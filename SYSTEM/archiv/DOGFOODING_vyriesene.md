@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-128** — Výška dreveného boxu zásuvky (Quadro) sa dá ručne znížiť: tretia os zámku (chip „box 360" s číselným poľom v riadku Zásuvka aj v karte čela), dielce boxu sa režú na zámok, zmenšená zóna = RED s náhradou — 13.9.2026, PR #363, v0.12.2
 - **D-94** — Rozklik nákupného riadku ukáže pôvod zoskupený po skrinkách (s počtami) a klik na skrinku či čelo ho označí v modeli a otvorí Inspector; rozklik prežije „Obnoviť" — 12.9.2026, PR #361, v0.12.1
 - **D-28** — Spoločný voliteľný vzhľad dosiek aj ABS, natívna mierka/PBR, knižnica SKM a zachovanie pri prestavbe/kópii — 12.9.2026, PR #353–#359, uzáver v0.12.0
 - **D-114** — Šesť ikon pridá priamo typ čela v jednom rade; kratšie texty, súhrn hrán a zachovaný fokus pri 470 px — 11.9.2026, PR #351, v0.11.0
@@ -116,6 +117,51 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-128 — ručná výška dreveného boxu zásuvky, vyriešené 13.9.2026
+
+**Výsledok: PR #363, v0.12.2.** Pri drevenom boxe (Quadro V6) sa výška boxu dá **ručne znížiť**. V riadku Zásuvka v kontexte Kovanie **aj v karte zásuvkového čela** stojí
+tretí chip osi — **„box 360"** vedľa „NL 450" — a hneď vedľa neho malé číselné pole s rozsahom v nápovede (napr. `58–360`). Používateľ napíše vlastnú výšku a stlačí Enter
+(alebo klikne mimo poľa); dielce boxu — **2 boky, vnútorné čelo a chrbát** — sa narežú na ňu, **dno sa nemení**. Klik na chip v stave „automat" zamkne aktuálny automat, klik
+na zamknutý chip zámok pustí. Nad automat sa zamknúť **nedá** (box väčší než zóna neexistuje) a pod minimum tiež nie (čelo a chrbát boxu potrebujú svojich 30 mm nad dnom).
+Keď sa zóna neskôr zmenší tak, že zámok už neplatí, zásuvka je **RED `box_lock_invalid`** — bez dielcov a bez kitu, s ponukou „Nahradiť za &lt;nový automat&gt;" (potvrdenie
+D-15) alebo „Odomknúť". Zámok sa **nikdy nemení sám**: tichá zmena výšky boxu by znamenala iný rez v objednávke, ktorú zákazník odsúhlasil.
+
+**Prečo tretia os, a nie rozšírenie výškovej.** Atira má výškové **varianty** (H70/H144/H176 — zoznam z receptu), Quadro má **spojitú** výšku boxu z geometrie. Sú to dve
+rôzne veci, preto má nová os vlastný kľúč `box` v payloade (nie `height`): Atira payload ostáva bajtovo zhodný a pravidlo „Quadro nemá kľúč `height`" platí ďalej. Z tej istej
+spojitosti plynie aj UI: ponuka so stovkami položiek nedáva zmysel, takže chip má **malé číselné pole** namiesto `<select>`.
+
+**Jedna funkcia rozsahu.** `Recipes.box_range(recipe, clear_h, part_thicknesses)` → `{min, max}`; číta ju resolver, payload osi aj zápisová akcia. `max` = automat
+(svetlá výška − vôľa receptu), `min` = `min_front_back_height` + **skutočná hrúbka dna** + odsadenie dna — 16 vs 18 mm dna dáva min 58 vs 60, takže kontext osi
+(`Construction.drawer_contexts`) od tejto dávky nesie aj `part_thicknesses`. Tri výpočty na troch miestach by sa časom rozišli a ponuka by sľubovala hodnotu, ktorú by
+zápis alebo stavba odmietla.
+
+**Dátový kontrakt.** Nové voliteľné pole **`box_height`** (mm Float > 0) v tom istom zázname `hardware_overrides` ako obe staršie osi, s tou istou identitou
+(`owner_part_key front:<id>/panel`, `generic_type slide`, `rule_id recipe:<id>`). Prijíma sa **len pre systém, ktorého resolver výšku boxu počíta** (nie Atira);
+inak ho normalizácia zahodí **s logom**. `CONFIG_SCHEMA` **13 → 14** — starší plugin by pole ticho zahodil a zásuvka by sa vrátila na automat, teda **iné dielce boxu
+v objednávke**. Odomknutie maže **len toto pole**: zámok NL tej istej zásuvky prežije.
+
+**Vedomé odchýlky a hranice rozsahu (audit Codex Astra, 13.9.2026):**
+
+- **Šablóny zámky nenesú** — je to existujúci a dokumentovaný kontrakt (`template_config_from` `hardware_overrides` neukladá vôbec a panel to hovorí), nie regresia.
+  `box_height` sa správa **presne ako** `nominal_length` a `height_variant`: vloženie zo šablóny = automat, aplikácia šablóny na existujúcu skrinku zámok cieľa nezhodí.
+  Zapísané v STANDARD §6 a v `hardware.md`, charakterizované testom.
+- **Neplatný zámok normalizácia zahodí LEN s logom** (vedomá odchýlka od návrhu auditu): config zapisuje výhradne server po validácii, takže neplatný tvar je externé
+  poškodenie — a oba existujúce zámky majú presne ten istý kontrakt. Trvalý „stav odmietnutého zámku" by bol nový perzistentný kontrakt mimo rozsahu tejto dávky.
+- **Dormantný zámok po prepnutí classic ↔ tipon** ostáva neviditeľný — existujúca medzera KOV-D4, ktorá platí rovnako pre všetky tri osi. D-128 ju nerozširuje ani
+  nezužuje; zaregistrovaná ako **D-132**.
+
+**Testy:** `tests/pure/test_d128_box_zamok.rb` (33 testov), `tests/js/test_d128_ui.js` (94 kontrol), in-SketchUp sekcia `run_d128` (model, kusovník, Späť/Redo, kópia,
+RED po zmenšení zóny, náhrada, odomknutie). Osem overených mutácií je v hlavičkách oboch sád.
+
+**Pôvodný plný text pri uzávere:**
+
+- **D-128 · Výška dreveného boxu zásuvky (Quadro) sa nedá nastaviť** (Michal 12.9.2026, po smoke D-94) — pri drevenom boxe (recept Quadro V6) výška boxu **plynie z geometrie**:
+  svetlá výška zóny − vôľa receptu (`box_clearance`), viď `explain` vetu „Výška boxu: X (svetlá … − vôľa …)" v `drawer_recipes.rb`. Hodnota **sa zobrazuje** len na čítanie
+  v sekcii Kovanie v riadku Zásuvka („box X mm", `Panel.drawer_row_text`) a v rozbalenom detaile s výpočtom — ale **nemá ovládač** a Michal ju ako nastaviteľnú hodnotu
+  hľadal a nenašiel (Codex #362: je to problém **objaviteľnosti + chýbajúceho zámku**, nie chýbajúceho zobrazenia). Otázka na overenie: má vzniknúť **ručný zámok výšky
+  boxu** (analógia zámku NL D-93 a zámku výškového variantu Atira `height_lock` — recept ho už pozná), a kde má stáť, aby sa dal nájsť. Dotýka sa receptu (dielce boxu sú
+  narezané na `box_height`) → zmena je výrobná, audit ÁNO. *Stav: OTVORENÉ — overiť a rozhodnúť v novom okne.*
 
 ### D-94 — nákup s pôvodom, vyriešené 12.9.2026
 

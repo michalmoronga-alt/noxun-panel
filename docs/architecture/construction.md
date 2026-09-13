@@ -69,6 +69,11 @@ zásuvky** — pomenovanou konštantou podľa umiestnenia boxu: dno `AXES_LYING`
 dĺžka = NL po hĺbke Y). Bez osí sa hrany nezafarbia a Kontrola olepov ich nezvýrazní. Otázku „pri stojacom dielci by L1 vyšla na spodnú hranu, kým páska ide na hornú" rieši
 `PartFaces::STANDING_EDGE_FACES` (otočená dvojica L1/L2 pre `STANDING_ROLES`) — recept, ABS pravidlá ani výrobné rozmery sa nemenia.
 
+**`drawer_contexts(cfg, plan, part_thicknesses)` = svetlé rozmery zásuvkových čiel pre PAYLOAD osí** (KOV-D2a; číta ju `CabinetBuilder.drawer_axis_contexts`). Vracia
+`{ front_id => ctx }` — ten istý `ctx`, s akým počítal resolver, plus **od D-128 aj `part_thicknesses`** (rola → mm z `drawer_thickness_map`, teda tie isté čísla, aké
+dostáva `resolve`): rozsah ručnej výšky boxu má dole **hrúbku dna**, takže bez nej by ju payload aj zápis museli hádať. Čelo, ktorého hranice plán nemá, sa **vynechá**;
+každá iná výnimka sa **zaloguje** (tichý široký rescue by fail-closed zásuvku vypustil z mapy osí bez stopy v diagnostike).
+
 **Zápisy, ktoré má vykonať builder,** cestujú v pláne ako `drawer_writes` (chýbajúci `drawer.system` a chýbajúci záznam mapy) a `drawer_override_writes` (D-93 migrácia
 legacy `rule_id` na `recipe:<recipe_id>`). Aplikuje ich `CabinetBuilder.apply_drawer_writes` v **tej istej operácii** ako geometriu, takže Undo vráti oboje naraz.
 
@@ -225,7 +230,11 @@ BIELY set z projektovej predvoľby a prvým zápisom by sa strata zvečnila (Cod
 · **`11` = KOV-E1b** (SYSTÉM VÝKLOPU NA ČELE): riadok čiel typu `lift` nesie **`lift: { system: 'hk_top' | 'hl_top' }`** a config nesie **výklopové dôvody**
 v `hardware_conflicts`. Starší plugin (schéma 10) `lift` nepozná: jeho `Fronts.normalize_items` ho whitelistom **zahodí** a prestavba by HL top ticho vrátila na HK —
 teda iný mechanizmus, iné ramená a iná tyč v objednávke; nové dôvody by z nosiča vypadli (`HW_CONFLICT_CODES` ich nepozná) a RED by zmizol. Brány sú tie isté ako pri 5–10.
-**`DRAWER_ACTIVATION_SCHEMA` ostáva 5** — je to VLASTNÁ konštanta práve preto, aby bump na 6 až 11 nespravil z každej skrinky schémy 5 „nemigrovanú" (`drawer_stale`).
+· **`12` = D-119** a **`13` = D-120** (samostatné presahy vľavo/vpravo a hrana úchytkového profilu) — vlastné odseky nižšie v tomto súbore.
+· **`14` = D-128** (RUČNÁ VÝŠKA DREVENÉHO BOXU): záznam `hardware_overrides` s `rule_id recipe:<id>` smie niesť pole **`box_height`** (mm Float), tretiu os zámku popri
+`nominal_length` a `height_variant`. Starší plugin (schéma 13) ho pri normalizácii **zahodí** whitelistom `norm_hardware_overrides`, takže zásuvka by sa ticho vrátila na
+**automatickú výšku boxu** — teda by narezal iné dielce boxu (2 boky, vnútorné čelo, chrbát), než odsúhlasila objednávka. Brány sú tie isté ako pri 5–13.
+**`DRAWER_ACTIVATION_SCHEMA` ostáva 5** — je to VLASTNÁ konštanta práve preto, aby bump na 6 až 14 nespravil z každej skrinky schémy 5 „nemigrovanú" (`drawer_stale`).
 **`HINGE_ACTIVATION_SCHEMA` = 9** je jej dvojička pre závesy (Codex #329 kolo 2 P1): skrinka uložená pod nižšou schémou nesie staré počty závesov, takže ju
 zber priznáva RED `hinge_stale` a brána zastaví nákup, rozpočet aj ponuku (VEPO nie) — detail v [outputs.md](outputs.md). **Sama o sebe schéma 9 RED
 nezhasína** (Codex #329 kolo 3 P1): kým sú pravidlá projektu spred F1, prestavba vyráta staré počty znova, takže nález drží aj druhá príčina

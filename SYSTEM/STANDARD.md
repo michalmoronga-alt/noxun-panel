@@ -192,6 +192,10 @@ seed `AbsRules` `SEED_VERSION` 4. Roly žijú na troch miestach naraz (`BuildPla
   dôvody v `hardware_conflicts` (§8). Starší plugin (schéma 10) `lift` nepozná — jeho normalizácia čiel ho **zahodí** a prestavba by HL top ticho vrátila na HK,
   teda iný mechanizmus, iné ramená a iná tyč v objednávke; nové dôvody by z nosiča vypadli a RED by zmizol. **`LIFT_ACTIVATION_SCHEMA` = 11** je aktivačná konštanta
   výklopov (skrinka postavená pod ňou nemá k čelu `flap` žiadne kovanie → `flap_stale`, §8) a pri budúcich bumpoch sa nehýbe.
+- **`14 = D-128` (v0.12.2): ručná výška dreveného boxu zásuvky.** Záznam `hardware_overrides` s `rule_id recipe:<id>` smie niesť pole **`box_height`** (mm Float > 0) —
+  **tretiu** os zámku popri `nominal_length` a `height_variant`. Starší plugin (schéma 13) ho pri normalizácii **zahodí** whitelistom `norm_hardware_overrides`, takže zásuvka
+  by sa ticho vrátila na **automatickú výšku boxu** — teda by narezal iné dielce boxu (2 boky, vnútorné čelo, chrbát), než odsúhlasila objednávka. `DRAWER_ACTIVATION_SCHEMA`
+  ostáva **5**, `HINGE_ACTIVATION_SCHEMA` **9** a `LIFT_ACTIVATION_SCHEMA` **11**. Brány sú tie isté ako pri 5–13.
 - **`rules_seed_version` — DRUHÁ proveniencia stavby (KOV-E1b, v0.9.54).** Config nesie **aditívne** pole so **seed verziou pravidiel kovania, s ktorou stavba bežala**
   (`HardwareRules.effective_seed_version`; chýbajúce pole = `0`). Zapisuje ho **výhradne stavba** (`cabinet_config`) — z klientskeho payloadu sa **nikdy nepreberá**,
   presne ako `config_schema`. Dôvod: projektový snapshot pravidiel sa zámerne nemerguje sám, takže prestavba starej zákazky zapíše aktuálnu schému, ale kovanie
@@ -552,16 +556,24 @@ Nákup si k nej hľadá set **triednym kľúčom** a na generický `slide` **nik
 **Ručné zásahy** žijú v configu korpusu ako `hardware_overrides` — identita zásahu = trojica **(owner_part_key, generic_type, rule_id)**;
 `quantity` prepíše počet, `disabled` položku vyradí, `nominal_length` prepíše dĺžku; šablóny korpusov zásahy zachovávajú.
 
-**ZÁMKY OSÍ ZÁSUVKY (KOV-D2a, v0.9.37).** Zásuvka z receptu má **dve** osi ručného zámku a obe žijú v tom istom zázname `hardware_overrides`:
-**`nominal_length`** (dĺžka výsuvu, D-93) a **`height_variant`** (výškový variant; celé číslo, **výhradne** na položke výsuvu (`generic_type: "slide"`), **výhradne** pri
-`rule_id recipe:<id>` a **výhradne pre Atiru** — Quadro výškové varianty nemá, `box_height` plynie z geometrie). Zámok = **existencia platného poľa**; `disabled: true`
-zámok nenesie. Obe brány (`generic_type` aj `rule_id`) platia **na oboch koncoch**: normalizácia pole zahodí s logom a zápisová akcia ho odmietne s hláškou — inak by
-v configu ostal **mŕtvy zámok**, ktorý čítač (`Recipes.height_lock_value` hľadá výhradne `slide`) nikdy neprečíta. Poradie resolvera je záväzné, lebo
-**rad NL JE per výška**: *zamknutá alebo automatická výška → rad NL tej výšky → zamknutá alebo automatická NL → dielce → nákupný selektor*. Zamknutá výška musí
-existovať v pripnutom recepte **a zmestiť sa**, inak RED `height_lock_invalid` bez dielcov aj výsuvu; zamknutá NL sa overuje proti radu **výslednej** výšky
+**ZÁMKY OSÍ ZÁSUVKY (KOV-D2a v0.9.37, tretia os D-128 v0.12.2).** Zásuvka z receptu má **tri** osi ručného zámku a všetky žijú v tom istom zázname `hardware_overrides`
+(identita `owner_part_key front:<id>/panel` + `generic_type slide` + `rule_id recipe:<id>`):
+
+- **`nominal_length`** — dĺžka výsuvu (D-93; `rule_id` smie byť aj legacy `vysuvy-nl-podla-hlbky`),
+- **`height_variant`** — výškový variant (celé číslo, **výhradne pre Atiru** — Quadro výškové varianty nemá),
+- **`box_height`** — výška dreveného boxu v mm (Float > 0, **výhradne pre systém, ktorého resolver výšku boxu počíta** — dnes Quadro V6; Atira ju nikdy nemá, tej výšku určuje
+  variant). Platný rozsah je **`min ≤ zámok ≤ max`, inkluzívne a bez EPS**, kde `max` = **automat** (svetlá výška − `box_clearance`; **nad automat sa zamknúť nedá**) a
+  `min` = `min_front_back_height` + **skutočná** hrúbka dna + `bottom_offset` (16 vs 18 mm dna = min 58 vs 60). Rozsah drží **jediná** funkcia `Recipes.box_range` — čítajú ju
+  resolver, payload osi aj zápisová akcia. Mimo rozsahu = RED **`box_lock_invalid`** bez dielcov aj výsuvu.
+
+Zámok = **existencia platného poľa**; `disabled: true` zámok nenesie. Obe brány (`generic_type` aj `rule_id`) platia **na oboch koncoch**: normalizácia pole zahodí s logom
+a zápisová akcia ho odmietne s hláškou — inak by v configu ostal **mŕtvy zámok**, ktorý čítač (hľadá výhradne `slide`) nikdy neprečíta. Poradie resolvera je záväzné, lebo
+**rad NL JE per výška**: *zamknutá alebo automatická výška (variant Atiry / výška boxu Quadra) → rad NL tej výšky → zamknutá alebo automatická NL → dielce → nákupný selektor*.
+Zamknutá výška musí existovať v pripnutom recepte **a zmestiť sa**, inak RED `height_lock_invalid`; zamknutá NL sa overuje proti radu **výslednej** výšky
 (zamknutá 520 po automatickom prechode H70 → H144 = `nl_lock_invalid`, **nikdy návrat na nižšiu výšku ani zmena NL**). Zápis ide **serverovou receptovou cestou**
-(vlastník → pripnutý recept → výsledná výška → jej rad; hodnoty z čerstvého serverového stavu, nikdy z payloadu) a **odomknutie osi maže LEN jedno pole** — druhý
-zámok tej istej identity prežije. Receptový zámok **nikdy** neprechádza `HardwareRules.apply_overrides` (prepol by `source` na `manual`).
+(vlastník → pripnutý recept → výsledná výška → jej rad, resp. rozsah boxu; hodnoty z čerstvého serverového stavu, nikdy z payloadu) a **odomknutie osi maže LEN jedno pole** —
+ostatné zámky tej istej identity prežijú. Receptový zámok **nikdy** neprechádza `HardwareRules.apply_overrides` (prepol by `source` na `manual`).
+**Žiadna os zámku necestuje v ŠABLÓNE** (`template_config_from` `hardware_overrides` neukladá vôbec) — vloženie zo šablóny je vždy automat a panel to používateľovi hovorí.
 
 **Ručná nominálna dĺžka výsuvu (D-93, V0.5.61).** Pole `nominal_length` v zázname `hardware_overrides` (Float mm > 0) je **zámok**: samotná **existencia platného poľa** znamená „drží sa ručná hodnota", žiadny ďalší príznak neexistuje. Pravidlá kontraktu:
 

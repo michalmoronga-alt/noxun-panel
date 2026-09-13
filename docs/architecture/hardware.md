@@ -1285,7 +1285,7 @@ Nič sa nezapisuje a vstupný stav sa nemutuje. `blocked` vetva (R-07, nekompati
 **Od KOV-C2b (v0.9.31) je modul ZAPOJENÝ:** `Construction.build_plan` ho volá pre každé klasifikované zásuvkové čelo (`drawer_pass`, viď
 [construction.md](construction.md)) a z neho vznikajú dielce v pláne aj **jedna** položka výsuvu.
 
-**Register brány `DRAWER_BLOCKERS` (12 kódov od KOV-D2a)** = `CONFLICT_CODES` (11, ktoré produkuje resolver) **+ 1 MIGRAČNÝ**. Delí sa na `BUILD_BLOCKERS` (10 fail-closed konfliktov
+**Register brány `DRAWER_BLOCKERS` (13 kódov od D-128)** = `CONFLICT_CODES` (12, ktoré produkuje resolver) **+ 1 MIGRAČNÝ**. Delí sa na `BUILD_BLOCKERS` (11 fail-closed konfliktov
 STAVBY: zásuvka nevydala ani dielec ani položku) a `ALL_EXPORT_BLOCKERS` = `drawer_kit_missing` (vzniká až v NÁKUPE) **+ `drawer_stale`** — jediný kód, ktorý neprodukuje
 resolver ani nákup, ale **čítanie modelu** (`Bom.collect`): skrinka uložená pred aktiváciou receptov (`config_schema < CabinetBuilder::DRAWER_ACTIVATION_SCHEMA`) má
 klasifikovanú zásuvku, takže v .skp **nie sú** receptové dielce a výsuv je legacy — kusovník aj VEPO by boli neúplné a ticho. Nápravou je **prestavba** skrinky.
@@ -1299,6 +1299,8 @@ projektovej predvoľby zásuviek ([materials.md](materials.md)); neznámy systé
 sa neukladá (schéma sa v C2c nemení), preto sa detail skladá **znova** — a to výhradne z toho, čo sa dá **dokázať**: z uložených `params` položky výsuvu a z **pripnutého**
 receptu (`load(params['recipe_id'])`). Preto sú vety **užšie** než `explain` v `resolve`: svetlé rozmery skrinky sa neukladajú, takže sa netvrdia. Neznámy alebo nečitateľný
 recept vráti **prázdny zoznam** — karta radšej nekreslí nič, než by ukázala vymyslené číslo. Čistá funkcia (číta len dátový pack), takže je headless testovateľná.
+**D-128 pridala voliteľný `axes:`** (tá istá mapa, akou panel kreslí chipy): pri `axes['box'].state == 'locked'` znie veta „Výška boxu X mm (ručný zámok; automat by dal Y mm)",
+pri `'conflict'` „Výška boxu X mm (ručný zámok NEPLATÍ — …)" — bez neho by karta pri aktívnom zámku **tvrdila vzorec**, z ktorého číslo neplynie. Bez `axes` sa nemení nič.
 
 **Dve vrstvy, jedna zodpovednosť každá:** fyzika (rozmery dielcov, výšky, rad NL) žije v **recepte**, objednávacie kódy v **setoch** (`hardware_sets`). Nákup nikdy nemení
 fyzický návrh: rad NL v recepte = rad, ktorý Noxun reálne kupuje, žiadni kandidáti ani fallback. **EB je pevné per recept** (Atira 10,5 · Quadro V6 23) — zmena hrúbky boku
@@ -1359,19 +1361,27 @@ Tiché prepnutie systému by k dielcom jedného systému objednalo kovanie druh�
 neprázdne `ctx[:obstructions]` → `drawer_obstruction` · **jedna výška** · **rad NL TEJ výšky** · **jedna NL** · nosnosť bunky · dielce · kontrola každého rozmeru
 proti `MIN_DIM`.
 
-**ZÁMKY OSÍ a ich poradie (KOV-D2a, Astra #20 B2).** Zásuvka má **dve** osi ručného zámku a obe žijú v tom istom zázname `hardware_overrides`
-(`generic_type slide`, `owner_part_key front:<id>/panel`): `nominal_length` (D-93; `rule_id` `vysuvy-nl-podla-hlbky` **alebo** `recipe:<id>`) a `height_variant`
-(KOV-D2a; **výhradne** `rule_id recipe:<id>` a **výhradne Atira** — Quadro výškové varianty nemá, `box_height` plynie z geometrie). Zámok = **existencia platného poľa**;
+**ZÁMKY OSÍ a ich poradie (KOV-D2a Astra #20 B2, tretia os D-128).** Zásuvka má **tri** osi ručného zámku a všetky žijú v tom istom zázname `hardware_overrides`
+(`generic_type slide`, `owner_part_key front:<id>/panel`): `nominal_length` (D-93; `rule_id` `vysuvy-nl-podla-hlbky` **alebo** `recipe:<id>`), `height_variant`
+(KOV-D2a; **výhradne** `rule_id recipe:<id>` a **výhradne Atira** — Quadro výškové varianty nemá) a **`box_height`** (D-128; **výhradne** `rule_id recipe:<id>` a **výhradne
+systém, ktorého resolver výšku boxu počíta** — dnes Quadro V6, na Atire nikdy). Zámok = **existencia platného poľa**;
 záznam s `disabled: true` zámok **nenesie** (ten istý kontrakt ako `HardwareRules.override_nominal_length`). Poradie je záväzné, lebo **rad NL JE per výška**:
 
-1. **zamknutá alebo automatická výška** — zamknutá musí existovať v pripnutom recepte **a zmestiť sa** (`min_clear_height ≤ clear_height`), inak RED
-   `height_lock_invalid` **bez dielcov aj výsuvu**; automat berie najvyšší variant, ktorý sa zmestí (Quadro: `box_height = clear_height − 40`, čelo/chrbát
-   `box_height − t_dna − 12 ≥ 30`);
+1. **zamknutá alebo automatická výška** — Atira: zamknutý variant musí existovať v pripnutom recepte **a zmestiť sa** (`min_clear_height ≤ clear_height`), inak RED
+   `height_lock_invalid` **bez dielcov aj výsuvu**; automat berie najvyšší variant, ktorý sa zmestí. Quadro: automat je `box_height = clear_height − 40` (čelo/chrbát
+   `box_height − t_dna − 12 ≥ 30`), **zamknutá** výška boxu musí ležať v rozsahu `box_range` — inak RED **`box_lock_invalid`**, rovnako bez dielcov aj výsuvu;
 2. **rad NL tej výšky** (`series_for`);
 3. **zamknutá alebo automatická NL** — zamknutá sa overuje proti radu **VÝSLEDNEJ** výšky: zamknutá 520 po automatickom prechode H70 → H144 (rad H144 520 nemá) je
    `nl_lock_invalid`, **nikdy návrat na H70 ani zmena NL**; automat berie najdlhšiu z radu s `min_depth ≤ clear_depth`.
 
-Dôvod, prečo zámok neplatí, skladá **jediná** funkcia per os — `height_lock_problem` a `nl_lock_problem`. Číta ich `resolve` (RED nález) **aj** payload osí (hláška chipu),
+**`box_range(recipe, clear_h, part_thicknesses)` = JEDINÁ funkcia rozsahu výšky boxu** (D-128) — číta ju resolver (`box_lock_problem`), payload osi (`Panel.drawer_box_axis`)
+aj zápisová akcia (`Panel.recipe_box_value`); druhý výpočet inde by sľuboval hodnotu, ktorú by iná cesta odmietla. `max` = **automat** (`clear_height − box_clearance`;
+nad automat sa zamknúť **nedá** — box väčší než zóna neexistuje), `min` = `min_front_back_height + t_dna + bottom_offset`, teda **skutočná** hrúbka dna rozhoduje
+(16 vs 18 mm = min 58 vs 60). Preto `Construction.drawer_contexts` nesie v `ctx` aj **`part_thicknesses`** — tie isté čísla, s akými počíta `resolve`. `nil` = rozsah sa určiť
+**nedá** (Atira, chýbajúca hrúbka dna) a volajúci to musí priznať; **`min > max`** (veľmi nízka zóna) je platný výsledok „zamknúť sa nedá nič" — payload vtedy dá
+`min`/`max`/`proposal` = `nil` a chip nemá čo ponúknuť. Bez zámku je taká zásuvka `drawer_no_fit` ako doteraz.
+
+Dôvod, prečo zámok neplatí, skladá **jediná** funkcia per os — `height_lock_problem`, **`box_lock_problem`** a `nl_lock_problem`. Číta ich `resolve` (RED nález) **aj** payload osí (hláška chipu),
 takže sa nemôžu rozísť; payload ich potrebuje preto, že zásuvka môže mať **skoršie** zlyhanie resolvera (prekážka, hrúbka, KD) a uložené `drawer_conflicts` o zámku vtedy
 nevedia vôbec. Opačné poradie krokov by pri zmene výšky ticho posunulo NL. Vety `explain` znejú „Výška: H144 (ručný zámok)" / „NL: 470 (ručný zámok)". Emitovaná položka výsuvu **ostáva
 `source: 'recipe'`** a nesie `locked: true` ako **súhrn** „aspoň jedna os je zamknutá" — receptový zámok **nikdy** neprechádza `HardwareRules.apply_overrides` (ten by pri NL
@@ -1396,10 +1406,10 @@ prepol zdroj na `manual` a nákup by prestal povyšovať chýbajúci kit na bloc
 hrana 1,0). `hardware_params` (`recipe_id`, `system`, `height_variant` | `box_height`, `nominal_length`, `load`, `opening`) je podklad pre **jednu** položku výsuvu, ktorú
 skladá C2. `explain` sú slovenské vety pre Inspector.
 
-**`OVERRIDE_CONFLICT_CODES` (KOV-D4)** = podmnožina troch kódov, ktorých **nápravou je riadok ručného zásahu** v Kovaní: `nl_lock_invalid` · `height_lock_invalid` ·
-`drawer_override_invalid`. Presne tie, ktorých veta už riadok menuje (`LOCK_HINT`, `Construction::ORPHAN_HINT`) — a jediné, pri ktorých smie deep-link Kontroly mieriť na záznam
+**`OVERRIDE_CONFLICT_CODES` (KOV-D4, od D-128 štyri kódy)** = podmnožina kódov, ktorých **nápravou je riadok ručného zásahu** v Kovaní: `nl_lock_invalid` · `height_lock_invalid` ·
+**`box_lock_invalid`** · `drawer_override_invalid`. Presne tie, ktorých veta už riadok menuje (`LOCK_HINT`, `Construction::ORPHAN_HINT`) — a jediné, pri ktorých smie deep-link Kontroly mieriť na záznam
 `hardware_overrides`. Je to **whitelist**: pri hrúbke, prekážke, KD, poškodenom pine či `drawer_stale` by reset zásahu konflikt nevyriešil (a riadok ani nemusí byť osirotený),
 takže blacklist by tichú chybu zdedil každému budúcemu kódu.
 
-**`CONFLICT_CODES`** = register 11 kódov brány `DRAWER_BLOCKERS` (KOV-C 10 + `height_lock_invalid` z KOV-D2a). C1 ich len **produkuje**; napojenie na `export_blockers`, `hardware_issues` a Kontrolu je
+**`CONFLICT_CODES`** = register 12 kódov brány `DRAWER_BLOCKERS` (KOV-C 10 + `height_lock_invalid` z KOV-D2a + `box_lock_invalid` z D-128). C1 ich len **produkuje**; napojenie na `export_blockers`, `hardware_issues` a Kontrolu je
 úloha C2 — v C1 preto `drawer_kit_missing` ani `drawer_override_invalid` nikto nevyrába, sú tu len ako jediné miesto pravdy o množine kódov.

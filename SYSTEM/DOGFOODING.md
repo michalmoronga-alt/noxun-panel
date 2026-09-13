@@ -36,12 +36,6 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
 
 ## V1 DOTIAHNUTIE
 
-- **D-128 · Výška dreveného boxu zásuvky (Quadro) sa nedá nastaviť** (Michal 12.9.2026, po smoke D-94) — pri drevenom boxe (recept Quadro V6) výška boxu **plynie z geometrie**:
-  svetlá výška zóny − vôľa receptu (`box_clearance`), viď `explain` vetu „Výška boxu: X (svetlá … − vôľa …)" v `drawer_recipes.rb`. Hodnota **sa zobrazuje** len na čítanie
-  v sekcii Kovanie v riadku Zásuvka („box X mm", `Panel.drawer_row_text`) a v rozbalenom detaile s výpočtom — ale **nemá ovládač** a Michal ju ako nastaviteľnú hodnotu
-  hľadal a nenašiel (Codex #362: je to problém **objaviteľnosti + chýbajúceho zámku**, nie chýbajúceho zobrazenia). Otázka na overenie: má vzniknúť **ručný zámok výšky
-  boxu** (analógia zámku NL D-93 a zámku výškového variantu Atira `height_lock` — recept ho už pozná), a kde má stáť, aby sa dal nájsť. Dotýka sa receptu (dielce boxu sú
-  narezané na `box_height`) → zmena je výrobná, audit ÁNO. *Stav: OTVORENÉ — overiť a rozhodnúť v novom okne.*
 - **D-129 · Úchytky sú v kontexte Čelá na dvoch miestach** (Michal 12.9.2026) — po KOV-A (smery otvárania) a D-120 (profil aj hrana) sa ovládanie úchytiek rozpadlo: skupina
   **Úchytky** (D-96 — hromadný profil/hrana per typ čela) a súčasne **karta čela** (profil, hrana, smer) — ten istý údaj sa nastavuje na dvoch miestach a členenie sekcie je
   chaotické. *Stav: OTVORENÉ — rieši sa ako súčasť D-130.*
@@ -50,6 +44,15 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
   pomocné texty (`.hint`) presunúť do tooltipov, prehodnotiť poradie a zbaľovanie skupín. Postup podľa [CLAUDE.md](../CLAUDE.md) (UX vzor s CAD precedensom): **debata
   s Michalom → draft → Antigravity outside-in → reconcile → mockup** (vzor `zdroje/ui20/`) **→ package → implementácia**. Platí trvalé pravidlo „vertikálny priestor je
   vzácny" ([PLAN.md](PLAN.md)). *Stav: OTVORENÉ — nové okno.*
+- **D-131 · Smer kresby čiel celej zákazky jedným klikom** (Michal 13.9.2026) — smer dekoru (pozdĺžna/priečna) sa dnes nastavuje len po jednom dielci v karte dielca (K1/D-108)
+  alebo v katalógu per dekor (mení knižnicu pre všetky zákazky, prejaví sa až prestavbou). Michal potrebuje **jedným klikom otočiť kresbu všetkých čiel v zákazke** (napr. celá
+  kuchyňa vodorovne). Návrh: akcia v Štúdiu nad všetkými skrinkami zákazky, zapisuje `part_overrides[..].grain_direction` čiel (existujúci kontrakt, žiadne nové dáta), jedna
+  operácia = jeden krok Späť, výsledok overí Kontrola kresby. Kandidát aj „aj na podobné dielce" v karte dielca (vzor ABS). *Stav: OTVORENÉ — zadanie po D-128; bez zmeny kontraktu.*
+- **D-132 · Dormantný zámok osi zásuvky po zmene otvárania je neviditeľný** (Codex audit D-128, 13.9.2026) — po prepnutí classic ↔ tipon sa pripne iný recept, starý záznam
+  `hardware_overrides` (NL, výška Atira alebo výška boxu) ostáva v configu, ale `override_orphan_kind` ho nevyhodnotí ako osirotený (identita nie je medzi položkami, nie je
+  `disabled`, vlastník nie je v konflikte) a riadok ručných zásahov ho nekreslí — používateľ ho nevie zrušiť, kým sa nevráti k pôvodnému otváraniu. Týka sa všetkých troch osí.
+  Riešenie: nový druh osirotenia „dormantný" (pôvodný recept + hodnota + Zrušiť) v riadku ručných zásahov; test oboma smermi.
+  *Stav: OTVORENÉ — samostatná fix dávka po D-128 (mení `override_orphan_kind` + JS filter).*
 
 - **Vedome odložené z dávky E — ceny (V1 rozsah)** (6.8., nič z toho neblokuje prácu so zákazkou) — **manuálne overenie ceny materiálov/ABS** BEZ väzby na Demos a **viac URL na položke**
   (zvyšok V1-03; dnes ich „Prepočítať ceny" preskočí) · ~~prepínač „na faktúru" (×1,2)~~ — **vyradené 6.9.2026** (Michal: existuje prepínač s DPH / bez DPH); zvyšok rozhodnutý v `zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md`.

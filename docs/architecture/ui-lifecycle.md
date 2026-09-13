@@ -902,7 +902,10 @@ Chipy dostáva aj **konfliktná** karta (stav `conflict`) — práve z nej sa mu
 potlačí, ak ju doslovne opakuje niektorá os v konflikte** (`frontDrawerAxesSay`, Codex #313 kolo 1 P2-2): pri `height_lock_invalid` / `nl_lock_invalid` je to ten istý uložený
 reťazec z `drawer_conflicts` a karta by ho vypísala dvakrát. Zhoda sa porovnáva **doslovne** — konflikt, o ktorom os nevie (prekážka, hrúbka, KD), ostáva jediným miestom, kde
 sa dôvod dá prečítať. Kontrakt chipov, kliku a náhrady je v odseku „Kontext Kovanie" nižšie. **Chipy „otváranie" a „nosnosť" z mockupu sa VEDOME nepridali** (vertikálny priestor — riadok zhrnutia ich už nesie; `UI20_KONTRAKT.md` §7).
-Ručný zámok dĺžky priznáva navyše veta `locked_note` pod riadkom.
+**D-128 pridala TRETÍ chip `box 360`** (drevený box Quadra) s malým číselným poľom vedľa — detail v odseku „Kontext Kovanie" nižšie; Atira ho nemá.
+Ručné zámky priznáva navyše veta `locked_note` pod riadkom — od D-128 **menuje práve zamknuté osi** („Ručne zamknuté: výška boxu · dĺžka výsuvu (Inspector → Kovanie).")
+namiesto pôvodnej vety o dĺžke výsuvu pri každom `locked: true`, a **rovnaký stav osí** používa `Recipes.explain_stored(params, axes:)`, aby veta Technického detailu pri
+aktívnom zámku netvrdila vzorec „svetlá výška zóny − vôľa".
 
 **PONUKA NOVEJ VERZIE RECEPTU (KOV-D3b).** Úplne naspodku karty — **až pod** jantárovým odporúčaním synchronizácie, lebo to je upozornenie na terajší stav, kým toto je
 príležitosť — stojí `.dwup`: jedna tlmená veta `inforow` („Dostupný recept v2 — &lt;release_note&gt;") a pod ňou **ghost** tlačidlo „Prejsť na v2…". Blok vzniká **výhradne**
@@ -1203,14 +1206,21 @@ zámer: karta čela žiadny `.hwrow` nemá.
 - **Konflikt** dostane červený riadok s **vetou zo servera** (`axes[os].message` — panel žiadnu vlastnú neskladá) a dve cesty von: **„Nahradiť za …"** len keď server dal
   `proposal`, a **„Odomknúť"** vždy. Náhrada je jedno rozhodnutie, takže ide cez **kostru D-15** (`NXModal.open` bez polí, `okLabel: 'Nahradiť'`); bez kostry sa neodošle nič —
   zmena zamknutej hodnoty bez potvrdenia je presne to, čomu sa dávka vyhýba. Po potvrdení sa zapíše `proposal` a náhrada **ostáva zamknutá**; druhý zámok server nemení.
-- **Zápis ide EXISTUJÚCOU akciou** `set_hardware_override` (`field` `height_variant` / `nominal_length`) cez `hwSend` → `nxDocPayload`, teda s guardom dokumentu aj skrinky.
+- **Zápis ide EXISTUJÚCOU akciou** `set_hardware_override` (`field` `height_variant` / **`box_height`** / `nominal_length`) cez `hwSend` → `nxDocPayload`, teda s guardom dokumentu aj skrinky.
   Žiadny nový callback, žiadny druhý tvar payloadu. Po zápise príde plný push a chipy sa prekreslia z nového `axes` — panel si stav osi **nikdy nepamätá**.
 - **Modal náhrady zatvára AŽ potvrdenie servera** (Codex #313 kolo 1 P2-1; kontrakt D-15 „zápis okno nezatvára", GH #138 P2 / audit #10). `onSubmit` len **zamkne** okno
   (`NXModal.setBusy(true)`) a pripne k odoslaniu **korelačný token** (`ax_token`, rastúci `a<N>`); server ho vracia v `NX.hwAxResult(ok, msg, token)` a `onHwAxResult` porovnáva
   **jeho** — korelovať podľa druhu operácie nestačí, odpoveď na staršie odoslanie by zavrela okno, ktoré už čaká na niečo iné (lekcia KOV-H2, Codex #285 P2-A). Úspech okno
   zatvorí, **odmietnutie ho odomkne a hlášku ukáže V ŇOM** — inak by používateľ pri zastaranom `proposal` (medzitým zmenený výber) videl len status pod prázdnou kartou.
   Server odpovedá **v každej vetve** `handle_set_hardware_override` (`axis_fail` / `push_axis_result`) a **len keď token prišiel** — klik na chip žiadne okno nečaká.
-- **Fokus prežije prekreslenie karty** (Codex #313 kolo 1 P2-4). Každý ovládač chipov nesie okrem `data-ax` (os) aj **`data-axc`** (druh: `chip` · `sel` · `fix` · `unlock`);
+- **Os `box` má POLE, nie ponuku (D-128).** Výška dreveného boxu je **spojitý rozsah** (58–360 mm po desatinách), takže `<select>` by musel mať stovky položiek. `hwAxChipHtml`
+  preto pre `box` kreslí `hwAxNumHtml` — malé `<input class="axnum" data-axc="num">` (46 px, tokeny `.axsel`): prázdne s rozsahom v `placeholder` v stave `auto`, so zamknutou
+  hodnotou v stave `locked`. **Enter alebo blur so ZMENENOU hodnotou** zapíše (`onHwAxNum`); prázdne pole a nezmenená hodnota **neposielajú nič**, takže z tejto cesty
+  **nikdy nevznikne `value: null`** — odomknutie ostáva vedomým klikom na chip alebo na „Odomknúť". V stave `conflict` sa pole **nekreslí** (rovnako ako sa nekreslí ponuka)
+  a nekreslí sa ani pri **prázdnom alebo neurčiteľnom rozsahu** (`min`/`max` = `null`, veľmi nízka zóna) — zamknúť sa nedá nič a server by to aj tak odmietol.
+  `data-min`/`data-max` a HTML atribúty **nie sú ochrana**: o platnosti rozhoduje výhradne server (`Recipes.box_range`). Klient overuje **celý text prísne** (`hwAxNum`:
+  trim → desatinná čiarka → `^\d+(\.\d+)?$` → konečné a kladné) — `parseFloat` by z „1e309" spravil Infinity a z „300,5xx" číslo 300, teda iný rozmer boxu, než je na obrazovke.
+- **Fokus prežije prekreslenie karty** (Codex #313 kolo 1 P2-4). Každý ovládač chipov nesie okrem `data-ax` (os) aj **`data-axc`** (druh: `chip` · `sel` · **`num`** · `fix` · `unlock`);
   `frontCardFocusKey` z dvojice skladá kľúč `a:<os>|<druh>` a `frontCardFocusSelector` z neho selektor. Hodnota (`data-val`) v kľúči **nie je** — po zamknutí sa mení, takže by
   fokus nemal čo nájsť. Bez toho by fokus padol na dokument po každom pushi, teda po **každom** zamknutí — presne pri klávesovej práci so zámkom.
 
@@ -1511,15 +1521,21 @@ aplikovateľnosti smeru (`Fronts.direction_slots`, KOV-A1) nad **uloženým** `f
 z počtu krídel neodvodzuje. **`wings_n` je súčasťou záznamu** (Codex #281 P2-A) a pri neznámom počte je `nil`: legacy záznam bez `wings_n` (pred D-07) tak dá `{ nil, [] }` —
 prázdne sloty **a priznané neznámo**, takže karta o ňom nepovie ani „pýtam sa", ani „je to dvojkrídlo".
 
-**`axes` — stav osí zámku (KOV-D2a, Astra #20 F7).** `drawer_axes_map` skladá pre každé klasifikované zásuvkové čelo mapu
-`owner_part_key → { height?: {...}, nl: {...} }` a vešia ju **na obe strany**: na emitovanú položku výsuvu (`attach_drawer_axes`, len `source: 'recipe'`) **aj** na riadok
+**`axes` — stav osí zámku (KOV-D2a Astra #20 F7, tretia os D-128).** `drawer_axes_map` skladá pre každé klasifikované zásuvkové čelo mapu
+`owner_part_key → { height?: {...}, box?: {...}, nl: {...} }` a vešia ju **na obe strany**: na emitovanú položku výsuvu (`attach_drawer_axes`, len `source: 'recipe'`) **aj** na riadok
 ručného zásahu (`attach_override_axes`) — pri konflikte totiž položka fail-closed **nevznikne** a odomknúť sa musí dať aj tak. Každá os nesie
 `state` (`auto` | `locked` | `conflict`), `value`, `options` (hodnoty, ktoré sa **dajú** zamknúť: výšky receptu, ktoré sa zmestia do svetlej výšky; NL z radu **výslednej**
 výšky, ktoré sa zmestia do hĺbky), pri konflikte `message` a `proposal`. **Invariant: os so `state: 'conflict'` má vždy `message`** — uložený dôvod z `drawer_conflicts`
 sa použije len keď **sedí kód**, inak sa veta odvodí z receptu a kontextu tou istou funkciou, akou ju skladá resolver (`Recipes.height_lock_problem` / `nl_lock_problem`).
 Bez toho by zásuvka so **skorším** zlyhaním (prekážka, hrúbka, KD) **a** neplatným zámkom ukázala konflikt aj návrh bez jediného slova prečo — návrh náhrady **z receptu a geometrie**,
 nikdy z dostupných kódov. Návrh mení **len opravovanú os**: druhý zámok ostáva a znova sa overí, a keď pri ňom platná náhrada neexistuje, `proposal` je `nil`
-(D2b potvrdenie neponúkne). **Quadro nemá kľúč `height` vôbec** (nie `state: 'auto'`) — os, ktorá neexistuje, sa neponúka. Pri konflikte **výšky** je ponuka NL prázdna
+(D2b potvrdenie neponúkne). **Quadro nemá kľúč `height` vôbec** (nie `state: 'auto'`) — os, ktorá neexistuje, sa neponúka; miesto neho má **`box`** a **Atira zase nemá `box`**.
+
+**Os `box` (D-128) — SPOJITÝ rozsah, teda žiadne `options`.** `drawer_box_axis` dáva `{ state, value, min, max, message?, proposal? }`, kde `min`/`max` sú z **jedinej**
+funkcie `Recipes.box_range` (`ctx[:part_thicknesses]` — teda **skutočná** hrúbka dna: 16 vs 18 mm = min 58 vs 60). `max` je **automat**, preto je aj `proposal`om pri konflikte —
+nad automat sa zamknúť nedá. **Prázdny rozsah** (`min > max`, veľmi nízka zóna) aj neurčiteľný rozsah dávajú `min`/`max`/`proposal` = `nil`: JS vtedy nekreslí pole ani ponuku
+náhrady a server taký zápis odmietne (obe brány). Nový kľúč je `box`, **nie** `height` — Atira payload tak ostáva bajtovo zhodný a pravidlo „Quadro nemá `height`" platí ďalej.
+Pri konflikte **výšky** je ponuka NL prázdna
 a riadok to prizná (`blocked_by: 'height'`): rad NL je per výška, takže sa nemá z čoho počítať. Svetlú výšku ani hĺbku config **neukladá**, preto sa `ctx` prepočítava
 z plánu (`CabinetBuilder.drawer_axis_contexts` → `Construction.drawer_contexts`) — tými **istými** číslami, z ktorých počíta `Recipes.resolve`; druhý výpočet inde by sa
 časom rozišiel a ponuka by sľubovala hodnotu, ktorú resolver odmietne. Existujúce `nl` bloky D-93 a súhrnné `locked` ostávajú **nedotknuté** (payload je aditívny).
@@ -1528,7 +1544,8 @@ z plánu (`CabinetBuilder.drawer_axis_contexts` → `Construction.drawer_context
 je odvtedy tenký obal nad ním, takže in-SketchUp `run_kovd2a` ani ostatní čitatelia sa nemenia) a `idents` (identita zápisu per čelo: `owner_part_key` · `generic_type` `slide` ·
 `rule_id` `recipe:<id>`). Dva prechody by znamenali **druhé `Recipes.load`** na každý push panela — to číta súbor a overuje odtlačok. `attach_front_drawer_axes` z indexu obohatí
 `front_drawer[fid]` o `axes` (**tú istú inštanciu**, žiadny druhý výpočet) a `lock` = identitu doplnenú o `cabinet_id` (guard F6 — klik z karty musí byť rovnako chránený ako klik
-v riadku). Panel si identitu skladať **nesmie**: `recipe:<id>` pozná len server, a z `front_id` odvodený kľúč by po zmene pripnutého receptu ukazoval na inú položku. Záznam bez
+v riadku). **D-128 posunula výpočet indexu PRED `front_drawer_payload`** (v `cabinet_payload` aj v `front_drawer_refresh`): riadok karty z neho skladá vetu `locked_note`
+(menuje práve zamknuté osi) a `Recipes.explain_stored(params, axes:)` (pri aktívnom zámku netvrdí vzorec). Je to stále **jeden** výpočet, len skôr. Panel si identitu skladať **nesmie**: `recipe:<id>` pozná len server, a z `front_id` odvodený kľúč by po zmene pripnutého receptu ukazoval na inú položku. Záznam bez
 osí (`stale`, čelo s nenačítateľným receptom) ostáva presne taký, aký bol v C2c.
 
 **KOV-D4 — osi dostane LEN záznam PRIPNUTÉHO receptu.** `attach_override_axes` berie od D4 celý `index` (nie len `by_owner`) a `active_lock_rules` z jeho `idents` prečíta
@@ -1788,8 +1805,8 @@ Doména panela: ručné zásahy do počtov kovania (`handle_set_hardware_overrid
 a výber setu na skrinke (`handle_set_hardware_set`, V0.6 D1b, H1b/D-81 aj per-dielec). Pravidlá a sety sú v [hardware.md](hardware.md), UI v odseku „Kontext Kovanie (UI-C4…)".
 Obe cesty overujú identitu **dokumentu** (`foreign_document?`, R-02) **pred** identitou rendrovanej skrinky (`cabinet_id`) a zápis vždy beží ako jeden rebuild = jeden krok Späť.
 
-**RECEPTOVÁ zapisovacia cesta zámkov osí (KOV-D2a, Astra #20 F5).** `OVERRIDE_FIELDS` má od tejto dávky štyri polia (`quantity` · `disabled` · `nominal_length` ·
-`height_variant`) a **musí sa zhodovať** s `CabinetBuilder::OVERRIDE_CONTENT_KEYS` (stráži guard test) — inak by panel uložil pole, ktoré normalizácia zahodí.
+**RECEPTOVÁ zapisovacia cesta zámkov osí (KOV-D2a Astra #20 F5, tretia os D-128).** `OVERRIDE_FIELDS` má od D-128 **päť** polí (`quantity` · `disabled` · `nominal_length` ·
+`height_variant` · **`box_height`**) a **musí sa zhodovať** s `CabinetBuilder::OVERRIDE_CONTENT_KEYS` (stráži guard test) — inak by panel uložil pole, ktoré normalizácia zahodí.
 Validácia hodnoty sa **rozdvojuje podľa `rule_id`**: projektové pravidlo ide ako dosiaľ cez `series_value?` (rad `fit_series` zo snapshotu), receptová položka
 (`rule_id recipe:<id>`) ide **úzkou serverovou vetvou** `recipe_lock_context` — *vlastník (čelo) → jeho **pripnutý** recept (`Recipes.active_ref` nad uloženými
 `recipe_refs`) → **výsledná výška** → rad tej výšky*. Výslednú výšku hľadá `recipe_result_height` v troch krokoch: **(1)** platný uložený **výškový zámok** (rad NL sa
@@ -1800,6 +1817,10 @@ fail-closed zásuvka (napr. NL zámok mimo radu po zmenšenej hĺbke) položku *
 D-93 `series_value?` hľadá výhradne projektové `fit_series`, takže zámok NL zásuvky sa dovtedy z panela uložiť **nedal**. Každý článok reťaze sa číta z **čerstvého
 serverového stavu** (uložený config skrinky), nikdy z payloadu: chip na obrazovke môže byť o generáciu starší než model. `rule_id`, ktorý nesedí s pripnutým receptom,
 sa **odmieta** („položka sa medzitým zmenila"), Quadro výškový zámok odmieta hláškou (systém výškové varianty nemá) a výška mimo `height_variants` receptu tiež.
+**`recipe_box_value` (D-128)** je tretia vetva tej istej reťaze: brány `lock_item?` + `recipe_rule?`, na **Atire odmietnutie** („tento systém má výškové varianty — použi výšku H"),
+tvar hodnoty **strict** (`Float(raw, exception: false)` + `finite?` + `> 0`, takže „Infinity" ani `1e309` neprejdú) a rozsah proti **čerstvému** `ctx` cez `Recipes.box_range`
+(hláška menuje `min–max` aj automat). Neurčiteľný kontext = **odmietnutie**, nikdy odhad („Rozmery zásuvky sa nepodarilo prečítať — výška boxu sa uložiť nedá."). Preto
+`recipe_lock_context` od D-128 číta `drawer_axis_ctx` pre **všetky** systémy, nie len pre Atiru — rozsah boxu stojí na svetlej výške **a** na hrúbke dna.
 **Odomknutie osi** je `field` + `value: null`: `merge_override` zmaže **jedno** pole a druhý zámok tej istej identity prežije; záznam zaniká až prázdny. Reset **celého**
 záznamu (`reset: true`) ostáva pre `disabled`/`quantity` a pre osirotené zásahy.
 
@@ -1841,7 +1862,9 @@ prekážku aj **chýbajúci kit** k výslednej výške/NL. Odmietnutie = **nezap
 — vzor `drawer_override_migration`). **Kolízna brána:** ak na cieľovom `rule_id` toho istého vlastníka už záznam leží a jeho obsah **nie je totožný** s preadresovaným
 (vrátane prípadu „zdroj neexistuje, dormantný cieľ áno"), upgrade sa **odmietne** — zlúčenie by ticho aktivovalo cudziu hodnotu. Dormantné zámky **iných** receptov
 (iné otváranie) sa nedotýkajú. Úspešný zápis je **jedna operácia** (`CabinetBuilder.rebuild`): nový ref v mape + preadresované zámky + prestavba = **jeden krok Späť**,
-Redo obnoví všetko súčasne.
+Redo obnoví všetko súčasne. **`UPGRADE_LOCK_AXES`** (`height` → `height_variant`, **`box` → `box_height`** od D-128, `nl` → `nominal_length`) je zrkadlo osí payloadu:
+kľúče musia sedieť s osami `drawer_axes` a hodnoty musia byť poľami z `OVERRIDE_FIELDS` (stráži guard test) — inak by preflight zámok znovu neoveril a tabuľka dopadu
+by menovala inú os, než ktorá je zamknutá.
 
 ### actions_materials.rb
 
