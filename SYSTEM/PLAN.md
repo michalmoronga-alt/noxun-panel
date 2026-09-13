@@ -242,8 +242,10 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   + „Použiť na všetky čelá (N)" a read-only stav „teraz: …". Zapisuje sa **existujúci** override `part_overrides[..].grain_direction` všetkých fyzických čiel (dvierka po
   krídlach, zásuvkové čelá, výklopy/sklopy, blendy) a všetky skrinky sa prestavia v **jednej operácii = jeden krok Späť**. Bez zmeny kontraktu; projektová predvoľba pre
   budúce skrinky sa vedome nezaviedla (hint aj tlačidlo to hovoria). **PR #365, v0.12.3.**
-- **D-132 · Dormantný zámok osi zásuvky po zmene otvárania je neviditeľný** — `override_orphan_kind` ho nevyhodnotí ako osirotený, riadok ručných zásahov ho nekreslí; nový druh osirotenia „dormantný" — fix dávka po D-128.
-- **D-133 · „Nahradiť UNI…" — rozsah skriniek ako výstupy (top-level) + preskočenie skriniek s odpojeným dielcom** — zber cez `Ids.each_of_kind` vidí aj vnorené skrinky a odpojené dielce nerieši; zjednotiť s D-131 (`front_grain_scan`/skip dôvody) — malá fix dávka po D-132.
+- ✅ **D-132 · Dormantný zámok osi zásuvky je viditeľný a dá sa zrušiť** — `override_orphan_kind` pozná štvrtý druh osirotenia **`dormant`** (zámok, ktorý dnes nikto nečíta:
+  pripnutý je iný recept · čelo už nie je zásuvka · čelo zaniklo). V Kovaní je z neho riadok „Dormantný zámok · NL 470" so serverovou poznámkou o dôvode a tlačidlom
+  „zrušiť" (existujúca cesta `reset: true` = jeden krok Späť). Bez zmeny kontraktu; chipy osí, nákup ani Kontrola sa nemenia. **PR #367, v0.12.4.**
+- **D-133 · „Nahradiť UNI…" — rozsah skriniek ako výstupy (top-level) + preskočenie skriniek s odpojeným dielcom** — zber cez `Ids.each_of_kind` vidí aj vnorené skrinky a odpojené dielce nerieši; zjednotiť s D-131 (`front_grain_scan`/skip dôvody) — malá fix dávka, na rade po D-132.
 - *(Vkladanie na klik — V1-04 — sa 26.8. vyčlenilo do vlastného bloku **GHOST VKLADANIE**; ten je od 31.8.2026 **hotový** (v0.9.0), plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).)*
 - **Konštrukcia — rozhodnuté 6.9.2026** ([zdroje/next_sessions/V1_DEBATA_2026-09-05_KONSTRUKCIA.md](zdroje/next_sessions/V1_DEBATA_2026-09-05_KONSTRUKCIA.md)): **K1 odsadenia** — dva prípady, jedna
   hodnota per skrinka (komín vzadu: dno a strop kratšie, chrbát na ich zadnej hrane · strop zapustený vpredu), nastaviteľné, nefixované · **K2 chrbát z výstuh** — nový typ chrbta:

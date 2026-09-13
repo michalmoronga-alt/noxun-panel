@@ -539,6 +539,12 @@
   .hwrow .hwbtn { flex: 0 0 auto; padding: 2px 5px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
   .hwrow .hwsrc { flex: 0 0 auto; width: 16px; }
   .hwrow.hwoff .hwname { color: var(--nx-ink-faint); }
+  /* D-132: DORMANTNY zamok osi — zatvoreny zamok pred nazvom a pod riadkom
+     serverova poznamka s dovodom (`.axnote`, ten isty tlmeny styl ako pri
+     chipoch osi). Ziadna nova farba ani token; riadok ostava jednoriadkovy,
+     poznamka je druhy riadok LEN tam, kde dovod naozaj je. */
+  .hwrow.hwoff > .ic { width: 13px; height: 13px; color: var(--nx-ink-faint); }
+  .hwitem > .axnote { margin-left: 2px; }
   .hwrow .hwqty.manual, .hwrow.manual .hwqty { border-color: var(--nx-warn); background: var(--nx-warn-bg); }
   /* D-81: vyber setu PRIAMO v riadku kovania dielca — kompaktne, aby riadok
      ostal jeden (vertikalny priestor). Riadok setu CELEJ skrinky (.hwsetrow)
@@ -634,6 +640,9 @@
             border: 0; background: var(--nx-surface-sunken); font: inherit; font-size: 11px;
             font-weight: 600; color: var(--nx-ink-strong); cursor: pointer; text-align: left; }
   .hwboxh:hover, .hwboxh:focus-visible { color: var(--nx-select); }
+  /* D-132: hlavicka boxu ZANIKNUTEHO vlastnika nie je tlacidlo (nie je co
+     oznacit) — zhodny vzhlad, len bez kurzora ruky a bez hover farby. */
+  .hwboxh-static, .hwboxh-static:hover { cursor: default; color: var(--nx-ink-strong); }
   .hwboxh .ic { width: 12px; height: 12px; flex: 0 0 12px; color: var(--nx-ink-faint); }
   .hwboxh:hover .ic, .hwboxh:focus-visible .ic { color: var(--nx-select); }
   .hwboxt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

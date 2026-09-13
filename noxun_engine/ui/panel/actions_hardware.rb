@@ -286,7 +286,9 @@ module Noxun
           fid = PartKeys.front_id(owner.to_s)
           return nil if fid.nil?
 
-          CabinetBuilder.drawer_axis_contexts(CabinetBuilder.config_to_params(cfg))[fid]
+          # `nil` = citanie kontextov zlyhalo (D-132 review P3) — pre TUTO cestu
+          # je to to iste ako „celo kontext nema": zapis sa fail-closed odmietne.
+          (CabinetBuilder.drawer_axis_contexts(CabinetBuilder.config_to_params(cfg)) || {})[fid]
         end
 
         # NL zamok receptovej polozky: hodnota MUSI byt presne v rade VYSLEDNEJ

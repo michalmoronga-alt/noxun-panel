@@ -1194,6 +1194,18 @@ zhodný s D1b).
 takže toto poradie prežije aj ľahký push), **riadok osiroteného zásahu** (`hwOffHtml`, ktorý sa preto obalí do `.hwitem`) a **karta čela**. Vlastný obal namiesto `.hwrow` je
 zámer: karta čela žiadny `.hwrow` nemá.
 
+**RIADOK OSIROTENÉHO ZÁSAHU (`hwOffHtml`) — štyri druhy, texty zo servera.** `hwDisabledOffs` filtruje **na `orphan`** (server je autorita), `hwOffLabel` dá krátku príponu stavu
+a `hwOffName` názov (`orphan_label`, keď ho server poslal). Druhy: `disabled` → „obnoviť" (`onHwEnable`) · `invalid` a **`dormant`** (D-132) → „zrušiť" (`onHwOrphanReset`,
+`reset: true`) · `part_material` → „zrušiť" vlastnou akciou. **Dormantný** riadok navyše nesie zatvorený zámok zo sprite (`lock`) a **pod riadkom** serverovú poznámku
+`orphan_note` (`.axnote`, ten istý tlmený štýl ako poznámka chipu) — riadok sa preto obalí do `.hwitem` rovnako ako pri chipoch. Poznámku skladá **výhradne server**: veta
+„teraz je pripnutý *Atira SiSy v1*" stojí na tom, ktorý recept čelo má, a to JS vedieť nesmie. Bez kľúča `orphan_note` sa druhý riadok **nekreslí vôbec** (vertikálny priestor).
+Chipy osí dormantný riadok **nedostáva** (KOV-D4 bod 3) — server mu ich neposiela.
+
+**BOX ZANIKNUTÉHO VLASTNÍKA (D-132, review P3).** Keď zámok patril čelu, ktoré už v zákazke nie je, server pošle riadku **`orphan_owner_gone: true`** a vlastný `owner_label`
+„(už neexistuje) · pôvodné zásuvkové čelo" — `PartKeys.human_label` by inak tvrdil „F9 · zásuvkové čelo", hoci **`F#` je poradie v resolved čelách** a to čelo medzi nimi nie
+je. `hwBoxGone(g)` (box **bez** živých položiek, ktorého **všetky** osirotené riadky nesú ten príznak) prepne hlavičku na **statický `div`** — bez oka a bez
+`onHwOwnerPick`, lebo `nx_select_hw_owner` by hľadal dielec, ktorý v modeli neexistuje. Hlavička ostáva **súrodencom** `.hwboxb` v oboch podobách (invariant UI-C4).
+
 - **Stav je serverový enum** (`auto` | `locked` | `conflict`); čokoľvek iné sa kreslí ako `auto` (nikdy sa nedomýšľa stav, ktorý server nepovedal). `locked` = jantárová rodina
   (`--nx-warn-*`, zatvorený zámok zo sprite), `conflict` = červená (`--nx-err-*`), `auto` = neutrálny chip s otvoreným zámkom. Žiadna nová farba, žiadne emoji.
 - **Hodnota do zápisu ide VŽDY zo servera**, nikdy z textu chipu: `data-val` nesie `axes[os].value` (resp. hodnotu z `options` alebo `proposal`). Text je popisok pre človeka
@@ -1558,7 +1570,8 @@ osí (`stale`, čelo s nenačítateľným receptom) ostáva presne taký, aký b
 `owner_part_key → rule_id` **pripnutého** receptu. **Dormantný zámok iného receptu** — zostal po zmene otvárania (`classic` ↔ `tipon` = iný recept) alebo po prechode zásuvka →
 dvierka → zásuvka — chipy **nedostane**: `Recipes.lock_value` ho aj tak nepoužije, ale chipy by ukazovali stav **aktuálneho** receptu, kým zápis by šiel na **cudzí** `rule_id`.
 Záznam v zozname **ostáva** (riadok osiroteného zásahu ho ukáže aj s „zrušiť"), len bez chipov. Je to **čítacia** zmena payloadu — jadro (resolver, normalizácia, schéma) sa
-nedotklo.
+nedotklo. **Od D-132** dostáva `hardware_overrides_payload` **ten istý index** (tretí, voliteľný argument), takže vie, ktorý recept je pripnutý a ktoré čelá existujú — a taký
+záznam označí ako **`orphan_kind: 'dormant'`** s hotovým `orphan_label` a `orphan_note`. Bez indexu (starší volajúci, test) je payload zhodný s tým spred D-132.
 
 **`front_drawer` (KOV-C2c).** Druhý — **vlastný** — kanál toho istého pushu: mapa `front_id → záznam riadku zásuvky` pre čelá, ktoré `Recipes.classified?` pozná ako zásuvku.
 Do `front_slots` sa **nezlučuje** zámerne: ten odpovedá výhradne na otázku „kde sa pýta smer". Záznam skladá `front_drawer_payload` **čítacím** spôsobom z uloženého configu —

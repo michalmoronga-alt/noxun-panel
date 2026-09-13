@@ -748,7 +748,9 @@ NxTest.test('Codex #304 P1: RESET zaznamu odstrani konflikt (zelene)') do
   NxTest.assert(act.include?("return [:all, nil, nil] if truthy?(data['reset'])"),
                 '`reset` zahadzuje CELY zaznam')
   pay = c.src_ui(File.join('panel', 'payloads.rb'))
-  NxTest.assert(pay.include?("HardwareRules.override_orphan_kind(ov, items, owners)"),
+  # D-132: klasifikator dostal dva dalsie argumenty (pripnute recepty +
+  # existujuce cela), volanie ostava JEDNO a nad KAZDYM zaznamom.
+  NxTest.assert(pay.include?("HardwareRules.override_orphan_kind(ov, items, owners, active, front_owners)"),
                 'payload panela klasifikuje kazdy zaznam')
 end
 

@@ -610,8 +610,12 @@
   // (KOV-C2b — celo so systemom skoncilo konfliktom, polozka NEVZNIKLA).
   // Prvy sa OBNOVUJE (zrusi sa pole `disabled`), druhy sa CELY ZRUSI: zaznam
   // moze niest pocet aj zamok naraz a po konflikte nema co z neho zostat.
+  // D-132: STVRTY druh — DORMANTNY zamok osi. Nazov riadku uz nesie server
+  // („Dormantný zámok · NL 470"), takze pripona je len kratky stav; dovod
+  // hovori poznamka pod riadkom (`orphan_note`, tiez zo servera).
   function hwOffLabel(ov){
     if (ov && ov.orphan_kind === 'part_material') return 'neplatný ručný materiál';
+    if (ov && ov.orphan_kind === 'dormant') return 'neplatí';
     return (ov && ov.orphan_kind === 'invalid') ? 'neplatný ručný zásah' : 'vypnuté';
   }
   // Nazov riadku: server ho pri materialovom override posiela hotovy
@@ -629,10 +633,17 @@
       btn = '<button class="ghostbtn hwbtn" title="Zrušiť ručný materiál (dielec ho zdedí)" onclick="onHwOrphanPartReset(this)">'+NXIcons.svg('rotate-ccw')+' zrušiť</button>';
     } else if (ov.orphan_kind === 'invalid'){
       btn = '<button class="ghostbtn hwbtn" title="Zrušiť ručný zásah (obnoví sa výpočet)" onclick="onHwOrphanReset(this)">'+NXIcons.svg('rotate-ccw')+' zrušiť</button>';
+    } else if (ov.orphan_kind === 'dormant'){
+      // D-132: TA ISTA serverova cesta ako `invalid` (`reset: true`) — zaznam
+      // moze niest viac osi naraz a po zmene receptu nema co z neho zostat.
+      btn = '<button class="ghostbtn hwbtn" title="Zrušiť dormantný zámok (recept ho už nepoužíva)" onclick="onHwOrphanReset(this)">'+NXIcons.svg('rotate-ccw')+' zrušiť</button>';
     } else {
       btn = '<button class="ghostbtn hwbtn" title="Obnoviť (platí pravidlo)" onclick="onHwEnable(this)">'+NXIcons.svg('rotate-ccw')+' obnoviť</button>';
     }
     var row = '<div class="hwrow hwoff" data-owner="'+esc(ov.owner_part_key||'')+'" data-type="'+esc(ov.generic_type||'')+'" data-rule="'+esc(ov.rule_id||'')+'" data-part="'+esc(ov.part_key||'')+'" data-cab="'+esc(cabId||'')+'">'
+      // D-132: zatvoreny zamok zo sprite — riadok sa na prvy pohlad lisi od
+      // vypnutej kategorie aj od neplatneho zasahu. Ziadna nova farba.
+      + (ov.orphan_kind === 'dormant' ? NXIcons.svg('lock') : '')
       // SMOKE PACK 1: nazov je jednoriadkovy s ellipsis, takze plny text MUSI
       // niest `title` — inak by sa orezany popis nedal precitat vobec.
       + '<span class="hwname" title="'+esc(name+(full?' · '+full:'')+' · '+ext)+'">'
@@ -643,9 +654,14 @@
     // KOV-D2b: OSIROTENY zasah zasuvky nesie stav osi tiez (polozka vysuvu pri
     // konflikte NEVZNIKLA) — bez chipov by sa konfliktna zasuvka nedala
     // odomknut inak, nez zrusenim CELEHO zaznamu (a s nim druheho zamku).
+    // DORMANTNY zaznam chipy NEDOSTAVA (KOV-D4 bod 3) — server mu ich neposle.
     var ax = hwAxHtml(ov.axes, { owner_part_key: ov.owner_part_key, generic_type: ov.generic_type,
                                  rule_id: ov.rule_id, cabinet_id: cabId });
-    return ax ? ('<div class="hwitem">' + row + ax + '</div>') : row;
+    // D-132: DOVOD pod riadkom. Text sklada VYHRADNE server (`orphan_note`) —
+    // JS by na vetu „teraz je pripnutý …" potreboval vlastnu pravdu o tom,
+    // ktory recept celo ma. Bez kluca sa poznamka nekresli vobec.
+    var note = ov.orphan_note ? ('<div class="axnote">'+esc(ov.orphan_note)+'</div>') : '';
+    return (ax || note) ? ('<div class="hwitem">' + row + ax + note + '</div>') : row;
   }
   // UI-C4: box vlastnika. Hlavicka je TLACIDLO (klavesnica aj citacka) a nesie
   // `data-keys` = part_key vlastnikov, ktore ma klik oznacit v modeli. Box sa
@@ -662,13 +678,28 @@
     var tip = (g.key === HW_GROUP_CAB)
       ? 'Označí skrinku v modeli'
       : 'Označí tento dielec v modeli (panel ostáva v Kovaní)';
+    var head = hwBoxGone(g)
+      // D-132 (review P3): box, ktorého VŠETKY riadky patria ZANIKNUTÉMU čelu,
+      // nemá čo označiť — oko ani klik sa preto nekreslia vôbec (inak by
+      // `nx_select_hw_owner` hľadal dielec, ktorý v modeli neexistuje).
+      ? '<div class="hwboxh hwboxh-static" title="'+esc(g.title)+'">'
+        + '<span class="hwboxt">'+esc(g.title)+'</span>'
+        + '<span class="hwboxsub">'+esc(hwGroupCountText(n))+'</span></div>'
+      : '<button type="button" class="hwboxh" data-cab="'+esc(cabId||'')+'" title="'+esc(g.title+' — '+tip)+'"'
+        + ' aria-label="'+esc(g.title+' — '+tip)+'" onclick="onHwOwnerPick(this)">'
+        + NXIcons.svg('eye')
+        + '<span class="hwboxt">'+esc(g.title)+'</span>'
+        + '<span class="hwboxsub">'+esc(hwGroupCountText(n))+'</span></button>';
     return '<div class="hwbox" data-group="'+esc(g.key)+'" data-keys="'+esc(g.ownerKeys.join(','))+'">'
-      + '<button type="button" class="hwboxh" data-cab="'+esc(cabId||'')+'" title="'+esc(g.title+' — '+tip)+'"'
-      + ' aria-label="'+esc(g.title+' — '+tip)+'" onclick="onHwOwnerPick(this)">'
-      + NXIcons.svg('eye')
-      + '<span class="hwboxt">'+esc(g.title)+'</span>'
-      + '<span class="hwboxsub">'+esc(hwGroupCountText(n))+'</span></button>'
+      + head
       + '<div class="hwboxb">'+body+'</div></div>';
+  }
+  // Patri CELY box zaniknutemu vlastnikovi? Rozhoduje SERVER (`orphan_owner_gone`)
+  // — JS to z textu poznamky ani z kluca neodvodzuje. Ziva polozka v boxe =
+  // vlastnik existuje, takze staci jedna a oko sa kresli.
+  function hwBoxGone(g){
+    if (!g || g.items.length || !g.offs.length) return false;
+    return g.offs.every(function(ov){ return ov && ov.orphan_owner_gone === true; });
   }
 
   // ---- SMOKE PACK 1: PODPERKY POLIC SUHRNNE (box „Vnútro skrinky") ---------
@@ -2485,7 +2516,8 @@
       hwRowOwnerText: hwRowOwnerText, hwGroupTitle: hwGroupTitle,
       hwGroupCountText: hwGroupCountText, hwGroupOrder: hwGroupOrder,
       hwGroups: hwGroups, hwDisabledOffs: hwDisabledOffs, hwOffLabel: hwOffLabel,
-      hwOffName: hwOffName,
+      hwOffName: hwOffName, hwOffHtml: hwOffHtml, hwBoxGone: hwBoxGone,
+      hwBoxHtml: hwBoxHtml,
       // KOV-D4 deep-link z Kontroly (tests/js/test_kovd4_ui.js) — selektor
       // riadku je cisty, `nxFocusHardware` a `hwFlash` sa testuju cez mini-DOM.
       HW_FLASH_MS: HW_FLASH_MS, hwRowSelector: hwRowSelector, hwRowKindOk: hwRowKindOk,
