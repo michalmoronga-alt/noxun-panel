@@ -437,15 +437,18 @@ miesto, kde vzniká číslo semaforu** — číta ho sekcia Kontrola v Štúdiu,
 odovzdáva svoj stav **explicitne** — okrem `generation:`/`status:`/`repush:` aj **`echo:`** (malý push stavu prepínača do TOHO okna) a pri kresbe `grain_echo:`; guard tak nemá
 **žiadny okenný stav** a obe okná sú nad ním len obaly.
 
-**D-131 `fronts_grain_all` — JEDINÁ zapisujúca cesta tohto modulu mimo rozpočtu** (v0.12.3, riadok „Kresba čiel" v sekcii Materiály). **Zber:** `front_grain_scan` prejde top-level
-NOXUN korpusy (`Panel.all_cabinets`) a z ULOŽENÉHO configu vezme `front_items` + `part_overrides` — zámerne NIE `Bom.collect`, ktorý nesie už **materializovaný** smer, z ktorého sa
-„používateľ to rozhodol" od „materiál to má" odlíšiť nedá. **Kľúče** fyzických čiel skladá `Fronts.panels_for` (jediná autorita tvaru: `panel` · `flap` · `blind` · `wing:*` podľa
-`wings_n`; „Bez čela" nemá dielec) — počet krídel sa NIKDY nehádá: položka bez platného `wings_n` znamená preskočenú a **vymenovanú** skrinku, rovnako ako skrinka z novšej verzie
-(R-12). **Guardy:** `gen` · `model_guid` v PRÍSNOM režime (je to zápis a ID skriniek sa naprieč dokumentmi opakujú) · uzavretý enum `length|width|__inherit__`, neznáma hodnota =
-odmietnutý zápis bez fallbacku. **All-or-nothing:** jedna `CabinetBuilder.rebuild_many` = **jeden krok Späť** pre celú zákazku; výnimka operáciu aborduje (rieši si to `rebuild_many`)
-a status povie dôvod. **0 čiel ⇒ žiadna operácia** (otvoriť undo krok pre nič by používateľovi zjedlo jeden Ctrl+Z) a rovnako **0 zmien** — skrinka, ktorá požadovaný smer už má, sa
-neprestavuje. Čisté funkcie (`front_grain_keys`, `front_grain_entry`, `front_grain_summary`, `front_grain_write!`, `fronts_grain_plan`) sú headless testovateľné; `front_grain_state`
-dáva stav riadku do `mat` payloadu. `Panel.push_selected` ide s `dedup: false` (brána 1b-3) — akcia žiadnu kópiu nevyrába, takže niet čomu prideľovať nové ID.
+**D-131 kresba čiel zákazky — v tomto module žije LEN ČÍTANIE** (v0.12.3, riadok „Kresba čiel" v sekcii Materiály). Zápis (`MaterialsDialog.fronts_grain_all`) je **zámerne inde**:
+`production_core.rb` je čítacia cesta a brána 1b-3 jej zakazuje vyžiadať si dedup — hromadná prestavba ho však potrebuje, lebo `rebuild_in_operation` volá `make_unique`
+(detail v [materials.md](materials.md)). **Zber `front_grain_scan`:** top-level `model.entities` — **presne to isté, čo zbiera `Bom.collect`**, teda „zákazka" v zmysle kusovníka;
+`Ids.each_cabinet` sem NEPATRÍ (hľadá globálne cez `model.definitions` a našiel by aj korpus **vnorený** v cudzom komponente, ktorý vo výstupoch nie je a ktorého prestavba by
+zasiahla všetky výskyty zdieľanej definície). Z uloženého configu berie `front_items` + `part_overrides` — nie `Bom.collect`, ktorý nesie už **materializovaný** smer, z ktorého sa
+„používateľ to rozhodol" od „materiál to má" odlíšiť nedá. Zlyhanie vracia **nil**, nie prázdny zoznam (prázdny by klient čítal ako „zákazka čelá nemá"). **Kľúče** fyzických čiel
+skladá `Fronts.panels_for` (jediná autorita tvaru: `panel` · `flap` · `blind` · `wing:*` podľa `wings_n`; „Bez čela" nemá dielec) a spolu s nimi vracia aj **legacy renderovací
+suffix** toho istého dielca — starý override pod ním musí riadok vidieť a zápis prebiť, inak by ho migrácia pri prestavbe vrátila do hry. Počet krídel sa NIKDY nehádá: položka bez
+platného `wings_n`, config **bez** `front_items` (skrinka spred zoznamu resolved čiel) aj skrinka z novšej verzie (R-12) sú **preskočené a vymenované** — `skipped` nesie id aj
+dôvod a ide aj do `mat.front_grain`, takže zákazka, kde je preskočené všetko, nehlási falošné „Žiadne čelá". Čisté funkcie `front_grain_keys` · `front_grain_value` ·
+`front_grain_entry` · `front_grain_skip_reason` · `front_grain_summary` · `front_grain_write!` · `fronts_grain_plan` sú headless testovateľné; `front_grain_state` dáva stav riadku
+do `mat` payloadu.
 
 Názvy stavov majú **jediný zdroj** `ProductionCore::EDGE_OPTION_LABELS` — rail Inspectora aj `js/edge_menu.js` ich čítajú odtiaľ (do ŠT-1c PR B3 sa rail pýtal cez tenký obal okna
 Výroba).

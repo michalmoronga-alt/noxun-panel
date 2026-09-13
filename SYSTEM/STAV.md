@@ -17,7 +17,7 @@ nálezy z výroby a chyby v cenách majú **najvyššiu prioritu** ([PLAN.md](PL
 **Výstupy zákaziek bez zásuvkovej klasifikácie sú obsahovo identické** (golden, CSV bajtovo).
 **Kompatibilita:** konfigurácia skrinky je od D-128 v **schéme 14**, výrobný plán v schéme 5; vzhľad používa katalógovú schému 10 až pri prvom uložení (staré katalógy sa otvorením nemenia). Starší plugin nové konfigurácie neprestaví — pred takou zákazkou aktualizovať **obe PC**.
 
-**D-131 (najnovšie):** **4059 headless · 117 JS sád · 2678 in-SketchUp PASS / 0 FAIL** (20 kontrol sekcie `run_d131`: snapshoty dielcov, presne jeden krok Späť pre celú zákazku, „Bez čela"/doska/korpus bajtovo nedotknuté, cudzí `model_guid` aj prázdna zákazka bez kroku Späť).
+**D-131 (najnovšie):** **4071 headless · 117 JS sád · in-SketchUp 0 FAIL** (28 kontrol sekcie `run_d131`: snapshoty dielcov, presne jeden krok Späť pre celú zákazku, „Bez čela"/doska/korpus aj VNORENÁ skrinka bajtovo nedotknuté, flush blokáda, cudzí `model_guid` aj prázdna zákazka bez kroku Späť).
 **D-128:** 4029 headless · 116 JS sád · 2658 in-SketchUp PASS / 0 FAIL (26 kontrol `run_d128`). **D-94:** 3993 headless · 115 JS sád · 2632 in-SketchUp PASS / 0 FAIL.
 **M-R:** 3983 headless · 114 JS sád · 2606 in-SketchUp PASS / 0 FAIL; CEF Štúdia **18 PASS**, controller → uloženie/otvorenie bez SKM → prestavba → výroba **50 PASS**, živá zmena mierky bez Apply **11 PASS** ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md); fyzický druhý PC, SU 2024 a render netestované). Ručné Redo Čiel zostáva nepotvrdené.
 **Michal 11.9. potvrdil** test produktových odkazov aj potvrdzovania cien (CENY-KOV-A/B, PR #345/#346) **a** používateľskú kontrolu balíka Čiel v0.11.0 (funguje, bez chýb).

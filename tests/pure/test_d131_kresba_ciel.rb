@@ -25,14 +25,30 @@
 #
 # MUTACIE OVERENE proti tejto sade (kazda ju zhodi):
 #   M1 — akcia zapise aj celu typu `none`  -> „rozsah: „Bez čela" (none) dielec nema"
-#   M2 — `fronts_grain_plan` da kazdej skrinke vlastnu operaciu (jobs po jednom
-#        volani rebuildu) -> „plan: VSETKY skrinky su v JEDNOM zozname jobs"
+#   M2 — `fronts_grain_plan` vrati kazdu skrinku vo VLASTNOM zozname jobs
+#        -> „plan: VSETKY skrinky su v JEDNOM zozname jobs". (Ze je z toho aj
+#        jedna OPERACIA, drzi in-SU marker `run_d131` — headless sada tu meri
+#        TVAR planu, SketchUp operacie nemá kde spustit.)
 #   M3 — neznama hodnota `grain` prejde na server -> „guard: neznamy smer sa ODMIETNE"
 #   M4 — `__inherit__` nechá prazdny zaznam v `part_overrides` -> „inherit: prazdny
 #        zaznam ZANIKA"
+#   M5 — zber ide `Ids.each_cabinet` (globalne, aj vnorene skrinky)
+#        -> „zber: zakazka je TOP-LEVEL `model.entities`"
+#   M6 — odmietava vetva neposle `repush` -> guardy v sekcii 5 (tlacidlo by
+#        v kliente navzdy viselo na „Prestavujem…")
 require_relative '../helper' unless defined?(NxTest)
 
+# UI vrstva — headless nie je v require zozname helpera, takze si ju sada pyta
+# sama (vzor `test_kovc2b_brany.rb`). ZAPISOVA cesta zije v `MaterialsDialog`
+# (brana 1b-3 — `production_core.rb` je CITACIA cesta a nesmie si vyziadat
+# dedup), cisty plan a suhrn v `ProductionCore`.
+if NxTest.headless?
+  require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core')
+  require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'materials_dialog')
+end
+
 D131PC = Noxun::Engine::ProductionCore
+D131MD = Noxun::Engine::MaterialsDialog
 D131CB = Noxun::Engine::CabinetBuilder
 D131DK = Noxun::Engine::DocKey
 
@@ -77,54 +93,60 @@ end
 # 1) ROZSAH A TVAR KLUCOV
 # ---------------------------------------------------------------------------
 
+# Zoznam `part_key`-ov (sada ich porovnava, legacy suffix ma vlastne testy).
+def d131_keys(items)
+  parts, unresolved = D131PC.front_grain_keys(items)
+  [parts.map { |p| p['key'] }, unresolved]
+end
+
 NxTest.test('D-131 rozsah: zasuvkove celo je `panel`') do
-  keys, unresolved = D131PC.front_grain_keys([d131_item('F1', 'drawer_front')])
+  keys, unresolved = d131_keys([d131_item('F1', 'drawer_front')])
   NxTest.assert_equal(['front:F1/panel'], keys)
   NxTest.refute(unresolved, 'resolved polozka nie je nerozlustena')
 end
 
 NxTest.test('D-131 rozsah: vyklop AJ sklop maju kanonicky kluc `flap`') do
-  lift, = D131PC.front_grain_keys([d131_item('F1', 'lift')])
-  fall, = D131PC.front_grain_keys([d131_item('F1', 'fall')])
+  lift, = d131_keys([d131_item('F1', 'lift')])
+  fall, = d131_keys([d131_item('F1', 'fall')])
   NxTest.assert_equal(['front:F1/flap'], lift)
   NxTest.assert_equal(['front:F1/flap'], fall, 'sklop ma TEN ISTY kluc ako vyklop (KOV-A1)')
 end
 
 NxTest.test('D-131 rozsah: blenda je `blind`') do
-  keys, = D131PC.front_grain_keys([d131_item('F1', 'blind')])
+  keys, = d131_keys([d131_item('F1', 'blind')])
   NxTest.assert_equal(['front:F1/blind'], keys)
 end
 
 NxTest.test('D-131 rozsah: dvierka daju kluc KAZDEMU kridlu (1 / 2 / 3)') do
-  one, = D131PC.front_grain_keys([d131_item('F1', 'door', 1)])
-  two, = D131PC.front_grain_keys([d131_item('F1', 'door', 2)])
-  three, = D131PC.front_grain_keys([d131_item('F1', 'door', 3)])
+  one, = d131_keys([d131_item('F1', 'door', 1)])
+  two, = d131_keys([d131_item('F1', 'door', 2)])
+  three, = d131_keys([d131_item('F1', 'door', 3)])
   NxTest.assert_equal(['front:F1/wing:single'], one)
   NxTest.assert_equal(['front:F1/wing:left', 'front:F1/wing:right'], two)
   NxTest.assert_equal(['front:F1/wing:p1', 'front:F1/wing:p2', 'front:F1/wing:p3'], three)
 end
 
 NxTest.test('D-131 rozsah: „Bez čela" (none) dielec nema — nie je co otacat') do
-  keys, unresolved = D131PC.front_grain_keys([d131_item('F1', 'none')])
+  keys, unresolved = d131_keys([d131_item('F1', 'none')])
   NxTest.assert_equal([], keys)
   NxTest.refute(unresolved, 'prazdna nika NIE JE chyba')
 end
 
 NxTest.test('D-131 rozsah: viac riadkov ciel v jednej skrinke = vsetky kluce') do
-  keys, = D131PC.front_grain_keys([d131_item('F1', 'drawer_front'),
-                                   d131_item('F2', 'none'),
-                                   d131_item('F3', 'door', 2)])
+  keys, = d131_keys([d131_item('F1', 'drawer_front'),
+                     d131_item('F2', 'none'),
+                     d131_item('F3', 'door', 2)])
   NxTest.assert_equal(['front:F1/panel', 'front:F3/wing:left', 'front:F3/wing:right'], keys)
 end
 
 NxTest.test('D-131 fail-visible: dvierka BEZ `wings_n` = nerozlustene (pocet sa NEHADA)') do
-  keys, unresolved = D131PC.front_grain_keys([{ 'id' => 'F1', 'type' => 'door' }])
+  keys, unresolved = d131_keys([{ 'id' => 'F1', 'type' => 'door' }])
   NxTest.assert_equal([], keys, 'z nerozlustenej skrinky nejde ZIADEN kluc')
   NxTest.assert(unresolved, 'skrinka sa ma preskocit a vymenovat')
 end
 
 NxTest.test('D-131 rozsah: chybajuce `front_items` = skrinka bez ciel') do
-  keys, unresolved = D131PC.front_grain_keys(nil)
+  keys, unresolved = d131_keys(nil)
   NxTest.assert_equal([], keys)
   NxTest.refute(unresolved)
 end
@@ -133,21 +155,26 @@ end
 # 2) ZAPIS OVERRIDU
 # ---------------------------------------------------------------------------
 
+# Dielec tak, ako ho dava `front_grain_keys` (dnesny kluc + legacy suffix).
+def d131_part(key = 'front:F1/panel', legacy = 'DRW-1')
+  { 'key' => key, 'legacy' => legacy }
+end
+
 NxTest.test('D-131 zapis: `width` PREPISE existujuci override') do
   params = { 'part_overrides' => { 'front:F1/panel' => { 'grain_direction' => 'length' } } }
-  n = D131PC.front_grain_write!(params, ['front:F1/panel'], 'width')
+  n = D131PC.front_grain_write!(params, [d131_part], 'width')
   NxTest.assert_equal(1, n)
   NxTest.assert_equal('width', params['part_overrides']['front:F1/panel']['grain_direction'])
 end
 
 NxTest.test('D-131 zapis: celo, ktore uz ma pozadovany smer, sa NEta (0 zmien)') do
   params = { 'part_overrides' => { 'front:F1/panel' => { 'grain_direction' => 'width' } } }
-  NxTest.assert_equal(0, D131PC.front_grain_write!(params, ['front:F1/panel'], 'width'))
+  NxTest.assert_equal(0, D131PC.front_grain_write!(params, [d131_part], 'width'))
 end
 
 NxTest.test('D-131 inherit: prazdny zaznam ZANIKA (kluc aj cely zaznam)') do
   params = { 'part_overrides' => { 'front:F1/panel' => { 'grain_direction' => 'width' } } }
-  n = D131PC.front_grain_write!(params, ['front:F1/panel'], D131PC::FRONT_GRAIN_INHERIT)
+  n = D131PC.front_grain_write!(params, [d131_part], D131PC::FRONT_GRAIN_INHERIT)
   NxTest.assert_equal(1, n)
   NxTest.assert_equal({}, params['part_overrides'], 'prazdny zaznam sa ma odstranit')
 end
@@ -155,7 +182,7 @@ end
 NxTest.test('D-131 inherit: zaznam s ABS hranami PREZIJE (maze sa LEN grain_direction)') do
   rec = { 'grain_direction' => 'width', 'edges' => { 'L1' => 'ABS_X' } }
   params = { 'part_overrides' => { 'front:F1/panel' => rec } }
-  D131PC.front_grain_write!(params, ['front:F1/panel'], D131PC::FRONT_GRAIN_INHERIT)
+  D131PC.front_grain_write!(params, [d131_part], D131PC::FRONT_GRAIN_INHERIT)
   NxTest.assert_equal({ 'edges' => { 'L1' => 'ABS_X' } },
                       params['part_overrides']['front:F1/panel'],
                       'ABS override dielca sa hromadnou kresbou NESMIE stratit')
@@ -166,10 +193,53 @@ NxTest.test('D-131 zapis: korpusove overridy a zvysok configu ostanu BAJTOVO nez
             'zone:Z1/shelf:1' => { 'material_id' => 'DUB18' } }
   before = Marshal.dump(other)
   params = { 'part_overrides' => other.merge('front:F1/panel' => {}) }
-  D131PC.front_grain_write!(params, ['front:F1/panel'], 'length')
+  D131PC.front_grain_write!(params, [d131_part], 'length')
   after = other.select { |k, _| k != 'front:F1/panel' }
   NxTest.assert_equal(before, Marshal.dump(after), 'cudzie overridy sa nesmu ani dotknut')
   NxTest.assert_equal('length', params['part_overrides']['front:F1/panel']['grain_direction'])
+end
+
+# --- LEGACY SLOT (stara skrinka spred `part_key`) ---------------------------
+# Override pod RENDEROVACIM suffixom prezije az do najblizsej prestavby, kde ho
+# zmigruje `CabinetBuilder.normalize`. Kym zije, MUSI ho riadok VIDIET a akcia
+# PREBIT — inak by „Podľa materiálu" override nezrusilo (migracia by starú
+# hodnotu vratila do hry) a riadok by hlasil „podľa materiálu" pri zapisanom
+# smere (review #365, P3).
+
+NxTest.test('D-131 legacy: smer pod RENDEROVACIM suffixom sa v suhrne VIDI') do
+  ent = D131PC.front_grain_entry('CAB-001',
+                                 d131_cfg([d131_item('F1', 'drawer_front')],
+                                          'DRW-1' => { 'grain_direction' => 'width' }))
+  NxTest.assert_equal({ 'length' => 0, 'width' => 1, 'inherit' => 0 },
+                      D131PC.front_grain_summary([ent])['by'],
+                      'stara skrinka NESMIE hlasit „podľa materiálu", ked override MA')
+end
+
+NxTest.test('D-131 legacy: dnesny kluc vyhrava nad legacy suffixom') do
+  ent = D131PC.front_grain_entry('CAB-001',
+                                 d131_cfg([d131_item('F1', 'drawer_front')],
+                                          'front:F1/panel' => { 'grain_direction' => 'length' },
+                                          'DRW-1' => { 'grain_direction' => 'width' }))
+  NxTest.assert_equal({ 'length' => 1, 'width' => 0, 'inherit' => 0 },
+                      D131PC.front_grain_summary([ent])['by'])
+end
+
+NxTest.test('D-131 legacy: „Podľa materiálu" zmaze smer aj z LEGACY zaznamu') do
+  params = { 'part_overrides' => { 'DRW-1' => { 'grain_direction' => 'width',
+                                                'edges' => { 'L1' => 'ABS_X' } } } }
+  n = D131PC.front_grain_write!(params, [d131_part], D131PC::FRONT_GRAIN_INHERIT)
+  NxTest.assert_equal(1, n, 'zmena legacy slotu sa RATA ako zmena')
+  NxTest.assert_equal({ 'DRW-1' => { 'edges' => { 'L1' => 'ABS_X' } } },
+                      params['part_overrides'],
+                      'ABS legacy zaznamu prezije, smer nie')
+end
+
+NxTest.test('D-131 legacy: zapis ide na DNESNY kluc a legacy smer zhasne') do
+  params = { 'part_overrides' => { 'DRW-1' => { 'grain_direction' => 'length' } } }
+  D131PC.front_grain_write!(params, [d131_part], 'width')
+  NxTest.assert_equal({ 'front:F1/panel' => { 'grain_direction' => 'width' } },
+                      params['part_overrides'],
+                      'po migracii nesmie ostat druha (stara) hodnota')
 end
 
 # ---------------------------------------------------------------------------
@@ -189,6 +259,7 @@ NxTest.test('D-131 suhrn: count/cabinets/by nad TROMI configmi') do
   NxTest.assert_equal(4, s['count'], '2 kridla + 2 zasuvkove cela; skrinka bez ciel sa neta')
   NxTest.assert_equal(2, s['cabinets'], 'skrinka bez ciel sa do poctu NERATA')
   NxTest.assert_equal({ 'length' => 1, 'width' => 1, 'inherit' => 2 }, s['by'])
+  NxTest.assert_equal([], s['skipped'], 'nic sa nepreskocilo')
 end
 
 NxTest.test('D-131 suhrn: neznama hodnota v configu sa rata ako `inherit` (nikdy vlastna skupina)') do
@@ -204,8 +275,25 @@ NxTest.test('D-131 suhrn: skrinka z NOVSEJ verzie sa do cisla v tlacidle NERATA'
                    'config_schema' => D131CB::CONFIG_SCHEMA + 5)
   ent = D131PC.front_grain_entry('CAB-009', newer)
   NxTest.assert(ent['newer'], 'marker novsej schemy sa musi rozpoznat')
-  NxTest.assert_equal(0, D131PC.front_grain_summary([ent])['count'],
-                      'tlacidlo nesmie slubit viac, nez akcia spravi')
+  out = D131PC.front_grain_summary([ent])
+  NxTest.assert_equal(0, out['count'], 'tlacidlo nesmie slubit viac, nez akcia spravi')
+  NxTest.assert_equal([{ 'id' => 'CAB-009', 'why' => 'novšia verzia pluginu' }], out['skipped'],
+                      'preskocena skrinka sa v suhrne PRIZNA (inak by riadok hlasil „Žiadne čelá")')
+end
+
+NxTest.test('D-131 suhrn: config BEZ `front_items` je STARA skrinka, nie skrinka bez ciel') do
+  ent = D131PC.front_grain_entry('CAB-005', { 'part_overrides' => {} })
+  NxTest.assert(ent['legacy'], 'chybajuci zoznam resolved ciel sa musi rozpoznat')
+  out = D131PC.front_grain_summary([ent])
+  NxTest.assert_equal(0, out['count'])
+  NxTest.assert_equal('CAB-005', out['skipped'][0]['id'])
+  NxTest.assert(out['skipped'][0]['why'].to_s.include?('prestav'), out['skipped'].inspect)
+end
+
+NxTest.test('D-131 suhrn: PRAZDNY `front_items` je platna odpoved (skrinka cela nema)') do
+  ent = D131PC.front_grain_entry('CAB-006', d131_cfg([]))
+  NxTest.refute(ent['legacy'], 'prazdne pole NIE JE stara skrinka')
+  NxTest.assert_equal([], D131PC.front_grain_summary([ent])['skipped'])
 end
 
 # ---------------------------------------------------------------------------
@@ -264,24 +352,43 @@ NxTest.test('D-131 plan: skrinka, ktora uz smer MA, do prestavby nejde (ziadny z
 end
 
 # ---------------------------------------------------------------------------
-# 5) SERVEROVE GUARDY AKCIE
+# 5) SERVEROVE GUARDY AKCIE (zapisova cesta `MaterialsDialog`)
 # ---------------------------------------------------------------------------
+#
+# KAZDA odmietavá vetva MUSI poslať `repush` — plny push okna je JEDINA cesta,
+# ktorou sa v kliente odomkne tlacidlo. Bez neho by po odmietnutom kliku navzdy
+# visel text „Prestavujem…" (review #365, P2).
+
+def d131_call(model, data, sink, generation: 1)
+  D131MD.fronts_grain_all(model, data, generation: generation,
+                                       status: d131_status(sink), repush: d131_repush(sink))
+end
 
 NxTest.test('D-131 guard: stara generacia = obnova okna, ZIADNY zapis') do
   sink = d131_sink
-  D131PC.fronts_grain_all(D131FakeModel.new, { 'gen' => 3, 'grain' => 'width' },
-                          generation: 7, status: d131_status(sink), repush: d131_repush(sink))
-  NxTest.assert_equal(1, sink[:repush], 'okno sa ma obnovit')
+  d131_call(D131FakeModel.new, { 'gen' => 3, 'grain' => 'width' }, sink, generation: 7)
+  NxTest.assert_equal(1, sink[:repush], 'okno sa ma obnovit (a tlacidlo odomknut)')
   NxTest.assert(sink[:status][0][1], 'hlaska je chybova')
   NxTest.assert(sink[:status][0][0].include?('prepočítalo'), sink[:status].inspect)
+end
+
+NxTest.test('D-131 guard: rozpisana zmena v Inspectore zapis ZASTAVI (flush handshake)') do
+  D131DK.reset! if D131DK.respond_to?(:reset!)
+  model = D131FakeModel.new
+  sink = d131_sink
+  d131_call(model, { 'gen' => 1, 'grain' => 'width', 'model_guid' => D131DK.key(model),
+                     'flush_blocked' => true }, sink)
+  NxTest.assert_equal(1, sink[:repush], 'aj odmietnutie odomkne tlacidlo')
+  NxTest.assert(sink[:status][0][1], 'hlaska je chybova')
+  NxTest.assert(sink[:status][0][0].include?('Inspektore') || sink[:status][0][0].include?('Inspectore'),
+                sink[:status].inspect)
 end
 
 NxTest.test('D-131 guard: cudzi dokument = obnova okna, ZIADNY zapis') do
   D131DK.reset! if D131DK.respond_to?(:reset!)
   model = D131FakeModel.new
   sink = d131_sink
-  D131PC.fronts_grain_all(model, { 'gen' => 1, 'grain' => 'width', 'model_guid' => 'CUDZI' },
-                          generation: 1, status: d131_status(sink), repush: d131_repush(sink))
+  d131_call(model, { 'gen' => 1, 'grain' => 'width', 'model_guid' => 'CUDZI' }, sink)
   NxTest.assert_equal(1, sink[:repush])
   NxTest.assert(sink[:status][0][0].include?('prepol'), sink[:status].inspect)
 end
@@ -290,21 +397,73 @@ NxTest.test('D-131 guard: PRAZDNY model_guid od klienta zapis ZASTAVI (prisny re
   D131DK.reset! if D131DK.respond_to?(:reset!)
   model = D131FakeModel.new
   sink = d131_sink
-  D131PC.fronts_grain_all(model, { 'gen' => 1, 'grain' => 'width' },
-                          generation: 1, status: d131_status(sink), repush: d131_repush(sink))
+  d131_call(model, { 'gen' => 1, 'grain' => 'width' }, sink)
   NxTest.assert(sink[:status][0][1], 'zapis je ZASTAVENY (nie tolerantny rezim)')
+  NxTest.assert_equal(1, sink[:repush])
 end
 
-NxTest.test('D-131 guard: neznamy smer sa ODMIETNE (ziadny fallback, ziadna obnova)') do
+NxTest.test('D-131 guard: neznamy smer sa ODMIETNE (ziadny fallback)') do
   D131DK.reset! if D131DK.respond_to?(:reset!)
   model = D131FakeModel.new
-  guid = D131DK.key(model)
   sink = d131_sink
-  D131PC.fronts_grain_all(model, { 'gen' => 2, 'grain' => 'diagonal', 'model_guid' => guid },
-                          generation: 2, status: d131_status(sink), repush: d131_repush(sink))
-  NxTest.assert_equal(0, sink[:repush], 'nie je co obnovovat — stav okna plati')
+  d131_call(model, { 'gen' => 2, 'grain' => 'diagonal', 'model_guid' => D131DK.key(model) },
+            sink, generation: 2)
   NxTest.assert(sink[:status][0][1], 'hlaska je chybova')
   NxTest.assert(sink[:status][0][0].include?('Neznámy'), sink[:status].inspect)
+  NxTest.assert_equal(1, sink[:repush], 'aj odmietnuty enum odomkne tlacidlo')
+end
+
+NxTest.test('D-131 guard: BEZ modelu sa nic nedeje, ale tlacidlo sa odomkne') do
+  sink = d131_sink
+  d131_call(nil, { 'gen' => 1, 'grain' => 'width' }, sink)
+  NxTest.assert(sink[:status][0][1])
+  NxTest.assert_equal(1, sink[:repush])
+end
+
+# ---------------------------------------------------------------------------
+# 6) ZBER: TOP-LEVEL ZAKAZKA A FAIL-SAFE
+# ---------------------------------------------------------------------------
+
+D131_PC_SRC = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core.rb'),
+                        encoding: 'UTF-8')
+D131_SCAN_SRC = D131_PC_SRC[/def front_grain_scan.*?\n      end\n/m].to_s
+
+NxTest.test('D-131 zber: zakazka je TOP-LEVEL `model.entities` (ako `Bom.collect`)') do
+  NxTest.assert(D131_SCAN_SRC.include?('model.entities.grep(Sketchup::ComponentInstance)'),
+                'zber musi ist rovnakou cestou ako kusovnik')
+  # `Ids.each_cabinet` hlada GLOBALNE cez `model.definitions` a nasiel by aj
+  # korpus VNORENY v cudzom komponente — ten v zakazke nie je a prestavba by
+  # ho zmenila vo VSETKYCH vyskytoch zdielanej definicie (Codex #365, P1).
+  NxTest.refute(D131_SCAN_SRC.include?('all_cabinets') || D131_SCAN_SRC.include?('each_cabinet'),
+                'globalny zber cez definicie sem NEPATRI')
+end
+
+NxTest.test('D-131 zber: zlyhanie vracia nil, NIE prazdny zoznam') do
+  # Prazdny zoznam by klient precital ako „v zakazke nie su cela" a tlacidlo by
+  # tvarilo, ze nie je co robit. nil = „stav nedostupny" (vzor `mat_payload`).
+  broken = Object.new
+  def broken.entities
+    raise 'model je prec'
+  end
+  NxTest.assert_equal(nil, D131PC.front_grain_scan(broken))
+  NxTest.assert_equal(nil, D131PC.front_grain_state(broken))
+end
+
+NxTest.test('D-131 zber: bez modelu je zoznam prazdny (nie chyba)') do
+  NxTest.assert_equal([], D131PC.front_grain_scan(nil))
+end
+
+NxTest.test('D-131 zapis: ZAPISOVA cesta NEZIJE v jadre vystupov (brana 1b-3)') do
+  # `production_core.rb` je CITACIA cesta: nesmie otvarat operaciu ani si
+  # vyziadat dedup. Prestavba (`rebuild_many`) preto zije v `MaterialsDialog`
+  # vedla „Nahradiť UNI…" — s VYCHODZIM dedupom, lebo `rebuild_in_operation`
+  # vola `make_unique` (review #365, P2).
+  NxTest.refute(D131_PC_SRC.include?('fronts_grain_apply'),
+                'zapisova cast sa do jadra vystupov nesmie vratit')
+  NxTest.assert(D131MD.respond_to?(:fronts_grain_all),
+                'MaterialsDialog.fronts_grain_all musi byt PUBLIC (vola ju obal okna)')
+  NxTest.assert(Noxun::Engine::StudioDialog.respond_to?(:do_fronts_grain_all),
+                'StudioDialog.do_fronts_grain_all musi byt PUBLIC (relay z panel.rb)')
 end
 
 NxTest.test('D-131 guard: enum pusti LEN length/width/__inherit__') do

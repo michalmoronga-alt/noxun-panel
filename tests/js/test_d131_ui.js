@@ -54,7 +54,8 @@ eq(M.mdFrontGrainBtnText({ count: 12 }), 'Použiť na všetky čelá (12)',
    'tlacidlo nesie POCET ciel, na ktore akcia dosiahne');
 eq(M.mdFrontGrainBtnText({ count: 0 }), 'Žiadne čelá',
    'prazdna zakazka to povie uz na tlacidle');
-eq(M.mdFrontGrainBtnText(null), 'Žiadne čelá', 'chybajuci stav nezhodi render');
+eq(M.mdFrontGrainBtnText(null), 'Stav nedostupný',
+   'chybajuci stav sa NEtvari ako prazdna zakazka');
 
 eq(M.mdFrontGrainNowText({ by: { length: 0, width: 8, inherit: 4 } }),
    'teraz: 8× priečna · 4× podľa materiálu',
@@ -62,7 +63,28 @@ eq(M.mdFrontGrainNowText({ by: { length: 0, width: 8, inherit: 4 } }),
 eq(M.mdFrontGrainNowText({ by: { length: 3, width: 0, inherit: 0 } }),
    'teraz: 3× pozdĺžna');
 eq(M.mdFrontGrainNowText({ by: {} }), '', 'bez ciel sa nepise nic');
-eq(M.mdFrontGrainNowText(null), '', 'chybajuci stav nezhodi render');
+eq(M.mdFrontGrainNowText(null), 'stav sa nepodarilo zistiť',
+   'zlyhanie zberu sa PRIZNA (server posiela `front_grain: null`)');
+
+// --- 1b) PRESKOCENE SKRINKY sa NIKDY nezamlcia --------------------------
+// Zakazka, kde je preskocene VSETKO (novsia schema / stara skrinka), by inak
+// hlasila falosne „Žiadne čelá" (review #365, P2).
+const SKIP2 = [{ cabinet_id: 'CAB-009', why: 'novšia verzia pluginu' },
+               { cabinet_id: 'CAB-010', why: 'novšia verzia pluginu' }];
+eq(M.mdFrontGrainSkipText(SKIP2), '2 skrinky preskočené — novšia verzia pluginu',
+   'dovody sa deduplikuju');
+eq(M.mdFrontGrainSkipText([{ why: 'a' }, { why: 'b' }]), '2 skrinky preskočené — a, b');
+eq(M.mdFrontGrainSkipText([{ why: 'a' }]), '1 skrinka preskočená — a',
+   'sklonovanie sedi aj v jednotnom cisle');
+eq(M.mdFrontGrainSkipText([]), '', 'bez preskocenych sa nepise nic');
+eq(M.mdFrontGrainNowText({ count: 0, by: {}, skipped: SKIP2 }),
+   '2 skrinky preskočené — novšia verzia pluginu',
+   'ked nie je co nastavit, riadok povie PRECO');
+eq(M.mdFrontGrainBtnText({ count: 0, skipped: SKIP2 }), 'Žiadne dostupné čelá',
+   'nie „Žiadne čelá" — čelá tam sú, len sa na ne nedá siahnuť');
+eq(M.mdFrontGrainNowText({ count: 4, by: { width: 4 }, skipped: [{ why: 'x' }] }),
+   'teraz: 4× priečna · 1 skrinka preskočená — x',
+   'preskocene sa priznaju aj vedla beznych poctov');
 
 // --- 2) PAYLOAD ------------------------------------------------------------
 
@@ -95,6 +117,13 @@ eq(ELS.md_front_grain_apply.textContent, 'Prestavujem…', 'a hovori, ze sa prac
 
 ok(M.mdFrontGrainApply() === false, 'DRUHY klik pred pushom NEPOSLE nic');
 eq(SENT.length, 1, 'stale jedna otazka — inak by vznikli dva kroky Späť');
+
+// Zámok pustí LEN plný push okna. Katalógové echo (`NX.setMatCatalog`) generáciu
+// nedvíha ani modelový stav nenesie — tlačidlo po ňom musí ostať zamknuté.
+NX.setMatCatalog({ sheets: [], edges: [] });
+eq(ELS.md_front_grain_apply.disabled, true, 'katalógové echo zámok NEPUSTÍ');
+ok(M.mdFrontGrainApply() === false, 'a klik po ňom stále nič nepošle');
+eq(SENT.length, 1);
 
 // --- 5) NOVY PUSH ODOMKNE --------------------------------------------------
 

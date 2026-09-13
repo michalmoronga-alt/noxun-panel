@@ -2904,7 +2904,9 @@
   // TERAZ (`{count, cabinets, by}` pocita SERVER — klient si z payloadu LEN
   // cita, ziadne cislo sa tu nedopocitava). Select preto nema co ukladat; po
   // pushi ostava na poslednej volbe pouzivatela.
-  var MD_FRONT_GRAIN = { count: 0, cabinets: 0, by: {} };
+  // `null` = server stav nezistil (výnimka pri zbere) — riadok to PRIZNÁ
+  // a tlačidlo ostane vypnuté; nikdy sa netvári, že zákazka čelá nemá.
+  var MD_FRONT_GRAIN = null;
   // Generacia okna Studio — identitu kliku (stary DOM) overuje SERVER, klient ju
   // len verne vracia. Sekcia si ju berie z payloadu okna (vzor `budget.js`).
   var MD_GEN = 0;
@@ -2913,22 +2915,50 @@
   // vznikli dva kroky Späť.
   var MD_GRAIN_BUSY = false;
 
-  // Cista funkcia (Node test): text tlacidla. 0 ciel = tlacidlo nema co robit.
+  // „1 skrinka preskočená" / „2 skrinky preskočené" / „5 skriniek preskočených"
+  // — podstatné meno aj prídavné meno sa v slovenčine zhodujú v čísle a páde.
+  function mdCabSkippedSk(n){
+    if (n === 1) return 'skrinka preskočená';
+    return (n >= 2 && n <= 4) ? 'skrinky preskočené' : 'skriniek preskočených';
+  }
+  // Cista funkcia (Node test): text tlacidla.
+  //   `null`     — stav nedostupny,
+  //   0 + skipped — su tu skrinky, na ktore sa NEDA siahnut (nie „ziadne cela"),
+  //   0          — zakazka naozaj cela nema.
   function mdFrontGrainBtnText(fg){
-    var n = (fg && fg.count) || 0;
-    return n ? ('Použiť na všetky čelá (' + n + ')') : 'Žiadne čelá';
+    if (!fg) return 'Stav nedostupný';
+    var n = fg.count || 0;
+    if (n) return 'Použiť na všetky čelá (' + n + ')';
+    return ((fg.skipped || []).length) ? 'Žiadne dostupné čelá' : 'Žiadne čelá';
   }
   // Cista funkcia (Node test): read-only stav „teraz: 8× priečna · 4× podľa
   // materiálu". Nulove skupiny sa nevypisuju (vertikalny priestor).
+  // PRESKOCENE skrinky sa PRIZNAJU vzdy — inak by zakazka, kde je preskocene
+  // VSETKO, hlasila falosne „Žiadne čelá" (review #365, P2).
   function mdFrontGrainNowText(fg){
-    var by = (fg && fg.by) || {};
+    if (!fg) return 'stav sa nepodarilo zistiť';
+    var by = fg.by || {};
     var order = [['length', 'pozdĺžna'], ['width', 'priečna'], ['inherit', 'podľa materiálu']];
     var out = [];
     order.forEach(function(p){
       var n = by[p[0]] || 0;
       if (n) out.push(n + '× ' + p[1]);
     });
-    return out.length ? ('teraz: ' + out.join(' · ')) : '';
+    var skip = mdFrontGrainSkipText(fg.skipped);
+    if (!out.length) return skip;
+    return 'teraz: ' + out.join(' · ') + (skip ? ' · ' + skip : '');
+  }
+  // „2 skrinky preskočené — novšia verzia pluginu" (dôvody bez duplicít).
+  function mdFrontGrainSkipText(skipped){
+    var list = skipped || [];
+    if (!list.length) return '';
+    var why = [];
+    list.forEach(function(s){
+      var w = (s && s.why) || '';
+      if (w && why.indexOf(w) === -1) why.push(w);
+    });
+    var txt = list.length + ' ' + mdCabSkippedSk(list.length);
+    return why.length ? (txt + ' — ' + why.join(', ')) : txt;
   }
   // Cista funkcia (Node test): payload kliku. Bez smeru sa NEPOSIELA nic.
   function mdFrontGrainPayload(gen, guid, grain){
@@ -2941,7 +2971,7 @@
     if (meta) meta.textContent = mdFrontGrainNowText(MD_FRONT_GRAIN);
     var btn = mdEl('md_front_grain_apply');
     if (!btn) return;
-    var n = MD_FRONT_GRAIN.count || 0;
+    var n = (MD_FRONT_GRAIN && MD_FRONT_GRAIN.count) || 0;
     btn.textContent = MD_GRAIN_BUSY ? 'Prestavujem…' : mdFrontGrainBtnText(MD_FRONT_GRAIN);
     btn.disabled = MD_GRAIN_BUSY || !n;
   }
@@ -3132,7 +3162,8 @@
     // navždy v stave „Prestavujem…").
     MD_GRAIN_BUSY = false;
     if (!m) return;
-    MD_FRONT_GRAIN = m.front_grain || { count: 0, cabinets: 0, by: {} };
+    // Chýbajúci kľúč = server stav NEZISTIL (nie „nula čiel") — riadok to prizná.
+    MD_FRONT_GRAIN = m.front_grain || null;
     if (MD_MODEL_GUID !== (m.model_guid || '')) mdAppearanceInvalidate();
     MD_MODEL_GUID = m.model_guid || '';
     MD_USED = m.used || {};
@@ -3179,7 +3210,7 @@
       // payload kliku a zámok tlačidla nad DOM stubom.
       mdFrontGrainBtnText: mdFrontGrainBtnText, mdFrontGrainNowText: mdFrontGrainNowText,
       mdFrontGrainPayload: mdFrontGrainPayload, mdFrontGrainApply: mdFrontGrainApply,
-      mdRenderFrontGrain: mdRenderFrontGrain,
+      mdRenderFrontGrain: mdRenderFrontGrain, mdFrontGrainSkipText: mdFrontGrainSkipText,
       // 2A-4b (tests/js/test_md_schema2.js) — skupiny, sekcie struktur, batch 3
       mdGroupKeyOf: mdGroupKeyOf, mdStructureSections: mdStructureSections,
       mdBuildEdgeVariants: mdBuildEdgeVariants, mdParseExtraThs: mdParseExtraThs,

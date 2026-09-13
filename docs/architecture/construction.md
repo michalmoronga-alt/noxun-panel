@@ -342,9 +342,10 @@ modelu, žiadna zmena geometrie.
 efektívnej dosky sa nemení ani o písmeno (charakterizačný test nad každou rolou × každým signálom).
 
 **K1/D-108 smer dekoru dielca:** `effective_grain(sheet, override)` je JEDINÁ autorita efektívneho smeru (`override → materiál`) a `resolve_part` ho **materializuje RAZ** do
-snapshotu dielca. **D-131 (v0.12.3) k tomu pridal HROMADNÚ cestu nad celou zákazkou** (`ProductionCore.fronts_grain_all`, riadok „Kresba čiel" v Štúdiu) — píše **ten istý**
+snapshotu dielca. **D-131 (v0.12.3) k tomu pridal HROMADNÚ cestu nad celou zákazkou** (`MaterialsDialog.fronts_grain_all`, riadok „Kresba čiel" v Štúdiu) — píše **ten istý**
 override `part_overrides[<kľúč čela>]['grain_direction']` a prestavuje cez `CabinetBuilder.rebuild_many`, takže **žiadny druhý kontrakt ani druhý zdroj smeru nevznikol**; kľúče
-fyzických čiel skladá výhradne `Fronts.panels_for` z uloženého `front_items`.
+fyzických čiel skladá výhradne `Fronts.panels_for` z uloženého `front_items` a starý override pod **renderovacím suffixom** sa pri zápise zhasína, aby ho migrácia v `normalize`
+nevrátila do hry.
 
 **Rotácia sa tu NEROBÍ** — `pd[:prod]` aj rozmery na entite ostávajú GEOMETRICKÉ (osi deskriptora, `part_faces`/D-88/D-104/hover a kovanie na nich stoja); výmenu dĺžka↔šírka +
 dvojíc hrán robí až VEPO a zrkadlovo `validation.fits_on_sheet?`, a nikde inde (dvojitý swap = dielec objednaný v pôvodnej orientácii). Povolené hodnoty overridu drží konštanta

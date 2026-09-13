@@ -33,12 +33,25 @@
   a rovnako **0 zmien** — skrinka, ktorá požadovaný smer už má, sa neprestavuje. Tlačidlo je počas prestavby zamknuté („Prestavujem…"), takže z jednej voľby nevzniknú dva
   kroky Späť.
   **Vedomé odchýlky:** (1) rozsah sa berie z **resolved `front_items`**, nie z `fronts` configu — ten istý zdroj, z ktorého číta `Bom.collect` smerové nálezy (KOV-A1);
-  (2) `Panel.push_selected` ide s `dedup: false` — vyžaduje to brána 1b-3 a akcia žiadnu kópiu nevyrába; (3) pridaná vetva „nič sa nemenilo" nad rámec zadania (bez nej by
-  opakovaný klik prestavoval celú zákazku pre nič); (4) zadanie žiadalo doplniť callback do whitelistov `test_relay_api` / `test_guards` / `test_st1a_studio` — také
-  **vyčerpávajúce zoznamy v repe nie sú** (testy menujú konkrétne callbacky), takže sa nič nedopĺňalo.
-  **Testy:** 4058 headless · 117 JS sád · in-SketchUp sekcia `run_d131` (snapshoty dielcov v modeli, presne jeden krok Späť pre celú zákazku, „Bez čela"/doska/korpusové
-  dielce bajtovo nedotknuté, „Podľa materiálu" mazanie, cudzí `model_guid` aj prázdna zákazka bez kroku Späť). Štyri overené mutácie v hlavičkách oboch sád.
-  **Codex review:** doplní orchestrátor po review.
+  a config bez toho kľúča sa preskočí s dôvodom, nie ticho; (2) pridaná vetva „nič sa nemenilo" nad rámec zadania (bez nej by opakovaný klik prestavoval celú zákazku pre nič);
+  (3) riadok je **priznaný druhý prechod** modelom pri každom pushi — overridy v kusovníkovom zbere nie sú (nesie už materializovaný smer); cena je jeden JSON parse configu na
+  skrinku a prijala sa radšej než rozširovanie `Bom.collect` o ďalšie aditívne kľúče; (4) zadanie žiadalo doplniť callback do whitelistov `test_relay_api` / `test_guards` /
+  `test_st1a_studio` — také **vyčerpávajúce zoznamy v repe nie sú** (testy menujú konkrétne callbacky), takže sa nič nedopĺňalo.
+  **Kde žije zápis (Codex review #365, P1+P2).** Prvá verzia mala celú akciu v `ProductionCore` a `push_selected` s `dedup: false`, aby prešla brána 1b-3. Bolo to naopak:
+  jadro výstupov je **čítacia** cesta a hromadná prestavba dedup POTREBUJE (`rebuild_in_operation` volá `make_unique`). Zápis preto presunutý k „Nahradiť UNI…" do
+  `MaterialsDialog.fronts_grain_all` s východzím dedupom; v jadre ostal len čistý plán a súhrn, takže brána platí ďalej **bez výnimky**. Klik navyše ide **flush handshakom**
+  ako exporty Štúdia (`NX.studioRelayFrontsGrain` → `studio_do_fronts_grain`): rozpísaná zmena čiel v Inspectore (debounce 400 ms) mení, ktoré čelá v zákazke sú — bez neho by
+  prestavba bežala nad starým rozložením a oneskorený apply by dorobil čelá bez zvoleného smeru. **Každá** vetva (aj odmietavá a `rescue`) posiela `repush`; plný push okna je
+  jediná cesta, ktorou sa v klientovi odomkne tlačidlo.
+  **Zákazka = TOP-LEVEL.** Zber ide `model.entities` presne ako `Bom.collect`. `Ids.each_cabinet` (ktorý mala prvá verzia cez `Panel.all_cabinets`) hľadá globálne cez
+  `model.definitions` a našiel by aj korpus **vnorený** v cudzom komponente — ten vo výstupoch zákazky nie je a prestavba by ho zmenila vo VŠETKÝCH výskytoch zdieľanej
+  definície. **Známy rozdiel na zapísanie:** `Materials.replace_uni_scan` je naďalej globálny (`Ids.each_of_kind`) — staršia nezrovnalosť, ktorej sa táto dávka VEDOME
+  nedotkla; patrí samostatnej fix dávke.
+  **Testy:** 4071 headless · 117 JS sád · in-SketchUp sekcia `run_d131` (snapshoty dielcov v modeli, presne jeden krok Späť pre celú zákazku, „Bez čela"/doska/korpusové dielce
+  aj VNORENÁ skrinka bajtovo nedotknuté, „Podľa materiálu" mazanie vrátane legacy kľúča, flush blokáda, cudzí `model_guid` aj prázdna zákazka bez kroku Späť a s pushom).
+  Šesť overených mutácií v hlavičkách oboch sád.
+  **Codex review:** kolo 1 = 2× P1 + 2× P2 (top-level zber, flush handshake, repush v no-op vetve, priznanie preskočených skriniek) + slepý Opus (2× P2, 6× P3) — zapracované
+  jedným pushom; zvyšok doplní orchestrátor po review.
 
 - **D-128 — RUČNÁ VÝŠKA DREVENÉHO BOXU ZÁSUVKY, v0.12.2 (13.9.2026, PR #364).**
   **Čo Michal dostal:** pri drevenom boxe (Quadro V6) sa výška boxu dá **ručne znížiť**. Riadok Zásuvka v kontexte Kovanie **aj karta zásuvkového čela** majú tretí chip osi

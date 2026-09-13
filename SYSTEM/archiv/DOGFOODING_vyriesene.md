@@ -141,13 +141,23 @@ rozlúštené čelo (dvierka bez `wings_n`), sa **preskočia a VYMENUJÚ** v hl�
 undo krok pre nič by zjedlo jeden Ctrl+Z) a rovnako **0 zmien** — skrinka, ktorá požadovaný smer už má, sa neprestavuje a hláška to povie. Tlačidlo je počas prestavby
 zamknuté („Prestavujem…"), takže druhý klik nevyrobí druhý krok Späť.
 
-**Vedomé odchýlky:** (1) Rozsah čiel sa berie z **resolved `front_items`**, nie z `fronts` configu — je to ten istý zdroj, z ktorého číta `Bom.collect` smerové nálezy
-(KOV-A1). (2) `Panel.push_selected` ide s `dedup: false` — bránu 1b-3 to vyžaduje a akcia žiadnu kópiu nevyrába. (3) Pridaná vetva „nič sa nemenilo" nad rámec zadania:
-bez nej by opakovaný klik prestavoval celú zákazku pre nič.
+**Kde žije zápis (review #365).** Jadro výstupov (`production_core.rb`) je **čítacia** cesta — brána 1b-3 jej zakazuje aj vyžiadať dedup, ktorý hromadná prestavba potrebuje
+(`rebuild_in_operation` volá `make_unique`). Zápis preto sedí vedľa „Nahradiť UNI…" v `MaterialsDialog.fronts_grain_all` s východzím dedupom; v jadre ostal len čistý plán
+a súhrn. Klik navyše ide **flush handshakom** ako exporty Štúdia (`NX.studioRelayFrontsGrain`): rozpísaná zmena čiel v Inspectore mení, ktoré čelá v zákazke sú, takže
+prestavba na ňu musí počkať — a červené pole ju zastaví bez zápisu.
 
-**Testy:** `tests/pure/test_d131_kresba_ciel.rb` (29 testov), `tests/js/test_d131_ui.js` (28 kontrol), in-SketchUp sekcia `run_d131` (snapshoty dielcov v modeli, presne jeden
-krok Späť pre celú zákazku, „Bez čela"/doska/korpusové dielce bajtovo nedotknuté, cudzí `model_guid` a prázdna zákazka bez kroku Späť). Štyri overené mutácie sú v hlavičkách
-oboch sád.
+**Zákazka = top-level.** Zber ide `model.entities` presne ako `Bom.collect`; `Ids.each_cabinet` hľadá globálne cez `model.definitions` a korpus **vnorený** v cudzom komponente
+by prestavba zmenila vo všetkých výskytoch zdieľanej definície — hoci vo výstupoch zákazky vôbec nie je.
+
+**Vedomé odchýlky:** (1) Rozsah čiel sa berie z **resolved `front_items`**, nie z `fronts` configu — je to ten istý zdroj, z ktorého číta `Bom.collect` smerové nálezy (KOV-A1);
+config **bez** toho kľúča je stará skrinka a preskočí sa s dôvodom, nie ticho. (2) Pridaná vetva „nič sa nemenilo" nad rámec zadania: bez nej by opakovaný klik prestavoval celú
+zákazku pre nič. (3) Riadok „Kresba čiel" je **priznaný druhý prechod** modelom pri každom pushi — overridy v kusovníkovom zbere nie sú (nesie už materializovaný smer);
+cena je jeden JSON parse configu na skrinku a prijala sa radšej než rozširovanie `Bom.collect`. (4) Starý override pod **renderovacím suffixom** sa pri zápise zhasína, inak by
+ho migrácia v `normalize` vrátila do hry a „Podľa materiálu" by nezabralo.
+
+**Testy:** `tests/pure/test_d131_kresba_ciel.rb` (42 testov), `tests/js/test_d131_ui.js` (38 kontrol), in-SketchUp sekcia `run_d131` (snapshoty dielcov v modeli, presne jeden
+krok Späť pre celú zákazku, „Bez čela"/doska/korpusové dielce bajtovo nedotknuté, vnorená skrinka nedotknutá, flush blokáda, cudzí `model_guid` a prázdna zákazka bez kroku
+Späť). Šesť overených mutácií je v hlavičkách oboch sád.
 
 **Pôvodný plný text pri uzávere:**
 

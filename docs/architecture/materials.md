@@ -327,6 +327,14 @@ Zo splitu `materials_*`: atomické založenie rodiny z Demosu.
 Zo splitu `materials_*`: projektové defaulty + mapy `decor_key_by_material_id` / **`decor_key_by_abs_id`** — kľúč dekorovej skupiny pre pás „Použité v projekte" a rozpis „Kde sa
 používa"; obe SCHEMA-aware, aby počty a zoznam ukazovali na tú istú skupinu.
 
+**D-131 „Kresba čiel" — TRETIA modelová cesta okna** (`MaterialsDialog.fronts_grain_all`, v0.12.3) popri projektovej predvoľbe a „Nahradiť UNI…". Zapisuje **existujúci** override
+`part_overrides[<kľúč čela>]['grain_direction']` všetkým fyzickým čelám zákazky a prestavuje ich jednou `CabinetBuilder.rebuild_many` = **jeden krok Späť**. **Prečo žije TU, a nie
+v `ProductionCore`:** jadro výstupov je čítacia cesta a brána 1b-3 (`test_1b3_citanie.rb`) jej zakazuje aj vyžiadanie dedupu — hromadná prestavba ho však potrebuje, lebo
+`rebuild_in_operation` volá `make_unique`; `Panel.push_selected` tu preto ide s **východzím** dedupom, presne ako po „Nahradiť UNI…". V jadre ostal len čistý plán a súhrn
+(detail v [outputs.md](outputs.md)). **Štyri serverové guardy:** `gen` · **`flush_blocked`** (rozpísaná zmena čiel v Inspectore mení, ktoré čelá v zákazke sú — klik ide tým istým
+flush handshakom ako exporty Štúdia, `NX.studioRelayFrontsGrain`) · `model_guid` v prísnom režime · uzavretý enum `length|width|__inherit__` bez fallbacku. **Každá** vetva
+(aj odmietavá a `rescue`) posiela `repush` — plný push okna je jediná cesta, ktorou sa v klientovi odomkne tlačidlo. **0 čiel aj 0 zmien ⇒ žiadna operácia**, teda ani krok Späť.
+
 ### materials_replace_uni.rb
 
 **M-B2 „Nahradiť UNI…"** (`materials_replace_uni`): scan+čistá klasifikácia, rozpis dopadu pred potvrdením, SHA256 odtlačok plánu, all-or-nothing, 1 undo (skrinky+dosky+predvoľby).

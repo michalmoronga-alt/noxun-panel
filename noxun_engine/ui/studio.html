@@ -789,6 +789,9 @@
         <button class="primary" onclick="mdConfirmProject()">Potvrdiť</button>
         <button class="ghostbtn" onclick="mdCancelProject()">Zrušiť</button>
       </div>
+      <!-- Hint PREDVOLIEB stojí hneď za mriežkou (a nad riadkom Kresba čiel),
+           aby sa nečítal ako popis hromadnej akcie. -->
+      <div class="hint">Použijú sa na skrinkách, ktoré dedia materiál z projektu. Zmena sa premietne do všetkých dediacich skriniek (1 krok Späť).</div>
       <!-- D-131: hromadná AKCIA nad čelami, ktoré v zákazke sú (nie predvoľba
            pre budúce skrinky) — preto samostatný riadok pod predvoľbami. -->
       <div class="mdgrainrow">
@@ -801,8 +804,7 @@
         <button id="md_front_grain_apply" class="ghostbtn" onclick="mdFrontGrainApply()">Použiť na všetky čelá</button>
         <span class="mddefault-meta" id="md_front_grain_now"></span>
       </div>
-      <div class="hint">Zapíše smer dekoru všetkým čelám, ktoré v zákazke sú teraz; skrinky vložené neskôr sa riadia materiálom — spusti znova. Výsledok skontroluj <b>Kontrolou kresby</b>.</div>
-      <div class="hint">Použijú sa na skrinkách, ktoré dedia materiál z projektu. Zmena sa premietne do všetkých dediacich skriniek (1 krok Späť).</div>
+      <div class="hint">Zapíše smer dekoru všetkým čelám, ktoré v zákazke sú teraz; skrinky vložené neskôr sa riadia materiálom — spusti znova. <b>Podľa materiálu</b> len zruší ručný smer; čelá, ktoré už dedia, sa neprestavujú — zmenu kresby dekoru v katalógu prenesie bežná prestavba. Výsledok skontroluj <b>Kontrolou kresby</b>.</div>
     </div>
   </details>
 

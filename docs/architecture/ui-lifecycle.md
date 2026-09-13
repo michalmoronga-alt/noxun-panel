@@ -2064,11 +2064,15 @@ Potvrdzovanie, `model_guid`, serverové predvoľby, dedenie aj Undo používajú
 
 **D-131 (v0.12.3): riadok „Kresba čiel" pod predvoľbami** — jediné miesto sekcie, ktoré **mení model**. Nie je to predvoľba, ale hromadná AKCIA nad čelami, ktoré v zákazke sú TERAZ
 (projektová predvoľba smeru pre budúce skrinky sa vedome nezavádza — bola by to zmena kontraktu projektu; hint to hovorí a číslo v tlačidle sa po vložení novej skrinky zdvihne).
-Select (Podľa materiálu / Pozdĺžna / Priečna) + `md_front_grain_apply` posielajú `fronts_grain_all` s `{gen, model_guid, grain}` — telo je v `ProductionCore` (nie v `MaterialsDialog`),
-preto má **vlastný `cb(dlg, …)`** a nejde cez `mat_actions`. Stav riadku (`teraz: 8× priečna · 4× podľa materiálu` a počet v tlačidle) počíta SERVER a nesie ho `mat.front_grain`
-(`{count, cabinets, by}`) — klient si nič nedopočítava. **Zámok tlačidla:** klik ho prepne na `Prestavujem…` + `disabled` a odomkne ho až NOVÝ push (`repush` po zápise, alebo aj
-push bez `mat`) — druhý klik pred ním nepošle nič, inak by z jednej voľby vznikli dva kroky Späť. `count = 0` → `disabled` s textom „Žiadne čelá". Generácia okna chodí do sekcie
-druhým parametrom `matApplyState(m, gen)` (identita CELÉHO payloadu Štúdia, nie sekcie — vzor `budget.js`).
+Select (Podľa materiálu / Pozdĺžna / Priečna) + `md_front_grain_apply` posielajú `fronts_grain_all` s `{gen, model_guid, grain}`. Callback má **vlastný `cb(dlg, …)`** (nejde cez
+`mat_actions`, lebo telo nie je v `MaterialsDialog.dispatch`) a ide **flush handshakom ako exporty**: `handle_fronts_grain_all` → `NX.studioRelayFrontsGrain` v paneli → flush
+rozpísaných editov → `studio_do_fronts_grain` → `StudioDialog.do_fronts_grain_all` → `MaterialsDialog.fronts_grain_all`. Bez neho by hromadná prestavba bežala nad starým
+rozložením čiel a oneskorený apply Inspectora by dorobil čelá bez zvoleného smeru; červené pole panela akciu zastaví (`flush_blocked`). Stav riadku (`teraz: 8× priečna · 4× podľa
+materiálu` a počet v tlačidle) počíta SERVER a nesie ho `mat.front_grain` (`{count, cabinets, by, skipped}`) — klient si nič nedopočítava. **Zámok tlačidla:** klik ho prepne na
+`Prestavujem…` + `disabled` a odomkne ho až NOVÝ push — preto **každá** serverová vetva (vrátane odmietnutia a `rescue`) posiela `repush`; katalógové echo zámok nepustí a druhý
+klik pred pushom nepošle nič (inak by z jednej voľby vznikli dva kroky Späť). `front_grain` **chýbajúci/null** = „stav sa nepodarilo zistiť" + `disabled` (nikdy „Žiadne čelá");
+`count = 0` so `skipped` ukáže „2 skrinky preskočené — <dôvod>" a tlačidlo hlási „Žiadne dostupné čelá". Generácia okna chodí do sekcie druhým parametrom `matApplyState(m, gen)`
+(identita CELÉHO payloadu Štúdia, nie sekcie — vzor `budget.js`).
 
 **Modály sekcie žijú v kotve `#matModalRoot` MIMO `#secbody`** (vzor `#nxModalRoot`).
 
