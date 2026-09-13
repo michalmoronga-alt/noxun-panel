@@ -2456,7 +2456,12 @@ module Noxun
 
         fronts_grain_apply(model, plan)
         status.call(fronts_grain_done_msg(grain, plan))
-        Panel.push_selected(model) # Inspector: karta dielca nesie novy VYSLEDOK
+        # Inspector: karta dielca nesie po prestavbe novy VYSLEDOK smeru.
+        # `dedup: false` je BRANA 1b-3 (jadro vystupov ani okno Studio si nesmu
+        # vyziadat opravu identity kopii) a tejto akcii nic neberie: prestavba
+        # ZIADNU kopiu nevyraba, takze niet comu prideľovat nove ID — duplicity
+        # ostavaju ORANGE nalezom Kontroly, presne ako doteraz.
+        Panel.push_selected(model, dedup: false)
         repush.call                # Studio: cerstvy stav riadku + odomknutie tlacidla
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.fronts_grain_all')
