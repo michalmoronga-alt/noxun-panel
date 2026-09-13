@@ -9558,15 +9558,15 @@ module NoxunSuRunner
     e::Panel.select_only(model, src)
 
     # --- 1) DEFINICIA „podobny": rovnaka ROLA + rovnaky MATERIAL ------------
-    n_cab = e::Panel.similar_parts_count(e::Panel.similar_parts_map(model, cab_a, src, 'cabinet'))
-    n_prj = e::Panel.similar_parts_count(e::Panel.similar_parts_map(model, cab_a, src, 'project'))
+    n_cab = e::Panel.similar_parts_count(e::Panel.similar_parts_map(model, cab_a, src, 'cabinet').first)
+    n_prj = e::Panel.similar_parts_count(e::Panel.similar_parts_map(model, cab_a, src, 'project').first)
     ok("UI-D1: rozsah „táto skrinka\" = ostatne police tej istej skrinky (#{n_cab})", n_cab == 2)
     ok("UI-D1: rozsah „celý projekt\" berie aj druhu skrinku (#{n_prj})", n_prj == 5)
 
     top = uid1_parts_of_role(cab_a, 'top').first
     if top
-      n_top_cab = e::Panel.similar_parts_count(e::Panel.similar_parts_map(model, cab_a, top, 'cabinet'))
-      n_top_prj = e::Panel.similar_parts_count(e::Panel.similar_parts_map(model, cab_a, top, 'project'))
+      n_top_cab = e::Panel.similar_parts_count(e::Panel.similar_parts_map(model, cab_a, top, 'cabinet').first)
+      n_top_prj = e::Panel.similar_parts_count(e::Panel.similar_parts_map(model, cab_a, top, 'project').first)
       ok('UI-D1: rola s JEDINYM dielcom v skrinke ma v rozsahu skrinky 0 podobnych',
          n_top_cab.zero?)
       ok('UI-D1: ta ista rola ma v projekte 1 podobny (vrch druhej skrinky)', n_top_prj == 1)

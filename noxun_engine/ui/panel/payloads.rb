@@ -2461,10 +2461,15 @@ module Noxun
         # dve kopie by sa casom rozisli a pouzivatel by pri tom istom probleme
         # cital raz jednu a raz druhu napravu.
         def detached_skipped_tail(ids)
-          list = Array(ids).reject { |id| id.to_s.empty? }
-          return '' if list.empty?
+          list = detached_skipped_list(ids)
+          list.empty? ? '' : " · preskočené: #{list.join(', ')}"
+        end
 
-          " · preskočené: #{list.map { |id| "#{id} (#{Ids::DETACHED_PART_REASON})" }.join(', ')}"
+        # Polozky zoznamu („CAB-3 (má odpojený dielec — …)") pre volajucich,
+        # ktori potrebuju INU vetu nez chvost statusu (modal podobnych dielcov).
+        def detached_skipped_list(ids)
+          Array(ids).reject { |id| id.to_s.empty? }
+                    .map { |id| "#{id} (#{Ids::DETACHED_PART_REASON})" }
         end
 
         # String alebo nil (prazdny -> nil). Pre material dedenie + override cistenie.

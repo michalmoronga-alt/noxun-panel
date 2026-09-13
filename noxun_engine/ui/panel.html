@@ -804,11 +804,15 @@
       <button type="button" data-sim-scope="cabinet" aria-pressed="true"
               title="Len dielce tejto skrinky" onclick="pickSimilarScope('cabinet')">Táto skrinka</button>
       <button type="button" data-sim-scope="project" aria-pressed="false"
-              title="Dielce všetkých skriniek v projekte" onclick="pickSimilarScope('project')">Celý projekt</button>
+              title="Dielce všetkých skriniek v zákazke" onclick="pickSimilarScope('project')">Celý projekt</button>
     </div>
     <div class="simcount" id="simCount">Počítam podobné dielce…</div>
+    <!-- D-134: preskocene skrinky (odpojeny dielec). Vetu sklada server, JS ju
+         len zobrazi; prazdna = riadok sa vobec neukaze. -->
+    <div class="hint" id="simSkipped" style="display:none"></div>
     <div class="hint">Podobný = <b>rovnaká rola</b> (napr. všetky boky) a <b>rovnaký materiál</b>.
       Prepíše sa len <b>olep hrán</b> — materiál, rozmery ani smer dekoru sa nemenia.
+      „Celý projekt“ znamená <b>skrinky zákazky</b> — skrinky vnorené v inom komponente sa nemenia.
       Všetko je <b>jeden krok Späť</b>.</div>
     <div class="btnrow">
       <!-- Stav tlacidla riadi JS (trieda + aria-disabled + title, vzor D-78):

@@ -41,7 +41,7 @@
     // nanovo). Pocet sa preto vypyta znova; odpoved meni LEN obsah modalu.
     // Pocet sa najprv zhodi na „počítam" (tlacidlo je dovtedy neaktivne) — inak
     // by okno v case letu odpovede stale ukazovalo staru hodnotu ako platnu.
-    else if (simModalOpen()){ simCount = null; applySimCountView(); requestSimilarCount(); }
+    else if (simModalOpen()){ simCount = null; simSkipped = ''; applySimCountView(); applySimSkippedView(); requestSimilarCount(); }
     // FIX 2: material dielca len z hrubkovo kompatibilnych dosiek (nekompatibilne disabled).
     // D-45: cela beru KATALOGOVU hrubku sveho materialu (frontMatch = rozsah dosky),
     // ostatne dielce presnu hrubku dielca — tu ju meni material/hrubka celej skrinky.
@@ -548,6 +548,7 @@
   var simFor = null; // { guid, cabinet_id, role_key }
   var simScope = 'cabinet';
   var simCount = null; // null = este sa pocita
+  var simSkipped = '';  // D-134: veta o preskocenych skrinkach (zo servera)
   var simBound = false;
   // Codex #180 P2 (kolo 2): TOKEN DOPYTU. Kontrola samotneho rozsahu nestaci —
   // po zatvoreni a otvoreni modalu nad INYM dielcom (alebo po prepnuti
@@ -573,10 +574,12 @@
                role_key: String(partCard.role_key || '') };
     simScope = 'cabinet';
     simCount = null;
+    simSkipped = '';
     el('simWhat').innerHTML = 'Olep hrán dielca <b>' +
       esc(partCard.name || roleLabel(partCard.role)) + '</b> (' + esc(roleLabel(partCard.role)) + ').';
     applySimScopeButtons();
     applySimCountView();
+    applySimSkippedView();
     m.style.display = 'flex';
     bindSimModal();
     requestSimilarCount();
@@ -584,6 +587,7 @@
   function closeSimilarModal(){
     simFor = null;
     simCount = null;
+    simSkipped = '';
     simReq++; // odpovede na uz nepotrebne dopyty prepadnu
     var m = el('simModal'); if (m) m.style.display = 'none';
   }
@@ -593,8 +597,10 @@
     if (scope === simScope) return; // no-op: rovnaky rozsah nic neprepocitava
     simScope = scope;
     simCount = null;
+    simSkipped = '';
     applySimScopeButtons();
     applySimCountView();
+    applySimSkippedView();
     requestSimilarCount();
   }
   function applySimScopeButtons(){
@@ -617,6 +623,18 @@
     if (n === null || n === undefined) return { enabled: false, title: 'Počet podobných dielcov sa ešte zisťuje.' };
     if (n === 0) return { enabled: false, title: 'V tomto rozsahu nie je čo zmeniť — skús celý projekt.' };
     return { enabled: true, title: 'Prepíše olep hrán ' + n + ' dielcom (jeden krok Späť).' };
+  }
+  // D-134: veta o PRESKOCENYCH skrinkach. Sklada ju SERVER (jedna autorita
+  // nazvov aj napravy) — klient ju len ocisti a zobrazi; prazdna = riadok sa
+  // vobec neukaze, takze bezna zakazka vidi presne to co doteraz.
+  function nxSimilarSkippedText(raw){
+    return (raw === null || raw === undefined) ? '' : String(raw).trim();
+  }
+  function applySimSkippedView(){
+    var s = el('simSkipped'); if (!s) return;
+    var txt = nxSimilarSkippedText(simSkipped);
+    s.textContent = txt;
+    s.style.display = txt ? '' : 'none';
   }
   function applySimCountView(){
     var c = el('simCount'), b = el('simApplyBtn');
@@ -649,13 +667,19 @@
     if (parseInt(d.req, 10) !== simReq) return;
     if (d.error){
       simCount = 0;
+      // D-134: chyba nie je stav zakazky — riadok o preskocenych skrinkach by
+      // pri nej tvrdil nieco, co sa uz nezistilo.
+      simSkipped = '';
       applySimCountView();
+      applySimSkippedView();
       var c = el('simCount');
       if (c){ c.textContent = String(d.error); c.classList.add('none'); }
       return;
     }
     simCount = (d.count === null || d.count === undefined) ? null : parseInt(d.count, 10);
+    simSkipped = nxSimilarSkippedText(d.skipped);
     applySimCountView();
+    applySimSkippedView();
   }
   // POZOR — TU SA FLUSH HANDSHAKE ZAMERNE NEROBI (na rozdiel od `onHwOwnerPick`,
   // „Dielcov" a „Vložiť kópiu"). `flushCabinetEditsNow` posiela `apply_all`
@@ -722,6 +746,8 @@
       nxDecorLinkState: nxDecorLinkState,
       nxEdgeRotOf: nxEdgeRotOf, nxSimilarCountText: nxSimilarCountText,
       nxSimilarBtnState: nxSimilarBtnState,
+      // D-134: veta o preskocenych skrinkach modalu podobnych dielcov.
+      nxSimilarSkippedText: nxSimilarSkippedText,
       // K1 (D-108): stav segmentu „Smer dekoru" (tests/js/test_k1_smer_dekoru.js).
       nxGrainSegmentState: nxGrainSegmentState, nxGrainWire: nxGrainWire };
   }
