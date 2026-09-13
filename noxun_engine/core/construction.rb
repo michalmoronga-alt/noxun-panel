@@ -700,8 +700,10 @@ module Noxun
         # KOV-D2a: `locked` je SUHRN „aspon jedna os je rucne zamknuta"
         # (Astra #20 F7). Nakup (`HardwareSets.note_manual`) ho cita ako
         # znamienko rucneho zasahu; ktora os to je, hovori az payload `axes`.
+        # D-128: suhrn zahrna aj TRETIU os (rucna vyska dreveneho boxu).
         out['locked'] = true if Recipes.lock_value(recipe, ctx, overrides) ||
-                                Recipes.height_lock_value(recipe, ctx, overrides)
+                                Recipes.height_lock_value(recipe, ctx, overrides) ||
+                                Recipes.box_lock_value(recipe, ctx, overrides)
         out
       end
 
@@ -719,7 +721,12 @@ module Noxun
       # rescue by fail-closed zasuvku vypustil z mapy osi — riadok osiroteneho
       # zasahu by prisiel o stav osi (a s nim o cestu opravy) a v diagnostike
       # by po chybe nebola ani stopa.
-      def drawer_contexts(cfg, plan)
+      #
+      # D-128: `ctx` nesie navyse `part_thicknesses` (rola -> mm) — rozsah
+      # rucnej vysky boxu ma dole hrubku DNA, takze bez nej by ju payload aj
+      # zapis museli hadat. Su to TIE ISTE cisla, s akymi pocita `resolve`
+      # (`drawer_thickness_map` nad mapou od buildera), nie druhy vypocet.
+      def drawer_contexts(cfg, plan, part_thicknesses = nil)
         bounds = plan[:front_bounds].is_a?(Hash) ? plan[:front_bounds] : {}
         Array(plan[:front_items]).each_with_object({}) do |item, acc|
           next unless item.is_a?(Hash)
@@ -730,7 +737,8 @@ module Noxun
           next unless bounds.key?(fid)
 
           begin
-            acc[fid] = context_for(item, plan, cfg)
+            th, = drawer_thickness_map(fid, part_thicknesses)
+            acc[fid] = context_for(item, plan, cfg).merge(part_thicknesses: th)
           rescue StandardError => e
             Engine.log_error(e, "Construction.drawer_contexts #{fid}") if defined?(Engine)
           end

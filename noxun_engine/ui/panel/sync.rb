@@ -556,15 +556,18 @@ module Noxun
         # Plan sa stavia LEN ked skrinka klasifikovanu zasuvku naozaj ma —
         # zakazka bez zasuviek ma payload zhodny s D1b.
         def front_drawer_refresh(cfg, cab_id)
-          map = front_drawer_payload(cfg)
+          # D-128: index osi sa cita PRED riadkom karty — detail aj veta
+          # „ručne zamknuté" z neho vychadzaju (rovnaky poriadok ako v plnom
+          # pushi `cabinet_payload`). Stale JEDEN vypocet.
+          index = drawer_axes_index(cfg, CabinetBuilder.config_to_params(cfg))
+          map = front_drawer_payload(cfg, index['by_owner'])
           return map unless map.is_a?(Hash) && !map.empty?
 
           # KOV-D3b: aj PONUKA novej verzie — `refreshFrontDrawer` vymiena
           # zaznam CELY, takze bez nej by z otvorenej karty po zmene mapovania
           # alebo katalogu zmizol riadok „Dostupný recept v2".
           attach_front_drawer_upgrade(
-            attach_front_drawer_axes(map, drawer_axes_index(cfg, CabinetBuilder.config_to_params(cfg)),
-                                     cab_id),
+            attach_front_drawer_axes(map, index, cab_id),
             cfg, cab_id
           )
         rescue StandardError => e

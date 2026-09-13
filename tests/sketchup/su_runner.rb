@@ -18288,6 +18288,214 @@ module NoxunSuRunner
        kovd2a_variant(inst) == auto && kovd2a_overrides(inst).empty?)
   end
 
+  # === D-128: RUCNA VYSKA DREVENEHO BOXU (Quadro, tretia os zamku) =========
+  #
+  # Headless sada dokaze cisla (rozsah, hranice, payload, zapisova cesta).
+  # NEDOKAZE, ze sa dielce boxu v MODELI naozaj prerezu na zamknutu vysku, ze
+  # zapis a prestavba su JEDEN krok Spat a ze kusovnik (a teda VEPO) nesie tie
+  # iste rozmery. Preto tento scenar zamyka cez REALNU akciu panela a meria
+  # MODEL, KUSOVNIK aj krok Spat/Redo.
+  #
+  # DETERMINISTICKA geometria (vzor D2a — ziadna vetva „preskocene"): svetla
+  # vyska riadku cela je `vyska cela - 16`, takze celo 416 da svetlu 400
+  # a automat boxu 360 (400 - vola 40). Minimum je 58 (celo/chrbat 30 + dno 16
+  # + odsadenie 12), takze zamok 300 lezi bezpecne vnutri rozsahu.
+  D128_RID       = 'recipe:quadro_v6_sisy_v1'
+  D128_FRONT_H   = 416.0
+  D128_AUTO_BOX  = 360.0
+  D128_LOCK_BOX  = 300.0
+  # Nizsie celo, pri ktorom uz zamok 300 NEPLATI: svetla 234 -> automat 194.
+  D128_SMALL_H   = 250.0
+
+  def d128_params(front_h = D128_FRONT_H)
+    kovc2b_params({ 'height' => 900.0 },
+                  'height' => front_h, 'drawer' => { 'construction' => 'wood' })
+  end
+
+  # Stav osi zo SERVERA — ten isty payload, z ktoreho kresli chip.
+  def d128_axis(inst)
+    cfg = e::Store.config(inst) || {}
+    map = e::Panel.drawer_axes_map(cfg, e::CabinetBuilder.config_to_params(cfg))
+    ((map[e::PartKeys.front('F1', 'panel')] || {})['box']) || {}
+  end
+
+  # Vyska boxu tak, ako ju nesie ULOZENA polozka vysuvu.
+  def d128_box(inst)
+    s = kovd2a_slide(inst)
+    s && s['params'] ? s['params']['box_height'].to_f : nil
+  end
+
+  # Rozmery dielca v MODELI (mm) — podla nich sa pozna, ci sa naozaj prerezal.
+  def d128_dims(inst, key)
+    part = kovc2b_parts(inst)[key]
+    return [] unless part
+
+    b = part.definition.bounds
+    [mm(b.width), mm(b.height), mm(b.depth)]
+  end
+
+  def d128_has?(inst, key, value)
+    d128_dims(inst, key).any? { |v| (v - value).abs <= TOL }
+  end
+
+  # REALNA akcia panela (nie priama prestavba) — inak by sa nedalo overit,
+  # ze zapis zamku a geometria su JEDEN krok Spat.
+  def d128_set(model, inst, cid, value)
+    model.selection.clear
+    model.selection.add(inst)
+    e::Panel.handle_set_hardware_override(
+      pg(model, 'generic_type' => 'slide', 'rule_id' => D128_RID,
+                'owner_part_key' => e::PartKeys.front('F1', 'panel'),
+                'field' => 'box_height', 'value' => value, 'cabinet_id' => cid)
+    )
+  end
+
+  # VYROBNE rozmery riadkov kusovnika ([dlzka, sirka]) — to, co ide do VEPO.
+  # Riadky su AGREGOVANE podla vyrobnych parametrov, takze rolu uz nenesu:
+  # bok boxu sa pozna podla dvojice NL x vyska boxu.
+  def d128_bom(model)
+    bom_rows(model).map { |r| [r['length'].to_f.round(1), r['width'].to_f.round(1)] }
+  end
+
+  def run_d128(model)
+    cleanup(model)
+    markers = []
+    inst = e::CabinetBuilder.build(model, d128_params)
+    return ok('D-128: vlozenie korpusu so zasuvkou drevenej konstrukcie', false) unless inst
+
+    cid = e::Store.get(inst, 'cabinet_id')
+    # PREDPOKLAD scenara je ASERCIA, nie podmienka behu (lekcia D2a).
+    ok("D-128: vychodisko = AUTOMATICKA vyska boxu #{D128_AUTO_BOX} (dostal #{d128_box(inst).inspect})",
+       d128_box(inst) && (d128_box(inst) - D128_AUTO_BOX).abs <= TOL)
+    ax = d128_axis(inst)
+    ok("D-128: os `box` je v payloade v stave `auto` s rozsahom (#{ax.inspect})",
+       ax['state'] == 'auto' && (ax['max'].to_f - D128_AUTO_BOX).abs <= TOL &&
+       ax['min'].to_f.positive? && ax['min'].to_f < D128_LOCK_BOX)
+    begin
+      d128_scenar(model, inst, cid, markers)
+    ensure
+      r03_clear_markers(model, markers)
+      cleanup(model)
+      ok('D-128: cleanup (0 korpusov)', cabinets(model).empty?)
+    end
+  rescue StandardError => ex
+    log_line("FAIL: run_d128 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
+  def d128_scenar(model, inst, cid, markers)
+    auto_fb = D128_AUTO_BOX - 16.0 - 12.0   # celo/chrbat pri automate = 332
+    lock_fb = D128_LOCK_BOX - 16.0 - 12.0   # a pri zamku 300 = 272
+    bottom_before = d128_dims(inst, 'front:F1/drawer_bottom')
+
+    # --- 1) zamknut NIZSIU vysku boxu --------------------------------------
+    m = r03_marker(model, markers)
+    d128_set(model, inst, cid, D128_LOCK_BOX)
+    ok("D-128: zamknuta vyska boxu drzi #{D128_LOCK_BOX} (automat dal #{D128_AUTO_BOX}, " \
+       "teraz #{d128_box(inst).inspect})",
+       d128_box(inst) && (d128_box(inst) - D128_LOCK_BOX).abs <= TOL)
+    ok('D-128: zamok je v configu ako pole `box_height`',
+       kovd2a_overrides(inst).any? { |o| (o['box_height'].to_f - D128_LOCK_BOX).abs <= TOL &&
+                                         o['rule_id'].to_s == D128_RID })
+    ok("D-128: ulozeny config ma schemu #{e::CabinetBuilder::CONFIG_SCHEMA}",
+       (e::Store.config(inst) || {})['config_schema'].to_i == e::CabinetBuilder::CONFIG_SCHEMA)
+    # MODEL, nie plan: OBA boky maju vysku zamku a NEMAJU vysku automatu —
+    # inak by tvrdenie preslo aj vtedy, keby v modeli stal automat.
+    %w[left right].each do |side|
+      key = "front:F1/box_side:#{side}"
+      ok("D-128: bok boxu #{side} v MODELI ma vysku zamku (#{d128_dims(inst, key).inspect})",
+         d128_has?(inst, key, D128_LOCK_BOX) && !d128_has?(inst, key, D128_AUTO_BOX))
+    end
+    %w[drawer_inner_front drawer_back].each do |role|
+      key = "front:F1/#{role}"
+      ok("D-128: #{role} v MODELI ma vysku #{lock_fb} (#{d128_dims(inst, key).inspect})",
+         d128_has?(inst, key, lock_fb) && !d128_has?(inst, key, auto_fb))
+    end
+    ok("D-128: DNO sa zamkom NEMENI (#{d128_dims(inst, 'front:F1/drawer_bottom').inspect})",
+       d128_dims(inst, 'front:F1/drawer_bottom') == bottom_before)
+    ok('D-128: polozka vysuvu OSTAVA `source: recipe` a nesie suhrn `locked`',
+       kovd2a_slide(inst)['source'] == 'recipe' && kovd2a_slide(inst)['locked'] == true)
+    ok("D-128: nakup objednava kit aj so zamknutym boxom (#{kovd1a_codes(model).inspect})",
+       kovd1a_codes(model).length == 1)
+    # Bok boxu = NL 450 x vyska boxu; celo/chrbat = SKW 818 x (vyska - 28).
+    ok("D-128: KUSOVNIK (a teda VEPO) nesie dielce na ZAMKNUTU vysku (#{d128_bom(model).inspect})",
+       d128_bom(model).any? { |row| (row[1] - D128_LOCK_BOX).abs <= 0.2 } &&
+       d128_bom(model).any? { |row| (row[1] - lock_fb).abs <= 0.2 } &&
+       d128_bom(model).none? { |row| (row[1] - D128_AUTO_BOX).abs <= 0.2 || (row[1] - auto_fb).abs <= 0.2 })
+    ok("D-128: payload osi hlasi `locked` (#{d128_axis(inst).inspect})",
+       d128_axis(inst)['state'] == 'locked' &&
+       (d128_axis(inst)['value'].to_f - D128_LOCK_BOX).abs <= TOL)
+
+    # --- 2) Spat = JEDEN krok pre zamok aj geometriu -----------------------
+    Sketchup.undo
+    ok("D-128 Spat: zamok aj dielce sa vratili NARAZ (box #{d128_box(inst).inspect})",
+       d128_box(inst) && (d128_box(inst) - D128_AUTO_BOX).abs <= TOL &&
+       kovd2a_overrides(inst).empty? &&
+       d128_has?(inst, 'front:F1/box_side:left', D128_AUTO_BOX))
+    ok('D-128 Spat: bol to PRESNE jeden krok', m.valid?)
+
+    # --- 3) Redo obnovi zamok aj geometriu konzistentne --------------------
+    if Sketchup.respond_to?(:redo)
+      Sketchup.redo
+      ok('D-128 Redo: zamok, dielce aj polozka su spat SUCASNE',
+         d128_box(inst) && (d128_box(inst) - D128_LOCK_BOX).abs <= TOL &&
+         d128_has?(inst, 'front:F1/box_side:left', D128_LOCK_BOX) &&
+         kovd2a_overrides(inst).any? { |o| (o['box_height'].to_f - D128_LOCK_BOX).abs <= TOL })
+    else
+      info('D-128: Sketchup.redo nedostupne — Redo vetva netestovana')
+      d128_set(model, inst, cid, D128_LOCK_BOX)
+    end
+    r03_clear_markers(model, markers)
+
+    # --- 4) kopia skrinky zamok NESIE --------------------------------------
+    model.selection.clear
+    model.selection.add(inst)
+    e::Panel.handle_insert_copy(pg(model, 'cabinet_id' => cid))
+    copy = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' && i != inst }
+    ok('D-128 kopia: zamok vysky boxu prezil „Vložiť kópiu"',
+       copy && kovd2a_overrides(copy).any? { |o| (o['box_height'].to_f - D128_LOCK_BOX).abs <= TOL })
+    ok('D-128 kopia: aj kopia stoji na zamknutej vyske (nie na automate)',
+       copy && d128_box(copy) && (d128_box(copy) - D128_LOCK_BOX).abs <= TOL)
+    if copy && copy.valid?
+      model.start_operation('D-128 erase copy', true)
+      copy.erase!
+      model.commit_operation
+    end
+
+    # --- 5) ZMENSENA zona = RED bez dielcov, s navrhom nahrady -------------
+    #
+    # Zamok sa NIKDY nemeni automaticky: po znizeni cela je 300 nad novym
+    # automatom (194), takze zasuvka je RED — nie ticho nizsi box.
+    small = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+    small['fronts']['items'][0]['height'] = D128_SMALL_H
+    e::CabinetBuilder.rebuild(model, inst, small)
+    ok("D-128: zmensena zona = RED `box_lock_invalid` (#{kovd2a_conflicts(inst).inspect})",
+       kovd2a_conflicts(inst) == ['box_lock_invalid'])
+    ok('D-128: RED = ziadne dielce zasuvky a ziadna polozka vysuvu',
+       kovc2b_parts(inst).empty? && kovd2a_slide(inst).nil?)
+    ok("D-128: RED zastavi nakup vysuvu (#{kovd1a_codes(model).inspect})",
+       kovd1a_codes(model).empty?)
+    conf = d128_axis(inst)
+    ok("D-128: konfliktna os ma hlasku aj NAVRH = novy automat (#{conf.inspect})",
+       conf['state'] == 'conflict' && conf['message'].to_s.length > 10 &&
+       conf['proposal'].to_f.positive? && conf['proposal'].to_f < D128_LOCK_BOX)
+
+    # --- 6) NAHRADA zo servera plati ---------------------------------------
+    proposal = conf['proposal'].to_f
+    d128_set(model, inst, cid, proposal)
+    ok("D-128: nahrada #{proposal} je platny zamok (box #{d128_box(inst).inspect})",
+       kovd2a_conflicts(inst).empty? && d128_box(inst) &&
+       (d128_box(inst) - proposal).abs <= TOL &&
+       d128_has?(inst, 'front:F1/box_side:left', proposal))
+
+    # --- 7) odomknutie = navrat na automat ---------------------------------
+    d128_set(model, inst, cid, nil)
+    small_auto = D128_SMALL_H - 16.0 - 40.0
+    ok("D-128: odomknuta vyska boxu = automat #{small_auto} (#{d128_box(inst).inspect})",
+       d128_box(inst) && (d128_box(inst) - small_auto).abs <= TOL &&
+       kovd2a_overrides(inst).empty?)
+  end
+
   # === KOV-D2b: ZAMKY OSI — UI CESTA (chip -> serverova akcia) ==============
   #
   # D2a dokazal JADRO (poradie resolvera, jedna operacia, Undo/Redo). D2b
@@ -22088,6 +22296,7 @@ module NoxunSuRunner
     run_kovc2b(model)        # KOV-C2b: zasuvky z receptu — dielce v modeli 1:1 s planom, JEDNA polozka vysuvu, prestavba (ina hlbka/vyska = ina NL/variant, ziadna duplicita, part_overrides prezijú), 1 krok Spat, kopia a sablona nesu pripnuty recept, plytka skrinka = ziadne dielce + RED + export zastaveny s PRAZDNYM priecinkom
     run_kovd1a(model)        # KOV-D1a: owner triedny override setu na CELE — akcia panela zapise `class:slide|…@front:F1/panel`, zmrazi definiciu a prestava v JEDNEJ operacii (Spat aj Redo vratia mapovanie, snapshot aj nakupny kod naraz), kopia kluc nesie, prerastenie bez pasma neobjedna zly kit
     run_kovd2a(model)        # KOV-D2a: zamky osi zasuvky — akcia panela zamkne VYSKU proti automatu (H144 -> H70) a prestava v JEDNEJ operacii (Spat aj Redo vratia zamok, dielce v modeli aj nakupny kit naraz), NL mimo radu = RED bez dielcov a bez kitu, odomknutie JEDNEJ osi necha druhy zamok zit, kopia zamky nesie
+    run_d128(model)          # D-128: rucna vyska dreveneho boxu (Quadro) — akcia panela zamkne NIZSI box proti automatu a prestava v JEDNEJ operacii (Spat aj Redo vratia zamok, oba boky, vnutorne celo aj chrbat naraz; DNO sa nemeni), kusovnik a nakup nesu zamknutu vysku, kopia zamok nesie, zmensena zona = RED `box_lock_invalid` bez dielcov a bez kitu s navrhom = novy automat, nahrada plati a odomknutie vrati automat
     run_kovd2b(model)        # KOV-D2b: chipy osi — kazdy zapis ide z PAYLOADU KARTY (identita `lock`, hodnoty `axes`): klik na `auto` pripne aktualnu vysku bez zmeny geometrie, volba z ponuky prestava dielce aj kit (Spat = 1 krok), odomknutie JEDNEJ osi necha druhu zit, konfliktna karta nesie identitu aj bez polozky a nahrada zo servera je zamknuta pri zachovanom druhom zamku (Spat aj Redo)
     run_kovd3a(model)        # KOV-D3a: upgrade receptu jedneho cela nad FIXTURNYM registrom (`with_test_dir`) — ciel s nesediacou hrubkou preflight odmietne BEZ kroku Spat (v mape ostava v1 aj zamok), uspesny upgrade meni ref, PREADRESUJE zamok NL a prestava dielce v JEDNEJ operacii (Spat aj Redo vratia vsetko naraz), kopia nesie novy ref
     run_kovd3b(model)        # KOV-D3b: CESTA Z KARTY nad dvojprvkovym fixturnym registrom — bez v2 karta ponuku nedostane vobec; s v2 nesie `upgrade.available` (plny aj lahky push), citaci callback dopadu vrati cisla (chrbat v1->v2, preneseny zamok NL, kod kitu) + ODTLACOK a NEZAPISE nic; ZMENA SKRINKY po nahlade zapis ODMIETNE bez kroku Spat (Codex #315 P1), potvrdeny zapis s tokenom a cerstvym odtlackom vymeni ref, preadresuje zamok a prestava dielce v JEDNEJ operacii (Spat = 1 krok, Redo obnovi ref+zamok+geometriu sucasne), odmietnuty preflight odpovie `ok:false` a nenechá ZIADNY krok Spat

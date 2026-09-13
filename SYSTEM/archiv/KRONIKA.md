@@ -17,6 +17,30 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **D-128 — RUČNÁ VÝŠKA DREVENÉHO BOXU ZÁSUVKY, v0.12.2 (13.9.2026, PR #364).**
+  **Čo Michal dostal:** pri drevenom boxe (Quadro V6) sa výška boxu dá **ručne znížiť**. Riadok Zásuvka v kontexte Kovanie **aj karta zásuvkového čela** majú tretí chip osi
+  — „box 360" vedľa „NL 450" — a hneď pri ňom **malé číselné pole** s rozsahom v nápovede. Napíšeš hodnotu, stlačíš Enter a **2 boky, vnútorné čelo a chrbát** sa narežú na
+  ňu; **dno sa nemení**. Nad automat sa zamknúť **nedá** (box väčší než zóna neexistuje) a pod minimum tiež nie (čelo a chrbát potrebujú svojich 30 mm nad dnom). Keď sa
+  zóna neskôr zmenší, zásuvka je **RED `box_lock_invalid`** — bez dielcov a bez kitu, s ponukou „Nahradiť za &lt;nový automat&gt;" (potvrdenie D-15) alebo „Odomknúť".
+  Zámok sa **nikdy nemení sám**: tichá zmena výšky boxu by znamenala iný rez v už odsúhlasenej objednávke.
+  **Prečo tretia os, a nie rozšírenie výškovej:** Atira má výškové **varianty** zo zoznamu, Quadro **spojitú** výšku z geometrie. Nová os má preto vlastný kľúč `box`
+  v payloade (nie `height`) — Atira payload ostáva bajtovo zhodný — a z tej istej spojitosti plynie **pole namiesto `<select>`** (ponuka so stovkami položiek nedáva zmysel).
+  **Prečo jedna funkcia rozsahu:** `Recipes.box_range` číta resolver, payload osi aj zápisová akcia; `max` = automat, `min` = čelo/chrbát + **skutočná** hrúbka dna +
+  odsadenie (16 vs 18 mm dna = min 58 vs 60), preto kontext osi (`Construction.drawer_contexts`) odteraz nesie aj `part_thicknesses`. Tri výpočty by sa časom rozišli
+  a ponuka by sľubovala hodnotu, ktorú by zápis odmietol. `CONFIG_SCHEMA` **13 → 14**: starší plugin by pole ticho zahodil a narezal iné dielce boxu.
+  **Vedomé odchýlky od návrhu auditu (Codex Astra 13.9., 3 BLOCKER + 4 FIX):** (1) **šablóny zámky nenesú** — existujúci a dokumentovaný kontrakt, `box_height` sa správa
+  presne ako obe staršie osi (charakterizované testom, zapísané do STANDARD §6 a `hardware.md`); (2) **neplatný zámok normalizácia zahodí len s logom** — config zapisuje
+  výhradne server po validácii, takže neplatný tvar je externé poškodenie a oba existujúce zámky majú ten istý kontrakt; trvalý „stav odmietnutého zámku" by bol nový
+  perzistentný kontrakt mimo rozsahu. Zvyšok auditu je zapracovaný celý: prísny klientsky parser (`1e309` ani `300,5xx` neprejdú), skutočná hrúbka dna v rozsahu, prázdny
+  rozsah bez poľa aj bez návrhu, karta pri aktívnom zámku netvrdí vzorec a veta „ručne zamknuté" menuje osi. Dormantný zámok po prepnutí classic ↔ tipon je **existujúca
+  medzera KOV-D4** (platí pre všetky tri osi) — zaregistrovaný ako **D-132**, nie riešený tu.
+  **Testy:** 4029 headless · 116 JS sád · **2658 in-SketchUp PASS / 0 FAIL** (26 kontrol novej sekcie `run_d128`: model, kusovník, Späť/Redo, kópia, RED po zmenšení zóny,
+  náhrada, odomknutie); 12 overených mutácií.
+  **Review (kolo 1, 2× P2 od Codexu + 5× P3 od slepého Opusa) pridalo dve pravidlá presnosti a jeden zámok odoslania:** zápis **zaokrúhľuje na 0,1 mm** a `box_range` vracia
+  hranice **na tej istej mriežke** (`min` nahor, `max` nadol) — panel formátuje výšku na desatinu, takže bez toho by zámok 300,04 znel „box 300", ale rezal by sa na 300,04,
+  a hranica 360,25 by sa ukázala ako 360,3, ktorú by server odmietol; **automatická** výška boxu ostáva presná, zaokrúhľuje sa výhradne zámok. Pole má navyše **dva
+  spúšťače** (Enter aj blur) a odpoveď prichádza až prekreslením — po odoslaní sa preto zamkne (`data-sent`), a klik na iný ovládač toho istého radu blur poľa umlčí
+  (`data-skipblur` z `onmousedown` na obale): jedna editácia = **jeden** krok Späť. **Codex review:** doplní orchestrátor po review.
 - **D-94 — POTVRDENÝ POUŽÍVATEĽSKÝ SMOKE + NOVÉ POSTREHY (12.9.2026 večer, docs PR #362).**
   Michal po aktualizácii pluginu na v0.12.1 potvrdil smoke D-94 „Nákup s pôvodom": **PASS** („všetko funguje super"). Z toho istého sedenia vzišli tri postrehy:
   **D-128** výška dreveného boxu zásuvky (Quadro) sa zobrazuje len na čítanie v riadku Zásuvka a nemá ovládač (objaviteľnosť + kandidát na zámok, vzor D-93) ·

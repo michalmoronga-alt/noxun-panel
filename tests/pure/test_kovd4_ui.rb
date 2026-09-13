@@ -193,13 +193,13 @@ NxTest.test('KOV-D4 (P2-1): adresu zasahu dostanu LEN konflikty, ktore ten zasah
   r = c.e::Recipes
   # NAPRAVOU je riadok zasahu — veta konfliktu ho uz dnes menuje (LOCK_HINT /
   # ORPHAN_HINT), takze ceruzka tam smie mierit.
-  %w[nl_lock_invalid height_lock_invalid drawer_override_invalid].each do |code|
+  %w[nl_lock_invalid height_lock_invalid box_lock_invalid drawer_override_invalid].each do |code|
     it = c.find(c.items_for(hardware_issues: [c.issue(code)],
                             hardware_overrides: [c.lock]), 'drawer')
     NxTest.assert_equal(NxD4::RID, (it['data'] || {})['rule_id'],
                         "#{code}: reset zasahu konflikt VYRIESI, ceruzka nan smie mierit")
   end
-  NxTest.assert_equal(%w[nl_lock_invalid height_lock_invalid drawer_override_invalid],
+  NxTest.assert_equal(%w[nl_lock_invalid height_lock_invalid box_lock_invalid drawer_override_invalid],
                       r::OVERRIDE_CONFLICT_CODES,
                       'zoznam je WHITELIST pri registri kodov — novy kod ho nezdedi')
   NxTest.assert((r::OVERRIDE_CONFLICT_CODES - r::DRAWER_BLOCKERS).empty?,

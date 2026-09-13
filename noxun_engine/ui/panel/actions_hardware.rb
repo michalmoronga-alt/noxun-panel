@@ -20,7 +20,8 @@ module Noxun
         # KOV-D2a: pribudla DRUHA os zamku `height_variant` (vyskovy variant
         # zasuvky). Zoznam MUSI sediet s `CabinetBuilder::OVERRIDE_CONTENT_KEYS`
         # (guard test) — inak by panel ulozil pole, ktore normalizacia zahodi.
-        OVERRIDE_FIELDS = %w[quantity disabled nominal_length height_variant].freeze
+        # D-128: TRETIA os `box_height` (rucna vyska dreveneho boxu).
+        OVERRIDE_FIELDS = %w[quantity disabled nominal_length height_variant box_height].freeze
         # KOV-C2b: identita receptovej polozky vysuvu (`Construction`
         # `drawer_hardware_item`). Pocet ani vypnutie sa na nej menit nedaju.
         RECIPE_RULE_PREFIX = 'recipe:'
@@ -168,6 +169,8 @@ module Noxun
             [field, nl, nil]
           when 'height_variant'
             recipe_height_value(cab, owner, gt, rid, raw)
+          when 'box_height'
+            recipe_box_value(cab, owner, gt, rid, raw)
           else
             [nil, nil, 'Neznáme pole ručného zásahu.']
           end
@@ -220,9 +223,12 @@ module Noxun
             unless rid.to_s == "#{RECIPE_RULE_PREFIX}#{ref}"
 
           recipe = Recipes.load(ref)
-          # Svetle rozmery sa citaju RAZ a pouzivaju ich OBE osi (vyska aj NL) —
-          # jeden vypocet, ziadne dva zdroje cisel.
-          ctx = Recipes.atira?(recipe) ? drawer_axis_ctx(cfg, owner) : nil
+          # Svetle rozmery sa citaju RAZ a pouzivaju ich VSETKY osi (vyska,
+          # vyska boxu aj NL) — jeden vypocet, ziadne dva zdroje cisel.
+          # D-128: kontext sa cita pre VSETKY systemy, nie len pre Atiru —
+          # rozsah rucnej vysky boxu stoji na svetlej vyske A na hrubke dna,
+          # takze Quadro ho potrebuje rovnako. Atirova vetva sa nemeni.
+          ctx = drawer_axis_ctx(cfg, owner)
           height, why = recipe_result_height(cfg, owner, recipe, ctx)
           [{ recipe: recipe, ctx: ctx, height: height, height_reason: why }, nil]
         rescue StandardError => e
@@ -347,6 +353,67 @@ module Noxun
           ['height_variant', hv, nil]
         end
 
+        # D-128: RUCNA VYSKA DREVENEHO BOXU — tretia os zamku.
+        #
+        # Retaz je ta ista ako pri ostatnych osiach: vlastnik (celo) -> jeho
+        # PRIPNUTY recept -> CERSTVE svetle rozmery -> rozsah receptu. Rozdiel
+        # je len v tvare hodnoty: je to SPOJITY rozsah v mm, nie polozka
+        # z ponuky, takze sa neoveruje zhoda s radom, ale hranice.
+        #
+        # Rozsah drzi JEDINA funkcia `Recipes.box_range` — ta ista, z ktorej
+        # kresli pole payload a proti ktorej meria resolver. Rozsah HORE je
+        # AUTOMAT: nad neho sa zamknut nedá (box vacsi nez zona neexistuje).
+        #
+        # Tvar hodnoty je STRICT (Astra BLOCKER 3): `Float(raw, exception: false)`
+        # + `finite?` + `> 0`, takze „Infinity", „1e309" ani text neprejdu.
+        # `value: null` (odomknutie) sem NECHODI — riesi ho `override_change`.
+        #
+        # ZAOKRUHLENIE NA 0,1 mm (Codex #364 kolo 1 P2): panel formatuje vysku
+        # cez `hwNlFmt` (do 0,05 od celeho cisla ukaze cele cislo), takze zamok
+        # 300,04 by na obrazovke znel „box 300", ale dielce by sa rezali na
+        # 300,04. Zapisova cesta preto hodnotu ZAOKRUHLI a rozsah overuje AZ
+        # POTOM — v modeli je vzdy presne to, co panel ukazuje. Normalizacia
+        # ulozeny tvar NEMENI (len cita); zaokruhluje sa jedine tu, pri zapise.
+        BOX_ROUND = 1
+        BOX_NO_CTX = 'Rozmery zásuvky sa nepodarilo prečítať — výška boxu sa uložiť nedá.'
+
+        def recipe_box_value(cab, owner, gt, rid, raw)
+          return [nil, nil, LOCK_WRONG_TYPE] unless lock_item?(gt)
+          return [nil, nil, 'Zámok výšky boxu sa dá uložiť len na receptovej položke výsuvu.'] \
+            unless recipe_rule?(rid)
+
+          mm = Recipes.nl_value(raw.is_a?(String) ? Float(raw, exception: false) : raw)
+          return [nil, nil, 'Neplatná výška boxu — zadaj číslo v mm.'] if mm.nil?
+
+          mm = mm.round(BOX_ROUND)
+          return [nil, nil, 'Neplatná výška boxu — zadaj číslo v mm.'] unless mm.positive?
+
+          info, err = recipe_lock_context(cab, owner, rid)
+          return [nil, nil, err] if err
+
+          recipe = info[:recipe]
+          if Recipes.atira?(recipe)
+            return [nil, nil, 'Tento systém má výškové varianty — použi výšku H.']
+          end
+
+          ctx = info[:ctx]
+          return [nil, nil, BOX_NO_CTX] if ctx.nil?
+
+          rng = Recipes.box_range(recipe, ctx[:clear_height].to_f, ctx[:part_thicknesses])
+          return [nil, nil, BOX_NO_CTX] if rng.nil?
+          if rng[:min] > rng[:max]
+            return [nil, nil, 'Do tejto zóny sa box nezmestí — výšku boxu zamknúť nemožno.']
+          end
+          # Porovnania INKLUZIVNE a bez EPS — presne ako v recepte (360,00
+          # plati, 360,001 padá). HTML `min`/`max` na poli nie je ochrana.
+          if mm < rng[:min] || mm > rng[:max]
+            return [nil, nil, "Výška boxu musí byť #{Recipes.fmt(rng[:min])}–#{Recipes.fmt(rng[:max])} mm " \
+                              "(automat #{Recipes.fmt(rng[:max])} mm)."]
+          end
+
+          ['box_height', mm, nil]
+        end
+
         # F5/F7: SET smie ulozit LEN hodnotu z aktualneho radu pravidla (presna
         # zhoda). Uz ULOZENA hodnota mimo radu sa nikdy nemaze — len sa zobrazi
         # a da sa odomknut (to je cesta 'value' => nil, ktora sem nechodi).
@@ -419,6 +486,12 @@ module Noxun
             return "Výška zásuvky odomknutá (platí automat) — #{cid}." if value.nil?
 
             return "Výška zásuvky zamknutá na H#{value.to_i} — #{cid}."
+          end
+          # D-128: tretia os. Vyska boxu je v mm (spojity rozsah), nie variant.
+          if field == 'box_height'
+            return "Výška boxu odomknutá (platí automat) — #{cid}." if value.nil?
+
+            return "Výška boxu zamknutá na #{HardwareRules.fmt_mm(value)} mm — #{cid}."
           end
           "Kovanie upravené — #{cid}."
         end
@@ -598,7 +671,11 @@ module Noxun
         # v payloade (`drawer_axes` — kluce `height` / `nl`) a v paneli
         # (`HW_AX`); guard test strazi, ze hodnoty su podmnozinou
         # `OVERRIDE_FIELDS` a kluce sedia s osami payloadu.
-        UPGRADE_LOCK_AXES = { 'height' => 'height_variant', 'nl' => 'nominal_length' }.freeze
+        # D-128: pribudla os `box` (`box_height`) — bez nej by preflight upgradu
+        # zamok znovu neoveril a tabulka dopadu (ktora uz pár `kind: 'box'` ma)
+        # by o rucnej vyske boxu mlčala.
+        UPGRADE_LOCK_AXES = { 'height' => 'height_variant', 'box' => 'box_height',
+                              'nl' => 'nominal_length' }.freeze
 
         # DOPAD = rozdiel medzi TERAJSIM a CIELOVYM stavom TOHTO cela.
         # Obe strany idu TOU ISTOU cestou (`Construction.build_plan` ->

@@ -165,7 +165,19 @@ module Noxun
       #       Starsi plugin by hranu zahodil a vyrobil horne profily s INYMI
       #       rozmermi dielcov aj rezov. Dopredne brany prestavby, sablon,
       #       kopie a exportu preto musia odmietnut novy config.
-      CONFIG_SCHEMA = 13
+      #  14 = D-128 — RUCNA VYSKA DREVENEHO BOXU ZASUVKY. Zaznam
+      #       `hardware_overrides` s receptovou identitou smie niest pole
+      #       `box_height` (mm Float) — TRETIU os zamku popri `nominal_length`
+      #       a `height_variant`. Starsi plugin (schema 13) pole pri
+      #       normalizacii ZAHODI whitelistom `norm_hardware_overrides`, takze
+      #       zasuvka by sa TICHO vratila na automaticku vysku boxu — teda by
+      #       narezal INE dielce boxu (2 boky, vnutorne celo, chrbat) nez
+      #       objednavka, ktoru zakaznik odsuhlasil. Brany su tie iste ako pri
+      #       5–13: dopredny guard prestavby/sablon/kopie (`newer_config?`)
+      #       a exportna brana (`ProductionCore.export_blockers`).
+      #       `DRAWER_ACTIVATION_SCHEMA` ostava 5, `HINGE_ACTIVATION_SCHEMA` 9
+      #       a `LIFT_ACTIVATION_SCHEMA` 11.
+      CONFIG_SCHEMA = 14
 
       # KOV-C2b: schema, OD KTOREJ stavba emituje dielce zasuviek z receptu.
       # VLASTNA konstanta (nie `CONFIG_SCHEMA`), lebo pri bumpe na 6 (KOV-D1a)
@@ -208,7 +220,8 @@ module Noxun
       # KOV-D2a: obsahove polia zaznamu `hardware_overrides`. JEDINE miesto
       # pravdy o tom, kedy je zaznam bezobsazny (a teda zanika) — panelovy
       # `Panel::OVERRIDE_FIELDS` je ten isty zoznam a guard test ich porovnava.
-      OVERRIDE_CONTENT_KEYS = %w[disabled quantity nominal_length height_variant].freeze
+      # D-128: pribudla tretia os `box_height` (rucna vyska dreveneho boxu).
+      OVERRIDE_CONTENT_KEYS = %w[disabled quantity nominal_length height_variant box_height].freeze
 
       # Fallback farby SketchUp materialu, ak material_id nie je v katalogu (Materials preberie color).
       FALLBACK_RGB_KORPUS = [216, 196, 160].freeze
@@ -1856,10 +1869,28 @@ module Noxun
           items = cfg[:fronts].is_a?(Hash) ? cfg[:fronts]['items'] : nil
           return {} unless Array(items).any? { |it| it.is_a?(Hash) && it['type'].to_s == 'drawer_front' }
 
-          Construction.drawer_contexts(cfg, Construction.build_plan(cfg))
+          # D-128: kontext osi nesie aj HRUBKY dielcov — rozsah rucnej vysky
+          # boxu ma dole hrubku DNA (16 vs 18 mm = min 58 vs 60), takze bez nej
+          # by ponuka slubovala hodnotu, ktoru zapis alebo stavba odmietne.
+          # Cesta je TA ISTA ako v stavbe (`effective_materials` ->
+          # `drawer_thicknesses`), ziadny druhy vypocet hrubok.
+          th = drawer_thicknesses(cfg, effective_materials(axis_model, params))
+          Construction.drawer_contexts(cfg, Construction.build_plan(cfg, 'CAB-000',
+                                                                    part_thicknesses: th), th)
         rescue StandardError => e
           Engine.log_error(e, 'drawer_axis_contexts') if defined?(Engine)
           {}
+        end
+
+        # D-128: MODEL pre projektove predvolby materialov na CITACEJ ceste osi.
+        # Cesta bezi vzdy nad aktivnym dokumentom (panel), ale volaju ju aj
+        # headless testy, kde `Sketchup` neexistuje — vtedy platia projektove
+        # fallbacky. Model sa berie TU a nie cez pat volajucich, aby sa
+        # nemusela menit signatura celej retaze payloadu.
+        def axis_model
+          defined?(Sketchup) ? Sketchup.active_model : nil
+        rescue StandardError
+          nil
         end
 
         def plan_parts_by_key(params)
@@ -2682,6 +2713,8 @@ module Noxun
             rec['nominal_length'] = nl if nl
             hv = norm_height_lock(gt, rid, ov['height_variant'] || ov[:height_variant])
             rec['height_variant'] = hv if hv
+            bh = norm_box_lock(gt, rid, ov['box_height'] || ov[:box_height])
+            rec['box_height'] = bh if bh
             next unless OVERRIDE_CONTENT_KEYS.any? { |k| rec.key?(k) }
             out[[owner, gt, rid]] = rec
           end
@@ -2722,6 +2755,43 @@ module Noxun
 
         def log_dropped_height_lock(rule_id, why)
           Engine.log("norm_hardware_overrides: height_variant zahodeny (#{rule_id}) — #{why}") if defined?(Engine)
+        end
+
+        # D-128: zamok VYSKY BOXU prezije normalizaciu LEN na POLOZKE VYSUVU
+        # (`slide`) s receptovou identitou systemu, ktoreho resolver vysku boxu
+        # naozaj POCITA — teda VSADE OKREM ATIRY (tej vysku urcuje variant,
+        # `box_height` by nemal co drzat). Zrkadlo `norm_height_lock`, vratane
+        # zahadzovania S LOGOM: tichy drop by z rucneho zamku spravil automat
+        # bez jedinej stopy, a to je INY rez dielcov boxu v objednavke.
+        #
+        # Tvar hodnoty rozhoduje `Recipes.nl_value` (strict Float > 0); ci sa
+        # taka vyska do svetlej vysky ZMESTI, rozhoduje az resolver (RED
+        # `box_lock_invalid`) — presne ako pri NL a vyskovom variante.
+        def norm_box_lock(generic_type, rule_id, raw)
+          return nil if raw.nil?
+          return nil unless defined?(Recipes)
+
+          rid = rule_id.to_s
+          unless generic_type.to_s == Recipes::LOCK_GENERIC_TYPE
+            log_dropped_box_lock(rid, "zamok vysky boxu patri len k polozke #{Recipes::LOCK_GENERIC_TYPE}")
+            return nil
+          end
+          unless rid.start_with?(Recipes::LOCK_RECIPE_PREFIX)
+            log_dropped_box_lock(rid, 'zamok vysky boxu existuje len na receptovej polozke')
+            return nil
+          end
+          parsed = Recipes.parse_id(rid.sub(Recipes::LOCK_RECIPE_PREFIX, ''))
+          if parsed.nil? || parsed[:system] == 'atira'
+            log_dropped_box_lock(rid, 'system vysku boxu nepocita')
+            return nil
+          end
+          v = Recipes.nl_value(raw)
+          log_dropped_box_lock(rid, "neplatny tvar #{raw.inspect}") if v.nil?
+          v
+        end
+
+        def log_dropped_box_lock(rule_id, why)
+          Engine.log("norm_hardware_overrides: box_height zahodeny (#{rule_id}) — #{why}") if defined?(Engine)
         end
 
         # KOV-E1b: nesie zaznam nieco, co by na chranenej vyklopovej polozke

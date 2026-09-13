@@ -140,7 +140,8 @@ NxTest.test('CELA-B: legacy top identicke vyrobne udaje a profile_band; roundtri
   invalid = c::F.normalize_config(c.config('door', nil))
   NxTest.assert(invalid['items'][0].key?('profile_edge'))
   NxTest.assert_equal(nil, invalid['items'][0]['profile_edge'])
-  NxTest.assert_equal(13, c::E::CabinetBuilder::CONFIG_SCHEMA)
+  # D-128 bumpla schemu na 14 (pole `box_height` v `hardware_overrides`).
+  NxTest.assert_equal(14, c::E::CabinetBuilder::CONFIG_SCHEMA)
   NxTest.assert_equal(5, c::E::BuildPlan::SCHEMA)
 end
 
