@@ -552,12 +552,18 @@ end
 
 D131_PC_SRC = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core.rb'),
                         encoding: 'UTF-8')
-D131_SCAN_SRC = D131_PC_SRC[/def front_grain_scan.*?\n      end\n/m].to_s
+# D-133: guard sa pyta na KOD, nie na komentare — inak by staclo meno helpera
+# vo vysvetlujucej vete a mutacia „vlastny prechod nazad" by presla.
+def d131_code_only(src)
+  src.lines.reject { |l| l.strip.start_with?('#') }.join
+end
+
+D131_SCAN_SRC = d131_code_only(D131_PC_SRC[/def front_grain_scan.*?\n      end\n/m].to_s)
 # D-133: samotny prechod korenom zije v `Ids.top_level_scan` (zdiela ho
 # „Nahradiť UNI…"), preto ho guardy citaju odtial.
 D131_IDS_SRC = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'ids.rb'),
                          encoding: 'UTF-8')
-D131_TOP_SCAN_SRC = D131_IDS_SRC[/def self\.top_level_scan.*?\n      end\n/m].to_s
+D131_TOP_SCAN_SRC = d131_code_only(D131_IDS_SRC[/def self\.top_level_scan.*?\n      end\n/m].to_s)
 
 NxTest.test('D-131 zber: zakazka je TOP-LEVEL `model.entities` (ako `Bom.collect`)') do
   NxTest.assert(D131_TOP_SCAN_SRC.include?('model.entities.grep(Sketchup::ComponentInstance)'),

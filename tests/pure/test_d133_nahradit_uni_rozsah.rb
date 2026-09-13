@@ -367,8 +367,15 @@ D133_RU_SRC = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'materia
                         encoding: 'UTF-8')
 D133_PC_SRC = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core.rb'),
                         encoding: 'UTF-8')
-D133_SCAN_SRC = D133_RU_SRC[/def replace_uni_scan.*?\n      end\n/m].to_s
-D133_FG_SRC = D133_PC_SRC[/def front_grain_scan.*?\n      end\n/m].to_s
+# Komentare sa zo zdroja ODSTRANUJU — guard sa pyta na KOD. Bez toho by
+# staclo, aby meno helpera ostalo vo vysvetlujucej vete, a mutacia „vlastny
+# prechod nazad" by presla.
+def d133_code_only(src)
+  src.lines.reject { |l| l.strip.start_with?('#') }.join
+end
+
+D133_SCAN_SRC = d133_code_only(D133_RU_SRC[/def replace_uni_scan.*?\n      end\n/m].to_s)
+D133_FG_SRC = d133_code_only(D133_PC_SRC[/def front_grain_scan.*?\n      end\n/m].to_s)
 
 NxTest.test('D-133 zdroj: obe hromadne akcie stoja na `Ids.top_level_scan`') do
   NxTest.assert(D133_SCAN_SRC.include?('Ids.top_level_scan'),
