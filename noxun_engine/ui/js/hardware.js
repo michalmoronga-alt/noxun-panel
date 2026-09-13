@@ -678,13 +678,28 @@
     var tip = (g.key === HW_GROUP_CAB)
       ? 'Označí skrinku v modeli'
       : 'Označí tento dielec v modeli (panel ostáva v Kovaní)';
+    var head = hwBoxGone(g)
+      // D-132 (review P3): box, ktorého VŠETKY riadky patria ZANIKNUTÉMU čelu,
+      // nemá čo označiť — oko ani klik sa preto nekreslia vôbec (inak by
+      // `nx_select_hw_owner` hľadal dielec, ktorý v modeli neexistuje).
+      ? '<div class="hwboxh hwboxh-static" title="'+esc(g.title)+'">'
+        + '<span class="hwboxt">'+esc(g.title)+'</span>'
+        + '<span class="hwboxsub">'+esc(hwGroupCountText(n))+'</span></div>'
+      : '<button type="button" class="hwboxh" data-cab="'+esc(cabId||'')+'" title="'+esc(g.title+' — '+tip)+'"'
+        + ' aria-label="'+esc(g.title+' — '+tip)+'" onclick="onHwOwnerPick(this)">'
+        + NXIcons.svg('eye')
+        + '<span class="hwboxt">'+esc(g.title)+'</span>'
+        + '<span class="hwboxsub">'+esc(hwGroupCountText(n))+'</span></button>';
     return '<div class="hwbox" data-group="'+esc(g.key)+'" data-keys="'+esc(g.ownerKeys.join(','))+'">'
-      + '<button type="button" class="hwboxh" data-cab="'+esc(cabId||'')+'" title="'+esc(g.title+' — '+tip)+'"'
-      + ' aria-label="'+esc(g.title+' — '+tip)+'" onclick="onHwOwnerPick(this)">'
-      + NXIcons.svg('eye')
-      + '<span class="hwboxt">'+esc(g.title)+'</span>'
-      + '<span class="hwboxsub">'+esc(hwGroupCountText(n))+'</span></button>'
+      + head
       + '<div class="hwboxb">'+body+'</div></div>';
+  }
+  // Patri CELY box zaniknutemu vlastnikovi? Rozhoduje SERVER (`orphan_owner_gone`)
+  // — JS to z textu poznamky ani z kluca neodvodzuje. Ziva polozka v boxe =
+  // vlastnik existuje, takze staci jedna a oko sa kresli.
+  function hwBoxGone(g){
+    if (!g || g.items.length || !g.offs.length) return false;
+    return g.offs.every(function(ov){ return ov && ov.orphan_owner_gone === true; });
   }
 
   // ---- SMOKE PACK 1: PODPERKY POLIC SUHRNNE (box „Vnútro skrinky") ---------
@@ -2501,7 +2516,8 @@
       hwRowOwnerText: hwRowOwnerText, hwGroupTitle: hwGroupTitle,
       hwGroupCountText: hwGroupCountText, hwGroupOrder: hwGroupOrder,
       hwGroups: hwGroups, hwDisabledOffs: hwDisabledOffs, hwOffLabel: hwOffLabel,
-      hwOffName: hwOffName, hwOffHtml: hwOffHtml,
+      hwOffName: hwOffName, hwOffHtml: hwOffHtml, hwBoxGone: hwBoxGone,
+      hwBoxHtml: hwBoxHtml,
       // KOV-D4 deep-link z Kontroly (tests/js/test_kovd4_ui.js) — selektor
       // riadku je cisty, `nxFocusHardware` a `hwFlash` sa testuju cez mini-DOM.
       HW_FLASH_MS: HW_FLASH_MS, hwRowSelector: hwRowSelector, hwRowKindOk: hwRowKindOk,

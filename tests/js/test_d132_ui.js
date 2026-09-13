@@ -20,6 +20,9 @@
 //      -> „D-132: „zrušiť" posiela EXISTUJUCU akciu `reset: true`"
 //   M7 `hwDisabledOffs` filtruje dormantny zaznam prec
 //      -> „D-132: filter riadkov sa NEMENI — rozhoduje `orphan`"
+// Slepy Opus review (P3-2):
+//   M9 box so ZANIKNUTYM vlastnikom dostane oko `onHwOwnerPick`
+//      -> „D-132 (P3-2): box zaniknuteho cela oko NEMA"
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
@@ -115,5 +118,37 @@ const OFFS = hwDisabledOffs([], [DORMANT, INVALID,
                                    disabled: true, orphan: false }]);
 eq(OFFS.length, 2, 'D-132: filter riadkov sa NEMENI — rozhoduje `orphan`');
 eq(OFFS[0].orphan_kind, 'dormant', 'dormantny zaznam medzi osirotenymi JE');
+
+// --- 5) P3-2: box ZANIKNUTEHO vlastnika nema co oznacit v modeli -------------
+const { hwGroups, hwBoxGone, hwBoxHtml } = HW;
+const GONE = {
+  owner_part_key: 'front:F9/panel', generic_type: 'slide',
+  rule_id: 'recipe:atira_p2o_v1', orphan: true, orphan_kind: 'dormant',
+  orphan_owner_gone: true, owner_label: '(už neexistuje) · pôvodné zásuvkové čelo',
+  orphan_label: 'Dormantný zámok · NL 470',
+  orphan_note: 'Zámok receptu Atira Tip-On v1 — čelo, ktorému patril, už neexistuje. Zrušiť ho môžeš tu.'
+};
+
+eq(hwBoxGone({ items: [], offs: [GONE] }), true, 'box so samymi zaniknutymi riadkami');
+eq(hwBoxGone({ items: [], offs: [GONE, DORMANT] }), false,
+   'staci JEDEN riadok zijuceho vlastnika a oko sa kresli');
+eq(hwBoxGone({ items: [{ owner_part_key: 'front:F9/panel' }], offs: [GONE] }), false,
+   'ziva polozka = vlastnik existuje');
+eq(hwBoxGone({ items: [], offs: [] }), false, 'prazdny box nie je „zaniknuty"');
+
+// M9
+const goneBox = hwBoxHtml(hwGroups([], [GONE], ['F1'], 'CAB-1')[0], 'CAB-1');
+ok(goneBox.indexOf('onHwOwnerPick') < 0 && goneBox.indexOf('#i-eye') < 0,
+   'D-132 (P3-2): box zaniknuteho cela oko NEMA');
+ok(goneBox.indexOf('<div class="hwboxh hwboxh-static"') >= 0,
+   'hlavicka je staticka (nie tlacidlo)');
+ok(goneBox.indexOf('Čelo (už neexistuje)') >= 0,
+   'a nemenuje cislo F#, ktore uz nic neznamena');
+ok(goneBox.indexOf('</span></div><div class="hwboxb">') >= 0,
+   'telo boxu ostava SURODENCOM hlavicky (UI-C4 invariant)');
+
+const liveBox = hwBoxHtml(hwGroups([], [DORMANT], ['F1'], 'CAB-1')[0], 'CAB-1');
+ok(liveBox.indexOf('onclick="onHwOwnerPick(this)"') >= 0 && liveBox.indexOf('#i-eye') >= 0,
+   'box ZIVEHO cela oko naďalej ma (dormantny zamok nie je dovod ho brat)');
 
 console.log(`OK test_d132_ui.js (${n} kontrol)`);

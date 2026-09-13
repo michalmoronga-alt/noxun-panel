@@ -76,12 +76,19 @@ NxTest.test('UI-C4: hlavicka je SURODENEC tela boxu — ovladace sa k nej nedost
   # Silnejsie nez stopPropagation: klik na select setu, zamok NL ci pole poctu
   # bubla k `.hwboxb`, a ten hlavicku NEOBSAHUJE. Ziadny buduci ovladac v boxe
   # preto nemusi na stopPropagation pamatat.
+  # D-132: hlavicka ma od tejto davky DVE podoby (tlacidlo s okom · staticky
+  # `div` pri ZANIKNUTOM vlastnikovi), takze sa sklada do premennej `head` —
+  # invariant je tym padom „obe sa UZAVRU a telo sa lepi AZ ZA ne".
   tpl = UIC4_HW_JS[/return '<div class="hwbox".*?<\/div>';/m].to_s
   NxTest.assert(!tpl.empty?, 'sablona boxu sa nasla')
-  NxTest.assert(tpl.include?('</button>') && tpl.include?('<div class="hwboxb">'),
+  NxTest.assert(tpl.include?('+ head') && tpl.include?('<div class="hwboxb">'),
                 'hlavicka sa uzavrie PRED telom boxu')
-  NxTest.assert(tpl.index('</button>') < tpl.index('<div class="hwboxb">'),
+  NxTest.assert(tpl.index('+ head') < tpl.index('<div class="hwboxb">'),
                 'telo boxu nie je vnutri hlavicky (inak by klik na select spustil vyber)')
+  head = UIC4_HW_JS[/var head = hwBoxGone\(g\).*?: '<button type="button" class="hwboxh".*?<\/button>';/m].to_s
+  NxTest.assert(!head.empty?, 'obe podoby hlavicky sa nasli')
+  NxTest.assert(head.scan('</span></div>').length == 1 && head.scan('</span></button>').length == 1,
+                'kazda podoba hlavicky sa uzatvara sama (nikdy neobalí telo boxu)')
 end
 
 NxTest.test('UI-C4: trieda boxu je `.hwbox` — `.hwown` ostava popisom v RIADKU') do
