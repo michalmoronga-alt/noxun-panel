@@ -1892,8 +1892,13 @@ module Noxun
           Construction.drawer_contexts(cfg, Construction.build_plan(cfg, 'CAB-000',
                                                                     part_thicknesses: th), th)
         rescue StandardError => e
+          # D-132 (review P3): ZLYHANIE nesmie vyzerat ako `{}` = „skrinka ziadnu
+          # zasuvku nema". Z prazdnej mapy by klasifikator osirotenych zasahov
+          # usudil, ze celo pripnuty recept nema, oznacil by ZIVY zamok za
+          # dormantny a ponukol ho zrusit. `nil` = „neviem" a volajuci na nom
+          # ziadny zaver nestavia.
           Engine.log_error(e, 'drawer_axis_contexts') if defined?(Engine)
-          {}
+          nil
         end
 
         # D-128: MODEL pre projektove predvolby materialov na CITACEJ ceste osi.

@@ -253,6 +253,69 @@ NxTest.test('D-132 (R3): dvierka a zaniknute celo maju svoj riadok tiez') do
   NxTest.assert(grow['orphan_note'].include?('už neexistuje'), grow['orphan_note'])
 end
 
+# review P3-2
+NxTest.test('D-132 (P3-2): ZANIKNUTY vlastnik sa v popise nevydava za existujuce celo') do
+  c = NxD132
+  gone = c.cfg_for(c.params, [c.ov({ 'nominal_length' => 470.0 }, NxD132::TIPON, NxD132::OTHER)])
+  row = c.rows_for(gone).find { |r| r['owner_part_key'] == NxD132::OTHER }
+  NxTest.assert_equal(true, row['orphan_owner_gone'],
+                      'priznak, z ktoreho panel vie, ze box nema co oznacit v modeli')
+  NxTest.assert_equal('(už neexistuje) · pôvodné zásuvkové čelo', row['owner_label'],
+                      '`human_label` by tu tvrdil „F9 · zásuvkové čelo" — cislo `F#` pritom ' \
+                      'znamena poradie v resolved celach a to celo uz neexistuje')
+  live = c.rows_for(c.cfg_for(c.params, [c.ov({ 'nominal_length' => 470.0 }, NxD132::TIPON)])).first
+  NxTest.refute(live.key?('orphan_owner_gone'),
+                'dormantny zamok ZIVEHO cela priznak nedostane (oko v boxe ostava)')
+  NxTest.assert_equal('F1 · zásuvkové čelo', live['owner_label'], 'a popis vlastnika je bezny')
+end
+
+# ============================================================================
+# review P3-1 — NEDOVERYHODNY INDEX NIKDY NEVYROBI DORMANT
+# ============================================================================
+
+# M8
+NxTest.test('D-132 (P3-1): ked citanie stavu osi ZLYHA, dormantnost sa nevyhodnocuje') do
+  c = NxD132
+  # Zamok TIPON receptu na cele, ktore ma pripnuty SiSy — za doveryhodneho
+  # indexu je to ucebnicovy `dormant`.
+  cfg = c.cfg_for(c.params, [c.ov({ 'nominal_length' => 470.0 }, NxD132::TIPON)])
+  honest = c.panel.hardware_overrides_payload(cfg, cfg['hardware_overrides'], c.index_for(cfg))
+  NxTest.assert_equal('dormant', honest.first['orphan_kind'], 'kontrola predpokladu scenara')
+
+  broken = { 'by_owner' => {}, 'idents' => {}, 'trusted' => false }
+  rows = c.panel.hardware_overrides_payload(cfg, cfg['hardware_overrides'], broken)
+  NxTest.refute(rows.first.key?('orphan'),
+                'prazdny index z rescue vyzera ako „ziadne celo nema recept" — a to by ' \
+                'z AKTIVNEHO zamku urobilo dormantny so Zrušiť')
+  NxTest.assert_equal(nil, rows.first['axes'], 'chipy sa z takeho indexu nekreslia (ako doteraz)')
+end
+
+NxTest.test('D-132 (P3-1): zlyhanie citania kontextov je `nil`, nie prazdna mapa') do
+  c = NxD132
+  cb = c.cb
+  # Zdrojova brana: rescue v `drawer_axis_contexts` vracia `nil` (= „neviem"),
+  # nie `{}` (= „skrinka zasuvku nema"). Rozdiel je cely zmysel opravy.
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'cabinet_builder.rb'),
+                  encoding: 'UTF-8')
+  body = src[/def drawer_axis_contexts.*?\n        end\n/m].to_s
+  NxTest.assert(body.include?("Engine.log_error(e, 'drawer_axis_contexts') if defined?(Engine)\n          nil\n"),
+                'rescue vracia `nil`, nie prazdnu mapu')
+
+  orig = cb.method(:drawer_axis_contexts)
+  begin
+    cb.define_singleton_method(:drawer_axis_contexts) { |_params| nil }
+    idx = c.panel.drawer_axes_index({}, {})
+    NxTest.assert_equal(false, idx['trusted'], 'nedoveryhodne citanie sa PRIZNA')
+    NxTest.assert_equal([{}, {}], [idx['by_owner'], idx['idents']],
+                        'tvar indexu sa nemeni (chipy aj karta cela s prazdnou mapou uz pocitaju)')
+  ensure
+    cb.define_singleton_method(:drawer_axis_contexts, orig)
+  end
+
+  cfg = c.cfg_for(c.params)
+  NxTest.refute(c.index_for(cfg).key?('trusted'), 'uspesne citanie ziadny priznak nepotrebuje')
+end
+
 # ============================================================================
 # R4 — AKTIVNY ZAMOK SA NEMENI ANI O BAJT
 # ============================================================================

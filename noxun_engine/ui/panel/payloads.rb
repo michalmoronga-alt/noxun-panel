@@ -874,9 +874,15 @@ module Noxun
         # co ocakava `handle_set_hardware_override`. Karta cela ju NEODVODZUJE
         # (skladat `recipe:<id>` v JS by znamenalo druhu pravdu o tom, ku ktorej
         # polozke zamok patri); v kontexte Kovanie ju riadok uz ma v datasete.
+        # D-132 (review P3): index nesie aj `trusted`. `false` znamena „stav osi
+        # sa NEPODARILO precitat" — nie „ziadna zasuvka". Rozdiel je podstatny:
+        # z prazdnej mapy `idents` by klasifikator usudil, ze celo pripnuty
+        # recept nema, oznacil by ZIVY zamok za dormantny a ponukol ho zrusit.
+        # Chipy ani karta cela sa nemenia (obe uz s prazdnym indexom pocitaju).
         def drawer_axes_index(cfg, params)
           empty = { 'by_owner' => {}, 'idents' => {} }
           ctxs = CabinetBuilder.drawer_axis_contexts(params)
+          return empty.merge('trusted' => false) if ctxs.nil?
           return empty if ctxs.empty?
 
           overrides = Array(cfg['hardware_overrides'])
@@ -896,7 +902,7 @@ module Noxun
           end
         rescue StandardError => e
           Engine.log_error(e, 'Panel.drawer_axes_map')
-          { 'by_owner' => {}, 'idents' => {} }
+          { 'by_owner' => {}, 'idents' => {}, 'trusted' => false }
         end
 
         def drawer_lock_ident(owner, recipe)
@@ -1223,8 +1229,13 @@ module Noxun
           fronts = payload_fronts(cfg)
           items = cfg['hardware'].is_a?(Array) ? cfg['hardware'] : []
           owners = drawer_conflict_owners(cfg)
-          active = index.nil? ? nil : active_lock_rules(index)
-          front_owners = index.nil? ? nil : front_owner_keys(fronts)
+          # D-132 (review P3): dormantnost sa vyhodnocuje LEN nad DOVERYHODNYM
+          # indexom. Ked citanie stavu osi zlyhalo (`trusted => false`), panel
+          # o pripnutych receptoch nevie nic — a „neviem" nesmie znamenat
+          # „zamok je mrtvy, zrus ho".
+          trusted = index.is_a?(Hash) && index['trusted'] != false
+          active = trusted ? active_lock_rules(index) : nil
+          front_owners = trusted ? front_owner_keys(fronts) : nil
           Array(overrides).map do |ov|
             next ov unless ov.is_a?(Hash)
 
@@ -1236,8 +1247,9 @@ module Noxun
             next row unless kind == 'dormant'
 
             why = HardwareRules.override_dormant_why(ov, active, front_owners)
-            row.merge('orphan_label' => dormant_label(ov),
-                      'orphan_note' => dormant_note(ov, why, active))
+            row = row.merge('orphan_label' => dormant_label(ov),
+                            'orphan_note' => dormant_note(ov, why, active))
+            why == 'no_front' ? row.merge(dormant_gone_owner) : row
           end + orphan_part_material_rows(cfg, fronts)
         rescue StandardError => e
           Engine.log_error(e, 'Panel.hardware_overrides_payload')
@@ -1273,6 +1285,17 @@ module Noxun
         end
 
         DORMANT_HINT = 'Zrušiť ho môžeš tu.'
+
+        # D-132 (review P3): vlastnik zaznamu UZ NEEXISTUJE, takze popis nesmie
+        # tvrdit „F9 · zásuvkové čelo" (cislo `F#` je poradie v resolved celach —
+        # pri zaniknutom cele by `human_label` vratil SUROVE id a hlavicka boxu
+        # by menovala celo, ktore v zakazke nie je). Riadok preto dostane vlastny
+        # popis a priznak `orphan_owner_gone`, z ktoreho panel vie, ze taky box
+        # NESMIE ponuknut oko „označ v modeli" — oznacovat niet co.
+        def dormant_gone_owner
+          { 'owner_label' => '(už neexistuje) · pôvodné zásuvkové čelo',
+            'orphan_owner_gone' => true }
+        end
 
         def dormant_note(ov, why, active)
           owner = ov['owner_part_key'].to_s
