@@ -32,6 +32,7 @@ GitHub Codex review beží automaticky na každý PR. **Nálezy sú v REVIEW THR
    gh pr comment <N> --body "@codex review"
    ```
    Budík ~10 min počítaj **od vyžiadania**, nie od pushu. Bez tohto komentára by si čakal na kolo, ktoré nikdy nezačalo — a „žiadne nové thready" by neznamenalo nič.
+   **Kvótová brána (od 13.9.2026, skill `usage`):** pred `gh pr create`/`gh pr ready` aj pred každým `@codex review` spusti `& ".claude\skills\usage\usage.ps1" -Gate codex` — **exit 3 (Codex weekly zostatok < 10 %) = kolo NEVYŽIADAŠ**; platí náhradná brána (slepý Opus reviewer s reprodukciami + interná delta-verifikácia — vzor 31.8. a 9.9.2026) a do PR popisu zapíšeš, že GH kolo nahradila z dôvodu kvóty. Kolo, ktoré beží samo po `gh pr create`, sa nedá zastaviť — ak zlyhá na limite (bot „Failed"/ticho), ber to ako nevyžiadané a použi náhradnú bránu.
 4. **Odpovedz v threade s hashom opravy:**
    ```
    gh api repos/michalmoronga-alt/noxun-panel/pulls/<N>/comments/<databaseId>/replies -f body="Opravené v <hash> — <krátko čo a ako>."
