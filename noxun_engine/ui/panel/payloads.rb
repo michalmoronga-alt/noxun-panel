@@ -70,10 +70,20 @@ module Noxun
           # kresli VYHRADNE to, co je tu. Cista projekcia nad ulozenym
           # `front_items` (ziadny zapis, ziadny prepocet planu).
           params['front_slots'] = front_slots_payload(cfg['front_items'])
+          # KOV-D2a: STAV KAZDEJ OSI zamku (vyska, vyska boxu, NL) — server
+          # pocita, JS len kresli (chipy su D2b). Mapa sa stavia RAZ a vesia sa
+          # na TRI miesta: emitovanu polozku vysuvu, osiroteny riadok zasahu
+          # (pri konflikte ziadna polozka nevznikne, ale odomknut sa musi dat)
+          # a kartu cela.
+          # D-128: index sa pocita UZ TU, lebo riadok karty ho potrebuje —
+          # veta detailu nesmie pri aktivnom zamku tvrdit vzorec a veta „ručne
+          # zamknuté" musi menovat OSI. Stale je to JEDEN vypocet.
+          axis_index = drawer_axes_index(cfg, params)
+          axis_by_owner = axis_index['by_owner']
           # KOV-C2c: RIADOK ZASUVKY karty cela (system · vyska · NL · nosnost ·
           # otvaranie · recept, alebo RED dovod / ORANGE sync). Vlastny kluc —
           # `front_slots` odpoveda VYHRADNE na otazku „kde sa pyta smer".
-          params['front_drawer'] = front_drawer_payload(cfg)
+          params['front_drawer'] = front_drawer_payload(cfg, axis_by_owner)
           # KOV-E2: RIADOK VYKLOPU karty cela (system · trieda · tyc, alebo RED
           # dovod / ORANGE upozornenie). Vlastny kluc — `front_drawer` odpoveda
           # VYHRADNE na otazku o zasuvke.
@@ -100,15 +110,11 @@ module Noxun
           # D-92: aj VYPNUTE kategorie (disabled overridy) pomenuva server —
           # inak by jedine ony ostali v sekcii Kovanie so surovym part_key.
           params['hardware_overrides'] = hardware_overrides_payload(cfg, params['hardware_overrides'])
-          # KOV-D2a: STAV KAZDEJ OSI zamku (vyska, NL) — server pocita, JS len
-          # kresli (chipy su D2b). Aditivne: existujuce `locked` aj `nl` bloky
-          # ostavaju nedotknute. Mapa sa stavia RAZ a vesia sa na OBE strany —
-          # na emitovanu polozku vysuvu aj na osiroteny riadok zasahu, lebo pri
-          # konflikte ziadna polozka nevznikne a odomknut sa musi dat aj tak.
-          # KOV-D2b: TRETIE miesto je karta cela (`front_drawer`) — kresli sa
-          # z TEJ ISTEJ mapy, aby panel nemal dva stavy jednej osi.
-          index = drawer_axes_index(cfg, params)
-          axes = index['by_owner']
+          # Aditivne: existujuce `locked` aj `nl` bloky ostavaju nedotknute.
+          # Index sa NEPOCITA znova — je to ten isty, z ktoreho uz vyssie
+          # vznikol riadok karty (`front_drawer`).
+          index = axis_index
+          axes = axis_by_owner
           unless axes.empty?
             params['hardware'] = attach_drawer_axes(params['hardware'], axes)
             # KOV-D4: osiroteny zasah dostane chipy LEN ked patri PRIPNUTEMU
@@ -319,9 +325,14 @@ module Noxun
         #                konstrukcia, ktoru recepty neriesia) — karta mlci
         DRAWER_SYNC_CODE = 'drawer_sync_recommended'
 
-        def front_drawer_payload(cfg)
+        # D-128: `axes_by_owner` = stav osi zamku (`drawer_axes_index`), aby
+        # riadok karty nemusel tvrdit vzorec pri AKTIVNOM zamku vysky boxu
+        # a aby veta „ručne zamknuté" menovala PRAVE zamknute osi. Prazdna mapa
+        # = spravanie spred D-128 (starsi volajuci, test).
+        def front_drawer_payload(cfg, axes_by_owner = {})
           return {} unless defined?(Recipes)
 
+          axes = axes_by_owner.is_a?(Hash) ? axes_by_owner : {}
           out = {}
           # KOV-D1b: „co je v balení" sa cita RAZ pre cely payload (stav setov +
           # mapa kod => polozka katalogu) — nie per celo. Cesta je CITACIA
@@ -334,7 +345,7 @@ module Noxun
             next if fid.empty?
 
             buy = drawer_buy_ctx(cfg) if buy.nil?
-            out[fid] = drawer_card_row(cfg, fid, buy)
+            out[fid] = drawer_card_row(cfg, fid, buy, axes[PartKeys.front(fid, 'panel')])
           end
           out
         rescue StandardError => e
@@ -364,7 +375,7 @@ module Noxun
           nil
         end
 
-        def drawer_card_row(cfg, fid, buy = nil)
+        def drawer_card_row(cfg, fid, buy = nil, axes = nil)
           conflict = drawer_conflict_for(cfg, fid)
           return { 'state' => 'conflict', 'message' => conflict['message'].to_s } if conflict
 
@@ -376,11 +387,42 @@ module Noxun
           end
           params = hw['params'].is_a?(Hash) ? hw['params'] : {}
           row = { 'state' => 'ok', 'text' => drawer_row_text(params),
-                  'detail' => Recipes.explain_stored(params) + drawer_buy_lines(hw, buy) }
-          row['locked_note'] = 'Dĺžka výsuvu je ručne zamknutá (Inspector → Kovanie).' if hw['locked'] == true
+                  'detail' => Recipes.explain_stored(params, axes: axes) + drawer_buy_lines(hw, buy) }
+          note = locked_note(hw, axes)
+          row['locked_note'] = note if note
           sync = drawer_sync_note(cfg, fid)
           row['sync'] = sync if sync
           row
+        end
+
+        # D-128: veta „ručne zamknuté" MENUJE OSI. Do D-128 tvrdila „Dĺžka
+        # výsuvu je ručne zamknutá" pri KAZDOM `locked: true` — pri samotnom
+        # zamku vysky boxu (alebo vyskoveho variantu) teda menovala INU os,
+        # nez ktora je naozaj zamknuta.
+        #
+        # Zdroj je `axes` (ten isty stav, akym sa kreslia chipy), nie `locked`
+        # boolean. Ked osi k dispozicii NIE SU (nenacitatelny recept, celo bez
+        # kontextu), ostava PRIZNANIE bez menovania — tichy vypadok vety by
+        # zamok skryl.
+        LOCKED_AXIS_LABELS = { 'height' => 'výška zásuvky', 'box' => 'výška boxu',
+                               'nl' => 'dĺžka výsuvu' }.freeze
+        LOCKED_NOTE_TAIL = '(Inspector → Kovanie).'
+
+        def locked_note(hw, axes)
+          named = axes.is_a?(Hash) ? LOCKED_AXIS_LABELS.keys.select { |k| locked_axis?(axes[k]) } : []
+          unless named.empty?
+            return "Ručne zamknuté: #{named.map { |k| LOCKED_AXIS_LABELS[k] }.join(' · ')} #{LOCKED_NOTE_TAIL}"
+          end
+          return nil unless hw.is_a?(Hash) && hw['locked'] == true
+          # Osi nepoznáme, ale polozka zamok priznava — radsej vseobecna veta
+          # nez ziadna.
+          return nil if axes.is_a?(Hash)
+
+          "Ručne zamknuté #{LOCKED_NOTE_TAIL}"
+        end
+
+        def locked_axis?(ax)
+          ax.is_a?(Hash) && %w[locked conflict].include?(ax['state'].to_s)
         end
 
         # KOV-D1b: „ČO JE V BALENÍ" — vety pod technickym detailom karty.
@@ -810,7 +852,9 @@ module Noxun
         # druhy zamok ostava a znovu sa overi (nil = pri nom platna nahrada
         # neexistuje, takze D2b potvrdenie neponukne).
         # QUADRO: kluc `axes.height` CHYBA (nie `state: auto`) — system vyskove
-        # varianty nema a ponuknut sa nema co.
+        # varianty nema a ponuknut sa nema co. Miesto neho ma D-128 kluc
+        #   axes.box = { state, value, min, max, message?, proposal? }
+        # (SPOJITY rozsah, teda ziadne `options`). ATIRA kluc `box` NEMA.
         def drawer_axes_map(cfg, params)
           drawer_axes_index(cfg, params)['by_owner']
         end
@@ -914,10 +958,50 @@ module Noxun
               height = v && v[:height]
               axes['height'] = { 'state' => 'auto', 'value' => height, 'options' => opts }
             end
+          else
+            # D-128: TRETIA os — RUCNA VYSKA DREVENEHO BOXU. Vlastny kluc `box`,
+            # NIE `height`: Atira payload tak ostava bajtovo zhodny a pravidlo
+            # „Quadro nema kluc `height`" plati dalej.
+            axes['box'] = drawer_box_axis(recipe, ctx, overrides, conflict)
           end
 
           axes['nl'] = drawer_nl_axis(recipe, height, height_conflict, clear_d, nl_lock, conflict)
           axes
+        end
+
+        # Stav osi VYSKY BOXU (systemy bez vyskovych variantov). Na rozdiel od
+        # vysky a NL je to SPOJITY ROZSAH, takze os nema `options` — nesie
+        # `min`/`max` a JS z nich kresli male ciselne pole.
+        #
+        # `max` je AUTOMAT (nad automat sa nesmie), preto je aj navrhom nahrady
+        # pri konflikte. Ked sa rozsah urcit NEDA alebo je PRAZDNY (`max < min`
+        # pri velmi nizkej zone), `min`/`max`/`proposal` su `nil` — JS vtedy
+        # nekresli ani pole, ani ponuku nahrady, a zapis by taku hodnotu aj tak
+        # odmietol (obe brany, vzor NL osi s prazdnymi `options`).
+        def drawer_box_axis(recipe, ctx, overrides, conflict)
+          clear_h = ctx[:clear_height].to_f
+          rng = Recipes.box_range(recipe, clear_h, ctx[:part_thicknesses])
+          usable = rng && rng[:min] <= rng[:max]
+          lock = Recipes.box_lock_value(recipe, ctx, overrides)
+          out = { 'state' => 'auto', 'value' => nil,
+                  'min' => usable ? rng[:min] : nil, 'max' => usable ? rng[:max] : nil }
+          if lock.nil?
+            out['value'] = usable ? rng[:max] : nil
+            return out
+          end
+
+          problem = Recipes.box_lock_problem(recipe, lock, clear_h, ctx[:part_thicknesses])
+          out['value'] = lock
+          out['state'] = problem ? 'conflict' : 'locked'
+          return out unless problem
+
+          # INVARIANT (vzor oboch starsich osi): os so `state: conflict` MA vzdy
+          # hlasku. Ulozeny dovod plati LEN ked sedi kod — zasuvka moze mat
+          # SKORSIE zlyhanie resolvera (prekazka, hrubka, KD) a `drawer_conflicts`
+          # o zamku vtedy nevie vobec.
+          out['message'] = axis_message(conflict, 'box_lock_invalid') || problem
+          out['proposal'] = usable ? rng[:max] : nil
+          out
         end
 
         def drawer_nl_axis(recipe, height, height_conflict, clear_d, nl_lock, conflict)
