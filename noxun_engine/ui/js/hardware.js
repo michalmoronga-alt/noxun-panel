@@ -101,8 +101,16 @@
   // („H144", „NL 470"), hodnota je cislo pre server.
   //
   // Ciste funkcie (Node testy: tests/js/test_kovd2b_ui.js).
+  //
+  // D-128: TRETIA os `box` (vyska dreveneho boxu). Je to SPOJITY rozsah, nie
+  // ponuka — server posiela `min`/`max` a chip ma vedla seba male ciselne pole
+  // namiesto `<select>`. Suffix je prazdny, lebo nazov osi uz nesie samotny
+  // text chipu („box 360") a druhy popisok by riadok `.axchips` pri 470 px
+  // zalomil.
   var HW_AX = [{ key: 'height', field: 'height_variant', label: 'výšku',
                  noun: 'Výška', suffix: 'výška' },
+               { key: 'box', field: 'box_height', label: 'výšku boxu',
+                 noun: 'Výška boxu', suffix: '' },
                { key: 'nl', field: 'nominal_length', label: 'dĺžku výsuvu',
                  noun: 'Dĺžka výsuvu', suffix: '' }];
   // Ponuka sa kresli az od DVOCH hodnot — jedna volba nie je vyber.
@@ -112,6 +120,7 @@
   var HW_AX_FIX_NOTE = 'Náhrada ostáva ZAMKNUTÁ (automat ju nezmení). Zámok druhej osi sa ' +
                        'nemení a znova sa overí.';
   var HW_AX_BLOCKED = 'Dĺžka výsuvu sa ponúkne, až keď vyriešiš výšku.';
+  var HW_AX_BADNUM = 'Neplatná výška boxu — zadaj číslo v mm.';
 
   function hwAxDef(kind){
     for (var i = 0; i < HW_AX.length; i++){ if (HW_AX[i].key === kind) return HW_AX[i]; }
@@ -127,9 +136,18 @@
   // pomlckou — nula ani prazdny retazec by klamali.
   function hwAxValText(kind, v){
     if (v == null || !isFinite(Number(v))) return '—';
-    return (kind === 'height') ? ('H' + Math.round(Number(v))) : ('NL ' + hwNlFmt(v));
+    if (kind === 'height') return 'H' + Math.round(Number(v));
+    if (kind === 'box') return 'box ' + hwNlFmt(v);
+    return 'NL ' + hwNlFmt(v);
   }
   function hwAxText(kind, ax){ return hwAxValText(kind, ax ? ax.value : null); }
+  // Hodnota BEZ nazvu osi. Chip nesie „box 360" (v rade chipov musi byt vidno,
+  // co je co), ale vety os uz menuju samy — „Nahradiť za box 360" by ju
+  // zopakovali. Pri `height` a `nl` je to presne dnesny text (nic sa nemeni).
+  function hwAxBare(kind, v){
+    if (v == null || !isFinite(Number(v))) return '—';
+    return (kind === 'box') ? hwNlFmt(v) : hwAxValText(kind, v);
+  }
   // Ponuka na zamknutie = VYHRADNE `options` zo servera. -> [{value,text,selected}]
   function hwAxOptionList(kind, ax){
     var out = [];
@@ -148,7 +166,8 @@
     var st = hwAxState(ax);
     if (st === 'locked') return 'Odomknúť — platí automat';
     if (st === 'conflict') return 'Zamknutá hodnota už neplatí — odomkni ju alebo nahraď';
-    return 'Zamknúť ' + d.label + ' ' + hwAxText(kind, ax) + ' (automat by mohol zmeniť)';
+    return 'Zamknúť ' + d.label + ' ' + hwAxBare(kind, ax ? ax.value : null) +
+           ' (automat by mohol zmeniť)';
   }
   function hwAxSelTitle(kind){
     var d = hwAxDef(kind);
@@ -158,11 +177,11 @@
   // nie z dovodu konfliktu — ten je uz na obrazovke v cervenom riadku.
   function hwAxFixSub(kind, ax){
     var d = hwAxDef(kind); if (!d) return '';
-    return d.noun + ' ' + hwAxText(kind, ax) + ' už neplatí. Nahradiť ju za ' +
-           hwAxValText(kind, ax && ax.proposal) + '?';
+    return d.noun + ' ' + hwAxBare(kind, ax ? ax.value : null) + ' už neplatí. Nahradiť ju za ' +
+           hwAxBare(kind, ax && ax.proposal) + '?';
   }
   function hwAxFixLabel(kind, ax){
-    return 'Nahradiť za ' + hwAxValText(kind, ax && ax.proposal);
+    return 'Nahradiť za ' + hwAxBare(kind, ax && ax.proposal);
   }
 
   // ---- UI-C4: BOXY PODLA VLASTNIKA ----------------------------------------
@@ -1129,6 +1148,8 @@
           + '<b>'+esc(hwAxText(kind, ax))+'</b>'
           + ((d && d.suffix) ? '<span class="axsuf">'+esc(d.suffix)+'</span>' : '')
           + '</button>';
+    // D-128: os `box` je SPOJITY rozsah — namiesto ponuky ma male ciselne pole.
+    if (kind === 'box') return h + hwAxNumHtml(ax, st);
     // KONFLIKT NEMA PONUKU (Codex #313 kolo 1 P2-3). Server pri konflikte
     // `options` stale posiela (su to hodnoty, ktore by sa dali zamknut), ale
     // select vedla cerveneho chipu by bol DRUHA cesta k tej istej zmene — a to
@@ -1143,6 +1164,38 @@
     return h + '<select class="axsel" data-ax="'+esc(kind)+'" data-axc="sel"'
              + ' aria-label="'+esc(hwAxSelTitle(kind))+'"'
              + ' title="'+esc(hwAxSelTitle(kind))+'" onchange="onHwAxPick(this)">'+oh+'</select>';
+  }
+  // D-128: MALE CISELNE POLE osi `box`.
+  //
+  // Preco pole a nie `<select>`: vyska boxu je SPOJITY rozsah (58–360 mm po
+  // desatinach), takze ponuka by musela mat stovky poloziek. Rozsah v
+  // `placeholder` a v `title` je LEN napoveda — o platnosti rozhoduje VYHRADNE
+  // server (`Recipes.box_range`); `data-min`/`data-max` su informacia pre
+  // pouzivatela a testy, NIE ochrana (HTML atributy sa daju obist).
+  //
+  // KONFLIKT pole NEKRESLI — presne ako sa pri konflikte nekresli ponuka:
+  // jedina cesta von je „Nahradiť za …" (s D-15 potvrdenim) alebo „Odomknúť".
+  // Neurcitelny alebo PRAZDNY rozsah (`max < min`, velmi nizka zona) tiez pole
+  // nekresli — zamknut sa neda nic a server by to aj tak odmietol.
+  function hwAxNumHtml(ax, st){
+    if (st === 'conflict') return '';
+    var lo = Number(ax && ax.min);
+    var hi = Number(ax && ax.max);
+    if (!isFinite(lo) || !isFinite(hi) || lo > hi) return '';
+    var rng = hwNlFmt(lo) + '–' + hwNlFmt(hi);
+    var cur = (st === 'locked' && ax && ax.value != null && isFinite(Number(ax.value)))
+      ? hwNlFmt(ax.value) : '';
+    // `data-init` = hodnota, s ktorou pole vzniklo. Blur bez zmeny nesmie
+    // zapisovat (prekreslenie panela po kazdom pushi by inak posielalo zapis
+    // pri kazdom kliknuti vedla).
+    return '<input type="text" class="axnum" data-ax="box" data-axc="num"'
+         + ' inputmode="decimal" autocomplete="off" spellcheck="false"'
+         + ' data-min="' + esc(String(lo)) + '" data-max="' + esc(String(hi)) + '"'
+         + ' data-init="' + esc(cur) + '" value="' + esc(cur) + '"'
+         + ' placeholder="' + esc(rng) + '"'
+         + ' aria-label="Výška boxu v mm (' + esc(rng) + ')"'
+         + ' title="' + esc('Zamknúť inú výšku boxu (' + rng + ' mm, automat ' + hwNlFmt(hi) + ')') + '"'
+         + ' onkeydown="onHwAxNumKey(event, this)" onblur="onHwAxNum(this)">';
   }
   // CERVENY riadok konfliktu (veta je SERVEROVA — panel ziadnu vlastnu
   // neskladá) + cesty von: nahrada LEN ked server navrh naozaj dal
@@ -1206,6 +1259,35 @@
     hwAxSend(sel, sel.getAttribute('data-ax'), v);
   }
   function onHwAxUnlock(btn){ hwAxSend(btn, btn.getAttribute('data-ax'), null); }
+
+  // D-128: PRISNY parser textu pola (`parseFloat` nestaci). `parseFloat('1e309')`
+  // dá Infinity a `parseFloat('300,5')` dá 300 — server by v oboch pripadoch
+  // dostal nieco ine, nez pouzivatel napisal. Preto: trim -> desatinna CIARKA
+  // na bodku -> CELY text musi byt cislo -> konecne a kladne.
+  // -> Number | null
+  function hwAxNum(raw){
+    var s = String(raw == null ? '' : raw).trim().replace(',', '.');
+    if (!/^\d+(\.\d+)?$/.test(s)) return null;
+    var v = Number(s);
+    return (isFinite(v) && v > 0) ? v : null;
+  }
+  // Zapis z pola. PRAZDNE pole sa NEODOSIELA a zmena na `null` z tejto cesty
+  // NIKDY nevznikne — odomyka sa vyhradne chipom alebo tlacidlom „Odomknúť".
+  // Rovnako sa neodosiela hodnota, ktora sa od vykreslenia NEZMENILA (blur po
+  // kliknuti vedla by inak zapisoval to iste znova).
+  function onHwAxNum(input){
+    var raw = String(input.value == null ? '' : input.value).trim();
+    if (raw === '') return false;
+    if (raw === String(input.getAttribute('data-init') || '')) return false;
+    var v = hwAxNum(raw);
+    if (v == null){ NX.setStatus(HW_AX_BADNUM, true); return false; }
+    return hwAxSend(input, input.getAttribute('data-ax') || 'box', v);
+  }
+  function onHwAxNumKey(ev, input){
+    if (!ev || ev.key !== 'Enter') return false;
+    if (typeof ev.preventDefault === 'function') ev.preventDefault();
+    return onHwAxNum(input);
+  }
 
   // ---- KOV-D2b: NAHRADA = D-15 POTVRDENIE SO ZAMKOM ODOSIELANIA -----------
   // Kontrakt kostry D-15: **zapis okno NEZATVARA** — zatvorit ho smie az
@@ -2335,6 +2417,9 @@
       hwAxFixSub: hwAxFixSub, hwAxFixLabel: hwAxFixLabel, hwAxHtml: hwAxHtml,
       hwAxIdent: hwAxIdent, onHwAxChip: onHwAxChip, onHwAxPick: onHwAxPick,
       onHwAxUnlock: onHwAxUnlock, onHwAxFix: onHwAxFix, onHwAxResult: onHwAxResult,
+      // D-128 os `box` — pole `.axnum` (tests/js/test_d128_ui.js)
+      HW_AX_BADNUM: HW_AX_BADNUM, hwAxBare: hwAxBare, hwAxNum: hwAxNum,
+      hwAxNumHtml: hwAxNumHtml, onHwAxNum: onHwAxNum, onHwAxNumKey: onHwAxNumKey,
       hwAxModalState: function(){ return HW_AX_MODAL; },
       // KOV-D3b prechod na novsiu verziu receptu (tests/js/test_kovd3b_ui.js) —
       // markup ponuky + CELY tok cez mini-DOM (klik -> dopad -> potvrdenie ->
