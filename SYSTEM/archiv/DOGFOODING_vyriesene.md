@@ -4,7 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
-- **D-128** — Výška dreveného boxu zásuvky (Quadro) sa dá ručne znížiť: tretia os zámku (chip „box 360" s číselným poľom v riadku Zásuvka aj v karte čela), dielce boxu sa režú na zámok, zmenšená zóna = RED s náhradou — 13.9.2026, PR #363, v0.12.2
+- **D-128** — Výška dreveného boxu zásuvky (Quadro) sa dá ručne znížiť: tretia os zámku (chip „box 360" s číselným poľom v riadku Zásuvka aj v karte čela), dielce boxu sa režú na zámok, zmenšená zóna = RED s náhradou — 13.9.2026, PR #364, v0.12.2
 - **D-94** — Rozklik nákupného riadku ukáže pôvod zoskupený po skrinkách (s počtami) a klik na skrinku či čelo ho označí v modeli a otvorí Inspector; rozklik prežije „Obnoviť" — 12.9.2026, PR #361, v0.12.1
 - **D-28** — Spoločný voliteľný vzhľad dosiek aj ABS, natívna mierka/PBR, knižnica SKM a zachovanie pri prestavbe/kópii — 12.9.2026, PR #353–#359, uzáver v0.12.0
 - **D-114** — Šesť ikon pridá priamo typ čela v jednom rade; kratšie texty, súhrn hrán a zachovaný fokus pri 470 px — 11.9.2026, PR #351, v0.11.0
@@ -120,7 +120,7 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ### D-128 — ručná výška dreveného boxu zásuvky, vyriešené 13.9.2026
 
-**Výsledok: PR #363, v0.12.2.** Pri drevenom boxe (Quadro V6) sa výška boxu dá **ručne znížiť**. V riadku Zásuvka v kontexte Kovanie **aj v karte zásuvkového čela** stojí
+**Výsledok: PR #364, v0.12.2.** Pri drevenom boxe (Quadro V6) sa výška boxu dá **ručne znížiť**. V riadku Zásuvka v kontexte Kovanie **aj v karte zásuvkového čela** stojí
 tretí chip osi — **„box 360"** vedľa „NL 450" — a hneď vedľa neho malé číselné pole s rozsahom v nápovede (napr. `58–360`). Používateľ napíše vlastnú výšku a stlačí Enter
 (alebo klikne mimo poľa); dielce boxu — **2 boky, vnútorné čelo a chrbát** — sa narežú na ňu, **dno sa nemení**. Klik na chip v stave „automat" zamkne aktuálny automat, klik
 na zamknutý chip zámok pustí. Nad automat sa zamknúť **nedá** (box väčší než zóna neexistuje) a pod minimum tiež nie (čelo a chrbát boxu potrebujú svojich 30 mm nad dnom).

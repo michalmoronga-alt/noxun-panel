@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **D-128 — RUČNÁ VÝŠKA DREVENÉHO BOXU ZÁSUVKY, v0.12.2 (13.9.2026, PR #363).**
+- **D-128 — RUČNÁ VÝŠKA DREVENÉHO BOXU ZÁSUVKY, v0.12.2 (13.9.2026, PR #364).**
   **Čo Michal dostal:** pri drevenom boxe (Quadro V6) sa výška boxu dá **ručne znížiť**. Riadok Zásuvka v kontexte Kovanie **aj karta zásuvkového čela** majú tretí chip osi
   — „box 360" vedľa „NL 450" — a hneď pri ňom **malé číselné pole** s rozsahom v nápovede. Napíšeš hodnotu, stlačíš Enter a **2 boky, vnútorné čelo a chrbát** sa narežú na
   ňu; **dno sa nemení**. Nad automat sa zamknúť **nedá** (box väčší než zóna neexistuje) a pod minimum tiež nie (čelo a chrbát potrebujú svojich 30 mm nad dnom). Keď sa

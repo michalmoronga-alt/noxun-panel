@@ -26,7 +26,7 @@ Pred prvou takou zákazkou aktualizovať **obe PC** (Štúdio → O plugine → 
 
 ## Robí sa
 
-**D-128 „Ručná výška dreveného boxu" je hotové (PR #363, v0.12.2) — čaká na Michalov smoke.** Pri drevenom boxe (Quadro) má riadok Zásuvka aj karta zásuvkového čela **tretí
+**D-128 „Ručná výška dreveného boxu" je hotové (PR #364, v0.12.2) — čaká na Michalov smoke.** Pri drevenom boxe (Quadro) má riadok Zásuvka aj karta zásuvkového čela **tretí
 chip osi „box 360"** s malým číselným poľom: napíšeš vlastnú výšku, Enter — a **2 boky, vnútorné čelo a chrbát** sa narežú na ňu (dno sa nemení). Nad automat sa zamknúť
 nedá, pod minimum tiež nie; keď sa zóna neskôr zmenší, zásuvka je **RED** s ponukou „Nahradiť za &lt;nový automat&gt;" alebo „Odomknúť". Zákazky bez zámku sú nezmenené.
 **D-94** (PR #361, v0.12.1) aj **M-R** (#353–#359, v0.12.0) sú hotové a Michal 12.9. potvrdil oba smoke **PASS**; D-28 vyriešené, Čelá A/B1/B2/C používateľsky potvrdené.
@@ -41,7 +41,7 @@ nedá, pod minimum tiež nie; keď sa zóna neskôr zmenší, zásuvka je **RED*
 
 ## Posledné uzávery
 
-- **D-128 · Ručná výška dreveného boxu zásuvky** (v0.12.1 → **v0.12.2**, 13.9.2026, PR #363). Tretia os zámku `box_height` (Quadro) popri NL a výškovom variante Atiry:
+- **D-128 · Ručná výška dreveného boxu zásuvky** (v0.12.1 → **v0.12.2**, 13.9.2026, PR #364). Tretia os zámku `box_height` (Quadro) popri NL a výškovom variante Atiry:
   chip s číselným poľom v riadku Zásuvka aj v karte čela, jediná funkcia rozsahu `Recipes.box_range` (max = automat, min podľa **skutočnej** hrúbky dna), RED
   `box_lock_invalid` bez dielcov a bez kitu s návrhom náhrady. `CONFIG_SCHEMA` 13 → 14. Zákazky bez zámku sú nezmenené.
 - **D-94 · Nákup s pôvodom** (v0.12.0 → **v0.12.1**, 12.9.2026, PR #361). Rozklik nákupného riadku po skrinkách, klik-select zdroja s deep-linkom na kartu čela, pamäť rozkliku

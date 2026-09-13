@@ -236,7 +236,7 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   Pôvodná debata: [zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md). Prepínač „na faktúru“ je vyradený (existuje s DPH / bez DPH); DOCX/PDF ponuka a rodina dokumentov sú mimo V1.
 - ✅ **D-128 · Ručná výška dreveného boxu zásuvky (Quadro)** — tretia os zámku (`box_height`) popri NL a výškovom variante Atiry: chip „box 360" s malým číselným poľom
   v riadku Zásuvka aj v karte čela, rozsah min–max (max = automat, nad automat sa nedá), dielce boxu sa režú na zámok, zmenšená zóna = RED `box_lock_invalid` s náhradou.
-  **PR #363, v0.12.2.**
+  **PR #364, v0.12.2.**
 - **D-129 + D-130 · Kontext Čelá: úchytky na dvoch miestach + menší UI/UX rework** — zjednotiť úchytky, pomocné texty do tooltipov, prehľadnejší celok; debata → draft → Antigravity outside-in → reconcile → mockup → package — nové okno.
 - **D-131 · Smer kresby čiel celej zákazky jedným klikom** — hromadný zápis `grain_direction` čiel cez existujúce `part_overrides`; bez zmeny kontraktu — po D-128.
 - **D-132 · Dormantný zámok osi zásuvky po zmene otvárania je neviditeľný** — `override_orphan_kind` ho nevyhodnotí ako osirotený, riadok ručných zásahov ho nekreslí; nový druh osirotenia „dormantný" — fix dávka po D-128.
