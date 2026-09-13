@@ -10,7 +10,8 @@ const path = require('node:path');
 // hwNlHtml v test_d93) — test si ho podstrci v tej istej podobe.
 global.fmtmm = function (v) { return (v == null || v === '') ? '?' : Math.round(parseFloat(v)); };
 
-const { nxPartBasicRows, nxEdgeRotOf, nxSimilarCountText, nxSimilarBtnState } =
+const { nxPartBasicRows, nxEdgeRotOf, nxSimilarCountText, nxSimilarBtnState,
+        nxSimilarSkippedText } =
   require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'part_card.js'));
 
 let n = 0;
@@ -77,5 +78,17 @@ eq(nxSimilarBtnState(0).title.indexOf('celý projekt') >= 0, true,
    'nula ponukne dalsi krok (skus siri rozsah), nie len konstatovanie');
 eq(nxSimilarBtnState(3).title.indexOf('Späť') >= 0, true,
    'aktivne tlacidlo vopred povie, ze je to JEDEN krok Späť');
+
+// --- 4) D-134: veta o PRESKOCENYCH skrinkach -------------------------------
+// Vetu sklada SERVER (jedna autorita nazvov aj napravy), klient ju len ocisti
+// a zobrazi. Prazdna hodnota = riadok sa vobec neukaze, takze BEZNA zakazka
+// vidi presne to, co doteraz (charakterizacia).
+eq(nxSimilarSkippedText(null), '', 'chybajuca hodnota riadok neukaze');
+eq(nxSimilarSkippedText(undefined), '', 'to iste pre undefined');
+eq(nxSimilarSkippedText(''), '', 'prazdny retazec zo servera = ziadny riadok');
+eq(nxSimilarSkippedText('   '), '', 'biele znaky sa neratau ako veta');
+eq(nxSimilarSkippedText('Preskočené: CAB-002 (má odpojený dielec).'),
+   'Preskočené: CAB-002 (má odpojený dielec).',
+   'vetu zo servera klient NEPREKLADA — zobrazi ju tak, ako prisla');
 
 console.log(`OK test_uid1_dielec.js — ${n} kontrol`);
