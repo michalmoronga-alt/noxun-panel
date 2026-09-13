@@ -17,6 +17,29 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **D-131 — KRESBA ČIEL CELEJ ZÁKAZKY JEDNÝM KLIKOM, v0.12.3 (13.9.2026, PR #365).**
+  **Čo Michal dostal:** v **Štúdiu → Materiály → Predvoľby projektu** je nový riadok **„Kresba čiel"** — voľba *Podľa materiálu · Pozdĺžna · Priečna*, tlačidlo **„Použiť na
+  všetky čelá (N)"** a vedľa neho read-only stav („teraz: 8× priečna · 4× podľa materiálu"). Jeden klik zapíše smer dekoru **všetkým fyzickým čelám všetkých skriniek
+  zákazky** (dvierkam po krídlach, zásuvkovým čelám, výklopom/sklopom, blendám) a prestaví ich v **jednej operácii = jeden krok Späť**. Predtým to bolo 12 klikov do 12
+  kariet dielca (K1/D-108) alebo zásah do katalógu, ktorý mení knižnicu pre všetky zákazky. Výsledok overí existujúca **Kontrola kresby**.
+  **Prečo AKCIA a nie predvoľba:** projektová predvoľba smeru pre budúce skrinky by bola zmena kontraktu projektu (audit-povinná dávka) a Michal chcel jednoduché riešenie.
+  Tlačidlo preto pôsobí na čelá, ktoré v zákazke sú **teraz**; nová skrinka sa riadi materiálom a akcia sa spustí znova (hint to hovorí, číslo v tlačidle sa zdvihne).
+  **Prečo žiadne nové pole:** zapisuje sa **ten istý** override `part_overrides[<kľúč čela>]['grain_direction']`, ktorý píše karta dielca — „Podľa materiálu" ho maže
+  (prázdny záznam zaniká). Hromadná cesta tak nezaviedla druhý kontrakt ani druhý zdroj smeru a `CONFIG_SCHEMA` sa nehýbe.
+  **Prečo sa kľúče čiel nehádajú:** skladá ich výhradne `Fronts.panels_for` z uloženého `front_items` — jediná autorita tvaru (`panel` · `flap` · `blind` · `wing:*`).
+  Druhý parser by sa časom rozišiel a override by ticho sadol na dielec, ktorý v pláne neexistuje. Dvierka bez platného `wings_n` = **preskočená a vymenovaná** skrinka,
+  rovnako ako skrinka z novšej verzie pluginu (R-12) — nikdy tichý drop.
+  **Undo:** jedna `CabinetBuilder.rebuild_many` pre celú zákazku (vzor „Nahradiť UNI…"); **0 čiel ⇒ žiadna operácia** (otvoriť undo krok pre nič by zjedlo jeden Ctrl+Z)
+  a rovnako **0 zmien** — skrinka, ktorá požadovaný smer už má, sa neprestavuje. Tlačidlo je počas prestavby zamknuté („Prestavujem…"), takže z jednej voľby nevzniknú dva
+  kroky Späť.
+  **Vedomé odchýlky:** (1) rozsah sa berie z **resolved `front_items`**, nie z `fronts` configu — ten istý zdroj, z ktorého číta `Bom.collect` smerové nálezy (KOV-A1);
+  (2) `Panel.push_selected` ide s `dedup: false` — vyžaduje to brána 1b-3 a akcia žiadnu kópiu nevyrába; (3) pridaná vetva „nič sa nemenilo" nad rámec zadania (bez nej by
+  opakovaný klik prestavoval celú zákazku pre nič); (4) zadanie žiadalo doplniť callback do whitelistov `test_relay_api` / `test_guards` / `test_st1a_studio` — také
+  **vyčerpávajúce zoznamy v repe nie sú** (testy menujú konkrétne callbacky), takže sa nič nedopĺňalo.
+  **Testy:** 4058 headless · 117 JS sád · in-SketchUp sekcia `run_d131` (snapshoty dielcov v modeli, presne jeden krok Späť pre celú zákazku, „Bez čela"/doska/korpusové
+  dielce bajtovo nedotknuté, „Podľa materiálu" mazanie, cudzí `model_guid` aj prázdna zákazka bez kroku Späť). Štyri overené mutácie v hlavičkách oboch sád.
+  **Codex review:** doplní orchestrátor po review.
+
 - **D-128 — RUČNÁ VÝŠKA DREVENÉHO BOXU ZÁSUVKY, v0.12.2 (13.9.2026, PR #364).**
   **Čo Michal dostal:** pri drevenom boxe (Quadro V6) sa výška boxu dá **ručne znížiť**. Riadok Zásuvka v kontexte Kovanie **aj karta zásuvkového čela** majú tretí chip osi
   — „box 360" vedľa „NL 450" — a hneď pri ňom **malé číselné pole** s rozsahom v nápovede. Napíšeš hodnotu, stlačíš Enter a **2 boky, vnútorné čelo a chrbát** sa narežú na

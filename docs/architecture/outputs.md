@@ -437,6 +437,16 @@ miesto, kde vzniká číslo semaforu** — číta ho sekcia Kontrola v Štúdiu,
 odovzdáva svoj stav **explicitne** — okrem `generation:`/`status:`/`repush:` aj **`echo:`** (malý push stavu prepínača do TOHO okna) a pri kresbe `grain_echo:`; guard tak nemá
 **žiadny okenný stav** a obe okná sú nad ním len obaly.
 
+**D-131 `fronts_grain_all` — JEDINÁ zapisujúca cesta tohto modulu mimo rozpočtu** (v0.12.3, riadok „Kresba čiel" v sekcii Materiály). **Zber:** `front_grain_scan` prejde top-level
+NOXUN korpusy (`Panel.all_cabinets`) a z ULOŽENÉHO configu vezme `front_items` + `part_overrides` — zámerne NIE `Bom.collect`, ktorý nesie už **materializovaný** smer, z ktorého sa
+„používateľ to rozhodol" od „materiál to má" odlíšiť nedá. **Kľúče** fyzických čiel skladá `Fronts.panels_for` (jediná autorita tvaru: `panel` · `flap` · `blind` · `wing:*` podľa
+`wings_n`; „Bez čela" nemá dielec) — počet krídel sa NIKDY nehádá: položka bez platného `wings_n` znamená preskočenú a **vymenovanú** skrinku, rovnako ako skrinka z novšej verzie
+(R-12). **Guardy:** `gen` · `model_guid` v PRÍSNOM režime (je to zápis a ID skriniek sa naprieč dokumentmi opakujú) · uzavretý enum `length|width|__inherit__`, neznáma hodnota =
+odmietnutý zápis bez fallbacku. **All-or-nothing:** jedna `CabinetBuilder.rebuild_many` = **jeden krok Späť** pre celú zákazku; výnimka operáciu aborduje (rieši si to `rebuild_many`)
+a status povie dôvod. **0 čiel ⇒ žiadna operácia** (otvoriť undo krok pre nič by používateľovi zjedlo jeden Ctrl+Z) a rovnako **0 zmien** — skrinka, ktorá požadovaný smer už má, sa
+neprestavuje. Čisté funkcie (`front_grain_keys`, `front_grain_entry`, `front_grain_summary`, `front_grain_write!`, `fronts_grain_plan`) sú headless testovateľné; `front_grain_state`
+dáva stav riadku do `mat` payloadu. `Panel.push_selected` ide s `dedup: false` (brána 1b-3) — akcia žiadnu kópiu nevyrába, takže niet čomu prideľovať nové ID.
+
 Názvy stavov majú **jediný zdroj** `ProductionCore::EDGE_OPTION_LABELS` — rail Inspectora aj `js/edge_menu.js` ich čítajú odtiaľ (do ŠT-1c PR B3 sa rail pýtal cez tenký obal okna
 Výroba).
 

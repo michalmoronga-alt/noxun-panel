@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-131** — Kresbu čiel celej zákazky prepne jeden klik v Štúdiu (Materiály → Kresba čiel): zapíše sa existujúci override čiel, všetky skrinky sa prestavia v jednej operácii = jeden krok Späť — 13.9.2026, PR #365, v0.12.3
 - **D-128** — Výška dreveného boxu zásuvky (Quadro) sa dá ručne znížiť: tretia os zámku (chip „box 360" s číselným poľom v riadku Zásuvka aj v karte čela), dielce boxu sa režú na zámok, zmenšená zóna = RED s náhradou — 13.9.2026, PR #364, v0.12.2
 - **D-94** — Rozklik nákupného riadku ukáže pôvod zoskupený po skrinkách (s počtami) a klik na skrinku či čelo ho označí v modeli a otvorí Inspector; rozklik prežije „Obnoviť" — 12.9.2026, PR #361, v0.12.1
 - **D-28** — Spoločný voliteľný vzhľad dosiek aj ABS, natívna mierka/PBR, knižnica SKM a zachovanie pri prestavbe/kópii — 12.9.2026, PR #353–#359, uzáver v0.12.0
@@ -117,6 +118,43 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-131 — kresba čiel celej zákazky jedným klikom, vyriešené 13.9.2026
+
+**Výsledok: PR #365, v0.12.3.** V **Štúdiu → Materiály → Predvoľby projektu** je nový riadok **„Kresba čiel"**: voľba *Podľa materiálu · Pozdĺžna · Priečna* a tlačidlo
+**„Použiť na všetky čelá (N)"**. Jeden klik zapíše smer dekoru **všetkým fyzickým čelám všetkých skriniek zákazky** — dvierkam (každému krídlu zvlášť), zásuvkovým čelám,
+výklopom/sklopom aj blendám — a prestaví ich v **jednej operácii = jeden krok Späť**. Vedľa tlačidla stojí read-only stav („teraz: 8× priečna · 4× podľa materiálu"), takže
+je vidieť, čo v zákazke platí, ešte pred klikom. Výsledok sa overí existujúcim prepínačom **Kontrola kresby**.
+
+**Žiadne nové dáta (rozhodnutie R1).** Zapisuje sa **ten istý** override, ktorý píše karta dielca od K1/D-108 — `part_overrides[<kľúč čela>]['grain_direction']`. „Podľa
+materiálu" override **maže** (a prázdny záznam zaniká), takže sa dá vrátiť späť k materiálu. Hromadná cesta tým **nezaviedla druhý kontrakt ani druhý zdroj smeru**.
+
+**Projektová predvoľba pre BUDÚCE skrinky sa vedome nezavádza.** Bola by to zmena kontraktu projektu (audit-povinná dávka) a Michal chcel jednoduché riešenie. Je to preto
+hromadná **akcia** nad čelami, ktoré v zákazke sú TERAZ; skrinka vložená neskôr sa riadi materiálom a tlačidlo sa spustí znova (hint to hovorí a číslo v tlačidle sa zdvihne).
+
+**Kľúče čiel sa nehádajú.** Skladá ich výhradne `Fronts.panels_for` z uloženého `front_items` — jediná autorita tvaru kľúčov (`panel` · `flap` · `blind` · `wing:*`). „Bez čela"
+(`none`) dielec nemá, takže sa nedotkne; korpusové dielce, dosky ani dielce zásuviek do rozsahu nepatria. Skrinka z **novšej verzie pluginu** (R-12) a položka, ktorá nie je
+rozlúštené čelo (dvierka bez `wings_n`), sa **preskočia a VYMENUJÚ** v hláške — nikdy tichý drop.
+
+**Guardy a undo.** `gen` (klik zo starého DOM) · `model_guid` v **prísnom** režime (je to zápis a ID skriniek sa naprieč dokumentmi opakujú) · uzavretý enum
+`length|width|__inherit__` — neznáma hodnota = odmietnutý zápis bez fallbacku. Zápis beží v **jednej** `CabinetBuilder.rebuild_many`; **0 čiel ⇒ žiadna operácia** (otvoriť
+undo krok pre nič by zjedlo jeden Ctrl+Z) a rovnako **0 zmien** — skrinka, ktorá požadovaný smer už má, sa neprestavuje a hláška to povie. Tlačidlo je počas prestavby
+zamknuté („Prestavujem…"), takže druhý klik nevyrobí druhý krok Späť.
+
+**Vedomé odchýlky:** (1) Rozsah čiel sa berie z **resolved `front_items`**, nie z `fronts` configu — je to ten istý zdroj, z ktorého číta `Bom.collect` smerové nálezy
+(KOV-A1). (2) `Panel.push_selected` ide s `dedup: false` — bránu 1b-3 to vyžaduje a akcia žiadnu kópiu nevyrába. (3) Pridaná vetva „nič sa nemenilo" nad rámec zadania:
+bez nej by opakovaný klik prestavoval celú zákazku pre nič.
+
+**Testy:** `tests/pure/test_d131_kresba_ciel.rb` (29 testov), `tests/js/test_d131_ui.js` (28 kontrol), in-SketchUp sekcia `run_d131` (snapshoty dielcov v modeli, presne jeden
+krok Späť pre celú zákazku, „Bez čela"/doska/korpusové dielce bajtovo nedotknuté, cudzí `model_guid` a prázdna zákazka bez kroku Späť). Štyri overené mutácie sú v hlavičkách
+oboch sád.
+
+**Pôvodný plný text pri uzávere:**
+
+- **D-131 · Smer kresby čiel celej zákazky jedným klikom** (Michal 13.9.2026) — smer dekoru (pozdĺžna/priečna) sa dnes nastavuje len po jednom dielci v karte dielca (K1/D-108)
+  alebo v katalógu per dekor (mení knižnicu pre všetky zákazky, prejaví sa až prestavbou). Michal potrebuje **jedným klikom otočiť kresbu všetkých čiel v zákazke** (napr. celá
+  kuchyňa vodorovne). Návrh: akcia v Štúdiu nad všetkými skrinkami zákazky, zapisuje `part_overrides[..].grain_direction` čiel (existujúci kontrakt, žiadne nové dáta), jedna
+  operácia = jeden krok Späť, výsledok overí Kontrola kresby. Kandidát aj „aj na podobné dielce" v karte dielca (vzor ABS). *Stav: OTVORENÉ — zadanie po D-128; bez zmeny kontraktu.*
 
 ### D-128 — ručná výška dreveného boxu zásuvky, vyriešené 13.9.2026
 

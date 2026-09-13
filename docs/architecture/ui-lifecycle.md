@@ -2062,6 +2062,14 @@ Obrázok ide existujúcim `mdImageSrc` len z `image_file` emitovaného serverom;
 „Pracovný materiál UNI“, nie katalógovú hrúbku**. Skutočné tlačidlo pickeru dostáva prístupné meno roly + celého vybraného labelu; dekoratívna vzorka má `aria-hidden`/prázdne alt.
 Potvrdzovanie, `model_guid`, serverové predvoľby, dedenie aj Undo používajú pôvodné cesty bez zmeny kontraktu.
 
+**D-131 (v0.12.3): riadok „Kresba čiel" pod predvoľbami** — jediné miesto sekcie, ktoré **mení model**. Nie je to predvoľba, ale hromadná AKCIA nad čelami, ktoré v zákazke sú TERAZ
+(projektová predvoľba smeru pre budúce skrinky sa vedome nezavádza — bola by to zmena kontraktu projektu; hint to hovorí a číslo v tlačidle sa po vložení novej skrinky zdvihne).
+Select (Podľa materiálu / Pozdĺžna / Priečna) + `md_front_grain_apply` posielajú `fronts_grain_all` s `{gen, model_guid, grain}` — telo je v `ProductionCore` (nie v `MaterialsDialog`),
+preto má **vlastný `cb(dlg, …)`** a nejde cez `mat_actions`. Stav riadku (`teraz: 8× priečna · 4× podľa materiálu` a počet v tlačidle) počíta SERVER a nesie ho `mat.front_grain`
+(`{count, cabinets, by}`) — klient si nič nedopočítava. **Zámok tlačidla:** klik ho prepne na `Prestavujem…` + `disabled` a odomkne ho až NOVÝ push (`repush` po zápise, alebo aj
+push bez `mat`) — druhý klik pred ním nepošle nič, inak by z jednej voľby vznikli dva kroky Späť. `count = 0` → `disabled` s textom „Žiadne čelá". Generácia okna chodí do sekcie
+druhým parametrom `matApplyState(m, gen)` (identita CELÉHO payloadu Štúdia, nie sekcie — vzor `budget.js`).
+
 **Modály sekcie žijú v kotve `#matModalRoot` MIMO `#secbody`** (vzor `#nxModalRoot`).
 
 **Lišta je čistá funkcia `matToolsHtml(state)`** — `[Pridať z Demosu] · [Pridať ručne] · [hľadanie] · [zoskupenie] · ⟶ · [Obnoviť zálohu] · [Obnoviť]`; **primárnym tlačidlom je od
