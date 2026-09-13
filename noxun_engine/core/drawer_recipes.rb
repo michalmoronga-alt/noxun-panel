@@ -1130,7 +1130,21 @@ module Noxun
       end
 
       def label(recipe)
-        "#{system_label(recipe[:system])} #{recipe[:opening] == 'p2o' ? 'Tip-On' : 'SiSy'} v#{recipe[:version]}"
+        "#{system_label(recipe[:system])} #{opening_label(recipe[:opening])} v#{recipe[:version]}"
+      end
+
+      # D-132: popis receptu LEN z jeho ID — bez citania suboru z disku.
+      # Potrebuje ho riadok DORMANTNEHO zamku: ten menuje recept, ktory sa uz
+      # nepouziva (a nacitavat ho kvoli jednemu popisku by bol disk pri kazdom
+      # pushi panela). nil = ID nema znamy tvar (nikdy sa nehada).
+      def id_label(id)
+        p = parse_id(id)
+        p && "#{system_label(p[:system])} #{opening_label(p[:opening])} v#{p[:version]}"
+      end
+
+      # JEDINY zdroj slovenskeho nazvu otvarania — cita ho `label` aj `id_label`.
+      def opening_label(opening)
+        opening.to_s == 'p2o' ? 'Tip-On' : 'SiSy'
       end
 
       def system_label(system)

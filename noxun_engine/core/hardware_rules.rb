@@ -1946,18 +1946,90 @@ module Noxun
       #   'invalid'  — vlastnik je v ULOZENOM konflikte zasuvky, takze polozka
       #                fail-closed NEVZNIKLA (rucny pocet != 1, vypnutie alebo
       #                zamok NL mimo radu): naprava je ZRUSIT cely zaznam
+      #   'dormant'  — D-132: ZAMOK OSI, ktory dnes nikto necita (pripnuty je
+      #                INY recept, celo uz nie je zasuvka, alebo celo zaniklo):
+      #                naprava je ZRUSIT cely zaznam
       #
       # `items` = `config.hardware` (emitovane polozky), `conflict_owners` =
-      # `owner_part_key` ciel z `config.drawer_conflicts`.
-      def override_orphan_kind(ov, items, conflict_owners)
+      # `owner_part_key` ciel z `config.drawer_conflicts`, `active_rules` =
+      # { owner_part_key => rule_id PRIPNUTEHO receptu } a `front_owners` =
+      # `owner_part_key` panelov EXISTUJUCICH ciel (obe z `Panel`).
+      #
+      # Poradie kontrol je zavazne: `invalid` (ulozeny konflikt) vitazi nad
+      # `dormant`, lebo konflikt blokuje exporty a jeho riadok to musi povedat.
+      def override_orphan_kind(ov, items, conflict_owners, active_rules = nil, front_owners = nil)
         return nil unless ov.is_a?(Hash)
 
         key = override_identity(ov)
         return nil if Array(items).any? { |it| it.is_a?(Hash) && override_identity(it) == key }
         return 'disabled' if ov['disabled'] == true || ov[:disabled] == true
         return 'invalid' if Array(conflict_owners).map(&:to_s).include?(key[0])
+        return 'dormant' if override_dormant_why(ov, active_rules, front_owners)
 
         nil
+      end
+
+      # D-132: PRECO je zamok dormantny — alebo nil (dormantny nie je).
+      # Podtyp skladá text riadku (SERVER, nikdy JS):
+      #
+      #   'other_recipe' — vlastnik ma pripnuty INY recept (ine otvaranie/verzia)
+      #   'not_drawer'   — celo existuje, ale ziadny recept pripnuty nema (dvierka)
+      #   'no_front'     — celo uz medzi celami nie je
+      #
+      # Bez `active_rules` / `front_owners` (legacy trojargumentove volanie) sa
+      # dormantnost NEVYHODNOCUJE: kto nevidi pripnute recepty ciel, nesmie
+      # hadat — vrati sa `nil` presne ako doteraz.
+      #
+      # CISTA funkcia: ziadne citanie modelu ani receptov z disku (recept sa
+      # v texte menuje az v paneli, z `rule_id` cez `Recipes.parse_id`).
+      def override_dormant_why(ov, active_rules, front_owners = nil)
+        return nil unless ov.is_a?(Hash)
+        return nil unless active_rules.is_a?(Hash) && front_owners.is_a?(Array)
+        return nil unless override_lock_identity?(ov)
+        return nil if override_lock_fields(ov).empty?
+
+        owner = (ov['owner_part_key'] || ov[:owner_part_key]).to_s
+        pinned = active_rules[owner].to_s
+        rid = (ov['rule_id'] || ov[:rule_id]).to_s
+        unless pinned.empty?
+          # Zaznam PRIPNUTEHO receptu dormantny nie je (to je aktivny zamok),
+          # a legacy `vysuvy-nl-podla-hlbky` cita `Recipes.lock_value` pri
+          # KAZDOM recepte — tvrdit o nom „caka" by bola lez.
+          return nil if pinned == rid || rid == Recipes::LOCK_LEGACY_RULE_ID
+
+          return 'other_recipe'
+        end
+        front_owners.map(&:to_s).include?(owner) ? 'not_drawer' : 'no_front'
+      end
+
+      # Nesie zaznam IDENTITU zamku osi zasuvky? (receptova `recipe:<id>` alebo
+      # legacy pravidlo NL — obe pod `generic_type` zamku)
+      def override_lock_identity?(ov)
+        return false unless (ov['generic_type'] || ov[:generic_type]).to_s == Recipes::LOCK_GENERIC_TYPE
+
+        rid = (ov['rule_id'] || ov[:rule_id]).to_s
+        rid.start_with?(Recipes::LOCK_RECIPE_PREFIX) || rid == Recipes::LOCK_LEGACY_RULE_ID
+      end
+
+      # Platne polia zamku zaznamu -> { pole => hodnota }. Tvar hodnoty urcuju
+      # TIE ISTE citace, ktore pouziva resolver (`Recipes.nl_value` /
+      # `height_value`) — druha definicia „co je zamok" by sa s nimi rozisla.
+      def override_lock_fields(ov)
+        h = Recipes::LOCK_HEIGHT_FIELD
+        b = Recipes::LOCK_BOX_FIELD
+        out = {}
+        nl = Recipes.nl_value(override_field(ov, 'nominal_length'))
+        out['nominal_length'] = nl if nl
+        hv = Recipes.height_value(override_field(ov, h))
+        out[h] = hv if hv
+        bx = Recipes.nl_value(override_field(ov, b))
+        out[b] = bx if bx
+        out
+      end
+
+      # Hodnota pola zaznamu bez ohladu na to, ci ma string alebo symbol kluce.
+      def override_field(ov, key)
+        ov.key?(key) ? ov[key] : ov[key.to_sym]
       end
 
       # Trojica (vlastnik, typ, pravidlo) — identita rucneho zasahu aj polozky.
