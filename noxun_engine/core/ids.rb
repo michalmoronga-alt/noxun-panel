@@ -52,10 +52,11 @@ module Noxun
       # model.definitions (najde aj instancie vnorene v cudzich komponentoch;
       # preskoci definicie group/image). Ci vnorene entity patria do vystupov,
       # rozhodne kusovnik (V0.5) — tu sa nefiltruje.
-      # D-133: HROMADNE ZAPISOVE akcie zakazky („Nahradiť UNI…", „Kresba čiel")
-      # sem NEPATRIA — tie stoja na `top_level_scan` nizsie, lebo ich rozsah sa
-      # nesmie rozist s rozsahom vystupov. Citacie cesty (usage/delete guard,
-      # observery, dedup, resolvery vyberu) globalny prechod NAOPAK potrebuju.
+      # D-133/D-134: HROMADNE ZAPISOVE akcie zakazky sem NEPATRIA — vsetkych
+      # PAT stoji na `top_level_scan` nizsie (D-134 cez `Panel.job_cabinets`),
+      # lebo ich rozsah sa nesmie rozist s rozsahom vystupov. Citacie cesty
+      # (katalogovy usage/delete guard, observery, dedup, resolvery vyberu)
+      # globalny prechod NAOPAK potrebuju — tie sa nemenia.
       # D-34 (audit B4a): pocas erase okna mozu kolekcie niest NEPLATNE entity —
       # citanie atributov zmazanej entity pada (TypeError). valid? guard na
       # definicii aj instancii; headless fakes maju valid? v tests/helper.rb.
@@ -120,6 +121,16 @@ module Noxun
       # D-133: JEDEN prechod KORENOM modelu pre hromadne ZAPISOVE akcie zakazky.
       # Vrati { 'cabinets' => [inst…], 'boards' => [inst…],
       #         'detached' => { cabinet_id => pocet } }.
+      #
+      # KTO HO POUZIVA (D-134 — vsetkych PAT hromadnych ZAPISOVYCH ciest):
+      #   1) „Kresba čiel"            — `ProductionCore.front_grain_scan`
+      #   2) „Nahradiť UNI…"          — `Materials.replace_uni_scan`
+      #   3) pravidla kovania          \
+      #   4) projektova predvolba mat.  > cez `Panel.job_cabinets` (D-134)
+      #   5) „aj na podobné v projekte"/
+      # PRAVIDLO: hromadny ZAPIS zakazky = TOP-LEVEL + skip (nastavenie projektu)
+      # alebo blokada (all-or-nothing nahrada dekoru) pri odpojenom dielci;
+      # CITANIE ostava globalne (`each_of_kind`).
       #
       # PRECO top-level a nie `each_of_kind`: kusovnik, VEPO aj Studio pracuju
       # s `model.entities` (vid `Bom.collect`) — to je „zákazka". Globalny

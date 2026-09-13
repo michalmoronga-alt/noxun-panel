@@ -2394,10 +2394,77 @@ module Noxun
           end
         end
 
+        # GLOBALNY zber korpusov (cez `model.definitions`) — najde aj korpus
+        # VNORENY v cudzom komponente.
+        # D-134: pre CITACIE cesty (katalogovy usage/delete guard, observery,
+        # resolvery vyberu) je to spravna otazka a NEMENI SA. Hromadne ZAPISOVE
+        # akcie zakazky (pravidla kovania, projektova predvolba materialu,
+        # „aj na podobné v projekte") sem UZ NEPATRIA — tie stoja na
+        # `job_cabinets` nizsie, aby sa ich rozsah nerozisiel s vystupmi.
         def all_cabinets(model)
           out = []
           Ids.each_cabinet(model) { |i| out << i }
           out
+        end
+
+        # D-134: JEDEN zdroj skriniek pre HROMADNE ZAPISOVE akcie zakazky.
+        # -> { 'cabinets' => [top-level inst…], 'detached' => { cabinet_id => n } }
+        #
+        # PRECO vlastny zdroj a nie `all_cabinets`: kusovnik, VEPO aj Studio
+        # citaju TOP-LEVEL `model.entities` (`Bom.collect`) — to je „zákazka".
+        # Globalny prechod by nasiel aj korpus vnoreny v cudzom komponente: ten
+        # vo vystupoch nie je a hromadna prestavba by ho zmenila vo VSETKYCH
+        # vyskytoch zdielanej definicie. Telo je zdielane s „Kresba čiel"
+        # (D-131) a „Nahradiť UNI…" (D-133) cez `Ids.top_level_scan`.
+        def job_cabinets(model)
+          scan = Ids.top_level_scan(model)
+          { 'cabinets' => scan['cabinets'], 'detached' => scan['detached'] }
+        end
+
+        # D-134: rozdeli skrinky zakazky na tie, ktore sa smu PRESTAVAT, a na ID
+        # tych PRESKOCENYCH (maju odpojeny dielec). -> [[inst…], ['CAB-3', …]]
+        #
+        # `detached` je mapa zo `job_cabinets`. Volajuci si vstupny zoznam moze
+        # najprv ZUZIT (projektova predvolba berie len DEDIACE skrinky) — inak by
+        # status menoval preskocenu skrinku, ktorej sa akcia vobec netyka.
+        #
+        # PRECO SKIP a nie blokada celej akcie (na rozdiel od „Nahradiť UNI…"):
+        # tam je nahradenie dekoru all-or-nothing kvoli konzistencii vyroby
+        # jedneho dekoru; tu ide o NASTAVENIE PROJEKTU, ktore musi byt zapisane
+        # — zakazka nesmie ostat bez ulozenych pravidiel kvoli jednej vytiahnutej
+        # doske. Preskocena skrinka sa dorovna pri svojej najblizsej prestavbe
+        # (to iste sa deje dnes, ked pravidla zmeni iny PC).
+        def job_split(cabinets, detached)
+          jobs = []
+          skipped = []
+          Array(cabinets).each do |inst|
+            cid = Store.get(inst, 'cabinet_id').to_s
+            if detached.is_a?(Hash) && detached[cid].to_i.positive?
+              skipped << cid
+            else
+              jobs << inst
+            end
+          end
+          [jobs, skipped.uniq]
+        end
+
+        # Skratka pre cesty, ktore beru CELU zakazku (pravidla kovania).
+        def job_cabinets_split(model)
+          scan = job_cabinets(model)
+          job_split(scan['cabinets'], scan['detached'])
+        end
+
+        # D-134: chvost statusu s preskocenymi skrinkami (vzor D-131
+        # `fronts_grain_skipped_tail`). Prazdny zoznam = prazdny retazec, takze
+        # bezna zakazka vidi PRESNE ten isty status ako doteraz.
+        # Veta o naprave je zdielana konstanta `Ids::DETACHED_PART_REASON` —
+        # dve kopie by sa casom rozisli a pouzivatel by pri tom istom probleme
+        # cital raz jednu a raz druhu napravu.
+        def detached_skipped_tail(ids)
+          list = Array(ids).reject { |id| id.to_s.empty? }
+          return '' if list.empty?
+
+          " · preskočené: #{list.map { |id| "#{id} (#{Ids::DETACHED_PART_REASON})" }.join(', ')}"
         end
 
         # String alebo nil (prazdny -> nil). Pre material dedenie + override cistenie.
