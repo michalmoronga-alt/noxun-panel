@@ -14,8 +14,13 @@
 # cieľa), nie iba na množiny ID — zmena configu skrinky/dosky či katalógu medzi
 # ponukou a potvrdením = stale, nová ponuka, žiadny zápis.
 #
-# All-or-nothing: jediná blokovaná skrinka (hrúbka mimo rozsahu dielca/roly)
-# zastaví celú akciu s vymenovaním — žiadne čiastočné nahradenie.
+# All-or-nothing: jediná blokovaná skrinka (hrúbka mimo rozsahu dielca/roly,
+# od D-133 aj odpojený dielec) zastaví celú akciu s vymenovaním — žiadne
+# čiastočné nahradenie.
+#
+# Rozsah (D-133): top-level `model.entities` cez `Ids.top_level_scan` — PRESNE
+# to, čo zbiera kusovník. Vnorená skrinka v cudzom komponente vo výstupoch nie
+# je a jej prestavba by zasiahla všetky výskyty zdieľanej definície.
 
 require 'digest'
 
@@ -53,6 +58,7 @@ module Noxun
       #   { 'cabs'  => [[cid, params, old_eff, raw, ref]],   # VŠETKY korpusy
       #     'boards'=> [[bid, stored_cfg, raw, ref]],        # dosky s uni_id
       #     'project' => { key => efektívne_id },            # po fallbackoch
+      #     'detached' => { cabinet_id => počet },           # D-133, aditívny
       #     'model_guid' => guid }
       # params sú čerstvé kópie (config_to_params), raw = surový config JSON
       # string entity (vstup odtlačku plánu). ref = inštancia (len prenos do
@@ -65,14 +71,25 @@ module Noxun
                 'model_guid' => (model ? DocKey.key(model) : '') }
         return out unless model && defined?(Ids)
         uid = uni_id.to_s
-        Ids.each_of_kind(model, 'cabinet') do |inst|
+        # D-133: rozsah = PRESNE rozsah vystupov (top-level `model.entities`),
+        # nie globalny prechod cez `model.definitions`. Vnorena skrinka
+        # v zdielanej definicii v kusovniku ani vo VEPO nie je, ale prestavba by
+        # ju zmenila vo VSETKYCH vyskytoch. Ten isty helper pouziva „Kresba
+        # čiel" (`ProductionCore.front_grain_scan`) — dve hromadne zapisove
+        # akcie zakazky nesmu mat dva rozne rozsahy.
+        top = Ids.top_level_scan(model)
+        # ADITIVNY kluc (`cabs` je pole poli s pevnymi indexmi — do stredu sa
+        # nesmie nic vkladat). Klasifikacia si ho vie vypytat, stare scany bez
+        # neho sa spravaju ako doteraz.
+        out['detached'] = top['detached']
+        top['cabinets'].each do |inst|
           cid = (Store.get(inst, 'cabinet_id') || Store.get(inst, 'id')).to_s
           raw = Store.get(inst, 'config').to_s
           params = CabinetBuilder.config_to_params(Store.config(inst) || {})
           old_eff = CabinetBuilder.effective_materials(model, params)
           out['cabs'] << [cid, params, old_eff, raw, inst]
         end
-        Ids.each_of_kind(model, 'board') do |inst|
+        top['boards'].each do |inst|
           cfg = Store.config(inst) || {}
           next unless cfg['material_id'].to_s == uid
           bid = Store.get(inst, 'id').to_s
@@ -114,6 +131,9 @@ module Noxun
         # systemu". 18 mm je platna hrubka pre Quadro, ale v ATIROVEJ zakazke
         # by z kazdej zasuvky spravila RED `drawer_thickness_unsupported`.
         scan_fronts = ru_scan_drawer_fronts(scan)
+        # D-133: mapa odpojenych dielcov zo scanu. Stary scan (a headless
+        # fixtury) kluc nemaju — vtedy sa nic nemeni.
+        ru_detached = scan['detached'].is_a?(Hash) ? scan['detached'] : {}
         project.each do |key, eff|
           next unless eff.to_s == uni_id
           reason = ru_project_target_issue(key, target_th, scan_fronts)
@@ -140,6 +160,21 @@ module Noxun
           end.values
           hit_ov_keys = ru_override_keys_with(params, uni_id)
           next if hit_keys.empty? && inherit_roles.empty? && hit_ov_keys.empty?
+
+          # D-133: ODPOJENY DIELEC je NAJTVRDSI dovod — pyta sa PRVY, este pred
+          # hrubkami. Dielec vytiahnuty na koren modelu ostava viazany uz len
+          # atributom `cabinet_id`: do kusovnika aj VEPO ide PO SVOJOM
+          # (`Bom.collect`, vetva `part`), kym `rebuild_many` prestava LEN
+          # VNORENE dielce. Nahradenie by teda vyrobilo DVOJNIKA — vnoreny
+          # dielec s novym materialom a odpojeny so starym. Rovnaka trieda
+          # ochrany ako `ProductionCore.front_grain_skip_reason` (D-131)
+          # a `Panel.detached_part_error` v karte dielca. Skrinka BEZ vyskytu
+          # UNI sa sem nedostane (`next` vyssie) — odpojeny dielec sam o sebe
+          # nahradenie neblokuje.
+          if ru_detached[cid.to_s].to_i.positive?
+            out['blocked'] << [cid, :detached, []]
+            next
+          end
 
           # Snapshot overridov PRED prepisom (audit BLOCKER 2b) — remap musí
           # čítať STARÝ materiál dielca, nie už prepísaný.
@@ -411,6 +446,9 @@ module Noxun
         reason =
           case why.to_s.to_sym
           when :parts then "dielce s vlastným materiálom inej hrúbky: #{Array(names).join(', ')}"
+          # D-133: veta je ZDIELANA konstanta — tu istu napravu ponuka
+          # „Kresba čiel" pri preskoceni skrinky (`front_grain_skip_reason`).
+          when :detached then Ids::DETACHED_PART_REASON
           when :range then 'hrúbka cieľa mimo rozsahu'
           when :front then 'hrúbka cieľa nesedí pre čelá'
           when :drawer
