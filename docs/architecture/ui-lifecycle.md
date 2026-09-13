@@ -1220,6 +1220,12 @@ zámer: karta čela žiadny `.hwrow` nemá.
   a nekreslí sa ani pri **prázdnom alebo neurčiteľnom rozsahu** (`min`/`max` = `null`, veľmi nízka zóna) — zamknúť sa nedá nič a server by to aj tak odmietol.
   `data-min`/`data-max` a HTML atribúty **nie sú ochrana**: o platnosti rozhoduje výhradne server (`Recipes.box_range`). Klient overuje **celý text prísne** (`hwAxNum`:
   trim → desatinná čiarka → `^\d+(\.\d+)?$` → konečné a kladné) — `parseFloat` by z „1e309" spravil Infinity a z „300,5xx" číslo 300, teda iný rozmer boxu, než je na obrazovke.
+- **JEDNA editácia = JEDEN zápis (Codex #364 kolo 1 P2 + slepý Opus review).** Pole má **dva spúšťače** (Enter aj blur) a odpoveď servera prichádza až prekreslením panela,
+  takže bez zámku by „Enter a hneď klik vedľa" poslali tú istú hodnotu dvakrát = **dva `rebuild`, teda dva kroky Späť** za jednu editáciu. Po odoslaní sa pole označí
+  `data-sent` a **zamkne** (`disabled`); ručne sa **neodomyká** — echo servera kreslí markup nanovo a nové pole je čisté (vzor `HW_AX_MODAL.sent`). Druhý prípad je klik na
+  **iný ovládač toho istého radu**: prehliadač najprv pošle **blur** poľa a až potom klik, takže by sa zapísala hodnota z poľa **a** rozhodnutie chipu. `onmousedown` na obale
+  `.hwax` preto označí pole `data-skipblur` a blur z tejto cesty nič nepošle (Enter sa príznakom nedotkne; `oninput` ho čistí, aby po klik-bez-blur nevisel). Neplatný vstup
+  zámok **nenasadzuje** — používateľ musí mať šancu opraviť preklep.
 - **Fokus prežije prekreslenie karty** (Codex #313 kolo 1 P2-4). Každý ovládač chipov nesie okrem `data-ax` (os) aj **`data-axc`** (druh: `chip` · `sel` · **`num`** · `fix` · `unlock`);
   `frontCardFocusKey` z dvojice skladá kľúč `a:<os>|<druh>` a `frontCardFocusSelector` z neho selektor. Hodnota (`data-val`) v kľúči **nie je** — po zamknutí sa mení, takže by
   fokus nemal čo nájsť. Bez toho by fokus padol na dokument po každom pushi, teda po **každom** zamknutí — presne pri klávesovej práci so zámkom.
@@ -1820,7 +1826,8 @@ sa **odmieta** („položka sa medzitým zmenila"), Quadro výškový zámok odm
 **`recipe_box_value` (D-128)** je tretia vetva tej istej reťaze: brány `lock_item?` + `recipe_rule?`, na **Atire odmietnutie** („tento systém má výškové varianty — použi výšku H"),
 tvar hodnoty **strict** (`Float(raw, exception: false)` + `finite?` + `> 0`, takže „Infinity" ani `1e309` neprejdú) a rozsah proti **čerstvému** `ctx` cez `Recipes.box_range`
 (hláška menuje `min–max` aj automat). Neurčiteľný kontext = **odmietnutie**, nikdy odhad („Rozmery zásuvky sa nepodarilo prečítať — výška boxu sa uložiť nedá."). Preto
-`recipe_lock_context` od D-128 číta `drawer_axis_ctx` pre **všetky** systémy, nie len pre Atiru — rozsah boxu stojí na svetlej výške **a** na hrúbke dna.
+`recipe_lock_context` od D-128 číta `drawer_axis_ctx` pre **všetky** systémy, nie len pre Atiru — rozsah boxu stojí na svetlej výške **a** na hrúbke dna. Hodnota sa navyše
+**zaokrúhli na 0,1 mm** (a rozsah sa overuje až potom), aby panel ukazoval presne to, čo je uložené — detail a dôvod v [hardware.md](hardware.md).
 **Odomknutie osi** je `field` + `value: null`: `merge_override` zmaže **jedno** pole a druhý zámok tej istej identity prežije; záznam zaniká až prázdny. Reset **celého**
 záznamu (`reset: true`) ostáva pre `disabled`/`quantity` a pre osirotené zásahy.
 

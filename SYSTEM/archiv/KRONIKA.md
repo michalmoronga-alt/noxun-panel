@@ -34,8 +34,13 @@
   perzistentný kontrakt mimo rozsahu. Zvyšok auditu je zapracovaný celý: prísny klientsky parser (`1e309` ani `300,5xx` neprejdú), skutočná hrúbka dna v rozsahu, prázdny
   rozsah bez poľa aj bez návrhu, karta pri aktívnom zámku netvrdí vzorec a veta „ručne zamknuté" menuje osi. Dormantný zámok po prepnutí classic ↔ tipon je **existujúca
   medzera KOV-D4** (platí pre všetky tri osi) — zaregistrovaný ako **D-132**, nie riešený tu.
-  **Testy:** 4027 headless · 116 JS sád · **2658 in-SketchUp PASS / 0 FAIL** (26 kontrol novej sekcie `run_d128`: model, kusovník, Späť/Redo, kópia, RED po zmenšení zóny,
-  náhrada, odomknutie); 8 overených mutácií. **Codex review:** doplní orchestrátor po review.
+  **Testy:** 4029 headless · 116 JS sád · **2658 in-SketchUp PASS / 0 FAIL** (26 kontrol novej sekcie `run_d128`: model, kusovník, Späť/Redo, kópia, RED po zmenšení zóny,
+  náhrada, odomknutie); 12 overených mutácií.
+  **Review (kolo 1, 2× P2 od Codexu + 5× P3 od slepého Opusa) pridalo dve pravidlá presnosti a jeden zámok odoslania:** zápis **zaokrúhľuje na 0,1 mm** a `box_range` vracia
+  hranice **na tej istej mriežke** (`min` nahor, `max` nadol) — panel formátuje výšku na desatinu, takže bez toho by zámok 300,04 znel „box 300", ale rezal by sa na 300,04,
+  a hranica 360,25 by sa ukázala ako 360,3, ktorú by server odmietol; **automatická** výška boxu ostáva presná, zaokrúhľuje sa výhradne zámok. Pole má navyše **dva
+  spúšťače** (Enter aj blur) a odpoveď prichádza až prekreslením — po odoslaní sa preto zamkne (`data-sent`), a klik na iný ovládač toho istého radu blur poľa umlčí
+  (`data-skipblur` z `onmousedown` na obale): jedna editácia = **jeden** krok Späť. **Codex review:** doplní orchestrátor po review.
 - **D-94 — POTVRDENÝ POUŽÍVATEĽSKÝ SMOKE + NOVÉ POSTREHY (12.9.2026 večer, docs PR #362).**
   Michal po aktualizácii pluginu na v0.12.1 potvrdil smoke D-94 „Nákup s pôvodom": **PASS** („všetko funguje super"). Z toho istého sedenia vzišli tri postrehy:
   **D-128** výška dreveného boxu zásuvky (Quadro) sa zobrazuje len na čítanie v riadku Zásuvka a nemá ovládač (objaviteľnosť + kandidát na zámok, vzor D-93) ·

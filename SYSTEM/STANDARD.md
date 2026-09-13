@@ -565,6 +565,10 @@ Nákup si k nej hľadá set **triednym kľúčom** a na generický `slide` **nik
   variant). Platný rozsah je **`min ≤ zámok ≤ max`, inkluzívne a bez EPS**, kde `max` = **automat** (svetlá výška − `box_clearance`; **nad automat sa zamknúť nedá**) a
   `min` = `min_front_back_height` + **skutočná** hrúbka dna + `bottom_offset` (16 vs 18 mm dna = min 58 vs 60). Rozsah drží **jediná** funkcia `Recipes.box_range` — čítajú ju
   resolver, payload osi aj zápisová akcia. Mimo rozsahu = RED **`box_lock_invalid`** bez dielcov aj výsuvu.
+  **Mriežka 0,1 mm:** zápisová cesta prijatú hodnotu **zaokrúhľuje na 0,1 mm** (rozsah sa overuje až po zaokrúhlení), lebo panel ju tak aj zobrazuje — v modeli je vždy presne
+  to, čo je na obrazovke. Z toho istého dôvodu `box_range` vracia hranice **na tej mriežke** (`min` nahor, `max` nadol): obe sa dajú zadať, zobraziť aj uložiť. Zaokrúhľuje sa
+  **len zámok a jeho rozsah** — **automatická** výška boxu ostáva presná (`clear_height − box_clearance`), inak by sa ticho zmenila geometria zákaziek bez zámku.
+  Normalizácia uložený tvar **nemení** (je to čítač, nie druhý zaokrúhľovač).
 
 Zámok = **existencia platného poľa**; `disabled: true` zámok nenesie. Obe brány (`generic_type` aj `rule_id`) platia **na oboch koncoch**: normalizácia pole zahodí s logom
 a zápisová akcia ho odmietne s hláškou — inak by v configu ostal **mŕtvy zámok**, ktorý čítač (hľadá výhradne `slide`) nikdy neprečíta. Poradie resolvera je záväzné, lebo

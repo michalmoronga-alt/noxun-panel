@@ -1381,6 +1381,12 @@ nad automat sa zamknúť **nedá** — box väčší než zóna neexistuje), `mi
 **nedá** (Atira, chýbajúca hrúbka dna) a volajúci to musí priznať; **`min > max`** (veľmi nízka zóna) je platný výsledok „zamknúť sa nedá nič" — payload vtedy dá
 `min`/`max`/`proposal` = `nil` a chip nemá čo ponúknuť. Bez zámku je taká zásuvka `drawer_no_fit` ako doteraz.
 
+**MRIEŽKA 0,1 mm (Codex #364 kolo 1 P2 + slepý Opus review).** Zápisová cesta (`Panel.recipe_box_value`) prijatú hodnotu **zaokrúhli na 0,1 mm** a rozsah overuje **až potom** —
+panel formátuje výšku cez `hwNlFmt` (do 0,05 od celého čísla ukáže celé číslo), takže bez toho by zámok 300,04 znel „box 300", ale dielce by sa rezali na 300,04. Z rovnakého
+dôvodu vracia `box_range` hranice **na tej mriežke**: `min` zaokrúhlený **nahor** (`step_up`), `max` **nadol** (`step_down`) — surový `max` 360,25 by sa v paneli ukázal ako
+360,3 a server by ho vzápätí odmietol. Zaokrúhľuje sa **výhradne zámok a jeho rozsah**; **automatická** výška boxu ostáva presná (`clear_height − box_clearance`), inak by sa
+ticho zmenila geometria zákaziek bez zámku. Normalizácia uložený tvar **nemení** — je to čítač, nie druhý zaokrúhľovač.
+
 Dôvod, prečo zámok neplatí, skladá **jediná** funkcia per os — `height_lock_problem`, **`box_lock_problem`** a `nl_lock_problem`. Číta ich `resolve` (RED nález) **aj** payload osí (hláška chipu),
 takže sa nemôžu rozísť; payload ich potrebuje preto, že zásuvka môže mať **skoršie** zlyhanie resolvera (prekážka, hrúbka, KD) a uložené `drawer_conflicts` o zámku vtedy
 nevedia vôbec. Opačné poradie krokov by pri zmene výšky ticho posunulo NL. Vety `explain` znejú „Výška: H144 (ručný zámok)" / „NL: 470 (ručný zámok)". Emitovaná položka výsuvu **ostáva

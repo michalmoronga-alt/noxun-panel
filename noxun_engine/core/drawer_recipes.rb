@@ -810,6 +810,12 @@ module Noxun
 
           return ["Výška boxu #{fmt(bh)} mm (ručný zámok)"]
         end
+        # KONFLIKT je dnes NEDOSIAHNUTELNY beznou cestou (neplatny zamok je
+        # fail-closed, takze polozka vysuvu — a s nou `params` — vobec
+        # nevznikne). Vetva tu je zamerne: `explain_stored` je CISTA funkcia
+        # nad ULOZENYM stavom a ten smie prist aj zo starsieho .skp alebo
+        # z inej cesty (dopad upgradu, diagnostika). Tichy pad na vetu so
+        # vzorcom by v takom pripade KLAMAL — radsej sa dovod prizna.
         if state == 'conflict'
           why = box['message'].to_s
           return ["Výška boxu #{fmt(bh)} mm (ručný zámok NEPLATÍ#{why.empty? ? '' : " — #{why}"})"]
@@ -974,6 +980,17 @@ module Noxun
       # svetla vyska) a volajuci to musi priznat, nikdy nahradit odhadom.
       # POZOR: `min > max` je platny vysledok (velmi nizka zona) — znamena
       # „zamknut sa neda nic", a rozhoduje o tom volajuci.
+      #
+      # HRANICE SA ZAOKRUHLUJU NA MRIEZKU ZAMKU (0,1 mm; slepy Opus review #364):
+      # zapisova cesta hodnotu zaokruhluje na desatinu a panel ju tak aj
+      # zobrazuje, takze SUROVA hranica (napr. max 360,25) by sa ukazala ako
+      # 360,3 — a to by uz server odmietol. `min` sa preto zaokruhluje NAHOR
+      # a `max` NADOL: obe hranice sa daju zadat, zobrazit AJ uspesne ulozit.
+      # Tyka sa to VYHRADNE rozsahu ZAMKU — AUTOMATICKA vyska boxu ostava
+      # presna (`clear_height - box_clearance`), inak by sa mlcky zmenila
+      # geometria zakaziek bez zamku.
+      BOX_STEP = 0.1
+
       def box_range(recipe, clear_h, part_thicknesses)
         return nil if atira?(recipe)
 
@@ -984,8 +1001,18 @@ module Noxun
         return nil unless h.finite?
 
         c = recipe[:constants]
-        { min: c[:min_front_back_height].to_f + t_bottom + c[:bottom_offset].to_f,
-          max: h - c[:box_clearance].to_f }
+        { min: step_up(c[:min_front_back_height].to_f + t_bottom + c[:bottom_offset].to_f),
+          max: step_down(h - c[:box_clearance].to_f) }
+      end
+
+      # Zaokruhlenie na mriezku zamku. `round(1)` PRED `ceil`/`floor` zmaze
+      # binarnu nepresnost Floatu (58,00000000000001 by inak vyskocilo na 58,1).
+      def step_up(v)
+        ((v / BOX_STEP).round(6).ceil * BOX_STEP).round(1)
+      end
+
+      def step_down(v)
+        ((v / BOX_STEP).round(6).floor * BOX_STEP).round(1)
       end
 
       # Preco zamknuta vyska boxu neplati (alebo nil, ked plati). JEDINA veta

@@ -1127,9 +1127,14 @@
       notes += hwAxNoteHtml(d.key, a);
     });
     if (!chips) return '';
+    // `onmousedown` na OBALE (D-128, slepy Opus review #364): klik na chip,
+    // ponuku alebo tlacidlo v tom istom rade najprv vyvola BLUR ciselneho pola
+    // a az potom vlastnu akciu — bez priznaku by prepisane pole zapisalo svoju
+    // hodnotu a klik hned nato druhu, teda DVA kroky Spat za jedno rozhodnutie.
     return '<div class="hwax" data-owner="'+esc(id.owner_part_key||'')+'"'
          + ' data-type="'+esc(id.generic_type||'')+'" data-rule="'+esc(id.rule_id||'')+'"'
-         + ' data-cab="'+esc(id.cabinet_id||'')+'">'
+         + ' data-cab="'+esc(id.cabinet_id||'')+'"'
+         + ' onmousedown="onHwAxDown(this, event &amp;&amp; event.target)">'
          + '<div class="axchips">'+chips+'</div>'+notes+'</div>';
   }
   function hwAxChipHtml(kind, ax){
@@ -1198,7 +1203,11 @@
          + ' placeholder="' + esc(rng) + '"'
          + ' aria-label="Výška boxu v mm (' + esc(rng) + ')"'
          + ' title="' + esc('Zamknúť inú výšku boxu (' + rng + ' mm, automat ' + hwNlFmt(hi) + ')') + '"'
-         + ' onkeydown="onHwAxNumKey(event, this)" onblur="onHwAxNum(this)">';
+         // `oninput` cisti priznak „preskoc blur": ked klik do rade blur
+         // nevyvolal (pole nebolo zaostrene), priznak by inak visel a zjedol
+         // by az NASLEDUJUCI, uz opravneny blur.
+         + ' oninput="this.removeAttribute(\'data-skipblur\')"'
+         + ' onkeydown="onHwAxNumKey(event, this)" onblur="onHwAxNum(this, true)">';
   }
   // CERVENY riadok konfliktu (veta je SERVEROVA — panel ziadnu vlastnu
   // neskladá) + cesty von: nahrada LEN ked server navrh naozaj dal
@@ -1278,18 +1287,49 @@
   // NIKDY nevznikne — odomyka sa vyhradne chipom alebo tlacidlom „Odomknúť".
   // Rovnako sa neodosiela hodnota, ktora sa od vykreslenia NEZMENILA (blur po
   // kliknuti vedla by inak zapisoval to iste znova).
-  function onHwAxNum(input){
+  //
+  // ZAMOK ODOSLANIA (Codex #364 kolo 1 P2). Pole ma DVA spustace — Enter aj
+  // blur — a odpoved servera prichadza az prekreslenim panela. Bez zamku by
+  // „Enter a hned klik vedla" (alebo dva Entery za sebou) poslali TU ISTU
+  // hodnotu dvakrat: dva `CabinetBuilder.rebuild`, teda DVA kroky Spat za
+  // JEDNU editaciu. Po odoslani sa preto pole oznaci `data-sent` a zamkne
+  // (`disabled`); stav sa NEODOMYKA rucne — echo servera kresli markup nanovo
+  // a nove pole je cisté. Vzor je zamok modalu nahrady (`HW_AX_MODAL.sent`).
+  function onHwAxNum(input, from_blur){
+    if (input.getAttribute('data-sent') != null) return false;
+    // Blur, ktory sposobil klik na iny ovladac TOHO ISTEHO radu, sa preskocí —
+    // rozhodnutie patri tomu kliku (chip, ponuka, „Nahradiť", „Odomknúť").
+    if (from_blur && input.getAttribute('data-skipblur') != null){
+      input.removeAttribute('data-skipblur');
+      return false;
+    }
+
     var raw = String(input.value == null ? '' : input.value).trim();
     if (raw === '') return false;
     if (raw === String(input.getAttribute('data-init') || '')) return false;
     var v = hwAxNum(raw);
     if (v == null){ NX.setStatus(HW_AX_BADNUM, true); return false; }
-    return hwAxSend(input, input.getAttribute('data-ax') || 'box', v);
+    if (!hwAxSend(input, input.getAttribute('data-ax') || 'box', v)) return false;
+
+    input.setAttribute('data-sent', raw);
+    input.setAttribute('disabled', 'disabled');
+    input.disabled = true;
+    return true;
   }
   function onHwAxNumKey(ev, input){
     if (!ev || ev.key !== 'Enter') return false;
     if (typeof ev.preventDefault === 'function') ev.preventDefault();
     return onHwAxNum(input);
+  }
+  // Klik do radu chipov: oznac pole, aby jeho blur NEZAPISOVAL (rozhodnutie
+  // patri kliknutemu ovladacu). Klik do SAMOTNEHO pola blur nevyvola, takze
+  // priznak nenasadzuje — inak by zjedol az nasledujuci opravneny blur.
+  function onHwAxDown(box, target){
+    var f = (box && box.querySelector) ? box.querySelector('.axnum') : null;
+    if (!f || f === target) return false;
+
+    f.setAttribute('data-skipblur', '1');
+    return true;
   }
 
   // ---- KOV-D2b: NAHRADA = D-15 POTVRDENIE SO ZAMKOM ODOSIELANIA -----------
@@ -1577,6 +1617,9 @@
   function hwUpLockLabel(l){
     if (!l || l.value == null) return '';
     if (l.axis === 'height') return 'výška H' + String(l.value);
+    // D-128: vyska boxu je mm Float — bez vlastnej vetvy by fallback nizsie
+    // vypisal surove „box 300.5" s desatinnou BODKOU (a s nazvom osi z kluca).
+    if (l.axis === 'box') return 'box ' + hwNlFmt(l.value);
     if (l.axis === 'nl') return 'NL ' + String(l.value);
     return String(l.axis) + ' ' + String(l.value);
   }
@@ -2423,6 +2466,7 @@
       // D-128 os `box` — pole `.axnum` (tests/js/test_d128_ui.js)
       HW_AX_BADNUM: HW_AX_BADNUM, hwAxBare: hwAxBare, hwAxNum: hwAxNum,
       hwAxNumHtml: hwAxNumHtml, onHwAxNum: onHwAxNum, onHwAxNumKey: onHwAxNumKey,
+      onHwAxDown: onHwAxDown,
       hwAxModalState: function(){ return HW_AX_MODAL; },
       // KOV-D3b prechod na novsiu verziu receptu (tests/js/test_kovd3b_ui.js) —
       // markup ponuky + CELY tok cez mini-DOM (klik -> dopad -> potvrdenie ->

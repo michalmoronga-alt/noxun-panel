@@ -36,6 +36,13 @@
 #      -> „D-128 (A6): prazdny rozsah nedava ani pole, ani navrh nahrady"
 #   M8 `locked_note` pise „Dĺžka výsuvu" pri samotnom zamku boxu
 #      -> „D-128 (A7): veta „ručne zamknuté" MENUJE prave zamknute osi"
+# Codex #364 kolo 1 (P2):
+#   M9  JS neoznaci pole ako odoslane (tests/js/test_d128_ui.js)
+#       -> „D-128 (P2): Enter dvakrat + blur = JEDEN zapis"
+#   M10 zapisova cesta hodnotu NEZAOKRUHLI (`mm.round(1)` vypadne)
+#       -> „D-128 (P2): zapis zaokruhli na 0,1 mm — panel ukazuje, co je ulozene"
+#   M12 `box_range` vrati SUROVE hranice (bez mriezky 0,1)
+#       -> „D-128 (P3): hranice rozsahu lezia na mriezke 0,1 mm"
 require_relative '../helper' unless defined?(NxTest)
 
 # Panelove akcie nie su v require zozname helpera (vzor KOV-D2a).
@@ -478,11 +485,12 @@ NxTest.test('D-128 (R6): zapis v rozsahu prejde, nad automatom sa odmietne s roz
   NxTest.assert(bad.to_s.include?('360'), bad.to_s)
   NxTest.assert(bad.to_s.include?('automat'), bad.to_s)
 
-  # Hranice INKLUZIVNE aj na zapisovej ceste.
+  # Hranice INKLUZIVNE aj na zapisovej ceste. Meria sa na mriezke 0,1 mm —
+  # jemnejsi rozdiel zapisova cesta zaokruhli (Codex #364 kolo 1 P2, test nizsie).
   NxTest.assert_equal(nil, c.write_value(cfg, 'box_height', 360.0)[2])
-  NxTest.assert(c.write_value(cfg, 'box_height', 360.01)[2].to_s.length.positive?)
+  NxTest.assert(c.write_value(cfg, 'box_height', 360.1)[2].to_s.length.positive?)
   NxTest.assert_equal(nil, c.write_value(cfg, 'box_height', 58.0)[2])
-  NxTest.assert(c.write_value(cfg, 'box_height', 57.99)[2].to_s.length.positive?)
+  NxTest.assert(c.write_value(cfg, 'box_height', 57.9)[2].to_s.length.positive?)
 end
 
 NxTest.test('D-128 (R6): zapis odmietne ATIRU, cudzi `generic_type` aj nereceptove pravidlo') do
@@ -514,6 +522,61 @@ NxTest.test('D-128 (R6): tvar hodnoty je PRISNY — Infinity, 1e309 ani text nep
   end
   # `1e309` ako JSON cislo je uz Infinity — musi padnut rovnako.
   NxTest.assert_equal(Float::INFINITY, JSON.parse('{"v":1e309}')['v'])
+end
+
+NxTest.test('D-128 (P3): hranice rozsahu lezia na mriezke 0,1 mm') do
+  c = NxD128
+  # Svetla 400,25 -> surovy automat 360,25. Zapis zaokruhluje na desatinu,
+  # takze surova hranica by sa v paneli ukazala ako 360,3 — a tu by server
+  # odmietol. `max` sa preto zaokruhluje NADOL, `min` NAHOR.
+  rng = c.r.box_range(c.rec, 400.25, c.th(16.0))
+  NxTest.assert_close(360.2, rng[:max], 0.0001, 'max NADOL na mriezku')
+  NxTest.assert_close(58.0, rng[:min], 0.0001, 'min uz na mriezke lezi')
+  # Dno 16,04 -> surove min 58,04 -> NAHOR na 58,1 (zapis 58,0 by resolver odmietol).
+  NxTest.assert_close(58.1, c.r.box_range(c.rec, 400.0, c.th(16.04))[:min], 0.0001,
+                      'min NAHOR na mriezku')
+  # Presne na mriezke sa nic neposuva.
+  NxTest.assert_close(360.0, c.r.box_range(c.rec, 400.0, c.th(16.0))[:max], 0.0001)
+  NxTest.assert_close(360.1, c.r.box_range(c.rec, 400.1, c.th(16.0))[:max], 0.0001)
+
+  # AUTOMAT (bez zamku) ostava PRESNY — zaokruhluje sa LEN rozsah zamku,
+  # inak by sa mlcky zmenila geometria zakaziek bez zamku.
+  auto = c.r.resolve(c.rec, c.ctx(clear_height: 400.25), c.th, [])
+  NxTest.assert_close(360.25, auto[:box_height], 0.0001, 'automat sa NEZAOKRUHLUJE')
+
+  # Obe hranice mriezky sa daju ZAMKNUT, o desatinu vyssie uz nie.
+  ok_lock = c.r.resolve(c.rec, c.ctx(clear_height: 400.25), c.th, c.ov('box_height' => 360.2))
+  NxTest.assert_equal([], c.codes(ok_lock))
+  bad_lock = c.r.resolve(c.rec, c.ctx(clear_height: 400.25), c.th, c.ov('box_height' => 360.3))
+  NxTest.assert_equal(['box_lock_invalid'], c.codes(bad_lock))
+  NxTest.assert(bad_lock[:conflicts].first[:message].include?('360,2'),
+                "hlaska menuje hranicu z mriezky: #{bad_lock[:conflicts].first[:message]}")
+end
+
+NxTest.test('D-128 (P2): zapis zaokruhli na 0,1 mm — panel ukazuje, co je ulozene') do
+  c = NxD128
+  cfg = c.cfg_for(c.params)
+  # Panel formatuje vysku cez `hwNlFmt`: do 0,05 od celeho cisla ukaze CELE
+  # cislo. Bez zaokruhlenia by zamok 300,04 znel „box 300", ale dielce by sa
+  # rezali na 300,04 — UI a vyroba by sa rozisli.
+  NxTest.assert_close(300.0, c.write_value(cfg, 'box_height', 300.04)[1], 0.0001,
+                      '300,04 -> 300,0 (panel aj tak ukaze „box 300")')
+  NxTest.assert_close(300.1, c.write_value(cfg, 'box_height', 300.06)[1], 0.0001,
+                      '300,06 -> 300,1 (panel ukaze „box 300,1")')
+  NxTest.assert_close(300.5, c.write_value(cfg, 'box_height', 300.5)[1], 0.0001,
+                      'desatina sa NEZAHADZUJE')
+  NxTest.assert_close(300.0, c.write_value(cfg, 'box_height', '300,04'.tr(',', '.'))[1], 0.0001,
+                      'to iste pri textovom vstupe')
+  # Rozsah sa overuje AZ PO zaokruhleni — hodnota tesne nad automatom, ktora
+  # sa na automat zaokruhli, prejde a ulozi sa PRESNE automat.
+  NxTest.assert_equal(nil, c.write_value(cfg, 'box_height', 360.04)[2])
+  NxTest.assert_close(360.0, c.write_value(cfg, 'box_height', 360.04)[1], 0.0001)
+  NxTest.assert(c.write_value(cfg, 'box_height', 360.06)[2].to_s.include?('58'),
+                'a co sa zaokruhli NAD automat, to padne')
+  # Zaokruhluje LEN zapis — normalizacia ulozeny tvar nemeni.
+  NxTest.assert_close(300.04, c.cb.norm_hardware_overrides(c.ov('box_height' => 300.04))
+                                 .first['box_height'], 0.0001,
+                      'normalizacia je citac, nie druhy zaokruhlovac')
 end
 
 NxTest.test('D-128 (R6): odomknutie osi boxu necha NL zamok zit') do

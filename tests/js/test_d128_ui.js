@@ -23,6 +23,11 @@
 //      -> „D-128: os v KONFLIKTE nema pole — len náhradu a odomknutie"
 //   M8 pole sa kresli aj pri PRAZDNOM rozsahu (`max < min`)
 //      -> „D-128: prazdny alebo neurcitelny rozsah pole NEKRESLI"
+// Codex #364 kolo 1 (P2) a slepy Opus review:
+//   M9  `onHwAxNum` neoznaci pole ako odoslane (chyba zamok `data-sent`)
+//       -> „D-128 (P2): Enter dvakrat + blur = JEDEN zapis"
+//   M11 `onHwAxDown` nenastavi „preskoc blur"
+//       -> „D-128 (P3): prepisane pole + klik na chip = JEDEN zapis"
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
@@ -190,16 +195,19 @@ eq(last().cabinet_id, 'CAB-1', 'guard F6 plati aj pre pole');
 ok(String(last().value) !== '360', 'hodnota chipu (360) sa neposlala');
 
 // Desatinna ciarka je slovenska realita — server dostane bodkove cislo.
+// KAZDY pripad ide cez CERSTVE pole: po odoslani sa pole zamyka (P2 nizsie).
 SENT.length = 0;
-inp.value = '300,5';
-ok(HW.onHwAxNum(inp));
+const inpDec = numOf(render(AUTO));
+inpDec.value = '300,5';
+ok(HW.onHwAxNum(inpDec));
 eq(last().value, 300.5);
 
 // Neplatny text sa NEODOSIELA a povie sa to.
 SENT.length = 0;
 STATUS.length = 0;
-inp.value = '1e309';
-eq(HW.onHwAxNum(inp), false, 'overflow sa neodosle');
+const inpBad = numOf(render(AUTO));
+inpBad.value = '1e309';
+eq(HW.onHwAxNum(inpBad), false, 'overflow sa neodosle');
 eq(SENT.length, 0);
 eq(STATUS[STATUS.length - 1].msg, HW.HW_AX_BADNUM);
 ok(STATUS[STATUS.length - 1].err, 'je to chyba, nie informacia');
@@ -207,8 +215,9 @@ ok(STATUS[STATUS.length - 1].err, 'je to chyba, nie informacia');
 // Prazdne pole = NIC (odomyka sa chipom alebo tlacidlom).
 SENT.length = 0;
 STATUS.length = 0;
-inp.value = '';
-eq(HW.onHwAxNum(inp), false, 'prazdne pole sa neodosiela');
+const inpEmpty = numOf(render(AUTO));
+inpEmpty.value = '';
+eq(HW.onHwAxNum(inpEmpty), false, 'prazdne pole sa neodosiela');
 eq(SENT.length, 0, 'z pola NIKDY nevznikne odomknutie (`value: null`)');
 eq(STATUS.length, 0, 'a ani hlaska — nie je to chyba');
 
@@ -252,6 +261,103 @@ STATUS.length = 0;
 HW.onHwAxChip(chipOf(render(NORANGE), 'box'));
 eq(SENT.length, 0, 'bez hodnoty sa nic neodosle');
 eq(STATUS[STATUS.length - 1].msg, HW.HW_AX_NOVAL);
+
+// ===========================================================================
+// C2) ZAMOK ODOSLANIA (Codex #364 kolo 1 P2)
+// ===========================================================================
+//
+// Pole ma DVA spustace (Enter aj blur) a odpoved servera prichadza az
+// prekreslenim panela. Bez zamku by „Enter a hned klik vedla" poslali TU ISTU
+// hodnotu dvakrat = dva rebuildy = DVA kroky Spat za jednu editaciu.
+
+SENT.length = 0;
+STATUS.length = 0;
+const busy = render(AUTO);
+const bi = numOf(busy);
+bi.value = '300';
+ok(HW.onHwAxNumKey({ key: 'Enter', preventDefault: function(){} }, bi), 'prvy Enter zapise');
+eq(SENT.length, 1);
+eq(bi.getAttribute('data-sent'), '300', 'pole si pamata, ze uz odoslalo');
+eq(bi.getAttribute('disabled'), 'disabled', 'a je zamknute, kym nepride echo');
+eq(HW.onHwAxNumKey({ key: 'Enter', preventDefault: function(){} }, bi), false, 'druhy Enter uz nie');
+eq(HW.onHwAxNum(bi), false, 'ani blur hned po nom');
+eq(SENT.length, 1, 'D-128 (P2): Enter dvakrat + blur = JEDEN zapis');
+// Ani ZMENA hodnoty v zamknutom poli neprepasuje druhy zapis — echo servera
+// pole aj tak prekresli.
+bi.value = '250';
+eq(HW.onHwAxNum(bi), false, 'zmena v uz odoslanom poli tiez nezapisuje');
+eq(SENT.length, 1);
+// PREKRESLENIE (echo servera) da CISTE pole a dalsia editacia zase zapise.
+SENT.length = 0;
+const after = render(LOCKED);
+const ai = numOf(after);
+eq(ai.getAttribute('data-sent'), null, 'nove pole zo servera zamok nenesie');
+eq(ai.getAttribute('disabled'), null, 'a je odomknute');
+ai.value = '250';
+ok(HW.onHwAxNum(ai), 'po echu sa da zapisat znova');
+eq(SENT.length, 1);
+eq(last().value, 250);
+// NEPLATNY vstup zamok NENASADI (pouzivatel musi mat sancu opravit preklep).
+SENT.length = 0;
+STATUS.length = 0;
+const badinp = numOf(render(AUTO));
+badinp.value = 'abc';
+eq(HW.onHwAxNum(badinp), false);
+eq(badinp.getAttribute('data-sent'), null, 'po odmietnutom vstupe pole ostava editovatelne');
+eq(badinp.getAttribute('disabled'), null);
+badinp.value = '300';
+ok(HW.onHwAxNum(badinp), 'a opravena hodnota sa uz odosle');
+eq(SENT.length, 1);
+
+// ===========================================================================
+// C3) KLIK V RADE CHIPOV NEZAPISUJE DVAKRAT (slepy Opus review #364)
+// ===========================================================================
+//
+// Prepises pole a klikneš na chip: prehliadac najprv posle BLUR pola a az
+// potom klik. Bez priznaku by sa zapisala hodnota z pola A hned nato
+// odomknutie z chipu — dva rebuildy, dva kroky Spat za jedno rozhodnutie.
+
+SENT.length = 0;
+const rowb = render(LOCKED);
+const rf = numOf(rowb);
+const rchip = chipOf(rowb, 'box');
+rf.value = '250';
+ok(HW.onHwAxDown(rowb, rchip), 'mousedown na chipe oznaci pole');
+eq(rf.getAttribute('data-skipblur'), '1');
+eq(HW.onHwAxNum(rf, true), false, 'blur z tohto kliku NEZAPISUJE');
+eq(rf.getAttribute('data-skipblur'), null, 'priznak sa spotrebuje');
+HW.onHwAxChip(rchip);
+eq(SENT.length, 1, 'D-128 (P3): prepisane pole + klik na chip = JEDEN zapis');
+eq(last().value, null, 'a je to rozhodnutie CHIPU (odomknutie), nie pola');
+
+// ENTER sa priznakom nedotkne — je to vlastne rozhodnutie pola.
+SENT.length = 0;
+const kb = render(AUTO);
+const kf = numOf(kb);
+kf.setAttribute('data-skipblur', '1');
+kf.value = '300';
+ok(HW.onHwAxNumKey({ key: 'Enter', preventDefault: function(){} }, kf), 'Enter zapisuje vzdy');
+eq(last().value, 300);
+
+// Klik do SAMOTNEHO pola priznak nenasadzuje (blur sa nekona a visel by).
+const sb = render(AUTO);
+const sf = numOf(sb);
+eq(HW.onHwAxDown(sb, sf), false, 'klik do pola nie je klik na iny ovladac');
+eq(sf.getAttribute('data-skipblur'), null);
+
+// Rad BEZ pola (Atira) sa mousedownom nerozbije.
+eq(HW.onHwAxDown(render(ATIRA), null), false, 'rad bez `.axnum` nema co oznacit');
+
+// ===========================================================================
+// C4) TABULKA DOPADU UPGRADU MENUJE OS `box` PO SLOVENSKY
+// ===========================================================================
+
+eq(HW.hwUpLockLabel({ axis: 'box', value: 300.5 }), 'box 300,5',
+   'desatinna CIARKA, nie surove „box 300.5"');
+eq(HW.hwUpLockLabel({ axis: 'box', value: 300 }), 'box 300');
+eq(HW.hwUpLockLabel({ axis: 'height', value: 144 }), 'výška H144', 'starsie osi sa NEMENIA');
+eq(HW.hwUpLockLabel({ axis: 'nl', value: 470 }), 'NL 470');
+eq(HW.hwUpLockLabel({ axis: 'box', value: null }), '', 'bez hodnoty ziadny popisok');
 
 // ===========================================================================
 // D) OBNOVA FOKUSU V KARTE CELA

@@ -151,8 +151,12 @@ v objednávke**. Odomknutie maže **len toto pole**: zámok NL tej istej zásuvk
 - **Dormantný zámok po prepnutí classic ↔ tipon** ostáva neviditeľný — existujúca medzera KOV-D4, ktorá platí rovnako pre všetky tri osi. D-128 ju nerozširuje ani
   nezužuje; zaregistrovaná ako **D-132**.
 
-**Testy:** `tests/pure/test_d128_box_zamok.rb` (33 testov), `tests/js/test_d128_ui.js` (94 kontrol), in-SketchUp sekcia `run_d128` (model, kusovník, Späť/Redo, kópia,
-RED po zmenšení zóny, náhrada, odomknutie). Osem overených mutácií je v hlavičkách oboch sád.
+**Presnosť a jedna editácia = jeden krok Späť (review kolo 1).** Zápis **zaokrúhľuje na 0,1 mm** a `box_range` vracia hranice na tej istej mriežke (`min` nahor, `max` nadol),
+takže panel ukazuje presne to, čo je uložené, a obe hranice sa dajú aj zadať; **automatická** výška boxu ostáva presná. Číselné pole má dva spúšťače (Enter aj blur), preto sa
+po odoslaní zamkne a klik na iný ovládač toho istého radu jeho blur umlčí — jedna editácia je vždy **jeden** krok Späť.
+
+**Testy:** `tests/pure/test_d128_box_zamok.rb` (35 testov), `tests/js/test_d128_ui.js` (129 kontrol), in-SketchUp sekcia `run_d128` (model, kusovník, Späť/Redo, kópia,
+RED po zmenšení zóny, náhrada, odomknutie). Dvanásť overených mutácií je v hlavičkách oboch sád.
 
 **Pôvodný plný text pri uzávere:**
 

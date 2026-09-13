@@ -367,6 +367,14 @@ module Noxun
         # Tvar hodnoty je STRICT (Astra BLOCKER 3): `Float(raw, exception: false)`
         # + `finite?` + `> 0`, takze „Infinity", „1e309" ani text neprejdu.
         # `value: null` (odomknutie) sem NECHODI — riesi ho `override_change`.
+        #
+        # ZAOKRUHLENIE NA 0,1 mm (Codex #364 kolo 1 P2): panel formatuje vysku
+        # cez `hwNlFmt` (do 0,05 od celeho cisla ukaze cele cislo), takze zamok
+        # 300,04 by na obrazovke znel „box 300", ale dielce by sa rezali na
+        # 300,04. Zapisova cesta preto hodnotu ZAOKRUHLI a rozsah overuje AZ
+        # POTOM — v modeli je vzdy presne to, co panel ukazuje. Normalizacia
+        # ulozeny tvar NEMENI (len cita); zaokruhluje sa jedine tu, pri zapise.
+        BOX_ROUND = 1
         BOX_NO_CTX = 'Rozmery zásuvky sa nepodarilo prečítať — výška boxu sa uložiť nedá.'
 
         def recipe_box_value(cab, owner, gt, rid, raw)
@@ -376,6 +384,9 @@ module Noxun
 
           mm = Recipes.nl_value(raw.is_a?(String) ? Float(raw, exception: false) : raw)
           return [nil, nil, 'Neplatná výška boxu — zadaj číslo v mm.'] if mm.nil?
+
+          mm = mm.round(BOX_ROUND)
+          return [nil, nil, 'Neplatná výška boxu — zadaj číslo v mm.'] unless mm.positive?
 
           info, err = recipe_lock_context(cab, owner, rid)
           return [nil, nil, err] if err

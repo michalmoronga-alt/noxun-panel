@@ -18,7 +18,7 @@ nálezy z výroby a chyby v cenách majú **najvyššiu prioritu** ([PLAN.md](PL
 **Kompatibilita:** konfigurácia skrinky je od D-128 v **schéme 14** (ručná výška boxu zásuvky), výrobný plán v schéme 5. Nový voliteľný vzhľad používa katalógovú schému 10 až pri prvom uložení; staré katalógy sa otvorením nemenia. Plugin podporujúci schému nižšiu než 14 nové konfigurácie neprestaví ani nepoužije ako šablónu.
 Pred prvou takou zákazkou aktualizovať **obe PC** (Štúdio → O plugine → Aktualizovať).
 
-**D-128 (najnovšie):** **4027 headless · 116 JS sád · 2658 in-SketchUp PASS / 0 FAIL** (26 kontrol sekcie `run_d128`: model, kusovník, Späť/Redo, kópia, RED po zmenšení zóny, náhrada).
+**D-128 (najnovšie):** **4029 headless · 116 JS sád · 2658 in-SketchUp PASS / 0 FAIL** (26 kontrol sekcie `run_d128`: model, kusovník, Späť/Redo, kópia, RED po zmenšení zóny, náhrada).
 **D-94:** 3993 headless · 115 JS sád · 2632 in-SketchUp PASS / 0 FAIL (26 kontrol `run_d94`). **Uzáver Čiel:** 3830 headless · 113 JS sád, skutočný Inspector pri 470 px.
 **M-R:** 3983 headless · 114 JS sád · 2606 in-SketchUp PASS / 0 FAIL; skutočné CEF Štúdia **18 PASS**, controller → uloženie/otvorenie bez SKM → prestavba → výroba **50 PASS**,
 živá zmena mierky bez Apply **11 PASS**; textúra, mierka, UV, živé materiály aj kusovník/VEPO zachované ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md); fyzický druhý PC, SU 2024 a render netestované). Geometrický dôkaz ČELÁ-B2: **in-SketchUp 2297 PASS / 0 FAIL**; C geometriu nemení. Ručné Redo zostáva nepotvrdené.
