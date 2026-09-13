@@ -412,10 +412,14 @@ end
 NxTest.test('D-131 zber: odpojeny dielec sa hlada v TOM ISTOM prechode korenom') do
   # Mapa `cabinet_id => pocet odpojenych` vznika RAZ na zber (nie per skrinka)
   # a vlastnika berie z atributu `cabinet_id` — presne ako `Bom.collect`.
-  NxTest.assert(D131_SCAN_SRC.include?("when 'part'") && D131_SCAN_SRC.include?('detached'),
-                'zber musi odpojene dielce zisťovat sam')
-  NxTest.assert(D131_SCAN_SRC.include?("Store.get(inst, 'manufactured') == true"),
+  # D-133: prechod sa PRESTAHOVAL do zdielaneho `Ids.top_level_scan` (zdiela ho
+  # „Nahradiť UNI…"), preto sa guard pyta TAM — otazka ostava ta ista.
+  NxTest.assert(D131_TOP_SCAN_SRC.include?("when 'part'") && D131_TOP_SCAN_SRC.include?('detached'),
+                'zber musi odpojene dielce zisťovat v tom istom prechode')
+  NxTest.assert(D131_TOP_SCAN_SRC.include?("Store.get(inst, 'manufactured') == true"),
                 'ratat sa smu LEN vyrobne dielce')
+  NxTest.assert(D131_SCAN_SRC.include?("Ids.top_level_scan"),
+                'front_grain_scan si mapu pyta od zdielaneho helpera')
 end
 
 # ---------------------------------------------------------------------------
@@ -549,15 +553,24 @@ end
 D131_PC_SRC = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core.rb'),
                         encoding: 'UTF-8')
 D131_SCAN_SRC = D131_PC_SRC[/def front_grain_scan.*?\n      end\n/m].to_s
+# D-133: samotny prechod korenom zije v `Ids.top_level_scan` (zdiela ho
+# „Nahradiť UNI…"), preto ho guardy citaju odtial.
+D131_IDS_SRC = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'ids.rb'),
+                         encoding: 'UTF-8')
+D131_TOP_SCAN_SRC = D131_IDS_SRC[/def self\.top_level_scan.*?\n      end\n/m].to_s
 
 NxTest.test('D-131 zber: zakazka je TOP-LEVEL `model.entities` (ako `Bom.collect`)') do
-  NxTest.assert(D131_SCAN_SRC.include?('model.entities.grep(Sketchup::ComponentInstance)'),
+  NxTest.assert(D131_TOP_SCAN_SRC.include?('model.entities.grep(Sketchup::ComponentInstance)'),
                 'zber musi ist rovnakou cestou ako kusovnik')
+  NxTest.assert(D131_SCAN_SRC.include?('Ids.top_level_scan'),
+                'front_grain_scan musi stat na zdielanom top-level zbere')
   # `Ids.each_cabinet` hlada GLOBALNE cez `model.definitions` a nasiel by aj
   # korpus VNORENY v cudzom komponente — ten v zakazke nie je a prestavba by
   # ho zmenila vo VSETKYCH vyskytoch zdielanej definicie (Codex #365, P1).
   NxTest.refute(D131_SCAN_SRC.include?('all_cabinets') || D131_SCAN_SRC.include?('each_cabinet'),
                 'globalny zber cez definicie sem NEPATRI')
+  NxTest.refute(D131_TOP_SCAN_SRC.include?('each_of_kind') || D131_TOP_SCAN_SRC.include?('definitions'),
+                'ani zdielany helper nesmie ist cez definicie')
 end
 
 NxTest.test('D-131 zber: zlyhanie vracia nil, NIE prazdny zoznam') do
