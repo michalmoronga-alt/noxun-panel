@@ -453,7 +453,11 @@ module Noxun
             return set_status('Projekt už má všetky predvolené pravidlá v aktuálnom tvare.')
           end
 
-          jobs = cabinets(model).map { |c| [c, CabinetBuilder.config_to_params(Store.config(c) || {})] }
+          # D-134: rozsah = ZAKAZKA (top-level), nie cely model. Skrinka
+          # s odpojenym dielcom sa PRESKOCI (a vymenuje v statuse), ale snapshot
+          # pravidiel sa napriek tomu zapise — vid `Panel.job_split`.
+          job_cabs, skipped = Panel.job_cabinets_split(model)
+          jobs = job_cabs.map { |c| [c, CabinetBuilder.config_to_params(Store.config(c) || {})] }
           CabinetBuilder.rebuild_many(model, jobs, op_name: 'NOXUN: doplnenie predvolenych pravidiel') do
             raise 'Predvolené pravidlá sa nepodarilo uložiť do projektu.' unless
               HardwareRules.set_project_rules(model, rules)
@@ -461,7 +465,8 @@ module Noxun
           parts = []
           parts << "doplnené: #{added.join(', ')}" unless added.empty?
           parts << "obnovené: #{refreshed.join(', ')}" unless refreshed.empty?
-          set_status("Predvolené pravidlá — #{parts.join(' · ')} · prestavaných #{jobs.size} skriniek.")
+          set_status("Predvolené pravidlá — #{parts.join(' · ')} · prestavaných #{jobs.size} " \
+                     "skriniek#{Panel.detached_skipped_tail(skipped)}.")
           after_model_write(model)
         end
 
@@ -620,7 +625,12 @@ module Noxun
           problems = HardwareRules.rules_problems(rules)
           return set_status("Pravidlá sa neuložili — #{problems_text(problems)}", true) unless problems.empty?
 
-          jobs = cabinets(model).map { |c| [c, CabinetBuilder.config_to_params(Store.config(c) || {})] }
+          # D-134: rozsah = ZAKAZKA (top-level). Preskocena skrinka (odpojeny
+          # dielec) NEBLOKUJE zapis pravidiel — `rebuild_many` otvara operaciu
+          # aj s PRAZDNYM zoznamom jobov, takze blok so `set_project_rules`
+          # prebehne vzdy a nikdy nie mimo operacie.
+          job_cabs, skipped = Panel.job_cabinets_split(model)
+          jobs = job_cabs.map { |c| [c, CabinetBuilder.config_to_params(Store.config(c) || {})] }
           CabinetBuilder.rebuild_many(model, jobs, op_name: 'NOXUN: pravidla kovania') do
             raise 'Pravidlá sa nepodarilo uložiť do projektu.' unless HardwareRules.set_project_rules(model, rules)
           end
@@ -640,7 +650,8 @@ module Noxun
                           end
           end
           @rev_conflicts = 0 # uspech = seria konfliktov sa konci (druhe znenie sa resetuje)
-          set_status("Pravidlá uložené do projektu#{global_note} — prestavaných #{jobs.size} skriniek.")
+          set_status("Pravidlá uložené do projektu#{global_note} — prestavaných #{jobs.size} " \
+                     "skriniek#{Panel.detached_skipped_tail(skipped)}.")
           after_model_write(model)
         end
 
@@ -1013,6 +1024,10 @@ module Noxun
           Engine.log_error(e, 'RulesDialog.refresh_studio')
         end
 
+        # CITACIA cesta: pocet „skriniek v modeli" v pate sekcie a resolver
+        # JEDNEJ skrinky podla `cabinet_id` (rucny override pravidla).
+        # D-134: HROMADNE ZAPISY sekcie (uloženie aj doplnenie pravidiel) sem uz
+        # NECHODIA — beru `Panel.job_cabinets_split` (zakazka = top-level).
         def cabinets(model)
           out = []
           Ids.each_cabinet(model) { |i| out << i }
