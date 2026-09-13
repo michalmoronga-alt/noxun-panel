@@ -12305,6 +12305,188 @@ module NoxunSuRunner
     end
   end
 
+  # --------------------------------------------------------------------------
+  # D-133 — „Nahradiť UNI…": ROZSAH ZAKAZKY + ODPOJENY DIELEC
+  #
+  # Akcia zbierala skrinky a dosky GLOBALNE (`Ids.each_of_kind` cez
+  # `model.definitions`), kym kusovnik a Studio vidia len TOP-LEVEL entity.
+  # Vnorena skrinka v zdielanej definicii sa teda prestavala vo VSETKYCH
+  # vyskytoch a pritom vo vystupoch vobec nie je. Druha medzera: odpojeny
+  # dielec (vytiahnuty na koren, do kusovnika ide po svojom cez `cabinet_id`)
+  # by po prestavbe skrinky ostal so STARYM materialom = DVOJNIK vo vyrobe.
+  # --------------------------------------------------------------------------
+
+  # Jedno kolo „Nahradiť UNI…" REALNOU cestou klienta (`dispatch` sekcie).
+  # Vracia [payload rozpisu dopadu (Hash alebo nil), statusy].
+  def d133_call(md, model, action, data)
+    lines = []
+    md.dispatch(action, data.to_json, ->(s) { lines << s.to_s })
+    offer = lines.find { |s| s.start_with?('MD.replaceUniOffer(') }
+    payload = offer ? JSON.parse(offer[offer.index('(') + 1...offer.rindex(')')]) : nil
+    statuses = lines.select { |s| s.start_with?('MD.setStatus(') }
+    [payload, statuses]
+  end
+
+  def d133_preview(md, model, guid)
+    d133_call(md, model, 'replace_uni_preview',
+              { 'gen' => 1, 'model_guid' => guid,
+                'uni_id' => 'K1UNI18', 'target_id' => 'K1DUB18' })
+  end
+
+  def run_d133(model)
+    cleanup(model)
+    return ok('D-133: modul MaterialsDialog je nacitany', false) unless defined?(e::MaterialsDialog)
+
+    md = e::MaterialsDialog
+    tmp = File.join(Dir.tmpdir, "noxun_d133_#{Process.pid}")
+    FileUtils.mkdir_p(tmp)
+    File.binwrite(File.join(tmp, 'materials.json'), JSON.pretty_generate(k1_catalog_json))
+    e::Materials.test_dir_override = tmp
+    e::Materials.reload!
+    markers = []
+    host = nil
+    det = nil
+    begin
+      guid = md.model_guid(model)
+
+      # --- a) VNORENA SKRINKA NIE JE V ZAKAZKE ------------------------------
+      # POZOR: `CabinetBuilder.build` si otvara VLASTNU operaciu — volat ju
+      # vnutri inej by tu nasu zhodilo (vzor `run_d131` 4c).
+      top = e::CabinetBuilder.build(model, k1_params('material_id' => 'K1UNI18'))
+      inner = e::CabinetBuilder.build(model, k1_params('material_id' => 'K1UNI18'))
+      return ok('D-133: vlozenie dvoch skriniek na UNI', false) unless top && inner
+
+      nested = nil
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST D-133 vnorenie', true)
+        hdef = model.definitions.add('D133_HOST')
+        host = model.entities.add_instance(hdef, Geom::Transformation.new)
+        nested = hdef.entities.add_instance(inner.definition,
+                                            Geom::Transformation.new)
+        %w[std kind id cabinet_id role part_key_schema manufactured production_class config]
+          .each do |k|
+            v = e::Store.get(inner, k)
+            nested.set_attribute(e::Store::DICT, k, v) unless v.nil?
+          end
+        inner.erase! if inner.valid?
+        model.commit_operation
+      end
+      return ok('D-133: priprava vnorenej skrinky', false) if nested.nil? || !nested.valid?
+
+      top_cid = e::Store.get(top, 'cabinet_id').to_s
+      nested_cid = e::Store.get(nested, 'cabinet_id').to_s
+      nested_before = e::Store.get(nested, 'config').to_s
+
+      scan_ids = Array(e::Materials.replace_uni_scan(model, 'K1UNI18')['cabs']).map(&:first)
+      ok("D-133: scan vidi LEN top-level skrinku (#{scan_ids.join(', ')})",
+         scan_ids.include?(top_cid) && !scan_ids.include?(nested_cid))
+
+      payload, = d133_preview(md, model, guid)
+      ok('D-133: rozpis dopadu prisiel a NIE JE blokovany',
+         payload.is_a?(Hash) && payload['blocked'].nil? && payload['pending'].is_a?(Hash))
+      if payload.is_a?(Hash) && payload['pending'].is_a?(Hash)
+        _, statuses = d133_call(md, model, 'replace_uni_apply',
+                                { 'gen' => 2, 'model_guid' => guid,
+                                  'confirm' => payload['pending'] })
+        ok("D-133: nahradenie prebehlo (#{statuses.first})",
+           statuses.any? { |s| s.include?('UNI nahradené') })
+      end
+      top = e::Panel.find_cabinet_by_id(model, top_cid)
+      ok('D-133: top-level skrinka uz NIE JE na UNI',
+         top && (e::Store.config(top) || {})['material_id'].to_s == 'K1DUB18')
+      ok('D-133: a VNORENA skrinka ostala BAJTOVO nedotknuta',
+         nested.valid? && e::Store.get(nested, 'config').to_s == nested_before)
+
+      # --- b) ODPOJENY DIELEC BLOKUJE CELE NAHRADENIE -----------------------
+      # Dielec vytiahnuty na koren ide do kusovnika PO SVOJOM, ale prestavba
+      # meni LEN vnorene dielce — zapis by vyrobil DVOJNIKA (vnoreny s novym
+      # materialom, odpojeny so starym). All-or-nothing: blokuje CELU akciu.
+      cab = e::CabinetBuilder.build(model, k1_params('material_id' => 'K1UNI18'))
+      return ok('D-133: vlozenie skrinky pre odpojeny dielec', false) unless cab
+
+      cab_cid = e::Store.get(cab, 'cabinet_id').to_s
+      src = cab.definition.entities.grep(Sketchup::ComponentInstance)
+               .find { |i| e::Store.kind(i) == 'part' }
+      return ok('D-133: skrinka ma vnoreny vyrobny dielec', false) unless src
+
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST D-133 odpojeny dielec', true)
+        det = model.entities.add_instance(src.definition,
+                                          Geom::Transformation.translation(e::Units.vector(0, 2000, 0)))
+        %w[std kind id part_id cabinet_id role name part_key part_key_schema role_key
+           manufactured production_class config].each do |k|
+          v = src.get_attribute(e::Store::DICT, k)
+          det.set_attribute(e::Store::DICT, k, v) unless v.nil?
+        end
+        model.commit_operation
+      end
+
+      cab_before = e::Store.get(cab, 'config').to_s
+      payload, = d133_preview(md, model, guid)
+      blocked = Array(payload && payload['blocked'])
+      ok("D-133: rozpis dopadu je BLOKOVANY s dovodom (#{blocked.first})",
+         blocked.any? { |t| t.to_s.include?(cab_cid) && t.to_s.include?('odpojený dielec') })
+
+      # Potvrdit sa to ani neda (klient tlacidlo schova), ale server je autorita:
+      # aj s PLATNYM potvrdenim z minuleho kola musi apply odmietnut a NESMIE
+      # nechat krok Späť — polovicny zapis je horsi nez ziadny.
+      r03_marker(model, markers)
+      stale_pending = { 'model_guid' => guid, 'uni_id' => 'K1UNI18',
+                        'target_id' => 'K1DUB18',
+                        'catalog_rev' => e::Materials.catalog_revision, 'digest' => 'STARY' }
+      apply_payload, statuses = d133_call(md, model, 'replace_uni_apply',
+                                          { 'gen' => 3, 'model_guid' => guid,
+                                            'confirm' => stale_pending })
+      ok("D-133: apply ODMIETNUTY a povie preco (#{statuses.first})",
+         statuses.any? { |s| s.include?('blokované') } &&
+         Array(apply_payload && apply_payload['blocked']).any?)
+      ok('D-133: config skrinky sa nezmenil ani o bajt',
+         e::Store.get(cab, 'config').to_s == cab_before)
+      Sketchup.undo
+      ok('D-133: odmietnutie nezalozilo ZIADEN krok Spat (1x Spat vratil marker)',
+         !markers.last.valid?)
+
+      # --- c) PO VRATENI DIELCA NAHRADENIE PREJDE ---------------------------
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST D-133 uprac odpojeny', true)
+        det.erase! if det && det.valid?
+        model.commit_operation
+      end
+      det = nil
+      payload, = d133_preview(md, model, guid)
+      ok('D-133: bez odpojeneho dielca uz blokacia nie je',
+         payload.is_a?(Hash) && payload['blocked'].nil? && payload['pending'].is_a?(Hash))
+      if payload.is_a?(Hash) && payload['pending'].is_a?(Hash)
+        _, statuses = d133_call(md, model, 'replace_uni_apply',
+                                { 'gen' => 4, 'model_guid' => guid,
+                                  'confirm' => payload['pending'] })
+        ok("D-133: a nahradenie prejde (#{statuses.first})",
+           statuses.any? { |s| s.include?('UNI nahradené') })
+      end
+      cab = e::Panel.find_cabinet_by_id(model, cab_cid)
+      ok('D-133: skrinka je po vrateni dielca prestavana na realny dekor',
+         cab && (e::Store.config(cab) || {})['material_id'].to_s == 'K1DUB18')
+    rescue StandardError => ex
+      ok("D-133: vynimka #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}", false)
+    ensure
+      r03_clear_markers(model, markers)
+      begin
+        e::ScaleWatch.guard do
+          model.start_operation('SU-TEST D-133 upratanie', true)
+          det.erase! if det && det.valid?
+          host.erase! if host && host.valid?
+          model.commit_operation
+          model.definitions.purge_unused
+        end
+      rescue StandardError
+        nil
+      end
+      e::Materials.test_dir_override = nil
+      e::Materials.reload!
+      cleanup(model)
+    end
+  end
+
   def run_d94(model)
     cleanup(model)
     return ok('D-94: okno Studio je nacitane', false) unless defined?(e::StudioDialog)
@@ -22614,6 +22796,7 @@ module NoxunSuRunner
     run_k1(model)            # K1/D-108: smer dekoru per dielec — 1 undo, geometria a D-88 nedotknute, VEPO otocene
     run_k2(model)            # K2/D-87: kresba smeru v modeli — lifecycle overlayu, ziadny undo krok, otocenie po prestavbe
     run_d131(model)          # D-131: kresba VSETKYCH ciel zakazky jednym klikom — dvierka aj zasuvkove celo dostanu priecnu kresbu v JEDNEJ operacii (1x Spat vrati obe skrinky a marker prezije), „Bez čela", doska aj korpusove dielce ostanu BAJTOVO nedotknute, „Podľa materiálu" overridy zmaze; cudzi model_guid, rozpisana zmena panela (flush handshake) ani prazdna zakazka nenechaju ZIADEN krok Spat a vsetky posielaju push (odomknutie tlacidla); VNORENA skrinka nie je v zakazke a zapis sa jej nedotkne
+    run_d133(model)          # D-133: „Nahradiť UNI…" ma rozsah VYSTUPOV — vnorena skrinka v cudzom komponente nie je v scane a zapis sa jej nedotkne; skrinka s ODPOJENYM dielcom rozpis dopadu BLOKUJE (dvojnik vo vyrobe), apply je odmietnuty BEZ kroku Spat a po vrateni dielca prejde
     run_d27(model)           # D-27: viditelnost tagov z panela — 1 klik = 1 krok Spat, guardy bez zapisu, legacy tag zon, aktivny tag, overlay nad skrytym
     run_uid2(model)          # UI-D2: PNG nahlady sablon — capture, KOMPLETNA obnova kamery (persp. aj orto), ziadny undo krok
     run_smoke1(model)        # SMOKE PACK 1 (6A): rucne odfotenie nahladu k ULOZENEJ sablone — guardy vyberu, ziadny undo krok

@@ -52,6 +52,10 @@ module Noxun
       # model.definitions (najde aj instancie vnorene v cudzich komponentoch;
       # preskoci definicie group/image). Ci vnorene entity patria do vystupov,
       # rozhodne kusovnik (V0.5) — tu sa nefiltruje.
+      # D-133: HROMADNE ZAPISOVE akcie zakazky („Nahradiť UNI…", „Kresba čiel")
+      # sem NEPATRIA — tie stoja na `top_level_scan` nizsie, lebo ich rozsah sa
+      # nesmie rozist s rozsahom vystupov. Citacie cesty (usage/delete guard,
+      # observery, dedup, resolvery vyberu) globalny prechod NAOPAK potrebuju.
       # D-34 (audit B4a): pocas erase okna mozu kolekcie niest NEPLATNE entity —
       # citanie atributov zmazanej entity pada (TypeError). valid? guard na
       # definicii aj instancii; headless fakes maju valid? v tests/helper.rb.
@@ -103,6 +107,56 @@ module Noxun
 
       def self.duplicate_boards(model)
         duplicates_of(model, 'board')
+      end
+
+      # D-133: PRECO je dovod odpojeneho dielca KONSTANTA a nie dve vety —
+      # pytaju sa nan dve hromadne akcie („Kresba čiel" cez
+      # `ProductionCore.front_grain_skip_reason` a „Nahradiť UNI…" cez
+      # `Materials.ru_blocked_line`) a dve kopie tej istej vety by sa casom
+      # rozisli. Pouzivatel by potom pri tom istom probleme cital raz jednu
+      # a raz druhu napravu.
+      DETACHED_PART_REASON = 'má odpojený dielec — vráť ho do skrinky alebo skrinku prestav'
+
+      # D-133: JEDEN prechod KORENOM modelu pre hromadne ZAPISOVE akcie zakazky.
+      # Vrati { 'cabinets' => [inst…], 'boards' => [inst…],
+      #         'detached' => { cabinet_id => pocet } }.
+      #
+      # PRECO top-level a nie `each_of_kind`: kusovnik, VEPO aj Studio pracuju
+      # s `model.entities` (vid `Bom.collect`) — to je „zákazka". Globalny
+      # prechod cez `model.definitions` by nasiel aj korpus VNORENY v cudzom
+      # komponente: ten vo vystupoch nie je a hromadna prestavba by ho zmenila
+      # vo VSETKYCH vyskytoch zdielanej definicie.
+      #
+      # `detached` = vyrobne dielce vytiahnute na koren modelu. Taky dielec je
+      # k vlastnikovi viazany uz len atributom `cabinet_id` a do kusovnika ide
+      # PO SVOJOM (`Bom.collect`, vetva `part`), kym prestavba korpusu siaha len
+      # na VNORENE dielce — zapis by teda vyrobil DVOJNIKA. Mapa sa stavia
+      # v TOM ISTOM prechode ako korpusy (raz na zber, nie pri kazdej skrinke).
+      # Filter je zamerne LEN `manufactured` (bez `production_class`) — presne
+      # tak sa pytal D-131 scan, ktory sem prisiel; sirsia otazka („je tu nieco
+      # odpojene?") je pre BRANU spravnejsia nez uzsia.
+      # D-34 (rovnaka pasca ako v `each_of_kind`): pocas erase okna moze
+      # `model.entities` niest NEPLATNE entity a citanie ich atributov pada
+      # (TypeError). `valid?` guard je preto POVINNY aj tu — hromadna akcia by
+      # inak spadla uprostred zberu a pouzivatel by videl len vynimku.
+      def self.top_level_scan(model)
+        out = { 'cabinets' => [], 'boards' => [], 'detached' => Hash.new(0) }
+        return out unless model
+
+        model.entities.grep(Sketchup::ComponentInstance).each do |inst|
+          next unless inst.valid?
+
+          case Store.kind(inst)
+          when 'cabinet' then out['cabinets'] << inst
+          when 'board'   then out['boards'] << inst
+          when 'part'
+            next unless Store.get(inst, 'manufactured') == true
+
+            cid = Store.get(inst, 'cabinet_id').to_s
+            out['detached'][cid] += 1 unless cid.empty?
+          end
+        end
+        out
       end
 
       # part_id = <cabinet_id>-<ROLE_SUFFIX>, napr. CAB-001-SIDE-L, CAB-001-SHELF-2.

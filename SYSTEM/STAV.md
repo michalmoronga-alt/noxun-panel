@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.12.4 · 13.9.2026 — M-R VZHĽAD KOMPLET, nad ním D-94 „Nákup s pôvodom", D-128 „Ručná výška dreveného boxu", D-131 „Kresba čiel celej zákazky" a D-132 „Dormantný zámok".** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.12.5 · 13.9.2026 — M-R VZHĽAD KOMPLET, nad ním D-94 „Nákup s pôvodom", D-128 „Ručná výška dreveného boxu", D-131 „Kresba čiel celej zákazky", D-132 „Dormantný zámok" a D-133 „Nahradiť UNI — rozsah zákazky".** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -17,17 +17,15 @@ nálezy z výroby a chyby v cenách majú **najvyššiu prioritu** ([PLAN.md](PL
 **Výstupy zákaziek bez zásuvkovej klasifikácie sú obsahovo identické** (golden, CSV bajtovo).
 **Kompatibilita:** konfigurácia skrinky je od D-128 v **schéme 14**, výrobný plán v schéme 5; vzhľad používa katalógovú schému 10 až pri prvom uložení (staré katalógy sa otvorením nemenia). Starší plugin nové konfigurácie neprestaví — pred takou zákazkou aktualizovať **obe PC**.
 
-**D-132 (najnovšie):** **4095 headless · 118 JS sád · 2705 in-SketchUp PASS / 0 FAIL** (12 kontrol `d132_scenar` v sekcii `run_kovd4`: riadok po zmene otvárania s nadpisom aj dôvodom a bez chipov, „zrušiť" = jeden krok Späť oboma smermi, prechod na dvierka s iným dôvodom, po zrušení platí automat).
-**D-131:** 4080 · 117 · 2693 PASS / 0 FAIL. **D-128:** 4029 · 116 · 2658 PASS / 0 FAIL. **D-94:** 3993 · 115 · 2632 PASS / 0 FAIL.
+**D-133 (najnovšie):** **4111 headless · 118 JS sád · 2717 in-SketchUp PASS / 0 FAIL** (nová sekcia `run_d133`, 12 kontrol: vnorená skrinka nie je v scane a zápis sa jej nedotkne, odpojený dielec blokuje rozpis dopadu, apply odmietnutý bez kroku Späť, po vrátení dielca prejde).
+**D-132:** 4095 · 118 · 2705 PASS / 0 FAIL. **D-131:** 4080 · 117 · 2693 PASS / 0 FAIL. **D-128:** 4029 · 116 · 2658 PASS / 0 FAIL. **D-94:** 3993 · 115 · 2632 PASS / 0 FAIL.
 **M-R:** 3983 headless · 114 JS sád · 2606 in-SketchUp PASS / 0 FAIL; CEF Štúdia **18 PASS**, controller → uloženie/otvorenie bez SKM → prestavba → výroba **50 PASS**, živá zmena mierky bez Apply **11 PASS** ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md); fyzický druhý PC, SU 2024 a render netestované). Ručné Redo Čiel zostáva nepotvrdené.
 **Michal 11.9. potvrdil** test produktových odkazov aj potvrdzovania cien (CENY-KOV-A/B, PR #345/#346) **a** používateľskú kontrolu balíka Čiel v0.11.0 (funguje, bez chýb).
 
 ## Robí sa
 
-**D-132 „Dormantný zámok osi zásuvky" je hotové (PR #367, v0.12.4) — čaká na Michalov smoke.** Zámok, ktorý po zmene otvárania (klasické ↔ Tip-On) alebo po prechode
-na dvierka ostal v konfigurácii a **nikto ho nečítal**, je konečne vidieť: v **Kovaní**, v boxe svojho čela, má riadok **„Dormantný zámok · NL 470"** s vetou o dôvode
-a tlačidlom **„zrušiť"** (jeden krok Späť). Kontrakt, chipy osí, nákup ani Kontrola sa nemenia — záznam sa naďalej **nemaže sám** (pamäť KOV-D4 je vedomá vlastnosť).
-**Tiež čakajú na smoke: D-131** (riadok „Kresba čiel" v Štúdiu otočí kresbu všetkých čiel zákazky v jednej operácii; PR #365) a **D-128** (tretí chip osi „box 360",
+**D-133 „Nahradiť UNI… — rozsah zákazky" je hotové (PR #368, v0.12.5) — čaká na smoke.** Zámena UNI vidí **tú istú zákazku ako kusovník** (top-level), takže vnorená skrinka sa už neprestavuje; skrinka s **odpojeným dielcom** rozpis dopadu **blokuje** („vráť ho do skrinky alebo skrinku prestav") — inak by vo výrobe vznikol dvojník. Bežná zákazka má rovnaký rozpis ako doteraz.
+**Tiež čakajú na smoke: D-132** (riadok „Dormantný zámok · NL 470" v Kovaní s dôvodom a tlačidlom „zrušiť"; PR #367), **D-131** (riadok „Kresba čiel" v Štúdiu otočí kresbu všetkých čiel zákazky v jednej operácii; PR #365) a **D-128** (tretí chip osi „box 360",
 dielce boxu sa režú na zámok, zmenšená zóna = RED s náhradou; PR #364). **D-94** (#361) aj **M-R** (#353–#359) sú hotové a Michal 12.9. potvrdil oba smoke **PASS**;
 D-28 vyriešené, Čelá A/B1/B2/C používateľsky potvrdené. **Blok 1d** podľa kapacity — hotové po R-14, ďalej R-18; **R-13 čaká na Michala**. Blok **1b** uzavretý, **1c/1e hotové**.
 
@@ -35,10 +33,11 @@ D-28 vyriešené, Čelá A/B1/B2/C používateľsky potvrdené. **Blok 1d** pod�
 
 **Ďalší blok vyberá Michal** — automaticky sa nič neštartuje; po uzávere M-R mala nasledovať slovná diskusia o workflow. Skupina „KONTROLA + VÝROBA" v
 [DOGFOODING.md](DOGFOODING.md) je po D-94 prázdna. Budúca rotácia obrázka a umiestnenie textúr sú D-126/D-127 v [PLAN.md](PLAN.md); D-48 a **D-109** (pomerová mechanika kovania, R-05) zostávajú po V1; ručné Redo Čiel je stále samostatne nepotvrdené.
-**Otvorené po D-132:** **D-133** „Nahradiť UNI…" má iný rozsah skriniek než výstupy a nerieši odpojené dielce (malá fix dávka, zjednotiť zber s D-131) · **D-129 + D-130** rework kontextu Čelá — **v novom okne** (debata → outside-in → mockup → package). Plné znenia v [DOGFOODING.md](DOGFOODING.md).
+**Otvorené po D-133:** **D-129 + D-130** rework kontextu Čelá (úchytky na dvoch miestach + menší UI/UX rework) — **v novom okne**: debata → outside-in → mockup → package. Plné znenie v [DOGFOODING.md](DOGFOODING.md).
 
 ## Posledné uzávery
 
+- **D-133 · „Nahradiť UNI…" má rozsah výstupov a blokuje pri odpojenom dielci** (v0.12.4 → **v0.12.5**, 13.9.2026, PR #368). Zber stojí na zdieľanom `Ids.top_level_scan` (ten istý prechod koreňom má D-131), takže vnorená skrinka sa už neprestavuje; nový blokujúci dôvod `:detached` so zdieľanou vetou. All-or-nothing, odtlačok plánu aj kontrakt bez zmeny.
 - **D-132 · Dormantný zámok osi zásuvky je viditeľný a dá sa zrušiť** (v0.12.3 → **v0.12.4**, 13.9.2026, PR #367). `override_orphan_kind` pozná štvrtý druh **`dormant`**
   (pripnutý je iný recept · čelo nie je zásuvka · čelo zaniklo); riadok v Kovaní nesie serverový názov aj dôvod a ruší sa **existujúcou** cestou `reset: true`. Bez zmeny kontraktu; chipy osí (KOV-D4 bod 3), nákup ani Kontrola sa nedotkli.
 - **D-131 · Kresba čiel celej zákazky jedným klikom** (v0.12.2 → **v0.12.3**, 13.9.2026, PR #365). Riadok „Kresba čiel" v Štúdiu zapíše **existujúci** override

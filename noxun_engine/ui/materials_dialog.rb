@@ -847,7 +847,7 @@ module Noxun
             uni = Materials.sheet(data['uni_id'].to_s)
             label = uni ? uni['decor'].to_s : 'UNI'
             return js("MD.replaceUniOffer(#{{ 'gen' => data['gen'],
-                                              'empty' => "#{label} sa v projekte nepoužíva — niet čo nahradiť." }.to_json})")
+                                              'empty' => ru_empty_msg(model, data['uni_id'], label) }.to_json})")
           end
           unless plan['blocked'].empty?
             return js("MD.replaceUniOffer(#{{ 'gen' => data['gen'],
@@ -1059,6 +1059,32 @@ module Noxun
 
         def ru_stale_model?(data, model)
           DocKey.foreign?(data['model_guid'], model, tolerate_blank_client: true)
+        end
+
+        # D-133 (slepy review P2-2): UNI dekor pouzity v modeli LEN vo VNORENEJ
+        # skrinke by pouzivatela poslal do SLEPEJ ULICKY — „Nahradiť UNI…" ho
+        # nevidi (jej rozsah je zakazka = top-level), ale zmazanie v katalogu ho
+        # ODMIETNE („používa sa 1×"), lebo delete guard je GLOBALNY. Hlaska preto
+        # musi povedat, KDE ten dekor je a co s tym; „niet čo nahradiť" by ho
+        # poslalo hladat chybu tam, kde ziadna nie je.
+        def ru_empty_msg(model, uni_id, label)
+          return "#{label} sa v projekte nepoužíva — niet čo nahradiť." unless ru_used_outside?(model, uni_id)
+
+          "#{label} je použitý len mimo zákazky (skrinka vnorená v inom komponente) — nahradenie " \
+            'pracuje len so skrinkami zákazky. Vynes skrinku na koreň modelu alebo dekor ponechaj.'
+        end
+
+        # GLOBALNE pouzitie v MODELI — ta ista cesta, akou sa pyta delete guard.
+        # SABLONY sa zamerne NEPYTAJU: o dekore pouzitom len v sablone by veta
+        # o „vnorenej skrinke" klamala (a mazanie ho blokuje z ineho dovodu).
+        def ru_used_outside?(model, uni_id)
+          return false unless model && defined?(Materials)
+
+          used = Hash.new { |h, k| h[k] = [] }
+          Materials.collect_model_usage(model, used)
+          !used[uni_id.to_s].empty?
+        rescue StandardError
+          false
         end
 
         def ru_pending(model, data, plan)

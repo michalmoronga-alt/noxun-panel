@@ -2357,7 +2357,9 @@ module Noxun
         # Rovnaka trieda ako `Panel.detached_part_error` v karte dielca (K1),
         # ktora taky zapis tiez ODMIETA — radsej fail-visible skip nez ticho
         # zmenit polovicu.
-        return 'má odpojený dielec — vráť ho do skrinky alebo skrinku prestav' if ent['detached']
+        # D-133: veta je KONSTANTA `Ids::DETACHED_PART_REASON` — tu istu napravu
+        # pouziva aj blokacia „Nahradiť UNI…" a dve kopie by sa casom rozisli.
+        return Ids::DETACHED_PART_REASON if ent['detached']
         return 'staršia skrinka bez zoznamu čiel — najprv ju prestav' if ent['legacy']
         return 'čelá treba najprv prestavať' if ent['unresolved']
 
@@ -2478,7 +2480,8 @@ module Noxun
 
       # Zber skriniek zakazky pre riadok Studia aj pre akciu — CISTE CITANIE.
       #
-      # TOP-LEVEL `model.entities` (Codex #365 kolo 1, P1): PRESNE to iste, co
+      # TOP-LEVEL `model.entities` (Codex #365 kolo 1, P1; od D-133 cez zdielany
+      # `Ids.top_level_scan`): PRESNE to iste, co
       # zbiera `Bom.collect`, teda „zákazka" v zmysle kusovnika a Studia.
       # `Ids.each_cabinet` sem NEPATRI — hlada GLOBALNE cez `model.definitions`
       # a nasiel by aj korpus VNORENY v cudzom komponente; ten vo vystupoch
@@ -2496,26 +2499,17 @@ module Noxun
       def front_grain_scan(model, with_params: false)
         return [] unless model
 
-        cabs = []
-        detached = Hash.new(0)
-        # JEDEN prechod korenom: korpusy zakazky AJ mapa `cabinet_id => pocet
-        # odpojenych dielcov`. Odpojeny dielec je top-level `part` s vlastnikom
-        # v atribute `cabinet_id` — presne to, co zbiera `Bom.collect`.
-        model.entities.grep(Sketchup::ComponentInstance).each do |inst|
-          case Store.kind(inst)
-          when 'cabinet'
-            cabs << inst
-          when 'part'
-            next unless Store.get(inst, 'manufactured') == true
-
-            cid = Store.get(inst, 'cabinet_id').to_s
-            detached[cid] += 1 unless cid.empty?
-          end
-        end
-        cabs.map do |inst|
+        # D-133: JEDEN prechod korenom je od tejto davky ZDIELANY helper
+        # `Ids.top_level_scan` — tu aj v „Nahradiť UNI…" (`replace_uni_scan`).
+        # Obe su hromadne ZAPISOVE akcie zakazky a ich rozsah sa nesmie rozist
+        # (dovtedy „Nahradiť UNI…" zbierala GLOBALNE cez `model.definitions`).
+        # Vracia korpusy zakazky AJ mapu `cabinet_id => pocet odpojenych`.
+        scan = Ids.top_level_scan(model)
+        detached = scan['detached']
+        scan['cabinets'].map do |inst|
           cid = Store.get(inst, 'cabinet_id').to_s
           ent = front_grain_entry(cid, Store.config(inst) || {})
-          ent['detached'] = detached[cid].positive?
+          ent['detached'] = detached[cid].to_i.positive?
           ent['ref'] = inst
           ent['params'] = Panel.existing_params(inst) if with_params
           ent

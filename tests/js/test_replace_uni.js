@@ -255,6 +255,25 @@ const CAT = {
   const applied = JSON.parse(sent.slice(sent.indexOf(':') + 1));
   eq(applied.confirm.target_id, 'K111_186', 'potvrdzuje sa plan pre POSLEDNY ciel, nie pre stary');
   M.mdUniClose();
+
+  // 6) D-133 ROZPIS DOPADU PRI BLOKACII. Dovody sklada SERVER
+  //    (`Materials.ru_blocked_line`) a klient ich kresli DOSLOVA — prave preto
+  //    sa novy dovod `:detached` („má odpojený dielec…") nemusi v JS opisovat.
+  //    Test straz to, na com to stoji: ziadny preklad, ziadne skracovanie,
+  //    ziadna moznost potvrdit blokovanu nahradu.
+  const BODY = ELS.mdUniBody;
+  const DETACHED = 'CAB-001 — má odpojený dielec — vráť ho do skrinky alebo skrinku prestav';
+  const THICK = 'CAB-002 — hrúbka cieľa mimo rozsahu';
+  openAndAsk();
+  const before = BODY.children.length;
+  M.MD.replaceUniOffer(answer({ blocked: [DETACHED, THICK] }));
+  const lines = BODY.children.slice(before).map(function(n){ return n.textContent; });
+  eq(lines[0], 'Nahradenie je blokované — najprv vyrieš:', 'blokacia sa uvedie vetou');
+  eq(lines[1], DETACHED, 'dovod odpojeneho dielca sa kresli DOSLOVA zo servera');
+  eq(lines[2], THICK, 'ostatne dovody sa nezmenili');
+  eq(ELS.mdUniConfirmBtn.style.display, 'none', 'blokovanu nahradu NEIDE potvrdit');
+  eq(modal.style.display, '', 'rozpis dopadu sa pouzivatelovi ukaze');
+  M.mdUniClose();
 })();
 
 console.log(JSON.stringify({ passed: passed, failed: 0 }));
