@@ -9558,15 +9558,15 @@ module NoxunSuRunner
     e::Panel.select_only(model, src)
 
     # --- 1) DEFINICIA „podobny": rovnaka ROLA + rovnaky MATERIAL ------------
-    n_cab = e::Panel.similar_parts_count(e::Panel.similar_parts_map(model, cab_a, src, 'cabinet'))
-    n_prj = e::Panel.similar_parts_count(e::Panel.similar_parts_map(model, cab_a, src, 'project'))
+    n_cab = e::Panel.similar_parts_count(e::Panel.similar_parts_map(model, cab_a, src, 'cabinet').first)
+    n_prj = e::Panel.similar_parts_count(e::Panel.similar_parts_map(model, cab_a, src, 'project').first)
     ok("UI-D1: rozsah „táto skrinka\" = ostatne police tej istej skrinky (#{n_cab})", n_cab == 2)
     ok("UI-D1: rozsah „celý projekt\" berie aj druhu skrinku (#{n_prj})", n_prj == 5)
 
     top = uid1_parts_of_role(cab_a, 'top').first
     if top
-      n_top_cab = e::Panel.similar_parts_count(e::Panel.similar_parts_map(model, cab_a, top, 'cabinet'))
-      n_top_prj = e::Panel.similar_parts_count(e::Panel.similar_parts_map(model, cab_a, top, 'project'))
+      n_top_cab = e::Panel.similar_parts_count(e::Panel.similar_parts_map(model, cab_a, top, 'cabinet').first)
+      n_top_prj = e::Panel.similar_parts_count(e::Panel.similar_parts_map(model, cab_a, top, 'project').first)
       ok('UI-D1: rola s JEDINYM dielcom v skrinke ma v rozsahu skrinky 0 podobnych',
          n_top_cab.zero?)
       ok('UI-D1: ta ista rola ma v projekte 1 podobny (vrch druhej skrinky)', n_top_prj == 1)
@@ -12473,6 +12473,295 @@ module NoxunSuRunner
       begin
         e::ScaleWatch.guard do
           model.start_operation('SU-TEST D-133 upratanie', true)
+          det.erase! if det && det.valid?
+          host.erase! if host && host.valid?
+          model.commit_operation
+          model.definitions.purge_unused
+        end
+      rescue StandardError
+        nil
+      end
+      e::Materials.test_dir_override = nil
+      e::Materials.reload!
+      cleanup(model)
+    end
+  end
+
+  # --------------------------------------------------------------------------
+  # D-134 — JEDNOTNY ROZSAH HROMADNYCH ZAPISOV ZAKAZKY
+  #
+  # Tri hromadne zapisove cesty (pravidla kovania, projektova predvolba
+  # materialu, „aj na podobné v projekte") stali na GLOBALNOM prechode cez
+  # `model.definitions`: prestavovali aj skrinku VNORENU v cudzom komponente
+  # (vo vystupoch zakazky nie je, a zmena by siahla na VSETKY vyskyty zdielanej
+  # definicie) a skrinke s ODPOJENYM dielcom vyrabali DVOJNIKA. Od D-134 beru
+  # `Panel.job_cabinets` (top-level zakazka) a skrinku s odpojenym dielcom
+  # PRESKOCIA + VYMENUJU — projektovy zapis vsak prebehne vzdy.
+  #
+  # Zakazka scenara: A (top-level) · B (top-level s ODPOJENYM dielcom) ·
+  # C (VNORENA v cudzom komponente).
+  # --------------------------------------------------------------------------
+
+  # Katalog D-134 = k1 katalog + druhy realny dekor (zamena predvolby ciel).
+  def d134_catalog_json
+    cat = k1_catalog_json
+    extra = JSON.parse(JSON.generate(cat['sheets'].first))
+    extra['material_id'] = 'K1BUK18'
+    extra['decor'] = 'DEC-K1BUK18'
+    extra['group_id'] = 'GRP-K1BUK18'
+    cat['sheets'] = cat['sheets'] + [extra]
+    cat
+  end
+
+  # Skrinka zakazky: 2 police (aby bolo „podobnych dielcov" na co pouzit)
+  # a celo BEZ vlastneho materialu (dedi projektovu predvolbu).
+  def d134_params
+    k1_params('front_material_id' => '',
+              'zone_tree' => { 'id' => 'Z1', 'shelves' => 2, 'children' => [] })
+  end
+
+  # Odtlacok VNUTRA skrinky: prestavba definiciu vycisti a postavi nanovo,
+  # takze zmenene id dielcov = „skrinka sa naozaj prestavala".
+  def d134_part_ids(inst)
+    return [] unless inst && inst.valid?
+
+    inst.definition.entities.grep(Sketchup::ComponentInstance).map(&:persistent_id).sort
+  end
+
+  # Skrinka VNORENA v cudzom komponente (vzor `run_d133`): postavi sa normalne,
+  # potom sa jej definicia vlozi do cudzieho hosta a original sa zmaze.
+  def d134_nest(model, inner)
+    nested = nil
+    host = nil
+    e::ScaleWatch.guard do
+      model.start_operation('SU-TEST D-134 vnorenie', true)
+      hdef = model.definitions.add('D134_HOST')
+      host = model.entities.add_instance(hdef, Geom::Transformation.new)
+      nested = hdef.entities.add_instance(inner.definition, Geom::Transformation.new)
+      %w[std kind id cabinet_id role part_key_schema manufactured production_class config]
+        .each do |k|
+          v = e::Store.get(inner, k)
+          nested.set_attribute(e::Store::DICT, k, v) unless v.nil?
+        end
+      inner.erase! if inner.valid?
+      model.commit_operation
+    end
+    [host, nested]
+  end
+
+  # ODPOJENY DIELEC: kopia vnoreneho dielca vytiahnuta na koren modelu. Do
+  # kusovnika ide PO SVOJOM (`cabinet_id`), ale prestavba korpusu sa jej uz
+  # nedotkne — preto sa taka skrinka z hromadneho zapisu vynecha.
+  def d134_detach(model, cab)
+    src = cab.definition.entities.grep(Sketchup::ComponentInstance)
+             .find { |i| e::Store.kind(i) == 'part' }
+    return nil unless src
+
+    det = nil
+    e::ScaleWatch.guard do
+      model.start_operation('SU-TEST D-134 odpojeny dielec', true)
+      det = model.entities.add_instance(src.definition,
+                                        Geom::Transformation.translation(e::Units.vector(0, 2000, 0)))
+      %w[std kind id part_id cabinet_id role name part_key part_key_schema role_key
+         manufactured production_class config].each do |k|
+        v = src.get_attribute(e::Store::DICT, k)
+        det.set_attribute(e::Store::DICT, k, v) unless v.nil?
+      end
+      model.commit_operation
+    end
+    det
+  end
+
+  def run_d134(model)
+    cleanup(model)
+    unless defined?(e::RulesDialog) && defined?(e::MaterialsDialog)
+      return ok('D-134: moduly RulesDialog + MaterialsDialog su nacitane', false)
+    end
+
+    tmp = File.join(Dir.tmpdir, "noxun_d134_#{Process.pid}")
+    FileUtils.mkdir_p(tmp)
+    File.binwrite(File.join(tmp, 'materials.json'), JSON.pretty_generate(d134_catalog_json))
+    e::Materials.test_dir_override = tmp
+    e::Materials.reload!
+    markers = []
+    host = nil
+    det = nil
+    begin
+      guid = e::Panel.model_guid(model)
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST D-134 predvolba ciel', true)
+        e::Materials.set_project_default(model, 'default_front_material_id', 'K1DUB18')
+        model.commit_operation
+      end
+
+      cab_a = e::CabinetBuilder.build(model, d134_params)
+      cab_b = e::CabinetBuilder.build(model, d134_params)
+      inner = e::CabinetBuilder.build(model, d134_params)
+      return ok('D-134: vlozenie troch skriniek', false) unless cab_a && cab_b && inner
+
+      host, nested = d134_nest(model, inner)
+      return ok('D-134: priprava VNORENEJ skrinky', false) if nested.nil? || !nested.valid?
+
+      det = d134_detach(model, cab_b)
+      return ok('D-134: priprava ODPOJENEHO dielca', false) if det.nil? || !det.valid?
+
+      cid_a = e::Store.get(cab_a, 'cabinet_id').to_s
+      cid_b = e::Store.get(cab_b, 'cabinet_id').to_s
+      cid_c = e::Store.get(nested, 'cabinet_id').to_s
+      scan = e::Panel.job_cabinets(model)
+      scan_ids = scan['cabinets'].map { |i| e::Store.get(i, 'cabinet_id').to_s }
+      ok("D-134: zber zakazky vidi LEN top-level skrinky (#{scan_ids.join(', ')})",
+         scan_ids.sort == [cid_a, cid_b].sort)
+      ok("D-134: a odpojeny dielec je pripisany svojmu vlastnikovi (#{cid_b})",
+         scan['detached'][cid_b].to_i.positive?)
+
+      # --- a) PRAVIDLA KOVANIA ------------------------------------------------
+      rd = e::RulesDialog
+      rules_before = JSON.generate(e::HardwareRules.project_rules(model) || [])
+      a_ids = d134_part_ids(cab_a)
+      b_ids = d134_part_ids(cab_b)
+      b_cfg = e::Store.get(cab_b, 'config').to_s
+      c_cfg = e::Store.get(nested, 'config').to_s
+      rec = []
+      r03_marker(model, markers)
+      # REALNA cesta klienta: formular je naplneny `rules_payload` (ten zaroven
+      # nasadi baseline aj odtlacok) a klient posiela naspat, co dostal. Bez
+      # toho by save narazil na branu „stav sa medzitým zmenil" — v behu pred
+      # nami uz iná sekcia baseline posunula.
+      rules_payload = rd.send(:rules_payload, model) || {}
+      rd.dispatch('save_rules',
+                  { 'rules' => rules_payload['rules'], 'also_global' => false,
+                    'model_guid' => guid,
+                    'rules_rev' => rules_payload['rules_rev'] }.to_json, ->(s) { rec << s.to_s })
+      status = rec.select { |s| s.include?('RD.setStatus') }.join(' ')
+      ok("D-134 pravidla: status hlasi prestavbu LEN skriniek zakazky (#{status[0, 160]})",
+         status.include?('prestavaných 1 skriniek'))
+      ok('D-134 pravidla: a VYMENUJE preskocenu skrinku aj s napravou',
+         status.include?(cid_b) && status.include?('odpojený dielec'))
+      cab_a = e::Panel.find_cabinet_by_id(model, cid_a)
+      cab_b = e::Panel.find_cabinet_by_id(model, cid_b)
+      ok('D-134 pravidla: skrinka A sa prestavala', d134_part_ids(cab_a) != a_ids)
+      ok('D-134 pravidla: skrinka B (odpojeny dielec) ostala BAJTOVO nedotknuta',
+         d134_part_ids(cab_b) == b_ids && e::Store.get(cab_b, 'config').to_s == b_cfg)
+      ok('D-134 pravidla: a VNORENA skrinka C tiez',
+         nested.valid? && e::Store.get(nested, 'config').to_s == c_cfg)
+      ok('D-134 pravidla: snapshot pravidiel projektu sa NAPRIEK preskoceniu zapisal',
+         JSON.generate(e::HardwareRules.project_rules(model) || []) ==
+         JSON.generate(e::HardwareRules.normalize_rules(rules_payload['rules'])))
+      Sketchup.undo
+      ok('D-134 pravidla: PRAVE JEDEN krok Spat vratil pravidla aj prestavbu',
+         markers.last.valid? &&
+         JSON.generate(e::HardwareRules.project_rules(model) || []) == rules_before)
+
+      # --- b) PROJEKTOVA PREDVOLBA MATERIALU (celá) ---------------------------
+      md = e::MaterialsDialog
+      cab_a = e::Panel.find_cabinet_by_id(model, cid_a)
+      cab_b = e::Panel.find_cabinet_by_id(model, cid_b)
+      a_ids = d134_part_ids(cab_a)
+      b_ids = d134_part_ids(cab_b)
+      b_cfg = e::Store.get(cab_b, 'config').to_s
+      c_cfg = e::Store.get(nested, 'config').to_s
+      rec = []
+      md.dispatch('set_project_material',
+                  { 'key' => 'default_front_material_id', 'value' => 'K1BUK18',
+                    'model_guid' => md.model_guid(model) }.to_json, ->(s) { rec << s.to_s })
+      status = rec.select { |s| s.include?('MD.setStatus') }.join(' ')
+      ok("D-134 predvolba: status VYMENUJE preskocenu skrinku (#{status[0, 160]})",
+         status.include?(cid_b) && status.include?('odpojený dielec'))
+      ok('D-134 predvolba: predvolba ciel je ZAPISANA aj pri preskocenej skrinke',
+         e::Materials.project_defaults(model)['default_front_material_id'].to_s == 'K1BUK18')
+      cab_a = e::Panel.find_cabinet_by_id(model, cid_a)
+      cab_b = e::Panel.find_cabinet_by_id(model, cid_b)
+      ok('D-134 predvolba: skrinka A sa prestavala', d134_part_ids(cab_a) != a_ids)
+      ok('D-134 predvolba: skrinka B (odpojeny dielec) ostala BAJTOVO nedotknuta',
+         d134_part_ids(cab_b) == b_ids && e::Store.get(cab_b, 'config').to_s == b_cfg)
+      ok('D-134 predvolba: a VNORENA skrinka C tiez',
+         nested.valid? && e::Store.get(nested, 'config').to_s == c_cfg)
+      Sketchup.undo
+      ok('D-134 predvolba: PRAVE JEDEN krok Spat vratil predvolbu aj prestavbu',
+         e::Materials.project_defaults(model)['default_front_material_id'].to_s == 'K1DUB18')
+
+      # --- c) „AJ NA PODOBNÉ V PROJEKTE" --------------------------------------
+      cab_a = e::Panel.find_cabinet_by_id(model, cid_a)
+      cab_b = e::Panel.find_cabinet_by_id(model, cid_b)
+      src = uid1_parts_of_role(cab_a, 'shelf').first
+      return ok('D-134 podobne: skrinka A ma policu', false) unless src
+
+      src_key = e::Store.get(src, 'part_key').to_s
+      e::Panel.select_only(model, src)
+      map, skipped = e::Panel.similar_parts_map(model, cab_a, src, 'project')
+      ok("D-134 podobne: rozsah „projekt\" = ZAKAZKA bez preskocenych (#{map.keys.join(', ')})",
+         map.keys == [cid_a])
+      ok("D-134 podobne: preskocena skrinka je PRIZNANA (#{skipped.join(', ')})",
+         skipped == [cid_b])
+      ok("D-134 podobne: pocet v modale = pocet v zapise (#{e::Panel.similar_parts_count(map)})",
+         e::Panel.similar_parts_count(map) == 1)
+
+      e::Panel.handle_set_part_edge(pg(model, 'role_key' => src_key, 'edge' => 'L1',
+                                              'abs_id' => '', 'cabinet_id' => cid_a))
+      cab_a = e::Panel.find_cabinet_by_id(model, cid_a)
+      cab_b = e::Panel.find_cabinet_by_id(model, cid_b)
+      b_cfg = e::Store.get(cab_b, 'config').to_s
+      c_cfg = e::Store.get(nested, 'config').to_s
+      ok('D-134 podobne: zdrojovy dielec ma rucny override hrany L1',
+         uid1_l1_override_keys(cab_a) == [src_key])
+
+      src = e::Panel.find_part_by_role_key(cab_a, src_key)
+      e::Panel.select_only(model, src) if src
+      e::Panel.handle_apply_edges_similar({ 'model_guid' => guid, 'cabinet_id' => cid_a,
+                                            'role_key' => src_key, 'scope' => 'project' }.to_json)
+      cab_a = e::Panel.find_cabinet_by_id(model, cid_a)
+      cab_b = e::Panel.find_cabinet_by_id(model, cid_b)
+      ok("D-134 podobne: olep dostali OBE police skrinky A (#{uid1_l1_override_keys(cab_a).size})",
+         uid1_l1_override_keys(cab_a).size == 2)
+      ok('D-134 podobne: skrinka B (odpojeny dielec) ostala BAJTOVO nedotknuta',
+         e::Store.get(cab_b, 'config').to_s == b_cfg && uid1_l1_override_keys(cab_b).empty?)
+      ok('D-134 podobne: a VNORENA skrinka C tiez',
+         nested.valid? && e::Store.get(nested, 'config').to_s == c_cfg)
+
+      # --- d) ZAKAZKA, KDE JE PRESKOCENE VSETKO (slepe review P3-4) -----------
+      # Jedina skrinka zakazky ma odpojeny dielec, takze `rebuild_many` dostane
+      # PRAZDNY zoznam jobov. Pravidla sa MUSIA ulozit aj tak — inak by zakazka
+      # ostala bez nich a pouzivatel by pritom videl hlasku o uspechu.
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST D-134 zuzenie zakazky', true)
+        cab_a = e::Panel.find_cabinet_by_id(model, cid_a)
+        cab_a.erase! if cab_a && cab_a.valid?
+        model.commit_operation
+      end
+      only_ids = e::Panel.job_cabinets(model)['cabinets'].map { |i| e::Store.get(i, 'cabinet_id').to_s }
+      ok("D-134 vsetko preskocene: v zakazke ostala LEN skrinka s odpojenym dielcom (#{only_ids.join(', ')})",
+         only_ids == [cid_b])
+      rules_before = JSON.generate(e::HardwareRules.project_rules(model) || [])
+      b_cfg = e::Store.get(e::Panel.find_cabinet_by_id(model, cid_b), 'config').to_s
+      rec = []
+      r03_marker(model, markers)
+      rules_payload = rd.send(:rules_payload, model) || {}
+      rd.dispatch('save_rules',
+                  { 'rules' => rules_payload['rules'], 'also_global' => false,
+                    'model_guid' => guid,
+                    'rules_rev' => rules_payload['rules_rev'] }.to_json, ->(s) { rec << s.to_s })
+      status = rec.select { |s| s.include?('RD.setStatus') }.join(' ')
+      ok("D-134 vsetko preskocene: pravidla sa ULOZILI aj pri 0 joboch (#{status[0, 140]})",
+         status.include?('Pravidlá uložené') && status.include?('prestavaných 0 skriniek'))
+      ok('D-134 vsetko preskocene: a status MENUJE preskocenu skrinku',
+         status.include?(cid_b) && status.include?('odpojený dielec'))
+      ok('D-134 vsetko preskocene: snapshot pravidiel projektu naozaj sedi',
+         JSON.generate(e::HardwareRules.project_rules(model) || []) ==
+         JSON.generate(e::HardwareRules.normalize_rules(rules_payload['rules'])))
+      ok('D-134 vsetko preskocene: skrinka ostala BAJTOVO nedotknuta',
+         e::Store.get(e::Panel.find_cabinet_by_id(model, cid_b), 'config').to_s == b_cfg)
+      Sketchup.undo
+      ok('D-134 vsetko preskocene: PRAVE JEDEN krok Spat vratil pravidla',
+         markers.last.valid? &&
+         JSON.generate(e::HardwareRules.project_rules(model) || []) == rules_before)
+    rescue StandardError => ex
+      ok("D-134: vynimka #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}", false)
+    ensure
+      r03_clear_markers(model, markers)
+      begin
+        e::ScaleWatch.guard do
+          model.start_operation('SU-TEST D-134 upratanie', true)
           det.erase! if det && det.valid?
           host.erase! if host && host.valid?
           model.commit_operation
@@ -22797,6 +23086,7 @@ module NoxunSuRunner
     run_k2(model)            # K2/D-87: kresba smeru v modeli — lifecycle overlayu, ziadny undo krok, otocenie po prestavbe
     run_d131(model)          # D-131: kresba VSETKYCH ciel zakazky jednym klikom — dvierka aj zasuvkove celo dostanu priecnu kresbu v JEDNEJ operacii (1x Spat vrati obe skrinky a marker prezije), „Bez čela", doska aj korpusove dielce ostanu BAJTOVO nedotknute, „Podľa materiálu" overridy zmaze; cudzi model_guid, rozpisana zmena panela (flush handshake) ani prazdna zakazka nenechaju ZIADEN krok Spat a vsetky posielaju push (odomknutie tlacidla); VNORENA skrinka nie je v zakazke a zapis sa jej nedotkne
     run_d133(model)          # D-133: „Nahradiť UNI…" ma rozsah VYSTUPOV — vnorena skrinka v cudzom komponente nie je v scane a zapis sa jej nedotkne; skrinka s ODPOJENYM dielcom rozpis dopadu BLOKUJE (dvojnik vo vyrobe), apply je odmietnuty BEZ kroku Spat a po vrateni dielca prejde
+    run_d134(model)          # D-134: hromadne zapisy zakazky (pravidla kovania, projektova predvolba materialu, „aj na podobné v projekte") beru TOP-LEVEL skrinky — vnorena skrinka v cudzom komponente ostane nedotknuta a skrinka s ODPOJENYM dielcom sa PRESKOCI a vymenuje v statuse, kym projektovy zapis (pravidla, predvolba) prebehne; vsetko je 1 krok Spat
     run_d27(model)           # D-27: viditelnost tagov z panela — 1 klik = 1 krok Spat, guardy bez zapisu, legacy tag zon, aktivny tag, overlay nad skrytym
     run_uid2(model)          # UI-D2: PNG nahlady sablon — capture, KOMPLETNA obnova kamery (persp. aj orto), ziadny undo krok
     run_smoke1(model)        # SMOKE PACK 1 (6A): rucne odfotenie nahladu k ULOZENEJ sablone — guardy vyberu, ziadny undo krok

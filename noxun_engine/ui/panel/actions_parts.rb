@@ -671,15 +671,33 @@ module Noxun
 
         # JEDINA autorita vyberu podobnych dielcov — pocet aj zapis idu TOU
         # ISTOU cestou (inak by modal ukazoval iny pocet, nez sa naozaj zapise).
-        # Vracia { cabinet_id => [cab_instance, [part_key, ...]] }.
+        # Vracia DVE hodnoty: [ { cabinet_id => [cab_instance, [part_key, …]] },
+        #                       ['CAB-3', …] ] — druha su PRESKOCENE skrinky.
+        #
+        # D-134: „celý projekt" znamena ZAKAZKA (top-level `model.entities`),
+        # nie „vsetko v modeli" — skrinka vnorena v cudzom komponente vo
+        # vystupoch nie je a zapis by ju zmenil vo VSETKYCH vyskytoch zdielanej
+        # definicie. Skrinka s ODPOJENYM dielcom sa preskoci: prestavba siaha
+        # len na vnorene dielce, takze odpojeny dvojnik by ostal so starym
+        # olepom a kusovnik by niesol oboje. Preskocene sa vracaju spolu s mapou,
+        # aby pocet v modale aj samotny zapis stali na TOM ISTOM vysledku.
         def similar_parts_map(model, cab, part, scope)
           role = Store.get(part, 'role').to_s
-          return {} if role.empty?
+          return [{}, []] if role.empty?
 
           mat = (Store.config(part) || {})['material_id'].to_s
           src_key = Store.get(part, 'part_key').to_s
           src_cid = Store.get(cab, 'cabinet_id').to_s
-          cabs = scope == 'project' ? all_cabinets(model) : [cab]
+          # D-134 (slepe review P3-3): OBA rozsahy idu TYM ISTYM filtrom.
+          # `similar_context` (`detached_part_error`) kryje LEN OZNACENY dielec —
+          # skrinka moze mat vytiahnuty INY dielec a v rozsahu „táto skrinka" by
+          # zapis potom vyrobil presne toho dvojnika, pred ktorym sa strazi
+          # rozsah „celý projekt": prestavba siaha na vnorene dielce, odpojeny
+          # dvojnik by ostal so starym olepom a kusovnik by niesol oboje.
+          # Fail-visible: skrinka vypadne a VYMENUJE sa, nikdy ticho.
+          scan = job_cabinets(model)
+          cabs, skipped = job_split(scope == 'project' ? scan['cabinets'] : [cab],
+                                    scan['detached'])
           out = {}
           cabs.each do |c|
             next unless c && c.valid?
@@ -694,10 +712,17 @@ module Noxun
             keys.delete(src_key) if cid == src_cid
             out[cid] = [c, keys] unless keys.empty?
           end
-          out
+          [out, skipped]
         rescue StandardError => e
           Engine.log_error(e, 'Panel.similar_parts_map')
-          {}
+          [{}, []]
+        end
+
+        # D-134: jedna veta o preskocenych skrinkach pre modal aj pre status.
+        # Text sklada SERVER (jedna autorita nazvov) — klient ho len zobrazi.
+        def similar_skipped_text(skipped)
+          list = detached_skipped_list(skipped)
+          list.empty? ? '' : "Preskočené: #{list.join(', ')}."
         end
 
         def similar_parts_count(map)
@@ -758,7 +783,9 @@ module Noxun
             cab, part, _scope, err = similar_context(model, data)
             return push_similar_count(scope, nil, err, req) if err
 
-            push_similar_count(scope, similar_parts_count(similar_parts_map(model, cab, part, scope)), nil, req)
+            map, skipped = similar_parts_map(model, cab, part, scope)
+            push_similar_count(scope, similar_parts_count(map), nil, req,
+                               skipped: similar_skipped_text(skipped))
           rescue StandardError => e
             Engine.log_error(e, 'Panel.handle_similar_parts_count')
             push_similar_count(scope, nil, 'Počet sa nepodarilo zistiť.', req)
@@ -768,9 +795,13 @@ module Noxun
         # `req` je TOKEN DOPYTU z klienta — vracia sa nezmeneny, aby si JS vedel
         # spárovať odpoved s tym dopytom, ktory ju naozaj caka (oneskorena odpoved
         # na uz zavretý alebo prepnutý modal sa zahodi).
-        def push_similar_count(scope, count, error, req = nil)
+        # D-134: `skipped` je HOTOVA VETA (alebo prazdny retazec) — modal ju len
+        # zobrazi pod poctom, aby pouzivatel videl, ze zakazka ma skrinku, na
+        # ktoru akcia nedosiahne, EST PRED kliknutim na „Použiť".
+        def push_similar_count(scope, count, error, req = nil, skipped: '')
           js("NX.setSimilarCount(#{{ 'scope' => scope, 'count' => count,
-                                     'error' => error, 'req' => req }.to_json})")
+                                     'error' => error, 'req' => req,
+                                     'skipped' => skipped.to_s }.to_json})")
         end
 
         # ZAPIS. Vsetky dotknute korpusy sa prestavaju v JEDNEJ operacii
@@ -792,10 +823,20 @@ module Noxun
           cab, part, scope, err = similar_context(model, data)
           return set_status("ABS sa nepoužilo — #{err}", true) if err
 
-          map = similar_parts_map(model, cab, part, scope)
+          map, skipped = similar_parts_map(model, cab, part, scope)
           if map.empty?
-            return set_status('Podobný dielec sa nenašiel — rovnakú rolu a materiál nemá žiadny iný dielec ' \
-                              "(#{similar_scope_label(scope)}).", true)
+            # D-134: aj prazdny vysledok musi priznat preskocene skrinky — inak
+            # by pouzivatel hladal chybu v roli alebo materiali, hoci skutocnym
+            # dovodom je vytiahnuty dielec. Ked su preskocene, veta o „rovnakej
+            # role a materiáli" sa VYNECHAVA: klamala by o pricine (P3-3).
+            msg = if skipped.empty?
+                    'Podobný dielec sa nenašiel — rovnakú rolu a materiál nemá žiadny iný dielec ' \
+                      "(#{similar_scope_label(scope)})."
+                  else
+                    "V tomto rozsahu (#{similar_scope_label(scope)}) nie je na čo olep použiť. " \
+                      "#{similar_skipped_text(skipped)}"
+                  end
+            return set_status("ABS sa nepoužilo — #{msg}", true)
           end
 
           src_params = existing_params(cab)
@@ -834,7 +875,8 @@ module Noxun
             focus_part(model, cab, src_rk)
           end
           set_status("Olep hrán použitý na #{total} #{similar_word(total)} " \
-                     "(#{similar_scope_label(scope)}, #{map.size} #{cabinet_word(map.size)}) — jeden krok Späť to vráti.")
+                     "(#{similar_scope_label(scope)}, #{map.size} #{cabinet_word(map.size)}) — " \
+                     "jeden krok Späť to vráti. #{similar_skipped_text(skipped)}".strip)
           push_selected(model)
         end
 

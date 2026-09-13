@@ -248,9 +248,10 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 - ✅ **D-133 · „Nahradiť UNI…" — rozsah skriniek ako výstupy (top-level) + blokáda pri odpojenom dielci** — zber stojí na novom zdieľanom `Ids.top_level_scan`
   (rovnaký prechod koreňom používa D-131 `front_grain_scan`), takže vnorená skrinka v cudzom komponente sa už neprestavuje. Skrinka s výskytom UNI a **odpojeným
   dielcom** je v rozpise dopadu blokujúca (dôvod `:detached`, veta zdieľaná s „Kresbou čiel") — all-or-nothing ako ostatné blokácie. Bez zmeny kontraktu. **PR #368, v0.12.5.**
-- **D-134 · Rozsah hromadných zápisov zákazky nie je jednotný** — pravidlá kovania (`rules_dialog.rb` ~456/~623), projektová predvoľba materiálu (`materials_dialog.rb` ~1144)
-  a project-scope override dielca (`actions_parts.rb` ~682) prestavujú skrinky **globálne** cez `model.definitions`; prepnúť na `Ids.top_level_scan` + blokáda/preskočenie pri
-  odpojenom dielci ako D-131/D-133 — malá fix dávka, plné znenie v [DOGFOODING.md](DOGFOODING.md).
+- ✅ **D-134 · Jednotný rozsah hromadných zápisov zákazky** — pravidlá kovania (`rules_dialog.rb`), projektová predvoľba materiálu (`materials_dialog.rb`)
+  a „aj na podobné v projekte" (`actions_parts.rb`) stoja na spoločnom helperi `Panel.job_cabinets` nad `Ids.top_level_scan`: vnorená skrinka v cudzom komponente sa už
+  neprestavuje a skrinka s **odpojeným dielcom** sa **preskočí a vymenuje**, kým projektový zápis (pravidlá, predvoľba) prebehne. „Projekt" pri podobných dielcoch odteraz
+  znamená zákazka. Bez zmeny kontraktu. **PR #369, v0.12.6.**
 - *(Vkladanie na klik — V1-04 — sa 26.8. vyčlenilo do vlastného bloku **GHOST VKLADANIE**; ten je od 31.8.2026 **hotový** (v0.9.0), plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).)*
 - **Konštrukcia — rozhodnuté 6.9.2026** ([zdroje/next_sessions/V1_DEBATA_2026-09-05_KONSTRUKCIA.md](zdroje/next_sessions/V1_DEBATA_2026-09-05_KONSTRUKCIA.md)): **K1 odsadenia** — dva prípady, jedna
   hodnota per skrinka (komín vzadu: dno a strop kratšie, chrbát na ich zadnej hrane · strop zapustený vpredu), nastaviteľné, nefixované · **K2 chrbát z výstuh** — nový typ chrbta:

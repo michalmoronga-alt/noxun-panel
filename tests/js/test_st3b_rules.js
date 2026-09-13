@@ -166,7 +166,7 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   const node = body.children[0];
   eq(node.id, 'rulesBody', 'a je to JEDEN uzol sekcie (klon šablóny)');
   ok(/value="4"/.test(ELS.rulesBox.innerHTML), 'formulár sa naplnil pravidlami zo servera');
-  ok(/skriniek v modeli: 3/.test(ELS.rdSrcLine.textContent),
+  ok(/skriniek zákazky: 3/.test(ELS.rdSrcLine.textContent),
      'a meta riadok nesie počet skriniek, ktoré uloženie prestavá');
 
   // Simulácia „rozpísaného formulára": uzol, ktorý tam nikto iný nedáva.

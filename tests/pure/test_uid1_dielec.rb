@@ -127,8 +127,12 @@ NxTest.test('UI-D1: definicia „podobny" je ROLA + MATERIAL a zdroj sa vynecha'
                 'rovnaky VYSLEDNY material (snapshot dielca)')
   NxTest.assert(UID1_MAP.include?('keys.delete(src_key) if cid == src_cid'),
                 'zdrojovy dielec sa do vyberu nepocita')
-  NxTest.assert(UID1_MAP.include?('all_cabinets(model)') && UID1_MAP.include?("scope == 'project'"),
-                'rozsah „celý projekt" ide cez vsetky korpusy modelu')
+  # D-134: „celý projekt" znamena ZAKAZKA (top-level `job_cabinets`), nie „vsetko
+  # v modeli" — povodny `all_cabinets` bral aj korpus vnoreny v cudzom komponente.
+  NxTest.assert(UID1_MAP.include?('job_cabinets(model)') && UID1_MAP.include?("scope == 'project'"),
+                'rozsah „celý projekt" ide cez skrinky ZAKAZKY')
+  NxTest.assert(!UID1_MAP.include?('all_cabinets(model)'),
+                'globalny prechod sa do zapisovej vetvy uz nesmie vratit')
 end
 
 NxTest.test('UI-D1 (Codex #180 P1): ODPOJENE dielce sa medzi podobne NEPOCITAJU') do
@@ -227,7 +231,10 @@ NxTest.test('UI-D1 (Codex #180 P2): prekreslenie karty si vypyta CERSTVY pocet')
   # sa uz netyka nikoho. Pocet sa najprv zhodi na „počítam" (tlacidlo neaktivne).
   body = UID1_PART_JS[/function renderPartCard.*?\n  \}/m].to_s
   NxTest.assert(body.include?('simModalStale(pc)'), 'iny dielec modal zavrie')
-  NxTest.assert(body.include?('simCount = null; applySimCountView(); requestSimilarCount();'),
+  # D-134: spolu s poctom sa zhadzuje aj veta o preskocenych skrinkach — inak by
+  # v case letu odpovede tvrdila nieco o stave, ktory sa prave prepocitava.
+  NxTest.assert(body.include?("simCount = null; simSkipped = ''; applySimCountView(); " \
+                              'applySimSkippedView(); requestSimilarCount();'),
                 'ta ista identita si vypyta cerstvy pocet a dovtedy nesluby nic')
 end
 

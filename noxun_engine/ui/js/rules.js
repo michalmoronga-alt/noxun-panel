@@ -499,7 +499,7 @@
     return 'zdroj: ' + (RD_META.source === 'project'
       ? 'tento projekt'
       : 'globálne predvoľby (projekt ešte nemá vlastné)') +
-      ' · skriniek v modeli: ' + (RD_META.cabinets || 0);
+      ' · skriniek zákazky: ' + (RD_META.cabinets || 0);
   }
 
   // ============== KOV-F2: EDITOR DOOR GUARDOV PRAVIDLA `bands` ===============

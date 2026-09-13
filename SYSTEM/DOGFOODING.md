@@ -44,14 +44,6 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
   pomocné texty (`.hint`) presunúť do tooltipov, prehodnotiť poradie a zbaľovanie skupín. Postup podľa [CLAUDE.md](../CLAUDE.md) (UX vzor s CAD precedensom): **debata
   s Michalom → draft → Antigravity outside-in → reconcile → mockup** (vzor `zdroje/ui20/`) **→ package → implementácia**. Platí trvalé pravidlo „vertikálny priestor je
   vzácny" ([PLAN.md](PLAN.md)). *Stav: OTVORENÉ — nové okno.*
-- **D-134 · Rozsah hromadných zápisov zákazky nie je jednotný** (nález pri slepom review D-133, 13.9.2026) — D-131 („Kresba čiel") a D-133 („Nahradiť UNI…") už stoja na
-  `Ids.top_level_scan` (top-level `model.entities` = presne to, čo zbiera kusovník), ale **ďalšie tri hromadné zápisové cesty ostali na globálnom prechode** cez
-  `model.definitions`: uloženie pravidiel kovania a doplnenie predvolených pravidiel (`ui/rules_dialog.rb` ~456 a ~623 — `cabinets(model)` = `Ids.each_cabinet` → `rebuild_many`),
-  zmena projektovej predvoľby materiálu (`ui/materials_dialog.rb` ~1144 — `Panel.all_cabinets` → `rebuild_many`) a override materiálu dielca so `scope == 'project'`
-  (`ui/panel/actions_parts.rb` ~682 — `all_cabinets`). **Prečo to vadí:** skrinka **vnorená** v cudzom komponente sa takou akciou prestaví — a to vo **všetkých výskytoch**
-  zdieľanej definície — hoci vo výstupoch zákazky (kusovník, VEPO, Kontrola) vôbec nie je; a odpojený dielec taká prestavba nechá so starým stavom, takže vo výrobe vznikne
-  **dvojník**. Riešenie: prepnúť všetky tri na `Ids.top_level_scan` a doplniť preskočenie/blokádu pri odpojenom dielci **presne ako D-131/D-133** (fail-visible, s dôvodom
-  zo zdieľanej `Ids::DETACHED_PART_REASON`); charakterizácia na zákazke bez vnorených skriniek. *Stav: OTVORENÉ — malá fix dávka (bez zmeny kontraktu).*
 - **Vedome odložené z dávky E — ceny (V1 rozsah)** (6.8., nič z toho neblokuje prácu so zákazkou) — **manuálne overenie ceny materiálov/ABS** BEZ väzby na Demos a **viac URL na položke**
   (zvyšok V1-03; dnes ich „Prepočítať ceny" preskočí) · ~~prepínač „na faktúru" (×1,2)~~ — **vyradené 6.9.2026** (Michal: existuje prepínač s DPH / bez DPH); zvyšok rozhodnutý v `zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md`.
   **Katalógové kovanie je hotové (10.9., CENY-KOV-A/B, PR #345/#346):** jeden produktový odkaz, preklik a ručné potvrdenie ceny k dnešku v katalógu/Rozpočte. Materiály/ABS a viac URL sú naďalej otvorené.

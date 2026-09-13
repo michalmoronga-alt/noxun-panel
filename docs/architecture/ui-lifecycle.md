@@ -1348,6 +1348,14 @@ počítať ich by znamenalo sľúbiť zmenu olepu, ktorú by výrobné dáta (ku
 **ZDROJ dostal rovnakú ochranu až v0.7.24** (`detached_part_error` v `similar_context`): olep zdroja sa číta podľa `part_key` z `params`, teda z overridu **vnoreného dvojčaťa** —
 hromadná zmena spustená nad odpojeným dielcom by po projekte rozniesla olep, ktorý používateľ na karte nikdy nevidel.
 
+**„Celý projekt" znamená ZÁKAZKA (D-134, v0.12.6).** Rozsah `project` berie `Panel.job_cabinets` (top-level), nie `all_cabinets` — vnorená skrinka v cudzom komponente
+sa teda nezapíše (menila by sa vo všetkých výskytoch zdieľanej definície) a skrinka s **odpojeným dielcom** sa **preskočí**: prestavba siaha len na vnorené dielce,
+takže odpojený dvojník by ostal so starým olepom a kusovník by niesol oboje. **Rovnaký filter platí aj pre rozsah „táto skrinka"** — `detached_part_error`
+v `similar_context` kryje len **označený** dielec, takže skrinka s **iným** vytiahnutým dielcom by inak vyrobila presne toho dvojníka; vypadne a vymenuje sa
+(prázdny výsledok s preskočenými preto nehovorí o „rovnakej role a materiáli" — to by klamalo o príčine). `similar_parts_map` vracia **dve** hodnoty `[mapa, preskočené]`, takže počet v modale
+aj zápis stoja na tom istom výsledku; vetu o preskočených skladá server (`similar_skipped_text`) a modal ju len zobrazí v `#simSkipped` — hint modalu preto hovorí
+„skrinky zákazky", nie „všetko v modeli".
+
 **Živý počet aj zápis idú JEDNOU funkciou `similar_parts_map`** — inak by modal sľúbil iný počet, než sa zapíše; JS posiela len `role_key + scope` (žiadny zoznam cieľov) a odpoveď
 chodí cez `NX.setSimilarCount`, ktorá prijme **len odpoveď na posledný odoslaný dopyt** — každý dopyt nesie rastúci **token `req`** a server ho vracia nezmenený (aj z chybovej
 vetvy); kontrola samotného rozsahu nestačila, lebo po prepnutí `cabinet → project → cabinet` alebo po znovuotvorení modalu nad iným dielcom má oneskorená odpoveď rovnaký rozsah a
@@ -2847,6 +2855,14 @@ riadky **neponúka** — hodnotou je vždy celá voľba z ponuky (pevný set ale
 ### rules_dialog.rb
 
 **`rules_dialog.rb` — od ŠT-3b-1 už NIE JE OKNO** (ostal serverový modul; obsah je sekcia `rules` Štúdia, popis ďalej v odseku `hardware_rules`).
+
+**Rozsah hromadného zápisu = ZÁKAZKA (D-134, v0.12.6).** Uloženie pravidiel (`handle_save`) aj „Doplniť nové predvoľby" (`handle_merge_seed`) berú skrinky zo
+spoločného helpera `Panel.job_cabinets_split` (top-level `model.entities` cez `Ids.top_level_scan`) — nie z `cabinets(model)`, ktorý chodí globálne cez
+`model.definitions` a našiel by aj korpus **vnorený** v cudzom komponente: ten vo výstupoch zákazky nie je a prestavba by ho zmenila vo všetkých výskytoch zdieľanej
+definície. Skrinka s **odpojeným dielcom** sa do `rebuild_many` nedostane, ale **snapshot pravidiel sa zapíše aj tak** (zákazka nesmie ostať bez pravidiel kvôli jednej
+vytiahnutej doske) — `rebuild_many` otvára operáciu aj s prázdnym zoznamom, takže zápis nikdy nekončí mimo operácie. Status ju **vymenuje**
+(`Panel.detached_skipped_tail`, veta z `Ids::DETACHED_PART_REASON`). `cabinets(model)` ostáva len pre **čítanie**: počet „skriniek v modeli" v päte sekcie a resolver
+jednej skrinky podľa `cabinet_id`. Pätu sekcie hlási **`Panel.job_cabinets`** — popisok je „skriniek zákazky", aby neprotirečil statusu „prestavaných M skriniek".
 
 **ŠT-3b-1 — `rules_dialog.rb` už NIE JE OKNO** (ostal serverový modul; obsah je sekcia `rules` Štúdia): `rules.html`, `UI::HtmlDialog`, `DLG_KEY`, `ensure_dialog`, `show`,
 `register_callbacks` aj `push_state` sú PREČ; `js` bez sinku padá na `studio_js`.

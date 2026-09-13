@@ -1167,9 +1167,18 @@ module Noxun
             return reset_project_select(key, Materials.project_defaults(model)[key].to_s)
           end
           selected = Panel.find_cabinet(model)
-          affected = Panel.all_cabinets(model).select do |cabinet|
+          # D-134: rozsah = ZAKAZKA (top-level), nie cely model — vnorena skrinka
+          # v cudzom komponente vo vystupoch nie je a prestavba by ju zmenila vo
+          # VSETKYCH vyskytoch zdielanej definicie.
+          # Zoznam sa najprv ZUZI na DEDIACE skrinky a az potom sa oddelia
+          # preskocene: skrinka s odpojenym dielcom, ktora ma vlastny override,
+          # by sa nemenila ani predtym a menovat ju v statuse by miatlo.
+          scan = Panel.job_cabinets(model)
+          inheriting = scan['cabinets'].select do |cabinet|
             Panel.present_str(Panel.existing_params(cabinet)[cfg_key]).nil?
           end
+          affected, skipped = Panel.job_split(inheriting, scan['detached'])
+          skip_tail = Panel.detached_skipped_tail(skipped)
 
           # D-41 PR C (audit FIX 5): projektova predvolba meni efektivny material
           # VSETKYCH dediacich skriniek — rucne ABS overridy zladene so starym
@@ -1185,19 +1194,32 @@ module Noxun
             # --- D-46: KORPUS. Dediacim skrinkam sa hrubka nemeni ticho, ale ani
             # sa uz neodmieta natvrdo — pouzivatel dostane presny rozpis a jedno
             # potvrdenie; vsetko potom prebehne v JEDNOM undo kroku.
-            plan = body_change_plan(model, affected, sheet, value)
+            # D-134 (slepe review P2-1): BRANA sa pyta nad VSETKYMI dediacimi
+            # skrinkami — VRATANE preskocenych. Projektova predvolba sa dedi
+            # ZA BEHU (efektivny material citaju vystupy hned), takze skrinka,
+            # ktora dnes nejde do prestavby, novu hrubku aj tak dostane. Keby
+            # brana videla len prestavatelne, preskocena skrinka by ju obisla
+            # a po svojej najblizsej prestavbe by mala material, ktory nikto
+            # neschvalil. Hlaska ju menuje rovnako ako doteraz.
+            plan = body_change_plan(model, inheriting, sheet, value)
             unless plan['blocked'].empty?
               # Blokujuce dielce sa neprelozia ani potvrdenim — ziadna ponuka
               # (audit F3: nesluboval by sa krok, ktory sa neda vykonat).
               set_status(blocked_cabs_msg(have, plan['blocked']), true)
               return reset_project_select(key, old_default)
             end
+            # PRESTAVBA je uz len na tych, ktore sa prestavat daju. Plan sa
+            # pocita ZNOVA nad uzsim zoznamom (cerstve kopie params), aby pocty
+            # aj remap ABS hlasili presne to, co sa naozaj zapise. Bez
+            # preskocenych je `inheriting == affected` a druhy prechod sa
+            # NEROBI — bezna zakazka ma teda presne tu istu cestu ako doteraz.
+            plan = body_change_plan(model, affected, sheet, value) unless skipped.empty?
             unless plan['adopting'].empty?
               fresh = { 'model_guid' => model_guid(model), 'key' => key, 'value' => value,
                         'old_default' => old_default,
                         'adopting_ids' => plan['adopting'], 'recompute_ids' => plan['recompute'] }
               unless Materials.pending_default_ok?(data['confirm'], fresh)
-                return offer_body_change(fresh, have, stale: !data['confirm'].nil?)
+                return offer_body_change(fresh, have, stale: !data['confirm'].nil?, skipped_tail: skip_tail)
               end
             end
             jobs = plan['jobs']
@@ -1211,13 +1233,17 @@ module Noxun
             # Tu rozhoduje, ktoré systémy zásuviek skrinky reálne používajú —
             # Atira prijme 16, Quadro V6 16 aj 18. Nevyhovujúci výber sa NEULOŽÍ
             # bez potvrdenia (hláška menuje systém aj povolené hrúbky).
-            plan = drawer_change_plan(model, affected, have)
+            # D-134 (P2-1): brana receptov nad VSETKYMI dediacimi vratane
+            # preskocenych — dopad na ne je REALNY hned (predvolba sa dedi za
+            # behu), takze varovanie o nich nie je nadpocetne, ale pravdive.
+            plan = drawer_change_plan(model, inheriting, have)
             unless plan['recipes'].empty?
               fresh = { 'model_guid' => model_guid(model), 'key' => key, 'value' => value,
                         'old_default' => old_default,
                         'adopting_ids' => [], 'recompute_ids' => plan['ids'] }
               unless Materials.pending_default_ok?(data['confirm'], fresh)
-                return offer_drawer_change(fresh, have, plan, stale: !data['confirm'].nil?)
+                return offer_drawer_change(fresh, have, plan, stale: !data['confirm'].nil?,
+                                                             skipped_tail: skip_tail)
               end
             end
             # Codex #304 kolo 2 P2: ABS overridy dielcov zasuviek sa preladia
@@ -1238,7 +1264,11 @@ module Noxun
               [cabinet, p]
             end
           else
-            incompatible = affected.select do |cabinet|
+            # D-134 (P2-1): brana hrubky nad VSETKYMI dediacimi vratane
+            # preskocenych — inak by skrinka s odpojenym dielcom prepustila
+            # hrubku, ktoru jej dielce neunesu, a prejavilo by sa to az pri jej
+            # najblizsej prestavbe.
+            incompatible = inheriting.select do |cabinet|
               params = Panel.existing_params(cabinet)
               # D-31 (GH P2): skrinka BEZ chrbta dielec back vobec nema — jej ulozena
               # hrubka (napr. HDF 3) nesmie blokovat zmenu projektoveho chrbta na 18.
@@ -1279,7 +1309,7 @@ module Noxun
             end
             Panel.reselect(model, selected) if selected && selected.valid?
           end
-          msg = saved_msg(adopted_n, recomputed_n, have)
+          msg = saved_msg(adopted_n, recomputed_n, have, skip_tail)
           msg += " ABS hrany prevedené na nový dekor (#{remap_changed}× dielec)." if remap_changed.positive?
           msg += " Bez náhrady: #{remap_lost.join(', ')}." unless remap_lost.empty?
           set_status(msg)
@@ -1368,10 +1398,14 @@ module Noxun
 
         # Ponuka na potvrdenie (rovnaky kanal ako D-46 — jedna lista, jeden
         # pending kontrakt; lisi sa LEN veta).
-        def offer_drawer_change(fresh, have, plan, stale: false)
+        # D-134: `skipped_tail` menuje skrinky, ktore z prestavby VYPADLI
+        # (odpojeny dielec). Potvrdzovacia lista tak ukazuje pocet PO vylucenie
+        # a zaroven povie, co sa neprestavi — inak by pouzivatel potvrdzoval
+        # dopad, ktory sa na vsetky skrinky nedostane.
+        def offer_drawer_change(fresh, have, plan, stale: false, skipped_tail: '')
           msg = "#{plan['recipes'].join(', ')} hrúbku #{Materials.fmt_mm(have)} mm neprijíma — " \
                 "zásuvky v #{cabs_phrase(plan['ids'].size, :future).sub(/ prevezm\S+\z/, '')} " \
-                'sa prestanú vyrábať (Kontrola ich ukáže červené). Potvrď nižšie.'
+                "sa prestanú vyrábať (Kontrola ich ukáže červené)#{skipped_tail}. Potvrď nižšie."
           msg = "Stav sa medzitým zmenil — #{msg}" if stale
           set_status(msg)
           js("MD.confirmDefault(#{{ 'key' => fresh['key'], 'current' => fresh['old_default'],
@@ -1396,8 +1430,8 @@ module Noxun
         # Ponuka na potvrdenie: select sa v UI VRATI na skutocny default a pod nim
         # sa zobrazi lista Potvrdiť/Zrušiť. Pending kontrakt (fresh) sa posiela
         # klientovi a pri potvrdeni pride CELY spat — server ho znovu overi.
-        def offer_body_change(fresh, have, stale: false)
-          msg = confirm_msg(fresh['adopting_ids'].size, fresh['recompute_ids'].size, have)
+        def offer_body_change(fresh, have, stale: false, skipped_tail: '')
+          msg = confirm_msg(fresh['adopting_ids'].size, fresh['recompute_ids'].size, have, skipped_tail)
           msg = "Stav sa medzitým zmenil — #{msg}" if stale
           set_status(msg)
           js("MD.confirmDefault(#{{ 'key' => fresh['key'], 'current' => fresh['old_default'],
@@ -1422,17 +1456,19 @@ module Noxun
           "#{count} #{noun} #{verb}"
         end
 
-        def confirm_msg(adopting, recompute, have)
+        # D-134: `skipped_tail` je prazdny retazec pri BEZNEJ zakazke — hlaska
+        # je potom bajtovo tá istá ako pred davkou (charakterizacia).
+        def confirm_msg(adopting, recompute, have, skipped_tail = '')
           msg = "#{cabs_phrase(adopting, :future)} hrúbku #{Panel.fmt_mm(have)} mm"
           msg += " (prepočítajú sa aj ďalšie: #{recompute})" if recompute.positive?
-          "#{msg} — potvrď nižšie."
+          "#{msg}#{skipped_tail} — potvrď nižšie."
         end
 
-        def saved_msg(adopted, recomputed, have)
-          return "Predvoľba uložená — prepočítaných #{recomputed} skriniek." if adopted.zero?
+        def saved_msg(adopted, recomputed, have, skipped_tail = '')
+          return "Predvoľba uložená — prepočítaných #{recomputed} skriniek#{skipped_tail}." if adopted.zero?
           msg = "Predvoľba uložená — #{cabs_phrase(adopted, :past)} hrúbku #{Panel.fmt_mm(have)} mm"
           msg += ", prepočítaných #{recomputed}" if recomputed.positive?
-          "#{msg}."
+          "#{msg}#{skipped_tail}."
         end
 
         # Blokujuce skrinky: "CAB-001: Polica 1, Bok Ľ; CAB-003: Bok P"
