@@ -1179,8 +1179,11 @@
   // nekresli — zamknut sa neda nic a server by to aj tak odmietol.
   function hwAxNumHtml(ax, st){
     if (st === 'conflict') return '';
-    var lo = Number(ax && ax.min);
-    var hi = Number(ax && ax.max);
+    // POZOR: `Number(null)` je 0 (a teda „konecne cislo") — server prazdny
+    // rozsah posiela prave ako `null`, takze sa musi vylucit EXPLICITNE.
+    if (!ax || ax.min == null || ax.max == null) return '';
+    var lo = Number(ax.min);
+    var hi = Number(ax.max);
     if (!isFinite(lo) || !isFinite(hi) || lo > hi) return '';
     var rng = hwNlFmt(lo) + '–' + hwNlFmt(hi);
     var cur = (st === 'locked' && ax && ax.value != null && isFinite(Number(ax.value)))

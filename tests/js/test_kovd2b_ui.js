@@ -414,7 +414,8 @@ ok(/ax: d\.ax, axc: d\.axc/.test(focusOf),
 
 // Chipy „otváranie" a „nosnosť" z mockupu sa VEDOME nepridali (vertikalny
 // priestor; riadok zhrnutia ich uz nesie) — strazi to pocet osi.
-eq(HW.HW_AX.map(d => d.key), ['height', 'nl'],
-   'osi su PRAVE DVE — mockupove chipy otvarania a nosnosti sa nepridavaju');
+// D-128 pridala TRETIU os `box` (rucna vyska dreveneho boxu) — a nic ine.
+eq(HW.HW_AX.map(d => d.key), ['height', 'box', 'nl'],
+   'osi su PRAVE TRI — mockupove chipy otvarania a nosnosti sa nepridavaju');
 
 console.log('KOV-D2b UI: ' + n + ' assertov OK');

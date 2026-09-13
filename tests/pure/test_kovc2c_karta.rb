@@ -115,7 +115,10 @@ module NxTest
     plain = C2C.row(C2C.cfg)
     assert plain['locked_note'].nil?, 'bez zamku ziadna poznamka'
     r = C2C.row(C2C.cfg('hardware' => [C2C.slide({}, 'locked' => true)]))
-    assert r['locked_note'].to_s.include?('zamknutá'), "cakam vetu o zamku, dostal #{r['locked_note'].inspect}"
+    # D-128: veta MENUJE OSI, ked panel ich stav pozna (`axes`). Tento fixture
+    # ich neposiela, takze ostava vseobecne priznanie zamku — nikdy nie
+    # menovanie osi, ktoru zamknutu nemame.
+    assert r['locked_note'].to_s.include?('zamknuté'), "cakam vetu o zamku, dostal #{r['locked_note'].inspect}"
   end
 
   # ============ 2) riadok karty: KONFLIKT a MIGRACIA ========================

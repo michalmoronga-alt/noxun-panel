@@ -457,7 +457,8 @@ NxTest.test('KOV-D3b: osi zamku v dopade sedia s polami overridu aj s osami payl
   c = NxD3b
   sc = c.panel.singleton_class
   map = sc::UPGRADE_LOCK_AXES
-  NxTest.assert_equal(%w[height nl], map.keys,
+  # D-128 pridala tretiu os `box` (rucna vyska dreveneho boxu).
+  NxTest.assert_equal(%w[height box nl], map.keys,
                       'kluce su OSI payloadu (`drawer_axes`) — inak by tabulka menovala inu os')
   NxTest.assert_equal([], map.values - sc::OVERRIDE_FIELDS,
                       'hodnoty musia byt polia, ktore zapis naozaj pozna')

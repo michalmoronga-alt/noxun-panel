@@ -494,7 +494,9 @@ NxTest.test('KOV-D1b (P2-5): ľahký push nesie aj detail zásuvky') do
                 'zmena mapovania/katalogu obnovi aj „co je v baleni"')
   refresh = c.src('noxun_engine', 'ui', 'panel',
                   'sync.rb')[/def front_drawer_refresh.*?\n        end\n/m].to_s
-  NxTest.assert(refresh.include?('front_drawer_payload(cfg)'),
+  # D-128: projekcia dostava aj STAV OSI (detail nesmie tvrdit vzorec pri
+  # aktivnom zamku vysky boxu) — zdroj riadku je stale JEDEN.
+  NxTest.assert(refresh.include?("front_drawer_payload(cfg, index['by_owner'])"),
                 'a zdrojom riadku ostava JEDINA citacia projekcia D1b')
   NxTest.assert(push.include?("'options' => hardware_set_options(cfg, items)"),
                 'a povodny obsah lahkeho pushu ostava')

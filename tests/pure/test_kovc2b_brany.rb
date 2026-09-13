@@ -97,15 +97,16 @@ end
 # R4 — REGISTER BRAN
 # ============================================================================
 
-NxTest.test('KOV-C2b (R4): register ma 12 kodov — 11 z resolvera + 1 MIGRACNY') do
+NxTest.test('KOV-C2b (R4): register ma 13 kodov — 12 z resolvera + 1 MIGRACNY') do
   c = NxC2bB
   # KOV-D2a pridala `height_lock_invalid` (vyskovy zamok mimo receptu alebo
-  # nezmestitelny) — je to konflikt STAVBY, teda fail-closed ako NL zamok.
-  NxTest.assert_equal(12, c::REC::DRAWER_BLOCKERS.length)
-  NxTest.assert_equal(11, c::REC::CONFLICT_CODES.length, 'resolver produkuje 11')
+  # nezmestitelny), D-128 `box_lock_invalid` (rucna vyska dreveneho boxu mimo
+  # rozsahu) — oboje su konflikty STAVBY, teda fail-closed ako NL zamok.
+  NxTest.assert_equal(13, c::REC::DRAWER_BLOCKERS.length)
+  NxTest.assert_equal(12, c::REC::CONFLICT_CODES.length, 'resolver produkuje 12')
   NxTest.assert_equal(c::REC::CONFLICT_CODES + ['drawer_stale'], c::REC::DRAWER_BLOCKERS,
                       'posledny kod je MIGRACNY (`drawer_stale`) — resolver ho nevyraba')
-  NxTest.assert_equal(10, c::REC::BUILD_BLOCKERS.length)
+  NxTest.assert_equal(11, c::REC::BUILD_BLOCKERS.length)
   NxTest.assert_equal('drawer_kit_missing', c::REC::KIT_MISSING)
   NxTest.assert_equal('drawer_stale', c::REC::STALE)
   NxTest.assert_equal(%w[drawer_kit_missing drawer_stale], c::REC::ALL_EXPORT_BLOCKERS,
