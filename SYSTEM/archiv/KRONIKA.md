@@ -30,8 +30,14 @@
   **Vedomé hranice:** `Ids.each_of_kind` (globálny prechod cez `model.definitions`) ostáva pre **čítacie** cesty — usage/delete guard katalógu, observery, dedup,
   resolvery výberu; tam je globálny záber správny, lebo vnorená skrinka materiál naozaj drží. `Bom.collect` má naďalej vlastný prechod (nesie identity a výrobné
   snapshoty); jeho zlúčenie s helperom je samostatná téma. Vnorená skrinka teda ostáva na UNI a nehlási ju ani Kontrola (beží nad `Bom.collect`, tiež top-level) —
-  všetky tri cesty sú konzistentné. Charakterizácia stráži, že zákazka bez vnorených skriniek a bez odpojených dielcov dostane **bajtovo rovnaký** plán aj odtlačok.
-  **Codex review:** doplní orchestrátor po review.
+  **čítanie zákazky a „Nahradiť UNI…" sú konzistentné**; *nie* však celý plugin: na globálnom prechode ostali ďalšie **tri hromadné zápisy** (pravidlá kovania,
+  projektová predvoľba materiálu, project-scope override dielca) — otvorené **D-134**. Charakterizácia stráži, že zákazka bez vnorených skriniek a bez odpojených
+  dielcov dostane **bajtovo rovnaký** plán aj odtlačok.
+  **Slepé Opus review (PR #368):** 0× P1, 2× P2, 3× P3 — všetko opravené. P2-1 = práve tá nepravdivá veta o konzistencii v docs + založenie D-134. P2-2 = slepá ulička:
+  dekor použitý v modeli **len** vo vnorenej skrinke nahradenie nevidelo („niet čo nahradiť"), ale zmazanie v katalógu ho odmietalo („používa sa 1×", delete guard je
+  globálny) — prázdny plán preto prejde `ru_empty_msg`, ktorý sa spýta na globálne použitie v modeli a povie, kde ten dekor je a čo s tým. P3 = `valid?` guard v
+  `top_level_scan` (D-34), priznaná hranica brány hrúbky zásuviek pri `project_writes` a oprava komentára kontraktu scanu.
+  **Codex review:** neprebehlo — týždenná kvóta vyčerpaná (náhradná brána: slepé Opus review vyššie).
 
 - **D-132 — DORMANTNÝ ZÁMOK OSI ZÁSUVKY JE VIDITEĽNÝ A DÁ SA ZRUŠIŤ, v0.12.4 (13.9.2026, PR #367).**
   **Čo Michal dostal:** keď sa pri zásuvke prepne otváranie (klasické ↔ Tip-On), pripne sa **iný recept** a starý ručný zámok (dĺžka výsuvu, výška H, výška boxu) ostane

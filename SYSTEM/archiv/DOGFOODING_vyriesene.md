@@ -138,8 +138,11 @@ pred vytiahnutím dielca sa už nedá uplatniť. Zákazka bez vnorených skrinie
 (charakterizačný test).
 
 **Vedomé hranice.** `Ids.each_of_kind` ostáva pre **čítacie** cesty (usage/delete guard katalógu, observery, dedup, resolvery výberu) — tam je globálny záber správny,
-lebo vnorená skrinka materiál naozaj drží. `Bom.collect` má vlastný prechod (nesie identity a výrobné snapshoty); zlúčenie s helperom je samostatná téma. Vnorená
-skrinka teda ostáva na UNI — nehlási ju ani Kontrola (beží nad `Bom.collect`, tiež top-level), takže všetky tri cesty sú konzistentné.
+lebo vnorená skrinka materiál naozaj drží. Na globálnom prechode však **ostali aj tri hromadné zápisové cesty**, ktoré táto dávka neprepínala (pravidlá kovania,
+projektová predvoľba materiálu, project-scope override dielca) — nález slepého review, vedený ako otvorené **D-134**. `Bom.collect` má vlastný prechod (nesie identity
+a výrobné snapshoty); zlúčenie s helperom je samostatná téma. Vnorená skrinka teda ostáva na UNI — nehlási ju ani Kontrola (beží nad `Bom.collect`, tiež top-level), takže
+**čítanie zákazky a „Nahradiť UNI…"** sú konzistentné. Aby z toho nebola slepá ulička, dekor použitý v modeli **len** vo vnorenej skrinke už nedostane hlášku „niet čo
+nahradiť" (a pritom by ho zmazanie v katalógu odmietlo), ale vetu, kde ten dekor je a čo s tým.
 
 ### D-132 — dormantný zámok osi zásuvky je viditeľný a dá sa zrušiť, vyriešené 13.9.2026
 

@@ -346,8 +346,15 @@ pri preskočenej skrinke sú entity nedotknuté a výber platný — a označen�
 **Rozsah = rozsah VÝSTUPOV (D-133, v0.12.5).** `replace_uni_scan` stojí na zdieľanom `Ids.top_level_scan` (top-level `model.entities`), nie na globálnom `Ids.each_of_kind`
 (`model.definitions`). Skrinka **vnorená** v cudzom komponente v kusovníku ani vo VEPO nie je — a prestavba by ju zmenila vo **všetkých výskytoch** zdieľanej definície.
 Ten istý helper používa „Kresba čiel" ([outputs.md](outputs.md), `front_grain_scan`): dve hromadné **zápisové** akcie zákazky nesmú mať dva rôzne rozsahy. Čítacie cesty
-(usage/delete guard, observery, dedup, resolvery výberu) globálny prechod naďalej potrebujú a nemenia sa. Vedomá hranica: vnorená skrinka teda ostáva na UNI — Kontrola ju
-nehlási tiež (beží nad `Bom.collect`, tiež top-level), takže všetky tri cesty sú konzistentné.
+(usage/delete guard, observery, dedup, resolvery výberu) globálny prechod naďalej potrebujú a nemenia sa; **na globálnom prechode však ostali aj tri zatiaľ neprepnuté hromadné
+zápisy** — pravidlá kovania, projektová predvoľba materiálu a project-scope override dielca (zoznam a dôvod v [model-a-identita.md](model-a-identita.md), vedené ako **D-134**).
+Vedomá hranica: vnorená skrinka teda ostáva na UNI — nehlási ju ani Kontrola (beží nad `Bom.collect`, tiež top-level), takže **čítanie zákazky** (výstupy, Kontrola)
+a „Nahradiť UNI…" sú konzistentné. **Slepú uličku z toho ale spraviť nesmieme:** dekor použitý v modeli **len** vo vnorenej skrinke by nahradenie nevidelo („niet čo nahradiť")
+a zmazanie v katalógu by ho odmietlo („používa sa 1×", delete guard je globálny) — preto prázdny plán prejde `ru_empty_msg`, ktorý sa cez `collect_model_usage` spýta na
+globálne použitie a povie, **kde** ten dekor je a čo s tým („vynes skrinku na koreň modelu alebo dekor ponechaj"). Šablóny sa nepýtajú — o dekore použitom len v šablóne by veta
+o vnorenej skrinke klamala. Druhá vedomá hranica: brána hrúbky zásuviek pre `project_writes` (`ru_scan_drawer_fronts`) číta čelá **zo scanu**, teda len z top-level skriniek —
+vnorená dediaca skrinka ju už nezablokuje. Dopad na výstupy je **nulový** (vnorená skrinka v nich nie je), zápis predvoľby je projektový a Kontrola RED odchytí čokoľvek, čo by
+sa cez to dostalo do zákazky.
 
 **Šiesty blokujúci dôvod: `:detached` (D-133).** Skrinka, ktorá má výskyt UNI **a** odpojený dielec (výrobný dielec vytiahnutý na koreň modelu, viazaný už len atribútom
 `cabinet_id`), ide do `blocked` s hláškou „má odpojený dielec — vráť ho do skrinky alebo skrinku prestav". Dôvod: taký dielec ide do kusovníka aj VEPO **po svojom**
