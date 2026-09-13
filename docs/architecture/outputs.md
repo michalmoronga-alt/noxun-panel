@@ -441,7 +441,8 @@ odovzdáva svoj stav **explicitne** — okrem `generation:`/`status:`/`repush:` 
 `production_core.rb` je čítacia cesta a brána 1b-3 jej zakazuje vyžiadať si dedup — hromadná prestavba ho však potrebuje, lebo `rebuild_in_operation` volá `make_unique`
 (detail v [materials.md](materials.md)). **Zber `front_grain_scan`:** top-level `model.entities` — **presne to isté, čo zbiera `Bom.collect`**, teda „zákazka" v zmysle kusovníka;
 `Ids.each_cabinet` sem NEPATRÍ (hľadá globálne cez `model.definitions` a našiel by aj korpus **vnorený** v cudzom komponente, ktorý vo výstupoch nie je a ktorého prestavba by
-zasiahla všetky výskyty zdieľanej definície). Z uloženého configu berie `front_items` + `part_overrides` — nie `Bom.collect`, ktorý nesie už **materializovaný** smer, z ktorého sa
+zasiahla všetky výskyty zdieľanej definície). **Od D-133 (v0.12.5) je ten prechod zdieľaný `Ids.top_level_scan`** ([model-a-identita.md](model-a-identita.md)) — to isté telo
+používa aj „Nahradiť UNI…", ktorá dovtedy zbierala globálne; správanie tejto cesty sa nemenilo, len prestala byť jediná svojho druhu. Z uloženého configu berie `front_items` + `part_overrides` — nie `Bom.collect`, ktorý nesie už **materializovaný** smer, z ktorého sa
 „používateľ to rozhodol" od „materiál to má" odlíšiť nedá. Zlyhanie vracia **nil**, nie prázdny zoznam (prázdny by klient čítal ako „zákazka čelá nemá"). **Kľúče** fyzických čiel
 skladá `Fronts.panels_for` (jediná autorita tvaru: `panel` · `flap` · `blind` · `wing:*` podľa `wings_n`; „Bez čela" nemá dielec) a spolu s nimi vracia aj **legacy renderovací
 suffix** toho istého dielca — starý override pod ním musí riadok vidieť a zápis prebiť, inak by ho migrácia pri prestavbe vrátila do hry. Počet krídel sa NIKDY nehádá: položka bez
@@ -451,8 +452,8 @@ dôvod a ide aj do `mat.front_grain`, takže zákazka, kde je preskočené všet
 **Skrinka s ODPOJENÝM dielcom sa preskočí tiež.** Dielec vytiahnutý na koreň modelu ostáva viazaný už len atribútom `cabinet_id` a do kusovníka aj VEPO ide **po svojom**
 (`Bom.collect`, vetva `part`), kým `rebuild_many` prestaví len **vnorené** dielce — zápis by teda vyrobil **dvojníka**: vnorený dielec s novým smerom a odpojený so starým.
 Ten istý prechod koreňom, ktorý zbiera korpusy, preto stavia mapu `cabinet_id → počet odpojených` (raz na zber, nie pri každej skrinke). Je to rovnaká trieda ochrany ako
-`Panel.detached_part_error` v karte dielca, ktorá taký zápis odmieta — fail-visible skip s dôvodom, nikdy tichá polovičná zmena. *(Známa medzera na porovnanie: „Nahradiť UNI…"
-odpojené dielce nerieši — samostatná téma, nie regresia tejto dávky.)*
+`Panel.detached_part_error` v karte dielca, ktorá taký zápis odmieta — fail-visible skip s dôvodom, nikdy tichá polovičná zmena. **D-133 dotiahlo to isté do „Nahradiť UNI…"**
+(tam je to blokácia `:detached`, nie skip — akcia je all-or-nothing) a vetu majú spoločnú: `Ids::DETACHED_PART_REASON`.
 
 **Piaty dôvod: neznáme kovanie.** Config s `generic_type`, ktorý táto verzia nepozná, **bez** vyššej `config_schema` (legacy fallback D1) by cez `rebuild_many` zhodil
 `CabinetBuilder.guard_unknown_hardware!` — a s ním **celú spoločnú operáciu**, teda aj zápis všetkých ostatných skriniek. Pýta sa preto ešte pred operáciou, a **tou istou**

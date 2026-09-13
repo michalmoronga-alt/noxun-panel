@@ -44,13 +44,6 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
   pomocné texty (`.hint`) presunúť do tooltipov, prehodnotiť poradie a zbaľovanie skupín. Postup podľa [CLAUDE.md](../CLAUDE.md) (UX vzor s CAD precedensom): **debata
   s Michalom → draft → Antigravity outside-in → reconcile → mockup** (vzor `zdroje/ui20/`) **→ package → implementácia**. Platí trvalé pravidlo „vertikálny priestor je
   vzácny" ([PLAN.md](PLAN.md)). *Stav: OTVORENÉ — nové okno.*
-- **D-133 · „Nahradiť UNI…" má iný rozsah skriniek než výstupy a nerieši odpojené dielce** (nález pri review D-131, 13.9.2026) — `Materials.replace_uni_scan` zbiera skrinky
-  globálne cez `Ids.each_of_kind` (model.definitions — aj inštancie **vnorené** v cudzích komponentoch), kým kusovník, VEPO a Štúdio pracujú len s **top-level** `model.entities`;
-  vnorená skrinka v zdieľanej definícii by sa pri nahradení prestavala vo všetkých výskytoch a pritom nie je vo výstupoch zákazky. Zároveň scan nepozná **odpojený dielec**
-  (výrobný dielec vytiahnutý na koreň modelu s `cabinet_id` vlastníka, ktorý `Bom.collect` zbiera) — prestavba skrinky by ho nechala starý a vyrobila dvojníka v kusovníku.
-  D-131 obe medzery rieši pre seba (top-level zber + skip „má odpojený dielec"); „Nahradiť UNI…" ostáva. Riešenie: rovnaký zber a rovnaké fail-visible preskočenie ako D-131
-  (`front_grain_scan` / `front_grain_skip_reason` ako vzor), test s vnorenou skrinkou a s odpojeným dielcom. *Stav: OTVORENÉ — malá fix dávka (bez zmeny kontraktu); D-132 je hotové, takže je na rade.*
-
 - **Vedome odložené z dávky E — ceny (V1 rozsah)** (6.8., nič z toho neblokuje prácu so zákazkou) — **manuálne overenie ceny materiálov/ABS** BEZ väzby na Demos a **viac URL na položke**
   (zvyšok V1-03; dnes ich „Prepočítať ceny" preskočí) · ~~prepínač „na faktúru" (×1,2)~~ — **vyradené 6.9.2026** (Michal: existuje prepínač s DPH / bez DPH); zvyšok rozhodnutý v `zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md`.
   **Katalógové kovanie je hotové (10.9., CENY-KOV-A/B, PR #345/#346):** jeden produktový odkaz, preklik a ručné potvrdenie ceny k dnešku v katalógu/Rozpočte. Materiály/ABS a viac URL sú naďalej otvorené.

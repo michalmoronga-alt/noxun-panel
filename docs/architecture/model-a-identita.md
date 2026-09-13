@@ -22,6 +22,13 @@ identifikátory entít (CAB-xxx, BRD-xxx).
 dostane nové id). **Od 1b-3 (brána G bloku 1b) ich číta výhradne ZÁPISOVÁ cesta** — dedup tik `ScaleWatch` a `Panel.push_selected` → `request_dedup`. Čítacie cesty okien identitu
 NEOPRAVUJÚ: duplicitu zbiera `Bom.collect` do kľúča `identities` a Kontrola ju prizná ako ORANGE `duplicate_identity` (detail v [outputs.md](outputs.md)).
 
+**`top_level_scan(model)` — rozsah ZÁKAZKY pre hromadné ZÁPISOVÉ akcie (D-133, v0.12.5).** Jeden prechod `model.entities` vracia `{ 'cabinets', 'boards', 'detached' }`, kde
+`detached` je mapa `cabinet_id → počet` výrobných dielcov vytiahnutých na koreň (filter je zámerne len `manufactured`, bez `production_class` — pre bránu je širšia otázka
+správnejšia než užšia). Je to **presne to, čo zbiera `Bom.collect`**, takže hromadný zápis nemôže siahnuť ďalej než výstupy. Používajú ho „Kresba čiel"
+(`ProductionCore.front_grain_scan`, [outputs.md](outputs.md)) a „Nahradiť UNI…" (`Materials.replace_uni_scan`, [materials.md](materials.md)); `Bom.collect` má vlastný prechod
+(nesie identity a snapshoty — zlúčenie je samostatná téma). **`each_of_kind` ostáva pre ČÍTACIE cesty** (usage/delete guard katalógu, observery, dedup, resolvery výberu), kde
+je globálny záber správny: vnorená skrinka materiál naozaj drží. Vedľa helpera žije konštanta `DETACHED_PART_REASON` — jedna veta o odpojenom dielci pre obe akcie.
+
 ### doc_key.rb
 
 **STABILNÁ identita dokumentu pre identity guardy** (1d/R-02b). `DocKey.key(model)` vydá token `nxdoc-<random>`; **rotuje ho UDALOSŤ výmeny dokumentu, nie život Ruby objektu** —

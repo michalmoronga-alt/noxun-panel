@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-133** — „Nahradiť UNI…" má rovnaký rozsah ako výstupy (top-level skrinky a dosky, vnorená skrinka sa už neprestavuje) a skrinka s odpojeným dielcom nahradenie blokuje s návodom, ako to vyriešiť — 13.9.2026, PR #368, v0.12.5
 - **D-132** — Dormantný zámok osi zásuvky (zostal po zmene otvárania alebo po prechode na dvierka) je v Kovaní vidieť ako riadok „Dormantný zámok · NL 470" s dôvodom a tlačidlom „zrušiť"; chipy osí ani nákup sa nemenia — 13.9.2026, PR #367, v0.12.4
 - **D-131** — Kresbu čiel celej zákazky prepne jeden klik v Štúdiu (Materiály → Kresba čiel): zapíše sa existujúci override čiel, všetky skrinky sa prestavia v jednej operácii = jeden krok Späť — 13.9.2026, PR #365, v0.12.3
 - **D-128** — Výška dreveného boxu zásuvky (Quadro) sa dá ručne znížiť: tretia os zámku (chip „box 360" s číselným poľom v riadku Zásuvka aj v karte čela), dielce boxu sa režú na zámok, zmenšená zóna = RED s náhradou — 13.9.2026, PR #364, v0.12.2
@@ -119,6 +120,26 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-133 — „Nahradiť UNI…": rozsah skriniek ako výstupy + odpojené dielce, vyriešené 13.9.2026
+
+**Výsledok: PR #368, v0.12.5.** Pôvodné znenie postrehu (nález pri review D-131, 13.9.2026): `Materials.replace_uni_scan` zbieral skrinky **globálne** cez
+`Ids.each_of_kind` (prechod `model.definitions` — teda aj inštancie **vnorené** v cudzích komponentoch), kým kusovník, VEPO a Štúdio pracujú len s **top-level**
+`model.entities`; vnorená skrinka v zdieľanej definícii by sa pri nahradení prestavala vo všetkých výskytoch a pritom vo výstupoch zákazky nie je. Zároveň scan
+nepoznal **odpojený dielec** (výrobný dielec vytiahnutý na koreň modelu s `cabinet_id` vlastníka, ktorý `Bom.collect` zbiera) — prestavba skrinky by ho nechala
+starý a vyrobila **dvojníka** v kusovníku. D-131 obe medzery riešilo pre seba; „Nahradiť UNI…" ostávalo.
+
+**Čo sa zmenilo.** Prechod koreňom je teraz **jeden zdieľaný helper** `Ids.top_level_scan(model)` → `{ 'cabinets', 'boards', 'detached' }`; stojí na ňom D-131
+`front_grain_scan` (bez zmeny správania) **aj** `replace_uni_scan`. Skrinka s výskytom UNI a odpojeným dielcom ide do `blocked` s dôvodom **`:detached`** a vetou
+**„má odpojený dielec — vráť ho do skrinky alebo skrinku prestav"** — tou istou, akú dáva „Kresba čiel" (jedna konštanta `Ids::DETACHED_PART_REASON`, nie dve kópie).
+Dôvod sa pýta **ako prvý**, ešte pred hrúbkovými: je najtvrdší a ostatné by používateľa poslali opravovať nesprávnu vec. Skrinka s odpojeným dielcom **bez** výskytu
+UNI sa nedotkne ničoho. All-or-nothing kontrakt sa nemenil (jedna blokovaná skrinka zastaví celé nahradenie) a `blocked` vstupuje do `digest`, takže potvrdenie vydané
+pred vytiahnutím dielca sa už nedá uplatniť. Zákazka bez vnorených skriniek a bez odpojených dielcov dostane **bajtovo rovnaký** plán aj odtlačok ako predtým
+(charakterizačný test).
+
+**Vedomé hranice.** `Ids.each_of_kind` ostáva pre **čítacie** cesty (usage/delete guard katalógu, observery, dedup, resolvery výberu) — tam je globálny záber správny,
+lebo vnorená skrinka materiál naozaj drží. `Bom.collect` má vlastný prechod (nesie identity a výrobné snapshoty); zlúčenie s helperom je samostatná téma. Vnorená
+skrinka teda ostáva na UNI — nehlási ju ani Kontrola (beží nad `Bom.collect`, tiež top-level), takže všetky tri cesty sú konzistentné.
 
 ### D-132 — dormantný zámok osi zásuvky je viditeľný a dá sa zrušiť, vyriešené 13.9.2026
 

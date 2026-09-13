@@ -343,6 +343,20 @@ pri preskočenej skrinke sú entity nedotknuté a výber platný — a označen�
 
 **M-B2 „Nahradiť UNI…"** (`materials_replace_uni`): scan+čistá klasifikácia, rozpis dopadu pred potvrdením, SHA256 odtlačok plánu, all-or-nothing, 1 undo (skrinky+dosky+predvoľby).
 
+**Rozsah = rozsah VÝSTUPOV (D-133, v0.12.5).** `replace_uni_scan` stojí na zdieľanom `Ids.top_level_scan` (top-level `model.entities`), nie na globálnom `Ids.each_of_kind`
+(`model.definitions`). Skrinka **vnorená** v cudzom komponente v kusovníku ani vo VEPO nie je — a prestavba by ju zmenila vo **všetkých výskytoch** zdieľanej definície.
+Ten istý helper používa „Kresba čiel" ([outputs.md](outputs.md), `front_grain_scan`): dve hromadné **zápisové** akcie zákazky nesmú mať dva rôzne rozsahy. Čítacie cesty
+(usage/delete guard, observery, dedup, resolvery výberu) globálny prechod naďalej potrebujú a nemenia sa. Vedomá hranica: vnorená skrinka teda ostáva na UNI — Kontrola ju
+nehlási tiež (beží nad `Bom.collect`, tiež top-level), takže všetky tri cesty sú konzistentné.
+
+**Šiesty blokujúci dôvod: `:detached` (D-133).** Skrinka, ktorá má výskyt UNI **a** odpojený dielec (výrobný dielec vytiahnutý na koreň modelu, viazaný už len atribútom
+`cabinet_id`), ide do `blocked` s hláškou „má odpojený dielec — vráť ho do skrinky alebo skrinku prestav". Dôvod: taký dielec ide do kusovníka aj VEPO **po svojom**
+(`Bom.collect`, vetva `part`), kým `rebuild_many` prestaví len **vnorené** dielce — zápis by vyrobil **dvojníka** (vnorený s novým materiálom, odpojený so starým).
+Pýta sa **ako prvý**, ešte pred hrúbkovými dôvodmi (je najtvrdší — ostatné by používateľa poslali opravovať nesprávnu vec). Skrinka s odpojeným dielcom **bez** výskytu UNI sa
+nedotkne ničoho. Veta je jediná konštanta `Ids::DETACHED_PART_REASON`, spoločná s `ProductionCore.front_grain_skip_reason` — dve kópie by sa časom rozišli. All-or-nothing
+platí ďalej: jedna blokovaná skrinka zastaví celé nahradenie a `blocked` vstupuje do `digest`, takže potvrdenie vydané pred vytiahnutím dielca sa už nedá uplatniť.
+Testy: `tests/pure/test_d133_nahradit_uni_rozsah.rb`, in-SU `run_d133`.
+
 **GHOST-D1 — brána schémy PRED normalizáciou.** Dávka dosku najprv `BoardBuilder.normalize`-uje a až potom prestavuje (`rebuild_in_operation`), lenže normalizácia je uzavretý
 whitelist: zahodí `config_schema` **aj neznáme polia**, takže doska z novšej verzie by prešla ticho a projekt by skončil **čiastočne migrovaný**. Kontrola preto beží už
 v `replace_uni_classify` — nad **RAW uloženým configom** zo scanu, pred akoukoľvek prácou s ním — a doska s vyššou schémou ide do `blocked` plánu (dôvod `:board_schema`,

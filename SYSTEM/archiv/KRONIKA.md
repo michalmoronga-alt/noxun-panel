@@ -17,6 +17,22 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **D-133 — „NAHRADIŤ UNI…" MÁ ROZSAH VÝSTUPOV A BLOKUJE PRI ODPOJENOM DIELCI, v0.12.5 (13.9.2026, PR #368).**
+  **Čo Michal dostal:** hromadná zámena UNI materiálu sa odteraz pozerá **presne na tú istú zákazku ako kusovník a VEPO**. Skrinka **vnorená** v cudzom komponente
+  vo výstupoch nie je, takže sa už neprestavuje — predtým ju zber našiel a nahradenie by ju zmenilo vo **všetkých výskytoch** zdieľanej definície. A skrinka, ktorá má
+  **odpojený dielec** (výrobný dielec vytiahnutý na koreň modelu), rozpis dopadu **zablokuje** s vetou „má odpojený dielec — vráť ho do skrinky alebo skrinku prestav":
+  taký dielec ide do kusovníka po svojom, ale prestavba siaha len na vnorené dielce, takže by vo výrobe vznikol **dvojník** — vnorený dielec s novým dekorom a odpojený
+  so starým. Ako pri ostatných blokáciách platí all-or-nothing: jedna taká skrinka zastaví celé nahradenie a povie, ktorá to je.
+  **Ako to je urobené:** prechod koreňom modelu sa vytiahol do jedného zdieľaného helpera `Ids.top_level_scan` (korpusy, dosky, mapa `cabinet_id → počet odpojených`);
+  stojí na ňom D-131 „Kresba čiel" (bez zmeny správania) aj `Materials.replace_uni_scan`. Nový blokujúci dôvod `:detached` sa pýta **ako prvý**, pred hrúbkovými — je
+  najtvrdší a ostatné by používateľa poslali opravovať nesprávnu vec. Veta je jedna konštanta `Ids::DETACHED_PART_REASON` pre obe akcie. Skrinka s odpojeným dielcom
+  **bez** výskytu UNI sa nedotkne ničoho. **Bez zmeny dátového kontraktu** — do scanu pribudol len aditívny kľúč `detached`; `cabs` je pole polí s pevnými indexmi.
+  **Vedomé hranice:** `Ids.each_of_kind` (globálny prechod cez `model.definitions`) ostáva pre **čítacie** cesty — usage/delete guard katalógu, observery, dedup,
+  resolvery výberu; tam je globálny záber správny, lebo vnorená skrinka materiál naozaj drží. `Bom.collect` má naďalej vlastný prechod (nesie identity a výrobné
+  snapshoty); jeho zlúčenie s helperom je samostatná téma. Vnorená skrinka teda ostáva na UNI a nehlási ju ani Kontrola (beží nad `Bom.collect`, tiež top-level) —
+  všetky tri cesty sú konzistentné. Charakterizácia stráži, že zákazka bez vnorených skriniek a bez odpojených dielcov dostane **bajtovo rovnaký** plán aj odtlačok.
+  **Codex review:** doplní orchestrátor po review.
+
 - **D-132 — DORMANTNÝ ZÁMOK OSI ZÁSUVKY JE VIDITEĽNÝ A DÁ SA ZRUŠIŤ, v0.12.4 (13.9.2026, PR #367).**
   **Čo Michal dostal:** keď sa pri zásuvke prepne otváranie (klasické ↔ Tip-On), pripne sa **iný recept** a starý ručný zámok (dĺžka výsuvu, výška H, výška boxu) ostane
   v konfigurácii. Doteraz bol **neviditeľný** — resolver ho nepoužil a riadok ručných zásahov ho nekreslil, takže sa nedal zrušiť, kým sa používateľ nevrátil k pôvodnému
