@@ -77,7 +77,8 @@ module Noxun
         drawer_unclassified drawer_no_fit drawer_obstruction
         drawer_internal_unsupported drawer_thickness_unsupported
         drawer_kd_unsupported drawer_recipe_unknown nl_lock_invalid
-        height_lock_invalid drawer_override_invalid drawer_kit_missing
+        height_lock_invalid box_lock_invalid drawer_override_invalid
+        drawer_kit_missing
       ].freeze
 
       # KOV-D4 (Codex #316 kolo 1 P2): kody, ktorych NAPRAVOU je RIADOK RUCNEHO
@@ -91,8 +92,13 @@ module Noxun
       # ceruzka by prisvietila zaznam, ktoreho zrusenie konflikt nevyriesi
       # (a pri `drawer_stale` riadok ani nemusi byt osiroteny). Pri blackliste
       # by kazdy buduci kod tichu chybu zdedil.
+      #
+      # D-128: `box_lock_invalid` (tretia os — rucna vyska dreveneho boxu) patri
+      # do whitelistu z toho isteho dovodu ako obe starsie osi: jeho veta menuje
+      # riadok rucneho zasahu (`LOCK_HINT`) a zrusenie zaznamu konflikt naozaj
+      # vyriesi.
       OVERRIDE_CONFLICT_CODES = %w[
-        nl_lock_invalid height_lock_invalid drawer_override_invalid
+        nl_lock_invalid height_lock_invalid box_lock_invalid drawer_override_invalid
       ].freeze
 
       # Jediny kod, ktory vznika az v NAKUPE (receptova polozka bez setu alebo
@@ -107,12 +113,12 @@ module Noxun
       # a ticho — preto blokuje VSETKY exporty. Napravou je PRESTAVBA skrinky.
       STALE = 'drawer_stale'
 
-      # KOV-C2b: REGISTER BRANY (12 kodov od KOV-D2a). `export_blockers` cita
+      # KOV-C2b: REGISTER BRANY (13 kodov od D-128). `export_blockers` cita
       # CELY tento zoznam — ziadny kod z neho nesmie prejst do vydaneho suboru.
-      # 11 kodov produkuje resolver (`CONFLICT_CODES`), posledny je MIGRACNY.
+      # 12 kodov produkuje resolver (`CONFLICT_CODES`), posledny je MIGRACNY.
       DRAWER_BLOCKERS = (CONFLICT_CODES + [STALE]).freeze
 
-      # Konflikty STAVBY (10): fail-closed, ziadne dielce ani polozka. Blokuju
+      # Konflikty STAVBY (11): fail-closed, ziadne dielce ani polozka. Blokuju
       # nakupny CSV, rozpocet a cenovu ponuku; VEPO chrani prave to, ze sa
       # geometria vobec nevydala (niet co rezat).
       BUILD_BLOCKERS = (CONFLICT_CODES - [KIT_MISSING]).freeze
@@ -133,6 +139,7 @@ module Noxun
         'drawer_recipe_unknown'       => 'zásuvka používa recept, ktorý plugin nepozná',
         'nl_lock_invalid'             => 'ručne zamknutá dĺžka výsuvu neplatí',
         'height_lock_invalid'         => 'ručne zamknutá výška zásuvky neplatí',
+        'box_lock_invalid'            => 'ručne zamknutá výška boxu neplatí',
         'drawer_override_invalid'     => 'ručný zásah do výsuvu zásuvky je neplatný',
         KIT_MISSING                   => 'nákup nenašiel kit výsuvu k postaveným dielcom',
         STALE                         => 'zásuvka je klasifikovaná ešte spred aktivovania receptov'
@@ -154,6 +161,13 @@ module Noxun
       # `rule_id` (`vysuvy-nl-podla-hlbky`) vysku nikdy nedrzal, takze
       # vyskovy zamok existuje VYHRADNE pod `recipe:<recipe_id>`.
       LOCK_RECIPE_PREFIX = 'recipe:'
+
+      # D-128: TRETIA os zamku — VYSKA DREVENEHO BOXU (pole `box_height`
+      # v tom istom zazname `hardware_overrides`). Zrkadlo `height_variant`,
+      # len OPACNY system: os existuje LEN tam, kde vysku boxu POCITA resolver
+      # (dnes Quadro V6), a NIKDY na Atire — tej vysku urcuje variant.
+      # Hodnota je mm Float (spojity rozsah), nie polozka z ponuky.
+      LOCK_BOX_FIELD = 'box_height'
 
       # Roly dielcov, ktore recepty emituju. `box_side` / `drawer_inner_front`
       # do `BuildPlan::ROLES` pridava az C2 (C1 plan nemeni).
@@ -484,7 +498,8 @@ module Noxun
       #   part_thicknesses — { rola => mm } VSTUP (C2 ho berie z materialoveho
       #                      kanala :drawer PRED stavbou planu), nie odvodeny
       #   overrides        — pole zaznamov `hardware_overrides` (zamky OSI:
-      #                      `nominal_length` a KOV-D2a `height_variant`)
+      #                      `nominal_length`, KOV-D2a `height_variant`
+      #                      a D-128 `box_height`)
       # Vracia:
       #   { height_variant, box_height, nl, load, parts, hardware_params,
       #     conflicts, explain }
@@ -549,15 +564,29 @@ module Noxun
           end
         else
           c = recipe[:constants]
-          box_h = clear_h - c[:box_clearance].to_f
-          front_back = box_h - th[ROLE_BOTTOM].to_f - c[:bottom_offset].to_f
-          if front_back < c[:min_front_back_height].to_f
-            return fail_with(out, 'drawer_no_fit',
-                             "#{label(recipe)}: svetlá výška #{fmt(clear_h)} mm dáva box #{fmt(box_h)} mm a čelo/chrbát " \
-                             "#{fmt(front_back)} mm (minimum #{fmt(c[:min_front_back_height])} mm).")
+          # D-128: TRETIA os zamku. Zamknuta vyska boxu ma PRESNE to iste
+          # postavenie ako zamknuty vyskovy variant Atiry — plati alebo je RED,
+          # nikdy sa nemeni automaticky. Rozsah drzi `box_range` (jedna funkcia
+          # pre resolver, payload aj zapis).
+          blocked = box_lock_value(recipe, ctx, overrides)
+          if blocked
+            problem = box_lock_problem(recipe, blocked, clear_h, th)
+            return fail_with(out, 'box_lock_invalid', problem) if problem
+
+            out[:box_height] = blocked.to_f
+            out[:explain] << "Výška boxu: #{fmt(blocked)} (ručný zámok; automat " \
+                             "#{fmt(clear_h - c[:box_clearance].to_f)})"
+          else
+            box_h = clear_h - c[:box_clearance].to_f
+            front_back = box_h - th[ROLE_BOTTOM].to_f - c[:bottom_offset].to_f
+            if front_back < c[:min_front_back_height].to_f
+              return fail_with(out, 'drawer_no_fit',
+                               "#{label(recipe)}: svetlá výška #{fmt(clear_h)} mm dáva box #{fmt(box_h)} mm a čelo/chrbát " \
+                               "#{fmt(front_back)} mm (minimum #{fmt(c[:min_front_back_height])} mm).")
+            end
+            out[:box_height] = box_h
+            out[:explain] << "Výška boxu: #{fmt(box_h)} (svetlá #{fmt(clear_h)} − vôľa #{fmt(c[:box_clearance])})"
           end
-          out[:box_height] = box_h
-          out[:explain] << "Výška boxu: #{fmt(box_h)} (svetlá #{fmt(clear_h)} − vôľa #{fmt(c[:box_clearance])})"
         end
 
         # (5) JEDNA NL — z radu VYSLEDNEJ vysky (zamknutej aj automatickej).
@@ -737,14 +766,19 @@ module Noxun
       # z ulozeneho stavu DOKAZAT (svetle rozmery skrinky sa neukladaju, preto
       # sa netvrdia). Nenacitatelny alebo neznamy recept = PRAZDNY zoznam —
       # karta vtedy detail vobec nekresli (radsej nic nez vymyslene cislo).
-      def explain_stored(params, dir: active_dir)
+      # D-128 (`axes:`): pri AKTIVNOM zamku vysky boxu by veta so vzorcom
+      # („svetlá výška zóny − vôľa 40 mm") KLAMALA — cislo z nej neplynie.
+      # `axes` je TA ISTA mapa, akou panel kresli chipy (`Panel.drawer_axes`),
+      # takze karta a chip nemozu tvrdit nieco ine. Bez nej (starsi volajuci,
+      # test) sa nic nemeni.
+      def explain_stored(params, dir: active_dir, axes: nil)
         p = params.is_a?(Hash) ? params : {}
         id = p['recipe_id'].to_s
         return [] if id.empty?
 
         recipe = load(id, dir: dir)
         out = ["Recept: #{label(recipe)} (#{id})"]
-        out.concat(explain_height(recipe, p))
+        out.concat(explain_height(recipe, p, axes))
         out.concat(explain_nl(recipe, p))
         out << "Nosnosť bunky: #{fmt(p['load'])} kg" if p['load'].is_a?(Numeric)
         out
@@ -754,7 +788,7 @@ module Noxun
 
       # Vyskovy variant (Atira) alebo vyska boxu (Quadro) — kazdy system povie
       # to svoje a nikdy oboje.
-      def explain_height(recipe, params)
+      def explain_height(recipe, params, axes = nil)
         hv = params['height_variant']
         if hv.is_a?(Numeric)
           v = (recipe[:height_variants] || {})[key_num(hv)]
@@ -764,6 +798,22 @@ module Noxun
         end
         bh = params['box_height']
         return [] unless bh.is_a?(Numeric)
+
+        box = axes.is_a?(Hash) ? axes['box'] : nil
+        state = box.is_a?(Hash) ? box['state'].to_s : ''
+        # ZAMOK: vzorec o vysku boxu uz nerozhoduje, preto sa netvrdi. Automat
+        # (= horna hranica rozsahu) sa priznava, aby pouzivatel videl, o kolko
+        # box znizil; bez neho ostane holá veta o zamku.
+        if state == 'locked'
+          auto = box['max']
+          return ["Výška boxu #{fmt(bh)} mm (ručný zámok; automat by dal #{fmt(auto)} mm)"] if auto.is_a?(Numeric)
+
+          return ["Výška boxu #{fmt(bh)} mm (ručný zámok)"]
+        end
+        if state == 'conflict'
+          why = box['message'].to_s
+          return ["Výška boxu #{fmt(bh)} mm (ručný zámok NEPLATÍ#{why.empty? ? '' : " — #{why}"})"]
+        end
 
         clear = recipe[:constants][:box_clearance]
         ["Výška boxu #{fmt(bh)} mm (svetlá výška zóny − vôľa #{fmt(clear)} mm)"]
@@ -883,6 +933,83 @@ module Noxun
 
         "#{label(recipe)}: ručne zamknutá výška H#{key_num(height)} potrebuje svetlú výšku " \
           "#{fmt(v[:min_clear_height])} mm (svetlá #{fmt(clear_h)} mm) — " \
+          "zámok sa nikdy nemení automaticky. #{LOCK_HINT}"
+      end
+
+      # --- D-128: zamok VYSKY BOXU (tretia os, systemy bez vyskovych variantov)
+      #
+      # Zrkadlo `height_lock_value` s jednym opacnym obmedzenim: os existuje
+      # LEN tam, kde vysku boxu POCITA resolver (dnes Quadro V6), a NIKDY na
+      # Atire — tej vysku urcuje variant, takze `box_height` by nemal co drzat
+      # (ani ked ho podvrhnuty config nesie). Ostatne brany su zhodne:
+      # `disabled` VITAZI, identita je receptova (`recipe:<recipe_id>`)
+      # a vlastnik musi sediet s celom.
+      def box_lock_value(recipe, ctx, overrides)
+        return nil if atira?(recipe)
+
+        owner = ctx[:owner_part_key]
+        rid = "#{LOCK_RECIPE_PREFIX}#{recipe[:recipe_id]}"
+        rec = Array(overrides).reverse.find do |ov|
+          next false unless ov.is_a?(Hash)
+          next false if get(ov, 'disabled') == true
+          next false unless get(ov, 'generic_type').to_s == LOCK_GENERIC_TYPE
+          next false unless get(ov, 'rule_id').to_s == rid
+          next false if owner && get(ov, 'owner_part_key').to_s != owner.to_s
+
+          nl_value(get(ov, LOCK_BOX_FIELD))
+        end
+        rec && nl_value(get(rec, LOCK_BOX_FIELD))
+      end
+
+      # JEDINA funkcia rozsahu vysky boxu — cita ju resolver (`box_lock_problem`),
+      # payload osi aj zapisova akcia panela. Druhy vypocet inde by sluboval
+      # hodnotu, ktoru by zapis alebo stavba odmietla.
+      #
+      #   max = AUTOMAT (svetla vyska - vola receptu) — nad automat sa NESMIE
+      #   min = celo/chrbat boxu + hrubka DNA + odsadenie dna
+      #
+      # Hrubka dna je SKUTOCNA (16 vs 18 mm dava min 58 vs 60), preto sa berie
+      # z `part_thicknesses` — tej istej mapy, s akou pocita `resolve`.
+      # `nil` = rozsah sa urcit NEDA (Atira, chybajuca hrubka dna, necitatelna
+      # svetla vyska) a volajuci to musi priznat, nikdy nahradit odhadom.
+      # POZOR: `min > max` je platny vysledok (velmi nizka zona) — znamena
+      # „zamknut sa neda nic", a rozhoduje o tom volajuci.
+      def box_range(recipe, clear_h, part_thicknesses)
+        return nil if atira?(recipe)
+
+        t_bottom = normalize_thicknesses(part_thicknesses)[ROLE_BOTTOM]
+        return nil if t_bottom.nil?
+
+        h = clear_h.to_f
+        return nil unless h.finite?
+
+        c = recipe[:constants]
+        { min: c[:min_front_back_height].to_f + t_bottom + c[:bottom_offset].to_f,
+          max: h - c[:box_clearance].to_f }
+      end
+
+      # Preco zamknuta vyska boxu neplati (alebo nil, ked plati). JEDINA veta
+      # o tomto dovode — cita ju `resolve` (RED nalez) AJ payload osi (hlaska
+      # chipu), presne ako `height_lock_problem` / `nl_lock_problem`.
+      # Porovnania su INKLUZIVNE nad NEZAOKRUHLENOU hodnotou, bez EPS.
+      def box_lock_problem(recipe, box_height, clear_h, part_thicknesses)
+        rng = box_range(recipe, clear_h, part_thicknesses)
+        if rng.nil?
+          return "#{label(recipe)}: rozmery zásuvky sa nepodarilo prečítať — ručne zamknutá " \
+                 "výška boxu sa overiť nedá. #{LOCK_HINT}"
+        end
+
+        c = recipe[:constants]
+        v = box_height.to_f
+        if v > rng[:max]
+          return "#{label(recipe)}: ručne zamknutá výška boxu #{fmt(v)} mm je nad automatom " \
+                 "#{fmt(rng[:max])} mm (svetlá #{fmt(clear_h)} − vôľa #{fmt(c[:box_clearance])}) — " \
+                 "zámok sa nikdy nemení automaticky. #{LOCK_HINT}"
+        end
+        return nil if v >= rng[:min]
+
+        "#{label(recipe)}: ručne zamknutá výška boxu #{fmt(v)} mm je pod minimom #{fmt(rng[:min])} mm " \
+          "(čelo a chrbát boxu potrebujú #{fmt(c[:min_front_back_height])} mm) — " \
           "zámok sa nikdy nemení automaticky. #{LOCK_HINT}"
       end
 
