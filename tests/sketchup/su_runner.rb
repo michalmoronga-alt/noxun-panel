@@ -19530,6 +19530,83 @@ module NoxunSuRunner
        (kovd2a_nl(inst).to_f - KOVD4_NL).abs <= TOL)
     ok('KOV-D4 navrat otvarania: a chipy su zase na zazname SiSy receptu',
        (kovd2b_axis(inst, 'nl')['state']).to_s == 'locked')
+
+    # --- 5) D-132: dormantny zamok je VIDNO a da sa ZRUSIT -----------------
+    d132_scenar(model, inst, cid)
+  end
+
+  # === D-132: DORMANTNY ZAMOK JE VIDITELNY A DA SA ZRUSIT ====================
+  #
+  # KOV-D4 dokazal, ze dormantny zamok NESVIETI ako aktivny (ziadne chipy).
+  # D-132 dokazuje druhu polovicu: ze ho pouzivatel vobec VIDI a ma cestu von.
+  #
+  # Headless sada dokaze tvar payloadu. NEDOKAZE, ze cez REALNU cestu panela
+  # (`handle_set_hardware_override` s `reset: true`) zaznam naozaj zmizne, ze
+  # je to PRESNE JEDEN krok Spat a ze po navrate k povodnemu otvaraniu uz
+  # zamok neplati (dlzka je z automatu) — to vidno len v modeli.
+
+  # Riadok osiroteneho zasahu pre dane `rule_id`, tak ako ho vidi panel.
+  def d132_row(inst, rule_id)
+    kovd4_row(inst, rule_id) || {}
+  end
+
+  # REALNA akcia tlacidla „zrušiť" v riadku osiroteneho zasahu.
+  def d132_reset(model, inst, cid, rule_id)
+    model.selection.clear
+    model.selection.add(inst)
+    e::Panel.handle_set_hardware_override(
+      pg(model, 'generic_type' => 'slide', 'rule_id' => rule_id,
+                'owner_part_key' => e::PartKeys.front('F1', 'panel'),
+                'reset' => true, 'cabinet_id' => cid)
+    )
+  end
+
+  def d132_scenar(model, inst, cid)
+    markers = []
+    # --- a) zmena otvarania: riadok „dormantný zámok" so serverovym textom -
+    kovd4_switch(model, inst, 'opening_mode' => 'tipon')
+    row = d132_row(inst, KOVD2A_RID)
+    ok("D-132: zamok SiSy receptu ma v paneli RIADOK druhu `dormant` (#{row['orphan_kind'].inspect})",
+       row['orphan'] == true && row['orphan_kind'].to_s == 'dormant')
+    ok("D-132: nadpis riadku menuje OS aj hodnotu (#{row['orphan_label'].inspect})",
+       row['orphan_label'].to_s == "Dormantný zámok · NL #{KOVD4_NL.to_i}")
+    ok("D-132: poznamka hovori DOVOD aj cestu von (#{row['orphan_note'].inspect})",
+       row['orphan_note'].to_s.include?('Tip-On') &&
+       row['orphan_note'].to_s.include?('SiSy') &&
+       row['orphan_note'].to_s.include?('Zrušiť ho môžeš tu.'))
+    ok('D-132: a NADALEJ nema chipy osi (pravidlo KOV-D4 bod 3 plati)',
+       row['axes'].nil?)
+
+    # --- b) „Zrušiť" = existujuca cesta `reset` + PRESNE jeden krok Spat ---
+    m = r03_marker(model, markers)
+    d132_reset(model, inst, cid, KOVD2A_RID)
+    ok('D-132 zrusenie: zaznam SiSy zamku je PREC z configu',
+       kovd2a_overrides(inst).none? { |o| o['rule_id'].to_s == KOVD2A_RID })
+    ok('D-132 zrusenie: a riadok v paneli zanikol s nim',
+       d132_row(inst, KOVD2A_RID).empty?)
+    Sketchup.undo
+    ok('D-132 Spat: zaznam sa vratil a riadok je zase dormantny',
+       kovd2a_overrides(inst).any? { |o| o['rule_id'].to_s == KOVD2A_RID } &&
+       d132_row(inst, KOVD2A_RID)['orphan_kind'].to_s == 'dormant')
+    ok('D-132 Spat: bol to PRESNE jeden krok', m.valid?)
+    r03_clear_markers(model, markers)
+
+    # --- c) prechod na dvierka: dovod je INY (celo uz nie je zasuvka) ------
+    kovd4_switch(model, inst, 'type' => 'door')
+    drow = d132_row(inst, KOVD2A_RID)
+    ok("D-132 dvierka: riadok ostava dormantny (#{drow['orphan_kind'].inspect})",
+       drow['orphan_kind'].to_s == 'dormant')
+    ok("D-132 dvierka: a poznamka hovori, ze celo uz nie je zasuvka (#{drow['orphan_note'].inspect})",
+       drow['orphan_note'].to_s.include?('čelo už nie je zásuvka'))
+
+    # --- d) zrusenie na dvierkach: navrat k zasuvke uz zamok NEMA ----------
+    d132_reset(model, inst, cid, KOVD2A_RID)
+    kovd4_switch(model, inst, 'type' => 'drawer_front', 'opening_mode' => 'classic')
+    ok('D-132 po zruseni: zasuvka sa vratila BEZ zamku — dlzku urcuje automat',
+       kovd2a_overrides(inst).none? { |o| o['rule_id'].to_s == KOVD2A_RID } &&
+       (kovd2a_nl(inst).to_f - KOVD4_NL).abs > TOL)
+    ok('D-132 po zruseni: chip osi NL je v stave `auto` (ziadny zamok neprezil)',
+       (kovd2b_axis(inst, 'nl')['state']).to_s == 'auto')
   end
 
   # === KOV-D5: ABS FARBENIE DIELCOV ZASUVIEK =================================
