@@ -2511,11 +2511,17 @@ module Noxun
           "nič sa nemenilo.#{fronts_grain_skipped_tail(plan)}"
       end
 
+      # LOKAL („v 1 skrinke" / „v 2 skrinkách") — `Panel.cabinet_word` dava
+      # NOMINATIV („2 skrinky"), ktory by v tejto vete znel zle.
+      def front_grain_cab_word(n)
+        n == 1 ? 'skrinke' : 'skrinkách'
+      end
+
       def fronts_grain_done_msg(grain, plan)
         n = plan['count'].to_i
         c = plan['cabinets'].to_i
         "Kresba čiel: #{front_grain_label(grain)} — #{n} #{front_grain_word(n)} v #{c} " \
-          "#{Panel.cabinet_word(c)} (1 krok Späť).#{fronts_grain_skipped_tail(plan)}"
+          "#{front_grain_cab_word(c)} (1 krok Späť).#{fronts_grain_skipped_tail(plan)}"
       end
 
       # --- D-104 / D-105 / K2 (audit #5): ZDIELANE PREPINACE OVERLAYOV ------

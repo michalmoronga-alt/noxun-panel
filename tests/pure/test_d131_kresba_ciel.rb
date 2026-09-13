@@ -320,8 +320,13 @@ end
 
 NxTest.test('D-131 hlaska: uspech menuje smer, pocty aj JEDEN krok Späť') do
   msg = D131PC.fronts_grain_done_msg('width', { 'count' => 12, 'cabinets' => 5, 'skipped' => [] })
-  NxTest.assert(msg.include?('priečna') && msg.include?('12 čiel') && msg.include?('5 skriniek'), msg)
+  NxTest.assert(msg.include?('priečna') && msg.include?('12 čiel') && msg.include?('5 skrinkách'), msg)
   NxTest.assert(msg.include?('1 krok Späť'), msg)
+end
+
+NxTest.test('D-131 hlaska: jedno celo v jednej skrinke sa sklonuje spravne') do
+  msg = D131PC.fronts_grain_done_msg('length', { 'count' => 1, 'cabinets' => 1, 'skipped' => [] })
+  NxTest.assert(msg.include?('1 čelo v 1 skrinke'), msg)
 end
 
 NxTest.test('D-131 hlaska: preskocene skrinky su V HLASKE (nikdy tichy drop)') do
