@@ -44,10 +44,6 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
   pomocné texty (`.hint`) presunúť do tooltipov, prehodnotiť poradie a zbaľovanie skupín. Postup podľa [CLAUDE.md](../CLAUDE.md) (UX vzor s CAD precedensom): **debata
   s Michalom → draft → Antigravity outside-in → reconcile → mockup** (vzor `zdroje/ui20/`) **→ package → implementácia**. Platí trvalé pravidlo „vertikálny priestor je
   vzácny" ([PLAN.md](PLAN.md)). *Stav: OTVORENÉ — nové okno.*
-- **D-131 · Smer kresby čiel celej zákazky jedným klikom** (Michal 13.9.2026) — smer dekoru (pozdĺžna/priečna) sa dnes nastavuje len po jednom dielci v karte dielca (K1/D-108)
-  alebo v katalógu per dekor (mení knižnicu pre všetky zákazky, prejaví sa až prestavbou). Michal potrebuje **jedným klikom otočiť kresbu všetkých čiel v zákazke** (napr. celá
-  kuchyňa vodorovne). Návrh: akcia v Štúdiu nad všetkými skrinkami zákazky, zapisuje `part_overrides[..].grain_direction` čiel (existujúci kontrakt, žiadne nové dáta), jedna
-  operácia = jeden krok Späť, výsledok overí Kontrola kresby. Kandidát aj „aj na podobné dielce" v karte dielca (vzor ABS). *Stav: OTVORENÉ — zadanie po D-128; bez zmeny kontraktu.*
 - **D-132 · Dormantný zámok osi zásuvky po zmene otvárania je neviditeľný** (Codex audit D-128, 13.9.2026) — po prepnutí classic ↔ tipon sa pripne iný recept, starý záznam
   `hardware_overrides` (NL, výška Atira alebo výška boxu) ostáva v configu, ale `override_orphan_kind` ho nevyhodnotí ako osirotený (identita nie je medzi položkami, nie je
   `disabled`, vlastník nie je v konflikte) a riadok ručných zásahov ho nekreslí — používateľ ho nevie zrušiť, kým sa nevráti k pôvodnému otváraniu. Týka sa všetkých troch osí.

@@ -2237,6 +2237,352 @@ module Noxun
         status.call("Otváram „Nahradiť UNI…“ pre #{uni_id}.")
       end
 
+      # --- D-131: KRESBA VSETKYCH CIEL ZAKAZKY JEDNYM KLIKOM ----------------
+      #
+      # PRECO to existuje (Michal 13.9.2026): smer dekoru (kresby) sa do dnes
+      # dal nastavit LEN po jednom dielci v karte dielca (K1/D-108) alebo per
+      # DEKOR v katalogu (to ale meni kniznicu pre vsetky zakazky). Kuchyna s 12
+      # celami tak znamenala 12 klikov do 12 kariet.
+      #
+      # KONTRAKT SA NEMENI (R1): zapisuje sa PRESNE ten isty override, ktory
+      # pise karta dielca — `part_overrides[<kluc cela>]['grain_direction']`.
+      # Ziadne nove pole, ziadna projektova predvolba pre BUDUCE skrinky (to by
+      # bola zmena kontraktu projektu); toto je hromadna AKCIA nad celami, ktore
+      # v zakazke SU TERAZ. Nova skrinka sa preto riadi materialom a tlacidlo sa
+      # spusti znova — hint v UI to hovori.
+      #
+      # `__inherit__` = zrusenie overridu (spat na smer materialu), rovnaky
+      # sentinel ako v `Panel.handle_set_part_grain`.
+      FRONT_GRAIN_INHERIT = '__inherit__'
+      # Sonda pre `Fronts.panels_for`: sirka/vyska otvoru rozhoduje o TVARE
+      # klucov jedine cez pocet kridiel, a ten sem chodi UZ VYRIESENY
+      # (`wings_n` z resolved cela). Geometria je preto len nenulova vypln.
+      FRONT_GRAIN_PROBE_W = 600.0
+      FRONT_GRAIN_PROBE_H = 100.0
+
+      # CISTA funkcia: kluce dielcov FYZICKYCH ciel jednej skrinky z jej
+      # RESOLVED ciel (`config['front_items']`, to iste pole, z ktoreho cita
+      # `Bom.collect` smerove nalezy KOV-A1).
+      #
+      # Tvar klucov NEOPISUJEME druhykrat — sklada ich `Fronts.panels_for`,
+      # jedina autorita (zasuvkove celo `panel`, vyklop/sklop `flap`, blenda
+      # `blind`, dvierka `wing:*` podla poctu kridiel). Druhy parser by sa casom
+      # rozisiel a override by ticho sadol na neexistujuci dielec.
+      #
+      # Vracia [dielce, unresolved?]. Dielec je `{ 'key' =>, 'legacy' => }`:
+      #   key    — stabilny `part_key` (dnesny kontrakt),
+      #   legacy — RENDEROVACI suffix toho isteho dielca (`DOOR-1-L`), pod ktorym
+      #            drzia override skrinky ulozene pred zavedenim `part_key`.
+      # Oba dava TEN ISTY deskriptor, takze mapovanie nic nestoji — a bez neho by
+      # stara skrinka v riadku hlasila „podľa materiálu", hoci override MA
+      # (review #365, P3). Migraciu klucov inak robi az `CabinetBuilder.normalize`
+      # pri prestavbe, a tá potrebuje CELY plan (drahe pri kazdom pushi).
+      #
+      # `unresolved?` = polozka, ktora NIE JE resolved celo (dvierka bez platneho
+      # `wings_n`) — vtedy sa pocet kridiel NEHADA a cela skrinka sa radsej
+      # preskoci a vymenuje (fail-visible).
+      def front_grain_keys(items)
+        parts = []
+        Array(items).each_with_index do |item, i|
+          next unless item.is_a?(Hash)
+          # D-18 „Bez čela": riadok drzi vysku, ale panel nevznikne — nie je co
+          # otacat. (`panels_for` ho tiez vracia prazdny; tu sa preskakuje
+          # skorej, aby sa na nom neriesil pocet kridiel.)
+          next if item['type'].to_s == 'none'
+
+          probe = item
+          if item['type'].to_s == 'door' || !Fronts::TYPES.include?(item['type'].to_s)
+            n = item['wings_n'].to_i
+            return [[], true] unless (1..4).cover?(n)
+
+            probe = item.merge('wings' => n.to_s)
+          end
+          Fronts.panels_for(probe, i + 1, 0.0, FRONT_GRAIN_PROBE_W, 0.0, FRONT_GRAIN_PROBE_H).each do |pd|
+            k = pd[:part_key].to_s
+            parts << { 'key' => k, 'legacy' => pd[:suffix].to_s } unless k.empty?
+          end
+        end
+        [parts, false]
+      end
+
+      # Ucinny smer dekoru jedneho cela z ULOZENYCH overridov — pozrie sa na
+      # dnesny kluc aj na legacy suffix (ten prezije v starej skrinke az do
+      # najblizsej prestavby). Vracia 'length'/'width' alebo nil.
+      def front_grain_value(overrides, part)
+        ov = overrides.is_a?(Hash) ? overrides : {}
+        [part['key'], part['legacy']].each do |k|
+          next if k.to_s.empty?
+
+          rec = ov[k]
+          v = rec.is_a?(Hash) ? rec['grain_direction'].to_s : ''
+          return v if CabinetBuilder::GRAIN_OVERRIDES.include?(v)
+        end
+        nil
+      end
+
+      # CISTA funkcia: jeden zaznam skrinky pre plan aj pre suhrn. `cfg` je
+      # SUROVY ulozeny config (`Store.config`) — NIE params: marker novsej
+      # schemy aj `front_items` ziju len v nom.
+      def front_grain_entry(id, cfg)
+        c = cfg.is_a?(Hash) ? cfg : {}
+        # CHYBAJUCI `front_items` != „skrinka bez čiel" (review #365, P3): tak
+        # vyzera config ULOZENY EST PRED tym, nez builder zoznam resolved ciel
+        # zapisoval. Čelá v nej BYT MOZU a zoznam sa doplni az prestavbou —
+        # preto sa taka skrinka preskoci a VYMENUJE, nikdy ticho nepreskoci.
+        # Prazdne pole je naopak platna odpoved: skrinka cela naozaj nema.
+        legacy = !c['front_items'].is_a?(Array)
+        parts, unresolved = front_grain_keys(c['front_items'])
+        { 'id' => id.to_s, 'keys' => parts, 'unresolved' => unresolved, 'legacy' => legacy,
+          'newer' => (defined?(CabinetBuilder) && CabinetBuilder.newer_config?(c)),
+          # Neznamy generic typ kovania BEZ vyssej `config_schema` (legacy
+          # fallback D1): `rebuild_many` by na nom zhodil CELU spolocnu operaciu
+          # a nezapisala by sa ani jedna z ostatnych skriniek. Pyta sa TA ISTA
+          # kontrola, akou branu drzi `guard_unknown_hardware!`.
+          'unknown_hw' => (defined?(CabinetBuilder) && CabinetBuilder.unknown_hardware?(c)),
+          'overrides' => (c['part_overrides'].is_a?(Hash) ? c['part_overrides'] : {}) }
+      end
+
+      # CISTA funkcia: PRECO sa skrinka preskoci, alebo nil. JEDNA definicia pre
+      # suhrn (riadok Studia) aj pre plan (akcia) — dva zoznamy dovodov by sa
+      # casom rozisli a pouzivatel by v tlacidle videl iné cislo, nez co akcia
+      # spravi (Codex #365 kolo 1, P2).
+      def front_grain_skip_reason(ent)
+        return 'novšia verzia pluginu' if ent['newer']
+        return 'má kovanie neznámeho typu — aktualizuj plugin alebo skrinku prestav' if ent['unknown_hw']
+        # ODPOJENY DIELEC (Codex #365 kolo 2, P1). Dielec vytiahnuty zo skrinky
+        # na koren modelu ostava viazany uz len atributom `cabinet_id` — do
+        # kusovnika aj VEPO ide PO SVOJOM (`Bom.collect`, vetva `part`), ale
+        # `rebuild_many` prestava LEN vnorene dielce. Zapis by teda vyrobil
+        # DVOJNIKA: vnoreny dielec s novym smerom a odpojeny so starym.
+        # Rovnaka trieda ako `Panel.detached_part_error` v karte dielca (K1),
+        # ktora taky zapis tiez ODMIETA — radsej fail-visible skip nez ticho
+        # zmenit polovicu.
+        return 'má odpojený dielec — vráť ho do skrinky alebo skrinku prestav' if ent['detached']
+        return 'staršia skrinka bez zoznamu čiel — najprv ju prestav' if ent['legacy']
+        return 'čelá treba najprv prestavať' if ent['unresolved']
+
+        nil
+      end
+
+      # CISTA funkcia (R4): stav pre riadok „Kresba čiel" v Studiu.
+      # Pocita sa LEN z ciel, na ktore akcia naozaj dosiahne — skrinka z novsej
+      # verzie ani nerozlustena polozka sa do cisla v tlacidle nerataju, inak by
+      # tlacidlo slubilo viac, nez akcia spravi. Nezmiznu vsak: vypadnu do
+      # `skipped` (id + dovod), takze zakazka, kde je preskocene VSETKO, uz
+      # nehlasi falosne „Žiadne čelá" (Codex #365 kolo 1, P2).
+      # `inherit` = celo BEZ overridu (smer mu urcuje material; katalog sa tu
+      # NEDOPOCITAVA — otazka je „ma to pouzivatel rozhodnute?", nie „aky smer
+      # z toho vyjde").
+      def front_grain_summary(entries)
+        by = { 'length' => 0, 'width' => 0, 'inherit' => 0 }
+        count = 0
+        cabs = 0
+        skipped = []
+        Array(entries).each do |ent|
+          why = front_grain_skip_reason(ent)
+          if why
+            skipped << { 'id' => ent['id'].to_s, 'why' => why }
+            next
+          end
+
+          parts = Array(ent['keys'])
+          next if parts.empty?
+
+          cabs += 1
+          parts.each do |part|
+            count += 1
+            by[front_grain_value(ent['overrides'], part) || 'inherit'] += 1
+          end
+        end
+        { 'count' => count, 'cabinets' => cabs, 'by' => by, 'skipped' => skipped }
+      end
+
+      # Zapis overridu do JEDNYCH params. Vracia pocet REALNE zmenenych ciel
+      # (celo, ktore uz ma pozadovany stav, sa neta). Prazdny zaznam zanika —
+      # `Panel.store_override` je na to jedine dvere (vzor karty dielca).
+      #
+      # LEGACY SLOT: stara skrinka moze mat smer ulozeny pod renderovacim
+      # suffixom. Zapisuje sa VZDY na dnesny `part_key`, ale `grain_direction`
+      # v legacy zazname sa MAZE — inak by „Podľa materiálu" override nezrusilo:
+      # migracia v `CabinetBuilder.normalize` by legacy hodnotu vratila spat do
+      # hry. Ostatne polia legacy zaznamu (napr. `edges`) sa NEDOTYKAJU.
+      def front_grain_write!(params, parts, grain)
+        ov = (params['part_overrides'] ||= {})
+        want = grain == FRONT_GRAIN_INHERIT ? '' : grain
+        changed = 0
+        Array(parts).each do |part|
+          touched = false
+          key = part['key'].to_s
+          rec = ov[key].is_a?(Hash) ? ov[key] : {}
+          if rec['grain_direction'].to_s != want
+            if want.empty? then rec.delete('grain_direction') else rec['grain_direction'] = want end
+            Panel.store_override(ov, key, rec)
+            touched = true
+          end
+          legacy = part['legacy'].to_s
+          lrec = legacy.empty? ? nil : ov[legacy]
+          if lrec.is_a?(Hash) && lrec.key?('grain_direction')
+            lrec.delete('grain_direction')
+            Panel.store_override(ov, legacy, lrec)
+            touched = true
+          end
+          changed += 1 if touched
+        end
+        changed
+      end
+
+      # CISTA funkcia: plan hromadneho zapisu. `entries` su zaznamy z
+      # `front_grain_entry` doplnene o `params` (config_to_params danej skrinky)
+      # a `ref` (co sa ma prestavat — instancia; v teste lubovolny objekt).
+      #
+      # ALL-OR-NOTHING je vec volajuceho (`rebuild_many` = JEDNA operacia);
+      # tu sa len rozhodne, KTORE skrinky do nej idu. Skrinka z novsej verzie
+      # sa NIKDY nezahodi ticho (R-12) — vypadne do `skipped` aj s dovodom.
+      def fronts_grain_plan(entries, grain)
+        jobs = []
+        skipped = []
+        count = 0
+        cabs = 0
+        Array(entries).each do |ent|
+          why = front_grain_skip_reason(ent)
+          if why
+            skipped << { 'id' => ent['id'].to_s, 'why' => why }
+            next
+          end
+          parts = Array(ent['keys'])
+          next if parts.empty?
+
+          count += parts.length
+          cabs += 1
+          params = ent['params']
+          next unless params.is_a?(Hash)
+
+          jobs << [ent['ref'], params] if front_grain_write!(params, parts, grain).positive?
+        end
+        { 'jobs' => jobs, 'skipped' => skipped, 'count' => count, 'cabinets' => cabs }
+      end
+
+      # CISTA funkcia: PRESTAVALA sa tato skrinka v tejto akcii?
+      #
+      # Vyber sa po akcii obnovuje LEN vtedy (review #365 kolo 3, P2). Skrinka,
+      # ktora do prestavby nesla (preskocena alebo bez zmeny), ma svoje entity
+      # NEDOTKNUTE — a hlavne: ked ma pouzivatel oznaceny ODPOJENY dielec, jeho
+      # vlastnik je prave taka preskocena skrinka. Obnova vyberu by vtedy
+      # oznacila VNORENE dvojca (alebo skrinku) a zahodila by platny vyber aj
+      # kartu dielca, na ktoru sa pouzivatel prave pozera.
+      def fronts_grain_rebuilt?(plan, ref)
+        return false if ref.nil?
+
+        Array(plan && plan['jobs']).any? { |job| job.is_a?(Array) && job[0].equal?(ref) }
+      end
+
+      # Zber skriniek zakazky pre riadok Studia aj pre akciu — CISTE CITANIE.
+      #
+      # TOP-LEVEL `model.entities` (Codex #365 kolo 1, P1): PRESNE to iste, co
+      # zbiera `Bom.collect`, teda „zákazka" v zmysle kusovnika a Studia.
+      # `Ids.each_cabinet` sem NEPATRI — hlada GLOBALNE cez `model.definitions`
+      # a nasiel by aj korpus VNORENY v cudzom komponente; ten vo vystupoch
+      # zakazky nie je a prestavba by ho zmenila vo VSETKYCH vyskytoch zdielanej
+      # definicie.
+      #
+      # PRECO vlastny lahky prechod a nie `Bom.collect`: zber kusovnika nesie
+      # VYROBNE snapshoty dielcov, v ktorych je uz smer MATERIALIZOVANY — z nich
+      # sa neda odlisit „pouzivatel zvolil pozdlznu" od „material ju ma". Otazka
+      # riadku je o OVERRIDOCH, a tie ziju v configu korpusu.
+      #
+      # Zlyhanie vracia nil (NIE prazdne pole): prazdne pole by klient precital
+      # ako „v zakazke nie su cela" a tlacidlo by tvarilo, ze nie je co robit.
+      # nil = „stav nedostupny" (vzor `mat_payload`).
+      def front_grain_scan(model, with_params: false)
+        return [] unless model
+
+        cabs = []
+        detached = Hash.new(0)
+        # JEDEN prechod korenom: korpusy zakazky AJ mapa `cabinet_id => pocet
+        # odpojenych dielcov`. Odpojeny dielec je top-level `part` s vlastnikom
+        # v atribute `cabinet_id` — presne to, co zbiera `Bom.collect`.
+        model.entities.grep(Sketchup::ComponentInstance).each do |inst|
+          case Store.kind(inst)
+          when 'cabinet'
+            cabs << inst
+          when 'part'
+            next unless Store.get(inst, 'manufactured') == true
+
+            cid = Store.get(inst, 'cabinet_id').to_s
+            detached[cid] += 1 unless cid.empty?
+          end
+        end
+        cabs.map do |inst|
+          cid = Store.get(inst, 'cabinet_id').to_s
+          ent = front_grain_entry(cid, Store.config(inst) || {})
+          ent['detached'] = detached[cid].positive?
+          ent['ref'] = inst
+          ent['params'] = Panel.existing_params(inst) if with_params
+          ent
+        end
+      rescue StandardError => e
+        Engine.log_error(e, 'ProductionCore.front_grain_scan')
+        nil
+      end
+
+      # Stav riadku pre payload sekcie Materialy (`mat.front_grain`).
+      # nil = stav sa nepodarilo zistit (riadok to prizna, tlacidlo ostane
+      # vypnute) — nikdy sa netvari, ze zakazka cela nema.
+      def front_grain_state(model)
+        scan = front_grain_scan(model)
+        scan.nil? ? nil : front_grain_summary(scan)
+      end
+
+      def front_grain_label(grain)
+        case grain
+        when 'length' then 'pozdĺžna'
+        when 'width' then 'priečna'
+        else 'podľa materiálu'
+        end
+      end
+
+      def front_grain_word(n)
+        return 'čelo' if n == 1
+
+        n < 5 ? 'čelá' : 'čiel'
+      end
+
+      def fronts_grain_skipped_tail(plan)
+        s = Array(plan['skipped'])
+        return '' if s.empty?
+
+        ' Preskočené: ' + s.map { |x| "#{x['id']} (#{x['why']})" }.join(', ') + '.'
+      end
+
+      def fronts_grain_empty_msg(plan)
+        "V zákazke nie sú žiadne čelá.#{fronts_grain_skipped_tail(plan)}"
+      end
+
+      def fronts_grain_noop_msg(grain, plan)
+        n = plan['count'].to_i
+        msg = +"Kresba čiel: #{front_grain_label(grain)} — už platí na všetkých #{n} " \
+               "#{front_grain_word(n)}, nič sa nemenilo."
+        # Review #365 (P3): pri „Podľa materiálu" je no-op najcastejsi stav —
+        # celo BEZ overridu uz materialu podlieha, takze nie je co rusit.
+        # Bez tejto vety by to vyzeralo, ze akcia nefunguje.
+        msg << ' Čelá, ktoré smer dedia, sa neprestavujú.' if grain == FRONT_GRAIN_INHERIT
+        msg << fronts_grain_skipped_tail(plan)
+        msg
+      end
+
+      # LOKAL („v 1 skrinke" / „v 2 skrinkách") — `Panel.cabinet_word` dava
+      # NOMINATIV („2 skrinky"), ktory by v tejto vete znel zle.
+      def front_grain_cab_word(n)
+        n == 1 ? 'skrinke' : 'skrinkách'
+      end
+
+      def fronts_grain_done_msg(grain, plan)
+        n = plan['count'].to_i
+        c = plan['cabinets'].to_i
+        "Kresba čiel: #{front_grain_label(grain)} — #{n} #{front_grain_word(n)} v #{c} " \
+          "#{front_grain_cab_word(c)} (1 krok Späť).#{fronts_grain_skipped_tail(plan)}"
+      end
+
       # --- D-104 / D-105 / K2 (audit #5): ZDIELANE PREPINACE OVERLAYOV ------
       #
       # „Zvýrazniť hrany" a „Smer kresby" su od ŠT-1b v liste sekcie Kontrola

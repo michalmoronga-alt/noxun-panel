@@ -12040,6 +12040,271 @@ module NoxunSuRunner
     model.selection.to_a.map { |x| e::Store.get(x, 'part_key').to_s }
   end
 
+  # --- D-131: HROMADNA KRESBA CIEL ZAKAZKY -----------------------------------
+  #
+  # Headless sada zamyka ROZSAH, ENUM a PLAN; tu sa dokazuje to, co headless
+  # nevie: ze zapis naozaj dopadne na SNAPSHOTY dielcov v modeli, ze je to
+  # PRESNE JEDEN krok Späť pre CELU zakazku a ze sa nic ine nedotklo.
+
+  # Kluce ciel skrinky tak, ako ich vidi akcia (z ULOZENEHO configu).
+  def d131_keys(inst)
+    parts, = e::ProductionCore.front_grain_keys((e::Store.config(inst) || {})['front_items'])
+    parts.map { |p| p['key'] }
+  end
+
+  # Smer dekoru zo SNAPSHOTU dielca (to, co cita karta dielca aj VEPO).
+  def d131_grain(inst, part_key)
+    part = inst.definition.entities.grep(Sketchup::ComponentInstance)
+               .find { |i| e::Store.kind(i) == 'part' && e::Store.get(i, 'part_key').to_s == part_key }
+    part ? (e::Store.config(part) || {})['grain_direction'].to_s : nil
+  end
+
+  # ZAPISOVA cesta zije v `MaterialsDialog` (brana 1b-3 — `production_core.rb`
+  # je citacia cesta a nesmie si vyziadat dedup). Runner ju vola PRIAMO, teda
+  # tam, kam klik dorazi PO flush handshake panela.
+  def d131_call(model, grain, guid, extra = {})
+    msgs = []
+    pushes = 0
+    e::MaterialsDialog.fronts_grain_all(
+      model, { 'gen' => 0, 'grain' => grain, 'model_guid' => guid }.merge(extra),
+      generation: 0, status: ->(m, err = false) { msgs << [m, err] }, repush: -> { pushes += 1 }
+    )
+    [msgs, pushes]
+  end
+
+  def run_d131(model)
+    cleanup(model)
+    tmp = File.join(Dir.tmpdir, "noxun_d131_#{Process.pid}")
+    FileUtils.mkdir_p(tmp)
+    File.binwrite(File.join(tmp, 'materials.json'), JSON.pretty_generate(k1_catalog_json))
+    e::Materials.test_dir_override = tmp
+    e::Materials.reload!
+    markers = []
+    begin
+      # Zakazka: dvierka · zasuvkove celo · „Bez čela" + samostatna doska.
+      cab_door = e::CabinetBuilder.build(model, k1_params)
+      cab_drw = e::CabinetBuilder.build(
+        model, k1_params('fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'drawer_front',
+                                                     'mode' => 'auto' }] })
+      )
+      cab_none = e::CabinetBuilder.build(
+        model, k1_params('fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'none',
+                                                     'mode' => 'auto' }] })
+      )
+      board = e::BoardBuilder.build(model, { 'material_id' => 'K1DUB18', 'length' => 700.0,
+                                             'width' => 400.0, 'edges' => {} })
+      unless cab_door && cab_drw && cab_none && board
+        return ok('D-131: vlozenie 3 skriniek a dosky', false)
+      end
+
+      guid = e::Panel.model_guid(model)
+      door_key = d131_keys(cab_door).first
+      drw_key = d131_keys(cab_drw).first
+      ok("D-131: kluce ciel su z planu (#{door_key} · #{drw_key})",
+         door_key.to_s.start_with?('front:') && drw_key.to_s.end_with?('/panel'))
+      ok('D-131: skrinka „Bez čela" nema ZIADEN kluc cela', d131_keys(cab_none).empty?)
+
+      none_cfg_before = e::Store.get(cab_none, 'config').to_s
+      board_cfg_before = e::Store.get(board, 'config').to_s
+      side_before = d131_grain(cab_door, e::PartKeys.cabinet('side', 'left'))
+      ok("D-131: cela dedia smer materialu (#{d131_grain(cab_door, door_key)})",
+          d131_grain(cab_door, door_key) == 'length' && d131_grain(cab_drw, drw_key) == 'length')
+
+      # --- 1) JEDEN KLIK = PRIECNA KRESBA VSETKYCH CIEL ---------------------
+      r03_marker(model, markers) # marker: 1x Spat ho NESMIE zmazat
+      msgs, pushes = d131_call(model, 'width', guid)
+      cab_door = e::Panel.find_cabinet_by_id(model, e::Store.get(cab_door, 'cabinet_id').to_s)
+      cab_drw = e::Panel.find_cabinet_by_id(model, e::Store.get(cab_drw, 'cabinet_id').to_s)
+      ok("D-131: hlaska menuje smer, pocty a 1 krok Späť (#{msgs.first && msgs.first[0]})",
+         msgs.length == 1 && msgs[0][1] == false && msgs[0][0].include?('priečna') &&
+         msgs[0][0].include?('1 krok Späť'))
+      ok('D-131: po zapise prisiel PLNY push okna (odomkne tlacidlo v kliente)', pushes == 1)
+      ok("D-131: dvierka maju PRIECNU kresbu (#{d131_grain(cab_door, door_key)})",
+         d131_grain(cab_door, door_key) == 'width')
+      ok("D-131: zasuvkove celo tiez (#{d131_grain(cab_drw, drw_key)})",
+         d131_grain(cab_drw, drw_key) == 'width')
+      ok('D-131: KORPUSOVY dielec ostal nedotknuty',
+         d131_grain(cab_door, e::PartKeys.cabinet('side', 'left')) == side_before)
+      ok('D-131: skrinka „Bez čela" ma config BAJTOVO nezmeneny',
+         e::Store.get(e::Panel.find_cabinet_by_id(model, e::Store.get(cab_none, 'cabinet_id').to_s),
+                      'config').to_s == none_cfg_before)
+      ok('D-131: DOSKA ma config BAJTOVO nezmeneny (kresbu ciel neriesi)',
+         e::Store.get(board, 'config').to_s == board_cfg_before)
+
+      # --- 2) PRESNE JEDEN krok Späť pre CELU zakazku -----------------------
+      Sketchup.undo
+      cab_door = e::Panel.find_cabinet_by_id(model, e::Store.get(cab_door, 'cabinet_id').to_s)
+      cab_drw = e::Panel.find_cabinet_by_id(model, e::Store.get(cab_drw, 'cabinet_id').to_s)
+      ok('D-131: 1x Spat vratil OBE skrinky naraz (jedna operacia)',
+         d131_grain(cab_door, door_key) == 'length' && d131_grain(cab_drw, drw_key) == 'length')
+      ok('D-131: 1x Spat NEZMAZAL marker — bol to PRESNE JEDEN krok',
+         markers.last.valid?)
+      ok('D-131: aj overridy v configoch su prec',
+         k1_override_of(cab_door, door_key).nil? && k1_override_of(cab_drw, drw_key).nil?)
+
+      # --- 3) „Podľa materiálu" override ZMAZE ------------------------------
+      d131_call(model, 'width', guid)
+      cab_door = e::Panel.find_cabinet_by_id(model, e::Store.get(cab_door, 'cabinet_id').to_s)
+      ok('D-131: priprava — override je zapisany', k1_override_of(cab_door, door_key) == 'width')
+      d131_call(model, '__inherit__', guid)
+      cab_door = e::Panel.find_cabinet_by_id(model, e::Store.get(cab_door, 'cabinet_id').to_s)
+      cab_drw = e::Panel.find_cabinet_by_id(model, e::Store.get(cab_drw, 'cabinet_id').to_s)
+      ok('D-131: „Podľa materiálu" overridy ZMAZALO',
+         k1_override_of(cab_door, door_key).nil? && k1_override_of(cab_drw, drw_key).nil?)
+      ok("D-131: a cela sa vratili na smer materialu (#{d131_grain(cab_door, door_key)})",
+         d131_grain(cab_door, door_key) == 'length')
+
+      # --- 3b) OZNACENY DIELEC PREZIJE prestavbu (karta sa NEZAVRIE) ---------
+      # Stare entity prestavba zahodi, takze navrat ide cez `part_key` (vzor
+      # `rebuild_focus_part`). Bez toho by `find_cabinet` vratil vlastnika,
+      # `reselect` by oznacil SKRINKU a karta dielca by sa po hromadnej zmene
+      # ZAVRELA namiesto toho, aby ukazala novy smer.
+      sel_part = cab_door.definition.entities.grep(Sketchup::ComponentInstance)
+                         .find { |i| e::Store.get(i, 'part_key').to_s == door_key }
+      e::Panel.select_only(model, sel_part) if sel_part
+      d131_call(model, 'width', guid)
+      cab_door = e::Panel.find_cabinet_by_id(model, e::Store.get(cab_door, 'cabinet_id').to_s)
+      after = e::Panel.find_selected_part(model)
+      ok("D-131: po prestavbe je vybrany DIELEC s tym istym part_key (#{after && e::Store.get(after, 'part_key')})",
+         !after.nil? && e::Store.get(after, 'part_key').to_s == door_key)
+      card = after ? (e::Panel.part_card_payload(model, cab_door, after) || {}) : {}
+      ok("D-131: a karta dielca uz ukazuje NOVY smer (#{card['grain_value']} / #{card['grain_effective']})",
+         card['grain_value'] == 'width' && card['grain_effective'] == 'width')
+      e::Panel.select_only(model, cab_door)
+
+      # --- 3c) ODPOJENY DIELEC: skrinka sa PRESKOCI, nic sa nezapise ---------
+      # Dielec vytiahnuty na koren ide do kusovnika PO SVOJOM, ale prestavba
+      # meni LEN vnorene dielce — zapis by vyrobil DVOJNIKA (vnoreny s novym
+      # smerom, odpojeny so starym). Rovnaka trieda ako `detached_part_error`
+      # v karte dielca, ktora taky zapis tiez odmieta.
+      d131_call(model, '__inherit__', guid)
+      cab_door = e::Panel.find_cabinet_by_id(model, e::Store.get(cab_door, 'cabinet_id').to_s)
+      src = cab_door.definition.entities.grep(Sketchup::ComponentInstance)
+                    .find { |i| e::Store.get(i, 'part_key').to_s == door_key }
+      det = nil
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST D-131 odpojeny dielec', true)
+        det = model.entities.add_instance(src.definition,
+                                          Geom::Transformation.translation(e::Units.vector(0, 2000, 0)))
+        %w[std kind id part_id cabinet_id role name part_key part_key_schema role_key
+           manufactured production_class config].each do |k|
+          v = src.get_attribute(e::Store::DICT, k)
+          det.set_attribute(e::Store::DICT, k, v) unless v.nil?
+        end
+        model.commit_operation
+      end
+      cfg_det_before = e::Store.get(cab_door, 'config').to_s
+      ent = Array(e::ProductionCore.front_grain_scan(model))
+            .find { |x| x['id'] == e::Store.get(cab_door, 'cabinet_id').to_s }
+      ok('D-131: zber vidi ODPOJENY dielec skrinky', ent && ent['detached'] == true)
+      # Pouzivatel ma oznaceny prave ten ODPOJENY dielec. Akcia meni INU skrinku
+      # (zasuvkovu), takze vyber sa nesmie hnut — obnova by oznacila vnorene
+      # dvojca a zahodila kartu, na ktoru sa pouzivatel pozera.
+      e::Panel.select_only(model, det)
+      msgs, = d131_call(model, 'width', guid)
+      cab_door = e::Panel.find_cabinet_by_id(model, e::Store.get(cab_door, 'cabinet_id').to_s)
+      ok("D-131: skrinka s odpojenym dielcom je PRESKOCENA a vymenovana (#{msgs.first && msgs.first[0]})",
+         msgs.length == 1 && msgs[0][0].include?('odpojený'))
+      ok('D-131: a jej config sa nezmenil ani o bajt (ziadny polovicny zapis)',
+         e::Store.get(cab_door, 'config').to_s == cfg_det_before)
+      sel_after = model.selection.to_a
+      ok("D-131: OZNACENY odpojeny dielec ostal vo vybere (#{sel_after.length} entit)",
+         sel_after.length == 1 && sel_after.first.equal?(det))
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST D-131 uprac odpojeny', true)
+        det.erase! if det && det.valid?
+        model.commit_operation
+      end
+
+      # --- 4) GUARD DOKUMENTU: cudzi guid NEZAPISE a nenecha krok Späť -------
+      cfg_before = e::Store.get(cab_door, 'config').to_s
+      r03_marker(model, markers)
+      msgs, pushes = d131_call(model, 'width', 'CUDZI-GUID')
+      ok("D-131: cudzi dokument zapis ZASTAVIL (#{msgs.first && msgs.first[0]})",
+         msgs.length == 1 && msgs[0][1] == true)
+      ok('D-131: aj odmietnutie posle push (tlacidlo sa odomkne)', pushes == 1)
+      ok('D-131: config sa pri cudzom guide nezmenil ani o bajt',
+         e::Store.get(cab_door, 'config').to_s == cfg_before)
+      Sketchup.undo
+      ok('D-131: odmietnutie nezalozilo ZIADEN krok Spat (1x Spat vratil marker)',
+         !markers.last.valid?)
+
+      # --- 4b) FLUSH HANDSHAKE: rozpisana zmena v Inspectore akciu ZASTAVI ---
+      # Klik ide cez panel (`NX.studioRelayFrontsGrain`), ktory rozpisane edity
+      # flushne; ked flush NEPREJDE (cervene pole), server zapis odmietne —
+      # inak by prestavba bezala nad starym rozlozenim ciel.
+      cfg_before = e::Store.get(cab_door, 'config').to_s
+      r03_marker(model, markers)
+      msgs, pushes = d131_call(model, 'width', guid, 'flush_blocked' => true)
+      ok("D-131: rozpisana zmena panela zapis ZASTAVILA (#{msgs.first && msgs.first[0]})",
+         msgs.length == 1 && msgs[0][1] == true && msgs[0][0].include?('Inspectore'))
+      ok('D-131: pri flush blokade sa config nezmenil ani o bajt',
+         e::Store.get(cab_door, 'config').to_s == cfg_before)
+      ok('D-131: a aj tak prisiel push (tlacidlo sa odomkne)', pushes == 1)
+      Sketchup.undo
+      ok('D-131: flush blokada nezalozila ZIADEN krok Spat (1x Spat vratil marker)',
+         !markers.last.valid?)
+
+      # --- 4c) VNORENA SKRINKA NIE JE V ZAKAZKE ------------------------------
+      # `Ids.each_cabinet` hlada GLOBALNE cez `model.definitions` a korpus
+      # vnoreny v cudzom komponente by nasiel; ten vsak nie je ani v kusovniku
+      # (`Bom.collect` = top-level) a prestavba by ho zmenila vo VSETKYCH
+      # vyskytoch zdielanej definicie (Codex #365, P1).
+      # POZOR: `CabinetBuilder.build` si otvara VLASTNU operaciu — volat ju
+      # vnutri inej by tu nasu zhodilo (TypeError na zmazanej definicii).
+      inner = e::CabinetBuilder.build(model, k1_params)
+      host = nil
+      nested = nil
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST D-131 vnorenie', true)
+        hdef = model.definitions.add('D131_HOST')
+        host = model.entities.add_instance(hdef, Geom::Transformation.new)
+        nested = hdef.entities.add_instance(inner.definition, Geom::Transformation.new)
+        %w[std kind id cabinet_id role part_key_schema manufactured production_class config]
+          .each do |k|
+            v = e::Store.get(inner, k)
+            nested.set_attribute(e::Store::DICT, k, v) unless v.nil?
+          end
+        inner.erase! if inner.valid?
+        model.commit_operation
+      end
+      if nested.nil? || !nested.valid?
+        ok('D-131: priprava vnorenej skrinky', false)
+      else
+        nested_before = e::Store.get(nested, 'config').to_s
+        scan_ids = Array(e::ProductionCore.front_grain_scan(model)).map { |x| x['id'] }
+        ok("D-131: vnorena skrinka NIE JE v zbere zakazky (#{scan_ids.length} top-level)",
+           !scan_ids.include?(e::Store.get(nested, 'cabinet_id').to_s))
+        d131_call(model, 'width', guid)
+        ok('D-131: a hromadny zapis sa jej NEDOTKOL (config bajtovo nezmeneny)',
+           e::Store.get(nested, 'config').to_s == nested_before)
+      end
+
+      # --- 5) PRAZDNA ZAKAZKA: ziadna operacia ------------------------------
+      cleanup(model)
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST D-131 uprac host', true)
+        host.erase! if host && host.valid?
+        model.commit_operation
+        model.definitions.purge_unused
+      end
+      r03_marker(model, markers)
+      msgs, pushes = d131_call(model, 'width', guid)
+      ok("D-131: prazdna zakazka to povie (#{msgs.first && msgs.first[0]})",
+         msgs.length == 1 && msgs[0][0].include?('nie sú žiadne čelá'))
+      ok('D-131: aj prazdna zakazka posle push (tlacidlo sa odomkne)', pushes == 1)
+      Sketchup.undo
+      ok('D-131: 0 ciel = ZIADNY krok Spat (1x Spat vratil marker)', !markers.last.valid?)
+    rescue StandardError => ex
+      ok("D-131: vynimka #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}", false)
+    ensure
+      r03_clear_markers(model, markers)
+      e::Materials.test_dir_override = nil
+      e::Materials.reload!
+      cleanup(model)
+    end
+  end
+
   def run_d94(model)
     cleanup(model)
     return ok('D-94: okno Studio je nacitane', false) unless defined?(e::StudioDialog)
@@ -22271,6 +22536,7 @@ module NoxunSuRunner
     run_uid1(model)          # UI-D1: dielec — „Použiť na podobné" (zapis do viacerych dielcov, 1 undo) + „Označiť v modeli"
     run_k1(model)            # K1/D-108: smer dekoru per dielec — 1 undo, geometria a D-88 nedotknute, VEPO otocene
     run_k2(model)            # K2/D-87: kresba smeru v modeli — lifecycle overlayu, ziadny undo krok, otocenie po prestavbe
+    run_d131(model)          # D-131: kresba VSETKYCH ciel zakazky jednym klikom — dvierka aj zasuvkove celo dostanu priecnu kresbu v JEDNEJ operacii (1x Spat vrati obe skrinky a marker prezije), „Bez čela", doska aj korpusove dielce ostanu BAJTOVO nedotknute, „Podľa materiálu" overridy zmaze; cudzi model_guid, rozpisana zmena panela (flush handshake) ani prazdna zakazka nenechaju ZIADEN krok Spat a vsetky posielaju push (odomknutie tlacidla); VNORENA skrinka nie je v zakazke a zapis sa jej nedotkne
     run_d27(model)           # D-27: viditelnost tagov z panela — 1 klik = 1 krok Spat, guardy bez zapisu, legacy tag zon, aktivny tag, overlay nad skrytym
     run_uid2(model)          # UI-D2: PNG nahlady sablon — capture, KOMPLETNA obnova kamery (persp. aj orto), ziadny undo krok
     run_smoke1(model)        # SMOKE PACK 1 (6A): rucne odfotenie nahladu k ULOZENEJ sablone — guardy vyberu, ziadny undo krok

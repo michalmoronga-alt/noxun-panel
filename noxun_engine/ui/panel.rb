@@ -262,6 +262,10 @@ module Noxun
           # Rozpocet — ten isty flush handshake, vlastnym kanalom Studia.
           cb(dlg, 'studio_do_budget_xlsx')  { |p| StudioDialog.do_budget_xlsx(p) }
           cb(dlg, 'studio_do_cp_xlsx')      { |p| StudioDialog.do_cp_xlsx(p) }
+          # D-131: „Použiť na všetky čelá" zo sekcie Materiály — TEN ISTY flush
+          # handshake ako exporty. Rozpisana zmena ciel v Inspectore meni, KTORE
+          # cela v zakazke su, takze prestavba musi cakat na jej flush.
+          cb(dlg, 'studio_do_fronts_grain') { |p| StudioDialog.do_fronts_grain_all(p) }
           # GHOST-FB4: pole locknutej vysky v Ghost pasiku (mm). Meni stav
           # BEZIACEJ session, nie model — guard identity dokumentu je preto
           # rovnaky ako pri zapisovych handleroch (R-02).

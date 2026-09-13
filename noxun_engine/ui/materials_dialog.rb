@@ -904,6 +904,125 @@ module Noxun
           refresh_studio_after_model_write
         end
 
+        # --- D-131: KRESBA VSETKYCH CIEL ZAKAZKY JEDNYM KLIKOM ---------------
+        #
+        # PRECO ZIJE TU a nie v `ProductionCore` (review #365): jadro vystupov
+        # je CITACIA cesta — branu 1b-3 (`test_1b3_citanie.rb`) drzi pravidlo,
+        # ze `production_core.rb` ani `studio_dialog.rb` si NESMU vyziadat
+        # opravu identity kopii. Hromadna prestavba ju vsak POTREBUJE:
+        # `CabinetBuilder.rebuild_in_operation` vola `make_unique`, takze po nej
+        # ma dedup tik co robit (presne ako po „Nahradiť UNI…" nizsie).
+        # V jadre preto ostal LEN cisty plan a suhrn; zapis je TRETIA modelova
+        # cesta tohto suboru a spravuje sa ako obe staršie.
+        #
+        # Vsetky styri guardy bezia na SERVERI (HTML select ani disabled
+        # tlacidlo nie su ochrana):
+        #   gen           — klik zo stareho DOM (medzitym prepocitane okno),
+        #   flush_blocked — rozpisana zmena v Inspectore (debounce 400 ms);
+        #                   prestavba by bezala nad STARYM rozlozenim a
+        #                   oneskoreny apply by potom vyrobil cela BEZ smeru,
+        #                   ktory pouzivatel zvolil (vzor exportov Studia),
+        #   model_guid    — medzitym prepnuty dokument. PRISNY rezim: je to
+        #                   ZAPIS a ID skriniek sa naprie dokumentmi OPAKUJU
+        #                   (vzor `Panel.handle_set_part_grain`),
+        #   grain         — uzavrety enum; neznama hodnota sa ODMIETNE, nikdy
+        #                   tichy fallback (vyrobne data by klamali o tom, co
+        #                   si pouzivatel zvolil).
+        #
+        # KAZDA vetva konci `repush` (review #365, P2): plny push okna je
+        # jedina cesta, ktorou sa v kliente odomkne tlacidlo — bez neho by po
+        # odmietnutom kliku navzdy visel text „Prestavujem…".
+        def fronts_grain_all(model, data, generation:, status:, repush:)
+          pc = ProductionCore
+          if model.nil?
+            repush.call
+            return status.call('Žiadny aktívny model.', true)
+          end
+          unless data['gen'].to_i == generation.to_i
+            repush.call
+            return status.call('Okno sa medzitým prepočítalo — obnovené, klikni znova.', true)
+          end
+          if data['flush_blocked']
+            repush.call
+            return status.call('Najprv sa dokončí rozpísaná zmena v Inspectore — klikni znova.', true)
+          end
+          if DocKey.foreign?(data['model_guid'], model)
+            repush.call
+            return status.call('Model sa medzitým prepol — obnovené, klikni znova.', true)
+          end
+          grain = data['grain'].to_s
+          unless grain == pc::FRONT_GRAIN_INHERIT || CabinetBuilder::GRAIN_OVERRIDES.include?(grain)
+            Engine.log("kresba ciel: neznama hodnota #{grain.inspect} — zapis odmietnuty")
+            repush.call
+            return status.call('Neznámy smer kresby — nič sa nezmenilo.', true)
+          end
+
+          scan = pc.front_grain_scan(model, with_params: true)
+          if scan.nil?
+            repush.call
+            return status.call('Stav čiel sa nepodarilo zistiť — pozri Ruby konzolu.', true)
+          end
+          plan = pc.fronts_grain_plan(scan, grain)
+          # 0 ciel aj 0 zmien = ZIADNA operacia (a teda ziadny krok Späť):
+          # otvorit undo krok pre nic by pouzivatelovi zjedlo jeden Ctrl+Z.
+          if plan['count'].zero?
+            repush.call
+            return status.call(pc.fronts_grain_empty_msg(plan), true)
+          end
+          if plan['jobs'].empty?
+            repush.call
+            return status.call(pc.fronts_grain_noop_msg(grain, plan))
+          end
+
+          fronts_grain_apply(model, plan)
+          status.call(pc.fronts_grain_done_msg(grain, plan))
+          # Inspector: karta dielca nesie po prestavbe novy VYSLEDOK smeru.
+          # Dedup ostava VYCHODZI (ako po „Nahradiť UNI…") — `make_unique`
+          # v prestavbe moze identitu kopii rozhodit a oprava patri ZAPISOVEJ
+          # ceste. Poradie (nota #20): `push_selected` PRED pushom Studia.
+          Panel.push_selected(model)
+          repush.call # Studio: cerstvy stav riadku + odomknutie tlacidla
+        rescue StandardError => e
+          Engine.log_error(e, 'MaterialsDialog.fronts_grain_all')
+          # `rebuild_many` operaciu pri vynimke ABORTUJE sama (nic v modeli
+          # neostane rozrobene) — sem uz patri len dovod pre pouzivatela.
+          repush.call
+          status.call("Kresba čiel sa nezapísala: #{e.message}", true)
+        end
+
+        # JEDNA operacia pre VSETKY skrinky = jeden krok Späť (vzor „Nahradiť
+        # UNI…"). Vyber pouzivatela prezije prestavbu.
+        #
+        # KED JE OZNACENY DIELEC (Codex #365 kolo 2, P2), vracia sa DIELEC, nie
+        # jeho skrinka: prestavba stare entity zahodi, takze navrat ide cez
+        # `part_key` — presne ako `Panel.rebuild_focus_part` v karte dielca.
+        # Bez toho by sa karta dielca po hromadnej zmene ZAVRELA namiesto toho,
+        # aby ukazala novy smer. Ked nahrada s tym klucom nevznikla (celo
+        # medzitym zaniklo), `focus_part` sam padne na vyber skrinky.
+        def fronts_grain_apply(model, plan)
+          selected = Panel.find_cabinet(model)
+          # Vyber sa obnovuje LEN ked sa jeho skrinka NAOZAJ prestavala (review
+          # #365 kolo 3, P2). Ked prestavbou nepresla — preskocena skrinka alebo
+          # skrinka bez zmeny — jej entity ziju dalej a vyber je platny; siahat
+          # nan by pri OZNACENOM ODPOJENOM DIELCI znamenalo oznacit vnorene
+          # dvojca (alebo skrinku) a zahodit kartu, na ktoru sa pouzivatel prave
+          # pozera.
+          rebuilt = ProductionCore.fronts_grain_rebuilt?(plan, selected)
+          part = rebuilt ? Panel.find_selected_part(model) : nil
+          part_key = part ? Panel.canonical_part_key(Panel.existing_params(selected),
+                                                     Panel.part_identity(selected, part)) : nil
+          Panel.suspend_selection_sync do
+            CabinetBuilder.rebuild_many(model, plan['jobs'], op_name: 'NOXUN: Kresba čiel zákazky')
+            if rebuilt && selected.valid?
+              if part_key
+                Panel.focus_part(model, selected, part_key)
+              else
+                Panel.reselect(model, selected)
+              end
+            end
+          end
+        end
+
         # ŠT-2a (audit #4): DVE cesty tohto suboru menia MODEL — projektova
         # predvolba a „Nahradiť UNI…". Obe prestavaju skrinky, takze Studio
         # musi dostat PLNY push AJ so zdvihom generacie: kusovnik, kontrola aj

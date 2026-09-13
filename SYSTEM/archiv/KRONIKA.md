@@ -17,6 +17,55 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **D-131 — KRESBA ČIEL CELEJ ZÁKAZKY JEDNÝM KLIKOM, v0.12.3 (13.9.2026, PR #365).**
+  **Čo Michal dostal:** v **Štúdiu → Materiály → Predvoľby projektu** je nový riadok **„Kresba čiel"** — voľba *Podľa materiálu · Pozdĺžna · Priečna*, tlačidlo **„Použiť na
+  všetky čelá (N)"** a vedľa neho read-only stav („teraz: 8× priečna · 4× podľa materiálu"). Jeden klik zapíše smer dekoru **všetkým fyzickým čelám všetkých skriniek
+  zákazky** (dvierkam po krídlach, zásuvkovým čelám, výklopom/sklopom, blendám) a prestaví ich v **jednej operácii = jeden krok Späť**. Predtým to bolo 12 klikov do 12
+  kariet dielca (K1/D-108) alebo zásah do katalógu, ktorý mení knižnicu pre všetky zákazky. Výsledok overí existujúca **Kontrola kresby**.
+  **Prečo AKCIA a nie predvoľba:** projektová predvoľba smeru pre budúce skrinky by bola zmena kontraktu projektu (audit-povinná dávka) a Michal chcel jednoduché riešenie.
+  Tlačidlo preto pôsobí na čelá, ktoré v zákazke sú **teraz**; nová skrinka sa riadi materiálom a akcia sa spustí znova (hint to hovorí, číslo v tlačidle sa zdvihne).
+  **Prečo žiadne nové pole:** zapisuje sa **ten istý** override `part_overrides[<kľúč čela>]['grain_direction']`, ktorý píše karta dielca — „Podľa materiálu" ho maže
+  (prázdny záznam zaniká). Hromadná cesta tak nezaviedla druhý kontrakt ani druhý zdroj smeru a `CONFIG_SCHEMA` sa nehýbe.
+  **Prečo sa kľúče čiel nehádajú:** skladá ich výhradne `Fronts.panels_for` z uloženého `front_items` — jediná autorita tvaru (`panel` · `flap` · `blind` · `wing:*`).
+  Druhý parser by sa časom rozišiel a override by ticho sadol na dielec, ktorý v pláne neexistuje. Dvierka bez platného `wings_n` = **preskočená a vymenovaná** skrinka,
+  rovnako ako skrinka z novšej verzie pluginu (R-12) — nikdy tichý drop.
+  **Undo:** jedna `CabinetBuilder.rebuild_many` pre celú zákazku (vzor „Nahradiť UNI…"); **0 čiel ⇒ žiadna operácia** (otvoriť undo krok pre nič by zjedlo jeden Ctrl+Z)
+  a rovnako **0 zmien** — skrinka, ktorá požadovaný smer už má, sa neprestavuje. Tlačidlo je počas prestavby zamknuté („Prestavujem…"), takže z jednej voľby nevzniknú dva
+  kroky Späť.
+  **Vedomé odchýlky:** (1) rozsah sa berie z **resolved `front_items`**, nie z `fronts` configu — ten istý zdroj, z ktorého číta `Bom.collect` smerové nálezy (KOV-A1);
+  a config bez toho kľúča sa preskočí s dôvodom, nie ticho; (2) pridaná vetva „nič sa nemenilo" nad rámec zadania (bez nej by opakovaný klik prestavoval celú zákazku pre nič);
+  (3) riadok je **priznaný druhý prechod** modelom pri každom pushi — overridy v kusovníkovom zbere nie sú (nesie už materializovaný smer); cena je jeden JSON parse configu na
+  skrinku a prijala sa radšej než rozširovanie `Bom.collect` o ďalšie aditívne kľúče; (4) zadanie žiadalo doplniť callback do whitelistov `test_relay_api` / `test_guards` /
+  `test_st1a_studio` — také **vyčerpávajúce zoznamy v repe nie sú** (testy menujú konkrétne callbacky), takže sa nič nedopĺňalo.
+  **Kde žije zápis (Codex review #365, P1+P2).** Prvá verzia mala celú akciu v `ProductionCore` a `push_selected` s `dedup: false`, aby prešla brána 1b-3. Bolo to naopak:
+  jadro výstupov je **čítacia** cesta a hromadná prestavba dedup POTREBUJE (`rebuild_in_operation` volá `make_unique`). Zápis preto presunutý k „Nahradiť UNI…" do
+  `MaterialsDialog.fronts_grain_all` s východzím dedupom; v jadre ostal len čistý plán a súhrn, takže brána platí ďalej **bez výnimky**. Klik navyše ide **flush handshakom**
+  ako exporty Štúdia (`NX.studioRelayFrontsGrain` → `studio_do_fronts_grain`): rozpísaná zmena čiel v Inspectore (debounce 400 ms) mení, ktoré čelá v zákazke sú — bez neho by
+  prestavba bežala nad starým rozložením a oneskorený apply by dorobil čelá bez zvoleného smeru. **Každá** vetva (aj odmietavá a `rescue`) posiela `repush`; plný push okna je
+  jediná cesta, ktorou sa v klientovi odomkne tlačidlo.
+  **Zákazka = TOP-LEVEL.** Zber ide `model.entities` presne ako `Bom.collect`. `Ids.each_cabinet` (ktorý mala prvá verzia cez `Panel.all_cabinets`) hľadá globálne cez
+  `model.definitions` a našiel by aj korpus **vnorený** v cudzom komponente — ten vo výstupoch zákazky nie je a prestavba by ho zmenila vo VŠETKÝCH výskytoch zdieľanej
+  definície. **Známy rozdiel na zapísanie:** `Materials.replace_uni_scan` je naďalej globálny (`Ids.each_of_kind`) — staršia nezrovnalosť, ktorej sa táto dávka VEDOME
+  nedotkla; patrí samostatnej fix dávke.
+  **Testy:** 4080 headless · 117 JS sád · 2693 in-SketchUp PASS / 0 FAIL (35 kontrol `run_d131`: snapshoty dielcov v modeli, presne jeden krok Späť pre celú zákazku,
+  „Bez čela"/doska/korpusové dielce, VNORENÁ skrinka aj skrinka s ODPOJENÝM dielcom bajtovo nedotknuté, výber dielca prežije prestavbu a karta ukáže nový smer (a označený
+  odpojený dielec ostane vo výbere), „Podľa materiálu" mazanie vrátane legacy kľúča, flush blokáda, cudzí `model_guid` aj prázdna zákazka bez kroku Späť a s pushom).
+  Deväť overených mutácií v hlavičkách oboch sád.
+  **Odpojené dielce (Codex kolo 2, P1).** Skrinka, ktorá má výrobný dielec **vytiahnutý na koreň** modelu, sa do prestavby vôbec nepustí: do kusovníka aj VEPO ide taký dielec
+  po svojom (`Bom.collect`, vetva `part`), kým `rebuild_many` prestaví len **vnorené** dielce — zápis by vyrobil **dvojníka** (vnorený s novým smerom, odpojený so starým).
+  Fail-visible skip s dôvodom, rovnaká trieda ako `Panel.detached_part_error` v karte dielca. Mapa `cabinet_id → počet odpojených` vzniká v tom istom prechode koreňom, ktorý
+  zbiera korpusy. **Na zapísanie:** „Nahradiť UNI…" má tú istú medzeru (odpojené dielce nerieši) — táto dávka sa jej vedome nedotkla.
+  **Výber dielca prežije prestavbu (Codex kolo 2, P2):** keď je označený vnorený dielec, zapamätá sa jeho `part_key` a po prestavbe sa označí náhrada (`Panel.focus_part`,
+  vzor `rebuild_focus_part`) — inak by sa karta dielca po hromadnej zmene zavrela namiesto toho, aby ukázala nový smer.
+  **Neznáme kovanie a brána obnovy výberu (Codex kolo 3, 2× P2).** Skrinka s `generic_type`, ktorý táto verzia nepozná, **bez** vyššej `config_schema` (legacy fallback D1) by
+  cez `rebuild_many` zhodila `guard_unknown_hardware!` — a s ním **celú spoločnú operáciu**, teda aj zápis všetkých ostatných skriniek. Pýta sa preto ešte pred operáciou a tou
+  istou kontrolou: guard sa od tejto dávky pýta cez čistý `CabinetBuilder.unknown_hardware(cfg)`, ktorý volá aj `front_grain_entry` (jedno telo, dve miesta). Druhý nález:
+  obnova výberu beží len keď skrinka výberu naozaj prešla prestavbou (`fronts_grain_rebuilt?`) — pri **označenom odpojenom dielci** je jeho vlastník preskočená skrinka a
+  obnova by označila vnorené dvojča a zahodila kartu, na ktorú sa používateľ pozerá.
+  **Codex review:** kolo 1 = 2× P1 + 2× P2 (top-level zber, flush handshake, repush v no-op vetve, priznanie preskočených skriniek) + slepý Opus (2× P2, 6× P3); kolo 2 =
+  1× P1 + 1× P2 (odpojené dielce, výber dielca); kolo 3 = 2× P2 (neznáme kovanie, brána obnovy výberu) — všetko zapracované.
+  **Vedomá výnimka z pravidla 3 kôl:** nálezy kola 3 sú okrajové P2 bez zmeny konceptu (vzor UI-B1), takže sa PR nerezal — dorobili sa na mieste.
+
 - **D-128 — RUČNÁ VÝŠKA DREVENÉHO BOXU ZÁSUVKY, v0.12.2 (13.9.2026, PR #364).**
   **Čo Michal dostal:** pri drevenom boxe (Quadro V6) sa výška boxu dá **ručne znížiť**. Riadok Zásuvka v kontexte Kovanie **aj karta zásuvkového čela** majú tretí chip osi
   — „box 360" vedľa „NL 450" — a hneď pri ňom **malé číselné pole** s rozsahom v nápovede. Napíšeš hodnotu, stlačíš Enter a **2 boky, vnútorné čelo a chrbát** sa narežú na

@@ -437,6 +437,34 @@ miesto, kde vzniká číslo semaforu** — číta ho sekcia Kontrola v Štúdiu,
 odovzdáva svoj stav **explicitne** — okrem `generation:`/`status:`/`repush:` aj **`echo:`** (malý push stavu prepínača do TOHO okna) a pri kresbe `grain_echo:`; guard tak nemá
 **žiadny okenný stav** a obe okná sú nad ním len obaly.
 
+**D-131 kresba čiel zákazky — v tomto module žije LEN ČÍTANIE** (v0.12.3, riadok „Kresba čiel" v sekcii Materiály). Zápis (`MaterialsDialog.fronts_grain_all`) je **zámerne inde**:
+`production_core.rb` je čítacia cesta a brána 1b-3 jej zakazuje vyžiadať si dedup — hromadná prestavba ho však potrebuje, lebo `rebuild_in_operation` volá `make_unique`
+(detail v [materials.md](materials.md)). **Zber `front_grain_scan`:** top-level `model.entities` — **presne to isté, čo zbiera `Bom.collect`**, teda „zákazka" v zmysle kusovníka;
+`Ids.each_cabinet` sem NEPATRÍ (hľadá globálne cez `model.definitions` a našiel by aj korpus **vnorený** v cudzom komponente, ktorý vo výstupoch nie je a ktorého prestavba by
+zasiahla všetky výskyty zdieľanej definície). Z uloženého configu berie `front_items` + `part_overrides` — nie `Bom.collect`, ktorý nesie už **materializovaný** smer, z ktorého sa
+„používateľ to rozhodol" od „materiál to má" odlíšiť nedá. Zlyhanie vracia **nil**, nie prázdny zoznam (prázdny by klient čítal ako „zákazka čelá nemá"). **Kľúče** fyzických čiel
+skladá `Fronts.panels_for` (jediná autorita tvaru: `panel` · `flap` · `blind` · `wing:*` podľa `wings_n`; „Bez čela" nemá dielec) a spolu s nimi vracia aj **legacy renderovací
+suffix** toho istého dielca — starý override pod ním musí riadok vidieť a zápis prebiť, inak by ho migrácia pri prestavbe vrátila do hry. Počet krídel sa NIKDY nehádá: položka bez
+platného `wings_n`, config **bez** `front_items` (skrinka spred zoznamu resolved čiel) aj skrinka z novšej verzie (R-12) sú **preskočené a vymenované** — `skipped` nesie id aj
+dôvod a ide aj do `mat.front_grain`, takže zákazka, kde je preskočené všetko, nehlási falošné „Žiadne čelá".
+
+**Skrinka s ODPOJENÝM dielcom sa preskočí tiež.** Dielec vytiahnutý na koreň modelu ostáva viazaný už len atribútom `cabinet_id` a do kusovníka aj VEPO ide **po svojom**
+(`Bom.collect`, vetva `part`), kým `rebuild_many` prestaví len **vnorené** dielce — zápis by teda vyrobil **dvojníka**: vnorený dielec s novým smerom a odpojený so starým.
+Ten istý prechod koreňom, ktorý zbiera korpusy, preto stavia mapu `cabinet_id → počet odpojených` (raz na zber, nie pri každej skrinke). Je to rovnaká trieda ochrany ako
+`Panel.detached_part_error` v karte dielca, ktorá taký zápis odmieta — fail-visible skip s dôvodom, nikdy tichá polovičná zmena. *(Známa medzera na porovnanie: „Nahradiť UNI…"
+odpojené dielce nerieši — samostatná téma, nie regresia tejto dávky.)*
+
+**Piaty dôvod: neznáme kovanie.** Config s `generic_type`, ktorý táto verzia nepozná, **bez** vyššej `config_schema` (legacy fallback D1) by cez `rebuild_many` zhodil
+`CabinetBuilder.guard_unknown_hardware!` — a s ním **celú spoločnú operáciu**, teda aj zápis všetkých ostatných skriniek. Pýta sa preto ešte pred operáciou, a **tou istou**
+kontrolou: guard sa od v0.12.3 pýta cez čistý `CabinetBuilder.unknown_hardware(cfg)` / `unknown_hardware?(cfg)` a `front_grain_entry` ho volá tiež — jedno telo, takže sa brána
+a predbežná otázka nemôžu rozísť.
+
+**Obnova výberu má bránu.** `fronts_grain_rebuilt?(plan, ref)` (čistá) hovorí, či skrinka naozaj prešla prestavbou; len vtedy sa výber obnovuje. Skrinka, ktorá do `jobs` nešla
+(preskočená alebo bez zmeny), má entity nedotknuté a jej výber je platný — a keď má používateľ označený **odpojený dielec**, jeho vlastník je práve taká preskočená skrinka:
+obnova by označila vnorené dvojča a zahodila kartu, na ktorú sa pozerá. Čisté funkcie `front_grain_keys` · `front_grain_value` ·
+`front_grain_entry` · `front_grain_skip_reason` · `front_grain_summary` · `front_grain_write!` · `fronts_grain_plan` sú headless testovateľné; `front_grain_state` dáva stav riadku
+do `mat` payloadu.
+
 Názvy stavov majú **jediný zdroj** `ProductionCore::EDGE_OPTION_LABELS` — rail Inspectora aj `js/edge_menu.js` ich čítajú odtiaľ (do ŠT-1c PR B3 sa rail pýtal cez tenký obal okna
 Výroba).
 

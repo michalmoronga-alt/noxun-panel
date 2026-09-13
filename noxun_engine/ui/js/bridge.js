@@ -421,6 +421,28 @@
       p.flush_blocked = blocked;
       if (window.sketchup && sketchup.studio_do_hw_csv) sketchup.studio_do_hw_csv(JSON.stringify(p));
     },
+    // D-131: „Použiť na všetky čelá" zo sekcie Materiály. Je to ZAPIS do
+    // modelu, nie export — a preto potrebuje TEN ISTY flush guard: rozpísaná
+    // zmena čiel v Inspectore (debounce 400 ms) mení, KTORÉ čelá v zákazke sú,
+    // takže hromadná prestavba by bežala nad starým rozložením a oneskorený
+    // apply by dorobil čelá bez zvoleného smeru. Červené pole akciu ZASTAVÍ.
+    studioRelayFrontsGrain: function(p){
+      var blocked = false;
+      try {
+        if (typeof validateFields === 'function' && typeof selectedCabId !== 'undefined' &&
+            selectedCabId && !validateFields()) blocked = true;
+        var badFg = document.querySelector('#boardCard input.bad, #boardCard .bad');
+        if (badFg) blocked = true;
+      } catch (e) { blocked = false; }
+      if (!blocked){
+        if (typeof nxCabinetAction === 'function'){
+          if (!nxCabinetAction(function(){ NX.studioRelayFrontsGrain(p); }, function(){ p.flush_blocked = true; if (window.sketchup && sketchup.studio_do_fronts_grain) sketchup.studio_do_fronts_grain(JSON.stringify(p)); })) return;
+        } else if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+        if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
+      }
+      p.flush_blocked = blocked;
+      if (window.sketchup && sketchup.studio_do_fronts_grain) sketchup.studio_do_fronts_grain(JSON.stringify(p));
+    },
     // ŠT-1c PR B1 (Š12): XLSX rozpoctu zo sekcie Rozpocet. Ten isty flush guard
     // ako pri VEPO — rozpisany edit korpusu meni kusovnik, teda aj platne, olep
     // a montaz v rozpocte (cervene pole preto export ZASTAVI).

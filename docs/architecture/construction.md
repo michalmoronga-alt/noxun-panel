@@ -191,6 +191,9 @@ a `part_key_schema` len kľúče dielcov, takže kompatibilitu **configu** nevyj
 `cabinet_config` (cez `write_cabinet_attrs` ním ide vklad AJ prestavba) — a **vždy ako aktuálna hodnota**; z params sa zámerne nepreberá (payload z CEF nie je autorita).
 `guard_newer_config!` stojí v `rebuild_in_operation` vedľa `guard_unknown_hardware!`, číta **RAW uložený config entity** a pri vyššom čísle odmieta **prestavbu**; legacy
 config bez markera (0) prechádza a **čítanie, výber, kusovník, VEPO ani exporty sa neblokujú**. Hlášku všetkých ciest skladá jediný zdroj `newer_config_message`.
+Otázku „nesie config kovanie, ktorému táto verzia nerozumie?" kladie od v0.12.3 **čistý** `unknown_hardware(cfg)` / `unknown_hardware?(cfg)` — `guard_unknown_hardware!` je nad
+ním len obal s hláškou. Dôvod: **hromadné** cesty (D-131 kresba čiel) sa to musia spýtať ešte PRED spoločnou operáciou, lebo guard vnútri `rebuild_many` by zhodil celú operáciu
+aj so zápisom všetkých ostatných skriniek; dve kópie tej istej logiky by sa časom rozišli.
 **`dedup_copies` novšiu kópiu PRESKOČÍ** (kontrola pred `start_operation`, takže žiadna zrušená operácia ani krok Späť) a pokračuje zvyškom: výnimka by cez `rescue`
 okolo celej metódy vyhladovala ostatné — kompatibilné — duplicity a follow-up tik sa už neplánuje. **Priznaný dôsledok:** preskočená kópia si necháva zdieľané
 `cabinet_id`, takže Kontrola drží ORANGE `duplicate_identity` a zliate ID zastaví nákupné/cenové exporty (brána P0-2) — vedome: tichý orez výrobných dát je horší
@@ -342,7 +345,10 @@ modelu, žiadna zmena geometrie.
 efektívnej dosky sa nemení ani o písmeno (charakterizačný test nad každou rolou × každým signálom).
 
 **K1/D-108 smer dekoru dielca:** `effective_grain(sheet, override)` je JEDINÁ autorita efektívneho smeru (`override → materiál`) a `resolve_part` ho **materializuje RAZ** do
-snapshotu dielca.
+snapshotu dielca. **D-131 (v0.12.3) k tomu pridal HROMADNÚ cestu nad celou zákazkou** (`MaterialsDialog.fronts_grain_all`, riadok „Kresba čiel" v Štúdiu) — píše **ten istý**
+override `part_overrides[<kľúč čela>]['grain_direction']` a prestavuje cez `CabinetBuilder.rebuild_many`, takže **žiadny druhý kontrakt ani druhý zdroj smeru nevznikol**; kľúče
+fyzických čiel skladá výhradne `Fronts.panels_for` z uloženého `front_items` a starý override pod **renderovacím suffixom** sa pri zápise zhasína, aby ho migrácia v `normalize`
+nevrátila do hry.
 
 **Rotácia sa tu NEROBÍ** — `pd[:prod]` aj rozmery na entite ostávajú GEOMETRICKÉ (osi deskriptora, `part_faces`/D-88/D-104/hover a kovanie na nich stoja); výmenu dĺžka↔šírka +
 dvojíc hrán robí až VEPO a zrkadlovo `validation.fits_on_sheet?`, a nikde inde (dvojitý swap = dielec objednaný v pôvodnej orientácii). Povolené hodnoty overridu drží konštanta

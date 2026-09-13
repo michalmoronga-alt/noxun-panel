@@ -238,7 +238,10 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   v riadku Zásuvka aj v karte čela, rozsah min–max (max = automat, nad automat sa nedá), dielce boxu sa režú na zámok, zmenšená zóna = RED `box_lock_invalid` s náhradou.
   **PR #364, v0.12.2.**
 - **D-129 + D-130 · Kontext Čelá: úchytky na dvoch miestach + menší UI/UX rework** — zjednotiť úchytky, pomocné texty do tooltipov, prehľadnejší celok; debata → draft → Antigravity outside-in → reconcile → mockup → package — nové okno.
-- **D-131 · Smer kresby čiel celej zákazky jedným klikom** — hromadný zápis `grain_direction` čiel cez existujúce `part_overrides`; bez zmeny kontraktu — po D-128.
+- ✅ **D-131 · Smer kresby čiel celej zákazky jedným klikom** — riadok „Kresba čiel" v Štúdiu (Materiály → Predvoľby projektu): voľba *Podľa materiálu · Pozdĺžna · Priečna*
+  + „Použiť na všetky čelá (N)" a read-only stav „teraz: …". Zapisuje sa **existujúci** override `part_overrides[..].grain_direction` všetkých fyzických čiel (dvierka po
+  krídlach, zásuvkové čelá, výklopy/sklopy, blendy) a všetky skrinky sa prestavia v **jednej operácii = jeden krok Späť**. Bez zmeny kontraktu; projektová predvoľba pre
+  budúce skrinky sa vedome nezaviedla (hint aj tlačidlo to hovoria). **PR #365, v0.12.3.**
 - **D-132 · Dormantný zámok osi zásuvky po zmene otvárania je neviditeľný** — `override_orphan_kind` ho nevyhodnotí ako osirotený, riadok ručných zásahov ho nekreslí; nový druh osirotenia „dormantný" — fix dávka po D-128.
 - *(Vkladanie na klik — V1-04 — sa 26.8. vyčlenilo do vlastného bloku **GHOST VKLADANIE**; ten je od 31.8.2026 **hotový** (v0.9.0), plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).)*
 - **Konštrukcia — rozhodnuté 6.9.2026** ([zdroje/next_sessions/V1_DEBATA_2026-09-05_KONSTRUKCIA.md](zdroje/next_sessions/V1_DEBATA_2026-09-05_KONSTRUKCIA.md)): **K1 odsadenia** — dva prípady, jedna
