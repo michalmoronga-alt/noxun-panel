@@ -274,6 +274,11 @@ skladá **výhradne server** (`orphan_label` „Dormantný zámok · H144 · box
 cez `Recipes.id_label`, **bez** čítania súboru). Náprava je tá istá ako pri `invalid` — `reset: true`, jeden krok Späť. Testy: `tests/pure/test_d132_dormant.rb`,
 `tests/js/test_d132_ui.js`, in-SketchUp `d132_scenar` (v sekcii `run_kovd4`).
 
+**„Neviem" nikdy neznamená „dormantný" (review D-132).** Keby `CabinetBuilder.drawer_axis_contexts` pri výnimke vrátil prázdnu mapu, vyzeralo by to ako „žiadne čelo nemá
+pripnutý recept" — a klasifikátor by označil **živý** zámok za dormantný a ponúkol ho zrušiť. Rescue preto vracia **`nil`** (= neviem) a `Panel.drawer_axes_index` z neho
+robí index s **`'trusted' => false`**; nad takým indexom sa dormantnosť **nevyhodnocuje vôbec** (payload je zhodný s tým spred D-132). Chipy osí a karta čela sa nemenia —
+tie s prázdnou mapou počítali už predtým. Zápisová cesta (`drawer_axis_ctx`) `nil` číta ako „kontext nie je" a zápis **fail-closed odmietne**.
+
 **Tretí druh: `part_material`.** Do toho istého zoznamu patrí aj **materiálový override dielca zásuvky**, ktorého čelo je v `drawer_conflicts`
 (`Panel.orphan_part_material_rows`). Dôvod je ten istý a ešte tvrdší: karta dielca sa dá otvoriť len pre dielec **vo výbere**, ale po fail-closed konflikte ten dielec
 **neexistuje** — zlý záznam z uloženého modelu by teda nemal cestu von a exporty by ostali zablokované aj po reopen. Riadok volá vlastnú serverovú akciu

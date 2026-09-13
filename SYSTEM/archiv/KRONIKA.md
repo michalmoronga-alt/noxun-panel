@@ -39,6 +39,10 @@
   **Texty skladá server** (vzor D-102), recept sa pomenúva **len z jeho ID** (`Recipes.id_label`) — bez čítania súboru z disku.
   **Testy:** headless `test_d132_dormant.rb` (12) + JS `test_d132_ui.js` (19 kontrol) + in-SketchUp `d132_scenar` v `run_kovd4` (12 kontrol: riadok po zmene otvárania,
   „zrušiť" → jeden krok Späť → riadok je zase dormantný, prechod na dvierka, po zrušení platí automat). Mutácie: 4 headless + 3 JS.
+  **Slepý Opus review (Codex kolo neprebehlo — kvóta):** **0× P1/P2, 2× P3, oba opravené.** (1) Zlyhanie čítania stavu osí vracalo **prázdny** index, ktorý sa nedal odlíšiť
+  od „žiadne čelo nemá pripnutý recept" — z **živého** zámku by sa stal dormantný a „zrušiť" by ho zmazal; `drawer_axis_contexts` preto pri výnimke vracia `nil` a index nesie
+  `'trusted' => false`, nad ktorým sa dormantnosť **nevyhodnocuje vôbec**. (2) Box zaniknutého čela mal hlavičku „Čelo F9" a oko, ktoré posielalo výber na **neexistujúci**
+  kľúč — server teraz pošle `orphan_owner_gone` s vlastným popisom a taký box sa kreslí **bez oka**. Mutácie M8 (headless) a M9 (JS).
   **Codex review:** doplní orchestrátor po review.
 
 - **D-131 — KRESBA ČIEL CELEJ ZÁKAZKY JEDNÝM KLIKOM, v0.12.3 (13.9.2026, PR #365).**

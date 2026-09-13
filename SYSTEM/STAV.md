@@ -17,7 +17,7 @@ nálezy z výroby a chyby v cenách majú **najvyššiu prioritu** ([PLAN.md](PL
 **Výstupy zákaziek bez zásuvkovej klasifikácie sú obsahovo identické** (golden, CSV bajtovo).
 **Kompatibilita:** konfigurácia skrinky je od D-128 v **schéme 14**, výrobný plán v schéme 5; vzhľad používa katalógovú schému 10 až pri prvom uložení (staré katalógy sa otvorením nemenia). Starší plugin nové konfigurácie neprestaví — pred takou zákazkou aktualizovať **obe PC**.
 
-**D-132 (najnovšie):** **4092 headless · 118 JS sád · 2705 in-SketchUp PASS / 0 FAIL** (12 kontrol `d132_scenar` v sekcii `run_kovd4`: riadok po zmene otvárania s nadpisom aj dôvodom a bez chipov, „zrušiť" = jeden krok Späť oboma smermi, prechod na dvierka s iným dôvodom, po zrušení platí automat).
+**D-132 (najnovšie):** **4095 headless · 118 JS sád · 2705 in-SketchUp PASS / 0 FAIL** (12 kontrol `d132_scenar` v sekcii `run_kovd4`: riadok po zmene otvárania s nadpisom aj dôvodom a bez chipov, „zrušiť" = jeden krok Späť oboma smermi, prechod na dvierka s iným dôvodom, po zrušení platí automat).
 **D-131:** 4080 · 117 · 2693 PASS / 0 FAIL. **D-128:** 4029 · 116 · 2658 PASS / 0 FAIL. **D-94:** 3993 · 115 · 2632 PASS / 0 FAIL.
 **M-R:** 3983 headless · 114 JS sád · 2606 in-SketchUp PASS / 0 FAIL; CEF Štúdia **18 PASS**, controller → uloženie/otvorenie bez SKM → prestavba → výroba **50 PASS**, živá zmena mierky bez Apply **11 PASS** ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md); fyzický druhý PC, SU 2024 a render netestované). Ručné Redo Čiel zostáva nepotvrdené.
 **Michal 11.9. potvrdil** test produktových odkazov aj potvrdzovania cien (CENY-KOV-A/B, PR #345/#346) **a** používateľskú kontrolu balíka Čiel v0.11.0 (funguje, bez chýb).

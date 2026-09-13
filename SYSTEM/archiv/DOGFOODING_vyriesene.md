@@ -149,9 +149,14 @@ receptom je teda **živý**, nie čakajúci; tvrdiť oň „zámok čaká" by bo
 
 **Nákup ani Kontrola sa nemenia** (rozhodnutie R5): dormantný zámok nie je výrobná chyba — automat platí a používateľ nie je ničím blokovaný, len to konečne vidí.
 
+**Dve poistky z review (slepý Opus, 2× P3).** (1) **„Neviem" nie je „mŕtvy zámok".** Keď čítanie stavu osí zlyhá, index sa označí ako nedôveryhodný a dormantnosť sa
+nevyhodnocuje vôbec — inak by prázdny index z chybovej vetvy vyzeral ako „žiadne čelo nemá pripnutý recept" a tlačidlo „zrušiť" by ponúklo zmazať **živý** zámok.
+(2) **Box zaniknutého čela nemá oko.** Zámok po čele, ktoré v zákazke už nie je, dostane vlastný popis („(už neexistuje) · pôvodné zásuvkové čelo") namiesto vymysleného
+čísla „F9" a jeho box sa kreslí **bez** ikony „označ v modeli" — označovať niet čo.
+
 **Testy:** headless `tests/pure/test_d132_dormant.rb` (tabuľka klasifikácie, tri dôvody, legacy volanie, texty, charakterizácia aktívneho zámku), JS
 `tests/js/test_d132_ui.js` (riadok, poznámka, tlačidlo, bajtový snapshot riadku `invalid`), in-SketchUp `d132_scenar` v sekcii `run_kovd4` (reálna zmena otvárania →
-riadok → „zrušiť" → jeden krok Späť → prechod na dvierka → po zrušení platí automat). Mutácie: 4 headless + 3 JS.
+riadok → „zrušiť" → jeden krok Späť → prechod na dvierka → po zrušení platí automat). Mutácie: 5 headless + 4 JS.
 
 ### D-131 — kresba čiel celej zákazky jedným klikom, vyriešené 13.9.2026
 
