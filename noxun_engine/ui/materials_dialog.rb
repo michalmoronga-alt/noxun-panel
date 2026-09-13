@@ -1001,12 +1001,19 @@ module Noxun
         # medzitym zaniklo), `focus_part` sam padne na vyber skrinky.
         def fronts_grain_apply(model, plan)
           selected = Panel.find_cabinet(model)
-          part = selected ? Panel.find_selected_part(model) : nil
+          # Vyber sa obnovuje LEN ked sa jeho skrinka NAOZAJ prestavala (review
+          # #365 kolo 3, P2). Ked prestavbou nepresla — preskocena skrinka alebo
+          # skrinka bez zmeny — jej entity ziju dalej a vyber je platny; siahat
+          # nan by pri OZNACENOM ODPOJENOM DIELCI znamenalo oznacit vnorene
+          # dvojca (alebo skrinku) a zahodit kartu, na ktoru sa pouzivatel prave
+          # pozera.
+          rebuilt = ProductionCore.fronts_grain_rebuilt?(plan, selected)
+          part = rebuilt ? Panel.find_selected_part(model) : nil
           part_key = part ? Panel.canonical_part_key(Panel.existing_params(selected),
                                                      Panel.part_identity(selected, part)) : nil
           Panel.suspend_selection_sync do
             CabinetBuilder.rebuild_many(model, plan['jobs'], op_name: 'NOXUN: Kresba čiel zákazky')
-            if selected && selected.valid?
+            if rebuilt && selected.valid?
               if part_key
                 Panel.focus_part(model, selected, part_key)
               else

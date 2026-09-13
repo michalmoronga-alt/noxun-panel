@@ -47,17 +47,24 @@
   `model.definitions` a našiel by aj korpus **vnorený** v cudzom komponente — ten vo výstupoch zákazky nie je a prestavba by ho zmenila vo VŠETKÝCH výskytoch zdieľanej
   definície. **Známy rozdiel na zapísanie:** `Materials.replace_uni_scan` je naďalej globálny (`Ids.each_of_kind`) — staršia nezrovnalosť, ktorej sa táto dávka VEDOME
   nedotkla; patrí samostatnej fix dávke.
-  **Testy:** 4075 headless · 117 JS sád · 2692 in-SketchUp PASS / 0 FAIL (34 kontrol `run_d131`: snapshoty dielcov v modeli, presne jeden krok Späť pre celú zákazku,
-  „Bez čela"/doska/korpusové dielce, VNORENÁ skrinka aj skrinka s ODPOJENÝM dielcom bajtovo nedotknuté, výber dielca prežije prestavbu a karta ukáže nový smer,
-  „Podľa materiálu" mazanie vrátane legacy kľúča, flush blokáda, cudzí `model_guid` aj prázdna zákazka bez kroku Späť a s pushom). Sedem overených mutácií v hlavičkách oboch sád.
+  **Testy:** 4080 headless · 117 JS sád · 2693 in-SketchUp PASS / 0 FAIL (35 kontrol `run_d131`: snapshoty dielcov v modeli, presne jeden krok Späť pre celú zákazku,
+  „Bez čela"/doska/korpusové dielce, VNORENÁ skrinka aj skrinka s ODPOJENÝM dielcom bajtovo nedotknuté, výber dielca prežije prestavbu a karta ukáže nový smer (a označený
+  odpojený dielec ostane vo výbere), „Podľa materiálu" mazanie vrátane legacy kľúča, flush blokáda, cudzí `model_guid` aj prázdna zákazka bez kroku Späť a s pushom).
+  Deväť overených mutácií v hlavičkách oboch sád.
   **Odpojené dielce (Codex kolo 2, P1).** Skrinka, ktorá má výrobný dielec **vytiahnutý na koreň** modelu, sa do prestavby vôbec nepustí: do kusovníka aj VEPO ide taký dielec
   po svojom (`Bom.collect`, vetva `part`), kým `rebuild_many` prestaví len **vnorené** dielce — zápis by vyrobil **dvojníka** (vnorený s novým smerom, odpojený so starým).
   Fail-visible skip s dôvodom, rovnaká trieda ako `Panel.detached_part_error` v karte dielca. Mapa `cabinet_id → počet odpojených` vzniká v tom istom prechode koreňom, ktorý
   zbiera korpusy. **Na zapísanie:** „Nahradiť UNI…" má tú istú medzeru (odpojené dielce nerieši) — táto dávka sa jej vedome nedotkla.
   **Výber dielca prežije prestavbu (Codex kolo 2, P2):** keď je označený vnorený dielec, zapamätá sa jeho `part_key` a po prestavbe sa označí náhrada (`Panel.focus_part`,
   vzor `rebuild_focus_part`) — inak by sa karta dielca po hromadnej zmene zavrela namiesto toho, aby ukázala nový smer.
+  **Neznáme kovanie a brána obnovy výberu (Codex kolo 3, 2× P2).** Skrinka s `generic_type`, ktorý táto verzia nepozná, **bez** vyššej `config_schema` (legacy fallback D1) by
+  cez `rebuild_many` zhodila `guard_unknown_hardware!` — a s ním **celú spoločnú operáciu**, teda aj zápis všetkých ostatných skriniek. Pýta sa preto ešte pred operáciou a tou
+  istou kontrolou: guard sa od tejto dávky pýta cez čistý `CabinetBuilder.unknown_hardware(cfg)`, ktorý volá aj `front_grain_entry` (jedno telo, dve miesta). Druhý nález:
+  obnova výberu beží len keď skrinka výberu naozaj prešla prestavbou (`fronts_grain_rebuilt?`) — pri **označenom odpojenom dielci** je jeho vlastník preskočená skrinka a
+  obnova by označila vnorené dvojča a zahodila kartu, na ktorú sa používateľ pozerá.
   **Codex review:** kolo 1 = 2× P1 + 2× P2 (top-level zber, flush handshake, repush v no-op vetve, priznanie preskočených skriniek) + slepý Opus (2× P2, 6× P3); kolo 2 =
-  1× P1 + 1× P2 (odpojené dielce, výber dielca) — zapracované; zvyšok doplní orchestrátor po review.
+  1× P1 + 1× P2 (odpojené dielce, výber dielca); kolo 3 = 2× P2 (neznáme kovanie, brána obnovy výberu) — všetko zapracované.
+  **Vedomá výnimka z pravidla 3 kôl:** nálezy kola 3 sú okrajové P2 bez zmeny konceptu (vzor UI-B1), takže sa PR nerezal — dorobili sa na mieste.
 
 - **D-128 — RUČNÁ VÝŠKA DREVENÉHO BOXU ZÁSUVKY, v0.12.2 (13.9.2026, PR #364).**
   **Čo Michal dostal:** pri drevenom boxe (Quadro V6) sa výška boxu dá **ručne znížiť**. Riadok Zásuvka v kontexte Kovanie **aj karta zásuvkového čela** majú tretí chip osi

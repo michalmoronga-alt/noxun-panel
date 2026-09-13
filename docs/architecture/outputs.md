@@ -452,7 +452,16 @@ dôvod a ide aj do `mat.front_grain`, takže zákazka, kde je preskočené všet
 (`Bom.collect`, vetva `part`), kým `rebuild_many` prestaví len **vnorené** dielce — zápis by teda vyrobil **dvojníka**: vnorený dielec s novým smerom a odpojený so starým.
 Ten istý prechod koreňom, ktorý zbiera korpusy, preto stavia mapu `cabinet_id → počet odpojených` (raz na zber, nie pri každej skrinke). Je to rovnaká trieda ochrany ako
 `Panel.detached_part_error` v karte dielca, ktorá taký zápis odmieta — fail-visible skip s dôvodom, nikdy tichá polovičná zmena. *(Známa medzera na porovnanie: „Nahradiť UNI…"
-odpojené dielce nerieši — samostatná téma, nie regresia tejto dávky.)* Čisté funkcie `front_grain_keys` · `front_grain_value` ·
+odpojené dielce nerieši — samostatná téma, nie regresia tejto dávky.)*
+
+**Piaty dôvod: neznáme kovanie.** Config s `generic_type`, ktorý táto verzia nepozná, **bez** vyššej `config_schema` (legacy fallback D1) by cez `rebuild_many` zhodil
+`CabinetBuilder.guard_unknown_hardware!` — a s ním **celú spoločnú operáciu**, teda aj zápis všetkých ostatných skriniek. Pýta sa preto ešte pred operáciou, a **tou istou**
+kontrolou: guard sa od v0.12.3 pýta cez čistý `CabinetBuilder.unknown_hardware(cfg)` / `unknown_hardware?(cfg)` a `front_grain_entry` ho volá tiež — jedno telo, takže sa brána
+a predbežná otázka nemôžu rozísť.
+
+**Obnova výberu má bránu.** `fronts_grain_rebuilt?(plan, ref)` (čistá) hovorí, či skrinka naozaj prešla prestavbou; len vtedy sa výber obnovuje. Skrinka, ktorá do `jobs` nešla
+(preskočená alebo bez zmeny), má entity nedotknuté a jej výber je platný — a keď má používateľ označený **odpojený dielec**, jeho vlastník je práve taká preskočená skrinka:
+obnova by označila vnorené dvojča a zahodila kartu, na ktorú sa pozerá. Čisté funkcie `front_grain_keys` · `front_grain_value` ·
 `front_grain_entry` · `front_grain_skip_reason` · `front_grain_summary` · `front_grain_write!` · `fronts_grain_plan` sú headless testovateľné; `front_grain_state` dáva stav riadku
 do `mat` payloadu.
 

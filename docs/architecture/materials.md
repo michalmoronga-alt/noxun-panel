@@ -336,7 +336,8 @@ flush handshakom ako exporty Štúdia, `NX.studioRelayFrontsGrain`) · `model_gu
 (aj odmietavá a `rescue`) posiela `repush` — plný push okna je jediná cesta, ktorou sa v klientovi odomkne tlačidlo. **0 čiel aj 0 zmien ⇒ žiadna operácia**, teda ani krok Späť.
 **Výber prežije prestavbu aj na úrovni dielca:** keď je označený vnorený dielec, zapamätá sa jeho `part_key` a po `rebuild_many` sa označí náhrada cez `Panel.focus_part`
 (vzor `rebuild_focus_part`) — inak by `find_cabinet` vrátil vlastníka, `reselect` by označil skrinku a karta dielca by sa namiesto obnovy so smerom **zavrela**; keď náhrada
-s tým kľúčom nevznikla, `focus_part` sám padne na výber skrinky.
+s tým kľúčom nevznikla, `focus_part` sám padne na výber skrinky. Obnova beží **len keď skrinka výberu naozaj prešla prestavbou** (`ProductionCore.fronts_grain_rebuilt?`):
+pri preskočenej skrinke sú entity nedotknuté a výber platný — a označený **odpojený dielec** patrí práve takej skrinke, takže siahnuť naň by znamenalo označiť vnorené dvojča.
 
 ### materials_replace_uni.rb
 

@@ -2334,6 +2334,11 @@ module Noxun
         parts, unresolved = front_grain_keys(c['front_items'])
         { 'id' => id.to_s, 'keys' => parts, 'unresolved' => unresolved, 'legacy' => legacy,
           'newer' => (defined?(CabinetBuilder) && CabinetBuilder.newer_config?(c)),
+          # Neznamy generic typ kovania BEZ vyssej `config_schema` (legacy
+          # fallback D1): `rebuild_many` by na nom zhodil CELU spolocnu operaciu
+          # a nezapisala by sa ani jedna z ostatnych skriniek. Pyta sa TA ISTA
+          # kontrola, akou branu drzi `guard_unknown_hardware!`.
+          'unknown_hw' => (defined?(CabinetBuilder) && CabinetBuilder.unknown_hardware?(c)),
           'overrides' => (c['part_overrides'].is_a?(Hash) ? c['part_overrides'] : {}) }
       end
 
@@ -2343,6 +2348,7 @@ module Noxun
       # spravi (Codex #365 kolo 1, P2).
       def front_grain_skip_reason(ent)
         return 'novšia verzia pluginu' if ent['newer']
+        return 'má kovanie neznámeho typu — aktualizuj plugin alebo skrinku prestav' if ent['unknown_hw']
         # ODPOJENY DIELEC (Codex #365 kolo 2, P1). Dielec vytiahnuty zo skrinky
         # na koren modelu ostava viazany uz len atributom `cabinet_id` — do
         # kusovnika aj VEPO ide PO SVOJOM (`Bom.collect`, vetva `part`), ale
@@ -2454,6 +2460,20 @@ module Noxun
           jobs << [ent['ref'], params] if front_grain_write!(params, parts, grain).positive?
         end
         { 'jobs' => jobs, 'skipped' => skipped, 'count' => count, 'cabinets' => cabs }
+      end
+
+      # CISTA funkcia: PRESTAVALA sa tato skrinka v tejto akcii?
+      #
+      # Vyber sa po akcii obnovuje LEN vtedy (review #365 kolo 3, P2). Skrinka,
+      # ktora do prestavby nesla (preskocena alebo bez zmeny), ma svoje entity
+      # NEDOTKNUTE — a hlavne: ked ma pouzivatel oznaceny ODPOJENY dielec, jeho
+      # vlastnik je prave taka preskocena skrinka. Obnova vyberu by vtedy
+      # oznacila VNORENE dvojca (alebo skrinku) a zahodila by platny vyber aj
+      # kartu dielca, na ktoru sa pouzivatel prave pozera.
+      def fronts_grain_rebuilt?(plan, ref)
+        return false if ref.nil?
+
+        Array(plan && plan['jobs']).any? { |job| job.is_a?(Array) && job[0].equal?(ref) }
       end
 
       # Zber skriniek zakazky pre riadok Studia aj pre akciu — CISTE CITANIE.

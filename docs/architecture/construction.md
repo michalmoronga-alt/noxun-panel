@@ -191,6 +191,9 @@ a `part_key_schema` len kľúče dielcov, takže kompatibilitu **configu** nevyj
 `cabinet_config` (cez `write_cabinet_attrs` ním ide vklad AJ prestavba) — a **vždy ako aktuálna hodnota**; z params sa zámerne nepreberá (payload z CEF nie je autorita).
 `guard_newer_config!` stojí v `rebuild_in_operation` vedľa `guard_unknown_hardware!`, číta **RAW uložený config entity** a pri vyššom čísle odmieta **prestavbu**; legacy
 config bez markera (0) prechádza a **čítanie, výber, kusovník, VEPO ani exporty sa neblokujú**. Hlášku všetkých ciest skladá jediný zdroj `newer_config_message`.
+Otázku „nesie config kovanie, ktorému táto verzia nerozumie?" kladie od v0.12.3 **čistý** `unknown_hardware(cfg)` / `unknown_hardware?(cfg)` — `guard_unknown_hardware!` je nad
+ním len obal s hláškou. Dôvod: **hromadné** cesty (D-131 kresba čiel) sa to musia spýtať ešte PRED spoločnou operáciou, lebo guard vnútri `rebuild_many` by zhodil celú operáciu
+aj so zápisom všetkých ostatných skriniek; dve kópie tej istej logiky by sa časom rozišli.
 **`dedup_copies` novšiu kópiu PRESKOČÍ** (kontrola pred `start_operation`, takže žiadna zrušená operácia ani krok Späť) a pokračuje zvyškom: výnimka by cez `rescue`
 okolo celej metódy vyhladovala ostatné — kompatibilné — duplicity a follow-up tik sa už neplánuje. **Priznaný dôsledok:** preskočená kópia si necháva zdieľané
 `cabinet_id`, takže Kontrola drží ORANGE `duplicate_identity` a zliate ID zastaví nákupné/cenové exporty (brána P0-2) — vedome: tichý orez výrobných dát je horší

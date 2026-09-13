@@ -12197,12 +12197,19 @@ module NoxunSuRunner
       ent = Array(e::ProductionCore.front_grain_scan(model))
             .find { |x| x['id'] == e::Store.get(cab_door, 'cabinet_id').to_s }
       ok('D-131: zber vidi ODPOJENY dielec skrinky', ent && ent['detached'] == true)
+      # Pouzivatel ma oznaceny prave ten ODPOJENY dielec. Akcia meni INU skrinku
+      # (zasuvkovu), takze vyber sa nesmie hnut — obnova by oznacila vnorene
+      # dvojca a zahodila kartu, na ktoru sa pouzivatel pozera.
+      e::Panel.select_only(model, det)
       msgs, = d131_call(model, 'width', guid)
       cab_door = e::Panel.find_cabinet_by_id(model, e::Store.get(cab_door, 'cabinet_id').to_s)
       ok("D-131: skrinka s odpojenym dielcom je PRESKOCENA a vymenovana (#{msgs.first && msgs.first[0]})",
          msgs.length == 1 && msgs[0][0].include?('odpojený'))
       ok('D-131: a jej config sa nezmenil ani o bajt (ziadny polovicny zapis)',
          e::Store.get(cab_door, 'config').to_s == cfg_det_before)
+      sel_after = model.selection.to_a
+      ok("D-131: OZNACENY odpojeny dielec ostal vo vybere (#{sel_after.length} entit)",
+         sel_after.length == 1 && sel_after.first.equal?(det))
       e::ScaleWatch.guard do
         model.start_operation('SU-TEST D-131 uprac odpojeny', true)
         det.erase! if det && det.valid?

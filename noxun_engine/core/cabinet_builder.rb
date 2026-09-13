@@ -677,12 +677,26 @@ module Noxun
         # ALEBO v klucoch hardware_sets (GH #126 P2) = model z novsej verzie
         # pluginu; prestavba sa odmieta (cista kontrola v BuildPlan).
         def guard_unknown_hardware!(inst)
-          cfg = Store.config(inst)
-          return unless cfg.is_a?(Hash)
-          set_keys = cfg['hardware_sets'].is_a?(Hash) ? cfg['hardware_sets'].keys : nil
-          unknown = BuildPlan.unknown_generic_types(cfg['hardware'], set_keys)
+          unknown = unknown_hardware(Store.config(inst))
           return if unknown.empty?
           raise "Korpus nesie kovanie z novšej verzie Noxun (#{unknown.join(', ')}) — projekt vyžaduje novší plugin, prestavba by kovanie stratila."
+        end
+
+        # CISTA otazka (bez entity): ktore generic typy v ULOZENOM configu tato
+        # verzia nepozna? Vytiahnute z `guard_unknown_hardware!` v D-131 (review
+        # #365) — HROMADNA prestavba sa to potrebuje spytat EST PRED operaciou:
+        # guard vnutri `rebuild_many` by zhodil CELU spolocnu operaciu a spolu
+        # s nou aj zapis vsetkych ostatnych skriniek. Telo je JEDNO, aby sa
+        # brana a predbezna otazka nemohli rozist.
+        def unknown_hardware(cfg)
+          return [] unless cfg.is_a?(Hash)
+
+          set_keys = cfg['hardware_sets'].is_a?(Hash) ? cfg['hardware_sets'].keys : nil
+          BuildPlan.unknown_generic_types(cfg['hardware'], set_keys)
+        end
+
+        def unknown_hardware?(cfg)
+          !unknown_hardware(cfg).empty?
         end
 
         # --- R-12: dopredny guard CONFIGU korpusu ---------------------------

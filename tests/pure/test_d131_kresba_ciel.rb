@@ -38,6 +38,10 @@
 #        v kliente navzdy viselo na „Prestavujem…")
 #   M7 — skrinka s ODPOJENYM dielcom sa prestava -> „odpojeny dielec: plan ju
 #        do prestavby NEPUSTI" (v modeli by vznikol DVOJNIK)
+#   M8 — skrinka s NEZNAMYM kovanim ide do spolocnej operacie -> „nezname
+#        kovanie: OSTATNE skrinky sa zapisu" (guard by zhodil CELU operaciu)
+#   M9 — vyber sa obnovuje aj pri PRESKOCENEJ skrinke -> „vyber: obnovuje sa
+#        LEN pri skrinke, ktora sa naozaj prestavala"
 require_relative '../helper' unless defined?(NxTest)
 
 # UI vrstva — headless nie je v require zozname helpera, takze si ju sada pyta
@@ -319,11 +323,79 @@ NxTest.test('D-131 odpojeny dielec: plan ju do prestavby NEPUSTI') do
   NxTest.assert_equal('CAB-004', plan['skipped'][0]['id'])
 end
 
+# --- NEZNAME KOVANIE (legacy fallback D1) ----------------------------------
+# Skrinka s neznamym `generic_type` v ULOZENOM configu BEZ vyssej
+# `config_schema`: `guard_unknown_hardware!` ju vnutri `rebuild_many` zhodi —
+# a s nou CELU spolocnu operaciu, teda aj zapis vsetkych OSTATNYCH skriniek.
+# Pyta sa preto EST PRED operaciou, TOU ISTOU kontrolou.
+
+def d131_hw_cfg(items = [d131_item('F1', 'drawer_front')])
+  d131_cfg(items, {}, 'hardware' => [{ 'generic_type' => 'teleport_2099' }])
+end
+
+NxTest.test('D-131 nezname kovanie: predikat je v CabinetBuilder a brana ho pouziva') do
+  NxTest.assert(D131CB.unknown_hardware?('hardware' => [{ 'generic_type' => 'teleport_2099' }]),
+                'neznamy generic typ sa musi rozpoznat')
+  NxTest.refute(D131CB.unknown_hardware?('hardware' => [{ 'generic_type' => 'slide' }]),
+                'znamy typ NIE JE nalez')
+  NxTest.refute(D131CB.unknown_hardware?(nil), 'chybajuci config nie je nalez')
+  # Telo MUSI byt jedno — inak by sa brana a predbezna otazka rozisli a akcia
+  # by pustila do operacie skrinku, ktoru guard aj tak zhodi.
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'cabinet_builder.rb'),
+                  encoding: 'UTF-8')
+  guard = src[/def guard_unknown_hardware!.*?\n        end\n/m].to_s
+  NxTest.assert(guard.include?('unknown_hardware(Store.config(inst))'),
+                'brana sa pyta TOU ISTOU cistou kontrolou')
+  NxTest.refute(guard.include?('BuildPlan.unknown_generic_types'),
+                'logika sa nesmie kopirovat na dve miesta')
+end
+
+NxTest.test('D-131 nezname kovanie: skrinka sa PRESKOCI a vymenuje') do
+  ent = D131PC.front_grain_entry('CAB-011', d131_hw_cfg)
+  NxTest.assert(ent['unknown_hw'], 'zaznam musi nalez niest')
+  why = D131PC.front_grain_skip_reason(ent)
+  NxTest.assert(why.to_s.include?('neznámeho typu'), why.inspect)
+  NxTest.assert_equal(0, D131PC.front_grain_summary([ent])['count'])
+end
+
+NxTest.test('D-131 nezname kovanie: OSTATNE skrinky sa zapisu (operacia nepadne)') do
+  bad = d131_entry('CAB-011', d131_hw_cfg, :bad)
+  good = d131_entry('CAB-012', d131_cfg([d131_item('F1', 'drawer_front')]), :good)
+  plan = D131PC.fronts_grain_plan([bad, good], 'width')
+  NxTest.assert_equal([:good], plan['jobs'].map(&:first),
+                      'do spolocnej operacie ide LEN zdrava skrinka')
+  NxTest.assert_equal('CAB-011', plan['skipped'][0]['id'])
+  NxTest.assert_equal(1, plan['count'], 'preskocene celo sa do poctu neráta')
+end
+
+# --- OBNOVA VYBERU ---------------------------------------------------------
+
+NxTest.test('D-131 vyber: obnovuje sa LEN pri skrinke, ktora sa naozaj prestavala') do
+  plan = { 'jobs' => [[:a, {}], [:b, {}]] }
+  NxTest.assert(D131PC.fronts_grain_rebuilt?(plan, :a))
+  NxTest.assert(D131PC.fronts_grain_rebuilt?(plan, :b))
+  # Preskocena skrinka (napr. tá s ODPOJENYM dielcom) v jobs NIE JE — siahnut
+  # na vyber by znamenalo oznacit vnorene dvojca a zahodit kartu dielca.
+  NxTest.refute(D131PC.fronts_grain_rebuilt?(plan, :c))
+  NxTest.refute(D131PC.fronts_grain_rebuilt?(plan, nil))
+  NxTest.refute(D131PC.fronts_grain_rebuilt?({ 'jobs' => [] }, :a))
+  NxTest.refute(D131PC.fronts_grain_rebuilt?(nil, :a))
+end
+
+NxTest.test('D-131 vyber: zapisova cesta sa pyta TYM ISTYM predikatom') do
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'materials_dialog.rb'),
+                  encoding: 'UTF-8')
+  body = src[/def fronts_grain_apply.*?\n        end\n/m].to_s
+  NxTest.assert(body.include?('fronts_grain_rebuilt?'), 'obnova vyberu ma branu')
+  NxTest.assert(body.include?('rebuilt ? Panel.find_selected_part(model) : nil'),
+                'dielec sa hlada LEN pri prestavanej skrinke')
+end
+
 NxTest.test('D-131 odpojeny dielec: suhrn aj plan pouzivaju TU ISTU funkciu dovodu') do
   # Dva zoznamy dovodov by sa casom rozisli a tlacidlo by hovorilo nieco ine
   # nez akcia. Kazdy dovod, ktory vie dat `front_grain_skip_reason`, musi
   # rovnako vypadnut zo suhrnu aj z planu.
-  %w[newer detached legacy unresolved].each do |flag|
+  %w[newer unknown_hw detached legacy unresolved].each do |flag|
     ent = D131PC.front_grain_entry('CAB-00X', d131_cfg([d131_item('F1', 'drawer_front')]))
     ent[flag] = true
     ent['ref'] = :x

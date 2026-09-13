@@ -151,8 +151,9 @@ by prestavba zmenila vo všetkých výskytoch zdieľanej definície — hoci vo 
 
 **Nič sa nemení „napoly".** Skrinka, ktorá má výrobný dielec **vytiahnutý na koreň** modelu, sa do prestavby nepustí vôbec: taký dielec ide do kusovníka aj VEPO po svojom, kým
 prestavba mení len vnorené dielce — zápis by vyrobil dvojníka (vnorený s novým smerom, odpojený so starým). Preskočí sa s dôvodom, rovnako ako v karte dielca. *(„Nahradiť UNI…"
-má tú istú medzeru — samostatná téma.)* **Výber dielca prežije:** keď je označené čelo, po prestavbe sa označí jeho náhrada podľa `part_key`, takže karta dielca sa nezavrie, ale
-ukáže nový smer.
+má tú istú medzeru — samostatná téma.)* Rovnako sa preskočí skrinka s **kovaním neznámeho typu**: guard prestavby by inak zhodil celú spoločnú operáciu a nezapísala by sa ani
+jedna z ostatných skriniek. **Výber dielca prežije:** keď je označené čelo, po prestavbe sa označí jeho náhrada podľa `part_key`, takže karta dielca sa nezavrie, ale ukáže nový
+smer — a keď skrinka výberu prestavbou vôbec neprešla (napr. je označený odpojený dielec), výber sa nechá tak, ako je.
 
 **Vedomé odchýlky:** (1) Rozsah čiel sa berie z **resolved `front_items`**, nie z `fronts` configu — je to ten istý zdroj, z ktorého číta `Bom.collect` smerové nálezy (KOV-A1);
 config **bez** toho kľúča je stará skrinka a preskočí sa s dôvodom, nie ticho. (2) Pridaná vetva „nič sa nemenilo" nad rámec zadania: bez nej by opakovaný klik prestavoval celú
@@ -160,9 +161,9 @@ zákazku pre nič. (3) Riadok „Kresba čiel" je **priznaný druhý prechod** m
 cena je jeden JSON parse configu na skrinku a prijala sa radšej než rozširovanie `Bom.collect`. (4) Starý override pod **renderovacím suffixom** sa pri zápise zhasína, inak by
 ho migrácia v `normalize` vrátila do hry a „Podľa materiálu" by nezabralo.
 
-**Testy:** `tests/pure/test_d131_kresba_ciel.rb` (46 testov), `tests/js/test_d131_ui.js` (38 kontrol), in-SketchUp sekcia `run_d131` (34 kontrol: snapshoty dielcov v modeli,
+**Testy:** `tests/pure/test_d131_kresba_ciel.rb` (51 testov), `tests/js/test_d131_ui.js` (38 kontrol), in-SketchUp sekcia `run_d131` (35 kontrol: snapshoty dielcov v modeli,
 presne jeden krok Späť pre celú zákazku, „Bez čela"/doska/korpusové dielce, vnorená skrinka aj skrinka s odpojeným dielcom nedotknuté, výber dielca prežije prestavbu, flush
-blokáda, cudzí `model_guid` a prázdna zákazka bez kroku Späť). Sedem overených mutácií je v hlavičkách oboch sád.
+blokáda, cudzí `model_guid` a prázdna zákazka bez kroku Späť). Deväť overených mutácií je v hlavičkách oboch sád.
 
 **Pôvodný plný text pri uzávere:**
 
