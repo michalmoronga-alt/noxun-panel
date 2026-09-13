@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-132** — Dormantný zámok osi zásuvky (zostal po zmene otvárania alebo po prechode na dvierka) je v Kovaní vidieť ako riadok „Dormantný zámok · NL 470" s dôvodom a tlačidlom „zrušiť"; chipy osí ani nákup sa nemenia — 13.9.2026, PR #367, v0.12.4
 - **D-131** — Kresbu čiel celej zákazky prepne jeden klik v Štúdiu (Materiály → Kresba čiel): zapíše sa existujúci override čiel, všetky skrinky sa prestavia v jednej operácii = jeden krok Späť — 13.9.2026, PR #365, v0.12.3
 - **D-128** — Výška dreveného boxu zásuvky (Quadro) sa dá ručne znížiť: tretia os zámku (chip „box 360" s číselným poľom v riadku Zásuvka aj v karte čela), dielce boxu sa režú na zámok, zmenšená zóna = RED s náhradou — 13.9.2026, PR #364, v0.12.2
 - **D-94** — Rozklik nákupného riadku ukáže pôvod zoskupený po skrinkách (s počtami) a klik na skrinku či čelo ho označí v modeli a otvorí Inspector; rozklik prežije „Obnoviť" — 12.9.2026, PR #361, v0.12.1
@@ -118,6 +119,39 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-132 — dormantný zámok osi zásuvky je viditeľný a dá sa zrušiť, vyriešené 13.9.2026
+
+**Výsledok: PR #367, v0.12.4.** Keď sa pri zásuvke prepne otváranie (klasické ↔ Tip-On), pripne sa **iný recept** a starý ručný zámok (dĺžka výsuvu, výška H, výška boxu)
+ostane v konfigurácii. Doteraz bol **neviditeľný**: resolver ho nepoužil a riadok ručných zásahov ho nekreslil, takže používateľ ho nemal ako zrušiť — až kým sa nevrátil
+k pôvodnému otváraniu, kde sa zámok „prebudil". Od tejto dávky má taký záznam v kontexte **Kovanie** (v boxe svojho čela) vlastný riadok **„Dormantný zámok · NL 470"**
+so zatvoreným zámkom, pod ním vetu s dôvodom („Zámok receptu Atira Tip-On v1 — teraz je pripnutý Atira SiSy v1, takže neplatí a čaká. Zrušiť ho môžeš tu.") a tlačidlo
+**„zrušiť"**. To isté platí, keď sa zásuvkové čelo zmenilo na **dvierka** („čelo už nie je zásuvka — zámok čaká na návrat") alebo keď **čelo už neexistuje**.
+
+**Žiadna zmena dát (rozhodnutie R1).** Kontrakt `hardware_overrides` ani normalizácia sa nedotkli — dormantný záznam **ostáva v configu**, pretože pamäť pri prechode
+na dvierka a späť je vedomá vlastnosť (pravidlo KOV-D4). Dávka ho len **ukazuje** a dáva zrušiť **existujúcou** serverovou akciou `reset: true` (jeden krok Späť), tou
+istou, akou sa ruší neplatný ručný zásah.
+
+**Klasifikácia je čistá funkcia so záväzným poradím.** `HardwareRules.override_orphan_kind` pozná štvrtý druh `dormant` a poradie je: má položku → nič · `disabled` ·
+`invalid` (uložený konflikt zásuvky) · **`dormant`** · inak nič. `invalid` víťazí zámerne — konflikt blokuje exporty, takže jeho riadok to musí povedať prednostne.
+Dôvod dormantnosti (`other_recipe` · `not_drawer` · `no_front`) hovorí `override_dormant_why`. **Bez mapy pripnutých receptov a zoznamu existujúcich čiel sa
+dormantnosť nevyhodnocuje vôbec** (staršie trojargumentové volanie vráti presne to, čo vracalo): kto nevidí, ktorý recept je pripnutý, nesmie hádať.
+
+**Chipy osí dormantný riadok ani teraz nedostane.** To je pravidlo KOV-D4 bod 3 a dávka sa ho nedotkla: chipy by ukazovali stav **aktuálneho** receptu, kým zápis by
+šiel na **cudzí** `rule_id` — presne tá tichá zámena, ktorej celý package bráni. Zviditeľnila sa pamäť, nezmenilo sa pravidlo.
+
+**Texty skladá výhradne server** (vzor D-102): názov riadku nesie len osi, ktoré záznam naozaj drží, a poznámka menuje **oba** recepty. Recept sa pomenúva iba z jeho ID
+(`Recipes.id_label`) — bez čítania súboru z disku, takže riadok nestojí panel ani jeden diskový prístup navyše. Klasifikátor aj texty berú **ten istý index osí**,
+z ktorého už vznikajú chipy; druhý prechod čelami nepribudol.
+
+**Legacy zámok sa nevydáva za dormantný.** Záznam so starým `rule_id` `vysuvy-nl-podla-hlbky` číta `Recipes.lock_value` pri **každom** recepte — na čele s pripnutým
+receptom je teda **živý**, nie čakajúci; tvrdiť oň „zámok čaká" by bola lož. Dormantný je len vtedy, keď čelo pripnutý recept nemá vôbec (dvierka) alebo keď zaniklo.
+
+**Nákup ani Kontrola sa nemenia** (rozhodnutie R5): dormantný zámok nie je výrobná chyba — automat platí a používateľ nie je ničím blokovaný, len to konečne vidí.
+
+**Testy:** headless `tests/pure/test_d132_dormant.rb` (tabuľka klasifikácie, tri dôvody, legacy volanie, texty, charakterizácia aktívneho zámku), JS
+`tests/js/test_d132_ui.js` (riadok, poznámka, tlačidlo, bajtový snapshot riadku `invalid`), in-SketchUp `d132_scenar` v sekcii `run_kovd4` (reálna zmena otvárania →
+riadok → „zrušiť" → jeden krok Späť → prechod na dvierka → po zrušení platí automat). Mutácie: 4 headless + 3 JS.
 
 ### D-131 — kresba čiel celej zákazky jedným klikom, vyriešené 13.9.2026
 

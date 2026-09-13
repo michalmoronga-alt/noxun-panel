@@ -257,11 +257,22 @@ keď recept skončil **konfliktom** (fail-closed: čelo nedostane ani legacy vý
 **KOV-C2b — OSIROTENÝ ručný zásah (Codex #304 P1).** Panel stavia editovateľné riadky Kovania z **emitovaných** položiek, takže záznam `hardware_overrides`, ku ktorému
 žiadna položka nevznikla, by nemal kde byť — a používateľ by ho nevedel zrušiť. Pri fail-closed zásuvke je to slepá ulička: `drawer_override_invalid` (ručný počet ≠ 1,
 vypnutie) aj `nl_lock_invalid` (zámok mimo radu) položku **nevydajú**, takže exporty ostanú zablokované, kým sa klasifikácia nevráti späť. Preto o osirotenosti rozhoduje
-**server**: `HardwareRules.override_orphan_kind(ov, items, conflict_owners)` je čistá funkcia, ktorá vráti `nil` (záznam má svoju položku), **`'disabled'`** (vypnutá
-kategória, D-92 — náprava „obnoviť") alebo **`'invalid'`** (vlastník je v uloženom `drawer_conflicts`, teda položka fail-closed nevznikla — náprava **zrušiť celý záznam**,
-lebo môže niesť počet aj zámok naraz). `Panel.hardware_overrides_payload` z nej robí `orphan`/`orphan_kind` v payloade, `hardware.js` filtruje **na `orphan`** (staré
-pravidlo „len `disabled`" ostáva len ako fallback pre payload bez kľúča) a riadok `invalid` volá **existujúcu** serverovú akciu `reset` — po nej prestavba konflikt
-už nevydá. Hlášky konfliktov na túto cestu odkazujú doslovne (`Construction::ORPHAN_HINT`), aby sa text riadku a text nálezu nemohli rozísť.
+**server**: `HardwareRules.override_orphan_kind(ov, items, conflict_owners, active_rules = nil, front_owners = nil)` je čistá funkcia, ktorá vráti `nil` (záznam má svoju
+položku), **`'disabled'`** (vypnutá kategória, D-92 — náprava „obnoviť"), **`'invalid'`** (vlastník je v uloženom `drawer_conflicts`, teda položka fail-closed nevznikla —
+náprava **zrušiť celý záznam**, lebo môže niesť počet aj zámok naraz) alebo **`'dormant'`** (D-132, nižšie). `Panel.hardware_overrides_payload` z nej robí
+`orphan`/`orphan_kind` v payloade, `hardware.js` filtruje **na `orphan`** (staré pravidlo „len `disabled`" ostáva len ako fallback pre payload bez kľúča) a riadok `invalid`
+volá **existujúcu** serverovú akciu `reset` — po nej prestavba konflikt už nevydá. Hlášky konfliktov na túto cestu odkazujú doslovne (`Construction::ORPHAN_HINT`), aby sa
+text riadku a text nálezu nemohli rozísť.
+
+**Štvrtý druh: `dormant` (D-132).** Zámok osi, ktorý dnes **nikto nečíta**: záznam nesie identitu zámku (`generic_type slide` + `rule_id recipe:<id>`, prípadne legacy
+`vysuvy-nl-podla-hlbky`) a aspoň jedno platné pole osi (`nominal_length` / `height_variant` / `box_height`), ale položku nemá. `HardwareRules.override_dormant_why` povie
+**prečo**: `'other_recipe'` (vlastník má pripnutý INÝ recept — iné otváranie alebo verzia) · `'not_drawer'` (čelo existuje, ale pripnutý recept nemá — je to dvierka) ·
+`'no_front'` (čelo už medzi čelami nie je). Poradie kontrol je záväzné — **`invalid` víťazí nad `dormant`**, lebo konflikt blokuje exporty. **Bez `active_rules`
+a `front_owners` sa dormantnosť nevyhodnocuje vôbec** (legacy trojargumentové volanie vráti `nil` ako doteraz): kto nevidí pripnuté recepty čiel, nesmie hádať. Legacy
+`vysuvy-nl-podla-hlbky` na čele **s** pripnutým receptom dormantný **nie je** — `Recipes.lock_value` ho číta pri každom recepte, takže „čaká" by bola lož. Texty riadku
+skladá **výhradne server** (`orphan_label` „Dormantný zámok · H144 · box 300 · NL 470", `orphan_note` s dôvodom a vetou „Zrušiť ho môžeš tu."; recept sa menuje z `rule_id`
+cez `Recipes.id_label`, **bez** čítania súboru). Náprava je tá istá ako pri `invalid` — `reset: true`, jeden krok Späť. Testy: `tests/pure/test_d132_dormant.rb`,
+`tests/js/test_d132_ui.js`, in-SketchUp `d132_scenar` (v sekcii `run_kovd4`).
 
 **Tretí druh: `part_material`.** Do toho istého zoznamu patrí aj **materiálový override dielca zásuvky**, ktorého čelo je v `drawer_conflicts`
 (`Panel.orphan_part_material_rows`). Dôvod je ten istý a ešte tvrdší: karta dielca sa dá otvoriť len pre dielec **vo výbere**, ale po fail-closed konflikte ten dielec
@@ -1404,8 +1415,9 @@ prepol zdroj na `manual` a nákup by prestal povyšovať chýbajúci kit na bloc
    „obnoví" bez overenia.
 3. **Dormantný zámok iného receptu sa NIKDY nezobrazí ako aktívny.** Zmena otvárania (`classic` ↔ `tipon`) pripne **iný** recept a starý záznam ostane dormantný: resolver
    ho nepoužije a payload mu **nedá chipy osí** (`Panel.attach_override_axes` porovnáva `rule_id` proti `idents` pripnutého receptu). Ukázať naň stav aktuálneho receptu
-   a zapisovať na cudzí `rule_id` je presne tá tichá zámena, ktorej celý package bráni. Záznam **ostáva v configu** a keď je osirotený, riadok ručných zásahov ho ukáže
-   s tlačidlom „zrušiť".
+   a zapisovať na cudzí `rule_id` je presne tá tichá zámena, ktorej celý package bráni. Záznam **ostáva v configu** a **od D-132 ho riadok ručných zásahov VŽDY ukáže**
+   (druh `dormant`: názov so zamknutými osami, serverová poznámka s dôvodom a tlačidlo „zrušiť") — dovtedy bol neviditeľný, kým sa používateľ nevrátil k pôvodnému
+   otváraniu. Chipy osí **nedostáva ani vtedy**: pamäť sa zviditeľnila, pravidlo sa nezmenilo.
 
 **Dielce.** Atira presne 2: `drawer_bottom` `(LB − 2·EB − 51,5) × (NL + 10)` a `drawer_back` `(LB − 2·EB − 63) × rear_height`. Quadro 5: `box_side` ×2 `NL × box_height`,
 `drawer_bottom` `SKW × NL`, `drawer_inner_front` a `drawer_back` `SKW × (box_height − t_dna − 12)`, kde `SKW = LB − 46`. ABS per rola z receptu (dno bez, ostatné horná dlhá

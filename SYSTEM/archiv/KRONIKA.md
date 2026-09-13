@@ -17,6 +17,30 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **D-132 — DORMANTNÝ ZÁMOK OSI ZÁSUVKY JE VIDITEĽNÝ A DÁ SA ZRUŠIŤ, v0.12.4 (13.9.2026, PR #367).**
+  **Čo Michal dostal:** keď sa pri zásuvke prepne otváranie (klasické ↔ Tip-On), pripne sa **iný recept** a starý ručný zámok (dĺžka výsuvu, výška H, výška boxu) ostane
+  v konfigurácii. Doteraz bol **neviditeľný** — resolver ho nepoužil a riadok ručných zásahov ho nekreslil, takže sa nedal zrušiť, kým sa používateľ nevrátil k pôvodnému
+  otváraniu (a tam sa zámok „prebudil"). Od tejto dávky má taký záznam v **Kovaní**, v boxe svojho čela, vlastný riadok **„Dormantný zámok · NL 470"** so zatvoreným
+  zámkom, pod ním vetu s dôvodom („Zámok receptu Atira Tip-On v1 — teraz je pripnutý Atira SiSy v1, takže neplatí a čaká. Zrušiť ho môžeš tu.") a tlačidlo **„zrušiť"**.
+  Rovnako sa ukáže zámok čela, ktoré sa zmenilo na **dvierka**, aj zámok čela, ktoré **zaniklo**.
+  **Prečo len zviditeľnenie a nie mazanie:** pamäť pri prechode zásuvka → dvierka → zásuvka je **vedomá vlastnosť** (pravidlo KOV-D4). Automatické mazanie by ju zabilo,
+  prenos zámku medzi receptmi (classic → tipon) by bola tichá zmena geometrie. Záznam preto **ostáva v configu** a používateľ dostal len oči a tlačidlo — ruší sa
+  **existujúcou** akciou `reset: true`, tou istou ako neplatný ručný zásah, teda jeden krok Späť.
+  **Prečo `invalid` víťazí nad `dormant`:** uložený konflikt zásuvky **blokuje exporty**, takže jeho riadok to musí povedať prednostne; dormantný zámok nikoho neblokuje.
+  Poradie kontrol (položka → `disabled` → `invalid` → `dormant`) je preto záväzné a stráži ho mutácia M4.
+  **Prečo sa bez indexu nič neháda:** dormantnosť sa dá vyhodnotiť len s mapou **pripnutých receptov** a zoznamom **existujúcich čiel**. Bez nich (staršie trojargumentové
+  volanie `override_orphan_kind`) vracia klasifikátor presne to, čo vracal — `nil`. Index je **ten istý**, z ktorého už vznikajú chipy osí: druhý prechod čelami (a druhé
+  `Recipes.load` na každý push) nepribudol.
+  **Prečo legacy zámok nie je dormantný:** starý `rule_id` `vysuvy-nl-podla-hlbky` číta `Recipes.lock_value` pri **každom** recepte — na čele s pripnutým receptom je teda
+  živý. Veta „zámok čaká" by o ňom bola lož, takže sa dormantným stáva len na čele bez receptu (dvierka) alebo po zániku čela. *(Rozhodnutie nad rámec zadania — brief
+  legacy identitu do dormantnosti zahŕňal bez tejto výnimky.)*
+  **Chipy osí sa nedotkli:** dormantný riadok ich nedostáva ani teraz (KOV-D4 bod 3) — ukazovali by stav aktuálneho receptu, kým zápis by šiel na cudzí `rule_id`.
+  Nákup ani Kontrola nález nemajú: dormantný zámok nie je výrobná chyba, automat platí.
+  **Texty skladá server** (vzor D-102), recept sa pomenúva **len z jeho ID** (`Recipes.id_label`) — bez čítania súboru z disku.
+  **Testy:** headless `test_d132_dormant.rb` (12) + JS `test_d132_ui.js` (19 kontrol) + in-SketchUp `d132_scenar` v `run_kovd4` (12 kontrol: riadok po zmene otvárania,
+  „zrušiť" → jeden krok Späť → riadok je zase dormantný, prechod na dvierka, po zrušení platí automat). Mutácie: 4 headless + 3 JS.
+  **Codex review:** doplní orchestrátor po review.
+
 - **D-131 — KRESBA ČIEL CELEJ ZÁKAZKY JEDNÝM KLIKOM, v0.12.3 (13.9.2026, PR #365).**
   **Čo Michal dostal:** v **Štúdiu → Materiály → Predvoľby projektu** je nový riadok **„Kresba čiel"** — voľba *Podľa materiálu · Pozdĺžna · Priečna*, tlačidlo **„Použiť na
   všetky čelá (N)"** a vedľa neho read-only stav („teraz: 8× priečna · 4× podľa materiálu"). Jeden klik zapíše smer dekoru **všetkým fyzickým čelám všetkých skriniek
