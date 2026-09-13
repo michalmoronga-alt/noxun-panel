@@ -12624,9 +12624,15 @@ module NoxunSuRunner
       c_cfg = e::Store.get(nested, 'config').to_s
       rec = []
       r03_marker(model, markers)
+      # REALNA cesta klienta: formular je naplneny `rules_payload` (ten zaroven
+      # nasadi baseline aj odtlacok) a klient posiela naspat, co dostal. Bez
+      # toho by save narazil na branu „stav sa medzitým zmenil" — v behu pred
+      # nami uz iná sekcia baseline posunula.
+      rules_payload = rd.send(:rules_payload, model) || {}
       rd.dispatch('save_rules',
-                  { 'rules' => e::HardwareRules.load, 'also_global' => false,
-                    'model_guid' => guid }.to_json, ->(s) { rec << s.to_s })
+                  { 'rules' => rules_payload['rules'], 'also_global' => false,
+                    'model_guid' => guid,
+                    'rules_rev' => rules_payload['rules_rev'] }.to_json, ->(s) { rec << s.to_s })
       status = rec.select { |s| s.include?('RD.setStatus') }.join(' ')
       ok("D-134 pravidla: status hlasi prestavbu LEN skriniek zakazky (#{status[0, 160]})",
          status.include?('prestavaných 1 skriniek'))
@@ -12640,7 +12646,8 @@ module NoxunSuRunner
       ok('D-134 pravidla: a VNORENA skrinka C tiez',
          nested.valid? && e::Store.get(nested, 'config').to_s == c_cfg)
       ok('D-134 pravidla: snapshot pravidiel projektu sa NAPRIEK preskoceniu zapisal',
-         !e::HardwareRules.project_rules(model).nil?)
+         JSON.generate(e::HardwareRules.project_rules(model) || []) ==
+         JSON.generate(e::HardwareRules.normalize_rules(rules_payload['rules'])))
       Sketchup.undo
       ok('D-134 pravidla: PRAVE JEDEN krok Spat vratil pravidla aj prestavbu',
          markers.last.valid? &&
