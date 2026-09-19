@@ -14,6 +14,15 @@
 # rátať DA (deklarovane pevne stopy + medzery); text a natívne selecty sa
 # neratáju, tie su prave preto pruzne a s ellipsis.
 #
+# D-130a (19.9.2026) — PRECO UZ NIE FLEX, ALE GRID:
+# Flex rad drzal riadok pohromade, ale poloha poli zavisela od TOHO, CO
+# v riadku prave bolo: chip AUTO, „mm", select kridel a ikona profilu tlacili
+# pole vysky vpravo, takze pri kazdom cele stalo inde a oko ho muselo hladat
+# (D-130 „polia lietajú"). `.frow` je preto CSS GRID so STALYMI STLPCAMI
+#   [22 cislo][minmax(0,1fr) nazov + suhrn][112 pole vysky][22 ✕]
+# a riadkami 1 = nazov · 2 = suhrn · 3 = karta. Rozpocet sa tym NEMENI, len
+# sa rata z `grid-template-columns` namiesto zo sumy `flex` stop.
+#
 # ROZPOCET SIRKY (odvodenie, panel.css + panel.html):
 #   470  obsahovy viewport Inspectora (NX_FIT_MIN, docs/UI_DIZAJN.md §D-51)
 #   -54  `body` padding-left (10 + rail 44)   -10  `body` padding-right
@@ -75,13 +84,15 @@ end
 # 1) Zoznam ciel — riadok je STLPEC, ovladace su NEZALAMOVACI rad
 # ---------------------------------------------------------------------------
 
-NxTest.test('SMOKE1 cela: `.frow` je stlpec a `.fmain` sa NEZALAMUJE') do
-  NxTest.assert_equal('column', smoke1_decl('.frow', 'flex-direction'),
-                      'riadok cela = ovladace + kovanie pod nimi, nie jeden zalamovaci rad')
-  NxTest.assert_equal('nowrap', smoke1_decl('.frow .fmain', 'flex-wrap'),
-                      'ovladace sa NIKDY nesmu zalomit — presne to poslalo krizik o riadok nizsie')
+NxTest.test('SMOKE1 cela: `.frow` je GRID so STALYMI stlpcami (polia uz nelietaju)') do
+  NxTest.assert_equal('grid', smoke1_decl('.frow', 'display'),
+                      'riadok cela je mriezka — poloha pola nezavisi od toho, co v riadku prave je')
+  NxTest.assert_equal('22px minmax(0, 1fr) 112px 22px', smoke1_decl('.frow', 'grid-template-columns'),
+                      'stlpce: cislo · nazov+suhrn · pole vysky · ✕ (pevny rozpocet)')
   NxTest.assert_equal(nil, smoke1_decl('.frow', 'flex-wrap'),
                       'stary `flex-wrap: wrap` na `.frow` uz neexistuje')
+  NxTest.assert_equal(nil, smoke1_decl('.frow .fmain', 'flex-wrap'),
+                      'obal `.fmain` zanikol — deti ziju priamo v mriezke')
 end
 
 NxTest.test('SMOKE1 cela: jemne predelenie medzi celami NEPRIDAVA vertikalny priestor') do
@@ -96,96 +107,113 @@ NxTest.test('SMOKE1 cela: jemne predelenie medzi celami NEPRIDAVA vertikalny pri
                       'spodok 1 px + vrch 2 px + linka 1 px = povodne 4 px medzi celami')
 end
 
-NxTest.test('SMOKE1 cela: sucet pevnych stop + medzier sa VOJDE do sirky karty') do
-  # Poradie zodpoveda markupu `addFrontRow` (form.js).
-  # KOV-A2a: `select.ftype` z radu ZANIKOL (typ sa vybera piktogramom v karte
-  # cela) a jeho miesto zabralo tlacidlo `.ftname`. Ikona typu `.ftico` uz nie
-  # je samostatna polozka radu — zije UVNUTRI `.ftname`, takze ju kryje jeho
-  # `min-width` a do rozpoctu sa NERATA druhykrat.
-  fixed = {
-    '.frow .fnum' => smoke1_fixed_px('.frow .fnum'),
-    '.frow input.fh' => smoke1_fixed_px('.frow input.fh'),
-    '.frow select.fw' => smoke1_fixed_px('.frow select.fw'),
-    '.frow .fprof' => smoke1_fixed_px('.frow .fprof'),
-    '.frow .fdel' => smoke1_fixed_px('.frow .fdel')
-  }
-  fixed.each { |sel, px| NxTest.assert(!px.nil?, "#{sel} ma PEVNU stopu (flex: 0 0 Npx)") }
+NxTest.test('SMOKE1 cela: sucet stlpcov + medzier sa VOJDE do sirky karty') do
+  # D-130a: rozpocet uz nie je sucet `flex` stop, ale STLPCE MRIEZKY. Sirky su
+  # deklarovane na JEDNOM mieste (`grid-template-columns`), takze novy ovladac
+  # sa uz nema kde „pritlacit" — musi si v mriezke najst miesto.
+  cols = smoke1_decl('.frow', 'grid-template-columns').to_s
+  fixed_cols = cols.scan(/(\d+(?:\.\d+)?)px/).flatten.map(&:to_f)
+  NxTest.assert_equal(3, fixed_cols.length, 'tri PEVNE stlpce (cislo, pole vysky, ✕)')
+  NxTest.assert(cols.include?('minmax(0, 1fr)'),
+                'stredny stlpec rastie a SMIE sa zmrstit (`minmax(0,1fr)` — bez neho ho dlhy suhrn rozsiri)')
 
-  gap = smoke1_decl('.frow .fmain', 'gap').to_f
-  NxTest.assert(gap.positive?, 'rad ma deklarovanu medzeru')
+  gap = smoke1_decl('.frow', 'column-gap').to_f
+  NxTest.assert(gap.positive?, 'mriezka ma deklarovanu medzeru')
+  gaps = gap * 3 # 4 stlpce = 3 medzery
 
-  # 8 flex poloziek radu = 7 medzier: fnum · ftname · dwrap · funit · fauto ·
-  # fw · fprof · fdel.
-  gaps = gap * 7
-  # `.dwrap` je obal pola vysky: input + 2 px + sipka radu (`.pbtn` 17 px).
-  dwrap = fixed['.frow input.fh'] + 2 + 17
-  # Nemeratelne, ale realne: „mm" (~14 px) + chip AUTO (~36 px) — prave tato
-  # dvojica riadok pretiekla, takze v rozpocte MUSI byt.
-  unit_auto = 14 + 36
-  ftname_min = smoke1_min_px('.frow .ftname')
-  NxTest.assert(ftname_min.positive?, 'nazov typu ma citatelne minimum (aj s ikonou vnutri)')
-  # Badge „smer?" (KOV-A2a) sa v riadku objavi LEN pri neurcenom smere — je
-  # nemeratelny, ale realny (text 9 px ~24 px + padding 8 + ramik 2), takze
-  # v rozpocte MUSI byt: pri vypisanej vyske stoji vedla „mm" aj chipu AUTO.
-  badge = 34
+  # Stredny stlpec nesie NAZOV aj SUHRN — obe su jednoriadkove s ellipsis,
+  # takze do rozpoctu ide ich CITATELNE minimum (nie skutocna dlzka textu).
+  middle_min = 120
 
-  total = fixed['.frow .fnum'] + ftname_min + badge + dwrap + unit_auto +
-          fixed['.frow select.fw'] + fixed['.frow .fprof'] + fixed['.frow .fdel'] + gaps
+  total = fixed_cols.sum + middle_min + gaps
   NxTest.assert(total <= SMOKE1_FRONT_BUDGET,
                 "riadok cela pri 470 px: #{total.round} px <= #{SMOKE1_FRONT_BUDGET} px")
+
+  # Pole vysky je JEDEN BOX s KONSTANTNOU sirkou — chip AUTO odobera miesto
+  # HODNOTE, nie boxu. Prave toto bola pricina „lietajucich poli" (D-130).
+  NxTest.assert_equal('3', smoke1_decl('.frow .hbox', 'grid-column'),
+                      'box vysky ma SVOJ stlpec (nie „to, co zvysi")')
+  NxTest.assert_equal('1 / 3', smoke1_decl('.frow .hbox', 'grid-row'),
+                      'a stoji cez oba riadky (nazov + suhrn)')
+  NxTest.assert_equal('1 1 0', smoke1_decl('.frow .hbox input.fh', 'flex'),
+                      'hodnota berie zvysok boxu — chip AUTO ju zmensi, box nie')
 end
 
-# KOV-A2a: karta cela nesmie rozbit ani rad, ani predel medzi celami.
-NxTest.test('SMOKE1 cela: karta cela je SAMOSTATNY riadok stlpca, nie polozka radu') do
+# KOV-A2a: karta cela nesmie rozbit ani mriezku, ani predel medzi celami.
+NxTest.test('SMOKE1 cela: karta cela je TRETI RIADOK mriezky, nie polozka radu') do
   NxTest.assert(SMOKE1_FORM.include?("card.className = 'fcard'"), 'karta ma svoju triedu')
-  NxTest.assert(SMOKE1_FORM.include?('row.appendChild(card); // karta je VZDY posledna v stlpci'),
-                'karta patri do `.frow` (stlpec), NIE do `.fmain` (nezalamovaci rad)')
-  # Riadok kovania sa pri otvorenej karte vklada NAD nu — inak by predel medzi
-  # celami ostal nad kovanim a karta by visela pod nim.
-  NxTest.assert(SMOKE1_FORM.include?('if (card) row.insertBefore(span, card);'),
-                'kovanie ostava nad kartou')
+  NxTest.assert(SMOKE1_FORM.include?('row.appendChild(card); // karta je VZDY posledna v riadku'),
+                'karta patri do `.frow`, nie do ziadneho obalu ovladacov')
+  NxTest.assert_equal('3', smoke1_decl('.nx-inspector .frow .fcard', 'grid-row'),
+                      'karta je TRETI riadok mriezky (pod nazvom aj suhrnom)')
+  NxTest.assert_equal('2 / 5', smoke1_decl('.nx-inspector .frow .fcard', 'grid-column'),
+                      'a tiahne sa od nazvu po ✕ (cislo cela ostava vlavo)')
   NxTest.assert(smoke1_decl('.nx-inspector .frow .fcard', 'border').to_s.include?('var(--nx-part-border)'),
                 'karta pouziva TOKEN ramika (ziadny natvrdo zapisany hex)')
 end
 
-NxTest.test('SMOKE1 cela (Codex #183 P2): zivy nahlad vyrazu NEZABERA sirku radu') do
+NxTest.test('SMOKE1 cela (Codex #183 P2): zivy nahlad vyrazu NEZABERA sirku pola') do
   # `= 450` pri rozpisanom vyraze `300+150` je v riadku cela OVERLAY. Ako flex
-  # polozka (`flex: 0 0 auto`) by pridal ~34 px, na ktore rad pri `nowrap` uz
-  # nema rezervu — riadok by pretiekol presne tak, ako predtym zalamoval.
-  NxTest.assert_equal('absolute', smoke1_decl('.nx-inspector .frow .dwrap .exprhint', 'position'),
-                      'hint je mimo toku radu')
-  NxTest.assert_equal('none', smoke1_decl('.nx-inspector .frow .dwrap .exprhint', 'pointer-events'),
+  # polozka (`flex: 0 0 auto`) by odtlacil hodnotu v 112 px boxe.
+  #
+  # Codex #371 P2: SELEKTOR MUSI SEDIET NA SKUTOCNEHO RODICA. `expr.js` vklada
+  # hint `insertAdjacentElement('afterend')` hned za `input.fh`, teda do
+  # `.hbox` — nie do `.dwrap` (tam ostala len sipka vyskoveho radu). Pravidlo
+  # na `.dwrap` by nesedelo na nic a hint by sa spraval ako flex polozka.
+  sel = '.nx-inspector .frow .hbox .exprhint'
+  NxTest.assert_equal('absolute', smoke1_decl(sel, 'position'), 'hint je mimo toku boxu')
+  NxTest.assert_equal('none', smoke1_decl(sel, 'pointer-events'),
                       'overlay nesmie kradnut kliky poliam pod nim')
+  NxTest.assert_equal('relative', smoke1_decl('.frow .hbox', 'position'),
+                      'a `.hbox` je jeho KOTVA (inak by sa ukotvil na cudzieho predka)')
+  NxTest.assert_equal(nil, smoke1_decl('.nx-inspector .frow .dwrap .exprhint', 'position'),
+                      'stary (nesediaci) selektor na `.dwrap` uz neexistuje')
   # Pod `.miniopts` (120) — ked je otvoreny rozmerovy rad, hodnoty maju prednost.
-  NxTest.assert(smoke1_decl('.nx-inspector .frow .dwrap .exprhint', 'z-index').to_i <
+  NxTest.assert(smoke1_decl(sel, 'z-index').to_i <
                 smoke1_decl('.nx-inspector .miniopts', 'z-index').to_i,
                 'hint nesmie prekryt otvorenu ponuku rozmeroveho radu')
 end
 
-NxTest.test('SMOKE1 cela: nazov typu je JEDINY rastuci prvok (vyuzije zvysok sirky)') do
-  # KOV-A2a: rastucim prvkom bola rozbalovacka typu, teraz je nim tlacidlo
-  # `.ftname` (ikona + nazov + pripadny badge „smer?"). Pravidlo je to iste:
-  # PRAVE JEDEN prvok radu rastie, vsetky ostatne maju pevnu stopu.
-  flex = smoke1_decl('.frow .ftname', 'flex').to_s
-  NxTest.assert(flex.start_with?('1 1'), "`.ftname` rastie aj sa zmrsti (#{flex})")
+NxTest.test('SMOKE1 cela: nazov a suhrn ziju v ROVNAKOM (rastucom) stlpci') do
+  # D-130a: rastucim prvkom uz nie je jedna flex polozka, ale STREDNY STLPEC
+  # mriezky. Nazov aj suhrn su v nom nad sebou — obe sa musia OREZAT (nie
+  # tlacit susedov), inak by dlhy text rozsiril cely riadok.
+  NxTest.assert_equal('2', smoke1_decl('.frow .ftname', 'grid-column'), 'nazov je v strednom stlpci')
+  NxTest.assert_equal('1', smoke1_decl('.frow .ftname', 'grid-row'), 'a v prvom riadku')
+  # R3-f: suhrn zije v OBALE `.fsubwrap` spolu s koncovkou kovania — obal je
+  # ten, kto sedi v mriezke.
+  NxTest.assert_equal('2', smoke1_decl('.frow .fsubwrap', 'grid-column'),
+                      'suhrn je v TOM ISTOM stlpci')
+  NxTest.assert_equal('2', smoke1_decl('.frow .fsubwrap', 'grid-row'), 'a pod nazvom')
+  NxTest.assert_equal('1 1 0', smoke1_decl('.frow .fsub', 'flex'), 'suhrn rastie a oreze sa')
+  NxTest.assert_equal('0 0 auto', smoke1_decl('.frow .fhwlink', 'flex'),
+                      'koncovka kovania ma PEVNU stopu')
   NxTest.assert_equal(nil, smoke1_decl('.frow select.ftype', 'flex'),
                       'rozbalovacka typu v riadku uz neexistuje')
-  ['.frow .fnum', '.frow input.fh', '.frow select.fw',
-   '.frow .fprof', '.frow .fdel', '.frow .fbadge'].each do |sel|
-    NxTest.assert(smoke1_decl(sel, 'flex').to_s.start_with?('0 0'), "#{sel} nerastie ani sa nezmrsti")
-  end
-  # Nazov sa v uzkom rade musi OREZAT (nie tlacit susedov) — ellipsis + nowrap.
+  NxTest.assert_equal(nil, smoke1_decl('.frow select.fw', 'flex'),
+                      'rozbalovacka kridel v riadku uz neexistuje (je to segment v karte)')
+  NxTest.assert_equal(nil, smoke1_decl('.frow .fprof', 'flex'),
+                      'indikator profilu v riadku uz neexistuje (hovori SUHRN slovom)')
+  # Oba texty su JEDNORIADKOVE s ellipsis — plne znenie nesie `title`.
   NxTest.assert_equal('ellipsis', smoke1_decl('.frow .ftname .ftl', 'text-overflow'))
   NxTest.assert_equal('nowrap', smoke1_decl('.frow .ftname .ftl', 'white-space'))
+  NxTest.assert_equal('ellipsis', smoke1_decl('.frow .fsub', 'text-overflow'))
+  NxTest.assert_equal('nowrap', smoke1_decl('.frow .fsub', 'white-space'))
+  NxTest.assert_equal('0', smoke1_decl('.frow .fsub', 'min-width'),
+                      'suhrn sa SMIE zmrstit — bez toho by dlhy text rozsiril mriezku')
 end
 
-NxTest.test('SMOKE1 cela: markup riadku obaluje ovladace do `.fmain`') do
+NxTest.test('SMOKE1 cela: markup riadku kladie deti PRIAMO do mriezky') do
   body = SMOKE1_FORM[/function addFrontRow.*?\n  \}\n/m].to_s
-  NxTest.assert(body.include?("row.innerHTML = '<span class=\"fmain\">'"), 'rad zacina obalom')
-  NxTest.assert(body.include?("'</span>';"), 'a je aj uzavrety')
-  # Riadok kovania (UI-C3) patri k celu — pripaja sa na `.frow`, teda POD rad,
-  # takze jemny predel medzi celami lezi az pod nim.
-  NxTest.assert(SMOKE1_FORM.include?('row.appendChild(span)'), 'kovanie zije v `.frow`, nie v `.fmain`')
+  NxTest.refute(body.include?('class="fmain"'), 'obal `.fmain` zanikol — deti ziju v mriezke')
+  NxTest.assert(body.include?("'<span class=\"fnum\">F' + idx + '</span>'"), 'riadok zacina cislom cela')
+  # Kazde dieta sa hlada VYHRADNE cez triedu (nikdy cez index) — obrateny
+  # render D-23 a `keepGaps` guard na tom stoja.
+  ['class="ftname"', 'class="fsub"', 'class="hbox"', 'class="fdel"'].each do |cls|
+    NxTest.assert(body.include?(cls), "riadok ma #{cls}")
+  end
+  # Samostatny riadok kovania `.fhw` ZANIKOL — je to posledna cast suhrnu.
+  NxTest.refute(SMOKE1_FORM.include?("row.querySelector('.fhw')"), 'riadok kovania zanikol')
 end
 
 # ---------------------------------------------------------------------------

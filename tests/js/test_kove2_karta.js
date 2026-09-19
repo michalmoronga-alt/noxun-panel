@@ -47,12 +47,15 @@ const md = require(path.join(__dirname, 'minidom.js'));
 const { mkEl, DOC } = md;
 const C = require(path.join(JS, 'core.js'));
 
+// D-130a: karta má dva taby — `rows` = tab Čelo (nastavenia), `hwRows` = tab
+// Kovanie (vyriešený výklop, technický detail). Riadky výklopu sa preto
+// hľadajú v `hwRows`; segmenty ostávajú medzi nastaveniami.
 function rowKeys(m){
   return m.rows.filter(r => r.kind === 'seg').map(r => r.key);
 }
-function kinds(m){ return m.rows.map(r => r.kind); }
+function kinds(m){ return m.rows.concat(m.hwRows).map(r => r.kind); }
 function infoTexts(m){
-  return m.rows.filter(r => r.kind === 'info').map(r => r.text);
+  return m.rows.concat(m.hwRows).filter(r => r.kind === 'info').map(r => r.text);
 }
 const ENTRY = { wings_n: 1, slots: [] };
 
@@ -73,7 +76,7 @@ eq(hl.rows.find(r => r.key === 'lift_system').active, 'hl_top',
    'K1: aktívna voľba ide z uloženej hodnoty');
 eq(rowKeys(C.frontCardModel({ type: 'fall' }, ENTRY)), ['opening_mode'],
    'K1: SKLOP systém nemá — dostáva závesy ako dvierka (M1)');
-eq(rowKeys(C.frontCardModel({ type: 'door' }, ENTRY)), ['opening_mode'],
+eq(rowKeys(C.frontCardModel({ type: 'door' }, ENTRY)), ['wings', 'opening_mode'],
    'K1: ani dvierka');
 
 // `frontLiftSystem` je JEDINÉ miesto čítania — poškodený tvar ho nezhodí.
@@ -141,8 +144,11 @@ eq(C.frontLiftRows({ state: 'incomplete', text: 'x', message: '' }).length, 1,
 const kartaNeuplna = C.frontCardModel({ type: 'lift', lift: { system: 'hk_top' } }, ENTRY, null,
                                       Object.assign({}, OK_REC,
                                                     { state: 'incomplete', message: NEUPLNY }));
-eq(kinds(kartaNeuplna), ['seg', 'seg', 'info', 'resolved'],
+eq(kartaNeuplna.hwRows.map(r => r.kind), ['info', 'resolved'],
    'K2b: veta o automate MIZNE aj tu — hovorí zaň červený riadok');
+eq(kartaNeuplna.rows.map(r => r.kind), ['info', 'seg', 'seg'],
+   'K2b (D-130a): červený dôvod stojí NAD segmentmi aj v tabe Čelo');
+eq(kartaNeuplna.rows[0].tone, 'err', 'K2b: a je červený');
 
 // ============ K3: vertikálny priestor =======================================
 const bezZaznamu = C.frontCardModel({ type: 'lift' }, ENTRY);
@@ -156,8 +162,11 @@ eq(kinds(sZaznamom), ['seg', 'seg', 'resolved'],
    'K3: presne systém + otváranie + jeden riadok');
 const sKonfliktom = C.frontCardModel({ type: 'lift' }, ENTRY, null,
                                      { state: 'conflict', message: VETA });
-eq(kinds(sKonfliktom), ['seg', 'seg', 'info'], 'K3: pri chybe červený riadok NAMIESTO vety');
-eq(infoTexts(sKonfliktom), [VETA], 'K3: a je to veta servera');
+eq(sKonfliktom.hwRows.map(r => r.kind), ['info'],
+   'K3: pri chybe červený riadok NAMIESTO vety');
+eq(sKonfliktom.rows.map(r => r.kind), ['info', 'seg', 'seg'],
+   'K3 (D-130a): a je vidieť aj v tabe Čelo — je to dôvod, prečo dielce nevzniknú');
+eq(infoTexts(sKonfliktom), [VETA, VETA], 'K3: a je to veta servera (v oboch taboch tá istá)');
 
 // ============ K4 + K5: DOM — zápis a HTML karty =============================
 global.el = id => DOC.getElementById(id);
@@ -219,6 +228,13 @@ function openCard(fid){
   const b = rowOf(fid).querySelector('.ftname');
   if (b.getAttribute('aria-expanded') !== 'true') FM.onFrontCardToggle(b);
 }
+// D-130a: vyriešený výklop žije v TABE KOVANIE — prepína sa naň klikom
+// na tab, presne ako to robí používateľ.
+function openCardTab(fid, tab){
+  openCard(fid);
+  const t = rowOf(fid).querySelector('.ctabs button[data-tab="' + tab + '"]');
+  if (t) FM.onFrontCardTab(t);
+}
 function cardOf(fid){ return rowOf(fid).querySelector('.fcard'); }
 
 // --- K4a: klik na chip zapíše systém ----------------------------------------
@@ -257,7 +273,7 @@ eq(items()[0].lift, { system: 'hl_top' }, 'K4: dormant HL top prežije návrat n
 resetRows();
 global.frontLift = { F1: Object.assign({ warn: 'Čelo je príliš ľahké.' }, OK_REC) };
 FM.addFrontRow({ id: 'F1', type: 'lift', lift: { system: 'hk_top' } });
-openCard('F1');
+openCardTab('F1', 'hw');
 const card = cardOf('F1');
 const drow = card.querySelector('.drow');
 ok(drow, 'K5: vyriešený výklop má vlastný read-only riadok');
@@ -281,6 +297,11 @@ const err = cardOf('F1').querySelectorAll('.inforow').find(e => (e.attrs.class |
 ok(err, 'K5: konflikt je červený inforow');
 ok(md.textOf(err).indexOf('Tip-On') >= 0, 'K5: s vetou servera');
 ok(!cardOf('F1').querySelector('.drow'), 'K5: a bez riadku, ktorý by tvrdil, že je hotovo');
+// D-130a: červený dôvod je vidieť aj v tabe Kovanie (v plnom znení).
+openCardTab('F1', 'hw');
+ok(cardOf('F1').querySelectorAll('.inforow').find(e => (e.attrs.class || '').indexOf('err') >= 0),
+   'K5 (D-130a): konflikt stojí v OBOCH taboch');
+openCardTab('F1', 'celo');
 // HTML `disabled` nie je ochrana: kombinácia HL + Tip-On sa DÁ nastaviť ďalej,
 // karta o nej len hneď povie (server ju odmieta v bránach, nie v markupe).
 const tipon = cardOf('F1').querySelectorAll('button')

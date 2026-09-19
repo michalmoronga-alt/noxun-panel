@@ -640,7 +640,10 @@ module NxTest
            'veta stavu ma TEN ISTY filter (inak by hlasila „bez profilu" o vyklope)')
     # KOV-A2a: `onFrontTypeChange` dostava RIADOK (typ zije v datasete), nie
     # select — zoznam sa tym nemeni, len sa cita z ineho miesta.
-    assert(NxKovA1.src('ui/js/form.js').include?('var off = frontProfileless(type);'),
+    # D-130a: indikator `.fprof` v riadku zanikol (profil hovori SUHRN slovom),
+    # takze sa uz neskryva ram ikony — zhodenie profilu na 'none' vsak ostava
+    # a ide cez TEN ISTY predikat.
+    assert(NxKovA1.src('ui/js/form.js').include?("if (frontProfileless(type) && row.dataset.frontProfile !== 'none')"),
            'form.js pouziva ten isty zoznam, nie vlastnu podmienku')
   end
 

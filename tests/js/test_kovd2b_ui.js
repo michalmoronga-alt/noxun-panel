@@ -375,7 +375,8 @@ eq(C.frontDrawerRows({ state: 'ok', text: 'x', detail: [] }).map(r => r.kind),
 eq(C.frontDrawerRows({ state: 'stale' }).map(r => r.kind), ['info'],
    'nemigrovana zasuvka nema co zamykat');
 
-const cardFn = formSrc.match(/function frontCardHtml\(row\)\{[\s\S]*?\n  \}\n/)[0];
+// D-130a: riadky view-modelu kresli spolocna `frontCardRowsHtml` (oba taby).
+const cardFn = formSrc.match(/function frontCardRowsHtml\(rows\)\{[\s\S]*?\n  \}\n/)[0];
 ok(/r\.kind === 'axes'/.test(cardFn) && /hwAxHtml\(r\.axes, r\.ident\)/.test(cardFn),
    'karta cela kresli TEN ISTY markup ako sekcia Kovanie (jeden renderer)');
 

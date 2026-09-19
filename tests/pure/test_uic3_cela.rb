@@ -67,15 +67,23 @@ end
 
 # --- 3) D-96 Uchytky ---------------------------------------------------------
 
-NxTest.test('D-96: profil sa vybera v sekcii Uchytky pre ROZSAH ciel') do
-  NxTest.assert(UIC3_PANEL_HTML.include?('id="frontProfileSel"'), 'sekcia ma vyber profilu')
-  NxTest.assert(UIC3_PANEL_HTML.include?('id="frontProfileScope"'), 'sekcia ma vyber rozsahu')
-  NxTest.assert(UIC3_PANEL_HTML.include?('data-key="fhandles"'), 'Uchytky su vlastna skupina kontextu Cela')
-  NxTest.assert(UIC3_FORM_JS.include?('function onFrontProfilePick'), 'volba profilu ma vlastnu cestu')
+NxTest.test('D-96 / D-130a: hromadna uchytka je POPOVER „všetkým" (akcia, nie druhy stav)') do
+  NxTest.assert(UIC3_PANEL_HTML.include?('id="frontProfileSel"'), 'popover ma vyber profilu')
+  NxTest.assert(UIC3_PANEL_HTML.include?('id="frontProfileScope"'), 'popover ma vyber rozsahu')
+  NxTest.assert(UIC3_PANEL_HTML.include?('id="frontBulkPop"'), 'hromadna uchytka zije v popoveri')
+  # D-129: skupina „Úchytky" zanikla — profil a hrana maju JEDINE miesto stavu
+  # (karta cela). Dve miesta toho isteho udaja boli hlasenym problemom.
+  NxTest.refute(UIC3_PANEL_HTML.include?('data-key="fhandles"'),
+                'skupina Uchytky zanikla (D-129)')
+  NxTest.assert(UIC3_FORM_JS.include?('function onFrontBulkApply'),
+                'zapisuje JEDINE tlacidlo „Použiť" — jeden krok Späť')
+  # Selecty popoveru su NAVRH: `onFrontProfilePick` uz nesmie nic zapisovat.
+  pick = UIC3_FORM_JS[/function onFrontProfilePick\(\)\{[^\n]*/].to_s
+  NxTest.refute(pick.include?('onField'), 'zmena selectu v popoveri NEZAPISUJE')
   # Ikona v riadku je INDIKATOR, nie ovladac — ziadny onclick, ziadne cyklenie.
   NxTest.refute(UIC3_FORM_JS.include?('toggleFrontProfile'), 'cyklenie ikonou zaniklo')
-  NxTest.refute(UIC3_FORM_JS.include?("class=\"fprof\" type=\"button\""),
-                'indikator uz nie je tlacidlo')
+  NxTest.refute(UIC3_FORM_JS.include?('class="fprof"'),
+                'indikator profilu v riadku zanikol — hovori SUHRN slovom')
 end
 
 NxTest.test('D-120: hrana osadenia ma registry API a zive UI') do
@@ -113,22 +121,26 @@ end
 
 # --- 5) naviazane kovanie pod riadkom ---------------------------------------
 
-NxTest.test('UI-C3: naviazane kovanie je JEDEN drobny riadok a vedie do Kovania') do
+NxTest.test('UI-C3 / D-130a: naviazane kovanie je POSLEDNA cast SUHRNU a vedie do Kovania') do
   NxTest.assert(UIC3_FORM_JS.include?('function openFrontHardware'),
-                'klik na riadok kovania prepne kontext a najde box vlastnika')
+                'preklik prepne kontext a najde box vlastnika')
   NxTest.assert(UIC3_FORM_JS.include?("setViewContext('kovanie')"), 'klik vedie tam, kam ukazuje (N13)')
-  NxTest.assert(UIC3_FORM_JS.include?('ev.stopPropagation()'),
-                'interaktivne prvky v riadku STOPUJU bublanie')
+  # D-130a: samostatny riadok `.fhw` zanikol — kovanie je posledna cast suhrnu
+  # a preklik robi tlacidlo „Otvoriť v Kovaní" v tabe Kovanie karty.
+  NxTest.refute(UIC3_FORM_JS.include?("row.querySelector('.fhw')"),
+                'samostatny riadok kovania v `.frow` zanikol')
+  NxTest.assert(UIC3_FORM_JS.include?('Otvoriť v Kovaní'),
+                'preklik zije v tabe Kovanie karty cela')
   # Codex #178 P2: nazov setu pod celom sa meni ZIVYM pushom z Katalogu kovania —
   # bez tejto cesty by pod celami visel stary set az do noveho oznacenia skrinky.
   hw = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'hardware.js'), encoding: 'UTF-8')
   NxTest.assert(hw.include?('refreshFrontHwBuy(items)'),
                 'zivy push kovania prestavi aj mapu setov pod riadkami ciel')
-  NxTest.assert(hw.include?('updateFrontRowBadges()'),
-                'a rovno obnovi riadky ciel (su MIMO #hwRows)')
+  NxTest.assert(hw.include?('updateFrontRowSummaries()'),
+                'a rovno obnovi suhrny riadkov ciel (su MIMO #hwRows)')
   css = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'css', 'panel.css'), encoding: 'UTF-8')
-  NxTest.assert(css.include?('.frow .fhw'), 'riadok kovania ma vlastny styl')
-  NxTest.assert(css[/\.frow \.fhw \{[^}]*\}/m].include?('text-overflow: ellipsis'),
+  NxTest.assert(css.include?('.frow .fsub'), 'suhrn riadku ma vlastny styl')
+  NxTest.assert(css[/\.frow \.fsub \{[^}]*\}/m].include?('text-overflow: ellipsis'),
                 'jednoriadkovy s ellipsis — vertikalny priestor panela je vzacny')
 end
 
@@ -187,10 +199,13 @@ end
 
 # --- 7) kostra kontextu Cela -------------------------------------------------
 
-NxTest.test('UI-C3: kontext Cela ma tri skupiny v zavaznom poradi') do
+NxTest.test('UI-C3 / D-130a: kontext Cela ma DVE skupiny v zavaznom poradi') do
   keys = UIC3_PANEL_HTML.scan(/data-key="([a-z_]+)" data-s4="cela"/).flatten
-  NxTest.assert_equal(%w[fronts fhandles fgaps], keys,
-                      'Zoznam ciel -> Uchytky -> Medzery (poradie je kontrakt)')
+  # D-129: skupina `fhandles` zanikla (uchytka ma jedine miesto = karta cela,
+  # hromadne cez popover „všetkým"). D-130b neskor zlucii `fgaps` do skupiny
+  # „Spoločné pre skrinku" (`cabfront`).
+  NxTest.assert_equal(%w[fronts fgaps], keys,
+                      'Čelá -> Medzery (poradie je kontrakt)')
 end
 
 NxTest.test('UI-C3: material ciel je dostupny aj zo zoznamu ciel (S3 je v tomto kontexte skryty)') do

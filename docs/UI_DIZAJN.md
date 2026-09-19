@@ -45,6 +45,11 @@ dokument opisuje **prečo** a **ako** — tabuľka tokenov nižšie je zrkadlom 
 - **Rozbaľovacie okno je overlay, nie nový riadok** (`position: absolute` —
   warnpanel, `.miniopts` rozmerových radov, nastavenie zvýraznenia hrán):
   vertikálny priestor sa nesmie meniť tým, že si niečo otvoríš.
+- **Pomocný text = tooltip, stavová veta ostáva viditeľná** (D-130a). Vysvetlenie
+  „ako to funguje" nesmie trvale zaberať riadok — ide do `.nxtip` (§5.x nižšie).
+  **Stavová veta je niečo iné:** červený dôvod, jantárové odporúčanie, „bez
+  klasifikácie" či návrhová hláška D-120 hovoria o TOMTO čele TERAZ a musia byť
+  vidieť bez hľadania. `.hint` sa v novom UI **nepridáva**.
 - **Žiadna vizuálna zmena bez zámeru.** Nová farba sa nepridáva ako hex do súboru —
   pridáva sa token, alebo sa použije existujúci.
 
@@ -865,14 +870,46 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Zones`).
   pred minimom**; medzi minimom a plochou sa veľkosti okna nikto nedotkne, takže
   vedome zväčšené okno ostáva. Nové okno = nové `NX_FIT_MIN` (bez neho fit nebeží).
 
-### 5.7 Čelá — riadky, AUTO chip, Úchytky (UI-C3)
+### 5.7 Čelá — riadky, AUTO chip, Úchytky (UI-C3, rework D-130a)
 
-Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Fronts`).
+Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_cela_final.html` (D-130a);
+staršia `mockup_inspector_c.html` (`s4Fronts`) pre zvyšok kontextu.
 
 - **Okraje (ČELÁ-A / D-119)** patria celej skrinke: hore/dole v prvom riadku, vľavo/vpravo v druhom. Medzera medzi čelami ostáva osobitne; čísla zarovnané doprava.
-- **Kontext má tri skupiny v záväznom poradí:** Zoznam čiel · **Úchytky** ·
-  Medzery a presahy. Ikony skupín (N3b) ukazujú, o čom skupina hovorí
-  (`front` · `profile` · `columns-2`).
+- **Kontext má od D-130a DVE skupiny v záväznom poradí:** **Čelá** · Medzery
+  a presahy (`fhandles` zanikla — úchytka má jediné miesto, nižšie). Ikony
+  skupín (N3b) ukazujú, o čom skupina hovorí (`front` · `columns-2`).
+- **RIADOK JE MRIEŽKA, nie rad (D-130a).** `22px minmax(0,1fr) 112px 22px`,
+  riadky: názov · súhrn · karta. Flex rad držal riadok pohromade, ale poloha
+  poľa výšky závisela od toho, **čo v riadku práve bolo** (chip AUTO, „mm",
+  select krídel, ikona profilu) — polia „lietali" a oko ich pri každom čele
+  hľadalo inde (D-130). **Pravidlo pre budúce ovládače:** nový ovládač si musí
+  v mriežke nájsť miesto; nemá kde „pritlačiť" susedov (stráži guard test).
+- **SÚHRN POD NÁZVOM je jeden tlmený riadok** („1 krídlo (auto) · smer? · bez
+  úchytky · Sensys klasik · 2 ks →"): stav **všetkých** čiel vidno bez
+  otvárania kariet. Zlúčil badge „smer?", indikátor profilu a riadok kovania —
+  tri drobné signály rozsypané po riadku sa čítali horšie než jedna veta.
+  Klik na súhrn otvorí kartu na tabe **Čelo**, klik na koncovku kovania rovno
+  na tabe **Kovanie**; sú to **dva súrodenecké ovládače**, nie ovládač vnorený
+  v ovládači (tlačidlo v tlačidle sa nedá fokusovať).
+- **POLE VÝŠKY JE JEDEN BOX s konštantnou šírkou** (`[AUTO][hodnota][mm][▾]`):
+  chip odoberá miesto **hodnote**, nie boxu. „mm" je **vždy** vidno — jednotka
+  patrí k poľu, nie k hodnote. Placeholder „≈ N" je **kurzívou a tlmený**,
+  pevná hodnota **tučná** (placeholder ako jediný nositeľ stavu AUTO je známa
+  pasca — outside-in).
+- **KARTA MÁ DVA TABY:** **Čelo** = čo nastavujem, **Kovanie** = čo z toho
+  vzišlo. Používateľ tak nemusí hľadať v jednom stĺpci nastavenia aj výsledky.
+  Tab sa nevolá podľa typu („Výsuv"/„Závesy") — jedno meno pre jednu vec.
+  **Červená stavová veta stojí v OBOCH taboch** (je to dôvod, prečo dielce
+  nevzniknú); jantárové odporúčanie je poznámka k výsledku a ostáva v Kovaní.
+- **POMOCNÝ TEXT JE TOOLTIP `?` (`.nxtip`), nie `.hint`.** Bublina za ikonou:
+  obsah v `data-tip`, kreslí ho pseudo-element, otvára **hover aj fokus**,
+  šírka 250 px, varianta `.r` zarovnaná vpravo. Natívny `title` nestačí — CEF
+  ho ukazuje s oneskorením a nedá sa štýlovať. **Stavové vety ostávajú
+  viditeľné** (§1). Ikona `help-circle` je zo spritu, žiadne emoji.
+- **Klik na ikonu v hlavičke skupiny NESMIE skupinu zbaliť.** `<details>`
+  toggluje na klik kdekoľvek v `<summary>`, takže každé tlačidlo v hlavičke
+  volá `preventDefault()` **aj** `stopPropagation()`.
 - **Riadok začína ikonou typu (N27).** Ikona odpovedá na „čo to je" skôr, než
   sa oko dostane k textu — a od **KOV-A2a** stojí **vnútri tlačidla názvu typu**
   (`.ftname`), ktoré otvára kartu čela. Rozbaľovačka typu zanikla: typ sa vyberá
@@ -890,39 +927,38 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Fronts`).
   (`--nx-warnchip-*`), nie červené: červená patrí nálezu v Kontrole (Štúdio), tu ide
   o otvorenú otázku. **Nič sa nepredvolí** — legacy čelo má segment bez zvýraznenia
   a pod ním vetu, čo platí, kým to nikto neurčí.
-- **Rad ovládačov sa NEZALAMUJE** (smoke test 20.8.). Riadok čela je **stĺpec**:
-  hore pevný nezalamovací rad `.fmain`, pod ním riadok kovania. Zalamovací rad
-  vyzeral bezpečne, kým bola výška prázdna — vypísaná hodnota k nemu pridala
-  „mm" aj chip AUTO a krížik ✗ spadol o riadok nižšie. **Pravidlo pre budúce
-  ovládače:** v takom rade smie **rásť jediný prvok** (od KOV-A2a `.ftname`),
-  všetko ostatné má pevnú stopu, a súčet stôp + medzier musí sedieť pri šírke
-  **470 px** — stráži to guard test, nie oko. **Do rozpočtu patrí aj to, čo sa
+- **Riadok sa NEZALAMUJE** (smoke test 20.8., mriežka od D-130a). Zalamovací
+  rad vyzeral bezpečne, kým bola výška prázdna — vypísaná hodnota k nemu
+  pridala „mm" aj chip AUTO a krížik ✗ spadol o riadok nižšie. Rozpočet šírky
+  pri **470 px** stráži guard test, nie oko. **Do rozpočtu patrí aj to, čo sa
   objaví len chvíľu**: živý náhľad výrazu („= 450") sa preto kreslí ako
-  **overlay pod poľom**, nie ako ďalšia položka radu — inak by riadok pretiekol
+  **overlay pod poľom**, nie ako ďalšia položka — inak by riadok pretiekol
   vždy, keď používateľ píše výraz.
 - **Predel medzi položkami je hairline, nie nový riadok.** Jemná linka
   (`--nx-border-soft`) sa platí **presunutím** existujúceho odstupu z `margin`
   do `padding`, nie jeho pripočítaním. Predel patrí pod **celú položku** — pri
-  čele teda až pod riadok naviazaného kovania, ktorý k nemu patrí.
+  čele teda až pod kartu, ktorá k nemu patrí.
 - **Zámok pri výške ZANIKOL: zamknuté ⇔ vypísané.** Vypísaná hodnota drží,
   prázdne pole je AUTO. Samostatný checkbox vedel byť zapnutý aj nad prázdnym
   poľom a nerobil nič — dve pravdy o tom istom. Návrat na automat robí **chip
   AUTO**, ktorý sa (spolu s jednotkou „mm") ukazuje **len pri vypísanej
   hodnote**: prázdnemu poľu niet čo vracať a jednotka by patrila k ničomu.
-  Pevná výška je aj **vidno** (tučnejšia hodnota, `.frow.fixed`) — zámok
+  Pevná výška je aj **vidno** (tučnejšia hodnota, `.hbox.fixed`) — zámok
   nesmie zmiznúť tým, že prestal mať vlastnú ikonu. Rovnaké pravidlo má pole
-  „Prvá zóna" z UI-C2.
-- **Pole výšky je úzke (46 px) a hodnota zarovnaná doprava** — rozmer je číslo,
-  nie veta (UX-03). Jednotka stojí **pri hodnote**, nie v hlavičke stĺpca.
+  „Prvá zóna" z UI-C2. Chip je **tlačidlo**, teda fokusovateľné aj z klávesnice.
+- **Hodnota je zarovnaná doprava** — rozmer je číslo, nie veta (UX-03).
+  Jednotka stojí **v boxe pri hodnote**, nie v hlavičke stĺpca.
 - **Rozmerový rad je ponuka, nie ďalšie pole** (N25, rovnaký vzor ako pri
   rozmeroch korpusu). Voľba len **dosadí** hodnotu a ohlási ju rovnakou
   udalosťou ako písanie rukou.
-- **Naviazané kovanie je JEDEN drobný riadok pod čelom**, nie tabuľka
-  (vertikálny priestor je vzácny): jednoriadkový s ellipsis, plný text v
-  `title`, klik vedie **do kontextu Kovanie** a doskočí na položku vlastníka
-  (krátke zvýraznenie, aby ju používateľ po skoku nehľadal). Obsah skladajú
-  existujúce zdroje — badge z plánu a nákupný set z D-92; panel nič
-  nedopočítava.
+- **Naviazané kovanie je KONCOVKA SÚHRNU**, nie vlastný riadok (D-130a —
+  vertikálny priestor je vzácny): jednoriadkové s ellipsis, plný text v
+  `title`. Klik otvorí kartu na tabe **Kovanie**; **do kontextu Kovanie** vedie
+  až tlačidlo „Otvoriť v Kovaní" v tom tabe a doskočí na box vlastníka (krátke
+  zvýraznenie, aby ho používateľ po skoku nehľadal). Keď box vlastníka
+  neexistuje, tlačidlo sa **neskrýva** — `aria-disabled` + dôvod v `title`
+  (D-78). Obsah skladajú existujúce zdroje — badge z plánu a nákupný set
+  z D-92; panel nič nedopočítava.
 - **D-84 reč stolára:** „+ pridaj dvere" (krídlové) a „+ pridaj čelo"
   (zásuvkové). Odoberacie tlačidlo **zaniklo** — mazanie ostáva krížikom pri
   konkrétnom riadku (jednoznačné, ktorý mizne) a v rade sa uvoľní miesto.
@@ -930,14 +966,18 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Fronts`).
   a tu je skrytý — bez druhého ovládača by sa dekor menil inde, než sa čelá
   kreslia. Je to **ten istý údaj v dvoch ovládačoch**, nie nové dáta; synchro
   drží každá cesta, ktorá siaha na materiál čiel.
-- **D-96 Úchytky:** profil sa nastavuje **v sekcii pre rozsah čiel**
-  (všetky / len zásuvkové / len dvierka), ikona v riadku je už len
-  **INDIKÁTOR** (žiaden rám tlačidla, žiaden kurzor akcie). Cyklenie klikom
-  bolo použiteľné len pri jednom profile. Rôzne profily v rozsahu ukáže
-  **disabled voľba „(rôzne)"** — select nikdy netvrdí zhodu, ktorá neplatí
-  (vzor „podľa parametra" zo sekcie Kovanie). **Hrana osadenia sa neponúka**,
-  kým ju registry profilov nepozná: ponúkať voľbu, ktorá nemá kam sadnúť, je
-  lož.
+- **D-129 / D-130a Úchytka má JEDINÉ MIESTO STAVU — kartu čela** (jeden riadok:
+  Profil + Hrana vedľa seba). Skupina „Úchytky" **zanikla**: bola druhým stavom
+  tých istých dvoch polí a používateľ nevedel, ktoré z dvoch miest platí.
+  Indikátor v riadku tiež zanikol — profil hovorí **súhrn slovom** („UKW-7
+  hore"), čo je zrozumiteľnejšie než ikona so stavom v `title`.
+  **Hromadná zmena je AKCIA, nie druhý stav:** popover „všetkým" v hlavičke
+  (Rozsah · Profil · Hrana · „Použiť na N"). Selecty v ňom **nič nezapisujú** —
+  zapisuje až „Použiť", teda **jeden krok Späť** na jedno rozhodnutie. Rôzne
+  profily v rozsahu ukáže **disabled voľba „(rôzne)"** — select nikdy netvrdí
+  zhodu, ktorá neplatí (vzor „podľa parametra" zo sekcie Kovanie). Ponuka hrán
+  je **prienik** hrán platných pre celý rozsah; bočné hrany sa nastavia v karte
+  alebo zúžením rozsahu.
 - **Výklop je v ponuke typov, ale zatiaľ NEvyberateľný** — s upozornením
   „AVENTOS ručne, automatika fáza 3". Vedomá odchýlka: rola `flap` potrebuje
   vlastnú cestu cez builder, ABS a kusovník, čo je samostatná dávka.

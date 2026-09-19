@@ -237,7 +237,14 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 - ✅ **D-128 · Ručná výška dreveného boxu zásuvky (Quadro)** — tretia os zámku (`box_height`) popri NL a výškovom variante Atiry: chip „box 360" s malým číselným poľom
   v riadku Zásuvka aj v karte čela, rozsah min–max (max = automat, nad automat sa nedá), dielce boxu sa režú na zámok, zmenšená zóna = RED `box_lock_invalid` s náhradou.
   **PR #364, v0.12.2.**
-- **D-129 + D-130 · Kontext Čelá: úchytky na dvoch miestach + menší UI/UX rework** — zjednotiť úchytky, pomocné texty do tooltipov, prehľadnejší celok; debata → draft → Antigravity outside-in → reconcile → mockup → package — nové okno.
+- ✅ **D-129 · Úchytka na jednom mieste** — skupina „Úchytky" zanikla; jediné miesto stavu je **karta čela** (riadok Profil + Hrana), hromadne cez **akciu** „všetkým"
+  v hlavičke skupiny Čelá (popover: Rozsah · Profil · Hrana · „Použiť na N") — selecty nič nezapisujú, zapisuje až „Použiť" = **jeden krok Späť**. Indikátor profilu
+  v riadku zanikol, profil hovorí súhrn slovom. **PR #371, v0.12.7** (spolu s D-130a).
+- **D-130 · Menší UI/UX rework kontextu Čelá** — **časť a HOTOVÁ (v0.12.7, PR #371):** riadok čela je mriežka so stálymi stĺpcami (polia už „nelietajú"), pod názvom
+  **súhrn** stavu čela (krídla · smer · konštrukcia · úchytka · kovanie), karta má **dva taby Čelo | Kovanie**, krídla sa nastavujú v karte (select z riadku zanikol)
+  a pomocné texty sú **tooltipy `?`** (stavové vety ostávajú viditeľné). **Ďalej časť b:** skupina „Spoločné pre skrinku" — materiál čiel · **schéma medzier** namiesto
+  dvoch riadkov polí · ikony zámku limitu a „Predvolené" v hlavičke skupiny (`fgaps` + `fronts` → `cabfront`). Mockup: [zdroje/ui20/mockup_cela_final.html](zdroje/ui20/mockup_cela_final.html),
+  outside-in: [zdroje/next_sessions/CELA_REWORK_OUTSIDE_IN_2026-09-19.md](zdroje/next_sessions/CELA_REWORK_OUTSIDE_IN_2026-09-19.md).
 - ✅ **D-131 · Smer kresby čiel celej zákazky jedným klikom** — riadok „Kresba čiel" v Štúdiu (Materiály → Predvoľby projektu): voľba *Podľa materiálu · Pozdĺžna · Priečna*
   + „Použiť na všetky čelá (N)" a read-only stav „teraz: …". Zapisuje sa **existujúci** override `part_overrides[..].grain_direction` všetkých fyzických čiel (dvierka po
   krídlach, zásuvkové čelá, výklopy/sklopy, blendy) a všetky skrinky sa prestavia v **jednej operácii = jeden krok Späť**. Bez zmeny kontraktu; projektová predvoľba pre

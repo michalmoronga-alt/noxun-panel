@@ -62,38 +62,40 @@ eq(unk.known, false, 'a karta o nom vie');
 
 // --- dvierka: smer sa pyta PRESNE tam, kde to povedal server ---------------
 eq(rowKeys(C.frontCardModel({ type: 'door' }, entry(1, [slot('single', null)]))),
-   ['direction:single', 'opening_mode'], '1 kridlo: smer + otvaranie');
+   ['wings', 'direction:single', 'opening_mode'], '1 kridlo: kridla + smer + otvaranie');
 eq(rowKeys(C.frontCardModel({ type: 'door' }, entry(2, []))),
-   ['opening_mode'], '2 kridla (server nekladie otazku): ZIADNY riadok smeru');
+   ['wings', 'opening_mode'], '2 kridla (server nekladie otazku): ZIADNY riadok smeru');
 ok(infoTexts(C.frontCardModel({ type: 'door' }, entry(2, []))).some(t => t.indexOf('Dvojkrídlo') === 0),
    'namiesto neho sa povie, co plati (lave = panty vlavo, prave vpravo)');
 eq(rowKeys(C.frontCardModel({ type: 'door' }, entry(3, [slot('p2', null)]))),
-   ['wing_direction:p2', 'opening_mode'], '3 kridla: len STREDNE kridlo');
+   ['wings', 'wing_direction:p2', 'opening_mode'], '3 kridla: len STREDNE kridlo');
 eq(rowKeys(C.frontCardModel({ type: 'door' }, entry(4, [slot('p2', null), slot('p3', null)]))),
-   ['wing_direction:p2', 'wing_direction:p3', 'opening_mode'], '4 kridla: obe stredne kridla');
+   ['wings', 'wing_direction:p2', 'wing_direction:p3', 'opening_mode'], '4 kridla: obe stredne kridla');
 // Popis krídla nesie aj CELKOVY pocet — „Krídlo 2/3" a „Krídlo 2/4" su ine veci.
-eq(C.frontCardModel({ type: 'door' }, entry(3, [slot('p2', null)])).rows[0].label, 'Krídlo 2/3',
+// D-130a R6-a: riadky „Krídlo k/n" ostavaju — segment „Krídla" ich NENAHRADZA
+// (pocet je nastavenie, smer stredneho kridla je otazka zo servera).
+eq(C.frontCardModel({ type: 'door' }, entry(3, [slot('p2', null)])).rows[1].label, 'Krídlo 2/3',
    '3 kridla: p2 je „Krídlo 2/3"');
-eq(C.frontCardModel({ type: 'door' }, entry(4, [slot('p2', null), slot('p3', null)])).rows.map(r => r.label).slice(0, 2),
+eq(C.frontCardModel({ type: 'door' }, entry(4, [slot('p2', null), slot('p3', null)])).rows.map(r => r.label).slice(1, 3),
    ['Krídlo 2/4', 'Krídlo 3/4'], '4 kridla: p2 a p3 vedia, z kolkych su');
 // Server sa este nevyjadril (novy riadok pred prvym echom) — nic sa neodvodzuje.
-eq(rowKeys(C.frontCardModel({ type: 'door' }, null)), ['opening_mode'],
+eq(rowKeys(C.frontCardModel({ type: 'door' }, null)), ['wings', 'opening_mode'],
    'bez zaznamu sa smer NEPYTA (a ani sa netvrdi, ze je dvojkridlo)');
 eq(infoTexts(C.frontCardModel({ type: 'door' }, null)), [],
    'a nekresli sa ani veta o dvojkridle');
 // Codex #281 P2-A: prazdne pole slotov SAMO O SEBE dvojkridlo NEZNAMENA —
 // da ho aj stary `front_items` (pred D-07) bez `wings_n`. Karta preto vetu
 // o dvojkridle povie LEN pri `wings_n === 2`; pri neznamom pocte MLCI.
-eq(rowKeys(C.frontCardModel({ type: 'door' }, entry(null, []))), ['opening_mode'],
+eq(rowKeys(C.frontCardModel({ type: 'door' }, entry(null, []))), ['wings', 'opening_mode'],
    'neznamy pocet kridiel: ziadny riadok smeru');
 eq(infoTexts(C.frontCardModel({ type: 'door' }, entry(null, []))), [],
    'a ANI veta o dvojkridle (tvrdit ju nad starym cache by bola lož)');
 // Cela matica efektivneho poctu kridiel (co karta zobrazi):
-[[1, [slot('single', null)], ['direction:single', 'opening_mode'], 0],
- [2, [], ['opening_mode'], 1],
- [3, [slot('p2', null)], ['wing_direction:p2', 'opening_mode'], 0],
- [4, [slot('p2', null), slot('p3', null)], ['wing_direction:p2', 'wing_direction:p3', 'opening_mode'], 0],
- [null, [], ['opening_mode'], 0]].forEach(([wn, sl, keys, infos]) => {
+[[1, [slot('single', null)], ['wings', 'direction:single', 'opening_mode'], 0],
+ [2, [], ['wings', 'opening_mode'], 1],
+ [3, [slot('p2', null)], ['wings', 'wing_direction:p2', 'opening_mode'], 0],
+ [4, [slot('p2', null), slot('p3', null)], ['wings', 'wing_direction:p2', 'wing_direction:p3', 'opening_mode'], 0],
+ [null, [], ['wings', 'opening_mode'], 0]].forEach(([wn, sl, keys, infos]) => {
   const m = C.frontCardModel({ type: 'door' }, entry(wn, sl));
   eq(rowKeys(m), keys, `wings_n ${wn}: riadky karty`);
   eq(infoTexts(m).length, infos, `wings_n ${wn}: pocet informacnych viet`);
@@ -110,8 +112,13 @@ eq(rowKeys(C.frontCardModel({ type: 'lift' }, entry(1, []))), ['lift_system', 'o
 eq(rowKeys(C.frontCardModel({ type: 'fall' }, entry(1, []))), ['opening_mode'], 'sklop: len otvaranie');
 eq(rowKeys(C.frontCardModel({ type: 'blind' }, entry(1, []))), [], 'blenda nema smer ani otvaranie');
 eq(rowKeys(C.frontCardModel({ type: 'none' }, entry(1, []))), [], '„Bez čela" nema co nastavovat');
-ok(infoTexts(C.frontCardModel({ type: 'blind' }, entry(1, []))).some(t => t.indexOf('pevný výrobný dielec') > 0),
+// D-130a R6-d: blenda NIE JE „bez kovania" — s uchytkovym profilom ho dostava
+// z pravidla `uchytkovy-profil-blenda`. Veta to musi povedat presne.
+const blindTxt = infoTexts(C.frontCardModel({ type: 'blind' }, entry(1, []))).join(' ');
+ok(blindTxt.indexOf('pevný dielec bez smeru a otvárania') > 0,
    'blenda povie, PRECO nema ovladace');
+ok(blindTxt.indexOf('kovanie vzniká len z úchytkového profilu') > 0,
+   'a NEPOPIERA kovanie, ktore z profilu vznika');
 // Sloty smeru sa pri ne-dvierkach ignoruju aj keby prisli (dormant hodnota
 // ostava v configu, ale otazka na nu sa nekladie).
 eq(rowKeys(C.frontCardModel({ type: 'drawer_front', direction: 'left' }, entry(1, [slot('single', 'left')]))),
@@ -132,8 +139,13 @@ eq(activeOf(C.frontCardModel({ type: 'door', direction: 'left' }, entry(3, [slot
    'scalarny smer sa pri 3/4 kridlach NECITA (dormant)');
 eq(activeOf(C.frontCardModel({ type: 'door' }, entry(2, [])), 'opening_mode'), null,
    'chybajuce otvaranie = ziadna aktivna volba (NIE „klasicke")');
-ok(C.frontCardModel({ type: 'door' }, entry(2, [])).rows.find(r => r.key === 'opening_mode').hint.includes('klasické otváranie'),
+// D-130a R9: veta „Bez voľby sa použije klasické otváranie." uz nestoji ako
+// `.hint` POD segmentom (zabrala riadok v kazdej karte) — je to POMOCNY text
+// a zije v tooltipe `?` pri popiske. Znenie sa nemeni.
+ok(C.frontCardModel({ type: 'door' }, entry(2, [])).rows.find(r => r.key === 'opening_mode').tip.includes('klasické otváranie'),
    'namiesto tichej volby sa povie, co plati, kym to nikto neurci');
+eq(C.frontCardModel({ type: 'door' }, entry(2, [])).rows.filter(r => r.kind === 'hint'), [],
+   'pomocne vety uz nie su riadky karty (su to tooltipy)');
 const drwLegacy = C.frontCardModel({ type: 'drawer_front' }, entry(1, []));
 eq(activeOf(drwLegacy, 'drawer_construction'), null, 'zasuvka bez klasifikacie: ziadna konstrukcia');
 eq(activeOf(drwLegacy, 'drawer_variant'), null, 'ani variant');
@@ -353,12 +365,21 @@ function openCard(fid){
   const b = rowOf(fid).querySelector('.ftname');
   if (b.getAttribute('aria-expanded') !== 'true') FM.onFrontCardToggle(b);
 }
+// D-130a: karta ma dva taby a otvara sa na tabe Čelo. Na tab Kovanie sa
+// prepina TOU ISTOU cestou ako pouzivatel — klikom na tab.
+function openCardTab(fid, tab){
+  openCard(fid);
+  const t = rowOf(fid).querySelector('.ctabs button[data-tab="' + tab + '"]');
+  if (t) FM.onFrontCardTab(t);
+}
 
 // --- 6a) OBRATENE PORADIE (D-23) prezije aj karta ---------------------------
 resetRows();
+// F3 ma smer ULOZENY ako „neurčené" — D-130a R3-b: badge „smer?" rozhoduje
+// ULOZENA HODNOTA, nie stav slotu (legacy celo bez kluca badge nikdy nema).
 [{ id: 'F1', type: 'door', wings: '1' },
  { id: 'F2', type: 'drawer_front' },
- { id: 'F3', type: 'door', wings: '1' }].forEach(it => FM.addFrontRow(it));
+ { id: 'F3', type: 'door', wings: '1', direction: UNSET }].forEach(it => FM.addFrontRow(it));
 eq(rows.querySelectorAll('.frow').map(r => r.dataset.frontId), ['F3', 'F2', 'F1'],
    'DOM je obrateny (najvyssie celo hore)');
 eq(items().map(x => x.id), ['F1', 'F2', 'F3'], 'collectFronts vracia DATOVE poradie (F1 dole)');
@@ -373,10 +394,10 @@ FM.onFrontCardToggle(rowOf('F1').querySelector('.ftname'));
 eq(rows.querySelectorAll('.fcard').length, 1, 'otvorena je prave jedna karta');
 ok(rowOf('F1').querySelector('.fcard'), 'a je v riadku, ktoreho sa tyka');
 eq(rowOf('F1').querySelector('.ftname').getAttribute('aria-expanded'), 'true', 'stav nesie aria-expanded');
-// Karta je POSLEDNA v stlpci — `.fmain` (nezalamovaci rad) ostava nedotknuty.
+// D-130a: karta je POSLEDNY potomok `.frow` (treti riadok mriezky).
 eq(rowOf('F1').children[rowOf('F1').children.length - 1].attrs.class, 'fcard',
    'karta je posledny potomok `.frow`');
-eq(rowOf('F1').querySelectorAll('.fmain .fcard').length, 0, 'a NIE JE v rade ovladacov');
+eq(rowOf('F1').querySelectorAll('.fmain').length, 0, 'obal `.fmain` zanikol');
 // Druhy klik ju zbali, klik na ine celo ju presunie.
 FM.onFrontCardToggle(rowOf('F1').querySelector('.ftname'));
 eq(rows.querySelectorAll('.fcard').length, 0, 'opatovny klik kartu zbali');
@@ -385,10 +406,17 @@ FM.onFrontCardToggle(rowOf('F3').querySelector('.ftname'));
 eq(rows.querySelectorAll('.fcard').length, 1, 'stale najviac jedna');
 ok(rowOf('F3').querySelector('.fcard'), 'a je pri poslednom kliknutom cele');
 
-// --- 6c) badge „smer?" chodi zo SERVERA -------------------------------------
-eq(rowOf('F3').querySelector('.fbadge').textContent, 'smer?', 'neurceny smer sa v riadku prizna');
+// --- 6c) badge „smer?" chodi z ULOZENEJ HODNOTY -----------------------------
+// D-130a: badge sa presunul z nazvu do SUHRNU riadku (`.fsub`) — stav riadku
+// hovori jedna veta, nie tlacidlo s prilepkom.
+eq(rowOf('F3').querySelector('.fsub .fbadge').textContent, 'smer?',
+   'neurceny smer sa v suhrne prizna');
 eq(rowOf('F1').querySelector('.fbadge'), null, 'LEGACY celo badge NEMA');
-eq(rowOf('F2').querySelector('.fbadge'), null, 'zasuvka tiez nie');
+// Zasuvka ma vlastny jantarovy chip („bez klasifikácie") — smerovy NIE.
+eq(rowOf('F2').querySelectorAll('.fbadge').map(b => b.textContent).indexOf('smer?'), -1,
+   'zasuvka badge smeru nema');
+eq(rowOf('F1').querySelector('.ftname .fbadge'), null,
+   'v nazve uz badge nestoji (patri do suhrnu)');
 
 // --- 6d) klik na dlazdicu zmeni typ a PRIZNA smer ---------------------------
 resetRows();
@@ -439,14 +467,24 @@ eq(items()[0].drawer, undefined, 'a klasifikacia zasuvky sa tym NEVYROBILA');
 resetRows();
 FM.addFrontRow({ id: 'F1', type: 'door', wings: '1', direction: 'left' });
 global.frontSlots = { F1: entry(1, [slot('single', 'left')]) };
-const fw = rowOf('F1').querySelector('.fw');
-fw.value = '4';
-FM.onFrontWings(fw);
+// D-130a R5: `select.fw` v riadku ZANIKOL — pocet kridiel je SEGMENT v karte
+// a hodnota zije v `dataset.frontWings`.
+const rF1 = rowOf('F1');
+eq(rF1.querySelector('.fw'), null, 'rozbalovacka kridel v riadku uz nie je');
+eq(rF1.dataset.frontWings, '1', 'pocet kridiel zije v datasete riadku');
+FM.onFrontWings(rF1, '4');
+eq(rF1.dataset.frontWings, '4', 'segment prepisal dataset');
+eq(items()[0].wings, '4', 'a `collectFronts` ho cita odtial');
 eq(items()[0].wing_directions, { p2: UNSET, p3: UNSET }, '4 kridla: obe stredne su neurcene');
 eq(items()[0].direction, 'left', 'a scalarny smer ostal (dormant pre navrat na 1 kridlo)');
-fw.value = '1';
-FM.onFrontWings(fw);
+FM.onFrontWings(rF1, '1');
 eq(items()[0].wing_directions, { p2: UNSET, p3: UNSET }, 'navrat na 1 kridlo NIC NEMAZE');
+eq(items()[0].wings, '1', 'a pocet sa vratil');
+// Legacy polozka BEZ kluca `wings` prejde koleckom ako `auto` (to iste
+// posielal doterajsi select).
+resetRows();
+FM.addFrontRow({ id: 'FX', type: 'door' });
+eq(items()[0].wings, 'auto', 'legacy celo bez `wings` ide na auto (1:1 s dnesnym selectom)');
 
 // --- 6g) NEGATIVNY TEST: legacy celo prejde celym koleckom BEZ klucov -------
 resetRows();
@@ -583,7 +621,7 @@ global.frontDrawer = { F1: { state: 'ok', text: 'Atira · H144 · NL 470', detai
                                      nl: { state: 'auto', value: 470, options: [420, 470] } },
                              lock: { owner_part_key: 'front:F1/panel', generic_type: 'slide',
                                      rule_id: 'recipe:atira_sisy_v1', cabinet_id: 'CAB-1' } } };
-openCard('F1');
+openCardTab('F1', 'hw'); // D-130a: chipy osi ziju v tabe Kovanie
 const axChip = rowOf('F1').querySelector('.axchip[data-ax="height"][data-axc="chip"]');
 ok(axChip, 'karta cela naozaj vykreslila chip vysky');
 axChip.focus();

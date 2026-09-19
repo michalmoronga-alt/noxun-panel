@@ -58,6 +58,13 @@
                     // pridavaju castejsie ako dvierka alebo ako zasuvkove.
                     'fronts:add-door', 'fronts:add-drawer',
                     'fronts:add-lift', 'fronts:add-fall', 'fronts:add-blind', 'fronts:add-none',
+                    // D-130a: novy zoznam ciel. Merac povie, ci sa karta otvara
+                    // skor z NAZVU alebo zo SUHRNU (a teda ci ma suhrn zmysel
+                    // ako druhy klikaci ciel), ako casto sa pouziva HROMADNA
+                    // uchytka namiesto karty a ci sa z tabu Kovanie naozaj
+                    // skace do kontextu Kovanie.
+                    'fronts:karta', 'fronts:suhrn', 'fronts:suhrn-kovanie',
+                    'fronts:vsetkym', 'fronts:vsetkym-pouzit', 'fronts:do-kovania',
                     // UI-D1: rad akcii karty dielca — merac povie, ci sa olep
                     // castejsie prenasa hromadne, alebo sa dielce hladaju rucne.
                     'part:select-in-model', 'part:apply-similar',

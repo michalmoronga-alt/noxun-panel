@@ -181,6 +181,14 @@
     { value: 'classic', label: 'Klasické' },
     { value: 'tipon', label: 'Tip-On' }
   ];
+  // D-130a R5: POCET KRIDIEL. Do tejto davky to bola rozbalovacka `select.fw`
+  // v RIADKU (rozbijala mriezku a pri nedvierkach stala prazdna) — teraz je to
+  // segment v karte, teda ten isty vzor „jedna volba z N" ako smer a otvaranie.
+  // Hodnoty su ZHODNE s tym, co posielal select (`auto` = podla sirky).
+  var FRONT_WINGS_OPTIONS = [
+    { value: 'auto', label: 'auto' }, { value: '1', label: '1' },
+    { value: '2', label: '2' }, { value: '3', label: '3' }, { value: '4', label: '4' }
+  ];
   // KOV-E2: SYSTEM VYKLOPU. Dve volby, teda segment (vzor „jedna volba z N"
   // z UI_DIZAJN §1) — nie select. Hodnoty su ZRKADLOM serverovej
   // `HardwareSets::LIFT_SYSTEMS` / `HardwareRules::LIFT_HK|LIFT_HL`.
@@ -356,6 +364,130 @@
     return v === '' ? null : v;
   }
 
+  // ===== D-130a: SUHRN RIADKU CELA (ciste jadro) =========================
+  //
+  // Jeden tlmeny riadok pod nazvom cela: „1 krídlo (auto) · smer? · bez
+  // úchytky · Sensys klasik · 2 ks →". Stav VSETKYCH ciel tak vidno bez
+  // otvarania kariet (D-130) — presne to riadok pred touto davkou nevedel.
+  //
+  // ZIADNE NOVE DATA: vsetko pochadza z `item` (to, co posle `collectFronts`),
+  // zo `entry` (`front_slots[fid]` zo servera) a z `hw` (uz hotovy text
+  // `frontHwBadge` + `frontHwBuy`). Funkcia je CISTA — `form.js` ju len kresli.
+  //
+  // Vracia POLE CASTI, nie retazec: badge „smer?" a jantarove „bez
+  // klasifikácie" potrebuju vlastny markup, takze spajanie patri rendereru.
+  //   { text: '…' }              obycajna cast
+  //   { text: '…', tone: 'warn' } jantarova cast (otvorena otazka)
+  //   { badge: 'smer?' }          jantarovy badge
+  //   { hw: '…' }                 naviazane kovanie (posledna cast, so sipkou)
+  var FRONT_SUM_DIR = { left: 'ľavé', right: 'pravé' };
+  var FRONT_SUM_CONSTR = { metal: 'kovové bočnice', wood: 'drevený box', other: 'ostatné' };
+  var FRONT_SUM_LIFT = { hk_top: 'HK top', hl_top: 'HL top' };
+  // R3-a: POCET KRIDIEL hovori SERVER (`front_slots[fid].wings_n`) — AUTO
+  // dvierka nad 600 mm su DVE kridla a to vie LEN on. Odvodzovat to v JS by
+  // znamenalo druhu (a casom inu) kopiu serveroveho pravidla.
+  // `null` = server sa este nevyjadril (novy riadok pred echom, stary cache).
+  function frontSumWings(entry){
+    var e = (entry && typeof entry === 'object') ? entry : null;
+    var n = e ? Number(e.wings_n) : NaN;
+    return (n > 0) ? n : null;
+  }
+  // R3-b: je smer NIEKTOREHO kridla NEURCENY? Rozhoduje ULOZENA HODNOTA —
+  // `unset` vznika vyhradne pouzivatelskou akciou. LEGACY celo (kluc smeru
+  // v configu chyba) badge NIKDY nedostane: `undefined !== 'unset'`.
+  // ZIADNY `|| 'unset'` fallback (zelezne pravidlo KOV-A1).
+  //
+  // Codex #371 P2: rata sa LEN cez AKTIVNE SLOTY (`front_slots[fid].slots`) —
+  // teda cez kridla, na ktore sa server naozaj pyta. Prechadzat vsetky ulozene
+  // `wing_directions` bolo zle: po navrate zo 4 kridiel na 2 ostava `p2: unset`
+  // ako DORMANTNA hodnota (A1 kontrakt: navrat nic nemaze) a riadok by navzdy
+  // svietil „smer?" na otazku, ktoru uz nikto nekladie.
+  // Bez slotov (server sa este nevyjadril / dvojkridlo) sa pozera LEN na
+  // scalarny `direction`, a to iba pri jednom kridle — dvojkridlo ma smer
+  // odvodeny z geometrie.
+  function frontSumDirUnset(item, entry){
+    var it = item || {};
+    var e = (entry && typeof entry === 'object') ? entry : null;
+    var list = (e && Array.isArray(e.slots)) ? e.slots : null;
+    if (list && list.length){
+      for (var i = 0; i < list.length; i++){
+        var wing = list[i] && list[i].wing;
+        if (wing && frontDirValue(it, wing) === FRONT_DIR_UNSET) return true;
+      }
+      return false;
+    }
+    var n = frontSumWings(e);
+    if (n != null && n !== 1) return false;
+    return it.direction === FRONT_DIR_UNSET;
+  }
+  // Cast „úchytka": „UKW-7 hore" / „bez úchytky". Profileless typ nema co
+  // povedat (vracia null) — rovnako ako `frontProfileScopeItems` ho vynecha.
+  function frontSumProfile(item, reg){
+    var it = item || {};
+    if (frontProfileless(it.type)) return null;
+    var rec = frontProfileRec(it.profile || 'none', reg);
+    if (!rec) return { text: 'bez úchytky' };
+    var edge = frontProfileEdge(it);
+    var valid = frontProfileEdges(it.type).indexOf(edge) >= 0;
+    var name = rec.short || rec.name || String(it.profile);
+    return { text: valid ? (name + ' ' + FRONT_EDGE_LABELS[edge].toLowerCase()) : name };
+  }
+  // `drawer` = ZAZNAM SERVERA `front_drawer[fid]` (volitelny) — vstupuje LEN
+  // do predikatu „bez klasifikácie", aby bol ZHODNY s `frontCardModel`.
+  function frontRowSummary(item, entry, hw, reg, drawer){
+    var it = item || {};
+    var type = it.type || 'door';
+    var parts = [];
+    if (type === 'none') return [{ text: 'otvorená nika' }];
+    if (type === 'blind'){
+      parts.push({ text: 'pevný dielec' });
+      var pb = frontSumProfile(it, reg);
+      if (pb) parts.push(pb);
+      // R6-b/R6-d: blenda s uchytkovym profilom KOVANIE MA (pravidlo
+      // `uchytkovy-profil-blenda`) — preto sa jej text kovania NEZAHADZUJE
+      // a bez neho sa to POVIE („bez kovania"), nie zamlci.
+      if (!hw) parts.push({ text: 'bez kovania' });
+    }
+    if (type === 'door'){
+      var n = frontSumWings(entry);
+      // Bez zaznamu servera sa POCET NEODVODZUJE — povie sa len to, ze vyska
+      // aj delenie su na automate.
+      if (n == null) parts.push({ text: 'auto' });
+      else parts.push({ text: (n === 1 ? '1 krídlo' : n + ' krídla') +
+                              ((it.wings == null || it.wings === '' || it.wings === 'auto') ? ' (auto)' : '') });
+      if (frontSumDirUnset(it, entry)) parts.push({ badge: 'smer?' });
+      else if (n === 1 && FRONT_SUM_DIR[it.direction])
+        parts.push({ text: FRONT_SUM_DIR[it.direction] });
+      // Dvojkridlo o smere MLCI — je odvodeny z geometrie (vzor karty).
+    }
+    if (type === 'drawer_front'){
+      var drw = (it.drawer && typeof it.drawer === 'object') ? it.drawer : {};
+      // „bez klasifikácie" znamena PRESNE to, co pod tym rozumie server
+      // (`Recipes.recipe_key_for` == `:legacy`) — CHYBAJU VSETKY klasifikacne
+      // polia A server o zasuvke nic nepovedal. Rovnaky predikat ako v karte
+      // (KOV-C2c, Codex #306 P2) — dve verzie toho isteho by sa rozisli.
+      if (!frontDrawerRows(drawer).length && drw.construction == null &&
+          drw.variant == null && it.opening_mode == null){
+        parts.push({ text: 'bez klasifikácie', tone: 'warn' });
+      } else if (FRONT_SUM_CONSTR[drw.construction]){
+        parts.push({ text: FRONT_SUM_CONSTR[drw.construction] });
+      }
+      if (drw.variant === 'internal') parts.push({ text: 'vnútorná' });
+    }
+    if (type === 'lift'){
+      var sys = FRONT_SUM_LIFT[frontLiftSystem(it)];
+      if (sys) parts.push({ text: sys });
+    }
+    if (it.opening_mode === 'tipon') parts.push({ text: 'Tip-On' });
+    if (type !== 'blind'){
+      var p = frontSumProfile(it, reg);
+      if (p) parts.push(p);
+    }
+    var txt = (hw == null) ? '' : String(hw);
+    if (txt) parts.push({ hw: txt });
+    return parts;
+  }
+
   // VIEW-MODEL karty. `item` = polozka cela (typ + dormant polia), `entry` =
   // ZAZNAM SERVERA `front_slots[front_id]` v tvare `{ wings_n, slots }`.
   //   entry == null            -> server sa k celu este nevyjadril (novy riadok
@@ -374,22 +506,49 @@
   // KOV-E2: `lift` = ZAZNAM SERVERA `front_lift[front_id]`. `undefined`/null =
   // server o vyklope nic nepovedal (nove celo pred prvym echom, navrh
   // vkladania) — karta vtedy riadok vyklopu NEKRESLI. Vstup sa NEMENI.
+  // D-130a: KARTA MA DVA TABY. `rows` = tab **Čelo** (co nastavujem), `hwRows`
+  // = tab **Kovanie** (co z toho vzislo — vyriesny set, zamky osi, technicky
+  // detail). `tabs` je cisty VM: `[{ key, label, badge }]`.
+  // R6-b: tab Kovanie ma KAZDY FYZICKY TYP vratane BLENDY — blenda
+  // s uchytkovym profilom kovanie dostava (pravidlo `uchytkovy-profil-blenda`).
+  // Chyba LEN pri `none`: otvorena nika nie je dielec, takze nema vlastnika.
+  var FRONT_TAB_CELO = 'celo';
+  var FRONT_TAB_HW = 'hw';
+  function frontCardTabs(type, dirUnset){
+    var tabs = [{ key: FRONT_TAB_CELO, label: 'Čelo', badge: dirUnset ? 'smer?' : null }];
+    if (type !== 'none') tabs.push({ key: FRONT_TAB_HW, label: 'Kovanie', badge: null });
+    return tabs;
+  }
   function frontCardModel(item, entry, drawer, lift){
     var it = item || {};
     var type = it.type || 'door';
     var known = FRONT_CARD_TYPES.indexOf(type) >= 0;
     var tiles = FRONT_CARD_TYPES.map(function(t){ return { type: t, on: t === type }; });
-    var rows = [];
+    var tabs = frontCardTabs(type, type === 'door' && frontSumDirUnset(it, entry));
+    var rows = [], hwRows = [];
     if (type === 'blind'){
+      // R6-d: blenda NIE JE „bez kovania" — s uchytkovym profilom ho dostava
+      // z pravidla `uchytkovy-profil-blenda`. Predosle znenie by poslalo
+      // pouzivatela hladat polozku, ktora v Kovani realne je.
       rows.push({ kind: 'info', tone: 'muted',
-                  text: 'Blenda je pevný výrobný dielec — bez smeru, otvárania a kovania. ' +
-                        'Materiál, ABS a rozmery ako každý iný dielec.' });
-      return { type: type, known: known, tiles: tiles, rows: rows };
+                  text: 'Blenda — pevný dielec bez smeru a otvárania; ' +
+                        'kovanie vzniká len z úchytkového profilu.' });
+      return { type: type, known: known, tiles: tiles, tabs: tabs, rows: rows, hwRows: hwRows };
     }
     if (type === 'none'){
       rows.push({ kind: 'info', tone: 'muted',
                   text: 'Riadok drží výšku v rade, ale panel sa nepostaví — otvorená nika.' });
-      return { type: type, known: known, tiles: tiles, rows: rows };
+      return { type: type, known: known, tiles: tiles, tabs: tabs, rows: rows, hwRows: hwRows };
+    }
+    // D-130a R5: POCET KRIDIEL sa presunul z riadku do karty (`select.fw`
+    // v riadku zanikol — rozbijal mriezku a pri nedvierkach stal prazdny).
+    // Hodnota zije v `dataset.frontWings` a `collectFronts` ju cita odtial.
+    if (type === 'door'){
+      rows.push({ kind: 'seg', key: 'wings', label: 'Krídla',
+                  options: FRONT_WINGS_OPTIONS,
+                  active: it.wings == null || it.wings === '' ? 'auto' : String(it.wings),
+                  tip: 'auto = podľa šírky (do 600 mm jedno krídlo). Pri 3 a 4 krídlach ' +
+                       'sa karta pýta na smer stredných krídel; krajné sú odvodené.' });
     }
     if (type === 'door'){
       var e = (entry && typeof entry === 'object') ? entry : null;
@@ -398,13 +557,17 @@
         var total = list.length + 2; // krajne kridla su odvodene, otazky su len stredne
         list.forEach(function(s){
           var wing = (s && s.wing) ? s.wing : '';
+          var dirTip = 'Strana pántov. „Neurčené" je otvorená otázka — Kontrola ' +
+                       'ju hlási ako červený nález a výroba ju potrebuje.';
           if (wing === 'single'){
             rows.push({ kind: 'seg', key: 'direction', wing: wing, label: 'Smer',
-                        options: FRONT_DIR_OPTIONS, active: frontDirValue(it, wing) });
+                        options: FRONT_DIR_OPTIONS, active: frontDirValue(it, wing),
+                        tip: dirTip });
           } else if (wing){
             rows.push({ kind: 'seg', key: 'wing_direction', wing: wing,
                         label: frontWingLabel(wing, total),
-                        options: FRONT_DIR_OPTIONS, active: frontDirValue(it, wing) });
+                        options: FRONT_DIR_OPTIONS, active: frontDirValue(it, wing),
+                        tip: dirTip });
           }
         });
       } else if (e && Number(e.wings_n) === 2){
@@ -420,23 +583,31 @@
     // nakup). SKLOP ho NEMA: dostane zavesy ako dvierka, mechanizmus ziadny.
     if (type === 'lift'){
       rows.push({ kind: 'seg', key: 'lift_system', label: 'Systém',
-                  options: FRONT_LIFT_OPTIONS, active: frontLiftSystem(it) });
+                  options: FRONT_LIFT_OPTIONS, active: frontLiftSystem(it),
+                  tip: 'HK top a HL top majú iné tabuľky aj iný nákup. ' +
+                       'HL top sa s Tip-On nevyrába.' });
     }
     if (FRONT_OPENING_TYPES.indexOf(type) >= 0){
+      // D-130a R9: hint „Bez voľby sa použije klasické otváranie." ZANIKOL ako
+      // riadok pod segmentom — je to POMOCNY text, takze zije v tooltipe `?`
+      // pri popiske (vertikalny priestor panela je vzacny).
       rows.push({ kind: 'seg', key: 'opening_mode', label: 'Otváranie',
                   options: FRONT_OPENING_OPTIONS,
                   active: it.opening_mode == null ? null : it.opening_mode,
-                  hint: it.opening_mode == null
-                    ? 'Bez voľby sa použije klasické otváranie.' : null });
+                  tip: 'Bez voľby sa použije klasické otváranie. Tip-On = bez úchytky ' +
+                       'a mení set kovania (pri HL top sa nevyrába).' });
     }
     if (type === 'drawer_front'){
       var drw = (it.drawer && typeof it.drawer === 'object') ? it.drawer : {};
       rows.push({ kind: 'seg', key: 'drawer_construction', label: 'Konštrukcia',
                   options: FRONT_DRAWER_CONSTR_OPTIONS,
-                  active: drw.construction == null ? null : drw.construction });
+                  active: drw.construction == null ? null : drw.construction,
+                  tip: 'Kovové bočnice = Atira, drevený box = Quadro. ' +
+                       '„Ostatné" znamená ručný set v kontexte Kovanie.' });
       rows.push({ kind: 'seg', key: 'drawer_variant', label: 'Zásuvka',
                   options: FRONT_DRAWER_VARIANT_OPTIONS,
-                  active: drw.variant == null ? null : drw.variant });
+                  active: drw.variant == null ? null : drw.variant,
+                  tip: 'Vnútorná zásuvka je skrytá za dvierkami — nemá vlastné čelo v pohľade.' });
       // KOV-C2c (Codex #306 P2): „bez klasifikacie" znamena PRESNE to, co pod tym
       // rozumie server (`Recipes.recipe_key_for` == `:legacy`) — teda ze CHYBAJU
       // VSETKY klasifikacne polia, nie len dve z troch. Celo s otvaranim a bez
@@ -451,17 +622,13 @@
                     text: 'Zásuvka bez klasifikácie — dielce zásuvky sa nevyrobia. ' +
                           'Vyber konštrukciu a otváranie.' });
       }
-      drawerRows.forEach(function(r){ rows.push(r); });
+      // D-130a R6: vyriesna zasuvka, chipy osi aj ponuka receptu patria do
+      // TABU KOVANIE — je to VYSLEDOK, nie nastavenie.
+      drawerRows.forEach(function(r){ hwRows.push(r); });
     }
-    // KOV-D1b: set VÝSUVU sa už vyberá — v kontexte Kovanie, pri riadku tohto
-    // čela („Set pre toto čelo"). Karta čela naň len ukazuje: výber patrí
-    // k položke kovania, nie ku klasifikácii čela. Rovnakú cestu majú závesy.
-    if (type === 'drawer_front'){
-      rows.push({ kind: 'hint', text: 'Set výsuvu vyberieš v kontexte Kovanie — pri riadku tohto čela.' });
-    }
-    if (type === 'door'){
-      rows.push({ kind: 'hint', text: 'Set závesov vyberieš v Kovaní pri tomto čele.' });
-    }
+    // D-130a R9: hinty „Set výsuvu vyberieš…" / „Set závesov vyberieš…"
+    // ZANIKLI BEZ NAHRADY — tab Kovanie a tlacidlo „Otvoriť v Kovaní"
+    // hovoria to iste a nezaberaju riadok v kazdej karte.
     // KOV-E1b (Codex #333 kolo 1 P2): od aktivácie pravidiel dostane výklop
     // mechanizmus a sklop závesy AUTOMATICKY. Pôvodný text („pridáva sa
     // ručne") by po tejto dávke klamal a viedol k ručnej položke navyše —
@@ -472,16 +639,33 @@
       // druhym riadkom o tom istom a vertikalny priestor panela je vzacny.
       var liftRows = frontLiftRows(lift);
       if (!liftRows.length){
-        rows.push({ kind: 'info', tone: 'muted',
-                    text: 'Mechanizmus vyberá automat podľa hmotnosti a rozmerov čela — detail v Kovaní.' });
+        hwRows.push({ kind: 'info', tone: 'muted',
+                      text: 'Mechanizmus vyberá automat podľa hmotnosti a rozmerov čela — detail v Kovaní.' });
       }
-      liftRows.forEach(function(r){ rows.push(r); });
+      liftRows.forEach(function(r){ hwRows.push(r); });
     }
     if (type === 'fall'){
       rows.push({ kind: 'info', tone: 'muted',
                   text: 'Sklop dostane závesy ako dvierka podľa tabuľky.' });
     }
-    return { type: type, known: known, tiles: tiles, rows: rows };
+    // D-130a R6: CERVENA STAVOVA VETA je dovod, PRECO dielce nevzniknu — preto
+    // stoji v OBOCH taboch. V Kovani v plnom zneni (s chipmi a detailom),
+    // v Čele ako JEDEN riadok NAD segmentmi, aby ju pouzivatel videl aj ked
+    // prave klasifikuje. Jantarove odporucanie a `locked_note` su POZNAMKY
+    // k vysledku — tie ostavaju len v Kovani.
+    var err = frontCardErrRow(hwRows);
+    if (err) rows.unshift(err);
+    return { type: type, known: known, tiles: tiles, tabs: tabs, rows: rows, hwRows: hwRows };
+  }
+  // Prva CERVENA veta z tabu Kovanie (alebo null). Kopia, nie ten isty objekt —
+  // renderer jej v tabe Čelo dava iny (jednoriadkovy) markup.
+  function frontCardErrRow(hwRows){
+    for (var i = 0; i < (hwRows || []).length; i++){
+      var r = hwRows[i];
+      if (r && r.kind === 'info' && r.tone === 'err' && r.text)
+        return { kind: 'info', tone: 'err', icon: r.icon || 'alert', text: r.text };
+    }
+    return null;
   }
   // (b) Prepnutie dlazdice typu. Na dvierka BEZ ulozeneho smeru = pouzivatelska
   // akcia -> smer sa PRIZNA ako neurceny. Prepnutie NA INY typ nic nemaze
@@ -586,6 +770,9 @@
   // (bez `|`), preto staci jednoduchy oddelovac.
   function frontCardFocusKey(attrs){
     var a = attrs || {};
+    // D-130a: TAB karty. Stoji PRVY, lebo je to jediny ovladac, ktory sa
+    // prekreslenim NIKDY nemeni na iny prvok — identitou je jeho kluc.
+    if (a.tab) return 'b:' + a.tab;
     if (a.pc === 'profile' || a.pc === 'edge') return 'p:' + a.pc;
     if (a.t) return 't:' + a.t;
     if (a.k && a.v != null && a.v !== '') return 's:' + a.k + '|' + a.v + '|' + (a.w || '');
@@ -601,6 +788,7 @@
   // fokusovany cudzi ovladac).
   function frontCardFocusSelector(key){
     if (!key) return null;
+    if (key.indexOf('b:') === 0) return key.length > 2 ? '[data-tab="' + key.slice(2) + '"]' : null;
     if (key === 'p:profile' || key === 'p:edge') return '[data-pc="' + key.slice(2) + '"]';
     if (key.indexOf('t:') === 0) return key.length > 2 ? '[data-t="' + key.slice(2) + '"]' : null;
     if (key.indexOf('a:') === 0){
@@ -1409,6 +1597,10 @@
       FRONT_DRAWER_CONSTR_OPTIONS: FRONT_DRAWER_CONSTR_OPTIONS,
       FRONT_DRAWER_VARIANT_OPTIONS: FRONT_DRAWER_VARIANT_OPTIONS,
       frontCardModel: frontCardModel, frontWingLabel: frontWingLabel,
+      // D-130a (tests/js/test_d130a_suhrn_karta.js): SUHRN riadku cela a taby
+      // karty. Suhrn je CISTA funkcia — `form.js` ho len kresli.
+      frontRowSummary: frontRowSummary, frontCardTabs: frontCardTabs,
+      FRONT_WINGS_OPTIONS: FRONT_WINGS_OPTIONS,
       // KOV-C2c (tests/js/test_kovc2c_karta.js): riadky zasuvky v karte cela.
       frontDrawerRows: frontDrawerRows, frontDrawerAxesRow: frontDrawerAxesRow,
       frontDrawerAxesSay: frontDrawerAxesSay,
