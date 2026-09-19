@@ -212,6 +212,28 @@
     // nezatvaraju a `solo` skupiny (strom zon) su z exkluzivity vynate — ani
     // ich nikto nezatvara, ani ony nikoho.
     // items = [{ key, s4, solo, open }]
+    // D-130b: NAZOV SKUPINY z jej `<summary>` — LEN priame textove uzly.
+    // `textContent` by pribral aj `.gtools` (meta a akcie v hlavicke), takze
+    // lista sektora by ukazovala „Čelá 3 čelá · 1 bez smeru všetkým".
+    // Element (ikona `<svg>`, `<span class="meta">`, tlacidla) sa preskoci;
+    // skupina bez `.gtools` da presne ten isty text ako predtym.
+    // Pracuje nad `childNodes` (prehliadac) aj nad `children` mini-DOM sady —
+    // v oboch su textove uzly v zozname deti, lisi sa len meno vlastnosti.
+    function groupTitle(summary){
+      if (!summary) return '';
+      var kids = summary.childNodes || summary.children || [];
+      var out = '', i, n;
+      for (i = 0; i < kids.length; i++){
+        n = kids[i];
+        if (!n) continue;
+        // nodeType 3 = TEXT_NODE (prehliadac); mini-DOM znaci textovy uzol menom.
+        if (n.nodeType === 3 || n.tagName === '#text'){
+          out += (n.nodeValue != null) ? n.nodeValue : (n.text || '');
+        }
+      }
+      return out.replace(/\s+/g, ' ').trim();
+    }
+
     function exclusiveClose(items, openedKey){
       items = items || [];
       var opened = null, i;
@@ -362,7 +384,7 @@
 
     return {
       secKey: secKey,
-      exclusiveClose: exclusiveClose,
+      exclusiveClose: exclusiveClose, groupTitle: groupTitle,
       warnRows: warnRows,
       studioSection: studioSection,
       studioOpenLink: studioOpenLink,
@@ -538,6 +560,13 @@
   // <summary> — slovenske nazvy tak ziju len v HTML (ikona je SVG, textContent
   // ju neberie).
   //
+  // D-130b: `textContent` uz NESTACI. Hlavicky skupin nesu od D-130a `.gtools`
+  // (meta + akcie), takze cely text hlavicky je „Čelá 3 čelá · 1 bez smeru
+  // všetkým" a „Spoločné pre skrinku dub Halifax · 3 · 2/2/0/0" — lista sektora
+  // potrebuje LEN nazov. Beru sa preto iba PRIAME TEXTOVE uzly `<summary>`:
+  // ikona je `<svg>` (element), meta aj tlacidla su `<span>`/`<button>`, takze
+  // vypadnu samy a skupiny bez `.gtools` davaju presne to, co davali doteraz.
+  // Biele znaky z odriadkovania v HTML sa zlucia (nazov je na vlastnom riadku).
   // Codex #173 P2: `data-s4-solo` (strom zon) je vynaty z EXKLUZIVITY, NIE zo
   // zberu udajov — je to plnohodnotna skupina sektora. Ked sa preskakoval, mal
   // kontext Zony (jedine dieta S4 je prave solo strom) meta trvalo prazdne.
@@ -549,7 +578,7 @@
     for (i = 0; i < nodes.length; i++){
       if (!nodes[i].open || open) continue;
       s = nodes[i].querySelector('summary');
-      open = s ? (s.textContent || '').trim() : '';
+      open = NXShell.groupTitle(s);
     }
     return { open: open, count: count };
   }

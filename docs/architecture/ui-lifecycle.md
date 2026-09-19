@@ -624,6 +624,9 @@ kontextu **EXKLUZÍVNE** (`NXShell.exclusiveClose`, kľúč `nxsec_s4.<ctx>.<key
 menom, inak počet zbalených) — vidno ho rovnako zbalený aj rozbalený (vzor mockupu). Texty skladá **čistá funkcia `NXShell.sectorMeta`** (bez DOM, testovaná v
 `tests/js/test_uib_meta.js`), stav do nej číta `nxSectorMetaApply` **zo ŽIVÉHO panela** (polia S2, materiálové selecty S3, otvorený `<details>` v S4) — **žiadna cache textu**
 (hotový reťazec by po premenovaní dekoru ukazoval starý názov, lekcia Codex #171 P2) **a žiadne nové serverové dáta**.
+**Názov otvorenej skupiny (S4) berie `NXShell.groupTitle` LEN z priamych textových uzlov `<summary>`** — `textContent` celej hlavičky by od D-130a pribral aj `.gtools`, takže
+lišta hlásila „Čelá 3 čelá · 1 bez smeru všetkým" a „Spoločné pre skrinku dub Halifax · 3 · 2/2/0/0". Ikona je `<svg>`, meta `<span>` a akcie `<button>` — elementy vypadnú samy,
+skupiny bez `.gtools` dávajú presne to, čo dávali predtým. **Pravidlo pre nové hlavičky:** názov skupiny musí zostať priamym textom `<summary>`, nie zabalený v elemente.
 
 Obnovuje sa na troch miestach: `nxShellApply` (režim, kontext, každý push), **jeden delegovaný `input`/`change` listener** na ID polí a selectov (meta je len zobrazenie — do
 zapisovacích ciest `form.js`/`materials.js` nesiaha) a `toggle` v `bindDetails` (`toggle` nebublinkuje, delegácia ho nezachytí).
