@@ -26,8 +26,8 @@
   **Prečo boli čísla prijaté / čo sa zmenilo:** väčšina rešerše sedela; opravy: PD nad rúrou Bosch pri indukcii ≥ 37/38 (nie 28–30, len poznámka); Beko nika min 560 × 1940–1950 ×
   **min 555** a vetranie = **zadná stena skrinky úplne otvorená** (nie kanál 50); umývačka WIO čelo 594 × max 720; varná doska PD min 12 (28 nad rúrou), odstupy 35/100; digestor
   min 500 el. / 650 plyn. GAPy vyplnené: **výrez digestora 437 × 216** (ETD), **dvere Beko 1159 / 71 / 629 / 40**. Z praxe (Michal): kóta 9 pri rúre Whirlpool = **povinná medzera
-  pod čelom** (horúci výduch; min. rozstup čiel 604, rezerva 605), Bosch má odvetranie 7,5 už v rozmere čela → medzera 0; presahy sa zapisujú **voči telu** (výrobcovia tak kótujú),
-  presah voči nike si engine dopočíta; chladnička = **kontrolná geometria** box + čelná plocha zdola s pásmami 669 / 71 / 1200 a nábytkovým delením vnútri pásma medzery s presahom
+  pod čelom** (horúci výduch; min. rozstup čiel 604, rezerva 605), Bosch má odvetranie 7,5 už v rozmere čela → medzera 0; presahy sa zapisujú **s referenciou** (Whirlpool kótuje voči telu, Bosch voči nike),
+  druhú referenciu si engine dopočíta z tela a niky; chladnička = **kontrolná geometria** box + čelná plocha zdola s pásmami 669 / 71 / 1200 a nábytkovým delením vnútri pásma medzery s presahom
   ≥ 10 mm cez hranu dverí spotrebiča; umývačka prax čelo 826 + blend 115 + vlastný sokel → kontrola len šírka slotu, hmotnosť čela vypadáva; digestor výrez odsadený 20 mm od prednej
   hrany dna (krycia doska), výška nad doskou sa nerieši; kombinácia rúra + varná doska sa nerieši. Dve URL surovej rešerše boli zle označené (W20027062 = list varnej dosky,
   datart doc_4401491 = návod umývačky). Packet je **dôkazový podklad, nie kontrakt** (zdrojová vrstva) — hodnoty vstúpia do záväzného kontraktu až cez package S1 po audite.

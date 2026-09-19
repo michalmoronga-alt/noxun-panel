@@ -48,7 +48,8 @@ Whirlpool ART 97101 2 **vyradený 19.9.** (list sa nedá získať, predaj skonč
 **Stav overenia (19.9.2026): OVERENÉ.** Fable otvoril PDF výrobcov (nie tvrdenie Gemini) a Michal prešiel všetko z praxe — porovnanie riadok po riadku, výkresy a Michalove
 doplnenia sú v [SPOTREBICE_TECHLISTY_OVERENIE_2026-09-19.md](SPOTREBICE_TECHLISTY_OVERENIE_2026-09-19.md) (**dôkazový podklad, nie kontrakt** — zdrojová vrstva `zdroje/` je nezáväzná,
 hodnoty vstúpia do záväzného kontraktu až cez package S1 po `codex-audit`). Tabuľky nižšie majú opravené kľúčové hodnoty; telo Bosch BFL7221B1 je **odvodené, nie overené** (list ho nekótuje);
-dve URL surovej rešerše boli zle označené (W20027062 = list varnej dosky, datart doc_4401491 = návod umývačky). RESEARCH GAP = výrobca údaj nedáva alebo bol len v PDF výkrese.
+dve URL surovej rešerše boli zle označené (W20027062 = list varnej dosky, datart doc_4401491 = návod umývačky). Surové packety (`SPOTREBICE_TECHLISTY_2026-09_agy_packety.md`)
+sa neopravujú — kde sa líšia od OVERENIA (napr. „škára ~4–5 mm" pri rúre + mikre), platí OVERENIE. RESEARCH GAP = výrobca údaj nedáva alebo bol len v PDF výkrese.
 
 ### 3.1 Rúra + mikrovlnka (do vysokej skrinky, často nad sebou)
 
@@ -66,7 +67,7 @@ dve URL surovej rešerše boli zle označené (W20027062 = list varnej dosky, da
 
 **Rúra + mikro nad sebou (Whirlpool):** spoločný predpis **neexistuje** (GAP). Z listov: **pevná polica medzi nimi je povinná** (každý spotrebič má vlastné nosné dno a skrutky do bokov);
 zadná hrana medzipolice **nesmie** sedieť na chrbte — musí ostať vetrací komín 35–40 mm. **Škára medzi čelami sa z listov NEDÁ odvodiť:** čelo rúry vyčnieva 20–25 mm nad telo
-(a 5–12 mm nad niku 583–585), čelo mikra visí 13–14 mm pod svojou nikou — pri 18 mm polici to podľa polohy tela v nike vychádza od prekrytia po 0 mm; rieši sa v praxi / v package
+(a 5–12 mm nad niku 583–585), čelo mikra visí 13–14 mm pod svojím telom (telo stojí na dne niky) — pri 18 mm polici to podľa polohy tela v nike vychádza od prekrytia po 0 mm; rieši sa v praxi / v package
 (Záver 2 to drží ako neriešené).
 Michalov ručný zápis pre BFL7221B1 (nika 362–365 × 560–568, presah hore 6 / dole 14, čelo 594 × 382 × 20) **sedí s listom Bosch** — dobrý znak pre jeho formát; telo 550 × 340 × 300 je
 **odvodené** (list kótuje len hĺbku 299, šírku ani výšku tela nie) — v seede označiť ako odvodené, nie overené.
@@ -103,7 +104,7 @@ Rozmerové polia podľa kategórie, každé **voliteľné** (neznáme = prázdne
 
 | Kategória | Rozmery pre engine (mm) | Kontrola vo V1 |
 |---|---|---|
-| Rúra · mikro | nika Š min–max · V min–max · H min · čelo Š × V × hrúbka · presah hore / dole **s referenciou (telo | nika — Whirlpool kótuje voči telu, Bosch voči nike; druhú referenciu engine dopočíta, len keď pozná telo aj niku)** · **medzera pod čelom (výduch: Whirlpool 9, Bosch 0)** · zadný výrez police (komín) · [pevná polica medzi rúrou a mikro = konštrukčné pravidlo šablóny] | **NIE** (rozhodnutie 6.9.); polia sa len evidujú |
+| Rúra · mikro | nika Š min–max · V min–max · H min · čelo Š × V × hrúbka · presah hore / dole **s referenciou (telo / nika — Whirlpool kótuje voči telu, Bosch voči nike; druhú referenciu engine dopočíta, len keď pozná telo aj niku)** · **medzera pod čelom (výduch: Whirlpool 9, Bosch 0)** · zadný výrez police (komín) · [pevná polica medzi rúrou a mikro = konštrukčné pravidlo šablóny] | **NIE** (rozhodnutie 6.9.); polia sa len evidujú |
 | Chladnička | nika Š · V min–max · H min · **dvere spotrebiča: dolné + spodok, medzera** (z listu = kontrolné pásma; nábytkové delenie engine dopočíta vnútri pásma medzery s presahom min 10 mm cez hranu dverí spotrebiča na oboch stranách; blend = parameter šablóny alebo mimo V1) (zadný kanál a vetranie **len ako poznámka v liste, bez poľa** — rozhodnutie 6.9.) | **ÁNO**: pre každý rozmer niky **`min ≤ vnútro skrinky ≤ max`** (šírka, výška, hĺbka — kde list dáva aj maximum, napr. Beko výška 1940–1950, je príliš veľký otvor rovnako chyba); kde list max nedáva (Beko šírka len min 560, hĺbka len min 555), len jednostranne `≥ min`; kanál/vetranie sa nekontroluje |
 | Umývačka | šírka (450/600) · výška min–max · čelo Š · V max · sokel min–max (evidencia) — hmotnosť čela **vypadáva** (Michal neráta) | **ÁNO**: len šírka slotu (450/600); výška čela vs. sokel sa **nekontroluje** (Michal predpísané rozmery obchádza — rozhodnutie 6.9.) |
 | Varná doska | vonkajší Š × H · výrez Š × H (+tolerancia) · montážna hĺbka · PD min hrúbka | cena + výrez (poznámka pre PD); kontrola = V1+ |

@@ -16,7 +16,7 @@
 
 | Pole | §3 | List výrobcu | Verdikt |
 |---|---|---|---|
-| Telo Š×V×H | 548 × 570 (vzadu 525) × 558 | 548 × 570 (vzadu 525) × 558 (Š×V×H tela); horná časť tela 428 hlboká; **celková hĺbka s čelom 570** (zhoda so 570 výšky je náhoda výkresu, nie tá istá kóta) | ✅ |
+| Telo Š×V×H | 548 × 570 (vzadu 525) × 558 | 548 × 570 (vzadu 525) × 558 (Š×V×H tela); horná časť tela 428 hlboká; **celková hĺbka s čelom 570** (zhoda so 570 výšky je náhoda výkresu, nie tá istá kóta); pozor: 558 + čelo 20 = 578 ≠ 570 — výkres kótuje obe nezávisle (čelo zrejme sedí zapustené do tela), nezjednocovať mlčky | ✅ |
 | Čelo Š×V, hrúbka | 595 × 595, 20 | 595 × 595, 20; ovládací panel 97 | ✅ |
 | Nika Š | 560–568 | 560–568 | ✅ |
 | Nika V | 583–585 stĺp / 600–601 pod PD | 583–585 / 600–601 | ✅ |
@@ -119,10 +119,10 @@ Telo 448 × 815–875 × 550; nika **450 × 815–875 × min 550** (výkres kót
 
 ## 8 · Čo z toho plynie pre S1 (návrh, rozhodne Michal)
 
-1. **Polia z §4 pôvodného dokumentu držia — a sú per kategória, nie univerzálne:** rúra/mikro = telo · čelo · nika min–max · presahy voči telu · medzera pod čelom; chladnička = nika + dvere spotrebiča (pásma);
+1. **Polia z §4 pôvodného dokumentu držia — a sú per kategória, nie univerzálne:** rúra/mikro = telo · čelo · nika min–max · presahy s referenciou (telo / nika) · medzera pod čelom; chladnička = nika + dvere spotrebiča (pásma);
    umývačka = šírka slotu + čelo; varná doska = výrez do PD; digestor = výrez do dna. Výrobcovia to členia rovnako (Bosch: Gerätemaße · Nischenmaße · Überstände).
 2. **Nové údaje do seedu:** výrez digestora 437 × 216 · dvere chladničky 1159 / 71 / 629 / 40 (kontrolné pásma) · čelo umývačky 594 × max 720 (hmotnosť čela 2–10 kg len ako poznámka v liste — pole vypadáva) · PD nad rúrou Bosch ≥ 37/38 pri indukcii (len poznámka — kombinácia s doskou sa nerieši).
-3. **Presahy čela** výrobcovia kótujú rôzne: Whirlpool voči TELU (rúra 20/5, mikro 20/13–14), Bosch voči NIKE (BFL 6|3 / 14) — do seedu **presah + referencia (telo | nika)** + nika min–max + **medzera pod čelom** (Whirlpool 9, Bosch 0); druhú referenciu si engine dopočíta, len keď pozná aj telo aj niku. Vyriešené 19.9. (§9).
+3. **Presahy čela** výrobcovia kótujú rôzne: Whirlpool voči TELU (rúra 20/5, mikro 20/13–14), Bosch voči NIKE (BFL 6|3 / 14) — do seedu **presah + referencia (telo / nika)** + nika min–max + **medzera pod čelom** (Whirlpool 9, Bosch 0); druhú referenciu si engine dopočíta, len keď pozná aj telo aj niku. Vyriešené 19.9. (§9).
 4. Poznámky vetrania ostávajú textom v liste (rozhodnutie 6.9.), ale Beko „zadná stena úplne otvorená" je iný predpis ako „kanál 50" — do poznámky presne.
 
 ## 9 · Michalove doplnenia z praxe (19.9.2026 večer — prejdené celé)
@@ -134,7 +134,7 @@ Zdroj: interaktívna stránka porovnania (súkromný artefakt, Michalove poznám
 - **Rúra Bosch:** kóta 7,5 = odvetranie **už v rozmere čela** → čelo pod rúrou začína na 0; telo 577 = 595 − 18. Kombinácia s varnou doskou sa **nerieši** (nikdy tak nedáva);
   hrúbka PD nad rúrou nanajvýš poznámka bokom.
 - **Mikro Whirlpool:** čelo 382, telo 544 × 348 × 299; kontrola 14 + 348 + 20 = 382. **Mikro Bosch:** sedí všetko.
-- **Chladnička Beko — kontrolná geometria:** **box 1940 × 560 × 555 + čelná plocha viazaná zdola** s **kontrolnými pásmami** dverí spotrebiča: **669** (= spodok 40 + dolné dvere 629) · **pásmo medzery 71** · **1200** (zvyšok do 1940).
+- **Chladnička Beko — kontrolná geometria:** **box 1940 × 560 × 555 + čelná plocha viazaná zdola** s **kontrolnými pásmami** dverí spotrebiča: **669** (= spodok 40 + dolné dvere 629) · **pásmo medzery 71** · **1200–1210** (zvyšok do výšky niky 1940–1950; pri Michalovej nike 1940 = 1200).
   Nábytkové dvere NIE sú 669 / 1200 — delenie leží **vnútri pásma 71**: dolné nábytkové dvere = 669 + a, horné = 1200 + b, škára s (2 mm), a + s + b = 71, pričom **a ≥ 10 a b ≥ 10**
   (hrana nábytkových dverí min. 10 mm cez hranu dverí spotrebiča, aby hrana chladničky nebola pri čelnej hrane na tesno) → vôľa posunu a v rozsahu 10 až 59 ≈ 50 mm. Cieľ: delenie sa má **matematicky odvodiť z listu**. **Blend** hore/dole („ďalšie dno" napr. o 30 mm vyššie) pri lícovaní so susednými skrinkami — ideálne parameter šablóny, ak komplikuje → mimo V1.
   Nosnosť dna: bez odpovede → poznámka v šablóne.
@@ -180,5 +180,5 @@ Whirlpool dokumenty sa dajú vypísať cez `https://docs.backend.prod.aws.wpsand
 
 Debata 6.9. ráta s drezom vo V1 ako „len výrez do PD + cena" a predúloha žiada aspoň jeden overený list per kategória. V tabuľkách VYBAVENIE sú pri drezoch **len značky**
 (Blanco, Alveus, Franke, Schock — drezyonline), žiadny konkrétny model ani list, takže drez sa tu neoveroval. **Rozhodnutie:** drez vstupuje do debaty polí S1 ako cenová položka
-s ručne zapísaným výrezom do PD (Š × H + R, montáž na/pod dosku — polia podľa `04A` §výrezy), **bez seedu**; konkrétny model + list dodá Michal z najbližšej zákazky. Ak model
+s ručne zapísaným výrezom do PD (Š × H + R, montáž na/pod dosku — polia podľa `04A_SPOTREBICE_EXTERNY_AUDIT.md` §7 „Drez — cut-out template"), **bez seedu**; konkrétny model + list dodá Michal z najbližšej zákazky. Ak model
 nepríde, platí poistka z debaty 6.9.: drez = len cenová položka. Nie je to tiché vynechanie kategórie — je to odložená predúloha.
