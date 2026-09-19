@@ -233,9 +233,10 @@
      a hint sa v 112 px boxe spraval ako flex polozka s `min-width: 38px`
      (`.frow .exprhint` nizsie) — teda presne to, comu mal zabranit.
      `min-width: 0` je poistka proti tomu pravidlu; kotvou je `.hbox`
-     (`position: relative` vyssie). Selektor je zamerne `.nx-inspector`-scopnuty
-     (4 triedy): kompaktne pravidlo `.nx-inspector .dwrap .exprhint` nizsie ma
-     rovnaku specificitu a je v zdroji NESKOR, takze by prebilo padding. */
+     (`position: relative` vyssie). Selektor ma ZAMERNE styri triedy: kompaktne
+     pravidlo `.nx-inspector .dwrap .exprhint` nizsie ma len tri, ale je
+     v zdroji NESKOR — pri zhodnej specificite by prebilo padding, takze
+     stvrta trieda (`.hbox`) je to, co tomuto pravidlu drzi prednost. */
   .nx-inspector .frow .hbox .exprhint { position: absolute; top: calc(100% + 2px); right: 0; z-index: 110;
               min-width: 0; padding: 1px 5px; border: 1px solid var(--nx-border); border-radius: 6px;
               background: var(--nx-surface); box-shadow: 0 2px 6px var(--nx-modal-shadow);
@@ -305,6 +306,13 @@
   /* `.wide` je v paneli GLOBALNA trieda (tlacidlo na plnu sirku) — v hlavicke
      by roztiahla ikonu cez cely riadok, preto ju tu VEDOME rusime. */
   .nx-inspector .gtools .ibtn.wide { width: auto; margin-top: 0; padding: 0 7px; font-size: 11px; }
+  /* D-130b: JANTAROVY stav ikony v hlavicke = „nieco je vypnute/odomknute".
+     Pouziva ho zamok limitu presahov (odomknute ±2000 mm) — stav musi byt
+     vidno aj pri ZBALENEJ skupine, preto farba a nie text. */
+  .nx-inspector .gtools .ibtn.amber { background: var(--nx-warn-bg); border-color: var(--nx-warn);
+              color: var(--nx-warnrow-fg); }
+  .nx-inspector .gtools .ibtn.amber:hover { background: var(--nx-warn-bg); color: var(--nx-warnrow-fg);
+              border-color: var(--nx-warn); }
 
   /* ===== D-130a R7: POPOVER „všetkým" (hromadna uchytka) ==================
      Je to AKCIA, nie druhy stav: selecty v nom NIC nezapisuju, zapise az
@@ -349,10 +357,42 @@
   .nx-inspector .front-add-plus .ic { width:10px; height:10px; }
   .nx-inspector .fprofile-row select { min-width:0; flex:1; width:100%; }
 .nx-inspector .fprofile-row label { flex:0 0 72px; }
-.nx-inspector .front-gap-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
-  .nx-inspector .front-gap-grid .row label { flex: 0 0 44px; }
-  .nx-inspector .front-gap-grid .row input { text-align: right; width: 54px; }
-  .nx-inspector .front-gap-grid .row .unit { flex-basis: 23px; }
+/* ===== D-130b R2: SCHEMA MEDZIER A OKRAJOV (`.gapdiag`) ===================
+     Nahradila mriezku `.front-gap-grid` (styri popisane riadky). Obrys
+     korpusu s dvoma celami; pat EXISTUJUCICH poli `fr_gap*` je absolutne
+     umiestnenych na hranach, ktorych sa tykaju — pouzivatel nemusi citat
+     popisky, vidi, ktora hrana je ktora.
+     POZOR NA SPECIFICITU: `.row input` (0,0,2,1) nastavuje `flex: 1`, preto
+     musi mat pravidlo schemy `.row .gapdiag input.gd` (0,0,4,1) — samotne
+     `.gd` by prehralo a polia by sa roztiahli cez cely riadok. */
+  .nx-inspector .row.gaprow { align-items: center; }
+  /* Popisok nesie tooltip `?` — bez inline-flexu by ikona sadla na uctovnu
+     linku textu a riadok by poskocil. */
+  .nx-inspector .row.gaprow > label { display: inline-flex; align-items: center; gap: 2px; }
+  .nx-inspector .gapdiag { position: relative; flex: 1; min-width: 0; height: 98px; }
+  .nx-inspector .gd-box { position: absolute; left: 46px; right: 46px; top: 11px; bottom: 11px;
+    border: 1.5px solid var(--nx-border-strong); background: var(--nx-surface-preview);
+    border-radius: 2px; display: flex; flex-direction: column; padding: 6px 8px; gap: 5px; }
+  .nx-inspector .gd-front { flex: 1; background: var(--nx-select-bg); border: 1px solid var(--nx-select);
+    border-radius: 1px; opacity: .75; }
+  .nx-inspector .row .gapdiag input.gd { position: absolute; flex: none; width: 44px; height: 21px;
+    font: inherit; font-size: 11.5px; text-align: center; padding: 0 3px;
+    border: 1px solid var(--nx-border-strong); border-radius: 6px;
+    background: var(--nx-surface); color: var(--nx-ink); z-index: 2; }
+  .nx-inspector .row .gapdiag input.gd:focus { outline: 2px solid var(--nx-select); outline-offset: -1px; }
+  .nx-inspector .row .gapdiag input.gd.top { left: 50%; top: 0; transform: translateX(-50%); }
+  .nx-inspector .row .gapdiag input.gd.bottom { left: 50%; bottom: 0; transform: translateX(-50%); }
+  .nx-inspector .row .gapdiag input.gd.left { left: 0; top: 50%; transform: translateY(-50%); }
+  .nx-inspector .row .gapdiag input.gd.right { right: 0; top: 50%; transform: translateY(-50%); }
+  /* Medzera medzi celami je JANTAROVA — je to ta ista skara, ktora sa pri
+     editacii prisvieti v nahlade (N26), takze farba spaja pole a kresbu. */
+  .nx-inspector .row .gapdiag input.gd.mid { left: 50%; top: 50%; transform: translate(-50%, -50%);
+    background: var(--nx-warn-bg-soft); border-color: var(--nx-warnchip-border);
+    color: var(--nx-warnrow-fg); font-weight: 600; }
+  /* Chybne pole (validacia) musi prebit aj vypln schemy — inak by cervene
+     orámovanie na jantarovom poli zaniklo. */
+  .nx-inspector .row .gapdiag input.gd.bad { border-color: var(--nx-danger-line);
+    background: var(--nx-danger-bg-soft); }
 
   /* ===== KOV-A2a: KARTA CELA ==============================================
      Karta je POSLEDNY potomok `.frow`, v mriezke D-130a TRETI RIADOK gridu
@@ -462,9 +502,6 @@
   .nx-inspector .fcard .ddet ul { margin: 3px 0 0; padding-left: 16px; line-height: 1.45; }
   /* Hint v karte je uz odsadeny kartou — nepotrebuje vlastny spodny odstup. */
   .nx-inspector .fcard .hint { margin: 5px 0 0; }
-  /* D-22: zamok limitu presahov (v riadku medzier sekcie Cela) — ikona + text v rade */
-  .row .lockbtn { flex: 1; text-align: left; padding: 4px 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
-  .row .lockbtn.unlocked { background: var(--nx-warn-bg); border-color: var(--nx-warn); color: var(--nx-warn-fg); }
   /* D-39: zamky vkladacej karty — PEVNA sirka v existujucich riadkoch poli
      (audit F10: vlastna trieda, NIE .row .lockbtn — ta je flex cez celu sirku;
      ziadny novy riadok — pravidlo vertikalneho priestoru). Mimo mode-insert skryte. */

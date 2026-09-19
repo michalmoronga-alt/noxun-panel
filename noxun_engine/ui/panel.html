@@ -12,7 +12,7 @@
      Vsetky nove CSS pravidla kostry visia pod nou, aby panel.css ostal
      bezpecne zdielatelny so satelitnymi oknami. -->
 <script>document.documentElement.className = 'nx-inspector';</script>
-<link rel="stylesheet" href="css/panel.css?v=0.12.7">
+<link rel="stylesheet" href="css/panel.css?v=0.12.8">
 
 <!-- ===== RAIL (A9: staticke ID pre merac D-25) =============================
      Kontexty su platne LEN nad oznacenym korpusom — pri dielci/doske/vkladani
@@ -537,8 +537,9 @@
       </div>
     </details>
 
-    <!-- ===== kontext CELA (UI-C3 · rework D-130a) ==========================
-         DVE skupiny v zavaznom poradi: Cela (`fronts`) · Medzery (`fgaps`).
+    <!-- ===== kontext CELA (UI-C3 · rework D-130a + D-130b) =================
+         DVE skupiny v zavaznom poradi: Cela (`fronts`) · Spolocne pre
+         skrinku (`cabfront`).
          D-130a: skupina `fhandles` („Úchytky") ZANIKLA — uchytka sa nastavuje
          na JEDNOM mieste (karta cela), hromadne cez POPOVER „všetkým"
          v hlavicke tejto skupiny (D-129). Kostra je STATICKA (A4) — JS pise
@@ -591,38 +592,61 @@
         <div id="frontDraftMessage" class="hint" role="status" hidden></div>
         <div class="addrow"><span class="addl">Pridať čelo</span>
           <span id="frontAddTypes" class="front-add-types" role="group" aria-label="Pridať čelo"></span></div>
-        <!-- UI-C3: material CIEL priamo v zozname. Sektor Materiály patrí
-             kontextu Korpus a v kontexte Čelá je skrytý — bez tohto ovládača
-             by sa dekor čiel musel meniť inde, než sa čelá kreslia. Je to DRUHY
-             OVLADAC toho isteho udaja (zrkadli sa s `cab_front`), nie nove data.
-             D-130b ho presunie do skupiny „Spoločné pre skrinku". -->
-        <div class="matrow"><label for="cab_front_c">Materiál čiel</label>
-          <select id="cab_front_c" data-nx-combo="decor" data-nx-combo-ctx="front" onchange="onCabinetMaterial('front', this.value)"></select></div>
       </div>
     </details>
 
-    <!-- D-07: medzery a presahy — hodnoty ziju vo fronts configu (nie construction params).
-         N26: pri fokuse v ktoromkolvek z tychto poli sa medzery v projekcii Cela
-         prisvietia jantarovo (zvyraznenie kresli preview.js, ziadne nove data). -->
-    <details data-key="fgaps" data-s4="cela">
-      <summary><svg class="ic gic" aria-hidden="true"><use href="#i-columns-2"/></svg>Medzery a presahy</summary>
+    <!-- ===== SPOLOCNE PRE SKRINKU (D-130b) =================================
+         Vsetko, co plati NARAZ pre vsetky cela jednej skrinky: material ciel
+         a medzery s okrajmi. D-07: hodnoty medzier ziju vo `fronts` configu
+         (nie construction params) — server ich cita ako `gap gap_top
+         gap_bottom gap_left gap_right`, tento rework dat NEMENI.
+         D-130b: zamok limitu a „Predvolené" su IKONY v hlavicke (telo drzi
+         len data — vertikalny priestor panela je vzacny) a dlhy pomocny text
+         nahradil tooltip `?` (pravidlo D-130a R8).
+         N26: pri fokuse v niektorom z poli schemy ALEBO hoveri nad schemou sa
+         medzery v projekcii Cela prisvietia jantarovo (kresli preview.js). -->
+    <details data-key="cabfront" data-s4="cela">
+      <summary class="ghdr"><svg class="ic gic" aria-hidden="true"><use href="#i-cabinet"/></svg>Spoločné pre skrinku
+        <span class="gtools">
+          <!-- Meta povie stav aj pri ZBALENEJ skupine: dekor · medzera · okraje. -->
+          <span class="meta" id="cabfrontMeta"></span>
+          <!-- D-22: zamok limitu presahov — odomknutie povoli okraje az ±2000 mm
+               (obklady, pilastre). D-130b: stav nesie IKONA + title + jantarova
+               farba; textovy label vedla ikony zanikol.
+               `preventDefault` + `stopPropagation` (v `nxTipStop`) su nutne:
+               tlacidlo zije v <summary>, ktore by klik inak zbalilo. -->
+          <button type="button" class="ibtn" id="edgeLimitLock" aria-pressed="true"
+            onclick="toggleEdgeLimit(event)"
+            title="Limit presahov: zamknuté ±100 mm — klik odomkne až ±2000 (obklady, pilastre)"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></button>
+          <button type="button" class="ibtn" id="frontGapsReset" onclick="resetFrontGaps(event)"
+            title="Predvolené medzery (3 / 2 mm)"><svg class="ic" aria-hidden="true"><use href="#i-rotate-ccw"/></svg></button>
+          <button type="button" class="nxtip r" aria-label="Pomoc"
+            data-tip="Platí pre všetky čelá tejto skrinky. Materiál čiel je ten istý údaj ako v Korpuse → Materiály — dva vstupné body, jedna hodnota. Medzery a okraje sú schéma: číslo sedí na hrane, ktorej sa týka."
+            onclick="nxTipStop(event)"><svg class="ic" aria-hidden="true"><use href="#i-help-circle"/></svg></button>
+        </span></summary>
       <div class="body">
-        <div class="hint">Záporný okraj = čelo presahuje obrys korpusu. Čelá sa kladú odspodu — okraj hore sa prejaví cez AUTO čelo (pri samých pevných výškach je len rezervou). Pri editácii sa medzery v náhľade prisvietia.</div>
-        <div class="row"><label>Medzi čelami</label><input id="fr_gap" type="text" oninput="onField()"><span class="unit">mm</span></div>
-        <div class="front-gap-grid">
-          <div class="row"><label for="fr_gap_top">Hore</label><input id="fr_gap_top" type="text" oninput="onField()"><span class="unit">mm</span></div>
-          <div class="row"><label for="fr_gap_bottom">Dole</label><input id="fr_gap_bottom" type="text" oninput="onField()"><span class="unit">mm</span></div>
-          <div class="row"><label for="fr_gap_left">Vľavo</label><input id="fr_gap_left" type="text" oninput="onField()"><span class="unit">mm</span></div>
-          <div class="row"><label for="fr_gap_right">Vpravo</label><input id="fr_gap_right" type="text" oninput="onField()"><span class="unit">mm</span></div>
-        </div>
-        <!-- D-22: zamok limitu presahov — odomknutie povoli okraje az ±2000 mm (obklady, pilastre) -->
-        <div class="row"><label>Limit presahov</label>
-          <button id="edgeLimitLock" class="ghostbtn lockbtn" onclick="toggleEdgeLimit()" aria-pressed="true"
-            title="Zamknuté: okraje max ±100 mm. Odomkni pre veľké presahy čiel — obklady, pilastre (až ±2000 mm)."><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg><span class="lblLimit">±100 mm</span></button>
-          <span class="unit"></span></div>
-        <div class="btnrow">
-          <button class="ghostbtn" onclick="resetFrontGaps()"><svg class="ic" aria-hidden="true"><use href="#i-rotate-ccw"/></svg> Predvolené (3 / 2 mm)</button>
-        </div>
+        <!-- UI-C3: material CIEL priamo v kontexte Cela. Sektor Materiály patrí
+             kontextu Korpus a tu je skrytý — bez tohto ovládača by sa dekor
+             čiel musel meniť inde, než sa čelá kreslia. Je to DRUHY OVLADAC
+             toho isteho udaja (zrkadli sa s `cab_front`), nie nove data.
+             D-130b: `.row` (nie `.matrow`) — popisky skupiny maju JEDEN stlpec. -->
+        <div class="row"><label for="cab_front_c">Materiál čiel</label>
+          <select id="cab_front_c" data-nx-combo="decor" data-nx-combo-ctx="front" onchange="onCabinetMaterial('front', this.value)"></select><span class="unit"></span></div>
+        <!-- SCHEMA MEDZIER (D-130b R2): obrys korpusu s dvoma celami, pat
+             EXISTUJUCICH poli `fr_gap*` lezi na hranach, ktorych sa tyka.
+             Kresba `.gd-box` je ILUSTRACIA (dve cela vzdy), nie skutocny
+             rozpis — ten je v nahlade. Ziadne nove data ani nove ID. -->
+        <div class="row gaprow"><label>Medzery a okraje<button type="button" class="nxtip inl" aria-label="Pomoc"
+            data-tip="Čísla sedia na hranách, ktorých sa týkajú. Okraj = vzdialenosť čela od obrysu korpusu: + = odskok (vidno korpus), 0 = zarovno, − = presah čela cez korpus (napr. −20 mm ako úchop dole). Číslo v strede = medzera (škára) medzi čelami. Čelá sa kladú odspodu — okraj hore sa prejaví cez AUTO čelo. Keď píšeš v niektorom poli alebo prejdeš myšou nad schému, medzery sa v náhľade prisvietia."
+            onclick="nxTipStop(event)"><svg class="ic" aria-hidden="true"><use href="#i-help-circle"/></svg></button></label>
+          <div class="gapdiag">
+            <div class="gd-box" aria-hidden="true"><div class="gd-front"></div><div class="gd-front"></div></div>
+            <input id="fr_gap_top" class="gd top" type="text" oninput="onField()" title="Okraj hore" aria-label="Okraj hore">
+            <input id="fr_gap_bottom" class="gd bottom" type="text" oninput="onField()" title="Okraj dole" aria-label="Okraj dole">
+            <input id="fr_gap_left" class="gd left" type="text" oninput="onField()" title="Okraj vľavo" aria-label="Okraj vľavo">
+            <input id="fr_gap_right" class="gd right" type="text" oninput="onField()" title="Okraj vpravo" aria-label="Okraj vpravo">
+            <input id="fr_gap" class="gd mid" type="text" oninput="onField()" title="Medzera medzi čelami" aria-label="Medzera medzi čelami">
+          </div><span class="unit">mm</span></div>
       </div>
     </details>
 
@@ -922,53 +946,53 @@
      musi existovat pred prvym renderom aj pred ready), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.12.7"></script>
+<script src="js/errors.js?v=0.12.8"></script>
 <!-- D-77 / A7: minimalna OBSAHOVA velkost okna pri otvoreni. UI-B1 stanovil
      jednu pravdu sirky Inspectora — 470 px OBSAHU (rail 44 + karta). Vyska 810
      pokryva nahlad + dva rozbalene sektory. Dorovnava sa oboma smermi, raz pri
      nacitani a nikdy nad plochu obrazovky (js/win_fit.js). -->
 <script>window.NX_FIT_MIN = { w: 470, h: 810 };</script>
-<script src="js/win_fit.js?v=0.12.7"></script>
-<script src="js/icons.js?v=0.12.7"></script>
+<script src="js/win_fit.js?v=0.12.8"></script>
+<script src="js/icons.js?v=0.12.8"></script>
 <!-- R-23.1: JEDEN dokumentový Escape handler s prioritným zoznamom vrstiev
      (ten istý súbor načítava aj studio.html). Musí byť PRED skriptami, ktoré
      modály otvárajú — jeho listener má bežať ako PRVÝ, aby vedel udalosť
      spotrebovať skôr, než ju dostane handler okna. -->
-<script src="js/nx_esc.js?v=0.12.7"></script>
+<script src="js/nx_esc.js?v=0.12.8"></script>
 <!-- KOV-H2: zdieľaná kostra modalov D-15 (ten istý súbor načítava aj
      studio.html). Musí byť ZA nx_esc.js (reťaz Escape má bežať prvá) a PRED
      core.js/hardware.js — modal ručnej položky kovania ju volá menom. -->
-<script src="js/nx_modal.js?v=0.12.7"></script>
+<script src="js/nx_modal.js?v=0.12.8"></script>
 <!-- ŠT-4a: zdieľaný obsah „O plugine" (rovnaký súbor načítava aj studio.html). -->
-<script src="js/about.js?v=0.12.7"></script>
+<script src="js/about.js?v=0.12.8"></script>
 <!-- D-85 (UI-03): zdielany combobox. Musi byt PRED core/part/board — tie ho pri
      renderi kariet volaju (NXCombo.scan). Sam na nikom nezavisi (ikony si berie
      defenzivne cez NXIcons, ak sprite existuje). -->
-<script src="js/nx_combo.js?v=0.12.7"></script>
+<script src="js/nx_combo.js?v=0.12.8"></script>
 <!-- v0.7.28: ZDIELANE 3-stavove nastavenie kontroly hran (rohovy trojuholnik pri
      ABS kontrole v raile). TEN ISTY subor nacitava aj okno Studio — jeden markup,
      jeden stav. Musi byt PRED shell.js (rohove okno kresli NXEdgeMenu). -->
-<script src="js/edge_menu.js?v=0.12.7"></script>
-<script src="js/tag_menu.js?v=0.12.7"></script>
-<script src="js/core.js?v=0.12.7"></script>
-<script src="js/expr.js?v=0.12.7"></script>
-<script src="js/insert_state.js?v=0.12.7"></script>
-<script src="js/form.js?v=0.12.7"></script>
-<script src="js/zone_tree.js?v=0.12.7"></script>
-<script src="js/preview.js?v=0.12.7"></script>
+<script src="js/edge_menu.js?v=0.12.8"></script>
+<script src="js/tag_menu.js?v=0.12.8"></script>
+<script src="js/core.js?v=0.12.8"></script>
+<script src="js/expr.js?v=0.12.8"></script>
+<script src="js/insert_state.js?v=0.12.8"></script>
+<script src="js/form.js?v=0.12.8"></script>
+<script src="js/zone_tree.js?v=0.12.8"></script>
+<script src="js/preview.js?v=0.12.8"></script>
 <!-- UI-B1: kostra Inspectora — stavovy stroj vyber x kontext, rail, sektory. -->
-<script src="js/shell.js?v=0.12.7"></script>
-<script src="js/actions.js?v=0.12.7"></script>
+<script src="js/shell.js?v=0.12.8"></script>
+<script src="js/actions.js?v=0.12.8"></script>
 <!-- GHOST-FB4: Ghost pasik vkladacej karty. Musi byt PRED bridge.js
      (NX.setGhost vola nxGhostApply); sam na nikom nezavisi. -->
-<script src="js/ghost_bar.js?v=0.12.7"></script>
+<script src="js/ghost_bar.js?v=0.12.8"></script>
 <!-- UI-B3: nastavenia Inspectora (koliesko) + rozmerove rady N6. Musi byt PRED
      bridge.js (NX.setUiSettings volá nxApplyUiSettings) a za core.js (el/esc). -->
-<script src="js/settings.js?v=0.12.7"></script>
-<script src="js/bridge.js?v=0.12.7"></script>
-<script src="js/materials.js?v=0.12.7"></script>
-<script src="js/part_card.js?v=0.12.7"></script>
-<script src="js/board_card.js?v=0.12.7"></script>
-<script src="js/hardware.js?v=0.12.7"></script>
-<script src="js/usage.js?v=0.12.7"></script>
-<script src="js/boot.js?v=0.12.7"></script>
+<script src="js/settings.js?v=0.12.8"></script>
+<script src="js/bridge.js?v=0.12.8"></script>
+<script src="js/materials.js?v=0.12.8"></script>
+<script src="js/part_card.js?v=0.12.8"></script>
+<script src="js/board_card.js?v=0.12.8"></script>
+<script src="js/hardware.js?v=0.12.8"></script>
+<script src="js/usage.js?v=0.12.8"></script>
+<script src="js/boot.js?v=0.12.8"></script>
