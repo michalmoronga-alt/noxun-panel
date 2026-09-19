@@ -348,4 +348,108 @@ global.frontSlots = null;
 FM.updateFrontMeta();
 eq(metaNode.textContent, '2 čelá', 'G2: bez slotov ostane LEN pocet — nic sa neodvodzuje');
 
+// ===========================================================================
+// H) CODEX #371 kolo 1 — sest P2 nalezov
+// ===========================================================================
+
+// --- H1) prazdny tab Kovanie sa odvodzuje z REALNEHO kovania vlastnika -----
+// Dvierka, sklop aj blenda s profilom kovanie MAJU, len o nom hovori plan
+// a nakup (`frontHwBadge` / `frontHwBuy`), nie serverovy zaznam `hwRows`.
+// Veta „Bez kovania" nad nimi by klamala.
+resetRows();
+global.frontSlots = { F1: entry(1, [slot('single', 'left')]) };
+global.frontDrawer = null;
+global.frontHwBadge = () => '2× závesy';
+global.frontHwBuy = () => 'Sensys klasik';
+FM.addFrontRow({ id: 'F1', type: 'door', direction: 'left' });
+openCard('F1');
+FM.onFrontCardTab(tabBtn('F1', 'hw'));
+let hwHtml = rowOf('F1').querySelector('.fcard').innerHTML;
+ok(hwHtml.indexOf('Bez kovania') < 0,
+   'H1: dvierka s naviazanym kovanim NEHLASIA „Bez kovania" (hwRows su prazdne, kovanie NIE)');
+ok(hwHtml.indexOf('2× závesy') >= 0 && hwHtml.indexOf('Sensys klasik') >= 0,
+   'H1: ukaze sa jeho TEXT — tie iste zdroje ako suhrn riadku');
+// A ked kovanie naozaj NIE JE, veta ostava.
+global.frontHwBadge = () => '';
+global.frontHwBuy = () => '';
+FM.refreshFrontCards();
+ok(rowOf('F1').querySelector('.fcard').innerHTML.indexOf('Bez kovania') >= 0,
+   'H1: bez kovania a bez boxu vlastnika sa to POVIE');
+
+// --- H3) deep-link `NX.focusFront` otvara kartu na tabe Čelo ---------------
+// RED nalez SMERU vedie na otazku, ktora zije v tabe Čelo. Bez resetu by sa
+// cielova karta otvorila na Kovani — stav po PREDCHADZAJUCEJ karte.
+resetRows();
+global.frontSlots = { F1: entry(1, [slot('single', UNSET)]), F2: entry(1, [slot('single', UNSET)]) };
+FM.addFrontRow({ id: 'F1', type: 'door', direction: UNSET });
+FM.addFrontRow({ id: 'F2', type: 'door', direction: UNSET });
+openCard('F1');
+FM.onFrontCardTab(tabBtn('F1', 'hw'));
+eq(tabBtn('F1', 'hw').attrs.class, 'on', 'H3: predchadzajuca karta stoji na Kovani');
+ok(FM.nxFocusFront('F2'), 'H3: deep-link na F2 presiel');
+eq(tabBtn('F2', 'celo').attrs.class, 'on',
+   'H3: cielova karta sa otvorila na tabe Čelo (tam je segment smeru)');
+
+// --- H4) badge „smer?" rata LEN z AKTIVNYCH slotov -------------------------
+// Navrat zo 4 kridiel na 2 necha `p2: unset` ako DORMANTNU hodnotu (A1: navrat
+// nic nemaze). Badge by inak navzdy svietil na otazku, ktoru nikto nekladie.
+const dormant = { type: 'door', wings: '2', wing_directions: { p2: UNSET, p3: UNSET } };
+eq(sum(dormant, entry(2, [])), '2 krídla · bez úchytky',
+   'H4: dormantne `wing_directions` po navrate na 2 kridla badge NEROBIA');
+eq(C.frontCardModel(dormant, entry(2, [])).tabs[0].badge, null, 'H4: ani na tabe');
+// Kym su sloty AKTIVNE, badge samozrejme plati.
+eq(sum({ type: 'door', wings: '4', wing_directions: { p2: UNSET, p3: 'left' } },
+       entry(4, [slot('p2', UNSET), slot('p3', 'left')])),
+   '4 krídla · [smer?] · bez úchytky', 'H4: aktivny slot s `unset` badge DAVA');
+eq(sum({ type: 'door', wings: '4', wing_directions: { p2: 'right', p3: 'left' } },
+       entry(4, [slot('p2', 'right'), slot('p3', 'left')])),
+   '4 krídla · bez úchytky', 'H4: a urcene stredne kridla uz nie');
+// Dvojkridlo bez slotov o smere mlci aj pri ulozenom scalarnom `unset`.
+eq(sum({ type: 'door', wings: '2', direction: UNSET }, entry(2, [])),
+   '2 krídla · bez úchytky', 'H4: dvojkridlo ma smer ODVODENY — badge nedostane');
+eq(sum({ type: 'door', direction: UNSET }, entry(1, [])),
+   '1 krídlo (auto) · [smer?] · bez úchytky',
+   'H4: bez slotov pri JEDNOM kridle rozhoduje scalarny `direction`');
+
+// --- H5) „Otvoriť v Kovaní" s `aria-disabled` NEROBI NIC -------------------
+resetRows();
+global.frontSlots = { F1: entry(1, []) };
+let ctxCalls = 0;
+global.setViewContext = () => { ctxCalls++; };
+global.hwBoxByGroup = () => null;        // box vlastnika neexistuje
+global.hwFrontGroup = (fid) => 'front:' + fid;
+global.NX = { setStatus: function(){} };
+FM.addFrontRow({ id: 'F1', type: 'drawer_front' });
+openCard('F1');
+FM.onFrontCardTab(tabBtn('F1', 'hw'));
+const openBtn = rowOf('F1').querySelector('.cfoot .ghostbtn');
+eq(openBtn.getAttribute('aria-disabled'), 'true', 'H5: bez boxu vlastnika je tlacidlo stlmene (D-78)');
+ok(openBtn.getAttribute('title').indexOf('nemá naviazané kovanie') >= 0, 'H5: a dovod nesie `title`');
+FM.onFrontOpenHardware(openBtn, 'F1');
+eq(ctxCalls, 0, 'H5: klik na `aria-disabled` tlacidlo NEPREPNE kontext');
+// A aj priama cesta overi ciel PRED prepnutim kontextu.
+FM.openFrontHardware('F1');
+eq(ctxCalls, 0, 'H5: `openFrontHardware` bez ciela kontext NEMENI (neuspesny skok nikam nevedie)');
+
+// --- H6) Escape popoveru SPOTREBUJE udalost --------------------------------
+// Vsetky Escape listenery visia na `document`; bez `stopImmediatePropagation`
+// by jedno stlacenie zavrelo popover AJ flyout z `boot.js`.
+(function(){
+  const src = require('node:fs')
+    .readFileSync(path.join(JS, 'form.js'), 'utf8').replace(/\r\n/g, '\n');
+  const esc = src.match(/document\.addEventListener\('keydown'[\s\S]*?\n    \}\);/);
+  ok(esc, 'H6: Escape handler popoveru sa nasiel');
+  ok(esc[0].indexOf('stopImmediatePropagation') >= 0,
+     'H6: Escape sa SPOTREBUJE (inak zavrie dve vrstvy naraz)');
+  ok(esc[0].indexOf('preventDefault') >= 0, 'H6: a zrusi natívne spravanie');
+  // PORADIE: `nx_esc.js` (retaz modalov) MUSI byt v panel.html PRED `form.js`,
+  // aby modal svoje Escape spotreboval skor, nez sa dostane k popoveru.
+  const html = require('node:fs')
+    .readFileSync(path.join(JS, '..', 'panel.html'), 'utf8').replace(/\r\n/g, '\n');
+  ok(html.indexOf('js/nx_esc.js') < html.indexOf('js/form.js'),
+     'H6: `nx_esc.js` je nacitany PRED `form.js` (modal je nad popoverom)');
+  ok(html.indexOf('js/form.js') < html.indexOf('js/boot.js'),
+     'H6: a `form.js` pred `boot.js` (popover je nad flyoutmi raily)');
+})();
+
 console.log('OK test_d130a_suhrn_karta.js — ' + n + ' kontrol');

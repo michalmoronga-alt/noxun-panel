@@ -241,6 +241,76 @@ NxTest.test('D-130a R6: karta ma taby a preklik pouziva TU ISTU konvenciu skupin
   NxTest.assert(hw.include?('Bez kovania.'), 'prazdny tab povie jednou vetou, ze nic nie je')
 end
 
+# --- 5b) CODEX #371 kolo 1: sest P2 nalezov --------------------------------
+
+NxTest.test('D-130a (Codex #371 P2-1): „Bez kovania" sa odvodzuje z REALNEHO kovania vlastnika') do
+  # Vyriesne riadky (`front_drawer` / `front_lift`) ma LEN zasuvka a vyklop.
+  # Dvierka, sklop aj blenda s uchytkovym profilom kovanie MAJU — hovori oň
+  # plan a nakup, nie serverovy zaznam. Prazdny stav sa preto NESMIE odvodzovat
+  # len z `m.hwRows`.
+  hw = D130A_FORM[/function frontCardHwHtml\(row, m\)\{.*?\n  \}/m].to_s
+  NxTest.refute(hw.empty?, 'funkcia sa nasla')
+  NxTest.assert(hw.include?('frontHwBadge(fid)') && hw.include?('frontHwBuy(fid)'),
+                'prazdny stav pozna TEXT kovania (tie iste zdroje ako suhrn riadku)')
+  NxTest.assert(hw.index('if (text)') < hw.index('Bez kovania.'),
+                'a veta „Bez kovania" padne az ako POSLEDNA moznost')
+  NxTest.assert(hw.include?('has'), 'do rozhodnutia vstupuje aj existencia boxu vlastnika')
+end
+
+NxTest.test('D-130a (Codex #371 P2-3): deep-link `nxFocusFront` otvara kartu na tabe Čelo') do
+  # RED nalez SMERU vedie na otazku, ktora zije v tabe Čelo — bez resetu by sa
+  # cielova karta otvorila na tabe Kovanie (stav po predchadzajucej karte).
+  body = D130A_FORM[/function nxFocusFront\(fid\)\{.*?\n  \}/m].to_s
+  NxTest.refute(body.empty?, 'funkcia sa nasla')
+  NxTest.assert(body.include?("openFrontCardTab = 'celo'"), 'tab sa RESETUJE')
+  NxTest.assert(body.index("openFrontCardTab = 'celo'") < body.index('refreshFrontCards()'),
+                'a to PRED prekreslenim karty')
+end
+
+NxTest.test('D-130a (Codex #371 P2-4): badge „smer?" rata LEN z aktivnych slotov') do
+  # Navrat zo 4 kridiel na 2 necha `p2: unset` ako DORMANTNU hodnotu (A1
+  # kontrakt: navrat nic nemaze). Skenovanie celeho `wing_directions` by badge
+  # nechalo svietit navzdy na otazku, ktoru uz nikto nekladie.
+  body = D130A_CORE[/function frontSumDirUnset\(item, entry\)\{.*?\n  \}/m].to_s
+  NxTest.refute(body.empty?, 'funkcia berie aj ZAZNAM SERVERA')
+  NxTest.assert(body.include?('Array.isArray(e.slots)'), 'rozhoduju AKTIVNE sloty')
+  NxTest.assert(body.include?('frontDirValue(it, wing)'),
+                'hodnota sa cita pre KONKRETNE kridlo (nie prechodom cez vsetky ulozene)')
+  NxTest.refute(body.include?('for (var k in wd)'),
+                'prechod cez vsetky ulozene `wing_directions` zanikol')
+  NxTest.assert(body.include?('it.direction === FRONT_DIR_UNSET'),
+                'bez slotov rozhoduje scalarny smer (pri jednom kridle)')
+end
+
+NxTest.test('D-130a (Codex #371 P2-5): stlmene „Otvoriť v Kovaní" nerobi nic a skok overi ciel') do
+  guard = D130A_FORM[/function onFrontOpenHardware\(btn, fid\)\{.*?\n  \}/m].to_s
+  NxTest.refute(guard.empty?, 'klik ma vlastny guard')
+  NxTest.assert(guard.include?("getAttribute('aria-disabled') === 'true'"),
+                'a `aria-disabled` tlacidlo NEROBI NIC (D-78 stlmenie nie je len vzhlad)')
+  open = D130A_FORM[/function openFrontHardware\(fid\)\{.*?\n  \}/m].to_s
+  NxTest.refute(open.empty?, 'skok sa nasiel')
+  NxTest.assert(open.index('hwBoxByGroup(hwFrontGroup(fid))') < open.index("setViewContext('kovanie')"),
+                'ciel sa overuje PRED prepnutim kontextu — neuspesny skok kontext NEMENI')
+end
+
+NxTest.test('D-130a (Codex #371 P2-6): Escape popoveru SPOTREBUJE udalost') do
+  # Vsetky Escape listenery okna visia na `document` a `stopPropagation` medzi
+  # nimi nefunguje (lekcia nx_esc.js) — bez spotrebovania by jedno stlacenie
+  # zavrelo popover AJ flyout z boot.js.
+  esc = D130A_FORM[/document\.addEventListener\('keydown'.*?\n    \}\);/m].to_s
+  NxTest.refute(esc.empty?, 'handler sa nasiel')
+  NxTest.assert(esc.include?('stopImmediatePropagation'), 'udalost sa SPOTREBUJE')
+  NxTest.assert(esc.include?('preventDefault'), 'a natívne spravanie sa zrusi')
+  # Poradie skriptov je kontrakt: retaz modalov (`nx_esc.js`) bezi PRVA,
+  # popover (`form.js`) az za nou, flyouty raily (`boot.js`) nakoniec.
+  esc_i = D130A_HTML.index('js/nx_esc.js')
+  form_i = D130A_HTML.index('js/form.js')
+  boot_i = D130A_HTML.index('js/boot.js')
+  NxTest.assert(esc_i && form_i && boot_i, 'vsetky tri skripty su v panel.html')
+  NxTest.assert(esc_i < form_i, '`nx_esc.js` PRED `form.js` (modal je nad popoverom)')
+  NxTest.assert(form_i < boot_i, '`form.js` PRED `boot.js` (popover je nad flyoutmi raily)')
+end
+
 # --- 6) MERAC: nove kluce su v allowliste -----------------------------------
 
 NxTest.test('D-130a: nove ovladace maju kluce meraca (D-25 invariant)') do

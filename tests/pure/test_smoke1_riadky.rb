@@ -152,16 +152,24 @@ NxTest.test('SMOKE1 cela: karta cela je TRETI RIADOK mriezky, nie polozka radu')
                 'karta pouziva TOKEN ramika (ziadny natvrdo zapisany hex)')
 end
 
-NxTest.test('SMOKE1 cela (Codex #183 P2): zivy nahlad vyrazu NEZABERA sirku radu') do
+NxTest.test('SMOKE1 cela (Codex #183 P2): zivy nahlad vyrazu NEZABERA sirku pola') do
   # `= 450` pri rozpisanom vyraze `300+150` je v riadku cela OVERLAY. Ako flex
-  # polozka (`flex: 0 0 auto`) by pridal ~34 px, na ktore rad pri `nowrap` uz
-  # nema rezervu — riadok by pretiekol presne tak, ako predtym zalamoval.
-  NxTest.assert_equal('absolute', smoke1_decl('.nx-inspector .frow .dwrap .exprhint', 'position'),
-                      'hint je mimo toku radu')
-  NxTest.assert_equal('none', smoke1_decl('.nx-inspector .frow .dwrap .exprhint', 'pointer-events'),
+  # polozka (`flex: 0 0 auto`) by odtlacil hodnotu v 112 px boxe.
+  #
+  # Codex #371 P2: SELEKTOR MUSI SEDIET NA SKUTOCNEHO RODICA. `expr.js` vklada
+  # hint `insertAdjacentElement('afterend')` hned za `input.fh`, teda do
+  # `.hbox` — nie do `.dwrap` (tam ostala len sipka vyskoveho radu). Pravidlo
+  # na `.dwrap` by nesedelo na nic a hint by sa spraval ako flex polozka.
+  sel = '.nx-inspector .frow .hbox .exprhint'
+  NxTest.assert_equal('absolute', smoke1_decl(sel, 'position'), 'hint je mimo toku boxu')
+  NxTest.assert_equal('none', smoke1_decl(sel, 'pointer-events'),
                       'overlay nesmie kradnut kliky poliam pod nim')
+  NxTest.assert_equal('relative', smoke1_decl('.frow .hbox', 'position'),
+                      'a `.hbox` je jeho KOTVA (inak by sa ukotvil na cudzieho predka)')
+  NxTest.assert_equal(nil, smoke1_decl('.nx-inspector .frow .dwrap .exprhint', 'position'),
+                      'stary (nesediaci) selektor na `.dwrap` uz neexistuje')
   # Pod `.miniopts` (120) — ked je otvoreny rozmerovy rad, hodnoty maju prednost.
-  NxTest.assert(smoke1_decl('.nx-inspector .frow .dwrap .exprhint', 'z-index').to_i <
+  NxTest.assert(smoke1_decl(sel, 'z-index').to_i <
                 smoke1_decl('.nx-inspector .miniopts', 'z-index').to_i,
                 'hint nesmie prekryt otvorenu ponuku rozmeroveho radu')
 end
