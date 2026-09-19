@@ -514,13 +514,15 @@
   // posiela server; polozka, ktora sa uz nezhoduje, sa ticho preskoci
   // (nasledujuci push_selected riadky aj tak prestavia).
   function refreshHardwarePurchase(items){
-    // Codex #178 P2 (UI-C3): naviazané kovanie pod riadkom čela ukazuje NÁZOV
+    // Codex #178 P2 (UI-C3): naviazané kovanie v riadku čela ukazuje NÁZOV
     // SETU — ten sa mení presne týmto pushom. Mapa aj riadky sa preto obnovia
     // TU (mimo `#hwRows`), inak by pod čelami visel starý set až do nového
     // označenia skrinky. Robí sa to PRED riadkami Kovania a z CELÉHO payloadu
     // (nie len z položiek, ktorým sa našiel riadok).
+    // D-130a: kovanie je POSLEDNÁ položka SÚHRNU riadku (samostatný `.fhw`
+    // zanikol), takže sa obnovuje spolu s ním — jedna cesta, jeden text.
     if (typeof refreshFrontHwBuy === 'function') refreshFrontHwBuy(items);
-    if (typeof updateFrontRowBadges === 'function') updateFrontRowBadges();
+    if (typeof updateFrontRowSummaries === 'function') updateFrontRowSummaries();
     var box = el('hwRows'); if (!box) return;
     (items || []).forEach(function(it){
       if (!it) return;

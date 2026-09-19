@@ -32,8 +32,12 @@ const OKROW = { state: 'ok', text: 'Atira · H70 · NL 470 · 30 kg · SiSy · r
 function drawerItem(){ return { type: 'drawer_front', opening_mode: 'classic',
                                 drawer: { construction: 'metal', variant: 'standard' } }; }
 function entry(){ return { wings_n: 1, slots: [] }; }
-function kinds(m){ return m.rows.map(r => r.kind); }
+// D-130a: karta ma DVA taby — `rows` = tab Čelo (klasifikacia), `hwRows` =
+// tab Kovanie (vyriesena zasuvka, chipy osi, ponuka receptu). Helpery preto
+// rozlisuju, V KTOROM tabe riadok stoji.
+function kinds(m){ return m.rows.concat(m.hwRows).map(r => r.kind); }
 function rowOf(m, kind){ return m.rows.filter(r => r.kind === kind); }
+function hwRowOf(m, kind){ return m.hwRows.filter(r => r.kind === kind); }
 
 // ============ 1) ciste jadro: frontDrawerRows ==============================
 
@@ -79,12 +83,13 @@ ok(kinds(mNone).indexOf('resolved') < 0,
    'bez `front_drawer` karta riadok zasuvky NEKRESLI (stary payload, navrh vkladania)');
 
 const mOk = C.frontCardModel(drawerItem(), entry(), OKROW);
-eq(rowOf(mOk, 'resolved').length, 1, 'karta zasuvky ma prave jeden resolved riadok');
+eq(hwRowOf(mOk, 'resolved').length, 1, 'karta zasuvky ma prave jeden resolved riadok');
+eq(rowOf(mOk, 'resolved').length, 0,
+   'D-130a: vyriesena zasuvka patri do TABU KOVANIE, nie medzi nastavenia');
 const segKeys = mOk.rows.filter(r => r.kind === 'seg').map(r => r.key);
 eq(segKeys, ['opening_mode', 'drawer_construction', 'drawer_variant'],
    'klasifikacne segmenty ostavaju nezmenene (C2c nemeni KOV-A2a)');
-ok(mOk.rows.indexOf(rowOf(mOk, 'resolved')[0]) > mOk.rows.indexOf(mOk.rows.filter(r => r.kind === 'seg').pop()),
-   'resolved riadok je POD klasifikaciou (mockup scena 1)');
+eq(mOk.tabs.map(t => t.key), ['celo', 'hw'], 'zasuvka ma oba taby');
 
 const mDoor = C.frontCardModel({ type: 'door' }, entry(), OKROW);
 ok(kinds(mDoor).indexOf('resolved') < 0,
@@ -175,7 +180,10 @@ const rows = mkEl('div');
 rows.attrs.id = 'frontRows';
 DOC.body.appendChild(rows);
 
-function renderCard(fid, drawerRec){
+// D-130a: karta ma dva taby a otvara sa na tabe Čelo. Vyriesena zasuvka zije
+// v tabe KOVANIE, takze render sa nan musi prepnut TOU ISTOU cestou ako
+// pouzivatel (klik na tab), nie nastavenim skryteho stavu.
+function renderCard(fid, drawerRec, tab){
   rows.children = [];
   global.frontDrawer = drawerRec ? { [fid]: drawerRec } : null;
   FM.addFrontRow({ id: fid, type: 'drawer_front', opening_mode: 'classic',
@@ -184,10 +192,16 @@ function renderCard(fid, drawerRec){
   const row = rows.querySelectorAll('.frow')[0];
   const b = row.querySelector('.ftname');
   if (b.getAttribute('aria-expanded') !== 'true') FM.onFrontCardToggle(b);
+  const t = row.querySelector('.ctabs button[data-tab="' + (tab || 'celo') + '"]');
+  if (t) FM.onFrontCardTab(t);
   return row.querySelector('.fcard').innerHTML;
 }
 
-const htmlOk = renderCard('F2', OKROW);
+const htmlCelo = renderCard('F2', OKROW);
+ok(htmlCelo.indexOf('data-tab="hw"') >= 0, 'karta zasuvky ponuka tab Kovanie');
+ok(htmlCelo.indexOf('class="drow"') < 0, 'vyriesena zasuvka NIE JE medzi nastaveniami');
+
+const htmlOk = renderCard('F2', OKROW, 'hw');
 ok(htmlOk.indexOf('class="drow"') >= 0, 'karta kresli riadok zasuvky');
 ok(htmlOk.indexOf('Atira · H70 · NL 470') >= 0, 'riadok nesie serverovy text');
 ok(htmlOk.indexOf('<details class="ddet">') >= 0, 'vety receptu su ROZBALITELNE (nie trvaly blok)');
@@ -199,14 +213,22 @@ ok(htmlConf.indexOf('Nezmestí sa &lt;b&gt;tu&lt;/b&gt;.') >= 0,
    'serverovy text sa ESKAPUJE (payload moze niest cudzie znaky)');
 ok(htmlConf.indexOf('class="drow"') < 0, 'pri konflikte sa hodnoty NEKRESLIA');
 
-const htmlSync = renderCard('F2', Object.assign({}, OKROW, { sync: 'Pridaj sync tyč.' }));
+const htmlSync = renderCard('F2', Object.assign({}, OKROW, { sync: 'Pridaj sync tyč.' }), 'hw');
 ok(htmlSync.indexOf('inforow warn') >= 0, 'sync je jantarovy riadok');
 ok(htmlSync.indexOf('i-alert') >= 0, 'riadok nesie sprite ikonu (ziadne emoji)');
 ok(htmlSync.indexOf('class="drow"') >= 0, 'sync riadok NENAHRADZA zhrnutie');
+// D-130a R6: jantarove odporucanie je POZNAMKA k vysledku — v tabe Čelo
+// nema co robit (cervena stavova veta ano, tu je overena nizsie).
+ok(renderCard('F2', Object.assign({}, OKROW, { sync: 'Pridaj sync tyč.' }))
+     .indexOf('Pridaj sync') < 0, 'sync odporucanie ostava LEN v tabe Kovanie');
+// Cerveny dovod je PRECO dielce nevzniknu — vidno ho v OBOCH taboch.
+ok(renderCard('F2', { state: 'conflict', message: 'Nezmestí sa.' }).indexOf('inforow err') >= 0,
+   'cervena stavova veta stoji aj v tabe Čelo');
 
-const htmlNone = renderCard('F2', null);
+const htmlNone = renderCard('F2', null, 'hw');
 ok(htmlNone.indexOf('class="drow"') < 0, 'bez zaznamu servera karta riadok nekresli');
-ok(htmlNone.indexOf('typegrid') >= 0, 'zvysok karty sa tym nemeni');
+ok(htmlNone.indexOf('Bez kovania') >= 0, 'prazdny tab Kovanie povie jednou vetou, ze nic nie je');
+ok(renderCard('F2', null).indexOf('typegrid') >= 0, 'zvysok karty sa tym nemeni');
 
 // ============ 4) NAKUP: zastavujuci riadok =================================
 

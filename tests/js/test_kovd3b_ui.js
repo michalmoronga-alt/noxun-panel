@@ -339,7 +339,8 @@ const fs = require('node:fs');
 // Zdroje sa citaju s normalizovanymi koncami riadkov (Windows checkout = CRLF).
 const readSrc = (name) => fs.readFileSync(path.join(JS, name), 'utf8').replace(/\r\n/g, '\n');
 const formSrc = readSrc('form.js');
-const cardFn = formSrc.match(/function frontCardHtml\(row\)\{[\s\S]*?\n  \}\n/)[0];
+// D-130a: riadky view-modelu kresli spolocna `frontCardRowsHtml` (oba taby).
+const cardFn = formSrc.match(/function frontCardRowsHtml\(rows\)\{[\s\S]*?\n  \}\n/)[0];
 ok(/r\.kind === 'upgrade'/.test(cardFn) && /hwUpHtml\(r\.upgrade\)/.test(cardFn),
    'karta cela deleguje markup ponuky na `hardware.js` (jeden renderer)');
 

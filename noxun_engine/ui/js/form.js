@@ -28,7 +28,12 @@
       // nastavuje VZDY (rovnaky vzor ako `dataset.frontProfile` z D-90).
       var type = r.dataset.frontType || 'door';
       var hv = r.querySelector('.fh').value.trim();
-      var wings = r.querySelector('.fw').value;
+      // D-130a (R5): POCET KRIDIEL uz nie je hodnota rozbalovacky v riadku
+      // (`select.fw` zanikol — rozbijal mriezku), ale STAV RIADKU
+      // `dataset.frontWings`, ktory meni segment „Krídla" v karte cela.
+      // Vzor je `dataset.frontType` z KOV-A2a. Legacy riadok bez kluca ide na
+      // `auto` — presne to posielal aj select, ked mu hodnota nesadla.
+      var wings = r.dataset.frontWings || 'auto';
       var hasH = hv !== '';
       var hNum = hasH ? evalDim(hv) : NaN; // vyraz vo vyske cela -> cislo (NaN blokuje apply cez validateFields)
       // D-90 (Codex #144 P1): 'profile' este NEMA ovladac (pride v PR 2), ale
@@ -1131,6 +1136,14 @@
   // nazov nesie `title` dlazdice (a riadok nad kartou ho pise cely).
   var FRONT_TYPE_TILE = { door: 'Dvierka', drawer_front: 'Zásuvka', none: 'Bez čela',
                           lift: 'Výklop', fall: 'Sklop', blind: 'Blenda' };
+  // D-130a R6-d: dva typy potrebuju v dlazdici VIAC nez nazov — ludia si ich
+  // pletu. Blenda NIE JE „bez kovania": s uchytkovym profilom ho dostava
+  // z pravidla `uchytkovy-profil-blenda`, takze tooltip to nesmie poprieť.
+  var FRONT_TYPE_TIP = {
+    blind: 'Blenda — pevný dielec bez smeru a otvárania; kovanie vzniká len z úchytkového profilu.',
+    none: 'Bez čela — riadok drží výšku v rade, panel sa nepostaví (otvorená nika).'
+  };
+  function frontTypeTileTitle(t){ return FRONT_TYPE_TIP[t] || frontTypeLabel(t); }
 
   // --- KOV-A1: PASS-THROUGH polí, ktoré A1 ešte needituje --------------------
   // `direction` · `wing_directions` · `opening_mode` · `drawer` žijú v datasete
@@ -1261,6 +1274,10 @@
     // KOV-A2a: TYP riadku zije v datasete rovnako ako profil — rozbalovacka
     // zanikla, meni ho dlazdica typegridu v karte cela.
     row.dataset.frontType = item.type || 'door';
+    // D-130a (R5): POCET KRIDIEL zije v datasete rovnako ako typ a profil —
+    // ovladacom je segment „Krídla" v karte cela. Legacy polozka bez kluca
+    // dostane 'auto' (to iste posielal doterajsi `select.fw`).
+    row.dataset.frontWings = item.wings || 'auto';
     frontExtraStore(row, item); // KOV-A1: smer/otváranie/klasifikácia (bez defaultov)
     // KOV-A2a (Codex #281 P1): „+ pridaj dvere" JE používateľská akcia (pravidlo
     // (a) z kontraktu) — nové dvierka bez uloženého smeru sa musia PRIZNAŤ ako
@@ -1271,54 +1288,65 @@
     // Render UŽ EXISTUJÚCICH položiek (userAdd nie je) sa nedotkne ničoho.
     if (userAdd) frontExtraSet(row, frontExtraOnTypeChange(frontExtraOf(row), row.dataset.frontType));
     var fhId = frontHeightInputId(row.dataset.frontId);
-    // SMOKE PACK 1: ovladace cela ziju v `.fmain` — PEVNOM, NEZALAMOVACOM rade.
-    // `.frow` je od tejto davky STLPEC (rad ovladacov + riadok kovania pod nim),
-    // takze pri vypisanej vyske (pribudne „mm" a chip AUTO) uz krizik ✗ nemoze
-    // spadnut o riadok nizsie. DOM zoznamu ostava „jeden .frow = jedno celo" —
-    // obrateny render (D-23), citanie odspodu aj `closest('.frow')` platia bez
-    // zmeny, lebo sa hlada VYHRADNE cez triedy, nikdy cez indexy deti.
-    row.innerHTML = '<span class="fmain">' +
+    // D-130a: RIADOK CELA je CSS GRID so STALYMI STLPCAMI
+    // ([cislo][nazov+suhrn][pole vysky][✕]) — polia uz „nelietaju" podla toho,
+    // co v riadku prave je (D-130). Deti sa preto do gridu kladu PRIAMO, bez
+    // obalu `.fmain`; kazde ma svoju poziciu v CSS, nie v poradi. DOM zoznamu
+    // ostava „jeden .frow = jedno celo" — obrateny render (D-23), citanie
+    // odspodu aj `closest('.frow')` platia bez zmeny, lebo sa hlada VYHRADNE
+    // cez triedy, nikdy cez indexy deti.
+    row.innerHTML =
       '<span class="fnum">F' + idx + '</span>' +
       // KOV-A2a: NAZOV TYPU je TLACIDLO, ktore otvara kartu cela (typegrid,
-      // smer, otváranie, klasifikácia). Rozbalovacka typu tým ZANIKLA — typ
-      // sa vyberá piktogramom, nie zoznamom. Ikona žije UVNÚTRI tlačidla, aby
-      // bol cieľ kliku celý „ikona + názov" (nie len text).
+      // kridla, smer, otváranie, klasifikácia, úchytka). Rozbalovacka typu tým
+      // ZANIKLA — typ sa vyberá piktogramom, nie zoznamom. Ikona žije UVNÚTRI
+      // tlačidla, aby bol cieľ kliku celý „ikona + názov" (nie len text).
       // Je to NATIVNE `<button>`: rolu, Enter aj medzernik dava prehliadac —
       // vlastny `keydown` by len zdvojil klik.
-      '<button type="button" class="ftname" aria-expanded="false" onclick="onFrontCardToggle(this)">' +
+      '<button type="button" class="ftname" aria-expanded="false" data-nx-usage="fronts:karta"' +
+        ' onclick="onFrontCardToggle(this)">' +
         '<span class="ftico" aria-hidden="true">' +
           NXIcons.svg(frontTypeIcon(item.type || 'door')) + '</span>' +
-        '<span class="ftl"></span></button>' +
-      // Uzke pole vysky (46 px) + sipka VYSKOVEHO RADU (N25). Rad len DOSADI
-      // hodnotu a ohlasi ju povodnou udalostou — vyrazy, validacia aj debounce
-      // apply beziat nezmenene.
-      '<span class="dwrap">' +
-        '<input class="fh" id="' + esc(fhId) + '" type="text" placeholder="auto" oninput="onFrontHeight(this)">' +
-        '<button type="button" class="pbtn" data-nx-usage="rad:vyska_cela" onclick="nxDimToggle(this, event)"' +
-          ' title="Výškový rad čiel" aria-label="Výškový rad čiel">' + NXIcons.svg('chevron-down') + '</button>' +
-        '<span class="miniopts" data-dim-key="vyska_cela" data-dim-input="' + esc(fhId) + '"></span>' +
+        '<span class="ftl"></span>' +
+        '<span class="fchev" aria-hidden="true">' + NXIcons.svg('chevron-down') + '</span></button>' +
+      // D-130a R3: SUHRN cela pod nazvom. Druhy riadok mriezky je OBAL
+      // `.fsubwrap` s DVOMA SURODENCAMI (R3-f):
+      //   `.fsub`    = suhrn stavu, rastie a oreze sa; klik = toggle karty
+      //   `.fhwlink` = naviazane kovanie; klik = karta rovno na tabe Kovanie
+      // SU to SURODENCI, nie ovladac vnoreny v ovladaci: tlacidlo v tlacidle
+      // je neplatne HTML, neda sa fokusovat a ellipsis susedu by ho orezal.
+      '<span class="fsubwrap">' +
+        '<button type="button" class="fsub" data-nx-usage="fronts:suhrn"' +
+          ' onclick="onFrontCardToggle(this)"></button>' +
+        '<button type="button" class="fhwlink" data-nx-usage="fronts:suhrn-kovanie" hidden' +
+          ' onclick="onFrontSummaryHw(event, this)"></button>' +
       '</span>' +
-      // „mm" pri hodnote + chip AUTO — obe sa ukazu LEN pri vypisanej vyske
-      // (prazdne pole je AUTO a nema co vracat). Zamok pri vyske ZANIKOL:
-      // zamknute ⇔ vypisane (to iste pravidlo ma pole „Prvá zóna" z UI-C2).
-      '<span class="funit">mm</span>' +
-      '<button type="button" class="fauto" onclick="frontHeightAuto(this, event)"' +
-        ' title="Vrátiť na AUTO — výška sa dopočíta z voľného miesta"' +
-        ' aria-label="Vrátiť výšku čela na AUTO">AUTO</button>' +
-      '<select class="fw" aria-label="Počet krídel" onchange="onFrontWings(this)"><option value="auto">auto</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>' +
-      (FRONT_PROFILES.length ? '<span class="fprof" aria-hidden="true">' + NXIcons.svg('profile') + '</span>' : '') +
-      '<button class="fdel" title="Odstrániť" aria-label="Odstrániť čelo" onclick="delFrontRow(this); onField()">' + NXIcons.svg('x') + '</button>' +
-      '</span>';
+      // D-130a R4: POLE VYSKY je JEDEN BOX s PEVNOU sirkou — chip AUTO, „mm"
+      // aj sipka VYSKOVEHO RADU (N25) ziju VNUTRI neho, takze susedne stlpce
+      // sa pri vypisanej hodnote nehybu. Rad len DOSADI hodnotu a ohlasi ju
+      // povodnou udalostou — vyrazy, validacia aj debounce apply beziat
+      // nezmenene. Zamok pri vyske ZANIKOL: zamknute ⇔ vypisane (to iste
+      // pravidlo ma pole „Prvá zóna" z UI-C2), chip AUTO hodnotu vracia.
+      '<span class="hbox" title="AUTO — výška sa dopočítava z voľného miesta; vypíš číslo = pevná výška">' +
+        '<button type="button" class="fauto" onclick="frontHeightAuto(this, event)"' +
+          ' title="Vrátiť na AUTO — výška sa dopočíta z voľného miesta"' +
+          ' aria-label="Vrátiť výšku čela na AUTO">AUTO</button>' +
+        '<input class="fh" id="' + esc(fhId) + '" type="text" placeholder="auto" oninput="onFrontHeight(this)">' +
+        '<span class="funit">mm</span>' +
+        '<span class="dwrap">' +
+          '<button type="button" class="pbtn" data-nx-usage="rad:vyska_cela" onclick="nxDimToggle(this, event)"' +
+            ' title="Výškový rad čiel" aria-label="Výškový rad čiel">' + NXIcons.svg('chevron-down') + '</button>' +
+          '<span class="miniopts" data-dim-key="vyska_cela" data-dim-input="' + esc(fhId) + '"></span>' +
+        '</span>' +
+      '</span>' +
+      '<button class="fdel" title="Odstrániť" aria-label="Odstrániť čelo" onclick="delFrontRow(this); onField()">' + NXIcons.svg('x') + '</button>';
     wrap.insertBefore(row, wrap.firstChild); // D-23: navrch — DOM je obrateny
     if (item.height !== null && item.height !== undefined && item.height !== '') row.querySelector('.fh').value = item.height;
-    if (item.wings) row.querySelector('.fw').value = item.wings;
     // UI-C3: `item.locked` sa uz necita — zamok JE vypisana hodnota.
     attachExprField(row.querySelector('.fh'), { flushFn: flushCabinetEditsNow }); // V0.4.7e vyrazy vo vyske cela
     nxDimFillRow(row);         // N25: hodnoty radu do mini-ponuky riadku
-    syncFrontProfileBtn(row);  // D-90/D-96: indikator profilu z datasetu
-    syncFrontAuto(row);        // chip AUTO + „mm" podla toho, ci je vyska vypisana
-    updateFrontRowBadge(row);  // naviazane kovanie pod riadkom
-    onFrontTypeChange(row);
+    syncFrontAuto(row);        // chip AUTO podla toho, ci je vyska vypisana
+    onFrontTypeChange(row);    // nazov, ikona a suhrn riadku
     if (userAdd){
       // D-23: novy riadok vznika NAVRCHU zoznamu — dotiahni ho do pohladu a fokusni vysku
       row.scrollIntoView({ block: 'nearest' });
@@ -1362,25 +1390,24 @@
     inp.classList.remove('bad');
     inp.dispatchEvent(new Event('input', { bubbles: true }));
   }
-  // „mm" a chip AUTO sa ukazu LEN pri vypisanej vyske. Prazdne pole je AUTO —
-  // vracat sa niet odkial a jednotka by patrila k nicomu.
+  // D-130a R4: chip AUTO sa ukazuje LEN pri VYPISANEJ vyske (prazdne pole uz
+  // AUTO JE a vracat sa niet odkial); „mm" je VZDY vidno — jednotka patri
+  // k poliu, nie k hodnote, a jej miznutie hybalo obsahom boxu.
+  // Stav nesie `.hbox.fixed` (nie `.frow.fixed`): tuci sa hodnota a odkryva
+  // chip, oboje VNUTRI boxu, takze sirka boxu ostava konstantna.
   function syncFrontAuto(row){
     var inp = row.querySelector('.fh'); if (!inp) return;
-    var on = inp.value.trim() !== '';
-    var u = row.querySelector('.funit'), a = row.querySelector('.fauto');
-    if (u) u.style.display = on ? '' : 'none';
-    if (a) a.style.display = on ? '' : 'none';
-    row.classList.toggle('fixed', on);
+    var box = row.querySelector('.hbox'); if (!box) return;
+    box.classList.toggle('fixed', inp.value.trim() !== '');
   }
-  // D-18: pri 'none' (Bez čela) sa skryje výber krídel (ako pri drawer_front) a hneď
-  // aj badge kovania (dátovo zmizne až po echu apply — bez dielcov niet kovania).
-  // Badge span nemusí existovať (vzniká len pri neprázdnom badge) — null guard (Codex F3).
+  // Zmena typu riadku: ikona, nazov, suhrn a profil.
   // KOV-A2a: parametrom je RIADOK (typ zije v `dataset.frontType`), nie select —
   // rozbalovacka zanikla spolu s typegridom v karte.
+  // D-130a: `select.fw` (kridla) a `.fprof` (indikator profilu) z riadku
+  // ZANIKLI — kridla su segment v karte, profil hovori SUHRN slovom.
   function onFrontTypeChange(row){
     if (!row) return;
     var type = row.dataset.frontType || 'door';
-    row.querySelector('.fw').style.visibility = (type === 'door') ? 'visible' : 'hidden';
     // N27: ikona typu je zrkadlom stavu riadku — meni sa `href` v <use>, NIE
     // innerHTML celeho span-u (vzor NXIcons.set pri zamkoch).
     var ico = row.querySelector('.ftico');
@@ -1390,51 +1417,18 @@
     if (btn){
       var lbl = btn.querySelector('.ftl');
       if (lbl) lbl.textContent = frontTypeLabel(type);
-      btn.title = frontTypeLabel(type) + ' — klik otvorí nastavenie čela';
+      btn.title = frontTypeLabel(type) + ' — klik otvorí kartu čela';
       btn.setAttribute('aria-label', 'Čelo ' + (row.dataset.frontId || '') + ': ' +
-                       frontTypeLabel(type) + ' — otvoriť nastavenie');
+                       frontTypeLabel(type) + ' — otvoriť kartu');
     }
-    var hw = row.querySelector('.fhw');
-    if (hw) hw.style.display = (type === 'none') ? 'none' : '';
-    // D-90: „Bez čela" nemá na čom profil držať — indikátor zmizne a stav sa
-    // zhodí na 'none' (rovnako to robí Ruby normalize; UI sa mu nesmie rozísť).
-    // KOV-A1 (Codex #280 P2-D): to isté platí pre výklop, sklop aj blendu —
-    // zoznam je JEDEN (`PROFILELESS_FRONT_TYPES` v core.js, zrkadlo servera),
-    // nie druhá podmienka, ktorá by sa časom rozišla.
-    var pb = row.querySelector('.fprof');
-    if (pb){
-      var off = frontProfileless(type);
-      pb.style.visibility = off ? 'hidden' : 'visible';
-      if (off && row.dataset.frontProfile !== 'none'){
-        row.dataset.frontProfile = 'none';
-        syncFrontProfileBtn(row);
-      }
-    }
-    updateFrontRowBadge(row);   // D-18: „Bez čela" nema kovanie
-    syncFrontDirBadge(row);     // KOV-A2a: badge „smer?" patri k typu aj k slotom
+    // D-90: „Bez čela" nemá na čom profil držať — stav sa zhodí na 'none'
+    // (rovnako to robí Ruby normalize; UI sa mu nesmie rozísť).
+    // KOV-A1 (Codex #280 P2-D): zoznam je JEDEN (`PROFILELESS_FRONT_TYPES`
+    // v core.js, zrkadlo servera), nie druhá podmienka, ktorá by sa rozišla.
+    if (frontProfileless(type) && row.dataset.frontProfile !== 'none')
+      row.dataset.frontProfile = 'none';
+    updateFrontRowSummary(row); // suhrn hovori o type, kridlach, uchytke aj kovani
     refreshFrontProfileUI();    // D-96: zmena typu meni rozsah aj vetu stavu
-  }
-  // D-114: indikator popise profil, hranu a skrateny rozmer.
-  // Volba zije v karte cela aj v hromadnych Uchytkach.
-  function syntheticProfileTitle(rec, type, edge){
-    if (!rec) return 'Bez úchytkového profilu (nastavíš v karte čela alebo skupine Úchytky)';
-    var valid = frontProfileEdges(type).indexOf(edge) >= 0;
-    var side = valid ? FRONT_EDGE_LABELS[edge] : 'Vyber hranu';
-    var dim = (edge === 'top' || edge === 'bottom') ? 'výška' : 'šírka';
-    return 'Úchytkový profil: ' + rec.name + ' · ' + side +
-      (valid ? ' — ' + dim + ' panela sa skráti o ' + Math.round(rec.reduction) + ' mm' : '') +
-      ' (nastavíš v karte čela alebo skupine Úchytky)';
-  }
-  function syncFrontProfileBtn(row){
-    var ind = row.querySelector('.fprof'); if (!ind) return;
-    var rec = frontProfileRec(row.dataset.frontProfile || 'none');
-    var edge = Object.prototype.hasOwnProperty.call(row.dataset, 'frontProfileEdge') ? row.dataset.frontProfileEdge : 'top';
-    var txt = syntheticProfileTitle(rec, row.dataset.frontType, edge);
-    // `aria-label` sa tu VEDOME nedava: span je `aria-hidden` (je to indikator,
-    // nie ovladac) a stav profilu cita citacka zo skupiny „Úchytky", kde sa aj
-    // meni. Dva popisy toho isteho by si odporovali.
-    ind.classList.toggle('on', !!rec);
-    ind.title = txt;
   }
   function delFrontRow(btn){
     var row = btn.closest('.frow');
@@ -1444,39 +1438,26 @@
 
   // ===== KOV-A2a: KARTA CELA =============================================
   //
-  // Karta zije UVNUTRI `.frow` (treti potomok stlpca, za `.fmain` a `.fhw`) —
-  // DOM zoznamu tak ostava „jeden `.frow` = jedno celo" a obrateny render
-  // (D-23), citanie odspodu aj `closest('.frow')` platia bez zmeny. Otvorena
-  // je VZDY NAJVIAC JEDNA (identita cela, nie index riadku — prestavba riadkov
-  // ju musi vediet obnovit).
+  // Karta zije UVNUTRI `.frow` (posledny potomok, v mriezke D-130a treti riadok
+  // gridu) — DOM zoznamu tak ostava „jeden `.frow` = jedno celo" a obrateny
+  // render (D-23), citanie odspodu aj `closest('.frow')` platia bez zmeny.
+  // Otvorena je VZDY NAJVIAC JEDNA (identita cela, nie index riadku —
+  // prestavba riadkov ju musi vediet obnovit).
   //
   // ZIADNY NOVY CALLBACK SERVERA: kazda zmena v karte prepise dataset riadku
   // a ide POVODNOU cestou `onField()` -> `collectFronts` -> `apply_all`, teda
   // jeden krok Spat a server ostava autoritou.
   var openFrontCardId = null;
+  // D-130a R6: OTVORENY TAB karty. Default je „Čelo" pri KAZDOM otvoreni inej
+  // karty; `refreshFrontCards` (echo, lahky push) ho ZACHOVA — inak by kazde
+  // echo hodilo pouzivatela z tabu Kovanie spat (vzor obnovy fokusu D2b).
+  var openFrontCardTab = 'celo';
 
-  // Badge „smer?" v riadku — rozhoduje VYHRADNE stav zo SERVERA (`front_slots`).
-  // Legacy celo (kluc smeru v configu nie je) badge NIKDY nedostane.
-  function syncFrontDirBadge(row){
-    if (!row) return;
-    var btn = row.querySelector('.ftname'); if (!btn) return;
-    var entry = frontSlotsOf(row.dataset.frontId);
-    var want = frontDirBadge(entry && entry.slots);
-    var badge = btn.querySelector('.fbadge');
-    if (!want){ if (badge) badge.remove(); return; }
-    if (!badge){
-      badge = document.createElement('span');
-      badge.className = 'fbadge';
-      badge.textContent = 'smer?';
-      btn.appendChild(badge);
-    }
-    badge.title = 'Smer otvárania nie je určený — otvor kartu čela a vyber stranu pántov.';
-  }
-  function updateFrontDirBadges(){
-    var wrap = el('frontRows'); if (!wrap) return;
-    var rows = wrap.querySelectorAll('.frow');
-    for (var i = 0; i < rows.length; i++) syncFrontDirBadge(rows[i]);
-  }
+  // D-130a: badge „smer?" sa PRESUNUL z nazvu do SUHRNU riadku (`.fsub`) —
+  // stav riadku tak hovori jedna veta, nie tlacidlo s prilepkom. Obnova preto
+  // bezi cez `updateFrontRowSummary`; nazov zostava len nazvom. Meno funkcie
+  // ostava (volaju ju `nxFrontPreflightResult` aj Node sady).
+  function updateFrontDirBadges(){ updateFrontRowSummaries(); updateFrontMeta(); }
 
   // KOV-A2a (Codex #281 P2-B): otvorená karta patrí KONKRÉTNEJ SKRINKE.
   // `front_id` (F1) má každá skrinka, takže bez tejto brány by sa po prepnutí
@@ -1503,7 +1484,29 @@
   function onFrontCardToggle(btn){
     var row = btn.closest('.frow'); if (!row) return;
     var fid = row.dataset.frontId;
+    // D-130a R6: kazde OTVORENIE INEJ karty zacina na tabe Čelo — tab je stav
+    // prace nad JEDNYM celom, nie nastavenie panela.
+    if (openFrontCardId !== fid) openFrontCardTab = 'celo';
     openFrontCardId = (openFrontCardId === fid) ? null : fid;
+    refreshFrontCards();
+  }
+  // R3-e/R3-f: koncovka kovania v riadku otvara kartu rovno na tabe KOVANIE.
+  // Je to NATIVNE `<button>` (surodenec suhrnu), takze Enter aj medzernik
+  // obsluhuje prehliadac; `stopPropagation` ostava ako poistka pre pripad,
+  // ze by okolo riadku niekedy pribudol delegovany handler.
+  function onFrontSummaryHw(ev, node){
+    if (ev && typeof ev.stopPropagation === 'function') ev.stopPropagation();
+    var row = node.closest('.frow'); if (!row) return;
+    openFrontCardId = row.dataset.frontId;
+    openFrontCardTab = 'hw';
+    refreshFrontCards();
+  }
+  // D-130a R6: prepnutie tabu karty. Ziadny zapis — je to len iny pohlad na tie
+  // iste data, takze ZIADNY `onField` a ziadny krok Spat.
+  function onFrontCardTab(btn){
+    var t = btn && btn.dataset ? btn.dataset.tab : null;
+    if (!t || t === openFrontCardTab) return;
+    openFrontCardTab = t;
     refreshFrontCards();
   }
   // Prekresli VSETKY riadky do stavu „otvorena je najviac jedna karta".
@@ -1515,12 +1518,14 @@
       var open = row.dataset.frontId === openFrontCardId;
       var btn = row.querySelector('.ftname');
       if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      // D-130a: otvoreny riadok sa prizna aj cislom (grid nema ram karty hore).
+      if (open) row.dataset.open = '1'; else delete row.dataset.open;
       var card = row.querySelector('.fcard');
       if (!open){ if (card) card.remove(); continue; }
       if (!card){
         card = document.createElement('div');
         card.className = 'fcard';
-        row.appendChild(card); // karta je VZDY posledna v stlpci
+        row.appendChild(card); // karta je VZDY posledna v riadku
       }
       // Codex #281 kolo 2 (P2): karta sa prekresluje CELA, takze tlacidlo,
       // ktore prave drzalo fokus, zanikne a fokus spadne na `<body>` —
@@ -1544,7 +1549,11 @@
     // (`data-ax` = os, `data-axc` = druh ovladaca) — bez nej by fokus po
     // KAZDOM prekresleni karty spadol na dokument prave pri klavesovej praci
     // so zamkom, teda tam, kde je najdrahsi.
-    return frontCardFocusKey({ t: d.t, k: d.k, v: d.v, w: d.w, ax: d.ax, axc: d.axc, pc: d.pc });
+    // D-130a: k identitam pribudli TABY (`data-tab`) — bez nich by fokus po
+    // prepnuti tabu spadol na dokument prave na ceste, ktoru klavesnica
+    // pouziva najcastejsie (tab -> obsah -> tab).
+    return frontCardFocusKey({ t: d.t, k: d.k, v: d.v, w: d.w, ax: d.ax, axc: d.axc,
+                               pc: d.pc, tab: d.tab });
   }
   // Najde v CERSTVO vykreslenej karte tlacidlo s rovnakou identitou a vrati mu
   // fokus. `preventScroll` je zamer: karta sa nema pod rukou posunut; staršie
@@ -1557,26 +1566,70 @@
     try { target.focus({ preventScroll: true }); } catch (e) { target.focus(); }
   }
 
+  // D-130a R8: TOOLTIP `?` pri popisku. Pomocny text uz nestoji ako `.hint`
+  // pod ovladacom (vertikalny priestor panela je vzacny) — zije za ikonou.
+  // Text ide cez `esc`: `data-tip` sa kresli pseudo-elementom, teda by inak
+  // uvodzovka v texte rozbila atribut.
+  function nxTipHtml(text, cls){
+    if (!text) return '';
+    return '<button type="button" class="nxtip' + (cls ? ' ' + cls : '') + '"' +
+           ' aria-label="Pomoc" data-tip="' + esc(text) + '" onclick="nxTipStop(event)">' +
+           NXIcons.svg('help-circle') + '</button>';
+  }
+  // Tooltip NIKAM NEVEDIE — klik na neho nesmie zbalit skupinu (`<summary>`
+  // toggluje na klik kdekolvek v hlavicke) ani otvorit kartu cela.
+  function nxTipStop(ev){
+    if (!ev) return;
+    if (typeof ev.preventDefault === 'function') ev.preventDefault();
+    if (typeof ev.stopPropagation === 'function') ev.stopPropagation();
+  }
+
   // HTML karty z ciseho view-modelu (`frontCardModel` v core.js). Panel tu
   // NEROZHODUJE, ktory riadok sa zobrazi ani ktora volba je aktivna — len
   // kresli. Vsetky texty idu cez `esc` (dataset moze niest cudzie data).
+  // D-130a R6: karta ma DVA TABY — „Čelo" (co nastavujem) a „Kovanie" (co
+  // z toho vzislo). Tab je JEDEN pre celu kartu (`openFrontCardTab`).
   function frontCardHtml(row){
-    var item = frontExtraOf(row);
-    item.type = row.dataset.frontType || 'door';
+    var item = frontRowItem(row);
     var m = frontCardModel(item, frontSlotsOf(row.dataset.frontId),
                            frontDrawerOf(row.dataset.frontId),
                            frontLiftOf(row.dataset.frontId));
-    var h = '<div class="typegrid" role="group" aria-label="Typ čela">';
+    // Tab, ktory NEEXISTUJE (blenda, „bez čela" kovanie nemaju), sa ticho
+    // vrati na „Čelo" — stav panela nesmie ukazat prazdno.
+    var has = m.tabs.some(function(t){ return t.key === openFrontCardTab; });
+    var tab = has ? openFrontCardTab : 'celo';
+    var h = '';
+    if (m.tabs.length > 1){
+      h += '<div class="ctabs" role="tablist">';
+      m.tabs.forEach(function(t){
+        h += '<button type="button" class="' + (t.key === tab ? 'on' : '') + '"' +
+             ' data-tab="' + esc(t.key) + '" role="tab" aria-selected="' +
+             (t.key === tab ? 'true' : 'false') + '" onclick="onFrontCardTab(this)">' +
+             (t.key === 'hw' ? NXIcons.svg('hammer') : '') + esc(t.label) +
+             (t.badge ? '<span class="fbadge">' + esc(t.badge) + '</span>' : '') + '</button>';
+      });
+      h += '</div>';
+    }
+    if (tab === 'hw') return h + frontCardHwHtml(row, m);
+    h += '<div class="typegrid" role="group" aria-label="Typ čela">';
     m.tiles.forEach(function(t){
       h += '<button type="button" class="typetile' + (t.on ? ' on' : '') + '"' +
            ' data-t="' + esc(t.type) + '" aria-pressed="' + (t.on ? 'true' : 'false') + '"' +
-           ' title="' + esc(frontTypeLabel(t.type)) + '" onclick="onFrontTile(this)">' +
+           ' title="' + esc(frontTypeTileTitle(t.type)) + '" onclick="onFrontTile(this)">' +
            NXIcons.svg(frontTypeIcon(t.type)) +
            '<span class="tl">' + esc(frontTypeTile(t.type)) + '</span></button>';
     });
     h += '</div>';
+    h += frontCardRowsHtml(m.rows);
+    // D-130a R7: UCHYTKA stoji AZ POD nastaveniami typu — je to posledna
+    // otazka o cele a jedine miesto, kde sa profil a hrana menia.
     h += frontProfileCardHtml(row);
-    m.rows.forEach(function(r){
+    return h;
+  }
+  // Riadky view-modelu -> HTML. Spolocne pre oba taby (obsah rozhoduje model).
+  function frontCardRowsHtml(rows){
+    var h = '';
+    (rows || []).forEach(function(r){
       if (r.kind === 'info'){
         // KOV-C2c: ikona LEN ked ju view-model vyslovne ziada (cerveny dovod,
         // jantarove odporucanie) — informacne vety karty ostavaju bez nej.
@@ -1584,10 +1637,10 @@
              (r.icon ? NXIcons.svg(r.icon) : '') + esc(r.text) + '</div>';
         return;
       }
-      if (r.kind === 'hint'){
-        h += '<div class="hint">' + esc(r.text) + '</div>';
-        return;
-      }
+      // D-130a R8/R9: riadok `kind: 'hint'` ZANIKOL — pomocny text uz nie je
+      // riadok karty (bral vertikalny priestor v KAZDEJ karte), ale tooltip
+      // `?` pri popisku segmentu (`r.tip` nizsie). STAVOVE vety (`info`
+      // s `tone: 'err' | 'warn'`) ostavaju viditelne.
       // KOV-D2b: chipy osi zamku kresli TEN ISTY markup ako kontext Kovanie
       // (`hwAxHtml` v hardware.js) — jeden zdroj stavu aj jeden zapis. Karta
       // si nekresli vlastnu verziu, aby sa obe miesta nemohli rozist.
@@ -1616,7 +1669,10 @@
         }
         return;
       }
-      h += '<div class="prow"><span class="pl">' + esc(r.label) + '</span>' +
+      // D-130a R8/R9: pomocny text riadku uz nie je `.hint` POD segmentom, ale
+      // tooltip `?` PRI POPISKU — text je ten isty, len nezabera riadok.
+      h += '<div class="prow"><span class="pl">' + esc(r.label) +
+           nxTipHtml(r.tip, 'inl') + '</span>' +
            '<span class="segrow" role="group" aria-label="' + esc(r.label) + '">';
       r.options.forEach(function(o){
         h += '<button type="button" class="' + (o.warn ? 'warnstate ' : '') +
@@ -1629,8 +1685,29 @@
              (o.icon ? NXIcons.svg(o.icon) : '') + esc(o.label) + '</button>';
       });
       h += '</span></div>';
-      if (r.hint) h += '<div class="hint">' + esc(r.hint) + '</div>';
     });
+    return h;
+  }
+  // D-130a R6: TAB KOVANIE — co z nastaveni cela VZISLO. Ziadne nove data:
+  // su to tie iste riadky (`resolved` · `axes` · `upgrade` · vety vyklopu),
+  // ktore karta kreslila doteraz pod segmentmi. Dole stoji JEDINY ovladac —
+  // navigacia do kontextu Kovanie (nahradila preklik zaniknuteho riadku `.fhw`).
+  function frontCardHwHtml(row, m){
+    var fid = row.dataset.frontId || '';
+    var h = frontCardRowsHtml(m.hwRows);
+    // R6-b: bez vyriesneho stavu JEDNA tlmena veta — karta nikdy neukaze
+    // prazdno. Plati aj pre blendu s profilom, kym echo nedobehne.
+    if (!m.hwRows.length) h += '<div class="inforow">Bez kovania.</div>';
+    // D-78: ovladac, ktory NEMA kam viest, sa NESKRYVA — ostava viditelny
+    // a `aria-disabled` s dovodom v `title` povie preco. Box vlastnika
+    // vznikne az po echu apply, takze pri novom cele este nemusi existovat.
+    var has = (typeof hwBoxByGroup === 'function' && typeof hwFrontGroup === 'function')
+      ? !!hwBoxByGroup(hwFrontGroup(fid)) : false;
+    h += '<div class="cfoot"><button type="button" class="ghostbtn" data-nx-usage="fronts:do-kovania"' +
+         (has ? ' title="Prepne kontext Kovanie a doskočí na box tohto čela"'
+              : ' aria-disabled="true" title="Toto čelo zatiaľ nemá naviazané kovanie — položky vzniknú po prestavaní skrinky."') +
+         ' onclick="openFrontHardware(\'' + esc(fid) + '\')">' + NXIcons.svg('hammer') +
+         'Otvoriť v Kovaní' + NXIcons.svg('arrow-right') + '</button></div>';
     return h;
   }
 
@@ -1655,28 +1732,42 @@
     // (ten istý guard má dlaždica typu). Aktívny stav nesie `aria-pressed`,
     // ktorý karta kreslí z view-modelu — netreba druhý výpočet toho istého.
     if (btn.getAttribute('aria-pressed') === 'true') return;
+    // D-130a R5: KRIDLA su jediny segment, ktoreho hodnota nezije v dormant
+    // poliach, ale vo VLASTNOM datasete riadku (`frontWings`) — presne tam,
+    // odkial ju cita `collectFronts`. Zapis preto ide svojou cestou.
+    if (btn.dataset.k === 'wings'){ onFrontWings(row, btn.dataset.v); return; }
     frontExtraSet(row, frontExtraOnSegrow(frontExtraOf(row), btn.dataset.k,
                                           btn.dataset.v, btn.dataset.w));
+    updateFrontRowSummary(row);
     refreshFrontCards();
     onField();
   }
   // Pocet kridiel: 3/4 kridla PRIDAJU otazku na STREDNE kridla (krajne su
   // odvodene). Navrat na 1/2/auto NIC NEMAZE — ulozena hodnota ostava dormant.
-  function onFrontWings(sel){
-    var row = sel.closest('.frow');
-    if (row){
-      frontExtraSet(row, frontExtraOnWings(frontExtraOf(row), sel.value));
-      refreshFrontCards();
-    }
+  // D-130a: parametrom je RIADOK a HODNOTA (vzor `onFrontTile`) — rozbalovacka
+  // `select.fw` v riadku zanikla, ovladacom je segment „Krídla" v karte.
+  function onFrontWings(row, value){
+    if (!row) return;
+    var v = (value == null || value === '') ? 'auto' : String(value);
+    if (row.dataset.frontWings === v) return; // klik na nasadenu hodnotu = ziadny prazdny krok Spat
+    row.dataset.frontWings = v;
+    frontExtraSet(row, frontExtraOnWings(frontExtraOf(row), v));
+    updateFrontRowSummary(row);
+    refreshFrontCards();
     onField();
   }
 
-  // ===== D-96: skupina „Úchytky" ==========================================
-  // Cita a zapisuje PRESNE tie iste data ako riadky (`dataset.frontProfile`) —
-  // ziadne nove pole, ziadny novy callback. Zmena ide POVODNOU cestou
-  // (dataset -> collectFronts -> apply_all), takze vsetky guardy beziat
-  // nezmenene a server ostava autoritou (Fronts.normalize_config neznamy
-  // profil zhodi na 'none').
+  // ===== D-96 / D-130a R7: UCHYTKA NA JEDNOM MIESTE =======================
+  // JEDINE MIESTO STAVU je KARTA CELA (riadok „Úchytka" = Profil + Hrana).
+  // Skupina „Úchytky" (`fhandles`) ZANIKLA — bola DRUHYM stavom tych istych
+  // dvoch poli a pouzivatel nevedel, ktore z dvoch miest plati (D-129).
+  //
+  // Hromadna zmena ostava ako AKCIA: popover „všetkým" v hlavicke skupiny.
+  // Jeho selecty NIC NEZAPISUJU — zapise az „Použiť" (jeden `onField`, jeden
+  // apply, jeden krok Späť). Zmena ide POVODNOU cestou (dataset ->
+  // collectFronts -> apply_all), takze vsetky guardy beziat nezmenene
+  // a server ostava autoritou (Fronts.normalize_config neznamy profil zhodi
+  // na 'none').
   var FRONT_PROFILE_MIXED = '__mixed__'; // len ZOBRAZENIE stavu, nikdy sa nezapisuje
   // Stav riadkov v DATOVOM poradi (DOM je obrateny — D-23).
   function frontRowsState(){
@@ -1721,25 +1812,98 @@
     refreshFrontProfileEdgeUI(items);
     var st = el('frontProfileState');
     if (st) st.textContent = empty ? 'V tomto rozsahu nie je žiadne čelo.' : frontProfileStateText(items);
+    // D-130a R7: tlacidlo pomenuva POCET ciel, ktorych sa zapis dotkne —
+    // pouzivatel vidi rozsah akcie EST PRED tym, nez ju spusti.
+    var btn = el('frontBulkApply');
+    if (btn){
+      var n = frontProfileScopeItems(items, frontProfileScopeNow()).length;
+      btn.textContent = 'Použiť na ' + n;
+      btn.disabled = !n;
+    }
   }
-  // Vyber profilu = zapis do VSETKYCH ciel rozsahu naraz (D-96: „profil, hrana
-  // a rozsah na jednom mieste"). Jeden `onField` = jeden apply = jeden krok Spat.
-  function onFrontProfilePick(){
+  // D-130a R7: selecty popoveru su len NAVRH — zmena profilu/hrany NIC
+  // NEZAPISUJE. Pred touto davkou zapisoval kazdy `change` (dva ovladace = dve
+  // cesty, dva kroky Späť a hrana sa nedala zvolit „vopred"). Teraz sa len
+  // prestavi ponuka hran a veta stavu.
+  function onFrontProfilePick(){ refreshFrontProfileEdgeUI(frontRowsState()); }
+  function onFrontProfileEdgePick(){ /* stav popoveru; zapisuje az „Použiť" */ }
+  // JEDINY ZAPIS hromadnej uchytky. Profil aj hranu nasadi VSETKYM celam
+  // rozsahu naraz — jeden `onField` = jeden apply = jeden krok Späť.
+  function onFrontBulkApply(){
     var sel = el('frontProfileSel'); if (!sel) return;
     var id = sel.value;
     if (id === FRONT_PROFILE_MIXED) return; // stav, nie volba
+    var eSel = el('frontProfileEdge');
+    var items = frontRowsState(), scope = frontProfileScopeNow();
+    // Hrana sa nasadzuje LEN ked je pre CELY rozsah platna (bocne hrany maju
+    // dvierka a zasuvky rozne) — inak by zapis ulozil hranu, ktoru cast ciel
+    // nema kam dat a server by ju aj tak zhodil.
+    var edge = (eSel && eSel.value && frontProfileScopeEdges(items, scope).indexOf(eSel.value) >= 0)
+      ? eSel.value : null;
     var changed = false;
-    frontProfileScopeItems(frontRowsState(), frontProfileScopeNow()).forEach(function(it){
-      if ((it.profile || 'none') === id) return;
-      frontRowProfileSet(it.row, id);
-      syncFrontProfileBtn(it.row);
-      changed = true;
+    frontProfileScopeItems(items, scope).forEach(function(it){
+      if ((it.profile || 'none') !== id){ frontRowProfileSet(it.row, id); changed = true; }
+      if (edge && it.row.dataset.frontProfileEdge !== edge){
+        it.row.dataset.frontProfileEdge = edge; changed = true;
+      }
+      updateFrontRowSummary(it.row);
     });
+    closeFrontBulk();
     refreshFrontProfileUI();
     refreshFrontCards();
-    if (!changed) return;   // klik na uz nasadenu hodnotu = ziadny prazdny krok Spat
+    if (!changed) return;   // „Použiť" nad uz nasadenym stavom = ziadny prazdny krok Spat
     renderPreview();        // pasmo profilu nad celom sa meni hned
     onField();
+  }
+  // --- popover „všetkým": otvorenie, zatvorenie, Escape, klik mimo ---------
+  function frontBulkOpen(){ var p = el('frontBulkPop'); return !!(p && !p.hidden); }
+  function openFrontBulk(){
+    var p = el('frontBulkPop'); if (!p) return;
+    // R7-c: popover je DIETA `<details>` (surodenec za hlavickou), takze pri
+    // ZBALENEJ skupine ho prehliadac nevykresli vobec. Trigger preto skupinu
+    // najprv OTVORI — inak by klik na „všetkým" navonok neurobil nic.
+    var grp = (typeof p.closest === 'function') ? p.closest('details') : null;
+    if (grp && !grp.open) grp.open = true;
+    p.hidden = false;
+    var b = el('frontBulkBtn'); if (b) b.setAttribute('aria-expanded', 'true');
+    refreshFrontProfileUI();      // ponuka a veta patria PRAVE vykreslenym riadkom
+    var s = el('frontProfileScope'); if (s && s.focus) s.focus();
+  }
+  function closeFrontBulk(){
+    var p = el('frontBulkPop'); if (!p || p.hidden) return;
+    // R7-b: fokus sa vracia na tlacidlo — ale LEN ked bol V POPOVERI. Pri
+    // zatvoreni klikom mimo uz fokus patri tomu, na co pouzivatel klikol,
+    // a stiahnut mu ho spat by bol skok, ktory nikto nezadal.
+    var inside = false;
+    try {
+      var ae = document.activeElement;
+      inside = !!(ae && typeof ae.closest === 'function' && ae.closest('#frontBulkPop'));
+    } catch (e) { inside = false; }
+    p.hidden = true;
+    var b = el('frontBulkBtn');
+    if (b){
+      b.setAttribute('aria-expanded', 'false');
+      if (inside && b.focus) b.focus();
+    }
+  }
+  // Tlacidlo zije v `<summary>` — bez `preventDefault` by klik zbalil CELU
+  // skupinu (natívne spravanie `<details>`) a popover by sa otvoril do zbalena.
+  function onFrontBulkToggle(ev){
+    nxTipStop(ev);
+    if (frontBulkOpen()) closeFrontBulk(); else openFrontBulk();
+  }
+  if (typeof document !== 'undefined' && document.addEventListener){
+    document.addEventListener('mousedown', function(ev){
+      if (!frontBulkOpen()) return;
+      var t = ev.target;
+      if (t && typeof t.closest === 'function' &&
+          (t.closest('#frontBulkPop') || t.closest('#frontBulkBtn'))) return;
+      closeFrontBulk();
+    });
+    document.addEventListener('keydown', function(ev){
+      if (!ev || ev.key !== 'Escape' || !frontBulkOpen()) return;
+      closeFrontBulk(); // fokus sa vracia na tlacidlo (bol v popoveri)
+    });
   }
   // D-120: karta aj hromadne ovladanie zapisuju tie iste dve item polia.
   function frontEdgeOptionsHtml(edges, value){
@@ -1756,47 +1920,47 @@
       row.dataset.frontProfileEdge = 'top';
     row.dataset.frontProfile = id;
   }
+  // D-130a R7: UCHYTKA v karte = JEDEN riadok (popisok + Profil + Hrana vedla
+  // seba). Doteraz to boli DVA riadky pod sebou — na jeden udaj dva riadky
+  // v kazdej karte je pri 470 px zbytocna dan.
   function frontProfileCardHtml(row){
     var type = row.dataset.frontType;
     if (frontProfileless(type) || !FRONT_PROFILES.length) return '';
     var id = row.dataset.frontProfile || 'none';
     var edge = row.dataset.frontProfileEdge === undefined ? 'top' : row.dataset.frontProfileEdge;
     var key = 'fp-' + row.dataset.frontId;
-    var h = '<div class="prow fprofile-row"><label for="' + esc(key) + '">Profil</label>' +
-      '<select id="' + esc(key) + '" data-pc="profile" onchange="onFrontCardProfile(this)">';
+    var h = '<div class="prow fprofile-row"><span class="pl">Úchytka' +
+      nxTipHtml('Profil skracuje panel pri zvolenej hrane; ABS aj smer dekoru zostávajú. ' +
+                'Viacerým čelám naraz: „všetkým" v hlavičke skupiny Čelá.', 'inl') +
+      '</span><span class="phalf">' +
+      '<select id="' + esc(key) + '" aria-label="Úchytkový profil" data-pc="profile"' +
+      ' onchange="onFrontCardProfile(this)">';
     frontProfileOptionList().forEach(function(o){ h += '<option value="' + esc(o.id) + '"' +
       (id === o.id ? ' selected' : '') + '>' + esc(o.name) + '</option>'; });
-    h += '</select></div><div class="prow fprofile-row"><label for="' + esc(key + '-edge') + '">Hrana</label>' +
-      '<select id="' + esc(key + '-edge') + '" data-pc="edge" onchange="onFrontCardEdge(this)">' +
-      frontEdgeOptionsHtml(frontProfileEdges(type), edge) + '</select></div>';
+    h += '</select>' +
+      '<select id="' + esc(key + '-edge') + '" aria-label="Hrana úchytky" data-pc="edge"' +
+      (id === 'none' ? ' disabled' : '') + ' onchange="onFrontCardEdge(this)">' +
+      frontEdgeOptionsHtml(frontProfileEdges(type), edge) + '</select></span></div>';
     return h;
   }
   function onFrontCardProfile(sel){
     var row = sel.closest('.frow'); if (!row) return;
     frontRowProfileSet(row, sel.value);
-    syncFrontProfileBtn(row); refreshFrontProfileUI(); refreshFrontCards(); onField();
+    updateFrontRowSummary(row); refreshFrontProfileUI(); refreshFrontCards(); onField();
   }
   function onFrontCardEdge(sel){
     var row = sel.closest('.frow'); if (!row || !sel.value) return;
     row.dataset.frontProfileEdge = sel.value;
-    syncFrontProfileBtn(row); refreshFrontProfileUI(); onField();
+    updateFrontRowSummary(row); refreshFrontProfileUI(); refreshFrontCards(); onField();
   }
+  // Ponuka hran popoveru = PRIENIK hran platnych pre cely rozsah. Hint
+  // „Bočné hrany nastav v karte čela" ZANIKOL (D-130a R9) — je to pomocny
+  // text a zije v tooltipe `?` v hlavicke popoveru.
   function refreshFrontProfileEdgeUI(items){
     var sel = el('frontProfileEdge'); if (!sel) return;
     var scope = frontProfileScopeNow(), edges = frontProfileScopeEdges(items, scope);
     sel.innerHTML = frontEdgeOptionsHtml(edges, frontProfileCommon(items, scope, 'profile_edge'));
     sel.disabled = !edges.length;
-    var hint = el('frontProfileEdgeHint');
-    if (hint) hint.textContent = edges.length === 2 ? 'Bočné hrany nastav v karte čela alebo zúž rozsah.' : '';
-  }
-  function onFrontProfileEdgePick(){
-    var sel = el('frontProfileEdge'); if (!sel || !sel.value) return;
-    var items = frontRowsState(), scope = frontProfileScopeNow();
-    if (frontProfileScopeEdges(items, scope).indexOf(sel.value) < 0) return;
-    frontProfileScopeItems(items, scope).forEach(function(it){
-      it.row.dataset.frontProfileEdge = sel.value; syncFrontProfileBtn(it.row);
-    });
-    refreshFrontProfileUI(); refreshFrontCards(); onField();
   }
   // Rozsah je FILTER, nie akcia — sam nic nemeni, len prestavi ponuku a vetu.
   function onFrontProfileScope(){ refreshFrontProfileUI(); }
@@ -1810,16 +1974,17 @@
   // D-23 (audit B1): pod TYM ISTYM guardom su aj RIADKY ciel — echo pocas
   // rozpisaneho editu ich uz NEprestavia (rebuild by zahodil pisany vstup aj
   // prave pridany/odobrany riadok — DOM s cakajucimi editmi je novsi nez echo).
-  // Obnovia sa len bezpecne udaje viazane cez ID: placeholder ≈ vysky a badge
-  // kovania. Plny rebuild riadkov = zmena vyberu alebo echo bez cakajucich editov.
+  // Obnovia sa len bezpecne udaje viazane cez ID: placeholder ≈ vysky
+  // a SUHRN riadku. Plny rebuild riadkov = zmena vyberu alebo echo bez
+  // cakajucich editov.
   function renderFronts(fronts, keepGaps){
     renderFrontAddTypes();
     if (keepGaps){
-      updateFrontRowBadges();
-      // KOV-A2a: badge „smer?" je BEZPECNY udaj viazany cez ID (rovnako ako
-      // badge kovania) — obnovi sa aj pri light-update, kde sa riadky
+      // D-130a: SUHRN (vratane badge „smer?" a textu kovania) je BEZPECNY udaj
+      // viazany cez ID — obnovi sa aj pri light-update, kde sa riadky
       // NEPRESTAVUJU. Karta ostava otvorena a prekresli sa z cerstvych slotov.
-      updateFrontDirBadges();
+      updateFrontRowSummaries();
+      updateFrontMeta();
       refreshFrontCards();
       // applyTimer = pouzivatel pisal AJ PO flushi, ktory toto echo vyvolal —
       // jeho ≈ vysky su uz stare; placeholder doplni az echo najnovsieho editu.
@@ -1845,7 +2010,8 @@
     // pod rukou zmizla. Cielove celo uz v zozname byt nemusi (zmena vyberu,
     // zmazany riadok) — vtedy stav ticho zanikne.
     if (openFrontCardId && !frontRowById(openFrontCardId)) openFrontCardId = null;
-    updateFrontDirBadges();
+    updateFrontRowSummaries();
+    updateFrontMeta();
     refreshFrontCards();
     refreshFrontProfileUI(); // D-96: ponuka a veta stavu patria k prave vykreslenym riadkom
   }
@@ -1874,55 +2040,82 @@
       var inp = rows[i].querySelector('.fh'); if (inp) inp.placeholder = 'auto';
     }
   }
-  // D-23 / UI-C3: NAVIAZANE KOVANIE POD RIADKOM. Jeden DROBNY riadok (nie
-  // tabulka — vertikalny priestor je vzacny): „2× závesy · výsuv NL 470 →
-  // Atira biela H176". Text skladaju dohromady dva EXISTUJUCE zdroje: badge
-  // z planu (`frontHwBadge`, D-23) a nakupny rozpis servera (`frontHwBuy`,
-  // D-92) — panel nic nedopocitava a ziadne nove data neprisli.
+  // D-130a R3: SUHRN RIADKU. Jeden tlmeny riadok pod nazvom cela —
+  // „1 krídlo (auto) · smer? · bez úchytky · Sensys klasik · 2 ks →". Zlucil
+  // tri veci, ktore boli predtym rozsypane po riadku: badge „smer?" (KOV-A2a),
+  // indikator profilu `.fprof` (D-90) a samostatny riadok kovania `.fhw`
+  // (UI-C3). Stav vsetkych ciel tak vidno bez otvarania kariet (D-130).
   //
-  // Riadok zije UVNUTRI `.frow` (flex-wrap, `flex: 1 0 100%`) — DOM zoznamu
-  // ostava „jeden .frow = jedno celo", takze obrateny render (D-23), citanie
-  // odspodu aj prestavba riadkov platia bez zmeny.
+  // Text sklada CISTE JADRO `frontRowSummary` (core.js) z tych istych zdrojov
+  // ako doteraz: dataset riadku, `front_slots` a hotovy text kovania (badge
+  // z planu `frontHwBadge` + nakupny rozpis servera `frontHwBuy`, D-92).
+  // Panel NIC NEDOPOCITAVA a ziadne nove data neprisli.
   //
-  // .fhw sa VZDY hlada/vklada cez triedu a appendChild na koniec riadku —
-  // NIKDY nie cez nextElementSibling/indexy deti (.exprhint zije hned za .fh).
-  // KOV-A2a: ked je otvorena KARTA CELA, riadok kovania patri NAD nu (karta je
-  // vzdy posledna v stlpci) — preto `insertBefore` s kartou ako referenciou;
-  // bez karty je referencia null, cize presne povodny `appendChild`.
-  function updateFrontRowBadge(row){
-    var fid = row.dataset.frontId;
-    var badge = frontHwBadge(fid);
-    var buy = (typeof frontHwBuy === 'function') ? frontHwBuy(fid) : null;
-    var text = [badge, buy].filter(function(t){ return !!t; }).join(' → ');
-    var span = row.querySelector('.fhw');
-    if (!text){ if (span) span.remove(); return; }
-    if (!span){
-      span = document.createElement('span');
-      span.className = 'fhw fhwline';
-      span.setAttribute('role', 'button');
-      span.setAttribute('tabindex', '0');
-      span.setAttribute('aria-label', 'Kovanie tohto čela — otvorí kontext Kovanie');
-      // stopPropagation: riadok je plny ovladacov a klik sem nesmie zamiesat
-      // nic ineho (lekcia „select sa zatvaral").
-      span.onclick = function(ev){ ev.stopPropagation(); openFrontHardware(fid); };
-      span.onkeydown = function(ev){
-        if (ev.key !== 'Enter' && ev.key !== ' ') return;
-        ev.preventDefault(); ev.stopPropagation(); openFrontHardware(fid);
-      };
-      var card = row.querySelector('.fcard');
-      if (card) row.insertBefore(span, card);
-      else row.appendChild(span);
-    }
-    // Riadok je JEDNORIADKOVY s ellipsis — plny text nesie `title` (vzor D-92).
-    span.title = text + ' — klik otvorí Kovanie';
-    span.innerHTML = NXIcons.svg('link') + esc(text); // B3/B9: ikona staticka, text cez esc
-    // D-18: pri „Bez čela" riadok skryty (typ zije v datasete — KOV-A2a).
-    span.style.display = (row.dataset.frontType === 'none') ? 'none' : '';
+  // Obnova bezi tam, kde doteraz bezali badge (light push aj plny render) —
+  // je to BEZPECNY udaj viazany cez ID, takze riadky sa NEPRESTAVUJU (D-23
+  // `keepGaps` guard). `.fsub` sa hlada VYHRADNE cez triedu, nikdy cez index.
+  function frontRowItem(row){
+    var item = frontExtraOf(row);
+    item.type = row.dataset.frontType || 'door';
+    item.wings = row.dataset.frontWings || 'auto';
+    item.profile = row.dataset.frontProfile || 'none';
+    if (row.dataset.frontProfileEdge !== undefined) item.profile_edge = row.dataset.frontProfileEdge;
+    return item;
   }
-  function updateFrontRowBadges(){
+  function updateFrontRowSummary(row){
+    var sub = row.querySelector('.fsub'); if (!sub) return;
+    var fid = row.dataset.frontId;
+    var badge = (typeof frontHwBadge === 'function') ? frontHwBadge(fid) : null;
+    var buy = (typeof frontHwBuy === 'function') ? frontHwBuy(fid) : null;
+    var hw = [badge, buy].filter(function(t){ return !!t; }).join(' → ');
+    var parts = frontRowSummary(frontRowItem(row), frontSlotsOf(fid), hw, FRONT_PROFILES,
+                                frontDrawerOf(fid));
+    var html = '', plain = [], hwText = '';
+    parts.forEach(function(p){
+      // R3-f: kovanie NIE JE cast textu suhrnu — je to SURODENE tlacidlo.
+      if (p.hw){ hwText = p.hw; plain.push(p.hw); return; }
+      if (html) html += '<span class="fsep">·</span>';
+      if (p.badge){ html += '<span class="fbadge">' + esc(p.badge) + '</span>'; plain.push(p.badge); return; }
+      html += (p.tone ? '<span class="fbadge">' + esc(p.text) + '</span>'
+                      : esc(p.text));
+      plain.push(p.text);
+    });
+    sub.innerHTML = html; // B3/B9: ikona staticka, kazdy text cez esc
+    // Riadok je JEDNORIADKOVY s ellipsis — plne znenie nesie `title` (vzor D-92).
+    sub.title = plain.join(' · ') + ' — klik otvorí kartu čela';
+    sub.setAttribute('aria-label', 'Čelo ' + (fid || '') + ': ' + plain.join(', ') +
+                     ' — otvoriť kartu');
+    // R3-e/R3-f: koncovka kovania = VLASTNE, FOKUSOVATELNE tlacidlo vedla
+    // suhrnu. Klik NEotvara kartu na tabe Čelo (to robi suhrn), ale rovno na
+    // tabe KOVANIE; prepnutie kontextu je az tlacidlo „Otvoriť v Kovaní"
+    // v tom tabe (N13: klikatelne vedie tam, kam ukazuje).
+    var link = row.querySelector('.fhwlink');
+    if (!link) return;
+    link.hidden = !hwText;
+    if (!hwText){ link.innerHTML = ''; return; }
+    link.innerHTML = esc(hwText) + NXIcons.svg('arrow-right');
+    link.title = hwText + ' — klik otvorí kartu na tabe Kovanie';
+    link.setAttribute('aria-label', 'Kovanie tohto čela — otvoriť tab Kovanie');
+  }
+  function updateFrontRowSummaries(){
     var wrap = el('frontRows'); if (!wrap) return;
     var rows = wrap.querySelectorAll('.frow');
-    for (var i = 0; i < rows.length; i++) updateFrontRowBadge(rows[i]);
+    for (var i = 0; i < rows.length; i++) updateFrontRowSummary(rows[i]);
+  }
+  // D-130a R1: META v hlavicke skupiny („3 čelá · 1 bez smeru"). Pocet ciel
+  // cita z DOM, „bez smeru" VYHRADNE zo servera (`front_slots`) — bez slotov
+  // ostane len pocet a nic sa neodvodzuje.
+  function updateFrontMeta(){
+    var node = el('frontMeta'); if (!node) return;
+    var wrap = el('frontRows');
+    var rows = wrap ? wrap.querySelectorAll('.frow') : [];
+    var n = rows.length, unset = 0;
+    for (var i = 0; i < n; i++){
+      var entry = frontSlotsOf(rows[i].dataset.frontId);
+      if (entry && frontDirBadge(entry.slots)) unset++;
+    }
+    var word = (n === 1) ? 'čelo' : (n < 5 ? 'čelá' : 'čiel');
+    node.textContent = n ? (n + ' ' + word + (unset ? ' · ' + unset + ' bez smeru' : '')) : '';
   }
   // Klik na naviazane kovanie: prepni kontext na Kovanie a dotiahni do pohladu
   // BOX VLASTNIKA tohto cela. Ziadny zapis — je to navigacia (N13: klikatelne
@@ -2011,6 +2204,21 @@
                        onFrontSeg: onFrontSeg, onFrontWings: onFrontWings,
                        frontExtraOf: frontExtraOf, refreshFrontCards: refreshFrontCards,
                        updateFrontDirBadges: updateFrontDirBadges,
+                       // D-130a: suhrn riadku, meta hlavicky, taby karty
+                       // a POPOVER „všetkým" (akcia, nie druhy stav).
+                       updateFrontRowSummary: updateFrontRowSummary,
+                       updateFrontRowSummaries: updateFrontRowSummaries,
+                       updateFrontMeta: updateFrontMeta, frontRowItem: frontRowItem,
+                       onFrontCardTab: onFrontCardTab, onFrontSummaryHw: onFrontSummaryHw,
+                       nxTipStop: nxTipStop,
+                       openFrontBulk: openFrontBulk, closeFrontBulk: closeFrontBulk,
+                       onFrontBulkToggle: onFrontBulkToggle, frontBulkOpen: frontBulkOpen,
+                       onFrontBulkApply: onFrontBulkApply,
+                       onFrontProfilePick: onFrontProfilePick,
+                       onFrontProfileEdgePick: onFrontProfileEdgePick,
+                       onFrontProfileScope: onFrontProfileScope,
+                       refreshFrontProfileUI: refreshFrontProfileUI,
+                       onFrontCardProfile: onFrontCardProfile, onFrontCardEdge: onFrontCardEdge,
                        addFrontKind: addFrontKind, syncFrontCardOwner: syncFrontCardOwner,
                        closeFrontCard: closeFrontCard,
                        // KOV-A2b: deep-link zo Studia (`NX.focusFront`).

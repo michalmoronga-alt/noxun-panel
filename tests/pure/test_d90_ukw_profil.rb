@@ -561,13 +561,19 @@ NxTest.test('D-90 UI: panel posiela register profilov a riadok cela ma volbu') d
   NxTest.assert(bridge.include?('FRONT_PROFILES = data.front_profiles'),
                 'NX.init register ulozi')
   form = File.read(File.join(root, 'noxun_engine', 'ui', 'js', 'form.js'), encoding: 'UTF-8')
-  NxTest.assert(form.include?('class="fprof"'), 'riadok cela ma indikator profilu')
-  NxTest.assert(form.include?("NXIcons.svg('profile')"), 'ikona zo spritu — ziadne emoji')
-  # D-96 (UI-C3): ovladacom uz NIE JE cyklujuca ikona v riadku (pri viacerych
-  # profiloch a volbe hrany osadenia by bola nepouzitelna) — profil sa nastavuje
-  # v skupine „Úchytky" pre zvoleny ROZSAH ciel. Ikona ostala INDIKATOR.
-  NxTest.assert(form.include?('function onFrontProfilePick'),
-                'volba profilu zije v sekcii Uchytky (D-96)')
+  # D-130a: indikator `.fprof` v riadku ZANIKOL — profil hovori SUHRN riadku
+  # SLOVOM („UKW-7 hore" / „bez úchytky"), teda zrozumitelnejsie nez ikona,
+  # ktorej stav sa dal precitat len z `title`.
+  NxTest.refute(form.include?('class="fprof"'), 'indikator profilu v riadku zanikol (D-130a)')
+  core = File.read(File.join(root, 'noxun_engine', 'ui', 'js', 'core.js'), encoding: 'UTF-8')
+  NxTest.assert(core.include?('function frontSumProfile(item, reg)'),
+                'cast suhrnu o uchytke je CISTA funkcia (testovatelna bez DOM)')
+  html = File.read(File.join(root, 'noxun_engine', 'ui', 'panel.html'), encoding: 'UTF-8')
+  NxTest.assert(html.include?('#i-profile'), 'ikona zo spritu — ziadne emoji')
+  # D-96 (UI-C3) / D-130a R7: JEDINE MIESTO STAVU je karta cela; hromadne
+  # nastavenie ostava ako AKCIA v popoveri „všetkým" — zapisuje LEN „Použiť".
+  NxTest.assert(form.include?('function onFrontBulkApply'),
+                'hromadna volba profilu ma JEDINU zapisovu cestu (D-130a R7)')
   NxTest.assert(form.include?("frontRowProfileSet(it.row, id)"),
                 'volba zapisuje do TYCH ISTYCH dat riadku (dataset) — ziadne nove pole')
   NxTest.assert(form.include?("row.dataset.frontProfile = 'none'"),
@@ -587,9 +593,11 @@ NxTest.test('D-90 UI: nahlad kresli pasmo profilu z registry a farby berie z tok
   NxTest.refute(band.empty?, 'pruh profilu ma styl v panel.css')
   NxTest.refute(band.include?('#'), "farby VYHRADNE cez --nx-* tokeny: #{band}")
   NxTest.assert(band.include?('var(--nx-'), 'pruh pouziva tokeny')
-  prof = css.scan(/\.frow \.fprof[^{]*\{([^}]*)\}/m).flatten.join(' ')
-  NxTest.refute(prof.empty?, 'tlacidlo profilu ma styl v panel.css')
-  NxTest.refute(prof.include?('#'), "tlacidlo profilu bez natvrdo pisanych farieb: #{prof}")
+  # D-130a: miesto indikatora `.fprof` nesie profil SUHRN riadku — jeho styly
+  # platia to iste pravidlo (farby VYHRADNE cez tokeny).
+  sub = css.scan(/\.frow \.fsub[^{]*\{([^}]*)\}/m).flatten.join(' ')
+  NxTest.refute(sub.empty?, 'suhrn riadku ma styl v panel.css')
+  NxTest.refute(sub.include?('#'), "suhrn riadku bez natvrdo pisanych farieb: #{sub}")
 end
 
 NxTest.test('D-90 (audit F6): handle_apply_fronts ma identity guard ako auto-apply') do

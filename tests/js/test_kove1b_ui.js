@@ -238,8 +238,12 @@ ok(/Výklop/.test(lmsg), 'L3: hláška menuje pravidlo: ' + lmsg);
 // Text „mechanizmus sa pridáva ručne — automatika príde s KOV-E" bol pravdivý
 // do E1a. Od aktivácie pravidiel by viedol k ručnej položke NAVYŠE, teda
 // k dvojitej objednávke.
+// D-130a: veta o výklope patrí do TABU KOVANIE (je to výsledok, nie
+// nastavenie); veta o sklope ostáva medzi nastaveniami. Test sa pýta na
+// ZNENIE, takže pozerá do oboch tabov.
 function infoText(type){
-  return C.frontCardModel({ type: type }, { wings: 1, slots: [] }).rows
+  const m = C.frontCardModel({ type: type }, { wings: 1, slots: [] });
+  return m.rows.concat(m.hwRows)
     .filter(function(r){ return r.kind === 'info'; })
     .map(function(r){ return r.text; }).join(' | ');
 }

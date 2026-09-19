@@ -113,6 +113,13 @@
     // 2A-4b (okno Materialy): universal toggle ABS pasky + info banner
     'globe': '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
     'info': '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+    // D-130a: TOOLTIP `?` (`.nxtip`). Pomocny text uz nestoji ako `.hint` pod
+    // ovladacom — vertikalny priestor panela je vzacny, takze zije za touto
+    // ikonou. Lucide `help-circle`.
+    'help-circle': '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+    // D-130a: sipka „vedie inam" na konci suhrnu riadku cela (preklik do
+    // Kovania) a v tlacidle „Otvoriť v Kovaní". Lucide `arrow-right`.
+    'arrow-right': '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
     // V0.6 B-2b (okno Materialy): tlacidlo "Aktualizovat z Demosu" v detaile dekoru
     'refresh-cw': '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
     // V0.6 M-A2 (okno Materialy): primarne tlacidlo "Pridat z Demosu"
@@ -194,7 +201,8 @@
     'front-lift': '<rect x="3" y="9" width="18" height="12" rx="1"/><path d="m9 6 3-3 3 3" stroke-dasharray="2 2"/>',
     // Sklop: panel hore, celo padá NADOL.
     'front-fall': '<rect x="3" y="3" width="18" height="12" rx="1"/><path d="m9 18 3 3 3-3" stroke-dasharray="2 2"/>',
-    // Blenda: pevny dielec — preskrtnuty panel (ziadny pohyb, ziadne kovanie).
+    // Blenda: pevny dielec — preskrtnuty panel (ziadny pohyb; kovanie vznika
+    // len z uchytkoveho profilu).
     'front-blind': '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="m3 4 18 16"/><path d="M21 4 3 20"/>',
     // Smer = STRANA PANTOV. Sipka ukazuje na VOLNU hranu, teda kam sa krídlo
     // otvara: `dir-left` (panty vlavo) = hrot vpravo.

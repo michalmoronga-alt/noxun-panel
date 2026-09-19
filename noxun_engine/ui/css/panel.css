@@ -109,96 +109,229 @@
   .selinfo b { color: var(--nx-select); }
   .muted { color: var(--nx-ink-faint); font-size: 11px; padding: 4px 0; }
   .hint { font-size: 10.5px; color: var(--nx-ink-faint); margin: 2px 0 6px; }
-  /* Cela riadky.
-     SMOKE PACK 1 (Michal 20.8.): riadok sa pri VYPISANEJ vyske rozbijal —
-     krizik ✗ padal o riadok nizsie. Pricina: `.frow` bol JEDEN zalamovaci flex
-     rad, do ktoreho pri vypisanej vyske pribudli „mm" + chip AUTO a sucet
-     presiahol sirku panela (470 px). Po novom je `.frow` STLPEC:
-       .fmain = ovladace cela v PEVNOM, NEZALAMOVACOM rade (flex-wrap: nowrap),
-       .fhw   = naviazane kovanie ako samostatny riadok pod nim (UI-C3).
+  /* Cela riadky — D-130a: riadok cela je CSS GRID so STALYMI STLPCAMI.
+     PRECO: do D-130a bol riadok zalamovaci/nezalamovaci FLEX rad, takze poloha
+     pola vysky zavisela od toho, co v riadku prave je — chip AUTO, „mm",
+     select kridel a ikona profilu ho tlacili vpravo a polia „lietali" (D-130).
+     Grid ma STALE stlpce, takze vyska sedi v tom istom stlpci pri kazdom cele:
+       [22 cislo][1fr nazov + suhrn][112 pole vysky][22 ✕]
+     Riadky gridu: 1 = nazov · 2 = suhrn · 3 = karta cela (stlpce 2-4).
      Sucet pevnych stop + medzier musi ostat pod sirkou karty pri 470 px —
      strazi to guard test `tests/pure/test_smoke1_riadky.rb`, aby buduci
-     ovladac v rade nezalomil to iste znova. Zvysnu sirku berie `.ftname`
-     (jediny rastuci prvok), takze riadok vyuziva maximum sirky.
+     ovladac mriezku znova nerozbil. Zvysok berie stredny stlpec `1fr`.
 
-     KOV-A2a: `select.ftype` ZANIKOL — typ sa uz nevybera rozbalovackou, ale
-     PIKTOGRAMOM v karte cela. Jeho miesto v rade zabralo tlacidlo `.ftname`
-     (ikona typu + nazov + pripadny badge „smer?"), ktore kartu otvara. */
-  .frow { display: flex; flex-direction: column; margin: 0; padding: 2px 0 1px; }
+     `.frow` ako TRIEDA OSTAVA: visia na nej `closest('.frow')`, hover
+     `frow.hov`, obrateny render (D-23) aj `keepGaps` guard.
+     Z riadku ZANIKLI: `.fmain` (obal radu), `select.fw` (kridla su v karte),
+     `.fprof` (suhrn to povie slovom) a `.fhw` (posledna polozka suhrnu). */
+  .frow { display: grid; grid-template-columns: 22px minmax(0, 1fr) 112px 22px;
+          grid-template-rows: auto auto; column-gap: 6px; row-gap: 0;
+          align-items: center; margin: 0; padding: 2px 0 1px; position: relative; }
   /* Jemne predelenie MEDZI celami — hairline, ZIADNY novy vertikalny priestor:
      odstup 4 px sa presunul z `margin: 4px 0` do `padding` + 1 px linky
-     (1 + 2 + 1 = 4). Predel je pod CELYM celom, teda aj pod riadkom kovania. */
+     (1 + 2 + 1 = 4). Predel je pod CELYM celom, teda aj pod kartou. */
   .frow + .frow { border-top: 1px solid var(--nx-border-soft); }
-  .frow .fmain { display: flex; flex-wrap: nowrap; align-items: center; gap: 4px; min-width: 0; }
-  .frow .fnum { flex: 0 0 22px; color: var(--nx-ink-faint); font-size: 11px; text-align: center; } /* D-23: "F1" namiesto "1" */
-  /* KOV-A2a: NAZOV TYPU = tlacidlo, ktore otvara kartu cela. `min-width: 0`
-     (cez `min-width: 72px` nizsie) — bez neho by najdlhsi nazov rad rozsiril
-     nad ramec karty. Je to JEDINY prvok radu s `flex-grow` — dostane vsetko,
-     co po pevnych stopach ostane. Vyzera ako TEXT, nie ako tlacidlo (ram az
-     na hover/fokus): v rade uz su tri tlacidla a stvrty ram by z riadku
-     spravil listu ovladacov. */
-  .frow .ftname { flex: 1 1 0; min-width: 60px; display: inline-flex; align-items: center; gap: 4px;
-                  padding: 3px 4px; border: 1px solid transparent; border-radius: 6px;
-                  background: none; color: var(--nx-ink-strong); font: inherit; font-size: 12px;
-                  text-align: left; cursor: pointer; }
+  /* D-23: "F1" namiesto "1"; cislo stoji cez oba riadky (nazov + suhrn). */
+  .frow .fnum { grid-column: 1; grid-row: 1 / 3; align-self: center; color: var(--nx-ink-faint);
+                font-size: 11px; font-weight: 700; text-align: center; }
+  .frow.hov .fnum, .frow[data-open="1"] .fnum { color: var(--nx-select-accent); }
+  /* KOV-A2a: NAZOV TYPU = tlacidlo, ktore otvara kartu cela. Vyzera ako TEXT,
+     nie ako tlacidlo (ram az na hover/fokus) — v riadku uz su tri ovladace. */
+  .frow .ftname { grid-column: 2; grid-row: 1; display: inline-flex; align-items: center; gap: 4px;
+                  min-width: 0; padding: 2px 4px; border: 1px solid transparent; border-radius: 6px;
+                  background: none; color: var(--nx-ink-strong); font: inherit; font-size: 12.5px;
+                  font-weight: 600; text-align: left; cursor: pointer; }
   .frow .ftname:hover { border-color: var(--nx-border-strong); background: var(--nx-select-bg-soft); }
   .frow .ftname:focus-visible { outline: 2px solid var(--nx-select); outline-offset: -2px; }
-  .frow .ftname[aria-expanded="true"] { background: var(--nx-select-bg); border-color: var(--nx-select);
-                                        color: var(--nx-select-strong); }
-  /* Nazov sa OREZE (rad sa nikdy nezalamuje) — plne znenie nesie `title`. */
+  .frow .ftname[aria-expanded="true"] { color: var(--nx-select-strong); }
+  .frow .ftname[aria-expanded="true"] .ftico, .frow .ftname[aria-expanded="true"] .fchev {
+                  color: var(--nx-select); }
+  .frow .ftname[aria-expanded="true"] .fchev { transform: rotate(180deg); }
+  /* Nazov sa OREZE (riadok sa nikdy nezalamuje) — plne znenie nesie `title`. */
   .frow .ftname .ftl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* UI-C3 (N27): ikona TYPU cela pred nazvom — cita sa skor nez text. */
-  .frow .ftico { flex: 0 0 15px; display: inline-flex; color: var(--nx-ink-faint); }
-  .frow .ftico .ic { width: 14px; height: 14px; }
+  .frow .ftico { flex: 0 0 15px; display: inline-flex; color: var(--nx-ink-muted); }
+  .frow .ftico .ic { width: 15px; height: 15px; }
+  /* Chevron „karta sa otvori" — jediny znak toho, ze nazov je klikatelny. */
+  .frow .fchev { flex: 0 0 12px; display: inline-flex; color: var(--nx-ink-faint);
+                 transition: transform .1s; }
+  .frow .fchev .ic { width: 12px; height: 12px; }
+  /* D-130a: SUHRN riadku — jeden tlmeny riadok pod nazvom („1 krídlo (auto) ·
+     smer? · bez úchytky · Sensys klasik · 2 ks →").
+     R3-f: druhy riadok mriezky je OBAL s DVOMA SURODENCAMI. `.fsub` rastie
+     a oreze sa, `.fhwlink` (kovanie) ma pevnu stopu — vnoreny ovladac vo
+     vnutri tlacidla by sa nedal fokusovat a ellipsis susedu by ho orezal. */
+  .frow .fsubwrap { grid-column: 2; grid-row: 2; display: flex; align-items: center;
+                    gap: 4px; min-width: 0; padding-left: 24px; }
+  .frow .fsub { flex: 1 1 0; min-width: 0; display: block; padding: 0 0 1px;
+                border: 0; background: none; font: inherit;
+                font-size: 10.5px; font-weight: 400; color: var(--nx-ink-soft);
+                text-align: left; cursor: pointer; white-space: nowrap;
+                overflow: hidden; text-overflow: ellipsis; }
+  .frow .fsub:hover { color: var(--nx-ink-muted); }
+  .frow .fsub:focus-visible { outline: 2px solid var(--nx-select); outline-offset: -2px; }
+  .frow .fsub .fsep { margin: 0 4px; color: var(--nx-border-strong); }
+  /* Naviazane KOVANIE = vlastne, fokusovatelne tlacidlo (klik otvori kartu
+     rovno na tabe Kovanie). Ma PEVNU stopu, takze ho suhrn nikdy neoreze;
+     ked celo kovanie nema, tlacidlo je `hidden`. */
+  .frow .fhwlink { flex: 0 0 auto; max-width: 45%; display: inline-flex; align-items: center;
+                   gap: 3px; padding: 0 2px; border: 0; border-radius: 6px; background: none;
+                   font: inherit; font-size: 10.5px; font-weight: 400;
+                   color: var(--nx-ink-faint); cursor: pointer; white-space: nowrap;
+                   overflow: hidden; text-overflow: ellipsis; }
+  .frow .fhwlink[hidden] { display: none; }
+  .frow .fhwlink .ic { flex: 0 0 auto; width: 10px; height: 10px; }
+  .frow .fhwlink:hover { color: var(--nx-select); }
+  .frow .fhwlink:focus-visible { outline: 2px solid var(--nx-select); outline-offset: -1px; }
   /* KOV-A2a: badge „smer?" — JANTAR (je to otvorena otazka, nie chyba stavby;
      RED nalez patri Kontrole v Studiu). Nikdy sa nezmrsti pod svoj text. */
-  .frow .fbadge { flex: 0 0 auto; font-size: 9px; font-weight: 600; line-height: 1.5;
-                  border-radius: 9px; padding: 0 4px; white-space: nowrap;
+  .frow .fbadge { display: inline-block; font-size: 9px; font-weight: 600; line-height: 1.5;
+                  border-radius: 9px; padding: 0 5px; white-space: nowrap;
                   color: var(--nx-warnchip-fg); background: var(--nx-warn-bg-soft);
                   border: 1px solid var(--nx-warnchip-border); }
-  /* UI-C3: pole vysky je UZKE (46 px) a hodnota zarovnana doprava — rozmer je
-     cislo, nie veta (UX-03). Jednotka „mm" stoji PRI HODNOTE, nie v hlavicke. */
-  .frow input.fh { flex: 0 0 46px; width: 46px; min-width: 0; padding: 3px 4px; text-align: right;
-                   border: 1px solid var(--nx-border-strong); border-radius: 6px; }
-  .frow .dwrap { flex: 0 0 auto; }
+  /* D-130a: POLE VYSKY je JEDEN BOX s PEVNOU sirkou (112 px) — chip AUTO
+     odobera miesto HODNOTE, nie boxu, takze susedne stlpce sa nehybu.
+     Obsah: [chip AUTO][hodnota][mm][sipka vyskoveho radu]. */
+  .frow .hbox { grid-column: 3; grid-row: 1 / 3; display: flex; align-items: center; height: 26px;
+                border: 1px solid var(--nx-border-strong); border-radius: 6px;
+                background: var(--nx-surface); overflow: visible; position: relative; }
+  .frow .hbox input.fh { flex: 1 1 0; min-width: 0; width: 100%; padding: 0 2px 0 5px; text-align: right;
+                         border: 0; outline: 0; background: none; font: inherit; font-size: 12px; }
+  /* Outside-in (packet 3): placeholder ako NOSITEL stavu AUTO je znama pasca.
+     Zmiernenie: „≈ N" kurzivou a tlmene — nezamenitelne s TUCNOU pevnou
+     hodnotou; plne vysvetlenie nesie `title` boxu. */
+  .frow .hbox input.fh::placeholder { color: var(--nx-ink-faint); font-style: italic; }
+  .frow .hbox input.fh.bad { background: var(--nx-danger-bg-soft); }
+  /* „mm" je VZDY vidno — jednotka patri k poliu, nie k vypisanej hodnote. */
+  .frow .hbox .funit { flex: 0 0 auto; font-size: 10px; color: var(--nx-ink-faint); padding-right: 3px; }
+  /* Chip AUTO = navrat na automat. Ukazuje sa LEN pri VYPISANEJ vyske
+     (`.hbox.fixed`) — prazdne pole uz AUTO JE a vracat sa niet odkial. */
+  .frow .hbox .fauto { display: none; flex: 0 0 auto; margin-left: 3px; padding: 0 3px;
+                       font-size: 8.5px; font-weight: 700; line-height: 1.6;
+                       border: 1px solid var(--nx-border); border-radius: 6px;
+                       background: var(--nx-surface-sunken); color: var(--nx-ink-muted); }
+  .frow .hbox.fixed .fauto { display: inline-block; }
+  .frow .hbox .fauto:hover { border-color: var(--nx-select); color: var(--nx-select); }
+  /* Zamknute ⇔ vypisane: pevna vyska je aj VIDNO (tucnejsia hodnota) — inak by
+     sa zamok stratil tym, ze prestal mat vlastnu ikonu. */
+  .frow .hbox.fixed input.fh { font-weight: 700; color: var(--nx-ink); }
+  .frow .hbox .dwrap { flex: 0 0 auto; height: 100%; }
+  .frow .hbox .pbtn { width: 16px; height: 100%; padding: 0; border: 0;
+                      border-left: 1px solid var(--nx-border-soft); border-radius: 0;
+                      background: var(--nx-surface-sunken); color: var(--nx-ink-faint);
+                      display: inline-flex; align-items: center; justify-content: center; }
+  .frow .hbox .pbtn .ic { width: 11px; height: 11px; }
   /* Codex #183 P2: ZIVY NAHLAD VYRAZU („= 450" pri `300+150`) je v riadku cela
-     OVERLAY, nie flex polozka. Ako polozka mal `flex: 0 0 auto`, takze pri
-     rozpisanom vyraze pridal do radu ~34 px — a `flex-wrap: nowrap` uz nema
-     kam ustupit, takze by riadok pretiekol presne tak, ako pred touto davkou
-     zalamoval. Overlay je zaroven vzor repa („rozbalovacie okno je overlay,
-     nie novy riadok") a drzi rozpocet sirky pravdivy. `z-index` je POD
-     `.miniopts` (120) — ked je otvoreny rad, hodnoty maju prednost.
-     `display: none` (nasadzuje ho expr.js pri prazdnom vyraze) plati dalej.
+     OVERLAY, nie polozka v boxe — v boxe by hodnotu odtlacil a box ma pevnu
+     sirku. `z-index` je POD `.miniopts` (120): ked je otvoreny rozmerovy rad,
+     hodnoty maju prednost. `display: none` (expr.js pri prazdnom vyraze) plati.
      Selektor je zamerne `.nx-inspector`-scopnuty (4 triedy): kompaktne
      pravidlo `.nx-inspector .dwrap .exprhint` nizsie ma rovnaku specificitu
-     ako `.frow .dwrap .exprhint` a je v zdroji NESKOR, takze by prebilo
-     padding tohto overlaya. */
+     a je v zdroji NESKOR, takze by prebilo padding tohto overlaya. */
   .nx-inspector .frow .dwrap .exprhint { position: absolute; top: calc(100% + 2px); right: 0; z-index: 110;
               padding: 1px 5px; border: 1px solid var(--nx-border); border-radius: 6px;
               background: var(--nx-surface); box-shadow: 0 2px 6px var(--nx-modal-shadow);
               white-space: nowrap; pointer-events: none; }
-  .frow .funit { flex: 0 0 auto; font-size: 10px; color: var(--nx-ink-faint); }
-  /* Chip AUTO = navrat na automat. Je to AKCIA nad hodnotou, nie stav — preto
-     neutralny ram a az hover nesie vyberovu farbu. */
-  .frow .fauto { flex: 0 0 auto; padding: 2px 5px; font-size: 9.5px; font-weight: 700;
-                 border: 1px solid var(--nx-border); border-radius: 6px; background: var(--nx-surface-sunken);
-                 color: var(--nx-ink-muted); }
-  .frow .fauto:hover { border-color: var(--nx-select); color: var(--nx-select); }
-  /* Zamknute ⇔ vypisane: pevna vyska je aj VIDNO (tucnejsia hodnota) — inak by
-     sa zamok stratil tym, ze prestal mat vlastnu ikonu. */
-  .frow.fixed input.fh { font-weight: 600; color: var(--nx-ink); }
-  .frow select.fw { flex: 0 0 46px; min-width: 0; padding: 3px; border: 1px solid var(--nx-border-strong); border-radius: 6px; }
-  /* D-90 + D-96: uchytkovy profil je v riadku uz LEN INDIKATOR (ovladac zije
-     v skupine „Úchytky") — preto ziadny ram tlacidla a ziadny kurzor akcie. */
-  .frow .fprof { flex: 0 0 18px; display: inline-flex; align-items: center;
-                 color: var(--nx-ink-faint); line-height: 0; }
-  .frow .fprof .ic { width: 15px; height: 15px; }
-  .frow .fprof.on { color: var(--nx-select); }
-  .frow .fdel { flex: 0 0 22px; background: var(--nx-danger-bg); color: var(--nx-danger); border: 1px solid var(--nx-danger-border); border-radius: 6px; padding: 2px 0; }
+  /* ✕ je TLMENE — cervene az pri hoveri (mazanie sa nema pytat o pozornost). */
+  .frow .fdel { grid-column: 4; grid-row: 1 / 3; width: 22px; height: 22px; justify-self: center;
+                padding: 0; border: 1px solid transparent; border-radius: 6px; background: none;
+                color: var(--nx-ink-faint); display: inline-flex; align-items: center;
+                justify-content: center; }
+  .frow .fdel:hover { background: var(--nx-danger-bg); color: var(--nx-danger);
+                      border-color: var(--nx-danger-border); }
+  .frow .fdel .ic { width: 12px; height: 12px; }
 
   /* D-119: styri okraje celej skrinky v dvoch kompaktnych riadkoch. */
-  /* D-114: sest typov v jedinom existujucom rade pridavania. */
-  .nx-inspector .front-add-types { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:6px; margin-top:8px; }
+  /* D-114: sest typov v jedinom existujucom rade pridavania.
+     D-130a: pred radom stoji tlmeny popisok „Pridať čelo" (R10). */
+  .nx-inspector .addrow { display: flex; align-items: center; gap: 6px; margin-top: 6px;
+    padding-top: 6px; border-top: 1px solid var(--nx-border-soft); }
+  .nx-inspector .addrow .addl { flex: 0 0 auto; font-size: 11px; color: var(--nx-ink-faint); }
+  .nx-inspector .front-add-types { flex: 1 1 0; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:6px; margin-top:0; }
+
+  /* ===== D-130a R8: TOOLTIP `.nxtip` (pomocny text za ikonou `?`) =========
+     PRECO NIE NATIVNY `title`: CEF ho ukazuje s velkym oneskorenim, neda sa
+     stylovat a pri dlhsom texte ho zalamuje po svojom. Toto je jeden maly
+     komponent, ktory plati v celom paneli: obsah nesie `data-tip`, kresli ho
+     pseudo-element, otvara hover AJ fokus (klavesnica).
+     POZOR: `.nxtip` NAHRADZA `.hint` pri POMOCNOM texte. STAVOVE vety
+     (cervene/jantarove, „bez klasifikácie", D-120 `frontDraftMessage`) NIE SU
+     pomocny text a ostavaju viditelne. */
+  .nx-inspector .nxtip { position: relative; display: inline-flex; align-items: center;
+              justify-content: center; flex: 0 0 auto; width: 18px; height: 18px; padding: 0;
+              border: 0; border-radius: 50%; background: none; color: var(--nx-ink-faint);
+              cursor: help; }
+  .nx-inspector .nxtip:hover, .nx-inspector .nxtip:focus { color: var(--nx-select); outline: none; }
+  .nx-inspector .nxtip:focus-visible { outline: 2px solid var(--nx-select); outline-offset: 1px; }
+  .nx-inspector .nxtip .ic { width: 13px; height: 13px; }
+  .nx-inspector .nxtip::after { content: attr(data-tip); display: none; position: absolute;
+              top: calc(100% + 6px); left: 0; z-index: 130; width: 250px; padding: 7px 9px;
+              border-radius: 6px; background: var(--nx-ink); color: var(--nx-surface);
+              font-size: 11px; font-weight: 400; line-height: 1.45; white-space: normal;
+              text-align: left; box-shadow: 0 6px 18px var(--nx-modal-shadow); }
+  /* `.r` = tooltip pri PRAVOM okraji (hlavicka skupiny) — inak by 250 px
+     bublina utiekla za okraj panela pri 470 px. */
+  .nx-inspector .nxtip.r::after { left: auto; right: 0; }
+  .nx-inspector .nxtip:hover::after, .nx-inspector .nxtip:focus::after { display: block; }
+  /* Vnutri karty/riadku stoji `?` HNED za popiskom — mensi kruh, bez odsadenia. */
+  .nx-inspector .nxtip.inl { width: 15px; height: 15px; margin-left: 2px; }
+  .nx-inspector .nxtip.inl .ic { width: 12px; height: 12px; }
+
+  /* ===== D-130a R1: NASTROJE V HLAVICKE SKUPINY (`.gtools`) ===============
+     Meta text + ikonove akcie vpravo v <summary>. Hlavicka musi byt FLEX,
+     inak by sa `margin-left:auto` nemalo o co oprieť — preto vlastna trieda
+     `.ghdr` (ostatne skupiny ostavaju nedotknute). */
+  .nx-inspector details > summary.ghdr { display: flex; align-items: center; }
+  .nx-inspector .gtools { display: inline-flex; align-items: center; gap: 3px;
+              margin-left: auto; flex: 0 0 auto; }
+  .nx-inspector .gtools .meta { font-size: 11px; font-weight: 400; color: var(--nx-ink-soft);
+              white-space: nowrap; margin-right: 4px; font-variant-numeric: tabular-nums; }
+  .nx-inspector .gtools .ibtn { display: inline-flex; align-items: center; justify-content: center;
+              gap: 4px; height: 22px; min-width: 24px; padding: 0 4px; border: 1px solid transparent;
+              border-radius: 6px; background: none; color: var(--nx-ink-muted); font: inherit;
+              font-size: 11px; font-weight: 600; cursor: pointer; }
+  .nx-inspector .gtools .ibtn:hover { background: var(--nx-select-bg-soft); color: var(--nx-select);
+              border-color: var(--nx-border); }
+  .nx-inspector .gtools .ibtn:focus-visible { outline: 2px solid var(--nx-select); outline-offset: -2px; }
+  .nx-inspector .gtools .ibtn .ic { width: 14px; height: 14px; }
+  /* `.wide` je v paneli GLOBALNA trieda (tlacidlo na plnu sirku) — v hlavicke
+     by roztiahla ikonu cez cely riadok, preto ju tu VEDOME rusime. */
+  .nx-inspector .gtools .ibtn.wide { width: auto; margin-top: 0; padding: 0 7px; font-size: 11px; }
+
+  /* ===== D-130a R7: POPOVER „všetkým" (hromadna uchytka) ==================
+     Je to AKCIA, nie druhy stav: selecty v nom NIC nezapisuju, zapise az
+     „Použiť" (jeden `onField`, jeden krok Späť). Stoji MIMO <summary>
+     (surodenec pred `.body`), inak by bol sucastou klikatelnej hlavicky.
+     Outside-in (packet 2): ukotveny `right: 6px` DOVNUTRA panela, aby ho pri
+     470 px neorezal scroll kontajner.
+     Kotvou je LEN skupina, ktora popover ma (nie `details` vseobecne —
+     `position: relative` na kazdej skupine by prekotvilo cudzie overlaye). */
+  .nx-inspector details[data-key="fronts"] { position: relative; }
+  .nx-inspector .pop { position: absolute; right: 6px; top: 32px; z-index: 125; width: 300px;
+              max-width: calc(100% - 12px); padding: 9px 10px 10px; border-radius: 8px;
+              border: 1px solid var(--nx-border-strong); background: var(--nx-surface);
+              box-shadow: 0 12px 30px var(--nx-modal-shadow); }
+  .nx-inspector .pop[hidden] { display: none; }
+  .nx-inspector .pop .poph { display: flex; align-items: center; gap: 6px; margin-bottom: 5px;
+              font-size: 11.5px; font-weight: 600; color: var(--nx-ink-strong); }
+  .nx-inspector .pop .poph .ic { width: 14px; height: 14px; color: var(--nx-ink-muted); }
+  .nx-inspector .pop .poph .nxtip { margin-left: 2px; }
+  .nx-inspector .pop .popx { margin-left: auto; padding: 0; border: 0; background: none;
+              color: var(--nx-ink-faint); cursor: pointer; display: inline-flex; }
+  .nx-inspector .pop .popx:hover { color: var(--nx-select); }
+  .nx-inspector .pop .popx .ic { width: 14px; height: 14px; }
+  .nx-inspector .pop .row label { flex: 0 0 70px; font-size: 12px; }
+  .nx-inspector .pop .row .unit { flex-basis: 0; padding-left: 0; }
+  .nx-inspector .pop .popfoot { display: flex; align-items: center; gap: 8px; margin-top: 7px; }
+  .nx-inspector .pop .popfoot .statline { flex: 1 1 0; min-width: 0; font-size: 11px;
+              line-height: 1.4; color: var(--nx-ink-muted); }
+  .nx-inspector .pop .popfoot .primbtn { flex: 0 0 auto; padding: 4px 11px; border-radius: 6px;
+              border: 1px solid var(--nx-action); background: var(--nx-action);
+              color: var(--nx-on-accent); font: inherit; font-size: 11.5px; font-weight: 600;
+              cursor: pointer; }
+  .nx-inspector .pop .popfoot .primbtn:hover { background: var(--nx-action-hover); }
+  .nx-inspector .pop .popfoot .primbtn:disabled { background: var(--nx-surface-sunken);
+              border-color: var(--nx-surface-sunken); color: var(--nx-ink-faint); cursor: not-allowed; }
   .nx-inspector .front-add-types button { display:flex; align-items:center; justify-content:center; gap:3px;
     min-width:0; min-height:30px; padding:4px; border-radius:6px; }
   .nx-inspector .front-add-types button:hover,
@@ -214,19 +347,54 @@
   .nx-inspector .front-gap-grid .row .unit { flex-basis: 23px; }
 
   /* ===== KOV-A2a: KARTA CELA ==============================================
-     Karta je TRETI potomok stlpca `.frow` (za `.fmain` a `.fhw`), teda lezi
-     PRIAMO POD svojim riadkom — odchylka od mockupu, kde je samostatny blok
-     pod celym zoznamom. Dovod: kontext ostava pri riadku, ktoreho sa tyka,
-     a v skupine nepribuda trvaly blok (vertikalny priestor je vzacny).
-     Otvorena je VZDY NAJVIAC JEDNA. `.fmain` sa tym nemeni (rad ostava
-     nezalamovaci) a hairline predel `.frow + .frow` lezi az pod kartou.
+     Karta je POSLEDNY potomok `.frow`, v mriezke D-130a TRETI RIADOK gridu
+     cez stlpce 2-4 (pod nazvom, suhrnom a polom vysky) — teda lezi PRIAMO POD
+     svojim riadkom, odchylka od mockupu, kde je samostatny blok pod celym
+     zoznamom. Dovod: kontext ostava pri riadku, ktoreho sa tyka, a v skupine
+     nepribuda trvaly blok (vertikalny priestor je vzacny).
+     Otvorena je VZDY NAJVIAC JEDNA a hairline predel `.frow + .frow` lezi az
+     pod kartou.
 
      VSETKY pravidla karty su scopnute pod `.nx-inspector .fcard` — triedy
      `.segrow` a `.inforow` UZ V PANELI ZIJU s inym vzhladom (vkladacia karta
      UI-C1b, informacny stlpec UI-B3), takze bez tohto scopu by sa dva vizualne
      jazyky bili. Vyssia specificita (3 triedy) vyhrava bez ohladu na poradie. */
-  .nx-inspector .frow .fcard { border: 1px solid var(--nx-part-border); background: var(--nx-part-bg);
-                               border-radius: 8px; padding: 7px 8px 8px; margin: 3px 0 2px; }
+  .nx-inspector .frow .fcard { grid-column: 2 / 5; grid-row: 3; min-width: 0;
+                               border: 1px solid var(--nx-part-border); background: var(--nx-part-bg);
+                               border-radius: 8px; padding: 0 8px 8px; margin: 5px 0 2px; }
+  /* D-130a: TABY karty — „Čelo" (co nastavujem) | „Kovanie" (co z toho vzislo).
+     Hlavicka je na plnu sirku karty (zaporne marginy vyrusia jej padding),
+     aby spodna linka tabu siahala od okraja po okraj. */
+  .nx-inspector .fcard .ctabs { display: flex; gap: 2px; margin: 0 -8px 7px; padding: 0 8px;
+              border-bottom: 1px solid var(--nx-part-border); border-radius: 8px 8px 0 0;
+              background: var(--nx-select-bg-soft); }
+  .nx-inspector .fcard .ctabs button { display: inline-flex; align-items: center; gap: 4px;
+              padding: 5px 10px; margin-bottom: -1px; border: 0; border-bottom: 2px solid transparent;
+              background: none; color: var(--nx-ink-muted); font: inherit; font-size: 11.5px;
+              font-weight: 600; cursor: pointer; }
+  .nx-inspector .fcard .ctabs button:hover { color: var(--nx-select); }
+  .nx-inspector .fcard .ctabs button:focus-visible { outline: 2px solid var(--nx-select); outline-offset: -2px; }
+  .nx-inspector .fcard .ctabs button.on { color: var(--nx-select-strong); border-bottom-color: var(--nx-select); }
+  .nx-inspector .fcard .ctabs .ic { width: 12px; height: 12px; }
+  /* Badge „smer?" na tabe Čelo — otvorena otazka ostane vidiet aj vtedy, ked
+     je karta prave na tabe Kovanie. */
+  .nx-inspector .fcard .ctabs .fbadge { font-size: 9px; font-weight: 600; line-height: 1.5;
+              border-radius: 9px; padding: 0 5px; color: var(--nx-warnchip-fg);
+              background: var(--nx-warn-bg-soft); border: 1px solid var(--nx-warnchip-border); }
+  /* „Otvoriť v Kovaní" stoji vpravo dole v tabe Kovanie (navigacia, nie zapis). */
+  .nx-inspector .fcard .cfoot { display: flex; justify-content: flex-end; margin-top: 8px; }
+  .nx-inspector .fcard .cfoot .ghostbtn { display: inline-flex; align-items: center; gap: 5px;
+              padding: 4px 9px; font-size: 11.5px; font-weight: 600; }
+  .nx-inspector .fcard .cfoot .ghostbtn .ic { width: 13px; height: 13px; }
+  /* D-78: ovladac bez ciela sa NESKRYVA — ostava viditelny a stlmeny,
+     dovod nesie `title`. */
+  .nx-inspector .fcard .cfoot .ghostbtn[aria-disabled="true"] { opacity: .5; cursor: default; }
+  .nx-inspector .fcard .cfoot .ghostbtn[aria-disabled="true"]:hover { background: var(--nx-surface-sunken); }
+  /* D-130a R7: UCHYTKA je JEDEN riadok karty — Profil a Hrana vedla seba. */
+  .nx-inspector .fcard .phalf { display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+              flex: 1 1 0; min-width: 0; }
+  .nx-inspector .fcard .phalf select { min-width: 0; width: 100%; padding: 3px 6px;
+              border: 1px solid var(--nx-border-strong); border-radius: 6px; font-size: 12px; }
   /* Sest typov v JEDNOM rade — dva rady by kartu zbytocne predlzili. Popisky
      su preto KRATKE (plny nazov typu nesie `title` dlazdice). */
   .nx-inspector .fcard .typegrid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
@@ -1759,16 +1927,10 @@
                       background: none; font: inherit; font-size: 11.5px;
                       color: var(--nx-select); text-align: center; cursor: pointer; }
   .warnpanel .wgoto:hover { text-decoration: underline; }
-  /* UI-C3: NAVIAZANE KOVANIE pod riadkom cela — JEDEN drobny riadok (nie
-     tabulka: vertikalny priestor je vzacny), jednoriadkovy s ellipsis, plny
-     text v `title` (vzor .hwbuy z D-92). Klik vedie do kontextu Kovanie.
-     SMOKE PACK 1: `.frow` uz nie je zalamovaci rad, ale STLPEC — riadok preto
-     nepotrebuje `flex: 1 0 100%`, je to prosto druhy potomok stlpca. */
-  .frow .fhw { font-size: 10.5px; color: var(--nx-ink-faint); padding: 1px 0 0 41px;
-               display: flex; align-items: center; gap: 5px; cursor: pointer;
-               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .frow .fhw:hover, .frow .fhw:focus { color: var(--nx-select); outline: none; }
-  .frow .fhw .ic { flex: 0 0 auto; width: 11px; height: 11px; }
+  /* D-130a: samostatny riadok `.fhw` ZANIKOL — naviazane kovanie je POSLEDNA
+     polozka SUHRNU riadku (`.fsub .fsubhw`, styly v bloku „Cela riadky"),
+     preklik do kontextu Kovanie robi tlacidlo „Otvoriť v Kovaní" v tabe
+     Kovanie karty cela. Jeden udaj na jednom mieste. */
   /* Kratke zvyraznenie ciela po skoku z riadku cela (alebo zo znacky v nahlade)
      do sekcie Kovanie — bez neho pouzivatel po prepnuti kontextu hlada, ktora
      polozka je „jeho". UI-C4: cielom je BOX vlastnika. */
