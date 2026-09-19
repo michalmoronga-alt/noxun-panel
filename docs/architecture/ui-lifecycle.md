@@ -856,7 +856,9 @@ otvárania kariet. Zlúčil tri veci, ktoré boli po riadku rozsypané: badge �
 Text skladá **čistá funkcia `frontRowSummary(item, entry, hw, reg, drawer)`** v `core.js` (vracia pole častí, nie reťazec — badge a jantárové „bez klasifikácie" potrebujú vlastný
 markup); `form.js` ho len kreslí (`updateFrontRowSummary`). **Žiadne nové dáta:** dataset riadku, `front_slots`, `front_drawer` a hotový text kovania (`frontHwBadge` +
 `frontHwBuy`). **Počet krídel hovorí SERVER** (`front_slots[fid].wings_n`) — AUTO dvierka nad 600 mm sú dve krídla a to vie len on; bez záznamu sa píše len „auto". **Smer** ide
-výhradne z uloženej hodnoty: legacy čelo (kľúč chýba) nedostane ani slovo, ani badge — badge „smer?" len pri `unset` (aj pri strednom krídle 3/4-krídlových dvierok). Obnovuje sa
+výhradne z uloženej hodnoty: legacy čelo (kľúč chýba) nedostane ani slovo, ani badge — badge „smer?" len pri `unset`. **Ráta sa LEN cez aktívne sloty** (`front_slots[fid].slots`,
+Codex #371): prechádzať všetky uložené `wing_directions` bolo zle, lebo po návrate zo 4 krídel na 2 ostáva `p2: unset` ako **dormantná** hodnota (A1: návrat nič nemaže) a riadok
+by navždy svietil „smer?" na otázku, ktorú nikto nekladie. Bez slotov rozhoduje skalárny `direction`, a to len pri **jednom** krídle — dvojkrídlo má smer odvodený. Obnovuje sa
 tam, kde sa dovtedy obnovovali badge (light push aj plný render), takže riadky sa pod `keepGaps` guardom **neprestavujú**.
 
 **Koncovka kovania `.fhwlink` je SÚRODENEC, nie vnorený prvok** (R3-f): druhý riadok mriežky je flex obal `.fsubwrap` s dvoma tlačidlami — `.fsub` rastie a oreže sa, `.fhwlink`
@@ -892,7 +894,9 @@ plní ich `nxDimFillRow` (settings.js) **tou istou cestou** ako statické polia,
 **Naviazané kovanie** je od D-130a **koncovka súhrnu** (`.fhwlink`, vyššie) — samostatný riadok `.fhw` zanikol. Text skladajú tie isté dva **existujúce** zdroje (`frontHwBadge`
 z plánu + `frontHwBuy` = `purchase.set_name` z D-92). Prepnutie kontextu na Kovanie a doskok na **box vlastníka** robí tlačidlo „Otvoriť v Kovaní" v tabe Kovanie karty
 (`hwBoxByGroup(hwFrontGroup(fid))` — kľúč skupiny skladá JEDNA funkcia pre render aj pre skok, takže sa nemôžu rozísť; `.hwfocus` krátke zvýraznenie). Keď box vlastníka
-**neexistuje** (nové čelo pred echom), tlačidlo sa **neskrýva**: ostáva viditeľné s `aria-disabled` a dôvodom v `title` (D-78).
+**neexistuje** (nové čelo pred echom), tlačidlo sa **neskrýva**: ostáva viditeľné s `aria-disabled` a dôvodom v `title` (D-78) — a **klik na neho nerobí nič** (guard
+`onFrontOpenHardware`, Codex #371). `openFrontHardware` navyše overí box vlastníka **pred** prepnutím kontextu: neúspešný skok kontext nemení, takže používateľ neskončí
+v Kovaní bez toho, na čo klikol.
 
 **D-84 / D-114:** šesť ikon „Pridať: typ“ posiela typ do nového riadku; odoberacie tlačidlo aj `removeLastFront` zanikli. Maže sa krížikom konkrétneho riadku. D-130a pred rad
 pridala tlmený popisok „Pridať čelo" a hairline predel (`.addrow`).
@@ -913,7 +917,10 @@ rukou zmizla. *Vedomá odchýlka od mockupu*, kde je karta samostatný blok pod 
 **KARTA MÁ DVA TABY (D-130a R6):** **Čelo** (čo nastavujem — typegrid, krídla, smer, otváranie, konštrukcia, zásuvka, úchytka) a **Kovanie** (čo z toho vzišlo — vyriešený set,
 chipy zámkov osí, technický detail, ponuka verzie receptu, tlačidlo „Otvoriť v Kovaní"). `frontCardModel` vracia `tabs` (čistý VM), `rows` = tab Čelo a `hwRows` = tab Kovanie.
 Tab Kovanie má **každý fyzický typ vrátane blendy** (blenda s úchytkovým profilom kovanie dostáva z pravidla `uchytkovy-profil-blenda`) — chýba len pri `none`; bez položiek
-ukáže jednu tlmenú vetu „Bez kovania." Stav tabu drží `openFrontCardTab`: default **Čelo** pri každom otvorení **inej** karty, ale `refreshFrontCards` (echo, ľahký push) ho
+ukáže jednu tlmenú vetu „Bez kovania." **Prázdny stav sa NEODVODZUJE len z `hwRows`** (Codex #371): vyriešené riadky má len zásuvka a výklop, kým dvierka, sklop aj blenda
+s úchytkovým profilom kovanie **majú** — hovorí oň plán a nákup. Poradie je preto: text (`frontHwBadge` + `frontHwBuy`, ako read-only `.drow`) → existujúci box vlastníka
+→ až potom „Bez kovania." Stav tabu drží `openFrontCardTab`: default **Čelo** pri každom otvorení **inej** karty (vrátane deep-linku `nxFocusFront` — RED nález smeru vedie
+na otázku v tabe Čelo), ale `refreshFrontCards` (echo, ľahký push) ho
 **zachová** — inak by každý push hodil používateľa z Kovania späť (vzor obnovy fokusu D2b). Prepnutie tabu **nič nezapisuje** (žiadny `onField`, žiadny krok Späť) a identita
 tabu (`data-tab`) je súčasťou `frontCardFocusKey`, takže fokus prežije prekreslenie. Badge „smer?" sedí **na tabe Čelo**, takže otvorená otázka je vidieť aj z tabu Kovanie.
 **Červená stavová veta stojí v OBOCH taboch** — je to dôvod, prečo dielce nevzniknú: v Kovaní v plnom znení s chipmi, v Čele ako jeden `inforow err` **nad** segmentmi.
@@ -1085,7 +1092,10 @@ znamenalo dva kroky Späť a hrana sa nedala zvoliť vopred. Hrana sa nasadí, l
 rôzne), inak by server uložené „Hore" aj tak zhodil. Popover stojí **mimo `<summary>`** (súrodenec pred `.body`) — vnútri hlavičky by bol súčasťou klikateľnej plochy, ktorá
 skupinu zbaľuje — a je **dieťaťom `<details>`**, takže pri zbalenej skupine ho prehliadač nevykreslí: trigger skupinu **najprv otvorí** (`details.open = true`) a až potom
 ukáže popover. Ukotvený je `right: 6px` dovnútra panela (outside-in packet 2). Zatvára ho klik mimo, **Escape** a „Použiť"; fokus sa vracia na tlačidlo, **len keď bol
-v popoveri** (pri kliku mimo patrí tomu, na čo používateľ klikol). Tlačidlo nesie `aria-haspopup="dialog"` + `aria-expanded`.
+v popoveri** (pri kliku mimo patrí tomu, na čo používateľ klikol). Tlačidlo nesie `aria-haspopup="dialog"` + `aria-expanded`. **Escape sa SPOTREBUJE**
+(`preventDefault` + `stopImmediatePropagation`, vzor `nx_esc.js` — Codex #371): všetky Escape listenery okna visia na `document` a `stopPropagation` medzi nimi nefunguje,
+takže bez toho by jedno stlačenie zavrelo popover **aj** flyout z `boot.js`. **Poradie skriptov v `panel.html` je kontrakt:** `nx_esc.js` (reťaz modalov) → `form.js`
+(popover) → `boot.js` (flyouty raily) — teda presne poradie vrstiev zhora nadol.
 
 Oba ovládače zapisujú rovnaké `dataset.frontProfile`/`frontProfileEdge`
 a `collectFronts`; žiadny uložený hromadný default. `frontProfileCommon(items, scope, key)` vracia nezávislý zmiešaný stav profilu/hrany. `frontProfileStateText` zoskupuje rovnaký profil aj hranu v poradí prvého výskytu. Rozsah ponúkne prienik platných
