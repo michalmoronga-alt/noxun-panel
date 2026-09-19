@@ -66,26 +66,64 @@
   // renderFronts ho obnovuje z kanonickeho configu pod TYM ISTYM echo-guardom ako
   // gap polia (keepGaps): starsie echo apply nesmie prepisat novsi klik na zamok.
   var edgeLimitOff = false;
+  // D-130b: zamok je IKONA v hlavicke skupiny `cabfront` — textovy label
+  // `.lblLimit` zanikol. Stav nesie ikona (lock/lock-open), `title`, farba
+  // (`amber` = odomknute) a `aria-pressed`; vsetko musi byt citatelne aj pri
+  // ZBALENEJ skupine, preto farba a nie veta v tele.
+  var EDGE_LIMIT_TITLE_ON = 'Limit presahov: zamknuté ±100 mm — klik odomkne až ±2000 (obklady, pilastre)';
+  var EDGE_LIMIT_TITLE_OFF = 'Odomknuté ±2000 mm — klik zamkne';
   function setEdgeLimitOff(off){
     edgeLimitOff = !!off;
     var b = el('edgeLimitLock');
     if (b){
       // B3: NEprepisovat cely obsah tlacidla textContentom (zmazal by ikonu) —
-      // meni sa len symbol v <use> a textovy label; aria-pressed drzi stav (B11).
-      if (window.NXIcons) NXIcons.set(b, edgeLimitOff ? 'lock-open' : 'lock');
-      var lbl = b.querySelector('.lblLimit');
-      if (lbl) lbl.textContent = edgeLimitOff ? '±2000 mm' : '±100 mm';
-      b.setAttribute('aria-pressed', edgeLimitOff ? 'false' : 'true'); // pressed = zamknuty limit
-      b.classList.toggle('unlocked', edgeLimitOff);
+      // meni sa len symbol v <use>, title a farba; aria-pressed drzi stav (B11).
+      if (typeof window !== 'undefined' && window.NXIcons) NXIcons.set(b, edgeLimitOff ? 'lock-open' : 'lock');
+      if (b.setAttribute) b.setAttribute('title', edgeLimitOff ? EDGE_LIMIT_TITLE_OFF : EDGE_LIMIT_TITLE_ON);
+      if (b.setAttribute) b.setAttribute('aria-pressed', edgeLimitOff ? 'false' : 'true'); // pressed = zamknuty limit
+      if (b.classList) b.classList.toggle('amber', edgeLimitOff);
     }
   }
-  function toggleEdgeLimit(){
+  // D-130b: tlacidlo zije v <summary> — bez `nxTipStop` by klik skupinu zbalil.
+  function toggleEdgeLimit(ev){
+    nxTipStop(ev);
     setEdgeLimitOff(!edgeLimitOff);
     onField(); // apply pre oznaceny korpus + prevalidovanie okrajovych poli
   }
   // D-07: hodnota gap pola cez evalDim (vyrazy); prazdne/nezmysel = default.
   function frontGapVal(id, dflt){ var v = numv(id); return isNaN(v) ? dflt : v; }
-  function resetFrontGaps(){ setNum('fr_gap', 3); setNum('fr_gap_top', 2); setNum('fr_gap_bottom', 2); setNum('fr_gap_left', 2); setNum('fr_gap_right', 2); onField(); }
+  // D-130b: `resetFrontGaps` je tiez ikona v hlavicke (ten isty stop-guard).
+  // PREDVOLBY SA NEMENIA — 3 / 2 / 2 / 2 / 2 je stav, ktory server normalizuje.
+  function resetFrontGaps(ev){ nxTipStop(ev); setNum('fr_gap', 3); setNum('fr_gap_top', 2); setNum('fr_gap_bottom', 2); setNum('fr_gap_left', 2); setNum('fr_gap_right', 2); onField(); }
+  // Meta hlavicky `cabfront`: dekor · medzera · styri okraje. Text sklada
+  // CISTA funkcia v core.js; tu sa len zbieraju hodnoty z DOM.
+  // Bez oznacenej skrinky je meta prazdna (`cabfrontMetaText(null)`).
+  function updateCabfrontMeta(){
+    var node = el('cabfrontMeta'); if (!node) return;
+    if (typeof cabfrontMetaText !== 'function') return;
+    var picked = (typeof selectedCabId !== 'undefined') && selectedCabId;
+    var gaps = picked ? { gap: frontGapVal('fr_gap', 3.0), top: frontGapVal('fr_gap_top', 2.0),
+                                 bottom: frontGapVal('fr_gap_bottom', 2.0), left: frontGapVal('fr_gap_left', 2.0),
+                                 right: frontGapVal('fr_gap_right', 2.0) } : null;
+    node.textContent = cabfrontMetaText(cabfrontDecorName(), gaps);
+  }
+  // Nazov dekoru berieme z TEXTU vybranej option uz existujuceho selectu
+  // `cab_front_c` — ziadny druhy zdroj pravdy, ziadny novy dotaz na server.
+  function cabfrontDecorName(){
+    var sel = el('cab_front_c');
+    if (!sel || !sel.value) return '';
+    var opts = sel.options || (sel.querySelectorAll ? sel.querySelectorAll('option') : null) || [];
+    for (var i = 0; i < opts.length; i++){
+      var o = opts[i];
+      // ATRIBUT ma prednost pred vlastnostou: `<option value="X">` je to, co
+      // porovnavame so `sel.value`. Ked atribut chyba, hodnotou je text —
+      // vtedy rozhodne vlastnost (tak to robi aj prehliadac).
+      var a = o.getAttribute ? o.getAttribute('value') : null;
+      var v = (a === null) ? o.value : a;
+      if (v === sel.value) return o.textContent || '';
+    }
+    return '';
+  }
   function frontSideGap(fronts, key){
     if (fronts && Object.prototype.hasOwnProperty.call(fronts, key)) return fronts[key];
     return (fronts && fronts.gap_sides != null) ? fronts.gap_sides : 2;
@@ -295,6 +333,7 @@
     refreshMaterialFilters();              // FIX 2: hrubka sa mohla zmenit -> prefiltruj material selecty
     schedulePreview();                     // D-02: nahlad sa neprekresluje pri kazdom pismene
     updateAvailable();
+    updateCabfrontMeta();                  // D-130b: meta skupiny „Spoločné" ukazuje PRAVE napisane cisla
     // KOV-G2 (D-111): riadok Noh vo VKLADANI. Dotaz odide LEN pri zmene toho,
     // na com nohy zavisia (typ, sirka, sokel, rezim sokla) — funkcia si to
     // stripuje sama, aby `onField` nemusel vediet, ktore pole sa menilo.
@@ -2024,6 +2063,7 @@
       // NEPRESTAVUJU. Karta ostava otvorena a prekresli sa z cerstvych slotov.
       updateFrontRowSummaries();
       updateFrontMeta();
+      updateCabfrontMeta(); // D-130b: meta skupiny „Spoločné pre skrinku"
       refreshFrontCards();
       // applyTimer = pouzivatel pisal AJ PO flushi, ktory toto echo vyvolal —
       // jeho ≈ vysky su uz stare; placeholder doplni az echo najnovsieho editu.
@@ -2051,6 +2091,7 @@
     if (openFrontCardId && !frontRowById(openFrontCardId)) openFrontCardId = null;
     updateFrontRowSummaries();
     updateFrontMeta();
+    updateCabfrontMeta(); // D-130b: meta skupiny „Spoločné pre skrinku"
     refreshFrontCards();
     refreshFrontProfileUI(); // D-96: ponuka a veta stavu patria k prave vykreslenym riadkom
   }
@@ -2274,6 +2315,12 @@
                        addFrontKind: addFrontKind, syncFrontCardOwner: syncFrontCardOwner,
                        closeFrontCard: closeFrontCard,
                        // KOV-A2b: deep-link zo Studia (`NX.focusFront`).
-                       nxFocusFront: nxFocusFront };
+                       nxFocusFront: nxFocusFront,
+                       // D-130b: skupina „Spoločné pre skrinku" — zamok limitu
+                       // a reset su IKONY v <summary> (inline `onclick`), meta
+                       // hlavicky kresli panel z ciseho textu core.js.
+                       toggleEdgeLimit: toggleEdgeLimit, setEdgeLimitOff: setEdgeLimitOff,
+                       resetFrontGaps: resetFrontGaps, updateCabfrontMeta: updateCabfrontMeta,
+                       cabfrontDecorName: cabfrontDecorName };
   }
 

@@ -512,6 +512,32 @@
   // R6-b: tab Kovanie ma KAZDY FYZICKY TYP vratane BLENDY — blenda
   // s uchytkovym profilom kovanie dostava (pravidlo `uchytkovy-profil-blenda`).
   // Chyba LEN pri `none`: otvorena nika nie je dielec, takze nema vlastnika.
+  // --- D-130b: meta hlavicky skupiny „Spoločné pre skrinku" -----------------
+  // JEDEN riadok, ktory povie stav aj pri ZBALENEJ skupine: dekor ciel ·
+  // medzera medzi celami · styri okraje (hore/dole/vlavo/vpravo).
+  // CISTA funkcia — `form.js` ju len kresli do `#cabfrontMeta`.
+  // `g == null` = nie je oznacena skrinka: meta je PRAZDNA (cisla bez skrinky
+  // by klamali — patrili by poslednemu vyberu).
+  // Dekor je volitelny: neoznaceny/nezvoleny material vypadne a riadok zacne
+  // rovno medzerou (radsej kratsi riadok nez prazdna bodka navrch).
+  var CABFRONT_DECOR_MAX = 14;
+  function cabfrontDecorShort(name){
+    var s = String(name == null ? '' : name).trim();
+    if (!s) return '';
+    // Elipsa je ZNAK, nie tri bodky — hlavicka je uzka a tri bodky by ju
+    // predlzili presne tam, kde setrime.
+    return (s.length > CABFRONT_DECOR_MAX) ? (s.slice(0, CABFRONT_DECOR_MAX - 1) + '…') : s;
+  }
+  function cabfrontMetaText(decor, g){
+    if (!g) return '';
+    function num(v){ var t = mmLabel(v); return t === '' ? '?' : t; }
+    var out = [], d = cabfrontDecorShort(decor);
+    if (d) out.push(d);
+    out.push(num(g.gap));
+    out.push([num(g.top), num(g.bottom), num(g.left), num(g.right)].join('/'));
+    return out.join(' · ');
+  }
+
   var FRONT_TAB_CELO = 'celo';
   var FRONT_TAB_HW = 'hw';
   function frontCardTabs(type, dirUnset){
@@ -1600,6 +1626,9 @@
       // D-130a (tests/js/test_d130a_suhrn_karta.js): SUHRN riadku cela a taby
       // karty. Suhrn je CISTA funkcia — `form.js` ho len kresli.
       frontRowSummary: frontRowSummary, frontCardTabs: frontCardTabs,
+      // D-130b (tests/js/test_d130b_spolocne.js): meta hlavicky skupiny
+      // „Spoločné pre skrinku" — cisty text z dekoru a piatich hodnot.
+      cabfrontMetaText: cabfrontMetaText, cabfrontDecorShort: cabfrontDecorShort,
       FRONT_WINGS_OPTIONS: FRONT_WINGS_OPTIONS,
       // KOV-C2c (tests/js/test_kovc2c_karta.js): riadky zasuvky v karte cela.
       frontDrawerRows: frontDrawerRows, frontDrawerAxesRow: frontDrawerAxesRow,

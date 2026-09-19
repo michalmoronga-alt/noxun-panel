@@ -20,6 +20,9 @@
     // D-85: zmena `value`/`disabled` nevystreli ziadnu udalost — trigger comboboxu
     // treba obnovit vyslovne (inak by ukazoval material predoslej skrinky).
     nxComboSync();
+    // D-130b: dekor je PRVY udaj v meta hlavicky skupiny „Spoločné pre
+    // skrinku" — zmena materialu ju musi prekreslit (echo ide TOUTO cestou).
+    if (typeof updateCabfrontMeta === 'function') updateCabfrontMeta();
   }
   function clearCabinetMaterials(){
     // UI-C3: `cab_front_c` je DRUHY ovladac materialu ciel (zoznam ciel v
@@ -29,6 +32,7 @@
     ['cab_body','cab_front','cab_front_c','cab_back'].forEach(function(id){ var e=el(id); if(e){ e.value=''; e.disabled=true; } });
     el('cabMatHint').textContent = 'Označ skrinku pre nastavenie jej materiálov.';
     nxComboSync();
+    if (typeof updateCabfrontMeta === 'function') updateCabfrontMeta(); // D-130b: bez skrinky je meta prazdna
   }
   // D-45 (audit F9): payload nesie cabinet_id z casu kliku — server ho overi proti
   // aktualnemu vyberu (preklik medzi klikom a callbackom nesmie zasiahnut iny
