@@ -24,7 +24,7 @@ sekcia `run_d130a`: segment „Krídla" postaví dva panely a 1 krok Späť ich 
 
 ## Robí sa
 
-**D-130a „Nový zoznam čiel" je hotové (PR #TBD, v0.12.7) — čaká na smoke.** Riadok čela je **mriežka so stálymi stĺpcami** (číslo · názov + súhrn · pole výšky · ✕), takže polia
+**D-130a „Nový zoznam čiel" je hotové (PR #371, v0.12.7) — čaká na smoke.** Riadok čela je **mriežka so stálymi stĺpcami** (číslo · názov + súhrn · pole výšky · ✕), takže polia
 už „nelietajú"; pod názvom je **súhrn stavu** („1 krídlo (auto) · smer? · bez úchytky · Sensys klasik · 2 ks →") — stav všetkých čiel vidno bez otvárania kariet. Klik otvorí
 **kartu s dvoma tabmi**: **Čelo** (typ · krídla · smer · otváranie · konštrukcia · zásuvka · úchytka) a **Kovanie** (vyriešený set, zámky osí, detail, „Otvoriť v Kovaní").
 **Úchytka je na jednom mieste** (karta), hromadne cez **„všetkým"** v hlavičke — skupina „Úchytky" zanikla (**D-129 vyriešené**). Pomocné texty sú tooltipy `?`; dáta, zápis,
@@ -37,11 +37,11 @@ Undo ani server sa nemenia.
 
 **Ďalší blok vyberá Michal** — automaticky sa nič neštartuje; po uzávere M-R mala nasledovať slovná diskusia o workflow. Skupina „KONTROLA + VÝROBA" v
 [DOGFOODING.md](DOGFOODING.md) je po D-94 prázdna. Budúca rotácia obrázka a umiestnenie textúr sú D-126/D-127 v [PLAN.md](PLAN.md); D-48 a **D-109** (pomerová mechanika kovania, R-05) zostávajú po V1; ručné Redo Čiel je stále samostatne nepotvrdené.
-**Otvorené po D-130a:** **D-130b — skupina „Spoločné pre skrinku"** (materiál čiel · **schéma medzier** namiesto dvoch riadkov polí · ikony zámku limitu a „Predvolené" v hlavičke; `fgaps` + `fronts` → `cabfront`). Mockup `zdroje/ui20/mockup_cela_final.html` je schválený, outside-in hotový — stačí package. Znenie v [DOGFOODING.md](DOGFOODING.md).
+**Otvorené po D-130a:** **D-130b — skupina „Spoločné pre skrinku"** (materiál čiel · **schéma medzier** namiesto dvoch riadkov polí · ikony zámku limitu a „Predvolené" v hlavičke; `fgaps` + `fronts` → `cabfront`). Mockup [zdroje/ui20/mockup_cela_final.html](zdroje/ui20/mockup_cela_final.html) je schválený, outside-in hotový — stačí package. Znenie v [DOGFOODING.md](DOGFOODING.md).
 
 ## Posledné uzávery
 
-- **D-130a · Nový zoznam čiel, karta s tabmi, úchytka na jednom mieste** (v0.12.6 → **v0.12.7**, 19.9.2026, PR #TBD). Riadok = CSS grid `22 / 1fr / 112 / 22`; pole výšky je
+- **D-130a · Nový zoznam čiel, karta s tabmi, úchytka na jednom mieste** (v0.12.6 → **v0.12.7**, 19.9.2026, PR #371). Riadok = CSS grid `22 / 1fr / 112 / 22`; pole výšky je
   jeden box s konštantnou šírkou (chip AUTO odoberá miesto hodnote, nie boxu); súhrn z čistej `frontRowSummary` (počet krídel zo servera, smer len z uloženej hodnoty);
   karta má taby Čelo | Kovanie (`frontCardModel.tabs` + `hwRows`), krídla sú segment v karte (`dataset.frontWings`); `fhandles` zanikla, hromadná úchytka je popover
   „všetkým" so **zápisom až pri „Použiť"**; pomocný text = tooltip `.nxtip`, stavové vety ostávajú. **D-129 vyriešené.** Bez zmeny kontraktu a payloadov.

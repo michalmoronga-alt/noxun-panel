@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **D-130a — NOVÝ ZOZNAM ČIEL, KARTA S TABMI, ÚCHYTKA NA JEDNOM MIESTE, v0.12.7 (19.9.2026, PR #TBD).**
+- **D-130a — NOVÝ ZOZNAM ČIEL, KARTA S TABMI, ÚCHYTKA NA JEDNOM MIESTE, v0.12.7 (19.9.2026, PR #371).**
   **Čo Michal dostal:** kontext **Čelá** je prehľadný. Každé čelo sú **dva rovnako usporiadané riadky** — hore číslo · názov typu · **pole výšky vždy v tom istom stĺpci** · ✕;
   pod názvom **tlmený súhrn** („1 krídlo (auto) · smer? · bez úchytky · Sensys klasik · 2 ks →"), takže **stav všetkých čiel vidno bez otvárania kariet**. Klik na názov
   alebo súhrn otvorí **kartu s dvoma tabmi**: **Čelo** (typ · krídla · smer · otváranie · konštrukcia · zásuvka · **úchytka**) a **Kovanie** (vyriešený set, zámky osí,

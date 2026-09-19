@@ -4,7 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
-- **D-129** — Úchytka čela sa nastavuje na jednom mieste (karta čela); hromadne cez akciu „všetkým" v hlavičke skupiny Čelá — skupina „Úchytky" zanikla — 19.9.2026, PR #TBD, v0.12.7
+- **D-129** — Úchytka čela sa nastavuje na jednom mieste (karta čela); hromadne cez akciu „všetkým" v hlavičke skupiny Čelá — skupina „Úchytky" zanikla — 19.9.2026, PR #371, v0.12.7
 - **D-134** — Hromadné zápisy zákazky (pravidlá kovania, projektová predvoľba materiálu, „aj na podobné v projekte") pracujú s rovnakým rozsahom ako výstupy (top-level skrinky) a skrinku s odpojeným dielcom preskočia a vymenujú, kým projektový zápis prebehne — 13.9.2026, PR #369, v0.12.6
 - **D-133** — „Nahradiť UNI…" má rovnaký rozsah ako výstupy (top-level skrinky a dosky, vnorená skrinka sa už neprestavuje) a skrinka s odpojeným dielcom nahradenie blokuje s návodom, ako to vyriešiť — 13.9.2026, PR #368, v0.12.5
 - **D-132** — Dormantný zámok osi zásuvky (zostal po zmene otvárania alebo po prechode na dvierka) je v Kovaní vidieť ako riadok „Dormantný zámok · NL 470" s dôvodom a tlačidlom „zrušiť"; chipy osí ani nákup sa nemenia — 13.9.2026, PR #367, v0.12.4
@@ -125,7 +125,7 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ### D-129 — Úchytka na jednom mieste, vyriešené 19.9.2026
 
-**Výsledok: PR #TBD, v0.12.7 (dávka D-130a).** Pôvodné znenie postrehu (Michal 12.9.2026): *„Úchytky sú v kontexte Čelá na dvoch miestach — po KOV-A (smery otvárania)
+**Výsledok: PR #371, v0.12.7 (dávka D-130a).** Pôvodné znenie postrehu (Michal 12.9.2026): *„Úchytky sú v kontexte Čelá na dvoch miestach — po KOV-A (smery otvárania)
 a D-120 (profil aj hrana) sa ovládanie úchytiek rozpadlo: skupina **Úchytky** (D-96 — hromadný profil/hrana per typ čela) a súčasne **karta čela** (profil, hrana, smer) —
 ten istý údaj sa nastavuje na dvoch miestach a členenie sekcie je chaotické."*
 

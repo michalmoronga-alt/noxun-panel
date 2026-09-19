@@ -40,7 +40,7 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
   s profilom aj hranou, medzery v dvoch riadkoch, materiál čiel, potvrdenie návrhu) a potrebuje **lepšiu organizáciu a spojenie do prehľadného celku**. **Časť a je HOTOVÁ
   (D-130a, v0.12.7):** nový zoznam čiel (riadok = mriežka so stálymi stĺpcami, súhrn pod názvom), karta s tabmi Čelo | Kovanie, úchytka na jednom mieste (vyriešila aj D-129)
   a pomocné texty presunuté do tooltipov `?`. *Stav: OTVORENÉ — **ostáva časť b: „Spoločné pre skrinku"** (materiál čiel · schéma medzier namiesto dvoch riadkov polí · ikony
-  zámku limitu a „Predvolené" v hlavičke skupiny; skupiny `fgaps` a `fronts` sa zlúčia do `cabfront`). Mockup: `zdroje/ui20/mockup_cela_final.html`.*
+  zámku limitu a „Predvolené" v hlavičke skupiny; skupiny `fgaps` a `fronts` sa zlúčia do `cabfront`). Mockup: [zdroje/ui20/mockup_cela_final.html](zdroje/ui20/mockup_cela_final.html).*
 - **Vedome odložené z dávky E — ceny (V1 rozsah)** (6.8., nič z toho neblokuje prácu so zákazkou) — **manuálne overenie ceny materiálov/ABS** BEZ väzby na Demos a **viac URL na položke**
   (zvyšok V1-03; dnes ich „Prepočítať ceny" preskočí) · ~~prepínač „na faktúru" (×1,2)~~ — **vyradené 6.9.2026** (Michal: existuje prepínač s DPH / bez DPH); zvyšok rozhodnutý v `zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md`.
   **Katalógové kovanie je hotové (10.9., CENY-KOV-A/B, PR #345/#346):** jeden produktový odkaz, preklik a ručné potvrdenie ceny k dnešku v katalógu/Rozpočte. Materiály/ABS a viac URL sú naďalej otvorené.
