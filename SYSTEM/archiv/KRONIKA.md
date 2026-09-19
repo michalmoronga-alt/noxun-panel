@@ -17,6 +17,26 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **S1 PREDÚLOHA — TECHNICKÉ LISTY SPOTREBIČOV OVERENÉ PROTI VÝROBCOM + PRAX (19.9.2026, PR #373, docs — bez zmeny kódu, VERSION 0.12.8 ostáva).**
+  **Čo sa spravilo:** rozmery z rešerše Antigravity (6.9., `zdroje/next_sessions/SPOTREBICE_TECHLISTY_2026-09.md` §3) sa porovnali riadok po riadku so **skutočnými PDF listami
+  výrobcov** (Whirlpool, Bosch, Beko — PDF otvorené a prečítané, nie tvrdenie Gemini) a Michal prešiel všetky kategórie z praxe cez interaktívnu stránku (súkromný artefakt,
+  poznámky v jej databáze). Výsledok = nový packet `SPOTREBICE_TECHLISTY_OVERENIE_2026-09-19.md` (porovnanie, verdikty, §9 doplnenia z praxe, §11 presné URL listov) +
+  opravené kľúčové hodnoty v §3/§4 pôvodného dokumentu + **seed 9 modelov** (Whirlpool ART 97101 2 vyradený: list nedostupný, predaj skončil). PLAN (riadok Spotrebiče S1)
+  a STAV („Ďalší krok") prepísané: predúloha hotová, ďalej detailná debata polí → outside-in → mockup → package + `codex-audit` (nový modul).
+  **Prečo boli čísla prijaté / čo sa zmenilo:** väčšina rešerše sedela; opravy: PD nad rúrou Bosch pri indukcii ≥ 37/38 (nie 28–30, len poznámka); Beko nika min 560 × 1940–1950 ×
+  **min 555** a vetranie = **zadná stena skrinky úplne otvorená** (nie kanál 50); umývačka WIO čelo 594 × max 720; varná doska PD min 12 (28 nad rúrou), odstupy 35/100; digestor
+  min 500 el. / 650 plyn. GAPy vyplnené: **výrez digestora 437 × 216** (ETD), **dvere Beko 1159 / 71 / 629 / 40**. Z praxe (Michal): kóta 9 pri rúre Whirlpool = **povinná medzera
+  pod čelom** (horúci výduch; min. rozstup čiel 604, rezerva 605), Bosch má odvetranie 7,5 už v rozmere čela → medzera 0; presahy sa zapisujú **s referenciou** (Whirlpool kótuje voči telu, Bosch voči nike),
+  druhú referenciu si engine dopočíta z tela a niky; chladnička = **kontrolná geometria** box + čelná plocha zdola s pásmami 669 / 71 / 1200 a nábytkovým delením vnútri pásma medzery s presahom
+  ≥ 10 mm cez hranu dverí spotrebiča; umývačka prax čelo 826 + blend 115 + vlastný sokel → kontrola len šírka slotu, hmotnosť čela vypadáva; digestor výrez odsadený 20 mm od prednej
+  hrany dna (krycia doska), výška nad doskou sa nerieši; kombinácia rúra + varná doska sa nerieši. Dve URL surovej rešerše boli zle označené (W20027062 = list varnej dosky,
+  datart doc_4401491 = návod umývačky). Packet je **dôkazový podklad, nie kontrakt** (zdrojová vrstva) — hodnoty vstúpia do záväzného kontraktu až cez package S1 po audite.
+  **Testy:** headless 4155 / 0 (docs guardy, encoding, limit STAV); in-SU sa nespúšťala (bez zmeny kódu). Codex kolo 1 na PR: 2×P1 (chýbal tento záznam; packet nesmie byť
+  „autorita") + 12×P2 (geometria rúry/chladničky/umývačky, poradie osí, URL listov, zastaraný „komín 50", digestor v Závere 2, hmotnosť čela v seede) — všetko zapracované.
+  Kolo 2 = 7×P2 (škára rúra + mikro sa z listov nedá odvodiť; hĺbka rúry 570 vs 558; Beko 4 mm nevysvetlené → pásma viazané zdola; hĺbka tela Bosch neoverená; nika SPV 450 bez +8;
+  **Bosch kótuje presahy voči NIKE, Whirlpool voči TELU → pole presahu s referenciou**; **drez bez modelu a listu → predúloha nesplnená, do debaty ako cenová položka + ručný
+  výrez, model dodá Michal**) — zapracované, delta overená interne (pravidlo delta-verifikácie, len P2). Kópie listov a Michalove screeny: `_dev/techlisty/` (gitignorované, per PC).
+
 - **D-130b — SKUPINA „SPOLOČNÉ PRE SKRINKU": MATERIÁL ČIEL + SCHÉMA MEDZIER, v0.12.8 (19.9.2026, PR #372).**
   **Čo Michal dostal:** pod zoznamom čiel je jedna skupina **„Spoločné pre skrinku"** so všetkým, čo platí naraz pre všetky čelá jednej skrinky. Prvý riadok je **Materiál
   čiel** (ten istý údaj ako v Korpuse → Materiály, len presunutý sem z konca zoznamu). Pod ním sú **medzery a okraje ako SCHÉMA** — obrys skrinky s dvoma čelami a päť čísel
