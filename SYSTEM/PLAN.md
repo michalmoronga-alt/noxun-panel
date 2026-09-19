@@ -227,7 +227,10 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 - **Spotrebiče S1** (V1-02) — **rozhodnuté 6.9.2026:** ručný katalóg (názov/model, odkazy obchod[], technické listy[] + **galéria príloh** so súbormi, rozmery per kategória),
   spotrebič patrí **zákazke a vlastníkovi podľa kategórie** (skrinka · slot umývačky · pracovná doska · len zákazka), cena len v rozpočte, kontrola niky vo V1 len chladnička + šírka umývačky, šablóna s tagom „spotrebičová" upozorní bez spotrebiča;
   detail: [zdroje/next_sessions/V1_DEBATA_2026-09-06_SPOTREBICE.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_SPOTREBICE.md) + technické listy [zdroje/next_sessions/SPOTREBICE_TECHLISTY_2026-09.md](zdroje/next_sessions/SPOTREBICE_TECHLISTY_2026-09.md)
-  (predúloha hotová 6.9.; **listy overené 19.9.2026** proti PDF výrobcov + Michalova prax — [zdroje/next_sessions/SPOTREBICE_TECHLISTY_OVERENIE_2026-09-19.md](zdroje/next_sessions/SPOTREBICE_TECHLISTY_OVERENIE_2026-09-19.md), seed 9 modelov → detailná debata polí → outside-in → mockup → package + `codex-audit`, nový modul). Za S1: **spotrebičová skrinka** (šablóny nad K1 + S1; nízka priorita).
+  (predúloha hotová 6.9.; **listy overené 19.9.2026** proti PDF výrobcov + Michalova prax —
+  [zdroje/next_sessions/SPOTREBICE_TECHLISTY_OVERENIE_2026-09-19.md](zdroje/next_sessions/SPOTREBICE_TECHLISTY_OVERENIE_2026-09-19.md), seed 9 modelov;
+  **drez bez modelu a listu** — do debaty vstupuje ako cenová položka + ručný výrez do PD, model dodá Michal, inak poistka „len cena"
+  → detailná debata polí → outside-in → mockup → package + `codex-audit`, nový modul). Za S1: **spotrebičová skrinka** (šablóny nad K1 + S1; nízka priorita).
 - ✅ **D-124 · Predvoľby projektu v Materiáloch** — default rozbalené, ručne zbaliteľné; štyri skupiny Korpus / Čelá / Chrbát / Zásuvky vedľa seba, náhľady **115 × 115 px**
   (schválený mockup mínus 20 %), celý názov variantu a údaje pod vzorkou; v úzkom okne dva stĺpce. Spoločný picker, potvrdenie/zrušenie a serverový kontrakt zachované.
   **PR #344, v0.10.3.** „Materiál per rola dielca" ostáva v zásobníku Po V1. Podklad: `zdroje/next_sessions/D124_OUTSIDE_IN_2026-09-10.md`.

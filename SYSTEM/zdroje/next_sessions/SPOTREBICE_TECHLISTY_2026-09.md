@@ -37,7 +37,7 @@
 | Varná doska s odsávaním | Bosch PVQ731H26E / Elica NIKOLATESLA FIT BL/A/72 | Medzihradský | **mimo S1** (downdraft) |
 | **Digestor** | ★ Whirlpool WCT3 63F LTK | Bella (objednaný) | 255 € |
 | Digestor | Elica FOLD BL MAT/A/52 | Hurbanová | |
-| Drez / batéria / dávkovač | Blanco, Alveus, Franke, Schock (drezyonline) | Bella, Trochtová, Hurbanová | len cenová položka + výrez PD |
+| Drez / batéria / dávkovač | Blanco, Alveus, Franke, Schock (drezyonline) | Bella, Trochtová, Hurbanová | len cenová položka + výrez PD · **model ani list nie sú — predúloha pre drez nesplnená (§4, riadok Drez)** |
 
 **Seed balík — jedna záväzná sada (9 modelov; Codex #322 P2, revízia 19.9.2026):** ★ objednané (6): Whirlpool OMSR58RU1SB · Whirlpool MBNA900B · **Beko** BCNA306E5ZSN · Whirlpool WIO 3O540 PELG ·
 Whirlpool WL B1160 BF · Whirlpool WCT3 63F LTK — a **doplnkové neobjednané (3):** Bosch BFL7221B1 (Michalov vzorový zápis) · Bosch HBG774KB1 (prémiová rúra) · Bosch SPV6EMX05E (jediná 45 cm umývačka).
@@ -54,18 +54,20 @@ dve URL surovej rešerše boli zle označené (W20027062 = list varnej dosky, da
 
 | Pole | Whirlpool OMSR58RU1SB (rúra) | Whirlpool MBNA900B (mikro) | Bosch BFL7221B1 (mikro) | Bosch HBG774KB1 (rúra) |
 |---|---|---|---|---|
-| Telo Š×V×H | 548 × 570 (vzadu 525) × 558 | 544 × 348 × 299 | **list nekótuje** (len hĺbka 299; Michalov zápis 550 × 340 = odvodené, neoverené) | V tela 577 (= 595 − 18), H 548; Š tela list nekótuje |
+| Telo Š×V×H | 548 × 570 (vzadu 525) × 558 | 544 × 348 × 299 | **list nekótuje** (len hĺbka 299; Michalov zápis 550 × 340 = odvodené, neoverené) | V tela 577 (= 595 − 18); **548 = hĺbka podľa listu „rozmery spotrebiča"** (výkres kótuje niku min 550 a čelo 19,5 pred korpusom, takže 548 sa číta ako hĺbka tela za čelom, list to však nerozlišuje → hĺbka tela **neoverená**); Š tela list nekótuje |
 | Čelo Š×V, hrúbka | 595 × 595, 20 | 595 × 381–382, 21 | 594 × 382, 19,5 | 594 × 595, 19,5 |
 | Nika Š | 560–568 | 556/560–568 | 560–568 | 560–568 |
 | Nika V | 583–585 (stĺp) / 600–601 (pod PD) | 360–363 (stĺp alt. 380 min s kitom AVM 105) | 362–365 (stĺp alt. 380⁺²) | 585⁺¹⁰ (stĺp) / 600⁺⁴ (pod PD) |
 | Nika H min | 560 | 300 (alt. 550) | 300 | 550 |
-| Presah čela voči telu hore / dole | 20 / 5 podľa výkresu (detail dvierok pripúšťa 25 / 0 — ovplyvní len policu pod rúrou, Michal overí v praxi) | 20 / 13–14 | 6 (nika 362) alebo 3 (365) / 14 | 18 / 0 (telo 577) |
+| Presah čela hore / dole **(referencia!)** | **voči telu** 20 / 5 podľa výkresu (detail dvierok pripúšťa 25 / 0 — ovplyvní len policu pod rúrou, Michal overí v praxi) | **voči telu** 20 / 13–14 | **voči NIKE** 6 (nika 362) alebo 3 (365) / 14 — Bosch kótuje presah voči nike; voči telu neznáme (telo V list nekótuje) | **voči telu** 18 / 0 (telo 577) |
 | Medzera pod čelom (výduch) | **min 9** (kóta 9) → min. rozstup čiel 595 + 9 = 604 (Michal rezervuje 605) | — | — | **0** — odvetranie 7,5 je už v rozmere čela, nie presah |
 | Odvetranie | výrez zadnej hrany police 35–40 mm po celej šírke; plocha v cm² GAP | vpredu cez čelo; zadná medzera 0 v závesnej skrinke | vetracie štrbiny v čele, chrbát za spotrebičom otvorený | sokel min 200 cm² + medzidno 200 cm² (alebo zadná medzera 35–45); pod PD medzera 5 |
 | Iné | korpus odolný 90 °C; zásuvka nie za rúrou; 2 skrutky do bokov + lišta | 4 skrutky do bokov; nie za zatvárateľné dvierka | korpus 90 °C, susedné čelá 65 °C | pyrolýza → lepidlá; PD nad rúrou pri indukcii ≥ 37/38 (kombinácia s doskou sa nerieši — Michal 19.9.); miesto na prípojku 320 × 115 |
 
 **Rúra + mikro nad sebou (Whirlpool):** spoločný predpis **neexistuje** (GAP). Z listov: **pevná polica medzi nimi je povinná** (každý spotrebič má vlastné nosné dno a skrutky do bokov);
-zadná hrana medzipolice **nesmie** sedieť na chrbte — musí ostať vetrací komín 35–40 mm; pri 18 mm polici presah čela mikro dole 13–14 mm → medzi čelami vznikne škára ~4–5 mm.
+zadná hrana medzipolice **nesmie** sedieť na chrbte — musí ostať vetrací komín 35–40 mm. **Škára medzi čelami sa z listov NEDÁ odvodiť:** čelo rúry vyčnieva 20–25 mm nad telo
+(a 5–12 mm nad niku 583–585), čelo mikra visí 13–14 mm pod svojou nikou — pri 18 mm polici to podľa polohy tela v nike vychádza od prekrytia po 0 mm; rieši sa v praxi / v package
+(Záver 2 to drží ako neriešené).
 Michalov ručný zápis pre BFL7221B1 (nika 362–365 × 560–568, presah hore 6 / dole 14, čelo 594 × 382 × 20) **sedí s listom Bosch** — dobrý znak pre jeho formát; telo 550 × 340 × 300 je
 **odvodené** (list kótuje len hĺbku 299, šírku ani výšku tela nie) — v seede označiť ako odvodené, nie overené.
 
@@ -81,7 +83,7 @@ zadná stena skrinky úplne otvorená** (nie kanál 50); nosnosť dna list nekó
 | Pole | WIO 3O540 PELG | SPV6EMX05E |
 |---|---|---|
 | Telo Š×V×H | 598 × 820–900 × 555 | 448 × 815–875 × 550 |
-| Nika | 600 × 820–900 × min 560 (odp. 570) | 450–458 × 815–875 × min 550 |
+| Nika | 600 × 820–900 × min 560 (odp. 570) | 450 × 815–875 × min 550 (výkres kótuje šírku len 450, bez +8) |
 | Nábytkové čelo Š | 594 (list W11401540) | 442–448 |
 | Nábytkové čelo V | max 720 (list; Michal v praxi 826 + blend 115 nad čelom) | 655–725 |
 | Hmotnosť čela | 2–10 kg (list; Michal neráta — pole vypadáva) | list neuvádza |
@@ -101,10 +103,11 @@ Rozmerové polia podľa kategórie, každé **voliteľné** (neznáme = prázdne
 
 | Kategória | Rozmery pre engine (mm) | Kontrola vo V1 |
 |---|---|---|
-| Rúra · mikro | nika Š min–max · V min–max · H min · čelo Š × V × hrúbka · presah hore / dole **voči telu** · **medzera pod čelom (výduch: Whirlpool 9, Bosch 0)** · zadný výrez police (komín) · [pevná polica medzi rúrou a mikro = konštrukčné pravidlo šablóny] | **NIE** (rozhodnutie 6.9.); polia sa len evidujú |
+| Rúra · mikro | nika Š min–max · V min–max · H min · čelo Š × V × hrúbka · presah hore / dole **s referenciou (telo | nika — Whirlpool kótuje voči telu, Bosch voči nike; druhú referenciu engine dopočíta, len keď pozná telo aj niku)** · **medzera pod čelom (výduch: Whirlpool 9, Bosch 0)** · zadný výrez police (komín) · [pevná polica medzi rúrou a mikro = konštrukčné pravidlo šablóny] | **NIE** (rozhodnutie 6.9.); polia sa len evidujú |
 | Chladnička | nika Š · V min–max · H min · **dvere spotrebiča: dolné + spodok, medzera** (z listu = kontrolné pásma; nábytkové delenie engine dopočíta vnútri pásma medzery s presahom min 10 mm cez hranu dverí spotrebiča na oboch stranách; blend = parameter šablóny alebo mimo V1) (zadný kanál a vetranie **len ako poznámka v liste, bez poľa** — rozhodnutie 6.9.) | **ÁNO**: pre každý rozmer niky **`min ≤ vnútro skrinky ≤ max`** (šírka, výška, hĺbka — kde list dáva aj maximum, napr. Beko výška 1940–1950, je príliš veľký otvor rovnako chyba); kde list max nedáva (Beko šírka len min 560, hĺbka len min 555), len jednostranne `≥ min`; kanál/vetranie sa nekontroluje |
 | Umývačka | šírka (450/600) · výška min–max · čelo Š · V max · sokel min–max (evidencia) — hmotnosť čela **vypadáva** (Michal neráta) | **ÁNO**: len šírka slotu (450/600); výška čela vs. sokel sa **nekontroluje** (Michal predpísané rozmery obchádza — rozhodnutie 6.9.) |
 | Varná doska | vonkajší Š × H · výrez Š × H (+tolerancia) · montážna hĺbka · PD min hrúbka | cena + výrez (poznámka pre PD); kontrola = V1+ |
+| Drez | výrez do PD Š × H (+ R) · montáž (na dosku / pod dosku) — **bez seedu**: predúloha pre drez **nesplnená** (v tabuľkách VYBAVENIE sú len značky, žiadny model ani list); konkrétny model + list dodá Michal pri debate polí, inak **poistka z debaty 6.9.: drez = len cenová položka** | len cena + výrez ako ručná poznámka pre PD |
 | Digestor | šírka skrinky min · výrez do dna Š × H (+ odsadenie od prednej hrany ako parameter šablóny, default 20) · Ø odvodu — výška nad doskou **vypadáva** (Michal rieši sám) | len cena (mimo V1 konštrukčne) |
 
 **Záver 2 — kde je to komplikované (zatiaľ neriešiť):** rúra + mikro nad sebou (presahy čiel, škára, medzipolica, komín) · presný algoritmus nábytkového delenia dverí chladničky (pásma + pravidlo 10 mm sú v §3.2, algoritmus rieši package) · plocha vetrania v cm²

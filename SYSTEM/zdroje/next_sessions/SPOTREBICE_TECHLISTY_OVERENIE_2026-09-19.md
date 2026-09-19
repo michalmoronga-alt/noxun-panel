@@ -16,7 +16,7 @@
 
 | Pole | §3 | List výrobcu | Verdikt |
 |---|---|---|---|
-| Telo Š×V×H | 548 × 570 (vzadu 525) × 558 | 548 × 570 (vzadu 525) × 558; horná časť 428 hlboká; celková hĺbka 570 | ✅ |
+| Telo Š×V×H | 548 × 570 (vzadu 525) × 558 | 548 × 570 (vzadu 525) × 558 (Š×V×H tela); horná časť tela 428 hlboká; **celková hĺbka s čelom 570** (zhoda so 570 výšky je náhoda výkresu, nie tá istá kóta) | ✅ |
 | Čelo Š×V, hrúbka | 595 × 595, 20 | 595 × 595, 20; ovládací panel 97 | ✅ |
 | Nika Š | 560–568 | 560–568 | ✅ |
 | Nika V | 583–585 stĺp / 600–601 pod PD | 583–585 / 600–601 | ✅ |
@@ -46,7 +46,7 @@
 | Rozmer spotrebiča V×Š×H | ~360 × ~560 × ~298 (odvodené telo) | **382 × 594 × 318** celkovo; hĺbka tela 299 + čelo 19,5; šírku/výšku tela list nekótuje | ✏️ list dáva len celok |
 | Čelo | 594 × 382, ~20 | 594 × 382, **19,5** | ✅ |
 | Nika | 560–568 × 362–382 × min 300 | **560⁺⁸ × 362–365 × ≥ 300**; stĺp alternatíva **560⁺⁸ × 380⁺² × ≥ 550** (Š×V×H; 35 vzadu, zadná stena voľná) | ✅ (textová tabuľka listu píše 362–382 = obe niky spolu) |
-| Presah hore / dole | 6 (362) alebo 3 (365) / 14 | 6 pri 362, 3 pri 365 / 14 | ✅ |
+| Presah čela **voči NIKE** hore / dole | 6 (362) alebo 3 (365) / 14 | 6 pri nike 362, 3 pri 365 / 14 — Bosch kótuje presah voči nike, nie voči telu; presah voči telu neznámy (telo V list nekótuje) | ✅ |
 | Iné | — | bočná vôľa 16 od steny; šírka skrinky 600 | ➕ |
 
 **Michalov zápis (debata §2) sedí:** nika 362–365 × 560–568, presah 6 / 14, čelo 594 × 382 × 20 (list 19,5), hĺbka tela 300 (list 299); **šírka a výška tela 550 × 340 sú odvodené** (list ich nekótuje) — v seede označiť ako odvodené. Formát zápisu je potvrdený.
@@ -55,7 +55,7 @@
 
 | Pole | §3 | List | Verdikt |
 |---|---|---|---|
-| Rozmer spotrebiča | ~548 × ~580 × ~527 (odvodené) | **595 × 594 × 548** (V×Š×H); telo výška 577, čelo 19,5, ovládač max 45 | ✏️ |
+| Rozmer spotrebiča | ~548 × ~580 × ~527 (odvodené) | **595 × 594 × 548** (V×Š×H, „rozmery spotrebiča"); telo výška 577, čelo 19,5, ovládač max 45; 548 = hĺbka podľa listu (výkres kótuje niku min 550 a čelo 19,5 pred korpusom → číta sa ako hĺbka tela za čelom, list to nerozlišuje → **hĺbka tela neoverená**) | ✏️ |
 | Nika stĺp | 585–595 × 560–568 × 550 | **585⁺¹⁰ × 560⁺⁸ × min 550**, 35 vzadu | ✅ |
 | Nika pod PD | — | **min 600⁺⁴ × 560⁺⁸ × min 550**; medzera 20 pod PD; miesto na prípojku 320 × 115 (nie zásuvková zóna) | ✏️ „zásuvková zóna 320 × 115" = miesto na prípojku |
 | Odvetranie | sokel 200 cm² + medzidno 200 cm² (alebo 35–45) | dva spotrebiče nad sebou: otvor na prívod vzduchu **≥ 200 cm²** (A) v sokli; 35 vzadu | ✅ |
@@ -71,7 +71,7 @@
 |---|---|---|---|
 | Telo Š×V×H | 540 × 1935 × 545 | 540 × 1935 × 545 | ✅ |
 | Nika | 560 (–570) × 1940 (–1950) × min 550–560 | **min 560 × 1940–1950 × min 555** | ✏️ hĺbka min 555 |
-| Dvere spotrebiča | delenie GAP (pomer ~70/30) | zhora: **horné dvere 1159 · medzera 71 · dolné dvere 629 · spodok 40** (spolu 1899 + 32 horný držiak = 1935 ± zaokrúhlenie); nábytkové dvere: 2 mm škáry, posuvné lišty (X < 10 mm) | ➕ GAP vyplnený |
+| Dvere spotrebiča | delenie GAP (pomer ~70/30) | zhora: **horné dvere 1159 · medzera 71 · dolné dvere 629 · spodok 40** (spolu 1899; s horným držiakom 32 = 1931, **zvyšné 4 mm list nekótuje** → pásma v §9 sú preto viazané ZDOLA: 40 + 629 = 669 je presné, horné pásmo = zvyšok do výšky niky, 1159 neslúži ako referencia); nábytkové dvere: 2 mm škáry, posuvné lišty (X < 10 mm) | ➕ GAP vyplnený |
 | Odvetranie | sokel 200 cm² + horný otvor 200 cm² + zadný kanál 50 | **min 200 cm² dole aj hore**; **zadná stena skrinky úplne otvorená** ku stene kuchyne (nie kanál 50) | ✏️ |
 | Dno na 75–80 kg | — | list nekótuje (bolo z Gemini); Michal bez odpovede → poznámka v šablóne, nie pole | ✏️ |
 
@@ -95,7 +95,7 @@ Telo 540 × 1935 × 545; nika **560–570 × 1940–1950 × 560**; posuvné liš
 
 ### 5.2 Bosch SPV6EMX05E — spec list Bosch DE
 
-Telo 448 × 815–875 × 550; nika **450 × 815–875 × min 550**; čelo **655–725**; sokel **min 90 / max 220**; nastavenie výšky max 60; hĺbka s otvorenými dverami 1150. ✅ so §3 (hmotnosť čela list neuvádza; Michal ju nikdy neráta → pole **vypadáva**).
+Telo 448 × 815–875 × 550; nika **450 × 815–875 × min 550** (výkres kótuje šírku len 450, bez +8 — rešeršné 450–458 opravené v §3.3); čelo **655–725**; sokel **min 90 / max 220**; nastavenie výšky max 60; hĺbka s otvorenými dverami 1150. ✅ so §3 (hmotnosť čela list neuvádza; Michal ju nikdy neráta → pole **vypadáva**).
 
 ## 6 · Varná doska Whirlpool WL B1160 BF — inštalačný list W20027062 + produktový list
 
@@ -122,7 +122,7 @@ Telo 448 × 815–875 × 550; nika **450 × 815–875 × min 550**; čelo **655�
 1. **Polia z §4 pôvodného dokumentu držia — a sú per kategória, nie univerzálne:** rúra/mikro = telo · čelo · nika min–max · presahy voči telu · medzera pod čelom; chladnička = nika + dvere spotrebiča (pásma);
    umývačka = šírka slotu + čelo; varná doska = výrez do PD; digestor = výrez do dna. Výrobcovia to členia rovnako (Bosch: Gerätemaße · Nischenmaße · Überstände).
 2. **Nové údaje do seedu:** výrez digestora 437 × 216 · dvere chladničky 1159 / 71 / 629 / 40 (kontrolné pásma) · čelo umývačky 594 × max 720 (hmotnosť čela 2–10 kg len ako poznámka v liste — pole vypadáva) · PD nad rúrou Bosch ≥ 37/38 pri indukcii (len poznámka — kombinácia s doskou sa nerieši).
-3. **Presahy čela rúry** výrobcovia kótujú voči telu, nie voči nike — do seedu **presah voči telu** + niku min–max + **medzera pod čelom** (Whirlpool 9, Bosch 0); presah voči nike si engine dopočíta (čelo − nika). Vyriešené 19.9. (§9).
+3. **Presahy čela** výrobcovia kótujú rôzne: Whirlpool voči TELU (rúra 20/5, mikro 20/13–14), Bosch voči NIKE (BFL 6|3 / 14) — do seedu **presah + referencia (telo | nika)** + nika min–max + **medzera pod čelom** (Whirlpool 9, Bosch 0); druhú referenciu si engine dopočíta, len keď pozná aj telo aj niku. Vyriešené 19.9. (§9).
 4. Poznámky vetrania ostávajú textom v liste (rozhodnutie 6.9.), ale Beko „zadná stena úplne otvorená" je iný predpis ako „kanál 50" — do poznámky presne.
 
 ## 9 · Michalove doplnenia z praxe (19.9.2026 večer — prejdené celé)
@@ -143,7 +143,8 @@ Zdroj: interaktívna stránka porovnania (súkromný artefakt, Michalove poznám
   kóty zo screenu (930 · 826 + 115) sa bez odsadení nesčítajú (čelo visí pod hranou korpusu, blend prekrýva) — presné odsadenia doriešiť v debate polí → výška čela ani sokel sa nekontrolujú (potvrdzuje rozhodnutie 6.9.). **Umývačka Bosch:** hmotnosť čela nikdy neráta → pole **vypadáva**.
 - **Varná doska:** digestor nad doskou **neriešiť** (rieši si sám).
 - **Digestor:** výrez do dna zvyčajne **20 mm od prednej hrany dna** (priestor na kryciu dosku) → odsadenie = parameter šablóny (default 20); výška nad doskou vypadáva.
-- **Otázka 1 (presahy):** zapisovať voči telu + medzera pod čelom + nika min–max; presah voči nike engine dopočíta.
+- **Otázka 1 (presahy):** zapisovať presah s referenciou (Whirlpool voči telu, Bosch voči nike) + medzera pod čelom + nika min–max; druhú referenciu engine dopočíta z tela a niky.
+- **Drez:** predúloha pre drez **nesplnená** (§12) — do debaty polí vstupuje ako cenová položka + ručný výrez do PD; konkrétny model a list dodá Michal, inak poistka „drez = len cena".
 
 ## 10 · Ďalší krok
 
@@ -174,3 +175,10 @@ Whirlpool dokumenty sa dajú vypísať cez `https://docs.backend.prod.aws.wpsand
 | Whirlpool WL B1160 BF | produktový list SK | https://digitalassets-cdn.thron.com/api/v1/content-delivery/shares/ivq4cm/contents/do-d8ada554-2c49-44a5-85f0-f15004a0a5dd/pdf/PR859991572120sk.pdf |
 | Whirlpool WCT3 63F LTK | výkres ETD 859991672930 | https://digitalassets-cdn.thron.com/api/v1/content-delivery/shares/ivq4cm/contents/do-d3874dda-a288-4a4b-976d-1238c4e8e2a0/pdf/ETD859991672930EN.pdf |
 | Whirlpool WCT3 63F LTK | všeobecný návod LIB0195104A | https://digitalassets-cdn.thron.com/api/v1/content-delivery/shares/ivq4cm/contents/do-0c7835b6-8356-4169-9334-3bcf89152306/pdf/LIB0195104A.pdf |
+
+## 12 · Drez — predúloha nesplnená (priznané 19.9.)
+
+Debata 6.9. ráta s drezom vo V1 ako „len výrez do PD + cena" a predúloha žiada aspoň jeden overený list per kategória. V tabuľkách VYBAVENIE sú pri drezoch **len značky**
+(Blanco, Alveus, Franke, Schock — drezyonline), žiadny konkrétny model ani list, takže drez sa tu neoveroval. **Rozhodnutie:** drez vstupuje do debaty polí S1 ako cenová položka
+s ručne zapísaným výrezom do PD (Š × H + R, montáž na/pod dosku — polia podľa `04A` §výrezy), **bez seedu**; konkrétny model + list dodá Michal z najbližšej zákazky. Ak model
+nepríde, platí poistka z debaty 6.9.: drez = len cenová položka. Nie je to tiché vynechanie kategórie — je to odložená predúloha.

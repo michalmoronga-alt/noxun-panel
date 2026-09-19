@@ -33,7 +33,9 @@
   datart doc_4401491 = návod umývačky). Packet je **dôkazový podklad, nie kontrakt** (zdrojová vrstva) — hodnoty vstúpia do záväzného kontraktu až cez package S1 po audite.
   **Testy:** headless 4155 / 0 (docs guardy, encoding, limit STAV); in-SU sa nespúšťala (bez zmeny kódu). Codex kolo 1 na PR: 2×P1 (chýbal tento záznam; packet nesmie byť
   „autorita") + 12×P2 (geometria rúry/chladničky/umývačky, poradie osí, URL listov, zastaraný „komín 50", digestor v Závere 2, hmotnosť čela v seede) — všetko zapracované.
-  Kópie listov a Michalove screeny: `_dev/techlisty/` (gitignorované, per PC).
+  Kolo 2 = 7×P2 (škára rúra + mikro sa z listov nedá odvodiť; hĺbka rúry 570 vs 558; Beko 4 mm nevysvetlené → pásma viazané zdola; hĺbka tela Bosch neoverená; nika SPV 450 bez +8;
+  **Bosch kótuje presahy voči NIKE, Whirlpool voči TELU → pole presahu s referenciou**; **drez bez modelu a listu → predúloha nesplnená, do debaty ako cenová položka + ručný
+  výrez, model dodá Michal**) — zapracované, delta overená interne (pravidlo delta-verifikácie, len P2). Kópie listov a Michalove screeny: `_dev/techlisty/` (gitignorované, per PC).
 
 - **D-130b — SKUPINA „SPOLOČNÉ PRE SKRINKU": MATERIÁL ČIEL + SCHÉMA MEDZIER, v0.12.8 (19.9.2026, PR #372).**
   **Čo Michal dostal:** pod zoznamom čiel je jedna skupina **„Spoločné pre skrinku"** so všetkým, čo platí naraz pre všetky čelá jednej skrinky. Prvý riadok je **Materiál
