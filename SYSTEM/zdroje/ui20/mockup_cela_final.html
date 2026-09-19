@@ -104,7 +104,7 @@
   .tip.inl{width:15px;height:15px;margin-left:2px}
 
   /* ===== NOVÝ ZOZNAM ČIEL =====
-     Pevná mriežka: [22 číslo][1fr typ+súhrn][108 výška][22 ✕] — každé pole sedí
+     Pevná mriežka: [22 číslo][1fr typ+súhrn][112 výška][22 ✕] — každé pole sedí
      v tom istom stĺpci bez ohľadu na typ a na to, či je výška AUTO alebo pevná. */
   .flist{display:flex;flex-direction:column}
   .fitem{display:grid;grid-template-columns:22px minmax(0,1fr) 112px 22px;grid-template-rows:auto auto;
@@ -125,7 +125,7 @@
   .fitem .fsub{grid-column:2;grid-row:2;display:flex;align-items:center;gap:0;min-width:0;font-size:10.5px;color:var(--nx-ink-soft);
                white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:20px;border:0;background:none;font-family:inherit;cursor:pointer;text-align:left}
   .fitem .fsub .sep{margin:0 4px;color:var(--nx-border-strong)}
-  .fitem .fsub .hw{color:var(--nx-ink-faint);display:inline-flex;align-items:center;gap:3px}
+  .fitem .fsub .hw{color:var(--nx-ink-faint);display:inline-flex;align-items:center;gap:3px;pointer-events:auto;cursor:pointer}
   .fitem .fsub .hw .ic{width:10px;height:10px}
   .fitem .fsub:hover .hw{color:var(--nx-select)}
   .fbadge{font-size:9px;font-weight:600;line-height:1.5;border-radius:9px;padding:0 5px;vertical-align:1px;
@@ -140,7 +140,7 @@
               color:var(--nx-ink-faint);cursor:pointer;padding:0;display:inline-flex;align-items:center;justify-content:center}
   .hbox .pbtn .ic{width:11px;height:11px}
   .hbox.fixed input{font-weight:700;color:var(--nx-ink)}
-  .hbox .auto{display:none;font-size:8px;font-weight:700;letter-spacing:.02em;color:var(--nx-ink-muted);border:1px solid var(--nx-border);
+  .hbox .auto{display:none;font:inherit;font-size:8px;font-weight:700;letter-spacing:.02em;color:var(--nx-ink-muted);border:1px solid var(--nx-border);
               border-radius:4px;padding:0 2px;margin-left:3px;background:var(--nx-surface-sunken);cursor:pointer;line-height:1.5}
   .hbox.fixed .auto{display:inline-block}
   .hbox .auto:hover{color:var(--nx-select);border-color:var(--nx-select)}
@@ -380,13 +380,13 @@
       <h4>Rozhodnutia do package (R1–R9)</h4>
       <ol>
         <li><b>R1</b> Kostra kontextu Čelá: 2 skupiny <code>fronts</code> · <code>cabfront</code> (Spoločné pre skrinku); skupiny <code>fhandles</code> a <code>fgaps</code> zanikajú.</li>
-        <li><b>R2</b> Riadok čela = CSS grid 22 / 1fr / 108 / 22 px, dva riadky (názov + súhrn) + tretí = karta. Guard šírky riadku (test_smoke1) sa prepíše na nový rozpočet.</li>
-        <li><b>R3</b> Súhrn skladá čistá funkcia <code>frontRowSummary(item, slots, hw)</code> v core.js (testovateľná headless), z tých istých dát ako karta.</li>
+        <li><b>R2</b> Riadok čela = CSS grid 22 / 1fr / 112 / 22 px, dva riadky (názov + súhrn) + tretí = karta. Guard šírky riadku (test_smoke1) sa prepíše na nový rozpočet.</li>
+        <li><b>R3</b> Súhrn skladá čistá funkcia <code>frontRowSummary(item, slots, hw)</code> v core.js (testovateľná headless), z tých istých dát ako karta: počet krídel zo serverového <code>wings_n</code> (AUTO nad 600 mm = 2), smer len z uloženého stavu (legacy bez kľúča = bez slova; <code>unset</code> = badge), zásuvka bez klasifikácie = jantárové „bez klasifikácie" (žiadne predvolené hodnoty). Mockup tu používa zjednodušené dáta (<code>drawer</code> namiesto <code>drawer_front</code>, <code>||</code> defaulty) — implementácia ide z reálneho <code>front_items</code>/<code>front_slots</code>. Koncovka „kovanie →" v súhrne je samostatný ovládač: otvorí kartu rovno na tabe Kovanie (nebubluje do prepínania karty).</li>
         <li><b>R4</b> Pole výšky: jeden komponent <code>.hbox</code>; pravidlo „zamknuté ⇔ vypísané" ostáva; placeholder „≈ N" z echa (dnešné <code>updateFrontPlaceholders</code>).</li>
         <li><b>R5</b> Krídla: segment auto·1·2·3·4 v karte (tab Čelo) len pre dvierka; zápis tá istá cesta ako dnes (<code>onFrontWings</code>).</li>
-        <li><b>R6</b> Úchytka: <b>jediné miesto stavu = karta</b> (Profil + Hrana na jednom riadku). Hromadne = popover „všetkým" (rozsah · profil · hrana · Použiť na N) — akcia, nie druhý stav; po použití sa zavrie.</li>
-        <li><b>R7</b> Tab Kovanie karty = dnešný obsah riadkov <code>resolved</code> / <code>axes</code> / <code>upgrade</code> / <code>lift</code> + tlačidlo „Otvoriť v Kovaní" (dnešný preklik <code>.fhw</code>); nič nové zo servera.</li>
-        <li><b>R8</b> Pomocné texty: 8 × <code>.hint</code> → tooltip ikona ? v hlavičke skupiny alebo pri popiske poľa (<code>title</code> alebo spoločný <code>.nxtip</code> komponent — rozhodnúť pri package podľa CEF správania). Stavové vety (RED/ORANGE, „bez klasifikácie") ostávajú viditeľné v karte.</li>
+        <li><b>R6</b> Úchytka: <b>jediné miesto stavu = karta</b> (Profil + Hrana na jednom riadku). Hromadne = popover „všetkým" (rozsah · profil · hrana · Použiť na N) — akcia, nie druhý stav; po použití sa zavrie. Ponuka hrán v popoveri = prienik platných hrán rozsahu (dnešné <code>frontProfileScopeEdges</code>; dvierka majú „Voľná", zásuvky bočné). Popover: Esc zatvára, fokus sa vráti na tlačidlo, <code>aria-haspopup</code>/<code>aria-expanded</code>.</li>
+        <li><b>R7</b> Tab Kovanie karty = dnešný obsah riadkov <code>resolved</code> / <code>axes</code> / <code>upgrade</code> / <code>lift</code> + tlačidlo „Otvoriť v Kovaní" (dnešný preklik <code>.fhw</code>); nič nové zo servera. Tab je pri každom fyzickom type (aj blenda s úchytkovým profilom má kovanie), chýba len pri „Bez čela"; bez položiek ukáže „Bez kovania". Karta 3/4-krídlových dvierok drží riadky „Krídlo k/n" pre stredné krídla (ako dnes).</li>
+        <li><b>R8</b> Pomocné texty: 8 × <code>.hint</code> → tooltip ikona ? v hlavičke skupiny alebo pri popiske poľa = <b>vlastný komponent <code>.nxtip</code></b> (čisté CSS z <code>data-tip</code>; natívny <code>title</code> je v CEF nespoľahlivý — outside-in packet 19.9., rozhodnuté). Stavové vety (RED/ORANGE, „bez klasifikácie") ostávajú viditeľné v karte.</li>
         <li><b>R9</b> Medzery: <b>schéma</b> — obrys skrinky s dvoma čelami, 4 okraje sedia na hranách a medzera v strede (5 polí = tie isté <code>fr_gap*</code>, žiadne nové dáta); riadok „Medzi čelami" zaniká; zámok limitu a Predvolené sú ikony v hlavičke skupiny; jantárové prisvietenie N26 sa viaže na otvorenú skupinu <code>cabfront</code> alebo fokus v jej poli.</li>
       </ol>
     </div>
@@ -430,7 +430,7 @@
     if (f.type==='blind') p = ['pevný dielec', p[p.length-1]];
     if (f.type==='none') p = ['otvorená nika'];
     var h = p.join('<span class="sep">·</span>');
-    if (f.type!=='none' && f.type!=='blind') h += '<span class="sep">·</span><span class="hw">'+f.hw+' '+ic('arrow-right')+'</span>';
+    if (f.type!=='none' && f.type!=='blind') h += '<span class="sep">·</span><span class="hw" role="link" title="Otvoriť tab Kovanie tohto čela" data-id="'+f.id+'" onclick="stop(event);openHw(this.dataset.id)">'+f.hw+' '+ic('arrow-right')+'</span>';
     return h;
   }
 
@@ -440,7 +440,7 @@
       '<span class="fnum">'+f.id+'</span>' +
       '<button class="ftitle" onclick="toggle(\''+f.id+'\')" title="'+d.l+' — klik otvorí kartu čela"><span class="ftico">'+ic(d.ico)+'</span><span>'+d.l+'</span><span class="chev">'+ic('chevron-down')+'</span></button>' +
       '<button class="fsub" onclick="toggle(\''+f.id+'\')" title="Stav čela — klik otvorí kartu; kovanie vedie do kontextu Kovanie">'+summary(f)+'</button>' +
-      '<span class="hbox'+(f.h?' fixed':'')+'"><span class="auto" title="Vrátiť na AUTO — výška sa dopočíta z voľného miesta">AUTO</span>' +
+      '<span class="hbox'+(f.h?' fixed':'')+'"><button type="button" class="auto" title="Vrátiť na AUTO — výška sa dopočíta z voľného miesta" onclick="stop(event);setAuto(this)">AUTO</button>' +
         '<input value="'+(f.h||'')+'" placeholder="≈ '+(f.approx||'')+'"><span class="u">mm</span>' +
         '<button class="pbtn" title="Výškový rad čiel">'+ic('chevron-down')+'</button></span>' +
       '<button class="fdel" title="Odstrániť čelo">'+ic('x')+'</button>' +
@@ -454,6 +454,8 @@
     document.querySelectorAll('svg.pv').forEach(drawPreview);
   }
   function toggle(id){ openId = (openId===id) ? null : id; tab = 'celo'; render(); }
+  function openHw(id){ openId = id; tab = 'hw'; render(); }
+  function setAuto(btn){ var it = btn.closest('.fitem'); if (it) setVal(it.dataset.id, 'h', null); }
   function setType(id,t){ FRONTS.forEach(function(f){ if (f.id===id){ f.type=t; if(t==='door'&&f.dir==null) f.dir='unset'; } }); render(); }
   function setTab(t){ tab=t; render(); }
   function setVal(id,k,v){ FRONTS.forEach(function(f){ if (f.id===id) f[k]=v; }); render(); }
@@ -571,6 +573,7 @@
 
   function togglePop(id){ var p=document.getElementById(id), was=p.classList.contains('open'); document.querySelectorAll('.pop').forEach(function(x){x.classList.remove('open');}); if(!was) p.classList.add('open'); }
   document.addEventListener('click', function(e){ if (!e.target.closest('.pop') && !e.target.closest('.ibtn')) document.querySelectorAll('.pop').forEach(function(x){ x.classList.remove('open'); }); });
+  document.addEventListener('keydown', function(e){ if (e.key==='Escape'){ var o=document.querySelector('.pop.open'); if(o){ o.classList.remove('open'); var b=document.querySelector('.ibtn.wide'); if(b) b.focus(); } } });
   render();
 </script>
 </body>
