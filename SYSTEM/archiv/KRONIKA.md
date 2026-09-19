@@ -17,6 +17,36 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **D-130b — SKUPINA „SPOLOČNÉ PRE SKRINKU": MATERIÁL ČIEL + SCHÉMA MEDZIER, v0.12.8 (19.9.2026, PR #372).**
+  **Čo Michal dostal:** pod zoznamom čiel je jedna skupina **„Spoločné pre skrinku"** so všetkým, čo platí naraz pre všetky čelá jednej skrinky. Prvý riadok je **Materiál
+  čiel** (ten istý údaj ako v Korpuse → Materiály, len presunutý sem z konca zoznamu). Pod ním sú **medzery a okraje ako SCHÉMA** — obrys skrinky s dvoma čelami a päť čísel
+  presne tam, kde platia: hore, dole, vľavo, vpravo na hranách obrysu a **medzera medzi čelami v strede** (jantárová, tá istá farba, akou sa škáry prisvietia v náhľade).
+  Používateľ nemusí čítať popisky, vidí, ktorá hrana je ktorá. **Zámok limitu presahov** (±100 mm, po odomknutí až ±2000 pre obklady a pilastre) a **„Predvolené"** sú
+  **ikony v hlavičke** skupiny, takže telo drží už len dáta; meta hlavičky („dub Halifax · 3 · 2/2/0/0") povie stav **aj pri zbalenej skupine**. Dlhý pomocný text nahradil
+  tooltip `?` so **stolárskym** vysvetlením znamienok: *+ = odskok (vidno korpus) · 0 = zarovno · − = presah čela cez korpus* (napr. −20 mm ako úchop dole) a *číslo
+  v strede = škára*. **Dáta, zápis, Undo ani server sa nemenia** — je to iné rozloženie tých istých ovládačov. Tým je **D-130 uzavreté celé (a + b)**.
+  **Prečo takto.** Štyri popísané riadky okrajov boli najdrahšie miesto kontextu na vertikálny priestor a pritom sa z nich nedalo prečítať, ktorá hrana je ktorá bez čítania
+  popiskov. Schéma hovorí polohou; kresba je **ilustrácia** (`aria-hidden`, vždy dve čelá), nie skutočný rozpis — ten je v náhľade. Ovládače zostali **tie isté polia**
+  `fr_gap*`, takže validácia, výrazy v poliach (`attachExprField`), echo-guard `keepGaps`, reset aj serverové kľúče `gap gap_top gap_bottom gap_left gap_right` platia bez
+  zmeny. Zámok stratil textový label: v hlavičke naň nie je miesto a stav sa dá povedať ikonou (`lock`/`lock-open`), `title`-om, `aria-pressed` a jantárovou farbou — navyše
+  to funguje aj pri zbalenej skupine, kde text nebolo vidno vôbec.
+  **Rozhodnutia, ktoré sa oplatí pamätať.** **N26 sa odviazalo od otvorenej skupiny.** Dovtedy sa medzery v náhľade prisvietili, keď bola otvorená skupina „Medzery a
+  presahy" — tá sa otvárala výhradne kvôli medzerám. Nová skupina obsahuje aj materiál čiel, takže býva otvorená pri bežnej práci a zvýraznenie by svietilo stále a prestalo
+  by niečo znamenať. Pravidlo je preto **fokus v niektorom z piatich polí ALEBO hover nad schémou** (`mouseover`/`mouseout` v capture, `relatedTarget` odfiltruje prechod
+  medzi uzlami schémy); `toggle` listener na `fgaps` zanikol. **Špecificita CSS je pasca:** `.row input` nastavuje `flex: 1`, takže absolútne umiestnené polia potrebujú
+  selektor so štyrmi triedami (`.nx-inspector .row .gapdiag input.gd`) — samotné `.gd` by prehralo a schéma by sa roztiahla cez celý riadok. **Predvolené hodnoty sa
+  NEMENILI** (3 / 2 / 2 / 2 / 2) — mockup ukazoval 0/0 po stranách len ako príklad. Meta skladá **čistá funkcia** `cabfrontMetaText` v `core.js` (dekor sa skracuje na 14
+  znakov elipsou, bez označenej skrinky je meta prázdna), `form.js` ju len kreslí. **Vedomé odchýlky:** tooltip nehovorí „pri otvorenej skupine sa medzery prisvietia" (bolo
+  by to po zmene N26 nepravdivé), ale „keď píšeš v poli alebo prejdeš myšou nad schému"; skupina **nedostala atribút `open`** — skupiny kontextu sú exkluzívne (otvorená je
+  vždy najviac jedna) a stav si panel pamätá v `localStorage`, takže vynútené otvorenie by menilo dnešné správanie bez úžitku. Ikona skupiny je `cabinet` (`sliders` v sprite
+  nie je).
+  **Testy:** 4155 headless · 120 JS sád · **2779 in-SketchUp PASS / 0 FAIL**. Nové sady `tests/pure/test_d130b_spolocne.rb` (kostra, ID polí práve raz a v schéme,
+  špecificita CSS, ikony v `<summary>`, znenie tooltipu) a `tests/js/test_d130b_spolocne.js` (meta z hodnôt aj s elipsou, zámok prepína ikonu/farbu/`title`/`aria-pressed`
+  a zapisuje `edge_limit_off` jedným apply, reset = jeden apply, N26 stav = fokus/hover nad mini-DOM), nová in-SU sekcia `run_d130b` (číslo zo schémy → `gap_top`
+  a jeden krok Späť · odomknutý zámok pustí −300 mm a zamknutý ten istý presah odmietne bez zmeny configu · „Predvolené" jedným krokom Späť · materiál čiel zapíše
+  `front_material_id`). Upravený `test_uic3_cela.rb` (poradie skupín `fronts cabfront`, N26 bez `fgaps`).
+  **Codex review:** doplní orchestrátor po review.
+
 - **D-130a — NOVÝ ZOZNAM ČIEL, KARTA S TABMI, ÚCHYTKA NA JEDNOM MIESTE, v0.12.7 (19.9.2026, PR #371).**
   **Čo Michal dostal:** kontext **Čelá** je prehľadný. Každé čelo sú **dva rovnako usporiadané riadky** — hore číslo · názov typu · **pole výšky vždy v tom istom stĺpci** · ✕;
   pod názvom **tlmený súhrn** („1 krídlo (auto) · smer? · bez úchytky · Sensys klasik · 2 ks →"), takže **stav všetkých čiel vidno bez otvárania kariet**. Klik na názov
@@ -40,7 +70,8 @@
   mriežky, zdroj hodnôt) a `tests/js/test_d130a_suhrn_karta.js` (súhrn nad všetkými typmi, taby, popover nezapisuje kým sa nestlačí „Použiť"), nová in-SU sekcia `run_d130a`
   (serverová polovica: jeden zápis = jeden krok Späť pri krídlach, hromadnej úchytke aj chipe AUTO; čítacie payloady nenechajú krok Späť). Prepísané `test_smoke1_riadky.rb`
   (rozpočet sa ráta z `grid-template-columns`), `test_uic3_cela.rb`, `test_d90_ukw_profil.rb`, `test_kova1_cela.rb` a päť JS sád karty.
-  **Codex review:** doplní orchestrátor po review.
+  **Codex review:** kolo 1 = 6×P2 (tab Kovanie prázdny stav, `.exprhint` kotva, deep-link tab, badge z aktívnych slotov, `aria-disabled` skok, Escape) opravené v `444493a`;
+  slepý Opus delta: MERGE OK + 5×P3.
 
 - **D-134 — HROMADNÉ ZÁPISY ZÁKAZKY MAJÚ JEDEN ROZSAH, v0.12.6 (13.9.2026, PR #369).**
   **Čo Michal dostal:** tri hromadné akcie — uloženie (aj doplnenie) **pravidiel kovania**, zmena **projektovej predvoľby materiálu** a override materiálu dielca

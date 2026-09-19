@@ -624,6 +624,9 @@ kontextu **EXKLUZÍVNE** (`NXShell.exclusiveClose`, kľúč `nxsec_s4.<ctx>.<key
 menom, inak počet zbalených) — vidno ho rovnako zbalený aj rozbalený (vzor mockupu). Texty skladá **čistá funkcia `NXShell.sectorMeta`** (bez DOM, testovaná v
 `tests/js/test_uib_meta.js`), stav do nej číta `nxSectorMetaApply` **zo ŽIVÉHO panela** (polia S2, materiálové selecty S3, otvorený `<details>` v S4) — **žiadna cache textu**
 (hotový reťazec by po premenovaní dekoru ukazoval starý názov, lekcia Codex #171 P2) **a žiadne nové serverové dáta**.
+**Názov otvorenej skupiny (S4) berie `NXShell.groupTitle` LEN z priamych textových uzlov `<summary>`** — `textContent` celej hlavičky by od D-130a pribral aj `.gtools`, takže
+lišta hlásila „Čelá 3 čelá · 1 bez smeru všetkým" a „Spoločné pre skrinku dub Halifax · 3 · 2/2/0/0". Ikona je `<svg>`, meta `<span>` a akcie `<button>` — elementy vypadnú samy,
+skupiny bez `.gtools` dávajú presne to, čo dávali predtým. **Pravidlo pre nové hlavičky:** názov skupiny musí zostať priamym textom `<summary>`, nie zabalený v elemente.
 
 Obnovuje sa na troch miestach: `nxShellApply` (režim, kontext, každý push), **jeden delegovaný `input`/`change` listener** na ID polí a selectov (meta je len zobrazenie — do
 zapisovacích ciest `form.js`/`materials.js` nesiaha) a `toggle` v `bindDetails` (`toggle` nebublinkuje, delegácia ho nezachytí).
@@ -843,7 +846,12 @@ neplatná hrana dostane výzvu a žiadny odhad. Indikátor popíše hranu a skr�
 **ČELÁ-B1 (v0.10.7):** formulár prenáša prítomné `profile_edge` bez dopĺňania defaultu. Náhľad kreslí fyzické `profile_edges` uložených riadkov;
 top/bottom skracuje výšku, left/right šírku, `free` bez resolved hrán nič neodhaduje. Profil podporujú všetky fyzické typy. Ovládače hrán a korelovaný návrh doplnilo B2 (v0.10.8), kontrakt je nižšie v Úchytkách.
 
-**D-130a (v0.12.7)** zúžila kontext na **dve skupiny** v záväznom poradí — **Čelá** (`data-key="fronts"`) · **Medzery a presahy** (`fgaps`); `fhandles` zanikla (nižšie, Úchytky).
+**D-130a (v0.12.7)** zúžila kontext na **dve skupiny**, **D-130b (v0.12.8)** ich pomenovala finálne: **Čelá** (`data-key="fronts"`) · **Spoločné pre skrinku** (`cabfront`) —
+poradie je kontrakt (`test_uic3_cela.rb`). `fhandles` zanikla (nižšie, Úchytky) a `fgaps` („Medzery a presahy") sa zlúčila do `cabfront`. Druhá skupina drží všetko, čo platí
+**naraz pre všetky čelá jednej skrinky**: riadok **Materiál čiel** (`cab_front_c`, prvý) a **schému medzier a okrajov** `.gapdiag` (nižšie, N26). V hlavičke sú meta
+`#cabfrontMeta` (dekor · medzera · štyri okraje — stav vidno aj pri zbalenej skupine; text skladá čistá `cabfrontMetaText` v `core.js`, `form.js` ho len kreslí), **ikona zámku
+limitu presahov** `#edgeLimitLock` (stav nesie ikona `lock`/`lock-open`, `title`, `aria-pressed` a trieda `amber` — textový label zanikol) a **ikona „Predvolené"**
+`#frontGapsReset`; tooltip `?` nahradil pomocný text. Každá z nich musí `preventDefault()` **aj** `stopPropagation()` (spoločný `nxTipStop`) — inak by klik skupinu zbalil.
 Riadok čela `.frow` je **CSS GRID so stálymi stĺpcami** `22px minmax(0,1fr) 112px 22px` a riadkami 1 = názov · 2 = súhrn · 3 = karta (stĺpce 2–4). Predtým to bol flex rad, takže
 poloha poľa výšky závisela od toho, **čo v riadku práve bolo** (chip AUTO, „mm", select krídel, ikona profilu) a polia „lietali" (D-130); pred SMOKE PACKOM 1 sa rad pri vypísanej
 výške dokonca zalomil. Deti sa kladú do mriežky **priamo** (obal `.fmain` zanikol), každé má pozíciu v CSS, nie v poradí; hľadajú sa **výhradne cez triedy**, takže obrátený render
@@ -858,7 +866,8 @@ markup); `form.js` ho len kreslí (`updateFrontRowSummary`). **Žiadne nové dá
 `frontHwBuy`). **Počet krídel hovorí SERVER** (`front_slots[fid].wings_n`) — AUTO dvierka nad 600 mm sú dve krídla a to vie len on; bez záznamu sa píše len „auto". **Smer** ide
 výhradne z uloženej hodnoty: legacy čelo (kľúč chýba) nedostane ani slovo, ani badge — badge „smer?" len pri `unset`. **Ráta sa LEN cez aktívne sloty** (`front_slots[fid].slots`,
 Codex #371): prechádzať všetky uložené `wing_directions` bolo zle, lebo po návrate zo 4 krídel na 2 ostáva `p2: unset` ako **dormantná** hodnota (A1: návrat nič nemaže) a riadok
-by navždy svietil „smer?" na otázku, ktorú nikto nekladie. Bez slotov rozhoduje skalárny `direction`, a to len pri **jednom** krídle — dvojkrídlo má smer odvodený. Obnovuje sa
+by navždy svietil „smer?" na otázku, ktorú nikto nekladie. Bez slotov rozhoduje skalárny `direction`, a to len pri **jednom** krídle — dvojkrídlo má smer odvodený; **ak server
+`wings_n` nedodal vôbec** (legacy echo, nové čelo pred prvým pushom), rozhoduje skalárny `direction` bez ohľadu na počet krídel (`core.js` ~r. 418). Obnovuje sa
 tam, kde sa dovtedy obnovovali badge (light push aj plný render), takže riadky sa pod `keepGaps` guardom **neprestavujú**.
 
 **Koncovka kovania `.fhwlink` je SÚRODENEC, nie vnorený prvok** (R3-f): druhý riadok mriežky je flex obal `.fsubwrap` s dvoma tlačidlami — `.fsub` rastie a oreže sa, `.fhwlink`
@@ -906,8 +915,10 @@ pridala tlmený popisok „Pridať čelo" a hairline predel (`.addrow`).
 `title` nestačí — CEF ho ukazuje s oneskorením, nedá sa štýlovať a dlhý text zalamuje po svojom. **Pravidlo: pomocný text = tooltip, stavová veta ostáva viditeľná** (RED/ORANGE,
 „bez klasifikácie", D-120 `frontDraftMessage`). V kontexte Čelá zostal presne jeden `.hint` — a je to práve `frontDraftMessage` (stráži guard `test_d130a_zoznam_ciel.rb`).
 
-**Materiál čiel** má DRUHÝ ovládač (`cab_front_c`) priamo v zozname, lebo sektor Materiály patrí kontextu Korpus a tu je skrytý — tá istá hodnota, dva vstupné body, synchro drží
-každá cesta, ktorá siaha na `cab_front`.
+**Materiál čiel** má DRUHÝ ovládač (`cab_front_c`), lebo sektor Materiály patrí kontextu Korpus a tu je skrytý — tá istá hodnota, dva vstupné body, synchro drží
+každá cesta, ktorá siaha na `cab_front`. **D-130b** ho presunul z konca zoznamu čiel do skupiny **Spoločné pre skrinku** (prvý riadok, `.row` nie `.matrow`, aby popisky
+skupiny mali jeden stĺpec) — ID, `data-nx-combo`, `onCabinetMaterial` ani synchro v `materials.js` sa nezmenili, iba miesto v DOM. Zmena dekoru navyše prekresľuje meta
+hlavičky (`setCabinetMaterials`/`clearCabinetMaterials` volajú `updateCabfrontMeta`).
 
 **KARTA ČELA (KOV-A2a)** je `.fcard` — **posledný potomok `.frow`**, v mriežke D-130a **tretí riadok** cez stĺpce 2–4, teda leží **priamo pod svojím riadkom**; otvorená je **vždy
 najviac jedna** a drží sa cez **identitu čela** (`openFrontCardId`), nie cez index riadku — klik na segrow spustí apply a echo riadky prestaví, takže bez identity by karta pod
@@ -1123,13 +1134,19 @@ Server pred pokračovaním overí dokument a presne tú istú jednu vybranú skr
 
 ### N26 medzery jantárovo (preview.js)
 
-ČELÁ-A (D-119): štyri okraje sú v dvoch riadkoch (`front-gap-grid`). Formulár odosiela `gap_left`/`gap_right`; legacy `gap_sides` preberá len pre chýbajúcu stranu.
+ČELÁ-A (D-119): štyri okraje. Formulár odosiela `gap_left`/`gap_right`; legacy `gap_sides` preberá len pre chýbajúcu stranu.
 Obe polia prechádzajú existujúcou validáciou, odomykaním limitu, resetom aj echo guardom `keepGaps`. `pvGeom` nesie `gapLeft`/`gapRight`; kresba čiel, kóty, ghost vrstva,
 fit vo vkladaní aj pri výbere, odhad plochy a značky kovania používajú oba okraje. Koľajnice výsuvov ostávajú na vnútorných lícach bokov korpusu.
+**D-130b: dva riadky polí nahradila SCHÉMA `.gapdiag`** — obrys korpusu (`.gd-box` s dvoma ilustračnými `.gd-front`) a **tých istých päť polí** `fr_gap*` absolútne umiestnených
+na hranách, ktorých sa týkajú (`fr_gap` v strede, jantárový). Mriežka `.front-gap-grid` zanikla. ID, `oninput="onField()"`, `LIMITS`, `attachExprField`, `keepGaps`,
+`resetFrontGaps` (3/2/2/2/2) aj serverové kľúče ostali nezmenené — zmenilo sa **len rozloženie**. Pozor na špecificitu: `.row input` nastavuje `flex: 1`, preto sa polia píšu
+`.nx-inspector .row .gapdiag input.gd` (štyri triedy) — samotné `.gd` by prehralo a schéma by sa roztiahla.
 
-pri **otvorenej** skupine „Medzery a presahy" (alebo kurzore v jej poli) sa medzery v projekcii Čelá podfarbia jantárovo. Stav sa **číta z DOM** (`details[data-key="fgaps"].open`),
-nedrží sa bokom — zbalenie skupiny zhasne zvýraznenie bez ďalšej synchronizácie; `toggle` NEBUBLÁ, preto listener v capture fáze. Pásy vznikajú z **toho istého** `nxFrontDims`,
-ktorým sa už kótuje (žiadny nový výpočet, žiadne nové dáta); farby `PV_GAP_*` sú zrkadlom tokenov `--nx-warn-bg-soft` / `--nx-warn` / `--nx-warnchip-fg`.
+od **D-130b** sa medzery v projekcii Čelá podfarbia jantárovo pri **kurzore v niektorom z piatich polí schémy** (`NX_GAP_FIELDS`, `focusin`/`focusout` v capture) **alebo pri
+hoveri nad `.gapdiag`** (`mouseover`/`mouseout` v capture, `relatedTarget` odfiltruje prechod medzi uzlami schémy). Väzba na **otvorenú skupinu** (`details[data-key="fgaps"].open`
++ `toggle` listener) **zanikla**: schéma žije v skupine `cabfront`, kde je aj materiál čiel, takže skupina býva otvorená pri bežnej práci a medzery by svietili stále.
+Pásy vznikajú z **toho istého** `nxFrontDims`, ktorým sa už kótuje (žiadny nový výpočet, žiadne nové dáta); farby `PV_GAP_*` sú zrkadlom tokenov `--nx-warn-bg-soft` /
+`--nx-warn` / `--nx-warnchip-fg`.
 
 ### Kontext Kovanie (UI-C4, panel.html + ui/js/hardware.js + ui/panel/selection.rb)
 

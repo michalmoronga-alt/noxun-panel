@@ -19427,6 +19427,162 @@ module NoxunSuRunner
        !m4.valid? && inst.valid? && e::Store.config(inst) == cfg2)
   end
 
+  # === D-130b: SKUPINA „SPOLOCNE PRE SKRINKU" ==============================
+  #
+  # Styri popisane riadky okrajov a riadok medzery sa v paneli zmenili na
+  # SCHEMU (obrys korpusu, cisla sedia na hranach), zamok limitu presahov aj
+  # „Predvolene" su IKONY v hlavicke skupiny a material ciel sa prestahoval do
+  # tej istej skupiny. DATA sa NEMENIA — a prave to tento scenar dokazuje, lebo
+  # headless sada overi tvar payloadu, nie to, ze zapis z novej obrazovky je
+  # JEDEN krok Spat a ze zamknuty limit velky presah naozaj ODMIETNE:
+  #   (a) cislo zo schemy -> `gap_top` v configu + geometria + jeden krok Spat
+  #   (b) zamok v hlavicke: odomknuty pusti okraj -300 mm, zamknuty ho odmietne
+  #   (c) ikona „Predvolene" vrati 3 / 2 / 2 / 2 / 2 jednym krokom Spat
+  #   (d) material ciel zo skupiny zapise `front_material_id` (ten isty udaj
+  #       ako v Korpuse -> Materialy — dva vstupne body, jedna hodnota)
+  # Scenar (e) z briefu (N26 fokus/hover) je CISTO klientsky — SketchUp runner
+  # ziadny CEF DOM nema, preto ho drzi mini-DOM sada `tests/js/test_d130b_spolocne.js`.
+  D130B_TOP = 7.0        # nova hodnota okraja hore (odlisna od predvolenych 2)
+  D130B_BIG_EDGE = -300.0 # presah, ktory prejde LEN pri odomknutom limite
+
+  def d130b_params
+    { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 500.0,
+      'thickness' => 18.0, 'floor_height' => 100.0,
+      'fronts' => { 'gap' => 3.0, 'gap_top' => 2.0, 'gap_bottom' => 2.0,
+                    'gap_left' => 2.0, 'gap_right' => 2.0,
+                    'items' => [{ 'id' => 'F1', 'type' => 'drawer_front', 'mode' => 'auto' },
+                                { 'id' => 'F2', 'type' => 'drawer_front', 'mode' => 'auto' }] } }
+  end
+
+  def d130b_gaps(inst)
+    f = (e::Store.config(inst) || {})['fronts'] || {}
+    f.values_at('gap', 'gap_top', 'gap_bottom', 'gap_left', 'gap_right').map(&:to_f)
+  end
+
+  # List z katalogu, ktory NIE JE dnesnym materialom ciel — scenar overuje
+  # CESTU (ovladac -> config), takze staci lubovolny INY platny zaznam.
+  # POZN.: kluc zaznamu je `material_id` (nie `id`).
+  def d130b_sheet_id(inst)
+    e::Materials.load
+    now = (e::Store.config(inst) || {})['front_material_id'].to_s
+    rows = Array(e::Materials.sheets).select { |s| s['thickness'].to_f == 18.0 }
+    rows = Array(e::Materials.sheets) if rows.empty?
+    rec = rows.find { |s| s['material_id'].to_s != now && !s['material_id'].to_s.empty? }
+    rec && rec['material_id']
+  end
+
+  def run_d130b(model)
+    cleanup(model)
+    markers = []
+    inst = e::CabinetBuilder.build(model, d130b_params)
+    return ok('D-130b: vlozenie skrinky s dvoma celami', false) unless inst
+
+    cid = e::Store.get(inst, 'cabinet_id')
+    begin
+      d130b_scenar(model, inst, cid, markers)
+    ensure
+      r03_clear_markers(model, markers)
+      cleanup(model)
+      ok('D-130b: cleanup (0 korpusov)', cabinets(model).empty?)
+    end
+  rescue StandardError => ex
+    log_line("FAIL: run_d130b vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
+  def d130b_scenar(model, inst, cid, markers)
+    ok("D-130b: vychodisko = 3 / 2 / 2 / 2 / 2 (#{d130b_gaps(inst).inspect})",
+       d130b_gaps(inst) == [3.0, 2.0, 2.0, 2.0, 2.0])
+
+    # --- (a) CISLO ZO SCHEMY -> config + geometria + jeden krok Spat -------
+    # Schema pise do TYCH ISTYCH poli `fr_gap*` — apply teda ide tou istou
+    # cestou `collectFronts` -> `handle_apply_all` ako pred reworkom.
+    top_before = Array((e::Store.config(inst) || {})['front_items']).map { |i| i['height'].to_f }.max
+    m = r03_marker(model, markers)
+    # POZN.: `d130a_apply` je GENERICKY pomocnik (posle cely blok `fronts`
+    # cez `handle_apply_all`) — zamerne sa nekopiruje, aby obe davky isli
+    # rovnakou cestou ako panel.
+    d130a_apply(model, inst, cid) { |f| f['gap_top'] = D130B_TOP }
+    ok("D-130b (a): okraj hore zo schemy je v configu (#{d130b_gaps(inst)[1]})",
+       d130b_gaps(inst) == [3.0, D130B_TOP, 2.0, 2.0, 2.0])
+    top_after = Array((e::Store.config(inst) || {})['front_items']).map { |i| i['height'].to_f }.max
+    ok("D-130b (a): vacsi okraj hore ubral z AUTO cela (#{top_before} -> #{top_after})",
+       top_after < top_before)
+    Sketchup.undo
+    ok('D-130b (a): PRESNE jeden krok Spat vratil povodny okraj',
+       m.valid? && d130b_gaps(inst) == [3.0, 2.0, 2.0, 2.0, 2.0])
+    r03_clear_markers(model, markers)
+
+    # --- (b) ZAMOK LIMITU PRESAHOV (ikona v hlavicke) ---------------------
+    # Zamknute = okraje max +-100 mm; odomknute = az +-2000 (obklady, pilastre).
+    d130a_apply(model, inst, cid) do |f|
+      f['edge_limit_off'] = true
+      f['gap_left'] = D130B_BIG_EDGE
+    end
+    ok("D-130b (b): odomknuty limit pustil presah #{D130B_BIG_EDGE} mm (#{d130b_gaps(inst)[3]})",
+       (e::Store.config(inst) || {}).dig('fronts', 'edge_limit_off') == true &&
+       d130b_gaps(inst)[3] == D130B_BIG_EDGE)
+    # Zamknutie SPAT s tym istym presahom musi cely apply ODMIETNUT — config
+    # ostava taky, aky bol. POZN.: v CEF chybu prestavby zachyti wrapper
+    # callbacku (log + cerveny status); runner vola handler PRIAMO, takze
+    # vynimka dobehne sem a scenar ju musi ocakavat.
+    before = e::Store.config(inst)
+    err = nil
+    begin
+      d130a_apply(model, inst, cid) do |f|
+        f['edge_limit_off'] = false
+        f['gap_left'] = D130B_BIG_EDGE
+      end
+    rescue StandardError => ex
+      err = ex.message.to_s
+    end
+    ok("D-130b (b): zamknuty limit ten isty presah ODMIETNE (#{err.inspect})",
+       !err.nil? && err.include?('100'))
+    ok('D-130b (b): a ulozeny config ostal NEDOTKNUTY', e::Store.config(inst) == before)
+    # Navrat do normalu: zamok zavriet a okraj vratit na 2 mm.
+    d130a_apply(model, inst, cid) do |f|
+      f['edge_limit_off'] = false
+      f['gap_left'] = 2.0
+    end
+    ok("D-130b (b): zamknutie s platnym okrajom uz prejde (#{d130b_gaps(inst)[3]})",
+       (e::Store.config(inst) || {}).dig('fronts', 'edge_limit_off') != true &&
+       d130b_gaps(inst)[3] == 2.0)
+
+    # --- (c) IKONA „Predvolene" = 3 / 2 / 2 / 2 / 2, jeden krok Spat -------
+    d130a_apply(model, inst, cid) do |f|
+      f['gap'] = 5.0
+      f['gap_top'] = 9.0
+      f['gap_left'] = -12.0
+    end
+    ok("D-130b (c): rozladene medzery (#{d130b_gaps(inst).inspect})",
+       d130b_gaps(inst) == [5.0, 9.0, 2.0, -12.0, 2.0])
+    m2 = r03_marker(model, markers)
+    d130a_apply(model, inst, cid) do |f|
+      # `resetFrontGaps` posle presne tieto hodnoty — jeden apply, jeden Spat.
+      f['gap'] = 3.0
+      %w[gap_top gap_bottom gap_left gap_right].each { |k| f[k] = 2.0 }
+    end
+    ok("D-130b (c): Predvolene vratilo 3 / 2 / 2 / 2 / 2 (#{d130b_gaps(inst).inspect})",
+       d130b_gaps(inst) == [3.0, 2.0, 2.0, 2.0, 2.0])
+    Sketchup.undo
+    ok('D-130b (c): PRESNE jeden krok Spat vratil rozladene medzery',
+       m2.valid? && d130b_gaps(inst) == [5.0, 9.0, 2.0, -12.0, 2.0])
+    r03_clear_markers(model, markers)
+
+    # --- (d) MATERIAL CIEL v tej istej skupine ----------------------------
+    sid = d130b_sheet_id(inst)
+    return ok('D-130b (d): katalog ponukol list na zmenu materialu ciel', false) if sid.nil?
+
+    model.selection.clear
+    model.selection.add(inst)
+    e::Panel.handle_set_cabinet_material(pg(model, 'which' => 'front', 'value' => sid, 'cabinet_id' => cid))
+    ok("D-130b (d): material ciel zo skupiny zapisal `front_material_id` (#{sid.inspect})",
+       (e::Store.config(inst) || {})['front_material_id'].to_s == sid.to_s)
+    # Korpus -> Materialy cita TU ISTU hodnotu — dva ovladace, jeden udaj.
+    ok('D-130b (d): payload panela nesie tu istu hodnotu pre oba ovladace',
+       e::Panel.cabinet_payload(inst)['front_material_id'].to_s == sid.to_s)
+  end
+
   # === KOV-D2b: ZAMKY OSI — UI CESTA (chip -> serverova akcia) ==============
   #
   # D2a dokazal JADRO (poradie resolvera, jedna operacia, Undo/Redo). D2b
@@ -23322,6 +23478,7 @@ module NoxunSuRunner
     run_cela_a(model)
     run_cela_b(model)
     run_d130a(model)         # D-130a: novy zoznam ciel — serverova polovica novych UI ciest: segment „Krídla" ulozi dve kridla a MODEL naozaj postavi dva panely (1 krok Spat vrati oboje), tab Kovanie ma co ukazat (zaznam zasuvky + box vlastnika, na ktory doskoci „Otvoriť v Kovaní"), popover „všetkým" zapise profil AJ hranu celemu rozsahu NARAZ a dvierka necha (1 krok Spat vrati obe cela), chip AUTO vrati celo na automat s novou dopocitanou vyskou (1 krok Spat), a citacie payloady suhrnu/karty nenechaju ZIADNY krok Spat
+    run_d130b(model)         # D-130b: skupina „Spoločné pre skrinku“ — serverova polovica schemy medzier: cislo zo schemy dojde do configu ako `gap_top` a ubere z AUTO cela (1 krok Spat), zamok limitu presahov v hlavicke pusti -300 mm len odomknuty a zamknuty ten isty presah ODMIETNE (config sa nezmeni), ikona „Predvolené“ vrati 3/2/2/2/2 jednym krokom Spat a material ciel z tej istej skupiny zapise `front_material_id` (ten isty udaj ako Korpus -> Materialy)
     run_mr1b1(model)
     run_mr1b2(model)          # MR-1B2: R1/R2, spolocna ABS, prestavba, verna kopia a rollback
     run_mr3a(model)           # MR-3A: fyzicke UV, skutocne roly, partial bindingy a rollback
