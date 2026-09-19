@@ -720,29 +720,37 @@
   }
 
   // ---- N26: MEDZERY JANTAROVO PRI EDITACII --------------------------------
-  // Kym stoji kurzor v niektorom poli skupiny „Medzery a presahy", medzery v
-  // projekcii Cela sa prisvietia — clovek vidi, KTORU skaru prave meni.
+  // Kym stoji kurzor v niektorom poli SCHEMY medzier (skupina „Spoločné pre
+  // skrinku") alebo mys nad schemou, medzery v projekcii Cela sa prisvietia —
+  // clovek vidi, KTORU skaru prave meni.
   // Je to LEN zvyraznenie: ziadne nove data, ziadny novy vypocet (pasy vznikaju
   // z toho isteho `nxFrontDims`, ktorym sa uz kotuju).
   var NX_GAP_FIELDS = { fr_gap: 1, fr_gap_top: 1, fr_gap_bottom: 1, fr_gap_left: 1, fr_gap_right: 1 };
   var PV_GAP_FILL = '#fff3e0';   // --nx-warn-bg-soft
   var PV_GAP_LINE = '#ffb74d';   // --nx-warn
   var PV_GAP_TEXT = '#b26a00';   // --nx-warnchip-fg
-  // „Editacia" = OTVORENA skupina „Medzery a presahy" (to je stav, kvoli
-  // ktoremu clovek na projekciu pozera) ALEBO kurzor priamo v niektorom z jej
-  // poli. Stav sa CITA z DOM, nedrzi sa nikde bokom — zbalenie skupiny tak
-  // zvyraznenie zhasne bez akejkolvek dalsej synchronizacie.
-  var pvGapFocus = false;
-  function pvGapsHot(){
-    if (pvGapFocus) return true;
-    if (typeof document === 'undefined') return false;
-    var d = document.querySelector('details[data-key="fgaps"]');
-    return !!(d && d.open);
-  }
+  // „Editacia" = kurzor v niektorom z piatich poli SCHEMY, alebo mys nad
+  // schemou. D-130b ZRUSIL vazbu na OTVORENU skupinu: schema zije v skupine
+  // „Spoločné pre skrinku" (`cabfront`), kde je aj material ciel, takze
+  // skupina byva otvorena pri bezne praci — medzery by svietili stale a
+  // zvyraznenie by prestalo nieco znamenat. Hover je lacna nahrada: kto sa
+  // na schemu pozera, ide na nu aj mysou.
+  var pvGapFocus = false, pvGapHover = false;
+  function pvGapsHot(){ return pvGapFocus || pvGapHover; }
   function pvSetGapFocus(on){
     if (pvGapFocus === !!on) return;
     pvGapFocus = !!on;
     renderPreview();
+  }
+  function pvSetGapHover(on){
+    if (pvGapHover === !!on) return;
+    pvGapHover = !!on;
+    renderPreview();
+  }
+  // Schema je jeden kontajner `.gapdiag` — patri do nej aj kazde z piatich
+  // poli, takze `closest` staci na cely blok (ziadny zoznam selektorov).
+  function pvInGapDiag(node){
+    return !!(node && typeof node.closest === 'function' && node.closest('.gapdiag'));
   }
   if (typeof document !== 'undefined'){
     document.addEventListener('focusin', function(ev){
@@ -751,11 +759,15 @@
     document.addEventListener('focusout', function(ev){
       if (ev.target && ev.target.id && NX_GAP_FIELDS[ev.target.id]) pvSetGapFocus(false);
     }, true);
-    // `toggle` NEBUBLA — preto zachytavanie (capture). Rozbalenie/zbalenie
-    // skupiny medzier musi projekciu prekreslit.
-    document.addEventListener('toggle', function(ev){
-      var t = ev.target;
-      if (t && t.getAttribute && t.getAttribute('data-key') === 'fgaps') renderPreview();
+    // `mouseover`/`mouseout` (nie `mouseenter`) — delegovane cez capture na
+    // dokumente, takze prezijú kazde prekreslenie panela. `relatedTarget`
+    // odfiltruje prechod MEDZI uzlami schemy (pole -> obrys), ktory by inak
+    // zvyraznenie zbytocne zhasol a zase rozsvietil.
+    document.addEventListener('mouseover', function(ev){
+      pvSetGapHover(pvInGapDiag(ev.target));
+    }, true);
+    document.addEventListener('mouseout', function(ev){
+      if (pvInGapDiag(ev.target) && !pvInGapDiag(ev.relatedTarget)) pvSetGapHover(false);
     }, true);
   }
 
@@ -1458,6 +1470,12 @@
                        frontTypeDesc: frontTypeDesc, PV_FRONT_TYPE_DESC: PV_FRONT_TYPE_DESC,
                        // D-115 (tests/js/test_kova2b_smer_overlay.js) — kresba symbolov
                        // otvarania; test ju vola nad hotovymi stlpcami kridiel
-                       drawFrontSymbols: drawFrontSymbols };
+                       drawFrontSymbols: drawFrontSymbols,
+                       // D-130b (tests/js/test_d130b_spolocne.js): N26 stav je
+                       // FOKUS/HOVER, nie otvorena skupina — test to overuje
+                       // priamo nad prepinacmi, bez kreslenia.
+                       pvGapsHot: pvGapsHot, pvSetGapFocus: pvSetGapFocus,
+                       pvSetGapHover: pvSetGapHover, pvInGapDiag: pvInGapDiag,
+                       NX_GAP_FIELDS: NX_GAP_FIELDS };
   }
 
