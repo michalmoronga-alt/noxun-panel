@@ -1695,20 +1695,46 @@
   function frontCardHwHtml(row, m){
     var fid = row.dataset.frontId || '';
     var h = frontCardRowsHtml(m.hwRows);
-    // R6-b: bez vyriesneho stavu JEDNA tlmena veta — karta nikdy neukaze
-    // prazdno. Plati aj pre blendu s profilom, kym echo nedobehne.
-    if (!m.hwRows.length) h += '<div class="inforow">Bez kovania.</div>';
     // D-78: ovladac, ktory NEMA kam viest, sa NESKRYVA — ostava viditelny
     // a `aria-disabled` s dovodom v `title` povie preco. Box vlastnika
     // vznikne az po echu apply, takze pri novom cele este nemusi existovat.
     var has = (typeof hwBoxByGroup === 'function' && typeof hwFrontGroup === 'function')
       ? !!hwBoxByGroup(hwFrontGroup(fid)) : false;
+    // Codex #371 P2: „Bez kovania" sa NESMIE odvodzovat len z `m.hwRows`.
+    // Vyriesne riadky (`front_drawer` / `front_lift`) ma LEN zasuvka a vyklop —
+    // dvierka, sklop aj blenda s uchytkovym profilom kovanie MAJU, len o nom
+    // hovori plan a nakup (`frontHwBadge` + `frontHwBuy`), nie samostatny
+    // serverovy zaznam. Prazdny stav preto rozhoduje REALNE kovanie vlastnika
+    // (text alebo existujuci box) A AZ POTOM absencia riadkov.
+    var badge = (typeof frontHwBadge === 'function') ? frontHwBadge(fid) : null;
+    var buy = (typeof frontHwBuy === 'function') ? frontHwBuy(fid) : null;
+    var text = [badge, buy].filter(function(t){ return !!t; }).join(' → ');
+    if (!m.hwRows.length){
+      if (text){
+        // Ten isty read-only riadok ako vyriesena zasuvka — je to vysledok,
+        // nie nastavenie; text skladaju TIE ISTE dva zdroje ako suhrn riadku.
+        h += '<div class="drow"><span class="dl">Kovanie</span>' +
+             '<span class="dv">' + esc(text) + '</span></div>';
+      } else if (has){
+        h += '<div class="inforow">Položky tohto čela nájdeš v kontexte Kovanie.</div>';
+      } else {
+        h += '<div class="inforow">Bez kovania.</div>';
+      }
+    }
     h += '<div class="cfoot"><button type="button" class="ghostbtn" data-nx-usage="fronts:do-kovania"' +
          (has ? ' title="Prepne kontext Kovanie a doskočí na box tohto čela"'
               : ' aria-disabled="true" title="Toto čelo zatiaľ nemá naviazané kovanie — položky vzniknú po prestavaní skrinky."') +
-         ' onclick="openFrontHardware(\'' + esc(fid) + '\')">' + NXIcons.svg('hammer') +
+         ' onclick="onFrontOpenHardware(this, \'' + esc(fid) + '\')">' + NXIcons.svg('hammer') +
          'Otvoriť v Kovaní' + NXIcons.svg('arrow-right') + '</button></div>';
     return h;
+  }
+  // Codex #371 P2: `aria-disabled` (vzor D-78) ovladac NESKRYVA, ale ani ho
+  // NESMIE nechat fungovat — inak by klik na stlmene tlacidlo prepol kontext
+  // a pouzivatel by skoncil v Kovani bez toho, na co klikol. Dovod uz nesie
+  // `title`, takze sa nic nehlasi znova.
+  function onFrontOpenHardware(btn, fid){
+    if (btn && btn.getAttribute('aria-disabled') === 'true') return;
+    openFrontHardware(fid);
   }
 
   // Dlazdica typu = zmena typu riadku. Na dvierka BEZ ulozeneho smeru sa smer
@@ -1900,9 +1926,22 @@
           (t.closest('#frontBulkPop') || t.closest('#frontBulkBtn'))) return;
       closeFrontBulk();
     });
+    // Codex #371 P2: Escape SPOTREBUJEME. Vsetky Escape listenery okna visia
+    // na `document` a `stopPropagation` medzi nimi NEFUNGUJE (lekcia
+    // `nx_esc.js`) — bez `stopImmediatePropagation` by jedno stlacenie zavrelo
+    // popover AJ flyout z `boot.js` (warnpanel, rohove menu ABS, tagy), ktore
+    // sa registruju NESKOR (`window.onload`). Pravidlo repa: jedno stlacenie =
+    // NAJVYSSIA otvorena vrstva.
+    //
+    // PORADIE JE ZAMER: `nx_esc.js` je v `panel.html` NACITANY PRED `form.js`,
+    // takze retaz modalov bezi PRVA a svoje Escape spotrebuje sama — modal
+    // (z-index 60) je nad popoverom (125 v ramci skupiny, ale pod scrimom),
+    // takze popover sa pod nim zatvarat nema.
     document.addEventListener('keydown', function(ev){
       if (!ev || ev.key !== 'Escape' || !frontBulkOpen()) return;
       closeFrontBulk(); // fokus sa vracia na tlacidlo (bol v popoveri)
+      if (typeof ev.preventDefault === 'function') ev.preventDefault();
+      if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
     });
   }
   // D-120: karta aj hromadne ovladanie zapisuju tie iste dve item polia.
@@ -2121,13 +2160,18 @@
   // BOX VLASTNIKA tohto cela. Ziadny zapis — je to navigacia (N13: klikatelne
   // vedie tam, kam ukazuje).
   function openFrontHardware(fid){
-    if (typeof setViewContext === 'function') setViewContext('kovanie');
     if (!fid) return;
     // UI-C4: cielom skoku je BOX VLASTNIKA (`.hwbox[data-group="front:<id>"]`),
     // nie jednotlivy riadok — kluc skupiny sklada `hwFrontGroup`, teda JEDINE
     // miesto konvencie, takze sa doskocenie a render nemozu rozist.
+    //
+    // Codex #371 P2: ciel sa overuje PRED prepnutim kontextu. Predtym sa
+    // kontext prepol vzdy a pri chybajucom boxe pouzivatel skoncil v Kovani
+    // s hlaskou „toto celo kovanie nema" — teda inde, nez kde klikol, a bez
+    // cesty spat. Neuspesny skok teraz NEMENI kontext.
     var target = (typeof hwBoxByGroup === 'function') ? hwBoxByGroup(hwFrontGroup(fid)) : null;
     if (!target){ NX.setStatus('Toto čelo zatiaľ nemá naviazané kovanie.', false); return; }
+    if (typeof setViewContext === 'function') setViewContext('kovanie');
     if (typeof nxRevealTarget === 'function') nxRevealTarget(target);
     target.scrollIntoView({ block: 'nearest' });
     // Kratke zvyraznenie: bez neho by pouzivatel po skoku hladal, KTORY box je
@@ -2147,6 +2191,12 @@
     if (!row) return false;
     if (typeof setViewContext === 'function') setViewContext('cela');
     openFrontCardId = id;
+    // Codex #371 P2: deep-link z RED nalezu SMERU vedie na otazku, ktora zije
+    // v tabe Čelo. Bez resetu by sa cielova karta otvorila na tabe Kovanie —
+    // stav ostal po PREDCHADZAJUCEJ karte — a pouzivatel by po kliku na nalez
+    // videl vyriesny set namiesto segmentu smeru. Tab je stav prace nad
+    // JEDNYM celom, takze kazde otvorenie INEJ karty zacina na Čele.
+    openFrontCardTab = 'celo';
     refreshFrontCards();
     if (typeof nxRevealTarget === 'function') nxRevealTarget(row);
     if (row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });
@@ -2211,6 +2261,8 @@
                        updateFrontMeta: updateFrontMeta, frontRowItem: frontRowItem,
                        onFrontCardTab: onFrontCardTab, onFrontSummaryHw: onFrontSummaryHw,
                        nxTipStop: nxTipStop,
+                       onFrontOpenHardware: onFrontOpenHardware,
+                       openFrontHardware: openFrontHardware,
                        openFrontBulk: openFrontBulk, closeFrontBulk: closeFrontBulk,
                        onFrontBulkToggle: onFrontBulkToggle, frontBulkOpen: frontBulkOpen,
                        onFrontBulkApply: onFrontBulkApply,
