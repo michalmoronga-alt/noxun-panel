@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-129** — Úchytka čela sa nastavuje na jednom mieste (karta čela); hromadne cez akciu „všetkým" v hlavičke skupiny Čelá — skupina „Úchytky" zanikla — 19.9.2026, PR #TBD, v0.12.7
 - **D-134** — Hromadné zápisy zákazky (pravidlá kovania, projektová predvoľba materiálu, „aj na podobné v projekte") pracujú s rovnakým rozsahom ako výstupy (top-level skrinky) a skrinku s odpojeným dielcom preskočia a vymenujú, kým projektový zápis prebehne — 13.9.2026, PR #369, v0.12.6
 - **D-133** — „Nahradiť UNI…" má rovnaký rozsah ako výstupy (top-level skrinky a dosky, vnorená skrinka sa už neprestavuje) a skrinka s odpojeným dielcom nahradenie blokuje s návodom, ako to vyriešiť — 13.9.2026, PR #368, v0.12.5
 - **D-132** — Dormantný zámok osi zásuvky (zostal po zmene otvárania alebo po prechode na dvierka) je v Kovaní vidieť ako riadok „Dormantný zámok · NL 470" s dôvodom a tlačidlom „zrušiť"; chipy osí ani nákup sa nemenia — 13.9.2026, PR #367, v0.12.4
@@ -121,6 +122,24 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-129 — Úchytka na jednom mieste, vyriešené 19.9.2026
+
+**Výsledok: PR #TBD, v0.12.7 (dávka D-130a).** Pôvodné znenie postrehu (Michal 12.9.2026): *„Úchytky sú v kontexte Čelá na dvoch miestach — po KOV-A (smery otvárania)
+a D-120 (profil aj hrana) sa ovládanie úchytiek rozpadlo: skupina **Úchytky** (D-96 — hromadný profil/hrana per typ čela) a súčasne **karta čela** (profil, hrana, smer) —
+ten istý údaj sa nastavuje na dvoch miestach a členenie sekcie je chaotické."*
+
+**Čo sa zmenilo.** Skupina `fhandles` **zanikla**. Jediné miesto stavu je **karta čela** — jeden riadok „Úchytka" = popisok + Profil a Hrana vedľa seba (dovtedy dva riadky
+pod sebou, čo je pri 470 px zbytočná daň na jeden údaj). Hromadná zmena ostala, ale ako **AKCIA, nie druhý stav**: popover **„všetkým"** v hlavičke skupiny Čelá (Rozsah ·
+Profil · Hrana · „Použiť na N"). Selecty v popoveri **nič nezapisujú** — zapisuje až „Použiť" (`onFrontBulkApply`), takže jedno rozhodnutie = jeden `onField` = **jeden krok
+Späť**; dovtedy zapisoval každý `change`, teda dva kroky, a hranu sa nedalo zvoliť vopred. Hrana sa nasadí len vtedy, keď je platná pre **celý** rozsah
+(`frontProfileScopeEdges`) — inak by server uložené „Hore" aj tak zhodil. Indikátor `.fprof` v riadku tiež zanikol: profil hovorí **súhrn slovom** („UKW-7 hore" / „bez
+úchytky"), čo je zrozumiteľnejšie než ikona so stavom schovaným v `title`.
+
+**Prístupnosť a pasce.** Popover stojí **mimo `<summary>`** (súrodenec pred `.body`) — vnútri hlavičky by bol súčasťou plochy, ktorá skupinu zbaľuje — a je **dieťaťom
+`<details>`**, takže pri zbalenej skupine ho prehliadač nevykreslí: trigger skupinu **najprv otvorí** a až potom ukáže popover. Každé tlačidlo v hlavičke volá
+`preventDefault()` aj `stopPropagation()` (`<details>` toggluje na klik kdekoľvek v hlavičke). Tlačidlo nesie `aria-haspopup="dialog"` + `aria-expanded`, Escape zatvára
+a fokus sa vracia na tlačidlo — ale len keď bol v popoveri (pri kliku mimo patrí tomu, na čo používateľ klikol).
 
 ### D-134 — Jednotný rozsah hromadných zápisov zákazky, vyriešené 13.9.2026
 

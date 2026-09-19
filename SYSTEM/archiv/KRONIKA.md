@@ -17,6 +17,31 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **D-130a — NOVÝ ZOZNAM ČIEL, KARTA S TABMI, ÚCHYTKA NA JEDNOM MIESTE, v0.12.7 (19.9.2026, PR #TBD).**
+  **Čo Michal dostal:** kontext **Čelá** je prehľadný. Každé čelo sú **dva rovnako usporiadané riadky** — hore číslo · názov typu · **pole výšky vždy v tom istom stĺpci** · ✕;
+  pod názvom **tlmený súhrn** („1 krídlo (auto) · smer? · bez úchytky · Sensys klasik · 2 ks →"), takže **stav všetkých čiel vidno bez otvárania kariet**. Klik na názov
+  alebo súhrn otvorí **kartu s dvoma tabmi**: **Čelo** (typ · krídla · smer · otváranie · konštrukcia · zásuvka · **úchytka**) a **Kovanie** (vyriešený set, zámky osí,
+  technický detail, tlačidlo „Otvoriť v Kovaní"). **Úchytka sa nastavuje na JEDNOM mieste** — v karte; hromadne cez ikonu **„všetkým"** v hlavičke skupiny (popover: rozsah ·
+  profil · hrana · „Použiť na N"). Skupina **„Úchytky" zanikla** — tým je vyriešený **D-129**. Pomocné texty zmizli z riadkov a žijú v **tooltipoch `?`**; stavové vety
+  (červené, jantárové, „bez klasifikácie", návrh D-120) ostávajú viditeľné. **Dáta, zápis, Undo ani server sa nemenia** — je to iné usporiadanie tých istých ovládačov.
+  **Prečo takto.** Dve Michalove hlásenia mali spoločnú príčinu. (1) **D-130 „polia lietajú":** riadok bol flex rad, takže poloha poľa výšky závisela od toho, čo v riadku
+  práve bolo — chip AUTO, „mm", select krídel a ikona profilu ho tlačili vpravo a oko ho pri každom čele hľadalo inde. Riadok je preto **CSS grid so stálymi stĺpcami**
+  (`22 / 1fr / 112 / 22`) a pole výšky je **jeden box s konštantnou šírkou**: chip AUTO odoberá miesto **hodnote**, nie boxu. (2) **D-129 „úchytka na dvoch miestach":**
+  profil a hranu sa dalo nastaviť v karte **aj** v skupine Úchytky a používateľ nevedel, ktoré platí. Stav má teraz jediné miesto (karta) a hromadná zmena je **akcia**
+  (popover), ktorá zapisuje až tlačidlom „Použiť" — jedno rozhodnutie = **jeden krok Späť**, kým predtým zapisoval každý `change` zvlášť a hranu sa nedalo zvoliť vopred.
+  **Rozhodnutia, ktoré sa oplatí pamätať.** **Počet krídel hovorí SERVER** (`front_slots[fid].wings_n`) — AUTO dvierka nad 600 mm sú dve krídla a odvodzovať to v JS by
+  znamenalo druhú (a časom inú) kópiu serverového pravidla. **Smer** ide výhradne z uloženej hodnoty: legacy čelo bez kľúča nedostane ani slovo, ani badge (železné pravidlo
+  KOV-A1 — žiadny `|| 'unset'`). **Červená stavová veta stojí v OBOCH taboch** (je to dôvod, prečo dielce nevzniknú), jantárové odporúčanie ostáva len v Kovaní.
+  **Blenda tab Kovanie MÁ** — s úchytkovým profilom ho dostáva z pravidla `uchytkovy-profil-blenda`, takže veta „bez kovania" by klamala (Codex kolo 2). Koncovka kovania
+  v riadku je **súrodenec** tlačidla súhrnu, nie vnorený prvok: tlačidlo v tlačidle je neplatné HTML a nedá sa fokusovať. Popover je **dieťaťom `<details>`**, takže pri
+  zbalenej skupine ho prehliadač skryje — trigger skupinu **najprv otvorí**. **Vedomé odchýlky od mockupu:** tab sa volá jednotne „Kovanie" (nie „Výsuv"/„Závesy" podľa
+  typu — jedna mapa navyše bez úžitku) a karta ostáva **pod svojím riadkom**, nie ako samostatný blok pod zoznamom.
+  **Testy:** 4141 headless · 119 JS sád · **2765 in-SketchUp PASS / 0 FAIL**. Nové sady `tests/pure/test_d130a_zoznam_ciel.rb` (kostra, počet `.hint` v skupine, rozpočet
+  mriežky, zdroj hodnôt) a `tests/js/test_d130a_suhrn_karta.js` (súhrn nad všetkými typmi, taby, popover nezapisuje kým sa nestlačí „Použiť"), nová in-SU sekcia `run_d130a`
+  (serverová polovica: jeden zápis = jeden krok Späť pri krídlach, hromadnej úchytke aj chipe AUTO; čítacie payloady nenechajú krok Späť). Prepísané `test_smoke1_riadky.rb`
+  (rozpočet sa ráta z `grid-template-columns`), `test_uic3_cela.rb`, `test_d90_ukw_profil.rb`, `test_kova1_cela.rb` a päť JS sád karty.
+  **Codex review:** doplní orchestrátor po review.
+
 - **D-134 — HROMADNÉ ZÁPISY ZÁKAZKY MAJÚ JEDEN ROZSAH, v0.12.6 (13.9.2026, PR #369).**
   **Čo Michal dostal:** tri hromadné akcie — uloženie (aj doplnenie) **pravidiel kovania**, zmena **projektovej predvoľby materiálu** a override materiálu dielca
   **„aj na podobné v projekte"** — pracujú odteraz **presne s tou istou zákazkou ako kusovník a VEPO**. Skrinka **vnorená** v cudzom komponente sa už neprestavuje

@@ -843,20 +843,40 @@ neplatná hrana dostane výzvu a žiadny odhad. Indikátor popíše hranu a skr�
 **ČELÁ-B1 (v0.10.7):** formulár prenáša prítomné `profile_edge` bez dopĺňania defaultu. Náhľad kreslí fyzické `profile_edges` uložených riadkov;
 top/bottom skracuje výšku, left/right šírku, `free` bez resolved hrán nič neodhaduje. Profil podporujú všetky fyzické typy. Ovládače hrán a korelovaný návrh doplnilo B2 (v0.10.8), kontrakt je nižšie v Úchytkách.
 
-tri skupiny v **záväznom poradí** — **Zoznam čiel** (`data-key="fronts"`) · **Úchytky** (`fhandles`) · **Medzery a presahy** (`fgaps`). Riadok čela `.frow` je od SMOKE PACKU 1
-**STĹPEC**: hore `.fmain` = ovládače v **pevnom, NEZALAMOVACOM** rade, pod ním riadok naviazaného kovania `.fhw`. Predtým bol `.frow` jeden zalamovací rad a pri **vypísanej** výške
-(pribudlo „mm" + chip AUTO) súčet presiahol šírku panela — krížik `.fdel` padol o riadok nižšie a riadok sa rozbil (Michalov smoke test 20.8.). `.fmain` nesie: `.fnum` (kanonická
-pozícia F1 dole — D-23) · **`.ftname`** (tlačidlo karty čela: ikona typu `.ftico` + názov `.ftl` s ellipsis + prípadný badge `.fbadge` „smer?") ·
-**`.dwrap` s úzkym poľom výšky (46 px, hodnota vpravo)** + šípkou **výškového radu (N25)** · `.funit` „mm" a **chip `.fauto`** · `select.fw` · **`.fprof` INDIKÁTOR profilu** ·
-`.fdel`.
+**D-130a (v0.12.7)** zúžila kontext na **dve skupiny** v záväznom poradí — **Čelá** (`data-key="fronts"`) · **Medzery a presahy** (`fgaps`); `fhandles` zanikla (nižšie, Úchytky).
+Riadok čela `.frow` je **CSS GRID so stálymi stĺpcami** `22px minmax(0,1fr) 112px 22px` a riadkami 1 = názov · 2 = súhrn · 3 = karta (stĺpce 2–4). Predtým to bol flex rad, takže
+poloha poľa výšky závisela od toho, **čo v riadku práve bolo** (chip AUTO, „mm", select krídel, ikona profilu) a polia „lietali" (D-130); pred SMOKE PACKOM 1 sa rad pri vypísanej
+výške dokonca zalomil. Deti sa kladú do mriežky **priamo** (obal `.fmain` zanikol), každé má pozíciu v CSS, nie v poradí; hľadajú sa **výhradne cez triedy**, takže obrátený render
+D-23, čítanie odspodu aj `closest('.frow')` platia bez zmeny. Mriežka nesie: `.fnum` (kanonická pozícia F1 dole — D-23, cez oba riadky) · **`.ftname`** (tlačidlo karty: ikona typu
+`.ftico` + názov `.ftl` s ellipsis + chevron `.fchev`) · **`.fsubwrap`** (súhrn `.fsub` + koncovka kovania `.fhwlink`) · **`.hbox`** (pole výšky) · `.fdel` (tlmený, červený až pri
+hoveri). `select.fw`, `.fprof` aj samostatný riadok `.fhw` **zanikli**.
+
+**SÚHRN RIADKU `.fsub` (D-130a R3).** Jeden tlmený riadok pod názvom — „1 krídlo (auto) · smer? · bez úchytky · Sensys klasik · 2 ks →" — takže stav **všetkých** čiel vidno bez
+otvárania kariet. Zlúčil tri veci, ktoré boli po riadku rozsypané: badge „smer?" (KOV-A2a, dovtedy v názve), indikátor profilu `.fprof` (D-90) a riadok kovania `.fhw` (UI-C3).
+Text skladá **čistá funkcia `frontRowSummary(item, entry, hw, reg, drawer)`** v `core.js` (vracia pole častí, nie reťazec — badge a jantárové „bez klasifikácie" potrebujú vlastný
+markup); `form.js` ho len kreslí (`updateFrontRowSummary`). **Žiadne nové dáta:** dataset riadku, `front_slots`, `front_drawer` a hotový text kovania (`frontHwBadge` +
+`frontHwBuy`). **Počet krídel hovorí SERVER** (`front_slots[fid].wings_n`) — AUTO dvierka nad 600 mm sú dve krídla a to vie len on; bez záznamu sa píše len „auto". **Smer** ide
+výhradne z uloženej hodnoty: legacy čelo (kľúč chýba) nedostane ani slovo, ani badge — badge „smer?" len pri `unset` (aj pri strednom krídle 3/4-krídlových dvierok). Obnovuje sa
+tam, kde sa dovtedy obnovovali badge (light push aj plný render), takže riadky sa pod `keepGaps` guardom **neprestavujú**.
+
+**Koncovka kovania `.fhwlink` je SÚRODENEC, nie vnorený prvok** (R3-f): druhý riadok mriežky je flex obal `.fsubwrap` s dvoma tlačidlami — `.fsub` rastie a oreže sa, `.fhwlink`
+má pevnú stopu. Tlačidlo v tlačidle je neplatné HTML, nedá sa fokusovať a ellipsis suseda by ho orezal. Klik na súhrn = toggle karty na tabe **Čelo**, klik na koncovku = karta
+rovno na tabe **Kovanie**; prepnutie kontextu robí až tlačidlo „Otvoriť v Kovaní" v tom tabe (N13). Bez naviazaného kovania je koncovka `hidden` (prázdne tlačidlo by bralo tab-stop).
+
+**META V HLAVIČKE `#frontMeta`** („3 čelá · 1 bez smeru") a **akcia „všetkým"** stoja v `<summary>` (`.gtools`). Každé tlačidlo v hlavičke musí `preventDefault()` **aj**
+`stopPropagation()` — `<details>` toggluje na klik kdekoľvek v hlavičke, takže bez toho by klik skupinu zbalil. Počet číta z DOM, „bez smeru" **výhradne** zo `front_slots`.
 
 **KOV-A2a: `select.ftype` ZANIKOL.** Typ sa vyberá **piktogramom v karte čela** a v riadku žije v `dataset.frontType` (vzor D-90 `profile` — `collectFronts` ho číta odtiaľ, takže
 editácia iného poľa ho nestratí). Mapa `FRONT_TYPE_ICON` ostáva jediným miestom prekladu typ→symbol a kreslí ikonu v riadku **aj** dlaždicu v karte; mení sa `href` v `<use>`, nie
 innerHTML (vzor `NXIcons.set`). Výklop, sklop a blenda majú od tejto dávky **vlastné sprite symboly** (`front-lift` / `front-fall` / `front-blind`), nie fallback `front`.
 
-**`.ftname` je JEDINÝ rastúci prvok** (`flex: 1 1 0`, `min-width: 60px`), všetko ostatné má pevnú stopu — riadok tak využije celú šírku a zároveň sa nikdy nezalomí; súčet stôp +
-medzier pri obsahu 470 px stráži guard `tests/pure/test_smoke1_riadky.rb` (spadne pri pridaní ďalšieho ovládača, nie až na Michalovej obrazovke). V rozpočte je **aj badge
-„smer?"** — stojí vedľa „mm" a chipu AUTO, takže v najužšom paneli sa názov typu oreže (plné znenie nesie `title` tlačidla).
+**Stredný stĺpec je JEDINÝ rastúci** (`minmax(0,1fr)`) — názov aj súhrn sa v ňom orežú (plné znenie nesie `title`), všetko ostatné má šírku danú mriežkou. Rozpočet pri obsahu
+470 px stráži guard `tests/pure/test_smoke1_riadky.rb`: ráta sa zo `grid-template-columns`, takže nový ovládač si musí v mriežke nájsť miesto a nemá kde „pritlačiť" pole výšky.
+
+**POLE VÝŠKY `.hbox` (D-130a R4)** je JEDEN box s **konštantnou** šírkou 112 px: `[chip AUTO][hodnota][mm][šípka výškového radu]`. Chip odoberá miesto **hodnote**, nie boxu,
+takže susedné stĺpce sa pri vypísanej výške nehýbu — presne to bola príčina „lietajúcich polí". Chip `.fauto` je **tlačidlo** (`frontHeightAuto`, fokusovateľné, `aria-label`) a
+ukazuje sa len pri vypísanej hodnote (`.hbox.fixed`); „mm" je **vždy** vidno — jednotka patrí k poľu, nie k hodnote, a jej miznutie hýbalo obsahom boxu. Placeholder „≈ N" je
+**kurzívou a tlmený** (outside-in packet 3: placeholder ako nositeľ stavu AUTO je známa pasca), pevná hodnota je **tučná**, a pravidlo vysvetľuje `title` boxu.
 
 **Živý náhľad výrazu `.exprhint`** („= 450" pri `300+150`) je v riadku čela **overlay** (`position: absolute` pod poľom, `z-index` pod `.miniopts`, `pointer-events: none`) — ako
 flex položka pridal do radu ~34 px, na ktoré `nowrap` už nemá rezervu, takže by riadok pretiekol presne tak, ako predtým zalamoval (Codex #183 P2). Je to ten istý vzor ako
@@ -869,27 +889,48 @@ zóna" z UI-C2); chip AUTO pole vyprázdni a ohlási to **pôvodnou udalosťou `
 **Výškový rad `vyska_cela`** existoval od UI-B3, ale nebol napojený — riadky vznikajú za behu, preto svoju mini-ponuku nesú v **atribútoch** (`data-dim-key` + `data-dim-input`) a
 plní ich `nxDimFillRow` (settings.js) **tou istou cestou** ako statické polia, takže úprava radu v koliesku sa premietne aj do už vykreslených riadkov.
 
-**Naviazané kovanie** je JEDEN drobný riadok `.fhw` **vnútri `.frow`** (druhý potomok stĺpca, ellipsis, plný text v `title`) — DOM zoznamu tak ostáva „jeden `.frow` = jedno čelo" a
-obrátený render D-23 platí bez zmeny; text skladajú dva **existujúce** zdroje (`frontHwBadge` z plánu + `frontHwBuy` = `purchase.set_name` z D-92), klik prepne kontext na Kovanie a
-doskočí na **box vlastníka** (`hwBoxByGroup(hwFrontGroup(fid))` — kľúč skupiny skladá JEDNA funkcia pre render aj pre skok, takže sa nemôžu rozísť; `.hwfocus` krátke zvýraznenie).
+**Naviazané kovanie** je od D-130a **koncovka súhrnu** (`.fhwlink`, vyššie) — samostatný riadok `.fhw` zanikol. Text skladajú tie isté dva **existujúce** zdroje (`frontHwBadge`
+z plánu + `frontHwBuy` = `purchase.set_name` z D-92). Prepnutie kontextu na Kovanie a doskok na **box vlastníka** robí tlačidlo „Otvoriť v Kovaní" v tabe Kovanie karty
+(`hwBoxByGroup(hwFrontGroup(fid))` — kľúč skupiny skladá JEDNA funkcia pre render aj pre skok, takže sa nemôžu rozísť; `.hwfocus` krátke zvýraznenie). Keď box vlastníka
+**neexistuje** (nové čelo pred echom), tlačidlo sa **neskrýva**: ostáva viditeľné s `aria-disabled` a dôvodom v `title` (D-78).
 
-**D-84 / D-114:** šesť ikon „Pridať: typ“ posiela typ do nového riadku; odoberacie tlačidlo aj `removeLastFront` zanikli. Maže sa krížikom konkrétneho riadku.
+**D-84 / D-114:** šesť ikon „Pridať: typ“ posiela typ do nového riadku; odoberacie tlačidlo aj `removeLastFront` zanikli. Maže sa krížikom konkrétneho riadku. D-130a pred rad
+pridala tlmený popisok „Pridať čelo" a hairline predel (`.addrow`).
+
+**TOOLTIP `.nxtip` (D-130a R8) — nový spoločný komponent.** Pomocný text už **nie je** `.hint` pod ovládačom (v každej karte bral riadok), ale bublina za ikonou `?`: obsah nesie
+`data-tip`, kreslí ho pseudo-element, otvára **hover aj fokus** (klávesnica), šírka 250 px, varianta `.r` je zarovnaná vpravo (inak by pri 470 px utiekla z panela). Natívny
+`title` nestačí — CEF ho ukazuje s oneskorením, nedá sa štýlovať a dlhý text zalamuje po svojom. **Pravidlo: pomocný text = tooltip, stavová veta ostáva viditeľná** (RED/ORANGE,
+„bez klasifikácie", D-120 `frontDraftMessage`). V kontexte Čelá zostal presne jeden `.hint` — a je to práve `frontDraftMessage` (stráži guard `test_d130a_zoznam_ciel.rb`).
 
 **Materiál čiel** má DRUHÝ ovládač (`cab_front_c`) priamo v zozname, lebo sektor Materiály patrí kontextu Korpus a tu je skrytý — tá istá hodnota, dva vstupné body, synchro drží
 každá cesta, ktorá siaha na `cab_front`.
 
-**KARTA ČELA (KOV-A2a)** je `.fcard` — **TRETÍ potomok stĺpca `.frow`** (za `.fmain` a `.fhw`), teda leží **priamo pod svojím riadkom**; otvorená je **vždy najviac jedna** a drží
-sa cez **identitu čela** (`openFrontCardId`), nie cez index riadku — klik na segrow spustí apply a echo riadky prestaví, takže bez identity by karta pod rukou zmizla. *Vedomá
-odchýlka od mockupu*, kde je karta samostatný blok pod celým zoznamom: takto ostáva kontext pri riadku, ktorého sa týka, a v skupine nepribúda trvalý blok (vertikálny priestor je
-vzácny). Z toho istého dôvodu karta **nemá hlavičku** — F-číslo, typ aj výšku má riadok priamo nad ňou. Riadok kovania `.fhw` sa pri otvorenej karte vkladá **nad ňu**.
+**KARTA ČELA (KOV-A2a)** je `.fcard` — **posledný potomok `.frow`**, v mriežke D-130a **tretí riadok** cez stĺpce 2–4, teda leží **priamo pod svojím riadkom**; otvorená je **vždy
+najviac jedna** a drží sa cez **identitu čela** (`openFrontCardId`), nie cez index riadku — klik na segrow spustí apply a echo riadky prestaví, takže bez identity by karta pod
+rukou zmizla. *Vedomá odchýlka od mockupu*, kde je karta samostatný blok pod celým zoznamom: takto ostáva kontext pri riadku, ktorého sa týka, a v skupine nepribúda trvalý blok
+(vertikálny priestor je vzácny). Z toho istého dôvodu karta **nemá hlavičku** — F-číslo, typ aj výšku má riadok priamo nad ňou.
 
-Obsah karty skladá **čistý view-model `frontCardModel(item, slots)`** (core.js): **typegrid** = 6 dlaždíc (Dvierka · Zásuvka · Výklop · Sklop · Blenda · **Bez čela** — `none` je
-platný typ D-18, preto musí ostať voliteľný; popisky sú krátke, plný názov nesie `title`) + **kontextové riadky `.prow`**: „Smer" (Ľavé · **Neurčené ⚠** · Pravé) pri slote
-`single` · „Krídlo 2/3" (resp. 2/4 a 3/4) **per stredné krídlo** pri slotoch `p2`/`p3` — *vedomé rozšírenie mockupu, variant a z BLOCKERA 2* · „Otváranie" (Klasické · Tip-On) na
-pohyblivých typoch · „Konštrukcia" + „Zásuvka" pri zásuvkovom čele · blenda a „Bez čela" majú len vetu, prečo ovládače nemajú. Riadky Závesy a zámky osí sú **KOV-D**, nie tu;
-karta to hovorí jednou vetou, než aby ponúkala voľbu bez účinku — **od KOV-D1b vetvenou podľa typu**: zásuvkové čelo ukazuje na miesto, kde sa výber naozaj robí („Set výsuvu
-vyberieš v kontexte Kovanie — pri riadku tohto čela."), dvierka ostávajú pri prísľube („Set závesov podľa otvárania príde s KOV-F." — závesové položky nenesú `opening_mode`,
-preto potrebujú dvojsegmentový hinge resolver). Výber setu patrí k **položke kovania**, nie ku klasifikácii čela, takže sa do karty čela nepresúva.
+**KARTA MÁ DVA TABY (D-130a R6):** **Čelo** (čo nastavujem — typegrid, krídla, smer, otváranie, konštrukcia, zásuvka, úchytka) a **Kovanie** (čo z toho vzišlo — vyriešený set,
+chipy zámkov osí, technický detail, ponuka verzie receptu, tlačidlo „Otvoriť v Kovaní"). `frontCardModel` vracia `tabs` (čistý VM), `rows` = tab Čelo a `hwRows` = tab Kovanie.
+Tab Kovanie má **každý fyzický typ vrátane blendy** (blenda s úchytkovým profilom kovanie dostáva z pravidla `uchytkovy-profil-blenda`) — chýba len pri `none`; bez položiek
+ukáže jednu tlmenú vetu „Bez kovania." Stav tabu drží `openFrontCardTab`: default **Čelo** pri každom otvorení **inej** karty, ale `refreshFrontCards` (echo, ľahký push) ho
+**zachová** — inak by každý push hodil používateľa z Kovania späť (vzor obnovy fokusu D2b). Prepnutie tabu **nič nezapisuje** (žiadny `onField`, žiadny krok Späť) a identita
+tabu (`data-tab`) je súčasťou `frontCardFocusKey`, takže fokus prežije prekreslenie. Badge „smer?" sedí **na tabe Čelo**, takže otvorená otázka je vidieť aj z tabu Kovanie.
+**Červená stavová veta stojí v OBOCH taboch** — je to dôvod, prečo dielce nevzniknú: v Kovaní v plnom znení s chipmi, v Čele ako jeden `inforow err` **nad** segmentmi.
+Jantárové odporúčanie a `locked_note` sú poznámky k výsledku a ostávajú len v Kovaní. *Vedomá odchýlka od mockupu:* tab sa volá jednotne **„Kovanie"**, nie „Výsuv"/„Závesy"
+podľa typu — jedna mapa navyše bez úžitku.
+
+Obsah tabu **Čelo** skladá **čistý view-model `frontCardModel(item, entry, drawer, lift)`** (core.js): **typegrid** = 6 dlaždíc (Dvierka · Zásuvka · Výklop · Sklop · Blenda ·
+**Bez čela** — `none` je platný typ D-18, preto musí ostať voliteľný; popisky sú krátke, plný názov nesie `title`, blenda a `none` majú dlhší vysvetľujúci `FRONT_TYPE_TIP`) +
+**kontextové riadky `.prow`**: **„Krídla"** (auto · 1 · 2 · 3 · 4, len pri dvierkach — D-130a R5) · „Smer" (Ľavé · **Neurčené ⚠** · Pravé) pri slote `single` · „Krídlo 2/3"
+(resp. 2/4 a 3/4) **per stredné krídlo** pri slotoch `p2`/`p3` — *vedomé rozšírenie mockupu, variant a z BLOCKERA 2*; segment „Krídla" ich **nenahrádza**, počet je nastavenie
+a smer stredného krídla je otázka zo servera · „Otváranie" (Klasické · Tip-On) na pohyblivých typoch · „Konštrukcia" + „Zásuvka" pri zásuvkovom čele · **„Úchytka"** (R7, nižšie)
+· blenda a „Bez čela" majú len vetu, prečo ovládače nemajú. Výber **setu** patrí k **položke kovania**, nie ku klasifikácii čela, takže v karte nie je; od D-130a to už nehovoria
+ani hinty („Set výsuvu vyberieš…" / „Set závesov vyberieš…" **zanikli bez náhrady**) — povie to tab **Kovanie** a jeho tlačidlo „Otvoriť v Kovaní".
+
+**KRÍDLA ŽIJÚ V DATASETE (D-130a R5).** `select.fw` v riadku zanikol (rozbíjal mriežku a pri nedvierkach stál prázdny); hodnota žije v `dataset.frontWings` (vzor
+`dataset.frontType` z KOV-A2a) a `collectFronts` ju číta odtiaľ — **legacy riadok bez kľúča ide na `auto`**, presne to posielal aj select. Zápis ide cez `onFrontWings(row, value)`
+→ `frontExtraOnWings` → `refreshFrontCards` → `onField`; klik na už nasadenú hodnotu je no-op (žiadny prázdny krok Späť).
 
 **RIADOK VYRIEŠENEJ ZÁSUVKY (KOV-C2c).** Pod klasifikáciou stojí **jediný read-only riadok** — „Atira · H70 · NL 470 · 30 kg · SiSy · recept v1" (Quadro namiesto H-variantu
 menuje **výšku boxu**). Vertikálny priestor panela je vzácny, preto to **nie je blok**: vety receptu („potrebná svetlá výška od…", „rad 350–520 mm, potrebná svetlá hĺbka…")
@@ -1034,9 +1075,22 @@ PV_* zrkadlo tokenu — žiadna nová farba), inak by ho X zásuvky/blendy preš
 
 ### Úchytky = D-96 / D-120 (form.js, core.js, preview.js, bridge.js)
 
-Profil aj hrana sa nastavujú v karte čela a hromadne pre all/door/drawer_front/lift/fall/blind. Oba ovládače zapisujú rovnaké `dataset.frontProfile`/`frontProfileEdge`
+**D-130a R7 / D-129: úchytka má JEDINÉ MIESTO STAVU — kartu čela.** Skupina `fhandles` („Úchytky") **zanikla**: bola druhým stavom tých istých dvoch polí a používateľ nevedel,
+ktoré z dvoch miest platí (hlásenie D-129). V karte je to **jeden riadok** „Úchytka" = popisok + `.phalf` (Profil + Hrana vedľa seba); dovtedy to boli dva riadky pod sebou, čo
+je pri 470 px zbytočná daň na jeden údaj. Handlery `onFrontCardProfile` / `onFrontCardEdge` ostávajú.
+
+**Hromadná zmena ostala ako AKCIA — popover „všetkým"** (`#frontBulkPop`) v hlavičke skupiny Čelá: Rozsah · Profil · Hrana · stavová veta · **„Použiť na N"**. **Selecty v ňom
+NIČ nezapisujú** — zapisuje až „Použiť" (`onFrontBulkApply`): jedna cesta, jeden `onField`, jeden krok Späť. Predtým zapisoval každý `change`, takže jedno rozhodnutie
+znamenalo dva kroky Späť a hrana sa nedala zvoliť vopred. Hrana sa nasadí, len keď je platná pre **celý** rozsah (`frontProfileScopeEdges` — bočné hrany majú dvierka a zásuvky
+rôzne), inak by server uložené „Hore" aj tak zhodil. Popover stojí **mimo `<summary>`** (súrodenec pred `.body`) — vnútri hlavičky by bol súčasťou klikateľnej plochy, ktorá
+skupinu zbaľuje — a je **dieťaťom `<details>`**, takže pri zbalenej skupine ho prehliadač nevykreslí: trigger skupinu **najprv otvorí** (`details.open = true`) a až potom
+ukáže popover. Ukotvený je `right: 6px` dovnútra panela (outside-in packet 2). Zatvára ho klik mimo, **Escape** a „Použiť"; fokus sa vracia na tlačidlo, **len keď bol
+v popoveri** (pri kliku mimo patrí tomu, na čo používateľ klikol). Tlačidlo nesie `aria-haspopup="dialog"` + `aria-expanded`.
+
+Oba ovládače zapisujú rovnaké `dataset.frontProfile`/`frontProfileEdge`
 a `collectFronts`; žiadny uložený hromadný default. `frontProfileCommon(items, scope, key)` vracia nezávislý zmiešaný stav profilu/hrany. `frontProfileStateText` zoskupuje rovnaký profil aj hranu v poradí prvého výskytu. Rozsah ponúkne prienik platných
 hrán; samotná zmena hrany profil nezapne, zmena profilu zachová platnú hranu. `PROFILELESS_FRONT_TYPES` zrkadlí Ruby a obsahuje iba none. Návrat z none vyžaduje zapnutie.
+**Indikátor `.fprof` v riadku zanikol** — profil hovorí súhrn slovom („UKW-7 hore" / „bez úchytky"), teda zrozumiteľnejšie než ikona, ktorej stav sa dal prečítať len z `title`.
 
 **Návrh a potvrdenie (D-120, v0.10.8):** `front_preflight` je čistý callback Panelu nad aktuálnymi rozmermi/fronts, vracia resolved riadky, fyzické hrany, smerové sloty
 aj chybu bez zápisu/Undo/katalógov. `nxFrontDraftAsk` koreluje dokument, cabinet_id alebo insert_session, revíziu a podpis formulára. Zmena kontextu/staré odpovede

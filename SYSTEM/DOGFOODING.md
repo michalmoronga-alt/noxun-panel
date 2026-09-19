@@ -36,14 +36,11 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
 
 ## V1 DOTIAHNUTIE
 
-- **D-129 · Úchytky sú v kontexte Čelá na dvoch miestach** (Michal 12.9.2026) — po KOV-A (smery otvárania) a D-120 (profil aj hrana) sa ovládanie úchytiek rozpadlo: skupina
-  **Úchytky** (D-96 — hromadný profil/hrana per typ čela) a súčasne **karta čela** (profil, hrana, smer) — ten istý údaj sa nastavuje na dvoch miestach a členenie sekcie je
-  chaotické. *Stav: OTVORENÉ — rieši sa ako súčasť D-130.*
 - **D-130 · Menší UI/UX rework kontextu Čelá** (Michal 12.9.2026) — kontext za posledné bloky narástol (typy čiel piktogramami, presahy per strana, smery otvárania, úchytky
-  s profilom aj hranou, medzery v dvoch riadkoch, materiál čiel, potvrdenie návrhu) a potrebuje **lepšiu organizáciu a spojenie do prehľadného celku**: zjednotiť úchytky (D-129),
-  pomocné texty (`.hint`) presunúť do tooltipov, prehodnotiť poradie a zbaľovanie skupín. Postup podľa [CLAUDE.md](../CLAUDE.md) (UX vzor s CAD precedensom): **debata
-  s Michalom → draft → Antigravity outside-in → reconcile → mockup** (vzor `zdroje/ui20/`) **→ package → implementácia**. Platí trvalé pravidlo „vertikálny priestor je
-  vzácny" ([PLAN.md](PLAN.md)). *Stav: OTVORENÉ — nové okno.*
+  s profilom aj hranou, medzery v dvoch riadkoch, materiál čiel, potvrdenie návrhu) a potrebuje **lepšiu organizáciu a spojenie do prehľadného celku**. **Časť a je HOTOVÁ
+  (D-130a, v0.12.7):** nový zoznam čiel (riadok = mriežka so stálymi stĺpcami, súhrn pod názvom), karta s tabmi Čelo | Kovanie, úchytka na jednom mieste (vyriešila aj D-129)
+  a pomocné texty presunuté do tooltipov `?`. *Stav: OTVORENÉ — **ostáva časť b: „Spoločné pre skrinku"** (materiál čiel · schéma medzier namiesto dvoch riadkov polí · ikony
+  zámku limitu a „Predvolené" v hlavičke skupiny; skupiny `fgaps` a `fronts` sa zlúčia do `cabfront`). Mockup: `zdroje/ui20/mockup_cela_final.html`.*
 - **Vedome odložené z dávky E — ceny (V1 rozsah)** (6.8., nič z toho neblokuje prácu so zákazkou) — **manuálne overenie ceny materiálov/ABS** BEZ väzby na Demos a **viac URL na položke**
   (zvyšok V1-03; dnes ich „Prepočítať ceny" preskočí) · ~~prepínač „na faktúru" (×1,2)~~ — **vyradené 6.9.2026** (Michal: existuje prepínač s DPH / bez DPH); zvyšok rozhodnutý v `zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md`.
   **Katalógové kovanie je hotové (10.9., CENY-KOV-A/B, PR #345/#346):** jeden produktový odkaz, preklik a ručné potvrdenie ceny k dnešku v katalógu/Rozpočte. Materiály/ABS a viac URL sú naďalej otvorené.
