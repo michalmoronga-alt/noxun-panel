@@ -870,15 +870,29 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Zones`).
   pred minimom**; medzi minimom a plochou sa veľkosti okna nikto nedotkne, takže
   vedome zväčšené okno ostáva. Nové okno = nové `NX_FIT_MIN` (bez neho fit nebeží).
 
-### 5.7 Čelá — riadky, AUTO chip, Úchytky (UI-C3, rework D-130a)
+### 5.7 Čelá — riadky, AUTO chip, Úchytky (UI-C3, rework D-130a + D-130b)
 
 Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_cela_final.html` (D-130a);
 staršia `mockup_inspector_c.html` (`s4Fronts`) pre zvyšok kontextu.
 
-- **Okraje (ČELÁ-A / D-119)** patria celej skrinke: hore/dole v prvom riadku, vľavo/vpravo v druhom. Medzera medzi čelami ostáva osobitne; čísla zarovnané doprava.
-- **Kontext má od D-130a DVE skupiny v záväznom poradí:** **Čelá** · Medzery
-  a presahy (`fhandles` zanikla — úchytka má jediné miesto, nižšie). Ikony
-  skupín (N3b) ukazujú, o čom skupina hovorí (`front` · `columns-2`).
+- **ČÍSLA SEDIA NA HRANÁCH — vzor „schéma" (D-130b).** Keď skupina hodnôt
+  popisuje **polohy na jednom tvare** (okraje čela voči obrysu korpusu), kreslí
+  sa obrys a polia sa položia na hrany, ktorých sa týkajú — nie štyri popísané
+  riadky pod sebou. Používateľ nemusí čítať popisky a **ušetrí sa vertikálny
+  priestor**. Kresba je ILUSTRÁCIA (`aria-hidden`), ovládače ostávajú **tie isté
+  polia** — žiadne nové dáta ani nové ID. Hodnota, ktorá má v náhľade vlastnú
+  farbu (medzera = jantár), ju nosí aj v schéme. **Pasca:** absolútne umiestnené
+  polia v `.row` musia prebiť `.row input { flex: 1 }` — selektor potrebuje
+  štyri triedy (`.nx-inspector .row .gapdiag input.gd`).
+- **Okraje (ČELÁ-A / D-119)** patria celej skrinke a od D-130b sú **schémou**: hore/dole/vľavo/vpravo na hranách obrysu, medzera medzi čelami v strede.
+- **Kontext má od D-130b DVE skupiny v záväznom poradí:** **Čelá** · **Spoločné
+  pre skrinku** (`fhandles` aj `fgaps` zanikli — úchytka má jediné miesto nižšie,
+  medzery sú v druhej skupine spolu s materiálom čiel). Ikony skupín (N3b)
+  ukazujú, o čom skupina hovorí (`front` · `cabinet`). Do druhej skupiny patrí
+  všetko, čo platí **naraz pre všetky čelá** — to je kritérium pre budúce
+  ovládače. Zámok limitu presahov a „Predvolené" sú **ikony v hlavičke** (stav
+  nesie ikona + `title` + jantárová farba, nie text v tele) a meta hlavičky
+  povie stav aj pri **zbalenej** skupine.
 - **RIADOK JE MRIEŽKA, nie rad (D-130a).** `22px minmax(0,1fr) 112px 22px`,
   riadky: názov · súhrn · karta. Flex rad držal riadok pohromade, ale poloha
   poľa výšky závisela od toho, **čo v riadku práve bolo** (chip AUTO, „mm",
@@ -983,9 +997,13 @@ staršia `mockup_inspector_c.html` (`s4Fronts`) pre zvyšok kontextu.
   vlastnú cestu cez builder, ABS a kusovník, čo je samostatná dávka.
   Poctivejšie je povedať, že sa s ním ráta, než ho zamlčať (rovnaký vzor ako
   rezervovaný slot „Vnútro" v Zónach).
-- **N26 medzery jantárovo:** pri otvorenej skupine „Medzery a presahy" (alebo
-  kurzore v jej poli) sa medzery v projekcii Čelá podfarbia. Je to **len
+- **N26 medzery jantárovo:** pri kurzore v niektorom poli schémy **alebo pri
+  hoveri nad schémou** sa medzery v projekcii Čelá podfarbia. Je to **len
   zvýraznenie** — pásy vznikajú z toho istého rozkladu, ktorým sa už kótuje.
+  D-130b zrušil väzbu na **otvorenú skupinu**: schéma žije v skupine, ktorá
+  býva otvorená, takže by medzery svietili stále a zvýraznenie by prestalo
+  niečo znamenať. **Vzor:** zvýraznenie viazať na prácu (fokus/hover), nie na
+  stav rozbalenia.
 - **Interaktívne prvky v riadku STOPUJÚ bublanie** (lekcia: rozbaľovačka sa
   zatvárala) — platí pre chip AUTO, šípku radu aj riadok kovania.
 

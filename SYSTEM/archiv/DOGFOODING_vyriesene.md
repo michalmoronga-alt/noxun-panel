@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-130** — Menší UI/UX rework kontextu Čelá: nový zoznam čiel + karta s tabmi (časť a) a skupina „Spoločné pre skrinku" s materiálom čiel a schémou medzier, kde číslo sedí na hrane, ktorej sa týka (časť b) — 19.9.2026, PR #371 + #372, v0.12.7–v0.12.8
 - **D-129** — Úchytka čela sa nastavuje na jednom mieste (karta čela); hromadne cez akciu „všetkým" v hlavičke skupiny Čelá — skupina „Úchytky" zanikla — 19.9.2026, PR #371, v0.12.7
 - **D-134** — Hromadné zápisy zákazky (pravidlá kovania, projektová predvoľba materiálu, „aj na podobné v projekte") pracujú s rovnakým rozsahom ako výstupy (top-level skrinky) a skrinku s odpojeným dielcom preskočia a vymenujú, kým projektový zápis prebehne — 13.9.2026, PR #369, v0.12.6
 - **D-133** — „Nahradiť UNI…" má rovnaký rozsah ako výstupy (top-level skrinky a dosky, vnorená skrinka sa už neprestavuje) a skrinka s odpojeným dielcom nahradenie blokuje s návodom, ako to vyriešiť — 13.9.2026, PR #368, v0.12.5
@@ -122,6 +123,29 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-130 — Menší UI/UX rework kontextu Čelá, vyriešené 19.9.2026
+
+**Výsledok: PR #371 (časť a, v0.12.7) + PR #372 (časť b, v0.12.8).** Pôvodné znenie postrehu (Michal 12.9.2026): *„Kontext Čelá za posledné bloky narástol (typy čiel
+piktogramami, presahy per strana, smery otvárania, úchytky s profilom aj hranou, medzery v dvoch riadkoch, materiál čiel, potvrdenie návrhu) a potrebuje lepšiu organizáciu
+a spojenie do prehľadného celku — polia lietajú, poloha poľa výšky závisí od toho, čo v riadku práve je."*
+
+**Časť a (D-130a, PR #371).** Riadok čela je **CSS grid so stálymi stĺpcami** (`22px minmax(0,1fr) 112px 22px`) — pole výšky je vždy na tom istom mieste, nech je AUTO alebo
+pevné. Pod názvom pribudol **súhrn** (krídla · smer · otváranie · úchytka · naviazané kovanie), takže stav všetkých čiel vidno bez otvárania kariet. Karta čela má **dva taby
+Čelo | Kovanie**, krídla sa nastavujú v karte (select z riadku zanikol) a dlhé pomocné texty nahradili **tooltipy `?`** (stavové vety ostali viditeľné). Tou istou dávkou
+zanikla skupina „Úchytky" (D-129).
+
+**Časť b (D-130b, PR #372).** Pod zoznamom čiel je jedna skupina **„Spoločné pre skrinku"** (`cabfront`) — všetko, čo platí naraz pre všetky čelá jednej skrinky: **Materiál
+čiel** (presunutý z konca zoznamu; ten istý údaj ako v Korpuse → Materiály) a **Medzery a okraje ako SCHÉMA** — obrys korpusu s dvoma čelami, päť **tých istých** polí
+`fr_gap*` položených na hrany, ktorých sa týkajú (medzera medzi čelami v strede, jantárovo). Používateľ nemusí čítať popisky, vidí, ktorá hrana je ktorá; štyri popísané
+riadky zmizli a s nimi aj kus vertikálneho priestoru. **Zámok limitu presahov** (±100 / ±2000 mm pre obklady a pilastre) a **„Predvolené"** sú **ikony v hlavičke** skupiny;
+zámok nesie stav ikonou, `title`-om, `aria-pressed` a jantárovou farbou — textový label zanikol. **Meta hlavičky** („dub Halifax · 3 · 2/2/0/0") povie stav aj pri zbalenej
+skupine. Dlhý pomocný text nahradil tooltip `?` so **stolárskym** vysvetlením znamienok: *+ = odskok · 0 = zarovno · − = presah čela cez korpus* a *číslo v strede = škára*.
+
+**Žiadne nové dáta.** `fronts.gap*`, `edge_limit_off`, `front_material_id`, serverové kľúče, validácia, výrazy v poliach, echo-guard `keepGaps` aj Undo ostali nezmenené —
+zmenilo sa **len rozloženie** a miesto ovládačov v DOM. Jediná zmena správania: **N26** (jantárové prisvietenie medzier v náhľade) sa už neviaže na **otvorenú skupinu**, ale na
+**fokus v poli schémy alebo hover nad schémou**. Dôvod: schéma žije v skupine, kde je aj materiál čiel, takže skupina býva otvorená pri bežnej práci — medzery by svietili
+stále a zvýraznenie by prestalo niečo znamenať.
 
 ### D-129 — Úchytka na jednom mieste, vyriešené 19.9.2026
 
