@@ -199,16 +199,16 @@ end
 
 # --- 7) kostra kontextu Cela -------------------------------------------------
 
-NxTest.test('UI-C3 / D-130a: kontext Cela ma DVE skupiny v zavaznom poradi') do
+NxTest.test('UI-C3 / D-130a+b: kontext Cela ma DVE skupiny v zavaznom poradi') do
   keys = UIC3_PANEL_HTML.scan(/data-key="([a-z_]+)" data-s4="cela"/).flatten
   # D-129: skupina `fhandles` zanikla (uchytka ma jedine miesto = karta cela,
-  # hromadne cez popover „všetkým"). D-130b neskor zlucii `fgaps` do skupiny
-  # „Spoločné pre skrinku" (`cabfront`).
-  NxTest.assert_equal(%w[fronts fgaps], keys,
-                      'Čelá -> Medzery (poradie je kontrakt)')
+  # hromadne cez popover „všetkým"). D-130b: `fgaps` (Medzery a presahy)
+  # zanikla tiez — jej polia su SCHEMOU v skupine „Spoločné pre skrinku".
+  NxTest.assert_equal(%w[fronts cabfront], keys,
+                      'Čelá -> Spoločné pre skrinku (poradie je kontrakt)')
 end
 
-NxTest.test('UI-C3: material ciel je dostupny aj zo zoznamu ciel (S3 je v tomto kontexte skryty)') do
+NxTest.test('UI-C3: material ciel je dostupny aj v kontexte Cela (S3 je v nom skryty)') do
   NxTest.assert(UIC3_PANEL_HTML.include?('id="cab_front_c"'), 'druhy ovladac materialu ciel')
   NxTest.assert(UIC3_PANEL_HTML.include?("data-nx-combo=\"decor\"></select></div>") ||
                 UIC3_PANEL_HTML.include?('id="cab_front_c" data-nx-combo="decor"'),
@@ -222,7 +222,11 @@ end
 
 NxTest.test('N26: pri editacii medzier sa medzery v projekcii prisvietia jantarovo') do
   pv = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'preview.js'), encoding: 'UTF-8')
-  NxTest.assert(pv.include?('pvGapsHot'), 'zvyraznenie ma vlastny stav viazany na fokus')
+  NxTest.assert(pv.include?('pvGapsHot'), 'zvyraznenie ma vlastny stav viazany na fokus/hover')
+  # D-130b: vazba na OTVORENU skupinu ZANIKLA — schema zije v skupine, ktora
+  # byva otvorena (je v nej aj material), takze by medzery svietili stale.
+  NxTest.refute(pv.include?('fgaps'), 'preview.js uz nepozna zaniknutu skupinu `fgaps`')
+  NxTest.assert(pv.include?('pvSetGapHover'), 'hover nad schemou je druhy spustac zvyraznenia')
   NxTest.assert(pv.include?("PV_GAP_FILL = '#fff3e0'"), 'jantarova vypln je zrkadlom --nx-warn-bg-soft')
   NxTest.assert(pv.include?("PV_GAP_LINE = '#ffb74d'"), 'jantarova linka je zrkadlom --nx-warn')
   NxTest.assert(pv.include?("PV_GAP_TEXT = '#b26a00'"), 'text je zrkadlom --nx-warnchip-fg')
