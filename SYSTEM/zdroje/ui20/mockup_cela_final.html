@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Noxun Engine — mockup ČELÁ final (D-129 / D-130) · variant B + tab Kovanie · nový zoznam čiel</title>
+<!--
+  D-130 rework kontextu Čelá (+ D-129). FINAL kandidát po výbere Michala 19.9.2026:
+  základ = variant B (Čelá · Spoločné pre skrinku) + karta s tabmi Čelo | Kovanie (z C)
+  + PREPRACOVANÝ ZOZNAM ČIEL (riadky boli prehustené, polia „lietali").
+  Podklad k 3 variantom: mockup_cela_rework.html. Tokeny = kópia :root z panel.css.
+  STAV: SCHVÁLENÝ Michalom 19.9.2026 — záväzná vizuálna autorita D-130a/D-130b; outside-in hotový (CELA_REWORK_OUTSIDE_IN_2026-09-19.md); spresnenia po Codex review PR #370 zapracované.
+-->
+<style>
+  :root{
+    --nx-bg:#f4f5f7; --nx-surface:#fff; --nx-surface-sunken:#eceff1; --nx-surface-readonly:#f4f6f8;
+    --nx-surface-preview:#fafcff; --nx-surface-th:#f5f7f8; --nx-part-bg:#f2fafb;
+    --nx-ink:#263238; --nx-ink-title:#1b3a4b; --nx-ink-strong:#37474f; --nx-ink-label:#455a64;
+    --nx-ink-muted:#607d8b; --nx-ink-soft:#78909c; --nx-ink-faint:#90a4ae;
+    --nx-border:#cfd8dc; --nx-border-strong:#b0bec5; --nx-border-soft:#eceff1;
+    --nx-action:#2e7d32; --nx-action-hover:#1b5e20; --nx-on-accent:#fff;
+    --nx-select:#107787; --nx-select-strong:#0B5661; --nx-select-accent:#0e6b7a;
+    --nx-select-bg:#e0f2f4; --nx-select-bg-soft:#f0f9fa; --nx-select-bg-hover:#d6eef1;
+    --nx-part-border:#7fc4cf;
+    --nx-ok-bg:#e8f5e9; --nx-ok-fg:#1b5e20; --nx-ok-border:#c8e6c9;
+    --nx-err-bg:#fdecea; --nx-err-fg:#b71c1c; --nx-err-border:#f5c6cb;
+    --nx-danger:#c62828; --nx-danger-bg:#fbe9e7; --nx-danger-border:#ffccbc;
+    --nx-warn:#ffb74d; --nx-warn-bg:#fff8ef; --nx-warn-bg-soft:#fff3e0; --nx-warn-fg:#e65100;
+    --nx-warnchip-fg:#b26a00; --nx-warnchip-border:#ffcc80;
+    --nx-warnrow-fg:#7a5000; --nx-warnrow-border:#ffe0b2;
+    --nx-ghost-hover:#e0e4e7;
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{font-family:"Segoe UI",Tahoma,sans-serif;font-size:13px;color:var(--nx-ink);background:#e6e9ec;padding:0 0 60px}
+  button,input,select{font-family:inherit}
+  .ic{width:15px;height:15px;flex:0 0 auto;vertical-align:middle;fill:none;stroke:currentColor;
+      stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+
+  .mockbar{display:flex;align-items:center;gap:12px;padding:9px 16px;background:#2b3a42;color:#dfe7ec}
+  .mockbar .mb-title{font-weight:600;font-size:13px}
+  .mockbar .mb-ver{font-size:11px;color:#8ea3ae}
+  .notestrip{display:flex;align-items:center;gap:8px;padding:6px 16px;font-size:11.5px;
+             background:var(--nx-warn-bg-soft);color:var(--nx-warnchip-fg);border-bottom:1px solid var(--nx-warnchip-border)}
+  .stagewrap{padding:16px 16px 0;display:flex;gap:18px;justify-content:center;align-items:flex-start;flex-wrap:wrap}
+  .stage{width:470px;flex:0 0 470px}
+  .side{width:420px;flex:0 1 420px}
+  .win{background:var(--nx-surface);border:1px solid #b6c0c6;border-radius:9px;box-shadow:0 12px 34px rgba(20,30,45,.16)}
+  .winhead{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#dfe4e7;border-radius:9px 9px 0 0;
+           border-bottom:1px solid var(--nx-border);font-size:12px;font-weight:600;color:var(--nx-ink-strong)}
+  .winhead .wdots{display:flex;gap:4px}
+  .winhead .wdots i{width:9px;height:9px;border-radius:50%;background:#bcc6cc;display:block}
+  .winhead .wsize{margin-left:auto;font-weight:400;font-size:11px;color:var(--nx-ink-faint)}
+  .mocknote{background:#fffdf3;border:1px dashed #d8cfa8;border-radius:8px;padding:10px 13px;font-size:12px;color:#6b5d1f;line-height:1.55;margin-bottom:12px}
+  .mocknote b{color:#5b4f18}
+  .mocknote h4{margin:0 0 4px;font-size:12.5px;color:#5b4f18}
+  .mocknote ol,.mocknote ul{margin:4px 0 0;padding-left:18px}
+  .mocknote li{margin:3px 0}
+  .mocknote code{font-family:Consolas,monospace;font-size:11px;background:#f3eed8;padding:0 3px;border-radius:3px}
+
+  /* ===== Inspector kostra ===== */
+  .panel{background:var(--nx-bg);min-height:640px;position:relative;display:flex;border-radius:0 0 9px 9px}
+  .crail{flex:0 0 44px;background:var(--nx-bg);border-right:1px solid var(--nx-border);padding:6px 0;
+         display:flex;flex-direction:column;align-items:center;gap:4px;border-radius:0 0 0 9px}
+  .railbtn{width:34px;height:32px;border-radius:6px;border:1px solid transparent;background:none;
+           color:var(--nx-ink-muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+  .railbtn.on{background:var(--nx-select-bg);color:var(--nx-select);border-color:var(--nx-select);box-shadow:inset 2px 0 0 var(--nx-select)}
+  .railbtn .ic{width:17px;height:17px}
+  .cmain{flex:1;min-width:0;display:flex;flex-direction:column}
+  .chdr{display:flex;align-items:center;gap:7px;padding:7px 10px;background:var(--nx-bg);border-bottom:1px solid var(--nx-border)}
+  .cid{font-weight:700;font-size:14px;color:var(--nx-select)}
+  .cname{color:var(--nx-ink-strong);font-size:12px}
+  .cbody{flex:1;padding:9px 10px 10px}
+  .ctxnote{font-size:11px;color:var(--nx-ink-soft);background:var(--nx-surface);border:1px solid var(--nx-border-soft);
+           border-radius:6px;padding:4px 8px;margin-bottom:8px}
+  .ctxnote b{color:var(--nx-select)}
+
+  details.grp{border:1px solid var(--nx-border);border-radius:6px;background:var(--nx-surface);margin-bottom:8px;position:relative}
+  details.grp>summary{list-style:none;display:flex;align-items:center;gap:7px;padding:6px 9px;cursor:pointer;
+                      background:var(--nx-surface-sunken);border-radius:6px;font-weight:600;font-size:12px;color:var(--nx-ink-strong);user-select:none}
+  details.grp[open]>summary{border-radius:6px 6px 0 0;border-bottom:1px solid var(--nx-border-soft)}
+  details.grp>summary::-webkit-details-marker{display:none}
+  details.grp>summary .gic{width:13px;height:13px;color:var(--nx-ink-faint)}
+  details.grp[open]>summary .gic{color:var(--nx-select)}
+  .gtools{display:flex;align-items:center;gap:3px;margin-left:auto;flex:0 0 auto}
+  .gtools .meta{font-size:11px;font-weight:400;color:var(--nx-ink-soft);white-space:nowrap;margin-right:4px;font-variant-numeric:tabular-nums}
+  .gbody{padding:6px 9px 9px}
+  .pvbox{background:var(--nx-surface-preview);border-radius:0 0 6px 6px}
+  .pvbox svg{width:100%;height:200px;display:block}
+
+  .ibtn{display:inline-flex;align-items:center;justify-content:center;gap:4px;height:22px;min-width:24px;border-radius:6px;
+        border:1px solid transparent;background:none;color:var(--nx-ink-muted);cursor:pointer;padding:0 4px;position:relative}
+  .ibtn:hover{background:var(--nx-select-bg-soft);color:var(--nx-select);border-color:var(--nx-border)}
+  .ibtn .ic{width:14px;height:14px}
+  .ibtn.wide{padding:0 7px;font-size:11px;font-weight:600}
+  .tip{position:relative;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;
+       color:var(--nx-ink-faint);cursor:help;flex:0 0 auto;border:0;background:none;padding:0}
+  .tip:hover,.tip:focus{color:var(--nx-select);outline:none}
+  .tip .ic{width:13px;height:13px}
+  .tip::after{content:attr(data-tip);position:absolute;top:calc(100% + 6px);left:0;width:250px;background:#263238;color:#eceff1;
+              font-size:11px;font-weight:400;line-height:1.45;padding:7px 9px;border-radius:6px;display:none;z-index:60;
+              white-space:normal;text-align:left;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+  .tip.r::after{left:auto;right:0}
+  .tip:hover::after,.tip:focus::after{display:block}
+  .tip.inl{width:15px;height:15px;margin-left:2px}
+
+  /* ===== NOVÝ ZOZNAM ČIEL =====
+     Pevná mriežka: [22 číslo][1fr typ+súhrn][112 výška][22 ✕] — každé pole sedí
+     v tom istom stĺpci bez ohľadu na typ a na to, či je výška AUTO alebo pevná. */
+  .flist{display:flex;flex-direction:column}
+  .fitem{display:grid;grid-template-columns:22px minmax(0,1fr) 112px 22px;grid-template-rows:auto auto;
+         column-gap:6px;row-gap:0;align-items:center;padding:5px 4px 5px 2px;border-radius:6px;position:relative}
+  .fitem+.fitem{border-top:1px solid var(--nx-border-soft)}
+  .fitem:hover{background:var(--nx-select-bg-soft)}
+  .fitem.open{background:var(--nx-select-bg-soft)}
+  .fitem .fnum{grid-row:1/3;font-size:11px;font-weight:700;color:var(--nx-ink-faint);text-align:center;align-self:center}
+  .fitem.open .fnum{color:var(--nx-select)}
+  .fitem .ftitle{grid-column:2;grid-row:1;display:flex;align-items:center;gap:5px;min-width:0;border:0;background:none;
+                 padding:0;font:inherit;font-size:12.5px;font-weight:600;color:var(--nx-ink-strong);cursor:pointer;text-align:left}
+  .fitem .ftitle .ftico{display:inline-flex;color:var(--nx-ink-muted)}
+  .fitem .ftitle .ftico .ic{width:15px;height:15px;stroke-width:1.8}
+  .fitem.open .ftitle .ftico,.fitem.open .ftitle{color:var(--nx-select-strong)}
+  .fitem .ftitle .chev{margin-left:2px;color:var(--nx-ink-faint);transition:transform .1s}
+  .fitem .ftitle .chev .ic{width:12px;height:12px}
+  .fitem.open .ftitle .chev{transform:rotate(180deg);color:var(--nx-select)}
+  .fitem .fsubwrap{grid-column:2;grid-row:2;display:flex;align-items:center;gap:4px;min-width:0;padding-left:20px}
+  .fitem .fsub{flex:0 1 auto;display:block;min-width:0;font-size:10.5px;color:var(--nx-ink-soft);
+               white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0;border:0;background:none;font-family:inherit;cursor:pointer;text-align:left}
+  .fitem .fhwlink{flex:0 0 auto;display:inline-flex;align-items:center;gap:3px;font:inherit;font-size:10.5px;color:var(--nx-ink-faint);border:0;background:none;padding:0;cursor:pointer;white-space:nowrap}
+  .fitem .fhwlink:hover,.fitem .fhwlink:focus{color:var(--nx-select);outline:none;text-decoration:underline}
+  .fitem .fhwlink .ic{width:10px;height:10px}
+  .fitem .fsub .sep{margin:0 4px;color:var(--nx-border-strong)}
+  .fbadge{font-size:9px;font-weight:600;line-height:1.5;border-radius:9px;padding:0 5px;vertical-align:1px;
+          color:var(--nx-warnchip-fg);background:var(--nx-warn-bg-soft);border:1px solid var(--nx-warnchip-border)}
+  /* pole výšky: jeden „box" — [AUTO chip | hodnota | mm | ▾]; šírka konštantná */
+  .hbox{grid-column:3;grid-row:1/3;display:flex;align-items:center;height:26px;border:1px solid var(--nx-border-strong);
+        border-radius:6px;background:var(--nx-surface);overflow:hidden;position:relative}
+  .hbox input{flex:1;min-width:0;width:100%;border:0;outline:0;padding:0 3px 0 6px;text-align:right;font:inherit;font-size:12px;background:none}
+  .hbox input::placeholder{color:var(--nx-ink-faint);font-style:italic}
+  .hbox .u{font-size:10px;color:var(--nx-ink-faint);padding-right:3px}
+  .hbox .pbtn{width:16px;height:100%;border:0;border-left:1px solid var(--nx-border-soft);background:var(--nx-surface-sunken);
+              color:var(--nx-ink-faint);cursor:pointer;padding:0;display:inline-flex;align-items:center;justify-content:center}
+  .hbox .pbtn .ic{width:11px;height:11px}
+  .hbox.fixed input{font-weight:700;color:var(--nx-ink)}
+  .hbox .auto{display:none;font:inherit;font-size:8px;font-weight:700;letter-spacing:.02em;color:var(--nx-ink-muted);border:1px solid var(--nx-border);
+              border-radius:4px;padding:0 2px;margin-left:3px;background:var(--nx-surface-sunken);cursor:pointer;line-height:1.5}
+  .hbox.fixed .auto{display:inline-block}
+  .hbox .auto:hover{color:var(--nx-select);border-color:var(--nx-select)}
+  .fitem .fdel{grid-column:4;grid-row:1/3;width:22px;height:22px;border-radius:6px;border:1px solid transparent;background:none;
+               color:var(--nx-ink-faint);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;justify-self:center}
+  .fitem .fdel:hover{background:var(--nx-danger-bg);color:var(--nx-danger);border-color:var(--nx-danger-border)}
+  .fitem .fdel .ic{width:12px;height:12px}
+  .fitem .fcard{grid-column:2/5;grid-row:3;margin:6px 0 2px}
+  .fitem.none .hbox{border-style:dashed}
+
+  /* karta */
+  .fcard{border:1px solid var(--nx-part-border);background:var(--nx-part-bg);border-radius:8px;padding:0 9px 8px}
+  .fcard[hidden]{display:none}
+  .ctabs{display:flex;border-bottom:1px solid var(--nx-part-border);margin:0 -9px 7px;padding:0 9px;gap:2px;background:rgba(127,196,207,.12);border-radius:8px 8px 0 0}
+  .ctabs button{font:inherit;font-size:11.5px;font-weight:600;padding:5px 10px;border:0;background:none;color:var(--nx-ink-muted);
+                cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;display:inline-flex;align-items:center;gap:4px}
+  .ctabs button.on{color:var(--nx-select-strong);border-bottom-color:var(--nx-select)}
+  .ctabs button .ic{width:12px;height:12px}
+  .ctabs button .cnt{font-size:9px;color:var(--nx-warnchip-fg);background:var(--nx-warn-bg-soft);border:1px solid var(--nx-warnchip-border);border-radius:9px;padding:0 5px}
+  .typegrid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-bottom:4px}
+  .typetile{border:1px solid var(--nx-border);border-radius:6px;background:var(--nx-surface);cursor:pointer;
+            padding:4px 1px 3px;display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--nx-ink-muted)}
+  .typetile:hover{border-color:var(--nx-select);color:var(--nx-select)}
+  .typetile.on{background:var(--nx-select-bg);border-color:var(--nx-select);color:var(--nx-select-strong)}
+  .typetile .ic{width:24px;height:22px;stroke-width:1.6}
+  .typetile .tl{font-size:9px;font-weight:600;text-align:center;line-height:1.1}
+  .prow{display:grid;grid-template-columns:82px minmax(0,1fr);align-items:center;column-gap:6px;margin-top:6px}
+  .prow .pl{font-size:11.5px;color:var(--nx-ink-label);display:inline-flex;align-items:center;gap:2px}
+  .prow select{width:100%;min-width:0;padding:3px 6px;border:1px solid var(--nx-border-strong);border-radius:6px;font-size:12px;background:var(--nx-surface)}
+  .prow .half{display:grid;grid-template-columns:1fr 1fr;gap:6px;min-width:0}
+  .segrow{display:flex;border:1px solid var(--nx-border-strong);border-radius:6px;overflow:hidden;min-width:0}
+  .segrow button{flex:1;font:inherit;font-size:11.5px;padding:4px 3px;border:0;background:var(--nx-surface);
+                 color:var(--nx-ink-muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:3px;
+                 border-right:1px solid var(--nx-border-soft);white-space:nowrap;overflow:hidden}
+  .segrow button:last-child{border-right:0}
+  .segrow button.on{background:var(--nx-select-bg);color:var(--nx-select-strong);font-weight:600}
+  .segrow button.warnstate.on{background:var(--nx-warn-bg-soft);color:var(--nx-warnchip-fg)}
+  .segrow .ic{width:15px;height:13px;stroke-width:1.7}
+  .inforow{font-size:11.5px;color:var(--nx-ink-muted);margin-top:6px;line-height:1.45;display:flex;gap:5px}
+  .inforow.warn{color:var(--nx-warnrow-fg)} .inforow .ic{width:13px;height:13px;margin-top:2px}
+  .drow{display:grid;grid-template-columns:82px minmax(0,1fr);column-gap:6px;align-items:baseline;margin-top:4px;font-size:11.5px}
+  .drow .dl{color:var(--nx-ink-label)}
+  .drow .dv{color:var(--nx-ink-strong);font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .axchips{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:5px;padding-left:88px}
+  .axchip{display:inline-flex;align-items:center;gap:4px;font-size:11px;border:1px solid var(--nx-border);border-radius:6px;
+          padding:2px 7px;background:var(--nx-surface-sunken);color:var(--nx-ink-strong);cursor:pointer}
+  .axchip .ic{width:12px;height:12px;color:var(--nx-ink-faint)}
+  .axchip.locked{background:var(--nx-warn-bg-soft);border-color:var(--nx-warnchip-border);color:var(--nx-warnrow-fg)}
+  .axchip.locked .ic{color:var(--nx-warn-fg)}
+  .axchip input{width:40px;font:inherit;font-size:11px;padding:0 3px;border:1px solid var(--nx-warnchip-border);border-radius:4px;text-align:right}
+  details.ddet{margin-top:5px;padding-left:88px}
+  details.ddet summary{font-size:11px;color:var(--nx-select);cursor:pointer;list-style:none}
+  details.ddet summary::-webkit-details-marker{display:none}
+  details.ddet ul{margin:3px 0 0;padding-left:16px;font-size:11px;color:var(--nx-ink-muted);line-height:1.5}
+  .cfoot{display:flex;justify-content:flex-end;margin-top:8px}
+
+  .addrow{display:flex;align-items:center;gap:4px;margin-top:6px;padding-top:6px;border-top:1px solid var(--nx-border-soft)}
+  .addrow .al{font-size:11px;color:var(--nx-ink-faint);margin:0 4px 0 2px}
+  .addbtn{display:inline-flex;align-items:center;gap:1px;padding:3px 5px;border:1px solid var(--nx-border);border-radius:6px;
+          background:var(--nx-surface-sunken);color:var(--nx-ink-strong);cursor:pointer}
+  .addbtn:hover{background:var(--nx-ghost-hover)}
+  .addbtn .ic{width:14px;height:14px;stroke-width:1.8}
+  .addbtn .pl{width:9px;height:9px;color:var(--nx-ink-faint)}
+
+  /* nastavenia skrinky — jeden stĺpec popisov (118) a jeden začiatok polí */
+  .row{display:grid;grid-template-columns:118px minmax(0,1fr) 26px;align-items:center;column-gap:4px;margin:5px 0}
+  .row label{color:var(--nx-ink-label);font-size:12px;display:inline-flex;align-items:center;gap:2px}
+  .row input,.row select{width:100%;padding:4px 6px;border:1px solid var(--nx-border-strong);border-radius:6px;font-size:12px;min-width:0;background:var(--nx-surface)}
+  .row .unit{text-align:right;color:var(--nx-ink-faint);font-size:11px}
+  .row input.sm{width:60px;text-align:right}
+  .combo{display:flex;align-items:center;gap:6px;padding:3px 6px;border:1px solid var(--nx-border-strong);border-radius:6px;background:var(--nx-surface);font-size:12px;min-width:0}
+  .combo .sw{width:14px;height:14px;border-radius:3px;background:linear-gradient(135deg,#c9a06a,#a67b46);flex:0 0 auto}
+  .combo .cn{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .combo .ic{width:12px;height:12px;color:var(--nx-ink-faint)}
+  /* schéma medzier: obrys skrinky s dvoma čelami, čísla sedia na hranách */
+  .row.gaprow{align-items:center}
+  .gapdiag{position:relative;height:98px;width:100%}
+  .gd-box{position:absolute;left:46px;right:46px;top:11px;bottom:11px;border:1.5px solid var(--nx-border-strong);
+          background:#f7f9fb;border-radius:2px;display:flex;flex-direction:column;padding:6px 8px;gap:5px}
+  .gd-front{flex:1;background:var(--nx-select-bg);border:1px solid var(--nx-select);border-radius:1px;opacity:.75}
+  .row .gapdiag input.gd{position:absolute;width:44px;height:21px;font:inherit;font-size:11.5px;text-align:center;padding:0 3px;
+      border:1px solid var(--nx-border-strong);border-radius:6px;background:var(--nx-surface);color:var(--nx-ink);z-index:2}
+  .row .gapdiag input.gd:focus{outline:2px solid var(--nx-select);outline-offset:-1px}
+  .row .gapdiag input.gd.top{left:50%;top:0;transform:translateX(-50%)}
+  .row .gapdiag input.gd.bottom{left:50%;bottom:0;transform:translateX(-50%)}
+  .row .gapdiag input.gd.left{left:0;top:50%;transform:translateY(-50%)}
+  .row .gapdiag input.gd.right{right:0;top:50%;transform:translateY(-50%)}
+  .row .gapdiag input.gd.mid{left:50%;top:50%;transform:translate(-50%,-50%);background:var(--nx-warn-bg-soft);border-color:var(--nx-warnchip-border);color:var(--nx-warnrow-fg);font-weight:600}
+  .edges{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;min-width:0}
+  .edges .e{display:flex;align-items:center;gap:1px;min-width:0}
+  .edges .e .ic{width:12px;height:12px;color:var(--nx-ink-faint);flex:0 0 auto}
+  .edges .e input{width:100%;padding:4px 3px;text-align:right}
+  .ghostbtn{display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:11.5px;padding:4px 9px;border-radius:6px;
+            border:1px solid var(--nx-border);background:var(--nx-surface-sunken);color:var(--nx-ink-strong);cursor:pointer}
+  .ghostbtn:hover{background:var(--nx-ghost-hover)}
+  .primbtn{display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:11.5px;font-weight:600;padding:4px 11px;
+           border-radius:6px;border:1px solid var(--nx-action);background:var(--nx-action);color:#fff;cursor:pointer}
+  .statline{font-size:11px;color:var(--nx-ink-muted);line-height:1.4}
+  .statline b{color:var(--nx-ink-strong);font-weight:600}
+
+  .pop{position:absolute;right:6px;top:30px;margin-top:2px;width:300px;background:var(--nx-surface);border:1px solid var(--nx-border-strong);
+       border-radius:8px;box-shadow:0 12px 30px rgba(20,30,45,.22);padding:9px 10px 10px;z-index:70;display:none}
+  .pop.open{display:block}
+  .pop .ph{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:var(--nx-ink-strong);margin-bottom:5px}
+  .pop .ph .mx{margin-left:auto;border:0;background:none;cursor:pointer;color:var(--nx-ink-faint);display:flex;padding:0}
+  .pop .row{grid-template-columns:70px minmax(0,1fr)}
+  .pop .foot{display:flex;align-items:center;gap:8px;margin-top:7px}
+  .pop .foot .statline{flex:1}
+</style>
+</head>
+<body>
+
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-door" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="1"/><path d="M8 3v18"/><path d="M16 11v2"/></symbol>
+  <symbol id="i-rows-2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 12h18"/><path d="M11 7.5h2M11 16.5h2"/></symbol>
+  <symbol id="i-front-lift" viewBox="0 0 24 24"><rect x="3" y="9" width="18" height="12" rx="1"/><path d="m9 6 3-3 3 3" stroke-dasharray="2 2"/></symbol>
+  <symbol id="i-front-fall" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="12" rx="1"/><path d="m9 18 3 3 3-3" stroke-dasharray="2 2"/></symbol>
+  <symbol id="i-front-blind" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="m3 4 18 16"/><path d="M21 4 3 20"/></symbol>
+  <symbol id="i-front" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="1" stroke-dasharray="3 2"/></symbol>
+  <symbol id="i-profile" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="5" rx="1.5"/><path d="M6 8v13h12V8"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="i-rotate-ccw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-dir-left" viewBox="0 0 24 24"><path d="m7 5 10 7-10 7" stroke-dasharray="3 2"/></symbol>
+  <symbol id="i-dir-right" viewBox="0 0 24 24"><path d="M17 5 7 12l10 7" stroke-dasharray="3 2"/></symbol>
+  <symbol id="i-dir-unset" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" stroke-dasharray="3 2"/><path d="M12 9v3"/><path d="M12 15.5h.01"/></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-hammer" viewBox="0 0 24 24"><path d="m15 12-8.5 8.5a2.12 2.12 0 1 1-3-3L12 9"/><path d="M17.64 15 22 10.64"/><path d="m20.91 11.7-1.25-1.25c-.6-.6-.93-1.4-.93-2.25v-.86L16.01 4.6a5.56 5.56 0 0 0-3.94-1.64H9l.92.82A6.18 6.18 0 0 1 12 8.4v1.56l2 2h2.47l2.26 1.91"/></symbol>
+  <symbol id="i-cabinet" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="1"/><path d="M4 15h16M12 3v12"/></symbol>
+  <symbol id="i-zones" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 12h18M12 3v18"/></symbol>
+  <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></symbol>
+  <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></symbol>
+  <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/></symbol>
+</svg>
+
+<div class="mockbar">
+  <span class="mb-title">Noxun Engine — mockup ČELÁ final</span>
+  <span class="mb-ver">B + tab Kovanie · nový zoznam čiel · SCHVÁLENÝ 19.9.2026 · klikateľné</span>
+</div>
+<div class="notestrip">
+  <svg class="ic" viewBox="0 0 24 24"><use href="#i-alert"/></svg>
+  Mockup, nie živý plugin. Klikaj: názov čela alebo jeho súhrn otvorí kartu · dlaždice menia typ · taby Čelo | Kovanie · „všetkým" v hlavičke otvorí popover · ikony ? = tooltip.
+</div>
+
+<div class="stagewrap">
+  <div class="stage">
+    <div class="win">
+      <div class="winhead"><span class="wdots"><i></i><i></i><i></i></span> Noxun Inspector <span class="wsize">470 px</span></div>
+      <div class="panel">
+        <div class="crail">
+          <button class="railbtn" title="Korpus"><svg class="ic"><use href="#i-cabinet"/></svg></button>
+          <button class="railbtn" title="Zóny"><svg class="ic"><use href="#i-zones"/></svg></button>
+          <button class="railbtn on" title="Čelá"><svg class="ic"><use href="#i-front"/></svg></button>
+          <button class="railbtn" title="Kovanie"><svg class="ic"><use href="#i-hammer"/></svg></button>
+        </div>
+        <div class="cmain">
+          <div class="chdr"><span class="cid">CAB-2</span><span class="cname">Dolná skrinka 900</span></div>
+          <div class="cbody">
+            <div class="ctxnote">Skrinka 900 × 720 × 560 · sokel 100 — rozmery a materiály upravíš v <b>Korpuse</b></div>
+            <details class="grp" open>
+              <summary><svg class="ic gic"><use href="#i-list"/></svg>Náhľad<span class="gtools"><span class="meta">predný pohľad · smery otvárania</span></span></summary>
+              <div class="pvbox"><svg viewBox="0 0 300 200" class="pv"></svg></div>
+            </details>
+
+            <details class="grp" open>
+              <summary><svg class="ic gic"><use href="#i-front"/></svg>Čelá
+                <span class="gtools"><span class="meta" id="fmeta"></span>
+                  <button class="ibtn wide" title="Úchytka pre viac čiel naraz" onclick="stop(event);togglePop('popB')"><svg class="ic"><use href="#i-profile"/></svg>všetkým</button>
+                  <button class="tip r" data-tip="F1 je spodné čelo. Vypísaná výška je pevná, prázdne pole = AUTO (dopočíta sa z voľného miesta; ≈ ukazuje aktuálny výsledok). Klik na názov čela otvorí kartu — všetko, čo patrí jednému čelu: typ, krídla, smer, otváranie, zásuvka, úchytka; tab Kovanie ukáže, čo z toho vyplynulo. „všetkým" nastaví úchytku viacerým čelám naraz." onclick="stop(event)"><svg class="ic"><use href="#i-help"/></svg></button>
+                </span></summary>
+              <div class="pop" id="popB">
+                <div class="ph"><svg class="ic"><use href="#i-profile"/></svg>Úchytka pre viac čiel naraz<button class="mx" onclick="togglePop('popB')"><svg class="ic"><use href="#i-x"/></svg></button></div>
+                <div class="row"><label>Rozsah</label><select><option>Všetky čelá (3)</option><option>Len zásuvkové čelá (2)</option><option>Len dvierka (1)</option><option>Len výklopy</option><option>Len sklopy</option><option>Len blendy</option></select></div>
+                <div class="row"><label>Profil</label><select><option>Bez profilu</option><option selected>Profil J</option><option>Profil C</option></select></div>
+                <div class="row"><label>Hrana</label><select><option selected>Hore</option><option>Dole</option></select></div>
+                <div class="foot"><span class="statline">Teraz: <b>Profil J (hore)</b> F1, F2 · bez F3</span><button class="primbtn" onclick="togglePop('popB')">Použiť na 3</button></div>
+              </div>
+              <div class="gbody">
+                <div class="flist" id="flist"></div>
+                <div class="addrow"><span class="al">Pridať čelo</span>
+                  <button class="addbtn" title="Pridať: Dvierka"><svg class="ic"><use href="#i-door"/></svg><svg class="ic pl"><use href="#i-plus"/></svg></button>
+                  <button class="addbtn" title="Pridať: Zásuvka"><svg class="ic"><use href="#i-rows-2"/></svg><svg class="ic pl"><use href="#i-plus"/></svg></button>
+                  <button class="addbtn" title="Pridať: Výklop"><svg class="ic"><use href="#i-front-lift"/></svg><svg class="ic pl"><use href="#i-plus"/></svg></button>
+                  <button class="addbtn" title="Pridať: Sklop"><svg class="ic"><use href="#i-front-fall"/></svg><svg class="ic pl"><use href="#i-plus"/></svg></button>
+                  <button class="addbtn" title="Pridať: Blenda"><svg class="ic"><use href="#i-front-blind"/></svg><svg class="ic pl"><use href="#i-plus"/></svg></button>
+                  <button class="addbtn" title="Pridať: Bez čela"><svg class="ic"><use href="#i-front"/></svg><svg class="ic pl"><use href="#i-plus"/></svg></button>
+                </div>
+              </div>
+            </details>
+
+            <details class="grp" open>
+              <summary><svg class="ic gic"><use href="#i-sliders"/></svg>Spoločné pre skrinku
+                <span class="gtools"><span class="meta">dub Halifax · 3 · 2/2/0/0</span>
+                  <button class="ibtn" title="Limit presahov: zamknuté ±100 mm (klik odomkne až ±2000 — obklady, pilastre)" onclick="stop(event)"><svg class="ic"><use href="#i-lock"/></svg></button>
+                  <button class="ibtn" title="Predvolené medzery (3 / 2 mm)" onclick="stop(event)"><svg class="ic"><use href="#i-rotate-ccw"/></svg></button>
+                  <button class="tip r" data-tip="Platí pre všetky čelá tejto skrinky. Materiál čiel je ten istý údaj ako v Korpuse → Materiály. Záporný okraj = čelo presahuje obrys korpusu; čelá sa kladú odspodu, okraj hore sa prejaví cez AUTO čelo. Pri otvorenej skupine sa medzery v náhľade prisvietia jantárovo." onclick="stop(event)"><svg class="ic"><use href="#i-help"/></svg></button>
+                </span></summary>
+              <div class="gbody">
+                <div class="row"><label>Materiál čiel</label>
+                  <div class="combo"><span class="sw"></span><span class="cn">H1180 ST37 Dub Halifax prírodný · 18</span><svg class="ic"><use href="#i-chevron-down"/></svg></div><span class="unit"></span></div>
+                <div class="row gaprow"><label>Medzery a okraje<button class="tip inl" data-tip="Čísla sedia na hranách, ktorých sa týkajú: hore · dole · vľavo · vpravo = okraj medzi čelom a obrysom korpusu (záporné = čelo presahuje). Číslo v strede = medzera medzi čelami. Čelá sa kladú odspodu — okraj hore sa prejaví cez AUTO čelo." onclick="stop(event)"><svg class="ic"><use href="#i-help"/></svg></button></label>
+                  <div class="gapdiag" title="Všetky hodnoty v mm">
+                    <div class="gd-box"><div class="gd-front gd-f2"></div><div class="gd-front gd-f1"></div></div>
+                    <input class="gd top" value="2" title="Okraj hore">
+                    <input class="gd bottom" value="2" title="Okraj dole">
+                    <input class="gd left" value="0" title="Okraj vľavo">
+                    <input class="gd right" value="0" title="Okraj vpravo">
+                    <input class="gd mid" value="3" title="Medzera medzi čelami">
+                  </div><span class="unit">mm</span></div>
+              </div>
+            </details>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="side">
+    <div class="mocknote">
+      <h4>Čo sa zmenilo v zozname čiel (oproti dnešku)</h4>
+      <ol>
+        <li><b>Pevná mriežka riadku:</b> číslo · názov · pole výšky · ✕ — výška je vždy v tom istom stĺpci, nech je AUTO alebo pevná, nech je to zásuvka alebo dvierka. Dnes „mm", chip AUTO a select krídel posúvali všetko vpravo.</li>
+        <li><b>Jedno pole výšky</b> (box): hodnota + „mm" + šípka výškového radu v jednom ráme. AUTO stav = prázdne pole s <i>≈ dopočítanou výškou</i> ako placeholder; pevná = tučná hodnota a malý chip AUTO vnútri boxu (klik = späť na automat).</li>
+        <li><b>Súhrn pod názvom</b> (jeden tlmený riadok): krídla · smer · otváranie · úchytka · naviazané kovanie. Vidíš stav všetkých čiel bez otvárania kariet; „smer?" je v ňom ako jantárový badge. Klik = otvorí kartu; kovanie na konci = preklik do Kovania.</li>
+        <li><b>Z riadku odišli</b> select krídel (→ karta, riadok „Krídla") a ikona profilu (→ súhrn slovom, napr. „Profil J hore"). ✕ je tlmené, červené až pri hoveri.</li>
+        <li><b>Karta = 2 taby:</b> <u>Čelo</u> (typ · krídla · smer · otváranie · konštrukcia · zásuvka · úchytka) · <u>Kovanie</u> (vyriešený set, zámky osí, technický detail, tlačidlo Otvoriť v Kovaní). Karta sa otvára pod svojím riadkom, max jedna.</li>
+        <li><b>Skupina Spoločné pre skrinku:</b> jeden stĺpec popisov (118 px); <b>medzery a okraje sú schéma</b> — obrys skrinky s dvoma čelami, každé číslo sedí na svojej hrane, medzera medzi čelami v strede (jantárová). Nemusíš čítať popisky, vidíš, ktorá hrana je ktorá.</li>
+      </ol>
+    </div>
+    <div class="mocknote">
+      <h4>Rozhodnutia do package (R1–R9)</h4>
+      <ol>
+        <li><b>R1</b> Kostra kontextu Čelá: 2 skupiny <code>fronts</code> · <code>cabfront</code> (Spoločné pre skrinku); skupiny <code>fhandles</code> a <code>fgaps</code> zanikajú.</li>
+        <li><b>R2</b> Riadok čela = CSS grid 22 / 1fr / 112 / 22 px, dva riadky (názov + súhrn) + tretí = karta. Guard šírky riadku (test_smoke1) sa prepíše na nový rozpočet.</li>
+        <li><b>R3</b> Súhrn skladá čistá funkcia <code>frontRowSummary(item, slots, hw)</code> v core.js (testovateľná headless), z tých istých dát ako karta: počet krídel zo serverového <code>wings_n</code> (AUTO nad 600 mm = 2), smer len z uloženého stavu (legacy bez kľúča = bez slova; <code>unset</code> = badge), zásuvka bez klasifikácie = jantárové „bez klasifikácie" (žiadne predvolené hodnoty). Mockup tu používa zjednodušené dáta (<code>drawer</code> namiesto <code>drawer_front</code>, <code>||</code> defaulty) — implementácia ide z reálneho <code>front_items</code>/<code>front_slots</code>. Koncovka „kovanie →" v súhrne je samostatný ovládač: otvorí kartu rovno na tabe Kovanie (nebubluje do prepínania karty).</li>
+        <li><b>R4</b> Pole výšky: jeden komponent <code>.hbox</code>; pravidlo „zamknuté ⇔ vypísané" ostáva; placeholder „≈ N" z echa (dnešné <code>updateFrontPlaceholders</code>).</li>
+        <li><b>R5</b> Krídla: segment auto·1·2·3·4 v karte (tab Čelo) len pre dvierka; zápis tá istá cesta ako dnes (<code>onFrontWings</code>).</li>
+        <li><b>R6</b> Úchytka: <b>jediné miesto stavu = karta</b> (Profil + Hrana na jednom riadku). Hromadne = popover „všetkým" (rozsah · profil · hrana · Použiť na N) — akcia, nie druhý stav; po použití sa zavrie. Ponuka hrán v popoveri = prienik platných hrán rozsahu (dnešné <code>frontProfileScopeEdges</code>; dvierka majú „Voľná", zásuvky bočné). Popover: Esc zatvára, fokus sa vráti na tlačidlo, <code>aria-haspopup</code>/<code>aria-expanded</code>.</li>
+        <li><b>R7</b> Tab Kovanie karty = dnešný obsah riadkov <code>resolved</code> / <code>axes</code> / <code>upgrade</code> / <code>lift</code> + tlačidlo „Otvoriť v Kovaní" (dnešný preklik <code>.fhw</code>); nič nové zo servera. Tab je pri každom fyzickom type (aj blenda s úchytkovým profilom má kovanie), chýba len pri „Bez čela"; bez položiek ukáže „Bez kovania". Karta 3/4-krídlových dvierok drží riadky „Krídlo k/n" pre stredné krídla (ako dnes).</li>
+        <li><b>R8</b> Pomocné texty: 8 × <code>.hint</code> → tooltip ikona ? v hlavičke skupiny alebo pri popiske poľa = <b>vlastný komponent <code>.nxtip</code></b> (čisté CSS z <code>data-tip</code>; natívny <code>title</code> je v CEF nespoľahlivý — outside-in packet 19.9., rozhodnuté). Stavové vety (RED/ORANGE, „bez klasifikácie") ostávajú viditeľné v karte.</li>
+        <li><b>R9</b> Medzery: <b>schéma</b> — obrys skrinky s dvoma čelami, 4 okraje sedia na hranách a medzera v strede (5 polí = tie isté <code>fr_gap*</code>, žiadne nové dáta); riadok „Medzi čelami" zaniká; zámok limitu a Predvolené sú ikony v hlavičke skupiny; jantárové prisvietenie N26 sa viaže na otvorenú skupinu <code>cabfront</code> alebo fokus v jej poli.</li>
+      </ol>
+    </div>
+  </div>
+</div>
+
+<script>
+  var FRONTS = [
+    { id:'F3', type:'door',   h:null, approx:275, wings:'auto', dir:'unset', opening:'classic', prof:'none', edge:null,
+      hw:'Sensys · 2 ks', hwfull:'Závesy: SET ZÁVES KLASIK · 2 ks', hwlabel:'Závesy', hwres:'Sensys 8645i 110° · 2 ks · Klasické' },
+    { id:'F2', type:'drawer', h:null, approx:250, prof:'J', edge:'Hore', constr:'metal', variant:'standard', opening:'classic',
+      hw:'Atira H70 · NL 470', hwfull:'Výsuv: Atira biela · H70 · NL 470', hwlabel:'Výsuv', hwres:'Atira · H70 · NL 470 · 30 kg · SiSy · recept v1' },
+    { id:'F1', type:'drawer', h:180, prof:'J', edge:'Hore', constr:'wood', variant:'standard', opening:'classic',
+      hw:'Quadro · box 360 · NL 470', hwfull:'Výsuv: Quadro V6 EB23 · box 360 · NL 470', hwlabel:'Výsuv', hwres:'Quadro V6 EB23 · box 360 · NL 470 · 30 kg · recept v1' }
+  ];
+  var TYPES = [
+    { t:'door', ico:'door', l:'Dvierka' }, { t:'drawer', ico:'rows-2', l:'Zásuvka' }, { t:'lift', ico:'front-lift', l:'Výklop' },
+    { t:'fall', ico:'front-fall', l:'Sklop' }, { t:'blind', ico:'front-blind', l:'Blenda' }, { t:'none', ico:'front', l:'Bez čela' }
+  ];
+  function tdef(t){ for (var i=0;i<TYPES.length;i++) if (TYPES[i].t===t) return TYPES[i]; return TYPES[0]; }
+  function ic(n, cls){ return '<svg class="ic'+(cls?' '+cls:'')+'"><use href="#i-'+n+'"/></svg>'; }
+  function tipb(txt){ return '<button class="tip inl" data-tip="'+txt+'" onclick="stop(event)">'+ic('help')+'</button>'; }
+  function stop(e){ e.preventDefault(); e.stopPropagation(); }
+  var openId = 'F1', tab = 'celo';
+
+  // ===== súhrn riadku (čistá funkcia — kandidát na core.js frontRowSummary) =====
+  function summary(f){
+    var p = [];
+    if (f.type==='door'){
+      var w = f.wings||'auto';
+      p.push(w==='auto' ? '1 krídlo (auto)' : (w==='1' ? '1 krídlo' : w+' krídla'));
+      if ((w==='auto'||w==='1')) p.push(f.dir==='unset' ? '<span class="fbadge">smer?</span>' : (f.dir==='left'?'ľavé':'pravé'));
+    }
+    if (f.type==='drawer'){
+      p.push(f.constr==='wood' ? 'drevený box' : (f.constr==='other' ? 'ostatné' : 'kovové bočnice'));
+      if (f.variant==='internal') p.push('vnútorná');
+    }
+    if (f.type==='lift') p.push(f.lift==='hl' ? 'HL top' : 'HK top');
+    if (f.opening==='tipon' && f.type!=='blind' && f.type!=='none') p.push('Tip-On');
+    if (f.type!=='none') p.push(f.prof!=='none' ? 'Profil '+f.prof+' '+(f.edge||'').toLowerCase() : 'bez úchytky');
+    if (f.type==='blind'){ p = ['pevný dielec', p[p.length-1]]; f.hw = f.prof==='none' ? 'bez kovania' : 'Úchytka z profilu'; }
+    if (f.type==='none') p = ['otvorená nika'];
+    var h = p.join('<span class="sep">·</span>');
+    if (f.type!=='none' && f.type!=='blind') h += '';
+    return h;
+  }
+
+  function rowHtml(f){
+    var d = tdef(f.type), isOpen = openId === f.id;
+    var h = '<div class="fitem'+(isOpen?' open':'')+(f.type==='none'?' none':'')+'" data-id="'+f.id+'">' +
+      '<span class="fnum">'+f.id+'</span>' +
+      '<button class="ftitle" onclick="toggle(\''+f.id+'\')" title="'+d.l+' — klik otvorí kartu čela"><span class="ftico">'+ic(d.ico)+'</span><span>'+d.l+'</span><span class="chev">'+ic('chevron-down')+'</span></button>' +
+      '<span class="fsubwrap"><button class="fsub" onclick="toggle(\''+f.id+'\')" title="Stav čela — klik otvorí kartu">'+summary(f)+'</button>' +
+      (f.type!=='none' ? '<button class="fhwlink" data-id="'+f.id+'" title="Kovanie tohto čela — otvorí tab Kovanie" onclick="stop(event);openHw(this.dataset.id)">'+f.hw+' '+ic('arrow-right')+'</button>' : '') + '</span>' +
+      '<span class="hbox'+(f.h?' fixed':'')+'"><button type="button" class="auto" title="Vrátiť na AUTO — výška sa dopočíta z voľného miesta" onclick="stop(event);setAuto(this)">AUTO</button>' +
+        '<input value="'+(f.h||'')+'" placeholder="≈ '+(f.approx||'')+'"><span class="u">mm</span>' +
+        '<button class="pbtn" title="Výškový rad čiel">'+ic('chevron-down')+'</button></span>' +
+      '<button class="fdel" title="Odstrániť čelo">'+ic('x')+'</button>' +
+      '<div class="fcard"'+(isOpen?'':' hidden')+'>'+(isOpen?cardHtml(f):'')+'</div></div>';
+    return h;
+  }
+  function render(){
+    document.getElementById('flist').innerHTML = FRONTS.map(rowHtml).join('');
+    var unset = FRONTS.filter(function(f){ return f.type==='door' && f.dir==='unset'; }).length;
+    document.getElementById('fmeta').textContent = FRONTS.length+' čelá'+(unset?' · '+unset+' bez smeru':'');
+    document.querySelectorAll('svg.pv').forEach(drawPreview);
+  }
+  function toggle(id){ openId = (openId===id) ? null : id; tab = 'celo'; render(); }
+  function openHw(id){ openId = id; tab = 'hw'; render(); }
+  function setAuto(btn){ var it = btn.closest('.fitem'); if (it) setVal(it.dataset.id, 'h', null); }
+  function setType(id,t){ FRONTS.forEach(function(f){ if (f.id===id){ f.type=t; if(t==='door'&&f.dir==null) f.dir='unset'; } }); render(); }
+  function setTab(t){ tab=t; render(); }
+  function setVal(id,k,v){ FRONTS.forEach(function(f){ if (f.id===id) f[k]=v; }); render(); }
+
+  // ===== karta =====
+  function seg(f, key, label, tip, opts, active, warnVal){
+    var h = '<div class="prow"><span class="pl">'+label+(tip?tipb(tip):'')+'</span><span class="segrow">';
+    opts.forEach(function(o){
+      var on = o.v===active;
+      h += '<button class="'+(o.v===warnVal?'warnstate ':'')+(on?'on':'')+'" title="'+(o.title||'')+'" onclick="setVal(\''+f.id+'\',\''+key+'\',\''+o.v+'\')">'+(o.ico?ic(o.ico):'')+o.l+'</button>';
+    });
+    return h + '</span></div>';
+  }
+  var WINGS = [ {v:'auto',l:'auto'}, {v:'1',l:'1'}, {v:'2',l:'2'}, {v:'3',l:'3'}, {v:'4',l:'4'} ];
+  var DIR = [ {v:'left',l:'Ľavé',ico:'dir-left',title:'Pánty vľavo — krídlo sa otvára doprava'},
+              {v:'unset',l:'Neurčené',ico:'dir-unset',title:'Smer zatiaľ neurčený — Kontrola ho hlási ako RED'},
+              {v:'right',l:'Pravé',ico:'dir-right',title:'Pánty vpravo — krídlo sa otvára doľava'} ];
+  var OPEN = [ {v:'classic',l:'Klasické'}, {v:'tipon',l:'Tip-On'} ];
+  var CONSTR = [ {v:'metal',l:'Kovové bočnice'}, {v:'wood',l:'Drevený box'}, {v:'other',l:'Ostatné'} ];
+  var VAR = [ {v:'standard',l:'Štandardná'}, {v:'internal',l:'Vnútorná'} ];
+  var LIFT = [ {v:'hk',l:'HK top',title:'AVENTOS HK top'}, {v:'hl',l:'HL top',title:'AVENTOS HL top (Tip-On sa nevyrába)'} ];
+
+  function tilesHtml(f){
+    var h = '<div class="typegrid">';
+    TYPES.forEach(function(t){
+      var tip = t.t==='blind' ? 'Blenda je pevný dielec — bez smeru a otvárania (kovanie len pri úchytkovom profile).' :
+                t.t==='none'  ? 'Riadok drží výšku v rade, panel sa nepostaví — otvorená nika.' : t.l;
+      h += '<button class="typetile'+(f.type===t.t?' on':'')+'" title="'+tip+'" onclick="setType(\''+f.id+'\',\''+t.t+'\')">'+ic(t.ico)+'<span class="tl">'+t.l+'</span></button>';
+    });
+    return h + '</div>';
+  }
+  function celoHtml(f){
+    var h = tilesHtml(f);
+    if (f.type==='door'){
+      h += seg(f,'wings','Krídla','auto = podľa šírky (do 600 mm jedno krídlo). Pri 3/4 krídlach sa pýta smer stredných krídel.',WINGS,f.wings||'auto');
+      var w = f.wings||'auto';
+      if (w==='auto'||w==='1') h += seg(f,'dir','Smer','Strana pántov. „Neurčené" je otvorená otázka — Kontrola ju hlási, výroba ju potrebuje.',DIR,f.dir||'unset','unset');
+      else h += '<div class="inforow">Dvojkrídlo: ľavé krídlo má pánty vľavo, pravé vpravo — smer sa neurčuje.</div>';
+      h += seg(f,'opening','Otváranie','Bez voľby sa použije klasické otváranie. Tip-On = bez úchytky, mení set závesov.',OPEN,f.opening||'classic');
+    }
+    if (f.type==='drawer'){
+      h += seg(f,'opening','Otváranie','Bez voľby sa použije klasické otváranie. Tip-On mení set výsuvu.',OPEN,f.opening||'classic');
+      h += seg(f,'constr','Konštrukcia','Kovové bočnice = Atira, drevený box = Quadro. Ostatné = ručný set v Kovaní.',CONSTR,f.constr||'metal');
+      h += seg(f,'variant','Zásuvka','Vnútorná zásuvka je skrytá za dvierkami — nemá vlastné čelo v pohľade.',VAR,f.variant||'standard');
+    }
+    if (f.type==='lift'){
+      h += seg(f,'lift','Systém','HK a HL majú iné tabuľky aj iný nákup.',LIFT,f.lift||'hk');
+      h += seg(f,'opening','Otváranie','HL top + Tip-On sa nevyrába.',OPEN,f.opening||'classic');
+    }
+    if (f.type==='fall') h += seg(f,'opening','Otváranie','Sklop dostáva závesy ako dvierka, mechanizmus žiadny.',OPEN,f.opening||'classic');
+    if (f.type==='blind') h += '<div class="inforow">Blenda — pevný dielec bez smeru a otvárania; kovanie vzniká len z úchytkového profilu.</div>';
+    if (f.type==='none'){ h += '<div class="inforow">Otvorená nika — riadok drží výšku, panel sa nepostaví.</div>'; return h; }
+    // úchytka — jediné miesto stavu
+    var edges = f.type==='door' ? ['Hore','Dole','Voľná'] : ['Hore','Dole','Vľavo','Vpravo'];
+    h += '<div class="prow"><span class="pl">Úchytka'+tipb('Profil skracuje panel pri zvolenej hrane; ABS aj smer dekoru zostávajú. Viacerým čelám naraz: „všetkým" v hlavičke skupiny.')+'</span><span class="half">' +
+      '<select onchange="setVal(\''+f.id+'\',\'prof\',this.value)"><option value="none"'+(f.prof==='none'?' selected':'')+'>Bez profilu</option><option value="J"'+(f.prof==='J'?' selected':'')+'>Profil J</option><option value="C"'+(f.prof==='C'?' selected':'')+'>Profil C</option></select>' +
+      '<select'+(f.prof==='none'?' disabled':'')+' onchange="setVal(\''+f.id+'\',\'edge\',this.value)">';
+    edges.forEach(function(e){ h += '<option'+(e===(f.edge||'Hore')?' selected':'')+'>'+e+'</option>'; });
+    return h + '</select></span></div>';
+  }
+  function hwHtml(f){
+    var h = '';
+    if (f.type==='drawer'){
+      h += '<div class="drow"><span class="dl">Vyriešené</span><span class="dv">'+f.hwres+'</span></div>';
+      h += '<div class="axchips">' +
+        (f.constr==='wood' ? '<span class="axchip locked" title="Ručne zamknutá výška boxu (max 380 = automat)">'+ic('lock')+'box <input value="360"></span>' : '<span class="axchip" title="Výška podľa receptu">H70 výška</span>') +
+        '<span class="axchip" title="Dĺžka výsuvu (automat podľa hĺbky)">NL 470</span></div>';
+      h += '<details class="ddet"><summary>Technický detail</summary><ul><li>potrebná svetlá výška od 100 mm</li><li>rad 350–520 mm, potrebná svetlá hĺbka 500</li><li>Balenie: '+(f.constr==='wood'?'Quadro V6 EB23 · pár výsuvov 317642 + spojky 104547':'K-sada 357696 — Súprava Atira 470 biela (1 ks)')+'</li></ul></details>';
+    } else if (f.type==='door' || f.type==='fall'){
+      h += '<div class="drow"><span class="dl">Vyriešené</span><span class="dv">'+(f.hwres||'Sensys 8645i 110° · 2 ks · Klasické')+'</span></div>';
+    } else if (f.type==='lift'){
+      h += '<div class="drow"><span class="dl">Vyriešené</span><span class="dv">AVENTOS HK top · 22K2300 · automat</span></div>';
+    }
+    h += '<div class="cfoot"><button class="ghostbtn" title="Prepne kontext Kovanie a doskočí na box tohto čela">'+ic('hammer')+'Otvoriť v Kovaní '+ic('arrow-right')+'</button></div>';
+    return h;
+  }
+  function cardHtml(f){
+    var hasHw = !(f.type==='none'||f.type==='blind');
+    var t = (tab==='hw' && hasHw) ? 'hw' : 'celo';
+    var h = '<div class="ctabs">' +
+      '<button class="'+(t==='celo'?'on':'')+'" onclick="setTab(\'celo\')">Čelo'+(f.type==='door'&&f.dir==='unset'&&(f.wings||'auto')!=='2'?'<span class="cnt">smer?</span>':'')+'</button>' +
+      (hasHw ? '<button class="'+(t==='hw'?'on':'')+'" onclick="setTab(\'hw\')">'+ic('hammer')+(f.hwlabel||'Kovanie')+'</button>' : '') + '</div>';
+    return h + (t==='celo' ? celoHtml(f) : hwHtml(f));
+  }
+
+  // ===== náhľad =====
+  function drawPreview(svg){
+    var W=900,H=720,s=0.255,x0=32,y0=8,w=W*s,hh=H*s;
+    var g = '<rect x="'+x0+'" y="'+y0+'" width="'+w+'" height="'+hh+'" fill="#f7f9fb" stroke="#b0bec5" stroke-width="1"/>';
+    var gap=3*s, yb=y0+hh-2*s;
+    FRONTS.slice().reverse().forEach(function(f){
+      var fh=(f.h||f.approx)*s, y=yb-fh, x=x0, fw=w, cx=x+fw/2, cy=y+fh/2;
+      if (f.type!=='none') g += '<rect x="'+(x+0.5)+'" y="'+y+'" width="'+(fw-1)+'" height="'+fh+'" fill="#e0f2f4" stroke="#107787" stroke-width="1.2"/>';
+      else g += '<rect x="'+(x+0.5)+'" y="'+y+'" width="'+(fw-1)+'" height="'+fh+'" fill="none" stroke="#90a4ae" stroke-width="1" stroke-dasharray="3 2"/>';
+      var dash = 'stroke="#0e6b7a" stroke-width="1" stroke-dasharray="4 3" fill="none"';
+      var lblY = cy+4;
+      if (f.type==='drawer') g += '<path d="M'+(x+6)+' '+(y+4)+' L'+(x+fw-6)+' '+(y+fh-4)+' M'+(x+fw-6)+' '+(y+4)+' L'+(x+6)+' '+(y+fh-4)+'" '+dash+'/>';
+      else if (f.type==='door'){
+        var w2 = f.wings||'auto';
+        if (w2==='2'){ g += '<path d="M'+(x+4)+' '+(y+4)+' L'+(cx-4)+' '+cy+' L'+(x+4)+' '+(y+fh-4)+'" '+dash+'/><path d="M'+(x+fw-4)+' '+(y+4)+' L'+(cx+4)+' '+cy+' L'+(x+fw-4)+' '+(y+fh-4)+'" '+dash+'/>'; }
+        else if (f.dir==='unset'){ g += '<circle cx="'+cx+'" cy="'+cy+'" r="11" fill="#fff3e0" stroke="#e65100" stroke-width="1.2" stroke-dasharray="3 2"/><text x="'+cx+'" y="'+(cy+4)+'" font-size="12" font-weight="700" fill="#e65100" text-anchor="middle" font-family="Segoe UI">?</text>'; lblY = y+fh-6; }
+        else { var hx = f.dir==='left' ? x+4 : x+fw-4, ex = f.dir==='left' ? x+fw-4 : x+4; g += '<path d="M'+hx+' '+(y+4)+' L'+ex+' '+cy+' L'+hx+' '+(y+fh-4)+'" '+dash+'/>'; }
+      }
+      else if (f.type==='lift') g += '<path d="M'+(x+4)+' '+(y+4)+' L'+cx+' '+(y+fh-4)+' L'+(x+fw-4)+' '+(y+4)+'" '+dash+'/>';
+      else if (f.type==='fall') g += '<path d="M'+(x+4)+' '+(y+fh-4)+' L'+cx+' '+(y+4)+' L'+(x+fw-4)+' '+(y+fh-4)+'" '+dash+'/>';
+      else if (f.type==='blind') g += '<path d="M'+(x+6)+' '+(y+4)+' L'+(x+fw-6)+' '+(y+fh-4)+' M'+(x+fw-6)+' '+(y+4)+' L'+(x+6)+' '+(y+fh-4)+'" stroke="#0e6b7a" stroke-width="1" fill="none"/>';
+      var lbl = f.id+' · '+tdef(f.type).l.toLowerCase()+' · '+(f.h? f.h : '≈ '+f.approx);
+      g += '<text x="'+cx+'" y="'+lblY+'" font-size="10" fill="#37474f" text-anchor="middle" font-family="Segoe UI" stroke="#e0f2f4" stroke-width="3" paint-order="stroke">'+lbl+'</text>';
+      g += '<line x1="'+(x0+w+8)+'" y1="'+y+'" x2="'+(x0+w+8)+'" y2="'+(y+fh)+'" stroke="#90a4ae" stroke-width="1"/><text x="'+(x0+w+12)+'" y="'+(cy+3)+'" font-size="9" fill="#78909c" font-family="Segoe UI">'+(f.h||'≈'+f.approx)+'</text>';
+      yb = y - gap;
+    });
+    g += '<text x="'+(x0+w/2)+'" y="'+(y0+hh+11)+'" font-size="9" fill="#90a4ae" text-anchor="middle" font-family="Segoe UI">900</text>';
+    svg.innerHTML = g;
+  }
+
+  function togglePop(id){ var p=document.getElementById(id), was=p.classList.contains('open'); document.querySelectorAll('.pop').forEach(function(x){x.classList.remove('open');}); if(!was){ var d=p.closest('details'); if(d) d.open=true; p.classList.add('open'); } }
+  document.addEventListener('click', function(e){ if (!e.target.closest('.pop') && !e.target.closest('.ibtn')) document.querySelectorAll('.pop').forEach(function(x){ x.classList.remove('open'); }); });
+  document.addEventListener('keydown', function(e){ if (e.key==='Escape'){ var o=document.querySelector('.pop.open'); if(o){ o.classList.remove('open'); var b=document.querySelector('.ibtn.wide'); if(b) b.focus(); } } });
+  render();
+</script>
+</body>
+</html>
