@@ -37,7 +37,7 @@ v náhľade sa viaže na **fokus v poli alebo hover nad schémou**. Dáta, zápi
 ## Ďalší krok
 
 **Ďalší blok vyberá Michal** — automaticky sa nič neštartuje; po uzávere M-R mala nasledovať slovná diskusia o workflow. **D-130 je uzavreté celé (a + b)**, skupina
-„KONTROLA + VÝROBA" je po D-94 prázdna a „V1 DOTIAHNUTIE" drží už len odložené ceny ([DOGFOODING.md](DOGFOODING.md)). Kandidáti podľa [PLAN.md](PLAN.md): **Spotrebiče S1**,
+„KONTROLA + VÝROBA" je po D-94 prázdna a „V1 DOTIAHNUTIE" drží už len odložené ceny ([DOGFOODING.md](DOGFOODING.md)). **Blok SPOTREBIČE S1 začal 19.9. predúlohou** — listy overené (OVERENIE v `zdroje/next_sessions/`), ďalej debata polí. Ďalší kandidáti podľa [PLAN.md](PLAN.md):
 **K1–K3**, **ceny materiálov/ABS**; rotácia obrázka a umiestnenie textúr sú D-126/D-127, D-48 a **D-109** zostávajú po V1; ručné Redo Čiel je stále nepotvrdené.
 
 ## Posledné uzávery
