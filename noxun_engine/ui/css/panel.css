@@ -225,11 +225,19 @@
      OVERLAY, nie polozka v boxe — v boxe by hodnotu odtlacil a box ma pevnu
      sirku. `z-index` je POD `.miniopts` (120): ked je otvoreny rozmerovy rad,
      hodnoty maju prednost. `display: none` (expr.js pri prazdnom vyraze) plati.
-     Selektor je zamerne `.nx-inspector`-scopnuty (4 triedy): kompaktne
-     pravidlo `.nx-inspector .dwrap .exprhint` nizsie ma rovnaku specificitu
-     a je v zdroji NESKOR, takze by prebilo padding tohto overlaya. */
-  .nx-inspector .frow .dwrap .exprhint { position: absolute; top: calc(100% + 2px); right: 0; z-index: 110;
-              padding: 1px 5px; border: 1px solid var(--nx-border); border-radius: 6px;
+
+     Codex #371 P2: SELEKTOR JE `.hbox`, NIE `.dwrap`. `expr.js` vklada hint
+     cez `insertAdjacentElement('afterend')` HNED ZA INPUT, teda ako surodenca
+     `input.fh` — a ten od D-130a zije v `.hbox`, nie v `.dwrap` (v `.dwrap`
+     ostala len sipka vyskoveho radu). Stare pravidlo tak nesedelo na nic
+     a hint sa v 112 px boxe spraval ako flex polozka s `min-width: 38px`
+     (`.frow .exprhint` nizsie) — teda presne to, comu mal zabranit.
+     `min-width: 0` je poistka proti tomu pravidlu; kotvou je `.hbox`
+     (`position: relative` vyssie). Selektor je zamerne `.nx-inspector`-scopnuty
+     (4 triedy): kompaktne pravidlo `.nx-inspector .dwrap .exprhint` nizsie ma
+     rovnaku specificitu a je v zdroji NESKOR, takze by prebilo padding. */
+  .nx-inspector .frow .hbox .exprhint { position: absolute; top: calc(100% + 2px); right: 0; z-index: 110;
+              min-width: 0; padding: 1px 5px; border: 1px solid var(--nx-border); border-radius: 6px;
               background: var(--nx-surface); box-shadow: 0 2px 6px var(--nx-modal-shadow);
               white-space: nowrap; pointer-events: none; }
   /* ✕ je TLMENE — cervene az pri hoveri (mazanie sa nema pytat o pozornost). */
