@@ -9,7 +9,7 @@
   základ = variant B (Čelá · Spoločné pre skrinku) + karta s tabmi Čelo | Kovanie (z C)
   + PREPRACOVANÝ ZOZNAM ČIEL (riadky boli prehustené, polia „lietali").
   Podklad k 3 variantom: mockup_cela_rework.html. Tokeny = kópia :root z panel.css.
-  STAV: DRAFT 19.9.2026 — čaká na Michalovo schválenie, potom outside-in → package.
+  STAV: SCHVÁLENÝ Michalom 19.9.2026 — záväzná vizuálna autorita D-130a/D-130b; outside-in hotový (CELA_REWORK_OUTSIDE_IN_2026-09-19.md); spresnenia po Codex review PR #370 zapracované.
 -->
 <style>
   :root{
@@ -122,12 +122,13 @@
   .fitem .ftitle .chev{margin-left:2px;color:var(--nx-ink-faint);transition:transform .1s}
   .fitem .ftitle .chev .ic{width:12px;height:12px}
   .fitem.open .ftitle .chev{transform:rotate(180deg);color:var(--nx-select)}
-  .fitem .fsub{grid-column:2;grid-row:2;display:flex;align-items:center;gap:0;min-width:0;font-size:10.5px;color:var(--nx-ink-soft);
-               white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:20px;border:0;background:none;font-family:inherit;cursor:pointer;text-align:left}
+  .fitem .fsubwrap{grid-column:2;grid-row:2;display:flex;align-items:center;gap:4px;min-width:0;padding-left:20px}
+  .fitem .fsub{flex:0 1 auto;display:block;min-width:0;font-size:10.5px;color:var(--nx-ink-soft);
+               white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0;border:0;background:none;font-family:inherit;cursor:pointer;text-align:left}
+  .fitem .fhwlink{flex:0 0 auto;display:inline-flex;align-items:center;gap:3px;font:inherit;font-size:10.5px;color:var(--nx-ink-faint);border:0;background:none;padding:0;cursor:pointer;white-space:nowrap}
+  .fitem .fhwlink:hover,.fitem .fhwlink:focus{color:var(--nx-select);outline:none;text-decoration:underline}
+  .fitem .fhwlink .ic{width:10px;height:10px}
   .fitem .fsub .sep{margin:0 4px;color:var(--nx-border-strong)}
-  .fitem .fsub .hw{color:var(--nx-ink-faint);display:inline-flex;align-items:center;gap:3px;pointer-events:auto;cursor:pointer}
-  .fitem .fsub .hw .ic{width:10px;height:10px}
-  .fitem .fsub:hover .hw{color:var(--nx-select)}
   .fbadge{font-size:9px;font-weight:600;line-height:1.5;border-radius:9px;padding:0 5px;vertical-align:1px;
           color:var(--nx-warnchip-fg);background:var(--nx-warn-bg-soft);border:1px solid var(--nx-warnchip-border)}
   /* pole výšky: jeden „box" — [AUTO chip | hodnota | mm | ▾]; šírka konštantná */
@@ -284,7 +285,7 @@
 
 <div class="mockbar">
   <span class="mb-title">Noxun Engine — mockup ČELÁ final</span>
-  <span class="mb-ver">B + tab Kovanie · nový zoznam čiel · draft 19.9.2026 · klikateľné</span>
+  <span class="mb-ver">B + tab Kovanie · nový zoznam čiel · SCHVÁLENÝ 19.9.2026 · klikateľné</span>
 </div>
 <div class="notestrip">
   <svg class="ic" viewBox="0 0 24 24"><use href="#i-alert"/></svg>
@@ -396,7 +397,7 @@
 <script>
   var FRONTS = [
     { id:'F3', type:'door',   h:null, approx:275, wings:'auto', dir:'unset', opening:'classic', prof:'none', edge:null,
-      hw:'Sensys klasik · 2 ks', hwfull:'Závesy: SET ZÁVES KLASIK · 2 ks', hwlabel:'Závesy', hwres:'Sensys 8645i 110° · 2 ks · Klasické' },
+      hw:'Sensys · 2 ks', hwfull:'Závesy: SET ZÁVES KLASIK · 2 ks', hwlabel:'Závesy', hwres:'Sensys 8645i 110° · 2 ks · Klasické' },
     { id:'F2', type:'drawer', h:null, approx:250, prof:'J', edge:'Hore', constr:'metal', variant:'standard', opening:'classic',
       hw:'Atira H70 · NL 470', hwfull:'Výsuv: Atira biela · H70 · NL 470', hwlabel:'Výsuv', hwres:'Atira · H70 · NL 470 · 30 kg · SiSy · recept v1' },
     { id:'F1', type:'drawer', h:180, prof:'J', edge:'Hore', constr:'wood', variant:'standard', opening:'classic',
@@ -427,10 +428,10 @@
     if (f.type==='lift') p.push(f.lift==='hl' ? 'HL top' : 'HK top');
     if (f.opening==='tipon' && f.type!=='blind' && f.type!=='none') p.push('Tip-On');
     if (f.type!=='none') p.push(f.prof!=='none' ? 'Profil '+f.prof+' '+(f.edge||'').toLowerCase() : 'bez úchytky');
-    if (f.type==='blind') p = ['pevný dielec', p[p.length-1]];
+    if (f.type==='blind'){ p = ['pevný dielec', p[p.length-1]]; f.hw = f.prof==='none' ? 'bez kovania' : 'Úchytka z profilu'; }
     if (f.type==='none') p = ['otvorená nika'];
     var h = p.join('<span class="sep">·</span>');
-    if (f.type!=='none' && f.type!=='blind') h += '<span class="sep">·</span><span class="hw" role="link" title="Otvoriť tab Kovanie tohto čela" data-id="'+f.id+'" onclick="stop(event);openHw(this.dataset.id)">'+f.hw+' '+ic('arrow-right')+'</span>';
+    if (f.type!=='none' && f.type!=='blind') h += '';
     return h;
   }
 
@@ -439,7 +440,8 @@
     var h = '<div class="fitem'+(isOpen?' open':'')+(f.type==='none'?' none':'')+'" data-id="'+f.id+'">' +
       '<span class="fnum">'+f.id+'</span>' +
       '<button class="ftitle" onclick="toggle(\''+f.id+'\')" title="'+d.l+' — klik otvorí kartu čela"><span class="ftico">'+ic(d.ico)+'</span><span>'+d.l+'</span><span class="chev">'+ic('chevron-down')+'</span></button>' +
-      '<button class="fsub" onclick="toggle(\''+f.id+'\')" title="Stav čela — klik otvorí kartu; kovanie vedie do kontextu Kovanie">'+summary(f)+'</button>' +
+      '<span class="fsubwrap"><button class="fsub" onclick="toggle(\''+f.id+'\')" title="Stav čela — klik otvorí kartu">'+summary(f)+'</button>' +
+      (f.type!=='none' ? '<button class="fhwlink" data-id="'+f.id+'" title="Kovanie tohto čela — otvorí tab Kovanie" onclick="stop(event);openHw(this.dataset.id)">'+f.hw+' '+ic('arrow-right')+'</button>' : '') + '</span>' +
       '<span class="hbox'+(f.h?' fixed':'')+'"><button type="button" class="auto" title="Vrátiť na AUTO — výška sa dopočíta z voľného miesta" onclick="stop(event);setAuto(this)">AUTO</button>' +
         '<input value="'+(f.h||'')+'" placeholder="≈ '+(f.approx||'')+'"><span class="u">mm</span>' +
         '<button class="pbtn" title="Výškový rad čiel">'+ic('chevron-down')+'</button></span>' +
@@ -481,7 +483,7 @@
   function tilesHtml(f){
     var h = '<div class="typegrid">';
     TYPES.forEach(function(t){
-      var tip = t.t==='blind' ? 'Blenda je pevný dielec — bez smeru, otvárania a kovania.' :
+      var tip = t.t==='blind' ? 'Blenda je pevný dielec — bez smeru a otvárania (kovanie len pri úchytkovom profile).' :
                 t.t==='none'  ? 'Riadok drží výšku v rade, panel sa nepostaví — otvorená nika.' : t.l;
       h += '<button class="typetile'+(f.type===t.t?' on':'')+'" title="'+tip+'" onclick="setType(\''+f.id+'\',\''+t.t+'\')">'+ic(t.ico)+'<span class="tl">'+t.l+'</span></button>';
     });
@@ -506,7 +508,7 @@
       h += seg(f,'opening','Otváranie','HL top + Tip-On sa nevyrába.',OPEN,f.opening||'classic');
     }
     if (f.type==='fall') h += seg(f,'opening','Otváranie','Sklop dostáva závesy ako dvierka, mechanizmus žiadny.',OPEN,f.opening||'classic');
-    if (f.type==='blind') h += '<div class="inforow">Blenda — pevný dielec bez smeru, otvárania a kovania.</div>';
+    if (f.type==='blind') h += '<div class="inforow">Blenda — pevný dielec bez smeru a otvárania; kovanie vzniká len z úchytkového profilu.</div>';
     if (f.type==='none'){ h += '<div class="inforow">Otvorená nika — riadok drží výšku, panel sa nepostaví.</div>'; return h; }
     // úchytka — jediné miesto stavu
     var edges = f.type==='door' ? ['Hore','Dole','Voľná'] : ['Hore','Dole','Vľavo','Vpravo'];
@@ -571,7 +573,7 @@
     svg.innerHTML = g;
   }
 
-  function togglePop(id){ var p=document.getElementById(id), was=p.classList.contains('open'); document.querySelectorAll('.pop').forEach(function(x){x.classList.remove('open');}); if(!was) p.classList.add('open'); }
+  function togglePop(id){ var p=document.getElementById(id), was=p.classList.contains('open'); document.querySelectorAll('.pop').forEach(function(x){x.classList.remove('open');}); if(!was){ var d=p.closest('details'); if(d) d.open=true; p.classList.add('open'); } }
   document.addEventListener('click', function(e){ if (!e.target.closest('.pop') && !e.target.closest('.ibtn')) document.querySelectorAll('.pop').forEach(function(x){ x.classList.remove('open'); }); });
   document.addEventListener('keydown', function(e){ if (e.key==='Escape'){ var o=document.querySelector('.pop.open'); if(o){ o.classList.remove('open'); var b=document.querySelector('.ibtn.wide'); if(b) b.focus(); } } });
   render();
