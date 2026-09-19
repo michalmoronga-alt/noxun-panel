@@ -1,7 +1,7 @@
 # SPOTREBIČE — overenie technických listov proti výrobcom (19.9.2026)
 
 > Stav: KONCEPT — neimplementovať priamo · zdroj: prvé porovnanie Fable 19.9.2026 (PDF výrobcov otvorené a prečítané, nie tvrdenie Gemini) ·
-> overuje sa [SPOTREBICE_TECHLISTY_2026-09.md](SPOTREBICE_TECHLISTY_2026-09.md) §3 · **Michal prešiel celé 19.9. večer** (doplnenia z praxe = §9; kľúčové opravy prepísané do §3 a seedu pôvodného dokumentu) ·
+> overuje sa [SPOTREBICE_TECHLISTY_2026-09.md](SPOTREBICE_TECHLISTY_2026-09.md) §3 · **Michal prešiel celé 19.9. večer** (doplnenia z praxe = §9; kľúčové opravy prepísané do §3 a seedu pôvodného dokumentu) · **dôkazový podklad, nie kontrakt** — zdrojová vrstva je nezáväzná, čísla vstúpia do záväzného kontraktu až cez package S1 po `codex-audit` ·
 > auditované proti kódu: nie. Kópie listov a výkresov: `_dev/techlisty/` (gitignorované, per PC).
 >
 > Pred implementáciou platí postup z [README.md](README.md).
@@ -10,7 +10,7 @@
 
 - ✅ = číslo v §3 sedí s listom výrobcu · ✏️ = list hovorí inak (oprava do §3) · ➕ = list dáva údaj, ktorý §3 označilo GAP · ❓ = list to nekótuje jednoznačne, rozhodne Michal z praxe.
 - Dve URL v rešerši boli **zle označené**: „W20027062" nie je umývačka, ale **inštalačný list varnej dosky WL B1160 BF**; „datart doc_4401491" nie je Beko chladnička, ale
-  **denný návod umývačky Whirlpool (CS)**. Správne listy sú dohľadané nižšie.
+  **denný návod umývačky Whirlpool (CS)**. Správne listy sú dohľadané nižšie; **presné URL všetkých použitých listov = §11** (vstup pre `listy[]` seedu, reprodukovateľné z čistého checkoutu).
 
 ## 1 · Rúra Whirlpool OMSR58RU1SB — inštalačný list W20036783_A + produktový list
 
@@ -21,8 +21,8 @@
 | Nika Š | 560–568 | 560–568 | ✅ |
 | Nika V | 583–585 stĺp / 600–601 pod PD | 583–585 / 600–601 | ✅ |
 | Nika H min | 560 | 560 | ✅ |
-| Presah čela voči telu hore / dole | 0 / 9 | výkres kótuje **20 nad telom / 5 pod telom** (595 − 570 = 25) | ✏️ |
-| Medzera pod čelom (odvetranie) | — | kóta 9 = **povinná medzera**: čelo pod rúrou začína min. 9 mm nižšie (horúci výduch) → min. rozstup čiel 605 (Michal, §9) | ➕ |
+| Presah čela voči telu hore / dole | 0 / 9 | výkres kótuje **20 nad telom / 5 pod telom** (595 − 570 = 25); detail otvorených dvierok pripúšťa 25 / 0 — nejasný je len spodný presah, ovplyvní len policu pod rúrou (prax) | ✏️ |
+| Medzera pod čelom (odvetranie) | — | kóta 9 = **povinná medzera**: čelo pod rúrou začína min. 9 mm nižšie (horúci výduch) → min. rozstup čiel 595 + 9 = **604** (Michal rezervuje 605; §9) | ➕ |
 | Odvetranie | výrez zadnej hrany 35–40 | **35** vzadu (v stĺpe nad nikou aj pod PD) | ✏️ 35 |
 | Iné | 90 °C, 2 skrutky + lišta | 90 °C, skrutky 2 + 2, lišta ×1, dvierka 89°, vyloženie 460 | ✅ |
 
@@ -35,7 +35,7 @@
 | Telo Š×V×H | 540–544 × 348 × 298 | 540 (list) / 544 (výkres) × 348 × 298–299; celkovo 316–319 | ✅ |
 | Čelo | 595 × 381–382, 21 | 595 × 381–382, 21; panel 80, dvierka 294 | ✅ |
 | Nika | 556/560–568 × 360–363 × min 300 | list: min 556 × min 360 × 300; výkres: 560–568 × 360–363 × 300 | ✅ |
-| Alternatíva | 380 s kitom AVM 105 | stĺp: **380 min × 560 min × 550 min** s AVM 105 (4801-310-00222) | ✅ |
+| Alternatíva (Š×V×H) | 380 s kitom AVM 105 | stĺp: **560 min × 380 min × 550 min** (Š×V×H) s AVM 105 (4801-310-00222) | ✅ |
 | Presah čela hore / dole | 20 / 13–14 | 20 nad telom / 13 (list) – 14 (výkres) pod telom | ✅ |
 | Iné | 4 skrutky do bokov | 4 skrutky, 90 °C korpus, dvierka 85°, 2 mm vôľa | ✅ |
 
@@ -45,11 +45,11 @@
 |---|---|---|---|
 | Rozmer spotrebiča V×Š×H | ~360 × ~560 × ~298 (odvodené telo) | **382 × 594 × 318** celkovo; hĺbka tela 299 + čelo 19,5; šírku/výšku tela list nekótuje | ✏️ list dáva len celok |
 | Čelo | 594 × 382, ~20 | 594 × 382, **19,5** | ✅ |
-| Nika | 560–568 × 362–382 × min 300 | **560⁺⁸ × 362–365 × ≥ 300**; stĺp alternatíva **380⁺² × 560⁺⁸ × ≥ 550** (35 vzadu, zadná stena voľná) | ✅ (textová tabuľka listu píše 362–382 = obe niky spolu) |
+| Nika | 560–568 × 362–382 × min 300 | **560⁺⁸ × 362–365 × ≥ 300**; stĺp alternatíva **560⁺⁸ × 380⁺² × ≥ 550** (Š×V×H; 35 vzadu, zadná stena voľná) | ✅ (textová tabuľka listu píše 362–382 = obe niky spolu) |
 | Presah hore / dole | 6 (362) alebo 3 (365) / 14 | 6 pri 362, 3 pri 365 / 14 | ✅ |
 | Iné | — | bočná vôľa 16 od steny; šírka skrinky 600 | ➕ |
 
-**Michalov zápis (debata §2) sedí:** nika 362–365 × 560–568, presah 6 / 14, čelo 594 × 382 × 20 (list 19,5), hĺbka tela 300 (list 299). Formát zápisu je potvrdený.
+**Michalov zápis (debata §2) sedí:** nika 362–365 × 560–568, presah 6 / 14, čelo 594 × 382 × 20 (list 19,5), hĺbka tela 300 (list 299); **šírka a výška tela 550 × 340 sú odvodené** (list ich nekótuje) — v seede označiť ako odvodené. Formát zápisu je potvrdený.
 
 ## 3 · Rúra Bosch HBG774KB1 — spec list Bosch SK
 
@@ -60,7 +60,8 @@
 | Nika pod PD | — | **min 600⁺⁴ × 560⁺⁸ × min 550**; medzera 20 pod PD; miesto na prípojku 320 × 115 (nie zásuvková zóna) | ✏️ „zásuvková zóna 320 × 115" = miesto na prípojku |
 | Odvetranie | sokel 200 cm² + medzidno 200 cm² (alebo 35–45) | dva spotrebiče nad sebou: otvor na prívod vzduchu **≥ 200 cm²** (A) v sokli; 35 vzadu | ✅ |
 | Hrúbka PD nad rúrou | min 20 (28–30 pri indukcii) | tabuľka listu: **indukčný ≥ 37 nasadený / ≥ 38 v rovine**, celopovrchový indukčný ≥ 47/48, plynový ≥ 30/38, elektrický ≥ 27/30 | ✏️ dôležité pre PD |
-| Presah čela / medzera pod čelom | ~5 / ~5–9 | 18 hore · 7,5 dole = odvetranie **už v rozmere čela** → čelo pod rúrou začína na 0; telo 577 = 595 − 18 (Michal, §9) | ➕ |
+| Presah čela voči telu hore / dole | ~5 / ~5–9 | **18 / 0** (telo 577 = 595 − 18) | ✏️ |
+| Medzera pod čelom (odvetranie) | — | **0** — kóta 7,5 je odvetranie **už v rozmere čela**, nie presah (Michal, §9) | ➕ |
 
 ## 4 · Chladničky
 
@@ -118,8 +119,9 @@ Telo 448 × 815–875 × 550; nika **450 × 815–875 × min 550**; čelo **655�
 
 ## 8 · Čo z toho plynie pre S1 (návrh, rozhodne Michal)
 
-1. **Polia z §4 pôvodného dokumentu držia** — všetky kategórie majú telo / čelo / niku min–max / presahy; výrobcovia to členia rovnako (Bosch aj Whirlpool).
-2. **Nové údaje do seedu:** výrez digestora 437 × 216 · delenie dverí chladničky 1159 / 71 / 629 / 40 · čelo umývačky 594 × max 720, 2–10 kg · PD nad rúrou Bosch ≥ 37/38 pri indukcii.
+1. **Polia z §4 pôvodného dokumentu držia — a sú per kategória, nie univerzálne:** rúra/mikro = telo · čelo · nika min–max · presahy voči telu · medzera pod čelom; chladnička = nika + dvere spotrebiča (pásma);
+   umývačka = šírka slotu + čelo; varná doska = výrez do PD; digestor = výrez do dna. Výrobcovia to členia rovnako (Bosch: Gerätemaße · Nischenmaße · Überstände).
+2. **Nové údaje do seedu:** výrez digestora 437 × 216 · dvere chladničky 1159 / 71 / 629 / 40 (kontrolné pásma) · čelo umývačky 594 × max 720 (hmotnosť čela 2–10 kg len ako poznámka v liste — pole vypadáva) · PD nad rúrou Bosch ≥ 37/38 pri indukcii (len poznámka — kombinácia s doskou sa nerieši).
 3. **Presahy čela rúry** výrobcovia kótujú voči telu, nie voči nike — do seedu **presah voči telu** + niku min–max + **medzera pod čelom** (Whirlpool 9, Bosch 0); presah voči nike si engine dopočíta (čelo − nika). Vyriešené 19.9. (§9).
 4. Poznámky vetrania ostávajú textom v liste (rozhodnutie 6.9.), ale Beko „zadná stena úplne otvorená" je iný predpis ako „kanál 50" — do poznámky presne.
 
@@ -127,18 +129,18 @@ Telo 448 × 815–875 × 550; nika **450 × 815–875 × min 550**; čelo **655�
 
 Zdroj: interaktívna stránka porovnania (súkromný artefakt, Michalove poznámky v jej databáze) + screenshoty zo SketchUpu v `_dev/techlisty/*_Michal_*.png`.
 
-- **Rúra Whirlpool:** kóta 9 = **povinná medzera pod čelom** (horúci výduch) — dvierka pod rúrou začínajú min. 9 mm nižšie; výška čela 595 + 9 = **min. rozstup medzi čelami 605**.
-  Poloha čela voči telu (0 / 5 v detaile) ovplyvní len výšku police pod rúrou — Michal overí v praxi, z listu to jednoznačne nejde.
+- **Rúra Whirlpool:** kóta 9 = **povinná medzera pod čelom** (horúci výduch) — dvierka pod rúrou začínajú min. 9 mm nižšie; výška čela 595 + min 9 = **min. rozstup medzi čelami 604** (Michal v praxi rezervuje **605**).
+  Presah voči telu: výkres 20 hore / 5 dole, detail dvierok pripúšťa 25 / 0 — nejasný je len spodný presah (0 alebo 5), ovplyvní len výšku police pod rúrou; Michal overí v praxi.
 - **Rúra Bosch:** kóta 7,5 = odvetranie **už v rozmere čela** → čelo pod rúrou začína na 0; telo 577 = 595 − 18. Kombinácia s varnou doskou sa **nerieši** (nikdy tak nedáva);
   hrúbka PD nad rúrou nanajvýš poznámka bokom.
 - **Mikro Whirlpool:** čelo 382, telo 544 × 348 × 299; kontrola 14 + 348 + 20 = 382. **Mikro Bosch:** sedí všetko.
-- **Chladnička Beko — kontrolná geometria:** **box 1940 × 560 × 555 + čelná plocha viazaná zdola**: dolné nábytkové dvere **669** (= 629 + 40) · medzera **71** · horné **1200** (zvyšok do 1940).
-  Cieľ: delenie sa má **matematicky odvodiť z listu**. Pravidlo: hrana nábytkových dverí min. **10 mm od dverí spotrebiča** (horná hrana dolných aj dolná hrana horných) → pri medzere 71
-  vôľa posunu cca 50 mm. **Blend** hore/dole („ďalšie dno" napr. o 30 mm vyššie) pri lícovaní so susednými skrinkami — ideálne parameter šablóny, ak komplikuje → mimo V1.
+- **Chladnička Beko — kontrolná geometria:** **box 1940 × 560 × 555 + čelná plocha viazaná zdola** s **kontrolnými pásmami** dverí spotrebiča: **669** (= spodok 40 + dolné dvere 629) · **pásmo medzery 71** · **1200** (zvyšok do 1940).
+  Nábytkové dvere NIE sú 669 / 1200 — delenie leží **vnútri pásma 71**: dolné nábytkové dvere = 669 + a, horné = 1200 + b, škára s (2 mm), a + s + b = 71, pričom **a ≥ 10 a b ≥ 10**
+  (hrana nábytkových dverí min. 10 mm cez hranu dverí spotrebiča, aby hrana chladničky nebola pri čelnej hrane na tesno) → vôľa posunu a v rozsahu 10 až 59 ≈ 50 mm. Cieľ: delenie sa má **matematicky odvodiť z listu**. **Blend** hore/dole („ďalšie dno" napr. o 30 mm vyššie) pri lícovaní so susednými skrinkami — ideálne parameter šablóny, ak komplikuje → mimo V1.
   Nosnosť dna: bez odpovede → poznámka v šablóne.
 - **Whirlpool ART 97101 2:** list nedostupný ani Michalovi, predaj skončil → **vyradený zo seedu (ostáva 9 modelov)**.
-- **Umývačka Whirlpool:** „sedí, doladíme v priebehu". Prax (screeny): korpusy 815 + nohy 100 = 930, **čelo umývačky 826** (viac než list max 720), nad ním **blend 115**, pod ním vlastný sokel
-  → výška čela ani sokel sa nekontrolujú (potvrdzuje rozhodnutie 6.9.). **Umývačka Bosch:** hmotnosť čela nikdy neráta → pole **vypadáva**.
+- **Umývačka Whirlpool:** „sedí, doladíme v priebehu". Prax (screeny, orientačne — nie kontrakt): susedné korpusy 815 na nohách 100, **čelo umývačky 826** (viac než list max 720), nad ním **blend 115**, pod ním vlastný sokel;
+  kóty zo screenu (930 · 826 + 115) sa bez odsadení nesčítajú (čelo visí pod hranou korpusu, blend prekrýva) — presné odsadenia doriešiť v debate polí → výška čela ani sokel sa nekontrolujú (potvrdzuje rozhodnutie 6.9.). **Umývačka Bosch:** hmotnosť čela nikdy neráta → pole **vypadáva**.
 - **Varná doska:** digestor nad doskou **neriešiť** (rieši si sám).
 - **Digestor:** výrez do dna zvyčajne **20 mm od prednej hrany dna** (priestor na kryciu dosku) → odsadenie = parameter šablóny (default 20); výška nad doskou vypadáva.
 - **Otázka 1 (presahy):** zapisovať voči telu + medzera pod čelom + nika min–max; presah voči nike engine dopočíta.
@@ -147,3 +149,28 @@ Zdroj: interaktívna stránka porovnania (súkromný artefakt, Michalove poznám
 
 Detailná debata polí S1 nad §8 + §9 (povinné / rozsah / voliteľné per kategória, kontrolná geometria chladničky, parametre šablón: blend, odsadenie výrezu) → Antigravity outside-in
 (nový modul = povinný) → mockup → package + `codex-audit`.
+
+## 11 · Zdroje — presné URL použitých listov (vstup pre `listy[]` seedu)
+
+Whirlpool dokumenty sa dajú vypísať cez `https://docs.backend.prod.aws.wpsandwatch.com/documents?brand=WHIRLPOOL&code=<12NC>`; Bosch spec listy majú vzor
+`https://media3.bsh-group.com/Documents/specsheet/<sk-SK|de-DE>/<model>.pdf`.
+
+| Model | Dokument | URL |
+|---|---|---|
+| Whirlpool OMSR58RU1SB | inštalačný list W20036783_A | https://digitalassets-cdn.thron.com/api/v1/content-delivery/shares/ivq4cm/contents/do-98e6a4dd-cd45-4afb-991e-f8850c742cbb/pdf/W20036783_A.pdf |
+| Whirlpool OMSR58RU1SB | produktový list SK | https://digitalassets-cdn.thron.com/api/v1/content-delivery/shares/ivq4cm/contents/do-de7f707a-b55c-4a8a-b60f-565c085299ae/pdf/PR859991660260sk.pdf |
+| Whirlpool MBNA900B | technický výkres | https://mc-static.fast.eu/other/40/40046680/40046680-other.pdf |
+| Whirlpool MBNA900B | inštalačný / bezpečnostný list 400011661025 SK | https://digitalassets-cdn.thron.com/api/v1/content-delivery/shares/ivq4cm/contents/do-94f27ca5-604a-4a2a-b1c0-27c8ec28ba1b/pdf/400011661025SK.pdf |
+| Whirlpool MBNA900B | produktový list SK | https://digitalassets-cdn.thron.com/api/v1/content-delivery/shares/ivq4cm/contents/do-c1090179-f21f-4a98-8169-2e58a734e041/pdf/PR859991659350sk.pdf |
+| Bosch BFL7221B1 | spec list SK (s rozmerovým výkresom) | https://media3.bsh-group.com/Documents/specsheet/sk-SK/BFL7221B1.pdf |
+| Bosch HBG774KB1 | spec list SK (s rozmerovým výkresom) | https://media3.bsh-group.com/Documents/specsheet/sk-SK/HBG774KB1.pdf |
+| Beko BCNA306E5ZSN | oficiálny inštalačný list (chassis K54275/K54306 Sliding); priamy download mimo prehliadača vracia 403 | https://www.beko.com/content/dam/poland-pl-aem/poland-pl-aemProductCatalog/product-documents/7522520024-BCNA306E5ZSN/en-US-7522520024-202308210830197-Installation-Diagramtr-TR.pdf |
+| Beko BCNA306E5ZSN | použitá kópia toho istého listu (str. 4 rozmery, str. 5 dvere) | https://www.manualslib.com/manual/1873435/Beko-Bcna306e3s.html?page=4 |
+| Beko BCNA306E5ZSN | produktový informačný list EU 2021 | https://www.beko.com/content/dam/slovakia-sk-aem/slovakia-sk-aemProductCatalog/product-documents/7522520024-BCNA306E5ZSN/en-US-7522520024-202308281605655-Product-Information-Sheet-EU-2021-EPen-US.pdf |
+| Whirlpool ART 97101 2 | len obchod (list nedostupný; vyradený zo seedu) | https://www.planeo.sk/whirlpool-art-97101-2 |
+| Whirlpool WIO 3O540 PELG | inštalačný list W11401540_E (60 + 45 cm) | https://digitalassets-cdn.thron.com/api/v1/content-delivery/shares/ivq4cm/contents/do-7be584ca-2037-45fc-9588-934b9946ea10/pdf/W11401540_E.pdf |
+| Bosch SPV6EMX05E | spec list DE (s rozmerovým výkresom) | https://media3.bsh-group.com/Documents/specsheet/de-DE/SPV6EMX05E.pdf |
+| Whirlpool WL B1160 BF | inštalačný list W20027062_A | https://digitalassets-cdn.thron.com/api/v1/content-delivery/shares/ivq4cm/contents/do-68d37b84-f29b-4808-a8a8-d39dc3330b93/pdf/W20027062_A.pdf |
+| Whirlpool WL B1160 BF | produktový list SK | https://digitalassets-cdn.thron.com/api/v1/content-delivery/shares/ivq4cm/contents/do-d8ada554-2c49-44a5-85f0-f15004a0a5dd/pdf/PR859991572120sk.pdf |
+| Whirlpool WCT3 63F LTK | výkres ETD 859991672930 | https://digitalassets-cdn.thron.com/api/v1/content-delivery/shares/ivq4cm/contents/do-d3874dda-a288-4a4b-976d-1238c4e8e2a0/pdf/ETD859991672930EN.pdf |
+| Whirlpool WCT3 63F LTK | všeobecný návod LIB0195104A | https://digitalassets-cdn.thron.com/api/v1/content-delivery/shares/ivq4cm/contents/do-0c7835b6-8356-4169-9334-3bcf89152306/pdf/LIB0195104A.pdf |
