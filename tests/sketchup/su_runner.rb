@@ -19232,6 +19232,201 @@ module NoxunSuRunner
        kovd2a_overrides(inst).empty?)
   end
 
+  # === D-130a: NOVY ZOZNAM CIEL — SERVEROVA POLOVICA UI CIEST ===============
+  #
+  # Klientsku polovicu (mriezka riadku, suhrn, taby, popover) dokazuju sady
+  # `tests/js/test_d130a_suhrn_karta.js` a `tests/pure/test_d130a_zoznam_ciel.rb`.
+  # TU sa overuje to, co sa nad mini-DOM dokazat NEDA: ze kazda z novych
+  # obrazoviek posiela do modelu PRESNE jeden zapis, ze je to PRESNE jeden krok
+  # Spat a ze udaje, ktore nove UI zobrazuje (suhrn, tab Kovanie, meta), su tie
+  # iste, ktore server naozaj poslal.
+  #
+  # Scenare zodpovedaju obrazovkam:
+  #   (a) segment „Krídla" v karte  -> `wings` v configu + dva panely v MODELI
+  #   (b) tab Kovanie karty          -> `front_drawer[fid].text` + box vlastnika,
+  #                                     na ktory doskoci „Otvoriť v Kovaní"
+  #   (c) popover „všetkým"          -> JEDEN zapis profilu AJ hrany celemu
+  #                                     rozsahu; dvierka nedotknute
+  #   (d) chip AUTO v poli vysky     -> navrat na automat, jeden krok Spat
+  #   (e) meta hlavicky + suhrn      -> pocet ciel bez smeru zo `front_slots`
+  D130A_FIXED_H = 180.0
+
+  def d130a_params
+    { 'type' => 'lower', 'width' => 900.0, 'height' => 720.0, 'depth' => 500.0,
+      'thickness' => 18.0, 'floor_height' => 100.0,
+      'fronts' => { 'items' => [
+        { 'id' => 'F1', 'type' => 'drawer_front', 'mode' => 'fixed', 'height' => D130A_FIXED_H,
+          'opening_mode' => 'classic', 'drawer' => { 'construction' => 'metal' } },
+        { 'id' => 'F2', 'type' => 'drawer_front', 'mode' => 'auto',
+          'opening_mode' => 'classic', 'drawer' => { 'construction' => 'metal' } },
+        # JEDNOKRIDLOVE dvierka vedome: skrinka je siroka 900, takze AUTO by
+        # server rozdelil na DVE kridla — a scenar (a) prave prepnutie na dve
+        # overuje. Vychodisko preto musi byt jedno kridlo.
+        { 'id' => 'F3', 'type' => 'door', 'mode' => 'auto', 'wings' => '1',
+          'direction' => 'left' }
+      ] } }
+  end
+
+  def d130a_items(inst)
+    Array((e::Store.config(inst) || {}).dig('fronts', 'items'))
+  end
+
+  def d130a_item(inst, fid)
+    d130a_items(inst).find { |i| i['id'].to_s == fid } || {}
+  end
+
+  # APPLY TOU ISTOU CESTOU ako panel: `collectFronts` posle CELY blok `fronts`
+  # a server ho prestava. Ziadna priama `rebuild` — inak by sa nedalo overit,
+  # ze zapis z novej obrazovky je jeden krok Spat.
+  def d130a_apply(model, inst, cid)
+    cfg = e::Store.config(inst) || {}
+    fronts = JSON.parse(JSON.generate(e::CabinetBuilder.config_to_params(cfg)['fronts'] || {}))
+    yield fronts
+    # `handle_apply_all` je AUTO-APPLY nad VYBEROM — bez oznacenia ticho konci.
+    model.selection.clear
+    model.selection.add(inst)
+    e::Panel.handle_apply_all(pg(model, 'cabinet_id' => cid, 'fronts' => fronts))
+  end
+
+  # Panely dvierok F3 v MODELI (podla nich sa pozna, ci sa kridla naozaj delia).
+  def d130a_wing_panels(inst)
+    inst.definition.entities.grep(Sketchup::ComponentInstance)
+        .select { |p| e::Store.get(p, 'role') == 'front_door' }
+  end
+
+  def run_d130a(model)
+    cleanup(model)
+    markers = []
+    inst = e::CabinetBuilder.build(model, d130a_params)
+    return ok('D-130a: vlozenie skrinky s troma celami', false) unless inst
+
+    cid = e::Store.get(inst, 'cabinet_id')
+    begin
+      d130a_scenar(model, inst, cid, markers)
+    ensure
+      r03_clear_markers(model, markers)
+      cleanup(model)
+      ok('D-130a: cleanup (0 korpusov)', cabinets(model).empty?)
+    end
+  rescue StandardError => ex
+    log_line("FAIL: run_d130a vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
+  def d130a_scenar(model, inst, cid, markers)
+    cfg0 = e::Store.config(inst)
+    ok('D-130a: vychodisko = 3 cela (dve zasuvky + dvierka)',
+       d130a_items(inst).map { |i| i['type'] } == %w[drawer_front drawer_front door])
+
+    # --- (e) META a SUHRN citaju zo `front_slots` --------------------------
+    # Meta v hlavicke („3 čelá · 1 bez smeru") aj badge v suhrne stoja NA TOM
+    # ISTOM payloade. Ked sa jeho tvar zmeni, nove UI ticho prestane hlasit
+    # neurcene smery — preto sa tu overuje payload, nie text.
+    slots = e::Panel.front_slots_payload(Array(cfg0['front_items']))
+    ok("D-130a: payload slotov pozna vsetky tri cela (#{slots.keys.inspect})",
+       slots.keys.sort == %w[F1 F2 F3])
+    # R3-a: POCET KRIDIEL je SERVEROVY udaj — suhrn ho nesmie odvodzovat z
+    # `wings` (pri AUTO nad 600 mm by tvrdil „1 krídlo" nad dvomi panelmi).
+    ok("D-130a: dvierka F3 nesu POCET KRIDIEL zo servera (#{slots['F3'].inspect})",
+       slots['F3']['wings_n'].to_i == 1)
+    ok('D-130a: urcene dvierka nemaju ziadny slot v stave `unset` (suhrn badge NEDA)',
+       Array(slots['F3']['slots']).none? { |s| s['state'].to_s == 'unset' })
+
+    # --- (a) SEGMENT „Krídla" = jeden zapis, jeden krok Spat ---------------
+    m = r03_marker(model, markers)
+    d130a_apply(model, inst, cid) do |f|
+      it = f['items'].find { |i| i['id'].to_s == 'F3' }
+      it['wings'] = '2'
+      it.delete('direction')   # dvojkridlo sa na stranu pantov nepyta
+    end
+    ok("D-130a (a): segment Kridla ulozil dve kridla (#{d130a_item(inst, 'F3')['wings'].inspect})",
+       d130a_item(inst, 'F3')['wings'].to_s == '2')
+    ok("D-130a (a): a v MODELI naozaj stoja DVA panely (#{d130a_wing_panels(inst).length})",
+       d130a_wing_panels(inst).length == 2)
+    slots2 = e::Panel.front_slots_payload(Array((e::Store.config(inst) || {})['front_items']))
+    ok("D-130a (a): suhrn uz o smere MLCI — server sa nan nepyta (#{slots2['F3'].inspect})",
+       slots2['F3']['wings_n'].to_i == 2 && Array(slots2['F3']['slots']).empty?)
+    Sketchup.undo
+    ok('D-130a (a): PRESNE jeden krok Spat vratil jedno kridlo aj geometriu',
+       m.valid? && d130a_item(inst, 'F3')['wings'].to_s != '2' &&
+       d130a_wing_panels(inst).length == 1)
+    r03_clear_markers(model, markers)
+
+    # --- (b) TAB KOVANIE: text karty a ciel prekliku -----------------------
+    cfg = e::Store.config(inst) || {}
+    drawer = e::Panel.front_drawer_payload(cfg, e::Panel.drawer_axes_map(cfg, e::CabinetBuilder.config_to_params(cfg)))
+    rec = drawer['F1'] || {}
+    ok("D-130a (b): tab Kovanie ma co ukazat — zaznam zasuvky F1 (#{rec['state'].inspect})",
+       rec['state'].to_s == 'ok' && rec['text'].to_s.length > 5)
+    ok('D-130a (b): text riadku sklada SERVER (karta ho len vypise)',
+       rec['text'].is_a?(String) && Array(rec['detail']).all? { |d| d.is_a?(String) })
+    # „Otvoriť v Kovaní" doskakuje na BOX VLASTNIKA — kluc skupiny je
+    # `front:<fid>` a musi sedieť s `owner_part_key` polozky kovania.
+    owners = Array(cfg['hardware']).map { |h| h['owner_part_key'].to_s }
+    ok("D-130a (b): box vlastnika F1 naozaj existuje (#{owners.grep(%r{\Afront:F1/}).first.inspect})",
+       owners.any? { |o| o.start_with?('front:F1/') })
+
+    # --- (c) POPOVER „všetkým": JEDEN zapis profilu AJ hrany ---------------
+    # Toto je jadro D-129: profil a hrana sa zapisu NARAZ celemu rozsahu,
+    # takze je to jedna operacia a jeden krok Spat — nie dva-tri.
+    m2 = r03_marker(model, markers)
+    d130a_apply(model, inst, cid) do |f|
+      f['items'].each do |it|
+        next unless it['type'].to_s == 'drawer_front'
+
+        it['profile'] = 'ukw7'
+        it['profile_edge'] = 'bottom'
+      end
+    end
+    ok('D-130a (c): profil aj hrana sadli OBOM zasuvkovym celam',
+       %w[F1 F2].all? { |fid| d130a_item(inst, fid)['profile'].to_s == 'ukw7' &&
+                              d130a_item(inst, fid)['profile_edge'].to_s == 'bottom' })
+    ok("D-130a (c): dvierka mimo rozsahu ostali NEDOTKNUTE (#{d130a_item(inst, 'F3')['profile'].inspect})",
+       d130a_item(inst, 'F3')['profile'].to_s != 'ukw7')
+    Sketchup.undo
+    ok('D-130a (c): PRESNE jeden krok Spat vratil OBE cela naraz',
+       m2.valid? && %w[F1 F2].all? { |fid| d130a_item(inst, fid)['profile'].to_s != 'ukw7' })
+    r03_clear_markers(model, markers)
+
+    # --- (d) CHIP AUTO = navrat na automat ---------------------------------
+    ok("D-130a (d): vychodisko F1 = PEVNA vyska #{D130A_FIXED_H}",
+       d130a_item(inst, 'F1')['mode'].to_s == 'fixed' &&
+       (d130a_item(inst, 'F1')['height'].to_f - D130A_FIXED_H).abs <= TOL)
+    m3 = r03_marker(model, markers)
+    d130a_apply(model, inst, cid) do |f|
+      it = f['items'].find { |i| i['id'].to_s == 'F1' }
+      # Chip AUTO vyprazdni pole — `collectFronts` z prazdneho pola posle
+      # presne toto (mode `auto`, ziadna vyska, `locked` false).
+      it['mode'] = 'auto'
+      it['height'] = nil
+      it['locked'] = false
+    end
+    ok('D-130a (d): chip AUTO vratil celo na automat',
+       d130a_item(inst, 'F1')['mode'].to_s == 'auto' &&
+       d130a_item(inst, 'F1')['locked'] != true)
+    auto_h = Array((e::Store.config(inst) || {})['front_items'])
+             .find { |i| i['id'].to_s == 'F1' }
+    ok("D-130a (d): a server dopocital NOVU vysku (#{auto_h && auto_h['height']})",
+       auto_h && (auto_h['height'].to_f - D130A_FIXED_H).abs > TOL)
+    Sketchup.undo
+    ok('D-130a (d): PRESNE jeden krok Spat vratil pevnu vysku',
+       m3.valid? && d130a_item(inst, 'F1')['mode'].to_s == 'fixed' &&
+       (d130a_item(inst, 'F1')['height'].to_f - D130A_FIXED_H).abs <= TOL)
+    r03_clear_markers(model, markers)
+
+    # --- (e2) CITACIE payloady NEROBIA krok Spat ---------------------------
+    # Suhrn, meta aj tab Kovanie sa prekresluju pri KAZDOM echu — keby
+    # ktorykolvek z nich otvoril operaciu, zoznam Spat by sa zaplnil.
+    m4 = r03_marker(model, markers)
+    cfg2 = e::Store.config(inst) || {}
+    e::Panel.front_slots_payload(Array(cfg2['front_items']))
+    e::Panel.front_drawer_payload(cfg2)
+    e::Panel.front_lift_payload(cfg2)
+    Sketchup.undo
+    ok('D-130a (e): citacie payloady suhrnu a karty NENECHAJU ziadny krok Spat',
+       !m4.valid? && inst.valid? && e::Store.config(inst) == cfg2)
+  end
+
   # === KOV-D2b: ZAMKY OSI — UI CESTA (chip -> serverova akcia) ==============
   #
   # D2a dokazal JADRO (poradie resolvera, jedna operacia, Undo/Redo). D2b
@@ -23126,6 +23321,7 @@ module NoxunSuRunner
     run_kovi(model)          # KOV-I: ulozenie S/BEZ kovania cez panel, badge data, automaticky recept/system/NL, projektove defaulty, 1x Spat vrati vklad aj freeze; poskodeny snapshot ulozi geometriu bez setov AJ manualu + jasny status (izolovane katalogy a sablony)
     run_cela_a(model)
     run_cela_b(model)
+    run_d130a(model)         # D-130a: novy zoznam ciel — serverova polovica novych UI ciest: segment „Krídla" ulozi dve kridla a MODEL naozaj postavi dva panely (1 krok Spat vrati oboje), tab Kovanie ma co ukazat (zaznam zasuvky + box vlastnika, na ktory doskoci „Otvoriť v Kovaní"), popover „všetkým" zapise profil AJ hranu celemu rozsahu NARAZ a dvierka necha (1 krok Spat vrati obe cela), chip AUTO vrati celo na automat s novou dopocitanou vyskou (1 krok Spat), a citacie payloady suhrnu/karty nenechaju ZIADNY krok Spat
     run_mr1b1(model)
     run_mr1b2(model)          # MR-1B2: R1/R2, spolocna ABS, prestavba, verna kopia a rollback
     run_mr3a(model)           # MR-3A: fyzicke UV, skutocne roly, partial bindingy a rollback
