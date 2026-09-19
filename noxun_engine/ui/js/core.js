@@ -396,16 +396,29 @@
   // `unset` vznika vyhradne pouzivatelskou akciou. LEGACY celo (kluc smeru
   // v configu chyba) badge NIKDY nedostane: `undefined !== 'unset'`.
   // ZIADNY `|| 'unset'` fallback (zelezne pravidlo KOV-A1).
-  function frontSumDirUnset(item){
+  //
+  // Codex #371 P2: rata sa LEN cez AKTIVNE SLOTY (`front_slots[fid].slots`) —
+  // teda cez kridla, na ktore sa server naozaj pyta. Prechadzat vsetky ulozene
+  // `wing_directions` bolo zle: po navrate zo 4 kridiel na 2 ostava `p2: unset`
+  // ako DORMANTNA hodnota (A1 kontrakt: navrat nic nemaze) a riadok by navzdy
+  // svietil „smer?" na otazku, ktoru uz nikto nekladie.
+  // Bez slotov (server sa este nevyjadril / dvojkridlo) sa pozera LEN na
+  // scalarny `direction`, a to iba pri jednom kridle — dvojkridlo ma smer
+  // odvodeny z geometrie.
+  function frontSumDirUnset(item, entry){
     var it = item || {};
-    if (it.direction === FRONT_DIR_UNSET) return true;
-    var wd = it.wing_directions;
-    if (wd && typeof wd === 'object'){
-      for (var k in wd){
-        if (Object.prototype.hasOwnProperty.call(wd, k) && wd[k] === FRONT_DIR_UNSET) return true;
+    var e = (entry && typeof entry === 'object') ? entry : null;
+    var list = (e && Array.isArray(e.slots)) ? e.slots : null;
+    if (list && list.length){
+      for (var i = 0; i < list.length; i++){
+        var wing = list[i] && list[i].wing;
+        if (wing && frontDirValue(it, wing) === FRONT_DIR_UNSET) return true;
       }
+      return false;
     }
-    return false;
+    var n = frontSumWings(e);
+    if (n != null && n !== 1) return false;
+    return it.direction === FRONT_DIR_UNSET;
   }
   // Cast „úchytka": „UKW-7 hore" / „bez úchytky". Profileless typ nema co
   // povedat (vracia null) — rovnako ako `frontProfileScopeItems` ho vynecha.
@@ -442,7 +455,7 @@
       if (n == null) parts.push({ text: 'auto' });
       else parts.push({ text: (n === 1 ? '1 krídlo' : n + ' krídla') +
                               ((it.wings == null || it.wings === '' || it.wings === 'auto') ? ' (auto)' : '') });
-      if (frontSumDirUnset(it)) parts.push({ badge: 'smer?' });
+      if (frontSumDirUnset(it, entry)) parts.push({ badge: 'smer?' });
       else if (n === 1 && FRONT_SUM_DIR[it.direction])
         parts.push({ text: FRONT_SUM_DIR[it.direction] });
       // Dvojkridlo o smere MLCI — je odvodeny z geometrie (vzor karty).
@@ -511,7 +524,7 @@
     var type = it.type || 'door';
     var known = FRONT_CARD_TYPES.indexOf(type) >= 0;
     var tiles = FRONT_CARD_TYPES.map(function(t){ return { type: t, on: t === type }; });
-    var tabs = frontCardTabs(type, type === 'door' && frontSumDirUnset(it));
+    var tabs = frontCardTabs(type, type === 'door' && frontSumDirUnset(it, entry));
     var rows = [], hwRows = [];
     if (type === 'blind'){
       // R6-d: blenda NIE JE „bez kovania" — s uchytkovym profilom ho dostava
