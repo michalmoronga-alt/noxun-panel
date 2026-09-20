@@ -27,7 +27,9 @@ paritu, neznámy kód sa neprekladá). Ďalej `manufacturer`, `name`, `shop_urls
 kľúč znamená „list to nekótuje"** — nikdy sa nedosadzuje default a `nil` sa neukladá. Rúra/mikro nesú presah čela **spolu s referenciou**
 (`overhang_ref` = `body` | `niche`), pretože Whirlpool kótuje presah voči telu a Bosch voči nike; druhú referenciu si engine dopočíta len vtedy, keď
 pozná telo aj niku. Validácia: mm Float 0–5000 (kg 0–100), enumy, `*_min ≤ *_max` (plus dvojica `cutout_depth`/`cutout_depth_max`, ktorú výrobca kótuje
-inak). **Kľúče mimo whitelistu kategórie — aj celé neznáme bloky — sa zachovajú, ale nevalidujú** (dopredná kompatibilita). `derived[]` menuje cesty polí,
+inak). **Kľúče mimo whitelistu kategórie — aj celé neznáme bloky — sa zachovajú, ale nevalidujú** (dopredná kompatibilita) — a to **výhradne tie, ktoré už
+sú v uloženom zázname**: kľúč, ktorý prinesie vstup klienta a nepozná ho ani whitelist kategórie, ani súbor, je `:invalid` s cestou poľa. Bez toho by
+preklep vo formulári (`cutout_dept`) skončil ako „uložené" a číslo by ticho zmizlo. `derived[]` menuje cesty polí,
 ktorých hodnota je odvodená, nie z listu (napr. `body.width` pri Bosch BFL7221B1).
 
 **`rev` je odtlačok obsahu, nie počítadlo** — `Digest::SHA1` uloženého záznamu, prvých 12 hex znakov. Do súboru sa **neukladá**; počíta sa pri čítaní
@@ -39,8 +41,16 @@ a až potom zapisuje.
 **Stav katalógu — `assess!`** (`:ok` | `:read_only` | `:degraded`): chýba primár aj `.bak` = prvá inštalácia → seed · chýba primár, `.bak` je = **nie je**
 prvá inštalácia (číta sa záloha, žiadny seed, prvý zápis primár obnoví) · poškodený primár + platná `.bak` = `:degraded` (číta sa záloha, **zápisy stoja**,
 inak by prepísali primár obsahom spred poškodenia) · poškodený primár bez zálohy, cudzí tvar, chýbajúci alebo nečíselný `std`, **`std` > `STD` (forward
-guard)**, záznam bez identity a duplicitné identity = `:read_only` s dôvodom. Tá istá kontrola (`stored_document_issue`) beží nad čerstvým dokumentom
-**pod zámkom pred každým zápisom** — cachovaný `:ok` nie je dôkazom aktuálneho stavu súboru.
+guard)**, záznam bez identity, **nečitateľná položka `attachments[]`** (nie Hash, chýbajúce `id`/`name`, neznámy `kind`, `file` mimo jedného segmentu —
+inak by `[null]` prešlo ako zdravý katalóg a rozbilo sa až v mutácii) a duplicitné identity = `:read_only` s dôvodom. **Zlyhaný prvý seed** (nezapisovateľný
+`%APPDATA%`, plný disk) je tiež `:read_only` — prázdny „zdravý" katalóg by pri prvom zápise vznikol **bez deviatich modelov** a marker `seed_version` by
+ich už nikdy nedosial. Tá istá kontrola (`stored_document_issue`) beží nad čerstvým dokumentom
+**pod zámkom pred každým zápisom** — cachovaný `:ok` nie je dôkazom aktuálneho stavu súboru; stav `:read_only` naopak zastaví mutáciu **aj keď súbor
+neexistuje**.
+
+**Založenie pri štarte.** Katalóg posudzuje (a nad čistou inštaláciou zakladá) už boot blok `main.rb` — vlastný chránený `begin/rescue` vedľa
+`Materials.boot_cutover!`, takže poškodený alebo nezapisovateľný katalóg nikdy nezhodí menu, toolbar ani observer. Bez toho by `appliances.json`
+vznikol až pri prvom otvorení sekcie Štúdia (S1-A2).
 
 **Tombstone.** `delete!` zapíše `deleted_at` a záznam ostáva v súbore: zákazka, ktorá model použila, nesmie prísť o jeho rozmery ani prílohy. `list`
 a `search` ho vynechajú (`include_deleted: true` ho vráti), `find` ho nájde vždy, `snapshot_for` ho odmietne (`:deleted`). `restore!` ho vráti — s tým
@@ -51,20 +61,26 @@ vymieňa**. Názov súboru je `<uuid prílohy>_<sanitized>.<ext>` (ASCII slug, p
 už obsadený cieľ sa neprepíše ani vtedy, keď je to sirota po odobranej prílohe (snapshot zákazky na ňu môže odkazovať) → `:copy_failed`. Poradie
 publikácie: staging `<uuid>.tmp` **v cieľovom priečinku** → kontrola veľkosti stagingu → `File.rename` na finálny názov → až potom zápis JSON pod tým
 istým zámkom; zlyhanie zápisu zmaže sirotu a vráti `:write_failed` (nikdy „úspech" s odkazom na neexistujúci súbor). Limit 25 MB sa kontroluje na zdroji
-**aj na uloženej kópii** (zdroj sa medzitým mohol zväčšiť) a `bytes` v zázname je veľkosť kópie. Náhľad je **najviac jeden** (`set_thumbnail!` prepína
-`image` ↔ `thumbnail`). `remove_attachment!` odoberá záznam zo zoznamu, **súbor vedome ostáva** — bez indexu zákaziek sa nedá overiť, či naň niekto
-neodkazuje, a jeho meno tým ostáva navždy obsadené.
+**aj na uloženej kópii** (zdroj sa medzitým mohol zväčšiť) a `bytes` v zázname je veľkosť kópie. **Druh určuje príponu** (`KIND_EXTS`): `sheet` berie
+`pdf jpg jpeg png webp`, ale `image` a `thumbnail` **len obrázok** — PDF ako náhľad by UI nevykreslilo a dlaždica by ostala prázdna bez dôvodu; chyba
+patrí poľu `kind`, lebo súbor je v poriadku. Náhľad je **najviac jeden** (`set_thumbnail!` prepína `image` ↔ `thumbnail` a rozhoduje sa podľa **prípony
+súboru**, nie podľa dnešného druhu — záznam z cudzieho zápisu môže mať `image` nad PDF). `remove_attachment!` odoberá záznam zo zoznamu, **súbor vedome
+ostáva** — bez indexu zákaziek sa nedá overiť, či naň niekto neodkazuje, a jeho meno tým ostáva navždy obsadené.
 
 **Otvorenie prílohy** ide cez jeden resolver: `attachment_path_for(ref)` nad referenciou `{id, kind, file, name}` — **nezávislý od aktuálneho zoznamu
 príloh**, takže zákazkový snapshot otvorí súbor aj po `remove_attachment!`. `file` musí byť jediný segment (žiadne `..`, `/`, `\`, absolútna cesta)
 a výsledná cesta prechádza containment testom; chýbajúci súbor je `:missing_file` s cestou, nikdy ticho. `open_attachment(id, attachment_id)` deleguje
 na ten istý resolver a volá `UI.openURL("file:///…")` s **URI kódovaním a doprednými lomkami** — holá Windows cesta s medzerami a diakritikou sa
-systémovému prehliadaču neodovzdá spoľahlivo (overené in-SketchUp sekciou `run_s1a1`).
+systémovému prehliadaču neodovzdá spoľahlivo (overené in-SketchUp sekciou `run_s1a1`). Nezakódované ostávajú len `/` a `:`; **UNC cesta**
+(`\\server\share\…`, teda `%APPDATA%` na sieťovom disku) si necháva hostiteľa — `file://server/share/…` s **dvoma** lomkami, lebo tri by z nej urobili
+neexistujúcu lokálnu cestu.
 
 **`snapshot_for(id)` pre zákazku (S1-B)** je čisté čítanie: hlboká kópia s **explicitným whitelistom** (`catalog_id`, `category`, `manufacturer`, `name`,
 `shop_urls`, `sheet_urls`, `note`, `dims`, `derived`, `attachments` ako nemenné referencie, `seed`, `catalog_std`, `snapshot_at`) — žiadny stav katalógu
 (`rev`, `updated_at`, `deleted_at`) do zákazky neprejde a neskoršia zmena katalógu snapshotom nepohne. Stavy: `:not_found` · `:deleted` (vyradený model
-sa nepriraďuje) · `:unsupported` (`std` z novšieho pluginu alebo nečitateľný dokument); `:degraded` snapshot dovolí.
+sa nepriraďuje) · `:unsupported` (`std` z novšieho pluginu alebo nečitateľný dokument); `:degraded` snapshot dovolí. Zdroj sa overuje **čerstvo z disku**
+a ten istý prečítaný dokument ide rovno do výberu záznamu — **žiadne druhé čítanie cez `JsonFileStore`**, ktoré by v okne sekundovej cache
+(`CHECK_INTERVAL`) vrátilo stav spred zápisu druhej inštancie SketchUpu. Zákazka si snapshot odkladá, takže cachovaný záznam by v nej ostal natrvalo.
 
 **Seed je markerový** (`SEED_VERSION`, vzor `TemplateStore`): seje sa **výhradne pri prvej inštalácii** (chýba primár aj `.bak`), **nikdy opakovane** — zmazaný seed
 záznam sa už nevráti a používateľská úprava sa neprepíše. Sadu tvorí **9 overených modelov** (2 rúry, 2 mikrovlnky, chladnička, 2 umývačky, varná doska,
