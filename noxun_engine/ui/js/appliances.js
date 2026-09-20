@@ -46,6 +46,10 @@
   var AP_TOKEN = '';      // identita JEDNÉHO odoslania modalu
   var AP_MODE = '';       // 'create' | 'edit'
   var AP_CARD_EDIT = null; // karta, ktorú modal upravuje (drží sa cez prekreslenie)
+  // Baseline OTVORENIA modalu: polia (pre pamäť D-15 naprieč prekresleniami)
+  // a hodnoty zo servera (proti nim sa počíta, čo sa naozaj zmenilo).
+  var AP_BASE_FIELDS = null;
+  var AP_BASE_VALUES = {};
   var AP_QTIMER = null;
   var AP_Q_DEBOUNCE = 200;
 
@@ -104,6 +108,12 @@
     var g = Number(p.gen || 0);
     if (g < AP_SEEN) return;                      // staršia odpoveď — zahodiť
     AP_SEEN = g;
+    // Generácia PRICHÁDZA aj zo servera (plný push, echo po zápise) a po
+    // znovuotvorení Štúdia štartuje klient od nuly, kým server si pamätá
+    // vyššie číslo. Bez tohto prevzatia by každý ďalší dotaz odišiel
+    // so `gen`, ktoré je pod už videným — a vlastnú odpoveď by klient zahodil
+    // ako staršiu (hľadanie aj formulár by „nereagovali"). Codex #378 kolo 1 P2.
+    if (g > AP_GEN) AP_GEN = g;
     AP_TREE = p;
     // Kolo dotazu je vybavené bez ohľadu na to, či formulár naozaj prišiel —
     // inak by jediná stratená odpoveď nechala príznak „čaká sa" navždy
@@ -127,17 +137,25 @@
     }
     AP_CARD = p;
     AP_SEL = String(p.id || '');
+    // OPTIMISTICKÝ ZÁMOK otvoreného modalu sa obnovuje z echa: po konflikte
+    // (alebo po zápise z druhej inštancie) drží formulár starú `rev` a každé
+    // ďalšie „Uložiť" by narazilo na ten istý konflikt. Hodnoty, ktoré
+    // používateľ rozpísal, sa NEDOTÝKAJÚ — mení sa len zámok.
+    if (AP_CARD_EDIT && String(AP_CARD_EDIT.id) === AP_SEL) AP_CARD_EDIT.rev = p.rev;
     if (!apIsActive()) return;
     apRenderBody();
-    apRequestThumbs();
   }
 
   // VÝSLEDOK ZÁPISU pre modal (D-15). Prijíma sa LEN odpoveď na TOTO odoslanie
   // (`token`) — výsledok formulára, ktorý používateľ medzitým zavrel a otvoril
   // iný, by mu inak zavrel rozpísaný koncept.
-  function apResult(ok, msg, errors, op, token){
+  function apResult(ok, msg, errors, op, token, info){
     if (!AP_TOKEN || String(token || '') !== AP_TOKEN) return;
     AP_TOKEN = '';
+    // `info.rev` nesie konflikt: server poslal ČERSTVÝ zámok záznamu. Berie sa
+    // aj vtedy, keď modal medzitým zanikol — `AP_CARD_EDIT` je to, s čím sa
+    // pracuje ďalej.
+    if (info && info.rev && AP_CARD_EDIT) AP_CARD_EDIT.rev = String(info.rev);
     var m = (typeof window !== 'undefined') ? window.NXModal : null;
     if (!m || !m.isOpen()) return;
     if (ok){
@@ -379,6 +397,11 @@
     box.innerHTML = apBodyHtml();
     apRequestForm(null);
     apHealFilter();
+    // Miniatúry sa pýtajú PO každom vykreslení, nielen po príchode karty
+    // (Codex #378 kolo 1 P2): karta s viac než `THUMB_BATCH` obrázkami dostane
+    // prvú dávku, a bez tohto volania by sa o zvyšok nikto neprihlásil —
+    // dlaždice by ostali na ikone navždy, aj po návrate do sekcie.
+    apRequestThumbs();
   }
 
   // SAMOLIEČBA pohľadu. Filter je stav KLIENTA, strom skladá SERVER — a tie dva
@@ -490,6 +513,11 @@
       clearTimeout(AP_QTIMER);
       AP_QTIMER = null;
     }
+    // Poistka „posledné kolo nič neprinieslo" platí pre JEDEN pobyt v sekcii.
+    // Návrat je nový pokus — inak by sa raz zaseknuté miniatúry už nikdy
+    // nedopýtali.
+    AP_THUMB_MARK = -1;
+    AP_THUMB_WAIT = false;
     var m = (typeof window !== 'undefined') ? window.NXModal : null;
     if (m && m.isOpen() && !m.busyLocked()) m.close();
     AP_TOKEN = '';
@@ -516,8 +544,11 @@
     if (!AP_CARD) return;
     var card = AP_CARD;
     var m = (typeof window !== 'undefined') ? window.NXModal : null;
-    if (!m){
-      apSend('appl_delete', { id: card.id, rev: card.rev });
+    // FAIL CLOSED (Codex #378 kolo 1 P2): bez kostry D-15 sa NEVYRADI NIC.
+    // Fallback „posli to rovno" robil z jedneho kliknutia tombstone bez
+    // jedineho potvrdenia — a prave potvrdenie je cely zmysel tohto kroku.
+    if (!m || typeof m.open !== 'function'){
+      AP.setStatus('Vyradenie potrebuje dialóg Štúdia — zavri a otvor Štúdio znova.', true);
       return;
     }
     m.open({
@@ -595,8 +626,12 @@
     var out = {};
     Object.keys(v).forEach(function(k){
       if (k === 'shop_urls' || k === 'sheet_urls'){
-        out[k] = (v[k] || []).map(function(r){ return String((r && r.url) || '').trim(); })
-                             .filter(function(s){ return s.length > 0; });
+        // Z modalu prídu RIADKY (`[{url}]`), zo servera holé reťazce — tá istá
+        // funkcia skladá aj BASELINE otvorenia, takže musí zvládnuť oba tvary.
+        // Inak by sa odkazy vždy tvárili ako zmenené.
+        out[k] = (v[k] || []).map(function(r){
+          return String((r && typeof r === 'object') ? (r.url || '') : (r == null ? '' : r)).trim();
+        }).filter(function(s){ return s.length > 0; });
         return;
       }
       out[k] = v[k];
@@ -627,7 +662,37 @@
     AP_MODE = mode;
     AP_CARD_EDIT = card;
     AP_TRIGGER = (typeof document !== 'undefined') ? (document.activeElement || null) : null;
+    // BASELINE otvorenia. Dve ulohy naraz:
+    //   * `AP_BASE_FIELDS` je VYCHODISKOVA specifikacia pre pamat D-15 —
+    //     vnutorne prekreslenie (zmena kategorie) ju podava dalej ako
+    //     `baseFields`, inak by sa vychodiskom stalo to, co pouzivatel prave
+    //     napisal, a `remember()` by na Escape neulozil nic (Codex #378 P2).
+    //   * `AP_BASE_VALUES` su hodnoty ZO SERVERA, proti ktorym sa pri ulozeni
+    //     pocita, co sa naozaj zmenilo.
+    AP_BASE_VALUES = apValuesToFields(values);
+    AP_BASE_FIELDS = apModalFields(mode, category, values);
     apOpenModalWith(m, mode, category, values, card, false);
+  }
+
+  // Polia, ktore sa LISIA od baseline otvorenia. Patch posiela len tie: modal
+  // vracia VSETKY rozmery, takze oprava nazvu by inak prepisala aj cisla,
+  // ktorych sa pouzivatel nedotkol — a pri rozmere s dvoma desatinnymi
+  // miestami by to bolo tiche zaokruhlenie (Codex #378 kolo 1 P2).
+  function apChangedFields(fields, base){
+    var b = base || {};
+    var out = {};
+    Object.keys(fields || {}).forEach(function(k){
+      if (apSameValue(fields[k], b[k])) return;
+      out[k] = fields[k];
+    });
+    return out;
+  }
+
+  function apSameValue(a, b){
+    if (Array.isArray(a) || Array.isArray(b)){
+      return JSON.stringify(a || []) === JSON.stringify(b || []);
+    }
+    return String(a == null ? '' : a) === String(b == null ? '' : b);
   }
 
   // Zmena kategórie prekresľuje SADU POLÍ (`apOnCategoryChange`). Rozpísané
@@ -646,17 +711,33 @@
       size: 'wide',
       trigger: AP_TRIGGER,
       skipMemory: skipMemory === true,
+      // Kostra si `base` inak berie z PRÁVE podanej špecifikácie — pri
+      // prekreslení (zmena kategórie) by sa teda východiskom stalo to, čo
+      // používateľ napísal, a pamäť rozpísaného konceptu by na Escape
+      // neuložila nič. `baseFields` je jediná cesta, ako ju udržať.
+      baseFields: AP_BASE_FIELDS || undefined,
       memoryKey: mode === 'edit' ? ('appl:edit:' + (card ? card.id : '')) : 'appl:create',
       fields: apModalFields(mode, category, values),
       onSubmit: function(vals){
-        AP_TOKEN = apNewToken();
         var fields = apValuesToFields(vals);
-        if (mode === 'edit'){
-          delete fields.category;   // kategóriu už nemožno zmeniť (server to odmietne)
-          apSend('appl_patch', { id: card.id, rev: card.rev, token: AP_TOKEN, fields: fields });
-        } else {
+        if (mode !== 'edit'){
+          AP_TOKEN = apNewToken();
           apSend('appl_create', { token: AP_TOKEN, fields: fields });
+          return;
         }
+        delete fields.category;   // kategóriu už nemožno zmeniť (server to odmietne)
+        var changed = apChangedFields(fields, AP_BASE_VALUES);
+        if (!Object.keys(changed).length){
+          // Prázdny patch by server odmietol ako „nie je čo uložiť" a modal by
+          // ostal otvorený s chybou — pritom sa naozaj nič nezmenilo.
+          m.setBusy(false, { clear: true });
+          m.close();
+          AP.setStatus('Nič sa nezmenilo.');
+          return;
+        }
+        var target = AP_CARD_EDIT || card;
+        AP_TOKEN = apNewToken();
+        apSend('appl_patch', { id: target.id, rev: target.rev, token: AP_TOKEN, fields: changed });
       }
     });
   }
@@ -780,6 +861,7 @@
       apBlockHtml: apBlockHtml, apFileHtml: apFileHtml, apBannerHtml: apBannerHtml,
       apBodyHtml: apBodyHtml, apRenderBody: apRenderBody, apRenderTools: apRenderTools,
       apModalFields: apModalFields, apValuesToFields: apValuesToFields,
+      apChangedFields: apChangedFields,
       apApplyState: apApplyState, apIsActive: apIsActive,
       apRequestThumbs: apRequestThumbs, apThumbMissing: apThumbMissing,
       apHealFilter: apHealFilter,
@@ -798,6 +880,7 @@
         AP_SEL = ''; AP_Q = ''; AP_DEL = false; AP_GEN = 0; AP_SEEN = -1;
         AP_CLOSED = {}; AP_THUMBS = {}; AP_THUMB_WAIT = false; AP_THUMB_MARK = -1;
         AP_TOKEN = ''; AP_MODE = ''; AP_CARD_EDIT = null; AP_TRIGGER = null;
+        AP_BASE_FIELDS = null; AP_BASE_VALUES = {};
         if (AP_QTIMER != null && typeof clearTimeout === 'function') clearTimeout(AP_QTIMER);
         AP_QTIMER = null;
       },
