@@ -73,7 +73,7 @@ NxTest.test('UI-C1a migracia: std 1 -> 2 doplni kind a doseje doskove sablony JE
   NxC1a.write_raw!(NxC1a.legacy_payload([NxC1a.cab('Stara dolna')]))
 
   list = NxC1a::TS.load
-  NxTest.assert_equal(4, list.size, '1 legacy + 3 doskove zo seedu')
+  NxTest.assert_equal(6, list.size, '1 legacy + 3 doskove + 2 slotove zo seedu')
   legacy = list.find { |t| t['name'] == 'Stara dolna' }
   NxTest.assert_equal('cabinet', legacy['kind'], 'zaznam bez kind je korpusovy')
 
@@ -360,7 +360,7 @@ NxTest.test('UI-C1a payload: panel dostane cely zoznam s kind a poradim pouzitia
   NxC1a::TS.touch_used('board', 'Diel')
 
   list = Noxun::Engine::Panel.template_list
-  NxTest.assert_equal(7, list.size, 'panel vidi korpusove AJ doskove')
+  NxTest.assert_equal(9, list.size, 'panel vidi korpusove AJ doskove')
   NxTest.assert(list.all? { |t| Noxun::Engine::TemplateStore::KINDS.include?(t['kind']) },
                 'kazdy zaznam nesie kind')
   diel = list.find { |t| t['kind'] == 'board' && t['name'] == 'Diel' }
@@ -375,7 +375,7 @@ NxTest.test('UI-C1a payload: okno Sablony dostane VYHRADNE korpusove (BLOCKER 5)
   NxC1a::TS.load
 
   list = Noxun::Engine::Panel.template_list(kind: 'cabinet')
-  NxTest.assert_equal(4, list.size, 'len 4 korpusove seedy')
+  NxTest.assert_equal(6, list.size, 'len korpusove seedy (4 + 2 slotove)')
   NxTest.refute(list.any? { |t| t['kind'] == 'board' }, 'doskova sablona sa v okne neukaze')
 end
 

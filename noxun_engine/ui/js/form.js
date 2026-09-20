@@ -148,8 +148,23 @@
   // zhodu vsetkych troch miest strazi `tests/pure/test_s1e0_min_vyska.rb`.
   var LIMITS = { width:[200,3000], height:[80,3000], depth:[150,2000], thickness:[6,50],
                  floor_height:[0,500], plinth_recess:[0,300], rail_depth:[20,400], rails_top_offset:[0,500],
+                 // S1-E: polia SLOTU UMYVACKY — zrkadlo Ruby `CabinetBuilder::DW_RANGES`
+                 // (guard test `tests/pure/test_s1e_slot.rb`). Vyska cela smie
+                 // presahovat vysku linky, preto ma vlastny (siroky) rozsah.
+                 dw_body_height:[700,1000], dw_front_bottom:[0,300], dw_front_height:[300,1200],
                  // D-07: medzery/presahy cel — zaporny okraj = presah cez obrys (limit zhodny s Fronts::EDGE_LIMIT)
                  fr_gap:[0,50], fr_gap_top:[-100,100], fr_gap_bottom:[-100,100], fr_gap_left:[-100,100], fr_gap_right:[-100,100] };
+  // S1-E: sirka a vyska maju INE hranice per TYP — slot nema vnutro, takze
+  // korpusove 200/80 mm by nedavali zmysel, a naopak „umyvacka" 3000 mm tiez
+  // nie. Zrkadlo `CabinetBuilder::DW_WIDTH_RANGE` / `DW_HEIGHT_RANGE`.
+  var TYPE_LIMITS = { dishwasher: { width:[300,1200], height:[500,1200] } };
+  // Typ korpusu BEZPECNE: `getType` zije v core.js a Node testy tohto suboru
+  // ho nemusia mat nacitany (rovnaky vzor ako `typeof nxLegs… === 'function'`).
+  function cabTypeNow(){ return (typeof getType === 'function') ? getType() : 'lower'; }
+  function limitFor(id){
+    var t = TYPE_LIMITS[cabTypeNow()];
+    return (t && t[id]) || LIMITS[id];
+  }
   // D-22: okraje cel maju dynamicky limit podla zamku (Fronts::EDGE_LIMIT_UNLOCKED);
   // fr_gap (medzera medzi celami) ostava 0..50 VZDY.
   var EDGE_LIMIT_FIELDS = { fr_gap_top:1, fr_gap_bottom:1, fr_gap_left:1, fr_gap_right:1 };
@@ -178,6 +193,9 @@
   function cabinetHeightError(){
     var he = el('height');
     if (!he || he.value === '') return '';
+    // S1-E: slot vnutro NEMA — krizova kontrola vysky proti soklu a hrubkam
+    // sa ho netyka (jeho spodnu hranicu drzi `TYPE_LIMITS`).
+    if (cabTypeNow() === 'dishwasher') return '';
     var h = evalDim(he.value);
     if (isNaN(h)) return ''; // nezmysel uz oznacil hlavny cyklus
     var sokel = (getType() === 'upper') ? 0 : cabFieldOrDefault('floor_height');
@@ -218,7 +236,8 @@
       if (e.value === ''){ e.classList.remove('bad'); continue; }
       var v = evalDim(e.value);
       if (isNaN(v)){ e.classList.add('bad'); ok = false; continue; }
-      var lo = LIMITS[id][0], hi = LIMITS[id][1];
+      var lim = limitFor(id);
+      var lo = lim[0], hi = lim[1];
       if (EDGE_LIMIT_FIELDS[id] && edgeLimitOff){ lo = -2000; hi = 2000; }
       if (v < lo || v > hi){ e.classList.add('bad'); ok = false; } else { e.classList.remove('bad'); }
     }
@@ -266,11 +285,21 @@
   }
   function nxFrontDraftData(){
     var c = collectConstruction(), d = DEFAULTS[getType()] || {};
-    return { width: c.width === '' ? d.width : c.width,
+    var t = getType();
+    var out = { width: c.width === '' ? d.width : c.width,
       height: c.height === '' ? d.height : c.height,
-      floor_height: getType() === 'upper' ? 0 : (c.floor_height === '' ? d.floor_height : c.floor_height),
+      floor_height: (t === 'upper' || t === 'dishwasher') ? 0 : (c.floor_height === '' ? d.floor_height : c.floor_height),
       fronts: collectFronts(), model_guid: nxDocGuid(), cabinet_id: selectedCabId || '',
       insert_session: frontDraftSession };
+    // S1-E: preflight potrebuje TYP a virtualny otvor slotu — bez nich by
+    // overoval celo proti VYSKE LINKY a presah nad linku (ktory je v poriadku)
+    // by zahlasil ako chybu.
+    out.type = t;
+    if (t === 'dishwasher'){
+      out.dw_front_bottom = c.dw_front_bottom === '' ? d.dw_front_bottom : c.dw_front_bottom;
+      out.dw_front_height = c.dw_front_height === '' ? d.dw_front_height : c.dw_front_height;
+    }
+    return out;
   }
   function nxFrontDraftSignature(){ return JSON.stringify(nxFrontDraftData()); }
   function nxFrontDraftMessage(message){
@@ -560,13 +589,52 @@
     writeConstruction(DEFAULTS[t] || {});
     applyVisibility(t);
   }
+  // S1-E: riadky, ktore su LEN pre slot, a riadky, ktore slot NEMA. Dva
+  // menovite zoznamy — nie CSS trieda: `applyVisibility` je jedina autorita
+  // viditelnosti a kazdy riadok tu musi byt vidno na jednom mieste.
+  var SLOT_ONLY_ROWS = ['dwClassRow', 'dwBodyRow', 'dwFrontBottomRow', 'dwFrontHeightRow',
+                        'infDwBody', 'infDwTop', 'infDwFill', 'infDwUnder', 'infDwClass'];
+  var SLOT_HIDDEN_ROWS = ['thicknessRow', 'infAvWidth', 'infIntDepth', 'infAvHeight', 'infArea'];
+
   function applyVisibility(t){
-    el('plinthGroup').style.display = (t === 'upper') ? 'none' : '';
-    el('fhRow').style.display = (t === 'upper') ? 'none' : ''; // D-11: vyska sokla v Zakladnych, horna ju nema
+    var slot = (t === 'dishwasher');
+    el('plinthGroup').style.display = (t === 'upper' || slot) ? 'none' : '';
+    // D-11: vyska sokla v Zakladnych, horna ju nema. S1-E: slot ju nema tiez —
+    // jeho „sokel" je spodna hrana CELA (`dw_front_bottom`), nie vyska korpusu.
+    el('fhRow').style.display = (t === 'upper' || slot) ? 'none' : '';
+    SLOT_ONLY_ROWS.forEach(function(id){ var n = el(id); if (n) n.hidden = !slot; });
+    SLOT_HIDDEN_ROWS.forEach(function(id){ var n = el(id); if (n) n.style.display = slot ? 'none' : ''; });
+    // Vyska korpusu je pri slote VYSKA LINKY (horna hrana susednych korpusov).
+    nxSetRowLabel('height', slot ? 'Výška linky' : 'Výška');
+    nxSetRowUnit('height', slot ? 'mm · horná hrana susedov' : 'mm');
+    nxSetRowUnit('dw_body_height', 'mm · rozsah ' + LIMITS.dw_body_height[0] + '–' + LIMITS.dw_body_height[1]);
+    var wrow = el('infWeight');
+    var wspan = wrow ? wrow.querySelector('span') : null;
+    if (wspan) wspan.textContent = slot ? 'Hmotnosť čela' : 'Hmotnosť';
     // KOV-G2 (D-111): riadok Noh ide s riadkom Sokel — horna skrinka nohy nema.
     // Vo VKLADANI si zaroven vypyta cerstvy nahlad (typ sa prave zmenil).
-    if (typeof nxLegsApplyVisibility === 'function') nxLegsApplyVisibility(t);
+    // S1-E: slot nohy ani sokel NEMA (podpora `none`), preto rovnako skryty.
+    if (typeof nxLegsApplyVisibility === 'function') nxLegsApplyVisibility(slot ? 'upper' : t);
     toggleRecess(); toggleTwoRails(); toggleBackTh(); // D-31: pokryva vyber korpusu, defaulty aj sablonu
+  }
+
+  // Popis riadku (label nesie ikonu + TEXT) — meni sa LEN textovy uzol, ikona
+  // ostava. Vzor: `Výška` -> `Výška linky` pri slote.
+  function nxSetRowLabel(forId, text){
+    var lab = document.querySelector('label[for="' + forId + '"]');
+    if (!lab) return;
+    for (var i = lab.childNodes.length - 1; i >= 0; i--){
+      if (lab.childNodes[i].nodeType === 3){ lab.childNodes[i].nodeValue = text; return; }
+    }
+    lab.appendChild(document.createTextNode(text));
+  }
+
+  // Jednotkovy hint riadku (`.unit` v tom istom `.rowc`).
+  function nxSetRowUnit(fieldId, text){
+    var f = el(fieldId);
+    var row = f && f.closest ? f.closest('.rowc') : null;
+    var u = row ? row.querySelector('.unit') : null;
+    if (u) u.textContent = text;
   }
   function toggleRecess(){ el('recessRow').style.display = (val('plinth_mode') === 'front') ? '' : 'none'; }
   function toggleTwoRails(){ el('twoRailsGroup').style.display = (val('top_mode') === 'two_rails') ? '' : 'none'; }
@@ -2158,6 +2226,30 @@
     updateCabfrontMeta(); // D-130b: meta skupiny „Spoločné pre skrinku"
     refreshFrontCards();
     refreshFrontProfileUI(); // D-96: ponuka a veta stavu patria k prave vykreslenym riadkom
+    nxSlotFrontsLock();      // S1-E: slot ma jedno pevne celo
+  }
+
+  // S1-E: SLOT MA JEDNO PEVNE CELO. UI to len PRIZNA (schova „Pridať čelo",
+  // krizik a vysku da na citanie) — vynucuje to SERVER (`slot_fronts_refusal`
+  // v `actions_cabinet.rb`), lebo HTML nie je ochrana.
+  function nxSlotFrontsLock(){
+    var slot = (cabTypeNow() === 'dishwasher');
+    var box = el('frontAddTypes');
+    var addRow = (box && box.closest) ? box.closest('.addrow') : null;
+    if (addRow) addRow.style.display = slot ? 'none' : '';
+    var wrap = el('frontRows');
+    var rows = wrap ? wrap.querySelectorAll('.frow') : [];
+    for (var i = 0; i < rows.length; i++){
+      var fh = rows[i].querySelector('.fh');
+      if (fh){
+        fh.readOnly = slot;
+        fh.title = slot ? 'Výšku čela slotu mení pole „Čelo V" v Základných.' : '';
+      }
+      var auto = rows[i].querySelector('.fauto');
+      if (auto) auto.style.display = slot ? 'none' : '';
+      var del = rows[i].querySelector('.fdel');
+      if (del) del.style.display = slot ? 'none' : '';
+    }
   }
 
   // --- D-23: placeholder ≈ dopocitanej vysky v AUTO poliach --------------------

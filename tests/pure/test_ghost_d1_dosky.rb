@@ -399,7 +399,9 @@ end
 NxTest.test('GHOST-D1 config: marker `BOARD_CONFIG_SCHEMA` je v KAZDOM zapise configu dosky') do
   c = NxD1.bb.board_config(NxD1.cfg)
   NxTest.assert_equal(NxD1.bb::BOARD_CONFIG_SCHEMA, c[:config_schema])
-  NxTest.assert_equal(1, NxD1.bb::BOARD_CONFIG_SCHEMA, 'zavedenie markera = 1 (dnesny tvar)')
+  # S1-E: cislo uz nie je pripnute na 1 (schema 2 rezervuje vazby na
+  # spotrebic) — kontroluje sa, ze marker EXISTUJE a je kladny.
+  NxTest.assert(NxD1.bb::BOARD_CONFIG_SCHEMA >= 1, 'marker kontraktu dosky existuje')
 end
 
 NxTest.test('GHOST-D1 config: vyssia schema = „novsi config", rovnaka a starsia su OK') do
@@ -419,8 +421,8 @@ NxTest.test('GHOST-D1 config: kontrakt dosky je NEZAVISLY od kontraktu korpusu')
   # Dva SAMOSTATNE kontrakty — cisla sa nikdy neporovnavaju medzi sebou
   # (doska so schemou 1 je aktualna, hoci korpus je na 4). Kazdy builder cita
   # VYHRADNE svoj marker; zamena by dosky ticho zablokovala alebo prepustila.
-  NxTest.assert_equal(1, NxD1.bb::BOARD_CONFIG_SCHEMA)
-  NxTest.assert(Noxun::Engine::CabinetBuilder::CONFIG_SCHEMA > 1,
+  NxTest.assert(NxD1.bb::BOARD_CONFIG_SCHEMA >= 1)
+  NxTest.assert(Noxun::Engine::CabinetBuilder::CONFIG_SCHEMA > NxD1.bb::BOARD_CONFIG_SCHEMA,
                 'korpus je na vlastnom (vyssom) cisle — porovnavat sa nikdy nesmu')
   bsrc = NxD1.src('noxun_engine', 'core', 'board_builder.rb')
   guard = bsrc[/def newer_config\?\(cfg\).*?\n        end\n/m].to_s

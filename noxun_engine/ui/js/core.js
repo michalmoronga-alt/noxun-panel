@@ -1478,9 +1478,12 @@
   // (setType v loadSelected), vo vkladani ho nastavuju tlacidla cez NXInsert —
   // jedna hodnota pre collectConstruction, defaulty aj modal „Uložiť ako šablónu".
   var cabTypeVal = 'lower';
+  // S1-E: tretia hodnota je SLOT UMYVACKY. Zoznam je zrkadlom Ruby
+  // `CabinetBuilder::TYPES` (guard test `tests/pure/test_s1e_slot.rb`).
+  var CAB_TYPES = ['lower', 'upper', 'dishwasher'];
   function getType(){ return cabTypeVal; }
   function setType(t){
-    cabTypeVal = (t === 'upper') ? 'upper' : 'lower';
+    cabTypeVal = (CAB_TYPES.indexOf(t) >= 0) ? t : 'lower';
     if (typeof syncInsertTypeButtons === 'function') syncInsertTypeButtons();
   }
 
@@ -1555,7 +1558,12 @@
     { id:'bottom_mode', kind:'sel' }, { id:'top_mode', kind:'sel' },
     { id:'back_mode', kind:'sel' }, { id:'back_thickness', kind:'num', dflt:3 },
     { id:'plinth_mode', kind:'sel' }, { id:'plinth_recess', kind:'num' },
-    { id:'rails_orientation', kind:'sel' }, { id:'rails_top_offset', kind:'num' }, { id:'rail_depth', kind:'num' }
+    { id:'rails_orientation', kind:'sel' }, { id:'rails_top_offset', kind:'num' }, { id:'rail_depth', kind:'num' },
+    // S1-E: polia SLOTU UMYVACKY. Idu TOU ISTOU cestou ako ostatne konstrukcne
+    // polia (zber, validacia, auto-apply) — zrkadlo Ruby `Panel::PARAM_KEYS`.
+    // Pri dolnej a hornej skrinke su prazdne a server ich ignoruje.
+    { id:'dw_class', kind:'sel' }, { id:'dw_body_height', kind:'num' },
+    { id:'dw_front_bottom', kind:'num' }, { id:'dw_front_height', kind:'num' }
   ];
   // Zapise hodnoty zdroja (defaulty / sablona / oznaceny korpus) do formulara.
   // Prazdne hodnoty ostavaju nedotknute (ako povodne setNum/setVal), dflt zrkadli povodne "|| 3".

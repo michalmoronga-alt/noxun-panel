@@ -639,6 +639,10 @@
       cancelBoardEdits();
       renderBoardCard(null);
       var t = c.type || 'lower';
+      // S1-E: kostra Inspectora potrebuje TYP skrinky — rail podla neho zhasina
+      // kontexty, ktore typ nema (slot umyvacky zony NEMA). Ide to PRED
+      // `applyVisibility`, aby uz prve prekreslenie raily bolo spravne.
+      if (typeof NXShell !== 'undefined' && NXShell.setCabType) NXShell.setCabType(t);
       if (!holdDraft){ setType(t); writeConstruction(c); }
       applyVisibility(t);
       buildFrontHwBadges(c.hardware || []); // D3: badge kovania PRED renderom riadkov ciel
@@ -723,6 +727,7 @@
       // UI-B3: dopocitane udaje stlpca — pocet dielcov a plocha dosky. Cisla
       // pocita server (ciste citanie snapshotov), JS ich len formatuje.
       setCabInfo(c);
+      renderSlotInfo(c.slot || null); // S1-E: vystupy slotu (server ich pocita)
       renderPartCard(c.part_card || null); // V0.3 karta dielca (ak je vybraty dielec)
       renderHardware(c.hardware || [], c.hardware_overrides || [], c.hardware_set_options || [], c.cabinet_id || ''); // V0.4 kovanie + D1b sety
       // KOV-G2 (D-111): riadok Noh v Zakladnych. AZ ZA `renderHardware` — berie
@@ -908,6 +913,24 @@
       n.setAttribute('aria-disabled', live ? 'false' : 'true');
       n.title = live ? o[1] : 'Označ skrinku v modeli';
     });
+  }
+
+  // S1-E: VYSTUPY SLOTU. Hodnoty pocita SERVER (`cabinet_payload.slot`) — tu
+  // sa LEN zapisuju. `under_ok` je ten isty predikat, akym Kontrola hlasi
+  // `dw_height_fit`, takze Inspector a semafor nikdy netvrdia dve rozne veci.
+  function renderSlotInfo(s){
+    if (!s){
+      ['inf_dw_body', 'inf_dw_top', 'inf_dw_fill', 'inf_dw_under', 'inf_dw_class']
+        .forEach(function(id){ setOut(id, ''); });
+      return;
+    }
+    setOut('inf_dw_body', s.body + ' · ' + s.body_note);
+    setOut('inf_dw_top', s.front_top + ' · ' + s.front_over_text);
+    setOut('inf_dw_fill', s.fill + ' · ručne');
+    setOut('inf_dw_under', s.under_text + ' ' + (s.under_ok ? '✓' : '✗'));
+    var u = el('inf_dw_under');
+    if (u){ u.classList.toggle('ok', !!s.under_ok); u.classList.toggle('bad', !s.under_ok); }
+    setOut('inf_dw_class', s.class_text);
   }
 
   // Identita dosky v idbar (BRD-xxx + nazov; bez warnchipu — dosky warnings zatial nemaju).

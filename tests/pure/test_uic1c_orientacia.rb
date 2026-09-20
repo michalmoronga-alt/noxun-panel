@@ -211,10 +211,13 @@ end
 # GHOST-D1: marker suboru sa posunul na 4 (doskove sablony nesu
 # `config['config_schema']`). Krok 2 -> 3 (orientacia) je tym NEDOTKNUTY —
 # migracia je stupnovana, takze scenare nizsie startuju zo std 2 aj zo std 1.
-NxTest.test('UI-C1c/GHOST-D1: marker suboru sablon je 4 a krok orientacie ostava') do
-  NxTest.assert_equal(4, NxC1c::TS::STD)
+NxTest.test('UI-C1c/GHOST-D1: marker suboru sablon rastie a krok orientacie ostava') do
+  # S1-E posunul marker na 5 (seed slotov umyvacky) — kroky 2->3 a 3->4 su
+  # tym NEDOTKNUTE, migracia je stupnovana.
+  NxTest.assert(NxC1c::TS::STD >= 4)
   NxTest.assert(NxC1c::TS.respond_to?(:fill_orientations), 'krok 2 -> 3 existuje')
   NxTest.assert(NxC1c::TS.respond_to?(:fill_board_schema), 'krok 3 -> 4 existuje')
+  NxTest.assert(NxC1c::TS.respond_to?(:missing_slot_seed), 'krok 4 -> 5 existuje')
 end
 
 # ---------------------------------------------------------------------------

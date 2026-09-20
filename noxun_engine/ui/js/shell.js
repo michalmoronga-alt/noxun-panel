@@ -21,8 +21,23 @@
       mode: 'insert',   // selectionMode zo servera
       identity: '',     // identita vyberu (retazec na porovnanie)
       ctx: 'korpus',    // viewContext (platny len pri mode === 'cab')
-      label: ''         // popis docasnej polozky raily (dielec/doska)
+      label: '',        // popis docasnej polozky raily (dielec/doska)
+      // S1-E: TYP oznaceneho korpusu ('lower' | 'upper' | 'dishwasher').
+      // Rozhoduje, ktore kontexty maju zmysel — slot umyvacky zony NEMA.
+      cabType: 'lower'
     };
+
+    // S1-E: kontexty, ktore dany typ korpusu NEMA (dovod ide do bubliny raily).
+    var NX_CTX_LOCK = {
+      dishwasher: { zony: 'slot umývačky zóny nemá' }
+    };
+
+    // CISTA otazka: ma tento typ korpusu tento kontext? -> '' (ma) alebo DOVOD.
+    function ctxLockedBy(ctx, type){
+      var t = (type === undefined ? state.cabType : type);
+      var m = NX_CTX_LOCK[String(t)];
+      return (m && m[String(ctx)]) || '';
+    }
 
     function normCtx(c){ return CONTEXTS.indexOf(c) >= 0 ? c : 'korpus'; }
     // Kontexty maju zmysel LEN nad oznacenym korpusom — nad navrhom niet zon
@@ -60,6 +75,9 @@
     function setCtx(c){
       if (!ctxEnabled()) return false;
       var next = normCtx(c);
+      // S1-E: kontext, ktory typ korpusu nema, sa NEDA otvorit — autorita je
+      // tento guard, nie CSS ani `aria-disabled` (vzor D-78).
+      if (ctxLockedBy(next)) return false;
       if (next === state.ctx) return false;
       state.ctx = next;
       return true;
@@ -67,7 +85,17 @@
 
     // ZOBRAZENY kontext: mimo oznaceneho korpusu vzdy 'korpus' (pamat sa tym
     // nemeni — po oznaceni skrinky sa aj tak resetuje, lebo identita je nova).
-    function effectiveCtx(){ return ctxEnabled() ? state.ctx : 'korpus'; }
+    function effectiveCtx(){
+      if (!ctxEnabled()) return 'korpus';
+      // S1-E: zapamatany kontext moze byt pri NOVOM type zakazany (Zony ->
+      // slot umyvacky) — vtedy padne na Korpus. Pamat sa tym nemeni.
+      return ctxLockedBy(state.ctx) ? 'korpus' : state.ctx;
+    }
+
+    // S1-E: typ oznaceneho korpusu. Nastavuje ho `NX.loadSelected` z payloadu;
+    // mimo oznaceneho korpusu ostava posledna hodnota (nikto sa jej nepyta).
+    function setCabType(t){ state.cabType = String(t == null ? 'lower' : t); }
+    function cabType(){ return state.cabType; }
 
     // Rozlozenie identity na dokument a objekt — vstup identity guardov
     // asynchronnych callbackov (server ich porovna s tym, co je NAOZAJ vybrate).
@@ -398,6 +426,9 @@
       track: track,
       setCtx: setCtx,
       effectiveCtx: effectiveCtx,
+      ctxLockedBy: ctxLockedBy,
+      setCabType: setCabType,
+      cabType: cabType,
       identityId: identityId,
       identityGuid: identityGuid,
       setLabel: setLabel,
@@ -468,11 +499,15 @@
     NX_RAIL_CTX.forEach(function(o){
       var n = el(o.id);
       if (!n) return;
-      var on = enabled && ctx === o.ctx;
-      var txt = enabled ? o.label : (o.label + ' — ' + reason);
+      // S1-E: kontext moze byt zakazany aj pri OZNACENEJ skrinke — vtedy ma
+      // vlastny dovod (slot umyvacky zony nema).
+      var lock = enabled ? NXShell.ctxLockedBy(o.ctx) : '';
+      var live = enabled && !lock;
+      var on = live && ctx === o.ctx;
+      var txt = live ? o.label : (o.label + ' — ' + (lock || reason));
       n.classList.toggle('on', on);
       n.setAttribute('aria-pressed', on ? 'true' : 'false');
-      n.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+      n.setAttribute('aria-disabled', live ? 'false' : 'true');
       // Codex #168 P2: vysvetlenie patri do VLASTNEJ bubliny raily — natívny
       // `title` sa zámerne NEPOUŽÍVA (bublina sa ukazuje hneď a druhý,
       // oneskorený systémový tooltip by ju len zdvojil). Čítačke to isté

@@ -153,7 +153,38 @@ module Noxun
           plan = manual_plan_keys(params)
           params['hardware_manual_view'] = hardware_manual_view(cfg, plan, params['cabinet_id'])
           params['hardware_manual_owners'] = hardware_manual_owners(cfg, plan)
+          # S1-E: VYSTUPY SLOTU (telo, celo hore, vyplň hore, pod doskou,
+          # trieda). Pocita ich SERVER — panel z nich nic neodvodzuje, len ich
+          # zapisuje do informacneho stlpca. Kluc chyba pri kazdom inom type.
+          params['slot'] = slot_payload(cfg)
           params
+        end
+
+        # --- S1-E: informacny stlpec slotu umyvacky --------------------------
+        #
+        # CISTA projekcia nad ULOZENYM configom (ziadny plan, ziadny zapis).
+        # „Pod doskou" pouziva TEN ISTY predikat ako Kontrola `dw_height_fit`
+        # (nastavena vyska tela vs vyska linky) — Inspector a semafor nesmu
+        # tvrdit dve rozne veci (Astra S1-E FIX E11).
+        def slot_payload(cfg)
+          return nil unless cfg.is_a?(Hash) && cfg['type'].to_s == 'dishwasher'
+
+          dims = Construction.dw_class_dims(cfg['dw_class'].to_i)
+          bh = cfg['dw_body_height'].to_f
+          line = cfg['height'].to_f
+          top = cfg['dw_front_bottom'].to_f + cfg['dw_front_height'].to_f
+          over = top - bh
+          fill = line - top
+          under = bh <= line + 0.01
+          { 'body' => "#{fmt_mm(dims[:body_w])} × #{fmt_mm(bh)} × #{fmt_mm(dims[:body_d])}",
+            'body_note' => "generické #{dims[:label]}",
+            'front_top' => fmt_mm(top),
+            'front_over' => over,
+            'front_over_text' => "#{over.negative? ? '' : '+'}#{fmt_mm(over)} nad telom",
+            'fill' => fmt_mm(fill),
+            'under_ok' => under,
+            'under_text' => "#{fmt_mm(line)} #{under ? '≥' : '<'} #{fmt_mm(bh)}",
+            'class_text' => "#{dims[:label]} · bez modelu" }
         end
 
         # --- KOV-H2: ad-hoc polozky pre UI Inspectora ------------------------
