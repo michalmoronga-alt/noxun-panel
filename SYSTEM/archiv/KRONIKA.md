@@ -17,6 +17,33 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **S1-E0 — MINIMÁLNA VÝŠKA KORPUSU 80 mm (v0.12.9, 20.9.2026, PR #375, zmergovaný 20.9.2026 do main `7d4c567`; záznam nesie docs PR #376).** Spodná hranica výšky klesla z 200
+  na 80 mm na všetkých troch miestach, ktoré ju držia (`CabinetBuilder::MIN`, `ScaleWatch::MIN`, `LIMITS` vo `form.js`) — Michal (20.9., debata S1) vypĺňa priestor nad umývačkou po
+  líniu linky nízkym korpusom na dorovnanie (80–110 mm) a plugin ho dovtedy nepustil. Šírka (200) a hĺbka (150) sa nemenia. **`CONFIG_SCHEMA` 14 → 15** (Codex #374 P1: starší
+  plugin by skrinku 80–199 mm pri prestavbe ticho zväčšil na 200 = zmena výrobnej geometrie; dopredný guard `newer_config?` ju odmietne — pred takou zákazkou aktualizovať obe PC).
+  Zhodu troch čísel stráži guard `tests/pure/test_s1e0_min_vyska.rb`. Výška je celková vrátane sokla, preto panel zastaví nízku skrinku s vysokým soklom červeným poľom ešte pred
+  apply (`cabinetHeightError` vo `form.js`, default sokla zhodný s Ruby), a absorpcia scale klampuje výšku config-aware (sokel + 2× hrúbka + vnútro), aby rebuild po klampe prešiel.
+  Police pri malom vnútre ostávajú odmietnutím z `ZoneTree.validate_shelves!` (charakterizované testom). Testy (kolo 0): 4169 headless + 121 JS sád + in-SU `run_s1e0` (2793 PASS / 0
+  FAIL), 3 mutácie chytené; Codex kolo 1 na #375 = 1×P1 (uzáverové záznamy) + 2×P2 (klamp scale so soklom, default sokla v JS), kolo 2 = 1×P2 (klamp musí prejsť celým `build_plan` — s policou minimum 94 mm),
+  všetko zapracované, delta overená orchestrátorom; finálne testy 4183 headless · 121 JS · in-SU 2799 PASS / 0 FAIL. D-135 vyriešené.
+
+- **S1 DEBATA POLÍ + CROSS OUTSIDE-IN AUDIT ×3 + MOCKUP SPOTREBIČE (19.–20.9.2026, docs PR — bez zmeny kódu, VERSION 0.12.8 ostáva; S1-E0 fix beží samostatne).**
+  **Čo sa spravilo:** nočná debata Michal + Fable nad 13 otázkami k poliam S1 (presahy s referenciou, delenie dverí chladničky = Kontrola + odporúčanie, drez Blanco Legra XL 6 S ako
+  10. model seedu, digestor len evidencia, rúra/mikro lacná kontrola Š + H, sekcia Štúdia s pohľadmi V zákazke · Katalóg, „očakáva" aj bez šablóny, prílohy po jednom, „dodáva
+  zákazník", nosnosť neriešiť) → **Michal rozhodol, že umývačka a chladnička dostanú fyzické telá už vo V1** (mení V1_VIZIA „Mimo V1"): umývačka = **slot ako nový typ skrinky**,
+  chladnička = **kontrolný box niky s pásmami dverí**; Fable kritika (poradie nie „fyzika najprv" pre obe, telá končia pri týchto dvoch, blok narastie na 11–13 PR) prijatá.
+  Potom **cross outside-in audit ×3 s rovnakým promptom** (Codex Astra 8 min · Grok 4.6 xhigh headless s web fetch · Gemini 3.7/3.8 Flash cez Antigravity v 4 malých behoch;
+  syntéza `zdroje/next_sessions/S1_CROSS_AUDIT_2026-09-20.md`, surové packety `..._packety.md`): zhoda 3/3 na D3 slote, proxy kontrakte, `UI.openpanel` = 1 súbor, Winner vzore
+  „nika najprv"; hlavný nález = čelo umývačky 826 > list 720 je viazané na typ uchytenia a hmotnosť (Bosch/Nobilia/Beko/Miele) — **Michal to z praxe odmietol ako kontrolu**
+  („audit to viac skomplikoval ako doplnil"): presah čela hore sa neobmedzuje, typ uchytenia sa nerieši, hmotnosť len evidencia; chladnička: presah ≥ 10 / škára = prax (Bosch KIV38X20
+  výkres má prednosť, voliteľné pole); drez min šírka skrinky (ETIM EC011315). Michalove screeny slot **zjednodušili**: 7 vstupov (trieda, šírka, výška linky, hĺbka, výška tela,
+  sokel = čelo od podlahy, výška čela), jediný dielec čelo, telo = referencia + základňa 200, **výplň hore ručne** → fix **S1-E0 min výška korpusu 200 → 80** (D-135).
+  **Mockup** `zdroje/ui20/mockup_spotrebice_s1.html` (sekcia Štúdia V zákazke · Katalóg + modal, riadok Spotrebič v Inspectore so 4 stavmi, slot umývačky) **schválený Michalom
+  20.9.** („mock je pass"). PLAN dostal **blok 5 SPOTREBIČE S1 s packages** (E0 → A1 → A2 → E → B → F → C → D, audit-povinné A1/E/B/F/C, stop pravidlá nočného behu), STAV a V1_VIZIA
+  bod 5 + Mimo V1 prepísané. **Pasce nástrojov:** Grok headless potrebuje `GROK_WEB_FETCH=1`, `--no-plan`, `--permission-mode dontAsk --allow "WebFetch(*)"` a tools allowlist bez
+  shellu (`bypassPermissions` blokuje aj Claude Code classifier); Gemini 3.8 Flash raz zdegeneroval (109 kB nezmyslov) → 3.7 Flash; headless auto-deny `command` zhodí beh bez výstupu.
+  Kvóty: Codex weekly +1 % za audit; Claude session 64 % o 03:15. **Testy:** headless docs guardy (STAV ≤ 80 riadkov / 12 kB, riadky ≤ 400, encoding).
+
 - **S1 PREDÚLOHA — TECHNICKÉ LISTY SPOTREBIČOV OVERENÉ PROTI VÝROBCOM + PRAX (19.9.2026, PR #373, docs — bez zmeny kódu, VERSION 0.12.8 ostáva).**
   **Čo sa spravilo:** rozmery z rešerše Antigravity (6.9., `zdroje/next_sessions/SPOTREBICE_TECHLISTY_2026-09.md` §3) sa porovnali riadok po riadku so **skutočnými PDF listami
   výrobcov** (Whirlpool, Bosch, Beko — PDF otvorené a prečítané, nie tvrdenie Gemini) a Michal prešiel všetky kategórie z praxe cez interaktívnu stránku (súkromný artefakt,

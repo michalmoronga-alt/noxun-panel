@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Noxun Engine — mockup SPOTREBIČE S1 · sekcia Štúdia · riadok Spotrebič · slot umývačky</title>
+<!--
+  Blok SPOTREBIČE S1 — mockup na schválenie (20.9.2026, po cross audite ×3).
+  Podklad: SYSTEM/zdroje/next_sessions/V1_DEBATA_2026-09-20_SPOTREBICE_POLIA.md (rozhodnutia §1, §1b)
+           + S1_CROSS_AUDIT_2026-09-20.md (reconcile §3).
+  Tri javiská: (1) Štúdio → sekcia SPOTREBIČE (pohľady V zákazke · Katalóg + modal Nový spotrebič)
+               (2) Inspector → Korpus → Základné s riadkom SPOTREBIČ (4 stavy, prepínač v mocku)
+               (3) Inspector → SLOT UMÝVAČKY (nový typ skrinky) — Základné + náhľad
+  Tokeny = kópia :root z panel.css. Mockup, nie živý plugin.
+  STAV: SCHVÁLENÝ Michalom 20.9.2026 („za mňa sedí, mock je pass") — záväzná vizuálna autorita dávok S1-A2 / S1-B / S1-E / S1-F;
+  slot umývačky zjednodušený podľa Michalových screenov (7 vstupov, len čelo, výplň hore ručne, S1-E0 odomkne min výšku korpusu 80).
+-->
+<style>
+  :root{
+    --nx-bg:#f4f5f7; --nx-surface:#fff; --nx-surface-sunken:#eceff1; --nx-surface-readonly:#f4f6f8;
+    --nx-surface-preview:#fafcff; --nx-surface-th:#f5f7f8; --nx-part-bg:#f2fafb;
+    --nx-ink:#263238; --nx-ink-title:#1b3a4b; --nx-ink-strong:#37474f; --nx-ink-label:#455a64;
+    --nx-ink-muted:#607d8b; --nx-ink-soft:#78909c; --nx-ink-faint:#90a4ae;
+    --nx-border:#cfd8dc; --nx-border-strong:#b0bec5; --nx-border-soft:#eceff1;
+    --nx-action:#2e7d32; --nx-action-hover:#1b5e20; --nx-on-accent:#fff;
+    --nx-select:#107787; --nx-select-strong:#0B5661; --nx-select-accent:#0e6b7a;
+    --nx-select-bg:#e0f2f4; --nx-select-bg-soft:#f0f9fa; --nx-select-bg-hover:#d6eef1;
+    --nx-part-border:#7fc4cf;
+    --nx-ok-bg:#e8f5e9; --nx-ok-fg:#1b5e20; --nx-ok-border:#c8e6c9;
+    --nx-err-bg:#fdecea; --nx-err-fg:#b71c1c; --nx-err-border:#f5c6cb;
+    --nx-danger:#c62828; --nx-danger-bg:#fbe9e7; --nx-danger-border:#ffccbc;
+    --nx-warn:#ffb74d; --nx-warn-bg:#fff8ef; --nx-warn-bg-soft:#fff3e0; --nx-warn-fg:#e65100;
+    --nx-warnchip-fg:#b26a00; --nx-warnchip-border:#ffcc80;
+    --nx-warnrow-fg:#7a5000; --nx-warnrow-border:#ffe0b2;
+    --nx-ghost-hover:#e0e4e7; --nx-scrim:rgba(38,50,56,.45);
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{font-family:"Segoe UI",Tahoma,sans-serif;font-size:13px;color:var(--nx-ink);background:#e6e9ec;padding:0 0 60px}
+  button,input,select{font-family:inherit;font-size:inherit}
+  .ic{width:15px;height:15px;flex:0 0 auto;vertical-align:middle;fill:none;stroke:currentColor;
+      stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+  .mockbar{display:flex;align-items:center;gap:12px;padding:9px 16px;background:#2b3a42;color:#dfe7ec}
+  .mockbar .mb-title{font-weight:600;font-size:13px}
+  .mockbar .mb-ver{font-size:11px;color:#8ea3ae}
+  .notestrip{display:flex;align-items:center;gap:8px;padding:6px 16px;font-size:11.5px;
+             background:var(--nx-warn-bg-soft);color:var(--nx-warnchip-fg);border-bottom:1px solid var(--nx-warnchip-border)}
+  .stagewrap{padding:16px 16px 0;display:flex;gap:18px;justify-content:center;align-items:flex-start;flex-wrap:wrap}
+  .stage{width:470px;flex:0 0 470px}
+  .stage.wide{width:1000px;flex:0 0 1000px}
+  .side{width:420px;flex:0 1 420px}
+  .win{background:var(--nx-surface);border:1px solid #b6c0c6;border-radius:9px;box-shadow:0 12px 34px rgba(20,30,45,.16)}
+  .winhead{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#dfe4e7;border-radius:9px 9px 0 0;
+           border-bottom:1px solid var(--nx-border);font-size:12px;font-weight:600;color:var(--nx-ink-strong)}
+  .winhead .wdots{display:flex;gap:4px}
+  .winhead .wdots i{width:9px;height:9px;border-radius:50%;background:#bcc6cc;display:block}
+  .winhead .wsize{margin-left:auto;font-weight:400;font-size:11px;color:var(--nx-ink-faint)}
+  .mocknote{background:#fffdf3;border:1px dashed #d8cfa8;border-radius:8px;padding:10px 13px;font-size:12px;color:#6b5d1f;line-height:1.55;margin-bottom:12px}
+  .mocknote b{color:#5b4f18}
+  .mocknote h4{margin:0 0 4px;font-size:12.5px;color:#5b4f18}
+  .mocknote ol,.mocknote ul{margin:4px 0 0;padding-left:18px}
+  .mocknote li{margin:3px 0}
+  .mocknote code{font-family:Consolas,monospace;font-size:11px;background:#f3eed8;padding:0 3px;border-radius:3px}
+  .mockctl{display:flex;align-items:center;gap:6px;font-size:11px;color:#6b5d1f;background:#fffdf3;border:1px dashed #d8cfa8;border-radius:8px;padding:6px 10px;margin-bottom:8px}
+  .mockctl button{font-size:11px;padding:3px 8px;border:1px solid #d8cfa8;background:#fff;border-radius:6px;cursor:pointer;color:#5b4f18}
+  .mockctl button.on{background:#5b4f18;color:#fff;border-color:#5b4f18}
+  .h4{font-size:12px;font-weight:700;color:var(--nx-ink-strong);margin:0 0 6px}
+
+  /* ===== ŠTÚDIO kostra ===== */
+  .studio{display:flex;min-height:640px;border-radius:0 0 9px 9px;overflow:hidden}
+  .snav{flex:0 0 200px;background:var(--nx-bg);border-right:1px solid var(--nx-border);padding:8px 6px}
+  .sgrp{font-size:10px;font-weight:700;letter-spacing:.6px;color:var(--nx-ink-faint);padding:8px 8px 3px}
+  .navitem{display:flex;width:100%;align-items:center;gap:8px;padding:6px 8px;margin:1px 0;border:0;background:none;
+           border-radius:6px;color:var(--nx-ink);cursor:pointer;text-align:left}
+  .navitem:hover{background:var(--nx-select-bg-soft)}
+  .navitem.on{background:var(--nx-select-bg);color:var(--nx-select);font-weight:600;box-shadow:inset 2px 0 0 var(--nx-select)}
+  .navitem .ic{width:15px;height:15px;color:var(--nx-ink-muted);flex:0 0 15px}
+  .navitem.on .ic{color:var(--nx-select)}
+  .navitem span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .navitem[aria-disabled="true"]{color:var(--nx-ink-faint);cursor:not-allowed}
+  .nbadge{font-size:9.5px;font-weight:700;padding:0 5px;border-radius:9px;background:var(--nx-warn-bg-soft);color:var(--nx-warnchip-fg);border:1px solid var(--nx-warnchip-border)}
+  .nbadge.red{background:var(--nx-err-bg);color:var(--nx-err-fg);border-color:var(--nx-err-border)}
+  .sbody{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--nx-surface)}
+  .sechead{display:flex;align-items:baseline;gap:8px;padding:9px 12px;border-bottom:1px solid var(--nx-border)}
+  .sechead h2{font-size:14px;margin:0;color:var(--nx-ink-title);font-weight:700}
+  .sechead .sechint{font-size:11px;color:var(--nx-ink-soft)}
+  .sechead .secmodel{margin-left:auto;font-size:11px;color:var(--nx-ink-faint);white-space:nowrap}
+  .sectools{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--nx-border-soft);flex-wrap:wrap}
+  .sectools .spacer{flex:1}
+  .sectools .sechint{font-size:11px;color:var(--nx-ink-soft)}
+  .secscroll{flex:1;overflow:auto;padding:10px 12px 24px}
+  .bomviews{display:flex;border:1px solid var(--nx-border-strong);border-radius:6px;overflow:hidden}
+  .bomvw{border:0;background:var(--nx-surface);padding:5px 11px;cursor:pointer;color:var(--nx-ink-muted)}
+  .bomvw+.bomvw{border-left:1px solid var(--nx-border-soft)}
+  .bomvw.on{background:var(--nx-select);color:var(--nx-on-accent);font-weight:600}
+  .primary{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:6px;border:1px solid var(--nx-action);
+           background:var(--nx-action);color:var(--nx-on-accent);font-weight:600;cursor:pointer}
+  .primary:hover{background:var(--nx-action-hover)}
+  .primary .ic,.ghostbtn .ic{width:14px;height:14px}
+  .ghostbtn{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border-radius:6px;border:1px solid var(--nx-border-strong);
+            background:var(--nx-surface);color:var(--nx-ink-strong);cursor:pointer}
+  .ghostbtn:hover{background:var(--nx-ghost-hover)}
+  .ghostbtn.danger{color:var(--nx-danger);border-color:var(--nx-danger-border);background:var(--nx-danger-bg)}
+  .searchbox{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--nx-border-strong);border-radius:6px;padding:0 6px;background:var(--nx-surface);color:var(--nx-ink-faint)}
+  .searchbox input{border:0;outline:0;padding:5px 2px;width:190px;background:none;color:var(--nx-ink)}
+  .sectools select{padding:5px 6px;border:1px solid var(--nx-border-strong);border-radius:6px;background:var(--nx-surface)}
+
+  /* tabuľka V ZÁKAZKE */
+  table.stbl{width:100%;border-collapse:collapse;font-size:12px}
+  .stbl th{text-align:left;font-size:10.5px;font-weight:600;color:var(--nx-ink-label);background:var(--nx-surface-th);padding:6px 8px;border-bottom:1px solid var(--nx-border)}
+  .stbl td{padding:6px 8px;border-bottom:1px solid var(--nx-border-soft);vertical-align:middle}
+  .stbl tr:hover td{background:var(--nx-select-bg-soft)}
+  .stbl .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .stbl .cat{display:inline-flex;align-items:center;gap:5px;color:var(--nx-ink-muted);white-space:nowrap}
+  .stbl .model b{display:block;color:var(--nx-ink-strong)}
+  .stbl .model small{color:var(--nx-ink-soft);font-size:10.5px}
+  .stbl .owner{white-space:nowrap}
+  .stbl .owner .oid{font-weight:700;color:var(--nx-select)}
+  .stbl .owner .odesc{color:var(--nx-ink-soft);font-size:10.5px;display:block}
+  .stbl .rowact{display:inline-flex;gap:2px;opacity:.55}
+  .stbl tr:hover .rowact{opacity:1}
+  .rowact button{border:0;background:none;color:var(--nx-ink-muted);cursor:pointer;padding:2px;border-radius:6px;display:inline-flex}
+  .rowact button:hover{background:var(--nx-select-bg);color:var(--nx-select)}
+  .chip{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:600;border-radius:6px;padding:1px 7px;white-space:nowrap}
+  .chip .ic{width:11px;height:11px}
+  .chip.ok{background:var(--nx-ok-bg);color:var(--nx-ok-fg);border:1px solid var(--nx-ok-border)}
+  .chip.warn{background:var(--nx-warn-bg-soft);color:var(--nx-warnchip-fg);border:1px solid var(--nx-warnchip-border)}
+  .chip.info{background:var(--nx-surface-sunken);color:var(--nx-ink-muted);border:1px solid var(--nx-border)}
+  .chip.cust{background:var(--nx-select-bg-soft);color:var(--nx-select);border:1px solid var(--nx-part-border)}
+  .totrow{display:flex;align-items:center;gap:8px;padding:8px 8px;margin-top:8px;border-top:2px solid var(--nx-border);font-size:12px}
+  .totrow .spacer{flex:1}
+  .linkbtn{border:0;background:none;color:var(--nx-select);cursor:pointer;padding:0;font:inherit;text-decoration:underline;display:inline-flex;align-items:center;gap:3px}
+  .linkbtn .ic{width:12px;height:12px}
+  .hint{font-size:11px;color:var(--nx-ink-faint);line-height:1.45}
+
+  /* KATALÓG: strom + karta */
+  .catwrap{display:flex;gap:12px;align-items:flex-start}
+  .cattree{flex:0 0 220px;border:1px solid var(--nx-border);border-radius:8px;background:var(--nx-surface);overflow:hidden}
+  .catgrp{display:flex;align-items:center;gap:6px;padding:6px 9px;font-size:12px;font-weight:600;color:var(--nx-ink-strong);background:var(--nx-surface-sunken);border-bottom:1px solid var(--nx-border-soft);cursor:pointer}
+  .catgrp .cnt{margin-left:auto;font-weight:400;font-size:11px;color:var(--nx-ink-soft)}
+  .catgrp .ic{width:13px;height:13px;color:var(--nx-ink-muted)}
+  .catitem{display:block;width:100%;text-align:left;border:0;background:none;padding:5px 9px 5px 26px;font-size:12px;cursor:pointer;color:var(--nx-ink);border-bottom:1px solid var(--nx-border-soft)}
+  .catitem small{display:block;font-size:10.5px;color:var(--nx-ink-soft)}
+  .catitem:hover{background:var(--nx-select-bg-soft)}
+  .catitem.on{background:var(--nx-select-bg);color:var(--nx-select);font-weight:600}
+  .catitem.tomb{color:var(--nx-ink-faint);font-style:italic}
+  .catcard{flex:1;min-width:0;border:1px solid var(--nx-border);border-radius:8px;background:var(--nx-surface)}
+  .cchead{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--nx-border);flex-wrap:wrap}
+  .cchead h3{margin:0;font-size:13.5px;color:var(--nx-ink-title)}
+  .cchead .man{font-size:11px;color:var(--nx-ink-soft)}
+  .cchead .acts{margin-left:auto;display:flex;gap:5px}
+  .badge{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.3px;padding:1px 6px;border-radius:9px;background:var(--nx-select-bg);color:var(--nx-select)}
+  .badge.seed{background:var(--nx-surface-sunken);color:var(--nx-ink-muted);border:1px dashed var(--nx-border-strong)}
+  .ccbody{padding:10px 12px;display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+  .blk{border:1px solid var(--nx-border-soft);border-radius:8px;padding:7px 10px 8px;background:var(--nx-surface)}
+  .blk h5{margin:0 0 5px;font-size:11px;font-weight:600;color:var(--nx-ink-label);display:flex;align-items:center;gap:6px}
+  .blk h5 .ic{width:12px;height:12px;color:var(--nx-ink-muted)}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:12px}
+  .kv span{color:var(--nx-ink-soft)}
+  .kv b{font-weight:600;color:var(--nx-ink-strong);font-variant-numeric:tabular-nums}
+  .kv i{color:var(--nx-ink-faint);font-style:italic}
+  .blk.full{grid-column:1/-1}
+  .links a{color:var(--nx-select);text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin:2px 10px 2px 0;font-size:12px}
+  .links a .ic{width:12px;height:12px}
+  .files{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start}
+  .file{width:86px;border:1px solid var(--nx-border);border-radius:8px;overflow:hidden;background:var(--nx-surface-sunken);text-align:center;font-size:10.5px;color:var(--nx-ink-muted);cursor:pointer}
+  .file .thumb{height:62px;display:flex;align-items:center;justify-content:center;background:var(--nx-surface-preview);color:var(--nx-ink-faint)}
+  .file .thumb .ic{width:26px;height:26px;stroke-width:1.5}
+  .file .fn{padding:3px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--nx-ink)}
+  .file.main{border-color:var(--nx-select);box-shadow:0 0 0 2px var(--nx-select-bg)}
+  .file.add{border-style:dashed;background:var(--nx-surface);color:var(--nx-select)}
+  .file.add .thumb{color:var(--nx-select)}
+  .ftag{display:inline-block;font-size:9px;font-weight:700;padding:0 4px;border-radius:9px;background:var(--nx-select-bg);color:var(--nx-select);margin-bottom:2px}
+
+  /* ===== Modal D-15 ===== */
+  .scrim{position:absolute;inset:0;background:var(--nx-scrim);display:none;align-items:flex-start;justify-content:center;padding-top:28px;z-index:40;border-radius:0 0 9px 9px}
+  .scrim.on{display:flex}
+  .nxmodal-card{width:560px;max-height:560px;display:flex;flex-direction:column;background:var(--nx-surface);border:1px solid var(--nx-border);border-radius:8px;box-shadow:0 14px 40px rgba(0,0,0,.25)}
+  .mhead{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--nx-border)}
+  .mhead h3{margin:0;font-size:13.5px;color:var(--nx-ink-title)}
+  .mhead .msub{font-size:11px;color:var(--nx-ink-soft)}
+  .mhead .mx{margin-left:auto;border:0;background:none;color:var(--nx-ink-faint);cursor:pointer}
+  .mbody{padding:10px 14px;overflow:auto}
+  .mgrp{font-size:11px;font-weight:600;color:var(--nx-ink-label);margin:10px 0 4px;padding-top:6px;border-top:1px solid var(--nx-border-soft);display:flex;align-items:center;gap:6px}
+  .mgrp:first-child{border-top:0;margin-top:0;padding-top:0}
+  .mrow{display:grid;grid-template-columns:120px 1fr;gap:4px 8px;align-items:center;margin:3px 0}
+  .mrow label{font-size:12px;color:var(--nx-ink-label)}
+  .mrow input,.mrow select{padding:5px 7px;border:1px solid var(--nx-border-strong);border-radius:6px;background:var(--nx-surface);width:100%}
+  .mrow .dims{display:flex;gap:5px;align-items:center}
+  .mrow .dims input{width:64px;text-align:right}
+  .mrow .dims span{font-size:11px;color:var(--nx-ink-faint)}
+  .mfoot{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--nx-border)}
+  .mfoot .spacer{flex:1}
+
+  /* ===== Inspector kostra ===== */
+  .panel{background:var(--nx-bg);min-height:560px;position:relative;display:flex;border-radius:0 0 9px 9px}
+  .crail{flex:0 0 44px;background:var(--nx-bg);border-right:1px solid var(--nx-border);padding:6px 0;display:flex;flex-direction:column;align-items:center;gap:4px}
+  .railbtn{width:34px;height:32px;border-radius:6px;border:1px solid transparent;background:none;color:var(--nx-ink-muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+  .railbtn.on{background:var(--nx-select-bg);color:var(--nx-select);border-color:var(--nx-select);box-shadow:inset 2px 0 0 var(--nx-select)}
+  .railbtn .ic{width:17px;height:17px}
+  .railbtn[aria-disabled="true"]{opacity:.4;cursor:not-allowed}
+  .cmain{flex:1;min-width:0;display:flex;flex-direction:column}
+  .chdr{display:flex;align-items:center;gap:7px;padding:7px 10px;background:var(--nx-bg);border-bottom:1px solid var(--nx-border)}
+  .cid{font-weight:700;font-size:14px;color:var(--nx-select)}
+  .cname{color:var(--nx-ink-strong);font-size:12px}
+  .tbadge{margin-left:auto;font-size:9.5px;font-weight:700;padding:1px 7px;border-radius:9px;background:var(--nx-surface-sunken);color:var(--nx-ink-muted);border:1px solid var(--nx-border)}
+  .cbody{flex:1;padding:9px 10px 10px}
+  details.grp{border:1px solid var(--nx-border);border-radius:6px;background:var(--nx-surface);margin-bottom:8px;position:relative}
+  details.grp>summary{list-style:none;display:flex;align-items:center;gap:7px;padding:6px 9px;cursor:pointer;background:var(--nx-surface-sunken);border-radius:6px;font-weight:600;font-size:12px;color:var(--nx-ink-strong);user-select:none}
+  details.grp[open]>summary{border-radius:6px 6px 0 0;border-bottom:1px solid var(--nx-border-soft)}
+  details.grp>summary::-webkit-details-marker{display:none}
+  details.grp>summary .gic{width:13px;height:13px;color:var(--nx-ink-faint)}
+  details.grp[open]>summary .gic{color:var(--nx-select)}
+  .gtools{display:flex;align-items:center;gap:3px;margin-left:auto}
+  .gtools .meta{font-size:11px;font-weight:400;color:var(--nx-ink-soft);white-space:nowrap;margin-right:4px;font-variant-numeric:tabular-nums}
+  .gbody{padding:6px 9px 9px}
+  .pvbox{background:var(--nx-surface-preview);border-radius:0 0 6px 6px}
+  .pvbox svg{width:100%;height:190px;display:block}
+  .tip{position:relative;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:var(--nx-ink-faint);cursor:help;border:0;background:none;padding:0}
+  .tip:hover,.tip:focus{color:var(--nx-select);outline:none}
+  .tip .ic{width:13px;height:13px}
+  .tip::after{content:attr(data-tip);position:absolute;top:calc(100% + 6px);right:0;width:260px;background:#263238;color:#eceff1;font-size:11px;font-weight:400;line-height:1.45;padding:7px 9px;border-radius:6px;display:none;z-index:60;white-space:normal;text-align:left;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+  .tip:hover::after,.tip:focus::after{display:block}
+  .basicgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px}
+  .rowc{display:flex;align-items:center;gap:5px;min-height:26px}
+  .rowc label{display:inline-flex;align-items:center;gap:4px;width:72px;font-size:12px;color:var(--nx-ink-label);flex:0 0 72px}
+  .rowc label .ic{width:13px;height:13px;color:var(--nx-ink-muted)}
+  .rowc input,.rowc select{width:70px;padding:3px 6px;border:1px solid var(--nx-border-strong);border-radius:6px;text-align:right;background:var(--nx-surface)}
+  .rowc select{text-align:left;width:auto;min-width:96px}
+  .rowc .unit{font-size:10.5px;color:var(--nx-ink-faint)}
+  .infocol{display:flex;flex-direction:column;gap:2px;padding-top:2px}
+  .inforow{display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:3px 6px;border-radius:6px;color:var(--nx-ink-label)}
+  .inforow b{font-weight:600;color:var(--nx-ink-strong);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .inforow b.ok{color:var(--nx-ok-fg)}
+  .inforow b.warn{color:var(--nx-warnchip-fg)}
+  .inforow.click{cursor:pointer;border:0;background:none;text-align:left;width:100%;font:inherit}
+  .inforow.click:hover{background:var(--nx-select-bg-soft)}
+  /* riadok SPOTREBIČ — cez oba stĺpce, vzor riadku Nohy */
+  /* riadok SPOTREBIČ: riadok 1 = ikona · „Spotrebič" · výber modelu (1fr) · preklik do Štúdia;
+     riadok 2 = verdikt servera drobným písmom cez šírku (model sa v texte neopakuje — je v selecte) */
+  .aprow{grid-column:1/-1;display:grid;grid-template-columns:auto auto 1fr auto;grid-template-rows:auto auto;align-items:center;column-gap:6px;row-gap:2px;margin-top:6px;padding:5px 7px;border:1px solid var(--nx-border-soft);border-radius:6px;background:var(--nx-surface)}
+  .aprow .ic{width:14px;height:14px;color:var(--nx-ink-muted)}
+  .aprow .aplbl{font-size:12px;color:var(--nx-ink-label);white-space:nowrap}
+  .aprow .apsel{display:flex;align-items:center;gap:4px;min-width:0}
+  .aprow select{flex:1;min-width:0;padding:3px 5px;border:1px solid var(--nx-border-strong);border-radius:6px;background:var(--nx-surface)}
+  .aprow .aptxt{grid-column:2/-1;grid-row:2;min-width:0;font-size:11px;color:var(--nx-ink-strong);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .aprow .aptxt b{font-weight:600}
+  .aprow .apsub{display:block;font-size:10.5px;color:var(--nx-ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .aprow.warn{border-color:var(--nx-warnchip-border);background:var(--nx-warn-bg)}
+  .aprow.warn .ic{color:var(--nx-warnchip-fg)}
+  .aprow.warn .aptxt{color:var(--nx-warnrow-fg)}
+  .aprow.ok .ic{color:var(--nx-ok-fg)}
+  .ibtn{display:inline-flex;align-items:center;justify-content:center;gap:4px;height:22px;min-width:22px;border-radius:6px;border:1px solid transparent;background:none;color:var(--nx-ink-muted);cursor:pointer;padding:0 3px}
+  .ibtn:hover{background:var(--nx-select-bg-soft);color:var(--nx-select);border-color:var(--nx-border)}
+  .ibtn .ic{width:14px;height:14px}
+  .ctxnote{font-size:11px;color:var(--nx-ink-soft);background:var(--nx-surface);border:1px solid var(--nx-border-soft);border-radius:6px;padding:4px 8px;margin-bottom:8px}
+  .ctxnote b{color:var(--nx-select)}
+  .segline{display:flex;gap:4px;align-items:center}
+  .segline button{padding:2px 8px;border:1px solid var(--nx-border-strong);background:var(--nx-surface);border-radius:6px;cursor:pointer;font-size:11px}
+  .segline button.on{background:var(--nx-select);color:#fff;border-color:var(--nx-select)}
+</style>
+</head>
+<body>
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-cabinet" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="1"/><path d="M4 15h16M12 3v12"/></symbol>
+  <symbol id="i-zones" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 12h18M12 3v18"/></symbol>
+  <symbol id="i-front" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="1" stroke-dasharray="3 2"/></symbol>
+  <symbol id="i-hammer" viewBox="0 0 24 24"><path d="m15 12-8.5 8.5a2.12 2.12 0 1 1-3-3L12 9"/><path d="M17.64 15 22 10.64"/><path d="m20.91 11.7-1.25-1.25c-.6-.6-.93-1.4-.93-2.25v-.86L16.01 4.6a5.56 5.56 0 0 0-3.94-1.64H9l.92.82A6.18 6.18 0 0 1 12 8.4v1.56l2 2h2.47l2.26 1.91"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+  <symbol id="i-clipboard-check" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></symbol>
+  <symbol id="i-cart" viewBox="0 0 24 24"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></symbol>
+  <symbol id="i-euro" viewBox="0 0 24 24"><path d="M4 10h12M4 14h9"/><path d="M19 6a7.7 7.7 0 0 0-5.2-2A7.9 7.9 0 0 0 6 12c0 4.4 3.5 8 7.8 8 2 0 3.8-.8 5.2-2"/></symbol>
+  <symbol id="i-file-text" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8M16 13H8M16 17H8"/></symbol>
+  <symbol id="i-scissors" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 12.5-9.17 4.17a2 2 0 0 1-1.66 0L2 12.5"/><path d="m22 17.5-9.17 4.17a2 2 0 0 1-1.66 0L2 17.5"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></symbol>
+  <symbol id="i-truck" viewBox="0 0 24 24"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+  <symbol id="i-appliance" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M5 10h14"/><path d="M15 5v2"/><path d="M15 13v3"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></symbol>
+  <symbol id="i-external-link" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.83 0L6 21"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></symbol>
+  <symbol id="i-arr-h" viewBox="0 0 24 24"><path d="M3 12h18"/><path d="m7 8-4 4 4 4"/><path d="m17 8 4 4-4 4"/></symbol>
+  <symbol id="i-arr-v" viewBox="0 0 24 24"><path d="M12 3v18"/><path d="m8 7 4-4 4 4"/><path d="m8 17 4 4 4-4"/></symbol>
+  <symbol id="i-arr-d" viewBox="0 0 24 24"><path d="m5 19 14-14"/><path d="M9 5h10v10"/></symbol>
+  <symbol id="i-plinth" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="1"/><path d="M6 16v4M18 16v4"/></symbol>
+  <symbol id="i-slab" viewBox="0 0 24 24"><rect x="3" y="9" width="18" height="6" rx="1"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></symbol>
+  <symbol id="i-door" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="1"/><path d="M8 3v18"/><path d="M16 11v2"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+  <symbol id="i-more-horizontal" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+  <symbol id="i-refresh-cw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+</svg>
+
+<div class="mockbar">
+  <span class="mb-title">Noxun Engine — mockup SPOTREBIČE S1</span>
+  <span class="mb-ver">sekcia Štúdia · riadok Spotrebič v Inspectore · slot umývačky · SCHVÁLENÝ 20.9.2026 · klikateľné</span>
+</div>
+<div class="notestrip">
+  <svg class="ic" viewBox="0 0 24 24"><use href="#i-alert"/></svg>
+  Mockup, nie živý plugin. Klikaj: pohľady „V zákazke | Katalóg" · položky stromu katalógu · „Nový spotrebič" otvorí modal · v Inspectore prepínač stavov riadku Spotrebič (mock ovládač) · ikony ? = tooltip.
+</div>
+
+<!-- ============================ JAVISKO 1 · ŠTÚDIO ============================ -->
+<div class="stagewrap">
+  <div class="stage wide">
+    <div class="win">
+      <div class="winhead"><span class="wdots"><i></i><i></i><i></i></span> Noxun Štúdio — sekcia Spotrebiče <span class="wsize">1076 × 680</span></div>
+      <div class="studio" style="position:relative">
+        <nav class="snav">
+          <div class="sgrp">ZÁKAZKA</div>
+          <button class="navitem"><svg class="ic"><use href="#i-list"/></svg><span>Kusovník</span></button>
+          <button class="navitem"><svg class="ic"><use href="#i-clipboard-check"/></svg><span>Kontrola</span><span class="nbadge">2</span></button>
+          <button class="navitem"><svg class="ic"><use href="#i-cart"/></svg><span>Nákup kovania</span></button>
+          <button class="navitem"><svg class="ic"><use href="#i-euro"/></svg><span>Rozpočet</span></button>
+          <button class="navitem"><svg class="ic"><use href="#i-file-text"/></svg><span>Cenová ponuka</span></button>
+          <button class="navitem" aria-disabled="true"><svg class="ic"><use href="#i-scissors"/></svg><span>Nárezový plán</span></button>
+          <div class="sgrp">KATALÓGY</div>
+          <button class="navitem"><svg class="ic"><use href="#i-layers"/></svg><span>Materiály</span></button>
+          <button class="navitem"><svg class="ic"><use href="#i-hammer"/></svg><span>Kovanie</span></button>
+          <button class="navitem on"><svg class="ic"><use href="#i-appliance"/></svg><span>Spotrebiče</span><span class="nbadge">1</span></button>
+          <button class="navitem"><svg class="ic"><use href="#i-settings"/></svg><span>Pravidlá</span></button>
+          <button class="navitem"><svg class="ic"><use href="#i-star"/></svg><span>Šablóny</span></button>
+          <div class="sgrp">NASTAVENIA</div>
+          <button class="navitem"><svg class="ic"><use href="#i-truck"/></svg><span>Dodávateľ / Demos</span></button>
+          <button class="navitem"><svg class="ic"><use href="#i-euro"/></svg><span>Nastavenia rozpočtu</span></button>
+          <button class="navitem"><svg class="ic"><use href="#i-info"/></svg><span>O plugine</span></button>
+        </nav>
+        <div class="sbody">
+          <div class="sechead"><h2>Spotrebiče</h2><span class="sechint" id="sechint">spotrebiče tejto zákazky — kde patria, čo hovorí list, čo hovorí kontrola</span><span class="secmodel">Bella_kuchyna.skp</span></div>
+          <div class="sectools" id="sectools"></div>
+          <div class="secscroll" id="secbody"></div>
+        </div>
+        <!-- D-15 modal: Nový spotrebič (katalóg) -->
+        <div class="scrim" id="scrim" onclick="if(event.target===this)closeModal()">
+          <div class="nxmodal-card" role="dialog" aria-modal="true">
+            <div class="mhead"><h3>Nový spotrebič</h3><span class="msub">katalóg · bez ceny (cena patrí zákazke)</span><button class="mx" onclick="closeModal()"><svg class="ic"><use href="#i-x"/></svg></button></div>
+            <div class="mbody">
+              <div class="mgrp">Identita</div>
+              <div class="mrow"><label>Kategória</label><select id="mcat" onchange="modalCat()"><option value="fridge">Chladnička vstavaná</option><option value="oven">Rúra</option><option value="microwave">Mikrovlnka</option><option value="dishwasher">Umývačka</option><option value="hob">Varná doska</option><option value="sink">Drez</option><option value="hood">Digestor</option><option value="other">Iné (batéria, dávkovač…)</option></select></div>
+              <div class="mrow"><label>Výrobca</label><input value="Beko"></div>
+              <div class="mrow"><label>Model / názov</label><input value="Beko Beyond BCNA306E5ZSN" placeholder="ako v obchode"></div>
+              <div id="mfields"></div>
+              <div class="mgrp">Odkazy a listy</div>
+              <div class="mrow"><label>Obchod</label><input value="https://www.nay.sk/…" placeholder="https://…"></div>
+              <div class="mrow"><label></label><button class="linkbtn"><svg class="ic"><use href="#i-plus"/></svg> ďalší odkaz na obchod</button></div>
+              <div class="mrow"><label>Technický list</label><input value="https://www.beko.com/…/Installation-Diagram.pdf" placeholder="https://… (URL listu)"></div>
+              <div class="mrow"><label></label><button class="linkbtn"><svg class="ic"><use href="#i-plus"/></svg> ďalší list</button></div>
+              <div class="mrow"><label>Poznámka</label><input placeholder="vetranie 200 cm² dole aj hore, zadná stena skrinky otvorená…"></div>
+              <div class="hint">Prílohy (súbory listov, obrázky, náhľad) sa pridávajú až v karte uloženého záznamu — po jednom cez systémový dialóg. Neznáme pole nechaj prázdne, nikdy sa nedoplní odhadom.</div>
+            </div>
+            <div class="mfoot"><span class="spacer"></span><button class="ghostbtn" onclick="closeModal()">Zrušiť</button><button class="primary" onclick="closeModal()"><svg class="ic"><use href="#i-check"/></svg> Uložiť do katalógu</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="side">
+    <div class="mocknote">
+      <h4>Sekcia Spotrebiče — rozhodnutia v mocku (R1–R8)</h4>
+      <ol>
+        <li><b>R1 · 13. sekcia v skupine KATALÓGY</b> medzi Kovaním a Pravidlami; ikona <code>appliance</code> je nová (Lucide „refrigerator"). Badge v navigácii = počet spotrebičov, ktoré v zákazke <b>chýbajú alebo nesedia</b> (rovnaké čísla ako Kontrola).</li>
+        <li><b>R2 · Dva pohľady</b> v lište (vzor Kovanie: Položky · Sety): <b>V zákazke</b> = čo je v tejto zákazke a kde; <b>Katalóg</b> = knižnica modelov s listami.</li>
+        <li><b>R3 · Tabuľka V zákazke:</b> Kategória · Model · Vlastník (skrinka / slot / doska / len zákazka) · Kontrola · Cena z rozpočtu · akcie (oko = označ vlastníka, ceruzka = Inspector, odkaz obchod, list). Riadok „očakáva" (skrinka zo spotrebičovej šablóny bez modelu) je jantárový.</li>
+        <li><b>R4 · Štyri stavy kontroly</b> (Winner vzor, cross audit Q7): <span class="chip ok">OK</span> · <span class="chip warn">nevybraný</span> · <span class="chip warn">chýbajú údaje</span> · <span class="chip warn">nezmestí sa</span>. Pri kategóriách bez kontroly (doska, drez, digestor) je <span class="chip info">evidencia</span>. Nikdy neblokuje.</li>
+        <li><b>R5 · Cena len z Rozpočtu:</b> stĺpec je výstup (preklik do sekcie Rozpočet → Spotrebiče a vybavenie); „dodáva zákazník" je štítok, nie nula.</li>
+        <li><b>R6 · Katalóg = strom po kategóriách + karta</b> záznamu v štyroch blokoch (Telo · Nika · Čelo/dvere · Montáž) — jazyk výrobcov (Bosch: Gerätemaße · Nischenmaße · Überstände). Bez ceny. Zmazaný záznam ostáva v strome ako <i>vyradený</i> (prílohy sa nemažú).</li>
+        <li><b>R7 · Prílohy:</b> miniatúry obrázkov, PDF ako ikona (otvorí systémový prehliadač), najviac jeden <b>náhľad</b> (teal rám); „+ Pridať" = systémový dialóg, jeden súbor naraz. Súbory sú per PC v <code>%APPDATA%\NOXUN\Engine\appliances\&lt;id&gt;\</code> (mimo inštalačného stromu, ktorý updater vymieňa; D-48 po V1).</li>
+        <li><b>R8 · Modal Nový spotrebič</b> = D-15 kostra; polia sa menia podľa kategórie (prepni v modale). Presahy čela rúry/mikra sa zapisujú <b>s referenciou</b> (voči telu / voči nike).</li>
+      </ol>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ JAVISKO 2 + 3 · INSPECTOR ============================ -->
+<div class="stagewrap">
+  <div class="stage">
+    <div class="mockctl">stav riadku Spotrebič (mock):
+      <button class="on" id="st-ok" onclick="setState('ok')">OK</button>
+      <button id="st-none" onclick="setState('none')">nevybraný</button>
+      <button id="st-nodata" onclick="setState('nodata')">chýbajú údaje</button>
+      <button id="st-clash" onclick="setState('clash')">nezmestí sa</button>
+      <button id="st-off" onclick="setState('off')">bez spotrebiča</button>
+    </div>
+    <div class="win">
+      <div class="winhead"><span class="wdots"><i></i><i></i><i></i></span> Noxun Inspector — Korpus (chladničková skriňa) <span class="wsize">470 px</span></div>
+      <div class="panel">
+        <div class="crail">
+          <button class="railbtn on" title="Korpus"><svg class="ic"><use href="#i-cabinet"/></svg></button>
+          <button class="railbtn" title="Zóny"><svg class="ic"><use href="#i-zones"/></svg></button>
+          <button class="railbtn" title="Čelá"><svg class="ic"><use href="#i-front"/></svg></button>
+          <button class="railbtn" title="Kovanie"><svg class="ic"><use href="#i-hammer"/></svg></button>
+        </div>
+        <div class="cmain">
+          <div class="chdr"><span class="cid">CAB-3</span><span class="cname">Chladničková skriňa 600</span><span class="tbadge">DOLNÁ</span></div>
+          <div class="cbody">
+            <details class="grp" open>
+              <summary><svg class="ic gic"><use href="#i-list"/></svg>Náhľad<span class="gtools"><span class="meta" id="pvmeta">čelný rez · kontrolný box chladničky</span></span></summary>
+              <div class="pvbox"><svg viewBox="0 0 300 190" id="pv1"></svg></div>
+            </details>
+            <details class="grp" open>
+              <summary><svg class="ic gic"><use href="#i-box"/></svg>Základné<span class="gtools"><span class="meta">600 × 2076 × 580 · sokel 100</span>
+                <button class="tip" data-tip="Riadok Spotrebič stojí pod rozmermi cez oba stĺpce (vzor riadku Nohy). Vidno ho, keď skrinka spotrebič očakáva alebo má; inak sa zapne voľbou „očakáva". Text skladá server: požiadavka niky z listu, verdikt kontroly a pri chladničke odporúčané delenie čiel. Klik na ikonu vpravo otvorí Štúdio → Spotrebiče." onclick="event.stopPropagation()"><svg class="ic"><use href="#i-help"/></svg></button></span></summary>
+              <div class="gbody">
+                <div class="basicgrid">
+                  <div class="dimcol">
+                    <div class="rowc"><label><svg class="ic"><use href="#i-arr-h"/></svg>Šírka</label><input value="600"><span class="unit">mm</span></div>
+                    <div class="rowc"><label><svg class="ic"><use href="#i-arr-v"/></svg>Výška</label><input value="2076"><span class="unit">mm</span></div>
+                    <div class="rowc"><label><svg class="ic"><use href="#i-arr-d"/></svg>Hĺbka</label><input value="580"><span class="unit">mm</span></div>
+                    <div class="rowc"><label><svg class="ic"><use href="#i-plinth"/></svg>Sokel</label><input value="100"><span class="unit">mm</span></div>
+                    <div class="rowc"><label><svg class="ic"><use href="#i-slab"/></svg>Hrúbka</label><input value="18"><span class="unit">mm</span></div>
+                  </div>
+                  <div class="infocol">
+                    <div class="inforow"><span>Vnút. šírka</span><b>564</b></div>
+                    <div class="inforow"><span>Vnút. hĺbka</span><b id="avd">562</b></div>
+                    <div class="inforow"><span>Úložná výška</span><b id="avh">1940</b></div>
+                    <button class="inforow click"><span>Dielcov</span><b>9</b></button>
+                    <button class="inforow click"><span>Materiál</span><b>4,86 m²</b></button>
+                    <div class="inforow"><span>Hmotnosť</span><b>≈ 38,2 kg</b></div>
+                  </div>
+                  <div class="aprow ok" id="aprow"></div>
+                </div>
+              </div>
+            </details>
+            <details class="grp"><summary><svg class="ic gic"><use href="#i-layers"/></svg>Materiály<span class="gtools"><span class="meta">dub Halifax · biela · HDF</span></span></summary></details>
+            <details class="grp"><summary><svg class="ic gic"><use href="#i-settings"/></svg>Nastavenia<span class="gtools"><span class="meta">4 skupiny · všetko zbalené</span></span></summary></details>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="mockctl">slot umývačky: <span class="segline"><button class="on" onclick="setSlot(600,this)">trieda 600</button><button onclick="setSlot(450,this)">trieda 450</button></span> <span style="margin-left:6px">model: </span><span class="segline"><button class="on" onclick="setSlotModel(true,this)">priradený</button><button onclick="setSlotModel(false,this)">generický</button></span></div>
+    <div class="win">
+      <div class="winhead"><span class="wdots"><i></i><i></i><i></i></span> Noxun Inspector — Slot umývačky (nový typ skrinky) <span class="wsize">470 px</span></div>
+      <div class="panel">
+        <div class="crail">
+          <button class="railbtn on" title="Korpus"><svg class="ic"><use href="#i-cabinet"/></svg></button>
+          <button class="railbtn" aria-disabled="true" title="Zóny — slot zóny nemá"><svg class="ic"><use href="#i-zones"/></svg></button>
+          <button class="railbtn" title="Čelá — jedno čelo umývačky (úchytka, materiál, ABS)"><svg class="ic"><use href="#i-front"/></svg></button>
+          <button class="railbtn" title="Kovanie — úchytka; závesy slot nemá"><svg class="ic"><use href="#i-hammer"/></svg></button>
+        </div>
+        <div class="cmain">
+          <div class="chdr"><span class="cid">CAB-7</span><span class="cname" id="slotname">Umývačka 60 (slot)</span><span class="tbadge">UMÝVAČKA</span></div>
+          <div class="cbody">
+            <details class="grp" open>
+              <summary><svg class="ic gic"><use href="#i-list"/></svg>Náhľad<span class="gtools"><span class="meta">čelný rez · telo ako referencia</span></span></summary>
+              <div class="pvbox"><svg viewBox="0 0 300 190" id="pv2"></svg></div>
+            </details>
+            <details class="grp" open>
+              <summary><svg class="ic gic"><use href="#i-box"/></svg>Základné<span class="gtools"><span class="meta" id="slotmeta">600 × 930 × 560 · telo 820 · čelo 776</span>
+                <button class="tip" data-tip="Slot nemá boky, dno, strop ani chrbát. Jediný výrobný dielec je ČELO (cez modul čiel: úchytka, materiál, ABS). Telo umývačky je referencia: nikdy v kusovníku, nikdy vo VEPO. Sokel = spodná hrana čela od podlahy. Presah čela nad telom a zvyšok po líniu linky sú výstupy — výplň hore si Michal rieši ručne (malý korpus alebo doska). Sokel, výška ani hmotnosť čela sa nekontrolujú (rozhodnutie 6.9. a 20.9.)." onclick="event.stopPropagation()"><svg class="ic"><use href="#i-help"/></svg></button></span></summary>
+              <div class="gbody">
+                <div class="basicgrid">
+                  <div class="dimcol">
+                    <div class="rowc"><label><svg class="ic"><use href="#i-arr-h"/></svg>Trieda</label><select id="slotclass" onchange="setSlot(+this.value,null)"><option value="600">600 · 60 cm</option><option value="450">450 · 45 cm</option></select></div>
+                    <div class="rowc"><label><svg class="ic"><use href="#i-arr-h"/></svg>Šírka</label><input id="slotw" value="600"><span class="unit">mm</span></div>
+                    <div class="rowc"><label><svg class="ic"><use href="#i-arr-v"/></svg>Výška linky</label><input value="930"><span class="unit">mm · horná hrana susedov</span></div>
+                    <div class="rowc"><label><svg class="ic"><use href="#i-arr-d"/></svg>Hĺbka</label><input value="560"><span class="unit">mm</span></div>
+                    <div class="rowc"><label><svg class="ic"><use href="#i-box"/></svg>Telo V</label><input value="820"><span class="unit" id="slotrange">mm · list 820–900</span></div>
+                    <div class="rowc"><label><svg class="ic"><use href="#i-plinth"/></svg>Sokel</label><input value="64"><span class="unit">mm · čelo od podlahy</span></div>
+                    <div class="rowc"><label><svg class="ic"><use href="#i-door"/></svg>Čelo V</label><input value="776"><span class="unit">mm</span></div>
+                  </div>
+                  <div class="infocol">
+                    <div class="inforow" title="Telo z priradeného modelu; bez modelu generické podľa triedy. Spodných 200 mm tela je fixná základňa (odsadená)"><span>Telo</span><b id="slotbody">598 × 820 × 555</b></div>
+                    <div class="inforow" title="Horná hrana čela = sokel + výška čela; presah nad telom sa neobmedzuje"><span>Čelo hore</span><b>840 · +20 nad telom</b></div>
+                    <div class="inforow" title="Zvyšok po líniu linky — vyplní sa ručne: malý korpus (min výška 80) alebo doska"><span>Výplň hore</span><b>90 · ručne</b></div>
+                    <div class="inforow" title="Minimálna výška tela z listu ≤ výška linky"><span>Pod doskou</span><b class="ok" id="slotavail">930 ≥ 820 ✓</b></div>
+                    <div class="inforow" title="Trieda šírky slotu vs trieda modelu"><span>Trieda</span><b class="ok" id="slotcls">60 = 60 ✓</b></div>
+                    <button class="inforow click" title="Klik = označí výrobný dielec slotu (čelo)"><span>Dielcov</span><b>1</b></button>
+                    <div class="inforow" title="Hmotnosť čela z materiálu — len informácia, nekontroluje sa"><span>Hmotnosť čela</span><b>≈ 6,9 kg</b></div>
+                  </div>
+                  <div class="aprow ok" id="aprow2"></div>
+                </div>
+              </div>
+            </details>
+            <details class="grp"><summary><svg class="ic gic"><use href="#i-layers"/></svg>Materiály<span class="gtools"><span class="meta">čelo dub Halifax</span></span></summary></details>
+            <details class="grp"><summary><svg class="ic gic"><use href="#i-settings"/></svg>Nastavenia<span class="gtools"><span class="meta">Čelo · všetko zbalené</span></span></summary></details>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="side">
+    <div class="mocknote">
+      <h4>Riadok Spotrebič v Inspectore (R9–R12)</h4>
+      <ol start="9">
+        <li><b>R9 · Jeden riadok cez oba stĺpce</b> Základných (vzor Nohy): ikona · „Spotrebič" · text servera · vpravo výber modelu zo spotrebičov zákazky danej kategórie. Žiadny nový sektor, žiadny nadpis navyše. Skrinka s viacerými spotrebičmi (rúra + mikro v CAB-5, doska + drez na BRD-2) má <b>jeden riadok per viazaný spotrebič</b> (<code>appliance_refs[]</code>) plus riadok „očakáva", ak ešte niečo chýba (Codex #374 P1).</li>
+        <li><b>R10 · Štyri stavy + „bez spotrebiča":</b> OK (zelená ikona, verdikt niky a delenia) · nevybraný (jantár; skrinka očakáva, model chýba = ORANGE <code>appliance_missing</code>) · chýbajú údaje (model bez rozmerov niky) · nezmestí sa (os a čísla). Bez spotrebiča riadok ukáže len voľbu „očakáva: —" (nastaviteľné aj bez šablóny, rozhodnutie 9).</li>
+        <li><b>R11 · Výber filtrovaný podľa niky</b> (Winner „Dimension Search"): ponuka ukáže modely, ktorých nika sedí s vnútrom skrinky <b>v osiach, ktoré daná kategória kontroluje</b> (chladnička Š/V/H, rúra a mikro len Š + H — ich výška je vec zón; nejednoznačná nika = bez filtra); prepínač „všetky" ich odkryje aj tak — audit potvrdil, že filter nemá byť brána.</li>
+        <li><b>R12 · Chladnička v náhľade:</b> kontrolný box niky s pásmami dverí spotrebiča (669 · 71 · 1200 pre Beko) a s pásmom prípustného delenia čiel (679–728). To isté telo vznikne v modeli ako referencia — <b>len pri priradenom modeli</b>; skrinka, ktorá chladničku iba očakáva (stav „nevybraný"), box nemá. Text delenia hovorí „odporúčané delenie podľa praxe (presah ≥ 10, škára s)" — keď výrobca dá výkres nábytkových dverí, má prednosť.</li>
+      </ol>
+      <h4 style="margin-top:8px">Slot umývačky — zjednodušený podľa Michalových screenov 20.9. (R13–R16)</h4>
+      <ol start="13">
+        <li><b>R13 · Nový typ skrinky UMÝVAČKA</b> (badge v hlavičke) má <b>sedem vstupov</b>: trieda 600 | 450 · šírka slotu · <b>výška linky</b> (horná hrana susedných korpusov) · hĺbka · <b>výška tela</b> v rozsahu listu (predvolene minimum) · <b>sokel = spodná hrana čela od podlahy</b> · <b>výška čela</b>. Výstupy: horná hrana čela a presah nad telom, <b>výplň hore = zvyšok po líniu</b>. Zóny slot nemá (rail sivý s dôvodom); Čelá = jedno čelo (úchytka, materiál, ABS); Kovanie = úchytka.</li>
+        <li><b>R14 · Výplň hore sa v slote NEGENERUJE</b> — Michal ju rieši ručne podľa situácie: malý korpus (variant A, napr. 90 mm) alebo doska (variant B, keď ostane len ~80 mm). Preto S1 <b>odomkne minimálnu výšku korpusu 200 → 80 mm</b> (dnes <code>CabinetBuilder::MIN</code>), aby sa dal spraviť aj nízky „korpus na dorovnanie". Žiadna blenda ani sokel ako dielce slotu.</li>
+        <li><b>R15 · Telo = referencia z dvoch boxov:</b> telo (šírka × výška tela × hĺbka) + fixná <b>základňa 200 mm</b> odsadená dozadu a do strán (zóna nôh a soklu spotrebiča). Z priradeného modelu, inak generické podľa triedy. Nikdy v kusovníku. Kontroly len tri: trieda vs model · telo vs šírka slotu · min výška tela ≤ výška linky. Výška čela, presah hore, sokel a hmotnosť sa <b>nekontrolujú</b> (list max 720 / 2–10 kg len ako informácia).</li>
+        <li><b>R16 · Náhľad:</b> telo so základňou (prerušované = referencia), čelo 776 so sokelom 64 od podlahy (spodná hrana môže visieť pod susedmi), jantárové pásmo „výplň 90 · ručne" po líniu 930; susedné korpusy len naznačené.</li>
+      </ol>
+      <h4 style="margin-top:8px">Rozpočet (R17)</h4>
+      <ul>
+        <li><b>R17 ·</b> sekcia „Spotrebiče" → <b>„Spotrebiče a vybavenie"</b>; modal „Pridať spotrebič" dostane pole <i>Z katalógu</i> (D-15 <code>lookup</code>), ktoré predvyplní typ a názov a uloží väzbu; prepínač <b>„dodáva zákazník"</b> vypne upozornenie „chýba cena". Ostatné v Rozpočte nemenené.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+  function ico(n){ return '<svg class="ic" aria-hidden="true"><use href="#i-'+n+'"/></svg>'; }
+  var S = { view:'job', cat:'beko', modalCat:'fridge' };
+
+  // ---------- V ZÁKAZKE ----------
+  var JOB = [
+    {cat:'Chladnička', ic:'appliance', model:'Beko Beyond BCNA306E5ZSN', man:'Beko · seed', owner:'CAB-3', odesc:'Chladničková skriňa 600', st:'ok', stt:'nika ✓ · delenie 700 ✓', price:'639 €', shop:1, list:1},
+    {cat:'Rúra', ic:'appliance', model:'Whirlpool OMSR58RU1SB', man:'Whirlpool · seed', owner:'CAB-5', odesc:'Vysoká skriňa 600', st:'ok', stt:'nika Š+H ✓', price:'299 €', shop:1, list:1},
+    {cat:'Mikrovlnka', ic:'appliance', model:'Whirlpool MBNA900B', man:'Whirlpool · seed', owner:'CAB-5', odesc:'Vysoká skriňa 600', st:'ok', stt:'nika Š+H ✓', price:'239 €', shop:1, list:1},
+    {cat:'Umývačka', ic:'appliance', model:'Whirlpool WIO 3O540 PELG', man:'Whirlpool · seed', owner:'CAB-7', odesc:'Umývačka 60 (slot)', st:'ok', stt:'trieda 60 ✓ · pod doskou ✓', price:'dodáva zákazník', cust:true, shop:1, list:1},
+    {cat:'Varná doska', ic:'appliance', model:'Whirlpool WL B1160 BF', man:'Whirlpool · seed', owner:'BRD-2', odesc:'Pracovná doska', st:'info', stt:'výrez 560⁺² × 480–492', price:'289 €', shop:1, list:1},
+    {cat:'Drez', ic:'appliance', model:'Blanco Legra XL 6 S', man:'Blanco · ručný záznam (rozmery z obchodu)', owner:'BRD-2', odesc:'Pracovná doska', st:'info', stt:'výrez 840 × 480 · skrinka ≥ 600', price:'189 €', shop:1, list:0},
+    {cat:'Digestor', ic:'appliance', model:'Whirlpool WCT3 63F LTK', man:'Whirlpool · seed', owner:'—', odesc:'len zákazka', st:'info', stt:'výrez do dna 437 × 216', price:'255 €', shop:1, list:1},
+    {cat:'Rúra', ic:'appliance', model:'Bosch HBF153EB0', man:'Bosch · ručný záznam', owner:'CAB-11', odesc:'Vysoká skriňa 600', st:'nodata', stt:'chýbajú údaje niky', price:'—', shop:1, list:0},
+    {cat:'Chladnička', ic:'appliance', model:'— nevybraný', man:'skrinka očakáva chladničku (šablóna)', owner:'CAB-9', odesc:'Chladničková skriňa 600', st:'none', stt:'nevybraný', price:'—', shop:0, list:0, expects:true}
+  ];
+  function chip(st, t){
+    var cls = st==='ok' ? 'ok' : (st==='info' ? 'info' : 'warn');
+    var ic = st==='ok' ? 'check' : (st==='info' ? 'info' : 'alert');
+    return '<span class="chip '+cls+'">'+ico(ic)+t+'</span>';
+  }
+  function jobTools(){
+    return '<div class="bomviews"><button class="bomvw on" onclick="setView(\'job\')">V zákazke</button><button class="bomvw" onclick="setView(\'cat\')">Katalóg</button></div>' +
+      '<button class="primary" title="Vyber model z katalógu a priraď mu vlastníka"><svg class="ic"><use href="#i-plus"/></svg> Pridať do zákazky</button>' +
+      '<div class="searchbox">'+ico('search')+'<input placeholder="Hľadať model, skrinku…"></div>' +
+      '<select title="Kategória"><option>Všetky kategórie</option><option>Chladničky</option><option>Rúry</option><option>Mikrovlnky</option><option>Umývačky</option><option>Varné dosky</option><option>Drezy</option><option>Digestory</option><option>Iné</option></select>' +
+      '<span class="spacer"></span>' +
+      '<button class="ghostbtn" title="Prepočítať kontrolu nad aktuálnym modelom"><svg class="ic"><use href="#i-refresh-cw"/></svg> Obnoviť</button>';
+  }
+  function jobBody(){
+    var h = '<table class="stbl"><thead><tr><th>Kategória</th><th>Model</th><th>Vlastník</th><th>Kontrola</th><th class="num">Cena (Rozpočet)</th><th style="width:118px"></th></tr></thead><tbody>';
+    JOB.forEach(function(r){
+      h += '<tr'+(r.st==='none'||r.st==='nodata' ? ' style="background:var(--nx-warn-bg)"' : '')+'>' +
+        '<td><span class="cat">'+ico(r.ic)+r.cat+'</span></td>' +
+        '<td class="model"><b>'+r.model+'</b><small>'+r.man+'</small></td>' +
+        '<td class="owner">'+(r.owner==='—' ? '<span class="oid" style="color:var(--nx-ink-faint)">—</span>' : '<span class="oid">'+r.owner+'</span>')+'<span class="odesc">'+r.odesc+'</span></td>' +
+        '<td>'+chip(r.st, r.stt)+'</td>' +
+        '<td class="num">'+(r.cust ? '<span class="chip cust">dodáva zákazník</span>' : r.price)+'</td>' +
+        '<td><span class="rowact">' +
+          (r.owner!=='—' ? '<button title="Označiť vlastníka v modeli">'+ico('eye')+'</button><button title="Otvoriť vlastníka v Inspectore">'+ico('pencil')+'</button>' : '<button title="Digestor patrí len zákazke — nemá čo označiť" style="opacity:.35">'+ico('eye')+'</button>') +
+          (r.shop ? '<button title="Otvoriť odkaz na obchod">'+ico('external-link')+'</button>' : '') +
+          (r.list ? '<button title="Otvoriť technický list">'+ico('file-text')+'</button>' : '') +
+          (r.expects ? '<button title="Vybrať model" class="linkbtn" style="font-size:11px;margin-left:4px">vybrať…</button>' : '<button title="Ďalšie: vlastník, snapshot rozmerov, odpojiť">'+ico('more-horizontal')+'</button>') +
+        '</span></td></tr>';
+    });
+    h += '</tbody></table>' +
+      '<div class="totrow"><span><b>9 spotrebičov</b> · 1 nevybraný · 1 bez údajov niky · 1 dodáva zákazník</span><span class="spacer"></span>' +
+      '<span>Rozpočet → <button class="linkbtn">Spotrebiče a vybavenie: 1 910 € '+ico('external-link')+'</button> <span class="hint">(nezapočítané do SPOLU — prepínač v Rozpočte)</span></span></div>' +
+      '<div class="hint" style="margin-top:8px">Vlastník podľa kategórie: rúra · mikro · chladnička = skrinka; umývačka = slot; varná doska · drez = pracovná doska (voliteľné); digestor · iné = len zákazka. Kontrola varuje, nikdy neblokuje. Zákazka drží kópiu rozmerov z katalógu — zmena katalógu ju nemení.</div>';
+    return h;
+  }
+
+  // ---------- KATALÓG ----------
+  var CAT = [
+    {g:'Chladničky', n:1, items:[{id:'beko', t:'Beko Beyond BCNA306E5ZSN', s:'nika 560 × 1940–1950 × ≥555 · seed'}]},
+    {g:'Rúry', n:3, items:[{id:'wp-oven', t:'Whirlpool OMSR58RU1SB', s:'nika 560–568 × 583–585 × ≥560 · seed'},{id:'bo-oven', t:'Bosch HBG774KB1', s:'nika 560⁺⁸ × 585⁺¹⁰ × ≥550 · seed'},{id:'bo-oven2', t:'Bosch HBF153EB0', s:'ručný · bez rozmerov niky'}]},
+    {g:'Mikrovlnky', n:2, items:[{id:'wp-mic', t:'Whirlpool MBNA900B', s:'nika 560–568 × 360–363 × ≥300 · seed'},{id:'bo-mic', t:'Bosch BFL7221B1', s:'nika 560⁺⁸ × 362–365 × ≥300 · seed'}]},
+    {g:'Umývačky', n:2, items:[{id:'wp-dw', t:'Whirlpool WIO 3O540 PELG', s:'60 · telo 598 × 820–900 × 555 · seed'},{id:'bo-dw', t:'Bosch SPV6EMX05E', s:'45 · telo 448 × 815–875 × 550 · seed'}]},
+    {g:'Varné dosky', n:1, items:[{id:'wp-hob', t:'Whirlpool WL B1160 BF', s:'výrez 560⁺² × 480–492 · seed'}]},
+    {g:'Drezy', n:1, items:[{id:'bl-sink', t:'Blanco Legra XL 6 S', s:'860 × 500 · výrez 840 × 480 · ručný (z obchodu)'}]},
+    {g:'Digestory', n:1, items:[{id:'wp-hood', t:'Whirlpool WCT3 63F LTK', s:'výrez do dna 437 × 216 · seed'}]},
+    {g:'Iné', n:0, items:[]},
+    {g:'Vyradené', n:1, items:[{id:'wp-art', t:'Whirlpool ART 97101 2', s:'zmazaný 19.9. — prílohy ostávajú', tomb:true}]}
+  ];
+  function catTools(){
+    return '<div class="bomviews"><button class="bomvw" onclick="setView(\'job\')">V zákazke</button><button class="bomvw on" onclick="setView(\'cat\')">Katalóg</button></div>' +
+      '<button class="primary" onclick="openModal()"><svg class="ic"><use href="#i-plus"/></svg> Nový spotrebič</button>' +
+      '<div class="searchbox">'+ico('search')+'<input placeholder="Hľadať model, výrobcu…"></div>' +
+      '<label class="hint" style="display:inline-flex;align-items:center;gap:4px"><input type="checkbox"> vyradené</label>' +
+      '<span class="spacer"></span><span class="sechint">Katalóg je tohto počítača · bez cien · 11 modelov (9 seed + 2 ručné)</span>';
+  }
+  function catTree(){
+    var h = '<div class="cattree">';
+    CAT.forEach(function(g){
+      h += '<div class="catgrp">'+ico('chevron-down')+g.g+'<span class="cnt">'+g.n+'</span></div>';
+      g.items.forEach(function(it){
+        h += '<button class="catitem'+(it.id===S.cat?' on':'')+(it.tomb?' tomb':'')+'" onclick="selCat(\''+it.id+'\')">'+it.t+'<small>'+it.s+'</small></button>';
+      });
+    });
+    return h + '</div>';
+  }
+  function fileTile(kind, name, main){
+    var icn = kind==='pdf' ? 'file-text' : 'image';
+    return '<div class="file'+(main?' main':'')+'" title="'+(kind==='pdf' ? 'Otvorí sa v systémovom prehliadači PDF' : 'Obrázok z listu')+'">' +
+      '<div class="thumb">'+ico(icn)+'</div><div class="fn">'+(main ? '<span class="ftag">náhľad</span><br>' : '')+name+'</div></div>';
+  }
+  function catCard(){
+    if (S.cat !== 'beko'){
+      return '<div class="catcard"><div class="cchead"><h3>'+S.cat+'</h3><span class="man">karta záznamu — v mocku je rozpísaná len chladnička Beko</span></div><div class="ccbody"><div class="blk full hint">Rovnaká karta: štyri bloky podľa kategórie (rúra/mikro: telo · nika · čelo a presahy s referenciou · montáž; umývačka: trieda · telo · čelo (V max, hmotnosť = evidencia) · montáž; doska/drez: vonkajší rozmer · výrez · montáž; digestor: šírka skrinky · výrez do dna · odvod).</div></div></div>';
+    }
+    return '<div class="catcard">' +
+      '<div class="cchead"><h3>Beko Beyond BCNA306E5ZSN</h3><span class="man">Beko · chladnička vstavaná · <span class="badge seed">seed 19.9.2026</span></span>' +
+        '<span class="acts"><button class="primary" title="Pridá do tejto zákazky s kópiou rozmerov a vyberie vlastníka">'+ico('plus')+' Do zákazky</button><button class="ghostbtn" onclick="openModal()">'+ico('pencil')+' Upraviť</button><button class="ghostbtn danger" title="Záznam sa skryje ako vyradený; prílohy ostávajú (zákazky na ne odkazujú)">'+ico('trash')+'</button></span></div>' +
+      '<div class="ccbody">' +
+        '<div class="blk"><h5>'+ico('box')+'Telo (rozmery spotrebiča)</h5><div class="kv"><span>Š × V × H</span><b>540 × 1935 × 545</b><span>hmotnosť</span><i>— (list nekótuje)</i></div></div>' +
+        '<div class="blk"><h5>'+ico('cabinet')+'Nika (výklenok v skrinke)</h5><div class="kv"><span>šírka</span><b>min 560</b><span>výška</span><b>1940 – 1950</b><span>hĺbka</span><b>min 555</b></div></div>' +
+        '<div class="blk"><h5>'+ico('door')+'Dvere spotrebiča (zdola)</h5><div class="kv"><span>spodok</span><b>40</b><span>dolné dvere</span><b>629</b><span>medzera</span><b>71</b><span>horné dvere</span><b>1159</b><span>pásma</span><b>669 · 71 · 1200</b><span>nábytkové dvere z výkresu</span><i>— (výrobca nedáva; platí prax)</i></div></div>' +
+        '<div class="blk"><h5>'+ico('settings')+'Montáž</h5><div class="kv"><span>dvere</span><b>posuvné lišty</b><span>strana pántu</span><b>otočná</b><span>max hmotnosť nábyt. dverí</span><i>—</i><span>vetranie</span><i>200 cm² dole aj hore, zadná stena skrinky otvorená (poznámka)</i></div></div>' +
+        '<div class="blk full"><h5>'+ico('link')+'Odkazy</h5><div class="links"><b style="font-weight:600;color:var(--nx-ink-label);font-size:11px;margin-right:6px">obchod</b><a href="#">'+ico('external-link')+'nay.sk</a><a href="#">'+ico('external-link')+'alza.sk</a><span style="display:block;height:3px"></span>' +
+          '<b style="font-weight:600;color:var(--nx-ink-label);font-size:11px;margin-right:6px">listy</b><a href="#">'+ico('file-text')+'inštalačný list (beko.com)</a><a href="#">'+ico('file-text')+'kópia ManualsLib</a><a href="#">'+ico('file-text')+'produktový list EU 2021</a></div></div>' +
+        '<div class="blk full"><h5>'+ico('image')+'Prílohy <span class="hint" style="font-weight:400">· súbory na tomto PC · jeden náhľad</span></h5><div class="files">' +
+          fileTile('img','beko_bcna306.jpg',true) + fileTile('pdf','Installation-Diagram.pdf',false) + fileTile('img','rozmery_str4.png',false) + fileTile('img','dvere_str5.png',false) +
+          '<div class="file add" title="Systémový dialóg — jeden súbor naraz (PDF, JPG, PNG)"><div class="thumb">'+ico('plus')+'</div><div class="fn">Pridať</div></div>' +
+        '</div></div>' +
+        '<div class="blk full"><h5>'+ico('info')+'Poznámka</h5><div class="hint" style="color:var(--nx-ink)">Nosnosť dna list nekótuje. Dvere spotrebiča na posuvných lištách (X &lt; 10 mm). V praxi: dno o 30 vyššie = blend pri lícovaní so susedmi (ručne).</div></div>' +
+      '</div></div>';
+  }
+  function catBody(){
+    return '<div class="catwrap">'+catTree()+catCard()+'</div>';
+  }
+
+  // ---------- modal fields per category ----------
+  var MF = {
+    fridge: '<div class="mgrp">Telo</div><div class="mrow"><label>Š × V × H</label><div class="dims"><input value="540"><span>×</span><input value="1935"><span>×</span><input value="545"><span>mm</span></div></div>' +
+      '<div class="mgrp">Nika</div><div class="mrow"><label>Šírka min – max</label><div class="dims"><input value="560"><span>–</span><input placeholder="max"><span>mm</span></div></div><div class="mrow"><label>Výška min – max</label><div class="dims"><input value="1940"><span>–</span><input value="1950"><span>mm</span></div></div><div class="mrow"><label>Hĺbka min</label><div class="dims"><input value="555"><span>mm</span></div></div>' +
+      '<div class="mgrp">Dvere spotrebiča (zdola)</div><div class="mrow"><label>spodok · dolné</label><div class="dims"><input value="40"><span>·</span><input value="629"><span>mm</span></div></div><div class="mrow"><label>medzera · horné</label><div class="dims"><input value="71"><span>·</span><input value="1159"><span>mm</span></div></div><div class="mrow"><label>Nábyt. dvere z výkresu</label><div class="dims"><input placeholder="dolné min"><span>–</span><input placeholder="max"><span>mm · škára</span><input placeholder="4" style="width:44px"></div></div>' +
+      '<div class="mgrp">Montáž</div><div class="mrow"><label>Dvere</label><select><option>posuvné lišty</option><option>door-on-door (mimo V1 — len evidencia)</option></select></div><div class="mrow"><label>Strana pántu</label><select><option>otočná</option><option>ľavá</option><option>pravá</option></select></div>',
+    oven: '<div class="mgrp">Telo</div><div class="mrow"><label>Š × V × H</label><div class="dims"><input value="548"><span>×</span><input value="570"><span>×</span><input value="558"><span>mm</span></div></div>' +
+      '<div class="mgrp">Nika</div><div class="mrow"><label>Šírka min – max</label><div class="dims"><input value="560"><span>–</span><input value="568"><span>mm</span></div></div><div class="mrow"><label>Výška min – max</label><div class="dims"><input value="583"><span>–</span><input value="585"><span>mm</span></div></div><div class="mrow"><label>Hĺbka min</label><div class="dims"><input value="560"><span>mm</span></div></div>' +
+      '<div class="mgrp">Čelo a presahy</div><div class="mrow"><label>Čelo Š × V × hr.</label><div class="dims"><input value="595"><span>×</span><input value="595"><span>×</span><input value="20"><span>mm</span></div></div><div class="mrow"><label>Presah hore / dole</label><div class="dims"><input value="20"><span>/</span><input value="5"><span>mm voči</span><select style="width:auto"><option>telu</option><option>nike</option></select></div></div><div class="mrow"><label>Medzera pod čelom</label><div class="dims"><input value="9"><span>mm (výduch)</span></div></div>',
+    dishwasher: '<div class="mgrp">Trieda a telo</div><div class="mrow"><label>Trieda šírky</label><select><option>600 · 60 cm</option><option>450 · 45 cm</option></select></div><div class="mrow"><label>Telo Š × V min–max × H</label><div class="dims"><input value="598"><span>×</span><input value="820"><span>–</span><input value="900"><span>×</span><input value="555"><span>mm</span></div></div>' +
+      '<div class="mgrp">Nábytkové čelo (evidencia, bez kontroly)</div><div class="mrow"><label>Šírka · V max</label><div class="dims"><input value="594"><span>·</span><input value="720"><span>mm</span></div></div><div class="mrow"><label>Hmotnosť min – max</label><div class="dims"><input value="2"><span>–</span><input value="10"><span>kg</span></div></div><div class="mrow"><label>Sokel min – max</label><div class="dims"><input placeholder="min"><span>–</span><input placeholder="max"><span>mm</span></div></div>',
+    sink: '<div class="mgrp">Rozmery</div><div class="mrow"><label>Vonkajší Š × H</label><div class="dims"><input value="860"><span>×</span><input value="500"><span>mm</span></div></div><div class="mrow"><label>Výrez Š × H · R</label><div class="dims"><input value="840"><span>×</span><input value="480"><span>· R</span><input placeholder="—" style="width:44px"><span>mm</span></div></div><div class="mrow"><label>Skrinka min šírka</label><div class="dims"><input value="600"><span>mm</span></div></div><div class="mrow"><label>Hĺbka vane</label><div class="dims"><input placeholder="—"><span>mm · montážna výška</span><input placeholder="—" style="width:56px"><span>mm</span></div></div><div class="mrow"><label>Montáž</label><select><option>na dosku</option><option>pod dosku</option></select></div>',
+    hob: '<div class="mgrp">Rozmery</div><div class="mrow"><label>Vonkajší Š × H</label><div class="dims"><input value="590"><span>×</span><input value="510"><span>mm</span></div></div><div class="mrow"><label>Výrez Š × H</label><div class="dims"><input value="560"><span>×</span><input value="480"><span>– 492 mm</span></div></div><div class="mrow"><label>Montážna hĺbka</label><div class="dims"><input value="50"><span>mm · PD min</span><input value="12" style="width:44px"><span>mm</span></div></div>',
+    hood: '<div class="mgrp">Rozmery</div><div class="mrow"><label>Skrinka min šírka</label><div class="dims"><input value="600"><span>mm</span></div></div><div class="mrow"><label>Výrez do dna Š × H</label><div class="dims"><input value="437"><span>×</span><input value="216"><span>mm</span></div></div><div class="mrow"><label>Odvod Ø</label><div class="dims"><input value="149"><span>mm</span></div></div>',
+    other: '<div class="hint">Iné vybavenie (batéria, dávkovač…) nemá rozmerové polia — len identita, odkazy a poznámka; cena ako vždy v Rozpočte.</div>'
+  };
+  MF.microwave = MF.oven; // kanonicke kody kategorii = A1 schema (fridge oven microwave dishwasher hob sink hood other)
+
+  // ---------- Inspector: riadok Spotrebič ----------
+  var STATES = {
+    ok:     {cls:'ok',   ic:'check', txt:'nika 560 × 1940–1950 × ≥555 <b>✓</b> · delenie čiel 679–728, odporúčané 703 · hrana 700 <b>✓</b>', sub:'delenie podľa praxe (presah ≥ 10, škára 2) — výkres výrobcu by mal prednosť', sel:'<select title="Spotrebiče zákazky v kategórii chladnička, ktorých nika sedí s touto skrinkou"><option>Beko BCNA306E5ZSN</option><option>Whirlpool ART 97101 2 (nesedí: hĺbka)</option><option disabled>— zobraziť všetky (2)</option></select>'},
+    none:   {cls:'warn', ic:'alert', txt:'<b>očakáva chladničku</b> · model nevybraný', sub:'Kontrola: ORANGE „spotrebič nevybraný" — návrh ide ďalej, pred objednávkou vyber model', sel:'<select><option>vyber model…</option><option>Beko BCNA306E5ZSN (sedí)</option><option disabled>— zobraziť všetky (2)</option></select>'},
+    nodata: {cls:'warn', ic:'alert', txt:'<b>chýbajú údaje niky</b> — ručný záznam bez rozmerov', sub:'doplň niku v katalógu; dovtedy sa nekontroluje (ORANGE „chýbajú údaje")', sel:'<select><option>Bosch HBF153EB0</option><option disabled>— zobraziť všetky (2)</option></select>'},
+    clash:  {cls:'warn', ic:'alert', txt:'<b>nezmestí sa:</b> hĺbka 540 &lt; 555 · výška 1924 &lt; 1940 · šírka 564 ✓', sub:'box niky v modeli trčí z korpusu (skrinka 2060 vysoká, hĺbka 560) — Kontrola ORANGE „nezmestí sa", nič sa neblokuje', sel:'<select><option>Beko BCNA306E5ZSN</option><option disabled>— zobraziť všetky (2)</option></select>'},
+    off:    {cls:'',     ic:'appliance', txt:'<span style="color:var(--nx-ink-soft)">bez spotrebiča — nastav „očakáva", ak sem spotrebič patrí</span>', sub:'', sel:'<select><option>očakáva: —</option><option>chladničku</option><option>rúru</option><option>mikrovlnku</option></select>'}
+  };
+  function drawApRow(id, st, studioTip){
+    var s = STATES[st];
+    var el = document.getElementById(id);
+    el.className = 'aprow ' + s.cls;
+    el.innerHTML = ico(s.ic) + '<span class="aplbl">Spotrebič</span>' +
+      '<span class="apsel">'+s.sel+'<button class="ibtn" title="'+(studioTip||'Otvoriť Štúdio → Spotrebiče')+'">'+ico('external-link')+'</button></span>' +
+      '<span class="aptxt">'+s.txt+(s.sub ? '<span class="apsub">'+s.sub+'</span>' : '')+'</span>';
+  }
+  // náhľad chladničky: čelný rez skrinky + kontrolný box niky s pásmami
+  function drawFridgePreview(st){
+    var svg = document.getElementById('pv1');
+    var clash = st==='clash', none = st==='none' || st==='off';
+    var x=95, y=8, w=110, h=174; // skrinka 600×2060 → 110×174
+    var t=3, plinth=8;
+    var h2 = '';
+    h2 += '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+(h-plinth)+'" fill="#fff" stroke="#607d8b" stroke-width="1.2"/>';
+    h2 += '<rect x="'+(x+t)+'" y="'+(y+t)+'" width="'+(w-2*t)+'" height="'+(h-plinth-2*t)+'" fill="#fafcff" stroke="#b0bec5" stroke-width="1"/>';
+    h2 += '<rect x="'+(x+6)+'" y="'+(y+h-plinth)+'" width="'+(w-12)+'" height="'+plinth+'" fill="#eceff1" stroke="#b0bec5"/>';
+    if (!none){
+      var bx=x+t+2, by=y+t+2, bw=w-2*t-4, bh=h-plinth-2*t-4;
+      var col = clash ? '#e65100' : '#107787';
+      var fill = clash ? 'rgba(230,81,0,.12)' : 'rgba(16,119,135,.10)';
+      if (clash) bw = w - 2*t + 10;
+      h2 += '<rect x="'+bx+'" y="'+by+'" width="'+bw+'" height="'+bh+'" fill="'+fill+'" stroke="'+col+'" stroke-width="1.2" stroke-dasharray="4 3"/>';
+      // pásma zdola: 669 / 71 / 1200 z 1940
+      var s = bh/1940;
+      var yb = by+bh;
+      var y669 = yb - 669*s, y740 = yb - 740*s;
+      h2 += '<rect x="'+bx+'" y="'+y669+'" width="'+bw+'" height="'+(yb-y669)+'" fill="none" stroke="'+col+'" stroke-width=".8"/>';
+      h2 += '<rect x="'+bx+'" y="'+y740+'" width="'+bw+'" height="'+(y669-y740)+'" fill="#fff8ef" stroke="#ffb74d" stroke-width=".8"/>';
+      h2 += '<rect x="'+bx+'" y="'+by+'" width="'+bw+'" height="'+(y740-by)+'" fill="none" stroke="'+col+'" stroke-width=".8"/>';
+      // pásmo prípustnej hrany čiel 679–728
+      var y679 = yb-679*s, y728 = yb-728*s;
+      h2 += '<rect x="'+(bx-14)+'" y="'+y728+'" width="10" height="'+(y679-y728)+'" fill="#ffb74d" opacity=".9"/>';
+      h2 += '<text x="'+(bx-17)+'" y="'+(y728-3)+'" font-size="7" fill="#7a5000" text-anchor="end">728</text>';
+      h2 += '<text x="'+(bx-17)+'" y="'+(y679+7)+'" font-size="7" fill="#7a5000" text-anchor="end">679</text>';
+      // hrana čiel dnes
+      var edge = clash ? 700 : 700; var ye = yb-edge*s;
+      h2 += '<line x1="'+(x-4)+'" y1="'+ye+'" x2="'+(x+w+4)+'" y2="'+ye+'" stroke="#107787" stroke-width="1.4"/>';
+      h2 += '<text x="'+(x+w+6)+'" y="'+(ye+3)+'" font-size="7.5" fill="#107787">hrana čiel 700</text>';
+      h2 += '<text x="'+(bx+bw/2)+'" y="'+(yb-330*s)+'" font-size="7.5" fill="'+col+'" text-anchor="middle">669</text>';
+      h2 += '<text x="'+(bx+bw/2)+'" y="'+(y740+(y669-y740)/2+2.5)+'" font-size="6.5" fill="#7a5000" text-anchor="middle">71</text>';
+      h2 += '<text x="'+(bx+bw/2)+'" y="'+(by+(y740-by)/2)+'" font-size="7.5" fill="'+col+'" text-anchor="middle">1200</text>';
+      h2 += '<text x="'+(x+w+6)+'" y="'+(by+9)+'" font-size="7.5" fill="'+col+'">'+(clash?'hĺbka ✗ · výška ✗':'nika ✓ (1940 v 1940–1950)')+'</text>';
+      h2 += '<text x="'+(x+w+6)+'" y="'+(by+19)+'" font-size="7" fill="#78909c">box = referencia,</text><text x="'+(x+w+6)+'" y="'+(by+27)+'" font-size="7" fill="#78909c">nie dielec</text>';
+    } else {
+      h2 += '<text x="'+(x+w/2)+'" y="'+(y+h/2)+'" font-size="8" fill="#90a4ae" text-anchor="middle">'+(st==='none'?'očakáva chladničku':'')+'</text>';
+    }
+    h2 += '<text x="'+(x+w/2)+'" y="'+(y+h+6)+'" font-size="7.5" fill="#90a4ae" text-anchor="middle">600</text>';
+    svg.innerHTML = h2;
+  }
+  // náhľad slotu umývačky (podľa Michalových screenov 20.9.): telo = referencia z dvoch boxov
+  // (telo + fixná základňa 200 odsadená), čelo zavesené so sokelom od podlahy, výplň hore ručne
+  function drawSlotPreview(cls, bound){
+    var svg = document.getElementById('pv2');
+    var scale = 0.185; // 930 mm → ~172
+    var sw = (cls===600?600:450)*scale, sh = 930*scale, x=150-sw/2, y=8;
+    var floor = y+sh;
+    var h = '';
+    // susedia (naznačené): korpus na nohách 100
+    h += '<rect x="'+(x-40)+'" y="'+(y)+'" width="36" height="'+(sh-100*scale)+'" fill="#f4f5f7" stroke="#cfd8dc" stroke-dasharray="3 2"/>';
+    h += '<rect x="'+(x+sw+4)+'" y="'+(y)+'" width="36" height="'+(sh-100*scale)+'" fill="#f4f5f7" stroke="#cfd8dc" stroke-dasharray="3 2"/>';
+    // pracovná doska
+    h += '<rect x="'+(x-44)+'" y="'+(y-6)+'" width="'+(sw+88)+'" height="6" fill="#eceff1" stroke="#b0bec5"/>';
+    // telo (referencia): horná časť + základňa 200 fix (odsadená)
+    var bw=(cls===600?598:448)*scale, bh=820*scale, base=200*scale;
+    var bx=150-bw/2, by=floor-bh;
+    h += '<rect x="'+bx+'" y="'+by+'" width="'+bw+'" height="'+(bh-base)+'" fill="rgba(16,119,135,.08)" stroke="#107787" stroke-width="1.2" stroke-dasharray="4 3"/>';
+    h += '<rect x="'+(bx+6)+'" y="'+(by+bh-base)+'" width="'+(bw-12)+'" height="'+base+'" fill="rgba(16,119,135,.05)" stroke="#107787" stroke-width="1" stroke-dasharray="2 2"/>';
+    h += '<text x="150" y="'+(by+(bh-base)/2-3)+'" font-size="7.5" fill="#107787" text-anchor="middle">telo '+(bound?(cls===600?'598 × 820':'448 × 815'):'generické '+(cls===600?'60':'45'))+'</text>';
+    h += '<text x="150" y="'+(by+(bh-base)/2+7)+'" font-size="6.5" fill="#607d8b" text-anchor="middle">referencia · list '+(cls===600?'820–900':'815–875')+'</text>';
+    h += '<text x="150" y="'+(floor-base/2+2)+'" font-size="6.5" fill="#607d8b" text-anchor="middle">základňa 200 fix</text>';
+    // čelo: spodná hrana = sokel 64 od podlahy, výška 776 → horná hrana 840
+    var sokel=64*scale, fh=776*scale;
+    var fy1=floor-sokel, fy0=fy1-fh;
+    h += '<rect x="'+(x+2)+'" y="'+fy0+'" width="'+(sw-4)+'" height="'+fh+'" fill="#e0f2f4" stroke="#0e6b7a" stroke-width="1.4"/>';
+    h += '<text x="'+(x+sw/2)+'" y="'+(fy0+fh/2)+'" font-size="8" fill="#0B5661" text-anchor="middle">čelo 776</text>';
+    h += '<text x="'+(x+sw/2)+'" y="'+(fy0+fh/2+10)+'" font-size="6.5" fill="#607d8b" text-anchor="middle">výrobný dielec</text>';
+    // výplň hore (ručne) medzi hornou hranou čela a líniou
+    h += '<rect x="'+(x+2)+'" y="'+y+'" width="'+(sw-4)+'" height="'+(fy0-y-2)+'" fill="none" stroke="#ffb74d" stroke-width="1" stroke-dasharray="3 2"/>';
+    h += '<text x="'+(x+sw/2)+'" y="'+(y+(fy0-y)/2+3)+'" font-size="6.5" fill="#b26a00" text-anchor="middle">výplň 90 · ručne</text>';
+    // kóty
+    h += '<line x1="'+(x+sw+46)+'" y1="'+y+'" x2="'+(x+sw+46)+'" y2="'+floor+'" stroke="#90a4ae" stroke-width="1"/>';
+    h += '<text x="'+(x+sw+50)+'" y="'+(y+sh/2)+'" font-size="7.5" fill="#90a4ae">930</text>';
+    h += '<line x1="'+(x-44)+'" y1="'+fy1+'" x2="'+(x-30)+'" y2="'+fy1+'" stroke="#90a4ae"/>';
+    h += '<text x="'+(x-46)+'" y="'+(fy1+3)+'" font-size="6.5" fill="#90a4ae" text-anchor="end">sokel 64</text>';
+    h += '<text x="'+(x+sw/2)+'" y="'+(floor+9)+'" font-size="7.5" fill="#90a4ae" text-anchor="middle">'+(cls===600?'600':'450')+'</text>';
+    svg.innerHTML = h;
+  }
+  var SLOT = {cls:600, bound:true};
+  function refreshSlot(){
+    var c = SLOT.cls, b = SLOT.bound;
+    document.getElementById('slotw').value = c;
+    document.getElementById('slotclass').value = c;
+    document.getElementById('slotname').textContent = (c===600?'Umývačka 60':'Umývačka 45')+' (slot)';
+    document.getElementById('slotmeta').textContent = c+' × 930 × 560 · telo '+(c===600?'820':'815')+' · čelo 776';
+    document.getElementById('slotbody').textContent = b ? (c===600?'598 × 820 × 555':'448 × 815 × 550') : (c===600?'generické 60 · 598 × 820 × 555':'generické 45 · 448 × 815 × 550');
+    document.getElementById('slotrange').textContent = c===600 ? 'mm · list 820–900' : 'mm · list 815–875';
+    document.getElementById('slotavail').textContent = c===600 ? '930 ≥ 820 ✓' : '930 ≥ 815 ✓';
+    var cls = document.getElementById('slotcls');
+    if (!b){ cls.textContent = c===600?'60 · bez modelu':'45 · bez modelu'; cls.className=''; }
+    else if (c===600){ cls.textContent = '60 = 60 ✓'; cls.className='ok'; }
+    else { cls.textContent = '45 ≠ 60 ✗ model'; cls.className='warn'; }
+    var el = document.getElementById('aprow2');
+    var lnk = '<button class="ibtn" title="Štúdio → Spotrebiče">'+ico('external-link')+'</button>';
+    if (!b){
+      el.className='aprow'; el.innerHTML = ico('appliance')+'<span class="aplbl">Spotrebič</span><span class="apsel"><select><option>vyber model…</option><option>Whirlpool WIO 3O540 PELG (60)</option><option>Bosch SPV6EMX05E (45)</option></select>'+lnk+'</span><span class="aptxt"><span style="color:var(--nx-ink-soft)">očakáva umývačku '+(c===600?'60':'45')+' · model nevybraný</span><span class="apsub">Kontrola: ORANGE „spotrebič nevybraný"; slot funguje s generickým telom</span></span>';
+    } else if (c===600){
+      el.className='aprow ok'; el.innerHTML = ico('check')+'<span class="aplbl">Spotrebič</span><span class="apsel"><select><option>Whirlpool WIO 3O540 PELG</option><option>Bosch SPV6EMX05E (45 — nesedí trieda)</option></select>'+lnk+'</span><span class="aptxt">trieda 60 <b>✓</b> · telo 598 v slote 600 <b>✓</b> · pod doskou 930 ≥ 820 <b>✓</b><span class="apsub">list: čelo 594 × max 720 · 2–10 kg — len informácia, čelo 776 a sokel sa nekontrolujú</span></span>';
+    } else {
+      el.className='aprow warn'; el.innerHTML = ico('alert')+'<span class="aplbl">Spotrebič</span><span class="apsel"><select><option>Whirlpool WIO 3O540 PELG</option><option>Bosch SPV6EMX05E (45)</option></select>'+lnk+'</span><span class="aptxt"><b>nesedí trieda:</b> model 60 v slote 45<span class="apsub">Kontrola ORANGE — vyber 45 cm model alebo zmeň triedu slotu</span></span>';
+    }
+    drawSlotPreview(c, b);
+  }
+
+  // ---------- public ----------
+  window.setView = function(v){ S.view = v; render(); };
+  window.selCat = function(id){ S.cat = id; render(); };
+  window.openModal = function(){ document.getElementById('scrim').classList.add('on'); modalCat(); };
+  window.closeModal = function(){ document.getElementById('scrim').classList.remove('on'); };
+  window.modalCat = function(){ var c = document.getElementById('mcat').value; document.getElementById('mfields').innerHTML = MF[c] || MF.other; };
+  window.setState = function(st){
+    ['ok','none','nodata','clash','off'].forEach(function(k){ document.getElementById('st-'+k).classList.toggle('on', k===st); });
+    drawApRow('aprow', st);
+    drawFridgePreview(st);
+    document.getElementById('avd').textContent = st==='clash' ? '540' : '562';
+    document.getElementById('avd').className = st==='clash' ? 'warn' : '';
+    document.getElementById('avh').textContent = st==='clash' ? '1924' : '1940';
+    document.getElementById('avh').className = st==='clash' ? 'warn' : '';
+  };
+  window.setSlot = function(c, btn){ SLOT.cls = c; if (btn){ Array.prototype.forEach.call(btn.parentNode.children, function(b){ b.classList.toggle('on', b===btn); }); } refreshSlot(); };
+  window.setSlotModel = function(b, btn){ SLOT.bound = b; Array.prototype.forEach.call(btn.parentNode.children, function(x){ x.classList.toggle('on', x===btn); }); refreshSlot(); };
+  function render(){
+    document.getElementById('sectools').innerHTML = S.view==='job' ? jobTools() : catTools();
+    document.getElementById('secbody').innerHTML = S.view==='job' ? jobBody() : catBody();
+    document.getElementById('sechint').textContent = S.view==='job' ? 'spotrebiče tejto zákazky — kde patria, čo hovorí list, čo hovorí kontrola' : 'knižnica modelov s overenými rozmermi a listami — bez cien, per počítač';
+  }
+  render(); setState('ok'); refreshSlot();
+  document.addEventListener('keydown', function(e){ if (e.key==='Escape') closeModal(); });
+})();
+</script>
+</body>
+</html>
