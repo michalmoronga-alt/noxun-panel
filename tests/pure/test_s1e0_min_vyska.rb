@@ -85,14 +85,19 @@ module NxS1E0
     JSON.parse(cb.cabinet_config(cfg).to_json)
   end
 
-  # Prejde `Construction.validate!` tento config pri danej vyske? Pytame sa
-  # PRIAMO validacie, nie kopie jej pravidiel.
-  def valid_height?(cfg, height)
-    c = cfg.merge(height: height)
-    cn.validate!(c, cn.interior_dims(c))
+  # Postavil by sa tento config pri danej vyske? Pytame sa TOU ISTOU cestou,
+  # ktorou ide rebuild — cely `build_plan` (validate! + zony + police + cela +
+  # kontrakt planu), nie len jeden z jeho krokov.
+  def buildable?(cfg, height)
+    cn.build_plan(cfg.merge(height: height), 'CAB-TEST')
     true
   rescue StandardError
     false
+  end
+
+  # Zony s policami pre konfiguraciu, ktora padala az na `validate_shelves!`.
+  def with_shelves(count)
+    { 'zone_tree' => { 'id' => 'Z1', 'shelves' => count, 'children' => [] } }
   end
 
   def js_limit(id)
@@ -284,9 +289,11 @@ end
 # 3b) Config-aware spodna hranica pre absorpciu scale (Codex #375 P2)
 # ---------------------------------------------------------------------------
 
-NxTest.test('S1-E0 (Codex #375 P2): min_valid_height je NAJNIZSIA vyska, ktoru validate! prijme') do
+NxTest.test('S1-E0 (Codex #375 P2): min_valid_height je NAJNIZSIA vyska, pri ktorej by PRESTAVBA PRESLA') do
   # Sila testu je v druhej polovici: o milimeter nizsie uz musi byt odmietnutie.
   # Inak by funkcia mohla vracat hocijake „dost velke" cislo a tvarit sa spravne.
+  # Kolo 2 (Codex #375): sondou je CELY `build_plan`, nie len `validate!` —
+  # preto su v matici aj police a cela, ktore padaju AZ ZA validaciou obalky.
   [
     { 'floor_height' => 100.0 },                                    # dolna so soklom
     { 'floor_height' => 0.0 },                                      # korpus na dorovnanie
@@ -298,15 +305,66 @@ NxTest.test('S1-E0 (Codex #375 P2): min_valid_height je NAJNIZSIA vyska, ktoru v
       'rails_orientation' => 'upright', 'rail_depth' => 100.0 },    # vystuhy na hranu
     { 'floor_height' => 100.0, 'top_mode' => 'two_rails',
       'rails_orientation' => 'upright', 'rail_depth' => 400.0,
-      'rails_top_offset' => 200.0 }                                 # extremne vystuhy
+      'rails_top_offset' => 200.0 },                                # extremne vystuhy
+    { 'floor_height' => 0.0 }.merge(NxS1E0.with_shelves(1)),        # JEDNA polica
+    { 'floor_height' => 100.0 }.merge(NxS1E0.with_shelves(2)),      # dve police + sokel
+    { 'floor_height' => 0.0 }.merge(NxS1E0.with_shelves(4))         # styri police
   ].each do |over|
     cfg = NxS1E0.low_lower(over)
     h = NxS1E0.cn.min_valid_height(cfg)
-    NxTest.assert(NxS1E0.valid_height?(cfg, h), "#{over.inspect}: vyska #{h} musi prejst validate!")
-    NxTest.refute(NxS1E0.valid_height?(cfg, h - 1.0),
+    NxTest.assert(NxS1E0.buildable?(cfg, h), "#{over.inspect}: vyska #{h} sa musi dat postavit")
+    NxTest.refute(NxS1E0.buildable?(cfg, h - 1.0),
                   "#{over.inspect}: vyska #{h - 1} uz prejst NESMIE (inak to nie je minimum)")
     NxTest.assert_equal(h, h.round.to_f, "#{over.inspect}: vysledok je cely milimeter")
   end
+end
+
+NxTest.test('S1-E0 (Codex #375 kolo 2 P2): JEDNA polica dvihne minimum z 80 na 94') do
+  # Nalez kola 2: skrinka s policou klampla na 80 (vnutro 44), `validate!`
+  # to prepustil a padlo to az na `ZoneTree.validate_shelves!` — absorpcia
+  # skoncila rejectom a pouzivatel dostal spat povodnych 720 mm.
+  # Polica potrebuje 18 (dielec) + 2 x 20 (dve pole) = 58 mm svetla,
+  # takze 58 + dno 18 + strop 18 = 94.
+  cfg = NxS1E0.low_lower({ 'floor_height' => 0.0 }.merge(NxS1E0.with_shelves(1)))
+  NxTest.assert_close(94.0, NxS1E0.cn.min_valid_height(cfg), 0.01)
+  NxTest.refute(NxS1E0.buildable?(cfg, 80.0), 'na 80 mm by prestavba padla na policu')
+  NxTest.assert(NxS1E0.buildable?(cfg, 94.0), 'na 94 mm uz skrinka stoji')
+  # A `validate!` SAM by 80 mm prepustil — presne to bola diera.
+  c80 = cfg.merge(height: 80.0)
+  NxTest.assert(NxS1E0.cn.interior_dims(c80)[:avail_h] > NxS1E0.cn::MIN_AVAIL_H,
+                'obalka je v poriadku — chyba je az v zonach, preto sonda musi byt cely plan')
+end
+
+NxTest.test('S1-E0 (Codex #375 kolo 2 P2): minimum rata aj s CELAMI (profil uchytky)') do
+  # Cela padaju vo `Fronts.layout` (profil zabera z panela), teda tiez AZ ZA
+  # `validate!`. Pevne celo 300 mm sa do 80 mm skrinky nezmesti.
+  cfg = NxS1E0.low_lower('fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'door',
+                                                     'height' => 300.0, 'wings' => '1' }] })
+  h = NxS1E0.cn.min_valid_height(cfg)
+  NxTest.assert(NxS1E0.buildable?(cfg, h), "vyska #{h} sa musi dat postavit aj s celom")
+  NxTest.refute(NxS1E0.buildable?(cfg, h - 1.0), "vyska #{h - 1} uz nie")
+end
+
+NxTest.test('S1-E0 (Codex #375 kolo 2 P2): nepostavitelny config vrati GEOMETRICKE minimum, nie strop') do
+  # 6 polic potrebuje 6 x 18 + 7 x 20 = 248 mm svetla — to sa do legalneho
+  # rozsahu zmesti, takze sa hlada dalej. Test strazi opacny extrem: ked by
+  # neprosla ani maximalna vyska, funkcia nesmie vratit 3000 (klamp na strop
+  # by bol horsi nez odmietnutie) — vrati startovaciu hranicu a rebuild padne
+  # vlastnou hlaskou.
+  many = NxS1E0.low_lower({ 'floor_height' => 0.0 }.merge(NxS1E0.with_shelves(6)))
+  h = NxS1E0.cn.min_valid_height(many)
+  NxTest.assert_close(284.0, h, 0.01, '6 polic: 248 svetla + dno 18 + strop 18')
+  NxTest.assert(NxS1E0.buildable?(many, h))
+  # Hranicny zamok zon: zamknute pole sirsie nez korpus sa nepostavi NIKDY.
+  bad = NxS1E0.low_lower('zone_tree' => { 'id' => 'Z1', 'shelves' => 0,
+                                          'split' => { 'axis' => 'v',
+                                                       'cuts' => [{ 'size' => 5000.0, 'locked' => true },
+                                                                  { 'size' => 5000.0, 'locked' => true }] },
+                                          'children' => [{ 'id' => 'Z2', 'shelves' => 0, 'children' => [] },
+                                                         { 'id' => 'Z3', 'shelves' => 0, 'children' => [] }] })
+  NxTest.refute(NxS1E0.buildable?(bad, 3000.0), 'taky config sa nepostavi ani na strope')
+  NxTest.assert(NxS1E0.cn.min_valid_height(bad) < 100.0,
+                'vrati sa geometricke minimum, nie strop rozsahu')
 end
 
 NxTest.test('S1-E0 (Codex #375 P2): dolna so soklom 100 a hrubkou 18 ma minimum 147 mm') do

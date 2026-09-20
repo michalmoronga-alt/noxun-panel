@@ -3604,6 +3604,34 @@ module NoxunSuRunner
       ok('S1-E0 (e): vlozenie skrinky so soklom', false)
     end
 
+    # (f) Codex #375 kolo 2: SKRINKA S POLICOU. Obalka by na 80 mm presla
+    #     (`validate!` vidi vnutro 44 mm), ale polica potrebuje 18 + 2 x 20
+    #     = 58 mm svetla — stavba by padla az v `ZoneTree.validate_shelves!`
+    #     a absorpcia by skoncila REJECTOM (spat 720 mm). Minimum preto meria
+    #     cely `build_plan`, nie len validaciu obalky: 58 + dno 18 + strop 18
+    #     = 94 mm.
+    police = e::CabinetBuilder.build(model, 'type' => 'lower', 'width' => 600.0,
+                                            'height' => 720.0, 'depth' => 560.0,
+                                            'thickness' => 18.0, 'floor_height' => 0.0,
+                                            'zone_tree' => { 'id' => 'Z1', 'shelves' => 1,
+                                                             'children' => [] })
+    if police
+      model.start_operation('SU-TEST S1E0 scale s policou', true)
+      police.transformation = police.transformation * Geom::Transformation.scaling(ORIGIN, 1.0, 1.0, 0.1)
+      model.commit_operation
+      e::ScaleWatch.absorb(police)
+      cfg_p = e::Store.config(police) || {}
+      ok("S1-E0 (f): skrinka s policou skoncila na 94, nie na 80 ani na povodnych 720 (config #{cfg_p['height']})",
+         (cfg_p['height'].to_f - 94.0).abs < 0.01)
+      shelves = s1e0_parts(police).select { |p| e::Store.get(p, 'role').to_s == 'shelf' }
+      ok("S1-E0 (f): polica v modeli NAOZAJ je (#{shelves.length} ks) a ziadny dielec nie je degenerovany",
+         shelves.length == 1 && s1e0_degenerate(s1e0_parts(police)).empty?)
+      ok('S1-E0 (f): bola to absorpcia, nie reject (transform cisty)',
+         e::ScaleWatch.scale_factors(police.transformation).nil?)
+    else
+      ok('S1-E0 (f): vlozenie skrinky s policou', false)
+    end
+
     cleanup(model)
     ok('S1-E0: cleanup (0 korpusov)', cabinets(model).empty?)
   rescue StandardError => ex

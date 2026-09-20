@@ -32,11 +32,11 @@ module Noxun
       # aj pre zrkadlo v paneli (`form.js` MIN_AVAIL_H) — zhodu strazi test.
       MIN_AVAIL_H = 10.0
 
-      # S1-E0 (Codex #375 P2): strop hladania v `min_valid_height`. Vystuhy vedia
-      # ukrojit z vysky najviac `rails_top_offset` (max 500) + hlbku upright
-      # vystuhy (max 400) + hrubku dosky (max 50); rezerva je zaokruhlena nahor.
-      # Nie je to ocakavanie, ale poistka proti nekonecnemu hladaniu.
-      RAIL_HEIGHT_RESERVE = 1200.0
+      # S1-E0 (Codex #375 P2): strop hladania v `min_valid_height` — ZHODNY
+      # s hornym clampom vysky v `CabinetBuilder.normalize`. Nad tuto hodnotu
+      # sa korpus aj tak nedostane, takze prehladany je cely legalny rozsah
+      # (polenie intervalu to stoji ~12 krokov).
+      MAX_HEIGHT = 3000.0
 
       module_function
 
@@ -962,34 +962,42 @@ module Noxun
           z_top: h - off, z_bottom: h - off - occupy }
       end
 
-      # S1-E0 (Codex #375 P2): NAJNIZSIA vyska korpusu, pri ktorej `validate!`
-      # TENTO config prijme. Potrebuje ju absorpcia scale: klamp na hole
-      # `ScaleWatch::MIN['height']` (80) by pri sokli 100 vyrobil config, ktory
-      # `validate!` odmietne — a pouzivatel by po tiahnuti uchopu dostal reject
-      # a POVODNY rozmer namiesto najnizsej PLATNEJ skrinky.
+      # S1-E0 (Codex #375 P2 + kolo 2): NAJNIZSIA vyska korpusu, pri ktorej by
+      # PRESTAVBA TOHTO configu PRESLA. Potrebuje ju absorpcia scale: klamp na
+      # hole `ScaleWatch::MIN['height']` (80) by pri sokli 100 vyrobil korpus
+      # bez vnutra — a pouzivatel by po tiahnuti uchopu dostal reject a POVODNY
+      # rozmer namiesto najnizsej platnej skrinky.
       #
-      # Vzorec sa NEKOPIRUJE: kandidat sa meria cez `interior_dims`, teda cez
-      # ten isty zdroj, z ktoreho cita `validate!`. `avail_h` je v `h`
-      # neklesajuca (odsadenie aj hlbka vystuh rastu s vyskou najviac 1:1),
-      # takze staci polenie intervalu. Vracia CELE milimetre — absorpcia
-      # aj panel pracuju s celymi mm.
-      def min_valid_height(cfg)
-        need = min_avail_for(cfg)
-        # Dolna hranica plati pre KAZDY vrch: strop vnutra nikdy nelezi vyssie
-        # nez vrch korpusu, takze `avail_h <= h - sokel - hrubka dna`. Pri vrchu
-        # `none` je to rovno vysledok, pri ostatnych startovaci bod hladania.
-        lo = (cfg[:floor_height].to_f + cfg[:thickness].to_f + need).ceil.to_f
-        return lo if avail_at(cfg, lo) >= need
+      # KANDIDAT JE PLATNY PRAVE VTEDY, KED NAD NIM PREJDE CELY `build_plan`
+      # (kolo 2 P2). Samotny `validate!` nestaci: dolna skrinka s JEDNOU policou
+      # potrebuje na nu 18 + 2 x 20 = 58 mm svetla, takze vyska 80 (vnutro 44)
+      # prejde `validate!`, ale padne az v `ZoneTree.validate_shelves!` — a
+      # absorpcia by skoncila rejectom. Rovnako vie zhodit stavbu profil cela
+      # (`Fronts.layout`) alebo zamknute zony. Ziadny druhy vzorec sa preto
+      # nepise: sondou je TA ISTA retaz, ktorou ide rebuild, len bez modelu.
+      #
+      # Pravidla kovania sa nacitaju RAZ a posielaju do kazdej sondy — inak by
+      # jedno tiahnutie uchopu precitalo kniznicu pravidiel desatkrat.
+      # Vracia CELE milimetre (absorpcia aj panel pracuju s celymi mm).
+      def min_valid_height(cfg, hardware_rules: nil)
+        rules = hardware_rules || HardwareRules.load
+        # NUTNA (nie postacujuca) podmienka: strop vnutra nikdy nelezi vyssie
+        # nez vrch korpusu, takze `avail_h <= h - sokel - hrubka dna`. Je to
+        # startovaci bod hladania, nie vysledok.
+        lo = (cfg[:floor_height].to_f + cfg[:thickness].to_f + min_avail_for(cfg)).ceil.to_f
+        return lo if buildable_at?(cfg, lo, rules)
 
-        hi = lo + RAIL_HEIGHT_RESERVE
-        # Poistka: ked ani strop nestaci, vrati sa strop — rebuild potom padne
-        # zrozumitelnou hlaskou `validate!`, nikdy nie tichym nezmyslom.
-        return hi if avail_at(cfg, hi) < need
+        hi = MAX_HEIGHT
+        # Ked neprejde ani strop legalneho rozsahu, config nie je postavitelny
+        # v ZIADNEJ vyske (napr. zamknute zony alebo neplatna hrana profilu).
+        # Vratime geometricke minimum a rebuild necháme padnut vlastnou
+        # zrozumitelnou hlaskou — hadat vyssiu vysku by problem len zakrylo.
+        return lo unless buildable_at?(cfg, hi, rules)
 
         while hi - lo > 1.0
           mid = ((lo + hi) / 2.0).ceil.to_f
           mid = hi if mid >= hi # poistka proti zaseknutiu na hranici
-          if avail_at(cfg, mid) >= need
+          if buildable_at?(cfg, mid, rules)
             hi = mid
           else
             lo = mid
@@ -1005,7 +1013,17 @@ module Noxun
         cfg[:top_mode] == 'two_rails' ? (MIN_INTERIOR_H - 0.01) : (MIN_AVAIL_H + 1.0)
       end
 
-      # Svetla vyska configu pri INEJ vyske korpusu (cista sonda pre hladanie).
+      # Postavil by sa TENTO config pri tejto vyske? Cista sonda — ziadny model,
+      # ziadny zapis; plan sa zahodi. `CAB-PROBE` je len menovka part_keys.
+      def buildable_at?(cfg, height, rules)
+        build_plan(cfg.merge(height: height), 'CAB-PROBE', hardware_rules: rules)
+        true
+      rescue StandardError
+        false
+      end
+
+      # Svetla vyska configu pri INEJ vyske korpusu (cista sonda pre testy
+      # a pre `min_avail_for` — hranicu vnutra meria `interior_dims`).
       def avail_at(cfg, height)
         interior_dims(cfg.merge(height: height))[:avail_h]
       end

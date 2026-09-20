@@ -377,13 +377,15 @@ brána. Detail je v histórii čísel vyššie; žiadna migrácia netreba, confi
 Geometriu nízkeho korpusu ďalej chráni **`Construction.validate!` ako posledná brána** (sokel ≥ výška, svetlé vnútro ≤ `MIN_AVAIL_H` = 10 mm, rezerva `MIN_INTERIOR_H` pod dvoma
 výstuhami); panel tie isté dve pravidlá zrkadlí v `cabinetHeightError` ([ui-lifecycle.md](ui-lifecycle.md)), takže používateľ dostane červenú dvojicu výška + podstavec ešte
 pred apply, nie výnimku po ňom. Plán nízkej skrinky nesmie mať degenerovaný dielec (`part_skipped_degenerate`) — meria to headless sada cez 16 kombinácií dno × vrch × chrbát
-a in-SU sekcia **`run_s1e0`** (stavba, kusovník, klamp 60 → 80 cestou Inspectora, absorpcia scale a jedno Späť).
+a in-SU sekcia **`run_s1e0`** (stavba, kusovník, klamp 60 → 80 cestou Inspectora, absorpcia scale so soklom aj s policou a jedno Späť).
 
-**`min_valid_height(cfg)` — NAJNIŽŠIA výška, ktorú `validate!` pre daný config prijme (S1-E0, Codex #375 P2).** `MIN[:height]` je absolútna hranica, ale nie postačujúca: pri
-sokli 100 a hrúbke 18 nedáva 80 mm žiadne vnútro. Funkcia preto vráti prvý celý milimeter, pri ktorom `avail_h` prekročí požiadavku (`MIN_AVAIL_H + 1`, pri dvoch výstuhách
-`MIN_INTERIOR_H`). **Vzorec sa nekopíruje** — kandidáti sa merajú cez `interior_dims`, teda cez ten istý zdroj, z ktorého číta `validate!`; `avail_h` je vo výške neklesajúca
-(odsadenie aj hĺbka výstuh rastú s výškou najviac 1 : 1), takže stačí polenie intervalu so stropom `RAIL_HEIGHT_RESERVE`. Dolná hranica hľadania `sokel + hrúbka + rezerva`
-platí pre každý vrch (strop vnútra nikdy neleží vyššie než vrch korpusu). Jediný čítateľ je dnes `ScaleWatch.clamp_height` (odsek `scale_observer.rb` nižšie).
+**`min_valid_height(cfg)` — NAJNIŽŠIA výška, pri ktorej by PRESTAVBA prešla (S1-E0, Codex #375 P2 a kolo 2).** `MIN[:height]` je absolútna hranica, ale nie postačujúca: pri
+sokli 100 a hrúbke 18 nedáva 80 mm žiadne vnútro. **Kandidát je platný práve vtedy, keď nad ním prejde celý `build_plan`** — teda tá istá reťaz, ktorou ide rebuild, len bez
+modelu. Samotný `validate!` nestačí (kolo 2 P2): skrinka s JEDNOU policou ho pri 80 mm prejde (obálka je v poriadku, vnútro 44 mm), ale padne až v `ZoneTree.validate_shelves!`
+— polica potrebuje 18 + 2 × 20 = 58 mm svetla, takže skutočné minimum je **94 mm**. Rovnako vie stavbu zhodiť profil čela (`Fronts.layout`) alebo zamknuté zóny. **Žiadny druhý
+vzorec sa preto nepíše.** Hľadá sa polením intervalu od nutnej (nie postačujúcej) hranice `sokel + hrúbka + rezerva` po `MAX_HEIGHT` (3000 = horný clamp `normalize`), pravidlá
+kovania sa načítajú **raz** a putujú do každej sondy. Keď neprejde ani strop rozsahu (config nepostaviteľný v žiadnej výške), vráti sa štartovacia hranica a rebuild padne
+vlastnou zrozumiteľnou hláškou — klamp na 3000 by problém len zakryl. Jediný čítateľ je dnes `ScaleWatch.clamp_height` (odsek `scale_observer.rb` nižšie).
 
 **PRERUŠENIE STAVBY** (`abort_safely`): výnimka kdekoľvek vnútri `build`/`rebuild` ruší CELÚ operáciu a **neprehĺta sa** — volajúci sa o nej dozvie. Rollback vracia geometriu
 (inštanciu aj definície dielcov) **a zároveň modelové atribúty**, teda aj projektové snapshoty kovania, ktoré `build_into` cestou `HardwareRules.ensure_project_rules!` /
@@ -949,11 +951,12 @@ configu) a klamp **loguje**, nikdy ho nerobí ticho. Čísla sú **zrkadlom `Cab
 `cabinet_builder`), preto zhodu stráži guard `tests/pure/test_s1e0_min_vyska.rb`; keby sa rozišli, ten istý korpus by po ťahaní myšou a po zápise do poľa skončil na inom
 rozmere.
 
-**VÝŠKA sa klampuje CONFIG-AWARE (`clamp_height`, Codex #375 P2).** Holé `MIN['height']` = 80 tu nestačí: pri sokli 100 by vyrobilo config, ktorý `validate!` odmietne —
-rebuild by padol, `reject_scale` by vrátil PÔVODNÚ skrinku a používateľ by po ťahaní úchopu nedostal nič. Hranica je preto **prísnejšia z dvoch**: `MIN['height']`
-a `Construction.min_valid_height` nad configom, ktorý o chvíľu pôjde do `rebuild`u (normalizuje sa **tou istou cestou**, takže pri hornej skrinke sokel korektne vypadne na 0).
+**VÝŠKA sa klampuje CONFIG-AWARE (`clamp_height`, Codex #375 P2 a kolo 2).** Holé `MIN['height']` = 80 tu nestačí: pri sokli 100 by vyrobilo korpus bez vnútra a pri skrinke
+s policou by geometria prešla, ale stavba padla na `validate_shelves!` — rebuild by zlyhal, `reject_scale` by vrátil PÔVODNÚ skrinku a používateľ by po ťahaní úchopu nedostal
+nič (720 mm späť namiesto 94). Hranica je preto **prísnejšia z dvoch**: `MIN['height']` a `Construction.min_valid_height` nad **kompletným** configom, ktorý o chvíľu pôjde do
+`rebuild`u (normalizuje sa **tou istou cestou**, takže pri hornej skrinke sokel korektne vypadne na 0).
 Šírka a hĺbka taký problém nemajú — ich `MIN` je vždy nad hranicou validácie. Lifecycle absorpcie sa tým **nemení**: klamp žije vnútri tej istej transparentnej operácie, takže
-jedno Späť ďalej vráti scale AJ absorpciu (in-SU `run_s1e0` body c a e, reálny debounce tik `async S1`).
+jedno Späť ďalej vráti scale AJ absorpciu (in-SU `run_s1e0` body c, e a f, reálny debounce tik `async S1`).
 
 **BARIÉRA PRED MUTÁCIOU NÁSTROJA — `flush_pending!(model)` (NÁSTROJE-1, v0.9.24).** `guard` zabráni len NOVÝM udalostiam; už naplnené fronty (`@dirty`, `@added`, `@requested`,
 `@prune_models`) a bežiaci debounce timer zostávajú — a keď timer dobehne PO operácii nástroja, jeho **transparentná** reakcia (dedup kópií, presun ghost zón) sa prilepí na krok
