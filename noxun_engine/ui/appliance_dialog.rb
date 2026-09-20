@@ -1160,7 +1160,11 @@ module Noxun
             'category_label' => ApplianceCatalog.category_label(cat),
             'model' => job_model_text(rec, state),
             'model_sub' => job_model_sub(rec, item, snap, state),
-            'owner' => { 'kind' => okind, 'id' => owner['id'].to_s, 'pid' => owner['pid'] },
+            # PID: zo zberu (viazana polozka) alebo z PONUKY vlastnikov — obe
+            # pochadzaju z toho isteho skenu modelu. Bez neho „oko" akciu
+            # neponuka: identita bez PID je pri recyklovanych ID nedostatocna.
+            'owner' => { 'kind' => okind, 'id' => owner['id'].to_s,
+                         'pid' => (owner['pid'] || info['pid']) },
             'owner_label' => job_owner_label(okind, owner, info),
             'owner_desc' => (info['desc'].to_s.empty? ? job_owner_kind_text(okind) : info['desc']),
             'customer_supplied' => cs,

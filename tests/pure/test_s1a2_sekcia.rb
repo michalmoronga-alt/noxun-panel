@@ -69,8 +69,9 @@ NxTest.test('S1-A2: sekcia stoji v skupine KATALÓGY medzi Kovanim a Pravidlami'
   NxTest.assert(!item.empty?, 'polozka navigacie sa nasla')
   NxTest.assert(item.include?("ic: 'appliance'"), 'ikona = appliance')
   NxTest.refute(item.include?('disabled:'), 'polozka nie je neaktivna — sekcia zije')
-  # Badge by tvrdil, ze sa nieco pocita; pocty „chyba/nesedi" pridu az v S1-B.
-  NxTest.refute(item.include?('badge:'), 'badge navigacie v A2 EST NIE JE')
+  # S1-B2: badge UZ JE — pocty „nevybrany / bez vlastnika / nalez" sklada
+  # SERVER v `appl.job.counts` (v A2 este nebolo co ratat).
+  NxTest.assert(item.include?("badge: 'appl'"), 'badge navigacie berie cisla z pohladu V zakazke')
 end
 
 NxTest.test('S1-A2: sekcia ma hlavicku (SEC_META) a vlastnu vetvu listy aj tela') do
@@ -88,9 +89,12 @@ end
 
 NxTest.test('S1-A2: whitelist akcii sekcie je UZAVRETY a `ready` v nom NIE JE') do
   acts = S1A2_AD::SECTION_ACTIONS
+  # S1-B2 pridala JEDINU akciu — `appl_job_select` (oznacenie vlastnika
+  # v modeli). Zapisy pohladu „V zákazke" idu kanalom ROZPOCTU, takze sa
+  # whitelist sekcie o ne nerozsiruje.
   NxTest.assert_equal(%w[appl_tree appl_card appl_create appl_patch appl_delete appl_restore
                          appl_attach appl_thumbnail appl_remove_attachment
-                         appl_open_url appl_open_attachment appl_leave],
+                         appl_open_url appl_open_attachment appl_leave appl_job_select],
                       acts, 'presne tieto akcie a ziadne ine')
   NxTest.refute(acts.include?('ready'), '`ready` by prepisal vlastny callback okna')
   NxTest.assert(acts.frozen?, 'zoznam je zmrazeny')
@@ -520,13 +524,15 @@ NxTest.test('S1-A2: klient ma vlastny priestor mien (`ap*` / `AP_*`)') do
                 "globaly bez prefixu: #{bad.join(' ')} — subor bezi v TOM ISTOM scope ako studio.js")
 end
 
-NxTest.test('S1-A2: pohlad „V zákazke" aj „Do zákazky" su aria-disabled s DOVODOM (D-78)') do
-  NxTest.assert(S1A2_AP_JS.include?('data-ap="view" data-v="job" aria-disabled="true"'),
-                'segment pohladov ma neaktivnu polovicu')
-  NxTest.assert(S1A2_AP_JS.include?('data-ap="tojob" aria-disabled="true"'),
-                'a tlacidlo karty tiez')
-  NxTest.assert(S1A2_AP_JS.scan(/S1-B/).length >= 3,
-                'dovod („príde v S1-B") je v tooltipe aj v hlaske po kliku — nie mrtve tlacidlo')
+# S1-B2: placeholder z A2 zanikol — OBE miesta su ZIVE. Test si to preto
+# pyta OPACNE (aby sa `aria-disabled` nemohol vratit nepozorovane) a drzi
+# povodne pravidlo: HTML `disabled` sa v sekcii nepouziva.
+NxTest.test('S1-B2: pohlad „V zákazke" aj „Do zákazky" su ZIVE (placeholder D-78 zanikol)') do
+  NxTest.refute(S1A2_AP_JS.include?('data-ap="view" data-v="job" aria-disabled="true"'),
+                'segment pohladov uz neaktivnu polovicu nema')
+  NxTest.refute(S1A2_AP_JS.include?('data-ap="tojob" aria-disabled="true"'),
+                'a tlacidlo karty tiez nie')
+  NxTest.assert(S1A2_AP_JS.include?("data-ap=\"jadd\""), 'pohlad ma „Pridať do zákazky"')
   NxTest.refute(S1A2_AP_JS_CODE.include?(' disabled>'),
                 'HTML `disabled` by prvok vyhodilo z Tab poradia a mlcalo by')
 end

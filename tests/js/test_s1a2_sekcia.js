@@ -153,8 +153,9 @@ A.apSetTree(tree());
 {
   const h = A.apToolsHtml(A.apToolsState());
   ok(h.includes('data-ap="view" data-v="job"'), 'lišta má segment pohľadov');
-  ok(h.includes('aria-disabled="true"') && h.includes('S1-B'),
-     'pohľad V zákazke je aria-disabled s dôvodom (D-78)');
+  // S1-B2: placeholder D-78 zanikol — obe polovice segmentu sú živé
+  // (kontrakt pohľadu „V zákazke" je v tests/js/test_s1b2_pohlad.js).
+  ok(!h.includes('aria-disabled="true"'), 'pohľad V zákazke už nie je placeholder');
   ok(!/ disabled[ >]/.test(h), 'a NIE je HTML disabled — to by ho vyhodilo z Tab poradia');
   ok(h.includes('data-ap="new"'), 'je tam Nový spotrebič');
   ok(h.includes('id="apQ"') && h.includes('id="apDel"'), 'hľadanie aj prepínač vyradených');
@@ -248,7 +249,10 @@ A.apSetCard(card());
   ok(h.includes('(odvodené)'), 'odvodená hodnota sa prizná');
   ok(h.includes('táto kategória tu nemá kótované polia'),
      'prázdny blok povie prečo — mlčiaci rám vyzerá ako chyba');
-  ok(h.includes('data-ap="tojob" aria-disabled="true"'), '„Do zákazky" je aria-disabled (D-78)');
+  // S1-B2: „Do zákazky" je ŽIVÉ (otvára spoločný modal) — kontrakt je
+  // v tests/js/test_s1b2_pohlad.js; tu stačí, že placeholder zanikol.
+  ok(h.includes('data-ap="tojob"') && !h.includes('data-ap="tojob" aria-disabled'),
+     '„Do zákazky" už nie je placeholder D-78');
   ok(h.includes('data-ap="url" data-u="https://nay.sk/beko"'), 'odkaz je tlačidlo, nie href');
   ok(!h.includes('href="https://'), 'v karte NIE JE žiadny href — otvára server');
   ok(h.includes('apfile main'), 'náhľad má vlastný rám');

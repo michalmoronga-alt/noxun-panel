@@ -1093,9 +1093,12 @@ NxTest.test('S1-B1 (kolo 1 P2): sirota vedie DEEP-LINKOM, nie vyberom entit') do
        'owner' => { 'kind' => 'cabinet', 'id' => 'CAB-9', 'pid' => nil } }], items
   )
   rt = NxS1B1::PC.route_target(items.first)
-  NxTest.assert_equal({ 'route' => 'appl', 'section' => 'budget', 'anchor' => 'appliance:A1' }, rt,
+  # S1-B2: adresa sa presunula z Rozpoctu do sekcie SPOTREBIČE (pohlad
+  # „V zákazke"). Menil sa VYHRADNE `ROUTE_SECTIONS` — tvar nalezu ani kotva
+  # nie (`appliance:<uuid>` plati v oboch sekciach).
+  NxTest.assert_equal({ 'route' => 'appl', 'section' => 'appl', 'anchor' => 'appliance:A1' }, rt,
                       'nalez sirotý nesie adresu SEKCIE, nie entity')
-  NxTest.assert(NxS1B1::PC.route_status(rt).include?('Rozpočte'))
+  NxTest.assert(NxS1B1::PC.route_status(rt).include?('Spotrebičoch'))
   # Nalez S POLOZKOU v modeli adresu sekcie NEMA — ide beznym vyberom.
   bound = []
   NxS1B1::VAL.check_appliances(

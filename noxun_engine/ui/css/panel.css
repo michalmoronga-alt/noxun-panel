@@ -1726,7 +1726,7 @@
              justify-self: end; }
   .nx-inspector .aprow .aprsel { max-width: 190px; font-size: 11px; min-width: 0; }
   .nx-inspector .aprow .ibtn { display: inline-flex; align-items: center; justify-content: center;
-             width: 20px; height: 18px; padding: 0; border: 1px solid transparent; border-radius: 5px;
+             width: 20px; height: 18px; padding: 0; border: 1px solid transparent; border-radius: 6px;
              background: none; color: var(--nx-ink-muted); cursor: pointer; }
   .nx-inspector .aprow .ibtn:hover { background: var(--nx-select-bg-soft); color: var(--nx-select);
              border-color: var(--nx-border); }

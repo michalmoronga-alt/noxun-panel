@@ -40,7 +40,7 @@ module Noxun
             # plnohodnotny vlastnik (varna doska, drez) a moze ich niest viac
             # naraz. Niku nema, takze sa ponuka nefiltruje a vazba geometriu
             # dosky nemeni (zapis configu bez prestavby, B1).
-            'appliance_rows' => appliance_rows('board', cfg, appliance_items(inst.model))
+            'appliance_rows' => appliance_rows('board', cfg, appliance_items(entity_model(inst)))
           }.merge(board_edge_texts(role, cfg)).merge(board_newer_flag(cfg))
         end
 
@@ -161,7 +161,7 @@ module Noxun
           # S1-B2: RIADOK „Spotrebič" v Zakladnych (viazane modely + nesplnene
           # ocakavania). Polozky zakazky sa citaju RAZ a sluzia obom klucom —
           # riadku aj vystupom slotu (telo z priradeneho modelu).
-          appl_items = appliance_items(cab.model)
+          appl_items = appliance_items(entity_model(cab))
           slot = cfg['type'].to_s == 'dishwasher'
           params['appliance_rows'] = appliance_rows(slot ? 'slot' : 'cabinet', cfg, appl_items,
                                                     (slot ? nil : appliance_interior(cfg)),
@@ -201,6 +201,19 @@ module Noxun
         rescue StandardError => e
           Engine.log_error(e, 'Panel.appliance_items')
           []
+        end
+
+        # Dokument, do ktoreho entita patri. Autoritou je SAMA ENTITA
+        # (`inst.model`) — panel moze kreslit kartu aj v okamihu, ked sa aktivny
+        # dokument prepina, a polozky zakazky musia prist z TOHO dokumentu,
+        # kde kus stoji. Headless fixtura `model` nema, takze vracia `nil`
+        # a riadok sa sklada nad prazdnym zoznamom.
+        def entity_model(inst)
+          return inst.model if inst.respond_to?(:model)
+
+          nil
+        rescue StandardError
+          nil
         end
 
         # `kind` = 'cabinet' | 'slot' | 'board' (druh VLASTNIKA, nie Store.kind).

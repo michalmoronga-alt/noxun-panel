@@ -18,12 +18,14 @@
 module Noxun
   module Engine
     module Panel
-      class << self
-        # Hlasky (jeden textovy zdroj).
-        APPL_MSG_NO_TARGET = 'Najprv označ skrinku, slot alebo dosku.'
-        APPL_MSG_STALE = 'Výber sa medzitým zmenil — panel sa obnovil, skús znova.'
-        APPL_MSG_NO_ITEM = 'Vyber spotrebič zo zoznamu.'
+      # Hlasky (jeden textovy zdroj). V TELE MODULU, nie v `class << self` —
+      # inak by zili na singleton triede a testy ani iné casti panela by sa na
+      # ne nedostali menom `Panel::APPL_MSG_*` (vzor `PARAM_KEYS`).
+      APPL_MSG_NO_TARGET = 'Najprv označ skrinku, slot alebo dosku.'
+      APPL_MSG_STALE = 'Výber sa medzitým zmenil — panel sa obnovil, skús znova.'
+      APPL_MSG_NO_ITEM = 'Vyber spotrebič zo zoznamu.'
 
+      class << self
         def handle_set_appliance_owner(payload)
           model = Sketchup.active_model
           data = parse(payload)
