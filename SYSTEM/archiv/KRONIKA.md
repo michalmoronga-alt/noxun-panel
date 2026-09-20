@@ -43,9 +43,15 @@
 - **Rozpočet UI:** modal „Pridať spotrebič" má pole **Z katalógu** (našepkávač nad katalógom tohto PC, predvypĺňa zo štruktúrovaných dát, nie z textu), select
   **Vlastník** (server posiela maticu aj zoznamy, klient ich len spája) a prepínač **dodáva zákazník**; modal je **viazaný na dokument**, z ktorého vznikol —
   prepnutá zákazka ho zavrie a zahodí frontu aj rozpracovaný dotaz. Pohľad „V zákazke", riadok Spotrebič v Inspectore a telo slotu z väzby patria S1-B2.
-- **Testy:** headless +38 (`tests/pure/test_s1b1_vazba.rb`), JS +77 (`tests/js/test_s1b1_rozpocet.js`), in-SU nová sekcia `run_s1b1` (40 kontrol: priradenie/presun/
-  odpojenie/zmazanie ako jeden krok Späť, sirota po Delete a jej náprava, trieda vs slot, „dodáva zákazník", legacy zákazka, **rollback po riadených zlyhaniach**
-  a **bariéra observera**). In-SU beh odhalil aj pascu stubov: `define_method` prebinduje `self`, takže helper `e` runnera v ňom neexistuje.
+- **Testy:** headless **4369** (nová `tests/pure/test_s1b1_vazba.rb`), JS **124 sád** (nová `tests/js/test_s1b1_rozpocet.js`, 105 kontrol), in-SU **2935 PASS / 0 FAIL**
+  — nová sekcia `run_s1b1` (67 kontrol: priradenie/presun/odpojenie/zmazanie ako jeden krok Späť, sirota po Delete a jej náprava, trieda vs slot, „dodáva zákazník",
+  legacy zákazka, **rollback po riadených zlyhaniach**, **bariéra observera** a tri podsekcie z review kôl). In-SU beh odhalil aj pascu stubov: `define_method`
+  prebinduje `self`, takže helper `e` runnera v ňom neexistuje.
+- **Review (tri kolá Codexu, PR #382):** kolo 1 = **1×P1 + 4×P2** (nedostupný vlastník v editore ticho presúval spotrebič · implicitný cieľ hľadaný podľa ID ·
+  dvojníci s tým istým ID · klik na sirotu cez resolver výberu · vlastník v payloade `patch`/`remove`), kolo 2 = **1×P1 + 3×P2** (nový spotrebič sa viazal na prvú
+  skrinku v ponuke · cieľ bez PID · `typ` pri zmene vlastníka obišiel maticu · presun siroty na recyklované ID nezapísal väzbu), kolo 3 = **4×P2 bez P1**
+  (kotva riadku pred `render()` · `ensure_root_context` zatváral komponent aj bez prestavby · `catalog_id` pri `move` · dôkaz väzby bez zhody druhu) → **interná
+  verifikácia delty** a merge. Mutácia M1 headless sady navyše odhalila reálnu chybu ešte pred prvým kolom (rescue `write!` abortoval cudziu operáciu).
 - **S1-E — SLOT UMÝVAČKY, PRVÝ TYP SKRINKY BEZ KORPUSU (v0.12.12, 20.9.2026, PR #381).** Pribudol **štvrtý typ objektu** vedľa dolnej, hornej a dosky:
   `type: dishwasher`. Nemá boky, dno, strop, chrbát ani zóny, **vyrába jediný dielec — čelo** (pevný item `blind`, rola `false_front`) a telo umývačky
   kreslí ako **referenciu** (`kind: reference`, `manufactured: false`, `production_class: 'reference'`) z dvoch boxov: telo podľa triedy (598/448) a pod ním

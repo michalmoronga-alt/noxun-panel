@@ -679,8 +679,9 @@ kvótová brána `usage` pred každým auditom a subagentom. Pravidlo 3 kôl pla
 - **S1-B1 ✅ PR #382, v0.12.13 · Spotrebič v zákazke — dáta, väzba, Kontrola** — `BUDGET_STD` 2 (položka += `catalog_id`, `snapshot`, `owner`, `customer_supplied`), **kanonické kódy
   kategórií** (legacy sa pri čítaní prevedie, zapisuje sa kanón), **„dodáva zákazník" ako príznak** (cena ostáva, do súčtov 0, informačný riadok v CP), **nový modul
   `core/appliance_binding.rb` = jediný transakčný vstup** (položka + `appliance_refs[]` oboch vlastníkov + prestavba v JEDNEJ operácii; guardy DocKey · std · matica · identita
-  PID+ID+druh · odpojený · novší config · bariéra observera · `ensure_root_context` bežia PRED `start_operation`), `Bom.collect[:appliances]`, Kontrola `appliance_owner_missing`
-  (bez `owner_id`) · `appliance_specs_missing` · `appliance_class_mismatch`, modal Rozpočtu (Z katalógu · vlastník · prepínač) viazaný na dokument.
+  PID+ID+druh · odpojený · novší config · bariéra observera bežia PRED `start_operation`; `ensure_root_context` len pri skutočnej prestavbe), `Bom.collect[:appliances]`,
+  Kontrola `appliance_owner_missing` (bez `owner_id`, deep-link do Rozpočtu) · `appliance_specs_missing` · `appliance_class_mismatch`, modal Rozpočtu
+  (Z katalógu · vlastník · prepínač) viazaný na dokument. **Review: 3 kolá Codexu** (1×P1+4×P2 · 1×P1+3×P2 · 4×P2) → interná verifikácia delty.
 - **S1-B2 (čaká) · UI väzby** — pohľad **V zákazke** (mockup R3–R5), **riadok Spotrebič** v Inspectore a v karte dosky (R9–R11), **telo slotu z väzby** (`source: 'catalog'`),
   výber podľa niky. Podklad má hotový: `collected[:appliances]` nesie stav aj `expected_missing`, `appliance_refs[]` nesú `body`/`niche`/`bands`.
 - *(pôvodné zadanie S1-B, ponechané ako kontrakt)* — snapshot (identita + rozmery + odkazy + prílohy), `appliance_refs[]`
