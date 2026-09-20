@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.12.9 · 20.9.2026 — M-R VZHĽAD KOMPLET, nad ním osem dávok D-94 až D-135** (S1-E0 = min výška korpusu 80 mm, PR #375 zmergovaný 20.9. · (Nákup s pôvodom · výška dreveného boxu · Kresba čiel · dormantný zámok ·
+**v0.12.10 · 20.9.2026 — M-R VZHĽAD KOMPLET, nad ním osem dávok D-94 až D-135 a začiatok bloku SPOTREBIČE S1** (S1-E0 = min výška korpusu 80 mm, PR #375 · **S1-A1 = katalóg spotrebičov so seedom 9 overených modelov** · (Nákup s pôvodom · výška dreveného boxu · Kresba čiel · dormantný zámok ·
 rozsah zákazky pri „Nahradiť UNI" aj pri hromadných zápisoch · **rework kontextu Čelá komplet — nový zoznam čiel + skupina „Spoločné pre skrinku"**).
 Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
@@ -37,7 +37,7 @@ v náhľade sa viaže na **fokus v poli alebo hover nad schémou**. Dáta, zápi
 ## Ďalší krok
 
 **Blok SPOTREBIČE S1 beží** (Michal schválil 20.9.2026, nočný autonómny beh): debata polí hotová, cross outside-in audit ×3 (Codex · Grok · Gemini) vyhodnotený, **mockup schválený**
-(`zdroje/ui20/mockup_spotrebice_s1.html`), packages v [PLAN.md](PLAN.md) blok 5. Poradie: **S1-E0** (min výška korpusu 80, ✅ PR #375) → A1 katalóg → A2 sekcia → E slot umývačky → B väzba →
+(`zdroje/ui20/mockup_spotrebice_s1.html`), packages v [PLAN.md](PLAN.md) blok 5. Poradie: **S1-E0** (✅ PR #375) → **A1 katalóg** (✅ v0.12.10) → A2 sekcia → E slot umývačky → B väzba →
 F telo chladničky + Kontrola → C šablóna → D uzáver (v0.13.0). Slot umývačky a telo chladničky sú nové vo V1. Po S1: **K1–K3**, **ceny materiálov/ABS**; D-126/D-127, D-48, D-109 po V1.
 
 ## Posledné uzávery

@@ -17,6 +17,34 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **S1-A1 — KATALÓG SPOTREBIČOV, JADRO (v0.12.10, 20.9.2026, PR #377).** Vznikol **tretí per-PC katalóg** vedľa materiálov a kovania:
+  `%APPDATA%\NOXUN\Engine\appliances.json` (JsonFileStore, `.bak`, vlastný sidecar zámok) s deviatimi overenými modelmi v seede. **Prečo takto:**
+  konkrétny spotrebič sa nikdy nedeformuje podľa niky, takže katalóg musí niesť presne to, čo kótuje list výrobcu — a nič viac. Preto je **každé pole
+  voliteľné a chýbajúci kľúč znamená „list to nekótuje"** (žiadny tichý default), rozmery sedia v štyroch blokoch v jazyku listov (telo · nika · čelo
+  a presahy · montáž) a presah čela sa zapisuje **spolu s referenciou** (Whirlpool kótuje voči telu, Bosch voči nike). Odvodené hodnoty (telo Bosch
+  BFL7221B1, hĺbka tela HBG774KB1) sú vymenované v `derived[]`, dve varianty niky (stĺp × pod doskou) sa nezlievajú do jedného rozsahu, ale druhá ide
+  do poznámky. **Kontrakt súbežnosti:** `rev` je **odtlačok obsahu** (SHA1, neukladá sa), povinný na každej mutácii vrátane `restore!`, `attach!`,
+  `set_thumbnail!` a `remove_attachment!` — server ho za klienta nikdy nedosadí, takže stale okno dostane `:conflict` a nič sa nezapíše; počítadlo by po
+  obnove z `.bak` mohlo pre iný obsah vydať tú istú hodnotu. **Prílohy** ležia v `%APPDATA%\NOXUN\Engine\appliances\<id>\`, teda **mimo stromu
+  `Plugins/noxun_engine`, ktorý updater pri aktualizácii celý vymieňa**; názov `<uuid>_<sanitized>.<ext>` je nemenný a nikdy sa nerecykluje (obsadený cieľ
+  sa neprepíše ani ako sirota — zákazkový snapshot naň môže odkazovať), publikuje sa staging → kontrola veľkosti uloženej kópie → `rename` → až potom
+  JSON pod tým istým zámkom. `delete!` je tombstone (súbory ostávajú), `snapshot_for` je uzavretý whitelist s hlbokou kópiou pre S1-B. **Kódy kategórií
+  sú kanonické pre celý engine** — S1-B na ne migruje slovenský enum rozpočtu. **Seed je 9 modelov, nie 10:** drez Blanco Legra XL 6 S nemá overený list
+  výrobcu (OVERENIE §12), takže sa neseeduje — kategória `sink` aj jej polia existujú a Michal ho pridá ručne. **Pasce:** `UI.openURL` musí dostať
+  `file:///` s URI kódovaním a doprednými lomkami (holá Windows cesta s medzerou a diakritikou nestačí) · limit 25 MB sa meria aj na uloženej kópii
+  (zdroj sa medzi kontrolou a kopírovaním mohol zväčšiť) · zámok katalógu sa nikdy nevnára do iného katalógového zámku · **`UI.openURL` v in-SU sekcii
+  musí byť posledný krok behu** — systémový prehliadač prekryje okno SketchUpu, zakryté okno prestane kresliť view a inferencia nad reálnou geometriou
+  (ghost snap, D-123 na zvýšenej ploche) začne vracať len základnú rovinu (prvý beh: 20 falošných FAILov). **Codex kolo 1 (1×P1 + 6×P2)** zapracované:
+  `snapshot_for` berie práve overený dokument priamo (druhé čítanie cez cache mohlo dať zákazke starý záznam) · katalóg **zakladá boot pluginu**
+  (`main.rb`, chránený blok — inak by súbor vznikol až v S1-A2) · zlyhaný seed = `:read_only` a `:read_only` zastaví mutáciu aj nad neexistujúcim súborom ·
+  neznámy kľúč `dims` **od klienta** je `:invalid` (dopredná kompatibilita platí pre súbor, nie pre formulár) · položky `attachments[]` sa kontrolujú už
+  v `assess!` · matica druh → prípona (PDF nikdy náhľad) · UNC cesta si v `file_url` necháva hostiteľa. **Codex kolo 2 (1×P1 + 5×P2)** zapracované: záloha sa v degradovanom stave posudzuje **tou istou maticou ako primár** (`.bak` z novšej verzie = `:read_only`, nie „čítaj zálohu"; snapshot z nej nevznikne) · uložené `dims` prechádzajú validáciou známych polí (ručná úprava „width: oops" = `:read_only` s cestou poľa) · `null` maže aj celé `dims` · mutácia nad **zmiznutými súbormi** pod zámkom najprv naseeduje katalóg (inak by 9 modelov už nikdy neprišlo) · `derived` sa overuje proti **schéme kategórie** (`body.wdith` neprejde) · in-SU sekcia netvrdí nič o zdraví živého katalógu vývojára.
+  **Codex kolo 3 (6×P2, interná delta)** zjednotilo validátor: uložený záznam sa posudzuje TÝMI ISTÝMI funkciami ako zápis (kategória z uzavretej sady, prílohy podľa matice druh → prípona, `derived` vždy, `dims` známe polia; dôvod nesie identitu záznamu aj cestu poľa), páry `*_min`/`*_max` sa nekontrolujú nad neznámymi kľúčmi, `flock` s návratovou hodnotou `false` zámok neznamená (mutácia = `:locked`) a I/O chyba pri čítaní sa priznáva stavom `:unsupported`, nikdy holou výnimkou.
+  **Testy:** 4232 headless
+  (nová sada `test_s1a1_appliance_catalog.rb`, 49 testov) · 121 JS sád · in-SU 2813 PASS / 0 FAIL (sekcia `run_s1a1`: boot katalógu, kópia súboru
+  s diakritikou a medzerou, `UI.openURL`, zlyhaná kópia bez siroty, tombstone priečinok nemaže). Mutácie: zrušený zámok (test súbehu s detským procesom),
+  zrušená kontrola `min ≤ max`, opakovaný seed — všetky tri zabité. Docs: nový `docs/architecture/appliances.md` + riadok v rozcestníku, STANDARD §7.1.
+
 - **S1-E0 — MINIMÁLNA VÝŠKA KORPUSU 80 mm (v0.12.9, 20.9.2026, PR #375, zmergovaný 20.9.2026 do main `7d4c567`; záznam nesie docs PR #376).** Spodná hranica výšky klesla z 200
   na 80 mm na všetkých troch miestach, ktoré ju držia (`CabinetBuilder::MIN`, `ScaleWatch::MIN`, `LIMITS` vo `form.js`) — Michal (20.9., debata S1) vypĺňa priestor nad umývačkou po
   líniu linky nízkym korpusom na dorovnanie (80–110 mm) a plugin ho dovtedy nepustil. Šírka (200) a hĺbka (150) sa nemenia. **`CONFIG_SCHEMA` 14 → 15** (Codex #374 P1: starší

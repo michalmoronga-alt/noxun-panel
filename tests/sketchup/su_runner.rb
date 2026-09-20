@@ -3639,6 +3639,139 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # --- S1-A1: KATALOG SPOTREBICOV — prilohy na REALNOM Windows suborovom
+  # systeme (headless sada ich overuje len logicky). Overuje sa to, co sa
+  # mimo SketchUpu overit NEDA: kopia suboru s DIAKRITIKOU a MEDZEROU v nazve,
+  # `UI.openURL` nad `file:///` cestou, zlyhanie kopie (zamknuty/nedostupny
+  # zdroj) a tombstone, ktory priecinok priloh NEMAZE.
+  #
+  # IZOLACIA: cely katalog aj priecinok priloh ide cez `test_dir_override` do
+  # docasneho priecinka; override sa v `ensure` VZDY vracia na nil, inak by
+  # dalsie sekcie (a zivy plugin) citali cudzi katalog.
+  #
+  # PORADIE: sekcia je POSLEDNA SYNCHRONNA a `UI.openURL` je v nej uplne
+  # nakoniec — systemovy prehliadac prekryje okno SketchUpu a zakryte okno
+  # prestane kreslit view, cim sa rozbije inferencia nad realnou geometriou
+  # v ghost a D-123 sekciach (dokazane behom 20.9.2026).
+  def run_s1a1(_model)
+    ac = e::ApplianceCatalog
+    # (0) BOOT: katalog posudzuje (a nad cistou instalaciou zaklada) uz
+    # `main.rb` pri starte pluginu (Codex #377 P2). Dokazom je MODULOVY STAV:
+    # `@state` nastavuje VYHRADNE `assess!`, takze nenulova hodnota EST PRED
+    # prvym volanim z testu znamena, ze boot naozaj bezal.
+    #
+    # PRECO NIE kontrola suboru ANI stavu: SketchUp nacita Plugins EST PRED
+    # `-RubyStartup`, takze bootstrap runnera presmeruje `ENV['APPDATA']` az
+    # PO boote pluginu (rovnako ako pri `Materials.boot_cutover!` — v sandboxe
+    # behu nie su ani jeho markery). Boot teda pracuje so ZIVYM katalogom
+    # vyvojara a sekcia nad nim NESMIE nic tvrdit: Michal si tam moze pridat
+    # vlastne modely (pocet 9 prestane platit) a katalog moze byt aj
+    # read-only ci degradovany — cela sada by potom padla na jeho stave, nie
+    # na chybe kodu (Codex #377 kolo 2 P2). Overuje sa VYHRADNE to, ze boot
+    # prebehol; zdravie obsahu strazi headless sada.
+    booted = ac.instance_variable_get(:@state)
+    ok("S1-A1 (0): katalog posudil uz BOOT pluginu, nie test (stav #{booted.inspect})", !booted.nil?)
+    info("S1-A1 (0): stav ZIVEHO katalogu po boote: #{booted} #{ac.instance_variable_get(:@state_reason)}")
+
+    root = File.join(Sketchup.temp_dir, "noxun_s1a1_#{Process.pid}_#{Time.now.to_i}")
+    FileUtils.mkdir_p(root)
+    ac.test_dir_override = root
+    ac.reset_state!
+    begin
+      st, info = ac.list
+      ok("S1-A1: izolovany katalog sa naseeduje (#{info[:records].length} modelov, stav #{st})",
+         st == :ok && info[:records].length == 9)
+      ok('S1-A1: subor lezi v izolovanom priecinku, nie v zivom %APPDATA%',
+         ac.path.start_with?(root) && File.file?(ac.path))
+
+      st_c, info_c = ac.create!('category' => 'sink', 'name' => 'Legra XL 6 S', 'manufacturer' => 'Blanco')
+      rec = info_c[:record]
+      ok("S1-A1: create prejde (#{st_c})", st_c == :ok && !rec.nil?)
+
+      # (a) REALNA kopia suboru s diakritikou a medzerou v nazve.
+      opened = nil
+      src = File.join(root, 'Technický list — drez 2026.pdf')
+      File.binwrite(src, 'PDF test')
+      st_a, info_a = ac.attach!(rec['id'], src, kind: 'sheet', rev: rec['rev'])
+      ok("S1-A1 (a): attach suboru s diakritikou a medzerou (#{st_a} #{info_a[:message]})", st_a == :ok)
+      if st_a == :ok
+        rec = info_a[:record]
+        item = rec['attachments'].first
+        target = File.join(ac.record_dir(rec['id']), item['file'])
+        ok("S1-A1 (a): kopia naozaj lezi na disku (#{item['file']})",
+           File.file?(target) && File.binread(target) == 'PDF test')
+        ok('S1-A1 (a): ulozeny nazov je ASCII (<uuid>_<sanitized>.pdf)',
+           item['file'].match?(/\A[0-9a-f-]{36}_technicky_list_drez_2026\.pdf\z/))
+        ok('S1-A1 (a): povodny nazov ostal v zazname', item['name'] == 'Technický list — drez 2026.pdf')
+        opened = [rec['id'], item['id'], target] # (b) sa spusta AZ NA KONCI sekcie
+      end
+
+      # (c) Zlyhanie kopie (zamknuty zdroj / EACCES) = [:copy_failed, hlaska],
+      #     ziadny staging a ziadna zmena zaznamu.
+      src2 = File.join(root, 'zamknuty list.pdf')
+      File.binwrite(src2, 'PDF')
+      before = File.binread(ac.path)
+      orig_cp = FileUtils.method(:cp)
+      FileUtils.define_singleton_method(:cp) { |*| raise Errno::EACCES, 'test: zamknuty subor' }
+      begin
+        st_f, info_f = ac.attach!(rec['id'], src2, kind: 'sheet', rev: rec['rev'])
+        ok("S1-A1 (c): zamknuty zdroj = :copy_failed s hlaskou (#{st_f}: #{info_f[:message]})",
+           st_f == :copy_failed && info_f[:message].to_s.length.positive?)
+      ensure
+        FileUtils.define_singleton_method(:cp, orig_cp)
+      end
+      ok('S1-A1 (c): po zlyhanej kopii nezostal staging ani zmeneny JSON',
+         Dir.glob(File.join(ac.record_dir(rec['id']), '*.tmp')).empty? &&
+         File.binread(ac.path) == before)
+
+      # (c2) REALNY zamok zdroja (Windows): vysledok sa LOGUJE, nie assertuje —
+      #      spravanie zavisi od verzie Windows, kontrakt strazi (c).
+      real = File.join(root, 'otvoreny list.pdf')
+      File.binwrite(real, 'PDF')
+      File.open(real, 'rb') do |f|
+        f.flock(File::LOCK_EX)
+        st_l, info_l = ac.attach!(rec['id'], real, kind: 'sheet', rev: ac.find(rec['id'])[1][:record]['rev'])
+        info("S1-A1 (c2): attach nad zamknutym zdrojom skoncil #{st_l} #{info_l[:message]}")
+        f.flock(File::LOCK_UN)
+      end
+
+      # (d) Tombstone NEMAZE priecinok ani subory priloh.
+      rec = ac.find(rec['id'])[1][:record]
+      dir_before = Dir.glob(File.join(ac.record_dir(rec['id']), '*')).sort
+      st_d, = ac.delete!(rec['id'], rev: rec['rev'])
+      ok("S1-A1 (d): delete = tombstone (#{st_d})", st_d == :ok)
+      ok("S1-A1 (d): priecinok priloh ostal nedotknuty (#{dir_before.length} suborov)",
+         Dir.glob(File.join(ac.record_dir(rec['id']), '*')).sort == dir_before && !dir_before.empty?)
+      ok('S1-A1 (d): vyradeny zaznam v zozname nie je, s prepinacom ano',
+         ac.list[1][:records].none? { |r| r['id'] == rec['id'] } &&
+         ac.list(include_deleted: true)[1][:records].any? { |r| r['id'] == rec['id'] })
+
+      # (b) UI.openURL nad `file:///` cestou (medzera aj diakritika v CESTE).
+      # AZ TU: spusta sa systemovy prehliadac, ktory PREKRYJE okno SketchUpu —
+      # po tomto kroku uz nesmie bezat nic, co potrebuje inferenciu nad realnou
+      # geometriou (viz komentar pri volani sekcie). Priloha sa otvara este
+      # z VYRADENEHO zaznamu — presne to bude robit zakazka cez snapshot.
+      if opened
+        url = ac.file_url(opened[2])
+        st_o, info_o = ac.open_attachment(opened[0], opened[1])
+        ok("S1-A1 (b): open_attachment otvoril subor cez #{url}", st_o == :ok)
+        info("S1-A1 (b): UI.openURL zlyhal pre #{info_o[:path]} — #{info_o[:message]}") unless st_o == :ok
+      else
+        ok('S1-A1 (b): open_attachment — priloha sa nevytvorila, nie je co otvarat', false)
+      end
+    ensure
+      ac.test_dir_override = nil # NIKDY nenechat presmerovany zivy katalog
+      ac.reset_state!
+      begin
+        FileUtils.rm_rf(root)
+      rescue StandardError
+        nil
+      end
+    end
+  rescue StandardError => ex
+    log_line("FAIL: run_s1a1 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
   # --- Recorder Panel.js (audit F9): zatvoreny panel je no-op — dokaz volania
   # NX.clearSelected/NX.setStatus sa zbiera docasnym obalenim Panel.js. Vzdy
   # parovat install/remove; remove je idempotentny (bezpecny aj po FAIL ceste).
@@ -23641,6 +23774,14 @@ module NoxunSuRunner
     run_mr3b(model)           # MR-3B: Apply cez skutocne vyskytove cesty, izolacia a rollback
     run_mr2a(model)           # MR-2A: pracovny SKM, atomicka priprava+Apply a early-exit rollback
     run_mr2b(model)           # MR-2B: controller dispatch, novy W, Save/retry/Reset a stale ACK
+    # S1-A1 je POSLEDNA SYNCHRONNA sekcia ZAMERNE: otvara prilohu cez
+    # `UI.openURL`, co spusti systemovy prehliadac a ten PREKRYJE okno
+    # SketchUpu. Zakryte okno prestane kreslit view a inferencia nad REALNOU
+    # geometriou (ghost snap na roh, D-123 na zvysenej ploche) zacne vracat
+    # len zakladnu rovinu — beh 20.9.2026 to dokazal 20 falosnymi FAILmi,
+    # ked sekcia bezala hned po S1-E0. Asynchronna retaz za nou uz inferenciu
+    # nepouziva (overene), takze tu skodit nema comu.
+    run_s1a1(model)           # S1-A1: katalog spotrebicov — prilohy na REALNOM disku (kopia suboru s diakritikou a medzerou, ASCII nazov ulozenej kopie, zlyhanie kopie = :copy_failed bez siroty a bez zmeny JSON, tombstone priecinok priloh NEMAZE, UI.openURL nad file:/// az uplne na konci); vsetko v izolovanom priecinku cez test_dir_override
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

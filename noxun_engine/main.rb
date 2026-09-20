@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.12.9' unless defined?(VERSION)
+    VERSION = '0.12.10' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -482,6 +482,7 @@ Sketchup.require 'noxun_engine/core/abs_rules'   # V0.3 ABS pravidla (pouziva Ma
 Sketchup.require 'noxun_engine/core/front_profiles' # D-90 uchytkove profily ciel (pred fronts/hardware_rules)
 Sketchup.require 'noxun_engine/core/hardware_rules' # V0.4 pravidla kovania (pred construction)
 Sketchup.require 'noxun_engine/core/hardware_catalog' # V0.6 C-1: katalog kovania (po materials/demos — pouziva slug, normalize_price, Demos.fetch)
+Sketchup.require 'noxun_engine/core/appliance_catalog' # S1-A1: katalog spotrebicov (po hardware_catalog — per-PC JSON vedla neho, pouziva Materials.dir a JsonFileStore)
 Sketchup.require 'noxun_engine/core/hardware_taxonomy' # KOV-B1: vyrobcovia a rady kovania (po hardware_catalog, pred hardware_sets — obe ju pouzivaju)
 Sketchup.require 'noxun_engine/core/hardware_sets' # V0.6 D1: sety kovania (po build_plan/hardware_catalog — GENERIC_TYPES, CATEGORIES; pred validation/ui)
 Sketchup.require 'noxun_engine/core/drawer_recipes' # KOV-C1: nemenne recepty zasuviek (ciste jadro, data pack v data/recipes)
@@ -569,6 +570,19 @@ module Noxun
         Materials.ensure_drawer_uni!
       rescue StandardError => e
         log_error(e, 'ensure_drawer_uni')
+      end
+
+      # S1-A1: prve stretnutie s katalogom spotrebicov. `assess!` nad cistou
+      # instalaciou ZALOZI subor a naseje 9 overenych modelov — bez tohto
+      # volania by katalog vznikol az pri prvom otvoreni sekcie (S1-A2) a
+      # dovtedy by Michal v `%APPDATA%` ziadny `appliances.json` nenasiel.
+      # VLASTNY chraneny blok (vzor `boot_cutover!`): poskodeny ci nezapisovatelny
+      # katalog NESMIE zhodit menu, toolbar ani observer — stav si modul
+      # zapamata (`read_only` / `degraded`) a povie ho az UI.
+      begin
+        ApplianceCatalog.assess!
+      rescue StandardError => e
+        log_error(e, 'appliance_catalog_boot')
       end
 
       # NASTROJE-1 (T1b): jednorazove UPRATANIE STARYCH INSTALACII Mower/Snaper
