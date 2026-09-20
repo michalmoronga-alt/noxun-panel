@@ -145,6 +145,16 @@ nad virtuálnym otvorom), **jednu** referenciu (`dw_body_reference`) a kovanie z
 **Generické telá** žijú v `DW_CLASSES` (600 → 598 × 555 × 820, 450 → 448 × 550 × 815) a sú to **tie isté čísla**, z ktorých kreslí builder, zbiera `Bom` aj náhľad
 (JS zrkadlo `PV_DW_BODY`, guard test ich porovnáva) — **kým slot nemá priradený model**.
 
+**S1-F: KONTROLNÁ GEOMETRIA NIKY CHLADNIČKY (`appliance_niche_references(cfg, interior)`).** Korpusový plán má od S1-F **ten istý aditívny kľúč `references`** ako slot.
+Vzniká z **väzby** (`appliance_refs[]`) kategórie `fridge` — skrinka, ktorá chladničku iba **očakáva**, box **nemá** (rozhodnutie Michal 20.9.2026, Codex #376 kolo 3 P2);
+bez väzby je zoznam prázdny a nič sa nekreslí. Box je **minimálna nika z listu** `[width_min, depth_min, height_min]`, **nie telo** (Beko: telo 540 × 1935 × 545, nika
+min 560 × 1940 × 555) — telo by tvrdilo, že sa spotrebič zmestí aj keď na montáž chýba 20 mm šírky. **Box vznikne LEN pri troch kladných minimách** (Astra S1-F BLOCKER F3);
+neúplný, ale platný katalógový záznam prestavbu **nikdy nezhodí** ani nevyhodí výnimku, len sa nekreslí a osové kontroly bežia ďalej per dostupná os. `origin` =
+`[(width − width_min) / 2, 0, interior_dims[:z_lo]]` — stojí na **hornej ploche dna**, je **centrovaný** (vnútro je symetrické, takže stred vnútra = stred korpusu) a **lícuje
+s čelnou rovinou** (hĺbka ide dozadu). **Nikdy sa nedeformuje**: keď je väčší než vnútro, **trčí** a Kontrola to povie. Deskriptor nesie `item_id` (identita `ref_key`
+= `ref:appliance_niche:<item_id>`) a voliteľné `bands` (pásma dverí spotrebiča). Viac chladničiek v jednej skrinke = **viac boxov**, každý s vlastnou identitou.
+Kategórie mimo `NICHE_REF_CATEGORIES` (dnes len `fridge`) geometriu nedostávajú — rúra a mikrovlnka sú vec zón (package S1-F, Scope OUT).
+
 **S1-B2: TELO Z VÄZBY.** Keď config slotu nesie `appliance_refs[]` kategórie `dishwasher` s blokom `body`, šírku a hĺbku tela určuje **katalógový list**
 (výšku vždy používateľ cez `dw_body_height`). Rozhoduje o tom **jediná funkcia `dw_body_dims(cfg)`** → `{w:, d:, label:, source: 'generic'|'catalog',
 item_id:}`; `dw_body_reference` z nej skladá deskriptor (pri katalógovom tele navyše `item_id` a label bez slova „generické“) a **tú istú funkciu** volajú
@@ -446,6 +456,14 @@ Definícia `NOXUN <cid> APPLIANCE` sa recykluje menom a `clear!`-uje, tag je tag
 **základňa** `Construction::DW_BASE_H` = 200 mm, odsadená `DW_BASE_INSET_FRONT` = 50 spredu a `DW_BASE_INSET_SIDE` = 20 do strán (zóna nôh a soklu spotrebiča).
 Telo sa **nikdy nedeformuje** podľa slotu — keď je širšie, trčí. **S1-B2:** config referencie nesie `source` (`generic` | `catalog`) a pri katalógovom tele aj
 **`item_id`** položky zákazky, takže sa v modeli dá povedať, **ktorý kus** tam stojí (kľúč pri generickom tele **chýba** — „nevieme“ nie je identita).
+
+**S1-F: `render_references` prechádza CELÝ zoznam** (Astra FIX F5) — do S1-F brala `list.first`, čo by pri skrinke s chladničkou **aj** druhou väzbou ticho zahodilo
+všetko okrem prvej referencie. **Identita je per referencia:** meno definície `NOXUN <cid> APPLIANCE` (telo slotu, nemení sa) alebo `NOXUN <cid> APPLIANCE <role> <item_id8>`
+(nika), `id`/`part_id` `<cid>-REF-APPL` alebo `<cid>-REF-NICHE-<item_id8>`; skratku uuid dáva `short_item_id` a **identitu v modeli drží atribút `config.item_id`** (celé uuid),
+nie meno. Definície referencií tej skrinky, ktoré v pláne už nie sú a nemajú živú inštanciu (odpojená väzba), po prestavbe **upratuje `purge_stale_reference_defs`**.
+**Box niky kreslí `draw_reference_niche`:** jeden kváder + **vodorovné čiary pásiem dverí spotrebiča na čelnej ploche** (`niche_band_levels` — zdola: `door_bottom_offset`,
+`+ door_lower`, `+ door_gap`; horná hrana horných dverí sa **nekreslí**, je to zvyšok do výšky niky a list ju presne nekótuje). Pásma sú **hrany, nie ďalšie kvádre** — tri
+telesá v jednej referencii by menili obálku pri prisúvaní. Kóta, ktorá by siahala nad box, sa vynechá: box sa kvôli listu nikdy nezväčšuje.
 
 **LOGICKÁ OBÁLKA `envelope(inst, transform:)`** (FIX E3) vracia **nominálny** obrys z configu (`width × depth × height`), nie skutočné bounds; `envelope_dims` je jeho
 čistá otázka nad uloženým configom (nil = cudzia entita, doska, poškodený config). Čítajú ju `Placement.next_x`, `Tools::Snaper` (cieľ **aj** prekážka) a

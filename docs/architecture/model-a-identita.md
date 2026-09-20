@@ -180,12 +180,19 @@ neblokuje a `class:sliding|classic` z novšej verzie áno. `parse_hardware_set_k
 
 **S1-E — aditívny kľúč `plan[:references]` (BLOCKER E2).** Referencia **nie je dielec**: nikdy nemá `part_key`, nikdy `prod` a **nikdy neprejde cez `parts`** —
 renderer dielcov (`CabinetBuilder.add_part`) zapisuje na entitu `kind: 'part'`, takže by ju kusovník aj VEPO videli ako dosku, ktorú nikto nevyrobí.
-Deskriptor (symbolové kľúče, mm Float): `ref_key` (unikátny v pláne) · `role` z `REFERENCE_ROLES` (dnes `appliance_body`) · `kind: 'reference'` ·
+Deskriptor (symbolové kľúče, mm Float): `ref_key` (unikátny v pláne) · `role` z `REFERENCE_ROLES` · `kind: 'reference'` ·
 `box` [3 × Float > 0] · `origin` [3 × Float] · `production_class: 'reference'` · `manufactured: false` · `source` z `REFERENCE_SOURCES`
-(`generic` | `catalog`) · `label` (ľudský popis do modelu a diagnostiky) · voliteľné `dw_class`. Validuje ho `validate_references!`, volané z `validate!`
-len keď kľúč existuje — **plány dolnej a hornej skrinky ho nedostanú a ich kontrakt sa nemení**. `SCHEMA` ostáva **5**: plán sa **neperzistuje**
+(`generic` | `catalog`) · `label` (ľudský popis do modelu a diagnostiky) · voliteľné `dw_class`, `item_id`, `bands`. Validuje ho `validate_references!`, volané
+z `validate!` len keď kľúč existuje. `SCHEMA` ostáva **5**: plán sa **neperzistuje**
 (do configu ide cez `merge_final` len menovitý zoznam kľúčov), takže kompatibilitu vyjadruje `CabinetBuilder::CONFIG_SCHEMA`, nie schéma plánu.
 Kreslí ho `CabinetBuilder.render_references` (viď [construction.md](construction.md)).
+
+**S1-F — DRUHÁ ROLA referencie a DESKRIPTOR PER POLOŽKU.** `REFERENCE_ROLES` sú od S1-F **dve**: `appliance_body` (telo spotrebiča v slote umývačky) a
+**`appliance_niche`** (kontrolná geometria niky chladničky — box minimálnych rozmerov niky z listu s pásmami dverí spotrebiča). **Od S1-F má kľúč `references`
+aj korpusový plán** (`build_plan`), nie len slot: bez väzby je **prázdne pole**, takže kontrakt dolnej a hornej skrinky sa nemení. Zoznam je **deskriptor per
+položku zákazky** — `ref_key` je `ref:appliance_niche:<item_id>` a skrinka s dvoma chladničkami nesie dva deskriptory (`validate_references!` duplicitný
+`ref_key` odmieta). Voliteľné `item_id` nesie identitu položky (pri `source: 'catalog'`) a `bands` pásma dverí spotrebiča; renderer z nich skladá meno definície,
+`part_id` aj čiary na čelnej ploche.
 
 ## Perzistencia a nastavenia počítača
 

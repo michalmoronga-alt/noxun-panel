@@ -696,8 +696,12 @@ kvótová brána `usage` pred každým auditom a subagentom. Pravidlo 3 kôl pla
   položka zákazky drží staré ID): položka sa NEMENÍ automaticky (Delete je transparentná operácia používateľa a Undo ju vráti) — Kontrola ju hlási ako **opraviteľného sirotu**
   („vlastník neexistuje", ORANGE, s akciou odpojiť → job) a pohľad V zákazke ho ukáže ako „vlastník zmizol"; test Delete + Undo/Redo + odpojenie · **výber podľa niky porovnáva len osi, ktoré daná kategória kontroluje** (rúra/mikro len
   Š + H; nejednoznačná nika = bez filtra).
-- **S1-F · Telo chladničky + Kontrola niky a delenia dverí** *(builder → `codex-audit` ÁNO; in-SU povinné)* — box niky s pásmami z `appliance_refs[]`, `appliance_niche_clash` per os,
-  `appliance_door_split` v súradniciach niky, náhľad (mockup R4, R10, R12).
+- **S1-F ✅ PR #N, v0.12.15 · Telo chladničky + Kontrola niky a delenia dverí** — **box kontrolnej niky** (minimá z listu, pásma dverí spotrebiča na čelnej ploche) vzniká
+  **len z väzby** `appliance_refs[]` kategórie chladnička a len pri troch kladných minimách; stojí na hornej ploche dna, je centrovaný, lícuje s čelnou rovinou a nikdy sa
+  nedeformuje. Nový čistý modul **`core/appliance_checks.rb`** = jediná autorita verdiktu, z ktorej žije Kontrola aj riadok Spotrebič: `appliance_niche_clash|<os>` (šírka
+  a hĺbka vždy, výška chladničky len pri jednej zóne; rúra a mikro Š + H) a `appliance_door_split` (hrana = vrch dolného čela od dna niky, pásmo `[D+10, D+G−s−10]`, výkres
+  výrobcu má prednosť). Kontrola hlási **len** `clash`/`unsatisfiable` — žiadna nová závažnosť. Náhľad kreslí box, pásma aj pásmo prípustnej hrany z payloadu servera
+  (mockup R4, R10, R12). Výstupy, kusovník ani VEPO sa nemenia.
 - **S1-C · Spotrebičová šablóna `expects[]` + ORANGE bez spotrebiča** *(TemplateStore STD 5 → 6 → `codex-audit` ÁNO)* — kľúč `appliance_expects[]` v configu skrinky je už v
   schéme 16 z S1-E (žiadny ďalší bump); kombinovaná skrinka očakáva viac kategórií.
 - **S1-D · Uzáver bloku** *(docs, `VERSION` → 0.13.0)* — V1_VIZIA, archív, STAV, KRONIKA, README, POJMY, smoke checklist pre Michala.

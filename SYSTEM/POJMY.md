@@ -41,6 +41,19 @@
   kreslí sa len preto, aby bolo vidno, čo do slotu príde. Nikdy sa nedeformuje podľa skrinky: keď je širšia, **trčí** a Kontrola to prizná.
 - **Základňa tela (200)** — spodných 200 mm tela spotrebiča: **fixná**, užšia (20 mm z každej strany) a plytšia (50 mm spredu) než telo.
   Je to zóna nôh a soklu spotrebiča — v modeli vďaka nej vidno, kadiaľ vedie soklová lišta.
+- **Kontrolná geometria chladničky** (S1-F) — box **minimálnych rozmerov NIKY** z listu výrobcu (Beko 560 × 555 × 1940), ktorý stojí na hornej ploche dna,
+  je centrovaný a lícuje s čelnou rovinou. **Nie je to telo** (telo Beko je 540 × 1935 × 545): telo by tvrdilo, že sa spotrebič zmestí, aj keď na montáž
+  chýba 20 mm šírky. Je to **referencia** — nikdy v kusovníku, VEPO ani v nákupe — a vzniká **len z priradeného modelu**; skrinka, ktorá chladničku iba
+  očakáva, box nemá. Nikdy sa nedeformuje: keď nesedí, **trčí** a Kontrola to povie (šírka · výška · hĺbka, každá os zvlášť).
+- **Pásma dverí spotrebiča** (S1-F) — vodorovné hrany na čelnej ploche boxu niky v miestach, kde sú hrany **dverí samotnej chladničky**. Viažu sa **ZDOLA**
+  (Beko: spodok 40 + dolné dvere 629 = 669 je presné, medzera 71, horné pásmo je zvyšok do výšky niky — list ho presne nekótuje). Sú to kontrolné čiary,
+  nie nábytkové čelá.
+- **Odporúčané delenie podľa praxe** (S1-F) — kde smie ležať **hrana medzi dolným a horným nábytkovým čelom**, aby lícovala s delením dverí chladničky:
+  `[D + 10, D + G − s − 10]`, kde `D` = spodok + dolné dvere spotrebiča, `G` = medzera medzi dverami spotrebiča, `s` = **škára** medzi nábytkovými čelami.
+  **10 mm je presah** nábytkových dverí cez hranu dverí spotrebiča na **oboch** stranách (Michal 19.9.2026) — bez neho by hrana chladničky bola pri čelnej
+  hrane na tesno. Hranou sa rozumie **vrch dolného čela** meraný od dna niky (sokel a dno sa odpočítavajú). Stred pásma je odporúčanie; keď výrobca dá
+  **výkres nábytkových dverí**, jeho rozsah má prednosť. Keď je rozstup dverí spotrebiča menší než `s + 20`, presah sa na obe strany nezmestí a delenie sa
+  **nedá odporučiť** — je to fakt listu, nie chyba skrinky.
 - **Vlastník spotrebiča** (S1-B1) — kus, v ktorom spotrebič **fyzicky stojí**: skrinka · slot umývačky · doska (drez, varná doska) — alebo **„len zákazka"**
   (`job`), keď v modeli nestojí nikde (digestor, kus na objednávku). Väzba je **obojsmerná**: položka rozpočtu nesie vlastníka a vlastník nesie jej `item_id`,
   takže vlastník platí **len keď entita existuje A o väzbe vie** (ID skriniek sa recyklujú). Priradenie, presun aj odpojenie je **jedna akcia = jeden krok Späť**.

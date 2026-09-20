@@ -17,6 +17,32 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **S1-F — KONTROLNÁ GEOMETRIA CHLADNIČKY + KONTROLA NIKY A DELENIA ČIEL (v0.12.15, 21.9.2026, PR #N).** Skrinka s priradenou chladničkou v modeli **nič
+  neukazovala** a nikto nepovedal, či sa nika zmestí ani kde má byť hrana medzi čelami — Michal to kreslil ručne a delenie odhadoval. Táto dávka obe veci dorobila
+  a **výstupy (kusovník, VEPO, nákup, rozpočet) nechala bajtovo nezmenené**.
+- **Box kontrolnej niky** je to, čo Michal kreslil ručne: kváder **minimálnych rozmerov niky z listu** (Beko 560 × 555 × 1940) s **pásmami dverí spotrebiča**
+  na čelnej ploche (zdola 40 · 629 · 71 · zvyšok). **Nie je to telo** (540 × 1935 × 545): telo by tvrdilo, že sa spotrebič zmestí, aj keď na montáž chýba 20 mm
+  šírky. Vzniká **výhradne z väzby** `appliance_refs[]` (skrinka, ktorá chladničku iba očakáva, box **nemá** — rozhodnutie Michal 20.9.) a **len pri troch
+  kladných minimách**: neúplný, ale platný katalógový záznam prestavbu **nikdy nezhodí**, len sa nekreslí a osové kontroly bežia ďalej. Stojí na hornej ploche
+  dna, je centrovaný, lícuje s čelnou rovinou a **nikdy sa nedeformuje** — keď nesedí, trčí a Kontrola to povie. Korpusový plán tak dostal ten istý aditívny
+  kľúč `references`, aký mal od S1-E slot; `render_references` prechádza **celý** zoznam (predtým `list.first`) a každá referencia má vlastnú definíciu aj identitu.
+- **Verdikt má JEDEN modul — `core/appliance_checks.rb`.** Kontrola aj riadok Spotrebič v Inspectore sa pýtajú tej istej čistej funkcie nad tým istým záznamom
+  zberu, takže semafor a karta nemôžu nad jednou skrinkou tvrdiť iné číslo. `Bom.collect[:appliances]` preto nesie **kompletný výpočtový kontext** (vnútro,
+  dno niky, škára čiel, jedna zóna, dvojica čiel, pásma, výkres) — počíta sa **raz na vlastníka**, bez druhého skenu modelu.
+- **Kontrola niky je per os:** `appliance_niche_clash|<os>` (tri osi = tri samostatné veci na opravu, každá s vlastným `stable_key`). Šírka a hĺbka sa merajú
+  vždy, **výška chladničky len pri jednej zóne** (v delenej skrinke neexistuje jedno vnútro); rúra a mikrovlnka majú šírku a hĺbku. **Delenie čiel**
+  (`appliance_door_split`) hovorí, kde smie ležať **vrch dolného čela** meraný od dna niky: `[D + 10, D + G − s − 10]` s presahom 10 mm cez hranu dverí
+  spotrebiča na oboch stranách (Michal 19.9.). Výkres nábytkových dverí od výrobcu má prednosť a prevádza sa cez **spodnú** hranu dolného čela, lebo tá môže
+  začínať pod nikou (sokel 100 + dno 18). Keď rozstup dverí spotrebiča presah na obe strany nedovolí, verdikt je `unsatisfiable` — fakt listu, nie chyba skrinky.
+- **Kontrola hlási LEN to, čo sa dá opraviť.** Nález vzniká výhradne pre `clash` a `unsatisfiable`; „nevieme" (list číslo nedáva), „nekontrolované" (viac zón)
+  a „netýka sa" (zásuvka namiesto dvierok) žijú v riadku Spotrebič a v `appliance_rows[].check`. **Žiadna nová závažnosť nevznikla** — kontrakt Kontroly ostáva
+  RED/ORANGE a počítadlá, badge ani klient sa nemenia.
+- **Náhľad Inspectora (kontext Korpus)** kreslí box, pásma aj jantárové pásmo prípustnej hrany z **hotového payloadu servera** (`preview.appliances[]`,
+  kolekcia adresovaná `item_id`) — JS si nedopočítava ani jedno číslo listu a scéna obsiahne aj box, ktorý z korpusu trčí.
+- **Testy:** nové sady `tests/pure/test_s1f_chladnicka.rb`, `tests/js/test_s1f_preview.js` a in-SU `run_s1f` (väzba → box v modeli → prestavba → Späť · presun
+  medzi skrinkami · `rebind_model` · zmena živého katalógu snapshotom nepohne · odpojenie a Späť). Mutácie: box aj pre `expects`, škára natvrdo 2, hrana bez
+  odčítania `z_lo` — všetky tri sada zabila.
+
 - **S1-B2 — SPOTREBIČ V ZÁKAZKE: POHĽAD „V ZÁKAZKE“, RIADOK SPOTREBIČ, TELO SLOTU Z VÄZBY (v0.12.14, 20.9.2026, PR #383).** Väzba z S1-B1 existovala, ale
   **nebolo ju kde vidieť**: sekcia Spotrebiče mala druhý pohľad priznaný ako placeholder, Inspector o spotrebiči mlčal a slot umývačky kreslil generické telo
   aj vtedy, keď už mal priradený konkrétny model. Táto dávka dorobila celú viditeľnú stranu — **bez jediného nového dátového kontraktu**.

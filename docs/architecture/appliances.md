@@ -272,3 +272,33 @@ jedno Späť by vrátilo len jednu z nich a zákazka by ostala v stave, ktorý v
 - **Ponuka vlastníkov cestuje v payloade rozpočtu** (`appliance_owners` = `matrix` + `options` per druh +
   `job_label`), nie samostatným kanálom: patrí k dokumentu, ktorý payload priniesol, takže prepnutie zákazky ju
   vymení samo a modal nikdy neponúka skrinku z inej zákazky.
+
+### appliance_checks.rb
+
+**Jediná autorita verdiktu niky a delenia čiel** (S1-F). O tom, či sa chladnička do skrinky zmestí a kde smie ležať hrana medzi dolným a horným čelom,
+hovoria **dve** miesta — Kontrola (`Validation`, ORANGE nálezy) a riadok „Spotrebič“ v Inspectore (`Panel.appliance_rows`). Keby si každé počítalo svoje,
+semafor a karta by mohli nad tou istou skrinkou tvrdiť iné číslo. Tento modul preto drží **všetky vzorce aj všetky vety**; volajúci už len kreslí.
+Je **čistý**: žiadne IO, žiadny SketchUp objekt, žiadny zápis. Vstupom je **záznam zberu** (`Bom.collect[:appliances]`) s kompletným výpočtovým kontextom;
+Inspector si ten istý záznam skladá z uloženého configu cez **`context(cfg)`** — tá istá funkcia, takže druhá pravda nevznikne.
+
+- **`context(cfg)`** → `{interior, z_lo, gap, single_zone, fronts_pair}`. `interior` a `z_lo` z `Construction.interior_dims`; `gap` a `fronts_pair`
+  z **jedného** `Fronts.resolve_layout` (druhý výpočet by mohol dať iný default škáry — Codex #376 kolo 2 P2). Slot umývačky vnútro nemá, preto vracia `{}`.
+- **`single_zone?(cfg)`** — autoritou je **koreň stromu zón** (`zone_tree.split`); ploché `zones` sú len jeho projekcia a slúžia legacy skrinke bez stromu.
+  Ten **istý** predikát používa filter ponuky modelov aj verdikt: inak by ponuka filtrovala podľa výšky, ktorú by verdikt vzápätí označil za nekontrolovateľnú.
+- **`niche_verdict(rec)`** → stav per os `ok | clash | unknown | skip` (+ celkový `na`, keď sa nika danej kategórie ani vlastníka netýka). Osi per kategória
+  drží `AXES`: chladnička **šírka · výška · hĺbka**, rúra a mikrovlnka **šírka · hĺbka** (ich výška je vec zón, rozhodnutie 7). `skip` má **len výška** a **len**
+  pri viacerých zónach. Agregácia: `clash` > `unsatisfiable` > `unknown` > `skip` > `na` > `ok`. Texty **menujú overené osi** („šírka, výška a hĺbka ✓“,
+  „výška nekontrolovaná — skrinka má viac zón“) a nikdy netvrdia, že je montáž priechodná: overená je **obálka niky**, nie police ani vnútorné vybavenie (FIX F13).
+- **`door_split_verdict(rec)`** → `ok | clash | na | unknown | unsatisfiable`. **Hrana je VRCH DOLNÉHO ČELA** meraný od dna niky: `bounds[lower][:z1] − z_lo`
+  (nezaokrúhlené `Fronts` hranice, tolerancia `EPS` = 0,01). Prípustné pásmo praxe je **`[D + 10, D + G − s − 10]`**, kde `D = door_bottom_offset + door_lower`
+  (spodok + dolné dvere **spotrebiča**), `G = door_gap` a `s` je normalizovaná škára čiel; **10 mm je presah nábytkových dverí cez hranu dverí spotrebiča
+  na oboch stranách** (konštanta enginu `OVERLAP_MIN`, Michal 19.9.2026). Stred pásma je **odporúčanie**. Prázdny interval (`G < s + 20`) je **`unsatisfiable`**:
+  bez pásma a bez odporúčania, s vetou, ktorá menuje rozstup aj škáru (FIX F8).
+- **Výkres výrobcu má prednosť.** Keď snapshot nesie `furniture_doors`, `lower_min`/`lower_max` sú **výšky dolných nábytkových dverí** (rozmer dielca), takže
+  sa do niky prevádzajú cez **spodnú hranu dolného čela**: `bounds[lower][:z0] + h − z_lo`. Tá môže začínať **pod** nikou (sokel 100 + dno 18 + medzera 2 = 16 mm
+  pod dnom niky) — `lower_z0` to nesie (FIX F2). Čiastočný blok = jednostranný rozsah, prázdny blok = vzorec praxe; `gap_ref` je len informácia a keď sa líši
+  od škáry projektu, text to prizná.
+- **Aplikovateľnosť dvojice čiel** (FIX F6): delenie sa počíta **len** pri práve dvoch čelách typu `door` nad sebou. Zásuvka, výklop, sklop, blenda ani riadok
+  bez čela panel dverí netvoria — stav je `na` s dôvodom („delenie sa netýka: zásuvka“).
+- **`findings(rec, computed = nil)`** vyrába vety Kontroly — **výhradne pre `clash` a `unsatisfiable`** (FIX F7 + F9). `unknown`, `skip` a `na` sú informácia
+  pre riadok Spotrebič, nie ORANGE.
