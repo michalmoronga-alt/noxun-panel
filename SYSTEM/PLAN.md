@@ -649,9 +649,20 @@ kvótová brána `usage` pred každým auditom a subagentom. Pravidlo 3 kôl pla
 
 - **S1-E0 · min výška korpusu 200 → 80 mm** *(✅ PR #375 zmergovaný 20.9.2026 → main `7d4c567`, v0.12.9; `CONFIG_SCHEMA` 14 → 15, config-aware klamp scale cez celý `build_plan`
   (min 94 mm s policou), default sokla v JS validácii; Codex kolo 1 = 1×P1 + 2×P2, kolo 2 = 1×P2, delta overená; D-135)* — dôvod: korpus na dorovnanie nad umývačkou (V1_DEBATA §3).
-- **S1-A1 · Katalóg spotrebičov — jadro** *(nový modul `core/appliance_catalog.rb` → `codex-audit` ÁNO)* — per-PC JSON katalóg (JsonFileStore, zámok, forward guard, tombstone), záznam
-  v štyroch blokoch telo · nika · čelo/dvere · montáž, prílohy (0–1 náhľad; súbory v `%APPDATA%\NOXUN\Engine\appliances\<id>\`, mimo stromu, ktorý updater vymieňa), **seed 9
-  overených modelov** (drez Blanco bez listu výrobcu sa neseeduje — Michal ho pridá ručne), `snapshot_for` pre zákazku; bez UI a bez ceny.
+- **S1-A1 · Katalóg spotrebičov — jadro** *(✅ PR #N, v0.12.10 — nový modul `core/appliance_catalog.rb`; Codex audit Astra 20.9.: 2 BLOCKER + 10 FIX + 2 NOTE zapracované)*.
+  **Scope IN:** per-PC JSON `%APPDATA%\NOXUN\Engine\appliances.json` cez `JsonFileStore` (atomický zápis + `.bak`, vlastný sidecar zámok — nikdy vnorený do iného katalógového),
+  marker `std` 1 s dopredným guardom, matica `assess!` `:ok | :read_only | :degraded`. **Scope OUT:** UI, väzba do zákazky, cena, Demos/scraping, drag-and-drop, PDF náhľad.
+  **Kontrakt (R1–R7):** záznam = UUID `id` · `category` z kanonických kódov `fridge oven microwave dishwasher hob sink hood other` (SK popisky v jednej mape, guard parity;
+  kategória sa nastavuje LEN pri `create!`) · výrobca · názov · `shop_urls[]` · `sheet_urls[]` · poznámka · `dims` v štyroch blokoch **telo · nika · čelo a presahy · montáž**
+  (obsah `front` per kategória; presah rúry/mikra vždy s referenciou `body|niche`; každé pole voliteľné, **chýbajúci kľúč = neznáme, nikdy default**; validácia mm 0–5000,
+  kg 0–100, enumy, `*_min ≤ *_max`; kľúče mimo whitelistu prežijú bez validácie) · `derived[]` (cesty odvodených polí) · `attachments[]` · tombstone `deleted_at`.
+  **`rev` = SHA1 odtlačok obsahu** (neukladá sa, počíta sa pri čítaní) a je **povinný na KAŽDEJ mutácii** — server ho nikdy nedosadí, stale okno dostane `:conflict`; mutácia
+  beží pod zámkom nad čerstvo načítaným dokumentom. **Prílohy** v `%APPDATA%\NOXUN\Engine\appliances\<id>\` (mimo stromu, ktorý updater vymieňa) s **nemenným názvom
+  `<uuid>_<sanitized>.<ext>`**, ktorý sa nikdy nerecykluje; staging v cieľovom priečinku → limit 25 MB meraný aj na uloženej kópii → `rename` → až potom JSON; najviac jeden
+  náhľad; `remove_attachment!` súbor ponecháva. `snapshot_for` = whitelist s hlbokou kópiou + `catalog_std` (zákazka je od katalógu nezávislá). **Seed = 9 overených modelov**
+  (markerový, nikdy opakovane; hodnoty a URL výhradne z OVERENIA listov; drez Blanco sa neseeduje — Michal ho pridá ručne, kategória `sink` existuje). Jeden návratový tvar
+  `[status, info]` s cestou chybného poľa. **DoD:** `tests/pure/test_s1a1_appliance_catalog.rb` (30 testov) + in-SU `run_s1a1` (prílohy na reálnom disku, `UI.openURL`,
+  zlyhaná kópia, tombstone) + docs `docs/architecture/appliances.md` a STANDARD §7.1.
 - **S1-A2 · Sekcia Štúdia SPOTREBIČE — pohľad Katalóg** *(UI, audit NIE)* — 13. sekcia `appl` (skupina KATALÓGY), strom + karta + prílohy + D-15 modal podľa mockupu R1–R8;
   tlačidlo „Do zákazky" a pohľad „V zákazke" sú v A2 `aria-disabled` s dôvodom (D-78), aktivuje ich S1-B.
 - **S1-E · Slot umývačky — nový typ skrinky** *(builder + `CONFIG_SCHEMA` 15 → 16 + TemplateStore STD 4 → 5 → `codex-audit` ÁNO; in-SU povinné)* — 7 vstupov, jediný dielec čelo

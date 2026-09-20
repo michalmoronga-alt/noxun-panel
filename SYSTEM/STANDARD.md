@@ -946,6 +946,13 @@ ceste podľa OBSAHU — rovnako marker 3 pri duplák väzbe).
 - **Duplicitné variant identity sú zakázané** (sheet: skupina+typ+hrúbka+štruktúra, PD
   +formát; ABS: skupina+šírka+hrúbka+štruktúra) — create, rename aj migrácia ich odmietnu.
 
+**Katalóg spotrebičov (S1-A1) je TRETÍ per-PC katalóg** vedľa materiálov a kovania
+(`%APPDATA%\NOXUN\Engine\appliances.json`, vlastný sidecar zámok, marker `std` s dopredným
+guardom) a platí preň **ten istý režim: živý katalóg × snapshot v zákazke** — zákazka si pri
+priradení modelu odkopíruje jeho identitu, rozmery a odkazy (`snapshot_for`, S1-B) a od živého
+katalógu je odvtedy nezávislá; vyradenie modelu je tombstone, nie mazanie. Detail kontraktu:
+[../docs/architecture/appliances.md](../docs/architecture/appliances.md).
+
 ### 7.2 Materiálové dedenie
 
 ```

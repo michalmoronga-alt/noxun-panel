@@ -25,6 +25,7 @@ Reťaz: `noxun_engine.rb` (loader, autorita VERSION) → `noxun_engine\main.rb` 
 | [architecture/construction.md](architecture/construction.md) | plánovač, buildery, strom zón, police a čelá, osi dielca, prekrytia v modeli (`Sketchup::Overlay`), absorpcia scale |
 | [architecture/materials.md](architecture/materials.md) | katalóg materiálov a ABS, dekorové skupiny, migrácia a zdravie katalógu, pravidlové ABS defaulty, Demos konektor |
 | [architecture/hardware.md](architecture/hardware.md) | pravidlá kovania, katalóg položiek, sety |
+| [architecture/appliances.md](architecture/appliances.md) | katalóg spotrebičov (per PC), prílohy, snapshot modelu pre zákazku |
 | [architecture/outputs.md](architecture/outputs.md) | kontrolný semafor, zdieľané jadro výstupov zákazky (kusovník, VEPO, nákup, rozpočet, ceny, exporty) |
 | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) | Inspector (kostra, kontexty, karty), Štúdio (okno a sekcie), zdieľané JS komponenty, lifecycle okien |
 
@@ -53,6 +54,7 @@ DC pasce [DC_PRAVIDLA.md](DC_PRAVIDLA.md) · UI dizajn [UI_DIZAJN.md](UI_DIZAJN.
 | `demos/` (`client` · `slug_matcher` · `name_search` · `product_parser` · `family` · `lookup` · `sitemap_cache` · `image_cache`) | [architecture/materials.md](architecture/materials.md) |
 | `hardware_rules` · `hardware_catalog` · `hardware_taxonomy` · `hardware_sets` | [architecture/hardware.md](architecture/hardware.md) |
 | `drawer_recipes` (nemenné recepty zásuviek + dátový pack `data/recipes/`) | [architecture/hardware.md](architecture/hardware.md) |
+| `appliance_catalog` (per-PC katalóg spotrebičov: rozmery z listov, prílohy, tombstone, snapshot pre zákazku) | [architecture/appliances.md](architecture/appliances.md) |
 | `validation` · `bom` · `budget` · `budget_store` · `sheet_estimate` | [architecture/outputs.md](architecture/outputs.md) |
 | `price_refresh` · `supplier_settings` · `vepo_export` · `cp_export` · `xlsx_writer` | [architecture/outputs.md](architecture/outputs.md) |
 | `usage_stats` | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |

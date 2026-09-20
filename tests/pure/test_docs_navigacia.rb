@@ -36,7 +36,7 @@ NX_NEXT_SESSIONS_STATUS = '> Stav: KONCEPT'
 NX_ARCH_ROUTER_MAX_LINES = 200
 NX_ARCH_FILES = %w[
   model-a-identita.md construction.md materials.md
-  hardware.md outputs.md ui-lifecycle.md
+  hardware.md appliances.md outputs.md ui-lifecycle.md
 ].freeze
 # Dlhy riadok = necitatelny diff (jeden odsek = jeden riadok bola presne choroba,
 # ktoru tato davka liecila). Plati na router aj na mapu; SYSTEM/ je mimo rozsah.
@@ -175,7 +175,7 @@ NxTest.test('docs: ARCHITEKTURA.md je ROUTER — kratky a odkazuje na docs/archi
   end
 end
 
-NxTest.test('docs: docs/architecture/ ma vsetkych 6 suborov mapy') do
+NxTest.test('docs: docs/architecture/ ma vsetky subory mapy') do
   dir = File.join(NxTest::ROOT, 'docs', 'architecture')
   NxTest.assert(Dir.exist?(dir), 'docs/architecture/ chyba — tam ziju odseky modulov')
   missing = NX_ARCH_FILES.reject { |n| File.exist?(File.join(dir, n)) }
