@@ -24,12 +24,12 @@ Predúloha listov (19.9.) dala overené čísla. Tu sú **rozhodnutia o poliach,
 | 2 | Delenie dverí chladničky | **Kontrola + odporúčanie** (§4.2). Tlačidlo „Použiť odporúčané delenie" = voliteľný krok po S1-C, nie v scope. Blend hore/dole ostáva ručne (mimo V1). |
 | 3 | Umývačka | **NIE len zákazka + cena** — Michal: „radšej poriadne": umývačka dostane **vlastný slot s telom, čelom a hornou blendou** (§2, §3). Kontrola: šírka slotu voči triede modelu + výška tela voči priestoru pod doskou. |
 | 4 | Varná doska a drez voči PD | väzba na dosku (pracovná doska = samostatná doska) je **voliteľná, bez kontroly**; výrez sa ukáže v karte spotrebiča ako poznámka pre PD. |
-| 5 | Drez | Michal dodal model: **Blanco Legra XL 6 S** (granitový drez, drezyonline.sk p47410) — rozmer **860 × 500**, výrez **840 × 480**. Ide do seedu ako 10. model; rádius a montáž (na dosku) doplniť z listu Blanco pri písaní seedu. |
+| 5 | Drez | Michal dodal model: **Blanco Legra XL 6 S** (granitový drez, drezyonline.sk p47410) — rozmer **860 × 500**, výrez **840 × 480** (údaje z obchodu, list výrobcu zatiaľ nie). **Do seedu NEJDE** (seed = 9 overených modelov; kontrakt „nikdy neoverené číslo v seede", OVERENIE §12, Codex #376 P1) — Michal ho pridá ručne v katalógu s rozmermi z obchodu a priloží list Blanco, keď ho bude mať; kategória `sink` s poliami existuje od A1. |
 | 6 | Digestor | len evidencia výrezu 437 × 216 + odkazy; **bez** parametra odsadenia (digestorový korpus je mimo V1). |
 | 7 | Rúra a mikro — lacná kontrola navyše | **ÁNO**: kontrola šírky a hĺbky niky (vnútro skrinky, napr. 560–568) aj pre rúru a mikro; **výška sa nekontroluje** (zóny, police). |
 | 8 | Kde sa spotrebič priraďuje | nová sekcia Štúdia **„Spotrebiče"** s pohľadmi **„V zákazke"** a **„Katalóg"** (vzor Kovanie: Položky · Sety). Rozpočet ostáva miestom pre cenu a dostane výber z katalógu. Vlastník sa priradí v Inspectore (riadok Spotrebič) aj v Štúdiu. |
 | 9 | Očakávaný typ aj bez šablóny | **ÁNO** — v riadku Spotrebič v Inspectore sa dá nastaviť „očakáva: chladnička" aj na existujúcej skrinke. |
-| 10 | Prílohy | kópie do priečinka pluginu, po jednom cez systémový dialóg (`UI.openpanel`), PDF bez náhľadu (ikona + otvorenie v prehliadači). **Seed nesie iba URL listov**, súbory si Michal priloží sám (PDF výrobcov do repa nejdú). |
+| 10 | Prílohy | kópie do **trvalého per-PC priečinka `%APPDATA%\NOXUN\Engine\appliances\<id>\`** (NIKDY do inštalačného stromu `Plugins/noxun_engine`, ktorý updater D-52 pri aktualizácii celý vymieňa — Codex #376 P1), po jednom cez systémový dialóg (`UI.openpanel`), PDF bez náhľadu (ikona + otvorenie v prehliadači). **Seed nesie iba URL listov**, súbory si Michal priloží sám (PDF výrobcov do repa nejdú). |
 | 11 | Kategórie | k dnešným (chladnička · rúra · mikrovlnka · umývačka · digestor · varná doska · iné) pribudne **drez**; batéria a dávkovač ostávajú „iné". |
 | 12 | Dodáva zákazník | **ÁNO**: prepínač „dodáva zákazník" na položke v zákazke — vypne upozornenie „chýba cena" a v ponuke položku takto označí. |
 | 13 | Nosnosť dna a vetranie | **neriešiť** — žiadne polia, žiadna kontrola; nanajvýš text v poznámke záznamu. |
@@ -106,8 +106,8 @@ v riadku Spotrebič.
 
 Kreslí sa **box niky s pásmami dverí na čelnej ploche** — presne to, čo Michal dnes kreslí ručne (`_dev/techlisty/chladnicka_Michal_kontrolna_geometria.png`: 560 × 1940 × 555,
 pásma 669 · 71 · 1200), **nie** skutočné telo 540 × 1935 × 545. Box stojí na dne niky (horná plocha dna skrinky), centrovaný na šírku, lícuje s čelnou rovinou korpusu. Vzniká
-z **priradeného** spotrebiča (snapshot); pri skrinke, ktorá spotrebič len **očakáva**, generický box podľa kategórie. Regeneruje sa s korpusom (jedna Undo operácia), je referencia
-(§2.2). Nikdy sa nedeformuje podľa niky — keď nesedí, trčí a Kontrola to povie (04A: „konkrétny model sa nikdy nestretchuje").
+z **priradeného** spotrebiča (`appliance_refs[]`); **skrinka, ktorá chladničku len očakáva, box NEMÁ** (stav „nevybraný" = ORANGE bez geometrie — mockup stav `none`; generický box
+má len slot umývačky, kde je telo vlastnou geometriou slotu; Codex #376 P2). Regeneruje sa s korpusom (jedna Undo operácia), je referencia (§2.2). Nikdy sa nedeformuje podľa niky — keď nesedí, trčí a Kontrola to povie (04A: „konkrétny model sa nikdy nestretchuje").
 
 ### 4.2 Kontrola
 
@@ -134,8 +134,9 @@ z **priradeného** spotrebiča (snapshot); pri skrinke, ktorá spotrebič len **
 | drez | vonkajší Š × H · výrez Š × H · R · montáž (na / pod dosku) | len evidencia + poznámka pre PD |
 | digestor | šírka skrinky min · výrez do dna Š × H · Ø odvodu | len evidencia |
 
-**Seed = 10 modelov:** 9 z OVERENIA (Whirlpool OMSR58RU1SB · MBNA900B · Bosch BFL7221B1 · HBG774KB1 · Beko BCNA306E5ZSN · Whirlpool WIO 3O540 PELG · Bosch SPV6EMX05E ·
-Whirlpool WL B1160 BF · WCT3 63F LTK) + **Blanco Legra XL 6 S** (drez). Hodnoty a URL listov: OVERENIE §1–§7 a §11; odvodené hodnoty (telo BFL7221B1) označené ako odvodené.
+**Seed = 9 modelov** z OVERENIA (Whirlpool OMSR58RU1SB · MBNA900B · Bosch BFL7221B1 · HBG774KB1 · Beko BCNA306E5ZSN · Whirlpool WIO 3O540 PELG · Bosch SPV6EMX05E ·
+Whirlpool WL B1160 BF · WCT3 63F LTK). Hodnoty a URL listov: OVERENIE §1–§7 a §11; odvodené hodnoty (telo BFL7221B1) označené ako odvodené. **Drez Blanco Legra XL 6 S sa neseeduje**
+(list výrobcu neoverený — §1 riadok 5): Michal ho pridá ručne s rozmermi z obchodu; kategória `sink` a jej polia existujú.
 
 ## 6 · Spotrebič v zákazke
 

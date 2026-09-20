@@ -375,7 +375,7 @@
         <li><b>R4 · Štyri stavy kontroly</b> (Winner vzor, cross audit Q7): <span class="chip ok">OK</span> · <span class="chip warn">nevybraný</span> · <span class="chip warn">chýbajú údaje</span> · <span class="chip warn">nezmestí sa</span>. Pri kategóriách bez kontroly (doska, drez, digestor) je <span class="chip info">evidencia</span>. Nikdy neblokuje.</li>
         <li><b>R5 · Cena len z Rozpočtu:</b> stĺpec je výstup (preklik do sekcie Rozpočet → Spotrebiče a vybavenie); „dodáva zákazník" je štítok, nie nula.</li>
         <li><b>R6 · Katalóg = strom po kategóriách + karta</b> záznamu v štyroch blokoch (Telo · Nika · Čelo/dvere · Montáž) — jazyk výrobcov (Bosch: Gerätemaße · Nischenmaße · Überstände). Bez ceny. Zmazaný záznam ostáva v strome ako <i>vyradený</i> (prílohy sa nemažú).</li>
-        <li><b>R7 · Prílohy:</b> miniatúry obrázkov, PDF ako ikona (otvorí systémový prehliadač), presne jeden <b>náhľad</b> (teal rám); „+ Pridať" = systémový dialóg, jeden súbor naraz. Súbory sú per PC (D-48 po V1).</li>
+        <li><b>R7 · Prílohy:</b> miniatúry obrázkov, PDF ako ikona (otvorí systémový prehliadač), najviac jeden <b>náhľad</b> (teal rám); „+ Pridať" = systémový dialóg, jeden súbor naraz. Súbory sú per PC v <code>%APPDATA%\NOXUN\Engine\appliances\&lt;id&gt;\</code> (mimo inštalačného stromu, ktorý updater vymieňa; D-48 po V1).</li>
         <li><b>R8 · Modal Nový spotrebič</b> = D-15 kostra; polia sa menia podľa kategórie (prepni v modale). Presahy čela rúry/mikra sa zapisujú <b>s referenciou</b> (voči telu / voči nike).</li>
       </ol>
     </div>
@@ -500,7 +500,7 @@
         <li><b>R9 · Jeden riadok cez oba stĺpce</b> Základných (vzor Nohy): ikona · „Spotrebič" · text servera · vpravo výber modelu zo spotrebičov zákazky danej kategórie. Žiadny nový sektor, žiadny nadpis navyše. Skrinka s viacerými spotrebičmi (rúra + mikro v CAB-5, doska + drez na BRD-2) má <b>jeden riadok per viazaný spotrebič</b> (<code>appliance_refs[]</code>) plus riadok „očakáva", ak ešte niečo chýba (Codex #374 P1).</li>
         <li><b>R10 · Štyri stavy + „bez spotrebiča":</b> OK (zelená ikona, verdikt niky a delenia) · nevybraný (jantár; skrinka očakáva, model chýba = ORANGE <code>appliance_missing</code>) · chýbajú údaje (model bez rozmerov niky) · nezmestí sa (os a čísla). Bez spotrebiča riadok ukáže len voľbu „očakáva: —" (nastaviteľné aj bez šablóny, rozhodnutie 9).</li>
         <li><b>R11 · Výber filtrovaný podľa niky</b> (Winner „Dimension Search"): ponuka ukáže modely, ktorých nika sedí s vnútrom skrinky <b>v osiach, ktoré daná kategória kontroluje</b> (chladnička Š/V/H, rúra a mikro len Š + H — ich výška je vec zón; nejednoznačná nika = bez filtra); prepínač „všetky" ich odkryje aj tak — audit potvrdil, že filter nemá byť brána.</li>
-        <li><b>R12 · Chladnička v náhľade:</b> kontrolný box niky s pásmami dverí spotrebiča (669 · 71 · 1200 pre Beko) a s pásmom prípustného delenia čiel (679–728). To isté telo vznikne v modeli ako referencia. Text delenia hovorí „odporúčané podľa praxe (presah ≥ 10, škára 2)" — keď výrobca dá výkres nábytkových dverí, má prednosť.</li>
+        <li><b>R12 · Chladnička v náhľade:</b> kontrolný box niky s pásmami dverí spotrebiča (669 · 71 · 1200 pre Beko) a s pásmom prípustného delenia čiel (679–728). To isté telo vznikne v modeli ako referencia — <b>len pri priradenom modeli</b>; skrinka, ktorá chladničku iba očakáva (stav „nevybraný"), box nemá. Text delenia hovorí „odporúčané delenie podľa praxe (presah ≥ 10, škára s)" — keď výrobca dá výkres nábytkových dverí, má prednosť.</li>
       </ol>
       <h4 style="margin-top:8px">Slot umývačky — zjednodušený podľa Michalových screenov 20.9. (R13–R16)</h4>
       <ol start="13">
@@ -530,7 +530,7 @@
     {cat:'Mikrovlnka', ic:'appliance', model:'Whirlpool MBNA900B', man:'Whirlpool · seed', owner:'CAB-5', odesc:'Vysoká skriňa 600', st:'ok', stt:'nika Š+H ✓', price:'239 €', shop:1, list:1},
     {cat:'Umývačka', ic:'appliance', model:'Whirlpool WIO 3O540 PELG', man:'Whirlpool · seed', owner:'CAB-7', odesc:'Umývačka 60 (slot)', st:'ok', stt:'trieda 60 ✓ · pod doskou ✓', price:'dodáva zákazník', cust:true, shop:1, list:1},
     {cat:'Varná doska', ic:'appliance', model:'Whirlpool WL B1160 BF', man:'Whirlpool · seed', owner:'BRD-2', odesc:'Pracovná doska', st:'info', stt:'výrez 560⁺² × 480–492', price:'289 €', shop:1, list:1},
-    {cat:'Drez', ic:'appliance', model:'Blanco Legra XL 6 S', man:'Blanco · seed', owner:'BRD-2', odesc:'Pracovná doska', st:'info', stt:'výrez 840 × 480 · skrinka ≥ 600', price:'189 €', shop:1, list:0},
+    {cat:'Drez', ic:'appliance', model:'Blanco Legra XL 6 S', man:'Blanco · ručný záznam (rozmery z obchodu)', owner:'BRD-2', odesc:'Pracovná doska', st:'info', stt:'výrez 840 × 480 · skrinka ≥ 600', price:'189 €', shop:1, list:0},
     {cat:'Digestor', ic:'appliance', model:'Whirlpool WCT3 63F LTK', man:'Whirlpool · seed', owner:'—', odesc:'len zákazka', st:'info', stt:'výrez do dna 437 × 216', price:'255 €', shop:1, list:1},
     {cat:'Rúra', ic:'appliance', model:'Bosch HBF153EB0', man:'Bosch · ručný záznam', owner:'CAB-11', odesc:'Vysoká skriňa 600', st:'nodata', stt:'chýbajú údaje niky', price:'—', shop:1, list:0},
     {cat:'Chladnička', ic:'appliance', model:'— nevybraný', man:'skrinka očakáva chladničku (šablóna)', owner:'CAB-9', odesc:'Chladničková skriňa 600', st:'none', stt:'nevybraný', price:'—', shop:0, list:0, expects:true}
@@ -578,7 +578,7 @@
     {g:'Mikrovlnky', n:2, items:[{id:'wp-mic', t:'Whirlpool MBNA900B', s:'nika 560–568 × 360–363 × ≥300 · seed'},{id:'bo-mic', t:'Bosch BFL7221B1', s:'nika 560⁺⁸ × 362–365 × ≥300 · seed'}]},
     {g:'Umývačky', n:2, items:[{id:'wp-dw', t:'Whirlpool WIO 3O540 PELG', s:'60 · telo 598 × 820–900 × 555 · seed'},{id:'bo-dw', t:'Bosch SPV6EMX05E', s:'45 · telo 448 × 815–875 × 550 · seed'}]},
     {g:'Varné dosky', n:1, items:[{id:'wp-hob', t:'Whirlpool WL B1160 BF', s:'výrez 560⁺² × 480–492 · seed'}]},
-    {g:'Drezy', n:1, items:[{id:'bl-sink', t:'Blanco Legra XL 6 S', s:'860 × 500 · výrez 840 × 480 · seed'}]},
+    {g:'Drezy', n:1, items:[{id:'bl-sink', t:'Blanco Legra XL 6 S', s:'860 × 500 · výrez 840 × 480 · ručný (z obchodu)'}]},
     {g:'Digestory', n:1, items:[{id:'wp-hood', t:'Whirlpool WCT3 63F LTK', s:'výrez do dna 437 × 216 · seed'}]},
     {g:'Iné', n:0, items:[]},
     {g:'Vyradené', n:1, items:[{id:'wp-art', t:'Whirlpool ART 97101 2', s:'zmazaný 19.9. — prílohy ostávajú', tomb:true}]}
@@ -588,7 +588,7 @@
       '<button class="primary" onclick="openModal()"><svg class="ic"><use href="#i-plus"/></svg> Nový spotrebič</button>' +
       '<div class="searchbox">'+ico('search')+'<input placeholder="Hľadať model, výrobcu…"></div>' +
       '<label class="hint" style="display:inline-flex;align-items:center;gap:4px"><input type="checkbox"> vyradené</label>' +
-      '<span class="spacer"></span><span class="sechint">Katalóg je tohto počítača · bez cien · 11 modelov (10 seed + 1 ručný)</span>';
+      '<span class="spacer"></span><span class="sechint">Katalóg je tohto počítača · bez cien · 11 modelov (9 seed + 2 ručné)</span>';
   }
   function catTree(){
     var h = '<div class="cattree">';

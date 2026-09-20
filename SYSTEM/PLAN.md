@@ -650,8 +650,10 @@ kvótová brána `usage` pred každým auditom a subagentom. Pravidlo 3 kôl pla
 - **S1-E0 · min výška korpusu 200 → 80 mm** *(✅ PR #375 zmergovaný 20.9.2026 → main `7d4c567`, v0.12.9; `CONFIG_SCHEMA` 14 → 15, config-aware klamp scale cez celý `build_plan`
   (min 94 mm s policou), default sokla v JS validácii; Codex kolo 1 = 1×P1 + 2×P2, kolo 2 = 1×P2, delta overená; D-135)* — dôvod: korpus na dorovnanie nad umývačkou (V1_DEBATA §3).
 - **S1-A1 · Katalóg spotrebičov — jadro** *(nový modul `core/appliance_catalog.rb` → `codex-audit` ÁNO)* — per-PC JSON katalóg (JsonFileStore, zámok, forward guard, tombstone), záznam
-  v štyroch blokoch telo · nika · čelo/dvere · montáž, prílohy (0–1 náhľad), seed 10 modelov, `snapshot_for` pre zákazku; bez UI a bez ceny.
-- **S1-A2 · Sekcia Štúdia SPOTREBIČE — pohľad Katalóg** *(UI, audit NIE)* — 13. sekcia `appl` (skupina KATALÓGY), strom + karta + prílohy + D-15 modal podľa mockupu R1–R8.
+  v štyroch blokoch telo · nika · čelo/dvere · montáž, prílohy (0–1 náhľad; súbory v `%APPDATA%\NOXUN\Engine\appliances\<id>\`, mimo stromu, ktorý updater vymieňa), **seed 9
+  overených modelov** (drez Blanco bez listu výrobcu sa neseeduje — Michal ho pridá ručne), `snapshot_for` pre zákazku; bez UI a bez ceny.
+- **S1-A2 · Sekcia Štúdia SPOTREBIČE — pohľad Katalóg** *(UI, audit NIE)* — 13. sekcia `appl` (skupina KATALÓGY), strom + karta + prílohy + D-15 modal podľa mockupu R1–R8;
+  tlačidlo „Do zákazky" a pohľad „V zákazke" sú v A2 `aria-disabled` s dôvodom (D-78), aktivuje ich S1-B.
 - **S1-E · Slot umývačky — nový typ skrinky** *(builder + `CONFIG_SCHEMA` 15 → 16 + TemplateStore STD 4 → 5 → `codex-audit` ÁNO; in-SU povinné)* — 7 vstupov, jediný dielec čelo
   (item `blind`), telo = referencia + základňa 200, šablóny 60/45, kontroly telo vs šírka a nastavená výška tela vs linka; výplň hore ručne (mockup R13–R16). Kontraktové body zo
   Codex kôl: **schéma 16 rezervuje `appliance_refs[]` aj `appliance_expects[]` — v configu skrinky AJ dosky (`BOARD_CONFIG_SCHEMA` bump, doska má vlastný whitelist a guard)** (C ich
@@ -664,7 +666,9 @@ kvótová brána `usage` pred každým auditom a subagentom. Pravidlo 3 kôl pla
   → `fridge oven microwave dishwasher hood hob other`, + `sink`) v `BUDGET_STD` 2 — existujúce zákazky sa otvoria a editujú ďalej · **„dodáva zákazník" je PRÍZNAK, nie nula:** cena
   ostáva v nečíselnom stave (nil povolené), príznak vypína upozornenie „chýba cena" a riadok sa zo súčtov vylučuje · **obojsmerná väzba = JEDNA operácia:** priradenie, presun aj
   odpojenie zapisujú položku zákazky (model dict) + `appliance_refs[]` vlastníka + rebuild v jednom `start_operation`/`commit_operation` cez nový operation-aware mutačný vstup (nie dve
-  existujúce cesty `BudgetStore.write!` + rebuild), takže jeden Ctrl+Z vráti obe strany · **výber podľa niky porovnáva len osi, ktoré daná kategória kontroluje** (rúra/mikro len
+  existujúce cesty `BudgetStore.write!` + rebuild), takže jeden Ctrl+Z vráti obe strany · **zmazanie vlastníka bežným Delete v SketchUpe** (config aj `appliance_refs[]` zmiznú,
+  položka zákazky drží staré ID): položka sa NEMENÍ automaticky (Delete je transparentná operácia používateľa a Undo ju vráti) — Kontrola ju hlási ako **opraviteľného sirotu**
+  („vlastník neexistuje", ORANGE, s akciou odpojiť → job) a pohľad V zákazke ho ukáže ako „vlastník zmizol"; test Delete + Undo/Redo + odpojenie · **výber podľa niky porovnáva len osi, ktoré daná kategória kontroluje** (rúra/mikro len
   Š + H; nejednoznačná nika = bez filtra).
 - **S1-F · Telo chladničky + Kontrola niky a delenia dverí** *(builder → `codex-audit` ÁNO; in-SU povinné)* — box niky s pásmami z `appliance_refs[]`, `appliance_niche_clash` per os,
   `appliance_door_split` v súradniciach niky, náhľad (mockup R4, R10, R12).
