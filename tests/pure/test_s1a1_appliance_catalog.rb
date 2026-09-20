@@ -500,6 +500,20 @@ NxTest.test('spotrebice: attach — limit 25 MB sa meria NA ULOZENEJ KOPII (zdro
                       'odmietnuta priloha sa do zaznamu nedostala')
 end
 
+NxTest.test('spotrebice: neocakavana chyba v mutacii je :write_failed, nie falosne :locked') do
+  applc_seeded!
+  rec = APPLC.create!(applc_new)[1][:record]
+  orig = APPLC.method(:record_rev)
+  APPLC.define_singleton_method(:record_rev) { |_r| raise NoMethodError, 'test: bug v mutacii' }
+  begin
+    st, info = APPLC.patch!(rec['id'], { 'note' => 'x' }, rev: rec['rev'])
+    NxTest.assert_equal(:write_failed, st, 'bug sa nesmie tvarit ako obsadeny zamok')
+    NxTest.assert(info[:message].to_s.length.positive?)
+  ensure
+    APPLC.define_singleton_method(:record_rev, orig)
+  end
+end
+
 NxTest.test('spotrebice: attach — zlyhany zapis JSON nenecha sirotu ani „uspech" (A5)') do
   applc_seeded!
   rec = APPLC.create!(applc_new)[1][:record]

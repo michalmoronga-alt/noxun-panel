@@ -713,9 +713,17 @@ module Noxun
           end
           yield(fresh, stored_records(fresh))
         end
-      rescue StandardError => e
+      # Realne sem doletia LEN chyby zo zamku (`mkdir_p` / `File.open` /
+      # `flock`) — zapis aj kopia priloh maju vlastny rescue. Preto sa chyby
+      # SUBOROVEHO povodu hlasia ako `:locked` („skus o chvilu"), ale
+      # cokolvek ine (teda nas bug) dostane `:write_failed`; jedna hlaska pre
+      # oboje by klamala o pricine.
+      rescue IOError, SystemCallError => e
         Engine.log_error(e, "ApplianceCatalog.#{op}") if defined?(Engine)
         [:locked, { message: 'katalóg spotrebičov sa práve nedá zamknúť — skús o chvíľu znova' }]
+      rescue StandardError => e
+        Engine.log_error(e, "ApplianceCatalog.#{op}") if defined?(Engine)
+        write_failed
       end
 
       # Zapis dokumentu (BEZI LEN POD ZAMKOM). Nezname top-level kluce
