@@ -570,6 +570,14 @@
   // Odhad je ZNACENY (≈) a riadky ostavaju neklikatelne (nie je co oznacit v
   // modeli) — vzor D-78: aria-disabled + vysvetlenie, nikdy ticho mrtve.
   function setInsertCabInfo(){
+    // S1-E: slot vyrába VŽDY jeden dielec (čelo) — korpusový odhad by mu
+    // spočítal boky, dno a strop, ktoré nikdy nevzniknú.
+    if (cabTypeNow() === 'dishwasher'){
+      setOut('inf_parts', '≈ 1');
+      setOut('inf_area', '—');
+      setOut('inf_weight', '—');
+      return;
+    }
     var st = nxDraftStats(pvGeom(), computeZones(), pvInsertFronts());
     setOut('inf_parts', st.count > 0 ? ('≈ ' + st.count) : '—');
     setOut('inf_area', st.area > 0 ? ('≈ ' + mmLabel(st.area) + ' m²') : '—');
@@ -2240,7 +2248,7 @@
       var fh = rows[i].querySelector('.fh');
       if (fh){
         fh.readOnly = slot;
-        fh.title = slot ? 'Výšku čela slotu mení pole „Čelo V" v Základných.' : '';
+        fh.title = slot ? 'Výšku čela slotu mení pole „Čelo V“ v Základných.' : '';
       }
       var auto = rows[i].querySelector('.fauto');
       if (auto) auto.style.display = slot ? 'none' : '';

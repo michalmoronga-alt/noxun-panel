@@ -17,6 +17,12 @@ module Noxun
                       rails_top_offset name
                       dw_class dw_body_height dw_front_bottom dw_front_height].freeze
 
+      # S1-E: SK nazov typu skrinky v 1. pade (hlasky Studia aj panela). Jedna
+      # tabulka — tri opisane ternary by sa casom rozisli a slot by v jednej
+      # hlaske ostal „dolna".
+      TEMPLATE_TYPE_WORDS = { 'lower' => 'dolná', 'upper' => 'horná',
+                              'dishwasher' => 'umývačka' }.freeze
+
       # D-39: polia vkladacej karty, ktore mozu niest zamok (JS zrkadlo: NXInsert.LOCK_FIELDS).
       INSERT_LOCK_FIELDS = %w[width height depth thickness floor_height].freeze
       INSERT_LOCK_LABELS = { 'width' => 'šírka', 'height' => 'výška', 'depth' => 'hĺbka',
@@ -766,7 +772,7 @@ module Noxun
         # vyska meni). `new_height` = hodnota z TEJ ISTEJ davky (auto-apply
         # posiela zmenu `dw_front_height` aj stary riadok ciel naraz), takze
         # legitimna zmena vysky NIE JE odmietnutie — rieši ju `normalize`.
-        SLOT_FRONTS_MSG = 'Slot umývačky má jedno pevné čelo — jeho výšku mení pole „Čelo V".'
+        SLOT_FRONTS_MSG = 'Slot umývačky má jedno pevné čelo — jeho výšku mení pole „Čelo V“.'
 
         def slot_fronts_refusal(params, incoming, new_height = nil)
           return nil unless params['type'].to_s == 'dishwasher'

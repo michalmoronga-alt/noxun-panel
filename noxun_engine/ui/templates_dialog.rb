@@ -410,7 +410,7 @@ module Noxun
           cab_type = (Store.config(cab) || {})['type'] || 'lower'
           tpl_type = (tpl['config'] || {})['type'] || 'lower'
           if tpl_type != cab_type
-            return set_status("Šablóna je pre iný typ (#{tpl_type == 'upper' ? 'horná' : 'dolná'}) " \
+            return set_status("Šablóna je pre iný typ (#{Panel::TEMPLATE_TYPE_WORDS[tpl_type] || 'dolná'}) " \
                               'než označená skrinka — nepoužitá.', true)
           end
 

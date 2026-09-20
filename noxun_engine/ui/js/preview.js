@@ -298,12 +298,21 @@
              fh: numv('dw_front_height') || 0 };
   }
 
+  // S1-E: výška sokla KORPUSU. Horná skrinka ju nemá a slot umývačky tiež nie
+  // (jeho „sokel" je spodná hrana ČELA a žije vo vlastnom poli) — bez tejto
+  // jednej otázky by stará hodnota po prepnutí typu posunula kresbu čiel.
+  function nxCabFloorHeight(){
+    if (typeof getType !== 'function') return numv('floor_height') || 0;
+    var t = getType();
+    return (t === 'upper' || t === 'dishwasher') ? 0 : (numv('floor_height') || 0);
+  }
+
   function pvGeom(){
     var gl = nxNumOr(numv('fr_gap_left'), 2), gr = nxNumOr(numv('fr_gap_right'), 2);
     var gap = 3; var gv = numv('fr_gap'); if (!isNaN(gv)) gap = gv;
     return { W: numv('width')||600, H: numv('height')||720, t: numv('thickness')||18,
              D: numv('depth')||0,
-             fh: (getType()==='upper') ? 0 : (numv('floor_height')||0),
+             fh: nxCabFloorHeight(),
              topNone: val('top_mode') === 'none',
              // UI-C1b: konstrukcne volby pre ODHAD kusov/plochy navrhu (nxDraftStats).
              topMode: val('top_mode'), backMode: val('back_mode'),
@@ -361,7 +370,7 @@
       var current = nxFrontDraftItems();
       if (current) return current;
       return nxFrontsResolve(collectFronts(), numv('height') || 0,
-        getType() === 'upper' ? 0 : (numv('floor_height') || 0));
+        nxCabFloorHeight());
     }
     return previewMode === 'insert' ? pvInsertFronts() : (frontItems || []);
   }
@@ -386,7 +395,7 @@
     if (typeof collectFronts !== 'function') return [];
     if (typeof getInsertKind === 'function' && getInsertKind() === 'board') return [];
     return nxFrontsResolve(collectFronts(), numv('height') || 0,
-                           (getType() === 'upper') ? 0 : (numv('floor_height') || 0));
+                           nxCabFloorHeight());
   }
 
   // ---- UI-C1b: ODHAD kusov a plochy pre NAVRH -------------------------------

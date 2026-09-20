@@ -193,7 +193,7 @@ FM.SLOT_ONLY_ROWS.forEach(id => ok(el(id).hidden === false, `slot MA riadok ${id
 FM.SLOT_HIDDEN_ROWS.forEach(id => eq(el(id).style.display, 'none', `slot NEMA riadok ${id}`));
 eq(el('fhRow').style.display, 'none', 'sokel korpusu slot nema (jeho sokel je pole Sokel slotu)');
 eq(el('plinthGroup').style.display, 'none', 'ani soklovu skupinu');
-eq(hLabSpan.textContent, 'Výška linky', 'vyska sa pri slote volá „Výška linky"');
+eq(hLabSpan.textContent, 'Výška linky', 'vyska sa pri slote volá „Výška linky“');
 ok(hUnit.textContent.indexOf('horná hrana susedov') >= 0, 'a hint to vysvetľuje');
 ok(bUnit.textContent.indexOf('700') >= 0 && bUnit.textContent.indexOf('1000') >= 0,
    'rozsah tela je v hinte pola');
@@ -237,7 +237,7 @@ frow.appendChild(fdel);
 
 setType('dishwasher');
 FM.nxSlotFrontsLock();
-eq(addRowBox.style.display, 'none', '„Pridať čelo" sa pri slote schova');
+eq(addRowBox.style.display, 'none', '„Pridať čelo“ sa pri slote schova');
 eq(fh.readOnly, true, 'vyska cela je na CITANIE (meni ju pole Čelo V)');
 ok(String(fh.title).indexOf('Čelo V') >= 0, 'a title povie KDE sa meni');
 eq(fauto.style.display, 'none', 'chip AUTO nema pri pevnom cele zmysel');
