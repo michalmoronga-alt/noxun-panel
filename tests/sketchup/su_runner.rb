@@ -3660,16 +3660,18 @@ module NoxunSuRunner
     # `@state` nastavuje VYHRADNE `assess!`, takze nenulova hodnota EST PRED
     # prvym volanim z testu znamena, ze boot naozaj bezal.
     #
-    # PRECO NIE kontrola suboru: SketchUp nacita Plugins EST PRED
+    # PRECO NIE kontrola suboru ANI stavu: SketchUp nacita Plugins EST PRED
     # `-RubyStartup`, takze bootstrap runnera presmeruje `ENV['APPDATA']` az
     # PO boote pluginu (rovnako ako pri `Materials.boot_cutover!` — v sandboxe
-    # behu nie su ani jeho markery). Boot teda zapisuje do ZIVEHO `%APPDATA%`
-    # vyvojara a test nad nim asserta nesmie: Michal si tam moze pridat vlastne
-    # modely a pocet 9 by uz neplatil. Obsah suboru strazi headless sada.
+    # behu nie su ani jeho markery). Boot teda pracuje so ZIVYM katalogom
+    # vyvojara a sekcia nad nim NESMIE nic tvrdit: Michal si tam moze pridat
+    # vlastne modely (pocet 9 prestane platit) a katalog moze byt aj
+    # read-only ci degradovany — cela sada by potom padla na jeho stave, nie
+    # na chybe kodu (Codex #377 kolo 2 P2). Overuje sa VYHRADNE to, ze boot
+    # prebehol; zdravie obsahu strazi headless sada.
     booted = ac.instance_variable_get(:@state)
     ok("S1-A1 (0): katalog posudil uz BOOT pluginu, nie test (stav #{booted.inspect})", !booted.nil?)
-    info("S1-A1 (0): stav katalogu po boote: #{booted} #{ac.instance_variable_get(:@state_reason)}")
-    ok('S1-A1 (0): boot skoncil ZDRAVYM katalogom (:ok)', booted == :ok)
+    info("S1-A1 (0): stav ZIVEHO katalogu po boote: #{booted} #{ac.instance_variable_get(:@state_reason)}")
 
     root = File.join(Sketchup.temp_dir, "noxun_s1a1_#{Process.pid}_#{Time.now.to_i}")
     FileUtils.mkdir_p(root)

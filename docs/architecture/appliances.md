@@ -29,8 +29,10 @@ kľúč znamená „list to nekótuje"** — nikdy sa nedosadzuje default a `nil
 pozná telo aj niku. Validácia: mm Float 0–5000 (kg 0–100), enumy, `*_min ≤ *_max` (plus dvojica `cutout_depth`/`cutout_depth_max`, ktorú výrobca kótuje
 inak). **Kľúče mimo whitelistu kategórie — aj celé neznáme bloky — sa zachovajú, ale nevalidujú** (dopredná kompatibilita) — a to **výhradne tie, ktoré už
 sú v uloženom zázname**: kľúč, ktorý prinesie vstup klienta a nepozná ho ani whitelist kategórie, ani súbor, je `:invalid` s cestou poľa. Bez toho by
-preklep vo formulári (`cutout_dept`) skončil ako „uložené" a číslo by ticho zmizlo. `derived[]` menuje cesty polí,
-ktorých hodnota je odvodená, nie z listu (napr. `body.width` pri Bosch BFL7221B1).
+preklep vo formulári (`cutout_dept`) skončil ako „uložené" a číslo by ticho zmizlo. Explicitné `null` **maže**: nad poľom kľúč, nad blokom celý blok
+a nad `dims` celé rozmery. `derived[]` menuje cesty polí, ktorých hodnota je odvodená, nie z listu (napr. `body.width` pri Bosch BFL7221B1); cesta sa
+overuje **proti schéme danej kategórie** (blok → pole → prípadne pole vnútri `furniture_doors`), takže `body.wdith` ani pole cudzej kategórie neprejde.
+Schéma, nie aktuálny obsah `dims` — inak by výsledok závisel od poradia patchu.
 
 **`rev` je odtlačok obsahu, nie počítadlo** — `Digest::SHA1` uloženého záznamu, prvých 12 hex znakov. Do súboru sa **neukladá**; počíta sa pri čítaní
 a vracia v `list`/`find`/`search` aj vo výsledku každej mutácie. Po obnove z `.bak` sa tak revízia pre iný obsah nezopakuje (počítadlo by to nezaručilo).
@@ -42,11 +44,15 @@ a až potom zapisuje.
 prvá inštalácia (číta sa záloha, žiadny seed, prvý zápis primár obnoví) · poškodený primár + platná `.bak` = `:degraded` (číta sa záloha, **zápisy stoja**,
 inak by prepísali primár obsahom spred poškodenia) · poškodený primár bez zálohy, cudzí tvar, chýbajúci alebo nečíselný `std`, **`std` > `STD` (forward
 guard)**, záznam bez identity, **nečitateľná položka `attachments[]`** (nie Hash, chýbajúce `id`/`name`, neznámy `kind`, `file` mimo jedného segmentu —
-inak by `[null]` prešlo ako zdravý katalóg a rozbilo sa až v mutácii) a duplicitné identity = `:read_only` s dôvodom. **Zlyhaný prvý seed** (nezapisovateľný
+inak by `[null]` prešlo ako zdravý katalóg a rozbilo sa až v mutácii), **uložené `dims`, ktoré neprejdú validáciou známych polí** (ručná úprava
+`"width": "oops"`, `min > max`, neznámy enum — dôvod nesie **cestu poľa**; neznáme kľúče ostávajú dopredne kompatibilné) a duplicitné identity =
+`:read_only` s dôvodom. **Záloha sa v degradovanom stave posudzuje tou istou maticou ako primár** — `.bak`, ktorá sa síce parsuje, ale je z novšej verzie
+alebo nečitateľná, nie je „čítaj zálohu, zápisy stoja", ale `:read_only` (nie je z čoho čítať). **Zlyhaný prvý seed** (nezapisovateľný
 `%APPDATA%`, plný disk) je tiež `:read_only` — prázdny „zdravý" katalóg by pri prvom zápise vznikol **bez deviatich modelov** a marker `seed_version` by
 ich už nikdy nedosial. Tá istá kontrola (`stored_document_issue`) beží nad čerstvým dokumentom
 **pod zámkom pred každým zápisom** — cachovaný `:ok` nie je dôkazom aktuálneho stavu súboru; stav `:read_only` naopak zastaví mutáciu **aj keď súbor
-neexistuje**.
+neexistuje**. A keď pod zámkom zmizne **primár aj `.bak`** (upratovanie `%APPDATA%`, sync, obnova), mutácia najprv spustí **cestu prvej inštalácie** a až
+nad naseedovaným dokumentom zapíše svoju zmenu — inak by katalóg vznikol prázdny so stampnutým `seed_version` a deväť modelov by sa už nikdy nedosialo.
 
 **Založenie pri štarte.** Katalóg posudzuje (a nad čistou inštaláciou zakladá) už boot blok `main.rb` — vlastný chránený `begin/rescue` vedľa
 `Materials.boot_cutover!`, takže poškodený alebo nezapisovateľný katalóg nikdy nezhodí menu, toolbar ani observer. Bez toho by `appliances.json`
@@ -78,7 +84,8 @@ neexistujúcu lokálnu cestu.
 **`snapshot_for(id)` pre zákazku (S1-B)** je čisté čítanie: hlboká kópia s **explicitným whitelistom** (`catalog_id`, `category`, `manufacturer`, `name`,
 `shop_urls`, `sheet_urls`, `note`, `dims`, `derived`, `attachments` ako nemenné referencie, `seed`, `catalog_std`, `snapshot_at`) — žiadny stav katalógu
 (`rev`, `updated_at`, `deleted_at`) do zákazky neprejde a neskoršia zmena katalógu snapshotom nepohne. Stavy: `:not_found` · `:deleted` (vyradený model
-sa nepriraďuje) · `:unsupported` (`std` z novšieho pluginu alebo nečitateľný dokument); `:degraded` snapshot dovolí. Zdroj sa overuje **čerstvo z disku**
+sa nepriraďuje) · `:unsupported` (`std` z novšieho pluginu alebo nečitateľný dokument). `:degraded` snapshot dovolí, ale **len keď záloha prejde tou istou
+maticou ako primár** — inak by sa `.bak` z novšej verzie dostala do zákazky označená naším `catalog_std`. Zdroj sa overuje **čerstvo z disku**
 a ten istý prečítaný dokument ide rovno do výberu záznamu — **žiadne druhé čítanie cez `JsonFileStore`**, ktoré by v okne sekundovej cache
 (`CHECK_INTERVAL`) vrátilo stav spred zápisu druhej inštancie SketchUpu. Zákazka si snapshot odkladá, takže cachovaný záznam by v nej ostal natrvalo.
 
