@@ -150,6 +150,14 @@
     'grain': '<rect x="2" y="5" width="20" height="14" rx="1.5"/><path d="M6 9.5h12"/><path d="M6 12h12"/><path d="M6 14.5h12"/>',
     // UI-B2: kamera N7 v spodnom pase nahladu — zarovna pohlad SketchUpu na skrinku
     'camera': '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
+    // S1-A2: navigacia + hlavicka sekcie SPOTREBICE (Lucide `refrigerator`) —
+    // obrys s vodorovnou deliacou ciarou a dvoma uchytkami. Kategoriove riadky
+    // stromu ikonu NEMAJU (maju text), takze tato kresba zije LEN v navigacii.
+    'appliance': '<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M5 10h14"/><path d="M15 5v2"/><path d="M15 13v3"/>',
+    // S1-A2: dlazdica prilohy-OBRAZKA v karte spotrebica (Lucide `image`) —
+    // kresli sa, kym nedorazi miniatura z lazy kanala, a v nadpise bloku
+    // Prilohy. PDF ma `file-text`, takze druh prilohy je vidno aj bez fotky.
+    'image': '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.83 0L6 21"/>',
     // ===== UI-B3: rozmery Zakladnych + ikony skupin Korpusu ====================
     // Prevzate 1:1 z mockupu SYSTEM/zdroje/ui20/mockup_inspector_c.html. Sipky
     // su smerove (sirka/vyska/hlbka), 'plinth' a 'p-*' su VLASTNE nabytkarske

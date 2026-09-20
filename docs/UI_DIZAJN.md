@@ -306,6 +306,13 @@ cez `data-rot` v CSS — nikdy štyri ikony),
 teda miniatúra toho, čo overlay kreslí v modeli; čiary nedobiehajú k hrane
 rovnako ako v `core/grain_check.rb`. **Jedna kresba pre obe miesta** — rail
 Inspectora aj prepínač „Smer kresby" v lište sekcie Kontrola v Štúdiu),
+`appliance` (S1-A2 — sekcia SPOTREBIČE v navigácii Štúdia; Lucide
+`refrigerator`: obrys s vodorovnou deliacou čiarou a dvoma úchytkami.
+Kategóriové riadky stromu ikonu **nemajú** — majú text, takže táto kresba žije
+len v navigácii),
+`image` (S1-A2 — dlaždica prílohy-OBRÁZKA v karte spotrebiča, kým nedorazí
+miniatúra z lazy kanála, a v nadpise bloku Prílohy; Lucide `image`. PDF má
+existujúci `file-text`, takže druh prílohy je vidieť aj bez fotky),
 `direction` (KOV-A2b — smer otvárania v modeli: panel čela s **prerušovanou
 šípkou na voľnú hranu**, teda miniatúra toho, čo overlay kreslí, presne ako
 `grain` pri kresbe dekoru. Plná čiara = dielec, prerušovaná = pohyb — to isté
