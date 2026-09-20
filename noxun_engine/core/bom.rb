@@ -76,6 +76,15 @@ module Noxun
         # `dw_height_fit`). Zbiera sa v TOM ISTOM prechode z uz nacitaneho
         # `ccfg` (ziadny druhy sken modelu) — vzor `hardware_manual`.
         appliance_slots = []
+        # S1-B1: SPOTREBICE ZAKAZKY. Aditivny kluc — `compute()` ho IGNORUJE
+        # (kusovnik, VEPO ani nakup sa o cislo nemenia). Zbiera sa z DVOCH
+        # zdrojov naraz: z rozpoctoveho dictu (polozky zakazky, precita sa RAZ
+        # na zber) a z TOHO ISTEHO prechodu skriniek/dosiek (`appliance_refs[]`
+        # a `appliance_expects[]`) — ziadny druhy sken modelu.
+        # `owners` je mapa entit, proti ktorej sa az PO prechode overi platnost
+        # vlastnika kazdej polozky (R6: entita musi existovat A niest vazbu).
+        appliance_owners = {}
+        appliances_doc = defined?(BudgetStore) ? BudgetStore.appliances(model) : []
         cabinet_sets = {}
         # R-34 (review #262 P1): `cabinet_sets` ma na ID JEDEN slot — pozri
         # `note_cabinet_sets`. `seen` drzi mapu PRVEJ instancie toho ID (nil =
@@ -126,6 +135,10 @@ module Noxun
             # S1-E: udaje slotu pre Kontrolu (telo vs sirka, telo vs vyska linky).
             sl = appliance_slot_record(cid, inst.persistent_id, ccfg)
             appliance_slots << sl if sl
+            # S1-B1: vlastnik spotrebica. PRVA instancia daneho ID vyhrava —
+            # dve skrinky so ZDIELANYM `cabinet_id` su samostatna chyba
+            # identity (`identities`), vazba sa kvoli nej nema preco hadat.
+            note_appliance_owner(appliance_owners, cid, inst.persistent_id, ccfg)
             # V0.5 D (nalez 2): RAW hardware_overrides — disabled:true polozka je
             # UZ VYRADENA z config.hardware[] pri vyhodnoteni pravidiel, takze semafor
             # "vypnute kovanie" ju vie zistit LEN z povodneho zaznamu. owner_id/owner_pid
@@ -232,6 +245,10 @@ module Noxun
             # kompatibility zabranuje. Vetva nizsie skladá LEN zname polia.
             note_newer_config(newer_configs, 'board', *newer_address(inst, bid)) if
               defined?(BoardBuilder) && BoardBuilder.newer_config?(bcfg)
+            # S1-B1: doska je plnohodnotny vlastnik (drez, varna doska) — zbiera
+            # sa PRED filtrom `manufactured`, lebo vazba na nom nezavisi
+            # (docasne nevyrabana doska drez stale nesie).
+            note_appliance_owner(appliance_owners, bid, inst.persistent_id, bcfg, kind: 'board')
             next unless Store.get(inst, 'manufactured') == true
             # 2A-3 (audit B2): warnings poslednej stavby DOSKY — doteraz sa
             # zbierali len z korpusov a warning vyberu ABS by sa pri samostatnej
@@ -270,7 +287,157 @@ module Noxun
           hardware_issues: hardware_issues, newer_configs: newer_configs,
           hardware_manual: hardware_manual, cabinet_fronts: cabinet_fronts,
           appliance_slots: appliance_slots,
+          appliances: appliance_records(appliances_doc, appliance_owners),
           warnings: warnings, cabinets: cabinets, boards: boards }
+      end
+
+      # --- S1-B1: spotrebice zakazky -----------------------------------------
+
+      # Zaznam VLASTNIKA z uz nacitaneho configu. CISTA funkcia (ziadny
+      # SketchUp objekt okrem `pid`). `kind` je „slot" pri skrinke typu
+      # `dishwasher` — matica kategoria -> vlastnik ich rozlisuje.
+      def note_appliance_owner(owners, id, pid, cfg, kind: nil)
+        oid = id.to_s
+        return owners if oid.empty? || owners.key?(oid) || !cfg.is_a?(Hash)
+
+        k = kind || (cfg['type'].to_s == 'dishwasher' ? 'slot' : 'cabinet')
+        refs = cfg['appliance_refs'].is_a?(Array) ? cfg['appliance_refs'].select { |r| r.is_a?(Hash) } : []
+        expects = cfg['appliance_expects'].is_a?(Array) ? cfg['appliance_expects'].map(&:to_s) : []
+        owners[oid] = { 'kind' => k, 'id' => oid, 'pid' => pid, 'refs' => refs,
+                        'expects' => expects, 'cfg' => cfg }
+        owners
+      end
+
+      # Zoznam pre pohlad „V zakazke" (S1-B2) a pre Kontrolu (`check_appliances`).
+      # TVAR (kontrakt, Astra B15):
+      #   { item_id, name, category, owner: {kind, id, pid}, state, customer_supplied,
+      #     snapshot: {niche:, body:, install: {dishwasher_class}} | nil,
+      #     slot: {dw_class} | nil, interior: {width, height, depth} | nil }
+      # `state`: bound | owner_missing | job | expected_missing
+      def appliance_records(items, owners)
+        out = Array(items).filter_map { |it| appliance_record(it, owners) }
+        out.concat(appliance_expected_records(items, owners))
+        out
+      end
+
+      def appliance_record(item, owners)
+        return nil unless item.is_a?(Hash)
+
+        id = item['id'].to_s
+        return nil if id.empty?
+
+        own = BudgetStore.owner_field(item['owner'])
+        kind = own['kind'].to_s
+        entry = kind == 'job' ? nil : owners[own['id'].to_s]
+        # R6: vlastnik plati LEN ked entita existuje A jej `appliance_refs[]`
+        # nesu TUTO polozku. ID skriniek sa recykluju (`Ids.next_id`), takze
+        # samotna zhoda ID nie je dokaz — po zmazani CAB-3 moze to ID dostat
+        # uplne ina skrinka.
+        bound = entry && Array(entry['refs']).any? { |r| r['item_id'].to_s == id }
+        state = if kind == 'job'
+                  'job'
+                elsif bound
+                  'bound'
+                else
+                  'owner_missing'
+                end
+        { 'item_id' => id, 'name' => appliance_label(item),
+          'category' => BudgetStore.canon_appliance_type(item['typ']).to_s,
+          'owner' => { 'kind' => kind, 'id' => own['id'].to_s,
+                       'pid' => (bound ? entry['pid'] : nil) },
+          'state' => state, 'customer_supplied' => (item['customer_supplied'] == true),
+          'snapshot' => appliance_snapshot_dims(item['snapshot']),
+          'slot' => (bound && entry['kind'] == 'slot' ? slot_info(entry['cfg']) : nil),
+          'interior' => (bound ? interior_of(entry) : nil) }
+      end
+
+      # Vlastnici, ktori spotrebic OCAKAVAJU, ale ziadny viazany nemaju
+      # (skrinka s `appliance_expects[]`, slot bez modelu). B1 ich len ZBIERA —
+      # ORANGE `appliance_missing` z nich robi az S1-C, pohlad „V zakazke"
+      # z nich kresli riadok „nevybraný" (S1-B2).
+      def appliance_expected_records(items, owners)
+        bound = {}
+        Array(items).each do |it|
+          next unless it.is_a?(Hash)
+
+          own = BudgetStore.owner_field(it['owner'])
+          next if own['kind'].to_s == 'job'
+
+          key = "#{own['id']}|#{BudgetStore.canon_appliance_type(it['typ'])}"
+          bound[key] = true
+        end
+        out = []
+        owners.each do |oid, entry|
+          cats = Array(entry['expects']).map { |c| BudgetStore.canon_appliance_type(c) }.compact
+          cats << 'dishwasher' if entry['kind'] == 'slot'
+          cats.uniq.each do |cat|
+            next if bound["#{oid}|#{cat}"]
+            next if Array(entry['refs']).any? { |r| r['category'].to_s == cat }
+
+            out << { 'item_id' => nil, 'name' => nil, 'category' => cat,
+                     'owner' => { 'kind' => entry['kind'], 'id' => oid, 'pid' => entry['pid'] },
+                     'state' => 'expected_missing', 'customer_supplied' => false,
+                     'snapshot' => nil,
+                     'slot' => (entry['kind'] == 'slot' ? slot_info(entry['cfg']) : nil),
+                     'interior' => interior_of(entry) }
+          end
+        end
+        out
+      end
+
+      # Zobrazovany nazov: vyrobca + model zo snapshotu, inak nazov z rozpoctu.
+      def appliance_label(item)
+        snap = item['snapshot'].is_a?(Hash) ? item['snapshot'] : {}
+        parts = [snap['manufacturer'].to_s.strip, snap['name'].to_s.strip].reject(&:empty?)
+        return parts.join(' ') unless parts.empty?
+
+        name = item['nazov'].to_s.strip
+        name.empty? ? BudgetStore::APPLIANCE_LABELS[item['typ'].to_s].to_s : name
+      end
+
+      # Zo snapshotu sa nesie LEN to, co Kontrola a S1-F potrebuju — nikdy cely
+      # katalogovy zaznam (odkazy, prilohy, poznamky do zberu nepatria).
+      def appliance_snapshot_dims(snapshot)
+        return nil unless snapshot.is_a?(Hash)
+
+        dims = snapshot['dims'].is_a?(Hash) ? snapshot['dims'] : {}
+        inst = dims['install'].is_a?(Hash) ? dims['install'] : {}
+        out = {}
+        out['niche'] = dims['niche'] if dims['niche'].is_a?(Hash)
+        out['body'] = dims['body'] if dims['body'].is_a?(Hash)
+        cls = inst['dishwasher_class'].to_s
+        out['install'] = { 'dishwasher_class' => cls } unless cls.empty?
+        out
+      end
+
+      def slot_info(cfg)
+        return nil unless cfg.is_a?(Hash)
+
+        { 'dw_class' => cfg['dw_class'].to_i }
+      end
+
+      # Vnutro skrinky pre filter kandidatov a kontrolu niky (S1-F). Doska ani
+      # slot ho nemaju (slot vnutro nema, doska je dielec).
+      def interior_of(entry)
+        return nil unless entry.is_a?(Hash) && entry['kind'] == 'cabinet'
+
+        cfg = entry['cfg']
+        return nil unless cfg.is_a?(Hash) && defined?(Construction)
+
+        # `Construction.interior_dims` cita SYMBOLOVE kluce (pracuje nad
+        # normalizovanym configom stavby), ulozeny config ma STRINGOVE —
+        # plytka konverzia staci, funkcia siaha len na skalary najvyssej
+        # urovne. Vlastny vypocet vysky vnutra by bol DRUHA PRAVDA o tom, kam
+        # sa spotrebic zmesti; autorita ostava jedna.
+        dims = Construction.interior_dims(cfg.transform_keys(&:to_sym))
+        return nil unless dims.is_a?(Hash)
+
+        t = cfg['thickness'].to_f
+        { 'width' => (cfg['width'].to_f - (2 * t)).round(2),
+          'height' => dims[:avail_h].to_f.round(2),
+          'depth' => dims[:back_front_y].to_f.round(2) }
+      rescue StandardError
+        nil
       end
 
       # S1-E: ZAZNAM SLOTU pre Kontrolu. CISTA funkcia (ziadny SketchUp objekt)
