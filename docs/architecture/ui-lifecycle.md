@@ -743,6 +743,21 @@ prepínača**, nikdy neprekresľuje kartu (vzor `NX.setUsedIds`).
 dva zdroje pravdy o farbe okna; push po zmene témy tu slúži len na **presvietenie tlačidiel** (`nxSyncThemeButtons`). Čisté jadro (normalizácia radu zrkadliaca Ruby, texty stĺpca,
 kostra) testuje `tests/js/test_uib3_korpus.js`, serverovú stranu a perzistenciu `tests/pure/test_uib3_rady.rb`.
 
+**KRÍŽOVÁ KONTROLA VÝŠKY (S1-E0, v0.12.9, `form.js` `cabinetHeightError`).** Od odomknutia výšky na 80 mm nestačí, že pole prejde rozsahom `LIMITS` — **výška je CELKOVÁ vrátane
+sokla**, takže dolná skrinka 90 mm s predvoleným soklom 100 mm nemá žiadne vnútro a `Construction.validate!` prestavbu odmietne. Dovtedy to používateľ zistil až **výnimkou po
+apply**; po novom `validateFields` na konci (za hlavným cyklom, takže mu nič neprepíše `bad`) zavolá `cabinetHeightError` a `markHeightError` **zočervení DVOJICU polí Výška
+a Podstavec** — chyba je v ich kombinácii, nie v jednom čísle. Dôvod ide do `title` týchto polí (obe sú v HTML bez `title`, takže sa nič neprepisuje); **nový DOM ani CSS
+nepribudli** a stavový riadok „Skontroluj červené polia" už existuje v `actions.js`. Apply je zablokovaný rovnako ako pri rozmere mimo limitu.
+
+Kontrola je **zrkadlom dvoch Ruby pravidiel** a počíta ich **zdieľanou `nxInteriorZ`** (`core.js`) — tou istou, ktorá kreslí údaj „Úložná výška", takže druhá kópia vzorca
+nevzniká: (a) svetlé vnútro `<= MIN_AVAIL_H` (10 mm) = odmietnutie · (b) pri vrchu **„dve výstuhy"** musí pod nimi ostať `NX_MIN_INTERIOR_H` (20 mm, D-80). Čísla sú zrkadlom
+`Construction::MIN_AVAIL_H` a `MIN_INTERIOR_H`; zhodu stráži `tests/pure/test_s1e0_min_vyska.rb`.
+
+**Prázdne pole NIE JE nula (Codex #375 P2).** Ruby `normalize` za prázdne pole dosadí **predvoľbu typu** (dolná skrinka má sokel 100 mm), takže kontrola musí počítať s tým istým
+číslom — inak by výška 90 mm s prázdnym soklom prešla klientom a padla až na serveri. `cabFieldOrDefault(id)` preto číta prázdnu (aj nezmyselnú) hodnotu z **`DEFAULTS[getType()]`**,
+teda z payloadu, do ktorého `sync.rb` posiela **priamo `CabinetBuilder::LOWER_DEFAULTS` / `UPPER_DEFAULTS`** — druhý zdroj pravdy nevzniká. Kým predvoľby zo servera neprišli,
+kontrola **mlčí**: falošná červená pri štarte panela je horšia než chýbajúca. JS sada `tests/js/test_s1e0_min_vyska.js`.
+
 ### Náhľad = kontextová projekcia + spodný pás (UI-B2, ui/js/preview.js)
 
 každý kontext kreslí **svoj** pohľad (výmena, nie vrstvenie) — **Korpus** čelný rez s kótami (Š dole, V vpravo, sokel/telo vľavo, hĺbka kótou na náznaku skosenia hornej plochy),
