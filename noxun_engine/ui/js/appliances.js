@@ -194,9 +194,22 @@
     return n + ' ' + word + (s > 0 ? ' (' + s + ' seed)' : '');
   }
 
+  // Lišta sa NEPREKRESĽUJE, kým používateľ píše do hľadania: odpoveď servera
+  // chodí uprostred písania (debounce 200 ms) a výmena uzla by vzala fokus aj
+  // pozíciu kurzora. Obnoví sa vtedy LEN počet modelov — presne ten vzor, aký
+  // má `NX.setVepoBar` v studio.js pri poli „Projekt".
   function apRenderTools(){
     var box = apEl('sectools');
-    if (box) box.innerHTML = apToolsHtml(apToolsState());
+    if (!box) return;
+    var q = apEl('apQ');
+    if (typeof document !== 'undefined' && q && document.activeElement === q){
+      var hint = box.querySelector ? box.querySelector('.sechint') : null;
+      var st = apToolsState();
+      if (hint) hint.textContent = 'Katalóg je tohto počítača · bez cien · ' +
+                                   apCountLabel(st.total, st.seed);
+      return;
+    }
+    box.innerHTML = apToolsHtml(apToolsState());
   }
 
   // --- TELO sekcie: strom + karta ---------------------------------------------
@@ -361,6 +374,21 @@
     if (!box) return;
     box.innerHTML = apBodyHtml();
     apRequestForm(null);
+    apHealFilter();
+  }
+
+  // SAMOLIEČBA pohľadu. Filter je stav KLIENTA, strom skladá SERVER — a tie dva
+  // sa vedia rozísť: odchod zo sekcie filter zabudne na oboch stranách, ale
+  // v okne ostane visieť naposledy vykreslený (zúžený) strom. Pri vstupe do
+  // sekcie sa preto porovná, čo strom hovorí, s tým, čo je v lište, a rozdiel
+  // sa dorovná jedným dotazom. Bez toho by sa prázdne hľadanie tvárilo, že
+  // katalóg má jeden model.
+  function apHealFilter(){
+    if (!AP_TREE) return false;
+    if (String(AP_TREE.query || '') === AP_Q && (AP_TREE.include_deleted === true) === AP_DEL) return false;
+
+    apAskTree();
+    return true;
   }
 
   // --- lazy miniatúry ----------------------------------------------------------
@@ -750,6 +778,7 @@
       apModalFields: apModalFields, apValuesToFields: apValuesToFields,
       apApplyState: apApplyState, apIsActive: apIsActive,
       apRequestThumbs: apRequestThumbs, apThumbMissing: apThumbMissing,
+      apHealFilter: apHealFilter,
       apSelect: apSelect, apSearch: apSearch, apToggleDeleted: apToggleDeleted,
       apToggleGroup: apToggleGroup, apOnLeaveSection: apOnLeaveSection,
       apOpenModal: apOpenModal, apDelete: apDelete, apOnCategoryChange: apOnCategoryChange,
