@@ -79,6 +79,9 @@ module Noxun
       MSG_OWNER_GONE    = 'vlastník sa nenašiel — obnov okno a vyber znova'
       MSG_OWNER_AMBIG   = 'nejednoznačná identita vlastníka (dva kusy s tým istým ID) — prestav skrinky'
       MSG_OWNER_OP      = 'zmena vlastníka ide vlastnou akciou — túto úpravu vlastník netýka'
+      MSG_OWNER_STALE   = 'zastaraná ponuka vlastníkov — otvor modal znova'
+      MSG_TYPE_WITH_OWNER = 'typ sa pri zmene vlastníka nemení — najprv ulož typ, potom vlastníka'
+      MSG_UNKNOWN_TYPE  = 'neznámy typ spotrebiča'
       MSG_OWNER_DETACH  = 'vlastník má odpojený dielec — vráť ho do skrinky a skús znova'
       MSG_OWNER_NEWER   = 'vlastník je z novšej verzie Noxun — väzba by jeho nastavenia stratila'
       MSG_PREV_LOCKED   = 'pôvodný vlastník sa nedá prestavať — väzbu treba najprv opraviť na ňom'
@@ -139,6 +142,16 @@ module Noxun
         snapshot, snap_err = snapshot_for(op, catalog_id, current)
         return [nil, [snap_err]] if snap_err
 
+        # KATEGORIA je to, proti comu sa overuje matica — musi sa teda rovnat
+        # tomu, co sa NAOZAJ ulozi (Codex #382 kolo 2 P2). Preto:
+        #   * pri operaciach MENIACICH VLASTNIKA sa `typ` z formulara ODMIETA
+        #     (inak by matica presla nad starou kategoriou a `write_item!` by
+        #     ulozil novu — chladnicka by sa dostala do slotu ako umyvacka),
+        #   * pri `create` sa neznamy kod odmietne uz tu (nikdy sa ticho
+        #     nenahradi defaultom) a ulozeny typ je PRESNE `plan[:category]`.
+        type_err = type_attr_error(op, attrs)
+        return [nil, [type_err]] if type_err
+
         category = category_of(op, attrs, snapshot, current)
         target, terr = target_owner(op, owner, current, category)
         return [nil, [terr]] if terr
@@ -177,7 +190,23 @@ module Noxun
         [{ op: op, item_id: item_id, attrs: (attrs.is_a?(Hash) ? attrs : {}),
            snapshot: snapshot, category: category, owner: target,
            new_entity: new_entity, prev: prev, current: current,
-           owner_changed: owner_changed?(prev_owner, target) }, []]
+           owner_changed: owner_changed?(prev_owner, target, owner, prev) }, []]
+      end
+
+      # Codex #382 kolo 2 (P2): `typ` z formulara pri operaciach, ktore menia
+      # VLASTNIKA. Matica uz bezala nad starou kategoriou, takze novy typ by sa
+      # ulozil BEZ kontroly — kategoria a vlastnik by sa rozisli.
+      # -> hlaska | nil
+      def type_attr_error(op, attrs)
+        a = attrs.is_a?(Hash) ? attrs : {}
+        raw = a.key?('typ') ? a['typ'] : a[:typ]
+        return nil if raw.nil? || raw.to_s.strip.empty?
+
+        return MSG_TYPE_WITH_OWNER if %w[move unbind rebind_model].include?(op.to_s)
+        return nil unless op.to_s == 'create'
+        # Neznamy kod sa NIKDY ticho nenahradi defaultom — inak by sa matica
+        # overila nad „Iné" a polozka by sa ulozila ako nieco ine.
+        BudgetStore.canon_appliance_type(raw).nil? ? MSG_UNKNOWN_TYPE : nil
       end
 
       # Ktore operacie sa vobec dotykaju `appliance_refs[]`? `patch` (cena,
@@ -188,8 +217,15 @@ module Noxun
         %w[move unbind remove rebind_model].include?(op.to_s)
       end
 
-      def owner_changed?(prev_owner, target)
+      # Meni sa vlastnik? Kind + ID NESTACI (Codex #382 kolo 2 P2): ulozeny
+      # vlastnik BEZ platnej vazby (`prev == nil` — entita zanikla alebo jej
+      # refs polozku nenesu) NIE JE platny vlastnik, takze VYSLOVNE vybrany
+      # fyzicky ciel je vtedy VZDY novy — aj keby mal to iste ID, ktore
+      # recykloval po zaniknutej skrinke. Bez toho by sirota presla „bez zmeny"
+      # a refs by sa nezapisali.
+      def owner_changed?(prev_owner, target, explicit_owner = nil, prev = nil)
         return false if target.nil?
+        return true if !explicit_owner.nil? && target['kind'].to_s != KIND_JOB && prev.nil?
 
         prev_owner['kind'].to_s != target['kind'].to_s ||
           prev_owner['id'].to_s != target['id'].to_s
@@ -284,15 +320,21 @@ module Noxun
       # zhody PID = ODMIETNUTIE, nie tiche priradenie k cudzej skrinke.
       # -> [instancia, nil] | [nil, hlaska]
       def resolve_target(model, owner)
+        # Codex #382 kolo 2 (P2): FYZICKY ciel BEZ PID sa neprijima. ID sa
+        # recykluju (`Ids.next_id`), takze bez PID by sa spotrebic pripojil na
+        # entitu, ktora len zdedila cislo po zaniknutej skrinke. Ponuka
+        # vlastnikov PID vzdy nesie — jeho absencia znamena zastaraly payload.
+        pid = owner['pid']
+        return [nil, MSG_OWNER_STALE] unless pid.is_a?(Numeric) ||
+                                             (pid.is_a?(String) && pid.strip.match?(/\A\d+\z/))
+        return [nil, MSG_OWNER_STALE] unless pid.to_i.positive?
+
         matches = instances_of(model, owner['kind'], owner['id'])
         return [nil, MSG_OWNER_GONE] if matches.empty?
         return [nil, MSG_OWNER_AMBIG] if matches.length > 1
 
         inst = matches.first
-        pid = owner['pid']
-        unless pid.nil? || pid.to_s.strip.empty? || pid.to_i == inst.persistent_id.to_i
-          return [nil, MSG_OWNER_GONE]
-        end
+        return [nil, MSG_OWNER_GONE] unless pid.to_i == inst.persistent_id.to_i
         return [nil, MSG_OWNER_DETACH] if detached?(model, owner)
         return [nil, MSG_OWNER_NEWER] if newer?(owner['kind'], inst)
 
@@ -475,6 +517,10 @@ module Noxun
       # hodnotou, ktora uz v polozke je).
       def server_attrs(plan, owner)
         out = { 'owner' => owner.reject { |k, _| k.to_s == 'pid' } }
+        # Codex #382 kolo 2 (P2): pri ZALOZENI sa uklada PRESNE ta kategoria,
+        # proti ktorej bezala matica — nie to, co prislo vo formulari. Legacy
+        # kod je uz prevedeny, neznamy sa odmietol vyssie.
+        out['typ'] = plan[:category] if plan[:op].to_s == 'create'
         return out unless %w[create rebind_model].include?(plan[:op])
 
         snap = plan[:snapshot]
@@ -486,8 +532,19 @@ module Noxun
 
       # --- zapis `appliance_refs[]` -------------------------------------------
 
+      # Ma sa zaznam u ciela (pre)pisat? Okrem zmeny vlastnika a vymeny modelu
+      # aj vtedy, ked OVERENY ciel polozku EST NENESIE — presne to je pripad
+      # siroty presunutej na entitu, ktora recyklovala ID po zaniknutom
+      # vlastnikovi (Codex #382 kolo 2 P2). Ciel, ktory ju uz nesie, sa
+      # zbytocne neprestavuje.
       def rewrite_ref?(plan)
-        plan[:owner_changed] == true || plan[:op].to_s == 'rebind_model'
+        return true if plan[:owner_changed] == true
+        return true if plan[:op].to_s == 'rebind_model'
+
+        ent = plan[:new_entity]
+        return false if ent.nil?
+
+        refs_of(ent).none? { |r| r['item_id'].to_s == plan[:item_id].to_s }
       end
 
       # Odstranenie vazby u predchadzajuceho vlastnika. -> true = zapisalo sa
