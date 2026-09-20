@@ -4749,6 +4749,252 @@ module NoxunSuRunner
     e::ApplianceCatalog.test_dir_override = nil
     e::ApplianceCatalog.reset_state!
   end
+
+  # --- S1-F: KONTROLNA GEOMETRIA CHLADNICKY + KONTROLA NIKY A DELENIA ------
+  #
+  # CO SA TU OVERUJE A MIMO SKETCHUPU OVERIT NEDA:
+  #   * box niky naozaj STOJI v modeli s AABB 560 x 555 x 1940 od hornej plochy
+  #     dna — headless overi len deskriptor planu,
+  #   * prestavba (zmena vysky) box ZACHOVA a je to JEDEN krok Spat, vratane
+  #     Redo (undo stack SketchUpu fake model nema),
+  #   * PRESUN vazby medzi dvoma skrinkami: box zmizne u jednej a vznikne
+  #     u druhej v TEJ ISTEJ operacii,
+  #   * `rebind_model` na iny model prekresli box podla NOVEHO listu,
+  #   * uprava ZIVEHO katalogu po vazbe boxom ani verdiktom nepohne (snapshot),
+  #   * Kontrola cez REALNU cestu `Bom.collect -> Validation.run`,
+  #   * box NIKDY nie je v `Bom.collect` (kusovnik, VEPO, nakup).
+  #
+  # Katalog spotrebicov je IZOLOVANY (`test_dir_override`).
+
+  # Skrinka je zamerne NIZKA (2060 -> vnutro 1924): nika Beko potrebuje 1940,
+  # takze scenar (c) zacina ORANGE a konci OK po zvyseni na 2076.
+  S1F_CAB = { 'type' => 'lower', 'width' => 600.0, 'height' => 2060.0, 'depth' => 580.0,
+              'thickness' => 18.0, 'floor_height' => 100.0, 'back_mode' => 'inset',
+              'back_thickness' => 18.0 }.freeze
+
+  # Referencia NIKY (rola `appliance_niche`) tak, ako stoji v modeli.
+  def s1f_niche(inst)
+    return nil unless inst && inst.valid?
+
+    s1e_refs(inst).find { |r| e::Store.get(r, 'role').to_s == 'appliance_niche' }
+  end
+
+  # [sirka, hlbka, vyska] obalky referencie v mm (BoundingBox#height je os Y).
+  def s1f_box(inst)
+    ref = s1f_niche(inst)
+    return nil unless ref
+
+    bb = ref.definition.bounds
+    [bb.width.to_f, bb.height.to_f, bb.depth.to_f].map { |v| (v * 25.4).round(1) }
+  end
+
+  # Spodna hrana boxu v suradniciach KORPUSU (mm) — musi sediet s `z_lo`.
+  def s1f_box_z(inst)
+    ref = s1f_niche(inst)
+    return nil unless ref
+
+    mm(ref.definition.bounds.min.z).round(1)
+  end
+
+  def s1f_cab(model, id)
+    cabinets(model).find { |i| e::Store.get(i, 'cabinet_id').to_s == id }
+  end
+
+  # Kontrolne kody kategorie `appliance` AJ s osou (`niche_clash|height`).
+  def s1f_codes(model)
+    res = e::Validation.run(e::Bom.collect(model))
+    Array(res['items']).select { |i| i['category'] == 'appliance' }
+                       .map { |i| i['stable_key'].to_s.split('|')[2..].join('|') }.sort
+  end
+
+  def s1f_check(inst)
+    row = Array(e::Panel.cabinet_payload(inst)['appliance_rows']).first
+    row ? row['check'] : nil
+  end
+
+  # Dve dvierka nad sebou; `lower` je vyska DOLNEHO cela.
+  def s1f_two_doors(model, inst, lower)
+    s1e_rebuild(model, inst, 'fronts' => {
+                  'items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'fixed', 'height' => lower },
+                              { 'id' => 'F2', 'type' => 'door', 'mode' => 'auto' }]
+                })
+  end
+
+  def run_s1f(model)
+    cleanup(model)
+    r14_clear!(model)
+    root = File.join(Sketchup.temp_dir, "noxun_s1f_#{Process.pid}_#{Time.now.to_i}")
+    FileUtils.mkdir_p(root)
+    fridge_id, = s1b1_catalog!(root)
+    # Druhy model chladnicky pre `rebind_model` — INA nika (600 x 560 x 1780).
+    _, other = e::ApplianceCatalog.create!(
+      'category' => 'fridge', 'manufacturer' => 'SU', 'name' => 'NIZKA 178',
+      'dims' => { 'body' => { 'width' => 580.0, 'height' => 1775.0, 'depth' => 550.0 },
+                  'niche' => { 'width_min' => 600.0, 'height_min' => 1780.0,
+                               'depth_min' => 560.0 } }
+    )
+    other_id = other[:record]['id'].to_s
+    ok('S1-F: izolovany katalog ma oba testovacie modely',
+       !fridge_id.empty? && !other_id.empty?)
+
+    cab = e::CabinetBuilder.build(model, S1F_CAB)
+    return ok('S1-F: fixtura skrinky', false) unless cab
+
+    cid = e::Store.get(cab, 'cabinet_id').to_s
+
+    # (a) VAZBA -> BOX V MODELI -> prestavba -> 1 Spat -> Redo.
+    ok('S1-F (a): skrinka BEZ vazby ziadny box nema', s1f_niche(cab).nil?)
+    s1b1_apply(model, 'create', attrs: { 'nazov' => 'Beko' }, catalog_id: fridge_id)
+    item_id = s1b1_items(model).first['id']
+    s1b2_pick(model, cab, item_id, echo: cid)
+    cab = s1f_cab(model, cid)
+    box = s1f_box(cab)
+    ok("S1-F (a): po vazbe stoji v modeli BOX NIKY 560 x 555 x 1940 (#{box.inspect})",
+       box && (box[0] - 560.0).abs < TOL && (box[1] - 555.0).abs < TOL &&
+       (box[2] - 1940.0).abs < TOL)
+    ok("S1-F (a): stoji na hornej ploche dna (z = #{s1f_box_z(cab)}, cakam 118)",
+       (s1f_box_z(cab).to_f - 118.0).abs < TOL)
+    ref = s1f_niche(cab)
+    rcfg = ref ? (e::Store.config(ref) || {}) : {}
+    ok("S1-F (a): je to REFERENCIA z katalogu (#{e::Store.get(ref, 'kind')} · #{rcfg['source']})",
+       ref && e::Store.get(ref, 'kind').to_s == 'reference' &&
+       e::Store.get(ref, 'manufactured') == false &&
+       e::Store.get(ref, 'production_class').to_s == 'reference' &&
+       rcfg['source'].to_s == 'catalog' && rcfg['item_id'].to_s == item_id)
+    ok("S1-F (a): identita boxu je PER POLOZKA (#{e::Store.get(ref, 'id')})",
+       e::Store.get(ref, 'id').to_s.start_with?("#{cid}-REF-NICHE-"))
+
+    s1e_rebuild(model, cab, 'height' => 2076.0)
+    cab = s1f_cab(model, cid)
+    box2 = s1f_box(cab)
+    ok("S1-F (a): prestavba (vyska 2076) box ZACHOVALA (#{box2.inspect})",
+       box2 && (box2[2] - 1940.0).abs < TOL)
+    Sketchup.undo
+    cab = s1f_cab(model, cid)
+    ok('S1-F (a): JEDEN Spat vratil vysku aj box',
+       cab && (e::Store.config(cab)['height'].to_f - 2060.0).abs < TOL && !s1f_niche(cab).nil?)
+
+    # (b) BOX NIKDY NIE JE V KUSOVNIKU ANI VO VYSTUPOCH.
+    col = e::Bom.collect(model)
+    recs = Array(col[:records])
+    ok("S1-F (b): box nie je v `Bom.collect` (#{recs.length} dielcov)",
+       recs.none? { |r| r['role'].to_s.include?('appliance') || r['kind'].to_s == 'reference' })
+    ok('S1-F (b): ani v kusovniku',
+       Array(e::Bom.compute(col)[:rows]).none? { |p| p['name'].to_s.include?('nika') })
+
+    # (c) KONTROLA NIKY: 1924 < 1940 -> ORANGE, zvysenie -> OK.
+    codes = s1f_codes(model)
+    ok("S1-F (c): nizka skrinka hlasi ORANGE na VYSKE (#{codes.inspect})",
+       codes.include?('appliance_niche_clash|height'))
+    ok('S1-F (c): a SIRKA ani HLBKA nalez nemaju (564 ≥ 560, 562 ≥ 555)',
+       !codes.include?('appliance_niche_clash|width') &&
+       !codes.include?('appliance_niche_clash|depth'))
+    chk = s1f_check(cab)
+    ok("S1-F (c): riadok Spotrebica hovori TO ISTE (#{chk && chk['state']})",
+       chk && chk['state'] == 'clash' && chk['niche']['axes']['height'] == 'clash')
+    s1e_rebuild(model, cab, 'height' => 2076.0, 'back_thickness' => 5.0)
+    cab = s1f_cab(model, cid)
+    codes = s1f_codes(model)
+    ok("S1-F (c): po zvyseni na 2076 je nika OK (#{codes.inspect})",
+       codes.none? { |c| c.start_with?('appliance_niche_clash') })
+
+    # (d) DELENIE CIEL: hrana mimo pasma -> ORANGE, posun -> OK.
+    s1f_two_doors(model, cab, 800.0)
+    cab = s1f_cab(model, cid)
+    codes = s1f_codes(model)
+    chk = s1f_check(cab)
+    rng = chk && chk['door_split'] ? chk['door_split']['range'] : nil
+    ok("S1-F (d): hrana 682 mimo pasma #{rng.inspect} = ORANGE (#{codes.inspect})",
+       codes.include?('appliance_door_split') && rng == [679.0, 727.0])
+    s1f_two_doors(model, cab, 711.0) # vrch dolneho cela 813 -> hrana 695 v nike
+    cab = s1f_cab(model, cid)
+    codes = s1f_codes(model)
+    chk = s1f_check(cab)
+    ok("S1-F (d): po posune je hrana #{chk && chk['door_split']['edge']} v pasme — nalez zmizol",
+       codes.none? { |c| c == 'appliance_door_split' } &&
+       chk['door_split']['state'] == 'ok')
+    pv = Array(e::Panel.cabinet_payload(cab)['preview']['appliances'])
+    ok("S1-F (d): nahlad dostal box, pasma aj pasmo hrany (#{pv.length} polozka)",
+       pv.length == 1 && pv.first['box']['h'] == 1940.0 &&
+       Array(pv.first['bands']).length == 4 && pv.first['split']['lo_mm'] == 679.0)
+
+    # (e) PRESUN medzi skrinkami: box zmizne u prvej, vznikne u druhej.
+    cab2 = e::CabinetBuilder.build(
+      model, S1F_CAB.merge('height' => 2076.0, 'back_thickness' => 5.0),
+      transform: Geom::Transformation.translation(e::Units.point(2000.0, 0, 0))
+    )
+    if cab2
+      cid2 = e::Store.get(cab2, 'cabinet_id').to_s
+      s1b2_pick(model, cab2, item_id, echo: cid2)
+      cab = s1f_cab(model, cid)
+      cab2 = s1f_cab(model, cid2)
+      ok('S1-F (e): presun vazby presunul aj BOX (jedna operacia)',
+         s1f_niche(cab).nil? && !s1f_niche(cab2).nil?)
+      Sketchup.undo
+      cab = s1f_cab(model, cid)
+      cab2 = s1f_cab(model, cid2)
+      ok('S1-F (e): JEDEN Spat vratil box PRVEJ skrinke',
+         !s1f_niche(cab).nil? && s1f_niche(cab2).nil?)
+      cab2.erase! if cab2 && cab2.valid?
+    else
+      ok('S1-F (e): fixtura druhej skrinky', false)
+    end
+
+    # (f) REBIND na INY model -> box sa prekresli podla noveho listu.
+    s1b1_apply(model, 'rebind_model', item_id: item_id, catalog_id: other_id)
+    cab = s1f_cab(model, cid)
+    box3 = s1f_box(cab)
+    ok("S1-F (f): iny model = iny box 600 x 560 x 1780 (#{box3.inspect})",
+       box3 && (box3[0] - 600.0).abs < TOL && (box3[1] - 560.0).abs < TOL &&
+       (box3[2] - 1780.0).abs < TOL)
+    Sketchup.undo
+    cab = s1f_cab(model, cid)
+    back = s1f_box(cab)
+    ok("S1-F (f): JEDEN Spat vratil povodny box (#{back.inspect})",
+       back && (back[2] - 1940.0).abs < TOL)
+
+    # (g) ZIVY KATALOG sa zmeni — zakazka ma SNAPSHOT, takze box ostava.
+    status, payload = e::ApplianceCatalog.find(fridge_id)
+    rec = status == :ok ? payload[:record] : nil
+    if rec
+      e::ApplianceCatalog.patch!(fridge_id, { 'dims' => { 'niche' => { 'height_min' => 2200.0 } } },
+                                 rev: rec['rev'])
+      cab = s1f_cab(model, cid)
+      s1e_rebuild(model, cab, 'height' => 2077.0)
+      cab = s1f_cab(model, cid)
+      keep = s1f_box(cab)
+      ok("S1-F (g): zmena ZIVEHO katalogu boxom NEPOHNE (#{keep.inspect})",
+         keep && (keep[2] - 1940.0).abs < TOL)
+      ok('S1-F (g): ani verdiktom',
+         s1f_codes(model).none? { |c| c.start_with?('appliance_niche_clash') })
+    else
+      ok('S1-F (g): katalogovy zaznam sa nasiel', false)
+    end
+
+    # (h) ODPOJENIE -> box zmizne; Spat vrati box aj vazbu.
+    cab = s1f_cab(model, cid)
+    s1b2_pick(model, cab, item_id, unbind: true, echo: cid)
+    cab = s1f_cab(model, cid)
+    ok('S1-F (h): odpojenie zmazalo box v TEJ ISTEJ operacii', s1f_niche(cab).nil?)
+    Sketchup.undo
+    cab = s1f_cab(model, cid)
+    ok('S1-F (h): JEDEN Spat vratil box AJ vazbu',
+       !s1f_niche(cab).nil? && s1b1_refs(cab).length == 1)
+
+    s1b1_apply(model, 'remove', item_id: item_id)
+    r14_clear!(model)
+    cleanup(model)
+    ok('S1-F: cleanup (0 korpusov, rozpocet prazdny)',
+       cabinets(model).empty? && s1b1_items(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: run_s1f vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    r14_clear!(model)
+    cleanup(model)
+  ensure
+    e::ApplianceCatalog.test_dir_override = nil
+    e::ApplianceCatalog.reset_state!
+  end
+
   # --- S1-A1: KATALOG SPOTREBICOV — prilohy na REALNOM Windows suborovom
   # systeme (headless sada ich overuje len logicky). Overuje sa to, co sa
   # mimo SketchUpu overit NEDA: kopia suboru s DIAKRITIKOU a MEDZEROU v nazve,
@@ -25048,6 +25294,7 @@ module NoxunSuRunner
     run_s1e(model)           # S1-E: SLOT UMYVACKY — zo sablony 1 vyrobny dielec + telo ako referencia (kind reference, v kusovniku nikde), zmena vysky cela = 1 Spat, prisunutie na NOMINALNU hranu (aj pri presahujucom cele a vypnutom tagu referencie), zmena triedy prestavi telo, absorpcia scale na typove minimum, sablona so slotom, Kontrola dw_body_fit/dw_height_fit cez realny zber
     run_s1b1(model)          # S1-B1: SPOTREBIC V ZAKAZKE — priradenie z katalogu, presun, odpojenie a zmazanie ako JEDEN krok Spat (polozka + `appliance_refs[]` vlastnika + prestavba naraz), sirota po Delete (nalez BEZ `owner_id`) a jej naprava, trieda umyvacky vs slot, „dodáva zákazník" (medzisucet 0 + stitok v ponuke), legacy zakazka na kanonicke kody, ROLLBACK po riadenych zlyhaniach a bariera observera
     run_s1b2(model)          # S1-B2: POHLAD V ZAKAZKE + riadok Spotrebica ? ocakavanie zo sablony a ponuka filtrovana podla niky, priradenie AKCIOU PANELA (ciel z oznacenej entity) a 1x Spat, telo slotu prekreslene z katalogu (448 x 550) a spat na genericke, doska bez prestavby, tabulka pohladu nad realnym zberom, Delete vlastnika -> sirota -> odpojenie -> Spat vrati oboje
+    run_s1f(model)           # S1-F: KONTROLNA GEOMETRIA CHLADNICKY — box niky 560 x 555 x 1940 na hornej ploche dna (prestavba ho zachova, 1x Spat), box nikdy v zbere ani v kusovniku, Kontrola niky per os (1924 -> ORANGE vyska -> zvysenie -> OK), delenie ciel (hrana 682 mimo 679-727 -> posun -> OK) + nahlad, presun vazby medzi skrinkami, rebind_model na iny box, zmena ziveho katalogu snapshotom nepohne, odpojenie a Spat
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
     run_r03(model)           # R-03: sev prepare_insert/commit_insert — ciste pripravenie, vlastny rigidny transform, odmietnutia, edit kontext
     run_r12(model)           # 1d/R-12: dopredny guard configu — marker, odmietnuta prestavba bez mutacie a bez kroku Spat, kopia/sablony, citanie dalej bezi
