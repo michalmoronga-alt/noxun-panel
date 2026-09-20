@@ -747,6 +747,10 @@
         renderApplianceRows(c.appliance_rows || [], { kind: 'cabinet', id: c.cabinet_id || '' },
                             'applRows');
       }
+      // S1-F: kontrolna geometria pre nahlad. Chybajuci kluc (staršie okno) =
+      // prazdne pole, teda ziadna kresba — nikdy zvysok po predchadzajucej
+      // skrinke (rovnaka zasada ako `appliance_rows`).
+      applPreview = (c.preview && Array.isArray(c.preview.appliances)) ? c.preview.appliances : [];
       nxFrontDraftAsk();
       renderPreview();
       refreshZoneUI();
@@ -768,7 +772,7 @@
       // `loadSelected` to robi uz dlho, doska na to cakala.
       if (typeof absModalCloseSilent === 'function') absModalCloseSilent();
       setSelected(null);
-      activeZoneId = null; frontItems = null; frontSlots = null; frontDrawer = null; hwItems = null;
+      activeZoneId = null; frontItems = null; frontSlots = null; frontDrawer = null; hwItems = null; applPreview = [];
       frontLift = null; // KOV-E2: bez oznaceneho korpusu niet vyklopu, o ktorom by server hovoril
       // KOV-H2 (Codex #285 P1): odchod z korpusu (doska alebo prazdny vyber) je
       // ZMENA IDENTITY — otvoreny modal by odoslal zoznam skrinky, ktora uz nie
@@ -807,7 +811,7 @@
       // D-32: identita prec PRED setUiMode — reset karty (materializeInsertCard
       // vnutri setUiMode) nesmie bezat nad zvyskami stareho vyberu.
       setSelected(null);
-      activeZoneId = null; frontItems = null; frontSlots = null; frontDrawer = null; hwItems = null;
+      activeZoneId = null; frontItems = null; frontSlots = null; frontDrawer = null; hwItems = null; applPreview = [];
       frontLift = null; // KOV-E2: bez oznaceneho korpusu niet vyklopu, o ktorom by server hovoril
       // KOV-H2 (Codex #285 P1): odchod z korpusu (doska alebo prazdny vyber) je
       // ZMENA IDENTITY — otvoreny modal by odoslal zoznam skrinky, ktora uz nie

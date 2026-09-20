@@ -164,8 +164,10 @@ module Noxun
           appl_items = appliance_items(entity_model(cab))
           slot = cfg['type'].to_s == 'dishwasher'
           params['appliance_rows'] = appliance_rows(slot ? 'slot' : 'cabinet', cfg, appl_items,
-                                                    (slot ? nil : appliance_interior(cfg)),
-                                                    cfg['zones'])
+                                                    (slot ? nil : appliance_interior(cfg)))
+          # S1-F: NAHLAD. Server pocita box niky, pasma dveri aj pasmo pripustnej
+          # hrany; JS z toho len kresli a odcita popisky (ziadny vypocet v JS).
+          params['preview'] = { 'appliances' => appliance_preview(cfg, params['appliance_rows']) }
           # S1-E: VYSTUPY SLOTU (telo, celo hore, vyplň hore, pod doskou,
           # trieda). Pocita ich SERVER — panel z nich nic neodvodzuje, len ich
           # zapisuje do informacneho stlpca. Kluc chyba pri kazdom inom type.
@@ -217,39 +219,80 @@ module Noxun
         end
 
         # `kind` = 'cabinet' | 'slot' | 'board' (druh VLASTNIKA, nie Store.kind).
-        def appliance_rows(kind, cfg, items, interior = nil, zones = nil)
+        def appliance_rows(kind, cfg, items, interior = nil)
           return [] unless cfg.is_a?(Hash)
 
           refs = cfg['appliance_refs'].is_a?(Array) ? cfg['appliance_refs'].select { |r| r.is_a?(Hash) } : []
           by_id = {}
           Array(items).each { |it| by_id[it['id'].to_s] = it if it.is_a?(Hash) }
-          rows = refs.filter_map { |ref| appliance_bound_row(kind, cfg, ref, by_id[ref['item_id'].to_s]) }
-          rows + appliance_expected_rows(kind, cfg, refs, items, interior, zones)
+          # S1-F: VYPOCTOVY KONTEXT skrinky sa cita RAZ na payload a sluzi VSETKYM
+          # riadkom (dva spotrebice = jeden prepocet ciel).
+          ctx = appliance_context(kind, cfg)
+          rows = refs.filter_map { |ref| appliance_bound_row(kind, cfg, ref, by_id[ref['item_id'].to_s], ctx) }
+          rows + appliance_expected_rows(kind, cfg, refs, items, interior, ctx)
         rescue StandardError => e
           Engine.log_error(e, 'Panel.appliance_rows')
           []
         end
 
-        def appliance_bound_row(kind, cfg, ref, item)
+        # Kontext pre verdikt. Doska ani slot niku nemaju, takze im ostava {}.
+        def appliance_context(kind, cfg)
+          return {} unless kind == 'cabinet' && defined?(ApplianceChecks)
+
+          ApplianceChecks.context(cfg)
+        rescue StandardError
+          {}
+        end
+
+        def appliance_bound_row(kind, cfg, ref, item, ctx = {})
           cat = BudgetStore.canon_appliance_type(ref['category']).to_s
           return nil if cat.empty?
 
-          tone, sub = appliance_row_tone(kind, cfg, cat, item)
-          { 'state' => 'bound', 'item_id' => ref['item_id'].to_s, 'category' => cat,
-            'category_label' => ApplianceCatalog.category_label(cat),
-            # Polozka, ktoru medzitym zmazalo druhe okno, riadok NESKRYVA:
-            # `appliance_refs[]` na entite stale visia a pouzivatel ich musi
-            # vidiet, aby ich vedel odpojit.
-            'text' => (item ? Bom.appliance_label(item) : 'položka už v rozpočte nie je'),
-            'sub' => sub, 'tone' => tone, 'link' => true }
+          id = ref['item_id'].to_s
+          check = appliance_check(kind, cat, id, item, ctx)
+          tone, sub = appliance_row_tone(kind, cfg, cat, item, check)
+          row = { 'state' => 'bound', 'item_id' => id, 'category' => cat,
+                  'category_label' => ApplianceCatalog.category_label(cat),
+                  # Polozka, ktoru medzitym zmazalo druhe okno, riadok NESKRYVA:
+                  # `appliance_refs[]` na entite stale visia a pouzivatel ich musi
+                  # vidiet, aby ich vedel odpojit.
+                  'text' => (item ? Bom.appliance_label(item) : 'položka už v rozpočte nie je'),
+                  'sub' => sub, 'tone' => tone, 'link' => true }
+          row['check'] = check if check
+          row
+        end
+
+        # S1-F: VERDIKT NIKY A DELENIA CIEL pre riadok. Pocita ho `ApplianceChecks`
+        # nad zaznamom v TOM ISTOM tvare, aky ma zber (`Bom.collect[:appliances]`)
+        # — Kontrola aj Inspector tak hovoria to iste cislo o tej istej skrinke.
+        # nil = niet co pocitat (polozka zmizla, doska, slot).
+        def appliance_check(kind, category, item_id, item, ctx)
+          return nil unless item.is_a?(Hash) && defined?(ApplianceChecks)
+          return nil if ctx.nil? || ctx.empty?
+
+          ApplianceChecks.verdict(appliance_check_record(kind, category, item_id, item, ctx))
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.appliance_check')
+          nil
+        end
+
+        def appliance_check_record(kind, category, item_id, item, ctx)
+          snap = item['snapshot'].is_a?(Hash) ? item['snapshot'] : {}
+          { 'item_id' => item_id, 'name' => Bom.appliance_label(item), 'category' => category,
+            'owner' => { 'kind' => kind }, 'state' => 'bound',
+            'snapshot' => Bom.appliance_snapshot_dims(snap) }
+            .merge(Bom.appliance_front_dims(snap))
+            .merge('interior' => ctx['interior'], 'z_lo' => ctx['z_lo'], 'gap' => ctx['gap'],
+                   'single_zone' => ctx['single_zone'], 'fronts_pair' => ctx['fronts_pair'])
         end
 
         # TON riadku. AUTORITA nalezov je `Validation.check_appliance_bound`;
         # panel ju NEVOLA (potrebovala by cely zber modelu), ale pyta sa na
-        # PRESNE TIE ISTE DVA VSTUPY — chybajuce rozmery niky a triedu umyvacky
-        # vs triedu slotu. Test `test_s1b2_pohlad.rb` porovnava oba smery nad
-        # jednou fixturou, takze sa nemozu rozist ticho.
-        def appliance_row_tone(kind, cfg, category, item)
+        # PRESNE TIE ISTE VSTUPY — chybajuce rozmery niky, triedu umyvacky vs
+        # triedu slotu a (S1-F) verdikt `ApplianceChecks`. Test
+        # `test_s1b2_pohlad.rb` a `test_s1f_chladnicka.rb` porovnavaju oba smery
+        # nad jednou fixturou, takze sa nemozu rozist ticho.
+        def appliance_row_tone(kind, cfg, category, item, check = nil)
           label = ApplianceCatalog.category_label(category).to_s
           return ['warn', 'položka už v rozpočte nie je — odpoj ju'] if item.nil?
 
@@ -262,7 +305,14 @@ module Noxun
           mis = appliance_class_mismatch(kind, cfg, dims)
           return ['warn', "#{label} · #{mis}"] if mis
 
-          ['ok', label]
+          verdict = check.is_a?(Hash) ? check : nil
+          return ['ok', label] if verdict.nil? || verdict['text'].to_s.strip.empty?
+
+          # ORANGE ma riadok LEN pri `clash` / `unsatisfiable` — presne tam, kde
+          # nalez vyrobi aj Kontrola (FIX F7). „Nevieme" a „nekontrolované" su
+          # informacia, nie varovanie.
+          warn = %w[clash unsatisfiable].include?(verdict['state'].to_s)
+          [(warn ? 'warn' : 'ok'), "#{label} · #{verdict['text']}"]
         end
 
         # Trieda modelu vs trieda slotu. Neznama trieda je „nevieme", nie
@@ -279,20 +329,21 @@ module Noxun
           "trieda #{model_cls} ≠ slot #{slot_cls}"
         end
 
-        def appliance_expected_rows(kind, cfg, refs, items, interior, zones)
+        def appliance_expected_rows(kind, cfg, refs, items, interior, ctx = {})
           cats = Array(cfg['appliance_expects']).filter_map { |c| BudgetStore.canon_appliance_type(c) }
           # Slot BEZ modelu ocakava umyvacku vzdy — je to jeho jediny zmysel
           # (to iste hovori `Bom.appliance_expected_records`).
           cats << 'dishwasher' if kind == 'slot'
           have = refs.map { |r| BudgetStore.canon_appliance_type(r['category']).to_s }
+          single = ctx.is_a?(Hash) && ctx.key?('single_zone') ? ctx['single_zone'] != false : true
           cats.uniq.reject { |c| have.include?(c) }.map do |cat|
-            appliance_expected_row(cat, items, interior, zones)
+            appliance_expected_row(cat, items, interior, single)
           end
         end
 
-        def appliance_expected_row(category, items, interior, zones)
+        def appliance_expected_row(category, items, interior, single_zone)
           label = ApplianceCatalog.category_label(category).to_s
-          ambiguous = appliance_niche_ambiguous?(category, zones)
+          ambiguous = appliance_niche_ambiguous?(category, single_zone)
           opts = appliance_options(category, items, ambiguous ? nil : interior)
           off = opts.count { |o| o['fits'] == false }
           { 'state' => 'expected', 'item_id' => nil, 'category' => category,
@@ -319,10 +370,14 @@ module Noxun
         # viac zon: vtedy neexistuje jedno „vnutro", proti ktoremu by sa dala
         # vyska merat. Sirka a hlbka su jednoznacne vzdy, takze rura ani
         # mikrovlnka filter nestracaju.
-        def appliance_niche_ambiguous?(category, zones)
+        #
+        # S1-F: „jedna zona" ma JEDEN predikat pre filter ponuky aj pre verdikt
+        # (`ApplianceChecks.single_zone?`) — inak by ponuka filtrovala podla
+        # vysky, ktoru verdikt vzapati oznaci za nekontrolovatelnu.
+        def appliance_niche_ambiguous?(category, single_zone)
           return false unless Array(APPL_AXES[category]).include?('height')
 
-          Array(zones).length > 1
+          single_zone == false
         end
 
         def appliance_options(category, items, interior)
@@ -382,6 +437,71 @@ module Noxun
           end
 
           nil
+        end
+
+        # === S1-F: NAHLAD KONTROLNEJ GEOMETRIE (kontext Korpus) ==============
+        #
+        # KOLEKCIA (FIX F10) adresovana `item_id` — skrinka moze niest viac
+        # chladniciek a kazda ma vlastny box, vlastne pasma a vlastne pasmo
+        # hrany. Geometriu dava TA ISTA funkcia, z ktorej kresli builder
+        # (`Construction.appliance_niche_references`), takze nahlad a model sa
+        # nemozu rozist; pasma a hrana su v suradniciach KORPUSU (z od podlahy),
+        # aby JS nemuselo nic scitavat.
+        def appliance_preview(cfg, rows)
+          return [] unless cfg.is_a?(Hash) && defined?(Construction)
+          return [] unless cfg['appliance_refs'].is_a?(Array)
+
+          checks = {}
+          Array(rows).each { |r| checks[r['item_id'].to_s] = r['check'] if r.is_a?(Hash) }
+          refs = Construction.appliance_niche_references(cfg.transform_keys(&:to_sym))
+          refs.map { |rd| appliance_preview_item(rd, checks[rd[:item_id].to_s]) }
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.appliance_preview')
+          []
+        end
+
+        def appliance_preview_item(rd, check)
+          w, _d, h = rd[:box].map(&:to_f)
+          ox, _oy, oz = rd[:origin].map(&:to_f)
+          split = check.is_a?(Hash) ? check['door_split'] : nil
+          { 'item_id' => rd[:item_id].to_s, 'label' => rd[:label].to_s,
+            'box' => { 'x' => ox.round(2), 'z' => oz.round(2),
+                       'w' => w.round(2), 'h' => h.round(2) },
+            'bands' => appliance_preview_bands(rd, oz, h),
+            'split' => appliance_preview_split(split, oz),
+            'state' => (check.is_a?(Hash) ? check['state'].to_s : 'unknown') }
+        end
+
+        # Pasma dveri SPOTREBICA: hrany v suradniciach korpusu + vyska pasma
+        # (popis „669", „71", zvysok). Pasmo, ktore by presiahlo box, sa oreze —
+        # box sa kvoli listu nikdy nezvacsuje.
+        def appliance_preview_bands(rd, z0, h)
+          levels = CabinetBuilder.niche_band_levels(rd[:bands].is_a?(Hash) ? rd[:bands] : {})
+          edges = ([0.0] + levels + [h]).map(&:to_f).select { |v| v >= -0.01 && v <= h + 0.01 }
+          edges = edges.uniq.sort
+          out = []
+          edges.each_cons(2) do |a, b|
+            next unless (b - a) > 0.01
+
+            out << { 'z0' => (z0 + a).round(2), 'z1' => (z0 + b).round(2),
+                     'size' => (b - a).round(1) }
+          end
+          out
+        end
+
+        def appliance_preview_split(split, z0)
+          return nil unless split.is_a?(Hash)
+          return nil unless %w[ok clash].include?(split['state'].to_s)
+
+          lo, hi = Array(split['range'])
+          { 'state' => split['state'].to_s,
+            'lo' => (lo.is_a?(Numeric) ? (z0 + lo).round(2) : nil),
+            'hi' => (hi.is_a?(Numeric) ? (z0 + hi).round(2) : nil),
+            'edge' => (split['edge'].is_a?(Numeric) ? (z0 + split['edge']).round(2) : nil),
+            'recommended' => (split['recommended'].is_a?(Numeric) ? (z0 + split['recommended']).round(2) : nil),
+            'lo_mm' => (lo.is_a?(Numeric) ? lo.round(1) : nil),
+            'hi_mm' => (hi.is_a?(Numeric) ? hi.round(1) : nil),
+            'edge_mm' => (split['edge'].is_a?(Numeric) ? split['edge'].round(1) : nil) }
         end
 
         # Vnutro skrinky pre filter. JEDINA autorita rozmerov vnutra je
