@@ -22,6 +22,13 @@ module Noxun
       # `cabinet_builder` (main.rb), takze konstanta by pri boote neexistovala —
       # zhodu preto strazi guard test `tests/pure/test_s1e0_min_vyska.rb`.
       MIN = { 'width' => 200.0, 'height' => 80.0, 'depth' => 150.0 }.freeze
+      # S1-E: SLOT UMYVACKY ma VLASTNE minima — nema vnutro, takze sa neriadi
+      # korpusovymi hranicami, a zaroven nema zmysel pustat 200 mm „umyvacku".
+      # Su to TIE ISTE cisla ako spodne hranice v `CabinetBuilder::DW_WIDTH_RANGE`
+      # / `DW_HEIGHT_RANGE` (Astra S1-E BLOCKER E1: jedna hranica na oboch
+      # miestach); zhodu strazi guard test `tests/pure/test_s1e_slot.rb`.
+      MIN_BY_TYPE = { 'dishwasher' => { 'width' => 300.0, 'height' => 500.0,
+                                        'depth' => 150.0 } }.freeze
       # NASTROJE-1: strop iteracii bariery `flush_pending!`. Pokoj observera
       # nastava spravidla v 1-2 iteraciach (follow-up po dedupe); vyssie cislo
       # by uz znamenalo, ze si observer sam sebe planuje pracu donekonecna.
@@ -478,8 +485,10 @@ module Noxun
           base_d = cfg['depth'].to_f
           cid = cfg['cabinet_id'] || Store.get(inst, 'cabinet_id')
 
-          new_w = clamp_min('width',  (base_w * sx).round.to_f, cid)
-          new_d = clamp_min('depth',  (base_d * sy).round.to_f, cid)
+          # S1-E: minima su TYPOVE — slot umyvacky ma vlastne (sirsie) hranice.
+          type = cfg['type'].to_s
+          new_w = clamp_min('width',  (base_w * sx).round.to_f, cid, type)
+          new_d = clamp_min('depth',  (base_d * sy).round.to_f, cid, type)
 
           params = CabinetBuilder.config_to_params(cfg)
           params['width']  = new_w
@@ -528,11 +537,18 @@ module Noxun
           Engine.log_error(e, 'ScaleWatch.refresh_panel')
         end
 
-        def clamp_min(key, val, cid)
-          m = MIN[key]
+        def clamp_min(key, val, cid, type = nil)
+          m = min_for(key, type)
           return val if m.nil? || val >= m
           Engine.log("scale absorb #{cid}: #{key} #{val.round} < min #{m.round} — clampujem na #{m.round}")
           m
+        end
+
+        # S1-E: JEDINA autorita spodnej hranice rozmeru pri absorpcii — typove
+        # minimum ma prednost pred korpusovym.
+        def min_for(key, type)
+          t = MIN_BY_TYPE[type.to_s]
+          (t && t[key]) || MIN[key]
         end
 
         # S1-E0 (Codex #375 P2): spodna hranica VYSKY zavisi od configu — sokel
@@ -544,7 +560,7 @@ module Noxun
         # (a pri hornej skrinke sokel korektne vypadne na 0).
         def clamp_height(params, val, cid)
           floor = Construction.min_valid_height(CabinetBuilder.normalize(params))
-          m = [MIN['height'], floor].max
+          m = [min_for('height', params['type']), floor].max
           return val if val >= m
           Engine.log("scale absorb #{cid}: height #{val.round} < min #{m.round} " \
                      "(sokel #{params['floor_height'].to_f.round}, hrubka #{params['thickness'].to_f.round}) " \
