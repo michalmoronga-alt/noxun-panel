@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **S1-A1 — KATALÓG SPOTREBIČOV, JADRO (v0.12.10, 20.9.2026, PR #N).** Vznikol **tretí per-PC katalóg** vedľa materiálov a kovania:
+- **S1-A1 — KATALÓG SPOTREBIČOV, JADRO (v0.12.10, 20.9.2026, PR #377).** Vznikol **tretí per-PC katalóg** vedľa materiálov a kovania:
   `%APPDATA%\NOXUN\Engine\appliances.json` (JsonFileStore, `.bak`, vlastný sidecar zámok) s deviatimi overenými modelmi v seede. **Prečo takto:**
   konkrétny spotrebič sa nikdy nedeformuje podľa niky, takže katalóg musí niesť presne to, čo kótuje list výrobcu — a nič viac. Preto je **každé pole
   voliteľné a chýbajúci kľúč znamená „list to nekótuje"** (žiadny tichý default), rozmery sedia v štyroch blokoch v jazyku listov (telo · nika · čelo

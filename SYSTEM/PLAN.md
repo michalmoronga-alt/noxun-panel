@@ -649,7 +649,7 @@ kvótová brána `usage` pred každým auditom a subagentom. Pravidlo 3 kôl pla
 
 - **S1-E0 · min výška korpusu 200 → 80 mm** *(✅ PR #375 zmergovaný 20.9.2026 → main `7d4c567`, v0.12.9; `CONFIG_SCHEMA` 14 → 15, config-aware klamp scale cez celý `build_plan`
   (min 94 mm s policou), default sokla v JS validácii; Codex kolo 1 = 1×P1 + 2×P2, kolo 2 = 1×P2, delta overená; D-135)* — dôvod: korpus na dorovnanie nad umývačkou (V1_DEBATA §3).
-- **S1-A1 · Katalóg spotrebičov — jadro** *(✅ PR #N, v0.12.10 — nový modul `core/appliance_catalog.rb`; Codex audit Astra 20.9.: 2 BLOCKER + 10 FIX + 2 NOTE zapracované)*.
+- **S1-A1 · Katalóg spotrebičov — jadro** *(✅ PR #377, v0.12.10 — nový modul `core/appliance_catalog.rb`; Codex audit Astra 20.9.: 2 BLOCKER + 10 FIX + 2 NOTE zapracované)*.
   **Scope IN:** per-PC JSON `%APPDATA%\NOXUN\Engine\appliances.json` cez `JsonFileStore` (atomický zápis + `.bak`, vlastný sidecar zámok — nikdy vnorený do iného katalógového),
   marker `std` 1 s dopredným guardom, matica `assess!` `:ok | :read_only | :degraded`. **Scope OUT:** UI, väzba do zákazky, cena, Demos/scraping, drag-and-drop, PDF náhľad.
   **Kontrakt (R1–R7):** záznam = UUID `id` · `category` z kanonických kódov `fridge oven microwave dishwasher hob sink hood other` (SK popisky v jednej mape, guard parity;
