@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.12.11 · 20.9.2026 — M-R VZHĽAD KOMPLET, nad ním osem dávok D-94 až D-135 a začiatok bloku SPOTREBIČE S1** (S1-E0 = min výška korpusu 80 mm, PR #375 · **S1-A1 = katalóg spotrebičov so seedom 9 overených modelov** · **S1-A2 = sekcia Štúdia Spotrebiče (pohľad Katalóg)** · (Nákup s pôvodom · výška dreveného boxu · Kresba čiel · dormantný zámok ·
+**v0.12.12 · 20.9.2026 — M-R VZHĽAD KOMPLET, nad ním osem dávok D-94 až D-135 a beží blok SPOTREBIČE S1** (S1-E0 = min výška korpusu 80 mm, PR #375 · **S1-A1 = katalóg spotrebičov so seedom 9 overených modelov** · **S1-A2 = sekcia Štúdia Spotrebiče (pohľad Katalóg)** · **S1-E = SLOT UMÝVAČKY, prvý typ skrinky bez korpusu** · (Nákup s pôvodom · výška dreveného boxu · Kresba čiel · dormantný zámok ·
 rozsah zákazky pri „Nahradiť UNI" aj pri hromadných zápisoch · **rework kontextu Čelá komplet — nový zoznam čiel + skupina „Spoločné pre skrinku"**).
 Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **trinástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · **Spotrebiče** · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
@@ -16,7 +16,7 @@ Etapa **V0.6 (katalógy a ceny) je obsahovo splnená**. **Od 20.8. sa z pluginu 
 **Hotové veľké celky:** INSPECTOR REWORK (UI-A…UI-D) · **fáza ŠTÚDIO** (ŠT-1a…ŠT-4b, PR #192–#228) — **zaniklo šesť okien** · **blok KRESBA** · **blok GHOST VKLADANIE**
 (v0.9.0) · **blok KOVANIE** (v0.9.14 → v0.10.0, 50 PR #277–#340 — plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md)). **Výstupy zákaziek bez
 zásuvkovej klasifikácie sú obsahovo identické** (golden, CSV bajtovo).
-**Kompatibilita:** konfigurácia skrinky je od D-128 v **schéme 14**, výrobný plán v schéme 5; vzhľad používa katalógovú schému 10 až pri prvom uložení. Starší plugin nové konfigurácie neprestaví — pred takou zákazkou aktualizovať **obe PC**.
+**Kompatibilita:** konfigurácia skrinky je od S1-E v **schéme 16** (S1-E0 dal 15, S1-E slot + rezervované väzby na spotrebič), **doska v schéme 2**, knižnica šablón v STD 5, výrobný plán v schéme 5; vzhľad používa katalógovú schému 10 až pri prvom uložení. Starší plugin nové konfigurácie neprestaví (zo slotu by vyrobil plný korpus) — pred takou zákazkou aktualizovať **obe PC**.
 
 **D-130b (najnovšie):** **4155 headless · 120 JS sád · 2779 in-SketchUp PASS / 0 FAIL** (nové sady `test_d130b_spolocne.rb` + `test_d130b_spolocne.js`, nová in-SU sekcia
 `run_d130b`: číslo zo schémy dojde do configu ako `gap_top` a 1 krok Späť ho vráti · odomknutý zámok pustí presah −300 mm a zamknutý ho odmietne · „Predvolené" vrátia 3/2/2/2/2
@@ -37,18 +37,18 @@ v náhľade sa viaže na **fokus v poli alebo hover nad schémou**. Dáta, zápi
 ## Ďalší krok
 
 **Blok SPOTREBIČE S1 beží** (Michal schválil 20.9.2026, nočný autonómny beh): debata polí hotová, cross outside-in audit ×3 (Codex · Grok · Gemini) vyhodnotený, **mockup schválený**
-(`zdroje/ui20/mockup_spotrebice_s1.html`), packages v [PLAN.md](PLAN.md) blok 5. Poradie: **S1-E0** (✅ PR #375) → **A1 katalóg** (✅ v0.12.10) → **A2 sekcia** (✅ v0.12.11) → E slot umývačky → B väzba →
+(`zdroje/ui20/mockup_spotrebice_s1.html`), packages v [PLAN.md](PLAN.md) blok 5. Poradie: **S1-E0** (✅ PR #375) → **A1 katalóg** (✅ v0.12.10) → **A2 sekcia** (✅ v0.12.11) → **E slot umývačky** (✅ v0.12.12) → B väzba →
 F telo chladničky + Kontrola → C šablóna → D uzáver (v0.13.0). Slot umývačky a telo chladničky sú nové vo V1. Po S1: **K1–K3**, **ceny materiálov/ABS**; D-126/D-127, D-48, D-109 po V1.
 
 ## Posledné uzávery
 
-- **D-130b · Skupina „Spoločné pre skrinku" — materiál čiel + schéma medzier** (v0.12.7 → **v0.12.8**, 19.9.2026, PR #372). `fgaps` zanikla, kontext Čelá má dve skupiny
-  `fronts` · `cabfront`; štyri popísané riadky okrajov nahradila **schéma `.gapdiag`** (tie isté polia `fr_gap*` na hranách obrysu, `fr_gap` v strede jantárovo, mriežka
-  `.front-gap-grid` zanikla); zámok limitu a reset sú **ikony v `<summary>`** (stav = ikona + `title` + `aria-pressed` + `amber`), meta `#cabfrontMeta` z čistej
-  `cabfrontMetaText`; N26 sa viaže na **fokus/hover**. **D-130 vyriešené celé.** Bez zmeny kontraktu.
-- **D-130a · Nový zoznam čiel, karta s tabmi, úchytka na jednom mieste** (v0.12.6 → **v0.12.7**, 19.9.2026, PR #371). Riadok = CSS grid `22 / 1fr / 112 / 22`; pole výšky je
-  jeden box s konštantnou šírkou; súhrn z čistej `frontRowSummary` (počet krídel zo servera, smer len z uloženej hodnoty); karta má taby Čelo | Kovanie, krídla sú segment
-  v karte; `fhandles` zanikla, hromadná úchytka je popover „všetkým" so **zápisom až pri „Použiť"**; pomocný text = tooltip `.nxtip`. **D-129 vyriešené.** Bez zmeny kontraktu.
+- **S1-E · Slot umývačky — prvý typ skrinky bez korpusu** (→ **v0.12.12**, 20.9.2026, PR #N). Typ `dishwasher`: žiadny korpus, **jediný výrobný dielec = čelo**
+  (pevný item `blind`), telo umývačky ako **referencia** (`kind: reference`, nikdy v kusovníku) so základňou 200; `CONFIG_SCHEMA` 16 · `BOARD_CONFIG_SCHEMA` 2 ·
+  TemplateStore STD 5 („Umývačka 60/45"). Prisúvanie a otáčanie merajú **logickú obálku** z configu — **zmena správania:** presahujúci potomok cieľa už doraz
+  neskracuje. Kontroly `dw_body_fit` / `dw_height_fit` (ORANGE, bez brány). Plné znenie v [archiv/KRONIKA.md](archiv/KRONIKA.md).
+- **REWORK KONTEXTU ČELÁ** — **D-130b** skupina „Spoločné pre skrinku" (materiál čiel + schéma medzier, zámok a reset ako ikony v hlavičke; v0.12.7 → **v0.12.8**, #372)
+  a **D-130a** nový zoznam čiel + karta s tabmi + úchytka na jednom mieste (v0.12.6 → **v0.12.7**, #371). **D-129 aj D-130 vyriešené**, bez zmeny kontraktu —
+  plné znenia v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 - **D-134 · Jednotný rozsah hromadných zápisov zákazky** (→ **v0.12.6**, 13.9.2026, PR #369). Pravidlá kovania, projektová predvoľba materiálu a „aj na podobné v projekte"
   stoja na spoločnom `Panel.job_cabinets` nad `Ids.top_level_scan`. Skrinka s odpojeným dielcom sa **preskočí a vymenuje**, projektový zápis prebehne.
 - **D-133** „Nahradiť UNI…" má rozsah výstupov a blokuje pri odpojenom dielci (→ **v0.12.5**, #368) · **D-132** dormantný zámok osi zásuvky je viditeľný a dá sa zrušiť

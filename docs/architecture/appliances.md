@@ -23,6 +23,31 @@ a pravidlá echa sú v [ui-lifecycle.md](ui-lifecycle.md) (odseky `appliance_dia
   vyžiadanie karty, PDF vôbec — otvára ho `open_attachment` cez systémový prehliadač. `attachment_path_for` tak ostáva jediným resolverom ciest pre živý záznam
   aj pre zákazkový snapshot.
 
+### Slot umývačky (S1-E)
+
+**Prvý spotrebič, ktorý má v modeli vlastnú geometriu.** Slot je **nový typ korpusu** `dishwasher` (`CabinetBuilder`, detail v
+[construction.md](construction.md)) a v tomto module figuruje preto, že je to **doménová referencia**: to, čo v modeli stojí, si kupuje zákazník a plugin
+to nevyrába ani neobjednáva.
+
+- **Čo slot vyrába:** jediný dielec — **čelo** (rola `false_front`, kľúč `front:F1/blind`), s úchytkou, materiálom a ABS ako každé iné čelo.
+  Kusovník, VEPO, nákup aj rozpočet z neho vidia **jeden riadok**.
+- **Čo slot NEvyrába:** telo umývačky. Kreslí sa ako `kind: 'reference'` · `role: 'appliance_body'` · `production_class: 'reference'` ·
+  `manufactured: false` (STANDARD §8.1) z **dvoch boxov** — telo podľa triedy a pod ním **fixná základňa 200 mm**, odsadená 50 mm spredu a 20 mm
+  do strán (zóna nôh a soklu spotrebiča). Telo sa **nikdy nedeformuje** podľa slotu; keď je širšie, trčí a Kontrola to prizná.
+- **Generické rozmery tela** (`Construction::DW_CLASSES`): trieda **600** → 598 × 555, telo 820 · trieda **450** → 448 × 550, telo 815. Je to
+  **jediná tabuľka** pre builder, zber aj náhľad (JS zrkadlo `PV_DW_BODY`). **Po S1-B ich prepíše telo z priradeného modelu** (`appliance_refs[]`),
+  dovtedy je to jediné, čo o umývačke vieme — payload to priznáva textom „generické 60".
+- **Väzba na katalóg v S1-E ešte NIE JE.** `CONFIG_SCHEMA` 16 iba **rezervuje** `appliance_refs[]` a `appliance_expects[]` (skrinka aj doska, tá
+  cez `BOARD_CONFIG_SCHEMA` 2), aby ich S1-B/F/C mohli naplniť bez ďalšieho bumpu. Kľúče prežijú prestavbu, materiály aj absorpciu scale; väzbu
+  na **konkrétny** spotrebič zahodí jediný helper `CabinetBuilder.strip_appliance_refs!` v troch kopírovacích vstupoch (natívna kópia, kópia
+  nástrojom, „Vložiť kópiu") — kópia sa správa ako „očakáva", ale nevlastní ten istý kus.
+- **Kontroly slotu sú PRESNE DVE** (rozhodnutie Michal 20.9.2026), obe ORANGE a **bez exportnej brány**: `dw_body_fit` (telo sa nezmestí do šírky
+  slotu) a `dw_height_fit` (**nastavená** výška tela > výška linky). Výška čela, jeho presah nad telo, sokel ani hmotnosť sa **nekontrolujú**.
+  Detail v [outputs.md](outputs.md).
+- **Šablóny:** `TemplateStore` STD 5 seeduje **„Umývačka 60"** a **„Umývačka 45"** — korpusové záznamy s `config['config_schema']`, bez ktorého by
+  starší plugin typ nepoznal a `norm_type` by mu ho sklopil na `lower` (zo slotu by vznikol plný korpus). Detail v
+  [model-a-identita.md](model-a-identita.md).
+
 ### appliance_catalog.rb
 
 **Tretí per-PC katalóg** (S1-A1) vedľa materiálov a kovania: `%APPDATA%\NOXUN\Engine\appliances.json` cez `JsonFileStore` (atomický zápis, `.bak`,

@@ -77,6 +77,14 @@ v `data['parts']`. Potláčanie UNI dielcov je **v pláne** (`Construction.annot
 (v pláne) drží obe cesty zhodné: čo je uložené, to sa hlási. UNI dielec hlási `uni_material` („materiál neurčený"), ORANGE o hmotnosti ostáva len za dielce bez hustoty,
 ktoré UNI nie sú.
 
+**S1-E — kategória `appliance` (ORANGE, žiadna brána).** `check_appliance_slots(collected[:appliance_slots], items)` hlási pri slote umývačky **presne dve** veci:
+**`dw_body_fit`** (telo triedy je širšie než slot — telo sa nikdy nedeformuje, takže by v modeli trčalo) a **`dw_height_fit`** (**nastavená** výška tela
+`dw_body_height`, nie katalógové minimum — to len ohraničuje vstup — presahuje **výšku linky**). Oba sú **ORANGE a nie sú v žiadnom registri blokerov**:
+slot vydáva jediný dielec (čelo) a jeho výroba na tele nezávisí — je to upozornenie pre človeka, nie chyba výrobných dát. `stable_key` nesie **kód**
+(`appliance|<owner_id>|<kód>`), takže oba nálezy na tom istom slote sú **dva riadky**; klik-select mieri na slot (`owner_id` + `owner_pid`).
+Chýbajúci kľúč `appliance_slots` kontrolu **ticho preskočí** (legacy volania a headless testy bez slotov — vzor `placements:`).
+**Inspector hovorí to isté:** výstup „Pod doskou" v Základných počíta `Panel.slot_payload` **tým istým predikátom** ako `dw_height_fit` (Astra S1-E FIX E11).
+
 ### production_core.rb — zdieľané čisté jadro výstupov zákazky (ŠT-1a PR A)
 
 `do_select` rešpektuje `flush_blocked` po kontrole generácie okna. Nedokončený návrh v Inspectore oznámi cez status pôvodného Štúdia a model ani výber pri tom nečíta/neprepíše.
@@ -584,6 +592,13 @@ riadok by vždy skončil hláškou „zoznam sa medzitým zmenil". Resolver má 
 Čitatelia: `ProductionCore.export_blockers(newer:)` — hlási „Skrinka CAB-001, Doska BRD-002" (`newer_ids_text`, ten istý strop „tri + a ďalšie N") a **zastaví VEPO, nákupný CSV,
 rozpočet aj ponuku** — a `Validation` (RED `newer_config`, hláška menuje **úplný** zoznam dotknutých výstupov vrátane kusovníka, ktorý je nad takým objektom neúplný, aj keď sa
 ďalej zobrazuje). `compute()` kľúč ignoruje.
+
+**S1-E — aditívny kľúč `appliance_slots`.** Pre každý slot umývačky (`ccfg['type'] == 'dishwasher'`) zbiera `appliance_slot_record` v **tom istom prechode**
+z už načítaného `ccfg` záznam `{owner_id, owner_pid, width, height, dw_class, dw_body_height, body_width, class_label}` — žiadny druhý sken modelu (vzor
+`hardware_manual`). `body_width` je šírka **generického** tela triedy z `Construction.dw_class_dims`, teda to isté číslo, z ktorého kreslí builder.
+`compute()` kľúč **ignoruje** (kusovník, nákup ani ceny sa nemenia ani o číslo); jediný čitateľ je `Validation.check_appliance_slots`.
+**Referencia (telo spotrebiča) sa do zberu nedostane nikdy:** vnorená slučka filtruje `kind == 'part'` **a** `manufactured == true` **a**
+`production_class == 'sheet'` — referencia nesplní ani jednu z troch podmienok. `Ids.top_level_scan` ju tiež nevidí (číta len `kind` `cabinet`/`board`/`part`).
 
 ### sheet_estimate.rb
 
