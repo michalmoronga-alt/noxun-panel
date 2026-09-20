@@ -63,6 +63,20 @@ ensure
   APPLC_JFS.define_singleton_method(:write, orig)
 end
 
+# Docasny stub `File#flock` -> false (filesystem bez podpory zamkov).
+def applc_with_failing_flock
+  File.class_eval do
+    alias_method :applc_flock_orig, :flock
+    define_method(:flock) { |_op| false }
+  end
+  yield
+ensure
+  File.class_eval do
+    alias_method :flock, :applc_flock_orig
+    remove_method :applc_flock_orig
+  end
+end
+
 # Docasny stub `File.size` (velkost prilohy sa nesimuluje realnym 25 MB suborom).
 # `resolver` je lambda (cesta, povodna_metoda) -> velkost.
 def applc_with_size_stub(resolver)
@@ -935,6 +949,49 @@ NxTest.test('spotrebice: ulozeny nahlad nad PDF = READ-ONLY (matica druh -> prip
   applc_install!('std' => 1, 'seed_version' => 1,
                  'records' => [{ 'id' => 'a1', 'category' => 'oven', 'name' => 'X', 'attachments' => ok_att }])
   NxTest.assert_equal(:ok, APPLC.state, 'obrazkovy nahlad + PDF list su v poriadku')
+end
+
+NxTest.test('spotrebice: I/O chyba pri citani nezhodi snapshot_for (kolo 3 P2)') do
+  applc_seeded!
+  rec = APPLC.list[1][:records].first
+  NxTest.assert_equal(:ok, APPLC.snapshot_for(rec['id'])[0])
+
+  orig = File.method(:binread)
+  File.define_singleton_method(:binread) { |*| raise Errno::EACCES, 'test: súbor sa nedá prečítať' }
+  begin
+    st, info = APPLC.snapshot_for(rec['id'])
+    NxTest.assert_equal(:unsupported, st, 'nedostupny subor sa prizna stavom, nie vynimkou')
+    NxTest.assert(info.is_a?(Hash) && info[:message].to_s.length.positive?)
+  ensure
+    File.define_singleton_method(:binread, orig)
+  end
+end
+
+NxTest.test('spotrebice: `flock`, ktory vrati FALSE, mutaciu NESPUSTI (kolo 3 P2)') do
+  applc_seeded!
+  before = File.binread(APPLC.path)
+  st, info = applc_with_failing_flock { APPLC.create!(applc_new) }
+  NxTest.assert_equal(:locked, st, 'nezamknuty katalog sa nesmie zapisat')
+  NxTest.assert(info[:message].to_s.length.positive?)
+  NxTest.assert_equal(before, File.binread(APPLC.path), 'subor ostal bajtovo nedotknuty')
+  NxTest.assert_equal(9, APPLC.list[1][:records].length)
+end
+
+NxTest.test('spotrebice: dvojica min/max sa NEKONTROLUJE nad neznamymi klucmi (kolo 3 P2)') do
+  applc_install!('std' => 1, 'seed_version' => 1,
+                 'records' => [{ 'id' => 'a1', 'category' => 'oven', 'name' => 'Z novsej verzie',
+                                 'dims' => { 'front' => { 'foo_min' => 10, 'foo_max' => 5,
+                                                          'width' => 595.0 } } }])
+  NxTest.assert_equal(:ok, APPLC.state, 'neznamy par nevieme interpretovat — nesmie zhodit katalog')
+  rec = APPLC.find('a1')[1][:record]
+  st, info = APPLC.patch!('a1', { 'name' => 'Premenovany' }, rev: rec['rev'])
+  NxTest.assert_equal(:ok, st, 'a nesmie blokovat ani nesuvisiaci patch')
+  NxTest.assert_close(10.0, info[:record]['dims']['front']['foo_min'], 0.01, 'neznamy kluc prezije')
+  # ZNAMY par sa kontroluje dalej.
+  st2, info2 = APPLC.patch!('a1', { 'dims' => { 'niche' => { 'width_min' => 700, 'width_max' => 600 } } },
+                            rev: info[:record]['rev'])
+  NxTest.assert_equal(:invalid, st2)
+  NxTest.assert_equal('dims.niche.width_min', info2[:field])
 end
 
 # --- hladanie a tvar odpovede --------------------------------------------------

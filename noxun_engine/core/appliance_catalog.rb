@@ -212,7 +212,13 @@ module Noxun
 
         FileUtils.mkdir_p(dir)
         File.open(lock_path, File::RDWR | File::CREAT) do |f|
-          f.flock(File::LOCK_EX)
+          # `flock` vracia FALSE tam, kde zamky nefunguju (nepodporovany
+          # filesystem, presmerovany sietovy share). Bez tejto kontroly by sa
+          # kriticka sekcia vykonala BEZ zamku a dve instancie SketchUpu by si
+          # prepisali katalog (Codex #377 kolo 3). Vynimka skonci v rescue
+          # volajuceho ako `[:locked, …]`.
+          raise IOError, 'zámok katalógu spotrebičov sa nepodarilo získať' unless f.flock(File::LOCK_EX)
+
           begin
             @lock_held = true
             JsonFileStore.invalidate(path) # pod zamkom sa cita CERSTVY stav disku
@@ -796,7 +802,7 @@ module Noxun
 
           out[k] = num
         end
-        msg, field = min_max_issue(out, prefix)
+        msg, field = min_max_issue(out, prefix, allowed)
         return [nil, msg, field] if msg
 
         [out, nil, nil]
@@ -823,14 +829,21 @@ module Noxun
 
       # `*_min` nesmie byt vacsie nez sesterske `*_max`; chyba nesie cestu
       # POLA (modal D-15 ju kresli pri poli).
-      def min_max_issue(fields, prefix)
-        pairs = fields.keys.filter_map do |k|
+      #
+      # Paruje sa VYHRADNE nad ZNAMYMI polami kategorie: neznamy kluc je
+      # dopredne kompatibilna hodnota novsej implementacie a MY NEVIEME, co
+      # znamena — `foo_min`/`foo_max` z buducej verzie moze mat uplne iny
+      # vyznam. Bez tohto obmedzenia by taky par zhodil cely katalog do
+      # read-only a zablokoval aj nesuvisiaci patch (Codex #377 kolo 3).
+      def min_max_issue(fields, prefix, allowed)
+        known = fields.select { |k, _| allowed.include?(k) }
+        pairs = known.keys.filter_map do |k|
           next unless k.end_with?('_min')
 
           twin = "#{k[0..-5]}_max"
-          [k, twin] if fields.key?(twin)
+          [k, twin] if known.key?(twin)
         end
-        pairs += EXTRA_MIN_MAX.select { |(lo, hi)| fields.key?(lo) && fields.key?(hi) }
+        pairs += EXTRA_MIN_MAX.select { |(lo, hi)| known.key?(lo) && known.key?(hi) }
         pairs.each do |(lo, hi)|
           next unless fields[lo].is_a?(Numeric) && fields[hi].is_a?(Numeric)
           next if fields[lo] <= fields[hi]
@@ -1354,6 +1367,14 @@ module Noxun
         snap['catalog_std'] = STD
         snap['snapshot_at'] = now_iso
         [:ok, { snapshot: snap }]
+      # `JsonFileStore.degraded?` VEDOME prepusta I/O chyby okrem ENOENT
+      # (sharing violation, nedostupny presmerovany `%APPDATA%`, sietovy disk
+      # offline) — tu by taka vynimka utiekla von a porusila kontrakt
+      # `[status, info]` (Codex #377 kolo 3). Citanie katalogu nikdy nevyhodi
+      # vynimku na volajuceho; nemozny snapshot sa prizna stavom.
+      rescue IOError, SystemCallError, JSON::ParserError => e
+        Engine.log_error(e, 'ApplianceCatalog.snapshot_for') if defined?(Engine)
+        [:unsupported, { message: 'katalóg spotrebičov sa práve nedá prečítať — skús to o chvíľu znova' }]
       end
 
       # --- seed ----------------------------------------------------------------
