@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-135** — Minimálna výška korpusu je 80 mm (korpus na dorovnanie nad umývačkou): Inspector, vkladanie aj ťahanie scale úchopom pustia 80–199 mm, šírka (200) a hĺbka (150) sa nemenia; nízka skrinka so soklom sa navyše zastaví červeným poľom už v paneli — 20.9.2026, PR #375, v0.12.9
 - **D-130** — Menší UI/UX rework kontextu Čelá: nový zoznam čiel + karta s tabmi (časť a) a skupina „Spoločné pre skrinku" s materiálom čiel a schémou medzier, kde číslo sedí na hrane, ktorej sa týka (časť b) — 19.9.2026, PR #371 + #372, v0.12.7–v0.12.8
 - **D-129** — Úchytka čela sa nastavuje na jednom mieste (karta čela); hromadne cez akciu „všetkým" v hlavičke skupiny Čelá — skupina „Úchytky" zanikla — 19.9.2026, PR #371, v0.12.7
 - **D-134** — Hromadné zápisy zákazky (pravidlá kovania, projektová predvoľba materiálu, „aj na podobné v projekte") pracujú s rovnakým rozsahom ako výstupy (top-level skrinky) a skrinku s odpojeným dielcom preskočia a vymenujú, kým projektový zápis prebehne — 13.9.2026, PR #369, v0.12.6
@@ -123,6 +124,33 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-135 — Minimálna výška korpusu 80 mm (korpus na dorovnanie), vyriešené 20.9.2026
+
+**Výsledok: PR #375, v0.12.9.** Pôvodné znenie postrehu (Michal 20.9.2026, debata S1 k spotrebičom): *„Nad umývačkou ostáva po líniu linky často len 80–110 mm.
+Vypĺňam to nízkym korpusom na dorovnanie (napr. 90 mm) — a plugin ma pod 200 nepustí."*
+
+**Čo sa zmenilo.** Spodná hranica výšky korpusu je **80 mm** namiesto 200, pre dolnú aj hornú skrinku. Platí na všetkých troch miestach, ktoré hranicu držia:
+pole Výška v Inspectore aj vo vkladacej karte (`LIMITS` v `ui/js/form.js`), normalizácia configu (`CabinetBuilder::MIN`) a absorpcia po ťahaní scale úchopom
+priamo v modeli (`ScaleWatch::MIN`). **Šírka (200) a hĺbka (150) sa NEODOMKLI** — užší ani plytší korpus konštrukčný zmysel nemá.
+
+**Prečo guard test.** Tie tri čísla sa na seba odkazovať nedajú (`scale_observer` sa načítava PRED `cabinet_builder`, JS Ruby konštantu nevidí), takže zhodu stráži
+`tests/pure/test_s1e0_min_vyska.rb` — rovnaký vzor ako pri `DRAWER_ROLES`. Keby sa rozišli, ten istý korpus by po ťahaní myšou a po zápise do poľa skončil na inom
+rozmere a nikto by to nezbadal skôr ako vo výrobe.
+
+**Nízky korpus sa stavia bez výnimiek.** Dolná 600 × 90 × 560 (aj horná 600 × 80 × 320) dá kompletný plán bez jediného dielca so záporným rozmerom — overené cez
+16 kombinácií dno × vrch × chrbát a v modeli sekciou `run_s1e0` (kusovník skrinku vidí, klamp 60 → 80 cestou Inspectora, absorpcia scale pod hranicu a jedno Späť,
+ktoré vráti scale aj absorpciu naraz).
+
+**Bonus, ktorý si vyžiadala samotná nízka skrinka: výška je CELKOVÁ vrátane sokla.** Dolná skrinka s predvoleným soklom 100 mm a výškou 90 mm preto nemá žiadne
+vnútro. Doteraz to bolo vidieť až ako výnimka po apply; po novom **zočervenie dvojica polí Výška + Podstavec** priamo v paneli, tooltip povie prečo a apply sa
+zastaví. Tú istú vetvu má aj vrch „dve výstuhy" (pod nimi musí ostať rezerva 20 mm). Panel to počíta tou istou zdieľanou funkciou (`nxInteriorZ`) ako údaj
+„Úložná výška" — žiadna druhá kópia vzorca, žiadny nový DOM ani CSS.
+
+**Čo sa NEMENILO a prečo.** `CONFIG_SCHEMA` ostáva 14: mení sa prípustný rozsah hodnoty, nie tvar configu, takže žiadna migrácia ani nová brána. **Vedomý
+dôsledok:** .skp uložený s výškou pod 200 si starší plugin pri prestavbe klampne späť na 200 — je to strata rozmeru, nie dát, a bump schémy by naopak zbytočne
+odmietol celú zákazku. Police sa do nízkej skrinky nevnucujú (predvoľba je 0); keby ich niekto pýtal, zóna ich odmietne zrozumiteľnou hláškou presne ako doteraz
+(54 mm vnútra na jednu policu nestačí, treba 58) — správanie sa nemení, len je odteraz charakterizované testom.
 
 ### D-130 — Menší UI/UX rework kontextu Čelá, vyriešené 19.9.2026
 
