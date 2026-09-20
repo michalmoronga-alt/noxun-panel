@@ -19,7 +19,7 @@
 # TRI KONTRAKTY, ktore su dolezitejsie nez vzhlad:
 #   1. SERVER SKLADA PORADIE. Strom (kategorie v poradi `CATEGORIES`, polozky
 #      podla nazvu cez `ApplianceCatalog.sort_records`), POCTY aj podtitul
-#      riadku robi Ruby; JS kresli presne to, co dostal, a NIKDY nic nedopĺňa
+#      riadku robi Ruby; JS kresli presne to, co dostal, a NIKDY nic nedoplna
 #      ani nepreskladava (ten isty kontrakt ako `HardwareCatalogDialog#handle_tree`).
 #   2. ECHO NEDVIHA GENERACIU OKNA. Zmena katalogu spotrebicov v A2 nemeni
 #      ZIADNE cislo zakazky (kusovnik, rozpocet, nakup), takze rozkliknuty
@@ -434,7 +434,7 @@ module Noxun
             'deleted' => ApplianceCatalog.deleted?(rec) }
         end
 
-        # PODTITUL riadku stromu sklada SERVER (kontrakt „JS nic nedopĺňa").
+        # PODTITUL riadku stromu sklada SERVER (kontrakt „JS poradie nikdy nedopĺňa").
         # Je to JEDNA veta o tom, co model urcuje: nika (zabudovanie), vyrez
         # (doska) alebo trieda (umyvacka) — teda to, podla coho sa model
         # v strome pozna.
@@ -572,7 +572,7 @@ module Noxun
         end
 
         # „min 560" / „560 – 568" / „max 568" — jednostranny rozsah sa PRIZNA
-        # slovom; holé číslo by klamalo o tom, ktorý koniec výrobca kótuje.
+        # slovom; hole cislo by klamalo o tom, ktory koniec vyrobca kotuje.
         def range_text(min, max)
           return '' if min.nil? && max.nil?
           return "min #{fmt_mm(min)}" if max.nil?
