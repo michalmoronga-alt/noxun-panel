@@ -3484,6 +3484,106 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # --- S1-E0: MINIMALNA VYSKA KORPUSU 80 mm (korpus na dorovnanie) ----------
+  # Michal 20.9.2026 (debata S1): nad umyvackou ostava po liniu linky casto len
+  # 80-110 mm a vyplna sa nizkym korpusom (napr. 90 mm). Headless sada overuje
+  # PLAN; tu sa overuje MODEL — ze sa nizka skrinka naozaj postavi bez
+  # zaporneho dielca, ze ju vidi kusovnik, ze cesta Inspectora klampne 60 na 80
+  # a ze absorpcia scale pod hranicu skonci tiez na 80 a jedno Spat vrati vsetko.
+
+  # Vyrobne dielce korpusu (bez ghostov a bez proxy).
+  def s1e0_parts(inst)
+    inst.definition.entities.grep(Sketchup::ComponentInstance)
+        .select { |i| e::Store.kind(i) == 'part' }
+  end
+
+  # Dielec s nekladnym rozmerom by v modeli nebol vidno, ale v kusovniku by sa
+  # objavil ako zaporna dlzka — preto sa meria BBOX, nie config.
+  def s1e0_degenerate(parts)
+    parts.reject do |p|
+      part_width_x(p) > TOL && part_depth(p) > TOL && part_height(p) > TOL
+    end
+  end
+
+  def run_s1e0(model)
+    low = { 'type' => 'lower', 'width' => 600.0, 'height' => 90.0, 'depth' => 560.0,
+            'thickness' => 18.0, 'floor_height' => 0.0 }
+    inst = e::CabinetBuilder.build(model, low)
+    return ok('S1-E0: vlozenie nizkeho korpusu', false) unless inst
+
+    # (a) stavba: dielce su realne a ziadny nema nekladny rozmer
+    parts = s1e0_parts(inst)
+    ok("S1-E0 (a): dolna 600 x 90 x 560 sa postavila (#{parts.length} vyrobnych dielcov)",
+       parts.length.positive?)
+    degen = s1e0_degenerate(parts)
+    ok("S1-E0 (a): ziadny dielec nema nekladny rozmer (#{degen.map { |p| e::Store.get(p, 'part_key') }.inspect})",
+       degen.empty?)
+    # Vyska je CELKOVA: obrys dielcov siaha od 0 (dno lezi na z = sokel = 0)
+    # po 90. Boky pri predvolbe `under_sides` zacinaju AZ NAD dnom (72 mm) —
+    # preto sa meria SPAN vsetkych dielcov, nie vyska jedneho.
+    ok("S1-E0 (a): obrys dielcov ide od 0 po 90 mm (vyska je CELKOVA, boky #{
+         parts.select { |p| e::Store.get(p, 'role').to_s.start_with?('side_') }.map { |p| part_height(p).round }.inspect})",
+       (parts.map { |p| part_z0(p) }.min.to_f).abs < TOL &&
+       (parts.map { |p| part_z1(p) }.max.to_f - 90.0).abs < TOL)
+    ok('S1-E0 (a): svetla vyska v configu = 54 (90 - dno 18 - strop 18)',
+       ((e::Store.config(inst) || {})['available_height'].to_f - 54.0).abs < 0.01)
+    col = e::Bom.collect(model)
+    ok("S1-E0 (a): kusovnik nizku skrinku VIDI (#{col[:cabinets]} korpus, #{col[:records].length} snapshotov)",
+       col[:cabinets] == 1 && col[:records].length.positive?)
+
+    # (b) cesta Inspectora (normalize -> rebuild): 60 sa klampne na 80
+    p60 = e::CabinetBuilder.config_to_params(e::Store.config(inst)).merge('height' => 60.0)
+    e::CabinetBuilder.rebuild(model, inst, p60)
+    cfg60 = e::Store.config(inst) || {}
+    ok("S1-E0 (b): vyska 60 sa klampla na 80 (config #{cfg60['height']})",
+       (cfg60['height'].to_f - 80.0).abs < 0.01)
+    p80 = s1e0_parts(inst)
+    ok('S1-E0 (b): model sedi s configom — obrys dielcov ide od 0 po 80 mm',
+       (p80.map { |p| part_z0(p) }.min.to_f).abs < TOL &&
+       (p80.map { |p| part_z1(p) }.max.to_f - 80.0).abs < TOL)
+    ok('S1-E0 (b): ani po klampnuti nevznikol degenerovany dielec',
+       s1e0_degenerate(s1e0_parts(inst)).empty?)
+
+    # (c) SCALE uchopom pod hranicu. Absorpcia sa vola PRIAMO (to iste, co robi
+    #     debounce tik `process_dirty`) — realny tik s timerom je v run_async.
+    #     300 * 0,2 = 60 -> klamp na 80; transparentna operacia sa prilepi na
+    #     pouzivatelov Scale krok, takze JEDNO Spat vrati oboje.
+    e::CabinetBuilder.rebuild(model, inst,
+                              e::CabinetBuilder.config_to_params(e::Store.config(inst))
+                                               .merge('height' => 300.0))
+    before_tr = inst.transformation.to_a
+    model.start_operation('SU-TEST S1E0 user scale', true)
+    inst.transformation = inst.transformation * Geom::Transformation.scaling(ORIGIN, 1.0, 1.0, 0.2)
+    model.commit_operation
+    e::ScaleWatch.absorb(inst)
+    cfg_sc = e::Store.config(inst) || {}
+    ok("S1-E0 (c): absorpcia scale klampla vysku na 80 (config #{cfg_sc['height']})",
+       (cfg_sc['height'].to_f - 80.0).abs < 0.01)
+    ok('S1-E0 (c): transform po absorpcii je cisty (ziadna zvysna mierka)',
+       e::ScaleWatch.scale_factors(inst.transformation).nil?)
+    Sketchup.undo
+    cfg_undo = e::Store.config(inst) || {}
+    ok("S1-E0 (c): 1x Spat vratil scale AJ absorpciu (vyska #{cfg_undo['height']}, transform sedi)",
+       inst.valid? && (cfg_undo['height'].to_f - 300.0).abs < 0.01 &&
+       inst.transformation.to_a == before_tr)
+
+    # (d) horna skrinka 600 x 80 x 320
+    up = e::CabinetBuilder.build(model, 'type' => 'upper', 'width' => 600.0,
+                                        'height' => 80.0, 'depth' => 320.0, 'thickness' => 18.0)
+    up_parts = up ? s1e0_parts(up) : []
+    ok("S1-E0 (d): horna 600 x 80 x 320 sa postavila (#{up_parts.length} dielcov, ziadny degenerovany)",
+       up_parts.length.positive? && s1e0_degenerate(up_parts).empty?)
+    ok('S1-E0 (d): horna skrinka nema sokel a svetla vyska je 44',
+       ((e::Store.config(up) || {})['available_height'].to_f - 44.0).abs < 0.01 &&
+       ((e::Store.config(up) || {})['floor_height'].to_f).abs < 0.01)
+
+    cleanup(model)
+    ok('S1-E0: cleanup (0 korpusov)', cabinets(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: run_s1e0 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
   # --- Recorder Panel.js (audit F9): zatvoreny panel je no-op — dokaz volania
   # NX.clearSelected/NX.setStatus sa zbiera docasnym obalenim Panel.js. Vzdy
   # parovat install/remove; remove je idempotentny (bezpecny aj po FAIL ceste).
@@ -23401,6 +23501,7 @@ module NoxunSuRunner
     run_sync(model)
     run_sync_back(model)     # davka Chrbat: D-37 hlbka, D-31 none, D-38 pevny 18
     run_sync_rails(model)    # H3/D-80: vnutro pod vystuhami (odsadenie, upright, chrbat, odmietnutie)
+    run_s1e0(model)          # S1-E0: minimalna vyska korpusu 80 mm — nizka skrinka na dorovnanie sa postavi bez degenerovaneho dielca a kusovnik ju vidi, cesta Inspectora klampne 60 na 80, absorpcia scale pod hranicu tiez (a 1x Spat vrati scale aj absorpciu), horna 600 x 80 x 320
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
     run_r03(model)           # R-03: sev prepare_insert/commit_insert — ciste pripravenie, vlastny rigidny transform, odmietnutia, edit kontext
     run_r12(model)           # 1d/R-12: dopredny guard configu — marker, odmietnuta prestavba bez mutacie a bez kroku Spat, kopia/sablony, citanie dalej bezi
