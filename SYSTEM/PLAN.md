@@ -647,18 +647,25 @@ kvótová brána `usage` pred každým auditom a subagentom. Pravidlo 3 kôl pla
 **Stop pravidlá nočného behu:** P1/P0 v review → plné GH kolo; 3. kolo opráv → PR zavrieť a rozdeliť; in-SU FAIL → nahlásiť v rannom reporte, neobchádzať; Codex weekly zostatok < 10 %
 → náhradná brána (slepý Opus + delta) a priznať v PR.
 
-- **S1-E0 · min výška korpusu 200 → 80 mm** *(✅ PR #375, v0.12.9, 20.9.2026 — `CONFIG_SCHEMA` 14 → 15, config-aware klamp scale, default sokla v JS validácii; D-135)* — dôvod: korpus
-  na dorovnanie nad umývačkou (V1_DEBATA §3).
+- **S1-E0 · min výška korpusu 200 → 80 mm** *(PR #375 v Codex review, v0.12.9 — merguje sa hneď po tomto docs PR; `CONFIG_SCHEMA` 14 → 15, config-aware klamp scale, default sokla
+  v JS validácii; D-135)* — dôvod: korpus na dorovnanie nad umývačkou (V1_DEBATA §3). Riadok sa označí ✅ až po mergi #375.
 - **S1-A1 · Katalóg spotrebičov — jadro** *(nový modul `core/appliance_catalog.rb` → `codex-audit` ÁNO)* — per-PC JSON katalóg (JsonFileStore, zámok, forward guard, tombstone), záznam
   v štyroch blokoch telo · nika · čelo/dvere · montáž, prílohy (0–1 náhľad), seed 10 modelov, `snapshot_for` pre zákazku; bez UI a bez ceny.
 - **S1-A2 · Sekcia Štúdia SPOTREBIČE — pohľad Katalóg** *(UI, audit NIE)* — 13. sekcia `appl` (skupina KATALÓGY), strom + karta + prílohy + D-15 modal podľa mockupu R1–R8.
 - **S1-E · Slot umývačky — nový typ skrinky** *(builder + `CONFIG_SCHEMA` 15 → 16 + TemplateStore STD 4 → 5 → `codex-audit` ÁNO; in-SU povinné)* — 7 vstupov, jediný dielec čelo
-  (item `blind`), telo = referencia + základňa 200, šablóny 60/45, kontroly telo vs šírka a nastavená výška tela vs linka; výplň hore ručne (mockup R13–R16).
-- **S1-B · Spotrebič v zákazke — väzba, vlastník, riadok Spotrebič** *(`BUDGET_STD` 1 → 2 → `codex-audit` ÁNO)* — snapshot, `appliance_refs[]` obojsmerná väzba, matica kategória →
-  vlastník, „dodáva zákazník" = suma 0, pohľad V zákazke, riadok Spotrebič v Inspectore (mockup R3–R5, R9–R11).
+  (item `blind`), telo = referencia + základňa 200, šablóny 60/45, kontroly telo vs šírka a nastavená výška tela vs linka; výplň hore ručne (mockup R13–R16). Kontraktové body zo
+  Codex kôl: **schéma 16 rezervuje `appliance_refs[]` aj `appliance_expects[]`** (C ich napĺňa bez ďalšieho bumpu) · **kópia skrinky aj dosky (toolbar aj natívna dedup) väzby
+  `appliance_refs[]` zahadzuje, `appliance_expects[]` ponecháva** · **slot má podporu `none`** — `dw_front_bottom` (sokel = spodná hrana čela) nikdy netečie do `floor_height`/
+  `Construction.support_type`, takže pravidlá kovania negenerujú nohy ani príchyty sokla (Kovanie slotu = len úchytka).
+- **S1-B · Spotrebič v zákazke — väzba, vlastník, riadok Spotrebič** *(`BUDGET_STD` 1 → 2 → `codex-audit` ÁNO)* — snapshot (identita + rozmery + odkazy + prílohy), `appliance_refs[]`
+  obojsmerná väzba (položky „len zákazka" = výslovná výnimka), matica kategória → vlastník, pohľad V zákazke, riadok Spotrebič v Inspectore (mockup R3–R5, R9–R11). Kontraktové body zo
+  Codex kôl: **jedna kanonická sada kódov kategórií = kódy katalógu + explicitná obojsmerná migrácia legacy kódov rozpočtu** (`chladnicka rura mikrovlnka umyvacka digestor varna_doska ine`
+  → `fridge oven microwave dishwasher hood hob other`, + `sink`) v `BUDGET_STD` 2 — existujúce zákazky sa otvoria a editujú ďalej · **„dodáva zákazník" je PRÍZNAK, nie nula:** cena
+  ostáva v nečíselnom stave (nil povolené), príznak vypína upozornenie „chýba cena" a riadok sa zo súčtov vylučuje.
 - **S1-F · Telo chladničky + Kontrola niky a delenia dverí** *(builder → `codex-audit` ÁNO; in-SU povinné)* — box niky s pásmami z `appliance_refs[]`, `appliance_niche_clash` per os,
   `appliance_door_split` v súradniciach niky, náhľad (mockup R4, R10, R12).
-- **S1-C · Spotrebičová šablóna `expects[]` + ORANGE bez spotrebiča** *(TemplateStore STD 5 → 6 → `codex-audit` ÁNO)*.
+- **S1-C · Spotrebičová šablóna `expects[]` + ORANGE bez spotrebiča** *(TemplateStore STD 5 → 6 → `codex-audit` ÁNO)* — kľúč `appliance_expects[]` v configu skrinky je už v
+  schéme 16 z S1-E (žiadny ďalší bump); kombinovaná skrinka očakáva viac kategórií.
 - **S1-D · Uzáver bloku** *(docs, `VERSION` → 0.13.0)* — V1_VIZIA, archív, STAV, KRONIKA, README, POJMY, smoke checklist pre Michala.
 
 ## Po V1 — zásobník (nezaradené, nestratiť)

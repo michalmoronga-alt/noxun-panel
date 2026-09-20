@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **S1-E0 — MINIMÁLNA VÝŠKA KORPUSU 80 mm (v0.12.9, 20.9.2026, PR #375; záznam zapísaný z docs PR #374, ktorý sa merguje tesne pred ním).** Spodná hranica výšky klesla z 200
+- **S1-E0 — MINIMÁLNA VÝŠKA KORPUSU 80 mm (v0.12.9, 20.9.2026, PR #375 — záznam zapísaný VOPRED z docs PR #376; platí až mergom #375, ktorý nasleduje hneď za ním).** Spodná hranica výšky klesla z 200
   na 80 mm na všetkých troch miestach, ktoré ju držia (`CabinetBuilder::MIN`, `ScaleWatch::MIN`, `LIMITS` vo `form.js`) — Michal (20.9., debata S1) vypĺňa priestor nad umývačkou po
   líniu linky nízkym korpusom na dorovnanie (80–110 mm) a plugin ho dovtedy nepustil. Šírka (200) a hĺbka (150) sa nemenia. **`CONFIG_SCHEMA` 14 → 15** (Codex #374 P1: starší
   plugin by skrinku 80–199 mm pri prestavbe ticho zväčšil na 200 = zmena výrobnej geometrie; dopredný guard `newer_config?` ju odmietne — pred takou zákazkou aktualizovať obe PC).
