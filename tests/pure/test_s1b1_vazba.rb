@@ -1174,13 +1174,14 @@ NxTest.test('S1-B1 (kolo 2 P2): `typ` pri zmene vlastnika sa ODMIETA') do
   NxTest.assert_equal('fridge', NxS1B1::BS.appliances(m).first['typ'], 'kategoria sa nezmenila')
   NxTest.assert_equal([], NxS1B1.refs_of(slot), 'slot vazbu nedostal')
 
-  # To iste pre `unbind` aj `rebind_model`.
-  %w[unbind rebind_model].each do |op|
+  # To iste pre `unbind` aj `rebind_model` (`unbind` model z katalogu niest
+  # NESMIE — ten ma vlastnu branu, viz nizsie).
+  { 'unbind' => nil, 'rebind_model' => 'CAT-FRIDGE' }.each do |op, cat|
     NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [cab, slot]),
                        NxS1B1.snapshot_stub('CAT-FRIDGE' => NxS1B1.fridge_snapshot)] +
                       NxS1B1.writer_stubs([])) do
       res = NxS1B1::AB.apply!(m, model_guid: '', op: op, item_id: id,
-                              attrs: { 'typ' => 'oven' }, catalog_id: 'CAT-FRIDGE')
+                              attrs: { 'typ' => 'oven' }, catalog_id: cat)
     end
     NxTest.assert_equal([NxS1B1::AB::MSG_TYPE_WITH_OWNER], res[:errors], op)
   end
@@ -1273,4 +1274,122 @@ NxTest.test('S1-B1 (kolo 2 P2): presun SIROTY na entitu s recyklovanym ID ZAPISE
   NxTest.assert(res[:ok], res[:errors].inspect)
   NxTest.assert_equal([], log, 'ciel uz polozku nesie — ziadna prestavba navyse')
   NxTest.assert_equal(false, res[:geometry_changed])
+end
+
+# ============ 10) Codex #382 kolo 3 — model, ram a dokaz vazby =============
+
+NxTest.test('S1-B1 (kolo 3 P2): `catalog_id` LEN pri `create` a `rebind_model`') do
+  m = NxS1B1::FakeModel.new
+  cab = NxS1B1.cabinet('CAB-1', 101)
+  slot = NxS1B1.cabinet('CAB-2', 102, type: 'dishwasher')
+  NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [cab, slot])]) do
+    NxS1B1.create!(m, NxS1B1.fridge_snapshot,
+                   { 'kind' => 'cabinet', 'id' => 'CAB-1', 'pid' => 101 })
+  end
+  id = NxS1B1::BS.appliances(m).first['id']
+  ops_before = m.ops.length
+  # Presun na SLOT s prilozenym modelom UMYVACKY: matica by bezala nad
+  # kategoriou KATALOGU (dishwasher -> slot OK), ale snapshot sa pri `move`
+  # neuklada — polozka by ostala chladnickou v slote.
+  res = nil
+  NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [cab, slot]),
+                     NxS1B1.snapshot_stub('CAT-DW450' => NxS1B1.dishwasher_snapshot)] +
+                    NxS1B1.writer_stubs([])) do
+    res = NxS1B1::AB.apply!(m, model_guid: '', op: 'move', item_id: id,
+                            catalog_id: 'CAT-DW450',
+                            owner: { 'kind' => 'slot', 'id' => 'CAB-2', 'pid' => 102 })
+  end
+  NxTest.refute(res[:ok], 'model z katalogu pri presune sa NEPRIJIMA')
+  NxTest.assert_equal([NxS1B1::AB::MSG_CATALOG_OP], res[:errors])
+  NxTest.assert_equal(ops_before, m.ops.length, 'a to PRED otvorenim operacie')
+  NxTest.assert_equal('fridge', NxS1B1::BS.appliances(m).first['typ'])
+  NxTest.assert_equal([], NxS1B1.refs_of(slot))
+
+  %w[unbind patch remove].each do |op|
+    NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [cab, slot]),
+                       NxS1B1.snapshot_stub('CAT-DW450' => NxS1B1.dishwasher_snapshot)] +
+                      NxS1B1.writer_stubs([])) do
+      res = NxS1B1::AB.apply!(m, model_guid: '', op: op, item_id: id,
+                              catalog_id: 'CAT-DW450')
+    end
+    NxTest.assert_equal([NxS1B1::AB::MSG_CATALOG_OP], res[:errors], op)
+  end
+  NxTest.assert_equal(%w[create rebind_model], NxS1B1::AB::CATALOG_OPS)
+end
+
+NxTest.test('S1-B1 (kolo 3 P2): `ensure_root_context` LEN pri skutocnej prestavbe') do
+  m = NxS1B1::FakeModel.new
+  cab = NxS1B1.cabinet('CAB-1', 101)
+  brd = NxS1B1.board('BRD-1', 201)
+  NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [cab])]) do
+    NxS1B1.create!(m, NxS1B1.fridge_snapshot,
+                   { 'kind' => 'cabinet', 'id' => 'CAB-1', 'pid' => 101 })
+  end
+  id = NxS1B1::BS.appliances(m).first['id']
+
+  closed = 0
+  ctx = [Noxun::Engine::CabinetBuilder, :ensure_root_context, ->(_model) { closed += 1 }]
+
+  # (a) `patch` — cisto rozpoctova uprava: ram sa NEZATVARA.
+  NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [cab]), ctx] + NxS1B1.writer_stubs([])) do
+    NxS1B1::AB.apply!(m, model_guid: '', op: 'patch', item_id: id, attrs: { 'cena' => 5.0 })
+  end
+  NxTest.assert_equal(0, closed, '`patch` pouzivatela z komponentu NEVYHODI')
+
+  # (b) DOSKA — zapis configu bez prestavby: ram sa NEZATVARA.
+  m2 = NxS1B1::FakeModel.new
+  NxS1B1.with_stubs([NxS1B1.scan_stub(boards: [brd]), ctx,
+                     NxS1B1.snapshot_stub('CAT-HOB' => NxS1B1.hob_snapshot)] +
+                    NxS1B1.writer_stubs([])) do
+    NxS1B1::AB.apply!(m2, model_guid: '', op: 'create', attrs: { 'nazov' => 'Varná doska' },
+                      catalog_id: 'CAT-HOB',
+                      owner: { 'kind' => 'board', 'id' => 'BRD-1', 'pid' => 201 })
+  end
+  NxTest.assert_equal(0, closed, 'vazba na DOSKU sa nerobi prestavbou')
+
+  # (c) SKRINKA — prestavba: ram sa zatvara (inak by commit korpus teleportoval).
+  m3 = NxS1B1::FakeModel.new
+  NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [cab]), ctx,
+                     NxS1B1.snapshot_stub('CAT-FRIDGE' => NxS1B1.fridge_snapshot)] +
+                    NxS1B1.writer_stubs([])) do
+    NxS1B1::AB.apply!(m3, model_guid: '', op: 'create', attrs: { 'nazov' => 'Beko' },
+                      catalog_id: 'CAT-FRIDGE',
+                      owner: { 'kind' => 'cabinet', 'id' => 'CAB-1', 'pid' => 101 })
+  end
+  NxTest.assert_equal(1, closed, 'prestavba skrinky ram zatvorit MUSI')
+end
+
+NxTest.test('S1-B1 (kolo 3 P2): dokaz vazby vyzaduje ZHODU DRUHU (jedna funkcia)') do
+  entry_slot = { 'kind' => 'slot', 'id' => 'CAB-3', 'refs' => [{ 'item_id' => 'A1' }] }
+  cab_owner = { 'kind' => 'cabinet', 'id' => 'CAB-3' }
+  slot_owner = { 'kind' => 'slot', 'id' => 'CAB-3' }
+  NxTest.refute(NxS1B1::AB.ref_matches?(entry_slot, cab_owner, 'A1'),
+                'skrinkovy vlastnik na SLOTE s tym istym ID vazbou NIE JE')
+  NxTest.assert(NxS1B1::AB.ref_matches?(entry_slot, slot_owner, 'A1'), 'zhodny druh ano')
+  NxTest.refute(NxS1B1::AB.ref_matches?(entry_slot, { 'kind' => 'slot', 'id' => 'CAB-9' }, 'A1'),
+                'ine ID nie')
+  NxTest.refute(NxS1B1::AB.ref_matches?(entry_slot, slot_owner, 'INE'), 'ine uuid nie')
+  NxTest.refute(NxS1B1::AB.ref_matches?(entry_slot, slot_owner, ''), 'prazdne uuid nie')
+  NxTest.refute(NxS1B1::AB.ref_matches?(nil, slot_owner, 'A1'))
+
+  # ZBER pouziva TU ISTU funkciu: slot s `cabinet_id` CAB-3 a skrinkovym
+  # zaznamom sa uz netvari ako viazany (mutacie vlastnika by ho nenasli).
+  items = [{ 'id' => 'A1', 'typ' => 'fridge', 'nazov' => 'Beko',
+             'owner' => { 'kind' => 'cabinet', 'id' => 'CAB-3' } }]
+  owners = {}
+  NxS1B1::BOM.note_appliance_owner(owners, 'CAB-3', 303,
+                                   { 'type' => 'dishwasher', 'dw_class' => 600,
+                                     'appliance_refs' => [{ 'item_id' => 'A1',
+                                                            'category' => 'fridge' }] })
+  rec = NxS1B1::BOM.appliance_records(items, owners).find { |r| r['item_id'] == 'A1' }
+  NxTest.assert_equal('owner_missing', rec['state'],
+                      'zhoda ID + uuid BEZ zhody druhu dokazom NIE JE')
+  NxTest.assert(rec['owner']['pid'].nil?)
+
+  # Ked druh sedi, vazba plati.
+  items2 = [{ 'id' => 'A1', 'typ' => 'dishwasher', 'nazov' => 'Bosch',
+              'owner' => { 'kind' => 'slot', 'id' => 'CAB-3' } }]
+  rec2 = NxS1B1::BOM.appliance_records(items2, owners).find { |r| r['item_id'] == 'A1' }
+  NxTest.assert_equal('bound', rec2['state'])
+  NxTest.assert_equal(303, rec2['owner']['pid'])
 end

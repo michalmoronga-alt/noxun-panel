@@ -34,6 +34,13 @@ DOC.body.appendChild(ROOT);
 const STATUS = mkEl('div');
 STATUS.attrs.id = 'status';
 DOC.body.appendChild(STATUS);
+// Kontajnery okna — `render()` bez nich telo sekcie nenakreslí a deep-link
+// (kotva riadku) by nemal čo nájsť.
+['snav', 'shead', 'sectools', 'secbody'].forEach(function(id){
+  const box = mkEl('div');
+  box.attrs.id = id;
+  DOC.body.appendChild(box);
+});
 
 const SENT = [];
 const LOOKUPS = [];
@@ -46,6 +53,11 @@ global.window.sketchup = global.sketchup;
 require(path.join(JS, 'studio.js'));
 global.NX = global.window.NX;
 const B = require(path.join(JS, 'budget.js'));
+// V CEF bežia `studio.js` a `budget.js` v TOM ISTOM globálnom scope, takže
+// `renderBody` aj deep-link kotva vidia funkcie rozpočtu ako globálne;
+// v Node ich `require` izoluje (vzor `matOpenAnchor` v test_st2d_kde.js).
+global.budRenderBody = B.budRenderBody;
+global.budOpenAnchor = B.budOpenAnchor;
 
 // --- payload rozpoctu (presne to, co posiela server) -------------------------
 const TYPES = [
@@ -436,6 +448,40 @@ const ROW_ORPHAN = {
   eq(SENT[0].owner, { kind: 'cabinet', id: 'CAB-1', pid: 101 },
      'vedomý výber sa pošle — aj s PID');
   NX.budgetResult('appliance_add', true);
+})();
+
+// ===== 13) Codex kolo 3 P2: kotva sa spotrebuje AŽ PO vykreslení sekcie ====
+//
+// `budOpenAnchor` je dotaz do DOM. Keď bežal PRED `render()`, riadok ešte
+// neexistoval → kotva sa spotrebovala naprázdno a okno navyše ohlásilo
+// „riadok už v rozpočte nie je" nad riadkom, ktorý tam o chvíľu bol.
+
+(function(){
+  const rows = [ROW_BOUND, ROW_ORPHAN];
+  const data = { gen: 9, model_guid: 'DOC-A', rows: [], sheets: [], edging: [],
+                 control: [], counts: { red: 0, orange: 0, total: 0 },
+                 budget: budget(rows), version: 'test',
+                 open_section: 'budget', anchor: 'appliance:A3' };
+  global.ST = data;
+  const before = String(STATUS.textContent || '');
+  NX.setStudio(data);
+
+  const row = DOC.querySelector('[data-brow="appliance:A3"]');
+  ok(row, 'sekcia Rozpočet je vykreslená a riadok v DOM je');
+  ok(String(row.attrs['class'] || '').indexOf('bhit') > -1,
+     'a deep-link ho PRISVIETIL: ' + row.attrs['class']);
+  eq(String(STATUS.textContent || ''), before,
+     'žiadna hláška „riadok už v rozpočte nie je" — riadok tam je');
+
+  // Kotva na ZANIKNUTÝ riadok to povie nahlas (a nie je tichý no-op).
+  const gone = { gen: 10, model_guid: 'DOC-A', rows: [], sheets: [], edging: [],
+                 control: [], counts: { red: 0, orange: 0, total: 0 },
+                 budget: budget([ROW_BOUND]), version: 'test',
+                 open_section: 'budget', anchor: 'appliance:ZMAZANE' };
+  global.ST = gone;
+  NX.setStudio(gone);
+  ok(String(STATUS.textContent || '').indexOf('už v rozpočte nie je') > -1,
+     'zaniknutý riadok = červený status, nie ticho');
 })();
 
 console.log('OK test_s1b1_rozpocet.js — ' + n + ' kontrol');

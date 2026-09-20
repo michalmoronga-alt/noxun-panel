@@ -97,7 +97,8 @@ Chýbajúci kľúč `appliance_slots` kontrolu **ticho preskočí** (legacy vola
 `stable_key` je `appliance|<uuid položky>|<kód>`, takže dva nálezy nad tým istým spotrebičom sú **dva riadky** (dedup by inak nechal len prvý). Viazané nálezy
 adresu vlastníka **majú** (`owner_id` + `owner_pid`), takže klik označí skrinku. **Nález BEZ `owner_id` nemá v modeli čo označiť**, preto ho `ProductionCore.do_select`
 vybaví **pred** akýmkoľvek výberom entít: `route_target` z neho prečíta `data.route` a vráti **deep-link do sekcie** (`appl` → Rozpočet, kotva `appliance:<uuid>`);
-výber sa pri tom **nedotkne** a okno riadok krátko prisvieti (`budOpenAnchor`). Bez toho by všeobecný resolver buď neoznačil nič („zoznam sa medzitým zmenil"),
+výber sa pri tom **nedotkne** a okno riadok krátko prisvieti (`budOpenAnchor` — **až PO vykreslení sekcie**, lebo je to dotaz do DOM; kotvy `bom` a `mat` naopak
+menia stav, z ktorého render kreslí, a preto bežia pred ním). Bez toho by všeobecný resolver buď neoznačil nič („zoznam sa medzitým zmenil"),
 alebo — pri recyklovanom ID — označil **cudziu** skrinku. S1-B2 prepne cieľ trasy na pohľad „V zákazke" zmenou **jedinej** mapy `ROUTE_SECTIONS`. Záznamy `expected_missing` (vlastník, ktorý spotrebič len očakáva) sú v zbere
 pre pohľad „V zákazke" — nález z nich robí až S1-C.
 
@@ -621,8 +622,9 @@ na začiatku zberu) a z **toho istého prechodu** skriniek a dosiek (`note_appli
 prvá inštancia daného ID vyhráva — zdieľané ID je samostatná chyba identity). Žiadny druhý sken modelu. Tvar záznamu:
 `{item_id, name, category, owner: {kind, id, pid}, state, customer_supplied, snapshot: {niche, body, install{dishwasher_class}} | nil, slot: {dw_class} | nil, interior: {width, height, depth} | nil}`.
 
-`state` je `bound` · `owner_missing` · `job` · `expected_missing`. **Vlastník platí LEN keď entita existuje A jej `appliance_refs[]` obsahujú `item_id`** —
-samotná zhoda ID dôkaz nie je, ID skriniek sa recyklujú. `interior` počíta `Construction.interior_dims` (plytká konverzia kľúčov na symboly) — vlastný výpočet
+`state` je `bound` · `owner_missing` · `job` · `expected_missing`. **Vlastník platí LEN keď entita existuje, má ten istý DRUH a jej `appliance_refs[]` obsahujú `item_id`** —
+samotná zhoda ID dôkaz nie je (ID sa recyklujú) a ani zhoda ID + uuid (`cabinet_id` zdieľa skrinka aj slot). Rozhoduje **jedna funkcia**
+`ApplianceBinding.ref_matches?`, ktorú volá zber aj mutácie väzby — inak by sa „viazané" v Kontrole a „nájdené" pri zápise rozišli. `interior` počíta `Construction.interior_dims` (plytká konverzia kľúčov na symboly) — vlastný výpočet
 by bol druhá pravda o tom, kam sa spotrebič zmestí. `compute()` kľúč **ignoruje**; čitateľmi sú `Validation.check_appliances` a (od S1-B2) pohľad „V zákazke".
 
 ### sheet_estimate.rb

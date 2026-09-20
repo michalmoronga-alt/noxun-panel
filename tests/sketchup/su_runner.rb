@@ -4120,6 +4120,7 @@ module NoxunSuRunner
 
     s1b1_kolo1(model, fridge_id)
     s1b1_kolo2(model, fridge_id)
+    s1b1_kolo3(model, fridge_id, dw_id)
     s1b1_rollback(model, fridge_id)
     s1b1_barrier(model, fridge_id)
 
@@ -4313,6 +4314,84 @@ module NoxunSuRunner
 
     s1b1_apply(model, 'remove', item_id: id)
     [slot, fresh].each { |i| i.erase! if i && i.valid? }
+    r14_clear!(model)
+  end
+
+  # Codex #382 kolo 3: MODEL Z KATALOGU, RAM A DOKAZ VAZBY.
+  #   * `catalog_id` pri operacii, ktora snapshot neuklada, sa odmietne,
+  #   * `ensure_root_context` (zatvorenie otvoreneho komponentu) bezi LEN ked
+  #     sa naozaj prestavuje skrinka/slot — cisto rozpoctova uprava ani vazba
+  #     na dosku pouzivatela z komponentu vyhodit nesmu,
+  #   * dokaz vazby vyzaduje ZHODU DRUHU: skrinkovy zaznam na SLOTE s tym istym
+  #     `cabinet_id` sa uz netvari ako viazany.
+  def s1b1_kolo3(model, catalog_id, dw_catalog_id)
+    r14_clear!(model)
+    cab = e::CabinetBuilder.build(
+      model, S1B1_CAB, transform: Geom::Transformation.translation(e::Units.point(15_000.0, 0, 0))
+    )
+    slot = e::CabinetBuilder.build(
+      model, S1B1_SLOT, transform: Geom::Transformation.translation(e::Units.point(16_000.0, 0, 0))
+    )
+    return ok('S1-B1 (kolo 3): fixtury', false) unless cab && slot
+
+    cid = e::Store.get(cab, 'cabinet_id').to_s
+    sid = e::Store.get(slot, 'cabinet_id').to_s
+    s1b1_apply(model, 'create', attrs: { 'nazov' => 'Beko' }, catalog_id: catalog_id,
+                                owner: { 'kind' => 'cabinet', 'id' => cid,
+                                         'pid' => cab.persistent_id })
+    id = s1b1_items(model).first['id']
+
+    # (1) `move` s MODELOM Z KATALOGU = odmietnutie bez operacie a bez kroku Spat.
+    markers = []
+    m1 = r03_marker(model, markers)
+    res = s1b1_apply(model, 'move', item_id: id, catalog_id: dw_catalog_id,
+                                    owner: { 'kind' => 'slot', 'id' => sid,
+                                             'pid' => slot.persistent_id })
+    ok("S1-B1 (kolo 3): `move` s `catalog_id` odmietnuty (#{Array(res[:errors]).first})",
+       res[:ok] == false)
+    ok("S1-B1 (kolo 3): kategoria ostala `#{s1b1_items(model).first['typ']}` a slot vazbu nedostal",
+       s1b1_items(model).first['typ'] == 'fridge' && s1b1_refs(slot).empty?)
+    Sketchup.undo
+    ok('S1-B1 (kolo 3): a NEZALOZIL ziadny krok Spat (1x Spat vratil marker)', !m1.valid?)
+    r03_clear_markers(model, markers)
+
+    # (2) RAM: `patch` pouzivatela z otvoreneho komponentu NEVYHODI.
+    #     Meria sa cez `model.active_path` — otvorime skrinku a po uprave ceny
+    #     musi byt kontext STALE otvoreny.
+    opened = begin
+      model.active_path = [cab]
+      !model.active_path.nil? && model.active_path.length.positive?
+    rescue StandardError
+      false
+    end
+    if opened
+      s1b1_apply(model, 'patch', item_id: id, attrs: { 'cena' => '321' })
+      still = !model.active_path.nil? && model.active_path.length.positive?
+      ok('S1-B1 (kolo 3): `patch` NEZATVORIL otvoreny komponent (ram ostal)', still)
+      ok("S1-B1 (kolo 3): a cena sa zapisala (#{s1b1_items(model).first['cena']})",
+         (s1b1_items(model).first['cena'].to_f - 321.0).abs < 0.01)
+      tools1_close_context(model)
+    else
+      info('S1-B1 (kolo 3): otvorenie komponentu sa nepodarilo — ram sa nemeria')
+    end
+
+    # (3) DOKAZ VAZBY vyzaduje ZHODU DRUHU. Slot dostane `cabinet_id` skrinky
+    #     (recyklacia cisla) a jej SKRINKOVY zaznam — bez kontroly druhu by sa
+    #     tvaril ako viazany, hoci mutacie vlastnika ho nenajdu.
+    refs = s1b1_refs(cab)
+    model.start_operation('SU-TEST S1B1 kolo3 dvojnik', true)
+    cab.erase!
+    cfg = e::Store.config(slot) || {}
+    cfg['appliance_refs'] = refs
+    e::Store.write(slot, { kind: 'cabinet', id: cid, cabinet_id: cid, config: cfg })
+    model.commit_operation
+    ok("S1-B1 (kolo 3): slot nesie `cabinet_id` #{cid} a SKRINKOVY zaznam " \
+       "(#{s1b1_refs(slot).length} refs)", s1b1_refs(slot).length == 1)
+    ok("S1-B1 (kolo 3): Kontrola ho ako vazbu NEUZNA — hlasi sirotu (#{s1b1_codes(model).inspect})",
+       s1b1_codes(model).include?('appliance_owner_missing'))
+
+    s1b1_apply(model, 'remove', item_id: id)
+    slot.erase! if slot.valid?
     r14_clear!(model)
   end
   # Astra B17: RIADENE ZLYHANIA. Po aborte musi byt stav PRESNE ako pred

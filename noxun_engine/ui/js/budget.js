@@ -2285,6 +2285,11 @@
       budOwnerValue: budOwnerValue, budApplianceRow: budApplianceRow,
       budOwnerOptionsFor: budOwnerOptionsFor, budOwnerDirty: budOwnerDirty,
       budOpenAnchor: budOpenAnchor,
+      // `budRenderBody` potrebuje DOM a exportuje sa ZAMERNE: kontrakt
+      // „kotva sa spotrebuje AZ PO vykresleni sekcie" (Codex kolo 3) sa da
+      // overit len nad SKUTOCNE vykreslenym telom. V CEF je to globalna
+      // funkcia (jeden scope so `studio.js`), v Node ju `require` izoluje.
+      budRenderBody: budRenderBody,
       budDocSwitched: budDocSwitched, budModalOp: budModalOp,
       budApplLookupResult: budApplLookupResult,
       // `budOpenDraft` potrebuje DOM a exportuje sa ZAMERNE — kontrakty
