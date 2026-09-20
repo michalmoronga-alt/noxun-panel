@@ -697,6 +697,112 @@ NxTest.test('spotrebice: snapshot_for — vyradeny zaznam, neznamy id a nepodpor
                       'cachovane :ok nie je dokaz — zakazka si snapshot ODLOZI')
 end
 
+NxTest.test('spotrebice: snapshot_for berie CERSTVY dokument, nikdy druhe cachovane citanie (#377 P1)') do
+  applc_seeded!
+  rec = APPLC.create!(applc_new)[1][:record]
+  stale = applc_doc # stav, ktory drzi sekundova cache JsonFileStore
+
+  doc = applc_doc # na disku ho druha instancia SketchUpu prave VYRADILA
+  doc['records'].find { |r| r['id'] == rec['id'] }['deleted_at'] = '2026-09-20T00:00:00Z'
+  File.binwrite(APPLC.path, JSON.pretty_generate(doc))
+
+  orig = APPLC_JFS.method(:read)
+  APPLC_JFS.define_singleton_method(:read) { |*| stale }
+  begin
+    NxTest.assert_equal(:deleted, APPLC.snapshot_for(rec['id'])[0],
+                        'snapshot ide z DISKU — cachovany zaznam by sa dostal do zakazky')
+  ensure
+    APPLC_JFS.define_singleton_method(:read, orig)
+  end
+end
+
+NxTest.test('spotrebice: boot pluginu katalog ZALOZI (guard nad main.rb, #377 P2)') do
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'main.rb'), encoding: 'UTF-8')
+  NxTest.assert(src.include?('ApplianceCatalog.assess!'),
+                'boot blok main.rb musi katalog zalozit — inak subor vznikne az pri prvom otvoreni sekcie')
+  NxTest.assert(src.include?("log_error(e, 'appliance_catalog_boot')"),
+                'zlyhanie katalogu nesmie zhodit menu, toolbar ani observer')
+end
+
+NxTest.test('spotrebice: ZLYHANY prvy seed = read_only, nie zdravy prazdny katalog (#377 P2)') do
+  applc_wipe!
+  st = applc_with_failing_write { APPLC.state }
+  NxTest.assert_equal(:read_only, st, 'nezapisovatelny %APPDATA% nesmie vydat stav :ok')
+  NxTest.assert(APPLC.state_reason.include?('nepodarilo založiť'), "dovod: #{APPLC.state_reason}")
+  NxTest.assert_equal(:read_only, APPLC.create!(applc_new)[0], 'zapis nad nezalozenym katalogom sa odmietne')
+  # Po naprave (zapis znova funguje) sa katalog zalozi pri najblizsom pristupe.
+  APPLC.reset_state!
+  NxTest.assert_equal(9, APPLC.list[1][:records].length)
+end
+
+NxTest.test('spotrebice: neznamy kluc `dims` OD KLIENTA sa odmietne, ulozeny prezije (#377 P2)') do
+  applc_seeded!
+  st, info = APPLC.create!(applc_new('dims' => { 'front' => { 'cutout_dept' => 480 } }))
+  NxTest.assert_equal(:invalid, st, 'preklep sa nesmie ticho ulozit')
+  NxTest.assert_equal('dims.front.cutout_dept', info[:field])
+  NxTest.assert_equal(:invalid, APPLC.create!(applc_new('dims' => { 'bodyy' => { 'width' => 100 } }))[0],
+                      'neznamy BLOK od klienta tiez nie')
+
+  rec = APPLC.create!(applc_new)[1][:record]
+  doc = applc_doc # zapis NOVSEJ verzie pluginu — ten neznamy kluc priniesol
+  row = doc['records'].find { |r| r['id'] == rec['id'] }
+  row['dims'] = { 'front' => { 'outer_width' => 860.0, 'future_key' => 'x' } }
+  File.binwrite(APPLC.path, JSON.pretty_generate(doc))
+  APPLC_JFS.invalidate(APPLC.path)
+  fresh = APPLC.find(rec['id'])[1][:record]
+
+  st2, info2 = APPLC.patch!(rec['id'], { 'dims' => { 'front' => { 'outer_depth' => 500 } } }, rev: fresh['rev'])
+  NxTest.assert_equal(:ok, st2)
+  NxTest.assert_equal('x', info2[:record]['dims']['front']['future_key'], 'ulozeny neznamy kluc prezije patch')
+  st3, = APPLC.patch!(rec['id'], { 'dims' => { 'front' => { 'future_key' => 'z' } } },
+                      rev: info2[:record]['rev'])
+  NxTest.assert_equal(:ok, st3, 'kluc, ktory v zazname UZ JE, smie klient zmenit aj zmazat')
+end
+
+NxTest.test('spotrebice: nečitateľná polozka `attachments[]` = READ-ONLY, nie pad v mutacii (#377 P2)') do
+  applc_install!('std' => 1, 'seed_version' => 1,
+                 'records' => [{ 'id' => 'a1', 'category' => 'oven', 'name' => 'S prilohou',
+                                 'attachments' => [nil] }])
+  NxTest.assert_equal(:read_only, APPLC.state, '[null] v prilohach je poskodeny subor')
+  NxTest.assert(APPLC.state_reason.include?('nečitateľný'), "dovod: #{APPLC.state_reason}")
+
+  bad = [{ 'id' => 'x', 'kind' => 'sheet', 'file' => '../tajne.pdf', 'name' => 'x' }]
+  applc_install!('std' => 1, 'seed_version' => 1,
+                 'records' => [{ 'id' => 'a1', 'category' => 'oven', 'name' => 'X', 'attachments' => bad }])
+  NxTest.assert_equal(:read_only, APPLC.state, 'nazov suboru mimo jedneho segmentu')
+
+  bad2 = [{ 'id' => 'x', 'kind' => 'video', 'file' => 'a_b.pdf', 'name' => 'x' }]
+  applc_install!('std' => 1, 'seed_version' => 1,
+                 'records' => [{ 'id' => 'a1', 'category' => 'oven', 'name' => 'X', 'attachments' => bad2 }])
+  NxTest.assert_equal(:read_only, APPLC.state, 'neznamy druh prilohy')
+end
+
+NxTest.test('spotrebice: PDF sa nestane nahladom ani obrazkom (matica druh -> pripona, #377 P2)') do
+  applc_seeded!
+  rec = APPLC.create!(applc_new)[1][:record]
+  pdf = applc_tmp_file('manual.pdf')
+  st, info = APPLC.attach!(rec['id'], pdf, kind: 'thumbnail', rev: rec['rev'])
+  NxTest.assert_equal(:invalid, st, 'PDF ako nahlad nie')
+  NxTest.assert_equal('kind', info[:field], 'chyba patri k druhu, subor je v poriadku')
+  NxTest.assert_equal(:invalid, APPLC.attach!(rec['id'], pdf, kind: 'image', rev: rec['rev'])[0],
+                      'PDF ako obrazok tiez nie')
+  rec = APPLC.attach!(rec['id'], pdf, kind: 'sheet', rev: rec['rev'])[1][:record]
+  NxTest.assert_equal('sheet', rec['attachments'].first['kind'], 'ako LIST prejde')
+  NxTest.assert_equal(:invalid, APPLC.set_thumbnail!(rec['id'], rec['attachments'].first['id'], rev: rec['rev'])[0],
+                      'a nahladom sa uz nestane')
+  ok_img = APPLC.attach!(rec['id'], applc_tmp_file('foto.webp'), kind: 'thumbnail', rev: rec['rev'])
+  NxTest.assert_equal(:ok, ok_img[0], 'webp nahlad prejde')
+end
+
+NxTest.test('spotrebice: file_url — UNC cesta si NECHA hostitela (#377 P2)') do
+  unc = APPLC.file_url('\\\\server\\share\\NOXUN\\Technický list.pdf')
+  NxTest.assert(unc.start_with?('file://server/share/'), "UNC ma dva lomky a hostitela, dostal #{unc}")
+  NxTest.refute(unc.start_with?('file:///'), 'z UNC sa nesmie stat lokalna cesta na disk')
+  NxTest.assert(unc.include?('%20'), 'kodovanie ostava')
+  local = APPLC.file_url('C:\\NOXUN\\list.pdf')
+  NxTest.assert_equal('file:///C:/NOXUN/list.pdf', local, 'lokalna cesta ostava s tromi lomkami')
+end
+
 # --- hladanie a tvar odpovede --------------------------------------------------
 
 NxTest.test('spotrebice: search — bez diakritiky, aj cez SK popisok kategorie, deterministicke poradie') do

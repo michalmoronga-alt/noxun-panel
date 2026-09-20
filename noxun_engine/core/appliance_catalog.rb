@@ -134,6 +134,20 @@ module Noxun
 
       ATTACHMENT_KINDS = %w[sheet image thumbnail].freeze
       ATTACHMENT_EXTS = %w[pdf jpg jpeg png webp].freeze
+      # Nazov ulozenej kopie je VZDY jediny segment `<uuid>_<slug>.<ext>` —
+      # ziadne `..`, `/`, `\` ani absolutna cesta. Ten isty vzor plati pre
+      # kontrolu dokumentu (`valid_stored_attachment?`) aj pre resolver
+      # referencie zo zakazkoveho snapshotu (jedna autorita).
+      ATTACH_FILE_RE = /\A[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.[A-Za-z0-9]{1,5}\z/.freeze
+      # Druh prilohy urcuje, ktore pripony su preň pripustne: PDF je LIST,
+      # nikdy obrazok ani nahlad — nahlad z PDF by UI nevykreslilo a dlazdica
+      # by ostala prazdna bez jedineho dovodu. `ATTACHMENT_EXTS` ostava
+      # zjednotenim (pozna ho resolver ciest).
+      KIND_EXTS = {
+        'sheet' => %w[pdf jpg jpeg png webp].freeze,
+        'image' => %w[jpg jpeg png webp].freeze,
+        'thumbnail' => %w[jpg jpeg png webp].freeze
+      }.freeze
       MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
       MAX_ATTACH_SLUG = 60
       MAX_ATTACHMENTS = 50
@@ -225,7 +239,14 @@ module Noxun
       def assess!
         set_state(:ok, '')
         unless JsonFileStore.available?(path)
-          seed!
+          # ZLYHANY SEED nie je zdravy prazdny katalog: nezapisovatelny
+          # `%APPDATA%` alebo plny disk by inak vydali stav `:ok` nad
+          # neexistujucim suborom a kazdy dalsi zapis by tisko padal.
+          unless seed!
+            return set_state(:read_only,
+                             'katalóg spotrebičov sa nepodarilo založiť — skontroluj miesto na disku a práva k %APPDATA%')
+          end
+
           return @state
         end
         return set_state(:degraded, DEGRADED_MSG) if JsonFileStore.degraded?(path)
@@ -289,7 +310,9 @@ module Noxun
         return 'katalóg spotrebičov má neznámy tvar (chýba zoznam záznamov)' unless data['records'].is_a?(Array)
         return 'katalóg spotrebičov nemá značku verzie (std)' unless data['std'].is_a?(Integer)
         return 'katalóg spotrebičov je v novšej verzii — aktualizuj plugin' if data['std'] > STD
-        return 'katalóg spotrebičov obsahuje záznam bez identity' unless data['records'].all? { |r| valid_stored_record?(r) }
+        unless data['records'].all? { |r| valid_stored_record?(r) }
+          return 'katalóg spotrebičov obsahuje nečitateľný záznam (identita, rozmery alebo príloha)'
+        end
 
         ids = data['records'].map { |r| r['id'].to_s }
         return 'katalóg spotrebičov má duplicitné identity — oprav súbor' unless ids.uniq.length == ids.length
@@ -301,8 +324,23 @@ module Noxun
       # retazec (UUID zo servera); tvrdsie veci strazi validacia pri zapise.
       def valid_stored_record?(rec)
         rec.is_a?(Hash) && !rec['id'].to_s.strip.empty? &&
-          (rec['attachments'].nil? || rec['attachments'].is_a?(Array)) &&
-          (rec['dims'].nil? || rec['dims'].is_a?(Hash))
+          (rec['dims'].nil? || rec['dims'].is_a?(Hash)) &&
+          (rec['attachments'].nil? ||
+            (rec['attachments'].is_a?(Array) && rec['attachments'].all? { |it| valid_stored_attachment?(it) }))
+      end
+
+      # Polozka `attachments[]` musi byt CITATELNA uz pri kontrole dokumentu.
+      # `[null]` alebo polozka bez `file` by inak presla ako zdravy katalog
+      # a rozbila sa az v `snapshot_for` / mutacii ako NoMethodError — teda
+      # hlaskou o zlyhanom zapise namiesto pravdy „subor je poskodeny".
+      def valid_stored_attachment?(item)
+        return false unless item.is_a?(Hash)
+        return false if item['id'].to_s.strip.empty?
+        return false unless ATTACHMENT_KINDS.include?(item['kind'].to_s)
+        return false unless item['name'].is_a?(String)
+
+        file = item['file'].to_s
+        file.match?(ATTACH_FILE_RE) && ATTACHMENT_EXTS.include?(attach_ext(file))
       end
 
       # --- citanie -------------------------------------------------------------
@@ -471,7 +509,15 @@ module Noxun
         if input.key?('dims')
           return [nil, 'rozmery musia byť objekt', 'dims'] unless input['dims'].nil? || input['dims'].is_a?(Hash)
 
-          merged = merge_dims(rec['dims'].is_a?(Hash) ? rec['dims'] : {}, input['dims'])
+          stored_dims = rec['dims'].is_a?(Hash) ? rec['dims'] : {}
+          # Doprednost plati pre SUBOR, nie pre klienta: neznamy kluc sa
+          # zachova len vtedy, ked uz v ulozenom zazname JE. Preklep zo
+          # vstupu (`cutout_dept`) sa musi ozvat, inak by sa mutacia tvarila
+          # ako ulozena a cislo by ticho zmizlo (Codex #377 P2).
+          msg, field = unknown_input_issue(input['dims'], stored_dims, category)
+          return [nil, msg, field] if msg
+
+          merged = merge_dims(stored_dims, input['dims'])
           dims, msg, field = normalize_dims(merged, category)
           return [nil, msg, field] if dims.nil?
 
@@ -535,9 +581,42 @@ module Noxun
         [out.uniq, nil]
       end
 
+      # Kluc, ktory prinasa VSTUP KLIENTA a nie je ani vo whiteliste kategorie,
+      # ani v ULOZENOM zazname -> `:invalid` s cestou pola. Neznamy kluc, ktory
+      # v subore uz je (zapis novsej verzie), sa dalej zachovava — ten prisiel
+      # od pluginu, nie z formulara (Codex #377 P2).
+      # -> [nil, nil] | [sprava, cesta_pola]
+      def unknown_input_issue(patch, stored, category, block = nil, prefix = 'dims', known = nil)
+        return [nil, nil] unless patch.is_a?(Hash)
+
+        patch.each do |key, value|
+          k = key.to_s
+          path = "#{prefix}.#{k}"
+          base = stored.is_a?(Hash) ? stored[k] : nil
+          if block.nil? # uroven BLOKOV
+            return ["neznámy blok rozmerov „#{k}“", path] unless DIM_BLOCKS.include?(k) || !base.nil?
+            next unless value.is_a?(Hash)
+
+            msg, field = unknown_input_issue(value, base, category, k, path)
+            return [msg, field] if msg
+
+            next
+          end
+          allowed = known || block_fields(block, category)
+          return ["neznáme pole „#{k}“", path] unless allowed.include?(k) || !base.nil?
+          next unless k == 'furniture_doors' && value.is_a?(Hash)
+
+          msg, field = unknown_input_issue(value, base, category, block, path, FURNITURE_DOOR_FIELDS)
+          return [msg, field] if msg
+        end
+        [nil, nil]
+      end
+
       # CIASTOCNY patch `dims` po LISTOCH: nepritomne pole = zachovat,
       # explicitne `nil` (JSON `null`) = ZMAZAT konkretny kluc. Nezname
-      # vnorene kluce preziju (doprednost).
+      # vnorene kluce preziju (doprednost) — ale LEN tie, ktore uz su
+      # v ULOZENOM zazname; vstup klienta ich cez `unknown_input_issue`
+      # neprepasuje.
       def merge_dims(stored, patch)
         out = deep_copy(stored)
         return out unless patch.is_a?(Hash)
@@ -696,6 +775,13 @@ module Noxun
       # Spolocny vstup KAZDEJ mutacie: zamok -> invalidacia cache -> cerstvy
       # dokument -> brany (degraded / read-only / novsia schema) -> blok.
       def with_fresh_document(op)
+        # Stav z `assess!` plati AJ ked subor neexistuje: po zlyhanom seede
+        # (nezapisovatelny `%APPDATA%`) by inak prvy zapis zalozil katalog BEZ
+        # devatich modelov a marker `seed_version` by ich uz nikdy nedosial
+        # (Codex #377 P2). Vzor `HardwareCatalog.create_item`.
+        ensure_state
+        return [:read_only, { message: state_reason }] if read_only?
+
         with_lock do
           JsonFileStore.invalidate(path)
           if JsonFileStore.available?(path)
@@ -881,6 +967,11 @@ module Noxun
         unless ATTACHMENT_EXTS.include?(ext)
           return invalid("príloha musí byť #{ATTACHMENT_EXTS.join(', ')}", 'file')
         end
+        # Pripustna pripona zavisi od DRUHU (PDF je list, nikdy obrazok ani
+        # nahlad) — chyba patri k polu `kind`, lebo subor je v poriadku.
+        unless KIND_EXTS[k].include?(ext)
+          return invalid("ako #{k == 'thumbnail' ? 'náhľad' : 'obrázok'} sa dá priložiť len #{KIND_EXTS[k].join(', ')}", 'kind')
+        end
         return [:copy_failed, { message: 'súbor sa nenašiel' }] unless File.file?(src)
 
         size = begin
@@ -983,7 +1074,10 @@ module Noxun
           items = stored['attachments'].is_a?(Array) ? stored['attachments'] : []
           target = items.find { |it| it['id'].to_s == attachment_id.to_s }
           next [:not_found, { message: 'príloha sa nenašla' }] unless target
-          if target['kind'].to_s == 'sheet'
+          # Rozhoduje PRIPONA suboru, nie len dnesny druh: zaznam z cudzieho
+          # alebo starsieho zapisu moze mat `kind: image` nad PDF a nahlad by
+          # sa z neho stal jedinym kliknutim.
+          if target['kind'].to_s == 'sheet' || !KIND_EXTS['thumbnail'].include?(attach_ext(target['file']))
             next invalid('náhľad sa dá nastaviť len z obrázka', 'kind')
           end
 
@@ -1044,8 +1138,7 @@ module Noxun
         return invalid('neplatná referencia na prílohu', 'id') if rid.empty?
         # Jediny segment podla vzoru `<uuid>_<slug>.<ext>` — ziadne `..`, `/`,
         # `\` ani absolutna cesta.
-        unless file.match?(/\A[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.[A-Za-z0-9]{1,5}\z/) &&
-               ATTACHMENT_EXTS.include?(attach_ext(file))
+        unless file.match?(ATTACH_FILE_RE) && ATTACHMENT_EXTS.include?(attach_ext(file))
           return invalid('neplatný názov súboru prílohy', 'file')
         end
 
@@ -1081,9 +1174,16 @@ module Noxun
       # ktore by prehliadac precital ako fragment ci dotaz a subor by neotvoril.
       URL_SAFE = %r{[^A-Za-z0-9\-_.!~*'()/:]}.freeze
 
+      # UNC cesta (`\\server\share\…`, teda po vymene lomiek `//server/share/…`)
+      # ma HOSTITELA. Orezanie vsetkych uvodnych lomiek by z neho vyrobilo
+      # `file:///server/share/…` — teda LOKALNU cestu na disk, ktora neexistuje;
+      # spravny tvar je `file://server/share/…` (Codex #377 P2). Michal moze
+      # mat `%APPDATA%` presmerovany na sietovy disk, takze to nie je teoria.
       def file_url(abs)
-        p = abs.to_s.tr('\\', '/').sub(%r{\A/+}, '')
-        "file:///#{URI::DEFAULT_PARSER.escape(p, URL_SAFE)}"
+        p = abs.to_s.tr('\\', '/')
+        return "file://#{URI::DEFAULT_PARSER.escape(p.sub(%r{\A/+}, ''), URL_SAFE)}" if p.start_with?('//')
+
+        "file:///#{URI::DEFAULT_PARSER.escape(p.sub(%r{\A/+}, ''), URL_SAFE)}"
       end
 
       def open_attachment(id, attachment_id)
@@ -1133,16 +1233,27 @@ module Noxun
         # neprepisala NOVSIA instancia pluginu (updater bezi popri otvorenom
         # SketchUpe). Degradovany katalog (platna `.bak`) snapshot DOVOLI —
         # obsah zalohy je citatelny, stoja len zapisy.
+        fresh = nil
         if JsonFileStore.available?(path) && !JsonFileStore.degraded?(path)
-          if (issue = stored_document_issue(raw_document))
+          fresh = raw_document
+          if (issue = stored_document_issue(fresh))
             set_state(:read_only, issue)
             return [:unsupported, { message: issue }]
           end
         elsif read_only?
           return [:unsupported, { message: state_reason }]
+        else
+          # Degradovany stav: cita sa `.bak` cez `JsonFileStore`, ale bez
+          # sekundovej cache — snapshot nesmie vzniknut zo stavu spred
+          # cudzieho zapisu.
+          JsonFileStore.invalidate(path)
         end
 
-        rec = stored_records.find { |r| r['id'].to_s == id.to_s }
+        # PRAVE OVERENY dokument ide do vyberu PRIAMO. Druhe citanie cez
+        # `JsonFileStore.read` by v okne `CHECK_INTERVAL` (1 s) vratilo
+        # CACHOVANY stav, takze by sa do zakazky mohol dostat zaznam, ktory
+        # druha instancia SketchUpu prave zmenila alebo vyradila (Codex #377 P1).
+        rec = stored_records(fresh).find { |r| r['id'].to_s == id.to_s }
         return [:not_found, { message: 'spotrebič sa nenašiel' }] unless rec
         return [:deleted, { message: 'vyradený spotrebič sa nedá priradiť' }] if deleted?(rec)
 
