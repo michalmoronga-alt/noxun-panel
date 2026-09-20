@@ -141,6 +141,13 @@ keď entita naozaj niečo nesie (prázdne pole by predstieralo, že väzbu už n
 aplikovanie šablóny); `appliance_refs[]` zaniká **výhradne pri KÓPII** (tri kopírovacie vstupy skrinky + dedup dosky), lebo kópia sa správa ako „očakáva
 spotrebič tej kategórie", ale nevlastní ten istý kus. Šablóna nesie `appliance_expects[]`, `appliance_refs[]` **nikdy**.
 
+**`appliance_refs[]` = OBOJSMERNÁ VÄZBA (S1-B1, záväzné od v0.12.13).** Položka zákazky nesie vlastníka (`owner {kind, id}`) a entita vlastníka nesie **ten istý
+`item_id`** vo svojich `appliance_refs[]`. Platí, že **vlastník je platný LEN keď entita existuje A jej `appliance_refs[]` obsahujú `item_id` položky** — samotná
+zhoda ID dôkazom nie je, ID skriniek aj dosiek sa **recyklujú** (`Ids.next_id`). Pri zápise navyše musí sedieť **PID + ID + druh** cieľa; recyklované ID bez zhody
+PID sa odmieta, dva kusy s tým istým ID sú „nejednoznačná identita". Záznam väzby má tvar
+`{item_id, category, body{…}, niche{…}, bands{…}, furniture_doors{…}, install{…}, snapshot_at}` a **chýbajúce pole = kľúč chýba, nikdy 0** (nula je rozmer, „nevieme" nie je).
+**Obe strany sa zapisujú v JEDNEJ operácii** cez `ApplianceBinding.apply!` — jeden krok Späť vráti položku, refs oboch vlastníkov aj prestavbu.
+
 **Korpus** (`kind: cabinet`):
 
 ```json
@@ -1396,6 +1403,16 @@ Možnosti:
   blokuje sa **nekompatibilná verzia dát**, nie **rozpracovaný rozpočet** — ten je legitímny stav zákazky a rieši ho dvojkrokové potvrdenie vyššie v tejto sekcii.
 - **Disciplína bumpu:** číslo sa zvýši pri **každom rozšírení whitelistu rozpočtových dát o pole, ktorého tichá strata by poškodila cenu alebo objednávku** (nové pole vlastnej
   položky, väzba spotrebiča na katalóg). Čisto odvodené alebo zobrazovacie pole bump nevyžaduje. Vykonateľná podoba: [`core/budget_store.rb`](../noxun_engine/core/budget_store.rb).
+
+**`BUDGET_STD` 2 — spotrebič má väzbu a vlastníka (od v0.12.13, S1-B1).** Položka `budget_appliances[]` nesie navyše `catalog_id`, `snapshot` (kópia rozmerov
+z katalógu — zákazka odvtedy na živom katalógu **nezávisí**), `owner {kind: cabinet|slot|board|job, id}` a `customer_supplied`. **Kódy kategórií sú kanonické**
+(`ApplianceCatalog::CATEGORIES`: `fridge oven microwave dishwasher hob sink hood other`), popisky z jednej mapy; čítanie prijme aj legacy slovenské kódy
+(`chladnicka`, `rura`, …) a prevedie ich, **zápis je vždy kanón**. „Dodáva zákazník" je **príznak, nie nula**: uložená cena ostáva, do súčtov ide 0 a upozornenie
+„chýba cena" zhasne — **0 sa do zákazky nikdy nezapíše**.
+
+- **Kompatibilita (priznané nahlas):** marker `BUDGET_STD` 2 zapíše **PRVÁ mutácia rozpočtu akéhokoľvek druhu** (zmena režimu, zaradenie v ponuke, prepis sumy…),
+  nie až úprava spotrebičov. Od tej chvíle **starší plugin zákazku needituje** a **zastaví aj oba cenové exporty** (XLSX rozpočtu aj cenovej ponuky). Čítanie,
+  kusovník ani VEPO blokované nie sú.
 
 ---
 

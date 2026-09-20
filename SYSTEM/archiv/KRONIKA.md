@@ -17,6 +17,35 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **S1-B1 — SPOTREBIČ V ZÁKAZKE: DÁTA, VÄZBA, KONTROLA (v0.12.13, 20.9.2026, PR #N).** Spotrebič prestal byť riadkom rozpočtu s voľným textom a stal sa **kusom,
+  ktorý v kuchyni niekde stojí**. Položka `budget_appliances[]` pribrala `catalog_id`, **`snapshot`** (kópia rozmerov z katalógu — zákazka odvtedy na živom
+  katalógu nezávisí), `owner` a `customer_supplied`; `BUDGET_STD` išiel 1 → 2. Kódy kategórií sú od tejto dávky **kanonické** (`ApplianceCatalog::CATEGORIES`) —
+  rozpočet už vlastný slovenský enum nemá, legacy kódy sa pri čítaní prevedú a zapisuje sa kanón (stará zákazka sa otvorí, upraví aj uloží).
+- **Väzba je OBOJSMERNÁ a zapisuje sa v JEDNEJ operácii.** Vlastník (skrinka · slot · doska) nesie `item_id` vo svojich `appliance_refs[]`, a platí **len keď
+  entita existuje A o väzbe vie** — samotná zhoda ID dôkazom nie je, ID sa recyklujú. Nový modul **`core/appliance_binding.rb`** je jediný transakčný vstup pre
+  všetky mutácie spotrebičov (`create · patch · rebind_model · move · unbind · remove`): v jednej `start_operation` zapíše položku, odstráni záznam u pôvodného
+  vlastníka, pridá ho u nového a oboch prestaví, takže **jeden Ctrl+Z vráti obe strany**. Guardy (DocKey · verzia dát · matica kategória → vlastník · identita
+  cieľa PID+ID+druh · odpojený dielec · novší config · pokoj observera · `ensure_root_context`) bežia **PRED** `start_operation` — odmietnutá mutácia nezaloží
+  žiadny krok Späť.
+- **Prečo jeden vstup a nie dve existujúce cesty:** SketchUp nemá vnorené operácie (`start_operation` v otvorenej operácii ju ticho ukončí), takže „zapíš položku
+  cez `BudgetStore.write!` a potom prestav skrinku" by bolo **päť krokov Späť** a po výnimke polovičný stav — položka by tvrdila, že rúra je v CAB-3, a skrinka by
+  o nej nevedela. `BudgetStore.write!` dostal režim **`in_operation`** s vlastným telom `write_in_operation!`: neotvára, nekomituje, **neabortuje** a **nemá vlastný
+  `rescue`**. Práve to odhalila mutácia M1 headless sady — pôvodne bol `rescue` na úrovni metódy a chytal aj výnimku z tohto režimu, takže by abortoval **cudziu**
+  operáciu; zachytávací blok pôvodnej vetvy je odvtedy vnorený.
+- **„Dodáva zákazník" je príznak, nie nula.** Uložená cena ostáva (je to referencia, za koľko sa dá kúpiť), ale do medzisúčtu aj do SPOLU ide 0, upozornenie
+  „chýba cena" zhasne a v cenovej ponuke pribudne **informačný riadok 0 €** so štítkom (nulový filter kandidátov by ho inak zahodil) aj štítok v špecifikácii.
+  Do zákazky sa **0 nikdy nezapíše**.
+- **Kontrola** dostala v tej istej kategórii `appliance` tri ORANGE kódy: `appliance_owner_missing` (vlastník zanikol — nález **nemá `owner_id`**, aby klik
+  neoznačil cudziu skrinku, ktorá to ID medzitým dostala), `appliance_specs_missing` a `appliance_class_mismatch` (len keď sú známe **obe** triedy).
+  `Bom.collect` nesie aditívny kľúč `appliances` z rozpočtového dictu a z toho istého prechodu skriniek — žiadny druhý sken; `compute()` ho ignoruje.
+- **Kompatibilita (priznané nahlas):** marker `BUDGET_STD` 2 zapíše **prvá mutácia rozpočtu akéhokoľvek druhu**, nie až úprava spotrebičov — od tej chvíle starší
+  plugin zákazku needituje a **zastaví aj oba cenové exporty**.
+- **Rozpočet UI:** modal „Pridať spotrebič" má pole **Z katalógu** (našepkávač nad katalógom tohto PC, predvypĺňa zo štruktúrovaných dát, nie z textu), select
+  **Vlastník** (server posiela maticu aj zoznamy, klient ich len spája) a prepínač **dodáva zákazník**; modal je **viazaný na dokument**, z ktorého vznikol —
+  prepnutá zákazka ho zavrie a zahodí frontu aj rozpracovaný dotaz. Pohľad „V zákazke", riadok Spotrebič v Inspectore a telo slotu z väzby patria S1-B2.
+- **Testy:** headless +38 (`tests/pure/test_s1b1_vazba.rb`), JS +77 (`tests/js/test_s1b1_rozpocet.js`), in-SU nová sekcia `run_s1b1` (40 kontrol: priradenie/presun/
+  odpojenie/zmazanie ako jeden krok Späť, sirota po Delete a jej náprava, trieda vs slot, „dodáva zákazník", legacy zákazka, **rollback po riadených zlyhaniach**
+  a **bariéra observera**). In-SU beh odhalil aj pascu stubov: `define_method` prebinduje `self`, takže helper `e` runnera v ňom neexistuje.
 - **S1-E — SLOT UMÝVAČKY, PRVÝ TYP SKRINKY BEZ KORPUSU (v0.12.12, 20.9.2026, PR #381).** Pribudol **štvrtý typ objektu** vedľa dolnej, hornej a dosky:
   `type: dishwasher`. Nemá boky, dno, strop, chrbát ani zóny, **vyrába jediný dielec — čelo** (pevný item `blind`, rola `false_front`) a telo umývačky
   kreslí ako **referenciu** (`kind: reference`, `manufactured: false`, `production_class: 'reference'`) z dvoch boxov: telo podľa triedy (598/448) a pod ním

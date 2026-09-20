@@ -152,3 +152,56 @@ pri prechode markera** (vzor `HardwareCatalog.apply_seed_patches!`) — dnes tak
 **Pasce.** Dve varianty niky (stĺp × pod pracovnou doskou) sa **nesmú zliať do jedného rozsahu** — záznam nesie jednu niku a druhú variantu drží
 poznámka (rúry v seede). Kategória sa nemení, preto sa `dims` nikdy nevalidujú proti inej sade polí, než pod akou vznikli. `search` porovnáva bez
 diakritiky aj SK popisok kategórie („umyvacka" nájde `dishwasher`) a radí deterministicky názov → výrobca → `id`.
+
+### appliance_binding.rb
+
+**Jediný transakčný vstup pre spotrebič v zákazke** (S1-B1). Spotrebič má dve strany: **položku rozpočtu**
+(`budget_appliances[]` na modeli) a **vlastníka** (skrinka · slot umývačky · doska), ktorý o väzbe vie —
+nesie ju vo svojom configu v `appliance_refs[]`. Keby sa tie dve strany zapisovali každá vo vlastnej operácii,
+jedno Späť by vrátilo len jednu z nich a zákazka by ostala v stave, ktorý v reálnej kuchyni neexistuje
+(položka tvrdí, že rúra je v CAB-3, a skrinka o nej nevie).
+
+- **Jedna operácia, jedno Späť.** `apply!(model, model_guid:, op:, item_id:, attrs:, catalog_id:, owner:)` má
+  **práve jednu** `start_operation` (SketchUp nemá vnorené operácie — `start_operation` v otvorenej operácii ju
+  ticho ukončí). V nej sa zapíše položka (`BudgetStore.write!` v režime `in_operation: true` — **neotvára,
+  nekomituje ani neabortuje** a výnimku prepúšťa von), odstráni sa záznam u pôvodného vlastníka, pridá sa
+  u nového a obaja sa prestavajú. Výnimka = `abort_operation` **celej** operácie; vracia sa
+  `{ok:, errors:, item:, geometry_changed:}`.
+- **`op` ∈ `create` · `patch` · `rebind_model` · `move` · `unbind` · `remove`.** `ProductionCore.apply_budget_op`
+  sem smeruje **všetky** spotrebičové operácie okna — aj položky „len zákazka".
+  `BudgetStore.add/update/remove_appliance!` sú odvtedy **vnútorné** funkcie volané pod `in_operation: true`
+  (a s `trusted: true`, lebo `catalog_id`, `snapshot` ani `owner` z klienta nikdy nechodia).
+- **Guardy bežia PRED `start_operation`** (odmietnutá mutácia nesmie založiť krok Späť — vzor D-133/D-134):
+  identita dokumentu (`DocKey.foreign?`, rovnaká tolerancia prázdneho klientskeho údaja ako rozpočet) · verzia
+  dát rozpočtu (`BudgetStore.std_block_reason`) · existencia položky a strop `MAX_APPLIANCES` · **matica**
+  kategória → vlastník · **pokoj observera** (`ScaleWatch.flush_pending!` — dedup kópií môže práve meniť
+  identitu skriniek) · **identita cieľa = PID + ID + druh** (recyklované ID bez zhody PID sa odmieta, dva kusy
+  s tým istým ID = „nejednoznačná identita", odpojený dielec aj config z novšej verzie tiež) · **stav pôvodného
+  vlastníka**. `CabinetBuilder.ensure_root_context` beží tesne pred operáciou — `rebuild_in_operation` to (na
+  rozdiel od `rebuild`) nerobí, takže väzba počas vnoreného editovania by inak porušila prestavbu.
+- **Matica `OWNER_MATRIX`** obmedzuje len **fyzických** vlastníkov: `fridge|oven|microwave` → skrinka ·
+  `dishwasher` → slot · `hob|sink` → doska · `hood|other` → nič. **`job` („len zákazka") je legitímny stav
+  každej kategórie** a v matici preto nie je. Platí v ponuke vlastníkov (`owner_options_map` — odpojené
+  skrinky a configy z novšej verzie sa **neponúkajú**) aj na serveri; klientsky payload nie je ochrana.
+- **Tri stavy pôvodného vlastníka:** (a) **platný** (entita existuje + jej refs nesú `item_id`) → prestaví sa ·
+  (b) **nezapisovateľný** (odpojený dielec, novšia verzia) → **celá operácia sa odmietne** · (c) **zaniknutá
+  väzba** (ID už patrí inému kusu bez refs) → tá skrinka sa **nedotkne**, položka len zmení vlastníka.
+  `patch` (cena, názov, príznak) sa väzby nedotýka, a preto ho **nesmie** zastaviť ani zamknutý, ani zaniknutý
+  vlastník — cena siroty sa musí dať opraviť.
+- **`rebind_model` s modelom inej kategórie sa ODMIETA**, nikdy automaticky neodpája („model inej kategórie —
+  najprv odpoj spotrebič").
+- **Kontrakt záznamu `appliance_refs[]`** (číta ho S1-B2 telo slotu, S1-F box chladničky, S1-C očakávania):
+  `{item_id, category, body{width,height,depth}, niche{width_min…depth_max}, bands{door_bottom_offset,
+  door_lower, door_gap, door_upper}, furniture_doors{lower_min,lower_max,gap_ref}, install{dishwasher_class,
+  door_system,hinge_side}, snapshot_at}`. **Chýbajúce pole = kľúč chýba, nikdy 0** — nula je rozmer, „nevieme" nie je.
+- **Zapisovače refs.** Skrinka a slot idú cez `CabinetBuilder.write_appliance_refs!` (config → `normalize` →
+  `rebuild_in_operation`; protiváha `strip_appliance_refs!`), **doska cez `BoardBuilder.write_appliance_refs!`** —
+  zápis samotného configu **bez prestavby** (väzba jej geometriu nemení), ale **s pečiatkou
+  `config_schema: BOARD_CONFIG_SCHEMA`**: doska uložená starším pluginom nesie schému 1 a tá by väzbu pri
+  najbližšej prestavbe ticho zahodila. Prázdny zoznam kľúč **odstráni** (legacy kus nikdy nedostane prázdne pole).
+- **`geometry_changed`** je `true` len vtedy, keď sa naozaj prestavovalo (skrinka/slot). Štúdio vtedy zdvihne
+  generáciu (`push_state(bump: true)`) a pošle čerstvú kartu Inspectora (`Panel.push_selected(dedup: false)`);
+  cenové zmeny ostávajú pri dnešnom `bump: false`.
+- **Ponuka vlastníkov cestuje v payloade rozpočtu** (`appliance_owners` = `matrix` + `options` per druh +
+  `job_label`), nie samostatným kanálom: patrí k dokumentu, ktorý payload priniesol, takže prepnutie zákazky ju
+  vymení samo a modal nikdy neponúka skrinku z inej zákazky.

@@ -2816,6 +2816,33 @@ lišty aj export „Cenová ponuka (zákazník)" — patrí sekcii, ktorá dokum
 `tests/pure/test_st1c_rozpocet.rb`, `tests/js/test_budget_ui.js`, in-SketchUp sekcia `run_st1c` (12 operácií × „jeden krok Späť", gen a guid guardy, odmietnutý zápis nechá draft
 otvorený, dôkaz `bump: false` klikom v Kusovníku so starou generáciou, XLSX guardy bez dialógu, meranie #19).
 
+#### SPOTREBIČ Z KATALÓGU, VLASTNÍK A „DODÁVA ZÁKAZNÍK" (S1-B1, v0.12.13)
+
+Modal **„Pridať spotrebič"** má sedem polí v pevnom poradí — `catalog_id` (**`lookup`**, prvé pole, teda to, ktoré dostane fokus) · `typ` · `nazov` · `dodavatel` · `cena` ·
+`owner` (select) · `customer_supplied` (checkbox). Ten istý `⋯` editor riadku pribral **vlastníka a prepínač** (kód ani poznámku spotrebič nemá).
+
+- **Kategórie ani ponuka vlastníkov nie sú v klientovi.** `budApplTypes(b)` číta `budget.appliance_types` (kanonické kódy + SK popisky zo servera) a `budOwnerOptions(b, cat)`
+  skladá ponuku z `budget.appliance_owners` = `matrix` (kategória → povolené druhy) + `options` per druh + `job_label`. Klient ich **len spája**; keby si maticu vymyslel,
+  ponúkol by umývačku do bežnej skrinky a server by zápis odmietol až po kliknutí. Hodnota položky je `<druh>:<id>`, `budOwnerPayload` z nej robí `{kind, id, pid}` —
+  **PID ide z ponuky**, lebo server overuje identitu cieľa cez všetky tri údaje.
+- **Zmena kategórie prekreslí ponuku vlastníkov** cez `budApplCtxSwitch` — kostra D-15 sadu polí za behu nevymieňa, takže sa modal otvorí znova s tým, čo už je vyplnené
+  (vzor `hwManualCtxSwitch` v Kovaní).
+- **Našepkávač** `sketchup.appl_lookup({q, gen})` → `StudioDialog.handle_appl_lookup` → `ProductionCore.appliance_lookup` (čistá funkcia, top 20) → `NX.applLookupResult`.
+  Je to **čítanie** — žiadna mutácia, žiadny krok Späť. Položka nesie `data` (výrobca, model, kategória) a **`onPick` z nich predvyplní polia** — nikdy sa neparsuje
+  zobrazený text. Staršia generácia odpovede sa zahadzuje.
+- **Klient neposiela snapshot ani kategóriu modelu** — posiela `catalog_id` ako odkaz a server si snapshot aj kategóriu vypýta z katalógu (Astra B14).
+- **Modal patrí DOKUMENTU** (Astra B4): pri otvorení sa zachytí `model_guid` a zápis ide **s ním**, nie s aktuálnym. Príchod payloadu iného dokumentu
+  (`budDocSwitched`) modal **zavrie**, zahodí frontu zápisov aj rozpracovaný dotaz našepkávača — inak by položka sadla do cudzej zákazky. Kontrola beží **pred**
+  uvoľnením fronty, takže čakajúci zápis sa už neodošle ani s novou generáciou.
+- **Zmena vlastníka je vlastná doménová akcia** `appliance_owner` (na serveri jedna operácia väzby), nie `appliance_update` — `budMoreCommit` ju rozlíši podľa toho, či
+  sa hodnota selectu zmenila. Riadok tabuľky kreslí typ ako **text**, keď je zamknutý (model z katalógu alebo fyzický vlastník), a priznáva vlastníka aj štítok
+  „dodáva zákazník".
+- **Generácia okna:** mutácia spotrebiča môže **prestavať skrinku** (zápis `appliance_refs[]` ide cez rebuild). `ProductionCore.do_budget` preto vracia aj
+  `geometry_changed` a Štúdio pri `true` pushne `bump: true` + čerstvú kartu Inspectora (`Panel.push_selected(dedup: false)` — čítacie okno si opravu identity kópií
+  nevyžiada, brána 1b-3). Cenové zmeny ostávajú pri dnešnom `bump: false`.
+
+Testy: `tests/js/test_s1b1_rozpocet.js` (77 kontrol) · `tests/pure/test_s1b1_vazba.rb` · in-SU `run_s1b1`.
+
 ### Sekcia CENOVÁ PONUKA v Štúdiu (ŠT-1c PR B2, Š14–Š15)
 
 do PR B1 to bol zbaliteľný náhľad vnútri Rozpočtu (E-b2), od PR B2 je to **vlastná sekcia `offer`** — zákaznícka **projekcia** toho istého rozpočtu. Kreslí ju **ten istý

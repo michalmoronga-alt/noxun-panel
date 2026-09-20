@@ -676,7 +676,14 @@ kvótová brána `usage` pred každým auditom a subagentom. Pravidlo 3 kôl pla
   **Slot má podporu `none`** — `dw_front_bottom` nikdy netečie do `floor_height`, takže žiadne nohy ani príchyty sokla. **Šírka sa neklampuje na triedu** — úzky slot
   sa postaví a hlási ho Kontrola ORANGE. `Construction.front_opening` je jediná autorita čelného otvoru (plán aj preflight), `CabinetBuilder.envelope` jediná autorita
   obálky (snap, placement, mower). TemplateStore STD 5 = markerový seed „Umývačka 60/45" s markerom schémy. Kontroly: `dw_body_fit` · `dw_height_fit` (ORANGE, bez brány).
-- **S1-B · Spotrebič v zákazke — väzba, vlastník, riadok Spotrebič** *(`BUDGET_STD` 1 → 2 → `codex-audit` ÁNO)* — snapshot (identita + rozmery + odkazy + prílohy), `appliance_refs[]`
+- **S1-B1 ✅ PR #N, v0.12.13 · Spotrebič v zákazke — dáta, väzba, Kontrola** — `BUDGET_STD` 2 (položka += `catalog_id`, `snapshot`, `owner`, `customer_supplied`), **kanonické kódy
+  kategórií** (legacy sa pri čítaní prevedie, zapisuje sa kanón), **„dodáva zákazník" ako príznak** (cena ostáva, do súčtov 0, informačný riadok v CP), **nový modul
+  `core/appliance_binding.rb` = jediný transakčný vstup** (položka + `appliance_refs[]` oboch vlastníkov + prestavba v JEDNEJ operácii; guardy DocKey · std · matica · identita
+  PID+ID+druh · odpojený · novší config · bariéra observera · `ensure_root_context` bežia PRED `start_operation`), `Bom.collect[:appliances]`, Kontrola `appliance_owner_missing`
+  (bez `owner_id`) · `appliance_specs_missing` · `appliance_class_mismatch`, modal Rozpočtu (Z katalógu · vlastník · prepínač) viazaný na dokument.
+- **S1-B2 (čaká) · UI väzby** — pohľad **V zákazke** (mockup R3–R5), **riadok Spotrebič** v Inspectore a v karte dosky (R9–R11), **telo slotu z väzby** (`source: 'catalog'`),
+  výber podľa niky. Podklad má hotový: `collected[:appliances]` nesie stav aj `expected_missing`, `appliance_refs[]` nesú `body`/`niche`/`bands`.
+- *(pôvodné zadanie S1-B, ponechané ako kontrakt)* — snapshot (identita + rozmery + odkazy + prílohy), `appliance_refs[]`
   obojsmerná väzba (položky „len zákazka" = výslovná výnimka), matica kategória → vlastník, pohľad V zákazke, riadok Spotrebič v Inspectore (mockup R3–R5, R9–R11). Kontraktové body zo
   Codex kôl: **jedna kanonická sada kódov kategórií = kódy katalógu + explicitná obojsmerná migrácia legacy kódov rozpočtu** (`chladnicka rura mikrovlnka umyvacka digestor varna_doska ine`
   → `fridge oven microwave dishwasher hood hob other`, + `sink`) v `BUDGET_STD` 2 — existujúce zákazky sa otvoria a editujú ďalej · **„dodáva zákazník" je PRÍZNAK, nie nula:** cena

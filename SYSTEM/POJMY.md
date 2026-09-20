@@ -41,6 +41,15 @@
   kreslí sa len preto, aby bolo vidno, čo do slotu príde. Nikdy sa nedeformuje podľa skrinky: keď je širšia, **trčí** a Kontrola to prizná.
 - **Základňa tela (200)** — spodných 200 mm tela spotrebiča: **fixná**, užšia (20 mm z každej strany) a plytšia (50 mm spredu) než telo.
   Je to zóna nôh a soklu spotrebiča — v modeli vďaka nej vidno, kadiaľ vedie soklová lišta.
+- **Vlastník spotrebiča** (S1-B1) — kus, v ktorom spotrebič **fyzicky stojí**: skrinka · slot umývačky · doska (drez, varná doska) — alebo **„len zákazka"**
+  (`job`), keď v modeli nestojí nikde (digestor, kus na objednávku). Väzba je **obojsmerná**: položka rozpočtu nesie vlastníka a vlastník nesie jej `item_id`,
+  takže vlastník platí **len keď entita existuje A o väzbe vie** (ID skriniek sa recyklujú). Priradenie, presun aj odpojenie je **jedna akcia = jeden krok Späť**.
+  Ktorá kategória kam patrí, hovorí matica: chladnička/rúra/mikrovlnka → skrinka · umývačka → slot · varná doska/drez → doska · digestor/iné → len zákazka.
+- **Dodáva zákazník** (S1-B1) — príznak položky rozpočtu: spotrebič **kupuje zákazník sám**. Cena v riadku **ostáva** (je to referencia, za koľko sa dá kúpiť),
+  ale do medzisúčtu ani do SPOLU **nevstúpi**, upozornenie „chýba cena" na ňom zhasne a v cenovej ponuke je ako **informačný riadok 0 €** so štítkom —
+  zákazník má vidieť, že s kuchyňou počítame, ale v našej cene to nie je.
+- **Snapshot spotrebiča** (S1-B1) — **kópia** katalógového záznamu (rozmery, odkazy, prílohy) odložená **v zákazke** v okamihu priradenia. Zákazka odvtedy na
+  živom katalógu **nezávisí**: neskoršia zmena modelu ani jeho vyradenie s ňou nepohnú. Preto sa nikdy neukladá „odkaz na katalóg" ako jediný zdroj rozmerov.
 - **Výplň hore** — pásmo medzi hornou hranou čela slotu a líniou linky. Plugin ho **negeneruje** — Michal ho rieši **ručne** podľa situácie:
   nízkym korpusom na dorovnanie (od 80 mm, preto S1-E0) alebo doskou. Inspector ho hlási ako výstup („výplň 90 · ručne"), nie ako chybu.
 - **Logická obálka korpusu** — **nominálny** obrys skrinky z configu (`šírka × hĺbka × výška`), nie skutočné bounds v modeli. Prisúvanie, umiestňovanie

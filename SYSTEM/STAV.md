@@ -5,7 +5,8 @@
 
 ## Stav
 
-**v0.12.12 · 20.9.2026 — M-R VZHĽAD KOMPLET, nad ním osem dávok D-94 až D-135 a beží blok SPOTREBIČE S1** (S1-E0 = min výška korpusu 80 mm, PR #375 · **S1-A1 = katalóg spotrebičov so seedom 9 overených modelov** · **S1-A2 = sekcia Štúdia Spotrebiče (pohľad Katalóg)** · **S1-E = SLOT UMÝVAČKY, prvý typ skrinky bez korpusu** · (Nákup s pôvodom · výška dreveného boxu · Kresba čiel · dormantný zámok ·
+**v0.12.13 · 20.9.2026 — M-R VZHĽAD KOMPLET, nad ním osem dávok D-94 až D-135 a beží blok SPOTREBIČE S1** (S1-E0 = min výška korpusu 80 mm, PR #375 · **S1-A1 = katalóg spotrebičov so seedom 9 overených modelov** · **S1-A2 = sekcia Štúdia Spotrebiče (pohľad Katalóg)** · **S1-E = SLOT UMÝVAČKY, prvý typ skrinky bez korpusu** ·
+**S1-B1 = spotrebič v zákazke: väzba na vlastníka + Kontrola** · (Nákup s pôvodom · výška dreveného boxu · Kresba čiel · dormantný zámok ·
 rozsah zákazky pri „Nahradiť UNI" aj pri hromadných zápisoch · **rework kontextu Čelá komplet — nový zoznam čiel + skupina „Spoločné pre skrinku"**).
 Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **trinástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · **Spotrebiče** · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
@@ -14,44 +15,43 @@ Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod 
 Etapa **V0.6 (katalógy a ceny) je obsahovo splnená**. **Od 20.8. sa z pluginu objednávajú REÁLNE zákazky** — zákazka KLINIKA (254 dielcov) je postavená čisto z pluginu; nálezy z výroby a chyby v cenách majú **najvyššiu prioritu** ([PLAN.md](PLAN.md)).
 
 **Hotové veľké celky:** INSPECTOR REWORK (UI-A…UI-D) · **fáza ŠTÚDIO** (ŠT-1a…ŠT-4b, PR #192–#228) — **zaniklo šesť okien** · **blok KRESBA** · **blok GHOST VKLADANIE**
-(v0.9.0) · **blok KOVANIE** (v0.9.14 → v0.10.0, 50 PR #277–#340 — plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md)). **Výstupy zákaziek bez
-zásuvkovej klasifikácie sú obsahovo identické** (golden, CSV bajtovo).
-**Kompatibilita:** konfigurácia skrinky je od S1-E v **schéme 16** (S1-E0 dal 15, S1-E slot + rezervované väzby na spotrebič), **doska v schéme 2**, knižnica šablón v STD 5, výrobný plán v schéme 5; vzhľad používa katalógovú schému 10 až pri prvom uložení. Starší plugin nové konfigurácie neprestaví (zo slotu by vyrobil plný korpus) — pred takou zákazkou aktualizovať **obe PC**.
+(v0.9.0) · **blok KOVANIE** (v0.9.14 → v0.10.0, 50 PR #277–#340 — plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md)).
+**Kompatibilita:** skrinka je v **schéme 16**, **doska v schéme 2**, šablóny v STD 5, výrobný plán v schéme 5 — starší plugin ich neprestaví. **Dáta rozpočtu sú
+od S1-B1 v `BUDGET_STD` 2:** marker zapíše **prvá** mutácia rozpočtu akéhokoľvek druhu a starší plugin odvtedy zákazku needituje **a zastaví oba cenové exporty**.
+Pred takou zákazkou aktualizovať **obe PC**.
 
-**D-130b (najnovšie):** **4155 headless · 120 JS sád · 2779 in-SketchUp PASS / 0 FAIL** (nové sady `test_d130b_spolocne.rb` + `test_d130b_spolocne.js`, nová in-SU sekcia
-`run_d130b`: číslo zo schémy dojde do configu ako `gap_top` a 1 krok Späť ho vráti · odomknutý zámok pustí presah −300 mm a zamknutý ho odmietne · „Predvolené" vrátia 3/2/2/2/2
-jedným krokom Späť · materiál čiel zo skupiny zapíše `front_material_id`). **D-130a:** 4141 · 119 · 2765. **D-134:** 4128 · 118 · 2745. **D-133:** 4111 · 118 · 2717.
-**D-132:** 4095 · 118 · 2705. **D-131:** 4080 · 117 · 2693. **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md); fyzický druhý PC, SU 2024 a render
-netestované). **Michal 11.9. potvrdil** test produktových odkazov aj potvrdzovania cien (CENY-KOV-A/B, #345/#346) **a** kontrolu balíka Čiel v0.11.0 (funguje, bez chýb).
+**S1-B1 (najnovšie):** **4357 headless · 124 JS sád · 2908 in-SketchUp PASS / 0 FAIL** (nové sady `test_s1b1_vazba.rb` + `test_s1b1_rozpocet.js`, nová in-SU sekcia `run_s1b1`).
+**D-130b:** **4155 headless · 120 JS sád · 2779 in-SketchUp PASS / 0 FAIL** (nové sady `test_d130b_spolocne.rb` + `test_d130b_spolocne.js`, nová in-SU sekcia
+`run_d130b`). **D-130a:** 4141 · 119 · 2765. **D-134:** 4128 · 118 · 2745. **D-133:** 4111 · 118 · 2717. **D-132:** 4095 · 118 · 2705. **D-131:** 4080 · 117 · 2693.
+**M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md); fyzický druhý PC, SU 2024 a render netestované). **Michal 11.9. potvrdil** test produktových
+odkazov aj potvrdzovania cien (CENY-KOV-A/B, #345/#346) **a** kontrolu balíka Čiel v0.11.0 (funguje, bez chýb).
 
 ## Robí sa
 
 **REWORK KONTEXTU ČELÁ JE KOMPLET (D-130a PR #371 v0.12.7 + D-130b PR #372 v0.12.8) — čaká na smoke.** Kontext má **dve skupiny**: **Čelá** (riadok = mriežka so stálymi
 stĺpcami, súhrn stavu pod názvom, karta s tabmi Čelo | Kovanie, úchytka na jednom mieste — **D-129 vyriešené**) a **Spoločné pre skrinku** (materiál čiel + **schéma medzier
-a okrajov**: obrys korpusu, päť tých istých polí sedí na hranách, ktorých sa týka; medzera v strede jantárovo). Zámok limitu presahov a „Predvolené" sú **ikony v hlavičke**,
-meta povie stav aj zbalenej skupiny („dub Halifax · 3 · 2/2/0/0"), tooltip `?` vysvetlí znamienka (+ odskok / 0 zarovno / − presah, škára); jantárové prisvietenie medzier
-v náhľade sa viaže na **fokus v poli alebo hover nad schémou**. Dáta, zápis, Undo ani server sa nemenia.
+a okrajov**; zámok limitu presahov a „Predvolené" sú ikony v hlavičke). Dáta, zápis, Undo ani server sa nemenia — plné znenie v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 **Tiež čakajú na smoke: D-134** (#369), **D-133** (#368), **D-132** (#367), **D-131** (#365) a **D-128** (#364). **D-94** (#361) aj **M-R** (#353–#359) sú hotové a Michal
 12.9. potvrdil oba smoke **PASS**; D-28 vyriešené, Čelá A/B1/B2/C používateľsky potvrdené. **Blok 1d** podľa kapacity — hotové po R-14, ďalej R-18; **R-13 čaká na Michala**.
 
 ## Ďalší krok
 
-**Blok SPOTREBIČE S1 beží** (Michal schválil 20.9.2026, nočný autonómny beh): debata polí hotová, cross outside-in audit ×3 (Codex · Grok · Gemini) vyhodnotený, **mockup schválený**
-(`zdroje/ui20/mockup_spotrebice_s1.html`), packages v [PLAN.md](PLAN.md) blok 5. Poradie: **S1-E0** (✅ PR #375) → **A1 katalóg** (✅ v0.12.10) → **A2 sekcia** (✅ v0.12.11) → **E slot umývačky** (✅ v0.12.12) → B väzba →
-F telo chladničky + Kontrola → C šablóna → D uzáver (v0.13.0). Slot umývačky a telo chladničky sú nové vo V1. Po S1: **K1–K3**, **ceny materiálov/ABS**; D-126/D-127, D-48, D-109 po V1.
+**Blok SPOTREBIČE S1 beží** (Michal schválil 20.9.2026, nočný autonómny beh): **mockup schválený** (`zdroje/ui20/mockup_spotrebice_s1.html`), packages v [PLAN.md](PLAN.md) blok 5.
+Poradie: **E0** (✅ #375) → **A1 katalóg** (✅ v0.12.10) → **A2 sekcia** (✅ v0.12.11) → **E slot umývačky** (✅ v0.12.12) → **B1 väzba + Kontrola** (✅ v0.12.13) →
+**B2 UI väzby** (pohľad V zákazke, riadok Spotrebič, telo slotu z väzby) → F telo chladničky → C šablóna → D uzáver (v0.13.0). Po S1: **K1–K3**, **ceny materiálov/ABS**.
 
 ## Posledné uzávery
 
-- **S1-E · Slot umývačky — prvý typ skrinky bez korpusu** (→ **v0.12.12**, 20.9.2026, PR #381). Typ `dishwasher`: žiadny korpus, **jediný výrobný dielec = čelo**
-  (pevný item `blind`), telo umývačky ako **referencia** (`kind: reference`, nikdy v kusovníku) so základňou 200; `CONFIG_SCHEMA` 16 · `BOARD_CONFIG_SCHEMA` 2 ·
-  TemplateStore STD 5 („Umývačka 60/45"). Prisúvanie a otáčanie merajú **logickú obálku** z configu — **zmena správania:** presahujúci potomok cieľa už doraz
-  neskracuje. Kontroly `dw_body_fit` / `dw_height_fit` (ORANGE, bez brány). Plné znenie v [archiv/KRONIKA.md](archiv/KRONIKA.md).
+- **S1-B1 · Spotrebič v zákazke — dáta, väzba, Kontrola** (→ **v0.12.13**, 20.9.2026, PR #N). Položka rozpočtu nesie **model z katalógu** (`snapshot` = kópia
+  rozmerov, zákazka na katalógu nezávisí) a **vlastníka** (skrinka · slot · doska · len zákazka); väzba je **obojsmerná** a zapisuje sa **v jednej operácii**
+  novým modulom `core/appliance_binding.rb` — **jeden Ctrl+Z vráti obe strany**. Prepínač **„dodáva zákazník"**, kanonické kódy kategórií, Kontrola: vlastník
+  neexistuje · model bez rozmerov niky · trieda umývačky vs slot. Plné znenie v [archiv/KRONIKA.md](archiv/KRONIKA.md).
+- **S1-E · Slot umývačky — prvý typ skrinky bez korpusu** (→ **v0.12.12**, #381): jediný dielec = čelo, telo ako **referencia**; prisúvanie meria **logickú obálku**.
 - **REWORK KONTEXTU ČELÁ** — **D-130b** skupina „Spoločné pre skrinku" (materiál čiel + schéma medzier, zámok a reset ako ikony v hlavičke; v0.12.7 → **v0.12.8**, #372)
   a **D-130a** nový zoznam čiel + karta s tabmi + úchytka na jednom mieste (v0.12.6 → **v0.12.7**, #371). **D-129 aj D-130 vyriešené**, bez zmeny kontraktu —
   plné znenia v [archiv/KRONIKA.md](archiv/KRONIKA.md).
-- **D-134 · Jednotný rozsah hromadných zápisov zákazky** (→ **v0.12.6**, 13.9.2026, PR #369). Pravidlá kovania, projektová predvoľba materiálu a „aj na podobné v projekte"
-  stoja na spoločnom `Panel.job_cabinets` nad `Ids.top_level_scan`. Skrinka s odpojeným dielcom sa **preskočí a vymenuje**, projektový zápis prebehne.
-- **D-133** „Nahradiť UNI…" má rozsah výstupov a blokuje pri odpojenom dielci (→ **v0.12.5**, #368) · **D-132** dormantný zámok osi zásuvky je viditeľný a dá sa zrušiť
+- **D-134** jednotný rozsah hromadných zápisov zákazky — spoločný `Panel.job_cabinets`, skrinka s odpojeným dielcom sa **preskočí a vymenuje** (→ **v0.12.6**, #369) ·
+  **D-133** „Nahradiť UNI…" má rozsah výstupov a blokuje pri odpojenom dielci (→ **v0.12.5**, #368) · **D-132** dormantný zámok osi zásuvky je viditeľný a dá sa zrušiť
   (→ **v0.12.4**, #367) · **D-131** Kresba čiel jedným klikom (→ **v0.12.3**, #365) · **D-128** ručná výška dreveného boxu (→ **v0.12.2**, #364, `CONFIG_SCHEMA` 13 → 14) · **D-94** Nákup s pôvodom (→ **v0.12.1**, #361) — plné znenia v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 - **BLOK M-R VZHĽAD UZAVRETÝ** (v0.11.1 → **v0.12.0**, 11.–12.9.2026, PR #353–#359). Spoločná knižnica dosiek/ABS, natívny editor, fyzické UV, zachovanie pri prestavbe/kópii a ovládanie v Štúdiu. D-28 vyriešené; [plný blok](archiv/ROADMAP_hotove_etapy.md).
 - **BLOK KOVANIE UZAVRETÝ** (v0.9.14 → **v0.10.0**, 2.–10.9.2026; 50 PR #277–#340). Klasifikované sety a katalóg s editorom · **zásuvka z nemenného receptu** (Atira,
