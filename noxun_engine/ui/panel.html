@@ -327,6 +327,12 @@
           <b class="legstxt" id="legsTxt">—</b>
           <span class="legssel" id="legsSel"></span>
         </div>
+        <!-- S1-B2: SPOTREBIČ. Jeden riadok cez oba stĺpce PER VIAZANÝ MODEL
+             (rúra + mikrovlnka v jednej skrinke) plus riadok „očakáva", keď
+             ešte niečo chýba. Kreslí ho SERVER (`appliance_rows`), panel si
+             nič nedopočítava. Skrytý vždy, keď skrinka spotrebič nemá a ani
+             ho neočakáva (vertikálny priestor je vzácny). -->
+        <div class="aprows" id="applRows" hidden></div>
       </div>
     </fieldset>
   </div>
@@ -818,6 +824,10 @@
         <button class="absall" onclick="onBoardEdgesAll()" title="Olepiť všetky 4 hrany páskou k materiálu"><i></i></button>
       </div>
       <div id="boardEdgeRows"></div>
+      <!-- S1-B2: SPOTREBIČ na doske (varná doska, drez) — ten istý komponent
+           ako v Základných skrinky. Doska nemá niku, takže sa ponuka
+           nefiltruje a väzba jej geometriu nemení. -->
+      <div class="aprows" id="boardApplRows" hidden></div>
       <details data-key="board_adv">
         <summary>Pokročilé</summary>
         <div class="body">
@@ -1030,5 +1040,9 @@
 <script src="js/part_card.js?v=0.12.13"></script>
 <script src="js/board_card.js?v=0.12.13"></script>
 <script src="js/hardware.js?v=0.12.13"></script>
+<!-- S1-B2: riadok „Spotrebič" v Základných aj v karte dosky. Vlastný súbor
+     (nie hardware.js) zámerne: s kovaním nemá nič spoločné a payload mu
+     chodí vlastným kľúčom (`appliance_rows`). -->
+<script src="js/appliance_row.js?v=0.12.13"></script>
 <script src="js/usage.js?v=0.12.13"></script>
 <script src="js/boot.js?v=0.12.13"></script>

@@ -2831,7 +2831,8 @@ module Noxun
       #   gen        — zapis zo stareho DOM (medzitym prepocitane okno),
       #   model_guid — medzitym prepnuty dokument (zapis by sadol do cudzej zakazky).
       # Po KAZDOM zapise ide cerstvy payload — klient si sumy NIKDY neprepocitava.
-      def do_budget(model, data, generation:, status:, repush:, result: nil, geometry: nil)
+      def do_budget(model, data, generation:, status:, repush:, result: nil, geometry: nil,
+                    card: nil)
         unless data['gen'].to_i == generation.to_i
           repush.call
           return status.call('Rozpočet sa medzitým prepočítal — obnovené, skús znova.', true)
@@ -2852,6 +2853,12 @@ module Noxun
         # zmena MODELU: generacia okna sa zdvihne a Inspector dostane cerstvu
         # kartu. Cenove zmeny ostavaju pri dnesnom `bump: false`.
         geometry.call if geometry && geometry_changed
+        # S1-B2: vazba na DOSKU (a zmena ceny ci priznaku nad viazanou
+        # polozkou) geometriu NEMENI — ale riadok „Spotrebič" v Inspectore
+        # hovori o inom. Karta preto pride cerstva aj tu, BEZ zdvihu generacie:
+        # ziadne cislo zakazky sa nezmenilo, takze rozkliknuty riadok Kusovnika
+        # ani rozrobeny export nesmu zastarat.
+        card.call if card && ok && !geometry_changed && appliance_op?(data)
         repush.call
         return status.call("Nezapísané: #{Array(errors).join(' · ')}", true) unless ok
 
@@ -2891,6 +2898,13 @@ module Noxun
         when 'cp_group'         then BudgetStore.set_cp_group!(model, data['source_key'], data['group'])
         else [false, ['neznáma operácia rozpočtu']]
         end
+      end
+
+      # S1-B2: tyka sa mutacia SPOTREBICA? (Riadok Inspectora sa potom obnovi
+      # aj bez zmeny geometrie.) Mena op-ov su kontrakt klienta — jedno miesto,
+      # kde sa cita prefix.
+      def appliance_op?(data)
+        data.is_a?(Hash) && data['op'].to_s.start_with?('appliance_')
       end
 
       # Klient posiela DOMENOVU akciu (pridat / upravit / zmazat / zmenit

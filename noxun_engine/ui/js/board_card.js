@@ -256,6 +256,13 @@
     var ms = el('bc_material');
     if (ms){ fillBoardMaterialSelect(ms, bc.material_id || '', true); }
     renderBoardEdgeRows(bc);
+    // S1-B2: riadok „Spotrebič" karty dosky (varná doska, drez) — TEN ISTÝ
+    // komponent ako v Základných skrinky, len s iným kontextom vlastníka.
+    // Prázdny zoznam riadok schová: doska bez väzby o spotrebiči nehovorí.
+    if (typeof renderApplianceRows === 'function'){
+      renderApplianceRows(bc.appliance_rows || [], { kind: 'board', id: bc.board_id || '' },
+                          'boardApplRows');
+    }
     renderBoardSvg(bc);
     // ŠT-2d: TA ISTA cesta ako pri dielci (`nxDecorLinkState` zije v part_card.js
     // — jedna funkcia, dva vstupne body). Doska ma vzdy konkretny material,

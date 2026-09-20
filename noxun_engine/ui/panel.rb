@@ -161,6 +161,10 @@ module Noxun
           # V0.4 kovanie: rucny pocet / vypnutie / reset polozky + editor pravidiel
           cb(dlg, 'set_hardware_override') { |p| handle_set_hardware_override(p) }
           cb(dlg, 'set_hardware_set')      { |p| handle_set_hardware_set(p) } # V0.6 D1b: set na skrinke
+          # S1-B2: riadok „Spotrebič" v Základných aj v karte dosky. Zápis robi
+          # `ApplianceBinding` (jedna operacia = polozka + refs + prestavba),
+          # panel dodava LEN to, ktora entita je oznacena.
+          cb(dlg, 'set_appliance_owner')   { |p| handle_set_appliance_owner(p) }
           # KOV-H2: hladanie v katalogu kovania pre modal rucnej polozky.
           # CISTE CITANIE — ziadna operacia, ziadny zapis, ziadny krok Spat;
           # odpoved chodi kanalom `NX.hwManualSearchResult` s generaciou dotazu.
@@ -346,6 +350,7 @@ Sketchup.require 'noxun_engine/ui/panel/actions_materials'
 Sketchup.require 'noxun_engine/ui/panel/actions_parts'
 Sketchup.require 'noxun_engine/ui/panel/actions_hardware'
 Sketchup.require 'noxun_engine/ui/panel/actions_board' # V0.4.7c samostatna doska
+Sketchup.require 'noxun_engine/ui/panel/actions_appliance' # S1-B2 riadok „Spotrebic"
 Sketchup.require 'noxun_engine/ui/panel/actions_usage' # D-25 merac pouzivania panela
 Sketchup.require 'noxun_engine/ui/panel/actions_settings' # UI-B3 koliesko: tema UI + rozmerove rady
 Sketchup.require 'noxun_engine/ui/panel/sync'

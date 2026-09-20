@@ -1706,6 +1706,38 @@
   .nx-inspector .legsrow .legssel { flex: 0 1 auto; min-width: 0; }
   .nx-inspector .legsrow .legssel:empty { display: none; }
   .nx-inspector .legsrow .hwsetsel { max-width: 150px; font-size: 11px; }
+  /* S1-B2 (mockup R9): RIADOK SPOTREBICA. Ta ista logika ako riadok noh —
+     cez OBA stlpce mriezky, bez nadpisu — ale DVOJRIADKOVY: hore popisok
+     a ovladac (ponuka modelov alebo „odpojit"), dole veta servera. Ten isty
+     komponent kresli aj karta dosky, preto ma vlastny kontajner a nie je
+     viazany na mriezku Zakladnych. */
+  .nx-inspector .aprows { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 4px;
+             margin-top: 4px; padding: 3px 0 0; border-top: 1px solid var(--nx-border-soft);
+             min-width: 0; }
+  .nx-inspector .aprows[hidden] { display: none; }
+  .nx-inspector .aprow { display: grid; grid-template-columns: auto auto 1fr; align-items: center;
+             column-gap: 6px; row-gap: 2px; font-size: 10.8px; color: var(--nx-ink-soft);
+             min-width: 0; }
+  .nx-inspector .aprow > .ic { flex: 0 0 auto; width: 12px; height: 12px; color: var(--nx-ink-faint); }
+  .nx-inspector .aprow.ok > .ic { color: var(--nx-ok-fg); }
+  .nx-inspector .aprow.warn > .ic { color: var(--nx-warnchip-fg); }
+  .nx-inspector .aprow .aplbl { flex: 0 0 auto; white-space: nowrap; }
+  .nx-inspector .aprow .apsel { display: flex; align-items: center; gap: 3px; min-width: 0;
+             justify-self: end; }
+  .nx-inspector .aprow .aprsel { max-width: 190px; font-size: 11px; min-width: 0; }
+  .nx-inspector .aprow .ibtn { display: inline-flex; align-items: center; justify-content: center;
+             width: 20px; height: 18px; padding: 0; border: 1px solid transparent; border-radius: 5px;
+             background: none; color: var(--nx-ink-muted); cursor: pointer; }
+  .nx-inspector .aprow .ibtn:hover { background: var(--nx-select-bg-soft); color: var(--nx-select);
+             border-color: var(--nx-border); }
+  .nx-inspector .aprow .ibtn .ic { width: 12px; height: 12px; }
+  /* Text je VYSTUP servera — orezava sa, cely ostava v tooltipe okna. */
+  .nx-inspector .aprow .aptxt { grid-column: 2 / -1; grid-row: 2; min-width: 0; overflow: hidden;
+             text-overflow: ellipsis; white-space: nowrap;
+             color: var(--nx-ink-strong); font-weight: 600; font-size: 11.2px; }
+  .nx-inspector .aprow.warn .aptxt { color: var(--nx-warnchip-fg); }
+  .nx-inspector .aprow .apsub { display: block; font-weight: 400; font-size: 10.5px;
+             color: var(--nx-ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* Typ korpusu v hlavicke — READONLY badge (typ urcuje sablona/vkladanie). */
   .nx-inspector .idbar .typbadge { flex: 0 0 auto; font-size: 10px; font-weight: 700; letter-spacing: .04em;
             text-transform: uppercase; padding: 1px 7px; border-radius: 9px;

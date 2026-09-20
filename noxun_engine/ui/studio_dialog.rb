@@ -420,7 +420,8 @@ module Noxun
                                                                 status: status_proc,
                                                                 repush: budget_repush_proc,
                                                                 result: budget_result_proc,
-                                                                geometry: budget_geometry_proc)
+                                                                geometry: budget_geometry_proc,
+                                                                card: budget_card_proc)
         end
 
         # XLSX rozpoctu — flush handshake (rozpisany edit panela meni kusovnik,
@@ -1218,6 +1219,19 @@ module Noxun
               defined?(Panel) && Panel.dialog_alive?
           rescue StandardError => e
             Engine.log_error(e, 'StudioDialog.budget_geometry')
+          end
+        end
+
+        # S1-B2: mutacia spotrebica, ktora geometriu NEMENI (vazba na dosku,
+        # cena, priznak) — Inspector aj tak drzi riadok „Spotrebič", takze
+        # dostane CERSTVU kartu. Generacia sa NEDVIHA: ziadne cislo zakazky sa
+        # nezmenilo (rozdiel oproti `budget_geometry_proc`).
+        def budget_card_proc
+          lambda do
+            Panel.push_selected(Sketchup.active_model, dedup: false) if
+              defined?(Panel) && Panel.dialog_alive?
+          rescue StandardError => e
+            Engine.log_error(e, 'StudioDialog.budget_card')
           end
         end
 

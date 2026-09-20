@@ -562,6 +562,11 @@
       // si z položiek nič neodvodzuje. Kľúč chýba pri staršom payloade aj vtedy,
       // keď nie je označená skrinka — vtedy sa riadku nedotýkame (patrí náhľadu
       // vkladania). AŽ ZA `refreshHardwareSets` — berie si z neho ponuku setov.
+      // S1-B2: riadok SPOTREBIČA sa týmto ľahkým pushom NEOBNOVUJE — a je to
+      // zámer. Väzba mení aj ostatné výstupy karty (telo slotu, trieda, náhľad),
+      // takže po zápise z Rozpočtu alebo z pohľadu „V zákazke" posiela server
+      // CELÚ čerstvú kartu (`Panel.push_selected`, vetva `loadSelected` nižšie).
+      // Druhý, čiastočný kanál by karte dovolil rozísť sa so sebou samou.
       if (d.legs_summary !== undefined && typeof renderLegsRow === 'function'){
         renderLegsRow(d.legs_summary, d.cabinet_id || '');
       // KOV-G2 (Codex #339 kolo 2 N1): BEZ označenej skrinky riadok patrí
@@ -735,6 +740,13 @@
       // Vkladaci nahlad sa pritom zrusi: teraz hovori payload skrinky.
       if (typeof nxLegsInsertReset === 'function') nxLegsInsertReset();
       if (typeof renderLegsRow === 'function') renderLegsRow(c.legs_summary || null, c.cabinet_id || '');
+      // S1-B2: riadok SPOTREBIČA (`appliance_rows`). Kreslí sa z payloadu
+      // skrinky — chýbajúci kľúč (staršie okno) znamená prázdny zoznam, teda
+      // skrytý riadok, nikdy zvyšok po predchádzajúcej skrinke.
+      if (typeof renderApplianceRows === 'function'){
+        renderApplianceRows(c.appliance_rows || [], { kind: 'cabinet', id: c.cabinet_id || '' },
+                            'applRows');
+      }
       nxFrontDraftAsk();
       renderPreview();
       refreshZoneUI();
