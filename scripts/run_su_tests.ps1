@@ -1,7 +1,8 @@
 # Noxun Engine - spustenie in-SketchUp test runnera (tests/sketchup/su_runner.rb).
 # Overena slucka: INSTALL deploy -> samostatna instancia SketchUp s -RubyStartup
 # nad KOPIOU _dev/ENGINEtests.skp -> poll na koncovy marker -> vypis vysledku.
-# Testovacie okno SketchUpu NEZATVARAME (pravidlo repa) - zavrie ho pouzivatel.
+# Testovacie okno SketchUpu predvolene NEZATVARAME (pravidlo repa) - zavrie ho
+# pouzivatel; volitelny prepinac -CloseWhenDone (nizsie) to meni.
 #
 # Paralelne behy (nalez 30.8.2026): kazdy beh ma VLASTNY run_* priecinok
 # (vysledok, boot.rb, kopia modelu, AppData sandbox), aby si dva behy
@@ -9,6 +10,32 @@
 # a deploy sa izolovat neda — druhy sucasny beh by prepisal nasadeny plugin
 # (prvy by potom testoval cudzi kod). Preto CELY beh drzi vyhradny deploy.lock
 # a druhy beh sa odmietne s jasnou hlaskou (exit 2) namiesto tichej kolizie.
+#
+# -CloseWhenDone (nalez 20.9.2026): pri autonomnych davkach bezi runner 5-10x
+# za den a kazda idle instancia drzi ~1,5 GB - 12 otvorenych instancii nechalo
+# 5 GB z 32 a novy beh uviazol (Welcome obrazovka, ziadny su_result.txt).
+# S prepinacom si instancia po zapisani koncoveho markera SAMA (v boot.rb,
+# teda vnutri SketchUpu) zbavi priznaku zmien - ulozi run-KOPIU modelu na jej
+# vlastnu cestu (povodny _dev model sa nikdy nedotkne; zaloha pri zlyhani =
+# `Model#close(true)`, na Windows podla API dokumentacie File/New bez otazky)
+# - a ukonci sa cez `Sketchup.quit` (pyta sa LEN pri neulozenych zmenach;
+# `send_action` je deprecated a nepouziva sa). Marker je BRANA: bez neho sa
+# instancia nezatvara (visiaci beh ostava na diagnostiku) a skript proces
+# NIKDY nezabija - po markeri len pocka na jeho zanik (max 120 s) a ak
+# neskonci, nahlasi to. Predvolene VYPNUTY, aby sa nezmenilo dnesne
+# spravanie (idle okno ostane otvorene).
+#
+# ZNAMY STAV (3 plne behy 20.9.2026, vzdy 2813 PASS / 0 FAIL): po CELEJ
+# testovacej sade konci teardown SketchUpu 2026 pri quit padom 0xC0000374
+# (heap corruption v ntdll) - az PO zapisani vysledku a ulozeni kopie; proces
+# zanikne do par sekund, neostane ziadny helper proces, dialog ani recovery
+# subor, Windows si to len ticho zapise do WER. Sondy s malym modelom (aj
+# s otvorenym Inspectorom/Studiom, overlaymi add+remove, nastrojmi a s
+# upratanim pluginu pred quit) koncia s kodom 0 - pricina je v stave po celej
+# relacii a izolovat sa nepodarila (File/New vs. save, okna, overlay ani
+# nastroje to nie su). Skript exit kod instancie vypise (aj hex), ale verdikt
+# testov sa nim NEMENI - ten je hotovy skor.
+param([switch]$CloseWhenDone)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
 $su = 'C:\Program Files\SketchUp\SketchUp 2026\SketchUp\SketchUp.exe'
@@ -142,15 +169,145 @@ try {
   $outRb = ConvertTo-RubySq $out
   $appdataRb = ConvertTo-RubySq $appdata
   $boot = Join-Path $work 'boot.rb'
-  $lines = @(
-    "ENV['APPDATA'] = '$appdataRb'",
-    "ENV['NOXUN_SU_OUT'] = '$outRb'",
-    "load '$runner'"
-  )
-  [System.IO.File]::WriteAllLines($boot, [string[]]$lines, (New-Object System.Text.UTF8Encoding($false)))
+  $closeLog = Join-Path $work 'close.log'
+  # boot.rb sa sklada zo SINGLE-QUOTED here-stringov (PowerShell v nich nic
+  # neinterpoluje, takze Ruby `#{}` ani `$` nic nerozbije) a cesty sa dosadia
+  # cez Replace (hodnoty su uz escapovane pre Ruby literal). Zatvaracie `'@`
+  # MUSI byt na zaciatku riadku - preto su tie bloky bez odsadenia.
+  $bootHead = @'
+ENV['APPDATA'] = '__NOXUN_APPDATA__'
+ENV['NOXUN_SU_OUT'] = '__NOXUN_OUT__'
+'@
+  # -CloseWhenDone: samozatvorenie bezi VNUTRI SketchUpu (Ruby timer), nie zo
+  # skriptu - skript by musel proces zabit a to je zakazane. Timer sa instaluje
+  # PRED `load` runnera, aby marker zachytil aj ked runner zlyha uz pri nacitani.
+  $closeBlock = @'
+# -CloseWhenDone (run_su_tests.ps1): po koncovom markeri v su_result.txt sa
+# instancia SAMA zbavi priznaku zmien (ulozi run-kopiu modelu; zaloha = File/New)
+# a ukonci SketchUp. Bez markera sa nikdy nezatvara (visiaci beh ostava na
+# diagnostiku); proces nikto nezabija.
+module NoxunSuClose
+  OUT = '__NOXUN_OUT__'
+  LOG = '__NOXUN_CLOSE_LOG__'
+  MARKER = '=== KONIEC SUBORU ==='
+  POLL_S = 2.0  # perioda kontroly markera
+  GRACE_S = 3.0 # po markeri: nechat dobehnut debounce timery observerov (0,2 s) + rezerva
+
+  class << self
+    def log(msg)
+      File.open(LOG, 'a') { |f| f.puts("#{Time.now.strftime('%H:%M:%S')} #{msg}") }
+    rescue StandardError
+      nil
+    end
+
+    # binread: vysledok nesie lubovolne bajty z hlasok testov - include?
+    # nad ASCII markerom tak nikdy nespadne na kodovani.
+    def marker_written?
+      File.exist?(OUT) && File.binread(OUT).include?(MARKER)
+    rescue StandardError
+      false
+    end
+
+    def start
+      log("cakam na marker: #{OUT}")
+      @timer = UI.start_timer(POLL_S, true) do
+        begin
+          if marker_written?
+            UI.stop_timer(@timer)
+            log("marker zapisany -> zatvaram o #{GRACE_S} s")
+            UI.start_timer(GRACE_S, false) { close_and_quit }
+          end
+        rescue StandardError => ex
+          log("tick: #{ex.class}: #{ex.message}")
+        end
+      end
+    end
+
+    # Krok 1: zbavit sa priznaku zmien, aby sa Sketchup.quit nepytal "ulozit?".
+    # Primarne ULOZENIM run-kopie modelu na jej vlastnu cestu: kopia zije len
+    # v run_* priecinku (povodny _dev model sa nikdy nedotkne), nevymiena sa
+    # dokument (ziadne onNewModel eventy pluginu) a ulozeny stav ostava na
+    # diagnostiku. Model#close(true) (= na Windows File/New bez otazky) je
+    # ZALOHA, ked ulozenie neprejde. Krok 2 az v DALSOM ticku timera, aby
+    # ulozenie/File/New dobehlo.
+    def close_and_quit
+      model = Sketchup.active_model
+      log("pred close: modified=#{model ? model.modified? : 'nil'} path=#{model ? model.path.inspect : 'nil'}")
+      saved = false
+      if model && !model.path.to_s.empty?
+        begin
+          saved = model.save ? true : false
+        rescue StandardError => ex
+          log("save kopie: #{ex.class}: #{ex.message}")
+        end
+      end
+      log("save run-kopie -> #{saved}")
+      unless saved
+        model.close(true) if model
+        log('zaloha: close(true) = File/New')
+      end
+      UI.start_timer(1.0, false) { quit_now }
+    rescue StandardError => ex
+      log("close: #{ex.class}: #{ex.message}")
+    end
+
+    # Poistka: keby bol dokument pred quit stale "spinavy" (save zlyhal a po
+    # File/New by plugin nieco zapisal v onNewModel), Sketchup.quit by cakal na
+    # klik v dialogu "ulozit zmeny?". Ulozenie dokumentu ako stub do run
+    # priecinka (nikdy nie povodny model) priznak zmien zmaze. Sonda 20.9.2026
+    # nad umyselne zaspinenym dokumentom: stub ulozeny, exit 0.
+    def quit_now
+      model = Sketchup.active_model
+      dirty = model ? model.modified? : false
+      log("po close: modified=#{dirty} path=#{model ? model.path.inspect : 'nil'}")
+      if dirty
+        begin
+          stub = File.join(File.dirname(OUT), 'closing_stub.skp')
+          log("stub save #{model.save(stub) ? 'OK' : 'ZLYHAL'}: #{stub}")
+        rescue StandardError => ex
+          log("stub save: #{ex.class}: #{ex.message}")
+        end
+      end
+      log('Sketchup.quit')
+      Sketchup.quit
+    rescue StandardError => ex
+      log("quit: #{ex.class}: #{ex.message}")
+    end
+  end
+end
+NoxunSuClose.start
+'@
+  # `load` v begin/rescue: SyntaxError/LoadError (ScriptError) NIE su
+  # StandardError - rescue v su_runner.rb by ich nechytil a beh by skoncil
+  # 8-min timeoutom bez markera (s -CloseWhenDone navyse visiacou instanciou).
+  # FAIL riadok + marker = rychly a citatelny vysledok; bez prepinaca ostane
+  # okno otvorene ako doteraz.
+  $bootLoad = @'
+begin
+  load '__NOXUN_RUNNER__'
+rescue ScriptError, StandardError => ex
+  begin
+    File.open('__NOXUN_OUT__', 'a') do |f|
+      f.puts("FAIL: boot: load su_runner.rb zlyhal: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+      f.puts('=== KONIEC SUBORU ===')
+    end
+  rescue StandardError
+    nil
+  end
+end
+'@
+  $bootText = $bootHead + "`n"
+  if ($CloseWhenDone) { $bootText += $closeBlock + "`n" }
+  $bootText += $bootLoad + "`n"
+  $bootText = $bootText.Replace('__NOXUN_APPDATA__', $appdataRb).Replace('__NOXUN_OUT__', $outRb)
+  $bootText = $bootText.Replace('__NOXUN_RUNNER__', $runner).Replace('__NOXUN_CLOSE_LOG__', (ConvertTo-RubySq $closeLog))
+  $bootText = $bootText -replace "`r`n", "`n"
+  [System.IO.File]::WriteAllText($boot, $bootText, (New-Object System.Text.UTF8Encoding($false)))
 
   Write-Host "Spustam SketchUp (model: $(Split-Path $modelCopy -Leaf), work: $work)..."
   $suProc = Start-Process -FilePath $su -ArgumentList '-RubyStartup', "`"$boot`"", "`"$modelCopy`"" -PassThru
+  # .NET pasca: bez skoreho dotyku Handle je ExitCode po zaniku procesu null.
+  $null = $suProc.Handle
   # Sentinel sa zapisuje hned po starte (pod zamkom) — pri kille skriptu ostane
   # a ochrani beziacu instanciu pred deployom dalsieho behu (vid vyssie).
   [System.IO.File]::WriteAllLines($sentinel,
@@ -181,12 +338,33 @@ try {
     elseif ($skipped -gt 0) { Write-Host 'VYSLEDOK: SKIP (testy nebezali) — povazovane za zlyhanie' }
     elseif ($passed -eq 0) { Write-Host 'VYSLEDOK: ziadny PASS — povazovane za zlyhanie' }
     else { Write-Host "VYSLEDOK: OK ($passed PASS)"; $exitCode = 0 }
+    if ($CloseWhenDone) {
+      # Marker je zapisany -> boot.rb instanciu zatvara SAM (save kopie + quit).
+      # Skript LEN caka; kill je zakazany (viz hlavicka). Zamok drzime aj pocas
+      # cakania - dalsi beh nesmie deployovat pod instanciu, ktora este zije.
+      $closeWaitS = 120
+      Write-Host ('Cakam na samozatvorenie instancie SketchUpu (PID ' + $suProc.Id + ', max ' + $closeWaitS + ' s)...')
+      if ($suProc.WaitForExit($closeWaitS * 1000)) {
+        $suExit = $suProc.ExitCode
+        if ($suExit -eq 0) {
+          Write-Host ('Instancia SketchUpu (PID ' + $suProc.Id + ') skoncila cisto (exit kod 0).')
+        } else {
+          # Pad v teardowne SketchUpu AZ PO zapisani vysledku (viz hlavicka) - verdikt testov je uz hotovy.
+          Write-Host ('Instancia SketchUpu (PID ' + $suProc.Id + ') skoncila s exit kodom ' + $suExit + ' (0x' + ('{0:X8}' -f $suExit) + ') - pad v teardowne PO zapisani vysledku, verdikt testov to nemeni.')
+        }
+      } else {
+        Write-Host ('POZOR: instancia SketchUpu (PID ' + $suProc.Id + ') sa do ' + $closeWaitS + ' s NEZAVRELA sama - skript ju NEZABIJA, zavri ju rucne.')
+      }
+      if (Test-Path $closeLog) { Get-Content $closeLog -Encoding UTF8 | ForEach-Object { Write-Host ('  close.log: ' + $_) } }
+      else { Write-Host ('  close.log chyba (' + $closeLog + ') - boot.rb sa k zatvaraniu nedostal.') }
+    }
   } else {
     Write-Host 'TIMEOUT po 8 min.'
     if (Test-Path $out) { Get-Content $out | Write-Host }
     # Zamok drzi tento skript, nie SketchUp — jeho ukoncenim sa uvolni. Kym
     # instancia zije bez koncoveho markera, dalsi beh odmietne SENTINEL.
     Write-Host 'POZOR: instancia SketchUpu pravdepodobne STALE BEZI - dalsi beh sa sam odmietne, kym nedobehne alebo ju nezavries.'
+    if ($CloseWhenDone) { Write-Host '  -CloseWhenDone: instancia sa zavrie sama, AK sa koncovy marker este objavi; bez markera ostava otvorena na diagnostiku.' }
   }
 } finally {
   # Zamok sa uvolnuje az PO vyhodnoteni — SketchUp nacitava plugin pocas celeho
