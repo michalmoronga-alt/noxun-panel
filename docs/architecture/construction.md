@@ -363,6 +363,17 @@ false — zdroj pravdy súpisu je VÝHRADNE `config.hardware[]` korpusu). Profil
 neschová** — patrí k čelu, nie k nohám (tie na `hardware_tag` ostávajú). Dáta proxy sa tým NEMENIA (súpis, nákup ani dĺžka rezu sa tagu nedotýkajú) a staré zákazky sa preznačia pri
 najbližšej prestavbe — proxy vzniká pri každom rebuilde nanovo, takže žiadna migrácia netreba. Stráži in-SU sekcia `run_d116`.
 
+**ROZMEROVÉ HRANICE (`MIN`, S1-E0, v0.12.9).** `normalize` klampuje obálku korpusu na `MIN` = šírka **200**, výška **80**, hĺbka **150** (horné hranice 3000/3000/2000).
+Výška ide od 80 mm od S1-E0 (Michal 20.9.2026): nad umývačkou ostáva po líniu linky často len 80–110 mm a vypĺňa sa **nízkym korpusom na dorovnanie**. Šírka ani hĺbka sa
+neodomkli — užší či plytší korpus nemá konštrukčný zmysel. `CONFIG_SCHEMA` sa **nebumpuje**: mení sa prípustný rozsah hodnoty, nie tvar configu. Vedomý dôsledok: model
+uložený s výškou pod 200 si ju **starší plugin pri prestavbe klampne späť na 200** — je to strata rozmeru, nie dát, a bump schémy by zbytočne odmietol celú zákazku.
+**Tú istú hodnotu držia TRI miesta:** `MIN` tu, `ScaleWatch::MIN` (absorpcia scale) a `LIMITS` v `ui/js/form.js` (červené pole panela). Priama referencia možná nie je
+(`scale_observer` sa načítava PRED `cabinet_builder`, JS Ruby konštantu nevidí), takže zhodu — rovnako ako pri `DRAWER_ROLES` — stráži guard `tests/pure/test_s1e0_min_vyska.rb`.
+Geometriu nízkeho korpusu ďalej chráni **`Construction.validate!` ako posledná brána** (sokel ≥ výška, svetlé vnútro ≤ 10 mm, rezerva `MIN_INTERIOR_H` pod dvoma výstuhami);
+panel tie isté dve pravidlá zrkadlí v `cabinetHeightError` (`form.js`, počíta ich zdieľaným `nxInteriorZ`), takže používateľ dostane červenú dvojicu výška + podstavec
+ešte pred apply, nie výnimku po ňom. Plán nízkej skrinky nesmie mať degenerovaný dielec (`part_skipped_degenerate`) — meria to headless sada cez 16 kombinácií
+dno × vrch × chrbát a in-SU sekcia **`run_s1e0`** (stavba, kusovník, klamp 60 → 80 cestou Inspectora, absorpcia scale a jedno Späť).
+
 **PRERUŠENIE STAVBY** (`abort_safely`): výnimka kdekoľvek vnútri `build`/`rebuild` ruší CELÚ operáciu a **neprehĺta sa** — volajúci sa o nej dozvie. Rollback vracia geometriu
 (inštanciu aj definície dielcov) **a zároveň modelové atribúty**, teda aj projektové snapshoty kovania, ktoré `build_into` cestou `HardwareRules.ensure_project_rules!` /
 `HardwareSets.ensure_project_state!` stihol zapísať — preto sa smú volať len vnútri operácie volajúceho. Zafixované scenárom `CH4` (`run_char`; sonda necháva `build_into` dobehnúť
@@ -921,6 +932,12 @@ Súbor, v ktorom žijú triedy prekrytí (`Sketchup::Overlay`) — celý je pod 
 (ScaleWatch) — absorpcia scale pre kind {cabinet, board}: doska mapuje lokálne osi X→length/Y→width, Z sa zahadzuje (hrúbku riadi materiál); shear guard; scale maska
 `scaletool`=120 aj na definícii = čisté osi. Mapovanie je **lokálne**, takže platí aj pre otočenú dosku (UI-C1c) — používateľov scale v globálnom Z stojacej dosky skončí v jej
 ŠÍRKE.
+
+**SPODNÉ HRANICE ABSORPCIE (`MIN`, S1-E0, v0.12.9).** `clamp_min` neprepustí rozmer pod `MIN` = šírka **200**, výška **80**, hĺbka **150** (mm, string kľúče — chodí sem
+kľúč z uloženého configu) a klamp **loguje**, nikdy ho nerobí ticho. Výška je od 80 mm preto, že korpus na dorovnanie nad umývačkou sa musí dať zmenšiť aj ťahaním úchopu,
+nie len v Inspectore. Čísla sú **zrkadlom `CabinetBuilder::MIN`** — priama referencia sa použiť nedá (`scale_observer` sa načítava PRED `cabinet_builder`), preto zhodu
+stráži guard `tests/pure/test_s1e0_min_vyska.rb`; keby sa rozišli, ten istý korpus by po ťahaní myšou a po zápise do poľa skončil na inom rozmere. Lifecycle absorpcie sa
+tým **nemení** — klamp žije vnútri tej istej transparentnej operácie, takže jedno Späť ďalej vráti scale AJ absorpciu (in-SU `run_s1e0` bod c, reálny debounce tik `async S1`).
 
 **BARIÉRA PRED MUTÁCIOU NÁSTROJA — `flush_pending!(model)` (NÁSTROJE-1, v0.9.24).** `guard` zabráni len NOVÝM udalostiam; už naplnené fronty (`@dirty`, `@added`, `@requested`,
 `@prune_models`) a bežiaci debounce timer zostávajú — a keď timer dobehne PO operácii nástroja, jeho **transparentná** reakcia (dedup kópií, presun ghost zón) sa prilepí na krok
