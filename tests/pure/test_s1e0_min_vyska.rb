@@ -48,6 +48,28 @@ module NxS1E0
   # Vytiahne z `form.js` dvojicu [min, max] pre pole `id` zo zoznamu LIMITS.
   # Zamerne cita SUROVY text (nie JS runtime) — guard ma padnut aj vtedy, ked
   # by niekto cislo prepisal a JS sada sa nespustila.
+  def cn
+    Noxun::Engine::Construction
+  end
+
+  # Nizky korpus na dorovnanie: dolny 600 x 90 x 560 BEZ sokla (stoji na
+  # umyvacke, nie na zemi) — presne to, co Michal kladie pod liniu linky.
+  def low_lower(over = {})
+    cb.normalize({ 'type' => 'lower', 'width' => 600.0, 'height' => 90.0, 'depth' => 560.0,
+                   'thickness' => 18.0, 'floor_height' => 0.0 }.merge(over))
+  end
+
+  def low_upper(over = {})
+    cb.normalize({ 'type' => 'upper', 'width' => 600.0, 'height' => 80.0, 'depth' => 320.0,
+                   'thickness' => 18.0 }.merge(over))
+  end
+
+  # Vrati [min_box_zlozka, kluce dielcov] — plan uz presiel `BuildPlan.validate!`
+  # (vola ho `build_plan` na konci), takze staci pozriet na cisla.
+  def plan_dims(plan)
+    plan[:parts].flat_map { |pd| Array(pd[:box]).map(&:to_f) }
+  end
+
   def js_limit(id)
     block = form_js[/var\s+LIMITS\s*=\s*\{(.*?)\};/m, 1].to_s
     NxTest.assert(!block.empty?, 'v form.js sa nenasiel zoznam LIMITS')
@@ -90,5 +112,108 @@ NxTest.test('S1-E0 R1: LIMITS vo form.js sedia s clampom normalize (horna hranic
     NxTest.assert_close(expected, hi, 0.01, "form.js LIMITS.#{id} horna hranica")
     clamped = NxS1E0.cb.normalize(id.to_s => (expected + 500))[id]
     NxTest.assert_close(expected, clamped, 0.01, "normalize klampuje #{id} na #{expected}")
+  end
+end
+
+# ---------------------------------------------------------------------------
+# 2) normalize — klampovanie vysky (R2: kontrakt configu sa NEMENI)
+# ---------------------------------------------------------------------------
+
+NxTest.test('S1-E0: normalize klampuje vysku na 80 a 90 prijme') do
+  cb = NxS1E0.cb
+  NxTest.assert_close(80.0, cb.normalize('height' => 50)[:height], 0.01, 'vyska 50 -> 80')
+  NxTest.assert_close(80.0, cb.normalize('height' => 79.9)[:height], 0.01, 'vyska tesne pod hranicou -> 80')
+  NxTest.assert_close(80.0, cb.normalize('height' => 80)[:height], 0.01, 'hranicna hodnota prejde nedotknuta')
+  NxTest.assert_close(90.0, cb.normalize('height' => 90)[:height], 0.01, 'korpus na dorovnanie 90 mm prejde')
+  NxTest.assert_close(90.0, cb.normalize('type' => 'upper', 'height' => 90)[:height], 0.01,
+                      'to iste plati pre hornu skrinku')
+end
+
+NxTest.test('S1-E0 R1: sirka a hlbka sa NEODOMKLI (200 / 150)') do
+  cfg = NxS1E0.cb.normalize('width' => 100, 'depth' => 100, 'height' => 90)
+  NxTest.assert_close(200.0, cfg[:width], 0.01, 'sirka dalej klampuje na 200')
+  NxTest.assert_close(150.0, cfg[:depth], 0.01, 'hlbka dalej klampuje na 150')
+end
+
+NxTest.test('S1-E0 R2: tvar configu sa nemeni — nizky korpus je bezna hodnota') do
+  # Nizka skrinka je obycajny config: ziadne nove pole, ziadna migracia. Ked by
+  # niekto na tento fix bumpol `CONFIG_SCHEMA`, starsi plugin by zbytocne
+  # odmietol CELU zakazku (dopredny guard R-12), hoci rozumie kazdemu poli.
+  NxTest.assert_equal(NxS1E0.cb.normalize('height' => 900).keys.sort,
+                      NxS1E0.cb.normalize('height' => 90).keys.sort,
+                      'nizky korpus ma PRESNE tie iste kluce ako bezny')
+end
+
+# ---------------------------------------------------------------------------
+# 3) Geometria nizkeho korpusu (R3) — plan bez zapornych dielcov
+# ---------------------------------------------------------------------------
+
+NxTest.test('S1-E0 R3: dolny 600 x 90 x 560 bez sokla da plan bez zapornych dielcov') do
+  plan = NxS1E0.cn.build_plan(NxS1E0.low_lower, 'CAB-S1E0-1')
+  keys = plan[:parts].map { |pd| pd[:part_key].to_s }
+  %w[cabinet/side:left cabinet/side:right cabinet/bottom cabinet/top cabinet/back].each do |k|
+    NxTest.assert(keys.include?(k), "nizky korpus ma dielec #{k}")
+  end
+  NxTest.assert(NxS1E0.plan_dims(plan).all?(&:positive?), 'ziadny dielec nema nekladny rozmer')
+  NxTest.refute(plan[:warnings].any? { |w| w['code'] == 'part_skipped_degenerate' },
+                'ziadny dielec sa nepreskakuje ako degenerovany')
+  NxTest.assert_close(54.0, plan[:available][:height], 0.01, 'svetla vyska 90 - 18 - 18 = 54')
+end
+
+NxTest.test('S1-E0 R3: horny 600 x 80 x 320 da plan bez zapornych dielcov') do
+  plan = NxS1E0.cn.build_plan(NxS1E0.low_upper, 'CAB-S1E0-2')
+  NxTest.assert(NxS1E0.plan_dims(plan).all?(&:positive?), 'ziadny dielec nema nekladny rozmer')
+  NxTest.assert_close(44.0, plan[:available][:height], 0.01, 'svetla vyska 80 - 18 - 18 = 44')
+  NxTest.assert_close(0.0, NxS1E0.low_upper[:floor_height], 0.01, 'horna skrinka sokel nema')
+end
+
+NxTest.test('S1-E0 R3: vsetky konstrukcne predvolby vrchu/dna/chrbta drzia kladne rozmery') do
+  # Kombinacie, ktore v nizkom korpuse realne hrozia (dno pod bokmi x chrbat
+  # v drazke x vrch bez dosky). Ziadna z nich nesmie vyrobit zaporny dielec.
+  %w[under_sides between_sides].each do |bottom|
+    %w[full none].each do |top|
+      %w[overlay inset groove none].each do |back|
+        cfg = NxS1E0.low_lower('bottom_mode' => bottom, 'top_mode' => top, 'back_mode' => back)
+        plan = NxS1E0.cn.build_plan(cfg, 'CAB-S1E0-3')
+        NxTest.assert(NxS1E0.plan_dims(plan).all?(&:positive?),
+                      "#{bottom}/#{top}/#{back}: vsetky rozmery kladne")
+      end
+    end
+  end
+end
+
+NxTest.test('S1-E0 R3: sokel VYSSI nez korpus sa odmietne zrozumitelnou hlaskou') do
+  # Vyska je CELKOVA vratane sokla (semantika sa NEMENI): dolna skrinka 90 mm
+  # s predvolenym soklom 100 mm ziadne vnutro nema. Builder to odmietne a panel
+  # to ukaze cervenym polom UZ PRED apply (`form.js` cabinetHeightError).
+  NxTest.assert_raise(/sokel|Vnutorna vyska/i) do
+    NxS1E0.cn.build_plan(NxS1E0.low_lower('floor_height' => 100.0), 'CAB-S1E0-4')
+  end
+end
+
+NxTest.test('S1-E0 R4: police v nizkom korpuse sa ODMIETNU s hlaskou, nikdy tichym nezmyslom') do
+  # Dnesne spravanie (ZoneTree.validate_shelves!) sa touto davkou NEMENI —
+  # zona 54 mm potrebuje na jednu policu 18 + 2 x 20 = 58 mm. Charakterizacia:
+  # ked sa to niekedy zmeni na warning, nech to test povie nahlas.
+  NxTest.assert_raise(/prilis nizka na 1 polic/) do
+    NxS1E0.cn.build_plan(
+      NxS1E0.low_lower('zone_tree' => { 'id' => 'Z1', 'shelves' => 1, 'children' => [] }),
+      'CAB-S1E0-5'
+    )
+  end
+end
+
+NxTest.test('S1-E0 R4: nizky korpus BEZ polic (default) prejde a zona je jedna') do
+  plan = NxS1E0.cn.build_plan(NxS1E0.low_lower, 'CAB-S1E0-6')
+  NxTest.assert_equal(0, NxS1E0.low_lower[:zone_tree]['shelves'], 'default je 0 polic')
+  NxTest.assert_equal(1, Array(plan[:zones]).length, 'vnutro je jedna zona')
+end
+
+NxTest.test('S1-E0 R3: dve vystuhy v nizkom korpuse su odmietnute (D-80 rezerva)') do
+  NxTest.assert_raise(/nizke na vystuhy|nízke na výstuhy/i) do
+    NxS1E0.cn.build_plan(
+      NxS1E0.low_lower('height' => 80.0, 'floor_height' => 25.0, 'top_mode' => 'two_rails'),
+      'CAB-S1E0-7'
+    )
   end
 end

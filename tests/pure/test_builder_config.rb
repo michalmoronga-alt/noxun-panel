@@ -55,7 +55,7 @@ NxTest.test('builder: normalize clampuje rozmery na realne hranice') do
                      'thickness' => 1, 'back_thickness' => 0.2,
                      'plinth_recess' => 999, 'rail_depth' => 5, 'rails_top_offset' => 900)
   NxTest.assert_close(3000.0, cfg[:width])       # max 3000
-  NxTest.assert_close(200.0, cfg[:height])       # MIN[:height]
+  NxTest.assert_close(80.0, cfg[:height])        # MIN[:height] — S1-E0: od 80 mm
   NxTest.assert_close(2000.0, cfg[:depth])       # max 2000
   NxTest.assert_close(6.0, cfg[:thickness])      # min 6
   NxTest.assert_close(1.0, cfg[:back_thickness]) # min 1
