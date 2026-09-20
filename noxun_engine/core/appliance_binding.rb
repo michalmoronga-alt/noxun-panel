@@ -62,6 +62,11 @@ module Noxun
       #   unbind       vlastnik -> `job` (odstranenie refs)
       #   remove       zmazanie polozky (+ refs u vlastnika)
       OPS = %w[create patch rebind_model move unbind remove].freeze
+      # Operacie, ktore smu niest VLASTNIKA. `patch` (cena, nazov, adresa,
+      # priznak) a `remove` ho niest NESMU — payload s dvomi vlastnikmi je
+      # nejednoznacny a tichy vyber jedneho z nich by spotrebic presunul bez
+      # toho, aby o to niekto poziadal (Codex #382 kolo 1 P2).
+      OWNER_OPS = %w[create move unbind rebind_model].freeze
 
       OP_NAME = 'NOXUN: Spotrebič — väzba'
 
@@ -73,6 +78,7 @@ module Noxun
       MSG_BUSY          = 'Model ešte dokončuje predchádzajúcu zmenu — skús to o chvíľu znova.'
       MSG_OWNER_GONE    = 'vlastník sa nenašiel — obnov okno a vyber znova'
       MSG_OWNER_AMBIG   = 'nejednoznačná identita vlastníka (dva kusy s tým istým ID) — prestav skrinky'
+      MSG_OWNER_OP      = 'zmena vlastníka ide vlastnou akciou — túto úpravu vlastník netýka'
       MSG_OWNER_DETACH  = 'vlastník má odpojený dielec — vráť ho do skrinky a skús znova'
       MSG_OWNER_NEWER   = 'vlastník je z novšej verzie Noxun — väzba by jeho nastavenia stratila'
       MSG_PREV_LOCKED   = 'pôvodný vlastník sa nedá prestavať — väzbu treba najprv opraviť na ňom'
@@ -108,6 +114,9 @@ module Noxun
       def plan_for(model, model_guid:, op:, item_id:, attrs:, catalog_id:, owner:)
         return [nil, [MSG_NO_MODEL]] unless model
         return [nil, [MSG_UNKNOWN_OP]] unless OPS.include?(op)
+        # Vlastnik v payloade operacie, ktora ho nemeni, sa ODMIETA (nie
+        # ignoruje): tichy no-op by klientovi tvrdil, ze zmena presla.
+        return [nil, [MSG_OWNER_OP]] if !owner.nil? && !OWNER_OPS.include?(op)
 
         # Identita dokumentu — rovnaka tolerancia ako rozpocet (prazdny udaj
         # zo stareho DOM neblokuje, NEZHODNE ID ano).
@@ -147,14 +156,22 @@ module Noxun
           return [nil, [perr]] if perr
         end
 
+        # CIEL VAZBY. Dve cesty, zamerne oddelene:
+        #   * VYSLOVNE VYBRANY vlastnik sa hlada podla identity (PID + ID + druh)
+        #     a musi existovat — inak sa cela operacia odmietne,
+        #   * IMPLICITNE NESENY vlastnik (vymena modelu nad uz viazanou polozkou)
+        #     sa NEHLADA VOBEC: pouzije sa PRESNE tá entita, ktoru overil
+        #     `resolve_previous` (existuje, sedi PID a jej refs nesu tuto
+        #     polozku). Hladanie podla ULOZENEHO ID by pri recyklovanom ID
+        #     pripojilo spotrebic na CUDZIU skrinku (Codex #382 kolo 1 P2).
+        #     Ked povodny vlastnik zanikol, refs sa neprepisuju — aktualizuje sa
+        #     len snapshot polozky a Kontrola hlasi sirotu dalej.
         new_entity = nil
-        if needs_target?(op, owner, target)
+        if !owner.nil? && target['kind'].to_s != KIND_JOB
           new_entity, nerr = resolve_target(model, target)
-          # Vlastnik, ktoreho pouzivatel PRAVE VYBRAL, musi existovat. Vlastnik,
-          # ktory sa len NESIE DALEJ (vymena modelu nad uz viazanou polozkou),
-          # medzitym mohol zaniknut — to nie je dovod odmietnut celu zmenu
-          # (Kontrola sirotu uz hlasi), len sa nema kam zapisat.
-          return [nil, [nerr]] if nerr && !owner.nil?
+          return [nil, [nerr]] if nerr
+        elsif op == 'rebind_model' && target['kind'].to_s != KIND_JOB && prev
+          new_entity = prev[:inst]
         end
 
         [{ op: op, item_id: item_id, attrs: (attrs.is_a?(Hash) ? attrs : {}),
@@ -169,15 +186,6 @@ module Noxun
       # musi dat opravit.
       def touches_refs?(op)
         %w[move unbind remove rebind_model].include?(op.to_s)
-      end
-
-      def needs_target?(op, owner, target)
-        return false if target.nil? || target['kind'].to_s == KIND_JOB
-        return true unless owner.nil?
-
-        # Implicitny vlastnik: refs sa prepisuju len pri vymene modelu
-        # (novy snapshot = nove rozmery v zazname).
-        op.to_s == 'rebind_model'
       end
 
       def owner_changed?(prev_owner, target)
@@ -341,19 +349,36 @@ module Noxun
       #   (c) ZANIKNUTY — entita neexistuje alebo ID uz patri INEMU kusu, ktory
       #                  vazbu nenesie -> nedotkne sa NIC, polozka len zmeni
       #                  vlastnika (a Kontrola medzitym hlasila sirotu).
+      #   (d) NEJEDNOZNACNY — v modeli ZIJE VIAC kusov s tym istym ulozenym ID
+      #                  (poskodeny alebo importovany model). Vtedy sa NEDA
+      #                  povedat, ktory vazbu drzi: ked ju drzi PRESNE JEDEN,
+      #                  je to jednoznacne a pouzije sa on; inak sa CELA
+      #                  operacia odmietne PRED otvorenim operacie — tichy
+      #                  preskok by nechal stare refs visiet na oboch kusoch
+      #                  (Codex #382 kolo 1 P2).
       # -> [{kind:, inst:} | nil, nil] | [nil, hlaska]
       def resolve_previous(model, prev_owner, item_id)
         kind = prev_owner['kind'].to_s
         return [nil, nil] if kind == KIND_JOB || item_id.to_s.empty?
 
         matches = instances_of(model, kind, prev_owner['id'].to_s)
-        return [nil, nil] unless matches.length == 1
+        return [nil, nil] if matches.empty?
 
-        inst = matches.first
-        return [nil, nil] unless refs_of(inst).any? { |r| r['item_id'].to_s == item_id.to_s }
+        carriers = matches.select { |i| refs_of(i).any? { |r| r['item_id'].to_s == item_id.to_s } }
+        if matches.length > 1
+          return [nil, prev_ambig_message(prev_owner)] unless carriers.length == 1
+        elsif carriers.empty?
+          return [nil, nil]
+        end
+
+        inst = carriers.first
         return [nil, MSG_PREV_LOCKED] if newer?(kind, inst) || detached?(model, prev_owner)
 
         [{ kind: kind, inst: inst }, nil]
+      end
+
+      def prev_ambig_message(prev_owner)
+        "nejednoznačná identita vlastníka #{prev_owner['id']} — prestav skrinky"
       end
 
       def refs_of(inst)
