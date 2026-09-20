@@ -3802,6 +3802,12 @@ module NoxunSuRunner
     ac = e::ApplianceCatalog
     root = File.join(Sketchup.temp_dir, "noxun_s1a2_#{Process.pid}_#{Time.now.to_i}")
     FileUtils.mkdir_p(root)
+    # Stav ZIVEHO katalogu (posudil ho BOOT pluginu) si odlozime a v `ensure`
+    # ho vratime PRESNE taky, aky bol. `reset_state!` by ho zhodil na `nil`
+    # a sekcia `run_s1a1`, ktora dokazuje „katalog posudil uz boot", by padla
+    # na nasom upratovani — nie na chybe kodu.
+    state_before = ac.instance_variable_get(:@state)
+    reason_before = ac.instance_variable_get(:@state_reason)
     ac.test_dir_override = root
     ac.reset_state!
     begin
@@ -3809,6 +3815,8 @@ module NoxunSuRunner
     ensure
       ac.test_dir_override = nil # NIKDY nenechat presmerovany zivy katalog
       ac.reset_state!
+      ac.instance_variable_set(:@state, state_before)
+      ac.instance_variable_set(:@state_reason, reason_before)
       e::ApplianceDialog.handle_leave # a ziadny filter po teste
       begin
         FileUtils.rm_rf(root)
@@ -12466,8 +12474,9 @@ module NoxunSuRunner
       # toky a zrusila okno; ŠT-3a-1 pridala siedmu `hw` (Kovanie) — okno
       # „Katalóg kovania" zatial zije, ale navigacia don uz nevedie.
       # ŠT-3c-1 pridala osmu `tpl` (Sablony) — okno „Šablóny" zaniklo.
-      ok('ŠT-1c B3: sekcie Studia su vsetky (bom · ctrl · buy · budget · offer · mat · hw · rules · tpl)',
-         e::StudioDialog::SECTIONS == %w[bom ctrl buy budget offer mat hw rules tpl sup bset about])
+      # S1-A2 pridala trinastu `appl` (Spotrebice) — katalog modelov tohto PC.
+      ok('ŠT-1c B3: sekcie Studia su vsetky (bom · ctrl · buy · budget · offer · mat · hw · appl · rules · tpl)',
+         e::StudioDialog::SECTIONS == %w[bom ctrl buy budget offer mat hw appl rules tpl sup bset about])
     end
 
     dlg = e::StudioDialog.instance_variable_get(:@dialog)

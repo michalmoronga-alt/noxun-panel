@@ -663,8 +663,11 @@ kvótová brána `usage` pred každým auditom a subagentom. Pravidlo 3 kôl pla
   (markerový, nikdy opakovane; hodnoty a URL výhradne z OVERENIA listov; drez Blanco sa neseeduje — Michal ho pridá ručne, kategória `sink` existuje). Jeden návratový tvar
   `[status, info]` s cestou chybného poľa. Katalóg **zakladá boot pluginu** (`main.rb`, chránený blok). **DoD:** `tests/pure/test_s1a1_appliance_catalog.rb` (49 testov) + in-SU `run_s1a1` (prílohy na reálnom disku, `UI.openURL`,
   zlyhaná kópia, tombstone) + docs `docs/architecture/appliances.md` a STANDARD §7.1.
-- **S1-A2 · Sekcia Štúdia SPOTREBIČE — pohľad Katalóg** *(UI, audit NIE)* — 13. sekcia `appl` (skupina KATALÓGY), strom + karta + prílohy + D-15 modal podľa mockupu R1–R8;
-  tlačidlo „Do zákazky" a pohľad „V zákazke" sú v A2 `aria-disabled` s dôvodom (D-78), aktivuje ich S1-B.
+- **S1-A2 · Sekcia Štúdia SPOTREBIČE — pohľad Katalóg** *(UI, audit NIE)* — **✅ PR #NNN, v0.12.11**. 13. sekcia `appl` (skupina KATALÓGY medzi `hw` a `rules`),
+  serverový modul `ui/appliance_dialog.rb` **bez okna** (uzavretý `SECTION_ACTIONS`, `ready` v ňom nie je) + klient `ui/js/appliances.js` (prefix `ap*`, načítaný za `studio.js`).
+  **Kontrakt:** server skladá strom (poradie `CATEGORIES`, počty, podtitul), kartu v 4 blokoch aj polia formulára z **jednej tabuľky `ROWS`**; kľúč poľa modalu = cesta, ktorú
+  katalóg vracia v chybe; zápis = **echo sekcie bez zdvihu generácie** a kreslí len v aktívnej sekcii; miniatúry príloh lazy kanálom (`Sketchup::ImageRep`, 96 px, záporná cache);
+  `appl_open_url` pustí len http/https. „Do zákazky" a pohľad „V zákazke" sú `aria-disabled` s dôvodom (D-78) — aktivuje ich S1-B.
 - **S1-E · Slot umývačky — nový typ skrinky** *(builder + `CONFIG_SCHEMA` 15 → 16 + TemplateStore STD 4 → 5 → `codex-audit` ÁNO; in-SU povinné)* — 7 vstupov, jediný dielec čelo
   (item `blind`), telo = referencia + základňa 200, šablóny 60/45, kontroly telo vs šírka a nastavená výška tela vs linka; výplň hore ručne (mockup R13–R16). Kontraktové body zo
   Codex kôl: **schéma 16 rezervuje `appliance_refs[]` aj `appliance_expects[]` — v configu skrinky AJ dosky (`BOARD_CONFIG_SCHEMA` bump, doska má vlastný whitelist a guard)** (C ich
