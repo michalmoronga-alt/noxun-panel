@@ -13,7 +13,9 @@ odkopíruje k sebe. Väzba do zákazky, slot umývačky, kontrolné telo chladni
 
 **Tretí per-PC katalóg** (S1-A1) vedľa materiálov a kovania: `%APPDATA%\NOXUN\Engine\appliances.json` cez `JsonFileStore` (atomický zápis, `.bak`,
 sekundová cache) a **vlastný sidecar zámok** `appliances.json.lock`. Zámok je reentrantný (`with_lock`, vzor `TemplateStore`) a **nikdy sa nevnára do
-iného katalógového zámku** — poradie zámkov je deadlock, preto má každý katalóg svoj. Cesta ide cez `Materials.dir`; `test_dir_override` (iba testy)
+iného katalógového zámku** — poradie zámkov je deadlock, preto má každý katalóg svoj. **`flock`, ktoré vráti `false`** (filesystem bez podpory zámkov,
+presmerovaný sieťový share), zámok NEZNAMENÁ: kritická sekcia sa nespustí a mutácia skončí `[:locked, …]` — inak by dve inštancie SketchUpu písali
+do katalógu naraz. Cesta ide cez `Materials.dir`; `test_dir_override` (iba testy)
 presmeruje JSON aj prílohy do izolovaného priečinka a in-SketchUp sekcia ho vo `ensure` vždy vracia na `nil`.
 
 **Záznam.** Identita = serverové UUID `id`. `category` je z uzavretej sady `CATEGORIES` (`fridge oven microwave dishwasher hob sink hood other`) —
@@ -43,10 +45,15 @@ a až potom zapisuje.
 **Stav katalógu — `assess!`** (`:ok` | `:read_only` | `:degraded`): chýba primár aj `.bak` = prvá inštalácia → seed · chýba primár, `.bak` je = **nie je**
 prvá inštalácia (číta sa záloha, žiadny seed, prvý zápis primár obnoví) · poškodený primár + platná `.bak` = `:degraded` (číta sa záloha, **zápisy stoja**,
 inak by prepísali primár obsahom spred poškodenia) · poškodený primár bez zálohy, cudzí tvar, chýbajúci alebo nečíselný `std`, **`std` > `STD` (forward
-guard)**, záznam bez identity, **nečitateľná položka `attachments[]`** (nie Hash, chýbajúce `id`/`name`, neznámy `kind`, `file` mimo jedného segmentu —
-inak by `[null]` prešlo ako zdravý katalóg a rozbilo sa až v mutácii), **uložené `dims`, ktoré neprejdú validáciou známych polí** (ručná úprava
-`"width": "oops"`, `min > max`, neznámy enum — dôvod nesie **cestu poľa**; neznáme kľúče ostávajú dopredne kompatibilné) a duplicitné identity =
-`:read_only` s dôvodom. **Záloha sa v degradovanom stave posudzuje tou istou maticou ako primár** — `.bak`, ktorá sa síce parsuje, ale je z novšej verzie
+guard)**, nečitateľný záznam a duplicitné identity = `:read_only` s dôvodom.
+
+**Uložený záznam sa posudzuje TÝM ISTÝM validátorom ako zápis** (`stored_record_issue` volá tie isté funkcie ako `build_record` a `attach!`), takže sa
+čítacia a zápisová cesta nemôžu rozísť: identita · **`category` z uzavretej sady** (bez známej kategórie niet proti čomu validovať `dims` ani `derived` —
+všetko by prepadlo ako „dopredne kompatibilné") · položky `attachments[]` (Hash, `id`, `name`, `kind` z enumu, `file` ako jediný segment a **prípona podľa
+druhu** — uložený náhľad nad PDF neprejde rovnako ako pri `attach!`) · **`derived[]` vždy, aj keď záznam nemá `dims`** · **`dims` validáciou známych polí**
+(ručná úprava `"width": "oops"`, `min > max`, neznámy enum — dôvod nesie **cestu poľa**). Neznáme kľúče ostávajú dopredne kompatibilné: prenesú sa bez
+interpretácie a **ani dvojice `*_min`/`*_max` sa nad nimi nekontrolujú** — `foo_min`/`foo_max` z novšej implementácie môže znamenať čokoľvek a jeden taký
+pár by inak zhodil celý katalóg do read-only a zablokoval aj nesúvisiaci patch. **Záloha sa v degradovanom stave posudzuje tou istou maticou ako primár** — `.bak`, ktorá sa síce parsuje, ale je z novšej verzie
 alebo nečitateľná, nie je „čítaj zálohu, zápisy stoja", ale `:read_only` (nie je z čoho čítať). **Zlyhaný prvý seed** (nezapisovateľný
 `%APPDATA%`, plný disk) je tiež `:read_only` — prázdny „zdravý" katalóg by pri prvom zápise vznikol **bez deviatich modelov** a marker `seed_version` by
 ich už nikdy nedosial. Tá istá kontrola (`stored_document_issue`) beží nad čerstvým dokumentom
@@ -88,6 +95,8 @@ sa nepriraďuje) · `:unsupported` (`std` z novšieho pluginu alebo nečitateľn
 maticou ako primár** — inak by sa `.bak` z novšej verzie dostala do zákazky označená naším `catalog_std`. Zdroj sa overuje **čerstvo z disku**
 a ten istý prečítaný dokument ide rovno do výberu záznamu — **žiadne druhé čítanie cez `JsonFileStore`**, ktoré by v okne sekundovej cache
 (`CHECK_INTERVAL`) vrátilo stav spred zápisu druhej inštancie SketchUpu. Zákazka si snapshot odkladá, takže cachovaný záznam by v nej ostal natrvalo.
+**I/O chyba pri čítaní** (sharing violation, nedostupný presmerovaný `%APPDATA%`, sieťový disk offline) sa prizná stavom `:unsupported` — `JsonFileStore`
+ju zámerne prepúšťa von, ale von z katalógu nikdy nevyletí holá výnimka: kontrakt `[status, info]` platí aj tu.
 
 **Seed je markerový** (`SEED_VERSION`, vzor `TemplateStore`): seje sa **výhradne pri prvej inštalácii** (chýba primár aj `.bak`), **nikdy opakovane** — zmazaný seed
 záznam sa už nevráti a používateľská úprava sa neprepíše. Sadu tvorí **9 overených modelov** (2 rúry, 2 mikrovlnky, chladnička, 2 umývačky, varná doska,
