@@ -3639,6 +3639,245 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # --- S1-E: SLOT UMYVACKY -------------------------------------------------
+  #
+  # Headless sada overuje PLAN a KONTRAKT; tu sa overuje MODEL a to, co sa mimo
+  # SketchUpu overit NEDA:
+  #   (a) zo sablony vznikne skrinka s JEDNYM vyrobnym dielcom a s REFERENCIOU,
+  #       ktora ma `kind: 'reference'` a v kusovniku NIE JE,
+  #   (b) zmena vysky cela je JEDEN krok Spat a celo sa naozaj prestavalo,
+  #   (c) prisunutie: slot ako POSUVANY objekt AJ ako PREKAZKA — a vysledok sa
+  #       NESMIE zmenit ani ked je tag referencie vypnuty, ani ked celo
+  #       presahuje liniu linky (Astra S1-E FIX E3),
+  #   (d) zmena triedy prestavi telo referencie v MODELI,
+  #   (e) `Bom.collect` vidi jeden dielec a referenciu NIKDE,
+  #   (f) absorpcia scale klampe na TYPOVE minimum slotu,
+  #   (g) „Uložiť ako šablónu" zo slotu ulozi typ `dishwasher`,
+  #   (h) Kontrola cez REALNU cestu `Bom.collect` -> `Validation.run`.
+
+  S1E_SLOT = { 'type' => 'dishwasher', 'width' => 600.0, 'height' => 930.0,
+               'depth' => 560.0, 'thickness' => 18.0, 'dw_class' => 600,
+               'dw_body_height' => 820.0, 'dw_front_bottom' => 64.0,
+               'dw_front_height' => 776.0 }.freeze
+
+  # Vyrobne dielce slotu (referencia ani proxy medzi ne NEPATRIA).
+  def s1e_parts(inst)
+    inst.definition.entities.grep(Sketchup::ComponentInstance)
+        .select { |i| e::Store.kind(i) == 'part' }
+  end
+
+  def s1e_refs(inst)
+    inst.definition.entities.grep(Sketchup::ComponentInstance)
+        .select { |i| e::Store.kind(i) == 'reference' }
+  end
+
+  def s1e_rebuild(model, inst, over)
+    params = e::CabinetBuilder.config_to_params(e::Store.config(inst)).merge(over)
+    e::CabinetBuilder.rebuild(model, inst, params)
+  end
+
+  # Kontrola TOU ISTOU cestou, akou bezi v Studiu: zber z modelu -> Validation.
+  def s1e_control_codes(model)
+    res = e::Validation.run(e::Bom.collect(model))
+    Array(res['items']).select { |i| i['category'] == 'appliance' }
+                       .map { |i| i['stable_key'].to_s.split('|').last }
+  end
+
+  # Pomocna (NIE NOXUN) geometria sekcie — `cleanup` ju nezmaze, lebo nie je
+  # ani korpus, ani doska. Zabudnuty kvader by posunul doraz vsetkym dalsim
+  # sekciam (ghost, NASTROJE-1), preto sa upratuje v `ensure`.
+  def s1e_drop_junk(model, junk)
+    return if junk.empty?
+
+    e::ScaleWatch.guard do
+      model.start_operation('SU-TEST S1E upratanie', true)
+      junk.each { |g| g.erase! if g && g.valid? }
+      model.commit_operation
+    end
+  rescue StandardError => ex
+    log_line("FAIL: s1e_drop_junk vynimka: #{ex.class}: #{ex.message}")
+  end
+
+  def run_s1e(model)
+    junk = []
+    # (a) VLOZENIE ZO SABLONY — autoritou je ULOZENY zaznam sablony.
+    tpl = e::TemplateStore.find('cabinet', 'Umývačka 60')
+    ok('S1-E (a): seedovana sablona „Umývačka 60“ je v kniznici', !tpl.nil?)
+    cfg0 = (tpl && tpl['config']) ? tpl['config'] : S1E_SLOT
+    inst = e::CabinetBuilder.build(model, cfg0)
+    return ok('S1-E (a): vlozenie slotu', false) unless inst
+
+    parts = s1e_parts(inst)
+    refs = s1e_refs(inst)
+    ok("S1-E (a): slot ma PRESNE JEDEN vyrobny dielec (#{parts.map { |p| e::Store.get(p, 'role') }.inspect})",
+       parts.length == 1 && e::Store.get(parts.first, 'role').to_s == 'false_front')
+    ok('S1-E (a): a ziadne boky, dno, strop ani chrbat',
+       parts.none? { |p| %w[side_left side_right bottom top back].include?(e::Store.get(p, 'role').to_s) })
+    ok("S1-E (a): telo spotrebica stoji v modeli ako REFERENCIA (#{refs.length} ks)",
+       refs.length == 1)
+    if refs.first
+      r = refs.first
+      ok('S1-E (a): referencia nie je vyrobna (manufactured false, production_class reference)',
+         e::Store.get(r, 'manufactured') == false &&
+         e::Store.get(r, 'production_class').to_s == 'reference')
+      rcfg = e::Store.config(r) || {}
+      ok("S1-E (a): a nesie svoj povod (#{rcfg['source']}, trieda #{rcfg['dw_class']})",
+         rcfg['proxy'] == true && rcfg['source'].to_s == 'generic' && rcfg['dw_class'].to_i == 600)
+      # PLAN -> MODEL: obalka referencie musi sediet s deskriptorom planu.
+      ok("S1-E (a): telo v modeli ma 598 x 820 (#{mm(r.bounds.max.x - r.bounds.min.x).round} x " \
+         "#{mm(r.bounds.max.z - r.bounds.min.z).round})",
+         (mm(r.bounds.max.x - r.bounds.min.x) - 598.0).abs < TOL &&
+         (mm(r.bounds.max.z - r.bounds.min.z) - 820.0).abs < TOL)
+    end
+    cfg_a = e::Store.config(inst) || {}
+    ok("S1-E (a): config nesie schemu 16 a typ dishwasher (#{cfg_a['config_schema']}, #{cfg_a['type']})",
+       cfg_a['config_schema'].to_i == 16 && cfg_a['type'].to_s == 'dishwasher')
+    ok('S1-E (a): sokel slotu NEPRETIEKOL do floor_height (podpora none)',
+       cfg_a['floor_height'].to_f.abs < 0.01 &&
+       (cfg_a['dw_front_bottom'].to_f - 64.0).abs < 0.01)
+    ok('S1-E (a): slot NEDOSTAL nohy ani prichyt sokla',
+       Array(cfg_a['hardware']).none? { |h| %w[leg plinth_clip].include?(h['generic_type'].to_s) })
+
+    # (b) ZMENA VYSKY CELA = JEDEN krok Spat.
+    front0 = s1e_parts(inst).first
+    h0 = part_height(front0)
+    s1e_rebuild(model, inst, 'dw_front_height' => 826.0)
+    front1 = s1e_parts(inst).first
+    ok("S1-E (b): celo sa prestavalo na 826 (#{part_height(front1).round} mm, predtym #{h0.round})",
+       (part_height(front1) - 826.0).abs < TOL)
+    Sketchup.undo
+    front2 = s1e_parts(inst).first
+    ok("S1-E (b): JEDNO Spat vratilo vysku cela na 776 (#{front2 ? part_height(front2).round : '?'})",
+       front2 && (part_height(front2) - 776.0).abs < TOL)
+
+    # (c) PRISUNUTIE. Scenar stoji VEDLA skrinky z (a) — kazdy kus ma vlastne
+    #     pasmo na osi X, aby si dva testy nepletli prekazky:
+    #       slot (c)  3000..3600   prekazka 3800..3900   ->  doraz na 3200
+    #       dolna     1000..1600   ->  doraz na lavu hranu slotu (3200 - 600)
+    #     E3: vysledok sa NESMIE zmenit ani pri vypnutom tagu referencie, ani
+    #     ked celo presahuje liniu linky — doraz mieri na NOMINALNU hranu.
+    slot_tr = e::CabinetBuilder.build(
+      model, S1E_SLOT,
+      transform: Geom::Transformation.translation(e::Units.point(3000.0, 0, 0))
+    )
+    if slot_tr
+      blk = tools1_block(model, model.entities, 3800.0, 3900.0)
+      junk << blk
+      tools1_select(model, slot_tr)
+      e::Tools::Snaper.snap(:right)
+      x1 = mm(slot_tr.transformation.origin.x)
+      ok("S1-E (c): slot sa prisunul na doraz (x = #{x1.round(1)} mm)", (x1 - 3200.0).abs <= TOL)
+      Sketchup.undo
+
+      # Celo PRESAHUJUCE liniu + vypnuty tag referencie — doraz je TEN ISTY.
+      s1e_rebuild(model, slot_tr, 'dw_front_height' => 1100.0)
+      hw_layer = model.layers[e::CabinetBuilder::HARDWARE_TAG]
+      vis0 = hw_layer ? hw_layer.visible? : nil
+      if hw_layer
+        e::ScaleWatch.guard do
+          model.start_operation('SU-TEST S1E tag off', true)
+          hw_layer.visible = false
+          model.commit_operation
+        end
+      end
+      tools1_select(model, slot_tr)
+      e::Tools::Snaper.snap(:right)
+      x2 = mm(slot_tr.transformation.origin.x)
+      ok("S1-E (c/E3): doraz je NOMINALNY aj pri presahujucom cele a vypnutom tagu referencie " \
+         "(x = #{x2.round(1)} mm)", (x2 - 3200.0).abs <= TOL)
+      if hw_layer
+        e::ScaleWatch.guard do
+          model.start_operation('SU-TEST S1E tag on', true)
+          hw_layer.visible = vis0.nil? ? true : vis0
+          model.commit_operation
+        end
+      end
+
+      # Slot ako PREKAZKA: dolna skrinka sa k nemu prisunie na jeho obalku.
+      low = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0,
+                                             'height' => 720.0, 'depth' => 560.0,
+                                             'thickness' => 18.0, 'floor_height' => 100.0 },
+                                    transform: Geom::Transformation.translation(e::Units.point(1000.0, 0, 0)))
+      if low
+        tools1_select(model, low)
+        e::Tools::Snaper.snap(:right)
+        xl = mm(low.transformation.origin.x)
+        want = x2 - 600.0
+        ok("S1-E (c/E3): dolna skrinka sadla na NOMINALNU hranu slotu (x = #{xl.round(1)}, " \
+           "cakam #{want.round(1)})", (xl - want).abs <= TOL)
+        low.erase! if low.valid?
+      end
+    else
+      ok('S1-E (c): vlozenie slotu pre Snaper', false)
+    end
+
+    # (d) ZMENA TRIEDY prestavi telo referencie v MODELI.
+    s1e_rebuild(model, inst, 'dw_class' => 450, 'dw_body_height' => 815.0)
+    r450 = s1e_refs(inst).first
+    ok("S1-E (d): trieda 450 prestavala telo na 448 x 815 (#{r450 ? mm(r450.bounds.max.x - r450.bounds.min.x).round : '?'} x " \
+       "#{r450 ? mm(r450.bounds.max.z - r450.bounds.min.z).round : '?'})",
+       r450 && (mm(r450.bounds.max.x - r450.bounds.min.x) - 448.0).abs < TOL &&
+       (mm(r450.bounds.max.z - r450.bounds.min.z) - 815.0).abs < TOL)
+    ok('S1-E (d): a stale je to JEDINA referencia a JEDINY dielec',
+       s1e_refs(inst).length == 1 && s1e_parts(inst).length == 1)
+    s1e_rebuild(model, inst, 'dw_class' => 600, 'dw_body_height' => 820.0)
+
+    # (e) KUSOVNIK: jeden dielec, referencia NIKDE.
+    col = e::Bom.collect(model)
+    slot_rows = col[:records].select { |r| r['owner_id'].to_s == e::Store.get(inst, 'cabinet_id').to_s }
+    ok("S1-E (e): kusovnik vidi zo slotu JEDEN riadok (#{slot_rows.length})", slot_rows.length == 1)
+    ok('S1-E (e): a je to CELO (rola false_front)',
+       slot_rows.first && slot_rows.first['role'].to_s == 'false_front')
+    ok('S1-E (e): referencia sa nedostala ani do `top_level_scan` ako odpojeny dielec',
+       e::Ids.top_level_scan(model)['detached'].empty?)
+    ok("S1-E (e/E12): zber nesie udaje slotu pre Kontrolu (#{Array(col[:appliance_slots]).length})",
+       Array(col[:appliance_slots]).any? { |s| s['owner_id'].to_s == e::Store.get(inst, 'cabinet_id').to_s })
+
+    # (f) ABSORPCIA SCALE — typove minimum slotu je 300 mm, nie korpusovych 200.
+    model.start_operation('SU-TEST S1E user scale', true)
+    inst.transformation = inst.transformation * Geom::Transformation.scaling(ORIGIN, 0.2, 1.0, 1.0)
+    model.commit_operation
+    e::ScaleWatch.absorb(inst)
+    cfg_sc = e::Store.config(inst) || {}
+    ok("S1-E (f): absorpcia klampla sirku slotu na 300 (config #{cfg_sc['width']})",
+       (cfg_sc['width'].to_f - 300.0).abs < 0.01)
+    ok('S1-E (f): transform po absorpcii je cisty (nebol to reject)',
+       e::ScaleWatch.scale_factors(inst.transformation).nil?)
+    s1e_rebuild(model, inst, 'width' => 600.0)
+
+    # (g) ULOZENIE AKO SABLONA zo slotu.
+    tname = "SU-TEST slot #{Time.now.to_i}"
+    tcfg = e::Panel.template_config_from(e::Store.config(inst))
+    e::Panel.apply_template_type!(tcfg, 'upper') # slot sa na hornu prepnut NESMIE
+    saved = e::TemplateStore.upsert('cabinet', tname, tcfg)
+    rec = e::TemplateStore.find('cabinet', tname)
+    ok("S1-E (g): „Uložiť ako šablónu“ zo slotu ulozi typ dishwasher (#{rec ? rec['config']['type'] : '?'})",
+       saved && rec && rec['config']['type'].to_s == 'dishwasher')
+    ok('S1-E (g): sablona nesie `dw_*` a marker schemy',
+       rec && rec['config']['dw_class'].to_i == 600 &&
+       (rec['config']['dw_front_height'].to_f - 776.0).abs < 0.01 &&
+       rec['config']['config_schema'].to_i == 16)
+    e::TemplateStore.delete('cabinet', tname)
+
+    # (h) KONTROLA cez REALNU cestu zberu.
+    ok("S1-E (h): zdravy slot nema ziadny nalez (#{s1e_control_codes(model).inspect})",
+       s1e_control_codes(model).empty?)
+    s1e_rebuild(model, inst, 'width' => 590.0)
+    ok("S1-E (h): sirka 590 -> ORANGE dw_body_fit (#{s1e_control_codes(model).inspect})",
+       s1e_control_codes(model).include?('dw_body_fit'))
+    s1e_rebuild(model, inst, 'width' => 600.0, 'height' => 800.0)
+    ok("S1-E (h): vyska linky 800 -> ORANGE dw_height_fit (#{s1e_control_codes(model).inspect})",
+       s1e_control_codes(model).include?('dw_height_fit'))
+
+    cleanup(model)
+    ok('S1-E: cleanup (0 korpusov)', cabinets(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: run_s1e vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  ensure
+    s1e_drop_junk(model, junk || [])
+  end
+
   # --- S1-A1: KATALOG SPOTREBICOV — prilohy na REALNOM Windows suborovom
   # systeme (headless sada ich overuje len logicky). Overuje sa to, co sa
   # mimo SketchUpu overit NEDA: kopia suboru s DIAKRITIKOU a MEDZEROU v nazve,
@@ -18760,18 +18999,25 @@ module NoxunSuRunner
       tools1_hide(model, nested_obs[:outer], true)
       tools1_hide(model, near, false)
 
-      # presahujuci potomok CIELA posuva jeho obalku — a skryty uz nie
+      # S1-E (FIX E3) — ZMENA SPRAVANIA: NOXUN KORPUS sa prisuva svojou
+      # LOGICKOU (nominalnou) obalkou z configu, nie skutocnymi bounds. Do S1-E
+      # posuval presahujuci VIDITELNY potomok ciela doraz na 50; odteraz je
+      # doraz VZDY na nominálnej hrane (100) — a to aj pri slote umyvacky,
+      # ktoreho celo smie presahovat vysku linky a telo spotrebica trcat do
+      # strany. Vysledok tak uz nezavisi ani od toho, ktore tagy ma kto zapnuty.
+      # Viditelnostna traverza na strane PREKAZOK ostava nedotknuta (meraju ju
+      # scenare `near` a `nested_obs` vyssie — su to obycajne skupiny).
       bump = tools1_block(model, a.definition.entities, 600.0, 650.0)
       tools1_select(model, a)
       e::Tools::Snaper.snap(:right)
-      ok('NASTROJE-1: presahujuci VIDITELNY potomok ciela skracuje doraz ' \
-         "(#{mm(a.transformation.origin.x).round(1)} mm)",
-         (mm(a.transformation.origin.x) - 50.0).abs <= TOL)
+      ok('NASTROJE-1 (S1-E): presahujuci VIDITELNY potomok ciela doraz UZ NESKRACUJE ' \
+         "— korpus sa meria nominalnou obalkou (#{mm(a.transformation.origin.x).round(1)} mm)",
+         (mm(a.transformation.origin.x) - 100.0).abs <= TOL)
       Sketchup.undo
       tools1_hide(model, bump, true)
       tools1_select(model, a)
       e::Tools::Snaper.snap(:right)
-      ok('NASTROJE-1: SKRYTY presahujuci potomok ciela doraz uz neskracuje ' \
+      ok('NASTROJE-1: ani SKRYTY presahujuci potomok ciela doraz neskracuje ' \
          "(#{mm(a.transformation.origin.x).round(1)} mm)",
          (mm(a.transformation.origin.x) - 100.0).abs <= TOL)
       Sketchup.undo
@@ -23925,6 +24171,7 @@ module NoxunSuRunner
     run_sync_back(model)     # davka Chrbat: D-37 hlbka, D-31 none, D-38 pevny 18
     run_sync_rails(model)    # H3/D-80: vnutro pod vystuhami (odsadenie, upright, chrbat, odmietnutie)
     run_s1e0(model)          # S1-E0: minimalna vyska korpusu 80 mm — nizka skrinka na dorovnanie sa postavi bez degenerovaneho dielca a kusovnik ju vidi, cesta Inspectora klampne 60 na 80, absorpcia scale pod hranicu tiez (a 1x Spat vrati scale aj absorpciu), horna 600 x 80 x 320
+    run_s1e(model)           # S1-E: SLOT UMYVACKY — zo sablony 1 vyrobny dielec + telo ako referencia (kind reference, v kusovniku nikde), zmena vysky cela = 1 Spat, prisunutie na NOMINALNU hranu (aj pri presahujucom cele a vypnutom tagu referencie), zmena triedy prestavi telo, absorpcia scale na typove minimum, sablona so slotom, Kontrola dw_body_fit/dw_height_fit cez realny zber
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
     run_r03(model)           # R-03: sev prepare_insert/commit_insert — ciste pripravenie, vlastny rigidny transform, odmietnutia, edit kontext
     run_r12(model)           # 1d/R-12: dopredny guard configu — marker, odmietnuta prestavba bez mutacie a bez kroku Spat, kopia/sablony, citanie dalej bezi

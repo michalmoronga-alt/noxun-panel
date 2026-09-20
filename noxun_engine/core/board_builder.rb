@@ -73,7 +73,15 @@ module Noxun
       # HISTORIA:
       #   1 = GHOST-D1 (zavedenie markera; dnesny tvar configu vratane
       #       `orientation` z UI-C1c)
-      BOARD_CONFIG_SCHEMA = 1
+      #   2 = S1-E — REZERVOVANE VAZBY NA SPOTREBIC (`appliance_refs[]` /
+      #       `appliance_expects[]`). Doska je plnohodnotny VLASTNIK spotrebica
+      #       (pracovna doska nesie varnu dosku a drez), takze ma rovnaky
+      #       rezervovany par ako skrinka. Starsi plugin (schema 1) kluce
+      #       NEPOZNA a jeho uzavrety whitelist by ich pri prvej prestavbe
+      #       ZAHODIL — polozka zakazky by stratila vlastnika a stala by sa
+      #       sirotou bez jedineho slova (Codex #376 kolo 2 P1). Napln im dava
+      #       az S1-B; v S1-E sa len PRENASAJU.
+      BOARD_CONFIG_SCHEMA = 2
 
       # GHOST-D1: ZMRAZENY snapshot vkladu DOSKY (`prepare_insert` ->
       # `commit_insert`). Kontrakt je zhodny s `CabinetBuilder::InsertPlan`
@@ -204,7 +212,12 @@ module Noxun
             edges: norm_edges(p, sheet, picker_issues),
             quantity: norm_quantity(p),
             # UI-C1c: umiestnenie, nie vyrobny udaj — do deskriptora NEJDE.
-            orientation: norm_orientation(p)
+            orientation: norm_orientation(p),
+            # S1-E: rezervovane vazby na spotrebic (schema 2). Normalizacia ich
+            # PRENASA nedotknute — zahodit `appliance_refs[]` smie VYHRADNE
+            # `dedup_copies` (kopia dosky nevlastni ten isty drez).
+            appliance_refs: CabinetBuilder.norm_appliance_refs(raw(p, :appliance_refs)),
+            appliance_expects: CabinetBuilder.norm_appliance_expects(raw(p, :appliance_expects))
           }
           # 2B-1 (GH #94 P2): duplak vazba zo SNAPSHOTU sa nesie cez normalize —
           # board_config ju pouzije ako carry-over, ked katalog vazbu pre tento
@@ -342,6 +355,11 @@ module Noxun
           # nieco vzniklo (SCHEMA 1 config ostava bajtovo identicky s dneskom).
           w = cfg[:warnings]
           out[:warnings] = w if w.is_a?(Array) && !w.empty?
+          # S1-E: kluc sa objavi LEN ked doska naozaj nieco nesie — prazdne
+          # pole by predstieralo „vazbu sme uz riesili" (a menilo by config
+          # kazdej existujucej dosky).
+          out[:appliance_refs] = cfg[:appliance_refs] if cfg[:appliance_refs].is_a?(Array)
+          out[:appliance_expects] = cfg[:appliance_expects] if cfg[:appliance_expects].is_a?(Array)
           out
         end
 
@@ -678,6 +696,13 @@ module Noxun
                 inst.definition.name = definition_name(new_id)
                 Store.write(inst, { std: Store::STD, kind: 'board', id: new_id, part_id: new_id })
                 inst.name = "Doska #{new_id}"
+                # S1-E (Astra FIX E6): kopia dosky nevlastni ten isty drez —
+                # `appliance_refs[]` zanikaju, `appliance_expects[]` ostavaju.
+                # Robi sa to ZAPISOM JEDNEHO KLUCA, nie `normalize` round-tripom:
+                # dedup zamerne geometriu ani config nedeformuje (zmena katalogu
+                # by inak pri kopirovani menila vyrobne cisla). Doska z NOVSEJ
+                # verzie sa NEDOTKNE vobec — jej configu nerozumieme.
+                drop_appliance_refs!(inst)
                 model.commit_operation
               rescue StandardError => e
                 abort_safely(model)
@@ -691,6 +716,24 @@ module Noxun
         rescue StandardError => e
           Engine.log_error(e, 'BoardBuilder.dedup_copies') if defined?(Engine)
           []
+        end
+
+        # S1-E (Astra FIX E6): odstrani `appliance_refs` z ULOZENEHO configu
+        # dosky BEZ normalizacie. Doska z NOVSEJ verzie sa NEDOTKNE — jej
+        # config by sme prepisom ocesali o polia, ktorym nerozumieme (dedup
+        # meni LEN identitu). Vracia true, ak sa config naozaj zmenil.
+        def drop_appliance_refs!(inst)
+          cfg = Store.config(inst)
+          return false unless cfg.is_a?(Hash)
+          return false if newer_config?(cfg)
+          return false unless cfg.key?('appliance_refs')
+
+          cfg.delete('appliance_refs')
+          Store.write_config(inst, cfg)
+          true
+        rescue StandardError => e
+          Engine.log_error(e, 'BoardBuilder.drop_appliance_refs!') if defined?(Engine)
+          false
         end
 
         # --- SketchUp pomocne -----------------------------------------------

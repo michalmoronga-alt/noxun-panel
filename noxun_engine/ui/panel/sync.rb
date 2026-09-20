@@ -39,7 +39,10 @@ module Noxun
             appdata_dir: about_dir,
             defaults: {
               lower: CabinetBuilder::LOWER_DEFAULTS,
-              upper: CabinetBuilder::UPPER_DEFAULTS
+              upper: CabinetBuilder::UPPER_DEFAULTS,
+              # S1-E: predvolby SLOTU UMYVACKY (vkladacia karta aj krizova
+              # validacia v paneli citaju TIE ISTE cisla ako builder).
+              dishwasher: CabinetBuilder::DISHWASHER_DEFAULTS
             },
             # D-27: viditelnost NOXUN tagov v modeli — JEDEN stav pre okno
             # tagov v raile aj pre checkbox „Zobraziť zóny (ghost)". Samostatne

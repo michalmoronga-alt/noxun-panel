@@ -174,15 +174,18 @@ NxTest.test('S1-E0: nizky korpus NEPRIDAVA ziadne pole do configu') do
                       'nizky korpus ma PRESNE tie iste kluce ako bezny')
 end
 
-NxTest.test('S1-E0 (Codex #374 P1): CONFIG_SCHEMA je 15 a nizka skrinka ho nesie') do
+NxTest.test('S1-E0 (Codex #374 P1): CONFIG_SCHEMA je aspon 15 a nizka skrinka nesie aktualny marker') do
   # PRECO BUMP, ked nepribudlo pole: starsi plugin (schema 14) ma MIN[:height]
   # = 200, takze by skrinku 80-199 mm pri prvej prestavbe KLAMPOL na 200 —
   # zmenil by vysku bokov, chrbta aj ciel a nikto by to nezbadal, kym by
   # dielce neprisli z pily. Disciplina bumpu (STANDARD 2.5) hovori o TICHEJ
   # ZMENE VYROBY, nie o novom poli.
-  NxTest.assert_equal(15, NxS1E0.cb::CONFIG_SCHEMA, 'schema configu je po S1-E0 pätnastka')
+  # S1-E: cislo uz nie je pripnute na 15 (dalsie davky bumpuju dalej) —
+  # kontroluje sa, ze S1-E0 bump NEZMIZOL a ze sa marker naozaj zapisuje.
+  NxTest.assert(NxS1E0.cb::CONFIG_SCHEMA >= 15, 'schema configu je po S1-E0 aspon pätnastka')
   stored = NxS1E0.stored(NxS1E0.low_lower)
-  NxTest.assert_equal(15, stored['config_schema'], 'ulozeny config nizkej skrinky nesie marker 15')
+  NxTest.assert_equal(NxS1E0.cb::CONFIG_SCHEMA, stored['config_schema'],
+                      'ulozeny config nizkej skrinky nesie AKTUALNY marker')
   NxTest.assert_close(90.0, stored['height'], 0.01, 'a nizku vysku')
 end
 
@@ -195,15 +198,16 @@ NxTest.test('S1-E0 (Codex #374 P1): starsi plugin (schema 14) nizku skrinku PRES
                 'skrinka postavena touto verziou je pre schemu 14 NOVSIA — prestavba sa odmietne')
   # A TATO verzia svoj vlastny config odmietat nesmie.
   NxTest.refute(NxS1E0.cb.newer_config?(stored), 'vlastny config prechadza bez blokady')
-  NxTest.assert(NxS1E0.cb.newer_config?(stored.merge('config_schema' => 16)),
+  NxTest.assert(NxS1E0.cb.newer_config?(stored.merge('config_schema' => NxS1E0.cb::CONFIG_SCHEMA + 1)),
                 'config z novsej verzie sa dalej blokuje')
 end
 
-NxTest.test('S1-E0 (Codex #374 P1): sablona nizkej skrinky nesie marker 15') do
+NxTest.test('S1-E0 (Codex #374 P1): sablona nizkej skrinky nesie AKTUALNY marker') do
   # Sablona je STRATOVA cesta BEZ rebuildu — keby marker nenesla, starsi plugin
   # by z nej postavil skrinku klampnutu na 200 a bez jedineho varovania.
   tc = Noxun::Engine::Panel.template_config_from(NxS1E0.stored(NxS1E0.low_lower))
-  NxTest.assert_equal(15, tc['config_schema'], 'sablonovy whitelist stampuje aktualny marker')
+  NxTest.assert_equal(NxS1E0.cb::CONFIG_SCHEMA, tc['config_schema'],
+                      'sablonovy whitelist stampuje aktualny marker')
 end
 
 NxTest.test('S1-E0: HISTORIA bumpu ma zapisany dovod cisla 15 (disciplina STANDARD 2.5)') do

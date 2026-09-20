@@ -95,8 +95,19 @@ module Noxun
               next if target && ent.equal?(target)
               next unless visible?(model, path + [ent])
 
+              env = nil
+              if ent.is_a?(Sketchup::ComponentInstance)
+                env = noxun_envelope_box(ent, to_local * ent.transformation)
+              end
               node =
-                if container?(ent)
+                if env
+                  # S1-E (FIX E3): NOXUN korpus je prekazkou svojou NOMINALNOU
+                  # obalkou. Doraz tak sadne na obrys skrinky aj vtedy, ked jej
+                  # celo presahuje linku alebo telo umyvacky trci do strany —
+                  # a vysledok uz nezavisi od toho, ci ma niekto zapnuty tag
+                  # referencie. Zanorovanie sa preto preskakuje.
+                  relevant?(env, t_box, dir) ? { box: env, container: false } : nil
+                elsif container?(ent)
                   container_node(model, ent, to_local, path, t_box, dir, depth)
                 elsif ent.is_a?(Sketchup::Face)
                   { box: box_mm(transform_bounds(ent.bounds, to_local)), container: false }
@@ -148,12 +159,31 @@ module Noxun
           # legacy bral surove `definition.bounds`, takze SKRYTY presahujuci
           # potomok (napr. proxy kovania na vypnutom tagu) posuval doraz.
           def target_box(model, target)
+            # S1-E (FIX E3): NOXUN korpus sa prisuva SVOJOU NOMINALNOU obalkou —
+            # presah cela ani trciace telo umyvacky doraz neposuvaju.
+            env = noxun_envelope_box(target, IDENTITY)
+            return env if env
+
             bb = Geom::BoundingBox.new
             collect_bounds(model, target.definition.entities, IDENTITY, [target], bb, 0)
             box_mm(bb.empty? ? target.definition.bounds : bb)
           rescue StandardError => e
             Engine.log_error(e, 'Tools::Snaper.target_box')
             box_mm(target.definition.bounds)
+          end
+
+          # Obalka NOXUN korpusu vyjadrena v ramci `frame_tr`, alebo nil (cudzia
+          # entita, doska, poskodeny config). JEDINA autorita tvaru obalky je
+          # `CabinetBuilder.envelope`; `frame_tr` si sklada volajuci (ciel =
+          # IDENTITY, prekazka = `to_local * ent.transformation`).
+          def noxun_envelope_box(ent, frame_tr)
+            return nil unless defined?(CabinetBuilder)
+            return nil unless ent.is_a?(Sketchup::ComponentInstance)
+            return nil if CabinetBuilder.envelope_dims(ent).nil?
+
+            box_mm(CabinetBuilder.envelope(ent, transform: frame_tr))
+          rescue StandardError
+            nil
           end
 
           def collect_bounds(model, entities, to_local, path, bb, depth)

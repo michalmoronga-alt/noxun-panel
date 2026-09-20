@@ -668,12 +668,14 @@ kvótová brána `usage` pred každým auditom a subagentom. Pravidlo 3 kôl pla
   **Kontrakt:** server skladá strom (poradie `CATEGORIES`, počty, podtitul), kartu v 4 blokoch aj polia formulára z **jednej tabuľky `ROWS`**; kľúč poľa modalu = cesta, ktorú
   katalóg vracia v chybe; zápis = **echo sekcie bez zdvihu generácie** a kreslí len v aktívnej sekcii; miniatúry príloh lazy kanálom (`Sketchup::ImageRep`, 96 px, záporná cache);
   `appl_open_url` pustí len http/https. „Do zákazky" a pohľad „V zákazke" sú `aria-disabled` s dôvodom (D-78) — aktivuje ich S1-B.
-- **S1-E · Slot umývačky — nový typ skrinky** *(builder + `CONFIG_SCHEMA` 15 → 16 + TemplateStore STD 4 → 5 → `codex-audit` ÁNO; in-SU povinné)* — 7 vstupov, jediný dielec čelo
-  (item `blind`), telo = referencia + základňa 200, šablóny 60/45, kontroly telo vs šírka a nastavená výška tela vs linka; výplň hore ručne (mockup R13–R16). Kontraktové body zo
-  Codex kôl: **schéma 16 rezervuje `appliance_refs[]` aj `appliance_expects[]` — v configu skrinky AJ dosky (`BOARD_CONFIG_SCHEMA` bump, doska má vlastný whitelist a guard)** (C ich
-  napĺňa bez ďalšieho bumpu) · **kópia skrinky aj dosky (toolbar aj natívna dedup) väzby `appliance_refs[]` zahadzuje, `appliance_expects[]` ponecháva** · **šablóna prenáša len
-  `appliance_expects[]`, nikdy `appliance_refs[]`** (`template_config_from`), a `merge_template` väzby cieľovej skrinky zachová · **slot má podporu `none`** — `dw_front_bottom` (sokel = spodná hrana čela) nikdy netečie do `floor_height`/
-  `Construction.support_type`, takže pravidlá kovania negenerujú nohy ani príchyty sokla (Kovanie slotu = len úchytka).
+- **S1-E · Slot umývačky — nový typ skrinky** — **✅ PR #381, v0.12.12**. Typ `dishwasher` bez korpusu: 7 vstupov (trieda 600/450, šírka, výška linky, hĺbka, telo V,
+  sokel = čelo od podlahy, čelo V), **jediný výrobný dielec = čelo** (pevný item `blind`, rola `false_front`, kľúč `front:F1/blind`) a **telo = referencia**
+  (`kind: reference`, základňa 200 odsadená 50/20) v aditívnom `plan[:references]` — nikdy cez `parts`. **Kontrakt:** `CONFIG_SCHEMA` 16 a `BOARD_CONFIG_SCHEMA` 2
+  rezervujú `appliance_refs[]` / `appliance_expects[]` (S1-B/F/C ich napĺňajú bez ďalšieho bumpu); väzby prežijú prestavbu, materiály, scale aj aplikovanie šablóny
+  a `appliance_refs[]` zaniká **len v kópii** (3 vstupy skrinky + dedup dosky s dopredným guardom); šablóna nesie `appliance_expects[]`, nikdy `appliance_refs[]`.
+  **Slot má podporu `none`** — `dw_front_bottom` nikdy netečie do `floor_height`, takže žiadne nohy ani príchyty sokla. **Šírka sa neklampuje na triedu** — úzky slot
+  sa postaví a hlási ho Kontrola ORANGE. `Construction.front_opening` je jediná autorita čelného otvoru (plán aj preflight), `CabinetBuilder.envelope` jediná autorita
+  obálky (snap, placement, mower). TemplateStore STD 5 = markerový seed „Umývačka 60/45" s markerom schémy. Kontroly: `dw_body_fit` · `dw_height_fit` (ORANGE, bez brány).
 - **S1-B · Spotrebič v zákazke — väzba, vlastník, riadok Spotrebič** *(`BUDGET_STD` 1 → 2 → `codex-audit` ÁNO)* — snapshot (identita + rozmery + odkazy + prílohy), `appliance_refs[]`
   obojsmerná väzba (položky „len zákazka" = výslovná výnimka), matica kategória → vlastník, pohľad V zákazke, riadok Spotrebič v Inspectore (mockup R3–R5, R9–R11). Kontraktové body zo
   Codex kôl: **jedna kanonická sada kódov kategórií = kódy katalógu + explicitná obojsmerná migrácia legacy kódov rozpočtu** (`chladnicka rura mikrovlnka umyvacka digestor varna_doska ine`

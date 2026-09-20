@@ -148,8 +148,29 @@
   // zhodu vsetkych troch miest strazi `tests/pure/test_s1e0_min_vyska.rb`.
   var LIMITS = { width:[200,3000], height:[80,3000], depth:[150,2000], thickness:[6,50],
                  floor_height:[0,500], plinth_recess:[0,300], rail_depth:[20,400], rails_top_offset:[0,500],
+                 // S1-E: polia SLOTU UMYVACKY — zrkadlo Ruby `CabinetBuilder::DW_RANGES`
+                 // (guard test `tests/pure/test_s1e_slot.rb`). Vyska cela smie
+                 // presahovat vysku linky, preto ma vlastny (siroky) rozsah.
+                 dw_body_height:[700,1000], dw_front_bottom:[0,300], dw_front_height:[300,1200],
                  // D-07: medzery/presahy cel — zaporny okraj = presah cez obrys (limit zhodny s Fronts::EDGE_LIMIT)
                  fr_gap:[0,50], fr_gap_top:[-100,100], fr_gap_bottom:[-100,100], fr_gap_left:[-100,100], fr_gap_right:[-100,100] };
+  // S1-E: sirka a vyska maju INE hranice per TYP — slot nema vnutro, takze
+  // korpusove 200/80 mm by nedavali zmysel, a naopak „umyvacka" 3000 mm tiez
+  // nie. Zrkadlo `CabinetBuilder::DW_WIDTH_RANGE` / `DW_HEIGHT_RANGE`.
+  var TYPE_LIMITS = { dishwasher: { width:[300,1200], height:[500,1200] } };
+  // PR #381 (Codex kolo 1, P2): polia, ktore existuju LEN pri slote. Su v DOM
+  // aj pri dolnej a hornej skrinke (len skryte), takze bez tohto filtra by
+  // hodnota, ktoru tam nechal predchadzajuci slot, CERVENELA a zablokovala by
+  // vlozenie uplne inej skrinky — v poli, ktore pouzivatel nevidi a nema ako
+  // opravit. Validuju sa preto VYHRADNE v type, ktoremu patria.
+  var SLOT_FIELDS = { dw_body_height: 1, dw_front_bottom: 1, dw_front_height: 1 };
+  // Typ korpusu BEZPECNE: `getType` zije v core.js a Node testy tohto suboru
+  // ho nemusia mat nacitany (rovnaky vzor ako `typeof nxLegs… === 'function'`).
+  function cabTypeNow(){ return (typeof getType === 'function') ? getType() : 'lower'; }
+  function limitFor(id){
+    var t = TYPE_LIMITS[cabTypeNow()];
+    return (t && t[id]) || LIMITS[id];
+  }
   // D-22: okraje cel maju dynamicky limit podla zamku (Fronts::EDGE_LIMIT_UNLOCKED);
   // fr_gap (medzera medzi celami) ostava 0..50 VZDY.
   var EDGE_LIMIT_FIELDS = { fr_gap_top:1, fr_gap_bottom:1, fr_gap_left:1, fr_gap_right:1 };
@@ -178,6 +199,9 @@
   function cabinetHeightError(){
     var he = el('height');
     if (!he || he.value === '') return '';
+    // S1-E: slot vnutro NEMA — krizova kontrola vysky proti soklu a hrubkam
+    // sa ho netyka (jeho spodnu hranicu drzi `TYPE_LIMITS`).
+    if (cabTypeNow() === 'dishwasher') return '';
     var h = evalDim(he.value);
     if (isNaN(h)) return ''; // nezmysel uz oznacil hlavny cyklus
     var sokel = (getType() === 'upper') ? 0 : cabFieldOrDefault('floor_height');
@@ -212,13 +236,16 @@
   function validateFields(skipFrontDraft){
     var ok = true;
     var ae = document.activeElement;
+    var slotNow = (cabTypeNow() === 'dishwasher');
     for (var id in LIMITS){
       var e = el(id); if (!e) continue;
+      if (SLOT_FIELDS[id] && !slotNow){ e.classList.remove('bad'); continue; }
       if (e === ae && isExprStr(e.value)) continue; // rozpisany vyraz — nechaj tak
       if (e.value === ''){ e.classList.remove('bad'); continue; }
       var v = evalDim(e.value);
       if (isNaN(v)){ e.classList.add('bad'); ok = false; continue; }
-      var lo = LIMITS[id][0], hi = LIMITS[id][1];
+      var lim = limitFor(id);
+      var lo = lim[0], hi = lim[1];
       if (EDGE_LIMIT_FIELDS[id] && edgeLimitOff){ lo = -2000; hi = 2000; }
       if (v < lo || v > hi){ e.classList.add('bad'); ok = false; } else { e.classList.remove('bad'); }
     }
@@ -266,11 +293,21 @@
   }
   function nxFrontDraftData(){
     var c = collectConstruction(), d = DEFAULTS[getType()] || {};
-    return { width: c.width === '' ? d.width : c.width,
+    var t = getType();
+    var out = { width: c.width === '' ? d.width : c.width,
       height: c.height === '' ? d.height : c.height,
-      floor_height: getType() === 'upper' ? 0 : (c.floor_height === '' ? d.floor_height : c.floor_height),
+      floor_height: (t === 'upper' || t === 'dishwasher') ? 0 : (c.floor_height === '' ? d.floor_height : c.floor_height),
       fronts: collectFronts(), model_guid: nxDocGuid(), cabinet_id: selectedCabId || '',
       insert_session: frontDraftSession };
+    // S1-E: preflight potrebuje TYP a virtualny otvor slotu — bez nich by
+    // overoval celo proti VYSKE LINKY a presah nad linku (ktory je v poriadku)
+    // by zahlasil ako chybu.
+    out.type = t;
+    if (t === 'dishwasher'){
+      out.dw_front_bottom = c.dw_front_bottom === '' ? d.dw_front_bottom : c.dw_front_bottom;
+      out.dw_front_height = c.dw_front_height === '' ? d.dw_front_height : c.dw_front_height;
+    }
+    return out;
   }
   function nxFrontDraftSignature(){ return JSON.stringify(nxFrontDraftData()); }
   function nxFrontDraftMessage(message){
@@ -541,6 +578,14 @@
   // Odhad je ZNACENY (≈) a riadky ostavaju neklikatelne (nie je co oznacit v
   // modeli) — vzor D-78: aria-disabled + vysvetlenie, nikdy ticho mrtve.
   function setInsertCabInfo(){
+    // S1-E: slot vyrába VŽDY jeden dielec (čelo) — korpusový odhad by mu
+    // spočítal boky, dno a strop, ktoré nikdy nevzniknú.
+    if (cabTypeNow() === 'dishwasher'){
+      setOut('inf_parts', '≈ 1');
+      setOut('inf_area', '—');
+      setOut('inf_weight', '—');
+      return;
+    }
     var st = nxDraftStats(pvGeom(), computeZones(), pvInsertFronts());
     setOut('inf_parts', st.count > 0 ? ('≈ ' + st.count) : '—');
     setOut('inf_area', st.area > 0 ? ('≈ ' + mmLabel(st.area) + ' m²') : '—');
@@ -560,13 +605,75 @@
     writeConstruction(DEFAULTS[t] || {});
     applyVisibility(t);
   }
+  // S1-E: riadky, ktore su LEN pre slot, a riadky, ktore slot NEMA. Dva
+  // menovite zoznamy — nie CSS trieda: `applyVisibility` je jedina autorita
+  // viditelnosti a kazdy riadok tu musi byt vidno na jednom mieste.
+  var SLOT_ONLY_ROWS = ['dwClassRow', 'dwBodyRow', 'dwFrontBottomRow', 'dwFrontHeightRow',
+                        'infDwBody', 'infDwTop', 'infDwFill', 'infDwUnder', 'infDwClass'];
+  var SLOT_HIDDEN_ROWS = ['thicknessRow', 'infAvWidth', 'infIntDepth', 'infAvHeight', 'infArea'];
+
   function applyVisibility(t){
-    el('plinthGroup').style.display = (t === 'upper') ? 'none' : '';
-    el('fhRow').style.display = (t === 'upper') ? 'none' : ''; // D-11: vyska sokla v Zakladnych, horna ju nema
+    var slot = (t === 'dishwasher');
+    if (slot) nxFillSlotFields();
+    el('plinthGroup').style.display = (t === 'upper' || slot) ? 'none' : '';
+    // D-11: vyska sokla v Zakladnych, horna ju nema. S1-E: slot ju nema tiez —
+    // jeho „sokel" je spodna hrana CELA (`dw_front_bottom`), nie vyska korpusu.
+    el('fhRow').style.display = (t === 'upper' || slot) ? 'none' : '';
+    SLOT_ONLY_ROWS.forEach(function(id){ var n = el(id); if (n) n.hidden = !slot; });
+    SLOT_HIDDEN_ROWS.forEach(function(id){ var n = el(id); if (n) n.style.display = slot ? 'none' : ''; });
+    // Vyska korpusu je pri slote VYSKA LINKY (horna hrana susednych korpusov).
+    nxSetRowLabel('lblHeight', slot ? 'Výška linky' : 'Výška');
+    nxSetRowUnit('height', slot ? 'mm · horná hrana susedov' : 'mm');
+    nxSetRowUnit('dw_body_height', 'mm · rozsah ' + LIMITS.dw_body_height[0] + '–' + LIMITS.dw_body_height[1]);
+    var wrow = el('infWeight');
+    var wspan = wrow ? wrow.querySelector('span') : null;
+    if (wspan) wspan.textContent = slot ? 'Hmotnosť čela' : 'Hmotnosť';
     // KOV-G2 (D-111): riadok Noh ide s riadkom Sokel — horna skrinka nohy nema.
     // Vo VKLADANI si zaroven vypyta cerstvy nahlad (typ sa prave zmenil).
-    if (typeof nxLegsApplyVisibility === 'function') nxLegsApplyVisibility(t);
+    // S1-E: slot nohy ani sokel NEMA (podpora `none`), preto rovnako skryty.
+    if (typeof nxLegsApplyVisibility === 'function') nxLegsApplyVisibility(slot ? 'upper' : t);
     toggleRecess(); toggleTwoRails(); toggleBackTh(); // D-31: pokryva vyber korpusu, defaulty aj sablonu
+  }
+
+  // PR #381 (Codex kolo 1, P2): prazdne alebo neplatne pole SLOTU dostane
+  // PREDVOLBU TYPU zo servera (`DEFAULTS.dishwasher` = `DISHWASHER_DEFAULTS`).
+  // Bez toho by po prepnuti typu ostalo pole prazdne alebo so starou hodnotou
+  // inej skrinky — a Ruby `normalize` by si aj tak dosadilo svoj default,
+  // takze panel by ukazoval nieco ine, nez sa naozaj postavi.
+  // Bezi z `applyVisibility`, teda PO `writeConstruction` na VSETKYCH troch
+  // cestach (oznaceny slot · sablona vo vkladacej karte · defaulty typu);
+  // `writeConstruction` samo v `core.js` o type nic nevie.
+  function nxFillSlotFields(){
+    var d = (typeof DEFAULTS === 'object' && DEFAULTS) ? (DEFAULTS.dishwasher || {}) : {};
+    for (var id in SLOT_FIELDS){
+      if (!Object.prototype.hasOwnProperty.call(SLOT_FIELDS, id)) continue;
+      var e = el(id); if (!e) continue;
+      var dv = parseFloat(d[id]);
+      if (isNaN(dv)) continue;              // predvolby zo servera este nedosli
+      var lim = LIMITS[id];
+      var v = (e.value === '') ? NaN : evalDim(e.value);
+      if (!isNaN(v) && v >= lim[0] && v <= lim[1]) continue;
+      setNum(id, dv);
+      e.classList.remove('bad');
+    }
+    var cls = el('dw_class');
+    if (cls && !cls.value && d.dw_class != null) setVal('dw_class', String(d.dw_class));
+  }
+
+  // Popis riadku. Text ma v HTML VLASTNY uzol (`<span id="lbl…">`), takze sa
+  // ikona nedotkne a nie je treba hladat textove uzly. Vzor: `Výška` ->
+  // `Výška linky` pri slote.
+  function nxSetRowLabel(spanId, text){
+    var s = el(spanId);
+    if (s) s.textContent = text;
+  }
+
+  // Jednotkovy hint riadku (`.unit` v tom istom `.rowc`).
+  function nxSetRowUnit(fieldId, text){
+    var f = el(fieldId);
+    var row = f && f.closest ? f.closest('.rowc') : null;
+    var u = row ? row.querySelector('.unit') : null;
+    if (u) u.textContent = text;
   }
   function toggleRecess(){ el('recessRow').style.display = (val('plinth_mode') === 'front') ? '' : 'none'; }
   function toggleTwoRails(){ el('twoRailsGroup').style.display = (val('top_mode') === 'two_rails') ? '' : 'none'; }
@@ -1011,10 +1118,18 @@
   // UI-C1b: pole zamku -> ID inputu. Korpusove kluce SU ID poli; doskove maju
   // prefix `ib_` (vkladacia doska) — mapovanie zije LEN tu.
   function insertLockElId(field, scope){ return (scope === 'board') ? ('ib_' + field) : field; }
+  // PR #381 (Codex kolo 1, P2): polia, ktore SLOT nema — zamok z predoslej
+  // skrinky sa do nich NEDOSADZUJE. Inak by zamknuta hrubka 25 mm pristala
+  // v payloade slotu (pole je skryte, takze by ju pouzivatel nemal ako
+  // odomknut) a server by mal rozhodovat o hrubke korpusu, ktory neexistuje.
+  var SLOT_NO_LOCK = { thickness: 1, floor_height: 1 };
   function applyInsertLockValues(scope){
     var flat = NXInsert.locksFlat(scope);
+    var slot = (scope !== 'board' && cabTypeNow() === 'dishwasher');
     for (var f in flat){
-      if (Object.prototype.hasOwnProperty.call(flat, f)) setNum(insertLockElId(f, scope), flat[f]);
+      if (!Object.prototype.hasOwnProperty.call(flat, f)) continue;
+      if (slot && SLOT_NO_LOCK[f]) continue;
+      setNum(insertLockElId(f, scope), flat[f]);
     }
   }
   function renderInsertLocks(){
@@ -1136,13 +1251,30 @@
     el('tplSaveName').value = (typeof tplNameSuggestion === 'string' && tplNameSuggestion) ? tplNameSuggestion : '';
     // UI-B3: typ sa predvyplni z TYPU OZNACENEJ SKRINKY (radio vo vkladacej
     // karte je pri oznacenom korpuse zrkadlom jeho typu — setType v loadSelected).
-    setVal('tplSaveType', getType());
+    // PR #381 (Codex kolo 1, P2): pri SLOTE je typ daný a select sa ZAMKNE —
+    // doteraz ostal prázdny (hodnota `dishwasher` v ňom nebola) a používateľ
+    // ho mohol prepnúť, hoci server voľbu aj tak ignoruje.
+    nxSyncTplSaveType(getType());
     el('tplSaveHardware').checked = tplSavedHardwareChoice();
     m.style.display = 'flex';
     refreshTplModalWarn();
     bindTplModal();
     var inp = el('tplSaveName'); inp.focus(); inp.select();
   }
+  // Zrkadlo typu do modalu + zámok pri slote. JEDINÉ miesto, ktoré s poľom
+  // typu pracuje; server ostáva autoritou (`Panel.apply_template_type!` pri
+  // slote typ nemení bez ohľadu na payload).
+  function nxSyncTplSaveType(t){
+    var sel = el('tplSaveType');
+    if (!sel) return;
+    var slot = (t === 'dishwasher');
+    setVal('tplSaveType', t);
+    sel.disabled = slot;
+    sel.title = slot ? 'Typ určuje sám slot umývačky — prepnúť sa nedá.' : '';
+    var tip = el('tplSaveTypeTip');
+    if (tip) tip.hidden = !slot;
+  }
+
   function closeSaveTemplateModal(){
     cancelTplDeferredSave();
     var m = el('tplModal'); if (m) m.style.display = 'none';
@@ -2158,6 +2290,30 @@
     updateCabfrontMeta(); // D-130b: meta skupiny „Spoločné pre skrinku"
     refreshFrontCards();
     refreshFrontProfileUI(); // D-96: ponuka a veta stavu patria k prave vykreslenym riadkom
+    nxSlotFrontsLock();      // S1-E: slot ma jedno pevne celo
+  }
+
+  // S1-E: SLOT MA JEDNO PEVNE CELO. UI to len PRIZNA (schova „Pridať čelo",
+  // krizik a vysku da na citanie) — vynucuje to SERVER (`slot_fronts_refusal`
+  // v `actions_cabinet.rb`), lebo HTML nie je ochrana.
+  function nxSlotFrontsLock(){
+    var slot = (cabTypeNow() === 'dishwasher');
+    var box = el('frontAddTypes');
+    var addRow = (box && box.closest) ? box.closest('.addrow') : null;
+    if (addRow) addRow.style.display = slot ? 'none' : '';
+    var wrap = el('frontRows');
+    var rows = wrap ? wrap.querySelectorAll('.frow') : [];
+    for (var i = 0; i < rows.length; i++){
+      var fh = rows[i].querySelector('.fh');
+      if (fh){
+        fh.readOnly = slot;
+        fh.title = slot ? 'Výšku čela slotu mení pole „Čelo V“ v Základných.' : '';
+      }
+      var auto = rows[i].querySelector('.fauto');
+      if (auto) auto.style.display = slot ? 'none' : '';
+      var del = rows[i].querySelector('.fdel');
+      if (del) del.style.display = slot ? 'none' : '';
+    }
   }
 
   // --- D-23: placeholder ≈ dopocitanej vysky v AUTO poliach --------------------
@@ -2342,6 +2498,7 @@
                        // KOV-I: mini-DOM overuje skutocny modal a existujuci hint.
                        nxTplHardwareText: nxTplHardwareText, nxTplHardwareBadge: nxTplHardwareBadge,
                        openSaveTemplateModal: openSaveTemplateModal, closeSaveTemplateModal: closeSaveTemplateModal,
+                       nxSyncTplSaveType: nxSyncTplSaveType,
                        saveTemplateAs: saveTemplateAs, setTplMeta: setTplMeta,
                        // UI-D2: dlazdica s PNG nahladom — kluc cache, ciste jadro
                        // pull/cache rozhodovania a nasadenie obrazka na dlazdicu.
@@ -2385,6 +2542,15 @@
                        // hlavicky kresli panel z ciseho textu core.js.
                        toggleEdgeLimit: toggleEdgeLimit, setEdgeLimitOff: setEdgeLimitOff,
                        resetFrontGaps: resetFrontGaps, updateCabfrontMeta: updateCabfrontMeta,
-                       cabfrontDecorName: cabfrontDecorName };
+                       cabfrontDecorName: cabfrontDecorName,
+                       // S1-E: hranice per TYP a viditelnost riadkov slotu.
+                       // `limitFor` je CISTE jadro (zrkadlo Ruby rozsahov),
+                       // `applyVisibility` a `nxSlotFrontsLock` sa overuju nad
+                       // mini-DOM (rovnaky vzor ako karta cela).
+                       LIMITS: LIMITS, TYPE_LIMITS: TYPE_LIMITS, limitFor: limitFor,
+                       SLOT_FIELDS: SLOT_FIELDS, validateFields: validateFields,
+                       nxFillSlotFields: nxFillSlotFields,
+                       applyVisibility: applyVisibility, nxSlotFrontsLock: nxSlotFrontsLock,
+                       SLOT_ONLY_ROWS: SLOT_ONLY_ROWS, SLOT_HIDDEN_ROWS: SLOT_HIDDEN_ROWS };
   }
 

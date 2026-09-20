@@ -466,13 +466,16 @@ end
 
 # ============================ TemplateStore ====================================
 
-NxTest.test('templates: prvy load seedne 4 korpusove + 3 doskove sablony') do
+NxTest.test('templates: prvy load seedne 4 korpusove + 2 slotove + 3 doskove sablony') do
   NxTest.skip! 'katalogove testy bezia len headless (APPDATA sandbox)' unless NxTest.headless?
   tpl = Noxun::Engine::TemplateStore
   nx_reset_catalog_file(tpl.path)
   list = tpl.load
-  NxTest.assert_equal(7, list.size)
-  NxTest.assert_equal(['Dolna klasik', 'Drezova', 'Varna doska', 'Horna klasik'],
+  # S1-E: seed pribudli dve SLOTOVE sablony umyvacky (korpusovy druh, typ
+  # `dishwasher`) — preto 9 namiesto 7.
+  NxTest.assert_equal(9, list.size)
+  NxTest.assert_equal(['Dolna klasik', 'Drezova', 'Varna doska', 'Horna klasik',
+                       'Umývačka 60', 'Umývačka 45'],
                       list.select { |t| t['kind'] == 'cabinet' }.map { |t| t['name'] })
   NxTest.assert_equal(['Diel', 'Pracovná doska', 'Zástena'],
                       list.select { |t| t['kind'] == 'board' }.map { |t| t['name'] })
@@ -491,7 +494,7 @@ NxTest.test('templates: prvy load seedne 4 korpusove + 3 doskove sablony') do
   parsed = JSON.parse(File.binread(tpl.path))
   NxTest.assert_equal(Noxun::Engine::TemplateStore::STD, parsed['std'],
                       'cerstva instalacia je rovno na AKTUALNOM markeri (UI-C1c: 3)')
-  NxTest.assert_equal(7, parsed['templates'].size)
+  NxTest.assert_equal(9, parsed['templates'].size)
 end
 
 NxTest.test('templates: find/upsert/delete round-trip') do
@@ -505,10 +508,10 @@ NxTest.test('templates: find/upsert/delete round-trip') do
   NxTest.assert_equal('cabinet', found['kind'])
   NxTest.assert_equal('lower', found['config']['type'])
   NxTest.assert_close(450.0, found['config']['width'])
-  NxTest.assert_equal(8, tpl.load.size, '7 seed + 1 nova')
+  NxTest.assert_equal(10, tpl.load.size, '9 seed + 1 nova')
   NxTest.assert_equal(true, tpl.delete('cabinet', 'Testovacia'))
   NxTest.assert_equal(nil, tpl.find('cabinet', 'Testovacia'))
-  NxTest.assert_equal(7, tpl.load.size)
+  NxTest.assert_equal(9, tpl.load.size)
 end
 
 NxTest.test('templates: upsert prepise existujucu sablonu podla dvojice (kind, meno)') do
@@ -534,9 +537,9 @@ NxTest.test('templates: reload! nacita subor po rucnom zapise mimo store') do
   # Rucny zapis vratil marker na 1 -> dalsi load spusti migraciu (kind + seed
   # dosiek). Rucna sablona ostava a dostane kind 'cabinet'.
   list = tpl.reload!
-  NxTest.assert_equal(4, list.size, '1 rucna + 3 doskove zo seedu migracie')
+  NxTest.assert_equal(6, list.size, '1 rucna + 3 doskove + 2 slotove zo seedu migracie')
   NxTest.assert_equal('Rucna', list[0]['name'])
   NxTest.assert_equal('cabinet', list[0]['kind'])
   NxTest.assert_equal('upper', list[0]['config']['type'])
-  NxTest.assert_equal(4, tpl.load.size, 'aj dalsi load ma vidiet rucny zapis')
+  NxTest.assert_equal(6, tpl.load.size, 'aj dalsi load ma vidiet rucny zapis')
 end

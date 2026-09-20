@@ -410,7 +410,7 @@ module Noxun
           cab_type = (Store.config(cab) || {})['type'] || 'lower'
           tpl_type = (tpl['config'] || {})['type'] || 'lower'
           if tpl_type != cab_type
-            return set_status("Šablóna je pre iný typ (#{tpl_type == 'upper' ? 'horná' : 'dolná'}) " \
+            return set_status("Šablóna je pre iný typ (#{Panel::TEMPLATE_TYPE_WORDS[tpl_type] || 'dolná'}) " \
                               'než označená skrinka — nepoužitá.', true)
           end
 
@@ -547,6 +547,16 @@ module Noxun
           %w[material_id front_material_id back_material_id drawer_material_id].each do |k|
             tv = CabinetBuilder.present(tpl_config[k])
             merged[k] = tv || target_params[k]
+          end
+          # S1-E (R2c): VAZBY NA SPOTREBIC su majetkom CIELA, nie sablony.
+          # `template_config_from` `appliance_refs[]` do sablony nikdy nedava,
+          # takze bez tohto riadku by aplikovanie sablony ticho odpojilo
+          # spotrebic uz viazanej skrinky (a polozka zakazky by ostala sirota).
+          # `appliance_expects[]` ma prednost zo SABLONY, ked ich nesie —
+          # „spotrebicova sablona" je prave o tom, co skrinka ocakava.
+          merged['appliance_refs'] = target_params['appliance_refs']
+          unless tpl_config['appliance_expects'].is_a?(Array)
+            merged['appliance_expects'] = target_params['appliance_expects']
           end
           merged
         end

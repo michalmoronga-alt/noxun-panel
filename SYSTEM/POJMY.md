@@ -32,6 +32,20 @@
   (nie je to symetrická lišta — orientácia dopredu/dozadu je zameniteľná a raz sa už zamenila, D-90/PR #146)
 - **Set kovania** — mapovacie pravidlo: generický typ z pravidiel (záves, noha, výsuv…) → zoznam Demos kódov s pomermi
   (per jednotka / per vlastník / rad podľa NL); **NIE je položka katalógu**; definície globálne + snapshot v modeli (dávka D)
+- **Slot umývačky** (`type: dishwasher`, S1-E) — **typ skrinky BEZ KORPUSU**: nemá boky, dno, strop, chrbát ani zóny a nedostane nohy ani sokel.
+  Vyrába **jediný dielec — čelo** (blenda, rola `false_front`) a telo umývačky kreslí ako **referenciu**. Jeho **výška je výška LINKY** (horná hrana
+  susedných korpusov), nie výška korpusu; „sokel" slotu je **spodná hrana čela od podlahy** (vlastné pole, do výšky korpusu nikdy netečie).
+  Trieda je 600 alebo 450 (60 / 45 cm).
+- **Telo spotrebiča (referencia)** — geometria v modeli, ktorá **nie je dielec**: `kind: reference`, `manufactured: false`,
+  `production_class: reference`. Kupuje ju zákazník, plugin ju **nevyrába ani neobjednáva**, takže ju nikdy nevidí kusovník, VEPO, nákup ani rozpočet —
+  kreslí sa len preto, aby bolo vidno, čo do slotu príde. Nikdy sa nedeformuje podľa skrinky: keď je širšia, **trčí** a Kontrola to prizná.
+- **Základňa tela (200)** — spodných 200 mm tela spotrebiča: **fixná**, užšia (20 mm z každej strany) a plytšia (50 mm spredu) než telo.
+  Je to zóna nôh a soklu spotrebiča — v modeli vďaka nej vidno, kadiaľ vedie soklová lišta.
+- **Výplň hore** — pásmo medzi hornou hranou čela slotu a líniou linky. Plugin ho **negeneruje** — Michal ho rieši **ručne** podľa situácie:
+  nízkym korpusom na dorovnanie (od 80 mm, preto S1-E0) alebo doskou. Inspector ho hlási ako výstup („výplň 90 · ručne"), nie ako chybu.
+- **Logická obálka korpusu** — **nominálny** obrys skrinky z configu (`šírka × hĺbka × výška`), nie skutočné bounds v modeli. Prisúvanie, umiestňovanie
+  novej skrinky a stred otáčania merajú **ju**, takže presahujúce čelo, proxy kovania ani telo spotrebiča doraz neposúvajú (a výsledok nezávisí od toho,
+  ktoré tagy má kto zapnuté).
 - **Šablóna vs TYP vs parameter** — tri úrovne konfigurácie — hranica definovaná v [PLAN.md](PLAN.md) (sekcia „Hranica: TYP vs. ŠABLÓNA vs. PARAMETER")
 
 ## Stolárske poznatky (doména)

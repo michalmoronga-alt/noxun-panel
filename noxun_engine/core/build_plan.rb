@@ -108,6 +108,35 @@ module Noxun
 
       PRODUCTION_CLASSES = %w[sheet linear counted reference none].freeze
 
+      # === S1-E: REFERENCNA GEOMETRIA (`plan[:references]`) ===================
+      #
+      # ADITIVNY kluc planu. Referencia NIE JE dielec: nikdy sa nevyraba, nikdy
+      # nema `part_key` a NIKDY nesmie prejst cez `parts` — renderer dielcov
+      # (`CabinetBuilder.add_part`) zapisuje na entitu `kind: 'part'`, takze by
+      # ju kusovnik aj VEPO videli ako vyrobny zaznam (Astra S1-E, BLOCKER E2).
+      # Preto ma vlastny zoznam, vlastny validator a vlastny renderer
+      # (`render_references`).
+      #
+      # Telo spotrebica (umyvacka, neskor chladnicka) je JEDINY dnesny pripad:
+      # kreslime ho preto, aby bolo v modeli vidno, co do slotu pride — kupuje
+      # ho zakaznik, my ho nevyrabame ani neobjednavame.
+      #
+      # DESKRIPTOR (symbolove kluce, mm Float):
+      #   ref_key          String  — identita v rámci planu (unikatna)
+      #   role             String  — z REFERENCE_ROLES
+      #   kind             'reference'
+      #   box              [3xFloat > 0] rozmery telesa (mm)
+      #   origin           [3xFloat]     poloha v korpuse (mm)
+      #   production_class 'reference'   (STANDARD 8.1 — referencia domeny)
+      #   manufactured     false
+      #   source           'generic' | 'catalog'
+      #   label            String  — ludsky popis do modelu a diagnostiky
+      #   dw_class         Numeric|nil — trieda umyvacky (600/450), ak je to slot
+      REFERENCE_ROLES = %w[appliance_body].freeze
+      REFERENCE_CLASS = 'reference'
+      REFERENCE_KIND  = 'reference'
+      REFERENCE_SOURCES = %w[generic catalog].freeze
+
       # Slovnik generickych typov kovania (faza 1 pouziva leg/hinge/slide; zvysok
       # rezervovany standardom 2.4). Neznamy typ = chyba kontraktu, nie nova kategoria.
       # wall_hanger = zavesenie skrinky na stenu (rektifikacny uholnik "Bystrica",
@@ -371,6 +400,11 @@ module Noxun
         seen = {}
         plan[:parts].each { |pd| validate_part!(pd, seen) }
         plan[:hardware].each { |hw| validate_hardware!(hw, seen) }
+        # S1-E: chybajuci kluc = ziadne referencie (vsetky dnesne plany dolnej
+        # a hornej skrinky) — kontrakt sa nemeni a `SCHEMA` sa nebumpuje, lebo
+        # plan sa NEPERZISTUJE (do configu ide len menovity zoznam klucov cez
+        # `CabinetBuilder.merge_final`).
+        validate_references!(plan[:references]) if plan.key?(:references)
         validate_drawer_conflicts!(plan[:drawer_conflicts]) if plan.key?(:drawer_conflicts)
         validate_hardware_conflicts!(plan[:hardware_conflicts], seen) if plan.key?(:hardware_conflicts)
         plan
@@ -413,6 +447,42 @@ module Noxun
         qty = pd.fetch(:quantity, 1)
         raise "BuildPlan: dielec #{key} ma neplatnu quantity (#{qty.inspect})." unless qty.is_a?(Integer) && qty.positive?
         pd
+      end
+
+      # S1-E: zvaliduje CELY zoznam referencii. Kontrakt je UZKY zamerne —
+      # referencia sa nesmie dat „skoro" spravit ako dielec: bez `part_key`,
+      # bez `prod`, VZDY `manufactured false` a `production_class 'reference'`.
+      # Mutacia ktorehokolvek z tychto poli zhodi plan HNED, nie az v kusovniku.
+      def validate_references!(list)
+        raise 'BuildPlan: references musi byt pole.' unless list.is_a?(Array)
+
+        seen = {}
+        list.each do |rd|
+          raise 'BuildPlan: referencia musi byt Hash.' unless rd.is_a?(Hash)
+          key = rd[:ref_key].to_s
+          raise 'BuildPlan: referencia nema ref_key.' if key.strip.empty?
+          raise "BuildPlan: duplicitny ref_key #{key} v plane." if seen[key]
+          seen[key] = true
+
+          role = rd[:role].to_s
+          raise "BuildPlan: referencia #{key} ma neznamu rolu '#{role}'." unless REFERENCE_ROLES.include?(role)
+          unless rd[:kind].to_s == REFERENCE_KIND
+            raise "BuildPlan: referencia #{key} ma neplatny kind (#{rd[:kind].inspect})."
+          end
+          validate_triplet!(key, 'box', rd[:box], positive: true)
+          validate_triplet!(key, 'origin', rd[:origin], positive: false)
+          unless rd[:production_class].to_s == REFERENCE_CLASS
+            raise "BuildPlan: referencia #{key} musi byt production_class '#{REFERENCE_CLASS}'."
+          end
+          unless rd[:manufactured] == false
+            raise "BuildPlan: referencia #{key} musi byt manufactured false."
+          end
+          unless REFERENCE_SOURCES.include?(rd[:source].to_s)
+            raise "BuildPlan: referencia #{key} ma neplatny source (#{rd[:source].inspect})."
+          end
+          raise "BuildPlan: referencia #{key} nema label." if rd[:label].to_s.strip.empty?
+        end
+        list
       end
 
       # D-88: osi deskriptora (mapovanie hrana -> plocha kvadra, core/part_faces.rb).

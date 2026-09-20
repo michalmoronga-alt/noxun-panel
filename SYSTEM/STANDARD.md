@@ -85,6 +85,12 @@ Základný layout (ploché kľúče, čítané často):
 | `role_key` | String | kompatibilitný alias `part_key` — buildery korpusu ho zapisujú s rovnakou hodnotou (doska ho nepíše), čítacia cesta ho berie ako fallback pre staršie modely a jeho meno nesie aj legacy UI protokol; kanonická identita je `part_key` |
 | `config` | JSON string | celá konfigurácia entity (rozmery, konštrukcia, zóny, hrany, materiál…) |
 
+**`kind: reference` = REFERENČNÁ GEOMETRIA DOMÉNY** (S1-E). Je to vec, ktorú **kupuje zákazník** a my ju v modeli len ukazujeme, aby bolo vidno, čo kam príde —
+dnes **telo spotrebiča** (`role: appliance_body`, slot umývačky; telo chladničky pribudne v S1-F). Vždy nesie `manufactured: false` a `production_class: 'reference'`
+(viď 8.1), takže ju **nikdy nevidí kusovník, VEPO, nákup ani rozpočet**. Odlišuje sa od `kind: hardware`, čo je **servisná geometria k položke kovania** (proxy nôh,
+úchytkový profil — `production_class: 'none'`): tam existuje položka v `config.hardware[]`, tu neexistuje žiadna položka, lebo sa nič neobjednáva. V pláne stavby má
+referencia **vlastný zoznam** `plan[:references]` a nikdy neprechádza cez `parts` (viď 3).
+
 Zložité veci (rozmery + konštrukcia korpusu, zoznam hrán dielca, delenie čiel) žijú v `config` ako JSON string. Dôvod: SketchUp dictionary je plochý kľúč→hodnota; JSON je jediný spoľahlivý spôsob, ako niesť vnorenú štruktúru bez desiatok kľúčov.
 
 ### 2.2 Autorita = inštancia
@@ -127,6 +133,13 @@ seed `AbsRules` `SEED_VERSION` 4. Roly žijú na troch miestach naraz (`BuildPla
 `free_panel` = voľná samostatná doska (V0.4.7, `kind: board`). Plánované roly dosiek (pribudnú **až s implementáciou** ich správania, vzor „rola pilaster do štandardu pri implementácii"): `cover_side` (pilaster), `cover_top`, `filler` (výplň), `worktop` (pracovná doska), `plinth_board` (soklová doska/lišta — môže byť `production_class: linear`).
 
 ### 2.5 JSON príklady per vrstva
+
+**Rezervované kľúče väzby na spotrebič (S1-E, `CONFIG_SCHEMA` 16 · `BOARD_CONFIG_SCHEMA` 2).** Config **skrinky aj dosky** smie niesť dvojicu
+`appliance_refs[]` (väzba na KONKRÉTNY spotrebič zákazky — položky `{item_id, category, body, niche, bands, snapshot_at}`) a `appliance_expects[]`
+(zoznam očakávaných kategórií). V S1-E ich **nikto nezapisuje** — sú rezervované, aby ich S1-B/F/C naplnili **bez ďalšieho bumpu**. Kľúč sa objaví len vtedy,
+keď entita naozaj niečo nesie (prázdne pole by predstieralo, že väzbu už niekto riešil). **Prežijú každú bežnú cestu** (prestavba, materiály, absorpcia scale,
+aplikovanie šablóny); `appliance_refs[]` zaniká **výhradne pri KÓPII** (tri kopírovacie vstupy skrinky + dedup dosky), lebo kópia sa správa ako „očakáva
+spotrebič tej kategórie", ale nevlastní ten istý kus. Šablóna nesie `appliance_expects[]`, `appliance_refs[]` **nikdy**.
 
 **Korpus** (`kind: cabinet`):
 
@@ -252,6 +265,11 @@ seed `AbsRules` `SEED_VERSION` 4. Roly žijú na troch miestach naraz (`BuildPla
 
 ## 3. Jednotky, osi, orientácia
 
+**PLÁN STAVBY NESIE REFERENCIE ODDELENE OD DIELCOV** (S1-E). `plan[:parts]` sú výrobné dielce; referenčná geometria (`kind: reference`, viď 2.1) žije
+v aditívnom `plan[:references]` a **nikdy neprejde cez `parts`** — renderer dielcov zapisuje na entitu `kind: 'part'`, takže by sa referencia stala výrobným
+záznamom, ktorý nikto nevyrobí. Deskriptor referencie nemá `part_key` ani `prod`; má `ref_key`, `role`, `kind`, `box`, `origin`, `production_class: 'reference'`,
+`manufactured: false`, `source` (`generic` | `catalog`) a `label`. Plán sa **neperzistuje**, takže kompatibilitu vyjadruje `CONFIG_SCHEMA`, nie schéma plánu.
+
 ### 3.1 Jednotky — mm ako Float, jeden svet
 
 **Všetky NOXUN dáta (JSON aj atribúty) sú v milimetroch ako Float.** Žiadne palce, žiadne cm, žiadny SketchUp `Length` v uložených dátach.
@@ -300,7 +318,12 @@ Korpus = **obálka + konštrukcia + zóny + rozhrania.** Nie master komponent s 
 
 ### 4.2 Typy korpusov na štart
 
-**V1: DOLNÁ a HORNÁ skrinka.** Pokryjú 60–70 % potrieb. Ostatné (vysoká, spotrebičová, drezová, rohová…) sa **odvodia** od týchto dvoch neskôr. Rohové a atypické korpusy sú mimo scope V1 (sekcia 12 / mimo scope).
+**V1: DOLNÁ, HORNÁ a — od S1-E — UMÝVAČKA (slot).** Dolná a horná pokryjú 60–70 % potrieb; ostatné (vysoká, spotrebičová, drezová, rohová…) sa **odvodia** od týchto dvoch neskôr. Rohové a atypické korpusy sú mimo scope V1 (sekcia 12 / mimo scope).
+
+**UMÝVAČKA (`type: dishwasher`) je typ BEZ KORPUSU.** Nemá boky, dno, strop, chrbát ani zóny a **podpora je vždy `none`** (nohy ani sokel nedostane). Vyrába
+**jediný dielec — čelo** (jeden pevný item typu `blind`, rola `false_front`, viď 5.3) a telo umývačky kreslí ako **referenciu** (`kind: reference`, viď 2.1).
+Jeho `height` je **výška linky**, nie výška korpusu; spodná hrana čela žije vo vlastnom poli `dw_front_bottom` a do `floor_height` **nikdy netečie**.
+Výplň medzi horným okrajom čela a líniou linky sa **negeneruje** — rieši ju človek nízkym korpusom (od 80 mm, S1-E0) alebo doskou.
 
 ### 4.3 Geometriu generuje Ruby (regenerate pattern)
 
@@ -361,6 +384,11 @@ Zóna nesie `allowed_modules` — čo do nej smie. Modul pri vklade dostane rozm
 Čelá nie sú len „dvere". Zahŕňajú: jednokrídlové/dvojkrídlové dvierka, zásuvkové čelá, výklopy, posuvné čelá, pevné krycie panely, falošné čelá, rámové a bezúchytkové riešenia.
 Čelný modul rieši: typ, počet, delenie, medzery, prekrytie korpusu, materiál, ABS, smer otvárania, úchytky, požiadavky na kovanie.
 **Geometria čela, spôsob otvárania a konkrétne kovanie sú oddelené.**
+
+**SLOT UMÝVAČKY má JEDNO PEVNÉ ČELO ako serverový invariant** (S1-E). `normalize` pre typ `dishwasher` vždy vyrobí práve jednu položku
+`F1 · type: blind · mode: fixed · wings: 1` s výškou `dw_front_height` a nulovými zvislými medzerami; z prichádzajúcej položky prevezme len profil a jeho hranu.
+**Autoritou výšky čela je pole `dw_front_height`**, nie riadok čiel — zápisová cesta panela payload s iným počtom, typom, režimom alebo cudzou výškou **odmietne**
+(config sa nedotkne). Typ je `blind` (nie literál `false_front`): `normalize_items` pozná len typy riadku a neznámy by sklopil na `door`, teda by vyrobil pánty.
 
 **Delenie na výšku: FIXNÉ + AUTO s lockmi** (Blum-konfigurátor princíp). Jedno čelo zamknem na fixnú výšku, ostatné sa dopočítajú automaticky zo zvyšku po odčítaní zamknutých + škár. Kanonický config (tak ho ukladá `Fronts.normalize_config` — pole sa volá **`items`**, poradie odspodu, F1 dole):
 

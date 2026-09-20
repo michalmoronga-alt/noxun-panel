@@ -2372,7 +2372,8 @@
   function nxLegsInsertSend(){
     legsTimer = null;
     if (!nxLegsInsertMode()) return false;
-    if (getType() === 'upper') return nxLegsHideRow();
+    // S1-E: slot nohy NEMÁ (podpora `none`) — rovnako ako horná skrinka.
+    if (getType() === 'upper' || getType() === 'dishwasher') return nxLegsHideRow();
     var body = nxLegsInsertPayload();
     // Kym server odpovie, riadok drzi miesto s pomlckou — a ked odpoved
     // nepride vobec (starsi plugin bez callbacku), ostane pri nej.

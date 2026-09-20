@@ -37,6 +37,17 @@
   // --nx-ink-faint (SVG atributy nevedia var(), rovnaky vzor ako farby vyssie).
   var PV_DIM = '#90a4ae';           // --nx-ink-faint (ciary a texty kot)
   var PV_GHOST = '#b0bec5';         // --nx-border-strong (tlmena ghost vrstva)
+  // S1-E: SLOT UMYVACKY. Telo spotrebica je REFERENCIA, nie dielec — kresli sa
+  // PRERUSOVANE vo vyberovej (firemnej) farbe, presne ako ghost zony. Pasmo
+  // „vyplň hore" je JANTAROVE: nie je to chyba, je to prace, ktora este caka
+  // (nizky korpus alebo doska) — zrkadlo tokenu --nx-warn-fg.
+  var PV_SLOT_FILL = '#e65100';     // --nx-warn-fg (pasmo „výplň hore")
+  // Rozmery generickeho tela per trieda — ZRKADLO Ruby `Construction::DW_CLASSES`
+  // (guard test `tests/pure/test_s1e_slot.rb` ich porovnava). Nahlad ich
+  // potrebuje aj vo VKLADANI, kde ziadny serverovy payload neexistuje.
+  var PV_DW_BODY = { 600: { w: 598, d: 555 }, 450: { w: 448, d: 550 } };
+  // Zakladna tela (nohy a sokel spotrebica) — zrkadlo `Construction::DW_BASE_*`.
+  var PV_DW_BASE_H = 200, PV_DW_BASE_SIDE = 20;
   var dragState = null;
   // ===== D-08 / UI-B1: kontext prepina nahlad AJ viditelne skupiny (CSS cez
   // data-view-ctx na <body>). Rezimove taby v hlavicke nahradil RAIL — stavovy
@@ -127,6 +138,20 @@
   function pvInsertBoard(){
     return previewMode === 'insert' && typeof getInsertKind === 'function' && getInsertKind() === 'board';
   }
+  // PR #381 (Codex kolo 1, P2): OBALKA SLOTU PRE SCENU — telo sa nikdy
+  // nedeformuje podla slotu, takze pri uzkom slote TRCI do stran a pri
+  // prehnanej vyske tela aj nad linku. Prave vtedy, ked Kontrola hlasi
+  // `dw_body_fit` / `dw_height_fit`, by fit telo OREZAL a pouzivatel by na
+  // nahlade nevidel to, o com mu semafor hovori. Vracia rozsah v mm sceny
+  // alebo null (nie je to slot). Ciste (Node testy).
+  function nxSlotExtent(sl, W){
+    if (!sl) return null;
+    var bw = sl.bodyW;
+    var bx = (W - bw) / 2;
+    return { minX: Math.min(0, bx), maxX: Math.max(W, bx + bw),
+             minZ: 0, maxZ: Math.max(sl.bodyH, sl.fb + sl.fh) };
+  }
+
   function sceneSize(){
     if (pvInsertBoard()) return pvBoardScene(numv('ib_length'), numv('ib_width'));
     var W = numv('width')||600, H = numv('height')||720;
@@ -151,6 +176,10 @@
         minX = Math.min(minX, ie.minX); maxX = Math.max(maxX, ie.maxX);
         minZ = Math.min(minZ, ie.minZ); maxZ = Math.max(maxZ, ie.maxZ);
       }
+      // S1-E: celo slotu SMIE presahovat vysku linky — scena mu musi nechat
+      // miesto, inak by fit odrezal jeho hornu hranu (a s nou popis presahu).
+      var sl = pvSlot();
+      if (sl) maxZ = Math.max(maxZ, sl.fb + sl.fh + DIM_TOP);
     } else if (previewMode === 'fronts'){
       maxX = Math.max(maxX, W) + DIM_EXT; // koty vysok riadkov vpravo
       minX = Math.min(minX, 0) - 34;      // cisla medzier pri lavom okraji
@@ -159,6 +188,13 @@
       minZ = Math.min(minZ, 0) - 46;      // koty sirok zon pod korpusom
     } else if (previewMode === 'hw'){
       minZ = Math.min(minZ, 0) - 96;      // nohy pod korpusom + suhrn kovania
+    }
+    // PR #381 (P2): telo slotu sa do sceny priklada v KAZDOM kontexte —
+    // od opravy projekcii ho vidno aj v Celach a v Kovani.
+    var sx = nxSlotExtent(pvSlot(), W);
+    if (sx){
+      minX = Math.min(minX, sx.minX); maxX = Math.max(maxX, sx.maxX);
+      minZ = Math.min(minZ, sx.minZ); maxZ = Math.max(maxZ, sx.maxZ);
     }
     return { x: minX, y: H - maxZ,
              w: (maxX - minX) + 2*PV_PAD, h: (maxZ - minZ) + 2*PV_PAD };
@@ -271,12 +307,33 @@
   // ===================== UI-B2: geometria projekcie ==========================
   // JEDEN zdroj hodnot pre vsetky vrstvy (zakladne aj ghost) — ziadna vrstva si
   // necita formular sama, inak by sa dve kresby rozisli.
+  // S1-E: udaje SLOTU z formulara (vklad aj oznaceny slot idu tou istou
+  // cestou ako zvysok nahladu — `numv`). nil = nie je to slot.
+  function pvSlot(){
+    if (typeof getType !== 'function' || getType() !== 'dishwasher') return null;
+    var cls = parseInt(val('dw_class'), 10);
+    var b = PV_DW_BODY[cls] || PV_DW_BODY[600];
+    return { cls: PV_DW_BODY[cls] ? cls : 600, bodyW: b.w, bodyD: b.d,
+             bodyH: numv('dw_body_height') || 0,
+             fb: numv('dw_front_bottom') || 0,
+             fh: numv('dw_front_height') || 0 };
+  }
+
+  // S1-E: výška sokla KORPUSU. Horná skrinka ju nemá a slot umývačky tiež nie
+  // (jeho „sokel" je spodná hrana ČELA a žije vo vlastnom poli) — bez tejto
+  // jednej otázky by stará hodnota po prepnutí typu posunula kresbu čiel.
+  function nxCabFloorHeight(){
+    if (typeof getType !== 'function') return numv('floor_height') || 0;
+    var t = getType();
+    return (t === 'upper' || t === 'dishwasher') ? 0 : (numv('floor_height') || 0);
+  }
+
   function pvGeom(){
     var gl = nxNumOr(numv('fr_gap_left'), 2), gr = nxNumOr(numv('fr_gap_right'), 2);
     var gap = 3; var gv = numv('fr_gap'); if (!isNaN(gv)) gap = gv;
     return { W: numv('width')||600, H: numv('height')||720, t: numv('thickness')||18,
              D: numv('depth')||0,
-             fh: (getType()==='upper') ? 0 : (numv('floor_height')||0),
+             fh: nxCabFloorHeight(),
              topNone: val('top_mode') === 'none',
              // UI-C1b: konstrukcne volby pre ODHAD kusov/plochy navrhu (nxDraftStats).
              topMode: val('top_mode'), backMode: val('back_mode'),
@@ -334,7 +391,7 @@
       var current = nxFrontDraftItems();
       if (current) return current;
       return nxFrontsResolve(collectFronts(), numv('height') || 0,
-        getType() === 'upper' ? 0 : (numv('floor_height') || 0));
+        nxCabFloorHeight());
     }
     return previewMode === 'insert' ? pvInsertFronts() : (frontItems || []);
   }
@@ -359,7 +416,7 @@
     if (typeof collectFronts !== 'function') return [];
     if (typeof getInsertKind === 'function' && getInsertKind() === 'board') return [];
     return nxFrontsResolve(collectFronts(), numv('height') || 0,
-                           (getType() === 'upper') ? 0 : (numv('floor_height') || 0));
+                           nxCabFloorHeight());
   }
 
   // ---- UI-C1b: ODHAD kusov a plochy pre NAVRH -------------------------------
@@ -414,7 +471,12 @@
     // UI-C1b: vkladana DOSKA nema zony, cela, kovanie ani hranove data — vsetky
     // chipy su neaktivne s vysvetlenim (nie ticho mrtve).
     if (pvInsertBoard()) return { zony: false, cela: false, kovanie: false, olep: false };
-    return { zony: !!currentZoneTree,
+    // PR #381 (P2 #5, dosledok): SLOT ZONY NEMA — `zone_tree` v jeho payloade
+    // je len prazdny kanonicky strom, takze bez tejto otazky by chip „Zóny"
+    // ostal aktivny a ghost vrstva by nad slotom kreslila FANTOMOVE zony
+    // (pred opravou #5 ich skryl `return`, teraz by sa naozaj nakreslili).
+    // Je to ta ista pravda, akou rail zhasina kontext Zóny (`NX_CTX_LOCK`).
+    return { zony: !!currentZoneTree && !pvSlot(),
              // Vo vkladani su cela DRAFT z karty (server ich este nema).
              cela: (previewMode === 'insert') ? pvInsertFronts().length > 0
                                               : !!(frontItems && frontItems.length),
@@ -473,6 +535,63 @@
     if (fh>0) S.push('<rect x="'+rx(0)+'" y="'+ry(fh)+'" width="'+W+'" height="'+fh+'" fill="#f4f5f7" stroke="#cfd8dc" stroke-dasharray="4 3"/>'); // podstavec
   }
 
+  // S1-E: PODKLAD SLOTU — telo so zakladnou (referencia, preto prerusovane)
+  // a linia linky. Kresli sa v KAZDOM kontexte namiesto `drawCarcass`: slot
+  // korpus nema, takze boky, dno a strop by boli vymyslene dielce.
+  // PR #381 (Codex kolo 1, P2): rozdelene z povodneho `drawSlot` — detail
+  // (celo, pasmo výplne, koty) patri LEN kontextu Korpus a vkladaniu; Cela
+  // a Kovanie kreslia svoje projekcie standardnymi rendererMI nad TYMTO
+  // podkladom (inak by zmizli koty ciel, znacky kovania aj hover).
+  function drawSlotBase(S, rx, ry, g, sl){
+    var W = g.W, H = g.H;
+    var bw = Math.min(sl.bodyW, W * 3);
+    var bx = (W - bw) / 2;
+    var baseH = Math.min(PV_DW_BASE_H, sl.bodyH);
+    var bodyTop = sl.bodyH;
+    // LINIA LINKY — horna hrana susednych korpusov (naznak vlavo aj vpravo).
+    S.push('<path d="M' + rx(-40) + ' ' + ry(H) + 'H' + rx(W + 40) + '" stroke="' + PV_DIM +
+           '" stroke-width="2" fill="none"/>');
+    // TELO (nad zakladnou) + ZAKLADNA (uzsia, odsadena) — obe prerusovane.
+    if (bodyTop - baseH > 0){
+      S.push('<rect x="' + rx(bx) + '" y="' + ry(bodyTop) + '" width="' + bw + '" height="' +
+             (bodyTop - baseH) + '" fill="' + PV_FRONT_DOOR + '" fill-opacity=".35" stroke="' +
+             PV_SELECT + '" stroke-width="2" stroke-dasharray="10 7"/>');
+    }
+    if (baseH > 0){
+      S.push('<rect x="' + rx(bx + PV_DW_BASE_SIDE) + '" y="' + ry(baseH) + '" width="' +
+             Math.max(bw - 2 * PV_DW_BASE_SIDE, 1) + '" height="' + baseH + '" fill="none" stroke="' +
+             PV_SELECT + '" stroke-width="2" stroke-dasharray="6 5"/>');
+    }
+  }
+
+  // S1-E: DETAIL SLOTU (mockup R16) — celo (jediny vyrobny dielec, preto plne),
+  // jantarove pasmo „výplň N · ručne" po liniu linky a koty sirky, vysky linky
+  // a sokla. LEN kontext Korpus a vkladanie.
+  function drawSlotDetail(S, rx, ry, g, sl){
+    var W = g.W, H = g.H;
+    // CELO — jediny VYROBNY dielec slotu, preto plna ciara a plna vypln.
+    var ftop = sl.fb + sl.fh;
+    if (sl.fh > 0){
+      S.push('<rect x="' + rx(g.gapLeft) + '" y="' + ry(ftop) + '" width="' +
+             Math.max(W - g.gapLeft - g.gapRight, 1) + '" height="' + sl.fh + '" fill="' +
+             PV_FRONT_DOOR + '" stroke="' + PV_FRONT_STROKE + '" stroke-width="2"/>');
+    }
+    // PASMO „VYPLŇ HORE" — zvysok po liniu linky; rieši sa RUCNE.
+    var fill = H - ftop;
+    if (fill > 1){
+      S.push('<rect x="' + rx(0) + '" y="' + ry(H) + '" width="' + W + '" height="' + fill +
+             '" fill="' + PV_SLOT_FILL + '" fill-opacity=".12" stroke="' + PV_SLOT_FILL +
+             '" stroke-width="1.5" stroke-dasharray="8 6"/>');
+      if (fill > 26){
+        pvText(S, rx(W / 2), ry(ftop + fill / 2) + 7,
+               'výplň ' + Math.round(fill) + ' · ručne', 20, 'middle', PV_SLOT_FILL);
+      }
+    }
+    pvDimH(S, rx, ry, 0, W, -26, String(Math.round(W)));
+    pvDimV(S, rx, ry, W + 26, 0, H, String(Math.round(H)));
+    if (sl.fb > 0) pvDimV(S, rx, ry, -26, 0, sl.fb, String(Math.round(sl.fb)));
+  }
+
   function renderPreview(){
     var svg = el('preview'); if (!svg) return;
     clearFrontHover(); // D-23: rerender/tab/vyber rusi hover uzly — stav ide s nimi
@@ -490,7 +609,16 @@
     // helper: model (x,z) -> svg (flip Z). y = pad + (H - z)
     function rx(x){ return pad + x; }
     function ry(z){ return pad + (H - z); }
-    drawCarcass(S, rx, ry, g, (previewMode === 'cab' || previewMode === 'insert') ? pvDepthSkew() : 0);
+    // S1-E: SLOT UMYVACKY ma VLASTNY PODKLAD — nema boky, dno ani vrch, takze
+    // korpusovy podklad by kreslil dielce, ktore neexistuju. PR #381 (P2):
+    // podklad NEnahradza cely nahlad — kontexty Cela a Kovanie kreslia svoje
+    // projekcie dalej, len nad nim.
+    var slot = pvSlot();
+    if (slot){
+      drawSlotBase(S, rx, ry, g, slot);
+    } else {
+      drawCarcass(S, rx, ry, g, (previewMode === 'cab' || previewMode === 'insert') ? pvDepthSkew() : 0);
+    }
 
     if (previewMode==='zones'){
       drawZonesBase(S, rx, ry, g);
@@ -501,6 +629,10 @@
     } else if (previewMode === 'hw'){
       // UI-B2: kontext Kovanie ma vlastnu projekciu — pozicie kovania
       drawHwBase(S, rx, ry, g);
+    } else if (previewMode === 'insert' && slot){
+      // S1-E: vkladany slot kresli TEN ISTY detail ako oznaceny slot —
+      // sablona nema zony ani viacriadkove cela, ktore by sa dali prepinat.
+      drawSlotDetail(S, rx, ry, g, slot);
     } else if (previewMode === 'insert'){
       // UI-C1b (N9): sablona TAK, AKO BUDE VLOZENA. Cela su PREPINATELNA vrstva
       // (chip Čelá je defaultne zapnuty) — po zhasnuti vidno vnutro sablony.
@@ -514,6 +646,9 @@
         drawZonesGhost(S, rx, ry, g);
       }
       renderCabOutline(S, rx, ry, W, H, g.fh);
+    } else if (slot){
+      // S1-E: kontext Korpus nad slotom — celo, pasmo výplne a koty.
+      drawSlotDetail(S, rx, ry, g, slot);
     } else {
       // D-08: kontext Korpus — kotovany celny rez (Š/V/sokel + naznak hlbky)
       renderCabOutline(S, rx, ry, W, H, g.fh);
@@ -1476,6 +1611,15 @@
                        // priamo nad prepinacmi, bez kreslenia.
                        pvGapsHot: pvGapsHot, pvSetGapFocus: pvSetGapFocus,
                        pvSetGapHover: pvSetGapHover, pvInGapDiag: pvInGapDiag,
-                       NX_GAP_FIELDS: NX_GAP_FIELDS };
+                       NX_GAP_FIELDS: NX_GAP_FIELDS,
+                       // S1-E: projekcia SLOTU UMYVACKY (celny rez) + zrkadla
+                       // rozmerov generickeho tela a zakladne.
+                       // PR #381 (P2 #5): Node sada overuje CELY nahlad nad
+                       // slotom (ze kontexty Cela a Kovanie kreslia dalej).
+                       renderPreview: renderPreview, pvAvail: pvAvail,
+                       pvSlot: pvSlot, drawSlotBase: drawSlotBase,
+                       drawSlotDetail: drawSlotDetail, nxSlotExtent: nxSlotExtent,
+                       PV_DW_BODY: PV_DW_BODY,
+                       PV_DW_BASE_H: PV_DW_BASE_H, PV_DW_BASE_SIDE: PV_DW_BASE_SIDE };
   }
 

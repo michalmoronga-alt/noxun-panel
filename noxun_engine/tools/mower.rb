@@ -27,7 +27,10 @@ module Noxun
 
           def rotate(degrees)
             with_target("Noxun: Otočiť #{degrees}°") do |model, inst, noxun|
-              pivot = inst.bounds.center
+              # S1-E: stred NOMINALNEJ obalky — pri slote umyvacky by skutocne
+              # bounds (presahujuce celo, trciace telo) posunuli os otacania
+              # mimo obrys skrinky.
+              pivot = CabinetBuilder.envelope(inst).center
               tr = Geom::Transformation.rotation(pivot, Z_AXIS, degrees.degrees)
               Tools.mutate(model, inst, "Noxun: Otočiť #{degrees}°", noxun) do
                 model.active_entities.transform_entities(tr, inst)
@@ -219,6 +222,9 @@ module Noxun
             # KOV-H1 (audit FIX 10): kopia je NOVA skrinka — ad-hoc polozky
             # kovania dostanu vlastnu identitu (obsah sa nemeni, len `id`).
             CabinetBuilder.rekey_hardware_manual(params)
+            # S1-E (FIX E4): kopia „ocakava" spotrebic, ale nevlastni ten isty
+            # kus — vazba na KONKRETNY spotrebic sa zahadzuje.
+            CabinetBuilder.strip_appliance_refs!(params)
             name = MowerCalc.copy_name(CabinetBuilder.manual_name(cfg), manual_names(model))
             params['name'] = name if name
 

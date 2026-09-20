@@ -17,6 +17,43 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **S1-E — SLOT UMÝVAČKY, PRVÝ TYP SKRINKY BEZ KORPUSU (v0.12.12, 20.9.2026, PR #381).** Pribudol **štvrtý typ objektu** vedľa dolnej, hornej a dosky:
+  `type: dishwasher`. Nemá boky, dno, strop, chrbát ani zóny, **vyrába jediný dielec — čelo** (pevný item `blind`, rola `false_front`) a telo umývačky
+  kreslí ako **referenciu** (`kind: reference`, `manufactured: false`, `production_class: 'reference'`) z dvoch boxov: telo podľa triedy (598/448) a pod ním
+  fixná **základňa 200 mm** odsadená 50 spredu a 20 do strán. Výplň medzi čelom a líniou linky sa **negeneruje** — rieši ju Michal ručne (nízky korpus od
+  80 mm zo S1-E0 alebo doska), Inspector ju hlási ako výstup „výplň 90 · ručne".
+
+  **Prečo takto:** (1) **Referencia má vlastné miesto v pláne** (`plan[:references]`), nie „dielec s výnimkou". Renderer dielcov zapisuje na entitu
+  `kind: 'part'`, takže telo prechádzajúce cez `parts` by sa stalo výrobným záznamom, ktorý nikto nevyrobí — a filter kusovníka by bol jediná ochrana.
+  Vlastný zoznam + `BuildPlan.validate_references!` znamená, že každá odchýlka (`manufactured: true`, `production_class: 'sheet'`, cudzia rola) zhodí
+  **plán**, nie až kusovník. (2) **Šírka slotu sa NEklampuje na triedu.** Prvý návrh chcel „šírka ≥ trieda − 2"; klamp by používateľovi ticho zmenil
+  rozmer, ktorý vedome zadal. Úzky slot sa preto postaví a hlási ho Kontrola ORANGE `dw_body_fit` — **semafor varuje, nikdy neblokuje**. (3) **Slot má
+  podporu `none`.** Jeho „sokel" je spodná hrana ČELA (`dw_front_bottom`) a keby tiekol do `floor_height`, pravidlá kovania by vydali 4/6 nôh, príchyty
+  soklovej lišty a proxy nôh — skrinke, ktorá stojí na vlastných nohách spotrebiča. (4) **Jedno pevné čelo je serverový invariant**, nie vec UI: `normalize`
+  ho vždy vyrobí a zápisová cesta panela payload s iným počtom/typom/režimom/výškou **odmietne**; autoritou výšky je pole „Čelo V". Typ je `blind`, nie
+  literál `false_front` — `normalize_items` pozná len typy riadku a neznámy by sklopil na `door`, teda by vyrobil pánty. (5) **Logická obálka**
+  (`CabinetBuilder.envelope`) nahradila skutočné bounds v prisúvaní, umiestňovaní aj v strede otáčania: pri slote smie čelo presahovať líniu linky a telo
+  trčať do strany, takže doraz mieri na **nominálnu** hranu — a výsledok už nezávisí od toho, ktoré tagy má kto zapnuté. Pri dolnej a hornej skrinke je to
+  ten istý obrys ako doteraz. (6) **`front_opening` je jedna autorita čelného otvoru** pre stavbu AJ pre panelový preflight — bez toho by panel pri slote
+  overoval čelá proti výške linky a legitímny presah nad ňu by ohlásil ako chybu.
+
+  **Kompatibilita:** `CONFIG_SCHEMA` **15 → 16** (nový typ, polia `dw_*` a rezervované `appliance_refs[]` / `appliance_expects[]`) a `BOARD_CONFIG_SCHEMA`
+  **1 → 2** (ten istý rezervovaný pár pre dosku — pracovná doska nesie varnú dosku a drez). **Dopredný guard je tu obzvlášť dôležitý:** starší plugin typ
+  nepozná, `norm_type` by mu ho sklopil na `lower` a zo slotu by pri prvej prestavbe vyrobil **plný korpus** s bokmi, dnom, stropom a chrbtom — teda celý
+  neexistujúci kusovník navyše. Preto marker schémy nesie aj **seed slotových šablón** (`TemplateStore` STD **4 → 5**, „Umývačka 60" a „Umývačka 45"),
+  na rozdiel od ostatných korpusových seedov. Väzby na spotrebič **prežijú** prestavbu, materiály, absorpciu scale aj aplikovanie šablóny a
+  `appliance_refs[]` zaniká **len v kópii** — jediným helperom `strip_appliance_refs!` v troch kopírovacích vstupoch skrinky a vlastným guardom v dedupe
+  dosky (novšia doska sa nedotkne vôbec, aktuálnej sa zapíše config bez kľúča, **bez `normalize` round-tripu**).
+
+  **UI:** vkladacia karta má štvrtý typ „Umývačka"; Základné pre slot majú sedem vstupov a päť vlastných výstupov (Telo · Čelo hore · Výplň hore ·
+  **Pod doskou** · Trieda) — všetky **počíta server** (`Panel.slot_payload`) a „Pod doskou" používa **ten istý predikát** ako Kontrola `dw_height_fit`,
+  takže Inspector a semafor nikdy netvrdia dve rôzne veci. Rail má Zóny pri slote neaktívne s **dôvodom** v bubline (guard v `NXShell.setCtx`, nie CSS),
+  karta Čelá skrýva „Pridať čelo", krížik aj AUTO a výšku dáva na čítanie. Náhľad je **vlastná projekcia**: telo so základňou prerušovane, čelo plne,
+  jantárové pásmo „výplň N · ručne" po líniu linky.
+
+  **Vedomé odchýlky od mockupu:** hint poľa „Telo V" ukazuje **povolený rozsah 700–1000**, nie „list 820–900" — katalógový list má slot až po S1-B a
+  vymyslieť ho by znamenalo tvrdiť číslo, ktoré nemáme; výstup „Trieda" preto hlási „60 · bez modelu".
+
 - **S1-A2 — SEKCIA ŠTÚDIA SPOTREBIČE, POHĽAD KATALÓG (v0.12.11, 20.9.2026, PR #378).** Katalóg z S1-A1 dostal UI: **13. sekcia `appl`** v skupine KATALÓGY
   (medzi Kovaním a Pravidlami) — strom po kategóriách vľavo, karta modelu v štyroch blokoch vpravo (**Telo · Nika · Čelo/dvere · Montáž**, jazyk listov
   výrobcov), odkazy, prílohy a poznámka. Serverová autorita je nový modul `ui/appliance_dialog.rb` — **modul bez okna od prvého riadku** (vzor

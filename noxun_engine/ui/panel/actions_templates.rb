@@ -208,15 +208,24 @@ module Noxun
         # (spravanie ako doteraz). Rozdiel oproti skrinke sa POVIE nahlas —
         # ulozene rozmery a konstrukcia ostavaju z tejto skrinky, meni sa len
         # zaradenie sablony.
+        # S1-E: SLOT UMYVACKY sa medzi dolnu a hornu NEPREPINA — `dishwasher`
+        # nema boky ani vnutro, takze „ulozene ako HORNA" by zo sablony
+        # vyrobilo korpus s uplne inou geometriou. Modal preto pri slote
+        # ponuka typ READONLY a server to vynucuje: typ sa nemeni.
+        TEMPLATE_TYPE_LABELS = { 'upper' => 'HORNÁ', 'lower' => 'DOLNÁ',
+                                 'dishwasher' => 'UMÝVAČKA' }.freeze
+
         def apply_template_type!(config, raw)
+          have = (config['type'] || 'lower').to_s
+          return '' if have == 'dishwasher'
+
           want = raw.to_s.strip.downcase
           return '' unless %w[lower upper].include?(want)
 
-          have = (config['type'] || 'lower').to_s
           config['type'] = want
           return '' if want == have
 
-          " Uložená ako #{want == 'upper' ? 'HORNÁ' : 'DOLNÁ'} (rozmery a konštrukcia ostali z tejto skrinky)."
+          " Uložená ako #{TEMPLATE_TYPE_LABELS[want]} (rozmery a konštrukcia ostali z tejto skrinky)."
         end
 
         # --- UI-C1a: identita pouzitej sablony vo vkladacom payloade ---------

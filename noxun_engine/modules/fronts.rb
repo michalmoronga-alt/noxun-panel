@@ -103,8 +103,13 @@ module Noxun
       #          wings:Integer, warnings:[BuildPlan.warning] }.
       # D-90: warnings su kanonicky kanal planu (Construction ich pripoji do
       # plan[:warnings]) — nefatalne upozornenia matematiky ciel.
-      def layout(fronts_cfg, width, height, floor_height, _thickness)
-        r = resolve_layout(fronts_cfg, width, height, floor_height)
+      # S1-E: `opening:` = VIRTUALNY celny otvor { x0:, w:, z0:, h: } (mm).
+      # Dolna a horna skrinka ho NEPOSIELAJU — odvodi sa presne z dnesnych
+      # `width`/`height`/`floor_height`, takze ich sprvanie je bajtovo rovnake.
+      # Slot umyvacky korpus nema, preto si otvor urcuje sam (`z0` = sokel
+      # slotu, `h` = vyska cela); autoritou tvaru je `Construction.front_opening`.
+      def layout(fronts_cfg, width, height, floor_height, _thickness, opening: nil)
+        r = resolve_layout(fronts_cfg, width, height, floor_height, opening: opening)
         parts = []; warnings = []
         r[:items].each_with_index do |item, i|
           b = r[:bounds][item['id']]
@@ -120,8 +125,8 @@ module Noxun
 
       # Cisty read-only preflight. Sloty sa vyriesia AJ pri neplatnom profile,
       # aby UI vedelo vypytat chybajuci smer bez docasnej prestavby modelu.
-      def preflight(fronts_cfg, width, height, floor_height)
-        r = resolve_layout(fronts_cfg, width, height, floor_height)
+      def preflight(fronts_cfg, width, height, floor_height, opening: nil)
+        r = resolve_layout(fronts_cfg, width, height, floor_height, opening: opening)
         errors = []; warnings = []
         r[:items].each_with_index do |item, i|
           begin
@@ -136,10 +141,11 @@ module Noxun
       end
 
       # Rozklad riadkov a pocet kridel su spolocne pre zapis aj preflight.
-      def resolve_layout(fronts_cfg, width, height, floor_height)
+      def resolve_layout(fronts_cfg, width, height, floor_height, opening: nil)
         unless [width, height, floor_height].all? { |v| v.is_a?(Numeric) && v.to_f.finite? }
           raise 'Rozmery čiel musia byť konečné čísla.'
         end
+        op = normalize_opening(opening, width, height, floor_height)
         cfg = normalize_config(fronts_cfg)
         # D-07: rozsahy medzier platia VZDY (aj bez ciel) — neplatne hodnoty sa
         # nesmu ulozit cez externy callback a vybuchnut az po pridani cela.
@@ -149,8 +155,8 @@ module Noxun
 
         gap = cfg['gap']; gt = cfg['gap_top']; gb = cfg['gap_bottom']; gl = cfg['gap_left']
         n = items.size
-        opening_w = width - gl - cfg['gap_right']
-        total_v = height - floor_height # celny otvor po vyske (od spodnej hrany tela po vrch)
+        opening_w = op[:w] - gl - cfg['gap_right']
+        total_v = op[:h] # celny otvor po vyske (od spodnej hrany tela po vrch)
 
         fixed_sum = items.select { |it| it['mode'] == 'fixed' }
                          .map { |it| it['height'].to_f }.reduce(0.0, :+)
@@ -167,7 +173,7 @@ module Noxun
         # hodnota by ticho povolila zasuvku, ktora sa nezmesti.
         bounds = {}
         total_wings = 0
-        z = floor_height + gb
+        z = op[:z0] + gb
         items.each_with_index do |it, i|
           idx = i + 1
           h = it['mode'] == 'fixed' ? it['height'].to_f : auto_h
@@ -198,7 +204,23 @@ module Noxun
           bounds[res['id']] = { z0: z.to_f, z1: (z + h).to_f, height: h.to_f }
           z += h + gap
         end
-        { items: resolved, wings: total_wings, bounds: bounds, opening_w: opening_w, x: gl, gap: gap }
+        { items: resolved, wings: total_wings, bounds: bounds, opening_w: opening_w,
+          x: op[:x0] + gl, gap: gap }
+      end
+
+      # S1-E: JEDINE miesto, kde sa z rozmerov korpusu odvodzuje celny otvor
+      # (a kde sa prijima otvor od volajuceho). Dodany otvor musi byt UPLNY
+      # a s konecnymi cislami — polovicny hash by ticho vratil cela na nulu.
+      def normalize_opening(opening, width, height, floor_height)
+        return { x0: 0.0, w: width.to_f, z0: floor_height.to_f, h: height.to_f - floor_height.to_f } if opening.nil?
+
+        op = %i[x0 w z0 h].each_with_object({}) do |k, out|
+          v = opening.is_a?(Hash) ? (opening[k] || opening[k.to_s]) : nil
+          raise 'Čelný otvor musí mať konečné rozmery.' unless v.is_a?(Numeric) && v.to_f.finite?
+
+          out[k] = v.to_f
+        end
+        op
       end
 
       # --- KOV-A1: JEDINA definicia „kde sa smer pyta" ------------------------

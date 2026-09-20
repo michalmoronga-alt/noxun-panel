@@ -18,7 +18,10 @@ module Noxun
         max_right = nil
         model.entities.grep(Sketchup::ComponentInstance).each do |inst|
           next unless OWNER_KINDS.include?(Store.kind(inst).to_s)
-          r = Units.to_mm(inst.bounds.max.x)
+          # S1-E: NOMINALNA obalka, nie skutocne bounds — celo s presahom ani
+          # proxy kovania nesmu odsunut miesto pre dalsiu skrinku
+          # (`CabinetBuilder.envelope` vracia doske jej vlastne bounds).
+          r = Units.to_mm(CabinetBuilder.envelope(inst).max.x)
           max_right = r if max_right.nil? || r > max_right
         end
         max_right.nil? ? 0.0 : max_right + gap

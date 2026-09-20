@@ -178,6 +178,15 @@ je v [construction.md](construction.md).
 **`hardware_set_key_type` pozná prefix `class:`** (triedny kľúč mapovania setov, [hardware.md](hardware.md)): vracia z neho prvý segment, takže `class:lift|classic` prestavbu
 neblokuje a `class:sliding|classic` z novšej verzie áno. `parse_hardware_set_key` pre triedny kľúč vracia `nil` — nie je to výber podľa typu ani podľa dielca.
 
+**S1-E — aditívny kľúč `plan[:references]` (BLOCKER E2).** Referencia **nie je dielec**: nikdy nemá `part_key`, nikdy `prod` a **nikdy neprejde cez `parts`** —
+renderer dielcov (`CabinetBuilder.add_part`) zapisuje na entitu `kind: 'part'`, takže by ju kusovník aj VEPO videli ako dosku, ktorú nikto nevyrobí.
+Deskriptor (symbolové kľúče, mm Float): `ref_key` (unikátny v pláne) · `role` z `REFERENCE_ROLES` (dnes `appliance_body`) · `kind: 'reference'` ·
+`box` [3 × Float > 0] · `origin` [3 × Float] · `production_class: 'reference'` · `manufactured: false` · `source` z `REFERENCE_SOURCES`
+(`generic` | `catalog`) · `label` (ľudský popis do modelu a diagnostiky) · voliteľné `dw_class`. Validuje ho `validate_references!`, volané z `validate!`
+len keď kľúč existuje — **plány dolnej a hornej skrinky ho nedostanú a ich kontrakt sa nemení**. `SCHEMA` ostáva **5**: plán sa **neperzistuje**
+(do configu ide cez `merge_final` len menovitý zoznam kľúčov), takže kompatibilitu vyjadruje `CabinetBuilder::CONFIG_SCHEMA`, nie schéma plánu.
+Kreslí ho `CabinetBuilder.render_references` (viď [construction.md](construction.md)).
+
 ## Perzistencia a nastavenia počítača
 
 ### json_file_store.rb
@@ -343,6 +352,13 @@ Escapom a otvoriť iný — a `renameSaved` by mu ten **cudzí rozpísaný formu
 
 (3) **Mazanie klasifikuje „zmizla" až po návrate zo zámku** — pred-kontrola `find` beží mimo zámku, takže medzi ňou a zamknutým `delete` môže šablónu zmazať druhá inštancia;
 `false` sa preto ešte raz overí `find`om a až potom sa hlási novšia schéma/disk (spoločné telo `template_gone`).
+
+**S1-E — `STD` 5: markerový seed slotov umývačky.** Krok `old_std < 5` doseje dve **korpusové** šablóny **„Umývačka 60"** a **„Umývačka 45"**
+(`build_predefined_slots`, config typu `dishwasher` s `dw_class`, `dw_body_height`, `dw_front_bottom` 64 a `dw_front_height` 776). Na rozdiel od
+ostatných korpusových seedov (`lower_base`/`upper_base`) **nesú `config['config_schema']`** = `CabinetBuilder::CONFIG_SCHEMA`: bez markera by ich
+starší plugin považoval za legacy, `norm_type` by mu neznámy typ sklopil na `lower` a zo slotu by vložil **plný korpus** s bokmi, dnom a chrbtom
+(Astra S1-E FIX E5). S markerom ho `Panel.newer_template_refusal` čisto odmietne. Seed je **markerový, nie obsahový** — viaže sa na prechod markera,
+takže zmazanú „Umývačku 60" plugin už nikdy nevráti (`missing_slot_seed` je čistá funkcia nad existujúcim zoznamom).
 
 ### template_usage (modul TemplateUsage, žije v core/templates.rb)
 

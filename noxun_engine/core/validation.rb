@@ -127,6 +127,15 @@ module Noxun
       # ostali ako „krytky bez mechanizmu", preto sa zastavuje nakup, rozpocet
       # a cenova ponuka; VEPO bezi dalej (geometria cela je spravna).
       CAT_HW_INCOMPLETE = 'hardware_incomplete'
+      # ORANGE — S1-E: SLOT UMYVACKY. Dva kody:
+      #   `dw_body_fit`   — telo spotrebica je sirsie nez slot (telo sa nikdy
+      #                     nedeformuje, takze by v modeli TRCALO),
+      #   `dw_height_fit` — NASTAVENA vyska tela presahuje vysku linky (telo by
+      #                     nezaslo pod pracovnu dosku).
+      # ORANGE a ZIADNA exportna brana zamerne: slot vydava jediny dielec —
+      # CELO — a jeho vyroba na tele nezavisi. Je to upozornenie pre cloveka
+      # („takto sa to nezmesti"), nie chyba vyrobnych dat.
+      CAT_APPLIANCE   = 'appliance'
 
       # Druh top-level kusu, ktory MA KOVANIE. Zdielana konstanta preto, ze
       # „skrinka vs. doska" nie je kozmetika textu: len pri skrinke zliatie
@@ -220,6 +229,11 @@ module Noxun
                               collected[:hardware_overrides])
         check_newer_configs(collected[:newer_configs], items)
         check_hardware_manual(collected[:hardware_manual], items)
+        # S1-E: udaje slotu chodia TOU ISTOU cestou ako vsetko ostatne —
+        # `Bom.collect` -> `Validation.run` (Astra S1-E FIX E12). Chybajuci
+        # kluc = kontrola sa preskoci (legacy volania a headless testy bez
+        # slotov; vzor `placements:`).
+        check_appliance_slots(collected[:appliance_slots], items)
         check_hardware_expansion(hardware_expansion, items)
         check_hardware_notes(hardware_expansion, items) # KOV-F1
         check_placements(placements, items)
@@ -965,6 +979,56 @@ module Noxun
                                      'v nákupe; prepni ju na iný dielec alebo ju zmaž.',
                      'stable_key' => [CAT_HW_ADHOC, oid, pkey, it['id'].to_s].join('|') }
         end
+      end
+
+      # --- S1-E: slot umyvacky (`appliance_slots` z Bom.collect) -------------
+      #
+      # Kontroluju sa PRESNE DVE veci (rozhodnutie Michal 20.9.):
+      #   `dw_body_fit`   telo triedy sa musi zmestit do SIRKY slotu,
+      #   `dw_height_fit` NASTAVENA vyska tela (`dw_body_height`, nie katalogove
+      #                   minimum — to len ohranicuje vstup) musi byt pod
+      #                   vyskou linky.
+      # Vyska cela, jeho presah nad telo, sokel ani hmotnost sa NEKONTROLUJU.
+      # `stable_key` nesie KOD, takze oba nalezy na tom istom slote su DVA
+      # riadky; klik-select mieri na slot (`owner_id` + `owner_pid`).
+      DW_BODY_FIT   = 'dw_body_fit'
+      DW_HEIGHT_FIT = 'dw_height_fit'
+
+      def check_appliance_slots(slots, items)
+        Array(slots).each do |s|
+          next unless s.is_a?(Hash)
+
+          oid = s['owner_id'].to_s
+          pid = s['owner_pid']
+          bw = s['body_width'].to_f
+          w  = s['width'].to_f
+          if bw.positive? && w.positive? && bw > w + 0.01
+            items << slot_item(oid, pid, DW_BODY_FIT,
+                               "Telo umývačky #{fmt_mm(bw)} sa nezmestí do slotu #{fmt_mm(w)} — " \
+                               'rozšír slot alebo zmeň triedu (60/45).')
+          end
+          bh = s['dw_body_height'].to_f
+          h  = s['height'].to_f
+          next unless bh.positive? && h.positive? && bh > h + 0.01
+
+          items << slot_item(oid, pid, DW_HEIGHT_FIT,
+                             "Výška tela #{fmt_mm(bh)} > výška linky #{fmt_mm(h)} — " \
+                             'umývačka sa pod dosku nezmestí.')
+        end
+      end
+
+      def slot_item(oid, pid, code, message)
+        { 'severity' => ORANGE, 'category' => CAT_APPLIANCE,
+          'owner_id' => oid, 'owner_pid' => pid, 'part_key' => nil, 'hw_key' => nil,
+          'message_sk' => message,
+          'stable_key' => "#{CAT_APPLIANCE}|#{oid}|#{code}" }
+      end
+
+      # Cele mm bez desatin, inak jedno desatinne miesto (slovenska ciarka) —
+      # ten isty tvar, aky pouzivaju hlasky ciel (`Fronts.fmt_mm`).
+      def fmt_mm(v)
+        f = v.to_f
+        (f - f.round).abs < 0.05 ? f.round.to_s : format('%.1f', f).tr('.', ',')
       end
 
       # --- kontroly kovania a stavby ----------------------------------------
