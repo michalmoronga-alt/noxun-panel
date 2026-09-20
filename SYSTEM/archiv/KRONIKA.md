@@ -17,6 +17,15 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **S1-E0 — MINIMÁLNA VÝŠKA KORPUSU 80 mm (v0.12.9, 20.9.2026, PR #375; záznam zapísaný z docs PR #374, ktorý sa merguje tesne pred ním).** Spodná hranica výšky klesla z 200
+  na 80 mm na všetkých troch miestach, ktoré ju držia (`CabinetBuilder::MIN`, `ScaleWatch::MIN`, `LIMITS` vo `form.js`) — Michal (20.9., debata S1) vypĺňa priestor nad umývačkou po
+  líniu linky nízkym korpusom na dorovnanie (80–110 mm) a plugin ho dovtedy nepustil. Šírka (200) a hĺbka (150) sa nemenia. **`CONFIG_SCHEMA` 14 → 15** (Codex #374 P1: starší
+  plugin by skrinku 80–199 mm pri prestavbe ticho zväčšil na 200 = zmena výrobnej geometrie; dopredný guard `newer_config?` ju odmietne — pred takou zákazkou aktualizovať obe PC).
+  Zhodu troch čísel stráži guard `tests/pure/test_s1e0_min_vyska.rb`. Výška je celková vrátane sokla, preto panel zastaví nízku skrinku s vysokým soklom červeným poľom ešte pred
+  apply (`cabinetHeightError` vo `form.js`, default sokla zhodný s Ruby), a absorpcia scale klampuje výšku config-aware (sokel + 2× hrúbka + vnútro), aby rebuild po klampe prešiel.
+  Police pri malom vnútre ostávajú odmietnutím z `ZoneTree.validate_shelves!` (charakterizované testom). Testy (kolo 0): 4169 headless + 121 JS sád + in-SU `run_s1e0` (2793 PASS / 0
+  FAIL), 3 mutácie chytené; Codex kolo 1 na #375 = 1×P1 (uzáverové záznamy) + 2×P2 (klamp scale so soklom, default sokla v JS) — zapracované. D-135 vyriešené.
+
 - **S1 DEBATA POLÍ + CROSS OUTSIDE-IN AUDIT ×3 + MOCKUP SPOTREBIČE (19.–20.9.2026, docs PR — bez zmeny kódu, VERSION 0.12.8 ostáva; S1-E0 fix beží samostatne).**
   **Čo sa spravilo:** nočná debata Michal + Fable nad 13 otázkami k poliam S1 (presahy s referenciou, delenie dverí chladničky = Kontrola + odporúčanie, drez Blanco Legra XL 6 S ako
   10. model seedu, digestor len evidencia, rúra/mikro lacná kontrola Š + H, sekcia Štúdia s pohľadmi V zákazke · Katalóg, „očakáva" aj bez šablóny, prílohy po jednom, „dodáva

@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.12.8 · 19.9.2026 — M-R VZHĽAD KOMPLET, nad ním sedem dávok D-94 až D-130** (Nákup s pôvodom · výška dreveného boxu · Kresba čiel · dormantný zámok ·
+**v0.12.9 · 20.9.2026 — M-R VZHĽAD KOMPLET, nad ním osem dávok D-94 až D-135** (S1-E0: min výška korpusu 80 mm, PR #375 · (Nákup s pôvodom · výška dreveného boxu · Kresba čiel · dormantný zámok ·
 rozsah zákazky pri „Nahradiť UNI" aj pri hromadných zápisoch · **rework kontextu Čelá komplet — nový zoznam čiel + skupina „Spoločné pre skrinku"**).
 Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.

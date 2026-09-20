@@ -96,7 +96,7 @@ modelu** (Winner „nika najprv, spotrebič neskôr").
 nízky napr. 90 mm**, preto sa **minimálna výška korpusu zníži 200 → 80 mm** (šírka a hĺbka bez zmeny; overiť guardy v JS/testoch; in-SU test nízkeho korpusu). Blendu ako
 dosku vie plugin už dnes (samostatná doska).
 
-**Kontrola slotu (3, ORANGE, nikdy neblokuje):** trieda šírky slotu vs trieda priradeného modelu · telo sa zmestí do šírky slotu · **minimálna výška tela ≤ výška linky**.
+**Kontrola slotu (3, ORANGE, nikdy neblokuje):** trieda šírky slotu vs trieda priradeného modelu · telo sa zmestí do šírky slotu · **nastavená výška tela ≤ výška linky** (katalógové minimum len ohraničuje vstup; Codex #374 P2).
 Výška čela, presah čela hore, sokel ani hmotnosť sa **nekontrolujú** (rozhodnutie 6.9., potvrdené 20.9. dvakrát) — list max 720 / 2–10 kg sa ukáže len ako informácia
 v riadku Spotrebič.
 
