@@ -95,7 +95,10 @@ Chýbajúci kľúč `appliance_slots` kontrolu **ticho preskočí** (legacy vola
   „nevieme", nie „nesedí".
 
 `stable_key` je `appliance|<uuid položky>|<kód>`, takže dva nálezy nad tým istým spotrebičom sú **dva riadky** (dedup by inak nechal len prvý). Viazané nálezy
-adresu vlastníka **majú** (`owner_id` + `owner_pid`), takže klik označí skrinku. Záznamy `expected_missing` (vlastník, ktorý spotrebič len očakáva) sú v zbere
+adresu vlastníka **majú** (`owner_id` + `owner_pid`), takže klik označí skrinku. **Nález BEZ `owner_id` nemá v modeli čo označiť**, preto ho `ProductionCore.do_select`
+vybaví **pred** akýmkoľvek výberom entít: `route_target` z neho prečíta `data.route` a vráti **deep-link do sekcie** (`appl` → Rozpočet, kotva `appliance:<uuid>`);
+výber sa pri tom **nedotkne** a okno riadok krátko prisvieti (`budOpenAnchor`). Bez toho by všeobecný resolver buď neoznačil nič („zoznam sa medzitým zmenil"),
+alebo — pri recyklovanom ID — označil **cudziu** skrinku. S1-B2 prepne cieľ trasy na pohľad „V zákazke" zmenou **jedinej** mapy `ROUTE_SECTIONS`. Záznamy `expected_missing` (vlastník, ktorý spotrebič len očakáva) sú v zbere
 pre pohľad „V zákazke" — nález z nich robí až S1-C.
 
 ### production_core.rb — zdieľané čisté jadro výstupov zákazky (ŠT-1a PR A)

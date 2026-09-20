@@ -2834,9 +2834,12 @@ Modal **„Pridať spotrebič"** má sedem polí v pevnom poradí — `catalog_i
 - **Modal patrí DOKUMENTU** (Astra B4): pri otvorení sa zachytí `model_guid` a zápis ide **s ním**, nie s aktuálnym. Príchod payloadu iného dokumentu
   (`budDocSwitched`) modal **zavrie**, zahodí frontu zápisov aj rozpracovaný dotaz našepkávača — inak by položka sadla do cudzej zákazky. Kontrola beží **pred**
   uvoľnením fronty, takže čakajúci zápis sa už neodošle ani s novou generáciou.
-- **Zmena vlastníka je vlastná doménová akcia** `appliance_owner` (na serveri jedna operácia väzby), nie `appliance_update` — `budMoreCommit` ju rozlíši podľa toho, či
-  sa hodnota selectu zmenila. Riadok tabuľky kreslí typ ako **text**, keď je zamknutý (model z katalógu alebo fyzický vlastník), a priznáva vlastníka aj štítok
-  „dodáva zákazník".
+- **Zmena vlastníka je vlastná doménová akcia** `appliance_owner` (na serveri jedna operácia väzby), nie `appliance_update` — `budMoreCommit` ju rozlíši **dirty
+  flagom** (`budOwnerDirty`: porovnanie s baseline z otvorenia editora; prázdna hodnota nie je zmena). Úprava adresy ani príznaku o vlastníkovi nehovorí nič, takže
+  ho ani **nenesie** — server ho pri `appliance_update` odmieta. **Uložený vlastník, ktorý nie je v ponuke** (zanikol, je odpojený, je z novšej verzie), dostane
+  v selecte **výslovnú voľbu navrchu** („CAB-9 — nedostupný…", `budOwnerOptionsFor`): bez nej by prehliadač vybral prvú skrinku a uloženie kvôli úplne inej zmene by
+  sirotu **ticho presunulo**. Riadok tabuľky kreslí typ ako **text**, keď je zamknutý (model z katalógu alebo fyzický vlastník), priznáva vlastníka, štítok
+  „dodáva zákazník" a nesie **adresu `data-brow="appliance:<uuid>"`** pre deep-link z Kontroly.
 - **Generácia okna:** mutácia spotrebiča môže **prestavať skrinku** (zápis `appliance_refs[]` ide cez rebuild). `ProductionCore.do_budget` preto vracia aj
   `geometry_changed` a Štúdio pri `true` pushne `bump: true` + čerstvú kartu Inspectora (`Panel.push_selected(dedup: false)` — čítacie okno si opravu identity kópií
   nevyžiada, brána 1b-3). Cenové zmeny ostávajú pri dnešnom `bump: false`.

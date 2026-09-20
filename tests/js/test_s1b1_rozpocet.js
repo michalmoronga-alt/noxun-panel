@@ -331,4 +331,78 @@ push('DOC-A', [ROW_BOUND, ROW_FREE]);
   eq(SENT.length, 1, 'cakajuci zapis sa NEODOSLAL do inej zakazky');
 })();
 
+// ========== 10) Codex #382 kolo 1 P1: NEDOSTUPNY vlastnik v editore =========
+//
+// Ulozeny vlastnik nemusi byt v ponuke (zanikol, je odpojeny, je z novsej
+// verzie). Bez vyslovnej volby by prehliadac v `<select>` vybral PRVU moznost
+// — cudziu skrinku — a ulozenie kvoli UPLNE INEJ zmene (adresa, „dodáva
+// zákazník") by sirotu TICHO presunulo.
+
+const ROW_ORPHAN = {
+  key: 'appliance:A3', id: 'A3', nazov: 'Beko (sirota)', typ: 'fridge',
+  typ_label: 'Chladnička', cena_mj: 899, spolu: 899, url: 'https://x.sk/a',
+  catalog_id: 'CAT-1', owner: { kind: 'cabinet', id: 'CAB-9' }, customer_supplied: false
+};
+
+(function(){
+  const b = budget([]);
+  // Ponuka pre ZIVEHO vlastnika sa nemeni.
+  eq(B.budOwnerOptionsFor(b, ROW_BOUND).map(function(o){ return o[0]; }),
+     ['cabinet:CAB-1', 'cabinet:CAB-2', 'job'], 'živý vlastník ponuku nemení');
+  // NEDOSTUPNY vlastnik dostane VYSLOVNU volbu NAVRCHU.
+  const opts = B.budOwnerOptionsFor(b, ROW_ORPHAN);
+  eq(opts[0][0], 'cabinet:CAB-9', 'uložený vlastník je prvou voľbou');
+  ok(opts[0][1].indexOf('nedostupný') > -1, 'a hovorí, že je nedostupný: ' + opts[0][1]);
+  eq(opts.length, 4, 'ostatné voľby ostávajú');
+  // „Len zakazka" placeholder nepotrebuje.
+  eq(B.budOwnerOptionsFor(b, ROW_FREE).length, 2);
+})();
+
+(function(){
+  push('DOC-A', [ROW_BOUND, ROW_FREE, ROW_ORPHAN]);
+  SENT.length = 0;
+  B.budOpenMore('appliance', 'A3');
+  ok(NXModal.isOpen(), 'editor siroty sa otvoril');
+  eq(DOC.getElementById('nxm_owner').value, 'cabinet:CAB-9',
+     'select drží ULOŽENÉHO vlastníka, nie prvú skrinku v ponuke');
+
+  // Zmena URL (vlastník sa NEDOTKOL) → žiadny `owner` v payloade.
+  DOC.getElementById('nxm_url').value = 'https://x.sk/b';
+  dispatch(DOC.querySelector('[data-nxm-act="submit"]'), 'click');
+  eq(SENT.length, 1);
+  eq(SENT[0].op, 'appliance_update', 'iná zmena ide obyčajnou úpravou');
+  ok(SENT[0].owner === undefined, 'a NEPRESÚVA spotrebič (žiadny `owner` v payloade)');
+  NX.budgetResult('appliance_update', true);
+
+  // Vyslovna zmena vlastnika → `appliance_owner` s NOVYM cielom.
+  push('DOC-A', [ROW_BOUND, ROW_FREE, ROW_ORPHAN]);
+  SENT.length = 0;
+  B.budOpenMore('appliance', 'A3');
+  DOC.getElementById('nxm_owner').value = 'cabinet:CAB-2';
+  dispatch(DOC.querySelector('[data-nxm-act="submit"]'), 'click');
+  eq(SENT[0].op, 'appliance_owner');
+  eq(SENT[0].owner, { kind: 'cabinet', id: 'CAB-2', pid: 102 });
+  NX.budgetResult('appliance_owner', true);
+
+  // Čistá funkcia dirty flagu: prázdna hodnota nie je zmena.
+  B.budOpenMore('appliance', 'A1');
+  ok(!B.budOwnerDirty({}), 'chýbajúce pole NIE JE zmena (neodpojí spotrebič)');
+  ok(!B.budOwnerDirty({ owner: 'cabinet:CAB-1' }), 'tá istá hodnota nie je zmena');
+  ok(B.budOwnerDirty({ owner: 'job' }), 'odpojenie zmena JE');
+  NXModal.close();
+})();
+
+// ========== 11) deep-link z Kontroly na riadok (kolo 1 P2) ==================
+
+(function(){
+  push('DOC-A', [ROW_BOUND, ROW_ORPHAN]);
+  // Sekcia musí byť vykreslená, aby mal deep-link čo nájsť.
+  if (typeof global.studioGoSection === 'function') global.studioGoSection('budget');
+  const html = B.budApplianceRow(ROW_ORPHAN, { vat: true }, budget([]));
+  ok(html.indexOf('data-brow="appliance:A3"') > -1, 'riadok nesie ADRESU pre deep-link');
+  ok(!B.budOpenAnchor(''), 'prázdna kotva nič neotvára');
+  ok(!B.budOpenAnchor('appliance:NEEXISTUJE'),
+     'zaniknutý riadok = false (volajúci to povie nahlas, nie ticho)');
+})();
+
 console.log('OK test_s1b1_rozpocet.js — ' + n + ' kontrol');

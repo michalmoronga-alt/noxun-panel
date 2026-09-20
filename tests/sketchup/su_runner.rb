@@ -4118,6 +4118,7 @@ module NoxunSuRunner
        r14_marker(model) == e::BudgetStore::BUDGET_STD)
     r14_clear!(model)
 
+    s1b1_kolo1(model, fridge_id)
     s1b1_rollback(model, fridge_id)
     s1b1_barrier(model, fridge_id)
 
@@ -4134,6 +4135,92 @@ module NoxunSuRunner
     e::ApplianceCatalog.reset_state!
   end
 
+
+  # Codex #382 kolo 1: DOTIAHNUTA IDENTITA A ADRESA NALEZU.
+  #   * `patch` s vlastnikom v payloade sa ODMIETA (dvaja vlastnici v jednom
+  #     zapise su nejednoznacni — tichy vyber jedneho z nich by spotrebic
+  #     presunul bez toho, aby o to niekto poziadal),
+  #   * `rebind_model` nad SIROTOU refs NEPREPISUJE (implicitny ciel je PRAVE
+  #     overeny povodny vlastnik, nie hladanie podla recyklovaneho ID),
+  #   * klik na sirotu ide DEEP-LINKOM do sekcie — v modeli nema co oznacit,
+  #     takze vyber sa nesmie ani dotknut.
+  def s1b1_kolo1(model, catalog_id)
+    r14_clear!(model)
+    cab = e::CabinetBuilder.build(
+      model, S1B1_CAB, transform: Geom::Transformation.translation(e::Units.point(10_000.0, 0, 0))
+    )
+    other = e::CabinetBuilder.build(
+      model, S1B1_CAB, transform: Geom::Transformation.translation(e::Units.point(11_000.0, 0, 0))
+    )
+    return ok('S1-B1 (kolo 1): fixtury', false) unless cab && other
+
+    cid = e::Store.get(cab, 'cabinet_id').to_s
+    owner1 = { 'kind' => 'cabinet', 'id' => cid, 'pid' => cab.persistent_id }
+    owner2 = { 'kind' => 'cabinet', 'id' => e::Store.get(other, 'cabinet_id').to_s,
+               'pid' => other.persistent_id }
+    s1b1_apply(model, 'create', attrs: { 'nazov' => 'Beko', 'cena' => '100' },
+                                catalog_id: catalog_id, owner: owner1)
+    id = s1b1_items(model).first['id']
+
+    # (1) `patch` s vlastnikom = ODMIETNUTIE bez zapisu a bez kroku Spat.
+    markers = []
+    m1 = r03_marker(model, markers)
+    res = s1b1_apply(model, 'patch', item_id: id, attrs: { 'cena' => '777' }, owner: owner2)
+    ok("S1-B1 (kolo 1): `patch` s vlastnikom ODMIETNUTY (#{Array(res[:errors]).first})",
+       res[:ok] == false)
+    ok("S1-B1 (kolo 1): a NIC sa nezapisalo (cena #{s1b1_items(model).first['cena']}, " \
+       "vlastnik #{s1b1_owner(model, id)['id']})",
+       (s1b1_items(model).first['cena'].to_f - 100.0).abs < 0.01 &&
+       s1b1_owner(model, id) == { 'kind' => 'cabinet', 'id' => cid } &&
+       s1b1_refs(other).empty?)
+    Sketchup.undo
+    ok('S1-B1 (kolo 1): odmietnuty `patch` NEZALOZIL krok Spat (1x Spat vratil marker)',
+       !m1.valid?)
+    r03_clear_markers(model, markers)
+
+    # (2) KLIK NA SIROTU: vyber sa NEDOTKNE a nalez vrati ADRESU SEKCIE.
+    model.start_operation('SU-TEST S1B1 kolo1 delete', true)
+    cab.erase!
+    model.commit_operation
+    item = Array(e::Validation.run(e::Bom.collect(model))['items'])
+           .find { |i| i['stable_key'].to_s.include?('appliance_owner_missing') }
+    ok('S1-B1 (kolo 1): sirota je v Kontrole', !item.nil?)
+    if item
+      e::Panel.suspend_selection_sync do
+        sel = model.selection
+        sel.clear
+        sel.add(other)
+      end
+      before = model.selection.to_a
+      routed = nil
+      status = nil
+      e::ProductionCore.do_select(
+        model, { 'gen' => 7, 'problem_key' => item['stable_key'] },
+        generation: 7,
+        status: ->(txt, err = false) { status = [txt, err] },
+        repush: -> {},
+        route: ->(rt) { routed = rt }
+      )
+      ok("S1-B1 (kolo 1): klik na sirotu vratil ADRESU SEKCIE (#{routed.inspect})",
+         routed.is_a?(Hash) && routed['section'] == 'budget' &&
+         routed['anchor'] == "appliance:#{id}")
+      ok('S1-B1 (kolo 1): a VYBER sa nedotkol (ziadna cudzia skrinka sa neoznacila)',
+         model.selection.to_a == before)
+      ok("S1-B1 (kolo 1): status nie je cerveny (#{status && status[0]})",
+         status.is_a?(Array) && status[1] != true)
+    end
+
+    # (3) `rebind_model` nad SIROTOU: snapshot sa aktualizuje, refs NIE.
+    res3 = s1b1_apply(model, 'rebind_model', item_id: id, catalog_id: catalog_id)
+    ok("S1-B1 (kolo 1): `rebind_model` nad sirotou prejde (#{Array(res3[:errors]).join(' · ')})",
+       res3[:ok] == true && res3[:geometry_changed] == false)
+    ok('S1-B1 (kolo 1): a ZIADNA cudzia skrinka vazbu nedostala',
+       s1b1_refs(other).empty? && cabinets(model).none? { |i| !s1b1_refs(i).empty? })
+
+    s1b1_apply(model, 'remove', item_id: id)
+    other.erase! if other.valid?
+    r14_clear!(model)
+  end
   # Astra B17: RIADENE ZLYHANIA. Po aborte musi byt stav PRESNE ako pred
   # operaciou (rozpocet, marker, oba configy) a NASLEDUJUCA operacia musi
   # uspiet — fake model v headless sade to nedokaze, jeho `abort_operation`

@@ -171,6 +171,9 @@ jedno Späť by vrátilo len jednu z nich a zákazka by ostala v stave, ktorý v
   sem smeruje **všetky** spotrebičové operácie okna — aj položky „len zákazka".
   `BudgetStore.add/update/remove_appliance!` sú odvtedy **vnútorné** funkcie volané pod `in_operation: true`
   (a s `trusted: true`, lebo `catalog_id`, `snapshot` ani `owner` z klienta nikdy nechodia).
+  **Vlastníka smú niesť LEN `OWNER_OPS` = `create · move · unbind · rebind_model`** — `patch` a `remove`
+  s vlastníkom v payloade sa **odmietajú** (nie ignorujú): dvaja vlastníci v jednom zápise sú nejednoznační
+  a tichý výber jedného z nich by spotrebič presunul bez toho, aby o to niekto požiadal.
 - **Guardy bežia PRED `start_operation`** (odmietnutá mutácia nesmie založiť krok Späť — vzor D-133/D-134):
   identita dokumentu (`DocKey.foreign?`, rovnaká tolerancia prázdneho klientskeho údaja ako rozpočet) · verzia
   dát rozpočtu (`BudgetStore.std_block_reason`) · existencia položky a strop `MAX_APPLIANCES` · **matica**
@@ -183,11 +186,18 @@ jedno Späť by vrátilo len jednu z nich a zákazka by ostala v stave, ktorý v
   `dishwasher` → slot · `hob|sink` → doska · `hood|other` → nič. **`job` („len zákazka") je legitímny stav
   každej kategórie** a v matici preto nie je. Platí v ponuke vlastníkov (`owner_options_map` — odpojené
   skrinky a configy z novšej verzie sa **neponúkajú**) aj na serveri; klientsky payload nie je ochrana.
-- **Tri stavy pôvodného vlastníka:** (a) **platný** (entita existuje + jej refs nesú `item_id`) → prestaví sa ·
+- **Štyri stavy pôvodného vlastníka:** (a) **platný** (entita existuje + jej refs nesú `item_id`) → prestaví sa ·
   (b) **nezapisovateľný** (odpojený dielec, novšia verzia) → **celá operácia sa odmietne** · (c) **zaniknutá
-  väzba** (ID už patrí inému kusu bez refs) → tá skrinka sa **nedotkne**, položka len zmení vlastníka.
-  `patch` (cena, názov, príznak) sa väzby nedotýka, a preto ho **nesmie** zastaviť ani zamknutý, ani zaniknutý
-  vlastník — cena siroty sa musí dať opraviť.
+  väzba** (ID už patrí inému kusu bez refs) → tá skrinka sa **nedotkne**, položka len zmení vlastníka ·
+  (d) **nejednoznačný** — v modeli žije **viac** kusov s tým istým uloženým ID (poškodený alebo importovaný
+  model): keď väzbu nesie **práve jeden**, použije sa on; inak sa celá operácia **odmietne pred**
+  `start_operation` („nejednoznačná identita vlastníka CAB-3 — prestav skrinky"), lebo tichý preskok by nechal
+  staré refs visieť na oboch kusoch. `patch` (cena, názov, príznak) sa väzby nedotýka, a preto ho **nesmie**
+  zastaviť ani zamknutý, ani zaniknutý vlastník — cena siroty sa musí dať opraviť.
+- **Implicitne nesený cieľ sa NEHĽADÁ podľa ID.** `rebind_model` bez vysloveného vlastníka zapíše refs
+  výhradne do **tej entity, ktorú overil `resolve_previous`**. Hľadanie podľa uloženého ID by pri recyklovanom
+  ID pripojilo spotrebič na **cudziu** skrinku; keď pôvodný vlastník zanikol, refs sa **neprepisujú** —
+  aktualizuje sa len snapshot položky a Kontrola hlási sirotu ďalej.
 - **`rebind_model` s modelom inej kategórie sa ODMIETA**, nikdy automaticky neodpája („model inej kategórie —
   najprv odpoj spotrebič").
 - **Kontrakt záznamu `appliance_refs[]`** (číta ho S1-B2 telo slotu, S1-F box chladničky, S1-C očakávania):

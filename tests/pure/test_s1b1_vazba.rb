@@ -32,6 +32,7 @@ module NxS1B1
   VAL = Noxun::Engine::Validation
   BOM = Noxun::Engine::Bom
   AC  = Noxun::Engine::ApplianceCatalog
+  PC  = Noxun::Engine::ProductionCore
   STORE = Noxun::Engine::Store
   DICT = STORE::DICT
 
@@ -964,4 +965,157 @@ NxTest.test('S1-B1: Kontrola rata spotrebicove nalezy do badge (existujuca cesta
   NxTest.assert_equal(1, out['counts']['orange'])
   NxTest.assert_equal(1, out['items'].length)
   NxTest.assert_equal('appliance', out['items'].first['category'])
+end
+
+# ================= 8) Codex #382 kolo 1 — dotiahnuta identita ===============
+
+NxTest.test('S1-B1 (kolo 1 P2): `patch` ani `remove` vlastnika NEPRIJMU') do
+  m = NxS1B1::FakeModel.new
+  cab = NxS1B1.cabinet('CAB-1', 101)
+  NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [cab])]) do
+    NxS1B1.create!(m, NxS1B1.fridge_snapshot,
+                   { 'kind' => 'cabinet', 'id' => 'CAB-1', 'pid' => 101 })
+  end
+  id = NxS1B1::BS.appliances(m).first['id']
+  ops_before = m.ops.length
+  %w[patch remove].each do |op|
+    res = nil
+    NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [cab])] + NxS1B1.writer_stubs([])) do
+      res = NxS1B1::AB.apply!(m, model_guid: '', op: op, item_id: id, attrs: { 'cena' => 9.0 },
+                              owner: { 'kind' => 'cabinet', 'id' => 'CAB-2', 'pid' => 102 })
+    end
+    NxTest.refute(res[:ok], "#{op}: payload s vlastnikom sa ODMIETA")
+    NxTest.assert_equal([NxS1B1::AB::MSG_OWNER_OP], res[:errors], op)
+  end
+  NxTest.assert_equal(ops_before, m.ops.length, 'a ziadna operacia sa neotvorila')
+  NxTest.assert_equal({ 'kind' => 'cabinet', 'id' => 'CAB-1' },
+                      NxS1B1::BS.appliances(m).first['owner'], 'vlastnik sa nezmenil')
+  NxTest.assert_equal(%w[create move unbind rebind_model], NxS1B1::AB::OWNER_OPS)
+end
+
+NxTest.test('S1-B1 (kolo 1 P2): `rebind_model` nad SIROTOU refs NEPREPISUJE') do
+  m = NxS1B1::FakeModel.new
+  cab = NxS1B1.cabinet('CAB-1', 101)
+  NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [cab])]) do
+    NxS1B1.create!(m, NxS1B1.fridge_snapshot,
+                   { 'kind' => 'cabinet', 'id' => 'CAB-1', 'pid' => 101 })
+  end
+  id = NxS1B1::BS.appliances(m).first['id']
+  # Povodna skrinka zanikla; ID CAB-1 dostala INA (bez vazby) — recyklacia ID.
+  recycled = NxS1B1.cabinet('CAB-1', 555)
+  other = NxS1B1.fridge_snapshot('CAT-FRIDGE-2')
+  other['name'] = 'BCNA999'
+  log = []
+  res = nil
+  NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [recycled]),
+                     NxS1B1.snapshot_stub('CAT-FRIDGE-2' => other)] + NxS1B1.writer_stubs(log)) do
+    res = NxS1B1::AB.apply!(m, model_guid: '', op: 'rebind_model', item_id: id,
+                            catalog_id: 'CAT-FRIDGE-2')
+  end
+  NxTest.assert(res[:ok], res[:errors].inspect)
+  NxTest.assert_equal([], log, 'CUDZIA skrinka s recyklovanym ID sa NEDOTKLA')
+  NxTest.assert_equal([], NxS1B1.refs_of(recycled))
+  NxTest.assert_equal('CAT-FRIDGE-2', NxS1B1::BS.appliances(m).first['catalog_id'],
+                      'ale snapshot polozky sa aktualizoval')
+  NxTest.assert_equal(false, res[:geometry_changed], 'ziadna prestavba')
+end
+
+NxTest.test('S1-B1 (kolo 1 P2): implicitny ciel je PRAVE overeny povodny vlastnik') do
+  m = NxS1B1::FakeModel.new
+  cab = NxS1B1.cabinet('CAB-1', 101)
+  twin = NxS1B1.cabinet('CAB-1', 202) # rovnake ID, ziadna vazba
+  NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [cab])]) do
+    NxS1B1.create!(m, NxS1B1.fridge_snapshot,
+                   { 'kind' => 'cabinet', 'id' => 'CAB-1', 'pid' => 101 })
+  end
+  id = NxS1B1::BS.appliances(m).first['id']
+  other = NxS1B1.fridge_snapshot('CAT-FRIDGE-2')
+  other['dims']['niche']['width_min'] = 600.0
+  log = []
+  res = nil
+  # V modeli su DVE skrinky s ID CAB-1 — vazbu nesie prave jedna, takze je
+  # jednoznacne, kam refs patria (a hladanie podla ID by bolo nejednoznacne).
+  NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [cab, twin]),
+                     NxS1B1.snapshot_stub('CAT-FRIDGE-2' => other)] + NxS1B1.writer_stubs(log)) do
+    res = NxS1B1::AB.apply!(m, model_guid: '', op: 'rebind_model', item_id: id,
+                            catalog_id: 'CAT-FRIDGE-2')
+  end
+  NxTest.assert(res[:ok], res[:errors].inspect)
+  NxTest.assert_equal(1, NxS1B1.refs_of(cab).length, 'refs ostali na NOSICOVI vazby')
+  NxTest.assert_equal(600.0, NxS1B1.refs_of(cab).first['niche']['width_min'], 'a su aktualne')
+  NxTest.assert_equal([], NxS1B1.refs_of(twin), 'dvojnik sa nedotkol')
+end
+
+NxTest.test('S1-B1 (kolo 1 P2): DVA zive kusy s tym istym ID = odmietnutie pred operaciou') do
+  m = NxS1B1::FakeModel.new
+  cab = NxS1B1.cabinet('CAB-1', 101)
+  target = NxS1B1.cabinet('CAB-2', 102)
+  NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [cab, target])]) do
+    NxS1B1.create!(m, NxS1B1.fridge_snapshot,
+                   { 'kind' => 'cabinet', 'id' => 'CAB-1', 'pid' => 101 })
+  end
+  id = NxS1B1::BS.appliances(m).first['id']
+  # Poskodeny/importovany model: dva ZIVE kusy s ID CAB-1 a ANI JEDEN nenesie
+  # vazbu (napr. po rucnom zasahu do atributov) — nevieme, kam refs patria.
+  ghost_a = NxS1B1.cabinet('CAB-1', 301)
+  ghost_b = NxS1B1.cabinet('CAB-1', 302)
+  log = []
+  res = nil
+  ops_before = m.ops.length
+  NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [ghost_a, ghost_b, target])] +
+                    NxS1B1.writer_stubs(log)) do
+    res = NxS1B1::AB.apply!(m, model_guid: '', op: 'move', item_id: id,
+                            owner: { 'kind' => 'cabinet', 'id' => 'CAB-2', 'pid' => 102 })
+  end
+  NxTest.refute(res[:ok], 'nejednoznacna identita povodneho vlastnika zastavi operaciu')
+  NxTest.assert(res[:errors].first.to_s.include?('nejednoznačná identita vlastníka CAB-1'),
+                res[:errors].inspect)
+  NxTest.assert_equal(ops_before, m.ops.length, 'a to PRED otvorenim operacie')
+  NxTest.assert_equal([], log)
+
+  # Ked vazbu nesie PRESNE JEDEN z dvojice, je to jednoznacne — operacia prejde.
+  carrier = NxS1B1.cabinet('CAB-1', 303,
+                           refs: [{ 'item_id' => id, 'category' => 'fridge' }])
+  NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [carrier, ghost_b, target])] +
+                    NxS1B1.writer_stubs(log)) do
+    res = NxS1B1::AB.apply!(m, model_guid: '', op: 'move', item_id: id,
+                            owner: { 'kind' => 'cabinet', 'id' => 'CAB-2', 'pid' => 102 })
+  end
+  NxTest.assert(res[:ok], res[:errors].inspect)
+  NxTest.assert_equal([], NxS1B1.refs_of(carrier), 'nosic vazbu stratil')
+  NxTest.assert_equal(1, NxS1B1.refs_of(target).length, 'ciel ju ma')
+end
+
+NxTest.test('S1-B1 (kolo 1 P2): sirota vedie DEEP-LINKOM, nie vyberom entit') do
+  items = []
+  NxS1B1::VAL.check_appliances(
+    [{ 'item_id' => 'A1', 'name' => 'Beko', 'category' => 'fridge', 'state' => 'owner_missing',
+       'owner' => { 'kind' => 'cabinet', 'id' => 'CAB-9', 'pid' => nil } }], items
+  )
+  rt = NxS1B1::PC.route_target(items.first)
+  NxTest.assert_equal({ 'route' => 'appl', 'section' => 'budget', 'anchor' => 'appliance:A1' }, rt,
+                      'nalez sirotý nesie adresu SEKCIE, nie entity')
+  NxTest.assert(NxS1B1::PC.route_status(rt).include?('Rozpočte'))
+  # Nalez S POLOZKOU v modeli adresu sekcie NEMA — ide beznym vyberom.
+  bound = []
+  NxS1B1::VAL.check_appliances(
+    [{ 'item_id' => 'A2', 'name' => 'Rúra', 'category' => 'oven', 'state' => 'bound',
+       'owner' => { 'kind' => 'cabinet', 'id' => 'CAB-1', 'pid' => 101 },
+       'snapshot' => { 'body' => { 'width' => 560.0 } } }], bound
+  )
+  NxTest.assert(NxS1B1::PC.route_target(bound.first).nil?,
+                'viazany nalez ma vlastnika — oznaci sa skrinka')
+  NxTest.assert(NxS1B1::PC.route_target(nil).nil?)
+  NxTest.assert(NxS1B1::PC.route_target({ 'data' => { 'route' => 'neznamy', 'item_id' => 'X' } }).nil?,
+                'neznama trasa sa IGNORUJE (nikdy sa nehada)')
+
+  # `do_select` musi vetvu spracovat PRED akymkolvek vyberom entit.
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core.rb'),
+                  encoding: 'UTF-8')
+  body = src[/def do_select\(model, data, generation:.*?\n      end\n/m].to_s
+  NxTest.refute(body.empty?, '`do_select` sa nasla')
+  at_route = body.index('rt = route_target(item)')
+  at_pids = body.index('pids = pids_for_problem(')
+  NxTest.assert(at_route && at_pids && at_route < at_pids,
+                'vetva trasy bezi PRED `pids_for_problem`')
 end
