@@ -143,7 +143,10 @@
   // V0.4.7e: cita cez evalDim (vyraz = hodnota); ROZPISANY vyraz vo fokusovanom
   // poli sa preskoci (ani apply, ani cervene — hint bezi); COMMITNUTY neprazdny
   // nezmysel je PO NOVOM chyba (predtym NaN ticho presiel) a blokuje apply.
-  var LIMITS = { width:[200,3000], height:[200,3000], depth:[150,2000], thickness:[6,50],
+  // S1-E0: VYSKA od 80 mm (korpus na dorovnanie nad umyvackou) — sirka a hlbka
+  // ostavaju. Cisla su zrkadlom Ruby `CabinetBuilder::MIN` / `ScaleWatch::MIN`;
+  // zhodu vsetkych troch miest strazi `tests/pure/test_s1e0_min_vyska.rb`.
+  var LIMITS = { width:[200,3000], height:[80,3000], depth:[150,2000], thickness:[6,50],
                  floor_height:[0,500], plinth_recess:[0,300], rail_depth:[20,400], rails_top_offset:[0,500],
                  // D-07: medzery/presahy cel — zaporny okraj = presah cez obrys (limit zhodny s Fronts::EDGE_LIMIT)
                  fr_gap:[0,50], fr_gap_top:[-100,100], fr_gap_bottom:[-100,100], fr_gap_left:[-100,100], fr_gap_right:[-100,100] };
