@@ -308,8 +308,14 @@ rovnako ako v `core/grain_check.rb`. **Jedna kresba pre obe miesta** — rail
 Inspectora aj prepínač „Smer kresby" v lište sekcie Kontrola v Štúdiu),
 `appliance` (S1-A2 — sekcia SPOTREBIČE v navigácii Štúdia; Lucide
 `refrigerator`: obrys s vodorovnou deliacou čiarou a dvoma úchytkami.
-Kategóriové riadky stromu ikonu **nemajú** — majú text, takže táto kresba žije
-len v navigácii),
+Kategóriové riadky **stromu katalógu** ikonu nemajú — majú text; od S1-B2 ju
+nesie **stĺpec Kategória v pohľade „V zákazke“** a **riadok „Spotrebič“
+v Inspectore**, keď kus spotrebič len očakáva (viazaný riadok má `check`,
+nesediaci `alert` — ikona hovorí stav, nie druh)),
+`unlink` (S1-B2 — „odpojiť spotrebič od vlastníka“ v pohľade „V zákazke“ aj
+v riadku Inspectora; Lucide `unlink`: **pretrhnutá** reťaz, teda opak
+existujúceho `link`. Dvojica tak hovorí sama za seba a riadok nepotrebuje
+slovo navyše),
 `image` (S1-A2 — dlaždica prílohy-OBRÁZKA v karte spotrebiča, kým nedorazí
 miniatúra z lazy kanála, a v nadpise bloku Prílohy; Lucide `image`. PDF má
 existujúci `file-text`, takže druh prílohy je vidieť aj bez fotky),

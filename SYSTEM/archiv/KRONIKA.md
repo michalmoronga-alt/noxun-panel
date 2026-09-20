@@ -17,6 +17,39 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **S1-B2 — SPOTREBIČ V ZÁKAZKE: POHĽAD „V ZÁKAZKE“, RIADOK SPOTREBIČ, TELO SLOTU Z VÄZBY (v0.12.14, 20.9.2026, PR #383).** Väzba z S1-B1 existovala, ale
+  **nebolo ju kde vidieť**: sekcia Spotrebiče mala druhý pohľad priznaný ako placeholder, Inspector o spotrebiči mlčal a slot umývačky kreslil generické telo
+  aj vtedy, keď už mal priradený konkrétny model. Táto dávka dorobila celú viditeľnú stranu — **bez jediného nového dátového kontraktu**.
+- **Pohľad „V zákazke“** (mockup R3–R5) je tabuľka celej zákazky: kategória · model (a odkiaľ je) · vlastník · Kontrola · cena z Rozpočtu · akcie
+  (oko · ceruzka · odkaz · list · odpojiť · zmazať), plus riadky, ktoré položku ešte **nemajú** („nevybraný“ pre kus s očakávaním, mockup CAB-9) a ktoré
+  **stratili vlastníka** („vlastník zmizol“). Riadky, ich **poradie**, tóny aj ceny skladá server (`ApplianceDialog.job_view`) ako **projekciu už hotového
+  zberu, rozpočtu a kontroly toho istého pushu** — žiadny druhý sken modelu a žiadne číslo, ktoré by počítal niekto druhý. Badge navigácie ráta **riadky na
+  vybavenie**, nie nálezy (dva nálezy nad tým istým spotrebičom sú jedna vec).
+- **Zápisy pohľadu idú EXISTUJÚCIM kanálom rozpočtu** (`budget_mutate` → `ApplianceBinding.apply!`). Sekcia si vedome **nerobí vlastnú zápisovú cestu**: druhá
+  cesta k tej istej väzbe by znamenala druhú sadu guardov a druhý spôsob, ako spraviť krok Späť. Jediná nová akcia sekcie je `appl_job_select` (označ vlastníka
+  v modeli) a tá je **čisté čítanie**. Dôsledkom je aj echo zadarmo: po zápise príde bežný `push_state`, ktorý nesie **aj Rozpočet, aj pohľad**.
+- **Jeden modal, dve vstupné miesta** (R2): „Pridať do zákazky“ v pohľade aj „Do zákazky“ v karte katalógu otvárajú **ten istý** D-15 modal ako Rozpočet
+  (z karty s predvyplneným modelom); ceruzka v riadku otvára **ten istý editor položky** ako ⋯ v Rozpočte, len s plnou sadou polí (v pohľade nie je čo editovať
+  inline). Vyradený model sa do zákazky nepriradí a tlačidlo to povie hneď.
+- **Riadok „Spotrebič“ v Inspectore** (R9–R11, vzor riadku Nôh): jeden riadok **per viazaný model** (rúra + mikrovlnka v jednej skrinke sú dva) plus riadok
+  „očakáva“, keď kus spotrebič čaká a nemá ho; **ten istý komponent má karta dosky** (varná doska, drez). Ponuka modelov je filtrovaná podľa niky **len po
+  osiach, ktoré kategória kontroluje** (rúra a mikro Š + H — ich výška je vec zón; chladnička Š/V/H), a **filter nie je brána**: model, ktorý nesedí, v ponuke
+  ostáva s dôvodom. Skrinka s **viac zónami** nemá jednoznačnú výšku vnútra, takže kategórii, ktorá výšku kontroluje, sa filter vypne celý a riadok to prizná;
+  šírka a hĺbka sú jednoznačné vždy, takže rúra o filter neprichádza. **Prvá voľba je vždy neutrálna** („vyber model…“) — `<select>` bez vyslovenej hodnoty
+  vyberie prvú možnosť a jediné kliknutie by inak spotrebič naviazalo aj s prestavbou skrinky.
+- **Cieľ väzby skladá server z OZNAČENEJ entity**, nie z payloadu klienta (nový `ui/panel/actions_appliance.rb`): klient posiela len `item_id` a echo ID, kým
+  druh (skrinka vs slot), ID aj `persistent_id` sa čítajú z modelu. Starý DOM tak nemá ako poslať cudziu skrinku a recyklované ID nemá ako trafiť iný kus.
+- **Telo slotu z väzby** (R5): šírku a hĺbku určuje **katalógový list**, výšku vždy používateľ. Rozhoduje o tom **jediná funkcia `Construction.dw_body_dims`**,
+  ktorú volá builder (referencia so `source: 'catalog'` a `item_id` v configu), Inspector (výstup „448 × 820 × 550 · Bosch SPV6EMX05E“, rozsah výšky z listu,
+  verdikt triedy) **aj Kontrola** (`dw_body_fit` meria telo, ktoré v slote naozaj stojí). Dva výpočty by znamenali, že model ukazuje jedno telo a semafor meria iné.
+- **Vedomé odchýlky od mockupu:** viazaný riadok Inspectora má „odpojiť“, **nie druhý `<select>`** — výmena modelu nad už viazanou položkou sú dve rozhodnutia
+  (odpoj + priraď) a patrí do Štúdia, kde je vidieť celá zákazka. Riadok „očakáva“ **neponúka výber kategórie** bez šablóny (to je S1-C).
+- **Nález Kontroly o spotrebiči vedie do sekcie Spotrebiče** (`ROUTE_SECTIONS` `'appl' => 'appl'`; v S1-B1 viedol do Rozpočtu) — kotva `appliance:<uuid>` prepne
+  pohľad a riadok prisvieti. Riadok, ktorý medzitým zanikol, nie je tichý no-op.
+- **Testy:** headless **4411** (nová sada `test_s1b2_pohlad.rb`), **126 JS sád** (nová `test_s1b2_pohlad.js`), in-SketchUp sekcia **`run_s1b2`** (riadok nad
+  reálnou skrinkou, telo slotu prekreslené v modeli, doska bez prestavby, tabuľka nad reálnym zberom, Delete vlastníka → sirota → odpojenie → Späť). Mutácie
+  M1–M3 overené (filter po osiach · telo z väzby · poradie tabuľky zo servera). Ikona `unlink` pribudla do spritu a do inventára UI_DIZAJN §4.
+
 - **S1-B1 — SPOTREBIČ V ZÁKAZKE: DÁTA, VÄZBA, KONTROLA (v0.12.13, 20.9.2026, PR #382).** Spotrebič prestal byť riadkom rozpočtu s voľným textom a stal sa **kusom,
   ktorý v kuchyni niekde stojí**. Položka `budget_appliances[]` pribrala `catalog_id`, **`snapshot`** (kópia rozmerov z katalógu — zákazka odvtedy na živom
   katalógu nezávisí), `owner` a `customer_supplied`; `BUDGET_STD` išiel 1 → 2. Kódy kategórií sú od tejto dávky **kanonické** (`ApplianceCatalog::CATEGORIES`) —
