@@ -3648,6 +3648,11 @@ module NoxunSuRunner
   # IZOLACIA: cely katalog aj priecinok priloh ide cez `test_dir_override` do
   # docasneho priecinka; override sa v `ensure` VZDY vracia na nil, inak by
   # dalsie sekcie (a zivy plugin) citali cudzi katalog.
+  #
+  # PORADIE: sekcia je POSLEDNA SYNCHRONNA a `UI.openURL` je v nej uplne
+  # nakoniec — systemovy prehliadac prekryje okno SketchUpu a zakryte okno
+  # prestane kreslit view, cim sa rozbije inferencia nad realnou geometriou
+  # v ghost a D-123 sekciach (dokazane behom 20.9.2026).
   def run_s1a1(_model)
     ac = e::ApplianceCatalog
     root = File.join(Sketchup.temp_dir, "noxun_s1a1_#{Process.pid}_#{Time.now.to_i}")
@@ -3666,6 +3671,7 @@ module NoxunSuRunner
       ok("S1-A1: create prejde (#{st_c})", st_c == :ok && !rec.nil?)
 
       # (a) REALNA kopia suboru s diakritikou a medzerou v nazve.
+      opened = nil
       src = File.join(root, 'Technický list — drez 2026.pdf')
       File.binwrite(src, 'PDF test')
       st_a, info_a = ac.attach!(rec['id'], src, kind: 'sheet', rev: rec['rev'])
@@ -3679,12 +3685,7 @@ module NoxunSuRunner
         ok('S1-A1 (a): ulozeny nazov je ASCII (<uuid>_<sanitized>.pdf)',
            item['file'].match?(/\A[0-9a-f-]{36}_technicky_list_drez_2026\.pdf\z/))
         ok('S1-A1 (a): povodny nazov ostal v zazname', item['name'] == 'Technický list — drez 2026.pdf')
-
-        # (b) UI.openURL nad `file:///` cestou (diakritika a medzera v CESTE).
-        url = ac.file_url(target)
-        st_o, info_o = ac.open_attachment(rec['id'], item['id'])
-        ok("S1-A1 (b): open_attachment otvoril subor cez #{url}", st_o == :ok)
-        info("S1-A1 (b): UI.openURL zlyhal pre #{info_o[:path]} — #{info_o[:message]}") unless st_o == :ok
+        opened = [rec['id'], item['id'], target] # (b) sa spusta AZ NA KONCI sekcie
       end
 
       # (c) Zlyhanie kopie (zamknuty zdroj / EACCES) = [:copy_failed, hlaska],
@@ -3726,6 +3727,20 @@ module NoxunSuRunner
       ok('S1-A1 (d): vyradeny zaznam v zozname nie je, s prepinacom ano',
          ac.list[1][:records].none? { |r| r['id'] == rec['id'] } &&
          ac.list(include_deleted: true)[1][:records].any? { |r| r['id'] == rec['id'] })
+
+      # (b) UI.openURL nad `file:///` cestou (medzera aj diakritika v CESTE).
+      # AZ TU: spusta sa systemovy prehliadac, ktory PREKRYJE okno SketchUpu —
+      # po tomto kroku uz nesmie bezat nic, co potrebuje inferenciu nad realnou
+      # geometriou (viz komentar pri volani sekcie). Priloha sa otvara este
+      # z VYRADENEHO zaznamu — presne to bude robit zakazka cez snapshot.
+      if opened
+        url = ac.file_url(opened[2])
+        st_o, info_o = ac.open_attachment(opened[0], opened[1])
+        ok("S1-A1 (b): open_attachment otvoril subor cez #{url}", st_o == :ok)
+        info("S1-A1 (b): UI.openURL zlyhal pre #{info_o[:path]} — #{info_o[:message]}") unless st_o == :ok
+      else
+        ok('S1-A1 (b): open_attachment — priloha sa nevytvorila, nie je co otvarat', false)
+      end
     ensure
       ac.test_dir_override = nil # NIKDY nenechat presmerovany zivy katalog
       ac.reset_state!
@@ -23657,7 +23672,6 @@ module NoxunSuRunner
     run_sync_back(model)     # davka Chrbat: D-37 hlbka, D-31 none, D-38 pevny 18
     run_sync_rails(model)    # H3/D-80: vnutro pod vystuhami (odsadenie, upright, chrbat, odmietnutie)
     run_s1e0(model)          # S1-E0: minimalna vyska korpusu 80 mm — nizka skrinka na dorovnanie sa postavi bez degenerovaneho dielca a kusovnik ju vidi, cesta Inspectora klampne 60 na 80, absorpcia scale pod hranicu tiez (a 1x Spat vrati scale aj absorpciu), horna 600 x 80 x 320
-    run_s1a1(model)          # S1-A1: katalog spotrebicov — prilohy na REALNOM disku (kopia suboru s diakritikou a medzerou, ASCII nazov ulozenej kopie, UI.openURL nad file:///), zlyhanie kopie = :copy_failed bez siroty a bez zmeny JSON, tombstone priecinok priloh NEMAZE; vsetko v izolovanom priecinku cez test_dir_override
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
     run_r03(model)           # R-03: sev prepare_insert/commit_insert — ciste pripravenie, vlastny rigidny transform, odmietnutia, edit kontext
     run_r12(model)           # 1d/R-12: dopredny guard configu — marker, odmietnuta prestavba bez mutacie a bez kroku Spat, kopia/sablony, citanie dalej bezi
@@ -23742,6 +23756,14 @@ module NoxunSuRunner
     run_mr3b(model)           # MR-3B: Apply cez skutocne vyskytove cesty, izolacia a rollback
     run_mr2a(model)           # MR-2A: pracovny SKM, atomicka priprava+Apply a early-exit rollback
     run_mr2b(model)           # MR-2B: controller dispatch, novy W, Save/retry/Reset a stale ACK
+    # S1-A1 je POSLEDNA SYNCHRONNA sekcia ZAMERNE: otvara prilohu cez
+    # `UI.openURL`, co spusti systemovy prehliadac a ten PREKRYJE okno
+    # SketchUpu. Zakryte okno prestane kreslit view a inferencia nad REALNOU
+    # geometriou (ghost snap na roh, D-123 na zvysenej ploche) zacne vracat
+    # len zakladnu rovinu — beh 20.9.2026 to dokazal 20 falosnymi FAILmi,
+    # ked sekcia bezala hned po S1-E0. Asynchronna retaz za nou uz inferenciu
+    # nepouziva (overene), takze tu skodit nema comu.
+    run_s1a1(model)           # S1-A1: katalog spotrebicov — prilohy na REALNOM disku (kopia suboru s diakritikou a medzerou, ASCII nazov ulozenej kopie, zlyhanie kopie = :copy_failed bez siroty a bez zmeny JSON, tombstone priecinok priloh NEMAZE, UI.openURL nad file:/// az uplne na konci); vsetko v izolovanom priecinku cez test_dir_override
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
