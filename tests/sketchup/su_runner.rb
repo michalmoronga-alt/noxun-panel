@@ -4656,7 +4656,7 @@ module NoxunSuRunner
       ok("S1-B2 (b): vystup tela menuje MODEL (#{pay['body']} · #{pay['body_note']})",
          pay['body'].to_s.start_with?('448') && pay['body_note'].to_s.include?('Bosch'))
       ok("S1-B2 (b): trieda 450 v slote 600 sa prizna (#{pay['class_text']})",
-         pay['class_ok'] == false && pay['class_text'].to_s.include?('✗'))
+         pay['class_state'] == 'mismatch' && pay['class_text'].to_s.include?('✗'))
       Sketchup.undo
       slot = cabinets(model).find { |i| e::Store.get(i, 'cabinet_id').to_s == sid }
       back = s1b2_body_box(slot)

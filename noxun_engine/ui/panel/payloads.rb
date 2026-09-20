@@ -430,7 +430,7 @@ module Noxun
             'fill' => fmt_mm(fill),
             'under_ok' => under,
             'under_text' => "#{fmt_mm(line)} #{under ? '≥' : '<'} #{fmt_mm(bh)}",
-            'class_ok' => slot_class_ok(cfg, item),
+            'class_state' => slot_class_state(cfg, item),
             'class_text' => slot_class_text(cfg, body, item) }
         end
 
@@ -471,21 +471,33 @@ module Noxun
           "list do #{fmt_mm(hi)}"
         end
 
-        # Trieda slotu vs trieda modelu. Bez modelu (alebo bez triedy v liste)
-        # sa nic netvrdi — „nevieme" nie je „nesedí" (zhoda s `Validation`).
-        def slot_class_ok(cfg, item)
-          appliance_class_mismatch('slot', cfg, slot_item_dims(item)).nil?
+        # Trieda slotu vs trieda modelu — TRI STAVY, nie dva (Codex #383 kolo 1
+        # P2): bez modelu a pri modeli, ktorého list triedu NEKÓTUJE, sa
+        # netvrdí nič (`unknown`). Binárne „ok" by Inspector zafarbil nazeleno
+        # nad vetou „trieda neuvedená" — teda by tvrdil overenie, ktoré sa
+        # nestalo. „Nevieme" nie je „nesedí" ani „sedí" (zhoda s `Validation`,
+        # ktorá pri neznámej triede nález nevydá).
+        # -> 'ok' | 'mismatch' | 'unknown'
+        def slot_class_state(cfg, item)
+          return 'unknown' if item.nil?
+          return 'unknown' if slot_class_code(item).empty?
+
+          appliance_class_mismatch('slot', cfg, slot_item_dims(item)).nil? ? 'ok' : 'mismatch'
+        end
+
+        def slot_class_code(item)
+          install = slot_item_dims(item)['install']
+          install.is_a?(Hash) ? install['dishwasher_class'].to_s : ''
         end
 
         def slot_class_text(cfg, body, item)
           return "#{body[:label]} · bez modelu" if item.nil?
 
           name = Bom.appliance_label(item)
-          install = slot_item_dims(item)['install']
-          cls = install.is_a?(Hash) ? install['dishwasher_class'].to_s : ''
-          return "#{body[:label]} · #{name} (trieda neuvedená)" if cls.empty?
+          state = slot_class_state(cfg, item)
+          return "#{body[:label]} · #{name} (trieda neuvedená)" if state == 'unknown'
 
-          "#{body[:label]} · #{name} #{slot_class_ok(cfg, item) ? '✓' : '✗'}"
+          "#{body[:label]} · #{name} #{state == 'ok' ? '✓' : '✗'}"
         end
 
         def slot_item_dims(item)

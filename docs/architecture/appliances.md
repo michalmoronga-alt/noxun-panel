@@ -44,7 +44,8 @@ to nevyrába ani neobjednáva.
   určuje **katalógový list**, nie trieda; **výšku určuje vždy používateľ** (`dw_body_height` — nastaviteľné nohy sú rozsah, nie jedno číslo). Vyberá to
   **jedna funkcia pre celý engine — `Construction.dw_body_dims(cfg)`** (`{w:, d:, label:, source: 'generic'|'catalog', item_id:}`), ktorú volajú
   **všetci, čo o tele niečo tvrdia**: builder (`dw_body_reference` → referencia so `source: 'catalog'` a `item_id` v configu referencie), Inspector
-  (`Panel.slot_payload` → „448 × 820 × 550 · Bosch SPV6EMX05E“, rozsah výšky tela z listu ako hint pri poli „Telo V“ a verdikt triedy ✓/✗) aj Kontrola
+  (`Panel.slot_payload` → „448 × 820 × 550 · Bosch SPV6EMX05E“, rozsah výšky tela z listu ako hint pri poli „Telo V“ a verdikt triedy — `class_state` má **tri**
+  hodnoty `ok · mismatch · unknown`, lebo model bez triedy v liste sa nesmie zafarbiť nazeleno: „nevieme“ nie je „sedí“, presne ako pri `Validation`) aj Kontrola
   (`Bom.appliance_slot_record` → `dw_body_fit` meria telo, ktoré v slote **naozaj stojí**). Druhá kópia toho výberu by znamenala, že model ukazuje jedno
   telo a semafor kontroluje iné. Zmena aj odpojenie väzby prestavia slot v **tej istej** operácii (S1-B1), takže je to jeden krok Späť.
 - **Väzba na katalóg v S1-E ešte NIE JE.** `CONFIG_SCHEMA` 16 iba **rezervuje** `appliance_refs[]` a `appliance_expects[]` (skrinka aj doska, tá
