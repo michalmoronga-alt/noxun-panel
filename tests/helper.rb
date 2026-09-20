@@ -153,6 +153,7 @@ unless NxTest::IN_SKETCHUP
     core/front_profiles
     core/hardware_rules
     core/hardware_catalog
+    core/appliance_catalog
     core/hardware_taxonomy
     core/hardware_sets
     core/drawer_recipes
