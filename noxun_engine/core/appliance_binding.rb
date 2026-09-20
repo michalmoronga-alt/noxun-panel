@@ -67,6 +67,12 @@ module Noxun
       # nejednoznacny a tichy vyber jedneho z nich by spotrebic presunul bez
       # toho, aby o to niekto poziadal (Codex #382 kolo 1 P2).
       OWNER_OPS = %w[create move unbind rebind_model].freeze
+      # To iste pre MODEL Z KATALOGU: `catalog_id` meni kategoriu polozky, a tu
+      # overuje matica. Pri operacii, ktora snapshot neuklada (`move`, `unbind`,
+      # `patch`, `remove`), by matica bezala nad kategoriou katalogu a ulozila
+      # by sa stara — chladnicka by presla ako umyvacka na slot
+      # (Codex #382 kolo 3 P2).
+      CATALOG_OPS = %w[create rebind_model].freeze
 
       OP_NAME = 'NOXUN: Spotrebič — väzba'
 
@@ -80,6 +86,7 @@ module Noxun
       MSG_OWNER_AMBIG   = 'nejednoznačná identita vlastníka (dva kusy s tým istým ID) — prestav skrinky'
       MSG_OWNER_OP      = 'zmena vlastníka ide vlastnou akciou — túto úpravu vlastník netýka'
       MSG_OWNER_STALE   = 'zastaraná ponuka vlastníkov — otvor modal znova'
+      MSG_CATALOG_OP    = 'zmena modelu z katalógu ide vlastnou akciou — túto úpravu model netýka'
       MSG_TYPE_WITH_OWNER = 'typ sa pri zmene vlastníka nemení — najprv ulož typ, potom vlastníka'
       MSG_UNKNOWN_TYPE  = 'neznámy typ spotrebiča'
       MSG_OWNER_DETACH  = 'vlastník má odpojený dielec — vráť ho do skrinky a skús znova'
@@ -120,6 +127,9 @@ module Noxun
         # Vlastnik v payloade operacie, ktora ho nemeni, sa ODMIETA (nie
         # ignoruje): tichy no-op by klientovi tvrdil, ze zmena presla.
         return [nil, [MSG_OWNER_OP]] if !owner.nil? && !OWNER_OPS.include?(op)
+        if !catalog_id.to_s.strip.empty? && !CATALOG_OPS.include?(op)
+          return [nil, [MSG_CATALOG_OP]]
+        end
 
         # Identita dokumentu — rovnaka tolerancia ako rozpocet (prazdny udaj
         # zo stareho DOM neblokuje, NEZHODNE ID ano).
@@ -406,7 +416,7 @@ module Noxun
         matches = instances_of(model, kind, prev_owner['id'].to_s)
         return [nil, nil] if matches.empty?
 
-        carriers = matches.select { |i| refs_of(i).any? { |r| r['item_id'].to_s == item_id.to_s } }
+        carriers = matches.select { |i| carries_item?(i, prev_owner, item_id) }
         if matches.length > 1
           return [nil, prev_ambig_message(prev_owner)] unless carriers.length == 1
         elsif carriers.empty?
@@ -429,6 +439,48 @@ module Noxun
         list.is_a?(Array) ? list.select { |r| r.is_a?(Hash) } : []
       end
 
+      # === DOKAZ VAZBY — JEDNA funkcia pre cely engine =====================
+      #
+      # Codex #382 kolo 3 (P2): samotne UUID v `appliance_refs[]` dokazom NIE
+      # JE. `cabinet_id` zdielaju skrinka aj SLOT (v modeli su oba
+      # `kind: 'cabinet'`, rozlisuje ich typ v configu), takze skrinkovy zaznam
+      # na entite, ktora je dnes slot s tym istym cislom, by sa tvaril ako
+      # platna vazba — a mutacie vlastnika by ju potom nenasli (hladaju podla
+      # DRUHU). Dokaz preto vyzaduje ZHODU DRUHU, ZHODU ID a uuid v refs.
+      #
+      # `entry` = `{ 'kind', 'id', 'refs' }` (zo zberu `Bom` alebo z entity cez
+      # `owner_entry_for`), `owner` = ulozeny vlastnik polozky `{ 'kind', 'id' }`.
+      def ref_matches?(entry, owner, item_id)
+        return false unless entry.is_a?(Hash) && owner.is_a?(Hash)
+
+        id = item_id.to_s
+        return false if id.empty?
+        return false unless entry['kind'].to_s == owner['kind'].to_s
+        return false unless entry['id'].to_s == owner['id'].to_s
+
+        Array(entry['refs']).any? { |r| r.is_a?(Hash) && r['item_id'].to_s == id }
+      end
+
+      # Zaznam vlastnika Z ENTITY v tvare, ktory cita `ref_matches?`. Druh aj
+      # ID sa citaju z TOHO, CO V MODELI NAOZAJ JE — nikdy z toho, co tvrdi
+      # polozka (inak by kontrola druhu nemala co porovnavat).
+      def owner_entry_for(inst)
+        kind = entity_kind(inst)
+        key = kind == KIND_BOARD ? 'id' : 'cabinet_id'
+        { 'kind' => kind, 'id' => Store.get(inst, key).to_s, 'refs' => refs_of(inst) }
+      end
+
+      def entity_kind(inst)
+        return KIND_BOARD if Store.kind(inst).to_s == 'board'
+
+        cabinet_type(inst) == 'dishwasher' ? KIND_SLOT : KIND_CABINET
+      end
+
+      # Nesie TATO entita vazbu na TUTO polozku? (Tenky most nad `ref_matches?`.)
+      def carries_item?(inst, owner, item_id)
+        ref_matches?(owner_entry_for(inst), owner, item_id)
+      end
+
       def observer_idle?(model)
         return true unless defined?(ScaleWatch) && ScaleWatch.respond_to?(:flush_pending!)
 
@@ -440,14 +492,17 @@ module Noxun
       def commit(model, plan)
         prev = plan[:prev]
         owner = plan[:owner] || { 'kind' => KIND_JOB }
-        # Presun NA TOHO ISTEHO vlastnika (vymena modelu) sa nerobi dvomi
-        # prestavbami: `add_ref!` zaznam s tym istym `item_id` prepisuje, takze
-        # predchadzajuce odstranenie by bolo len prestavba navyse.
-        same_owner = !plan[:owner_changed] && plan[:new_entity] && prev && prev[:inst]
+        same_owner = same_target?(plan)
 
         # R-03/rebuild pravidlo: prestavba musi bezat v ABSOLUTNOM rame —
         # `rebuild_in_operation` to (na rozdiel od `rebuild`) nerobi (B7).
-        CabinetBuilder.ensure_root_context(model) if defined?(CabinetBuilder)
+        #
+        # Codex #382 kolo 3 (P2): rám sa zatvara LEN ked sa NAOZAJ prestavuje
+        # skrinka alebo slot. `ensure_root_context` vyhodi pouzivatela
+        # z komponentu, ktory prave edituje — a uprava ceny, priznaku ci vazby
+        # na DOSKU (zapis configu bez prestavby) mu to spravit nesmie.
+        CabinetBuilder.ensure_root_context(model) if defined?(CabinetBuilder) &&
+                                                     rebuilds_cabinet?(plan, same_owner)
 
         item = nil
         geometry = false
@@ -532,6 +587,27 @@ module Noxun
 
       # --- zapis `appliance_refs[]` -------------------------------------------
 
+      # Presun NA TOHO ISTEHO vlastnika (vymena modelu) sa nerobi dvomi
+      # prestavbami: `add_ref!` zaznam s tym istym `item_id` prepisuje, takze
+      # predchadzajuce odstranenie by bolo len prestavba navyse.
+      def same_target?(plan)
+        prev = plan[:prev]
+        !plan[:owner_changed] && !plan[:new_entity].nil? && !prev.nil? && !prev[:inst].nil?
+      end
+
+      # Prestavi tato operacia SKRINKU alebo SLOT? (Doska sa zapisuje bez
+      # prestavby, cisto rozpoctova uprava sa modelu nedotkne vobec.)
+      # Rozhoduje o `ensure_root_context` — jedine miesto, ktore pouzivatelovi
+      # zavrie otvoreny komponent.
+      def rebuilds_cabinet?(plan, same_owner = nil)
+        same_owner = same_target?(plan) if same_owner.nil?
+        prev = plan[:prev]
+        return true if !same_owner && prev && prev[:kind].to_s != KIND_BOARD
+
+        owner = plan[:owner] || {}
+        rewrite_ref?(plan) && !plan[:new_entity].nil? && owner['kind'].to_s != KIND_BOARD
+      end
+
       # Ma sa zaznam u ciela (pre)pisat? Okrem zmeny vlastnika a vymeny modelu
       # aj vtedy, ked OVERENY ciel polozku EST NENESIE — presne to je pripad
       # siroty presunutej na entitu, ktora recyklovala ID po zaniknutom
@@ -544,7 +620,7 @@ module Noxun
         ent = plan[:new_entity]
         return false if ent.nil?
 
-        refs_of(ent).none? { |r| r['item_id'].to_s == plan[:item_id].to_s }
+        !carries_item?(ent, plan[:owner] || {}, plan[:item_id])
       end
 
       # Odstranenie vazby u predchadzajuceho vlastnika. -> true = zapisalo sa

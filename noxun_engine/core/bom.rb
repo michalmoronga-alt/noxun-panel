@@ -333,7 +333,7 @@ module Noxun
         # nesu TUTO polozku. ID skriniek sa recykluju (`Ids.next_id`), takze
         # samotna zhoda ID nie je dokaz — po zmazani CAB-3 moze to ID dostat
         # uplne ina skrinka.
-        bound = entry && Array(entry['refs']).any? { |r| r['item_id'].to_s == id }
+        bound = appliance_bound?(entry, own, id)
         state = if kind == 'job'
                   'job'
                 elsif bound
@@ -383,6 +383,18 @@ module Noxun
           end
         end
         out
+      end
+
+      # DOKAZ VAZBY ma JEDNU autoritu — `ApplianceBinding.ref_matches?` (zhoda
+      # DRUHU + ID + uuid v refs). Zber a mutacie tak riesia identitu rovnako:
+      # keby zber uznal len uuid, skrinkovy zaznam na entite, ktora je dnes
+      # SLOT s tym istym `cabinet_id`, by sa tvaril ako viazany — a mutacia
+      # vlastnika by ho potom nenasla (Codex #382 kolo 3 P2).
+      # Bez modulu vazieb nie je co dokazovat, takze nic nie je viazane.
+      def appliance_bound?(entry, owner, item_id)
+        return false unless defined?(ApplianceBinding)
+
+        ApplianceBinding.ref_matches?(entry, owner, item_id)
       end
 
       # Zobrazovany nazov: vyrobca + model zo snapshotu, inak nazov z rozpoctu.
