@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.12.10' unless defined?(VERSION)
+    VERSION = '0.12.11' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -527,6 +527,7 @@ Sketchup.require 'noxun_engine/ui/rules_dialog'     # V0.4 editor pravidiel kova
 Sketchup.require 'noxun_engine/ui/materials_dialog' # V0.4.5 D2 projektove predvolby materialov
 Sketchup.require 'noxun_engine/ui/materials_appearance_dialog' # MR-2B session spolocneho vzhladu
 Sketchup.require 'noxun_engine/ui/hardware_catalog_dialog' # V0.6 C-2: okno Katalog kovania
+Sketchup.require 'noxun_engine/ui/appliance_dialog' # S1-A2: serverova autorita sekcie SPOTREBICE (bez okna)
 Sketchup.require 'noxun_engine/ui/supplier_settings_dialog' # ŠT-4a: serverova autorita sekcii Nastavenia (okno zaniklo)
 Sketchup.require 'noxun_engine/ui/templates_dialog' # V0.4.5 D2 sprava sablon
 # NASTROJE-1: nastroje Mower + Snaper v balíku enginu. Ciste jadra prve (headless

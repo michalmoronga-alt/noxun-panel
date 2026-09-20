@@ -310,7 +310,8 @@
     // v ŠT-3a-2).
     // ŠT-4a: + `sup`/`bset`/`about` (Nastavenia) — posledné premostenia sa
     // stali sekciami a satelit zanikol.
-    var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat', 'hw', 'rules', 'tpl',
+    // S1-A2: + `appl` (Spotrebiče — katalóg modelov tohto počítača).
+    var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat', 'hw', 'appl', 'rules', 'tpl',
                            'sup', 'bset', 'about'];
     function studioSection(s){
       var v = String(s == null ? '' : s);
