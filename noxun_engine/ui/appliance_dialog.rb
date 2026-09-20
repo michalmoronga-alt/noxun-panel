@@ -256,6 +256,13 @@ module Noxun
       # Filter systemoveho dialogu `UI.openpanel` (JEDEN subor naraz).
       ATTACH_FILTER = 'Listy a obrázky|*.pdf;*.jpg;*.jpeg;*.png;*.webp||'
 
+      # AKCIE, KTORE ODOSIELA MODAL (`akcia -> meno operacie pre klienta`).
+      # Ich odpoved MUSI prist aj vtedy, ked handler vybuchne — inak ostane
+      # `NXModal` zamknuty (`setBusy(true)`) NAVZDY a pouzivatel ma na
+      # obrazovke formular, ktory sa uz neda ani odoslat, ani ulozit
+      # (Codex #378 kolo 1 P2).
+      TOKEN_ACTIONS = { 'appl_create' => 'create', 'appl_patch' => 'patch' }.freeze
+
       class << self
         # --- vstup sekcie -----------------------------------------------------
 
@@ -268,7 +275,16 @@ module Noxun
           with_client(sink) { run_section_action(key, payload) }
         rescue StandardError => e
           Engine.log_error(e, "ApplianceDialog.dispatch #{name}")
-          sink.call(status_script("Chyba: #{e.message}", true))
+          msg = "Chyba: #{e.message}"
+          sink.call(status_script(msg, true))
+          op = TOKEN_ACTIONS[key]
+          return unless op
+
+          # Zamok odosielania odomyka VYHRADNE volajuci (kontrakt D-15), takze
+          # aj nas bug sa musi vratit ako ODPOVED — modal ostane otvoreny
+          # s rozpisanymi hodnotami, len sa da znova odoslat.
+          token = parse(payload)['token'].to_s
+          sink.call(result_script(false, msg, field_errors(msg, nil), op, token, {}))
         end
 
         def run_section_action(key, payload)
@@ -351,6 +367,19 @@ module Noxun
           @view_query = ''
           @view_deleted = false
           @view_gen = 0
+          nil
+        end
+
+        # ZATVORENE STUDIO = ziadna sekcia. Stav pohladu musi padnut spolu
+        # s oknom (Codex #378 kolo 1 P2): nova instancia okna zacina s `gen` 0,
+        # takze keby server drzal `view_gen` z minuleho sedenia, prva odpoved
+        # by mu prisla so starsou generaciou a klient by ju zahodil — hladanie
+        # aj formular by „nereagovali" a nikde by to nezasvietilo.
+        # Vzor `HardwareCatalogDialog.on_ui_closed`.
+        def on_ui_closed
+          handle_leave
+        rescue StandardError => e
+          Engine.log_error(e, 'ApplianceDialog.on_ui_closed')
           nil
         end
 
@@ -728,9 +757,23 @@ module Noxun
                   'sheet_urls' => Array(rec['sheet_urls']).map(&:to_s) }
           modal_paths(rec['category'].to_s).each do |(block, field)|
             v = dim_value(rec, block, field)
-            out["dims.#{block}.#{field}"] = v.nil? ? '' : (v.is_a?(Numeric) ? fmt_mm(v) : v.to_s)
+            out["dims.#{block}.#{field}"] = v.nil? ? '' : (v.is_a?(Numeric) ? fmt_input(v) : v.to_s)
           end
           out
+        end
+
+        # HODNOTA DO FORMULARA je BEZSTRATOVA (Codex #378 kolo 1 P2): karta
+        # zobrazuje `fmt_mm` (jedno desatinne miesto), ale formular musi vratit
+        # PRESNE to, co je v katalogu — inak by 19,55 pri otvoreni zmenilo na
+        # 19,6 a prve ulozenie (hoci len nazvu) by to zaokruhlenie ZAPISALO.
+        # Cele cislo ide bez desatinnej ciarky, zvysok v plnej presnosti
+        # (`Float#to_s` je najkratsi zapis, ktory sa nacita spat na tu istu
+        # hodnotu) a so slovenskou ciarkou — `normalize_number` ju prijima.
+        def fmt_input(v)
+          f = v.to_f
+          return f.round.to_s if f == f.round
+
+          f.to_s.tr('.', ',')
         end
 
         # FORMULAR modalu pre VSETKY kategorie (`{ kod => [polia] }`). Klient
@@ -832,8 +875,20 @@ module Noxun
             result(true, 'Uložené.', [], 'patch', token)
           else
             echo(id) if %i[conflict not_found].include?(status)
-            fail_result(status, info, 'patch', token)
+            # KONFLIKT dostane CERSTVU `rev` (Codex #378 kolo 1 P2): modal ostava
+            # otvoreny s rozpisanymi hodnotami, ale uz NIE so zastaralym zamkom —
+            # bez toho by kazde dalsie „Uložiť" narazilo na ten isty konflikt
+            # a z formulara by sa nedalo dostat inak nez zahodenim prace.
+            extra = status == :conflict ? { 'rev' => fresh_rev(id) } : {}
+            fail_result(status, info, 'patch', token, extra)
           end
+        end
+
+        def fresh_rev(id)
+          status, info = ApplianceCatalog.find(id)
+          status == :ok ? info[:record]['rev'].to_s : ''
+        rescue StandardError
+          ''
         end
 
         def handle_delete(payload)
@@ -1004,16 +1059,25 @@ module Noxun
         # VYHRADNE volajuci (kontrakt D-15) — server preto hlasi OBE vetvy.
         # `token` je identita JEDNEHO odoslania: klient prijme len odpoved,
         # ktora ju nesie spat (vzor `MDH.itemResult`).
-        def result(ok, msg, errors, op, token)
-          js("NX.applResult(#{ok ? 'true' : 'false'}, #{msg.to_s.to_json}, " \
-             "#{Array(errors).to_json}, #{op.to_s.to_json}, #{token.to_s.to_json})")
+        # `info` je ADITIVNY siesty argument: pri `:conflict` nesie CERSTVU
+        # `rev` zaznamu, aby si ju modal prevzal a dalsie „Uložiť" uz neskoncilo
+        # na tom istom konflikte donekonecna (Codex #378 kolo 1 P2). Klient
+        # starsej verzie ho ignoruje.
+        def result(ok, msg, errors, op, token, info = {})
+          js(result_script(ok, msg, errors, op, token, info))
         end
 
-        def fail_result(status, info, op, token)
+        def result_script(ok, msg, errors, op, token, info = {})
+          "NX.applResult(#{ok ? 'true' : 'false'}, #{msg.to_s.to_json}, " \
+            "#{Array(errors).to_json}, #{op.to_s.to_json}, #{token.to_s.to_json}, " \
+            "#{(info || {}).to_json})"
+        end
+
+        def fail_result(status, info, op, token, extra = {})
           msg = reason(status, info)
           set_status(msg, true)
           field = status == :invalid ? info[:field] : nil
-          result(false, msg, field_errors(msg, field), op, token)
+          result(false, msg, field_errors(msg, field), op, token, extra)
         end
 
         # Hlaska pre pouzivatela. Katalog uz hlasky sklada — tu sa len doplni
@@ -1022,7 +1086,10 @@ module Noxun
           msg = info.is_a?(Hash) ? info[:message].to_s : ''
           case status
           when :invalid then msg.empty? ? 'Neplatná hodnota.' : msg
-          when :conflict then 'Záznam sa medzitým zmenil — obnovil sa, uprav ho znova.'
+          # Katalog je per PC, ale otvorene môžu byť dve inštancie SketchUpu —
+          # veta preto menuje SKUTOCNU pricinu, nie zahadne „medzitým".
+          when :conflict
+            'Záznam medzitým zmenil iný SketchUp — skontroluj hodnoty a ulož znova.'
           when :not_found then msg.empty? ? 'Spotrebič sa nenašiel.' : msg
           when :read_only, :degraded then "Katalóg je len na čítanie: #{msg}"
           else msg.empty? ? 'Zápis zlyhal.' : msg

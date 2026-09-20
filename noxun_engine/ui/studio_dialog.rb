@@ -1291,6 +1291,11 @@ module Noxun
             # ŠT-3a-1: to iste pre sekciu Kovanie — beziace overenie ceny
             # ci nahlad z Demosu uz nema komu prist (session bump, ABA guard).
             HardwareCatalogDialog.on_ui_closed if defined?(HardwareCatalogDialog)
+            # S1-A2: stav POHLADU sekcie Spotrebiče (filter + generácia dotazu)
+            # zomiera s oknom — nová inštancia začína od nuly, takže server
+            # nesmie držať generáciu z minulého sedenia (klient by jeho odpoveď
+            # zahodil ako staršiu a sekcia by „nereagovala").
+            ApplianceDialog.on_ui_closed if defined?(ApplianceDialog)
             @dialog = nil
           end
           # Indikator neaktualnosti zije PRESNE tak dlho ako okno.
