@@ -153,6 +153,7 @@ module Noxun
       MAX_ATTACHMENTS = 50
 
       DEGRADED_MSG = 'katalóg spotrebičov je poškodený — číta sa záloha, zápisy sú vypnuté (oprav/zmaž súbor)'
+      SEED_FAILED_MSG = 'katalóg spotrebičov sa nepodarilo založiť — skontroluj miesto na disku a práva k %APPDATA%'
 
       module_function
 
@@ -231,6 +232,10 @@ module Noxun
       #                                      primar obnovi), stav :ok
       #   poskodeny primar + platna .bak  -> :degraded (citanie zo zalohy,
       #                                      zapisy stoja)
+      #   poskodeny primar + .bak, ktora
+      #     sa SICE parsuje, ale je cudzia
+      #     / novsia / necitatelna        -> :read_only (nie :degraded — nie je
+      #                                      z coho citat, nieto este snapshotovat)
       #   poskodeny primar bez .bak       -> :read_only
       #   cudzi/novsi/necitatelny obsah   -> :read_only s dovodom
       #
@@ -242,14 +247,20 @@ module Noxun
           # ZLYHANY SEED nie je zdravy prazdny katalog: nezapisovatelny
           # `%APPDATA%` alebo plny disk by inak vydali stav `:ok` nad
           # neexistujucim suborom a kazdy dalsi zapis by tisko padal.
-          unless seed!
-            return set_state(:read_only,
-                             'katalóg spotrebičov sa nepodarilo založiť — skontroluj miesto na disku a práva k %APPDATA%')
-          end
+          return set_state(:read_only, SEED_FAILED_MSG) unless seed!
 
           return @state
         end
-        return set_state(:degraded, DEGRADED_MSG) if JsonFileStore.degraded?(path)
+        if JsonFileStore.degraded?(path)
+          # `degraded?` hovori LEN to, ze zaloha sa PARSUJE — nie ze sa da
+          # pouzit. Zaloha z novsej verzie (`std` > STD) alebo s necitatelnym
+          # zaznamom nie je „citaj zalohu, zapisy stoja", ale READ-ONLY bez
+          # pouzitelneho obsahu (Codex #377 kolo 2 P1).
+          issue = stored_document_issue(backup_document)
+          return set_state(:read_only, issue) if issue
+
+          return set_state(:degraded, DEGRADED_MSG)
+        end
 
         issue = stored_document_issue(raw_document)
         return set_state(:read_only, issue) if issue
@@ -299,6 +310,14 @@ module Noxun
       # (cache by pod zamkom vratila stav spred cudzieho zapisu).
       def raw_document
         JSON.parse(File.binread(File.exist?(path) ? path : "#{path}.bak"))
+      rescue StandardError
+        nil
+      end
+
+      # VYHRADNE zaloha — pouziva ju degradovany stav, kde primar nie je
+      # citatelny a `raw_document` by ho aj tak skusil ako prvy.
+      def backup_document
+        JSON.parse(File.binread("#{path}.bak"))
       rescue StandardError
         nil
       end
@@ -1231,28 +1250,25 @@ module Noxun
         # Zdroj sa overuje CERSTVO, nie z cachovaneho stavu sedenia: zakazka si
         # snapshot ODLOZI a cachovane `:ok` nie je dokaz, ze subor medzitym
         # neprepisala NOVSIA instancia pluginu (updater bezi popri otvorenom
-        # SketchUpe). Degradovany katalog (platna `.bak`) snapshot DOVOLI —
-        # obsah zalohy je citatelny, stoja len zapisy.
-        fresh = nil
-        if JsonFileStore.available?(path) && !JsonFileStore.degraded?(path)
-          fresh = raw_document
-          if (issue = stored_document_issue(fresh))
-            set_state(:read_only, issue)
-            return [:unsupported, { message: issue }]
-          end
-        elsif read_only?
-          return [:unsupported, { message: state_reason }]
-        else
-          # Degradovany stav: cita sa `.bak` cez `JsonFileStore`, ale bez
-          # sekundovej cache — snapshot nesmie vzniknut zo stavu spred
-          # cudzieho zapisu.
-          JsonFileStore.invalidate(path)
+        # SketchUpe). Degradovany katalog (platna `.bak`) snapshot DOVOLI, ale
+        # LEN ked zaloha prejde TOU ISTOU maticou ako primar (tvar, `std`,
+        # identity, prilohy, rozmery) — zaloha z novsej verzie by inak odisla
+        # do zakazky oznacena nasim `catalog_std` (Codex #377 kolo 2 P1).
+        return [:unsupported, { message: state_reason }] unless JsonFileStore.available?(path)
+
+        fresh = JsonFileStore.degraded?(path) ? backup_document : raw_document
+        if (issue = stored_document_issue(fresh))
+          # Pri degradovanom stave sa stav NEPREPISUJE na read-only — o tom
+          # rozhoduje `assess!`; tu staci, ze snapshot NEVZNIKNE.
+          set_state(:read_only, issue) unless degraded?
+          return [:unsupported, { message: issue }]
         end
 
-        # PRAVE OVERENY dokument ide do vyberu PRIAMO. Druhe citanie cez
-        # `JsonFileStore.read` by v okne `CHECK_INTERVAL` (1 s) vratilo
-        # CACHOVANY stav, takze by sa do zakazky mohol dostat zaznam, ktory
-        # druha instancia SketchUpu prave zmenila alebo vyradila (Codex #377 P1).
+        # PRAVE OVERENY dokument ide do vyberu PRIAMO (a nikdy nie `nil`).
+        # Druhe citanie cez `JsonFileStore.read` by v okne `CHECK_INTERVAL`
+        # (1 s) vratilo CACHOVANY stav, takze by sa do zakazky mohol dostat
+        # zaznam, ktory druha instancia SketchUpu prave zmenila alebo
+        # vyradila (Codex #377 kolo 1 P1).
         rec = stored_records(fresh).find { |r| r['id'].to_s == id.to_s }
         return [:not_found, { message: 'spotrebič sa nenašiel' }] unless rec
         return [:deleted, { message: 'vyradený spotrebič sa nedá priradiť' }] if deleted?(rec)

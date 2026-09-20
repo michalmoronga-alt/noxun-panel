@@ -803,6 +803,35 @@ NxTest.test('spotrebice: file_url — UNC cesta si NECHA hostitela (#377 P2)') d
   NxTest.assert_equal('file:///C:/NOXUN/list.pdf', local, 'lokalna cesta ostava s tromi lomkami')
 end
 
+NxTest.test('spotrebice: degradovany stav — NEPLATNA zaloha sa nesnapshotuje ani necita (kolo 2 P1)') do
+  # Platna zaloha: snapshot bezi dalej (citanie zo zalohy je v poriadku).
+  # Snapshotuje sa SEED zaznam — `.bak` drzi stav PRED poslednym zapisom,
+  # takze cerstvo zalozeny zaznam v nej este nie je.
+  applc_seeded!
+  seed_id = APPLC.list[1][:records].first['id']
+  APPLC.create!(applc_new) # druhy zapis vyrobi `.bak` zo seedoveho dokumentu
+  File.binwrite(APPLC.path, '{ toto nie je JSON')
+  APPLC_JFS.invalidate(APPLC.path)
+  APPLC.reset_state!
+  NxTest.assert_equal(:degraded, APPLC.state)
+  st, info = APPLC.snapshot_for(seed_id)
+  NxTest.assert_equal(:ok, st, 'platna zaloha snapshot dovoli')
+  NxTest.assert_equal(seed_id, info[:snapshot]['catalog_id'])
+  NxTest.assert_equal(APPLC::STD, info[:snapshot]['catalog_std'])
+
+  # Zaloha z NOVSEJ verzie: parsuje sa, ale pouzit sa neda.
+  doc = JSON.parse(File.binread("#{APPLC.path}.bak"))
+  doc['std'] = 99
+  File.binwrite("#{APPLC.path}.bak", JSON.pretty_generate(doc))
+  APPLC_JFS.invalidate(APPLC.path)
+  APPLC.reset_state!
+  NxTest.assert_equal(:read_only, APPLC.state, 'zaloha z novsej verzie nie je „degradovany" stav')
+  NxTest.assert(APPLC.state_reason.include?('aktualizuj plugin'), "dovod: #{APPLC.state_reason}")
+  st2, info2 = APPLC.snapshot_for(seed_id)
+  NxTest.assert_equal(:unsupported, st2, 'snapshot zo zalohy novsej verzie NEVZNIKNE')
+  NxTest.assert(info2[:message].to_s.length.positive?)
+end
+
 # --- hladanie a tvar odpovede --------------------------------------------------
 
 NxTest.test('spotrebice: search — bez diakritiky, aj cez SK popisok kategorie, deterministicke poradie') do
