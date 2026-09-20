@@ -2653,6 +2653,46 @@ okna** — `hw_csv_export` → `handle_hw_csv` → `NX.studioRelayHwCsv` (flush 
 riadok generiky ide **existujúcou cestou** `nx_select` s `hw_key` (`refs_for` nájde vlastníkov v čerstvom BOM). Navigačná položka `buy` prestala byť premostením. Testy:
 `tests/pure/test_st1c_nakup.rb`, `tests/js/test_st1c_nakup.js`, `tests/js/test_d93_nl_override.js` (presunutá sada znamienka ručného zásahu), in-SketchUp sekcia `run_st1c`.
 
+### Sekcia SPOTREBIČE v Štúdiu (S1-A2)
+
+**13. sekcia** (`appl`), v skupine KATALÓGY medzi Kovaním a Pravidlami — katalóg modelov spotrebičov **tohto počítača** (`%APPDATA%`), teda tretí per-PC katalóg vedľa
+materiálov a kovania. Serverová strana: [appliance_dialog.rb](#appliance_dialogrb); klient `ui/js/appliances.js` (prefix `ap*` / `AP_*`, načítava sa **AŽ ZA** `studio.js`,
+lebo obaľuje jeho `NX.setStudio` a dopĺňa `window.NX` o `applTree`/`applCard`/`applResult` — v opačnom poradí by ich `window.NX = {…}` prepísalo; poradie stráži guard test).
+Ikona navigácie `appliance` (Lucide `refrigerator`). **Badge navigácie zámerne nie je** — počty „chýba/nesedí" prídu z Kontroly až v S1-B a prázdny badge by tvrdil,
+že sa niečo počíta.
+
+**Lišta:** segment `[V zákazke · Katalóg]` (vzor Kovania) · „Nový spotrebič" · hľadanie (debounce 200 ms) · prepínač „vyradené" · vpravo `sechint`
+„Katalóg je tohto počítača · bez cien · N modelov". **Pohľad „V zákazke" je `aria-disabled`, nie `disabled`** (D-78): klik naň **povie dôvod** („príde v dávke S1-B"),
+kým HTML `disabled` by ho vyhodilo z Tab poradia a mlčalo. To isté platí pre tlačidlo **„Do zákazky"** v karte. Žiadne „Obnoviť" — katalóg nie je z modelu, takže
+jantárový indikátor neaktuálnosti sem nepatrí (`staleFlag` sa sekcii vedome nepodáva).
+
+**Telo:** strom po kategóriách vľavo (skupiny sa dajú zbaliť — stav okna, nikam sa neukladá), karta vpravo v štyroch blokoch (Telo · Nika · Čelo/dvere · Montáž) plus
+Odkazy, Prílohy a Poznámka. Blok, ktorý pre danú kategóriu nemá kótované polia (Montáž pri rúre), nesie **priznanú vetu** namiesto prázdna — mlčiaci prázdny rám vyzerá
+ako chyba. Prílohy sú dlaždice: obrázok kreslí miniatúru z lazy kanála (kým nedorazí, ikonu), PDF ikonu vždy, náhľad má **teal rám** a štítok; akcie „nastaviť ako
+náhľad" a „odobrať zo zoznamu" sa ukazujú pri hoveri (a pri fokuse — `:focus-within`, inak by boli neprístupné z klávesnice).
+
+**REFRESH INVARIANT.** Zmena katalógu = **echo sekcie** (`NX.applTree` + `NX.applCard`), **nikdy `push_state`** a **žiadne zdvihnutie generácie okna**: katalóg spotrebičov
+v tejto dávke nemení ani jedno číslo zákazky, takže rozkliknutý riadok Kusovníka ani rozrobený export nesmú po uložení modelu zastarať. (Po S1-B sa to prehodnotí — vtedy
+už katalóg do zákazky vstupuje.) Echo **kreslí len vtedy, keď je sekcia `appl` aktívna** (`studioActiveSection() === 'appl'`): `#secbody` a `#sectools` sú zdieľané uzly
+celého okna a echo do nich nesmie písať, kým je otvorená iná sekcia (review #225 P1). Keď sekcia otvorená nie je, stav sa iba uloží a vykreslí ho `renderBody` pri vstupe.
+
+**Kto čo vlastní.** Server: obsah, poradie, počty, texty, polia formulára. Klient: pohľad — vybraný záznam, text hľadania, prepínač „vyradené", zbalené skupiny a cache
+miniatúr. Je to pamäť **okna**: nikam sa neukladá a **nový dokument ju nezhadzuje** (katalóg nie je zákazka, takže `model_guid` sa jej netýka).
+
+**Modal Nový/Upraviť** je D-15 kostra (`NXModal`), `memoryKey` `appl:create` / `appl:edit:<id>`, šírka `wide`. Zápis **modal nezatvára** — zatvorí ho až
+`NX.applResult(true, …)` a odmietnutie nechá rozpísané hodnoty na mieste s chybou pri poli; `token` je identita jedného odoslania, takže výsledok formulára, ktorý
+používateľ medzitým zavrel, mu nezavrie ten nový (vzor `MDH.itemResult`). Kategória sa pri úprave **nedá zmeniť** (server patch s kategóriou odmieta) a pri novom zázname
+prepína **sadu polí**: kostra D-15 vlastný `onChange` nemá, takže sa počúva `change` na `nxm_category` a modal sa prekreslí s **prenesenými** hodnotami
+(`skipMemory: true` — na obrazovke sú čerstvejšie hodnoty než v pamäti konceptu). Mazanie je **D-15 danger** modal (nikdy `UI.messagebox` — natívny modal v callbacku
+HtmlDialogu blokuje celý kanál okna) a je to **tombstone**: vyradený záznam sa vráti tlačidlom „Obnoviť". Bez dostupnej kostry sa **nevyradí nič** (fail closed) — fallback
+„pošli to rovno" by z jedného kliknutia urobil tombstone bez potvrdenia, teda presne bez toho, čo je zmyslom toho kroku. Prekreslenie modalu pri zmene kategórie podáva
+**`baseFields`** (pôvodnú špecifikáciu otvorenia): kostra si inak berie baseline z práve podanej špecifikácie, takže by sa východiskom stalo to, čo používateľ napísal,
+a pamäť rozpísaného konceptu by na Escape neuložila nič.
+
+**Stav katalógu** (`:read_only` / `:degraded`) kreslí sekcia ako **banner nad stromom** s dôvodom zo servera a vypína zápisy (žiadne „Nový spotrebič", „Upraviť",
+„Vyradiť", „Pridať prílohu") — ponúkať tlačidlá, ktoré vždy skončia chybou, je horšie než ich schovať. Príznak `writable` chodí v **každom** payloade sekcie, aby sa UI
+nerozišlo s tým, čo server naozaj dovolí. Testy: `tests/pure/test_s1a2_sekcia.rb`, `tests/js/test_s1a2_sekcia.js`, in-SketchUp sekcia `run_s1a2`.
+
 ### Sekcia ROZPOČET v Štúdiu (ŠT-1c PR B1, Š12–Š13)
 
 presun posledného tabu okna Výroba — a **JEDINÁ sekcia, ktorá zapisuje do modelu** (1 zmena = 1 krok Späť). Obsah je 1:1 (Š12), **kód nie**: render `js/budget.js` sa rozrezal na
@@ -2883,6 +2923,61 @@ zo šablóny** v paneli (`Panel.newer_template_refusal` — záznam sa načíta 
 
 **SMOKE PACK 1:** riadok má tretie tlačidlo **„Odfotiť" / „Prefotiť"** (podľa `preview_rev`) — pridá k šablóne náhľad z **práve jednej označenej** skrinky bez toho, aby prepísalo
 jej dáta; je **vždy aktívne** (vzor D-78 — dôvod, prečo to teraz nejde, povie server v statuse), text namiesto ikony preto, že toto okno sprite `icons.js` nenačítava).
+
+### appliance_dialog.rb
+
+**Serverová autorita sekcie `appl` (S1-A2) — modul BEZ okna od prvého riadku.** Žiadny `DLG_KEY`, žiadny `HtmlDialog`, žiadna položka menu: jediné UI katalógu spotrebičov je
+sekcia Štúdia. Vstup je uzavretý whitelist `SECTION_ACTIONS` (`appl_tree` · `appl_card` · `appl_create` · `appl_patch` · `appl_delete` · `appl_restore` · `appl_attach` ·
+`appl_thumbnail` · `appl_remove_attachment` · `appl_open_url` · `appl_open_attachment` · `appl_leave`) + `dispatch(name, payload, sink)` + `with_client(sink)` s povinným
+`ensure` (visiaci sink by zdedila nasledujúca odpoveď a poslala ju do cudzieho kanála). **`ready` v whiteliste NIE JE** — Štúdio registruje callbacky pod tými istými menami,
+takže by prepísal jeho vlastný a okno by prestalo dostať prvý push; prvotný stav sekcie nesie `push_state` pod kľúčom `appl`.
+
+**Modul je JEDINÝ vstup do `ApplianceCatalog`** a sám žiadne pravidlá katalógu neduplikuje — validácia, `rev` guard, prílohy aj seed žijú výhradne v
+[appliances.md](appliances.md). Tu žije len to, čo je UI: zloženie stromu a karty, texty polí, preklad statusov na hlášky a chyby pri poli modalu.
+
+**Payloady.** `tree_payload` skladá **celé zoskupenie aj poradie** (kategórie v poradí `CATEGORIES`, položky cez `ApplianceCatalog.sort_records`, `total` per kategória,
+skupina **Vyradené** na konci len s prepínačom `include_deleted`), podtitul riadku (`summary_line` — nika / výrez / trieda + `seed`/`ručný`) a zobrazovaný názov
+(`title` = výrobca + model). Klient kreslí presne to, čo dostal. `gen` je generácia dotazu klienta a server ju **iba echuje** — hľadanie je debounced, takže pomalšie kolo
+nesmie prepísať čerstvejší strom. `card_payload` nesie štyri bloky (`body` · `niche` · `front` · `install`) s riadkami `{label, value, unit, derived}`, kde **`value: null`
+znamená „list to nekótuje"** (klient kreslí „—" kurzívou) a `derived` dokresľuje „(odvodené)"; ďalej odkazy, prílohy a `fields` (predvyplnený formulár).
+
+**Jedna tabuľka riadkov, dve použitia.** `ROWS[kategória][blok]` je **jediný** zoznam polí: karta z neho skladá riadky (`Š × V × H` je jeden riadok z troch čísel), formulár
+z neho generuje jeden vstup na pole (`form_fields` + popisky `FIELD_LABELS` po blokoch). Karta a modal sa tak nemôžu rozísť. Riadok nesie svoj blok (`spec[2]`), lebo niektoré
+polia patria vizuálne inam než dátovo — výška tela umývačky je rozsah, takže v dátach žije v `install`, ale číta sa pri tele.
+
+**Kľúč poľa modalu = cesta, ktorú vracia katalóg v chybe** (`dims.niche.width_min`), takže „preklad chýb na kľúče modalu" je **identita** a `NXModal.showErrors` posadí hlášku
+k poľu bez prekladovej tabuľky, ktorá by pri pridaní poľa ticho zaostala. Formulár pre **všetky** kategórie (`form_payload`) chodí LEN na vyžiadanie (`appl_tree` s
+`form: true`) — klient si ho vypýta raz za okno; v každom pushi by to boli kilobajty navyše pri každom prepočte kusovníka (lekcia západiek `mat`/`hw`).
+
+**Formulár dostáva BEZSTRATOVÚ hodnotu, karta zaokrúhlenú** (`fmt_input` vs `fmt_mm`). Karta ukazuje jedno desatinné miesto, ale predvyplnenie modalu musí vrátiť presne to,
+čo je v katalógu: pri `19,55` by inak formulár ponúkol `19,6` a prvé uloženie — hoci len opravy názvu — by to zaokrúhlenie **zapísalo**. Klient to poisťuje z druhej strany:
+`appl_patch` nesie **len polia zmenené oproti baseline otvorenia** (`apChangedFields`), takže sa nedotknuté rozmery vôbec neposielajú a prázdny patch sa ani neodosiela.
+
+**Odpoveď modalu `NX.applResult(ok, msg, errors, op, token, info)`** má **šiesty, aditívny argument**: pri `:conflict` nesie **čerstvú `rev`** záznamu. Bez nej by modal ostal
+na zámku z času otvorenia a každé ďalšie „Uložiť" by narazilo na ten istý konflikt — z formulára by sa nedalo dostať inak než zahodením práce. Zámok obnovuje aj samotné
+**echo karty** (zápis z druhej inštancie pod otvoreným modalom). **Výnimka v tokenizovanej akcii** (`TOKEN_ACTIONS` = `appl_create` · `appl_patch`) posiela `applResult`
+**tiež** — inak by `NXModal` ostal `setBusy(true)` navždy a formulár by sa nedal ani odoslať, ani uložiť; stavová hláška sama na to nestačí.
+
+**Lazy miniatúry.** `data:` URI chodí len pre prílohy druhu `image`/`thumbnail`, len na vyžiadanie karty (`thumbs: true`) a len pre tie, ktoré klient **ešte nemá** (`have`);
+naraz najviac `THUMB_BATCH` (6). Primárna cesta je `Sketchup::ImageRep` — obrázok sa zmenší na `THUMB_MAX_PX` (96 px), uloží ako dočasné PNG, prečíta a zmaže, takže fotka
+z mobilu preletí mostom ako pár kB. Keď `ImageRep` nie je (headless testy) alebo formát nepozná (webp, poškodený súbor), pošle sa **pôvodný** súbor, ale len pod
+`THUMB_MAX_BYTES` (256 kB) a so správnymi magic bytes; inak `null` — a to je **platná odpoveď** „náhľad nebude", ktorú si klient zacachuje (záporná cache, vzor
+`TPL_PNG`). Cache je kľúčovaná **id prílohy**, ktoré je nemenné a nikdy sa nerecykluje, takže zastarať nemôže. **Reťaz dávok pokračuje sama**: o miniatúry si klient pýta po
+**každom** vykreslení tela (nielen po príchode karty), takže karta s viac než šiestimi obrázkami dostane aj zvyšok — a po odchode zo sekcie sa poistka „posledné kolo nič
+neprinieslo" resetuje, aby sa raz zaseknuté dlaždice pri návrate dopýtali znova.
+
+**`appl_open_url` overuje schému na SERVERI** (`URI::HTTP` + neprázdny host). Katalóg síce do `shop_urls`/`sheet_urls` pustí len http/https, ale adresa sem chodí z klienta
+a `UI.openURL` nad `file:` alebo `javascript:` by bol úplne iný druh akcie, než na aký používateľ klikol. Klient preto nemá v karte žiadny `href` — otvára server.
+
+**`appl_attach` volá `UI.openpanel` PRIAMO v callbacku** (tá istá cesta ako `MaterialsDialog.appearance_pick_image` — overené, že HtmlDialog nezamrzne), filter
+`Listy a obrázky|*.pdf;*.jpg;*.jpeg;*.png;*.webp||`, jeden súbor naraz. `nil` (zrušené) **nie je chyba**: nič sa nezapíše a okno to povie vetou „Nič sa nepriložilo.".
+Druh sa odvodí z prípony (`pdf` → `sheet`, inak `image`); na náhľad sa obrázok prepína až v karte (`appl_thumbnail`).
+
+**Stav pohľadu drží server v tom tvare, v akom ho klient poslal** (`@view_query`, `@view_deleted`, `@view_gen`) — echo po zápise musí rešpektovať rozpísané hľadanie, inak by
+sa strom pred používateľom „roztiahol". `appl_leave` ho **zabudne**: najbližší plný push by inak nakreslil strom zúžený filtrom, ktorý používateľ už dávno nevidí. To isté
+robí **`on_ui_closed`**, ktoré volá `StudioDialog` pri zatvorení okna (vzor `HardwareCatalogDialog`): nová inštancia Štúdia začína s `gen` 0, takže server nesmie držať
+generáciu z minulého sedenia — klient by jeho odpoveď zahodil ako staršiu a hľadanie aj formulár by „nereagovali". Klient to poisťuje zrkadlovo: **preberá najvyššiu videnú
+generáciu** (`AP_GEN = max(AP_GEN, gen)`), lebo strom mu chodí aj pushom, ktorý si nevyžiadal.
 
 ### hardware_catalog_dialog.rb
 

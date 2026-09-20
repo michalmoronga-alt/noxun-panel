@@ -5,7 +5,7 @@
      to isté zdieľané jadro `ProductionCore`).
      Vizuálna referencia: SYSTEM/zdroje/ui20/mockup_studio.html -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.12.10">
+<link rel="stylesheet" href="css/panel.css?v=0.12.11">
 <style>
   /* Štýly sú ZÁMERNE inline v studio.html (rovnaký dôvod, aký mala production.html):
      panel.css je zdieľaný s Inspectorom a rozloženie tohto okna doňho nepatrí.
@@ -562,6 +562,94 @@
   @media (max-width: 1000px) {
     .mddefaults-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
   }
+
+  /* ---------- S1-A2: sekcia SPOTREBIČE (`appl`, js/appliances.js) ----------
+     Vizuálna autorita: SYSTEM/zdroje/ui20/mockup_spotrebice_s1.html (javisko 1).
+     Strom vľavo (pevná šírka), karta vpravo (zvyšok) — rovnaký vzor ako
+     katalóg kovania. Farby VÝHRADNE cez --nx-* tokeny. */
+  .apwrap { display: flex; gap: 12px; align-items: flex-start; }
+  .aptree { flex: 0 0 232px; border: 1px solid var(--nx-border); border-radius: 8px;
+            background: var(--nx-surface); overflow: hidden; }
+  .apgrp { display: flex; width: 100%; align-items: center; gap: 6px; padding: 6px 9px;
+           border: 0; border-bottom: 1px solid var(--nx-border-soft); font: inherit;
+           font-size: 12px; font-weight: 600; color: var(--nx-ink-strong);
+           background: var(--nx-surface-sunken); cursor: pointer; text-align: left; }
+  .apgrp .ic { width: 13px; height: 13px; color: var(--nx-ink-muted); flex: 0 0 13px; }
+  .apgrp .cnt { margin-left: auto; font-weight: 400; font-size: 11px; color: var(--nx-ink-soft); }
+  .apitem { display: block; width: 100%; text-align: left; border: 0; background: none;
+            padding: 5px 9px 5px 26px; font: inherit; font-size: 12px; cursor: pointer;
+            color: var(--nx-ink); border-bottom: 1px solid var(--nx-border-soft); }
+  .apitem small { display: block; font-size: 10.5px; color: var(--nx-ink-soft); }
+  .apitem:hover { background: var(--nx-select-bg-soft); }
+  .apitem.on { background: var(--nx-select-bg); color: var(--nx-select); font-weight: 600; }
+  .apitem.tomb { color: var(--nx-ink-faint); font-style: italic; }
+  .apempty { padding: 10px; font-size: 12px; color: var(--nx-ink-faint); }
+  .apcard { flex: 1; min-width: 0; border: 1px solid var(--nx-border); border-radius: 8px;
+            background: var(--nx-surface); }
+  .apcard.empty { padding: 14px; }
+  .apchead { display: flex; align-items: center; gap: 8px; padding: 9px 12px;
+             border-bottom: 1px solid var(--nx-border); flex-wrap: wrap; }
+  .apchead h3 { margin: 0; font-size: 13.5px; color: var(--nx-ink-title); }
+  .apchead .man { font-size: 11px; color: var(--nx-ink-soft); }
+  .apchead .acts { margin-left: auto; display: flex; gap: 5px; }
+  .apchead .primary, .apchead .ghostbtn { display: inline-flex; align-items: center; gap: 5px;
+                                          padding: 5px 10px; }
+  .apchead .ic { width: 14px; height: 14px; }
+  .apbadge { display: inline-block; font-size: 9.5px; font-weight: 700; letter-spacing: .3px;
+             padding: 1px 6px; border-radius: 9px; background: var(--nx-surface-sunken);
+             color: var(--nx-ink-muted); border: 1px dashed var(--nx-border-strong); }
+  .apbadge.tomb { background: var(--nx-warn-bg-soft); color: var(--nx-warnchip-fg);
+                  border-color: var(--nx-warnchip-border); border-style: solid; }
+  .apbody { padding: 10px 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+  .apblk { border: 1px solid var(--nx-border-soft); border-radius: 8px; padding: 7px 10px 8px;
+           background: var(--nx-surface); min-width: 0; }
+  .apblk.full { grid-column: 1 / -1; }
+  .apblk h5 { margin: 0 0 5px; font-size: 11px; font-weight: 600; color: var(--nx-ink-label);
+              display: flex; align-items: center; gap: 6px; }
+  .apblk h5 .ic { width: 12px; height: 12px; color: var(--nx-ink-muted); flex: 0 0 12px; }
+  .apkv { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 12px; }
+  .apkv > span { color: var(--nx-ink-soft); }
+  .apkv b { font-weight: 600; color: var(--nx-ink-strong); font-variant-numeric: tabular-nums; }
+  .apkv i { color: var(--nx-ink-faint); font-style: italic; }
+  .apder { font-size: 10.5px; color: var(--nx-warnchip-fg); }
+  .apnote { font-size: 10.5px; color: var(--nx-ink-faint); font-weight: 400; }
+  .apnotetext { font-size: 12px; line-height: 1.5; color: var(--nx-ink); }
+  .aplinks { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 12px; }
+  .aplinks b { font-size: 11px; font-weight: 600; color: var(--nx-ink-label); }
+  .aplinks .linkbtn { display: inline-flex; align-items: center; gap: 3px; }
+  .aplinks .linkbtn .ic { width: 12px; height: 12px; }
+  /* Dlaždice príloh: obrázok kreslí miniatúru z lazy kanála, PDF ikonu. */
+  .apfiles { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-start; }
+  .apfile { position: relative; width: 92px; border: 1px solid var(--nx-border); border-radius: 8px;
+            overflow: hidden; background: var(--nx-surface-sunken); text-align: center;
+            font-size: 10.5px; color: var(--nx-ink-muted); }
+  .apfile.main { border-color: var(--nx-select); box-shadow: 0 0 0 2px var(--nx-select-bg); }
+  .apfile.add { border-style: dashed; background: var(--nx-surface); color: var(--nx-select);
+                cursor: pointer; padding: 0; display: block; font: inherit; font-size: 10.5px; }
+  .apfile.add:hover { background: var(--nx-select-bg-soft); }
+  .apthumb { display: flex; width: 100%; height: 64px; align-items: center; justify-content: center;
+             border: 0; padding: 0; background: var(--nx-surface-preview); color: var(--nx-ink-faint);
+             cursor: pointer; }
+  .apthumb .ic { width: 26px; height: 26px; stroke-width: 1.5; }
+  .apthumb img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+  .apfn { padding: 3px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+          color: var(--nx-ink); }
+  .aptag { display: inline-block; font-size: 9px; font-weight: 700; padding: 0 4px; border-radius: 9px;
+           background: var(--nx-select-bg); color: var(--nx-select); }
+  .apfacts { display: flex; justify-content: center; gap: 2px; padding: 0 0 3px;
+             opacity: 0; transition: opacity .12s; }
+  .apfile:hover .apfacts, .apfile:focus-within .apfacts { opacity: 1; }
+  .apfacts .ibtn { display: inline-flex; align-items: center; justify-content: center;
+                   width: 22px; height: 20px; border: 1px solid transparent; border-radius: 6px;
+                   background: none; color: var(--nx-ink-muted); cursor: pointer; padding: 0; }
+  .apfacts .ibtn:hover { background: var(--nx-select-bg-soft); color: var(--nx-select);
+                         border-color: var(--nx-border); }
+  .apfacts .ic { width: 13px; height: 13px; }
+  .sectools .apdel { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px;
+                     color: var(--nx-ink-muted); }
+  @media (max-width: 1100px) {
+    .apbody { grid-template-columns: 1fr; }
+  }
 </style>
 
 <div class="studio" id="studio">
@@ -925,40 +1013,40 @@
 </template>
 <div id="status">Pripravené.</div>
 
-<script src="js/errors.js?v=0.12.10"></script>
+<script src="js/errors.js?v=0.12.11"></script>
 <!-- D-51/D-77: minimálna OBSAHOVÁ veľkosť okna pri otvorení (js/win_fit.js).
      Navigácia 208 px + tabuľka Kusovníka so 7 stĺpcami a stĺpcom akcií — v užšom
      okne končí pravá časť riadku mimo. Trojica NX_FIT_MIN → width/height →
      min_width/min_height je v docs/UI_DIZAJN.md (tabuľka D-51). -->
 <script>window.NX_FIT_MIN = { w: 1060, h: 640 };</script>
-<script src="js/win_fit.js?v=0.12.10"></script>
+<script src="js/win_fit.js?v=0.12.11"></script>
 <!-- Sprite ikon (žiadne emoji v ovládacích prvkoch). Musí byť PRED studio.js —
      navigácia aj hover akcie riadkov používajú <use href="#i-…">. -->
-<script src="js/icons.js?v=0.12.10"></script>
+<script src="js/icons.js?v=0.12.11"></script>
 <!-- R-23.1: JEDEN dokumentový Escape handler s prioritným zoznamom vrstiev
      (ten istý súbor načítava aj panel.html). Musí byť PRED nx_modal.js
      aj studio.js — jeho listener má bežať ako PRVÝ, aby vedel udalosť
      spotrebovať skôr, než ju dostane handler okna. Kostre D-15, rozbaľovacím
      nastaveniam a `budPrModal` sa vyhýba sám (zoznam FOREIGN). -->
-<script src="js/nx_esc.js?v=0.12.10"></script>
+<script src="js/nx_esc.js?v=0.12.11"></script>
 <!-- ŠT-1b: ZDIELANE 3-stavove nastavenie kontroly hran. TEN ISTY subor nacitava
      aj Inspector (rohovy trojuholnik pri ABS kontrole v raile) — jeden markup,
      jeden stav. Musi byt PRED studio.js (lista sekcie Kontrola ho vola pri
      renderi). ŠT-1c PR B3: okno Vyroba zaniklo — prepinace su TU. -->
-<script src="js/edge_menu.js?v=0.12.10"></script>
+<script src="js/edge_menu.js?v=0.12.11"></script>
 <!-- ŠT-1c PR B2 (D-15): ZDIELANA kostra modalov („pridávačiek"). Musí byť PRED
      studio.js aj budget.js — Escape handler Štúdia sa pýta `NXModal.isOpen()`
      a rozpočet ním otvára svoje pridávačky. Ďalšie inštancie (D-69 editor
      materiálu, položka/set kovania) sa naň napoja bez kopírovania. -->
-<script src="js/nx_modal.js?v=0.12.10"></script>
-<script src="js/studio.js?v=0.12.10"></script>
+<script src="js/nx_modal.js?v=0.12.11"></script>
+<script src="js/studio.js?v=0.12.11"></script>
 <!-- ŠT-1c PR B1: sekcia ROZPOČET (Š12–Š13). MUSÍ byť AŽ ZA studio.js — číta
      jeho globálny payload `ST` a hlavne OBALUJE `NX.setStudio` (uvoľnenie
      frontu zápisov po príchode čerstvej generácie). studio.js pritom NX
      PRIRAĎUJE celý (`window.NX = {…}`), takže v opačnom poradí by obal aj
      `NX.budgetResult`/`NX.priceRefresh` prepísal a rozpočet by po prvom zápise
      zamrzol. Poradie stráži guard test (tests/pure/test_st1c_rozpocet.rb). -->
-<script src="js/budget.js?v=0.12.10"></script>
+<script src="js/budget.js?v=0.12.11"></script>
 <!-- ŠT-2a/2b: sekcia MATERIÁLY. Okno „Materiály projektu" ZANIKLO, takže tento
      súbor beží už len TU; príznak nižšie ostáva ako explicitné prihlásenie sa
      do režimu sekcie (a ako poistka Node testov, ktoré ho nenastavujú).
@@ -972,14 +1060,14 @@
      handlerov; `demos_add.js` nesie modal „Pridať z Demosu". Oba používajú
      výhradne vlastné prefixy (`mdd*` / `nxda*`), takže v okne so studio.js
      a budget.js nič neprepisujú (stráži guard test). -->
-<script src="js/demos_diff.js?v=0.12.10"></script>
-<script src="js/demos_add.js?v=0.12.10"></script>
+<script src="js/demos_diff.js?v=0.12.11"></script>
+<script src="js/demos_add.js?v=0.12.11"></script>
 <!-- PICKER-1: vyhľadávač materiálov (`nx_combo`) je TEN ISTÝ komponent ako
      v Inspectore — predvoľby projektu v sekcii Materiály ho používajú tiež.
      Musí byť PRED proj_materials.js, ktorý ho pri renderi volá. -->
-<script src="js/nx_combo.js?v=0.12.10"></script>
-<script src="js/proj_materials.js?v=0.12.10"></script>
-<script src="js/md_appearance.js?v=0.12.10"></script>
+<script src="js/nx_combo.js?v=0.12.11"></script>
+<script src="js/proj_materials.js?v=0.12.11"></script>
+<script src="js/md_appearance.js?v=0.12.11"></script>
 <!-- ŠT-3a-1/3a-2: sekcia KOVANIE (Š16). Okno „Katalóg kovania" ZANIKLO, takže
      oba súbory bežia už len TU; príznak nižšie ostáva ako čitateľné prihlásenie
      sa do režimu sekcie (a ako marker poradia skriptov pre guard test).
@@ -990,23 +1078,30 @@
      projektu" volajú jeho funkcie. Poradie stráži guard test
      (tests/pure/test_st3a_hw.rb). -->
 <script>window.NX_HW_SECTION = true;</script>
-<script src="js/hw_sets.js?v=0.12.10"></script>
-<script src="js/hw_catalog.js?v=0.12.10"></script>
+<script src="js/hw_sets.js?v=0.12.11"></script>
+<script src="js/hw_catalog.js?v=0.12.11"></script>
+<!-- S1-A2: sekcia SPOTREBIČE (`appl`). MUSÍ byť AŽ ZA studio.js — obaľuje jeho
+     `NX.setStudio` (rovnaký dôvod ako rozpočet, materiály a kovanie) a lištu/telo
+     sekcie kreslí cez `apRenderTools`/`apRenderBody`, ktoré studio.js volá cez
+     `typeof`. Prijímače `NX.applTree`/`NX.applCard`/`NX.applResult` pridáva DO
+     `window.NX` (studio.js ho priraďuje CELÝ), takže v opačnom poradí by zmizli.
+     Poradie stráži guard test (tests/pure/test_s1a2_sekcia.rb). -->
+<script src="js/appliances.js?v=0.12.11"></script>
 <!-- ŠT-3b-1: sekcia PRAVIDLÁ (Š17). Okno „Pravidlá kovania" ZANIKLO, takže
      tento súbor beží už len TU. MUSÍ byť AŽ ZA studio.js (obaľuje jeho
      `NX.setStudio` — rovnaký dôvod ako rozpočet, materiály a kovanie)
      a lištu/telo sekcie kreslí cez `rulesRenderTools`/`rulesRenderBody`,
      ktoré studio.js volá cez `typeof`. Poradie stráži guard test
      (tests/pure/test_st3b_rules.rb). -->
-<script src="js/rules.js?v=0.12.10"></script>
+<script src="js/rules.js?v=0.12.11"></script>
 <!-- ŠT-3c-1: sekcia Šablóny (Š18). Načítava sa AŽ ZA studio.js — obaľuje
      jeho NX.setStudio, rovnako ako všetky predošlé sekcie. -->
-<script src="js/templates.js?v=0.12.10"></script>
+<script src="js/templates.js?v=0.12.11"></script>
 <!-- ŠT-4a: „O plugine" je JEDEN OBSAH, DVA VSTUPY (kontrakt Š19) — ten istý
      `js/about.js` načítava aj panel.html. Musí byť PRED studio_settings.js,
      ktorý ho volá pri kreslení sekcie `about`. -->
-<script src="js/about.js?v=0.12.10"></script>
+<script src="js/about.js?v=0.12.11"></script>
 <!-- ŠT-4a: sekcie Nastavenia (`sup` · `bset` · `about`, Š19) — obsah
      zaniknutého okna „Nastavenia rozpočtu" (POSLEDNÝ satelit). Načítava sa AŽ
      ZA studio.js: obaľuje jeho NX.setStudio, rovnako ako všetky predošlé sekcie. -->
-<script src="js/studio_settings.js?v=0.12.10"></script>
+<script src="js/studio_settings.js?v=0.12.11"></script>

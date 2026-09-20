@@ -7,7 +7,21 @@
 > [../../SYSTEM/archiv/KRONIKA.md](../../SYSTEM/archiv/KRONIKA.md).
 
 Katalóg konkrétnych modelov spotrebičov tohto počítača (rozmery z listov výrobcov, odkazy, prílohy) a snapshot, ktorým si ich zákazka
-odkopíruje k sebe. Väzba do zákazky, slot umývačky, kontrolné telo chladničky a UI sekcia prídu v dávkach S1-A2 až S1-F.
+odkopíruje k sebe. Väzba do zákazky, slot umývačky a kontrolné telo chladničky prídu v dávkach S1-B až S1-F; **UI je od S1-A2 sekcia `appl` v Štúdiu**.
+
+### UI sekcie
+
+**Jediné UI katalógu je sekcia `appl` okna ŠTÚDIO** (S1-A2) a jediný vstup do tohto modulu je `ui/appliance_dialog.rb` — kontrakt sekcie, payloady, lazy kanál miniatúr
+a pravidlá echa sú v [ui-lifecycle.md](ui-lifecycle.md) (odseky `appliance_dialog.rb` a „Sekcia SPOTREBIČE v Štúdiu"). Pre tento modul z toho platia tri veci:
+
+- **UI nikdy neobchádza pravidlá katalógu.** Validáciu, `rev` guard, tombstone, prílohy aj seed rieši výhradne `appliance_catalog.rb`; sekcia jeho statusy iba prekladá
+  na vety a chyby posiela k poľu modalu. `field` z `[:invalid, {message:, field:}]` je **cesta** (`dims.niche.width_min`) a presne tak sa volá aj kľúč poľa vo formulári,
+  takže medzi katalógom a modalom neexistuje prekladová tabuľka, ktorá by mohla zaostať.
+- **Zmena katalógu NEDVÍHA generáciu okna Štúdio.** Katalóg spotrebičov zatiaľ nevstupuje do žiadneho čísla zákazky, takže zápis posiela len echo sekcie
+  (`NX.applTree` + `NX.applCard`), nie plný `push_state`. Po S1-B (väzba do zákazky) sa to prehodnotí v tej dávke.
+- **Prílohy do UI chodia ako `data:` URI, nikdy ako cesta.** CEF súbory zo systému čítať nesmie; obrázok sa posiela zmenšený (`Sketchup::ImageRep`, max 96 px) a len na
+  vyžiadanie karty, PDF vôbec — otvára ho `open_attachment` cez systémový prehliadač. `attachment_path_for` tak ostáva jediným resolverom ciest pre živý záznam
+  aj pre zákazkový snapshot.
 
 ### appliance_catalog.rb
 

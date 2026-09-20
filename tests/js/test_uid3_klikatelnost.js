@@ -97,7 +97,7 @@ eq(typeof NXShell.studioLink, 'undefined', 'aj skladanie payloadu deep-linku na 
 
 // --- 3) ST-1a: deep-link do okna STUDIO -------------------------------------
 
-eq(NXShell.STUDIO_SECTIONS, ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat', 'hw', 'rules', 'tpl', 'sup', 'bset', 'about'],
+eq(NXShell.STUDIO_SECTIONS, ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat', 'hw', 'appl', 'rules', 'tpl', 'sup', 'bset', 'about'],
    'zoznam sekcii je ZRKADLO StudioDialog::SECTIONS');
 eq(NXShell.studioSection('bom'), 'bom', 'platna sekcia prejde');
 eq(NXShell.studioSection('ctrl'), 'ctrl', 'ŠT-1b: Kontrola je ZIVA sekcia Studia (uz nie premostenie)');

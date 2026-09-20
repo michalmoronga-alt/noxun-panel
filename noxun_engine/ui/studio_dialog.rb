@@ -47,7 +47,9 @@ module Noxun
       # ŠT-3c-1 pridala ŠABLÓNY (`tpl`), ŠT-4a NASTAVENIA (`sup` · `bset` ·
       # `about`) — poslednu skupinu navigacie. Tym su ZIVE VSETKY polozky
       # okrem Narezoveho planu (faza 2) a v okne nie je uz ziadne premostenie.
-      SECTIONS = %w[bom ctrl buy budget offer mat hw rules tpl sup bset about].freeze
+      # S1-A2 pridala SPOTREBICE (`appl`) — 13. sekcia, v skupine KATALOGY
+      # medzi Kovanim a Pravidlami (katalog modelov spotrebicov tohto PC).
+      SECTIONS = %w[bom ctrl buy budget offer mat hw appl rules tpl sup bset about].freeze
 
       # ŠT-2a/2b: akcie katalogu materialov, ktore smie poslat SEKCIA `mat`,
       # ziju v JEDINOM zozname — `MaterialsDialog::SECTION_ACTIONS`. Telo
@@ -953,6 +955,53 @@ module Noxun
           nil
         end
 
+        # --- S1-A2: sekcia SPOTREBIČE (`appl`) -------------------------------
+        #
+        # Kanal je vzor `rules` (modul BEZ okna, ziadny asynchronny beh), s
+        # JEDNYM rozdielom: katalog spotrebicov je GLOBALNY (per PC), takze
+        # payload nepotrebuje model — rovnako ako sablony.
+        #
+        # ECHO po zapise NEIDE cez `push_state`: zmena katalogu spotrebicov
+        # v tejto davke nemeni ZIADNE cislo zakazky, takze by zbytocne
+        # zneplatnila rozkliknuty riadok Kusovnika a rozrobeny export. Sekcia
+        # si posiela `NX.applTree` + `NX.applCard` sama (`ApplianceDialog.echo`)
+        # — pocas volania sekcie do SINKU volajuceho, mimo neho cez `appl_js`.
+        def appl_actions
+          defined?(ApplianceDialog) ? ApplianceDialog::SECTION_ACTIONS : []
+        end
+
+        def do_appl(name, payload)
+          return set_status('Katalóg spotrebičov nie je načítaný.', true) unless defined?(ApplianceDialog)
+
+          ApplianceDialog.dispatch(name, payload, appl_sink)
+        end
+
+        # Adresat odpovedi: TOTO okno. `ApplianceDialog` posiela `AP.*` a `NX.appl*`
+        # volania — sekcia ma presne tie iste prijimace, lebo bezi na TOM ISTOM
+        # `js/appliances.js`.
+        def appl_sink
+          ->(script) { js(script) }
+        end
+
+        # VEREJNY vstup pre `ApplianceDialog` mimo synchronneho volania sekcie
+        # (`js` je private, patri kanalu okna) — vzor `rules_js`.
+        def appl_js(script)
+          js(script)
+        end
+
+        # Payload sekcie. Model sa NEODOVZDAVA — katalog spotrebicov je
+        # GLOBALNY (per PC). Maly JSON (strom je zoznam nazvov a podtitulov,
+        # ziadne obrazky), takze chodi CELY pri kazdom pushi; KARTU si klient
+        # pyta sam (`appl_card`) a miniatury k nej chodia lazy kanalom.
+        def appl_payload
+          return nil unless defined?(ApplianceDialog)
+
+          ApplianceDialog.section_payload
+        rescue StandardError => e
+          Engine.log_error(e, 'StudioDialog.appl_payload')
+          nil
+        end
+
         # --- ŠT-3b-1: sekcia PRAVIDLÁ (`rules`) ----------------------------
         #
         # Presun formulára okna „Pravidlá kovania" (Š17, skupina „Kovanie podľa
@@ -1242,6 +1291,11 @@ module Noxun
             # ŠT-3a-1: to iste pre sekciu Kovanie — beziace overenie ceny
             # ci nahlad z Demosu uz nema komu prist (session bump, ABA guard).
             HardwareCatalogDialog.on_ui_closed if defined?(HardwareCatalogDialog)
+            # S1-A2: stav POHLADU sekcie Spotrebiče (filter + generácia dotazu)
+            # zomiera s oknom — nová inštancia začína od nuly, takže server
+            # nesmie držať generáciu z minulého sedenia (klient by jeho odpoveď
+            # zahodil ako staršiu a sekcia by „nereagovala").
+            ApplianceDialog.on_ui_closed if defined?(ApplianceDialog)
             @dialog = nil
           end
           # Indikator neaktualnosti zije PRESNE tak dlho ako okno.
@@ -1315,6 +1369,12 @@ module Noxun
           # sem chodi len odpoved (`hw_sink`).
           hw_actions.each { |name| cb(dlg, name) { |p| do_hw(name, p) } }
           cb(dlg, 'hw_leave')             { |p| do_hw_leave(p) }
+          # S1-A2, sekcia SPOTREBIČE. Mená sú prefixované `appl_` (vlastný
+          # priestor mien — `create`/`patch`/`delete` by sa zrazili s ostatnými
+          # sekciami). Telo je v `ApplianceDialog`, sem chodí len odpoveď
+          # (`appl_sink`); `appl_leave` je súčasťou whitelistu, takže vlastný
+          # riadok nepotrebuje.
+          appl_actions.each { |name| cb(dlg, name) { |p| do_appl(name, p) } }
           # ŠT-3b-1, sekcia PRAVIDLÁ. Mena callbackov su TIE ISTE, ake
           # pouzivalo okno „Pravidlá kovania" — presunuty JS (`js/rules.js`)
           # tak vola presne to, co volal doteraz. Telo je v `RulesDialog`,
@@ -1523,6 +1583,12 @@ module Noxun
             # aj cely katalog poloziek. Inak katalog drzi klient a zmeny mu
             # chodia lacnym echom (`push_hw_catalog`).
             hw: hw_payload(model),
+            # S1-A2, sekcia SPOTREBIČE: strom katalógu (kategórie, počty,
+            # podtitul riadku) v tom filtri, ktorý klient naposledy poslal.
+            # Karta v pushi NIE JE — klient si ju pýta (`appl_card`) a
+            # miniatúry k nej chodia lazy kanálom, takže prepočet kusovníka
+            # nikdy neťahá obrázky príloh.
+            appl: appl_payload,
             # ŠT-3b-1, sekcia PRAVIDLÁ: pravidla kovania projektu (alebo
             # globalne predvolby, kym projekt vlastne nema) + pocet skriniek,
             # ktore ulozenie prestavia. Maly JSON — chodi CELY pri kazdom pushi.

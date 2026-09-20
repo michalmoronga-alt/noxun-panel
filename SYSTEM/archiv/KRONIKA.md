@@ -17,6 +17,29 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **S1-A2 — SEKCIA ŠTÚDIA SPOTREBIČE, POHĽAD KATALÓG (v0.12.11, 20.9.2026, PR #378).** Katalóg z S1-A1 dostal UI: **13. sekcia `appl`** v skupine KATALÓGY
+  (medzi Kovaním a Pravidlami) — strom po kategóriách vľavo, karta modelu v štyroch blokoch vpravo (**Telo · Nika · Čelo/dvere · Montáž**, jazyk listov
+  výrobcov), odkazy, prílohy a poznámka. Serverová autorita je nový modul `ui/appliance_dialog.rb` — **modul bez okna od prvého riadku** (vzor
+  `HardwareCatalogDialog` po ŠT-3a-2: uzavretý `SECTION_ACTIONS`, `dispatch`/`with_client` s povinným `ensure`, `ready` vo whiteliste nie je).
+  **Prečo takto:** (1) **Server skladá poradie, počty aj texty** — strom, podtitul riadku („nika 560 – 568 × 583 – 585 · seed"), popisky polí karty
+  aj polia formulára; klient kreslí presne to, čo dostal. Druhá tabuľka polí na klientovi by sa pri pridaní poľa ticho rozišla s tou, proti ktorej
+  server validuje. (2) **Karta a modal majú JEDEN zdroj polí** (`ROWS`): karta z neho skladá riadky („Š × V × H" je jeden riadok z troch čísel),
+  formulár generuje jeden vstup na pole. Guard test overuje, že **každé pole, ktoré UI ponúka, pozná aj whitelist kategórie v katalógu** — inak by
+  používateľ vyplnil pole, ktoré server odmietne ako „neznáme", a nevidel by prečo. (3) **Kľúč poľa modalu je presne tá cesta, ktorú katalóg vracia
+  v chybe** (`dims.niche.width_min`), takže „preklad chýb na kľúče modalu" je identita — žiadna prekladová tabuľka, ktorá by zaostala. (4) **Echo
+  nedvíha generáciu okna**: katalóg spotrebičov zatiaľ nemení ani jedno číslo zákazky, takže zápis posiela len `NX.applTree` + `NX.applCard`, nie plný
+  push — rozkliknutý riadok Kusovníka ani rozrobený export po uložení modelu nezastarajú. Echo pritom **kreslí len vtedy, keď je sekcia aktívna**
+  (`#secbody` je zdieľaný uzol celého okna, lekcia review #225). (5) **Miniatúry príloh idú lazy kanálom**: `data:` URI len pre obrázky, len na
+  vyžiadanie karty a len pre tie, ktoré klient ešte nemá; primárne cez `Sketchup::ImageRep` zmenšené na 96 px (fotka z mobilu preletí mostom ako pár
+  kB), inak pôvodný súbor pod 256 kB — a `null` je platná odpoveď „náhľad nebude", ktorú si klient zacachuje. (6) **`appl_open_url` overuje schému na
+  serveri**: adresa chodí z klienta a `UI.openURL` nad `file:` alebo `javascript:` by bol úplne iný druh akcie; v karte preto nie je žiadny `href`.
+  **Čo je priznane nehotové:** pohľad „V zákazke" a tlačidlo „Do zákazky" sú `aria-disabled` s dôvodom (D-78) — zapne ich S1-B. Badge v navigácii
+  nie je vôbec: počty „chýba/nesedí" prídu z Kontroly až s väzbou do zákazky a prázdny badge by tvrdil, že sa niečo počíta.
+  **Odchýlky od mockupu:** skupiny stromu sú v jednotnom čísle (`CATEGORY_LABELS` je jediný zdroj SK popiskov); modal má jeden vstup na pole (kostra
+  D-15 viacvstupový riadok nepozná a meniť zdieľaný komponent kvôli jednej sekcii sa neoplatí); prázdny blok karty nesie priznanú vetu.
+  **DoD:** `tests/pure/test_s1a2_sekcia.rb` + `tests/js/test_s1a2_sekcia.js` + in-SU sekcia `run_s1a2` (celý kanál nad reálnym katalógom vrátane
+  miniatúry z reálneho súboru); architektúra v `docs/architecture/ui-lifecycle.md` (odseky `appliance_dialog.rb` a „Sekcia SPOTREBIČE v Štúdiu")
+  a `docs/architecture/appliances.md` (odsek „UI sekcie"); ikony `appliance` a `image` v inventári `docs/UI_DIZAJN.md` §4.
 - **test-infra · SAMOZATVORENIE IN-SU TEST INŠTANCIE `-CloseWhenDone` (bez bumpu verzie — plugin sa nemení, 20.9.2026, PR #379).** Nález autonómnych dávok:
   `scripts/run_su_tests.ps1` necháva testovaciu inštanciu SketchUpu otvorenú (pravidlo repa — zavrie ju používateľ); pri 5–10 behoch za deň sa nahromadí 10+ idle inštancií
   po ~1,5 GB (20.9.: 12 inštancií, 5 GB voľných z 32) a nový beh uviazne na Welcome obrazovke bez `su_result.txt`. **Riešenie = voliteľný prepínač, predvolene VYPNUTÝ**

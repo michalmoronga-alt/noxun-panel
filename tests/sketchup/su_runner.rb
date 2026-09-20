@@ -3772,6 +3772,214 @@ module NoxunSuRunner
     log_line("FAIL: run_s1a1 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
   end
 
+  # --- S1-A2: SEKCIA SPOTREBICE (`appl`) nad REALNYM katalogom a REALNYM
+  # suborovym systemom. Headless sada overuje tvary payloadov nad vymyslenymi
+  # zaznamami; TU bezi cely kanal sekcie (`dispatch` -> katalog -> echo) nad
+  # naseedovanym katalogom a nad prilohou, ktora naozaj lezi na disku.
+  #
+  # CO SA TU OVERUJE A INDE NEDA:
+  #   * `Sketchup::ImageRep` — lazy miniatura prilohy. Headless Ruby ju NEMA,
+  #     takze cesta „zmensi na 96 px a posli ako data URI" sa da spustit LEN tu.
+  #   * echo po zapise ide DO SINKU volajuceho (nie do okna) a nesie strom
+  #     s filtrom, ktory klient naposledy poslal.
+  #   * `push_state` Studia naozaj nesie kluc `appl` (payload sekcie).
+  #
+  # SEKCIA NEOTVARA NIC: ziadny `appl_open_url` ani `appl_attach` (ten by
+  # spustil `UI.openpanel` a cakal na cloveka). Priloha sa preto prikladá
+  # PRIAMO cez katalog — testuje sa UI cesta k nej, nie systemovy dialog.
+  #
+  # IZOLACIA: cely katalog aj priecinok priloh ide cez `test_dir_override` do
+  # docasneho priecinka a `ensure` ho VZDY vracia na nil (inak by dalsie
+  # sekcie a zivy plugin citali cudzi katalog).
+  def run_s1a2(_model)
+    return ok('S1-A2: modul ApplianceDialog je nacitany', false) unless defined?(e::ApplianceDialog)
+
+    ok('S1-A2: `appl` je sekcia Studia', e::StudioDialog::SECTIONS.include?('appl'))
+    ok('S1-A2: whitelist akcii je uzavrety a `ready` v nom nie je',
+       e::ApplianceDialog::SECTION_ACTIONS.length == 12 &&
+       !e::ApplianceDialog::SECTION_ACTIONS.include?('ready'))
+
+    ac = e::ApplianceCatalog
+    root = File.join(Sketchup.temp_dir, "noxun_s1a2_#{Process.pid}_#{Time.now.to_i}")
+    FileUtils.mkdir_p(root)
+    # Stav ZIVEHO katalogu (posudil ho BOOT pluginu) si odlozime a v `ensure`
+    # ho vratime PRESNE taky, aky bol. `reset_state!` by ho zhodil na `nil`
+    # a sekcia `run_s1a1`, ktora dokazuje „katalog posudil uz boot", by padla
+    # na nasom upratovani — nie na chybe kodu.
+    state_before = ac.instance_variable_get(:@state)
+    reason_before = ac.instance_variable_get(:@state_reason)
+    ac.test_dir_override = root
+    ac.reset_state!
+    begin
+      s1a2_scenar(ac, root)
+    ensure
+      ac.test_dir_override = nil # NIKDY nenechat presmerovany zivy katalog
+      ac.reset_state!
+      ac.instance_variable_set(:@state, state_before)
+      ac.instance_variable_set(:@state_reason, reason_before)
+      e::ApplianceDialog.handle_leave # a ziadny filter po teste
+      begin
+        FileUtils.rm_rf(root)
+      rescue StandardError
+        nil
+      end
+    end
+  rescue StandardError => ex
+    log_line("FAIL: run_s1a2 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
+  # Posledne volanie daneho prijimaca zo zachytenych skriptov.
+  def s1a2_last(rec, name)
+    line = rec.reverse.find { |x| x.to_s.start_with?("#{name}(") }
+    return nil unless line
+
+    raw = line.to_s[/\A#{Regexp.escape(name)}\((.*)\)\z/m, 1].to_s
+    raw == 'null' ? nil : JSON.parse(raw)
+  rescue StandardError
+    nil
+  end
+
+  # 1x1 PNG (validny subor, nie len magic bytes) — `ImageRep.load_file` ho
+  # musi zvladnut. Vacsi obrazok netreba: cesta „nacitaj -> uloz -> zakoduj"
+  # je ta ista, len bez zmensenia.
+  S1A2_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+
+  def s1a2_scenar(ac, root)
+    ad = e::ApplianceDialog
+    rec = []
+    sink = ->(script) { rec << script.to_s }
+
+    # --- (a) STROM naseedovaneho katalogu --------------------------------
+    ad.dispatch('appl_tree', { 'query' => '', 'include_deleted' => false, 'gen' => 1 }.to_json, sink)
+    tree = s1a2_last(rec, 'NX.applTree')
+    ok("S1-A2 (a): strom prisiel (#{tree ? tree['total'] : '—'} modelov, stav #{tree && tree['state']})",
+       !tree.nil? && tree['total'] == 9 && tree['state'] == 'ok')
+    ok('S1-A2 (a): poradie skupin = poradie CATEGORIES (server sklada, JS nepreskladava)',
+       tree && tree['groups'].map { |g| g['code'] } == ac::CATEGORIES)
+    ok('S1-A2 (a): `gen` sa len echuje', tree && tree['gen'] == 1)
+
+    # --- (b) CREATE cez dispatch -> zaznam v katalogu + echo --------------
+    rec.clear
+    ad.dispatch('appl_create',
+                { 'token' => 'tok-1',
+                  'fields' => { 'category' => 'sink', 'manufacturer' => 'Blanco',
+                                'name' => 'Legra XL 6 S',
+                                'dims.front.cutout_width' => '840',
+                                'dims.front.cutout_depth' => '480',
+                                'shop_urls' => ['https://www.blanco.com/drez'] } }.to_json, sink)
+    res = rec.find { |x| x.start_with?('NX.applResult(') }
+    ok("S1-A2 (b): create potvrdeny modalu s tokenom (#{res ? 'ano' : 'nie'})",
+       !res.nil? && res.include?('true') && res.include?('tok-1'))
+    card = s1a2_last(rec, 'NX.applCard')
+    ok('S1-A2 (b): echo poslalo KARTU noveho zaznamu (klient si z nej berie vyber)',
+       card && card['name'] == 'Legra XL 6 S' && card['category'] == 'sink')
+    tree = s1a2_last(rec, 'NX.applTree')
+    ok("S1-A2 (b): a strom s novym poctom (#{tree && tree['total']})", tree && tree['total'] == 10)
+    ok('S1-A2 (b): karta nesie vyrez z formulara',
+       card && card['blocks'].any? { |b| Array(b['rows']).any? { |r| r['value'].to_s.include?('840') } })
+    id = card && card['id'].to_s
+    rev = card && card['rev'].to_s
+    return ok('S1-A2: bez noveho zaznamu sa dalej testovat neda', false) if id.to_s.empty?
+
+    # --- (c) ODMIETNUTY zapis -> modal sa NEZATVARA, chyba ma CESTU pola --
+    rec.clear
+    ad.dispatch('appl_patch',
+                { 'id' => id, 'rev' => rev, 'token' => 'tok-2',
+                  'fields' => { 'dims.niche.width_min' => '900',
+                                'dims.niche.width_max' => '600' } }.to_json, sink)
+    res = rec.find { |x| x.start_with?('NX.applResult(') }
+    ok('S1-A2 (c): min > max je odmietnutie (modal ostava otvoreny)',
+       !res.nil? && res.include?('false'))
+    ok('S1-A2 (c): a chyba nesie CESTU pola, takze sadne k vstupu modalu',
+       res.to_s.include?('dims.niche.width_min'))
+
+    # --- (d) PRILOHA na REALNOM disku -> lazy miniatura ako data URI ------
+    png = File.join(root, 'nahlad drezu.png')
+    File.binwrite(png, S1A2_PNG.unpack1('m'))
+    st_a, info_a = ac.attach!(id, png, kind: 'image', rev: ac.find(id)[1][:record]['rev'])
+    ok("S1-A2 (d): priloha sa priloziala (#{st_a})", st_a == :ok)
+    att = st_a == :ok ? info_a[:record]['attachments'].first : nil
+    rec.clear
+    ad.dispatch('appl_card', { 'id' => id, 'thumbs' => true, 'have' => [] }.to_json, sink)
+    card = s1a2_last(rec, 'NX.applCard')
+    uri = att && card && card['thumbs'][att['id'].to_s]
+    ok("S1-A2 (d): miniatura prisla ako data URI (#{uri.to_s[0, 22]}…)",
+       uri.to_s.start_with?('data:image/'))
+    raw = "data:image/png;base64,#{[File.binread(png)].pack('m0')}"
+    info("S1-A2 (d): cesta miniatury = #{uri == raw ? 'povodny subor (ImageRep nebezal)' : 'Sketchup::ImageRep'}")
+    ok('S1-A2 (d): klient, ktory ju UZ MA, ju druhy raz nedostane',
+       begin
+         rec.clear
+         ad.dispatch('appl_card', { 'id' => id, 'thumbs' => true,
+                                    'have' => [att['id'].to_s] }.to_json, sink)
+         c2 = s1a2_last(rec, 'NX.applCard')
+         c2 && c2['thumbs'].empty?
+       end)
+
+    # --- (e) NAHLAD a ODOBRATIE prilohy zo zoznamu ------------------------
+    rec.clear
+    ad.dispatch('appl_thumbnail', { 'id' => id, 'attachment_id' => att['id'],
+                                    'rev' => ac.find(id)[1][:record]['rev'] }.to_json, sink)
+    card = s1a2_last(rec, 'NX.applCard')
+    ok('S1-A2 (e): priloha sa stala NAHLADOM',
+       card && card['attachments'].first['thumbnail'] == true)
+    target = File.join(ac.record_dir(id), att['file'])
+    rec.clear
+    ad.dispatch('appl_remove_attachment', { 'id' => id, 'attachment_id' => att['id'],
+                                            'rev' => ac.find(id)[1][:record]['rev'] }.to_json, sink)
+    card = s1a2_last(rec, 'NX.applCard')
+    ok('S1-A2 (e): odobrata priloha zmizla zo ZOZNAMU',
+       card && Array(card['attachments']).empty?)
+    ok('S1-A2 (e): ale SUBOR na disku ostal (zakazka nan moze odkazovat)', File.file?(target))
+
+    # --- (f) TOMBSTONE: strom bez zaznamu, s prepinacom s nim -------------
+    rec.clear
+    ad.dispatch('appl_delete', { 'id' => id, 'rev' => ac.find(id)[1][:record]['rev'] }.to_json, sink)
+    tree = s1a2_last(rec, 'NX.applTree')
+    live = tree && tree['groups'].flat_map { |g| g['items'] }.map { |i| i['id'] }
+    ok("S1-A2 (f): vyradeny zaznam v strome NIE JE (#{tree && tree['total']} modelov)",
+       !live.nil? && !live.include?(id) && tree['total'] == 9)
+    rec.clear
+    ad.dispatch('appl_tree', { 'query' => '', 'include_deleted' => true, 'gen' => 2 }.to_json, sink)
+    tree = s1a2_last(rec, 'NX.applTree')
+    gone = tree && tree['groups'].find { |g| g['code'] == e::ApplianceDialog::DELETED_GROUP }
+    ok('S1-A2 (f): s prepinacom „vyradené" ho vidno vo vlastnej skupine',
+       gone && gone['items'].any? { |i| i['id'] == id })
+
+    # --- (g) RESTORE -----------------------------------------------------
+    rec.clear
+    ad.dispatch('appl_restore', { 'id' => id, 'rev' => ac.find(id)[1][:record]['rev'] }.to_json, sink)
+    tree = s1a2_last(rec, 'NX.applTree')
+    ok("S1-A2 (g): obnoveny zaznam je spat v katalogu (#{tree && tree['total']})",
+       tree && tree['total'] == 10)
+
+    # --- (h) FILTER prezije zapis, odchod zo sekcie ho ZABUDNE ------------
+    rec.clear
+    ad.dispatch('appl_tree', { 'query' => 'blanco', 'gen' => 3 }.to_json, sink)
+    tree = s1a2_last(rec, 'NX.applTree')
+    ok("S1-A2 (h): hladanie zuzilo strom (#{tree && tree['total']})", tree && tree['total'] == 1)
+    rec.clear
+    ad.dispatch('appl_patch', { 'id' => id, 'rev' => ac.find(id)[1][:record]['rev'],
+                                'token' => 'tok-3',
+                                'fields' => { 'note' => 'rucny zaznam z obchodu' } }.to_json, sink)
+    tree = s1a2_last(rec, 'NX.applTree')
+    ok('S1-A2 (h): echo po zapise RESPEKTUJE filter (strom sa pred pouzivatelom neroztiahne)',
+       tree && tree['total'] == 1 && tree['query'] == 'blanco')
+    ad.dispatch('appl_leave', '{}', sink)
+    ok('S1-A2 (h): odchod zo sekcie filter ZABUDNE', ad.view_query.empty?)
+
+    # --- (i) `appl` v payloade push_state --------------------------------
+    push = []
+    st3a_with_fake_studio(push) do
+      e::StudioDialog.send(:push_state)
+    end
+    data = st3a_last_push(push)
+    ok('S1-A2 (i): push_state nesie prvotny stav sekcie pod klucom `appl`',
+       data && data['appl'].is_a?(Hash) && data['appl']['groups'].is_a?(Array))
+    ok('S1-A2 (i): a NEnesie karta ani miniatury (tie si klient pyta sam)',
+       data && !data['appl'].key?('card') && !data['appl'].key?('thumbs'))
+  end
+
   # --- Recorder Panel.js (audit F9): zatvoreny panel je no-op — dokaz volania
   # NX.clearSelected/NX.setStatus sa zbiera docasnym obalenim Panel.js. Vzdy
   # parovat install/remove; remove je idempotentny (bezpecny aj po FAIL ceste).
@@ -12266,8 +12474,9 @@ module NoxunSuRunner
       # toky a zrusila okno; ŠT-3a-1 pridala siedmu `hw` (Kovanie) — okno
       # „Katalóg kovania" zatial zije, ale navigacia don uz nevedie.
       # ŠT-3c-1 pridala osmu `tpl` (Sablony) — okno „Šablóny" zaniklo.
-      ok('ŠT-1c B3: sekcie Studia su vsetky (bom · ctrl · buy · budget · offer · mat · hw · rules · tpl)',
-         e::StudioDialog::SECTIONS == %w[bom ctrl buy budget offer mat hw rules tpl sup bset about])
+      # S1-A2 pridala trinastu `appl` (Spotrebice) — katalog modelov tohto PC.
+      ok('ŠT-1c B3: sekcie Studia su vsetky (bom · ctrl · buy · budget · offer · mat · hw · appl · rules · tpl)',
+         e::StudioDialog::SECTIONS == %w[bom ctrl buy budget offer mat hw appl rules tpl sup bset about])
     end
 
     dlg = e::StudioDialog.instance_variable_get(:@dialog)
@@ -23774,6 +23983,10 @@ module NoxunSuRunner
     run_mr3b(model)           # MR-3B: Apply cez skutocne vyskytove cesty, izolacia a rollback
     run_mr2a(model)           # MR-2A: pracovny SKM, atomicka priprava+Apply a early-exit rollback
     run_mr2b(model)           # MR-2B: controller dispatch, novy W, Save/retry/Reset a stale ACK
+    # S1-A2 bezi PRED S1-A1: sekcia Studia ZIADNU adresu ani prilohu NEOTVARA
+    # (ziadny `UI.openURL` ani `UI.openpanel`), takze okno SketchUpu neprekryje
+    # nic a inferencia dalsich sekcii ostava cela.
+    run_s1a2(model)           # S1-A2: sekcia SPOTREBICE — dispatch nad REALNYM katalogom (create/patch/delete/restore), lazy miniatura prilohy ako data URI cez Sketchup::ImageRep, tombstone v strome len s prepinacom, `appl` v payloade push_state
     # S1-A1 je POSLEDNA SYNCHRONNA sekcia ZAMERNE: otvara prilohu cez
     # `UI.openURL`, co spusti systemovy prehliadac a ten PREKRYJE okno
     # SketchUpu. Zakryte okno prestane kreslit view a inferencia nad REALNOU
