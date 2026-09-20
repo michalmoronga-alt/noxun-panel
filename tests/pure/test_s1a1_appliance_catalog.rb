@@ -663,6 +663,18 @@ NxTest.test('spotrebice: snapshot_for — vyradeny zaznam, neznamy id a nepodpor
   st2, info2 = APPLC.snapshot_for('a1')
   NxTest.assert_equal(:unsupported, st2, 'z novsieho suboru sa snapshot nerobi')
   NxTest.assert(info2[:message].to_s.include?('aktualizuj plugin'))
+
+  # Zdroj sa overuje CERSTVO: subor prepisala novsia instancia AZ PO tom, co
+  # sedenie uz katalog precitalo ako zdravy.
+  applc_seeded!
+  rec = APPLC.list[1][:records].first
+  NxTest.assert_equal(:ok, APPLC.snapshot_for(rec['id'])[0])
+  doc = applc_doc
+  doc['std'] = 99
+  File.binwrite(APPLC.path, JSON.pretty_generate(doc))
+  APPLC_JFS.invalidate(APPLC.path)
+  NxTest.assert_equal(:unsupported, APPLC.snapshot_for(rec['id'])[0],
+                      'cachovane :ok nie je dokaz — zakazka si snapshot ODLOZI')
 end
 
 # --- hladanie a tvar odpovede --------------------------------------------------

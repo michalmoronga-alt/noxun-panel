@@ -1112,7 +1112,17 @@ module Noxun
       # -> [:ok, { snapshot: }] | [:not_found|:deleted|:unsupported, …]
       def snapshot_for(id)
         ensure_state
-        if read_only?
+        # Zdroj sa overuje CERSTVO, nie z cachovaneho stavu sedenia: zakazka si
+        # snapshot ODLOZI a cachovane `:ok` nie je dokaz, ze subor medzitym
+        # neprepisala NOVSIA instancia pluginu (updater bezi popri otvorenom
+        # SketchUpe). Degradovany katalog (platna `.bak`) snapshot DOVOLI —
+        # obsah zalohy je citatelny, stoja len zapisy.
+        if JsonFileStore.available?(path) && !JsonFileStore.degraded?(path)
+          if (issue = stored_document_issue(raw_document))
+            set_state(:read_only, issue)
+            return [:unsupported, { message: issue }]
+          end
+        elsif read_only?
           return [:unsupported, { message: state_reason }]
         end
 
