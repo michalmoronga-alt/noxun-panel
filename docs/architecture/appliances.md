@@ -178,10 +178,19 @@ jedno Späť by vrátilo len jednu z nich a zákazka by ostala v stave, ktorý v
   identita dokumentu (`DocKey.foreign?`, rovnaká tolerancia prázdneho klientskeho údaja ako rozpočet) · verzia
   dát rozpočtu (`BudgetStore.std_block_reason`) · existencia položky a strop `MAX_APPLIANCES` · **matica**
   kategória → vlastník · **pokoj observera** (`ScaleWatch.flush_pending!` — dedup kópií môže práve meniť
-  identitu skriniek) · **identita cieľa = PID + ID + druh** (recyklované ID bez zhody PID sa odmieta, dva kusy
-  s tým istým ID = „nejednoznačná identita", odpojený dielec aj config z novšej verzie tiež) · **stav pôvodného
-  vlastníka**. `CabinetBuilder.ensure_root_context` beží tesne pred operáciou — `rebuild_in_operation` to (na
+  identitu skriniek) · **identita cieľa** · **stav pôvodného vlastníka**.
+  `CabinetBuilder.ensure_root_context` beží tesne pred operáciou — `rebuild_in_operation` to (na
   rozdiel od `rebuild`) nerobí, takže väzba počas vnoreného editovania by inak porušila prestavbu.
+- **Identita vysloveného cieľa = PID + ID + druh, a PID je POVINNÝ.** Fyzický cieľ (`cabinet|slot|board`)
+  bez platného `pid` sa odmieta hláškou „zastaraná ponuka vlastníkov — otvor modal znova": ID sa recyklujú,
+  takže hľadanie podľa neho samotného by spotrebič pripojilo na entitu, ktorá po zaniknutej skrinke iba
+  zdedila číslo. Ponuka vlastníkov PID vždy nesie. Ďalej platí: dva kusy s tým istým ID = „nejednoznačná
+  identita", odpojený dielec a config z novšej verzie sa odmietajú.
+- **Kategória, proti ktorej beží matica, sa musí rovnať tej, ktorá sa NAOZAJ uloží.** Preto sa `typ`
+  z formulára pri operáciách meniacich vlastníka (`move · unbind · rebind_model`) **odmieta** — inak by
+  matica prešla nad starou kategóriou a zápis uložil novú (chladnička by sa dostala do slotu ako umývačka).
+  Pri `create` sa **neznámy kód odmietne** (nikdy sa ticho nenahradí defaultom) a uložený typ je presne
+  `plan[:category]` — teda to, čo maticou prešlo (legacy kód je v tom okamihu už prevedený na kanón).
 - **Matica `OWNER_MATRIX`** obmedzuje len **fyzických** vlastníkov: `fridge|oven|microwave` → skrinka ·
   `dishwasher` → slot · `hob|sink` → doska · `hood|other` → nič. **`job` („len zákazka") je legitímny stav
   každej kategórie** a v matici preto nie je. Platí v ponuke vlastníkov (`owner_options_map` — odpojené
@@ -198,6 +207,11 @@ jedno Späť by vrátilo len jednu z nich a zákazka by ostala v stave, ktorý v
   výhradne do **tej entity, ktorú overil `resolve_previous`**. Hľadanie podľa uloženého ID by pri recyklovanom
   ID pripojilo spotrebič na **cudziu** skrinku; keď pôvodný vlastník zanikol, refs sa **neprepisujú** —
   aktualizuje sa len snapshot položky a Kontrola hlási sirotu ďalej.
+- **„Nezmenený vlastník" sa neposudzuje len podľa `kind` + `id`.** Uložený vlastník **bez platnej väzby**
+  (`prev == nil` — entita zanikla alebo jej refs položku nenesú) nie je platný vlastník, takže vyslovený
+  fyzický cieľ je vtedy **vždy nový** — aj keď má to isté ID, ktoré recykloval po zaniknutej skrinke.
+  Navyše `rewrite_ref?` zapíše záznam vždy, keď **overený cieľ položku ešte nenesie**; cieľ, ktorý ju už má,
+  sa zbytočne neprestavuje. Bez toho by „úspešný" presun siroty na recyklované ID nechal sirotu sirotou.
 - **`rebind_model` s modelom inej kategórie sa ODMIETA**, nikdy automaticky neodpája („model inej kategórie —
   najprv odpoj spotrebič").
 - **Kontrakt záznamu `appliance_refs[]`** (číta ho S1-B2 telo slotu, S1-F box chladničky, S1-C očakávania):

@@ -4119,6 +4119,7 @@ module NoxunSuRunner
     r14_clear!(model)
 
     s1b1_kolo1(model, fridge_id)
+    s1b1_kolo2(model, fridge_id)
     s1b1_rollback(model, fridge_id)
     s1b1_barrier(model, fridge_id)
 
@@ -4219,6 +4220,99 @@ module NoxunSuRunner
 
     s1b1_apply(model, 'remove', item_id: id)
     other.erase! if other.valid?
+    r14_clear!(model)
+  end
+
+  # Codex #382 kolo 2: IDENTITA CIELA A KATEGORIA.
+  #   * fyzicky ciel BEZ PID sa odmietne (ID sa recykluju — bez PID by sa
+  #     spotrebic pripojil na entitu, ktora len zdedila cislo),
+  #   * `typ` pri zmene vlastnika sa odmietne (matica uz bezala nad starou
+  #     kategoriou),
+  #   * presun SIROTY na entitu, ktora recyklovala ID po zaniknutom vlastnikovi,
+  #     MUSI refs zapisat — inak by „uspesny" presun nechal sirotu sirotou.
+  def s1b1_kolo2(model, catalog_id)
+    r14_clear!(model)
+    cab = e::CabinetBuilder.build(
+      model, S1B1_CAB, transform: Geom::Transformation.translation(e::Units.point(12_000.0, 0, 0))
+    )
+    slot = e::CabinetBuilder.build(
+      model, S1B1_SLOT, transform: Geom::Transformation.translation(e::Units.point(13_000.0, 0, 0))
+    )
+    return ok('S1-B1 (kolo 2): fixtury', false) unless cab && slot
+
+    cid = e::Store.get(cab, 'cabinet_id').to_s
+    sid = e::Store.get(slot, 'cabinet_id').to_s
+    markers = []
+
+    # (1) CIEL BEZ PID = odmietnutie bez operacie a bez kroku Spat.
+    m1 = r03_marker(model, markers)
+    res = s1b1_apply(model, 'create', attrs: { 'nazov' => 'Beko' }, catalog_id: catalog_id,
+                                      owner: { 'kind' => 'cabinet', 'id' => cid })
+    ok("S1-B1 (kolo 2): ciel BEZ PID odmietnuty (#{Array(res[:errors]).first})",
+       res[:ok] == false && s1b1_items(model).empty? && s1b1_refs(cab).empty?)
+    Sketchup.undo
+    ok('S1-B1 (kolo 2): a NEZALOZIL ziadny krok Spat (1x Spat vratil marker)', !m1.valid?)
+    r03_clear_markers(model, markers)
+
+    # S PID to prejde.
+    s1b1_apply(model, 'create', attrs: { 'nazov' => 'Beko' }, catalog_id: catalog_id,
+                                owner: { 'kind' => 'cabinet', 'id' => cid,
+                                         'pid' => cab.persistent_id })
+    id = s1b1_items(model).first['id']
+    ok("S1-B1 (kolo 2): s PID vazba vznikla (#{s1b1_refs(cab).length} refs)",
+       s1b1_refs(cab).length == 1)
+
+    # (2) `typ` pri presune sa ODMIETNE (inak by chladnicka skoncila v slote
+    #     ulozena ako umyvacka).
+    res2 = s1b1_apply(model, 'move', item_id: id, attrs: { 'typ' => 'dishwasher' },
+                                     owner: { 'kind' => 'slot', 'id' => sid,
+                                              'pid' => slot.persistent_id })
+    ok("S1-B1 (kolo 2): `move` s `typ` odmietnuty (#{Array(res2[:errors]).first})",
+       res2[:ok] == false)
+    ok("S1-B1 (kolo 2): kategoria ostala `#{s1b1_items(model).first['typ']}` a slot vazbu nedostal",
+       s1b1_items(model).first['typ'] == 'fridge' && s1b1_refs(slot).empty?)
+
+    # (3) SIROTA + entita s RECYKLOVANYM ID: presun na nu MUSI zapisat refs.
+    #     Zmazeme vlastnika a postavime NOVU skrinku, ktorej `Ids.next_id`
+    #     pridelí to iste cislo.
+    model.start_operation('SU-TEST S1B1 kolo2 delete', true)
+    cab.erase!
+    model.commit_operation
+    ok("S1-B1 (kolo 2): po zmazani je polozka sirota (#{s1b1_codes(model).inspect})",
+       s1b1_codes(model).include?('appliance_owner_missing'))
+    fresh = e::CabinetBuilder.build(
+      model, S1B1_CAB, transform: Geom::Transformation.translation(e::Units.point(14_000.0, 0, 0))
+    )
+    # RECYKLACIA ID sa vynuti zapisom: `Ids.next_id` je max+1, takze po zmazani
+    # jednej skrinky medzi zivymi dostane nova VYSSIE cislo — realna recyklacia
+    # nastane az ked zanikne ta s najvyssim ID. Test ju preto nasimuluje
+    # priamo (to iste `cabinet_id`, INA entita a INY `persistent_id`).
+    if fresh
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST S1B1 kolo2 recyklacia ID', true)
+        e::Store.write(fresh, { kind: 'cabinet', id: cid, cabinet_id: cid })
+        model.commit_operation
+      end
+    end
+    fresh_id = fresh ? e::Store.get(fresh, 'cabinet_id').to_s : ''
+    ok("S1-B1 (kolo 2): nova skrinka nesie RECYKLOVANE ID #{fresh_id} (povodne #{cid}), " \
+       "ale iny pid (#{fresh && fresh.persistent_id})", fresh_id == cid)
+    res3 = s1b1_apply(model, 'move', item_id: id,
+                                     owner: { 'kind' => 'cabinet', 'id' => fresh_id,
+                                              'pid' => fresh.persistent_id })
+    ok("S1-B1 (kolo 2): presun siroty na nu prejde (#{Array(res3[:errors]).join(' · ')})",
+       res3[:ok] == true)
+    ok("S1-B1 (kolo 2): a VAZBA sa naozaj zapisala (#{s1b1_refs(fresh).length} refs, " \
+       "geometria #{res3[:geometry_changed]})",
+       s1b1_refs(fresh).length == 1 && res3[:geometry_changed] == true)
+    ok("S1-B1 (kolo 2): Kontrola uz sirotu nehlasi (#{s1b1_codes(model).inspect})",
+       !s1b1_codes(model).include?('appliance_owner_missing'))
+    Sketchup.undo
+    ok('S1-B1 (kolo 2): JEDEN Spat vratil aj tento presun',
+       s1b1_refs(fresh).empty? && s1b1_codes(model).include?('appliance_owner_missing'))
+
+    s1b1_apply(model, 'remove', item_id: id)
+    [slot, fresh].each { |i| i.erase! if i && i.valid? }
     r14_clear!(model)
   end
   # Astra B17: RIADENE ZLYHANIA. Po aborte musi byt stav PRESNE ako pred

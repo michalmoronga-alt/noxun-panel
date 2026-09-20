@@ -2824,7 +2824,10 @@ Modal **„Pridať spotrebič"** má sedem polí v pevnom poradí — `catalog_i
 - **Kategórie ani ponuka vlastníkov nie sú v klientovi.** `budApplTypes(b)` číta `budget.appliance_types` (kanonické kódy + SK popisky zo servera) a `budOwnerOptions(b, cat)`
   skladá ponuku z `budget.appliance_owners` = `matrix` (kategória → povolené druhy) + `options` per druh + `job_label`. Klient ich **len spája**; keby si maticu vymyslel,
   ponúkol by umývačku do bežnej skrinky a server by zápis odmietol až po kliknutí. Hodnota položky je `<druh>:<id>`, `budOwnerPayload` z nej robí `{kind, id, pid}` —
-  **PID ide z ponuky**, lebo server overuje identitu cieľa cez všetky tri údaje.
+  **PID ide z ponuky** a je **povinný**: server fyzický cieľ bez neho odmieta („zastaraná ponuka vlastníkov").
+- **„Len zákazka" je PRVÁ voľba a zároveň predvoľba nového záznamu.** `<select>` bez vyslovenej hodnoty vyberie prvú možnosť — a keby ňou bola skrinka, nový spotrebič by
+  sa **bez jediného kliknutia** viazal na prvý korpus v zozname (aj s prestavbou). `budDraftCommit` preto posiela `owner` **len keď je to fyzický kus**; nedotknuté pole
+  neposiela nič a server pri `create` bez vlastníka založí položku „len zákazka". Väzba na kus v modeli je **vedomé rozhodnutie**, nie náhoda poradia v ponuke.
 - **Zmena kategórie prekreslí ponuku vlastníkov** cez `budApplCtxSwitch` — kostra D-15 sadu polí za behu nevymieňa, takže sa modal otvorí znova s tým, čo už je vyplnené
   (vzor `hwManualCtxSwitch` v Kovaní).
 - **Našepkávač** `sketchup.appl_lookup({q, gen})` → `StudioDialog.handle_appl_lookup` → `ProductionCore.appliance_lookup` (čistá funkcia, top 20) → `NX.applLookupResult`.

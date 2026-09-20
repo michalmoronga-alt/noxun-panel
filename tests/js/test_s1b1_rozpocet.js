@@ -118,18 +118,20 @@ push('DOC-A', [ROW_BOUND, ROW_FREE]);
 
 (function(){
   const b = budget([]);
+  // Kolo 2 (P1): „len zákazka" je PRVA volba — `<select>` bez vyslovnej
+  // hodnoty vyberie prvu moznost a tou nesmie byt skrinka.
   eq(B.budOwnerOptions(b, 'fridge').map(function(o){ return o[0]; }),
-     ['cabinet:CAB-1', 'cabinet:CAB-2', 'job'],
-     'chladnicka: skrinky + „len zakazka" na konci');
+     ['job', 'cabinet:CAB-1', 'cabinet:CAB-2'],
+     'chladnicka: „len zakazka" je PRVA, skrinky za nou');
   eq(B.budOwnerOptions(b, 'dishwasher').map(function(o){ return o[0]; }),
-     ['slot:CAB-3', 'job'], 'umyvacka: LEN sloty');
+     ['job', 'slot:CAB-3'], 'umyvacka: LEN sloty');
   eq(B.budOwnerOptions(b, 'hob').map(function(o){ return o[0]; }),
-     ['board:BRD-1', 'job'], 'varna doska: LEN dosky');
+     ['job', 'board:BRD-1'], 'varna doska: LEN dosky');
   eq(B.budOwnerOptions(b, 'hood').map(function(o){ return o[0]; }),
      ['job'], 'digestor fyzickeho vlastnika NEMA');
   eq(B.budOwnerOptions({}, 'fridge').map(function(o){ return o[0]; }),
      ['job'], 'bez payloadu ostava len „len zakazka"');
-  eq(B.budOwnerOptions(b, 'fridge')[0][1], 'CAB-1 · Chladničková', 'popisok je zo servera');
+  eq(B.budOwnerOptions(b, 'fridge')[1][1], 'CAB-1 · Chladničková', 'popisok je zo servera');
 
   // Hodnota selectu <-> payload vlastnika (s PID z ponuky — identita ciela).
   eq(B.budOwnerPayload(b, 'cabinet:CAB-2'), { kind: 'cabinet', id: 'CAB-2', pid: 102 });
@@ -153,13 +155,14 @@ push('DOC-A', [ROW_BOUND, ROW_FREE]);
   ok(typeof f[0].search === 'function', 'a ma serverove hladanie');
   ok(typeof f[0].onPick === 'function', 'vyber je ZACIATOK dalsieho kroku (predvyplnenie)');
   eq(f[1].options, B.budApplTypes(b), 'typ ponuka kategorie zo servera');
-  eq(f[5].options.map(function(o){ return o[0]; }), ['cabinet:CAB-1', 'cabinet:CAB-2', 'job'],
+  eq(f[5].options.map(function(o){ return o[0]; }), ['job', 'cabinet:CAB-1', 'cabinet:CAB-2'],
      'vlastnik je podla PRVEJ kategorie (fridge)');
+  eq(f[5].value, 'job', 'a NOVY zaznam ma predvolenú „len zákazku" — nikdy prvú skrinku');
   eq(f[6].type, 'checkbox', '„dodáva zákazník" je prepinac');
 
   // Ina kategoria = INA ponuka vlastnikov.
   const dw = B.budDraftFields('appliance', { typ: 'dishwasher' }, b);
-  eq(dw[5].options.map(function(o){ return o[0]; }), ['slot:CAB-3', 'job']);
+  eq(dw[5].options.map(function(o){ return o[0]; }), ['job', 'slot:CAB-3']);
 })();
 
 // ===================== 4) riadok tabulky ====================================
@@ -348,7 +351,7 @@ const ROW_ORPHAN = {
   const b = budget([]);
   // Ponuka pre ZIVEHO vlastnika sa nemeni.
   eq(B.budOwnerOptionsFor(b, ROW_BOUND).map(function(o){ return o[0]; }),
-     ['cabinet:CAB-1', 'cabinet:CAB-2', 'job'], 'živý vlastník ponuku nemení');
+     ['job', 'cabinet:CAB-1', 'cabinet:CAB-2'], 'živý vlastník ponuku nemení');
   // NEDOSTUPNY vlastnik dostane VYSLOVNU volbu NAVRCHU.
   const opts = B.budOwnerOptionsFor(b, ROW_ORPHAN);
   eq(opts[0][0], 'cabinet:CAB-9', 'uložený vlastník je prvou voľbou');
@@ -403,6 +406,36 @@ const ROW_ORPHAN = {
   ok(!B.budOpenAnchor(''), 'prázdna kotva nič neotvára');
   ok(!B.budOpenAnchor('appliance:NEEXISTUJE'),
      'zaniknutý riadok = false (volajúci to povie nahlas, nie ticho)');
+})();
+
+// ====== 12) Codex kolo 2 P1: NOVY spotrebic sa NEVIAZE sam od seba =========
+
+(function(){
+  push('DOC-A', []);
+  SENT.length = 0;
+  B.budOpenDraft('appliance');
+  // Pole vlastníka sa NEDOTKNE — presne tak, ako keď ho používateľ prehliadne.
+  eq(DOC.getElementById('nxm_owner').value, 'job',
+     'select je predvolene na „len zákazke", nie na prvej skrinke');
+  DOC.getElementById('nxm_nazov').value = 'Beko bez vlastníka';
+  dispatch(DOC.querySelector('[data-nxm-act="submit"]'), 'click');
+
+  eq(SENT.length, 1);
+  eq(SENT[0].op, 'appliance_add');
+  ok(SENT[0].owner === undefined,
+     'bez dotyku poľa sa NEPOSIELA žiadny vlastník — nič sa neviaže a neprestavuje');
+  NX.budgetResult('appliance_add', true);
+
+  // Vedomý výber fyzického vlastníka `owner` POŠLE.
+  push('DOC-A', []);
+  SENT.length = 0;
+  B.budOpenDraft('appliance');
+  DOC.getElementById('nxm_nazov').value = 'Beko so skrinkou';
+  DOC.getElementById('nxm_owner').value = 'cabinet:CAB-1';
+  dispatch(DOC.querySelector('[data-nxm-act="submit"]'), 'click');
+  eq(SENT[0].owner, { kind: 'cabinet', id: 'CAB-1', pid: 101 },
+     'vedomý výber sa pošle — aj s PID');
+  NX.budgetResult('appliance_add', true);
 })();
 
 console.log('OK test_s1b1_rozpocet.js — ' + n + ' kontrol');

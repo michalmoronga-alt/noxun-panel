@@ -1119,3 +1119,158 @@ NxTest.test('S1-B1 (kolo 1 P2): sirota vedie DEEP-LINKOM, nie vyberom entit') do
   NxTest.assert(at_route && at_pids && at_route < at_pids,
                 'vetva trasy bezi PRED `pids_for_problem`')
 end
+
+# ================= 9) Codex #382 kolo 2 — identita a kategoria =============
+
+NxTest.test('S1-B1 (kolo 2 P2): fyzicky ciel BEZ PID sa ODMIETNE') do
+  m = NxS1B1::FakeModel.new
+  cab = NxS1B1.cabinet('CAB-1', 101)
+  [nil, '', 0, 'abc'].each do |bad|
+    res = nil
+    NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [cab]),
+                       NxS1B1.snapshot_stub('CAT-FRIDGE' => NxS1B1.fridge_snapshot)] +
+                      NxS1B1.writer_stubs([])) do
+      res = NxS1B1::AB.apply!(m, model_guid: '', op: 'create', attrs: { 'nazov' => 'Beko' },
+                              catalog_id: 'CAT-FRIDGE',
+                              owner: { 'kind' => 'cabinet', 'id' => 'CAB-1', 'pid' => bad })
+    end
+    NxTest.refute(res[:ok], "pid #{bad.inspect}: ciel bez platneho PID sa NEPRIJIMA")
+    NxTest.assert_equal([NxS1B1::AB::MSG_OWNER_STALE], res[:errors], bad.inspect)
+  end
+  NxTest.assert_equal([], m.ops, 'a ziadna operacia sa neotvorila')
+  NxTest.assert_equal([], NxS1B1::BS.appliances(m))
+
+  # S PID to prejde (a PID moze prist aj ako retazec z JSON).
+  res = nil
+  NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [cab])]) do
+    res = NxS1B1.create!(m, NxS1B1.fridge_snapshot,
+                         { 'kind' => 'cabinet', 'id' => 'CAB-1', 'pid' => '101' })
+  end
+  NxTest.assert(res[:ok], res[:errors].inspect)
+  NxTest.assert_equal(1, NxS1B1.refs_of(cab).length)
+end
+
+NxTest.test('S1-B1 (kolo 2 P2): `typ` pri zmene vlastnika sa ODMIETA') do
+  m = NxS1B1::FakeModel.new
+  cab = NxS1B1.cabinet('CAB-1', 101)
+  slot = NxS1B1.cabinet('CAB-2', 102, type: 'dishwasher')
+  NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [cab, slot])]) do
+    NxS1B1.create!(m, NxS1B1.fridge_snapshot,
+                   { 'kind' => 'cabinet', 'id' => 'CAB-1', 'pid' => 101 })
+  end
+  id = NxS1B1::BS.appliances(m).first['id']
+  ops_before = m.ops.length
+  # Presun na SLOT s prilozenym `typ` = umyvacka: matica by bezala nad starou
+  # kategoriou (fridge -> skrinka) a zapis by ulozil dishwasher.
+  res = nil
+  NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [cab, slot])] + NxS1B1.writer_stubs([])) do
+    res = NxS1B1::AB.apply!(m, model_guid: '', op: 'move', item_id: id,
+                            attrs: { 'typ' => 'dishwasher' },
+                            owner: { 'kind' => 'slot', 'id' => 'CAB-2', 'pid' => 102 })
+  end
+  NxTest.refute(res[:ok], 'typ pri presune sa NEPRIJIMA')
+  NxTest.assert_equal([NxS1B1::AB::MSG_TYPE_WITH_OWNER], res[:errors])
+  NxTest.assert_equal(ops_before, m.ops.length, 'a to PRED otvorenim operacie')
+  NxTest.assert_equal('fridge', NxS1B1::BS.appliances(m).first['typ'], 'kategoria sa nezmenila')
+  NxTest.assert_equal([], NxS1B1.refs_of(slot), 'slot vazbu nedostal')
+
+  # To iste pre `unbind` aj `rebind_model`.
+  %w[unbind rebind_model].each do |op|
+    NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [cab, slot]),
+                       NxS1B1.snapshot_stub('CAT-FRIDGE' => NxS1B1.fridge_snapshot)] +
+                      NxS1B1.writer_stubs([])) do
+      res = NxS1B1::AB.apply!(m, model_guid: '', op: op, item_id: id,
+                              attrs: { 'typ' => 'oven' }, catalog_id: 'CAT-FRIDGE')
+    end
+    NxTest.assert_equal([NxS1B1::AB::MSG_TYPE_WITH_OWNER], res[:errors], op)
+  end
+  # `patch` typ menit SMIE (polozka bez katalogu a bez vlastnika) — tam ho
+  # strazi `BudgetStore.type_locked?`.
+  NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [cab, slot])] + NxS1B1.writer_stubs([])) do
+    res = NxS1B1::AB.apply!(m, model_guid: '', op: 'patch', item_id: id,
+                            attrs: { 'nazov' => 'Beko II' })
+  end
+  NxTest.assert(res[:ok], "uprava poli musi prejst: #{res[:errors].inspect}")
+end
+
+NxTest.test('S1-B1 (kolo 2 P2): matica pri `create` bezi nad ULOZENYM typom') do
+  m = NxS1B1::FakeModel.new
+  slot = NxS1B1.cabinet('CAB-2', 102, type: 'dishwasher')
+  # Legacy kod „umyvacka" -> kanon `dishwasher` -> slot je povoleny vlastnik.
+  res = nil
+  NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [slot])] + NxS1B1.writer_stubs([])) do
+    res = NxS1B1::AB.apply!(m, model_guid: '', op: 'create',
+                            attrs: { 'nazov' => 'Bosch', 'typ' => 'umyvacka' },
+                            owner: { 'kind' => 'slot', 'id' => 'CAB-2', 'pid' => 102 })
+  end
+  NxTest.assert(res[:ok], res[:errors].inspect)
+  NxTest.assert_equal('dishwasher', NxS1B1::BS.appliances(m).first['typ'],
+                      'ulozi sa PRESNE to, proti comu bezala matica')
+
+  # Neznamy kod sa NIKDY ticho nenahradi defaultom.
+  m2 = NxS1B1::FakeModel.new
+  NxS1B1.with_stubs([NxS1B1.scan_stub] + NxS1B1.writer_stubs([])) do
+    res = NxS1B1::AB.apply!(m2, model_guid: '', op: 'create',
+                            attrs: { 'nazov' => 'X', 'typ' => 'kozub' })
+  end
+  NxTest.refute(res[:ok], 'neznamy typ sa odmietne')
+  NxTest.assert_equal([NxS1B1::AB::MSG_UNKNOWN_TYPE], res[:errors])
+  NxTest.assert_equal([], m2.ops)
+  NxTest.assert_equal([], NxS1B1::BS.appliances(m2))
+
+  # A kategoria mimo matice sa odmietne aj ked ju klient „preklopi" typom.
+  m3 = NxS1B1::FakeModel.new
+  cab = NxS1B1.cabinet('CAB-1', 101)
+  NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [cab])] + NxS1B1.writer_stubs([])) do
+    res = NxS1B1::AB.apply!(m3, model_guid: '', op: 'create',
+                            attrs: { 'nazov' => 'Drez', 'typ' => 'sink' },
+                            owner: { 'kind' => 'cabinet', 'id' => 'CAB-1', 'pid' => 101 })
+  end
+  NxTest.refute(res[:ok], 'drez do skrinky nepatri (matica nad ULOZENYM typom)')
+  NxTest.assert_equal([], m3.ops)
+end
+
+NxTest.test('S1-B1 (kolo 2 P2): presun SIROTY na entitu s recyklovanym ID ZAPISE refs') do
+  m = NxS1B1::FakeModel.new
+  cab = NxS1B1.cabinet('CAB-1', 101)
+  NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [cab])]) do
+    NxS1B1.create!(m, NxS1B1.fridge_snapshot,
+                   { 'kind' => 'cabinet', 'id' => 'CAB-1', 'pid' => 101 })
+  end
+  id = NxS1B1::BS.appliances(m).first['id']
+  # Povodna skrinka zanikla; NOVA skrinka dostala TO ISTE ID (recyklacia) —
+  # z pohladu polozky je to „ten isty" vlastnik, ale entita je INA a vazbu
+  # nenesie. Presun na nu MUSI refs zapisat, inak sirota ostane sirotou.
+  recycled = NxS1B1.cabinet('CAB-1', 777)
+  log = []
+  res = nil
+  NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [recycled])] + NxS1B1.writer_stubs(log)) do
+    res = NxS1B1::AB.apply!(m, model_guid: '', op: 'move', item_id: id,
+                            owner: { 'kind' => 'cabinet', 'id' => 'CAB-1', 'pid' => 777 })
+  end
+  NxTest.assert(res[:ok], res[:errors].inspect)
+  NxTest.assert_equal([[:cabinet, 'CAB-1', 1]], log, 'vazba sa ZAPISALA')
+  NxTest.assert_equal(1, NxS1B1.refs_of(recycled).length)
+  NxTest.assert_equal(id, NxS1B1.refs_of(recycled).first['item_id'])
+  NxTest.assert_equal(true, res[:geometry_changed])
+
+  # A Kontrola uz sirotu nehlasi (ten isty zber, ktory ju hlasil predtym).
+  owners = {}
+  NxS1B1::BOM.note_appliance_owner(owners, 'CAB-1', 777, NxS1B1.cfg_of(recycled))
+  recs = NxS1B1::BOM.appliance_records(NxS1B1::BS.appliances(m), owners)
+  NxTest.assert_equal('bound', recs.first['state'], 'polozka je zase viazana')
+  items = []
+  NxS1B1::VAL.check_appliances(recs, items)
+  NxTest.assert(items.none? { |i| i['stable_key'].to_s.include?('owner_missing') },
+                "nalez sirotý zhasol: #{items.map { |i| i['stable_key'] }.inspect}")
+
+  # Opakovany presun na TEN ISTY (uz nesuci) ciel sa zbytocne NEPRESTAVUJE.
+  log.clear
+  NxS1B1.with_stubs([NxS1B1.scan_stub(cabinets: [recycled])] + NxS1B1.writer_stubs(log)) do
+    res = NxS1B1::AB.apply!(m, model_guid: '', op: 'move', item_id: id,
+                            owner: { 'kind' => 'cabinet', 'id' => 'CAB-1', 'pid' => 777 })
+  end
+  NxTest.assert(res[:ok], res[:errors].inspect)
+  NxTest.assert_equal([], log, 'ciel uz polozku nesie — ziadna prestavba navyse')
+  NxTest.assert_equal(false, res[:geometry_changed])
+end
