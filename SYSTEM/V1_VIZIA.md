@@ -19,9 +19,11 @@ v PLANe prázdny**; V1 je hotové, keď je odškrtnuté všetko. Stav dopĺňaj�
 4. [ ] **Kovanie:** blok KOVANIE (architektúra V1 FINAL 2.9.2026): sety s klasifikáciou a katalóg (A, B, H hotové), recepty a odvodené dielce zásuviek (C), resolver + zámky (D),
    výklopy podľa hmotnosti (E), závesy max(výška, hmotnosť) + úchytka + Tip-On (F), nohy 4/6 + príchyty (G), šablóny s kovaním (I), UI/UX balík Čiel (D-114 + D-119 presah
    per strana + D-120 UKW na dolnej a bočných hranách). *(Plný model výklopov, výplne fáza B, D-109 pomer setu = mimo V1.)*
-5. [ ] **Spotrebiče S1 (rozhodnuté 6.9.2026):** ručný katalóg s odkazmi, technickými listami a **galériou príloh** · spotrebič patrí zákazke a vlastníkovi podľa kategórie (skrinka · slot umývačky · pracovná doska · len zákazka) · cena len v rozpočte ·
-   kontrola niky vo V1 len chladnička a šírka umývačky · šablóna s tagom „spotrebičová" upozorní bez spotrebiča · za S1 spotrebičová skrinka ako šablóny nad K1.
-   Predúloha (zoznam modelov + technické listy) hotová 6.9., čaká na Michalovo overenie listov. *(Kontrola rúry/mikro, police podľa niky, vetranie, digestor = mimo V1.)*
+5. [ ] **Spotrebiče S1 (rozhodnuté 6.9.2026, rozšírené 20.9.2026):** ručný katalóg s odkazmi, technickými listami a **galériou príloh** · spotrebič patrí zákazke a vlastníkovi
+   podľa kategórie (skrinka · **slot umývačky** · pracovná doska · len zákazka) · cena len v rozpočte · **slot umývačky = nový typ skrinky** (telo ako referencia, jediný dielec čelo,
+   výplň hore ručne) · **telo chladničky = kontrolný box niky s pásmami dverí** + Kontrola niky (chladnička; rúra/mikro len Š + H) a delenia čiel podľa praxe · šablóna s tagom
+   „spotrebičová" upozorní bez spotrebiča · „dodáva zákazník". Predúloha listov hotová 19.9., cross audit ×3 a mockup schválené 20.9., packages v [PLAN.md](PLAN.md) blok 5.
+   *(Delené čelo umývačky, kontrola výšky/hmotnosti čela, police podľa niky, vetranie, digestorový korpus, telá rúry/mikra/dosky/digestora = mimo V1.)*
 6. [ ] **Výstupy:** VEPO CSV, kusovník, nákup kovania, rozpočet s cenami, XLSX cenová ponuka *(hotové — dávky E + fáza ŠTÚDIO)* · **zvyšok V1-03 (rozhodnuté 6.9.2026):**
    manuálne 1-klik overenie ceny + viac URL na položke („na faktúru" vyradené) · **D-94** nákup s pôvodom · **nárezový plán primitívny** (horná hranica počtu platní podľa zvoleného rozloženia namiesto odhadu z m²; objednáva človek) ·
    **D-121** názvy dielcov do 20 znakov (fix). *(D-95 odškrtávanie diel po diele = preč natrvalo, stráž kolízií a EN DANIELI = mimo V1.)*
@@ -33,7 +35,7 @@ v PLANe prázdny**; V1 je hotové, keď je odškrtnuté všetko. Stav dopĺňaj�
 zostavy, segmenty, sektory, viazané diely (koncept 02) · D-95 plošná kontrola presety / X-ray, stráž kolízií, EN DANIELI · rohové spoje per strana, poldrážka, „bez dielca",
 horná rohová, digestorový korpus, LeMans, materiál per rola dielca · V1-07 čelo ako cenová položka + konfigurátor typov čiel · pixla (V1-06) a zdieľanie `.skm` ·
 D-106 predbežná cena skrinky · D-10 čelá ťahaním · DOCX/PDF ponuka s vizualizáciami (koncept 08) · kovanie fáza 3 geometria (plný model výklopov, výplne fáza B, D-109) ·
-zásuvkové bloky na novom štandarde · CNC/výkresy · plná automatika niche→zóny · fyzické telá spotrebičov (kubusy) · výrezy/otvory v dielcoch · D-107 izolácia pri fotení šablóny.
+zásuvkové bloky na novom štandarde · CNC/výkresy · plná automatika niche→zóny · fyzické telá ostatných spotrebičov (rúra, mikro, doska, digestor — umývačka a chladnička sú od 20.9.2026 vo V1) · výrezy/otvory v dielcoch · D-107 izolácia pri fotení šablóny.
 
 ## 2 · Princípy (nemenné)
 
