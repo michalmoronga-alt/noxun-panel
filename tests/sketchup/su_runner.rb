@@ -12193,7 +12193,10 @@ module NoxunSuRunner
     end
     Sketchup.undo # fixture prec
 
-    bs.add_appliance!(model, 'typ' => 'umyvacka', 'nazov' => 'SU fixture', 'cena' => '5')
+    # S1-B1: ZLOZENE ZATVORKY su povinne — `add_appliance!` ma od tejto davky
+    # klucove parametre, takze bezzatvorkovy hash by Ruby 3 odovzdal ako
+    # keywords a volanie by spadlo na arite.
+    bs.add_appliance!(model, { 'typ' => 'umyvacka', 'nazov' => 'SU fixture', 'cena' => '5' })
     aid = appl.call(model).last.to_h['id'].to_s
     if aid.empty?
       ok('ŠT-1c B1: fixture spotrebica sa vytvorila', false)

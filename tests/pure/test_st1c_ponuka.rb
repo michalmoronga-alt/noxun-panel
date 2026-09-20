@@ -253,7 +253,10 @@ NxTest.test('ŠT-1c B2 (review #3+#4): rozpisane hodnoty prezijú zatvorenie mod
   NxTest.assert(S1C2_BUDGET_JS[/function budDraftMemory.*?\n  \}/m].to_s
                   .include?('NXModal.memory(budDraftKey(kind))'),
                 'a cita sa cez JEDNO miesto — tenky pristupovy bod nad kostrou')
-  NxTest.assert(S1C2_BUDGET_JS.include?('fields: budDraftFields(kind, null)'),
+  # S1-B1: pri beznom otvoreni sa polia podavaju VYCHODISKOVE (`values || null`)
+  # — predvyplnenie robi kostra a prizna ho pásom. Argument `values` pouziva
+  # LEN prekreslenie po zmene kategorie (ponuka vlastnikov sa meni).
+  NxTest.assert(S1C2_BUDGET_JS.include?('fields: budDraftFields(kind, values || null, budBudget())'),
                 'polia sa podavaju VYCHODISKOVE — predvyplnenie robi kostra (a prizna ho pásom)')
   NxTest.assert(S1C2_BUDGET_JS[/function budCloseDraft.*?\n  \}/m].to_s
                   .include?('NXModal.clearMemory(budDraftKey(BUD_DRAFT))'),

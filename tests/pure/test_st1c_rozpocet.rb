@@ -89,8 +89,12 @@ NxTest.test('ŠT-1c B1 (audit #1): rozpoctovy push NEZDVIHA generaciu okna') do
   # Mutacia rozpoctu ide VYHRADNE cez `bump: false` proc.
   repush = S1CB_STUDIO_RB[/def budget_repush_proc.*?\n        end\n/m].to_s
   NxTest.refute(repush.empty?, 'rozpocet ma VLASTNY repush proc')
-  NxTest.assert(repush.include?('push_state(bump: false)'),
-                'a ten generaciu NEDVIHA (pending klik inej sekcie ostava platny)')
+  # S1-B1 (Astra B13): generacia sa zdviha LEN vtedy, ked mutacia zmenila
+  # GEOMETRIU (vazba spotrebica prestava vlastnika). Cenova zmena ostava pri
+  # `bump: false` — pending klik inej sekcie ostava platny.
+  NxTest.assert(repush.include?('bump = @budget_geometry == true') &&
+                repush.include?('push_state(bump: bump)'),
+                'a ten generaciu dviha LEN po geometrickej zmene')
   # Review #3: `ProductionCore.do_budget` vola `repush` AJ vo svojej rescue
   # vetve — vynimka v prvom pokuse by druhy pokus poslala uz MIMO rescue, ten
   # by vyletel z callbacku a klientovi by nedosiel payload; jeho fronta zapisov
@@ -168,8 +172,11 @@ NxTest.test('ŠT-1c B1: mutacie, oba XLSX aj prepocet cien maju telo v jadre') d
     NxTest.refute(src.include?('CpXlsx.sheets'), "#{name} nesmie mat vlastnu cenovu ponuku")
     NxTest.refute(src.include?('PriceRefresh.run'), "#{name} nesmie spustat prepocet sama")
   end
-  NxTest.assert_equal(12, S1CB_CORE_RB[/def apply_budget_op.*?\n      end\n/m].to_s.scan(/^        when /).length,
-                      'jadro pozna presne 12 operacii rozpoctu (jedna = jeden krok Spat)')
+  # S1-B1: 13. operacia = `appliance_owner` (zmena vlastnika spotrebica).
+  # Spotrebicove vetvy uz nevolaju `BudgetStore` priamo — idu jedinym
+  # transakcnym vstupom `ApplianceBinding.apply!` (polozka + vazba = 1 krok).
+  NxTest.assert_equal(13, S1CB_CORE_RB[/def apply_budget_op.*?\n      end\n/m].to_s.scan(/^        when /).length,
+                      'jadro pozna presne 13 operacii rozpoctu (jedna = jeden krok Spat)')
 end
 
 NxTest.test('ŠT-1c B1 (audit #12): prepocet cien obnovi VSETKY okna nad KATALOGOM') do

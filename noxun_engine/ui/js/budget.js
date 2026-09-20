@@ -565,7 +565,7 @@
     var base = n + ' ' + budPluralSk(n, ['položka', 'položky', 'položiek']);
     if (sec.key === 'standard_rows') return base + ' · režim ' + (b.mode_label || '');
     if (sec.key === 'custom') return 'len táto zákazka';
-    if (sec.key === 'appliances') return 'manuálne · katalóg príde v S1';
+    if (sec.key === 'appliances') return base + ' · z katalógu alebo ručne';
     return base;
   }
 
@@ -631,8 +631,8 @@
         rows.forEach(function(r){ body += budCustomRow(r, d); });
         break;
       case 'appliances':
-        head = ['Typ', 'Názov', 'Dodávateľ', 'Cena', '', 'Medzisúčet'];
-        rows.forEach(function(r){ body += budApplianceRow(r, d); });
+        head = ['Typ', 'Názov a vlastník', 'Dodávateľ', 'Cena', '', 'Medzisúčet'];
+        rows.forEach(function(r){ body += budApplianceRow(r, d, b); });
         break;
       default:
         head = ['Položka', 'Medzisúčet'];
@@ -814,24 +814,63 @@
       '<td class="bnum">' + bEsc(budSub(r.spolu, d)) + '</td></tr>';
   }
 
-  var BUD_APPL_TYPES = [['chladnicka', 'Chladnička'], ['rura', 'Rúra'], ['mikrovlnka', 'Mikrovlnka'],
-                        ['umyvacka', 'Umývačka'], ['digestor', 'Digestor'], ['varna_doska', 'Varná doska'],
-                        ['ine', 'Iné']];
+  // S1-B1 (R1): KODY A POPISKY KATEGORII SU ZO SERVERA. Natvrdo zapisany
+  // zoznam by sa s kanonickou sadou katalogu (`ApplianceCatalog::CATEGORIES`)
+  // casom rozisiel a modal by ponukal typ, ktory server nepozna.
+  // -> [[kod, popisok], …]
+  function budApplTypes(b){
+    var list = (b && b.appliance_types) ? b.appliance_types : [];
+    var out = [];
+    list.forEach(function(t){
+      if (t && t.code) out.push([String(t.code), String(t.label == null ? t.code : t.label)]);
+    });
+    return out;
+  }
 
-  function budTypeSelect(attrs, current){
+  function budApplTypeLabel(b, code){
+    var found = null;
+    budApplTypes(b).forEach(function(t){ if (t[0] === String(code)) found = t[1]; });
+    return found == null ? String(code == null ? '' : code) : found;
+  }
+
+  function budTypeSelect(b, attrs, current){
     var h = '<select class="bedit" ' + attrs + ' aria-label="Typ spotrebiča">';
-    BUD_APPL_TYPES.forEach(function(t){
-      h += '<option value="' + t[0] + '"' + (t[0] === current ? ' selected' : '') + '>' + bEsc(t[1]) + '</option>';
+    budApplTypes(b).forEach(function(t){
+      h += '<option value="' + bEsc(t[0]) + '"' + (t[0] === current ? ' selected' : '') + '>' +
+           bEsc(t[1]) + '</option>';
     });
     return h + '</select>';
   }
 
-  function budApplianceRow(r, d){
+  // S1-B1 (B3): typ sa v riadku NEEDITUJE, ked ho urci model z katalogu alebo
+  // ked ma polozka fyzickeho vlastnika — server by taku zmenu aj tak odmietol
+  // a pouzivatel by videl select, ktory nic nerobi.
+  function budApplTypeLocked(r){
+    if (!r) return false;
+    if (r.catalog_id) return true;
+    var o = r.owner || {};
+    return !!(o.kind && o.kind !== 'job');
+  }
+
+  // Vlastnik v riadku tabulky: ID kusu, alebo „len zákazka".
+  function budApplOwnerText(r){
+    var o = (r && r.owner) ? r.owner : {};
+    if (!o.kind || o.kind === 'job') return 'len zákazka';
+    return String(o.id || '');
+  }
+
+  function budApplianceRow(r, d, b){
     var base = ' data-bud="appl_field" data-id="' + bEsc(r.id) + '"';
+    var typ = budApplTypeLocked(r)
+      ? '<span class="bfnt">' + bEsc(r.typ_label || budApplTypeLabel(b, r.typ)) + '</span>'
+      : budTypeSelect(b, base + ' data-field="typ" data-bkey="a:typ:' + bEsc(r.id) + '"', r.typ);
+    var flag = r.customer_supplied
+      ? ' <span class="bmisslbl">' + bEsc(BUD_APPL_CS_LABEL) + '</span>' : '';
     return '<tr' + budRowClass(r) + '>' +
-      '<td>' + budTypeSelect(base + ' data-field="typ" data-bkey="a:typ:' + bEsc(r.id) + '"', r.typ) + '</td>' +
+      '<td>' + typ + '</td>' +
       '<td><input class="bedit bwide" type="text"' + base + ' data-field="nazov" data-bkey="a:nazov:' + bEsc(r.id) + '"' +
-      ' value="' + bEsc(r.nazov) + '" placeholder="Názov / model…" aria-label="Názov"></td>' +
+      ' value="' + bEsc(r.nazov) + '" placeholder="Názov / model…" aria-label="Názov">' +
+      '<span class="bfnt"> · ' + bEsc(budApplOwnerText(r)) + '</span>' + flag + '</td>' +
       '<td><input class="bedit" type="text"' + base + ' data-field="dodavatel" data-bkey="a:dod:' + bEsc(r.id) + '"' +
       ' value="' + bEsc(r.dodavatel || '') + '" placeholder="Dodávateľ" aria-label="Dodávateľ"></td>' +
       '<td class="bnum"><input class="bedit bshort" type="text"' + base + ' data-field="cena"' +
@@ -849,7 +888,10 @@
   //
   // CISTE (testuje tests/js/test_st1c_ponuka.js): kind + zapamatane hodnoty
   // -> zoznam poli. Ziadny DOM.
-  function budDraftFields(kind, values){
+  // S1-B1: polia modalu „Pridať spotrebič". `b` = payload rozpoctu (kategorie
+  // aj ponuka vlastnikov su zo SERVERA — klient si ziaden z tych zoznamov
+  // nedrzi). CISTA funkcia (tests/js/test_s1b1_rozpocet.js).
+  function budDraftFields(kind, values, b){
     var v = values || {};
     if (kind === 'custom'){
       return [
@@ -859,12 +901,68 @@
         { key: 'cena', label: 'Cena / j.', value: v.cena, placeholder: '0,00', cls: 'mshort' }
       ];
     }
+    var types = budApplTypes(b);
+    var typ = String(v.typ || (types.length ? types[0][0] : ''));
     return [
-      { key: 'typ', label: 'Typ', type: 'select', value: v.typ || 'chladnicka', options: BUD_APPL_TYPES },
+      { key: 'catalog_id', label: 'Z katalógu', type: 'lookup',
+        placeholder: 'výrobca alebo model (napr. Beko)',
+        value: String(v.catalog_id || ''), valueText: String(v.catalog_text || ''),
+        hintText: 'Rozmery a odkazy sa odložia do zákazky — tá potom na katalógu nezávisí.',
+        search: budApplLookup, onPick: budApplPicked },
+      { key: 'typ', label: 'Typ', type: 'select', value: typ, options: types },
       { key: 'nazov', label: 'Názov / model', value: v.nazov, placeholder: 'napr. Bosch SMV4HVX00E' },
       { key: 'dodavatel', label: 'Dodávateľ', value: v.dodavatel, placeholder: 'nepovinné' },
-      { key: 'cena', label: 'Cena', value: v.cena, placeholder: '0,00', cls: 'mshort' }
+      { key: 'cena', label: 'Cena', value: v.cena, placeholder: '0,00', cls: 'mshort' },
+      { key: 'owner', label: 'Vlastník', type: 'select', value: String(v.owner || ''),
+        options: budOwnerOptions(b, typ) },
+      { key: 'customer_supplied', label: BUD_APPL_CS_LABEL, type: 'checkbox',
+        value: v.customer_supplied === true || v.customer_supplied === 'true',
+        hint: 'Cena ostane v riadku, ale do súčtov nevstúpi a v ponuke bude ako informácia.' }
     ];
+  }
+
+  var BUD_APPL_CS_LABEL = 'dodáva zákazník';
+  var BUD_OWNER_JOB = 'job';
+
+  // Ponuka vlastnikov pre KATEGORIU. Matica aj zoznamy su zo servera; klient
+  // ich LEN spaja. Hodnota polozky je `<druh>:<id>` — pri zapise sa rozlozi
+  // spat a server si identitu overi este raz (PID + ID + druh).
+  function budOwnerOptions(b, category){
+    var src = (b && b.appliance_owners) ? b.appliance_owners : null;
+    var out = [];
+    if (src){
+      var kinds = (src.matrix && src.matrix[category]) ? src.matrix[category] : [];
+      kinds.forEach(function(kind){
+        var list = (src.options && src.options[kind]) ? src.options[kind] : [];
+        list.forEach(function(o){
+          out.push([kind + ':' + String(o.id), String(o.label || o.id)]);
+        });
+      });
+    }
+    out.push([BUD_OWNER_JOB, (src && src.job_label) ? String(src.job_label) : 'len zákazka (bez väzby)']);
+    return out;
+  }
+
+  // `<druh>:<id>` -> payload vlastnika (s `pid` z ponuky — identitu ciela
+  // server overuje cez VSETKY TRI udaje, B5).
+  function budOwnerPayload(b, value){
+    var raw = String(value == null ? '' : value);
+    if (raw === '' || raw === BUD_OWNER_JOB) return { kind: BUD_OWNER_JOB, id: '', pid: null };
+    var i = raw.indexOf(':');
+    if (i < 0) return { kind: BUD_OWNER_JOB, id: '', pid: null };
+    var kind = raw.slice(0, i);
+    var id = raw.slice(i + 1);
+    var pid = null;
+    var src = (b && b.appliance_owners && b.appliance_owners.options) ? b.appliance_owners.options[kind] : null;
+    (src || []).forEach(function(o){ if (String(o.id) === id) pid = o.pid; });
+    return { kind: kind, id: id, pid: pid };
+  }
+
+  // Hodnota selectu z ULOZENEHO vlastnika riadku (opacny smer).
+  function budOwnerValue(r){
+    var o = (r && r.owner) ? r.owner : {};
+    if (!o.kind || o.kind === BUD_OWNER_JOB) return BUD_OWNER_JOB;
+    return String(o.kind) + ':' + String(o.id || '');
   }
 
   var BUD_DRAFT_META = {
@@ -891,11 +989,16 @@
   // Otvorenie modalu. Polia sa predvyplnia tym, co v tejto pridavacke naposledy
   // ostalo nedokoncene — ci uz preto, ze server zapis ODMIETOL (audit #10),
   // alebo preto, ze pouzivatel okno zavrel Escapom (review #3+#4).
-  function budOpenDraft(kind){
+  function budOpenDraft(kind, values){
     if (typeof window === 'undefined' || !window.NXModal) return;
     var meta = BUD_DRAFT_META[kind];
     if (!meta) return;
     BUD_DRAFT = kind;
+    // S1-B1 (B4): modal patri DOKUMENTU, v ktorom vznikol. Zapis pojde s TYMTO
+    // `model_guid` (nie s aktualnym) a prepnutie dokumentu modal zavrie —
+    // inak by sa polozka zapisala do cudzej zakazky alebo by sa vlastnik
+    // vybral zo zoznamu, ktory uz neplati.
+    BUD_MODAL_DOC = budModelGuid();
     // Polia sa podavaju VYCHODISKOVE (`null`) — rozpisane hodnoty do nich
     // vlieva sama kostra podla `memoryKey` a zaroven ich VIDITELNE prizna
     // pásom „Predvyplnené z rozpísaného konceptu". Keby ich predvyplnil uz
@@ -904,9 +1007,26 @@
     NXModal.open({
       title: meta.title, sub: meta.sub, note: meta.note, okLabel: 'Pridať',
       memoryKey: budDraftKey(kind),
-      fields: budDraftFields(kind, null),
+      // `values` dodava LEN prekreslenie po zmene kategorie (`budApplCtxSwitch`)
+      // — pri beznom otvoreni je to `null`, aby si rozpisane hodnoty vliala
+      // sama kostra z pamate.
+      fields: budDraftFields(kind, values || null, budBudget()),
       onSubmit: function(v){ budDraftCommit(kind, v); }
     });
+  }
+
+  // Zmena KATEGORIE meni ponuku vlastnikov — a tu kostra D-15 za behu
+  // nevymiena (vzor `hwManualCtxSwitch`). Modal sa preto otvori znova s tym,
+  // co uz pouzivatel vyplnil.
+  function budApplCtxSwitch(){
+    if (BUD_DRAFT !== 'appliance') return;
+    if (typeof window === 'undefined' || !window.NXModal || !NXModal.isOpen()) return;
+    if (NXModal.isBusy && NXModal.isBusy()) return;
+
+    var v = NXModal.values() || {};
+    var q = (typeof document !== 'undefined') ? document.getElementById('nxm_catalog_id_q') : null;
+    v.catalog_text = q ? q.value : '';
+    budOpenDraft('appliance', v);
   }
 
   // Zatvorenie PO USPESNOM zapise — riadok uz v rozpocte je, takze pamat
@@ -918,6 +1038,7 @@
       NXModal.close();
     }
     BUD_DRAFT = null;
+    BUD_MODAL_DOC = null;
   }
 
   // Odomknutie potvrdzovacieho tlacidla po odmietnutom zapise (review #2).
@@ -1471,10 +1592,21 @@
   // Ciste (tests/js/test_st2d_kde.js): polozka -> polia formulara. Spotrebic
   // ma LEN adresu — kod ani poznamku jeho zaznam nenesie (server by ich
   // zahodil), takze sa ani nesmu pytat.
-  function budMoreFields(kind, it){
+  function budMoreFields(kind, it, b){
     var r = it || {};
     var url = { key: 'url', label: 'Adresa', value: r.url || '', placeholder: 'https://…' };
-    if (kind === 'appliance') return [url];
+    // S1-B1: spotrebic ma v editore navyse VLASTNIKA a prepinac „dodáva
+    // zákazník" — kod ani poznamku jeho zaznam nenesie (server by ich zahodil).
+    if (kind === 'appliance'){
+      return [
+        url,
+        { key: 'owner', label: 'Vlastník', type: 'select', value: budOwnerValue(r),
+          options: budOwnerOptions(b, r.typ) },
+        { key: 'customer_supplied', label: BUD_APPL_CS_LABEL, type: 'checkbox',
+          value: r.customer_supplied === true,
+          hint: 'Cena ostane v riadku, ale do súčtov nevstúpi.' }
+      ];
+    }
     return [
       { key: 'kod', label: 'Kód', value: r.kod || '' },
       url,
@@ -1487,7 +1619,10 @@
   function budMoreAttrs(kind, f){
     var g = f || {};
     var attrs = { url: g.url || '' };
-    if (kind === 'appliance') return attrs;
+    if (kind === 'appliance'){
+      attrs.customer_supplied = g.customer_supplied === true || g.customer_supplied === 'true';
+      return attrs;
+    }
     attrs.kod = g.kod || '';
     attrs.poznamka = g.poznamka || '';
     return attrs;
@@ -1510,21 +1645,34 @@
     BUD_MORE = null;
     var it = budFindItem(kind, id);
     if (!it){ NX.setStatus('Položka sa nenašla — obnov okno.', true); return; }
-    BUD_MORE = { kind: kind, id: id, sent: false };
+    BUD_MORE = { kind: kind, id: id, sent: false, owner: budOwnerValue(it) };
+    // S1-B1 (B4): editor je tiez viazany na DOKUMENT, z ktoreho vznikol.
+    BUD_MODAL_DOC = budModelGuid();
     NXModal.open({
       title: it.nazov || 'Detail položky',
       sub: 'voliteľné údaje · v tabuľke sa nezobrazujú',
       okLabel: 'Uložiť',
-      fields: budMoreFields(kind, it),
+      fields: budMoreFields(kind, it, budBudget()),
       onSubmit: function(v){ budMoreCommit(v); }
     });
   }
 
+  // S1-B1: editor spotrebica moze zmenit VLASTNIKA — a to je ina domenova
+  // akcia nez uprava poli (`appliance_owner` -> `ApplianceBinding` move/unbind,
+  // jedna operacia, jeden krok Spat). Ked sa vlastnik nezmenil, ide obycajny
+  // `appliance_update`.
   function budMoreCommit(values){
     if (!BUD_MORE) return;
-    var op = BUD_MORE.kind === 'appliance' ? 'appliance_update' : 'custom_update';
+    var v = values || {};
+    var kind = BUD_MORE.kind;
     BUD_MORE.sent = true; // odteraz je najblizsi vysledok TOHO ISTEHO op-u NAS
-    budSend(op, { id: BUD_MORE.id, attrs: budMoreAttrs(BUD_MORE.kind, values || {}) });
+    if (kind === 'appliance' && String(v.owner || '') !== String(BUD_MORE.owner || '')){
+      budSend('appliance_owner', { id: BUD_MORE.id, attrs: budMoreAttrs(kind, v),
+                                   owner: budOwnerPayload(budBudget(), v.owner) });
+      return;
+    }
+    budSend(kind === 'appliance' ? 'appliance_update' : 'custom_update',
+            { id: BUD_MORE.id, attrs: budMoreAttrs(kind, v) });
   }
 
   // Caka prave otvoreny ⋯ modal na vysledok VLASTNEHO zapisu? Zavrety modal
@@ -1537,6 +1685,7 @@
   function budCloseMore(){
     if (typeof window !== 'undefined' && window.NXModal) NXModal.close();
     BUD_MORE = null;
+    BUD_MODAL_DOC = null;
   }
 
   // --- fokus cez re-render -------------------------------------------------
@@ -1571,6 +1720,89 @@
 
   // GH #138 P2: kym bezi predchadzajuci zapis, dalsi ide DO FRONTY (nie do
   // koša) — odosle sa hned po prichode cerstveho payloadu, uz s novou `gen`.
+  // S1-B1 (B4): identita dokumentu, ktoremu payload patri. Modal si ju drzi od
+  // svojho otvorenia a posiela JU — nie aktualnu.
+  var BUD_MODAL_DOC = null;
+  // Naseptavac katalogu spotrebicov: generacia dotazu + callback kostry.
+  var BUD_APPL_Q = { gen: 0, done: null, doc: null };
+
+  function budModelGuid(){
+    var st = budData();
+    return (st && st.model_guid) ? String(st.model_guid) : '';
+  }
+
+  // Hladanie v katalogu = SERVEROVA cesta. Poradie neskladame — kreslime, co
+  // pride; starsia odpoved sa zahadzuje (generacia).
+  function budApplLookup(query, done){
+    BUD_APPL_Q.gen++;
+    BUD_APPL_Q.done = done;
+    BUD_APPL_Q.doc = BUD_MODAL_DOC;
+    if (!(typeof window !== 'undefined' && window.sketchup && sketchup.appl_lookup)){
+      done([], 0);
+      return;
+    }
+    sketchup.appl_lookup(JSON.stringify({ q: String(query == null ? '' : query),
+                                          gen: BUD_APPL_Q.gen }));
+  }
+
+  // Odpoved servera. Zahadza sa STARSIA generacia aj odpoved pre INY dokument
+  // (medzitym prepnuta zakazka — B4).
+  function budApplLookupResult(res){
+    var r = res || {};
+    if (Number(r.gen) !== BUD_APPL_Q.gen) return;
+    if (BUD_APPL_Q.doc !== BUD_MODAL_DOC) return;
+    var done = BUD_APPL_Q.done;
+    if (typeof done !== 'function') return;
+    done(r.items || [], Number(r.total || 0));
+  }
+
+  // Vyber z ponuky predvyplni polia zo STRUKTUROVANYCH dat polozky (B14) —
+  // nikdy parsovanim zobrazeneho textu.
+  function budApplPicked(item){
+    if (typeof document === 'undefined') return;
+    var d = (item && item.data) ? item.data : {};
+    budSetField('nazov', [d.manufacturer, d.name].filter(function(x){ return !!x; }).join(' '));
+    budSetField('dodavatel', String(d.manufacturer || ''));
+    var typ = document.getElementById('nxm_typ');
+    if (typ && d.category){
+      typ.value = String(d.category);
+      budApplCtxSwitch(); // ina kategoria = ina ponuka vlastnikov
+    }
+  }
+
+  function budSetField(key, value){
+    var node = document.getElementById('nxm_' + key);
+    if (node && String(value || '') !== '') node.value = String(value);
+  }
+
+  // Operacie, ktore pochadzaju z MODALU (a teda z konkretneho dokumentu).
+  var BUD_MODAL_OPS = ['custom_add', 'appliance_add', 'custom_update', 'appliance_update',
+                       'appliance_owner'];
+
+  function budModalOp(op){
+    return BUD_MODAL_OPS.indexOf(String(op)) >= 0;
+  }
+
+  function budModalOpen(){
+    return !!(typeof window !== 'undefined' && window.NXModal && NXModal.isOpen());
+  }
+
+  // S1-B1 (B4): dokument sa vymenil — otvoreny modal patri zakazke, ktora uz
+  // nie je na obrazovke. Zavriet, zahodit frontu zapisov aj rozpracovany
+  // dotaz naseptavaca; ziadna odpoved z predchadzajuceho dokumentu sa uz
+  // nesmie nikam zapisat.
+  function budDocSwitched(guid){
+    if (BUD_MODAL_DOC === null || String(guid || '') === String(BUD_MODAL_DOC)) return false;
+    BUD_MODAL_DOC = null;
+    BUD_APPL_Q.done = null;
+    BUD_APPL_Q.gen++;
+    BUD_QUEUE.length = 0;
+    BUD_DRAFT = null;
+    BUD_MORE = null;
+    if (typeof window !== 'undefined' && window.NXModal && NXModal.isOpen()) NXModal.close();
+    return true;
+  }
+
   function budSend(op, extra){
     var st = budData();
     if (!st || !window.sketchup || !sketchup.budget_mutate) return;
@@ -1578,6 +1810,13 @@
     // kresleni). Server mutaciu odmietne tak ci tak — toto ju len nepusti do
     // fronty a povie dovod hned.
     if (budStdBlocked(st.budget)){ NX.setStatus(budStdReason(st.budget), true); return; }
+    // S1-B1 (B4): zapis z MODALU ide s identitou dokumentu, v ktorom modal
+    // vznikol. Server nezhodne ID odmietne — a to je spravne: medzitym
+    // prepnuty dokument nesmie dostat cudziu polozku.
+    if (BUD_MODAL_DOC !== null && budModalOp(op) && budModalOpen()){
+      extra = extra || {};
+      extra.model_guid = BUD_MODAL_DOC;
+    }
     if (BUD_BUSY){ BUD_QUEUE.push([op, extra]); return; }
     BUD_BUSY = true;
     if (budBusyTimer) clearTimeout(budBusyTimer);
@@ -1706,23 +1945,30 @@
   function budDraftCommit(kind, values){
     // Hodnoty su zapamatane PRED odoslanim — zapisuje ich sama kostra
     // (`NXModal`, kluc `memoryKey`), takze rozpocet uz o sklade nevie.
-    var attrs = budDraftAttrs(kind, values || {});
+    var v = values || {};
+    var attrs = budDraftAttrs(kind, v);
     var missing = budDraftMissing(kind, attrs);
     // Klientske odmietnutie (chyba povinne pole) — na server sa nic neposlalo,
     // takze zamok treba pustit HNED, inak by okno ostalo zosednute navzdy.
     if (missing){ NX.setStatus(missing, true); budUnlockDraft(); return; }
-    budSend(kind === 'custom' ? 'custom_add' : 'appliance_add', { attrs: attrs });
+    if (kind === 'custom'){ budSend('custom_add', { attrs: attrs }); return; }
+    // S1-B1: identitu modelu (`catalog_id`) a vlastnika posiela klient ako
+    // ODKAZY — rozmery, kategoriu ani snapshot si server z klienta NEBERIE
+    // (odvodi ich z katalogu a z modelu, B14).
+    budSend('appliance_add', { attrs: attrs, catalog_id: String(v.catalog_id || ''),
+                               owner: budOwnerPayload(budBudget(), v.owner) });
   }
 
-  // Ciste: polia formulara -> atributy pre server (default pocet 1, typ „iné").
+  // Ciste: polia formulara -> atributy pre server (default pocet 1).
   function budDraftAttrs(kind, f){
     var g = f || {};
     if (kind === 'custom'){
       return { popis: g.popis || '', pocet: (g.pocet == null || g.pocet === '') ? '1' : g.pocet,
                cena: g.cena || '' };
     }
-    return { typ: g.typ || 'ine', nazov: g.nazov || '',
-             dodavatel: g.dodavatel || '', cena: g.cena || '' };
+    return { typ: g.typ || '', nazov: g.nazov || '',
+             dodavatel: g.dodavatel || '', cena: g.cena || '',
+             customer_supplied: g.customer_supplied === true || g.customer_supplied === 'true' };
   }
 
   // Ciste: co este chyba, aby sa dalo odoslat (null = mozeme). Rozsahy a typy
@@ -1745,9 +1991,14 @@
   if (typeof window !== 'undefined' && window.NX && typeof NX.setStudio === 'function'){
     var budPrevSetStudio = NX.setStudio;
     NX.setStudio = function(data){
+      // S1-B1 (B4): kontrola dokumentu bezi PRED uvolnenim fronty — cakajuci
+      // zapis z inej zakazky sa nesmie odoslat ani s novou generaciou.
+      budDocSwitched(data ? data.model_guid : '');
       budPrevSetStudio(data);
       budAfterPush(); // fronta sa odosiela AZ s cerstvou gen z tohto payloadu
     };
+    // S1-B1: odpoved naseptavaca katalogu spotrebicov (modal Rozpoctu).
+    NX.applLookupResult = function(res){ budApplLookupResult(res); };
     // Server hlasi vysledok mutacie PRED push_state — D-15 modal sa zavrie LEN
     // pri uspechu (audit #10). Odmietnuty zapis ho NECHAVA otvoreny aj
     // s rozpisanymi hodnotami: pouzivatel ma opravit svoje cislo, nie ho
@@ -1756,7 +2007,7 @@
       // ŠT-2d: rovnaky zivotny cyklus ma uz aj ⋯ EDITOR riadku — je to ten
       // isty kontrakt (zapis nezatvara, potvrdenie zatvara, odmietnutie
       // odomyka), len iny modal.
-      if (op === 'custom_update' || op === 'appliance_update'){
+      if (op === 'custom_update' || op === 'appliance_update' || op === 'appliance_owner'){
         // Ten istý op posiela aj inline editácia bunky (blur ceny/popisu) —
         // bez korelácie by cudzí výsledok zavrel rozpísaný ⋯ modal.
         if (!budMoreAwaiting()) return;
@@ -1886,6 +2137,16 @@
       }
     });
 
+    // S1-B1: zmena KATEGORIE v modale spotrebica meni ponuku vlastnikov —
+    // kostra D-15 sadu poli za behu nevymiena, takze sa modal otvori znova
+    // s tym, co uz je vyplnene (vzor `hwManualCtxSwitch`).
+    document.addEventListener('change', function(ev){
+      var t = ev.target;
+      if (!t || !t.getAttribute) return;
+      if (t.getAttribute('data-nxm') !== 'typ') return;
+      budApplCtxSwitch();
+    });
+
     // Enter v poli tabulky = zapis (blur vyvola `change`). Enter v D-15 modale
     // riesi ZDIELANY komponent (`nx_modal.js`) — tu sa nan uz nesiaha.
     document.addEventListener('keydown', function(ev){
@@ -1947,6 +2208,17 @@
       // „odmietnutie nezatvara" a „busy zamok" sa inak overit nedaju.
       budMoreFields: budMoreFields, budMoreAttrs: budMoreAttrs,
       budOpenMore: budOpenMore,
+      // S1-B1: vazba spotrebica (tests/js/test_s1b1_rozpocet.js). Ciste
+      // funkcie — kategorie aj ponuka vlastnikov chodia zo SERVERA, klient
+      // z nich LEN sklada. `budDocSwitched` potrebuje stav modalu a exportuje
+      // sa ZAMERNE: kontrakt „prepnuty dokument zahodi frontu aj modal" (B4)
+      // sa inak overit neda.
+      budApplTypes: budApplTypes, budApplTypeLabel: budApplTypeLabel,
+      budApplTypeLocked: budApplTypeLocked, budApplOwnerText: budApplOwnerText,
+      budOwnerOptions: budOwnerOptions, budOwnerPayload: budOwnerPayload,
+      budOwnerValue: budOwnerValue, budApplianceRow: budApplianceRow,
+      budDocSwitched: budDocSwitched, budModalOp: budModalOp,
+      budApplLookupResult: budApplLookupResult,
       // P0-HF: dvojkrokový export pri riadkoch bez ceny (tests/js/test_p0hf_potvrdenie.js).
       // `budXlsx`/`budCpExport` sa exportujú ZÁMERNE — kontrakt „prvý klik
       // zastaví, druhý pošle `confirm_unpriced`" sa inak overiť nedá.

@@ -308,9 +308,14 @@ ok(body.indexOf('CP = Rozpočet') > -1, 'zeleny pas: ponuka sedi s rozpoctom');
   const c = sandbox.budDraftFields('custom', null).map(function(f){ return f.key; }).join(',');
   eq(c, 'popis,pocet,cena', 'vlastna polozka: tie iste polia ako inline draft');
   eq(sandbox.budDraftFields('custom', null)[1].value, '1', 'pocet ma default 1');
+  // S1-B1: modal spotrebica pribral pole „Z katalógu" (naseptavac), VLASTNIKA
+  // a prepinac „dodáva zákazník". Poradie je kontrakt — fokus dostava PRVE
+  // pole, a tym ma byt vyber modelu.
   const a = sandbox.budDraftFields('appliance', null).map(function(f){ return f.key; }).join(',');
-  eq(a, 'typ,nazov,dodavatel,cena', 'spotrebic: typ + nazov + dodavatel + cena');
-  eq(sandbox.budDraftFields('appliance', null)[0].type, 'select', 'typ je ponuka, nie volny text');
+  eq(a, 'catalog_id,typ,nazov,dodavatel,cena,owner,customer_supplied',
+     'spotrebic: katalog + typ + nazov + dodavatel + cena + vlastnik + priznak');
+  eq(sandbox.budDraftFields('appliance', null)[0].type, 'lookup', 'katalog je naseptavac');
+  eq(sandbox.budDraftFields('appliance', null)[1].type, 'select', 'typ je ponuka, nie volny text');
   // Odmietnuty zapis: hodnoty sa vratia do poli.
   const back = sandbox.budDraftFields('custom', { popis: 'Likvidácia', pocet: '2', cena: 'abc' });
   eq(back[0].value, 'Likvidácia', 'zapamatany popis');

@@ -2788,7 +2788,7 @@ module Noxun
       #   gen        — zapis zo stareho DOM (medzitym prepocitane okno),
       #   model_guid — medzitym prepnuty dokument (zapis by sadol do cudzej zakazky).
       # Po KAZDOM zapise ide cerstvy payload — klient si sumy NIKDY neprepocitava.
-      def do_budget(model, data, generation:, status:, repush:, result: nil)
+      def do_budget(model, data, generation:, status:, repush:, result: nil, geometry: nil)
         unless data['gen'].to_i == generation.to_i
           repush.call
           return status.call('Rozpočet sa medzitým prepočítal — obnovené, skús znova.', true)
@@ -2799,11 +2799,16 @@ module Noxun
           repush.call
           return status.call('Model sa medzitým prepol — obnovené, skús znova.', true)
         end
-        ok, errors = apply_budget_op(model, data)
+        ok, errors, geometry_changed = apply_budget_op(model, data)
         # GH #138 P2: vysledok ide do okna PRED cerstvym payloadom — rozpisany
         # novy riadok sa smie zavriet LEN pri uspechu (inak by pouzivatel po
         # odmietnutom zapise prisiel o vsetky vyplnene hodnoty).
         result.call(data['op'].to_s, ok) if result
+        # S1-B1 (Astra B13): mutacia spotrebica moze PRESTAVAT skrinku (zapis
+        # `appliance_refs[]` ide cez rebuild). Vtedy — a len vtedy — je to
+        # zmena MODELU: generacia okna sa zdvihne a Inspector dostane cerstvu
+        # kartu. Cenove zmeny ostavaju pri dnesnom `bump: false`.
+        geometry.call if geometry && geometry_changed
         repush.call
         return status.call("Nezapísané: #{Array(errors).join(' · ')}", true) unless ok
 
@@ -2817,7 +2822,13 @@ module Noxun
       end
 
       # Jedna mutacia = jedna metoda BudgetStore = jeden undo krok.
-      # -> [ok, errors]
+      # -> [ok, errors] | [ok, errors, geometry_changed]
+      #
+      # S1-B1 (Astra B2): VSETKY mutacie SPOTREBICOV idu JEDINYM transakcnym
+      # vstupom `ApplianceBinding.apply!` — aj tie, ktore ziadnu vazbu nemenia
+      # (polozka „len zakazka"). Jeden kanal znamena jedno miesto, kde bezia
+      # guardy (dokument, verzia dat, matica, identita ciela) a jedno miesto,
+      # kde sa rozhoduje o kroku Spat.
       def apply_budget_op(model, data)
         attrs = data['attrs'].is_a?(Hash) ? data['attrs'] : {}
         id = data['id'].to_s
@@ -2830,12 +2841,63 @@ module Noxun
         when 'custom_add'       then ok_pair(BudgetStore.add_custom_item!(model, attrs))
         when 'custom_update'    then ok_pair(BudgetStore.update_custom_item!(model, id, attrs))
         when 'custom_remove'    then BudgetStore.remove_custom_item!(model, id)
-        when 'appliance_add'    then ok_pair(BudgetStore.add_appliance!(model, attrs))
-        when 'appliance_update' then ok_pair(BudgetStore.update_appliance!(model, id, attrs))
-        when 'appliance_remove' then BudgetStore.remove_appliance!(model, id)
+        when 'appliance_add'    then appliance_op(model, data, 'create', attrs, id)
+        when 'appliance_update' then appliance_op(model, data, appliance_update_op(data), attrs, id)
+        when 'appliance_remove' then appliance_op(model, data, 'remove', attrs, id)
+        when 'appliance_owner'  then appliance_op(model, data, appliance_owner_op(data), attrs, id)
         when 'cp_group'         then BudgetStore.set_cp_group!(model, data['source_key'], data['group'])
         else [false, ['neznáma operácia rozpočtu']]
         end
+      end
+
+      # Klient posiela DOMENOVU akciu (pridat / upravit / zmazat / zmenit
+      # vlastnika); ktora vnutorna operacia vazby to je, rozhoduje SERVER podla
+      # toho, co v payloade naozaj je.
+      def appliance_update_op(data)
+        data['catalog_id'].to_s.strip.empty? ? 'patch' : 'rebind_model'
+      end
+
+      def appliance_owner_op(data)
+        owner = data['owner']
+        kind = owner.is_a?(Hash) ? owner['kind'].to_s : ''
+        kind.empty? || kind == ApplianceBinding::KIND_JOB ? 'unbind' : 'move'
+      end
+
+      def appliance_op(model, data, op, attrs, id)
+        res = ApplianceBinding.apply!(model, model_guid: data['model_guid'], op: op,
+                                             item_id: id, attrs: attrs,
+                                             catalog_id: data['catalog_id'],
+                                             owner: data['owner'])
+        [res[:ok] == true, Array(res[:errors]), res[:geometry_changed] == true]
+      end
+
+      # S1-B1: CISTA funkcia naseptavaca katalogu spotrebicov (headless
+      # testovatelna). Polozka nesie `data` so STRUKTUROVANYMI udajmi (B14) —
+      # modal z nich predvypĺňa polia, nikdy nie parsovanim zobrazeneho textu.
+      APPLIANCE_SEARCH_TOP = 20
+
+      def appliance_lookup(query, gen)
+        return { 'gen' => gen.to_i, 'total' => 0, 'items' => [] } unless defined?(ApplianceCatalog)
+
+        status, info = ApplianceCatalog.search(query.to_s)
+        rows = status == :ok ? Array(info[:records]) : []
+        total = rows.length
+        { 'gen' => gen.to_i, 'total' => total,
+          'items' => rows.first(APPLIANCE_SEARCH_TOP).map { |r| appliance_lookup_item(r) } }
+      rescue StandardError => e
+        Engine.log_error(e, 'ProductionCore.appliance_lookup')
+        { 'gen' => gen.to_i, 'total' => 0, 'items' => [] }
+      end
+
+      def appliance_lookup_item(rec)
+        cat = rec['category'].to_s
+        manufacturer = rec['manufacturer'].to_s
+        name = rec['name'].to_s
+        text = [manufacturer, name].reject(&:empty?).join(' ')
+        { 'value' => rec['id'].to_s, 'text' => (text.empty? ? rec['id'].to_s : text),
+          'hint' => ApplianceCatalog.category_label(cat),
+          'data' => { 'manufacturer' => manufacturer, 'name' => name, 'category' => cat,
+                      'category_label' => ApplianceCatalog.category_label(cat) } }
       end
 
       # add_/update_ vracaju [polozka|nil, chyby] — zjednotenie na [ok, chyby].
@@ -2851,6 +2913,7 @@ module Noxun
         'custom_add' => 'Položka pridaná.', 'custom_update' => 'Položka upravená.',
         'custom_remove' => 'Položka zmazaná.', 'appliance_add' => 'Spotrebič pridaný.',
         'appliance_update' => 'Spotrebič upravený.', 'appliance_remove' => 'Spotrebič zmazaný.',
+        'appliance_owner' => 'Vlastník spotrebiča uložený.',
         'cp_group' => 'Zaradenie v cenovej ponuke zmenené.'
       }.freeze
 
