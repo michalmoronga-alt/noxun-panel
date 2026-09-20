@@ -450,6 +450,14 @@ doraz neposúvajú**; pri slote to znamená, že výsledok prisunutia nezávisí
 smie **jediný** helper `strip_appliance_refs!`, volaný v **troch** kopírovacích vstupoch — `dedup_copies` (natívna kópia), `Tools::Mower.copy_cabinet` a
 `Panel.handle_insert_copy`. `appliance_expects[]` sa pritom **zachováva**: kópia sa správa ako „očakáva spotrebič tej kategórie", ale nevlastní ten istý kus.
 
+**Zápis väzby — `write_appliance_refs!` (S1-B1, protiváha `strip_appliance_refs!`).** Skrinka a slot idú cez `CabinetBuilder.write_appliance_refs!(model, inst, refs)`:
+uložený config → `config_to_params` → nastavenie kľúča → `normalize` → **`rebuild_in_operation`**. Je to zámerne prestavba, nie holý zápis atribútu — skrinka nesie
+väzbu v configu, **z ktorého sa stavia**, a S1-F z nej kreslí kontrolný box, ktorý musí vzniknúť v tej istej prestavbe. **Doska ide inak:** `BoardBuilder.write_appliance_refs!(inst, refs)`
+zapisuje **samotný config bez prestavby** (väzba jej geometriu nemení) a **v tom istom zápise pečiatkuje `config_schema: BOARD_CONFIG_SCHEMA`** — doska uložená starším
+pluginom nesie schému 1 a tá by väzbu pri najbližšej prestavbe ticho zahodila; `normalize` round-trip sa jej zámerne nerobí (menil by výrobné čísla pri zmene katalógu).
+Prázdny zoznam kľúč **odstráni**. Obe funkcie bežia v **už otvorenej operácii volajúceho** — operáciu, guard aj `ensure_root_context` vlastní `ApplianceBinding`
+([appliances.md](appliances.md)).
+
 ### ghost_tool.rb
 
 **GHOST VKLADANIE (V1-04): skrinka sa kladie KLIKOM, nie tlačidlom.** Modul drží tri vrstvy — `GhostTool` (vlastník session + čisté API pre panel), `GhostTool::Calc`

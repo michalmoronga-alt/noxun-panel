@@ -181,6 +181,7 @@ unless NxTest::IN_SKETCHUP
     core/hover_edge
     core/supplier_settings
     core/budget_store
+    core/appliance_binding
     core/budget
     core/xlsx_writer
     core/cp_export

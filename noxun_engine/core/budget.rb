@@ -63,7 +63,7 @@ module Noxun
       SECTION_NAMES = {
         'materials' => 'Materiál', 'abs' => 'ABS hrany', 'hardware' => 'Kovanie',
         'services' => 'Služby', 'standard_rows' => 'Štandardné riadky',
-        'custom' => 'Vlastné položky', 'appliances' => 'Spotrebiče',
+        'custom' => 'Vlastné položky', 'appliances' => 'Spotrebiče a vybavenie',
         'rounding' => 'Zaokrúhlenie ponuky'
       }.freeze
 
@@ -136,6 +136,10 @@ module Noxun
           },
           'viz_m2' => st['viz_m2'],
           'appliances_included' => st['appliances_included'],
+          # S1-B1 (R1): kody a SK popisky kategorii chodia zo SERVERA — JS si
+          # zoznam nedrzi natvrdo (dva zoznamy by sa rozisli a modal by ponukal
+          # kategoriu, ktoru server nepozna).
+          'appliance_types' => BudgetStore.appliance_type_options,
           # R-14: kompatibilita DAT ROZPOCTU v zakazke. Pri novsom/neplatnom
           # markeri su sumy nizsie pocitane z OREZANEHO stavu — okno to musi
           # povedat bannerom a cenove exporty sa zastavia.
@@ -160,9 +164,26 @@ module Noxun
       # nastavenia. Vypocet samotny ostava CISTY.
       def payload_for(model, bom, sheets: {}, edges: {}, hardware_expansion: nil,
                       hardware_catalog: nil, sheet_estimate: nil)
-        compute(bom, BudgetStore.state(model), SupplierSettings.active,
-                sheets: sheets, edges: edges, hardware_expansion: hardware_expansion,
-                hardware_catalog: hardware_catalog, sheet_estimate: sheet_estimate)
+        payload = compute(bom, BudgetStore.state(model), SupplierSettings.active,
+                          sheets: sheets, edges: edges, hardware_expansion: hardware_expansion,
+                          hardware_catalog: hardware_catalog, sheet_estimate: sheet_estimate)
+        # S1-B1 (R4): PONUKA VLASTNIKOV je MODELOVA (skrinky, sloty a dosky
+        # TEJTO zakazky) — preto zije tu, nie v cistom `compute`. Cestuje
+        # v payloade dokumentu, takze prepnutie dokumentu ponuku vymeni samo
+        # a modal nikdy neponuka skrinku z inej zakazky (B4).
+        payload['appliance_owners'] = appliance_owners(model) if payload.is_a?(Hash)
+        payload
+      end
+
+      def appliance_owners(model)
+        return nil unless defined?(ApplianceBinding)
+
+        { 'matrix' => ApplianceBinding::OWNER_MATRIX,
+          'options' => ApplianceBinding.owner_options_map(model),
+          'job_label' => ApplianceBinding::JOB_LABEL }
+      rescue StandardError => e
+        Engine.log_error(e, 'Budget.appliance_owners') if defined?(Engine)
+        nil
       end
 
       # --- sekcia MATERIAL -----------------------------------------------------
@@ -446,6 +467,7 @@ module Noxun
       # prepinac (default VYPNUTY — casto sa platia osobitne, mock v4).
       def appliances_section(state)
         rows = Array(state['appliances']).map do |it|
+          typ = appliance_type(it)
           row = base_row(
             key: "appliance:#{it['id']}",
             nazov: appliance_name(it), dodavatel: it['dodavatel'],
@@ -453,9 +475,14 @@ module Noxun
             zdroj: SRC_MANUAL, cp_skupina: it['cp_skupina']
           )
           row['id'] = it['id']
-          row['typ'] = it['typ']
-          row['typ_label'] = BudgetStore::APPLIANCE_LABELS[it['typ']] || it['typ']
+          row['typ'] = typ
+          row['typ_label'] = BudgetStore::APPLIANCE_LABELS[typ] || typ
           row['url'] = it['url'] if it['url']
+          # S1-B1: vazba na katalog a vlastnika nesie RIADOK — okno si ich
+          # nedohladava v inom payloade (jedna pravda o tom, co je na obrazovke).
+          row['catalog_id'] = it['catalog_id'].to_s unless it['catalog_id'].to_s.empty?
+          row['owner'] = BudgetStore.owner_field(it['owner'])
+          apply_customer_supplied(row, it)
           row
         end
         sec = section('appliances', rows)
@@ -464,10 +491,30 @@ module Noxun
         sec
       end
 
+      # S1-B1 (R3 + Codex #376 P2): „DODAVA ZAKAZNIK" je PRIZNAK, nie nula.
+      # Ulozena cena ostava nedotknuta (referencne ju nesie `cena_ref` a input
+      # v tabulke z nej dalej cita), ale do MEDZISUCTU aj do SPOLU ide 0 a
+      # riadok uz nikdy nie je „bez ceny" — spotrebic, ktory kupuje zakaznik,
+      # nam v ponuke nechyba.
+      def apply_customer_supplied(row, item)
+        return row unless item['customer_supplied'] == true
+
+        row['customer_supplied'] = true
+        row['cena_ref'] = row['cena_mj']
+        row['spolu'] = 0.0
+        row['spolu_auto'] = 0.0
+        row['price_missing'] = false
+        row
+      end
+
+      def appliance_type(item)
+        BudgetStore.canon_appliance_type(item['typ']) || BudgetStore::DEFAULT_APPLIANCE_TYPE
+      end
+
       def appliance_name(item)
         name = item['nazov'].to_s.strip
-        label = BudgetStore::APPLIANCE_LABELS[item['typ']] || item['typ'].to_s
-        name.empty? ? label.to_s : name
+        label = BudgetStore::APPLIANCE_LABELS[appliance_type(item)].to_s
+        name.empty? ? label : name
       end
 
       # --- sucty a zaokruhlenie ------------------------------------------------

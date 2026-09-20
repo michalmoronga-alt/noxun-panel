@@ -85,6 +85,23 @@ slot vydáva jediný dielec (čelo) a jeho výroba na tele nezávisí — je to 
 Chýbajúci kľúč `appliance_slots` kontrolu **ticho preskočí** (legacy volania a headless testy bez slotov — vzor `placements:`).
 **Inspector hovorí to isté:** výstup „Pod doskou" v Základných počíta `Panel.slot_payload` **tým istým predikátom** ako `dw_height_fit` (Astra S1-E FIX E11).
 
+**S1-B1 — tá istá kategória `appliance`, tri ďalšie kódy.** `check_appliances(collected[:appliances], items)`:
+
+- **`appliance_owner_missing`** — vlastník zanikol, alebo jeho ID už patrí inému kusu (ID sa recyklujú, `Ids.next_id`), takže položka ukazuje do prázdna.
+  Nález **nemá `owner_id`** (Astra B16): fallback resolvera podľa uloženého ID by označil **cudziu** skrinku, ktorá to ID medzitým dostala. Adresou je preto
+  `data: {route: 'appl', item_id}` — klik vedie na položku, nie do modelu. Náprava je „odpojiť" (vlastník → `job`, jeden krok Späť).
+- **`appliance_specs_missing`** — viazaný model so skrinkovým vlastníkom (`cabinet`/`slot`), ktorý v katalógu nemá rozmery niky; kontrola niky (S1-F) sa z neho nedá urobiť.
+- **`appliance_class_mismatch`** — trieda umývačky zo snapshotu ≠ `dw_class` slotu. Hlási sa **len keď sú známe OBE triedy** (Astra B15) — neznáma trieda je
+  „nevieme", nie „nesedí".
+
+`stable_key` je `appliance|<uuid položky>|<kód>`, takže dva nálezy nad tým istým spotrebičom sú **dva riadky** (dedup by inak nechal len prvý). Viazané nálezy
+adresu vlastníka **majú** (`owner_id` + `owner_pid`), takže klik označí skrinku. **Nález BEZ `owner_id` nemá v modeli čo označiť**, preto ho `ProductionCore.do_select`
+vybaví **pred** akýmkoľvek výberom entít: `route_target` z neho prečíta `data.route` a vráti **deep-link do sekcie** (`appl` → Rozpočet, kotva `appliance:<uuid>`);
+výber sa pri tom **nedotkne** a okno riadok krátko prisvieti (`budOpenAnchor` — **až PO vykreslení sekcie**, lebo je to dotaz do DOM; kotvy `bom` a `mat` naopak
+menia stav, z ktorého render kreslí, a preto bežia pred ním). Bez toho by všeobecný resolver buď neoznačil nič („zoznam sa medzitým zmenil"),
+alebo — pri recyklovanom ID — označil **cudziu** skrinku. S1-B2 prepne cieľ trasy na pohľad „V zákazke" zmenou **jedinej** mapy `ROUTE_SECTIONS`. Záznamy `expected_missing` (vlastník, ktorý spotrebič len očakáva) sú v zbere
+pre pohľad „V zákazke" — nález z nich robí až S1-C.
+
 ### production_core.rb — zdieľané čisté jadro výstupov zákazky (ŠT-1a PR A)
 
 `do_select` rešpektuje `flush_blocked` po kontrole generácie okna. Nedokončený návrh v Inspectore oznámi cez status pôvodného Štúdia a model ani výber pri tom nečíta/neprepíše.
@@ -600,6 +617,16 @@ z už načítaného `ccfg` záznam `{owner_id, owner_pid, width, height, dw_clas
 **Referencia (telo spotrebiča) sa do zberu nedostane nikdy:** vnorená slučka filtruje `kind == 'part'` **a** `manufactured == true` **a**
 `production_class == 'sheet'` — referencia nesplní ani jednu z troch podmienok. `Ids.top_level_scan` ju tiež nevidí (číta len `kind` `cabinet`/`board`/`part`).
 
+**S1-B1 — aditívny kľúč `appliances` (spotrebiče zákazky).** Zbiera sa z **dvoch zdrojov naraz**: z rozpočtového dictu (`BudgetStore.appliances`, prečíta sa **raz**
+na začiatku zberu) a z **toho istého prechodu** skriniek a dosiek (`note_appliance_owner` zapíše `appliance_refs[]`, `appliance_expects[]`, druh a `persistent_id`;
+prvá inštancia daného ID vyhráva — zdieľané ID je samostatná chyba identity). Žiadny druhý sken modelu. Tvar záznamu:
+`{item_id, name, category, owner: {kind, id, pid}, state, customer_supplied, snapshot: {niche, body, install{dishwasher_class}} | nil, slot: {dw_class} | nil, interior: {width, height, depth} | nil}`.
+
+`state` je `bound` · `owner_missing` · `job` · `expected_missing`. **Vlastník platí LEN keď entita existuje, má ten istý DRUH a jej `appliance_refs[]` obsahujú `item_id`** —
+samotná zhoda ID dôkaz nie je (ID sa recyklujú) a ani zhoda ID + uuid (`cabinet_id` zdieľa skrinka aj slot). Rozhoduje **jedna funkcia**
+`ApplianceBinding.ref_matches?`, ktorú volá zber aj mutácie väzby — inak by sa „viazané" v Kontrole a „nájdené" pri zápise rozišli. `interior` počíta `Construction.interior_dims` (plytká konverzia kľúčov na symboly) — vlastný výpočet
+by bol druhá pravda o tom, kam sa spotrebič zmestí. `compute()` kľúč **ignoruje**; čitateľmi sú `Validation.check_appliances` a (od S1-B2) pohľad „V zákazke".
+
 ### sheet_estimate.rb
 
 _(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
@@ -628,6 +655,13 @@ explicitná, aby to bol zámer, nie náhoda). Cenová ponuka voľný riadok **ne
 ten istý globálny katalóg ako pri dodávateľovi; URL nevstupuje do výpočtu ani projektových override dát. Platný odkaz otvorí web, chýbajúci vedie do existujúcej úpravy
 katalógovej položky. Voľné položky bez kódu tento kanál nemajú; vlastné položky Rozpočtu a spotrebiče si nechávajú pôvodné odkazy uložené v zákazke.
 
+**„Dodáva zákazník" je PRÍZNAK, nie nula (S1-B1, v0.12.13).** `appliances_section` pre položku s `customer_supplied: true` nechá **uloženú cenu nedotknutú**
+(nesie ju riadok ako `cena_ref` a input v tabuľke z nej ďalej číta), ale nastaví `spolu` aj `spolu_auto` na **0** a `price_missing` na `false`. Do medzisúčtu
+a do SPOLU teda ide nula, upozornenie „chýba cena" zhasne (nie je to naša cena) a **do zákazky sa 0 nikdy nezapíše** — prepnutie príznaku späť vráti sumu do súčtu.
+Sekcia sa volá **„Spotrebiče a vybavenie"**. Kategóriu riadku normalizuje `appliance_type` (legacy kód sa prevedie aj tu — výpočet je čistý a stav môže prísť
+z legacy zdroja). `payload_for` navyše prikladá **`appliance_owners`** (`matrix` + `options` per druh + `job_label`) zo `ApplianceBinding.owner_options_map`:
+ponuka vlastníkov je **modelová**, preto necestuje cez `compute`, ale s payloadom dokumentu — prepnutie zákazky ju vymení samo.
+
 **Ručná čerstvosť kovania (CENY-KOV-B, v0.10.5).** `freshness_item` pre neviazané kovanie používa ručný serverový marker, uložený odkaz, reálnu cenu/MJ a platný ISO dátum, ktorý nie je v budúcnosti.
 Bez platného potvrdenia zostáva stav `manual`; platné potvrdenie je `fresh` alebo `stale` podľa rovnakého `stale_days` ako Demos (vek ≥ prah). Materiály/ABS a viazané Demos položky používajú pôvodnú vetvu.
 Riadok kovania nesie `price_check` aj pre čerstvé ručné ceny, aby UI vedelo ukázať pôvod/dátum a opätovné overenie. Rovnaká funkcia a časová referencia tvoria scan aj riadok; `stale.items` naďalej vynecháva čerstvé ceny.
@@ -653,7 +687,23 @@ Každá z 12 mutácií má vlastnú malú metódu (`set_mode!`, `set_override!`,
 - **Čítanie sa neblokuje nikdy** — `state` novšiu zákazku prečíta a pridá do nej `'std'`; zastavené sú len mutácie a (cez payload) oba cenové exporty. VEPO a nákupný CSV kovania rozpočtové dáta nenesú, takže bránu nedostávajú.
 - **Disciplína bumpu:** číslo sa zvýši pri každom rozšírení whitelistu rozpočtových dát o pole, ktorého tichá strata by poškodila cenu alebo objednávku (blok 4 = väzba spotrebiča na katalóg). Detail v STANDARD §11.3.
 
-Testy: `tests/pure/test_r14_budget_std.rb` (19 scenárov, 7 mutácií overených) · `tests/js/test_r14_budget_std.js` (banner + vypnuté ovládače oboch sekcií) · in-SU `run_r14` a `run_r14_async` (undo atómovosť — headless fake model kroky Späť nevracia).
+**`BUDGET_STD` 2 — spotrebič má väzbu a vlastníka (S1-B1, v0.12.13).** Položka `budget_appliances[]` pribrala štyri polia: `catalog_id` (UUID modelu z katalógu),
+`snapshot` (**výstup `ApplianceCatalog.snapshot_for` bez zmien** — zákazka odvtedy na živom katalógu nezávisí), `owner` `{kind: cabinet|slot|board|job, id}` a
+`customer_supplied` (bool). Kódy kategórií sú od tejto verzie **kanonické** (`ApplianceCatalog::CATEGORIES`, popisky z tej istej mapy): čítanie prijme aj legacy
+slovenské kódy a `LEGACY_TYPES` ich prevedie, **zápis je vždy kanón** — dva zoznamy by sa časom rozišli a položka zákazky by sa s modelom z katalógu nespárovala.
+
+- **Server vs. klient.** `catalog_id`, `snapshot` a `owner` preberá `build_appliance` **len s `trusted: true`** — teda od jediného transakčného vstupu
+  `ApplianceBinding` a od čítania už uloženého dokumentu. Z klienta chodia výhradne polia, ktoré používateľ vypísal; identitu modelu aj vlastníka odvodzuje server.
+- **Typ je zamknutý**, keď ho určuje model z katalógu **alebo** keď má položka fyzického vlastníka (`type_locked?`) — inak by sa ručnou zmenou kategórie rozbila
+  matica kategória → vlastník bez toho, aby sa väzba prepočítala.
+- **`in_operation: true` (Astra B1)** — `write!` má v tomto režime **vlastné telo `write_in_operation!`**: neotvára, nekomituje ani **neabortuje** a **nemá vlastný
+  `rescue`**, takže výnimka (aj zo `stamp_std`) ide von a abort vlastní volajúci, ktorý operáciu otvoril. Zachytávací blok pôvodnej vetvy je preto **vnorený**, nie
+  na úrovni metódy — inak by chytil aj cudziu výnimku a zhodil by cudziu operáciu (položka by sa vrátila, ale `appliance_refs[]` vlastníka by ostali zapísané).
+- **`add/update/remove_appliance!` sú odvtedy vnútorné** — okno ich už nevolá, ide cez `ApplianceBinding.apply!` ([appliances.md](appliances.md)).
+  Majú kľúčové parametre, takže **volanie s bezzátvorkovým hashom** (`add_appliance!(m, 'typ' => …)`) by Ruby 3 odovzdalo ako keywords a spadlo by na arite.
+
+Testy: `tests/pure/test_r14_budget_std.rb` (marker, guardy, kanály chýb) · `tests/pure/test_s1b1_vazba.rb` (kanonické kódy, std 2, väzba, matica, rollback) ·
+`tests/js/test_r14_budget_std.js` (banner + vypnuté ovládače oboch sekcií) · in-SU `run_r14`, `run_r14_async` a `run_s1b1` (undo atómovosť — headless fake model kroky Späť nevracia).
 
 ### price_refresh.rb
 
@@ -767,7 +817,13 @@ in-SU `run_k1` (rotácia dekoru v reálnom CSV).
 
 ### cp_export.rb
 
-_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+_(kostra — dokumentuje sa postupne pri zásahoch)_
+
+**Spotrebiče v cenovej ponuke (S1-B1, v0.12.13).** Kategória špecifikácie sa volá **„SPOTREBIČE A VYBAVENIE"**. Položku, ktorú **dodáva zákazník**, by `candidates`
+zahodilo už na filtri nulových súm (jej `spolu` je 0), lenže zákazník ju v ponuke vidieť **má** — je to kus, ktorý si kupuje sám a ktorý v kuchyni stojí. Ide preto
+**vlastnou cestou** ako **informačný riadok** (`kind: 'info'`, 0 €, kľúč `cp:info:<kľúč riadku>`) so štítkom `CUSTOMER_SUPPLIED_LABEL` v názve; ten istý štítok
+pridáva `appliance_labels` do špecifikácie. Riadok **nemení žiadne číslo** (0 € do súčtu ani do `diff` nevstúpi). Platí preň **to isté existujúce pravidlo** ako pre
+zvyšok sekcie: pri **vypnutom** „sčítať do rozpočtu" sa spotrebiče do ponuky nedostanú **vôbec** — ani informačne.
 
 ### xlsx_writer.rb
 

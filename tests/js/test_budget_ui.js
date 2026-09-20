@@ -125,7 +125,10 @@ function payload(over){
   eq(B.budSectionCount({ key: 'standard_rows', rows: [{}] }, { mode_label: 'Štandard' }),
      '1 položka · režim Štandard', 'standardne riadky ukazuju rezim');
   eq(B.budSectionCount({ key: 'custom', rows: [] }, {}), 'len táto zákazka', 'vlastne polozky');
-  eq(B.budSectionCount({ key: 'appliances', rows: [] }, {}), 'manuálne · katalóg príde v S1', 'spotrebice');
+  // S1-B1: spotrebic uz moze prist Z KATALOGU (modal ma pole „Z katalógu"),
+  // takze podtitul sekcie uz nehovori „katalóg príde v S1".
+  eq(B.budSectionCount({ key: 'appliances', rows: [] }, {}), '0 položiek · z katalógu alebo ručne',
+     'spotrebice');
 })();
 
 // --- GH #138 P2: rozpisany novy riadok prezije odmietnuty zapis ---------------
@@ -134,8 +137,14 @@ function payload(over){
      { popis: 'Doprava', pocet: '1', cena: '42,5' }, 'chybajuci pocet ma default 1');
   eq(B.budDraftAttrs('custom', { popis: 'X', pocet: '3', cena: '' }),
      { popis: 'X', pocet: '3', cena: '' }, 'prazdna cena ostava prazdna (nie 0)');
+  // S1-B1: typ uz NEMA klientsky default — kategoriu urcuje SERVER (model
+  // z katalogu, inak jeho vlastny `DEFAULT_APPLIANCE_TYPE`). Klientsky default
+  // by bol druha pravda o tom, co je „iné".
   eq(B.budDraftAttrs('appliance', { nazov: 'Bosch', cena: '649' }),
-     { typ: 'ine', nazov: 'Bosch', dodavatel: '', cena: '649' }, 'chybajuci typ padne na „iné"');
+     { typ: '', nazov: 'Bosch', dodavatel: '', cena: '649', customer_supplied: false },
+     'chybajuci typ posiela prazdno — dopln ho server');
+  eq(B.budDraftAttrs('appliance', { typ: 'oven', nazov: 'Rúra', customer_supplied: true }).customer_supplied,
+     true, '„dodáva zákazník" je BOOLEAN, nie text');
   eq(B.budDraftAttrs('custom', null), { popis: '', pocet: '1', cena: '' }, 'prazdny formular nezhodi render');
 })();
 

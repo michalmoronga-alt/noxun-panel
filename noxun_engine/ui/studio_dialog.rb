@@ -369,7 +369,20 @@ module Noxun
         def do_select(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
           ProductionCore.do_select(Sketchup.active_model, data, generation: @generation,
-                                                                status: status_proc, repush: repush_proc)
+                                                                status: status_proc, repush: repush_proc,
+                                                                route: route_proc)
+        end
+
+        # S1-B1: nalez BEZ entity v modeli (sirota po spotrebici) vedie do
+        # SEKCIE tohto okna, nie do výberu. Ide to EXISTUJÚCOU deep-link cestou
+        # (`show(open_section:, anchor:)`) — tá pri otvorenom okne len nastaví
+        # odloženú sekciu a pushne, takže žiadny nový kanál nevzniká.
+        def route_proc
+          lambda do |rt|
+            show(open_section: rt['section'], anchor: rt['anchor'])
+          rescue StandardError => e
+            Engine.log_error(e, 'StudioDialog.route')
+          end
         end
 
         def do_export(payload)
@@ -406,7 +419,8 @@ module Noxun
           ProductionCore.do_budget(Sketchup.active_model, data, generation: @generation,
                                                                 status: status_proc,
                                                                 repush: budget_repush_proc,
-                                                                result: budget_result_proc)
+                                                                result: budget_result_proc,
+                                                                geometry: budget_geometry_proc)
         end
 
         # XLSX rozpoctu — flush handshake (rozpisany edit panela meni kusovnik,
@@ -1177,9 +1191,28 @@ module Noxun
         # potom visela az do 6 s poistky (`BUD_BUSY_MS`).
         def budget_repush_proc
           lambda do
-            push_state(bump: false) if @dialog && @dialog.visible?
+            # S1-B1 (Astra B13): vazba spotrebica skrinku PRESTAVA — vtedy je to
+            # zmena modelu a generacia sa zdvihnut MUSI (inak by pending klik
+            # v Kusovniku mieril na dielec, ktory uz nema ten isty kluc).
+            bump = @budget_geometry == true
+            @budget_geometry = false
+            push_state(bump: bump) if @dialog && @dialog.visible?
           rescue StandardError => e
             Engine.log_error(e, 'StudioDialog.budget_repush')
+          end
+        end
+
+        # S1-B1: mutacia rozpoctu zmenila GEOMETRIU (zapis `appliance_refs[]`
+        # ide cez prestavbu vlastnika). Inspector musi dostat cerstvu kartu —
+        # `dedup: false`, lebo citacie okno si opravu identity kopii NIKDY
+        # nevyziada (brana 1b-3); dedup tik patri observeru.
+        def budget_geometry_proc
+          lambda do
+            @budget_geometry = true
+            Panel.push_selected(Sketchup.active_model, dedup: false) if
+              defined?(Panel) && Panel.dialog_alive?
+          rescue StandardError => e
+            Engine.log_error(e, 'StudioDialog.budget_geometry')
           end
         end
 
@@ -1343,6 +1376,10 @@ module Noxun
           cb(dlg, 'budget_xlsx')     { |p| handle_budget_xlsx(p) }
           cb(dlg, 'cp_xlsx')         { |p| handle_cp_xlsx(p) }
           cb(dlg, 'budget_open_url') { |p| handle_budget_url(p) }
+          # S1-B1: naseptavac katalogu spotrebicov v modale „Pridať spotrebič".
+          # Je to CITANIE (ziadna mutacia, ziadny krok Spat) — vlastny kanal
+          # s generaciou dotazu, presne ako naseptavac kovania.
+          cb(dlg, 'appl_lookup')     { |p| handle_appl_lookup(p) }
           # ŠT-4a: `budget_settings` (⚙ v liste Rozpoctu otvarala SATELIT) ZANIKLO —
           # sadzby su SEKCIA `bset` TOHTO okna, takze prepnutie je cisto klientske
           # (`studioGoSection('bset')`). Server o prepnuti sekcie vediet nemusi.
@@ -1473,6 +1510,18 @@ module Noxun
           else
             do_cp_xlsx(data)
           end
+        end
+
+        # S1-B1: hladanie v katalogu spotrebicov pre modal Rozpoctu. Klientovi
+        # ide LEN to, co ponuka potrebuje (id, vyrobca, model, kategoria) —
+        # rozmery, odkazy ani prilohy sa do okna neposielaju; snapshot si server
+        # vypyta az pri zapise, a to VYHRADNE podla `catalog_id` (B14).
+        def handle_appl_lookup(payload)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          res = ProductionCore.appliance_lookup(data['q'], data['gen'])
+          js("if (window.NX && NX.applLookupResult) NX.applLookupResult(#{res.to_json});")
+        rescue StandardError => e
+          Engine.log_error(e, 'StudioDialog.handle_appl_lookup')
         end
 
         # ↗ v riadku rozpoctu — adresa sa dohladava v modeli podla ID polozky a

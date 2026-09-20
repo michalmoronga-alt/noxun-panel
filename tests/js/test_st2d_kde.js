@@ -249,11 +249,15 @@ const BUDGET = {
 (function(){
   eq(B.budMoreFields('custom', BUDGET.sections[0].rows[0]).map(function(f){ return f.key; }),
      ['kod', 'url', 'poznamka'], 'vlastna polozka ma kod, adresu aj poznamku');
-  eq(B.budMoreFields('appliance', BUDGET.sections[1].rows[0]).map(function(f){ return f.key; }),
-     ['url'], 'spotrebic ma LEN adresu — kod ani poznamku jeho zaznam nenesie');
+  // S1-B1: spotrebic ma v editore navyse VLASTNIKA a prepinac „dodáva
+  // zákazník"; kod ani poznamku jeho zaznam dalej nenesie.
+  eq(B.budMoreFields('appliance', BUDGET.sections[1].rows[0], BUDGET).map(function(f){ return f.key; }),
+     ['url', 'owner', 'customer_supplied'],
+     'spotrebic: adresa + vlastnik + priznak (bez kodu a poznamky)');
   eq(B.budMoreAttrs('custom', { kod: 'K', url: 'U', poznamka: 'P' }),
      { url: 'U', kod: 'K', poznamka: 'P' });
-  eq(B.budMoreAttrs('appliance', { kod: 'K', url: 'U', poznamka: 'P' }), { url: 'U' },
+  eq(B.budMoreAttrs('appliance', { kod: 'K', url: 'U', poznamka: 'P' }),
+     { url: 'U', customer_supplied: false },
      'zo spotrebica sa kod ani poznamka NEODOSIELAJU');
 })();
 
@@ -400,7 +404,9 @@ function repush(){
   SENT.length = 0;
   dispatch(DOC.querySelector('[data-nxm-act="submit"]'), 'click');
   eq(SENT[0][1].op, 'appliance_update');
-  eq(SENT[0][1].attrs, { url: 'https://demos.sk/x' });
+  // S1-B1: priznak „dodáva zákazník" ide so zapisom VZDY (nezaskrtnuty = false),
+  // vlastnik sa neposiela — nezmenil sa (to je vlastna akcia `appliance_owner`).
+  eq(SENT[0][1].attrs, { url: 'https://demos.sk/x', customer_supplied: false });
   NX.budgetResult('appliance_update', true);
   ok(!NXModal.isOpen());
   repush();

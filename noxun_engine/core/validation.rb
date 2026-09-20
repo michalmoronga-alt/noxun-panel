@@ -234,6 +234,10 @@ module Noxun
         # kluc = kontrola sa preskoci (legacy volania a headless testy bez
         # slotov; vzor `placements:`).
         check_appliance_slots(collected[:appliance_slots], items)
+        # S1-B1: spotrebice zakazky (vlastnik, rozmery niky, trieda umyvacky).
+        # Rovnaka cesta a rovnaka kategoria ako slot — chybajuci kluc =
+        # kontrola sa preskoci (legacy volania a headless testy bez zoznamu).
+        check_appliances(collected[:appliances], items)
         check_hardware_expansion(hardware_expansion, items)
         check_hardware_notes(hardware_expansion, items) # KOV-F1
         check_placements(placements, items)
@@ -1022,6 +1026,91 @@ module Noxun
           'owner_id' => oid, 'owner_pid' => pid, 'part_key' => nil, 'hw_key' => nil,
           'message_sk' => message,
           'stable_key' => "#{CAT_APPLIANCE}|#{oid}|#{code}" }
+      end
+
+      # --- S1-B1: spotrebice zakazky (`appliances` z Bom.collect) ------------
+      #
+      # TRI KODY, vsetky ORANGE a bez exportnej brany (spotrebic sa nevyraba,
+      # takze vyrobne data su v poriadku — je to upozornenie pre cloveka):
+      #   `appliance_owner_missing`  vlastnik zanikol alebo jeho ID uz patri
+      #                              inemu kusu (ID sa recykluju) — polozka
+      #                              ostava v rozpocte, treba ju odpojit,
+      #   `appliance_specs_missing`  viazany model nema v katalogu rozmery niky,
+      #                              takze kontrolu niky (S1-F) sa neda urobit,
+      #   `appliance_class_mismatch` trieda umyvacky sa nezhoduje s triedou slotu.
+      #
+      # `stable_key` nesie KOD aj UUID polozky — dva nalezy nad tym istym
+      # spotrebicom su DVA riadky (dedup by inak nechal len prvy).
+      APPL_OWNER_MISSING  = 'appliance_owner_missing'
+      APPL_SPECS_MISSING  = 'appliance_specs_missing'
+      APPL_CLASS_MISMATCH = 'appliance_class_mismatch'
+      # Vlastnici, u ktorych ma zmysel pytat sa na rozmery niky (doska ani „len
+      # zakazka" niku nemaju).
+      APPL_NICHE_OWNERS = %w[cabinet slot].freeze
+
+      def check_appliances(list, items)
+        Array(list).each do |a|
+          next unless a.is_a?(Hash)
+
+          id = a['item_id'].to_s
+          # Zaznamy bez polozky (`expected_missing`) su podklad pre pohlad
+          # „V zakazke" a pre S1-C — v B1 z nich nalez nevznika.
+          next if id.empty?
+
+          name = a['name'].to_s.strip
+          name = 'bez názvu' if name.empty?
+          owner = a['owner'].is_a?(Hash) ? a['owner'] : {}
+          case a['state'].to_s
+          when 'owner_missing' then check_appliance_orphan(a, id, name, owner, items)
+          when 'bound'         then check_appliance_bound(a, id, name, owner, items)
+          end
+        end
+      end
+
+      # Astra B16: sirota NEMA `owner_id` — resolver klik-selectu by podla
+      # ulozeneho ID oznacil CUDZIU skrinku, ktora to ID medzitym dostala.
+      # Adresa je preto `data.route` (Studio -> Spotrebice na polozku).
+      def check_appliance_orphan(_rec, id, name, owner, items)
+        where = owner['id'].to_s
+        items << { 'severity' => ORANGE, 'category' => CAT_APPLIANCE,
+                   'owner_id' => nil, 'owner_pid' => nil, 'part_key' => nil, 'hw_key' => nil,
+                   'message_sk' => "Spotrebič „#{name}“ má vlastníka #{where.empty? ? '—' : where}, " \
+                                   'ktorý už neexistuje — odpoj ho alebo vráť skrinku Späť.',
+                   'data' => { 'route' => 'appl', 'item_id' => id },
+                   'stable_key' => "#{CAT_APPLIANCE}|#{id}|#{APPL_OWNER_MISSING}" }
+      end
+
+      def check_appliance_bound(rec, id, name, owner, items)
+        kind = owner['kind'].to_s
+        snap = rec['snapshot'].is_a?(Hash) ? rec['snapshot'] : {}
+        if APPL_NICHE_OWNERS.include?(kind) && !snap['niche'].is_a?(Hash)
+          items << appliance_item(id, owner, APPL_SPECS_MISSING,
+                                  "Spotrebič „#{name}“ nemá v katalógu rozmery niky — " \
+                                  'kontrola niky sa nedá urobiť.')
+        end
+        slot = rec['slot'].is_a?(Hash) ? rec['slot'] : nil
+        return unless slot
+
+        install = snap['install'].is_a?(Hash) ? snap['install'] : {}
+        model_cls = install['dishwasher_class'].to_s
+        slot_cls = slot['dw_class'].to_i
+        # Astra B15: nalez vznika LEN ked su zname OBE triedy. Neznama trieda
+        # je „nevieme", nie „nesedi" — hlasit ju by bol falosny poplach.
+        return if model_cls.empty? || !slot_cls.positive?
+        return if model_cls == slot_cls.to_s
+
+        items << appliance_item(id, owner, APPL_CLASS_MISMATCH,
+                                "Umývačka „#{name}“ je trieda #{model_cls}, slot je #{slot_cls} — " \
+                                'zmeň triedu slotu alebo model.')
+      end
+
+      def appliance_item(id, owner, code, message)
+        { 'severity' => ORANGE, 'category' => CAT_APPLIANCE,
+          'owner_id' => owner['id'].to_s, 'owner_pid' => owner['pid'],
+          'part_key' => nil, 'hw_key' => nil,
+          'message_sk' => message,
+          'data' => { 'route' => 'appl', 'item_id' => id },
+          'stable_key' => "#{CAT_APPLIANCE}|#{id}|#{code}" }
       end
 
       # Cele mm bez desatin, inak jedno desatinne miesto (slovenska ciarka) —

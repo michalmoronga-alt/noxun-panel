@@ -111,8 +111,12 @@ module NxR14
       ['add_custom_item!', ->(m) { BS.add_custom_item!(m, 'popis' => 'Doprava', 'cena' => 50.0) }],
       ['update_custom_item!', ->(m) { BS.update_custom_item!(m, seeded_id(m, :custom), 'cena' => 99.0) }],
       ['remove_custom_item!', ->(m) { BS.remove_custom_item!(m, seeded_id(m, :custom)) }],
-      ['add_appliance!', ->(m) { BS.add_appliance!(m, 'nazov' => 'Bosch', 'typ' => 'umyvacka') }],
-      ['update_appliance!', ->(m) { BS.update_appliance!(m, seeded_id(m, :appliance), 'cena' => 649.0) }],
+      # POZOR (S1-B1): argumenty spotrebicovych mutacii su v ZLOZENYCH
+      # ZATVORKACH — metody maju od tejto davky kľucove parametre
+      # (`trusted:`, `in_operation:`), takze bezzatvorkovy hash by Ruby 3
+      # odovzdal ako KEYWORDS a volanie by spadlo na arite.
+      ['add_appliance!', ->(m) { BS.add_appliance!(m, { 'nazov' => 'Bosch', 'typ' => 'umyvacka' }) }],
+      ['update_appliance!', ->(m) { BS.update_appliance!(m, seeded_id(m, :appliance), { 'cena' => 649.0 }) }],
       ['remove_appliance!', ->(m) { BS.remove_appliance!(m, seeded_id(m, :appliance)) }]
     ]
   end
@@ -313,8 +317,24 @@ NxTest.test('R-14: marker sa NIKDY nepreberá z ulozeneho stavu — zapisuje sa 
   s = NxR14.src(File.join('core', 'budget_store.rb'))
   NxTest.assert_equal(1, s.scan(/write_attr\(model, KEY_STD, BUDGET_STD\)/).length,
                       'marker sa zapisuje z JEDINEHO miesta a VZDY ako BUDGET_STD')
-  NxTest.assert_equal(1, s.scan(/^\s+stamp_std\(model\)$/).length,
-                      'a `stamp_std` sa vola z JEDINEHO miesta (`write!`)')
+  # S1-B1: zapisove cesty su DVE — `write!` (vlastna operacia) a
+  # `write_in_operation!` (rezim „v cudzej operacii", BEZ vlastneho rescue).
+  # Marker peciatkuje KAZDA z nich prave raz a NIKTO iny.
+  NxTest.assert_equal(2, s.scan(/^\s+stamp_std\(model\)$/).length,
+                      '`stamp_std` sa vola PRESNE dvakrat')
+  %w[write! write_in_operation!].each do |m|
+    body = s[/def #{Regexp.escape(m)}\(.*?\n      end\n/m].to_s
+    NxTest.refute(body.empty?, "`#{m}` sa nasla")
+    NxTest.assert_equal(1, body.scan(/stamp_std\(model\)/).length,
+                        "`#{m}` peciatkuje marker prave raz")
+  end
+  # B1: rezim „v cudzej operacii" NESMIE mat vlastny rescue ani abort —
+  # zhodil by LEN zapis rozpoctu a vazbu u vlastnika by nechal zapisanu.
+  inop = s[/def write_in_operation!\(.*?\n      end\n/m].to_s
+  NxTest.refute(inop.include?('rescue'), 'rezim v cudzej operacii nechytá vynimky')
+  NxTest.refute(inop.include?('model.abort_operation'),
+                'ani neabortuje — operacia patri volajucemu')
+  NxTest.refute(inop.include?('model.start_operation'), 'ani neotvara vlastnu operaciu')
 end
 
 # ============================ DOPREDNY GUARD ================================

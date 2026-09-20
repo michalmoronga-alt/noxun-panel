@@ -734,7 +734,9 @@ NxTest.test('ŠT-3b-2a (F11): riadky NEVSTUPUJU do poctov Kontroly') do
 end
 
 NxTest.test('ŠT-3b-2a (F10): oko ide novou vetvou (owner_id, part_key), NIE cez pids') do
-  sel = ST3B2_PC_RB[/def do_select\(model, data, generation:, status:, repush:\).*?\n      end\n/m].to_s
+  # Podpis `do_select` sa rozsiruje (S1-B1 pridal volitelny `route:`), preto sa
+  # telo hlada podla ZACIATKU podpisu — guard strazi VETVY, nie arity.
+  sel = ST3B2_PC_RB[/def do_select\(model, data, generation:.*?\n      end\n/m].to_s
   NxTest.assert(sel.include?("elsif data['rule_ref']"), 'vyber ma vlastnu vetvu')
   NxTest.assert(sel.include?("pids_for_override(model, data['rule_ref'])"), 'a vlastny resolver')
   NxTest.assert(sel.index("data['rule_ref']") < sel.index('refs_for(Bom.compute'),
@@ -984,7 +986,7 @@ NxTest.test('ŠT-3b-2b (F13/F14): status hovori VYSLEDOK a odpojene dvojca sa ne
 end
 
 NxTest.test('ŠT-3b-2b (review #221): vyber podla `rule_ref` uz nerobi zbytocny zber modelu') do
-  sel = ST3B2_PC_RB[/def do_select\(model, data, generation:, status:, repush:\).*?\n      end\n/m].to_s
+  sel = ST3B2_PC_RB[/def do_select\(model, data, generation:.*?\n      end\n/m].to_s
   branch = sel[/elsif data\['rule_ref'\].*?\n        else/m].to_s
   NxTest.refute(branch.include?('fresh_collect'),
                 'vetva oka hlada podla identity — plny sken modelu je cista rezia')

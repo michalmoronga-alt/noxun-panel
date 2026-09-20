@@ -152,3 +152,92 @@ pri prechode markera** (vzor `HardwareCatalog.apply_seed_patches!`) — dnes tak
 **Pasce.** Dve varianty niky (stĺp × pod pracovnou doskou) sa **nesmú zliať do jedného rozsahu** — záznam nesie jednu niku a druhú variantu drží
 poznámka (rúry v seede). Kategória sa nemení, preto sa `dims` nikdy nevalidujú proti inej sade polí, než pod akou vznikli. `search` porovnáva bez
 diakritiky aj SK popisok kategórie („umyvacka" nájde `dishwasher`) a radí deterministicky názov → výrobca → `id`.
+
+### appliance_binding.rb
+
+**Jediný transakčný vstup pre spotrebič v zákazke** (S1-B1). Spotrebič má dve strany: **položku rozpočtu**
+(`budget_appliances[]` na modeli) a **vlastníka** (skrinka · slot umývačky · doska), ktorý o väzbe vie —
+nesie ju vo svojom configu v `appliance_refs[]`. Keby sa tie dve strany zapisovali každá vo vlastnej operácii,
+jedno Späť by vrátilo len jednu z nich a zákazka by ostala v stave, ktorý v reálnej kuchyni neexistuje
+(položka tvrdí, že rúra je v CAB-3, a skrinka o nej nevie).
+
+- **Jedna operácia, jedno Späť.** `apply!(model, model_guid:, op:, item_id:, attrs:, catalog_id:, owner:)` má
+  **práve jednu** `start_operation` (SketchUp nemá vnorené operácie — `start_operation` v otvorenej operácii ju
+  ticho ukončí). V nej sa zapíše položka (`BudgetStore.write!` v režime `in_operation: true` — **neotvára,
+  nekomituje ani neabortuje** a výnimku prepúšťa von), odstráni sa záznam u pôvodného vlastníka, pridá sa
+  u nového a obaja sa prestavajú. Výnimka = `abort_operation` **celej** operácie; vracia sa
+  `{ok:, errors:, item:, geometry_changed:}`.
+- **`op` ∈ `create` · `patch` · `rebind_model` · `move` · `unbind` · `remove`.** `ProductionCore.apply_budget_op`
+  sem smeruje **všetky** spotrebičové operácie okna — aj položky „len zákazka".
+  `BudgetStore.add/update/remove_appliance!` sú odvtedy **vnútorné** funkcie volané pod `in_operation: true`
+  (a s `trusted: true`, lebo `catalog_id`, `snapshot` ani `owner` z klienta nikdy nechodia).
+  **Vlastníka smú niesť LEN `OWNER_OPS` = `create · move · unbind · rebind_model`** — `patch` a `remove`
+  s vlastníkom v payloade sa **odmietajú** (nie ignorujú): dvaja vlastníci v jednom zápise sú nejednoznační
+  a tichý výber jedného z nich by spotrebič presunul bez toho, aby o to niekto požiadal.
+  **To isté platí pre model z katalógu:** `catalog_id` smú niesť len `CATALOG_OPS` = `create · rebind_model`.
+  Pri operácii, ktorá snapshot neukladá, by matica bežala nad kategóriou **katalógu**, ale uložila by sa
+  **stará** — chladnička by prešla ako umývačka na slot.
+- **Guardy bežia PRED `start_operation`** (odmietnutá mutácia nesmie založiť krok Späť — vzor D-133/D-134):
+  identita dokumentu (`DocKey.foreign?`, rovnaká tolerancia prázdneho klientskeho údaja ako rozpočet) · verzia
+  dát rozpočtu (`BudgetStore.std_block_reason`) · existencia položky a strop `MAX_APPLIANCES` · **matica**
+  kategória → vlastník · **pokoj observera** (`ScaleWatch.flush_pending!` — dedup kópií môže práve meniť
+  identitu skriniek) · **identita cieľa** · **stav pôvodného vlastníka**.
+  `CabinetBuilder.ensure_root_context` beží tesne pred operáciou — `rebuild_in_operation` to (na
+  rozdiel od `rebuild`) nerobí, takže väzba počas vnoreného editovania by inak porušila prestavbu.
+  **Volá sa len vtedy, keď sa naozaj prestavuje skrinka alebo slot** (`rebuilds_cabinet?`): zatvorenie
+  rámu vyhodí používateľa z komponentu, ktorý práve edituje, a úprava ceny, príznaku či väzba na **dosku**
+  (zápis configu bez prestavby) mu to spraviť nesmie.
+- **Identita vysloveného cieľa = PID + ID + druh, a PID je POVINNÝ.** Fyzický cieľ (`cabinet|slot|board`)
+  bez platného `pid` sa odmieta hláškou „zastaraná ponuka vlastníkov — otvor modal znova": ID sa recyklujú,
+  takže hľadanie podľa neho samotného by spotrebič pripojilo na entitu, ktorá po zaniknutej skrinke iba
+  zdedila číslo. Ponuka vlastníkov PID vždy nesie. Ďalej platí: dva kusy s tým istým ID = „nejednoznačná
+  identita", odpojený dielec a config z novšej verzie sa odmietajú.
+- **Kategória, proti ktorej beží matica, sa musí rovnať tej, ktorá sa NAOZAJ uloží.** Preto sa `typ`
+  z formulára pri operáciách meniacich vlastníka (`move · unbind · rebind_model`) **odmieta** — inak by
+  matica prešla nad starou kategóriou a zápis uložil novú (chladnička by sa dostala do slotu ako umývačka).
+  Pri `create` sa **neznámy kód odmietne** (nikdy sa ticho nenahradí defaultom) a uložený typ je presne
+  `plan[:category]` — teda to, čo maticou prešlo (legacy kód je v tom okamihu už prevedený na kanón).
+- **Matica `OWNER_MATRIX`** obmedzuje len **fyzických** vlastníkov: `fridge|oven|microwave` → skrinka ·
+  `dishwasher` → slot · `hob|sink` → doska · `hood|other` → nič. **`job` („len zákazka") je legitímny stav
+  každej kategórie** a v matici preto nie je. Platí v ponuke vlastníkov (`owner_options_map` — odpojené
+  skrinky a configy z novšej verzie sa **neponúkajú**) aj na serveri; klientsky payload nie je ochrana.
+- **Štyri stavy pôvodného vlastníka:** (a) **platný** (entita existuje + jej refs nesú `item_id`) → prestaví sa ·
+  (b) **nezapisovateľný** (odpojený dielec, novšia verzia) → **celá operácia sa odmietne** · (c) **zaniknutá
+  väzba** (ID už patrí inému kusu bez refs) → tá skrinka sa **nedotkne**, položka len zmení vlastníka ·
+  (d) **nejednoznačný** — v modeli žije **viac** kusov s tým istým uloženým ID (poškodený alebo importovaný
+  model): keď väzbu nesie **práve jeden**, použije sa on; inak sa celá operácia **odmietne pred**
+  `start_operation` („nejednoznačná identita vlastníka CAB-3 — prestav skrinky"), lebo tichý preskok by nechal
+  staré refs visieť na oboch kusoch. `patch` (cena, názov, príznak) sa väzby nedotýka, a preto ho **nesmie**
+  zastaviť ani zamknutý, ani zaniknutý vlastník — cena siroty sa musí dať opraviť.
+- **Implicitne nesený cieľ sa NEHĽADÁ podľa ID.** `rebind_model` bez vysloveného vlastníka zapíše refs
+  výhradne do **tej entity, ktorú overil `resolve_previous`**. Hľadanie podľa uloženého ID by pri recyklovanom
+  ID pripojilo spotrebič na **cudziu** skrinku; keď pôvodný vlastník zanikol, refs sa **neprepisujú** —
+  aktualizuje sa len snapshot položky a Kontrola hlási sirotu ďalej.
+- **„Nezmenený vlastník" sa neposudzuje len podľa `kind` + `id`.** Uložený vlastník **bez platnej väzby**
+  (`prev == nil` — entita zanikla alebo jej refs položku nenesú) nie je platný vlastník, takže vyslovený
+  fyzický cieľ je vtedy **vždy nový** — aj keď má to isté ID, ktoré recykloval po zaniknutej skrinke.
+  Navyše `rewrite_ref?` zapíše záznam vždy, keď **overený cieľ položku ešte nenesie**; cieľ, ktorý ju už má,
+  sa zbytočne neprestavuje. Bez toho by „úspešný" presun siroty na recyklované ID nechal sirotu sirotou.
+- **`rebind_model` s modelom inej kategórie sa ODMIETA**, nikdy automaticky neodpája („model inej kategórie —
+  najprv odpoj spotrebič").
+- **Dôkaz väzby má JEDNU funkciu pre celý engine — `ref_matches?(entry, owner, item_id)`** (zhoda **druhu**,
+  zhoda **ID** a uuid v `refs`). Samotné uuid dôkazom nie je: `cabinet_id` zdieľa skrinka aj **slot** (v modeli
+  sú oba `kind: 'cabinet'`, rozlišuje ich typ v configu), takže skrinkový záznam na entite, ktorá je dnes slot
+  s tým istým číslom, by sa tváril ako platná väzba — a mutácie vlastníka by ju nenašli (hľadajú podľa druhu).
+  Tú istú funkciu volá `Bom.collect` (`appliance_bound?`) aj binding (`carries_item?` nad `owner_entry_for`,
+  ktorý druh a ID číta **z entity**, nie z toho, čo tvrdí položka) — zber a mutácie tak riešia identitu rovnako.
+- **Kontrakt záznamu `appliance_refs[]`** (číta ho S1-B2 telo slotu, S1-F box chladničky, S1-C očakávania):
+  `{item_id, category, body{width,height,depth}, niche{width_min…depth_max}, bands{door_bottom_offset,
+  door_lower, door_gap, door_upper}, furniture_doors{lower_min,lower_max,gap_ref}, install{dishwasher_class,
+  door_system,hinge_side}, snapshot_at}`. **Chýbajúce pole = kľúč chýba, nikdy 0** — nula je rozmer, „nevieme" nie je.
+- **Zapisovače refs.** Skrinka a slot idú cez `CabinetBuilder.write_appliance_refs!` (config → `normalize` →
+  `rebuild_in_operation`; protiváha `strip_appliance_refs!`), **doska cez `BoardBuilder.write_appliance_refs!`** —
+  zápis samotného configu **bez prestavby** (väzba jej geometriu nemení), ale **s pečiatkou
+  `config_schema: BOARD_CONFIG_SCHEMA`**: doska uložená starším pluginom nesie schému 1 a tá by väzbu pri
+  najbližšej prestavbe ticho zahodila. Prázdny zoznam kľúč **odstráni** (legacy kus nikdy nedostane prázdne pole).
+- **`geometry_changed`** je `true` len vtedy, keď sa naozaj prestavovalo (skrinka/slot). Štúdio vtedy zdvihne
+  generáciu (`push_state(bump: true)`) a pošle čerstvú kartu Inspectora (`Panel.push_selected(dedup: false)`);
+  cenové zmeny ostávajú pri dnešnom `bump: false`.
+- **Ponuka vlastníkov cestuje v payloade rozpočtu** (`appliance_owners` = `matrix` + `options` per druh +
+  `job_label`), nie samostatným kanálom: patrí k dokumentu, ktorý payload priniesol, takže prepnutie zákazky ju
+  vymení samo a modal nikdy neponúka skrinku z inej zákazky.

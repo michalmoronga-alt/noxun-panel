@@ -722,6 +722,34 @@ module Noxun
         # dosky BEZ normalizacie. Doska z NOVSEJ verzie sa NEDOTKNE — jej
         # config by sme prepisom ocesali o polia, ktorym nerozumieme (dedup
         # meni LEN identitu). Vracia true, ak sa config naozaj zmenil.
+        # S1-B1 (Astra B9): ZAPIS vazieb na spotrebic do configu DOSKY. Doska
+        # sa pri vazbe NEPRESTAVUJE (drez jej geometriu nemeni — vyrez rieši
+        # neskorsia davka), takze sa zapisuje SAMOTNY config; o operaciu aj
+        # o guard sa stara volajuci (`ApplianceBinding`).
+        #
+        # PECIATKA SCHEMY je povinna cast zapisu: doska ulozena starsim
+        # pluginom nesie `config_schema` 1, a ten by jej vazbu pri najblizsej
+        # prestavbe TICHO zahodil (`normalize` pozna `appliance_refs[]` az od
+        # schemy 2). Preto sa v TOM ISTOM zapise marker zdvihne — ostatne polia
+        # ostavaju nedotknute (ziadny `normalize` round-trip: ten by pri zmene
+        # katalogu menil vyrobne cisla).
+        def write_appliance_refs!(inst, refs)
+          cfg = Store.config(inst)
+          raise 'Vybrana instancia nie je NOXUN doska.' unless cfg.is_a?(Hash)
+          raise CabinetBuilder.newer_config_message('Doska', 'väzba by jej nastavenia stratila') if
+            newer_config?(cfg)
+
+          list = Array(refs).select { |r| r.is_a?(Hash) && !r['item_id'].to_s.strip.empty? }
+          if list.empty?
+            cfg.delete('appliance_refs')
+          else
+            cfg['appliance_refs'] = list
+          end
+          cfg['config_schema'] = BOARD_CONFIG_SCHEMA
+          Store.write_config(inst, cfg)
+          true
+        end
+
         def drop_appliance_refs!(inst)
           cfg = Store.config(inst)
           return false unless cfg.is_a?(Hash)
