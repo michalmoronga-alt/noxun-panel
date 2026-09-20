@@ -395,7 +395,7 @@ NxTest.test('S1-B2: viazany riadok nesie nazov modelu, ton a odkaz do Studia') d
   items = [NxS1B2.item('I-1', 'fridge', NxS1B2.owner('cabinet', 'CAB-3'),
                        'snapshot' => NxS1B2.snapshot('fridge', 'BCNA306', 'Beko',
                                                      NxS1B2.fridge_dims))]
-  rows = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, NxS1B2.interior(cfg), cfg['zones'])
+  rows = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, NxS1B2.interior(cfg))
   NxTest.assert_equal(1, rows.length)
   NxTest.assert_equal('bound', rows.first['state'])
   NxTest.assert_equal('Beko BCNA306', rows.first['text'])
@@ -412,7 +412,7 @@ NxTest.test('S1-B2: DVA viazane spotrebice = DVA riadky (rura + mikrovlnka)') do
            NxS1B2.item('I-2', 'microwave', NxS1B2.owner('cabinet', 'CAB-5'),
                        'snapshot' => NxS1B2.snapshot('microwave', 'MBNA900', 'Whirlpool',
                                                      NxS1B2.oven_dims))]
-  rows = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, NxS1B2.interior(cfg), cfg['zones'])
+  rows = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, NxS1B2.interior(cfg))
   NxTest.assert_equal(%w[I-1 I-2], rows.map { |r| r['item_id'] })
 end
 
@@ -426,7 +426,7 @@ NxTest.test('S1-B2: riadok „očakáva" vznikne z `appliance_expects[]` a ponuk
                                               NxS1B2.fridge_dims)),
     NxS1B2.item('OVEN', 'oven', NxS1B2.owner('job', ''))
   ]
-  rows = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, NxS1B2.interior(cfg), cfg['zones'])
+  rows = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, NxS1B2.interior(cfg))
   NxTest.assert_equal(1, rows.length)
   row = rows.first
   NxTest.assert_equal('expected', row['state'])
@@ -442,19 +442,19 @@ NxTest.test('S1-B2: ocakavanie, ktore uz vazbu MA, riadok nevyrobi') do
   items = [NxS1B2.item('I-1', 'fridge', NxS1B2.owner('cabinet', 'CAB-3'),
                        'snapshot' => NxS1B2.snapshot('fridge', 'BCNA306', 'Beko',
                                                      NxS1B2.fridge_dims))]
-  rows = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, NxS1B2.interior(cfg), cfg['zones'])
+  rows = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, NxS1B2.interior(cfg))
   NxTest.assert_equal(%w[bound], rows.map { |r| r['state'] })
 end
 
 NxTest.test('S1-B2: skrinka bez vazby a bez ocakavania NEMA riadok') do
   cfg = NxS1B2.tall_cfg
-  rows = NxS1B2::PANEL.appliance_rows('cabinet', cfg, [], NxS1B2.interior(cfg), cfg['zones'])
+  rows = NxS1B2::PANEL.appliance_rows('cabinet', cfg, [], NxS1B2.interior(cfg))
   NxTest.assert(rows.empty?, 'prazdny zoznam = skryty riadok (vertikalny priestor je vzacny)')
 end
 
 NxTest.test('S1-B2: SLOT bez modelu ocakava umyvacku vzdy (aj bez `appliance_expects`)') do
   cfg = NxS1B2.slot_cfg
-  rows = NxS1B2::PANEL.appliance_rows('slot', cfg, [], nil, nil)
+  rows = NxS1B2::PANEL.appliance_rows('slot', cfg, [], nil)
   NxTest.assert_equal(1, rows.length)
   NxTest.assert_equal('dishwasher', rows.first['category'])
   NxTest.assert_equal('expected', rows.first['state'])
@@ -472,7 +472,7 @@ NxTest.test('S1-B2 (M1): rura sa filtruje LEN po sirke a hlbke — vyska je vec 
            NxS1B2.item('DEEP', 'oven', NxS1B2.owner('job', ''),
                        'snapshot' => NxS1B2.snapshot('oven', 'HBG774', 'Bosch',
                                                      NxS1B2.oven_dims(900.0)))]
-  row = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, inter, cfg['zones']).first
+  row = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, inter).first
   fits = row['options'].select { |o| o['fits'] }
   NxTest.assert_equal(['OK'], fits.map { |o| o['item_id'] },
                       'vyska niky 583–585 vs vnutro 1924 sa NEKONTROLUJE (inak by nesedelo nic)')
@@ -487,7 +487,7 @@ NxTest.test('S1-B2: chladnicka sa filtruje po vsetkych troch osiach') do
   items = [NxS1B2.item('BEKO', 'fridge', NxS1B2.owner('job', ''),
                        'snapshot' => NxS1B2.snapshot('fridge', 'BCNA306', 'Beko',
                                                      NxS1B2.fridge_dims))]
-  row = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, inter, cfg['zones']).first
+  row = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, inter).first
   opt = row['options'].first
   NxTest.refute(opt['fits'], 'ulozna vyska vnutra < nika 1940')
   NxTest.assert(opt['hint'].include?('výška'), "dovod menuje os: #{opt['hint']}")
@@ -500,7 +500,7 @@ NxTest.test('S1-B2: VIAC ZON = nejednoznacna nika -> chladnicka sa nefiltruje (r
   items = [NxS1B2.item('BEKO', 'fridge', NxS1B2.owner('job', ''),
                        'snapshot' => NxS1B2.snapshot('fridge', 'BCNA306', 'Beko',
                                                      NxS1B2.fridge_dims))]
-  row = NxS1B2::PANEL.appliance_rows('cabinet', fcfg, items, NxS1B2.interior(fcfg), zones).first
+  row = NxS1B2::PANEL.appliance_rows('cabinet', fcfg, items, NxS1B2.interior(fcfg)).first
   NxTest.assert(row['options'].first['fits'], 'pri viacerych zonach sa neda povedat, co je vnutro')
   NxTest.assert(row['sub'].include?('nejednoznačná'), "riadok to PRIZNA: #{row['sub']}")
   NxTest.refute(row['all'], 'ked sa nefiltruje, niet co odkryvat')
@@ -509,7 +509,7 @@ NxTest.test('S1-B2: VIAC ZON = nejednoznacna nika -> chladnicka sa nefiltruje (r
   ovens = [NxS1B2.item('DEEP', 'oven', NxS1B2.owner('job', ''),
                        'snapshot' => NxS1B2.snapshot('oven', 'HBG774', 'Bosch',
                                                      NxS1B2.oven_dims(900.0)))]
-  orow = NxS1B2::PANEL.appliance_rows('cabinet', ocfg, ovens, NxS1B2.interior(ocfg), zones).first
+  orow = NxS1B2::PANEL.appliance_rows('cabinet', ocfg, ovens, NxS1B2.interior(ocfg)).first
   NxTest.refute(orow['options'].first['fits'],
                 'sirka a hlbka su jednoznacne aj v delenej skrinke — rura o filter neprichadza')
 end
@@ -518,7 +518,7 @@ NxTest.test('S1-B2: model BEZ rozmerov niky sa NIKDY neoznaci ako „nesedí"') 
   cfg = NxS1B2.tall_cfg('appliance_expects' => ['oven'])
   items = [NxS1B2.item('RUCNY', 'oven', NxS1B2.owner('job', ''),
                        'snapshot' => NxS1B2.snapshot('oven', 'HBF153', 'Bosch', {}))]
-  row = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, NxS1B2.interior(cfg), cfg['zones']).first
+  row = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, NxS1B2.interior(cfg)).first
   NxTest.assert(row['options'].first['fits'], '„nevieme" nie je „nesedí"')
 end
 
@@ -528,7 +528,7 @@ NxTest.test('S1-B2: PORADIE volieb — najprv sediace, potom nesediace') do
                        'snapshot' => NxS1B2.snapshot('oven', 'A', 'X', NxS1B2.oven_dims(900.0))),
            NxS1B2.item('Z_OK', 'oven', NxS1B2.owner('job', ''),
                        'snapshot' => NxS1B2.snapshot('oven', 'Z', 'X', NxS1B2.oven_dims))]
-  row = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, NxS1B2.interior(cfg), cfg['zones']).first
+  row = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, NxS1B2.interior(cfg)).first
   NxTest.assert_equal(%w[Z_OK A_DEEP], row['options'].map { |o| o['item_id'] },
                       'prva volba nikdy nie je model, o ktorom vieme, ze nesedi')
 end
@@ -539,7 +539,7 @@ NxTest.test('S1-B2: TON riadku sa nemoze rozist s Kontrolou (chybajuca nika)') d
   cfg = NxS1B2.tall_cfg('appliance_refs' => [NxS1B2.ref('I-1', 'oven')])
   item = NxS1B2.item('I-1', 'oven', NxS1B2.owner('cabinet', 'CAB-5'),
                      'snapshot' => NxS1B2.snapshot('oven', 'HBF153', 'Bosch', {}))
-  row = NxS1B2::PANEL.appliance_rows('cabinet', cfg, [item], NxS1B2.interior(cfg), cfg['zones']).first
+  row = NxS1B2::PANEL.appliance_rows('cabinet', cfg, [item], NxS1B2.interior(cfg)).first
   NxTest.assert_equal('warn', row['tone'])
   # A TA ISTA situacia ocami Kontroly (jedina autorita nalezov).
   items = []
@@ -558,7 +558,7 @@ NxTest.test('S1-B2: TON riadku sa nemoze rozist s Kontrolou (trieda umyvacky)') 
   item = NxS1B2.item('I-9', 'dishwasher', NxS1B2.owner('slot', 'CAB-7'),
                      'snapshot' => NxS1B2.snapshot('dishwasher', 'SPV6EMX05E', 'Bosch',
                                                    NxS1B2.dw_dims('450')))
-  row = NxS1B2::PANEL.appliance_rows('slot', cfg, [item], nil, nil).first
+  row = NxS1B2::PANEL.appliance_rows('slot', cfg, [item], nil).first
   NxTest.assert_equal('warn', row['tone'], 'trieda 450 v slote 600')
   NxTest.assert(row['sub'].include?('450'), "dovod menuje obe triedy: #{row['sub']}")
   items = []
@@ -574,7 +574,7 @@ end
 
 NxTest.test('S1-B2: polozka, ktora uz v rozpocte NIE JE, riadok NESKRYVA') do
   cfg = NxS1B2.tall_cfg('appliance_refs' => [NxS1B2.ref('GHOST', 'fridge')])
-  row = NxS1B2::PANEL.appliance_rows('cabinet', cfg, [], NxS1B2.interior(cfg), cfg['zones']).first
+  row = NxS1B2::PANEL.appliance_rows('cabinet', cfg, [], NxS1B2.interior(cfg)).first
   NxTest.assert_equal('warn', row['tone'])
   NxTest.assert(row['text'].include?('už v rozpočte nie je'), 'refs na entite treba vediet odpojit')
 end
@@ -588,7 +588,7 @@ NxTest.test('S1-B2: karta DOSKY ma ten isty riadok (a niku nefiltruje)') do
                        'snapshot' => NxS1B2.snapshot('hob', 'WL B1160', 'Whirlpool', {})),
            NxS1B2.item('I-SINK', 'sink', NxS1B2.owner('board', 'BRD-2'),
                        'snapshot' => NxS1B2.snapshot('sink', 'Legra XL', 'Blanco', {}))]
-  rows = NxS1B2::PANEL.appliance_rows('board', cfg, items, nil, nil)
+  rows = NxS1B2::PANEL.appliance_rows('board', cfg, items, nil)
   NxTest.assert_equal(2, rows.length, 'doska nesie aj dosku aj drez')
   NxTest.assert(rows.all? { |r| r['tone'] == 'ok' },
                 'doska niku nema, takze chybajuce rozmery niky nie su nalez')
