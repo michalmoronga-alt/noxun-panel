@@ -46,7 +46,8 @@
   (odpoj + priraď) a patrí do Štúdia, kde je vidieť celá zákazka. Riadok „očakáva“ **neponúka výber kategórie** bez šablóny (to je S1-C).
 - **Nález Kontroly o spotrebiči vedie do sekcie Spotrebiče** (`ROUTE_SECTIONS` `'appl' => 'appl'`; v S1-B1 viedol do Rozpočtu) — kotva `appliance:<uuid>` prepne
   pohľad a riadok prisvieti. Riadok, ktorý medzitým zanikol, nie je tichý no-op.
-- **Testy:** headless **4411** (nová sada `test_s1b2_pohlad.rb`), **126 JS sád** (nová `test_s1b2_pohlad.js`), in-SketchUp sekcia **`run_s1b2`** (riadok nad
+- **Testy:** headless **4411** (nová sada `test_s1b2_pohlad.rb`), **126 JS sád** (nová `test_s1b2_pohlad.js`), in-SketchUp **2963 PASS / 0 FAIL** vrátane novej
+  sekcie **`run_s1b2`** (riadok nad
   reálnou skrinkou, telo slotu prekreslené v modeli, doska bez prestavby, tabuľka nad reálnym zberom, Delete vlastníka → sirota → odpojenie → Späť). Mutácie
   M1–M3 overené (filter po osiach · telo z väzby · poradie tabuľky zo servera). Ikona `unlink` pribudla do spritu a do inventára UI_DIZAJN §4.
 

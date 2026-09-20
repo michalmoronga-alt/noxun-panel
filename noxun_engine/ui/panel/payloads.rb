@@ -420,9 +420,8 @@ module Noxun
           over = top - bh
           fill = line - top
           under = bh <= line + 0.01
-          name = item ? Bom.appliance_label(item) : ''
           { 'body' => "#{fmt_mm(body[:w])} × #{fmt_mm(bh)} × #{fmt_mm(body[:d])}",
-            'body_note' => (name.empty? ? "generické #{body[:label]}" : name),
+            'body_note' => slot_body_note(body, item),
             'body_source' => body[:source],
             'body_range' => slot_body_range(item),
             'front_top' => fmt_mm(top),
@@ -433,6 +432,17 @@ module Noxun
             'under_text' => "#{fmt_mm(line)} #{under ? '≥' : '<'} #{fmt_mm(bh)}",
             'class_ok' => slot_class_ok(cfg, item),
             'class_text' => slot_class_text(cfg, body, item) }
+        end
+
+        # Odkial su rozmery tela. Vazba BEZ polozky (druhe okno ju medzitym
+        # zmazalo) sa NEVYDAVA za generiku — telo je stale z katalogu, len sa
+        # uz nema ako volat.
+        def slot_body_note(body, item)
+          name = item ? Bom.appliance_label(item).to_s : ''
+          return name unless name.empty?
+          return 'z katalógu (položka už v rozpočte nie je)' if body[:source] == 'catalog'
+
+          "generické #{body[:label]}"
         end
 
         # Polozka zakazky, ktora v TOMTO slote stoji (vazba je v configu).
@@ -471,11 +481,11 @@ module Noxun
           return "#{body[:label]} · bez modelu" if item.nil?
 
           name = Bom.appliance_label(item)
-          cls = slot_item_dims(item)['install'].is_a?(Hash) ? slot_item_dims(item)['install']['dishwasher_class'].to_s : ''
-          mark = slot_class_ok(cfg, item) ? '✓' : '✗'
+          install = slot_item_dims(item)['install']
+          cls = install.is_a?(Hash) ? install['dishwasher_class'].to_s : ''
           return "#{body[:label]} · #{name} (trieda neuvedená)" if cls.empty?
 
-          "#{body[:label]} · #{name} #{mark}"
+          "#{body[:label]} · #{name} #{slot_class_ok(cfg, item) ? '✓' : '✗'}"
         end
 
         def slot_item_dims(item)
