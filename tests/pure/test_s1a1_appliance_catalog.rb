@@ -409,7 +409,8 @@ NxTest.test('spotrebice: assess! — necitatelny tvar, chybajuci marker a duplic
   applc_install!('std' => 1, 'records' => [{ 'category' => 'oven', 'name' => 'Bez identity' }])
   NxTest.assert_equal(:read_only, APPLC.state, 'zaznam bez UUID')
 
-  applc_install!('std' => 1, 'records' => [{ 'id' => 'x', 'name' => 'A' }, { 'id' => 'x', 'name' => 'B' }])
+  applc_install!('std' => 1, 'records' => [{ 'id' => 'x', 'category' => 'oven', 'name' => 'A' },
+                                           { 'id' => 'x', 'category' => 'oven', 'name' => 'B' }])
   NxTest.assert_equal(:read_only, APPLC.state, 'duplicitne identity')
   NxTest.assert(APPLC.state_reason.include?('duplicitné'), "dovod: #{APPLC.state_reason}")
 end
@@ -895,6 +896,45 @@ NxTest.test('spotrebice: `derived` sa overuje proti SCHEME kategorie, nie len pr
   st2, = APPLC.create!(applc_new('category' => 'fridge', 'name' => 'Chlad',
                                  'derived' => ['front.furniture_doors.lower_min']))
   NxTest.assert_equal(:ok, st2, 'vnorene pole nabytkovych dveri je platna cesta')
+end
+
+NxTest.test('spotrebice: ulozeny zaznam BEZ znamej kategorie = READ-ONLY (kolo 3 P2)') do
+  applc_install!('std' => 1, 'seed_version' => 1,
+                 'records' => [{ 'id' => 'a1', 'name' => 'Bez kategorie',
+                                 'dims' => { 'front' => { 'outer_width' => 'oops' } } }])
+  NxTest.assert_equal(:read_only, APPLC.state, 'bez kategorie nie je proti comu validovat `dims`')
+  NxTest.assert(APPLC.state_reason.include?('neznámu kategóriu'), "dovod: #{APPLC.state_reason}")
+
+  applc_install!('std' => 1, 'seed_version' => 1,
+                 'records' => [{ 'id' => 'a1', 'category' => 'spotrebic_z_buducnosti', 'name' => 'X' }])
+  NxTest.assert_equal(:read_only, APPLC.state, 'neznama kategoria tiez nie')
+  NxTest.assert_equal(:unsupported, APPLC.snapshot_for('a1')[0], 'a do zakazky sa taky zaznam nedostane')
+end
+
+NxTest.test('spotrebice: ulozene `derived` sa validuju AJ bez `dims` (kolo 3 P2)') do
+  applc_install!('std' => 1, 'seed_version' => 1,
+                 'records' => [{ 'id' => 'a1', 'category' => 'oven', 'name' => 'Preklep',
+                                 'derived' => ['body.wdith'] }])
+  NxTest.assert_equal(:read_only, APPLC.state, 'zaznam bez `dims` sa uz nevracia skor')
+  NxTest.assert(APPLC.state_reason.include?('odvodeného poľa'), "dovod: #{APPLC.state_reason}")
+
+  applc_install!('std' => 1, 'seed_version' => 1,
+                 'records' => [{ 'id' => 'a1', 'category' => 'oven', 'name' => 'OK',
+                                 'derived' => ['body.width'] }])
+  NxTest.assert_equal(:ok, APPLC.state, 'platna cesta prejde')
+end
+
+NxTest.test('spotrebice: ulozeny nahlad nad PDF = READ-ONLY (matica druh -> pripona, kolo 3 P2)') do
+  att = [{ 'id' => 'x1', 'kind' => 'thumbnail', 'file' => "#{'a' * 8}_list.pdf", 'name' => 'list.pdf' }]
+  applc_install!('std' => 1, 'seed_version' => 1,
+                 'records' => [{ 'id' => 'a1', 'category' => 'oven', 'name' => 'X', 'attachments' => att }])
+  NxTest.assert_equal(:read_only, APPLC.state, 'PDF ako nahlad neprejde ani z ULOZENEHO suboru')
+
+  ok_att = [{ 'id' => 'x1', 'kind' => 'thumbnail', 'file' => "#{'a' * 8}_foto.png", 'name' => 'foto.png' },
+            { 'id' => 'x2', 'kind' => 'sheet', 'file' => "#{'b' * 8}_list.pdf", 'name' => 'list.pdf' }]
+  applc_install!('std' => 1, 'seed_version' => 1,
+                 'records' => [{ 'id' => 'a1', 'category' => 'oven', 'name' => 'X', 'attachments' => ok_att }])
+  NxTest.assert_equal(:ok, APPLC.state, 'obrazkovy nahlad + PDF list su v poriadku')
 end
 
 # --- hladanie a tvar odpovede --------------------------------------------------

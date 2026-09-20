@@ -343,24 +343,40 @@ module Noxun
       end
 
       # Dovod, preco je ULOZENY zaznam necitatelny (nil = je v poriadku).
-      # Kontroluje sa TA ISTA validacia znamych poli ako pri zapise: subor
-      # upraveny rukou (`"width": "oops"`) by inak presiel ako zdravy katalog
-      # a retazec by sa skopiroval do zakazkoveho snapshotu (Codex #377 kolo 2
-      # P2). Nezname kluce ostavaju dopredne kompatibilne — `normalize_dims`
-      # ich nevaliduje, len prenasa.
+      # Kontroluje sa TA ISTA validacia ako pri zapise — kategoria, `dims`,
+      # `derived` aj matica priloh idu cez TIE ISTE funkcie, ktore pouziva
+      # `build_record` a `attach!` (Codex #377 kolo 3): jeden zdroj pravdy,
+      # takze citacia a zapisova cesta sa uz nemozu rozist. Subor upraveny
+      # rukou (`"width": "oops"`, preklep v `derived`, PDF ako nahlad) tak
+      # neprejde ako zdravy katalog a nedostane sa do zakazkoveho snapshotu.
+      # Nezname kluce ostavaju dopredne kompatibilne — `normalize_dims` ich
+      # nevaliduje, len prenasa.
       def stored_record_issue(rec)
         return 'záznam nie je objekt' unless rec.is_a?(Hash)
-        return 'záznam bez identity' if rec['id'].to_s.strip.empty?
+
+        id = rec['id'].to_s.strip
+        return 'záznam bez identity' if id.empty?
+
+        category = rec['category'].to_s
+        # Bez ZNAMEJ kategorie nie je proti comu validovat `dims` ani
+        # `derived` — vsetky polia by prepadli ako „dopredne kompatibilne".
+        return "záznam #{id} má neznámu kategóriu" unless CATEGORIES.include?(category)
 
         unless rec['attachments'].nil? ||
                (rec['attachments'].is_a?(Array) && rec['attachments'].all? { |it| valid_stored_attachment?(it) })
-          return 'nečitateľná príloha'
+          return "záznam #{id}: nečitateľná príloha"
         end
-        return nil if rec['dims'].nil?
-        return 'rozmery nie sú objekt' unless rec['dims'].is_a?(Hash)
 
-        _dims, msg, field = normalize_dims(rec['dims'], rec['category'].to_s)
-        msg ? "#{msg} (#{field})" : nil
+        if rec.key?('derived')
+          _derived, dmsg = normalize_derived(rec['derived'], category)
+          return "záznam #{id}: #{dmsg}" if dmsg
+        end
+
+        return nil if rec['dims'].nil?
+        return "záznam #{id}: rozmery nie sú objekt" unless rec['dims'].is_a?(Hash)
+
+        _dims, msg, field = normalize_dims(rec['dims'], category)
+        msg ? "záznam #{id}: #{msg} (#{field})" : nil
       end
 
       # Polozka `attachments[]` musi byt CITATELNA uz pri kontrole dokumentu.
@@ -370,11 +386,16 @@ module Noxun
       def valid_stored_attachment?(item)
         return false unless item.is_a?(Hash)
         return false if item['id'].to_s.strip.empty?
-        return false unless ATTACHMENT_KINDS.include?(item['kind'].to_s)
+
+        kind = item['kind'].to_s
+        return false unless ATTACHMENT_KINDS.include?(kind)
         return false unless item['name'].is_a?(String)
 
         file = item['file'].to_s
-        file.match?(ATTACH_FILE_RE) && ATTACHMENT_EXTS.include?(attach_ext(file))
+        # Pripona sa meria TOU ISTOU maticou ako pri `attach!` — ulozeny
+        # `thumbnail` nad PDF by inak presiel a UI by kreslilo prazdnu
+        # dlazdicu (Codex #377 kolo 3).
+        file.match?(ATTACH_FILE_RE) && KIND_EXTS[kind].include?(attach_ext(file))
       end
 
       # --- citanie -------------------------------------------------------------
