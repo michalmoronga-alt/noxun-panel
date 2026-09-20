@@ -118,9 +118,11 @@
       // navigácia. Ikona = hammer (kontrakt „Ikony navigácie").
       { id: 'hw',     ic: 'hammer',   t: 'Kovanie' },
       // S1-A2: Spotrebiče sú SEKCIA (13. položka, katalóg modelov tohto PC).
-      // Badge tu ZÁMERNE nie je — počty „chýba/nesedí" prídu z Kontroly až
-      // v S1-B a prázdny badge by tvrdil, že sa niečo počíta.
-      { id: 'appl',   ic: 'appliance', t: 'Spotrebiče' },
+      // S1-B2: badge = koľko riadkov pohľadu „V zákazke" treba vybaviť
+      // (nevybraný model, zaniknutý vlastník, nález Kontroly). Číslo skladá
+      // SERVER v `appl.job.counts` — klient si zo zoznamu nič nepočíta, presne
+      // ako pri Kontrole.
+      { id: 'appl',   ic: 'appliance', t: 'Spotrebiče', badge: 'appl' },
       // ŠT-3b-1: Pravidlá sú SEKCIA (Š17). Okno „Pravidlá kovania" zaniklo;
       // skupina „ABS podľa roly" pribudne v ŠT-3b-2.
       { id: 'rules',  ic: 'settings', t: 'Pravidlá' },
@@ -458,6 +460,15 @@
 
   // Š11: živé počty pri navigačnej položke Kontrola. Čísla sú zo `counts`
   // KAŽDÉHO pushu — čistá zákazka badge nekreslí vôbec.
+  // Ktoré čísla visia pri položke navigácie. `true` = semafor celej zákazky
+  // (Kontrola), `'appl'` = počty pohľadu „V zákazke" (S1-B2). Oboje skladá
+  // SERVER — klient sa len rozhodne, ktorý hotový blok prečíta.
+  function navCounts(badge){
+    if (badge === 'appl') return (ST && ST.appl && ST.appl.job) ? ST.appl.job.counts : null;
+
+    return ST ? ST.counts : null;
+  }
+
   function navBadgeHtml(counts){
     var c = counts || {};
     var r = c.red || 0;
@@ -942,6 +953,8 @@
       // S1-B1: kotva RIADKU rozpočtu sa spotrebuje až po vykreslení sekcie
       // (dôvod nižšie), preto musí prežiť blok deep-linku.
       var budAnchor = null;
+      // S1-B2: to isté pre kotvu riadku v sekcii SPOTREBIČE.
+      var applAnchor = null;
       // CENY-KOV-A: produktovy preklik mohol zacat aj z Rozpoctu. Zmena
       // dokumentu zrusi jeho cakanie este PRED dosadenim cudzieho payloadu.
       if (typeof hwProductContextChanged === 'function' &&
@@ -1042,10 +1055,18 @@
         // riadku) — pred vykreslením sekcie by nenašla nič a jednorazová kotva
         // by zanikla bez účinku. Aplikuje sa preto AŽ PO `render()`.
         budAnchor = (studioSec === 'budget') ? anchorFilter(ST) : null;
+        // S1-B2: nález o spotrebiči vedie do sekcie SPOTREBIČE (`route: 'appl'`
+        // v `ProductionCore::ROUTE_SECTIONS`) — kotva prepne pohľad na
+        // „V zákazke" a riadok prisvieti. Rovnaký životný cyklus ako pri
+        // Rozpočte: AŽ PO `render()` (je to dotaz do DOM) a JEDNORAZOVO.
+        applAnchor = (studioSec === 'appl') ? anchorFilter(ST) : null;
       }
       render();
       if (budAnchor && typeof budOpenAnchor === 'function' && !budOpenAnchor(budAnchor)){
         NXAPI.setStatus('Tento riadok už v rozpočte nie je — otvorený je celý Rozpočet.', true);
+      }
+      if (applAnchor && typeof apOpenAnchor === 'function' && !apOpenAnchor(applAnchor)){
+        NXAPI.setStatus('Tento spotrebič už v zákazke nie je — otvorený je celý zoznam.', true);
       }
     },
     setStatus: function(msg, err){
@@ -1133,7 +1154,7 @@
              ' data-nav="' + esc(it.id) + '" title="' + esc(tip) + '">' +
              ico(it.ic) + '<span>' + esc(it.t) + '</span>' +
              // Š11: živé počty pri Kontrole — z counts KAŽDÉHO pushu.
-             (it.badge ? navBadgeHtml(ST ? ST.counts : null) : '') + '</button>';
+             (it.badge ? navBadgeHtml(navCounts(it.badge)) : '') + '</button>';
       });
     });
     h += '<div class="navfoot"><button type="button" class="navitem" data-navmini' +
@@ -2092,6 +2113,8 @@
       semaforHtml: semaforHtml, ctrlRows: ctrlRows, ctrlRowHtml: ctrlRowHtml,
       ctrlListHtml: ctrlListHtml,
       ctrlActionsHtml: ctrlActionsHtml, navBadgeHtml: navBadgeHtml,
+      // S1-B2: ktoré počty visia pri ktorej položke navigácie.
+      navCounts: navCounts,
       // ŠT-1c PR A sekcia Nákup kovania (Š7) + D-93 znamienko ručného zásahu
       // (sada tests/js/test_d93_nl_override.js sa sem presunula z production.js)
       buySection: buySection, price: price, hwManualMark: hwManualMark,

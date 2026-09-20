@@ -79,6 +79,12 @@
     // stavov (rozbaľovacie okno pod tlačidlom).
     'chevron-down': '<path d="m6 9 6 6 6-6"/>',
     'link': '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+    // S1-B2: „odpojiť spotrebic od vlastnika" v pohlade V zakazke (Lucide
+    // `unlink`) — pretrhnuta retaz je opak `link`, takze dvojica hovori sama
+    // za seba a nepotrebuje slovo v riadku tabulky.
+    'unlink': '<path d="m18.84 12.25 1.72-1.71h-.02a5.004 5.004 0 0 0-.12-7.07 5.006 5.006 0 0 0-6.95 0l-1.72 1.71"/>' +
+              '<path d="m5.17 11.75-1.71 1.71a5.004 5.004 0 0 0 .12 7.07 5.006 5.006 0 0 0 6.95 0l1.71-1.71"/>' +
+              '<path d="M8 2v2"/><path d="M2 8h2"/><path d="M16 22v-2"/><path d="M22 16h-2"/>',
     'search': '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
     'arrow-left': '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
     // D-83: „Nahradiť UNI…" priamo z riadku KONTROLY (Štúdio) —

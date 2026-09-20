@@ -1003,14 +1003,19 @@ module Noxun
           js(script)
         end
 
-        # Payload sekcie. Model sa NEODOVZDAVA — katalog spotrebicov je
-        # GLOBALNY (per PC). Maly JSON (strom je zoznam nazvov a podtitulov,
-        # ziadne obrazky), takze chodi CELY pri kazdom pushi; KARTU si klient
-        # pyta sam (`appl_card`) a miniatury k nej chodia lazy kanalom.
-        def appl_payload
+        # Payload sekcie. KATALOG je GLOBALNY (per PC), pohlad „V zákazke"
+        # (S1-B2) naopak patri DOKUMENTU — preto sa sem od S1-B2 podava model
+        # a tri UZ HOTOVE vysledky tohto pushu (zber, rozpocet, kontrola).
+        # Ziadny z nich sa nepocita druhy raz: tabulka spotrebicov je ich
+        # PROJEKCIA, nie vlastny prepocet.
+        # Maly JSON (strom aj tabulka su zoznamy textov, ziadne obrazky), takze
+        # chodi CELY pri kazdom pushi; KARTU si klient pyta sam (`appl_card`)
+        # a miniatury k nej chodia lazy kanalom.
+        def appl_payload(model = nil, collected = nil, budget = nil, control = nil)
           return nil unless defined?(ApplianceDialog)
 
-          ApplianceDialog.section_payload
+          ApplianceDialog.section_payload(model, collected: collected, budget: budget,
+                                                 control: control)
         rescue StandardError => e
           Engine.log_error(e, 'StudioDialog.appl_payload')
           nil
@@ -1637,7 +1642,9 @@ module Noxun
             # Karta v pushi NIE JE — klient si ju pýta (`appl_card`) a
             # miniatúry k nej chodia lazy kanálom, takže prepočet kusovníka
             # nikdy neťahá obrázky príloh.
-            appl: appl_payload,
+            # S1-B2: a navyše pohľad „V zákazke" (`appl.job`) — projekcia UŽ
+            # HOTOVÉHO zberu, rozpočtu a kontroly tohto pushu.
+            appl: appl_payload(model, collected, budget, control),
             # ŠT-3b-1, sekcia PRAVIDLÁ: pravidla kovania projektu (alebo
             # globalne predvolby, kym projekt vlastne nema) + pocet skriniek,
             # ktore ulozenie prestavia. Maly JSON — chodi CELY pri kazdom pushi.

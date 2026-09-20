@@ -2137,10 +2137,11 @@ module Noxun
       # S1-B1: DEEP-LINK nalezu, ktory v modeli ziadnu entitu NEMA. Adresu
       # sklada VALIDACIA (`item['data']['route']`), tu sa len overi tvar —
       # ziadne odvodzovanie z kategorie (druha pravda o tom, kam nalez vedie).
-      # `route: 'appl'` v B1 vedie do sekcie ROZPOCET na riadok polozky; S1-B2
-      # ho prepne na pohlad „V zakazke" (zmeni sa TATO mapa, nikde inde).
+      # `route: 'appl'` viedol v B1 do sekcie ROZPOCET na riadok polozky; od
+      # S1-B2 vedie do sekcie SPOTREBIČE na pohlad „V zákazke" (zmenila sa
+      # PRESNE TATO mapa, nikde inde — presne preto tu je).
       # -> { 'section' =>, 'anchor' =>, 'route' => } | nil
-      ROUTE_SECTIONS = { 'appl' => 'budget' }.freeze
+      ROUTE_SECTIONS = { 'appl' => 'appl' }.freeze
 
       def route_target(item)
         d = item.is_a?(Hash) ? item['data'] : nil
@@ -2160,7 +2161,7 @@ module Noxun
       end
 
       def route_status(rt)
-        return 'Otvorené v Rozpočte — riadok spotrebiča je zvýraznený.' if rt['route'] == 'appl'
+        return 'Otvorené v Spotrebičoch — riadok je zvýraznený v pohľade V zákazke.' if rt['route'] == 'appl'
 
         'Otvorené v Štúdiu.'
       end

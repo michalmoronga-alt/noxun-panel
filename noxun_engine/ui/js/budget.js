@@ -1620,20 +1620,35 @@
   // Ciste (tests/js/test_st2d_kde.js): polozka -> polia formulara. Spotrebic
   // ma LEN adresu — kod ani poznamku jeho zaznam nenesie (server by ich
   // zahodil), takze sa ani nesmu pytat.
-  function budMoreFields(kind, it, b){
+  //
+  // S1-B2: `full` = editor otvoreny MIMO tabulky rozpoctu (pohlad „V zákazke"
+  // v sekcii Spotrebice). Tam nie je co inline editovat, takze formular musi
+  // niest aj nazov, dodavatela a cenu; v ROZPOCTE su to bunky tabulky a druhy
+  // sposob, ako ich zmenit, by len rozdvojil zapisovu cestu.
+  function budMoreFields(kind, it, b, full){
     var r = it || {};
     var url = { key: 'url', label: 'Adresa', value: r.url || '', placeholder: 'https://…' };
     // S1-B1: spotrebic ma v editore navyse VLASTNIKA a prepinac „dodáva
     // zákazník" — kod ani poznamku jeho zaznam nenesie (server by ich zahodil).
     if (kind === 'appliance'){
-      return [
+      var head = full === true
+        ? [{ key: 'nazov', label: 'Názov / model', value: r.nazov || '',
+             placeholder: 'napr. Bosch SMV4HVX00E' },
+           { key: 'dodavatel', label: 'Dodávateľ', value: r.dodavatel || '',
+             placeholder: 'nepovinné' },
+           // `cena_mj` nesie ULOZENU cenu aj pri „dodáva zákazník" (priznak
+           // nuluje len medzisucet, nikdy zapis) — presne ako bunka tabulky.
+           { key: 'cena', label: 'Cena', value: budNumText(r.cena_mj),
+             placeholder: '0,00', cls: 'mshort' }]
+        : [];
+      return head.concat([
         url,
         { key: 'owner', label: 'Vlastník', type: 'select', value: budOwnerValue(r),
           options: budOwnerOptionsFor(b, r) },
         { key: 'customer_supplied', label: BUD_APPL_CS_LABEL, type: 'checkbox',
           value: r.customer_supplied === true,
           hint: 'Cena ostane v riadku, ale do súčtov nevstúpi.' }
-      ];
+      ]);
     }
     return [
       { key: 'kod', label: 'Kód', value: r.kod || '' },
@@ -1644,11 +1659,17 @@
 
   // Ciste: polia formulara -> atributy pre server (rovnaky vzor ako
   // `budDraftAttrs` — jedno miesto, kde sa rozhoduje, co sa odosiela).
-  function budMoreAttrs(kind, f){
+  // `full` (S1-B2) = editor niesol aj nazov, dodavatela a cenu.
+  function budMoreAttrs(kind, f, full){
     var g = f || {};
     var attrs = { url: g.url || '' };
     if (kind === 'appliance'){
       attrs.customer_supplied = g.customer_supplied === true || g.customer_supplied === 'true';
+      if (full === true){
+        attrs.nazov = g.nazov || '';
+        attrs.dodavatel = g.dodavatel || '';
+        attrs.cena = g.cena || '';
+      }
       return attrs;
     }
     attrs.kod = g.kod || '';
@@ -1665,7 +1686,7 @@
     return (sec.rows || []).filter(function(r){ return r.id === id; })[0] || null;
   }
 
-  function budOpenMore(kind, id){
+  function budOpenMore(kind, id, full){
     if (typeof window === 'undefined' || !window.NXModal) return;
     // Review #2: pozostatok po Escape/kliku vedľa — `NXModal.close()` sa
     // rozpočtu neohlási, takže zvyšný `BUD_MORE` by koreloval odpoveď na
@@ -1673,17 +1694,26 @@
     BUD_MORE = null;
     var it = budFindItem(kind, id);
     if (!it){ NX.setStatus('Položka sa nenašla — obnov okno.', true); return; }
-    BUD_MORE = { kind: kind, id: id, sent: false, owner: budOwnerValue(it) };
+    BUD_MORE = { kind: kind, id: id, sent: false, owner: budOwnerValue(it),
+                 full: full === true };
     // S1-B1 (B4): editor je tiez viazany na DOKUMENT, z ktoreho vznikol.
     BUD_MODAL_DOC = budModelGuid();
     NXModal.open({
       title: it.nazov || 'Detail položky',
-      sub: 'voliteľné údaje · v tabuľke sa nezobrazujú',
+      sub: full === true ? 'spotrebič zákazky · zmena ide jedným krokom Späť'
+                         : 'voliteľné údaje · v tabuľke sa nezobrazujú',
       okLabel: 'Uložiť',
-      fields: budMoreFields(kind, it, budBudget()),
+      fields: budMoreFields(kind, it, budBudget(), full === true),
       onSubmit: function(v){ budMoreCommit(v); }
     });
   }
+
+  // S1-B2: TEN ISTY editor otvoreny z pohladu „V zákazke" (sekcia Spotrebice).
+  // Je to JEDNA implementacia s dvomi vstupnymi miestami — kanal, korelacia
+  // odpovede aj zivotny cyklus modalu ostavaju rozpoctove; lisi sa len sada
+  // poli (`full`), lebo tam sa nazov ani cena inline editovat neda.
+  function budOpenApplEdit(id){ budOpenMore('appliance', id, true); }
+  if (typeof window !== 'undefined') window.budOpenApplEdit = budOpenApplEdit;
 
   // S1-B1: editor spotrebica moze zmenit VLASTNIKA — a to je ina domenova
   // akcia nez uprava poli (`appliance_owner` -> `ApplianceBinding` move/unbind,
@@ -1698,13 +1728,14 @@
     // NAOZAJ zmenil (porovnanie s baseline z otvorenia editora). Uprava adresy
     // alebo priznaku o vlastnikovi NEHOVORI NIC, takze ho ani nesmie niest —
     // server ho pri `appliance_update` odmieta (`ApplianceBinding::OWNER_OPS`).
+    var full = BUD_MORE.full === true;
     if (kind === 'appliance' && budOwnerDirty(v)){
-      budSend('appliance_owner', { id: BUD_MORE.id, attrs: budMoreAttrs(kind, v),
+      budSend('appliance_owner', { id: BUD_MORE.id, attrs: budMoreAttrs(kind, v, full),
                                    owner: budOwnerPayload(budBudget(), v.owner) });
       return;
     }
     budSend(kind === 'appliance' ? 'appliance_update' : 'custom_update',
-            { id: BUD_MORE.id, attrs: budMoreAttrs(kind, v) });
+            { id: BUD_MORE.id, attrs: budMoreAttrs(kind, v, full) });
   }
 
   // Zmenil pouzivatel pole „Vlastník"? Prazdna hodnota (pole sa nevykreslilo)
@@ -2274,6 +2305,8 @@
       // „odmietnutie nezatvara" a „busy zamok" sa inak overit nedaju.
       budMoreFields: budMoreFields, budMoreAttrs: budMoreAttrs,
       budOpenMore: budOpenMore,
+      // S1-B2: ten istý editor otvorený z pohľadu „V zákazke" (plná sada polí).
+      budOpenApplEdit: budOpenApplEdit,
       // S1-B1: vazba spotrebica (tests/js/test_s1b1_rozpocet.js). Ciste
       // funkcie — kategorie aj ponuka vlastnikov chodia zo SERVERA, klient
       // z nich LEN sklada. `budDocSwitched` potrebuje stav modalu a exportuje

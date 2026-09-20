@@ -48,7 +48,7 @@ module Noxun
       SECTION_ACTIONS = %w[
         appl_tree appl_card appl_create appl_patch appl_delete appl_restore
         appl_attach appl_thumbnail appl_remove_attachment
-        appl_open_url appl_open_attachment appl_leave
+        appl_open_url appl_open_attachment appl_leave appl_job_select
       ].freeze
 
       # Skupina vyradenych zaznamov je v strome POSLEDNA a ma vlastny kod —
@@ -300,6 +300,7 @@ module Noxun
           when 'appl_remove_attachment' then handle_remove_attachment(payload)
           when 'appl_open_url'          then handle_open_url(payload)
           when 'appl_open_attachment'   then handle_open_attachment(payload)
+          when 'appl_job_select'        then handle_job_select(payload)
           when 'appl_leave'             then handle_leave
           end
         end
@@ -385,8 +386,17 @@ module Noxun
 
         # --- payload sekcie (prvotny stav v `push_state`) ---------------------
 
-        def section_payload
-          tree_payload(view_query, view_deleted?, view_gen)
+        # S1-B2: payload nesie OBA pohlady naraz — strom katalogu (per PC) aj
+        # tabulku „V zákazke" (per dokument). Su to dve rozne veci v jednom
+        # kluci zamerne: klient prepina pohlad BEZ dotazu na server, takze
+        # prepnutie nikdy necaka na kolo a nikdy neukaze prazdnu tabulku.
+        # Bez modelu (legacy volanie, headless test) chyba kluc `job` — sekcia
+        # vtedy kresli iba katalog.
+        def section_payload(model = nil, collected: nil, budget: nil, control: nil)
+          out = tree_payload(view_query, view_deleted?, view_gen)
+          job = job_payload(model, collected: collected, budget: budget, control: control)
+          out['job'] = job if job
+          out
         rescue StandardError => e
           Engine.log_error(e, 'ApplianceDialog.section_payload')
           nil
@@ -1002,6 +1012,329 @@ module Noxun
           return set_status('Otvorené.') if status == :ok
 
           set_status(reason(status, info), true)
+        end
+
+        # === POHLAD „V ZAKAZKE" (S1-B2) =======================================
+        #
+        # Tabulku sklada SERVER: riadky, ich PORADIE, stav, cenu aj vsetky
+        # texty. JS kresli presne to, co dostal — poradie skladane na klientovi
+        # by bola druha pravda o tom, kde spotrebic v zakazke stoji.
+        #
+        # ZIADNY DRUHY SKEN MODELU: stavy su z `Bom.collect[:appliances]`
+        # (S1-B1), ceny a priznak „dodáva zákazník" z uz hotoveho payloadu
+        # ROZPOCTU, nalezy z uz hotovej KONTROLY a poradie aj popisky vlastnikov
+        # z ponuky `budget['appliance_owners']`, ktoru rozpocet uz postavil.
+        # Jedine vlastne citanie su POLOZKY zakazky (`BudgetStore.appliances`):
+        # odkaz na obchod a technicky list zije v SNAPSHOTE polozky a ziadny iny
+        # payload ho nenesie.
+        #
+        # MUTACIE POHLADU (pridanie, editor, odpojenie, zmazanie) maju SVOJ
+        # kanal — `budget_mutate` (`ProductionCore.apply_budget_op` ->
+        # `ApplianceBinding`). Sekcia si NEROBI vlastnu zapisovu cestu: druha
+        # cesta k tej istej vazbe by znamenala druhu sadu guardov a druhy
+        # sposob, ako spravit krok Spat. Jedina zapisova akcia sekcie je teda
+        # ZIADNA; `appl_job_select` len oznacuje v modeli.
+
+        # Poradie vlastnikov v tabulke (R1).
+        JOB_KIND_ORDER = %w[cabinet board slot job].freeze
+        # Kategorie, o ktorych ma plugin co tvrdit (nika alebo trieda). Ostatne
+        # su EVIDENCIA — chip „evidencia" nie je chyba, je to priznanie, ze
+        # kontrola k nim neexistuje (mockup R4).
+        JOB_CHECKED = %w[fridge oven microwave dishwasher].freeze
+        # Skratky nalezov Kontroly do stlpca „Kontrola". Cely text nalezu
+        # ostava v Kontrole; tu je miesto na jednu vetu.
+        JOB_CODE_LABELS = {
+          'appliance_specs_missing' => 'chýbajú údaje niky',
+          'appliance_class_mismatch' => 'trieda nesedí',
+          'appliance_owner_missing' => 'vlastník zmizol'
+        }.freeze
+        JOB_OK_TEXT = 'v poriadku'
+        JOB_INFO_TEXT = 'evidencia'
+        JOB_NONE_TEXT = 'nevybraný'
+        JOB_MISSING_TEXT = 'vlastník zmizol'
+        JOB_CS_LABEL = 'dodáva zákazník'
+
+        def job_payload(model, collected: nil, budget: nil, control: nil)
+          return nil unless collected.is_a?(Hash) && defined?(BudgetStore)
+
+          job_view(Array(collected[:appliances]), BudgetStore.appliances(model), budget, control)
+        rescue StandardError => e
+          Engine.log_error(e, 'ApplianceDialog.job_payload')
+          nil
+        end
+
+        # CISTA funkcia (headless test `test_s1b2_pohlad.rb`): zaznamy zberu +
+        # polozky zakazky + payload rozpoctu + kontrola -> payload pohladu.
+        def job_view(records, items, budget, control)
+          owners = job_owner_index(budget)
+          prices = job_price_index(budget)
+          issues = job_issue_index(control)
+          by_id = {}
+          Array(items).each { |it| by_id[it['id'].to_s] = it if it.is_a?(Hash) }
+          rows = Array(records).filter_map do |rec|
+            job_row(rec, by_id[rec['item_id'].to_s], prices, issues, owners)
+          end
+          rows = job_sorted(rows)
+          warn = rows.count { |r| r['tone'] == 'warn' }
+          { 'rows' => rows, 'total' => rows.count { |r| !r['item_id'].to_s.empty? },
+            'warn' => warn,
+            # Badge navigacie: JEDEN riadok = JEDNO cislo (dva nalezy nad tym
+            # istym spotrebicom su v Kontrole dva riadky, tu je to jedna vec,
+            # ktoru treba vybavit). Cervene cislo tu nikdy nie je — spotrebic
+            # exportnu branu nedrzi.
+            'counts' => { 'red' => 0, 'orange' => warn, 'total' => warn },
+            'summary' => job_summary(rows), 'categories' => category_options }
+            .merge(job_totals(budget))
+        end
+
+        # Ponuka vlastnikov z rozpoctu je zaroven ich PORADIM aj POPISKOM:
+        # `{ 'cabinet|CAB-3' => { rank, index, label, desc } }`.
+        def job_owner_index(budget)
+          src = budget.is_a?(Hash) ? budget['appliance_owners'] : nil
+          opts = src.is_a?(Hash) ? src['options'] : nil
+          out = {}
+          return out unless opts.is_a?(Hash)
+
+          JOB_KIND_ORDER.each_with_index do |kind, rank|
+            Array(opts[kind]).each_with_index do |o, idx|
+              next unless o.is_a?(Hash)
+
+              id = o['id'].to_s
+              label = o['label'].to_s
+              out["#{kind}|#{id}"] = { 'rank' => rank, 'index' => idx, 'label' => id,
+                                       'desc' => job_owner_desc(id, label), 'pid' => o['pid'] }
+            end
+          end
+          out
+        end
+
+        # Popisok ponuky je „CAB-3 · Chladničková skriňa 600" — v tabulke su to
+        # DVA stlpcove udaje, takze sa rozdeli TAM, kde ho ponuka zlepila.
+        def job_owner_desc(id, label)
+          rest = label.to_s.start_with?(id.to_s) ? label.to_s[id.to_s.length..].to_s : label.to_s
+          rest.sub(/\A\s*·\s*/, '').strip
+        end
+
+        # Ceny a priznaky zo sekcie `appliances` rozpoctu (id -> riadok).
+        def job_price_index(budget)
+          sections = budget.is_a?(Hash) ? Array(budget['sections']) : []
+          sec = sections.find { |s| s.is_a?(Hash) && s['key'] == 'appliances' }
+          out = {}
+          Array(sec && sec['rows']).each do |r|
+            out[r['id'].to_s] = r if r.is_a?(Hash) && !r['id'].to_s.empty?
+          end
+          out
+        end
+
+        # Nalezy Kontroly kategorie `appliance` podla polozky (id -> [nalez…]).
+        def job_issue_index(control)
+          items = control.is_a?(Hash) ? Array(control['items']) : Array(control)
+          out = {}
+          items.each do |it|
+            next unless it.is_a?(Hash) && it['category'].to_s == 'appliance'
+
+            d = it['data'].is_a?(Hash) ? it['data'] : {}
+            id = d['item_id'].to_s
+            next if id.empty?
+
+            (out[id] ||= []) << it
+          end
+          out
+        end
+
+        def job_row(rec, item, prices, issues, owners)
+          return nil unless rec.is_a?(Hash)
+
+          state = rec['state'].to_s
+          id = rec['item_id'].to_s
+          cat = rec['category'].to_s
+          owner = rec['owner'].is_a?(Hash) ? rec['owner'] : {}
+          okind = owner['kind'].to_s
+          info = owners["#{okind}|#{owner['id']}"] || {}
+          price = prices[id] || {}
+          found = Array(issues[id])
+          snap = item.is_a?(Hash) && item['snapshot'].is_a?(Hash) ? item['snapshot'] : {}
+          cs = price['customer_supplied'] == true || (item.is_a?(Hash) && item['customer_supplied'] == true)
+          row = {
+            'item_id' => (id.empty? ? nil : id), 'state' => state, 'category' => cat,
+            'category_label' => ApplianceCatalog.category_label(cat),
+            'model' => job_model_text(rec, state),
+            'model_sub' => job_model_sub(rec, item, snap, state),
+            'owner' => { 'kind' => okind, 'id' => owner['id'].to_s, 'pid' => owner['pid'] },
+            'owner_label' => job_owner_label(okind, owner, info),
+            'owner_desc' => (info['desc'].to_s.empty? ? job_owner_kind_text(okind) : info['desc']),
+            'customer_supplied' => cs,
+            'price_text' => job_price_text(price, cs),
+            'shop_url' => job_first_url(snap['shop_urls']),
+            'sheet_url' => job_first_url(snap['sheet_urls']),
+            # Poradie: rank/index vlastnika. Neznamy vlastnik (sirota) ide na
+            # KONIEC svojej skupiny — ponuka ho uz nema odkial ocislovat.
+            'sort' => [info['rank'] || JOB_KIND_ORDER.index(okind) || JOB_KIND_ORDER.length,
+                       info['index'] || 9999,
+                       ApplianceCatalog::CATEGORIES.index(cat) || 99,
+                       job_model_text(rec, state).to_s.downcase, id]
+          }
+          row.merge(job_status(state, cat, found)).merge('actions' => job_actions(row, state))
+        end
+
+        def job_model_text(rec, state)
+          return "— #{JOB_NONE_TEXT}" if state == 'expected_missing'
+
+          name = rec['name'].to_s.strip
+          name.empty? ? '—' : name
+        end
+
+        # Druhy riadok stlpca Model: odkial model je (katalog vs rucny zaznam),
+        # alebo PRECO tam riadok vobec je (skrinka spotrebic ocakava).
+        def job_model_sub(rec, item, snap, state)
+          if state == 'expected_missing'
+            label = ApplianceCatalog.category_label(rec['category'].to_s).to_s.downcase
+            return "vlastník očakáva #{label.empty? ? 'spotrebič' : label}"
+          end
+          man = snap['manufacturer'].to_s.strip
+          return 'ručný záznam (bez katalógu)' if item.is_a?(Hash) && item['catalog_id'].to_s.empty?
+
+          man.empty? ? 'z katalógu' : "#{man} · z katalógu"
+        end
+
+        def job_owner_label(kind, owner, info)
+          return '—' if kind.empty? || kind == ApplianceBinding::KIND_JOB
+
+          label = info['label'].to_s
+          label.empty? ? owner['id'].to_s : label
+        end
+
+        def job_owner_kind_text(kind)
+          return 'len zákazka' if kind.empty? || kind == ApplianceBinding::KIND_JOB
+
+          ApplianceBinding.kind_label(kind)
+        end
+
+        # Stlpec „Kontrola". Poradie vetiev je kontrakt: chybajuci model a
+        # zaniknuty vlastnik su stav RIADKU (nalez k nim este nemusi existovat),
+        # nalezy Kontroly maju prednost pred „v poriadku" a kategoria bez
+        # kontroly je EVIDENCIA, nie zelena.
+        def job_status(state, category, found)
+          return { 'tone' => 'warn', 'status_text' => JOB_NONE_TEXT } if state == 'expected_missing'
+          return { 'tone' => 'warn', 'status_text' => JOB_MISSING_TEXT } if state == 'owner_missing'
+
+          unless found.empty?
+            return { 'tone' => 'warn', 'status_text' => job_issue_text(found),
+                     'status_title' => found.map { |i| i['message_sk'].to_s }.join(' · ') }
+          end
+          return { 'tone' => 'info', 'status_text' => JOB_INFO_TEXT } unless JOB_CHECKED.include?(category)
+          return { 'tone' => 'info', 'status_text' => JOB_INFO_TEXT } if state == 'job'
+
+          { 'tone' => 'ok', 'status_text' => JOB_OK_TEXT }
+        end
+
+        def job_issue_text(found)
+          codes = found.map { |i| i['stable_key'].to_s.split('|').last }
+          labels = codes.map { |c| JOB_CODE_LABELS[c] }.compact.uniq
+          labels.empty? ? 'upozornenie' : labels.join(' · ')
+        end
+
+        def job_price_text(price, customer_supplied)
+          return JOB_CS_LABEL if customer_supplied
+
+          v = price['cena_mj']
+          return '—' unless v.is_a?(Numeric)
+
+          "#{format('%.2f', v.to_f).tr('.', ',')} €"
+        end
+
+        def job_first_url(list)
+          url = Array(list).map(&:to_s).find { |u| http_url?(u) }
+          url.to_s
+        end
+
+        # Co riadok PONUKA. Server rozhoduje, ktore akcie davaju zmysel —
+        # klient ziadnu vlastnu podmienku nema (stale DOM nie je ochrana a
+        # server si kazdy zapis aj tak overi este raz).
+        def job_actions(row, state)
+          owner = row['owner'] || {}
+          physical = !owner['kind'].to_s.empty? && owner['kind'].to_s != ApplianceBinding::KIND_JOB
+          item = !row['item_id'].to_s.empty?
+          { 'select' => (state == 'bound' && physical && !owner['pid'].nil?),
+            'edit' => item, 'remove' => item, 'unbind' => (item && physical),
+            'assign' => (state == 'expected_missing'),
+            'shop' => !row['shop_url'].to_s.empty?, 'sheet' => !row['sheet_url'].to_s.empty? }
+        end
+
+        def job_sorted(rows)
+          rows.each_with_index.sort_by { |(r, i)| [r['sort'], i] }.map { |(r, _)| r.reject { |k, _| k == 'sort' } }
+        end
+
+        # Veta pod tabulkou. Cisla pocita SERVER (vzor suctoveho riadku Studia).
+        def job_summary(rows)
+          total = rows.count { |r| !r['item_id'].to_s.empty? }
+          parts = ["#{total} #{job_word(total)}"]
+          none = rows.count { |r| r['state'] == 'expected_missing' }
+          gone = rows.count { |r| r['state'] == 'owner_missing' }
+          cs = rows.count { |r| r['customer_supplied'] }
+          parts << "#{none} nevybraný" if none.positive?
+          parts << "#{gone} bez vlastníka" if gone.positive?
+          parts << "#{cs} dodáva zákazník" if cs.positive?
+          parts.join(' · ')
+        end
+
+        def job_word(n)
+          return 'spotrebič' if n == 1
+          return 'spotrebiče' if n >= 2 && n <= 4
+
+          'spotrebičov'
+        end
+
+        # Medzisucet sekcie „Spotrebiče a vybavenie" — CISLO pocita rozpocet,
+        # tu sa len prepisuje (a prizna sa, ci vstupuje do SPOLU).
+        def job_totals(budget)
+          t = budget.is_a?(Hash) ? budget['totals'] : nil
+          return { 'subtotal_text' => '', 'subtotal_included' => false } unless t.is_a?(Hash)
+
+          v = t['appliances_subtotal'].to_f
+          { 'subtotal_text' => "#{format('%.2f', v).tr('.', ',')} €",
+            'subtotal_included' => t['appliances_included'] == true }
+        end
+
+        # „Oko" pohladu: oznaci vlastnika v modeli a doramuje naň kameru.
+        # CISTE CITANIE — ziadna operacia, ziadny krok Spat. Identitu overuje
+        # TA ISTA funkcia ako vazba (`ApplianceBinding.instances_of` + PID),
+        # takze recyklovane ID nikdy neoznaci cudziu skrinku.
+        def handle_job_select(payload)
+          data = parse(payload)
+          model = defined?(Sketchup) ? Sketchup.active_model : nil
+          return set_status('Model nie je k dispozícii.', true) unless model
+
+          kind = data['kind'].to_s
+          id = data['id'].to_s
+          pid = data['pid'].to_i
+          inst = job_select_target(model, kind, id, pid)
+          return set_status('Vlastník sa nenašiel — obnov okno a skús znova.', true) if inst.nil?
+
+          model.selection.clear
+          model.selection.add(inst)
+          zoom_to(model, inst)
+          set_status("Označené v modeli: #{id}.")
+        end
+
+        def job_select_target(model, kind, id, pid)
+          return nil if id.empty? || !ApplianceBinding::OWNER_KINDS.include?(kind)
+          return nil if kind == ApplianceBinding::KIND_JOB
+
+          matches = ApplianceBinding.instances_of(model, kind, id)
+          return nil unless matches.length == 1
+          return nil if pid.positive? && matches.first.persistent_id.to_i != pid
+
+          matches.first
+        end
+
+        def zoom_to(model, inst)
+          view = model.active_view
+          view.zoom(inst)
+          view.invalidate
+          true
+        rescue StandardError
+          false
         end
 
         # --- spolocne ----------------------------------------------------------

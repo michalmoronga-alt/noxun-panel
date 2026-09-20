@@ -650,6 +650,33 @@
   .apfacts .ic { width: 13px; height: 13px; }
   .sectools .apdel { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px;
                      color: var(--nx-ink-muted); }
+  /* ---------- S1-B2: pohľad „V zákazke" (mockup javisko 1, R3–R5) ----------
+     Tabuľka je bežná `.bomtab` Štúdia — vlastné sú len chipy stavu, dvojriadkové
+     bunky Model/Vlastník a jantárový riadok. Farby VÝHRADNE cez --nx-* tokeny. */
+  .apjob td { vertical-align: middle; }
+  .apjcat { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+            color: var(--nx-ink-muted); }
+  .apjcat .ic { width: 13px; height: 13px; flex: 0 0 13px; }
+  .apjmodel b { display: block; color: var(--nx-ink-strong); }
+  .apjmodel small { display: block; font-size: 10.5px; color: var(--nx-ink-soft); }
+  .apjowner { white-space: nowrap; }
+  .apjowner .oid { font-weight: 700; color: var(--nx-select); }
+  .apjowner .odesc { display: block; font-size: 10.5px; color: var(--nx-ink-soft); }
+  .apjrow.warn td { background: var(--nx-warn-bg); }
+  .apjrow.focus td { box-shadow: inset 0 0 0 1px var(--nx-select); }
+  .apjrow .rowact { opacity: .55; }
+  .apjrow:hover .rowact { opacity: 1; }
+  .apchip { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px;
+            font-weight: 600; border-radius: 6px; padding: 1px 7px; white-space: nowrap; }
+  .apchip .ic { width: 11px; height: 11px; }
+  .apchip.ok { background: var(--nx-ok-bg); color: var(--nx-ok-fg); border: 1px solid var(--nx-ok-border); }
+  .apchip.warn { background: var(--nx-warn-bg-soft); color: var(--nx-warnchip-fg);
+                 border: 1px solid var(--nx-warnchip-border); }
+  .apchip.info { background: var(--nx-surface-sunken); color: var(--nx-ink-muted);
+                 border: 1px solid var(--nx-border); }
+  .apchip.cust { background: var(--nx-select-bg-soft); color: var(--nx-select);
+                 border: 1px solid var(--nx-part-border); }
+  .apjhint { margin-top: 8px; line-height: 1.5; }
   @media (max-width: 1100px) {
     .apbody { grid-template-columns: 1fr; }
   }
