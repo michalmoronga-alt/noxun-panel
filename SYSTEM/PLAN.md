@@ -224,13 +224,9 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 
 
 - *(Kovanie — D-109/D-110/D-111 aj fáza 3 — sa 26.8. vyčlenilo do vlastného bloku **KOVANIE**; ten je od **10.9.2026 hotový** (v0.10.0), plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).)*
-- **Spotrebiče S1** (V1-02) — **rozhodnuté 6.9.2026:** ručný katalóg (názov/model, odkazy obchod[], technické listy[] + **galéria príloh** so súbormi, rozmery per kategória),
-  spotrebič patrí **zákazke a vlastníkovi podľa kategórie** (skrinka · slot umývačky · pracovná doska · len zákazka), cena len v rozpočte, kontrola niky vo V1 len chladnička + šírka umývačky, šablóna s tagom „spotrebičová" upozorní bez spotrebiča;
-  detail: [zdroje/next_sessions/V1_DEBATA_2026-09-06_SPOTREBICE.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_SPOTREBICE.md) + technické listy [zdroje/next_sessions/SPOTREBICE_TECHLISTY_2026-09.md](zdroje/next_sessions/SPOTREBICE_TECHLISTY_2026-09.md)
-  (predúloha hotová 6.9.; **listy overené 19.9.2026** proti PDF výrobcov + Michalova prax —
-  [zdroje/next_sessions/SPOTREBICE_TECHLISTY_OVERENIE_2026-09-19.md](zdroje/next_sessions/SPOTREBICE_TECHLISTY_OVERENIE_2026-09-19.md), seed 9 modelov;
-  **drez bez modelu a listu** — do debaty vstupuje ako cenová položka + ručný výrez do PD, model dodá Michal, inak poistka „len cena"
-  → detailná debata polí → outside-in → mockup → package + `codex-audit`, nový modul). Za S1: **spotrebičová skrinka** (šablóny nad K1 + S1; nízka priorita).
+- **Spotrebiče S1** (V1-02) — **beží ako vlastný blok 5 nižšie** (packages schválené 20.9.2026, nočný autonómny beh). Rámec 6.9.: ručný katalóg s odkazmi, listami
+  a prílohami, spotrebič patrí zákazke a vlastníkovi podľa kategórie, cena len v rozpočte, spotrebičová šablóna. Rozšírenie 20.9.: **slot umývačky** (nový typ skrinky)
+  a **telo chladničky** (kontrolná geometria) idú do V1. Podklady: [zdroje/next_sessions/V1_DEBATA_2026-09-20_SPOTREBICE_POLIA.md](zdroje/next_sessions/V1_DEBATA_2026-09-20_SPOTREBICE_POLIA.md).
 - ✅ **D-124 · Predvoľby projektu v Materiáloch** — default rozbalené, ručne zbaliteľné; štyri skupiny Korpus / Čelá / Chrbát / Zásuvky vedľa seba, náhľady **115 × 115 px**
   (schválený mockup mínus 20 %), celý názov variantu a údaje pod vzorkou; v úzkom okne dva stĺpce. Spoločný picker, potvrdenie/zrušenie a serverový kontrakt zachované.
   **PR #344, v0.10.3.** „Materiál per rola dielca" ostáva v zásobníku Po V1. Podklad: `zdroje/next_sessions/D124_OUTSIDE_IN_2026-09-10.md`.
@@ -631,6 +627,94 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   sekcia hlási nedostupný zdroj, Štúdio nezamrzne. **Checklist uzáveru:** bump patch + `?v=` → testy → `ui-lifecycle.md` (odsek About + updater UI, vedomá odchýlka) →
   D-52 do DOGFOODING_vyriesene (plný text + riadok indexu) → STAV/KRONIKA/PLAN (blok 6 položka hotová).
 - ~~**D-20 · Quick actions — bezpečný move plugin**~~ — **✅ VYRIEŠENÁ 4.9.2026** package **NÁSTROJE-1** (T1a PR #293 v0.9.24 + T1b PR #294 v0.9.25); plný text v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md).
+
+### 5 · SPOTREBIČE S1 (V1-02) — packages (schválené Michalom 20.9.2026, nočný autonómny beh od 20.9.)
+
+**Cieľ bloku:** katalóg spotrebičov s overenými rozmermi a listami · spotrebič v zákazke s vlastníkom a kópiou rozmerov · **slot umývačky** ako nový typ skrinky · **telo chladničky**
+ako kontrolná geometria + Kontrola niky a delenia dverí · spotrebičová šablóna. Autority: debata [zdroje/next_sessions/V1_DEBATA_2026-09-20_SPOTREBICE_POLIA.md](zdroje/next_sessions/V1_DEBATA_2026-09-20_SPOTREBICE_POLIA.md)
+(§1 rozhodnutia, §1b–§1c druhé kolo, §3 slot, §4 chladnička, §5 polia, §6 zákazka, §7 UI, §8 šablóna) · cross audit ×3 [zdroje/next_sessions/S1_CROSS_AUDIT_2026-09-20.md](zdroje/next_sessions/S1_CROSS_AUDIT_2026-09-20.md)
+(§3 delta) · **mockup [zdroje/ui20/mockup_spotrebice_s1.html](zdroje/ui20/mockup_spotrebice_s1.html) = záväzná vizuálna autorita** (R1–R17) · čísla listov [zdroje/next_sessions/SPOTREBICE_TECHLISTY_OVERENIE_2026-09-19.md](zdroje/next_sessions/SPOTREBICE_TECHLISTY_OVERENIE_2026-09-19.md).
+Nemenné zásady: semafor varuje, nikdy neblokuje · neznáme pole = prázdne, nikdy tichý default · telo spotrebiča = referencia (proxy kontrakt nôh: `manufactured: false`, `production_class: 'none'`), nikdy v kusovníku ani VEPO ·
+konkrétny model sa nikdy nedeformuje podľa niky · cena len v Rozpočte · katalóg je per PC (D-48 po V1).
+
+**Poradie a brány:** S1-E0 → S1-A1 → S1-A2 → S1-E → S1-B → S1-F → S1-C → S1-D. Každá dávka = brief `_dev/BRIEF_s1<x>.md` (vzor `_dev/BRIEF_s1e0.md`) → Opus subagent vo worktree z čerstvého `main`
+→ PR → `codex-po-pr` (kolo 1 plné GH review; len P2/P3 = fix + interná delta) → merge `--match-head-commit` → `git checkout main && git pull`. Audit-povinné dávky (**A1, E, B, F, C**) majú PRED
+briefom `codex-audit` (Astra) nad package + dotknutými súbormi; kvótová brána `usage` pred každým auditom a subagentom. Pravidlo 3 kôl platí (rozdeliť, nie iterovať). Patch bump per PR, **uzáver bloku = v0.13.0**.
+Ráno denný report (čo je v maine · čo čaká a prečo · čo zlyhalo · čo večer smoke-testovať).
+
+- **S1-E0 · min výška korpusu 200 → 80 mm** *(fix, bez auditu; beží od 20.9. ~03:15, brief `_dev/BRIEF_s1e0.md`)* — `CabinetBuilder::MIN[:height]`, `scale_observer` MIN, JS `LIMITS.height` + parity guard;
+  nízky korpus (80–120) sa postaví bez záporných dielcov (build warning namiesto pádu); `CONFIG_SCHEMA` nemení; VERSION 0.12.9. Dôvod: korpus na dorovnanie nad umývačkou (V1_DEBATA §3). DoD: pure sada + JS + in-SU `run_s1e0`.
+- **S1-A1 · Katalóg spotrebičov — jadro** *(nový modul `core/appliance_catalog.rb` → `codex-audit` ÁNO)*. **Scope IN:** per-PC JSON `%APPDATA%\NOXUN\Engine\appliances.json`
+  cez `JsonFileStore` (atomický zápis + `.bak`, sidecar flock, `assess!` matica ok / read_only / degraded ako `HardwareCatalog`), marker `std` 1 s forward guardom; záznam = `id` (UUID) · `category`
+  (interné kódy `fridge oven microwave dishwasher hob sink hood other`; SK popisky v jednej mape, guard parity) · `manufacturer` · `name` · `shop_urls[]` · `sheet_urls[]` · `note` · `dims` v štyroch
+  blokoch **`body` · `niche` · `front` · `install`** per kategória (V1_DEBATA §5 + cross audit §3: rúra/mikro presahy s referenciou `body|niche` + medzera pod čelom; chladnička pásma dverí,
+  voliteľné `furniture_doors` z výkresu, `door_system`, `hinge_side`; umývačka trieda, telo V min–max, čelo Š / V max / hmotnosť = evidencia; drez `min_cabinet_width`; digestor výrez do dna) — každé pole
+  voliteľné, validácia min ≤ max, `derived: true` pri odvodených; `attachments[]` `{file, kind: sheet|image|thumbnail, added_at}` (presne 1 thumbnail) — `attach!` kopíruje do
+  `appliances\<id>\<n>_<sanitized>.<ext>` s `rescue` zamknutého súboru/EACCES a limitom veľkosti; `open_attachment` = `UI.openURL("file:///…")` s URI-kódovaním; `delete!` = tombstone `deleted_at`
+  (súbory ostávajú); `patch!` s `row_rev` guardom; **seed 10 modelov** (`SEED_VERSION` 1, hodnoty a URL listov z OVERENIA §1–§7 a §11 + Blanco Legra XL 6 S; odvodené hodnoty označené).
+  **Scope OUT:** UI, väzba do zákazky, cena, scraping, drag-and-drop, PDF náhľad, zdieľanie. **DoD:** pure `test_s1a1_appliance_catalog.rb` (schéma, seed, tombstone, rev guard, min/max, forward
+  guard read-only, prílohy v temp dir, sanitizácia, parity popiskov); in-SU `run_s1a1` (attach + `UI.openURL` s diakritikou a medzerami, zamknutý súbor → hláška, tombstone nemaže súbor).
+  **Docs:** NOVÝ súbor `docs/architecture/appliances.md` (odsek `appliance_catalog.rb`) + riadok v rozcestníku `docs/ARCHITEKTURA.md` (tabuľka „Kde čo nájdeš" aj Core) · STANDARD §2.1 poznámka
+  `kind: reference` pripravená pre S1-E. **Riziká:** kolízia zámkov s inými katalógmi (vlastný sidecar, nikdy vnorený) · Unicode cesty vo `FileUtils.cp` (in-SU test).
+- **S1-A2 · Sekcia Štúdia SPOTREBIČE — pohľad Katalóg** *(UI, audit NIE)*. **Scope IN:** `StudioDialog::SECTIONS` += `appl` (13. sekcia, skupina KATALÓGY medzi `hw` a `rules`; JS zrkadlo
+  `NXShell.STUDIO_SECTIONS`, guard parity); ikona `appliance` v `icons.js` (Lucide `refrigerator`, ISC; inventár v UI_DIZAJN §4); serverový modul `ui/appliance_dialog.rb` (vzor
+  `hardware_catalog_dialog.rb`: uzavretý `SECTION_ACTIONS`, `dispatch`, `with_client`), JS `ui/js/appliances.js` (načítať ZA `studio.js`, prefix `ap*`), CSS v `studio.html`; lišta = segment
+  **V zákazke · Katalóg** (pohľad V zákazke = priznaný placeholder s dôvodom „príde v S1-B", D-78) + „Nový spotrebič" + hľadanie + checkbox „vyradené"; strom po kategóriách (server skladá poradie
+  aj počty), karta záznamu v 4 blokoch (mockup R6), odkazy cez `UI.openURL`, prílohy: miniatúry obrázkov lazy kanálom (vzor `template_previews`), PDF = ikona + otvorenie, „Pridať" = callback →
+  `UI.openpanel` (rovnaká cesta ako `appearance_pick_image`), náhľad = teal rám; D-15 modal Nový/Upraviť (`NXModal.open`, polia per kategória podľa mockupu R8, `memoryKey appl:create` /
+  `appl:edit:<id>`, echo tokenu ako `MDH.itemResult`, chyby pri poli); zmazať = D-15 danger (tombstone). Zmena katalógu = echo sekcie (bez zdvihu generácie — čísla zákazky sa nemenia).
+  **Scope OUT:** zákazka, Inspector, Rozpočet, drag-and-drop. **DoD:** pure `test_s1a2_sekcia.rb` (SECTIONS parita, whitelist, ikona, `?v=`), JS `test_s1a2_sekcia.js` (strom/karta z payloadu,
+  polia per kategória, memoryKey), in-SU `run_s1a2` (otvorenie sekcie, create → súbor, tombstone → vyradené). **Docs:** ui-lifecycle.md odsek „Sekcia SPOTREBIČE" + UI_DIZAJN ikona + appliances.md.
+- **S1-E · Slot umývačky — nový typ skrinky** *(builder + `CONFIG_SCHEMA` 14 → 15 + TemplateStore STD 4 → 5 → `codex-audit` ÁNO; in-SU povinné)*. **Scope IN:** `type: 'dishwasher'`
+  (UI „Umývačka", badge v hlavičke) v `CabinetBuilder`: `DISHWASHER_DEFAULTS`, `normalize` whitelist `lower|upper|dishwasher`, polia `dw_class` (600|450), `width`, `height` (= výška linky),
+  `depth`, `dw_body_height` (rozsah listu; generické 820/815), `dw_front_bottom` (sokel = spodná hrana čela od podlahy), `dw_front_height`; **schéma 15 rezervuje aj kľúče `appliance_ref`
+  a `appliance_expects`** (napĺňajú S1-B/F/C bez ďalšieho bumpu). Stavba: žiadne boky/dno/strop/chrbát; **jediný výrobný dielec = čelo** cez modul čiel (jeden pevný item typu
+  `false_front` — bez závesov, s úchytkou/profilom, materiál čiel, ABS) nad virtuálnym otvorom (z0 = sokel, výška = čelo); **telo = referencia** (`kind: 'reference'`, `role: 'appliance_body'`,
+  `manufactured: false`, `production_class: 'none'`, `proxy: true`, definícia recyklovaná menom, tag ako proxy nôh) z dvoch boxov: telo (598/448 × telo V × 555/550) + fixná základňa 200 mm
+  odsadená (konštanty 50 spredu / 20 zboku); AABB slotu = šírka × výška linky × hĺbka (ghost, snap, mower). Inspector: Základné podľa mockupu R13–R14 (7 vstupov, výstupy: čelo hore, výplň hore
+  „ručne", telo, pod doskou, trieda), rail Zóny `aria-disabled` s dôvodom, Čelá = jedno čelo (karta), Kovanie = úchytka; vkladacia karta: typ Umývačka + **seed šablóny „Umývačka 60" a
+  „Umývačka 45"** (markerový seed STD 5). Kontroly (Validation): telo vs šírka slotu · min výška tela ≤ výška linky (trieda vs model až po S1-B). Kusovník/VEPO/nákup: len čelo (+ úchytka).
+  **Scope OUT:** blenda/sokel ako dielce, väzba na katalóg, delené čelo, kontrola výšky čela/hmotnosti/sokla, zóny. **DoD:** pure (normalize, defaults, plán = 1 výrobný dielec + referencia,
+  `BuildPlan.validate!`, AABB, VEPO/kusovník len čelo, golden existujúcich zákaziek nezmenený, schéma 15 forward guard), JS (Základné render, LIMITS dw polí), in-SU `run_s1e` (vklad zo
+  šablóny, prestavba, 1 Späť, snap medzi dve skrinky, kusovník 1 dielec, scale absorpcia, ghost). **Docs:** construction.md odsek `cabinet_builder.rb` (typ dishwasher, kľúče schémy 15),
+  appliances.md (slot), STANDARD §4.2 (V1 typy: DOLNÁ, HORNÁ, UMÝVAČKA slot) + §2.1 `kind: reference`, ui-lifecycle (obsah slotu, vkladacia karta), POJMY (slot umývačky).
+  **Riziká:** modul čiel predpokladá korpus s bokmi (otvor, medzery) — overiť `Fronts.layout` nad virtuálnym otvorom · scale absorpcia typu · guard testy vymenúvajúce typy `lower|upper`.
+- **S1-B · Spotrebič v zákazke — väzba, vlastník, riadok Spotrebič** *(`BUDGET_STD` 1 → 2 + aditívny kľúč `Bom.collect` → `codex-audit` ÁNO)*. **Scope IN:** položka
+  `budget_appliances[]` += `catalog_id`, `snapshot` (identita + `dims` bloky + `sheet_urls`, `snapshot_at`; zákazka nezávisí od živého katalógu), `owner` `{kind: cabinet|board|slot|job, id}`,
+  `customer_supplied` (vypína `missing_price`, CP štítok „dodáva zákazník"), typ `drez`; `BUDGET_STD` 2 (legacy položky = `owner.kind: job`); mutácie `bind_appliance!`, `set_owner!`,
+  `set_customer_supplied!` (1 mutácia = 1 Späť cez `write!`); sekcia Rozpočtu premenovaná **„Spotrebiče a vybavenie"** (budget.js + `cp_export` labels) a modal „Pridať spotrebič" += pole
+  **Z katalógu** (D-15 `lookup` nad `ApplianceCatalog.search`) + prepínač „dodáva zákazník". `Bom.collect` += aditívny kľúč `appliances` (položky zákazky s owner — z modelového dictu, žiadny
+  druhý sken); `Validation`: kategória `appliance` so `stable_key = appliance|<uuid>`, klik-select = vlastník; v B nálezy **`appliance_specs_missing`** (model bez rozmerov niky) a
+  **trieda vs model pri slote**; ostatné v F/C. Štúdio pohľad **V zákazke** (mockup R3–R5: tabuľka, akcie oko/ceruzka/odkaz/list/⋯, „Pridať do zákazky" = modal s lookup + výber vlastníka
+  zo zoznamu `Panel.job_cabinets` + dosky + sloty + „len zákazka"; badge navigácie = počty z Kontroly; súčet z Rozpočtu ako preklik). Inspector: **riadok „Spotrebič"** v Základných (vzor
+  `legsRow`; mockup R9–R11): `cabinet_payload.appliance` `{state, text, sub, options[], all}` skladá server (options = spotrebiče zákazky danej kategórie, **filtrované podľa niky vs vnútro
+  skrinky** + voľba „zobraziť všetky"), select = akcia `set_appliance_owner` (1 Späť), link → `openStudio('appl')`; pri slote väzba spresní telo (zápis `appliance_ref` do configu + rebuild
+  v jednej operácii). **Scope OUT:** `expects` (C), box chladničky a niky kontroly (F), delené čelo. **DoD:** pure (`test_r14` na std 2 + migrácia, `test_s1b_vazba.rb`: snapshot nezávislý od
+  katalógu, owner proti zákazke, customer_supplied, filter niky), JS (tabuľka, modal, riadok stavy), in-SU `run_s1b` (bind → owner → Späť; slot telo z väzby; položka z katalógu v Rozpočte;
+  CP štítok). **Docs:** outputs.md odseky `budget_store.rb`/`budget.rb`/`validation.rb`, appliances.md (zákazka), ui-lifecycle (sekcia V zákazke, riadok Spotrebič, Rozpočet modal),
+  STANDARD §11.3 (BUDGET_STD 2). **Riziká:** identita skriniek naprieč dokumentmi (`DocKey` guard pri zápise vlastníka) · odpojený dielec (`top_level_scan`) · položka s vlastníkom, ktorý
+  zanikol → nález „mŕtvy vlastník" (vzor `hardware_adhoc`).
+- **S1-F · Telo chladničky + Kontrola niky a delenia dverí** *(builder → `codex-audit` ÁNO; in-SU povinné)*. **Scope IN:** builder pri `appliance_ref` kategórie chladnička vykreslí
+  **referenčný box niky** (min rozmery niky) s **pásmami dverí spotrebiča** na čelnej ploche (669 · 71 · 1200 pre Beko) na hornej ploche dna, centrovaný, lícujúci s čelnou rovinou; pri
+  `appliance_expects: fridge` bez modelu generický box (kategóriové konštanty, priznané „generické"); rovnaký proxy kontrakt ako slot; box sa nikdy nedeformuje. `Validation` (mockup R4/R10/R12):
+  **`appliance_niche_clash`** per os (`min ≤ vnútro ≤ max`, jednostranne kde list max nedáva; jedna zóna, inak preskočiť s poznámkou „nika nejednoznačná"; rúra/mikro len Š + H) ·
+  **`appliance_door_split`**: z `Fronts.resolve_layout` hrana medzi dolným a horným čelom v `[D+10, D+G−s−10]` (D = spodok + dolné dvere, G = medzera, s = škára čiel z configu), text „odporúčané
+  delenie podľa praxe (presah ≥ 10, škára s)", stred ako odporúčanie; ak snapshot má `furniture_doors` z výkresu, jeho rozsah má prednosť · slot: trieda vs model (ak nie je v B) · riadok
+  Spotrebič ukazuje verdikt + odporúčané delenie · náhľad Inspectora (kontext Korpus) kreslí box s pásmami a pásmom prípustnej hrany (preview.js, farby zrkadlo tokenov).
+  **Scope OUT:** automatické delenie čiel, blend, door-on-door, telá rúry/mikra/dosky/digestora. **DoD:** pure (fixtúry Beko: pásmo 679–728, vnútro 564 × 1924 × 562 → výška ✗, jednostranné
+  min, viac zón → skip, rúra Š+H), JS (preview box, riadok text), in-SU `run_s1f` (väzba → box v modeli → prestavba → 1 Späť; box nikdy v `Bom.collect`; Kontrola ORANGE → oprava výšky → OK).
+  **Docs:** construction.md (`cabinet_builder.rb` box, `preview`), outputs.md (`validation.rb` nové kategórie), appliances.md, POJMY (kontrolná geometria chladničky, pásma dverí).
+- **S1-C · Spotrebičová šablóna `expects` + ORANGE bez spotrebiča** *(TemplateStore STD 5 → 6 + config kľúč → `codex-audit` ÁNO)*. **Scope IN:** záznam šablóny += `expects` (kategória,
+  voliteľné; lazy migrácia markerová, forward guard); modal „Uložiť ako šablónu" (D-14) += select „Očakáva spotrebič"; vloženie zo šablóny zapíše `appliance_expects` do configu; riadok
+  Spotrebič ponúka „očakáva: …" aj bez šablóny (zápis configu = 1 Späť); slot má `expects` implicitne umývačka; `Validation` **`appliance_missing`** ORANGE (expects bez viazaného spotrebiča,
+  slot bez modelu), badge navigácie. **Scope OUT:** spotrebičová skrinka ako šablóny nad K1 (nízka priorita, po S1). **DoD:** pure (round-trip šablóny, STD 6 guard, config, nález), JS (modal
+  pole, riadok „očakáva"), in-SU `run_s1c` (ulož šablónu s expects → vlož → ORANGE → priraď → OK). **Docs:** model-a-identita.md (`templates.rb` STD 6), appliances.md, ui-lifecycle (modal).
+- **S1-D · Uzáver bloku** *(docs, `VERSION` → 0.13.0)*: V1_VIZIA bod 5 ✔ + „Mimo V1" (telá ostatných spotrebičov), tento blok plným textom do [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md),
+  STAV prepis, KRONIKA, README, POJMY, DOGFOODING_vyriesene (D-135 + prípadné nové), plugin update pre Michala + smoke checklist (katalóg seed 10 · prílohy · slot 60/45 vložiť a prisunúť ·
+  chladnička box + Kontrola · šablóna expects · Rozpočet „dodáva zákazník").
+
+**Smoke checklist pre Michala (po každej dávke, v PR popise):** čo otvoriť, čo kliknúť, čo má vidieť — po slovensky, bez diffu. **Stop pravidlá nočného behu:** P1/P0 v review → plné GH kolo;
+3. kolo opráv → PR zavrieť a rozdeliť; in-SU FAIL → neriešiť obchádzkou, nahlásiť v rannom reporte; Codex weekly zostatok < 10 % → náhradná brána (slepý Opus + delta) a priznať v PR.
 
 ## Po V1 — zásobník (nezaradené, nestratiť)
 
