@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **S1-A2 — SEKCIA ŠTÚDIA SPOTREBIČE, POHĽAD KATALÓG (v0.12.11, 20.9.2026, PR #NNN).** Katalóg z S1-A1 dostal UI: **13. sekcia `appl`** v skupine KATALÓGY
+- **S1-A2 — SEKCIA ŠTÚDIA SPOTREBIČE, POHĽAD KATALÓG (v0.12.11, 20.9.2026, PR #378).** Katalóg z S1-A1 dostal UI: **13. sekcia `appl`** v skupine KATALÓGY
   (medzi Kovaním a Pravidlami) — strom po kategóriách vľavo, karta modelu v štyroch blokoch vpravo (**Telo · Nika · Čelo/dvere · Montáž**, jazyk listov
   výrobcov), odkazy, prílohy a poznámka. Serverová autorita je nový modul `ui/appliance_dialog.rb` — **modul bez okna od prvého riadku** (vzor
   `HardwareCatalogDialog` po ŠT-3a-2: uzavretý `SECTION_ACTIONS`, `dispatch`/`with_client` s povinným `ensure`, `ready` vo whiteliste nie je).
