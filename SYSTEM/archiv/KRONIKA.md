@@ -32,10 +32,16 @@
   sú kanonické pre celý engine** — S1-B na ne migruje slovenský enum rozpočtu. **Seed je 9 modelov, nie 10:** drez Blanco Legra XL 6 S nemá overený list
   výrobcu (OVERENIE §12), takže sa neseeduje — kategória `sink` aj jej polia existujú a Michal ho pridá ručne. **Pasce:** `UI.openURL` musí dostať
   `file:///` s URI kódovaním a doprednými lomkami (holá Windows cesta s medzerou a diakritikou nestačí) · limit 25 MB sa meria aj na uloženej kópii
-  (zdroj sa medzi kontrolou a kopírovaním mohol zväčšiť) · zámok katalógu sa nikdy nevnára do iného katalógového zámku. **Testy:** 4213 headless
-  (nová sada `test_s1a1_appliance_catalog.rb`, 30 testov) · 121 JS sád · in-SU sekcia `run_s1a1` (kópia súboru s diakritikou a medzerou, `UI.openURL`,
-  zlyhaná kópia bez siroty, tombstone priečinok nemaže). Mutácie: zrušený zámok (test súbehu s detským procesom), zrušená kontrola `min ≤ max`,
-  opakovaný seed — všetky tri zabité. Docs: nový `docs/architecture/appliances.md` + riadok v rozcestníku, STANDARD §7.1.
+  (zdroj sa medzi kontrolou a kopírovaním mohol zväčšiť) · zámok katalógu sa nikdy nevnára do iného katalógového zámku · **`UI.openURL` v in-SU sekcii
+  musí byť posledný krok behu** — systémový prehliadač prekryje okno SketchUpu, zakryté okno prestane kresliť view a inferencia nad reálnou geometriou
+  (ghost snap, D-123 na zvýšenej ploche) začne vracať len základnú rovinu (prvý beh: 20 falošných FAILov). **Codex kolo 1 (1×P1 + 6×P2)** zapracované:
+  `snapshot_for` berie práve overený dokument priamo (druhé čítanie cez cache mohlo dať zákazke starý záznam) · katalóg **zakladá boot pluginu**
+  (`main.rb`, chránený blok — inak by súbor vznikol až v S1-A2) · zlyhaný seed = `:read_only` a `:read_only` zastaví mutáciu aj nad neexistujúcim súborom ·
+  neznámy kľúč `dims` **od klienta** je `:invalid` (dopredná kompatibilita platí pre súbor, nie pre formulár) · položky `attachments[]` sa kontrolujú už
+  v `assess!` · matica druh → prípona (PDF nikdy náhľad) · UNC cesta si v `file_url` necháva hostiteľa. **Testy:** 4221 headless
+  (nová sada `test_s1a1_appliance_catalog.rb`, 38 testov) · 121 JS sád · in-SU 2814 PASS / 0 FAIL (sekcia `run_s1a1`: boot katalógu, kópia súboru
+  s diakritikou a medzerou, `UI.openURL`, zlyhaná kópia bez siroty, tombstone priečinok nemaže). Mutácie: zrušený zámok (test súbehu s detským procesom),
+  zrušená kontrola `min ≤ max`, opakovaný seed — všetky tri zabité. Docs: nový `docs/architecture/appliances.md` + riadok v rozcestníku, STANDARD §7.1.
 
 - **S1-E0 — MINIMÁLNA VÝŠKA KORPUSU 80 mm (v0.12.9, 20.9.2026, PR #375, zmergovaný 20.9.2026 do main `7d4c567`; záznam nesie docs PR #376).** Spodná hranica výšky klesla z 200
   na 80 mm na všetkých troch miestach, ktoré ju držia (`CabinetBuilder::MIN`, `ScaleWatch::MIN`, `LIMITS` vo `form.js`) — Michal (20.9., debata S1) vypĺňa priestor nad umývačkou po
