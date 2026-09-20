@@ -654,14 +654,18 @@ kvótová brána `usage` pred každým auditom a subagentom. Pravidlo 3 kôl pla
 - **S1-A2 · Sekcia Štúdia SPOTREBIČE — pohľad Katalóg** *(UI, audit NIE)* — 13. sekcia `appl` (skupina KATALÓGY), strom + karta + prílohy + D-15 modal podľa mockupu R1–R8.
 - **S1-E · Slot umývačky — nový typ skrinky** *(builder + `CONFIG_SCHEMA` 15 → 16 + TemplateStore STD 4 → 5 → `codex-audit` ÁNO; in-SU povinné)* — 7 vstupov, jediný dielec čelo
   (item `blind`), telo = referencia + základňa 200, šablóny 60/45, kontroly telo vs šírka a nastavená výška tela vs linka; výplň hore ručne (mockup R13–R16). Kontraktové body zo
-  Codex kôl: **schéma 16 rezervuje `appliance_refs[]` aj `appliance_expects[]`** (C ich napĺňa bez ďalšieho bumpu) · **kópia skrinky aj dosky (toolbar aj natívna dedup) väzby
-  `appliance_refs[]` zahadzuje, `appliance_expects[]` ponecháva** · **slot má podporu `none`** — `dw_front_bottom` (sokel = spodná hrana čela) nikdy netečie do `floor_height`/
+  Codex kôl: **schéma 16 rezervuje `appliance_refs[]` aj `appliance_expects[]` — v configu skrinky AJ dosky (`BOARD_CONFIG_SCHEMA` bump, doska má vlastný whitelist a guard)** (C ich
+  napĺňa bez ďalšieho bumpu) · **kópia skrinky aj dosky (toolbar aj natívna dedup) väzby `appliance_refs[]` zahadzuje, `appliance_expects[]` ponecháva** · **šablóna prenáša len
+  `appliance_expects[]`, nikdy `appliance_refs[]`** (`template_config_from`), a `merge_template` väzby cieľovej skrinky zachová · **slot má podporu `none`** — `dw_front_bottom` (sokel = spodná hrana čela) nikdy netečie do `floor_height`/
   `Construction.support_type`, takže pravidlá kovania negenerujú nohy ani príchyty sokla (Kovanie slotu = len úchytka).
 - **S1-B · Spotrebič v zákazke — väzba, vlastník, riadok Spotrebič** *(`BUDGET_STD` 1 → 2 → `codex-audit` ÁNO)* — snapshot (identita + rozmery + odkazy + prílohy), `appliance_refs[]`
   obojsmerná väzba (položky „len zákazka" = výslovná výnimka), matica kategória → vlastník, pohľad V zákazke, riadok Spotrebič v Inspectore (mockup R3–R5, R9–R11). Kontraktové body zo
   Codex kôl: **jedna kanonická sada kódov kategórií = kódy katalógu + explicitná obojsmerná migrácia legacy kódov rozpočtu** (`chladnicka rura mikrovlnka umyvacka digestor varna_doska ine`
   → `fridge oven microwave dishwasher hood hob other`, + `sink`) v `BUDGET_STD` 2 — existujúce zákazky sa otvoria a editujú ďalej · **„dodáva zákazník" je PRÍZNAK, nie nula:** cena
-  ostáva v nečíselnom stave (nil povolené), príznak vypína upozornenie „chýba cena" a riadok sa zo súčtov vylučuje.
+  ostáva v nečíselnom stave (nil povolené), príznak vypína upozornenie „chýba cena" a riadok sa zo súčtov vylučuje · **obojsmerná väzba = JEDNA operácia:** priradenie, presun aj
+  odpojenie zapisujú položku zákazky (model dict) + `appliance_refs[]` vlastníka + rebuild v jednom `start_operation`/`commit_operation` cez nový operation-aware mutačný vstup (nie dve
+  existujúce cesty `BudgetStore.write!` + rebuild), takže jeden Ctrl+Z vráti obe strany · **výber podľa niky porovnáva len osi, ktoré daná kategória kontroluje** (rúra/mikro len
+  Š + H; nejednoznačná nika = bez filtra).
 - **S1-F · Telo chladničky + Kontrola niky a delenia dverí** *(builder → `codex-audit` ÁNO; in-SU povinné)* — box niky s pásmami z `appliance_refs[]`, `appliance_niche_clash` per os,
   `appliance_door_split` v súradniciach niky, náhľad (mockup R4, R10, R12).
 - **S1-C · Spotrebičová šablóna `expects[]` + ORANGE bez spotrebiča** *(TemplateStore STD 5 → 6 → `codex-audit` ÁNO)* — kľúč `appliance_expects[]` v configu skrinky je už v

@@ -114,9 +114,9 @@ z **priradeného** spotrebiča (snapshot); pri skrinke, ktorá spotrebič len **
 - **Nika:** pre každú os `min ≤ vnútro skrinky ≤ max` tam, kde list dáva obe (Beko výška 1940–1950), inak len `≥ min` (šírka min 560, hĺbka min 555). **Predpoklad V1:**
   nika = celé vnútro skrinky (jedna zóna); skrinka s vodorovnými deleniami → kontrola sa preskočí s poznámkou „nika nejednoznačná".
 - **Delenie dverí (z pásiem listu):** `D = spodok + dolné dvere spotrebiča` (Beko 40 + 629 = 669), `G = medzera dverí spotrebiča` (71), škára nábytkových čiel `s`
-  (z configu čiel, predvolene 2), presah nábytkových dverí cez hranu dverí spotrebiča **min 10 mm na oboch stranách** (konštanta enginu, Michal 19.9.).
-  Hrana medzi nábytkovými dverami (horná hrana dolného čela, meraná od dna niky) musí ležať v pásme **`[D + 10, D + G − s − 10]`** = pre Beko **679 až 728**; odporúčaný
-  stred **703**. Polohy čiel dáva `Fronts.resolve_layout` (`z0`/`z1` per čelo) — engine ich pozná bez novej geometrie. Mimo pásma = ORANGE s vetou, ktorá menuje
+  (z toho istého normalizovaného configu čiel, z ktorého `Fronts` počíta hrany — predvolená hodnota je `Fronts::GAP_DEFAULT` = 3, nie 2; Codex #376 P2), presah nábytkových dverí cez hranu dverí spotrebiča **min 10 mm na oboch stranách** (konštanta enginu, Michal 19.9.).
+  Hrana medzi nábytkovými dverami (horná hrana dolného čela, meraná od dna niky) musí ležať v pásme **`[D + 10, D + G − s − 10]`** = pre Beko **679 až 728 pri škáre 2**
+  (679 až 727 pri predvolenej škáre 3); odporúčaný stred **703**. Polohy čiel dáva `Fronts.resolve_layout` (`z0`/`z1` per čelo) — engine ich pozná bez novej geometrie. Mimo pásma = ORANGE s vetou, ktorá menuje
   pásmo aj aktuálnu hranu; riadok Spotrebič v Inspectore ukáže odporúčané delenie. Horné pásmo (1200 = zvyšok do výšky niky) je len informácia.
 - Rúra a mikro (rozhodnutie 7): kontrola **šírky a hĺbky** niky rovnakým pravidlom, výška nie.
 
