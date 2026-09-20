@@ -317,15 +317,24 @@ NxTest.test('R-14: marker sa NIKDY nepreberá z ulozeneho stavu — zapisuje sa 
   s = NxR14.src(File.join('core', 'budget_store.rb'))
   NxTest.assert_equal(1, s.scan(/write_attr\(model, KEY_STD, BUDGET_STD\)/).length,
                       'marker sa zapisuje z JEDINEHO miesta a VZDY ako BUDGET_STD')
-  # S1-B1: `write!` ma DVE vetvy (vlastna operacia + rezim „v cudzej operacii"),
-  # takze volania su dve — obe MUSIA byt vnutri `write!`. Ziadny iny zapisovac
-  # marker peciatkovat nesmie.
-  body = s[/def write!\(model, operation_name, in_operation: false\).*?\n      end\n/m].to_s
-  NxTest.refute(body.empty?, '`write!` sa nasla')
+  # S1-B1: zapisove cesty su DVE — `write!` (vlastna operacia) a
+  # `write_in_operation!` (rezim „v cudzej operacii", BEZ vlastneho rescue).
+  # Marker peciatkuje KAZDA z nich prave raz a NIKTO iny.
   NxTest.assert_equal(2, s.scan(/^\s+stamp_std\(model\)$/).length,
-                      '`stamp_std` sa vola PRESNE dvakrat (obe vetvy `write!`)')
-  NxTest.assert_equal(2, body.scan(/stamp_std\(model\)/).length,
-                      'a obe volania su vnutri `write!`')
+                      '`stamp_std` sa vola PRESNE dvakrat')
+  %w[write! write_in_operation!].each do |m|
+    body = s[/def #{Regexp.escape(m)}\(.*?\n      end\n/m].to_s
+    NxTest.refute(body.empty?, "`#{m}` sa nasla")
+    NxTest.assert_equal(1, body.scan(/stamp_std\(model\)/).length,
+                        "`#{m}` peciatkuje marker prave raz")
+  end
+  # B1: rezim „v cudzej operacii" NESMIE mat vlastny rescue ani abort —
+  # zhodil by LEN zapis rozpoctu a vazbu u vlastnika by nechal zapisanu.
+  inop = s[/def write_in_operation!\(.*?\n      end\n/m].to_s
+  NxTest.refute(inop.include?('rescue'), 'rezim v cudzej operacii nechytá vynimky')
+  NxTest.refute(inop.include?('model.abort_operation'),
+                'ani neabortuje — operacia patri volajucemu')
+  NxTest.refute(inop.include?('model.start_operation'), 'ani neotvara vlastnu operaciu')
 end
 
 # ============================ DOPREDNY GUARD ================================

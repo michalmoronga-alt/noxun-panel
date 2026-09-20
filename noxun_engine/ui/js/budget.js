@@ -2219,6 +2219,10 @@
       budOwnerValue: budOwnerValue, budApplianceRow: budApplianceRow,
       budDocSwitched: budDocSwitched, budModalOp: budModalOp,
       budApplLookupResult: budApplLookupResult,
+      // `budOpenDraft` potrebuje DOM a exportuje sa ZAMERNE — kontrakty
+      // „naseptavac predvypĺňa zo strukturovanych dat", „zapis nesie identitu
+      // dokumentu" a „prepnuta zakazka modal zavrie" sa inak overit nedaju.
+      budOpenDraft: budOpenDraft, budApplCtxSwitch: budApplCtxSwitch,
       // P0-HF: dvojkrokový export pri riadkoch bez ceny (tests/js/test_p0hf_potvrdenie.js).
       // `budXlsx`/`budCpExport` sa exportujú ZÁMERNE — kontrakt „prvý klik
       // zastaví, druhý pošle `confirm_unpriced`" sa inak overiť nedá.

@@ -730,13 +730,17 @@ module Noxun
         return [false, ['model nie je k dispozícii']] unless model
 
         reason = std_block_reason(std_state(model))
-        if in_operation
-          # Vonkajsi volajuci branu uz overil PRED `start_operation` (verejna
-          # `std_block_reason`). Ak sa sem aj tak dostane nekompatibilna
-          # zakazka, je to chyba programu — fail-closed vynimkou, ktora zhodi
-          # (a teda vrati) CELU operaciu, nikdy polovicny zapis.
-          raise "BudgetStore: #{reason}" unless reason.empty?
+        # POZOR: rezim „v cudzej operacii" MUSI mat vlastne telo — `rescue`
+        # tejto metody je az pod nim a chytal by AJ jeho vynimku (a abortoval
+        # by CUDZIU operaciu). Presne to zakazuje kontrakt B1.
+        return write_in_operation!(model, reason) { yield } if in_operation
+        return [false, [reason]] unless reason.empty?
 
+        # Zachytavaci blok je VNUTORNY, nie na urovni metody: `rescue` metody
+        # by chytil aj vynimku z `write_in_operation!` vyssie — a abortoval by
+        # CUDZIU operaciu, ktoru tato metoda neotvorila.
+        begin
+          model.start_operation(operation_name, true)
           begin
             @in_write = true
             yield
@@ -744,11 +748,34 @@ module Noxun
           ensure
             @in_write = false
           end
-          return [true, []]
+          model.commit_operation
+          [true, []]
+        rescue StandardError => e
+          begin
+            model.abort_operation
+          rescue StandardError
+            nil
+          end
+          Engine.log_error(e, 'BudgetStore.write!') if defined?(Engine)
+          [false, ['zmenu sa nepodarilo uložiť']]
         end
-        return [false, [reason]] unless reason.empty?
+      end
 
-        model.start_operation(operation_name, true)
+      # S1-B1 (Astra B1): REZIM „V CUDZEJ OPERACII". NEOTVARA, NEKOMITUJE ani
+      # NEABORTUJE a NEMA VLASTNY `rescue` — vynimka (aj zo `stamp_std`) ide
+      # VON a abort vlastni volajuci, ktory operaciu otvoril
+      # (`ApplianceBinding`). Keby sme ju chytili tu, zhodili by sme LEN zapis
+      # rozpoctu a `appliance_refs[]` vlastnika by ostali zapisane — presne ten
+      # polovicny stav, kvoli ktoremu je vazba jedna operacia.
+      # `@in_write` vracia `ensure`, takze ani po vynimke neostane zapisovy
+      # kanal otvoreny.
+      def write_in_operation!(model, reason)
+        # Volajuci branu overil PRED `start_operation` (verejna
+        # `std_block_reason`). Ak sa sem aj tak dostane nekompatibilna zakazka,
+        # je to chyba programu — fail-closed vynimkou, ktora vrati CELU
+        # operaciu, nikdy polovicny zapis.
+        raise "BudgetStore: #{reason}" unless reason.empty?
+
         begin
           @in_write = true
           yield
@@ -756,16 +783,7 @@ module Noxun
         ensure
           @in_write = false
         end
-        model.commit_operation
         [true, []]
-      rescue StandardError => e
-        begin
-          model.abort_operation
-        rescue StandardError
-          nil
-        end
-        Engine.log_error(e, 'BudgetStore.write!') if defined?(Engine)
-        [false, ['zmenu sa nepodarilo uložiť']]
       end
 
       # R-14: marker sa zapisuje VZDY ako AKTUALNA hodnota (nikdy sa nepreberá
