@@ -647,8 +647,8 @@ kvótová brána `usage` pred každým auditom a subagentom. Pravidlo 3 kôl pla
 **Stop pravidlá nočného behu:** P1/P0 v review → plné GH kolo; 3. kolo opráv → PR zavrieť a rozdeliť; in-SU FAIL → nahlásiť v rannom reporte, neobchádzať; Codex weekly zostatok < 10 %
 → náhradná brána (slepý Opus + delta) a priznať v PR.
 
-- **S1-E0 · min výška korpusu 200 → 80 mm** *(PR #375 v Codex review, v0.12.9 — merguje sa hneď po tomto docs PR; `CONFIG_SCHEMA` 14 → 15, config-aware klamp scale, default sokla
-  v JS validácii; D-135)* — dôvod: korpus na dorovnanie nad umývačkou (V1_DEBATA §3). Riadok sa označí ✅ až po mergi #375.
+- **S1-E0 · min výška korpusu 200 → 80 mm** *(✅ PR #375 zmergovaný 20.9.2026 → main `7d4c567`, v0.12.9; `CONFIG_SCHEMA` 14 → 15, config-aware klamp scale cez celý `build_plan`
+  (min 94 mm s policou), default sokla v JS validácii; Codex kolo 1 = 1×P1 + 2×P2, kolo 2 = 1×P2, delta overená; D-135)* — dôvod: korpus na dorovnanie nad umývačkou (V1_DEBATA §3).
 - **S1-A1 · Katalóg spotrebičov — jadro** *(nový modul `core/appliance_catalog.rb` → `codex-audit` ÁNO)* — per-PC JSON katalóg (JsonFileStore, zámok, forward guard, tombstone), záznam
   v štyroch blokoch telo · nika · čelo/dvere · montáž, prílohy (0–1 náhľad), seed 10 modelov, `snapshot_for` pre zákazku; bez UI a bez ceny.
 - **S1-A2 · Sekcia Štúdia SPOTREBIČE — pohľad Katalóg** *(UI, audit NIE)* — 13. sekcia `appl` (skupina KATALÓGY), strom + karta + prílohy + D-15 modal podľa mockupu R1–R8.
