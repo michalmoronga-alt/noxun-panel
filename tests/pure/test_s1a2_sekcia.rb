@@ -393,6 +393,97 @@ NxTest.test('S1-A2: z formulara sa NEPREBERA nic, co katalog nepusti') do
   NxTest.assert_equal(%w[name], attrs.keys, 'whitelist vstupu drzi server, nie formular')
 end
 
+# --- 9b) Codex kolo 1 (P2): bezstratovy formular, konflikt, rescue, close ----
+
+NxTest.test('S1-A2: formular dostava BEZSTRATOVU hodnotu, karta zaokruhlenu') do
+  rec = { 'id' => 'x', 'category' => 'oven', 'name' => 'T', 'rev' => 'r',
+          'dims' => { 'front' => { 'thickness' => 19.55, 'width' => 595.0 } } }
+  fields = S1A2_AD.card_payload(rec)['fields']
+  NxTest.assert_equal('19,55', fields['dims.front.thickness'],
+                      'formular vracia PRESNE to, co je v katalogu — inak by prve ulozenie ' \
+                      '(hoci len nazvu) zapisalo zaokruhlenie')
+  NxTest.assert_equal('595', fields['dims.front.width'], 'cele cislo bez desatinnej ciarky')
+  row = S1A2_AD.card_payload(rec)['blocks'].find { |b| b['key'] == 'front' }['rows']
+             .find { |r| r['label'] == 'hrúbka čela' }
+  NxTest.assert_equal('19,6', row['value'], 'karta ZOBRAZUJE jedno desatinne miesto')
+  NxTest.assert_equal('19,55', S1A2_AD.fmt_input(19.55))
+  NxTest.assert_equal('548', S1A2_AD.fmt_input(548.0))
+end
+
+NxTest.test('S1-A2: KONFLIKT posiela modalu CERSTVU `rev` (inak sa zacykli)') do
+  require 'tmpdir'
+  Dir.mktmpdir('noxun-s1a2-conf-') do |dir|
+    S1A2_AC.test_dir_override = dir
+    S1A2_AC.reset_state!
+    begin
+      _st, info = S1A2_AC.create!('category' => 'sink', 'name' => 'Drez')
+      rec = info[:record]
+      # Druha instancia zapisala medzitym — nasa `rev` je od tej chvile stara.
+      S1A2_AC.patch!(rec['id'], { 'note' => 'cudzi zapis' }, rev: rec['rev'])
+      sent = []
+      S1A2_AD.dispatch('appl_patch',
+                       { 'id' => rec['id'], 'rev' => rec['rev'], 'token' => 'tok',
+                         'fields' => { 'name' => 'Iny nazov' } }.to_json, ->(x) { sent << x })
+      line = sent.find { |x| x.start_with?('NX.applResult(') }
+      NxTest.assert(!line.nil?, 'modal dostal odpoved')
+      NxTest.assert(line.include?('false'), 'a je to odmietnutie')
+      NxTest.assert(line.include?('iný SketchUp'), 'veta menuje skutocnu pricinu')
+      fresh = S1A2_AC.find(rec['id'])[1][:record]['rev']
+      NxTest.assert(line.include?(fresh),
+                    'odpoved nesie CERSTVU `rev` — dalsie „Uložiť" uz neskonci na tom istom konflikte')
+    ensure
+      S1A2_AC.test_dir_override = nil
+      S1A2_AC.reset_state!
+    end
+  end
+end
+
+NxTest.test('S1-A2: VYNIMKA v tokenizovanej akcii ODOMKNE modal (nie len status)') do
+  sent = []
+  S1A2_AC.singleton_class.class_eval do
+    alias_method :nx_s1a2_create, :create!
+    define_method(:create!) { |*| raise 'test: vybuch v handleri' }
+  end
+  begin
+    S1A2_AD.dispatch('appl_create',
+                     { 'token' => 'tok-9', 'fields' => { 'category' => 'sink', 'name' => 'X' } }.to_json,
+                     ->(x) { sent << x })
+  ensure
+    S1A2_AC.singleton_class.class_eval do
+      alias_method :create!, :nx_s1a2_create
+      remove_method :nx_s1a2_create
+    end
+  end
+  NxTest.assert(sent.any? { |x| x.start_with?('AP.setStatus(') }, 'okno dostane hlasku')
+  res = sent.find { |x| x.start_with?('NX.applResult(') }
+  NxTest.assert(!res.nil?,
+                'a MODAL dostane vysledok — bez neho ostane `setBusy(true)` navzdy a formular ' \
+                'sa uz neda ani odoslat, ani ulozit')
+  NxTest.assert(res.include?('tok-9'), 'odpoved nesie token odoslania')
+  NxTest.assert(res.include?('false'), 'a je to neuspech')
+end
+
+NxTest.test('S1-A2: akcie MODALU su vymenovane — rescue vie, komu odpovedat') do
+  NxTest.assert_equal(%w[appl_create appl_patch], S1A2_AD::TOKEN_ACTIONS.keys.sort,
+                      'tokenizovane su presne zapisy z modalu')
+  NxTest.assert(S1A2_AD::TOKEN_ACTIONS.values.sort == %w[create patch],
+                'a mapuju sa na mena operacii, ktore klient pozna')
+end
+
+NxTest.test('S1-A2: ZATVORENE Studio zhodi stav pohladu sekcie') do
+  S1A2_AD.dispatch('appl_tree', { 'query' => 'bosch', 'include_deleted' => true, 'gen' => 42 }.to_json,
+                   ->(_x) {})
+  NxTest.assert_equal(42, S1A2_AD.view_gen, 'server drzi generaciu klienta')
+  S1A2_AD.on_ui_closed
+  NxTest.assert_equal(0, S1A2_AD.view_gen,
+                      'po zatvoreni okna je nula — nova instancia startuje od nuly a stara ' \
+                      'generacia by jej vlastne odpovede oznacila ako starsie')
+  NxTest.assert_equal('', S1A2_AD.view_query, 'a filter padol tiez')
+  studio = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog.rb'), encoding: 'UTF-8')
+  NxTest.assert(studio.include?('ApplianceDialog.on_ui_closed if defined?(ApplianceDialog)'),
+                'a Studio ten hook naozaj vola pri zatvoreni okna')
+end
+
 # --- 10) klient: subory, poradie a cache-bust --------------------------------
 
 NxTest.test('S1-A2: `appliances.js` sa nacitava AZ ZA `studio.js`') do

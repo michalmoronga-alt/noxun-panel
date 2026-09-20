@@ -429,6 +429,145 @@ A.apOnLeaveSection();
 ok(sentOf('appl_leave').length === 1, 'odchod zo sekcie sa ohlási serveru');
 eq(A.apState().q, '', 'a klient zabudne filter spolu so serverom');
 
+// --- 8b) Codex kolo 1 (P2): konflikt, fail-closed mazanie, minimálny patch ---
+
+// (P2 #1) Po konflikte drží modal ČERSTVÚ revíziu — inak by každé ďalšie
+// „Uložiť" narazilo na ten istý konflikt a z formulára sa nedalo dostať inak
+// než zahodením práce.
+reset();
+A.apSetTree(tree({ form: FORM }));
+A.apSetCard(card());
+A.apOpenModal('edit');
+MODAL._spec.onSubmit({ manufacturer: 'Beko', name: 'Nové meno' });
+{
+  const first = lastPayload('appl_patch');
+  eq(first.rev, 'r1', 'prvé uloženie ide so zámkom z karty');
+  const token = first.token;
+  // Server: echo karty s novou revíziou + applResult s `info.rev`.
+  A.apSetCard(card({ rev: 'r2' }));
+  A.apResult(false, 'Záznam medzitým zmenil iný SketchUp — skontroluj hodnoty a ulož znova.',
+             [{ msg: 'Záznam medzitým zmenil iný SketchUp — skontroluj hodnoty a ulož znova.' }],
+             'patch', token, { rev: 'r2' });
+  ok(MODAL._open, 'konflikt modal NEZATVÁRA — rozpísané hodnoty ostávajú');
+  eq(MODAL._busy, false, 'a odomkne odoslanie');
+  ok(String(MODAL._errors[0].msg).includes('iný SketchUp'), 'veta povie, čo sa naozaj stalo');
+  MODAL._spec.onSubmit({ manufacturer: 'Beko', name: 'Nové meno' });
+  eq(lastPayload('appl_patch').rev, 'r2',
+     'druhé uloženie ide s ČERSTVOU revíziou — konflikt sa nezacyklí');
+}
+
+// (P2 #1b) Zámok obnovuje aj SAMOTNÉ ECHO karty — zápis z druhej inštancie
+// (alebo príloha pridaná v karte pod otvoreným modalom) posunie `rev` bez
+// toho, aby k nemu prišiel akýkoľvek `applResult`.
+reset();
+A.apSetTree(tree({ form: FORM }));
+A.apSetCard(card());
+A.apOpenModal('edit');
+A.apSetCard(card({ rev: 'r9' }));               // echo po cudzom zápise
+MODAL._spec.onSubmit({ manufacturer: 'Beko', name: 'Iné meno' });
+eq(lastPayload('appl_patch').rev, 'r9',
+   'formulár ukladá s revíziou z posledného echa — nie s tou z času otvorenia');
+
+// (P2 #2) Bez kostry D-15 sa NEVYRADÍ nič (fail closed).
+reset();
+A.apSetTree(tree());
+A.apSetCard(card());
+{
+  const saved = global.window.NXModal;
+  global.window.NXModal = null;
+  A.apDelete();
+  eq(sentOf('appl_delete').length, 0, 'bez modalu sa tombstone NEODOŠLE');
+  ok(String(ELS.status.textContent).includes('Vyradenie potrebuje dialóg'),
+     'a okno povie prečo');
+  global.window.NXModal = saved;
+}
+
+// (P2 #3) Patch nesie LEN zmenené polia — oprava názvu sa nedotkne rozmerov.
+reset();
+A.apSetTree(tree({ form: FORM }));
+A.apSetCard(card({ fields: { category: 'fridge', manufacturer: 'Beko', name: 'BCNA306E5ZSN',
+                             note: '', shop_urls: ['https://nay.sk/beko'], sheet_urls: [],
+                             'dims.body.width': '540', 'dims.front.thickness': '19,55' } }));
+A.apOpenModal('edit');
+MODAL._spec.onSubmit({ category: 'fridge', manufacturer: 'Beko', name: 'Beko Beyond',
+                       note: '', shop_urls: [{ url: 'https://nay.sk/beko' }], sheet_urls: [],
+                       'dims.body.width': '540', 'dims.front.thickness': '19,55' });
+{
+  const p = lastPayload('appl_patch');
+  eq(Object.keys(p.fields), ['name'], 'ide LEN zmenený názov');
+  eq(p.fields.name, 'Beko Beyond', 'a s novou hodnotou');
+  ok(!('dims.front.thickness' in p.fields),
+     'nedotknutý rozmer sa neposiela — inak by ho prepísalo zaokrúhlenie');
+  ok(!('shop_urls' in p.fields), 'ani nezmenené odkazy (server ich posiela ako reťazce)');
+}
+eq(A.apChangedFields({ a: '1', b: '2' }, { a: '1', b: '3' }), { b: '2' }, 'diff po kľúčoch');
+eq(A.apChangedFields({ u: ['x'] }, { u: ['x'] }), {}, 'zhodné polia sa nepočítajú za zmenu');
+
+// Nič sa nezmenilo = nič sa neposiela a modal sa zavrie bez chyby servera.
+reset();
+A.apSetTree(tree({ form: FORM }));
+A.apSetCard(card());
+A.apOpenModal('edit');
+MODAL._spec.onSubmit({ category: 'fridge', manufacturer: 'Beko', name: 'BCNA306E5ZSN',
+                       note: '', shop_urls: [], sheet_urls: [], 'dims.body.width': '540' });
+eq(sentOf('appl_patch').length, 0, 'prázdny patch sa NEODOSIELA');
+ok(!MODAL._open, 'modal sa zavrie');
+ok(String(ELS.status.textContent).includes('Nič sa nezmenilo'), 'a povie to');
+
+// (P2 #4) Dávkovanie miniatúr pokračuje aj nad CACHOVANOU kartou.
+reset();
+A.apSetTree(tree());
+{
+  const many = [];
+  for (let i = 1; i <= 8; i++){
+    many.push({ id: 'i' + i, kind: 'image', name: 'x' + i + '.png', ext: 'png',
+                image: true, thumbnail: false });
+  }
+  const first = {};
+  for (let i = 1; i <= 6; i++) first['i' + i] = 'data:image/png;base64,AAA';
+  SENT.length = 0;
+  A.apSetCard(card({ attachments: many, thumbs: first }));
+  eq(A.apThumbMissing(A.apState().card), ['i7', 'i8'], 'dve dlaždice ostali bez miniatúry');
+  eq(sentOf('appl_card').length, 1, 'reťaz dávok POKRAČUJE sama — o zvyšok si sekcia požiada');
+  eq(lastPayload('appl_card').have.length, 6, 'a povie, čo už má');
+
+  // Odchod a návrat: poistka „posledné kolo nič neprinieslo" platí pre jeden
+  // pobyt v sekcii, inak by sa raz zaseknuté dlaždice už nikdy nedopýtali.
+  A.apOnLeaveSection();
+  SENT.length = 0;
+  A.apRenderBody();                              // návrat do sekcie nad cache
+  eq(sentOf('appl_card').length, 1, 'po návrate do sekcie sa dávkovanie obnoví');
+}
+
+// (P2 #5) Generácia zo servera sa preberie — po znovuotvorení Štúdia sa
+// dotazy neposielajú s číslom, ktoré je pod už videným.
+reset();
+A.apSetTree(tree({ gen: 12, form: FORM }));
+ok(A.apState().gen >= 12, 'klient prevzal generáciu z payloadu (štartoval od nuly)');
+A.apToggleDeleted(true);
+{
+  const g = lastPayload('appl_tree').gen;
+  ok(g > 12, 'ďalší dotaz ide NAD ňou (' + g + ') — vlastnú odpoveď klient nezahodí');
+  A.apSetTree(tree({ gen: g, total: 4 }));
+  eq(A.apState().tree.total, 4, 'a odpoveď na ten dotaz sa naozaj prijme');
+}
+
+// (P2 #6) Prekreslenie pri zmene kategórie podáva PÔVODNÝ baseline.
+reset();
+A.apSetTree(tree({ form: FORM }));
+A.apOpenModal('create');
+{
+  const base0 = MODAL._spec.fields;
+  MODAL._vals = { category: 'oven', manufacturer: 'Bosch', name: 'HBG',
+                  shop_urls: [], sheet_urls: [] };
+  A.apOnCategoryChange('oven');
+  ok(Array.isArray(MODAL._spec.baseFields), 'prekreslenie nesie `baseFields`');
+  eq(MODAL._spec.baseFields, base0,
+     'a je to PÔVODNÁ špecifikácia — pamäť D-15 má voči čomu porovnávať');
+  eq(MODAL._spec.baseFields.find(f => f.key === 'category').value, 'fridge',
+     'baseline drží kategóriu, s ktorou sa začalo');
+}
+
 // --- 9) MUTÁCIE (čo test naozaj chytí) ---------------------------------------
 // M1 „echo kreslí aj mimo aktívnej sekcie" zabije test v bloku 4.
 // M2 „token echo neporovnáva" zabije test v bloku 7 (cudzia odpoveď zavrie modal).
