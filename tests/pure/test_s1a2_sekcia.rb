@@ -413,6 +413,15 @@ NxTest.test('S1-A2: ikona `appliance` je v sprite a v inventari UI_DIZAJN §4') 
   NxTest.assert(dizajn.include?('`image` (S1-A2'), 'a druhu tiez')
 end
 
+NxTest.test('S1-A2: KAZDA ikona, ktoru sekcia kresli, je v sprite') do
+  used = S1A2_AP_JS.scan(/apIco\('([a-z0-9-]+)'\)/).flatten.uniq
+  NxTest.assert(used.length >= 8, "nenasiel som ikony sekcie (#{used.length}) — zmenil sa tvar volania?")
+  have = S1A2_ICONS_JS.scan(/^    '([a-z0-9-]+)':/).flatten
+  missing = used - have
+  NxTest.assert(missing.empty?,
+                "ikony, ktore v sprite NIE SU: #{missing.join(' · ')} — v CEF sa vykresli prazdne "                 'miesto a nikde to nezasvieti')
+end
+
 NxTest.test('S1-A2: klient ma vlastny priestor mien (`ap*` / `AP_*`)') do
   globals = S1A2_AP_JS_CODE.scan(/^  (?:var|function) ([A-Za-z_][A-Za-z0-9_]*)/).flatten.uniq
   bad = globals.reject { |g| g.start_with?('ap', 'AP') }
