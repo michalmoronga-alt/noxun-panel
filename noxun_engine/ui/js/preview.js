@@ -471,7 +471,12 @@
     // UI-C1b: vkladana DOSKA nema zony, cela, kovanie ani hranove data — vsetky
     // chipy su neaktivne s vysvetlenim (nie ticho mrtve).
     if (pvInsertBoard()) return { zony: false, cela: false, kovanie: false, olep: false };
-    return { zony: !!currentZoneTree,
+    // PR #381 (P2 #5, dosledok): SLOT ZONY NEMA — `zone_tree` v jeho payloade
+    // je len prazdny kanonicky strom, takze bez tejto otazky by chip „Zóny"
+    // ostal aktivny a ghost vrstva by nad slotom kreslila FANTOMOVE zony
+    // (pred opravou #5 ich skryl `return`, teraz by sa naozaj nakreslili).
+    // Je to ta ista pravda, akou rail zhasina kontext Zóny (`NX_CTX_LOCK`).
+    return { zony: !!currentZoneTree && !pvSlot(),
              // Vo vkladani su cela DRAFT z karty (server ich este nema).
              cela: (previewMode === 'insert') ? pvInsertFronts().length > 0
                                               : !!(frontItems && frontItems.length),
@@ -1611,7 +1616,7 @@
                        // rozmerov generickeho tela a zakladne.
                        // PR #381 (P2 #5): Node sada overuje CELY nahlad nad
                        // slotom (ze kontexty Cela a Kovanie kreslia dalej).
-                       renderPreview: renderPreview,
+                       renderPreview: renderPreview, pvAvail: pvAvail,
                        pvSlot: pvSlot, drawSlotBase: drawSlotBase,
                        drawSlotDetail: drawSlotDetail, nxSlotExtent: nxSlotExtent,
                        PV_DW_BODY: PV_DW_BODY,

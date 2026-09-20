@@ -369,8 +369,16 @@ ok(cabSvg.indexOf('stroke-dasharray') >= 0, 'aj s podkladom');
 global.previewMode = 'hw';
 PV.renderPreview();
 ok(svgNode.innerHTML.indexOf('stroke-dasharray') >= 0, 'Kovanie: podklad slotu tiež');
+
+// Dôsledok #5: ghost vrstva „Zóny" sa nad slotom nesmie ponúkať — slot zóny
+// nemá a jeho `zone_tree` je len prázdny kanonický strom. Pred opravou #5 ich
+// skryl `return`; teraz by sa nad ním naozaj nakreslili fantómové zóny.
+global.currentZoneTree = { id: 'Z1', children: [] };
 global.previewMode = 'cab';
+eq(PV.pvAvail().zony, false, 'nad slotom je vrstva Zóny NEDOSTUPNÁ');
 setType('lower');
+eq(PV.pvAvail().zony, true, 'nad dolnou skrinkou ostáva dostupná');
+global.currentZoneTree = null;
 
 // --- P2 #1: skryté `dw_*` polia neblokujú inú skrinku -----------------------
 // Kostra polí — tie isté ID ako v panel.html.
