@@ -3642,17 +3642,20 @@ module NoxunSuRunner
   # --- S1-A1: KATALOG SPOTREBICOV — prilohy na REALNOM Windows suborovom
   # systeme (headless sada ich overuje len logicky). Overuje sa to, co sa
   # mimo SketchUpu overit NEDA: kopia suboru s DIAKRITIKOU a MEDZEROU v nazve,
-  # `UI.openURL` nad `file:///` cestou, zlyhanie kopie (zamknuty/nedostupny
-  # zdroj) a tombstone, ktory priecinok priloh NEMAZE.
+  # zlozenie `file:///` URL pre `UI.openURL` (cez STUB — prehliadac sa
+  # NEOTVARA, viz (b)), zlyhanie kopie (zamknuty/nedostupny zdroj) a
+  # tombstone, ktory priecinok priloh NEMAZE.
   #
   # IZOLACIA: cely katalog aj priecinok priloh ide cez `test_dir_override` do
   # docasneho priecinka; override sa v `ensure` VZDY vracia na nil, inak by
   # dalsie sekcie (a zivy plugin) citali cudzi katalog.
   #
-  # PORADIE: sekcia je POSLEDNA SYNCHRONNA a `UI.openURL` je v nej uplne
-  # nakoniec — systemovy prehliadac prekryje okno SketchUpu a zakryte okno
-  # prestane kreslit view, cim sa rozbije inferencia nad realnou geometriou
-  # v ghost a D-123 sekciach (dokazane behom 20.9.2026).
+  # PORADIE: sekcia ostava POSLEDNA SYNCHRONNA zo zvyku z 20.9.2026, ked este
+  # volala skutocny `UI.openURL`: systemovy prehliadac prekryl okno SketchUpu,
+  # zakryte okno prestalo kreslit view a inferencia nad realnou geometriou
+  # v ghost a D-123 sekciach vracala len zakladnu rovinu (20 falosnych
+  # FAILov); v dalsom behu instancia SketchUpu na tom rovno spadla. Od fixu
+  # (stub) sekcia nic neotvara — poradie je uz len obranne.
   def run_s1a1(_model)
     ac = e::ApplianceCatalog
     # (0) BOOT: katalog posudzuje (a nad cistou instalaciou zaklada) uz
@@ -3746,16 +3749,35 @@ module NoxunSuRunner
          ac.list[1][:records].none? { |r| r['id'] == rec['id'] } &&
          ac.list(include_deleted: true)[1][:records].any? { |r| r['id'] == rec['id'] })
 
-      # (b) UI.openURL nad `file:///` cestou (medzera aj diakritika v CESTE).
-      # AZ TU: spusta sa systemovy prehliadac, ktory PREKRYJE okno SketchUpu —
-      # po tomto kroku uz nesmie bezat nic, co potrebuje inferenciu nad realnou
-      # geometriou (viz komentar pri volani sekcie). Priloha sa otvara este
-      # z VYRADENEHO zaznamu — presne to bude robit zakazka cez snapshot.
+      # (b) `UI.openURL` nad `file:///` cestou (medzera aj diakritika v CESTE)
+      # cez STUB, NIE realne otvorenie: skutocny `UI.openURL` spusti systemovy
+      # prehliadac, ktory PREKRYJE okno SketchUpu (zakryte okno prestane
+      # kreslit view a inferencia dalsich sekcii vracia len zakladnu rovinu —
+      # beh 20.9.2026, 20 falosnych FAILov) a v behu S1-A2 #2 (20.9.2026)
+      # instanciu SketchUpu ROVNO ZHODIL. Test preto overuje presne to, co
+      # modul robi a co sa mimo SketchUpu overit neda: z realnej cesty na
+      # disku zlozi `file:///` URL a PODA JU `UI.openURL`; odpoved `true`
+      # dodava stub. Stub sa v `ensure` VZDY vracia (alias na povodnu metodu),
+      # inak by zivy plugin v tejto instancii uz nic neotvoril. Priloha sa
+      # otvara este z VYRADENEHO zaznamu — presne to bude robit zakazka cez
+      # snapshot.
       if opened
         url = ac.file_url(opened[2])
-        st_o, info_o = ac.open_attachment(opened[0], opened[1])
-        ok("S1-A1 (b): open_attachment otvoril subor cez #{url}", st_o == :ok)
-        info("S1-A1 (b): UI.openURL zlyhal pre #{info_o[:path]} — #{info_o[:message]}") unless st_o == :ok
+        seen = []
+        ui_meta = UI.singleton_class
+        ui_meta.send(:alias_method, :nx_s1a1_orig_open_url, :openURL)
+        ui_meta.send(:define_method, :openURL) { |u| seen << u.to_s; true }
+        begin
+          st_o, info_o = ac.open_attachment(opened[0], opened[1])
+        ensure
+          ui_meta.send(:alias_method, :openURL, :nx_s1a1_orig_open_url)
+          ui_meta.send(:remove_method, :nx_s1a1_orig_open_url)
+        end
+        ok("S1-A1 (b): open_attachment podal UI.openURL presne #{url} (stub, prehliadac sa neotvara)",
+           st_o == :ok && seen == [url])
+        ok('S1-A1 (b): URL je file:/// s doprednymi lomkami a bez holej medzery',
+           url.start_with?('file:///') && !url.include?('\\') && !url.include?(' '))
+        info("S1-A1 (b): open_attachment zlyhal pre #{info_o[:path]} — #{info_o[:message]}") unless st_o == :ok
       else
         ok('S1-A1 (b): open_attachment — priloha sa nevytvorila, nie je co otvarat', false)
       end
@@ -23987,14 +24009,12 @@ module NoxunSuRunner
     # (ziadny `UI.openURL` ani `UI.openpanel`), takze okno SketchUpu neprekryje
     # nic a inferencia dalsich sekcii ostava cela.
     run_s1a2(model)           # S1-A2: sekcia SPOTREBICE — dispatch nad REALNYM katalogom (create/patch/delete/restore), lazy miniatura prilohy ako data URI cez Sketchup::ImageRep, tombstone v strome len s prepinacom, `appl` v payloade push_state
-    # S1-A1 je POSLEDNA SYNCHRONNA sekcia ZAMERNE: otvara prilohu cez
-    # `UI.openURL`, co spusti systemovy prehliadac a ten PREKRYJE okno
-    # SketchUpu. Zakryte okno prestane kreslit view a inferencia nad REALNOU
-    # geometriou (ghost snap na roh, D-123 na zvysenej ploche) zacne vracat
-    # len zakladnu rovinu — beh 20.9.2026 to dokazal 20 falosnymi FAILmi,
-    # ked sekcia bezala hned po S1-E0. Asynchronna retaz za nou uz inferenciu
-    # nepouziva (overene), takze tu skodit nema comu.
-    run_s1a1(model)           # S1-A1: katalog spotrebicov — prilohy na REALNOM disku (kopia suboru s diakritikou a medzerou, ASCII nazov ulozenej kopie, zlyhanie kopie = :copy_failed bez siroty a bez zmeny JSON, tombstone priecinok priloh NEMAZE, UI.openURL nad file:/// az uplne na konci); vsetko v izolovanom priecinku cez test_dir_override
+    # S1-A1 ostava POSLEDNA SYNCHRONNA sekcia uz len obranne: od fixu
+    # (20.9.2026) je `UI.openURL` v nej STUB, takze systemovy prehliadac
+    # neprekryje okno SketchUpu (skutocne otvorenie dalo 20.9.2026 20 falosnych
+    # FAILov inferencie v ghost a D-123 sekciach a raz instanciu rovno zhodilo).
+    # Asynchronna retaz za nou inferenciu nepouziva (overene).
+    run_s1a1(model)           # S1-A1: katalog spotrebicov — prilohy na REALNOM disku (kopia suboru s diakritikou a medzerou, ASCII nazov ulozenej kopie, zlyhanie kopie = :copy_failed bez siroty a bez zmeny JSON, tombstone priecinok priloh NEMAZE, file:/// URL pre UI.openURL cez STUB bez prehliadaca); vsetko v izolovanom priecinku cez test_dir_override
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
