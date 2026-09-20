@@ -866,7 +866,9 @@
       : budTypeSelect(b, base + ' data-field="typ" data-bkey="a:typ:' + bEsc(r.id) + '"', r.typ);
     var flag = r.customer_supplied
       ? ' <span class="bmisslbl">' + bEsc(BUD_APPL_CS_LABEL) + '</span>' : '';
-    return '<tr' + budRowClass(r) + '>' +
+    // S1-B1: ADRESA RIADKU pre deep-link z Kontroly (`appliance:<uuid>`).
+    // Nález o sirote nemá v modeli čo označiť, takže klik vedie sem.
+    return '<tr' + budRowClass(r) + ' data-brow="' + bEsc(r.key) + '">' +
       '<td>' + typ + '</td>' +
       '<td><input class="bedit bwide" type="text"' + base + ' data-field="nazov" data-bkey="a:nazov:' + bEsc(r.id) + '"' +
       ' value="' + bEsc(r.nazov) + '" placeholder="Názov / model…" aria-label="Názov">' +
@@ -963,6 +965,25 @@
     var o = (r && r.owner) ? r.owner : {};
     if (!o.kind || o.kind === BUD_OWNER_JOB) return BUD_OWNER_JOB;
     return String(o.kind) + ':' + String(o.id || '');
+  }
+
+  // S1-B1 (Codex #382 kolo 1 P1): PONUKA PRE EDITOR UZ EXISTUJUCEHO RIADKU.
+  // Ulozeny vlastnik nemusi byt v ponuke — mohol zaniknut, byt odpojeny alebo
+  // z novsej verzie. Prehliadac by vtedy v `<select>` vybral PRVU moznost
+  // (cudziu skrinku) a ulozenie kvoli uplne inej zmene (adresa, „dodáva
+  // zákazník") by spotrebic TICHO presunulo. Preto sa nedostupny vlastnik
+  // pridava ako VYSLOVNA volba navrch — hodnota selectu tak zodpoveda tomu,
+  // co je naozaj ulozene, a zmena vlastnika ostava vedomym klikom.
+  function budOwnerOptionsFor(b, r){
+    var opts = budOwnerOptions(b, r && r.typ);
+    var cur = budOwnerValue(r);
+    if (cur === BUD_OWNER_JOB) return opts;
+    var known = false;
+    opts.forEach(function(o){ if (o[0] === cur) known = true; });
+    if (known) return opts;
+    var o2 = (r && r.owner) ? r.owner : {};
+    return [[cur, String(o2.id || cur) + ' — nedostupný (vlastník neexistuje / odpojený)']]
+      .concat(opts);
   }
 
   var BUD_DRAFT_META = {
@@ -1601,7 +1622,7 @@
       return [
         url,
         { key: 'owner', label: 'Vlastník', type: 'select', value: budOwnerValue(r),
-          options: budOwnerOptions(b, r.typ) },
+          options: budOwnerOptionsFor(b, r) },
         { key: 'customer_supplied', label: BUD_APPL_CS_LABEL, type: 'checkbox',
           value: r.customer_supplied === true,
           hint: 'Cena ostane v riadku, ale do súčtov nevstúpi.' }
@@ -1666,13 +1687,27 @@
     var v = values || {};
     var kind = BUD_MORE.kind;
     BUD_MORE.sent = true; // odteraz je najblizsi vysledok TOHO ISTEHO op-u NAS
-    if (kind === 'appliance' && String(v.owner || '') !== String(BUD_MORE.owner || '')){
+    // S1-B1 (Codex #382 kolo 1 P1): vlastnik sa posiela LEN ked ho pouzivatel
+    // NAOZAJ zmenil (porovnanie s baseline z otvorenia editora). Uprava adresy
+    // alebo priznaku o vlastnikovi NEHOVORI NIC, takze ho ani nesmie niest —
+    // server ho pri `appliance_update` odmieta (`ApplianceBinding::OWNER_OPS`).
+    if (kind === 'appliance' && budOwnerDirty(v)){
       budSend('appliance_owner', { id: BUD_MORE.id, attrs: budMoreAttrs(kind, v),
                                    owner: budOwnerPayload(budBudget(), v.owner) });
       return;
     }
     budSend(kind === 'appliance' ? 'appliance_update' : 'custom_update',
             { id: BUD_MORE.id, attrs: budMoreAttrs(kind, v) });
+  }
+
+  // Zmenil pouzivatel pole „Vlastník"? Prazdna hodnota (pole sa nevykreslilo)
+  // sa NIKDY neberie ako zmena — inak by chybajuci `<select>` v starom DOM
+  // odpojil spotrebic bez toho, aby o to niekto poziadal.
+  function budOwnerDirty(values){
+    if (!BUD_MORE) return false;
+    var now = String((values || {}).owner || '');
+    if (now === '') return false;
+    return now !== String(BUD_MORE.owner || '');
   }
 
   // Caka prave otvoreny ⋯ modal na vysledok VLASTNEHO zapisu? Zavrety modal
@@ -1865,6 +1900,24 @@
     el.open = true;
     BUD_OPEN[section] = true;
     if (el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  // S1-B1: DEEP-LINK NA RIADOK (kotva `appliance:<uuid>` zo servera). Nález
+  // Kontroly o spotrebiči, ktorého vlastník zmizol, nemá v modeli čo označiť —
+  // klik preto otvorí Rozpočet a riadok krátko prisvieti.
+  // -> false = riadok už neexistuje (volajúci to povie nahlas, nie ticho).
+  function budOpenAnchor(key){
+    var k = String(key == null ? '' : key).trim();
+    if (!k || typeof document === 'undefined') return false;
+    budGoto('appliances'); // sekcia musí byť rozbalená, inak nie je čo scrollovať
+    var node = document.querySelector('[data-brow="' + k.replace(/"/g, '\\"') + '"]');
+    if (!node) return false;
+    if (node.scrollIntoView) node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (node.classList){
+      node.classList.add('bhit');
+      setTimeout(function(){ try { node.classList.remove('bhit'); } catch (e) { /* riadok zanikol */ } }, 2500);
+    }
+    return true;
   }
 
   function budXlsx(){
@@ -2217,6 +2270,8 @@
       budApplTypeLocked: budApplTypeLocked, budApplOwnerText: budApplOwnerText,
       budOwnerOptions: budOwnerOptions, budOwnerPayload: budOwnerPayload,
       budOwnerValue: budOwnerValue, budApplianceRow: budApplianceRow,
+      budOwnerOptionsFor: budOwnerOptionsFor, budOwnerDirty: budOwnerDirty,
+      budOpenAnchor: budOpenAnchor,
       budDocSwitched: budDocSwitched, budModalOp: budModalOp,
       budApplLookupResult: budApplLookupResult,
       // `budOpenDraft` potrebuje DOM a exportuje sa ZAMERNE — kontrakty
