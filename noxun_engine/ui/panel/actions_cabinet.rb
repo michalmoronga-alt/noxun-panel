@@ -285,15 +285,27 @@ module Noxun
         # old_eff: volitelny snapshot efektivnych materialov PRED zmenou — sablonovy
         # flow ho dodava z CIELOVEJ skrinky (merged params uz nesu novy material,
         # takze default by remapu ukazal "ziadnu zmenu" — GH P1).
+        # PR #381 (Codex kolo 1, P2): SLOT UMYVACKY nema TELO ani CHRBAT, takze
+        # obe brany sa ho netykaju — bezali by nad ZDEDENYM projektovym
+        # materialom korpusu a vlozenie slotu by odmietli chybou o hrubke
+        # korpusu, ktoru pouzivatel v SKRYTOM poli nevie opravit. Materialovy
+        # remap ABS overridov ostava: slot MA celo a jeho material sa meni.
+        # Hrubku cela validuje dalej ta ista brana ako pri kazdom inom cele
+        # (`CabinetBuilder.validate_material_thickness!` v `resolve_part`).
+        def slot_params?(params)
+          params.is_a?(Hash) && params['type'].to_s == 'dishwasher'
+        end
+
         def material_preflight(params, model, old_eff: nil)
           old_eff ||= CabinetBuilder.effective_materials(model, params)
           note = ''
+          slot = slot_params?(params)
           # POSTUPNE, nie naraz: pri odmietnutom tele sa chrbat uz neriesi (jeho
           # picker cita material tela — musi vidiet finalny stav, nie polovicny).
-          body = body_preflight(params, model)
+          body = slot ? nil : body_preflight(params, model)
           return body if body && body[:error]
           note += body[:note].to_s if body
-          back = back_preflight(params, model)
+          back = slot ? nil : back_preflight(params, model)
           return back if back && back[:error]
           note += back[:note].to_s if back
           new_eff = CabinetBuilder.effective_materials(model, params)
@@ -355,6 +367,11 @@ module Noxun
         # Vrati nil / { error: } / { note: }.
         def insert_thickness_preflight(params, model)
           return nil unless defined?(Materials)
+          # PR #381 (P2): slot hrubku KORPUSU nema — `thickness` je mu len
+          # placeholder cela, ktory `materialized_part` aj tak prepise
+          # katalogovou hrubkou celoveho materialu. Zamok hrubky z predoslej
+          # skrinky by inak vlozenie slotu odmietol.
+          return nil if slot_params?(params)
           explicit = str_or_nil(params['material_id'])
           sheet = Materials.sheet(CabinetBuilder.effective_materials(model, params)['body'])
           return nil if sheet.nil? # legacy material mimo katalogu — stary rezim
