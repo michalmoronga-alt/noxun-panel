@@ -1046,7 +1046,11 @@ module Noxun
         JOB_CODE_LABELS = {
           'appliance_specs_missing' => 'chýbajú údaje niky',
           'appliance_class_mismatch' => 'trieda nesedí',
-          'appliance_owner_missing' => 'vlastník zmizol'
+          'appliance_owner_missing' => 'vlastník zmizol',
+          # S1-F: verdikt niky a delenia ciel. Cela veta ostava v Kontrole
+          # (a v `status_title`), tu je miesto na jednu skratku.
+          'appliance_niche_clash' => 'nezmestí sa',
+          'appliance_door_split' => 'delenie čiel'
         }.freeze
         # Codex #383 kolo 1 (P2): vlastnik, ktorého ponuka vlastníkov NEOBSAHUJE
         # (odpojený dielec, config z novšej verzie) — priradiť sa k nemu nedá.
@@ -1244,8 +1248,11 @@ module Noxun
           { 'tone' => 'ok', 'status_text' => JOB_OK_TEXT }
         end
 
+        # S1-F: kod je TRETI segment kluca (`appliance|<uuid>|<kod>[|<os>]`),
+        # nie posledny — `appliance_niche_clash` nesie za kodom este OS, takze
+        # `.last` by vratilo „width" a skratka by zmizla.
         def job_issue_text(found)
-          codes = found.map { |i| i['stable_key'].to_s.split('|').last }
+          codes = found.map { |i| i['stable_key'].to_s.split('|')[2] }
           labels = codes.map { |c| JOB_CODE_LABELS[c] }.compact.uniq
           labels.empty? ? 'upozornenie' : labels.join(' · ')
         end

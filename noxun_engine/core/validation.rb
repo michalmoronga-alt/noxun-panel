@@ -1037,13 +1037,25 @@ module Noxun
       #                              ostava v rozpocte, treba ju odpojit,
       #   `appliance_specs_missing`  viazany model nema v katalogu rozmery niky,
       #                              takze kontrolu niky (S1-F) sa neda urobit,
-      #   `appliance_class_mismatch` trieda umyvacky sa nezhoduje s triedou slotu.
+      #   `appliance_class_mismatch` trieda umyvacky sa nezhoduje s triedou slotu,
+      #   `appliance_niche_clash`    nika modelu sa do vnutra skrinky nezmesti
+      #                              (S1-F; JEDEN nalez na OS — sirka, vyska
+      #                              a hlbka su tri samostatne veci na opravu),
+      #   `appliance_door_split`     hrana medzi celami nelicuje s delenim dveri
+      #                              spotrebica (alebo sa odporucit neda).
       #
       # `stable_key` nesie KOD aj UUID polozky — dva nalezy nad tym istym
-      # spotrebicom su DVA riadky (dedup by inak nechal len prvy).
+      # spotrebicom su DVA riadky (dedup by inak nechal len prvy). Pri
+      # `appliance_niche_clash` je sucastou kluca aj OS.
+      #
+      # Astra S1-F FIX F9: ZIADNA nova zavaznost. Kontrakt Kontroly ostava
+      # RED/ORANGE, takze informacne stavy verdiktu (`unknown`, `skip`, `na`)
+      # sem NEVSTUPUJU — ziju v riadku Spotrebic a v `appliance_rows[].check`.
       APPL_OWNER_MISSING  = 'appliance_owner_missing'
       APPL_SPECS_MISSING  = 'appliance_specs_missing'
       APPL_CLASS_MISMATCH = 'appliance_class_mismatch'
+      APPL_NICHE_CLASH    = 'appliance_niche_clash'
+      APPL_DOOR_SPLIT     = 'appliance_door_split'
       # Vlastnici, u ktorych ma zmysel pytat sa na rozmery niky (doska ani „len
       # zakazka" niku nemaju).
       APPL_NICHE_OWNERS = %w[cabinet slot].freeze
@@ -1083,11 +1095,17 @@ module Noxun
       def check_appliance_bound(rec, id, name, owner, items)
         kind = owner['kind'].to_s
         snap = rec['snapshot'].is_a?(Hash) ? rec['snapshot'] : {}
-        if APPL_NICHE_OWNERS.include?(kind) && !snap['niche'].is_a?(Hash)
+        # Astra S1-F FIX F3: „chýbajú údaje niky" plati, ked NIKTORA os nema
+        # pouzitelnu hodnotu — zaznam napr. bez `depth_min` sa da skontrolovat
+        # na zvysnych osiach a hlasit ho ako cely nepouzitelny by bol falosny
+        # poplach. Predikat je v `ApplianceChecks`, aby riadok Spotrebica
+        # a Kontrola nemohli o tom istom zazname tvrdit dve veci.
+        if APPL_NICHE_OWNERS.include?(kind) && appliance_specs_missing?(snap['niche'])
           items << appliance_item(id, owner, APPL_SPECS_MISSING,
                                   "Spotrebič „#{name}“ nemá v katalógu rozmery niky — " \
                                   'kontrola niky sa nedá urobiť.')
         end
+        check_appliance_geometry(rec, id, owner, items)
         slot = rec['slot'].is_a?(Hash) ? rec['slot'] : nil
         return unless slot
 
@@ -1102,6 +1120,30 @@ module Noxun
         items << appliance_item(id, owner, APPL_CLASS_MISMATCH,
                                 "Umývačka „#{name}“ je trieda #{model_cls}, slot je #{slot_cls} — " \
                                 'zmeň triedu slotu alebo model.')
+      end
+
+      def appliance_specs_missing?(niche)
+        return !niche.is_a?(Hash) unless defined?(ApplianceChecks)
+
+        ApplianceChecks.specs_missing?(niche)
+      end
+
+      # S1-F: NIKA A DELENIE CIEL. Vzorce aj vety pocita `ApplianceChecks` nad
+      # zaznamom zberu — Kontrola z neho robi LEN riadky. Nalez vznikne vyhradne
+      # pre `clash` (os sa nezmesti) a `unsatisfiable` (rozstup dveri spotrebica
+      # presah 10 mm na oboch stranach vobec nedovoli); vsetko ostatne je
+      # informacia pre riadok Spotrebic, nie ORANGE.
+      def check_appliance_geometry(rec, id, owner, items)
+        return unless defined?(ApplianceChecks)
+
+        ApplianceChecks.findings(rec).each do |f|
+          code = f['code'].to_s == 'door_split' ? APPL_DOOR_SPLIT : APPL_NICHE_CLASH
+          key = f['axis'].to_s.empty? ? code : "#{code}|#{f['axis']}"
+          items << appliance_item(id, owner, key, f['message'].to_s)
+        end
+      rescue StandardError => e
+        Engine.log_error(e, 'Validation.check_appliance_geometry') if defined?(Engine)
+        nil
       end
 
       def appliance_item(id, owner, code, message)
