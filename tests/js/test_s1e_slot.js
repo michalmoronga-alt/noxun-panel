@@ -105,7 +105,10 @@ global.evalDim = v => parseFloat(v);
 let FIELDS = {};
 global.numv = id => (FIELDS[id] === undefined ? NaN : parseFloat(FIELDS[id]));
 global.val = id => (FIELDS[id] === undefined ? '' : String(FIELDS[id]));
-global.setNum = () => {};
+// `setNum`/`setVal` su v CEF zapisove cesty do poli — sada P2 #1 overuje
+// PRAVE ich ucinok (dosadenie predvolby slotu), takze musia naozaj pisat.
+global.setNum = (id, v) => { const e = el(id); if (e && v !== null && v !== undefined) e.value = String(parseFloat(v)); };
+global.setVal = (id, v) => { const e = el(id); if (e && v !== null && v !== undefined) e.value = String(v); };
 global.setOut = () => {};
 global.isExprInput = () => false;
 global.isExprStr = () => false;
@@ -274,9 +277,13 @@ FIELDS.dw_class = '999';
 eq(PV.pvSlot().cls, 600, 'neznama trieda padne na 600 (ako Ruby normalize)');
 FIELDS.dw_class = '600';
 
-// Kresba: telo + zakladna prerusovane, celo plne, jantarove pasmo „výplň".
+// Kresba: PODKLAD (telo + zakladna prerusovane) + DETAIL (celo, jantarove
+// pasmo „výplň", koty). PR #381 (P2 #5): su to DVE funkcie — podklad ide do
+// KAZDEHO kontextu, detail len do Korpusu a vkladania.
 const S = [];
-PV.drawSlot(S, x => x, z => 930 - z, { W: 600, H: 930, gapLeft: 2, gapRight: 2 }, PV.pvSlot());
+const GEO = { W: 600, H: 930, gapLeft: 2, gapRight: 2 };
+PV.drawSlotBase(S, x => x, z => 930 - z, GEO, PV.pvSlot());
+PV.drawSlotDetail(S, x => x, z => 930 - z, GEO, PV.pvSlot());
 const svg = S.join('');
 ok(svg.indexOf('stroke-dasharray') >= 0, 'referencia (telo + zakladna) je PRERUSOVANA');
 ok(svg.indexOf('výplň 90 · ručne') >= 0, 'pasmo vyplne nesie svoj popis');
@@ -288,8 +295,137 @@ ok(svg.indexOf('>64<') >= 0, 'kota sokla');
 // Celo PRESAHUJUCE liniu: pasmo vyplne uz nevznikne (nie je co vypĺňať).
 FIELDS.dw_front_height = 900;
 const S2 = [];
-PV.drawSlot(S2, x => x, z => 930 - z, { W: 600, H: 930, gapLeft: 2, gapRight: 2 }, PV.pvSlot());
+PV.drawSlotDetail(S2, x => x, z => 930 - z, GEO, PV.pvSlot());
 ok(S2.join('').indexOf('výplň') < 0, 'celo nad linkou = ziadne pasmo vyplne');
+FIELDS.dw_front_height = 776;
 setType('lower');
+
+// ============ 8) PR #381 — CODEX KOLO 1 (P2) ================================
+
+// --- P2 #3: hlavicka Inspectora pozna slot ---------------------------------
+eq(C.NX_TYPE_LABEL.dishwasher, 'Umývačka', 'mapa typ -> popisok pozna slot');
+eq(C.nxCabInfo({ type: 'dishwasher' }).type, 'Umývačka', 'badge nad slotom uz nehlasi „Dolná"');
+eq(C.nxCabInfo({ type: 'lower' }).type, 'Dolná', 'dolna ostava dolna');
+eq(C.nxCabInfo({ type: 'nieco' }).type, 'Dolná', 'neznamy typ padne na dolnu (ako doteraz)');
+
+// --- P2 #4: scena slotu obsiahne TRCIACE telo -------------------------------
+// Telo 598 v slote 300 — presne stav, ktory Kontrola hlasi `dw_body_fit`.
+const uzky = PV.nxSlotExtent({ bodyW: 598, bodyH: 820, fb: 64, fh: 776 }, 300);
+near(uzky.minX, -149, 0.01, 'telo trci VLAVO (scena ho nesmie orezat)');
+near(uzky.maxX, 449, 0.01, 'a VPRAVO');
+near(uzky.maxZ, 840, 0.01, 'hore rozhoduje vyssie z tela a horneho okraja cela');
+// Telo VYSSIE nez linka — presne stav `dw_height_fit`.
+const vysoke = PV.nxSlotExtent({ bodyW: 598, bodyH: 1000, fb: 64, fh: 700 }, 600);
+near(vysoke.maxZ, 1000, 0.01, 'telo nad linkou sa do sceny zmesti');
+near(vysoke.minX, 0, 0.01, 'telo 598 v slote 600 netrci — scena ostava na obryse slotu');
+near(vysoke.maxX, 600, 0.01, 'ani vpravo');
+eq(PV.nxSlotExtent(null, 600), null, 'bez slotu ziadny rozsah');
+
+// --- P2 #5: slot ma PODKLAD, nie vlastny CELY nahlad ------------------------
+FIELDS = { dw_class: '600', dw_body_height: 820, dw_front_bottom: 64, dw_front_height: 776,
+           width: 600, height: 930, depth: 560 };
+setType('dishwasher');
+const SL = PV.pvSlot();
+const G = { W: 600, H: 930, gapLeft: 2, gapRight: 2 };
+const B = []; PV.drawSlotBase(B, x => x, z => 930 - z, G, SL);
+const D = []; PV.drawSlotDetail(D, x => x, z => 930 - z, G, SL);
+const bs = B.join(''), ds = D.join('');
+ok(bs.indexOf('stroke-dasharray') >= 0, 'podklad kresli telo a zakladnu PRERUSOVANE');
+eq((bs.match(/<rect /g) || []).length, 2, 'podklad = telo + zakladna, nic viac');
+ok(bs.indexOf('výplň') < 0, 'podklad pasmo vyplne NEKRESLI');
+ok(bs.indexOf('<text') < 0, 'ani koty — tie patria detailu');
+ok(ds.indexOf('výplň 90 · ručne') >= 0, 'detail ma pasmo vyplne');
+eq((ds.match(/<rect /g) || []).length, 2, 'detail = celo + pasmo vyplne');
+ok(ds.indexOf('>930<') >= 0, 'a koty');
+
+// Celý náhľad: v kontexte ČELÁ sa kreslí PODKLAD slotu + ŠTANDARDNÝ renderer
+// čiel (kóty výšok, čísla) — do opravy tam `pvSlot()` skončil `return`om.
+const svgNode = mkEl('svg');
+svgNode.id = 'preview';
+DOC.body.appendChild(svgNode);
+global.selectedCabId = 'CAB-7';
+global.frontItems = [{ id: 'F1', type: 'blind', mode: 'fixed', height: 776, z: 64, wings_n: 1,
+                       profile: 'none' }];
+global.activeZoneId = null;
+global.currentZoneTree = null;
+global.hwItems = [];
+global.partCard = null;
+global.pvUserView = false;
+FIELDS.fr_gap_left = 2; FIELDS.fr_gap_right = 2; FIELDS.fr_gap = 3;
+
+global.previewMode = 'fronts';
+PV.renderPreview();
+const frontsSvg = svgNode.innerHTML;
+ok(frontsSvg.indexOf('stroke-dasharray') >= 0, 'Čelá: podklad slotu (telo) sa kreslí');
+ok(frontsSvg.indexOf('<text') >= 0, 'Čelá: štandardný renderer čiel kreslí kóty a čísla');
+ok(frontsSvg.indexOf('výplň') < 0, 'Čelá: detail Korpusu sa do nich NEPLETIE');
+
+global.previewMode = 'cab';
+PV.renderPreview();
+const cabSvg = svgNode.innerHTML;
+ok(cabSvg.indexOf('výplň 90 · ručne') >= 0, 'Korpus: detail slotu ostáva');
+ok(cabSvg.indexOf('stroke-dasharray') >= 0, 'aj s podkladom');
+
+global.previewMode = 'hw';
+PV.renderPreview();
+ok(svgNode.innerHTML.indexOf('stroke-dasharray') >= 0, 'Kovanie: podklad slotu tiež');
+global.previewMode = 'cab';
+setType('lower');
+
+// --- P2 #1: skryté `dw_*` polia neblokujú inú skrinku -----------------------
+// Kostra polí — tie isté ID ako v panel.html.
+['width', 'height', 'depth', 'thickness', 'floor_height'].forEach(function(id){
+  const i = mkEl('input'); i.id = id; i.value = ''; DOC.body.appendChild(i);
+});
+['dw_body_height', 'dw_front_bottom', 'dw_front_height'].forEach(function(id){
+  if (!el(id)){ const i = mkEl('input'); i.id = id; DOC.body.appendChild(i); }
+});
+const dwBody = el('dw_body_height');
+
+// Neplatná hodnota zostala po slote v skrytom poli.
+dwBody.value = '5000';
+setType('dishwasher');
+eq(FM.validateFields(true), false, 'pri SLOTE je neplatné Telo V chyba');
+ok(el('dw_body_height').classList.contains('bad'), 'a pole je červené');
+
+setType('lower');
+eq(FM.validateFields(true), true, 'pri DOLNEJ skrinke to isté pole vloženie NEBLOKUJE');
+ok(!el('dw_body_height').classList.contains('bad'), 'a červené už nie je');
+
+// Prepnutie späť na slot dosadí predvoľbu servera do prázdneho/neplatného poľa.
+global.DEFAULTS = { dishwasher: { dw_class: 600, dw_body_height: 820, dw_front_bottom: 100,
+                                  dw_front_height: 776 } };
+dwBody.value = '';
+setType('dishwasher');
+FM.nxFillSlotFields();
+eq(dwBody.value, '820', 'prázdne Telo V dostane predvoľbu typu');
+dwBody.value = '5000';
+FM.nxFillSlotFields();
+eq(dwBody.value, '820', 'aj neplatná hodnota (panel tak ukazuje to, čo server postaví)');
+dwBody.value = '900';
+FM.nxFillSlotFields();
+eq(dwBody.value, '900', 'platnú hodnotu používateľa NEPREPÍŠE');
+setType('lower');
+
+// --- P2 #2: modal „Uložiť ako šablónu" ------------------------------------
+const tplSel = mkEl('select');
+tplSel.id = 'tplSaveType';
+['lower', 'upper', 'dishwasher'].forEach(function(v){
+  const o = mkEl('option'); o.setAttribute('value', v); tplSel.appendChild(o);
+});
+DOC.body.appendChild(tplSel);
+const tplTip = mkEl('button');
+tplTip.id = 'tplSaveTypeTip';
+tplTip.hidden = true;
+DOC.body.appendChild(tplTip);
+
+FM.nxSyncTplSaveType('dishwasher');
+eq(tplSel.value, 'dishwasher', 'pri slote select ukazuje Umývačku');
+eq(tplSel.disabled, true, 'a je ZAMKNUTÝ (typ určuje slot)');
+eq(tplTip.hidden, false, 'bublina vysvetlí prečo');
+FM.nxSyncTplSaveType('lower');
+eq(tplSel.value, 'lower', 'pri korpuse sa prepne späť');
+eq(tplSel.disabled, false, 'a odomkne');
+eq(tplTip.hidden, true, 'bublina zmizne');
 
 console.log(`OK test_s1e_slot.js — ${n} kontrol`);

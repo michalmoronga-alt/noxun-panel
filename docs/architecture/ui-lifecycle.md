@@ -778,6 +778,14 @@ kontrola **mlčí**: falošná červená pri štarte panela je horšia než chý
 **Hmotnosť čela**. **Všetky čísla počíta SERVER** (`Panel.slot_payload` v `cabinet_payload`), panel z nich nič neodvodzuje — zapisuje ich `renderSlotInfo`
 v `bridge.js`. „Pod doskou" používa **ten istý predikát** ako Kontrola `dw_height_fit`, takže Inspector a semafor nikdy netvrdia dve rôzne veci.
 
+**Polia slotu sa validujú LEN v type, ktorému patria** (PR #381, Codex kolo 1 P2). `dw_body_height`/`dw_front_bottom`/`dw_front_height` sú v DOM aj pri dolnej
+a hornej skrinke (len skryté), takže hodnota, ktorú tam nechal predchádzajúci slot, by **červenela a zablokovala vloženie úplne inej skrinky** — v poli, ktoré
+používateľ nevidí a nemá ako opraviť. `validateFields` ich preto preskočí, keď typ nie je `dishwasher` (zoznam `SLOT_FIELDS`). Opačným smerom: pri prepnutí **na**
+slot dosadí `nxFillSlotFields` (volané z `applyVisibility`, teda po každom `writeConstruction`) do prázdneho alebo mimorozsahového poľa **predvoľbu typu zo servera**
+(`DEFAULTS.dishwasher` = `CabinetBuilder::DISHWASHER_DEFAULTS`) — inak by panel ukazoval niečo iné, než čo si `normalize` aj tak dosadí. Platnú hodnotu používateľa
+neprepíše. Z rovnakého dôvodu `applyInsertLockValues` pri slote **nedosadzuje zámok hrúbky ani sokla** (`SLOT_NO_LOCK`): slot tie polia nemá, takže zamknutá hrúbka
+25 mm z predchádzajúcej skrinky by pristála v jeho payloade.
+
 **Viditeľnosť riadkov je JEDNA autorita — `applyVisibility(t)`** s dvoma menovitými zoznamami (`SLOT_ONLY_ROWS` / `SLOT_HIDDEN_ROWS`, obe exportované pre Node
 sadu). Slot **nemá**: riadok Sokel korpusu (`#fhRow` — jeho sokel je spodná hrana čela), soklovú skupinu, Hrúbku, Vnút. šírku/hĺbku, Úložnú výšku, Materiál m²
 ani riadok Nohy (podpora `none`). **Limity poľa sú per TYP** (`TYPE_LIMITS` v `form.js`): šírka 300–1200 a výška linky 500–1200 — zrkadlo
@@ -788,10 +796,14 @@ ani riadok Nohy (podpora `none`). **Limity poľa sú per TYP** (`TYPE_LIMITS` v 
 `type` + `dw_front_bottom` + `dw_front_height` a počíta s **virtuálnym otvorom** (`Construction.front_opening`), takže čelo presahujúce výšku linky prijme;
 rozsahy preflightu sú per typ.
 
-**Náhľad slotu** (kontext Korpus) je **vlastná projekcia** `drawSlot` — korpusový podklad by kreslil dielce, ktoré neexistujú. Kreslí sa čelný rez: telo so
-základňou **prerušovane** (referencia, firemná teal), čelo plne, **jantárové pásmo „výplň N · ručne"** po líniu linky a kóty šírky, výšky linky a sokla.
-Scéna dostáva miesto aj pre čelo **nad** líniou. Rozmery generického tela a základne sú v JS **zrkadlom** Ruby konštánt (`PV_DW_BODY`, `PV_DW_BASE_H`,
-`PV_DW_BASE_SIDE`) — náhľad ich potrebuje aj vo VKLADANÍ, kde žiadny serverový payload neexistuje; zhodu stráži guard test.
+**Náhľad slotu má PODKLAD a DETAIL, nie vlastný celý náhľad** (PR #381, P2). `drawSlotBase` (telo so základňou **prerušovane** = referencia, línia linky) nahrádza
+`drawCarcass` v **každom** kontexte — slot korpus nemá, takže boky, dno a strop by boli vymyslené dielce. `drawSlotDetail` (čelo plne, **jantárové pásmo
+„výplň N · ručne"** po líniu linky, kóty šírky, výšky linky a sokla) beží **len v kontexte Korpus a vo vkladaní**. Kontexty **Čelá** a **Kovanie** tak kreslia svoje
+štandardné projekcie (kóty výšok riadkov, značky kovania, hover) **nad** podkladom slotu — pôvodný jediný `drawSlot` ich `return`om prepísal a používateľ o ne prišiel.
+**Scéna** (`nxSlotExtent`, prikladá sa v každom kontexte) obsiahne aj **trčiace telo**: telo sa nikdy nedeformuje podľa slotu, takže pri úzkom slote presahuje do strán
+a pri prehnanej výške nad líniu — práve vtedy, keď Kontrola hlási `dw_body_fit`/`dw_height_fit`, by ho fit orezal a na náhľade by nebolo vidieť to, o čom semafor hovorí.
+Rozmery generického tela a základne sú v JS **zrkadlom** Ruby konštánt (`PV_DW_BODY`, `PV_DW_BASE_H`, `PV_DW_BASE_SIDE`) — náhľad ich potrebuje aj vo VKLADANÍ, kde
+žiadny serverový payload neexistuje; zhodu stráži guard test. **Hlavička Inspectora** má popisok typu v jedinej mape `NX_TYPE_LABEL` (`Dolná · Horná · Umývačka`).
 
 ### Náhľad = kontextová projekcia + spodný pás (UI-B2, ui/js/preview.js)
 
@@ -1534,7 +1546,15 @@ vloženie prebehlo, pečiatka sa ticho vynechá. Pečiatka je **samostatná oper
 sa **nesklápa** na `lower`). Vkladacia karta zobrazuje tie isté polia ako Základné, takže payload nesie `dw_*` explicitne — **autoritou je však ULOŽENÝ ZÁZNAM
 šablóny**, nie CEF: `Panel.apply_template_slot_fields!` po `take_template_ref!` doplní chýbajúce `dw_*` a prevezme `appliance_expects[]` zo záznamu
 (Astra S1-E FIX E7). Vložený slot **nikdy** nenesie väzbu na konkrétny spotrebič — šablóna ju ani niesť nemôže. **„Uložiť ako šablónu" zo slotu** typ
-neprepína (`apply_template_type!` pri `dishwasher` nerobí nič) — slot sa na hornú skrinku prepnúť nedá.
+neprepína (`apply_template_type!` pri `dishwasher` nerobí nič) — slot sa na hornú skrinku prepnúť nedá. Modal to od PR #381 aj **ukazuje**: select `#tplSaveType`
+má tretiu voľbu **Umývačka** a pri slote je **zamknutý** (`disabled` + bublina „typ určuje sám slot"). Opačný smer je rovnako uzavretý — voľba `dishwasher` nad
+**dolnou** skrinkou sa ignoruje (whitelist ostáva `lower|upper`), lebo jej config nemá `dw_*`. Autoritou je server, HTML je zrkadlo.
+
+**Preflighty TELA a CHRBTA sa slotu netýkajú** (PR #381, P2). `Panel.body_preflight` aj `back_preflight` by nad slotom bežali nad **zdedeným projektovým materiálom
+korpusu** a vloženie by odmietli chybou o hrúbke korpusu, ktorú používateľ v **skrytom** poli nemá ako opraviť; `insert_thickness_preflight` by ho navyše odmietol pre
+zámok hrúbky z predchádzajúcej skrinky. Oba sa preto preskočia (`Panel.slot_params?`), a to **pred prvým čítaním materiálu**. **Materiálový remap ABS overridov ostáva** —
+slot čelo má a jeho materiál sa mení. Hrúbku čela validuje ďalej **tá istá brána ako pri každom inom čele** (`CabinetBuilder.validate_material_thickness!`
+v `resolve_part`): katalógový materiál mimo rozsahu čiel prestavbu zastaví, nie ticho oreže.
 
 #### UI-C1b (vzhľad a správanie karty)
 

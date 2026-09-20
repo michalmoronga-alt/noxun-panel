@@ -597,6 +597,83 @@ NxTest.test('S1-E E3: logicka obalka je zapojena vsade, kde sa doteraz citali bo
                       'obalka sa cita pri cieli aj pri prekazke')
 end
 
+# ---------------------------------------------------------------------------
+# 7) PR #381 — CODEX KOLO 1 (P2)
+# ---------------------------------------------------------------------------
+
+NxTest.test('S1-E (P2 #2): modal „Uložiť ako šablónu" pozna slot a server ostava autoritou') do
+  html = NxS1E.src('noxun_engine', 'ui', 'panel.html')
+  sel = html[/<select id="tplSaveType">.*?<\/select>/m].to_s
+  NxTest.assert(sel.include?('value="dishwasher"'), 'select ma volbu Umývačka')
+  NxTest.assert(sel.include?('>Umývačka<'), 'a ludsky popisok')
+  # SERVER je autorita: slot sa na hornu ani dolnu prepnut NEDA...
+  slot = { 'type' => 'dishwasher' }
+  NxTest.assert_equal('', Noxun::Engine::Panel.apply_template_type!(slot, 'upper'))
+  NxTest.assert_equal('dishwasher', slot['type'])
+  # ...a naopak sa z dolnej skrinky NEDA spravit slot (config nema `dw_*`).
+  low = { 'type' => 'lower' }
+  NxTest.assert_equal('', Noxun::Engine::Panel.apply_template_type!(low, 'dishwasher'),
+                      'neplatna volba sa ticho ignoruje, nic sa nemeni')
+  NxTest.assert_equal('lower', low['type'])
+  # JS zamok je LEN zrkadlo — existuje a nastavuje `disabled`.
+  js = NxS1E.src('noxun_engine', 'ui', 'js', 'form.js')
+  fn = js[/function nxSyncTplSaveType\(t\)\{.*?\n  \}/m].to_s
+  NxTest.assert(fn.include?('sel.disabled = slot'), 'modal typ pri slote ZAMKNE')
+end
+
+NxTest.test('S1-E (P2 #6): preflighty TELA a CHRBTA sa slotu netykaju') do
+  pan = Noxun::Engine::Panel
+  NxTest.assert(pan.slot_params?('type' => 'dishwasher'))
+  NxTest.refute(pan.slot_params?('type' => 'lower'))
+  NxTest.refute(pan.slot_params?(nil))
+
+  # Obe brany sa NAHRADIA chybou — slot ich nesmie ani zavolat, dolna skrinka
+  # ich musi mat dalej (inak by test nic nemeral).
+  sc = pan.singleton_class
+  orig_body = pan.method(:body_preflight).unbind
+  orig_back = pan.method(:back_preflight).unbind
+  begin
+    sc.send(:define_method, :body_preflight) { |_p, _m| { error: 'TELO' } }
+    sc.send(:define_method, :back_preflight) { |_p, _m| { error: 'CHRBAT' } }
+    low = pan.material_preflight({ 'type' => 'lower', 'thickness' => 25.0 }, nil)
+    NxTest.assert_equal('TELO', low[:error], 'dolna skrinka branu tela STALE ma')
+    slot = pan.material_preflight({ 'type' => 'dishwasher', 'thickness' => 18.0 }, nil)
+    NxTest.assert_equal(nil, slot, 'slot telo ani chrbat NEMA — ziadna brana, ziadna hlaska')
+  ensure
+    sc.send(:define_method, :body_preflight, orig_body)
+    sc.send(:define_method, :back_preflight, orig_back)
+  end
+end
+
+NxTest.test('S1-E (P2 #6): ZAMOK HRUBKY vlozenie slotu neodmietne') do
+  pan = Noxun::Engine::Panel
+  pan.handle_set_insert_locks({ 'locks' => { 'thickness' => 25.0 } }.to_json)
+  begin
+    NxTest.assert_equal(25.0, pan.insert_locks['thickness'], 'zamok je naozaj aktivny')
+    NxTest.assert_equal(nil, pan.insert_thickness_preflight({ 'type' => 'dishwasher',
+                                                              'thickness' => 18.0 }, nil),
+                        'slot hrubku KORPUSU nema — brana sa ho netyka')
+    src = NxS1E.src('noxun_engine', 'ui', 'panel', 'actions_cabinet.rb')
+    body = src[/def insert_thickness_preflight\(params, model\).*?\n        end\n/m].to_s
+    i_guard = body.index('slot_params?(params)')
+    i_mat = body.index('effective_materials')
+    NxTest.assert(i_guard && i_mat && i_guard < i_mat,
+                  'guard stoji PRED prvym citanim materialu (inak by zbytocne siahal na katalog)')
+  ensure
+    pan.handle_set_insert_locks({ 'locks' => {} }.to_json)
+  end
+end
+
+NxTest.test('S1-E (P2 #6): hrubku CELA slotu validuje dalej TA ISTA brana') do
+  pd = { role: 'false_front', suffix: 'BLIND-1', prod: { thickness: 18.0 } }
+  # Katalogovy material mimo rozsahu ciel = prestavba sa ZASTAVI (nie tichy orez).
+  NxTest.assert_raise(/potrebuje/) do
+    NxS1E.cb.validate_material_thickness!('HDF3', { 'thickness' => 3.0 }, pd)
+  end
+  # Bezna hrubka cela (18,6 mm) prejde.
+  NxTest.assert_equal(nil, NxS1E.cb.validate_material_thickness!('DEC186', { 'thickness' => 18.6 }, pd))
+end
+
 NxTest.test('S1-E R12: VERSION je v oboch suboroch rovnaka a `?v=` sedi') do
   v = Noxun::Engine::VERSION
   main = NxS1E.src('noxun_engine', 'main.rb')
