@@ -2962,6 +2962,30 @@ module Noxun
           params
         end
 
+        # S1-B1: PROTIVAHA `strip_appliance_refs!` — zapis vazieb na spotrebic
+        # do configu skrinky alebo slotu. Bezi v UZ OTVORENEJ operacii volajuceho
+        # (`ApplianceBinding`), lebo polozka rozpoctu a obe strany vazby musia
+        # byt JEDEN krok Spat. Ide cez `config_to_params` + `rebuild_in_operation`
+        # (nie cez holy zapis atributu) zamerne: skrinka nesie vazbu v configu,
+        # z ktoreho sa STAVA — S1-F z nej kresli kontrolny box a ten musi
+        # vzniknut v TEJ ISTEJ prestavbe. Prazdny zoznam kluc ODSTRANI (legacy
+        # skrinka nikdy nedostane prazdne pole, ktore by vyzeralo ako „uz sme
+        # to riesili").
+        def write_appliance_refs!(model, inst, refs)
+          cfg = Store.config(inst)
+          raise 'Vybrana instancia nie je NOXUN korpus.' unless cfg.is_a?(Hash)
+
+          params = config_to_params(cfg)
+          list = Array(refs).select { |r| r.is_a?(Hash) && !r['item_id'].to_s.strip.empty? }
+          if list.empty?
+            strip_appliance_refs!(params)
+          else
+            params['appliance_refs'] = list
+          end
+          rebuild_in_operation(model, inst, normalize(params))
+          inst
+        end
+
         # Ocisti part_overrides na { part_key => { 'material_id'=>..|nil,
         # 'edges'=>{L1..W2}, 'grain_direction'=>'length'|'width' } }.
         # Zahodi prazdne / neplatne zaznamy. Zachova nil hrany (explicitne "bez ABS").
