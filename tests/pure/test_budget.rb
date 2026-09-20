@@ -544,12 +544,15 @@ end
 
 NxTest.test('budget_store: spotrebic — enum typu, UUID, prepinac sceitania') do
   m = NxBudget::FakeModel.new
-  a, errs = NxBudget.bs.add_appliance!(m, 'typ' => 'chladnicka', 'nazov' => 'Liebherr',
-                                       'cena' => 899.0, 'dodavatel' => 'Nay')
+  # S1-B1: legacy slovensky kod sa PRIJME (stara zakazka sa musi dat upravit),
+  # ale ZAPISE sa uz KANONICKY kod katalogu.
+  a, errs = NxBudget.bs.add_appliance!(m, { 'typ' => 'chladnicka', 'nazov' => 'Liebherr',
+                                            'cena' => 899.0, 'dodavatel' => 'Nay' })
   NxTest.assert(errs.empty?, errs.inspect)
-  NxTest.assert_equal('chladnicka', a['typ'])
+  NxTest.assert_equal('fridge', a['typ'])
   NxTest.assert_equal('zostava', a['cp_skupina'])
-  _, bad = NxBudget.bs.add_appliance!(m, 'typ' => 'kozub', 'nazov' => 'X')
+  NxTest.assert_equal({ 'kind' => 'job' }, a['owner'], 'polozka bez vazby je „len zakazka"')
+  _, bad = NxBudget.bs.add_appliance!(m, { 'typ' => 'kozub', 'nazov' => 'X' })
   NxTest.assert(bad.any?, 'typ mimo enumu sa odmietne')
   NxTest.assert_equal(1, NxBudget.bs.appliances(m).length)
   NxBudget.bs.set_appliances_included!(m, true)

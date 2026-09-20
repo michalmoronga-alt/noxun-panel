@@ -80,8 +80,12 @@ module Noxun
         'zavesy' => 'ZÁVESY', 'vysuvy' => 'VÝSUVY', 'vyklopy' => 'VÝKLOPY',
         'uchytky' => 'ÚCHYTKY', 'nohy' => 'REKTIFIKAČNÉ NOHY', 'vesiaky' => 'VEŠIAKY',
         'osvetlenie' => 'LED OSVETLENIE', 'ostatne' => 'OSTATNÉ VYBAVENIE',
-        'spotrebice' => 'SPOTREBIČE'
+        'spotrebice' => 'SPOTREBIČE A VYBAVENIE'
       }.freeze
+
+      # S1-B1 (R3): stitok polozky, ktoru dodava zakaznik. Ten isty text nesie
+      # informacny riadok cenovej tabulky aj specifikacia — jeden zdroj.
+      CUSTOMER_SUPPLIED_LABEL = 'dodáva zákazník'
 
       # Role dielcov, ktore zakaznik vidi ako "dvierka a viditeľné časti".
       # GH #139 P2: `plinth` sem PATRI — Construction.plinth_parts ho vyrobi LEN
@@ -146,6 +150,12 @@ module Noxun
         rows = [{ 'key' => 'cp:assembly', 'polozka' => ASSEMBLY_NAME, 'cena' => assembly,
                   'mnozstvo' => 1, 'mj' => 'set', 'kind' => 'assembly' }]
         separate.each { |c| rows << item_row(c) }
+        # S1-B1 (B10): spotrebic „dodáva zákazník" ma NULOVU sumu, takze ho
+        # `candidates` zahodi uz pri filtri nulovych riadkov. Zakaznik ho ale
+        # v ponuke vidiet MA — je to kus, ktory si kupuje sam a ktory v kuchyni
+        # stoji. Ide preto VLASTNOU cestou ako INFORMACNY riadok (0 €) a len
+        # vtedy, ked je sekcia spotrebicov vobec sucastou ponuky.
+        rows.concat(customer_supplied_rows(sections))
         rows.concat(fixed)
 
         cp_total = rows.sum { |r| r['cena'].to_f }.round(2)
@@ -204,6 +214,30 @@ module Noxun
           end
         end
         out.sort_by { |c| [-c['amount'], c['source_key']] }
+      end
+
+      # Informacne riadky „dodáva zákazník" (B10). Nulovy filter `candidates`
+      # ich obist musi, preto sa skladaju priamo zo sekcie — ale PRESNE podla
+      # toho isteho pravidla: nezapocitana sekcia spotrebicov do ponuky nejde
+      # vobec (existujuce pravidlo, plati aj tu).
+      def customer_supplied_rows(sections)
+        sec = sections.find { |s| s.is_a?(Hash) && s['key'].to_s == 'appliances' }
+        return [] unless sec.is_a?(Hash) && sec['counts_in_total'] != false
+
+        Array(sec['rows']).filter_map do |r|
+          next nil unless r.is_a?(Hash) && r['customer_supplied'] == true
+
+          key = r['key'].to_s
+          next nil if key.empty?
+
+          { 'key' => "cp:info:#{key}", 'polozka' => customer_supplied_label(r),
+            'cena' => 0.0, 'mnozstvo' => 1, 'mj' => 'ks', 'kind' => 'info',
+            'source_key' => key, 'customer_supplied' => true }
+        end
+      end
+
+      def customer_supplied_label(row)
+        "#{item_label(row, 'appliances')} (#{CUSTOMER_SUPPLIED_LABEL})"
       end
 
       def item_row(cand)
@@ -406,7 +440,12 @@ module Noxun
                   else
                     "#{typ} #{name}"
                   end
-          label.strip.empty? ? nil : label.strip
+          label = label.strip
+          next nil if label.empty?
+
+          # S1-B1: co dodava zakaznik, musi byt v specifikacii PRIZNANE —
+          # inak by cakal, ze je to v cene.
+          r['customer_supplied'] == true ? "#{label} (#{CUSTOMER_SUPPLIED_LABEL})" : label
         end
       end
 

@@ -57,7 +57,16 @@ module Noxun
       # ktoreho ticha strata by poskodila CENU alebo objednavku (nove pole
       # vlastnej polozky, vazba spotrebica na katalog v bloku 4, novy kluc
       # zaradenia v ponuke). Cisto odvodene/zobrazovacie pole bump nevyzaduje.
-      BUDGET_STD = 1
+      #
+      #   1 = V0.6 E-a (rezim, overridy, nasobky, m2, vlastne polozky, spotrebice)
+      #   2 = S1-B1 — SPOTREBIC MA VAZBU NA KATALOG A VLASTNIKA: polozka
+      #       `budget_appliances[]` pribrala `catalog_id`, `snapshot` (kopia
+      #       rozmerov z katalogu), `owner` (`{kind, id}`) a `customer_supplied`.
+      #       Starsi plugin by ich pri prvej mutacii ticho orezal — a s nimi by
+      #       zanikla VAZBA na skrinku, z ktorej S1-F kresli kontrolnu geometriu.
+      #       Kody kategorii su od tejto verzie KANONICKE (`ApplianceCatalog`);
+      #       legacy slovenske kody sa pri citani prevedu, zapisuje sa kanon.
+      BUDGET_STD = 2
 
       # Sentinel pre rozlisenie „atribut NIE JE" od „atribut je a je prazdny".
       # `read_attr` obe splostuje na nil a fail-open `.to_i` by z poskodenej
@@ -71,15 +80,35 @@ module Noxun
         'invalid' => 'Dáta rozpočtu sú poškodené (neplatná verzia formátu) — nahlás problém, needituj.'
       }.freeze
 
-      # Typy spotrebicov (S1 z enumu spravi vazbu na katalog — ID struktura
-      # ostava kompatibilna dopredu).
-      APPLIANCE_TYPES = %w[chladnicka rura mikrovlnka umyvacka digestor varna_doska ine].freeze
-      APPLIANCE_LABELS = {
-        'chladnicka' => 'Chladnička', 'rura' => 'Rúra', 'mikrovlnka' => 'Mikrovlnka',
-        'umyvacka' => 'Umývačka', 'digestor' => 'Digestor', 'varna_doska' => 'Varná doska',
-        'ine' => 'Iné'
+      # S1-B1 (R1): JEDNA KANONICKA SADA KODOV KATEGORII pre cely engine =
+      # kody katalogu spotrebicov. Rozpocet uz nema vlastny enum — dva zoznamy
+      # by sa casom rozisli a polozka zakazky by sa s modelom z katalogu
+      # nesparovala. `appliance_catalog` sa nacitava PRED `budget_store`
+      # (main.rb), takze konstanta je tu dostupna uz pri definicii triedy.
+      APPLIANCE_TYPES = ApplianceCatalog::CATEGORIES
+      APPLIANCE_LABELS = ApplianceCatalog::CATEGORY_LABELS
+      # Legacy slovenske kody spred `BUDGET_STD` 2. CITANIE ich prijme a
+      # prevedie, ZAPIS je vzdy kanonicky — stara zakazka sa tak otvori,
+      # upravi aj ulozi bez toho, aby pouzivatel o polozku prisiel.
+      # Mapa je JEDNOSMERNA (legacy -> kanon): naspat sa uz nikdy nezapisuje.
+      LEGACY_TYPES = {
+        'chladnicka' => 'fridge', 'rura' => 'oven', 'mikrovlnka' => 'microwave',
+        'umyvacka' => 'dishwasher', 'digestor' => 'hood', 'varna_doska' => 'hob',
+        'ine' => 'other'
       }.freeze
-      DEFAULT_APPLIANCE_TYPE = 'ine'
+      DEFAULT_APPLIANCE_TYPE = 'other'
+
+      # S1-B1 (B3): typ sa NEDA prepisat rucne, ked ho urcuje model z katalogu
+      # alebo ked polozka uz ma fyzickeho vlastnika (matica kategoria ->
+      # vlastnik by sa inak rozbila bez toho, aby sa vazba prepocitala).
+      TYPE_LOCKED_MSG = 'typ určuje model z katalógu — zmeň model'
+
+      # Druhy vlastnika polozky. `job` = „len zakazka" (ziadna entita v modeli)
+      # a je to LEGITIMNY stav KAZDEJ kategorie (B11) — matica obmedzuje iba
+      # FYZICKYCH vlastnikov. Autoritou matice je `ApplianceBinding`.
+      OWNER_KINDS = %w[cabinet slot board job].freeze
+      OWNER_JOB = 'job'
+      MAX_CATALOG_ID = 64
 
       DEFAULT_CP_GROUP = 'zostava'
 
@@ -357,32 +386,50 @@ module Noxun
 
       # --- spotrebice ----------------------------------------------------------
 
-      def add_appliance!(model, attrs)
-        item, errors = build_appliance(attrs, nil)
+      # S1-B1 (B2): od `BUDGET_STD` 2 su tieto tri metody VNUTORNE — jediny
+      # vstup pre mutacie spotrebicov je `ApplianceBinding.apply!`, ktory ich
+      # vola s `in_operation: true` (polozka aj `appliance_refs[]` vlastnika
+      # v JEDNEJ operacii = jeden krok Spat) a s `trusted: true` (smie odovzdat
+      # `catalog_id`/`snapshot`/`owner`). Bez tychto prepinacov sa spravaju
+      # presne ako doteraz — vlastna operacia, klientsky whitelist.
+      def add_appliance!(model, attrs, trusted: false, in_operation: false)
+        item, errors = build_appliance(attrs, nil, trusted: trusted)
         return [nil, errors] unless errors.empty?
         list = appliances(model)
         return [nil, ['viac spotrebičov sa už nezmestí']] if list.length >= MAX_APPLIANCES
         list << item
-        ok, errs = write!(model, 'Rozpočet — nový spotrebič') { write_json(model, KEY_APPLIANCES, list) }
+        ok, errs = write!(model, 'Rozpočet — nový spotrebič', in_operation: in_operation) do
+          write_json(model, KEY_APPLIANCES, list)
+        end
         ok ? [item, []] : [nil, errs]
       end
 
-      def update_appliance!(model, id, attrs)
+      def update_appliance!(model, id, attrs, trusted: false, in_operation: false)
         list = appliances(model)
         idx = list.index { |it| it['id'] == id.to_s }
         return [nil, ['spotrebič sa nenašiel']] if idx.nil?
-        item, errors = build_appliance(attrs, list[idx])
+        item, errors = build_appliance(attrs, list[idx], trusted: trusted)
         return [nil, errors] unless errors.empty?
         list[idx] = item
-        ok, errs = write!(model, 'Rozpočet — úprava spotrebiča') { write_json(model, KEY_APPLIANCES, list) }
+        ok, errs = write!(model, 'Rozpočet — úprava spotrebiča', in_operation: in_operation) do
+          write_json(model, KEY_APPLIANCES, list)
+        end
         ok ? [item, []] : [nil, errs]
       end
 
-      def remove_appliance!(model, id)
+      def remove_appliance!(model, id, in_operation: false)
         list = appliances(model)
         rest = list.reject { |it| it['id'] == id.to_s }
         return [false, ['spotrebič sa nenašiel']] if rest.length == list.length
-        write!(model, 'Rozpočet — zmazanie spotrebiča') { write_json(model, KEY_APPLIANCES, rest) }
+        write!(model, 'Rozpočet — zmazanie spotrebiča', in_operation: in_operation) do
+          write_json(model, KEY_APPLIANCES, rest)
+        end
+      end
+
+      # Polozka podla UUID (citanie) — vstup pre `ApplianceBinding` aj pre
+      # vsetkych, kto potrebuju VLASTNIKA polozky bez druheho citania dictu.
+      def appliance(model, id)
+        appliances(model).find { |it| it['id'] == id.to_s }
       end
 
       # --- stavba a validacia zaznamov ----------------------------------------
@@ -409,15 +456,20 @@ module Noxun
         [out, errors.compact.uniq]
       end
 
-      def build_appliance(attrs, existing)
+      # S1-B1 (B2/B3): `trusted` = volajuci je SERVER (jediny transakcny vstup
+      # `ApplianceBinding` alebo citanie UZ ULOZENEHO dokumentu). Len vtedy sa
+      # preberaju polia, ktore klient NESMIE poslat: `catalog_id`, `snapshot`
+      # (kopia rozmerov z katalogu) a `owner`. Z klienta chodi vzdy iba to, co
+      # pouzivatel vypisal vo formulari — identitu modelu a vlastnika odvodzuje
+      # server z katalogu a z modelu.
+      def build_appliance(attrs, existing, trusted: false)
         a = stringify(attrs.is_a?(Hash) ? attrs : {})
         base = existing.is_a?(Hash) ? existing : {}
+        src = trusted ? a : {}
         errors = []
         out = { 'id' => (base['id'] || SecureRandom.uuid).to_s }
-        typ = a.key?('typ') ? a['typ'].to_s.strip : base['typ'].to_s
-        typ = DEFAULT_APPLIANCE_TYPE if typ.empty?
-        errors << 'neznámy typ spotrebiča' unless APPLIANCE_TYPES.include?(typ)
-        out['typ'] = typ
+        snapshot = snapshot_field(src.key?('snapshot') ? src['snapshot'] : base['snapshot'])
+        out['typ'] = appliance_type_field(a, base, snapshot, errors)
         out['nazov'] = text_field(a, base, 'nazov', errors)
         cena, cena_err = price_field(a, base, 'cena')
         errors << cena_err if cena_err
@@ -427,7 +479,95 @@ module Noxun
         errors << url_err if url_err
         put_opt(out, 'url', url)
         out['cp_skupina'] = cp_group_field(a, base, errors)
+        # BUDGET_STD 2 — vazba na katalog a vlastnik.
+        cat_id = (src.key?('catalog_id') ? src['catalog_id'] : base['catalog_id']).to_s.strip
+        out['catalog_id'] = cat_id if !cat_id.empty? && cat_id.length <= MAX_CATALOG_ID
+        out['snapshot'] = snapshot if snapshot
+        out['owner'] = owner_field(src.key?('owner') ? src['owner'] : base['owner'])
+        out['customer_supplied'] = flag_field(a, base, 'customer_supplied')
         [out, errors.compact.uniq]
+      end
+
+      # Legacy kod -> kanon; kanon ostava; neznamy kod -> nil (volajuci z toho
+      # spravi chybu alebo default). JEDINA prekladova cesta v celom engine.
+      def canon_appliance_type(raw)
+        v = raw.to_s.strip
+        return nil if v.empty?
+
+        v = LEGACY_TYPES[v] || v
+        APPLIANCE_TYPES.include?(v) ? v : nil
+      end
+
+      # Ponuka typov PRE KLIENTA — kody a SK popisky z JEDNEJ mapy (guard
+      # parity Ruby <-> JS). JS si zoznam nedrzi natvrdo.
+      def appliance_type_options
+        APPLIANCE_TYPES.map { |c| { 'code' => c, 'label' => APPLIANCE_LABELS[c] || c } }
+      end
+
+      # B3: kategoria polozky. Poradie autorit:
+      #   1. SNAPSHOT (model z katalogu) — kategoria je jeho, klient ju nemeni,
+      #   2. vyslovne poslany `typ` — ale LEN ked polozka nie je zamknuta,
+      #   3. doterajsi typ / default.
+      def appliance_type_field(attrs, base, snapshot, errors)
+        snap_cat = canon_appliance_type(snapshot.is_a?(Hash) ? snapshot['category'] : nil)
+        return snap_cat if snap_cat
+
+        current = canon_appliance_type(base['typ'])
+        return current || DEFAULT_APPLIANCE_TYPE unless attrs.key?('typ')
+
+        wanted = canon_appliance_type(attrs['typ'])
+        if wanted.nil?
+          errors << 'neznámy typ spotrebiča'
+          return current || DEFAULT_APPLIANCE_TYPE
+        end
+        return wanted if current.nil? || wanted == current || !type_locked?(base)
+
+        errors << TYPE_LOCKED_MSG
+        current
+      end
+
+      # Je typ polozky urceny niecim silnejsim nez formularom? Bud modelom
+      # z katalogu, alebo fyzickym vlastnikom (matica).
+      def type_locked?(item)
+        return false unless item.is_a?(Hash)
+        return true unless item['catalog_id'].to_s.strip.empty?
+
+        owner_kind(item) != OWNER_JOB
+      end
+
+      def owner_kind(item)
+        own = item.is_a?(Hash) ? item['owner'] : nil
+        kind = own.is_a?(Hash) ? own['kind'].to_s : ''
+        OWNER_KINDS.include?(kind) ? kind : OWNER_JOB
+      end
+
+      # Vlastnik polozky. Legacy polozka (bez kluca) aj kazdy neuplny zaznam =
+      # `job` („len zakazka") — nikdy sa nevymysla entita, ktora v modeli nie je.
+      # `pid` sa do ZAKAZKY NEUKLADA: platnost vlastnika urcuje `appliance_refs[]`
+      # entity (R6), druha identita v polozke by sa s nou mohla rozist.
+      def owner_field(raw)
+        h = raw.is_a?(Hash) ? stringify(raw) : {}
+        kind = h['kind'].to_s.strip
+        return { 'kind' => OWNER_JOB } unless OWNER_KINDS.include?(kind) && kind != OWNER_JOB
+
+        id = h['id'].to_s.strip
+        id.empty? ? { 'kind' => OWNER_JOB } : { 'kind' => kind, 'id' => id }
+      end
+
+      # SNAPSHOT sa uklada BEZ normalizacie (vystup `ApplianceCatalog.snapshot_for`
+      # 1:1) — zakazka nesmie zavisiet od toho, comu rozumie DNESNY katalog.
+      # Overuje sa LEN tvar: Hash s KANONICKOU kategoriou.
+      def snapshot_field(raw)
+        return nil unless raw.is_a?(Hash)
+        return nil unless canon_appliance_type(raw['category'])
+
+        stringify(raw)
+      end
+
+      # Boolean pole. Prazdny/chybajuci vstup = doterajsia hodnota.
+      def flag_field(attrs, base, key)
+        raw = attrs.key?(key) ? attrs[key] : base[key]
+        raw == true || raw.to_s.strip.downcase == 'true' || raw.to_s.strip == '1'
       end
 
       def text_field(attrs, base, key, errors)
@@ -515,7 +655,11 @@ module Noxun
         return nil unless raw.is_a?(Hash)
         id = raw['id'].to_s.strip
         return nil if id.empty?
-        item, = build_appliance(raw.merge('id' => id), { 'id' => id })
+        # ULOZENY dokument je DOVERYHODNY zdroj (zapisal ho tento server):
+        # `catalog_id`, `snapshot` aj `owner` musia citanie prezit, inak by
+        # prve otvorenie zakazky zahodilo vazbu. Legacy kod typu sa tu
+        # prevedie na kanon (zapisuje sa uz len kanon).
+        item, = build_appliance(raw.merge('id' => id), { 'id' => id }, trusted: true)
         item
       end
 
@@ -573,10 +717,35 @@ module Noxun
       # ale este PRED `commit_operation`: udaj a marker su tak JEDNA operacia
       # (jeden krok Spat vrati oboje, vynimka pri zapise markera zrusi cely
       # krok — ziadny polovicny zapis).
-      def write!(model, operation_name)
+      #
+      # S1-B1 (B1) — REZIM „V CUDZEJ OPERACII" (`in_operation: true`): zapis
+      # spotrebica je len JEDNOU z troch casti vazby (polozka + `appliance_refs[]`
+      # oboch vlastnikov + prestavba) a SketchUp nema vnorene operacie
+      # (`start_operation` v otvorenej operacii ju ticho ukonci). V tomto rezime
+      # sa preto operacia NEOTVARA, NEKOMITUJE ani NEABORTUJE a vynimka (aj zo
+      # `stamp_std`) sa PREPUSTA VON — abort vlastni vyhradne `ApplianceBinding`,
+      # ktory operaciu otvoril. `@in_write` vracia `ensure`, takze ani po
+      # vynimke neostane zapisovy kanal otvoreny.
+      def write!(model, operation_name, in_operation: false)
         return [false, ['model nie je k dispozícii']] unless model
 
         reason = std_block_reason(std_state(model))
+        if in_operation
+          # Vonkajsi volajuci branu uz overil PRED `start_operation` (verejna
+          # `std_block_reason`). Ak sa sem aj tak dostane nekompatibilna
+          # zakazka, je to chyba programu — fail-closed vynimkou, ktora zhodi
+          # (a teda vrati) CELU operaciu, nikdy polovicny zapis.
+          raise "BudgetStore: #{reason}" unless reason.empty?
+
+          begin
+            @in_write = true
+            yield
+            stamp_std(model)
+          ensure
+            @in_write = false
+          end
+          return [true, []]
+        end
         return [false, [reason]] unless reason.empty?
 
         model.start_operation(operation_name, true)
