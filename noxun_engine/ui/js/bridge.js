@@ -785,6 +785,9 @@
       renderHardware(null, []);
       // KOV-G2 (D-111): doska nohy nema — riadok zmizne aj s pamatou vstupov.
       if (typeof nxLegsInsertReset === 'function') nxLegsInsertReset();
+      // S1-B2: korpusový riadok Spotrebiča patrí skrinke — doska má vlastný
+      // (`boardApplRows`, kreslí ho `renderBoardCard` nižšie).
+      if (typeof clearApplianceRows === 'function') clearApplianceRows('applRows');
       clearCabinetMaterials();
       if (lastCabForFit !== null){ lastCabForFit = null; }
       renderBoardCard(b);
@@ -832,6 +835,13 @@
       // nahlad pre kartu, ktoru prave postavil `setUiMode`.
       if (typeof nxLegsInsertReset === 'function') nxLegsInsertReset();
       if (typeof nxLegsInsertAsk === 'function') nxLegsInsertAsk();
+      // S1-B2 (Codex #383 kolo 1 P2): riadok SPOTREBIČA patrí označenému kusu —
+      // bez neho by vo vkladacom režime ostal visieť cudzí riadok so starými
+      // akciami (vkladaná skrinka o žiadnom spotrebiči nevie).
+      if (typeof clearApplianceRows === 'function'){
+        clearApplianceRows('applRows');
+        clearApplianceRows('boardApplRows');
+      }
       clearCabinetMaterials();   // korpusove material selecty na "dedi" + disabled
       refreshZoneUI(); renderPreview();
     },
@@ -947,12 +957,14 @@
     if (u){ u.classList.toggle('ok', !!s.under_ok); u.classList.toggle('bad', !s.under_ok); }
     setOut('inf_dw_class', s.class_text);
     var c = el('inf_dw_class');
-    // Trieda dostane zelenú/červenú LEN keď sa dá porovnať (model s triedou);
-    // bez modelu je to informácia, nie verdikt.
+    // Trieda dostane zelenú/červenú LEN keď sa naozaj porovnala. Server nesie
+    // TRI stavy (`class_state`: ok · mismatch · unknown) — pri „unknown"
+    // (bez modelu alebo model bez triedy v liste) ostáva riadok neutrálny,
+    // inak by zelená tvrdila overenie, ktoré sa nestalo (Codex #383 kolo 1 P2).
     if (c){
-      var known = s.class_ok !== undefined && String(s.body_source) === 'catalog';
-      c.classList.toggle('ok', known && !!s.class_ok);
-      c.classList.toggle('bad', known && !s.class_ok);
+      var st = String(s.class_state || 'unknown');
+      c.classList.toggle('ok', st === 'ok');
+      c.classList.toggle('bad', st === 'mismatch');
     }
     // Rozsah výšky tela z listu (nastaviteľné nohy) je HINT k poľu „Telo V",
     // nie kontrola — vstup ohraničuje používateľ.

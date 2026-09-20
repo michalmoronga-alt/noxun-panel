@@ -91,6 +91,20 @@
     return list.length > 0;
   }
 
+  // Odchod z kontextu (odznačenie, prechod na dosku) — riadky PATRIA označenému
+  // kusu, takže s ním musia zmiznúť. Nestačí ich skryť: s kontajnerom odchádza
+  // aj KONTEXT vlastníka (`data-apr-*`), inak by klik do zvyšného DOM poslal
+  // zápis na kus, ktorý už nikto nevidí (Codex #383 kolo 1 P2).
+  function clearApplianceRows(nodeId){
+    var box = aprEl(nodeId || 'applRows');
+    if (!box) return false;
+    box.innerHTML = '';
+    box.hidden = true;
+    box.removeAttribute('data-apr-kind');
+    box.removeAttribute('data-apr-id');
+    return true;
+  }
+
   // Payload zápisu. Identitu VLASTNÍKA skladá SERVER z označenej entity —
   // klient posiela len to, čo priradiť, a nad čím bol riadok vykreslený
   // (echo ID, GH #127 P2).
@@ -164,5 +178,6 @@
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { aprRowHtml: aprRowHtml, aprRowsHtml: aprRowsHtml,
                        aprSelectHtml: aprSelectHtml, aprPayload: aprPayload,
-                       renderApplianceRows: renderApplianceRows, aprCtxOf: aprCtxOf };
+                       renderApplianceRows: renderApplianceRows, aprCtxOf: aprCtxOf,
+                       clearApplianceRows: clearApplianceRows };
   }
