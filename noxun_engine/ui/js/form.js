@@ -161,15 +161,30 @@
   // zastavi. Je to ZRKADLO dvoch Ruby pravidiel a pocita sa JEDINOU zdielanou
   // funkciou `nxInteriorZ` (core.js) — ziadna druha kopia vzorca.
   var MIN_AVAIL_H = 10.0;     // Construction.validate!: vnutro <= 10 mm = odmietnutie
+  // S1-E0 (Codex #375 P2): PRAZDNE pole NIE JE nula — Ruby `normalize` doplni
+  // PREDVOLBU TYPU (dolna skrinka ma sokel 100 mm). Validacia preto musi citat
+  // tu istu hodnotu, akou bude server pocitat; inak by vyska 90 mm s prazdnym
+  // soklom presla klientom a padla az na serveri. Predvolby su DOSLOVA cisla
+  // zo servera (`CabinetBuilder::LOWER_DEFAULTS` / `UPPER_DEFAULTS` -> DEFAULTS
+  // v `bridge.js`), takze druhy zdroj pravdy nevznika — parita je strazena
+  // testom `tests/pure/test_s1e0_min_vyska.rb`.
+  function cabFieldOrDefault(id){
+    var e = el(id), d = DEFAULTS[getType()] || {};
+    var raw = (e && e.value !== '') ? evalDim(e.value) : NaN;
+    if (!isNaN(raw)) return raw;
+    var dv = parseFloat(d[id]);
+    return isNaN(dv) ? NaN : dv;   // NaN = predvolby zo servera este nedosli
+  }
   function cabinetHeightError(){
     var he = el('height');
     if (!he || he.value === '') return '';
     var h = evalDim(he.value);
     if (isNaN(h)) return ''; // nezmysel uz oznacil hlavny cyklus
-    // `currentCarcass` (core.js) vracia za KAZDE pole cislo — prazdne, chybajuce
-    // aj nezmyselne pole ma fallback — takze dalsie isNaN kontroly by tu boli
-    // mrtvy kod. Jedina hodnota, ktora sa musi overit, je prave citana vyska.
-    var c = currentCarcass({ height: h });
+    var sokel = (getType() === 'upper') ? 0 : cabFieldOrDefault('floor_height');
+    var hrubka = cabFieldOrDefault('thickness');
+    // Bez predvolieb zo servera sa NEHADA — radsej ziadna hlaska nez falosna.
+    if (isNaN(sokel) || isNaN(hrubka)) return '';
+    var c = currentCarcass({ height: h, floor_height: sokel, thickness: hrubka });
     var avail = nxInteriorZ(c).availH;
     if (avail <= MIN_AVAIL_H){
       return 'Výška ' + Math.round(h) + ' mm nenechá žiadne vnútro (podstavec ' +

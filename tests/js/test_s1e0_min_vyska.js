@@ -46,7 +46,13 @@ function num(id){
   return evalDim(fields[id] === undefined ? '' : fields[id]);
 }
 let cabType = 'lower';
+// Predvolby, ktore do panela posiela server (`CabinetBuilder::LOWER_DEFAULTS`
+// / `UPPER_DEFAULTS` cez `bridge.js`). Dolna skrinka ma sokel 100 — presne to
+// dosadi Ruby `normalize`, ked je pole prazdne.
+const DEFAULTS = { lower: { floor_height: 100, thickness: 18, height: 720 },
+                   upper: { floor_height: 0, thickness: 18, height: 720 } };
 const ctx = {
+  DEFAULTS: DEFAULTS,
   el: id => (fields[id] === undefined ? null : node(id)),
   val: id => (selects[id] !== undefined ? selects[id] : fields[id]),
   numv: num, setNum: (id, v) => { fields[id] = String(v); }, setOut: () => {}, onField: () => {},
@@ -145,5 +151,35 @@ assert.match(node('height').title, /výstuh/i, 'hlaska pomenuje vystuhy');
 selects.top_mode = 'full';
 assert.equal(valid(), true, 'plny vrch tu istu vysku pusti');
 n += 3;
+
+// --- 6) PRAZDNY sokel = PREDVOLBA typu, nie nula (Codex #375 P2) -------------
+// Ruby `normalize` pri prazdnom poli dosadi `LOWER_DEFAULTS[:floor_height]`
+// = 100 mm. Keby panel ratal s nulou, vyska 90 by presla klientom a padla az
+// na serveri — presne to, co ma krizova kontrola chytit.
+reset();
+fields.floor_height = ''; fields.height = '90';
+assert.equal(valid(), false, 'prazdny sokel znamena predvolenych 100 mm, nie 0');
+assert.equal(bad('height'), true, 'a vyska zocervenie');
+assert.match(node('height').title, /100 mm/, 'hlaska menuje PREDVOLENY sokel, nie nulu');
+// Ta ista vyska s VYSLOVNE nulovym soklom je v poriadku.
+fields.floor_height = '0';
+assert.equal(valid(), true, 'vyslovna nula prejde');
+// Horna skrinka sokel nema ani s prazdnym polom.
+reset();
+cabType = 'upper';
+fields.floor_height = ''; fields.height = '80'; fields.depth = '320';
+assert.equal(valid(), true, 'horna skrinka ignoruje sokel aj pri prazdnom poli');
+n += 4;
+
+// Kym predvolby zo servera nedosli, kontrola RADSEJ MLCI — falosna cervena
+// pri starte panela je horsia nez chybajuca.
+reset();
+const savedLower = DEFAULTS.lower;
+DEFAULTS.lower = {};
+fields.floor_height = ''; fields.height = '90';
+assert.equal(valid(), true, 'bez predvolieb zo servera sa nehada');
+assert.equal(bad('height'), false, 'a pole neostane cervene');
+DEFAULTS.lower = savedLower;
+n += 2;
 
 console.log(`S1-E0 (min vyska korpusu 80 mm): ${n} kontrol OK`);

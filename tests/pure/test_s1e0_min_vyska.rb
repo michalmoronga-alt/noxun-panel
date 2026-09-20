@@ -85,6 +85,16 @@ module NxS1E0
     JSON.parse(cb.cabinet_config(cfg).to_json)
   end
 
+  # Prejde `Construction.validate!` tento config pri danej vyske? Pytame sa
+  # PRIAMO validacie, nie kopie jej pravidiel.
+  def valid_height?(cfg, height)
+    c = cfg.merge(height: height)
+    cn.validate!(c, cn.interior_dims(c))
+    true
+  rescue StandardError
+    false
+  end
+
   def js_limit(id)
     block = form_js[/var\s+LIMITS\s*=\s*\{(.*?)\};/m, 1].to_s
     NxTest.assert(!block.empty?, 'v form.js sa nenasiel zoznam LIMITS')
@@ -268,6 +278,97 @@ NxTest.test('S1-E0 R4: nizky korpus BEZ polic (default) prejde a zona je jedna')
   plan = NxS1E0.cn.build_plan(NxS1E0.low_lower, 'CAB-S1E0-6')
   NxTest.assert_equal(0, NxS1E0.low_lower[:zone_tree]['shelves'], 'default je 0 polic')
   NxTest.assert_equal(1, Array(plan[:zones]).length, 'vnutro je jedna zona')
+end
+
+# ---------------------------------------------------------------------------
+# 3b) Config-aware spodna hranica pre absorpciu scale (Codex #375 P2)
+# ---------------------------------------------------------------------------
+
+NxTest.test('S1-E0 (Codex #375 P2): min_valid_height je NAJNIZSIA vyska, ktoru validate! prijme') do
+  # Sila testu je v druhej polovici: o milimeter nizsie uz musi byt odmietnutie.
+  # Inak by funkcia mohla vracat hocijake „dost velke" cislo a tvarit sa spravne.
+  [
+    { 'floor_height' => 100.0 },                                    # dolna so soklom
+    { 'floor_height' => 0.0 },                                      # korpus na dorovnanie
+    { 'floor_height' => 150.0, 'thickness' => 25.0 },               # hruby material
+    { 'floor_height' => 500.0 },                                    # maximalny sokel
+    { 'floor_height' => 100.0, 'top_mode' => 'none' },              # bez vrchu
+    { 'floor_height' => 100.0, 'top_mode' => 'two_rails' },         # dve vystuhy naplocho
+    { 'floor_height' => 0.0, 'top_mode' => 'two_rails',
+      'rails_orientation' => 'upright', 'rail_depth' => 100.0 },    # vystuhy na hranu
+    { 'floor_height' => 100.0, 'top_mode' => 'two_rails',
+      'rails_orientation' => 'upright', 'rail_depth' => 400.0,
+      'rails_top_offset' => 200.0 }                                 # extremne vystuhy
+  ].each do |over|
+    cfg = NxS1E0.low_lower(over)
+    h = NxS1E0.cn.min_valid_height(cfg)
+    NxTest.assert(NxS1E0.valid_height?(cfg, h), "#{over.inspect}: vyska #{h} musi prejst validate!")
+    NxTest.refute(NxS1E0.valid_height?(cfg, h - 1.0),
+                  "#{over.inspect}: vyska #{h - 1} uz prejst NESMIE (inak to nie je minimum)")
+    NxTest.assert_equal(h, h.round.to_f, "#{over.inspect}: vysledok je cely milimeter")
+  end
+end
+
+NxTest.test('S1-E0 (Codex #375 P2): dolna so soklom 100 a hrubkou 18 ma minimum 147 mm') do
+  # 100 (sokel) + 2 x 18 (dno a strop) + 11 (vnutro tesne nad hranicou 10) = 147.
+  cfg = NxS1E0.low_lower('floor_height' => 100.0)
+  NxTest.assert_close(147.0, NxS1E0.cn.min_valid_height(cfg), 0.01)
+  NxTest.assert_close(11.0, NxS1E0.cn.avail_at(cfg, 147.0), 0.01, 'vnutro 11 mm je tesne NAD hranicou')
+end
+
+NxTest.test('S1-E0 (Codex #375 P2): bez sokla je minimum POD hranicou 80 — rozhoduje MIN') do
+  # Absorpcia berie prisnejsie z dvoch: `MIN['height']` a `min_valid_height`.
+  # Pri sokli 0 je geometricke minimum 47 mm, takze rozhoduje absolutnych 80.
+  cfg = NxS1E0.low_lower('floor_height' => 0.0)
+  NxTest.assert_close(47.0, NxS1E0.cn.min_valid_height(cfg), 0.01)
+  NxTest.assert(NxS1E0.cb::MIN[:height] > NxS1E0.cn.min_valid_height(cfg),
+                'pri nulovom sokli je tvrdsie absolutne minimum 80 mm')
+end
+
+NxTest.test('S1-E0 (Codex #375 P2): absorpcia scale klampuje CONFIG-AWARE, nie na hole MIN') do
+  # `scale_observer.rb` sa headless nenacitava (potrebuje zive SketchUp API),
+  # takze sa strazi ZDROJ: vyska musi ist cez `clamp_height`, ktory berie
+  # `Construction.min_valid_height`. Spravanie nad zivym modelom dokazuje
+  # in-SU sekcia `run_s1e0` (bod e).
+  src = NxS1E0.src('noxun_engine', 'core', 'scale_observer.rb')
+  NxTest.assert(src.include?("params['height'] = clamp_height(params,"),
+                'vyska ide cez config-aware clamp')
+  NxTest.assert(src.include?('Construction.min_valid_height'),
+                'a ten cita najnizsiu PLATNU vysku z Construction')
+  NxTest.refute(src.include?("clamp_min('height'"),
+                'stary klamp vysky na hole MIN uz v absorpcii nie je')
+end
+
+NxTest.test('S1-E0 (Codex #375 P2): panel berie PRAZDNY sokel ako predvolbu typu, nie ako nulu') do
+  # Ruby `normalize` dosadi za prazdne pole PREDVOLBU typu (dolna skrinka ma
+  # sokel 100 mm). Keby panel ratal s nulou, vyska 90 by presla cervenou
+  # kontrolou a padla az na serveri — teda presne to, comu ma zabranit.
+  # Parita je STRUKTURNA: panel cita cisla, ktore mu server posiela.
+  NxTest.assert_close(100.0, NxS1E0.cb::LOWER_DEFAULTS[:floor_height], 0.01,
+                      'dolna skrinka ma predvoleny sokel 100 mm')
+  NxTest.assert_close(0.0, NxS1E0.cb::UPPER_DEFAULTS[:floor_height], 0.01,
+                      'horna skrinka sokel nema')
+  sync = NxS1E0.src('noxun_engine', 'ui', 'panel', 'sync.rb')
+  NxTest.assert(sync.include?('lower: CabinetBuilder::LOWER_DEFAULTS'),
+                'server posiela do panela PRIAMO svoje predvolby (ziadna druha tabulka)')
+  NxTest.assert(sync.include?('upper: CabinetBuilder::UPPER_DEFAULTS'))
+  js = NxS1E0.form_js
+  NxTest.assert(js.include?("cabFieldOrDefault('floor_height')"),
+                'krizova kontrola cita sokel cez predvolbu, nie cez `|| 0`')
+  NxTest.assert(js.include?("cabFieldOrDefault('thickness')"),
+                'a hrubku rovnako')
+  NxTest.assert(js.include?('DEFAULTS[getType()]'),
+                'zdrojom predvolieb je payload servera')
+end
+
+NxTest.test('S1-E0 (Codex #375 P2): hranicu vnutra drzi JEDNA konstanta (MIN_AVAIL_H)') do
+  NxTest.assert_close(10.0, NxS1E0.cn::MIN_AVAIL_H, 0.01)
+  src = NxS1E0.src('noxun_engine', 'core', 'construction.rb')
+  NxTest.assert(src.include?('interior[:avail_h] <= MIN_AVAIL_H'),
+                'validate! pouziva konstantu, nie literal — inak by sa rozisla s hladanim')
+  js = NxS1E0.form_js
+  NxTest.assert(js.include?('var MIN_AVAIL_H = 10.0'),
+                'panel zrkadli to iste cislo (form.js MIN_AVAIL_H)')
 end
 
 NxTest.test('S1-E0 R3: dve vystuhy v nizkom korpuse su odmietnute (D-80 rezerva)') do
