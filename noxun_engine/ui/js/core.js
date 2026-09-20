@@ -1075,7 +1075,9 @@
   // (parts_count / parts_area_m2 v cabinet_payload). Chybajuci udaj = '—'
   // (radsej pomlcka nez vymyslene cislo); typ badge je tiez odtialto, aby sa
   // slovenske nazvy typov nepisali na dvoch miestach.
-  var NX_TYPE_LABEL = { lower: 'Dolná', upper: 'Horná' };
+  // PR #381 (Codex kolo 1, P2): JEDINA mapa typ -> SK popisok pre hlavicku
+  // Inspectora. Bez `dishwasher` hlasila hlavicka nad slotom „Dolná".
+  var NX_TYPE_LABEL = { lower: 'Dolná', upper: 'Horná', dishwasher: 'Umývačka' };
   function nxCabInfo(c){
     var p = c || {};
     var n = parseInt(p.parts_count, 10);

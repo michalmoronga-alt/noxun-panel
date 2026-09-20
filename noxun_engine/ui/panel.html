@@ -844,11 +844,19 @@
     <!-- UI-B3: TYP urcuje, pod ktorym typom sa sablona ponuka pri vkladani (zoznam je
          typovo filtrovany). Predvypln sa z typu oznacenej skrinky; whitelist
          a hlaska o rozdiele su na strane Ruby. -->
+    <!-- PR #381 (Codex kolo 1, P2): SLOT UMÝVAČKY je tretia hodnota. Pri slote
+         je select ZAMKNUTÝ (typ určuje sám slot — na hornú/dolnú sa prepnúť
+         nedá, config nemá korpus); autoritou je server, HTML je len zrkadlo. -->
     <div class="row"><label>Typ</label>
       <select id="tplSaveType">
         <option value="lower">Dolná</option>
         <option value="upper">Horná</option>
-      </select><span class="unit"></span></div>
+        <option value="dishwasher">Umývačka</option>
+      </select>
+      <button type="button" class="nxtip" id="tplSaveTypeTip" aria-label="Pomoc" hidden
+        data-tip="Typ určuje sám slot umývačky — nemá korpus, takže sa na dolnú ani hornú skrinku prepnúť nedá."
+        onclick="nxTipStop(event)"><svg class="ic" aria-hidden="true"><use href="#i-help-circle"/></svg></button>
+      <span class="unit"></span></div>
     <label class="tplsavehw"><input id="tplSaveHardware" type="checkbox" checked> Uložiť aj kovanie (sety a ručné položky)</label>
     <div class="hint">Uloží sa konštrukcia, zóny, čelá s medzerami a nastavené materiály skrinky. Úpravy jednotlivých dielcov (materiál/ABS) sa neukladajú. Kovanie podľa voľby: sety a ručné položky áno, ručné zámky (dĺžka výsuvu, výška a počty) nie.</div>
     <div class="nxmodal-warn" id="tplSaveWarn" style="display:none">Šablóna s týmto názvom už existuje — Uložiť ju prepíše.</div>
