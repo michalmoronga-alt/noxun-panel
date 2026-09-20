@@ -329,9 +329,8 @@ module Noxun
         return 'katalóg spotrebičov má neznámy tvar (chýba zoznam záznamov)' unless data['records'].is_a?(Array)
         return 'katalóg spotrebičov nemá značku verzie (std)' unless data['std'].is_a?(Integer)
         return 'katalóg spotrebičov je v novšej verzii — aktualizuj plugin' if data['std'] > STD
-        unless data['records'].all? { |r| valid_stored_record?(r) }
-          return 'katalóg spotrebičov obsahuje nečitateľný záznam (identita, rozmery alebo príloha)'
-        end
+        bad = data['records'].find { |r| stored_record_issue(r) }
+        return "katalóg spotrebičov obsahuje nečitateľný záznam: #{stored_record_issue(bad)}" if bad
 
         ids = data['records'].map { |r| r['id'].to_s }
         return 'katalóg spotrebičov má duplicitné identity — oprav súbor' unless ids.uniq.length == ids.length
@@ -339,13 +338,29 @@ module Noxun
         nil
       end
 
-      # Minimalna citatelnost ULOZENEHO zaznamu. Identita musi byt neprazdny
-      # retazec (UUID zo servera); tvrdsie veci strazi validacia pri zapise.
       def valid_stored_record?(rec)
-        rec.is_a?(Hash) && !rec['id'].to_s.strip.empty? &&
-          (rec['dims'].nil? || rec['dims'].is_a?(Hash)) &&
-          (rec['attachments'].nil? ||
-            (rec['attachments'].is_a?(Array) && rec['attachments'].all? { |it| valid_stored_attachment?(it) }))
+        stored_record_issue(rec).nil?
+      end
+
+      # Dovod, preco je ULOZENY zaznam necitatelny (nil = je v poriadku).
+      # Kontroluje sa TA ISTA validacia znamych poli ako pri zapise: subor
+      # upraveny rukou (`"width": "oops"`) by inak presiel ako zdravy katalog
+      # a retazec by sa skopiroval do zakazkoveho snapshotu (Codex #377 kolo 2
+      # P2). Nezname kluce ostavaju dopredne kompatibilne — `normalize_dims`
+      # ich nevaliduje, len prenasa.
+      def stored_record_issue(rec)
+        return 'záznam nie je objekt' unless rec.is_a?(Hash)
+        return 'záznam bez identity' if rec['id'].to_s.strip.empty?
+
+        unless rec['attachments'].nil? ||
+               (rec['attachments'].is_a?(Array) && rec['attachments'].all? { |it| valid_stored_attachment?(it) })
+          return 'nečitateľná príloha'
+        end
+        return nil if rec['dims'].nil?
+        return 'rozmery nie sú objekt' unless rec['dims'].is_a?(Hash)
+
+        _dims, msg, field = normalize_dims(rec['dims'], rec['category'].to_s)
+        msg ? "#{msg} (#{field})" : nil
       end
 
       # Polozka `attachments[]` musi byt CITATELNA uz pri kontrole dokumentu.
@@ -519,14 +534,19 @@ module Noxun
         end
 
         if input.key?('derived')
-          derived, msg = normalize_derived(input['derived'])
+          derived, msg = normalize_derived(input['derived'], category)
           return [nil, msg, 'derived'] if derived.nil?
 
           derived.empty? ? rec.delete('derived') : rec['derived'] = derived
         end
 
-        if input.key?('dims')
-          return [nil, 'rozmery musia byť objekt', 'dims'] unless input['dims'].nil? || input['dims'].is_a?(Hash)
+        if input.key?('dims') && input['dims'].nil?
+          # Explicitne `null` nad CELYM blokom `dims` je to iste ako nad
+          # jednotlivym polom: ZMAZ (semantika A10). Predtym patch prebehol,
+          # ale rozmery ticho ostali (Codex #377 kolo 2 P2).
+          rec.delete('dims')
+        elsif input.key?('dims')
+          return [nil, 'rozmery musia byť objekt', 'dims'] unless input['dims'].is_a?(Hash)
 
           stored_dims = rec['dims'].is_a?(Hash) ? rec['dims'] : {}
           # Doprednost plati pre SUBOR, nie pre klienta: neznamy kluc sa
@@ -581,15 +601,14 @@ module Noxun
       # `derived` = zoznam CIEST poli, ktorych hodnota je odvodena (list ju
       # nekotuje), napr. „body.width". Prvy segment musi byt znamy blok, inak
       # by v zozname skoncila lubovolna veta a UI by ju kreslila ako pole.
-      def normalize_derived(raw)
+      def normalize_derived(raw, category)
         list = raw.is_a?(Array) ? raw : [raw]
         out = []
         list.each do |item|
           s = item.to_s.strip
           next if s.empty?
 
-          block = s.split('.').first.to_s
-          unless DIM_BLOCKS.include?(block) && s.match?(/\A[a-z_]+(\.[a-z_0-9]+)+\z/)
+          unless derived_path?(s, category)
             return [nil, "neznáma cesta odvodeného poľa „#{s}“"]
           end
 
@@ -598,6 +617,21 @@ module Noxun
         return [nil, "odvodených polí je priveľa (max #{MAX_DERIVED})"] if out.length > MAX_DERIVED
 
         [out.uniq, nil]
+      end
+
+      # Cesta odvodeneho pola sa overuje proti SCHEME KATEGORIE, nie proti
+      # aktualnemu obsahu `dims`: je to deterministicke a nezavisle od poradia
+      # patchu (pole sa moze doplnit neskor). Kontrola len prveho segmentu
+      # prepustila preklep `body.wdith` (Codex #377 kolo 2 P2).
+      def derived_path?(path, category)
+        return false unless path.match?(/\A[a-z_]+(\.[a-z_0-9]+){1,2}\z/)
+
+        block, field, nested = path.split('.')
+        return false unless DIM_BLOCKS.include?(block)
+        return false unless block_fields(block, category).include?(field)
+        return true if nested.nil?
+
+        field == 'furniture_doors' && FURNITURE_DOOR_FIELDS.include?(nested)
       end
 
       # Kluc, ktory prinasa VSTUP KLIENTA a nie je ani vo whiteliste kategorie,
@@ -803,19 +837,30 @@ module Noxun
 
         with_lock do
           JsonFileStore.invalidate(path)
-          if JsonFileStore.available?(path)
-            if JsonFileStore.degraded?(path)
-              set_state(:degraded, DEGRADED_MSG)
-              next [:degraded, { message: DEGRADED_MSG }]
+          # Subory medzitym ZMIZLI (pouzivatel upratoval `%APPDATA%`, sync,
+          # obnova zo zalohy): mutacia nad „prazdnym" dokumentom by ho zapisala
+          # so `seed_version` a devat modelov by sa uz NIKDY nedosialo
+          # (Codex #377 kolo 2 P2). Pod TYM ISTYM zamkom preto bezi cesta prvej
+          # instalacie a mutacia sa aplikuje az nad naseedovanym dokumentom.
+          unless JsonFileStore.available?(path)
+            unless seed!
+              set_state(:read_only, SEED_FAILED_MSG)
+              next [:read_only, { message: state_reason }]
             end
-            fresh = raw_document
-            if (issue = stored_document_issue(fresh))
-              set_state(:read_only, issue)
-              next [:read_only, { message: issue }]
-            end
-          else
-            fresh = nil
+
+            JsonFileStore.invalidate(path)
           end
+          if JsonFileStore.degraded?(path)
+            set_state(:degraded, DEGRADED_MSG)
+            next [:degraded, { message: DEGRADED_MSG }]
+          end
+
+          fresh = raw_document
+          if (issue = stored_document_issue(fresh))
+            set_state(:read_only, issue)
+            next [:read_only, { message: issue }]
+          end
+
           yield(fresh, stored_records(fresh))
         end
       # Realne sem doletia LEN chyby zo zamku (`mkdir_p` / `File.open` /

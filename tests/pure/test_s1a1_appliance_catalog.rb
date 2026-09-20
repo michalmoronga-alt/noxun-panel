@@ -832,6 +832,71 @@ NxTest.test('spotrebice: degradovany stav — NEPLATNA zaloha sa nesnapshotuje a
   NxTest.assert(info2[:message].to_s.length.positive?)
 end
 
+NxTest.test('spotrebice: ULOZENE `dims` prechadzaju validaciou znamych poli (kolo 2 P2)') do
+  applc_install!('std' => 1, 'seed_version' => 1,
+                 'records' => [{ 'id' => 'a1', 'category' => 'oven', 'name' => 'Rucna uprava',
+                                 'dims' => { 'body' => { 'width' => 'oops' } } }])
+  NxTest.assert_equal(:read_only, APPLC.state, 'retazec v rozmere nie je zdravy katalog')
+  NxTest.assert(APPLC.state_reason.include?('dims.body.width'), "dovod nesie cestu pola: #{APPLC.state_reason}")
+  NxTest.assert_equal(:unsupported, APPLC.snapshot_for('a1')[0], 'a do zakazky sa taky zaznam nedostane')
+
+  applc_install!('std' => 1, 'seed_version' => 1,
+                 'records' => [{ 'id' => 'a1', 'category' => 'fridge', 'name' => 'Zla nika',
+                                 'dims' => { 'niche' => { 'width_min' => 700, 'width_max' => 600 } } }])
+  NxTest.assert_equal(:read_only, APPLC.state, 'min > max v ulozenom zazname')
+
+  applc_install!('std' => 1, 'seed_version' => 1,
+                 'records' => [{ 'id' => 'a1', 'category' => 'oven', 'name' => 'Z novsej verzie',
+                                 'dims' => { 'body' => { 'width' => 548.0 },
+                                             'future_block' => { 'x' => 'lubovolne' },
+                                             'front' => { 'future_key' => 'ok' } } }])
+  NxTest.assert_equal(:ok, APPLC.state, 'NEZNAME kluce ostavaju dopredne kompatibilne')
+end
+
+NxTest.test('spotrebice: patch `dims: null` ZMAZE rozmery, `dims.body: null` zmaze blok (kolo 2 P2)') do
+  applc_seeded!
+  rec = APPLC.create!(applc_new('dims' => { 'body' => { 'width' => 860 },
+                                            'front' => { 'outer_width' => 860 } }))[1][:record]
+  st, info = APPLC.patch!(rec['id'], { 'dims' => { 'body' => nil } }, rev: rec['rev'])
+  NxTest.assert_equal(:ok, st)
+  NxTest.refute(info[:record]['dims'].key?('body'), 'null nad blokom ho zmaze')
+  NxTest.assert(info[:record]['dims'].key?('front'), 'ostatne bloky ostanu')
+
+  st2, info2 = APPLC.patch!(rec['id'], { 'dims' => nil }, rev: info[:record]['rev'])
+  NxTest.assert_equal(:ok, st2)
+  NxTest.refute(info2[:record].key?('dims'), 'null nad celym `dims` zmaze rozmery (nie ticho ponecha)')
+end
+
+NxTest.test('spotrebice: subory medzitym ZMIZLI — mutacia pod zamkom katalog naseeduje (kolo 2 P2)') do
+  applc_seeded!
+  NxTest.assert_equal(9, APPLC.list[1][:records].length)
+  [APPLC.path, "#{APPLC.path}.bak"].each { |f| File.delete(f) if File.exist?(f) }
+  APPLC_JFS.invalidate(APPLC.path)
+
+  st, info = APPLC.create!(applc_new)
+  NxTest.assert_equal(:ok, st, 'mutacia nad zmiznutym katalogom prejde')
+  doc = applc_doc
+  NxTest.assert_equal(10, doc['records'].length, 'seed 9 modelov + novy zaznam')
+  NxTest.assert_equal(9, doc['records'].count { |r| r['seed'] == true }, 'devat seed modelov sa naozaj doselo')
+  NxTest.assert_equal(1, doc['seed_version'])
+  NxTest.assert(doc['records'].any? { |r| r['id'] == info[:record]['id'] })
+end
+
+NxTest.test('spotrebice: `derived` sa overuje proti SCHEME kategorie, nie len prvym segmentom (kolo 2 P2)') do
+  applc_seeded!
+  st, info = APPLC.create!(applc_new('derived' => ['body.wdith']))
+  NxTest.assert_equal(:invalid, st, 'preklep v druhom segmente')
+  NxTest.assert_equal('derived', info[:field])
+  NxTest.assert_equal(:invalid, APPLC.create!(applc_new('derived' => ['front.overhang_top']))[0],
+                      'pole inej kategorie (presah nie je pole drezu)')
+  NxTest.assert_equal(:invalid, APPLC.create!(applc_new('derived' => ['body.width.extra']))[0],
+                      'tretí segment mimo furniture_doors')
+  NxTest.assert_equal(:ok, APPLC.create!(applc_new('derived' => %w[body.width front.cutout_width]))[0])
+  st2, = APPLC.create!(applc_new('category' => 'fridge', 'name' => 'Chlad',
+                                 'derived' => ['front.furniture_doors.lower_min']))
+  NxTest.assert_equal(:ok, st2, 'vnorene pole nabytkovych dveri je platna cesta')
+end
+
 # --- hladanie a tvar odpovede --------------------------------------------------
 
 NxTest.test('spotrebice: search — bez diakritiky, aj cez SK popisok kategorie, deterministicke poradie') do
