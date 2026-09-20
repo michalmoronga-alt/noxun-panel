@@ -2684,7 +2684,10 @@ miniatúr. Je to pamäť **okna**: nikam sa neukladá a **nový dokument ju nezh
 používateľ medzitým zavrel, mu nezavrie ten nový (vzor `MDH.itemResult`). Kategória sa pri úprave **nedá zmeniť** (server patch s kategóriou odmieta) a pri novom zázname
 prepína **sadu polí**: kostra D-15 vlastný `onChange` nemá, takže sa počúva `change` na `nxm_category` a modal sa prekreslí s **prenesenými** hodnotami
 (`skipMemory: true` — na obrazovke sú čerstvejšie hodnoty než v pamäti konceptu). Mazanie je **D-15 danger** modal (nikdy `UI.messagebox` — natívny modal v callbacku
-HtmlDialogu blokuje celý kanál okna) a je to **tombstone**: vyradený záznam sa vráti tlačidlom „Obnoviť".
+HtmlDialogu blokuje celý kanál okna) a je to **tombstone**: vyradený záznam sa vráti tlačidlom „Obnoviť". Bez dostupnej kostry sa **nevyradí nič** (fail closed) — fallback
+„pošli to rovno" by z jedného kliknutia urobil tombstone bez potvrdenia, teda presne bez toho, čo je zmyslom toho kroku. Prekreslenie modalu pri zmene kategórie podáva
+**`baseFields`** (pôvodnú špecifikáciu otvorenia): kostra si inak berie baseline z práve podanej špecifikácie, takže by sa východiskom stalo to, čo používateľ napísal,
+a pamäť rozpísaného konceptu by na Escape neuložila nič.
 
 **Stav katalógu** (`:read_only` / `:degraded`) kreslí sekcia ako **banner nad stromom** s dôvodom zo servera a vypína zápisy (žiadne „Nový spotrebič", „Upraviť",
 „Vyradiť", „Pridať prílohu") — ponúkať tlačidlá, ktoré vždy skončia chybou, je horšie než ich schovať. Príznak `writable` chodí v **každom** payloade sekcie, aby sa UI
@@ -2946,11 +2949,22 @@ polia patria vizuálne inam než dátovo — výška tela umývačky je rozsah, 
 k poľu bez prekladovej tabuľky, ktorá by pri pridaní poľa ticho zaostala. Formulár pre **všetky** kategórie (`form_payload`) chodí LEN na vyžiadanie (`appl_tree` s
 `form: true`) — klient si ho vypýta raz za okno; v každom pushi by to boli kilobajty navyše pri každom prepočte kusovníka (lekcia západiek `mat`/`hw`).
 
+**Formulár dostáva BEZSTRATOVÚ hodnotu, karta zaokrúhlenú** (`fmt_input` vs `fmt_mm`). Karta ukazuje jedno desatinné miesto, ale predvyplnenie modalu musí vrátiť presne to,
+čo je v katalógu: pri `19,55` by inak formulár ponúkol `19,6` a prvé uloženie — hoci len opravy názvu — by to zaokrúhlenie **zapísalo**. Klient to poisťuje z druhej strany:
+`appl_patch` nesie **len polia zmenené oproti baseline otvorenia** (`apChangedFields`), takže sa nedotknuté rozmery vôbec neposielajú a prázdny patch sa ani neodosiela.
+
+**Odpoveď modalu `NX.applResult(ok, msg, errors, op, token, info)`** má **šiesty, aditívny argument**: pri `:conflict` nesie **čerstvú `rev`** záznamu. Bez nej by modal ostal
+na zámku z času otvorenia a každé ďalšie „Uložiť" by narazilo na ten istý konflikt — z formulára by sa nedalo dostať inak než zahodením práce. Zámok obnovuje aj samotné
+**echo karty** (zápis z druhej inštancie pod otvoreným modalom). **Výnimka v tokenizovanej akcii** (`TOKEN_ACTIONS` = `appl_create` · `appl_patch`) posiela `applResult`
+**tiež** — inak by `NXModal` ostal `setBusy(true)` navždy a formulár by sa nedal ani odoslať, ani uložiť; stavová hláška sama na to nestačí.
+
 **Lazy miniatúry.** `data:` URI chodí len pre prílohy druhu `image`/`thumbnail`, len na vyžiadanie karty (`thumbs: true`) a len pre tie, ktoré klient **ešte nemá** (`have`);
 naraz najviac `THUMB_BATCH` (6). Primárna cesta je `Sketchup::ImageRep` — obrázok sa zmenší na `THUMB_MAX_PX` (96 px), uloží ako dočasné PNG, prečíta a zmaže, takže fotka
 z mobilu preletí mostom ako pár kB. Keď `ImageRep` nie je (headless testy) alebo formát nepozná (webp, poškodený súbor), pošle sa **pôvodný** súbor, ale len pod
 `THUMB_MAX_BYTES` (256 kB) a so správnymi magic bytes; inak `null` — a to je **platná odpoveď** „náhľad nebude", ktorú si klient zacachuje (záporná cache, vzor
-`TPL_PNG`). Cache je kľúčovaná **id prílohy**, ktoré je nemenné a nikdy sa nerecykluje, takže zastarať nemôže.
+`TPL_PNG`). Cache je kľúčovaná **id prílohy**, ktoré je nemenné a nikdy sa nerecykluje, takže zastarať nemôže. **Reťaz dávok pokračuje sama**: o miniatúry si klient pýta po
+**každom** vykreslení tela (nielen po príchode karty), takže karta s viac než šiestimi obrázkami dostane aj zvyšok — a po odchode zo sekcie sa poistka „posledné kolo nič
+neprinieslo" resetuje, aby sa raz zaseknuté dlaždice pri návrate dopýtali znova.
 
 **`appl_open_url` overuje schému na SERVERI** (`URI::HTTP` + neprázdny host). Katalóg síce do `shop_urls`/`sheet_urls` pustí len http/https, ale adresa sem chodí z klienta
 a `UI.openURL` nad `file:` alebo `javascript:` by bol úplne iný druh akcie, než na aký používateľ klikol. Klient preto nemá v karte žiadny `href` — otvára server.
@@ -2960,7 +2974,10 @@ a `UI.openURL` nad `file:` alebo `javascript:` by bol úplne iný druh akcie, ne
 Druh sa odvodí z prípony (`pdf` → `sheet`, inak `image`); na náhľad sa obrázok prepína až v karte (`appl_thumbnail`).
 
 **Stav pohľadu drží server v tom tvare, v akom ho klient poslal** (`@view_query`, `@view_deleted`, `@view_gen`) — echo po zápise musí rešpektovať rozpísané hľadanie, inak by
-sa strom pred používateľom „roztiahol". `appl_leave` ho **zabudne**: najbližší plný push by inak nakreslil strom zúžený filtrom, ktorý používateľ už dávno nevidí.
+sa strom pred používateľom „roztiahol". `appl_leave` ho **zabudne**: najbližší plný push by inak nakreslil strom zúžený filtrom, ktorý používateľ už dávno nevidí. To isté
+robí **`on_ui_closed`**, ktoré volá `StudioDialog` pri zatvorení okna (vzor `HardwareCatalogDialog`): nová inštancia Štúdia začína s `gen` 0, takže server nesmie držať
+generáciu z minulého sedenia — klient by jeho odpoveď zahodil ako staršiu a hľadanie aj formulár by „nereagovali". Klient to poisťuje zrkadlovo: **preberá najvyššiu videnú
+generáciu** (`AP_GEN = max(AP_GEN, gen)`), lebo strom mu chodí aj pushom, ktorý si nevyžiadal.
 
 ### hardware_catalog_dialog.rb
 
