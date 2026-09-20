@@ -3639,6 +3639,106 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # --- S1-A1: KATALOG SPOTREBICOV — prilohy na REALNOM Windows suborovom
+  # systeme (headless sada ich overuje len logicky). Overuje sa to, co sa
+  # mimo SketchUpu overit NEDA: kopia suboru s DIAKRITIKOU a MEDZEROU v nazve,
+  # `UI.openURL` nad `file:///` cestou, zlyhanie kopie (zamknuty/nedostupny
+  # zdroj) a tombstone, ktory priecinok priloh NEMAZE.
+  #
+  # IZOLACIA: cely katalog aj priecinok priloh ide cez `test_dir_override` do
+  # docasneho priecinka; override sa v `ensure` VZDY vracia na nil, inak by
+  # dalsie sekcie (a zivy plugin) citali cudzi katalog.
+  def run_s1a1(_model)
+    ac = e::ApplianceCatalog
+    root = File.join(Sketchup.temp_dir, "noxun_s1a1_#{Process.pid}_#{Time.now.to_i}")
+    FileUtils.mkdir_p(root)
+    ac.test_dir_override = root
+    ac.reset_state!
+    begin
+      st, info = ac.list
+      ok("S1-A1: izolovany katalog sa naseeduje (#{info[:records].length} modelov, stav #{st})",
+         st == :ok && info[:records].length == 9)
+      ok('S1-A1: subor lezi v izolovanom priecinku, nie v zivom %APPDATA%',
+         ac.path.start_with?(root) && File.file?(ac.path))
+
+      st_c, info_c = ac.create!('category' => 'sink', 'name' => 'Legra XL 6 S', 'manufacturer' => 'Blanco')
+      rec = info_c[:record]
+      ok("S1-A1: create prejde (#{st_c})", st_c == :ok && !rec.nil?)
+
+      # (a) REALNA kopia suboru s diakritikou a medzerou v nazve.
+      src = File.join(root, 'Technický list — drez 2026.pdf')
+      File.binwrite(src, 'PDF test')
+      st_a, info_a = ac.attach!(rec['id'], src, kind: 'sheet', rev: rec['rev'])
+      ok("S1-A1 (a): attach suboru s diakritikou a medzerou (#{st_a} #{info_a[:message]})", st_a == :ok)
+      if st_a == :ok
+        rec = info_a[:record]
+        item = rec['attachments'].first
+        target = File.join(ac.record_dir(rec['id']), item['file'])
+        ok("S1-A1 (a): kopia naozaj lezi na disku (#{item['file']})",
+           File.file?(target) && File.binread(target) == 'PDF test')
+        ok('S1-A1 (a): ulozeny nazov je ASCII (<uuid>_<sanitized>.pdf)',
+           item['file'].match?(/\A[0-9a-f-]{36}_technicky_list_drez_2026\.pdf\z/))
+        ok('S1-A1 (a): povodny nazov ostal v zazname', item['name'] == 'Technický list — drez 2026.pdf')
+
+        # (b) UI.openURL nad `file:///` cestou (diakritika a medzera v CESTE).
+        url = ac.file_url(target)
+        st_o, info_o = ac.open_attachment(rec['id'], item['id'])
+        ok("S1-A1 (b): open_attachment otvoril subor cez #{url}", st_o == :ok)
+        info("S1-A1 (b): UI.openURL zlyhal pre #{info_o[:path]} — #{info_o[:message]}") unless st_o == :ok
+      end
+
+      # (c) Zlyhanie kopie (zamknuty zdroj / EACCES) = [:copy_failed, hlaska],
+      #     ziadny staging a ziadna zmena zaznamu.
+      src2 = File.join(root, 'zamknuty list.pdf')
+      File.binwrite(src2, 'PDF')
+      before = File.binread(ac.path)
+      orig_cp = FileUtils.method(:cp)
+      FileUtils.define_singleton_method(:cp) { |*| raise Errno::EACCES, 'test: zamknuty subor' }
+      begin
+        st_f, info_f = ac.attach!(rec['id'], src2, kind: 'sheet', rev: rec['rev'])
+        ok("S1-A1 (c): zamknuty zdroj = :copy_failed s hlaskou (#{st_f}: #{info_f[:message]})",
+           st_f == :copy_failed && info_f[:message].to_s.length.positive?)
+      ensure
+        FileUtils.define_singleton_method(:cp, orig_cp)
+      end
+      ok('S1-A1 (c): po zlyhanej kopii nezostal staging ani zmeneny JSON',
+         Dir.glob(File.join(ac.record_dir(rec['id']), '*.tmp')).empty? &&
+         File.binread(ac.path) == before)
+
+      # (c2) REALNY zamok zdroja (Windows): vysledok sa LOGUJE, nie assertuje —
+      #      spravanie zavisi od verzie Windows, kontrakt strazi (c).
+      real = File.join(root, 'otvoreny list.pdf')
+      File.binwrite(real, 'PDF')
+      File.open(real, 'rb') do |f|
+        f.flock(File::LOCK_EX)
+        st_l, info_l = ac.attach!(rec['id'], real, kind: 'sheet', rev: ac.find(rec['id'])[1][:record]['rev'])
+        info("S1-A1 (c2): attach nad zamknutym zdrojom skoncil #{st_l} #{info_l[:message]}")
+        f.flock(File::LOCK_UN)
+      end
+
+      # (d) Tombstone NEMAZE priecinok ani subory priloh.
+      rec = ac.find(rec['id'])[1][:record]
+      dir_before = Dir.glob(File.join(ac.record_dir(rec['id']), '*')).sort
+      st_d, = ac.delete!(rec['id'], rev: rec['rev'])
+      ok("S1-A1 (d): delete = tombstone (#{st_d})", st_d == :ok)
+      ok("S1-A1 (d): priecinok priloh ostal nedotknuty (#{dir_before.length} suborov)",
+         Dir.glob(File.join(ac.record_dir(rec['id']), '*')).sort == dir_before && !dir_before.empty?)
+      ok('S1-A1 (d): vyradeny zaznam v zozname nie je, s prepinacom ano',
+         ac.list[1][:records].none? { |r| r['id'] == rec['id'] } &&
+         ac.list(include_deleted: true)[1][:records].any? { |r| r['id'] == rec['id'] })
+    ensure
+      ac.test_dir_override = nil # NIKDY nenechat presmerovany zivy katalog
+      ac.reset_state!
+      begin
+        FileUtils.rm_rf(root)
+      rescue StandardError
+        nil
+      end
+    end
+  rescue StandardError => ex
+    log_line("FAIL: run_s1a1 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
   # --- Recorder Panel.js (audit F9): zatvoreny panel je no-op — dokaz volania
   # NX.clearSelected/NX.setStatus sa zbiera docasnym obalenim Panel.js. Vzdy
   # parovat install/remove; remove je idempotentny (bezpecny aj po FAIL ceste).
@@ -23557,6 +23657,7 @@ module NoxunSuRunner
     run_sync_back(model)     # davka Chrbat: D-37 hlbka, D-31 none, D-38 pevny 18
     run_sync_rails(model)    # H3/D-80: vnutro pod vystuhami (odsadenie, upright, chrbat, odmietnutie)
     run_s1e0(model)          # S1-E0: minimalna vyska korpusu 80 mm — nizka skrinka na dorovnanie sa postavi bez degenerovaneho dielca a kusovnik ju vidi, cesta Inspectora klampne 60 na 80, absorpcia scale pod hranicu tiez (a 1x Spat vrati scale aj absorpciu), horna 600 x 80 x 320
+    run_s1a1(model)          # S1-A1: katalog spotrebicov — prilohy na REALNOM disku (kopia suboru s diakritikou a medzerou, ASCII nazov ulozenej kopie, UI.openURL nad file:///), zlyhanie kopie = :copy_failed bez siroty a bez zmeny JSON, tombstone priecinok priloh NEMAZE; vsetko v izolovanom priecinku cez test_dir_override
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
     run_r03(model)           # R-03: sev prepare_insert/commit_insert — ciste pripravenie, vlastny rigidny transform, odmietnutia, edit kontext
     run_r12(model)           # 1d/R-12: dopredny guard configu — marker, odmietnuta prestavba bez mutacie a bez kroku Spat, kopia/sablony, citanie dalej bezi
