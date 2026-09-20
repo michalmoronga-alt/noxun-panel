@@ -668,7 +668,7 @@ kvótová brána `usage` pred každým auditom a subagentom. Pravidlo 3 kôl pla
   **Kontrakt:** server skladá strom (poradie `CATEGORIES`, počty, podtitul), kartu v 4 blokoch aj polia formulára z **jednej tabuľky `ROWS`**; kľúč poľa modalu = cesta, ktorú
   katalóg vracia v chybe; zápis = **echo sekcie bez zdvihu generácie** a kreslí len v aktívnej sekcii; miniatúry príloh lazy kanálom (`Sketchup::ImageRep`, 96 px, záporná cache);
   `appl_open_url` pustí len http/https. „Do zákazky" a pohľad „V zákazke" sú `aria-disabled` s dôvodom (D-78) — aktivuje ich S1-B.
-- **S1-E · Slot umývačky — nový typ skrinky** — **✅ PR #N, v0.12.12**. Typ `dishwasher` bez korpusu: 7 vstupov (trieda 600/450, šírka, výška linky, hĺbka, telo V,
+- **S1-E · Slot umývačky — nový typ skrinky** — **✅ PR #381, v0.12.12**. Typ `dishwasher` bez korpusu: 7 vstupov (trieda 600/450, šírka, výška linky, hĺbka, telo V,
   sokel = čelo od podlahy, čelo V), **jediný výrobný dielec = čelo** (pevný item `blind`, rola `false_front`, kľúč `front:F1/blind`) a **telo = referencia**
   (`kind: reference`, základňa 200 odsadená 50/20) v aditívnom `plan[:references]` — nikdy cez `parts`. **Kontrakt:** `CONFIG_SCHEMA` 16 a `BOARD_CONFIG_SCHEMA` 2
   rezervujú `appliance_refs[]` / `appliance_expects[]` (S1-B/F/C ich napĺňajú bez ďalšieho bumpu); väzby prežijú prestavbu, materiály, scale aj aplikovanie šablóny

@@ -42,7 +42,7 @@ F telo chladničky + Kontrola → C šablóna → D uzáver (v0.13.0). Slot umý
 
 ## Posledné uzávery
 
-- **S1-E · Slot umývačky — prvý typ skrinky bez korpusu** (→ **v0.12.12**, 20.9.2026, PR #N). Typ `dishwasher`: žiadny korpus, **jediný výrobný dielec = čelo**
+- **S1-E · Slot umývačky — prvý typ skrinky bez korpusu** (→ **v0.12.12**, 20.9.2026, PR #381). Typ `dishwasher`: žiadny korpus, **jediný výrobný dielec = čelo**
   (pevný item `blind`), telo umývačky ako **referencia** (`kind: reference`, nikdy v kusovníku) so základňou 200; `CONFIG_SCHEMA` 16 · `BOARD_CONFIG_SCHEMA` 2 ·
   TemplateStore STD 5 („Umývačka 60/45"). Prisúvanie a otáčanie merajú **logickú obálku** z configu — **zmena správania:** presahujúci potomok cieľa už doraz
   neskracuje. Kontroly `dw_body_fit` / `dw_height_fit` (ORANGE, bez brány). Plné znenie v [archiv/KRONIKA.md](archiv/KRONIKA.md).

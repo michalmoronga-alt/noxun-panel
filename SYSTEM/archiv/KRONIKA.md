@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **S1-E — SLOT UMÝVAČKY, PRVÝ TYP SKRINKY BEZ KORPUSU (v0.12.12, 20.9.2026, PR #N).** Pribudol **štvrtý typ objektu** vedľa dolnej, hornej a dosky:
+- **S1-E — SLOT UMÝVAČKY, PRVÝ TYP SKRINKY BEZ KORPUSU (v0.12.12, 20.9.2026, PR #381).** Pribudol **štvrtý typ objektu** vedľa dolnej, hornej a dosky:
   `type: dishwasher`. Nemá boky, dno, strop, chrbát ani zóny, **vyrába jediný dielec — čelo** (pevný item `blind`, rola `false_front`) a telo umývačky
   kreslí ako **referenciu** (`kind: reference`, `manufactured: false`, `production_class: 'reference'`) z dvoch boxov: telo podľa triedy (598/448) a pod ním
   fixná **základňa 200 mm** odsadená 50 spredu a 20 do strán. Výplň medzi čelom a líniou linky sa **negeneruje** — rieši ju Michal ručne (nízky korpus od
