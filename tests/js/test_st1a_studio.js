@@ -42,7 +42,7 @@ function ok(cond, msg){ n++; assert.ok(cond, msg); }
 // okna Vyroba. Zoznam je ZRKADLO `StudioDialog::SECTIONS`.
 // ŠT-2a: pribudla sekcia Materiály (`mat`) — prva ziva polozka skupiny KATALÓGY.
 // ŠT-3a-1: a Kovanie (`hw`) — druha.
-eq(S.STUDIO_SECTIONS, ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat', 'hw', 'rules', 'tpl', 'sup', 'bset', 'about'],
+eq(S.STUDIO_SECTIONS, ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat', 'hw', 'appl', 'rules', 'tpl', 'sup', 'bset', 'about'],
    'v Studiu ziju sekcie Kusovník, Kontrola, Nákup kovania, Rozpočet, Cenová ponuka, Materiály, Kovanie, Pravidlá a Šablóny');
 
 // --- 2) hladanie bez diakritiky (Š6) ----------------------------------------

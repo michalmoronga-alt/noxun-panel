@@ -27,7 +27,13 @@
   var AP_SEL = '';        // vybraný záznam (pamäť okna)
   var AP_Q = '';          // text hľadania
   var AP_DEL = false;     // prepínač „vyradené"
-  var AP_GEN = 0;         // generácia dotazu stromu (staršia odpoveď sa zahodí)
+  var AP_GEN = 0;         // generácia ODOSLANÉHO dotazu stromu
+  // Generácia stromu, ktorý je PRÁVE V OKNE. Hľadanie je debounced a odpovede
+  // chodia asynchrónne, takže pomalšie kolo môže doraziť až po čerstvejšom —
+  // a to by používateľovi ukázalo výsledky pre text, ktorý už prepísal.
+  // Porovnáva sa proti VYKRESLENÉMU stavu (nie proti počítadlu dotazov), lebo
+  // strom chodí aj plným pushom, ktorý si klient nevyžiadal.
+  var AP_SEEN = -1;
   var AP_CLOSED = {};     // zbalené skupiny stromu (kód kategórie -> true)
   // Cache miniatúr: id prílohy -> data URI alebo `null` (= server povedal
   // „náhľad nebude"). Názov uloženej prílohy je NEMENNÝ a nikdy sa
@@ -95,7 +101,9 @@
   // dotazu, takže prejde.
   function apSetTree(p){
     if (!p) return;
-    if (Number(p.gen || 0) < AP_GEN) return;      // staršia odpoveď — zahodiť
+    var g = Number(p.gen || 0);
+    if (g < AP_SEEN) return;                      // staršia odpoveď — zahodiť
+    AP_SEEN = g;
     AP_TREE = p;
     // Kolo dotazu je vybavené bez ohľadu na to, či formulár naozaj prišiel —
     // inak by jediná stratená odpoveď nechala príznak „čaká sa" navždy
@@ -747,14 +755,14 @@
       apOpenModal: apOpenModal, apDelete: apDelete, apOnCategoryChange: apOnCategoryChange,
       apSetTree: apSetTree, apSetCard: apSetCard, apResult: apResult,
       apState: function(){
-        return { sel: AP_SEL, q: AP_Q, deleted: AP_DEL, gen: AP_GEN,
+        return { sel: AP_SEL, q: AP_Q, deleted: AP_DEL, gen: AP_GEN, seen: AP_SEEN,
                  token: AP_TOKEN, thumbs: AP_THUMBS, form: AP_FORM,
                  tree: AP_TREE, card: AP_CARD };
       },
       apReset: function(){
         AP_TREE = null; AP_CARD = null; AP_FORM = null; AP_FORM_WAIT = false;
         AP_FORM_TRIED = false; AP_FORM_THEN = null;
-        AP_SEL = ''; AP_Q = ''; AP_DEL = false; AP_GEN = 0;
+        AP_SEL = ''; AP_Q = ''; AP_DEL = false; AP_GEN = 0; AP_SEEN = -1;
         AP_CLOSED = {}; AP_THUMBS = {}; AP_THUMB_WAIT = false; AP_THUMB_MARK = -1;
         AP_TOKEN = ''; AP_MODE = ''; AP_CARD_EDIT = null; AP_TRIGGER = null;
         if (AP_QTIMER != null && typeof clearTimeout === 'function') clearTimeout(AP_QTIMER);
