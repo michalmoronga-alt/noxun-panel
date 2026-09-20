@@ -62,6 +62,11 @@
   var AP_JOB_Q = '';       // hľadanie v tabuľke (ČISTO klientske — je to pohľad)
   var AP_JOB_CAT = '';     // filter kategórie (to isté)
   var AP_JOB_FOCUS = '';   // item_id prisvieteného riadku (kotva z Kontroly)
+  // IDENTITA PAYLOADU, z ktorého je tabuľka vykreslená: dokument a generácia
+  // okna. Posiela sa s „okom" (jediná akcia sekcie, ktorá siaha do modelu) —
+  // klik zo zastaraného pohľadu by inak zhodou ID a PID označil cudziu
+  // skrinku (Codex #383 kolo 1 P2).
+  var AP_JOB_DOC = { guid: '', gen: 0 };
 
   var AP_STUDIO = (typeof module !== 'undefined' && module.exports)
     ? require('./studio.js')            // Node testy
@@ -1031,7 +1036,8 @@
     var r = apJobRow(id);
     if (!r || !r.owner) return false;
 
-    return apSend('appl_job_select', { kind: r.owner.kind, id: r.owner.id, pid: r.owner.pid });
+    return apSend('appl_job_select', { kind: r.owner.kind, id: r.owner.id, pid: r.owner.pid,
+                                       model_guid: AP_JOB_DOC.guid, gen: AP_JOB_DOC.gen });
   }
 
   function apJobUnbind(id){
@@ -1187,9 +1193,21 @@
     apSetTree(t);
   }
 
+  // Identita payloadu, ktorý tabuľku priniesol. Drží sa TU (nie v `AP_JOB`):
+  // je to vlastnosť PUSHU, nie dát — a s ňou odchádza aj platnosť akcií
+  // pohľadu (Codex #383 kolo 1 P2).
+  function apSetJobDoc(data){
+    var d = data || {};
+    AP_JOB_DOC = { guid: String(d.model_guid || ''), gen: Number(d.gen || 0) };
+    return AP_JOB_DOC;
+  }
+
   if (typeof window !== 'undefined' && window.NX && typeof NX.setStudio === 'function'){
     var apPrevSetStudio = NX.setStudio;
     NX.setStudio = function(data){
+      // PORADIE: identita sa preberá PRED dosadením tabuľky — obe patria
+      // k tomu istému pushu a akcia sa nesmie odoslať s identitou minulého.
+      apSetJobDoc(data);
       apApplyState(data && data.appl);
       apPrevSetStudio(data);
     };
@@ -1220,6 +1238,7 @@
       apJobToolsHtml: apJobToolsHtml, apViewSegHtml: apViewSegHtml,
       apJobChip: apJobChip, apJobActsHtml: apJobActsHtml, apCardTitle: apCardTitle,
       apSetView: apSetView, apJobSearch: apJobSearch, apJobFilter: apJobFilter,
+      apSetJobDoc: apSetJobDoc,
       apJobSelect: apJobSelect, apJobUnbind: apJobUnbind, apJobDelete: apJobDelete,
       apJobRow: apJobRow, apCardToJob: apCardToJob, apOpenApplDraft: apOpenApplDraft,
       apOpenAnchor: apOpenAnchor, apJobBudget: apJobBudget,
@@ -1230,10 +1249,11 @@
                  token: AP_TOKEN, thumbs: AP_THUMBS, form: AP_FORM,
                  tree: AP_TREE, card: AP_CARD,
                  view: AP_VIEW, job: AP_JOB, jobQuery: AP_JOB_Q, jobCat: AP_JOB_CAT,
-                 jobFocus: AP_JOB_FOCUS };
+                 jobFocus: AP_JOB_FOCUS, jobDoc: AP_JOB_DOC };
       },
       apReset: function(){
         AP_VIEW = 'cat'; AP_JOB = null; AP_JOB_Q = ''; AP_JOB_CAT = ''; AP_JOB_FOCUS = '';
+        AP_JOB_DOC = { guid: '', gen: 0 };
         AP_TREE = null; AP_CARD = null; AP_FORM = null; AP_FORM_WAIT = false;
         AP_FORM_TRIED = false; AP_FORM_THEN = null;
         AP_SEL = ''; AP_Q = ''; AP_DEL = false; AP_GEN = 0; AP_SEEN = -1;

@@ -33,6 +33,7 @@ function stubEl(id){
   n.appendChild = function(c){ c.parentNode = n; n.children.push(c); return c; };
   n.setAttribute = function(k, v){ n._attrs[k] = String(v); };
   n.getAttribute = function(k){ return Object.prototype.hasOwnProperty.call(n._attrs, k) ? n._attrs[k] : null; };
+  n.removeAttribute = function(k){ delete n._attrs[k]; };
   n.closest = function(sel){
     if (sel === '[data-apr-kind]' && n._attrs['data-apr-kind'] !== undefined) return n;
     return n._closest && n._closest[sel] ? n._closest[sel] : null;
@@ -245,6 +246,16 @@ eq(SENT.length, 0, 'a nejde naň žiadny dotaz na server');
   ok(exp.indexOf('data-ap="jassign"') > 0, 'riadok „nevybraný" ponúka výber');
   ok(exp.indexOf('data-ap="jdel"') < 0, 'a nedá sa zmazať — nie je čo');
 }
+{
+  // Codex #383 kolo 1 (P2): vlastník mimo ponuky — akcia NIE JE a riadok
+  // povie dôvod (server ju v `actions.assign` vypne).
+  const locked = job().rows[2];
+  locked.actions.assign = false;
+  locked.model_sub = 'vlastník očakáva umývačka — teraz sa k nemu priradiť nedá';
+  const html = A.apJobActsHtml(locked);
+  ok(html.indexOf('data-ap="jassign"') < 0, 'bez ponuky žiadne „vybrať…"');
+  ok(A.apJobRowHtml(locked).indexOf('priradiť nedá') > 0, 'dôvod je v riadku vidieť');
+}
 
 // ---------------------------------------------------------------------------
 // 4) FILTER tabuľky je klientsky (zužuje, čo už v okne je)
@@ -308,11 +319,15 @@ eq(BUD.send[0][1], { id: 'I-FRIDGE', owner: { kind: 'job', id: '', pid: null } }
 click(btn({ 'data-ap': 'jedit', 'data-id': 'I-FRIDGE' }));
 eq(BUD.more, ['I-FRIDGE'], 'ceruzka otvára editor položky ROZPOČTU (plná sada polí)');
 
+A.apSetJobDoc({ model_guid: 'DOC-1', gen: 7 });
 click(btn({ 'data-ap': 'jsel', 'data-id': 'I-FRIDGE' }));
 {
   const sel = SENT.filter(function(x){ return x[0] === 'appl_job_select'; });
   eq(sel.length, 1, 'oko je jediná vlastná akcia sekcie');
-  eq(JSON.parse(sel[0][1]), { kind: 'cabinet', id: 'CAB-3', pid: 11 },
+  // Codex #383 kolo 1 (P2): s identitou PAYLOADU (dokument + kolo okna) —
+  // klik zo zastaraného pohľadu server odmietne.
+  eq(JSON.parse(sel[0][1]),
+     { kind: 'cabinet', id: 'CAB-3', pid: 11, model_guid: 'DOC-1', gen: 7 },
      'identitu posiela SERVER v riadku — klient si ju neskladá z textu');
 }
 
@@ -437,6 +452,30 @@ R.renderApplianceRows([EXPECTED], { kind: 'cabinet', id: 'CAB-3' }, 'applRows');
   click(b);
   eq(BUD.goto, ['studio:appl:appliance:I-1'],
      'odkaz vedie na TEN ISTÝ riadok ako nález Kontroly');
+}
+
+// --- Codex #383 kolo 1 (P2): odchod z kontextu riadky ZAHODÍ ----------------
+{
+  R.renderApplianceRows([BOUND], { kind: 'cabinet', id: 'CAB-3' }, 'applRows');
+  eq(ELS.applRows.hidden, false, 'východisko: riadok je vykreslený');
+  ok(R.clearApplianceRows('applRows'), 'odznačenie riadky zahodí');
+  eq(ELS.applRows._html, '', 'obsah je preč (nie iba skrytý)');
+  eq(ELS.applRows.hidden, true);
+  eq(ELS.applRows.getAttribute('data-apr-kind'), null,
+     'a s ním aj KONTEXT vlastníka — stará akcia nemá kam poslať zápis');
+  eq(R.aprCtxOf(ELS.applRows), null, 'kontext sa už nedá vyriešiť');
+}
+{
+  // Zdrojový guard: obe cesty odchodu z kontextu skrinky riadky čistia.
+  const fs = require('node:fs');
+  const src = fs.readFileSync(path.join(JS, 'bridge.js'), 'utf8');
+  const clear = src.slice(src.indexOf('clearSelected: function(guid)'),
+                          src.indexOf('setStatus: function(msg, err)'));
+  const board = src.slice(src.indexOf('loadBoard: function(b)'),
+                          src.indexOf('clearSelected: function(guid)'));
+  ok(clear.indexOf('clearApplianceRows') > -1, 'prázdny výber riadky zahodí');
+  ok(board.indexOf("clearApplianceRows('applRows')") > -1,
+     'a prechod na dosku zahodí KORPUSOVÝ riadok (doska má vlastný)');
 }
 
 // ---------------------------------------------------------------------------

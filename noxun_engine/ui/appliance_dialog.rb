@@ -1048,6 +1048,9 @@ module Noxun
           'appliance_class_mismatch' => 'trieda nesedí',
           'appliance_owner_missing' => 'vlastník zmizol'
         }.freeze
+        # Codex #383 kolo 1 (P2): vlastnik, ktorého ponuka vlastníkov NEOBSAHUJE
+        # (odpojený dielec, config z novšej verzie) — priradiť sa k nemu nedá.
+        JOB_OWNER_LOCKED = 'teraz sa k nemu priradiť nedá (odpojený dielec alebo novší plugin)'
         JOB_OK_TEXT = 'v poriadku'
         JOB_INFO_TEXT = 'evidencia'
         JOB_NONE_TEXT = 'nevybraný'
@@ -1159,7 +1162,7 @@ module Noxun
             'item_id' => (id.empty? ? nil : id), 'state' => state, 'category' => cat,
             'category_label' => ApplianceCatalog.category_label(cat),
             'model' => job_model_text(rec, state),
-            'model_sub' => job_model_sub(rec, item, snap, state),
+            'model_sub' => job_model_sub(rec, item, snap, state, info),
             # PID: zo zberu (viazana polozka) alebo z PONUKY vlastnikov — obe
             # pochadzaju z toho isteho skenu modelu. Bez neho „oko" akciu
             # neponuka: identita bez PID je pri recyklovanych ID nedostatocna.
@@ -1169,7 +1172,7 @@ module Noxun
             'owner_desc' => (info['desc'].to_s.empty? ? job_owner_kind_text(okind) : info['desc']),
             'customer_supplied' => cs,
             'price_text' => job_price_text(price, cs),
-            'shop_url' => job_first_url(snap['shop_urls']),
+            'shop_url' => job_shop_url(item, price, snap),
             'sheet_url' => job_first_url(snap['sheet_urls']),
             # Poradie: rank/index vlastnika. Neznamy vlastnik (sirota) ide na
             # KONIEC svojej skupiny — ponuka ho uz nema odkial ocislovat.
@@ -1178,7 +1181,8 @@ module Noxun
                        ApplianceCatalog::CATEGORIES.index(cat) || 99,
                        job_model_text(rec, state).to_s.downcase, id]
           }
-          row.merge(job_status(state, cat, found)).merge('actions' => job_actions(row, state))
+          row.merge(job_status(state, cat, found))
+             .merge('actions' => job_actions(row, state, !info.empty?))
         end
 
         def job_model_text(rec, state)
@@ -1190,10 +1194,18 @@ module Noxun
 
         # Druhy riadok stlpca Model: odkial model je (katalog vs rucny zaznam),
         # alebo PRECO tam riadok vobec je (skrinka spotrebic ocakava).
-        def job_model_sub(rec, item, snap, state)
+        #
+        # Codex #383 kolo 1 (P2): ked vlastnik NIE JE v ponuke (odpojeny dielec,
+        # config z novsej verzie), riadok to POVIE — akcia „vybrať…" by inak
+        # otvorila modal, ktorému ten vlastnik chyba, a spotrebic by vznikol
+        # ako „len zákazka" bez toho, aby o to niekto poziadal.
+        def job_model_sub(rec, item, snap, state, info = {})
           if state == 'expected_missing'
             label = ApplianceCatalog.category_label(rec['category'].to_s).to_s.downcase
-            return "vlastník očakáva #{label.empty? ? 'spotrebič' : label}"
+            base = "vlastník očakáva #{label.empty? ? 'spotrebič' : label}"
+            return "#{base} — #{JOB_OWNER_LOCKED}" if (info || {}).empty?
+
+            return base
           end
           man = snap['manufacturer'].to_s.strip
           return 'ručný záznam (bez katalógu)' if item.is_a?(Hash) && item['catalog_id'].to_s.empty?
@@ -1252,16 +1264,34 @@ module Noxun
           url.to_s
         end
 
+        # Codex #383 kolo 1 (P2): ADRESA OBCHODU. Prednost ma to, co ma polozka
+        # ZAKAZKY (`url` — pole, ktore pouzivatel edituje v Rozpocte aj v editore
+        # riadku), az potom snapshot katalogu. Inak by akcia „obchod" otvarala
+        # STARU katalogovu adresu aj po tom, co ju niekto prepisal — a RUCNA
+        # polozka (bez katalogu) by akciu nemala vobec, hoci adresu nesie.
+        # Technicky LIST ostava zo snapshotu: polozka zakazky pole pre list nema
+        # (`CLIENT_KEYS` ho nepozna) a vymyslat ho z `url` by bola druha pravda.
+        def job_shop_url(item, price, snap)
+          own = [item.is_a?(Hash) ? item['url'] : nil, price['url']]
+                .map(&:to_s).find { |u| http_url?(u) }
+          return own if own
+
+          job_first_url(snap['shop_urls'])
+        end
+
         # Co riadok PONUKA. Server rozhoduje, ktore akcie davaju zmysel —
         # klient ziadnu vlastnu podmienku nema (stale DOM nie je ochrana a
         # server si kazdy zapis aj tak overi este raz).
-        def job_actions(row, state)
+        # `offered` = vlastník riadku JE v serverovej ponuke vlastníkov. Bez toho
+        # sa k nemu priradiť nedá (odpojený dielec, novší config), takže akcia
+        # „vybrať…" nevznikne — dôvod nesie `model_sub` (Codex #383 kolo 1 P2).
+        def job_actions(row, state, offered = true)
           owner = row['owner'] || {}
           physical = !owner['kind'].to_s.empty? && owner['kind'].to_s != ApplianceBinding::KIND_JOB
           item = !row['item_id'].to_s.empty?
           { 'select' => (state == 'bound' && physical && !owner['pid'].nil?),
             'edit' => item, 'remove' => item, 'unbind' => (item && physical),
-            'assign' => (state == 'expected_missing'),
+            'assign' => (state == 'expected_missing' && offered),
             'shop' => !row['shop_url'].to_s.empty?, 'sheet' => !row['sheet_url'].to_s.empty? }
         end
 
@@ -1304,10 +1334,19 @@ module Noxun
         # CISTE CITANIE — ziadna operacia, ziadny krok Spat. Identitu overuje
         # TA ISTA funkcia ako vazba (`ApplianceBinding.instances_of` + PID),
         # takze recyklovane ID nikdy neoznaci cudziu skrinku.
+        #
+        # Codex #383 kolo 1 (P2): riadok sa rieši proti AKTIVNEMU dokumentu,
+        # takze klik zo ZASTARANEHO pohladu (medzitym prepnuty dokument alebo
+        # prepocitane okno) musi PREPADNUT — nahodna zhoda ID a PID by inak
+        # oznacila cudziu skrinku. Guard je ten isty ako pri zapisovych akciach
+        # sekcii: identita dokumentu (`DocKey`) + generacia okna.
+        STALE_VIEW_SK = 'Pohľad je zastaraný — obnov okno a skús znova.'
+
         def handle_job_select(payload)
           data = parse(payload)
           model = defined?(Sketchup) ? Sketchup.active_model : nil
           return set_status('Model nie je k dispozícii.', true) unless model
+          return set_status(STALE_VIEW_SK, true) if job_view_stale?(data, model)
 
           kind = data['kind'].to_s
           id = data['id'].to_s
@@ -1319,6 +1358,20 @@ module Noxun
           model.selection.add(inst)
           zoom_to(model, inst)
           set_status("Označené v modeli: #{id}.")
+        end
+
+        # Patri klik k TOMU dokumentu a k TOMU payloadu, ktory je na obrazovke?
+        # Prazdny udaj klienta sa NETOLERUJE (na rozdiel od rozpoctu): tabulku
+        # posiela server vzdy aj s identitou, takze jej absencia znamena presne
+        # to, proti comu je tento guard — DOM spred prepnutia dokumentu.
+        def job_view_stale?(data, model)
+          return true if defined?(DocKey) && DocKey.foreign?(data['model_guid'], model)
+          return false unless defined?(StudioDialog) && StudioDialog.respond_to?(:generation)
+
+          gen = data['gen']
+          return true unless gen.is_a?(Numeric) || (gen.is_a?(String) && gen.strip.match?(/\A\d+\z/))
+
+          gen.to_i != StudioDialog.generation.to_i
         end
 
         def job_select_target(model, kind, id, pid)

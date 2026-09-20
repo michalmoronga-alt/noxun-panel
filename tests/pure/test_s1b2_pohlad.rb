@@ -281,6 +281,49 @@ NxTest.test('S1-B2: odkaz a technicky list su zo SNAPSHOTU polozky (a len http/h
                       'nehttp adresa sa do okna nedostane vobec')
 end
 
+# Codex #383 kolo 1 (P2): ADRESA OBCHODU je z POLOZKY, snapshot az potom.
+NxTest.test('S1-B2 (kolo 1 P2): „obchod" berie adresu polozky, katalog je az fallback') do
+  recs, items, budget, control = NxS1B2.job_fixture
+  # (a) rucna polozka BEZ katalogu, ale S adresou -> akcia JE.
+  items.find { |i| i['id'] == 'I-OVEN' }['url'] = 'https://obchod.sk/rucny'
+  view = NxS1B2::AD.job_view(recs, items, budget, control)
+  oven = NxS1B2.row_of(view, 'I-OVEN')
+  NxTest.assert_equal('https://obchod.sk/rucny', oven['shop_url'],
+                      'polozka bez katalogu ma adresu — a teda aj akciu')
+  NxTest.assert(oven['actions']['shop'])
+  # (b) UPRAVENA adresa nad katalogovou polozkou PREBIJE snapshot.
+  items.find { |i| i['id'] == 'I-HOB' }['url'] = 'https://obchod.sk/nova'
+  view2 = NxS1B2::AD.job_view(recs, items, budget, control)
+  NxTest.assert_equal('https://obchod.sk/nova', NxS1B2.row_of(view2, 'I-HOB')['shop_url'],
+                      'stara katalogova URL sa uz neotvara')
+  # (c) Neplatna adresa polozky sa IGNORUJE a padne sa na snapshot.
+  items.find { |i| i['id'] == 'I-HOB' }['url'] = 'file:///C:/tajne.pdf'
+  view3 = NxS1B2::AD.job_view(recs, items, budget, control)
+  NxTest.assert_equal('https://obchod.sk/x', NxS1B2.row_of(view3, 'I-HOB')['shop_url'],
+                      'nehttp adresa sa do okna nedostane ani takto')
+  # (d) LIST ostava zo snapshotu — polozka pole pre list nema.
+  NxTest.assert_equal('https://vyrobca.sk/list.pdf', NxS1B2.row_of(view3, 'I-HOB')['sheet_url'])
+end
+
+# Codex #383 kolo 1 (P2): vlastnik MIMO ponuky sa nepriradzuje.
+NxTest.test('S1-B2 (kolo 1 P2): „vybrať…" je LEN pri vlastnikovi, ktory je v ponuke') do
+  recs, items, budget, control = NxS1B2.job_fixture
+  view = NxS1B2::AD.job_view(recs, items, budget, control)
+  exp = Array(view['rows']).find { |r| r['state'] == 'expected_missing' }
+  NxTest.assert(exp['actions']['assign'], 'slot CAB-7 je v ponuke — vybrat sa da')
+
+  # Ten isty pohlad, ale ponuka vlastnikov slot NEOBSAHUJE (odpojeny dielec,
+  # config z novsej verzie — `owner_options_map` ho vynecha).
+  owners = NxS1B2.owners_map
+  owners['options']['slot'] = []
+  budget2 = budget.merge('appliance_owners' => owners)
+  view2 = NxS1B2::AD.job_view(recs, items, budget2, control)
+  exp2 = Array(view2['rows']).find { |r| r['state'] == 'expected_missing' }
+  NxTest.refute(exp2['actions']['assign'],
+                'modal by spadol na „len zákazka" a vyrobil nepriradenu polozku')
+  NxTest.assert(exp2['model_sub'].include?('nedá'), "riadok povie DOVOD: #{exp2['model_sub']}")
+end
+
 NxTest.test('S1-B2: AKCIE riadku urcuje server (oko len pri zivom vlastnikovi)') do
   view = NxS1B2.job_view
   fridge = NxS1B2.row_of(view, 'I-FRIDGE')['actions']
@@ -645,13 +688,51 @@ NxTest.test('S1-B2: vystupy slotu menuju MODEL a rozsah vysky tela z listu') do
   NxTest.assert_equal('448 × 820 × 550', pay['body'])
   NxTest.assert_equal('Bosch SPV6EMX05E', pay['body_note'], 'telo menuje MODEL, nie triedu')
   NxTest.assert_equal('list 815–875', pay['body_range'])
-  NxTest.assert(pay['class_ok'], 'trieda 450 v slote 450')
+  NxTest.assert_equal('ok', pay['class_state'], 'trieda 450 v slote 450')
   NxTest.assert(pay['class_text'].include?('Bosch SPV6EMX05E'))
   NxTest.assert(pay['class_text'].include?('✓'))
   bez = NxS1B2::PANEL.slot_payload(NxS1B2.slot_cfg, [])
   NxTest.assert(bez['body_note'].include?('generické'))
   NxTest.assert(bez['class_text'].include?('bez modelu'))
+  NxTest.assert_equal('unknown', bez['class_state'], 'bez modelu sa NETVRDI nic')
   NxTest.assert_equal('', bez['body_range'], 'bez modelu sa rozsah nevymysla')
+end
+
+# Codex #383 kolo 1 (P2): TRI STAVY triedy — „nevieme" nie je „sedí".
+NxTest.test('S1-B2 (kolo 1 P2): model BEZ triedy v liste je `unknown`, nie zelene „ok"') do
+  cfg = NxS1B2.slot_cfg('appliance_refs' => [NxS1B2.ref('I-9', 'dishwasher',
+                                                        'body' => { 'width' => 598.0,
+                                                                    'depth' => 555.0 })])
+  dims = NxS1B2.dw_dims('450')
+  dims['install'] = dims['install'].reject { |k, _| k == 'dishwasher_class' }
+  item = NxS1B2.item('I-9', 'dishwasher', NxS1B2.owner('slot', 'CAB-7'),
+                     'snapshot' => NxS1B2.snapshot('dishwasher', 'SPV bez triedy', 'Bosch', dims))
+  pay = NxS1B2::PANEL.slot_payload(cfg, [item])
+  NxTest.assert_equal('unknown', pay['class_state'],
+                      'list triedu nekótuje — nie je proti comu porovnavat')
+  NxTest.assert(pay['class_text'].include?('trieda neuvedená'), 'a text to povie')
+  NxTest.refute(pay['class_text'].include?('✓'), 'ziadna fajka nad neoverenou vecou')
+  NxTest.refute(pay['class_text'].include?('✗'))
+  # A to, co Kontrola nad tou istou fixturou hovori: NIC (Astra B15).
+  items = []
+  NxS1B2::VAL.check_appliances(
+    [{ 'item_id' => 'I-9', 'name' => 'Bosch', 'category' => 'dishwasher', 'state' => 'bound',
+       'owner' => { 'kind' => 'slot', 'id' => 'CAB-7', 'pid' => 7 },
+       'snapshot' => { 'niche' => { 'width_min' => 450.0 }, 'install' => {} },
+       'slot' => { 'dw_class' => 600 } }], items
+  )
+  NxTest.refute(items.any? { |i| i['stable_key'].to_s.include?('appliance_class_mismatch') },
+                'Kontrola pri neznamej triede tiez mlci — Inspector sa s nou nerozide')
+end
+
+NxTest.test('S1-B2 (kolo 1 P2): Inspector farbi triedu LEN pri ok/mismatch') do
+  js = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'bridge.js'),
+                 encoding: 'UTF-8')
+  body = js[/var c = el\('inf_dw_class'\);.*?\n    \}/m].to_s
+  NxTest.assert(!body.empty?, 'vetva farbenia sa nasla')
+  NxTest.assert(body.include?("st === 'ok'") && body.include?("st === 'mismatch'"),
+                'obe farby maju VLASTNY stav')
+  NxTest.refute(body.include?('class_ok'), 'binarny priznak uz neexistuje')
 end
 
 # ---------------------------------------------------------------------------
@@ -717,6 +798,40 @@ NxTest.test('S1-B2: `appl_job_select` je CISTE CITANIE (ziadna operacia)') do
   NxTest.assert(target.include?('ApplianceBinding.instances_of'),
                 'identitu overuje TA ISTA funkcia ako vazba')
   NxTest.assert(target.include?('persistent_id'), 'a PID musi sediet (ID sa recykluju)')
+end
+
+# Codex #383 kolo 1 (P2): klik zo ZASTARANEHO pohladu sa nesmie vykonat.
+NxTest.test('S1-B2 (kolo 1 P2): „oko" odmietne cudzi dokument aj stare kolo okna') do
+  ad = NxS1B2::AD
+  model = Object.new
+  stub = lambda do |claimed, gen, &blk|
+    dk = Noxun::Engine::DocKey.singleton_class
+    sd = Noxun::Engine::StudioDialog.singleton_class
+    old_foreign = dk.instance_method(:foreign?)
+    old_gen = sd.instance_method(:generation)
+    dk.send(:define_method, :foreign?) { |asked, _m, **_o| asked.to_s != 'DOC-1' }
+    sd.send(:define_method, :generation) { 7 }
+    begin
+      blk.call(ad.job_view_stale?({ 'model_guid' => claimed, 'gen' => gen }, model))
+    ensure
+      dk.send(:define_method, :foreign?, old_foreign)
+      sd.send(:define_method, :generation, old_gen)
+    end
+  end
+  stub.call('DOC-1', 7) { |stale| NxTest.refute(stale, 'ten isty dokument a to iste kolo') }
+  stub.call('DOC-2', 7) { |stale| NxTest.assert(stale, 'INY dokument = odmietnut') }
+  stub.call('DOC-1', 6) { |stale| NxTest.assert(stale, 'STARE kolo okna = odmietnut') }
+  stub.call('', 7) { |stale| NxTest.assert(stale, 'chybajuca identita sa NETOLERUJE') }
+  stub.call('DOC-1', nil) { |stale| NxTest.assert(stale, 'ani chybajuca generacia') }
+
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'appliance_dialog.rb'),
+                  encoding: 'UTF-8')
+  body = src[/def handle_job_select.*?\n        end\n/m].to_s
+  NxTest.assert(body.include?('job_view_stale?'), 'guard bezi v handleri, nie az v resolveri')
+  js = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'appliances.js'),
+                 encoding: 'UTF-8')
+  NxTest.assert(js.include?('model_guid: AP_JOB_DOC.guid') && js.include?('gen: AP_JOB_DOC.gen'),
+                'klient identitu payloadu posiela')
 end
 
 NxTest.test('S1-B2: `?v=` vo vsetkych html = presne VERSION') do

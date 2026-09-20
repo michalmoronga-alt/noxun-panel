@@ -2796,7 +2796,18 @@ nerozišlo s tým, čo server naozaj dovolí. Testy: `tests/pure/test_s1a2_sekci
 ho nenesie — klient si ho preto preberá podmienene (`if (p.job) AP_JOB = p.job`), inak by uloženie modelu do katalógu vyprázdnilo tabuľku, s ktorou nemá nič spoločné.
 Tvar `job`: `rows[]` (`{state, item_id, category, category_label, model, model_sub, owner{kind,id,pid}, owner_label, owner_desc, tone, status_text, status_title,
 price_text, customer_supplied, shop_url, sheet_url, actions{select,edit,remove,unbind,assign,shop,sheet}}`) · `total` · `warn` · `counts{red,orange,total}` · `summary` ·
-`subtotal_text` · `subtotal_included` · `categories`.
+`subtotal_text` · `subtotal_included` · `categories`. Dve pravidlá, ktoré z tvaru vidieť nie je:
+
+- **`shop_url` je z POLOŽKY zákazky, snapshot katalógu je až fallback** (`url` je pole, ktoré používateľ edituje v Rozpočte aj v editore riadku). Inak by akcia „obchod“
+  otvárala starú katalógovú adresu aj po jej prepísaní a **ručná položka bez katalógu by akciu nemala vôbec**. `sheet_url` ostáva zo snapshotu — položka zákazky pole pre
+  technický list nemá a odvodzovať ho z `url` by bola druhá pravda.
+- **`actions.assign` („vybrať…“) je LEN vtedy, keď je vlastník riadku v serverovej ponuke vlastníkov.** Odpojený dielec a config z novšej verzie sa neponúkajú, takže modal
+  by spadol na „len zákazka“ a vyrobil nepriradenú položku; riadok namiesto akcie nesie **dôvod** v `model_sub`.
+
+**Akcia `appl_job_select` („oko“) má guard zastaraného pohľadu.** Rieši riadok proti **aktívnemu** dokumentu, takže klik z DOM spred prepnutia dokumentu alebo spred
+prepočtu okna by zhodou ID a PID mohol označiť cudziu skrinku. Klient preto posiela identitu **payloadu, z ktorého je tabuľka vykreslená** (`model_guid` + `gen`, drží ich
+`AP_JOB_DOC` z toho istého pushu) a server odmieta nezhodu tým istým párom guardov ako zápisové akcie sekcií (`DocKey.foreign?` + `StudioDialog.generation`). Prázdny údaj
+sa tu **netoleruje** — tabuľka chodí vždy aj s identitou, takže jej absencia je presne ten stav, proti ktorému guard stojí.
 
 ### Riadok „Spotrebič" v Inspectore (S1-B2, ui/js/appliance_row.js + ui/panel/payloads.rb)
 
@@ -2823,6 +2834,8 @@ Payload `cabinet_payload.appliance_rows[]` / `board_payload.appliance_rows[]` sk
   ktorá geometriu nemení — nový `budget_card_proc` (**bez** zdvihu generácie: žiadne číslo zákazky sa nezmenilo).
 - **Kontext vlastníka drží DOM**, nie globálna premenná (`data-apr-kind` / `data-apr-id` na kontajneri): panel môže mať vykreslenú kartu dosky aj karty skrinky a echo
   katalógu materiálov prekresľuje kartu dosky aj vtedy, keď je označená skrinka — globál by sa dal prepísať pod rukami a zápis by odišiel na cudzieho vlastníka.
+- **Odchod z kontextu riadky ZAHODÍ** (`clearApplianceRows`): prázdny výber čistí oba kontajnery, prechod na dosku ten korpusový. Nestačí ich skryť — s kontajnerom
+  odchádza aj **kontext vlastníka** (`data-apr-*`), inak by vo vkladacom režime ostal visieť riadok cudzej skrinky so starými akciami.
 
 ### Sekcia ROZPOČET v Štúdiu (ŠT-1c PR B1, Š12–Š13)
 
