@@ -259,7 +259,10 @@
           <div class="rowc"><label for="width"><svg class="ic" aria-hidden="true"><use href="#i-arr-h"/></svg>Šírka</label>
             <span class="dwrap"><input id="width" type="text" oninput="onField()"><button type="button" class="pbtn" data-nx-usage="rad:sirka" onclick="nxDimToggle(this, event)" title="Rozmerový rad — bežné šírky" aria-label="Rozmerový rad šírky"><svg class="ic" aria-hidden="true"><use href="#i-chevron-down"/></svg></button><span class="miniopts" id="dimser_width"></span></span>
             <button class="inslock" data-lock="width" onclick="toggleInsertLock('width')" aria-label="Zamknúť šírku" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
-          <div class="rowc"><label for="height"><svg class="ic" aria-hidden="true"><use href="#i-arr-v"/></svg>Výška</label>
+          <!-- S1-E: popis TOHTO riadku sa meni podla typu („Výška linky" pri
+               slote umyvacky), preto ma text vlastny uzol s ID — menit textovy
+               uzol vedla ikony by bolo krehke. -->
+          <div class="rowc"><label for="height"><svg class="ic" aria-hidden="true"><use href="#i-arr-v"/></svg><span id="lblHeight">Výška</span></label>
             <span class="dwrap"><input id="height" type="text" oninput="onField()"><button type="button" class="pbtn" data-nx-usage="rad:vyska" onclick="nxDimToggle(this, event)" title="Rozmerový rad — bežné výšky" aria-label="Rozmerový rad výšky"><svg class="ic" aria-hidden="true"><use href="#i-chevron-down"/></svg></button><span class="miniopts" id="dimser_height"></span></span>
             <button class="inslock" data-lock="height" onclick="toggleInsertLock('height')" aria-label="Zamknúť výšku" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
           <div class="rowc"><label for="depth"><svg class="ic" aria-hidden="true"><use href="#i-arr-d"/></svg>Hĺbka</label>

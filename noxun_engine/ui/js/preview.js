@@ -1559,6 +1559,10 @@
                        // priamo nad prepinacmi, bez kreslenia.
                        pvGapsHot: pvGapsHot, pvSetGapFocus: pvSetGapFocus,
                        pvSetGapHover: pvSetGapHover, pvInGapDiag: pvInGapDiag,
-                       NX_GAP_FIELDS: NX_GAP_FIELDS };
+                       NX_GAP_FIELDS: NX_GAP_FIELDS,
+                       // S1-E: projekcia SLOTU UMYVACKY (celny rez) + zrkadla
+                       // rozmerov generickeho tela a zakladne.
+                       pvSlot: pvSlot, drawSlot: drawSlot, PV_DW_BODY: PV_DW_BODY,
+                       PV_DW_BASE_H: PV_DW_BASE_H, PV_DW_BASE_SIDE: PV_DW_BASE_SIDE };
   }
 

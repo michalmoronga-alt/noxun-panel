@@ -605,7 +605,7 @@
     SLOT_ONLY_ROWS.forEach(function(id){ var n = el(id); if (n) n.hidden = !slot; });
     SLOT_HIDDEN_ROWS.forEach(function(id){ var n = el(id); if (n) n.style.display = slot ? 'none' : ''; });
     // Vyska korpusu je pri slote VYSKA LINKY (horna hrana susednych korpusov).
-    nxSetRowLabel('height', slot ? 'Výška linky' : 'Výška');
+    nxSetRowLabel('lblHeight', slot ? 'Výška linky' : 'Výška');
     nxSetRowUnit('height', slot ? 'mm · horná hrana susedov' : 'mm');
     nxSetRowUnit('dw_body_height', 'mm · rozsah ' + LIMITS.dw_body_height[0] + '–' + LIMITS.dw_body_height[1]);
     var wrow = el('infWeight');
@@ -618,15 +618,12 @@
     toggleRecess(); toggleTwoRails(); toggleBackTh(); // D-31: pokryva vyber korpusu, defaulty aj sablonu
   }
 
-  // Popis riadku (label nesie ikonu + TEXT) — meni sa LEN textovy uzol, ikona
-  // ostava. Vzor: `Výška` -> `Výška linky` pri slote.
-  function nxSetRowLabel(forId, text){
-    var lab = document.querySelector('label[for="' + forId + '"]');
-    if (!lab) return;
-    for (var i = lab.childNodes.length - 1; i >= 0; i--){
-      if (lab.childNodes[i].nodeType === 3){ lab.childNodes[i].nodeValue = text; return; }
-    }
-    lab.appendChild(document.createTextNode(text));
+  // Popis riadku. Text ma v HTML VLASTNY uzol (`<span id="lbl…">`), takze sa
+  // ikona nedotkne a nie je treba hladat textove uzly. Vzor: `Výška` ->
+  // `Výška linky` pri slote.
+  function nxSetRowLabel(spanId, text){
+    var s = el(spanId);
+    if (s) s.textContent = text;
   }
 
   // Jednotkovy hint riadku (`.unit` v tom istom `.rowc`).
@@ -2477,6 +2474,13 @@
                        // hlavicky kresli panel z ciseho textu core.js.
                        toggleEdgeLimit: toggleEdgeLimit, setEdgeLimitOff: setEdgeLimitOff,
                        resetFrontGaps: resetFrontGaps, updateCabfrontMeta: updateCabfrontMeta,
-                       cabfrontDecorName: cabfrontDecorName };
+                       cabfrontDecorName: cabfrontDecorName,
+                       // S1-E: hranice per TYP a viditelnost riadkov slotu.
+                       // `limitFor` je CISTE jadro (zrkadlo Ruby rozsahov),
+                       // `applyVisibility` a `nxSlotFrontsLock` sa overuju nad
+                       // mini-DOM (rovnaky vzor ako karta cela).
+                       LIMITS: LIMITS, TYPE_LIMITS: TYPE_LIMITS, limitFor: limitFor,
+                       applyVisibility: applyVisibility, nxSlotFrontsLock: nxSlotFrontsLock,
+                       SLOT_ONLY_ROWS: SLOT_ONLY_ROWS, SLOT_HIDDEN_ROWS: SLOT_HIDDEN_ROWS };
   }
 
