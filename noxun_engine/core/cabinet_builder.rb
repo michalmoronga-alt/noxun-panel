@@ -28,11 +28,56 @@ module Noxun
         rail_depth: 100.0, rails_orientation: 'flat', rails_top_offset: 0.0
       }.freeze
 
+      # S1-E: SLOT UMYVACKY. Nie je to korpus — nema boky, dno, strop, chrbat,
+      # zony ani sokel. Ma JEDEN vyrobny dielec (celo cez modul ciel) a telo
+      # spotrebica ako REFERENCIU. `height` je VYSKA LINKY (horna hrana
+      # susednych korpusov), `dw_front_bottom` je spodna hrana CELA od podlahy
+      # („sokel" v jazyku Inspectora) a `dw_front_height` vyska cela; presah
+      # cela nad linku sa NEOBMEDZUJE.
+      # `floor_height` je VZDY 0 a `plinth_mode` VZDY 'none' — inak by pravidla
+      # kovania vydali nohy aj prichyty sokla (Codex #376 kolo 1 P1).
+      DISHWASHER_DEFAULTS = {
+        type: 'dishwasher', width: 600.0, height: 915.0, depth: 560.0, thickness: 18.0,
+        floor_height: 0.0, shelves: 0, fronts: 'none',
+        bottom_mode: 'under_sides', top_mode: 'full', back_mode: 'none', back_thickness: 3.0,
+        plinth_mode: 'none', plinth_recess: 40.0,
+        rail_depth: 100.0, rails_orientation: 'flat', rails_top_offset: 0.0,
+        dw_class: 600, dw_body_height: 820.0, dw_front_bottom: 100.0, dw_front_height: 776.0
+      }.freeze
+
+      # JEDINY zoznam typov korpusu. Kazde miesto, ktore sa pyta „aky typ",
+      # sa pyta TOHTO zoznamu (guard testy ho porovnavaju s JS zrkadlom).
+      TYPES = %w[lower upper dishwasher].freeze
+
+      # S1-E: UZAVRETE polia slotu. Su tu vymenovane, aby ich `normalize`,
+      # `cabinet_config` aj `config_to_params` mohli prejst JEDNYM zoznamom —
+      # dva opisane zoznamy by sa casom rozisli a pole by pri prestavbe ticho
+      # vypadlo (presne to, comu brani `CONFIG_SCHEMA`).
+      DW_KEYS = %i[dw_class dw_body_height dw_front_bottom dw_front_height].freeze
+      DW_CLASSES = [600, 450].freeze
+      # Rozsahy vstupov slotu (mm). Sirka a vyska sa NEklampuju na triedu
+      # (Astra S1-E BLOCKER E1) — uzky slot sa POSTAVI a hlasi ho Kontrola.
+      DW_RANGES = {
+        dw_body_height: [700.0, 1000.0],
+        dw_front_bottom: [0.0, 300.0],
+        # Presah cela nad vysku linky je LEGITIMNY (celo moze byt vyssie nez
+        # linka) — horna hranica je len poistka proti nezmyslu.
+        dw_front_height: [300.0, 1200.0]
+      }.freeze
+      # Sirka a vyska slotu maju VLASTNE (sirsie) hranice nez korpus: slot
+      # nema vnutro, takze `MIN[:width]` 200 by ho zbytocne zvazoval, a
+      # naopak nema zmysel pustat 3000 mm „umyvacku".
+      DW_WIDTH_RANGE  = [300.0, 1200.0].freeze
+      DW_HEIGHT_RANGE = [500.0, 1200.0].freeze
+
       # D-100: nazov skrinky. Zhoda s tymto vzorom = nazov POVAZUJEME za
       # nenastaveny (automaticky sa dopocitava zo sucasnych parametrov) — tak
       # ozivnu aj skrinky, ktore maju dnesny default zapeceny v configu, vratane
       # stareho bezdiakritickeho tvaru. Ruby /i pokryva aj velke Á.
-      AUTO_NAME_RE = /\A(?:horn(?:a|á)|spodn(?:a|á))\s+skrinka\s+\d+\z/i
+      # S1-E: pribudol automaticky nazov slotu („Umývačka 60 (slot)") — platí
+      # preň to isté ako pre korpusy: nesmie sa zapiecť do configu, inak by
+      # po zmene triedy natrvalo klamal.
+      AUTO_NAME_RE = /\A(?:(?:horn(?:a|á)|spodn(?:a|á))\s+skrinka\s+\d+|um(?:y|ý)va[cč]ka\s+\d+\s*\(slot\))\z/i
       NAME_MAX_LEN = 80 # JS zrkadlo: CAB_NAME_MAX v ui/js/core.js
 
       GAP_BETWEEN_CABS = 50.0    # medzera medzi korpusmi pri vkladani vedla seba
@@ -189,7 +234,20 @@ module Noxun
       #       (`newer_config?`) a exportna brana (`ProductionCore.export_blockers`).
       #       Vsetky tri aktivacne konstanty ostavaju (5 / 9 / 11) — skrinky
       #       schemy 14 sa nesmu zrazu tvarit ako nemigrovane.
-      CONFIG_SCHEMA = 15
+      #  16 = S1-E — SLOT UMYVACKY a REZERVOVANE VAZBY NA SPOTREBIC. Config
+      #       nesie NOVY TYP (`dishwasher`) so styrmi vlastnymi polami
+      #       (`dw_class`, `dw_body_height`, `dw_front_bottom`,
+      #       `dw_front_height`) a rezervuje `appliance_refs[]` /
+      #       `appliance_expects[]` (napln im da S1-B/F/C bez dalsieho bumpu).
+      #       Starsi plugin (schema 15) typ NEPOZNA: `norm_type` mu ho sklopi
+      #       na `lower`, takze by zo slotu pri prvej prestavbe vyrobil PLNY
+      #       KORPUS s bokmi, dnom, strophom a chrbtom — teda cely NEEXISTUJUCI
+      #       kusovnik navyse — a `dw_*` by ticho zahodil. A vazba na spotrebic
+      #       by z configu vypadla, takze by sa polozka zakazky stala sirotou.
+      #       Brany su tie iste ako pri 5-15: dopredny guard prestavby/sablon/
+      #       kopie (`newer_config?`) a exportna brana
+      #       (`ProductionCore.export_blockers`).
+      CONFIG_SCHEMA = 16
 
       # KOV-C2b: schema, OD KTOREJ stavba emituje dielce zasuviek z receptu.
       # VLASTNA konstanta (nie `CONFIG_SCHEMA`), lebo pri bumpe na 6 (KOV-D1a)
@@ -833,6 +891,9 @@ module Noxun
                 # jedine miesto (spolu s „Vlozit kopiu"), kde ad-hoc polozky
                 # dostavaju vlastnu identitu. `normalize` ID NIKDY nemeni.
                 rekey_hardware_manual(params)
+                # S1-E (FIX E4): natívna kopia je JEDNA z troch kopirovacich
+                # ciest — vazbu na KONKRETNY spotrebic si neberie so sebou.
+                strip_appliance_refs!(params)
                 rebuild_in_operation(model, inst, normalize(params), appearance: appearance)
                 model.commit_operation
               rescue StandardError => e
@@ -946,6 +1007,9 @@ module Noxun
           attach_abs_warnings!(plan, abs_issues)
 
           render_hardware(model, ents, plan[:hardware], cfg, cid)
+          # S1-E: referencna geometria (telo spotrebica). Vznika VNUTRI tej
+          # istej operacie ako dielce — SketchUp vnorene operacie nema.
+          render_references(model, ents, plan[:references], cid)
 
           # V0.2c: ghost zony uz NEstoja v definicii korpusu, ale ako top-level skupina
           # (Zones.sync_ghost, volane z build/rebuild) — klik na zonu = 1 klik bez dvojkliku.
@@ -2071,6 +2135,139 @@ module Noxun
           nil
         end
 
+        # --- S1-E: referencna geometria (telo spotrebica) --------------------
+        #
+        # PROXY KONTRAKT je pribuzny nohám (`render_hardware`), ale NIE TEN
+        # ISTY: noha je servisna geometria k POLOZKE KOVANIA (`kind: hardware`,
+        # `production_class: 'none'`), kym telo umyvacky je REFERENCIA DOMENY
+        # — vec, ktoru zakaznik kupuje a my ju len ukazujeme
+        # (`kind: 'reference'`, `production_class: 'reference'`, STANDARD 8.1).
+        # `manufactured: false` znamena, ze ju NIKDY neuvidi kusovnik, VEPO,
+        # nakup ani rozpocet.
+        #
+        # DVA BOXY z JEDNEHO deskriptora: telo a pod nim ZAKLADNA
+        # (`Construction::DW_BASE_*`) — odsadena spredu aj do stran, aby bolo
+        # v modeli vidno priestor pre soklovu listu. Zakladna sa NIKDY nekresli
+        # samostatne, preto nema vlastny deskriptor ani vlastny `ref_key`.
+        #
+        # Definicia sa recykluje MENOM (`NOXUN <cid> APPLIANCE`) a `clear!`-uje
+        # — presne ako pri nohach; identitu drzi ATRIBUT, nie meno (meno si
+        # SketchUp pri kolizii uniqne).
+        def render_references(model, parent_ents, references, cid)
+          list = Array(references)
+          return nil if list.empty?
+
+          dname = "NOXUN #{cid} APPLIANCE"
+          rdef = model.definitions[dname]
+          rdef = nil if rdef && rdef.instances.any?(&:valid?)
+          rdef ||= model.definitions.add(dname)
+          rdef.entities.clear!
+          rd = list.first
+          draw_reference_body(rdef.entities, rd)
+          inst = parent_ents.add_instance(rdef, Geom::Transformation.new)
+          inst.layer = hardware_tag(model)
+          rid = "#{cid}-REF-APPL"
+          Store.write(inst, {
+            std: Store::STD, kind: 'reference', id: rid, part_id: rid,
+            cabinet_id: cid, role: rd[:role].to_s, name: rd[:label].to_s,
+            manufactured: false, production_class: BuildPlan::REFERENCE_CLASS,
+            config: { proxy: true, ref_key: rd[:ref_key].to_s, source: rd[:source].to_s,
+                      dw_class: rd[:dw_class],
+                      body: { w: rd[:box][0].to_f.round(2), h: rd[:box][2].to_f.round(2),
+                              d: rd[:box][1].to_f.round(2) } }
+          })
+          inst.name = rd[:label].to_s
+          inst
+        rescue StandardError => e
+          # Vizual nesmie zhodit rebuild — vyrobny dielec (celo) uz stoji.
+          Engine.log_error(e, 'render_references') if defined?(Engine)
+          nil
+        end
+
+        # Telo + zakladna. `origin` deskriptora je LAVY PREDNY SPODNY roh tela;
+        # zakladna z neho vychadza tymi istymi konstantami, ktore pozna aj
+        # `Construction` — ziadny druhy vzorec.
+        def draw_reference_body(ents, rd)
+          bw, bd, bh = rd[:box].map(&:to_f)
+          ox, oy, oz = rd[:origin].map(&:to_f)
+          base_h = [Construction::DW_BASE_H, bh].min
+          body_h = bh - base_h
+          draw_box_at(ents, ox, oy, oz + base_h, bw, bd, body_h) if body_h > BuildPlan::MIN_DIM
+          return if base_h <= BuildPlan::MIN_DIM
+
+          iw = bw - 2 * Construction::DW_BASE_INSET_SIDE
+          idp = bd - Construction::DW_BASE_INSET_FRONT
+          return if iw <= BuildPlan::MIN_DIM || idp <= BuildPlan::MIN_DIM
+
+          draw_box_at(ents, ox + Construction::DW_BASE_INSET_SIDE,
+                      oy + Construction::DW_BASE_INSET_FRONT, oz, iw, idp, base_h)
+        end
+
+        # Kvader s POSUNUTYM zaciatkom. `draw_box` kresli vzdy od lokalneho
+        # nuloveho bodu — referencia potrebuje dva kvadre v JEDNEJ definicii.
+        def draw_box_at(ents, x, y, z, sx, sy, sz)
+          pts = [
+            Units.point(x, y, z), Units.point(x + sx, y, z),
+            Units.point(x + sx, y + sy, z), Units.point(x, y + sy, z)
+          ]
+          f = ents.add_face(pts)
+          f.reverse! if f.normal.z < 0
+          f.pushpull(Units.mm(sz))
+          f
+        end
+
+        # === S1-E: LOGICKA OBALKA KORPUSU ====================================
+        #
+        # Svetovy `Geom::BoundingBox` NOMINALNEHO obrysu (`width x depth x
+        # height` z configu), nie skutocnych bounds. Rozdiel je podstatny pri
+        # SLOTE UMYVACKY: jeho celo smie presahovat vysku linky a telo smie
+        # trcat do strán, takze skutocne bounds by pri prisuvani zastavili
+        # skrinku skor, nez sa dotkne. Pri dolnej a hornej skrinke je obalka
+        # ta ista vec, akou sa merala doteraz (obrys korpusu) — meni sa len to,
+        # ze presah cela a proxy uz doraz neposuvaju (Astra S1-E FIX E3).
+        #
+        # Cudzia entita (nie NOXUN korpus) dostane svoje `bounds` — funkcia je
+        # pouzitelna ako univerzalna nahrada `inst.bounds`.
+        # `transform:` = ramec, v ktorom sa obalka vyjadri (default = svet).
+        def envelope(inst, transform: nil)
+          dims = envelope_dims(inst)
+          tr = transform || (inst.respond_to?(:transformation) ? inst.transformation : nil)
+          bb = Geom::BoundingBox.new
+          if dims
+            w, d, h = dims
+            [[0.0, 0.0, 0.0], [w, 0.0, 0.0], [0.0, d, 0.0], [w, d, 0.0],
+             [0.0, 0.0, h], [w, 0.0, h], [0.0, d, h], [w, d, h]].each do |c|
+              p = Units.point(*c)
+              bb.add(tr ? p.transform(tr) : p)
+            end
+            return bb
+          end
+          src = (inst.respond_to?(:definition) && inst.definition) ? inst.definition.bounds : nil
+          return inst.bounds if src.nil?
+
+          8.times { |i| bb.add(tr ? src.corner(i).transform(tr) : src.corner(i)) }
+          bb
+        rescue StandardError => e
+          Engine.log_error(e, 'CabinetBuilder.envelope') if defined?(Engine)
+          inst.bounds
+        end
+
+        # [sirka, hlbka, vyska] NOMINALNEJ obalky NOXUN korpusu v mm, alebo nil
+        # (cudzia entita, doska, poskodeny config). CISTA otazka nad ulozenym
+        # configom — ziadne citanie geometrie.
+        def envelope_dims(inst)
+          return nil unless inst.respond_to?(:valid?) && inst.valid?
+          return nil unless Store.kind(inst).to_s == 'cabinet'
+
+          cfg = Store.config(inst)
+          return nil unless cfg.is_a?(Hash)
+
+          dims = [cfg['width'].to_f, cfg['depth'].to_f, cfg['height'].to_f]
+          dims.all? { |v| v.finite? && v.positive? } ? dims : nil
+        rescue StandardError
+          nil
+        end
+
         # Rozmiestnenie valcov pod dnom: 2 rady (predny/zadny) s odsadenim LEG_INSET;
         # plytky korpus / 1 ks -> 1 rad v strede hlbky. Predny rad berie prebytok
         # (ceil), rovnomerne po sirke. Kresli sa najviac LEG_RENDER_MAX valcov.
@@ -2403,7 +2600,7 @@ module Noxun
         end
 
         def cabinet_config(cfg)
-          {
+          out = {
             engine_version: Engine::VERSION,
             # R-12: marker kontraktu configu. Zapisuje sa VZDY a VZDY ako
             # AKTUALNA hodnota — `cabinet_config` je JEDINE miesto, kde config
@@ -2430,7 +2627,7 @@ module Noxun
             # D-100: uklada sa LEN rucny nazov (nil = zivy default z display_name).
             # Zapecenim defaultu by nazov prestal sledovat sirku/typ skrinky.
             name: manual_name(cfg),
-            construction_preset: cfg[:type] == 'upper' ? 'noxun-upper-18' : 'noxun-lower-18',
+            construction_preset: construction_preset_for(cfg[:type]),
             mode: 'parametric',
             width: cfg[:width], height: cfg[:height], depth: cfg[:depth],
             thickness: cfg[:thickness], floor_height: cfg[:floor_height],
@@ -2471,6 +2668,25 @@ module Noxun
             fronts: cfg[:fronts],
             front_items: cfg[:front_items]
           }
+          # S1-E: polia slotu sa zapisuju LEN pri type `dishwasher` — dolna a
+          # horna skrinka ostavaju BAJTOVO rovnake ako pred S1-E (golden
+          # fixtury zakaziek sa nesmu pohnut).
+          DW_KEYS.each { |k| out[k] = cfg[k] } if cfg[:type] == 'dishwasher'
+          # Rezervovane vazby: kluc sa objavi LEN ked skrinka naozaj nieco
+          # nesie (nil = „o vazbe nic nevieme", nie „vazba nie je").
+          out[:appliance_refs] = cfg[:appliance_refs] if cfg[:appliance_refs].is_a?(Array)
+          out[:appliance_expects] = cfg[:appliance_expects] if cfg[:appliance_expects].is_a?(Array)
+          out
+        end
+
+        # S1-E: konstrukcny preset podla typu (udaj pre cloveka aj pre buduce
+        # migracie — JEDEN `case`, nie tri ternary rozsypane po subore).
+        def construction_preset_for(type)
+          case type
+          when 'upper' then 'noxun-upper-18'
+          when 'dishwasher' then 'noxun-dishwasher'
+          else 'noxun-lower-18'
+          end
         end
 
         # Typ podopretia urcuje Construction.support_type (1 zdroj pravdy — citaju ho
@@ -2524,11 +2740,27 @@ module Noxun
         def default_name(cfg)
           w = (cfg.is_a?(Hash) ? raw(cfg, :width) : nil).to_f.round
           type = (cfg.is_a?(Hash) ? raw(cfg, :type) : nil).to_s
-          type == 'upper' ? "Horná skrinka #{w}" : "Spodná skrinka #{w}"
+          case type
+          when 'upper' then "Horná skrinka #{w}"
+          # S1-E: slot sa menuje podla TRIEDY (60/45), nie podla sirky —
+          # „Umývačka 590" by pri uzsom slote klamala o tom, co tam stoji.
+          when 'dishwasher' then "Umývačka #{dw_class_label(cfg)} (slot)"
+          else "Spodná skrinka #{w}"
+          end
+        end
+
+        # Popisok triedy slotu do nazvu a hlasok (600 -> „60").
+        def dw_class_label(cfg)
+          cls = (cfg.is_a?(Hash) ? raw(cfg, :dw_class) : nil).to_i
+          Construction.dw_class_dims(cls)[:label]
         end
 
         def template_id_for(type)
-          type == 'upper' ? 'base-upper-18' : 'base-lower-18'
+          case type
+          when 'upper' then 'base-upper-18'
+          when 'dishwasher' then 'dishwasher-slot-18'
+          else 'base-lower-18'
+          end
         end
 
         # KOV-E1b (Codex #333 kolo 1 P1): `seed_version` = seed pravidiel, s
@@ -2565,27 +2797,42 @@ module Noxun
         # --- normalizacia parametrov ---------------------------------------
 
         def defaults_for(type)
-          type == 'upper' ? UPPER_DEFAULTS : LOWER_DEFAULTS
+          case type
+          when 'upper' then UPPER_DEFAULTS
+          when 'dishwasher' then DISHWASHER_DEFAULTS
+          else LOWER_DEFAULTS
+          end
         end
 
         def normalize(params)
           p = params || {}
           type = norm_type(p)
           d = defaults_for(type)
+          slot = type == 'dishwasher'
           fronts_cfg = Fronts.normalize_config(raw(p, :fronts))
-          {
+          # S1-E: vyska cela slotu ma AUTORITU v poli `dw_front_height`, preto
+          # sa `dw_*` normalizuju PRED celami a ich vysledok riadi jedine pevne
+          # celo (`slot_fronts!`).
+          dw = slot ? norm_dishwasher(p, d) : {}
+          fronts_cfg = slot_fronts!(fronts_cfg, dw) if slot
+          out = {
             type: type,
-            width:  clampf(fetchf(p, :width,  d[:width]),  MIN[:width],  3000.0),
-            height: clampf(fetchf(p, :height, d[:height]), MIN[:height], 3000.0),
+            width:  slot ? clampf(fetchf(p, :width, d[:width]), *DW_WIDTH_RANGE)
+                         : clampf(fetchf(p, :width,  d[:width]),  MIN[:width],  3000.0),
+            height: slot ? clampf(fetchf(p, :height, d[:height]), *DW_HEIGHT_RANGE)
+                         : clampf(fetchf(p, :height, d[:height]), MIN[:height], 3000.0),
             depth:  clampf(fetchf(p, :depth,  d[:depth]),  MIN[:depth],  2000.0),
             thickness: clampf(fetchf(p, :thickness, d[:thickness]), *THICKNESS_RANGE),
-            floor_height: type == 'upper' ? 0.0 : clampf(fetchf(p, :floor_height, d[:floor_height]), 0.0, 500.0),
+            # S1-E (Codex #376 kolo 1 P1): slot ma podporu `none` — jeho sokel
+            # je spodna hrana CELA (`dw_front_bottom`) a do `floor_height`
+            # NIKDY netecie, inak by pravidla vydali nohy a prichyty sokla.
+            floor_height: (type == 'upper' || slot) ? 0.0 : clampf(fetchf(p, :floor_height, d[:floor_height]), 0.0, 500.0),
             bottom_mode: enum_val(p, :bottom_mode, %w[between_sides under_sides], d[:bottom_mode]),
             top_mode:    enum_val(p, :top_mode,    %w[full two_rails none],       d[:top_mode]),
             back_mode:   enum_val(p, :back_mode,   %w[overlay inset groove none], d[:back_mode]), # D-31: + none
             # hrubka chrbta ako Float mm (3 HDF / 18 pevny / ine); clamp 1..50
             back_thickness: clampf(fetchf(p, :back_thickness, d[:back_thickness]), 1.0, 50.0),
-            plinth_mode: type == 'upper' ? 'none' : enum_val(p, :plinth_mode, %w[none front], d[:plinth_mode]),
+            plinth_mode: (type == 'upper' || slot) ? 'none' : enum_val(p, :plinth_mode, %w[none front], d[:plinth_mode]),
             plinth_recess: clampf(fetchf(p, :plinth_recess, d[:plinth_recess]), 0.0, 300.0),
             # two_rails parametre (uplatnia sa len pri top_mode == 'two_rails')
             rail_depth: clampf(fetchf(p, :rail_depth, d[:rail_depth]), 20.0, 400.0),
@@ -2615,11 +2862,104 @@ module Noxun
             # striktnu kontrolu robi panelova ADD/EDIT cesta PRED rebuildom.
             hardware_manual: norm_hardware_manual(raw(p, :hardware_manual)),
             part_key_schema: raw(p, :part_key_schema).to_i,
+            # S1-E: REZERVOVANE vazby na spotrebic. `normalize` ich PRENASA
+            # NEDOTKNUTE (Astra S1-E FIX E4): prestavba, zmena materialu aj
+            # absorpcia scale musia vazbu zachovat. Zahodit `appliance_refs[]`
+            # smie VYHRADNE `strip_appliance_refs!` v troch kopirovacich
+            # cestach — kopia „ocakava" spotrebic, ale nevlastni ten isty kus.
+            appliance_refs: norm_appliance_refs(raw(p, :appliance_refs)),
+            appliance_expects: norm_appliance_expects(raw(p, :appliance_expects)),
             # D-100: nazov prechadza cez JEDINU ocistovaciu cestu — stary
             # zapeceny default (aj bez diakritiky) sa tu zmeni na nil a skrinka
             # sa pri najblizsej prestavbe vrati na zivy nazov.
             name: sanitize_name(raw(p, :name))
           }
+          out.merge(dw)
+        end
+
+        # --- S1-E: polia slotu umyvacky -------------------------------------
+
+        # Uzavrety whitelist styroch poli slotu. Trieda je ENUM (600|450),
+        # zvysok su clampnute mm. Sirka sa na triedu NEVIAZE (BLOCKER E1).
+        def norm_dishwasher(p, d)
+          cls = raw(p, :dw_class).to_i
+          cls = d[:dw_class] unless DW_CLASSES.include?(cls)
+          out = { dw_class: cls }
+          DW_RANGES.each do |key, range|
+            out[key] = clampf(fetchf(p, key, d[key]), *range)
+          end
+          out
+        end
+
+        # S1-E (Astra FIX E9): JEDNO PEVNE CELO je SERVEROVY INVARIANT. Z
+        # prichadzajuceho F1 sa preberu LEN vizualne volby (profil, hrana
+        # profilu, materialovy override cela zije inde); typ, rezim, pocet
+        # kridiel aj VYSKA su dane — vysku urcuje `dw_front_height`.
+        # Typ je `blind`: emituje rolu `false_front` (blenda). Literal
+        # `false_front` by v `Fronts.normalize_items` prepadol na `door`
+        # a vyrobil by pánty (Codex #374 P1).
+        def slot_fronts!(fronts_cfg, dw)
+          src = Array(fronts_cfg['items']).find { |it| it.is_a?(Hash) } || {}
+          item = { 'id' => 'F1', 'type' => 'blind', 'mode' => 'fixed',
+                   'height' => dw[:dw_front_height], 'locked' => true, 'wings' => 1,
+                   'profile' => src['profile'] }
+          item['profile_edge'] = src['profile_edge'] if src.key?('profile_edge')
+          fronts_cfg.merge(
+            'items' => Fronts.normalize_items([item]),
+            # Zvisle medzery nemaju co delit (jeden riadok) a hore/dole by len
+            # posunuli celo proti `dw_front_bottom` — autorita je pole slotu.
+            'gap' => 0.0, 'gap_top' => 0.0, 'gap_bottom' => 0.0
+          )
+        end
+
+        # Ma tento config JEDNO PEVNE CELO tak, ako slot vyzaduje? Cista
+        # otazka pre zapisovu cestu panela (akcia Cela) — server zmenu poctu,
+        # typu, rezimu aj vysky ODMIETNE, nie ticho prepise.
+        def slot_fronts_ok?(fronts_cfg, dw_front_height)
+          items = fronts_cfg.is_a?(Hash) ? fronts_cfg['items'] : nil
+          return false unless items.is_a?(Array) && items.length == 1
+
+          it = items.first
+          return false unless it.is_a?(Hash)
+          return false unless it['type'].to_s == 'blind' && it['mode'].to_s == 'fixed'
+
+          (it['height'].to_f - dw_front_height.to_f).abs < 0.01
+        end
+
+        # --- S1-E: rezervovane vazby na spotrebic ---------------------------
+        #
+        # V S1-E ich NIKTO nezapisuje — su rezervovane, aby S1-B/F/C uz
+        # nemuseli bumpnut `CONFIG_SCHEMA`. Normalizacia je preto ZAMERNE
+        # tenka: drzi tvar (pole hashov / pole retazcov) a inak nic nevymysla.
+        # nil = kluc v configu NEBUDE (legacy skrinka ho nema a nikdy
+        # nedostane prazdne pole, ktore by vyzeralo ako „uz sme to riesili").
+        def norm_appliance_refs(raw_list)
+          return nil unless raw_list.is_a?(Array)
+
+          out = raw_list.select { |r| r.is_a?(Hash) && !r['item_id'].to_s.strip.empty? }
+          out.empty? ? nil : out
+        end
+
+        def norm_appliance_expects(raw_list)
+          return nil unless raw_list.is_a?(Array)
+
+          out = raw_list.map { |c| c.to_s.strip }.reject(&:empty?).uniq
+          out.empty? ? nil : out
+        end
+
+        # S1-E (Astra FIX E4): JEDINE miesto, kde vazba na KONKRETNY spotrebic
+        # zanika. Vola sa v TROCH kopirovacich vstupoch (`Mower.copy_cabinet`,
+        # natívny dedup, „Vložiť kópiu" v paneli): kopia sa spravna ako
+        # „OCAKAVA spotrebic tej kategorie", ale nevlastni ten isty kus —
+        # inak by dva korpusy tvrdili, ze v nich stoji ta ista rura.
+        # `appliance_expects[]` sa ZACHOVAVA. Mutuje params in-place (vzor
+        # `rekey_hardware_manual`) a vracia ich.
+        def strip_appliance_refs!(params)
+          return params unless params.is_a?(Hash)
+
+          params.delete('appliance_refs')
+          params.delete(:appliance_refs)
+          params
         end
 
         # Ocisti part_overrides na { part_key => { 'material_id'=>..|nil,
@@ -3250,6 +3590,14 @@ module Noxun
             'hardware_manual' => (cfg['hardware_manual'].is_a?(Array) ? cfg['hardware_manual'] : []),
             'name' => cfg['name']
           }
+          # S1-E: polia slotu a rezervovane vazby PREZIJU kazdy round-trip
+          # (prestavba, materialy, absorpcia scale). Bez kopie by ich KAZDY
+          # rebuild zo stored configu zahodil — rovnaka pasca ako pri
+          # `hardware_sets` (GH #126 P1). Zahodenie `appliance_refs[]` robi
+          # VYHRADNE `strip_appliance_refs!` v kopirovacich cestach (FIX E4).
+          DW_KEYS.each { |k| params[k.to_s] = cfg[k.to_s] if cfg.key?(k.to_s) }
+          params['appliance_refs'] = cfg['appliance_refs'] if cfg['appliance_refs'].is_a?(Array)
+          params['appliance_expects'] = cfg['appliance_expects'] if cfg['appliance_expects'].is_a?(Array)
           migrate_legacy_part_keys(params, cfg)
         end
 
@@ -3322,8 +3670,13 @@ module Noxun
           Placement.next_x(model, gap: GAP_BETWEEN_CABS)
         end
 
+        # S1-E: UZAVRETY slovnik typov. Neznamy typ (aj z NOVSIEHO pluginu) sa
+        # sklapa na `lower` — to je dnesne spravanie a zamerne sa nemeni:
+        # skrinku z novsej verzie zastavi dopredny guard `newer_config?` EST
+        # PRED normalizaciou, takze sa sem nedostane.
         def norm_type(p)
-          (raw(p, :type)).to_s == 'upper' ? 'upper' : 'lower'
+          v = raw(p, :type).to_s
+          TYPES.include?(v) ? v : 'lower'
         end
 
         def enum_val(p, key, allowed, default)

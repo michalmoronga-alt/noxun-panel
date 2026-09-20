@@ -110,6 +110,12 @@ module Noxun
       # = spravanie ako doteraz.
       def build_plan(cfg, cabinet_id = 'CAB-000', hardware_rules: nil, part_thicknesses: nil,
                      materials: nil, manual_flap_owners: {})
+        # S1-E: slot umyvacky nie je korpus — nema boky, dno, strop, chrbat ani
+        # zony, takze cela dnesna vetva (interior, ZoneTree, recepty zasuviek)
+        # sa ho netyka. Vlastna vetva je ciste oddelenie, nie `if` v kazdom kroku.
+        return appliance_slot_plan(cfg, cabinet_id, hardware_rules: hardware_rules, materials: materials) if
+          cfg[:type] == 'dishwasher'
+
         w = cfg[:width]; h = cfg[:height]; t = cfg[:thickness]
 
         interior = interior_dims(cfg)
@@ -132,8 +138,9 @@ module Noxun
         parts.concat(zres[:shelves])
         warnings.concat(zres[:warnings] || [])
 
-        # Cela pred korpusom (fixed + auto s lockmi).
-        fr = Fronts.layout(cfg[:fronts], w, h, cfg[:floor_height], t)
+        # Cela pred korpusom (fixed + auto s lockmi). S1-E: otvor uz nepocita
+        # `Fronts` sam — je to jedna autorita zdielana s preflightom panela.
+        fr = Fronts.layout(cfg[:fronts], w, h, cfg[:floor_height], t, opening: front_opening(cfg))
         parts.concat(fr[:parts])
         # D-90: nefatalne upozornenia matematiky ciel (nizky panel pod profilom).
         warnings.concat(fr[:warnings] || [])
@@ -231,6 +238,137 @@ module Noxun
           hardware_conflicts: hw[:conflicts].is_a?(Array) ? hw[:conflicts] : []
         }
         BuildPlan.validate!(plan)
+      end
+
+      # === S1-E: SLOT UMYVACKY ================================================
+      #
+      # ROZMERY TELA generickeho spotrebica (mm). Su to hodnoty z listov
+      # bezneho radu (60 cm: 598 x 555, 45 cm: 448 x 550) — telo sa NIKDY
+      # nedeformuje podla slotu: ked je sirsie nez slot, TRCI a Kontrola to
+      # hlasi ORANGE `dw_body_fit`. Po S1-B ich prepise telo z priradeneho
+      # modelu (`appliance_refs[]`), dovtedy su to jedine cisla, ktore mame.
+      DW_CLASSES = {
+        600 => { body_w: 598.0, body_d: 555.0, body_h: 820.0, label: '60' },
+        450 => { body_w: 448.0, body_d: 550.0, body_h: 815.0, label: '45' }
+      }.freeze
+      DW_CLASS_DEFAULT = 600
+
+      # Spodnych 200 mm tela je ZAKLADNA (nohy a sokel spotrebica): uzsia a
+      # plytsia nez telo, takze v modeli vidno, kade vedie soklova lista.
+      # Konstanty su FIXNE — nezavisia od triedy ani od modelu.
+      DW_BASE_H           = 200.0
+      DW_BASE_INSET_FRONT = 50.0
+      DW_BASE_INSET_SIDE  = 20.0
+
+      # `ref_key` tela spotrebica v `plan[:references]` (S1-F pridá chladnicku
+      # pod vlastnym klucom).
+      DW_BODY_REF_KEY = 'ref:appliance_body'
+
+      # Rozmery generickeho tela pre triedu. Neznama trieda = 600 (normalize
+      # ju aj tak klampuje na uzavrety slovnik).
+      def dw_class_dims(dw_class)
+        DW_CLASSES[dw_class.to_i] || DW_CLASSES[DW_CLASS_DEFAULT]
+      end
+
+      # Plan slotu: JEDEN vyrobny dielec (celo cez modul ciel) + JEDNA
+      # referencia (telo). Ziadne zony, ziadne recepty, ziadne police —
+      # a preto ani ziadny `interior_dims`/`ZoneTree` (slot vnutro nema).
+      def appliance_slot_plan(cfg, cabinet_id, hardware_rules: nil, materials: nil)
+        w = cfg[:width].to_f
+        h = cfg[:height].to_f
+        d = cfg[:depth].to_f
+        validate_slot!(cfg)
+        warnings = []
+
+        fr = Fronts.layout(cfg[:fronts], w, h, 0.0, cfg[:thickness], opening: front_opening(cfg))
+        parts = fr[:parts]
+        warnings.concat(fr[:warnings] || [])
+
+        parts, degenerate = parts.partition { |pd| pd[:box].all? { |v| v.to_f > BuildPlan::MIN_DIM } }
+        degenerate.each do |pd|
+          warnings << BuildPlan.warning('part_skipped_degenerate',
+                                        "Dielec #{pd[:name]} (#{pd[:suffix]}) ma nekladny rozmer — preskoceny.",
+                                        part_key: pd[:part_key].to_s,
+                                        data: { 'box' => pd[:box].map(&:to_f) })
+        end
+
+        annotate_weights!(parts, materials, warnings)
+        annotate_front_modes!(parts, fr[:items])
+
+        hw_ctx = cabinet_hw_ctx(cfg).merge(
+          'available_width' => w,
+          'available_height' => h,
+          'available_depth' => d,
+          'front_rows' => Array(fr[:items]).length
+        )
+        hw = HardwareRules.evaluate(cfg, parts, hw_ctx, rules: hardware_rules || HardwareRules.load)
+        warnings.concat(hw[:warnings])
+
+        plan = {
+          schema: BuildPlan::SCHEMA,
+          parts: parts,
+          references: [dw_body_reference(cfg)],
+          hardware: hw[:items],
+          warnings: warnings,
+          zones: [],
+          zone_tree: ZoneTree.sanitize(nil),
+          front_items: fr[:items],
+          available: { width: w, height: h, depth: d },
+          wings: fr[:wings],
+          # Slot vnutro NEMA; kluc ostava kvoli citatelom, ktori sa nan pytaju
+          # (panelove resolvery) — hodnoty popisuju CELY slot, nie svetlo.
+          interior: { z_lo: 0.0, z_hi: h, avail_h: h, back_front_y: d, back_thickness: 0.0 },
+          zone_bounds: {},
+          front_bounds: fr[:bounds] || {},
+          drawer_conflicts: [], drawer_writes: [], drawer_override_writes: [],
+          hardware_conflicts: hw[:conflicts].is_a?(Array) ? hw[:conflicts] : []
+        }
+        BuildPlan.validate!(plan)
+      end
+
+      # Deskriptor TELA spotrebica. Telo licuje CELNOU rovinou slotu (y = 0)
+      # a ide dozadu; stoji na podlahe (z = 0). Spodnych `DW_BASE_H` je
+      # zakladna — preto su to DVA boxy az v rendereri, v plane je JEDEN
+      # deskriptor a zakladnu z neho odvodi `CabinetBuilder.render_references`
+      # z tych istych konstant.
+      def dw_body_reference(cfg)
+        dims = dw_class_dims(cfg[:dw_class])
+        bh = cfg[:dw_body_height].to_f
+        { ref_key: DW_BODY_REF_KEY, role: 'appliance_body', kind: BuildPlan::REFERENCE_KIND,
+          box: [dims[:body_w], dims[:body_d], bh],
+          origin: [((cfg[:width].to_f - dims[:body_w]) / 2.0), 0.0, 0.0],
+          production_class: BuildPlan::REFERENCE_CLASS, manufactured: false,
+          source: 'generic', dw_class: cfg[:dw_class].to_i,
+          label: "Umývačka #{dims[:label]} — telo (generické)" }
+      end
+
+      # Slot ma VLASTNU (uzku) validaciu: nema vnutro, sokel ani vystuhy,
+      # takze `validate!` vyssie sa ho netyka. Sirka sa NEKONTROLUJE proti
+      # triede — uzky slot je ORANGE `dw_body_fit` v Kontrole, nikdy blokada
+      # prestavby (Astra S1-E, BLOCKER E1).
+      def validate_slot!(cfg)
+        raise 'Šírka slotu musí byť kladná.' unless cfg[:width].to_f.positive?
+        raise 'Hĺbka slotu musí byť kladná.' unless cfg[:depth].to_f.positive?
+        raise 'Výška linky musí byť kladná.' unless cfg[:height].to_f.positive?
+        raise 'Výška tela umývačky musí byť kladná.' unless cfg[:dw_body_height].to_f > DW_BASE_H
+      end
+
+      # === S1-E: VIRTUALNY CELNY OTVOR ========================================
+      #
+      # JEDINA autorita otazky „kde zacinaju a kam siahaju cela". Dolna a horna
+      # skrinka dostanu presne dnesne cisla (x od 0, z od sokla po vrch), slot
+      # umyvacky svoje vlastne (z od `dw_front_bottom`, vyska = `dw_front_height`).
+      # Cita ju `build_plan` AJ panelovy preflight (`Panel.front_preflight_result`)
+      # — bez toho by panel pri slote overoval cela proti VYSKE LINKY a
+      # presahujuce celo by ohlasil ako chybu, ktorá chybou nie je.
+      def front_opening(cfg)
+        if cfg[:type] == 'dishwasher'
+          return { x0: 0.0, w: cfg[:width].to_f, z0: cfg[:dw_front_bottom].to_f,
+                   h: cfg[:dw_front_height].to_f }
+        end
+
+        { x0: 0.0, w: cfg[:width].to_f, z0: cfg[:floor_height].to_f,
+          h: cfg[:height].to_f - cfg[:floor_height].to_f }
       end
 
       # --- KOV-F1/E1b: anotacia klasifikacie ciel -----------------------------
@@ -880,8 +1018,13 @@ module Noxun
       # Typ podopretia korpusu (JEDEN zdroj pravdy — builder support_descriptor aj
       # pravidla kovania citaju tuto funkciu): horna/na zemi = none, predny sokel =
       # plinth (nohy pod nim aj tak su — pravidlo noh berie legs AJ plinth), inak legs.
+      # S1-E (Codex #376 kolo 1 P1): SLOT UMYVACKY ma podporu `none` VZDY.
+      # Jeho „sokel" (`dw_front_bottom`) je spodna hrana CELA, nie vyska
+      # korpusu nad podlahou — do `floor_height` nikdy netecie a pravidla
+      # kovania tak na slot nevydaju ani nohu, ani prichyt sokla.
       def support_type(cfg)
-        return 'none' if cfg[:type] == 'upper' || cfg[:floor_height].to_f <= 0
+        return 'none' if cfg[:type] == 'upper' || cfg[:type] == 'dishwasher' ||
+                         cfg[:floor_height].to_f <= 0
         cfg[:plinth_mode] == 'front' ? 'plinth' : 'legs'
       end
 
@@ -980,6 +1123,10 @@ module Noxun
       # jedno tiahnutie uchopu precitalo kniznicu pravidiel desatkrat.
       # Vracia CELE milimetre (absorpcia aj panel pracuju s celymi mm).
       def min_valid_height(cfg, hardware_rules: nil)
+        # S1-E: slot vnutro nema, takze ziadna vyska linky prestavbu neodmietne
+        # — spodnu hranicu drzi VYHRADNE typove MIN absorpcie (500 mm).
+        return 0.0 if cfg[:type] == 'dishwasher'
+
         rules = hardware_rules || HardwareRules.load
         # NUTNA (nie postacujuca) podmienka: strop vnutra nikdy nelezi vyssie
         # nez vrch korpusu, takze `avail_h <= h - sokel - hrubka dna`. Je to
