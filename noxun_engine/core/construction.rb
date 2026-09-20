@@ -27,6 +27,17 @@ module Noxun
       # zaroven ZoneTree::MIN_FIELD — najmensie zmysluplne svetle pole).
       MIN_INTERIOR_H = 20.0
 
+      # Svetla vyska, pri ktorej `validate!` este korpus ODMIETNE (musi byt
+      # ostro VACSIA). JEDEN zdroj pravdy pre validaciu, pre `min_valid_height`
+      # aj pre zrkadlo v paneli (`form.js` MIN_AVAIL_H) — zhodu strazi test.
+      MIN_AVAIL_H = 10.0
+
+      # S1-E0 (Codex #375 P2): strop hladania v `min_valid_height`. Vystuhy vedia
+      # ukrojit z vysky najviac `rails_top_offset` (max 500) + hlbku upright
+      # vystuhy (max 400) + hrubku dosky (max 50); rezerva je zaokruhlena nahor.
+      # Nie je to ocakavanie, ale poistka proti nekonecnemu hladaniu.
+      RAIL_HEIGHT_RESERVE = 1200.0
+
       module_function
 
       # Vystup MUSI prejst BuildPlan.validate! — chybny plan nikdy neopusti planovac.
@@ -951,6 +962,54 @@ module Noxun
           z_top: h - off, z_bottom: h - off - occupy }
       end
 
+      # S1-E0 (Codex #375 P2): NAJNIZSIA vyska korpusu, pri ktorej `validate!`
+      # TENTO config prijme. Potrebuje ju absorpcia scale: klamp na hole
+      # `ScaleWatch::MIN['height']` (80) by pri sokli 100 vyrobil config, ktory
+      # `validate!` odmietne — a pouzivatel by po tiahnuti uchopu dostal reject
+      # a POVODNY rozmer namiesto najnizsej PLATNEJ skrinky.
+      #
+      # Vzorec sa NEKOPIRUJE: kandidat sa meria cez `interior_dims`, teda cez
+      # ten isty zdroj, z ktoreho cita `validate!`. `avail_h` je v `h`
+      # neklesajuca (odsadenie aj hlbka vystuh rastu s vyskou najviac 1:1),
+      # takze staci polenie intervalu. Vracia CELE milimetre — absorpcia
+      # aj panel pracuju s celymi mm.
+      def min_valid_height(cfg)
+        need = min_avail_for(cfg)
+        # Dolna hranica plati pre KAZDY vrch: strop vnutra nikdy nelezi vyssie
+        # nez vrch korpusu, takze `avail_h <= h - sokel - hrubka dna`. Pri vrchu
+        # `none` je to rovno vysledok, pri ostatnych startovaci bod hladania.
+        lo = (cfg[:floor_height].to_f + cfg[:thickness].to_f + need).ceil.to_f
+        return lo if avail_at(cfg, lo) >= need
+
+        hi = lo + RAIL_HEIGHT_RESERVE
+        # Poistka: ked ani strop nestaci, vrati sa strop — rebuild potom padne
+        # zrozumitelnou hlaskou `validate!`, nikdy nie tichym nezmyslom.
+        return hi if avail_at(cfg, hi) < need
+
+        while hi - lo > 1.0
+          mid = ((lo + hi) / 2.0).ceil.to_f
+          mid = hi if mid >= hi # poistka proti zaseknutiu na hranici
+          if avail_at(cfg, mid) >= need
+            hi = mid
+          else
+            lo = mid
+          end
+        end
+        hi
+      end
+
+      # Kolko svetla musi vnutro mat, aby `validate!` neodmietol. Bezny vrch:
+      # ostro nad `MIN_AVAIL_H`, teda staci +1 mm (pracujeme v celych mm).
+      # Dve vystuhy: plna rezerva `MIN_INTERIOR_H` (s toleranciou validacie).
+      def min_avail_for(cfg)
+        cfg[:top_mode] == 'two_rails' ? (MIN_INTERIOR_H - 0.01) : (MIN_AVAIL_H + 1.0)
+      end
+
+      # Svetla vyska configu pri INEJ vyske korpusu (cista sonda pre hladanie).
+      def avail_at(cfg, height)
+        interior_dims(cfg.merge(height: height))[:avail_h]
+      end
+
       # Vnutorne rozmery (svetle) + poloha celnej hrany chrbta. Hrubka chrbta z configu.
       def interior_dims(cfg)
         h = cfg[:height]; d = cfg[:depth]
@@ -1139,7 +1198,8 @@ module Noxun
         raise 'Sirka je prilis mala vzhladom na hrubku materialu.' if w <= 2 * t + 10
         raise 'Hlbka je prilis mala.' if interior[:back_front_y] <= 10
         raise 'Podstavec/sokel nesmie byt vyssi nez korpus.' if s >= h
-        raise 'Vnutorna vyska je nulova alebo zaporna (skontroluj vysku, podstavec a hrubky).' if interior[:avail_h] <= 10
+        raise 'Vnutorna vyska je nulova alebo zaporna (skontroluj vysku, podstavec a hrubky).' if
+          interior[:avail_h] <= MIN_AVAIL_H
         # D-80 (Codex P2 na PR #134): pri vrchu "dve vystuhy" musi pod nimi ostat
         # aspon MIN_INTERIOR_H svetla — inak vznikne zona mensia nez ZoneTree::MIN_FIELD
         # (a pri upright dokonca vystuha tenka pod svoje vlastne minimum). Kombinacia

@@ -3577,6 +3577,33 @@ module NoxunSuRunner
        ((e::Store.config(up) || {})['available_height'].to_f - 44.0).abs < 0.01 &&
        ((e::Store.config(up) || {})['floor_height'].to_f).abs < 0.01)
 
+    # (e) Codex #375 P2: SCALE DOLNEJ SKRINKY SO SOKLOM pod hranicu. 720 x 0,1
+    #     = 72 mm — pod absolutnym minimom (80) AJ pod geometrickym (147 pri
+    #     sokli 100 a hrubke 18). Klamp na hole MIN by vyrobil config, ktory
+    #     `Construction.validate!` odmietne: rebuild by padol, `reject_scale`
+    #     by vratil POVODNU skrinku a pouzivatel by nedostal nic. Spravne je
+    #     absorbovat na najnizsiu PLATNU vysku.
+    sokel = e::CabinetBuilder.build(model, 'type' => 'lower', 'width' => 600.0,
+                                           'height' => 720.0, 'depth' => 560.0,
+                                           'thickness' => 18.0, 'floor_height' => 100.0)
+    if sokel
+      model.start_operation('SU-TEST S1E0 scale so soklom', true)
+      sokel.transformation = sokel.transformation * Geom::Transformation.scaling(ORIGIN, 1.0, 1.0, 0.1)
+      model.commit_operation
+      e::ScaleWatch.absorb(sokel)
+      cfg_s = e::Store.config(sokel) || {}
+      ok("S1-E0 (e): scale pod hranicu dal najnizsiu PLATNU vysku 147, nie 80 (config #{cfg_s['height']})",
+         (cfg_s['height'].to_f - 147.0).abs < 0.01)
+      ok('S1-E0 (e): skrinka naozaj STOJI — rebuild presiel a vnutro ma 11 mm',
+         sokel.valid? && s1e0_parts(sokel).length.positive? &&
+         s1e0_degenerate(s1e0_parts(sokel)).empty? &&
+         (cfg_s['available_height'].to_f - 11.0).abs < 0.01)
+      ok('S1-E0 (e): transform po absorpcii je cisty (nebol to reject)',
+         e::ScaleWatch.scale_factors(sokel.transformation).nil?)
+    else
+      ok('S1-E0 (e): vlozenie skrinky so soklom', false)
+    end
+
     cleanup(model)
     ok('S1-E0: cleanup (0 korpusov)', cabinets(model).empty?)
   rescue StandardError => ex
