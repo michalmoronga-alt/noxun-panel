@@ -61,7 +61,7 @@
 
   // ZRKADLO `StudioDialog::SECTIONS` — autoritou whitelistu je RUBY, tento
   // zoznam len zabrani, aby z okna vyletela hodnota, ktora sekciu nepomenuva.
-  var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat', 'hw', 'rules', 'tpl',
+  var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat', 'hw', 'appl', 'rules', 'tpl',
                          'sup', 'bset', 'about'];
 
   // ŠT-1b (Š10): 3-stavove nastavenie kontroly hran je ZDIELANY komponent —
@@ -117,6 +117,10 @@
       // setov projektu) — otvára ho premostenie Z VNÚTRA sekcie, nie
       // navigácia. Ikona = hammer (kontrakt „Ikony navigácie").
       { id: 'hw',     ic: 'hammer',   t: 'Kovanie' },
+      // S1-A2: Spotrebiče sú SEKCIA (13. položka, katalóg modelov tohto PC).
+      // Badge tu ZÁMERNE nie je — počty „chýba/nesedí" prídu z Kontroly až
+      // v S1-B a prázdny badge by tvrdil, že sa niečo počíta.
+      { id: 'appl',   ic: 'appliance', t: 'Spotrebiče' },
       // ŠT-3b-1: Pravidlá sú SEKCIA (Š17). Okno „Pravidlá kovania" zaniklo;
       // skupina „ABS podľa roly" pribudne v ŠT-3b-2.
       { id: 'rules',  ic: 'settings', t: 'Pravidlá' },
@@ -153,6 +157,10 @@
              hint: 'ABS podľa roly dielca (spoločné, len na čítanie) · kovanie podľa rozmerov — platí pre tento projekt' },
     hw: { t: 'Kovanie',
           hint: 'katalóg položiek a sety sú spoločné pre všetky zákazky · predvoľby setov projektu zatiaľ v okne' },
+    // S1-A2 (Š20): katalóg spotrebičov je vec POČÍTAČA (%APPDATA%), nie
+    // zákazky — hint to hovorí hneď, rovnako ako pri materiáloch a kovaní.
+    appl: { t: 'Spotrebiče',
+            hint: 'katalóg modelov je tohto počítača · rozmery z listov výrobcov · bez cien (tie patria Rozpočtu)' },
     // ŠT-3c-1 (Š18): knižnica je spoločná pre všetky zákazky; NOVÚ šablónu
     // ukladáš v Inspectore (má po ruke označenú skrinku), tu ich spravuješ.
     tpl: { t: 'Šablóny',
@@ -987,6 +995,12 @@
             typeof hwOnLeaveSection === 'function'){
           hwOnLeaveSection();
         }
+        // S1-A2: to isté pre sekciu Spotrebiče (modal D-15 žije mimo tela
+        // sekcie a server si pamätá filter stromu).
+        if (studioSec === 'appl' && ST.open_section !== 'appl' &&
+            typeof apOnLeaveSection === 'function'){
+          apOnLeaveSection();
+        }
         // D-52b: DEEP-LINK je jeden z DVOCH vstupov do sekcie „O plugine"
         // (druhý je navigácia v `studioGoSection`) — a oba musia spustiť
         // PRESNE JEDEN explicitný check verzie. Zo `settings_payload` check
@@ -1154,6 +1168,14 @@
     // (načítava sa AŽ ZA týmto súborom, preto cez `typeof`).
     if (studioSec === 'hw'){
       if (typeof hwRenderTools === 'function') hwRenderTools(staleFlag);
+      else box.innerHTML = '';
+      return;
+    }
+    // S1-A2: to isté pre sekciu Spotrebiče — lištu kreslí `js/appliances.js`.
+    // `staleFlag` sa jej NEPODÁVA: katalóg je per PC a s modelom nemá nič
+    // spoločné, takže „Obnoviť" (prepočet zákazky) sem nepatrí.
+    if (studioSec === 'appl'){
+      if (typeof apRenderTools === 'function') apRenderTools();
       else box.innerHTML = '';
       return;
     }
@@ -1352,6 +1374,14 @@
     if (studioSec === 'hw'){
       if (typeof hwRenderBody === 'function') hwRenderBody();
       else box.innerHTML = '<div class="muted">Kovanie sa nenačítalo (js/hw_catalog.js).</div>';
+      return;
+    }
+    // S1-A2: telo sekcie Spotrebiče si kreslí `js/appliances.js` SAM — dôvod
+    // je ten istý ako pri Šablónach: sekcia si po vykreslení PÝTA miniatúry
+    // príloh a odpovede nasadzuje do už vykreslenej karty.
+    if (studioSec === 'appl'){
+      if (typeof apRenderBody === 'function') apRenderBody();
+      else box.innerHTML = '<div class="muted">Spotrebiče sa nenačítali (js/appliances.js).</div>';
       return;
     }
     // ŠT-3b-1: telo sekcie Pravidlá si kreslí `js/rules.js` SAM — v sekcii
@@ -1821,6 +1851,11 @@
     // ŠT-3a-1: sekcia Kovanie má z rovnakých dôvodov vlastný odchodový hook.
     if (studioSec === 'hw' && id !== 'hw' && typeof hwOnLeaveSection === 'function'){
       hwOnLeaveSection();
+    }
+    // S1-A2: sekcia Spotrebiče má modal (D-15) MIMO tela sekcie a na serveri
+    // si pamätá filter stromu — odchod oboje zruší (`appl_leave`).
+    if (studioSec === 'appl' && id !== 'appl' && typeof apOnLeaveSection === 'function'){
+      apOnLeaveSection();
     }
     // D-52b: NAVIGÁCIA je druhý vstup do sekcie „O plugine" — vstupný hook je
     // protipólom odchodových hookov vyššie a spúšťa PRESNE JEDEN check verzie
