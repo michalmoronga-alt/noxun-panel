@@ -17,6 +17,25 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **test-infra · SAMOZATVORENIE IN-SU TEST INŠTANCIE `-CloseWhenDone` (bez bumpu verzie — plugin sa nemení, 20.9.2026, PR #379).** Nález autonómnych dávok:
+  `scripts/run_su_tests.ps1` necháva testovaciu inštanciu SketchUpu otvorenú (pravidlo repa — zavrie ju používateľ); pri 5–10 behoch za deň sa nahromadí 10+ idle inštancií
+  po ~1,5 GB (20.9.: 12 inštancií, 5 GB voľných z 32) a nový beh uviazne na Welcome obrazovke bez `su_result.txt`. **Riešenie = voliteľný prepínač, predvolene VYPNUTÝ**
+  (dnešné správanie sa nemení). Zatváranie beží **vnútri SketchUpu** (modul `NoxunSuClose` v generovanom `boot.rb`, timer 2 s), nie zo skriptu — skript by musel proces zabiť
+  a to je zakázané. **Brána = koncový marker** `=== KONIEC SUBORU ===` v `su_result.txt`: bez neho sa inštancia nikdy nezatvorí (visiaci beh ostáva na diagnostiku). Po markeri
+  (+3 s na debounce observerov) sa inštancia zbaví príznaku zmien **uložením run-kópie modelu** (žije len v `run_*`, pôvodný `_dev` model sa nedotkne, uložený stav ostáva
+  na diagnostiku; záloha pri zlyhaní = `Model#close(true)`, na Windows podľa API dokumentácie File/New bez otázky) a v ďalšom ticku volá `Sketchup.quit` (pýta sa len pri
+  neuložených zmenách; `send_action` je deprecated, nepoužíva sa). Poistka pre „špinavý" dokument: uloženie malého stubu do run priečinka. Runner po markeri počká na zánik
+  procesu (max 120 s), vypíše `close.log` a exit kód (aj hex); ak inštancia neskončí, LEN to nahlási. Sentinel `last_run.txt` aj `deploy.lock` bez zmeny (zámok sa drží aj
+  počas čakania). Navyše `load` runnera v `begin/rescue ScriptError, StandardError` — SyntaxError/LoadError nie sú StandardError, rescue v `su_runner.rb` by ich nechytil
+  a beh by skončil 8-min timeoutom bez markera; teraz dá FAIL riadok + marker (platí aj bez prepínača, okno sa bez neho nezatvára). Šablóna `boot.rb` je od tejto dávky
+  v single-quoted here-stringoch s placeholdermi (PowerShell v nich neinterpoluje — Ruby `` ani `$` nič nerozbije). **Overené:** sonda 1 (mutácia → `close(true)` → nový
+  dokument `modified? false` → `quit` → exit 0), sonda 2 nad reálnou šablónou s úmyselne zašpineným dokumentom (stub, exit 0), sonda 4 (save cesta, exit 0) a **štyri plné behy
+  `run_su_tests.ps1 -CloseWhenDone`: vždy 2813 PASS / 0 FAIL, proces zanikol do 8 s po markeri, vlastná inštancia nikdy neostala.** **Známy stav (neizolovaná príčina):**
+  po CELEJ sade končí teardown SketchUpu 2026 pri quit kódom 0xC0000374 (heap corruption v ntdll) — až PO zapísaní výsledku a uložení kópie; proces zmizne, neostane helper,
+  dialog ani recovery súbor, WER to len ticho zaloguje, ďalšie behy štartujú normálne. Vylúčené sondami a behmi: File/New vs. save (beh 1 vs. 2), otvorený Inspector/Štúdio,
+  overlay add+remove (5×), nástroje, upratanie pluginu pred quit (beh 3: okná + `EdgeCheck/DirectionCheck.disable!` + `select_tool(nil)` + GC — bez zmeny, preto v šablóne
+  nie je). Verdikt testov to nemení (je hotový pred zatváraním). Poznámka v `CLAUDE.md` (Testovanie): pri autonómnych behoch prepínač používať.
+
 - **S1-A1 — KATALÓG SPOTREBIČOV, JADRO (v0.12.10, 20.9.2026, PR #377).** Vznikol **tretí per-PC katalóg** vedľa materiálov a kovania:
   `%APPDATA%\NOXUN\Engine\appliances.json` (JsonFileStore, `.bak`, vlastný sidecar zámok) s deviatimi overenými modelmi v seede. **Prečo takto:**
   konkrétny spotrebič sa nikdy nedeformuje podľa niky, takže katalóg musí niesť presne to, čo kótuje list výrobcu — a nič viac. Preto je **každé pole
