@@ -3775,8 +3775,12 @@ module NoxunSuRunner
         end
         ok("S1-A1 (b): open_attachment podal UI.openURL presne #{url} (stub, prehliadac sa neotvara)",
            st_o == :ok && seen == [url])
-        ok('S1-A1 (b): URL je file:/// s doprednymi lomkami a bez holej medzery',
-           url.start_with?('file:///') && !url.include?('\\') && !url.include?(' '))
+        # UNC temp (`\\server\share`) dava zamerne `file://server/share/...`
+        # (headless sada to strazi), lokalny disk `file:///C:/...` — ocakavany
+        # prefix sa preto odvodzuje z cesty, nie natvrdo (Codex #380 P2).
+        expected_prefix = opened[2].to_s.tr('\\', '/').start_with?('//') ? 'file://' : 'file:///'
+        ok("S1-A1 (b): URL zacina #{expected_prefix}, ma dopredne lomky a ziadnu holu medzeru",
+           url.start_with?(expected_prefix) && !url.include?('\\') && !url.include?(' '))
         info("S1-A1 (b): open_attachment zlyhal pre #{info_o[:path]} — #{info_o[:message]}") unless st_o == :ok
       else
         ok('S1-A1 (b): open_attachment — priloha sa nevytvorila, nie je co otvarat', false)
