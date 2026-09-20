@@ -4,7 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
-- **D-135** — Minimálna výška korpusu je 80 mm (korpus na dorovnanie nad umývačkou): Inspector, vkladanie aj ťahanie scale úchopom pustia 80–199 mm, šírka (200) a hĺbka (150) sa nemenia; nízka skrinka so soklom sa navyše zastaví červeným poľom už v paneli — 20.9.2026, PR #375, v0.12.9
+- **D-135** — Minimálna výška korpusu je 80 mm (korpus na dorovnanie nad umývačkou): Inspector, vkladanie aj ťahanie scale úchopom pustia 80–199 mm, šírka (200) a hĺbka (150) sa nemenia; nízka skrinka so soklom sa navyše zastaví červeným poľom už v paneli a schéma configu ide na 15 (starší plugin by výšku ticho klampol na 200) — 20.9.2026, PR #375, v0.12.9
 - **D-130** — Menší UI/UX rework kontextu Čelá: nový zoznam čiel + karta s tabmi (časť a) a skupina „Spoločné pre skrinku" s materiálom čiel a schémou medzier, kde číslo sedí na hrane, ktorej sa týka (časť b) — 19.9.2026, PR #371 + #372, v0.12.7–v0.12.8
 - **D-129** — Úchytka čela sa nastavuje na jednom mieste (karta čela); hromadne cez akciu „všetkým" v hlavičke skupiny Čelá — skupina „Úchytky" zanikla — 19.9.2026, PR #371, v0.12.7
 - **D-134** — Hromadné zápisy zákazky (pravidlá kovania, projektová predvoľba materiálu, „aj na podobné v projekte") pracujú s rovnakým rozsahom ako výstupy (top-level skrinky) a skrinku s odpojeným dielcom preskočia a vymenujú, kým projektový zápis prebehne — 13.9.2026, PR #369, v0.12.6
@@ -147,9 +147,13 @@ vnútro. Doteraz to bolo vidieť až ako výnimka po apply; po novom **zočerven
 zastaví. Tú istú vetvu má aj vrch „dve výstuhy" (pod nimi musí ostať rezerva 20 mm). Panel to počíta tou istou zdieľanou funkciou (`nxInteriorZ`) ako údaj
 „Úložná výška" — žiadna druhá kópia vzorca, žiadny nový DOM ani CSS.
 
-**Čo sa NEMENILO a prečo.** `CONFIG_SCHEMA` ostáva 14: mení sa prípustný rozsah hodnoty, nie tvar configu, takže žiadna migrácia ani nová brána. **Vedomý
-dôsledok:** .skp uložený s výškou pod 200 si starší plugin pri prestavbe klampne späť na 200 — je to strata rozmeru, nie dát, a bump schémy by naopak zbytočne
-odmietol celú zákazku. Police sa do nízkej skrinky nevnucujú (predvoľba je 0); keby ich niekto pýtal, zóna ich odmietne zrozumiteľnou hláškou presne ako doteraz
+**Schéma configu ide na 15 (Codex #374 P1).** Config nedostal ani jedno nové pole — zmenil sa len prípustný rozsah hodnoty `height`. Bump je napriek tomu povinný,
+lebo strata by bola **výrobná a tichá**: starší plugin (schéma 14) má vlastné minimum 200 mm, takže by skrinku 80–199 mm pri prvej prestavbe klampol späť na 200 a zmenil
+výšku bokov, chrbta aj čiel — a nikto by si to nevšimol, kým by dielce neprišli z píly. Disciplína bumpu (STANDARD §2.5) hovorí o tichej zmene výroby, nie o novom poli.
+Chráni to existujúci dopredný guard `newer_config?` (prestavba, šablóny, kópia) plus exportná brána; migrácia netreba. Prakticky to znamená: **pred prvou zákazkou
+s nízkym korpusom aktualizovať plugin na oboch PC** (rovnako ako pri D-52 updateri) — starší plugin takú zákazku odmietne prestavať namiesto toho, aby ju ticho pokazil.
+
+**Čo sa nemenilo.** Police sa do nízkej skrinky nevnucujú (predvoľba je 0); keby ich niekto pýtal, zóna ich odmietne zrozumiteľnou hláškou presne ako doteraz
 (54 mm vnútra na jednu policu nestačí, treba 58) — správanie sa nemení, len je odteraz charakterizované testom.
 
 ### D-130 — Menší UI/UX rework kontextu Čelá, vyriešené 19.9.2026

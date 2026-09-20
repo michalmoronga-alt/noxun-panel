@@ -349,9 +349,13 @@ NxTest.test('D-128 (R1): neplatny TVAR sa zahodi S LOGOM, `disabled` prezije') d
   end
 end
 
-NxTest.test('D-128 (R2): schema 14, aktivacie sa nehybu, dopredny guard drzi') do
+NxTest.test('D-128 (R2): schema >= 14, aktivacie sa nehybu, dopredny guard drzi') do
   c = NxD128
-  NxTest.assert_equal(14, c.cb::CONFIG_SCHEMA, 'D-128 zaviedla schemu 14')
+  # D-128 zaviedla schemu 14; S1-E0 ju posunula na 15. Test strazi, ze cislo
+  # uz pod 14 NEKLESNE (to by znamenalo, ze sa bump D-128 stratil) — presnu
+  # hodnotu aktualnej schemy drzi sada davky, ktora ju naposledy bumpla.
+  NxTest.assert(c.cb::CONFIG_SCHEMA >= 14,
+                "schema configu #{c.cb::CONFIG_SCHEMA} < 14 — bump D-128 sa stratil")
   NxTest.assert_equal(5, c.cb::DRAWER_ACTIVATION_SCHEMA)
   NxTest.assert_equal(9, c.cb::HINGE_ACTIVATION_SCHEMA)
   NxTest.assert_equal(11, c.cb::LIFT_ACTIVATION_SCHEMA)
@@ -363,7 +367,7 @@ NxTest.test('D-128 (R2): schema 14, aktivacie sa nehybu, dopredny guard drzi') d
   NxTest.refute(c.cb.newer_config?('config_schema' => cur))
   NxTest.refute(c.cb.newer_config?('config_schema' => 13))
   NxTest.assert(c.cb.newer_config?('config_schema' => cur + 1),
-                'config schemy 15 by tento plugin prestavat NESMEL')
+                "config schemy #{cur + 1} by tento plugin prestavat NESMEL")
   inst = NxTest::FakeEntity.new
   inst.set_attribute(c.e::Store::DICT, 'config', JSON.generate('config_schema' => cur + 1))
   NxTest.assert_raise(/novšej verzie/) { c.cb.guard_newer_config!(inst) }

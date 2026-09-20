@@ -237,7 +237,11 @@ teda iný mechanizmus, iné ramená a iná tyč v objednávke; nové dôvody by 
 · **`14` = D-128** (RUČNÁ VÝŠKA DREVENÉHO BOXU): záznam `hardware_overrides` s `rule_id recipe:<id>` smie niesť pole **`box_height`** (mm Float), tretiu os zámku popri
 `nominal_length` a `height_variant`. Starší plugin (schéma 13) ho pri normalizácii **zahodí** whitelistom `norm_hardware_overrides`, takže zásuvka by sa ticho vrátila na
 **automatickú výšku boxu** — teda by narezal iné dielce boxu (2 boky, vnútorné čelo, chrbát), než odsúhlasila objednávka. Brány sú tie isté ako pri 5–13.
-**`DRAWER_ACTIVATION_SCHEMA` ostáva 5** — je to VLASTNÁ konštanta práve preto, aby bump na 6 až 14 nespravil z každej skrinky schémy 5 „nemigrovanú" (`drawer_stale`).
+· **`15` = S1-E0** (NÍZKY KORPUS NA DOROVNANIE, výška od 80 mm): **jediný bump v celej histórii, pri ktorom nepribudlo pole** — zmenil sa prípustný rozsah hodnoty
+`height` z 200 na 80 mm. Povinný je napriek tomu, lebo strata je výrobná a tichá: starší plugin (schéma 14) má `MIN[:height]` = 200, takže by skrinku 80–199 mm pri
+prvej prestavbe **klampol na 200** a zmenil výšku bokov, chrbta aj čiel — nikto by si to nevšimol, kým by dielce neprišli z píly (Codex #374 P1). Disciplína bumpu
+(STANDARD §2.5) hovorí o TICHEJ ZMENE VÝROBY, nie o novom poli. Brány sú tie isté ako pri 5–14.
+**`DRAWER_ACTIVATION_SCHEMA` ostáva 5** — je to VLASTNÁ konštanta práve preto, aby bump na 6 až 15 nespravil z každej skrinky schémy 5 „nemigrovanú" (`drawer_stale`).
 **`HINGE_ACTIVATION_SCHEMA` = 9** je jej dvojička pre závesy (Codex #329 kolo 2 P1): skrinka uložená pod nižšou schémou nesie staré počty závesov, takže ju
 zber priznáva RED `hinge_stale` a brána zastaví nákup, rozpočet aj ponuku (VEPO nie) — detail v [outputs.md](outputs.md). **Sama o sebe schéma 9 RED
 nezhasína** (Codex #329 kolo 3 P1): kým sú pravidlá projektu spred F1, prestavba vyráta staré počty znova, takže nález drží aj druhá príčina
@@ -365,8 +369,9 @@ najbližšej prestavbe — proxy vzniká pri každom rebuilde nanovo, takže ži
 
 **ROZMEROVÉ HRANICE (`MIN`, S1-E0, v0.12.9).** `normalize` klampuje obálku korpusu na `MIN` = šírka **200**, výška **80**, hĺbka **150** (horné hranice 3000/3000/2000).
 Výška ide od 80 mm od S1-E0 (Michal 20.9.2026): nad umývačkou ostáva po líniu linky často len 80–110 mm a vypĺňa sa **nízkym korpusom na dorovnanie**. Šírka ani hĺbka sa
-neodomkli — užší či plytší korpus nemá konštrukčný zmysel. `CONFIG_SCHEMA` sa **nebumpuje**: mení sa prípustný rozsah hodnoty, nie tvar configu. Vedomý dôsledok: model
-uložený s výškou pod 200 si ju **starší plugin pri prestavbe klampne späť na 200** — je to strata rozmeru, nie dát, a bump schémy by zbytočne odmietol celú zákazku.
+neodomkli — užší či plytší korpus nemá konštrukčný zmysel. **`CONFIG_SCHEMA` sa bumpuje na 15**, hoci nepribudlo pole: starší plugin (schéma 14) by skrinku 80–199 mm
+pri prestavbe ticho klampol späť na 200, teda zmenil výrobnú geometriu — a presne pred tým chráni dopredný guard `newer_config?` (prestavba, šablóny, kópia) a exportná
+brána. Detail je v histórii čísel vyššie; žiadna migrácia netreba, config nemá nové pole.
 **Tú istú hodnotu držia TRI miesta:** `MIN` tu, `ScaleWatch::MIN` (absorpcia scale) a `LIMITS` v `ui/js/form.js` (červené pole panela). Priama referencia možná nie je
 (`scale_observer` sa načítava PRED `cabinet_builder`, JS Ruby konštantu nevidí), takže zhodu — rovnako ako pri `DRAWER_ROLES` — stráži guard `tests/pure/test_s1e0_min_vyska.rb`.
 Geometriu nízkeho korpusu ďalej chráni **`Construction.validate!` ako posledná brána** (sokel ≥ výška, svetlé vnútro ≤ 10 mm, rezerva `MIN_INTERIOR_H` pod dvoma výstuhami);

@@ -177,7 +177,19 @@ module Noxun
       #       a exportna brana (`ProductionCore.export_blockers`).
       #       `DRAWER_ACTIVATION_SCHEMA` ostava 5, `HINGE_ACTIVATION_SCHEMA` 9
       #       a `LIFT_ACTIVATION_SCHEMA` 11.
-      CONFIG_SCHEMA = 14
+      #  15 = S1-E0 — NIZKY KORPUS NA DOROVNANIE (vyska od 80 mm). Tu NEPRIBUDLO
+      #       ziadne pole: zmenil sa PRIPUSTNY ROZSAH hodnoty `height` z 200 na
+      #       80 mm. Bump je napriek tomu povinny, lebo strata je VYROBNA a
+      #       TICHA: starsi plugin (schema 14) ma `MIN[:height]` = 200, takze by
+      #       skrinku 80-199 mm pri prvej prestavbe KLAMPOL na 200 — zmenil by
+      #       vysku bokov, chrbta aj ciel a nikto by to nezbadal, kym by dielce
+      #       neprisli z pily (Codex #374 P1). Disciplina bumpu (STANDARD 2.5)
+      #       hovori o TICHEJ ZMENE VYROBY, nie o novom poli. Brany su tie iste
+      #       ako pri 5-14: dopredny guard prestavby/sablon/kopie
+      #       (`newer_config?`) a exportna brana (`ProductionCore.export_blockers`).
+      #       Vsetky tri aktivacne konstanty ostavaju (5 / 9 / 11) — skrinky
+      #       schemy 14 sa nesmu zrazu tvarit ako nemigrovane.
+      CONFIG_SCHEMA = 15
 
       # KOV-C2b: schema, OD KTOREJ stavba emituje dielce zasuviek z receptu.
       # VLASTNA konstanta (nie `CONFIG_SCHEMA`), lebo pri bumpe na 6 (KOV-D1a)

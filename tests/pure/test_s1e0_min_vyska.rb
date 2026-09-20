@@ -20,6 +20,14 @@
 #      konstrukcny zmysel nemaju.
 require_relative '../helper' unless defined?(NxTest)
 
+# Headless: `ui/*.rb` nie su v require zozname helpera (UI vrstva) — sablonovy
+# whitelist `Panel.template_config_from` si ich sada dotiahne sama, aby
+# nezavisela od poradia suborov v behu (vzor `test_r12_config_schema.rb`).
+if NxTest.headless?
+  require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'payloads')
+  require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_templates')
+end
+
 module NxS1E0
   module_function
 
@@ -68,6 +76,13 @@ module NxS1E0
   # (vola ho `build_plan` na konci), takze staci pozriet na cisla.
   def plan_dims(plan)
     plan[:parts].flat_map { |pd| Array(pd[:box]).map(&:to_f) }
+  end
+
+  # Config tak, ako ho zapise JEDINY zapisovy bod (`cabinet_config`) — teda
+  # vratane markera `config_schema`. Cez JSON round-trip, presne ako to prezije
+  # cesta do modelu (vzor `NxR12.stored_config`).
+  def stored(cfg)
+    JSON.parse(cb.cabinet_config(cfg).to_json)
   end
 
   def js_limit(id)
@@ -135,13 +150,59 @@ NxTest.test('S1-E0 R1: sirka a hlbka sa NEODOMKLI (200 / 150)') do
   NxTest.assert_close(150.0, cfg[:depth], 0.01, 'hlbka dalej klampuje na 150')
 end
 
-NxTest.test('S1-E0 R2: tvar configu sa nemeni — nizky korpus je bezna hodnota') do
-  # Nizka skrinka je obycajny config: ziadne nove pole, ziadna migracia. Ked by
-  # niekto na tento fix bumpol `CONFIG_SCHEMA`, starsi plugin by zbytocne
-  # odmietol CELU zakazku (dopredny guard R-12), hoci rozumie kazdemu poli.
+NxTest.test('S1-E0: nizky korpus NEPRIDAVA ziadne pole do configu') do
+  # Zmenil sa PRIPUSTNY ROZSAH hodnoty, nie tvar configu — ziadna migracia,
+  # ziadny novy whitelist. Bump schemy (nizsie) je tu kvoli TICHEJ ZMENE
+  # VYROBY u starsieho pluginu, nie kvoli novemu poľu.
   NxTest.assert_equal(NxS1E0.cb.normalize('height' => 900).keys.sort,
                       NxS1E0.cb.normalize('height' => 90).keys.sort,
                       'nizky korpus ma PRESNE tie iste kluce ako bezny')
+end
+
+NxTest.test('S1-E0 (Codex #374 P1): CONFIG_SCHEMA je 15 a nizka skrinka ho nesie') do
+  # PRECO BUMP, ked nepribudlo pole: starsi plugin (schema 14) ma MIN[:height]
+  # = 200, takze by skrinku 80-199 mm pri prvej prestavbe KLAMPOL na 200 —
+  # zmenil by vysku bokov, chrbta aj ciel a nikto by to nezbadal, kym by
+  # dielce neprisli z pily. Disciplina bumpu (STANDARD 2.5) hovori o TICHEJ
+  # ZMENE VYROBY, nie o novom poli.
+  NxTest.assert_equal(15, NxS1E0.cb::CONFIG_SCHEMA, 'schema configu je po S1-E0 pätnastka')
+  stored = NxS1E0.stored(NxS1E0.low_lower)
+  NxTest.assert_equal(15, stored['config_schema'], 'ulozeny config nizkej skrinky nesie marker 15')
+  NxTest.assert_close(90.0, stored['height'], 0.01, 'a nizku vysku')
+end
+
+NxTest.test('S1-E0 (Codex #374 P1): starsi plugin (schema 14) nizku skrinku PRESTAVAT ODMIETNE') do
+  # Simulacia starsieho pluginu: jeho `newer_config?` je presne toto porovnanie
+  # proti VLASTNEJ (nizsej) konstante. Bez bumpu by 14 >= 15 neplatilo, guard
+  # by mlcal a klamp na 200 by prebehol ticho.
+  stored = NxS1E0.stored(NxS1E0.low_lower)
+  NxTest.assert(NxS1E0.cb.config_schema_of(stored) > 14,
+                'skrinka postavena touto verziou je pre schemu 14 NOVSIA — prestavba sa odmietne')
+  # A TATO verzia svoj vlastny config odmietat nesmie.
+  NxTest.refute(NxS1E0.cb.newer_config?(stored), 'vlastny config prechadza bez blokady')
+  NxTest.assert(NxS1E0.cb.newer_config?(stored.merge('config_schema' => 16)),
+                'config z novsej verzie sa dalej blokuje')
+end
+
+NxTest.test('S1-E0 (Codex #374 P1): sablona nizkej skrinky nesie marker 15') do
+  # Sablona je STRATOVA cesta BEZ rebuildu — keby marker nenesla, starsi plugin
+  # by z nej postavil skrinku klampnutu na 200 a bez jedineho varovania.
+  tc = Noxun::Engine::Panel.template_config_from(NxS1E0.stored(NxS1E0.low_lower))
+  NxTest.assert_equal(15, tc['config_schema'], 'sablonovy whitelist stampuje aktualny marker')
+end
+
+NxTest.test('S1-E0: HISTORIA bumpu ma zapisany dovod cisla 15 (disciplina STANDARD 2.5)') do
+  hist = NxS1E0.src('noxun_engine', 'core', 'cabinet_builder.rb')[/HISTORIA:.*?CONFIG_SCHEMA = /m].to_s
+  NxTest.assert(hist.include?('15 = S1-E0'), 'cislo 15 ma v komentari svoj dovod')
+  NxTest.assert(hist.include?('newer_config?'), 'a menuje dopredu branu, ktora k bumpu patri')
+end
+
+NxTest.test('S1-E0: aktivacne schemy zasuviek, zavesov a vyklopov bump NEPRESUNUL') do
+  # Bump na 15 nesmie spravit zo skriniek schemy 14 „nemigrovane" — rovnaky
+  # dovod, pre ktory maju tieto tri konstanty vlastny zivot.
+  NxTest.assert_equal(5, NxS1E0.cb::DRAWER_ACTIVATION_SCHEMA)
+  NxTest.assert_equal(9, NxS1E0.cb::HINGE_ACTIVATION_SCHEMA)
+  NxTest.assert_equal(11, NxS1E0.cb::LIFT_ACTIVATION_SCHEMA)
 end
 
 # ---------------------------------------------------------------------------
