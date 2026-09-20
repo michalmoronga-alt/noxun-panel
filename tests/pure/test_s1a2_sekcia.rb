@@ -302,6 +302,35 @@ NxTest.test('S1-A2: klient, ktory miniaturu UZ MA, ju druhy raz nedostane') do
   NxTest.refute(thumbs.key?('a2'), 'a PDF nikdy — nahlad z neho UI nevykresli')
 end
 
+# 1x1 PNG — validny subor, nie len magic bytes.
+S1A2_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+
+NxTest.test('S1-A2: nahradna cesta miniatury posle POVODNY subor — ale len maly a spravny') do
+  require 'tmpdir'
+  Dir.mktmpdir('noxun-s1a2-') do |dir|
+    small = File.join(dir, 'x.png')
+    File.binwrite(small, S1A2_PNG.unpack1('m'))
+    uri = S1A2_AD.thumb_data_uri(small)
+    NxTest.assert(uri.to_s.start_with?('data:image/png;base64,'),
+                  'maly obrazok so spravnymi magic bytes ide klientovi ako data URI')
+
+    big = File.join(dir, 'big.png')
+    File.binwrite(big, S1A2_PNG.unpack1('m') + ('x' * (300 * 1024)))
+    NxTest.assert(S1A2_AD.thumb_data_uri(big).nil?,
+                  "obrazok nad #{S1A2_AD::THUMB_MAX_BYTES / 1024} kB sa NEPOSIELA — data URI nad strop "                   'uz nie je nahlad, ale prenos (klient si `nil` zacachuje a nepyta sa znova)')
+
+    pdf = File.join(dir, 'list.pdf')
+    File.binwrite(pdf, '%PDF-1.7')
+    NxTest.assert(S1A2_AD.thumb_data_uri(pdf).nil?, 'z PDF sa nahlad nerobi')
+
+    fake = File.join(dir, 'podvrh.png')
+    File.binwrite(fake, 'toto nie je obrazok')
+    NxTest.assert(S1A2_AD.thumb_data_uri(fake).nil?,
+                  'subor s obrazkovou priponou, ale bez magic bytes, sa do okna nedostane')
+    NxTest.assert(S1A2_AD.thumb_data_uri(File.join(dir, 'niet.png')).nil?, 'chybajuci subor = nil')
+  end
+end
+
 NxTest.test('S1-A2: prilohy nesu DRUH, nie cestu na disk') do
   rec = { 'id' => 'x', 'category' => 'fridge', 'name' => 'T', 'rev' => 'r',
           'attachments' => [{ 'id' => 'a1', 'kind' => 'thumbnail', 'file' => 'a1_x.jpg', 'name' => 'x.jpg' },
