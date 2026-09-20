@@ -296,7 +296,7 @@
   // Dlaždica prílohy. Obrázok kreslí miniatúru z cache (kým nedorazí, ostáva
   // ikona — presne ako schéma pri šablónach), PDF má ikonu vždy. Náhľad
   // (`thumbnail`) má teal rám a štítok.
-  function apFileHtml(a, thumbs){
+  function apFileHtml(a, thumbs, writable){
     var at = a || {};
     var cache = thumbs || {};
     var png = at.image ? cache[at.id] : null;
@@ -307,8 +307,12 @@
       ' title="' + apEsc(at.image ? 'Otvoriť obrázok' : 'Otvoriť v systémovom prehliadači') + '">' +
       inner + '</button>' +
       '<div class="apfn" title="' + apEsc(at.name) + '">' +
-      (at.thumbnail ? '<span class="aptag">náhľad</span>' : '') + apEsc(at.name) + '</div>' +
-      '<div class="apfacts">';
+      (at.thumbnail ? '<span class="aptag">náhľad</span>' : '') + apEsc(at.name) + '</div>';
+    // Pri read-only katalógu sa akcie dlaždice NEKRESLIA vôbec — obe sú zápis
+    // a server by ich odmietol (to isté pravidlo ako v hlavičke karty).
+    if (writable === false) return h + '</div>';
+
+    h += '<div class="apfacts">';
     if (at.image && !at.thumbnail){
       h += '<button type="button" class="ibtn" data-ap="thumb" data-id="' + apEsc(at.id) + '"' +
            ' title="Nastaviť ako náhľad záznamu" aria-label="Nastaviť ako náhľad">' + apIco('eye') + '</button>';
@@ -324,7 +328,7 @@
     var items = card.attachments || [];
     var h = '<div class="apblk full"><h5>' + apIco('image') + 'Prílohy ' +
       '<span class="apnote">· súbory na tomto počítači · jeden náhľad</span></h5><div class="apfiles">';
-    h += items.map(function(a){ return apFileHtml(a, thumbs); }).join('');
+    h += items.map(function(a){ return apFileHtml(a, thumbs, card.writable !== false); }).join('');
     if (card.writable !== false){
       h += '<button type="button" class="apfile add" data-ap="add"' +
            ' title="Systémový dialóg — jeden súbor naraz (PDF, JPG, PNG, WEBP)">' +

@@ -269,6 +269,9 @@ eq(A.apCardHtml(null, {}).includes('Vyber model'), true, 'bez výberu karta poz�
   const h = A.apCardHtml(card({ writable: false }), {});
   ok(!h.includes('data-ap="edit"') && !h.includes('data-ap="del"') && !h.includes('data-ap="add"'),
      'pri read-only katalógu sa zápisové tlačidlá vôbec nekreslia');
+  ok(!h.includes('data-ap="thumb"') && !h.includes('data-ap="unfile"'),
+     'ani akcie dlaždice prílohy — obe sú zápis a server by ich odmietol');
+  ok(h.includes('data-ap="open"'), 'otvoriť prílohu sa ale dá — je to čítanie');
 }
 
 // Escapovanie: meno modelu píše používateľ.
