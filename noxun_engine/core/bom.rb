@@ -456,20 +456,24 @@ module Noxun
       # — `collect` jej dava uz nacitany config. nil = nie je to slot (alebo je
       # config poskodeny), teda ziadny zaznam a ziadny nalez.
       #
-      # `body_width` je sirka GENERICKEHO tela triedy (`Construction.dw_class_dims`)
-      # — TA ISTA hodnota, z ktorej builder kresli referenciu. Po S1-B ju
-      # prepise telo z priradeneho modelu; tu ostava jedna autorita.
+      # `body_width` je sirka tela, ktore v modeli NAOZAJ stoji — s vazbou
+      # (S1-B2) teda telo PRIRADENEHO modelu, bez nej generika triedy. Vyber
+      # robi JEDNA funkcia pre builder, Inspector aj Kontrolu
+      # (`Construction.dw_body_dims`): keby semafor meral generickych 598, kym
+      # v slote stoji 448 z katalogu, hlasil by „nezmesti sa" nad telom, ktore
+      # tam nie je.
       def appliance_slot_record(owner_id, owner_pid, ccfg)
         return nil unless ccfg.is_a?(Hash) && ccfg['type'].to_s == 'dishwasher'
 
         cls = ccfg['dw_class'].to_i
-        dims = defined?(Construction) ? Construction.dw_class_dims(cls) : nil
-        return nil if dims.nil?
+        body = defined?(Construction) ? Construction.dw_body_dims(ccfg) : nil
+        return nil if body.nil?
 
         { 'owner_id' => owner_id.to_s, 'owner_pid' => owner_pid,
           'width' => ccfg['width'].to_f, 'height' => ccfg['height'].to_f,
           'dw_class' => cls, 'dw_body_height' => ccfg['dw_body_height'].to_f,
-          'body_width' => dims[:body_w].to_f, 'class_label' => dims[:label].to_s }
+          'body_width' => body[:w].to_f, 'body_source' => body[:source].to_s,
+          'class_label' => body[:label].to_s }
       end
 
       # GHOST-D1: JEDEN zapisovac aditivneho kluca `newer_configs`. Zaznam je

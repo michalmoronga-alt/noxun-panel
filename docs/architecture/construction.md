@@ -143,7 +143,13 @@ netýka ani `validate!` obálky (má vlastnú úzku `validate_slot!`, ktorá š�
 nad virtuálnym otvorom), **jednu** referenciu (`dw_body_reference`) a kovanie z pravidiel; `zones` je prázdne a `interior` popisuje celý slot, nie svetlo.
 `support_type` vracia pre `dishwasher` **vždy `none`** a `min_valid_height` 0 (slot nemá vnútro, ktoré by výšku zdola obmedzovalo — tú drží typové MIN absorpcie).
 **Generické telá** žijú v `DW_CLASSES` (600 → 598 × 555 × 820, 450 → 448 × 550 × 815) a sú to **tie isté čísla**, z ktorých kreslí builder, zbiera `Bom` aj náhľad
-(JS zrkadlo `PV_DW_BODY`, guard test ich porovnáva). Po S1-B ich prepíše telo z priradeného modelu.
+(JS zrkadlo `PV_DW_BODY`, guard test ich porovnáva) — **kým slot nemá priradený model**.
+
+**S1-B2: TELO Z VÄZBY.** Keď config slotu nesie `appliance_refs[]` kategórie `dishwasher` s blokom `body`, šírku a hĺbku tela určuje **katalógový list**
+(výšku vždy používateľ cez `dw_body_height`). Rozhoduje o tom **jediná funkcia `dw_body_dims(cfg)`** → `{w:, d:, label:, source: 'generic'|'catalog',
+item_id:}`; `dw_body_reference` z nej skladá deskriptor (pri katalógovom tele navyše `item_id` a label bez slova „generické“) a **tú istú funkciu** volajú
+aj `Panel.slot_payload` a `Bom.appliance_slot_record`. Dva výpočty by znamenali, že v modeli stojí jedno telo a Kontrola meria iné. Väzba sa zapisuje cez
+prestavbu (`CabinetBuilder.write_appliance_refs!` v operácii `ApplianceBinding`), takže telo sa prekreslí **v tom istom kroku Späť** ako položka rozpočtu.
 
 ### cabinet_builder.rb
 
@@ -438,7 +444,8 @@ FIX E10), nie `wing:single`.
 kým telo umývačky je **referencia domény** (`kind: 'reference'`, `production_class: 'reference'`, `manufactured: false`, STANDARD §8.1) — vec, ktorú kupuje zákazník.
 Definícia `NOXUN <cid> APPLIANCE` sa recykluje menom a `clear!`-uje, tag je tag proxy kovania. Z **jedného** deskriptora vznikajú **dva boxy**: telo a pod ním
 **základňa** `Construction::DW_BASE_H` = 200 mm, odsadená `DW_BASE_INSET_FRONT` = 50 spredu a `DW_BASE_INSET_SIDE` = 20 do strán (zóna nôh a soklu spotrebiča).
-Telo sa **nikdy nedeformuje** podľa slotu — keď je širšie, trčí.
+Telo sa **nikdy nedeformuje** podľa slotu — keď je širšie, trčí. **S1-B2:** config referencie nesie `source` (`generic` | `catalog`) a pri katalógovom tele aj
+**`item_id`** položky zákazky, takže sa v modeli dá povedať, **ktorý kus** tam stojí (kľúč pri generickom tele **chýba** — „nevieme“ nie je identita).
 
 **LOGICKÁ OBÁLKA `envelope(inst, transform:)`** (FIX E3) vracia **nominálny** obrys z configu (`width × depth × height`), nie skutočné bounds; `envelope_dims` je jeho
 čistá otázka nad uloženým configom (nil = cudzia entita, doska, poškodený config). Čítajú ju `Placement.next_x`, `Tools::Snaper` (cieľ **aj** prekážka) a

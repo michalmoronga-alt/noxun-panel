@@ -1870,6 +1870,18 @@ v **jednodokumentovom** flow (zastavený okamžitý flush pri červenom poli, ro
 aj rozpísané gap hodnoty. `nxDropDocState` navyše **zhodí fokus** (`document.activeElement.blur()` v `try/catch`) — CEF drží `activeElement` aj po strate fokusu okna, takže
 `bset` na karte dosky by pole s kurzorom preskočilo a nechalo v ňom hodnotu zo starej zákazky.
 
+### actions_appliance.rb
+
+**Jediná akcia panela k spotrebičom** (S1-B2): `set_appliance_owner` — priradenie modelu z riadku „Spotrebič" alebo jeho odpojenie, pre skrinku, slot umývačky aj dosku.
+Súbor **nezapisuje**: deleguje na `ApplianceBinding.apply!` (`move` / `unbind`), ktorý je jediným transakčným vstupom väzby (položka rozpočtu + `appliance_refs[]`
+vlastníka + prestavba = **jedna operácia, jeden krok Späť**). Rieši len to, čo panel vie a jadro nie: **ktorá entita je označená**.
+
+**Cieľ väzby skladá SERVER z výberu, nie z payloadu.** Klient posiela iba `item_id` (čo priradiť) a echo `cabinet_id` / `board_id` (nad čím bol riadok vykreslený, GH #127
+P2); druh (`cabinet` vs `slot` podľa `type` v configu), ID aj `persistent_id` sa čítajú z označenej entity. Starý DOM tak nemá ako poslať cudziu skrinku a recyklované ID
+nemá ako trafiť iný kus. Identitu **dokumentu** overuje `foreign_document?` nahlas (vzor R-02), nezhodné echo ID vráti „Výbor sa medzitým zmenil" a obnoví kartu.
+Po úspechu ide `push_selected` (čerstvá karta) a status menuje model aj vlastníka; otvorené Štúdio sa o zmene dozvie bežnou cestou — transakčný observer zožltne
+„Obnoviť" (`on_model_txn`), druhý push do cudzieho okna by bol druhý kanál k tým istým číslam.
+
 ### actions_board.rb
 
 Doména panela: vloženie samostatnej dosky (`handle_insert_board`) a zápisové cesty jej karty (polia · materiál · ABS hrana · olep všetkých 4 · orientácia). Kontrakt karty je
@@ -2715,18 +2727,42 @@ okna** — `hw_csv_export` → `handle_hw_csv` → `NX.studioRelayHwCsv` (flush 
 riadok generiky ide **existujúcou cestou** `nx_select` s `hw_key` (`refs_for` nájde vlastníkov v čerstvom BOM). Navigačná položka `buy` prestala byť premostením. Testy:
 `tests/pure/test_st1c_nakup.rb`, `tests/js/test_st1c_nakup.js`, `tests/js/test_d93_nl_override.js` (presunutá sada znamienka ručného zásahu), in-SketchUp sekcia `run_st1c`.
 
-### Sekcia SPOTREBIČE v Štúdiu (S1-A2)
+### Sekcia SPOTREBIČE v Štúdiu (S1-A2 katalóg + S1-B2 pohľad „V zákazke")
 
-**13. sekcia** (`appl`), v skupine KATALÓGY medzi Kovaním a Pravidlami — katalóg modelov spotrebičov **tohto počítača** (`%APPDATA%`), teda tretí per-PC katalóg vedľa
-materiálov a kovania. Serverová strana: [appliance_dialog.rb](#appliance_dialogrb); klient `ui/js/appliances.js` (prefix `ap*` / `AP_*`, načítava sa **AŽ ZA** `studio.js`,
-lebo obaľuje jeho `NX.setStudio` a dopĺňa `window.NX` o `applTree`/`applCard`/`applResult` — v opačnom poradí by ich `window.NX = {…}` prepísalo; poradie stráži guard test).
-Ikona navigácie `appliance` (Lucide `refrigerator`). **Badge navigácie zámerne nie je** — počty „chýba/nesedí" prídu z Kontroly až v S1-B a prázdny badge by tvrdil,
-že sa niečo počíta.
+**13. sekcia** (`appl`), v skupine KATALÓGY medzi Kovaním a Pravidlami — **dva pohľady**: katalóg modelov spotrebičov **tohto počítača** (`%APPDATA%`, tretí per-PC katalóg
+vedľa materiálov a kovania) a **V zákazke** = čo je v tejto zákazke a kde. Serverová strana: [appliance_dialog.rb](#appliance_dialogrb); klient `ui/js/appliances.js`
+(prefix `ap*` / `AP_*`, načítava sa **AŽ ZA** `studio.js`, lebo obaľuje jeho `NX.setStudio` a dopĺňa `window.NX` o `applTree`/`applCard`/`applResult` — v opačnom poradí by
+ich `window.NX = {…}` prepísalo; poradie stráži guard test). Ikona navigácie `appliance` (Lucide `refrigerator`). **Badge navigácie** (S1-B2) = `appl.job.counts` zo
+servera — koľko riadkov pohľadu „V zákazke" treba vybaviť (nevybraný model · zaniknutý vlastník · nález Kontroly); je to **počet RIADKOV, nie nálezov** (dva nálezy nad tým
+istým spotrebičom sú jedna vec, ktorú treba vybaviť). Klient si zo zoznamu nepočíta nič — `navCounts('appl')` len prečíta hotový blok, presne ako pri Kontrole.
 
-**Lišta:** segment `[V zákazke · Katalóg]` (vzor Kovania) · „Nový spotrebič" · hľadanie (debounce 200 ms) · prepínač „vyradené" · vpravo `sechint`
-„Katalóg je tohto počítača · bez cien · N modelov". **Pohľad „V zákazke" je `aria-disabled`, nie `disabled`** (D-78): klik naň **povie dôvod** („príde v dávke S1-B"),
-kým HTML `disabled` by ho vyhodilo z Tab poradia a mlčalo. To isté platí pre tlačidlo **„Do zákazky"** v karte. Žiadne „Obnoviť" — katalóg nie je z modelu, takže
+**Lišta katalógu:** segment `[V zákazke · Katalóg]` (vzor Kovania) · „Nový spotrebič" · hľadanie (debounce 200 ms) · prepínač „vyradené" · vpravo `sechint`
+„Katalóg je tohto počítača · bez cien · N modelov". **Lišta pohľadu „V zákazke":** segment · „Pridať do zákazky" · hľadanie · výber kategórie · vpravo súhrn zo servera.
+Obe hľadania sú **čisto klientske** (zužujú, čo už v okne je), preto sa lišta neprekresľuje, kým v nich používateľ píše. Žiadne „Obnoviť" — katalóg nie je z modelu, takže
 jantárový indikátor neaktuálnosti sem nepatrí (`staleFlag` sa sekcii vedome nepodáva).
+
+**Pohľad „V zákazke" (S1-B2, mockup R3–R5).** Tabuľka: Kategória · Model (+ odkiaľ je) · Vlastník (ID + popis) · Kontrola · Cena z Rozpočtu · akcie. Riadky, ich
+**PORADIE**, tóny, texty aj ceny skladá SERVER (`ApplianceDialog.job_view`) — JS kreslí presne to, čo dostal. Zdroje sú **už hotové výsledky toho istého pushu**:
+`Bom.collect[:appliances]` (stavy `bound|job|owner_missing|expected_missing`), payload ROZPOČTU (ceny, príznak „dodáva zákazník", poradie a popisky vlastníkov z
+`appliance_owners`) a KONTROLA (nálezy kategórie `appliance`); jediné vlastné čítanie sú **položky zákazky** (`BudgetStore.appliances`) kvôli odkazom na obchod a
+technický list zo snapshotu. **Žiadny druhý sken modelu.** Poradie: skrinky → dosky → sloty → „len zákazka", v rámci skupiny podľa ponuky vlastníkov (tá je už zoradená),
+potom podľa kategórie a názvu. Riadok **„nevybraný"** (`expected_missing`, mockup CAB-9) má akciu „vybrať…", riadok **„vlastník zmizol"** (`owner_missing`) akciu
+„Odpojiť". Stav `evidencia` dostanú kategórie, ku ktorým kontrola neexistuje (doska, drez, digestor, iné) — zelená by tvrdila, že sa niečo overilo.
+
+**ZÁPISY POHĽADU IDÚ KANÁLOM ROZPOČTU.** Väzba spotrebiča má jeden transakčný vstup (`ApplianceBinding.apply!`) a jednu cestu k nemu (`budget_mutate` →
+`ProductionCore.apply_budget_op`), takže sekcia **vlastnú zápisovú cestu nemá**: „Pridať do zákazky", editor položky, „Odpojiť" aj „Zmazať" volajú priamo funkcie
+`budget.js` (to isté okno, ten istý scope). Jediná akcia sekcie navyše je **`appl_job_select`** (oko = označ vlastníka v modeli + doramovanie) a tá je **čisté čítanie**.
+Dôsledok pre echo: po zápise príde bežný `push_state`, ktorý nesie **aj Rozpočet, aj `appl.job`** — obe sekcie sú tak čerstvé bez druhého kanála.
+
+**JEDEN MODAL, DVE VSTUPNÉ MIESTA** (R2): „Pridať do zákazky" v pohľade aj „Do zákazky" v karte katalógu otvárajú **ten istý** D-15 modal ako Rozpočet
+(`budOpenDraft('appliance', …)`) — z karty s predvyplneným modelom (`catalog_id`, názov, dodávateľ, kategória). Vyradený (tombstone) záznam tlačidlo nemá: zákazka si ho
+nepriradí (`snapshot_for` → `:deleted`). Ceruzka v riadku otvára **ten istý editor položky** ako ⋯ v Rozpočte (`budOpenApplEdit` → `budOpenMore(..., full: true)`), len
+s plnou sadou polí (názov, dodávateľ, cena navyše) — v pohľade nie je čo editovať inline. Odkaz a technický list otvára server (`appl_open_url` overí schému), takže
+v okne nie je jediný `href`, ktorý by mohol HtmlDialog prenavigovať preč zo Štúdia.
+
+**Deep-link z Kontroly.** Nález o spotrebiči má `data.route = 'appl'` a `ProductionCore::ROUTE_SECTIONS` ho od S1-B2 smeruje do **tejto** sekcie (v S1-B1 viedol do
+Rozpočtu). Kotva `appliance:<uuid>` prepne pohľad na „V zákazke" a riadok prisvieti; spotrebuje sa **raz** a aplikuje sa **AŽ PO `render()`** (je to dotaz do DOM, nie
+zmena stavu, z ktorého sa kreslí). Riadok, ktorý medzitým zanikol, nie je tichý no-op — okno to povie.
 
 **Telo:** strom po kategóriách vľavo (skupiny sa dajú zbaliť — stav okna, nikam sa neukladá), karta vpravo v štyroch blokoch (Telo · Nika · Čelo/dvere · Montáž) plus
 Odkazy, Prílohy a Poznámka. Blok, ktorý pre danú kategóriu nemá kótované polia (Montáž pri rúre), nesie **priznanú vetu** namiesto prázdna — mlčiaci prázdny rám vyzerá
@@ -2753,7 +2789,53 @@ a pamäť rozpísaného konceptu by na Escape neuložila nič.
 
 **Stav katalógu** (`:read_only` / `:degraded`) kreslí sekcia ako **banner nad stromom** s dôvodom zo servera a vypína zápisy (žiadne „Nový spotrebič", „Upraviť",
 „Vyradiť", „Pridať prílohu") — ponúkať tlačidlá, ktoré vždy skončia chybou, je horšie než ich schovať. Príznak `writable` chodí v **každom** payloade sekcie, aby sa UI
-nerozišlo s tým, čo server naozaj dovolí. Testy: `tests/pure/test_s1a2_sekcia.rb`, `tests/js/test_s1a2_sekcia.js`, in-SketchUp sekcia `run_s1a2`.
+nerozišlo s tým, čo server naozaj dovolí. Testy: `tests/pure/test_s1a2_sekcia.rb`, `tests/pure/test_s1b2_pohlad.rb`, `tests/js/test_s1a2_sekcia.js`,
+`tests/js/test_s1b2_pohlad.js`, in-SketchUp sekcie `run_s1a2` a `run_s1b2`.
+
+**Payload sekcie** (`push_state`, kľúč `appl`) = strom katalógu **plus** `job` (pohľad V zákazke). `job` chodí **len plným pushom** (patrí dokumentu), kým echo katalógu
+ho nenesie — klient si ho preto preberá podmienene (`if (p.job) AP_JOB = p.job`), inak by uloženie modelu do katalógu vyprázdnilo tabuľku, s ktorou nemá nič spoločné.
+Tvar `job`: `rows[]` (`{state, item_id, category, category_label, model, model_sub, owner{kind,id,pid}, owner_label, owner_desc, tone, status_text, status_title,
+price_text, customer_supplied, shop_url, sheet_url, actions{select,edit,remove,unbind,assign,shop,sheet}}`) · `total` · `warn` · `counts{red,orange,total}` · `summary` ·
+`subtotal_text` · `subtotal_included` · `categories`. Dve pravidlá, ktoré z tvaru vidieť nie je:
+
+- **`shop_url` je z POLOŽKY zákazky, snapshot katalógu je až fallback** (`url` je pole, ktoré používateľ edituje v Rozpočte aj v editore riadku). Inak by akcia „obchod“
+  otvárala starú katalógovú adresu aj po jej prepísaní a **ručná položka bez katalógu by akciu nemala vôbec**. `sheet_url` ostáva zo snapshotu — položka zákazky pole pre
+  technický list nemá a odvodzovať ho z `url` by bola druhá pravda.
+- **`actions.assign` („vybrať…“) je LEN vtedy, keď je vlastník riadku v serverovej ponuke vlastníkov.** Odpojený dielec a config z novšej verzie sa neponúkajú, takže modal
+  by spadol na „len zákazka“ a vyrobil nepriradenú položku; riadok namiesto akcie nesie **dôvod** v `model_sub`.
+
+**Akcia `appl_job_select` („oko“) má guard zastaraného pohľadu.** Rieši riadok proti **aktívnemu** dokumentu, takže klik z DOM spred prepnutia dokumentu alebo spred
+prepočtu okna by zhodou ID a PID mohol označiť cudziu skrinku. Klient preto posiela identitu **payloadu, z ktorého je tabuľka vykreslená** (`model_guid` + `gen`, drží ich
+`AP_JOB_DOC` z toho istého pushu) a server odmieta nezhodu tým istým párom guardov ako zápisové akcie sekcií (`DocKey.foreign?` + `StudioDialog.generation`). Prázdny údaj
+sa tu **netoleruje** — tabuľka chodí vždy aj s identitou, takže jej absencia je presne ten stav, proti ktorému guard stojí.
+
+### Riadok „Spotrebič" v Inspectore (S1-B2, ui/js/appliance_row.js + ui/panel/payloads.rb)
+
+**JEDEN riadok cez oba stĺpce Základných per VIAZANÝ spotrebič** (rúra + mikrovlnka v jednej skrinke sú dva riadky) **plus jeden riadok „očakáva"**, keď kus spotrebič
+očakáva a nemá ho (`appliance_expects[]`, slot umývačky vždy). Vzor je riadok Nôh — žiadny nový sektor, žiadny nadpis; **prázdny zoznam riadok skryje** (vertikálny
+priestor panela je vzácny). **Ten istý komponent kreslí karta dosky** (`#boardApplRows`, varná doska a drez), len s iným kontextom vlastníka.
+
+Payload `cabinet_payload.appliance_rows[]` / `board_payload.appliance_rows[]` skladá server (`Panel.appliance_rows`):
+`{state: 'bound'|'expected', item_id, category, category_label, text, sub, tone: 'ok'|'warn', link, placeholder, options[], all, all_note}`.
+
+- **Tón viazaného riadku** sa pýta na **tie isté dva vstupy** ako `Validation.check_appliance_bound` (chýbajúce rozmery niky · trieda umývačky vs trieda slotu). Panel
+  Kontrolu **nevolá** (potrebovala by celý zber modelu), preto to stráži test, ktorý porovnáva oba smery nad jednou fixtúrou.
+- **Ponuka modelov** = položky zákazky danej kategórie **bez fyzického vlastníka**, filtrované podľa niky vs vnútro skrinky **len po osiach, ktoré kategória kontroluje**
+  (rúra a mikrovlnka Š + H, chladnička Š/V/H, ostatné bez filtra). Skrinka s **viac zónami** nemá jednoznačnú výšku vnútra, takže kategórii, ktorá výšku kontroluje
+  (chladnička), sa filter **vypne celý** a riadok to prizná vetou; šírka a hĺbka sú jednoznačné vždy, takže rúra o filter neprichádza. **Filter nie je brána**: model,
+  ktorý nesedí, v ponuke ostáva s dôvodom a za ním stojí disabled „— zobraziť všetky (N)". **Prvá voľba je vždy neutrálna** („vyber model…") — `<select>` bez vyslovenej
+  hodnoty vyberie prvú možnosť a jediné kliknutie do riadku by inak spotrebič naviazalo aj s prestavbou.
+- **Zápis** ide akciou `set_appliance_owner` → [actions_appliance.rb](#actions_appliancerb) → `ApplianceBinding.apply!` (`move` / `unbind`), teda **jeden krok Späť**.
+  Viazaný riadok má „odpojiť" (ikona `unlink`), nie druhý `<select>` — **vedomá odchýlka od mockupu R9**: výmena modelu nad už viazanou položkou je dve rozhodnutia
+  (odpoj + priraď) a patrí do Štúdia, kde je vidieť celá zákazka.
+- **Ikona odkazu** otvára Štúdio → Spotrebiče (`openStudio('appl', 'appliance:<uuid>')`) — tá istá adresa, akú používa nález Kontroly.
+- **Echo:** riadok sa **neobnovuje ľahkým pushom** (`setHardwareSets`); väzba mení aj ostatné výstupy karty (telo slotu, trieda, náhľad), takže po zápise z Rozpočtu
+  alebo z pohľadu „V zákazke" posiela server **celú čerstvú kartu**. Pri prestavbe to robí `budget_geometry_proc` (so zdvihom generácie), pri väzbe na **dosku** —
+  ktorá geometriu nemení — nový `budget_card_proc` (**bez** zdvihu generácie: žiadne číslo zákazky sa nezmenilo).
+- **Kontext vlastníka drží DOM**, nie globálna premenná (`data-apr-kind` / `data-apr-id` na kontajneri): panel môže mať vykreslenú kartu dosky aj karty skrinky a echo
+  katalógu materiálov prekresľuje kartu dosky aj vtedy, keď je označená skrinka — globál by sa dal prepísať pod rukami a zápis by odišiel na cudzieho vlastníka.
+- **Odchod z kontextu riadky ZAHODÍ** (`clearApplianceRows`): prázdny výber čistí oba kontajnery, prechod na dosku ten korpusový. Nestačí ich skryť — s kontajnerom
+  odchádza aj **kontext vlastníka** (`data-apr-*`), inak by vo vkladacom režime ostal visieť riadok cudzej skrinky so starými akciami.
 
 ### Sekcia ROZPOČET v Štúdiu (ŠT-1c PR B1, Š12–Š13)
 

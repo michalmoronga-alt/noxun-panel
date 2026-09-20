@@ -2171,10 +2171,15 @@ module Noxun
             std: Store::STD, kind: 'reference', id: rid, part_id: rid,
             cabinet_id: cid, role: rd[:role].to_s, name: rd[:label].to_s,
             manufactured: false, production_class: BuildPlan::REFERENCE_CLASS,
+            # S1-B2: `item_id` je pri tele Z KATALOGU (`source: 'catalog'`) —
+            # referencia tak v modeli nesie, KTORY kus zakazky reprezentuje.
+            # Bez vazby kluc CHYBA (nikdy prazdny retazec: „nevieme" nie je
+            # identita).
             config: { proxy: true, ref_key: rd[:ref_key].to_s, source: rd[:source].to_s,
                       dw_class: rd[:dw_class],
                       body: { w: rd[:box][0].to_f.round(2), h: rd[:box][2].to_f.round(2),
                               d: rd[:box][1].to_f.round(2) } }
+              .merge(rd[:item_id].to_s.empty? ? {} : { item_id: rd[:item_id].to_s })
           })
           inst.name = rd[:label].to_s
           inst

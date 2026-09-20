@@ -7,7 +7,9 @@
 > [../../SYSTEM/archiv/KRONIKA.md](../../SYSTEM/archiv/KRONIKA.md).
 
 Katalóg konkrétnych modelov spotrebičov tohto počítača (rozmery z listov výrobcov, odkazy, prílohy) a snapshot, ktorým si ich zákazka
-odkopíruje k sebe. Väzba do zákazky, slot umývačky a kontrolné telo chladničky prídu v dávkach S1-B až S1-F; **UI je od S1-A2 sekcia `appl` v Štúdiu**.
+odkopíruje k sebe. Väzba do zákazky a slot umývačky **už fungujú** (S1-A2 katalóg → S1-E slot → S1-B1 väzba → S1-B2 UI); kontrolné telo chladničky a
+očakávania zo šablón prídu v S1-F a S1-C. **UI je sekcia `appl` v Štúdiu** — dva pohľady: **Katalóg** (modely tohto PC) a **V zákazke** (čo je v tejto
+zákazke a kde).
 
 ### UI sekcie
 
@@ -17,8 +19,9 @@ a pravidlá echa sú v [ui-lifecycle.md](ui-lifecycle.md) (odseky `appliance_dia
 - **UI nikdy neobchádza pravidlá katalógu.** Validáciu, `rev` guard, tombstone, prílohy aj seed rieši výhradne `appliance_catalog.rb`; sekcia jeho statusy iba prekladá
   na vety a chyby posiela k poľu modalu. `field` z `[:invalid, {message:, field:}]` je **cesta** (`dims.niche.width_min`) a presne tak sa volá aj kľúč poľa vo formulári,
   takže medzi katalógom a modalom neexistuje prekladová tabuľka, ktorá by mohla zaostať.
-- **Zmena katalógu NEDVÍHA generáciu okna Štúdio.** Katalóg spotrebičov zatiaľ nevstupuje do žiadneho čísla zákazky, takže zápis posiela len echo sekcie
-  (`NX.applTree` + `NX.applCard`), nie plný `push_state`. Po S1-B (väzba do zákazky) sa to prehodnotí v tej dávke.
+- **Zmena katalógu NEDVÍHA generáciu okna Štúdio.** Katalóg spotrebičov nevstupuje do žiadneho čísla zákazky (zákazka si drží **snapshot**, nie odkaz na
+  živý záznam), takže zápis posiela len echo sekcie (`NX.applTree` + `NX.applCard`), nie plný `push_state`. Platí to aj po S1-B2: pohľad „V zákazke“
+  chodí **plným pushom** (patrí dokumentu) a echo katalógu ho nikdy neprepisuje.
 - **Prílohy do UI chodia ako `data:` URI, nikdy ako cesta.** CEF súbory zo systému čítať nesmie; obrázok sa posiela zmenšený (`Sketchup::ImageRep`, max 96 px) a len na
   vyžiadanie karty, PDF vôbec — otvára ho `open_attachment` cez systémový prehliadač. `attachment_path_for` tak ostáva jediným resolverom ciest pre živý záznam
   aj pre zákazkový snapshot.
@@ -35,8 +38,16 @@ to nevyrába ani neobjednáva.
   `manufactured: false` (STANDARD §8.1) z **dvoch boxov** — telo podľa triedy a pod ním **fixná základňa 200 mm**, odsadená 50 mm spredu a 20 mm
   do strán (zóna nôh a soklu spotrebiča). Telo sa **nikdy nedeformuje** podľa slotu; keď je širšie, trčí a Kontrola to prizná.
 - **Generické rozmery tela** (`Construction::DW_CLASSES`): trieda **600** → 598 × 555, telo 820 · trieda **450** → 448 × 550, telo 815. Je to
-  **jediná tabuľka** pre builder, zber aj náhľad (JS zrkadlo `PV_DW_BODY`). **Po S1-B ich prepíše telo z priradeného modelu** (`appliance_refs[]`),
-  dovtedy je to jediné, čo o umývačke vieme — payload to priznáva textom „generické 60".
+  **jediná tabuľka** pre builder, zber aj náhľad (JS zrkadlo `PV_DW_BODY`) — a platí, **kým slot nemá priradený model**; payload to priznáva textom
+  „generické 60“.
+- **S1-B2: telo z PRIRADENÉHO MODELU.** Keď slot nesie väzbu na umývačku (`appliance_refs[]` kategórie `dishwasher` s blokom `body`), šírku a hĺbku tela
+  určuje **katalógový list**, nie trieda; **výšku určuje vždy používateľ** (`dw_body_height` — nastaviteľné nohy sú rozsah, nie jedno číslo). Vyberá to
+  **jedna funkcia pre celý engine — `Construction.dw_body_dims(cfg)`** (`{w:, d:, label:, source: 'generic'|'catalog', item_id:}`), ktorú volajú
+  **všetci, čo o tele niečo tvrdia**: builder (`dw_body_reference` → referencia so `source: 'catalog'` a `item_id` v configu referencie), Inspector
+  (`Panel.slot_payload` → „448 × 820 × 550 · Bosch SPV6EMX05E“, rozsah výšky tela z listu ako hint pri poli „Telo V“ a verdikt triedy — `class_state` má **tri**
+  hodnoty `ok · mismatch · unknown`, lebo model bez triedy v liste sa nesmie zafarbiť nazeleno: „nevieme“ nie je „sedí“, presne ako pri `Validation`) aj Kontrola
+  (`Bom.appliance_slot_record` → `dw_body_fit` meria telo, ktoré v slote **naozaj stojí**). Druhá kópia toho výberu by znamenala, že model ukazuje jedno
+  telo a semafor kontroluje iné. Zmena aj odpojenie väzby prestavia slot v **tej istej** operácii (S1-B1), takže je to jeden krok Späť.
 - **Väzba na katalóg v S1-E ešte NIE JE.** `CONFIG_SCHEMA` 16 iba **rezervuje** `appliance_refs[]` a `appliance_expects[]` (skrinka aj doska, tá
   cez `BOARD_CONFIG_SCHEMA` 2), aby ich S1-B/F/C mohli naplniť bez ďalšieho bumpu. Kľúče prežijú prestavbu, materiály aj absorpciu scale; väzbu
   na **konkrétny** spotrebič zahodí jediný helper `CabinetBuilder.strip_appliance_refs!` v troch kopírovacích vstupoch (natívna kópia, kópia
@@ -47,6 +58,26 @@ to nevyrába ani neobjednáva.
 - **Šablóny:** `TemplateStore` STD 5 seeduje **„Umývačka 60"** a **„Umývačka 45"** — korpusové záznamy s `config['config_schema']`, bez ktorého by
   starší plugin typ nepoznal a `norm_type` by mu ho sklopil na `lower` (zo slotu by vznikol plný korpus). Detail v
   [model-a-identita.md](model-a-identita.md).
+
+### Zákazka — UI (S1-B2)
+
+**Spotrebič zákazky je vidieť na TROCH miestach a všetky tri kreslia to isté z toho istého zdroja.** Kontrakt každého z nich (payloady, akcie, echo) je
+v [ui-lifecycle.md](ui-lifecycle.md); sem patrí to, čo z toho platí pre doménu:
+
+- **Štúdio → Spotrebiče → „V zákazke“** = celá zákazka v tabuľke (kategória · model · vlastník · Kontrola · cena · akcie), vrátane riadkov, ktoré
+  položku ešte **nemajú** („nevybraný“ pre kus s očakávaním) a ktoré **stratili vlastníka** („vlastník zmizol“). Skladá ju server ako **projekciu už
+  hotového zberu, rozpočtu a kontroly** toho istého pushu — žiadny druhý sken modelu a žiadne číslo, ktoré by počítal niekto druhý.
+- **Inspector — riadok „Spotrebič“** pri skrinke, slote aj doske: jeden riadok per viazaný model + riadok „očakáva“. Je to **jediné miesto, kde sa
+  spotrebič priraďuje z modelu** (výber zo spotrebičov zákazky danej kategórie); ponuka je filtrovaná podľa niky, ale **filter nie je brána**.
+- **Rozpočet → „Spotrebiče a vybavenie“** ostáva miestom, kde spotrebič **stojí peniaze** (cena, „dodáva zákazník“, do SPOLU len s prepínačom).
+
+**JEDEN TRANSAKČNÝ VSTUP, JEDEN KANÁL.** Všetky zápisy (pridať · zmeniť model · presunúť · odpojiť · zmazať) idú cez `ApplianceBinding.apply!` a do neho
+sa chodí **jednou cestou** — `budget_mutate` → `ProductionCore.apply_budget_op`. Sekcia Spotrebiče **vlastnú zápisovú akciu nemá** (jej jediná akcia
+navyše, `appl_job_select`, len označuje vlastníka v modeli) a panel dodáva iba to, čo jadro nevie: **ktorá entita je označená**
+([actions_appliance.rb](ui-lifecycle.md#actions_appliancerb)). Preto má každá zmena **jeden krok Späť** a rovnaké guardy bez ohľadu na to, odkiaľ prišla.
+
+**Čo zákazka o modeli vie, vie zo SNAPSHOTU.** Názov, rozmery, odkaz na obchod aj technický list v pohľade „V zákazke“ sú z kópie uloženej pri väzbe —
+zmena či vyradenie záznamu v katalógu nimi nepohne (a vyradený model sa **nepriradí**: `snapshot_for` vráti `:deleted`).
 
 ### appliance_catalog.rb
 

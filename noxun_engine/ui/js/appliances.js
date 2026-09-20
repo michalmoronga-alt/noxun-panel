@@ -53,6 +53,21 @@
   var AP_QTIMER = null;
   var AP_Q_DEBOUNCE = 200;
 
+  // --- S1-B2: pohľad „V zákazke" ---------------------------------------------
+  // POHĽAD je pamäť OKNA (ako vybraný záznam alebo zbalená skupina): prepnutie
+  // segmentu NEJDE na server a nikdy nečaká na kolo. Tabuľku aj jej PORADIE
+  // skladá server (`ST.appl.job`) — tu sa len kreslí a filtruje.
+  var AP_VIEW = 'cat';     // 'job' | 'cat'
+  var AP_JOB = null;       // posledná tabuľka zo servera
+  var AP_JOB_Q = '';       // hľadanie v tabuľke (ČISTO klientske — je to pohľad)
+  var AP_JOB_CAT = '';     // filter kategórie (to isté)
+  var AP_JOB_FOCUS = '';   // item_id prisvieteného riadku (kotva z Kontroly)
+  // IDENTITA PAYLOADU, z ktorého je tabuľka vykreslená: dokument a generácia
+  // okna. Posiela sa s „okom" (jediná akcia sekcie, ktorá siaha do modelu) —
+  // klik zo zastaraného pohľadu by inak zhodou ID a PID označil cudziu
+  // skrinku (Codex #383 kolo 1 P2).
+  var AP_JOB_DOC = { guid: '', gen: 0 };
+
   var AP_STUDIO = (typeof module !== 'undefined' && module.exports)
     ? require('./studio.js')            // Node testy
     : null;
@@ -120,6 +135,11 @@
     // a tlačidlo „Nový spotrebič" by už nikdy nič neotvorilo.
     AP_FORM_WAIT = false;
     if (p.form) AP_FORM = p.form;
+    // S1-B2: tabuľka „V zákazke" chodí LEN plným pushom (patrí dokumentu),
+    // kým strom aj echo po zápise do katalógu chodia bez nej. Bez tejto
+    // podmienky by echo katalógu vymazalo tabuľku a pohľad by sa vyprázdnil
+    // po uložení modelu, s ktorým nemá nič spoločné.
+    if (p.job) AP_JOB = p.job;
     if (!apIsActive()) return;
     apRenderTools();
     apRenderBody();
@@ -177,20 +197,28 @@
 
   function apToolsState(){
     var t = AP_TREE || {};
-    return { query: AP_Q, deleted: AP_DEL,
+    return { view: AP_VIEW, query: AP_Q, deleted: AP_DEL,
              total: Number(t.total || 0), seed: Number(t.seed_total || 0),
-             writable: t.writable !== false };
+             writable: t.writable !== false,
+             job: AP_JOB, jobQuery: AP_JOB_Q, jobCat: AP_JOB_CAT };
   }
 
-  // Čistá funkcia (Node test). Pohľad „V zákazke" je `aria-disabled` — nie
-  // `disabled`: klik naň POVIE DÔVOD (D-78), zatiaľ čo HTML `disabled` by ho
-  // vyhodilo z Tab poradia a mlčalo by.
+  // Segment pohľadov (S1-B2: OBA sú aktívne — „V zákazke" už nie je
+  // `aria-disabled` placeholder z A2).
+  function apViewSegHtml(view){
+    var job = view === 'job';
+    return '<div class="bomviews">' +
+      '<button type="button" class="bomvw' + (job ? ' on' : '') + '" data-ap="view" data-v="job"' +
+      ' title="Spotrebiče TEJTO zákazky — kde patria a čo hovorí kontrola">V zákazke</button>' +
+      '<button type="button" class="bomvw' + (job ? '' : ' on') + '" data-ap="view" data-v="cat"' +
+      ' title="Katalóg modelov tohto počítača">Katalóg</button></div>';
+  }
+
+  // Čistá funkcia (Node test).
   function apToolsHtml(s){
     var st = s || {};
-    var h = '<div class="bomviews">' +
-      '<button type="button" class="bomvw" data-ap="view" data-v="job" aria-disabled="true"' +
-      ' title="Pohľad V zákazke — príde v S1-B (väzba spotrebiča na skrinku)">V zákazke</button>' +
-      '<button type="button" class="bomvw on" data-ap="view" data-v="cat">Katalóg</button></div>';
+    if (st.view === 'job') return apJobToolsHtml(st);
+    var h = apViewSegHtml('cat');
     h += '<button type="button" class="primary" data-ap="new"' +
          (st.writable ? '' : ' aria-disabled="true"') +
          ' title="Nový model do katalógu tohto počítača">' + apIco('plus') + ' Nový spotrebič</button>';
@@ -201,6 +229,31 @@
          (st.deleted ? ' checked' : '') + '> vyradené</label>';
     h += '<span class="spacer"></span><span class="sechint">Katalóg je tohto počítača · bez cien · ' +
          apEsc(apCountLabel(st.total, st.seed)) + '</span>';
+    return h;
+  }
+
+  // Lišta pohľadu „V zákazke" (mockup R3). Hľadanie aj kategória sú ČISTO
+  // klientske — zužujú TO, ČO UŽ V OKNE JE, takže nechodia na server a ani
+  // nemôžu preskladať poradie, ktoré server poslal.
+  function apJobToolsHtml(s){
+    var st = s || {};
+    var job = st.job || {};
+    var h = apViewSegHtml('job');
+    h += '<button type="button" class="primary" data-ap="jadd"' +
+         ' title="Vyber model z katalógu a priraď mu vlastníka">' +
+         apIco('plus') + ' Pridať do zákazky</button>';
+    h += '<div class="searchbox">' + apIco('search') +
+         '<input type="text" id="apJobQ" placeholder="Hľadať model, skrinku…" value="' +
+         apEsc(st.jobQuery) + '"></div>';
+    h += '<select id="apJobCat" title="Kategória"><option value="">Všetky kategórie</option>';
+    (job.categories || []).forEach(function(c){
+      var code = String(c[0]);
+      h += '<option value="' + apEsc(code) + '"' + (code === st.jobCat ? ' selected' : '') + '>' +
+           apEsc(c[1]) + '</option>';
+    });
+    h += '</select>';
+    h += '<span class="spacer"></span><span class="sechint">' +
+         apEsc(job.summary || 'zatiaľ žiadne spotrebiče') + '</span>';
     return h;
   }
 
@@ -219,6 +272,12 @@
   function apRenderTools(){
     var box = apEl('sectools');
     if (!box) return;
+    // S1-B2: to isté pre hľadanie v pohľade „V zákazke" — plný push chodí aj
+    // uprostred písania (prepočet zákazky), a výmena uzla by vzala fokus.
+    // Text je čisto klientsky, takže sa nemá čím rozísť; prekreslenie sa len
+    // odloží na chvíľu, keď v poli nikto nepíše.
+    var jq = apEl('apJobQ');
+    if (typeof document !== 'undefined' && jq && document.activeElement === jq) return;
     var q = apEl('apQ');
     if (typeof document !== 'undefined' && q && document.activeElement === q){
       var hint = box.querySelector ? box.querySelector('.sechint') : null;
@@ -363,9 +422,12 @@
       '</span>' + (card.seed ? '<span class="apbadge">seed</span>' : '') +
       (card.deleted ? '<span class="apbadge tomb">vyradený</span>' : '') +
       '<span class="acts">' +
-      '<button type="button" class="primary" data-ap="tojob" aria-disabled="true"' +
-      ' title="Pridanie do zákazky príde v S1-B (väzba na skrinku, kópia rozmerov)">' +
-      apIco('plus') + ' Do zákazky</button>';
+      // S1-B2 (R2): druhé vstupné miesto TOHO ISTÉHO modalu — s modelom už
+      // vybraným. Vyradený záznam ponuku nemá (zákazka si ho nepriradí).
+      (card.deleted ? ''
+        : '<button type="button" class="primary" data-ap="tojob"' +
+          ' title="Pridá do tejto zákazky s kópiou rozmerov a výberom vlastníka">' +
+          apIco('plus') + ' Do zákazky</button>');
     if (card.writable !== false){
       h += '<button type="button" class="ghostbtn" data-ap="edit" title="Upraviť záznam katalógu">' +
            apIco('pencil') + ' Upraviť</button>';
@@ -387,14 +449,133 @@
   }
 
   function apBodyHtml(){
+    if (AP_VIEW === 'job') return apJobHtml(AP_JOB);
     return apBannerHtml(AP_TREE) + '<div class="apwrap">' +
            apTreeHtml(AP_TREE) + apCardHtml(AP_CARD, AP_THUMBS) + '</div>';
+  }
+
+  // --- S1-B2: TABUĽKA „V zákazke" ---------------------------------------------
+  //
+  // Riadky, ich poradie, stav aj ceny skladá SERVER (`ui/appliance_dialog.rb`,
+  // `job_view`). Tento kód kreslí presne to, čo dostal — NIČ nedopočítava,
+  // NIČ nepreskladáva a ani neradí; jediné, čo robí sám, je ZÚŽENIE zoznamu
+  // podľa hľadania a kategórie (to je pohľad, nie dáta).
+
+  // Čistá funkcia (Node test): payload + filtre -> riadky na vykreslenie.
+  function apJobRows(job, query, category){
+    var rows = (job && job.rows) ? job.rows : [];
+    var q = String(query == null ? '' : query).trim().toLowerCase();
+    var cat = String(category == null ? '' : category);
+    return rows.filter(function(r){
+      if (cat && String(r.category || '') !== cat) return false;
+      if (!q) return true;
+      var hay = [r.model, r.model_sub, r.owner_label, r.owner_desc, r.category_label]
+        .map(function(x){ return String(x == null ? '' : x).toLowerCase(); }).join(' ');
+      return hay.indexOf(q) >= 0;
+    });
+  }
+
+  function apJobChip(row){
+    var tone = String((row && row.tone) || 'info');
+    var ic = tone === 'ok' ? 'check' : (tone === 'info' ? 'info' : 'alert');
+    var title = row && row.status_title ? ' title="' + apEsc(row.status_title) + '"' : '';
+    return '<span class="apchip ' + apEsc(tone) + '"' + title + '>' + apIco(ic) +
+           apEsc(row ? row.status_text : '') + '</span>';
+  }
+
+  function apJobActsHtml(r){
+    var a = r.actions || {};
+    var id = apEsc(r.item_id || '');
+    var h = '<span class="rowact">';
+    if (a.select){
+      h += '<button type="button" data-ap="jsel" data-id="' + id + '"' +
+           ' title="Označiť vlastníka v modeli" aria-label="Označiť vlastníka">' +
+           apIco('eye') + '</button>';
+    }
+    if (a.edit){
+      h += '<button type="button" data-ap="jedit" data-id="' + id + '"' +
+           ' title="Upraviť položku (názov, cena, vlastník…)" aria-label="Upraviť položku">' +
+           apIco('pencil') + '</button>';
+    }
+    if (a.shop){
+      h += '<button type="button" data-ap="url" data-u="' + apEsc(r.shop_url) + '"' +
+           ' title="Otvoriť odkaz na obchod" aria-label="Odkaz na obchod">' +
+           apIco('external-link') + '</button>';
+    }
+    if (a.sheet){
+      h += '<button type="button" data-ap="url" data-u="' + apEsc(r.sheet_url) + '"' +
+           ' title="Otvoriť technický list" aria-label="Technický list">' +
+           apIco('file-text') + '</button>';
+    }
+    if (a.assign){
+      h += '<button type="button" class="linkbtn" data-ap="jassign" data-c="' + apEsc(r.category) +
+           '" data-ok="' + apEsc(r.owner.kind) + '" data-oid="' + apEsc(r.owner.id) + '"' +
+           ' title="Vybrať model a priradiť ho tomuto vlastníkovi">vybrať…</button>';
+    }
+    if (a.unbind){
+      h += '<button type="button" data-ap="junbind" data-id="' + id + '"' +
+           ' title="Odpojiť od vlastníka (ostane v zákazke)" aria-label="Odpojiť">' +
+           apIco('unlink') + '</button>';
+    }
+    if (a.remove){
+      h += '<button type="button" data-ap="jdel" data-id="' + id + '"' +
+           ' title="Zmazať položku zo zákazky" aria-label="Zmazať položku">' + apIco('trash') + '</button>';
+    }
+    return h + '</span>';
+  }
+
+  function apJobRowHtml(r){
+    var warn = r.tone === 'warn';
+    var focus = AP_JOB_FOCUS && r.item_id && String(r.item_id) === AP_JOB_FOCUS;
+    return '<tr class="apjrow' + (warn ? ' warn' : '') + (focus ? ' focus' : '') + '"' +
+      ' data-apjob="' + apEsc(r.item_id || ('x:' + r.owner.kind + ':' + r.owner.id + ':' + r.category)) + '">' +
+      '<td><span class="apjcat">' + apIco('appliance') + apEsc(r.category_label) + '</span></td>' +
+      '<td class="apjmodel"><b>' + apEsc(r.model) + '</b><small>' + apEsc(r.model_sub) + '</small></td>' +
+      '<td class="apjowner"><span class="oid">' + apEsc(r.owner_label) + '</span>' +
+      '<span class="odesc">' + apEsc(r.owner_desc) + '</span></td>' +
+      '<td>' + apJobChip(r) + '</td>' +
+      '<td class="num">' + (r.customer_supplied
+        ? '<span class="apchip cust">' + apEsc(r.price_text) + '</span>' : apEsc(r.price_text)) + '</td>' +
+      '<td class="acth">' + apJobActsHtml(r) + '</td></tr>';
+  }
+
+  function apJobHtml(job){
+    if (!job){
+      return '<div class="apempty">Zákazka sa ešte nenačítala — otvor Štúdio znova alebo daj „Obnoviť".</div>';
+    }
+    var rows = apJobRows(job, AP_JOB_Q, AP_JOB_CAT);
+    var h = '<table class="bomtab apjob"><thead><tr><th>Kategória</th><th>Model</th>' +
+      '<th>Vlastník</th><th>Kontrola</th><th class="num">Cena (Rozpočet)</th>' +
+      '<th class="acth"></th></tr></thead><tbody>';
+    if (!rows.length){
+      h += '<tr><td colspan="6" class="apempty">' +
+           ((job.rows || []).length ? 'Filtru nič nezodpovedá.'
+             : 'Zákazka zatiaľ žiadny spotrebič nemá — pridaj ho tlačidlom vyššie.') +
+           '</td></tr>';
+    }
+    rows.forEach(function(r){ h += apJobRowHtml(r); });
+    h += '</tbody></table>';
+    h += '<div class="totrow"><span><b>' + apEsc(job.summary || '') + '</b></span>' +
+      '<span class="spacer"></span><span class="tmuted">Rozpočet → </span>' +
+      '<button type="button" class="linkbtn" data-ap="jbudget"' +
+      ' title="Otvoriť sekciu Rozpočet na spotrebičoch">Spotrebiče a vybavenie: ' +
+      apEsc(job.subtotal_text || '—') + ' ' + apIco('external-link') + '</button>' +
+      (job.subtotal_included ? '' : '<span class="apnote">(nezapočítané do SPOLU — prepínač v Rozpočte)</span>') +
+      '</div>';
+    h += '<div class="apnote apjhint">Vlastník podľa kategórie: rúra · mikrovlnka · chladnička = skrinka; ' +
+      'umývačka = slot; varná doska · drez = pracovná doska; digestor · iné = len zákazka. ' +
+      'Kontrola varuje, nikdy neblokuje. Zákazka drží kópiu rozmerov z katalógu — zmena katalógu ňou nepohne.</div>';
+    return h;
   }
 
   function apRenderBody(){
     var box = apEl('secbody');
     if (!box) return;
     box.innerHTML = apBodyHtml();
+    // S1-B2: pohľad „V zákazke" nemá strom, kartu ani modal katalógu, takže
+    // si nepýta ani formulár, ani miniatúry — jediný payload, z ktorého
+    // kreslí, už v okne je.
+    if (AP_VIEW === 'job') return;
     apRequestForm(null);
     apHealFilter();
     // Miniatúry sa pýtajú PO každom vykreslení, nielen po príchode karty
@@ -523,6 +704,10 @@
     AP_TOKEN = '';
     AP_Q = '';
     AP_DEL = false;
+    // Prisvietený riadok je JEDNORAZOVÁ kotva z Kontroly — po odchode zo
+    // sekcie už nemá čo zvýrazňovať. Pohľad (segment) si okno PAMÄTÁ: je to
+    // to isté rozhodnutie ako vybraný záznam v strome.
+    AP_JOB_FOCUS = '';
     apSend('appl_leave', {});
   }
   if (typeof window !== 'undefined') window.apOnLeaveSection = apOnLeaveSection;
@@ -782,6 +967,158 @@
   // stránku a stratiť celý stav Štúdia.
   function apOpenUrl(url){ apSend('appl_open_url', { url: url }); }
 
+  // --- S1-B2: akcie pohľadu „V zákazke" ---------------------------------------
+  //
+  // ZÁPISY IDÚ CEZ ROZPOČET. Väzba spotrebiča má JEDEN transakčný vstup
+  // (`ApplianceBinding.apply!`) a jeden kanál, ktorým sa k nemu chodí
+  // (`budget_mutate` v `budget.js`) — druhý kanál by znamenal druhú sadu
+  // guardov, druhý spôsob, ako spraviť krok Späť, a dve miesta, ktoré by sa
+  // časom rozišli. `budget.js` beží v TOM ISTOM okne aj scope, takže sa volá
+  // priamo; keď tam z akéhokoľvek dôvodu nie je, akcia to POVIE (nikdy ticho).
+  function apBudMissing(){
+    AP.setStatus('Rozpočet sa nenačítal — zavri a otvor Štúdio znova.', true);
+    return false;
+  }
+
+  function apJobSend(op, extra){
+    if (typeof budSend !== 'function') return apBudMissing();
+
+    budSend(op, extra);
+    return true;
+  }
+
+  // JEDEN modal pre OBE vstupné miesta (R2): „Pridať do zákazky" v tomto
+  // pohľade aj „Do zákazky" v karte katalógu. Je to TEN ISTÝ komponent, aký
+  // otvára Rozpočet (`budOpenDraft('appliance')`) — vrátane našepkávača
+  // katalógu, ponuky vlastníkov podľa matice a príznaku „dodáva zákazník".
+  function apOpenApplDraft(values){
+    if (typeof budOpenDraft !== 'function') return apBudMissing();
+
+    budOpenDraft('appliance', values || null);
+    return true;
+  }
+
+  // Zobrazovaný názov modelu skladá server všade rovnako („výrobca model") —
+  // tu sa lepí len preto, že karta nesie obe polia zvlášť; presne ten istý
+  // reťazec dá našepkávač katalógu (`appliance_lookup_item`).
+  function apCardTitle(card){
+    var c = card || {};
+    return [String(c.manufacturer || ''), String(c.name || '')]
+      .filter(function(x){ return x !== ''; }).join(' ');
+  }
+
+  // „Do zákazky" z karty katalógu (R2) = ten istý modal, len s predvyplneným
+  // modelom. VYRADENÝ záznam sa nepriraďuje — server ho odmietne
+  // (`snapshot_for` -> `:deleted`), takže tlačidlo o tom povie hneď.
+  function apCardToJob(){
+    var card = AP_CARD;
+    if (!card){ AP.setStatus('Vyber model v strome vľavo.', true); return false; }
+    if (card.deleted){
+      AP.setStatus('Vyradený model sa do zákazky nepriraďuje — najprv ho obnov.', true);
+      return false;
+    }
+    var title = apCardTitle(card);
+    return apOpenApplDraft({ catalog_id: card.id, catalog_text: title,
+                             typ: card.category, nazov: title,
+                             dodavatel: String(card.manufacturer || '') });
+  }
+
+  function apJobRow(id){
+    var rows = (AP_JOB && AP_JOB.rows) ? AP_JOB.rows : [];
+    var found = null;
+    rows.forEach(function(r){ if (String(r.item_id || '') === String(id || '')) found = r; });
+    return found;
+  }
+
+  // „Oko": označenie vlastníka v modeli. Identitu (druh + ID + PID) posiela
+  // SERVER v riadku — klient si ju nikdy neskladá z textu.
+  function apJobSelect(id){
+    var r = apJobRow(id);
+    if (!r || !r.owner) return false;
+
+    return apSend('appl_job_select', { kind: r.owner.kind, id: r.owner.id, pid: r.owner.pid,
+                                       model_guid: AP_JOB_DOC.guid, gen: AP_JOB_DOC.gen });
+  }
+
+  function apJobUnbind(id){
+    return apJobSend('appliance_owner', { id: id, owner: { kind: 'job', id: '', pid: null } });
+  }
+
+  // Zmazanie položky = D-15 DANGER potvrdenie (rovnaký kontrakt ako vyradenie
+  // z katalógu). Viazanú položku odpojí SERVER v tej istej operácii
+  // (`ApplianceBinding` op `remove`), takže je to jeden krok Späť.
+  function apJobDelete(id){
+    var r = apJobRow(id);
+    var m = (typeof window !== 'undefined') ? window.NXModal : null;
+    if (!r) return false;
+    if (!m || typeof m.open !== 'function'){
+      AP.setStatus('Mazanie potrebuje dialóg Štúdia — zavri a otvor Štúdio znova.', true);
+      return false;
+    }
+    m.open({
+      title: 'Zmazať zo zákazky',
+      sub: 'Položku „' + r.model + '" odstrániť z rozpočtu?',
+      note: (r.actions && r.actions.unbind)
+        ? 'Spotrebič sa zároveň odpojí od vlastníka — jedna zmena, jeden krok Späť.'
+        : 'Riadok zmizne z rozpočtu aj z cenovej ponuky. Vrátiť sa dá krokom Späť.',
+      okLabel: 'Zmazať', danger: true, fields: [],
+      onSubmit: function(){
+        m.close();
+        apJobSend('appliance_remove', { id: id });
+      }
+    });
+    return true;
+  }
+
+  function apJobBudget(){
+    if (typeof studioGoSection === 'function') studioGoSection('budget');
+    if (typeof budGoto === 'function') budGoto('appliances');
+  }
+
+  function apJobSearch(text){
+    AP_JOB_Q = String(text == null ? '' : text);
+    if (apIsActive()) apRenderBody();
+    return AP_JOB_Q;
+  }
+
+  function apJobFilter(code){
+    AP_JOB_CAT = String(code == null ? '' : code);
+    if (apIsActive()) apRenderBody();
+    return AP_JOB_CAT;
+  }
+
+  function apSetView(view){
+    var v = view === 'job' ? 'job' : 'cat';
+    if (AP_VIEW === v) return false;
+
+    AP_VIEW = v;
+    if (v !== 'job') AP_JOB_FOCUS = '';
+    if (apIsActive()){ apRenderTools(); apRenderBody(); }
+    return true;
+  }
+
+  // DEEP-LINK z Kontroly (`route: 'appl'`, kotva `appliance:<uuid>`): prepne
+  // pohľad na „V zákazke" a riadok prisvieti. Riadok, ktorý medzitým zanikol,
+  // NIE JE tichý no-op — volajúci (studio.js) to povie nahlas.
+  function apOpenAnchor(anchor){
+    var raw = String(anchor == null ? '' : anchor);
+    if (raw.indexOf('appliance:') !== 0) return false;
+
+    var id = raw.slice('appliance:'.length);
+    AP_VIEW = 'job';
+    AP_JOB_FOCUS = id;
+    AP_JOB_Q = '';
+    AP_JOB_CAT = '';
+    if (apIsActive()){ apRenderTools(); apRenderBody(); }
+    if (!apJobRow(id)) return false;
+
+    var el = (typeof document !== 'undefined')
+      ? document.querySelector('[data-apjob="' + id + '"]') : null;
+    if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center' });
+    return true;
+  }
+  if (typeof window !== 'undefined') window.apOpenAnchor = apOpenAnchor;
+
   // --- listenery ---------------------------------------------------------------
 
   if (typeof document !== 'undefined'){
@@ -793,12 +1130,23 @@
       if (!act) return;
       var a = act.getAttribute('data-ap');
       var id = act.getAttribute('data-id');
-      if (a === 'view'){
-        if (act.getAttribute('data-v') === 'job'){
-          AP.setStatus('Pohľad „V zákazke" príde v dávke S1-B — vtedy sa spotrebič naviaže na skrinku.', true);
-        }
+      if (a === 'view'){ apSetView(act.getAttribute('data-v')); return; }
+      // S1-B2: riadky pohľadu „V zákazke".
+      if (a === 'jadd'){ apOpenApplDraft(null); return; }
+      if (a === 'jassign'){
+        apOpenApplDraft({ typ: act.getAttribute('data-c'),
+                          owner: act.getAttribute('data-ok') + ':' + act.getAttribute('data-oid') });
         return;
       }
+      if (a === 'jsel'){ apJobSelect(id); return; }
+      if (a === 'jedit'){
+        if (typeof budOpenApplEdit === 'function') budOpenApplEdit(id);
+        else apBudMissing();
+        return;
+      }
+      if (a === 'junbind'){ apJobUnbind(id); return; }
+      if (a === 'jdel'){ apJobDelete(id); return; }
+      if (a === 'jbudget'){ apJobBudget(); return; }
       if (a === 'grp'){ apToggleGroup(act.getAttribute('data-g')); return; }
       if (a === 'sel'){ apSelect(id); return; }
       if (a === 'new'){ apOpenModal('create'); return; }
@@ -809,17 +1157,19 @@
       if (a === 'thumb'){ apSetThumb(id); return; }
       if (a === 'unfile'){ apRemoveAttachment(id); return; }
       if (a === 'open'){ apOpenAttachment(id); return; }
-      if (a === 'tojob'){
-        AP.setStatus('Pridanie do zákazky príde v dávke S1-B (väzba na skrinku a kópia rozmerov).', true);
-        return;
-      }
+      if (a === 'tojob'){ apCardToJob(); return; }
       if (a === 'url'){ apOpenUrl(act.getAttribute('data-u')); }
     });
 
     document.addEventListener('input', function(ev){
       if (!apIsActive()) return;
       var t = ev.target;
-      if (!t || t.id !== 'apQ') return;
+      if (!t) return;
+      // S1-B2: hľadanie v tabuľke je ČISTO klientske — žiadny dotaz, žiadny
+      // debounce, len prekreslenie tela (lišta ostáva, inak by pole stratilo
+      // fokus pri každom písmene).
+      if (t.id === 'apJobQ'){ apJobSearch(t.value); return; }
+      if (t.id !== 'apQ') return;
       apSearch(t.value);
     });
 
@@ -828,6 +1178,7 @@
       var t = ev.target;
       if (!t) return;
       if (t.id === 'apDel'){ apToggleDeleted(t.checked === true); return; }
+      if (t.id === 'apJobCat'){ apJobFilter(t.value); return; }
       // Kategória v modale „Nový spotrebič" mení SADU POLÍ.
       if (t.id === 'nxm_category') apOnCategoryChange(t.value);
     });
@@ -842,9 +1193,21 @@
     apSetTree(t);
   }
 
+  // Identita payloadu, ktorý tabuľku priniesol. Drží sa TU (nie v `AP_JOB`):
+  // je to vlastnosť PUSHU, nie dát — a s ňou odchádza aj platnosť akcií
+  // pohľadu (Codex #383 kolo 1 P2).
+  function apSetJobDoc(data){
+    var d = data || {};
+    AP_JOB_DOC = { guid: String(d.model_guid || ''), gen: Number(d.gen || 0) };
+    return AP_JOB_DOC;
+  }
+
   if (typeof window !== 'undefined' && window.NX && typeof NX.setStudio === 'function'){
     var apPrevSetStudio = NX.setStudio;
     NX.setStudio = function(data){
+      // PORADIE: identita sa preberá PRED dosadením tabuľky — obe patria
+      // k tomu istému pushu a akcia sa nesmie odoslať s identitou minulého.
+      apSetJobDoc(data);
       apApplyState(data && data.appl);
       apPrevSetStudio(data);
     };
@@ -867,14 +1230,30 @@
       apHealFilter: apHealFilter,
       apSelect: apSelect, apSearch: apSearch, apToggleDeleted: apToggleDeleted,
       apToggleGroup: apToggleGroup, apOnLeaveSection: apOnLeaveSection,
+      // S1-B2: pohľad „V zákazke" (tests/js/test_s1b2_pohlad.js). Čisté
+      // funkcie (`apJobHtml`, `apJobRowHtml`, `apJobRows`, `apViewSegHtml`,
+      // `apJobToolsHtml`, `apCardTitle`) + prepínače pohľadu a akcie riadku,
+      // ktoré sa inak nedajú overiť ničím než klikaním.
+      apJobHtml: apJobHtml, apJobRowHtml: apJobRowHtml, apJobRows: apJobRows,
+      apJobToolsHtml: apJobToolsHtml, apViewSegHtml: apViewSegHtml,
+      apJobChip: apJobChip, apJobActsHtml: apJobActsHtml, apCardTitle: apCardTitle,
+      apSetView: apSetView, apJobSearch: apJobSearch, apJobFilter: apJobFilter,
+      apSetJobDoc: apSetJobDoc,
+      apJobSelect: apJobSelect, apJobUnbind: apJobUnbind, apJobDelete: apJobDelete,
+      apJobRow: apJobRow, apCardToJob: apCardToJob, apOpenApplDraft: apOpenApplDraft,
+      apOpenAnchor: apOpenAnchor, apJobBudget: apJobBudget,
       apOpenModal: apOpenModal, apDelete: apDelete, apOnCategoryChange: apOnCategoryChange,
       apSetTree: apSetTree, apSetCard: apSetCard, apResult: apResult,
       apState: function(){
         return { sel: AP_SEL, q: AP_Q, deleted: AP_DEL, gen: AP_GEN, seen: AP_SEEN,
                  token: AP_TOKEN, thumbs: AP_THUMBS, form: AP_FORM,
-                 tree: AP_TREE, card: AP_CARD };
+                 tree: AP_TREE, card: AP_CARD,
+                 view: AP_VIEW, job: AP_JOB, jobQuery: AP_JOB_Q, jobCat: AP_JOB_CAT,
+                 jobFocus: AP_JOB_FOCUS, jobDoc: AP_JOB_DOC };
       },
       apReset: function(){
+        AP_VIEW = 'cat'; AP_JOB = null; AP_JOB_Q = ''; AP_JOB_CAT = ''; AP_JOB_FOCUS = '';
+        AP_JOB_DOC = { guid: '', gen: 0 };
         AP_TREE = null; AP_CARD = null; AP_FORM = null; AP_FORM_WAIT = false;
         AP_FORM_TRIED = false; AP_FORM_THEN = null;
         AP_SEL = ''; AP_Q = ''; AP_DEL = false; AP_GEN = 0; AP_SEEN = -1;

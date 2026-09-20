@@ -682,8 +682,10 @@ kvótová brána `usage` pred každým auditom a subagentom. Pravidlo 3 kôl pla
   PID+ID+druh · odpojený · novší config · bariéra observera bežia PRED `start_operation`; `ensure_root_context` len pri skutočnej prestavbe), `Bom.collect[:appliances]`,
   Kontrola `appliance_owner_missing` (bez `owner_id`, deep-link do Rozpočtu) · `appliance_specs_missing` · `appliance_class_mismatch`, modal Rozpočtu
   (Z katalógu · vlastník · prepínač) viazaný na dokument. **Review: 3 kolá Codexu** (1×P1+4×P2 · 1×P1+3×P2 · 4×P2) → interná verifikácia delty.
-- **S1-B2 (čaká) · UI väzby** — pohľad **V zákazke** (mockup R3–R5), **riadok Spotrebič** v Inspectore a v karte dosky (R9–R11), **telo slotu z väzby** (`source: 'catalog'`),
-  výber podľa niky. Podklad má hotový: `collected[:appliances]` nesie stav aj `expected_missing`, `appliance_refs[]` nesú `body`/`niche`/`bands`.
+- **S1-B2 ✅ PR #383, v0.12.14 · UI väzby** — pohľad **V zákazke** (mockup R3–R5: tabuľka so stavmi, riadky „nevybraný“ a „vlastník zmizol“, badge navigácie, medzisúčet ako preklik),
+  **jeden D-15 modal** pre „Pridať do zákazky“ aj „Do zákazky“ z karty katalógu, **riadok Spotrebič** v Základných aj v karte dosky (R9–R11; ponuka filtrovaná podľa niky len po osiach
+  kategórie, filter nie je brána) a **telo slotu z väzby** (`Construction.dw_body_dims`, `source: 'catalog'` + `item_id`). Zápisy idú existujúcim kanálom rozpočtu
+  (`ApplianceBinding.apply!` = 1 krok Späť); nález Kontroly o spotrebiči vedie deep-linkom do sekcie Spotrebiče. Nové: `ui/panel/actions_appliance.rb`, `ui/js/appliance_row.js`.
 - *(pôvodné zadanie S1-B, ponechané ako kontrakt)* — snapshot (identita + rozmery + odkazy + prílohy), `appliance_refs[]`
   obojsmerná väzba (položky „len zákazka" = výslovná výnimka), matica kategória → vlastník, pohľad V zákazke, riadok Spotrebič v Inspectore (mockup R3–R5, R9–R11). Kontraktové body zo
   Codex kôl: **jedna kanonická sada kódov kategórií = kódy katalógu + explicitná obojsmerná migrácia legacy kódov rozpočtu** (`chladnicka rura mikrovlnka umyvacka digestor varna_doska ine`

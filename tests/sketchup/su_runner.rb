@@ -4204,7 +4204,7 @@ module NoxunSuRunner
         route: ->(rt) { routed = rt }
       )
       ok("S1-B1 (kolo 1): klik na sirotu vratil ADRESU SEKCIE (#{routed.inspect})",
-         routed.is_a?(Hash) && routed['section'] == 'budget' &&
+         routed.is_a?(Hash) && routed['section'] == 'appl' &&
          routed['anchor'] == "appliance:#{id}")
       ok('S1-B1 (kolo 1): a VYBER sa nedotkol (ziadna cudzia skrinka sa neoznacila)',
          model.selection.to_a == before)
@@ -4500,6 +4500,255 @@ module NoxunSuRunner
     e::ScaleWatch.flush_pending!(model)
     r14_clear!(model)
   end
+
+  # --- S1-B2: POHLAD „V zákazke“, RIADOK SPOTREBIC, TELO SLOTU Z VAZBY ------
+  #
+  # CO SA TU OVERUJE (a headless sa overit NEDA):
+  #   (a) riadok „Spotrebič“ v Zakladnych nad REALNOU skrinkou — ocakavanie zo
+  #       sablony, ponuka z poloziek zakazky a priradenie cez AKCIU PANELA
+  #       (cielom je OZNACENA entita, nie payload klienta), JEDEN krok Spat,
+  #   (b) TELO SLOTU sa po priradeni modelu naozaj PREKRESLI v modeli
+  #       (geometria referencie, nie len cislo v payloade) a odpojenie ho
+  #       vrati na genericke,
+  #   (c) DOSKA: vazba zapise `appliance_refs[]` BEZ prestavby (dielec ostava
+  #       ten isty kus geometrie),
+  #   (d) POHLAD „V zákazke“ nad realnym zberom — stavy, vlastnici a riadok
+  #       „nevybraný“ pre skrinku, ktora spotrebic ocakava,
+  #   (e) DELETE vlastnika beznym Delete-om: „vlastník zmizol“ -> „Odpojiť“ ->
+  #       „len zákazka“; Spat vrati skrinku AJ vazbu.
+  #
+  # Katalog je IZOLOVANY (`test_dir_override`) — zivy %APPDATA% katalog
+  # vyvojara sa necita ani nezapisuje (lekcia S1-B1).
+
+  # Katalog sekcie: chladnicka + umyvacka (zo S1-B1) + VARNA DOSKA.
+  def s1b2_catalog!(root)
+    fridge_id, dw_id = s1b1_catalog!(root)
+    _, hob = e::ApplianceCatalog.create!(
+      'category' => 'hob', 'manufacturer' => 'Whirlpool', 'name' => 'SU WL B1160',
+      'dims' => { 'body' => { 'width' => 590.0, 'depth' => 510.0 } }
+    )
+    [fridge_id, dw_id, hob[:record]['id'].to_s]
+  end
+
+  def s1b2_rows(inst)
+    Array(e::Panel.cabinet_payload(inst)['appliance_rows'])
+  end
+
+  # Akcia PANELA (`set_appliance_owner`) nad OZNACENOU entitou — presne cesta,
+  # ktorou ide klik v Inspectore. Bez dialogu je `set_status` no-op, takze sa
+  # da volat priamo.
+  def s1b2_pick(model, inst, item_id, unbind: false, echo: nil)
+    model.selection.clear
+    model.selection.add(inst)
+    # Identita dokumentu je POVINNA (panel ju posiela cez `nxDocPayload`;
+    # `foreign_document?` prazdny udaj NETOLERUJE — na rozdiel od rozpoctu).
+    payload = { 'item_id' => item_id, 'model_guid' => e::DocKey.key(model) }
+    payload['unbind'] = true if unbind
+    if echo
+      payload[e::Store.kind(inst).to_s == 'board' ? 'board_id' : 'cabinet_id'] = echo
+    end
+    e::Panel.handle_set_appliance_owner(payload.to_json)
+  end
+
+  # Telo referencie slotu tak, ako STOJI V MODELI (nie ako ho tvrdi payload).
+  # POZOR na SketchUp API: `BoundingBox#height` je rozmer po osi Y a `#depth`
+  # po osi Z (nie naopak) — vraciame preto [x, y, z] = [sirka, hlbka, vyska].
+  def s1b2_body_box(slot)
+    ref = s1e_refs(slot).first
+    return nil unless ref
+
+    bb = ref.definition.bounds
+    [bb.width.to_f, bb.height.to_f, bb.depth.to_f].map { |v| (v * 25.4).round(1) }
+  end
+
+  def s1b2_job_view(model)
+    col = e::Bom.collect(model)
+    budget = e::ProductionCore.budget_payload(model, e::Bom.compute(col), col)
+    control = e::ProductionCore.control_payload(col, budget: budget)
+    e::ApplianceDialog.job_view(Array(col[:appliances]), e::BudgetStore.appliances(model),
+                                budget, control)
+  end
+
+  def s1b2_job_row(view, id)
+    Array(view['rows']).find { |r| r['item_id'].to_s == id.to_s }
+  end
+
+  # Skrinka je ZAMERNE nizka (2000): nika chladnicky ma vysku min 1940, takze
+  # sa do vnutra NEZMESTI — riadok to ma priznat a ponuku NEZABLOKOVAT.
+  S1B2_CAB = { 'type' => 'lower', 'width' => 600.0, 'height' => 2000.0, 'depth' => 580.0,
+               'thickness' => 18.0, 'floor_height' => 100.0,
+               'appliance_expects' => ['fridge'] }.freeze
+  S1B2_SLOT = { 'type' => 'dishwasher', 'width' => 600.0, 'height' => 870.0, 'depth' => 560.0,
+                'thickness' => 18.0, 'dw_class' => 600, 'dw_body_height' => 820.0,
+                'dw_front_bottom' => 64.0, 'dw_front_height' => 776.0 }.freeze
+
+  def run_s1b2(model)
+    cleanup(model)
+    r14_clear!(model)
+    root = File.join(Sketchup.temp_dir, "noxun_s1b2_#{Process.pid}_#{Time.now.to_i}")
+    FileUtils.mkdir_p(root)
+    fridge_id, dw_id, hob_id = s1b2_catalog!(root)
+    ok('S1-B2: izolovany katalog ma vsetky tri testovacie modely',
+       ![fridge_id, dw_id, hob_id].any? { |i| i.to_s.empty? })
+
+    cab = e::CabinetBuilder.build(model, S1B2_CAB)
+    return ok('S1-B2: fixtura skrinky', false) unless cab
+
+    cid = e::Store.get(cab, 'cabinet_id').to_s
+
+    # (a) RIADOK SPOTREBICA: ocakavanie -> ponuka -> priradenie -> 1 Spat.
+    rows = s1b2_rows(cab)
+    ok("S1-B2 (a): skrinka so sablonovym ocakavanim ma riadok ocakavania (#{rows.length})",
+       rows.length == 1 && rows.first['state'] == 'expected' &&
+       rows.first['category'] == 'fridge')
+    ok('S1-B2 (a): prazdna zakazka ponuku nema, a riadok to POVIE',
+       Array(rows.first['options']).empty? && rows.first['sub'].to_s.include?('zákazka'))
+
+    s1b1_apply(model, 'create', attrs: { 'nazov' => 'Beko' }, catalog_id: fridge_id)
+    item_id = s1b1_items(model).first['id']
+    rows = s1b2_rows(cab)
+    opts = Array(rows.first['options'])
+    ok("S1-B2 (a): volna polozka zakazky je v ponuke (#{opts.map { |o| o['text'] }.inspect})",
+       opts.length == 1 && opts.first['item_id'] == item_id)
+    ok('S1-B2 (a): a NESEDI — nika 1940 sa do vnutra tejto skrinky nezmesti',
+       opts.first['fits'] == false && opts.first['hint'].to_s.include?('výška'))
+
+    s1b2_pick(model, cab, item_id, echo: cid)
+    ok("S1-B2 (a): priradenie z riadku zapise vazbu (#{s1b1_refs(cab).length} refs)",
+       s1b1_refs(cab).length == 1 && s1b1_refs(cab).first['item_id'] == item_id)
+    ok('S1-B2 (a): polozka ukazuje na TU skrinku',
+       s1b1_owner(model, item_id) == { 'kind' => 'cabinet', 'id' => cid })
+    bound = s1b2_rows(cab)
+    ok("S1-B2 (a): riadok je teraz VIAZANY a menuje model (#{bound.first['text']})",
+       bound.length == 1 && bound.first['state'] == 'bound' &&
+       bound.first['text'].to_s.include?('Beko'))
+    Sketchup.undo
+    ok("S1-B2 (a): JEDEN Spat vratil vazbu aj riadok (#{s1b1_refs(cab).length} refs)",
+       s1b1_refs(cab).empty? && s1b2_rows(cab).first['state'] == 'expected')
+
+    # Echo ID z CUDZIEHO vyberu sa odmietne (stary DOM nesmie prepisat inu skrinku).
+    s1b2_pick(model, cab, item_id, echo: 'CAB-NEEXISTUJE')
+    ok('S1-B2 (a): zapis s cudzim echo ID sa NEVYKONA', s1b1_refs(cab).empty?)
+
+    # (b) SLOT: telo z katalogu, prekreslene v MODELI.
+    slot = e::CabinetBuilder.build(
+      model, S1B2_SLOT, transform: Geom::Transformation.translation(e::Units.point(2000.0, 0, 0))
+    )
+    if slot
+      sid = e::Store.get(slot, 'cabinet_id').to_s
+      generic = s1b2_body_box(slot)
+      ok("S1-B2 (b): bez vazby je telo GENERICKE (#{generic.inspect})",
+         generic && (generic[0] - 598.0).abs < 1.0)
+      s1b1_apply(model, 'create', attrs: { 'nazov' => 'Bosch' }, catalog_id: dw_id)
+      dw_item = s1b1_items(model).find { |i| i['typ'] == 'dishwasher' }['id']
+      s1b2_pick(model, slot, dw_item, echo: sid)
+      slot = cabinets(model).find { |i| e::Store.get(i, 'cabinet_id').to_s == sid }
+      box = s1b2_body_box(slot)
+      ok("S1-B2 (b): po priradeni je telo Z KATALOGU 448 x 550 x 820 (#{box.inspect})",
+         box && (box[0] - 448.0).abs < 1.0 && (box[1] - 550.0).abs < 1.0 &&
+         (box[2] - 820.0).abs < 1.0)
+      ok("S1-B2 (b): generika triedy 600 sa uz nekresli (#{generic.inspect})",
+         generic && (generic[0] - 598.0).abs < 1.0 && (generic[1] - 555.0).abs < 1.0)
+      refcfg = e::Store.config(s1e_refs(slot).first) || {}
+      ok("S1-B2 (b): referencia sa prizna ako KATALOGOVA (#{refcfg['source']})",
+         refcfg['source'] == 'catalog' && refcfg['item_id'].to_s == dw_item)
+      pay = e::Panel.cabinet_payload(slot)['slot']
+      ok("S1-B2 (b): vystup tela menuje MODEL (#{pay['body']} · #{pay['body_note']})",
+         pay['body'].to_s.start_with?('448') && pay['body_note'].to_s.include?('Bosch'))
+      ok("S1-B2 (b): trieda 450 v slote 600 sa prizna (#{pay['class_text']})",
+         pay['class_state'] == 'mismatch' && pay['class_text'].to_s.include?('✗'))
+      Sketchup.undo
+      slot = cabinets(model).find { |i| e::Store.get(i, 'cabinet_id').to_s == sid }
+      back = s1b2_body_box(slot)
+      ok("S1-B2 (b): JEDEN Spat vratil GENERICKE telo (#{back.inspect})",
+         back && (back[0] - 598.0).abs < 1.0 && s1b1_refs(slot).empty?)
+      s1b2_pick(model, slot, dw_item, echo: sid)
+      slot = cabinets(model).find { |i| e::Store.get(i, 'cabinet_id').to_s == sid }
+      s1b2_pick(model, slot, dw_item, unbind: true, echo: sid)
+      slot = cabinets(model).find { |i| e::Store.get(i, 'cabinet_id').to_s == sid }
+      after = s1b2_body_box(slot)
+      ok("S1-B2 (b): odpojenie vrati generiku aj vlastnika bez vazby (#{after.inspect})",
+         after && (after[0] - 598.0).abs < 1.0 &&
+         s1b1_owner(model, dw_item) == { 'kind' => 'job' })
+      s1b1_apply(model, 'remove', item_id: dw_item)
+      slot.erase! if slot && slot.valid?
+    else
+      ok('S1-B2 (b): vlozenie slotu', false)
+    end
+
+    # (c) DOSKA: vazba BEZ prestavby (ten isty kus geometrie).
+    board = e::BoardBuilder.build(
+      model, { 'length' => 2400.0, 'width' => 600.0, 'thickness' => 38.0, 'role' => 'free_panel' }
+    )
+    if board
+      bid = e::Store.get(board, 'id').to_s
+      before = board.persistent_id
+      s1b1_apply(model, 'create', attrs: { 'nazov' => 'Whirlpool' }, catalog_id: hob_id)
+      hob_item = s1b1_items(model).find { |i| i['typ'] == 'hob' }['id']
+      s1b2_pick(model, board, hob_item, echo: bid)
+      ok("S1-B2 (c): doska nesie vazbu (#{s1b1_refs(board).length} refs)",
+         board.valid? && s1b1_refs(board).length == 1)
+      ok('S1-B2 (c): a NEPRESTAVALA sa — je to ten isty kus (rovnake PID)',
+         board.valid? && board.persistent_id == before)
+      brows = Array(e::Panel.board_payload(board)['appliance_rows'])
+      ok("S1-B2 (c): karta dosky ma riadok spotrebica (#{brows.length})",
+         brows.length == 1 && brows.first['state'] == 'bound' &&
+         brows.first['text'].to_s.include?('Whirlpool'))
+      s1b1_apply(model, 'remove', item_id: hob_item)
+      board.erase! if board.valid?
+    else
+      ok('S1-B2 (c): vlozenie dosky', false)
+    end
+
+    # (d) POHLAD V ZAKAZKE nad REALNYM zberom.
+    s1b2_pick(model, cab, item_id, echo: cid)
+    view = s1b2_job_view(model)
+    row = s1b2_job_row(view, item_id)
+    ok("S1-B2 (d): viazana polozka je v pohlade a menuje vlastnika (#{row && row['owner_label']})",
+       row && row['state'] == 'bound' && row['owner_label'] == cid)
+    ok("S1-B2 (d): badge rata riadky, ktore treba vybavit (#{view['counts'].inspect})",
+       view['counts'].is_a?(Hash) && view['counts']['red'].to_i.zero?)
+    s1b2_pick(model, cab, item_id, unbind: true, echo: cid)
+    view = s1b2_job_view(model)
+    none = Array(view['rows']).find { |r| r['state'] == 'expected_missing' }
+    ok("S1-B2 (d): skrinka s NESPLNENYM ocakavanim ma riadok nevybraneho " \
+       "(#{none && none['owner_label']})",
+       none && none['owner_label'] == cid && none['actions']['assign'] == true)
+
+    # (e) DELETE vlastnika: sirota -> odpojenie -> Spat vrati oboje.
+    s1b2_pick(model, cab, item_id, echo: cid)
+    model.start_operation('SU-TEST S1B2 delete', true)
+    cab.erase!
+    model.commit_operation
+    view = s1b2_job_view(model)
+    row = s1b2_job_row(view, item_id)
+    ok("S1-B2 (e): po zmazani skrinky je riadok siroty (#{row && row['status_text']})",
+       row && row['state'] == 'owner_missing' && row['actions']['select'] == false &&
+       row['actions']['unbind'] == true)
+    s1b1_apply(model, 'unbind', item_id: item_id)
+    ok('S1-B2 (e): odpojenie sirotu zhasne',
+       s1b1_owner(model, item_id) == { 'kind' => 'job' } &&
+       s1b2_job_row(s1b2_job_view(model), item_id)['state'] == 'job')
+    Sketchup.undo # unbind
+    Sketchup.undo # delete
+    cab = cabinets(model).find { |i| e::Store.get(i, 'cabinet_id').to_s == cid }
+    ok("S1-B2 (e): Spat vratil skrinku AJ vazbu (#{cab ? s1b1_refs(cab).length : -1} refs)",
+       !cab.nil? && s1b1_refs(cab).length == 1 &&
+       s1b2_job_row(s1b2_job_view(model), item_id)['state'] == 'bound')
+
+    s1b1_apply(model, 'remove', item_id: item_id)
+    r14_clear!(model)
+    cleanup(model)
+    ok('S1-B2: cleanup (0 korpusov, rozpocet prazdny)',
+       cabinets(model).empty? && s1b1_items(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: run_s1b2 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    r14_clear!(model)
+    cleanup(model)
+  ensure
+    e::ApplianceCatalog.test_dir_override = nil
+    e::ApplianceCatalog.reset_state!
+  end
   # --- S1-A1: KATALOG SPOTREBICOV — prilohy na REALNOM Windows suborovom
   # systeme (headless sada ich overuje len logicky). Overuje sa to, co sa
   # mimo SketchUpu overit NEDA: kopia suboru s DIAKRITIKOU a MEDZEROU v nazve,
@@ -4683,7 +4932,7 @@ module NoxunSuRunner
 
     ok('S1-A2: `appl` je sekcia Studia', e::StudioDialog::SECTIONS.include?('appl'))
     ok('S1-A2: whitelist akcii je uzavrety a `ready` v nom nie je',
-       e::ApplianceDialog::SECTION_ACTIONS.length == 12 &&
+       e::ApplianceDialog::SECTION_ACTIONS.length == 13 &&
        !e::ApplianceDialog::SECTION_ACTIONS.include?('ready'))
 
     ac = e::ApplianceCatalog
@@ -24798,6 +25047,7 @@ module NoxunSuRunner
     run_s1e0(model)          # S1-E0: minimalna vyska korpusu 80 mm — nizka skrinka na dorovnanie sa postavi bez degenerovaneho dielca a kusovnik ju vidi, cesta Inspectora klampne 60 na 80, absorpcia scale pod hranicu tiez (a 1x Spat vrati scale aj absorpciu), horna 600 x 80 x 320
     run_s1e(model)           # S1-E: SLOT UMYVACKY — zo sablony 1 vyrobny dielec + telo ako referencia (kind reference, v kusovniku nikde), zmena vysky cela = 1 Spat, prisunutie na NOMINALNU hranu (aj pri presahujucom cele a vypnutom tagu referencie), zmena triedy prestavi telo, absorpcia scale na typove minimum, sablona so slotom, Kontrola dw_body_fit/dw_height_fit cez realny zber
     run_s1b1(model)          # S1-B1: SPOTREBIC V ZAKAZKE — priradenie z katalogu, presun, odpojenie a zmazanie ako JEDEN krok Spat (polozka + `appliance_refs[]` vlastnika + prestavba naraz), sirota po Delete (nalez BEZ `owner_id`) a jej naprava, trieda umyvacky vs slot, „dodáva zákazník" (medzisucet 0 + stitok v ponuke), legacy zakazka na kanonicke kody, ROLLBACK po riadenych zlyhaniach a bariera observera
+    run_s1b2(model)          # S1-B2: POHLAD V ZAKAZKE + riadok Spotrebica ? ocakavanie zo sablony a ponuka filtrovana podla niky, priradenie AKCIOU PANELA (ciel z oznacenej entity) a 1x Spat, telo slotu prekreslene z katalogu (448 x 550) a spat na genericke, doska bez prestavby, tabulka pohladu nad realnym zberom, Delete vlastnika -> sirota -> odpojenie -> Spat vrati oboje
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
     run_r03(model)           # R-03: sev prepare_insert/commit_insert — ciste pripravenie, vlastny rigidny transform, odmietnutia, edit kontext
     run_r12(model)           # 1d/R-12: dopredny guard configu — marker, odmietnuta prestavba bez mutacie a bez kroku Spat, kopia/sablony, citanie dalej bezi

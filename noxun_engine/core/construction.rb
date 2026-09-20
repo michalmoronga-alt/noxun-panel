@@ -270,6 +270,43 @@ module Noxun
         DW_CLASSES[dw_class.to_i] || DW_CLASSES[DW_CLASS_DEFAULT]
       end
 
+      # === S1-B2: TELO SLOTU — JEDNA autorita pre model aj pre cisla =========
+      #
+      # Bez vazby su rozmery GENERICKE (tabulka triedy); s vazbou ich prepise
+      # TELO PRIRADENEHO MODELU zo `appliance_refs[]` (kontrakt S1-B1: blok
+      # `body` je kopia listu vyrobcu v zakazke). Vysku tela urcuje VZDY
+      # pouzivatel (`dw_body_height`) — nastavitelne nohy umyvacky su rozsah,
+      # nie jedno cislo.
+      #
+      # Tuto funkciu volaju VSETCI, co o tele slotu nieco tvrdia: builder
+      # (`dw_body_reference`), Inspector (`Panel.slot_payload`) aj Kontrola
+      # (`Bom.appliance_slot_record`). Druha kopia vyberu „katalog alebo
+      # generika" by znamenala, ze model ukazuje ine telo, nez ktore semafor
+      # kontroluje.
+      # -> { w:, d:, label:, source: 'generic'|'catalog', item_id: nil|String }
+      def dw_body_dims(cfg)
+        dims = dw_class_dims(cfg[:dw_class] || (cfg.is_a?(Hash) ? cfg['dw_class'] : nil))
+        ref = dw_appliance_ref(cfg)
+        body = ref.is_a?(Hash) && ref['body'].is_a?(Hash) ? ref['body'] : nil
+        w = body && body['width'].to_f.positive? ? body['width'].to_f : dims[:body_w].to_f
+        d = body && body['depth'].to_f.positive? ? body['depth'].to_f : dims[:body_d].to_f
+        { w: w, d: d, label: dims[:label].to_s,
+          source: (body ? 'catalog' : 'generic'),
+          item_id: (body ? ref['item_id'].to_s : nil) }
+      end
+
+      # Zaznam vazby na UMYVACKU (kluce su STRINGOVE — tak ich pise
+      # `ApplianceBinding.ref_record`). Pri viacerych (poskodeny config) plati
+      # PRVY so znamym telom: slot je jedno miesto pre jeden spotrebic.
+      def dw_appliance_ref(cfg)
+        list = cfg[:appliance_refs] || (cfg.is_a?(Hash) ? cfg['appliance_refs'] : nil)
+        return nil unless list.is_a?(Array)
+
+        list.find do |r|
+          r.is_a?(Hash) && r['category'].to_s == 'dishwasher' && r['body'].is_a?(Hash)
+        end
+      end
+
       # Plan slotu: JEDEN vyrobny dielec (celo cez modul ciel) + JEDNA
       # referencia (telo). Ziadne zony, ziadne recepty, ziadne police —
       # a preto ani ziadny `interior_dims`/`ZoneTree` (slot vnutro nema).
@@ -332,14 +369,20 @@ module Noxun
       # deskriptor a zakladnu z neho odvodi `CabinetBuilder.render_references`
       # z tych istych konstant.
       def dw_body_reference(cfg)
-        dims = dw_class_dims(cfg[:dw_class])
+        body = dw_body_dims(cfg)
         bh = cfg[:dw_body_height].to_f
-        { ref_key: DW_BODY_REF_KEY, role: 'appliance_body', kind: BuildPlan::REFERENCE_KIND,
-          box: [dims[:body_w], dims[:body_d], bh],
-          origin: [((cfg[:width].to_f - dims[:body_w]) / 2.0), 0.0, 0.0],
-          production_class: BuildPlan::REFERENCE_CLASS, manufactured: false,
-          source: 'generic', dw_class: cfg[:dw_class].to_i,
-          label: "Umývačka #{dims[:label]} — telo (generické)" }
+        catalog = body[:source] == 'catalog'
+        rec = { ref_key: DW_BODY_REF_KEY, role: 'appliance_body', kind: BuildPlan::REFERENCE_KIND,
+                box: [body[:w], body[:d], bh],
+                origin: [((cfg[:width].to_f - body[:w]) / 2.0), 0.0, 0.0],
+                production_class: BuildPlan::REFERENCE_CLASS, manufactured: false,
+                source: body[:source], dw_class: cfg[:dw_class].to_i,
+                label: "Umývačka #{body[:label]} — telo#{catalog ? '' : ' (generické)'}" }
+        # S1-B2: pri tele Z KATALOGU nesie deskriptor aj IDENTITU polozky —
+        # `render_references` ju zapise do configu referencie, takze sa v modeli
+        # da povedat, KTORY kus zakazky tam stoji (a nie len „nejaka umyvacka").
+        rec[:item_id] = body[:item_id] if catalog
+        rec
       end
 
       # Slot ma VLASTNU (uzku) validaciu: nema vnutro, sokel ani vystuhy,

@@ -562,6 +562,11 @@
       // si z položiek nič neodvodzuje. Kľúč chýba pri staršom payloade aj vtedy,
       // keď nie je označená skrinka — vtedy sa riadku nedotýkame (patrí náhľadu
       // vkladania). AŽ ZA `refreshHardwareSets` — berie si z neho ponuku setov.
+      // S1-B2: riadok SPOTREBIČA sa týmto ľahkým pushom NEOBNOVUJE — a je to
+      // zámer. Väzba mení aj ostatné výstupy karty (telo slotu, trieda, náhľad),
+      // takže po zápise z Rozpočtu alebo z pohľadu „V zákazke" pošle server
+      // CELÚ čerstvú kartu (vetva `loadSelected` nižšie). Druhý, čiastočný
+      // kanál by karte dovolil rozísť sa so sebou samou.
       if (d.legs_summary !== undefined && typeof renderLegsRow === 'function'){
         renderLegsRow(d.legs_summary, d.cabinet_id || '');
       // KOV-G2 (Codex #339 kolo 2 N1): BEZ označenej skrinky riadok patrí
@@ -735,6 +740,13 @@
       // Vkladaci nahlad sa pritom zrusi: teraz hovori payload skrinky.
       if (typeof nxLegsInsertReset === 'function') nxLegsInsertReset();
       if (typeof renderLegsRow === 'function') renderLegsRow(c.legs_summary || null, c.cabinet_id || '');
+      // S1-B2: riadok SPOTREBIČA (`appliance_rows`). Kreslí sa z payloadu
+      // skrinky — chýbajúci kľúč (staršie okno) znamená prázdny zoznam, teda
+      // skrytý riadok, nikdy zvyšok po predchádzajúcej skrinke.
+      if (typeof renderApplianceRows === 'function'){
+        renderApplianceRows(c.appliance_rows || [], { kind: 'cabinet', id: c.cabinet_id || '' },
+                            'applRows');
+      }
       nxFrontDraftAsk();
       renderPreview();
       refreshZoneUI();
@@ -773,6 +785,9 @@
       renderHardware(null, []);
       // KOV-G2 (D-111): doska nohy nema — riadok zmizne aj s pamatou vstupov.
       if (typeof nxLegsInsertReset === 'function') nxLegsInsertReset();
+      // S1-B2: korpusový riadok Spotrebiča patrí skrinke — doska má vlastný
+      // (`boardApplRows`, kreslí ho `renderBoardCard` nižšie).
+      if (typeof clearApplianceRows === 'function') clearApplianceRows('applRows');
       clearCabinetMaterials();
       if (lastCabForFit !== null){ lastCabForFit = null; }
       renderBoardCard(b);
@@ -820,6 +835,13 @@
       // nahlad pre kartu, ktoru prave postavil `setUiMode`.
       if (typeof nxLegsInsertReset === 'function') nxLegsInsertReset();
       if (typeof nxLegsInsertAsk === 'function') nxLegsInsertAsk();
+      // S1-B2 (Codex #383 kolo 1 P2): riadok SPOTREBIČA patrí označenému kusu —
+      // bez neho by vo vkladacom režime ostal visieť cudzí riadok so starými
+      // akciami (vkladaná skrinka o žiadnom spotrebiči nevie).
+      if (typeof clearApplianceRows === 'function'){
+        clearApplianceRows('applRows');
+        clearApplianceRows('boardApplRows');
+      }
       clearCabinetMaterials();   // korpusove material selecty na "dedi" + disabled
       refreshZoneUI(); renderPreview();
     },
@@ -924,6 +946,9 @@
         .forEach(function(id){ setOut(id, ''); });
       return;
     }
+    // S1-B2: `body_note` je pri priradenom modeli jeho NÁZOV (inak „generické
+    // 60"), `body_range` rozsah výšky tela z listu výrobcu — oboje skladá
+    // server, panel z väzby nič neodvodzuje.
     setOut('inf_dw_body', s.body + ' · ' + s.body_note);
     setOut('inf_dw_top', s.front_top + ' · ' + s.front_over_text);
     setOut('inf_dw_fill', s.fill + ' · ručne');
@@ -931,6 +956,20 @@
     var u = el('inf_dw_under');
     if (u){ u.classList.toggle('ok', !!s.under_ok); u.classList.toggle('bad', !s.under_ok); }
     setOut('inf_dw_class', s.class_text);
+    var c = el('inf_dw_class');
+    // Trieda dostane zelenú/červenú LEN keď sa naozaj porovnala. Server nesie
+    // TRI stavy (`class_state`: ok · mismatch · unknown) — pri „unknown"
+    // (bez modelu alebo model bez triedy v liste) ostáva riadok neutrálny,
+    // inak by zelená tvrdila overenie, ktoré sa nestalo (Codex #383 kolo 1 P2).
+    if (c){
+      var st = String(s.class_state || 'unknown');
+      c.classList.toggle('ok', st === 'ok');
+      c.classList.toggle('bad', st === 'mismatch');
+    }
+    // Rozsah výšky tela z listu (nastaviteľné nohy) je HINT k poľu „Telo V",
+    // nie kontrola — vstup ohraničuje používateľ.
+    var r = el('dwBodyUnit');
+    if (r) r.textContent = s.body_range ? ('mm · ' + s.body_range) : 'mm';
   }
 
   // Identita dosky v idbar (BRD-xxx + nazov; bez warnchipu — dosky warnings zatial nemaju).
