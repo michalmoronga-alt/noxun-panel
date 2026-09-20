@@ -676,7 +676,7 @@ kvótová brána `usage` pred každým auditom a subagentom. Pravidlo 3 kôl pla
   **Slot má podporu `none`** — `dw_front_bottom` nikdy netečie do `floor_height`, takže žiadne nohy ani príchyty sokla. **Šírka sa neklampuje na triedu** — úzky slot
   sa postaví a hlási ho Kontrola ORANGE. `Construction.front_opening` je jediná autorita čelného otvoru (plán aj preflight), `CabinetBuilder.envelope` jediná autorita
   obálky (snap, placement, mower). TemplateStore STD 5 = markerový seed „Umývačka 60/45" s markerom schémy. Kontroly: `dw_body_fit` · `dw_height_fit` (ORANGE, bez brány).
-- **S1-B1 ✅ PR #N, v0.12.13 · Spotrebič v zákazke — dáta, väzba, Kontrola** — `BUDGET_STD` 2 (položka += `catalog_id`, `snapshot`, `owner`, `customer_supplied`), **kanonické kódy
+- **S1-B1 ✅ PR #382, v0.12.13 · Spotrebič v zákazke — dáta, väzba, Kontrola** — `BUDGET_STD` 2 (položka += `catalog_id`, `snapshot`, `owner`, `customer_supplied`), **kanonické kódy
   kategórií** (legacy sa pri čítaní prevedie, zapisuje sa kanón), **„dodáva zákazník" ako príznak** (cena ostáva, do súčtov 0, informačný riadok v CP), **nový modul
   `core/appliance_binding.rb` = jediný transakčný vstup** (položka + `appliance_refs[]` oboch vlastníkov + prestavba v JEDNEJ operácii; guardy DocKey · std · matica · identita
   PID+ID+druh · odpojený · novší config · bariéra observera · `ensure_root_context` bežia PRED `start_operation`), `Bom.collect[:appliances]`, Kontrola `appliance_owner_missing`

@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **S1-B1 — SPOTREBIČ V ZÁKAZKE: DÁTA, VÄZBA, KONTROLA (v0.12.13, 20.9.2026, PR #N).** Spotrebič prestal byť riadkom rozpočtu s voľným textom a stal sa **kusom,
+- **S1-B1 — SPOTREBIČ V ZÁKAZKE: DÁTA, VÄZBA, KONTROLA (v0.12.13, 20.9.2026, PR #382).** Spotrebič prestal byť riadkom rozpočtu s voľným textom a stal sa **kusom,
   ktorý v kuchyni niekde stojí**. Položka `budget_appliances[]` pribrala `catalog_id`, **`snapshot`** (kópia rozmerov z katalógu — zákazka odvtedy na živom
   katalógu nezávisí), `owner` a `customer_supplied`; `BUDGET_STD` išiel 1 → 2. Kódy kategórií sú od tejto dávky **kanonické** (`ApplianceCatalog::CATEGORIES`) —
   rozpočet už vlastný slovenský enum nemá, legacy kódy sa pri čítaní prevedú a zapisuje sa kanón (stará zákazka sa otvorí, upraví aj uloží).

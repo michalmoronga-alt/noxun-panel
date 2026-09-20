@@ -42,7 +42,7 @@ Poradie: **E0** (✅ #375) → **A1 katalóg** (✅ v0.12.10) → **A2 sekcia** 
 
 ## Posledné uzávery
 
-- **S1-B1 · Spotrebič v zákazke — dáta, väzba, Kontrola** (→ **v0.12.13**, 20.9.2026, PR #N). Položka rozpočtu nesie **model z katalógu** (`snapshot` = kópia
+- **S1-B1 · Spotrebič v zákazke — dáta, väzba, Kontrola** (→ **v0.12.13**, 20.9.2026, PR #382). Položka rozpočtu nesie **model z katalógu** (`snapshot` = kópia
   rozmerov, zákazka na katalógu nezávisí) a **vlastníka** (skrinka · slot · doska · len zákazka); väzba je **obojsmerná** a zapisuje sa **v jednej operácii**
   novým modulom `core/appliance_binding.rb` — **jeden Ctrl+Z vráti obe strany**. Prepínač **„dodáva zákazník"**, kanonické kódy kategórií, Kontrola: vlastník
   neexistuje · model bez rozmerov niky · trieda umývačky vs slot. Plné znenie v [archiv/KRONIKA.md](archiv/KRONIKA.md).
