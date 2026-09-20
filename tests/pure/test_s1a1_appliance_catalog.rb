@@ -558,6 +558,12 @@ NxTest.test('spotrebice: nahlad je najviac JEDEN a set_thumbnail prepina image <
   NxTest.assert_equal(:invalid, st3, 'PDF sa nahladom nestane')
   NxTest.assert_equal(:conflict, APPLC.set_thumbnail!(sheet['id'], second['id'], rev: 'stara')[0])
   NxTest.assert_equal(:conflict, APPLC.remove_attachment!(sheet['id'], second['id'], rev: 'stara')[0])
+
+  # Odobratie JEDNEJ z viacerych priloh necha ostatne (aj nahlad) na pokoji.
+  st4, info4 = APPLC.remove_attachment!(sheet['id'], sheet['attachments'].last['id'], rev: sheet['rev'])
+  NxTest.assert_equal(:ok, st4)
+  NxTest.assert_equal(2, info4[:record]['attachments'].length, 'ostatne prilohy ostavaju')
+  NxTest.assert_equal('thumbnail', info4[:record]['attachments'].last['kind'], 'nahlad sa odobratim listu nestrati')
 end
 
 NxTest.test('spotrebice: resolver prilohy — containment, chybajuci subor a file:/// URL') do

@@ -66,11 +66,12 @@ systémovému prehliadaču neodovzdá spoľahlivo (overené in-SketchUp sekciou 
 (`rev`, `updated_at`, `deleted_at`) do zákazky neprejde a neskoršia zmena katalógu snapshotom nepohne. Stavy: `:not_found` · `:deleted` (vyradený model
 sa nepriraďuje) · `:unsupported` (`std` z novšieho pluginu alebo nečitateľný dokument); `:degraded` snapshot dovolí.
 
-**Seed je markerový** (`SEED_VERSION`, vzor `TemplateStore`): seje sa pri prvej inštalácii a pri prechode markera, **nikdy opakovane** — zmazaný seed
+**Seed je markerový** (`SEED_VERSION`, vzor `TemplateStore`): seje sa **výhradne pri prvej inštalácii** (chýba primár aj `.bak`), **nikdy opakovane** — zmazaný seed
 záznam sa už nevráti a používateľská úprava sa neprepíše. Sadu tvorí **9 overených modelov** (2 rúry, 2 mikrovlnky, chladnička, 2 umývačky, varná doska,
 digestor) s hodnotami a odkazmi výhradne zo `SYSTEM/zdroje/next_sessions/SPOTREBICE_TECHLISTY_OVERENIE_2026-09-19.md`; čo list nekótuje, v seede nie je,
 a odvodené hodnoty sú vymenované v `derived`. **Drez Blanco Legra XL 6 S sa nesedúje** (list výrobcu nie je overený, OVERENIE §12) — kategória `sink`
-aj jej polia existujú od tejto dávky a Michal ho pridá ručne.
+aj jej polia existujú od tejto dávky a Michal ho pridá ručne. Marker `SEED_VERSION` cestuje s dokumentom; doplnenie sady v budúcej dávke pobeží ako **seed patch
+pri prechode markera** (vzor `HardwareCatalog.apply_seed_patches!`) — dnes taký patch neexistuje, lebo sada je prvá.
 
 **Odpovede majú jeden tvar** `[status, info]`, kde `info` je Hash so symbolovými kľúčmi: `:ok` → `{record:}` / `{records:}` / `{snapshot:}` / `{path:}`,
 `:invalid` → `{message:, field:}` (pole je **cesta**, napr. `dims.niche.width_min` — modal D-15 kreslí chybu pri poli), ostatné statusy

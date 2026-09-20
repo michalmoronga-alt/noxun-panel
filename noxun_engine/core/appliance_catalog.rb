@@ -25,9 +25,12 @@
 #     po zmazanej prilohe — zakazkovy snapshot na nu moze stale odkazovat.
 #   - `delete!` je TOMBSTONE (`deleted_at`), nie mazanie: zakazky, ktore model
 #     pouzili, nesmu prist o jeho rozmery ani prilohy.
-#   - SEED je MARKEROVY (`SEED_VERSION`, vzor `TemplateStore`): seje sa pri
-#     prvej instalacii a pri prechode markera, NIKDY opakovane — zmazany seed
-#     zaznam sa uz nevrati a pouzivatelska uprava sa neprepise.
+#   - SEED je MARKEROVY (`SEED_VERSION`, vzor `TemplateStore`): seje sa
+#     VYHRADNE pri prvej instalacii (chyba primar AJ `.bak`), NIKDY opakovane —
+#     zmazany seed zaznam sa uz nevrati a pouzivatelska uprava sa neprepise.
+#     Marker cestuje s dokumentom; doplnenie modelov v buducej davke pobezi ako
+#     SEED PATCH pri prechode markera (vzor `HardwareCatalog.apply_seed_patches!`)
+#     — dnes ziadny taky patch neexistuje, lebo sada je prva.
 #   - VSETKO vracia DVOJICU `[status, info]`, kde `info` je Hash so symbolovymi
 #     klucmi (`:record`, `:records`, `:snapshot`, `:message`, `:field`).
 #
@@ -1065,9 +1068,14 @@ module Noxun
 
       # `file:///` + URI kodovanie s DOPREDNYMI lomkami — hola Windows cesta
       # s medzerami a diakritikou sa systemovemu prehliadacu neodovzda spolahlivo.
+      # Nezakodovane ostavaju LEN `/` a `:` (oddelovace a pismeno disku);
+      # predvoleny vzor `URI::DEFAULT_PARSER.escape` necha prejst aj `#` a `?`,
+      # ktore by prehliadac precital ako fragment ci dotaz a subor by neotvoril.
+      URL_SAFE = %r{[^A-Za-z0-9\-_.!~*'()/:]}.freeze
+
       def file_url(abs)
         p = abs.to_s.tr('\\', '/').sub(%r{\A/+}, '')
-        "file:///#{URI::DEFAULT_PARSER.escape(p)}"
+        "file:///#{URI::DEFAULT_PARSER.escape(p, URL_SAFE)}"
       end
 
       def open_attachment(id, attachment_id)
@@ -1149,9 +1157,10 @@ module Noxun
 
       # --- seed ----------------------------------------------------------------
 
-      # MARKEROVY seed (vzor `TemplateStore`): seje sa pri prvej instalacii
-      # a pri prechode `SEED_VERSION`, NIKDY opakovane. Zmazany seed zaznam sa
-      # uz nevrati a pouzivatelska uprava sa neprepise.
+      # MARKEROVY seed (vzor `TemplateStore`): seje sa VYHRADNE nad prazdnym
+      # stavom (chyba primar aj `.bak`), NIKDY opakovane — zmazany seed zaznam
+      # sa uz nevrati a pouzivatelska uprava sa neprepise. Doplnenie sady
+      # v buducej davke = seed patch pri prechode `SEED_VERSION`.
       def seed!
         with_lock do
           next true if JsonFileStore.available?(path)
