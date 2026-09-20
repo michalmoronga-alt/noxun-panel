@@ -3655,6 +3655,22 @@ module NoxunSuRunner
   # v ghost a D-123 sekciach (dokazane behom 20.9.2026).
   def run_s1a1(_model)
     ac = e::ApplianceCatalog
+    # (0) BOOT: katalog posudzuje (a nad cistou instalaciou zaklada) uz
+    # `main.rb` pri starte pluginu (Codex #377 P2). Dokazom je MODULOVY STAV:
+    # `@state` nastavuje VYHRADNE `assess!`, takze nenulova hodnota EST PRED
+    # prvym volanim z testu znamena, ze boot naozaj bezal.
+    #
+    # PRECO NIE kontrola suboru: SketchUp nacita Plugins EST PRED
+    # `-RubyStartup`, takze bootstrap runnera presmeruje `ENV['APPDATA']` az
+    # PO boote pluginu (rovnako ako pri `Materials.boot_cutover!` — v sandboxe
+    # behu nie su ani jeho markery). Boot teda zapisuje do ZIVEHO `%APPDATA%`
+    # vyvojara a test nad nim asserta nesmie: Michal si tam moze pridat vlastne
+    # modely a pocet 9 by uz neplatil. Obsah suboru strazi headless sada.
+    booted = ac.instance_variable_get(:@state)
+    ok("S1-A1 (0): katalog posudil uz BOOT pluginu, nie test (stav #{booted.inspect})", !booted.nil?)
+    info("S1-A1 (0): stav katalogu po boote: #{booted} #{ac.instance_variable_get(:@state_reason)}")
+    ok('S1-A1 (0): boot skoncil ZDRAVYM katalogom (:ok)', booted == :ok)
+
     root = File.join(Sketchup.temp_dir, "noxun_s1a1_#{Process.pid}_#{Time.now.to_i}")
     FileUtils.mkdir_p(root)
     ac.test_dir_override = root

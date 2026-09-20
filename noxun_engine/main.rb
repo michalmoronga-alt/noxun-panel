@@ -572,6 +572,19 @@ module Noxun
         log_error(e, 'ensure_drawer_uni')
       end
 
+      # S1-A1: prve stretnutie s katalogom spotrebicov. `assess!` nad cistou
+      # instalaciou ZALOZI subor a naseje 9 overenych modelov — bez tohto
+      # volania by katalog vznikol az pri prvom otvoreni sekcie (S1-A2) a
+      # dovtedy by Michal v `%APPDATA%` ziadny `appliances.json` nenasiel.
+      # VLASTNY chraneny blok (vzor `boot_cutover!`): poskodeny ci nezapisovatelny
+      # katalog NESMIE zhodit menu, toolbar ani observer — stav si modul
+      # zapamata (`read_only` / `degraded`) a povie ho az UI.
+      begin
+        ApplianceCatalog.assess!
+      rescue StandardError => e
+        log_error(e, 'appliance_catalog_boot')
+      end
+
       # NASTROJE-1 (T1b): jednorazove UPRATANIE STARYCH INSTALACII Mower/Snaper
       # z priecinka `Plugins`. VLASTNY chraneny blok a bezi PRED registraciou
       # toolbarov (vzor `boot_cutover!`) — zlyhanie migracie NESMIE zhodit menu,
