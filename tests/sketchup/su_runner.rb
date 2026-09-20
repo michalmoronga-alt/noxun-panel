@@ -3878,6 +3878,368 @@ module NoxunSuRunner
     s1e_drop_junk(model, junk || [])
   end
 
+
+  # --- S1-B1: SPOTREBIC V ZAKAZKE (vazba, Kontrola, rollback) --------------
+  #
+  # CO SA TU OVERUJE A MIMO SKETCHUPU OVERIT NEDA:
+  #   * JEDEN Ctrl+Z vrati OBE strany vazby (polozku rozpoctu AJ `appliance_refs[]`
+  #     vlastnika aj jeho prestavanu geometriu) — fake model v headless sade
+  #     undo nema,
+  #   * ROLLBACK po riadenom zlyhani (`stamp_std`, druha prestavba, zapis dosky):
+  #     `abort_operation` fake modelu nic neobnovuje, takze dokaz „stav je ako
+  #     pred operaciou a NASLEDUJUCA operacia uspeje" existuje len tu,
+  #     (Astra B17),
+  #   * BARIERA OBSERVERA (B6): cakajuci dedup kopie sa nesmie prilepit na nasu
+  #     operaciu,
+  #   * Kontrola cez REALNU cestu `Bom.collect -> Validation.run`.
+  #
+  # Katalog spotrebicov je IZOLOVANY (`test_dir_override`) — zivy %APPDATA%
+  # katalog vyvojara sa necita ani nezapisuje.
+
+  S1B1_CAB = { 'type' => 'lower', 'width' => 600.0, 'height' => 2076.0, 'depth' => 560.0,
+               'thickness' => 18.0, 'floor_height' => 100.0 }.freeze
+  S1B1_SLOT = { 'type' => 'dishwasher', 'width' => 600.0, 'height' => 870.0, 'depth' => 560.0,
+                'thickness' => 18.0, 'dw_class' => 600, 'dw_body_height' => 820.0,
+                'dw_front_bottom' => 64.0, 'dw_front_height' => 776.0 }.freeze
+
+  def s1b1_refs(inst)
+    cfg = (inst && inst.valid?) ? (e::Store.config(inst) || {}) : {}
+    Array(cfg['appliance_refs'])
+  end
+
+  def s1b1_items(model)
+    e::BudgetStore.appliances(model)
+  end
+
+  def s1b1_owner(model, id)
+    it = s1b1_items(model).find { |i| i['id'] == id }
+    it ? e::BudgetStore.owner_field(it['owner']) : nil
+  end
+
+  # Nalezy KATEGORIE `appliance` cez tu istu cestu ako Studio.
+  def s1b1_codes(model)
+    s1e_control_codes(model)
+  end
+
+  def s1b1_apply(model, op, extra = {})
+    e::ApplianceBinding.apply!(model, model_guid: '', op: op, **extra)
+  end
+
+  # Katalog v docasnom priecinku + DVA zaznamy, ktore scenare potrebuju.
+  def s1b1_catalog!(root)
+    ac = e::ApplianceCatalog
+    ac.test_dir_override = root
+    ac.reset_state!
+    _, fridge = ac.create!(
+      'category' => 'fridge', 'manufacturer' => 'Beko', 'name' => 'SU BCNA306',
+      'dims' => { 'body' => { 'width' => 540.0, 'height' => 1935.0, 'depth' => 545.0 },
+                  'niche' => { 'width_min' => 560.0, 'height_min' => 1940.0,
+                               'height_max' => 1950.0, 'depth_min' => 555.0 },
+                  'front' => { 'door_bottom_offset' => 40.0, 'door_lower' => 629.0,
+                               'door_gap' => 71.0, 'door_upper' => 1159.0 } }
+    )
+    _, dw = ac.create!(
+      'category' => 'dishwasher', 'manufacturer' => 'Bosch', 'name' => 'SU SPV450',
+      'dims' => { 'body' => { 'width' => 448.0, 'depth' => 550.0 },
+                  'niche' => { 'width_min' => 450.0, 'height_min' => 815.0 },
+                  'install' => { 'dishwasher_class' => '450' } }
+    )
+    [fridge[:record]['id'].to_s, dw[:record]['id'].to_s]
+  end
+
+  def run_s1b1(model)
+    cleanup(model)
+    r14_clear!(model)
+    root = File.join(Sketchup.temp_dir, "noxun_s1b1_#{Process.pid}_#{Time.now.to_i}")
+    FileUtils.mkdir_p(root)
+    fridge_id, dw_id = s1b1_catalog!(root)
+    ok('S1-B1: izolovany katalog ma oba testovacie modely',
+       !fridge_id.empty? && !dw_id.empty?)
+
+    cab = e::CabinetBuilder.build(model, S1B1_CAB)
+    cab2 = e::CabinetBuilder.build(
+      model, S1B1_CAB, transform: Geom::Transformation.translation(e::Units.point(1500.0, 0, 0))
+    )
+    return ok('S1-B1: fixtury skriniek', false) unless cab && cab2
+
+    cid = e::Store.get(cab, 'cabinet_id').to_s
+    cid2 = e::Store.get(cab2, 'cabinet_id').to_s
+    owner1 = { 'kind' => 'cabinet', 'id' => cid, 'pid' => cab.persistent_id }
+    owner2 = { 'kind' => 'cabinet', 'id' => cid2, 'pid' => cab2.persistent_id }
+
+    # (a) PRIRADENIE Z KATALOGU = JEDNA operacia, JEDEN Ctrl+Z vrati OBOJE.
+    res = s1b1_apply(model, 'create', attrs: { 'nazov' => 'Beko' },
+                                      catalog_id: fridge_id, owner: owner1)
+    ok("S1-B1 (a): priradenie prejde (#{Array(res[:errors]).join(' · ')})", res[:ok] == true)
+    item = s1b1_items(model).first
+    ok("S1-B1 (a): polozka nesie SNAPSHOT z katalogu (#{item && item['catalog_id']})",
+       item && item['catalog_id'] == fridge_id &&
+       item['snapshot'].is_a?(Hash) && item['typ'] == 'fridge')
+    ok("S1-B1 (a): skrinka o vazbe VIE (#{s1b1_refs(cab).length} refs)",
+       s1b1_refs(cab).length == 1 && s1b1_refs(cab).first['item_id'] == item['id'])
+    ok('S1-B1 (a): a zaznam nesie rozmery niky aj pasma dveri zo snapshotu',
+       s1b1_refs(cab).first['niche'].is_a?(Hash) &&
+       s1b1_refs(cab).first['bands'].is_a?(Hash) &&
+       (s1b1_refs(cab).first['niche']['width_min'].to_f - 560.0).abs < 0.01)
+    ok("S1-B1 (a): marker rozpoctu je #{e::BudgetStore::BUDGET_STD}",
+       r14_marker(model) == e::BudgetStore::BUDGET_STD)
+    Sketchup.undo
+    ok("S1-B1 (a): JEDEN Spat vratil polozku AJ vazbu (#{s1b1_items(model).length} poloziek, " \
+       "#{s1b1_refs(cab).length} refs)",
+       s1b1_items(model).empty? && s1b1_refs(cab).empty?)
+
+    # (b) PRESUN na inu skrinku = JEDEN krok Spat, obe strany naraz.
+    s1b1_apply(model, 'create', attrs: { 'nazov' => 'Beko' },
+                                catalog_id: fridge_id, owner: owner1)
+    item_id = s1b1_items(model).first['id']
+    mv = s1b1_apply(model, 'move', item_id: item_id, owner: owner2)
+    ok("S1-B1 (b): presun prejde (#{Array(mv[:errors]).join(' · ')})", mv[:ok] == true)
+    ok("S1-B1 (b): stara skrinka vazbu stratila, nova ju ma (#{s1b1_refs(cab).length} / " \
+       "#{s1b1_refs(cab2).length})",
+       s1b1_refs(cab).empty? && s1b1_refs(cab2).length == 1)
+    ok("S1-B1 (b): a polozka ukazuje na #{cid2}",
+       s1b1_owner(model, item_id) == { 'kind' => 'cabinet', 'id' => cid2 })
+    Sketchup.undo
+    ok("S1-B1 (b): JEDEN Spat vratil OBE strany (#{s1b1_refs(cab).length} / " \
+       "#{s1b1_refs(cab2).length}, vlastnik #{s1b1_owner(model, item_id).inspect})",
+       s1b1_refs(cab).length == 1 && s1b1_refs(cab2).empty? &&
+       s1b1_owner(model, item_id) == { 'kind' => 'cabinet', 'id' => cid })
+
+    # (c) ODPOJENIE = vlastnik `job`, JEDEN krok Spat.
+    ub = s1b1_apply(model, 'unbind', item_id: item_id)
+    ok("S1-B1 (c): odpojenie prejde (#{Array(ub[:errors]).join(' · ')})", ub[:ok] == true)
+    ok('S1-B1 (c): vlastnik je „len zákazka“ a skrinka uz vazbu nenesie',
+       s1b1_owner(model, item_id) == { 'kind' => 'job' } && s1b1_refs(cab).empty?)
+    Sketchup.undo
+    ok('S1-B1 (c): JEDEN Spat vratil vazbu na oboch stranach',
+       s1b1_refs(cab).length == 1 &&
+       s1b1_owner(model, item_id) == { 'kind' => 'cabinet', 'id' => cid })
+
+    # (d) ZMAZANIE VLASTNIKA bezným Delete: polozka sa NEMENI, Kontrola hlasi
+    #     opravitelneho SIROTU a Spat vsetko vrati.
+    ok("S1-B1 (d): zdrava vazba nema nalez (#{s1b1_codes(model).inspect})",
+       !s1b1_codes(model).include?('appliance_owner_missing'))
+    model.start_operation('SU-TEST S1B1 delete', true)
+    cab.erase!
+    model.commit_operation
+    ok("S1-B1 (d): po zmazani skrinky Kontrola hlasi sirotu (#{s1b1_codes(model).inspect})",
+       s1b1_codes(model).include?('appliance_owner_missing'))
+    orphan = Array(e::Validation.run(e::Bom.collect(model))['items'])
+             .find { |i| i['stable_key'].to_s.include?('appliance_owner_missing') }
+    ok('S1-B1 (d): nalez NEMA `owner_id` (klik nesmie oznacit cudziu skrinku) a nesie adresu polozky',
+       orphan && orphan['owner_id'].nil? &&
+       orphan['data'].is_a?(Hash) && orphan['data']['item_id'].to_s == item_id)
+    ok('S1-B1 (d): polozka rozpoctu sa Delete-om NEZMENILA',
+       s1b1_owner(model, item_id) == { 'kind' => 'cabinet', 'id' => cid })
+    Sketchup.undo
+    cab = cabinets(model).find { |i| e::Store.get(i, 'cabinet_id').to_s == cid }
+    ok("S1-B1 (d): Spat vratil skrinku aj vazbu a nalez zhasol (#{s1b1_codes(model).inspect})",
+       !cab.nil? && s1b1_refs(cab).length == 1 &&
+       !s1b1_codes(model).include?('appliance_owner_missing'))
+    # Naprava zo strany polozky: odpojenim sirota zanikne aj bez skrinky.
+    model.start_operation('SU-TEST S1B1 delete 2', true)
+    cab.erase!
+    model.commit_operation
+    ok('S1-B1 (d): zmazanie znova zapali nalez', s1b1_codes(model).include?('appliance_owner_missing'))
+    s1b1_apply(model, 'unbind', item_id: item_id)
+    ok("S1-B1 (d): „odpojiť“ nalez zhasne (#{s1b1_codes(model).inspect})",
+       !s1b1_codes(model).include?('appliance_owner_missing') &&
+       s1b1_owner(model, item_id) == { 'kind' => 'job' })
+    s1b1_apply(model, 'remove', item_id: item_id)
+
+    # (e) UMYVACKA triedy 450 na slot 600 = ORANGE `appliance_class_mismatch`.
+    slot = e::CabinetBuilder.build(
+      model, S1B1_SLOT, transform: Geom::Transformation.translation(e::Units.point(3000.0, 0, 0))
+    )
+    if slot
+      sid = e::Store.get(slot, 'cabinet_id').to_s
+      sres = s1b1_apply(model, 'create', attrs: { 'nazov' => 'Bosch' }, catalog_id: dw_id,
+                                         owner: { 'kind' => 'slot', 'id' => sid,
+                                                  'pid' => slot.persistent_id })
+      ok("S1-B1 (e): umyvacka sa priradi na SLOT (#{Array(sres[:errors]).join(' · ')})",
+         sres[:ok] == true)
+      ok("S1-B1 (e): trieda 450 na slote 600 = ORANGE `appliance_class_mismatch` " \
+         "(#{s1b1_codes(model).inspect})",
+         s1b1_codes(model).include?('appliance_class_mismatch'))
+      # Matica: ta ista umyvacka do BEZNEJ skrinky nepatri.
+      dwid = s1b1_items(model).first['id']
+      bad = s1b1_apply(model, 'move', item_id: dwid, owner: owner2)
+      ok("S1-B1 (e): umyvacka do beznej skrinky = ODMIETNUTIE (#{Array(bad[:errors]).first})",
+         bad[:ok] == false && s1b1_refs(cab2).empty?)
+      s1b1_apply(model, 'remove', item_id: dwid)
+      slot.erase! if slot.valid?
+    else
+      ok('S1-B1 (e): vlozenie slotu', false)
+    end
+
+    # (f) „DODAVA ZAKAZNIK“: medzisucet 0 a stitok v cenovej ponuke.
+    e::BudgetStore.set_appliances_included!(model, true)
+    s1b1_apply(model, 'create', attrs: { 'nazov' => 'Beko', 'cena' => '899' },
+                                catalog_id: fridge_id, owner: nil)
+    cs_id = s1b1_items(model).first['id']
+    col = e::Bom.collect(model)
+    pay1 = e::ProductionCore.budget_payload(model, e::Bom.compute(col), col)
+    sec1 = Array(pay1['sections']).find { |s| s['key'] == 'appliances' }
+    s1b1_apply(model, 'patch', item_id: cs_id, attrs: { 'customer_supplied' => true })
+    col2 = e::Bom.collect(model)
+    pay2 = e::ProductionCore.budget_payload(model, e::Bom.compute(col2), col2)
+    sec2 = Array(pay2['sections']).find { |s| s['key'] == 'appliances' }
+    ok("S1-B1 (f): medzisucet klesol z #{sec1['subtotal']} na #{sec2['subtotal']}",
+       (sec1['subtotal'].to_f - 899.0).abs < 0.01 && sec2['subtotal'].to_f.abs < 0.01)
+    ok('S1-B1 (f): ulozena cena v ZAKAZKE ostala (0 sa nikdy nezapisuje)',
+       (s1b1_items(model).first['cena'].to_f - 899.0).abs < 0.01)
+    cp = pay2['cp_preview']
+    ok("S1-B1 (f): cenova ponuka ma informacny riadok so stitkom " \
+       "(#{Array(cp && cp['rows']).map { |r| r['kind'] }.inspect})",
+       Array(cp && cp['rows']).any? do |r|
+         r['kind'] == 'info' && r['polozka'].to_s.include?('dodáva zákazník')
+       end)
+    spec = e::CpExport.appliance_labels(pay2)
+    ok("S1-B1 (f): a specifikacia stitok nesie tiez (#{spec.inspect})",
+       spec.any? { |l| l.to_s.include?('dodáva zákazník') })
+    s1b1_apply(model, 'remove', item_id: cs_id)
+    e::BudgetStore.set_appliances_included!(model, false)
+
+    # (g) LEGACY zakazka: typ `rura` + std 1 sa otvori a ulozi ako `oven`/std 2.
+    r14_clear!(model)
+    model.start_operation('SU-TEST S1B1 legacy', true)
+    model.set_attribute(e::Store::DICT, e::BudgetStore::KEY_STD, 1)
+    model.set_attribute(e::Store::DICT, e::BudgetStore::KEY_APPLIANCES,
+                        [{ 'id' => 'SU-LEGACY-1', 'typ' => 'rura', 'nazov' => 'Stará rúra',
+                           'cena' => 100.0, 'cp_skupina' => 'zostava' }].to_json)
+    model.commit_operation
+    legacy = s1b1_items(model).first
+    ok("S1-B1 (g): legacy zakazka sa OTVORI a typ sa prevedie (#{legacy && legacy['typ']})",
+       legacy && legacy['typ'] == 'oven' && legacy['owner'] == { 'kind' => 'job' })
+    s1b1_apply(model, 'patch', item_id: 'SU-LEGACY-1', attrs: { 'cena' => '120' })
+    ok("S1-B1 (g): prva uprava ulozi KANON a std 2 (typ #{s1b1_items(model).first['typ']}, " \
+       "marker #{r14_marker(model).inspect})",
+       s1b1_items(model).first['typ'] == 'oven' &&
+       r14_marker(model) == e::BudgetStore::BUDGET_STD)
+    r14_clear!(model)
+
+    s1b1_rollback(model, fridge_id)
+    s1b1_barrier(model, fridge_id)
+
+    r14_clear!(model)
+    cleanup(model)
+    ok('S1-B1: cleanup (0 korpusov, rozpocet prazdny)',
+       cabinets(model).empty? && s1b1_items(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: run_s1b1 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    r14_clear!(model)
+    cleanup(model)
+  ensure
+    e::ApplianceCatalog.test_dir_override = nil
+    e::ApplianceCatalog.reset_state!
+  end
+
+  # Astra B17: RIADENE ZLYHANIA. Po aborte musi byt stav PRESNE ako pred
+  # operaciou (rozpocet, marker, oba configy) a NASLEDUJUCA operacia musi
+  # uspiet — fake model v headless sade to nedokaze, jeho `abort_operation`
+  # nic neobnovuje.
+  def s1b1_rollback(model, catalog_id)
+    r14_clear!(model)
+    # VLASTNE fixtury: sekcia (d) svoju skrinku zmazala, takze rollback
+    # potrebuje CERSTVE kusy.
+    cab = e::CabinetBuilder.build(
+      model, S1B1_CAB, transform: Geom::Transformation.translation(e::Units.point(7000.0, 0, 0))
+    )
+    cab2 = e::CabinetBuilder.build(
+      model, S1B1_CAB, transform: Geom::Transformation.translation(e::Units.point(8000.0, 0, 0))
+    )
+    return ok('S1-B1 (B17): fixtury rollbacku', false) unless cab && cab2
+
+    owner1 = { 'kind' => 'cabinet', 'id' => e::Store.get(cab, 'cabinet_id').to_s,
+               'pid' => cab.persistent_id }
+    owner2 = { 'kind' => 'cabinet', 'id' => e::Store.get(cab2, 'cabinet_id').to_s,
+               'pid' => cab2.persistent_id }
+    s1b1_apply(model, 'create', attrs: { 'nazov' => 'Beko' },
+                                catalog_id: catalog_id, owner: owner1)
+    item_id = s1b1_items(model).first['id']
+    before_items = s1b1_items(model)
+    before_marker = r14_marker(model)
+    before_refs = [s1b1_refs(cab), s1b1_refs(cab2)]
+    before_parts = s1e_parts(cab).length
+
+    # (1) ZLYHANIE PECIATKY MARKERA (zapis polozky).
+    res = s1b1_with_raise(e::BudgetStore, :stamp_std, ->(_m) { raise 'SU-TEST: peciatka' }) do
+      s1b1_apply(model, 'move', item_id: item_id, owner: owner2)
+    end
+    ok("S1-B1 (B17/1): zlyhanie peciatky = neuspech (#{Array(res[:errors]).first})",
+       res[:ok] == false)
+    ok('S1-B1 (B17/1): rozpocet, marker aj OBA configy su ako pred operaciou',
+       s1b1_items(model) == before_items && r14_marker(model) == before_marker &&
+       [s1b1_refs(cab), s1b1_refs(cab2)] == before_refs)
+
+    # (2) ZLYHANIE DRUHEJ PRESTAVBY (zapis vazby u NOVEHO vlastnika).
+    calls = 0
+    # POZOR: `define_method` prebinduje `self` na CabinetBuilder, takze helper
+    # `e` runnera tu NEEXISTUJE — modul sa musi menovat plnym menom.
+    res2 = s1b1_with_raise(e::CabinetBuilder, :write_appliance_refs!, lambda { |mdl, inst, refs|
+      calls += 1
+      raise 'SU-TEST: druha prestavba' if calls > 1
+
+      Noxun::Engine::CabinetBuilder.send(:s1b1_orig_write_appliance_refs!, mdl, inst, refs)
+    }) do
+      s1b1_apply(model, 'move', item_id: item_id, owner: owner2)
+    end
+    ok("S1-B1 (B17/2): zlyhanie druhej prestavby = neuspech (#{Array(res2[:errors]).first}, " \
+       "prestavieb #{calls})", res2[:ok] == false && calls == 2)
+    ok('S1-B1 (B17/2): PRVA (uz vykonana) prestavba sa tiez vratila — stav je ako pred operaciou',
+       s1b1_items(model) == before_items &&
+       [s1b1_refs(cab), s1b1_refs(cab2)] == before_refs &&
+       s1e_parts(cab).length == before_parts)
+
+    # (3) NASLEDUJUCA operacia po aborte USPEJE (model nie je zamknuty).
+    res3 = s1b1_apply(model, 'move', item_id: item_id, owner: owner2)
+    ok("S1-B1 (B17/3): nasledujuca operacia po aborte USPEJE (#{Array(res3[:errors]).join(' · ')})",
+       res3[:ok] == true && s1b1_refs(cab2).length == 1 && s1b1_refs(cab).empty?)
+    s1b1_apply(model, 'remove', item_id: item_id)
+    r14_clear!(model)
+  end
+
+  # Docasna nahrada SINGLETON metody (vzor `run_r14`). Original je dostupny pod
+  # `s1b1_orig_<meno>`, takze stub moze delegovat.
+  def s1b1_with_raise(mod, name, impl)
+    sc = mod.singleton_class
+    sc.send(:alias_method, :"s1b1_orig_#{name}", name)
+    sc.send(:define_method, name, &impl)
+    yield
+  ensure
+    sc.send(:remove_method, name)
+    sc.send(:alias_method, name, :"s1b1_orig_#{name}")
+    sc.send(:remove_method, :"s1b1_orig_#{name}")
+  end
+
+  # Astra B6: BARIERA OBSERVERA. Cerstva kopia caka na dedup; vazba sa NESMIE
+  # zapisat „popri“ jeho tiku — najprv pocka na POKOJ, potom znovu overi ciel.
+  def s1b1_barrier(model, catalog_id)
+    r14_clear!(model)
+    cab = e::CabinetBuilder.build(
+      model, S1B1_CAB, transform: Geom::Transformation.translation(e::Units.point(9000.0, 0, 0))
+    )
+    return ok('S1-B1 (B6): fixtura bariery', false) unless cab
+
+    owner1 = { 'kind' => 'cabinet', 'id' => e::Store.get(cab, 'cabinet_id').to_s,
+               'pid' => cab.persistent_id }
+    e::ScaleWatch.flush_pending!(model)
+    copy = tools1_clone_cabinet(model, cab, 6000.0, guarded: false)
+    ok('S1-B1 (B6): cerstva kopia caka na dedup (observer NIE JE v pokoji)',
+       e::ScaleWatch.pending? == true)
+    res = s1b1_apply(model, 'create', attrs: { 'nazov' => 'Beko' },
+                                      catalog_id: catalog_id, owner: owner1)
+    ok("S1-B1 (B6): vazba prejde (#{Array(res[:errors]).join(' · ')})", res[:ok] == true)
+    ok('S1-B1 (B6): a observer je PO nej v pokoji — bariera dobehla PRED operaciou',
+       e::ScaleWatch.pending? == false)
+    ok('S1-B1 (B6): vazbu nesie POVODNA skrinka, kopia ju NEMA (dedup ju zahodil)',
+       s1b1_refs(cab).length == 1 && s1b1_refs(copy).empty?)
+    item_id = s1b1_items(model).first['id']
+    s1b1_apply(model, 'remove', item_id: item_id)
+    copy.erase! if copy && copy.valid?
+    e::ScaleWatch.flush_pending!(model)
+    r14_clear!(model)
+  end
   # --- S1-A1: KATALOG SPOTREBICOV — prilohy na REALNOM Windows suborovom
   # systeme (headless sada ich overuje len logicky). Overuje sa to, co sa
   # mimo SketchUpu overit NEDA: kopia suboru s DIAKRITIKOU a MEDZEROU v nazve,
@@ -24175,6 +24537,7 @@ module NoxunSuRunner
     run_sync_rails(model)    # H3/D-80: vnutro pod vystuhami (odsadenie, upright, chrbat, odmietnutie)
     run_s1e0(model)          # S1-E0: minimalna vyska korpusu 80 mm — nizka skrinka na dorovnanie sa postavi bez degenerovaneho dielca a kusovnik ju vidi, cesta Inspectora klampne 60 na 80, absorpcia scale pod hranicu tiez (a 1x Spat vrati scale aj absorpciu), horna 600 x 80 x 320
     run_s1e(model)           # S1-E: SLOT UMYVACKY — zo sablony 1 vyrobny dielec + telo ako referencia (kind reference, v kusovniku nikde), zmena vysky cela = 1 Spat, prisunutie na NOMINALNU hranu (aj pri presahujucom cele a vypnutom tagu referencie), zmena triedy prestavi telo, absorpcia scale na typove minimum, sablona so slotom, Kontrola dw_body_fit/dw_height_fit cez realny zber
+    run_s1b1(model)          # S1-B1: SPOTREBIC V ZAKAZKE — priradenie z katalogu, presun, odpojenie a zmazanie ako JEDEN krok Spat (polozka + `appliance_refs[]` vlastnika + prestavba naraz), sirota po Delete (nalez BEZ `owner_id`) a jej naprava, trieda umyvacky vs slot, „dodáva zákazník" (medzisucet 0 + stitok v ponuke), legacy zakazka na kanonicke kody, ROLLBACK po riadenych zlyhaniach a bariera observera
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
     run_r03(model)           # R-03: sev prepare_insert/commit_insert — ciste pripravenie, vlastny rigidny transform, odmietnutia, edit kontext
     run_r12(model)           # 1d/R-12: dopredny guard configu — marker, odmietnuta prestavba bez mutacie a bez kroku Spat, kopia/sablony, citanie dalej bezi
