@@ -39,8 +39,9 @@
   (`main.rb`, chránený blok — inak by súbor vznikol až v S1-A2) · zlyhaný seed = `:read_only` a `:read_only` zastaví mutáciu aj nad neexistujúcim súborom ·
   neznámy kľúč `dims` **od klienta** je `:invalid` (dopredná kompatibilita platí pre súbor, nie pre formulár) · položky `attachments[]` sa kontrolujú už
   v `assess!` · matica druh → prípona (PDF nikdy náhľad) · UNC cesta si v `file_url` necháva hostiteľa. **Codex kolo 2 (1×P1 + 5×P2)** zapracované: záloha sa v degradovanom stave posudzuje **tou istou maticou ako primár** (`.bak` z novšej verzie = `:read_only`, nie „čítaj zálohu"; snapshot z nej nevznikne) · uložené `dims` prechádzajú validáciou známych polí (ručná úprava „width: oops" = `:read_only` s cestou poľa) · `null` maže aj celé `dims` · mutácia nad **zmiznutými súbormi** pod zámkom najprv naseeduje katalóg (inak by 9 modelov už nikdy neprišlo) · `derived` sa overuje proti **schéme kategórie** (`body.wdith` neprejde) · in-SU sekcia netvrdí nič o zdraví živého katalógu vývojára.
-  **Testy:** 4226 headless
-  (nová sada `test_s1a1_appliance_catalog.rb`, 43 testov) · 121 JS sád · in-SU 2813 PASS / 0 FAIL (sekcia `run_s1a1`: boot katalógu, kópia súboru
+  **Codex kolo 3 (6×P2, interná delta)** zjednotilo validátor: uložený záznam sa posudzuje TÝMI ISTÝMI funkciami ako zápis (kategória z uzavretej sady, prílohy podľa matice druh → prípona, `derived` vždy, `dims` známe polia; dôvod nesie identitu záznamu aj cestu poľa), páry `*_min`/`*_max` sa nekontrolujú nad neznámymi kľúčmi, `flock` s návratovou hodnotou `false` zámok neznamená (mutácia = `:locked`) a I/O chyba pri čítaní sa priznáva stavom `:unsupported`, nikdy holou výnimkou.
+  **Testy:** 4232 headless
+  (nová sada `test_s1a1_appliance_catalog.rb`, 49 testov) · 121 JS sád · in-SU 2813 PASS / 0 FAIL (sekcia `run_s1a1`: boot katalógu, kópia súboru
   s diakritikou a medzerou, `UI.openURL`, zlyhaná kópia bez siroty, tombstone priečinok nemaže). Mutácie: zrušený zámok (test súbehu s detským procesom),
   zrušená kontrola `min ≤ max`, opakovaný seed — všetky tri zabité. Docs: nový `docs/architecture/appliances.md` + riadok v rozcestníku, STANDARD §7.1.
 

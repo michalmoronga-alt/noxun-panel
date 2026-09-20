@@ -661,7 +661,7 @@ kvótová brána `usage` pred každým auditom a subagentom. Pravidlo 3 kôl pla
   `<uuid>_<sanitized>.<ext>`**, ktorý sa nikdy nerecykluje; staging v cieľovom priečinku → limit 25 MB meraný aj na uloženej kópii → `rename` → až potom JSON; najviac jeden
   náhľad; `remove_attachment!` súbor ponecháva. `snapshot_for` = whitelist s hlbokou kópiou + `catalog_std` (zákazka je od katalógu nezávislá). **Seed = 9 overených modelov**
   (markerový, nikdy opakovane; hodnoty a URL výhradne z OVERENIA listov; drez Blanco sa neseeduje — Michal ho pridá ručne, kategória `sink` existuje). Jeden návratový tvar
-  `[status, info]` s cestou chybného poľa. Katalóg **zakladá boot pluginu** (`main.rb`, chránený blok). **DoD:** `tests/pure/test_s1a1_appliance_catalog.rb` (43 testov) + in-SU `run_s1a1` (prílohy na reálnom disku, `UI.openURL`,
+  `[status, info]` s cestou chybného poľa. Katalóg **zakladá boot pluginu** (`main.rb`, chránený blok). **DoD:** `tests/pure/test_s1a1_appliance_catalog.rb` (49 testov) + in-SU `run_s1a1` (prílohy na reálnom disku, `UI.openURL`,
   zlyhaná kópia, tombstone) + docs `docs/architecture/appliances.md` a STANDARD §7.1.
 - **S1-A2 · Sekcia Štúdia SPOTREBIČE — pohľad Katalóg** *(UI, audit NIE)* — 13. sekcia `appl` (skupina KATALÓGY), strom + karta + prílohy + D-15 modal podľa mockupu R1–R8;
   tlačidlo „Do zákazky" a pohľad „V zákazke" sú v A2 `aria-disabled` s dôvodom (D-78), aktivuje ich S1-B.
