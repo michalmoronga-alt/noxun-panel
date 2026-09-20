@@ -1028,6 +1028,14 @@
         if (ma && typeof matOpenAnchor === 'function' && !matOpenAnchor(ma)){
           NXAPI.setStatus('Tento dekor už v katalógu nie je — otvorené v zozname materiálov.', true);
         }
+        // S1-B1: sekcia Rozpočet spotrebuje kotvu ako ADRESU RIADKU (deep-link
+        // z Kontroly pri spotrebiči, ktorého vlastník zmizol — taký nález nemá
+        // v modeli čo označiť). Rovnako JEDNORAZOVO a rovnako nahlas: riadok,
+        // ktorý medzitým zanikol, nie je tichý no-op.
+        var ba = (studioSec === 'budget') ? anchorFilter(ST) : null;
+        if (ba && typeof budOpenAnchor === 'function' && !budOpenAnchor(ba)){
+          NXAPI.setStatus('Tento riadok už v rozpočte nie je — otvorený je celý Rozpočet.', true);
+        }
       }
       render();
     },

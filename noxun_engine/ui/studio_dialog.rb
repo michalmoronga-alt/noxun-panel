@@ -369,7 +369,20 @@ module Noxun
         def do_select(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
           ProductionCore.do_select(Sketchup.active_model, data, generation: @generation,
-                                                                status: status_proc, repush: repush_proc)
+                                                                status: status_proc, repush: repush_proc,
+                                                                route: route_proc)
+        end
+
+        # S1-B1: nalez BEZ entity v modeli (sirota po spotrebici) vedie do
+        # SEKCIE tohto okna, nie do výberu. Ide to EXISTUJÚCOU deep-link cestou
+        # (`show(open_section:, anchor:)`) — tá pri otvorenom okne len nastaví
+        # odloženú sekciu a pushne, takže žiadny nový kanál nevzniká.
+        def route_proc
+          lambda do |rt|
+            show(open_section: rt['section'], anchor: rt['anchor'])
+          rescue StandardError => e
+            Engine.log_error(e, 'StudioDialog.route')
+          end
         end
 
         def do_export(payload)

@@ -416,6 +416,9 @@
   .bpen { width: 12px; height: 12px; color: var(--nx-warn-fg); vertical-align: -0.1em; }
   .btab tr.bzero td { color: var(--nx-ink-faint); }
   .btab tr.bmiss td { background: var(--nx-warn-bg); }
+  /* S1-B1: krátke prisvietenie riadku po deep-linku z Kontroly (nález, ktorý
+     v modeli nemá čo označiť — spotrebič so zmiznutým vlastníkom). */
+  .btab tr.bhit td { background: var(--nx-select-bg); transition: background .4s ease; }
   .bmisslbl { color: var(--nx-warn-fg); font-size: 11px; }
   .bold-price { color: var(--nx-warn-fg); background: var(--nx-warn-bg); border-radius: 6px; padding: 0 5px; }
 

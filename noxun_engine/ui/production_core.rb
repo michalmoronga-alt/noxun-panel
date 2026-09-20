@@ -1932,7 +1932,7 @@ module Noxun
       # `focus_inspector` (ST-1a, Š3 ceruzka): po vybere sa Inspector zdvihne
       # dopredu, aby sa dielec dal rovno upravit. Vyber sa tym NEMENI a do
       # modelu sa nezapisuje nic.
-      def do_select(model, data, generation:, status:, repush:)
+      def do_select(model, data, generation:, status:, repush:, route: nil)
         unless data['gen'].to_i == generation.to_i # B4: stale klik (iny model/stary DOM)
           # Review PR #193 P2: tichy no-op tu bol chyba — pouzivatel klikol,
           # v modeli sa nic neoznacilo a okno mlcalo. Data sa obnovia A POVIE
@@ -1980,6 +1980,17 @@ module Noxun
           # — Inspector potom nemusi hladat riadok rucne. Parser kluca je
           # ZDIELANY (`PartKeys.front_id`); ine kluce vratia nil a neposiela sa nic.
           front_id = PartKeys.front_id(item['part_key'])
+          # S1-B1 (Codex #382 kolo 1 P2): NALEZ BEZ ENTITY V MODELI. Sirota po
+          # spotrebici (`appliance_owner_missing`) NEMA `owner_id` — vlastník
+          # zanikol a jeho ID uz moze patrit CUDZIEMU kusu. Vseobecny resolver
+          # by preto bud neoznacil nic („zoznam sa medzitým zmenil"), alebo
+          # oznacil cudziu skrinku. Taky nalez ma vlastnu adresu: DEEP-LINK do
+          # sekcie okna. Vetva bezi PRED akymkolvek vyberom entit.
+          rt = route_target(item)
+          if rt
+            route.call(rt) if route
+            return status.call(route_status(rt))
+          end
           # KOV-D4: ADRESA riadku v sekcii Kovanie. Sklada ju VALIDACIA
           # (`item['data']` — owner_part_key + generic_type + rule_id + orphan);
           # tu sa len prepise klientovi. Nalez bez nej sa sprava ako doteraz.
@@ -2121,6 +2132,37 @@ module Noxun
         return ' Inspector nie je otvorený.' if focus_wanted
 
         ''
+      end
+
+      # S1-B1: DEEP-LINK nalezu, ktory v modeli ziadnu entitu NEMA. Adresu
+      # sklada VALIDACIA (`item['data']['route']`), tu sa len overi tvar —
+      # ziadne odvodzovanie z kategorie (druha pravda o tom, kam nalez vedie).
+      # `route: 'appl'` v B1 vedie do sekcie ROZPOCET na riadok polozky; S1-B2
+      # ho prepne na pohlad „V zakazke" (zmeni sa TATO mapa, nikde inde).
+      # -> { 'section' =>, 'anchor' =>, 'route' => } | nil
+      ROUTE_SECTIONS = { 'appl' => 'budget' }.freeze
+
+      def route_target(item)
+        d = item.is_a?(Hash) ? item['data'] : nil
+        return nil unless d.is_a?(Hash)
+        # Trasa platí LEN pre nález, ktorý v modeli NEMA CO OZNACIT. Nález
+        # s vlastníkom (`owner_id`) ide ďalej bežným výberom — klik na neho
+        # má označiť skrinku, nie prepnúť sekciu.
+        return nil unless item['owner_id'].to_s.strip.empty?
+
+        section = ROUTE_SECTIONS[d['route'].to_s]
+        return nil if section.nil?
+
+        id = d['item_id'].to_s
+        return nil if id.empty?
+
+        { 'route' => d['route'].to_s, 'section' => section, 'anchor' => "appliance:#{id}" }
+      end
+
+      def route_status(rt)
+        return 'Otvorené v Rozpočte — riadok spotrebiča je zvýraznený.' if rt['route'] == 'appl'
+
+        'Otvorené v Štúdiu.'
       end
 
       # KOV-D4: ADRESA riadku v sekcii Kovanie z nalezu. Sklada ju VALIDACIA
