@@ -166,8 +166,10 @@
     if (!he || he.value === '') return '';
     var h = evalDim(he.value);
     if (isNaN(h)) return ''; // nezmysel uz oznacil hlavny cyklus
+    // `currentCarcass` (core.js) vracia za KAZDE pole cislo — prazdne, chybajuce
+    // aj nezmyselne pole ma fallback — takze dalsie isNaN kontroly by tu boli
+    // mrtvy kod. Jedina hodnota, ktora sa musi overit, je prave citana vyska.
     var c = currentCarcass({ height: h });
-    if (isNaN(c.thickness) || isNaN(c.floor_height)) return '';
     var avail = nxInteriorZ(c).availH;
     if (avail <= MIN_AVAIL_H){
       return 'Výška ' + Math.round(h) + ' mm nenechá žiadne vnútro (podstavec ' +
