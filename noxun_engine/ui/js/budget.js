@@ -915,8 +915,10 @@
       { key: 'nazov', label: 'Názov / model', value: v.nazov, placeholder: 'napr. Bosch SMV4HVX00E' },
       { key: 'dodavatel', label: 'Dodávateľ', value: v.dodavatel, placeholder: 'nepovinné' },
       { key: 'cena', label: 'Cena', value: v.cena, placeholder: '0,00', cls: 'mshort' },
-      { key: 'owner', label: 'Vlastník', type: 'select', value: String(v.owner || ''),
-        options: budOwnerOptions(b, typ) },
+      // Predvolba NOVEHO zaznamu je „len zákazka" — vazba na kus v modeli je
+      // VEDOME rozhodnutie, nie nahoda poradia v ponuke (kolo 2 P1).
+      { key: 'owner', label: 'Vlastník', type: 'select',
+        value: String(v.owner || BUD_OWNER_JOB), options: budOwnerOptions(b, typ) },
       { key: 'customer_supplied', label: BUD_APPL_CS_LABEL, type: 'checkbox',
         value: v.customer_supplied === true || v.customer_supplied === 'true',
         hint: 'Cena ostane v riadku, ale do súčtov nevstúpi a v ponuke bude ako informácia.' }
@@ -929,9 +931,15 @@
   // Ponuka vlastnikov pre KATEGORIU. Matica aj zoznamy su zo servera; klient
   // ich LEN spaja. Hodnota polozky je `<druh>:<id>` — pri zapise sa rozlozi
   // spat a server si identitu overi este raz (PID + ID + druh).
+  //
+  // Codex #382 kolo 2 (P1): „LEN ZÁKAZKA" JE PRVA VOLBA. `<select>` bez
+  // vyslovnej hodnoty vyberie PRVU moznost — a keby nou bola skrinka, novy
+  // spotrebic by sa BEZ jedineho kliknutia viazal na prvy korpus v zozname
+  // (aj s prestavbou). Fyzicky vlastnik sa viaze LEN ked ho niekto vyberie.
   function budOwnerOptions(b, category){
     var src = (b && b.appliance_owners) ? b.appliance_owners : null;
-    var out = [];
+    var out = [[BUD_OWNER_JOB,
+                (src && src.job_label) ? String(src.job_label) : 'len zákazka (bez väzby)']];
     if (src){
       var kinds = (src.matrix && src.matrix[category]) ? src.matrix[category] : [];
       kinds.forEach(function(kind){
@@ -941,7 +949,6 @@
         });
       });
     }
-    out.push([BUD_OWNER_JOB, (src && src.job_label) ? String(src.job_label) : 'len zákazka (bez väzby)']);
     return out;
   }
 
@@ -2008,8 +2015,14 @@
     // S1-B1: identitu modelu (`catalog_id`) a vlastnika posiela klient ako
     // ODKAZY — rozmery, kategoriu ani snapshot si server z klienta NEBERIE
     // (odvodi ich z katalogu a z modelu, B14).
-    budSend('appliance_add', { attrs: attrs, catalog_id: String(v.catalog_id || ''),
-                               owner: budOwnerPayload(budBudget(), v.owner) });
+    //
+    // Kolo 2 (P1): VLASTNIK sa posiela LEN ked je to fyzicky kus. „Len
+    // zákazka" je zaroven serverovy default pre `create`, takze nedotknute
+    // pole neposiela nic — a nic sa teda ani neviaze a neprestavuje.
+    var extra = { attrs: attrs, catalog_id: String(v.catalog_id || '') };
+    var own = budOwnerPayload(budBudget(), v.owner);
+    if (own.kind !== BUD_OWNER_JOB) extra.owner = own;
+    budSend('appliance_add', extra);
   }
 
   // Ciste: polia formulara -> atributy pre server (default pocet 1).
