@@ -140,8 +140,11 @@ NxTest.test('CELA-B: legacy top identicke vyrobne udaje a profile_band; roundtri
   invalid = c::F.normalize_config(c.config('door', nil))
   NxTest.assert(invalid['items'][0].key?('profile_edge'))
   NxTest.assert_equal(nil, invalid['items'][0]['profile_edge'])
-  # D-128 bumpla schemu na 14 (pole `box_height` v `hardware_overrides`).
-  NxTest.assert_equal(14, c::E::CabinetBuilder::CONFIG_SCHEMA)
+  # D-128 bumpla schemu na 14 (pole `box_height` v `hardware_overrides`); od
+  # S1-E0 je 15. Sada strazi, ze cislo uz pod 14 NEKLESNE — vlastne cislo
+  # kazdeho bumpu si drzi `test_r12_config_schema.rb` a sada tej davky.
+  NxTest.assert(c::E::CabinetBuilder::CONFIG_SCHEMA >= 14,
+                "schema configu #{c::E::CabinetBuilder::CONFIG_SCHEMA} < 14")
   NxTest.assert_equal(5, c::E::BuildPlan::SCHEMA)
 end
 

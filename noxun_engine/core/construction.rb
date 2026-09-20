@@ -27,6 +27,17 @@ module Noxun
       # zaroven ZoneTree::MIN_FIELD — najmensie zmysluplne svetle pole).
       MIN_INTERIOR_H = 20.0
 
+      # Svetla vyska, pri ktorej `validate!` este korpus ODMIETNE (musi byt
+      # ostro VACSIA). JEDEN zdroj pravdy pre validaciu, pre `min_valid_height`
+      # aj pre zrkadlo v paneli (`form.js` MIN_AVAIL_H) — zhodu strazi test.
+      MIN_AVAIL_H = 10.0
+
+      # S1-E0 (Codex #375 P2): strop hladania v `min_valid_height` — ZHODNY
+      # s hornym clampom vysky v `CabinetBuilder.normalize`. Nad tuto hodnotu
+      # sa korpus aj tak nedostane, takze prehladany je cely legalny rozsah
+      # (polenie intervalu to stoji ~12 krokov).
+      MAX_HEIGHT = 3000.0
+
       module_function
 
       # Vystup MUSI prejst BuildPlan.validate! — chybny plan nikdy neopusti planovac.
@@ -951,6 +962,72 @@ module Noxun
           z_top: h - off, z_bottom: h - off - occupy }
       end
 
+      # S1-E0 (Codex #375 P2 + kolo 2): NAJNIZSIA vyska korpusu, pri ktorej by
+      # PRESTAVBA TOHTO configu PRESLA. Potrebuje ju absorpcia scale: klamp na
+      # hole `ScaleWatch::MIN['height']` (80) by pri sokli 100 vyrobil korpus
+      # bez vnutra — a pouzivatel by po tiahnuti uchopu dostal reject a POVODNY
+      # rozmer namiesto najnizsej platnej skrinky.
+      #
+      # KANDIDAT JE PLATNY PRAVE VTEDY, KED NAD NIM PREJDE CELY `build_plan`
+      # (kolo 2 P2). Samotny `validate!` nestaci: dolna skrinka s JEDNOU policou
+      # potrebuje na nu 18 + 2 x 20 = 58 mm svetla, takze vyska 80 (vnutro 44)
+      # prejde `validate!`, ale padne az v `ZoneTree.validate_shelves!` — a
+      # absorpcia by skoncila rejectom. Rovnako vie zhodit stavbu profil cela
+      # (`Fronts.layout`) alebo zamknute zony. Ziadny druhy vzorec sa preto
+      # nepise: sondou je TA ISTA retaz, ktorou ide rebuild, len bez modelu.
+      #
+      # Pravidla kovania sa nacitaju RAZ a posielaju do kazdej sondy — inak by
+      # jedno tiahnutie uchopu precitalo kniznicu pravidiel desatkrat.
+      # Vracia CELE milimetre (absorpcia aj panel pracuju s celymi mm).
+      def min_valid_height(cfg, hardware_rules: nil)
+        rules = hardware_rules || HardwareRules.load
+        # NUTNA (nie postacujuca) podmienka: strop vnutra nikdy nelezi vyssie
+        # nez vrch korpusu, takze `avail_h <= h - sokel - hrubka dna`. Je to
+        # startovaci bod hladania, nie vysledok.
+        lo = (cfg[:floor_height].to_f + cfg[:thickness].to_f + min_avail_for(cfg)).ceil.to_f
+        return lo if buildable_at?(cfg, lo, rules)
+
+        hi = MAX_HEIGHT
+        # Ked neprejde ani strop legalneho rozsahu, config nie je postavitelny
+        # v ZIADNEJ vyske (napr. zamknute zony alebo neplatna hrana profilu).
+        # Vratime geometricke minimum a rebuild necháme padnut vlastnou
+        # zrozumitelnou hlaskou — hadat vyssiu vysku by problem len zakrylo.
+        return lo unless buildable_at?(cfg, hi, rules)
+
+        while hi - lo > 1.0
+          mid = ((lo + hi) / 2.0).ceil.to_f
+          mid = hi if mid >= hi # poistka proti zaseknutiu na hranici
+          if buildable_at?(cfg, mid, rules)
+            hi = mid
+          else
+            lo = mid
+          end
+        end
+        hi
+      end
+
+      # Kolko svetla musi vnutro mat, aby `validate!` neodmietol. Bezny vrch:
+      # ostro nad `MIN_AVAIL_H`, teda staci +1 mm (pracujeme v celych mm).
+      # Dve vystuhy: plna rezerva `MIN_INTERIOR_H` (s toleranciou validacie).
+      def min_avail_for(cfg)
+        cfg[:top_mode] == 'two_rails' ? (MIN_INTERIOR_H - 0.01) : (MIN_AVAIL_H + 1.0)
+      end
+
+      # Postavil by sa TENTO config pri tejto vyske? Cista sonda — ziadny model,
+      # ziadny zapis; plan sa zahodi. `CAB-PROBE` je len menovka part_keys.
+      def buildable_at?(cfg, height, rules)
+        build_plan(cfg.merge(height: height), 'CAB-PROBE', hardware_rules: rules)
+        true
+      rescue StandardError
+        false
+      end
+
+      # Svetla vyska configu pri INEJ vyske korpusu (cista sonda pre testy
+      # a pre `min_avail_for` — hranicu vnutra meria `interior_dims`).
+      def avail_at(cfg, height)
+        interior_dims(cfg.merge(height: height))[:avail_h]
+      end
+
       # Vnutorne rozmery (svetle) + poloha celnej hrany chrbta. Hrubka chrbta z configu.
       def interior_dims(cfg)
         h = cfg[:height]; d = cfg[:depth]
@@ -1139,7 +1216,8 @@ module Noxun
         raise 'Sirka je prilis mala vzhladom na hrubku materialu.' if w <= 2 * t + 10
         raise 'Hlbka je prilis mala.' if interior[:back_front_y] <= 10
         raise 'Podstavec/sokel nesmie byt vyssi nez korpus.' if s >= h
-        raise 'Vnutorna vyska je nulova alebo zaporna (skontroluj vysku, podstavec a hrubky).' if interior[:avail_h] <= 10
+        raise 'Vnutorna vyska je nulova alebo zaporna (skontroluj vysku, podstavec a hrubky).' if
+          interior[:avail_h] <= MIN_AVAIL_H
         # D-80 (Codex P2 na PR #134): pri vrchu "dve vystuhy" musi pod nimi ostat
         # aspon MIN_INTERIOR_H svetla — inak vznikne zona mensia nez ZoneTree::MIN_FIELD
         # (a pri upright dokonca vystuha tenka pod svoje vlastne minimum). Kombinacia

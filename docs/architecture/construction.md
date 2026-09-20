@@ -237,7 +237,11 @@ teda iný mechanizmus, iné ramená a iná tyč v objednávke; nové dôvody by 
 · **`14` = D-128** (RUČNÁ VÝŠKA DREVENÉHO BOXU): záznam `hardware_overrides` s `rule_id recipe:<id>` smie niesť pole **`box_height`** (mm Float), tretiu os zámku popri
 `nominal_length` a `height_variant`. Starší plugin (schéma 13) ho pri normalizácii **zahodí** whitelistom `norm_hardware_overrides`, takže zásuvka by sa ticho vrátila na
 **automatickú výšku boxu** — teda by narezal iné dielce boxu (2 boky, vnútorné čelo, chrbát), než odsúhlasila objednávka. Brány sú tie isté ako pri 5–13.
-**`DRAWER_ACTIVATION_SCHEMA` ostáva 5** — je to VLASTNÁ konštanta práve preto, aby bump na 6 až 14 nespravil z každej skrinky schémy 5 „nemigrovanú" (`drawer_stale`).
+· **`15` = S1-E0** (NÍZKY KORPUS NA DOROVNANIE, výška od 80 mm): **jediný bump v celej histórii, pri ktorom nepribudlo pole** — zmenil sa prípustný rozsah hodnoty
+`height` z 200 na 80 mm. Povinný je napriek tomu, lebo strata je výrobná a tichá: starší plugin (schéma 14) má `MIN[:height]` = 200, takže by skrinku 80–199 mm pri
+prvej prestavbe **klampol na 200** a zmenil výšku bokov, chrbta aj čiel — nikto by si to nevšimol, kým by dielce neprišli z píly (Codex #374 P1). Disciplína bumpu
+(STANDARD §2.5) hovorí o TICHEJ ZMENE VÝROBY, nie o novom poli. Brány sú tie isté ako pri 5–14.
+**`DRAWER_ACTIVATION_SCHEMA` ostáva 5** — je to VLASTNÁ konštanta práve preto, aby bump na 6 až 15 nespravil z každej skrinky schémy 5 „nemigrovanú" (`drawer_stale`).
 **`HINGE_ACTIVATION_SCHEMA` = 9** je jej dvojička pre závesy (Codex #329 kolo 2 P1): skrinka uložená pod nižšou schémou nesie staré počty závesov, takže ju
 zber priznáva RED `hinge_stale` a brána zastaví nákup, rozpočet aj ponuku (VEPO nie) — detail v [outputs.md](outputs.md). **Sama o sebe schéma 9 RED
 nezhasína** (Codex #329 kolo 3 P1): kým sú pravidlá projektu spred F1, prestavba vyráta staré počty znova, takže nález drží aj druhá príčina
@@ -362,6 +366,26 @@ false — zdroj pravdy súpisu je VÝHRADNE `config.hardware[]` korpusu). Profil
 `part_tag(model, pd[:role])` — úchytka je s čelom zrastená, takže pri skrytí tagu „Čelá" musí zmiznúť s ním (predtým visela vo vzduchu). **Vedomý dôsledok: prepínač tagu Kovanie ju už
 neschová** — patrí k čelu, nie k nohám (tie na `hardware_tag` ostávajú). Dáta proxy sa tým NEMENIA (súpis, nákup ani dĺžka rezu sa tagu nedotýkajú) a staré zákazky sa preznačia pri
 najbližšej prestavbe — proxy vzniká pri každom rebuilde nanovo, takže žiadna migrácia netreba. Stráži in-SU sekcia `run_d116`.
+
+**ROZMEROVÉ HRANICE (`MIN`, S1-E0, v0.12.9).** `normalize` klampuje obálku korpusu na `MIN` = šírka **200**, výška **80**, hĺbka **150** (horné hranice 3000/3000/2000).
+Výška ide od 80 mm od S1-E0 (Michal 20.9.2026): nad umývačkou ostáva po líniu linky často len 80–110 mm a vypĺňa sa **nízkym korpusom na dorovnanie**. Šírka ani hĺbka sa
+neodomkli — užší či plytší korpus nemá konštrukčný zmysel. **`CONFIG_SCHEMA` sa bumpuje na 15**, hoci nepribudlo pole: starší plugin (schéma 14) by skrinku 80–199 mm
+pri prestavbe ticho klampol späť na 200, teda zmenil výrobnú geometriu — a presne pred tým chráni dopredný guard `newer_config?` (prestavba, šablóny, kópia) a exportná
+brána. Detail je v histórii čísel vyššie; žiadna migrácia netreba, config nemá nové pole.
+**Tú istú hodnotu držia TRI miesta:** `MIN` tu, `ScaleWatch::MIN` (absorpcia scale) a `LIMITS` v `ui/js/form.js` (červené pole panela). Priama referencia možná nie je
+(`scale_observer` sa načítava PRED `cabinet_builder`, JS Ruby konštantu nevidí), takže zhodu — rovnako ako pri `DRAWER_ROLES` — stráži guard `tests/pure/test_s1e0_min_vyska.rb`.
+Geometriu nízkeho korpusu ďalej chráni **`Construction.validate!` ako posledná brána** (sokel ≥ výška, svetlé vnútro ≤ `MIN_AVAIL_H` = 10 mm, rezerva `MIN_INTERIOR_H` pod dvoma
+výstuhami); panel tie isté dve pravidlá zrkadlí v `cabinetHeightError` ([ui-lifecycle.md](ui-lifecycle.md)), takže používateľ dostane červenú dvojicu výška + podstavec ešte
+pred apply, nie výnimku po ňom. Plán nízkej skrinky nesmie mať degenerovaný dielec (`part_skipped_degenerate`) — meria to headless sada cez 16 kombinácií dno × vrch × chrbát
+a in-SU sekcia **`run_s1e0`** (stavba, kusovník, klamp 60 → 80 cestou Inspectora, absorpcia scale so soklom aj s policou a jedno Späť).
+
+**`min_valid_height(cfg)` — NAJNIŽŠIA výška, pri ktorej by PRESTAVBA prešla (S1-E0, Codex #375 P2 a kolo 2).** `MIN[:height]` je absolútna hranica, ale nie postačujúca: pri
+sokli 100 a hrúbke 18 nedáva 80 mm žiadne vnútro. **Kandidát je platný práve vtedy, keď nad ním prejde celý `build_plan`** — teda tá istá reťaz, ktorou ide rebuild, len bez
+modelu. Samotný `validate!` nestačí (kolo 2 P2): skrinka s JEDNOU policou ho pri 80 mm prejde (obálka je v poriadku, vnútro 44 mm), ale padne až v `ZoneTree.validate_shelves!`
+— polica potrebuje 18 + 2 × 20 = 58 mm svetla, takže skutočné minimum je **94 mm**. Rovnako vie stavbu zhodiť profil čela (`Fronts.layout`) alebo zamknuté zóny. **Žiadny druhý
+vzorec sa preto nepíše.** Hľadá sa polením intervalu od nutnej (nie postačujúcej) hranice `sokel + hrúbka + rezerva` po `MAX_HEIGHT` (3000 = horný clamp `normalize`), pravidlá
+kovania sa načítajú **raz** a putujú do každej sondy. Keď neprejde ani strop rozsahu (config nepostaviteľný v žiadnej výške), vráti sa štartovacia hranica a rebuild padne
+vlastnou zrozumiteľnou hláškou — klamp na 3000 by problém len zakryl. Jediný čítateľ je dnes `ScaleWatch.clamp_height` (odsek `scale_observer.rb` nižšie).
 
 **PRERUŠENIE STAVBY** (`abort_safely`): výnimka kdekoľvek vnútri `build`/`rebuild` ruší CELÚ operáciu a **neprehĺta sa** — volajúci sa o nej dozvie. Rollback vracia geometriu
 (inštanciu aj definície dielcov) **a zároveň modelové atribúty**, teda aj projektové snapshoty kovania, ktoré `build_into` cestou `HardwareRules.ensure_project_rules!` /
@@ -921,6 +945,18 @@ Súbor, v ktorom žijú triedy prekrytí (`Sketchup::Overlay`) — celý je pod 
 (ScaleWatch) — absorpcia scale pre kind {cabinet, board}: doska mapuje lokálne osi X→length/Y→width, Z sa zahadzuje (hrúbku riadi materiál); shear guard; scale maska
 `scaletool`=120 aj na definícii = čisté osi. Mapovanie je **lokálne**, takže platí aj pre otočenú dosku (UI-C1c) — používateľov scale v globálnom Z stojacej dosky skončí v jej
 ŠÍRKE.
+
+**SPODNÉ HRANICE ABSORPCIE (`MIN`, S1-E0, v0.12.9).** `clamp_min` neprepustí šírku ani hĺbku pod `MIN` = **200** / **150** (mm, string kľúče — chodí sem kľúč z uloženého
+configu) a klamp **loguje**, nikdy ho nerobí ticho. Čísla sú **zrkadlom `CabinetBuilder::MIN`** — priama referencia sa použiť nedá (`scale_observer` sa načítava PRED
+`cabinet_builder`), preto zhodu stráži guard `tests/pure/test_s1e0_min_vyska.rb`; keby sa rozišli, ten istý korpus by po ťahaní myšou a po zápise do poľa skončil na inom
+rozmere.
+
+**VÝŠKA sa klampuje CONFIG-AWARE (`clamp_height`, Codex #375 P2 a kolo 2).** Holé `MIN['height']` = 80 tu nestačí: pri sokli 100 by vyrobilo korpus bez vnútra a pri skrinke
+s policou by geometria prešla, ale stavba padla na `validate_shelves!` — rebuild by zlyhal, `reject_scale` by vrátil PÔVODNÚ skrinku a používateľ by po ťahaní úchopu nedostal
+nič (720 mm späť namiesto 94). Hranica je preto **prísnejšia z dvoch**: `MIN['height']` a `Construction.min_valid_height` nad **kompletným** configom, ktorý o chvíľu pôjde do
+`rebuild`u (normalizuje sa **tou istou cestou**, takže pri hornej skrinke sokel korektne vypadne na 0).
+Šírka a hĺbka taký problém nemajú — ich `MIN` je vždy nad hranicou validácie. Lifecycle absorpcie sa tým **nemení**: klamp žije vnútri tej istej transparentnej operácie, takže
+jedno Späť ďalej vráti scale AJ absorpciu (in-SU `run_s1e0` body c, e a f, reálny debounce tik `async S1`).
 
 **BARIÉRA PRED MUTÁCIOU NÁSTROJA — `flush_pending!(model)` (NÁSTROJE-1, v0.9.24).** `guard` zabráni len NOVÝM udalostiam; už naplnené fronty (`@dirty`, `@added`, `@requested`,
 `@prune_models`) a bežiaci debounce timer zostávajú — a keď timer dobehne PO operácii nástroja, jeho **transparentná** reakcia (dedup kópií, presun ghost zón) sa prilepí na krok

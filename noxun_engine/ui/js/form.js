@@ -143,13 +143,72 @@
   // V0.4.7e: cita cez evalDim (vyraz = hodnota); ROZPISANY vyraz vo fokusovanom
   // poli sa preskoci (ani apply, ani cervene — hint bezi); COMMITNUTY neprazdny
   // nezmysel je PO NOVOM chyba (predtym NaN ticho presiel) a blokuje apply.
-  var LIMITS = { width:[200,3000], height:[200,3000], depth:[150,2000], thickness:[6,50],
+  // S1-E0: VYSKA od 80 mm (korpus na dorovnanie nad umyvackou) — sirka a hlbka
+  // ostavaju. Cisla su zrkadlom Ruby `CabinetBuilder::MIN` / `ScaleWatch::MIN`;
+  // zhodu vsetkych troch miest strazi `tests/pure/test_s1e0_min_vyska.rb`.
+  var LIMITS = { width:[200,3000], height:[80,3000], depth:[150,2000], thickness:[6,50],
                  floor_height:[0,500], plinth_recess:[0,300], rail_depth:[20,400], rails_top_offset:[0,500],
                  // D-07: medzery/presahy cel — zaporny okraj = presah cez obrys (limit zhodny s Fronts::EDGE_LIMIT)
                  fr_gap:[0,50], fr_gap_top:[-100,100], fr_gap_bottom:[-100,100], fr_gap_left:[-100,100], fr_gap_right:[-100,100] };
   // D-22: okraje cel maju dynamicky limit podla zamku (Fronts::EDGE_LIMIT_UNLOCKED);
   // fr_gap (medzera medzi celami) ostava 0..50 VZDY.
   var EDGE_LIMIT_FIELDS = { fr_gap_top:1, fr_gap_bottom:1, fr_gap_left:1, fr_gap_right:1 };
+
+  // S1-E0: KRIZOVA KONTROLA VYSKY. Samotny limit 80 mm uz nestaci — vyska je
+  // CELKOVA (vratane sokla), takze dolna skrinka s predvolenym soklom 100 by
+  // pri vyske 90 nedavala ziadne vnutro a builder by rebuild ODMIETOL vynimkou
+  // (`Construction.validate!`). Pole preto zocervenie UZ V PANELI a apply sa
+  // zastavi. Je to ZRKADLO dvoch Ruby pravidiel a pocita sa JEDINOU zdielanou
+  // funkciou `nxInteriorZ` (core.js) — ziadna druha kopia vzorca.
+  var MIN_AVAIL_H = 10.0;     // Construction.validate!: vnutro <= 10 mm = odmietnutie
+  // S1-E0 (Codex #375 P2): PRAZDNE pole NIE JE nula — Ruby `normalize` doplni
+  // PREDVOLBU TYPU (dolna skrinka ma sokel 100 mm). Validacia preto musi citat
+  // tu istu hodnotu, akou bude server pocitat; inak by vyska 90 mm s prazdnym
+  // soklom presla klientom a padla az na serveri. Predvolby su DOSLOVA cisla
+  // zo servera (`CabinetBuilder::LOWER_DEFAULTS` / `UPPER_DEFAULTS` -> DEFAULTS
+  // v `bridge.js`), takze druhy zdroj pravdy nevznika — parita je strazena
+  // testom `tests/pure/test_s1e0_min_vyska.rb`.
+  function cabFieldOrDefault(id){
+    var e = el(id), d = DEFAULTS[getType()] || {};
+    var raw = (e && e.value !== '') ? evalDim(e.value) : NaN;
+    if (!isNaN(raw)) return raw;
+    var dv = parseFloat(d[id]);
+    return isNaN(dv) ? NaN : dv;   // NaN = predvolby zo servera este nedosli
+  }
+  function cabinetHeightError(){
+    var he = el('height');
+    if (!he || he.value === '') return '';
+    var h = evalDim(he.value);
+    if (isNaN(h)) return ''; // nezmysel uz oznacil hlavny cyklus
+    var sokel = (getType() === 'upper') ? 0 : cabFieldOrDefault('floor_height');
+    var hrubka = cabFieldOrDefault('thickness');
+    // Bez predvolieb zo servera sa NEHADA — radsej ziadna hlaska nez falosna.
+    if (isNaN(sokel) || isNaN(hrubka)) return '';
+    var c = currentCarcass({ height: h, floor_height: sokel, thickness: hrubka });
+    var avail = nxInteriorZ(c).availH;
+    if (avail <= MIN_AVAIL_H){
+      return 'Výška ' + Math.round(h) + ' mm nenechá žiadne vnútro (podstavec ' +
+             Math.round(c.floor_height) + ' mm + hrúbky ' + Math.round(c.thickness) +
+             ' mm). Zväčši výšku alebo zmenši podstavec.';
+    }
+    // D-80: pri vrchu „dve výstuhy" pod nimi musí ostať rezerva MIN_INTERIOR_H.
+    if (c.top_mode === 'two_rails' && avail < NX_MIN_INTERIOR_H - 0.01){
+      return 'Vnútro je príliš nízke na výstuhy (ostáva ' + Math.round(avail) +
+             ' mm) — zväčši výšku, zmenši podstavec alebo prepni vrch na plný.';
+    }
+    return '';
+  }
+  // Oznaci/odznaci vysku a podstavec. Dovod ide do `title` (tooltip) samotneho
+  // pola — panel nedostava novy DOM ani nove CSS (obe polia su v HTML BEZ
+  // titlu, takze sa nic neprepisuje) a stavovy riadok „Skontroluj červené
+  // polia" uz existuje v `actions.js`.
+  function markHeightError(message){
+    ['height', 'floor_height'].forEach(function(id){
+      var e = el(id); if (!e) return;
+      if (message){ e.classList.add('bad'); e.title = message; } else { e.title = ''; }
+    });
+  }
+
   function validateFields(skipFrontDraft){
     var ok = true;
     var ae = document.activeElement;
@@ -171,6 +230,11 @@
       if (f.value.trim() === ''){ f.classList.remove('bad'); continue; }
       if (isNaN(evalDim(f.value))){ f.classList.add('bad'); ok = false; } else { f.classList.remove('bad'); }
     }
+    // S1-E0: krizova kontrola AZ TU — hlavny cyklus vyssie uz `bad` nastavil
+    // aj zrusil podla rozsahov, takze nas priznak nic neprepise.
+    var hErr = cabinetHeightError();
+    markHeightError(hErr);
+    if (hErr) ok = false;
     if (!skipFrontDraft && typeof nxFrontDraftReady === 'function' && !nxFrontDraftReady()) ok = false;
     return ok;
   }

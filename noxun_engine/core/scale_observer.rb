@@ -15,7 +15,13 @@ module Noxun
     module ScaleWatch
       SCALE_TOL = 0.001  # tolerancia: dlzka osi != 1.0 => scale
       DEBOUNCE  = 0.2    # s — cakanie na ustalenie po poslednej zmene
-      MIN = { 'width' => 200.0, 'height' => 200.0, 'depth' => 150.0 }.freeze
+      # S1-E0: spodna hranica absorbovaneho rozmeru. VYSKA je od 80 mm (korpus
+      # na dorovnanie nad umyvackou) — hodnoty su ZRKADLOM `CabinetBuilder::MIN`
+      # (string kluce, lebo sem chodi kluc z uloženeho configu). Priama
+      # referencia sa pouzit NEDA: `scale_observer` sa nacitava PRED
+      # `cabinet_builder` (main.rb), takze konstanta by pri boote neexistovala —
+      # zhodu preto strazi guard test `tests/pure/test_s1e0_min_vyska.rb`.
+      MIN = { 'width' => 200.0, 'height' => 80.0, 'depth' => 150.0 }.freeze
       # NASTROJE-1: strop iteracii bariery `flush_pending!`. Pokoj observera
       # nastava spravidla v 1-2 iteraciach (follow-up po dedupe); vyssie cislo
       # by uz znamenalo, ze si observer sam sebe planuje pracu donekonecna.
@@ -473,13 +479,19 @@ module Noxun
           cid = cfg['cabinet_id'] || Store.get(inst, 'cabinet_id')
 
           new_w = clamp_min('width',  (base_w * sx).round.to_f, cid)
-          new_h = clamp_min('height', (base_h * sz).round.to_f, cid)
           new_d = clamp_min('depth',  (base_d * sy).round.to_f, cid)
 
           params = CabinetBuilder.config_to_params(cfg)
           params['width']  = new_w
-          params['height'] = new_h
           params['depth']  = new_d
+          # S1-E0 (Codex #375 P2): vyska sa klampuje AZ TU a CONFIG-AWARE.
+          # Hole `MIN['height']` nestaci: pri sokli 100 by 80 mm vyrobilo config
+          # bez vnutra, `Construction.validate!` by prestavbu odmietol a
+          # pouzivatel by po tiahnuti uchopu dostal reject + POVODNY rozmer
+          # namiesto najnizsej platnej skrinky. Sirka a hlbka taky problem
+          # nemaju (ich MIN je vzdy nad hranicou validacie).
+          params['height'] = clamp_height(params, (base_h * sz).round.to_f, cid)
+          new_h = params['height']
 
           clean = clean_transform(inst.transformation)
           # V0.3.4 undo fix (runner S1): TRANSPARENTNA operacia — absorpcia sa pripoji
@@ -520,6 +532,23 @@ module Noxun
           m = MIN[key]
           return val if m.nil? || val >= m
           Engine.log("scale absorb #{cid}: #{key} #{val.round} < min #{m.round} — clampujem na #{m.round}")
+          m
+        end
+
+        # S1-E0 (Codex #375 P2): spodna hranica VYSKY zavisi od configu — sokel
+        # a hrubky musia nechat vnutro, inak by rebuild po klampe padol. Berie
+        # sa PRISNEJSIE z dvoch: absolutne minimum (`MIN['height']`) a najnizsia
+        # vyska, ktoru `Construction.validate!` este prijme.
+        # `normalize` je tu ZAMERNE ta ista cesta, ktorou o chvilu prejde
+        # `rebuild` — takze sa pocita proti configu, ktory sa naozaj postavi
+        # (a pri hornej skrinke sokel korektne vypadne na 0).
+        def clamp_height(params, val, cid)
+          floor = Construction.min_valid_height(CabinetBuilder.normalize(params))
+          m = [MIN['height'], floor].max
+          return val if val >= m
+          Engine.log("scale absorb #{cid}: height #{val.round} < min #{m.round} " \
+                     "(sokel #{params['floor_height'].to_f.round}, hrubka #{params['thickness'].to_f.round}) " \
+                     "— clampujem na #{m.round}")
           m
         end
 
