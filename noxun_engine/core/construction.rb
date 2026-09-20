@@ -220,6 +220,10 @@ module Noxun
           },
           wings: fr[:wings],
           interior: interior,
+          # S1-F: KONTROLNA GEOMETRIA NIKY chladnicky. Vznika VYHRADNE z vazby
+          # (`appliance_refs[]`) — skrinka, ktora chladnicku iba ocakava, box
+          # nema (rozhodnutie Michal 20.9., Codex #376 kolo 3 P2).
+          references: appliance_niche_references(cfg, interior),
           # KOV-C1: ADITIVNE surove (NEZAOKRUHLENE) hranice pre `context_for`.
           # Do configu sa NEUKLADAJU — `CabinetBuilder.merge_final` kopiruje len
           # menovity zoznam klucov, takze model ani vystupy sa nemenia.
@@ -383,6 +387,88 @@ module Noxun
         # da povedat, KTORY kus zakazky tam stoji (a nie len „nejaka umyvacka").
         rec[:item_id] = body[:item_id] if catalog
         rec
+      end
+
+      # === S1-F: KONTROLNA GEOMETRIA NIKY CHLADNICKY ==========================
+      #
+      # V modeli stoji BOX MINIMALNYCH ROZMEROV NIKY z listu vyrobcu — presne
+      # to, co Michal dnes kresli rucne. NIE je to telo spotrebica (Beko: telo
+      # 540 x 1935 x 545, nika min 560 x 1940 x 555): telo by povedalo, ze sa
+      # spotrebic zmesti, aj ked pre montaz chyba 20 mm sirky.
+      #
+      # Box vznika VYHRADNE z PRIRADENEHO modelu (`appliance_refs[]`); skrinka,
+      # ktora chladnicku iba ocakava, box NEMA (Codex #376 kolo 3 P2) — generika
+      # ma len slot umyvacky, kde je telo vlastnou geometriou slotu.
+      #
+      # Kategorie sa lisia: chladnicka ma niku ako CELE vnutro (a teda aj box),
+      # rura a mikrovlnka su vec zon a V1 im geometriu nekresli (package S1-F
+      # „Scope OUT: tela rury/mikra/dosky/digestora").
+      NICHE_REF_CATEGORIES = %w[fridge].freeze
+      NICHE_REF_PREFIX = 'ref:appliance_niche:'
+
+      # Deskriptory niky pre CELY zoznam vazieb skrinky (viac chladniciek v
+      # jednej skrinke = viac boxov, kazdy so svojou identitou).
+      def appliance_niche_references(cfg, interior = nil)
+        list = cfg[:appliance_refs] || (cfg.is_a?(Hash) ? cfg['appliance_refs'] : nil)
+        return [] unless list.is_a?(Array)
+
+        dims = interior || interior_dims(cfg)
+        seen = {}
+        list.filter_map do |ref|
+          next nil unless ref.is_a?(Hash)
+          next nil unless NICHE_REF_CATEGORIES.include?(ref['category'].to_s)
+
+          id = ref['item_id'].to_s
+          next nil if id.empty? || seen[id]
+
+          seen[id] = true
+          niche_reference(cfg, dims, ref, id)
+        end
+      end
+
+      # JEDEN deskriptor, alebo nil. Astra S1-F BLOCKER F3: box vznikne LEN ked
+      # su VSETKY TRI minima kladne cisla — neuplny (ale platny) katalogovy
+      # zaznam nesmie zhodit prestavbu ani vazbu, len sa nekresli. Osove
+      # kontroly bezia dalej per dostupna os (`ApplianceChecks`).
+      def niche_reference(cfg, dims, ref, item_id)
+        niche = ref['niche'].is_a?(Hash) ? ref['niche'] : {}
+        w = pos_mm(niche['width_min'])
+        d = pos_mm(niche['depth_min'])
+        h = pos_mm(niche['height_min'])
+        return nil unless w && d && h
+
+        # Box stoji na HORNEJ PLOCHE DNA (`z_lo`), je CENTROVANY v sirke vnutra
+        # (vnutro je symetricke, takze stred vnutra = stred korpusu) a LICUJE
+        # s celnou rovinou korpusu (y = 0; hlbka ide dozadu). NIKDY sa
+        # nedeformuje podla skrinky — ked je vacsi nez vnutro, TRCI a Kontrola
+        # to povie (04A: „konkretny model sa nikdy nestretchuje").
+        rec = { ref_key: "#{NICHE_REF_PREFIX}#{item_id}", role: 'appliance_niche',
+                kind: BuildPlan::REFERENCE_KIND,
+                box: [w, d, h],
+                origin: [((cfg[:width].to_f - w) / 2.0), 0.0, dims[:z_lo].to_f],
+                production_class: BuildPlan::REFERENCE_CLASS, manufactured: false,
+                source: 'catalog', item_id: item_id,
+                label: "#{niche_ref_label(ref)} — kontrolná nika" }
+        # Pasma dveri SPOTREBICA (zdola: spodok · dolne dvere · medzera · horne)
+        # kresli renderer ako ciary na CELNEJ ploche boxu. Chybajuci blok = box
+        # bez pasiem (zaznam bez udajov o dverach je platny).
+        bands = ref['bands'].is_a?(Hash) ? ref['bands'] : nil
+        rec[:bands] = bands if bands && !bands.empty?
+        rec
+      end
+
+      # Popis do modelu: vyrobca a model zo zaznamu vazby, inak kategoria.
+      def niche_ref_label(ref)
+        name = [ref['manufacturer'], ref['name']].map { |v| v.to_s.strip }.reject(&:empty?).join(' ')
+        name.empty? ? 'Chladnička' : name
+      end
+
+      # Kladne konecne cislo v mm, inak nil („nevieme" nie je 0).
+      def pos_mm(v)
+        return nil unless v.is_a?(Numeric)
+
+        f = v.to_f
+        f.finite? && f.positive? ? f : nil
       end
 
       # Slot ma VLASTNU (uzku) validaciu: nema vnutro, sokel ani vystuhy,
