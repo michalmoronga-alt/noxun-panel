@@ -1679,6 +1679,13 @@ module Noxun
             'zone_tree' => cfg['zone_tree'] || ZoneTree.default_tree((cfg['shelves'] || 0).to_i),
             'fronts' => Fronts.normalize_config(cfg['fronts'])
           }
+          # S1-E: polia SLOTU cestuju so sablonou — bez nich by z „Umývačky 60"
+          # vznikol slot s generickymi rozmermi namiesto tych ulozenych.
+          CabinetBuilder::DW_KEYS.each { |k| tc[k.to_s] = cfg[k.to_s] if cfg.key?(k.to_s) }
+          # S1-E (R2c): sablona nesie OCAKAVANIE (`appliance_expects[]`), NIKDY
+          # vazbu na konkretny spotrebic — ten je majetkom JEDNEJ skrinky
+          # v JEDNEJ zakazke a v sablone by z neho bola sirota.
+          tc['appliance_expects'] = cfg['appliance_expects'] if cfg['appliance_expects'].is_a?(Array)
           # V0.3 FIX 1: korpusove materialy do sablony LEN ak su na zdroji nastavene (non-nil).
           # part_overrides do sablony NEUKLADAME — su viazane na konkretne dielce/zony zdroja
           # (pri aplikacii sablony sa zachovaju z cieloveho korpusu).

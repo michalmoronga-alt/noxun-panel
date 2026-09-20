@@ -18,11 +18,19 @@
 #       (`BoardBuilder::BOARD_CONFIG_SCHEMA`) — bez markera by starsi plugin
 #       nevedel odmietnut doskovu sablonu z NOVSEJ verzie a ticho by z nej
 #       vlozil ocesanu dosku
+#   5 = S1-E: seed dvoch SLOTOVYCH sablon („Umývačka 60" a „Umývačka 45").
+#       Su to KORPUSOVE zaznamy s typom `dishwasher` a — na rozdiel od
+#       ostatnych korpusovych seedov — nesu `config['config_schema']`
+#       (`CabinetBuilder::CONFIG_SCHEMA`). BEZ markera by starsi plugin typ
+#       NEPOZNAL, `norm_type` by mu ho sklopil na `lower` a zo slotu by
+#       vlozil PLNY KORPUS s bokmi, dnom a chrbtom (Astra S1-E FIX E5);
+#       s markerom ho `newer_template_refusal` cisto odmietne.
 # Migracia je LAZY (pri prvom `load`) a STUPNOVANA (Codex audit C1c B2):
 # `migrate!` si precita STARY marker PRED zapisom a podla neho spusti
 #   old_std < 2 -> doseje doskove sablony (uz s orientaciou aj markerom),
 #   old_std < 3 -> doplni orientaciu existujucim doskovym sablonam,
 #   old_std < 4 -> doplni marker schemy existujucim doskovym sablonam,
+#   old_std < 5 -> doseje chybajuce slotove sablony umyvacky,
 # VSETKO JEDNYM atomickym zapisom pod JEDNYM zamkom (ziadny medzistav na disku).
 # Seed je MARKEROVY, nie obsahovy: viaze sa na prechod markera, nie na
 # pritomnost zaznamov, takze sa uz nikdy neopakuje (zmazanu doskovu sablonu
@@ -49,7 +57,7 @@ require 'tmpdir'
 module Noxun
   module Engine
     module TemplateStore
-      STD  = 4
+      STD  = 5
       FILE = 'templates.json'
       KINDS = %w[cabinet board].freeze
       DEFAULT_KIND = 'cabinet'
@@ -378,7 +386,9 @@ module Noxun
       def migrate!
         return true if current? # medzitym to stihla ina instancia
 
-        return write_list(build_predefined + build_predefined_boards) unless JsonFileStore.available?(path)
+        unless JsonFileStore.available?(path)
+          return write_list(build_predefined + build_predefined_slots + build_predefined_boards)
+        end
 
         data = JsonFileStore.read(path, copy: false)
         old_std = data.is_a?(Hash) && data['std'].is_a?(Integer) ? data['std'] : 1
@@ -387,6 +397,9 @@ module Noxun
         list += missing_board_seed(list) if old_std < 2
         list = fill_orientations(list) if old_std < 3
         list = fill_board_schema(list) if old_std < 4
+        # S1-E: seed slotov je MARKEROVY (viaze sa na PRECHOD markera, nie na
+        # obsah suboru) — zmazanu „Umývačku 60" plugin uz nikdy nevrati.
+        list += missing_slot_seed(list) if old_std < 5
         write_list(list)
       rescue StandardError => e
         Engine.log_error(e, 'TemplateStore.migrate!')
@@ -574,6 +587,14 @@ module Noxun
         end
       end
 
+      # S1-E: seed sa nikdy nepretlaci cez existujucu KORPUSOVU sablonu
+      # rovnakeho mena (doskovej sa netyka — ina identita).
+      def missing_slot_seed(list)
+        build_predefined_slots.reject do |seed|
+          list.any? { |t| t['kind'] == 'cabinet' && t['name'] == seed['name'] }
+        end
+      end
+
       # --- predvolene sablony (konstrukcne presety) ---------------------------
 
       def build_predefined
@@ -601,6 +622,27 @@ module Noxun
 
       def tpl(name, config)
         record('cabinet', name, config)
+      end
+
+      # S1-E: SLOTOVE sablony. Na rozdiel od `lower_base`/`upper_base` nesu
+      # `config_schema` — starsi plugin typ `dishwasher` nepozna a bez markera
+      # by ho ticho sklopil na `lower` (FIX E5). Rozmery su generické podla
+      # triedy: 60 cm slot je 600 x 915 x 560 s telom 820, 45 cm 450 x 915 x 560
+      # s telom 815. Sokel a vyska cela su Michalove hodnoty z praxe (64 / 776).
+      def build_predefined_slots
+        [
+          tpl('Umývačka 60', slot_base(600, 600.0, 820.0)),
+          tpl('Umývačka 45', slot_base(450, 450.0, 815.0))
+        ]
+      end
+
+      def slot_base(dw_class, width, body_h)
+        { 'type' => 'dishwasher', 'width' => width, 'height' => 915.0, 'depth' => 560.0,
+          'thickness' => 18.0, 'floor_height' => 0.0,
+          'dw_class' => dw_class, 'dw_body_height' => body_h,
+          'dw_front_bottom' => 64.0, 'dw_front_height' => 776.0,
+          'zone_tree' => ZoneTree.default_tree(0), 'fronts' => Fronts.empty_config,
+          'config_schema' => CabinetBuilder::CONFIG_SCHEMA }
       end
 
       # KONTRAKT doskovej sablony (Codex #174 P2): sablona bez materialu =

@@ -548,6 +548,16 @@ module Noxun
             tv = CabinetBuilder.present(tpl_config[k])
             merged[k] = tv || target_params[k]
           end
+          # S1-E (R2c): VAZBY NA SPOTREBIC su majetkom CIELA, nie sablony.
+          # `template_config_from` `appliance_refs[]` do sablony nikdy nedava,
+          # takze bez tohto riadku by aplikovanie sablony ticho odpojilo
+          # spotrebic uz viazanej skrinky (a polozka zakazky by ostala sirota).
+          # `appliance_expects[]` ma prednost zo SABLONY, ked ich nesie —
+          # „spotrebicova sablona" je prave o tom, co skrinka ocakava.
+          merged['appliance_refs'] = target_params['appliance_refs']
+          unless tpl_config['appliance_expects'].is_a?(Array)
+            merged['appliance_expects'] = target_params['appliance_expects']
+          end
           merged
         end
 

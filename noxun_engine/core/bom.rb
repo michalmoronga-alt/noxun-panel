@@ -70,6 +70,12 @@ module Noxun
         # samostatna chyba identity (rieši ju `identities`) — popisok sa kvoli
         # nej nema preco hadat.
         cabinet_fronts = {}
+        # S1-E: SLOTY UMYVACKY. Aditivny kluc — `compute()` ho IGNORUJE, takze
+        # kusovnik, nakup ani ceny sa o cislo nemenia. Jediny citatel je
+        # `Validation.check_appliance_slots` (ORANGE `dw_body_fit` /
+        # `dw_height_fit`). Zbiera sa v TOM ISTOM prechode z uz nacitaneho
+        # `ccfg` (ziadny druhy sken modelu) — vzor `hardware_manual`.
+        appliance_slots = []
         cabinet_sets = {}
         # R-34 (review #262 P1): `cabinet_sets` ma na ID JEDEN slot — pozri
         # `note_cabinet_sets`. `seen` drzi mapu PRVEJ instancie toho ID (nil =
@@ -117,6 +123,9 @@ module Noxun
             Array(ccfg['hardware']).each { |h| hardware << h.merge('owner_id' => cid, 'owner_pid' => inst.persistent_id) }
             # KOV-H2: resolved cela pre popis vlastnika v povode nakupneho riadku.
             cabinet_fronts[cid] ||= (ccfg['front_items'].is_a?(Array) ? ccfg['front_items'] : [])
+            # S1-E: udaje slotu pre Kontrolu (telo vs sirka, telo vs vyska linky).
+            sl = appliance_slot_record(cid, inst.persistent_id, ccfg)
+            appliance_slots << sl if sl
             # V0.5 D (nalez 2): RAW hardware_overrides — disabled:true polozka je
             # UZ VYRADENA z config.hardware[] pri vyhodnoteni pravidiel, takze semafor
             # "vypnute kovanie" ju vie zistit LEN z povodneho zaznamu. owner_id/owner_pid
@@ -260,7 +269,28 @@ module Noxun
           placements: placements, identities: identities,
           hardware_issues: hardware_issues, newer_configs: newer_configs,
           hardware_manual: hardware_manual, cabinet_fronts: cabinet_fronts,
+          appliance_slots: appliance_slots,
           warnings: warnings, cabinets: cabinets, boards: boards }
+      end
+
+      # S1-E: ZAZNAM SLOTU pre Kontrolu. CISTA funkcia (ziadny SketchUp objekt)
+      # — `collect` jej dava uz nacitany config. nil = nie je to slot (alebo je
+      # config poskodeny), teda ziadny zaznam a ziadny nalez.
+      #
+      # `body_width` je sirka GENERICKEHO tela triedy (`Construction.dw_class_dims`)
+      # — TA ISTA hodnota, z ktorej builder kresli referenciu. Po S1-B ju
+      # prepise telo z priradeneho modelu; tu ostava jedna autorita.
+      def appliance_slot_record(owner_id, owner_pid, ccfg)
+        return nil unless ccfg.is_a?(Hash) && ccfg['type'].to_s == 'dishwasher'
+
+        cls = ccfg['dw_class'].to_i
+        dims = defined?(Construction) ? Construction.dw_class_dims(cls) : nil
+        return nil if dims.nil?
+
+        { 'owner_id' => owner_id.to_s, 'owner_pid' => owner_pid,
+          'width' => ccfg['width'].to_f, 'height' => ccfg['height'].to_f,
+          'dw_class' => cls, 'dw_body_height' => ccfg['dw_body_height'].to_f,
+          'body_width' => dims[:body_w].to_f, 'class_label' => dims[:label].to_s }
       end
 
       # GHOST-D1: JEDEN zapisovac aditivneho kluca `newer_configs`. Zaznam je

@@ -10,9 +10,12 @@ module Noxun
       # POZN. D-33/F6: materialy (material_id/front_material_id/back_material_id) tu VEDOME
       # nie su — PARAM_KEYS je zaroven apply whitelist a materialy maju vlastny kanal
       # set_cabinet_material; insert ich nesie explicitne v payloade (build/normalize ich pozna).
+      # S1-E: polia SLOTU su bezne konstrukcne polia panela (menia sa v
+      # Zakladnych a idu tou istou apply cestou) — preto patria do whitelistu.
       PARAM_KEYS = %w[type width height depth thickness floor_height bottom_mode top_mode back_mode
                       back_thickness plinth_mode plinth_recess rail_depth rails_orientation
-                      rails_top_offset name].freeze
+                      rails_top_offset name
+                      dw_class dw_body_height dw_front_bottom dw_front_height].freeze
 
       # D-39: polia vkladacej karty, ktore mozu niest zamok (JS zrkadlo: NXInsert.LOCK_FIELDS).
       INSERT_LOCK_FIELDS = %w[width height depth thickness floor_height].freeze
@@ -24,6 +27,11 @@ module Noxun
         # snapshot, inicializacia katalogov ani Undo. Identita sa iba vracia.
         def front_preflight_result(data)
           out = data.slice('model_guid', 'cabinet_id', 'insert_session', 'revision')
+          # S1-E (Astra FIX E8): preflight sa pyta na TEN ISTY virtualny otvor,
+          # z ktoreho stavia `Construction.build_plan`. Bez toho by slot
+          # umyvacky overoval celo proti VYSKE LINKY a legitimny presah cela
+          # nad linku by zahlasil ako chybu, ktora chybou nie je.
+          slot = data['type'].to_s == 'dishwasher'
           dims = %w[width height floor_height].map do |key|
             v = data[key]
             unless v.is_a?(Numeric) && v.to_f.finite?
@@ -31,9 +39,14 @@ module Noxun
             end
             v.to_f
           end
-          unless (200.0..3000.0).cover?(dims[0]) && (200.0..3000.0).cover?(dims[1]) && (0.0..500.0).cover?(dims[2])
+          dims[2] = 0.0 if slot # slot sokel v zmysle korpusu NEMA
+          wr = slot ? CabinetBuilder::DW_WIDTH_RANGE : [200.0, 3000.0]
+          hr = slot ? CabinetBuilder::DW_HEIGHT_RANGE : [200.0, 3000.0]
+          unless (wr[0]..wr[1]).cover?(dims[0]) && (hr[0]..hr[1]).cover?(dims[1]) &&
+                 (0.0..500.0).cover?(dims[2])
             raise 'Rozmery skrinky sú mimo povoleného rozsahu.'
           end
+          opening = slot ? slot_preflight_opening(data, dims[0]) : nil
           cfg = data['fronts']
           raise 'Neplatný návrh čiel.' unless cfg.is_a?(Hash) && cfg['items'].is_a?(Array)
           %w[gap gap_top gap_bottom gap_left gap_right].each do |key|
@@ -46,11 +59,31 @@ module Noxun
             v = it['height']
             raise 'Pevná výška čela musí byť číslo.' unless v.is_a?(Numeric) && v.to_f.finite?
           end
-          result = Fronts.preflight(cfg, *dims)
+          result = Fronts.preflight(cfg, *dims, opening: opening)
           out.merge(result).merge('slots' => front_slots_payload(result['items']))
         rescue RuntimeError => e
           out.merge('valid' => false, 'items' => [], 'slots' => {},
                     'errors' => [{ 'message' => e.message }])
+        end
+
+        # S1-E: virtualny otvor slotu z PAYLOADU preflightu. Autoritou tvaru je
+        # `Construction.front_opening` — tu sa len poskladá cfg, ktory ocakava
+        # (preflight bezi BEZ modelu, nad rozpisanym formularom).
+        def slot_preflight_opening(data, width)
+          z0 = data['dw_front_bottom']
+          h = data['dw_front_height']
+          unless z0.is_a?(Numeric) && z0.to_f.finite? && h.is_a?(Numeric) && h.to_f.finite?
+            raise 'Sokel a výška čela slotu musia byť konečné čísla.'
+          end
+
+          r = CabinetBuilder::DW_RANGES
+          unless (r[:dw_front_bottom][0]..r[:dw_front_bottom][1]).cover?(z0.to_f) &&
+                 (r[:dw_front_height][0]..r[:dw_front_height][1]).cover?(h.to_f)
+            raise 'Sokel alebo výška čela slotu sú mimo povoleného rozsahu.'
+          end
+
+          Construction.front_opening({ type: 'dishwasher', width: width,
+                                       dw_front_bottom: z0.to_f, dw_front_height: h.to_f })
         end
 
         def handle_front_preflight(payload)
@@ -405,6 +438,11 @@ module Noxun
           if (tpl_msg = newer_template_refusal(tpl_ref, 'vloženie by nastavenia stratilo'))
             return set_status("#{tpl_msg} Nič sa nevložilo.", true)
           end
+          # S1-E (Astra FIX E7): AUTORITA je ULOZENY ZAZNAM sablony, nie CEF.
+          # Klient prenasa len polia, ktore pozna jeho formular — `dw_*` aj
+          # `appliance_expects[]` by z neho vypadli a zo slotovej sablony by
+          # vznikol slot s generickymi rozmermi a bez ocakavania.
+          apply_template_slot_fields!(params, tpl_ref)
           hw_status, hw = take_insert_hardware!(params) # H2 (D-76)
           if hw_status == :lossy
             return set_status("Šablóna nesie kovanie, ktoré sa nedá prečítať (#{Array(hw).join(', ')}) — " \
@@ -446,6 +484,40 @@ module Noxun
           # a po kliku by sa to zopakovalo druhy raz (review #268 P3-7).
           set_status('Skrinka visí na kurzore — klikni, kam ju položiť. ' \
                      'Šípky ←/→ otáčajú, Alt prepína kotvu, ↓ drží domácu výšku, ↑ pustí voľnú výšku, Esc zruší.')
+        end
+
+        # S1-E (FIX E7): doplni do vkladacieho payloadu to, co vie LEN ULOZENY
+        # ZAZNAM sablony — typ slotu, jeho `dw_*` polia a `appliance_expects[]`.
+        # Payload z panela ma PREDNOST (pouzivatel mohol rozmery doladit vo
+        # vkladacej karte); doplna sa VYHRADNE chybajuce.
+        # `appliance_expects[]` sa preberá VZDY zo zaznamu — vo vkladacej karte
+        # sa neda menit, takze klientska hodnota by bola len echo (alebo podvrh).
+        def apply_template_slot_fields!(params, tpl_ref)
+          return params if tpl_ref.nil?
+
+          tpl = TemplateStore.find(*tpl_ref)
+          cfg = tpl && tpl['config']
+          return params unless cfg.is_a?(Hash)
+
+          params['type'] = cfg['type'] if cfg['type'].to_s == 'dishwasher'
+          CabinetBuilder::DW_KEYS.each do |k|
+            key = k.to_s
+            next unless cfg.key?(key)
+
+            v = params[key]
+            params[key] = cfg[key] if v.nil? || v.to_s.strip.empty?
+          end
+          if cfg['appliance_expects'].is_a?(Array)
+            params['appliance_expects'] = cfg['appliance_expects']
+          else
+            params.delete('appliance_expects')
+          end
+          # Vklad NIKDY nenesie vazbu na konkretny spotrebic — sablona ju ani
+          # niest nemoze (`template_config_from` ju nezapisuje).
+          CabinetBuilder.strip_appliance_refs!(params)
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.apply_template_slot_fields!')
+          params
         end
 
         # GHOST-FB4: rucne prestavenie LOCKNUTEJ vysky z Ghost pasika.
@@ -566,6 +638,9 @@ module Noxun
           # kovania dostanu vlastnu identitu. Obsah (kod, nazov, cena, pocet,
           # vlastnik) sa NEMENI, meni sa LEN `id`.
           CabinetBuilder.rekey_hardware_manual(params)
+          # S1-E (FIX E4): treti kopirovaci vstup — vazba na KONKRETNY
+          # spotrebic zanika, ocakavanie ostava.
+          CabinetBuilder.strip_appliance_refs!(params)
           inst = CabinetBuilder.build(model, params, appearance_source: cab)
           select_only(model, inst)
           status_with_warnings(inst, "Vložená kópia #{Store.get(cab, 'cabinet_id')} → " \
@@ -669,6 +744,12 @@ module Noxun
             return
           end
           params = existing_params(cab)
+          # S1-E (Astra FIX E9): slot ma JEDNO PEVNE CELO ako SERVEROVY
+          # invariant — payload s dvoma celami, inym typom, rezimom alebo
+          # cudzou vyskou sa ODMIETNE a config sa NEDOTKNE.
+          if (msg = slot_fronts_refusal(params, data['fronts']))
+            return set_status(msg, true)
+          end
           # KOV-C2b: `drawer.system` a `drawer.recipe_refs` su SERVEROVE.
           # Payload panela nahradza cela VCELKU, takze stale alebo podvrhnute
           # pole by pripnutu verziu receptu prepisalo — a s nou GEOMETRIU uz
@@ -679,6 +760,26 @@ module Noxun
           )
           CabinetBuilder.rebuild(model, cab, params)
           finish_cab(model, cab, "Cela aktualizovane — #{Store.get(cab, 'cabinet_id')}.")
+        end
+
+        # S1-E: JEDINA veta o tom, ze slot ma jedno pevne celo (a KDE sa jeho
+        # vyska meni). `new_height` = hodnota z TEJ ISTEJ davky (auto-apply
+        # posiela zmenu `dw_front_height` aj stary riadok ciel naraz), takze
+        # legitimna zmena vysky NIE JE odmietnutie — rieši ju `normalize`.
+        SLOT_FRONTS_MSG = 'Slot umývačky má jedno pevné čelo — jeho výšku mení pole „Čelo V".'
+
+        def slot_fronts_refusal(params, incoming, new_height = nil)
+          return nil unless params['type'].to_s == 'dishwasher'
+          return nil if incoming.nil?
+
+          cfg = Fronts.normalize_config(incoming)
+          [params['dw_front_height'], new_height].compact.each do |h|
+            return nil if CabinetBuilder.slot_fronts_ok?(cfg, h)
+          end
+          SLOT_FRONTS_MSG
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.slot_fronts_refusal')
+          nil
         end
 
         # V0.2c AUTO-APPLY: jedna zmena poľa (konstrukcia AJ cela) -> 1 rebuild, 1 undo krok.
@@ -714,6 +815,14 @@ module Noxun
             return push_manual_result(op, false, 'Výber sa medzitým zmenil — skús to znova.')
           end
           params = existing_params(cab)
+          # S1-E: invariant jedneho pevneho cela sa posudzuje proti ULOZENEJ
+          # vyske AJ proti tej, ktoru prave posiela ta ista davka (zmena
+          # „Čelo V" chodi s riadkom ciel, ktory este drzi staru hodnotu).
+          if (msg = slot_fronts_refusal(params, data['fronts'], data['dw_front_height']))
+            set_status(msg, true)
+            push_selected(model)
+            return push_manual_result(op, false, msg)
+          end
           PARAM_KEYS.each do |k|
             params[k] = data[k] if data.key?(k)
           end
