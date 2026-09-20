@@ -939,6 +939,9 @@
   // budget.js, ktory ho obaluje.
   var NXAPI = {
     setStudio: function(data){
+      // S1-B1: kotva RIADKU rozpočtu sa spotrebuje až po vykreslení sekcie
+      // (dôvod nižšie), preto musí prežiť blok deep-linku.
+      var budAnchor = null;
       // CENY-KOV-A: produktovy preklik mohol zacat aj z Rozpoctu. Zmena
       // dokumentu zrusi jeho cakanie este PRED dosadenim cudzieho payloadu.
       if (typeof hwProductContextChanged === 'function' &&
@@ -1032,12 +1035,18 @@
         // z Kontroly pri spotrebiči, ktorého vlastník zmizol — taký nález nemá
         // v modeli čo označiť). Rovnako JEDNORAZOVO a rovnako nahlas: riadok,
         // ktorý medzitým zanikol, nie je tichý no-op.
-        var ba = (studioSec === 'budget') ? anchorFilter(ST) : null;
-        if (ba && typeof budOpenAnchor === 'function' && !budOpenAnchor(ba)){
-          NXAPI.setStatus('Tento riadok už v rozpočte nie je — otvorený je celý Rozpočet.', true);
-        }
+        //
+        // ROZDIEL oproti kotvám vyššie (Codex #382 kolo 3): `bom` aj `mat`
+        // menia STAV, z ktorého `render()` kreslí, takže musia bežať PRED ním.
+        // Táto kotva je naopak DOTAZ DO DOM (doscrollovanie a prisvietenie
+        // riadku) — pred vykreslením sekcie by nenašla nič a jednorazová kotva
+        // by zanikla bez účinku. Aplikuje sa preto AŽ PO `render()`.
+        budAnchor = (studioSec === 'budget') ? anchorFilter(ST) : null;
       }
       render();
+      if (budAnchor && typeof budOpenAnchor === 'function' && !budOpenAnchor(budAnchor)){
+        NXAPI.setStatus('Tento riadok už v rozpočte nie je — otvorený je celý Rozpočet.', true);
+      }
     },
     setStatus: function(msg, err){
       var e = el('status');
