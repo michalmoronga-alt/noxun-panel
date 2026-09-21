@@ -192,6 +192,18 @@
 
   // S1-C: zápis očakávaní. Vlastný callback (nie `set_appliance_owner`) —
   // je to iná vec: žiadna položka zákazky sa nemení, len config kusu.
+  //
+  // DVE POISTKY PROTI RÝCHLEMU DRUHÉMU PRÍKAZU (Codex #385 kolo 1, P2). Zápis
+  // je asynchrónny a pravdu prinesie až čerstvá karta, takže dve voľby za sebou
+  // by sa obe počítali z TOHO ISTÉHO zastaraného zoznamu a druhá by prvú
+  // prepísala („pridaj rúru" + „pridaj mikrovlnku" = zostane len mikrovlnka):
+  //   1. **ovládač sa zamkne** (`disabled`), kým nepríde nový payload — server
+  //      posiela čerstvú kartu aj pri KAŽDOM odmietnutí, takže sa vždy odomkne,
+  //   2. **lokálny snapshot sa aktualizuje optimisticky** — príkaz, ktorý sa
+  //      napriek zámku dostane cez (klávesnica, oneskorená udalosť, druhý
+  //      ovládač v tom istom riadku), vychádza z AKTUÁLNEHO zoznamu.
+  // Klient si pritom nič nedopočítava: posiela ÚPLNY zoznam a server ho aj tak
+  // validuje a porovnáva so stavom modelu.
   function aprSetExpects(select, ctx){
     if (!ctx || !select) return false;
     var row = (select.closest) ? select.closest('[data-apr-expects]') : null;
@@ -202,6 +214,8 @@
     if (!next) return false;
     if (typeof window === 'undefined' || !window.sketchup || !sketchup.set_appliance_expects) return false;
 
+    if (row) row.setAttribute('data-apr-expects', next.join(','));
+    select.disabled = true;
     sketchup.set_appliance_expects(nxDocPayload(aprPayload({ expects: next }, ctx)));
     return true;
   }
