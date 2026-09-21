@@ -475,8 +475,16 @@ module Noxun
         # Pasma dveri SPOTREBICA: hrany v suradniciach korpusu + vyska pasma
         # (popis „669", „71", zvysok). Pasmo, ktore by presiahlo box, sa oreze —
         # box sa kvoli listu nikdy nezvacsuje.
+        #
+        # Codex #384 kolo 1 (P2): zaznam BEZ pouzitelnych pasiem = PRAZDNY
+        # ZOZNAM, nie jedno vymyslene pasmo cez cely box. Renderer modelu
+        # (`draw_reference_niche`) vtedy nekresli ziadnu ciaru a nahlad musi
+        # hovorit to iste — inak by pri modeli bez udajov o dverach ukazoval
+        # popisok „1940", ktory v modeli nikde nie je.
         def appliance_preview_bands(rd, z0, h)
           levels = CabinetBuilder.niche_band_levels(rd[:bands].is_a?(Hash) ? rd[:bands] : {})
+          return [] if levels.empty?
+
           edges = ([0.0] + levels + [h]).map(&:to_f).select { |v| v >= -0.01 && v <= h + 0.01 }
           edges = edges.uniq.sort
           out = []
