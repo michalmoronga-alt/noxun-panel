@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.12.14' unless defined?(VERSION)
+    VERSION = '0.12.15' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -499,6 +499,7 @@ Sketchup.require 'noxun_engine/core/ghost_tool'    # V1-04 GHOST vkladanie na kl
 Sketchup.require 'noxun_engine/core/tags'          # D-27 viditelnost tagov modelu (po builderoch — cita ich konstanty mien)
 Sketchup.require 'noxun_engine/core/templates'
 Sketchup.require 'noxun_engine/core/template_previews' # UI-D2: PNG nahlady sablon (subor vedla templates.json)
+Sketchup.require 'noxun_engine/core/appliance_checks' # S1-F: verdikt niky a delenia ciel (po construction+fronts — cita interior_dims, front_opening a GAP_DEFAULT; pred bom/validation/panel)
 Sketchup.require 'noxun_engine/core/bom'           # V0.5 A kusovnik/supisy zo snapshotov
 Sketchup.require 'noxun_engine/core/usage_stats'   # D-25 merac pouzivania panela (lokalne pocitadla)
 Sketchup.require 'noxun_engine/core/vepo_export'   # V0.5 C VEPO CSV export (prirezy z BOM)

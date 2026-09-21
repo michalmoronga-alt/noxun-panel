@@ -258,9 +258,13 @@ jedno Späť by vrátilo len jednu z nich a zákazka by ostala v stave, ktorý v
   Tú istú funkciu volá `Bom.collect` (`appliance_bound?`) aj binding (`carries_item?` nad `owner_entry_for`,
   ktorý druh a ID číta **z entity**, nie z toho, čo tvrdí položka) — zber a mutácie tak riešia identitu rovnako.
 - **Kontrakt záznamu `appliance_refs[]`** (číta ho S1-B2 telo slotu, S1-F box chladničky, S1-C očakávania):
-  `{item_id, category, body{width,height,depth}, niche{width_min…depth_max}, bands{door_bottom_offset,
-  door_lower, door_gap, door_upper}, furniture_doors{lower_min,lower_max,gap_ref}, install{dishwasher_class,
-  door_system,hinge_side}, snapshot_at}`. **Chýbajúce pole = kľúč chýba, nikdy 0** — nula je rozmer, „nevieme" nie je.
+  `{item_id, category, manufacturer, name, body{width,height,depth}, niche{width_min…depth_max},
+  bands{door_bottom_offset, door_lower, door_gap, door_upper}, furniture_doors{lower_min,lower_max,gap_ref},
+  install{dishwasher_class, door_system,hinge_side}, snapshot_at}`. **Chýbajúce pole = kľúč chýba, nikdy 0** —
+  nula je rozmer, „nevieme" nie je. **`manufacturer` a `name`** pribudli s S1-F (Codex #384 kolo 1, P2): bez
+  nich sa **referencia v modeli nemala ako pomenovať** a každý box niky sa volal „Chladnička", takže dva boxy
+  v jednej skrinke sa nedali rozoznať. Rozšírenie je **aditívne** — záznam uložený pred ním mená nemá a label
+  vtedy padne na popisok kategórie (`Construction.niche_ref_label`).
 - **Zapisovače refs.** Skrinka a slot idú cez `CabinetBuilder.write_appliance_refs!` (config → `normalize` →
   `rebuild_in_operation`; protiváha `strip_appliance_refs!`), **doska cez `BoardBuilder.write_appliance_refs!`** —
   zápis samotného configu **bez prestavby** (väzba jej geometriu nemení), ale **s pečiatkou
@@ -272,3 +276,41 @@ jedno Späť by vrátilo len jednu z nich a zákazka by ostala v stave, ktorý v
 - **Ponuka vlastníkov cestuje v payloade rozpočtu** (`appliance_owners` = `matrix` + `options` per druh +
   `job_label`), nie samostatným kanálom: patrí k dokumentu, ktorý payload priniesol, takže prepnutie zákazky ju
   vymení samo a modal nikdy neponúka skrinku z inej zákazky.
+
+### appliance_checks.rb
+
+**Jediná autorita verdiktu niky a delenia čiel** (S1-F). O tom, či sa chladnička do skrinky zmestí a kde smie ležať hrana medzi dolným a horným čelom,
+hovoria **dve** miesta — Kontrola (`Validation`, ORANGE nálezy) a riadok „Spotrebič“ v Inspectore (`Panel.appliance_rows`). Keby si každé počítalo svoje,
+semafor a karta by mohli nad tou istou skrinkou tvrdiť iné číslo. Tento modul preto drží **všetky vzorce aj všetky vety**; volajúci už len kreslí.
+Je **čistý**: žiadne IO, žiadny SketchUp objekt, žiadny zápis. Vstupom je **záznam zberu** (`Bom.collect[:appliances]`) s kompletným výpočtovým kontextom;
+Inspector si ten istý záznam skladá z uloženého configu cez **`context(cfg)`** — tá istá funkcia, takže druhá pravda nevznikne.
+
+- **`context(cfg)`** → `{interior, z_lo, gap, single_zone, fronts_pair}`. `interior` a `z_lo` z `Construction.interior_dims`; `gap` a `fronts_pair`
+  z **jedného** `Fronts.resolve_layout` (druhý výpočet by mohol dať iný default škáry — Codex #376 kolo 2 P2). Slot umývačky vnútro nemá, preto vracia `{}`.
+- **`single_zone?(cfg)`** — autoritou je **koreň stromu zón** (`zone_tree.split`); ploché `zones` sú len jeho projekcia a slúžia legacy skrinke bez stromu.
+  Ten **istý** predikát používa filter ponuky modelov aj verdikt: inak by ponuka filtrovala podľa výšky, ktorú by verdikt vzápätí označil za nekontrolovateľnú.
+- **`niche_verdict(rec)`** → stav per os `ok | clash | unknown | skip` (+ celkový `na`, keď sa nika danej kategórie ani vlastníka netýka). Osi per kategória
+  drží `AXES`: chladnička **šírka · výška · hĺbka**, rúra a mikrovlnka **šírka · hĺbka** (ich výška je vec zón, rozhodnutie 7). `skip` má **len výška** a **len**
+  pri viacerých zónach. Agregácia: `clash` > `unsatisfiable` > `unknown` > `skip` > `na` > `ok`. Texty **menujú overené osi** („šírka, výška a hĺbka ✓“,
+  „výška nekontrolovaná — skrinka má viac zón“) a nikdy netvrdia, že je montáž priechodná: overená je **obálka niky**, nie police ani vnútorné vybavenie (FIX F13).
+- **Porovnanie osi má JEDNO miesto — `axis_state` / `axis_fits?` / `axis_check`** (Codex #384 kolo 1, P2) a **jednu toleranciu `AXIS_TOL` = 0,5 mm**. Používa ho
+  verdikt **aj filter ponuky modelov** (`Panel.appliance_axis_reason`). Kým mala ponuka vlastné porovnanie na 0,5 mm a verdikt vlastné na 0,01 mm, model
+  ponúknutý ako „zmestí sa" dostal hneď po väzbe ORANGE „nezmestí sa". Pol milimetra je hranica, pod ktorou je rozdiel vec zaokrúhlenia listu, nie montáže.
+  Z toho istého dôvodu žije aj **tabuľka osí `AXES` len tu** — panel si ju nekopíruje. „Nevieme" (list číslo nedáva) nie je „nesedí": `axis_fits?` vtedy vracia `true`.
+- **`door_split_verdict(rec)`** → `ok | clash | na | unknown | unsatisfiable`. **Hrana je VRCH DOLNÉHO ČELA** meraný od dna niky: `bounds[lower][:z1] − z_lo`
+  (nezaokrúhlené `Fronts` hranice, tolerancia `EPS` = 0,01). Prípustné pásmo praxe je **`[D + 10, D + G − s − 10]`**, kde `D = door_bottom_offset + door_lower`
+  (spodok + dolné dvere **spotrebiča**), `G = door_gap` a `s` je normalizovaná škára čiel; **10 mm je presah nábytkových dverí cez hranu dverí spotrebiča
+  na oboch stranách** (konštanta enginu `OVERLAP_MIN`, Michal 19.9.2026). Stred pásma je **odporúčanie**. Prázdny interval (`G < s + 20`) je **`unsatisfiable`**:
+  bez pásma a bez odporúčania, s vetou, ktorá menuje rozstup aj škáru (FIX F8).
+- **Výkres výrobcu má prednosť.** Keď snapshot nesie `furniture_doors`, `lower_min`/`lower_max` sú **výšky dolných nábytkových dverí** (rozmer dielca), takže
+  sa do niky prevádzajú cez **spodnú hranu dolného čela**: `bounds[lower][:z0] + h − z_lo`. Tá môže začínať **pod** nikou (sokel 100 + dno 18 + medzera 2 = 16 mm
+  pod dnom niky) — `lower_z0` to nesie (FIX F2). Čiastočný blok = jednostranný rozsah, prázdny blok = vzorec praxe; `gap_ref` je len informácia a keď sa líši
+  od škáry projektu, text to prizná.
+- **Aplikovateľnosť dvojice čiel** (FIX F6): delenie sa počíta **len** pri práve dvoch čelách typu `door` nad sebou. Zásuvka, výklop, sklop, blenda ani riadok
+  bez čela panel dverí netvoria — stav je `na` s dôvodom („delenie sa netýka: zásuvka“).
+- **`findings(rec, computed = nil)`** vyrába vety Kontroly — **výhradne pre `clash` a `unsatisfiable`** (FIX F7 + F9). `unknown`, `skip` a `na` sú informácia
+  pre riadok Spotrebič, nie ORANGE.
+- **Informačné stavy sa v riadku naozaj ZOBRAZUJÚ** (Codex #384 kolo 1, P2). `verdict_text` skladá vetu z niky **aj** z delenia vrátane `unknown` — používateľ
+  má vedieť, **prečo** sa delenie neodporúča („list nedáva rozmery dverí spotrebiča"), inak riadok o ňom ticho mlčal a nedalo sa rozoznať „je to v poriadku"
+  od „nekontroluje sa". Tón riadku sa tým nemení (warn je len `clash` a `unsatisfiable`). Jediný stav, ktorý sa **nezobrazuje**, je `na`: „delenie sa netýka"
+  je vlastnosť skrinky (zásuvka namiesto dvierok), nie modelu, a riadok je o modeli.

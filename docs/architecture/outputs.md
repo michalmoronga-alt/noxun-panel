@@ -90,11 +90,26 @@ Chýbajúci kľúč `appliance_slots` kontrolu **ticho preskočí** (legacy vola
 - **`appliance_owner_missing`** — vlastník zanikol, alebo jeho ID už patrí inému kusu (ID sa recyklujú, `Ids.next_id`), takže položka ukazuje do prázdna.
   Nález **nemá `owner_id`** (Astra B16): fallback resolvera podľa uloženého ID by označil **cudziu** skrinku, ktorá to ID medzitým dostala. Adresou je preto
   `data: {route: 'appl', item_id}` — klik vedie na položku, nie do modelu. Náprava je „odpojiť" (vlastník → `job`, jeden krok Späť).
-- **`appliance_specs_missing`** — viazaný model so skrinkovým vlastníkom (`cabinet`/`slot`), ktorý v katalógu nemá rozmery niky; kontrola niky (S1-F) sa z neho nedá urobiť.
+- **`appliance_specs_missing`** — viazaný model so skrinkovým vlastníkom (`cabinet`/`slot`), ktorý v katalógu nemá rozmery niky; kontrola niky sa z neho nedá urobiť.
+  **S1-F to spresnil** (Astra FIX F3): hlási sa, až keď **žiadna os** nemá použiteľnú hodnotu (predikát `ApplianceChecks.specs_missing?`) — záznam napr. bez `depth_min`
+  sa dá skontrolovať na zvyšných osiach a hlásiť ho ako celý nepoužiteľný by bol falošný poplach.
 - **`appliance_class_mismatch`** — trieda umývačky zo snapshotu ≠ `dw_class` slotu. Hlási sa **len keď sú známe OBE triedy** (Astra B15) — neznáma trieda je
   „nevieme", nie „nesedí".
 
-`stable_key` je `appliance|<uuid položky>|<kód>`, takže dva nálezy nad tým istým spotrebičom sú **dva riadky** (dedup by inak nechal len prvý). Viazané nálezy
+**S1-F — dva kódy geometrie chladničky, obe ORANGE a bez brány.** Vzorce aj vety počíta **`ApplianceChecks`** (odsek v [appliances.md](appliances.md)); `check_appliance_geometry`
+z neho robí **len riadky**, takže Kontrola a riadok Spotrebič v Inspectore nemôžu tvrdiť dve veci.
+
+- **`appliance_niche_clash|<os>`** — os niky sa do vnútra skrinky nezmestí (`min ≤ vnútro ≤ max`, jednostranne kde list max nedáva). **Jeden nález na OS**
+  (šírka · výška · hĺbka sú tri samostatné veci na opravu) a `stable_key` preto nesie aj os: `appliance|<uuid>|appliance_niche_clash|height`. Veta menuje číslo
+  listu aj skrinky („potrebuje niku výška min 1940, skrinka má 1924"). **Výška chladničky sa kontroluje len pri jednej zóne**; v delenej skrinke je os `skip`.
+- **`appliance_door_split`** — hrana medzi dolným a horným čelom nelícuje s delením dverí spotrebiča, alebo sa odporučiť nedá (`unsatisfiable`: rozstup dverí
+  spotrebiča nedovolí presah 10 mm na oboch stranách pri danej škáre).
+
+**Nález vzniká VÝHRADNE pre `clash` a `unsatisfiable`** (Astra FIX F7). Informačné stavy verdiktu (`unknown` — list číslo nedáva · `skip` — viac zón ·
+`na` — delenie sa netýka) idú **len** do riadku Spotrebič a do `appliance_rows[].check`; **žiadna nová závažnosť nevzniká** (FIX F9 — kontrakt Kontroly
+ostáva RED/ORANGE, počítadlá, badge aj klient sa nemenia).
+
+`stable_key` je `appliance|<uuid položky>|<kód>` (pri `niche_clash` + `|<os>`), takže dva nálezy nad tým istým spotrebičom sú **dva riadky** (dedup by inak nechal len prvý). Viazané nálezy
 adresu vlastníka **majú** (`owner_id` + `owner_pid`), takže klik označí skrinku. **Nález BEZ `owner_id` nemá v modeli čo označiť**, preto ho `ProductionCore.do_select`
 vybaví **pred** akýmkoľvek výberom entít: `route_target` z neho prečíta `data.route` a vráti **deep-link do sekcie** (`appl` → Rozpočet, kotva `appliance:<uuid>`);
 výber sa pri tom **nedotkne** a okno riadok krátko prisvieti (`budOpenAnchor` — **až PO vykreslení sekcie**, lebo je to dotaz do DOM; kotvy `bom` a `mat` naopak
@@ -620,12 +635,20 @@ z už načítaného `ccfg` záznam `{owner_id, owner_pid, width, height, dw_clas
 **S1-B1 — aditívny kľúč `appliances` (spotrebiče zákazky).** Zbiera sa z **dvoch zdrojov naraz**: z rozpočtového dictu (`BudgetStore.appliances`, prečíta sa **raz**
 na začiatku zberu) a z **toho istého prechodu** skriniek a dosiek (`note_appliance_owner` zapíše `appliance_refs[]`, `appliance_expects[]`, druh a `persistent_id`;
 prvá inštancia daného ID vyhráva — zdieľané ID je samostatná chyba identity). Žiadny druhý sken modelu. Tvar záznamu:
-`{item_id, name, category, owner: {kind, id, pid}, state, customer_supplied, snapshot: {niche, body, install{dishwasher_class}} | nil, slot: {dw_class} | nil, interior: {width, height, depth} | nil}`.
+`{item_id, name, category, owner: {kind, id, pid}, state, customer_supplied, snapshot: {niche, body, install{dishwasher_class}} | nil, slot: {dw_class} | nil, interior: {width, height, depth} | nil}`
+a od **S1-F** navyše `bands` · `furniture_doors` · `z_lo` · `gap` · `single_zone` · `fronts_pair {applicable, reason, lower_z0, lower_z1, upper_z0}`.
 
 `state` je `bound` · `owner_missing` · `job` · `expected_missing`. **Vlastník platí LEN keď entita existuje, má ten istý DRUH a jej `appliance_refs[]` obsahujú `item_id`** —
 samotná zhoda ID dôkaz nie je (ID sa recyklujú) a ani zhoda ID + uuid (`cabinet_id` zdieľa skrinka aj slot). Rozhoduje **jedna funkcia**
-`ApplianceBinding.ref_matches?`, ktorú volá zber aj mutácie väzby — inak by sa „viazané" v Kontrole a „nájdené" pri zápise rozišli. `interior` počíta `Construction.interior_dims` (plytká konverzia kľúčov na symboly) — vlastný výpočet
-by bol druhá pravda o tom, kam sa spotrebič zmestí. `compute()` kľúč **ignoruje**; čitateľmi sú `Validation.check_appliances` a (od S1-B2) pohľad „V zákazke".
+`ApplianceBinding.ref_matches?`, ktorú volá zber aj mutácie väzby — inak by sa „viazané" v Kontrole a „nájdené" pri zápise rozišli.
+`compute()` kľúč **ignoruje**; čitateľmi sú `Validation.check_appliances` a (od S1-B2) pohľad „V zákazke".
+
+**S1-F — KOMPLETNÝ VÝPOČTOVÝ KONTEXT v tom istom prechode** (Astra FIX F4). Záznam nesie všetko, čo verdikt niky a delenia čiel potrebuje, takže
+`ApplianceChecks` je nad ním **čistá funkcia** a Kontrola už do modelu druhý raz nesiaha. Kontext počíta **`ApplianceChecks.context(cfg)`** (vnútro, `z_lo`,
+normalizovaná škára čiel, jedna zóna, dvojica čiel) a `Bom` si ho drží **raz na vlastníka** (`appliance_context` cachuje do záznamu vlastníka) — dva spotrebiče
+v jednej skrinke neznamenajú dva prepočty čiel. Z tej istej funkcie ide aj **`interior`**: vlastný výpočet by bol druhá pravda o tom, kam sa spotrebič zmestí.
+`bands` a `furniture_doors` sa čítajú zo **snapshotu položky** (`dims.front`) — z toho istého miesta ako `niche`, a teda z tej istej kópie listu, akou
+`ApplianceBinding.apply!` v jednej operácii naplnil aj `appliance_refs[]` na entite; zmena živého katalógu po väzbe nimi nepohne.
 
 ### sheet_estimate.rb
 

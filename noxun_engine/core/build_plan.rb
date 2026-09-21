@@ -117,9 +117,15 @@ module Noxun
       # Preto ma vlastny zoznam, vlastny validator a vlastny renderer
       # (`render_references`).
       #
-      # Telo spotrebica (umyvacka, neskor chladnicka) je JEDINY dnesny pripad:
-      # kreslime ho preto, aby bolo v modeli vidno, co do slotu pride — kupuje
-      # ho zakaznik, my ho nevyrabame ani neobjednavame.
+      # Referencie su DNES DVE (S1-F):
+      #   `appliance_body`  — TELO spotrebica v slote umyvacky: kreslime ho preto,
+      #                       aby bolo v modeli vidno, co do slotu pride,
+      #   `appliance_niche` — KONTROLNA GEOMETRIA NIKY chladnicky: box minimalnych
+      #                       rozmerov niky z listu vyrobcu s pasmami dveri
+      #                       spotrebica na celnej ploche. NIE je to telo (telo
+      #                       Beko je 540 x 1935 x 545, nika 560 x 1940 x 555) —
+      #                       je to priestor, ktory musi skrinka poskytnut.
+      # Obe su vec, ktoru kupuje zakaznik; my ich nevyrabame ani neobjednavame.
       #
       # DESKRIPTOR (symbolove kluce, mm Float):
       #   ref_key          String  — identita v rámci planu (unikatna)
@@ -132,7 +138,9 @@ module Noxun
       #   source           'generic' | 'catalog'
       #   label            String  — ludsky popis do modelu a diagnostiky
       #   dw_class         Numeric|nil — trieda umyvacky (600/450), ak je to slot
-      REFERENCE_ROLES = %w[appliance_body].freeze
+      #   item_id          String|nil  — polozka zakazky (pri `source: 'catalog'`)
+      #   bands            Hash|nil    — pasma dveri spotrebica (len `appliance_niche`)
+      REFERENCE_ROLES = %w[appliance_body appliance_niche].freeze
       REFERENCE_CLASS = 'reference'
       REFERENCE_KIND  = 'reference'
       REFERENCE_SOURCES = %w[generic catalog].freeze

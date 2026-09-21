@@ -48,6 +48,12 @@
   var PV_DW_BODY = { 600: { w: 598, d: 555 }, 450: { w: 448, d: 550 } };
   // Zakladna tela (nohy a sokel spotrebica) — zrkadlo `Construction::DW_BASE_*`.
   var PV_DW_BASE_H = 200, PV_DW_BASE_SIDE = 20;
+  // S1-F: KONTROLNA GEOMETRIA CHLADNICKY. Box niky je referencia — prerusovane
+  // vo firemnej teal (rovnako ako telo slotu); ked sa nezmesti, prekresli sa
+  // jantarom (`PV_SLOT_FILL` = --nx-warn-fg), lebo je to prave to, o com hovori
+  // Kontrola. PASMO PRIPUSTNEJ HRANY ciel je jantarovy prizvuk vlavo od boxu
+  // (mockup R12) a sirku gutteru potrebuje aj scena, inak ho fit oreze.
+  var PV_APPL_GUTTER = 22;
   var dragState = null;
   // ===== D-08 / UI-B1: kontext prepina nahlad AJ viditelne skupiny (CSS cez
   // data-view-ctx na <body>). Rezimove taby v hlavicke nahradil RAIL — stavovy
@@ -151,6 +157,26 @@
     return { minX: Math.min(0, bx), maxX: Math.max(W, bx + bw),
              minZ: 0, maxZ: Math.max(sl.bodyH, sl.fb + sl.fh) };
   }
+  // S1-F (Astra FIX F11): OBALKA VSETKYCH REFERENCII — tela slotu AJ boxov
+  // niky. Box niky sa NIKDY nedeformuje podla skrinky, takze pri uzkej alebo
+  // nizkej skrinke TRCI (a prave vtedy o nom Kontrola hovori) — scena mu musi
+  // nechat miesto vratane jantaroveho pasma hrany vlavo. Ciste (Node testy).
+  function nxRefExtent(sl, appl, W){
+    var e = nxSlotExtent(sl, W);
+    var list = appl || [];
+    list.forEach(function(a){
+      if (!a || !a.box) return;
+      var b = a.box, x0 = nxNumOr(b.x, 0), z0 = nxNumOr(b.z, 0);
+      var x1 = x0 + nxNumOr(b.w, 0), z1 = z0 + nxNumOr(b.h, 0);
+      // Pasmo hrany a jeho popisky lezia VLAVO od boxu.
+      var gx = (a.split ? x0 - PV_APPL_GUTTER : x0);
+      var n = { minX: Math.min(0, gx), maxX: Math.max(W, x1),
+                minZ: Math.min(0, z0), maxZ: z1 };
+      e = e ? { minX: Math.min(e.minX, n.minX), maxX: Math.max(e.maxX, n.maxX),
+                minZ: Math.min(e.minZ, n.minZ), maxZ: Math.max(e.maxZ, n.maxZ) } : n;
+    });
+    return e;
+  }
 
   function sceneSize(){
     if (pvInsertBoard()) return pvBoardScene(numv('ib_length'), numv('ib_width'));
@@ -190,8 +216,10 @@
       minZ = Math.min(minZ, 0) - 96;      // nohy pod korpusom + suhrn kovania
     }
     // PR #381 (P2): telo slotu sa do sceny priklada v KAZDOM kontexte —
-    // od opravy projekcii ho vidno aj v Celach a v Kovani.
-    var sx = nxSlotExtent(pvSlot(), W);
+    // od opravy projekcii ho vidno aj v Celach a v Kovani. S1-F: box niky sa
+    // kresli LEN v kontexte Korpus, takze sa aj do sceny priklada len tam
+    // (inak by Cela a Kovanie mali prazdny okraj po neviditelnom boxe).
+    var sx = nxRefExtent(pvSlot(), pvApplianceRefs(), W);
     if (sx){
       minX = Math.min(minX, sx.minX); maxX = Math.max(maxX, sx.maxX);
       minZ = Math.min(minZ, sx.minZ); maxZ = Math.max(maxZ, sx.maxZ);
@@ -317,6 +345,14 @@
              bodyH: numv('dw_body_height') || 0,
              fb: numv('dw_front_bottom') || 0,
              fh: numv('dw_front_height') || 0 };
+  }
+
+  // S1-F: KONTROLNA GEOMETRIA zo SERVERA (`preview.appliances[]`). Panel z nej
+  // NIC nepocita — box, pasma aj pasmo pripustnej hrany prichadzaju hotove
+  // v mm suradniciach korpusu (z od podlahy). Kresli sa LEN v kontexte Korpus.
+  function pvApplianceRefs(){
+    if (previewMode !== 'cab') return [];
+    return (typeof applPreview !== 'undefined' && applPreview) ? applPreview : [];
   }
 
   // S1-E: výška sokla KORPUSU. Horná skrinka ju nemá a slot umývačky tiež nie
@@ -592,6 +628,71 @@
     if (sl.fb > 0) pvDimV(S, rx, ry, -26, 0, sl.fb, String(Math.round(sl.fb)));
   }
 
+  // ---- S1-F: BOX NIKY + PASMA DVERI + PASMO PRIPUSTNEJ HRANY --------------
+  //
+  // Kresli PRESNE to, co poslal server (`preview.appliances[]`): box je
+  // referencia (prerusovana ciara, nikdy vypln dielca), pasma su jeho vnutorne
+  // delenie podla listu vyrobcu a jantarovy prizvuk vlavo je pasmo, v ktorom
+  // smie lezat hrana medzi dolnym a hornym celom. ZIADNY vypocet — cisla
+  // (669, 71, 679–727) su v payloade.
+  function drawApplianceRefs(S, rx, ry, g, list){
+    (list || []).forEach(function(a){
+      if (!a || !a.box) return;
+      var b = a.box, x = nxNumOr(b.x, 0), z = nxNumOr(b.z, 0);
+      var w = nxNumOr(b.w, 0), h = nxNumOr(b.h, 0);
+      if (!(w > 0 && h > 0)) return;
+      var clash = (a.state === 'clash' || a.state === 'unsatisfiable');
+      var col = clash ? PV_SLOT_FILL : PV_SELECT;
+      S.push('<rect x="' + rx(x) + '" y="' + ry(z + h) + '" width="' + w + '" height="' + h +
+             '" fill="' + col + '" fill-opacity=".08" stroke="' + col +
+             '" stroke-width="2" stroke-dasharray="12 8"/>');
+      (a.bands || []).forEach(function(bd){
+        if (!bd) return;
+        var z0 = nxNumOr(bd.z0, 0), z1 = nxNumOr(bd.z1, 0);
+        if (z1 - z0 <= 0) return;
+        if (z0 > z + 0.01){
+          S.push('<line x1="' + rx(x) + '" y1="' + ry(z0) + '" x2="' + rx(x + w) +
+                 '" y2="' + ry(z0) + '" stroke="' + col + '" stroke-width="1.5"/>');
+        }
+        if (z1 - z0 > 34){
+          pvText(S, rx(x + w / 2), ry(z0 + (z1 - z0) / 2) + 7,
+                 String(Math.round(nxNumOr(bd.size, z1 - z0))), 20, 'middle', col);
+        }
+      });
+      drawApplianceSplit(S, rx, ry, a, x, w);
+    });
+  }
+
+  // Pasmo pripustnej hrany ciel (jantar) + ciara SUCASNEJ hrany. Jednostranny
+  // rozsah (list dal len min alebo len max) sa kresli od/po hranu boxu.
+  function drawApplianceSplit(S, rx, ry, a, x, w){
+    var sp = a.split;
+    if (!sp) return;
+    var lo = nxNumOr(sp.lo, NaN), hi = nxNumOr(sp.hi, NaN);
+    var b = a.box, z = nxNumOr(b.z, 0), h = nxNumOr(b.h, 0);
+    if (isNaN(lo)) lo = z;
+    if (isNaN(hi)) hi = z + h;
+    if (hi - lo > 0){
+      S.push('<rect x="' + rx(x - PV_APPL_GUTTER) + '" y="' + ry(hi) + '" width="' +
+             (PV_APPL_GUTTER - 4) + '" height="' + (hi - lo) + '" fill="' + PV_SLOT_FILL +
+             '" fill-opacity=".55" stroke="' + PV_SLOT_FILL + '" stroke-width="1"/>');
+      if (sp.lo_mm != null && sp.hi_mm != null){
+        pvText(S, rx(x - PV_APPL_GUTTER - 4), ry(hi) - 4,
+               String(Math.round(sp.hi_mm)), 18, 'end', PV_SLOT_FILL);
+        pvText(S, rx(x - PV_APPL_GUTTER - 4), ry(lo) + 16,
+               String(Math.round(sp.lo_mm)), 18, 'end', PV_SLOT_FILL);
+      }
+    }
+    var e = nxNumOr(sp.edge, NaN);
+    if (isNaN(e)) return;
+    var ecol = sp.state === 'clash' ? PV_SLOT_FILL : PV_SELECT_ACCENT;
+    S.push('<line x1="' + rx(x - PV_APPL_GUTTER) + '" y1="' + ry(e) + '" x2="' + rx(x + w) +
+           '" y2="' + ry(e) + '" stroke="' + ecol + '" stroke-width="2.5"/>');
+    if (sp.edge_mm != null){
+      pvText(S, rx(x + w) + 6, ry(e) + 6, 'hrana ' + Math.round(sp.edge_mm), 18, 'start', ecol);
+    }
+  }
+
   function renderPreview(){
     var svg = el('preview'); if (!svg) return;
     clearFrontHover(); // D-23: rerender/tab/vyber rusi hover uzly — stav ide s nimi
@@ -653,6 +754,10 @@
       // D-08: kontext Korpus — kotovany celny rez (Š/V/sokel + naznak hlbky)
       renderCabOutline(S, rx, ry, W, H, g.fh);
     }
+    // S1-F: kontrolna geometria chladnicky NAD podkladom korpusu (kontext
+    // Korpus) — je to referencia, nie dielec, takze sa kresli ako posledna
+    // vrstva a nikdy nenahradza obrys.
+    drawApplianceRefs(S, rx, ry, g, pvApplianceRefs());
     drawGhostLayers(S, rx, ry, g);
     svg.innerHTML = S.join('');
     renderPvBar();
@@ -1620,6 +1725,13 @@
                        pvSlot: pvSlot, drawSlotBase: drawSlotBase,
                        drawSlotDetail: drawSlotDetail, nxSlotExtent: nxSlotExtent,
                        PV_DW_BODY: PV_DW_BODY,
-                       PV_DW_BASE_H: PV_DW_BASE_H, PV_DW_BASE_SIDE: PV_DW_BASE_SIDE };
+                       PV_DW_BASE_H: PV_DW_BASE_H, PV_DW_BASE_SIDE: PV_DW_BASE_SIDE,
+                       // S1-F: kontrolna geometria chladnicky (box, pasma,
+                       // pasmo pripustnej hrany) — Node sada ju kresli nad
+                       // payloadom servera a overuje, ze si nic nedopocitava.
+                       nxRefExtent: nxRefExtent, drawApplianceRefs: drawApplianceRefs,
+                       drawApplianceSplit: drawApplianceSplit,
+                       pvApplianceRefs: pvApplianceRefs,
+                       PV_APPL_GUTTER: PV_APPL_GUTTER };
   }
 

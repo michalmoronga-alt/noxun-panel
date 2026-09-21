@@ -2150,23 +2150,49 @@ module Noxun
         # v modeli vidno priestor pre soklovu listu. Zakladna sa NIKDY nekresli
         # samostatne, preto nema vlastny deskriptor ani vlastny `ref_key`.
         #
-        # Definicia sa recykluje MENOM (`NOXUN <cid> APPLIANCE`) a `clear!`-uje
-        # — presne ako pri nohach; identitu drzi ATRIBUT, nie meno (meno si
-        # SketchUp pri kolizii uniqne).
+        # Definicia sa recykluje MENOM a `clear!`-uje — presne ako pri nohach;
+        # identitu drzi ATRIBUT, nie meno (meno si SketchUp pri kolizii uniqne).
+        #
+        # S1-F (Astra FIX F5): KAZDA referencia ma VLASTNU definiciu a VLASTNU
+        # identitu — `list.first` by pri skrinke s chladnickou AJ druhou vazbou
+        # ticho zahodil vsetko okrem prvej. Meno definicie:
+        #   telo slotu   `NOXUN <cid> APPLIANCE`                 (nemeni sa)
+        #   nika         `NOXUN <cid> APPLIANCE <role> <id8>`
+        # a identita `<cid>-REF-APPL` / `<cid>-REF-NICHE-<id8>`. Definicie
+        # skrinky, ktore uz v plane nie su (odpojena vazba), sa po prestavbe
+        # upracu — inak by v `model.definitions` ostavali mrtve zaznamy.
         def render_references(model, parent_ents, references, cid)
-          list = Array(references)
-          return nil if list.empty?
+          list = Array(references).select { |rd| rd.is_a?(Hash) }
+          made = []
+          names = {}
+          list.each do |rd|
+            dname = reference_def_name(cid, rd)
+            names[dname] = true
+            inst = render_reference(model, parent_ents, rd, cid, dname)
+            made << inst if inst
+          end
+          purge_stale_reference_defs(model, cid, names)
+          made
+        rescue StandardError => e
+          # Vizual nesmie zhodit rebuild — vyrobny dielec (celo) uz stoji.
+          Engine.log_error(e, 'render_references') if defined?(Engine)
+          nil
+        end
 
-          dname = "NOXUN #{cid} APPLIANCE"
+        # JEDNA referencia: definicia (recyklovana menom) + instancia s atributmi.
+        def render_reference(model, parent_ents, rd, cid, dname)
           rdef = model.definitions[dname]
           rdef = nil if rdef && rdef.instances.any?(&:valid?)
           rdef ||= model.definitions.add(dname)
           rdef.entities.clear!
-          rd = list.first
-          draw_reference_body(rdef.entities, rd)
+          if rd[:role].to_s == 'appliance_niche'
+            draw_reference_niche(rdef.entities, rd)
+          else
+            draw_reference_body(rdef.entities, rd)
+          end
           inst = parent_ents.add_instance(rdef, Geom::Transformation.new)
           inst.layer = hardware_tag(model)
-          rid = "#{cid}-REF-APPL"
+          rid = reference_id(cid, rd)
           Store.write(inst, {
             std: Store::STD, kind: 'reference', id: rid, part_id: rid,
             cabinet_id: cid, role: rd[:role].to_s, name: rd[:label].to_s,
@@ -2183,10 +2209,86 @@ module Noxun
           })
           inst.name = rd[:label].to_s
           inst
+        end
+
+        # PREFIX mien definicii referencii skrinky — spolocny pre telo aj niku,
+        # takze upratovanie ich najde jednym dotazom.
+        def reference_def_prefix(cid)
+          "NOXUN #{cid} APPLIANCE"
+        end
+
+        def reference_def_name(cid, rd)
+          base = reference_def_prefix(cid)
+          return base if rd[:role].to_s == 'appliance_body'
+
+          "#{base} #{rd[:role]} #{short_item_id(rd[:item_id])}"
+        end
+
+        def reference_id(cid, rd)
+          return "#{cid}-REF-APPL" if rd[:role].to_s == 'appliance_body'
+
+          "#{cid}-REF-NICHE-#{short_item_id(rd[:item_id])}"
+        end
+
+        # Prvych 8 znakov uuid polozky. Identitu v MODELI drzi atribut
+        # `config.item_id` (cele uuid) — skratka je len citatelny rozlisovac
+        # mena definicie a `part_id`.
+        def short_item_id(item_id)
+          id = item_id.to_s.gsub(/[^A-Za-z0-9]/, '')
+          id.empty? ? 'X' : id[0, 8]
+        end
+
+        # Definicie referencii TEJTO skrinky, ktore uz v plane nie su a nemaju
+        # ziadnu zivu instanciu. Vznikaju pri odpojeni vazby: `cdef.entities
+        # .clear!` instanciu zmaze, ale definicia by v dokumente ostala.
+        def purge_stale_reference_defs(model, cid, keep)
+          prefix = reference_def_prefix(cid)
+          stale = model.definitions.select do |d|
+            n = d.name.to_s
+            n.start_with?(prefix) && !keep[n] && d.instances.none?(&:valid?)
+          end
+          stale.each { |d| model.definitions.remove(d) }
         rescue StandardError => e
-          # Vizual nesmie zhodit rebuild — vyrobny dielec (celo) uz stoji.
-          Engine.log_error(e, 'render_references') if defined?(Engine)
+          Engine.log_error(e, 'CabinetBuilder.purge_stale_reference_defs') if defined?(Engine)
           nil
+        end
+
+        # === S1-F: BOX NIKY + PASMA DVERI SPOTREBICA =========================
+        #
+        # JEDEN kvader (minimalne rozmery niky) a na jeho CELNEJ ploche vodorovne
+        # ciary v miestach, kde su hrany dveri SPOTREBICA. Ciary su hrany bez
+        # plochy — kreslit pasma ako dalsie kvadre by z jednej referencie urobilo
+        # tri telesa a pri prisuvani by sa obalka menila podla listu.
+        #
+        # Pasma su viazane ZDOLA (list Beko: spodok 40 + dolne dvere 629 = 669 je
+        # PRESNE, horne pasmo je zvysok do vysky niky). Kota, ktora by siahala nad
+        # box, sa vynecha — box sa kvoli listu nikdy nezvacsuje.
+        def draw_reference_niche(ents, rd)
+          bw, bd, bh = rd[:box].map(&:to_f)
+          ox, oy, oz = rd[:origin].map(&:to_f)
+          draw_box_at(ents, ox, oy, oz, bw, bd, bh)
+          bands = rd[:bands].is_a?(Hash) ? rd[:bands] : nil
+          return unless bands
+
+          niche_band_levels(bands).each do |z|
+            next unless z > BuildPlan::MIN_DIM && z < bh - BuildPlan::MIN_DIM
+
+            ents.add_line(Units.point(ox, oy, oz + z), Units.point(ox + bw, oy, oz + z))
+          end
+        end
+
+        # Vysky hran dveri spotrebica NAD DNOM NIKY (mm), zdola nahor:
+        # spodok · spodok + dolne dvere · + medzera. Horna hrana horných dveri
+        # sa nekresli — je to zvysok do vysky niky (list ju nekotuje presne).
+        def niche_band_levels(bands)
+          out = []
+          b0 = bands['door_bottom_offset'].to_f
+          lower = bands['door_lower'].to_f
+          gap = bands['door_gap'].to_f
+          out << b0 if b0.positive?
+          out << (b0 + lower) if lower.positive?
+          out << (b0 + lower + gap) if lower.positive? && gap.positive?
+          out
         end
 
         # Telo + zakladna. `origin` deskriptora je LAVY PREDNY SPODNY roh tela;

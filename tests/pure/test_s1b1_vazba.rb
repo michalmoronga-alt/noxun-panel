@@ -583,6 +583,10 @@ NxTest.test('S1-B1: KONTRAKT zaznamu `appliance_refs[]` — chybajuce pole je KL
   NxTest.assert_equal({ 'door_bottom_offset' => 40.0, 'door_lower' => 629.0,
                         'door_gap' => 71.0, 'door_upper' => 1159.0 }, rec['bands'])
   NxTest.assert_equal({ 'door_system' => 'sliding' }, rec['install'])
+  # Codex #384 kolo 1 (P2): zaznam nesie aj MENO MODELU — referencia v modeli
+  # (S1-F box niky) sa nim vola, inak by sa kazda chladnicka volala rovnako.
+  NxTest.assert_equal('Beko', rec['manufacturer'])
+  NxTest.assert_equal('BCNA306E5ZSN', rec['name'])
   NxTest.refute(rec['niche'].key?('width_max'), 'co list nekotuje, v zazname NIE JE')
   NxTest.refute(rec.key?('furniture_doors'), 'prazdny blok sa nezapisuje ako {}')
   NxTest.assert_equal('2026-09-20T10:00:00Z', rec['snapshot_at'])

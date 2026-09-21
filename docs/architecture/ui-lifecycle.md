@@ -805,6 +805,18 @@ a pri prehnanej výške nad líniu — práve vtedy, keď Kontrola hlási `dw_bo
 Rozmery generického tela a základne sú v JS **zrkadlom** Ruby konštánt (`PV_DW_BODY`, `PV_DW_BASE_H`, `PV_DW_BASE_SIDE`) — náhľad ich potrebuje aj vo VKLADANÍ, kde
 žiadny serverový payload neexistuje; zhodu stráži guard test. **Hlavička Inspectora** má popisok typu v jedinej mape `NX_TYPE_LABEL` (`Dolná · Horná · Umývačka`).
 
+**Náhľad kontrolnej geometrie chladničky (S1-F, `preview.appliances[]`).** Karta skrinky nesie nový kľúč **`preview.appliances[]`** — **kolekciu adresovanú `item_id`**
+(FIX F10), lebo skrinka môže niesť viac chladničiek a každá má vlastný box, vlastné pásma a vlastné pásmo hrany. Tvar položky:
+`{item_id, label, box{x, z, w, h}, bands[{z0, z1, size}], split{state, lo, hi, edge, recommended, lo_mm, hi_mm, edge_mm} | nil, state}` — **všetko v mm a už
+v súradniciach korpusu** (z od podlahy), takže JS nič nescitáva. **Model bez údajov o dverách má `bands` prázdne** (Codex #384 kolo 1, P2): renderer v modeli
+vtedy nekreslí žiadnu čiaru, takže ani náhľad nesmie vyrobiť jedno „pásmo" cez celý box s popiskom, ktorý v modeli nikde nie je. Geometriu dáva **tá istá funkcia, z ktorej kreslí builder** (`Construction.appliance_niche_references`),
+a verdikt tá istá, z ktorej žije Kontrola — náhľad a model sa teda nemôžu rozísť. Kreslí `drawApplianceRefs` **len v kontexte Korpus**, ako poslednú vrstvu nad obrysom:
+box **prerušovane** (referencia, nie dielec) vo firemnej teal, pri `clash` v jantári, pásma dverí spotrebiča ako čiary s číslom listu a **pásmo prípustnej hrany**
+jantárovým prizvukom vľavo od boxu s číslami koncov a čiarou súčasnej hrany. Stav `na`, `unknown` aj `unsatisfiable` pásmo **nekreslí** (niet čo odporučiť).
+**Scéna** (`nxRefExtent` — zovšeobecnený `nxSlotExtent`) obsiahne telo slotu **aj** boxy niky vrátane záporného X (box širší než skrinka) a presahu nad korpus:
+box sa nikdy nedeformuje, takže práve vtedy, keď Kontrola hlási „nezmestí sa", by ho fit orezal. Globál `applPreview` plní `bridge.js` z toho istého pushu ako
+`appliance_rows`; chýbajúci kľúč (staršie okno) = prázdne pole, odchod z výberu ho **zahodí** — nikdy zvyšok po predchádzajúcej skrinke.
+
 ### Náhľad = kontextová projekcia + spodný pás (UI-B2, ui/js/preview.js)
 
 každý kontext kreslí **svoj** pohľad (výmena, nie vrstvenie) — **Korpus** čelný rez s kótami (Š dole, V vpravo, sokel/telo vľavo, hĺbka kótou na náznaku skosenia hornej plochy),
@@ -2816,10 +2828,16 @@ očakáva a nemá ho (`appliance_expects[]`, slot umývačky vždy). Vzor je ria
 priestor panela je vzácny). **Ten istý komponent kreslí karta dosky** (`#boardApplRows`, varná doska a drez), len s iným kontextom vlastníka.
 
 Payload `cabinet_payload.appliance_rows[]` / `board_payload.appliance_rows[]` skladá server (`Panel.appliance_rows`):
-`{state: 'bound'|'expected', item_id, category, category_label, text, sub, tone: 'ok'|'warn', link, placeholder, options[], all, all_note}`.
+`{state: 'bound'|'expected', item_id, category, category_label, text, sub, tone: 'ok'|'warn', link, placeholder, options[], all, all_note}`
+a od **S1-F** má viazaný riadok navyše **`check`** = celý verdikt (`{state, niche{state, axes, axis_texts, text}, door_split{state, edge, range, recommended, source, text}, text}`).
 
-- **Tón viazaného riadku** sa pýta na **tie isté dva vstupy** ako `Validation.check_appliance_bound` (chýbajúce rozmery niky · trieda umývačky vs trieda slotu). Panel
-  Kontrolu **nevolá** (potrebovala by celý zber modelu), preto to stráži test, ktorý porovnáva oba smery nad jednou fixtúrou.
+- **Tón viazaného riadku** sa pýta na **tie isté vstupy** ako `Validation.check_appliance_bound` (chýbajúce rozmery niky · trieda umývačky vs trieda slotu) a od S1-F
+  na **ten istý verdikt** (`ApplianceChecks.verdict`). Panel Kontrolu **nevolá** (potrebovala by celý zber modelu), preto to stráži test, ktorý porovnáva oba smery nad
+  jednou fixtúrou. ORANGE riadok vzniká **len** pri `clash`/`unsatisfiable` — presne tam, kde nález vyrobí aj Kontrola; „nevieme" a „nekontrolované" idú do podtextu
+  bez zmeny tónu. Vetu skladá server do `sub` („Chladnička · nika ✓ — šírka, výška a hĺbka ✓ · hrana čiel 695 v 679–727 ✓"), **JS o nike ani o delení nevie nič**
+  (stráži to Node sada nad zdrojom `appliance_row.js`).
+- **Filter ponuky a verdikt merajú tou istou toleranciou** (Codex #384 kolo 1, P2): osi aj ich porovnanie žijú v `ApplianceChecks` (`AXES`, `axis_fits?`,
+  `AXIS_TOL` = 0,5 mm). Panel si tabuľku ani vzorec nekopíruje — kým mal vlastné, ponuka model odporučila a Kontrola ho vzápätí zhodila.
 - **Ponuka modelov** = položky zákazky danej kategórie **bez fyzického vlastníka**, filtrované podľa niky vs vnútro skrinky **len po osiach, ktoré kategória kontroluje**
   (rúra a mikrovlnka Š + H, chladnička Š/V/H, ostatné bez filtra). Skrinka s **viac zónami** nemá jednoznačnú výšku vnútra, takže kategórii, ktorá výšku kontroluje
   (chladnička), sa filter **vypne celý** a riadok to prizná vetou; šírka a hĺbka sú jednoznačné vždy, takže rúra o filter neprichádza. **Filter nie je brána**: model,

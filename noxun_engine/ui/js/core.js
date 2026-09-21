@@ -15,6 +15,11 @@
   // identitu ineho dokumentu. null = ziadne rozpisane edity.
   var applyPendingGuid = null;
   var frontItems = null;        // rozlozene cela z backendu
+  // S1-F: `preview.appliances[]` z Ruby — kontrolna geometria chladnicky (box
+  // niky, pasma dveri spotrebica, pasmo pripustnej hrany ciel) UZ PREPOCITANA
+  // do suradnic korpusu. Nahlad z nej LEN kresli; panel si z configu ani zo
+  // snapshotu nic neodvodzuje. Prazdne pole = niet co kreslit.
+  var applPreview = [];
   // KOV-A2a: `front_slots` z Ruby — mapa front_id -> [{ wing, part_key, state }].
   // JEDINA odpoved na otazku „kde sa smer pyta"; panel si ju NEODVODZUJE
   // z poctu kridiel. null = nic oznacene (alebo payload bez ciel).

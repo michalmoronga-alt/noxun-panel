@@ -171,6 +171,7 @@ unless NxTest::IN_SKETCHUP
     core/ghost_tool
     core/zones
     core/tags
+    core/appliance_checks
     core/bom
     core/vepo_export
     core/sheet_estimate

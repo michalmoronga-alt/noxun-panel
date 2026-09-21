@@ -277,11 +277,13 @@ NxTest.test('S1-E E2: `validate_references!` odmietne kazdu odchylku od kontrakt
   NxTest.assert_raise(/box/) { NxS1E.bp.validate_references!([ok.merge(box: [0.0, 1.0, 1.0])]) }
 end
 
-NxTest.test('S1-E E2: plan BEZ referencii (dolna a horna skrinka) ostava NEDOTKNUTY') do
+NxTest.test('S1-E E2 (+S1-F): skrinka BEZ vazby ma PRAZDNY zoznam referencii') do
   low = NxS1E.cb.normalize('type' => 'lower', 'width' => 600.0, 'height' => 720.0,
                            'floor_height' => 100.0)
   pl = NxS1E.cn.build_plan(low, 'CAB-001')
-  NxTest.refute(pl.key?(:references), 'kluc sa korpusovemu planu NEPRIDAVA')
+  # S1-F pridal korpusovemu planu kluc `references` (box niky chladnicky), ale
+  # BEZ VAZBY je prazdny — skrinka, ktora spotrebic iba ocakava, geometriu nema.
+  NxTest.assert_equal([], pl[:references], 'bez vazby ziadna referencia')
   NxTest.assert_equal(5, NxS1E.bp::SCHEMA, 'plan sa neperzistuje, takze schema ostava')
 end
 

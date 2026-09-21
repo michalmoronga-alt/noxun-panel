@@ -309,11 +309,19 @@ module Noxun
       end
 
       # Zoznam pre pohlad „V zakazke" (S1-B2) a pre Kontrolu (`check_appliances`).
-      # TVAR (kontrakt, Astra B15):
+      # TVAR (kontrakt, Astra B15 + S1-F FIX F4):
       #   { item_id, name, category, owner: {kind, id, pid}, state, customer_supplied,
       #     snapshot: {niche:, body:, install: {dishwasher_class}} | nil,
-      #     slot: {dw_class} | nil, interior: {width, height, depth} | nil }
+      #     slot: {dw_class} | nil, interior: {width, height, depth} | nil,
+      #     bands: {door_bottom_offset, door_lower, door_gap, door_upper} | nil,
+      #     furniture_doors: {lower_min, lower_max, gap_ref} | nil,
+      #     z_lo:, gap:, single_zone:, fronts_pair: {applicable, reason, lower_z0,
+      #                                              lower_z1, upper_z0} }
       # `state`: bound | owner_missing | job | expected_missing
+      #
+      # S1-F: zaznam nesie KOMPLETNY VYPOCTOVY KONTEXT, takze verdikt niky aj
+      # delenia ciel (`ApplianceChecks`) je cista funkcia nad nim — Kontrola ani
+      # Inspector uz do modelu nesiahaju druhy raz.
       def appliance_records(items, owners)
         out = Array(items).filter_map { |it| appliance_record(it, owners) }
         out.concat(appliance_expected_records(items, owners))
@@ -349,6 +357,38 @@ module Noxun
           'snapshot' => appliance_snapshot_dims(item['snapshot']),
           'slot' => (bound && entry['kind'] == 'slot' ? slot_info(entry['cfg']) : nil),
           'interior' => (bound ? interior_of(entry) : nil) }
+          .merge(appliance_front_dims(item['snapshot']))
+          .merge(appliance_geometry(bound ? entry : nil))
+      end
+
+      # S1-F: PASMA DVERI SPOTREBICA a NABYTKOVE DVERE Z VYKRESU. Citaju sa zo
+      # SNAPSHOTU polozky — z toho isteho miesta ako `niche`, a teda z tej istej
+      # kopie listu, akou `ApplianceBinding.apply!` v jednej operacii naplnil aj
+      # `appliance_refs[]` na entite. Zmena ziveho katalogu po vazbe tymito
+      # cislami nepohne (rovnaka zasada ako pri `snapshot`).
+      def appliance_front_dims(snapshot)
+        dims = snapshot.is_a?(Hash) && snapshot['dims'].is_a?(Hash) ? snapshot['dims'] : {}
+        front = dims['front'].is_a?(Hash) ? dims['front'] : {}
+        bands = front.reject { |k, _v| k.to_s == 'furniture_doors' }
+        fd = front['furniture_doors'].is_a?(Hash) ? front['furniture_doors'] : nil
+        { 'bands' => (bands.empty? ? nil : bands), 'furniture_doors' => fd }
+      end
+
+      # S1-F: VYPOCTOVY KONTEXT SKRINKY (vnutro, dno niky, skara ciel, jedna
+      # zona, dvojica ciel). Pocita ho `ApplianceChecks.context` RAZ na vlastnika
+      # (vysledok si drzi zaznam vlastnika) — dva spotrebice v jednej skrinke
+      # nesmu znamenat dva prepocty ciel.
+      def appliance_geometry(entry)
+        ctx = appliance_context(entry)
+        { 'z_lo' => ctx['z_lo'], 'gap' => ctx['gap'],
+          'single_zone' => ctx['single_zone'], 'fronts_pair' => ctx['fronts_pair'] }
+      end
+
+      def appliance_context(entry)
+        return {} unless entry.is_a?(Hash) && entry['kind'] == 'cabinet'
+        return entry['ctx'] if entry.key?('ctx')
+
+        entry['ctx'] = defined?(ApplianceChecks) ? ApplianceChecks.context(entry['cfg']) : {}
       end
 
       # Vlastnici, ktori spotrebic OCAKAVAJU, ale ziadny viazany nemaju
@@ -380,6 +420,8 @@ module Noxun
                      'snapshot' => nil,
                      'slot' => (entry['kind'] == 'slot' ? slot_info(entry['cfg']) : nil),
                      'interior' => interior_of(entry) }
+              .merge(appliance_front_dims(nil))
+              .merge(appliance_geometry(entry))
           end
         end
         out
@@ -430,26 +472,12 @@ module Noxun
 
       # Vnutro skrinky pre filter kandidatov a kontrolu niky (S1-F). Doska ani
       # slot ho nemaju (slot vnutro nema, doska je dielec).
+      #
+      # Cislo dava `ApplianceChecks.context` — TA ISTA funkcia, z ktorej ziju aj
+      # `z_lo`, skara a dvojica ciel. Vlastny vypocet vysky vnutra by bol DRUHA
+      # PRAVDA o tom, kam sa spotrebic zmesti; autorita ostava jedna.
       def interior_of(entry)
-        return nil unless entry.is_a?(Hash) && entry['kind'] == 'cabinet'
-
-        cfg = entry['cfg']
-        return nil unless cfg.is_a?(Hash) && defined?(Construction)
-
-        # `Construction.interior_dims` cita SYMBOLOVE kluce (pracuje nad
-        # normalizovanym configom stavby), ulozeny config ma STRINGOVE —
-        # plytka konverzia staci, funkcia siaha len na skalary najvyssej
-        # urovne. Vlastny vypocet vysky vnutra by bol DRUHA PRAVDA o tom, kam
-        # sa spotrebic zmesti; autorita ostava jedna.
-        dims = Construction.interior_dims(cfg.transform_keys(&:to_sym))
-        return nil unless dims.is_a?(Hash)
-
-        t = cfg['thickness'].to_f
-        { 'width' => (cfg['width'].to_f - (2 * t)).round(2),
-          'height' => dims[:avail_h].to_f.round(2),
-          'depth' => dims[:back_front_y].to_f.round(2) }
-      rescue StandardError
-        nil
+        appliance_context(entry)['interior']
       end
 
       # S1-E: ZAZNAM SLOTU pre Kontrolu. CISTA funkcia (ziadny SketchUp objekt)
