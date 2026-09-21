@@ -136,7 +136,11 @@ module Noxun
             'config' => TILE_CONFIG_KEYS.each_with_object({}) do |k, out|
               out[k] = cfg[k] unless cfg[k].nil?
             end,
-            'hardware' => TemplateStore.hardware_tile_summary(cfg) }
+            'hardware' => TemplateStore.hardware_tile_summary(cfg),
+            # S1-C: OCAKAVANIA sablony (jeden riadok textu, ziadne nove
+            # ovladanie). Odvodeny udaj — do `templates.json` sa nikdy
+            # nezapisuje (rovnako ako `hardware` a `preview_rev`).
+            'appliance_expects' => TemplateStore.appliance_expects_summary(cfg) }
         end
 
         # --- Ruby -> JS -----------------------------------------------------
@@ -552,13 +556,31 @@ module Noxun
           # `template_config_from` `appliance_refs[]` do sablony nikdy nedava,
           # takze bez tohto riadku by aplikovanie sablony ticho odpojilo
           # spotrebic uz viazanej skrinky (a polozka zakazky by ostala sirota).
-          # `appliance_expects[]` ma prednost zo SABLONY, ked ich nesie —
-          # „spotrebicova sablona" je prave o tom, co skrinka ocakava.
+          # S1-C (R6): OCAKAVANIA sa ZJEDNOCUJU, neprepisuju. Sablona hovori
+          # „sem patri rura"; ked cielova skrinka uz ocakava mikrovlnku (alebo
+          # ju dokonca ma viazanu), prepis by jej ocakavanie TICHO zahodil
+          # a Kontrola by prestala upozornovat na chybajuci spotrebic.
+          # Odpajat sa pritom nema co: vazbu nesie CIEL a tu sablona nikdy
+          # neprenasa.
           merged['appliance_refs'] = target_params['appliance_refs']
-          unless tpl_config['appliance_expects'].is_a?(Array)
-            merged['appliance_expects'] = target_params['appliance_expects']
-          end
+          merged['appliance_expects'] = union_expects(target_params['appliance_expects'],
+                                                      tpl_config['appliance_expects'])
           merged
+        end
+
+        # Zjednotenie dvoch zoznamov ocakavani v KANONICKOM poradi.
+        # `nil` = kluc v configu NEBUDE (prazdne pole by predstieralo, ze
+        # ocakavanie uz niekto riesil) — rovnaky kontrakt ako
+        # `CabinetBuilder.norm_appliance_expects`.
+        def union_expects(target, tpl)
+          codes = (Array(target) + Array(tpl)).map { |c| c.to_s.strip }.reject(&:empty?)
+          return nil if codes.empty?
+
+          out = ApplianceCatalog::CATEGORIES.select { |c| codes.include?(c) }
+          # Neznamy kod (zaznam z novsej verzie) sa NEZAHADZUJE — kanonicke
+          # kody idu prve, zvysok v poradi, v akom prisiel.
+          out.concat(codes.uniq.reject { |c| ApplianceCatalog::CATEGORIES.include?(c) })
+          out.empty? ? nil : out
         end
 
         # H2 (D-76): sety kovania pri aplikacii sablony.

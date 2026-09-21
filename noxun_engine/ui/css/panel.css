@@ -1042,6 +1042,15 @@
   .tplhw .ic { width: 12px; height: 12px; }
   .tplsavehw { display: flex; align-items: center; gap: 6px; margin: 8px 0 4px; font-size: 12px; }
   .tplsavehw input { flex: 0 0 auto; width: auto; margin: 0; }
+  /* S1-C: skupina checkboxov „Očakáva" v modale D-14 (NXModal multi-select
+     nema) — tri volby sa zmestia do jedneho riadku, sirsie okno nie je treba. */
+  .tplexpectsopts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
+             font-size: 11.5px; }
+  .tplexpectsopts label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .tplexpectsopts input { flex: 0 0 auto; width: auto; margin: 0; }
+  .row.tplexpects[hidden] { display: none; }
+  /* S1-C: druhy meta riadok dlazdice — OCAKAVANIA sablony (text zo servera). */
+  .stplexp { font-style: italic; }
   .stplmeta { font-size: 11px; color: var(--nx-ink-muted); overflow: hidden;
               text-overflow: ellipsis; white-space: nowrap; }
   .stplact { display: flex; gap: 4px; margin-top: 3px; }
@@ -1738,6 +1747,10 @@
   .nx-inspector .aprow.warn .aptxt { color: var(--nx-warnchip-fg); }
   .nx-inspector .aprow .apsub { display: block; font-weight: 400; font-size: 10.5px;
              color: var(--nx-ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* S1-C: riadok VOLBY „ocakava" je len ponuka, nie stav — ziadny semafor,
+     tlmene pismo (vertikalny priestor panela je vzacny, ale volba musi byt
+     dostupna aj na skrinke, ktora zatiaľ nic neocakava). */
+  .nx-inspector .aprow.expects .aptxt.soft { color: var(--nx-ink-soft); font-weight: 400; }
   /* Typ korpusu v hlavicke — READONLY badge (typ urcuje sablona/vkladanie). */
   .nx-inspector .idbar .typbadge { flex: 0 0 auto; font-size: 10px; font-weight: 700; letter-spacing: .04em;
             text-transform: uppercase; padding: 1px 7px; border-radius: 9px;

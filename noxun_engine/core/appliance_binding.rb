@@ -54,6 +54,17 @@ module Noxun
         'other' => [].freeze
       }.freeze
 
+      # S1-C (Astra C5): OCAKAVANIE (`appliance_expects[]`) RESPEKTUJE TU ISTU
+      # maticu — skrinka smie ocakavat len to, co jej smie patrit. Druha
+      # tabulka by znamenala, ze sa da ocakavat spotrebic, ktory sa k tomu
+      # istemu kusu nikdy priradit neda (digestor a „iné" nemaju fyzickeho
+      # vlastnika vobec). Odvodzuje sa preto Z `OWNER_MATRIX`, nie vedla nej.
+      #
+      # SLOT je vynimka v opacnom smere: ocakava VZDY presne umyvacku
+      # (je to jeho jediny zmysel) — server to vynuti aj pri podvrhnutom
+      # payloade, HTML `readonly` ochrana nie je.
+      SLOT_EXPECTS = %w[dishwasher].freeze
+
       # Operacie jedineho vstupu (B2).
       #   create       zalozenie polozky (+ snapshot z katalogu, + pripadna vazba)
       #   patch        textove polia, cena, priznak „dodáva zákazník"
@@ -95,6 +106,8 @@ module Noxun
       MSG_FAILED        = 'väzbu sa nepodarilo uložiť'
       MSG_REBIND_CAT    = 'model inej kategórie — najprv odpoj spotrebič'
       MSG_NEED_CATALOG  = 'vyber model z katalógu'
+      # S1-C: ocakavania (`appliance_expects[]`).
+      MSG_EXPECTS_INPUT = 'neplatné očakávanie spotrebiča — obnov panel a skús znova'
 
       module_function
 
@@ -311,6 +324,77 @@ module Noxun
         return true if kind.to_s == KIND_JOB
 
         Array(OWNER_MATRIX[category.to_s]).include?(kind.to_s)
+      end
+
+      # === S1-C: OCAKAVANIA (`appliance_expects[]`) =========================
+
+      # Ktore kategorie smie TENTO DRUH vlastnika ocakavat? Poradie je
+      # KANONICKE (poradie `ApplianceCatalog::CATEGORIES`, ktore drzi
+      # `OWNER_MATRIX`) — zoznam v configu aj ponuka v UI tak maju jedno
+      # poradie a „ta ista sada" sa da porovnavat ako pole.
+      def expectable_categories(kind)
+        k = kind.to_s
+        return SLOT_EXPECTS.dup if k == KIND_SLOT
+
+        OWNER_MATRIX.each_with_object([]) do |(cat, kinds), out|
+          out << cat if Array(kinds).include?(k)
+        end
+      end
+
+      def expectable?(kind, category)
+        expectable_categories(kind).include?(category.to_s)
+      end
+
+      # STRIKTNA validacia VSTUPU akcie (Astra C8) — zamerne NIE
+      # `CabinetBuilder.norm_appliance_expects` (ta drzi len tvar a neznamy kod
+      # by prepustila do configu). `nil` ani ne-pole NIE JE „zrus ocakavania":
+      # taky payload je chyba klienta a odmietne sa. Explicitne `[]` je
+      # legitimne zrusenie.
+      # -> [zoznam, nil] | [nil, hlaska]
+      def validate_expects(raw, kind)
+        return [nil, MSG_EXPECTS_INPUT] unless raw.is_a?(Array)
+
+        allowed = expectable_categories(kind)
+        out = []
+        raw.each do |c|
+          code = c.is_a?(String) || c.is_a?(Symbol) ? c.to_s.strip : nil
+          return [nil, MSG_EXPECTS_INPUT] if code.nil? || code.empty?
+          return [nil, expects_matrix_message(code, kind)] unless allowed.include?(code)
+
+          out << code
+        end
+        # Dedup + KANONICKE poradie: dve rovnake kategorie v payloade su to iste
+        # ocakavanie a preskupeny zoznam je ten isty stav (inak by sa zapisoval
+        # krok Spat „bez zmeny").
+        [allowed.select { |cat| out.include?(cat) }, nil]
+      end
+
+      def expects_matrix_message(category, kind)
+        label = BudgetStore::APPLIANCE_LABELS[category.to_s] || category.to_s
+        return "slot umývačky očakáva vždy umývačku — iné sa nastaviť nedá" if kind.to_s == KIND_SLOT
+
+        "#{label} sa k tomuto kusu (#{kind_label(kind)}) priradiť nedá, takže sa ani očakávať nedá"
+      end
+
+      # KATEGORIE, KTORE SU NA TEJTO ENTITE NAOZAJ SPLNENE. Dokaz je TEN ISTY
+      # obojsmerny dokaz ako pri `bound` (Astra C3): musi existovat POLOZKA
+      # zakazky, ktorej vlastnik je tato entita, A refs entity musia niest jej
+      # `item_id`. Samotne `category` v refs dokazom NIE JE (osirely zaznam po
+      # zmazanej polozke) a samotne ID vlastnika tiez nie (ID sa recykluju).
+      def bound_categories(entry, items)
+        return [] unless entry.is_a?(Hash)
+
+        out = []
+        Array(items).each do |it|
+          next unless it.is_a?(Hash)
+
+          own = BudgetStore.owner_field(it['owner'])
+          next unless ref_matches?(entry, own, it['id'].to_s)
+
+          cat = BudgetStore.canon_appliance_type(it['typ'])
+          out << cat if cat
+        end
+        out.uniq
       end
 
       def matrix_message(category, kind)

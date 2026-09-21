@@ -151,6 +151,24 @@ module Noxun
         { 'has' => summary['has'], 'labels' => labels }
       end
 
+      # S1-C: OCAKAVANIA SABLONY pre dlazdicu sekcie `tpl`. Ocakavania ziju
+      # LEN v `config['appliance_expects']` (Astra C1) — ziadny novy kluc
+      # zaznamu, teda ani ziadny bump `STD`. Je to ODVODENY udaj NA ZOBRAZENIE
+      # (rovnako ako `hardware_tile_summary`): cista funkcia bez IO, vetu sklada
+      # SERVER a klient ziadnu mapu popiskov nema.
+      # Slot (typ `dishwasher`) ocakava umyvacku IMPLICITNE — builder ju dosadi
+      # pri vlozeni, takze dlazdica hovori to iste, co potom uvidi skrinka.
+      def appliance_expects_summary(config)
+        cfg = config.is_a?(Hash) ? config : {}
+        raw = cfg['appliance_expects'].is_a?(Array) ? cfg['appliance_expects'] : []
+        codes = raw.map { |c| c.to_s.strip }.reject(&:empty?)
+        codes = ApplianceBinding::SLOT_EXPECTS.dup if cfg['type'].to_s == 'dishwasher'
+        codes = ApplianceCatalog::CATEGORIES.select { |c| codes.include?(c) } # kanonicke poradie
+        labels = codes.map { |c| ApplianceCatalog.category_label_acc(c) }
+        { 'has' => !codes.empty?, 'codes' => codes,
+          'text' => (codes.empty? ? '' : "očakáva #{labels.join(', ')}") }
+      end
+
       # Prida/prepise sablonu podla DVOJICE (kind, name). Vrati true/false.
       # CELY read-modify-write bezi pod JEDNYM sidecar zamkom (Codex #174 P2):
       # dve instancie SketchUpu si inak mohli cerstvo ulozenu sablonu prepisat
@@ -188,8 +206,15 @@ module Noxun
             next false
           end
 
-          list = load.reject { |t| t['kind'] == k && t['name'] == n }
-          list << record(k, n, config)
+          # S1-C (Astra C16): PREPIS zachova NEZNAME kluce existujuceho zaznamu
+          # (rovnaky forward kontrakt ako `rename` a `normalize_list`) — `record`
+          # stavia zaznam nanovo, takze bez tohto by ulozenie sablony z novsej
+          # verzie ticho zahodilo to, comu tento plugin nerozumie. Cita sa POD
+          # TYM ISTYM zamkom ako zapis.
+          all = load
+          old = all.find { |t| t['kind'] == k && t['name'] == n }
+          list = all.reject { |t| t['kind'] == k && t['name'] == n }
+          list << merged_record(old, k, n, config)
           ok = write_list(list)
           apply_preview(k, n, preview, ok)
           ok
@@ -577,6 +602,17 @@ module Noxun
         cfg = config.is_a?(Hash) ? config : {}
         cfg = cfg.merge('type' => 'board') if kind == 'board'
         { 'name' => name.to_s, 'kind' => kind, 'config' => cfg }
+      end
+
+      # S1-C (C16): novy zaznam, ktory PODEDI nezname kluce toho stareho.
+      # `name`, `kind` a `config` su VZDY z noveho zapisu — prepis sablony
+      # je vedomy akt nad JEJ obsahom; zachovavaju sa len kluce ZAZNAMU,
+      # o ktorych tento plugin nic nevie (napr. pole z novsej verzie).
+      def merged_record(old, kind, name, config)
+        rec = record(kind, name, config)
+        return rec unless old.is_a?(Hash)
+
+        JsonFileStore.deep_copy(old).merge(rec)
       end
 
       # Seed sa nikdy nepretlaci cez existujucu DOSKOVU sablonu rovnakeho mena;

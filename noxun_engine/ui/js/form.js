@@ -1255,6 +1255,7 @@
     // doteraz ostal prázdny (hodnota `dishwasher` v ňom nebola) a používateľ
     // ho mohol prepnúť, hoci server voľbu aj tak ignoruje.
     nxSyncTplSaveType(getType());
+    nxSyncTplSaveExpects(getType());
     el('tplSaveHardware').checked = tplSavedHardwareChoice();
     m.style.display = 'flex';
     refreshTplModalWarn();
@@ -1273,6 +1274,41 @@
     sel.title = slot ? 'Typ určuje sám slot umývačky — prepnúť sa nedá.' : '';
     var tip = el('tplSaveTypeTip');
     if (tip) tip.hidden = !slot;
+  }
+
+  // --- S1-C: pole „Očakáva" v modale D-14 ------------------------------------
+  // Predvyplní sa z `appliance_expects[]` UKLADANEJ skrinky, ale autoritou je
+  // MODAL: používateľ smie pri ukladaní povedať niečo iné („táto šablóna je na
+  // rúru", hoci v skrinke zatiaľ žiadna nestojí). Server hodnoty validuje proti
+  // matici vlastníkov — HTML ochrana nie je.
+  function nxTplExpectBoxes(){
+    var box = el('tplSaveExpects');
+    if (!box || !box.querySelectorAll) return [];
+    return Array.prototype.slice.call(box.querySelectorAll('input[data-tplexp]'));
+  }
+  // Zrkadlo očakávaní do modalu + zámok pri slote (očakáva umývačku vždy).
+  function nxSyncTplSaveExpects(t){
+    var slot = (t === 'dishwasher');
+    // `typeof` guard je rovnaký vzor ako pri `tplNameSuggestion`: globál žije
+    // v core.js a izolovaná sada (Node) ho nemusí mať.
+    var have = (typeof cabApplianceExpects !== 'undefined' && Array.isArray(cabApplianceExpects))
+      ? cabApplianceExpects.map(String) : [];
+    nxTplExpectBoxes().forEach(function(inp){
+      inp.checked = !slot && have.indexOf(inp.getAttribute('data-tplexp')) >= 0;
+      inp.disabled = slot;
+    });
+    var row = el('tplSaveExpectsRow');
+    if (row) row.hidden = slot;
+    var note = el('tplSaveExpectsSlot');
+    if (note) note.hidden = !slot;
+  }
+  // Zoznam pre payload. Slot ho NEPOSIELA — server si umývačku vynúti sám
+  // a prázdny zoznam z vypnutých checkboxov by vyzeral ako „nič neočakáva".
+  function nxTplSaveExpectsValue(t){
+    if (t === 'dishwasher') return null;
+
+    return nxTplExpectBoxes().filter(function(i){ return i.checked; })
+      .map(function(i){ return i.getAttribute('data-tplexp'); });
   }
 
   function closeSaveTemplateModal(){
@@ -1320,10 +1356,16 @@
       // identita z casu OTVORENIA modalu — preklik na inu skrinku ANI iny
       // dokument server neprepusti; UI-B3: typ urcuje, pod ktorym typom sa
       // sablona ponuka (whitelist v Ruby)
-      sketchup.save_template_as(JSON.stringify({ name: name, cabinet_id: tplModalCabId || selectedCabId,
-                                                 model_guid: tplModalGuid || '',
-                                                 with_hardware: el('tplSaveHardware').checked,
-                                                 type: val('tplSaveType') || getType() }));
+      var tplType = val('tplSaveType') || getType();
+      var payload = { name: name, cabinet_id: tplModalCabId || selectedCabId,
+                      model_guid: tplModalGuid || '',
+                      with_hardware: el('tplSaveHardware').checked,
+                      type: tplType };
+      // S1-C: `expects` sa posiela LEN keď má modal čo povedať (slot si
+      // umývačku vynúti server) — chýbajúci kľúč znamená „nemeň očakávania".
+      var exp = nxTplSaveExpectsValue(tplType);
+      if (exp) payload.expects = exp;
+      sketchup.save_template_as(JSON.stringify(payload));
     }
     closeSaveTemplateModal();
   }
@@ -1332,6 +1374,11 @@
     var m = el('tplModal');
     el('tplSaveName').addEventListener('input', function(){ cancelTplDeferredSave(); this.classList.remove('bad'); refreshTplModalWarn(); });
     el('tplSaveType').addEventListener('change', cancelTplDeferredSave);
+    // S1-C: aj zmena očakávaní ruší rozpísané uloženie (rovnako ako názov
+    // a typ) — inak by sa odoslala hodnota z času pred prepnutím checkboxu.
+    nxTplExpectBoxes().forEach(function(inp){
+      inp.addEventListener('change', cancelTplDeferredSave);
+    });
     el('tplSaveHardware').addEventListener('change', function(){ cancelTplDeferredSave(); rememberTplHardwareChoice(); });
     m.addEventListener('keydown', function(ev){
       if (ev.key === 'Escape'){ ev.preventDefault(); closeSaveTemplateModal(); return; }

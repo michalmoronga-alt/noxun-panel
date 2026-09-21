@@ -128,6 +128,11 @@ module Noxun
           config = template_config_from(cab_cfg, model: model, with_hardware: with_hardware)
           hw_note = template_save_hardware_note(cab_cfg, config, model, with_hardware: with_hardware)
           type_note = apply_template_type!(config, data['type'])        # UI-B3 modal: Nazov + Typ
+          # S1-C (Astra C9): OCAKAVANIA sa validuju PRED `upsert` — a teda aj
+          # pred odfotenim nahladu. Chybny payload nesmie nechat v kniznici
+          # polovicnu sablonu ani prepisany obrazok.
+          expects_err = apply_template_expects!(config, data['expects'])
+          return set_status(expects_err, true) if expects_err
           # UI-D2: nahlad sa foti AZ TERAZ — po VSETKYCH guardoch a z TOHO
           # ISTEHO `cab`, z ktoreho vznikol config (inak by obrazok patril inej
           # skrinke nez data). Zlyhany capture = nil -> pripadny stary PNG sa
@@ -226,6 +231,35 @@ module Noxun
           return '' if want == have
 
           " Uložená ako #{TEMPLATE_TYPE_LABELS[want]} (rozmery a konštrukcia ostali z tejto skrinky)."
+        end
+
+        # S1-C (Astra C1): OCAKAVANIA SABLONY ziju LEN v `config
+        # .appliance_expects[]` — ziadny novy kluc zaznamu, ziadny bump
+        # `TemplateStore::STD`. Autoritou je MODAL, nie config ukladanej
+        # skrinky: pouzivatel smie pri ukladani povedat nieco ine, nez ma
+        # skrinka prave teraz (typicky „tato sablona je na ruru", hoci v nej
+        # ziadna zatial nestoji).
+        #
+        # Bezi PO `apply_template_type!` — typ uz je finalny, takze matica
+        # (C5) sa pyta na ten DRUH vlastnika, pod ktorym sa sablona bude
+        # ponukat. SLOT ocakava VZDY presne umyvacku (payload sa ignoruje).
+        # Chybajuci kluc = starsi klient -> ocakavania sablony sa NEMENIA
+        # (zachova sa to, co prinieslo `template_config_from`).
+        # -> hlaska pri chybe, inak nil
+        def apply_template_expects!(config, raw)
+          kind = config['type'].to_s == 'dishwasher' ? ApplianceBinding::KIND_SLOT
+                                                     : ApplianceBinding::KIND_CABINET
+          if kind == ApplianceBinding::KIND_SLOT
+            config['appliance_expects'] = ApplianceBinding::SLOT_EXPECTS.dup
+            return nil
+          end
+          return nil if raw.nil?
+
+          list, err = ApplianceBinding.validate_expects(raw, kind)
+          return "Šablóna sa neuložila — #{err}" if err
+
+          list.empty? ? config.delete('appliance_expects') : config['appliance_expects'] = list
+          nil
         end
 
         # --- UI-C1a: identita pouzitej sablony vo vkladacom payloade ---------

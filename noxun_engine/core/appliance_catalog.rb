@@ -72,6 +72,21 @@ module Noxun
         'other' => 'Iné'
       }.freeze
 
+      # S1-C: TEN ISTY popisok v 4. PADE („očakáva rúru"). Slovencina sklonuje,
+      # takze veta poskladana z 1. padu („očakáva Rúra") je necitatelna; mapa
+      # musi pokryvat `CATEGORIES` PRESNE rovnako ako `CATEGORY_LABELS`
+      # (guard test). Male pismeno na zaciatku — popisok stoji VNUTRI vety.
+      CATEGORY_LABELS_ACC = {
+        'fridge' => 'chladničku',
+        'oven' => 'rúru',
+        'microwave' => 'mikrovlnku',
+        'dishwasher' => 'umývačku',
+        'hob' => 'varnú dosku',
+        'sink' => 'drez',
+        'hood' => 'digestor',
+        'other' => 'iný spotrebič'
+      }.freeze
+
       # Polia, ktore smie menit KLIENT (vzor `HardwareCatalog::PATCHABLE`).
       # `category` chyba zamerne — nastavuje sa len pri `create!`.
       # `id`, `rev`, `seed`, `attachments`, `created_at`, `updated_at`,
@@ -503,6 +518,11 @@ module Noxun
 
       def category_label(code)
         CATEGORY_LABELS[code.to_s] || code.to_s
+      end
+
+      # S1-C: popisok v 4. pade pre vety Kontroly a riadku Spotrebic.
+      def category_label_acc(code)
+        CATEGORY_LABELS_ACC[code.to_s] || category_label(code)
       end
 
       # --- normalizacia a validacia zaznamu ------------------------------------
