@@ -40,7 +40,13 @@ module Noxun
             # plnohodnotny vlastnik (varna doska, drez) a moze ich niest viac
             # naraz. Niku nema, takze sa ponuka nefiltruje a vazba geometriu
             # dosky nemeni (zapis configu bez prestavby, B1).
-            'appliance_rows' => appliance_rows('board', cfg, appliance_items(entity_model(inst)))
+            'appliance_rows' => appliance_rows('board', cfg, appliance_items(entity_model(inst)),
+                                               nil, owner_id: Store.get(inst, 'id').to_s),
+            # S1-C: IDENTITA KUSU pre zapis ocakavani. `persistent_id` je
+            # jedina vec, ktora prezije recyklaciu vyrobneho ID, takze ho
+            # server pri zapise porovnava (payload nesie to, nad cim bol
+            # riadok VYKRESLENY).
+            'board_pid' => entity_pid(inst)
           }.merge(board_edge_texts(role, cfg)).merge(board_newer_flag(cfg))
         end
 
@@ -164,7 +170,10 @@ module Noxun
           appl_items = appliance_items(entity_model(cab))
           slot = cfg['type'].to_s == 'dishwasher'
           params['appliance_rows'] = appliance_rows(slot ? 'slot' : 'cabinet', cfg, appl_items,
-                                                    (slot ? nil : appliance_interior(cfg)))
+                                                    (slot ? nil : appliance_interior(cfg)),
+                                                    owner_id: params['cabinet_id'].to_s)
+          # S1-C: identita kusu pre zapis ocakavani (viď `board_pid`).
+          params['cabinet_pid'] = entity_pid(cab)
           # S1-F: NAHLAD. Server pocita box niky, pasma dveri aj pasmo pripustnej
           # hrany; JS z toho len kresli a odcita popisky (ziadny vypocet v JS).
           params['preview'] = { 'appliances' => appliance_preview(cfg, params['appliance_rows']) }
@@ -218,8 +227,21 @@ module Noxun
           nil
         end
 
+        # S1-C: `persistent_id` kusu. Headless fixtura ho nema, takze payload
+        # nesie `nil` a serverovy guard zapis odmietne — presne tak, ako ma
+        # (bez identity sa zapisovat neda).
+        def entity_pid(inst)
+          return nil unless inst.respond_to?(:persistent_id)
+
+          inst.persistent_id
+        rescue StandardError
+          nil
+        end
+
         # `kind` = 'cabinet' | 'slot' | 'board' (druh VLASTNIKA, nie Store.kind).
-        def appliance_rows(kind, cfg, items, interior = nil)
+        # `owner_id` = vyrobne ID kusu (S1-C: dokaz vazby potrebuje ID, ktore
+        # v configu nie je — zije ako atribut instancie).
+        def appliance_rows(kind, cfg, items, interior = nil, owner_id: '')
           return [] unless cfg.is_a?(Hash)
 
           refs = cfg['appliance_refs'].is_a?(Array) ? cfg['appliance_refs'].select { |r| r.is_a?(Hash) } : []
@@ -229,9 +251,80 @@ module Noxun
           # riadkom (dva spotrebice = jeden prepocet ciel).
           ctx = appliance_context(kind, cfg)
           rows = refs.filter_map { |ref| appliance_bound_row(kind, cfg, ref, by_id[ref['item_id'].to_s], ctx) }
-          rows + appliance_expected_rows(kind, cfg, refs, items, interior, ctx)
+          rows += appliance_expected_rows(kind, cfg, refs, items, interior, ctx)
+          picker = appliance_expects_row(kind, cfg, refs, items, owner_id)
+          picker ? rows + [picker] : rows
         rescue StandardError => e
           Engine.log_error(e, 'Panel.appliance_rows')
+          []
+        end
+
+        # === S1-C: RIADOK VOLBY „OCAKAVA" ====================================
+        #
+        # POSLEDNY riadok bloku Spotrebic — jediny sposob, ako povedat „sem
+        # patri rura" BEZ sablony (mockup R10 „Bez spotrebiča riadok ukáže len
+        # voľbu očakáva: —"). Kresli sa aj vtedy, ked kus nic neocakava ani
+        # nema — inak by sa ocakavanie nedalo zapnut.
+        #
+        # SLOT ho NEMA: ocakava umyvacku VZDY a menit sa to neda (server to
+        # vynucuje aj pri podvrhnutom payloade), takze volba by bola klamstvo.
+        # To iste plati o kuse, ktory podla matice nemoze ocakavat NIC.
+        #
+        # Astra C13: riadok nesie UPLNY aktualny zoznam (`expects`), nie len
+        # nesplnene kategorie z riadkov „očakáva" — klient z neho sklada NOVY
+        # UPLNY zoznam (pridanie = unia, odstranenie = zoznam bez kategorie)
+        # a posiela ho cely. Bez toho by pridanie mikrovlnky ticho zmazalo
+        # ocakavanie rury, ktore uz je splnene.
+        def appliance_expects_row(kind, cfg, refs, items, owner_id)
+          return nil unless defined?(ApplianceBinding)
+          return nil if kind == ApplianceBinding::KIND_SLOT
+
+          allowed = ApplianceBinding.expectable_categories(kind)
+          return nil if allowed.empty?
+
+          have = Array(cfg['appliance_expects']).filter_map { |c| BudgetStore.canon_appliance_type(c) }
+          have = allowed.select { |c| have.include?(c) }
+          locked = appliance_expects_bound(kind, refs, items, owner_id)
+          { 'state' => 'expects', 'item_id' => nil, 'category' => nil, 'category_label' => '',
+            'text' => appliance_expects_text(have), 'sub' => '', 'tone' => '', 'link' => false,
+            'expects' => have, 'placeholder' => appliance_expects_summary_label(have),
+            'options' => allowed.map { |cat| appliance_expects_option(cat, have, locked) } }
+        end
+
+        def appliance_expects_text(have)
+          return 'bez spotrebiča — nastav „očakáva", ak sem spotrebič patrí' if have.empty?
+
+          "očakáva #{have.map { |c| ApplianceCatalog.category_label_acc(c) }.join(', ')}"
+        end
+
+        def appliance_expects_summary_label(have)
+          return 'očakáva: —' if have.empty?
+
+          "očakáva: #{have.map { |c| ApplianceCatalog.category_label(c).downcase }.join(', ')}"
+        end
+
+        # Jedna volba ponuky. `op` je PRIKAZ, nie stav: klient z neho a z
+        # `expects` poskladá novy UPLNY zoznam.
+        def appliance_expects_option(cat, have, locked)
+          on = have.include?(cat)
+          label = ApplianceCatalog.category_label(cat).downcase
+          if on
+            { 'value' => "del:#{cat}", 'code' => cat, 'op' => 'del',
+              'text' => (locked.include?(cat) ? "− #{label} (priradená — najprv odpoj)" : "− #{label}"),
+              'disabled' => locked.include?(cat) }
+          else
+            { 'value' => "add:#{cat}", 'code' => cat, 'op' => 'add',
+              'text' => "+ #{label}", 'disabled' => false }
+          end
+        end
+
+        # Kategorie, ktore su na kuse NAOZAJ viazane (obojsmerny dokaz — ten
+        # isty, aky pouziva zber). Sluzia LEN na popisok „najprv odpoj";
+        # branou je server (`appliance_expects_locked`).
+        def appliance_expects_bound(kind, refs, items, owner_id)
+          entry = { 'kind' => kind, 'id' => owner_id.to_s, 'refs' => refs }
+          ApplianceBinding.bound_categories(entry, items)
+        rescue StandardError
           []
         end
 
