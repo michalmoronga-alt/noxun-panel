@@ -454,6 +454,16 @@ module Noxun
           # UI-C1a: metadata sablony sa z payloadu vyberu HNED — do buildera
           # sa nikdy nedostanu; peciatka pouzitia ide az po uspesnom vlozeni.
           tpl_ref = take_template_ref!(params, 'cabinet')
+          # S1-C (Astra C11): payload DEKLARUJE sablonu, ktora uz v kniznici
+          # nie je (zmazana alebo premenovana z druhej instancie SketchUpu).
+          # Odkedy zo ZAZNAMU pochadzaju `dw_*` aj `appliance_expects[]`, tichy
+          # vklad „bez sablony" by postavil INU skrinku, nez si pouzivatel
+          # vybral — a nikto by mu to nepovedal. VEDOMY vklad BEZ sablony
+          # (payload ref nenesie) ide dalej ako doteraz.
+          if tpl_ref && TemplateStore.find(*tpl_ref).nil?
+            return set_status("Šablóna \"#{tpl_ref[1]}\" už v knižnici nie je — " \
+                              'vyber ju znova. Nič sa nevložilo.', true)
+          end
           # R-12 [B1]: guard nad CIELOVOU instanciou pred novsou SABLONOU
           # nechrani — pri vklade ziadny cielovy korpus este neexistuje.
           # Autorita je ULOZENY ZAZNAM sablony, nie payload z CEF (JS prenasa
