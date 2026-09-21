@@ -186,9 +186,9 @@ module Noxun
         # vyska je vec zon; chladnicka Š/V/H). Filter NIE JE BRANA: model, ktory
         # nesedi, v ponuke OSTAVA a nesie dovod (mockup R11 — „prepínač všetky
         # ich odkryje aj tak").
-        APPL_AXES = { 'fridge' => %w[width height depth], 'oven' => %w[width depth],
-                      'microwave' => %w[width depth] }.freeze
-        APPL_AXIS_LABEL = { 'width' => 'šírka', 'height' => 'výška', 'depth' => 'hĺbka' }.freeze
+        # Codex #384 kolo 1 (P2): OSI aj ich porovnanie ziju v `ApplianceChecks`
+        # (S1-F) — druha tabulka tu by znamenala, ze ponuka filtruje podla inych
+        # osi, nez ktore vzapati skontroluje Kontrola.
         APPL_PICK_LABEL = 'vyber model…'
         # Vlastnici, u ktorych ma zmysel pytat sa na rozmery niky — TA ISTA
         # mnozina ako `Validation::APPL_NICHE_OWNERS` (doska niku nema).
@@ -375,7 +375,7 @@ module Noxun
         # (`ApplianceChecks.single_zone?`) — inak by ponuka filtrovala podla
         # vysky, ktoru verdikt vzapati oznaci za nekontrolovatelnu.
         def appliance_niche_ambiguous?(category, single_zone)
-          return false unless Array(APPL_AXES[category]).include?('height')
+          return false unless appliance_axes(category).include?('height')
 
           single_zone == false
         end
@@ -402,13 +402,21 @@ module Noxun
             'hint' => reason.to_s }
         end
 
+        # OSI, ktore dana kategoria kontroluje. Autoritou je `ApplianceChecks`
+        # (jedna tabulka pre ponuku aj pre verdikt).
+        def appliance_axes(category)
+          return [] unless defined?(ApplianceChecks)
+
+          Array(ApplianceChecks::AXES[category.to_s])
+        end
+
         # PRVY dovod, preco sa model do niky nezmesti (nil = zmesti sa alebo
         # sa to neda povedat). Kontroluju sa LEN osi danej kategorie a LEN tie,
         # ktore list naozaj kotuje.
         def appliance_fit_reason(item, category, interior)
           return nil unless interior.is_a?(Hash)
 
-          axes = Array(APPL_AXES[category])
+          axes = appliance_axes(category)
           return nil if axes.empty?
 
           snap = item['snapshot'].is_a?(Hash) ? item['snapshot'] : {}
@@ -423,20 +431,14 @@ module Noxun
           nil
         end
 
+        # Codex #384 kolo 1 (P2): porovnanie osi ma JEDNO miesto —
+        # `ApplianceChecks.axis_reason`. Kym tu zilo vlastne (tolerancia 0,5 mm)
+        # a vo verdikte druhe (0,01 mm), ponuka model odporucila ako sediaci
+        # a Kontrola ho vzapati zhodila ORANGE.
         def appliance_axis_reason(axis, niche, have)
-          return nil unless have.is_a?(Numeric) && have.to_f.positive?
+          return nil unless defined?(ApplianceChecks)
 
-          lo = niche["#{axis}_min"]
-          hi = niche["#{axis}_max"]
-          label = APPL_AXIS_LABEL[axis]
-          if lo.is_a?(Numeric) && have.to_f + 0.5 < lo.to_f
-            return "#{label} #{fmt_mm(have)} < #{fmt_mm(lo)}"
-          end
-          if hi.is_a?(Numeric) && have.to_f - 0.5 > hi.to_f
-            return "#{label} #{fmt_mm(have)} > #{fmt_mm(hi)}"
-          end
-
-          nil
+          ApplianceChecks.axis_reason(axis, niche, have)
         end
 
         # === S1-F: NAHLAD KONTROLNEJ GEOMETRIE (kontext Korpus) ==============
