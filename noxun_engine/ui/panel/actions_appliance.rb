@@ -28,6 +28,13 @@ module Noxun
       APPL_MSG_BUSY = 'Model ešte dokončuje predchádzajúcu zmenu — skús to o chvíľu znova.'
       APPL_MSG_DETACH = 'Kus má odpojený dielec — vráť ho späť a skús znova.'
       APPL_MSG_NEWER = 'Kus je z novšej verzie Noxun — zápis by jeho nastavenia stratil.'
+      # Codex #385 kolo 1 (P1): config-only zapis marker schemy NEPOSUVA (je to
+      # proveniencia STAVBY — cítajú ho stale guardy zasuviek, zavesov a vyklopov).
+      # Kus zo STARSEJ schemy sa preto neda doplnit o novy kluc bez prestavby.
+      APPL_MSG_OLDER = 'Skrinka je zo staršej verzie — najprv ju prestav ' \
+                       '(Aplikuj zmeny), potom nastav očakávanie.'
+      APPL_MSG_OLDER_BOARD = 'Doska je zo staršej verzie — najprv ju prestav ' \
+                             '(ulož ľubovoľnú zmenu karty), potom nastav očakávanie.'
       APPL_MSG_AMBIG = 'Dva kusy s tým istým ID — prestav skrinky a skús znova.'
       APPL_MSG_EXPECTS_FAILED = 'Očakávanie sa nepodarilo uložiť — skús znova.'
       APPL_MSG_EXPECTS_SAME = 'Očakávanie sa nezmenilo.'
@@ -137,25 +144,37 @@ module Noxun
         #   5. „viazana kategoria sa odstranit neda",
         #   6. NEZMENENY vysledok = ZIADNA operacia (ziadny prazdny krok Spat).
         # Az potom sa otvara operacia.
+        # KAZDE ODMIETNUTIE POSIELA CERSTVU KARTU (Codex #385 kolo 1 P2):
+        # klient si po odoslani prikazu ovladac ZABLOKUJE a odblokuje ho az
+        # prichod noveho payloadu. Keby odmietnutie vratilo len status, riadok
+        # by ostal zamknuty a pouzivatel by musel preklikat vyber.
         def handle_set_appliance_expects(payload)
           model = Sketchup.active_model
           data = parse(payload)
           return if foreign_document?(data, model, 'Očakávanie sa nezmenilo') # R-02
-          return set_status(APPL_MSG_BUSY, true) unless ApplianceBinding.observer_idle?(model)
+          return appliance_expects_refused(model, APPL_MSG_BUSY) unless ApplianceBinding.observer_idle?(model)
 
           inst, target, err = appliance_expects_target(model, data)
-          return set_status(err, true) if err
+          return appliance_expects_refused(model, err) if err
 
           list, verr = ApplianceBinding.validate_expects(data['expects'], target['kind'])
-          return set_status("Očakávanie sa neuložilo — #{verr}", true) if verr
+          return appliance_expects_refused(model, "Očakávanie sa neuložilo — #{verr}") if verr
 
           lock = appliance_expects_locked(model, inst, list)
-          return set_status(lock, true) if lock
+          return appliance_expects_refused(model, lock) if lock
 
           appliance_expects_write(model, inst, target, Store.config(inst) || {}, list)
         rescue StandardError => e
           Engine.log_error(e, 'Panel.handle_set_appliance_expects')
-          set_status("Očakávanie sa nepodarilo uložiť: #{e.message}", true)
+          appliance_expects_refused(model, "Očakávanie sa nepodarilo uložiť: #{e.message}")
+        end
+
+        # Odmietnutie: NAJPRV cerstva karta (odblokuje riadok), potom hlaska.
+        # `dedup: false` — zapis sa nekonal, takze nie je preco prestavovat
+        # duplicitne skrinky (vzor D-100 `handle_rename_cabinet`).
+        def appliance_expects_refused(model, msg)
+          push_selected(model, dedup: false) if model
+          set_status(msg, true)
         end
 
         # OZNACENA entita ako ciel zapisu -> `[instancia, {kind,id,pid}, nil]`
@@ -197,9 +216,17 @@ module Noxun
           end
 
           cfg = Store.config(inst)
-          newer = kind == ApplianceBinding::KIND_BOARD ? BoardBuilder.newer_config?(cfg)
-                                                       : CabinetBuilder.newer_config?(cfg)
-          return [nil, nil, APPL_MSG_NEWER] if newer
+          board = kind == ApplianceBinding::KIND_BOARD
+          builder = board ? BoardBuilder : CabinetBuilder
+          return [nil, nil, APPL_MSG_NEWER] if builder.newer_config?(cfg)
+          # Codex #385 kolo 1 (P1): STARSIA schema. Config-only zapis marker
+          # NEPOSUVA (je to proveniencia stavby — stale guardy zasuviek, zavesov
+          # a vyklopov ju citaju a RED nalezy by po tichom posunuti zmizli),
+          # takze kus zo starsej verzie treba najprv PRESTAVAT. Odmietnutie
+          # stoji PRED operaciou — ziadny krok Spat nevznikne.
+          if builder.older_config?(cfg)
+            return [nil, nil, (board ? APPL_MSG_OLDER_BOARD : APPL_MSG_OLDER)]
+          end
 
           [inst, { 'kind' => kind, 'id' => id, 'pid' => inst.persistent_id }, nil]
         end

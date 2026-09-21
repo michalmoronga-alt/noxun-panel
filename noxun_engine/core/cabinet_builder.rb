@@ -3099,10 +3099,21 @@ module Noxun
         # ocakavanie nic nekresli, takze prestavba by bola len zbytocny prepocet
         # vyrobnych cisel (a pri zmene katalogu by ich aj posunula).
         #
-        # PECIATKA SCHEMY je povinna cast zapisu (vzor `BoardBuilder
-        # .write_appliance_refs!`): skrinka ulozena starsim pluginom nesie
-        # nizsi `config_schema` a `normalize` by jej pri najblizsej prestavbe
-        # kluc TICHO zahodil (`appliance_expects[]` pozna az schema 16).
+        # MARKER `config_schema` SA TU NIKDY NEPOSUVA (Codex #385 kolo 1 P1).
+        # Povodne ho tento zapis pecatkoval — a bola to CHYBA: marker je
+        # u skrinky PROVENIENCIA STAVBY, nie verzia posledneho zapisu.
+        # Citaju ho stale guardy (`Bom.drawer_stale_issue`, `hinge_stale_issue`,
+        # `pre_lift_build?`) proti prahom `DRAWER/HINGE/LIFT_ACTIVATION_SCHEMA`,
+        # takze jeho posunutie BEZ prestavby by vyhlasilo, ze skrinka je
+        # postavena s receptami zasuviek, tabulkou zavesov a vyklopmi — RED
+        # nalezy a s nimi aj blokacia nakupu a cenovych exportov by TICHO
+        # zmizli. Schemu smie zdvihnut VYHRADNE prestavba plnym planom.
+        #
+        # Dosledok: config-only zapis je legitimny LEN nad skrinkou, ktora uz
+        # na dnesnej scheme JE. Starsiu musi volajuci odmietnut PRED operaciou
+        # (`older_config?` + `Panel.handle_set_appliance_expects`) — tu by uz
+        # bolo neskoro a novy kluc by sedel vo configu, ktoremu `normalize`
+        # pri najblizsej prestavbe nerozumie.
         #
         # `nil` hodnota kluc ODSTRANI (legacy skrinka nikdy nedostane prazdne
         # pole, ktore by vyzeralo ako „uz sme to riesili"). Cely config ostava
@@ -3117,9 +3128,15 @@ module Noxun
             key = k.to_s
             v.nil? ? cfg.delete(key) : cfg[key] = v
           end
-          cfg['config_schema'] = CONFIG_SCHEMA
           Store.write_config(inst, cfg)
           true
+        end
+
+        # Je ulozeny config STARSI nez dnesny kontrakt? Config-only zapis ho
+        # migrovat NEVIE (migruje vyhradne prestavba plnym planom), takze
+        # volajuci musi taky kus odmietnut.
+        def older_config?(cfg)
+          config_schema_of(cfg) < CONFIG_SCHEMA
         end
 
         # Ocisti part_overrides na { part_key => { 'material_id'=>..|nil,
