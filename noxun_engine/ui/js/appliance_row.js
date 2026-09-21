@@ -115,9 +115,9 @@
     return h;
   }
 
-  // Vykreslenie do uzla sekcie. Prázdny zoznam = riadok sa SCHOVÁ: skrinka,
-  // ktorá spotrebič nemá a ani ho neočakáva, o ňom nemá čo hovoriť
-  // (vertikálny priestor panela je vzácny).
+  // Vykreslenie do uzla sekcie. Prázdny zoznam = blok sa SCHOVÁ (o čom
+  // rozhoduje VÝHRADNE server). S1-C: skrinka a doska dostávajú aspoň riadok
+  // VOĽBY „očakáva", takže prázdno ostáva len tam, kde sa očakávať nedá nič.
   function renderApplianceRows(rows, ctx, nodeId){
     var box = aprEl(nodeId || 'applRows');
     if (!box) return false;
