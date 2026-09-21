@@ -444,8 +444,19 @@ NxTest.test('S1-B2: ocakavanie, ktore uz vazbu MA, riadok nevyrobi') do
   items = [NxS1B2.item('I-1', 'fridge', NxS1B2.owner('cabinet', 'CAB-3'),
                        'snapshot' => NxS1B2.snapshot('fridge', 'BCNA306', 'Beko',
                                                      NxS1B2.fridge_dims))]
-  rows = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, NxS1B2.interior(cfg))
+  # S1-C (Codex #385 kolo 1 P2): „uz vazbu MA" znamena OBOJSMERNY dokaz, takze
+  # riadok potrebuje ID vlastnika — bez neho by sa nemalo co porovnavat
+  # s vlastnikom polozky a panel by kategoriu za splnenu NEPOVAZOVAL.
+  rows = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, NxS1B2.interior(cfg),
+                                      owner_id: 'CAB-3')
   NxTest.assert_equal(%w[bound expects], rows.map { |r| r['state'] })
+
+  # Polozka, ktora patri INEJ skrinke (recyklovane ID), ocakavanie NESPLNI —
+  # Kontrola v tej istej situacii hlasi `appliance_missing`.
+  other = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, NxS1B2.interior(cfg),
+                                       owner_id: 'CAB-9')
+  NxTest.assert_equal(%w[bound expected expects], other.map { |r| r['state'] },
+                      'sirota riadok „očakáva" NEPOTLACI — inak by sa nalez nedal vybavit')
 end
 
 # S1-C VEDOMA REVIZIA pravidla B2 „prazdny zoznam riadok skryje": bez VIDITELNEJ

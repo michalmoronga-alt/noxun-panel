@@ -5100,6 +5100,7 @@ module NoxunSuRunner
         s1c_template_cycle(model)
       end
       s1c_row_action(model)
+      s1c_legacy_schema(model)
       s1c_observer_barrier(model)
       s1c_slot(model)
       s1c_apply_to_bound(model) unless tpl_existed
@@ -5200,7 +5201,7 @@ module NoxunSuRunner
        s1c_missing(model) == ['missing|microwave'])
     ok("S1-C (e): geometria sa NEZMENILA (#{cab.definition.entities.length} entit)",
        cab.definition.entities.length == parts_before)
-    ok('S1-C (e): peciatka schemy sadla (inak by prestavba ocakavanie zahodila)',
+    ok('S1-C (e/P1): marker schemy sa zapisom NEPOSUNUL (je to proveniencia STAVBY)',
        (e::Store.config(cab) || {})['config_schema'].to_i == e::CabinetBuilder::CONFIG_SCHEMA)
 
     # NEZMENENY zoznam = ziadna operacia (Spat by inak zmazal nespravnu vec).
@@ -5239,6 +5240,68 @@ module NoxunSuRunner
     s1c_set_expects(model, cab, [])
     cab = s1f_cab(model, cid)
     ok("S1-C (e): viazanu ruru sa zrusit NEDA (#{s1c_expects_of(cab).inspect})",
+       s1c_expects_of(cab) == %w[oven])
+
+    # (P2, Codex #385 kolo 1) SIROTA: polozku zmazalo druhe okno (rozpoctovou
+    # cestou, refs na skrinke OSTALI). Kontrola od tej chvile hlasi
+    # `appliance_missing` — a riadok Spotrebica MUSI ponuknut vyber, inak
+    # pouzivatel nema nalez kde vybavit. Panel aj Kontrola citaju TU ISTU
+    # mnozinu splnenych kategorii.
+    e::BudgetStore.remove_appliance!(model, item)
+    cab = s1f_cab(model, cid)
+    orphan = Array(e::Panel.cabinet_payload(cab)['appliance_rows'])
+    ok("S1-C (P2): osirely ref necha Kontrolu svietit (#{s1c_missing(model).inspect})",
+       s1c_missing(model) == ['missing|oven'])
+    ok("S1-C (P2): a riadok PONUKA vyber (#{orphan.map { |r| r['state'] }.inspect})",
+       orphan.any? { |r| r['state'] == 'expected' && r['category'] == 'oven' })
+    ok('S1-C (P2): viazanu kategoriu uz nic nezamyka — ocakavanie sa da zrusit',
+       begin
+         s1c_set_expects(model, s1f_cab(model, cid), [])
+         s1c_expects_of(s1f_cab(model, cid)).empty?
+       end)
+    r14_clear!(model)
+    cleanup(model)
+  end
+
+  # (P1, Codex #385 kolo 1) STARSIA SCHEMA: config-only zapis marker NEPOSUVA
+  # (je to proveniencia STAVBY — citaju ju stale guardy zasuviek, zavesov
+  # a vyklopov), takze kus zo starsej verzie sa ODMIETNE a ponukne prestavbu.
+  # Mimo SketchUpu sa neda overit to podstatne: ze PRESTAVBA marker naozaj
+  # zmigruje a zapis potom PREJDE.
+  def s1c_legacy_schema(model)
+    cab = e::CabinetBuilder.build(model, S1C_CAB)
+    return ok('S1-C (P1): fixtura skrinky', false) unless cab
+
+    cid = e::Store.get(cab, 'cabinet_id').to_s
+    old = e::CabinetBuilder::CONFIG_SCHEMA - 1
+    cfg = e::Store.config(cab) || {}
+    cfg['config_schema'] = old
+    e::CabinetBuilder.guarded do
+      model.start_operation('SU-TEST S1C stara schema', true)
+      e::Store.write_config(cab, cfg)
+      model.commit_operation
+    end
+    markers = []
+    m1 = r03_marker(model, markers) # kontrolny bod: 1x Spat ho ma zmazat
+    s1c_set_expects(model, cab, %w[oven])
+    cab = s1f_cab(model, cid)
+    ok("S1-C (P1): zapis na STARSIU schemu ODMIETNUTY (#{s1c_expects_of(cab).inspect})",
+       cab && s1c_expects_of(cab).empty?)
+    ok("S1-C (P1): a marker schemy ostal nedotknuty (#{(e::Store.config(cab) || {})['config_schema']})",
+       (e::Store.config(cab) || {})['config_schema'].to_i == old)
+    Sketchup.undo
+    ok('S1-C (P1): odmietnutie NEZALOZILO krok Spat (1x Spat vratil marker)', !m1.valid?)
+    r03_clear_markers(model, markers)
+    cab = s1f_cab(model, cid)
+
+    # PRESTAVBA migruje marker plnym planom — az potom zapis prejde.
+    s1e_rebuild(model, cab, 'width' => 620.0)
+    cab = s1f_cab(model, cid)
+    ok("S1-C (P1): prestavba marker zmigrovala (#{(e::Store.config(cab) || {})['config_schema']})",
+       (e::Store.config(cab) || {})['config_schema'].to_i == e::CabinetBuilder::CONFIG_SCHEMA)
+    s1c_set_expects(model, cab, %w[oven])
+    cab = s1f_cab(model, cid)
+    ok("S1-C (P1): po prestavbe zapis PRESIEL (#{s1c_expects_of(cab).inspect})",
        s1c_expects_of(cab) == %w[oven])
     r14_clear!(model)
     cleanup(model)

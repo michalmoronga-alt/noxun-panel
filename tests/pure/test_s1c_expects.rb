@@ -253,6 +253,41 @@ NxTest.test('S1-C (C3): splnene je LEN to, co dokazu OBE strany vazby') do
   NxTest.assert_equal([], ab.bound_categories(slot_entry, items), 'druh musi sediet')
 end
 
+# Codex #385 kolo 1 (P2): Inspector a Kontrola MUSIA citat TU ISTU mnozinu
+# splnenych kategorii. Kym panel veril samotnej `category` v refs, sirota mu
+# riadok „očakáva" POTLACILA — Kontrola pritom (spravne) hlasila
+# `appliance_missing` a pouzivatel nemal kde ho vybavit.
+NxTest.test('S1-C (P2): sirota ani recyklovany ref riadok „očakáva" NEPOTLACIA') do
+  # (a) OSIRELY ref: entita nesie zaznam, polozka uz v rozpocte NIE JE.
+  cfg = { 'type' => 'lower', 'width' => 600.0, 'height' => 2076.0, 'depth' => 560.0,
+          'thickness' => 18.0, 'floor_height' => 100.0,
+          'appliance_expects' => %w[oven],
+          'appliance_refs' => [NxS1C.ref('ZOMBIE', 'oven')] }
+  rows = NxS1C::PANEL.appliance_rows('cabinet', cfg, [], nil, owner_id: 'CAB-3')
+  exp = rows.find { |r| r['state'] == 'expected' }
+  NxTest.refute(exp.nil?, "riadok ocakavania MUSI byt: #{rows.map { |r| r['state'] }.inspect}")
+  NxTest.assert_equal('oven', exp['category'])
+  NxTest.assert(exp.key?('options'), 'a ponuka vyberu modelu je v nom')
+
+  # (b) RECYKLOVANE ID: polozka tvrdi CAB-3, ale TATO CAB-3 jej `item_id` nenesie.
+  cfg2 = cfg.merge('appliance_refs' => [])
+  items = [NxS1C.item('I-1', 'oven', 'cabinet', 'CAB-3')]
+  rows2 = NxS1C::PANEL.appliance_rows('cabinet', cfg2, items, nil, owner_id: 'CAB-3')
+  NxTest.assert(rows2.any? { |r| r['state'] == 'expected' },
+                'bez zaznamu na entite nie je co povazovat za splnene')
+
+  # (c) PLATNA vazba riadok POTLACI — obe strany dokazu sedia.
+  cfg3 = cfg.merge('appliance_refs' => [NxS1C.ref('I-1', 'oven')])
+  rows3 = NxS1C::PANEL.appliance_rows('cabinet', cfg3, items, nil, owner_id: 'CAB-3')
+  NxTest.refute(rows3.any? { |r| r['state'] == 'expected' },
+                'splnene ocakavanie riadok nepotrebuje')
+
+  # A TO ISTE hovori Kontrola nad tou istou fixturou — jedna mnozina, dva citatelia.
+  res = NxS1C.control([], NxS1C.owners(['CAB-3', 303, cfg, nil]))
+  NxTest.assert_equal(['appliance|CAB-3|missing|oven'], NxS1C.missing_keys(res),
+                      'Kontrola pri osirelom refs nalez DAVA — panel musel ponuknut vyber')
+end
+
 NxTest.test('S1-C (C3): zber hlasi `expected_missing` aj pri recyklovanom ID a osirelych refs') do
   # (a) recyklovane ID — polozka tvrdi CAB-3, entita CAB-3 vazbu nenesie
   own = NxS1C.owners(['CAB-3', 103, { 'type' => 'lower', 'appliance_expects' => %w[oven] }, nil])
@@ -524,18 +559,92 @@ end
 # 5) CONFIG-ONLY ZAPIS (C4)
 # ---------------------------------------------------------------------------
 
-NxTest.test('S1-C (C4): `write_config_keys!` pecatkuje schemu a zvysok configu NEMENI') do
-  # LEGACY skrinka (schema 15) — bez peciatky by `normalize` kluc pri najblizsej
-  # prestavbe TICHO zahodil.
-  cab = NxS1C.cabinet('CAB-1', 101, schema: 15)
+# Codex #385 kolo 1 (P1) PREPISAL rozhodnutie C4: marker sa config-only zapisom
+# NEPOSUVA. Je to PROVENIENCIA STAVBY — citaju ju stale guardy zasuviek, zavesov
+# a vyklopov proti prahom `*_ACTIVATION_SCHEMA`, takze tiche posunutie by
+# vyhlasilo, ze skrinka je postavena s funkciami, ktore v nej nie su, a RED
+# nalezy aj blokacia exportov by zmizli.
+NxTest.test('S1-C (P1): `write_config_keys!` marker NEPOSUVA a zvysok configu NEMENI') do
+  cab = NxS1C.cabinet('CAB-1', 101, schema: NxS1C::CB::CONFIG_SCHEMA)
   NxS1C::CB.write_config_keys!(cab, 'appliance_expects' => %w[oven])
   cfg = NxS1C.cfg_of(cab)
   NxTest.assert_equal(%w[oven], cfg['appliance_expects'])
-  NxTest.assert_equal(NxS1C::CB::CONFIG_SCHEMA, cfg['config_schema'], 'peciatka je sucast zapisu')
+  NxTest.assert_equal(NxS1C::CB::CONFIG_SCHEMA, cfg['config_schema'], 'marker ostava aky bol')
   NxTest.assert_close(720.0, cfg['height'], 0.01, 'zvysok configu je NEDOTKNUTY')
-  # `nil` kluc ODSTRANI (legacy kus nikdy nedostane prazdne pole).
+  # `nil` kluc ODSTRANI (kus nikdy nedostane prazdne pole).
   NxS1C::CB.write_config_keys!(cab, 'appliance_expects' => nil)
   NxTest.refute(NxS1C.cfg_of(cab).key?('appliance_expects'))
+
+  # LEGACY skrinka: keby zapis predsa len prebehol, marker sa NEZDVIHNE.
+  old = NxS1C.cabinet('CAB-2', 102, schema: 15)
+  NxS1C::CB.write_config_keys!(old, 'appliance_expects' => %w[oven])
+  NxTest.assert_equal(15, NxS1C.cfg_of(old)['config_schema'],
+                      'marker je proveniencia STAVBY, nie verzia zapisu')
+  # A doska ma ten isty kontrakt (vlastny, nezavisly marker).
+  brd = NxS1C.board('BRD-1', 201, schema: 1)
+  NxS1C::BB.write_config_keys!(brd, 'appliance_expects' => %w[sink])
+  NxTest.assert_equal(1, NxS1C.cfg_of(brd)['config_schema'])
+end
+
+NxTest.test('S1-C (P1): STARSIA schema = akcia sa ODMIETNE (marker migruje LEN prestavba)') do
+  NxTest.skip!('payload testy potrebuju Store fake') unless NxTest.headless?
+  model = NxS1C::FakeModel.new
+  legacy = NxS1C.cabinet('CAB-3', 303, schema: 15)
+  NxS1C.with_stubs([NxS1C.scan_stub(cabinets: [legacy])]) do
+    inst, _t, err = NxS1C::PANEL.appliance_expects_entity(model, legacy, 'cabinet', 'CAB-3',
+                                                          'CAB-3', { 'pid' => 303 })
+    NxTest.assert(inst.nil?)
+    NxTest.assert_equal(NxS1C::PANEL::APPL_MSG_OLDER, err)
+    NxTest.assert(err.include?('prestav'), 'hlaska hovori, CO ma pouzivatel urobit')
+  end
+  NxTest.assert_equal(15, NxS1C.cfg_of(legacy)['config_schema'], 'marker ostal nedotknuty')
+  NxTest.refute(NxS1C.cfg_of(legacy).key?('appliance_expects'), 'a nic sa nezapisalo')
+
+  # AKTUALNA schema prejde.
+  fresh = NxS1C.cabinet('CAB-4', 304, schema: NxS1C::CB::CONFIG_SCHEMA)
+  NxS1C.with_stubs([NxS1C.scan_stub(cabinets: [fresh])]) do
+    inst, target, err = NxS1C::PANEL.appliance_expects_entity(model, fresh, 'cabinet', 'CAB-4',
+                                                              'CAB-4', { 'pid' => 304 })
+    NxTest.assert(err.nil?, err.to_s)
+    NxTest.assert_equal(fresh, inst)
+    NxTest.assert_equal('cabinet', target['kind'])
+  end
+  # DOSKA ma vlastnu hlasku a vlastny prah.
+  brd = NxS1C.board('BRD-2', 202, schema: 1)
+  NxS1C.with_stubs([NxS1C.scan_stub(boards: [brd])]) do
+    _i, _t, err = NxS1C::PANEL.appliance_expects_entity(model, brd, 'board', 'BRD-2', 'BRD-2',
+                                                        { 'pid' => 202 })
+    NxTest.assert_equal(NxS1C::PANEL::APPL_MSG_OLDER_BOARD, err)
+  end
+end
+
+NxTest.test('S1-C (P1): STALE guardy zasuviek/zavesov/vyklopov po zapise STALE hlasia RED') do
+  # Skrinka postavena PRED aktivaciou receptov zasuviek (schema 4) s uz
+  # klasifikovanym celom — `drawer_stale_issue` z nej robi RED.
+  cfg = { 'config_schema' => NxS1C::CB::DRAWER_ACTIVATION_SCHEMA - 1, 'type' => 'lower',
+          'front_items' => [{ 'id' => 'F1', 'type' => 'drawer_front',
+                              'drawer' => { 'construction' => 'metal' } }] }
+  before = NxS1C::BOM.drawer_stale_issue('CAB-5', 105, cfg)
+  NxTest.refute(before.nil?, 'vychodisko: stara skrinka RED hlasi')
+
+  inst = NxS1C::FakeInst.new(105)
+  NxS1C::STORE.write(inst, { kind: 'cabinet', cabinet_id: 'CAB-5', config: cfg })
+  NxS1C::CB.write_config_keys!(inst, 'appliance_expects' => %w[oven])
+  after = NxS1C::BOM.drawer_stale_issue('CAB-5', 105, NxS1C.cfg_of(inst))
+  NxTest.refute(after.nil?,
+                'config-only zapis NESMIE zhasnut RED — marker je proveniencia stavby')
+  NxTest.assert_equal(before['code'], after['code'])
+  # To iste pre zavesy a vyklopy — vsetky tri citaju TEN ISTY marker.
+  hcfg = { 'config_schema' => NxS1C::CB::HINGE_ACTIVATION_SCHEMA - 1, 'type' => 'lower',
+           'hardware' => [{ 'generic_type' => 'hinge', 'owner_part_key' => 'front:F1/panel' }],
+           'front_items' => [{ 'id' => 'F1', 'type' => 'door' }] }
+  hinst = NxS1C::FakeInst.new(106)
+  NxS1C::STORE.write(hinst, { kind: 'cabinet', cabinet_id: 'CAB-6', config: hcfg })
+  NxS1C::CB.write_config_keys!(hinst, 'appliance_expects' => %w[oven])
+  NxTest.refute(NxS1C::BOM.hinge_stale_issue('CAB-6', 106, NxS1C.cfg_of(hinst)).nil?,
+                'zavesy tiez ostavaju RED')
+  NxTest.assert(NxS1C::BOM.pre_lift_build?(NxS1C.cfg_of(hinst)),
+                'a skrinka je dalej „postavena pred vyklopmi"')
 end
 
 NxTest.test('S1-C (C4): zapis do configu z NOVSEJ verzie sa ODMIETNE (nic sa nezahodi)') do
@@ -684,6 +793,15 @@ NxTest.test('S1-C (C7/C14): poradie handlera — bariera, ciel, guardy, operacia
   NxTest.assert(i_busy < i_target, 'ciel sa cita AZ PO bariere observera (C7)')
   NxTest.assert(i_target < i_valid, 'druh vlastnika urcuje, co sa smie ocakavat')
   NxTest.assert(i_valid < i_lock && i_lock < i_write, 'guardy PRED zapisom')
+  # Codex #385 kolo 1 (P2): KAZDE odmietnutie posiela cerstvu kartu — klient si
+  # po odoslani ovladac zamyka a odomkne ho az novy payload.
+  NxTest.assert_equal(5, body.scan('appliance_expects_refused').length,
+                      'vsetky styri guardy AJ `rescue` idu cez jednu cestu s refreshom')
+  rbody = NxS1C.body_of(NxS1C.src('noxun_engine', 'ui', 'panel', 'actions_appliance.rb'),
+                        'appliance_expects_refused')
+  NxTest.assert(rbody.index('push_selected') < rbody.index('set_status'),
+                'NAJPRV cerstva karta (odomkne riadok), az potom hlaska')
+  NxTest.assert(rbody.include?('dedup: false'), 'zapis sa nekonal — netreba dedup prestavbu')
 
   wbody = NxS1C.body_of(NxS1C.src('noxun_engine', 'ui', 'panel', 'actions_appliance.rb'),
                         'appliance_expects_write')

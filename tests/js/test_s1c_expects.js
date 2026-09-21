@@ -178,11 +178,32 @@ function pickRow(extra){
   eq(pay.model_guid, 'G', 'identita dokumentu (R-02)');
   eq(sel.value, '', 'select sa vracia na neutrálny súhrn — pravdu prinesie čerstvá karta');
 
-  // Neutrálna voľba NIČ nepošle.
+  // Codex #385 kolo 1 (P2): DVE RÝCHLE VOĽBY pred prekreslením riadku. Prvá
+  // ovládač zamkne a snapshot posunie, takže druhá vychádza z AKTUÁLNEHO
+  // zoznamu — bez toho by sa obe počítali zo starého a druhá by prvú prepísala
+  // („pridaj rúru" + „pridaj mikrovlnku" = zostala by len mikrovlnka).
+  ok(sel.disabled === true, 'po odoslaní je ovládač zamknutý, kým nepríde čerstvá karta');
+  eq(sel.getAttribute('data-apr-expects'), 'oven,microwave',
+     'lokálny snapshot je aktualizovaný OPTIMISTICKY');
   SENT.length = 0;
+  sel.value = 'add:fridge';
+  change(sel);
+  eq(JSON.parse(SENT[0][1]).expects, ['oven', 'microwave', 'fridge'],
+     'druhý príkaz stavia na výsledku prvého, nie na zastaranom zozname');
+
+  // Neutrálna voľba NIČ nepošle a snapshot ani zámok nemení.
+  SENT.length = 0;
+  const before = sel.getAttribute('data-apr-expects');
   sel.value = '';
   change(sel);
   eq(SENT.length, 0, 'neutrálna voľba zápis nespustí');
+  eq(sel.getAttribute('data-apr-expects'), before, 'ani snapshot neposunie');
+
+  // Čerstvá karta ovládač ODOMKNE (prekreslí celý riadok) — a server ju posiela
+  // aj pri KAŽDOM odmietnutí, takže riadok nikdy neostane zamknutý.
+  R.renderApplianceRows([pickRow()], { kind: 'cabinet', id: 'CAB-3', pid: 303 }, 'applRows');
+  ok(ELS.applRows.innerHTML.indexOf('data-apr-expects="oven"') > 0,
+     'prekreslenie vráti stav zo SERVERA (nový select je odomknutý)');
 
   // DOSKA posiela `board_id`.
   SENT.length = 0;
