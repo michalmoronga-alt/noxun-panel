@@ -165,6 +165,10 @@ module Noxun
           # `ApplianceBinding` (jedna operacia = polozka + refs + prestavba),
           # panel dodava LEN to, ktora entita je oznacena.
           cb(dlg, 'set_appliance_owner')   { |p| handle_set_appliance_owner(p) }
+          # S1-C: OCAKAVANY spotrebic (`appliance_expects[]`). Zapis CONFIGU
+          # bez prestavby vo vlastnej operacii — je to INA vec nez vazba
+          # (ziadna polozka zakazky sa nemeni), preto vlastny callback.
+          cb(dlg, 'set_appliance_expects') { |p| handle_set_appliance_expects(p) }
           # KOV-H2: hladanie v katalogu kovania pre modal rucnej polozky.
           # CISTE CITANIE — ziadna operacia, ziadny zapis, ziadny krok Spat;
           # odpoved chodi kanalom `NX.hwManualSearchResult` s generaciou dotazu.

@@ -3093,6 +3093,35 @@ module Noxun
           inst
         end
 
+        # S1-C (Astra C4): CONFIG-ONLY ZAPIS — zmena, ktora sa GEOMETRIE
+        # NEDOTYKA (dnes `appliance_expects[]`). Na rozdiel od
+        # `write_appliance_refs!` NEIDE cez `config_to_params` + prestavbu:
+        # ocakavanie nic nekresli, takze prestavba by bola len zbytocny prepocet
+        # vyrobnych cisel (a pri zmene katalogu by ich aj posunula).
+        #
+        # PECIATKA SCHEMY je povinna cast zapisu (vzor `BoardBuilder
+        # .write_appliance_refs!`): skrinka ulozena starsim pluginom nesie
+        # nizsi `config_schema` a `normalize` by jej pri najblizsej prestavbe
+        # kluc TICHO zahodil (`appliance_expects[]` pozna az schema 16).
+        #
+        # `nil` hodnota kluc ODSTRANI (legacy skrinka nikdy nedostane prazdne
+        # pole, ktore by vyzeralo ako „uz sme to riesili"). Cely config ostava
+        # inak NEDOTKNUTY — nezname kluce z novsej verzie prezijú.
+        # O OPERACIU a `guarded` sa stara VOLAJUCI (vzor `ApplianceBinding`).
+        def write_config_keys!(inst, keys)
+          cfg = Store.config(inst)
+          raise 'Vybrana instancia nie je NOXUN korpus.' unless cfg.is_a?(Hash)
+          raise newer_config_message('Korpus', 'zápis by jeho nastavenia stratil') if newer_config?(cfg)
+
+          (keys.is_a?(Hash) ? keys : {}).each do |k, v|
+            key = k.to_s
+            v.nil? ? cfg.delete(key) : cfg[key] = v
+          end
+          cfg['config_schema'] = CONFIG_SCHEMA
+          Store.write_config(inst, cfg)
+          true
+        end
+
         # Ocisti part_overrides na { part_key => { 'material_id'=>..|nil,
         # 'edges'=>{L1..W2}, 'grain_direction'=>'length'|'width' } }.
         # Zahodi prazdne / neplatne zaznamy. Zachova nil hrany (explicitne "bez ABS").

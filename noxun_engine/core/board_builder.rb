@@ -750,6 +750,26 @@ module Noxun
           true
         end
 
+        # S1-C (Astra C4): CONFIG-ONLY ZAPIS dosky — protivaha
+        # `CabinetBuilder.write_config_keys!` (dnes `appliance_expects[]`).
+        # Doska sa neprestavuje ani pri vazbe, takze rozdiel je len v markeri
+        # schemy; `nil` hodnota kluc odstrani, zvysok configu ostava nedotknuty.
+        # O OPERACIU sa stara volajuci.
+        def write_config_keys!(inst, keys)
+          cfg = Store.config(inst)
+          raise 'Vybrana instancia nie je NOXUN doska.' unless cfg.is_a?(Hash)
+          raise CabinetBuilder.newer_config_message('Doska', 'zápis by jej nastavenia stratil') if
+            newer_config?(cfg)
+
+          (keys.is_a?(Hash) ? keys : {}).each do |k, v|
+            key = k.to_s
+            v.nil? ? cfg.delete(key) : cfg[key] = v
+          end
+          cfg['config_schema'] = BOARD_CONFIG_SCHEMA
+          Store.write_config(inst, cfg)
+          true
+        end
+
         def drop_appliance_refs!(inst)
           cfg = Store.config(inst)
           return false unless cfg.is_a?(Hash)
