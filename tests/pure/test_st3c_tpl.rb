@@ -295,8 +295,9 @@ NxTest.test('1b-4 (B3): payload sekcie je OREZANY na tvar dlazdice') do
     pay = e::TemplatesDialog.tpl_payload
     NxTest.assert_equal(%w[cabinet board], pay.keys, 'payload nesie PRESNE dva druhy')
     row = pay['cabinet'].first
-    NxTest.assert_equal(%w[name preview_rev config hardware], row.keys,
-                        'KOV-I: dlazdica dostava aj odvodeny lahky suhrn kovania')
+    NxTest.assert_equal(%w[name preview_rev config hardware appliance_expects], row.keys,
+                        'KOV-I: dlazdica dostava aj odvodeny lahky suhrn kovania, ' \
+                        'S1-C: + ocakavany spotrebic')
     NxTest.assert_equal({ 'has' => true, 'labels' => ['Závesy: SET-1'] }, row['hardware'])
     NxTest.assert_equal(%w[type width height depth], row['config'].keys,
                         'a z configu LEN to, co dlazdica kresli (typ + tri rozmery)')

@@ -419,9 +419,12 @@ NxTest.test('S1-E R2c: `merge_template` ZACHOVA vazby CIELA') do
   NxTest.assert_equal([{ 'item_id' => 'uuid-1' }], merged['appliance_refs'],
                       'aplikovanie sablony NESMIE odpojit spotrebic')
   NxTest.assert_equal(%w[dishwasher], merged['appliance_expects'])
-  # Sablona s VLASTNYM ocakavanim ho prepise (spotrebicova sablona je prave o tom).
+  # S1-C (R6): ocakavania sa ZJEDNOCUJU, NEPREPISUJU — prepis by cielu ticho
+  # zahodil ocakavanie, na ktore Kontrola upozornuje (a pri viazanom spotrebici
+  # by z nalezu spravil „splneny" stav bez toho, aby sa cokolvek priradilo).
   m2 = Noxun::Engine::TemplatesDialog.merge_template(target, tpl.merge('appliance_expects' => %w[oven]))
-  NxTest.assert_equal(%w[oven], m2['appliance_expects'])
+  NxTest.assert_equal(%w[oven dishwasher], m2['appliance_expects'],
+                      'unia v kanonickom poradi kategorii')
   NxTest.assert_equal([{ 'item_id' => 'uuid-1' }], m2['appliance_refs'], 'vazba ostava cielu')
 end
 
