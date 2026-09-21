@@ -58,6 +58,12 @@
   (`job`), keď v modeli nestojí nikde (digestor, kus na objednávku). Väzba je **obojsmerná**: položka rozpočtu nesie vlastníka a vlastník nesie jej `item_id`,
   takže vlastník platí **len keď entita existuje A o väzbe vie** (ID skriniek sa recyklujú). Priradenie, presun aj odpojenie je **jedna akcia = jeden krok Späť**.
   Ktorá kategória kam patrí, hovorí matica: chladnička/rúra/mikrovlnka → skrinka · umývačka → slot · varná doska/drez → doska · digestor/iné → len zákazka.
+- **Očakávaný spotrebič** (S1-C, `appliance_expects[]`) — vyhlásenie „sem patrí rúra" **bez konkrétneho kusu**: nekreslí nič, nič nestojí a nikoho neviaže.
+  Jediný dôsledok je jantárové **„spotrebič nevybraný"** v Kontrole (jeden riadok **na každú nesplnenú kategóriu**), kým sa spotrebič nepriradí — návrh ide
+  ďalej, len sa nezabudne. Nastavuje sa **dvomi cestami**: v modale „Uložiť ako šablónu" (skrinka z takej šablóny očakáva rovno pri vložení) alebo priamo
+  v riadku Spotrebič. **Slot umývačky očakáva umývačku sám od seba.** Očakávať sa dá len to, čo sa k tomu kusu smie aj priradiť (tá istá matica ako pri
+  vlastníkovi), a **viazanú kategóriu nemožno zrušiť** — najprv sa spotrebič odpojí. Aplikovanie šablóny na existujúcu skrinku očakávania **zjednotí**
+  a jej priradené spotrebiče **nezoberie**.
 - **Dodáva zákazník** (S1-B1) — príznak položky rozpočtu: spotrebič **kupuje zákazník sám**. Cena v riadku **ostáva** (je to referencia, za koľko sa dá kúpiť),
   ale do medzisúčtu ani do SPOLU **nevstúpi**, upozornenie „chýba cena" na ňom zhasne a v cenovej ponuke je ako **informačný riadok 0 €** so štítkom —
   zákazník má vidieť, že s kuchyňou počítame, ale v našej cene to nie je.

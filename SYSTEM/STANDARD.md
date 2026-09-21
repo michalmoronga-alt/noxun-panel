@@ -134,12 +134,28 @@ seed `AbsRules` `SEED_VERSION` 4. Roly žijú na troch miestach naraz (`BuildPla
 
 ### 2.5 JSON príklady per vrstva
 
-**Rezervované kľúče väzby na spotrebič (S1-E, `CONFIG_SCHEMA` 16 · `BOARD_CONFIG_SCHEMA` 2).** Config **skrinky aj dosky** smie niesť dvojicu
+**Kľúče väzby na spotrebič (`CONFIG_SCHEMA` 16 · `BOARD_CONFIG_SCHEMA` 2).** Config **skrinky aj dosky** smie niesť dvojicu
 `appliance_refs[]` (väzba na KONKRÉTNY spotrebič zákazky — položky `{item_id, category, body, niche, bands, snapshot_at}`) a `appliance_expects[]`
-(zoznam očakávaných kategórií). V S1-E ich **nikto nezapisuje** — sú rezervované, aby ich S1-B/F/C naplnili **bez ďalšieho bumpu**. Kľúč sa objaví len vtedy,
+(zoznam očakávaných kategórií). Schéma 16 ich **rezervovala** v S1-E a napĺňajú ich S1-B/F/C **bez ďalšieho bumpu**. Kľúč sa objaví len vtedy,
 keď entita naozaj niečo nesie (prázdne pole by predstieralo, že väzbu už niekto riešil). **Prežijú každú bežnú cestu** (prestavba, materiály, absorpcia scale,
 aplikovanie šablóny); `appliance_refs[]` zaniká **výhradne pri KÓPII** (tri kopírovacie vstupy skrinky + dedup dosky), lebo kópia sa správa ako „očakáva
 spotrebič tej kategórie", ale nevlastní ten istý kus. Šablóna nesie `appliance_expects[]`, `appliance_refs[]` **nikdy**.
+
+**`appliance_expects[]` = OČAKÁVANÝ SPOTREBIČ (S1-C, záväzné od v0.12.16).** Je to **ZOZNAM** kanonických kódov kategórií (jedna skrinka môže očakávať rúru
+**aj** mikrovlnku), nie jedna hodnota. Kontrakt:
+
+- **JEDNA REPREZENTÁCIA — config.** Aj šablóna ich nesie v `config['appliance_expects']`; záznam knižnice šablón **žiadny vlastný kľúč nemá** a `TemplateStore::STD`
+  sa kvôli očakávaniam **nebumpuje** (staršie pluginy od schémy 16 ich čítajú aj vkladajú správne, takže bump by knižnicu len zamkol pre zápis).
+- **MATICA je tá istá ako pri väzbe** (`ApplianceBinding::OWNER_MATRIX`): skrinka `fridge|oven|microwave` · doska `hob|sink` · **slot vždy presne `['dishwasher']`**
+  (dosadzuje ho builder **implicitne**, v configu ani v seed šablónach nie je) · `hood|other` sa očakávať nedajú. Očakávať sa nesmie to, čo sa k tomu istému kusu
+  nedá ani priradiť.
+- **DÔKAZ SPLNENIA je ten istý obojsmerný dôkaz ako `bound`** — položka s vlastníkom = tá entita **A** `item_id` v jej `appliance_refs[]`. Samotné ID vlastníka
+  (ID sa recyklujú) ani samotná `category` v refs (osirelý záznam) dôkazom nie je.
+- **ZÁPIS je CONFIG-ONLY a pečiatkuje schému:** `CabinetBuilder.write_config_keys!` / `BoardBuilder.write_config_keys!` v jednej operácii, **bez prestavby**
+  (očakávanie nič nekreslí), s `config_schema` — inak by `normalize` kľúč starej skrinky pri najbližšej prestavbe ticho zahodil. Prázdny zoznam kľúč **odstráni**.
+- **ÚNIA PRI MERGE:** aplikovanie šablóny na existujúcu skrinku očakávania **zjednocuje** (a väzby cieľa zachováva) — prepis by ticho zahodil to, na čo Kontrola
+  upozorňuje. Kópia skrinky očakávania **ponecháva**.
+- **NESPLNENÉ OČAKÁVANIE = ORANGE `appliance_missing`** per kategóriu (§11), bez exportnej brány.
 
 **`appliance_refs[]` = OBOJSMERNÁ VÄZBA (S1-B1, záväzné od v0.12.13).** Položka zákazky nesie vlastníka (`owner {kind, id}`) a entita vlastníka nesie **ten istý
 `item_id`** vo svojich `appliance_refs[]`. Platí, že **vlastník je platný LEN keď entita existuje A jej `appliance_refs[]` obsahujú `item_id` položky** — samotná

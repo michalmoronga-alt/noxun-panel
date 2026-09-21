@@ -483,6 +483,13 @@ pluginom nesie schému 1 a tá by väzbu pri najbližšej prestavbe ticho zahodi
 Prázdny zoznam kľúč **odstráni**. Obe funkcie bežia v **už otvorenej operácii volajúceho** — operáciu, guard aj `ensure_root_context` vlastní `ApplianceBinding`
 ([appliances.md](appliances.md)).
 
+**CONFIG-ONLY ZÁPIS — `write_config_keys!(inst, keys)` (S1-C).** Pre zmeny, ktoré sa **geometrie nedotýkajú** (dnes `appliance_expects[]`): zachová **celý** uložený config
+(neznáme kľúče z novšej verzie prežijú), nastavené kľúče prepíše, `nil` hodnota kľúč **odstráni** a v tom istom zápise **opečiatkuje `config_schema`** — bez pečiatky by
+`normalize` očakávanie starej skrinky pri najbližšej prestavbe ticho zahodil (kľúč pozná až schéma 16). Na rozdiel od `write_appliance_refs!` **nejde cez `config_to_params`
+ani prestavbu**: očakávanie nič nekreslí, takže prestavba by bola len zbytočný prepočet výrobných čísel (a pri zmene katalógu by ich aj posunula). Config z **novšej verzie**
+zápis **odmietne výnimkou** (nič sa neoreže). `BoardBuilder.write_config_keys!` je tá istá funkcia pre dosku s jej vlastným markerom. Operáciu a `guarded` vlastní volajúci
+(`Panel.handle_set_appliance_expects` — [ui-lifecycle.md](ui-lifecycle.md)).
+
 ### ghost_tool.rb
 
 **GHOST VKLADANIE (V1-04): skrinka sa kladie KLIKOM, nie tlačidlom.** Modul drží tri vrstvy — `GhostTool` (vlastník session + čisté API pre panel), `GhostTool::Calc`
