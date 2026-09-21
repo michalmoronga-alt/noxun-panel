@@ -250,9 +250,13 @@ module Noxun
           # S1-F: VYPOCTOVY KONTEXT skrinky sa cita RAZ na payload a sluzi VSETKYM
           # riadkom (dva spotrebice = jeden prepocet ciel).
           ctx = appliance_context(kind, cfg)
+          # Codex #385 kolo 1 (P2): mnozinu SPLNENYCH kategorii pocita TA ISTA
+          # funkcia ako v zbere (`ApplianceBinding.bound_categories` cez
+          # obojsmerny dokaz) — cita ju aj riadok „očakáva", aj popisky volby.
+          bound = appliance_expects_bound(kind, refs, items, owner_id)
           rows = refs.filter_map { |ref| appliance_bound_row(kind, cfg, ref, by_id[ref['item_id'].to_s], ctx) }
-          rows += appliance_expected_rows(kind, cfg, refs, items, interior, ctx)
-          picker = appliance_expects_row(kind, cfg, refs, items, owner_id)
+          rows += appliance_expected_rows(kind, cfg, bound, items, interior, ctx)
+          picker = appliance_expects_row(kind, cfg, bound)
           picker ? rows + [picker] : rows
         rescue StandardError => e
           Engine.log_error(e, 'Panel.appliance_rows')
@@ -275,7 +279,7 @@ module Noxun
         # UPLNY zoznam (pridanie = unia, odstranenie = zoznam bez kategorie)
         # a posiela ho cely. Bez toho by pridanie mikrovlnky ticho zmazalo
         # ocakavanie rury, ktore uz je splnene.
-        def appliance_expects_row(kind, cfg, refs, items, owner_id)
+        def appliance_expects_row(kind, cfg, locked)
           return nil unless defined?(ApplianceBinding)
           return nil if kind == ApplianceBinding::KIND_SLOT
 
@@ -284,7 +288,6 @@ module Noxun
 
           have = Array(cfg['appliance_expects']).filter_map { |c| BudgetStore.canon_appliance_type(c) }
           have = allowed.select { |c| have.include?(c) }
-          locked = appliance_expects_bound(kind, refs, items, owner_id)
           { 'state' => 'expects', 'item_id' => nil, 'category' => nil, 'category_label' => '',
             'text' => appliance_expects_text(have), 'sub' => '', 'tone' => '', 'link' => false,
             'expects' => have, 'placeholder' => appliance_expects_summary_label(have),
@@ -318,9 +321,11 @@ module Noxun
           end
         end
 
-        # Kategorie, ktore su na kuse NAOZAJ viazane (obojsmerny dokaz — ten
-        # isty, aky pouziva zber). Sluzia LEN na popisok „najprv odpoj";
-        # branou je server (`appliance_expects_locked`).
+        # Kategorie, ktore su na kuse NAOZAJ SPLNENE — obojsmerny dokaz,
+        # TA ISTA funkcia, akou ich pocita zber (`ApplianceBinding
+        # .bound_categories`). Riadia DVE veci: ktora kategoria uz riadok
+        # „očakáva" nepotrebuje a ktoru volbu nemozno odstranit („najprv
+        # odpoj"). Branou zapisu ostava server (`appliance_expects_locked`).
         def appliance_expects_bound(kind, refs, items, owner_id)
           entry = { 'kind' => kind, 'id' => owner_id.to_s, 'refs' => refs }
           ApplianceBinding.bound_categories(entry, items)
@@ -422,12 +427,19 @@ module Noxun
           "trieda #{model_cls} ≠ slot #{slot_cls}"
         end
 
-        def appliance_expected_rows(kind, cfg, refs, items, interior, ctx = {})
+        # `bound` = kategorie, ktore su NAOZAJ splnene (obojsmerny dokaz).
+        #
+        # Codex #385 kolo 1 (P2): doteraz sa tu bralo samotne `ref['category']`,
+        # takze OSIROTENY zaznam (polozka zmizla) alebo ref po RECYKLOVANOM ID
+        # riadok „očakáva" POTLACIL — a s nim aj vyber modelu. Kontrola pritom
+        # (spravne) hlasila `appliance_missing` a pouzivatel nemal kde ho
+        # vybavit. Panel a Kontrola preto citaju jednu a tu istu mnozinu.
+        def appliance_expected_rows(kind, cfg, bound, items, interior, ctx = {})
           cats = Array(cfg['appliance_expects']).filter_map { |c| BudgetStore.canon_appliance_type(c) }
           # Slot BEZ modelu ocakava umyvacku vzdy — je to jeho jediny zmysel
           # (to iste hovori `Bom.appliance_expected_records`).
           cats << 'dishwasher' if kind == 'slot'
-          have = refs.map { |r| BudgetStore.canon_appliance_type(r['category']).to_s }
+          have = Array(bound).map(&:to_s)
           single = ctx.is_a?(Hash) && ctx.key?('single_zone') ? ctx['single_zone'] != false : true
           cats.uniq.reject { |c| have.include?(c) }.map do |cat|
             appliance_expected_row(cat, items, interior, single)
