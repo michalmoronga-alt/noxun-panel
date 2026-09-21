@@ -293,6 +293,10 @@ Inspector si ten istý záznam skladá z uloženého configu cez **`context(cfg)
   drží `AXES`: chladnička **šírka · výška · hĺbka**, rúra a mikrovlnka **šírka · hĺbka** (ich výška je vec zón, rozhodnutie 7). `skip` má **len výška** a **len**
   pri viacerých zónach. Agregácia: `clash` > `unsatisfiable` > `unknown` > `skip` > `na` > `ok`. Texty **menujú overené osi** („šírka, výška a hĺbka ✓“,
   „výška nekontrolovaná — skrinka má viac zón“) a nikdy netvrdia, že je montáž priechodná: overená je **obálka niky**, nie police ani vnútorné vybavenie (FIX F13).
+- **Porovnanie osi má JEDNO miesto — `axis_state` / `axis_fits?` / `axis_check`** (Codex #384 kolo 1, P2) a **jednu toleranciu `AXIS_TOL` = 0,5 mm**. Používa ho
+  verdikt **aj filter ponuky modelov** (`Panel.appliance_axis_reason`). Kým mala ponuka vlastné porovnanie na 0,5 mm a verdikt vlastné na 0,01 mm, model
+  ponúknutý ako „zmestí sa" dostal hneď po väzbe ORANGE „nezmestí sa". Pol milimetra je hranica, pod ktorou je rozdiel vec zaokrúhlenia listu, nie montáže.
+  Z toho istého dôvodu žije aj **tabuľka osí `AXES` len tu** — panel si ju nekopíruje. „Nevieme" (list číslo nedáva) nie je „nesedí": `axis_fits?` vtedy vracia `true`.
 - **`door_split_verdict(rec)`** → `ok | clash | na | unknown | unsatisfiable`. **Hrana je VRCH DOLNÉHO ČELA** meraný od dna niky: `bounds[lower][:z1] − z_lo`
   (nezaokrúhlené `Fronts` hranice, tolerancia `EPS` = 0,01). Prípustné pásmo praxe je **`[D + 10, D + G − s − 10]`**, kde `D = door_bottom_offset + door_lower`
   (spodok + dolné dvere **spotrebiča**), `G = door_gap` a `s` je normalizovaná škára čiel; **10 mm je presah nábytkových dverí cez hranu dverí spotrebiča
@@ -306,3 +310,7 @@ Inspector si ten istý záznam skladá z uloženého configu cez **`context(cfg)
   bez čela panel dverí netvoria — stav je `na` s dôvodom („delenie sa netýka: zásuvka“).
 - **`findings(rec, computed = nil)`** vyrába vety Kontroly — **výhradne pre `clash` a `unsatisfiable`** (FIX F7 + F9). `unknown`, `skip` a `na` sú informácia
   pre riadok Spotrebič, nie ORANGE.
+- **Informačné stavy sa v riadku naozaj ZOBRAZUJÚ** (Codex #384 kolo 1, P2). `verdict_text` skladá vetu z niky **aj** z delenia vrátane `unknown` — používateľ
+  má vedieť, **prečo** sa delenie neodporúča („list nedáva rozmery dverí spotrebiča"), inak riadok o ňom ticho mlčal a nedalo sa rozoznať „je to v poriadku"
+  od „nekontroluje sa". Tón riadku sa tým nemení (warn je len `clash` a `unsatisfiable`). Jediný stav, ktorý sa **nezobrazuje**, je `na`: „delenie sa netýka"
+  je vlastnosť skrinky (zásuvka namiesto dvierok), nie modelu, a riadok je o modeli.

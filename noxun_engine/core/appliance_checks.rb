@@ -27,9 +27,15 @@ module Noxun
     module ApplianceChecks
       module_function
 
-      # Tolerancia porovnani (mm). `Fronts` vracia NEZAOKRUHLENE hranice, takze
-      # 727,000000001 nesmie byt „mimo pasma".
+      # Tolerancia porovnani DELENIA CIEL (mm). `Fronts` vracia NEZAOKRUHLENE
+      # hranice, takze 727,000000001 nesmie byt „mimo pasma".
       EPS = 0.01
+      # Tolerancia porovnani OSI NIKY (mm). Codex #384 kolo 1 (P2): ponuka
+      # modelov merala na 0,5 mm a verdikt na 0,01 — model ponuknuty ako
+      # „zmestí sa" tak po vazbe dostal ORANGE. Cislo je jedno a porovnanie
+      # tiez (`axis_state` nizsie): pol milimetra je hranica, pod ktorou je
+      # rozdiel vec zaokruhlenia listu, nie montaze.
+      AXIS_TOL = 0.5
       # Presah nabytkovych dveri cez hranu dveri spotrebica (mm) na KAZDEJ
       # strane medzery. Konstanta enginu, nie pole katalogu.
       OVERLAP_MIN = 10.0
@@ -195,17 +201,58 @@ module Noxun
           return ['skip', "#{label} nekontrolovaná — skrinka má viac zón"]
         end
 
-        lo = num(niche["#{axis}_min"])
-        hi = num(niche["#{axis}_max"])
-        return ['unknown', "#{label} — list rozmer nedáva"] if lo.nil? && hi.nil?
+        axis_check(axis, niche, have)
+      end
 
-        v = num(have)
-        return ['unknown', "#{label} — vnútro skrinky sa nedá zistiť"] if v.nil?
+      # === JEDINE POROVNANIE OSI V CELOM ENGINE ================================
+      #
+      # Pouziva ho VERDIKT (`axis_verdict`) aj FILTER PONUKY modelov
+      # (`Panel.appliance_axis_reason`). Dve porovnania s roznou toleranciou
+      # znamenali, ze ponuka model odporucila a Kontrola ho vzapati zhodila
+      # (Codex #384 kolo 1, P2).
+      # -> :ok | :below | :above | :unknown
+      def axis_state(value, min, max)
+        lo = num(min)
+        hi = num(max)
+        return :unknown if lo.nil? && hi.nil?
 
-        return ['clash', "#{label} #{mm(v)} < #{mm(lo)}"] if lo && v < lo - EPS
-        return ['clash', "#{label} #{mm(v)} > #{mm(hi)}"] if hi && v > hi + EPS
+        v = num(value)
+        # Nula ani zaporny rozmer nie je vnutro — je to „nevieme".
+        return :unknown if v.nil? || !v.positive?
+        return :below if lo && (v + AXIS_TOL) < lo
+        return :above if hi && (v - AXIS_TOL) > hi
 
-        ['ok', "#{label} #{mm(v)} #{requirement(lo, hi)}"]
+        :ok
+      end
+
+      # Zmesti sa? „Nevieme" NIE JE „nesedí" — model bez rozmerov niky sa
+      # v ponuke nikdy neoznaci ako nesediaci.
+      def axis_fits?(value, min, max)
+        %i[ok unknown].include?(axis_state(value, min, max))
+      end
+
+      # [stav, veta] pre jednu os. Vety su TU (a nie u volajucich), aby ponuka
+      # aj Kontrola menovali to iste cislo rovnako.
+      def axis_check(axis, niche, have)
+        label = AXIS_LABEL[axis] || axis
+        n = niche.is_a?(Hash) ? niche : {}
+        lo = num(n["#{axis}_min"])
+        hi = num(n["#{axis}_max"])
+        case axis_state(have, lo, hi)
+        when :below then ['clash', "#{label} #{mm(have)} < #{mm(lo)}"]
+        when :above then ['clash', "#{label} #{mm(have)} > #{mm(hi)}"]
+        when :ok    then ['ok', "#{label} #{mm(have)} #{requirement(lo, hi)}"]
+        else
+          lo.nil? && hi.nil? ? ['unknown', "#{label} — list rozmer nedáva"]
+                             : ['unknown', "#{label} — vnútro skrinky sa nedá zistiť"]
+        end
+      end
+
+      # PRVY dovod, preco sa model na danej osi nezmesti (nil = zmesti sa alebo
+      # sa to nedá povedať). Toto vola filter ponuky.
+      def axis_reason(axis, niche, have)
+        state, text = axis_check(axis, niche, have)
+        state == 'clash' ? text : nil
       end
 
       def requirement(lo, hi)
@@ -369,10 +416,18 @@ module Noxun
           'text' => verdict_text(niche, split) }
       end
 
+      # Codex #384 kolo 1 (P2): `unknown` delenia SA ZOBRAZUJE. Verdikt vie
+      # povedat, PRECO sa delenie neda odporucit („list nedáva rozmery dverí
+      # spotrebiča"), a to je presne ten druh informacie, ktora podla F7/F9
+      # patri do riadku Spotrebic — nie do Kontroly. Zahadzovat ju znamenalo,
+      # ze riadok o deleni ticho mlcal a pouzivatel nevedel, ci sa nekontroluje,
+      # alebo je v poriadku. Ton riadku sa tym NEMENI (warn je len `clash`
+      # a `unsatisfiable`). `na` sa nezobrazuje: „delenie sa netýka" je stav
+      # skrinky, nie modelu, a riadok je o modeli.
       def verdict_text(niche, split)
         parts = []
         parts << niche['text'].to_s unless niche['state'] == 'na'
-        parts << split['text'].to_s unless %w[na unknown].include?(split['state'])
+        parts << split['text'].to_s unless split['state'] == 'na'
         parts.reject { |p| p.to_s.strip.empty? }.join(' · ')
       end
 
