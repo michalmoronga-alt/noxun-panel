@@ -3093,6 +3093,52 @@ module Noxun
           inst
         end
 
+        # S1-C (Astra C4): CONFIG-ONLY ZAPIS — zmena, ktora sa GEOMETRIE
+        # NEDOTYKA (dnes `appliance_expects[]`). Na rozdiel od
+        # `write_appliance_refs!` NEIDE cez `config_to_params` + prestavbu:
+        # ocakavanie nic nekresli, takze prestavba by bola len zbytocny prepocet
+        # vyrobnych cisel (a pri zmene katalogu by ich aj posunula).
+        #
+        # MARKER `config_schema` SA TU NIKDY NEPOSUVA (Codex #385 kolo 1 P1).
+        # Povodne ho tento zapis pecatkoval — a bola to CHYBA: marker je
+        # u skrinky PROVENIENCIA STAVBY, nie verzia posledneho zapisu.
+        # Citaju ho stale guardy (`Bom.drawer_stale_issue`, `hinge_stale_issue`,
+        # `pre_lift_build?`) proti prahom `DRAWER/HINGE/LIFT_ACTIVATION_SCHEMA`,
+        # takze jeho posunutie BEZ prestavby by vyhlasilo, ze skrinka je
+        # postavena s receptami zasuviek, tabulkou zavesov a vyklopmi — RED
+        # nalezy a s nimi aj blokacia nakupu a cenovych exportov by TICHO
+        # zmizli. Schemu smie zdvihnut VYHRADNE prestavba plnym planom.
+        #
+        # Dosledok: config-only zapis je legitimny LEN nad skrinkou, ktora uz
+        # na dnesnej scheme JE. Starsiu musi volajuci odmietnut PRED operaciou
+        # (`older_config?` + `Panel.handle_set_appliance_expects`) — tu by uz
+        # bolo neskoro a novy kluc by sedel vo configu, ktoremu `normalize`
+        # pri najblizsej prestavbe nerozumie.
+        #
+        # `nil` hodnota kluc ODSTRANI (legacy skrinka nikdy nedostane prazdne
+        # pole, ktore by vyzeralo ako „uz sme to riesili"). Cely config ostava
+        # inak NEDOTKNUTY — nezname kluce z novsej verzie prezijú.
+        # O OPERACIU a `guarded` sa stara VOLAJUCI (vzor `ApplianceBinding`).
+        def write_config_keys!(inst, keys)
+          cfg = Store.config(inst)
+          raise 'Vybrana instancia nie je NOXUN korpus.' unless cfg.is_a?(Hash)
+          raise newer_config_message('Korpus', 'zápis by jeho nastavenia stratil') if newer_config?(cfg)
+
+          (keys.is_a?(Hash) ? keys : {}).each do |k, v|
+            key = k.to_s
+            v.nil? ? cfg.delete(key) : cfg[key] = v
+          end
+          Store.write_config(inst, cfg)
+          true
+        end
+
+        # Je ulozeny config STARSI nez dnesny kontrakt? Config-only zapis ho
+        # migrovat NEVIE (migruje vyhradne prestavba plnym planom), takze
+        # volajuci musi taky kus odmietnut.
+        def older_config?(cfg)
+          config_schema_of(cfg) < CONFIG_SCHEMA
+        end
+
         # Ocisti part_overrides na { part_key => { 'material_id'=>..|nil,
         # 'edges'=>{L1..W2}, 'grain_direction'=>'length'|'width' } }.
         # Zahodi prazdne / neplatne zaznamy. Zachova nil hrany (explicitne "bez ABS").

@@ -5,6 +5,11 @@
   var cabEditsInFlight = false; // D-07 Codex B2: apply odoslany, echo este nedoslo
   // (D-08 currentCabTab zanikol v UI-B1 — aktivny kontext drzi NXShell v js/shell.js)
   var tplNameSuggestion = '';   // D-14: navrh nazvu sablony z Ruby (cabinet_payload)
+  // S1-C: OCAKAVANIA oznacenej skrinky (`appliance_expects[]` z configu) —
+  // predvyplnenie checkboxov v modale „Uložiť ako šablónu". Je to LEN prefill:
+  // autoritou zapisu je modal (pouzivatel smie povedat nieco ine) a matica na
+  // serveri.
+  var cabApplianceExpects = [];
   var selectedCabId = null;
   var currentZoneTree = null;   // strukturny strom zon (nový vklad aj oznaceny)
   var previewMode = 'zones';

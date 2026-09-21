@@ -1562,6 +1562,20 @@ neprepína (`apply_template_type!` pri `dishwasher` nerobí nič) — slot sa na
 má tretiu voľbu **Umývačka** a pri slote je **zamknutý** (`disabled` + bublina „typ určuje sám slot"). Opačný smer je rovnako uzavretý — voľba `dishwasher` nad
 **dolnou** skrinkou sa ignoruje (whitelist ostáva `lower|upper`), lebo jej config nemá `dw_*`. Autoritou je server, HTML je zrkadlo.
 
+**S1-C — modal „Uložiť ako šablónu" (D-14) má pole „Očakáva".** NXModal multi-select nemá, preto je to **skupina checkboxov** v `panel.html` (`#tplSaveExpects`,
+`data-tplexp="<kód>"`) serializovaná ako Array; ponuka je **matica skrinky** (`fridge · oven · microwave`), pri **slote** sa riadok skryje a nahradí ho veta „Slot umývačky
+očakáva umývačku vždy" (`nxSyncTplSaveExpects`, zrkadlo `nxSyncTplSaveType`). Predvyplní sa z `appliance_expects[]` **označenej skrinky** (globál `cabApplianceExpects`
+z `cabinet_payload`), ale **autoritou je MODAL, nie config**: používateľ smie pri ukladaní povedať niečo iné („táto šablóna je na rúru", hoci v skrinke zatiaľ žiadna
+nestojí), takže prázdny zoznam znamená „táto šablóna nič neočakáva". Slot `expects` **neposiela vôbec** (server si umývačku vynúti sám — prázdny zoznam z vypnutých
+checkboxov by vyzeral ako „nič neočakáva"); **chýbajúci kľúč = starší klient, očakávania sa nemenia**. Zmena checkboxu ruší odložené uloženie rovnako ako názov a typ, takže
+uložiť sa dá až po flushnutí rozpísaných úprav skrinky (`nxCabinetAction`). Validáciu robí `Panel.apply_template_expects!` **pred `TemplatePreviews.capture` aj pred
+`TemplateStore.upsert`** — odmietnutá šablóna nesmie prepísať ani záznam, ani náhľad (Astra C9). Dlaždica sekcie `tpl` k tomu pridala **jeden riadok textu** zo servera
+(`tile_row.appliance_expects` = `{has, codes, text}`), žiadne nové ovládanie.
+
+**S1-C — deklarovaná šablóna, ktorá medzitým zmizla, vklad ODMIETNE** (Astra C11). Odkedy `dw_*` aj `appliance_expects[]` pochádzajú zo **uloženého záznamu** (E7), tichý vklad
+„bez šablóny" by postavil **inú** skrinku, než si používateľ vybral — a nikto by mu to nepovedal. Guard (`TemplateStore.find(*tpl_ref).nil?`) stojí **pred**
+`apply_template_slot_fields!` aj pred akoukoľvek stavbou; vedomý vklad **bez** referencie (payload ju nenesie) ide ďalej ako doteraz.
+
 **Preflighty TELA a CHRBTA sa slotu netýkajú** (PR #381, P2). `Panel.body_preflight` aj `back_preflight` by nad slotom bežali nad **zdedeným projektovým materiálom
 korpusu** a vloženie by odmietli chybou o hrúbke korpusu, ktorú používateľ v **skrytom** poli nemá ako opraviť; `insert_thickness_preflight` by ho navyše odmietol pre
 zámok hrúbky z predchádzajúcej skrinky. Oba sa preto preskočia (`Panel.slot_params?`), a to **pred prvým čítaním materiálu**. **Materiálový remap ABS overridov ostáva** —
@@ -1884,8 +1898,11 @@ aj rozpísané gap hodnoty. `nxDropDocState` navyše **zhodí fokus** (`document
 
 ### actions_appliance.rb
 
-**Jediná akcia panela k spotrebičom** (S1-B2): `set_appliance_owner` — priradenie modelu z riadku „Spotrebič" alebo jeho odpojenie, pre skrinku, slot umývačky aj dosku.
-Súbor **nezapisuje**: deleguje na `ApplianceBinding.apply!` (`move` / `unbind`), ktorý je jediným transakčným vstupom väzby (položka rozpočtu + `appliance_refs[]`
+**DVE akcie panela k spotrebičom:** `set_appliance_owner` (S1-B2 — väzba) a `set_appliance_expects` (S1-C — očakávanie). Sú to **dve rôzne veci**: väzba mení položku
+zákazky aj geometriu, očakávanie je len vyhlásenie v configu, takže druhá akcia by nemala čo robiť v transakčnom vstupe väzby.
+
+`set_appliance_owner` — priradenie modelu z riadku „Spotrebič" alebo jeho odpojenie, pre skrinku, slot umývačky aj dosku.
+Súbor pri väzbe **nezapisuje**: deleguje na `ApplianceBinding.apply!` (`move` / `unbind`), ktorý je jediným transakčným vstupom väzby (položka rozpočtu + `appliance_refs[]`
 vlastníka + prestavba = **jedna operácia, jeden krok Späť**). Rieši len to, čo panel vie a jadro nie: **ktorá entita je označená**.
 
 **Cieľ väzby skladá SERVER z výberu, nie z payloadu.** Klient posiela iba `item_id` (čo priradiť) a echo `cabinet_id` / `board_id` (nad čím bol riadok vykreslený, GH #127
@@ -1893,6 +1910,29 @@ P2); druh (`cabinet` vs `slot` podľa `type` v configu), ID aj `persistent_id` s
 nemá ako trafiť iný kus. Identitu **dokumentu** overuje `foreign_document?` nahlas (vzor R-02), nezhodné echo ID vráti „Výbor sa medzitým zmenil" a obnoví kartu.
 Po úspechu ide `push_selected` (čerstvá karta) a status menuje model aj vlastníka; otvorené Štúdio sa o zmene dozvie bežnou cestou — transakčný observer zožltne
 „Obnoviť" (`on_model_txn`), druhý push do cudzieho okna by bol druhý kanál k tým istým číslam.
+
+**`set_appliance_expects` (S1-C) je CONFIG-ONLY zápis vo VLASTNEJ operácii = jeden krok Späť, BEZ prestavby.** Payload nesie `expects[]` (**úplný** nový zoznam, nie
+„pridaj/odober"), echo `cabinet_id` / `board_id` a **`pid`** — oboje z času, kedy bol riadok vykreslený. **Poradie guardov je súčasťou kontraktu:**
+
+1. **identita dokumentu** (`foreign_document?`, R-02),
+2. **bariéra observera** (`ApplianceBinding.observer_idle?` → `ScaleWatch.flush_pending!`): dedup kópií a presun ghostov môže **práve teraz** meniť `cabinet_id`, takže bez
+   pokoja by sme zapisovali do configu, ktorý o pár milisekúnd neplatí — a transparentná reakcia observera by sa navyše prilepila na našu operáciu,
+3. **cieľ sa číta AŽ POTOM** (čerstvý výber, čerstvý config) a overuje sa **celý**: druh + ID + `persistent_id`, jednoznačnosť (dva živé kusy s tým istým ID = odmietnutie —
+   ID sa recyklujú), nie odpojený dielec, nie config z novšej verzie **a ani zo STARŠEJ** (marker sa config-only zápisom neposúva, takže kus pred migráciou sa odmietne
+   s vetou „najprv ju prestav (Aplikuj zmeny), potom nastav očakávanie" — [construction.md](construction.md), `write_config_keys!`). **Prázdne echo ani chýbajúci `pid`
+   sa tu netolerujú** (na rozdiel od `set_appliance_owner`): riadok ich kreslí vždy, takže ich absencia je presne ten starý DOM, proti ktorému guard stojí,
+4. **striktná validácia vstupu** proti matici druhu (`ApplianceBinding.validate_expects` — [appliances.md](appliances.md)),
+5. **„viazanú kategóriu odstrániť nedáš"** (`appliance_expects_locked` nad tým istým obojsmerným dôkazom) — zámok sa však týka **len očakávaní, ktoré na kuse
+   naozaj sú** (prienik `viazané ∩ uložené appliance_expects` mínus nový zoznam, Codex #385 kolo 2): väzba a očakávanie sú dve nezávislé veci, takže skrinka
+   s priradenou, ale nikdy neočakávanou rúrou musí vedieť pridať očakávanie mikrovlnky,
+6. **nezmenený výsledok = ŽIADNA operácia** (status „Očakávanie sa nezmenilo", žiadny prázdny krok Späť).
+
+Zapisuje `CabinetBuilder.write_config_keys!` / `BoardBuilder.write_config_keys!` pod `CabinetBuilder.guarded` v jednej `start_operation`; výnimka = `abort`.
+**Po úspechu (Astra C14)** ide `push_selected(dedup: false)` **a** `StudioDialog.refresh_if_open(bump: true)` — zmenili sa **dáta Kontroly**, takže ORANGE „spotrebič
+nevybraný" musí byť vidieť hneď, nie až pri najbližšom inom zápise. Undo/Redo ide existujúcou stale cestou observera.
+
+**KAŽDÉ odmietnutie posiela čerstvú kartu** (`appliance_expects_refused` → `push_selected(dedup: false)` a až potom červený status). Klient si totiž po odoslaní
+príkazu ovládač **zamkne** a odomkne ho až príchod nového payloadu — keby odmietnutie vrátilo len status, riadok by ostal zamknutý.
 
 ### actions_board.rb
 
@@ -2824,12 +2864,36 @@ sa tu **netoleruje** — tabuľka chodí vždy aj s identitou, takže jej absenc
 ### Riadok „Spotrebič" v Inspectore (S1-B2, ui/js/appliance_row.js + ui/panel/payloads.rb)
 
 **JEDEN riadok cez oba stĺpce Základných per VIAZANÝ spotrebič** (rúra + mikrovlnka v jednej skrinke sú dva riadky) **plus jeden riadok „očakáva"**, keď kus spotrebič
-očakáva a nemá ho (`appliance_expects[]`, slot umývačky vždy). Vzor je riadok Nôh — žiadny nový sektor, žiadny nadpis; **prázdny zoznam riadok skryje** (vertikálny
-priestor panela je vzácny). **Ten istý komponent kreslí karta dosky** (`#boardApplRows`, varná doska a drez), len s iným kontextom vlastníka.
+očakáva a nemá ho (`appliance_expects[]`, slot umývačky vždy), **plus (S1-C) POSLEDNÝ riadok VOĽBY „očakáva"**. Vzor je riadok Nôh — žiadny nový sektor, žiadny nadpis.
+**Ten istý komponent kreslí karta dosky** (`#boardApplRows`, varná doska a drez), len s iným kontextom vlastníka.
+
+**S1-C VEDOMÁ REVÍZIA pravidla „prázdny zoznam riadok skryje".** Blok Spotrebiča sa od S1-C skrýva už len tam, kde sa nedá očakávať **nič**: pri kuse mimo matice vlastníkov
+(a slot voľbu nemá — očakáva umývačku vždy a server to vynucuje, takže ponuka „očakáva: —" by bola klamstvo). Skrinka a doska teda dostávajú **presne jeden** tlmený riadok
+voľby aj vtedy, keď nič neočakávajú. Bez viditeľnej voľby by sa očakávanie **bez šablóny nedalo zapnúť vôbec** — mockup R10 to hovorí priamo („Bez spotrebiča riadok ukáže
+len voľbu očakáva: —"), a schované ovládanie je horšie než jeden riadok (trvalé pravidlo „vertikálny priestor panela je vzácny" preto platí ďalej v tom, že je to **jeden**
+riadok bez semaforu, nie nový sektor).
 
 Payload `cabinet_payload.appliance_rows[]` / `board_payload.appliance_rows[]` skladá server (`Panel.appliance_rows`):
-`{state: 'bound'|'expected', item_id, category, category_label, text, sub, tone: 'ok'|'warn', link, placeholder, options[], all, all_note}`
+`{state: 'bound'|'expected'|'expects', item_id, category, category_label, text, sub, tone: 'ok'|'warn'|'', link, placeholder, options[], all, all_note}`
 a od **S1-F** má viazaný riadok navyše **`check`** = celý verdikt (`{state, niche{state, axes, axis_texts, text}, door_split{state, edge, range, recommended, source, text}, text}`).
+
+- **Riadok VOĽBY (`state: 'expects'`) nesie ÚPLNY aktuálny zoznam** (`expects[]` z configu) a `options[]` = **matica** druhu v kanonickom poradí, každá voľba ako **príkaz**
+  `{value: 'add:<kód>'|'del:<kód>', code, op, text, disabled}`. Viazaná kategória má `disabled` **s dôvodom** v texte („− rúra (priradená — najprv odpoj)") — mŕtva voľba bez
+  vysvetlenia je horšia než jej absencia (D-78). **Prvá voľba `<select>`u je neutrálny SÚHRN** (`placeholder`, napr. „očakáva: rúra"), inak by samotné vykreslenie karty
+  zapísalo očakávanie a založilo krok Späť.
+- **Klient posiela ÚPLNY nový zoznam, nie zmenu** (Astra C13): `aprExpectsNext(current, value)` je čistá funkcia nad zoznamom z DOM (`data-apr-expects` na riadku) — pridanie je
+  únia, odobranie filter. Keby posielal len zmenenú kategóriu, pridanie mikrovlnky by ticho zmazalo **už splnené** očakávanie rúry (riadky „očakáva" nesú len **nesplnené**,
+  takže skladať z nich stav sa nedá).
+- **Dve rýchle voľby pred prekreslením majú DVE poistky** (Codex #385 kolo 1, P2). Zápis je asynchrónny, takže by sa obe počítali z toho istého zastaraného zoznamu
+  a druhá by prvú prepísala („pridaj rúru" + „pridaj mikrovlnku" = zostala by len mikrovlnka). Preto sa po odoslaní **ovládač zamkne** (`disabled`, odomkne ho až
+  čerstvá karta — a tú server posiela aj pri každom odmietnutí) **a lokálny snapshot `data-apr-expects` sa posunie optimisticky**, takže príkaz, ktorý sa napriek
+  zámku dostane cez (klávesnica, oneskorená udalosť), vychádza z aktuálneho zoznamu. Autoritou ostáva server: dostane úplný zoznam a porovná ho so stavom modelu.
+- **Kategóriu považuje za splnenú TÁ ISTÁ funkcia ako zber** (`ApplianceBinding.bound_categories` cez obojsmerný dôkaz; Codex #385 kolo 1, P2). Kým panel veril samotnej
+  `category` v `appliance_refs[]`, **osirelý záznam** (položku zmazalo druhé okno) alebo ref po **recyklovanom ID** riadok „očakáva" potlačil — a s ním aj výber modelu,
+  presne tam, kde Kontrola hlásila `appliance_missing` a priradiť **kázala**. Tá istá množina riadi aj `disabled` voľby „− kategória (priradená — najprv odpoj)".
+- **Kontext nesie aj `pid`** (`data-apr-pid`, z `cabinet_pid` / `board_pid` v payloade karty): `persistent_id` je jediný údaj, ktorý prežije recykláciu výrobného ID, takže ním
+  server overuje, že zápis mieri na TEN kus, nad ktorým bol riadok vykreslený. `clearApplianceRows` ho zahadzuje spolu s ostatným kontextom.
+- **Popisky kategórií v JS NEŽIJÚ** — text riadku aj text dlaždice šablóny skladá server (stráži to Node sada nad zdrojom `appliance_row.js` a `templates.js`).
 
 - **Tón viazaného riadku** sa pýta na **tie isté vstupy** ako `Validation.check_appliance_bound` (chýbajúce rozmery niky · trieda umývačky vs trieda slotu) a od S1-F
   na **ten istý verdikt** (`ApplianceChecks.verdict`). Panel Kontrolu **nevolá** (potrebovala by celý zber modelu), preto to stráži test, ktorý porovnáva oba smery nad

@@ -48,10 +48,9 @@ to nevyrába ani neobjednáva.
   hodnoty `ok · mismatch · unknown`, lebo model bez triedy v liste sa nesmie zafarbiť nazeleno: „nevieme“ nie je „sedí“, presne ako pri `Validation`) aj Kontrola
   (`Bom.appliance_slot_record` → `dw_body_fit` meria telo, ktoré v slote **naozaj stojí**). Druhá kópia toho výberu by znamenala, že model ukazuje jedno
   telo a semafor kontroluje iné. Zmena aj odpojenie väzby prestavia slot v **tej istej** operácii (S1-B1), takže je to jeden krok Späť.
-- **Väzba na katalóg v S1-E ešte NIE JE.** `CONFIG_SCHEMA` 16 iba **rezervuje** `appliance_refs[]` a `appliance_expects[]` (skrinka aj doska, tá
-  cez `BOARD_CONFIG_SCHEMA` 2), aby ich S1-B/F/C mohli naplniť bez ďalšieho bumpu. Kľúče prežijú prestavbu, materiály aj absorpciu scale; väzbu
-  na **konkrétny** spotrebič zahodí jediný helper `CabinetBuilder.strip_appliance_refs!` v troch kopírovacích vstupoch (natívna kópia, kópia
-  nástrojom, „Vložiť kópiu") — kópia sa správa ako „očakáva", ale nevlastní ten istý kus.
+- **Kľúče väzby rezervuje `CONFIG_SCHEMA` 16** (skrinka; doska cez `BOARD_CONFIG_SCHEMA` 2) a **napĺňajú ich S1-B/F/C bez ďalšieho bumpu**. Kľúče
+  prežijú prestavbu, materiály aj absorpciu scale; väzbu na **konkrétny** spotrebič zahodí jediný helper `CabinetBuilder.strip_appliance_refs!`
+  v troch kopírovacích vstupoch (natívna kópia, kópia nástrojom, „Vložiť kópiu") — kópia sa správa ako „očakáva", ale nevlastní ten istý kus.
 - **Kontroly slotu sú PRESNE DVE** (rozhodnutie Michal 20.9.2026), obe ORANGE a **bez exportnej brány**: `dw_body_fit` (telo sa nezmestí do šírky
   slotu) a `dw_height_fit` (**nastavená** výška tela > výška linky). Výška čela, jeho presah nad telo, sokel ani hmotnosť sa **nekontrolujú**.
   Detail v [outputs.md](outputs.md).
@@ -78,6 +77,42 @@ navyše, `appl_job_select`, len označuje vlastníka v modeli) a panel dodáva i
 
 **Čo zákazka o modeli vie, vie zo SNAPSHOTU.** Názov, rozmery, odkaz na obchod aj technický list v pohľade „V zákazke“ sú z kópie uloženej pri väzbe —
 zmena či vyradenie záznamu v katalógu nimi nepohne (a vyradený model sa **nepriradí**: `snapshot_for` vráti `:deleted`).
+
+### Očakávania (`appliance_expects[]`, S1-C)
+
+**Očakávanie je vyhlásenie „sem patrí rúra“ — nie väzba.** Nekreslí nič, nič nestojí a nevie o konkrétnom kuse; jeho jediný dôsledok je **ORANGE
+`appliance_missing`** v Kontrole a riadok „nevybraný“ v pohľade „V zákazke“, kým spotrebič nedostane. Práve preto sa dá nastaviť aj na skrinke, v ktorej
+ešte nič nestojí — návrh ide ďalej, len sa nezabudne.
+
+- **JEDNA REPREZENTÁCIA: `config['appliance_expects']`** (zoznam kanonických kódov kategórií). **Aj šablóna ich nesie tam** — záznam šablóny žiadny
+  vlastný kľúč nemá, takže `TemplateStore::STD` ostáva **5** a knižnica sa staršiemu pluginu nezamyká pre zápis (starší plugin od S1-E, teda od schémy 16,
+  očakávania číta aj vkladá správne). Dve reprezentácie by znamenali dve pravdy, ktoré sa pri každom vklade musia zladiť.
+- **MATICA je tá istá ako pri väzbe** (`ApplianceBinding::OWNER_MATRIX`, odvodzuje ju `expectable_categories(kind)`): skrinka `fridge|oven|microwave`,
+  doska `hob|sink`, **slot vždy presne `['dishwasher']`**, `hood` a `other` sa očakávať nedajú vôbec (nemajú fyzického vlastníka). Očakávať sa nesmie to,
+  čo sa k tomu istému kusu nedá ani priradiť — inak by Kontrola žiadala niečo, čo sa nedá splniť. Slotu ho **dosadzuje builder** (implicitne, kľúč
+  v configu ani v seed šablónach nie je), takže stará aj nová slotová šablóna hovoria to isté.
+- **DÔKAZ SPLNENIA je ten istý obojsmerný dôkaz ako `bound`** (`ApplianceBinding.ref_matches?`): kategória je splnená len vtedy, keď existuje **položka
+  zákazky s vlastníkom = táto entita** A entita nesie jej `item_id` v `appliance_refs[]`. Ani recyklované ID vlastníka, ani osirelý záznam v refs po
+  zmazanej položke dôkazom nie je — oboje by očakávanie ticho „splnilo“ a semafor by mlčal. Zbiera to `Bom.appliance_expected_records`
+  (`state: 'expected_missing'`) v **tom istom** prechode skriniek, žiadny druhý sken.
+- **NÁLEZ JE PER NESPLNENÚ KATEGÓRIU:** `stable_key = "appliance|<owner_id>|missing|<kategória>"`, takže skrinka s rúrou aj mikrovlnkou má **dva** riadky
+  — sú to dve samostatné veci na opravu. Klik mieri na **vlastníka** (`owner_id` + `owner_pid`): na rozdiel od siroty ho poznáme, záznam vznikol z tej
+  entity, ktorá v modeli stojí. Nález **neblokuje export** (spotrebič sa nevyrába).
+- **ZÁPIS je CONFIG-ONLY a má vlastnú akciu `set_appliance_expects`** (nie `ApplianceBinding.apply!` — žiadna položka zákazky sa nemení).
+  `CabinetBuilder.write_config_keys!` / `BoardBuilder.write_config_keys!` zachovajú celý config a bežia v **jednej** operácii pod `guarded` = jeden krok Späť,
+  **bez prestavby**. **Marker `config_schema` sa pritom NEPOSÚVA** (Codex #385 kolo 1, P1): je to proveniencia STAVBY, ktorú čítajú stale guardy zásuviek, závesov
+  a výklopov — tiché posunutie by zhaslo RED nálezy aj blokáciu exportov. Kus na **staršej schéme** sa preto odmietne ešte pred operáciou („najprv ju prestav,
+  potom nastav očakávanie") — schému migruje výhradne prestavba plným plánom. Guardy a poradie sú v [ui-lifecycle.md](ui-lifecycle.md) (`actions_appliance.rb`).
+- **VIAZANÚ kategóriu sa odstrániť nedá** — najprv odpoj spotrebič. Bránou je server a rozhoduje **ten istý** dôkaz, takže osirelý záznam očakávanie
+  **nezamkne** (inak by ho po zmazanej položke nikto nikdy nedostal preč). **Zámok sa pritom týka LEN očakávaní, ktoré na kuse naozaj sú** (Codex #385 kolo 2):
+  priradený spotrebič a očakávanie sú **dve nezávislé veci** — skrinka môže mať viazanú rúru bez toho, aby ju kedy „očakávala". Rozdiel sa preto počíta
+  z prieniku **viazané ∩ dnes uložené** mínus nový zoznam; kým sa porovnávala celá väzba, taká skrinka nemohla pridať očakávanie mikrovlnky (nový zoznam
+  `['microwave']` sa tváril ako odstránenie rúry). Ponuka voľby hovorí to isté: viazaná, ale neočakávaná kategória sa ponúka ako **„+"** a zamknuté je len
+  `del:` pri kategórii, ktorá v `appliance_expects[]` už je.
+- **ŠABLÓNY:** `Panel.template_config_from` očakávania prenáša a `appliance_refs[]` **nikdy**; vloženie ich berie zo **ULOŽENÉHO záznamu**
+  (`apply_template_slot_fields!`, E7), nie z CEF payloadu, a **deklarovaná šablóna, ktorá medzitým zmizla, vklad odmietne** (inak by vznikla iná skrinka,
+  než si používateľ vybral). `TemplatesDialog.merge_template` (aplikovanie na existujúcu skrinku) **zjednocuje** očakávania cieľa a šablóny a väzby cieľa
+  **zachováva** — prepis by ticho zahodil to, na čo Kontrola upozorňuje, a odpájanie by bola strata dát. Kópia skrinky očakávania **ponecháva** (E4).
 
 ### appliance_catalog.rb
 
@@ -232,6 +267,14 @@ jedno Späť by vrátilo len jednu z nich a zákazka by ostala v stave, ktorý v
   `dishwasher` → slot · `hob|sink` → doska · `hood|other` → nič. **`job` („len zákazka") je legitímny stav
   každej kategórie** a v matici preto nie je. Platí v ponuke vlastníkov (`owner_options_map` — odpojené
   skrinky a configy z novšej verzie sa **neponúkajú**) aj na serveri; klientsky payload nie je ochrana.
+- **S1-C: OČAKÁVANIA čítajú TÚ ISTÚ maticu.** `expectable_categories(kind)` ju **odvodzuje** z `OWNER_MATRIX`
+  (slot má výnimku v opačnom smere — `SLOT_EXPECTS` = vždy presne `dishwasher`), `expectable?` je predikát
+  a `validate_expects(raw, kind)` je **striktná validácia vstupu akcie**: `nil` ani ne-pole **nie je**
+  „zruš očakávania" (to je chyba klienta), explicitné `[]` je legitímne zrušenie, neznámy kód aj kód mimo
+  matice sa odmietnu s vetou, výsledok je dedup v **kanonickom poradí** (dva rovnaké kódy aj preskupený zoznam
+  sú ten istý stav — inak by vznikol prázdny krok Späť). Druhá tabuľka by dovolila očakávať spotrebič, ktorý sa
+  k tomu kusu nikdy nedá priradiť. `bound_categories(entry, items)` vracia kategórie, ktoré sú na entite
+  **naozaj** splnené — nad tým istým `ref_matches?`, takže osirelý záznam očakávanie nezamkne.
 - **Štyri stavy pôvodného vlastníka:** (a) **platný** (entita existuje + jej refs nesú `item_id`) → prestaví sa ·
   (b) **nezapisovateľný** (odpojený dielec, novšia verzia) → **celá operácia sa odmietne** · (c) **zaniknutá
   väzba** (ID už patrí inému kusu bez refs) → tá skrinka sa **nedotkne**, položka len zmení vlastníka ·

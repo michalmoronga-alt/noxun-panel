@@ -483,6 +483,19 @@ pluginom nesie schému 1 a tá by väzbu pri najbližšej prestavbe ticho zahodi
 Prázdny zoznam kľúč **odstráni**. Obe funkcie bežia v **už otvorenej operácii volajúceho** — operáciu, guard aj `ensure_root_context` vlastní `ApplianceBinding`
 ([appliances.md](appliances.md)).
 
+**CONFIG-ONLY ZÁPIS — `write_config_keys!(inst, keys)` (S1-C).** Pre zmeny, ktoré sa **geometrie nedotýkajú** (dnes `appliance_expects[]`): zachová **celý** uložený config
+(neznáme kľúče z novšej verzie prežijú), nastavené kľúče prepíše a `nil` hodnota kľúč **odstráni**. Na rozdiel od `write_appliance_refs!` **nejde cez `config_to_params`
+ani prestavbu**: očakávanie nič nekreslí, takže prestavba by bola len zbytočný prepočet výrobných čísel (a pri zmene katalógu by ich aj posunula). Config z **novšej verzie**
+zápis **odmietne výnimkou** (nič sa neoreže). `BoardBuilder.write_config_keys!` je tá istá funkcia pre dosku s jej vlastným markerom. Operáciu a `guarded` vlastní volajúci
+(`Panel.handle_set_appliance_expects` — [ui-lifecycle.md](ui-lifecycle.md)).
+
+**MARKER `config_schema` SA CONFIG-ONLY ZÁPISOM NEMENÍ** (Codex #385 kolo 1, P1 — revízia pôvodného návrhu, ktorý ho pečiatkoval). U skrinky je marker **provenienciou
+STAVBY**, nie verziou posledného zápisu: čítajú ho stale guardy `Bom.drawer_stale_issue`, `hinge_stale_issue` a `pre_lift_build?` proti prahom
+`DRAWER/HINGE/LIFT_ACTIVATION_SCHEMA`, takže jeho posunutie **bez prestavby** by vyhlásilo, že skrinka je postavená s receptami zásuviek, tabuľkou závesov a výklopmi —
+RED nálezy a s nimi **blokácia nákupu aj cenových exportov** by ticho zmizli. Schému smie zdvihnúť **výhradne prestavba plným plánom**. Dôsledok: config-only zápis je
+legitímny len nad kusom, ktorý na dnešnej schéme **už je** — staršiu musí volajúci odmietnuť **pred** operáciou (predikát `older_config?` na oboch builderoch), inak by
+nový kľúč sedel v configu, ktorému `normalize` pri najbližšej prestavbe nerozumie.
+
 ### ghost_tool.rb
 
 **GHOST VKLADANIE (V1-04): skrinka sa kladie KLIKOM, nie tlačidlom.** Modul drží tri vrstvy — `GhostTool` (vlastník session + čisté API pre panel), `GhostTool::Calc`

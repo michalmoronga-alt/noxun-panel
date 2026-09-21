@@ -260,7 +260,8 @@
     // komponent ako v Základných skrinky, len s iným kontextom vlastníka.
     // Prázdny zoznam riadok schová: doska bez väzby o spotrebiči nehovorí.
     if (typeof renderApplianceRows === 'function'){
-      renderApplianceRows(bc.appliance_rows || [], { kind: 'board', id: bc.board_id || '' },
+      renderApplianceRows(bc.appliance_rows || [],
+                          { kind: 'board', id: bc.board_id || '', pid: bc.board_pid },
                           'boardApplRows');
     }
     renderBoardSvg(bc);

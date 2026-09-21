@@ -233,6 +233,10 @@
     var dims = tplDims(cfg);
     var hw = tp.hardware && tp.hardware.has === true
       ? 'Kovanie: ' + (tp.hardware.labels || []).join(' · ') + ' — zámky sa neprenášajú' : '';
+    // S1-C: vetu skladá server (`TemplateStore.appliance_expects_summary`) —
+    // staršie okno kľúč nemá, takže riadok jednoducho nie je.
+    var exp = (tp.appliance_expects && tp.appliance_expects.has === true)
+      ? String(tp.appliance_expects.text || '') : '';
     var id = tplDomIdAt(kind, idx == null ? 0 : idx);
     TPL_DOM[tplKey(kind, tp.name, '')] = { id: id, rev: tp.preview_rev };
     var h = '<div class="stpltile" data-kind="' + tplEsc(kind) + '" data-name="' + tplEsc(tp.name) + '"' +
@@ -244,6 +248,9 @@
       tplIco('wrench') + '</i>' : '') + '<span>' + tplEsc(tp.name) + '</span></b>' +
       '<span class="stplmeta">' + tplEsc(isCab ? tplTypeLabel(type) : 'doska') +
       (dims ? ' · ' + tplEsc(dims) : '') + '</span>' +
+      // S1-C: OČAKÁVANIA šablóny — jeden riadok TEXTU zo servera, žiadne nové
+      // ovládanie a žiadna mapa popiskov v klientovi.
+      (exp ? '<span class="stplmeta stplexp">' + tplEsc(exp) + '</span>' : '') +
       '<span class="stplact">';
     if (isCab){
       h += '<button type="button" class="stplbtn" title="Prestaví označenú skrinku podľa šablóny' +

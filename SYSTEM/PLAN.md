@@ -702,8 +702,13 @@ kvótová brána `usage` pred každým auditom a subagentom. Pravidlo 3 kôl pla
   a hĺbka vždy, výška chladničky len pri jednej zóne; rúra a mikro Š + H) a `appliance_door_split` (hrana = vrch dolného čela od dna niky, pásmo `[D+10, D+G−s−10]`, výkres
   výrobcu má prednosť). Kontrola hlási **len** `clash`/`unsatisfiable` — žiadna nová závažnosť. Náhľad kreslí box, pásma aj pásmo prípustnej hrany z payloadu servera
   (mockup R4, R10, R12). Výstupy, kusovník ani VEPO sa nemenia.
-- **S1-C · Spotrebičová šablóna `expects[]` + ORANGE bez spotrebiča** *(TemplateStore STD 5 → 6 → `codex-audit` ÁNO)* — kľúč `appliance_expects[]` v configu skrinky je už v
-  schéme 16 z S1-E (žiadny ďalší bump); kombinovaná skrinka očakáva viac kategórií.
+- **S1-C ✅ PR #N, v0.12.16 · Spotrebičová šablóna + ORANGE bez spotrebiča** — očakávaný spotrebič (`appliance_expects[]`, zoznam kategórií) sa nastaví v modale „Uložiť ako
+  šablónu" (skupina checkboxov podľa matice, slot readonly) alebo priamo v riadku Spotrebič (nová akcia `set_appliance_expects` = config-only zápis s pečiatkou schémy,
+  1 krok Späť, bez prestavby). Kontrola hlási **ORANGE `appliance_missing` per nesplnenú kategóriu** (slot bez modelu tiež), badge aj pohľad V zákazke to rátajú z toho
+  istého zberu. Aplikovanie šablóny väzby zachová a očakávania **zjednotí**; zmiznutá šablóna vklad odmietne.
+  **ODCHÝLKA od tohto riadku: TemplateStore STD sa NEBUMPUJE (ostáva 5)** — očakávania šablóny žijú v `config['appliance_expects']`, takže žiadny nový kľúč záznamu
+  nevznikol a bump by knižnicu len zamkol pre zápis staršiemu pluginu (audit C1/C2). Vedomá revízia B2: blok Spotrebiča sa skrýva už len tam, kde sa nedá očakávať nič —
+  skrinka a doska majú vždy jeden tlmený riadok voľby (inak sa očakávanie bez šablóny nedá zapnúť, mockup R10).
 - **S1-D · Uzáver bloku** *(docs, `VERSION` → 0.13.0)* — V1_VIZIA, archív, STAV, KRONIKA, README, POJMY, smoke checklist pre Michala.
 
 ## Po V1 — zásobník (nezaradené, nestratiť)

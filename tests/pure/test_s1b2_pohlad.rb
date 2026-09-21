@@ -396,8 +396,9 @@ NxTest.test('S1-B2: viazany riadok nesie nazov modelu, ton a odkaz do Studia') d
                        'snapshot' => NxS1B2.snapshot('fridge', 'BCNA306', 'Beko',
                                                      NxS1B2.fridge_dims))]
   rows = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, NxS1B2.interior(cfg))
-  NxTest.assert_equal(1, rows.length)
-  NxTest.assert_equal('bound', rows.first['state'])
+  # S1-C: POSLEDNY riadok je VOLBA „očakáva" (kresli sa vzdy — inak by sa
+  # ocakavanie bez sablony nedalo zapnut). Viazany riadok je ten prvy.
+  NxTest.assert_equal(%w[bound expects], rows.map { |r| r['state'] })
   NxTest.assert_equal('Beko BCNA306', rows.first['text'])
   NxTest.assert_equal('ok', rows.first['tone'])
   NxTest.assert(rows.first['link'])
@@ -413,7 +414,8 @@ NxTest.test('S1-B2: DVA viazane spotrebice = DVA riadky (rura + mikrovlnka)') do
                        'snapshot' => NxS1B2.snapshot('microwave', 'MBNA900', 'Whirlpool',
                                                      NxS1B2.oven_dims))]
   rows = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, NxS1B2.interior(cfg))
-  NxTest.assert_equal(%w[I-1 I-2], rows.map { |r| r['item_id'] })
+  bound = rows.reject { |r| r['state'] == 'expects' } # S1-C: volba je samostatny riadok
+  NxTest.assert_equal(%w[I-1 I-2], bound.map { |r| r['item_id'] })
 end
 
 NxTest.test('S1-B2: riadok „očakáva" vznikne z `appliance_expects[]` a ponuka len VOLNE polozky') do
@@ -427,7 +429,7 @@ NxTest.test('S1-B2: riadok „očakáva" vznikne z `appliance_expects[]` a ponuk
     NxS1B2.item('OVEN', 'oven', NxS1B2.owner('job', ''))
   ]
   rows = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, NxS1B2.interior(cfg))
-  NxTest.assert_equal(1, rows.length)
+  NxTest.assert_equal(%w[expected expects], rows.map { |r| r['state'] }) # S1-C: + volba
   row = rows.first
   NxTest.assert_equal('expected', row['state'])
   NxTest.assert_equal('očakáva: chladnička', row['text'])
@@ -442,14 +444,67 @@ NxTest.test('S1-B2: ocakavanie, ktore uz vazbu MA, riadok nevyrobi') do
   items = [NxS1B2.item('I-1', 'fridge', NxS1B2.owner('cabinet', 'CAB-3'),
                        'snapshot' => NxS1B2.snapshot('fridge', 'BCNA306', 'Beko',
                                                      NxS1B2.fridge_dims))]
-  rows = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, NxS1B2.interior(cfg))
-  NxTest.assert_equal(%w[bound], rows.map { |r| r['state'] })
+  # S1-C (Codex #385 kolo 1 P2): „uz vazbu MA" znamena OBOJSMERNY dokaz, takze
+  # riadok potrebuje ID vlastnika — bez neho by sa nemalo co porovnavat
+  # s vlastnikom polozky a panel by kategoriu za splnenu NEPOVAZOVAL.
+  rows = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, NxS1B2.interior(cfg),
+                                      owner_id: 'CAB-3')
+  NxTest.assert_equal(%w[bound expects], rows.map { |r| r['state'] })
+
+  # Polozka, ktora patri INEJ skrinke (recyklovane ID), ocakavanie NESPLNI —
+  # Kontrola v tej istej situacii hlasi `appliance_missing`.
+  other = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, NxS1B2.interior(cfg),
+                                       owner_id: 'CAB-9')
+  NxTest.assert_equal(%w[bound expected expects], other.map { |r| r['state'] },
+                      'sirota riadok „očakáva" NEPOTLACI — inak by sa nalez nedal vybavit')
 end
 
-NxTest.test('S1-B2: skrinka bez vazby a bez ocakavania NEMA riadok') do
+# S1-C VEDOMA REVIZIA pravidla B2 „prazdny zoznam riadok skryje": bez VIDITELNEJ
+# volby by sa ocakavanie bez sablony nedalo zapnut vobec (mockup R10 „Bez
+# spotrebiča riadok ukáže len voľbu očakáva: —"). Riadok je preto PRESNE JEDEN
+# a tlmeny; kus, ktory podla matice nemoze ocakavat nic, ho stale nema.
+NxTest.test('S1-C: skrinka bez vazby a bez ocakavania ma UZ LEN volbu „očakáva"') do
   cfg = NxS1B2.tall_cfg
   rows = NxS1B2::PANEL.appliance_rows('cabinet', cfg, [], NxS1B2.interior(cfg))
-  NxTest.assert(rows.empty?, 'prazdny zoznam = skryty riadok (vertikalny priestor je vzacny)')
+  NxTest.assert_equal(%w[expects], rows.map { |r| r['state'] },
+                      'jeden tlmeny riadok — inak sa ocakavanie bez sablony neda zapnut')
+  row = rows.first
+  NxTest.assert_equal([], row['expects'], 'UPLNY zoznam je prazdny')
+  NxTest.assert_equal('bez spotrebiča — nastav „očakáva", ak sem spotrebič patrí', row['text'])
+  NxTest.assert_equal('očakáva: —', row['placeholder'], 'prva volba je NEUTRALNA')
+  NxTest.assert_equal(%w[add:fridge add:oven add:microwave],
+                      row['options'].map { |o| o['value'] },
+                      'ponuka je MATICA vlastnikov v kanonickom poradi')
+  NxTest.refute(row['link'], 'volba nie je odkaz do Studia')
+end
+
+NxTest.test('S1-C: SLOT volbu NEMA (ocakava umyvacku vzdy) a doska ma svoje dve') do
+  slot = NxS1B2::PANEL.appliance_rows('slot', NxS1B2.slot_cfg, [], nil)
+  NxTest.refute(slot.any? { |r| r['state'] == 'expects' },
+                'volba by pri slote bola klamstvo — server umyvacku vynucuje')
+  board = NxS1B2::PANEL.appliance_rows('board', NxS1B2.board_cfg, [], nil)
+  pick = board.find { |r| r['state'] == 'expects' }
+  NxTest.assert_equal(%w[add:hob add:sink], pick['options'].map { |o| o['value'] },
+                      'doska smie ocakavat varnu dosku a drez')
+end
+
+NxTest.test('S1-C: volba nesie UPLNY zoznam a viazanu kategoriu ODOBRAT nedovoli') do
+  cfg = NxS1B2.tall_cfg('appliance_expects' => %w[oven microwave],
+                        'appliance_refs' => [NxS1B2.ref('I-1', 'oven')])
+  items = [NxS1B2.item('I-1', 'oven', NxS1B2.owner('cabinet', 'CAB-3'),
+                       'snapshot' => NxS1B2.snapshot('oven', 'OMSR58', 'Whirlpool',
+                                                     NxS1B2.oven_dims))]
+  rows = NxS1B2::PANEL.appliance_rows('cabinet', cfg, items, NxS1B2.interior(cfg),
+                                      owner_id: 'CAB-3')
+  pick = rows.find { |r| r['state'] == 'expects' }
+  NxTest.assert_equal(%w[oven microwave], pick['expects'],
+                      'UPLNY zoznam (aj splnene) — klient z neho sklada novy')
+  by = pick['options'].each_with_object({}) { |o, h| h[o['code']] = o }
+  NxTest.assert_equal('del:oven', by['oven']['value'])
+  NxTest.assert(by['oven']['disabled'], 'viazanu ruru sa odobrat neda')
+  NxTest.assert(by['oven']['text'].include?('najprv odpoj'), by['oven']['text'])
+  NxTest.refute(by['microwave']['disabled'], 'nesplnene ocakavanie sa zrusit da')
+  NxTest.assert_equal('add:fridge', by['fridge']['value'])
 end
 
 NxTest.test('S1-B2: SLOT bez modelu ocakava umyvacku vzdy (aj bez `appliance_expects`)') do
@@ -589,20 +644,24 @@ NxTest.test('S1-B2: karta DOSKY ma ten isty riadok (a niku nefiltruje)') do
            NxS1B2.item('I-SINK', 'sink', NxS1B2.owner('board', 'BRD-2'),
                        'snapshot' => NxS1B2.snapshot('sink', 'Legra XL', 'Blanco', {}))]
   rows = NxS1B2::PANEL.appliance_rows('board', cfg, items, nil)
-  NxTest.assert_equal(2, rows.length, 'doska nesie aj dosku aj drez')
-  NxTest.assert(rows.all? { |r| r['tone'] == 'ok' },
+  bound = rows.reject { |r| r['state'] == 'expects' } # S1-C: volba je samostatny riadok
+  NxTest.assert_equal(2, bound.length, 'doska nesie aj dosku aj drez')
+  NxTest.assert(bound.all? { |r| r['tone'] == 'ok' },
                 'doska niku nema, takze chybajuce rozmery niky nie su nalez')
 end
 
 NxTest.test('S1-B2: `board_payload` riadky NESIE (aditivny kluc)') do
   NxTest.skip!('payload testy potrebuju Store fake') unless NxTest.headless?
-  inst = NxTest::FakeInstance.new(21)
+  inst = NxS1B2::FakeInst.new(21) # S1-C: payload nesie `persistent_id`
   NxS1B2::STORE.write(inst, { std: NxS1B2::STORE::STD, kind: 'board', id: 'BRD-2',
                               role: 'free_panel', name: 'D',
                               config: NxS1B2.board_cfg })
   pay = NxS1B2::PANEL.board_payload(inst)
-  NxTest.assert(pay.key?('appliance_rows'), 'kluc je vzdy (prazdne pole = skryty riadok)')
-  NxTest.assert_equal([], pay['appliance_rows'])
+  NxTest.assert(pay.key?('appliance_rows'), 'kluc je vzdy')
+  # S1-C: doska bez vazby ma volbu „očakáva" (varna doska / drez) a payload
+  # nesie aj jej `persistent_id` — bez neho server zapis odmietne.
+  NxTest.assert_equal(%w[expects], pay['appliance_rows'].map { |r| r['state'] })
+  NxTest.assert_equal(21, pay['board_pid'])
 end
 
 # ---------------------------------------------------------------------------
@@ -772,9 +831,15 @@ NxTest.test('S1-B2: panel NEZAPISUJE — deleguje na jediny transakcny vstup') d
                             'actions_appliance.rb'), encoding: 'UTF-8')
   code = src.lines.reject { |l| l.strip.start_with?('#') }.join
   NxTest.assert(code.include?('ApplianceBinding.apply!'), 'zapis robi jadro')
-  NxTest.refute(code.include?('start_operation'), 'panel vlastnu operaciu NEOTVARA')
   NxTest.assert(code.include?('foreign_document?'), 'identita dokumentu sa overuje')
   NxTest.assert(code.include?("op: (unbind ? 'unbind' : 'move')"), 'dve operacie, obe z jadra')
+  # S1-C: JEDINA vlastna operacia v tomto subore je zapis OCAKAVANI — ziadna
+  # polozka zakazky sa v nej nemeni, takze jadro vazby na nu nemá co pouzit.
+  # Vazba samotna ostava VYHRADNE na `ApplianceBinding.apply!`.
+  NxTest.assert_equal(1, code.scan('start_operation').length,
+                      'vlastnu operaciu ma LEN zapis `appliance_expects[]`')
+  NxTest.assert(code.include?('APPL_EXPECTS_OP'), 'a je pomenovana konstantou')
+  NxTest.assert(code.include?('CabinetBuilder.guarded'), 'zapis configu bezi pod ScaleWatch guardom')
 end
 
 # ---------------------------------------------------------------------------

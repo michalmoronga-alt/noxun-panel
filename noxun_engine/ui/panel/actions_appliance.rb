@@ -24,6 +24,21 @@ module Noxun
       APPL_MSG_NO_TARGET = 'Najprv označ skrinku, slot alebo dosku.'
       APPL_MSG_STALE = 'Výber sa medzitým zmenil — panel sa obnovil, skús znova.'
       APPL_MSG_NO_ITEM = 'Vyber spotrebič zo zoznamu.'
+      # S1-C: ocakavania (`appliance_expects[]`).
+      APPL_MSG_BUSY = 'Model ešte dokončuje predchádzajúcu zmenu — skús to o chvíľu znova.'
+      APPL_MSG_DETACH = 'Kus má odpojený dielec — vráť ho späť a skús znova.'
+      APPL_MSG_NEWER = 'Kus je z novšej verzie Noxun — zápis by jeho nastavenia stratil.'
+      # Codex #385 kolo 1 (P1): config-only zapis marker schemy NEPOSUVA (je to
+      # proveniencia STAVBY — cítajú ho stale guardy zasuviek, zavesov a vyklopov).
+      # Kus zo STARSEJ schemy sa preto neda doplnit o novy kluc bez prestavby.
+      APPL_MSG_OLDER = 'Skrinka je zo staršej verzie — najprv ju prestav ' \
+                       '(Aplikuj zmeny), potom nastav očakávanie.'
+      APPL_MSG_OLDER_BOARD = 'Doska je zo staršej verzie — najprv ju prestav ' \
+                             '(ulož ľubovoľnú zmenu karty), potom nastav očakávanie.'
+      APPL_MSG_AMBIG = 'Dva kusy s tým istým ID — prestav skrinky a skús znova.'
+      APPL_MSG_EXPECTS_FAILED = 'Očakávanie sa nepodarilo uložiť — skús znova.'
+      APPL_MSG_EXPECTS_SAME = 'Očakávanie sa nezmenilo.'
+      APPL_EXPECTS_OP = 'NOXUN: Očakávaný spotrebič'
 
       class << self
         def handle_set_appliance_owner(payload)
@@ -107,6 +122,197 @@ module Noxun
           return "#{what} odpojený — ostáva v zákazke." if unbind
 
           "#{what} priradený: #{target['id']}."
+        end
+
+        # === S1-C: OCAKAVANY SPOTREBIC (`appliance_expects[]`) ===============
+        #
+        # Zapis CONFIGU BEZ PRESTAVBY (ocakavanie nic nekresli) vo VLASTNEJ
+        # operacii = JEDEN krok Spat. NEJDE cez `ApplianceBinding.apply!`:
+        # ten je transakcnym vstupom VAZBY (polozka rozpoctu + refs + prestavba)
+        # a tu sa ziadna polozka zakazky nemeni.
+        #
+        # PORADIE GUARDOV je zavazne (vzor `ApplianceBinding.plan_for` a D-100):
+        #   1. identita DOKUMENTU (R-02),
+        #   2. BARIERA OBSERVERA — dedup kopii a presun ghostov moze PRAVE TERAZ
+        #      menit `cabinet_id`; bez pokoja by sme zapisovali do configu, ktory
+        #      o par milisekund neplati, a transparentna reakcia observera by sa
+        #      navyse prilepila na nasu operaciu,
+        #   3. CIEL sa cita AZ PO bariere (cerstvy vyber, cerstvy config)
+        #      a overuje sa cely: druh + ID + PID, jednoznacnost, nie odpojeny,
+        #      nie z novsej verzie,
+        #   4. STRIKTNA validacia vstupu proti matici,
+        #   5. „viazana kategoria sa odstranit neda",
+        #   6. NEZMENENY vysledok = ZIADNA operacia (ziadny prazdny krok Spat).
+        # Az potom sa otvara operacia.
+        # KAZDE ODMIETNUTIE POSIELA CERSTVU KARTU (Codex #385 kolo 1 P2):
+        # klient si po odoslani prikazu ovladac ZABLOKUJE a odblokuje ho az
+        # prichod noveho payloadu. Keby odmietnutie vratilo len status, riadok
+        # by ostal zamknuty a pouzivatel by musel preklikat vyber.
+        def handle_set_appliance_expects(payload)
+          model = Sketchup.active_model
+          data = parse(payload)
+          return if foreign_document?(data, model, 'Očakávanie sa nezmenilo') # R-02
+          return appliance_expects_refused(model, APPL_MSG_BUSY) unless ApplianceBinding.observer_idle?(model)
+
+          inst, target, err = appliance_expects_target(model, data)
+          return appliance_expects_refused(model, err) if err
+
+          list, verr = ApplianceBinding.validate_expects(data['expects'], target['kind'])
+          return appliance_expects_refused(model, "Očakávanie sa neuložilo — #{verr}") if verr
+
+          lock = appliance_expects_locked(model, inst, list)
+          return appliance_expects_refused(model, lock) if lock
+
+          appliance_expects_write(model, inst, target, Store.config(inst) || {}, list)
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.handle_set_appliance_expects')
+          appliance_expects_refused(model, "Očakávanie sa nepodarilo uložiť: #{e.message}")
+        end
+
+        # Odmietnutie: NAJPRV cerstva karta (odblokuje riadok), potom hlaska.
+        # `dedup: false` — zapis sa nekonal, takze nie je preco prestavovat
+        # duplicitne skrinky (vzor D-100 `handle_rename_cabinet`).
+        def appliance_expects_refused(model, msg)
+          push_selected(model, dedup: false) if model
+          set_status(msg, true)
+        end
+
+        # OZNACENA entita ako ciel zapisu -> `[instancia, {kind,id,pid}, nil]`
+        # alebo `[nil, nil, hlaska]`. Skrinka ma prednost pred doskou (rovnake
+        # poradie ako `push_selected`), takze sa rozhoduje rovnako ako to, co
+        # pouzivatel v okne vidi.
+        #
+        # ECHO IDENTITY SA TU NETOLERUJE PRAZDNE (na rozdiel od
+        # `set_appliance_owner`): riadok ocakavani sa kresli VZDY aj s `pid`,
+        # takze jeho absencia je presne ten stary DOM, proti ktoremu guard stoji.
+        def appliance_expects_target(model, data)
+          cab = find_cabinet(model)
+          return appliance_expects_cabinet(model, cab, data) if cab
+
+          board = find_board(model)
+          return [nil, nil, APPL_MSG_NO_TARGET] if board.nil?
+
+          appliance_expects_entity(model, board, ApplianceBinding::KIND_BOARD,
+                                   Store.get(board, 'id').to_s, data['board_id'], data)
+        end
+
+        def appliance_expects_cabinet(model, cab, data)
+          cfg = Store.config(cab) || {}
+          kind = cfg['type'].to_s == 'dishwasher' ? ApplianceBinding::KIND_SLOT
+                                                  : ApplianceBinding::KIND_CABINET
+          appliance_expects_entity(model, cab, kind, Store.get(cab, 'cabinet_id').to_s,
+                                   data['cabinet_id'], data)
+        end
+
+        def appliance_expects_entity(model, inst, kind, id, echo, data)
+          return [nil, nil, APPL_MSG_STALE] if id.empty? || echo.to_s != id
+          return [nil, nil, APPL_MSG_STALE] unless appliance_pid_matches?(inst, data['pid'])
+          # ID sa recykluju (`Ids.next_id`), takze dva zive kusy s tym istym
+          # cislom znamenaju, ze sa neda povedat, komu ocakavanie patri.
+          return [nil, nil, APPL_MSG_AMBIG] if ApplianceBinding.instances_of(model, kind, id).length > 1
+          if kind != ApplianceBinding::KIND_BOARD &&
+             Ids.top_level_scan(model)['detached'][id].to_i.positive?
+            return [nil, nil, APPL_MSG_DETACH]
+          end
+
+          cfg = Store.config(inst)
+          board = kind == ApplianceBinding::KIND_BOARD
+          builder = board ? BoardBuilder : CabinetBuilder
+          return [nil, nil, APPL_MSG_NEWER] if builder.newer_config?(cfg)
+          # Codex #385 kolo 1 (P1): STARSIA schema. Config-only zapis marker
+          # NEPOSUVA (je to proveniencia stavby — stale guardy zasuviek, zavesov
+          # a vyklopov ju citaju a RED nalezy by po tichom posunuti zmizli),
+          # takze kus zo starsej verzie treba najprv PRESTAVAT. Odmietnutie
+          # stoji PRED operaciou — ziadny krok Spat nevznikne.
+          if builder.older_config?(cfg)
+            return [nil, nil, (board ? APPL_MSG_OLDER_BOARD : APPL_MSG_OLDER)]
+          end
+
+          [inst, { 'kind' => kind, 'id' => id, 'pid' => inst.persistent_id }, nil]
+        end
+
+        # PID z payloadu musi sediet s instanciou (Astra C6). Chybajuci alebo
+        # necitatelny udaj = zastaraly DOM, nie „tolerovat".
+        def appliance_pid_matches?(inst, raw)
+          pid = raw.is_a?(Numeric) ? raw.to_i : (raw.to_s.strip.match?(/\A\d+\z/) ? raw.to_s.to_i : 0)
+          pid.positive? && pid == inst.persistent_id.to_i
+        end
+
+        # „Viazanu kategoriu odstranit nedas" — dokaz vazby je TEN ISTY
+        # obojsmerny dokaz ako v zbere (`ApplianceBinding.bound_categories`),
+        # nie samotna `category` v refs. Inak by osirely zaznam po zmazanej
+        # polozke navzdy zamkol ocakavanie, ktore uz nikto neplni.
+        #
+        # ZAMOK SA TYKA LEN OCAKAVANI, KTORE NA KUSE NAOZAJ SU (Codex #385
+        # kolo 2 P2). Priradeny spotrebic a OCAKAVANIE su dve NEZAVISLE veci:
+        # skrinka moze mat viazanu ruru BEZ toho, aby ju niekedy „ocakavala".
+        # Kym sa porovnaval cely `bound` proti novemu zoznamu, taka skrinka
+        # nemohla pridat ocakavanie mikrovlnky — `['microwave']` sa tvarilo,
+        # ze RUSI ocakavanie rury, ktore nikdy neexistovalo. Rozdiel sa preto
+        # pocita z PRIENIKU „viazane ∩ dnes ulozene", nie z celej vazby.
+        # -> hlaska, alebo nil
+        def appliance_expects_locked(model, inst, list)
+          have = Array((Store.config(inst) || {})['appliance_expects']).map(&:to_s)
+          entry = ApplianceBinding.owner_entry_for(inst)
+          bound = ApplianceBinding.bound_categories(entry, appliance_items(model))
+          gone = bound.select { |c| have.include?(c) }.reject { |c| list.include?(c) }
+          return nil if gone.empty?
+
+          what = gone.map { |c| ApplianceCatalog.category_label_acc(c) }.join(', ')
+          "Tento kus má priradenú #{what} — najprv spotrebič odpoj, potom očakávanie zruš."
+        end
+
+        # Zapis. `[]` = kluc z configu ZMIZNE (legacy kus nikdy nedostane
+        # prazdne pole, ktore by vyzeralo ako „uz sme to riesili").
+        def appliance_expects_write(model, inst, target, cfg, list)
+          current = Array(cfg['appliance_expects']).map(&:to_s)
+          if current == list
+            push_selected(model, dedup: false) # UI resync, model sa nedotkne
+            return set_status(APPL_MSG_EXPECTS_SAME)
+          end
+
+          value = list.empty? ? nil : list
+          begin
+            CabinetBuilder.guarded do
+              model.start_operation(APPL_EXPECTS_OP, true)
+              begin
+                appliance_expects_store!(inst, target['kind'], value)
+                model.commit_operation
+              rescue StandardError => e
+                CabinetBuilder.abort_safely(model)
+                raise e
+              end
+            end
+          rescue StandardError => e
+            Engine.log_error(e, 'Panel.appliance_expects_write')
+            push_selected(model, dedup: false)
+            return set_status(APPL_MSG_EXPECTS_FAILED, true)
+          end
+
+          # Astra C14: zmenili sa DATA KONTROLY (ORANGE „spotrebič nevybraný"),
+          # takze cerstve cisla musia dostat OBAJA odberatelia — panel aj
+          # otvorene Studio so ZDVIHOM generacie. Bez toho by nalez pribudol
+          # az pri najblizsom inom zapise.
+          push_selected(model, dedup: false)
+          StudioDialog.refresh_if_open(bump: true) if defined?(StudioDialog)
+          set_status(appliance_expects_status(target, list))
+        end
+
+        def appliance_expects_store!(inst, kind, value)
+          keys = { 'appliance_expects' => value }
+          if kind == ApplianceBinding::KIND_BOARD
+            BoardBuilder.write_config_keys!(inst, keys)
+          else
+            CabinetBuilder.write_config_keys!(inst, keys)
+          end
+        end
+
+        def appliance_expects_status(target, list)
+          who = target['id'].to_s
+          return "#{who} — očakávanie spotrebiča zrušené. Jeden krok Späť to vráti." if list.empty?
+
+          labels = list.map { |c| ApplianceCatalog.category_label_acc(c) }
+          "#{who} očakáva #{labels.join(', ')}. Jeden krok Späť to vráti."
         end
       end
     end

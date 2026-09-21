@@ -274,7 +274,17 @@ záznam — **vedomé obmedzenie**, radšej rovná doska než zle otočená).
 scan katalógu materiálov aj dry-run migrácie ABS bežia v horúcich cestách a nesmú spustiť zápis.
 
 **Forward guard** (vzor `usage_stats`): `std` vyšší než `STD` = súbor z novšej verzie pluginu ⇒ **režim len na čítanie** (`upsert`/`delete`/`touch_used` odmietnu a zalogujú —
-volajúci **musí** návratovú hodnotu vetviť, inak ohlási falošný úspech); neznáme top-level kľúče **aj neznáme kľúče záznamu** prežijú každý zápis.
+volajúci **musí** návratovú hodnotu vetviť, inak ohlási falošný úspech); neznáme top-level kľúče **aj neznáme kľúče záznamu** prežijú každý zápis. **`upsert` zachová neznáme
+kľúče záznamu aj pri PREPISE** (S1-C, `merged_record` číta starý záznam pod tým istým zámkom): `record()` stavia záznam nanovo, takže bez toho by uloženie šablóny z novšej
+verzie ticho zahodilo to, čomu tento plugin nerozumie. `name`, `kind` a `config` sú vždy z nového zápisu — prepis je vedomý akt nad OBSAHOM šablóny.
+
+**S1-C: OČAKÁVANÝ SPOTREBIČ žije v `config['appliance_expects']`, nie na zázname — a `STD` preto ostáva 5.** Záznam šablóny **žiadny vlastný kľúč** (`expects`) nedostal:
+pri reprezentácii v configu starší plugin (od S1-E, teda od `CONFIG_SCHEMA` 16) očakávania číta aj vkladá správne a plugin pred S1-E config schémy 16 odmieta už dnes,
+takže bump markera by knižnicu len zbytočne zamkol pre zápis — bez jediného dôvodu. Dve reprezentácie by navyše znamenali dve pravdy, ktoré sa musia pri každom vklade
+zladiť. Dôsledok: **žiadna migrácia** (čítanie STD 5 je bajtovo nemenné), seed slotov sa neopakuje a **slotové šablóny očakávanie v configu vôbec nemajú** — umývačku im
+dosadzuje builder podľa typu, takže stará aj nová slotová šablóna hovoria to isté. Odvodený súhrn pre dlaždicu je `TemplateStore.appliance_expects_summary(config)`
+(`{has, codes, text}`, vzor `hardware_tile_summary` — čistá funkcia, na disk sa nikdy nezapíše). Kontrakt očakávaní je v
+[appliances.md](appliances.md#očakávania-appliance_expects-s1-c).
 
 **Explicitný neznámy `kind` sa nikdy nepreklasifikuje** — záznam z novšej verzie (napr. `assembly`) normalizáciu aj zápis prežije nedotknutý, ale žiadny filter `cabinet`/`board` ho
 nezachytí, takže sa nikde neponúkne ani neaplikuje (tichý prevod na korpus by dovolil vložiť ho ako skrinku); JS `NXInsert.templateKind` je zrkadlom tohto pravidla.

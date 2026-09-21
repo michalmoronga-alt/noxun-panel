@@ -3860,8 +3860,12 @@ module NoxunSuRunner
     e::TemplateStore.delete('cabinet', tname)
 
     # (h) KONTROLA cez REALNU cestu zberu.
-    ok("S1-E (h): zdravy slot nema ziadny nalez (#{s1e_control_codes(model).inspect})",
-       s1e_control_codes(model).empty?)
+    # S1-C: slot BEZ modelu uz nie je „bez nalezu" — ocakava umyvacku vzdy,
+    # takze hlasi `appliance_missing dishwasher` (to je jeho zmysel). Tento
+    # scenar overuje kody SLOTU, preto sa ocakavanie odfiltruje.
+    s1e_slot_codes = ->(m) { s1e_control_codes(m).reject { |c| c == 'dishwasher' } }
+    ok("S1-E (h): zdravy slot nema ziadny nalez ROZMEROV (#{s1e_control_codes(model).inspect})",
+       s1e_slot_codes.call(model).empty?)
     s1e_rebuild(model, inst, 'width' => 590.0)
     ok("S1-E (h): sirka 590 -> ORANGE dw_body_fit (#{s1e_control_codes(model).inspect})",
        s1e_control_codes(model).include?('dw_body_fit'))
@@ -4597,7 +4601,9 @@ module NoxunSuRunner
     cid = e::Store.get(cab, 'cabinet_id').to_s
 
     # (a) RIADOK SPOTREBICA: ocakavanie -> ponuka -> priradenie -> 1 Spat.
-    rows = s1b2_rows(cab)
+    # S1-C: POSLEDNY riadok je VOLBA „očakáva" (kresli sa vzdy) — tento scenar
+    # sa pyta na riadky VAZBY a OCAKAVANIA, takze volbu odfiltruje.
+    rows = s1b2_rows(cab).reject { |r| r['state'] == 'expects' }
     ok("S1-B2 (a): skrinka so sablonovym ocakavanim ma riadok ocakavania (#{rows.length})",
        rows.length == 1 && rows.first['state'] == 'expected' &&
        rows.first['category'] == 'fridge')
@@ -4618,7 +4624,7 @@ module NoxunSuRunner
        s1b1_refs(cab).length == 1 && s1b1_refs(cab).first['item_id'] == item_id)
     ok('S1-B2 (a): polozka ukazuje na TU skrinku',
        s1b1_owner(model, item_id) == { 'kind' => 'cabinet', 'id' => cid })
-    bound = s1b2_rows(cab)
+    bound = s1b2_rows(cab).reject { |r| r['state'] == 'expects' }
     ok("S1-B2 (a): riadok je teraz VIAZANY a menuje model (#{bound.first['text']})",
        bound.length == 1 && bound.first['state'] == 'bound' &&
        bound.first['text'].to_s.include?('Beko'))
@@ -4691,6 +4697,7 @@ module NoxunSuRunner
       ok('S1-B2 (c): a NEPRESTAVALA sa — je to ten isty kus (rovnake PID)',
          board.valid? && board.persistent_id == before)
       brows = Array(e::Panel.board_payload(board)['appliance_rows'])
+                .reject { |r| r['state'] == 'expects' } # S1-C: volba je samostatny riadok
       ok("S1-B2 (c): karta dosky ma riadok spotrebica (#{brows.length})",
          brows.length == 1 && brows.first['state'] == 'bound' &&
          brows.first['text'].to_s.include?('Whirlpool'))
@@ -4998,6 +5005,441 @@ module NoxunSuRunner
   ensure
     e::ApplianceCatalog.test_dir_override = nil
     e::ApplianceCatalog.reset_state!
+  end
+
+  # --- S1-C: OCAKAVANY SPOTREBIC (`appliance_expects[]`) --------------------
+  #
+  # CO SA TU OVERUJE A MIMO SKETCHUPU OVERIT NEDA:
+  #   * CELY CYKLUS SABLONY: „Uložiť ako šablónu" s ocakavaniami -> realny vklad
+  #     ghostom -> config vlozenej skrinky -> Kontrola. Headless sada vie overit
+  #     len jednotlive kusy cesty (payload, whitelist, normalize).
+  #   * JEDEN Ctrl+Z nad CONFIG-ONLY zapisom. `abort_operation` ani `undo` fake
+  #     modelu nic nerobia, takze dokaz „zapis ocakavania je PRESNE jeden krok
+  #     Spat a geometriu nechal na pokoji" existuje len tu.
+  #   * BARIERA OBSERVERA po NATIVNEJ KOPII (Astra C7): dedup kopie bezi
+  #     v debounce; zapis ocakavania sa na jeho transparentnu operaciu nesmie
+  #     prilepit a nesmie citat config, ktory o chvilu neplati.
+  #   * Kontrola cez REALNU cestu `Bom.collect -> Validation.run` (per kategoriu).
+  #
+  # Katalog spotrebicov je IZOLOVANY (`test_dir_override`). Sablona ide do
+  # REALNEJ kniznice (%APPDATA% sa v SketchUpe nepresmeruva), preto ma
+  # testovacie meno, existujuci rovnomenny zaznam scenar PRESKOCI a na konci sa
+  # maze — pouzivatelske sablony sa nesmu dotknut.
+
+  S1C_TPL  = '__SU_TEST_S1C_RURA__'
+  S1C_CAB  = { 'type' => 'lower', 'width' => 600.0, 'height' => 2076.0, 'depth' => 560.0,
+               'thickness' => 18.0, 'floor_height' => 100.0 }.freeze
+  S1C_SLOT = { 'type' => 'dishwasher', 'width' => 600.0, 'height' => 870.0, 'depth' => 560.0,
+               'thickness' => 18.0, 'dw_class' => 600, 'dw_body_height' => 820.0,
+               'dw_front_bottom' => 64.0, 'dw_front_height' => 776.0 }.freeze
+
+  def s1c_expects_of(inst)
+    cfg = (inst && inst.valid?) ? (e::Store.config(inst) || {}) : {}
+    Array(cfg['appliance_expects'])
+  end
+
+  # Nalezy „spotrebic nevybraný" (`missing|<kategoria>`) cez REALNU cestu.
+  def s1c_missing(model)
+    s1f_codes(model).select { |c| c.start_with?('missing|') }.sort
+  end
+
+  # Akcia PANELA (`set_appliance_expects`) nad OZNACENOU entitou — presne cesta,
+  # ktorou ide zmena v riadku Spotrebic. `echo`/`pid` sa daju podvrhnut, aby sa
+  # dali overit guardy identity.
+  def s1c_set_expects(model, inst, list, echo: nil, pid: nil)
+    model.selection.clear
+    model.selection.add(inst)
+    board = e::Store.kind(inst).to_s == 'board'
+    id = e::Store.get(inst, board ? 'id' : 'cabinet_id').to_s
+    e::Panel.handle_set_appliance_expects(
+      pg(model, 'expects' => list,
+                (board ? 'board_id' : 'cabinet_id') => (echo.nil? ? id : echo),
+                'pid' => (pid.nil? ? inst.persistent_id : pid))
+    )
+  end
+
+  # Riadok VOLBY „ocakava" z payloadu karty (posledny riadok bloku Spotrebic).
+  def s1c_pick_row(inst)
+    Array(e::Panel.cabinet_payload(inst)['appliance_rows'])
+      .find { |r| r['state'] == 'expects' }
+  end
+
+  def run_s1c(model)
+    cleanup(model)
+    r14_clear!(model)
+    root = File.join(Sketchup.temp_dir, "noxun_s1c_#{Process.pid}_#{Time.now.to_i}")
+    FileUtils.mkdir_p(root)
+    oven_id = micro_id = nil
+    tpl_existed = !e::TemplateStore.find('cabinet', S1C_TPL).nil?
+    begin
+      ac = e::ApplianceCatalog
+      ac.test_dir_override = root
+      ac.reset_state!
+      _, oven = ac.create!('category' => 'oven', 'manufacturer' => 'SU', 'name' => 'RURA 60',
+                           'dims' => { 'body' => { 'width' => 594.0, 'height' => 595.0,
+                                                   'depth' => 548.0 },
+                                       'niche' => { 'width_min' => 560.0, 'depth_min' => 550.0 } })
+      _, micro = ac.create!('category' => 'microwave', 'manufacturer' => 'SU', 'name' => 'MIKRO 45',
+                            'dims' => { 'body' => { 'width' => 594.0, 'height' => 388.0,
+                                                    'depth' => 388.0 },
+                                        'niche' => { 'width_min' => 560.0, 'depth_min' => 390.0 } })
+      oven_id = oven[:record]['id'].to_s
+      micro_id = micro[:record]['id'].to_s
+      # Scenare si ID vypytaju z ivarov — su to fixtury CELEJ sekcie, nie
+      # parametre jednotlivych krokov (a pretlacat ich piatimi argumentmi by
+      # scenare len zatemnilo).
+      @s1c_oven = oven_id
+      @s1c_micro = micro_id
+      ok('S1-C: izolovany katalog ma ruru aj mikrovlnku',
+         !oven_id.empty? && !micro_id.empty?)
+
+      if tpl_existed
+        info("S1-C: sablona #{S1C_TPL} uz existuje — sablonovy scenar preskoceny " \
+             '(chranime pouzivatelske data)')
+      else
+        s1c_template_cycle(model)
+      end
+      s1c_row_action(model)
+      s1c_bound_not_expected(model)
+      s1c_legacy_schema(model)
+      s1c_observer_barrier(model)
+      s1c_slot(model)
+      s1c_apply_to_bound(model) unless tpl_existed
+    ensure
+      e::TemplateStore.delete('cabinet', S1C_TPL) unless tpl_existed
+      e::ApplianceCatalog.test_dir_override = nil
+      e::ApplianceCatalog.reset_state!
+      @s1c_oven = @s1c_micro = nil
+    end
+    r14_clear!(model)
+    cleanup(model)
+    ok('S1-C: cleanup (0 korpusov, rozpocet prazdny)',
+       cabinets(model).empty? && s1b1_items(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: run_s1c vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    r14_clear!(model)
+    cleanup(model)
+    e::TemplateStore.delete('cabinet', S1C_TPL) unless tpl_existed
+    e::ApplianceCatalog.test_dir_override = nil
+    e::ApplianceCatalog.reset_state!
+  end
+
+  # (a) ULOZ SABLONU s ocakavaniami -> VLOZ ju -> config + Kontrola 2x ORANGE.
+  # (b) priradenie rury -> 1 ORANGE; (c) mikrovlnky -> OK; (d) 2x Spat -> nalezy
+  # su spat.
+  def s1c_template_cycle(model)
+    src = e::CabinetBuilder.build(model, S1C_CAB)
+    return ok('S1-C (a): fixtura zdrojovej skrinky', false) unless src
+
+    model.selection.clear
+    model.selection.add(src)
+    e::Panel.handle_save_template_as(
+      pg(model, 'cabinet_id' => e::Store.get(src, 'cabinet_id'), 'name' => S1C_TPL,
+                'type' => 'lower', 'expects' => %w[oven microwave])
+    )
+    rec = e::TemplateStore.find('cabinet', S1C_TPL)
+    ok("S1-C (a): sablona ulozila OCAKAVANIA do configu (#{(rec || {}).dig('config', 'appliance_expects').inspect})",
+       rec && rec['config']['appliance_expects'] == %w[oven microwave])
+    ok('S1-C (a): a NIKDY nie vazbu na konkretny spotrebic',
+       rec && !rec['config'].key?('appliance_refs'))
+    cleanup(model)
+
+    # VKLAD celou cestou panela (preflighty + ghost + klik).
+    payload = rec['config'].merge('template_kind' => 'cabinet', 'template_name' => S1C_TPL)
+    inst = ghost_place!(model, payload, [2200.0, 300.0])
+    ghost_teardown!(model)
+    ok("S1-C (a): vlozena skrinka nesie ocakavania (#{s1c_expects_of(inst).inspect})",
+       inst && s1c_expects_of(inst) == %w[oven microwave])
+    cid = inst ? e::Store.get(inst, 'cabinet_id').to_s : ''
+    ok("S1-C (a): Kontrola hlasi DVE nesplnene kategorie (#{s1c_missing(model).inspect})",
+       s1c_missing(model) == ['missing|microwave', 'missing|oven'])
+
+    # (b) + (c) PRIRADENIE cez riadok Spotrebic — vazba je jeden krok Spat.
+    # OBE polozky vznikaju NAJPRV (zalozenie je vlastna operacia), aby na konci
+    # zostali dva SUSEDNE kroky Spat, ktore rusia LEN vazby.
+    s1b1_apply(model, 'create', attrs: { 'nazov' => 'Rúra' }, catalog_id: @s1c_oven)
+    oven_item = s1b1_items(model).last['id']
+    s1b1_apply(model, 'create', attrs: { 'nazov' => 'Mikro' }, catalog_id: @s1c_micro)
+    micro_item = s1b1_items(model).last['id']
+    inst = s1f_cab(model, cid)
+    s1b2_pick(model, inst, oven_item, echo: cid)
+    ok("S1-C (b): po priradeni rury ostava JEDEN nalez (#{s1c_missing(model).inspect})",
+       s1c_missing(model) == ['missing|microwave'])
+    inst = s1f_cab(model, cid)
+    s1b2_pick(model, inst, micro_item, echo: cid)
+    ok("S1-C (c): po priradeni mikrovlnky je CISTO (#{s1c_missing(model).inspect})",
+       s1c_missing(model).empty?)
+
+    # (d) DVA Spat vratia oba nalezy (kazda vazba = JEDEN krok).
+    Sketchup.undo
+    ok("S1-C (d): jeden Spat vratil nalez mikrovlnky (#{s1c_missing(model).inspect})",
+       s1c_missing(model) == ['missing|microwave'])
+    Sketchup.undo
+    ok("S1-C (d): druhy Spat vratil aj nalez rury (#{s1c_missing(model).inspect})",
+       s1c_missing(model) == ['missing|microwave', 'missing|oven'])
+    r14_clear!(model)
+    cleanup(model)
+  end
+
+  # (e) OCAKAVANIE BEZ SABLONY: riadok volby -> ORANGE -> zrusenie -> OK.
+  # Overuje sa aj to, ze zapis je PRESNE JEDEN krok Spat, ze GEOMETRIU nemeni
+  # a ze nezmeneny zoznam NEZALOZI ziadny krok.
+  def s1c_row_action(model)
+    cab = e::CabinetBuilder.build(model, S1C_CAB)
+    return ok('S1-C (e): fixtura skrinky', false) unless cab
+
+    cid = e::Store.get(cab, 'cabinet_id').to_s
+    parts_before = cab.definition.entities.length
+    row = s1c_pick_row(cab)
+    ok("S1-C (e): skrinka bez ocakavani ma riadok VOLBY (#{row && row['expects'].inspect})",
+       row && row['expects'] == [] && row['options'].length == 3)
+
+    s1c_set_expects(model, cab, %w[microwave])
+    cab = s1f_cab(model, cid)
+    ok("S1-C (e): ocakavanie zapisane BEZ sablony (#{s1c_expects_of(cab).inspect})",
+       s1c_expects_of(cab) == %w[microwave])
+    ok("S1-C (e/C14): Kontrola svieti HNED (#{s1c_missing(model).inspect})",
+       s1c_missing(model) == ['missing|microwave'])
+    ok("S1-C (e): geometria sa NEZMENILA (#{cab.definition.entities.length} entit)",
+       cab.definition.entities.length == parts_before)
+    ok('S1-C (e/P1): marker schemy sa zapisom NEPOSUNUL (je to proveniencia STAVBY)',
+       (e::Store.config(cab) || {})['config_schema'].to_i == e::CabinetBuilder::CONFIG_SCHEMA)
+
+    # NEZMENENY zoznam = ziadna operacia (Spat by inak zmazal nespravnu vec).
+    s1c_set_expects(model, cab, %w[microwave])
+    Sketchup.undo
+    cab = s1f_cab(model, cid)
+    ok("S1-C (e): rovnake zadanie NEZALOZILO krok Spat (#{s1c_expects_of(cab).inspect})",
+       cab && s1c_expects_of(cab).empty?)
+
+    # ZRUSENIE ocakavania + Spat.
+    s1c_set_expects(model, cab, %w[oven])
+    cab = s1f_cab(model, cid)
+    s1c_set_expects(model, cab, [])
+    cab = s1f_cab(model, cid)
+    ok("S1-C (e): prazdny zoznam kluc ZRUSIL (#{s1c_expects_of(cab).inspect})",
+       s1c_expects_of(cab).empty? && s1c_missing(model).empty?)
+    Sketchup.undo
+    cab = s1f_cab(model, cid)
+    ok("S1-C (e): jeden Spat vratil ocakavanie aj nalez (#{s1c_missing(model).inspect})",
+       s1c_expects_of(cab) == %w[oven] && s1c_missing(model) == ['missing|oven'])
+
+    # GUARDY IDENTITY: cudzie echo aj nesediaci PID NEZAPISU nic.
+    s1c_set_expects(model, cab, %w[oven microwave], echo: 'CAB-NEEXISTUJE')
+    cab = s1f_cab(model, cid)
+    ok('S1-C (e/C6): cudzie echo ID nezapisalo nic', s1c_expects_of(cab) == %w[oven])
+    s1c_set_expects(model, cab, %w[oven microwave], pid: 999_999)
+    cab = s1f_cab(model, cid)
+    ok('S1-C (e/C6): nesediaci PID nezapisal nic', s1c_expects_of(cab) == %w[oven])
+
+    # VIAZANA kategoria sa odstranit NEDA.
+    s1b1_apply(model, 'create', attrs: { 'nazov' => 'Rúra' }, catalog_id: @s1c_oven)
+    item = s1b1_items(model).last['id']
+    cab = s1f_cab(model, cid)
+    s1b2_pick(model, cab, item, echo: cid)
+    cab = s1f_cab(model, cid)
+    s1c_set_expects(model, cab, [])
+    cab = s1f_cab(model, cid)
+    ok("S1-C (e): viazanu ruru sa zrusit NEDA (#{s1c_expects_of(cab).inspect})",
+       s1c_expects_of(cab) == %w[oven])
+
+    # (P2, Codex #385 kolo 1) SIROTA: polozku zmazalo druhe okno (rozpoctovou
+    # cestou, refs na skrinke OSTALI). Kontrola od tej chvile hlasi
+    # `appliance_missing` — a riadok Spotrebica MUSI ponuknut vyber, inak
+    # pouzivatel nema nalez kde vybavit. Panel aj Kontrola citaju TU ISTU
+    # mnozinu splnenych kategorii.
+    e::BudgetStore.remove_appliance!(model, item)
+    cab = s1f_cab(model, cid)
+    orphan = Array(e::Panel.cabinet_payload(cab)['appliance_rows'])
+    ok("S1-C (P2): osirely ref necha Kontrolu svietit (#{s1c_missing(model).inspect})",
+       s1c_missing(model) == ['missing|oven'])
+    ok("S1-C (P2): a riadok PONUKA vyber (#{orphan.map { |r| r['state'] }.inspect})",
+       orphan.any? { |r| r['state'] == 'expected' && r['category'] == 'oven' })
+    ok('S1-C (P2): viazanu kategoriu uz nic nezamyka — ocakavanie sa da zrusit',
+       begin
+         s1c_set_expects(model, s1f_cab(model, cid), [])
+         s1c_expects_of(s1f_cab(model, cid)).empty?
+       end)
+    r14_clear!(model)
+    cleanup(model)
+  end
+
+  # (P2, Codex #385 kolo 2) VIAZANA, ale NEOCAKAVANA kategoria zamok NEDRZI.
+  # Priradeny spotrebic a OCAKAVANIE su dve NEZAVISLE veci — bezne vznikne
+  # tento stav priradenim spotrebica BEZ sablony (skrinka ho ma, ale nikdy ho
+  # „neocakavala"). Taka skrinka MUSI vediet pridat ocakavanie inej kategorie.
+  def s1c_bound_not_expected(model)
+    cab = e::CabinetBuilder.build(model, S1C_CAB)
+    return ok('S1-C (kolo 2 P2): fixtura skrinky', false) unless cab
+
+    cid = e::Store.get(cab, 'cabinet_id').to_s
+    s1b1_apply(model, 'create', attrs: { 'nazov' => 'Rúra' }, catalog_id: @s1c_oven)
+    item = s1b1_items(model).last['id']
+    cab = s1f_cab(model, cid)
+    s1b2_pick(model, cab, item, echo: cid)
+    cab = s1f_cab(model, cid)
+    ok("S1-C (kolo 2 P2): fixtura — rura je VIAZANA a NEOCAKAVANA " \
+       "(#{s1b1_refs(cab).length} refs, #{s1c_expects_of(cab).inspect})",
+       s1b1_refs(cab).length == 1 && s1c_expects_of(cab).empty?)
+
+    # Presne ten pripad z nalezu: novy zoznam neobsahuje `oven`, ale ziadne
+    # ocakavanie rury sa neodstranuje — nikdy ziadne nebolo.
+    s1c_set_expects(model, cab, %w[microwave])
+    cab = s1f_cab(model, cid)
+    ok("S1-C (kolo 2 P2): pridanie mikrovlnky PRESLO (#{s1c_expects_of(cab).inspect})",
+       s1c_expects_of(cab) == %w[microwave] && s1b1_refs(cab).length == 1)
+
+    # Ked uz rura OCAKAVANA je, jej odstranenie sa (spravne) ODMIETA.
+    s1c_set_expects(model, cab, %w[oven microwave])
+    cab = s1f_cab(model, cid)
+    ok("S1-C (kolo 2 P2): doplnenie rury do ocakavani preslo (#{s1c_expects_of(cab).inspect})",
+       s1c_expects_of(cab) == %w[oven microwave])
+    s1c_set_expects(model, cab, %w[microwave])
+    cab = s1f_cab(model, cid)
+    ok("S1-C (kolo 2 P2): a teraz uz sa viazana rura zrusit NEDA (#{s1c_expects_of(cab).inspect})",
+       s1c_expects_of(cab) == %w[oven microwave])
+    r14_clear!(model)
+    cleanup(model)
+  end
+
+  # (P1, Codex #385 kolo 1) STARSIA SCHEMA: config-only zapis marker NEPOSUVA
+  # (je to proveniencia STAVBY — citaju ju stale guardy zasuviek, zavesov
+  # a vyklopov), takze kus zo starsej verzie sa ODMIETNE a ponukne prestavbu.
+  # Mimo SketchUpu sa neda overit to podstatne: ze PRESTAVBA marker naozaj
+  # zmigruje a zapis potom PREJDE.
+  def s1c_legacy_schema(model)
+    cab = e::CabinetBuilder.build(model, S1C_CAB)
+    return ok('S1-C (P1): fixtura skrinky', false) unless cab
+
+    cid = e::Store.get(cab, 'cabinet_id').to_s
+    old = e::CabinetBuilder::CONFIG_SCHEMA - 1
+    cfg = e::Store.config(cab) || {}
+    cfg['config_schema'] = old
+    e::CabinetBuilder.guarded do
+      model.start_operation('SU-TEST S1C stara schema', true)
+      e::Store.write_config(cab, cfg)
+      model.commit_operation
+    end
+    markers = []
+    m1 = r03_marker(model, markers) # kontrolny bod: 1x Spat ho ma zmazat
+    s1c_set_expects(model, cab, %w[oven])
+    cab = s1f_cab(model, cid)
+    ok("S1-C (P1): zapis na STARSIU schemu ODMIETNUTY (#{s1c_expects_of(cab).inspect})",
+       cab && s1c_expects_of(cab).empty?)
+    ok("S1-C (P1): a marker schemy ostal nedotknuty (#{(e::Store.config(cab) || {})['config_schema']})",
+       (e::Store.config(cab) || {})['config_schema'].to_i == old)
+    Sketchup.undo
+    ok('S1-C (P1): odmietnutie NEZALOZILO krok Spat (1x Spat vratil marker)', !m1.valid?)
+    r03_clear_markers(model, markers)
+    cab = s1f_cab(model, cid)
+
+    # PRESTAVBA migruje marker plnym planom — az potom zapis prejde.
+    s1e_rebuild(model, cab, 'width' => 620.0)
+    cab = s1f_cab(model, cid)
+    ok("S1-C (P1): prestavba marker zmigrovala (#{(e::Store.config(cab) || {})['config_schema']})",
+       (e::Store.config(cab) || {})['config_schema'].to_i == e::CabinetBuilder::CONFIG_SCHEMA)
+    s1c_set_expects(model, cab, %w[oven])
+    cab = s1f_cab(model, cid)
+    ok("S1-C (P1): po prestavbe zapis PRESIEL (#{s1c_expects_of(cab).inspect})",
+       s1c_expects_of(cab) == %w[oven])
+    r14_clear!(model)
+    cleanup(model)
+  end
+
+  # (C7) BARIERA OBSERVERA: NATIVNA kopia skrinky ceka na dedup v debounce.
+  # Zapis ocakavania sa na jeho transparentnu operaciu NESMIE prilepit — musi
+  # to byt SAMOSTATNY krok Spat a geometria sa nesmie pohnut.
+  def s1c_observer_barrier(model)
+    cab = e::CabinetBuilder.build(model, S1C_CAB)
+    return ok('S1-C (C7): fixtura skrinky', false) unless cab
+
+    cid = e::Store.get(cab, 'cabinet_id').to_s
+    parts = cab.definition.entities.length
+    # NATIVNA kopia = nova instancia TEJ ISTEJ definicie + skopirovany NOXUN
+    # slovnik (`tools1_clone_cabinet`, `guarded: false` — kopia musi observera
+    # naozaj rozhybat). Bez slovnika by to nebol NOXUN korpus a dedup by ju
+    # vobec nevidel.
+    e::ScaleWatch.flush_pending!(model)
+    copy = tools1_clone_cabinet(model, cab, 7000.0, guarded: false)
+    return ok('S1-C (C7): nativna kopia vznikla', false) unless copy && copy.valid?
+
+    ok('S1-C (C7): cerstva kopia caka na dedup (observer NIE JE v pokoji)',
+       e::ScaleWatch.pending? == true)
+    # Zapis nad POVODNOU skrinkou (jej ID sa dedupom nemeni). Bariera dedup
+    # dobehne HNED — az potom sa cita ciel a otvara operacia.
+    s1c_set_expects(model, cab, %w[oven])
+    ok('S1-C (C7): observer je PO zapise v POKOJI — bariera dobehla PRED operaciou',
+       e::ScaleWatch.pending? == false)
+    cab = s1f_cab(model, cid)
+    ok("S1-C (C7): ocakavanie sa zapisalo (#{s1c_expects_of(cab).inspect})",
+       cab && s1c_expects_of(cab) == %w[oven])
+    ok("S1-C (C7): a KOPIA dostala vlastne ID (#{e::Store.get(copy, 'cabinet_id')})",
+       copy.valid? && e::Store.get(copy, 'cabinet_id').to_s != cid)
+
+    # SAMOSTATNY krok Spat: vrati LEN ocakavanie. Dedup kopie sa na nas
+    # neprilepil (kopia si nove ID drzi) a geometria sa nepohla.
+    Sketchup.undo
+    cab = s1f_cab(model, cid)
+    ok('S1-C (C7): jeden Spat vratil LEN ocakavanie (dedup ostal, geometria sa nepohla)',
+       cab && s1c_expects_of(cab).empty? &&
+       cab.definition.entities.length == parts &&
+       copy.valid? && e::Store.get(copy, 'cabinet_id').to_s != cid)
+
+    # ZASTARALE ECHO: riadok vykresleny PRED dedupom nesie stare ID kopie —
+    # server ho po dedupe odmietne (inak by zapis sadol na cudzi kus).
+    old_copy_id = cid
+    s1c_set_expects(model, copy, %w[oven], echo: old_copy_id)
+    ok('S1-C (C7): zastarale echo kopie sa ODMIETLO (nic sa nezapisalo)',
+       s1c_expects_of(copy).empty?)
+    r14_clear!(model)
+    cleanup(model)
+  end
+
+  # (g) SLOT BEZ MODELU je nalez `appliance_missing dishwasher` a volbu NEMA.
+  def s1c_slot(model)
+    slot = e::CabinetBuilder.build(model, S1C_SLOT)
+    return ok('S1-C (g): fixtura slotu', false) unless slot
+
+    ok("S1-C (g): slot bez modelu hlasi ORANGE (#{s1c_missing(model).inspect})",
+       s1c_missing(model) == ['missing|dishwasher'])
+    ok('S1-C (g): a volbu „očakáva" NEMA (ocakava umyvacku vzdy)',
+       s1c_pick_row(slot).nil?)
+    # Podvrhnuty payload slot neprepise.
+    s1c_set_expects(model, slot, %w[oven])
+    ok('S1-C (g): podvrhnute ocakavanie na slote server ODMIETOL',
+       s1c_expects_of(slot).empty? && s1c_missing(model) == ['missing|dishwasher'])
+    r14_clear!(model)
+    cleanup(model)
+  end
+
+  # (f) APLIKOVANIE SABLONY na VIAZANU skrinku: vazba OSTAVA, ocakavania sa
+  # ZJEDNOTIA (R6). Je to jediny scenar, ktory to overi nad REALNOU prestavbou.
+  def s1c_apply_to_bound(model)
+    cab = e::CabinetBuilder.build(model, S1C_CAB)
+    return ok('S1-C (f): fixtura skrinky', false) unless cab
+
+    cid = e::Store.get(cab, 'cabinet_id').to_s
+    s1c_set_expects(model, cab, %w[microwave])
+    s1b1_apply(model, 'create', attrs: { 'nazov' => 'Rúra' }, catalog_id: @s1c_oven)
+    item = s1b1_items(model).last['id']
+    cab = s1f_cab(model, cid)
+    s1b2_pick(model, cab, item, echo: cid)
+    cab = s1f_cab(model, cid)
+    ok('S1-C (f): fixtura ma vazbu aj ocakavanie',
+       s1b1_refs(cab).length == 1 && s1c_expects_of(cab) == %w[microwave])
+
+    model.selection.clear
+    model.selection.add(cab)
+    e::TemplatesDialog.handle_apply({ 'template' => S1C_TPL }.to_json)
+    cab = s1f_cab(model, cid)
+    ok("S1-C (f): aplikovanie sablony vazbu ZACHOVALO (#{s1b1_refs(cab).length} refs)",
+       cab && s1b1_refs(cab).length == 1)
+    ok("S1-C (f): a ocakavania ZJEDNOTILO (#{s1c_expects_of(cab).inspect})",
+       cab && s1c_expects_of(cab) == %w[oven microwave])
+    ok("S1-C (f): Kontrola hlasi LEN nesplnenu mikrovlnku (#{s1c_missing(model).inspect})",
+       s1c_missing(model) == ['missing|microwave'])
+    r14_clear!(model)
+    cleanup(model)
   end
 
   # --- S1-A1: KATALOG SPOTREBICOV — prilohy na REALNOM Windows suborovom
@@ -25300,6 +25742,7 @@ module NoxunSuRunner
     run_s1b1(model)          # S1-B1: SPOTREBIC V ZAKAZKE — priradenie z katalogu, presun, odpojenie a zmazanie ako JEDEN krok Spat (polozka + `appliance_refs[]` vlastnika + prestavba naraz), sirota po Delete (nalez BEZ `owner_id`) a jej naprava, trieda umyvacky vs slot, „dodáva zákazník" (medzisucet 0 + stitok v ponuke), legacy zakazka na kanonicke kody, ROLLBACK po riadenych zlyhaniach a bariera observera
     run_s1b2(model)          # S1-B2: POHLAD V ZAKAZKE + riadok Spotrebica ? ocakavanie zo sablony a ponuka filtrovana podla niky, priradenie AKCIOU PANELA (ciel z oznacenej entity) a 1x Spat, telo slotu prekreslene z katalogu (448 x 550) a spat na genericke, doska bez prestavby, tabulka pohladu nad realnym zberom, Delete vlastnika -> sirota -> odpojenie -> Spat vrati oboje
     run_s1f(model)           # S1-F: KONTROLNA GEOMETRIA CHLADNICKY — box niky 560 x 555 x 1940 na hornej ploche dna (prestavba ho zachova, 1x Spat), box nikdy v zbere ani v kusovniku, Kontrola niky per os (1924 -> ORANGE vyska -> zvysenie -> OK), delenie ciel (hrana 682 mimo 679-727 -> posun -> OK) + nahlad, presun vazby medzi skrinkami, rebind_model na iny box, zmena ziveho katalogu snapshotom nepohne, odpojenie a Spat
+    run_s1c(model)           # S1-C: OCAKAVANY SPOTREBIC — cely cyklus sablony (uloz s ocakavaniami -> vloz ghostom -> config -> Kontrola 2x ORANGE -> priradenie -> OK -> 2x Spat), ocakavanie BEZ sablony v riadku Spotrebic (1x Spat, geometria netknuta, peciatka schemy, nezmenene = ziadny krok, cudzie echo/PID nezapisu nic, viazanu kategoriu zrusit nedas), bariera observera po nativnej kopii, slot bez modelu (ORANGE + podvrh odmietnuty), aplikovanie sablony na viazanu skrinku (vazba ostava, ocakavania unia)
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
     run_r03(model)           # R-03: sev prepare_insert/commit_insert — ciste pripravenie, vlastny rigidny transform, odmietnutia, edit kontext
     run_r12(model)           # 1d/R-12: dopredny guard configu — marker, odmietnuta prestavba bez mutacie a bez kroku Spat, kopia/sablony, citanie dalej bezi

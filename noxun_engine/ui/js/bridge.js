@@ -697,6 +697,8 @@
       renderFronts(c.fronts, keepGaps);
       currentZoneTree = c.zone_tree ? sanitizeTree(c.zone_tree) : defaultTree();
       tplNameSuggestion = c.template_name_suggestion || ''; // D-14 modal prefill
+      // S1-C: očakávania označenej skrinky (prefill checkboxov D-14 modalu).
+      cabApplianceExpects = Array.isArray(c.appliance_expects) ? c.appliance_expects.slice() : [];
       // Codex GH #46 P2: preklik na INY korpus pri otvorenom modale = zavriet
       // (mode ostava cab, setUiMode guard nezabera; identitu navyse strazi server).
       // UI-B3 (Codex audit BLOCKER 2): „iny" znamena aj INY DOKUMENT — ID skriniek
@@ -744,7 +746,8 @@
       // skrinky — chýbajúci kľúč (staršie okno) znamená prázdny zoznam, teda
       // skrytý riadok, nikdy zvyšok po predchádzajúcej skrinke.
       if (typeof renderApplianceRows === 'function'){
-        renderApplianceRows(c.appliance_rows || [], { kind: 'cabinet', id: c.cabinet_id || '' },
+        renderApplianceRows(c.appliance_rows || [],
+                            { kind: 'cabinet', id: c.cabinet_id || '', pid: c.cabinet_pid },
                             'applRows');
       }
       // S1-F: kontrolna geometria pre nahlad. Chybajuci kluc (staršie okno) =

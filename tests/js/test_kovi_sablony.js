@@ -66,7 +66,9 @@ eq(checkbox.checked, true, 'prve otvorenie predvoli dnesne spravanie');
 eq(el('tplSaveName').value, 'Zásuvková', 'navrh mena ostava');
 fm.saveTemplateAs();
 eq(sent[0], { name: 'Zásuvková', cabinet_id: 'CAB-007', model_guid: 'model-kovi',
-  type: 'lower', with_hardware: true }, 'server dostane bool aj existujucu identitu');
+  type: 'lower', with_hardware: true, expects: [] },
+  'server dostane bool aj existujucu identitu; S1-C: modal je AUTORITA ocakavani, ' +
+  'takze prazdny zoznam znamena „tato sablona nic neocakava" (chybajuci kluc = starsi klient)');
 eq(order, ['flush', 'save'], 'rozpisane edity sa flushnu pred ulozenim');
 
 fm.openSaveTemplateModal();

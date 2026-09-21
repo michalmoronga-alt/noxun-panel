@@ -114,8 +114,17 @@ adresu vlastníka **majú** (`owner_id` + `owner_pid`), takže klik označí skr
 vybaví **pred** akýmkoľvek výberom entít: `route_target` z neho prečíta `data.route` a vráti **deep-link do sekcie** (`appl` → Rozpočet, kotva `appliance:<uuid>`);
 výber sa pri tom **nedotkne** a okno riadok krátko prisvieti (`budOpenAnchor` — **až PO vykreslení sekcie**, lebo je to dotaz do DOM; kotvy `bom` a `mat` naopak
 menia stav, z ktorého render kreslí, a preto bežia pred ním). Bez toho by všeobecný resolver buď neoznačil nič („zoznam sa medzitým zmenil"),
-alebo — pri recyklovanom ID — označil **cudziu** skrinku. S1-B2 prepne cieľ trasy na pohľad „V zákazke" zmenou **jedinej** mapy `ROUTE_SECTIONS`. Záznamy `expected_missing` (vlastník, ktorý spotrebič len očakáva) sú v zbere
-pre pohľad „V zákazke" — nález z nich robí až S1-C.
+alebo — pri recyklovanom ID — označil **cudziu** skrinku. S1-B2 prepne cieľ trasy na pohľad „V zákazke" zmenou **jedinej** mapy `ROUTE_SECTIONS`.
+
+**S1-C — `appliance_missing` („spotrebič nevybraný"), ORANGE a bez brány.** Zo záznamov `expected_missing` toho istého zberu (vlastník, ktorý spotrebič **očakáva**
+a žiadny priradený nemá — `appliance_expects[]`, slot umývačky vždy) robí `check_appliance_missing` **jeden nález na NESPLNENÚ KATEGÓRIU**: skrinka s rúrou aj
+mikrovlnkou má **dva** riadky, lebo sú to dve samostatné veci na opravu. `stable_key` preto nesie kategóriu — **`appliance|<owner_id>|missing|<kategória>`** (vlastný
+tvar: nález nemá `item_id`, položka ešte neexistuje). Klik mieri na **vlastníka** (`owner_id` + `owner_pid`): na rozdiel od siroty ho **poznáme**, záznam vznikol z tej
+entity, ktorá v modeli stojí. Veta menuje druh, ID aj kategóriu v 4. páde a hovorí **obe** cesty von („Skrinka CAB-3 očakáva rúru, ale priradený spotrebič nemá — priraď
+ho v riadku Spotrebič alebo očakávanie zruš"). Nález **neblokuje export** — skrinka sa vyrába rovnako, je to upozornenie pred objednávkou; badge navigácie ho ráta
+existujúcou cestou `counts`. **Čo je splnené, rozhoduje obojsmerný dôkaz** — jedna funkcia pre celý engine, `ApplianceBinding.bound_categories` (nad `ref_matches?`),
+ktorú volá `Bom.appliance_expected_records` **aj riadok Spotrebič v Inspectore**: ani recyklované ID vlastníka, ani osirelý záznam v `appliance_refs[]` po zmazanej
+položke očakávanie nesplnia, a panel preto v takom stave **ponúka výber modelu** namiesto toho, aby ho potlačil. Kontrakt očakávaní je v [appliances.md](appliances.md).
 
 ### production_core.rb — zdieľané čisté jadro výstupov zákazky (ŠT-1a PR A)
 

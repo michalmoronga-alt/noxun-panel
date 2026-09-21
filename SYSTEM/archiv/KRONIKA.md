@@ -17,6 +17,36 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **S1-C — OČAKÁVANÝ SPOTREBIČ + ORANGE „spotrebič nevybraný" (v0.12.16, 21.9.2026, PR #N).** Skrinka vie odteraz povedať, že do nej **patrí rúra**, ešte
+  predtým, než je rúra vybraná. Nastaví sa to **dvomi cestami**: v modale „Uložiť ako šablónu" (skupina checkboxov — chladnička · rúra · mikrovlnka; pri slote
+  je voľba daná a zamknutá) alebo priamo v riadku Spotrebič v Inspectore. Skrinka vložená z takej šablóny očakávanie **nesie so sebou** a Kontrola na ňu svieti
+  **ORANGE „spotrebič nevybraný"**, kým sa spotrebič nepriradí — jeden riadok **na každú nesplnenú kategóriu** (rúra aj mikrovlnka v jednej skrinke sú dve
+  samostatné veci na opravu). Slot umývačky očakáva umývačku **sám od seba**. Aplikovanie šablóny na existujúcu skrinku jej priradené spotrebiče **nezoberie**
+  a očakávania **zjednotí**.
+  **PREČO TAK (rozhodnutia po Codex audite, 4 BLOCKER + 12 FIX):** (1) **JEDNA REPREZENTÁCIA** — očakávania žijú len v `config['appliance_expects']`, aj tie
+  šablónové; záznam knižnice žiadny vlastný kľúč nedostal. (2) **ODCHÝLKA OD PLÁNU: `TemplateStore::STD` sa NEBUMPUJE** (ostáva 5). Pri reprezentácii v configu
+  starší plugin (od schémy 16, teda od S1-E) očakávania číta aj vkladá správne a plugin spred S1-E config schémy 16 odmieta už dnes — bump by knižnicu len
+  zamkol pre zápis bez jediného dôvodu. (3) **DÔKAZ SPLNENIA je ten istý obojsmerný dôkaz ako pri väzbe** (`ref_matches?`): ani recyklované ID vlastníka, ani
+  osirelý záznam v `appliance_refs[]` po zmazanej položke očakávanie nesplnia — obe skratky by semafor ticho zhasli. (4) **Zápis bez prestavby pečiatkuje
+  schému** (`write_config_keys!`): bez pečiatky by `normalize` očakávanie starej skrinky pri najbližšej prestavbe zahodil. (5) **Očakávať sa dá len to, čo sa
+  k tomu kusu smie aj priradiť** — jedna matica pre väzbu aj pre očakávanie.
+  **VEDOMÁ REVÍZIA PRAVIDLA B2 „prázdny zoznam riadok skryje":** skrinka a doska majú odteraz vždy **jeden tlmený riadok voľby „očakáva"** (slot nie — očakáva
+  umývačku vždy). Bez viditeľnej voľby by sa očakávanie **bez šablóny nedalo zapnúť vôbec**; mockup R10 to hovorí priamo a schované ovládanie je horšie než
+  jeden riadok. Pravidlo „vertikálny priestor panela je vzácny" platí ďalej v tom, že je to **jeden** riadok bez semaforu, nie nový sektor.
+  **CODEX KOLO 1 (1×P1 + 2×P2) prepísalo jedno rozhodnutie auditu:** config-only zápis **marker `config_schema` NEPOSÚVA**. Pôvodne ho pečiatkoval (rozhodnutie C4)
+  — a to by bolo tichou regresiou výroby: marker je u skrinky **provenienciou STAVBY** a čítajú ho stale guardy zásuviek, závesov a výklopov
+  (`DRAWER/HINGE/LIFT_ACTIVATION_SCHEMA`), takže jeho posunutie bez prestavby by vyhlásilo, že skrinka je postavená s funkciami, ktoré v nej nie sú — **RED nálezy
+  aj blokácia nákupu a cenových exportov by zmizli**. Kus na staršej schéme sa preto odmietne pred operáciou a používateľ ho najprv prestaví (prestavba schému
+  zmigruje plným plánom). Ďalšie dve opravy: riadok očakávaní sa po odoslaní **zamkne** a lokálny snapshot sa posunie optimisticky (dve rýchle voľby sa inak obe
+  počítali zo zastaraného zoznamu a druhá prvú prepísala), a **Inspector číta množinu splnených kategórií tou istou funkciou ako Kontrola** — osirelý ref mu predtým
+  potlačil výber modelu práve tam, kde Kontrola priradiť kázala.
+  **CODEX KOLO 2 (1×P2):** zámok „viazanú kategóriu odstrániť nedáš" sa počítal z **celej** väzby, takže skrinka s priradenou — ale nikdy neočakávanou — rúrou
+  nemohla pridať očakávanie mikrovlnky (nový zoznam `['microwave']` sa tváril ako odstránenie rúry). Väzba a očakávanie sú dve nezávislé veci, preto sa rozdiel
+  počíta z prieniku **viazané ∩ dnes uložené** mínus nový zoznam.
+  **Testy:** 4499 headless · 127 JS sád · in-SU `run_s1c` (celý cyklus šablóny, očakávanie bez šablóny, staršia schéma → odmietnutie → prestavba → zápis prejde,
+  osirelý ref, bariéra observera po natívnej kópii, slot, aplikovanie šablóny na viazanú skrinku). Cielene prepísané testy S1-B1 (`expected_missing` už nález dáva),
+  S1-B2 (riadok voľby, dôkaz cez ID vlastníka), S1-E (merge zjednocuje) a ŠT-3c (dlaždica má nový kľúč) — každý so zdôvodnením v commite.
+
 - **S1-F — KONTROLNÁ GEOMETRIA CHLADNIČKY + KONTROLA NIKY A DELENIA ČIEL (v0.12.15, 21.9.2026, PR #N).** Skrinka s priradenou chladničkou v modeli **nič
   neukazovala** a nikto nepovedal, či sa nika zmestí ani kde má byť hrana medzi čelami — Michal to kreslil ručne a delenie odhadoval. Táto dávka obe veci dorobila
   a **výstupy (kusovník, VEPO, nákup, rozpočet) nechala bajtovo nezmenené**.

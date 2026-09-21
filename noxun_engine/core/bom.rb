@@ -392,27 +392,29 @@ module Noxun
       end
 
       # Vlastnici, ktori spotrebic OCAKAVAJU, ale ziadny viazany nemaju
-      # (skrinka s `appliance_expects[]`, slot bez modelu). B1 ich len ZBIERA —
-      # ORANGE `appliance_missing` z nich robi az S1-C, pohlad „V zakazke"
-      # z nich kresli riadok „nevybraný" (S1-B2).
+      # (skrinka s `appliance_expects[]`, slot bez modelu). JEDEN zoznam, dvaja
+      # citatelia: Kontrola z nich robi ORANGE `appliance_missing` (S1-C)
+      # a pohlad „V zakazke" riadok „nevybraný" (S1-B2) — ziadny druhy sken.
       def appliance_expected_records(items, owners)
-        bound = {}
-        Array(items).each do |it|
-          next unless it.is_a?(Hash)
-
-          own = BudgetStore.owner_field(it['owner'])
-          next if own['kind'].to_s == 'job'
-
-          key = "#{own['id']}|#{BudgetStore.canon_appliance_type(it['typ'])}"
-          bound[key] = true
-        end
+        # DOKAZ SPLNENIA je TEN ISTY obojsmerny dokaz ako `bound` (Astra C3):
+        # polozka musi mat za vlastnika TUTO entitu A entita musi niest jej
+        # `item_id` v `appliance_refs[]`. Ani samotne ID vlastnika (ID sa
+        # recykluju — po zmazanej CAB-1 dostane cislo ina skrinka), ani samotna
+        # `category` v refs (osirely zaznam po zmazanej polozke) dokazom NIE JE;
+        # oboje by ocakavanie ticho „splnilo" a Kontrola by mlcala.
+        #
+        # Codex #385 kolo 1 (P2): mnozinu splnenych kategorii stavia JEDNA
+        # funkcia pre cely engine — `ApplianceBinding.bound_categories`. Ta ista
+        # ju vola aj riadok Spotrebica v Inspectore, inak by panel povazoval
+        # kategoriu za splnenu podla samotnej `category` v refs a potlacil by
+        # vyber modelu prave tam, kde Kontrola priradit KAZE.
         out = []
         owners.each do |oid, entry|
           cats = Array(entry['expects']).map { |c| BudgetStore.canon_appliance_type(c) }.compact
           cats << 'dishwasher' if entry['kind'] == 'slot'
+          bound = appliance_bound_categories(entry, items)
           cats.uniq.each do |cat|
-            next if bound["#{oid}|#{cat}"]
-            next if Array(entry['refs']).any? { |r| r['category'].to_s == cat }
+            next if bound.include?(cat)
 
             out << { 'item_id' => nil, 'name' => nil, 'category' => cat,
                      'owner' => { 'kind' => entry['kind'], 'id' => oid, 'pid' => entry['pid'] },
@@ -437,6 +439,15 @@ module Noxun
         return false unless defined?(ApplianceBinding)
 
         ApplianceBinding.ref_matches?(entry, owner, item_id)
+      end
+
+      # Kategorie, ktore su na TEJTO entite naozaj splnene. Tenky most nad
+      # `ApplianceBinding.bound_categories` — jedna autorita pre zber aj pre
+      # riadok Spotrebica v Inspectore (Codex #385 kolo 1 P2).
+      def appliance_bound_categories(entry, items)
+        return [] unless defined?(ApplianceBinding)
+
+        ApplianceBinding.bound_categories(entry, items)
       end
 
       # Zobrazovany nazov: vyrobca + model zo snapshotu, inak nazov z rozpoctu.

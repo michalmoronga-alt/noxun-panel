@@ -47,9 +47,48 @@
     return h + '</select>';
   }
 
+  // S1-C: PONUKA OČAKÁVANÍ. Prvá voľba je neutrálny SÚHRN („očakáva: rúra"),
+  // takže `<select>` bez vyslovenej hodnoty nikdy nič nezapíše; ďalšie voľby
+  // sú PRÍKAZY `add:<kód>` / `del:<kód>`. Viazanú kategóriu sa odobrať nedá —
+  // voľba ostáva viditeľná s dôvodom (`disabled`), aby bolo vidieť PREČO.
+  function aprExpectsHtml(row){
+    var opts = row.options || [];
+    var h = '<select class="aprsel" data-apr="expects" aria-label="Očakávaný spotrebič">' +
+            '<option value="">' + aprEsc(row.placeholder || 'očakáva: —') + '</option>';
+    opts.forEach(function(o){
+      h += '<option value="' + aprEsc(o.value) + '"' + (o.disabled ? ' disabled' : '') + '>' +
+           aprEsc(o.text) + '</option>';
+    });
+    return h + '</select>';
+  }
+
+  // Nový ÚPLNÝ zoznam očakávaní (čistá funkcia — Node test). Klient nikdy
+  // neposiela „pridaj/odober", ale celý zoznam: server tak porovnáva stav so
+  // stavom a nemusí hádať, z čoho klient vychádzal (Codex C13).
+  function aprExpectsNext(current, value){
+    var list = (current || []).map(String);
+    var v = String(value || '');
+    var i = v.indexOf(':');
+    if (i < 0) return null;
+    var op = v.slice(0, i), code = v.slice(i + 1);
+    if (!code) return null;
+    if (op === 'add') return list.indexOf(code) >= 0 ? list.slice() : list.concat([code]);
+    if (op === 'del') return list.filter(function(c){ return c !== code; });
+    return null;
+  }
+
   // Čistá funkcia (Node test): riadok payloadu -> HTML.
   function aprRowHtml(row){
     var r = row || {};
+    if (r.state === 'expects'){
+      // ÚPLNY aktuálny zoznam ide do DOM (nie len do pamäte): riadok sa
+      // prekresľuje celou kartou, takže jediné miesto, kde stav naozaj žije,
+      // je posledný payload servera.
+      return '<div class="aprow expects" data-apr-row="expects" data-apr-expects="' +
+        aprEsc((r.expects || []).join(',')) + '">' + aprIco('appliance') +
+        '<span class="aplbl">Spotrebič</span><span class="apsel">' + aprExpectsHtml(r) +
+        '</span><span class="aptxt soft">' + aprEsc(r.text) + '</span></div>';
+    }
     var bound = r.state === 'bound';
     var tone = String(r.tone || '');
     var id = aprEsc(r.item_id || '');
@@ -76,9 +115,9 @@
     return h;
   }
 
-  // Vykreslenie do uzla sekcie. Prázdny zoznam = riadok sa SCHOVÁ: skrinka,
-  // ktorá spotrebič nemá a ani ho neočakáva, o ňom nemá čo hovoriť
-  // (vertikálny priestor panela je vzácny).
+  // Vykreslenie do uzla sekcie. Prázdny zoznam = blok sa SCHOVÁ (o čom
+  // rozhoduje VÝHRADNE server). S1-C: skrinka a doska dostávajú aspoň riadok
+  // VOĽBY „očakáva", takže prázdno ostáva len tam, kde sa očakávať nedá nič.
   function renderApplianceRows(rows, ctx, nodeId){
     var box = aprEl(nodeId || 'applRows');
     if (!box) return false;
@@ -86,6 +125,10 @@
     var c = ctx || {};
     box.setAttribute('data-apr-kind', String(c.kind || 'cabinet'));
     box.setAttribute('data-apr-id', String(c.id || ''));
+    // S1-C: `persistent_id` kusu — jediný údaj, ktorý prežije recykláciu
+    // výrobného ID, takže server ním overuje, že zápis mieri na TEN kus,
+    // nad ktorým bol riadok vykreslený.
+    box.setAttribute('data-apr-pid', (c.pid == null ? '' : String(c.pid)));
     box.innerHTML = aprRowsHtml(list);
     box.hidden = list.length === 0;
     return list.length > 0;
@@ -102,6 +145,7 @@
     box.hidden = true;
     box.removeAttribute('data-apr-kind');
     box.removeAttribute('data-apr-id');
+    box.removeAttribute('data-apr-pid');
     return true;
   }
 
@@ -113,6 +157,7 @@
     var c = ctx || {};
     if (String(c.kind) === 'board') e.board_id = String(c.id || '');
     else e.cabinet_id = String(c.id || '');
+    if (c.pid != null && c.pid !== '') e.pid = c.pid;
     return e;
   }
 
@@ -121,7 +166,8 @@
     var box = (node && node.closest) ? node.closest('[data-apr-kind]') : null;
     if (!box) return null;
 
-    return { kind: box.getAttribute('data-apr-kind'), id: box.getAttribute('data-apr-id') };
+    return { kind: box.getAttribute('data-apr-kind'), id: box.getAttribute('data-apr-id'),
+             pid: box.getAttribute('data-apr-pid') };
   }
 
   function aprSend(extra, ctx){
@@ -142,6 +188,36 @@
     if (!id) return false;
 
     return aprSend({ item_id: id, unbind: true }, ctx);
+  }
+
+  // S1-C: zápis očakávaní. Vlastný callback (nie `set_appliance_owner`) —
+  // je to iná vec: žiadna položka zákazky sa nemení, len config kusu.
+  //
+  // DVE POISTKY PROTI RÝCHLEMU DRUHÉMU PRÍKAZU (Codex #385 kolo 1, P2). Zápis
+  // je asynchrónny a pravdu prinesie až čerstvá karta, takže dve voľby za sebou
+  // by sa obe počítali z TOHO ISTÉHO zastaraného zoznamu a druhá by prvú
+  // prepísala („pridaj rúru" + „pridaj mikrovlnku" = zostane len mikrovlnka):
+  //   1. **ovládač sa zamkne** (`disabled`), kým nepríde nový payload — server
+  //      posiela čerstvú kartu aj pri KAŽDOM odmietnutí, takže sa vždy odomkne,
+  //   2. **lokálny snapshot sa aktualizuje optimisticky** — príkaz, ktorý sa
+  //      napriek zámku dostane cez (klávesnica, oneskorená udalosť, druhý
+  //      ovládač v tom istom riadku), vychádza z AKTUÁLNEHO zoznamu.
+  // Klient si pritom nič nedopočítava: posiela ÚPLNY zoznam a server ho aj tak
+  // validuje a porovnáva so stavom modelu.
+  function aprSetExpects(select, ctx){
+    if (!ctx || !select) return false;
+    var row = (select.closest) ? select.closest('[data-apr-expects]') : null;
+    var raw = row ? String(row.getAttribute('data-apr-expects') || '') : '';
+    var cur = raw ? raw.split(',') : [];
+    var next = aprExpectsNext(cur, select.value);
+    select.value = ''; // späť na neutrálny súhrn; pravdu prinesie čerstvá karta
+    if (!next) return false;
+    if (typeof window === 'undefined' || !window.sketchup || !sketchup.set_appliance_expects) return false;
+
+    if (row) row.setAttribute('data-apr-expects', next.join(','));
+    select.disabled = true;
+    sketchup.set_appliance_expects(nxDocPayload(aprPayload({ expects: next }, ctx)));
+    return true;
   }
 
   // Ikona odkazu vedie do Štúdia na sekciu Spotrebiče; pri viazanom riadku
@@ -168,16 +244,20 @@
     // ponuku by inak spustilo prestavbu skrinky a krok Späť.
     document.addEventListener('change', function(ev){
       var t = ev.target;
-      if (!t || !t.getAttribute || t.getAttribute('data-apr') !== 'pick') return;
-      aprPick(t.value, aprCtxOf(t));
+      if (!t || !t.getAttribute) return;
+      var a = t.getAttribute('data-apr');
+      if (a === 'pick'){ aprPick(t.value, aprCtxOf(t)); return; }
+      if (a === 'expects'){ aprSetExpects(t, aprCtxOf(t)); }
     });
   }
 
-  // Node testy (tests/js/test_s1b2_pohlad.js) — ČISTÉ funkcie + vykreslenie,
-  // ktoré sa inak overiť nedá.
+  // Node testy (tests/js/test_s1b2_pohlad.js, test_s1c_expects.js) — ČISTÉ
+  // funkcie + vykreslenie, ktoré sa inak overiť nedá.
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { aprRowHtml: aprRowHtml, aprRowsHtml: aprRowsHtml,
                        aprSelectHtml: aprSelectHtml, aprPayload: aprPayload,
                        renderApplianceRows: renderApplianceRows, aprCtxOf: aprCtxOf,
-                       clearApplianceRows: clearApplianceRows };
+                       clearApplianceRows: clearApplianceRows,
+                       aprExpectsHtml: aprExpectsHtml, aprExpectsNext: aprExpectsNext,
+                       aprSetExpects: aprSetExpects };
   }

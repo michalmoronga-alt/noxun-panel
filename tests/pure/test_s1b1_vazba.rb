@@ -936,7 +936,10 @@ NxTest.test('S1-B1: Kontrola — tri kody, kazdy VLASTNY stable_key') do
   NxTest.assert_equal(101, specs['owner_pid'])
 end
 
-NxTest.test('S1-B1: neznama trieda NIE JE nezhoda (B15) a `expected_missing` nalez nedava') do
+# S1-C zmenil DRUHU polovicu tohto testu: `expected_missing` UZ nalez DAVA
+# (ORANGE `appliance_missing`). Prva polovica (neznama trieda nie je nezhoda)
+# plati dalej nezmenene.
+NxTest.test('S1-B1/S1-C: neznama trieda NIE JE nezhoda (B15), ocakavanie UZ nalez dava') do
   items = []
   NxS1B1::VAL.check_appliances(
     [{ 'item_id' => 'A1', 'name' => 'Umývačka', 'category' => 'dishwasher', 'state' => 'bound',
@@ -946,7 +949,8 @@ NxTest.test('S1-B1: neznama trieda NIE JE nezhoda (B15) a `expected_missing` nal
      { 'item_id' => nil, 'category' => 'oven', 'state' => 'expected_missing',
        'owner' => { 'kind' => 'cabinet', 'id' => 'CAB-5', 'pid' => 105 } }], items
   )
-  NxTest.assert_equal([], items, 'neznama trieda a ocakavanie nalez nedavaju (to je S1-C)')
+  NxTest.assert_equal(['appliance|CAB-5|missing|oven'], items.map { |i| i['stable_key'] },
+                      'neznama trieda nalez nedava, nesplnene ocakavanie ANO (S1-C)')
 end
 
 NxTest.test('S1-B1: Kontrola bez zoznamu = ziadny nalez (legacy volania)') do
