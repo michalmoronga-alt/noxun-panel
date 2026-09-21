@@ -1056,6 +1056,12 @@ module Noxun
       APPL_CLASS_MISMATCH = 'appliance_class_mismatch'
       APPL_NICHE_CLASH    = 'appliance_niche_clash'
       APPL_DOOR_SPLIT     = 'appliance_door_split'
+      # S1-C: kus OCAKAVA spotrebic (`appliance_expects[]`, slot vzdy), ale
+      # ziadny priradeny nema. Nalez je PER NESPLNENU KATEGORIU — skrinka
+      # s rurou aj mikrovlnkou ma dve samostatne veci na opravu, takze
+      # `stable_key` nesie kategoriu. Klik mieri na VLASTNIKA (na rozdiel od
+      # siroty ho poznáme: zaznam vznikol Z TEJ ENTITY, ktora v modeli stoji).
+      APPL_MISSING        = 'appliance_missing'
       # Vlastnici, u ktorych ma zmysel pytat sa na rozmery niky (doska ani „len
       # zakazka" niku nemaju).
       APPL_NICHE_OWNERS = %w[cabinet slot].freeze
@@ -1064,19 +1070,58 @@ module Noxun
         Array(list).each do |a|
           next unless a.is_a?(Hash)
 
+          owner = a['owner'].is_a?(Hash) ? a['owner'] : {}
+          # S1-C: zaznam BEZ polozky (`expected_missing`) je nesplnene
+          # OCAKAVANIE — vlastna vetva, lebo nema `item_id` ani meno modelu.
+          if a['state'].to_s == 'expected_missing'
+            check_appliance_missing(a, owner, items)
+            next
+          end
+
           id = a['item_id'].to_s
-          # Zaznamy bez polozky (`expected_missing`) su podklad pre pohlad
-          # „V zakazke" a pre S1-C — v B1 z nich nalez nevznika.
           next if id.empty?
 
           name = a['name'].to_s.strip
           name = 'bez názvu' if name.empty?
-          owner = a['owner'].is_a?(Hash) ? a['owner'] : {}
           case a['state'].to_s
           when 'owner_missing' then check_appliance_orphan(a, id, name, owner, items)
           when 'bound'         then check_appliance_bound(a, id, name, owner, items)
           end
         end
+      end
+
+      # S1-C: ORANGE „spotrebič nevybraný". Veta menuje VLASTNIKA aj
+      # KATEGORIU (4. pad) a hovori OBE cesty von — priradit spotrebic, alebo
+      # ocakavanie zrusit. Nalez NEBLOKUJE export: skrinka sa vyraba rovnako,
+      # je to upozornenie pred objednavkou.
+      def check_appliance_missing(rec, owner, items)
+        cat = rec['category'].to_s
+        return if cat.empty?
+
+        oid = owner['id'].to_s
+        who = appliance_owner_word(owner['kind'])
+        what = appliance_acc_label(cat)
+        items << { 'severity' => ORANGE, 'category' => CAT_APPLIANCE,
+                   'owner_id' => oid, 'owner_pid' => owner['pid'],
+                   'part_key' => nil, 'hw_key' => nil,
+                   'message_sk' => "#{who} #{oid.empty? ? '—' : oid} očakáva #{what}, ale priradený " \
+                                   'spotrebič nemá — priraď ho v riadku Spotrebič alebo ' \
+                                   'očakávanie zruš.',
+                   'data' => { 'route' => 'appl' },
+                   'stable_key' => "#{CAT_APPLIANCE}|#{oid}|missing|#{cat}" }
+      end
+
+      # Druh vlastnika v 1. pade s velkym pismenom (veta nim zacina). Slovnik
+      # je `ApplianceBinding.kind_label` — jedna tabulka pre cely engine.
+      def appliance_owner_word(kind)
+        word = defined?(ApplianceBinding) ? ApplianceBinding.kind_label(kind).to_s : kind.to_s
+        word.empty? ? 'Kus' : (word[0].upcase + word[1..].to_s)
+      end
+
+      def appliance_acc_label(code)
+        return code.to_s unless defined?(ApplianceCatalog)
+
+        ApplianceCatalog.category_label_acc(code)
       end
 
       # Astra B16: sirota NEMA `owner_id` — resolver klik-selectu by podla

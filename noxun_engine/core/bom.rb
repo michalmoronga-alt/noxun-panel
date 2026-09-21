@@ -392,16 +392,25 @@ module Noxun
       end
 
       # Vlastnici, ktori spotrebic OCAKAVAJU, ale ziadny viazany nemaju
-      # (skrinka s `appliance_expects[]`, slot bez modelu). B1 ich len ZBIERA —
-      # ORANGE `appliance_missing` z nich robi az S1-C, pohlad „V zakazke"
-      # z nich kresli riadok „nevybraný" (S1-B2).
+      # (skrinka s `appliance_expects[]`, slot bez modelu). JEDEN zoznam, dvaja
+      # citatelia: Kontrola z nich robi ORANGE `appliance_missing` (S1-C)
+      # a pohlad „V zakazke" riadok „nevybraný" (S1-B2) — ziadny druhy sken.
       def appliance_expected_records(items, owners)
+        # DOKAZ SPLNENIA je TEN ISTY obojsmerny dokaz ako `bound` (Astra C3):
+        # polozka musi mat za vlastnika TUTO entitu A entita musi niest jej
+        # `item_id` v `appliance_refs[]`. Ani samotne ID vlastnika (ID sa
+        # recykluju — po zmazanej CAB-1 dostane cislo ina skrinka), ani samotna
+        # `category` v refs (osirely zaznam po zmazanej polozke) dokazom NIE JE;
+        # oboje by ocakavanie ticho „splnilo" a Kontrola by mlcala.
         bound = {}
         Array(items).each do |it|
           next unless it.is_a?(Hash)
 
           own = BudgetStore.owner_field(it['owner'])
           next if own['kind'].to_s == 'job'
+
+          entry = owners[own['id'].to_s]
+          next unless appliance_bound?(entry, own, it['id'].to_s)
 
           key = "#{own['id']}|#{BudgetStore.canon_appliance_type(it['typ'])}"
           bound[key] = true
@@ -412,7 +421,6 @@ module Noxun
           cats << 'dishwasher' if entry['kind'] == 'slot'
           cats.uniq.each do |cat|
             next if bound["#{oid}|#{cat}"]
-            next if Array(entry['refs']).any? { |r| r['category'].to_s == cat }
 
             out << { 'item_id' => nil, 'name' => nil, 'category' => cat,
                      'owner' => { 'kind' => entry['kind'], 'id' => oid, 'pid' => entry['pid'] },
