@@ -755,6 +755,52 @@ NxTest.test('S1-C: VIAZANU kategoriu sa odstranit NEDA (osirely zaznam ju nezamk
   end
 end
 
+# Codex #385 kolo 2 (P2): priradeny spotrebic a OCAKAVANIE su dve NEZAVISLE
+# veci. Kym sa zamok pocital z CELEJ vazby, skrinka s viazanou (ale nikdy
+# neocakavanou) rurou nemohla pridat ocakavanie mikrovlnky — novy zoznam
+# `['microwave']` sa tvaril ako ODSTRANENIE rury.
+NxTest.test('S1-C (kolo 2 P2): zamok plati LEN na ocakavania, ktore na kuse NAOZAJ su') do
+  NxTest.skip!('payload testy potrebuju Store fake') unless NxTest.headless?
+  model = NxS1C::FakeModel.new
+  items = [NxS1C.item('I-1', 'oven', 'cabinet', 'CAB-3')]
+  NxS1C.with_stubs([[NxS1C::PANEL, :appliance_items, ->(_m) { items }]]) do
+    # (a) VIAZANA, ale NEOCAKAVANA rura: pridanie mikrovlnky MUSI prejst.
+    free = NxS1C.cabinet('CAB-3', 303, refs: [NxS1C.ref('I-1', 'oven')])
+    NxTest.assert(NxS1C::PANEL.appliance_expects_locked(model, free, %w[microwave]).nil?,
+                  'rura sa neodstranuje — nikdy ocakavana nebola')
+    NxTest.assert(NxS1C::PANEL.appliance_expects_locked(model, free, []).nil?,
+                  'ani prazdny zoznam nic neodobera')
+
+    # (b) VIAZANA A OCAKAVANA rura: jej odstranenie sa dalej ODMIETA.
+    kept = NxS1C.cabinet('CAB-3', 303, refs: [NxS1C.ref('I-1', 'oven')], expects: %w[oven])
+    msg = NxS1C::PANEL.appliance_expects_locked(model, kept, %w[microwave])
+    NxTest.refute(msg.nil?, 'ocakavanie viazanej rury sa zrusit neda')
+    NxTest.assert(msg.include?('rúru'), msg.to_s)
+    # Ponechanie rury a pridanie mikrovlnky je v poriadku.
+    NxTest.assert(NxS1C::PANEL.appliance_expects_locked(model, kept, %w[oven microwave]).nil?)
+  end
+end
+
+NxTest.test('S1-C (kolo 2 P2): ponuka volby to hovori ROVNAKO (viazana neocakavana = „+")') do
+  # Viazana, ale NEOCAKAVANA rura: volba ju ponuka PRIDAT a nie je zamknuta —
+  # zamknuty je len `del:` pri kategorii, ktora UZ v `appliance_expects` je.
+  cfg = { 'type' => 'lower', 'appliance_refs' => [NxS1C.ref('I-1', 'oven')] }
+  items = [NxS1C.item('I-1', 'oven', 'cabinet', 'CAB-3')]
+  rows = NxS1C::PANEL.appliance_rows('cabinet', cfg, items, nil, owner_id: 'CAB-3')
+  by = rows.find { |r| r['state'] == 'expects' }['options']
+          .each_with_object({}) { |o, h| h[o['code']] = o }
+  NxTest.assert_equal('add:oven', by['oven']['value'], 'viazana neocakavana rura = PRIDAT')
+  NxTest.refute(by['oven']['disabled'], 'a volba NIE JE zamknuta — nic sa neodobera')
+
+  # Ked uz ocakavana JE, `del:` je zamknuty s dovodom (nezmenene spravanie).
+  cfg2 = cfg.merge('appliance_expects' => %w[oven])
+  rows2 = NxS1C::PANEL.appliance_rows('cabinet', cfg2, items, nil, owner_id: 'CAB-3')
+  by2 = rows2.find { |r| r['state'] == 'expects' }['options']
+           .each_with_object({}) { |o, h| h[o['code']] = o }
+  NxTest.assert_equal('del:oven', by2['oven']['value'])
+  NxTest.assert(by2['oven']['disabled'], 'viazane ocakavanie sa odobrat neda')
+end
+
 NxTest.test('S1-C (C8): NEZMENENY vysledok = ZIADNA operacia (ziadny prazdny krok Spat)') do
   NxTest.skip!('payload testy potrebuju Store fake') unless NxTest.headless?
   model = NxS1C::FakeModel.new

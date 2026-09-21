@@ -5100,6 +5100,7 @@ module NoxunSuRunner
         s1c_template_cycle(model)
       end
       s1c_row_action(model)
+      s1c_bound_not_expected(model)
       s1c_legacy_schema(model)
       s1c_observer_barrier(model)
       s1c_slot(model)
@@ -5259,6 +5260,44 @@ module NoxunSuRunner
          s1c_set_expects(model, s1f_cab(model, cid), [])
          s1c_expects_of(s1f_cab(model, cid)).empty?
        end)
+    r14_clear!(model)
+    cleanup(model)
+  end
+
+  # (P2, Codex #385 kolo 2) VIAZANA, ale NEOCAKAVANA kategoria zamok NEDRZI.
+  # Priradeny spotrebic a OCAKAVANIE su dve NEZAVISLE veci — bezne vznikne
+  # tento stav priradenim spotrebica BEZ sablony (skrinka ho ma, ale nikdy ho
+  # „neocakavala"). Taka skrinka MUSI vediet pridat ocakavanie inej kategorie.
+  def s1c_bound_not_expected(model)
+    cab = e::CabinetBuilder.build(model, S1C_CAB)
+    return ok('S1-C (kolo 2 P2): fixtura skrinky', false) unless cab
+
+    cid = e::Store.get(cab, 'cabinet_id').to_s
+    s1b1_apply(model, 'create', attrs: { 'nazov' => 'Rúra' }, catalog_id: @s1c_oven)
+    item = s1b1_items(model).last['id']
+    cab = s1f_cab(model, cid)
+    s1b2_pick(model, cab, item, echo: cid)
+    cab = s1f_cab(model, cid)
+    ok("S1-C (kolo 2 P2): fixtura — rura je VIAZANA a NEOCAKAVANA " \
+       "(#{s1b1_refs(cab).length} refs, #{s1c_expects_of(cab).inspect})",
+       s1b1_refs(cab).length == 1 && s1c_expects_of(cab).empty?)
+
+    # Presne ten pripad z nalezu: novy zoznam neobsahuje `oven`, ale ziadne
+    # ocakavanie rury sa neodstranuje — nikdy ziadne nebolo.
+    s1c_set_expects(model, cab, %w[microwave])
+    cab = s1f_cab(model, cid)
+    ok("S1-C (kolo 2 P2): pridanie mikrovlnky PRESLO (#{s1c_expects_of(cab).inspect})",
+       s1c_expects_of(cab) == %w[microwave] && s1b1_refs(cab).length == 1)
+
+    # Ked uz rura OCAKAVANA je, jej odstranenie sa (spravne) ODMIETA.
+    s1c_set_expects(model, cab, %w[oven microwave])
+    cab = s1f_cab(model, cid)
+    ok("S1-C (kolo 2 P2): doplnenie rury do ocakavani preslo (#{s1c_expects_of(cab).inspect})",
+       s1c_expects_of(cab) == %w[oven microwave])
+    s1c_set_expects(model, cab, %w[microwave])
+    cab = s1f_cab(model, cid)
+    ok("S1-C (kolo 2 P2): a teraz uz sa viazana rura zrusit NEDA (#{s1c_expects_of(cab).inspect})",
+       s1c_expects_of(cab) == %w[oven microwave])
     r14_clear!(model)
     cleanup(model)
   end

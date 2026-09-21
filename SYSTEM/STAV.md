@@ -20,7 +20,7 @@ Etapa **V0.6 (katalógy a ceny) je obsahovo splnená**. **Od 20.8. sa z pluginu 
 od S1-B1 v `BUDGET_STD` 2:** marker zapíše **prvá** mutácia rozpočtu akéhokoľvek druhu a starší plugin odvtedy zákazku needituje **a zastaví oba cenové exporty**.
 Pred takou zákazkou aktualizovať **obe PC**.
 
-**S1-C (najnovšie):** **4497 headless · 127 JS sád · 3036 in-SketchUp PASS / 0 FAIL** (nové sady `test_s1c_expects.rb` + `test_s1c_expects.js`, in-SU `run_s1c`).
+**S1-C (najnovšie):** **4499 headless · 127 JS sád · 3036 in-SketchUp PASS / 0 FAIL** (nové sady `test_s1c_expects.rb` + `test_s1c_expects.js`, in-SU `run_s1c`).
 **S1-F:** 4452 · 126 · 2989. **S1-B2:** 4411 · 126 · 2963. **S1-B1:** 4369 · 124 · 2935 (3 kolá Codexu). **D-130b:** 4155 · 120 · 2779. **D-130a:** 4141 · 119 · 2765. **D-134:** 4128 · 118 · 2745. **D-133:** 4111 · 118 · 2717.
 **D-132:** 4095 · 118 · 2705. **D-131:** 4080 · 117 · 2693. **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md); fyzický druhý PC, SU 2024 a render netestované).
 **Michal 11.9. potvrdil** test produktových odkazov aj potvrdzovania cien (CENY-KOV-A/B, #345/#346) **a** kontrolu balíka Čiel v0.11.0.

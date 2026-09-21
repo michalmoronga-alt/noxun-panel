@@ -40,7 +40,10 @@
   zmigruje plným plánom). Ďalšie dve opravy: riadok očakávaní sa po odoslaní **zamkne** a lokálny snapshot sa posunie optimisticky (dve rýchle voľby sa inak obe
   počítali zo zastaraného zoznamu a druhá prvú prepísala), a **Inspector číta množinu splnených kategórií tou istou funkciou ako Kontrola** — osirelý ref mu predtým
   potlačil výber modelu práve tam, kde Kontrola priradiť kázala.
-  **Testy:** 4497 headless · 127 JS sád · in-SU `run_s1c` (celý cyklus šablóny, očakávanie bez šablóny, staršia schéma → odmietnutie → prestavba → zápis prejde,
+  **CODEX KOLO 2 (1×P2):** zámok „viazanú kategóriu odstrániť nedáš" sa počítal z **celej** väzby, takže skrinka s priradenou — ale nikdy neočakávanou — rúrou
+  nemohla pridať očakávanie mikrovlnky (nový zoznam `['microwave']` sa tváril ako odstránenie rúry). Väzba a očakávanie sú dve nezávislé veci, preto sa rozdiel
+  počíta z prieniku **viazané ∩ dnes uložené** mínus nový zoznam.
+  **Testy:** 4499 headless · 127 JS sád · in-SU `run_s1c` (celý cyklus šablóny, očakávanie bez šablóny, staršia schéma → odmietnutie → prestavba → zápis prejde,
   osirelý ref, bariéra observera po natívnej kópii, slot, aplikovanie šablóny na viazanú skrinku). Cielene prepísané testy S1-B1 (`expected_missing` už nález dáva),
   S1-B2 (riadok voľby, dôkaz cez ID vlastníka), S1-E (merge zjednocuje) a ŠT-3c (dlaždica má nový kľúč) — každý so zdôvodnením v commite.
 

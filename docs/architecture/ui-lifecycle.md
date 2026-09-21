@@ -1922,7 +1922,9 @@ Po úspechu ide `push_selected` (čerstvá karta) a status menuje model aj vlast
    s vetou „najprv ju prestav (Aplikuj zmeny), potom nastav očakávanie" — [construction.md](construction.md), `write_config_keys!`). **Prázdne echo ani chýbajúci `pid`
    sa tu netolerujú** (na rozdiel od `set_appliance_owner`): riadok ich kreslí vždy, takže ich absencia je presne ten starý DOM, proti ktorému guard stojí,
 4. **striktná validácia vstupu** proti matici druhu (`ApplianceBinding.validate_expects` — [appliances.md](appliances.md)),
-5. **„viazanú kategóriu odstrániť nedáš"** (`appliance_expects_locked` nad tým istým obojsmerným dôkazom),
+5. **„viazanú kategóriu odstrániť nedáš"** (`appliance_expects_locked` nad tým istým obojsmerným dôkazom) — zámok sa však týka **len očakávaní, ktoré na kuse
+   naozaj sú** (prienik `viazané ∩ uložené appliance_expects` mínus nový zoznam, Codex #385 kolo 2): väzba a očakávanie sú dve nezávislé veci, takže skrinka
+   s priradenou, ale nikdy neočakávanou rúrou musí vedieť pridať očakávanie mikrovlnky,
 6. **nezmenený výsledok = ŽIADNA operácia** (status „Očakávanie sa nezmenilo", žiadny prázdny krok Späť).
 
 Zapisuje `CabinetBuilder.write_config_keys!` / `BoardBuilder.write_config_keys!` pod `CabinetBuilder.guarded` v jednej `start_operation`; výnimka = `abort`.

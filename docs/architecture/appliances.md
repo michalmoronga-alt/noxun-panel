@@ -104,7 +104,11 @@ ešte nič nestojí — návrh ide ďalej, len sa nezabudne.
   a výklopov — tiché posunutie by zhaslo RED nálezy aj blokáciu exportov. Kus na **staršej schéme** sa preto odmietne ešte pred operáciou („najprv ju prestav,
   potom nastav očakávanie") — schému migruje výhradne prestavba plným plánom. Guardy a poradie sú v [ui-lifecycle.md](ui-lifecycle.md) (`actions_appliance.rb`).
 - **VIAZANÚ kategóriu sa odstrániť nedá** — najprv odpoj spotrebič. Bránou je server a rozhoduje **ten istý** dôkaz, takže osirelý záznam očakávanie
-  **nezamkne** (inak by ho po zmazanej položke nikto nikdy nedostal preč).
+  **nezamkne** (inak by ho po zmazanej položke nikto nikdy nedostal preč). **Zámok sa pritom týka LEN očakávaní, ktoré na kuse naozaj sú** (Codex #385 kolo 2):
+  priradený spotrebič a očakávanie sú **dve nezávislé veci** — skrinka môže mať viazanú rúru bez toho, aby ju kedy „očakávala". Rozdiel sa preto počíta
+  z prieniku **viazané ∩ dnes uložené** mínus nový zoznam; kým sa porovnávala celá väzba, taká skrinka nemohla pridať očakávanie mikrovlnky (nový zoznam
+  `['microwave']` sa tváril ako odstránenie rúry). Ponuka voľby hovorí to isté: viazaná, ale neočakávaná kategória sa ponúka ako **„+"** a zamknuté je len
+  `del:` pri kategórii, ktorá v `appliance_expects[]` už je.
 - **ŠABLÓNY:** `Panel.template_config_from` očakávania prenáša a `appliance_refs[]` **nikdy**; vloženie ich berie zo **ULOŽENÉHO záznamu**
   (`apply_template_slot_fields!`, E7), nie z CEF payloadu, a **deklarovaná šablóna, ktorá medzitým zmizla, vklad odmietne** (inak by vznikla iná skrinka,
   než si používateľ vybral). `TemplatesDialog.merge_template` (aplikovanie na existujúcu skrinku) **zjednocuje** očakávania cieľa a šablóny a väzby cieľa

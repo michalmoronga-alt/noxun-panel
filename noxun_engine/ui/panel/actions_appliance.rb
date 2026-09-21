@@ -242,11 +242,20 @@ module Noxun
         # obojsmerny dokaz ako v zbere (`ApplianceBinding.bound_categories`),
         # nie samotna `category` v refs. Inak by osirely zaznam po zmazanej
         # polozke navzdy zamkol ocakavanie, ktore uz nikto neplni.
+        #
+        # ZAMOK SA TYKA LEN OCAKAVANI, KTORE NA KUSE NAOZAJ SU (Codex #385
+        # kolo 2 P2). Priradeny spotrebic a OCAKAVANIE su dve NEZAVISLE veci:
+        # skrinka moze mat viazanu ruru BEZ toho, aby ju niekedy „ocakavala".
+        # Kym sa porovnaval cely `bound` proti novemu zoznamu, taka skrinka
+        # nemohla pridat ocakavanie mikrovlnky — `['microwave']` sa tvarilo,
+        # ze RUSI ocakavanie rury, ktore nikdy neexistovalo. Rozdiel sa preto
+        # pocita z PRIENIKU „viazane ∩ dnes ulozene", nie z celej vazby.
         # -> hlaska, alebo nil
         def appliance_expects_locked(model, inst, list)
+          have = Array((Store.config(inst) || {})['appliance_expects']).map(&:to_s)
           entry = ApplianceBinding.owner_entry_for(inst)
           bound = ApplianceBinding.bound_categories(entry, appliance_items(model))
-          gone = bound.reject { |c| list.include?(c) }
+          gone = bound.select { |c| have.include?(c) }.reject { |c| list.include?(c) }
           return nil if gone.empty?
 
           what = gone.map { |c| ApplianceCatalog.category_label_acc(c) }.join(', ')
