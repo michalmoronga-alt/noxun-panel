@@ -4863,6 +4863,11 @@ module NoxunSuRunner
        rcfg['source'].to_s == 'catalog' && rcfg['item_id'].to_s == item_id)
     ok("S1-F (a): identita boxu je PER POLOZKA (#{e::Store.get(ref, 'id')})",
        e::Store.get(ref, 'id').to_s.start_with?("#{cid}-REF-NICHE-"))
+    # Codex #384 kolo 1 (P2): box sa v modeli vola MENOM MODELU (vyrobca +
+    # nazov zo zaznamu vazby), nie genericky „Chladnička".
+    ok("S1-F (a): box sa v modeli vola menom modelu (#{e::Store.get(ref, 'name')})",
+       e::Store.get(ref, 'name').to_s == 'Beko SU BCNA306 — kontrolná nika' &&
+       ref.name.to_s == e::Store.get(ref, 'name').to_s)
 
     s1e_rebuild(model, cab, 'height' => 2076.0)
     cab = s1f_cab(model, cid)

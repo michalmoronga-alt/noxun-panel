@@ -585,3 +585,79 @@ NxTest.test('S1-F: `merge_final` referencie do configu NEUKLADA (model ostava ci
   NxTest.refute(body.empty?, '`merge_final` sa nasla')
   NxTest.refute(body.include?('references'), 'plan referencii sa neperzistuje')
 end
+
+# ================= 8) CODEX #384 KOLO 1 (P2) — opravy ======================
+
+NxTest.test('S1-F (#384 P2): zaznam BEZ pasiem dveri nema v nahlade ZIADNE pasmo') do
+  bez = NxS1F.ref('I-1').reject { |k, _v| k == 'bands' }
+  cfg = NxS1F.cab('appliance_refs' => [bez])
+  rd = NxS1F.plan_refs(cfg).first
+  NxTest.assert(rd[:box], 'box vznikne — minima niky su tam')
+  NxTest.assert(rd[:bands].nil?, 'deskriptor pasma nenesie')
+  NxTest.assert_equal([], NxS1F::CB.niche_band_levels({}), 'renderer modelu ziadnu ciaru nekresli')
+  pv = NxS1F::PANEL.appliance_preview(cfg, [])
+  NxTest.assert_equal([], pv.first['bands'],
+                      "nahlad nesmie vymysliet jedno pasmo cez cely box: #{pv.first['bands'].inspect}")
+end
+
+NxTest.test('S1-F (#384 P2): vazba nesie MENO MODELU a box sa nim v modeli vola') do
+  item = { 'id' => 'I-1', 'typ' => 'fridge',
+           'snapshot' => NxS1F.snapshot.merge('manufacturer' => 'Beko', 'name' => 'BCNA306E5ZSN') }
+  rec = Noxun::Engine::ApplianceBinding.ref_record(item)
+  NxTest.assert_equal('Beko', rec['manufacturer'], 'zaznam vazby nesie vyrobcu')
+  NxTest.assert_equal('BCNA306E5ZSN', rec['name'], 'aj model')
+  rd = NxS1F.plan_refs(NxS1F.cab('appliance_refs' => [rec.merge('niche' => NxS1F.ref['niche'])])).first
+  NxTest.assert_equal('Beko BCNA306E5ZSN — kontrolná nika', rd[:label])
+  # Starsi zaznam (pred opravou) mena nema — label padne na kategoriu.
+  old = NxS1F.plan_refs(NxS1F.cab('appliance_refs' => [NxS1F.ref])).first
+  NxTest.assert_equal('Chladnička — kontrolná nika', old[:label], 'fallback ostava')
+  # Chybajuce meno = KLUC CHYBA (nikdy prazdny retazec).
+  holy = Noxun::Engine::ApplianceBinding.ref_record('id' => 'I-2', 'typ' => 'fridge',
+                                                    'snapshot' => { 'manufacturer' => '  ' })
+  NxTest.refute(holy.key?('manufacturer'), 'prazdny vyrobca sa nezapise')
+end
+
+NxTest.test('S1-F (#384 P2): `unknown` delenia je v riadku VIDIET — a ton ostava zeleny') do
+  it = NxS1F.item('I-1', 'fridge', 'CAB-3', NxS1F.snapshot(nil, {}))
+  cfg = NxS1F.cab('appliance_refs' => [NxS1F.ref], 'fronts' => NxS1F.fronts(695.0))
+  v = NxS1F::AC.verdict(NxS1F.record(cfg, [it]))
+  NxTest.assert_equal('unknown', v['door_split']['state'])
+  NxTest.assert(v['text'].include?('nedá odporučiť'), "verdikt povie PRECO: #{v['text']}")
+  row = NxS1F::PANEL.appliance_rows('cabinet', cfg, [it],
+                                    NxS1F::PANEL.appliance_interior(cfg)).first
+  NxTest.assert(row['sub'].include?('nedá odporučiť'), "riadok to ZOBRAZI: #{row['sub']}")
+  NxTest.assert_equal('ok', row['tone'], 'stav „nevieme" nie je varovanie (F7/F9)')
+  NxTest.assert_equal([], NxS1F.findings(NxS1F.record(cfg, [it])), 'a nalez z neho nevznika')
+  # `na` (delenie sa netyka) sa NEZOBRAZUJE — je to stav skrinky, nie modelu.
+  jedno = NxS1F.cab('appliance_refs' => [NxS1F.ref],
+                    'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'auto' }] })
+  vna = NxS1F::AC.verdict(NxS1F.record(jedno))
+  NxTest.refute(vna['text'].include?('netýka'), "stav `na` ostava mimo riadku: #{vna['text']}")
+end
+
+NxTest.test('S1-F (#384 P2): ponuka aj verdikt meraju TOU ISTOU toleranciou (0,5 mm)') do
+  NxTest.assert_close(0.5, NxS1F::AC::AXIS_TOL)
+  # 559,7 vs min 560 — rozdiel 0,3 je vec zaokruhlenia listu, nie montaze.
+  NxTest.assert(NxS1F::AC.axis_fits?(559.7, 560.0, nil), 'ponuka: zmesti sa')
+  NxTest.assert_equal('ok', NxS1F::AC.axis_check('width', { 'width_min' => 560.0 }, 559.7).first,
+                      'verdikt: to iste')
+  # 559,4 uz nesedi — a NESEDI OBOM cestam.
+  NxTest.refute(NxS1F::AC.axis_fits?(559.4, 560.0, nil), 'ponuka: nesedi')
+  NxTest.assert_equal('clash', NxS1F::AC.axis_check('width', { 'width_min' => 560.0 }, 559.4).first,
+                      'verdikt: nesedi rovnako')
+  # Cez REALNE cesty: skrinka so sirkou vnutra 559,7 (600 - 2 x 20,15);
+  # vyska je dorovnana tak, aby vnutro ostalo presne 1940 (testuje sa SIRKA).
+  hrubka = { 'thickness' => 20.15, 'height' => 2080.3 }
+  cfg = NxS1F.cab(hrubka.merge('appliance_refs' => [NxS1F.ref]))
+  NxTest.assert_close(559.7, NxS1F::PANEL.appliance_interior(cfg)['width'], 0.01)
+  volna = { 'id' => 'FREE', 'typ' => 'fridge', 'nazov' => 'Beko',
+            'owner' => { 'kind' => 'job' }, 'snapshot' => NxS1F.snapshot }
+  ocak = NxS1F.cab(hrubka.merge('appliance_expects' => ['fridge']))
+  opt = NxS1F::PANEL.appliance_rows('cabinet', ocak, [volna],
+                                    NxS1F::PANEL.appliance_interior(cfg)).first['options'].first
+  NxTest.assert(opt['fits'], "ponuka model prijme: #{opt['hint']}")
+  NxTest.assert_equal('ok', NxS1F::AC.niche_verdict(NxS1F.record(cfg))['axes']['width'],
+                      'a Kontrola ho vzapati NEZHODI')
+  # Stav „nevieme" nie je „nesedí" — model bez rozmerov niky ponuka neoznaci.
+  NxTest.assert(NxS1F::AC.axis_fits?(564.0, nil, nil), 'bez cisla listu sa nefiltruje')
+end

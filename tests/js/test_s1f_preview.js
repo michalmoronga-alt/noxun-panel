@@ -114,6 +114,18 @@ PV.drawApplianceRefs(S3, rx, ry, { W: 600, H: 2076 },
                      [null, {}, { box: { x: 0, z: 0, w: 0, h: 100 } }]);
 eq(S3.length, 0, 'prazdny payload nic nekresli');
 
+// Codex #384 kolo 1 (P2): model BEZ udajov o dverach ma PRAZDNY zoznam pasiem —
+// a nahlad vtedy kresli holy box. Ziadna vymyslena ciara, ziadny popisok cez
+// cely box (v modeli ich renderer tiez nekresli).
+let S3b = [];
+PV.drawApplianceRefs(S3b, rx, ry, { W: 600, H: 2076 },
+                     [{ item_id: 'I-9', state: 'ok', bands: [],
+                        box: { x: 20, z: 118, w: 560, h: 1940 } }]);
+const bezPasiem = S3b.join('');
+eq((bezPasiem.match(/<rect /g) || []).length, 1, 'kresli sa LEN box');
+eq((bezPasiem.match(/<line /g) || []).length, 0, 'ziadna ciara pasma');
+eq((bezPasiem.match(/<text /g) || []).length, 0, 'ani popisok „1940" cez cely box');
+
 // ============ 3) PASMO HRANY: stavy a jednostranny rozsah ==================
 
 let S4 = [];
@@ -168,5 +180,18 @@ ok(rowHtml.indexOf('679–727') >= 0, 'vratane pasma delenia');
 const AR_SRC = require('node:fs').readFileSync(path.join(JS, 'appliance_row.js'), 'utf8');
 ok(AR_SRC.indexOf('niche') < 0 && AR_SRC.indexOf('door_split') < 0,
    'komponent riadku o nike ani o deleni NIC nevie — kresli `text`/`sub`/`tone`');
+
+// Codex #384 kolo 1 (P2): INFORMACNY stav delenia („nevieme preco") sa v riadku
+// ZOBRAZI, ale riadok ostava zeleny — varovanie je len clash a unsatisfiable.
+const infoRow = AR.aprRowHtml({
+  state: 'bound', item_id: 'I-9', category: 'fridge', category_label: 'Chladnička',
+  text: 'Ručný záznam', tone: 'ok',
+  sub: 'Chladnička · nika ✓ — šírka, výška a hĺbka ✓ · delenie čiel sa nedá odporučiť — ' +
+       'list nedáva rozmery dverí spotrebiča',
+  link: true
+});
+ok(infoRow.indexOf('nedá odporučiť') >= 0, 'dovod je v riadku VIDIET');
+ok(infoRow.indexOf('aprow warn') < 0, 'a riadok pritom NIE JE oranzovy');
+ok(infoRow.indexOf('#i-check') >= 0, 'ikona ostava zelena „v poriadku"');
 
 console.log(`OK test_s1f_preview.js — ${n} kontrol`);
