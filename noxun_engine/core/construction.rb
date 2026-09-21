@@ -457,10 +457,18 @@ module Noxun
         rec
       end
 
-      # Popis do modelu: vyrobca a model zo zaznamu vazby, inak kategoria.
+      # Popis do modelu: VYROBCA a MODEL zo zaznamu vazby („Beko BCNA306E5ZSN"),
+      # inak popisok kategorie. Mena pise `ApplianceBinding.ref_record`
+      # (Codex #384 kolo 1, P2); zaznam ulozeny pred touto opravou ich nema,
+      # preto fallback ostava — box sa vtedy vola „Chladnička" ako doteraz.
       def niche_ref_label(ref)
         name = [ref['manufacturer'], ref['name']].map { |v| v.to_s.strip }.reject(&:empty?).join(' ')
-        name.empty? ? 'Chladnička' : name
+        return name unless name.empty?
+
+        return 'Chladnička' unless defined?(ApplianceCatalog)
+
+        label = ApplianceCatalog.category_label(ref['category']).to_s
+        label.empty? ? 'Chladnička' : label
       end
 
       # Kladne konecne cislo v mm, inak nil („nevieme" nie je 0).

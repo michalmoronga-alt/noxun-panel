@@ -652,6 +652,15 @@ module Noxun
         front = dims['front'].is_a?(Hash) ? dims['front'] : {}
         rec = { 'item_id' => item['id'].to_s,
                 'category' => BudgetStore.canon_appliance_type(item['typ']).to_s }
+        # Codex #384 kolo 1 (P2): MENO MODELU. Referencia v modeli (S1-F box
+        # niky) sa musí vedieť pomenovať — bez toho sa kazda chladnicka volala
+        # „Chladnička" a dva boxy v jednej skrinke sa nedali rozoznat.
+        # ADITIVNE: chybajuce pole = kluc chyba, starsie zaznamy bez mien
+        # fungujú dalej (label padne na kategoriu).
+        %w[manufacturer name].each do |k|
+          v = snap[k].to_s.strip
+          rec[k] = v unless v.empty?
+        end
         put_block(rec, 'body', dims['body'], %w[width height depth])
         put_block(rec, 'niche', dims['niche'],
                   %w[width_min width_max height_min height_max depth_min depth_max])

@@ -258,9 +258,13 @@ jedno Späť by vrátilo len jednu z nich a zákazka by ostala v stave, ktorý v
   Tú istú funkciu volá `Bom.collect` (`appliance_bound?`) aj binding (`carries_item?` nad `owner_entry_for`,
   ktorý druh a ID číta **z entity**, nie z toho, čo tvrdí položka) — zber a mutácie tak riešia identitu rovnako.
 - **Kontrakt záznamu `appliance_refs[]`** (číta ho S1-B2 telo slotu, S1-F box chladničky, S1-C očakávania):
-  `{item_id, category, body{width,height,depth}, niche{width_min…depth_max}, bands{door_bottom_offset,
-  door_lower, door_gap, door_upper}, furniture_doors{lower_min,lower_max,gap_ref}, install{dishwasher_class,
-  door_system,hinge_side}, snapshot_at}`. **Chýbajúce pole = kľúč chýba, nikdy 0** — nula je rozmer, „nevieme" nie je.
+  `{item_id, category, manufacturer, name, body{width,height,depth}, niche{width_min…depth_max},
+  bands{door_bottom_offset, door_lower, door_gap, door_upper}, furniture_doors{lower_min,lower_max,gap_ref},
+  install{dishwasher_class, door_system,hinge_side}, snapshot_at}`. **Chýbajúce pole = kľúč chýba, nikdy 0** —
+  nula je rozmer, „nevieme" nie je. **`manufacturer` a `name`** pribudli s S1-F (Codex #384 kolo 1, P2): bez
+  nich sa **referencia v modeli nemala ako pomenovať** a každý box niky sa volal „Chladnička", takže dva boxy
+  v jednej skrinke sa nedali rozoznať. Rozšírenie je **aditívne** — záznam uložený pred ním mená nemá a label
+  vtedy padne na popisok kategórie (`Construction.niche_ref_label`).
 - **Zapisovače refs.** Skrinka a slot idú cez `CabinetBuilder.write_appliance_refs!` (config → `normalize` →
   `rebuild_in_operation`; protiváha `strip_appliance_refs!`), **doska cez `BoardBuilder.write_appliance_refs!`** —
   zápis samotného configu **bez prestavby** (väzba jej geometriu nemení), ale **s pečiatkou
