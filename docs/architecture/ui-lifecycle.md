@@ -1918,8 +1918,9 @@ Po úspechu ide `push_selected` (čerstvá karta) a status menuje model aj vlast
 2. **bariéra observera** (`ApplianceBinding.observer_idle?` → `ScaleWatch.flush_pending!`): dedup kópií a presun ghostov môže **práve teraz** meniť `cabinet_id`, takže bez
    pokoja by sme zapisovali do configu, ktorý o pár milisekúnd neplatí — a transparentná reakcia observera by sa navyše prilepila na našu operáciu,
 3. **cieľ sa číta AŽ POTOM** (čerstvý výber, čerstvý config) a overuje sa **celý**: druh + ID + `persistent_id`, jednoznačnosť (dva živé kusy s tým istým ID = odmietnutie —
-   ID sa recyklujú), nie odpojený dielec, nie config z novšej verzie. **Prázdne echo ani chýbajúci `pid` sa tu netolerujú** (na rozdiel od `set_appliance_owner`): riadok ich
-   kreslí vždy, takže ich absencia je presne ten starý DOM, proti ktorému guard stojí,
+   ID sa recyklujú), nie odpojený dielec, nie config z novšej verzie **a ani zo STARŠEJ** (marker sa config-only zápisom neposúva, takže kus pred migráciou sa odmietne
+   s vetou „najprv ju prestav (Aplikuj zmeny), potom nastav očakávanie" — [construction.md](construction.md), `write_config_keys!`). **Prázdne echo ani chýbajúci `pid`
+   sa tu netolerujú** (na rozdiel od `set_appliance_owner`): riadok ich kreslí vždy, takže ich absencia je presne ten starý DOM, proti ktorému guard stojí,
 4. **striktná validácia vstupu** proti matici druhu (`ApplianceBinding.validate_expects` — [appliances.md](appliances.md)),
 5. **„viazanú kategóriu odstrániť nedáš"** (`appliance_expects_locked` nad tým istým obojsmerným dôkazom),
 6. **nezmenený výsledok = ŽIADNA operácia** (status „Očakávanie sa nezmenilo", žiadny prázdny krok Späť).
@@ -1927,6 +1928,9 @@ Po úspechu ide `push_selected` (čerstvá karta) a status menuje model aj vlast
 Zapisuje `CabinetBuilder.write_config_keys!` / `BoardBuilder.write_config_keys!` pod `CabinetBuilder.guarded` v jednej `start_operation`; výnimka = `abort`.
 **Po úspechu (Astra C14)** ide `push_selected(dedup: false)` **a** `StudioDialog.refresh_if_open(bump: true)` — zmenili sa **dáta Kontroly**, takže ORANGE „spotrebič
 nevybraný" musí byť vidieť hneď, nie až pri najbližšom inom zápise. Undo/Redo ide existujúcou stale cestou observera.
+
+**KAŽDÉ odmietnutie posiela čerstvú kartu** (`appliance_expects_refused` → `push_selected(dedup: false)` a až potom červený status). Klient si totiž po odoslaní
+príkazu ovládač **zamkne** a odomkne ho až príchod nového payloadu — keby odmietnutie vrátilo len status, riadok by ostal zamknutý.
 
 ### actions_board.rb
 
@@ -2878,6 +2882,13 @@ a od **S1-F** má viazaný riadok navyše **`check`** = celý verdikt (`{state, 
 - **Klient posiela ÚPLNY nový zoznam, nie zmenu** (Astra C13): `aprExpectsNext(current, value)` je čistá funkcia nad zoznamom z DOM (`data-apr-expects` na riadku) — pridanie je
   únia, odobranie filter. Keby posielal len zmenenú kategóriu, pridanie mikrovlnky by ticho zmazalo **už splnené** očakávanie rúry (riadky „očakáva" nesú len **nesplnené**,
   takže skladať z nich stav sa nedá).
+- **Dve rýchle voľby pred prekreslením majú DVE poistky** (Codex #385 kolo 1, P2). Zápis je asynchrónny, takže by sa obe počítali z toho istého zastaraného zoznamu
+  a druhá by prvú prepísala („pridaj rúru" + „pridaj mikrovlnku" = zostala by len mikrovlnka). Preto sa po odoslaní **ovládač zamkne** (`disabled`, odomkne ho až
+  čerstvá karta — a tú server posiela aj pri každom odmietnutí) **a lokálny snapshot `data-apr-expects` sa posunie optimisticky**, takže príkaz, ktorý sa napriek
+  zámku dostane cez (klávesnica, oneskorená udalosť), vychádza z aktuálneho zoznamu. Autoritou ostáva server: dostane úplný zoznam a porovná ho so stavom modelu.
+- **Kategóriu považuje za splnenú TÁ ISTÁ funkcia ako zber** (`ApplianceBinding.bound_categories` cez obojsmerný dôkaz; Codex #385 kolo 1, P2). Kým panel veril samotnej
+  `category` v `appliance_refs[]`, **osirelý záznam** (položku zmazalo druhé okno) alebo ref po **recyklovanom ID** riadok „očakáva" potlačil — a s ním aj výber modelu,
+  presne tam, kde Kontrola hlásila `appliance_missing` a priradiť **kázala**. Tá istá množina riadi aj `disabled` voľby „− kategória (priradená — najprv odpoj)".
 - **Kontext nesie aj `pid`** (`data-apr-pid`, z `cabinet_pid` / `board_pid` v payloade karty): `persistent_id` je jediný údaj, ktorý prežije recykláciu výrobného ID, takže ním
   server overuje, že zápis mieri na TEN kus, nad ktorým bol riadok vykreslený. `clearApplianceRows` ho zahadzuje spolu s ostatným kontextom.
 - **Popisky kategórií v JS NEŽIJÚ** — text riadku aj text dlaždice šablóny skladá server (stráži to Node sada nad zdrojom `appliance_row.js` a `templates.js`).

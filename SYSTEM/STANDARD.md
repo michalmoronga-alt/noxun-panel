@@ -151,8 +151,9 @@ spotrebič tej kategórie", ale nevlastní ten istý kus. Šablóna nesie `appli
   nedá ani priradiť.
 - **DÔKAZ SPLNENIA je ten istý obojsmerný dôkaz ako `bound`** — položka s vlastníkom = tá entita **A** `item_id` v jej `appliance_refs[]`. Samotné ID vlastníka
   (ID sa recyklujú) ani samotná `category` v refs (osirelý záznam) dôkazom nie je.
-- **ZÁPIS je CONFIG-ONLY a pečiatkuje schému:** `CabinetBuilder.write_config_keys!` / `BoardBuilder.write_config_keys!` v jednej operácii, **bez prestavby**
-  (očakávanie nič nekreslí), s `config_schema` — inak by `normalize` kľúč starej skrinky pri najbližšej prestavbe ticho zahodil. Prázdny zoznam kľúč **odstráni**.
+- **ZÁPIS je CONFIG-ONLY:** `CabinetBuilder.write_config_keys!` / `BoardBuilder.write_config_keys!` v jednej operácii, **bez prestavby** (očakávanie nič nekreslí).
+  Prázdny zoznam kľúč **odstráni**. **Marker `config_schema` sa config-only zápisom NEMENÍ** — je to proveniencia STAVBY (čítajú ju stale guardy zásuviek, závesov
+  a výklopov), takže kus na **staršej schéme** sa odmietne a najprv sa musí prestavať; schému migruje výhradne prestavba plným plánom.
 - **ÚNIA PRI MERGE:** aplikovanie šablóny na existujúcu skrinku očakávania **zjednocuje** (a väzby cieľa zachováva) — prepis by ticho zahodil to, na čo Kontrola
   upozorňuje. Kópia skrinky očakávania **ponecháva**.
 - **NESPLNENÉ OČAKÁVANIE = ORANGE `appliance_missing`** per kategóriu (§11), bez exportnej brány.

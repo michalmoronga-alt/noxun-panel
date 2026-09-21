@@ -99,9 +99,10 @@ ešte nič nestojí — návrh ide ďalej, len sa nezabudne.
   — sú to dve samostatné veci na opravu. Klik mieri na **vlastníka** (`owner_id` + `owner_pid`): na rozdiel od siroty ho poznáme, záznam vznikol z tej
   entity, ktorá v modeli stojí. Nález **neblokuje export** (spotrebič sa nevyrába).
 - **ZÁPIS je CONFIG-ONLY a má vlastnú akciu `set_appliance_expects`** (nie `ApplianceBinding.apply!` — žiadna položka zákazky sa nemení).
-  `CabinetBuilder.write_config_keys!` / `BoardBuilder.write_config_keys!` zachovajú celý config, **opečiatkujú `config_schema`** (bez toho by `normalize`
-  očakávanie starej skrinky pri najbližšej prestavbe ticho zahodil) a bežia v **jednej** operácii pod `guarded` = jeden krok Späť, **bez prestavby**.
-  Guardy a poradie sú v [ui-lifecycle.md](ui-lifecycle.md) (`actions_appliance.rb`).
+  `CabinetBuilder.write_config_keys!` / `BoardBuilder.write_config_keys!` zachovajú celý config a bežia v **jednej** operácii pod `guarded` = jeden krok Späť,
+  **bez prestavby**. **Marker `config_schema` sa pritom NEPOSÚVA** (Codex #385 kolo 1, P1): je to proveniencia STAVBY, ktorú čítajú stale guardy zásuviek, závesov
+  a výklopov — tiché posunutie by zhaslo RED nálezy aj blokáciu exportov. Kus na **staršej schéme** sa preto odmietne ešte pred operáciou („najprv ju prestav,
+  potom nastav očakávanie") — schému migruje výhradne prestavba plným plánom. Guardy a poradie sú v [ui-lifecycle.md](ui-lifecycle.md) (`actions_appliance.rb`).
 - **VIAZANÚ kategóriu sa odstrániť nedá** — najprv odpoj spotrebič. Bránou je server a rozhoduje **ten istý** dôkaz, takže osirelý záznam očakávanie
   **nezamkne** (inak by ho po zmazanej položke nikto nikdy nedostal preč).
 - **ŠABLÓNY:** `Panel.template_config_from` očakávania prenáša a `appliance_refs[]` **nikdy**; vloženie ich berie zo **ULOŽENÉHO záznamu**

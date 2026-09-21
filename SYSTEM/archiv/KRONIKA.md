@@ -33,9 +33,16 @@
   **VEDOMÁ REVÍZIA PRAVIDLA B2 „prázdny zoznam riadok skryje":** skrinka a doska majú odteraz vždy **jeden tlmený riadok voľby „očakáva"** (slot nie — očakáva
   umývačku vždy). Bez viditeľnej voľby by sa očakávanie **bez šablóny nedalo zapnúť vôbec**; mockup R10 to hovorí priamo a schované ovládanie je horšie než
   jeden riadok. Pravidlo „vertikálny priestor panela je vzácny" platí ďalej v tom, že je to **jeden** riadok bez semaforu, nie nový sektor.
-  **Testy:** 4494 headless · 127 JS sád · in-SU `run_s1c` (celý cyklus šablóny, očakávanie bez šablóny, bariéra observera po natívnej kópii, slot, aplikovanie
-  šablóny na viazanú skrinku). Cielene prepísané testy S1-B1 (`expected_missing` už nález dáva), S1-B2 (riadok voľby), S1-E (merge zjednocuje) a ŠT-3c
-  (dlaždica má nový kľúč) — každý so zdôvodnením v commite.
+  **CODEX KOLO 1 (1×P1 + 2×P2) prepísalo jedno rozhodnutie auditu:** config-only zápis **marker `config_schema` NEPOSÚVA**. Pôvodne ho pečiatkoval (rozhodnutie C4)
+  — a to by bolo tichou regresiou výroby: marker je u skrinky **provenienciou STAVBY** a čítajú ho stale guardy zásuviek, závesov a výklopov
+  (`DRAWER/HINGE/LIFT_ACTIVATION_SCHEMA`), takže jeho posunutie bez prestavby by vyhlásilo, že skrinka je postavená s funkciami, ktoré v nej nie sú — **RED nálezy
+  aj blokácia nákupu a cenových exportov by zmizli**. Kus na staršej schéme sa preto odmietne pred operáciou a používateľ ho najprv prestaví (prestavba schému
+  zmigruje plným plánom). Ďalšie dve opravy: riadok očakávaní sa po odoslaní **zamkne** a lokálny snapshot sa posunie optimisticky (dve rýchle voľby sa inak obe
+  počítali zo zastaraného zoznamu a druhá prvú prepísala), a **Inspector číta množinu splnených kategórií tou istou funkciou ako Kontrola** — osirelý ref mu predtým
+  potlačil výber modelu práve tam, kde Kontrola priradiť kázala.
+  **Testy:** 4497 headless · 127 JS sád · in-SU `run_s1c` (celý cyklus šablóny, očakávanie bez šablóny, staršia schéma → odmietnutie → prestavba → zápis prejde,
+  osirelý ref, bariéra observera po natívnej kópii, slot, aplikovanie šablóny na viazanú skrinku). Cielene prepísané testy S1-B1 (`expected_missing` už nález dáva),
+  S1-B2 (riadok voľby, dôkaz cez ID vlastníka), S1-E (merge zjednocuje) a ŠT-3c (dlaždica má nový kľúč) — každý so zdôvodnením v commite.
 
 - **S1-F — KONTROLNÁ GEOMETRIA CHLADNIČKY + KONTROLA NIKY A DELENIA ČIEL (v0.12.15, 21.9.2026, PR #N).** Skrinka s priradenou chladničkou v modeli **nič
   neukazovala** a nikto nepovedal, či sa nika zmestí ani kde má byť hrana medzi čelami — Michal to kreslil ručne a delenie odhadoval. Táto dávka obe veci dorobila
