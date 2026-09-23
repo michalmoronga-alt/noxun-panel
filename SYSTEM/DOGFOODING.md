@@ -45,8 +45,30 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
 ## INFRA
 
   *Stav: na návrhovú dávku — od 26.8. SAMOSTATNE (bez väzby na D-48, ktorý je mimo V1); distribučný kanál jednoducho, napr. zdieľaný priečinok.*
+## SPOTREBIČE S1 — smoke 21.9.2026 (opravy pred uzáverom D)
+
+*(Michalov smoke celého bloku S1 na v0.12.16. Vyriešené hneď v smoke oprave A: **D-136** a **D-137** — plné texty v
+[archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md).)*
+
+- **D-138 · Čelo umývačky kresliť ako sklop, nie ako blendu** (Michal 21.9.2026, smoke S1 bod 2) — čelo slotu je dátovo blenda (`blind`, rola `false_front`), aby
+  mu pravidlá kovania nevydali pánty ani kovanie sklopu; v Smere otvárania v modeli aj v náhľade Inspectora preto nesie **plné X blendy**. Dvere umývačky sa
+  otvárajú nadol — symbol má byť **sklop „Λ"**. Návrh (agent 21.9., Michal nenamietal): typ ostáva `blind` (žiadne kovanie), mení sa len **symbol** pri slote.
+  Otvorená otázka pri implementácii: či aj názov dielca v kusovníku/VEPO („Blenda 1") nahradiť „Čelo umývačky". *Stav: smoke oprava B.*
+- **D-139 · Výška čela umývačky sa dopočíta: linka − sokel − medzera hore** (Michal 21.9.2026, smoke S1 bod 2) — vstup „Čelo V" preč (ostane len ako zobrazený
+  údaj); čelo siaha od soklu po hornú hranu linky mínus **medzeru hore**, ktorá sa nastavuje **podľa logiky medzier** (schéma medzier skrinky, ako pri
+  ostatných čelách). Mení sa tým schválené R13/R14 mockupu („výplň hore = zvyšok po líniu, ručne"): výplň nad umývačkou sa po novom robí tak, že slot dostane
+  výšku po spodok výplne a výplň je samostatný nízky korpus. Stratí sa ručná výška čela nižšia než linka — kontrola „čelo presahuje max výšku čela modelu"
+  (list ju pozná) sa zváži spolu. *Stav: smoke oprava B — mení význam uloženého `dw_front_height`, preto `codex-audit` pred implementáciou.*
+- **D-140 · Výška osadenia chladničky v skrinke** (Michal 23.9.2026, smoke S1 bod 4) — box niky chladničky stojí vždy na dne skrinky; keď je chladnička
+  osadená vyššie (polica pod ňou, zásuvky pod ňou), box aj pásma dverí ostanú „prilepené na dne". Želanie: **textové pole s výškou osadenia**, ktoré posunie
+  box niky a **rovno prepočíta umiestnenie dverí** (pásma dverí spotrebiča a pásmo prípustnej hrany medzi čelami). *Stav: smoke oprava C — nové pole väzby
+  spotrebiča, preto `codex-audit` pred implementáciou.*
+
 ## Po V1 — zásobník
 
+- **D-141 · Typ „Umývačka" vo vkladacej karte neskôr ako „Spotrebič"** (Michal 21.9.2026, smoke S1) — samostatné tlačidlo typu pre jeden spotrebič je
+  nesystémové; keď pribudne ďalší fyzický spotrebič ako samostatný objekt (voľne stojaca chladnička, sporák…), tlačidlo sa premenuje na **„Spotrebič"**
+  a konkrétny druh sa vyberie pod ním. *Stav: zásobník — kým je slot umývačky jediný objekt bez korpusu, ostáva „Umývačka".*
 - **D-126 · Otočenie obrázka textúry pred uložením** (Michal 12.9.2026, smoke M-R PASS) — pri vkladaní obrázka nie je samozrejmé, že kresba drevodekoru má byť vodorovná; plugin smer obrázka automaticky nerozpoznáva.
   Uzáver M-R pridáva pomocný text. Neskôr zvážiť otočenie obrázka o **±90° priamo v plugine pred uložením**. *Stav: odložené, bez termínu; neblokuje prijatý blok M-R.*
 - **D-127 · Prirodzenejšie umiestnenie textúry na dielcoch** (Michal 12.9.2026, smoke M-R PASS) — orientácia textúry je správna, ale opakovanie vždy od rovnakého bodu pôsobí neprirodzene.

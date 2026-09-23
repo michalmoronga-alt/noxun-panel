@@ -4,6 +4,8 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-137** — Štyri polia a päť výstupov slotu umývačky (a pomocník „?" k typu slotu v modale šablóny) sa už neukazujú pri každej skrinke — skrytie prebíjalo CSS; nový guard to stráži pre celý panel aj Štúdio — 23.9.2026, PR #386, v0.12.17
+- **D-136** — Karta a formulár spotrebiča ukazujú len bloky, ktoré kategória má: doska a drez bez Tela a Niky (ako v schválenom mockupe), rúra/mikrovlnka/digestor bez prázdnej Montáže; uložené hodnoty ostávajú — 23.9.2026, PR #386, v0.12.17
 - **D-135** — Minimálna výška korpusu je 80 mm (korpus na dorovnanie nad umývačkou): Inspector, vkladanie aj ťahanie scale úchopom pustia 80–199 mm, šírka (200) a hĺbka (150) sa nemenia; nízka skrinka so soklom sa navyše zastaví červeným poľom už v paneli a schéma configu ide na 15 (starší plugin by výšku ticho klampol na 200) — 20.9.2026, PR #375, v0.12.9
 - **D-130** — Menší UI/UX rework kontextu Čelá: nový zoznam čiel + karta s tabmi (časť a) a skupina „Spoločné pre skrinku" s materiálom čiel a schémou medzier, kde číslo sedí na hrane, ktorej sa týka (časť b) — 19.9.2026, PR #371 + #372, v0.12.7–v0.12.8
 - **D-129** — Úchytka čela sa nastavuje na jednom mieste (karta čela); hromadne cez akciu „všetkým" v hlavičke skupiny Čelá — skupina „Úchytky" zanikla — 19.9.2026, PR #371, v0.12.7
@@ -124,6 +126,39 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-137 — Polia slotu umývačky svietili pri každej skrinke, vyriešené 23.9.2026
+
+**Výsledok: PR #386, v0.12.17.** Pôvodné znenie (Michal, smoke bloku S1 21.9.2026): *„Nastavenia pre umývačku sa dostali do všetkých dolných korpusov — na korpuse
+je nezmyselne trieda, výška tela, sokel je 2×, a nerelevantná výška čela, ktorá patrí umývačke."*
+
+**Príčina.** Riadky slotu (Trieda · Telo V · Sokel · Čelo V a výstupy Telo · Čelo hore · Výplň hore · Pod doskou · Trieda) sú v `panel.html` správne označené
+atribútom `hidden` a `applyVisibility` ho pri inom type než `dishwasher` správne drží. Lenže trieda riadku má v CSS vlastné `display: flex` — a autorské pravidlo
+**vždy prebije** vstavané `[hidden] { display: none }` prehliadača. Riadky boli teda „skryté" len v DOM, na obrazovke ich videl každý korpus od v0.12.12 (S1-E).
+Hodnoty sa pri dolnej ani hornej skrinke nikam neukladali (server berie polia slotu len pri type `dishwasher`) — bola to chyba zobrazenia, nie dát.
+Tá istá pasca sedela aj na pomocníkovi „?" pri Type v modale „Uložiť ako šablónu" (vysvetľuje, že typ slotu sa nedá prepnúť) — svietil pri každej šablóne.
+
+**Oprava.** Tri párové pravidlá `.nx-inspector .rowc[hidden]`, `.nx-inspector .inforow[hidden]` a `.nx-inspector .nxtip[hidden]` (`display: none`).
+
+**Prečo guard.** Je to **druhý výskyt** tej istej pasce (prvý: S1-C `.row.tplexpects`). Nový `tests/pure/test_hidden_css_guard.rb` prejde každý prvok, ktorý je
+skrytý už v `panel.html` / `studio.html`, nájde CSS pravidlá, ktoré by ho zobrazili (posledný článok selektora na prvku, stredné na statických predkoch, koreň
+`.nx-inspector` a stavy `body` platia vždy), a žiada párové `[hidden]` pravidlo s aspoň rovnakou špecificitou. Pri zavedení našiel práve týchto 9 + 1 prvkov.
+Pravidlo pre ďalšiu UI prácu je v `docs/UI_DIZAJN.md` §5.6.
+
+### D-136 — Doska a drez bez Tela a Niky v karte spotrebiča, vyriešené 23.9.2026
+
+**Výsledok: PR #386, v0.12.17.** Pôvodné znenie (Michal, smoke bloku S1 21.9.2026, pri zakladaní drezu): *„Nemalo by sa pri tejto kategórii skryť to, čo tam nemá
+byť? Resp. každá kategória by mala zobraziť iba relevantné."*
+
+**Čo sa zmenilo.** Varná doska a drez už v karte ani vo formulári nemajú bloky **Telo** a **Nika**. Ich vonkajší rozmer, výrez a montážna hĺbka / hĺbka vane sú
+v bloku výrezu a niku nemajú — sadajú do výrezu v doske, nie do skrinky. Presne tak ich kreslil **schválený mockup** S1 („doska/drez: vonkajší rozmer · výrez ·
+montáž"), implementácia A2 im telo a niku pridala omylom. Druhá polovica: karta kreslí **len bloky, ktoré kategória má** — rovnaké ako formulár, ktorý prázdne
+bloky vynechával odjakživa. Zmizol tak aj prázdny rám „Montáž — táto kategória tu nemá kótované polia" pri rúre, mikrovlnke a digestore.
+
+**Čo sa nemenilo.** Dáta: katalóg má ďalej štyri bloky a hodnoty tela, ktoré v niektorom zázname drezu či dosky už sú, **ostávajú** (úprava cez formulár ich
+zlučuje, overené testom) — len sa nekreslia. Digestor si Telo aj Niku necháva (vstavaný digestor má telo, podľa ktorého sa volí horná skrinka).
+Otázka „budú tieto údaje treba neskôr pre fyzické rozmery?" (Michal): pri dreze a doske nie — aj budúce kreslenie ich postaví z vonkajšieho rozmeru a hĺbky
+z bloku výrezu; telo potrebujú rúra, mikrovlnka, chladnička a digestor, a tým ostáva.
 
 ### D-135 — Minimálna výška korpusu 80 mm (korpus na dorovnanie), vyriešené 20.9.2026
 

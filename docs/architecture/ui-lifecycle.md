@@ -2816,9 +2816,9 @@ v okne nie je jediný `href`, ktorý by mohol HtmlDialog prenavigovať preč zo 
 Rozpočtu). Kotva `appliance:<uuid>` prepne pohľad na „V zákazke" a riadok prisvieti; spotrebuje sa **raz** a aplikuje sa **AŽ PO `render()`** (je to dotaz do DOM, nie
 zmena stavu, z ktorého sa kreslí). Riadok, ktorý medzitým zanikol, nie je tichý no-op — okno to povie.
 
-**Telo:** strom po kategóriách vľavo (skupiny sa dajú zbaliť — stav okna, nikam sa neukladá), karta vpravo v štyroch blokoch (Telo · Nika · Čelo/dvere · Montáž) plus
-Odkazy, Prílohy a Poznámka. Blok, ktorý pre danú kategóriu nemá kótované polia (Montáž pri rúre), nesie **priznanú vetu** namiesto prázdna — mlčiaci prázdny rám vyzerá
-ako chyba. Prílohy sú dlaždice: obrázok kreslí miniatúru z lazy kanála (kým nedorazí, ikonu), PDF ikonu vždy, náhľad má **teal rám** a štítok; akcie „nastaviť ako
+**Telo:** strom po kategóriách vľavo (skupiny sa dajú zbaliť — stav okna, nikam sa neukladá), karta vpravo z blokov Telo · Nika · Čelo/dvere · Montáž — **len z tých,
+ktoré kategória má** (D-136, rovnaké ako formulár: doska a drez majú len blok výrezu, rúra, mikrovlnka a digestor nemajú Montáž) — plus Odkazy, Prílohy a Poznámka.
+Prázdny blok server neposiela; keby prišiel, klient ho nakreslí s **priznanou vetou** (mlčiaci prázdny rám vyzerá ako chyba). Prílohy sú dlaždice: obrázok kreslí miniatúru z lazy kanála (kým nedorazí, ikonu), PDF ikonu vždy, náhľad má **teal rám** a štítok; akcie „nastaviť ako
 náhľad" a „odobrať zo zoznamu" sa ukazujú pri hoveri (a pri fokuse — `:focus-within`, inak by boli neprístupné z klávesnice).
 
 **REFRESH INVARIANT.** Zmena katalógu = **echo sekcie** (`NX.applTree` + `NX.applCard`), **nikdy `push_state`** a **žiadne zdvihnutie generácie okna**: katalóg spotrebičov
@@ -3197,12 +3197,15 @@ takže by prepísal jeho vlastný a okno by prestalo dostať prvý push; prvotn�
 **Payloady.** `tree_payload` skladá **celé zoskupenie aj poradie** (kategórie v poradí `CATEGORIES`, položky cez `ApplianceCatalog.sort_records`, `total` per kategória,
 skupina **Vyradené** na konci len s prepínačom `include_deleted`), podtitul riadku (`summary_line` — nika / výrez / trieda + `seed`/`ručný`) a zobrazovaný názov
 (`title` = výrobca + model). Klient kreslí presne to, čo dostal. `gen` je generácia dotazu klienta a server ju **iba echuje** — hľadanie je debounced, takže pomalšie kolo
-nesmie prepísať čerstvejší strom. `card_payload` nesie štyri bloky (`body` · `niche` · `front` · `install`) s riadkami `{label, value, unit, derived}`, kde **`value: null`
+nesmie prepísať čerstvejší strom. `card_payload` nesie bloky (`body` · `niche` · `front` · `install`) — **len neprázdne podľa `ROWS`**, teda presne tie, z ktorých
+`form_fields` skladá formulár (D-136) — s riadkami `{label, value, unit, derived}`, kde **`value: null`
 znamená „list to nekótuje"** (klient kreslí „—" kurzívou) a `derived` dokresľuje „(odvodené)"; ďalej odkazy, prílohy a `fields` (predvyplnený formulár).
 
 **Jedna tabuľka riadkov, dve použitia.** `ROWS[kategória][blok]` je **jediný** zoznam polí: karta z neho skladá riadky (`Š × V × H` je jeden riadok z troch čísel), formulár
 z neho generuje jeden vstup na pole (`form_fields` + popisky `FIELD_LABELS` po blokoch). Karta a modal sa tak nemôžu rozísť. Riadok nesie svoj blok (`spec[2]`), lebo niektoré
-polia patria vizuálne inam než dátovo — výška tela umývačky je rozsah, takže v dátach žije v `install`, ale číta sa pri tele.
+polia patria vizuálne inam než dátovo — výška tela umývačky je rozsah, takže v dátach žije v `install`, ale číta sa pri tele. **Doska a drez majú `body` aj `niche`
+prázdne** (D-136, mockup „vonkajší rozmer · výrez · montáž"): ich vonkajší rozmer, výrez a montážna hĺbka / hĺbka vane sú v `front` a niku nemajú. Hodnoty tela, ktoré
+už v zázname sú, **ostávajú** (patch katalógu ich zlučuje) — len sa nekreslia.
 
 **Kľúč poľa modalu = cesta, ktorú vracia katalóg v chybe** (`dims.niche.width_min`), takže „preklad chýb na kľúče modalu" je **identita** a `NXModal.showErrors` posadí hlášku
 k poľu bez prekladovej tabuľky, ktorá by pri pridaní poľa ticho zaostala. Formulár pre **všetky** kategórie (`form_payload`) chodí LEN na vyžiadanie (`appl_tree` s

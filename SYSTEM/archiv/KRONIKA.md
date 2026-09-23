@@ -17,6 +17,17 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **SMOKE S1 · OPRAVA A — drez a doska bez Tela a Niky + skryté polia slotu (v0.12.17, 23.9.2026, PR #386).** Prvé dve chyby z Michalovho smoke celého bloku
+  S1 (21.9.). **D-136:** karta aj formulár spotrebiča kreslia **len bloky, ktoré kategória má** — varná doska a drez stratili Telo a Niku (schválený mockup ich
+  nemal, dávka A2 ich pridala omylom), rúra, mikrovlnka a digestor prázdny rám Montáže. Dáta katalógu sa nemenia: štyri bloky ostávajú a hodnoty tela, ktoré
+  v zázname drezu už sú, prežijú úpravu cez formulár (patch ich zlučuje — overené testom). **D-137:** štyri polia a päť výstupov slotu umývačky svietili od
+  v0.12.12 **pri každej skrinke** — trieda riadku má vlastné `display: flex` a autorské pravidlo vždy prebije vstavané `[hidden]` prehliadača; tá istá pasca sedela
+  na pomocníkovi „?" k typu slotu v modale šablóny. Chyba zobrazenia, nie dát (server polia slotu inde neukladá). Oprava troma párovými pravidlami `[hidden]`.
+  **PREČO GUARD:** druhý výskyt tej istej pasce (prvý S1-C `.row.tplexpects`), preto `tests/pure/test_hidden_css_guard.rb` — mini parser HTML stromu a CSS
+  pravidiel, ktorý pre každý prvok skrytý už v `panel.html`/`studio.html` hľadá pravidlo, čo by ho zobrazilo, a žiada párové `[hidden]` s aspoň rovnakou
+  špecificitou (koreň `.nx-inspector` dáva JS na `<html>`, preto platí vždy; stredné články sa overujú na statických predkoch). Pri zavedení našiel presne 9 + 1
+  prvkov a nič iné. Pravidlo je v `docs/UI_DIZAJN.md` §5.6. Testy 4506 headless · 127 JS sád; in-SU sa nespúšťal (bez zmeny buildera, observera či geometrie).
+  Ďalej v smoke opravách: **B** čelo umývačky (symbol sklopu D-138, výška čela z linky, soklu a medzery hore D-139) a **C** výška osadenia chladničky (D-140).
 - **S1-C — OČAKÁVANÝ SPOTREBIČ + ORANGE „spotrebič nevybraný" (v0.12.16, 21.9.2026, PR #N).** Skrinka vie odteraz povedať, že do nej **patrí rúra**, ešte
   predtým, než je rúra vybraná. Nastaví sa to **dvomi cestami**: v modale „Uložiť ako šablónu" (skupina checkboxov — chladnička · rúra · mikrovlnka; pri slote
   je voľba daná a zamknutá) alebo priamo v riadku Spotrebič v Inspectore. Skrinka vložená z takej šablóny očakávanie **nesie so sebou** a Kontrola na ňu svieti
