@@ -220,13 +220,54 @@ NxTest.test('S1-A2: SK popisky enumov pokryvaju VSETKY hodnoty katalogu') do
   NxTest.assert(missing.empty?, "enumy bez SK popisku: #{missing.join(' · ')}")
 end
 
-NxTest.test('S1-A2: karta ma pre KAZDU kategoriu styri bloky (aj prazdny sa prizna)') do
+NxTest.test('S1-A2 + D-136: karta kresli LEN bloky, ktore kategoria ma — rovnake ako formular') do
   S1A2_AC::CATEGORIES.each do |cat|
     rec = { 'id' => 'x', 'category' => cat, 'name' => 'Test', 'rev' => 'r' }
     blocks = S1A2_AD.card_payload(rec)['blocks']
-    NxTest.assert_equal(S1A2_AC::DIM_BLOCKS, blocks.map { |b| b['key'] },
-                        "#{cat}: bloky su v poradi tela -> niky -> cela -> montaze")
+    specs = S1A2_AD::ROWS[cat] || S1A2_AD::ROWS['other']
+    expected = S1A2_AC::DIM_BLOCKS.reject { |b| Array(specs[b]).empty? }
+    NxTest.assert_equal(expected, blocks.map { |b| b['key'] },
+                        "#{cat}: len neprazdne bloky, v poradi tela -> niky -> cela -> montaze")
+    groups = S1A2_AD.form_fields(cat).select { |f| f['type'] == 'group' }.map { |f| f['label'] }
+    NxTest.assert_equal(groups, blocks.map { |b| b['title'] },
+                        "#{cat}: karta a formular maju tie iste bloky v tom istom poradi")
     NxTest.assert(blocks.all? { |b| !b['title'].to_s.empty? }, "#{cat}: kazdy blok ma nadpis")
+  end
+end
+
+NxTest.test('D-136: doska a drez NEMAJU blok Telo ani Nika (mockup: vonkajší rozmer · výrez)') do
+  %w[hob sink].each do |cat|
+    keys = S1A2_AD.card_payload({ 'id' => 'x', 'category' => cat, 'name' => 'T', 'rev' => 'r' })['blocks']
+                  .map { |b| b['key'] }
+    NxTest.assert_equal(['front'], keys, "#{cat}: karta ma len blok vyrezu")
+  end
+  %w[fridge oven microwave dishwasher hood other].each do |cat|
+    keys = S1A2_AD.card_payload({ 'id' => 'x', 'category' => cat, 'name' => 'T', 'rev' => 'r' })['blocks']
+                  .map { |b| b['key'] }
+    NxTest.assert(keys.include?('body') && keys.include?('niche'), "#{cat}: Telo aj Nika ostavaju")
+  end
+end
+
+NxTest.test('D-136: ulozeny rozmer tela drezu PREZIJE upravu cez formular (len sa nekresli)') do
+  require 'tmpdir'
+  Dir.mktmpdir('noxun-d136-') do |dir|
+    S1A2_AC.test_dir_override = dir
+    S1A2_AC.reset_state!
+    begin
+      st, info = S1A2_AC.create!('category' => 'sink', 'name' => 'Drez',
+                                 'dims' => { 'body' => { 'width' => 860.0 } })
+      NxTest.assert_equal(:ok, st, 'zaznam so starsim telom vznikol')
+      rec = info[:record]
+      attrs = S1A2_AD.attrs_from('name' => 'Drez', 'dims.front.cutout_width' => '840')
+      st2, = S1A2_AC.patch!(rec['id'], attrs, rev: rec['rev'])
+      NxTest.assert_equal(:ok, st2, 'uprava z formulara (bez poli tela) prejde')
+      saved = S1A2_AC.find(rec['id'])[1][:record]
+      NxTest.assert_equal(860.0, saved['dims']['body']['width'], 'telo ostalo v zazname')
+      NxTest.assert_equal(840.0, saved['dims']['front']['cutout_width'], 'novy vyrez je ulozeny')
+    ensure
+      S1A2_AC.test_dir_override = nil
+      S1A2_AC.reset_state!
+    end
   end
 end
 

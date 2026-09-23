@@ -141,9 +141,14 @@ module Noxun
             ['sokel', :range, 'install', 'plinth_min', 'plinth_max']
           ]
         },
+        # D-136 (smoke S1 21.9.2026): doska a drez NEMAJU blok Telo ani Nika.
+        # Ich „telo" je vonkajsi rozmer a montazna hlbka / hlbka vane, ktore uz
+        # su v bloku vyrezu, a niku nemaju — sadaju do vyrezu v doske, nie do
+        # skrinky (mockup R: „doska/drez: vonkajší rozmer · výrez · montáž").
+        # Ulozene hodnoty v zazname ostavaju (patch ich zlucuje), len sa nekreslia.
         'hob' => {
-          'body' => BODY_XYZ,
-          'niche' => NICHE_ROWS,
+          'body' => [],
+          'niche' => [],
           'front' => [
             ['vonkajší Š × H', :pair, 'front', 'outer_width', 'outer_depth'],
             ['výrez Š', :one, 'front', 'cutout_width'],
@@ -154,8 +159,8 @@ module Noxun
           'install' => []
         },
         'sink' => {
-          'body' => BODY_XYZ,
-          'niche' => NICHE_ROWS,
+          'body' => [],
+          'niche' => [],
           'front' => [
             ['vonkajší Š × H', :pair, 'front', 'outer_width', 'outer_depth'],
             ['výrez Š × H', :pair, 'front', 'cutout_width', 'cutout_depth'],
@@ -525,10 +530,17 @@ module Noxun
         def card_payload(rec, have: [], thumbs: false)
           category = rec['category'].to_s
           specs = ROWS[category] || ROWS['other']
-          blocks = ApplianceCatalog::DIM_BLOCKS.map do |block|
+          # D-136: karta kresli LEN bloky, ktore kategoria naozaj ma — tak isto
+          # ako formular (`form_fields` prazdny blok preskakuje). Prazdny ram
+          # „táto kategória tu nemá kótované polia" bol pri doske, dreze, rure
+          # aj digestore len sum; klient ho kresli dalej, keby prisiel.
+          blocks = ApplianceCatalog::DIM_BLOCKS.filter_map do |block|
+            rows = Array(specs[block])
+            next if rows.empty?
+
             { 'key' => block, 'title' => block_title(block, category),
               'icon' => BLOCK_ICONS[block],
-              'rows' => Array(specs[block]).map { |spec| card_row(spec, rec) } }
+              'rows' => rows.map { |spec| card_row(spec, rec) } }
           end
           { 'id' => rec['id'].to_s, 'rev' => rec['rev'].to_s,
             'name' => rec['name'].to_s, 'manufacturer' => rec['manufacturer'].to_s,

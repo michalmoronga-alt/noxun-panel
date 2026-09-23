@@ -845,6 +845,15 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Zones`).
 - **Náhľad:** fixné okno so zoom/pan; ovládanie (kamera + fit) žije v **spodnom
   páse** — viď 5.2.
 - **Karty:** `fieldset`/`details` na bielom povrchu, rámik `--nx-border`.
+- **Skrývanie atribútom `hidden` potrebuje párové pravidlo (D-137).** Autorské
+  `display: flex` na triede **vždy prebije** vstavané `[hidden] { display: none }`
+  prehliadača — na špecificite nezáleží. Každá trieda s vlastným `display`, ktorej
+  prvky sa prepínajú cez `el.hidden`, preto potrebuje aj `.nx-inspector .trieda[hidden]
+  { display: none; }` (špecificita aspoň taká istá, neskôr v súbore). Bez toho sa
+  „skrytý" prvok ukazuje ďalej: od v0.12.12 videl každý korpus štyri polia a päť
+  výstupov slotu umývačky a pri každej šablóne pomocníka „?" k typu slotu. Stráži to
+  guard `tests/pure/test_hidden_css_guard.rb` nad všetkými prvkami, ktoré sú skryté
+  už v `panel.html` / `studio.html`.
 - **Warn chip → warnpanel (N5, UI-D3):** klik na ⚠ chip otvorí **overlay** pod
   hlavičkou — `position: absolute` **vnútri sticky `<header>`**, nie riadok
   layoutu. Blokový zoznam (pôvodné riešenie D-29) otvorením posunul celý obsah

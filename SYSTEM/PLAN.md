@@ -709,6 +709,10 @@ kvótová brána `usage` pred každým auditom a subagentom. Pravidlo 3 kôl pla
   **ODCHÝLKA od tohto riadku: TemplateStore STD sa NEBUMPUJE (ostáva 5)** — očakávania šablóny žijú v `config['appliance_expects']`, takže žiadny nový kľúč záznamu
   nevznikol a bump by knižnicu len zamkol pre zápis staršiemu pluginu (audit C1/C2). Vedomá revízia B2: blok Spotrebiča sa skrýva už len tam, kde sa nedá očakávať nič —
   skrinka a doska majú vždy jeden tlmený riadok voľby (inak sa očakávanie bez šablóny nedá zapnúť, mockup R10).
+- **Smoke S1 — opravy pred uzáverom** (Michal od 21.9.2026, plné znenia v [DOGFOODING.md](DOGFOODING.md) skupina SPOTREBIČE S1): **A ✅ PR #386, v0.12.17** — drez a doska
+  bez Tela a Niky, karta = len bloky kategórie (D-136) + polia slotu umývačky už nesvietia pri každej skrinke, nový guard `[hidden]` (D-137); UI, audit NIE ·
+  **B** čelo umývačky: symbol sklopu (D-138) + výška čela = linka − sokel − medzera hore podľa schémy medzier (D-139); **audit ÁNO** (mení význam `dw_front_height`),
+  in-SU povinné · **C** výška osadenia chladničky: pole posunie box niky a prepočíta pásma dverí (D-140); **audit ÁNO** (nové pole väzby), in-SU povinné.
 - **S1-D · Uzáver bloku** *(docs, `VERSION` → 0.13.0)* — V1_VIZIA, archív, STAV, KRONIKA, README, POJMY, smoke checklist pre Michala.
 
 ## Po V1 — zásobník (nezaradené, nestratiť)
