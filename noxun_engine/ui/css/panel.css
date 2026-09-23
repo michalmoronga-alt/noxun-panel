@@ -270,6 +270,9 @@
               justify-content: center; flex: 0 0 auto; width: 18px; height: 18px; padding: 0;
               border: 0; border-radius: 50%; background: none; color: var(--nx-ink-faint);
               cursor: help; }
+  /* D-137: `display: inline-flex` vyssie prebija `[hidden]` — pomocnik „?"
+     pri Type v modale „Uložiť ako šablónu" (len slot) svietil pri kazdej skrinke. */
+  .nx-inspector .nxtip[hidden] { display: none; }
   .nx-inspector .nxtip:hover, .nx-inspector .nxtip:focus { color: var(--nx-select); outline: none; }
   .nx-inspector .nxtip:focus-visible { outline: 2px solid var(--nx-select); outline-offset: 1px; }
   .nx-inspector .nxtip .ic { width: 13px; height: 13px; }
@@ -1648,6 +1651,10 @@
   /* Kompaktny rozmerovy riadok — uzsi nez .row, aby sa vedla neho zmestil
      informacny stlpec (obsah panela ma 470 px, viac uz nebude). */
   .nx-inspector .rowc { display: flex; align-items: center; gap: 5px; margin: 4px 0; }
+  /* D-137: `display: flex` vyssie prebija UA pravidlo pre `[hidden]` — bez
+     tohto riadku videl kazdy korpus styri polia slotu umyvacky (S1-E).
+     Stazi to guard `tests/pure/test_hidden_css_guard.rb`. */
+  .nx-inspector .rowc[hidden] { display: none; }
   .nx-inspector .rowc label { flex: 0 0 62px; display: flex; align-items: center; gap: 5px;
                 color: var(--nx-ink-label); font-size: 12.5px; }
   .nx-inspector .rowc label .ic { width: 14px; height: 14px; color: var(--nx-ink-faint); flex: 0 0 14px; }
@@ -1682,6 +1689,8 @@
              width: 100%; padding: 2px 0; font-size: 10.8px; color: var(--nx-ink-soft);
              background: none; border: 0; font-family: inherit; text-align: left; }
   .nx-inspector .inforow b { color: var(--nx-ink-strong); font-variant-numeric: tabular-nums; font-weight: 600; font-size: 11.2px; }
+  /* D-137: to iste pre vystupy slotu (Telo, Čelo hore, Výplň, Pod doskou, Trieda). */
+  .nx-inspector .inforow[hidden] { display: none; }
   /* S1-E: verdikt „Pod doskou" v informacnom stlpci slotu. Jantar = nezmesti
      sa (to iste hlasi Kontrola ORANGE `dw_height_fit`); zelena = v poriadku.
      Ziadne nove tokeny — pouzivaju sa existujuce stavove farby. */
