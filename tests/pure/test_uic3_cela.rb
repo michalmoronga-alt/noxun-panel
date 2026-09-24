@@ -115,8 +115,12 @@ NxTest.test('N27: ikona typu cela ma svoj symbol v sprite (ziadne emoji)') do
   # KOV-A2a: typ uz nie je hodnota rozbalovacky, ale STAV RIADKU
   # (`dataset.frontType`) — meni ho dlazdica typegridu v karte cela. Pravidlo
   # samo sa NEMENI: prepina sa `href` v <use>, nie innerHTML celeho uzla.
-  NxTest.assert(UIC3_FORM_JS.include?('NXIcons.set(ico, frontTypeIcon(type))'),
+  # D-138: riadok ide cez `frontRowIcon` (slot = dvere umyvacky), ktory mimo
+  # slotu deleguje na TU ISTU mapu `frontTypeIcon` — prekladove miesto je jedno.
+  NxTest.assert(UIC3_FORM_JS.include?('NXIcons.set(ico, frontRowIcon(type))'),
                 'zmena typu meni `href` v <use>, nie innerHTML celeho uzla')
+  NxTest.assert(UIC3_FORM_JS.include?("function frontRowIcon(t){ return nxSlotDoor(t) ? 'front-fall' : frontTypeIcon(t); }"),
+                'ikona riadku mimo slotu je ikona z mapy typov')
 end
 
 # --- 5) naviazane kovanie pod riadkom ---------------------------------------

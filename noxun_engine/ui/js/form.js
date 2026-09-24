@@ -1483,13 +1483,16 @@
     if (n) row.dataset.frontExtra = JSON.stringify(out);
     else delete row.dataset.frontExtra;
   }
+  function frontTypeIcon(t){ return FRONT_TYPE_ICON[t] || 'front'; }
+  function frontTypeLabel(t){ return FRONT_TYPE_LABEL[t] || 'Čelo'; }
   // D-138: jedine celo SLOTU UMYVACKY je datovo blenda, ale su to DVERE
-  // UMYVACKY (otvaraju sa nadol) — riadok ich tak aj pomenuje a nakresli
-  // ikonou sklopu. Dlazdice typov slot nema (`frontCardModel` opts.slot),
-  // takze tato vynimka sa tyka len jeho vlastneho riadku.
+  // UMYVACKY (otvaraju sa nadol) — RIADOK cela oznacenej skrinky ich tak
+  // pomenuje a nakresli ikonou sklopu. Vynimka zije LEN tu: pas „pridať čelo"
+  // sa kresli raz a cachuje (`renderFrontAddTypes`), takze typove ikony a
+  // popisy musia ostat nezavisle od toho, co je prave oznacene (Codex #387 P2).
   function nxSlotDoor(t){ return t === 'blind' && cabTypeNow() === 'dishwasher'; }
-  function frontTypeIcon(t){ return nxSlotDoor(t) ? 'front-fall' : (FRONT_TYPE_ICON[t] || 'front'); }
-  function frontTypeLabel(t){ return nxSlotDoor(t) ? 'Dvere umývačky' : (FRONT_TYPE_LABEL[t] || 'Čelo'); }
+  function frontRowIcon(t){ return nxSlotDoor(t) ? 'front-fall' : frontTypeIcon(t); }
+  function frontRowLabel(t){ return nxSlotDoor(t) ? 'Dvere umývačky' : frontTypeLabel(t); }
   function frontTypeTile(t){ return FRONT_TYPE_TILE[t] || 'Čelo'; }
   // KOV-A2a: ZÁZNAM SERVERA pre dané čelo (`front_slots[fid]` = `{ wings_n,
   // slots }`). `undefined` = server sa k tomuto čelu ešte nevyjadril (nový
@@ -1593,7 +1596,7 @@
       '<button type="button" class="ftname" aria-expanded="false" data-nx-usage="fronts:karta"' +
         ' onclick="onFrontCardToggle(this)">' +
         '<span class="ftico" aria-hidden="true">' +
-          NXIcons.svg(frontTypeIcon(item.type || 'door')) + '</span>' +
+          NXIcons.svg(frontRowIcon(item.type || 'door')) + '</span>' +
         '<span class="ftl"></span>' +
         '<span class="fchev" aria-hidden="true">' + NXIcons.svg('chevron-down') + '</span></button>' +
       // D-130a R3: SUHRN cela pod nazvom. Druhy riadok mriezky je OBAL
@@ -1698,15 +1701,15 @@
     // N27: ikona typu je zrkadlom stavu riadku — meni sa `href` v <use>, NIE
     // innerHTML celeho span-u (vzor NXIcons.set pri zamkoch).
     var ico = row.querySelector('.ftico');
-    if (ico && window.NXIcons) NXIcons.set(ico, frontTypeIcon(type));
+    if (ico && window.NXIcons) NXIcons.set(ico, frontRowIcon(type));
     // Nazov typu + plne znenie v `title` tlacidla (nazov sa v uzkom rade oreze).
     var btn = row.querySelector('.ftname');
     if (btn){
       var lbl = btn.querySelector('.ftl');
-      if (lbl) lbl.textContent = frontTypeLabel(type);
-      btn.title = frontTypeLabel(type) + ' — klik otvorí kartu čela';
+      if (lbl) lbl.textContent = frontRowLabel(type);
+      btn.title = frontRowLabel(type) + ' — klik otvorí kartu čela';
       btn.setAttribute('aria-label', 'Čelo ' + (row.dataset.frontId || '') + ': ' +
-                       frontTypeLabel(type) + ' — otvoriť kartu');
+                       frontRowLabel(type) + ' — otvoriť kartu');
     }
     // D-90: „Bez čela" nemá na čom profil držať — stav sa zhodí na 'none'
     // (rovnako to robí Ruby normalize; UI sa mu nesmie rozísť).
@@ -2608,7 +2611,9 @@
                        nxFillSlotFields: nxFillSlotFields,
                        applyVisibility: applyVisibility, nxSlotFrontsLock: nxSlotFrontsLock,
                        SLOT_ONLY_ROWS: SLOT_ONLY_ROWS, SLOT_HIDDEN_ROWS: SLOT_HIDDEN_ROWS,
-                       // D-138: nazov a ikona riadku cela (slot = dvere umyvacky).
+                       // D-138: nazov a ikona RIADKU cela (slot = dvere umyvacky)
+                       // vs. vseobecne typove ikony (pas „pridať čelo", dlazdice).
+                       frontRowLabel: frontRowLabel, frontRowIcon: frontRowIcon,
                        frontTypeLabel: frontTypeLabel, frontTypeIcon: frontTypeIcon };
   }
 
