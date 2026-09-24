@@ -95,6 +95,14 @@
     var h = '<div class="aprow ' + aprEsc(tone) + '" data-apr-row="' + id + '">' +
       aprIco(bound && tone === 'ok' ? 'check' : (bound ? 'alert' : 'appliance')) +
       '<span class="aplbl">Spotrebič</span><span class="apsel">';
+    // D-140: VYSKA OSADENIA (len chladnicka v skrinke — posiela ju server).
+    // Tlacidlo, nie pole: zapis ide VYHRADNE cez popover s „Použiť".
+    if (bound && r.mount){
+      h += '<button type="button" class="apmount" data-apr="mount" data-id="' + id + '"' +
+        ' data-v="' + aprEsc(r.mount.value) + '" aria-haspopup="dialog" aria-controls="aprMountPop"' +
+        ' title="Výška osadenia od hornej plochy dna (napr. vrch police) — klik = zmeniť">' +
+        aprEsc(r.mount.text) + '</button>';
+    }
     h += bound
       ? '<button type="button" class="ibtn" data-apr="unbind" data-id="' + id + '"' +
         ' title="Odpojiť spotrebič od tohto kusu — v zákazke ostáva" aria-label="Odpojiť">' +
@@ -131,7 +139,86 @@
     box.setAttribute('data-apr-pid', (c.pid == null ? '' : String(c.pid)));
     box.innerHTML = aprRowsHtml(list);
     box.hidden = list.length === 0;
+    if ((nodeId || 'applRows') === 'applRows') aprMountSync(list, c);
     return list.length > 0;
+  }
+
+  // === D-140: POPOVER VYSKY OSADENIA =======================================
+  //
+  // STATICKY uzol `#aprMountPop` ZA `#applRows` — prekreslenie riadkov (echo
+  // prestavby, novy payload) ho nezmaze, takze rozpisana hodnota prezije
+  // (Astra C FIX 8). Pri OTVORENI sa ZACHYTI dokument, vlastnik (druh, ID,
+  // PID), `item_id` a POVODNA hodnota; odosiela sa PRESNE to (BLOCKER 2) —
+  // nikdy stav okna v case odoslania a nikdy pri `blur`. Zmena dokumentu,
+  // kusu alebo zanik riadku popover ZAVRIE BEZ ZAPISU.
+  var APR_MOUNT = null;
+
+  function aprMountFmt(v){
+    var n = Number(v) || 0;
+    return String(Math.round(n * 10) / 10).replace('.', ',');
+  }
+  // Cislo z pola: desatinna ciarka aj bodka; NaN = neplatne (nezapise sa).
+  function aprMountParse(s){
+    var t = String(s == null ? '' : s).trim().replace(',', '.');
+    if (!/^-?\d+(\.\d+)?$/.test(t)) return NaN;
+    return parseFloat(t);
+  }
+  function aprMountDoc(){ return (typeof nxDocGuid === 'function') ? nxDocGuid() : ''; }
+
+  function aprMountOpen(btn){
+    var ctx = aprCtxOf(btn);
+    var pop = aprEl('aprMountPop'), inp = aprEl('aprMountVal');
+    if (!ctx || !pop || !inp) return false;
+    var prev = Number(btn.getAttribute('data-v')) || 0;
+    APR_MOUNT = { guid: aprMountDoc(), ctx: ctx, item: String(btn.getAttribute('data-id') || ''), prev: prev };
+    inp.value = aprMountFmt(prev);
+    inp.classList.remove('bad');
+    pop.hidden = false;
+    if (inp.focus) inp.focus();
+    if (inp.select) inp.select();
+    return true;
+  }
+
+  function aprMountClose(){
+    APR_MOUNT = null;
+    var pop = aprEl('aprMountPop');
+    if (pop) pop.hidden = true;
+    return true;
+  }
+
+  // Payload zapisu — z ZACHYTENEHO stavu (cista funkcia, Node test).
+  function aprMountPayload(state, value){
+    var s = state || {};
+    return aprPayload({ item_id: s.item, value: value, prev: s.prev }, s.ctx);
+  }
+
+  function aprMountApply(){
+    if (!APR_MOUNT) return false;
+    var inp = aprEl('aprMountVal');
+    var v = aprMountParse(inp ? inp.value : '');
+    if (!isFinite(v) || v < 0){
+      if (inp) inp.classList.add('bad');
+      return false;
+    }
+    var s = APR_MOUNT;
+    aprMountClose();
+    if (Math.abs(v - s.prev) < 0.05) return false; // bez zmeny — ziadna prestavba
+    if (typeof window === 'undefined' || !window.sketchup || !sketchup.set_appliance_mount) return false;
+
+    sketchup.set_appliance_mount(nxDocPayload(aprMountPayload(s, v), s.guid));
+    return true;
+  }
+
+  // Po KAZDOM vykresleni riadkov: popover zije dalej LEN nad tym istym
+  // dokumentom, tym istym kusom (ID + PID) a riadkom, ktory osadenie stale ma.
+  function aprMountSync(rows, ctx){
+    if (!APR_MOUNT) return false;
+    var s = APR_MOUNT, c = ctx || {};
+    var same = s.guid === aprMountDoc() && String(s.ctx.id) === String(c.id || '') &&
+               String(s.ctx.pid == null ? '' : s.ctx.pid) === String(c.pid == null ? '' : c.pid) &&
+               (rows || []).some(function(r){ return r && r.mount && String(r.item_id) === s.item; });
+    if (!same) aprMountClose();
+    return same;
   }
 
   // Odchod z kontextu (odznačenie, prechod na dosku) — riadky PATRIA označenému
@@ -141,6 +228,7 @@
   function clearApplianceRows(nodeId){
     var box = aprEl(nodeId || 'applRows');
     if (!box) return false;
+    if ((nodeId || 'applRows') === 'applRows') aprMountClose(); // D-140: kus zmizol z okna
     box.innerHTML = '';
     box.hidden = true;
     box.removeAttribute('data-apr-kind');
@@ -237,7 +325,25 @@
       if (!b || b.tagName === 'SELECT') return;
       var a = b.getAttribute('data-apr');
       if (a === 'unbind'){ aprUnbind(b.getAttribute('data-id'), aprCtxOf(b)); return; }
-      if (a === 'studio'){ aprStudio(b.getAttribute('data-id')); }
+      if (a === 'studio'){ aprStudio(b.getAttribute('data-id')); return; }
+      if (a === 'mount'){ aprMountOpen(b); return; }
+      if (a === 'mount-ok'){ aprMountApply(); return; }
+      if (a === 'mount-cancel'){ aprMountClose(); }
+    });
+
+    // D-140: popover sa zatvara klikom MIMO (bez zapisu), Escape; Enter = Použiť.
+    document.addEventListener('mousedown', function(ev){
+      if (!APR_MOUNT) return;
+      var t = ev.target;
+      if (t && t.closest && (t.closest('#aprMountPop') || t.closest('[data-apr="mount"]'))) return;
+      aprMountClose();
+    }, true);
+    document.addEventListener('keydown', function(ev){
+      if (!APR_MOUNT) return;
+      var t = ev.target;
+      if (!t || t.id !== 'aprMountVal') return;
+      if (ev.key === 'Enter'){ ev.preventDefault(); aprMountApply(); }
+      else if (ev.key === 'Escape'){ ev.preventDefault(); aprMountClose(); }
     });
 
     // Zápis až na `change` (nie `input`): každé prebehnutie klávesnicou cez
@@ -259,5 +365,11 @@
                        renderApplianceRows: renderApplianceRows, aprCtxOf: aprCtxOf,
                        clearApplianceRows: clearApplianceRows,
                        aprExpectsHtml: aprExpectsHtml, aprExpectsNext: aprExpectsNext,
-                       aprSetExpects: aprSetExpects };
+                       aprSetExpects: aprSetExpects,
+                       // D-140: popover vysky osadenia.
+                       aprMountOpen: aprMountOpen, aprMountClose: aprMountClose,
+                       aprMountApply: aprMountApply, aprMountSync: aprMountSync,
+                       aprMountParse: aprMountParse, aprMountFmt: aprMountFmt,
+                       aprMountPayload: aprMountPayload,
+                       aprMountState: function(){ return APR_MOUNT; } };
   }

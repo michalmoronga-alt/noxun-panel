@@ -356,9 +356,18 @@ module Noxun
           'state' => state, 'customer_supplied' => (item['customer_supplied'] == true),
           'snapshot' => appliance_snapshot_dims(item['snapshot']),
           'slot' => (bound && entry['kind'] == 'slot' ? slot_info(entry['cfg']) : nil),
-          'interior' => (bound ? interior_of(entry) : nil) }
+          'interior' => (bound ? interior_of(entry) : nil),
+          # D-140: osadenie je vlastnost KUSU v tejto skrinke (ref), nie
+          # spolocneho kontextu vlastnika — dve chladnicky mozu mat kazda ine.
+          'mount_offset' => (bound ? appliance_ref_mount(entry, id) : 0.0) }
           .merge(appliance_front_dims(item['snapshot']))
           .merge(appliance_geometry(bound ? entry : nil))
+      end
+
+      # D-140: vyska osadenia z `appliance_refs[]` vlastnika pre TUTO polozku.
+      def appliance_ref_mount(entry, item_id)
+        ref = Array(entry && entry['refs']).find { |r| r.is_a?(Hash) && r['item_id'].to_s == item_id.to_s }
+        defined?(Construction) ? Construction.appliance_mount_offset(ref) : 0.0
       end
 
       # S1-F: PASMA DVERI SPOTREBICA a NABYTKOVE DVERE Z VYKRESU. Citaju sa zo

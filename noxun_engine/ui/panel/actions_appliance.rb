@@ -38,6 +38,12 @@ module Noxun
       APPL_MSG_AMBIG = 'Dva kusy s tým istým ID — prestav skrinky a skús znova.'
       APPL_MSG_EXPECTS_FAILED = 'Očakávanie sa nepodarilo uložiť — skús znova.'
       APPL_MSG_EXPECTS_SAME = 'Očakávanie sa nezmenilo.'
+      # D-140: vyska osadenia chladnicky.
+      APPL_MOUNT_OP = 'NOXUN: Osadenie spotrebiča'
+      APPL_MSG_MOUNT_GONE = 'Chladnička už v tejto skrinke nie je priradená — panel sa obnovil.'
+      APPL_MSG_MOUNT_STALE = 'Osadenie sa medzitým zmenilo — panel sa obnovil, skús znova.'
+      APPL_MSG_MOUNT_SAME = 'Osadenie sa nezmenilo.'
+      APPL_MSG_MOUNT_FAILED = 'Osadenie sa nepodarilo uložiť — skús znova.'
       APPL_EXPECTS_OP = 'NOXUN: Očakávaný spotrebič'
 
       class << self
@@ -167,6 +173,130 @@ module Noxun
         rescue StandardError => e
           Engine.log_error(e, 'Panel.handle_set_appliance_expects')
           appliance_expects_refused(model, "Očakávanie sa nepodarilo uložiť: #{e.message}")
+        end
+
+        # === D-140: VYSKA OSADENIA CHLADNICKY =================================
+        #
+        # Vlastny callback (nie `set_appliance_owner`): polozka zakazky ani vazba
+        # sa nemenia — meni sa, KDE v skrinke kus stoji. Na rozdiel od
+        # ocakavani sa PRESTAVUJE (box niky sa posunie), takze: bariera
+        # observera a identita PRED operaciou, `ensure_root_context` (vzor
+        # `ApplianceBinding.commit`, Astra C FIX 4), prestavba v JEDNEJ operacii
+        # = jeden krok Spat.
+        # Payload nesie dokument ZACHYTENY pri otvoreni popoveru (Astra C
+        # BLOCKER 2) a POVODNU hodnotu (`prev`, FIX 5) — stary prikaz tak
+        # neprepise novsie osadenie ani neobnovi odpojeny spotrebic.
+        def handle_set_appliance_mount(payload)
+          model = Sketchup.active_model
+          data = parse(payload)
+          return if foreign_document?(data, model, 'Osadenie sa nezmenilo') # R-02
+          return appliance_expects_refused(model, APPL_MSG_BUSY) unless ApplianceBinding.observer_idle?(model)
+
+          inst, refs, idx, err = appliance_mount_target(model, data)
+          return appliance_expects_refused(model, err) if err
+
+          value, verr = appliance_mount_value(data['value'])
+          return appliance_expects_refused(model, "Osadenie sa neuložilo — #{verr}") if verr
+
+          current = Construction.appliance_mount_offset(refs[idx])
+          prev = data['prev']
+          unless prev.is_a?(Numeric) && (prev.to_f - current).abs < 0.05
+            return appliance_expects_refused(model, APPL_MSG_MOUNT_STALE)
+          end
+          if (value - current).abs < 0.05
+            push_selected(model, dedup: false) # UI resync, model sa nedotkne
+            return set_status(APPL_MSG_MOUNT_SAME)
+          end
+
+          appliance_mount_write(model, inst, appliance_mount_refs(refs, idx, value), value)
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.handle_set_appliance_mount')
+          appliance_expects_refused(model, "Osadenie sa nepodarilo uložiť: #{e.message}")
+        end
+
+        # OZNACENA skrinka a JEDINY ref tejto chladnicky -> [inst, refs, index, nil]
+        # alebo [nil, nil, nil, hlaska]. Astra C FIX 5: echo ID + PID, jednoznacne
+        # ID, bez odpojeneho dielca, nie novsi config, a OBOJSMERNY dokaz vazby —
+        # ziva polozka zakazky patri TEJTO skrinke a skrinka nesie PRAVE JEDEN
+        # ref kategorie fridge s jej `item_id`. Starsia schema sa NEODMIETA:
+        # zapis ide cez prestavbu, ktora schemu zmigruje plnym planom.
+        def appliance_mount_target(model, data)
+          cab = find_cabinet(model)
+          return [nil, nil, nil, APPL_MSG_NO_TARGET] if cab.nil?
+
+          cfg = Store.config(cab) || {}
+          id = Store.get(cab, 'cabinet_id').to_s
+          return [nil, nil, nil, APPL_MSG_MOUNT_GONE] if cfg['type'].to_s == 'dishwasher'
+          return [nil, nil, nil, APPL_MSG_STALE] if id.empty? || data['cabinet_id'].to_s != id
+          return [nil, nil, nil, APPL_MSG_STALE] unless appliance_pid_matches?(cab, data['pid'])
+          kind = ApplianceBinding::KIND_CABINET
+          return [nil, nil, nil, APPL_MSG_AMBIG] if ApplianceBinding.instances_of(model, kind, id).length > 1
+          return [nil, nil, nil, APPL_MSG_DETACH] if Ids.top_level_scan(model)['detached'][id].to_i.positive?
+          return [nil, nil, nil, APPL_MSG_NEWER] if CabinetBuilder.newer_config?(cfg)
+
+          item_id = data['item_id'].to_s
+          refs = ApplianceBinding.refs_of(cab)
+          idxs = refs.each_index.select { |i| refs[i]['item_id'].to_s == item_id }
+          return [nil, nil, nil, APPL_MSG_MOUNT_GONE] unless item_id != '' && idxs.length == 1 &&
+                                                            refs[idxs[0]]['category'].to_s == 'fridge'
+
+          item = appliance_items(model).find { |it| it.is_a?(Hash) && it['id'].to_s == item_id }
+          own = item ? BudgetStore.owner_field(item['owner']) : {}
+          owner = { 'kind' => kind, 'id' => id }
+          proof = item && own['kind'].to_s == kind && own['id'].to_s == id &&
+                  ApplianceBinding.ref_matches?(ApplianceBinding.owner_entry_for(cab), owner, item_id)
+          return [nil, nil, nil, APPL_MSG_MOUNT_GONE] unless proof
+
+          [cab, refs, idxs[0], nil]
+        end
+
+        # -> [mm Float zaokruhleny na 0,1, nil] alebo [nil, veta]
+        def appliance_mount_value(raw)
+          v = raw.is_a?(Numeric) ? raw.to_f : nil
+          return [nil, 'zadaj výšku v mm (0 = chladnička stojí na dne)'] if v.nil? || !v.finite?
+
+          max = Construction::MOUNT_OFFSET_MAX
+          return [nil, "výška osadenia musí byť 0 až #{max.round} mm"] if v.negative? || v > max
+
+          [v.round(1), nil]
+        end
+
+        # Novy zoznam refs — meni sa LEN tento kus; 0 kluc ZMAZE (chybajuci
+        # kluc = 0, nula sa neuklada).
+        def appliance_mount_refs(refs, idx, value)
+          refs.each_with_index.map do |r, i|
+            next r unless i == idx
+
+            out = r.dup
+            value.positive? ? out['mount_offset'] = value : out.delete('mount_offset')
+            out
+          end
+        end
+
+        def appliance_mount_write(model, inst, refs, value)
+          CabinetBuilder.ensure_root_context(model)
+          begin
+            CabinetBuilder.guarded do
+              model.start_operation(APPL_MOUNT_OP, true)
+              begin
+                CabinetBuilder.write_appliance_refs!(model, inst, refs)
+                model.commit_operation
+              rescue StandardError => e
+                CabinetBuilder.abort_safely(model)
+                raise e
+              end
+            end
+          rescue StandardError => e
+            Engine.log_error(e, 'Panel.appliance_mount_write')
+            push_selected(model, dedup: false)
+            return set_status(APPL_MSG_MOUNT_FAILED, true)
+          end
+
+          # Box niky, pasma aj Kontrola sa zmenili — cerstve cisla dostane panel
+          # aj otvorene Studio (vzor zapisu ocakavani, Astra C14).
+          push_selected(model)
+          StudioDialog.refresh_if_open(bump: true) if defined?(StudioDialog)
+          set_status("Osadenie spotrebiča: #{value.positive? ? "#{fmt_mm(value)} mm od dna" : 'na dne'}.")
         end
 
         # Odmietnutie: NAJPRV cerstva karta (odblokuje riadok), potom hlaska.

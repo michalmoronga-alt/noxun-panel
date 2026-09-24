@@ -722,9 +722,24 @@ module Noxun
         return false if item.nil?
 
         rec = ref_record(item)
+        old = refs_of(plan[:new_entity]).find { |r| r['item_id'].to_s == rec['item_id'] }
+        carry_mount!(rec, old)
         list = refs_of(plan[:new_entity]).reject { |r| r['item_id'].to_s == rec['item_id'] }
         list << rec
         write_refs!(model, owner['kind'].to_s, plan[:new_entity], list)
+      end
+
+      # D-140: VYSKA OSADENIA patri KUSU V TEJTO SKRINKE — pri prepise zaznamu
+      # toho isteho `item_id` na TEJ ISTEJ entite (vymena modelu, re-bind) sa
+      # prenesie, ale LEN medzi dvoma chladnickami (Astra C FIX 9: `fridge ->
+      # oven` by nechal zakazane osadenie na rure). Presun na inu skrinku ho
+      # neprenasa (`old` tam nie je).
+      def carry_mount!(rec, old)
+        return rec unless old.is_a?(Hash) && old['category'].to_s == 'fridge' && rec['category'].to_s == 'fridge'
+
+        m = Construction.appliance_mount_offset(old)
+        rec['mount_offset'] = m if m.positive?
+        rec
       end
 
       # KONTRAKT ZAZNAMU `appliance_refs[]` (cita ho S1-B2 telo slotu, S1-F box

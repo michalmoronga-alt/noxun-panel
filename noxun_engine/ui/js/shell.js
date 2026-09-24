@@ -774,6 +774,7 @@
     if (typeof absModalCloseSilent === 'function') absModalCloseSilent(); // modal chybajucej ABS
     if (typeof closeSaveTemplateModal === 'function') closeSaveTemplateModal();
     if (typeof closeSimilarModal === 'function') closeSimilarModal();     // „Použiť na podobné"
+    if (typeof aprMountClose === 'function') aprMountClose();             // D-140 popover osadenia
     // Zatvarka „apply odoslany, echo este nedoslo" je DRUHA polovica podmienky
     // `keepGaps`. Nuluje sa VYHRADNE tu, nie v `cancelCabinetEdits` (interne
     // review kola 4, P2): tam bezi aj jednodokumentove flow — zruseny okamzity

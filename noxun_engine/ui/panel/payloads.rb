@@ -347,7 +347,8 @@ module Noxun
           return nil if cat.empty?
 
           id = ref['item_id'].to_s
-          check = appliance_check(kind, cat, id, item, ctx)
+          mount = Construction.appliance_mount_offset(ref)
+          check = appliance_check(kind, cat, id, item, ctx, mount)
           tone, sub = appliance_row_tone(kind, cfg, cat, item, check)
           row = { 'state' => 'bound', 'item_id' => id, 'category' => cat,
                   'category_label' => ApplianceCatalog.category_label(cat),
@@ -357,6 +358,11 @@ module Noxun
                   'text' => (item ? Bom.appliance_label(item) : 'položka už v rozpočte nie je'),
                   'sub' => sub, 'tone' => tone, 'link' => true }
           row['check'] = check if check
+          # D-140: VYSKA OSADENIA — len chladnicka v skrinke (box niky ma len ona)
+          # a len pri zivej polozke (sirota sa neupravuje, len odpaja).
+          if cat == 'fridge' && kind == ApplianceBinding::KIND_CABINET && item
+            row['mount'] = { 'value' => mount, 'text' => "osadenie #{fmt_mm(mount)} mm" }
+          end
           row
         end
 
@@ -364,21 +370,23 @@ module Noxun
         # nad zaznamom v TOM ISTOM tvare, aky ma zber (`Bom.collect[:appliances]`)
         # — Kontrola aj Inspector tak hovoria to iste cislo o tej istej skrinke.
         # nil = niet co pocitat (polozka zmizla, doska, slot).
-        def appliance_check(kind, category, item_id, item, ctx)
+        def appliance_check(kind, category, item_id, item, ctx, mount = 0.0)
           return nil unless item.is_a?(Hash) && defined?(ApplianceChecks)
           return nil if ctx.nil? || ctx.empty?
 
-          ApplianceChecks.verdict(appliance_check_record(kind, category, item_id, item, ctx))
+          ApplianceChecks.verdict(appliance_check_record(kind, category, item_id, item, ctx, mount))
         rescue StandardError => e
           Engine.log_error(e, 'Panel.appliance_check')
           nil
         end
 
-        def appliance_check_record(kind, category, item_id, item, ctx)
+        # D-140: `mount` = vyska osadenia z REF tohto kusu (zber `Bom` ho berie
+        # z toho isteho miesta) — nikdy zo spolocneho kontextu vlastnika.
+        def appliance_check_record(kind, category, item_id, item, ctx, mount = 0.0)
           snap = item['snapshot'].is_a?(Hash) ? item['snapshot'] : {}
           { 'item_id' => item_id, 'name' => Bom.appliance_label(item), 'category' => category,
             'owner' => { 'kind' => kind }, 'state' => 'bound',
-            'snapshot' => Bom.appliance_snapshot_dims(snap) }
+            'snapshot' => Bom.appliance_snapshot_dims(snap), 'mount_offset' => mount.to_f }
             .merge(Bom.appliance_front_dims(snap))
             .merge('interior' => ctx['interior'], 'z_lo' => ctx['z_lo'], 'gap' => ctx['gap'],
                    'single_zone' => ctx['single_zone'], 'fronts_pair' => ctx['fronts_pair'])

@@ -262,7 +262,13 @@ module Noxun
       #       pri 5-16 (`newer_config?`, `ProductionCore.export_blockers`).
       #       Stare sloty sa NEMIGRUJU (Michal 24.9.2026: ziadna zakazka so
       #       slotom) — pri najblizsej prestavbe dostanu celo z ulozenej medzery.
-      CONFIG_SCHEMA = 17
+      #  18 = D-140 — VYSKA OSADENIA CHLADNICKY. Polozka `appliance_refs[]`
+      #       kategorie `fridge` smie niest `mount_offset` (mm od hornej plochy
+      #       dna po spodok niky). Plugin schemy 17 (v0.12.19) by kluc ignoroval
+      #       (box aj kontrola delenia ciel by ostali na dne) a pri vymene modelu
+      #       by ho ticho zahodil (Astra C BLOCKER 1). Brany su tie iste ako
+      #       pri 5-17.
+      CONFIG_SCHEMA = 18
 
       # KOV-C2b: schema, OD KTOREJ stavba emituje dielce zasuviek z receptu.
       # VLASTNA konstanta (nie `CONFIG_SCHEMA`), lebo pri bumpe na 6 (KOV-D1a)

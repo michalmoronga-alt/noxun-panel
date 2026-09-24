@@ -173,8 +173,12 @@ eq(NX_TYPE_LABEL.upper, 'Horná', 'slovensky nazov typu zije na JEDNOM mieste');
        'pole ' + id + ' si drzi ID aj svoju change cestu (onField)');
     ok(new RegExp('data-lock="' + id + '"').test(grid), 'pole ' + id + ' ma dalej zamok vkladacej karty (D-39)');
   });
-  const info = grid.slice(grid.indexOf('<div class="infocol">'));
-  ok(info.indexOf('<input') < 0, 'informacny stlpec NEMA polia — vystupy sa netvaria ako vstupy');
+  // Informacny stlpec konci pred riadkami Spotrebic (S1-B2) — za nimi zije
+  // popover vysky osadenia (D-140), ktory je VEDOMY vstup, nie vystup stlpca.
+  const info = grid.slice(grid.indexOf('<div class="infocol">'), grid.indexOf('id="applRows"'));
+  ok(info.length > 0 && info.indexOf('<input') < 0, 'informacny stlpec NEMA polia — vystupy sa netvaria ako vstupy');
+  ok(grid.indexOf('id="aprMountPop"') > grid.indexOf('id="applRows"'),
+     'popover osadenia stoji AZ ZA riadkami Spotrebic, mimo informacneho stlpca');
   ['av_width', 'av_depth', 'av_height', 'inf_parts', 'inf_area'].forEach(function(id){
     ok(new RegExp('<b id="' + id + '"').test(info), 'udaj ' + id + ' je TEXT (<b>), nie input');
   });

@@ -169,6 +169,8 @@ module Noxun
           # bez prestavby vo vlastnej operacii — je to INA vec nez vazba
           # (ziadna polozka zakazky sa nemeni), preto vlastny callback.
           cb(dlg, 'set_appliance_expects') { |p| handle_set_appliance_expects(p) }
+          # D-140: vyska osadenia chladnicky (popover riadku Spotrebic).
+          cb(dlg, 'set_appliance_mount') { |p| handle_set_appliance_mount(p) }
           # KOV-H2: hladanie v katalogu kovania pre modal rucnej polozky.
           # CISTE CITANIE — ziadna operacia, ziadny zapis, ziadny krok Spat;
           # odpoved chodi kanalom `NX.hwManualSearchResult` s generaciou dotazu.
