@@ -18,9 +18,9 @@ BUDGET_STD 2 — aktualizovať obe PC. **Vedomé revízie mockupu zo smoke:** v�
 ### 5 · SPOTREBIČE S1 (V1-02) — poradie, brány a stav dávok (schválené Michalom 20.9.2026; nočný autonómny beh od 20.9.)
 
 **Cieľ bloku:** katalóg spotrebičov s overenými rozmermi a listami · spotrebič v zákazke s vlastníkom a kópiou rozmerov · **slot umývačky** ako nový typ skrinky · **telo chladničky**
-ako kontrolná geometria + Kontrola niky a delenia dverí · spotrebičová šablóna. Autority: debata [zdroje/next_sessions/V1_DEBATA_2026-09-20_SPOTREBICE_POLIA.md](zdroje/next_sessions/V1_DEBATA_2026-09-20_SPOTREBICE_POLIA.md)
-· cross audit ×3 [zdroje/next_sessions/S1_CROSS_AUDIT_2026-09-20.md](zdroje/next_sessions/S1_CROSS_AUDIT_2026-09-20.md) · **mockup [zdroje/ui20/mockup_spotrebice_s1.html](zdroje/ui20/mockup_spotrebice_s1.html) = záväzná vizuálna autorita**
-(R1–R17) · čísla listov [zdroje/next_sessions/SPOTREBICE_TECHLISTY_OVERENIE_2026-09-19.md](zdroje/next_sessions/SPOTREBICE_TECHLISTY_OVERENIE_2026-09-19.md).
+ako kontrolná geometria + Kontrola niky a delenia dverí · spotrebičová šablóna. Autority: debata [zdroje/next_sessions/V1_DEBATA_2026-09-20_SPOTREBICE_POLIA.md](../zdroje/next_sessions/V1_DEBATA_2026-09-20_SPOTREBICE_POLIA.md)
+· cross audit ×3 [zdroje/next_sessions/S1_CROSS_AUDIT_2026-09-20.md](../zdroje/next_sessions/S1_CROSS_AUDIT_2026-09-20.md) · **mockup [zdroje/ui20/mockup_spotrebice_s1.html](../zdroje/ui20/mockup_spotrebice_s1.html) = záväzná vizuálna autorita**
+(R1–R17) · čísla listov [zdroje/next_sessions/SPOTREBICE_TECHLISTY_OVERENIE_2026-09-19.md](../zdroje/next_sessions/SPOTREBICE_TECHLISTY_OVERENIE_2026-09-19.md).
 Nemenné zásady: semafor varuje, nikdy neblokuje · neznáme pole = prázdne, nikdy tichý default · telo spotrebiča = referencia (`manufactured: false`, `production_class: 'reference'`),
 nikdy v kusovníku ani VEPO · konkrétny model sa nikdy nedeformuje podľa niky · cena len v Rozpočte · katalóg je per PC (D-48 po V1).
 
@@ -96,7 +96,7 @@ kvótová brána `usage` pred každým auditom a subagentom. Pravidlo 3 kôl pla
   **ODCHÝLKA od tohto riadku: TemplateStore STD sa NEBUMPUJE (ostáva 5)** — očakávania šablóny žijú v `config['appliance_expects']`, takže žiadny nový kľúč záznamu
   nevznikol a bump by knižnicu len zamkol pre zápis staršiemu pluginu (audit C1/C2). Vedomá revízia B2: blok Spotrebiča sa skrýva už len tam, kde sa nedá očakávať nič —
   skrinka a doska majú vždy jeden tlmený riadok voľby (inak sa očakávanie bez šablóny nedá zapnúť, mockup R10).
-- **Smoke S1 — opravy pred uzáverom** (Michal od 21.9.2026, plné znenia v [DOGFOODING.md](DOGFOODING.md) skupina SPOTREBIČE S1): **A ✅ PR #386, v0.12.17** — drez a doska
+- **Smoke S1 — opravy pred uzáverom** (Michal od 21.9.2026, plné znenia v [DOGFOODING.md](../DOGFOODING.md) skupina SPOTREBIČE S1): **A ✅ PR #386, v0.12.17** — drez a doska
   bez Tela a Niky, karta = len bloky kategórie (D-136) + polia slotu umývačky už nesvietia pri každej skrinke, nový guard `[hidden]` (D-137); UI, audit NIE ·
   **B1 ✅ PR #387, v0.12.18** — čelo slotu sa v kusovníku/VEPO volá „Dv myčka", v modeli aj náhľade má symbol sklopu, zoznam čiel ho menuje „Dvere umývačky" (D-138);
   audit NIE · **B2 ✅ PR #388, v0.12.19** výška čela = linka − sokel − medzera hore podľa schémy medzier, predvoľby slotu 880/100, „F1 · dv myčka" v Kovaní
