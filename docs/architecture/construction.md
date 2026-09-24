@@ -151,8 +151,12 @@ Vzniká z **väzby** (`appliance_refs[]`) kategórie `fridge` — skrinka, ktor�
 bez väzby je zoznam prázdny a nič sa nekreslí. Box je **minimálna nika z listu** `[width_min, depth_min, height_min]`, **nie telo** (Beko: telo 540 × 1935 × 545, nika
 min 560 × 1940 × 555) — telo by tvrdilo, že sa spotrebič zmestí aj keď na montáž chýba 20 mm šírky. **Box vznikne LEN pri troch kladných minimách** (Astra S1-F BLOCKER F3);
 neúplný, ale platný katalógový záznam prestavbu **nikdy nezhodí** ani nevyhodí výnimku, len sa nekreslí a osové kontroly bežia ďalej per dostupná os. `origin` =
-`[(width − width_min) / 2, 0, interior_dims[:z_lo]]` — stojí na **hornej ploche dna**, je **centrovaný** (vnútro je symetrické, takže stred vnútra = stred korpusu) a **lícuje
-s čelnou rovinou** (hĺbka ide dozadu). **Nikdy sa nedeformuje**: keď je väčší než vnútro, **trčí** a Kontrola to povie. Deskriptor nesie `item_id` (identita `ref_key`
+`[(width − width_min) / 2, 0, interior_dims[:z_lo] + appliance_mount_offset(ref)]` — stojí na **hornej ploche dna** zdvihnutej o **výšku osadenia** (D-140, v0.12.20:
+kľúč `mount_offset` záznamu väzby — polica pod chladničkou; chýbajúci = 0), je **centrovaný** (vnútro je symetrické, takže stred vnútra = stred korpusu) a **lícuje
+s čelnou rovinou** (hĺbka ide dozadu). Pásma dverí sú relatívne k boxu, takže idú s ním. **`appliance_mount_offset(h)` je JEDINÝ čitač osadenia** v celom engine
+(builder, `ApplianceChecks`, zber `Bom`, Inspector, akcia panela aj prenos pri výmene modelu): platné konečné číslo > 0 orezané na `MOUNT_OFFSET_MAX` 2000
+(poistka proti preklepu m/mm), inak 0 — neplatná hodnota stavbu nikdy nezhodí. **Nikdy sa nedeformuje**: keď je väčší než vnútro (aj po osadení), **trčí** a Kontrola
+to povie. Deskriptor nesie `item_id` (identita `ref_key`
 = `ref:appliance_niche:<item_id>`) a voliteľné `bands` (pásma dverí spotrebiča). Viac chladničiek v jednej skrinke = **viac boxov**, každý s vlastnou identitou.
 Kategórie mimo `NICHE_REF_CATEGORIES` (dnes len `fridge`) geometriu nedostávajú — rúra a mikrovlnka sú vec zón (package S1-F, Scope OUT).
 
@@ -480,7 +484,8 @@ telesá v jednej referencii by menili obálku pri prisúvaní. Kóta, ktorá by 
 doraz neposúvajú**; pri slote to znamená, že výsledok prisunutia nezávisí ani od presahujúceho čela, ani od toho, či má niekto zapnutý tag referencie.
 
 **`CONFIG_SCHEMA` 16 rezervoval `appliance_refs[]` a `appliance_expects[]`** — väzbu na konkrétny spotrebič a očakávanú kategóriu (napĺňa ich S1-B/F/C **bez ďalšieho bumpu**);
-**17 = D-139** (odvodené čelo slotu + skutočná medzera hore — starší plugin by medzeru zahodil a čelo držal ako ručné, preto ho nový config odmieta).
+**17 = D-139** (odvodené čelo slotu + skutočná medzera hore — starší plugin by medzeru zahodil a čelo držal ako ručné, preto ho nový config odmieta);
+**18 = D-140** (`mount_offset` v zázname chladničky — starší plugin by ho ignoroval a pri výmene modelu zahodil).
 `normalize` aj `config_to_params` ich **prenášajú nedotknuté** (FIX E4): prestavba, zmena materiálu ani absorpcia scale väzbu stratiť nesmú. Zahodiť `appliance_refs[]`
 smie **jediný** helper `strip_appliance_refs!`, volaný v **troch** kopírovacích vstupoch — `dedup_copies` (natívna kópia), `Tools::Mower.copy_cabinet` a
 `Panel.handle_insert_copy`. `appliance_expects[]` sa pritom **zachováva**: kópia sa správa ako „očakáva spotrebič tej kategórie", ale nevlastní ten istý kus.

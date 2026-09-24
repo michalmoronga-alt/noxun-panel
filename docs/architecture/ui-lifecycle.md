@@ -1907,8 +1907,9 @@ aj rozpísané gap hodnoty. `nxDropDocState` navyše **zhodí fokus** (`document
 
 ### actions_appliance.rb
 
-**DVE akcie panela k spotrebičom:** `set_appliance_owner` (S1-B2 — väzba) a `set_appliance_expects` (S1-C — očakávanie). Sú to **dve rôzne veci**: väzba mení položku
-zákazky aj geometriu, očakávanie je len vyhlásenie v configu, takže druhá akcia by nemala čo robiť v transakčnom vstupe väzby.
+**TRI akcie panela k spotrebičom:** `set_appliance_owner` (S1-B2 — väzba), `set_appliance_expects` (S1-C — očakávanie) a `set_appliance_mount` (D-140 — výška osadenia
+chladničky). Sú to **tri rôzne veci**: väzba mení položku zákazky aj geometriu, očakávanie je len vyhlásenie v configu a osadenie mení, **kde v skrinke kus stojí** (prestavba,
+ale bez zmeny položky zákazky), takže ani jedna z ďalších dvoch nemá čo robiť v transakčnom vstupe väzby.
 
 `set_appliance_owner` — priradenie modelu z riadku „Spotrebič" alebo jeho odpojenie, pre skrinku, slot umývačky aj dosku.
 Súbor pri väzbe **nezapisuje**: deleguje na `ApplianceBinding.apply!` (`move` / `unbind`), ktorý je jediným transakčným vstupom väzby (položka rozpočtu + `appliance_refs[]`
@@ -1942,6 +1943,17 @@ nevybraný" musí byť vidieť hneď, nie až pri najbližšom inom zápise. Und
 
 **KAŽDÉ odmietnutie posiela čerstvú kartu** (`appliance_expects_refused` → `push_selected(dedup: false)` a až potom červený status). Klient si totiž po odoslaní
 príkazu ovládač **zamkne** a odomkne ho až príchod nového payloadu — keby odmietnutie vrátilo len status, riadok by ostal zamknutý.
+
+**`set_appliance_mount` (D-140, v0.12.20) = PRESTAVBA vo VLASTNEJ operácii = jeden krok Späť.** Payload nesie `item_id`, echo `cabinet_id` + `pid`, novú hodnotu `value`
+a **pôvodnú hodnotu `prev`** — všetko zachytené pri **otvorení** popoveru, dokument ide cez `nxDocPayload(…, zachytený guid)` (Astra C BLOCKER 2). Poradie guardov:
+identita dokumentu → bariéra observera → **cieľ** (`appliance_mount_target`: označená skrinka, echo ID + PID, nie slot, jednoznačné ID, nie odpojený dielec, nie novší config,
+**práve jeden** záznam `fridge` s tým `item_id` a **živá položka zákazky, ktorej vlastník je táto skrinka** — obojsmerný dôkaz `ref_matches?`; Astra C FIX 5) → **hodnota**
+(`appliance_mount_value`: konečné číslo 0–2000 mm, zaokrúhlené na 0,1; inak veta a config sa nedotkne) → **echo pôvodnej hodnoty** (`|prev − aktuálne| < 0,05`, inak
+„Osadenie sa medzitým zmenilo" — starý príkaz neprepíše novšie osadenie ani neobnoví odpojený spotrebič) → **nezmenené po zaokrúhlení = žiadna operácia** (0,04 → 0).
+Zápis (`appliance_mount_write`): **`CabinetBuilder.ensure_root_context` PRED operáciou** (prestavba z otvoreného komponentu skrinky — `rebuild_in_operation` rám nezatvára;
+Astra C FIX 4) → `guarded` → `start_operation(APPL_MOUNT_OP)` → `write_appliance_refs!` s novým zoznamom (`appliance_mount_refs` mení **len** tento kus; 0 kľúč zmaže)
+→ `commit`; výnimka = `abort_safely` + čerstvá karta + „Osadenie sa nepodarilo uložiť". Po úspechu `push_selected` a `StudioDialog.refresh_if_open(bump: true)` — box
+niky, pásma aj Kontrola sa zmenili. Odmietnutia idú tou istou cestou `appliance_expects_refused` (čerstvá karta, potom status).
 
 ### actions_board.rb
 
@@ -2927,6 +2939,14 @@ a od **S1-F** má viazaný riadok navyše **`check`** = celý verdikt (`{state, 
   katalógu materiálov prekresľuje kartu dosky aj vtedy, keď je označená skrinka — globál by sa dal prepísať pod rukami a zápis by odišiel na cudzieho vlastníka.
 - **Odchod z kontextu riadky ZAHODÍ** (`clearApplianceRows`): prázdny výber čistí oba kontajnery, prechod na dosku ten korpusový. Nestačí ich skryť — s kontajnerom
   odchádza aj **kontext vlastníka** (`data-apr-*`), inak by vo vkladacom režime ostal visieť riadok cudzej skrinky so starými akciami.
+- **D-140: VÝŠKA OSADENIA chladničky = ČIP v riadku + STATICKÝ POPOVER.** Viazaný riadok chladničky v skrinke so živou položkou nesie `mount: {value, text}`
+  („osadenie 150 mm"); iná kategória, slot, doska ani sirota ho nedostanú. Riadok kreslí **tlačidlo-čip** pred „odpojiť" (žiadny nový riadok — vertikálny priestor), **nie pole**.
+  Klik otvorí **statický** `#aprMountPop` **za** `#applRows` (prekreslenie riadkov ho nezmaže, rozpísaná hodnota prežije echo prestavby — Astra C FIX 8), ktorý pri
+  otvorení **zachytí** dokument, vlastníka (druh, ID, PID), `item_id` a pôvodnú hodnotu. Zapisuje **výhradne** „Použiť"/Enter — **nikdy `blur`**: `nxSetModelGuid`
+  pri prepnutí dokumentu najprv prepíše identitu a až potom zhodí fokus, takže uloženie na blur by starú hodnotu poslalo s novým dokumentom (Astra C BLOCKER 2).
+  Escape, „Zrušiť" a klik mimo zrušia bez zápisu; neplatné číslo pole označí a nič nepošle; nezmenená hodnota nič nepošle. Po každom vykreslení riadkov
+  `aprMountSync` popover nechá žiť **len** nad tým istým dokumentom, kusom (ID + PID) a riadkom, ktorý osadenie stále má — inak ho zavrie bez zápisu; zavrie ho aj
+  `clearApplianceRows` a centrálne `nxDropDocState` (`aprMountClose`, prvá obrana pri zmene dokumentu). CSS má vlastné `.aprmountpop[hidden] { display: none }` (poučenie D-137).
 
 ### Sekcia ROZPOČET v Štúdiu (ŠT-1c PR B1, Š12–Š13)
 

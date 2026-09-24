@@ -713,8 +713,10 @@ kvótová brána `usage` pred každým auditom a subagentom. Pravidlo 3 kôl pla
   bez Tela a Niky, karta = len bloky kategórie (D-136) + polia slotu umývačky už nesvietia pri každej skrinke, nový guard `[hidden]` (D-137); UI, audit NIE ·
   **B1 ✅ PR #387, v0.12.18** — čelo slotu sa v kusovníku/VEPO volá „Dv myčka", v modeli aj náhľade má symbol sklopu, zoznam čiel ho menuje „Dvere umývačky" (D-138);
   audit NIE · **B2 ✅ PR #388, v0.12.19** výška čela = linka − sokel − medzera hore podľa schémy medzier, predvoľby slotu 880/100, „F1 · dv myčka" v Kovaní
-  (D-139 + zvyšok D-138); audit Astra 1 BLOCKER + 4 FIX zapracované, CONFIG_SCHEMA 17, TemplateStore STD 6 · **C** výška osadenia chladničky: pole posunie box niky a prepočíta pásma dverí (D-140); **audit ÁNO**
-  (nové pole väzby), in-SU povinné. Zásobník zo smoke: D-141 (typ „Spotrebič"), D-142 (delenie dverí pri zásuvkách pod chladničkou).
+  (D-139 + zvyšok D-138); audit Astra 1 BLOCKER + 4 FIX zapracované, CONFIG_SCHEMA 17, TemplateStore STD 6 · **C ✅ PR #389, v0.12.20** výška osadenia chladničky:
+  čip „osadenie N mm" v riadku Spotrebič + okienko s „Použiť" posunie box niky, pásma dverí aj Kontrolu výšky a delenia čiel (D-140); audit Astra 3 BLOCKER + 6 FIX
+  zapracované (popover namiesto uloženia pri blur, výkres výrobcu kotvený k montáži na dne), CONFIG_SCHEMA 18, in-SU 3080 PASS. Zásobník zo smoke: D-141 (typ
+  „Spotrebič"), D-142 (delenie dverí pri zásuvkách pod chladničkou).
 - **S1-D · Uzáver bloku** *(docs, `VERSION` → 0.13.0)* — V1_VIZIA, archív, STAV, KRONIKA, README, POJMY, smoke checklist pre Michala.
 
 ## Po V1 — zásobník (nezaradené, nestratiť)
