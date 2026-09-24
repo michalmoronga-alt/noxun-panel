@@ -53,10 +53,16 @@ to nevyrába ani neobjednáva.
 - **Kľúče väzby rezervuje `CONFIG_SCHEMA` 16** (skrinka; doska cez `BOARD_CONFIG_SCHEMA` 2) a **napĺňajú ich S1-B/F/C bez ďalšieho bumpu**. Kľúče
   prežijú prestavbu, materiály aj absorpciu scale; väzbu na **konkrétny** spotrebič zahodí jediný helper `CabinetBuilder.strip_appliance_refs!`
   v troch kopírovacích vstupoch (natívna kópia, kópia nástrojom, „Vložiť kópiu") — kópia sa správa ako „očakáva", ale nevlastní ten istý kus.
+- **D-139 — VÝŠKA ČELA JE ODVODENÁ** (Michal 21.9. + 24.9.2026): výška linky − sokel − **medzera hore** (`fronts.gap_top`, schéma medzier skrinky — rovnaké
+  pole ako pri korpusoch, predvolene 2 mm, záporná = presah nad linku). Vstup „Čelo V" zanikol, predvoľby sú **880 / 100** (čelo 778). Jediný vzorec aj validácia
+  je `CabinetBuilder.dw_front_eval` (JS `nxSlotFrontEval`, spoločná fixtúra). **Vedomá revízia mockupu R13/R14/R16:** 6 vstupov namiesto 7 a **žiadne pásmo
+  „výplň hore"** — výplň nad umývačkou je samostatný nízky korpus a slotu sa nastaví výška po jej spodok (R14 „rieši sa ručne" teda platí ďalej, len inou cestou).
+  Staré sloty (schéma 16) sa **nemigrujú** (Michal: žiadna zákazka so slotom); Inspector ukazuje ich uložené čelo s „po prestavbe X", prestavba ho odvodí.
 - **Kontroly slotu sú PRESNE DVE** (rozhodnutie Michal 20.9.2026), obe ORANGE a **bez exportnej brány**: `dw_body_fit` (telo sa nezmestí do šírky
   slotu) a `dw_height_fit` (**nastavená** výška tela > výška linky). Výška čela, jeho presah nad telo, sokel ani hmotnosť sa **nekontrolujú**.
   Detail v [outputs.md](outputs.md).
-- **Šablóny:** `TemplateStore` STD 5 seeduje **„Umývačka 60"** a **„Umývačka 45"** — korpusové záznamy s `config['config_schema']`, bez ktorého by
+- **Šablóny:** `TemplateStore` STD 5 seeduje **„Umývačka 60"** a **„Umývačka 45"** (od STD 6 / D-139 s predvoľbami 880 / 100; nedotknutý starý seed sa
+  jednorazovo obnoví) — korpusové záznamy s `config['config_schema']`, bez ktorého by
   starší plugin typ nepoznal a `norm_type` by mu ho sklopil na `lower` (zo slotu by vznikol plný korpus). Detail v
   [model-a-identita.md](model-a-identita.md).
 
@@ -87,8 +93,8 @@ zmena či vyradenie záznamu v katalógu nimi nepohne (a vyradený model sa **ne
 ešte nič nestojí — návrh ide ďalej, len sa nezabudne.
 
 - **JEDNA REPREZENTÁCIA: `config['appliance_expects']`** (zoznam kanonických kódov kategórií). **Aj šablóna ich nesie tam** — záznam šablóny žiadny
-  vlastný kľúč nemá, takže `TemplateStore::STD` ostáva **5** a knižnica sa staršiemu pluginu nezamyká pre zápis (starší plugin od S1-E, teda od schémy 16,
-  očakávania číta aj vkladá správne). Dve reprezentácie by znamenali dve pravdy, ktoré sa pri každom vklade musia zladiť.
+  vlastný kľúč nemá, takže `TemplateStore::STD` sa kvôli nim **nebumpovalo** (v S1-C ostalo 5; na 6 ho posunula až D-139 obnova slotových seedov — z iného
+  dôvodu). Dve reprezentácie by znamenali dve pravdy, ktoré sa pri každom vklade musia zladiť.
 - **MATICA je tá istá ako pri väzbe** (`ApplianceBinding::OWNER_MATRIX`, odvodzuje ju `expectable_categories(kind)`): skrinka `fridge|oven|microwave`,
   doska `hob|sink`, **slot vždy presne `['dishwasher']`**, `hood` a `other` sa očakávať nedajú vôbec (nemajú fyzického vlastníka). Očakávať sa nesmie to,
   čo sa k tomu istému kusu nedá ani priradiť — inak by Kontrola žiadala niečo, čo sa nedá splniť. Slotu ho **dosadzuje builder** (implicitne, kľúč

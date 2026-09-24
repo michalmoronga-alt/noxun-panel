@@ -3730,25 +3730,38 @@ module NoxunSuRunner
          (mm(r.bounds.max.z - r.bounds.min.z) - 820.0).abs < TOL)
     end
     cfg_a = e::Store.config(inst) || {}
-    ok("S1-E (a): config nesie schemu 16 a typ dishwasher (#{cfg_a['config_schema']}, #{cfg_a['type']})",
-       cfg_a['config_schema'].to_i == 16 && cfg_a['type'].to_s == 'dishwasher')
+    ok("S1-E (a): config nesie schemu 17 a typ dishwasher (#{cfg_a['config_schema']}, #{cfg_a['type']})",
+       cfg_a['config_schema'].to_i == e::CabinetBuilder::CONFIG_SCHEMA && cfg_a['type'].to_s == 'dishwasher')
     ok('S1-E (a): sokel slotu NEPRETIEKOL do floor_height (podpora none)',
        cfg_a['floor_height'].to_f.abs < 0.01 &&
-       (cfg_a['dw_front_bottom'].to_f - 64.0).abs < 0.01)
+       (cfg_a['dw_front_bottom'].to_f - cfg0['dw_front_bottom'].to_f).abs < 0.01)
+    # D-139: celo = linka − sokel − medzera hore (zo sablony, default 2).
+    gt_a = (cfg_a['fronts'] || {})['gap_top'].to_f
+    want_a = cfg_a['height'].to_f - cfg_a['dw_front_bottom'].to_f - gt_a
+    ok("D-139 (a): celo v modeli je ODVODENE #{want_a.round} " \
+       "(#{part_height(s1e_parts(inst).first).round} mm)",
+       (part_height(s1e_parts(inst).first) - want_a).abs < TOL)
     ok('S1-E (a): slot NEDOSTAL nohy ani prichyt sokla',
        Array(cfg_a['hardware']).none? { |h| %w[leg plinth_clip].include?(h['generic_type'].to_s) })
 
-    # (b) ZMENA VYSKY CELA = JEDEN krok Spat.
+    # (b) D-139: ZMENA VYSKY LINKY prepocita celo = JEDEN krok Spat.
     front0 = s1e_parts(inst).first
     h0 = part_height(front0)
-    s1e_rebuild(model, inst, 'dw_front_height' => 826.0)
+    s1e_rebuild(model, inst, 'height' => cfg_a['height'].to_f + 50.0)
     front1 = s1e_parts(inst).first
-    ok("S1-E (b): celo sa prestavalo na 826 (#{part_height(front1).round} mm, predtym #{h0.round})",
-       (part_height(front1) - 826.0).abs < TOL)
+    ok("D-139 (b): linka +50 -> celo +50 (#{part_height(front1).round} mm, predtym #{h0.round})",
+       (part_height(front1) - (h0 + 50.0)).abs < TOL)
     Sketchup.undo
     front2 = s1e_parts(inst).first
-    ok("S1-E (b): JEDNO Spat vratilo vysku cela na 776 (#{front2 ? part_height(front2).round : '?'})",
-       front2 && (part_height(front2) - 776.0).abs < TOL)
+    ok("D-139 (b): JEDNO Spat vratilo celo na #{h0.round} (#{front2 ? part_height(front2).round : '?'})",
+       front2 && (part_height(front2) - h0).abs < TOL)
+    # Medzera hore zo schemy medzier tiez prepocita celo.
+    fr_b = (e::Store.config(inst) || {})['fronts'] || {}
+    s1e_rebuild(model, inst, 'fronts' => fr_b.merge('gap_top' => fr_b['gap_top'].to_f + 8.0))
+    front3 = s1e_parts(inst).first
+    ok("D-139 (b): medzera hore +8 -> celo −8 (#{front3 ? part_height(front3).round : '?'} mm)",
+       front3 && (part_height(front3) - (h0 - 8.0)).abs < TOL)
+    Sketchup.undo
 
     # (c) PRISUNUTIE. Scenar stoji VEDLA skrinky z (a) — kazdy kus ma vlastne
     #     pasmo na osi X, aby si dva testy nepletli prekazky:
@@ -3770,7 +3783,10 @@ module NoxunSuRunner
       Sketchup.undo
 
       # Celo PRESAHUJUCE liniu + vypnuty tag referencie — doraz je TEN ISTY.
-      s1e_rebuild(model, slot_tr, 'dw_front_height' => 1100.0)
+      # D-139: presah nad linku = ZAPORNA medzera hore (schema medzier; so
+      # zamknutym limitom okrajov najviac −100 mm).
+      fr_c = (e::Store.config(slot_tr) || {})['fronts'] || {}
+      s1e_rebuild(model, slot_tr, 'fronts' => fr_c.merge('gap_top' => -90.0))
       hw_layer = model.layers[e::CabinetBuilder::HARDWARE_TAG]
       vis0 = hw_layer ? hw_layer.visible? : nil
       if hw_layer
@@ -3845,6 +3861,24 @@ module NoxunSuRunner
        e::ScaleWatch.scale_factors(inst.transformation).nil?)
     s1e_rebuild(model, inst, 'width' => 600.0)
 
+    # (f2) D-139 (Astra B2 FIX 5): SCALE VYSKY slotu — linka sa klampne do
+    #      hranic, v ktorych je odvodene celo platne (a celo sa prepocita).
+    lo_f2, = e::CabinetBuilder.slot_height_bounds(e::CabinetBuilder.config_to_params(e::Store.config(inst)))
+    model.start_operation('SU-TEST D-139 scale vysky', true)
+    inst.transformation = inst.transformation * Geom::Transformation.scaling(ORIGIN, 1.0, 1.0, 0.3)
+    model.commit_operation
+    e::ScaleWatch.absorb(inst)
+    cfg_f2 = e::Store.config(inst) || {}
+    ok("D-139 (f2): absorpcia klampla linku slotu na spodnu hranicu #{lo_f2.round} (config #{cfg_f2['height']})",
+       (cfg_f2['height'].to_f - lo_f2).abs < 0.01)
+    want_f2 = cfg_f2['height'].to_f - cfg_f2['dw_front_bottom'].to_f - (cfg_f2['fronts'] || {})['gap_top'].to_f
+    ok("D-139 (f2): celo sa prepocitalo z novej linky (#{part_height(s1e_parts(inst).first).round} = #{want_f2.round})",
+       (part_height(s1e_parts(inst).first) - want_f2).abs < TOL)
+    ok('D-139 (f2): bola to absorpcia, nie reject', e::ScaleWatch.scale_factors(inst.transformation).nil?)
+    Sketchup.undo
+    ok("D-139 (f2): JEDNO Spat vratilo scale aj absorpciu (linka #{(e::Store.config(inst) || {})['height']})",
+       ((e::Store.config(inst) || {})['height'].to_f - cfg_a['height'].to_f).abs < 0.01)
+
     # (g) ULOZENIE AKO SABLONA zo slotu.
     tname = "SU-TEST slot #{Time.now.to_i}"
     tcfg = e::Panel.template_config_from(e::Store.config(inst))
@@ -3855,9 +3889,44 @@ module NoxunSuRunner
        saved && rec && rec['config']['type'].to_s == 'dishwasher')
     ok('S1-E (g): sablona nesie `dw_*` a marker schemy',
        rec && rec['config']['dw_class'].to_i == 600 &&
-       (rec['config']['dw_front_height'].to_f - 776.0).abs < 0.01 &&
-       rec['config']['config_schema'].to_i == 16)
+       rec['config'].key?('dw_front_bottom') &&
+       rec['config']['config_schema'].to_i == e::CabinetBuilder::CONFIG_SCHEMA)
     e::TemplateStore.delete('cabinet', tname)
+
+    # (g2) D-139: STARY SLOT (schema 16, rucne celo 776 pri linke 930, medzera
+    #      hore 0) — citanie NEPREDSTIERA prestavbu (Astra B2 FIX 2): Inspector
+    #      ukaze 776 a „po prestavbe 866"; prestavba celo odvodi, Spat ho vrati.
+    old = e::CabinetBuilder.build(model, S1E_SLOT)
+    if old
+      ocfg = (e::Store.config(old) || {}).merge(
+        'config_schema' => 16, 'dw_front_height' => 776.0,
+        'fronts' => ((e::Store.config(old) || {})['fronts'] || {}).merge('gap_top' => 0.0)
+      )
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST D-139 stary slot', true)
+        e::Store.write(old, { config: ocfg })
+        model.commit_operation
+      end
+      h_before = part_height(s1e_parts(old).first)
+      pay = e::Panel.slot_payload(e::Store.config(old))
+      ok("D-139 (g2): stary slot ukaze ULOZENE celo a „po prestavbe“ (#{pay && pay['front_text'].inspect})",
+         pay && pay['front_text'].to_s == '776 · po prestavbe 866')
+      e::CabinetBuilder.rebuild(model, old, e::CabinetBuilder.config_to_params(e::Store.config(old)))
+      ofront = s1e_parts(old).first
+      ok("D-139 (g2): prestavba stareho slotu odvodi celo 866 (#{ofront ? part_height(ofront).round : '?'})",
+         ofront && (part_height(ofront) - 866.0).abs < TOL)
+      ok('D-139 (g2): a zapise schemu 17',
+         (e::Store.config(old) || {})['config_schema'].to_i == e::CabinetBuilder::CONFIG_SCHEMA)
+      Sketchup.undo
+      ofr = s1e_parts(old).first
+      ok("D-139 (g2): JEDNO Spat vratilo stav pred prestavbou (celo #{ofr ? part_height(ofr).round : '?'}, " \
+         "config #{(e::Store.config(old) || {})['dw_front_height'].inspect})",
+         ofr && (part_height(ofr) - h_before).abs < TOL &&
+         ((e::Store.config(old) || {})['dw_front_height'].to_f - 776.0).abs < 0.01)
+      old.erase! if old.valid?
+    else
+      ok('D-139 (g2): vlozenie slotu pre starý config', false)
+    end
 
     # (h) KONTROLA cez REALNU cestu zberu.
     # S1-C: slot BEZ modelu uz nie je „bez nalezu" — ocakava umyvacku vzdy,

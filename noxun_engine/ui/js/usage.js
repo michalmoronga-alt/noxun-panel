@@ -48,7 +48,8 @@
                     'pv:kamera', 'pv:fit',
                     'pv:vrstva:zony', 'pv:vrstva:cela', 'pv:vrstva:kovanie', 'pv:vrstva:olep',
                     'rad:sirka', 'rad:vyska', 'rad:hlbka', 'rad:sokel', 'rad:vyska_cela',
-                    'info:dielce', 'info:material',
+                    // D-139: „Medzera hore" slotu vedie do schemy medzier v Celach.
+                    'info:dielce', 'info:material', 'info:dw-medzera',
                     'ctx:korpus',
                     // UI-C2: dlazdice delenia zony. Kluc je STATICKY (os + pocet
                     // poli), nikdy z dat — merac tak povie, ktore delenie sa

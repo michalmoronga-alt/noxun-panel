@@ -771,14 +771,18 @@ nevzniká: (a) svetlé vnútro `<= MIN_AVAIL_H` (10 mm) = odmietnutie · (b) pri
 teda z payloadu, do ktorého `sync.rb` posiela **priamo `CabinetBuilder::LOWER_DEFAULTS` / `UPPER_DEFAULTS`** — druhý zdroj pravdy nevzniká. Kým predvoľby zo servera neprišli,
 kontrola **mlčí**: falošná červená pri štarte panela je horšia než chýbajúca. JS sada `tests/js/test_s1e0_min_vyska.js`.
 
-**S1-E — Základné SLOTU UMÝVAČKY.** Ten istý `.basicgrid`, iný obsah. **Vľavo sedem vstupov:** Trieda (`dw_class`, select 600/450) · Šírka · **Výška linky**
-(pole `height` — popis nesie vlastný uzol `#lblHeight`, hint „mm · horná hrana susedov") · Hĺbka · **Telo V** (`dw_body_height`, hint s rozsahom) ·
-**Sokel** (`dw_front_bottom`, „čelo od podlahy") · **Čelo V** (`dw_front_height`). **Vpravo výstupy** (TEXT, `.infocol`): Telo (`598 × 820 × 555 · generické 60`) ·
-Čelo hore (`840 · +20 nad telom`) · **Výplň hore** (`90 · ručne`) · **Pod doskou** (`930 ≥ 820 ✓`, jantár pri ✗) · Trieda (`60 · bez modelu`) · Dielcov ·
-**Hmotnosť čela**. **Všetky čísla počíta SERVER** (`Panel.slot_payload` v `cabinet_payload`), panel z nich nič neodvodzuje — zapisuje ich `renderSlotInfo`
-v `bridge.js`. „Pod doskou" používa **ten istý predikát** ako Kontrola `dw_height_fit`, takže Inspector a semafor nikdy netvrdia dve rôzne veci.
+**S1-E — Základné SLOTU UMÝVAČKY.** Ten istý `.basicgrid`, iný obsah. **Vľavo šesť vstupov** (D-139 — „Čelo V" už vstup nie je): Trieda (`dw_class`, select 600/450) ·
+Šírka · **Výška linky** (pole `height` — popis nesie vlastný uzol `#lblHeight`, hint „mm · horná hrana susedov") · Hĺbka · **Telo V** (`dw_body_height`, hint
+s rozsahom) · **Sokel** (`dw_front_bottom`, „čelo od podlahy"). **Vpravo výstupy** (TEXT, `.infocol`): Telo (`598 × 820 × 555 · generické 60`) · **Čelo V**
+(`778`; pri starom slote pred prvou prestavbou `776 · po prestavbe 866`) · **Medzera hore** (`2 · schéma medzier` — tlačidlo `onInfoDwGap`: prepne na Čelá,
+rozbalí „Spoločné pre skrinku" a zameria pole „hore") · **Pod doskou** (`880 ≥ 820 ✓`, jantár pri ✗) · Trieda (`60 · bez modelu`) · Dielcov · **Hmotnosť čela**.
+**Všetky čísla počíta SERVER** (`Panel.slot_payload` v `cabinet_payload`), panel z nich nič neodvodzuje — zapisuje ich `renderSlotInfo` v `bridge.js`.
+**Čelo V je STAV POSLEDNEJ STAVBY** (uložené `dw_front_height`, `slot_front_info`) — čítanie nepredstiera prestavbu (Astra B2 FIX 2); odvodená hodnota ide
+cez tú istú `CabinetBuilder.dw_front_eval`. „Pod doskou" používa **ten istý predikát** ako Kontrola `dw_height_fit`, takže Inspector a semafor nikdy netvrdia dve rôzne veci.
+**D-139: krížová kontrola** `cabinetHeightError` pri slote vráti vetu `nxSlotFrontEval` (zrkadlo `dw_front_eval`, rozsah 300–1200, rada podľa strany) a
+`markHeightError` označí **Výšku linky + Sokel slotu**; schéma medzier slotu skryje polia „medzi" a „dole" (`SLOT_HIDDEN_GAPS`, atribút `hidden` + párové CSS).
 
-**Polia slotu sa validujú LEN v type, ktorému patria** (PR #381, Codex kolo 1 P2). `dw_body_height`/`dw_front_bottom`/`dw_front_height` sú v DOM aj pri dolnej
+**Polia slotu sa validujú LEN v type, ktorému patria** (PR #381, Codex kolo 1 P2). `dw_body_height`/`dw_front_bottom` sú v DOM aj pri dolnej
 a hornej skrinke (len skryté), takže hodnota, ktorú tam nechal predchádzajúci slot, by **červenela a zablokovala vloženie úplne inej skrinky** — v poli, ktoré
 používateľ nevidí a nemá ako opraviť. `validateFields` ich preto preskočí, keď typ nie je `dishwasher` (zoznam `SLOT_FIELDS`). Opačným smerom: pri prepnutí **na**
 slot dosadí `nxFillSlotFields` (volané z `applyVisibility`, teda po každom `writeConstruction`) do prázdneho alebo mimorozsahového poľa **predvoľbu typu zo servera**
@@ -792,14 +796,18 @@ ani riadok Nohy (podpora `none`). **Limity poľa sú per TYP** (`TYPE_LIMITS` v 
 `CabinetBuilder::DW_WIDTH_RANGE`/`DW_HEIGHT_RANGE`; krížová kontrola výšky proti soklu a hrúbkam (S1-E0) sa slotu **netýka**, lebo nemá vnútro.
 
 **Karta Čelá pri slote** schová „Pridať čelo", krížik aj chip AUTO a výšku dá **na čítanie** (`nxSlotFrontsLock`); riadok menuje čelo „Dvere umývačky" s ikonou
-sklopu (`frontTypeLabel`/`frontTypeIcon`) a karta čela nemá dlaždice typov (`frontCardModel(…, { slot: true })`, D-138) — vynucuje to však **server**
-(`Panel.slot_fronts_refusal`: payload s iným počtom, typom, režimom alebo cudzou výškou sa odmietne a config sa nedotkne). **Preflight čiel** dostáva
-`type` + `dw_front_bottom` + `dw_front_height` a počíta s **virtuálnym otvorom** (`Construction.front_opening`), takže čelo presahujúce výšku linky prijme;
-rozsahy preflightu sú per typ.
+sklopu (`frontRowLabel`/`frontRowIcon` — len riadok označenej skrinky; všeobecné `frontTypeLabel`/`frontTypeIcon` pre pás „pridať čelo" a dlaždice ostávajú
+nezávislé, Codex #387 P2) a karta čela nemá dlaždice typov (`frontCardModel(…, { slot: true })`, D-138) — vynucuje to však **server**
+(`Panel.slot_fronts_refusal`: payload s iným počtom, typom či režimom sa odmietne a config sa nedotkne; **výška sa neposudzuje** — je odvodená, D-139).
+**Preflight čiel** dostáva `type` + `dw_front_bottom` + výšku linky, počíta s **virtuálnym otvorom** (`Construction.front_opening`: od soklu po linku) a riadok
+čiel slotu pred `Fronts.preflight` **kanonizuje** tým istým `slot_fronts!` s výškou z `dw_front_eval` (`slot_preflight_fronts`) — stará výška z riadku klienta
+tak nedá falošné „nezmestí sa" a mimo rozsahu hovorí preflight tou istou vetou ako stavba.
 
 **Náhľad slotu má PODKLAD a DETAIL, nie vlastný celý náhľad** (PR #381, P2). `drawSlotBase` (telo so základňou **prerušovane** = referencia, línia linky) nahrádza
-`drawCarcass` v **každom** kontexte — slot korpus nemá, takže boky, dno a strop by boli vymyslené dielce. `drawSlotDetail` (čelo plne, **jantárové pásmo
-„výplň N · ručne"** po líniu linky, kóty šírky, výšky linky a sokla) beží **len v kontexte Korpus a vo vkladaní**. Kontexty **Čelá** a **Kovanie** tak kreslia svoje
+`drawCarcass` v **každom** kontexte — slot korpus nemá, takže boky, dno a strop by boli vymyslené dielce. `drawSlotDetail` (čelo plne s **odvodenou výškou** —
+`pvSlot` ju berie z `nxSlotFrontEval`, kóty šírky, výšky linky, sokla a čela; D-139: jantárové pásmo „výplň" zaniklo) beží **len v kontexte Korpus a vo vkladaní**.
+Cesty bez čiel zo servera (čakanie na preflight, vkladanie) majú **slotovú projekciu** `nxSlotFrontItems` — jedno čelo na sokli s odvodenou výškou; všeobecný
+resolver by ho položil na z = 0 so starou výškou z riadku (Astra B2 FIX 4). Kontexty **Čelá** a **Kovanie** tak kreslia svoje
 štandardné projekcie (kóty výšok riadkov, značky kovania, hover) **nad** podkladom slotu — pôvodný jediný `drawSlot` ich `return`om prepísal a používateľ o ne prišiel.
 **Scéna** (`nxSlotExtent`, prikladá sa v každom kontexte) obsiahne aj **trčiace telo**: telo sa nikdy nedeformuje podľa slotu, takže pri úzkom slote presahuje do strán
 a pri prehnanej výške nad líniu — práve vtedy, keď Kontrola hlási `dw_body_fit`/`dw_height_fit`, by ho fit orezal a na náhľade by nebolo vidieť to, o čom semafor hovorí.

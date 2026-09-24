@@ -41,7 +41,7 @@
   // PRERUSOVANE vo vyberovej (firemnej) farbe, presne ako ghost zony. Pasmo
   // „vyplň hore" je JANTAROVE: nie je to chyba, je to prace, ktora este caka
   // (nizky korpus alebo doska) — zrkadlo tokenu --nx-warn-fg.
-  var PV_SLOT_FILL = '#e65100';     // --nx-warn-fg (pasmo „výplň hore")
+  var PV_SLOT_FILL = '#e65100';     // --nx-warn-fg (jantar: kolizia niky, pasmo pripustnej hrany)
   // Rozmery generickeho tela per trieda — ZRKADLO Ruby `Construction::DW_CLASSES`
   // (guard test `tests/pure/test_s1e_slot.rb` ich porovnava). Nahlad ich
   // potrebuje aj vo VKLADANI, kde ziadny serverovy payload neexistuje.
@@ -341,10 +341,28 @@
     if (typeof getType !== 'function' || getType() !== 'dishwasher') return null;
     var cls = parseInt(val('dw_class'), 10);
     var b = PV_DW_BODY[cls] || PV_DW_BODY[600];
+    var fb = numv('dw_front_bottom') || 0;
+    // D-139: vyska cela je ODVODENA (linka − sokel − medzera hore) — ta ista
+    // `nxSlotFrontEval` ako krizova kontrola aj server. Zaporne = nekresli sa.
+    var fh = (typeof nxSlotFrontEval === 'function')
+      ? nxSlotFrontEval(numv('height') || 0, fb, nxNumOr(numv('fr_gap_top'), 2)).value : 0;
     return { cls: PV_DW_BODY[cls] ? cls : 600, bodyW: b.w, bodyD: b.d,
              bodyH: numv('dw_body_height') || 0,
-             fb: numv('dw_front_bottom') || 0,
-             fh: numv('dw_front_height') || 0 };
+             fb: fb, fh: fh > 0 ? fh : 0 };
+  }
+
+  // D-139 (Astra B2 FIX 4): cela SLOTU pre nahlad — jedno pevne celo na
+  // sokli s odvodenou vyskou. Vseobecny resolver by ho polozil na z = 0 so
+  // STAROU vyskou z riadku (slot podstavec korpusu nema) — preto ma slot
+  // vlastnu projekciu vo VSETKYCH cestach, kde nahlad nema cela zo servera.
+  function nxSlotFrontItems(sl){
+    var cfg = (typeof collectFronts === 'function') ? collectFronts() : null;
+    var src = (cfg && cfg.items && cfg.items[0]) ? cfg.items[0] : {};
+    var it = { id: src.id || 'F1', type: 'blind', mode: 'fixed', wings: 1,
+               profile: src.profile || 'none',
+               height: Math.round(sl.fh * 100) / 100, z: Math.round(sl.fb * 100) / 100 };
+    if (Object.prototype.hasOwnProperty.call(src, 'profile_edge')) it.profile_edge = src.profile_edge;
+    return [it];
   }
 
   // S1-F: KONTROLNA GEOMETRIA zo SERVERA (`preview.appliances[]`). Panel z nej
@@ -426,6 +444,8 @@
     if (typeof frontDraft !== 'undefined' && frontDraft){
       var current = nxFrontDraftItems();
       if (current) return current;
+      var sl = pvSlot();
+      if (sl) return nxSlotFrontItems(sl);
       return nxFrontsResolve(collectFronts(), numv('height') || 0,
         nxCabFloorHeight());
     }
@@ -451,6 +471,8 @@
   function pvInsertFronts(){
     if (typeof collectFronts !== 'function') return [];
     if (typeof getInsertKind === 'function' && getInsertKind() === 'board') return [];
+    var sl = pvSlot();
+    if (sl) return nxSlotFrontItems(sl);
     return nxFrontsResolve(collectFronts(), numv('height') || 0,
                            nxCabFloorHeight());
   }
@@ -612,17 +634,10 @@
              Math.max(W - g.gapLeft - g.gapRight, 1) + '" height="' + sl.fh + '" fill="' +
              PV_FRONT_DOOR + '" stroke="' + PV_FRONT_STROKE + '" stroke-width="2"/>');
     }
-    // PASMO „VYPLŇ HORE" — zvysok po liniu linky; rieši sa RUCNE.
-    var fill = H - ftop;
-    if (fill > 1){
-      S.push('<rect x="' + rx(0) + '" y="' + ry(H) + '" width="' + W + '" height="' + fill +
-             '" fill="' + PV_SLOT_FILL + '" fill-opacity=".12" stroke="' + PV_SLOT_FILL +
-             '" stroke-width="1.5" stroke-dasharray="8 6"/>');
-      if (fill > 26){
-        pvText(S, rx(W / 2), ry(ftop + fill / 2) + 7,
-               'výplň ' + Math.round(fill) + ' · ručne', 20, 'middle', PV_SLOT_FILL);
-      }
-    }
+    // D-139: pasmo „výplň hore" ZANIKLO — celo siaha po linku mínus medzeru
+    // hore; vyplň nad umyvackou je samostatny nizky korpus a slot sa nastavi
+    // po jej spodok. Kota vysky cela ukaze odvodene cislo.
+    if (sl.fh > 0) pvDimV(S, rx, ry, g.gapLeft + 26, sl.fb, ftop, String(Math.round(sl.fh)));
     pvDimH(S, rx, ry, 0, W, -26, String(Math.round(W)));
     pvDimV(S, rx, ry, W + 26, 0, H, String(Math.round(H)));
     if (sl.fb > 0) pvDimV(S, rx, ry, -26, 0, sl.fb, String(Math.round(sl.fb)));
@@ -1725,6 +1740,9 @@
                        renderPreview: renderPreview, pvAvail: pvAvail,
                        pvSlot: pvSlot, drawSlotBase: drawSlotBase,
                        drawSlotDetail: drawSlotDetail, nxSlotExtent: nxSlotExtent,
+                       // D-139: slotova projekcia ciel (vsetky cesty bez ciel servera).
+                       nxSlotFrontItems: nxSlotFrontItems, pvLiveFronts: pvLiveFronts,
+                       pvInsertFronts: pvInsertFronts,
                        PV_DW_BODY: PV_DW_BODY,
                        PV_DW_BASE_H: PV_DW_BASE_H, PV_DW_BASE_SIDE: PV_DW_BASE_SIDE,
                        // S1-F: kontrolna geometria chladnicky (box, pasma,

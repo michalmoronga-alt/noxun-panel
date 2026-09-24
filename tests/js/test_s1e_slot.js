@@ -9,8 +9,8 @@
 //      ID, ake su v panel.html),
 //   5) CELA: slot ma jedno pevne celo — „Pridať čelo", krizik a AUTO sa
 //      schovaju a vyska ide na citanie,
-//   6) NAHLAD: celny rez slotu (telo so zakladnou, celo, jantarove pasmo
-//      „výplň" po liniu linky) a jeho zrkadla rozmerov.
+//   6) NAHLAD: celny rez slotu (telo so zakladnou, celo s ODVODENOU vyskou
+//      — D-139: pasmo „výplň" zaniklo) a jeho zrkadla rozmerov.
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
@@ -73,6 +73,9 @@ NXInsert.setInsertType('lower');
 // ============ 3) DOM stuby pre form.js ======================================
 const { mkEl, DOC } = require(path.join(__dirname, 'minidom.js'));
 const C = require(path.join(JS, 'core.js'));
+// D-139: v CEF je `nxSlotFrontEval` GLOBAL z core.js (preview.js a form.js sa
+// nan pytaju cez `typeof`) — v Node ho zverejni test.
+global.nxSlotFrontEval = C.nxSlotFrontEval;
 global.el = id => DOC.getElementById(id);
 global.esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
   .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -132,7 +135,8 @@ eq(FM.TYPE_LIMITS.dishwasher.width, [300, 1200], 'slot ma vlastny rozsah sirky')
 eq(FM.TYPE_LIMITS.dishwasher.height, [500, 1200], 'a vlastny rozsah vysky linky');
 eq(FM.LIMITS.dw_body_height, [700, 1000], 'telo V');
 eq(FM.LIMITS.dw_front_bottom, [0, 300], 'sokel slotu');
-eq(FM.LIMITS.dw_front_height, [300, 1200], 'vyska cela — presah nad linku je legitimny');
+eq(FM.LIMITS.dw_front_height, undefined, 'D-139: vyska cela uz nie je pole s rozsahom (odvodi sa)');
+eq(FM.SLOT_FIELDS.dw_front_height, undefined, 'ani pole slotu');
 
 setType('lower');
 eq(FM.limitFor('width'), [200, 3000], 'dolna skrinka drzi korpusove hranice');
@@ -155,6 +159,7 @@ function addRow(id){
 ['plinthGroup', 'fhRow', 'recessRow', 'twoRailsGroup', 'backThRow'].forEach(addRow);
 FM.SLOT_ONLY_ROWS.forEach(addRow);
 FM.SLOT_HIDDEN_ROWS.forEach(addRow);
+FM.SLOT_HIDDEN_GAPS.forEach(addRow); // D-139: polia schemy medzier „medzi" a „dole"
 const weightRow = addRow('infWeight');
 const weightSpan = mkEl('span');
 weightRow.appendChild(weightSpan);
@@ -201,11 +206,20 @@ ok(hUnit.textContent.indexOf('horná hrana susedov') >= 0, 'a hint to vysvetľuj
 ok(bUnit.textContent.indexOf('700') >= 0 && bUnit.textContent.indexOf('1000') >= 0,
    'rozsah tela je v hinte pola');
 eq(weightSpan.textContent, 'Hmotnosť čela', 'slot vyraba jedine celo');
+// D-139: schema medzier slotu — medzera MEDZI celami ani okraj DOLE nemaju co
+// nastavit (jeden riadok, spodok = sokel); zmiznu atributom `hidden`.
+eq(FM.SLOT_HIDDEN_GAPS, ['fr_gap', 'fr_gap_bottom'], 'zoznam skrytych poli schemy');
+FM.SLOT_HIDDEN_GAPS.forEach(id => eq(el(id).hidden, true, `slot nema pole ${id}`));
+ok(FM.SLOT_ONLY_ROWS.indexOf('infDwFront') >= 0 && FM.SLOT_ONLY_ROWS.indexOf('infDwGap') >= 0,
+   'informacny stlpec ma Čelo V aj Medzeru hore');
+ok(FM.SLOT_ONLY_ROWS.indexOf('dwFrontHeightRow') < 0 && FM.SLOT_ONLY_ROWS.indexOf('infDwFill') < 0,
+   'riadok Čelo V (vstup) ani Výplň hore uz nie su');
 
 setType('lower');
 FM.applyVisibility('lower');
 FM.SLOT_ONLY_ROWS.forEach(id => ok(el(id).hidden === true, `dolna skrinka riadok ${id} NEMA`));
 FM.SLOT_HIDDEN_ROWS.forEach(id => eq(el(id).style.display, '', `a riadok ${id} zas MA`));
+FM.SLOT_HIDDEN_GAPS.forEach(id => eq(el(id).hidden, false, `dolna skrinka pole ${id} MA`));
 eq(el('fhRow').style.display, '', 'sokel korpusu sa vratil');
 eq(hLabSpan.textContent, 'Výška', 'aj povodny popis vysky');
 eq(weightSpan.textContent, 'Hmotnosť', 'a popis hmotnosti');
@@ -241,8 +255,8 @@ frow.appendChild(fdel);
 setType('dishwasher');
 FM.nxSlotFrontsLock();
 eq(addRowBox.style.display, 'none', '„Pridať čelo“ sa pri slote schova');
-eq(fh.readOnly, true, 'vyska cela je na CITANIE (meni ju pole Čelo V)');
-ok(String(fh.title).indexOf('Čelo V') >= 0, 'a title povie KDE sa meni');
+eq(fh.readOnly, true, 'vyska cela je na CITANIE (D-139: je odvodena)');
+ok(String(fh.title).indexOf('výška linky − sokel − medzera hore') >= 0, 'a title povie, z coho sa berie');
 eq(fauto.style.display, 'none', 'chip AUTO nema pri pevnom cele zmysel');
 eq(fdel.style.display, 'none', 'ani krizik — slot bez cela neexistuje');
 
@@ -276,14 +290,17 @@ setType('lower');
 eq(PV.pvSlot(), null, 'dolna skrinka slotovy nahlad NEMA');
 
 setType('dishwasher');
-FIELDS = { dw_class: '600', dw_body_height: 820, dw_front_bottom: 64, dw_front_height: 776,
+FIELDS = { dw_class: '600', dw_body_height: 820, dw_front_bottom: 64,
            width: 600, height: 930, depth: 560 };
 const sl = PV.pvSlot();
 eq(sl.cls, 600, 'trieda zo selectu');
 eq(sl.bodyW, 598, 'sirka generickeho tela');
 near(sl.bodyH, 820, 0.01, 'vyska tela z pola');
 near(sl.fb, 64, 0.01, 'sokel');
-near(sl.fh, 776, 0.01, 'vyska cela');
+near(sl.fh, 864, 0.01, 'D-139: vyska cela = linka 930 − sokel 64 − medzera hore 2 (default)');
+FIELDS.fr_gap_top = 10;
+near(PV.pvSlot().fh, 856, 0.01, 'medzera hore zo schemy medzier sa odpocita');
+delete FIELDS.fr_gap_top;
 
 FIELDS.dw_class = '450';
 eq(PV.pvSlot().bodyW, 448, 'zmena triedy prestavi telo');
@@ -291,27 +308,29 @@ FIELDS.dw_class = '999';
 eq(PV.pvSlot().cls, 600, 'neznama trieda padne na 600 (ako Ruby normalize)');
 FIELDS.dw_class = '600';
 
-// Kresba: PODKLAD (telo + zakladna prerusovane) + DETAIL (celo, jantarove
-// pasmo „výplň", koty). PR #381 (P2 #5): su to DVE funkcie — podklad ide do
-// KAZDEHO kontextu, detail len do Korpusu a vkladania.
+// Kresba: PODKLAD (telo + zakladna prerusovane) + DETAIL (celo, koty).
+// PR #381 (P2 #5): su to DVE funkcie — podklad ide do KAZDEHO kontextu,
+// detail len do Korpusu a vkladania. D-139: pasmo „výplň" zaniklo.
 const S = [];
 const GEO = { W: 600, H: 930, gapLeft: 2, gapRight: 2 };
 PV.drawSlotBase(S, x => x, z => 930 - z, GEO, PV.pvSlot());
 PV.drawSlotDetail(S, x => x, z => 930 - z, GEO, PV.pvSlot());
 const svg = S.join('');
 ok(svg.indexOf('stroke-dasharray') >= 0, 'referencia (telo + zakladna) je PRERUSOVANA');
-ok(svg.indexOf('výplň 90 · ručne') >= 0, 'pasmo vyplne nesie svoj popis');
-eq((svg.match(/<rect /g) || []).length, 4, 'telo + zakladna + celo + pasmo vyplne');
+ok(svg.indexOf('výplň') < 0, 'D-139: pasmo vyplne sa uz NEKRESLI');
+eq((svg.match(/<rect /g) || []).length, 3, 'telo + zakladna + celo');
 ok(svg.indexOf('>600<') >= 0, 'kota sirky');
 ok(svg.indexOf('>930<') >= 0, 'kota vysky linky');
 ok(svg.indexOf('>64<') >= 0, 'kota sokla');
+ok(svg.indexOf('>864<') >= 0, 'kota ODVODENEJ vysky cela');
 
-// Celo PRESAHUJUCE liniu: pasmo vyplne uz nevznikne (nie je co vypĺňať).
-FIELDS.dw_front_height = 900;
-const S2 = [];
-PV.drawSlotDetail(S2, x => x, z => 930 - z, GEO, PV.pvSlot());
-ok(S2.join('').indexOf('výplň') < 0, 'celo nad linkou = ziadne pasmo vyplne');
-FIELDS.dw_front_height = 776;
+// D-139 (Astra B2 FIX 4): SLOTOVA projekcia ciel — jedno celo na SOKLI
+// s odvodenou vyskou, nie vseobecny resolver (z = 0, stara vyska z riadku).
+const sf = PV.nxSlotFrontItems(PV.pvSlot());
+eq(sf.length, 1, 'slot ma jedno celo');
+near(sf[0].z, 64, 0.01, 'stoji na sokli');
+near(sf[0].height, 864, 0.01, 'a ma odvodenu vysku');
+eq(sf[0].type, 'blind', 'typ blind (datovo blenda)');
 setType('lower');
 
 // ============ 8) PR #381 — CODEX KOLO 1 (P2) ================================
@@ -336,7 +355,7 @@ near(vysoke.maxX, 600, 0.01, 'ani vpravo');
 eq(PV.nxSlotExtent(null, 600), null, 'bez slotu ziadny rozsah');
 
 // --- P2 #5: slot ma PODKLAD, nie vlastny CELY nahlad ------------------------
-FIELDS = { dw_class: '600', dw_body_height: 820, dw_front_bottom: 64, dw_front_height: 776,
+FIELDS = { dw_class: '600', dw_body_height: 820, dw_front_bottom: 64,
            width: 600, height: 930, depth: 560 };
 setType('dishwasher');
 const SL = PV.pvSlot();
@@ -348,8 +367,8 @@ ok(bs.indexOf('stroke-dasharray') >= 0, 'podklad kresli telo a zakladnu PRERUSOV
 eq((bs.match(/<rect /g) || []).length, 2, 'podklad = telo + zakladna, nic viac');
 ok(bs.indexOf('výplň') < 0, 'podklad pasmo vyplne NEKRESLI');
 ok(bs.indexOf('<text') < 0, 'ani koty — tie patria detailu');
-ok(ds.indexOf('výplň 90 · ručne') >= 0, 'detail ma pasmo vyplne');
-eq((ds.match(/<rect /g) || []).length, 2, 'detail = celo + pasmo vyplne');
+ok(ds.indexOf('výplň') < 0, 'D-139: ani detail uz pasmo vyplne nema');
+eq((ds.match(/<rect /g) || []).length, 1, 'detail = celo');
 ok(ds.indexOf('>930<') >= 0, 'a koty');
 
 // Celý náhľad: v kontexte ČELÁ sa kreslí PODKLAD slotu + ŠTANDARDNÝ renderer
@@ -358,7 +377,7 @@ const svgNode = mkEl('svg');
 svgNode.id = 'preview';
 DOC.body.appendChild(svgNode);
 global.selectedCabId = 'CAB-7';
-global.frontItems = [{ id: 'F1', type: 'blind', mode: 'fixed', height: 776, z: 64, wings_n: 1,
+global.frontItems = [{ id: 'F1', type: 'blind', mode: 'fixed', height: 864, z: 64, wings_n: 1,
                        profile: 'none' }];
 global.activeZoneId = null;
 global.currentZoneTree = null;
@@ -377,7 +396,7 @@ ok(frontsSvg.indexOf('výplň') < 0, 'Čelá: detail Korpusu sa do nich NEPLETIE
 global.previewMode = 'cab';
 PV.renderPreview();
 const cabSvg = svgNode.innerHTML;
-ok(cabSvg.indexOf('výplň 90 · ručne') >= 0, 'Korpus: detail slotu ostáva');
+ok(cabSvg.indexOf('>864<') >= 0, 'Korpus: detail slotu (kota cela) ostáva');
 ok(cabSvg.indexOf('stroke-dasharray') >= 0, 'aj s podkladom');
 
 global.previewMode = 'hw';
@@ -399,7 +418,7 @@ global.currentZoneTree = null;
 ['width', 'height', 'depth', 'thickness', 'floor_height'].forEach(function(id){
   const i = mkEl('input'); i.id = id; i.value = ''; DOC.body.appendChild(i);
 });
-['dw_body_height', 'dw_front_bottom', 'dw_front_height'].forEach(function(id){
+['dw_body_height', 'dw_front_bottom'].forEach(function(id){
   if (!el(id)){ const i = mkEl('input'); i.id = id; DOC.body.appendChild(i); }
 });
 const dwBody = el('dw_body_height');
@@ -416,7 +435,7 @@ ok(!el('dw_body_height').classList.contains('bad'), 'a červené už nie je');
 
 // Prepnutie späť na slot dosadí predvoľbu servera do prázdneho/neplatného poľa.
 global.DEFAULTS = { dishwasher: { dw_class: 600, dw_body_height: 820, dw_front_bottom: 100,
-                                  dw_front_height: 776 } };
+                                  height: 880 } };
 dwBody.value = '';
 setType('dishwasher');
 FM.nxFillSlotFields();
@@ -427,6 +446,18 @@ eq(dwBody.value, '820', 'aj neplatná hodnota (panel tak ukazuje to, čo server 
 dwBody.value = '900';
 FM.nxFillSlotFields();
 eq(dwBody.value, '900', 'platnú hodnotu používateľa NEPREPÍŠE');
+
+// D-139: ODVODENE celo slotu — krizova kontrola vysky linky proti soklu
+// a medzere hore (ta ista `nxSlotFrontEval` a vety ako server).
+el('height').value = '500';
+el('dw_front_bottom').value = '300';
+ok(FM.cabinetHeightError().indexOf('najmenej 300 mm') >= 0, 'nizka linka + vysoky sokel = veta so spodnou hranicou');
+eq(FM.validateFields(true), false, 'apply sa zastavi');
+ok(el('dw_front_bottom').classList.contains('bad'), 'cervene je aj pole Sokel slotu');
+ok(String(el('dw_front_bottom').title).indexOf('zvýš výšku linky') >= 0, 'tooltip radi, co zmenit');
+el('height').value = '880';
+el('dw_front_bottom').value = '100';
+eq(FM.cabinetHeightError(), '', 'platna kombinacia = ziadna veta');
 setType('lower');
 
 // --- P2 #2: modal „Uložiť ako šablónu" ------------------------------------

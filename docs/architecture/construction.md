@@ -133,7 +133,8 @@ znovuotvorení .skp sa nedá odvodiť: `Bom.hardware_conflict_issues` ho zlúči
 
 
 **VIRTUÁLNY ČELNÝ OTVOR (S1-E, `front_opening(cfg)` → `{x0:, w:, z0:, h:}`)** je **jediná autorita** otázky „kde začínajú a kam siahajú čelá". Dolná a horná skrinka
-dostanú presne dnešné čísla (`x0` 0, `z0` = sokel, `h` = výška − sokel), slot umývačky svoje vlastné (`z0` = `dw_front_bottom`, `h` = `dw_front_height`).
+dostanú presne dnešné čísla (`x0` 0, `z0` = sokel, `h` = výška − sokel), slot umývačky svoje vlastné (`z0` = `dw_front_bottom`, `h` = výška linky − `dw_front_bottom`;
+D-139 — čelo v ňom končí o medzeru hore `fronts.gap_top` nižšie a jeho výška je odvodená).
 Číta ju `build_plan` **aj** panelový preflight `Panel.front_preflight_result` (FIX E8) — bez toho by panel pri slote overoval čelá proti **výške linky** a legitímny
 presah čela nad linku by ohlásil ako chybu. `Fronts.layout`/`resolve_layout`/`preflight` prijímajú otvor voliteľným `opening:`; keď ho volajúci nedá, odvodí sa
 z `width`/`height`/`floor_height` presne ako predtým (výsledok korpusov je bajtovo rovnaký).
@@ -436,19 +437,26 @@ meria `async S6`).
 Vyrába **jediný dielec — ČELO** (cez modul čiel ako jeden pevný item typu `blind`, teda rola `false_front`) a **telo spotrebiča kreslí ako REFERENCIU**, nie ako dielec.
 `TYPES` je **jediný zoznam typov** (`lower upper dishwasher`) a JS ho zrkadlí v `core.js` (`CAB_TYPES`) aj v `insert_state.js` (`INSERT_TYPES` + `board`); zhodu stráži guard test.
 
-**Polia slotu** (`DW_KEYS`, uzavretý whitelist): `dw_class` (600 | 450), `dw_body_height`, `dw_front_bottom` = spodná hrana **čela** od podlahy, `dw_front_height`.
-`height` je **výška linky** (horná hrana susedných korpusov), nie výška korpusu. **Rozsahy žijú na jednom mieste** a majú tri zrkadlá: `DW_RANGES` + `DW_WIDTH_RANGE`
+**Polia slotu** (`DW_KEYS`, uzavretý whitelist uložených polí): `dw_class` (600 | 450), `dw_body_height`, `dw_front_bottom` = spodná hrana **čela** od podlahy,
+`dw_front_height`. **D-139: vstupmi sú len trieda, telo a sokel (`DW_INPUT_KEYS`)** — `dw_front_height` je **ODVODENÉ** (`dw_front_eval`: výška linky − sokel −
+medzera hore `fronts.gap_top`, platné 300–1200, mimo = výnimka so SK vetou s radou podľa strany) a ukladá sa len ako stav poslednej stavby. Predvoľby slotu sú
+**880 / 100** (čelo 778). `height` je **výška linky** (horná hrana slotu; výplň nad umývačkou = samostatný nízky korpus a slot po jej spodok), nie výška korpusu.
+**Rozsahy žijú na jednom mieste** a majú tri zrkadlá: `DW_RANGES` + `DW_WIDTH_RANGE`
 (300–1200) + `DW_HEIGHT_RANGE` (500–1200) v Ruby, `ScaleWatch::MIN_BY_TYPE` v absorpcii scale a `LIMITS`/`TYPE_LIMITS` v `ui/js/form.js`. **Šírka sa NEKLAMPUJE na triedu**
 (Astra S1-E, BLOCKER E1): užší slot sa postaví a nedostatočnú šírku hlási Kontrola ORANGE `dw_body_fit` — semafor varuje, nikdy neblokuje prestavbu.
 
 **Podpora `none` je invariant** (Codex #376 kolo 1 P1): `floor_height` slotu je **vždy 0** a `dw_front_bottom` doň **nikdy netečie**; `plinth_mode` je `none`. Bez toho by
 pravidlá kovania vydali 4/6 nôh, príchyty sokla a proxy nôh — slot má v Kovaní len úchytku.
 
-**Jedno pevné čelo je SERVEROVÝ invariant** (FIX E9): `normalize` pre slot vždy vyrobí `fronts.items = [F1 · type blind · mode fixed · height = dw_front_height · wings 1]`
-(z prichádzajúceho F1 preberá len profil a jeho hranu) a nastaví `gap`/`gap_top`/`gap_bottom` na 0. **Autorita výšky čela je `dw_front_height`**; zápisová cesta panela
-(`Panel.slot_fronts_refusal`) payload s iným počtom, typom, režimom alebo cudzou výškou **odmietne** a config sa nedotkne. Kľúč čela je **`front:F1/blind`** (kľúč blendy,
+**Jedno pevné čelo je SERVEROVÝ invariant** (FIX E9): `normalize` pre slot vždy vyrobí `fronts.items = [F1 · type blind · mode fixed · height = odvodená · wings 1]`
+(z prichádzajúceho F1 preberá len profil a jeho hranu) a nastaví `gap`/`gap_bottom` na 0 — **`gap_top` ZACHOVÁ** (D-139: je to skutočné pole schémy medzier).
+Poradie v `normalize`: výška slotu → `norm_dishwasher(p, d, height, gap_top)` → `slot_fronts!`. Zápisová cesta panela (`Panel.slot_fronts_refusal`) payload s iným
+počtom, typom či režimom **odmietne** a config sa nedotkne; **výšku** (`slot_fronts_ok?(fronts)`) už neposudzuje — riadok z klienta nesie starú, `normalize` ju odvodí.
+Absorpcia scale a `min_valid_height` berú hranice výšky linky zo **`slot_height_bounds(params)`** — bez `normalize` uloženého configu (Astra B2 FIX 5). Kľúč čela je **`front:F1/blind`** (kľúč blendy,
 FIX E10), nie `wing:single`. **D-138:** `appliance_slot_plan` dielec čela premenuje na `DW_FRONT_NAME` = **„Dv myčka"** (kusovník, VEPO); identitu dielca to nemení —
-definíciu aj ID nesie prípona `BLIND-1`, kľúč ostáva `front:F1/blind`. Modul čiel pomenúva blendy ostatných skriniek po starom („Blenda N").
+definíciu aj ID nesie prípona `BLIND-1`, kľúč ostáva `front:F1/blind`. Modul čiel pomenúva blendy ostatných skriniek po starom („Blenda N"). Resolved položke čela plán
+dopíše odvodený kľúč **`label` = `DW_FRONT_LABEL` („dv myčka")** — projekcia `front_items` sa zapisuje z plánu, takže `PartKeys.human_label` (Kovanie, Nákup, Kontrola)
+povie „F1 · dv myčka"; bežná blenda kľúč nemá a ostáva „blenda".
 
 **Telo = referencia, nie dielec** (BLOCKER E2). Plán ju nesie v aditívnom `plan[:references]` (kontrakt v `model-a-identita.md`, `build_plan.rb`) a kreslí ju
 `render_references` — vzor `render_hardware`, ale s **iným kontraktom**: noha je servisná geometria k položke kovania (`kind: 'hardware'`, `production_class: 'none'`),
@@ -471,7 +479,8 @@ telesá v jednej referencii by menili obálku pri prisúvaní. Kóta, ktorá by 
 `Tools::Mower.rotate` (stred otáčania). Pri dolnej a hornej skrinke je to ten istý obrys, s akým sa pracovalo doteraz — mení sa len to, že **presah čela ani proxy
 doraz neposúvajú**; pri slote to znamená, že výsledok prisunutia nezávisí ani od presahujúceho čela, ani od toho, či má niekto zapnutý tag referencie.
 
-**`CONFIG_SCHEMA` 16 rezervuje `appliance_refs[]` a `appliance_expects[]`** — väzbu na konkrétny spotrebič a očakávanú kategóriu (napĺňa ich S1-B/F/C **bez ďalšieho bumpu**).
+**`CONFIG_SCHEMA` 16 rezervoval `appliance_refs[]` a `appliance_expects[]`** — väzbu na konkrétny spotrebič a očakávanú kategóriu (napĺňa ich S1-B/F/C **bez ďalšieho bumpu**);
+**17 = D-139** (odvodené čelo slotu + skutočná medzera hore — starší plugin by medzeru zahodil a čelo držal ako ručné, preto ho nový config odmieta).
 `normalize` aj `config_to_params` ich **prenášajú nedotknuté** (FIX E4): prestavba, zmena materiálu ani absorpcia scale väzbu stratiť nesmú. Zahodiť `appliance_refs[]`
 smie **jediný** helper `strip_appliance_refs!`, volaný v **troch** kopírovacích vstupoch — `dedup_copies` (natívna kópia), `Tools::Mower.copy_cabinet` a
 `Panel.handle_insert_copy`. `appliance_expects[]` sa pritom **zachováva**: kópia sa správa ako „očakáva spotrebič tej kategórie", ale nevlastní ten istý kus.
@@ -1047,8 +1056,10 @@ Súbor, v ktorom žijú triedy prekrytí (`Sketchup::Overlay`) — celý je pod 
 
 **S1-E: TYPOVÉ MINIMÁ.** `MIN_BY_TYPE` drží spodné hranice pre typy, ktoré sa neriadia korpusovými (dnes `dishwasher`: šírka 300, výška 500) — sú to **tie isté čísla**
 ako spodné hranice `CabinetBuilder::DW_WIDTH_RANGE` / `DW_HEIGHT_RANGE` (jedna hranica na oboch miestach, BLOCKER E1; guard test `test_s1e_slot.rb`). `clamp_min`
-aj `clamp_height` sa pýtajú `min_for(key, type)`, takže typové minimum má prednosť pred korpusovým; `Construction.min_valid_height` vracia pre slot 0 (nemá vnútro,
-ktoré by výšku zdola obmedzovalo).
+aj `clamp_height` sa pýtajú `min_for(key, type)`, takže typové minimum má prednosť pred korpusovým. **D-139:** výšku linky slotu viaže odvodené čelo, preto
+`clamp_height` pri slote odbočí na **`clamp_slot_height`** — hranice `CabinetBuilder.slot_height_bounds(params)` (prienik `DW_HEIGHT_RANGE` a sokel + medzera + 300 …
+1200) **bez `normalize` uloženého configu** (starý slot môže byť pod novým pravidlom neplatný a absorpcia by padla aj pri platnom cieli — Astra B2 FIX 5);
+`Construction.min_valid_height` vracia pre slot tú istú spodnú hranicu.
 
 (ScaleWatch) — absorpcia scale pre kind {cabinet, board}: doska mapuje lokálne osi X→length/Y→width, Z sa zahadzuje (hrúbku riadi materiál); shear guard; scale maska
 `scaletool`=120 aj na definícii = čisté osi. Mapovanie je **lokálne**, takže platí aj pre otočenú dosku (UI-C1c) — používateľov scale v globálnom Z stojacej dosky skončí v jej

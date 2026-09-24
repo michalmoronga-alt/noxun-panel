@@ -48,7 +48,8 @@ module NxS1E
   end
 
   # Slot 60 cm v „Michalovych" hodnotach z debaty 20.9.: linka 930, telo 820,
-  # sokel 64, celo 776 (vyplň hore 90 mm sa rieši rucne).
+  # sokel 64. D-139: vyska cela je ODVODENA — 930 − 64 − medzera hore 2 = 864
+  # (vstup `dw_front_height` sa ignoruje; test ho posiela, aby to bolo vidno).
   def slot(over = {})
     cb.normalize({ 'type' => 'dishwasher', 'width' => 600.0, 'height' => 930.0,
                    'depth' => 560.0, 'dw_class' => 600, 'dw_body_height' => 820.0,
@@ -176,13 +177,18 @@ NxTest.test('S1-E R1: rozsahy poli slotu su zrkadlom v Ruby aj v JS') do
   NxTest.assert_equal([700.0, 1000.0], ranges[:dw_body_height])
   NxTest.assert_equal([0.0, 300.0], ranges[:dw_front_bottom])
   NxTest.assert_equal([300.0, 1200.0], ranges[:dw_front_height])
-  ranges.each do |key, want|
+  # D-139: pole v paneli maju LEN vstupy — vysku cela JS odvodzuje.
+  NxS1E.cb::DW_INPUT_KEYS.each do |key|
     got = NxS1E.js_limit(/var\s+LIMITS\s*=\s*\{(.*?)\};/m, key.to_s)
-    NxTest.assert_equal(want, got, "form.js ma pre #{key} ten isty rozsah")
+    NxTest.assert_equal(ranges[key], got, "form.js ma pre #{key} ten isty rozsah")
   end
-  # Presah cela NAD vysku linky sa NEOBMEDZUJE — celo 1200 na linke 930 prejde.
-  cfg = NxS1E.slot('dw_front_height' => 1200.0)
-  NxTest.assert_close(1200.0, cfg[:dw_front_height], 0.01)
+  NxTest.refute(NxS1E.form_js[/var\s+LIMITS\s*=\s*\{(.*?)\};/m, 1].to_s.include?('dw_front_height'),
+                'vyska cela uz nie je pole s rozsahom (je odvodena)')
+  # Vstup `dw_front_height` sa IGNORUJE — celo je linka − sokel − medzera hore.
+  NxTest.assert_close(864.0, NxS1E.slot('dw_front_height' => 1200.0)[:dw_front_height], 0.01)
+  # Presah NAD linku sa vyjadruje ZAPORNOU medzerou hore (schema medzier).
+  over = NxS1E.slot('fronts' => { 'gap_top' => -30.0 })
+  NxTest.assert_close(896.0, over[:dw_front_height], 0.01, 'celo presahuje linku o 30')
 end
 
 NxTest.test('S1-E R1: trieda je UZAVRETY slovnik (600 | 450)') do
@@ -233,7 +239,8 @@ NxTest.test('S1-E R3: celo stoji na virtualnom otvore (sokel .. sokel + vyska ce
   pl = NxS1E.plan
   pd = NxS1E.parts(pl).first
   NxTest.assert_close(64.0, pd[:origin][2], 0.01, 'spodna hrana cela = dw_front_bottom')
-  NxTest.assert_close(776.0, pd[:box][2], 0.01, 'vyska cela = dw_front_height')
+  NxTest.assert_close(864.0, pd[:box][2], 0.01, 'vyska cela = linka 930 − sokel 64 − medzera 2 (D-139)')
+  NxTest.assert_close(928.0, pd[:origin][2] + pd[:box][2], 0.01, 'horna hrana = linka − medzera hore')
   # Bocne medzery ciel PLATIA (default 2 mm z kazdej strany).
   NxTest.assert_close(2.0, pd[:origin][0], 0.01)
   NxTest.assert_close(596.0, pd[:box][0], 0.01)
@@ -242,7 +249,7 @@ end
 NxTest.test('S1-E E8: `front_opening` je JEDINA autorita otvoru (a pre korpus sa NEMENI)') do
   op = NxS1E.cn.front_opening(NxS1E.slot)
   NxTest.assert_close(64.0, op[:z0], 0.01)
-  NxTest.assert_close(776.0, op[:h], 0.01)
+  NxTest.assert_close(866.0, op[:h], 0.01, 'D-139: otvor ide od soklu po linku (930 − 64)')
   low = NxS1E.cb.normalize('type' => 'lower', 'width' => 600.0, 'height' => 720.0,
                            'floor_height' => 100.0)
   lop = NxS1E.cn.front_opening(low)
@@ -252,18 +259,27 @@ end
 
 NxTest.test('S1-E E9: jedno pevne celo je SERVEROVY invariant') do
   # Payload s dvoma celami aj s typom `door` sa pri normalizacii VZDY vrati
-  # na jedno pevne celo `blind` s vyskou z `dw_front_height`.
+  # na jedno pevne celo `blind` s ODVODENOU vyskou (D-139).
   cfg = NxS1E.slot('fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'auto' },
                                              { 'id' => 'F2', 'type' => 'drawer_front' }] })
   items = cfg[:fronts]['items']
   NxTest.assert_equal(1, items.length)
   NxTest.assert_equal('blind', items[0]['type'])
   NxTest.assert_equal('fixed', items[0]['mode'])
-  NxTest.assert_close(776.0, items[0]['height'], 0.01)
-  # A ta ista otazka ako CISTY predikat pre zapisovu cestu panela.
-  NxTest.assert(NxS1E.cb.slot_fronts_ok?(cfg[:fronts], 776.0))
-  NxTest.refute(NxS1E.cb.slot_fronts_ok?(cfg[:fronts], 800.0), 'cudzia vyska sa odmietne')
-  NxTest.refute(NxS1E.cb.slot_fronts_ok?({ 'items' => [] }, 776.0), 'prazdny zoznam tiez')
+  NxTest.assert_close(864.0, items[0]['height'], 0.01)
+  NxTest.assert_close(2.0, cfg[:fronts]['gap_top'], 0.01, 'medzera hore sa ZACHOVA (schema medzier)')
+  NxTest.assert_close(0.0, cfg[:fronts]['gap'], 0.01, 'medzera medzi celami slot nema')
+  NxTest.assert_close(0.0, cfg[:fronts]['gap_bottom'], 0.01, 'ani okraj dole (spodok = sokel)')
+  # A ta ista otazka ako CISTY predikat pre zapisovu cestu panela — pocet,
+  # typ a rezim; VYSKA sa uz neposudzuje (je odvodena, normalize ju prepise).
+  NxTest.assert(NxS1E.cb.slot_fronts_ok?(cfg[:fronts]))
+  stale = cfg[:fronts].merge('items' => [items[0].merge('height' => 500.0)])
+  NxTest.assert(NxS1E.cb.slot_fronts_ok?(stale), 'stara vyska z riadku klienta NIE JE odmietnutie')
+  NxTest.refute(NxS1E.cb.slot_fronts_ok?(cfg[:fronts].merge('items' => [items[0], items[0]])),
+                'dve cela sa odmietnu')
+  NxTest.refute(NxS1E.cb.slot_fronts_ok?(cfg[:fronts].merge('items' => [items[0].merge('type' => 'door')])),
+                'iny typ tiez')
+  NxTest.refute(NxS1E.cb.slot_fronts_ok?({ 'items' => [] }), 'prazdny zoznam tiez')
 end
 
 NxTest.test('S1-E E2 (BLOCKER): referencia ma VLASTNE miesto v plane, nikdy `parts`') do
@@ -323,16 +339,16 @@ end
 # 3) SCHEMA 16 A REZERVOVANE VAZBY
 # ---------------------------------------------------------------------------
 
-NxTest.test('S1-E R2: CONFIG_SCHEMA je 16 a slot nesie svoje polia') do
-  NxTest.assert_equal(16, NxS1E.cb::CONFIG_SCHEMA)
+NxTest.test('S1-E R2: CONFIG_SCHEMA je 17 (D-139) a slot nesie svoje polia') do
+  NxTest.assert_equal(17, NxS1E.cb::CONFIG_SCHEMA)
   st = NxS1E.stored(NxS1E.slot)
-  NxTest.assert_equal(16, st['config_schema'])
+  NxTest.assert_equal(17, st['config_schema'])
   NxTest.assert_equal('dishwasher', st['type'])
   NxTest.assert_equal('noxun-dishwasher', st['construction_preset'])
   NxTest.assert_equal(600, st['dw_class'])
   NxTest.assert_close(820.0, st['dw_body_height'], 0.01)
   NxTest.assert_close(64.0, st['dw_front_bottom'], 0.01)
-  NxTest.assert_close(776.0, st['dw_front_height'], 0.01)
+  NxTest.assert_close(864.0, st['dw_front_height'], 0.01, 'ulozena je ODVODENA hodnota (stav stavby)')
 end
 
 NxTest.test('S1-E R2: dolna skrinka NEDOSTALA ani jedno pole slotu (golden sa nehne)') do
@@ -343,10 +359,13 @@ NxTest.test('S1-E R2: dolna skrinka NEDOSTALA ani jedno pole slotu (golden sa ne
   NxTest.refute(st.key?('appliance_expects'))
 end
 
-NxTest.test('S1-E R2: dopredny guard — schema 17 sa odmietne, 16 prejde') do
+NxTest.test('S1-E R2: dopredny guard — schema 18 sa odmietne, 17 prejde') do
   st = NxS1E.stored(NxS1E.slot)
   NxTest.refute(NxS1E.cb.newer_config?(st), 'vlastny config prechadza')
-  NxTest.assert(NxS1E.cb.newer_config?(st.merge('config_schema' => 17)))
+  NxTest.assert(NxS1E.cb.newer_config?(st.merge('config_schema' => 18)))
+  # D-139: plugin schemy 16 (odvodene celo nepozna) novy slot ODMIETNE.
+  NxTest.assert(NxS1E.cb.config_schema_of(st) > 16,
+                'slot je pre schemu 16 NOVSI — rucne celo by ticho prestalo sledovat linku')
   # Starsi plugin (schema 15): jeho `newer_config?` je presne toto porovnanie.
   NxTest.assert(NxS1E.cb.config_schema_of(st) > 15,
                 'slot je pre schemu 15 NOVSI — prestavba by z neho spravila PLNY korpus')
@@ -424,10 +443,10 @@ NxTest.test('S1-E R2c: sablona nesie `dw_*` a OCAKAVANIE, vazbu NIKDY') do
   tc = Noxun::Engine::Panel.template_config_from(st)
   NxTest.assert_equal('dishwasher', tc['type'])
   NxTest.assert_equal(600, tc['dw_class'])
-  NxTest.assert_close(776.0, tc['dw_front_height'], 0.01)
+  NxTest.assert_close(64.0, tc['dw_front_bottom'], 0.01)
   NxTest.assert_equal(%w[dishwasher], tc['appliance_expects'])
   NxTest.refute(tc.key?('appliance_refs'), 'sablona nenesie vazbu na konkretny spotrebic')
-  NxTest.assert_equal(16, tc['config_schema'], 'a stampuje aktualny marker')
+  NxTest.assert_equal(17, tc['config_schema'], 'a stampuje aktualny marker')
 end
 
 NxTest.test('S1-E R2c: `merge_template` ZACHOVA vazby CIELA') do
@@ -456,8 +475,12 @@ NxTest.test('S1-E E5: seed slotov nesie marker schemy (inak by ho starsi plugin 
     NxTest.assert_equal('dishwasher', cfg['type'])
     NxTest.assert_equal(NxS1E.cb::CONFIG_SCHEMA, cfg['config_schema'],
                         'marker je POVINNY — starsi plugin by inak zo slotu spravil korpus')
-    NxTest.assert_close(64.0, cfg['dw_front_bottom'], 0.01)
-    NxTest.assert_close(776.0, cfg['dw_front_height'], 0.01)
+    # D-139 (Michal 24.9.2026): predvolby linka 880, sokel 100 -> celo 778.
+    NxTest.assert_close(880.0, cfg['height'], 0.01)
+    NxTest.assert_close(100.0, cfg['dw_front_bottom'], 0.01)
+    NxTest.refute(cfg.key?('dw_front_height'), 'vyska cela sa v seede NEUKLADA — odvodi sa')
+    NxTest.assert_close(778.0, NxS1E.cb.normalize(cfg)[:dw_front_height], 0.01,
+                        'z predvolieb vyjde celo 778 (medzera hore 2)')
   end
   NxTest.assert_equal(600, seeds[0]['config']['dw_class'])
   NxTest.assert_equal(450, seeds[1]['config']['dw_class'])
@@ -470,9 +493,9 @@ NxTest.test('S1-E E5: STARSI plugin (schema 15) seedovanu sablonu ODMIETNE') do
                 'sablona je pre schemu 15 NOVSIA — `newer_template_refusal` ju zastavi')
 end
 
-NxTest.test('S1-E R6: seed STD je 5 a je MARKEROVY (zmazanu sablonu nevrati)') do
+NxTest.test('S1-E R6: seed je MARKEROVY (zmazanu sablonu nevrati) — STD 6 od D-139') do
   ts = Noxun::Engine::TemplateStore
-  NxTest.assert_equal(5, ts::STD)
+  NxTest.assert_equal(6, ts::STD)
   # `missing_slot_seed` je CISTA funkcia — nad zoznamom, kde uz sablona je,
   # vrati prazdno (preto sa seed nikdy neopakuje).
   have = ts.build_predefined_slots
@@ -570,9 +593,11 @@ NxTest.test('S1-E R7: payload slotu nesie vystupy informacneho stlpca') do
   pay = Noxun::Engine::Panel.slot_payload(NxS1E.stored(NxS1E.slot))
   NxTest.assert_equal('598 × 820 × 555', pay['body'])
   NxTest.assert_equal('generické 60', pay['body_note'])
-  NxTest.assert_equal('840', pay['front_top'], 'sokel 64 + celo 776')
-  NxTest.assert_equal('+20 nad telom', pay['front_over_text'])
-  NxTest.assert_equal('90', pay['fill'], 'vyplň po liniu linky 930')
+  # D-139: celo = stav stavby (odvodene 864), medzera hore = udaj schemy.
+  NxTest.assert_equal('864', pay['front_text'], 'linka 930 − sokel 64 − medzera 2')
+  NxTest.assert_equal('2 · schéma medzier', pay['gap_text'])
+  NxTest.refute(pay.key?('fill'), '„výplň hore" zanikla')
+  NxTest.refute(pay.key?('front_top'), 'aj „čelo hore"')
   NxTest.assert_equal('60 · bez modelu', pay['class_text'])
   # Dolna skrinka kluc NEDOSTANE.
   low = NxS1E.cb.normalize('type' => 'lower', 'width' => 600.0, 'height' => 720.0)
@@ -597,15 +622,17 @@ NxTest.test('S1-E: JS pozna PRESNE tie iste typy ako Ruby') do
 end
 
 NxTest.test('S1-E: panel prijme polia slotu (PARAM_KEYS) a posiela ich (CONSTRUCTION_FIELDS)') do
-  NxS1E.cb::DW_KEYS.each do |k|
-    NxTest.assert(Noxun::Engine::Panel::PARAM_KEYS.include?(k.to_s),
-                  "apply whitelist pozna #{k}")
-  end
+  # D-139: VSTUPY slotu su trieda, telo a sokel — vysku cela nikto neposiela.
+  inputs = %w[dw_class] + NxS1E.cb::DW_INPUT_KEYS.map(&:to_s)
   core = NxS1E.src('noxun_engine', 'ui', 'js', 'core.js')
   block = core[/var\s+CONSTRUCTION_FIELDS\s*=\s*\[(.*?)\];/m, 1].to_s
-  NxS1E.cb::DW_KEYS.each do |k|
+  inputs.each do |k|
+    NxTest.assert(Noxun::Engine::Panel::PARAM_KEYS.include?(k), "apply whitelist pozna #{k}")
     NxTest.assert(block.include?("id:'#{k}'"), "form.js posiela #{k}")
   end
+  NxTest.refute(Noxun::Engine::Panel::PARAM_KEYS.include?('dw_front_height'),
+                'odvodena vyska cela nie je vstup apply')
+  NxTest.refute(block.include?("id:'dw_front_height'"), 'a panel ju neposiela')
 end
 
 NxTest.test('S1-E E3: logicka obalka je zapojena vsade, kde sa doteraz citali bounds') do

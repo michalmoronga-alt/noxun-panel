@@ -4,6 +4,8 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-139** — Výška čela slotu umývačky sa dopočíta: výška linky − sokel − medzera hore zo schémy medzier; vstup „Čelo V" zanikol, predvolený slot 880 / 100 (čelo 778), výplň nad umývačkou = slot po jej spodok — 24.9.2026, PR #388, v0.12.19
+- **D-138** — Čelo slotu umývačky je „Dv myčka" so symbolom sklopu (model aj náhľad), v Čelách „Dvere umývačky" a v Kovaní/Nákupe „F1 · dv myčka"; kovanie ostáva len úchytka — 24.9.2026, PR #387 + #388, v0.12.18–v0.12.19
 - **D-137** — Štyri polia a päť výstupov slotu umývačky (a pomocník „?" k typu slotu v modale šablóny) sa už neukazujú pri každej skrinke — skrytie prebíjalo CSS; nový guard to stráži pre celý panel aj Štúdio — 23.9.2026, PR #386, v0.12.17
 - **D-136** — Karta a formulár spotrebiča ukazujú len bloky, ktoré kategória má: doska a drez bez Tela a Niky (ako v schválenom mockupe), rúra/mikrovlnka/digestor bez prázdnej Montáže; uložené hodnoty ostávajú — 23.9.2026, PR #386, v0.12.17
 - **D-135** — Minimálna výška korpusu je 80 mm (korpus na dorovnanie nad umývačkou): Inspector, vkladanie aj ťahanie scale úchopom pustia 80–199 mm, šírka (200) a hĺbka (150) sa nemenia; nízka skrinka so soklom sa navyše zastaví červeným poľom už v paneli a schéma configu ide na 15 (starší plugin by výšku ticho klampol na 200) — 20.9.2026, PR #375, v0.12.9
@@ -126,6 +128,38 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-139 — Výška čela umývačky sa dopočíta z linky, soklu a medzery hore, vyriešené 24.9.2026
+
+**Výsledok: PR #388, v0.12.19 (CONFIG_SCHEMA 17, TemplateStore STD 6).** Pôvodné znenie (Michal, smoke S1 21.9.2026): *„Položku Čelo V by som odstránil,
+nechal ju prípadne iba ako zobrazenie — výška čela sa bude rátať výška linky − sokel."* Po vysvetlení, na čo slúži výška linky: *„na medzeru som zabudol —
+uveďme ju teda ako údaj, medzera hore, ktorá sa dá nastaviť podľa logiky medzier."* 24.9.: žiadna reálna zákazka so slotom; predvoľby **880 / 100**.
+
+**Čo sa zmenilo.** Výška čela slotu = **výška linky − sokel − medzera hore**. Medzera hore je **to isté pole schémy medzier** ako pri každej skrinke
+(Čelá → Spoločné pre skrinku, predvolene 2 mm, záporná = čelo presahuje linku); pri slote sa v schéme skryjú polia „medzi" a „dole" (jeden riadok, spodok
+určuje sokel). V Základných zanikol vstup „Čelo V" aj riadky „Čelo hore"/„Výplň hore"; vpravo je **Čelo V** (údaj) a **Medzera hore** (klik vedie do schémy).
+Predvolený slot aj seedové šablóny: linka 880, sokel 100 → čelo 778. Náhľad kreslí čelo z toho istého výpočtu, pásmo „výplň" zaniklo.
+**Výplň nad umývačkou** (vysoká linka, čelo spotrebiča nesmie byť vyššie): slot sa nastaví **po spodok výplne** a výplň je samostatný nízky korpus nad ním —
+vedomá revízia mockupu R13/R14/R16.
+
+**Prečo tak (audit Astra, 1 BLOCKER + 4 FIX):** jeden vzorec aj **jedna validácia** (`dw_front_eval`, 300–1200 mm, veta radí podľa strany — pod minimom zvýšiť
+linku, nad maximom znížiť) pre stavbu, preflight panela, absorpciu scale aj JS zrkadlo (spoločná fixtúra); Inspector ukazuje **uložené** čelo (stav poslednej stavby)
+a pri starom slote pripíše „po prestavbe X" — čítanie nepredstiera prestavbu; náhľad má slotovú projekciu čiel vo všetkých cestach; absorpcia scale počíta hranice
+výšky linky bez `normalize` starého configu; seedové šablóny sa obnovia **len keď sú celé nedotknuté** (odtlačok z rozmerov by prepísal aj upravený dekor či medzery).
+
+**Kompatibilita.** `CONFIG_SCHEMA` 17: starší plugin by medzeru zahodil a čelo držal ako ručné — nový config preto odmietne. Staré sloty sa **nemigrujú**
+(žiadna zákazka); pri najbližšej prestavbe dostanú čelo z uloženej medzery (0). Knižnica šablón STD 6 je pre starší plugin len na čítanie. **Aktualizovať obe PC.**
+
+### D-138 — Čelo umývačky ako sklop a „Dv myčka", vyriešené 24.9.2026
+
+**Výsledok: PR #387 (v0.12.18) + PR #388 (v0.12.19).** Pôvodné znenie (Michal, smoke S1 21.9.2026): *„Dvere umývačky — vykresľovať ako sklop, nie ako blenda."*
+24.9. k názvu v kusovníku: *„dv myčka"*.
+
+**Čo sa zmenilo.** Čelo slotu ostáva **dátovo blendou** (`blind`, rola `false_front` — pravidlá kovania mu nevydajú pánty ani kovanie sklopu, len úchytku), ale všade,
+kde ho človek vidí, sú to dvere umývačky: **symbol sklopu „Λ"** v Smere otvárania aj v náhľade (o symbole rozhoduje aj typ skrinky, spoločná fixtúra Ruby↔JS),
+v kusovníku a VEPO dielec **„Dv myčka"** (štýl skratiek VEPO, diakritika ostáva; identitu nesie prípona `BLIND-1`), v zozname čiel „Dvere umývačky" s ikonou
+sklopu a bez dlaždíc typov (#387; Codex kolo 1 P2: výnimka len v riadku, pás „pridať čelo" ostáva nezávislý) a v textoch Kovania, Nákupu a Kontroly **„F1 · dv myčka"**
+(#388: odvodený kľúč `label` na uloženej projekcii čiel, bežná blenda ostáva „blenda").
 
 ### D-137 — Polia slotu umývačky svietili pri každej skrinke, vyriešené 23.9.2026
 

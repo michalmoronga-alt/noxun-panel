@@ -233,6 +233,10 @@ PID sa odmieta, dva kusy s tým istým ID sú „nejednoznačná identita". Záz
   **tretiu** os zámku popri `nominal_length` a `height_variant`. Starší plugin (schéma 13) ho pri normalizácii **zahodí** whitelistom `norm_hardware_overrides`, takže zásuvka
   by sa ticho vrátila na **automatickú výšku boxu** — teda by narezal iné dielce boxu (2 boky, vnútorné čelo, chrbát), než odsúhlasila objednávka. `DRAWER_ACTIVATION_SCHEMA`
   ostáva **5**, `HINGE_ACTIVATION_SCHEMA` **9** a `LIFT_ACTIVATION_SCHEMA` **11**. Brány sú tie isté ako pri 5–13.
+- **`17 = D-139` (v0.12.19): výška čela slotu umývačky je ODVODENÁ** (výška linky − sokel − `fronts.gap_top`) a medzera hore je skutočné pole schémy medzier
+  (schéma 16 ju vynucovala na 0). Starší plugin by pri prestavbe nového slotu medzeru zahodil a uloženú výšku čela držal ako **ručnú** — pri ďalších úpravách linky či
+  soklu by čelo ticho prestalo sledovať linku. Staré sloty sa **nemigrujú** (Michal 24.9.2026: žiadna zákazka so slotom); prestavba ich odvodí z uloženej medzery.
+  Brány sú tie isté ako pri 5–16. *(15 = S1-E0 minimum výšky 80 mm a 16 = S1-E slot umývačky + rezervované väzby sú opísané pri konštante `CONFIG_SCHEMA`.)*
 - **`rules_seed_version` — DRUHÁ proveniencia stavby (KOV-E1b, v0.9.54).** Config nesie **aditívne** pole so **seed verziou pravidiel kovania, s ktorou stavba bežala**
   (`HardwareRules.effective_seed_version`; chýbajúce pole = `0`). Zapisuje ho **výhradne stavba** (`cabinet_config`) — z klientskeho payloadu sa **nikdy nepreberá**,
   presne ako `config_schema`. Dôvod: projektový snapshot pravidiel sa zámerne nemerguje sám, takže prestavba starej zákazky zapíše aktuálnu schému, ale kovanie
@@ -410,9 +414,11 @@ Zóna nesie `allowed_modules` — čo do nej smie. Modul pri vklade dostane rozm
 **Geometria čela, spôsob otvárania a konkrétne kovanie sú oddelené.**
 
 **SLOT UMÝVAČKY má JEDNO PEVNÉ ČELO ako serverový invariant** (S1-E). `normalize` pre typ `dishwasher` vždy vyrobí práve jednu položku
-`F1 · type: blind · mode: fixed · wings: 1` s výškou `dw_front_height` a nulovými zvislými medzerami; z prichádzajúcej položky prevezme len profil a jeho hranu.
-**Autoritou výšky čela je pole `dw_front_height`**, nie riadok čiel — zápisová cesta panela payload s iným počtom, typom, režimom alebo cudzou výškou **odmietne**
-(config sa nedotkne). Typ je `blind` (nie literál `false_front`): `normalize_items` pozná len typy riadku a neznámy by sklopil na `door`, teda by vyrobil pánty.
+`F1 · type: blind · mode: fixed · wings: 1`; z prichádzajúcej položky prevezme len profil a jeho hranu. **Výška čela je ODVODENÁ** (D-139, schéma 17):
+**výška linky − `dw_front_bottom` (sokel) − `fronts.gap_top` (medzera hore zo schémy medzier)**, platná 300–1200 mm (mimo = slot sa nepostaví, veta radí podľa
+strany); `gap` a `gap_bottom` sú 0, `gap_top` sa zachováva. `dw_front_height` sa ukladá len ako stav poslednej stavby a zo vstupu sa nečíta. Zápisová cesta panela
+payload s iným počtom, typom či režimom **odmietne** (config sa nedotkne); výšku neposudzuje. Typ je `blind` (nie literál `false_front`): `normalize_items` pozná
+len typy riadku a neznámy by sklopil na `door`, teda by vyrobil pánty. V kusovníku a VEPO sa dielec volá **„Dv myčka"**, v textoch kovania „F1 · dv myčka" (D-138).
 
 **Delenie na výšku: FIXNÉ + AUTO s lockmi** (Blum-konfigurátor princíp). Jedno čelo zamknem na fixnú výšku, ostatné sa dopočítajú automaticky zo zvyšku po odčítaní zamknutých + škár. Kanonický config (tak ho ukladá `Fronts.normalize_config` — pole sa volá **`items`**, poradie odspodu, F1 dole):
 

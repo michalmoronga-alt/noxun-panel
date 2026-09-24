@@ -12,7 +12,7 @@
      Vsetky nove CSS pravidla kostry visia pod nou, aby panel.css ostal
      bezpecne zdielatelny so satelitnymi oknami. -->
 <script>document.documentElement.className = 'nx-inspector';</script>
-<link rel="stylesheet" href="css/panel.css?v=0.12.18">
+<link rel="stylesheet" href="css/panel.css?v=0.12.19">
 
 <!-- ===== RAIL (A9: staticke ID pre merac D-25) =============================
      Kontexty su platne LEN nad oznacenym korpusom — pri dielci/doske/vkladani
@@ -272,10 +272,11 @@
           <div class="rowc" id="fhRow"><label for="floor_height"><svg class="ic" aria-hidden="true"><use href="#i-plinth"/></svg>Sokel</label>
             <span class="dwrap"><input id="floor_height" type="text" oninput="onField()"><button type="button" class="pbtn" data-nx-usage="rad:sokel" onclick="nxDimToggle(this, event)" title="Rozmerový rad — bežné výšky sokla" aria-label="Rozmerový rad výšky sokla"><svg class="ic" aria-hidden="true"><use href="#i-chevron-down"/></svg></button><span class="miniopts" id="dimser_floor_height"></span></span>
             <button class="inslock" data-lock="floor_height" onclick="toggleInsertLock('floor_height')" aria-label="Zamknúť výšku sokla" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
-          <!-- S1-E: SLOT UMYVACKY. Styri VLASTNE polia (trieda, telo, sokel
-               slotu = spodna hrana cela, vyska cela) — zvysok (sirka, vyska
-               linky, hlbka) pouziva ROVNAKE vstupy ako korpus, len s inym
-               popisom. Riadky su skryte pre kazdy iny typ (applyVisibility). -->
+          <!-- S1-E: SLOT UMYVACKY. Tri VLASTNE polia (trieda, telo, sokel
+               slotu = spodna hrana cela) — zvysok (sirka, vyska linky, hlbka)
+               pouziva ROVNAKE vstupy ako korpus, len s inym popisom. D-139:
+               vyska cela uz pole NIE JE (odvodi sa: linka − sokel − medzera
+               hore). Riadky su skryte pre kazdy iny typ (applyVisibility). -->
           <div class="rowc" id="dwClassRow" hidden><label for="dw_class"><svg class="ic" aria-hidden="true"><use href="#i-arr-h"/></svg>Trieda</label>
             <span class="dwrap"><select id="dw_class" onchange="onField()"><option value="600">600 · 60 cm</option><option value="450">450 · 45 cm</option></select></span>
             <span class="unit"></span></div>
@@ -285,9 +286,7 @@
           <div class="rowc" id="dwFrontBottomRow" hidden><label for="dw_front_bottom"><svg class="ic" aria-hidden="true"><use href="#i-plinth"/></svg>Sokel</label>
             <span class="dwrap"><input id="dw_front_bottom" type="text" oninput="onField()"></span>
             <span class="unit">mm · čelo od podlahy</span></div>
-          <div class="rowc" id="dwFrontHeightRow" hidden><label for="dw_front_height"><svg class="ic" aria-hidden="true"><use href="#i-front"/></svg>Čelo V</label>
-            <span class="dwrap"><input id="dw_front_height" type="text" oninput="onField()"></span>
-            <span class="unit">mm</span></div>
+
           <!-- Hrubka rad NEMA — urcuje ju material dosky (D-45). -->
           <div class="rowc" id="thicknessRow"><label for="thickness"><svg class="ic" aria-hidden="true"><use href="#i-slab"/></svg>Hrúbka</label>
             <span class="dwrap"><input id="thickness" type="text" oninput="onField()"></span>
@@ -305,8 +304,8 @@
                — panel z nich nic neodvodzuje, len ich zapisuje. Skryte pri
                kazdom inom type (applyVisibility). -->
           <div class="inforow" id="infDwBody" hidden title="Telo umývačky podľa triedy (šírka × výška × hĺbka). Spodných 200 mm je fixná základňa — nohy a sokel spotrebiča"><span>Telo</span><b id="inf_dw_body">—</b></div>
-          <div class="inforow" id="infDwTop" hidden title="Horná hrana čela = sokel + výška čela; presah nad telom sa neobmedzuje"><span>Čelo hore</span><b id="inf_dw_top">—</b></div>
-          <div class="inforow" id="infDwFill" hidden title="Zvyšok po líniu linky — vypĺňa sa ručne: nízky korpus (od 80 mm) alebo doska"><span>Výplň hore</span><b id="inf_dw_fill">—</b></div>
+          <div class="inforow" id="infDwFront" hidden title="Výška čela = výška linky − sokel − medzera hore. Výplň nad umývačkou je samostatný nízky korpus — slot vtedy nastav po jej spodok."><span>Čelo V</span><b id="inf_dw_front">—</b></div>
+          <button type="button" class="inforow click" id="infDwGap" hidden onclick="onInfoDwGap()" data-nx-usage="info:dw-medzera" title="Medzera medzi hornou hranou čela a linkou — klik otvorí Čelá → Spoločné pre skrinku → schéma medzier"><span>Medzera hore</span><b id="inf_dw_gap">—</b></button>
           <div class="inforow" id="infDwUnder" hidden title="Nastavená výška tela ≤ výška linky — to isté tvrdí aj Kontrola"><span>Pod doskou</span><b id="inf_dw_under">—</b></div>
           <div class="inforow" id="infDwClass" hidden title="Trieda šírky slotu (model sa priradí až neskôr)"><span>Trieda</span><b id="inf_dw_class">—</b></div>
           <div class="inforow" id="infAvWidth" title="Svetlá šírka vnútra (mm)"><span>Vnút. šírka</span><b id="av_width">—</b></div>
@@ -1007,57 +1006,57 @@
      musi existovat pred prvym renderom aj pred ready), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.12.18"></script>
+<script src="js/errors.js?v=0.12.19"></script>
 <!-- D-77 / A7: minimalna OBSAHOVA velkost okna pri otvoreni. UI-B1 stanovil
      jednu pravdu sirky Inspectora — 470 px OBSAHU (rail 44 + karta). Vyska 810
      pokryva nahlad + dva rozbalene sektory. Dorovnava sa oboma smermi, raz pri
      nacitani a nikdy nad plochu obrazovky (js/win_fit.js). -->
 <script>window.NX_FIT_MIN = { w: 470, h: 810 };</script>
-<script src="js/win_fit.js?v=0.12.18"></script>
-<script src="js/icons.js?v=0.12.18"></script>
+<script src="js/win_fit.js?v=0.12.19"></script>
+<script src="js/icons.js?v=0.12.19"></script>
 <!-- R-23.1: JEDEN dokumentový Escape handler s prioritným zoznamom vrstiev
      (ten istý súbor načítava aj studio.html). Musí byť PRED skriptami, ktoré
      modály otvárajú — jeho listener má bežať ako PRVÝ, aby vedel udalosť
      spotrebovať skôr, než ju dostane handler okna. -->
-<script src="js/nx_esc.js?v=0.12.18"></script>
+<script src="js/nx_esc.js?v=0.12.19"></script>
 <!-- KOV-H2: zdieľaná kostra modalov D-15 (ten istý súbor načítava aj
      studio.html). Musí byť ZA nx_esc.js (reťaz Escape má bežať prvá) a PRED
      core.js/hardware.js — modal ručnej položky kovania ju volá menom. -->
-<script src="js/nx_modal.js?v=0.12.18"></script>
+<script src="js/nx_modal.js?v=0.12.19"></script>
 <!-- ŠT-4a: zdieľaný obsah „O plugine" (rovnaký súbor načítava aj studio.html). -->
-<script src="js/about.js?v=0.12.18"></script>
+<script src="js/about.js?v=0.12.19"></script>
 <!-- D-85 (UI-03): zdielany combobox. Musi byt PRED core/part/board — tie ho pri
      renderi kariet volaju (NXCombo.scan). Sam na nikom nezavisi (ikony si berie
      defenzivne cez NXIcons, ak sprite existuje). -->
-<script src="js/nx_combo.js?v=0.12.18"></script>
+<script src="js/nx_combo.js?v=0.12.19"></script>
 <!-- v0.7.28: ZDIELANE 3-stavove nastavenie kontroly hran (rohovy trojuholnik pri
      ABS kontrole v raile). TEN ISTY subor nacitava aj okno Studio — jeden markup,
      jeden stav. Musi byt PRED shell.js (rohove okno kresli NXEdgeMenu). -->
-<script src="js/edge_menu.js?v=0.12.18"></script>
-<script src="js/tag_menu.js?v=0.12.18"></script>
-<script src="js/core.js?v=0.12.18"></script>
-<script src="js/expr.js?v=0.12.18"></script>
-<script src="js/insert_state.js?v=0.12.18"></script>
-<script src="js/form.js?v=0.12.18"></script>
-<script src="js/zone_tree.js?v=0.12.18"></script>
-<script src="js/preview.js?v=0.12.18"></script>
+<script src="js/edge_menu.js?v=0.12.19"></script>
+<script src="js/tag_menu.js?v=0.12.19"></script>
+<script src="js/core.js?v=0.12.19"></script>
+<script src="js/expr.js?v=0.12.19"></script>
+<script src="js/insert_state.js?v=0.12.19"></script>
+<script src="js/form.js?v=0.12.19"></script>
+<script src="js/zone_tree.js?v=0.12.19"></script>
+<script src="js/preview.js?v=0.12.19"></script>
 <!-- UI-B1: kostra Inspectora — stavovy stroj vyber x kontext, rail, sektory. -->
-<script src="js/shell.js?v=0.12.18"></script>
-<script src="js/actions.js?v=0.12.18"></script>
+<script src="js/shell.js?v=0.12.19"></script>
+<script src="js/actions.js?v=0.12.19"></script>
 <!-- GHOST-FB4: Ghost pasik vkladacej karty. Musi byt PRED bridge.js
      (NX.setGhost vola nxGhostApply); sam na nikom nezavisi. -->
-<script src="js/ghost_bar.js?v=0.12.18"></script>
+<script src="js/ghost_bar.js?v=0.12.19"></script>
 <!-- UI-B3: nastavenia Inspectora (koliesko) + rozmerove rady N6. Musi byt PRED
      bridge.js (NX.setUiSettings volá nxApplyUiSettings) a za core.js (el/esc). -->
-<script src="js/settings.js?v=0.12.18"></script>
-<script src="js/bridge.js?v=0.12.18"></script>
-<script src="js/materials.js?v=0.12.18"></script>
-<script src="js/part_card.js?v=0.12.18"></script>
-<script src="js/board_card.js?v=0.12.18"></script>
-<script src="js/hardware.js?v=0.12.18"></script>
+<script src="js/settings.js?v=0.12.19"></script>
+<script src="js/bridge.js?v=0.12.19"></script>
+<script src="js/materials.js?v=0.12.19"></script>
+<script src="js/part_card.js?v=0.12.19"></script>
+<script src="js/board_card.js?v=0.12.19"></script>
+<script src="js/hardware.js?v=0.12.19"></script>
 <!-- S1-B2: riadok „Spotrebič" v Základných aj v karte dosky. Vlastný súbor
      (nie hardware.js) zámerne: s kovaním nemá nič spoločné a payload mu
      chodí vlastným kľúčom (`appliance_rows`). -->
-<script src="js/appliance_row.js?v=0.12.18"></script>
-<script src="js/usage.js?v=0.12.18"></script>
-<script src="js/boot.js?v=0.12.18"></script>
+<script src="js/appliance_row.js?v=0.12.19"></script>
+<script src="js/usage.js?v=0.12.19"></script>
+<script src="js/boot.js?v=0.12.19"></script>

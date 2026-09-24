@@ -47,21 +47,10 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
   *Stav: na návrhovú dávku — od 26.8. SAMOSTATNE (bez väzby na D-48, ktorý je mimo V1); distribučný kanál jednoducho, napr. zdieľaný priečinok.*
 ## SPOTREBIČE S1 — smoke 21.9.2026 (opravy pred uzáverom D)
 
-*(Michalov smoke celého bloku S1 na v0.12.16. Vyriešené hneď v smoke oprave A: **D-136** a **D-137** — plné texty v
-[archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md).)*
+*(Michalov smoke celého bloku S1 na v0.12.16. Vyriešené: **D-136** a **D-137** (oprava A, #386), **D-138** (B1 #387 + B2 #388) a **D-139** (B2 #388) —
+plné texty v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md). Kontrola „čelo presahuje max výšku čela modelu z listu" sa pri D-139 **nezaviedla**
+— kontroly slotu ostávajú dve (rozhodnutie 20.9.); keď si ju prax vypýta, bude to nový postreh.)*
 
-- **D-138 · Čelo umývačky kresliť ako sklop, nie ako blendu** (Michal 21.9.2026, smoke S1 bod 2) — čelo slotu je dátovo blenda (`blind`, rola `false_front`), aby
-  mu pravidlá kovania nevydali pánty ani kovanie sklopu; v Smere otvárania v modeli aj v náhľade Inspectora preto nesie **plné X blendy**. Dvere umývačky sa
-  otvárajú nadol — symbol má byť **sklop „Λ"**. Návrh (agent 21.9., Michal nenamietal): typ ostáva `blind` (žiadne kovanie), mení sa len **symbol** pri slote.
-  Michal 24.9.: dielec sa v kusovníku/VEPO volá **„dv myčka"** (zapísané v štýle skratiek VEPO ako „Dv myčka"). *Stav: **B1 ✅ #387 (v0.12.18)** — symbol sklopu
-  v modeli aj náhľade, názov „Dv myčka", zoznam čiel „Dvere umývačky" bez dlaždíc typov; **zostáva** text „F1 · blenda" v Kovaní, Nákupe a Kontrole → B2
-  (skladá sa z uloženej projekcie čiel, preto ide s auditom).*
-- **D-139 · Výška čela umývačky sa dopočíta: linka − sokel − medzera hore** (Michal 21.9.2026, smoke S1 bod 2) — vstup „Čelo V" preč (ostane len ako zobrazený
-  údaj); čelo siaha od soklu po hornú hranu linky mínus **medzeru hore**, ktorá sa nastavuje **podľa logiky medzier** (schéma medzier skrinky, ako pri
-  ostatných čelách). Mení sa tým schválené R13/R14 mockupu („výplň hore = zvyšok po líniu, ručne"): výplň nad umývačkou sa po novom robí tak, že slot dostane
-  výšku po spodok výplne a výplň je samostatný nízky korpus. Stratí sa ručná výška čela nižšia než linka — kontrola „čelo presahuje max výšku čela modelu"
-  (list ju pozná) sa zváži spolu. **Michal 24.9.:** žiadna reálna zákazka so slotom ešte nie je (prechod nemusí zachovávať ručné čelá) a **predvoľby slotu =
-  výška linky 880, sokel 100** (čelo 778 pri medzere 2). *Stav: smoke oprava B2 — mení význam uloženého `dw_front_height`, preto `codex-audit` pred implementáciou.*
 - **D-140 · Výška osadenia chladničky v skrinke** (Michal 23.9.2026, smoke S1 bod 4) — box niky chladničky stojí vždy na dne skrinky; keď je chladnička
   osadená vyššie (polica pod ňou, zásuvky pod ňou), box aj pásma dverí ostanú „prilepené na dne". Želanie: **textové pole s výškou osadenia**, ktoré posunie
   box niky a **rovno prepočíta umiestnenie dverí** (pásma dverí spotrebiča a pásmo prípustnej hrany medzi čelami). **Michal 24.9. schválil** pole „osadenie od dna"

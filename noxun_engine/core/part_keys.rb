@@ -101,7 +101,7 @@ module Noxun
           return "#{front_no(m[1], fronts)} · #{flap_label(m[1], fronts)}"
         end
         if (m = k.match(%r{\Afront:([^/]+)/blind\z}))
-          return "#{front_no(m[1], fronts)} · blenda"
+          return "#{front_no(m[1], fronts)} · #{blind_label(m[1], fronts)}"
         end
         # KOV-C2b: vyrabane dielce zasuvky z receptu. `box_side` nesie stranu
         # (left/right) — bez nej by dva boky Quadro boxu mali rovnaky popis.
@@ -153,6 +153,16 @@ module Noxun
         when 'fall' then 'sklop'
         else 'výklop/sklop'
         end
+      end
+
+      # D-138: blenda je dielec blendy — okrem jedineho cela SLOTU UMYVACKY,
+      # ktore je datovo blenda, ale su to dvere umyvacky. Ich resolved polozka
+      # nesie odvodeny `label` (zapisuje ho LEN plan slotu); bez neho — alebo
+      # bez zhody ID — ostava „blenda". Nic sa nehada.
+      def blind_label(front_id, fronts)
+        f = Array(fronts).find { |x| x.is_a?(Hash) && x['id'].to_s == front_id.to_s }
+        lbl = f ? f['label'].to_s.strip : ''
+        lbl.empty? ? 'blenda' : lbl
       end
 
       # Kridlo dvierok. p1..p4 nesie aj celkovy pocet kridiel („krídlo 2/3"),

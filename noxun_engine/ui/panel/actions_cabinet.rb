@@ -15,7 +15,7 @@ module Noxun
       PARAM_KEYS = %w[type width height depth thickness floor_height bottom_mode top_mode back_mode
                       back_thickness plinth_mode plinth_recess rail_depth rails_orientation
                       rails_top_offset name
-                      dw_class dw_body_height dw_front_bottom dw_front_height].freeze
+                      dw_class dw_body_height dw_front_bottom].freeze
 
       # S1-E: SK nazov typu skrinky v 1. pade (hlasky Studia aj panela). Jedna
       # tabulka — tri opisane ternary by sa casom rozisli a slot by v jednej
@@ -52,9 +52,14 @@ module Noxun
                  (0.0..500.0).cover?(dims[2])
             raise 'Rozmery skrinky sú mimo povoleného rozsahu.'
           end
-          opening = slot ? slot_preflight_opening(data, dims[0]) : nil
+          opening = slot ? slot_preflight_opening(data, dims[0], dims[1]) : nil
           cfg = data['fronts']
           raise 'Neplatný návrh čiel.' unless cfg.is_a?(Hash) && cfg['items'].is_a?(Array)
+          # D-139: riadok slotu sa pred preflightom KANONIZUJE tym istym
+          # `slot_fronts!` ako pri stavbe — vyska cela je odvodena a stara
+          # hodnota z formulara (echo este neprislo) nesmie dat falosne
+          # „nezmestí sa". Validacia rozsahu ide tou istou `dw_front_eval`.
+          cfg = slot_preflight_fronts(data, cfg, dims[1]) if slot
           %w[gap gap_top gap_bottom gap_left gap_right].each do |key|
             v = cfg[key]
             raise "Neplatná medzera čiel: #{key}." unless v.is_a?(Numeric) && v.to_f.finite?
@@ -74,22 +79,27 @@ module Noxun
 
         # S1-E: virtualny otvor slotu z PAYLOADU preflightu. Autoritou tvaru je
         # `Construction.front_opening` — tu sa len poskladá cfg, ktory ocakava
-        # (preflight bezi BEZ modelu, nad rozpisanym formularom).
-        def slot_preflight_opening(data, width)
+        # (preflight bezi BEZ modelu, nad rozpisanym formularom). D-139: otvor
+        # ide od soklu po vysku linky; vyska cela sa odvodzuje.
+        def slot_preflight_opening(data, width, height)
           z0 = data['dw_front_bottom']
-          h = data['dw_front_height']
-          unless z0.is_a?(Numeric) && z0.to_f.finite? && h.is_a?(Numeric) && h.to_f.finite?
-            raise 'Sokel a výška čela slotu musia byť konečné čísla.'
-          end
+          raise 'Sokel slotu musí byť konečné číslo.' unless z0.is_a?(Numeric) && z0.to_f.finite?
 
-          r = CabinetBuilder::DW_RANGES
-          unless (r[:dw_front_bottom][0]..r[:dw_front_bottom][1]).cover?(z0.to_f) &&
-                 (r[:dw_front_height][0]..r[:dw_front_height][1]).cover?(h.to_f)
-            raise 'Sokel alebo výška čela slotu sú mimo povoleného rozsahu.'
-          end
+          r = CabinetBuilder::DW_RANGES[:dw_front_bottom]
+          raise 'Sokel slotu je mimo povoleného rozsahu.' unless (r[0]..r[1]).cover?(z0.to_f)
 
-          Construction.front_opening({ type: 'dishwasher', width: width,
-                                       dw_front_bottom: z0.to_f, dw_front_height: h.to_f })
+          Construction.front_opening({ type: 'dishwasher', width: width, height: height,
+                                       dw_front_bottom: z0.to_f })
+        end
+
+        # D-139: kanonicky riadok slotu pre preflight — ta ista `dw_front_eval`
+        # (vzorec + rozsah + veta) a ten isty `slot_fronts!` ako pri stavbe.
+        def slot_preflight_fronts(data, fronts, height)
+          norm = Fronts.normalize_config(fronts)
+          ev = CabinetBuilder.dw_front_eval(height, data['dw_front_bottom'].to_f, norm['gap_top'])
+          raise ev[:error] if ev[:error]
+
+          CabinetBuilder.slot_fronts!(norm, { dw_front_height: ev[:value] })
         end
 
         def handle_front_preflight(payload)
@@ -778,8 +788,8 @@ module Noxun
           end
           params = existing_params(cab)
           # S1-E (Astra FIX E9): slot ma JEDNO PEVNE CELO ako SERVEROVY
-          # invariant — payload s dvoma celami, inym typom, rezimom alebo
-          # cudzou vyskou sa ODMIETNE a config sa NEDOTKNE.
+          # invariant — payload s dvoma celami, inym typom ci rezimom sa
+          # ODMIETNE a config sa NEDOTKNE (vysku odvodi `normalize`, D-139).
           if (msg = slot_fronts_refusal(params, data['fronts']))
             return set_status(msg, true)
           end
@@ -795,20 +805,17 @@ module Noxun
           finish_cab(model, cab, "Cela aktualizovane — #{Store.get(cab, 'cabinet_id')}.")
         end
 
-        # S1-E: JEDINA veta o tom, ze slot ma jedno pevne celo (a KDE sa jeho
-        # vyska meni). `new_height` = hodnota z TEJ ISTEJ davky (auto-apply
-        # posiela zmenu `dw_front_height` aj stary riadok ciel naraz), takze
-        # legitimna zmena vysky NIE JE odmietnutie — rieši ju `normalize`.
-        SLOT_FRONTS_MSG = 'Slot umývačky má jedno pevné čelo — jeho výšku mení pole „Čelo V“.'
+        # S1-E: JEDINA veta o tom, ze slot ma jedno pevne celo (a z coho sa
+        # jeho vyska berie — D-139: je odvodena, ziadne pole ju nemeni).
+        SLOT_FRONTS_MSG = 'Slot umývačky má jedno pevné čelo — jeho výška sa dopočíta z výšky linky, soklu a medzery hore.'
 
-        def slot_fronts_refusal(params, incoming, new_height = nil)
+        def slot_fronts_refusal(params, incoming)
           return nil unless params['type'].to_s == 'dishwasher'
           return nil if incoming.nil?
 
           cfg = Fronts.normalize_config(incoming)
-          [params['dw_front_height'], new_height].compact.each do |h|
-            return nil if CabinetBuilder.slot_fronts_ok?(cfg, h)
-          end
+          return nil if CabinetBuilder.slot_fronts_ok?(cfg)
+
           SLOT_FRONTS_MSG
         rescue StandardError => e
           Engine.log_error(e, 'Panel.slot_fronts_refusal')
@@ -848,10 +855,10 @@ module Noxun
             return push_manual_result(op, false, 'Výber sa medzitým zmenil — skús to znova.')
           end
           params = existing_params(cab)
-          # S1-E: invariant jedneho pevneho cela sa posudzuje proti ULOZENEJ
-          # vyske AJ proti tej, ktoru prave posiela ta ista davka (zmena
-          # „Čelo V" chodi s riadkom ciel, ktory este drzi staru hodnotu).
-          if (msg = slot_fronts_refusal(params, data['fronts'], data['dw_front_height']))
+          # S1-E: invariant jedneho pevneho cela (pocet, typ, rezim). D-139:
+          # vyska sa neposudzuje — riadok z klienta nesie staru, `normalize`
+          # ju odvodi z vysky linky, soklu a medzery hore tej istej davky.
+          if (msg = slot_fronts_refusal(params, data['fronts']))
             set_status(msg, true)
             push_selected(model)
             return push_manual_result(op, false, msg)

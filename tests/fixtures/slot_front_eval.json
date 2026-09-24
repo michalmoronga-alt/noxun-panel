@@ -1,0 +1,13 @@
+{
+  "note": "D-139: SPOLOCNA tabulka pre Ruby `CabinetBuilder.dw_front_eval` a JS `nxSlotFrontEval` (core.js). Vyska cela slotu = vyska linky - sokel - medzera hore; platny rozsah [300, 1200]. `side` = null (platne) | 'low' (veta 'najmenej …, zvys vysku linky alebo zniz sokel') | 'high' (veta 'najviac …, zniz vysku linky, zvys sokel alebo medzeru hore'). Zmena pravidla = zmena TU.",
+  "cases": [
+    { "case": "predvolby Michala 880/100, medzera 2", "height": 880, "bottom": 100, "gap_top": 2, "value": 778, "side": null },
+    { "case": "linka 930, sokel 64, medzera 2", "height": 930, "bottom": 64, "gap_top": 2, "value": 864, "side": null },
+    { "case": "zaporna medzera = presah nad linku", "height": 930, "bottom": 64, "gap_top": -30, "value": 896, "side": null },
+    { "case": "presne dolna hranica 300", "height": 500, "bottom": 198, "gap_top": 2, "value": 300, "side": null },
+    { "case": "pod minimom (nizka linka, vysoky sokel)", "height": 500, "bottom": 300, "gap_top": 2, "value": 198, "side": "low" },
+    { "case": "presne horna hranica 1200", "height": 1200, "bottom": 0, "gap_top": 0, "value": 1200, "side": null },
+    { "case": "nad maximom cez zapornu medzeru (Astra B2 FIX 3)", "height": 1200, "bottom": 0, "gap_top": -2, "value": 1202, "side": "high" },
+    { "case": "desatinne mm", "height": 912.5, "bottom": 100, "gap_top": 2.5, "value": 810, "side": null }
+  ]
+}

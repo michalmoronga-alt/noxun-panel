@@ -949,7 +949,7 @@
   // `dw_height_fit`, takze Inspector a semafor nikdy netvrdia dve rozne veci.
   function renderSlotInfo(s){
     if (!s){
-      ['inf_dw_body', 'inf_dw_top', 'inf_dw_fill', 'inf_dw_under', 'inf_dw_class']
+      ['inf_dw_body', 'inf_dw_front', 'inf_dw_gap', 'inf_dw_under', 'inf_dw_class']
         .forEach(function(id){ setOut(id, ''); });
       return;
     }
@@ -957,8 +957,11 @@
     // 60"), `body_range` rozsah výšky tela z listu výrobcu — oboje skladá
     // server, panel z väzby nič neodvodzuje.
     setOut('inf_dw_body', s.body + ' · ' + s.body_note);
-    setOut('inf_dw_top', s.front_top + ' · ' + s.front_over_text);
-    setOut('inf_dw_fill', s.fill + ' · ručne');
+    // D-139: celo = STAV POSLEDNEJ STAVBY (+ „po prestavbe X", ked sa odvodena
+    // hodnota lisi — stary slot pred prvou prestavbou), medzera hore = udaj
+    // schemy medzier (klik vedie do nej). Texty sklada server.
+    setOut('inf_dw_front', s.front_text);
+    setOut('inf_dw_gap', s.gap_text);
     setOut('inf_dw_under', s.under_text + ' ' + (s.under_ok ? '✓' : '✗'));
     var u = el('inf_dw_under');
     if (u){ u.classList.toggle('ok', !!s.under_ok); u.classList.toggle('bad', !s.under_ok); }
