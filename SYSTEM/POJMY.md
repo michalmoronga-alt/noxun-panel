@@ -69,8 +69,11 @@
   zákazník má vidieť, že s kuchyňou počítame, ale v našej cene to nie je.
 - **Snapshot spotrebiča** (S1-B1) — **kópia** katalógového záznamu (rozmery, odkazy, prílohy) odložená **v zákazke** v okamihu priradenia. Zákazka odvtedy na
   živom katalógu **nezávisí**: neskoršia zmena modelu ani jeho vyradenie s ňou nepohnú. Preto sa nikdy neukladá „odkaz na katalóg" ako jediný zdroj rozmerov.
-- **Výplň hore** — pásmo medzi hornou hranou čela slotu a líniou linky. Plugin ho **negeneruje** — Michal ho rieši **ručne** podľa situácie:
-  nízkym korpusom na dorovnanie (od 80 mm, preto S1-E0) alebo doskou. Inspector ho hlási ako výstup („výplň 90 · ručne"), nie ako chybu.
+- **Výplň hore** — pásmo nad čelom slotu umývačky, keď je kuchynská linka vyššia, než dovolí čelo spotrebiča. Plugin ho **negeneruje** — Michal ho rieši
+  **ručne** nízkym korpusom na dorovnanie (od 80 mm, preto S1-E0) alebo doskou. Od D-139 (24.9.2026) sa výška čela slotu **dopočíta** (výška linky − sokel −
+  medzera hore), takže slot sa pri výplni nastaví **po jej spodok** a výplň je samostatný kus nad ním; Inspector pásmo výplne už neukazuje.
+- **Medzera hore (slot umývačky)** — vzdialenosť hornej hrany čela slotu od linky; nastavuje sa v schéme medzier skrinky (Čelá → Spoločné pre skrinku),
+  predvolene 2 mm ako pri ostatných čelách. Záporná = čelo presahuje linku.
 - **Logická obálka korpusu** — **nominálny** obrys skrinky z configu (`šírka × hĺbka × výška`), nie skutočné bounds v modeli. Prisúvanie, umiestňovanie
   novej skrinky a stred otáčania merajú **ju**, takže presahujúce čelo, proxy kovania ani telo spotrebiča doraz neposúvajú (a výsledok nezávisí od toho,
   ktoré tagy má kto zapnuté).

@@ -278,7 +278,7 @@ volajúci **musí** návratovú hodnotu vetviť, inak ohlási falošný úspech)
 kľúče záznamu aj pri PREPISE** (S1-C, `merged_record` číta starý záznam pod tým istým zámkom): `record()` stavia záznam nanovo, takže bez toho by uloženie šablóny z novšej
 verzie ticho zahodilo to, čomu tento plugin nerozumie. `name`, `kind` a `config` sú vždy z nového zápisu — prepis je vedomý akt nad OBSAHOM šablóny.
 
-**S1-C: OČAKÁVANÝ SPOTREBIČ žije v `config['appliance_expects']`, nie na zázname — a `STD` preto ostáva 5.** Záznam šablóny **žiadny vlastný kľúč** (`expects`) nedostal:
+**S1-C: OČAKÁVANÝ SPOTREBIČ žije v `config['appliance_expects']`, nie na zázname — a `STD` sa kvôli nemu nebumpoval (ostal 5; 6 je až D-139).** Záznam šablóny **žiadny vlastný kľúč** (`expects`) nedostal:
 pri reprezentácii v configu starší plugin (od S1-E, teda od `CONFIG_SCHEMA` 16) očakávania číta aj vkladá správne a plugin pred S1-E config schémy 16 odmieta už dnes,
 takže bump markera by knižnicu len zbytočne zamkol pre zápis — bez jediného dôvodu. Dve reprezentácie by navyše znamenali dve pravdy, ktoré sa musia pri každom vklade
 zladiť. Dôsledok: **žiadna migrácia** (čítanie STD 5 je bajtovo nemenné), seed slotov sa neopakuje a **slotové šablóny očakávanie v configu vôbec nemajú** — umývačku im
@@ -370,8 +370,14 @@ Escapom a otvoriť iný — a `renameSaved` by mu ten **cudzí rozpísaný formu
 (3) **Mazanie klasifikuje „zmizla" až po návrate zo zámku** — pred-kontrola `find` beží mimo zámku, takže medzi ňou a zamknutým `delete` môže šablónu zmazať druhá inštancia;
 `false` sa preto ešte raz overí `find`om a až potom sa hlási novšia schéma/disk (spoločné telo `template_gone`).
 
+**D-139 — `STD` 6: obnova NEDOTKNUTÝCH slotových seedov.** Krok `old_std < 6` (`refresh_slot_seed`) prepíše na nové predvoľby (linka 880, sokel 100, marker
+schémy 17, bez uloženej výšky čela) **len** záznam, ktorý je **celý** zhodný s pôvodným seedom S1-E (`legacy_slot_seeds` — zamrazené literály 915/64/776,
+schéma 16) po JSON round-tripe: meno, druh, config a žiadne ďalšie kľúče. Odtlačok z vybraných rozmerov by prepísal aj šablónu so zmeneným dekorom, hrúbkou,
+medzerami či kovaním (Astra B2 BLOCKER 1). Upravený, premenovaný, novší alebo inak odlišný záznam ostáva **presne** taký, aký je. Starší plugin prejde nad `std` 6
+do režimu len na čítanie (forward guard) — zákazky zo schémy 17 aj tak neprestaví.
+
 **S1-E — `STD` 5: markerový seed slotov umývačky.** Krok `old_std < 5` doseje dve **korpusové** šablóny **„Umývačka 60"** a **„Umývačka 45"**
-(`build_predefined_slots`, config typu `dishwasher` s `dw_class`, `dw_body_height`, `dw_front_bottom` 64 a `dw_front_height` 776). Na rozdiel od
+(`build_predefined_slots`, config typu `dishwasher` s `dw_class`, `dw_body_height` a `dw_front_bottom`; od D-139 linka 880 a sokel 100, výška čela sa neukladá). Na rozdiel od
 ostatných korpusových seedov (`lower_base`/`upper_base`) **nesú `config['config_schema']`** = `CabinetBuilder::CONFIG_SCHEMA`: bez markera by ich
 starší plugin považoval za legacy, `norm_type` by mu neznámy typ sklopil na `lower` a zo slotu by vložil **plný korpus** s bokmi, dnom a chrbtom
 (Astra S1-E FIX E5). S markerom ho `Panel.newer_template_refusal` čisto odmietne. Seed je **markerový, nie obsahový** — viaže sa na prechod markera,

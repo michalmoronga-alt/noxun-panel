@@ -17,6 +17,20 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **SMOKE S1 · OPRAVA B2 — výška čela umývačky sa dopočíta (v0.12.19, 24.9.2026, PR #388, CONFIG_SCHEMA 17, TemplateStore STD 6).** D-139 (Michal 21.9.):
+  výška čela slotu = **výška linky − sokel − medzera hore**; medzera hore je to isté pole schémy medzier ako pri každej skrinke (predvolene 2, záporná = presah
+  nad linku), pri slote bez polí „medzi" a „dole". Vstup „Čelo V" aj riadky „Čelo hore"/„Výplň hore" zanikli; Základné ukazujú **Čelo V** a **Medzeru hore**
+  (preklik do schémy). Predvoľby a seedové šablóny **880 / 100** → čelo 778 (Michal 24.9.). **Vedomá revízia mockupu R13/R14/R16:** výplň nad umývačkou je samostatný
+  nízky korpus a slot sa nastaví po jej spodok. Zvyšok D-138: texty Kovania, Nákupu a Kontroly hovoria **„F1 · dv myčka"** (odvodený `label` na projekcii čiel).
+  **AUDIT ASTRA (1 BLOCKER + 4 FIX + 3 NOTE) zmenil návrh:** (1) seed šablóny sa obnoví **len keď je CELÝ nedotknutý** (odtlačok z rozmerov by prepísal aj upravený
+  dekor či medzery) — Michalova knižnica mala presne pôvodné seedy; (2) Inspector ukazuje **uložené** čelo a pri starom slote „po prestavbe X" — čítanie nepredstiera
+  prestavbu; (3) **jeden vzorec aj jedna validácia** (`dw_front_eval`, 300–1200, rada podľa strany) pre stavbu, preflight, scale aj JS (spoločná fixtúra); (4) náhľad
+  má slotovú projekciu čiel aj počas čakania na preflight a vo vkladaní; (5) absorpcia scale počíta hranice linky **bez `normalize`** starého configu. **Bez migrácie**
+  starých slotov (Michal: žiadna zákazka) — prestavba ich odvodí z uloženej medzery 0. Testy 4520 headless · 128 JS sád (nová sada `test_d139_celo_slotu` +
+  fixtúra `slot_front_eval.json`) · in-SU 3049 PASS / 0 FAIL (nové scenáre: linka a medzera prepočítajú čelo + Späť, starý slot „po prestavbe" → prestavba → Späť,
+  scale výšky s klampom).
+- **SMOKE S1 · OPRAVA B1 — čelo slotu „Dv myčka" so symbolom sklopu (v0.12.18, 24.9.2026, PR #387).** Zmergované po Codex kole 1 (1 × P2: výnimka slotu len v riadku
+  čela, pás „pridať čelo" nezávislý — `frontRowIcon`/`frontRowLabel`) + internej delte; in-SU 3039 PASS (+3 kontroly D-138).
 - **SMOKE S1 · OPRAVA B1 — čelo slotu umývačky je „Dv myčka" so symbolom sklopu (v0.12.18, 24.9.2026, PR #387).** Michal 21.9.: dvere umývačky sa kreslili ako
   blenda (plné X). Čelo slotu ostáva **dátovo blendou** (`blind`, rola `false_front`) — inak by mu pravidlá kovania vydali pánty alebo kovanie sklopu — ale všade,
   kde ho človek vidí, sú to **dvere umývačky**: symbol **sklopu „Λ"** v Smere otvárania aj v náhľade Inspectora (o symbole po novom rozhoduje aj **typ skrinky** —

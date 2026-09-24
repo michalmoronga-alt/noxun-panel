@@ -3783,9 +3783,10 @@ module NoxunSuRunner
       Sketchup.undo
 
       # Celo PRESAHUJUCE liniu + vypnuty tag referencie — doraz je TEN ISTY.
-      # D-139: presah nad linku = ZAPORNA medzera hore (schema medzier).
+      # D-139: presah nad linku = ZAPORNA medzera hore (schema medzier; so
+      # zamknutym limitom okrajov najviac −100 mm).
       fr_c = (e::Store.config(slot_tr) || {})['fronts'] || {}
-      s1e_rebuild(model, slot_tr, 'fronts' => fr_c.merge('gap_top' => -150.0))
+      s1e_rebuild(model, slot_tr, 'fronts' => fr_c.merge('gap_top' => -90.0))
       hw_layer = model.layers[e::CabinetBuilder::HARDWARE_TAG]
       vis0 = hw_layer ? hw_layer.visible? : nil
       if hw_layer
