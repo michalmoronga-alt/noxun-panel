@@ -910,7 +910,8 @@
       });
       return;
     }
-    var tsym = frontTypeSymbol(it.type);
+    // D-138: slot umyvacky kresli svoje celo ako sklop (typ skrinky z formulara).
+    var tsym = frontTypeSymbol(it.type, (typeof getType === 'function') ? getType() : null);
     if (!tsym) return;
     var c0 = cols[0];
     pvSymLines(S, rx, ry, tsym, c0.x, c0.w, z, ph);

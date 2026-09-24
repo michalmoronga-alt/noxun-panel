@@ -1483,8 +1483,13 @@
     if (n) row.dataset.frontExtra = JSON.stringify(out);
     else delete row.dataset.frontExtra;
   }
-  function frontTypeIcon(t){ return FRONT_TYPE_ICON[t] || 'front'; }
-  function frontTypeLabel(t){ return FRONT_TYPE_LABEL[t] || 'Čelo'; }
+  // D-138: jedine celo SLOTU UMYVACKY je datovo blenda, ale su to DVERE
+  // UMYVACKY (otvaraju sa nadol) — riadok ich tak aj pomenuje a nakresli
+  // ikonou sklopu. Dlazdice typov slot nema (`frontCardModel` opts.slot),
+  // takze tato vynimka sa tyka len jeho vlastneho riadku.
+  function nxSlotDoor(t){ return t === 'blind' && cabTypeNow() === 'dishwasher'; }
+  function frontTypeIcon(t){ return nxSlotDoor(t) ? 'front-fall' : (FRONT_TYPE_ICON[t] || 'front'); }
+  function frontTypeLabel(t){ return nxSlotDoor(t) ? 'Dvere umývačky' : (FRONT_TYPE_LABEL[t] || 'Čelo'); }
   function frontTypeTile(t){ return FRONT_TYPE_TILE[t] || 'Čelo'; }
   // KOV-A2a: ZÁZNAM SERVERA pre dané čelo (`front_slots[fid]` = `{ wings_n,
   // slots }`). `undefined` = server sa k tomuto čelu ešte nevyjadril (nový
@@ -1875,7 +1880,8 @@
     var item = frontRowItem(row);
     var m = frontCardModel(item, frontSlotsOf(row.dataset.frontId),
                            frontDrawerOf(row.dataset.frontId),
-                           frontLiftOf(row.dataset.frontId));
+                           frontLiftOf(row.dataset.frontId),
+                           { slot: cabTypeNow() === 'dishwasher' });
     // Tab, ktory NEEXISTUJE (blenda, „bez čela" kovanie nemaju), sa ticho
     // vrati na „Čelo" — stav panela nesmie ukazat prazdno.
     var has = m.tabs.some(function(t){ return t.key === openFrontCardTab; });
@@ -1893,15 +1899,18 @@
       h += '</div>';
     }
     if (tab === 'hw') return h + frontCardHwHtml(row, m);
-    h += '<div class="typegrid" role="group" aria-label="Typ čela">';
-    m.tiles.forEach(function(t){
-      h += '<button type="button" class="typetile' + (t.on ? ' on' : '') + '"' +
-           ' data-t="' + esc(t.type) + '" aria-pressed="' + (t.on ? 'true' : 'false') + '"' +
-           ' title="' + esc(frontTypeTileTitle(t.type)) + '" onclick="onFrontTile(this)">' +
-           NXIcons.svg(frontTypeIcon(t.type)) +
-           '<span class="tl">' + esc(frontTypeTile(t.type)) + '</span></button>';
-    });
-    h += '</div>';
+    // D-138: slot umyvacky dlazdice typov NEMA (typ je dany) — bez prazdneho ramu.
+    if (m.tiles.length){
+      h += '<div class="typegrid" role="group" aria-label="Typ čela">';
+      m.tiles.forEach(function(t){
+        h += '<button type="button" class="typetile' + (t.on ? ' on' : '') + '"' +
+             ' data-t="' + esc(t.type) + '" aria-pressed="' + (t.on ? 'true' : 'false') + '"' +
+             ' title="' + esc(frontTypeTileTitle(t.type)) + '" onclick="onFrontTile(this)">' +
+             NXIcons.svg(frontTypeIcon(t.type)) +
+             '<span class="tl">' + esc(frontTypeTile(t.type)) + '</span></button>';
+      });
+      h += '</div>';
+    }
     h += frontCardRowsHtml(m.rows);
     // D-130a R7: UCHYTKA stoji AZ POD nastaveniami typu — je to posledna
     // otazka o cele a jedine miesto, kde sa profil a hrana menia.
@@ -2598,6 +2607,8 @@
                        SLOT_FIELDS: SLOT_FIELDS, validateFields: validateFields,
                        nxFillSlotFields: nxFillSlotFields,
                        applyVisibility: applyVisibility, nxSlotFrontsLock: nxSlotFrontsLock,
-                       SLOT_ONLY_ROWS: SLOT_ONLY_ROWS, SLOT_HIDDEN_ROWS: SLOT_HIDDEN_ROWS };
+                       SLOT_ONLY_ROWS: SLOT_ONLY_ROWS, SLOT_HIDDEN_ROWS: SLOT_HIDDEN_ROWS,
+                       // D-138: nazov a ikona riadku cela (slot = dvere umyvacky).
+                       frontTypeLabel: frontTypeLabel, frontTypeIcon: frontTypeIcon };
   }
 

@@ -170,7 +170,13 @@ module Noxun
       # Symbol NEDVIEROKOVEHO typu. Zrkadlo `frontTypeSymbol`. D-115: zasuvkove
       # celo uz symbol MA — prerusovane X (`xdash`); od plneho X blendy ho lisi
       # prave prerusovanie (pravidlo „prerusovana = pohyb, plna = dielec").
-      def type_symbol(type)
+      # D-138: jedine celo SLOTU UMYVACKY je datovo blenda (`blind` — pravidla
+      # kovania mu nesmu vydat panty ani kovanie sklopu), ale su to DVERE
+      # UMYVACKY a otvaraju sa NADOL — kresli sa preto sklop „Λ", nie plne X.
+      # O slote rozhoduje TYP SKRINKY (`cab_type`), nie celo samo.
+      def type_symbol(type, cab_type = nil)
+        return SYM_DOWN if type.to_s == 'blind' && cab_type.to_s == 'dishwasher'
+
         case type.to_s
         when 'lift' then SYM_UP
         when 'fall' then SYM_DOWN
@@ -228,9 +234,10 @@ module Noxun
 
       # Co sa ma pri JEDNEJ resolved polozke `front_items` nakreslit:
       #   [{ key: part_key, symbol: 'left'|… }]
-      # Prazdne pole = nic (legacy dvierka, „Bez cela").
+      # Prazdne pole = nic (legacy dvierka, „Bez cela"). `cab_type` = typ
+      # skrinky, ktorej celo patri (D-138: slot umyvacky).
       # CISTA funkcia — ziadne IO, ziadny SketchUp.
-      def marks(item)
+      def marks(item, cab_type = nil)
         return [] unless item.is_a?(Hash)
 
         fid = item['id'].to_s
@@ -244,7 +251,7 @@ module Noxun
             syms[i] ? { key: k, symbol: syms[i] } : nil
           end
         else
-          sym = type_symbol(item['type'])
+          sym = type_symbol(item['type'], cab_type)
           key = sym ? type_key(fid, item['type']) : nil
           key ? [{ key: key, symbol: sym }] : []
         end
@@ -429,7 +436,7 @@ module Noxun
         base = inst.transformation
         items.each do |item|
           out['legacy'] += legacy_count(item)
-          mk = marks(item)
+          mk = marks(item, cfg['type'])
           next if mk.empty?
 
           parts ||= parts_by_key(inst)

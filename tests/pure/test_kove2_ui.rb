@@ -764,7 +764,8 @@ end
 NxTest.test('KOV-E2 (7): karta čela kreslí systém VÝHRADNE výklopu') do
   c = NxKovE2
   core = c.js(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'core.js'))
-  body = core[/function frontCardModel\(item, entry, drawer, lift\)\{.*?\n  \}/m].to_s
+  # D-138: piaty parameter `opts` (slot umyvacky) — hladame telo tej istej funkcie.
+  body = core[/function frontCardModel\(item, entry, drawer, lift(?:, opts)?\)\{.*?\n  \}/m].to_s
   NxTest.assert(!body.empty?, 'view-model sa našiel')
   NxTest.assert(body.include?("if (type === 'lift'){\n      rows.push({ kind: 'seg', key: 'lift_system'"),
                 'segment systému je pod podmienkou typu `lift`')

@@ -252,6 +252,16 @@ eq(addRowBox.style.display, '', 'dolna skrinka cela pridavat MOZE');
 eq(fh.readOnly, false, 'a vysku menit tiez');
 eq(fdel.style.display, '', 'aj mazat');
 
+// D-138: jedine celo slotu su DVERE UMYVACKY (datovo blenda, bez kovania) —
+// riadok v Celach ich tak pomenuje a nakresli ikonou SKLOPU.
+setType('dishwasher');
+eq(FM.frontTypeLabel('blind'), 'Dvere umývačky', 'celo slotu sa v riadku nevola „Blenda"');
+eq(FM.frontTypeIcon('blind'), 'front-fall', 'a ma ikonu sklopu (otvara sa nadol)');
+eq(FM.frontTypeLabel('fall'), 'Sklop', 'ine typy sa pri slote nemenia');
+setType('lower');
+eq(FM.frontTypeLabel('blind'), 'Blenda', 'v dolnej skrinke ostava blenda');
+eq(FM.frontTypeIcon('blind'), 'front-blind', 'aj s vlastnou ikonou');
+
 // ============ 7) NAHLAD: celny rez slotu ====================================
 eq(PV.PV_DW_BODY[600], { w: 598, d: 555 }, 'zrkadlo generickeho tela 60 cm');
 eq(PV.PV_DW_BODY[450], { w: 448, d: 550 }, 'a 45 cm');

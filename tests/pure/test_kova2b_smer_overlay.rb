@@ -56,7 +56,7 @@ end
 
 NxTest.test('KOV-A2b: symboly typov sedia s tabulkou fixtur (zrkadlo frontTypeSymbol)') do
   A2B_FIX['types'].each do |row|
-    NxTest.assert_equal(row['expect'], A2B.type_symbol(row['type']), row['case'])
+    NxTest.assert_equal(row['expect'], A2B.type_symbol(row['type'], row['cab_type']), row['case'])
   end
 end
 
@@ -98,6 +98,19 @@ NxTest.test('KOV-A2b: 3 kridla bez ulozeneho stredneho — krajne ANO, stredne N
   got = A2B.marks('id' => 'F1', 'type' => 'door', 'wings_n' => 3)
   NxTest.assert_equal([{ key: 'front:F1/wing:p1', symbol: 'left' },
                        { key: 'front:F1/wing:p3', symbol: 'right' }], got)
+end
+
+NxTest.test('D-138: celo slotu umyvacky ma v modeli symbol SKLOPU (kluc blendy ostava)') do
+  item = { 'id' => 'F1', 'type' => 'blind' }
+  NxTest.assert_equal([{ key: 'front:F1/blind', symbol: 'down' }], A2B.marks(item, 'dishwasher'),
+                      'dvere umyvacky sa otvaraju nadol — „Λ", nie plne X')
+  NxTest.assert_equal([{ key: 'front:F1/blind', symbol: 'cross' }], A2B.marks(item, 'lower'),
+                      'blenda v dolnej skrinke ostava X')
+  NxTest.assert_equal([{ key: 'front:F1/blind', symbol: 'cross' }], A2B.marks(item),
+                      'volanie bez typu skrinky = blenda (spatne kompatibilne)')
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'direction_check.rb'), encoding: 'UTF-8')
+  NxTest.assert(src.include?("marks(item, cfg['type'])"),
+                'sken modelu posiela TYP SKRINKY — bez neho by slot v modeli ostal s X')
 end
 
 NxTest.test('KOV-A2b: vyklop/sklop/blenda/zasuvka maju kanonicke kluce A1') do
