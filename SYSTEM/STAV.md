@@ -5,49 +5,43 @@
 
 ## Stav
 
-**v0.12.20 · 24.9.2026 — M-R VZHĽAD KOMPLET, nad ním osem dávok D-94 až D-135; blok SPOTREBIČE S1 je v maine celý a beží jeho SMOKE s opravami** (S1-E0 = min výška korpusu 80 mm, PR #375 · **S1-A1 = katalóg spotrebičov so seedom 9 overených modelov** · **S1-A2 = sekcia Štúdia Spotrebiče (pohľad Katalóg)** · **S1-E = SLOT UMÝVAČKY, prvý typ skrinky bez korpusu** ·
-**S1-B1 = spotrebič v zákazke: väzba na vlastníka + Kontrola** · **S1-B2 = UI väzby: pohľad V zákazke, riadok Spotrebič v Inspectore, telo slotu z priradeného modelu** ·
-**S1-F = kontrolná geometria chladničky: box niky + Kontrola niky per os a delenia čiel** · **S1-C = OČAKÁVANÝ SPOTREBIČ: šablóna aj riadok Spotrebič povedia „sem patrí rúra" a Kontrola svieti ORANGE, kým sa nepriradí** ·
-(Nákup s pôvodom · výška dreveného boxu · Kresba čiel · dormantný zámok · rozsah zákazky pri „Nahradiť UNI" aj pri hromadných zápisoch · **rework kontextu Čelá — nový zoznam čiel + skupina „Spoločné pre skrinku"**).
+**v0.13.0 · 24.9.2026 — BLOK SPOTREBIČE S1 UZAVRETÝ** (E0 · A1 · A2 · E · B1 · B2 · F · C + smoke opravy A–C, PR #375–#389, uzáver #390): **katalóg spotrebičov**
+s odkazmi, listami a prílohami · **spotrebič v zákazke** s vlastníkom (skrinka · slot umývačky · doska · len zákazka) a riadkom Spotrebič v Inspectore · **slot umývačky**
+(prvý typ skrinky bez korpusu, čelo „Dv myčka" = výška linky − sokel − medzera hore) · **chladnička v skrinke** (box niky, Kontrola niky a delenia čiel, výška osadenia) ·
+**očakávaný spotrebič** zo šablóny. Pod ním blok M-R VZHĽAD (v0.12.0) a dávky D-94 až D-135 (Nákup s pôvodom · výška dreveného boxu · Kresba čiel · dormantný zámok ·
+rozsah zákazky pri hromadných zápisoch · **rework kontextu Čelá**).
 Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **trinástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · **Spotrebiče** · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine. Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
 Etapa **V0.6 (katalógy a ceny) je obsahovo splnená**. **Od 20.8. sa z pluginu objednávajú REÁLNE zákazky** — zákazka KLINIKA (254 dielcov) je postavená čisto z pluginu; nálezy z výroby a chyby v cenách majú **najvyššiu prioritu** ([PLAN.md](PLAN.md)).
 
 **Hotové veľké celky:** INSPECTOR REWORK (UI-A…UI-D) · **fáza ŠTÚDIO** (ŠT-1a…ŠT-4b, PR #192–#228) — **zaniklo šesť okien** · **blok KRESBA** · **blok GHOST VKLADANIE**
-(v0.9.0) · **blok KOVANIE** (v0.9.14 → v0.10.0, 50 PR #277–#340 — plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md)).
+(v0.9.0) · **blok KOVANIE** (v0.9.14 → v0.10.0, 50 PR #277–#340) · **blok M-R VZHĽAD** (v0.12.0) · **blok SPOTREBIČE S1** (v0.13.0) — plné texty v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).
 **Kompatibilita:** skrinka je v **schéme 18**, **doska v schéme 2**, šablóny v STD 6, výrobný plán v schéme 5 — starší plugin ich neprestaví. **Dáta rozpočtu sú
 od S1-B1 v `BUDGET_STD` 2:** marker zapíše **prvá** mutácia rozpočtu akéhokoľvek druhu a starší plugin odvtedy zákazku needituje **a zastaví oba cenové exporty**.
 Pred takou zákazkou aktualizovať **obe PC**.
 
-**Smoke oprava C (najnovšie, #389):** **4545 headless · 129 JS sád · 3081 in-SU PASS / 0 FAIL**. **B2 (#388):** 4520 · 128 · 3049. **B1:** 4509 · 127 · 3039. **A:** 4506 · 127. **S1-C:** 4499 · 127 · 3036. **S1-F:** 4452 · 126 · 2989.
-**S1-B2:** 4411 · 126 · 2963. **S1-B1:** 4369 · 124 · 2935 (3 kolá Codexu). **D-130b:** 4155 · 120 · 2779. **D-134:** 4128 · 118 · 2745. **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md); druhý PC, SU 2024 a render netestované).
+**Testy (posledná kódová dávka, smoke oprava C #389):** **4545 headless · 129 JS sád · 3081 in-SU PASS / 0 FAIL**. **B2 (#388):** 4520 · 128 · 3049. **B1:** 4509 · 127 · 3039.
+**S1-C:** 4499 · 127 · 3036. **S1-F:** 4452 · 126 · 2989. **S1-B1:** 4369 · 124 · 2935. **D-130b:** 4155 · 120 · 2779. **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 **Michal 11.9. potvrdil** test produktových odkazov aj potvrdzovania cien (CENY-KOV-A/B, #345/#346) **a** kontrolu balíka Čiel v0.11.0.
 
 ## Robí sa
 
-**SMOKE BLOKU S1 BEŽÍ (Michal od 21.9.2026)** — nálezy sa opravujú po celkoch pred uzáverom v0.13.0 ([DOGFOODING.md](DOGFOODING.md), skupina SPOTREBIČE S1):
-**A ✅ #386 (v0.12.17)** drez a doska bez Tela a Niky (D-136) + polia slotu už nesvietia pri každej skrinke (D-137) · **B1 ✅ #387 (v0.12.18)** čelo slotu = „Dv myčka",
-symbol sklopu (D-138) · **B2 ✅ #388 (v0.12.19)** výška čela z linky, soklu a medzery hore, predvoľby 880/100 (D-139) · **C ✅ #389 (v0.12.20)** výška osadenia
-chladničky — čip „osadenie N mm“ v riadku Spotrebič posunie box niky, pásma dverí aj Kontrolu výšky a delenia čiel (D-140, `CONFIG_SCHEMA` 18). V zásobníku D-141, D-142.
+**Michalov smoke bloku S1 pokračuje** (od 21.9.2026; checklist po aktualizácii v [archiv/S1_ZAVER_2026-09-24.md](archiv/S1_ZAVER_2026-09-24.md)) — nálezy **D-136 až D-140**
+sú opravené (#386–#389), **D-141** a **D-142** čakajú v zásobníku; nové nálezy sa zapíšu do [DOGFOODING.md](DOGFOODING.md) (skupina SPOTREBIČE S1) a opravia ako v0.13.x.
 **Tiež čakajú na smoke: D-134** (#369), **D-133** (#368), **D-132** (#367), **D-131** (#365) a **D-128** (#364). **D-94** (#361) aj **M-R** (#353–#359) sú hotové a Michal
 12.9. potvrdil oba smoke **PASS**; D-28 vyriešené, Čelá A/B1/B2/C používateľsky potvrdené. **Blok 1d** podľa kapacity — hotové po R-14, ďalej R-18; **R-13 čaká na Michala**.
 
 ## Ďalší krok
 
-**Blok SPOTREBIČE S1 beží** (Michal schválil 20.9.2026, nočný autonómny beh): **mockup schválený** (`zdroje/ui20/mockup_spotrebice_s1.html`), packages v [PLAN.md](PLAN.md) blok 5.
-Poradie: **E0** (✅ #375) → **A1 katalóg** (✅ v0.12.10) → **A2 sekcia** (✅ v0.12.11) → **E slot umývačky** (✅ v0.12.12) → **B1 väzba + Kontrola** (✅ v0.12.13) →
-**B2 UI väzby** (✅ v0.12.14) → **F telo chladničky + kontrola niky a delenia dverí** (✅ v0.12.15) → **C očakávaný spotrebič** (✅ v0.12.16) → **smoke opravy A–C** (✅ v0.12.17–v0.12.20) → **D uzáver** (v0.13.0). Po S1: **K1–K3**, **ceny materiálov/ABS**.
+**Ďalší blok vyberá Michal** ([PLAN.md](PLAN.md); cieľ V1 v [V1_VIZIA.md](V1_VIZIA.md) — odškrtnuté sú už Materiály a Spotrebiče). Plán pred S1 počítal po ňom
+s blokom **K1–K3** (konštrukcia: odsadenia, chrbát z výstuh, rohová skrinka) a **cenami materiálov/ABS** (zvyšok V1-03). Nálezy z výroby a cien majú prednosť.
 
 ## Posledné uzávery
 
-- **S1-B2 · Spotrebič v zákazke — UI väzby** (→ **v0.12.14**, 20.9.2026, PR #383). Sekcia Spotrebiče má druhý pohľad **„V zákazke"** (tabuľka zákazky so stavmi
-  z Kontroly, riadky „nevybraný" a „vlastník zmizol", badge navigácie, medzisúčet ako preklik), Inspector má pri skrinke, slote aj doske **riadok „Spotrebič"**
-  (ponuka filtrovaná podľa niky, filter nie je brána) a **telo slotu sa kreslí z priradeného modelu**; zápisy idú jediným vstupom väzby = **jeden krok Späť**.
-- **S1-B1 · Spotrebič v zákazke — dáta, väzba, Kontrola** (→ **v0.12.13**, #382). Položka nesie **model z katalógu** (`snapshot`) a **vlastníka**; väzba je
-  **obojsmerná** a zapisuje sa **v jednej operácii** (`core/appliance_binding.rb` — jeden Ctrl+Z vráti obe strany). Prepínač „dodáva zákazník", kanonické kódy
-  kategórií, tri ORANGE nálezy. Plné znenie v [archiv/KRONIKA.md](archiv/KRONIKA.md).
-- **S1-E · Slot umývačky — prvý typ skrinky bez korpusu** (→ **v0.12.12**, #381): jediný dielec = čelo, telo ako **referencia**; prisúvanie meria **logickú obálku**.
+- **BLOK SPOTREBIČE S1 UZAVRETÝ** (v0.12.9 → **v0.13.0**, 20.–24.9.2026, PR #375–#389 + uzáver #390). Katalóg spotrebičov, spotrebič v zákazke s obojsmernou väzbou
+  (jeden krok Späť), slot umývačky, telo chladničky s Kontrolou niky a delenia čiel, očakávaný spotrebič; smoke opravy D-136 až D-140 (výška osadenia chladničky = schéma 18).
+  [Plný blok](archiv/ROADMAP_hotove_etapy.md) · [výsledok, dávky a checklist](archiv/S1_ZAVER_2026-09-24.md) · priebeh v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 - **REWORK KONTEXTU ČELÁ** — **D-130b** skupina „Spoločné pre skrinku" (materiál čiel + schéma medzier, zámok a reset ako ikony v hlavičke; v0.12.7 → **v0.12.8**, #372)
   a **D-130a** nový zoznam čiel + karta s tabmi + úchytka na jednom mieste (v0.12.6 → **v0.12.7**, #371). **D-129 aj D-130 vyriešené** — [archiv/KRONIKA.md](archiv/KRONIKA.md).
 - **D-134** jednotný rozsah hromadných zápisov zákazky — spoločný `Panel.job_cabinets`, skrinka s odpojeným dielcom sa **preskočí a vymenuje** (→ **v0.12.6**, #369) ·

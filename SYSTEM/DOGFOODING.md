@@ -45,12 +45,12 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
 ## INFRA
 
   *Stav: na návrhovú dávku — od 26.8. SAMOSTATNE (bez väzby na D-48, ktorý je mimo V1); distribučný kanál jednoducho, napr. zdieľaný priečinok.*
-## SPOTREBIČE S1 — smoke 21.9.2026 (opravy pred uzáverom D)
+## SPOTREBIČE S1 — smoke po uzávere bloku (v0.13.0, opravy v0.13.x)
 
-*(Michalov smoke celého bloku S1 na v0.12.16. Vyriešené: **D-136** a **D-137** (oprava A, #386), **D-138** (B1 #387 + B2 #388), **D-139** (B2 #388)
-a **D-140** (C #389) — plné texty v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md). Kontrola „čelo presahuje max výšku čela modelu z listu"
-sa pri D-139 **nezaviedla** — kontroly slotu ostávajú dve (rozhodnutie 20.9.); keď si ju prax vypýta, bude to nový postreh. Otvorené postrehy zo smoke sú
-v zásobníku nižšie (D-141, D-142); ďalšie nálezy smoke pribudnú sem.)*
+*(Blok S1 je uzavretý vo v0.13.0 (24.9.2026). Michalov smoke z 21.–24.9. priniesol **D-136** až **D-140** — všetky opravené (#386–#389), plné texty
+v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md); **D-141** a **D-142** sú v zásobníku nižšie. Kontrola „čelo presahuje max výšku čela modelu
+z listu" sa pri D-139 **nezaviedla** — kontroly slotu ostávajú dve (rozhodnutie 20.9.); keď si ju prax vypýta, bude to nový postreh. Michalov smoke pokračuje
+podľa checklistu v [archiv/S1_ZAVER_2026-09-24.md](archiv/S1_ZAVER_2026-09-24.md) — nové nálezy sa zapíšu sem a opravia ako v0.13.x.)*
 
 ## Po V1 — zásobník
 

@@ -2,7 +2,9 @@
 
 Parametrický nábytkársky systém pre SketchUp (Ruby plugin). Korpusy generuje kód z konfigurácie — žiadne Dynamic Components: zóny s priečkami, čelá s lockmi (fixed/auto), šablóny, scale → automatická prestavba na mm, 2D náhľad v paneli, materiály s dekorovými skupinami, kovanie so setmi a výrobné aj obchodné výstupy (kusovník, VEPO CSV, nákupné zoznamy, rozpočet, cenová ponuka).
 
-**Stav: v0.12.0 — BLOK M-R VZHĽAD KOMPLET.** Dosky aj ABS rovnakého dekoru a povrchu majú jeden spoločný vzhľad naprieč hrúbkami; zástena má jeden vzhľad. Textúra je voliteľná, obyčajné farby zostávajú. Vzhľad sa zachová pri prestavbe a produktovej kópii; textúra rešpektuje fyzickú mierku a smer dekoru aj ABS.
+**Stav: v0.13.0 — BLOK SPOTREBIČE S1 KOMPLET.** Štúdio má **katalóg spotrebičov** s odkazmi, technickými listami a prílohami; spotrebič patrí zákazke a skrinke, **slotu umývačky** alebo doske a jeho cena žije len v Rozpočte (aj „dodáva zákazník“). **Slot umývačky** je nový typ skrinky bez korpusu — jediný dielec je čelo „Dv myčka“, jeho výška sa dopočíta z výšky linky, soklu a medzery hore. **Chladnička v skrinke** má kontrolný box niky s pásmami dverí, Kontrolu niky a odporúčané delenie čiel aj s výškou osadenia (polica pod chladničkou) a šablóna vie povedať „sem patrí rúra“. Semafor varuje, nikdy neblokuje; telo spotrebiča nie je v kusovníku ani VEPO. [Výsledok a checklist po aktualizácii](SYSTEM/archiv/S1_ZAVER_2026-09-24.md).
+
+Predtým: **v0.12.0 — BLOK M-R VZHĽAD KOMPLET.** Dosky aj ABS rovnakého dekoru a povrchu majú jeden spoločný vzhľad naprieč hrúbkami; zástena má jeden vzhľad. Textúra je voliteľná, obyčajné farby zostávajú. Vzhľad sa zachová pri prestavbe a produktovej kópii; textúra rešpektuje fyzickú mierku a smer dekoru aj ABS.
 
 V **Štúdiu → Materiály → detail dekoru → Vzhľad pri povrchu** priraď obrázok, otvor **Upraviť v SketchUpe** a v natívnom paneli uprav mierku či vlastnosti povrchu. **Uložiť vzhľad do knižnice** ho uloží pre ďalšie dielce. Farba sa ukladá hneď, **Použiť katalógovú farbu** odstráni vlastný vzhľad. **Späť vracia modelovú zmenu; uložená knižnica ostáva.** [Overenie a krátky smoke](SYSTEM/archiv/MR_ZAVER_2026-09-12.md).
 

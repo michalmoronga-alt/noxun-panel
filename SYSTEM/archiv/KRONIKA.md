@@ -17,6 +17,16 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **BLOK SPOTREBIČE S1 UZAVRETÝ (24.9.2026, v0.12.20 → v0.13.0, PR #375–#389 + uzáver #390).** Blok schválený 20.9. (debata polí, cross audit ×3, mockup
+  `zdroje/ui20/mockup_spotrebice_s1.html`) bežal ako nočný autonómny beh 20.–21.9.: **E0** min výška korpusu 80 mm (#375) · **A1** katalóg spotrebičov so seedom
+  9 overených modelov (#377) · **A2** sekcia Štúdia Spotrebiče (#378) · **E** slot umývačky (#381) · **B1** spotrebič v zákazke — väzba a Kontrola (#382) · **B2** UI väzby
+  (#383) · **F** telo chladničky — box niky, Kontrola niky a delenia čiel (#384) · **C** očakávaný spotrebič (#385); podporné #373 (listy), #376 (docs), #379/#380 (runner).
+  Michalov smoke od 21.9. priniesol **D-136 až D-142**; opravy **A** #386 (karta podľa kategórie, polia slotu na každej skrinke), **B1** #387 („Dv myčka" so symbolom
+  sklopu), **B2** #388 (čelo slotu z linky, soklu a medzery hore, 880/100), **C** #389 (výška osadenia chladničky); **D-141 a D-142 idú do zásobníka**. Uzáver #390 mení
+  len dokumentáciu a verziu: blok plným textom do [ROADMAP_hotove_etapy.md](ROADMAP_hotove_etapy.md), výsledok, dávky a checklist po aktualizácii v
+  [S1_ZAVER_2026-09-24.md](S1_ZAVER_2026-09-24.md), V1_VIZIA bod 5 odškrtnutý, README, POJMY (výška osadenia), DOGFOODING (skupina smoke po uzávere), STAV.
+  Pri poslednej dávke **4545 headless · 129 JS sád · 3081 in-SU PASS / 0 FAIL**. Kompatibilita: skrinka schéma 18, šablóny STD 6, rozpočet BUDGET_STD 2 —
+  aktualizovať obe PC. Michalov smoke pokračuje; nové nálezy pôjdu ako opravy v0.13.x.
 - **SMOKE S1 · OPRAVA C — výška osadenia chladničky v skrinke (v0.12.20, 24.9.2026, PR #389, CONFIG_SCHEMA 18).** D-140 (Michal 23.9.: „ak dávam pod ňu policu,
   chladnička ostáva prilepená na dno … rovno prepočítava umiestnenie dverí"; 24.9. schválené „osadenie od dna" v riadku Spotrebič). Záznam väzby chladničky
   v skrinke nesie **`mount_offset`** (mm od hornej plochy dna po spodok niky; chýbajúci = 0, nula sa neukladá) s **jediným čitačom**
