@@ -265,8 +265,28 @@ function reset(){ R.aprMountClose(); SENT.length = 0; DOC = 'doc-A'; ELS.aprMoun
   SENT.length = 0;
   fire('click', { target: chip('I-1', 150) });
   ELS.aprMountVal.value = '90';
-  fire('keydown', { key: 'Escape', target: ELS.aprMountVal, preventDefault: noop });
+  let stopped = 0;
+  fire('keydown', { key: 'Escape', target: ELS.aprMountVal, preventDefault: noop,
+                    stopImmediatePropagation: function(){ stopped++; } });
   eq([R.aprMountState(), SENT.length], [null, 0], 'Escape zruší bez zápisu');
+  eq(stopped, 1, 'Escape sa spotrebuje (popover je najvyššia vrstva)');
+
+  // Codex #389 P2: Escape aj z TLAČIDLA v popoveri (Tab z poľa na Použiť/Zrušiť/Pomoc).
+  const tabbed = stubEl('tabbed-ok');
+  tabbed._attrs = { 'data-apr': 'mount-ok' };
+  fire('click', { target: chip('I-1', 150) });
+  ELS.aprMountVal.value = '90';
+  fire('keydown', { key: 'Escape', target: tabbed, preventDefault: noop });
+  eq([R.aprMountState(), SENT.length], [null, 0], 'Escape z tlačidla v popoveri zruší bez zápisu');
+  fire('click', { target: chip('I-1', 150) });
+  fire('keydown', { key: 'Enter', target: tabbed, preventDefault: noop });
+  ok(R.aprMountState() !== null && SENT.length === 0,
+     'Enter na tlačidle nerieši keydown (vybaví ho klik tlačidla), pole nie je odoslané');
+  R.aprMountClose();
+  stopped = 0;
+  fire('keydown', { key: 'Escape', target: tabbed, preventDefault: noop,
+                    stopImmediatePropagation: function(){ stopped++; } });
+  eq(stopped, 0, 'zatvorený popover Escape nespotrebúva (patrí iným vrstvám)');
 
   fire('click', { target: chip('I-1', 150) });
   const inside = stubEl('inside');

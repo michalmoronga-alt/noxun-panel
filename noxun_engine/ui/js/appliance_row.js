@@ -338,12 +338,21 @@
       if (t && t.closest && (t.closest('#aprMountPop') || t.closest('[data-apr="mount"]'))) return;
       aprMountClose();
     }, true);
+    // Escape zatvara z KAZDEHO prvku (Tab na Pomoc/Použiť/Zrušiť — Codex #389
+    // P2) a udalost sa spotrebuje: otvoreny popover je najvyssia vrstva
+    // Inspectora (modaly obsluzi `nx_esc.js`, ktory je nacitany PRED nami).
+    // Enter ostava viazany na pole — na tlacidle ho vybavi jeho vlastny klik.
     document.addEventListener('keydown', function(ev){
       if (!APR_MOUNT) return;
+      if (ev.key === 'Escape'){
+        ev.preventDefault();
+        if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
+        aprMountClose();
+        return;
+      }
       var t = ev.target;
       if (!t || t.id !== 'aprMountVal') return;
       if (ev.key === 'Enter'){ ev.preventDefault(); aprMountApply(); }
-      else if (ev.key === 'Escape'){ ev.preventDefault(); aprMountClose(); }
     });
 
     // Zápis až na `change` (nie `input`): každé prebehnutie klávesnicou cez
