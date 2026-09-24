@@ -53,22 +53,29 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
 - **D-138 · Čelo umývačky kresliť ako sklop, nie ako blendu** (Michal 21.9.2026, smoke S1 bod 2) — čelo slotu je dátovo blenda (`blind`, rola `false_front`), aby
   mu pravidlá kovania nevydali pánty ani kovanie sklopu; v Smere otvárania v modeli aj v náhľade Inspectora preto nesie **plné X blendy**. Dvere umývačky sa
   otvárajú nadol — symbol má byť **sklop „Λ"**. Návrh (agent 21.9., Michal nenamietal): typ ostáva `blind` (žiadne kovanie), mení sa len **symbol** pri slote.
-  Otvorená otázka pri implementácii: či aj názov dielca v kusovníku/VEPO („Blenda 1") nahradiť „Čelo umývačky". *Stav: smoke oprava B.*
+  Michal 24.9.: dielec sa v kusovníku/VEPO volá **„dv myčka"** (zapísané v štýle skratiek VEPO ako „Dv myčka"). *Stav: **B1 ✅ #387 (v0.12.18)** — symbol sklopu
+  v modeli aj náhľade, názov „Dv myčka", zoznam čiel „Dvere umývačky" bez dlaždíc typov; **zostáva** text „F1 · blenda" v Kovaní, Nákupe a Kontrole → B2
+  (skladá sa z uloženej projekcie čiel, preto ide s auditom).*
 - **D-139 · Výška čela umývačky sa dopočíta: linka − sokel − medzera hore** (Michal 21.9.2026, smoke S1 bod 2) — vstup „Čelo V" preč (ostane len ako zobrazený
   údaj); čelo siaha od soklu po hornú hranu linky mínus **medzeru hore**, ktorá sa nastavuje **podľa logiky medzier** (schéma medzier skrinky, ako pri
   ostatných čelách). Mení sa tým schválené R13/R14 mockupu („výplň hore = zvyšok po líniu, ručne"): výplň nad umývačkou sa po novom robí tak, že slot dostane
   výšku po spodok výplne a výplň je samostatný nízky korpus. Stratí sa ručná výška čela nižšia než linka — kontrola „čelo presahuje max výšku čela modelu"
-  (list ju pozná) sa zváži spolu. *Stav: smoke oprava B — mení význam uloženého `dw_front_height`, preto `codex-audit` pred implementáciou.*
+  (list ju pozná) sa zváži spolu. **Michal 24.9.:** žiadna reálna zákazka so slotom ešte nie je (prechod nemusí zachovávať ručné čelá) a **predvoľby slotu =
+  výška linky 880, sokel 100** (čelo 778 pri medzere 2). *Stav: smoke oprava B2 — mení význam uloženého `dw_front_height`, preto `codex-audit` pred implementáciou.*
 - **D-140 · Výška osadenia chladničky v skrinke** (Michal 23.9.2026, smoke S1 bod 4) — box niky chladničky stojí vždy na dne skrinky; keď je chladnička
   osadená vyššie (polica pod ňou, zásuvky pod ňou), box aj pásma dverí ostanú „prilepené na dne". Želanie: **textové pole s výškou osadenia**, ktoré posunie
-  box niky a **rovno prepočíta umiestnenie dverí** (pásma dverí spotrebiča a pásmo prípustnej hrany medzi čelami). *Stav: smoke oprava C — nové pole väzby
-  spotrebiča, preto `codex-audit` pred implementáciou.*
+  box niky a **rovno prepočíta umiestnenie dverí** (pásma dverí spotrebiča a pásmo prípustnej hrany medzi čelami). **Michal 24.9. schválil** pole „osadenie od dna"
+  v riadku Spotrebič (meria sa od hornej plochy dna po spodok niky, predvolene 0). *Stav: smoke oprava C — nové pole väzby spotrebiča, preto `codex-audit`
+  pred implementáciou.*
 
 ## Po V1 — zásobník
 
 - **D-141 · Typ „Umývačka" vo vkladacej karte neskôr ako „Spotrebič"** (Michal 21.9.2026, smoke S1) — samostatné tlačidlo typu pre jeden spotrebič je
   nesystémové; keď pribudne ďalší fyzický spotrebič ako samostatný objekt (voľne stojaca chladnička, sporák…), tlačidlo sa premenuje na **„Spotrebič"**
   a konkrétny druh sa vyberie pod ním. *Stav: zásobník — kým je slot umývačky jediný objekt bez korpusu, ostáva „Umývačka".*
+- **D-142 · Delenie dverí chladničky aj pri skrinke so zásuvkami pod ňou** (Michal 24.9.2026, smoke S1) — kontrola delenia čiel (S1-F) sa počíta len pri
+  skrinke s **práve dvoma** dvierkami nad sebou; vysoká skrinka so zásuvkami pod chladničkou (viac čiel) dostane „delenie sa netýka". Po výške osadenia
+  (D-140) by sa dala vybrať dvojica dvierok nad osadením. *Stav: zásobník — Michal: „neskôr".*
 - **D-126 · Otočenie obrázka textúry pred uložením** (Michal 12.9.2026, smoke M-R PASS) — pri vkladaní obrázka nie je samozrejmé, že kresba drevodekoru má byť vodorovná; plugin smer obrázka automaticky nerozpoznáva.
   Uzáver M-R pridáva pomocný text. Neskôr zvážiť otočenie obrázka o **±90° priamo v plugine pred uložením**. *Stav: odložené, bez termínu; neblokuje prijatý blok M-R.*
 - **D-127 · Prirodzenejšie umiestnenie textúry na dielcoch** (Michal 12.9.2026, smoke M-R PASS) — orientácia textúry je správna, ale opakovanie vždy od rovnakého bodu pôsobí neprirodzene.

@@ -791,7 +791,8 @@ sadu). Slot **nemá**: riadok Sokel korpusu (`#fhRow` — jeho sokel je spodná 
 ani riadok Nohy (podpora `none`). **Limity poľa sú per TYP** (`TYPE_LIMITS` v `form.js`): šírka 300–1200 a výška linky 500–1200 — zrkadlo
 `CabinetBuilder::DW_WIDTH_RANGE`/`DW_HEIGHT_RANGE`; krížová kontrola výšky proti soklu a hrúbkam (S1-E0) sa slotu **netýka**, lebo nemá vnútro.
 
-**Karta Čelá pri slote** schová „Pridať čelo", krížik aj chip AUTO a výšku dá **na čítanie** (`nxSlotFrontsLock`) — vynucuje to však **server**
+**Karta Čelá pri slote** schová „Pridať čelo", krížik aj chip AUTO a výšku dá **na čítanie** (`nxSlotFrontsLock`); riadok menuje čelo „Dvere umývačky" s ikonou
+sklopu (`frontTypeLabel`/`frontTypeIcon`) a karta čela nemá dlaždice typov (`frontCardModel(…, { slot: true })`, D-138) — vynucuje to však **server**
 (`Panel.slot_fronts_refusal`: payload s iným počtom, typom, režimom alebo cudzou výškou sa odmietne a config sa nedotkne). **Preflight čiel** dostáva
 `type` + `dw_front_bottom` + `dw_front_height` a počíta s **virtuálnym otvorom** (`Construction.front_opening`), takže čelo presahujúce výšku linky prijme;
 rozsahy preflightu sú per typ.

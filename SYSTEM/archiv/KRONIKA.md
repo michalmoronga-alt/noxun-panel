@@ -17,6 +17,13 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **SMOKE S1 · OPRAVA B1 — čelo slotu umývačky je „Dv myčka" so symbolom sklopu (v0.12.18, 24.9.2026, PR #387).** Michal 21.9.: dvere umývačky sa kreslili ako
+  blenda (plné X). Čelo slotu ostáva **dátovo blendou** (`blind`, rola `false_front`) — inak by mu pravidlá kovania vydali pánty alebo kovanie sklopu — ale všade,
+  kde ho človek vidí, sú to **dvere umývačky**: symbol **sklopu „Λ"** v Smere otvárania aj v náhľade Inspectora (o symbole po novom rozhoduje aj **typ skrinky** —
+  `type_symbol(type, cab_type)` / `frontTypeSymbol(type, cabType)`, spoločná fixtúra dostala stĺpec `cab_type`), v kusovníku a VEPO názov **„Dv myčka"** (Michal:
+  „dv myčka"; zapísané v štýle skratiek VEPO, diakritika ostáva, identitu dielca nesie prípona `BLIND-1`, takže sa nemení definícia ani ID) a v zozname čiel
+  „Dvere umývačky" s ikonou sklopu, karta bez dlaždíc typov (typ je daný). **Vedome ponechané na B2:** texty „F1 · blenda" v Kovaní, Nákupe a Kontrole — skladajú
+  sa z uloženej projekcie čiel (`front_items`) a ich zmena ide s auditom spolu s dopočítanou výškou čela. Testy 4509 headless · 127 JS sád; in-SU pred mergom.
 - **SMOKE S1 · OPRAVA A — drez a doska bez Tela a Niky + skryté polia slotu (v0.12.17, 23.9.2026, PR #386).** Prvé dve chyby z Michalovho smoke celého bloku
   S1 (21.9.). **D-136:** karta aj formulár spotrebiča kreslia **len bloky, ktoré kategória má** — varná doska a drez stratili Telo a Niku (schválený mockup ich
   nemal, dávka A2 ich pridala omylom), rúra, mikrovlnka a digestor prázdny rám Montáže. Dáta katalógu sa nemenia: štyri bloky ostávajú a hodnoty tela, ktoré

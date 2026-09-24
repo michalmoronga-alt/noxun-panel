@@ -447,7 +447,8 @@ pravidlá kovania vydali 4/6 nôh, príchyty sokla a proxy nôh — slot má v K
 **Jedno pevné čelo je SERVEROVÝ invariant** (FIX E9): `normalize` pre slot vždy vyrobí `fronts.items = [F1 · type blind · mode fixed · height = dw_front_height · wings 1]`
 (z prichádzajúceho F1 preberá len profil a jeho hranu) a nastaví `gap`/`gap_top`/`gap_bottom` na 0. **Autorita výšky čela je `dw_front_height`**; zápisová cesta panela
 (`Panel.slot_fronts_refusal`) payload s iným počtom, typom, režimom alebo cudzou výškou **odmietne** a config sa nedotkne. Kľúč čela je **`front:F1/blind`** (kľúč blendy,
-FIX E10), nie `wing:single`.
+FIX E10), nie `wing:single`. **D-138:** `appliance_slot_plan` dielec čela premenuje na `DW_FRONT_NAME` = **„Dv myčka"** (kusovník, VEPO); identitu dielca to nemení —
+definíciu aj ID nesie prípona `BLIND-1`, kľúč ostáva `front:F1/blind`. Modul čiel pomenúva blendy ostatných skriniek po starom („Blenda N").
 
 **Telo = referencia, nie dielec** (BLOCKER E2). Plán ju nesie v aditívnom `plan[:references]` (kontrakt v `model-a-identita.md`, `build_plan.rb`) a kreslí ju
 `render_references` — vzor `render_hardware`, ale s **iným kontraktom**: noha je servisná geometria k položke kovania (`kind: 'hardware'`, `production_class: 'none'`),
@@ -989,6 +990,9 @@ a každá svoju kresbu. Trojstav A1 platí bez výnimky (**R-39: žiadny default
 nekreslí sa NIČ**. Krajné krídla 2/3/4-krídlových dvierok sú **ODVODENÉ** (A1 variant a: p1 pánty vľavo, posledné vpravo). Výber symbolu (`dir_symbol`/`type_symbol`/`wing_symbols`) je **zrkadlo**
 `frontDirSymbol`/`frontTypeSymbol`/`frontWingSymbols` z `ui/js/core.js` — čo vidno v náhľade karty, to je aj v modeli (stráži test nad spoločnými fixtúrami). **D-115: zásuvkové čelo už symbol MÁ**
 (`xdash`, kanonický kľúč `front:F#/panel` z `Fronts.panels_for`) — do „krídel" sa však NERÁTA (`WING_SYMBOLS`), takže počty v raile aj v lište Kontroly ostávajú o dvierkach.
+**D-138: o symbole rozhoduje aj TYP SKRINKY.** Jediné čelo slotu umývačky je dátovo blenda (`blind` — bez kovania), ale sú to dvere umývačky a otvárajú sa nadol:
+`type_symbol(type, cab_type)` / `frontTypeSymbol(type, cabType)` vrátia pri `blind` v skrinke typu `dishwasher` **sklop** (`down`), inak plné X. `scan_cabinet` posiela
+`cfg['type']`, náhľad `getType()`; spoločná fixtúra `kova2b_symbols.json` nesie aj stĺpec `cab_type`.
 
 **Geometria:** symbol leží na ploche **MIN osi hrúbky** (tá, na ktorú sa pozerá používateľ) posunutej o `OUT_MM = 0,7` von — viac než `EdgeCheck::OUT_MM` (0,5), aby ho neprekryla plôška olepu, a
 menej než `HoverEdge::OUT_MM` (0,9), takže hover hrany ostáva navrchu. Osi určuje zdieľané `PartFaces.axes_for_snapshot` (čelo = `AXES_FRONT`); neoveriteľné osi = **nekreslí sa nič** (D-88). **TVAR má JEDINÝ zdroj** (D-115):

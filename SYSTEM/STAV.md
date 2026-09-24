@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.12.17 · 23.9.2026 — M-R VZHĽAD KOMPLET, nad ním osem dávok D-94 až D-135; blok SPOTREBIČE S1 je v maine celý a beží jeho SMOKE s opravami** (S1-E0 = min výška korpusu 80 mm, PR #375 · **S1-A1 = katalóg spotrebičov so seedom 9 overených modelov** · **S1-A2 = sekcia Štúdia Spotrebiče (pohľad Katalóg)** · **S1-E = SLOT UMÝVAČKY, prvý typ skrinky bez korpusu** ·
+**v0.12.18 · 24.9.2026 — M-R VZHĽAD KOMPLET, nad ním osem dávok D-94 až D-135; blok SPOTREBIČE S1 je v maine celý a beží jeho SMOKE s opravami** (S1-E0 = min výška korpusu 80 mm, PR #375 · **S1-A1 = katalóg spotrebičov so seedom 9 overených modelov** · **S1-A2 = sekcia Štúdia Spotrebiče (pohľad Katalóg)** · **S1-E = SLOT UMÝVAČKY, prvý typ skrinky bez korpusu** ·
 **S1-B1 = spotrebič v zákazke: väzba na vlastníka + Kontrola** · **S1-B2 = UI väzby: pohľad V zákazke, riadok Spotrebič v Inspectore, telo slotu z priradeného modelu** ·
 **S1-F = kontrolná geometria chladničky: box niky + Kontrola niky per os a delenia čiel** · **S1-C = OČAKÁVANÝ SPOTREBIČ: šablóna aj riadok Spotrebič povedia „sem patrí rúra" a Kontrola svieti ORANGE, kým sa nepriradí** ·
 (Nákup s pôvodom · výška dreveného boxu · Kresba čiel · dormantný zámok · rozsah zákazky pri „Nahradiť UNI" aj pri hromadných zápisoch · **rework kontextu Čelá — nový zoznam čiel + skupina „Spoločné pre skrinku"**).
@@ -20,7 +20,7 @@ Etapa **V0.6 (katalógy a ceny) je obsahovo splnená**. **Od 20.8. sa z pluginu 
 od S1-B1 v `BUDGET_STD` 2:** marker zapíše **prvá** mutácia rozpočtu akéhokoľvek druhu a starší plugin odvtedy zákazku needituje **a zastaví oba cenové exporty**.
 Pred takou zákazkou aktualizovať **obe PC**.
 
-**Smoke oprava A (najnovšie, #386):** **4506 headless · 127 JS sád** (nový guard `test_hidden_css_guard.rb`; in-SU sa nespúšťal — bez zmeny buildera). **S1-C:** 4499 · 127 · **3036 in-SU PASS / 0 FAIL**.
+**Smoke oprava B1 (najnovšie, #387):** **4509 headless · 127 JS sád**. **A (#386):** 4506 · 127 (guard `test_hidden_css_guard.rb`). **S1-C:** 4499 · 127 · **3036 in-SU PASS / 0 FAIL**.
 **S1-F:** 4452 · 126 · 2989. **S1-B2:** 4411 · 126 · 2963. **S1-B1:** 4369 · 124 · 2935 (3 kolá Codexu). **D-130b:** 4155 · 120 · 2779. **D-130a:** 4141 · 119 · 2765. **D-134:** 4128 · 118 · 2745. **D-133:** 4111 · 118 · 2717.
 **D-132:** 4095 · 118 · 2705. **D-131:** 4080 · 117 · 2693. **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md); fyzický druhý PC, SU 2024 a render netestované).
 **Michal 11.9. potvrdil** test produktových odkazov aj potvrdzovania cien (CENY-KOV-A/B, #345/#346) **a** kontrolu balíka Čiel v0.11.0.
@@ -28,8 +28,8 @@ Pred takou zákazkou aktualizovať **obe PC**.
 ## Robí sa
 
 **SMOKE BLOKU S1 BEŽÍ (Michal od 21.9.2026)** — nálezy sa opravujú po celkoch pred uzáverom v0.13.0 ([DOGFOODING.md](DOGFOODING.md), skupina SPOTREBIČE S1):
-**A ✅ #386 (v0.12.17)** drez a doska bez Tela a Niky (D-136) + polia slotu umývačky už nesvietia pri každej skrinke (D-137) · **B** čelo umývačky: symbol sklopu (D-138)
-a výška čela dopočítaná z linky, soklu a medzery hore (D-139) · **C** výška osadenia chladničky v skrinke (D-140). Rework Čiel D-130a/b (#371/#372) Michal potvrdil 19.9.
+**A ✅ #386 (v0.12.17)** drez a doska bez Tela a Niky (D-136) + polia slotu už nesvietia pri každej skrinke (D-137) · **B1 ✅ #387 (v0.12.18)** čelo slotu = „Dv myčka",
+symbol sklopu (D-138) · **B2** výška čela z linky, soklu a medzery hore, predvoľby 880/100 (D-139) · **C** výška osadenia chladničky (D-140). Rework Čiel Michal potvrdil 19.9.
 **Tiež čakajú na smoke: D-134** (#369), **D-133** (#368), **D-132** (#367), **D-131** (#365) a **D-128** (#364). **D-94** (#361) aj **M-R** (#353–#359) sú hotové a Michal
 12.9. potvrdil oba smoke **PASS**; D-28 vyriešené, Čelá A/B1/B2/C používateľsky potvrdené. **Blok 1d** podľa kapacity — hotové po R-14, ďalej R-18; **R-13 čaká na Michala**.
 
