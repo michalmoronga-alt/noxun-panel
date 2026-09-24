@@ -17,6 +17,14 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **PROCES — slepá predrecenzia pred PR + spresnené pravidlo 3 kôl (25.9.2026, PR #391, docs; verzia pluginu sa nemení).** Z retrospektívy bloku S1 (Michal
+  24.–25.9.): **(1) nový skill `predrecenzia`** — dávka audit-povinná alebo výrobná/cenová prejde pred `gh pr create` nezávislým Opus subagentom bez kontextu
+  orchestrátora (len zadanie + `git diff main...HEAD`), jeho P1/P2 sa opravia pred PR a výsledok ide do PR popisu; pri iných kódových dávkach odporúčaná. Dôvody:
+  PR #389 (D-140) potreboval 3 plné GH kolá na 6 drobností, ktoré by jedna recenzia chytila naraz, a subagent šetrí kontext orchestrátora pri dlhých blokoch
+  (Michal: orchestrátor drží kontext bloku, subagenti robia diely — kompresia kontextu). **(2) Pravidlo 3 kôl má presné znenie** v CLAUDE.md aj v `codex-po-pr`:
+  3. kolo s len P2/P3 bez zmeny konceptu = vedomá výnimka (oprava na mieste + slepá delta-verifikácia, bez 4. GH kola, zápis do PR a KRONIKY — doteraz len
+  precedensy S1-B1 #382 a D-140 #389); P0/P1 alebo zmena konceptu = zavrieť a rozdeliť. Brána mergu v `codex-po-pr` výnimku menuje. Mapa celého workflowu
+  a ďalšie spresnenia pravidiel prídu v spoločnej debate s Michalom.
 - **BLOK SPOTREBIČE S1 UZAVRETÝ (24.9.2026, v0.12.20 → v0.13.0, PR #375–#389 + uzáver #390).** Blok schválený 20.9. (debata polí, cross audit ×3, mockup
   `zdroje/ui20/mockup_spotrebice_s1.html`) bežal ako nočný autonómny beh 20.–21.9.: **E0** min výška korpusu 80 mm (#375) · **A1** katalóg spotrebičov so seedom
   9 overených modelov (#377) · **A2** sekcia Štúdia Spotrebiče (#378) · **E** slot umývačky (#381) · **B1** spotrebič v zákazke — väzba a Kontrola (#382) · **B2** UI väzby

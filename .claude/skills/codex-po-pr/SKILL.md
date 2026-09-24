@@ -9,6 +9,8 @@ GitHub Codex review beží automaticky na každý PR. **Nálezy sú v REVIEW THR
 
 ## Postup
 
+0. **Pred `gh pr create` (od 25.9.2026):** dávka **audit-povinná** alebo **výrobná/cenová** prešla **slepou predrecenziou** (skill `predrecenzia`) — jej P1/P2 sú opravené
+   a PR popis má sekciu „Predrecenzia". Pri iných kódových dávkach s väčším diffom alebo novou UI interakciou je odporúčaná, pri docs-only sa nerobí.
 1. **Po `git push` + `gh pr create`** (PR popis po slovensky cez `--body-file`, nie here-string): nastav budík — Bash `sleep 600` s `run_in_background: true`; medzitým pokračuj v inej práci. **Prvé kolo (po `gh pr create`) beží automaticky — ďalšie NIE.**
 2. **Po budíku over stav:**
    - `gh pr view <N> --comments` — ak 👀 a nič viac, review ešte beží → krátky druhý budík (~3 min).
@@ -39,12 +41,23 @@ GitHub Codex review beží automaticky na každý PR. **Nálezy sú v REVIEW THR
    ```
    Ak nález vedome neopravuješ, odpovedz prečo.
 5. **Merge robí Claude (od RETRO 12.8.)** — až keď AKTUÁLNA hlava vetvy prešla oboma bránami:
-   - **Review kolo uzavreté pre aktuálny head:** buď (a) head dostal 👍 / po budíku **z vyžiadaného kola** nepribudli nové thready a všetky existujúce majú reply (oprava s hashom / zdôvodnenie), alebo (b) predchádzajúce kolo malo LEN P2/P3 a fix delta prešla **internou verifikáciou** (pravidlo delta-verifikácie, krok 3). CI býva hotové skôr než review, takže „CI zelené po pushi opráv" samo osebe NIKDY nestačí na merge. **Brána „žiadne nové thready" platí LEN pre reálne vyžiadané kolo** — ticho po nevyžiadanom kole je ticho Codexu, nie súhlas.
+   - **Review kolo uzavreté pre aktuálny head:** buď (a) head dostal 👍 / po budíku **z vyžiadaného kola** nepribudli nové thready a všetky existujúce majú reply (oprava s hashom / zdôvodnenie), alebo (b) predchádzajúce kolo malo LEN P2/P3 a fix delta prešla **internou verifikáciou** (pravidlo delta-verifikácie, krok 3; pri audit-povinnej či výrobnej/cenovej dávke to platí len pre **3. kolo** podľa výnimky (a) pravidla 3 kôl nižšie — v kolách 1–2 sa tam vyžaduje nové plné GH kolo, **okrem prípadu, keď GH kolo nahrádza kvótová náhradná brána** (Codex weekly zostatok < 10 %, krok 3: slepý Opus reviewer s reprodukciami + interná delta-verifikácia — vtedy platí v každom kole a PR to prizná). CI býva hotové skôr než review, takže „CI zelené po pushi opráv" samo osebe NIKDY nestačí na merge. **Brána „žiadne nové thready" platí LEN pre reálne vyžiadané kolo** — ticho po nevyžiadanom kole je ticho Codexu, nie súhlas.
    - **CI zelené** na aktuálnom head commite (`gh pr checks <N>`).
    Merge s pripnutou odrevidovanou hlavou (ochrana pred pretekom s cudzím pushom): `sha=$(git rev-parse HEAD)` → `gh pr merge <N> --merge --match-head-commit "$sha"` (vetvu na GitHube maže repo automaticky). Potom **návrat na čerstvý main**: `git checkout main && git pull && git branch -d <vetva>` — ďalšia dávka štartuje výhradne odtiaľto. Over `git log origin/main --oneline -3`, že merge commit v maine naozaj je.
 6. **Záznam do denného reportu** (nahrádza niekdajšie hlásenie „môžeš mergovať"): čo PR mení z pohľadu používateľa · stav testov · výsledok Codex review (počet nálezov + ako vyriešené). Report sa Michalovi posiela súhrnne na konci bloku, zrozumiteľný z mobilu bez čítania diffu.
 
-**Pravidlo 3 kôl:** ak review ide do 3. kola opráv, PR bol zle narezaný — zavri ho a rozdeľ na menšie celky, neiteruj (lekcia PR #93 s 10 kolami).
+**Pravidlo 3 kôl (spresnené 25.9.2026):** počítajú sa **GH kolá review, ktoré vrátili nálezy** (kolo s 👍 sa nepočíta; pri dávkach, kde stačí delta-verifikácia,
+sa ďalšie GH kolo po P2/P3 ani nevyžaduje — pravidlo sa teda týka hlavne audit-povinných, výrobných/cenových dávok a kôl s P1). Keď nálezy vráti aj **3. kolo**:
+
+- **(a) len P2/P3 bez zmeny konceptu** (okrajový prípad, text, fokus, chýbajúci test) → **vedomá výnimka**, PR sa nereže:
+  1. oprav na mieste a pushni, v každom threade reply s hashom (krok 4),
+  2. spusti **slepú delta-verifikáciu**: subagent (Agent tool, `model: opus`) overí VÝHRADNE `git diff <hlava pred opravou>..<hlava po oprave>` — správnosť
+     opráv, žiadne vedľajšie zmeny, testy na každú opravu (musia na starom kóde padať a na novom prechádzať),
+  3. P2/P3 nájdené deltou opraví a overí orchestrátor sám (bez ďalšieho subagenta a bez GH kola),
+  4. **4. GH kolo sa nevyžaduje**; výsledok delty ide do komentára PR a výnimka do PR popisu aj KRONIKY (precedensy S1-B1 #382, D-140 #389),
+  5. merge po zelenom CI na finálnej hlave (brána (b) v kroku 5).
+- **(b) P0/P1 alebo oprava mení koncept** (dátový kontrakt, tok, návrh riešenia) → PR bol zle narezaný — **zavri ho a rozdeľ na menšie celky**, neiteruj
+  (lekcie PR #93 s 10 kolami, #243, #278). To isté platí, keď P1 alebo zmenu konceptu nájde slepá delta v bode (a).
 
 ## Pasce
 
