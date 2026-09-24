@@ -21,6 +21,10 @@
     { "case": "zasuvka ma od D-115 PRERUSOVANE X (od plneho X blendy ju lisi prave ciara)", "type": "drawer_front", "expect": "xdash" },
     { "case": "dvierka riesia kridla, nie typ", "type": "door", "expect": null },
     { "case": "Bez cela", "type": "none", "expect": null },
-    { "case": "neznamy typ z novsej verzie", "type": "sliding_2027", "expect": null }
+    { "case": "neznamy typ z novsej verzie", "type": "sliding_2027", "expect": null },
+    { "case": "D-138: celo SLOTU UMYVACKY je datovo blenda, ale otvara sa nadol = sklop", "type": "blind", "cab_type": "dishwasher", "expect": "down" },
+    { "case": "D-138: blenda v dolnej skrinke ostava plne X", "type": "blind", "cab_type": "lower", "expect": "cross" },
+    { "case": "D-138: blenda v hornej skrinke ostava plne X", "type": "blind", "cab_type": "upper", "expect": "cross" },
+    { "case": "D-138: vynimka slotu sa tyka LEN blendy (iny typ v slote sa neprepisuje)", "type": "lift", "cab_type": "dishwasher", "expect": "up" }
   ]
 }

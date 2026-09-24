@@ -555,13 +555,23 @@
     if (type !== 'none') tabs.push({ key: FRONT_TAB_HW, label: 'Kovanie', badge: null });
     return tabs;
   }
-  function frontCardModel(item, entry, drawer, lift){
+  // D-138: `opts.slot` = celo patri SLOTU UMYVACKY. Jeho typ aj pocet su dane
+  // (server iny odmietne — `slot_fronts_refusal`), preto karta NEPONUKA
+  // dlazdice typov a namiesto vety o blende povie, co to je: dvere umyvacky.
+  function frontCardModel(item, entry, drawer, lift, opts){
     var it = item || {};
     var type = it.type || 'door';
     var known = FRONT_CARD_TYPES.indexOf(type) >= 0;
-    var tiles = FRONT_CARD_TYPES.map(function(t){ return { type: t, on: t === type }; });
+    var slot = !!(opts && opts.slot);
+    var tiles = slot ? [] : FRONT_CARD_TYPES.map(function(t){ return { type: t, on: t === type }; });
     var tabs = frontCardTabs(type, type === 'door' && frontSumDirUnset(it, entry));
     var rows = [], hwRows = [];
+    if (slot && type === 'blind'){
+      rows.push({ kind: 'info', tone: 'muted',
+                  text: 'Dvere umývačky — otvárajú sa nadol. Typ aj výšku čela určuje slot ' +
+                        '(Základné); kovanie vzniká len z úchytkového profilu.' });
+      return { type: type, known: known, tiles: tiles, tabs: tabs, rows: rows, hwRows: hwRows };
+    }
     if (type === 'blind'){
       // R6-d: blenda NIE JE „bez kovania" — s uchytkovym profilom ho dostava
       // z pravidla `uchytkovy-profil-blenda`. Predosle znenie by poslalo
@@ -852,7 +862,11 @@
   // Symbol NEDVIEROKOVEHO typu (dvierka riesi `frontWingSymbols`).
   // D-115: zasuvkove celo uz symbol MA — prerusovane X ('xdash'); od PLNEHO X
   // blendy ho lisi prave prerusovanie (prerusovana = pohyb, plna = dielec).
-  function frontTypeSymbol(type){
+  // D-138: jedine celo SLOTU UMYVACKY je datovo blenda (bez kovania), ale su
+  // to DVERE UMYVACKY — otvaraju sa NADOL, preto sklop 'down'. Rozhoduje TYP
+  // SKRINKY (`cabType`). Zrkadlo `DirectionCheck.type_symbol(type, cab_type)`.
+  function frontTypeSymbol(type, cabType){
+    if (type === 'blind' && cabType === 'dishwasher') return 'down';
     if (type === 'lift') return 'up';
     if (type === 'fall') return 'down';
     if (type === 'blind') return 'cross';

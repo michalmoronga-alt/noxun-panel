@@ -210,6 +210,25 @@ NxTest.test('S1-E R3: plan slotu = presne JEDEN vyrobny dielec (rola false_front
   NxTest.assert_equal([], pl[:zones], 'ani zony')
 end
 
+NxTest.test('D-138: celo slotu sa v kusovniku a VEPO vola „Dv myčka" (nie „Blenda 1")') do
+  pd = NxS1E.parts(NxS1E.plan).first
+  NxTest.assert_equal('Dv myčka', pd[:name], 'nazov dielca slotu (Michal 23.9.2026)')
+  NxTest.assert_equal(Noxun::Engine::Construction::DW_FRONT_NAME, pd[:name], 'jediny zdroj nazvu')
+  NxTest.assert_equal('BLIND-1', pd[:suffix].to_s,
+                      'identita dielca sa NEMENI — definiciu aj ID nesie pripona, nie nazov')
+  NxTest.assert_equal('front:F1/blind', pd[:part_key].to_s, 'ani kluc dielca (kovanie, override)')
+  v = Noxun::Engine::VepoExport
+  NxTest.assert_equal('Dv myčka', v.short_name('Dv myčka'), 'VEPO skratka ho necha bez zmeny')
+  NxTest.assert_equal('Dv myčka s1', v.row_name('names' => ['Dv myčka'], 'kde' => [{ 'owner_id' => 'CAB-001' }]),
+                      'riadok VEPO so skrinkou (<= 20 znakov, diakritika ostava)')
+end
+
+NxTest.test('D-138: blenda v dolnej skrinke sa vola dalej „Blenda N" (premenovanie je len slot)') do
+  fr = Noxun::Engine::Fronts.layout({ 'items' => [{ 'id' => 'F1', 'type' => 'blind', 'mode' => 'auto' }] },
+                                    600.0, 720.0, 100.0, 18.0)
+  NxTest.assert_equal(['Blenda 1'], fr[:parts].map { |p| p[:name] }, 'modul ciel pomenuva po starom')
+end
+
 NxTest.test('S1-E R3: celo stoji na virtualnom otvore (sokel .. sokel + vyska cela)') do
   pl = NxS1E.plan
   pd = NxS1E.parts(pl).first

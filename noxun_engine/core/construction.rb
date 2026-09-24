@@ -263,6 +263,14 @@ module Noxun
       DW_BASE_H           = 200.0
       DW_BASE_INSET_FRONT = 50.0
       DW_BASE_INSET_SIDE  = 20.0
+      # D-138: NAZOV jedineho vyrobneho dielca slotu v kusovniku a VEPO
+      # (Michal 23.9.2026). Datovo je to blenda (`front:F1/blind`, bez
+      # kovania), ale dielna ho pozna ako dvere umyvacky — `Blenda 1` by
+      # v objednavke klamal. Kratky tvar v style VEPO skratiek (`Dv1 L`),
+      # takze ho `VepoExport.short_name` necha bez zmeny; diakritika vo VEPO
+      # ostava (cita ju clovek). Identitu dielca to nemeni — definiciu aj ID
+      # nesie pripona `BLIND-1`, nie nazov.
+      DW_FRONT_NAME       = 'Dv myčka'
 
       # `ref_key` tela spotrebica v `plan[:references]` (S1-F pridá chladnicku
       # pod vlastnym klucom).
@@ -322,7 +330,8 @@ module Noxun
         warnings = []
 
         fr = Fronts.layout(cfg[:fronts], w, h, 0.0, cfg[:thickness], opening: front_opening(cfg))
-        parts = fr[:parts]
+        # D-138: jedine celo slotu sa v kusovniku a VEPO vola `DW_FRONT_NAME`.
+        parts = fr[:parts].map { |pd| pd[:role] == 'false_front' ? pd.merge(name: DW_FRONT_NAME) : pd }
         warnings.concat(fr[:warnings] || [])
 
         parts, degenerate = parts.partition { |pd| pd[:box].all? { |v| v.to_f > BuildPlan::MIN_DIM } }

@@ -31,7 +31,7 @@ FIX.wings.forEach(row => {
   eq(C.frontWingSymbols(row.wings_n, row.slots), row.expect, row.case);
 });
 FIX.types.forEach(row => {
-  eq(C.frontTypeSymbol(row.type), row.expect, row.case);
+  eq(C.frontTypeSymbol(row.type, row.cab_type), row.expect, row.case);
 });
 ok(FIX.wings.length >= 10, 'tabulka fixtur je podozrivo kratka');
 

@@ -33,7 +33,9 @@ a pravidlá echa sú v [ui-lifecycle.md](ui-lifecycle.md) (odseky `appliance_dia
 to nevyrába ani neobjednáva.
 
 - **Čo slot vyrába:** jediný dielec — **čelo** (rola `false_front`, kľúč `front:F1/blind`), s úchytkou, materiálom a ABS ako každé iné čelo.
-  Kusovník, VEPO, nákup aj rozpočet z neho vidia **jeden riadok**.
+  Kusovník, VEPO, nákup aj rozpočet z neho vidia **jeden riadok**. **D-138:** dátovo je to blenda (pravidlá kovania mu nevydajú pánty ani kovanie
+  sklopu), ale dielňa ho pozná ako **dvere umývačky** — v kusovníku a VEPO sa volá **„Dv myčka"** (`Construction::DW_FRONT_NAME`), v Smere otvárania aj
+  v náhľade má **symbol sklopu „Λ"** a zoznam čiel v Inspectore ho menuje „Dvere umývačky" (bez dlaždíc typov — typ je daný).
 - **Čo slot NEvyrába:** telo umývačky. Kreslí sa ako `kind: 'reference'` · `role: 'appliance_body'` · `production_class: 'reference'` ·
   `manufactured: false` (STANDARD §8.1) z **dvoch boxov** — telo podľa triedy a pod ním **fixná základňa 200 mm**, odsadená 50 mm spredu a 20 mm
   do strán (zóna nôh a soklu spotrebiča). Telo sa **nikdy nedeformuje** podľa slotu; keď je širšie, trčí a Kontrola to prizná.

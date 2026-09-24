@@ -50,7 +50,7 @@ Platí LEN pre VEPO CSV a LOG — **kusovník Štúdia ostáva s plnými názvam
 
 - **Skratky** (presná zhoda na názvy z builderov; neznámy názov ide BEZ ZMENY): `Bok lavy`→`Bok L` · `Bok pravy`→`Bok P` · `Vystuha predna`→`Vyst P` · `Vystuha zadna`→`Vyst Z` ·
   `Sokel predny`→`Sokel` · `Priecka zvisla`→`Priecka Z` · `Priecka vodorovna`→`Priecka V` · `Dvierka N lave/prave`→`Dv<N> L`/`Dv<N> P` · `Dvierka N kridlo i/n`→`Dv<N> k<i>` ·
-  `Dvierka N`→`Dv<N>` · `Zasuvkove celo N`→`Zas celo N`. `Dno`, `Vrch`, `Chrbat`, `Polica N`, `Blenda N`, `Výklop N`, `Sklop N` a názvy samostatných dosiek (voľný text) sa nemenia.
+  `Dvierka N`→`Dv<N>` · `Zasuvkove celo N`→`Zas celo N`. `Dno`, `Vrch`, `Chrbat`, `Polica N`, `Blenda N`, `Výklop N`, `Sklop N`, `Dv myčka` (čelo slotu umývačky, D-138) a názvy samostatných dosiek (voľný text) sa nemenia.
 - **Vyrábané dielce zásuvky (D-121a, 8.9.2026):** `Dno zasuvky N`→`Zas dno N` · `Chrbat zasuvky N`→`Zas chrb N` · `Vnutorne celo zasuvky N`→`Zas predok N` ·
   `Bok boxu lavy/pravy N`→`Zas bok L/P N`; dvojica bokov jednej zásuvky v riadku → `Zas bok LP N`. `N` je **číslo čela** — to isté, aké nesie `Zasuvkove celo N`.
   **Legacy:** zákazka postavená pred D-121a má v názve namiesto čísla interné id čela (`Dno zasuvky Fmslwqdm2-9-464wsa`) — dostane tvar **bez čísla** (`Zas dno s1`);

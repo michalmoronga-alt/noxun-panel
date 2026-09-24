@@ -197,7 +197,10 @@ module NxTest
     p = A2.src('js/preview.js')
     assert(p.include?('frontWingSymbols(cols.length, frontSlotsFor(it.id))'),
            'symboly kridiel idu zo SLOTOV servera')
-    assert(p.include?('var tsym = frontTypeSymbol(it.type);'), 'typy cez mapu, nie cez vetvy')
+    # D-138: druhy argument je TYP SKRINKY (slot umyvacky = sklop) — rozhoduje
+    # o nom stale cista funkcia `frontTypeSymbol`, nie vetva v nahlade.
+    assert(p.include?("var tsym = frontTypeSymbol(it.type, (typeof getType === 'function') ? getType() : null);"),
+           'typy cez mapu, nie cez vetvy')
     refute(p.match?(/direction\s*===\s*'/), 'preview stav smeru vobec neinterpretuje')
     refute(p.match?(/['"]unset['"]/), 'a literal neurceneho stavu nepozna')
   end

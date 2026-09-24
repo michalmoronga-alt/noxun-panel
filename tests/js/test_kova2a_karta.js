@@ -55,6 +55,16 @@ C.FRONT_CARD_TYPES.forEach(t => {
   eq(m.tiles.length, 6, `${t}: sest dlazdic`);
   eq(m.tiles.filter(x => x.on).map(x => x.type), [t], `${t}: aktivna je prave jeho dlazdica`);
 });
+// D-138: celo SLOTU UMYVACKY — typ je dany (server iny odmietne), preto karta
+// dlazdice NEPONUKA a namiesto vety o blende povie, ze su to dvere umyvacky.
+const slotCard = C.frontCardModel({ type: 'blind' }, entry(1, []), null, null, { slot: true });
+eq(slotCard.tiles, [], 'slot: ziadne dlazdice typov');
+ok(slotCard.rows.length === 1 && slotCard.rows[0].text.indexOf('Dvere umývačky') === 0,
+   'slot: karta menuje dvere umyvacky');
+ok(slotCard.rows[0].text.indexOf('Blenda') < 0, 'a o blende nehovori');
+const blindCard = C.frontCardModel({ type: 'blind' }, entry(1, []), null, null, { slot: false });
+eq(blindCard.tiles.length, 6, 'bezna blenda ma dlazdice dalej');
+ok(blindCard.rows[0].text.indexOf('Blenda') === 0, 'a svoju vetu');
 // Neznamy typ (config z novsej verzie) NEROZSVIETI ziadnu dlazdicu a prizna sa.
 const unk = C.frontCardModel({ type: 'sliding_2027' }, entry(1, []));
 eq(unk.tiles.filter(x => x.on).length, 0, 'neznamy typ sa nevydava za ziadny zo sestice');
