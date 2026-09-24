@@ -26,14 +26,21 @@ povinné pre každý PR). Je to lacnejšie kolo navyše medzi hotovým kódom a 
 ## Postup
 
 1. **Vetva je hotová:** testy zelené (headless + všetky JS sady; in-SU pri builderoch, observeroch a undo), docs na mieste, všetko commitnuté.
-2. **Spusti subagenta:** Agent tool — `subagent_type: general-purpose`, `model: opus`, `run_in_background: true`, prompt podľa vzoru
+2. **Kvóta PRED spustením** (subagent míňa Claude kvótu, orientačne 200–350 k tokenov na beh; skill `usage`, bod 4):
+   `& ".claude\skills\usage\usage.ps1" -Label "predrecenzia <dávka>" -Phase before -Gate claude` — **exit 3** (Claude weekly na dne) =
+   subagenta nespúšťaj a použi náhradu z bodu 7; keď je Claude session nad 80 % a reset je ďaleko, povedz to Michalovi pred štartom.
+3. **Spusti subagenta:** Agent tool — `subagent_type: general-purpose`, `model: opus`, `run_in_background: true`, prompt podľa vzoru
    nižšie. **Slepý** = dostane len ZADANIE (čo sa má zmeniť pre používateľa a kľúčové rozhodnutia z briefu) a rozsah diffu — nie výsledky
    auditu, nie vlastné hodnotenie orchestrátora, nie zoznam „na čo si dať pozor". Medzitým orchestrátor pripravuje PR popis.
-3. **Nálezy:** P1/P2 oprav pred PR (commit `predrecenzia: …`, testy znova). P3 zváž — oprav, alebo v PR uveď, prečo nie. Oprava, ktorá
+4. **Po výsledku** zapíš spotrebu: `& ".claude\skills\usage\usage.ps1" -Label "predrecenzia <dávka>" -Phase after` (ten istý Label).
+5. **Nálezy:** P1/P2 oprav pred PR (commit `predrecenzia: …`, testy znova). P3 zváž — oprav, alebo v PR uveď, prečo nie. Oprava, ktorá
    mení koncept riešenia → späť k briefu; pri audit-povinnej dávke aj k auditu.
-4. **PR popis** má sekciu **„Predrecenzia"**: počty P1/P2/P3 a čo sa opravilo (pri „bez nálezov" jedna veta).
-5. **Kvóta:** subagent míňa Claude kvótu (orientačne 200–350 k tokenov na beh; skill `usage`). Pri nedostatku Claude kvóty je náhrada
-   lokálny Codex CLI (Sol) cez companion s tým istým promptom — postup v skille `codex-audit`, kroky 3–5.
+6. **PR popis** má sekciu **„Predrecenzia"**: počty P1/P2/P3 a čo sa opravilo (pri „bez nálezov" jedna veta; pri náhrade aj prečo).
+7. **Náhrada pri nedostatku Claude kvóty = lokálny Codex CLI s modelom Sol** (výslovne — predvolený model v `~/.codex/config.toml`
+   je Astra, ktorá míňa viac Codex kvóty). Najprv Codex brána `& ".claude\skills\usage\usage.ps1" -Label "predrecenzia <dávka>" -Phase before -Gate codex`
+   (exit 3 = ani náhradu nespúšťaj, predrecenzia sa odloží po resete a PR to prizná), potom cez **PowerShell tool** s tým istým promptom:
+   `$prompt = Get-Content -Raw '<prompt-file>'; node "<companion>" task --background --model gpt-5.6-sol $prompt`.
+   Nájdenie companionu, čakanie so stall guardom a vytiahnutie výsledku: skill `codex-audit`, kroky 1 a 4–5.
 
 **Závažnosť:** **P1** = chybné výrobné dáta alebo ceny, strata či poškodenie dát, pád, zápis do cudzieho dokumentu · **P2** = zlé správanie
 v reálnom postupe používateľa (vrátane nesúladu Inspector ↔ Kontrola a chýbajúceho testu novej vetvy) · **P3** = kozmetika, docs, drobnosť.
