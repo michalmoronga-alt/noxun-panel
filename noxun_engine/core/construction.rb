@@ -271,6 +271,11 @@ module Noxun
       # ostava (cita ju clovek). Identitu dielca to nemeni — definiciu aj ID
       # nesie pripona `BLIND-1`, nie nazov.
       DW_FRONT_NAME       = 'Dv myčka'
+      # D-138 (zvysok v B2): ako celo slotu HOVORIA texty Kovania, Nakupu a
+      # Kontroly („F1 · dv myčka"). Odvodeny kluc `label` na resolved polozke
+      # (`front_items`) — zapisuje ho LEN plan slotu, bezna blenda ho nema
+      # a `PartKeys.human_label` jej ponecha „blenda".
+      DW_FRONT_LABEL      = 'dv myčka'
 
       # `ref_key` tela spotrebica v `plan[:references]` (S1-F pridá chladnicku
       # pod vlastnym klucom).
@@ -330,8 +335,10 @@ module Noxun
         warnings = []
 
         fr = Fronts.layout(cfg[:fronts], w, h, 0.0, cfg[:thickness], opening: front_opening(cfg))
-        # D-138: jedine celo slotu sa v kusovniku a VEPO vola `DW_FRONT_NAME`.
+        # D-138: jedine celo slotu sa v kusovniku a VEPO vola `DW_FRONT_NAME`
+        # a v textoch podla kluca dielca `DW_FRONT_LABEL` (resolved polozka).
         parts = fr[:parts].map { |pd| pd[:role] == 'false_front' ? pd.merge(name: DW_FRONT_NAME) : pd }
+        Array(fr[:items]).each { |it| it['label'] = DW_FRONT_LABEL if it.is_a?(Hash) && it['type'] == 'blind' }
         warnings.concat(fr[:warnings] || [])
 
         parts, degenerate = parts.partition { |pd| pd[:box].all? { |v| v.to_f > BuildPlan::MIN_DIM } }
@@ -503,14 +510,16 @@ module Noxun
       #
       # JEDINA autorita otazky „kde zacinaju a kam siahaju cela". Dolna a horna
       # skrinka dostanu presne dnesne cisla (x od 0, z od sokla po vrch), slot
-      # umyvacky svoje vlastne (z od `dw_front_bottom`, vyska = `dw_front_height`).
+      # umyvacky svoje vlastne (z od `dw_front_bottom` po vysku linky; D-139).
       # Cita ju `build_plan` AJ panelovy preflight (`Panel.front_preflight_result`)
       # — bez toho by panel pri slote overoval cela proti VYSKE LINKY a
       # presahujuce celo by ohlasil ako chybu, ktorá chybou nie je.
       def front_opening(cfg)
         if cfg[:type] == 'dishwasher'
+          # D-139: otvor ide od soklu PO LINKU; celo v nom konci o medzeru
+          # hore (`fronts.gap_top`) nizsie — jeho vyska je odvodena.
           return { x0: 0.0, w: cfg[:width].to_f, z0: cfg[:dw_front_bottom].to_f,
-                   h: cfg[:dw_front_height].to_f }
+                   h: cfg[:height].to_f - cfg[:dw_front_bottom].to_f }
         end
 
         { x0: 0.0, w: cfg[:width].to_f, z0: cfg[:floor_height].to_f,
@@ -1269,9 +1278,10 @@ module Noxun
       # jedno tiahnutie uchopu precitalo kniznicu pravidiel desatkrat.
       # Vracia CELE milimetre (absorpcia aj panel pracuju s celymi mm).
       def min_valid_height(cfg, hardware_rules: nil)
-        # S1-E: slot vnutro nema, takze ziadna vyska linky prestavbu neodmietne
-        # — spodnu hranicu drzi VYHRADNE typove MIN absorpcie (500 mm).
-        return 0.0 if cfg[:type] == 'dishwasher'
+        # S1-E: slot vnutro nema. D-139: spodnu hranicu vysky linky urcuje
+        # odvodene celo (sokel + medzera hore + 300) — ta ista funkcia ako
+        # v absorpcii scale, bez `normalize` (Astra B2 FIX 5).
+        return CabinetBuilder.slot_height_bounds(cfg)[0] if cfg[:type] == 'dishwasher'
 
         rules = hardware_rules || HardwareRules.load
         # NUTNA (nie postacujuca) podmienka: strop vnutra nikdy nelezi vyssie

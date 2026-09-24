@@ -559,6 +559,12 @@ module Noxun
         # `rebuild` — takze sa pocita proti configu, ktory sa naozaj postavi
         # (a pri hornej skrinke sokel korektne vypadne na 0).
         def clamp_height(params, val, cid)
+          # D-139 (Astra B2 FIX 5): pri SLOTE je vyska linky viazana na
+          # odvodene celo (sokel + medzera hore + 300 .. + 1200). Hranice sa
+          # beru BEZ `normalize` ulozeneho configu — stary slot moze byt pod
+          # novym pravidlom neplatny a absorpcia by padla aj pri platnom cieli.
+          return clamp_slot_height(params, val, cid) if params['type'].to_s == 'dishwasher'
+
           floor = Construction.min_valid_height(CabinetBuilder.normalize(params))
           m = [min_for('height', params['type']), floor].max
           return val if val >= m
@@ -566,6 +572,17 @@ module Noxun
                      "(sokel #{params['floor_height'].to_f.round}, hrubka #{params['thickness'].to_f.round}) " \
                      "— clampujem na #{m.round}")
           m
+        end
+
+        def clamp_slot_height(params, val, cid)
+          lo, hi = CabinetBuilder.slot_height_bounds(params)
+          lo = [lo, min_for('height', 'dishwasher')].max
+          return val if val.between?(lo, hi)
+
+          to = val < lo ? lo : hi
+          Engine.log("scale absorb #{cid}: vyska slotu #{val.round} mimo #{lo.round}..#{hi.round} " \
+                     "(celo = linka − sokel − medzera hore) — clampujem na #{to.round}")
+          to
         end
 
         # --- absorpcia scale DOSKY (V0.4.7d) --------------------------------

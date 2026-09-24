@@ -149,9 +149,10 @@
   var LIMITS = { width:[200,3000], height:[80,3000], depth:[150,2000], thickness:[6,50],
                  floor_height:[0,500], plinth_recess:[0,300], rail_depth:[20,400], rails_top_offset:[0,500],
                  // S1-E: polia SLOTU UMYVACKY — zrkadlo Ruby `CabinetBuilder::DW_RANGES`
-                 // (guard test `tests/pure/test_s1e_slot.rb`). Vyska cela smie
-                 // presahovat vysku linky, preto ma vlastny (siroky) rozsah.
-                 dw_body_height:[700,1000], dw_front_bottom:[0,300], dw_front_height:[300,1200],
+                 // (guard test `tests/pure/test_s1e_slot.rb`). D-139: vyska cela uz
+                 // pole NIE JE — odvodi sa (`nxSlotFrontEval`) a jej rozsah strazi
+                 // krizova kontrola `cabinetHeightError`.
+                 dw_body_height:[700,1000], dw_front_bottom:[0,300],
                  // D-07: medzery/presahy cel — zaporny okraj = presah cez obrys (limit zhodny s Fronts::EDGE_LIMIT)
                  fr_gap:[0,50], fr_gap_top:[-100,100], fr_gap_bottom:[-100,100], fr_gap_left:[-100,100], fr_gap_right:[-100,100] };
   // S1-E: sirka a vyska maju INE hranice per TYP — slot nema vnutro, takze
@@ -163,7 +164,7 @@
   // hodnota, ktoru tam nechal predchadzajuci slot, CERVENELA a zablokovala by
   // vlozenie uplne inej skrinky — v poli, ktore pouzivatel nevidi a nema ako
   // opravit. Validuju sa preto VYHRADNE v type, ktoremu patria.
-  var SLOT_FIELDS = { dw_body_height: 1, dw_front_bottom: 1, dw_front_height: 1 };
+  var SLOT_FIELDS = { dw_body_height: 1, dw_front_bottom: 1 };
   // Typ korpusu BEZPECNE: `getType` zije v core.js a Node testy tohto suboru
   // ho nemusia mat nacitany (rovnaky vzor ako `typeof nxLegs… === 'function'`).
   function cabTypeNow(){ return (typeof getType === 'function') ? getType() : 'lower'; }
@@ -200,8 +201,9 @@
     var he = el('height');
     if (!he || he.value === '') return '';
     // S1-E: slot vnutro NEMA — krizova kontrola vysky proti soklu a hrubkam
-    // sa ho netyka (jeho spodnu hranicu drzi `TYPE_LIMITS`).
-    if (cabTypeNow() === 'dishwasher') return '';
+    // sa ho netyka. D-139: jeho vyska linky vsak URCUJE CELO (linka − sokel
+    // − medzera hore) a to ma rozsah — ta ista funkcia a vety ako na serveri.
+    if (cabTypeNow() === 'dishwasher') return slotFrontError(evalDim(he.value));
     var h = evalDim(he.value);
     if (isNaN(h)) return ''; // nezmysel uz oznacil hlavny cyklus
     var sokel = (getType() === 'upper') ? 0 : cabFieldOrDefault('floor_height');
@@ -227,10 +229,22 @@
   // titlu, takze sa nic neprepisuje) a stavovy riadok „Skontroluj červené
   // polia" uz existuje v `actions.js`.
   function markHeightError(message){
-    ['height', 'floor_height'].forEach(function(id){
+    // D-139: pri slote je druhym polom SOKEL slotu (`dw_front_bottom`) —
+    // podstavec korpusu slot nema.
+    var ids = (cabTypeNow() === 'dishwasher') ? ['height', 'dw_front_bottom'] : ['height', 'floor_height'];
+    ids.forEach(function(id){
       var e = el(id); if (!e) return;
       if (message){ e.classList.add('bad'); e.title = message; } else { e.title = ''; }
     });
+  }
+  // D-139: odvodene celo slotu mimo rozsahu = veta pre obe polia. Pri
+  // prazdnom/nezmyselnom vstupe sa NEHADA (oznacil ho hlavny cyklus).
+  function slotFrontError(h){
+    if (isNaN(h) || typeof nxSlotFrontEval !== 'function') return '';
+    var fb = cabFieldOrDefault('dw_front_bottom');
+    if (isNaN(fb)) return '';
+    var ev = nxSlotFrontEval(h, fb, frontGapVal('fr_gap_top', 2.0));
+    return ev.error || '';
   }
 
   function validateFields(skipFrontDraft){
@@ -304,8 +318,8 @@
     // by zahlasil ako chybu.
     out.type = t;
     if (t === 'dishwasher'){
+      // D-139: vysku cela preflight ODVODI zo sokla, vysky linky a medzery hore.
       out.dw_front_bottom = c.dw_front_bottom === '' ? d.dw_front_bottom : c.dw_front_bottom;
-      out.dw_front_height = c.dw_front_height === '' ? d.dw_front_height : c.dw_front_height;
     }
     return out;
   }
@@ -608,8 +622,13 @@
   // S1-E: riadky, ktore su LEN pre slot, a riadky, ktore slot NEMA. Dva
   // menovite zoznamy — nie CSS trieda: `applyVisibility` je jedina autorita
   // viditelnosti a kazdy riadok tu musi byt vidno na jednom mieste.
-  var SLOT_ONLY_ROWS = ['dwClassRow', 'dwBodyRow', 'dwFrontBottomRow', 'dwFrontHeightRow',
-                        'infDwBody', 'infDwTop', 'infDwFill', 'infDwUnder', 'infDwClass'];
+  // D-139: „Čelo V" uz nie je vstup a „Čelo hore"/„Výplň hore" zanikli —
+  // informacny stlpec ukazuje odvodene celo a medzeru hore (preklik do schemy).
+  var SLOT_ONLY_ROWS = ['dwClassRow', 'dwBodyRow', 'dwFrontBottomRow',
+                        'infDwBody', 'infDwFront', 'infDwGap', 'infDwUnder', 'infDwClass'];
+  // D-139: slot ma JEDEN riadok cela a spodok urcuje sokel — medzera medzi
+  // celami ani okraj dole nemaju co nastavit (server ich drzi na 0).
+  var SLOT_HIDDEN_GAPS = ['fr_gap', 'fr_gap_bottom'];
   var SLOT_HIDDEN_ROWS = ['thicknessRow', 'infAvWidth', 'infIntDepth', 'infAvHeight', 'infArea'];
 
   function applyVisibility(t){
@@ -621,6 +640,7 @@
     el('fhRow').style.display = (t === 'upper' || slot) ? 'none' : '';
     SLOT_ONLY_ROWS.forEach(function(id){ var n = el(id); if (n) n.hidden = !slot; });
     SLOT_HIDDEN_ROWS.forEach(function(id){ var n = el(id); if (n) n.style.display = slot ? 'none' : ''; });
+    SLOT_HIDDEN_GAPS.forEach(function(id){ var n = el(id); if (n) n.hidden = slot; });
     // Vyska korpusu je pri slote VYSKA LINKY (horna hrana susednych korpusov).
     nxSetRowLabel('lblHeight', slot ? 'Výška linky' : 'Výška');
     nxSetRowUnit('height', slot ? 'mm · horná hrana susedov' : 'mm');
@@ -2352,6 +2372,19 @@
     nxSlotFrontsLock();      // S1-E: slot ma jedno pevne celo
   }
 
+  // D-139: „Medzera hore" v Základných slotu je UDAJ. Nastavuje sa tam, kde
+  // vsetky medzery ciel — Čelá → Spoločné pre skrinku → schéma medzier —
+  // preto klik prepne kontext, rozbali skupinu a zameria pole „hore".
+  function onInfoDwGap(){
+    if (typeof setViewContext === 'function') setViewContext('cela');
+    var inp = el('fr_gap_top');
+    if (!inp) return;
+    if (typeof nxRevealTarget === 'function') nxRevealTarget(inp);
+    if (inp.scrollIntoView) inp.scrollIntoView({ block: 'nearest' });
+    if (inp.focus) inp.focus();
+    if (inp.select) inp.select();
+  }
+
   // S1-E: SLOT MA JEDNO PEVNE CELO. UI to len PRIZNA (schova „Pridať čelo",
   // krizik a vysku da na citanie) — vynucuje to SERVER (`slot_fronts_refusal`
   // v `actions_cabinet.rb`), lebo HTML nie je ochrana.
@@ -2366,7 +2399,7 @@
       var fh = rows[i].querySelector('.fh');
       if (fh){
         fh.readOnly = slot;
-        fh.title = slot ? 'Výšku čela slotu mení pole „Čelo V“ v Základných.' : '';
+        fh.title = slot ? 'Výška čela slotu = výška linky − sokel − medzera hore (Základné a schéma medzier).' : '';
       }
       var auto = rows[i].querySelector('.fauto');
       if (auto) auto.style.display = slot ? 'none' : '';
@@ -2611,6 +2644,10 @@
                        nxFillSlotFields: nxFillSlotFields,
                        applyVisibility: applyVisibility, nxSlotFrontsLock: nxSlotFrontsLock,
                        SLOT_ONLY_ROWS: SLOT_ONLY_ROWS, SLOT_HIDDEN_ROWS: SLOT_HIDDEN_ROWS,
+                       // D-139: odvodene celo (krizova kontrola), schema medzier
+                       // slotu a preklik „Medzera hore".
+                       SLOT_HIDDEN_GAPS: SLOT_HIDDEN_GAPS, cabinetHeightError: cabinetHeightError,
+                       onInfoDwGap: onInfoDwGap,
                        // D-138: nazov a ikona RIADKU cela (slot = dvere umyvacky)
                        // vs. vseobecne typove ikony (pas „pridať čelo", dlazdice).
                        frontRowLabel: frontRowLabel, frontRowIcon: frontRowIcon,

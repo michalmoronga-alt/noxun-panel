@@ -383,6 +383,10 @@
     border: 1px solid var(--nx-border-strong); border-radius: 6px;
     background: var(--nx-surface); color: var(--nx-ink); z-index: 2; }
   .nx-inspector .row .gapdiag input.gd:focus { outline: 2px solid var(--nx-select); outline-offset: -1px; }
+  /* D-139: slot umyvacky ma jeden riadok cela a spodok urcuje sokel — pole
+     „medzi" a „dole" sa pri nom skryju atributom `hidden` (parove pravidlo
+     vzoru D-137, aby ho ziadne `display` schemy neprebilo). */
+  .nx-inspector .row .gapdiag input.gd[hidden] { display: none; }
   .nx-inspector .row .gapdiag input.gd.top { left: 50%; top: 0; transform: translateX(-50%); }
   .nx-inspector .row .gapdiag input.gd.bottom { left: 50%; bottom: 0; transform: translateX(-50%); }
   .nx-inspector .row .gapdiag input.gd.left { left: 0; top: 50%; transform: translateY(-50%); }

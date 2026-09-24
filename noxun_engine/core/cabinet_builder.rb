@@ -30,19 +30,21 @@ module Noxun
 
       # S1-E: SLOT UMYVACKY. Nie je to korpus — nema boky, dno, strop, chrbat,
       # zony ani sokel. Ma JEDEN vyrobny dielec (celo cez modul ciel) a telo
-      # spotrebica ako REFERENCIU. `height` je VYSKA LINKY (horna hrana
-      # susednych korpusov), `dw_front_bottom` je spodna hrana CELA od podlahy
-      # („sokel" v jazyku Inspectora) a `dw_front_height` vyska cela; presah
-      # cela nad linku sa NEOBMEDZUJE.
+      # spotrebica ako REFERENCIU. `height` je VYSKA LINKY (horna hrana slotu),
+      # `dw_front_bottom` je spodna hrana CELA od podlahy („sokel" v jazyku
+      # Inspectora). D-139: vyska cela `dw_front_height` uz NIE JE vstup — je
+      # ODVODENA (`dw_front_eval`: linka − sokel − medzera hore `fronts.gap_top`)
+      # a uklada sa len ako stav poslednej stavby. Predvolby 880 / 100 (Michal
+      # 24.9.2026) dávajú pri medzere 2 mm čelo 778.
       # `floor_height` je VZDY 0 a `plinth_mode` VZDY 'none' — inak by pravidla
       # kovania vydali nohy aj prichyty sokla (Codex #376 kolo 1 P1).
       DISHWASHER_DEFAULTS = {
-        type: 'dishwasher', width: 600.0, height: 915.0, depth: 560.0, thickness: 18.0,
+        type: 'dishwasher', width: 600.0, height: 880.0, depth: 560.0, thickness: 18.0,
         floor_height: 0.0, shelves: 0, fronts: 'none',
         bottom_mode: 'under_sides', top_mode: 'full', back_mode: 'none', back_thickness: 3.0,
         plinth_mode: 'none', plinth_recess: 40.0,
         rail_depth: 100.0, rails_orientation: 'flat', rails_top_offset: 0.0,
-        dw_class: 600, dw_body_height: 820.0, dw_front_bottom: 100.0, dw_front_height: 776.0
+        dw_class: 600, dw_body_height: 820.0, dw_front_bottom: 100.0
       }.freeze
 
       # JEDINY zoznam typov korpusu. Kazde miesto, ktore sa pyta „aky typ",
@@ -53,15 +55,19 @@ module Noxun
       # `cabinet_config` aj `config_to_params` mohli prejst JEDNYM zoznamom —
       # dva opisane zoznamy by sa casom rozisli a pole by pri prestavbe ticho
       # vypadlo (presne to, comu brani `CONFIG_SCHEMA`).
+      # D-139: `DW_KEYS` su ULOZENE polia (vratane odvodeneho `dw_front_height`),
+      # `DW_INPUT_KEYS` tie, ktore sa naozaj citaju zo vstupu (trieda zvlast).
       DW_KEYS = %i[dw_class dw_body_height dw_front_bottom dw_front_height].freeze
+      DW_INPUT_KEYS = %i[dw_body_height dw_front_bottom].freeze
       DW_CLASSES = [600, 450].freeze
       # Rozsahy vstupov slotu (mm). Sirka a vyska sa NEklampuju na triedu
       # (Astra S1-E BLOCKER E1) — uzky slot sa POSTAVI a hlasi ho Kontrola.
       DW_RANGES = {
         dw_body_height: [700.0, 1000.0],
         dw_front_bottom: [0.0, 300.0],
-        # Presah cela nad vysku linky je LEGITIMNY (celo moze byt vyssie nez
-        # linka) — horna hranica je len poistka proti nezmyslu.
+        # D-139: platny rozsah ODVODENEJ vysky cela (`dw_front_eval`) — mimo
+        # neho sa slot nepostavi a veta povie, co zmenit. Presah nad linku sa
+        # vyjadruje zapornou medzerou hore (schema medzier, ±EDGE_LIMIT).
         dw_front_height: [300.0, 1200.0]
       }.freeze
       # Sirka a vyska slotu maju VLASTNE (sirsie) hranice nez korpus: slot
@@ -247,7 +253,16 @@ module Noxun
       #       Brany su tie iste ako pri 5-15: dopredny guard prestavby/sablon/
       #       kopie (`newer_config?`) a exportna brana
       #       (`ProductionCore.export_blockers`).
-      CONFIG_SCHEMA = 16
+      #  17 = D-139 — VYSKA CELA SLOTU JE ODVODENA (linka − sokel − medzera hore
+      #       `fronts.gap_top`) a medzera hore je SKUTOCNE pole schemy medzier
+      #       (S1-E ju vynucovalo na 0). Starsi plugin (schema 16) by pri
+      #       prestavbe noveho slotu medzeru zahodil a uloženú vysku cela drzal
+      #       ako RUCNU — pri dalsich upravach linky ci soklu by celo ticho
+      #       prestalo sledovat linku (Astra B2 NOTE 6). Brany su tie iste ako
+      #       pri 5-16 (`newer_config?`, `ProductionCore.export_blockers`).
+      #       Stare sloty sa NEMIGRUJU (Michal 24.9.2026: ziadna zakazka so
+      #       slotom) — pri najblizsej prestavbe dostanu celo z ulozenej medzery.
+      CONFIG_SCHEMA = 17
 
       # KOV-C2b: schema, OD KTOREJ stavba emituje dielce zasuviek z receptu.
       # VLASTNA konstanta (nie `CONFIG_SCHEMA`), lebo pri bumpe na 6 (KOV-D1a)
@@ -2917,16 +2932,17 @@ module Noxun
           d = defaults_for(type)
           slot = type == 'dishwasher'
           fronts_cfg = Fronts.normalize_config(raw(p, :fronts))
-          # S1-E: vyska cela slotu ma AUTORITU v poli `dw_front_height`, preto
-          # sa `dw_*` normalizuju PRED celami a ich vysledok riadi jedine pevne
-          # celo (`slot_fronts!`).
-          dw = slot ? norm_dishwasher(p, d) : {}
+          # D-139: vyska cela slotu je ODVODENA z vysky linky, soklu a medzery
+          # hore — vyska slotu sa preto normalizuje PRED polami slotu a ich
+          # vysledok riadi jedine pevne celo (`slot_fronts!`).
+          slot_h = slot ? clampf(fetchf(p, :height, d[:height]), *DW_HEIGHT_RANGE) : nil
+          dw = slot ? norm_dishwasher(p, d, slot_h, fronts_cfg['gap_top']) : {}
           fronts_cfg = slot_fronts!(fronts_cfg, dw) if slot
           out = {
             type: type,
             width:  slot ? clampf(fetchf(p, :width, d[:width]), *DW_WIDTH_RANGE)
                          : clampf(fetchf(p, :width,  d[:width]),  MIN[:width],  3000.0),
-            height: slot ? clampf(fetchf(p, :height, d[:height]), *DW_HEIGHT_RANGE)
+            height: slot ? slot_h
                          : clampf(fetchf(p, :height, d[:height]), MIN[:height], 3000.0),
             depth:  clampf(fetchf(p, :depth,  d[:depth]),  MIN[:depth],  2000.0),
             thickness: clampf(fetchf(p, :thickness, d[:thickness]), *THICKNESS_RANGE),
@@ -2986,25 +3002,68 @@ module Noxun
 
         # --- S1-E: polia slotu umyvacky -------------------------------------
 
-        # Uzavrety whitelist styroch poli slotu. Trieda je ENUM (600|450),
-        # zvysok su clampnute mm. Sirka sa na triedu NEVIAZE (BLOCKER E1).
-        def norm_dishwasher(p, d)
+        # Uzavrety whitelist poli slotu. Trieda je ENUM (600|450), telo a sokel
+        # su clampnute mm. Sirka sa na triedu NEVIAZE (BLOCKER E1). D-139: vyska
+        # cela sa zo vstupu NECITA — odvodi sa (`dw_front_eval`) a mimo platneho
+        # rozsahu sa slot NEPOSTAVI (SK veta s radou podla strany).
+        def norm_dishwasher(p, d, height, gap_top)
           cls = raw(p, :dw_class).to_i
           cls = d[:dw_class] unless DW_CLASSES.include?(cls)
           out = { dw_class: cls }
-          DW_RANGES.each do |key, range|
-            out[key] = clampf(fetchf(p, key, d[key]), *range)
+          DW_INPUT_KEYS.each do |key|
+            out[key] = clampf(fetchf(p, key, d[key]), *DW_RANGES[key])
           end
+          ev = dw_front_eval(height, out[:dw_front_bottom], gap_top)
+          raise ev[:error] if ev[:error]
+
+          out[:dw_front_height] = ev[:value]
           out
+        end
+
+        # D-139: VYSKA CELA SLOTU = linka − sokel − medzera hore. JEDINY vzorec
+        # aj JEDINA validacia (Astra B2 FIX 3) — cita ju `normalize`, panelovy
+        # preflight aj absorpcia scale; JS zrkadlo `nxSlotFrontEval` (core.js),
+        # zhodu strazi spolocna fixtura `tests/fixtures/slot_front_eval.json`.
+        # -> { value: Float, error: String|nil }. Rada je PODLA STRANY: pod
+        # minimom treba linku zvysit, nad maximom znizit (alebo zvysit sokel ci
+        # medzeru) — jedna veta pre obe by radila opacne.
+        def dw_front_eval(height, bottom, gap_top)
+          v = height.to_f - bottom.to_f - gap_top.to_f
+          lo, hi = DW_RANGES[:dw_front_height]
+          err = if v < lo - 0.005
+                  "Čelo umývačky by malo #{v.round} mm (výška linky − sokel − medzera hore), najmenej " \
+                  "#{lo.round} mm — zvýš výšku linky alebo zníž sokel."
+                elsif v > hi + 0.005
+                  "Čelo umývačky by malo #{v.round} mm (výška linky − sokel − medzera hore), najviac " \
+                  "#{hi.round} mm — zníž výšku linky, zvýš sokel alebo medzeru hore."
+                end
+          { value: v, error: err }
+        end
+
+        # D-139 (Astra B2 FIX 5): hranice VYSKY LINKY slotu, v ktorych je odvodene
+        # celo platne — prienik typoveho `DW_HEIGHT_RANGE` a [sokel + medzera +
+        # 300, sokel + medzera + 1200]. Pocita sa BEZ `normalize` ulozeneho
+        # configu: stary slot moze byt pod novym pravidlom neplatny a absorpcia
+        # scale by padla aj pri platnom cieli. -> [min, max] (mm)
+        def slot_height_bounds(params)
+          p = params || {}
+          d = DISHWASHER_DEFAULTS
+          fb = clampf(fetchf(p, :dw_front_bottom, d[:dw_front_bottom]), *DW_RANGES[:dw_front_bottom])
+          gt = Fronts.normalize_config(raw(p, :fronts))['gap_top'].to_f
+          lo, hi = DW_RANGES[:dw_front_height]
+          [[DW_HEIGHT_RANGE[0], fb + gt + lo].max, [DW_HEIGHT_RANGE[1], fb + gt + hi].min]
         end
 
         # S1-E (Astra FIX E9): JEDNO PEVNE CELO je SERVEROVY INVARIANT. Z
         # prichadzajuceho F1 sa preberu LEN vizualne volby (profil, hrana
         # profilu, materialovy override cela zije inde); typ, rezim, pocet
-        # kridiel aj VYSKA su dane — vysku urcuje `dw_front_height`.
+        # kridiel aj VYSKA su dane — vyska je ODVODENA (`dw_front_eval`, D-139).
         # Typ je `blind`: emituje rolu `false_front` (blenda). Literal
         # `false_front` by v `Fronts.normalize_items` prepadol na `door`
         # a vyrobil by pánty (Codex #374 P1).
+        # D-139: MEDZERA HORE sa ZACHOVA — je to skutocne pole schemy medzier
+        # (otvor ide po linku, celo konci `gap_top` pod nou). Medzera medzi
+        # celami ani dole slot nema: riadok je jeden a spodok urcuje sokel.
         def slot_fronts!(fronts_cfg, dw)
           src = Array(fronts_cfg['items']).find { |it| it.is_a?(Hash) } || {}
           item = { 'id' => 'F1', 'type' => 'blind', 'mode' => 'fixed',
@@ -3013,24 +3072,23 @@ module Noxun
           item['profile_edge'] = src['profile_edge'] if src.key?('profile_edge')
           fronts_cfg.merge(
             'items' => Fronts.normalize_items([item]),
-            # Zvisle medzery nemaju co delit (jeden riadok) a hore/dole by len
-            # posunuli celo proti `dw_front_bottom` — autorita je pole slotu.
-            'gap' => 0.0, 'gap_top' => 0.0, 'gap_bottom' => 0.0
+            'gap' => 0.0, 'gap_bottom' => 0.0
           )
         end
 
         # Ma tento config JEDNO PEVNE CELO tak, ako slot vyzaduje? Cista
         # otazka pre zapisovu cestu panela (akcia Cela) — server zmenu poctu,
-        # typu, rezimu aj vysky ODMIETNE, nie ticho prepise.
-        def slot_fronts_ok?(fronts_cfg, dw_front_height)
+        # typu ci rezimu ODMIETNE, nie ticho prepise. D-139: VYSKA sa uz
+        # neporovnava — je odvodena a `normalize` ju vzdy prepise, takze stara
+        # hodnota v riadku z klienta (echo este neprislo) nie je chyba.
+        def slot_fronts_ok?(fronts_cfg)
           items = fronts_cfg.is_a?(Hash) ? fronts_cfg['items'] : nil
           return false unless items.is_a?(Array) && items.length == 1
 
           it = items.first
           return false unless it.is_a?(Hash)
-          return false unless it['type'].to_s == 'blind' && it['mode'].to_s == 'fixed'
 
-          (it['height'].to_f - dw_front_height.to_f).abs < 0.01
+          it['type'].to_s == 'blind' && it['mode'].to_s == 'fixed'
         end
 
         # --- S1-E: rezervovane vazby na spotrebic ---------------------------

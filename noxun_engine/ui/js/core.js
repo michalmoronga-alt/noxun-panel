@@ -859,6 +859,24 @@
     if (state === FRONT_DIR_UNSET) return 'unknown';
     return null;
   }
+  // D-139: VYSKA CELA SLOTU = linka − sokel − medzera hore. Zrkadlo
+  // `CabinetBuilder.dw_front_eval` — ten isty vzorec, ten isty rozsah [300,
+  // 1200] aj tie iste vety s radou PODLA STRANY; zhodu strazi spolocna
+  // fixtura `tests/fixtures/slot_front_eval.json`. -> { value, error }
+  var NX_SLOT_FRONT_RANGE = [300, 1200];
+  function nxSlotFrontEval(H, fb, gt){
+    var v = (parseFloat(H) || 0) - (parseFloat(fb) || 0) - (parseFloat(gt) || 0);
+    var lo = NX_SLOT_FRONT_RANGE[0], hi = NX_SLOT_FRONT_RANGE[1];
+    var err = null;
+    if (v < lo - 0.005){
+      err = 'Čelo umývačky by malo ' + Math.round(v) + ' mm (výška linky − sokel − medzera hore), najmenej ' +
+            lo + ' mm — zvýš výšku linky alebo zníž sokel.';
+    } else if (v > hi + 0.005){
+      err = 'Čelo umývačky by malo ' + Math.round(v) + ' mm (výška linky − sokel − medzera hore), najviac ' +
+            hi + ' mm — zníž výšku linky, zvýš sokel alebo medzeru hore.';
+    }
+    return { value: v, error: err };
+  }
   // Symbol NEDVIEROKOVEHO typu (dvierka riesi `frontWingSymbols`).
   // D-115: zasuvkove celo uz symbol MA — prerusovane X ('xdash'); od PLNEHO X
   // blendy ho lisi prave prerusovanie (prerusovana = pohyb, plna = dielec).
@@ -1588,8 +1606,9 @@
     // S1-E: polia SLOTU UMYVACKY. Idu TOU ISTOU cestou ako ostatne konstrukcne
     // polia (zber, validacia, auto-apply) — zrkadlo Ruby `Panel::PARAM_KEYS`.
     // Pri dolnej a hornej skrinke su prazdne a server ich ignoruje.
+    // D-139: `dw_front_height` uz NIE JE vstup — odvodi sa (`nxSlotFrontEval`).
     { id:'dw_class', kind:'sel' }, { id:'dw_body_height', kind:'num' },
-    { id:'dw_front_bottom', kind:'num' }, { id:'dw_front_height', kind:'num' }
+    { id:'dw_front_bottom', kind:'num' }
   ];
   // Zapise hodnoty zdroja (defaulty / sablona / oznaceny korpus) do formulara.
   // Prazdne hodnoty ostavaju nedotknute (ako povodne setNum/setVal), dflt zrkadli povodne "|| 3".
@@ -1657,6 +1676,7 @@
       FRONT_DRAWER_CONSTR_OPTIONS: FRONT_DRAWER_CONSTR_OPTIONS,
       FRONT_DRAWER_VARIANT_OPTIONS: FRONT_DRAWER_VARIANT_OPTIONS,
       frontCardModel: frontCardModel, frontWingLabel: frontWingLabel,
+      nxSlotFrontEval: nxSlotFrontEval, NX_SLOT_FRONT_RANGE: NX_SLOT_FRONT_RANGE,
       // D-130a (tests/js/test_d130a_suhrn_karta.js): SUHRN riadku cela a taby
       // karty. Suhrn je CISTA funkcia — `form.js` ho len kresli.
       frontRowSummary: frontRowSummary, frontCardTabs: frontCardTabs,

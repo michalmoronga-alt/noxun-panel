@@ -651,22 +651,40 @@ module Noxun
           item = slot_appliance_item(cfg, items)
           bh = cfg['dw_body_height'].to_f
           line = cfg['height'].to_f
-          top = cfg['dw_front_bottom'].to_f + cfg['dw_front_height'].to_f
-          over = top - bh
-          fill = line - top
           under = bh <= line + 0.01
+          front = slot_front_info(cfg)
           { 'body' => "#{fmt_mm(body[:w])} × #{fmt_mm(bh)} × #{fmt_mm(body[:d])}",
             'body_note' => slot_body_note(body, item),
             'body_source' => body[:source],
             'body_range' => slot_body_range(item),
-            'front_top' => fmt_mm(top),
-            'front_over' => over,
-            'front_over_text' => "#{over.negative? ? '' : '+'}#{fmt_mm(over)} nad telom",
-            'fill' => fmt_mm(fill),
+            'front_height' => front[:height],
+            'front_after' => front[:after],
+            'front_text' => front[:text],
+            'gap_top' => front[:gap],
+            'gap_text' => "#{front[:gap]} · schéma medzier",
             'under_ok' => under,
             'under_text' => "#{fmt_mm(line)} #{under ? '≥' : '<'} #{fmt_mm(bh)}",
             'class_state' => slot_class_state(cfg, item),
             'class_text' => slot_class_text(cfg, body, item) }
+        end
+
+        # D-139: VYSKA CELA v Inspectore je STAV POSLEDNEJ STAVBY (ulozene
+        # `dw_front_height` — z neho stoji dielec v modeli aj `front_items`).
+        # Citanie NESMIE predstierat prestavbu (Astra B2 FIX 2): stary slot
+        # (schema 16, rucne celo) ukaze svoje cislo a „po prestavbe X", kym ho
+        # nieco neprestavi. Odvodena hodnota ide cez tu istu `dw_front_eval`.
+        def slot_front_info(cfg)
+          stored = cfg['dw_front_height'].to_f
+          gap = begin
+            Fronts.normalize_config(cfg['fronts'])['gap_top'].to_f
+          rescue StandardError
+            0.0
+          end
+          ev = CabinetBuilder.dw_front_eval(cfg['height'].to_f, cfg['dw_front_bottom'].to_f, gap)
+          after = (ev[:value] - stored).abs > 0.01 ? fmt_mm(ev[:value]) : nil
+          text = fmt_mm(stored)
+          text += " · po prestavbe #{after}" if after
+          { height: fmt_mm(stored), after: after, text: text, gap: fmt_mm(gap) }
         end
 
         # Odkial su rozmery tela. Vazba BEZ polozky (druhe okno ju medzitym

@@ -25,12 +25,18 @@
 #       NEPOZNAL, `norm_type` by mu ho sklopil na `lower` a zo slotu by
 #       vlozil PLNY KORPUS s bokmi, dnom a chrbtom (Astra S1-E FIX E5);
 #       s markerom ho `newer_template_refusal` cisto odmietne.
+#   6 = D-139: slotove seedy dostali nove predvolby (linka 880, sokel 100 —
+#       vyska cela je od schemy 17 ODVODENA). `refresh_slot_seed` prepise LEN
+#       zaznam, ktory je CELY zhodny s povodnym seedom S1-E (meno, druh aj
+#       config po JSON round-tripe — Astra B2 BLOCKER 1); upraveny, premenovany
+#       alebo inak odlisny zaznam ostava nedotknuty.
 # Migracia je LAZY (pri prvom `load`) a STUPNOVANA (Codex audit C1c B2):
 # `migrate!` si precita STARY marker PRED zapisom a podla neho spusti
 #   old_std < 2 -> doseje doskove sablony (uz s orientaciou aj markerom),
 #   old_std < 3 -> doplni orientaciu existujucim doskovym sablonam,
 #   old_std < 4 -> doplni marker schemy existujucim doskovym sablonam,
 #   old_std < 5 -> doseje chybajuce slotove sablony umyvacky,
+#   old_std < 6 -> obnovi NEDOTKNUTE slotove seedy S1-E na predvolby D-139,
 # VSETKO JEDNYM atomickym zapisom pod JEDNYM zamkom (ziadny medzistav na disku).
 # Seed je MARKEROVY, nie obsahovy: viaze sa na prechod markera, nie na
 # pritomnost zaznamov, takze sa uz nikdy neopakuje (zmazanu doskovu sablonu
@@ -57,7 +63,7 @@ require 'tmpdir'
 module Noxun
   module Engine
     module TemplateStore
-      STD  = 5
+      STD  = 6
       FILE = 'templates.json'
       KINDS = %w[cabinet board].freeze
       DEFAULT_KIND = 'cabinet'
@@ -425,6 +431,8 @@ module Noxun
         # S1-E: seed slotov je MARKEROVY (viaze sa na PRECHOD markera, nie na
         # obsah suboru) — zmazanu „Umývačku 60" plugin uz nikdy nevrati.
         list += missing_slot_seed(list) if old_std < 5
+        # D-139: nedotknute seedy S1-E (915/64/776) -> predvolby 880/100.
+        list = refresh_slot_seed(list) if old_std < 6
         write_list(list)
       rescue StandardError => e
         Engine.log_error(e, 'TemplateStore.migrate!')
@@ -631,6 +639,42 @@ module Noxun
         end
       end
 
+      # D-139 (std 5 -> 6): zaznam, ktory je PREUKAZATELNE nedotknuty seed S1-E,
+      # dostane novy seed toho isteho mena. „Nedotknuty" = CELY zaznam (meno,
+      # druh, config a ziadne dalsie kluce) je po JSON round-tripe zhodny
+      # s povodnym seedom — odtlacok z vybranych rozmerov by prepisal aj
+      # sablonu so zmenenym dekorom, hrubkou, medzerami ci kovanim (Astra B2
+      # BLOCKER 1). Vsetko ostatne (upravene, premenovane, vyssi marker,
+      # nezname kluce) ostava presne tak, ako je.
+      def refresh_slot_seed(list)
+        legacy = legacy_slot_seeds.to_h { |r| [r['name'], canon_json(r)] }
+        fresh = build_predefined_slots.to_h { |r| [r['name'], r] }
+        list.map do |rec|
+          old = legacy[rec['name']]
+          next rec unless old && fresh[rec['name']] && canon_json(rec) == old
+
+          JsonFileStore.deep_copy(fresh[rec['name']])
+        end
+      end
+
+      def canon_json(obj)
+        JSON.parse(JSON.generate(obj))
+      end
+
+      # Presny tvar seedu S1-E (std 5, schema 16) — len na porovnanie v
+      # `refresh_slot_seed`. Hodnoty su ZAMRAZENE literaly, nie dnesne
+      # konstanty: zmena predvolieb nesmie zmenit to, co sa povazuje za povodny seed.
+      def legacy_slot_seeds
+        [['Umývačka 60', 600, 600.0, 820.0], ['Umývačka 45', 450, 450.0, 815.0]].map do |name, cls, w, body|
+          tpl(name, { 'type' => 'dishwasher', 'width' => w, 'height' => 915.0, 'depth' => 560.0,
+                      'thickness' => 18.0, 'floor_height' => 0.0,
+                      'dw_class' => cls, 'dw_body_height' => body,
+                      'dw_front_bottom' => 64.0, 'dw_front_height' => 776.0,
+                      'zone_tree' => ZoneTree.default_tree(0), 'fronts' => Fronts.empty_config,
+                      'config_schema' => 16 })
+        end
+      end
+
       # --- predvolene sablony (konstrukcne presety) ---------------------------
 
       def build_predefined
@@ -663,8 +707,9 @@ module Noxun
       # S1-E: SLOTOVE sablony. Na rozdiel od `lower_base`/`upper_base` nesu
       # `config_schema` — starsi plugin typ `dishwasher` nepozna a bez markera
       # by ho ticho sklopil na `lower` (FIX E5). Rozmery su generické podla
-      # triedy: 60 cm slot je 600 x 915 x 560 s telom 820, 45 cm 450 x 915 x 560
-      # s telom 815. Sokel a vyska cela su Michalove hodnoty z praxe (64 / 776).
+      # triedy: 60 cm slot je 600 x 880 x 560 s telom 820, 45 cm 450 x 880 x 560
+      # s telom 815. D-139: linka 880 a sokel 100 su Michalove predvolby
+      # (24.9.2026); vyska cela sa NEUKLADA — odvodi sa (778 pri medzere 2).
       def build_predefined_slots
         [
           tpl('Umývačka 60', slot_base(600, 600.0, 820.0)),
@@ -673,10 +718,10 @@ module Noxun
       end
 
       def slot_base(dw_class, width, body_h)
-        { 'type' => 'dishwasher', 'width' => width, 'height' => 915.0, 'depth' => 560.0,
+        { 'type' => 'dishwasher', 'width' => width, 'height' => 880.0, 'depth' => 560.0,
           'thickness' => 18.0, 'floor_height' => 0.0,
           'dw_class' => dw_class, 'dw_body_height' => body_h,
-          'dw_front_bottom' => 64.0, 'dw_front_height' => 776.0,
+          'dw_front_bottom' => 100.0,
           'zone_tree' => ZoneTree.default_tree(0), 'fronts' => Fronts.empty_config,
           'config_schema' => CabinetBuilder::CONFIG_SCHEMA }
       end

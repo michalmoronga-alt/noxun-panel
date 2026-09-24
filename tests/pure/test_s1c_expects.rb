@@ -92,7 +92,10 @@ module NxS1C
     end
   end
 
-  def cabinet(id, pid, type: 'lower', refs: nil, expects: nil, schema: 16)
+  # Predvolena schema = AKTUALNA (v case S1-C to bola 16; D-139 ju posunulo
+  # na 17). Starsie skrinky si testy pytaju vyslovne cez `schema:`.
+  def cabinet(id, pid, type: 'lower', refs: nil, expects: nil,
+              schema: Noxun::Engine::CabinetBuilder::CONFIG_SCHEMA)
     inst = FakeInst.new(pid)
     cfg = { 'config_schema' => schema, 'type' => type, 'width' => 600.0, 'height' => 720.0,
             'depth' => 560.0, 'thickness' => 18.0, 'floor_height' => 100.0,
@@ -373,9 +376,10 @@ end
 # 4) SABLONA (C1, C2, C9, C16, R3, R6)
 # ---------------------------------------------------------------------------
 
-NxTest.test('S1-C (C2): `TemplateStore::STD` ostava 5 — ocakavania ziju v CONFIGU') do
-  NxTest.assert_equal(5, NxS1C::TS::STD,
-                      'bump by zamkol zapis kniznice starsiemu pluginu bez jedineho dovodu')
+NxTest.test('S1-C (C2): ocakavania ziju v CONFIGU — zaznam sablony novy kluc NEMA') do
+  # S1-C `TemplateStore::STD` NEbumpovalo (ostalo 5). Od D-139 je 6 z INEHO
+  # dovodu — jednorazova obnova slotovych seedov; ocakavania ho nepotrebuju.
+  NxTest.assert_equal(6, NxS1C::TS::STD, 'STD 6 = D-139 (seedy slotu), nie ocakavania')
   hdr = NxS1C.src('noxun_engine', 'core', 'templates.rb')
   NxTest.refute(hdr.include?("'expects'"), 'zaznam sablony ziadny novy kluc NEMA')
 end
