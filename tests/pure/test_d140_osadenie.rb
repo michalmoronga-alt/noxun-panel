@@ -332,6 +332,13 @@ NxTest.test('D-140 (Codex #389 kolo 3): riadok BEZ bloku niky pomenuje ZNAMY kon
   row0 = NxD140.row_for(NxS1F.cab('appliance_refs' => [NxD140.ref]), [it]).first
   NxTest.assert(row0['sub'].include?('chýbajú údaje niky — kontrola sa nedá urobiť'),
                 "bez konfliktu ostava povodna veta: #{row0['sub']}")
+
+  # Konflikt z DELENIA ciel (nika je `unknown`): veta o chybajucich udajoch
+  # niky je v texte verdiktu uz sama — neopakuje sa (slepa delta #389, P3).
+  split = NxD140.row_for(NxD140.tall('appliance_refs' => [NxD140.ref], 'fronts' => NxS1F.fronts(869.0)), [it]).first
+  NxTest.assert_equal('warn', split['tone'])
+  NxTest.assert(split['sub'].include?('mimo'), "konflikt delenia je v riadku: #{split['sub']}")
+  NxTest.assert_equal(1, split['sub'].scan('chýbajú údaje niky').length, split['sub'])
 end
 
 NxTest.test('D-140 (Codex #389 kolo 2): VYCERPANA vyska je konflikt aj BEZ udajov niky') do

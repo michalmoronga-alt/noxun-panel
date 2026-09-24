@@ -426,7 +426,10 @@ module Noxun
             # vnutro, zle delenie ciel) ma prednost pred „kontrola sa nedá
             # urobiť" — Kontrola ho hlasi tiez, riadok nesmie tvrdit opak.
             if check.is_a?(Hash) && %w[clash unsatisfiable].include?(check['state'].to_s)
-              return ['warn', "#{label} · chýbajú údaje niky · #{check['text']}"]
+              # Ked je konflikt z DELENIA ciel, nika je `unknown` a jej veta
+              # („chýbajú údaje niky — …") uz v texte verdiktu je — predpona len inak.
+              niche_unknown = check['niche'].is_a?(Hash) && check['niche']['state'].to_s == 'unknown'
+              return ['warn', "#{label} · #{niche_unknown ? '' : 'chýbajú údaje niky · '}#{check['text']}"]
             end
 
             return ['warn', "#{label} · chýbajú údaje niky — kontrola sa nedá urobiť"]
