@@ -19,6 +19,7 @@ plný text vrátane výsledku je v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADM
 *(Blok **KOVANIE** je hotový — **v0.9.14 → v0.10.0, 2.–10.9.2026**, 50 PR (#277 → #340: slice 0 D-52 · A · H · B · C · D · D-118 · D-121 · W · F · E · G · I);
 plný text so všetkými task packages a výsledkom uzáveru je v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), priebeh dávok v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 Balík **Čiel (D-114/D-119/D-120)** je tiež uzavretý — **v0.11.0, 11.9.2026**, plný text v tom istom archíve. Zoznam **Mimo V1** ostáva v sekcii **Po V1 — zásobník**.)*
+*(Blok **5 · SPOTREBIČE S1** (V1-02) je hotový — **v0.12.9 → v0.13.0, 20.–24.9.2026**, PR #375 → #389 + uzáver #390 (E0 · A1 · A2 · E · B1 · B2 · F · C + smoke opravy A–C); plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), výsledok a checklist v [archiv/S1_ZAVER_2026-09-24.md](archiv/S1_ZAVER_2026-09-24.md).)*
 
 
 ### 1b · STABILIZAČNÁ REVÍZIA (dlhy fázy ŠTÚDIO — pred blokom KOVANIE)
@@ -224,9 +225,7 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 
 
 - *(Kovanie — D-109/D-110/D-111 aj fáza 3 — sa 26.8. vyčlenilo do vlastného bloku **KOVANIE**; ten je od **10.9.2026 hotový** (v0.10.0), plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).)*
-- **Spotrebiče S1** (V1-02) — **beží ako vlastný blok 5 nižšie** (packages schválené 20.9.2026, nočný autonómny beh). Rámec 6.9.: ručný katalóg s odkazmi, listami
-  a prílohami, spotrebič patrí zákazke a vlastníkovi podľa kategórie, cena len v rozpočte, spotrebičová šablóna. Rozšírenie 20.9.: **slot umývačky** (nový typ skrinky)
-  a **telo chladničky** (kontrolná geometria) idú do V1. Podklady: [zdroje/next_sessions/V1_DEBATA_2026-09-20_SPOTREBICE_POLIA.md](zdroje/next_sessions/V1_DEBATA_2026-09-20_SPOTREBICE_POLIA.md).
+- ✅ **Spotrebiče S1** (V1-02) — **hotové v0.13.0** (blok 5 uzavretý 24.9.2026): katalóg s listami a prílohami, spotrebič v zákazke s vlastníkom, slot umývačky, telo chladničky s Kontrolou niky a delenia čiel, očakávaný spotrebič; plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).
 - ✅ **D-124 · Predvoľby projektu v Materiáloch** — default rozbalené, ručne zbaliteľné; štyri skupiny Korpus / Čelá / Chrbát / Zásuvky vedľa seba, náhľady **115 × 115 px**
   (schválený mockup mínus 20 %), celý názov variantu a údaje pod vzorkou; v úzkom okne dva stĺpce. Spoločný picker, potvrdenie/zrušenie a serverový kontrakt zachované.
   **PR #344, v0.10.3.** „Materiál per rola dielca" ostáva v zásobníku Po V1. Podklad: `zdroje/next_sessions/D124_OUTSIDE_IN_2026-09-10.md`.
@@ -627,97 +626,6 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   sekcia hlási nedostupný zdroj, Štúdio nezamrzne. **Checklist uzáveru:** bump patch + `?v=` → testy → `ui-lifecycle.md` (odsek About + updater UI, vedomá odchýlka) →
   D-52 do DOGFOODING_vyriesene (plný text + riadok indexu) → STAV/KRONIKA/PLAN (blok 6 položka hotová).
 - ~~**D-20 · Quick actions — bezpečný move plugin**~~ — **✅ VYRIEŠENÁ 4.9.2026** package **NÁSTROJE-1** (T1a PR #293 v0.9.24 + T1b PR #294 v0.9.25); plný text v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md).
-
-### 5 · SPOTREBIČE S1 (V1-02) — poradie, brány a stav dávok (schválené Michalom 20.9.2026; nočný autonómny beh od 20.9.)
-
-**Cieľ bloku:** katalóg spotrebičov s overenými rozmermi a listami · spotrebič v zákazke s vlastníkom a kópiou rozmerov · **slot umývačky** ako nový typ skrinky · **telo chladničky**
-ako kontrolná geometria + Kontrola niky a delenia dverí · spotrebičová šablóna. Autority: debata [zdroje/next_sessions/V1_DEBATA_2026-09-20_SPOTREBICE_POLIA.md](zdroje/next_sessions/V1_DEBATA_2026-09-20_SPOTREBICE_POLIA.md)
-· cross audit ×3 [zdroje/next_sessions/S1_CROSS_AUDIT_2026-09-20.md](zdroje/next_sessions/S1_CROSS_AUDIT_2026-09-20.md) · **mockup [zdroje/ui20/mockup_spotrebice_s1.html](zdroje/ui20/mockup_spotrebice_s1.html) = záväzná vizuálna autorita**
-(R1–R17) · čísla listov [zdroje/next_sessions/SPOTREBICE_TECHLISTY_OVERENIE_2026-09-19.md](zdroje/next_sessions/SPOTREBICE_TECHLISTY_OVERENIE_2026-09-19.md).
-Nemenné zásady: semafor varuje, nikdy neblokuje · neznáme pole = prázdne, nikdy tichý default · telo spotrebiča = referencia (`manufactured: false`, `production_class: 'reference'`),
-nikdy v kusovníku ani VEPO · konkrétny model sa nikdy nedeformuje podľa niky · cena len v Rozpočte · katalóg je per PC (D-48 po V1).
-
-**Packages:** detailné packages dávok prešli tromi Codex kolami na docs PR #374 (31 nálezov zapracovaných) a podľa pravidla 3 kôl sa **z PLANu presunuli do lokálneho draftu**
-(`_dev/S1_PACKAGES_DRAFT.md`, per PC). **Finálny package každej dávky vzniká pri jej štarte: draft → `codex-audit` (Astra) → brief `_dev/BRIEF_s1<x>.md` → PR dávky zapíše
-package (skrátený na kontrakt) do riadku dávky nižšie + docs.** Riadok dávky v PLANe je autorita až od tohto zápisu.
-
-**Poradie a brány:** S1-E0 → S1-A1 → S1-A2 → S1-E → S1-B → S1-F → S1-C → S1-D. Každá dávka = brief → Opus subagent vo worktree z čerstvého `main` → PR → `codex-po-pr` (kolo 1 plné GH
-review; len P2/P3 = fix + interná delta) → merge `--match-head-commit` → `git checkout main && git pull`. Audit-povinné dávky (**A1, E, B, F, C**) majú PRED briefom `codex-audit`;
-kvótová brána `usage` pred každým auditom a subagentom. Pravidlo 3 kôl platí (rozdeliť, nie iterovať). Patch bump per PR, **uzáver bloku = v0.13.0**. Ráno denný report.
-**Stop pravidlá nočného behu:** P1/P0 v review → plné GH kolo; 3. kolo opráv → PR zavrieť a rozdeliť; in-SU FAIL → nahlásiť v rannom reporte, neobchádzať; Codex weekly zostatok < 10 %
-→ náhradná brána (slepý Opus + delta) a priznať v PR.
-
-- **S1-E0 · min výška korpusu 200 → 80 mm** *(✅ PR #375 zmergovaný 20.9.2026 → main `7d4c567`, v0.12.9; `CONFIG_SCHEMA` 14 → 15, config-aware klamp scale cez celý `build_plan`
-  (min 94 mm s policou), default sokla v JS validácii; Codex kolo 1 = 1×P1 + 2×P2, kolo 2 = 1×P2, delta overená; D-135)* — dôvod: korpus na dorovnanie nad umývačkou (V1_DEBATA §3).
-- **S1-A1 · Katalóg spotrebičov — jadro** *(✅ PR #377, v0.12.10 — nový modul `core/appliance_catalog.rb`; Codex audit Astra 20.9.: 2 BLOCKER + 10 FIX + 2 NOTE zapracované)*.
-  **Scope IN:** per-PC JSON `%APPDATA%\NOXUN\Engine\appliances.json` cez `JsonFileStore` (atomický zápis + `.bak`, vlastný sidecar zámok — nikdy vnorený do iného katalógového),
-  marker `std` 1 s dopredným guardom, matica `assess!` `:ok | :read_only | :degraded`. **Scope OUT:** UI, väzba do zákazky, cena, Demos/scraping, drag-and-drop, PDF náhľad.
-  **Kontrakt (R1–R7):** záznam = UUID `id` · `category` z kanonických kódov `fridge oven microwave dishwasher hob sink hood other` (SK popisky v jednej mape, guard parity;
-  kategória sa nastavuje LEN pri `create!`) · výrobca · názov · `shop_urls[]` · `sheet_urls[]` · poznámka · `dims` v štyroch blokoch **telo · nika · čelo a presahy · montáž**
-  (obsah `front` per kategória; presah rúry/mikra vždy s referenciou `body|niche`; každé pole voliteľné, **chýbajúci kľúč = neznáme, nikdy default**; validácia mm 0–5000,
-  kg 0–100, enumy, `*_min ≤ *_max`; kľúče mimo whitelistu prežijú bez validácie) · `derived[]` (cesty odvodených polí) · `attachments[]` · tombstone `deleted_at`.
-  **`rev` = SHA1 odtlačok obsahu** (neukladá sa, počíta sa pri čítaní) a je **povinný na KAŽDEJ mutácii** — server ho nikdy nedosadí, stale okno dostane `:conflict`; mutácia
-  beží pod zámkom nad čerstvo načítaným dokumentom. **Prílohy** v `%APPDATA%\NOXUN\Engine\appliances\<id>\` (mimo stromu, ktorý updater vymieňa) s **nemenným názvom
-  `<uuid>_<sanitized>.<ext>`**, ktorý sa nikdy nerecykluje; staging v cieľovom priečinku → limit 25 MB meraný aj na uloženej kópii → `rename` → až potom JSON; najviac jeden
-  náhľad; `remove_attachment!` súbor ponecháva. `snapshot_for` = whitelist s hlbokou kópiou + `catalog_std` (zákazka je od katalógu nezávislá). **Seed = 9 overených modelov**
-  (markerový, nikdy opakovane; hodnoty a URL výhradne z OVERENIA listov; drez Blanco sa neseeduje — Michal ho pridá ručne, kategória `sink` existuje). Jeden návratový tvar
-  `[status, info]` s cestou chybného poľa. Katalóg **zakladá boot pluginu** (`main.rb`, chránený blok). **DoD:** `tests/pure/test_s1a1_appliance_catalog.rb` (49 testov) + in-SU `run_s1a1` (prílohy na reálnom disku, `UI.openURL`,
-  zlyhaná kópia, tombstone) + docs `docs/architecture/appliances.md` a STANDARD §7.1.
-- **S1-A2 · Sekcia Štúdia SPOTREBIČE — pohľad Katalóg** *(UI, audit NIE)* — **✅ PR #378, v0.12.11**. 13. sekcia `appl` (skupina KATALÓGY medzi `hw` a `rules`),
-  serverový modul `ui/appliance_dialog.rb` **bez okna** (uzavretý `SECTION_ACTIONS`, `ready` v ňom nie je) + klient `ui/js/appliances.js` (prefix `ap*`, načítaný za `studio.js`).
-  **Kontrakt:** server skladá strom (poradie `CATEGORIES`, počty, podtitul), kartu v 4 blokoch aj polia formulára z **jednej tabuľky `ROWS`**; kľúč poľa modalu = cesta, ktorú
-  katalóg vracia v chybe; zápis = **echo sekcie bez zdvihu generácie** a kreslí len v aktívnej sekcii; miniatúry príloh lazy kanálom (`Sketchup::ImageRep`, 96 px, záporná cache);
-  `appl_open_url` pustí len http/https. „Do zákazky" a pohľad „V zákazke" sú `aria-disabled` s dôvodom (D-78) — aktivuje ich S1-B.
-- **S1-E · Slot umývačky — nový typ skrinky** — **✅ PR #381, v0.12.12**. Typ `dishwasher` bez korpusu: 7 vstupov (trieda 600/450, šírka, výška linky, hĺbka, telo V,
-  sokel = čelo od podlahy, čelo V), **jediný výrobný dielec = čelo** (pevný item `blind`, rola `false_front`, kľúč `front:F1/blind`) a **telo = referencia**
-  (`kind: reference`, základňa 200 odsadená 50/20) v aditívnom `plan[:references]` — nikdy cez `parts`. **Kontrakt:** `CONFIG_SCHEMA` 16 a `BOARD_CONFIG_SCHEMA` 2
-  rezervujú `appliance_refs[]` / `appliance_expects[]` (S1-B/F/C ich napĺňajú bez ďalšieho bumpu); väzby prežijú prestavbu, materiály, scale aj aplikovanie šablóny
-  a `appliance_refs[]` zaniká **len v kópii** (3 vstupy skrinky + dedup dosky s dopredným guardom); šablóna nesie `appliance_expects[]`, nikdy `appliance_refs[]`.
-  **Slot má podporu `none`** — `dw_front_bottom` nikdy netečie do `floor_height`, takže žiadne nohy ani príchyty sokla. **Šírka sa neklampuje na triedu** — úzky slot
-  sa postaví a hlási ho Kontrola ORANGE. `Construction.front_opening` je jediná autorita čelného otvoru (plán aj preflight), `CabinetBuilder.envelope` jediná autorita
-  obálky (snap, placement, mower). TemplateStore STD 5 = markerový seed „Umývačka 60/45" s markerom schémy. Kontroly: `dw_body_fit` · `dw_height_fit` (ORANGE, bez brány).
-- **S1-B1 ✅ PR #382, v0.12.13 · Spotrebič v zákazke — dáta, väzba, Kontrola** — `BUDGET_STD` 2 (položka += `catalog_id`, `snapshot`, `owner`, `customer_supplied`), **kanonické kódy
-  kategórií** (legacy sa pri čítaní prevedie, zapisuje sa kanón), **„dodáva zákazník" ako príznak** (cena ostáva, do súčtov 0, informačný riadok v CP), **nový modul
-  `core/appliance_binding.rb` = jediný transakčný vstup** (položka + `appliance_refs[]` oboch vlastníkov + prestavba v JEDNEJ operácii; guardy DocKey · std · matica · identita
-  PID+ID+druh · odpojený · novší config · bariéra observera bežia PRED `start_operation`; `ensure_root_context` len pri skutočnej prestavbe), `Bom.collect[:appliances]`,
-  Kontrola `appliance_owner_missing` (bez `owner_id`, deep-link do Rozpočtu) · `appliance_specs_missing` · `appliance_class_mismatch`, modal Rozpočtu
-  (Z katalógu · vlastník · prepínač) viazaný na dokument. **Review: 3 kolá Codexu** (1×P1+4×P2 · 1×P1+3×P2 · 4×P2) → interná verifikácia delty.
-- **S1-B2 ✅ PR #383, v0.12.14 · UI väzby** — pohľad **V zákazke** (mockup R3–R5: tabuľka so stavmi, riadky „nevybraný“ a „vlastník zmizol“, badge navigácie, medzisúčet ako preklik),
-  **jeden D-15 modal** pre „Pridať do zákazky“ aj „Do zákazky“ z karty katalógu, **riadok Spotrebič** v Základných aj v karte dosky (R9–R11; ponuka filtrovaná podľa niky len po osiach
-  kategórie, filter nie je brána) a **telo slotu z väzby** (`Construction.dw_body_dims`, `source: 'catalog'` + `item_id`). Zápisy idú existujúcim kanálom rozpočtu
-  (`ApplianceBinding.apply!` = 1 krok Späť); nález Kontroly o spotrebiči vedie deep-linkom do sekcie Spotrebiče. Nové: `ui/panel/actions_appliance.rb`, `ui/js/appliance_row.js`.
-- *(pôvodné zadanie S1-B, ponechané ako kontrakt)* — snapshot (identita + rozmery + odkazy + prílohy), `appliance_refs[]`
-  obojsmerná väzba (položky „len zákazka" = výslovná výnimka), matica kategória → vlastník, pohľad V zákazke, riadok Spotrebič v Inspectore (mockup R3–R5, R9–R11). Kontraktové body zo
-  Codex kôl: **jedna kanonická sada kódov kategórií = kódy katalógu + explicitná obojsmerná migrácia legacy kódov rozpočtu** (`chladnicka rura mikrovlnka umyvacka digestor varna_doska ine`
-  → `fridge oven microwave dishwasher hood hob other`, + `sink`) v `BUDGET_STD` 2 — existujúce zákazky sa otvoria a editujú ďalej · **„dodáva zákazník" je PRÍZNAK, nie nula:** cena
-  ostáva v nečíselnom stave (nil povolené), príznak vypína upozornenie „chýba cena" a riadok sa zo súčtov vylučuje · **obojsmerná väzba = JEDNA operácia:** priradenie, presun aj
-  odpojenie zapisujú položku zákazky (model dict) + `appliance_refs[]` vlastníka + rebuild v jednom `start_operation`/`commit_operation` cez nový operation-aware mutačný vstup (nie dve
-  existujúce cesty `BudgetStore.write!` + rebuild), takže jeden Ctrl+Z vráti obe strany · **zmazanie vlastníka bežným Delete v SketchUpe** (config aj `appliance_refs[]` zmiznú,
-  položka zákazky drží staré ID): položka sa NEMENÍ automaticky (Delete je transparentná operácia používateľa a Undo ju vráti) — Kontrola ju hlási ako **opraviteľného sirotu**
-  („vlastník neexistuje", ORANGE, s akciou odpojiť → job) a pohľad V zákazke ho ukáže ako „vlastník zmizol"; test Delete + Undo/Redo + odpojenie · **výber podľa niky porovnáva len osi, ktoré daná kategória kontroluje** (rúra/mikro len
-  Š + H; nejednoznačná nika = bez filtra).
-- **S1-F ✅ PR #N, v0.12.15 · Telo chladničky + Kontrola niky a delenia dverí** — **box kontrolnej niky** (minimá z listu, pásma dverí spotrebiča na čelnej ploche) vzniká
-  **len z väzby** `appliance_refs[]` kategórie chladnička a len pri troch kladných minimách; stojí na hornej ploche dna, je centrovaný, lícuje s čelnou rovinou a nikdy sa
-  nedeformuje. Nový čistý modul **`core/appliance_checks.rb`** = jediná autorita verdiktu, z ktorej žije Kontrola aj riadok Spotrebič: `appliance_niche_clash|<os>` (šírka
-  a hĺbka vždy, výška chladničky len pri jednej zóne; rúra a mikro Š + H) a `appliance_door_split` (hrana = vrch dolného čela od dna niky, pásmo `[D+10, D+G−s−10]`, výkres
-  výrobcu má prednosť). Kontrola hlási **len** `clash`/`unsatisfiable` — žiadna nová závažnosť. Náhľad kreslí box, pásma aj pásmo prípustnej hrany z payloadu servera
-  (mockup R4, R10, R12). Výstupy, kusovník ani VEPO sa nemenia.
-- **S1-C ✅ PR #N, v0.12.16 · Spotrebičová šablóna + ORANGE bez spotrebiča** — očakávaný spotrebič (`appliance_expects[]`, zoznam kategórií) sa nastaví v modale „Uložiť ako
-  šablónu" (skupina checkboxov podľa matice, slot readonly) alebo priamo v riadku Spotrebič (nová akcia `set_appliance_expects` = config-only zápis s pečiatkou schémy,
-  1 krok Späť, bez prestavby). Kontrola hlási **ORANGE `appliance_missing` per nesplnenú kategóriu** (slot bez modelu tiež), badge aj pohľad V zákazke to rátajú z toho
-  istého zberu. Aplikovanie šablóny väzby zachová a očakávania **zjednotí**; zmiznutá šablóna vklad odmietne.
-  **ODCHÝLKA od tohto riadku: TemplateStore STD sa NEBUMPUJE (ostáva 5)** — očakávania šablóny žijú v `config['appliance_expects']`, takže žiadny nový kľúč záznamu
-  nevznikol a bump by knižnicu len zamkol pre zápis staršiemu pluginu (audit C1/C2). Vedomá revízia B2: blok Spotrebiča sa skrýva už len tam, kde sa nedá očakávať nič —
-  skrinka a doska majú vždy jeden tlmený riadok voľby (inak sa očakávanie bez šablóny nedá zapnúť, mockup R10).
-- **Smoke S1 — opravy pred uzáverom** (Michal od 21.9.2026, plné znenia v [DOGFOODING.md](DOGFOODING.md) skupina SPOTREBIČE S1): **A ✅ PR #386, v0.12.17** — drez a doska
-  bez Tela a Niky, karta = len bloky kategórie (D-136) + polia slotu umývačky už nesvietia pri každej skrinke, nový guard `[hidden]` (D-137); UI, audit NIE ·
-  **B1 ✅ PR #387, v0.12.18** — čelo slotu sa v kusovníku/VEPO volá „Dv myčka", v modeli aj náhľade má symbol sklopu, zoznam čiel ho menuje „Dvere umývačky" (D-138);
-  audit NIE · **B2 ✅ PR #388, v0.12.19** výška čela = linka − sokel − medzera hore podľa schémy medzier, predvoľby slotu 880/100, „F1 · dv myčka" v Kovaní
-  (D-139 + zvyšok D-138); audit Astra 1 BLOCKER + 4 FIX zapracované, CONFIG_SCHEMA 17, TemplateStore STD 6 · **C ✅ PR #389, v0.12.20** výška osadenia chladničky:
-  čip „osadenie N mm" v riadku Spotrebič + okienko s „Použiť" posunie box niky, pásma dverí aj Kontrolu výšky a delenia čiel (D-140); audit Astra 3 BLOCKER + 6 FIX
-  zapracované (popover namiesto uloženia pri blur, výkres výrobcu kotvený k montáži na dne), CONFIG_SCHEMA 18, in-SU 3081 PASS; Codex kolo 1 = 1×P2, kolo 2 = 3×P2, kolo 3 = 2×P2 (opravené, interná delta — vedomá výnimka z pravidla 3 kôl). Zásobník zo smoke: D-141 (typ
-  „Spotrebič"), D-142 (delenie dverí pri zásuvkách pod chladničkou).
-- **S1-D · Uzáver bloku** *(docs, `VERSION` → 0.13.0)* — V1_VIZIA, archív, STAV, KRONIKA, README, POJMY, smoke checklist pre Michala.
 
 ## Po V1 — zásobník (nezaradené, nestratiť)
 

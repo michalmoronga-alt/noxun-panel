@@ -41,10 +41,14 @@
   kreslí sa len preto, aby bolo vidno, čo do slotu príde. Nikdy sa nedeformuje podľa skrinky: keď je širšia, **trčí** a Kontrola to prizná.
 - **Základňa tela (200)** — spodných 200 mm tela spotrebiča: **fixná**, užšia (20 mm z každej strany) a plytšia (50 mm spredu) než telo.
   Je to zóna nôh a soklu spotrebiča — v modeli vďaka nej vidno, kadiaľ vedie soklová lišta.
-- **Kontrolná geometria chladničky** (S1-F) — box **minimálnych rozmerov NIKY** z listu výrobcu (Beko 560 × 555 × 1940), ktorý stojí na hornej ploche dna,
+- **Kontrolná geometria chladničky** (S1-F) — box **minimálnych rozmerov NIKY** z listu výrobcu (Beko 560 × 555 × 1940), ktorý stojí na hornej ploche dna (zdvihnutej o **výšku osadenia**),
   je centrovaný a lícuje s čelnou rovinou. **Nie je to telo** (telo Beko je 540 × 1935 × 545): telo by tvrdilo, že sa spotrebič zmestí, aj keď na montáž
   chýba 20 mm šírky. Je to **referencia** — nikdy v kusovníku, VEPO ani v nákupe — a vzniká **len z priradeného modelu**; skrinka, ktorá chladničku iba
   očakáva, box nemá. Nikdy sa nedeformuje: keď nesedí, **trčí** a Kontrola to povie (šírka · výška · hĺbka, každá os zvlášť).
+- **Výška osadenia chladničky** (D-140, v0.12.20) — výška spodku chladničky (niky) nad **hornou plochou dna** skrinky, napr. vrch police pod chladničkou; predvolene 0 = stojí
+  na dne. Nastavuje sa čipom „osadenie N mm“ v riadku Spotrebič. Posunie **box niky** aj **pásma dverí**, Kontrola výšky počíta s **vnútrom − osadenie** a hrana delenia čiel sa
+  meria od zdvihnutého dna; pri **výkrese výrobcu** (odporúčané dolné dvere pre chladničku na dne) musia byť dolné nábytkové dvere o osadenie vyššie. Patrí kusu v tejto
+  skrinke — výmena modelu ho prenesie, presun do inej skrinky ani kópia nie.
 - **Pásma dverí spotrebiča** (S1-F) — vodorovné hrany na čelnej ploche boxu niky v miestach, kde sú hrany **dverí samotnej chladničky**. Viažu sa **ZDOLA**
   (Beko: spodok 40 + dolné dvere 629 = 669 je presné, medzera 71, horné pásmo je zvyšok do výšky niky — list ho presne nekótuje). Sú to kontrolné čiary,
   nie nábytkové čelá.

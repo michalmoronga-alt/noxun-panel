@@ -19,10 +19,11 @@ v PLANe prázdny**; V1 je hotové, keď je odškrtnuté všetko. Stav dopĺňaj�
 4. [ ] **Kovanie:** blok KOVANIE (architektúra V1 FINAL 2.9.2026): sety s klasifikáciou a katalóg (A, B, H hotové), recepty a odvodené dielce zásuviek (C), resolver + zámky (D),
    výklopy podľa hmotnosti (E), závesy max(výška, hmotnosť) + úchytka + Tip-On (F), nohy 4/6 + príchyty (G), šablóny s kovaním (I), UI/UX balík Čiel (D-114 + D-119 presah
    per strana + D-120 UKW na dolnej a bočných hranách). *(Plný model výklopov, výplne fáza B, D-109 pomer setu = mimo V1.)*
-5. [ ] **Spotrebiče S1 (rozhodnuté 6.9.2026, rozšírené 20.9.2026):** ručný katalóg s odkazmi, technickými listami a **galériou príloh** · spotrebič patrí zákazke a vlastníkovi
+5. [x] **Spotrebiče S1 (rozhodnuté 6.9.2026, rozšírené 20.9.2026; hotové v0.13.0, 24.9.2026 — [výsledok a overenie](archiv/S1_ZAVER_2026-09-24.md)):** ručný katalóg s odkazmi, technickými listami a **galériou príloh** · spotrebič patrí zákazke a vlastníkovi
    podľa kategórie (skrinka · **slot umývačky** · pracovná doska · len zákazka) · cena len v rozpočte · **slot umývačky = nový typ skrinky** (telo ako referencia, jediný dielec čelo,
    výplň hore ručne) · **telo chladničky = kontrolný box niky s pásmami dverí** + Kontrola niky (chladnička; rúra/mikro len Š + H) a delenia čiel podľa praxe · šablóna s tagom
-   „spotrebičová" upozorní bez spotrebiča · „dodáva zákazník". Predúloha listov hotová 19.9., cross audit ×3 a mockup schválené 20.9., packages v [PLAN.md](PLAN.md) blok 5.
+   „spotrebičová" upozorní bez spotrebiča · „dodáva zákazník". Predúloha listov hotová 19.9., cross audit ×3 a mockup schválené 20.9.; plný blok v [archíve](archiv/ROADMAP_hotove_etapy.md).
+   Zo smoke (21.–24.9.): výška čela slotu sa dopočíta z linky, soklu a medzery hore (výplň nad umývačkou = samostatný nízky korpus) a chladnička má výšku osadenia.
    *(Delené čelo umývačky, kontrola výšky/hmotnosti čela, police podľa niky, vetranie, digestorový korpus, telá rúry/mikra/dosky/digestora = mimo V1.)*
 6. [ ] **Výstupy:** VEPO CSV, kusovník, nákup kovania, rozpočet s cenami, XLSX cenová ponuka *(hotové — dávky E + fáza ŠTÚDIO)* · **zvyšok V1-03 (rozhodnuté 6.9.2026):**
    manuálne 1-klik overenie ceny + viac URL na položke („na faktúru" vyradené) · **D-94** nákup s pôvodom · **nárezový plán primitívny** (horná hranica počtu platní podľa zvoleného rozloženia namiesto odhadu z m²; objednáva človek) ·
