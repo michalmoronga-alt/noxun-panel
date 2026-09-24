@@ -316,6 +316,24 @@ NxTest.test('D-140 (Codex #389 kolo 2): cip LEN pri OBOJSMERNEJ vazbe — jednos
                 'bez identity vlastnika sa dokaz neda urobit')
 end
 
+NxTest.test('D-140 (Codex #389 kolo 3): riadok BEZ bloku niky pomenuje ZNAMY konflikt ako Kontrola') do
+  snap = NxS1F.snapshot
+  snap['dims'].delete('niche')
+  it = NxS1F.item('I-1', 'fridge', 'CAB-3', snap)
+  cfg = NxS1F.cab('appliance_refs' => [NxD140.ref(1940.0)])
+  row = NxD140.row_for(cfg, [it]).first
+  NxTest.assert_equal('warn', row['tone'])
+  NxTest.assert(row['sub'].include?('chýbajú údaje niky') && row['sub'].include?('osadenie 1940 ≥ vnútro 1940'),
+                "riadok hovori to iste co Kontrola: #{row['sub']}")
+  NxTest.refute(row['sub'].include?('kontrola sa nedá urobiť'), 'znamy konflikt nie je „neda sa"')
+  codes = NxS1F.codes(NxS1F.findings(NxS1F.record(cfg, [it])))
+  NxTest.assert(codes.include?('appliance_niche_clash|height'), codes.inspect)
+
+  row0 = NxD140.row_for(NxS1F.cab('appliance_refs' => [NxD140.ref]), [it]).first
+  NxTest.assert(row0['sub'].include?('chýbajú údaje niky — kontrola sa nedá urobiť'),
+                "bez konfliktu ostava povodna veta: #{row0['sub']}")
+end
+
 NxTest.test('D-140 (Codex #389 kolo 2): VYCERPANA vyska je konflikt aj BEZ udajov niky') do
   bez = NxS1F.item('I-1', 'fridge', 'CAB-3', NxS1F.snapshot({}))
   rec = NxS1F.record(NxS1F.cab('appliance_refs' => [NxD140.ref(1940.0)]), [bez])

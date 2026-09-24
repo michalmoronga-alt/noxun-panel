@@ -31,7 +31,8 @@
   z tej istej efektívnej výšky (inak radila opačnú opravu); (8) server no-op po zaokrúhlení; (9) prenos pri výmene modelu len fridge → fridge; NOTE: osadenie per kus.
   **GH Codex review:** kolo 1 = 1×P2 (Escape z tlačidla popoveru → Escape z každého prvku, spotrebuje sa) · kolo 2 = 3×P2 (vyčerpaná výška je konflikt aj bez
   údajov niky · čip osadenia len pri obojsmernej väzbe — jednostranný záznam sa dá len odpojiť · presun nezdedí osadenie zo starého záznamu cieľa, `carry_source`
-  len pri `same_target?`). Testy **4544 headless · 129 JS sád** (nové `test_d140_osadenie` Ruby 24 + JS 79 kontrol) · **in-SU 3081 PASS / 0 FAIL** (+32: box +150
+  len pri `same_target?`) · kolo 3 = 2×P2 (riadok bez bloku niky pomenuje známy konflikt ako Kontrola · po Escape/Zrušiť/Použiť fokus späť na čip) — **vedomá výnimka
+  z pravidla 3 kôl** (okrajové P2 bez zmeny konceptu, vzor S1-B1 #382): opravené na mieste + interná verifikácia delty, bez 4. GH kola. Testy **4545 headless · 129 JS sád** (nové `test_d140_osadenie` Ruby 25 + JS 86 kontrol) · **in-SU 3081 PASS / 0 FAIL** (+32: box +150
   a 1× Späť, 8 odmietnutí bez kroku Späť, prestavba dvierok drží osadenie + hrana 703, zápis z otvoreného komponentu, výmena modelu prenesie, presun (aj na
   starý jednostranný záznam) a kópia nie, 0 zmaže kľúč).
 - **SMOKE S1 · OPRAVA B2 — výška čela umývačky sa dopočíta (v0.12.19, 24.9.2026, PR #388, CONFIG_SCHEMA 17, TemplateStore STD 6).** D-139 (Michal 21.9.):

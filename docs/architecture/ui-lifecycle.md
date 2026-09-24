@@ -2919,7 +2919,8 @@ a od **S1-F** má viazaný riadok navyše **`check`** = celý verdikt (`{state, 
 - **Tón viazaného riadku** sa pýta na **tie isté vstupy** ako `Validation.check_appliance_bound` (chýbajúce rozmery niky · trieda umývačky vs trieda slotu) a od S1-F
   na **ten istý verdikt** (`ApplianceChecks.verdict`). Panel Kontrolu **nevolá** (potrebovala by celý zber modelu), preto to stráži test, ktorý porovnáva oba smery nad
   jednou fixtúrou. ORANGE riadok vzniká **len** pri `clash`/`unsatisfiable` — presne tam, kde nález vyrobí aj Kontrola; „nevieme" a „nekontrolované" idú do podtextu
-  bez zmeny tónu. Vetu skladá server do `sub` („Chladnička · nika ✓ — šírka, výška a hĺbka ✓ · hrana čiel 695 v 679–727 ✓"), **JS o nike ani o delení nevie nič**
+  bez zmeny tónu. **Pri chýbajúcom bloku niky má ZNÁMY konflikt** (`clash`/`unsatisfiable` — napr. osadenie, ktoré zje celé vnútro) **prednosť** pred vetou
+  „kontrola sa nedá urobiť" (D-140, Codex #389 kolo 3, P2): riadok potom hovorí „chýbajú údaje niky · nezmestí sa: …" ako Kontrola. Vetu skladá server do `sub` („Chladnička · nika ✓ — šírka, výška a hĺbka ✓ · hrana čiel 695 v 679–727 ✓"), **JS o nike ani o delení nevie nič**
   (stráži to Node sada nad zdrojom `appliance_row.js`).
 - **Filter ponuky a verdikt merajú tou istou toleranciou** (Codex #384 kolo 1, P2): osi aj ich porovnanie žijú v `ApplianceChecks` (`AXES`, `axis_fits?`,
   `AXIS_TOL` = 0,5 mm). Panel si tabuľku ani vzorec nekopíruje — kým mal vlastné, ponuka model odporučila a Kontrola ho vzápätí zhodila.
@@ -2948,7 +2949,8 @@ a od **S1-F** má viazaný riadok navyše **`check`** = celý verdikt (`{state, 
   pri prepnutí dokumentu najprv prepíše identitu a až potom zhodí fokus, takže uloženie na blur by starú hodnotu poslalo s novým dokumentom (Astra C BLOCKER 2).
   Escape, „Zrušiť" a klik mimo zrušia bez zápisu — **Escape z ktoréhokoľvek prvku** (aj po Tab na Pomoc/Použiť/Zrušiť) a **spotrebuje sa** (otvorený popover
   je najvyššia vrstva Inspectora; modály obslúži skôr načítaný `nx_esc.js`; Codex #389 kolo 1, P2), Enter platí len v poli; neplatné číslo pole označí
-  a nič nepošle; nezmenená hodnota nič nepošle. Po každom vykreslení riadkov
+  a nič nepošle; nezmenená hodnota nič nepošle. Po Escape, „Zrušiť" a „Použiť" sa **fokus vráti na čip** toho kusu (hľadá sa v aktuálnom DOM podľa `data-id`),
+  ale len keď bol v popoveri — vzor `closeFrontBulk`; klik mimo ani upratovanie pri zmene kontextu fokus nepresúvajú (Codex #389 kolo 3, P2). Po každom vykreslení riadkov
   `aprMountSync` popover nechá žiť **len** nad tým istým dokumentom, kusom (ID + PID) a riadkom, ktorý osadenie stále má — inak ho zavrie bez zápisu; zavrie ho aj
   `clearApplianceRows` a centrálne `nxDropDocState` (`aprMountClose`, prvá obrana pri zmene dokumentu). CSS má vlastné `.aprmountpop[hidden] { display: none }` (poučenie D-137).
 

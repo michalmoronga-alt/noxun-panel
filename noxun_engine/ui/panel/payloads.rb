@@ -422,6 +422,13 @@ module Noxun
           snap = item['snapshot'].is_a?(Hash) ? item['snapshot'] : {}
           dims = snap['dims'].is_a?(Hash) ? snap['dims'] : {}
           if APPL_NICHE_KINDS.include?(kind) && !dims['niche'].is_a?(Hash)
+            # D-140 (Codex #389 kolo 3, P2): ZNAMY konflikt (osadenie zje cele
+            # vnutro, zle delenie ciel) ma prednost pred „kontrola sa nedá
+            # urobiť" — Kontrola ho hlasi tiez, riadok nesmie tvrdit opak.
+            if check.is_a?(Hash) && %w[clash unsatisfiable].include?(check['state'].to_s)
+              return ['warn', "#{label} · chýbajú údaje niky · #{check['text']}"]
+            end
+
             return ['warn', "#{label} · chýbajú údaje niky — kontrola sa nedá urobiť"]
           end
 

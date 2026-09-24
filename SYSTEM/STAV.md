@@ -20,7 +20,7 @@ Etapa **V0.6 (katalógy a ceny) je obsahovo splnená**. **Od 20.8. sa z pluginu 
 od S1-B1 v `BUDGET_STD` 2:** marker zapíše **prvá** mutácia rozpočtu akéhokoľvek druhu a starší plugin odvtedy zákazku needituje **a zastaví oba cenové exporty**.
 Pred takou zákazkou aktualizovať **obe PC**.
 
-**Smoke oprava C (najnovšie, #389):** **4544 headless · 129 JS sád · 3081 in-SU PASS / 0 FAIL**. **B2 (#388):** 4520 · 128 · 3049. **B1:** 4509 · 127 · 3039. **A:** 4506 · 127. **S1-C:** 4499 · 127 · 3036. **S1-F:** 4452 · 126 · 2989.
+**Smoke oprava C (najnovšie, #389):** **4545 headless · 129 JS sád · 3081 in-SU PASS / 0 FAIL**. **B2 (#388):** 4520 · 128 · 3049. **B1:** 4509 · 127 · 3039. **A:** 4506 · 127. **S1-C:** 4499 · 127 · 3036. **S1-F:** 4452 · 126 · 2989.
 **S1-B2:** 4411 · 126 · 2963. **S1-B1:** 4369 · 124 · 2935 (3 kolá Codexu). **D-130b:** 4155 · 120 · 2779. **D-134:** 4128 · 118 · 2745. **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md); druhý PC, SU 2024 a render netestované).
 **Michal 11.9. potvrdil** test produktových odkazov aj potvrdzovania cien (CENY-KOV-A/B, #345/#346) **a** kontrolu balíka Čiel v0.11.0.
 

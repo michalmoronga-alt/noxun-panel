@@ -715,7 +715,7 @@ kvótová brána `usage` pred každým auditom a subagentom. Pravidlo 3 kôl pla
   audit NIE · **B2 ✅ PR #388, v0.12.19** výška čela = linka − sokel − medzera hore podľa schémy medzier, predvoľby slotu 880/100, „F1 · dv myčka" v Kovaní
   (D-139 + zvyšok D-138); audit Astra 1 BLOCKER + 4 FIX zapracované, CONFIG_SCHEMA 17, TemplateStore STD 6 · **C ✅ PR #389, v0.12.20** výška osadenia chladničky:
   čip „osadenie N mm" v riadku Spotrebič + okienko s „Použiť" posunie box niky, pásma dverí aj Kontrolu výšky a delenia čiel (D-140); audit Astra 3 BLOCKER + 6 FIX
-  zapracované (popover namiesto uloženia pri blur, výkres výrobcu kotvený k montáži na dne), CONFIG_SCHEMA 18, in-SU 3081 PASS; Codex kolo 1 = 1×P2, kolo 2 = 3×P2 (opravené). Zásobník zo smoke: D-141 (typ
+  zapracované (popover namiesto uloženia pri blur, výkres výrobcu kotvený k montáži na dne), CONFIG_SCHEMA 18, in-SU 3081 PASS; Codex kolo 1 = 1×P2, kolo 2 = 3×P2, kolo 3 = 2×P2 (opravené, interná delta — vedomá výnimka z pravidla 3 kôl). Zásobník zo smoke: D-141 (typ
   „Spotrebič"), D-142 (delenie dverí pri zásuvkách pod chladničkou).
 - **S1-D · Uzáver bloku** *(docs, `VERSION` → 0.13.0)* — V1_VIZIA, archív, STAV, KRONIKA, README, POJMY, smoke checklist pre Michala.
 

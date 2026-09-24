@@ -314,6 +314,58 @@ function reset(){ R.aprMountClose(); SENT.length = 0; DOC = 'doc-A'; ELS.aprMoun
 }
 
 // ---------------------------------------------------------------------------
+// 7b) FOKUS (Codex #389 kolo 3, P2) — po Escape / Zrušiť / Použiť sa vráti na
+//     čip, ale LEN keď bol v popoveri (vzor `closeFrontBulk`); upratovanie pri
+//     zmene dokumentu či kusu a klik mimo fokus nepresúvajú.
+// ---------------------------------------------------------------------------
+{
+  const noop = function(){};
+  const chipEl = chip('I-1', 150);
+  ELS.applRows.querySelectorAll = function(sel){ return sel === '[data-apr="mount"]' ? [chipEl] : []; };
+  const inside = stubEl('inside-btn');
+  inside.closest = function(sel){ return sel === '#aprMountPop' ? ELS.aprMountPop : null; };
+  const away = stubEl('away');
+  function openAgain(){ R.renderApplianceRows([fridgeRow()], CTX); R.aprMountOpen(chipEl); }
+
+  reset(); openAgain();
+  global.document.activeElement = inside;
+  fire('keydown', { key: 'Escape', target: inside, preventDefault: noop });
+  eq(chipEl.focused, 1, 'Escape v popoveri vráti fokus na čip');
+
+  openAgain(); global.document.activeElement = inside;
+  const cancelBtn = stubEl('cancel2');
+  cancelBtn._attrs = { 'data-apr': 'mount-cancel' };
+  cancelBtn.closest = function(sel){ return sel === '[data-apr]' ? cancelBtn : null; };
+  fire('click', { target: cancelBtn });
+  eq(chipEl.focused, 2, 'Zrušiť vráti fokus na čip');
+
+  openAgain(); global.document.activeElement = inside;
+  ELS.aprMountVal.value = '150';
+  R.aprMountApply();
+  eq([chipEl.focused, SENT.length], [3, 0], 'Použiť bez zmeny: fokus na čip, nič neodišlo');
+
+  openAgain(); global.document.activeElement = away;
+  fire('keydown', { key: 'Escape', target: away, preventDefault: noop });
+  eq([R.aprMountState(), chipEl.focused], [null, 3], 'Escape mimo popoveru zavrie, ale fokus neťahá späť');
+
+  openAgain(); global.document.activeElement = inside;
+  fire('mousedown', { target: away });
+  eq([R.aprMountState(), chipEl.focused], [null, 3], 'klik mimo: fokus patrí tomu, na čo sa kliklo');
+
+  openAgain(); global.document.activeElement = inside;
+  R.renderApplianceRows([fridgeRow()], { kind: 'cabinet', id: 'CAB-4', pid: 404 });
+  eq([R.aprMountState(), chipEl.focused], [null, 3], 'zmena kusu (upratovanie) fokus nepresúva');
+
+  openAgain(); global.document.activeElement = inside;
+  R.aprMountClose(); // tak volá nxDropDocState pri zmene dokumentu
+  eq(chipEl.focused, 3, 'zmena dokumentu fokus nepresúva');
+
+  ELS.applRows.querySelectorAll = function(){ return []; };
+  global.document.activeElement = null;
+  reset();
+}
+
+// ---------------------------------------------------------------------------
 // 8) GUARDY ZDROJA — žiadny blur zápis, popover je statický, CSS schová [hidden]
 // ---------------------------------------------------------------------------
 {

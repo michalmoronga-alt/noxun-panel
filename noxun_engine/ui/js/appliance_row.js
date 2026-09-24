@@ -179,11 +179,38 @@
     return true;
   }
 
-  function aprMountClose(){
+  // `restore` = pouzivatel popover SAM zrusil alebo potvrdil (Escape, Zrušiť,
+  // Použiť): fokus sa vrati na cip — ale LEN ked bol V POPOVERI (vzor
+  // `closeFrontBulk`; pri kliku mimo patri tomu, na co pouzivatel klikol).
+  // Upratovanie pri zmene dokumentu ci kusu (`aprMountSync`, `clearApplianceRows`,
+  // `nxDropDocState`) fokus NEPRESUVA (Codex #389 kolo 3, P2).
+  function aprMountClose(restore){
+    var s = APR_MOUNT;
     APR_MOUNT = null;
+    var inside = false;
+    if (restore === true){
+      try {
+        var ae = (typeof document === 'undefined') ? null : document.activeElement;
+        inside = !!(ae && typeof ae.closest === 'function' && ae.closest('#aprMountPop'));
+      } catch (e) { inside = false; }
+    }
     var pop = aprEl('aprMountPop');
     if (pop) pop.hidden = true;
+    var chip = (inside && s) ? aprMountChip(s.item) : null;
+    if (chip && chip.focus) chip.focus();
     return true;
+  }
+
+  // Cip TOHO kusu v aktualnom DOM — riadky sa prekresluju cez innerHTML, takze
+  // uzol z casu otvorenia uz nemusi zit; hlada sa podla `data-id`.
+  function aprMountChip(item){
+    var box = aprEl('applRows');
+    if (!box || !box.querySelectorAll) return null;
+    var list = box.querySelectorAll('[data-apr="mount"]');
+    for (var i = 0; i < list.length; i++){
+      if (String(list[i].getAttribute('data-id') || '') === String(item)) return list[i];
+    }
+    return null;
   }
 
   // Payload zapisu — z ZACHYTENEHO stavu (cista funkcia, Node test).
@@ -201,7 +228,7 @@
       return false;
     }
     var s = APR_MOUNT;
-    aprMountClose();
+    aprMountClose(true);
     if (Math.abs(v - s.prev) < 0.05) return false; // bez zmeny — ziadna prestavba
     if (typeof window === 'undefined' || !window.sketchup || !sketchup.set_appliance_mount) return false;
 
@@ -328,7 +355,7 @@
       if (a === 'studio'){ aprStudio(b.getAttribute('data-id')); return; }
       if (a === 'mount'){ aprMountOpen(b); return; }
       if (a === 'mount-ok'){ aprMountApply(); return; }
-      if (a === 'mount-cancel'){ aprMountClose(); }
+      if (a === 'mount-cancel'){ aprMountClose(true); }
     });
 
     // D-140: popover sa zatvara klikom MIMO (bez zapisu), Escape; Enter = Použiť.
@@ -347,7 +374,7 @@
       if (ev.key === 'Escape'){
         ev.preventDefault();
         if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
-        aprMountClose();
+        aprMountClose(true);
         return;
       }
       var t = ev.target;
