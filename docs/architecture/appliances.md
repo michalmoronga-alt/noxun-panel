@@ -323,11 +323,13 @@ jedno Späť by vrátilo len jednu z nich a zákazka by ostala v stave, ktorý v
   `Construction.appliance_mount_offset` (platné konečné číslo > 0, orezané na `MOUNT_OFFSET_MAX` 2000, inak 0 —
   neplatná hodnota stavbu nikdy nezhodí). Zapisuje ho akcia panela `set_appliance_mount`
   ([ui-lifecycle.md](ui-lifecycle.md), riadok Spotrebič), nie `apply!`: položka zákazky ani väzba sa nemenia.
-- **D-140: `add_ref!` PRENESIE osadenie pri prepise záznamu toho istého `item_id` na TEJ ISTEJ entite**
-  (`rebind_model`, re-bind) — `carry_mount!(rec, old)`, kde `old` sa prečíta **pred** prepisom zoznamu. Prenáša
-  sa **len medzi dvoma `fridge` záznamami** (Astra C FIX 9): `fridge → oven` na tej istej skrinke by nechal na rúre
-  zakázané osadenie a neskorší návrat na chladničku by ho oživil. Presun na inú skrinku ho neprenáša (starý záznam
-  tam nie je) a kópia skrinky ho nemá (`strip_appliance_refs!` zahodí celú väzbu).
+- **D-140: `add_ref!` PRENESIE osadenie pri prepise PLATNEJ väzby toho istého `item_id` na TEJ ISTEJ entite**
+  (`rebind_model`, re-bind bez zmeny vlastníka) — `carry_mount!(rec, carry_source(plan, item_id))`, kde zdroj sa prečíta
+  **pred** prepisom zoznamu a **len keď `same_target?(plan)`** (vlastník sa nemení a `resolve_previous` ho overil).
+  Prenáša sa **len medzi dvoma `fridge` záznamami** (Astra C FIX 9): `fridge → oven` na tej istej skrinke by nechal na rúre
+  zakázané osadenie a neskorší návrat na chladničku by ho oživil. **Presun osadenie nikdy neprenáša** — ani keď cieľová
+  entita nesie **jednostranný (starý) záznam** toho istého kusu s vlastným osadením (Codex #389 kolo 2, P2: hľadanie
+  „záznam s týmto `item_id` na cieli" by ho zdedilo). Kópia skrinky ho nemá (`strip_appliance_refs!` zahodí celú väzbu).
 - **Zapisovače refs.** Skrinka a slot idú cez `CabinetBuilder.write_appliance_refs!` (config → `normalize` →
   `rebuild_in_operation`; protiváha `strip_appliance_refs!`), **doska cez `BoardBuilder.write_appliance_refs!`** —
   zápis samotného configu **bez prestavby** (väzba jej geometriu nemení), ale **s pečiatkou
@@ -358,7 +360,8 @@ Inspector si ten istý záznam skladá z uloženého configu cez **`context(cfg)
   „výška nekontrolovaná — skrinka má viac zón“) a nikdy netvrdia, že je montáž priechodná: overená je **obálka niky**, nie police ani vnútorné vybavenie (FIX F13).
 - **D-140: VÝŠKA S OSADENÍM (`height_verdict`).** Pri `mount_offset > 0` (číta sa zo záznamu cez `mount_offset(rec)` = ten istý čitač ako builder) sa
   výška meria ako **`effective_height` = vnútro − osadenie**; šírka a hĺbka sa nemenia. Veta priznáva odpočet („výška 1790 < 1940 (vnútro 1940 −
-  osadenie 150)"). **Vyčerpaná výška (≤ 0) je `clash`**, nie `unknown` („osadenie 1940 ≥ vnútro 1940") a pri **viacerých zónach**, kde sa výška inak
+  osadenie 150)"). **Vyčerpaná výška (≤ 0) je `clash`**, nie `unknown` („osadenie 1940 ≥ vnútro 1940") — **aj keď model nemá v katalógu rozmery
+  niky** (`specs_missing`; Codex #389 kolo 2, P2: je to fakt skrinky, nie listu; vetu skladá jediný `exhausted_height_text`) — a pri **viacerých zónach**, kde sa výška inak
   preskakuje, beží aspoň kontrola presahu **osadenie + nika > celé vnútro** = `clash` (Astra C FIX 6); inak ostáva `skip`. **`niche_message`** (veta
   Kontroly) berie **tú istú** efektívnu výšku — inak by pri 1800 − 100 = 1700 a požiadavke 1750–1780 radila „priveľa: 1800 > 1780", teda opačnú
   opravu než Inspector (FIX 7); pri vyčerpanej výške a viacerých zónach preberá vetu verdiktu.

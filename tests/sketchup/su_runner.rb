@@ -5246,21 +5246,34 @@ module NoxunSuRunner
     ok("D-140 (f): JEDEN Spat vratil povodny model aj osadenie (#{back.inspect})",
        back && (back[2] - 1940.0).abs < TOL && d140_mount_of(cab) == 150.0)
 
-    # (g) PRESUN na inu skrinku osadenie NEPRENASA; Spat ho vrati s kusom.
+    # (g) PRESUN na inu skrinku osadenie NEPRENASA — ani ked cielova skrinka nesie
+    #     JEDNOSTRANNY (stary) zaznam toho isteho kusu s vlastnym osadenim
+    #     (Codex #389 kolo 2, P2); taky riadok cip osadenia NEMA (server by zapis
+    #     aj tak odmietol). Spat vrati kus s osadenim prvej skrinke.
     cab2 = e::CabinetBuilder.build(
       model, D140_CAB, transform: Geom::Transformation.translation(e::Units.point(2000.0, 0, 0))
     )
     if cab2
       cid2 = e::Store.get(cab2, 'cabinet_id').to_s
+      stale = s1b1_refs(cab).find { |r| r['item_id'].to_s == item_id }.merge('mount_offset' => 90.0)
+      e::CabinetBuilder.guarded do
+        model.start_operation('SU-TEST D-140 jednostranny zaznam', true)
+        e::CabinetBuilder.write_appliance_refs!(model, cab2, [stale])
+        model.commit_operation
+      end
+      cab2 = s1f_cab(model, cid2)
+      row2 = d140_row(cab2)
+      ok("D-140 (g): jednostranny zaznam v cudzej skrinke cip osadenia NEMA (#{row2 ? row2['mount'].inspect : 'bez riadku'})",
+         row2 && !row2.key?('mount') && d140_mount_of(cab2) == 90.0)
       s1b2_pick(model, cab2, item_id, echo: cid2)
       cab2 = s1f_cab(model, cid2)
-      ok("D-140 (g): presun na inu skrinku osadenie NEPRENIESOL (z = #{s1f_box_z(cab2)}, cakam 118)",
-         d140_mount_of(cab2).nil? && d140_at?(cab2, 118.0))
+      ok("D-140 (g): presun osadenie NEPRENIESOL ani zo stareho zaznamu ciela (z = #{s1f_box_z(cab2)}, cakam 118)",
+         d140_mount_of(cab2).nil? && d140_at?(cab2, 118.0) && s1b1_owner(model, item_id)['id'].to_s == cid2)
       Sketchup.undo
       cab = s1f_cab(model, cid)
       cab2 = s1f_cab(model, cid2)
-      ok('D-140 (g): JEDEN Spat vratil kus s osadenim 150 do prvej skrinky',
-         d140_mount_of(cab) == 150.0 && s1f_niche(cab2).nil?)
+      ok('D-140 (g): JEDEN Spat vratil kus s osadenim 150 do prvej skrinky (ciel ma zase len stary zaznam)',
+         d140_mount_of(cab) == 150.0 && d140_mount_of(cab2) == 90.0)
       cab2.erase! if cab2 && cab2.valid?
     else
       ok('D-140 (g): fixtura druhej skrinky', false)

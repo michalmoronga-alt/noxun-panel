@@ -71,8 +71,10 @@ module NxD140
     F.item('I-1', 'fridge', 'CAB-3', F.snapshot(nil, fd))
   end
 
-  def row_for(cfg, items)
-    PANEL.appliance_rows('cabinet', cfg, items, PANEL.appliance_interior(cfg))
+  # Riadky karty skrinky CAB-3 — `owner_id` posiela produkcny payload vzdy
+  # (bez neho by chyba obojsmerny dokaz a cip osadenia by sa neukazal).
+  def row_for(cfg, items, owner_id: 'CAB-3')
+    PANEL.appliance_rows('cabinet', cfg, items, PANEL.appliance_interior(cfg), owner_id: owner_id)
   end
 
   # Ciel akcie: skrinka CAB-3 (pid 303) s refs a polozkami zakazky.
@@ -297,6 +299,41 @@ NxTest.test('D-140: osadenie NEMA rura ani osirely riadok (zaniknuta polozka)') 
   NxTest.refute(orphan.key?('mount'), 'sirota sa neupravuje, len odpaja')
 end
 
+NxTest.test('D-140 (Codex #389 kolo 2): cip LEN pri OBOJSMERNEJ vazbe — jednostranny zaznam ho nema') do
+  cfg = NxS1F.cab('appliance_refs' => [NxD140.ref(150.0)])
+  ok = NxD140.row_for(cfg, [NxS1F.item('I-1', 'fridge', 'CAB-3')]).first
+  NxTest.assert_equal(150.0, ok['mount']['value'], 'polozka patri tejto skrinke -> cip')
+
+  # Polozku medzitym presunulo druhe okno do CAB-4, CAB-3 drzi uz len stary zaznam.
+  stale = NxD140.row_for(cfg, [NxS1F.item('I-1', 'fridge', 'CAB-4')]).first
+  NxTest.assert_equal('bound', stale['state'], 'riadok ostava (da sa odpojit)')
+  NxTest.refute(stale.key?('mount'), 'server by zapis vzdy odmietol -> cip nesmie klamat')
+
+  twice = NxS1F.cab('appliance_refs' => [NxD140.ref(150.0), NxD140.ref(90.0)])
+  rows = NxD140.row_for(twice, [NxS1F.item('I-1', 'fridge', 'CAB-3')])
+  NxTest.assert(rows.none? { |r| r.key?('mount') }, 'dva zaznamy toho isteho kusu = nejednoznacny ciel')
+  NxTest.assert(NxD140.row_for(cfg, [NxS1F.item], owner_id: '').none? { |r| r.key?('mount') },
+                'bez identity vlastnika sa dokaz neda urobit')
+end
+
+NxTest.test('D-140 (Codex #389 kolo 2): VYCERPANA vyska je konflikt aj BEZ udajov niky') do
+  bez = NxS1F.item('I-1', 'fridge', 'CAB-3', NxS1F.snapshot({}))
+  rec = NxS1F.record(NxS1F.cab('appliance_refs' => [NxD140.ref(1940.0)]), [bez])
+  v = NxD140::AC.niche_verdict(rec)
+  NxTest.assert_equal(true, v['specs_missing'], 'model rozmery niky naozaj nema')
+  NxTest.assert_equal('clash', v['axes']['height'])
+  NxTest.assert(v['text'].include?('osadenie 1940 ≥ vnútro 1940'), v['text'])
+  msgs = NxS1F.findings(rec).select { |i| i['stable_key'].include?('niche_clash|height') }
+  NxTest.assert_equal(1, msgs.length, 'Kontrola ho hlasi')
+  NxTest.assert(msgs.first['message_sk'].include?('osadenie 1940 ≥ vnútro 1940'), msgs.first['message_sk'])
+
+  # Osadenie, ktore vnutro NEVYCERPA, bez udajov niky ostava „nevieme".
+  ok = NxS1F.record(NxS1F.cab('appliance_refs' => [NxD140.ref(100.0)]), [bez])
+  v2 = NxD140::AC.niche_verdict(ok)
+  NxTest.assert_equal('unknown', v2['state'])
+  NxTest.assert_equal([], NxS1F.findings(ok).select { |i| i['stable_key'].include?('niche_clash') })
+end
+
 NxTest.test('D-140: nahlad kresli box, pasma aj pasmo hrany od ZDVIHNUTEHO dna') do
   cfg = NxD140.tall('appliance_refs' => [NxD140.ref(150.0)], 'fronts' => NxS1F.fronts(869.0))
   rows = NxD140.row_for(cfg, [NxS1F.item])
@@ -464,7 +501,34 @@ NxTest.test('D-140 (FIX 9): vymena modelu prenesie osadenie LEN medzi dvoma chla
 
   src = NxS1C.src('noxun_engine', 'core', 'appliance_binding.rb')
   body = src[/def add_ref!\(.*?\n      end\n/m].to_s
-  NxTest.assert(body.index('carry_mount!(rec, old)') &&
-                body.index('carry_mount!(rec, old)') < body.index('.reject'),
+  call = "carry_mount!(rec, carry_source(plan, rec['item_id']))"
+  NxTest.assert(body.index(call) && body.index(call) < body.index('.reject'),
                 'stary zaznam sa precita PRED prepisom zoznamu')
+end
+
+NxTest.test('D-140 (Codex #389 kolo 2): PRESUN na jednostranny zaznam osadenie NEZDEDI') do
+  NxTest.skip!('payload testy potrebuju Store fake') unless NxTest.headless?
+  ab = NxD140::AB
+  stale = { 'item_id' => 'I-1', 'category' => 'fridge', 'mount_offset' => 90.0 }
+  cab_b = NxS1C.cabinet('CAB-4', 404, refs: [stale])
+  cab_a = NxS1C.cabinet('CAB-3', 303, refs: [{ 'item_id' => 'I-1', 'category' => 'fridge' }])
+
+  moving = { owner_changed: true, new_entity: cab_b, prev: { inst: cab_a, kind: 'cabinet' } }
+  NxTest.assert(ab.carry_source(moving, 'I-1').nil?, 'presun: zdroj osadenia NIE JE')
+  rebind = { owner_changed: false, new_entity: cab_b, prev: { inst: cab_b, kind: 'cabinet' } }
+  NxTest.assert_equal(90.0, ab.carry_source(rebind, 'I-1')['mount_offset'], 'vymena modelu: platna vazba')
+  orphan = { owner_changed: false, new_entity: cab_b, prev: nil }
+  NxTest.assert(ab.carry_source(orphan, 'I-1').nil?, 'bez overenej predchadzajucej vazby nic')
+
+  written = []
+  NxS1C.with_stubs([[ab, :write_refs!, ->(_m, _k, _inst, list) { written << list; true }]]) do
+    item = NxS1F.item('I-1', 'fridge', 'CAB-4')
+    owner = { 'kind' => 'cabinet', 'id' => 'CAB-4' }
+    ab.add_ref!(NxS1C::FakeModel.new, moving.merge(owner: owner), owner, item)
+    rec = written.last.find { |r| r['item_id'] == 'I-1' }
+    NxTest.refute(rec.key?('mount_offset'), "presun nezdedil stare osadenie ciela: #{rec.inspect}")
+    ab.add_ref!(NxS1C::FakeModel.new, rebind.merge(owner: owner), owner, item)
+    NxTest.assert_equal(90.0, written.last.find { |r| r['item_id'] == 'I-1' }['mount_offset'],
+                        'vymena modelu na tej istej entite osadenie drzi')
+  end
 end

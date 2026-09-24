@@ -254,7 +254,8 @@ module Noxun
           # funkcia ako v zbere (`ApplianceBinding.bound_categories` cez
           # obojsmerny dokaz) — cita ju aj riadok „očakáva", aj popisky volby.
           bound = appliance_expects_bound(kind, refs, items, owner_id)
-          rows = refs.filter_map { |ref| appliance_bound_row(kind, cfg, ref, by_id[ref['item_id'].to_s], ctx) }
+          owner = { 'kind' => kind, 'id' => owner_id.to_s, 'refs' => refs }
+          rows = refs.filter_map { |ref| appliance_bound_row(kind, cfg, ref, by_id[ref['item_id'].to_s], ctx, owner) }
           rows += appliance_expected_rows(kind, cfg, bound, items, interior, ctx)
           picker = appliance_expects_row(kind, cfg, bound)
           picker ? rows + [picker] : rows
@@ -342,7 +343,9 @@ module Noxun
           {}
         end
 
-        def appliance_bound_row(kind, cfg, ref, item, ctx = {})
+        # `owner` = zaznam vlastnika v tvare `ref_matches?` (`{kind, id, refs}`)
+        # — z neho sa overuje, ci je osadenie naozaj zapisatelne (D-140).
+        def appliance_bound_row(kind, cfg, ref, item, ctx = {}, owner = nil)
           cat = BudgetStore.canon_appliance_type(ref['category']).to_s
           return nil if cat.empty?
 
@@ -359,11 +362,25 @@ module Noxun
                   'sub' => sub, 'tone' => tone, 'link' => true }
           row['check'] = check if check
           # D-140: VYSKA OSADENIA — len chladnicka v skrinke (box niky ma len ona)
-          # a len pri zivej polozke (sirota sa neupravuje, len odpaja).
-          if cat == 'fridge' && kind == ApplianceBinding::KIND_CABINET && item
+          # a len pri OBOJSMERNEJ vazbe (sirota ani jednostranny zaznam sa
+          # neupravuju, len odpajaju).
+          if cat == 'fridge' && kind == ApplianceBinding::KIND_CABINET && appliance_mount_editable?(owner, item, id)
             row['mount'] = { 'value' => mount, 'text' => "osadenie #{fmt_mm(mount)} mm" }
           end
           row
+        end
+
+        # D-140 (Codex #389 kolo 2, P2): cip osadenia ukazuje LEN tam, kde ho
+        # akcia `set_appliance_mount` aj prijme — TEN ISTY dokaz ako
+        # `appliance_mount_target`: ziva polozka patri TEJTO skrinke, jej refs
+        # nesu `item_id` (`ref_matches?`) a nesu ho PRAVE RAZ. Jednostranny
+        # zaznam (polozku medzitym presunulo druhe okno) je stav na odpojenie —
+        # ovladac, ktory server vzdy odmietne, by klamal.
+        def appliance_mount_editable?(owner, item, item_id)
+          return false unless item.is_a?(Hash) && owner.is_a?(Hash) && defined?(ApplianceBinding)
+          return false unless Array(owner['refs']).count { |r| r.is_a?(Hash) && r['item_id'].to_s == item_id.to_s } == 1
+
+          ApplianceBinding.ref_matches?(owner, BudgetStore.owner_field(item['owner']), item_id)
         end
 
         # S1-F: VERDIKT NIKY A DELENIA CIEL pre riadok. Pocita ho `ApplianceChecks`

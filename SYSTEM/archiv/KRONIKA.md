@@ -29,8 +29,11 @@
   (dolné dvere musia narásť o osadenie, poznámka to povie); (4) `ensure_root_context` pred prestavbou z otvoreného komponentu; (5) server overí živú položku tejto
   skrinky, práve jeden fridge ref a echo pôvodnej hodnoty; (6) vyčerpaná výška = konflikt, pri viacerých zónach kontrola presahu nad celé vnútro; (7) veta Kontroly
   z tej istej efektívnej výšky (inak radila opačnú opravu); (8) server no-op po zaokrúhlení; (9) prenos pri výmene modelu len fridge → fridge; NOTE: osadenie per kus.
-  Testy **4541 headless · 129 JS sád** (nové `test_d140_osadenie` Ruby 21 + JS 75 kontrol) · **in-SU 3080 PASS / 0 FAIL** (+31: box +150 a 1× Späť, 8 odmietnutí bez
-  kroku Späť, prestavba dvierok drží osadenie + hrana 703, zápis z otvoreného komponentu, výmena modelu prenesie, presun a kópia nie, 0 zmaže kľúč).
+  **GH Codex review:** kolo 1 = 1×P2 (Escape z tlačidla popoveru → Escape z každého prvku, spotrebuje sa) · kolo 2 = 3×P2 (vyčerpaná výška je konflikt aj bez
+  údajov niky · čip osadenia len pri obojsmernej väzbe — jednostranný záznam sa dá len odpojiť · presun nezdedí osadenie zo starého záznamu cieľa, `carry_source`
+  len pri `same_target?`). Testy **4544 headless · 129 JS sád** (nové `test_d140_osadenie` Ruby 24 + JS 79 kontrol) · **in-SU 3081 PASS / 0 FAIL** (+32: box +150
+  a 1× Späť, 8 odmietnutí bez kroku Späť, prestavba dvierok drží osadenie + hrana 703, zápis z otvoreného komponentu, výmena modelu prenesie, presun (aj na
+  starý jednostranný záznam) a kópia nie, 0 zmaže kľúč).
 - **SMOKE S1 · OPRAVA B2 — výška čela umývačky sa dopočíta (v0.12.19, 24.9.2026, PR #388, CONFIG_SCHEMA 17, TemplateStore STD 6).** D-139 (Michal 21.9.):
   výška čela slotu = **výška linky − sokel − medzera hore**; medzera hore je to isté pole schémy medzier ako pri každej skrinke (predvolene 2, záporná = presah
   nad linku), pri slote bez polí „medzi" a „dole". Vstup „Čelo V" aj riadky „Čelo hore"/„Výplň hore" zanikli; Základné ukazujú **Čelo V** a **Medzeru hore**

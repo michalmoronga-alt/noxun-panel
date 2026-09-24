@@ -2939,12 +2939,16 @@ a od **S1-F** má viazaný riadok navyše **`check`** = celý verdikt (`{state, 
   katalógu materiálov prekresľuje kartu dosky aj vtedy, keď je označená skrinka — globál by sa dal prepísať pod rukami a zápis by odišiel na cudzieho vlastníka.
 - **Odchod z kontextu riadky ZAHODÍ** (`clearApplianceRows`): prázdny výber čistí oba kontajnery, prechod na dosku ten korpusový. Nestačí ich skryť — s kontajnerom
   odchádza aj **kontext vlastníka** (`data-apr-*`), inak by vo vkladacom režime ostal visieť riadok cudzej skrinky so starými akciami.
-- **D-140: VÝŠKA OSADENIA chladničky = ČIP v riadku + STATICKÝ POPOVER.** Viazaný riadok chladničky v skrinke so živou položkou nesie `mount: {value, text}`
-  („osadenie 150 mm"); iná kategória, slot, doska ani sirota ho nedostanú. Riadok kreslí **tlačidlo-čip** pred „odpojiť" (žiadny nový riadok — vertikálny priestor), **nie pole**.
+- **D-140: VÝŠKA OSADENIA chladničky = ČIP v riadku + STATICKÝ POPOVER.** Viazaný riadok chladničky v skrinke nesie `mount: {value, text}` („osadenie 150 mm")
+  **len pri obojsmernej väzbe** — `appliance_mount_editable?` robí **ten istý dôkaz** ako serverový cieľ akcie (živá položka patrí tejto skrinke, `ref_matches?`,
+  záznam s `item_id` práve raz; Codex #389 kolo 2, P2). Iná kategória, slot, doska, sirota ani **jednostranný záznam** (položku presunulo druhé okno) čip
+  nedostanú — ovládač, ktorý server vždy odmietne, by klamal; taký riadok sa dá len odpojiť. Riadok kreslí **tlačidlo-čip** pred „odpojiť" (žiadny nový riadok — vertikálny priestor), **nie pole**.
   Klik otvorí **statický** `#aprMountPop` **za** `#applRows` (prekreslenie riadkov ho nezmaže, rozpísaná hodnota prežije echo prestavby — Astra C FIX 8), ktorý pri
   otvorení **zachytí** dokument, vlastníka (druh, ID, PID), `item_id` a pôvodnú hodnotu. Zapisuje **výhradne** „Použiť"/Enter — **nikdy `blur`**: `nxSetModelGuid`
   pri prepnutí dokumentu najprv prepíše identitu a až potom zhodí fokus, takže uloženie na blur by starú hodnotu poslalo s novým dokumentom (Astra C BLOCKER 2).
-  Escape, „Zrušiť" a klik mimo zrušia bez zápisu; neplatné číslo pole označí a nič nepošle; nezmenená hodnota nič nepošle. Po každom vykreslení riadkov
+  Escape, „Zrušiť" a klik mimo zrušia bez zápisu — **Escape z ktoréhokoľvek prvku** (aj po Tab na Pomoc/Použiť/Zrušiť) a **spotrebuje sa** (otvorený popover
+  je najvyššia vrstva Inspectora; modály obslúži skôr načítaný `nx_esc.js`; Codex #389 kolo 1, P2), Enter platí len v poli; neplatné číslo pole označí
+  a nič nepošle; nezmenená hodnota nič nepošle. Po každom vykreslení riadkov
   `aprMountSync` popover nechá žiť **len** nad tým istým dokumentom, kusom (ID + PID) a riadkom, ktorý osadenie stále má — inak ho zavrie bez zápisu; zavrie ho aj
   `clearApplianceRows` a centrálne `nxDropDocState` (`aprMountClose`, prvá obrana pri zmene dokumentu). CSS má vlastné `.aprmountpop[hidden] { display: none }` (poučenie D-137).
 

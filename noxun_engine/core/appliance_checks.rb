@@ -170,6 +170,17 @@ module Noxun
                    'text' => 'kontrola niky sa nerobí' }
         end
         if missing
+          # D-140 (Codex #389 kolo 2, P2): osadenie, ktore zje CELE vnutro, je
+          # konflikt aj bez udajov niky — je to fakt skrinky, nie listu.
+          over = exhausted_height_text(rec)
+          if over
+            states = { 'height' => 'clash' }
+            texts = { 'height' => over }
+            return { 'state' => 'clash', 'axes' => states, 'axis_texts' => texts, 'specs_missing' => true,
+                     'reason' => 'model nemá v katalógu rozmery niky',
+                     'text' => niche_text('clash', states, texts) }
+          end
+
           return { 'state' => 'unknown', 'axes' => {}, 'axis_texts' => {}, 'specs_missing' => true,
                    'reason' => 'model nemá v katalógu rozmery niky',
                    'text' => 'chýbajú údaje niky — kontrola sa nedá urobiť' }
@@ -216,9 +227,8 @@ module Noxun
         full = num(Hash(rec['interior'])['height'])
         lo = num(Hash(niche)['height_min'])
         tail = full ? " (vnútro #{mm(full)} − osadenie #{mm(m)})" : ''
-        if full && have && !have.positive?
-          return ['clash', "výška: osadenie #{mm(m)} ≥ vnútro #{mm(full)}"]
-        end
+        over = exhausted_height_text(rec)
+        return ['clash', over] if over
         if rec['single_zone'] == false
           if full && lo && (m + lo) > full + AXIS_TOL
             return ['clash', "výška: osadenie #{mm(m)} + nika #{mm(lo)} > vnútro #{mm(full)}"]
@@ -240,6 +250,19 @@ module Noxun
       def effective_height(rec)
         full = num(Hash(rec['interior'])['height'])
         full.nil? ? nil : (full - mount_offset(rec)).round(2)
+      end
+
+      # VYCERPANA vyska: osadenie >= cele vnutro -> veta konfliktu, inak nil.
+      # JEDNO miesto pre verdikt s udajmi niky (`height_verdict`) aj bez nich
+      # (`niche_verdict` pri `specs_missing`) — obe cesty hovoria tu istu vetu.
+      def exhausted_height_text(rec)
+        m = mount_offset(rec)
+        return nil unless m.positive?
+
+        have = effective_height(rec)
+        return nil if have.nil? || have.positive?
+
+        "výška: osadenie #{mm(m)} ≥ vnútro #{mm(num(Hash(rec['interior'])['height']))}"
       end
 
       # === JEDINE POROVNANIE OSI V CELOM ENGINE ================================
