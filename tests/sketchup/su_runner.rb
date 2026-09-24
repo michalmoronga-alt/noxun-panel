@@ -19673,6 +19673,20 @@ module NoxunSuRunner
            got == want && sok)
         i.erase! if i && i.valid?
       end
+      # D-138: jedine celo SLOTU UMYVACKY je datovo blenda (bez kovania), ale
+      # otvara sa NADOL — v modeli ma symbol SKLOPU „Λ" (overeny aj geometricky)
+      # a v kusovniku/VEPO sa vola „Dv myčka".
+      is = e::CabinetBuilder.build(model, S1E_SLOT)
+      e::DirectionCheck.refresh!(model)
+      sp = is ? a2b_part(is, 'front:F1/blind') : nil
+      sg = sp ? a2b_symbol_of(sp) : nil
+      sok2, swhy2 = sp ? a2b_shape_check(is, sp, 'down') : [false, 'celo slotu chyba']
+      ok("D-138: celo slotu umyvacky kresli sklop down (#{sg.inspect})", sg == 'down')
+      ok("D-138: ciary z dolnych rohov do stredu hornej hrany#{sok2 ? '' : " — #{swhy2}"}",
+         sg == 'down' && sok2)
+      ok("D-138: dielec slotu sa v modeli vola „Dv myčka“ (#{sp ? e::Store.get(sp, 'name').inspect : 'nil'})",
+         sp && e::Store.get(sp, 'name').to_s == 'Dv myčka')
+      is.erase! if is && is.valid?
       # Zasuvka je PRERUSOVANA (bucket „move"), blenda PLNA (bucket „fixed") —
       # inak by sa dva rovnake X nedali od seba odlisit.
       e::DirectionCheck.refresh!(model)
