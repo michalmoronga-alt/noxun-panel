@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-140** — Výška osadenia chladničky v skrinke: čip „osadenie N mm" v riadku Spotrebič otvorí malé okienko s číslom (od hornej plochy dna, napr. vrch police); box niky aj pásma dverí sa posunú a Kontrola výšky aj delenia čiel počíta od zdvihnutého dna — 24.9.2026, PR #389, v0.12.20
 - **D-139** — Výška čela slotu umývačky sa dopočíta: výška linky − sokel − medzera hore zo schémy medzier; vstup „Čelo V" zanikol, predvolený slot 880 / 100 (čelo 778), výplň nad umývačkou = slot po jej spodok — 24.9.2026, PR #388, v0.12.19
 - **D-138** — Čelo slotu umývačky je „Dv myčka" so symbolom sklopu (model aj náhľad), v Čelách „Dvere umývačky" a v Kovaní/Nákupe „F1 · dv myčka"; kovanie ostáva len úchytka — 24.9.2026, PR #387 + #388, v0.12.18–v0.12.19
 - **D-137** — Štyri polia a päť výstupov slotu umývačky (a pomocník „?" k typu slotu v modale šablóny) sa už neukazujú pri každej skrinke — skrytie prebíjalo CSS; nový guard to stráži pre celý panel aj Štúdio — 23.9.2026, PR #386, v0.12.17
@@ -128,6 +129,29 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-140 — Výška osadenia chladničky v skrinke, vyriešené 24.9.2026
+
+**Výsledok: PR #389, v0.12.20 (CONFIG_SCHEMA 18).** Pôvodné znenie (Michal, smoke S1 bod 4, 23.9.2026): *„Chýba mi nastavenie výšky spotrebiča — ak dávam
+pod ňu policu, chladnička ostáva prilepená na dno. Chcel by som textbox, kde môžem zadať výšku — zároveň rovno prepočítava umiestnenie dverí."*
+24.9.: miesto a význam schválené — „osadenie od dna" v riadku Spotrebič, merané **od hornej plochy dna po spodok niky**, predvolene 0; skrinka so zásuvkami
+pod chladničkou = neskôr (D-142).
+
+**Čo sa zmenilo.** Riadok viazanej chladničky v skrinke má **čip „osadenie N mm"** (žiadny nový riadok). Klik otvorí malé okienko s číslom, „Použiť" / Enter
+zapíše, Escape / „Zrušiť" / klik mimo zruší. Po zápise sa v **jednom kroku Späť**: posunie **box niky** o zadanú výšku (pásma dverí spotrebiča idú s ním),
+**Kontrola výšky** meria vnútro − osadenie (veta to prizná: „výška 1790 < 1940 (vnútro 1940 − osadenie 150)"; osadenie, ktoré zje celú výšku, je konflikt)
+a **hrana delenia čiel** sa meria od zdvihnutého dna niky. Pri výkrese výrobcu (odporúčané dolné dvere z listu) platí jeho čísla pre chladničku na dne, preto
+pri osadení musia byť dolné dvere o toľko vyššie — poznámka to povie. Čelá sa samy nemenia (Kontrola odporučí hranu). Výmena modelu chladničky osadenie
+**prenesie**, presun na inú skrinku a kópia skrinky **nie**.
+
+**Prečo tak (audit Astra, 3 BLOCKER + 6 FIX):** schéma 18 (plugin v0.12.19 by kľúč ignoroval a pri výmene modelu zahodil) · zápis **len** tlačidlom, nikdy pri
+opustení poľa (prepnutie dokumentu by inak poslalo hodnotu do iného modelu) — okienko si pri otvorení zapamätá dokument, skrinku aj pôvodnú hodnotu ·
+výkres výrobcu kotvený k montáži na dne (inak by sa posun algebraicky zrušil a Kontrola ticho tvrdila OK) · zatvorenie otvoreného komponentu pred prestavbou ·
+server overí živú položku a pôvodnú hodnotu (starý príkaz neprepíše novšie osadenie) · veta Kontroly radí tú istú opravu ako Inspector · prenos pri výmene
+len medzi dvoma chladničkami · osadenie patrí kusu (dve chladničky = každá svoje).
+
+**Kompatibilita.** `CONFIG_SCHEMA` 18: plugin v0.12.19 skrinku s osadením neprestaví (odmietne novší config). Bez migrácie — chýbajúce osadenie = 0 = doterajšie
+správanie. **Aktualizovať obe PC.**
 
 ### D-139 — Výška čela umývačky sa dopočíta z linky, soklu a medzery hore, vyriešené 24.9.2026
 

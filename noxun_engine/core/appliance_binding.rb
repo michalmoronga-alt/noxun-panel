@@ -722,9 +722,34 @@ module Noxun
         return false if item.nil?
 
         rec = ref_record(item)
+        carry_mount!(rec, carry_source(plan, rec['item_id']))
         list = refs_of(plan[:new_entity]).reject { |r| r['item_id'].to_s == rec['item_id'] }
         list << rec
         write_refs!(model, owner['kind'].to_s, plan[:new_entity], list)
+      end
+
+      # D-140: VYSKA OSADENIA patri KUSU V TEJTO SKRINKE — pri prepise PLATNEJ
+      # vazby toho isteho `item_id` na TEJ ISTEJ entite (vymena modelu, re-bind
+      # bez zmeny vlastnika) sa prenesie, ale LEN medzi dvoma chladnickami
+      # (Astra C FIX 9: `fridge -> oven` by nechal zakazane osadenie na rure).
+      # Presun ho NEPRENASA — zdroj dava vyhradne `carry_source`.
+      def carry_mount!(rec, old)
+        return rec unless old.is_a?(Hash) && old['category'].to_s == 'fridge' && rec['category'].to_s == 'fridge'
+
+        m = Construction.appliance_mount_offset(old)
+        rec['mount_offset'] = m if m.positive?
+        rec
+      end
+
+      # Zdroj osadenia pre `carry_mount!` = zaznam PLATNEJ vazby na tej istej
+      # entite (`same_target?`: vlastnik sa nemeni a `resolve_previous` ho
+      # overil). Codex #389 kolo 2 (P2): pri PRESUNE na entitu, ktora nesie len
+      # JEDNOSTRANNY (stary) zaznam toho isteho kusu, by sa inak zdedilo jeho
+      # stare osadenie — presun ho vzdy nuluje. -> zaznam | nil
+      def carry_source(plan, item_id)
+        return nil unless same_target?(plan)
+
+        refs_of(plan[:new_entity]).find { |r| r['item_id'].to_s == item_id.to_s }
       end
 
       # KONTRAKT ZAZNAMU `appliance_refs[]` (cita ho S1-B2 telo slotu, S1-F box

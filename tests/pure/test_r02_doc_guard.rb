@@ -227,7 +227,7 @@ NxTest.test('R-02: zmena dokumentu ZAHODI vsetok rozpracovany stav panela') do
   # Kazdy novy pending buffer / editor / modal patri SEM (inak prezije
   # prepnutie dokumentu a jeho zapis skonci v cudzej zakazke).
   %w[cancelCabinetEdits cancelBoardEdits dropCabRename closeCabRenameEditor
-     absModalCloseSilent closeSaveTemplateModal closeSimilarModal].each do |fn|
+     absModalCloseSilent closeSaveTemplateModal closeSimilarModal aprMountClose].each do |fn|
     NxTest.assert(drop.include?("typeof #{fn} === 'function'") && drop.include?("#{fn}();"),
                   "#{fn} sa pri zmene dokumentu vola (a je volany bezpecne cez typeof)")
   end

@@ -17,6 +17,24 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **SMOKE S1 · OPRAVA C — výška osadenia chladničky v skrinke (v0.12.20, 24.9.2026, PR #389, CONFIG_SCHEMA 18).** D-140 (Michal 23.9.: „ak dávam pod ňu policu,
+  chladnička ostáva prilepená na dno … rovno prepočítava umiestnenie dverí"; 24.9. schválené „osadenie od dna" v riadku Spotrebič). Záznam väzby chladničky
+  v skrinke nesie **`mount_offset`** (mm od hornej plochy dna po spodok niky; chýbajúci = 0, nula sa neukladá) s **jediným čitačom**
+  `Construction.appliance_mount_offset`: **box niky** stojí na `z_lo + osadenie` (pásma dverí idú s ním), **výška niky** = vnútro − osadenie, **hrana delenia čiel**
+  sa meria od zdvihnutého dna. Zápis ide novou akciou panela **`set_appliance_mount`** (prestavba = jeden krok Späť, položka zákazky sa nemení); v riadku je
+  **čip „osadenie N mm"** a statické okienko s „Použiť". **AUDIT ASTRA (3 BLOCKER + 6 FIX + 1 NOTE) zmenil návrh:** (1) bump schémy 17 → **18** (v0.12.19 by kľúč
+  ignoroval a pri výmene modelu zahodil); (2) pôvodné pole s uložením pri opustení **nahradil popover** — `nxSetModelGuid` prepína identitu PRED zhodením fokusu, takže
+  blur by poslal hodnotu do iného dokumentu; popover zachytí dokument, kus aj pôvodnú hodnotu pri otvorení, prežije prekreslenie riadkov a zmena kontextu ho zavrie
+  bez zápisu (aj centrálne `nxDropDocState`); (3) **výkres výrobcu kotvený k montáži na dne** — odčítanie nového dna od hrany aj pásma by posun algebraicky zrušilo
+  (dolné dvere musia narásť o osadenie, poznámka to povie); (4) `ensure_root_context` pred prestavbou z otvoreného komponentu; (5) server overí živú položku tejto
+  skrinky, práve jeden fridge ref a echo pôvodnej hodnoty; (6) vyčerpaná výška = konflikt, pri viacerých zónach kontrola presahu nad celé vnútro; (7) veta Kontroly
+  z tej istej efektívnej výšky (inak radila opačnú opravu); (8) server no-op po zaokrúhlení; (9) prenos pri výmene modelu len fridge → fridge; NOTE: osadenie per kus.
+  **GH Codex review:** kolo 1 = 1×P2 (Escape z tlačidla popoveru → Escape z každého prvku, spotrebuje sa) · kolo 2 = 3×P2 (vyčerpaná výška je konflikt aj bez
+  údajov niky · čip osadenia len pri obojsmernej väzbe — jednostranný záznam sa dá len odpojiť · presun nezdedí osadenie zo starého záznamu cieľa, `carry_source`
+  len pri `same_target?`) · kolo 3 = 2×P2 (riadok bez bloku niky pomenuje známy konflikt ako Kontrola · po Escape/Zrušiť/Použiť fokus späť na čip) — **vedomá výnimka
+  z pravidla 3 kôl** (okrajové P2 bez zmeny konceptu, vzor S1-B1 #382): opravené na mieste + interná verifikácia delty, bez 4. GH kola. Testy **4545 headless · 129 JS sád** (nové `test_d140_osadenie` Ruby 25 + JS 86 kontrol) · **in-SU 3081 PASS / 0 FAIL** (+32: box +150
+  a 1× Späť, 8 odmietnutí bez kroku Späť, prestavba dvierok drží osadenie + hrana 703, zápis z otvoreného komponentu, výmena modelu prenesie, presun (aj na
+  starý jednostranný záznam) a kópia nie, 0 zmaže kľúč).
 - **SMOKE S1 · OPRAVA B2 — výška čela umývačky sa dopočíta (v0.12.19, 24.9.2026, PR #388, CONFIG_SCHEMA 17, TemplateStore STD 6).** D-139 (Michal 21.9.):
   výška čela slotu = **výška linky − sokel − medzera hore**; medzera hore je to isté pole schémy medzier ako pri každej skrinke (predvolene 2, záporná = presah
   nad linku), pri slote bez polí „medzi" a „dole". Vstup „Čelo V" aj riadky „Čelo hore"/„Výplň hore" zanikli; Základné ukazujú **Čelo V** a **Medzeru hore**

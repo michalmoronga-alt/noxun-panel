@@ -254,7 +254,8 @@ module Noxun
           # funkcia ako v zbere (`ApplianceBinding.bound_categories` cez
           # obojsmerny dokaz) — cita ju aj riadok „očakáva", aj popisky volby.
           bound = appliance_expects_bound(kind, refs, items, owner_id)
-          rows = refs.filter_map { |ref| appliance_bound_row(kind, cfg, ref, by_id[ref['item_id'].to_s], ctx) }
+          owner = { 'kind' => kind, 'id' => owner_id.to_s, 'refs' => refs }
+          rows = refs.filter_map { |ref| appliance_bound_row(kind, cfg, ref, by_id[ref['item_id'].to_s], ctx, owner) }
           rows += appliance_expected_rows(kind, cfg, bound, items, interior, ctx)
           picker = appliance_expects_row(kind, cfg, bound)
           picker ? rows + [picker] : rows
@@ -342,12 +343,15 @@ module Noxun
           {}
         end
 
-        def appliance_bound_row(kind, cfg, ref, item, ctx = {})
+        # `owner` = zaznam vlastnika v tvare `ref_matches?` (`{kind, id, refs}`)
+        # — z neho sa overuje, ci je osadenie naozaj zapisatelne (D-140).
+        def appliance_bound_row(kind, cfg, ref, item, ctx = {}, owner = nil)
           cat = BudgetStore.canon_appliance_type(ref['category']).to_s
           return nil if cat.empty?
 
           id = ref['item_id'].to_s
-          check = appliance_check(kind, cat, id, item, ctx)
+          mount = Construction.appliance_mount_offset(ref)
+          check = appliance_check(kind, cat, id, item, ctx, mount)
           tone, sub = appliance_row_tone(kind, cfg, cat, item, check)
           row = { 'state' => 'bound', 'item_id' => id, 'category' => cat,
                   'category_label' => ApplianceCatalog.category_label(cat),
@@ -357,28 +361,49 @@ module Noxun
                   'text' => (item ? Bom.appliance_label(item) : 'položka už v rozpočte nie je'),
                   'sub' => sub, 'tone' => tone, 'link' => true }
           row['check'] = check if check
+          # D-140: VYSKA OSADENIA — len chladnicka v skrinke (box niky ma len ona)
+          # a len pri OBOJSMERNEJ vazbe (sirota ani jednostranny zaznam sa
+          # neupravuju, len odpajaju).
+          if cat == 'fridge' && kind == ApplianceBinding::KIND_CABINET && appliance_mount_editable?(owner, item, id)
+            row['mount'] = { 'value' => mount, 'text' => "osadenie #{fmt_mm(mount)} mm" }
+          end
           row
+        end
+
+        # D-140 (Codex #389 kolo 2, P2): cip osadenia ukazuje LEN tam, kde ho
+        # akcia `set_appliance_mount` aj prijme — TEN ISTY dokaz ako
+        # `appliance_mount_target`: ziva polozka patri TEJTO skrinke, jej refs
+        # nesu `item_id` (`ref_matches?`) a nesu ho PRAVE RAZ. Jednostranny
+        # zaznam (polozku medzitym presunulo druhe okno) je stav na odpojenie —
+        # ovladac, ktory server vzdy odmietne, by klamal.
+        def appliance_mount_editable?(owner, item, item_id)
+          return false unless item.is_a?(Hash) && owner.is_a?(Hash) && defined?(ApplianceBinding)
+          return false unless Array(owner['refs']).count { |r| r.is_a?(Hash) && r['item_id'].to_s == item_id.to_s } == 1
+
+          ApplianceBinding.ref_matches?(owner, BudgetStore.owner_field(item['owner']), item_id)
         end
 
         # S1-F: VERDIKT NIKY A DELENIA CIEL pre riadok. Pocita ho `ApplianceChecks`
         # nad zaznamom v TOM ISTOM tvare, aky ma zber (`Bom.collect[:appliances]`)
         # — Kontrola aj Inspector tak hovoria to iste cislo o tej istej skrinke.
         # nil = niet co pocitat (polozka zmizla, doska, slot).
-        def appliance_check(kind, category, item_id, item, ctx)
+        def appliance_check(kind, category, item_id, item, ctx, mount = 0.0)
           return nil unless item.is_a?(Hash) && defined?(ApplianceChecks)
           return nil if ctx.nil? || ctx.empty?
 
-          ApplianceChecks.verdict(appliance_check_record(kind, category, item_id, item, ctx))
+          ApplianceChecks.verdict(appliance_check_record(kind, category, item_id, item, ctx, mount))
         rescue StandardError => e
           Engine.log_error(e, 'Panel.appliance_check')
           nil
         end
 
-        def appliance_check_record(kind, category, item_id, item, ctx)
+        # D-140: `mount` = vyska osadenia z REF tohto kusu (zber `Bom` ho berie
+        # z toho isteho miesta) — nikdy zo spolocneho kontextu vlastnika.
+        def appliance_check_record(kind, category, item_id, item, ctx, mount = 0.0)
           snap = item['snapshot'].is_a?(Hash) ? item['snapshot'] : {}
           { 'item_id' => item_id, 'name' => Bom.appliance_label(item), 'category' => category,
             'owner' => { 'kind' => kind }, 'state' => 'bound',
-            'snapshot' => Bom.appliance_snapshot_dims(snap) }
+            'snapshot' => Bom.appliance_snapshot_dims(snap), 'mount_offset' => mount.to_f }
             .merge(Bom.appliance_front_dims(snap))
             .merge('interior' => ctx['interior'], 'z_lo' => ctx['z_lo'], 'gap' => ctx['gap'],
                    'single_zone' => ctx['single_zone'], 'fronts_pair' => ctx['fronts_pair'])
@@ -397,6 +422,16 @@ module Noxun
           snap = item['snapshot'].is_a?(Hash) ? item['snapshot'] : {}
           dims = snap['dims'].is_a?(Hash) ? snap['dims'] : {}
           if APPL_NICHE_KINDS.include?(kind) && !dims['niche'].is_a?(Hash)
+            # D-140 (Codex #389 kolo 3, P2): ZNAMY konflikt (osadenie zje cele
+            # vnutro, zle delenie ciel) ma prednost pred „kontrola sa nedá
+            # urobiť" — Kontrola ho hlasi tiez, riadok nesmie tvrdit opak.
+            if check.is_a?(Hash) && %w[clash unsatisfiable].include?(check['state'].to_s)
+              # Ked je konflikt z DELENIA ciel, nika je `unknown` a jej veta
+              # („chýbajú údaje niky — …") uz v texte verdiktu je — predpona len inak.
+              niche_unknown = check['niche'].is_a?(Hash) && check['niche']['state'].to_s == 'unknown'
+              return ['warn', "#{label} · #{niche_unknown ? '' : 'chýbajú údaje niky · '}#{check['text']}"]
+            end
+
             return ['warn', "#{label} · chýbajú údaje niky — kontrola sa nedá urobiť"]
           end
 

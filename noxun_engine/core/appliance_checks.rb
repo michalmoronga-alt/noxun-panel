@@ -170,6 +170,17 @@ module Noxun
                    'text' => 'kontrola niky sa nerobí' }
         end
         if missing
+          # D-140 (Codex #389 kolo 2, P2): osadenie, ktore zje CELE vnutro, je
+          # konflikt aj bez udajov niky — je to fakt skrinky, nie listu.
+          over = exhausted_height_text(rec)
+          if over
+            states = { 'height' => 'clash' }
+            texts = { 'height' => over }
+            return { 'state' => 'clash', 'axes' => states, 'axis_texts' => texts, 'specs_missing' => true,
+                     'reason' => 'model nemá v katalógu rozmery niky',
+                     'text' => niche_text('clash', states, texts) }
+          end
+
           return { 'state' => 'unknown', 'axes' => {}, 'axis_texts' => {}, 'specs_missing' => true,
                    'reason' => 'model nemá v katalógu rozmery niky',
                    'text' => 'chýbajú údaje niky — kontrola sa nedá urobiť' }
@@ -185,7 +196,9 @@ module Noxun
         states = {}
         texts = {}
         axes.each do |axis|
-          st, txt = axis_verdict(axis, niche, interior[axis], rec)
+          # D-140: vyska sa meria od DNA NIKY (vnutro − osadenie).
+          have = axis == 'height' ? effective_height(rec) : interior[axis]
+          st, txt = axis_verdict(axis, niche, have, rec)
           states[axis] = st
           texts[axis] = txt
         end
@@ -197,11 +210,59 @@ module Noxun
       # JEDNA os. -> [stav, veta]
       def axis_verdict(axis, niche, have, rec)
         label = AXIS_LABEL[axis] || axis
+        return height_verdict(niche, have, rec) if axis == 'height' && mount_offset(rec).positive?
         if ZONE_AXES.include?(axis) && rec['single_zone'] == false
           return ['skip', "#{label} nekontrolovaná — skrinka má viac zón"]
         end
 
         axis_check(axis, niche, have)
+      end
+
+      # D-140: VYSKA S OSADENIM. Dno niky je `z_lo + osadenie`, dostupna vyska
+      # `vnutro − osadenie`. Astra C FIX 6: vycerpany priestor (≤ 0) je ZNAMY
+      # konflikt, nie „nevieme", a pri VIACERYCH zonach, kde sa vyska inak
+      # nekontroluje, sa aspon overi, ze box nepresahuje CELE vnutro.
+      def height_verdict(niche, have, rec)
+        m = mount_offset(rec)
+        full = num(Hash(rec['interior'])['height'])
+        lo = num(Hash(niche)['height_min'])
+        tail = full ? " (vnútro #{mm(full)} − osadenie #{mm(m)})" : ''
+        over = exhausted_height_text(rec)
+        return ['clash', over] if over
+        if rec['single_zone'] == false
+          if full && lo && (m + lo) > full + AXIS_TOL
+            return ['clash', "výška: osadenie #{mm(m)} + nika #{mm(lo)} > vnútro #{mm(full)}"]
+          end
+
+          return ['skip', 'výška nekontrolovaná — skrinka má viac zón']
+        end
+
+        st, txt = axis_check('height', niche, have)
+        [st, st == 'unknown' ? txt : "#{txt}#{tail}"]
+      end
+
+      # D-140: vyska osadenia z ZAZNAMU (ten isty citac ako builder).
+      def mount_offset(rec)
+        Construction.appliance_mount_offset(rec)
+      end
+
+      # Dostupna vyska niky = vnutro − osadenie (nil = vnutro nepozname).
+      def effective_height(rec)
+        full = num(Hash(rec['interior'])['height'])
+        full.nil? ? nil : (full - mount_offset(rec)).round(2)
+      end
+
+      # VYCERPANA vyska: osadenie >= cele vnutro -> veta konfliktu, inak nil.
+      # JEDNO miesto pre verdikt s udajmi niky (`height_verdict`) aj bez nich
+      # (`niche_verdict` pri `specs_missing`) — obe cesty hovoria tu istu vetu.
+      def exhausted_height_text(rec)
+        m = mount_offset(rec)
+        return nil unless m.positive?
+
+        have = effective_height(rec)
+        return nil if have.nil? || have.positive?
+
+        "výška: osadenie #{mm(m)} ≥ vnútro #{mm(num(Hash(rec['interior'])['height']))}"
       end
 
       # === JEDINE POROVNANIE OSI V CELOM ENGINE ================================
@@ -301,15 +362,27 @@ module Noxun
         return split_unknown('dno niky sa nedá zistiť') if z_lo.nil?
 
         s = num(rec['gap']) || Fronts::GAP_DEFAULT
+        # Pasmo je v suradniciach NIKY (0 = dno niky). Pasma z praxe su vztiahnute
+        # k spotrebicu, takze s osadenim idu same; VYKRES VYROBCU je kotveny
+        # k STANDARDNEJ montazi (chladnicka na dne) — preto sa prevadza cez
+        # `z_lo`, nie cez zdvihnute dno (Astra C BLOCKER 3: odcitanie noveho dna
+        # od hrany AJ pasma by posun algebraicky zrusilo).
         range, source, note = split_range(rec, pair, z_lo, s)
         return split_unknown('list nedáva rozmery dverí spotrebiča') if range.nil?
+
+        m = mount_offset(rec)
+        if source == 'drawing' && m.positive?
+          note = [note, "výkres výrobcu je pre chladničku na dne — pri osadení #{mm(m)} sa dolné dvere zväčšujú o #{mm(m)}"]
+                 .compact.join(' · ')
+        end
 
         lo, hi = range
         if lo && hi && hi < lo - EPS
           return split_unsatisfiable(rec, s, note)
         end
 
-        edge = (num(pair['lower_z1']).to_f - z_lo).round(2)
+        # D-140: hrana sa meria od DNA NIKY (horna plocha dna + osadenie).
+        edge = (num(pair['lower_z1']).to_f - (z_lo + m)).round(2)
         state = within?(edge, lo, hi) ? 'ok' : 'clash'
         rec_mid = (lo && hi) ? ((lo + hi) / 2.0).round(1) : nil
         { 'state' => state, 'edge' => edge, 'range' => [lo, hi], 'recommended' => rec_mid,
@@ -463,14 +536,22 @@ module Noxun
         label = AXIS_LABEL[axis] || axis
         niche = niche_of(rec)
         interior = rec['interior'].is_a?(Hash) ? rec['interior'] : {}
-        have = num(interior[axis])
+        # Astra C FIX 7: TA ISTA dostupna vyska ako verdikt (vnutro − osadenie)
+        # — inak by Kontrola radila opacnu opravu nez Inspector.
+        m = axis == 'height' ? mount_offset(rec) : 0.0
+        have = axis == 'height' ? effective_height(rec) : num(interior[axis])
+        if m.positive? && (!have || !have.positive? || rec['single_zone'] == false)
+          return "Spotrebič „#{name}“ — #{verdict_niche['axis_texts'][axis]}."
+        end
+
+        tail = m.positive? ? " (vnútro #{mm(num(interior[axis]))} − osadenie #{mm(m)})" : ''
         lo = num(niche["#{axis}_min"])
         hi = num(niche["#{axis}_max"])
         if lo && have && have < lo - EPS
-          return "Spotrebič „#{name}“ potrebuje niku #{label} min #{mm(lo)}, skrinka má #{mm(have)}."
+          return "Spotrebič „#{name}“ potrebuje niku #{label} min #{mm(lo)}, skrinka má #{mm(have)}#{tail}."
         end
         if hi && have && have > hi + EPS
-          return "Spotrebič „#{name}“ potrebuje niku #{label} najviac #{mm(hi)}, skrinka má #{mm(have)}."
+          return "Spotrebič „#{name}“ potrebuje niku #{label} najviac #{mm(hi)}, skrinka má #{mm(have)}#{tail}."
         end
 
         "Spotrebič „#{name}“ — #{verdict_niche['axis_texts'][axis]}."

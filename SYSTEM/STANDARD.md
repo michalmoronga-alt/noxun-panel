@@ -164,6 +164,10 @@ zhoda ID dôkazom nie je, ID skriniek aj dosiek sa **recyklujú** (`Ids.next_id`
 PID sa odmieta, dva kusy s tým istým ID sú „nejednoznačná identita". Záznam väzby má tvar
 `{item_id, category, body{…}, niche{…}, bands{…}, furniture_doors{…}, install{…}, snapshot_at}` a **chýbajúce pole = kľúč chýba, nikdy 0** (nula je rozmer, „nevieme" nie je).
 **Obe strany sa zapisujú v JEDNEJ operácii** cez `ApplianceBinding.apply!` — jeden krok Späť vráti položku, refs oboch vlastníkov aj prestavbu.
+**Výška osadenia chladničky `mount_offset` (D-140, `CONFIG_SCHEMA` 18, v0.12.20).** Záznam kategórie `fridge` u vlastníka `cabinet` smie niesť `mount_offset`
+(mm Float ≥ 0, od hornej plochy dna po spodok niky — napr. vrch police); **chýbajúci kľúč = 0 a nula sa neukladá**. Posúva box niky aj pásma dverí a Kontrola od neho
+meria výšku niky (vnútro − osadenie) aj hranu delenia čiel. Je to vlastnosť **kusu v tejto skrinke** (nie spoločného kontextu vlastníka), zapisuje ho akcia panela
+`set_appliance_mount` (jeden krok Späť, bez zmeny položky zákazky), výmena modelu chladničky ho **prenesie**, presun na inú skrinku a kópia **nie**.
 
 **Korpus** (`kind: cabinet`):
 
@@ -237,6 +241,9 @@ PID sa odmieta, dva kusy s tým istým ID sú „nejednoznačná identita". Záz
   (schéma 16 ju vynucovala na 0). Starší plugin by pri prestavbe nového slotu medzeru zahodil a uloženú výšku čela držal ako **ručnú** — pri ďalších úpravách linky či
   soklu by čelo ticho prestalo sledovať linku. Staré sloty sa **nemigrujú** (Michal 24.9.2026: žiadna zákazka so slotom); prestavba ich odvodí z uloženej medzery.
   Brány sú tie isté ako pri 5–16. *(15 = S1-E0 minimum výšky 80 mm a 16 = S1-E slot umývačky + rezervované väzby sú opísané pri konštante `CONFIG_SCHEMA`.)*
+- **`18 = D-140` (v0.12.20): výška osadenia chladničky.** Záznam `appliance_refs[]` kategórie `fridge` smie niesť `mount_offset` (§2.5). Kľúč by starší plugin síce
+  pri normalizácii nezahodil (refs idú celé), ale **ignoroval** by ho — box niky aj Kontrola delenia čiel by ostali na dne — a pri výmene modelu chladničky by ho
+  **ticho zahodil** (Astra C BLOCKER 1). Brány sú tie isté ako pri 5–17; bez migrácie (chýbajúci kľúč = 0 = doterajšie správanie).
 - **`rules_seed_version` — DRUHÁ proveniencia stavby (KOV-E1b, v0.9.54).** Config nesie **aditívne** pole so **seed verziou pravidiel kovania, s ktorou stavba bežala**
   (`HardwareRules.effective_seed_version`; chýbajúce pole = `0`). Zapisuje ho **výhradne stavba** (`cabinet_config`) — z klientskeho payloadu sa **nikdy nepreberá**,
   presne ako `config_schema`. Dôvod: projektový snapshot pravidiel sa zámerne nemerguje sám, takže prestavba starej zákazky zapíše aktuálnu schému, ale kovanie

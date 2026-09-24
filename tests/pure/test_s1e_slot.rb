@@ -339,10 +339,10 @@ end
 # 3) SCHEMA 16 A REZERVOVANE VAZBY
 # ---------------------------------------------------------------------------
 
-NxTest.test('S1-E R2: CONFIG_SCHEMA je 17 (D-139) a slot nesie svoje polia') do
-  NxTest.assert_equal(17, NxS1E.cb::CONFIG_SCHEMA)
+NxTest.test('S1-E R2: CONFIG_SCHEMA je aspon 17 (D-139) a slot nesie svoje polia') do
+  NxTest.assert(NxS1E.cb::CONFIG_SCHEMA >= 17, 'od D-139 aspon 17 (D-140 = 18)')
   st = NxS1E.stored(NxS1E.slot)
-  NxTest.assert_equal(17, st['config_schema'])
+  NxTest.assert_equal(NxS1E.cb::CONFIG_SCHEMA, st['config_schema'])
   NxTest.assert_equal('dishwasher', st['type'])
   NxTest.assert_equal('noxun-dishwasher', st['construction_preset'])
   NxTest.assert_equal(600, st['dw_class'])
@@ -359,10 +359,10 @@ NxTest.test('S1-E R2: dolna skrinka NEDOSTALA ani jedno pole slotu (golden sa ne
   NxTest.refute(st.key?('appliance_expects'))
 end
 
-NxTest.test('S1-E R2: dopredny guard — schema 18 sa odmietne, 17 prejde') do
+NxTest.test('S1-E R2: dopredny guard — novsia schema sa odmietne, aktualna prejde') do
   st = NxS1E.stored(NxS1E.slot)
   NxTest.refute(NxS1E.cb.newer_config?(st), 'vlastny config prechadza')
-  NxTest.assert(NxS1E.cb.newer_config?(st.merge('config_schema' => 18)))
+  NxTest.assert(NxS1E.cb.newer_config?(st.merge('config_schema' => NxS1E.cb::CONFIG_SCHEMA + 1)))
   # D-139: plugin schemy 16 (odvodene celo nepozna) novy slot ODMIETNE.
   NxTest.assert(NxS1E.cb.config_schema_of(st) > 16,
                 'slot je pre schemu 16 NOVSI — rucne celo by ticho prestalo sledovat linku')
@@ -446,7 +446,7 @@ NxTest.test('S1-E R2c: sablona nesie `dw_*` a OCAKAVANIE, vazbu NIKDY') do
   NxTest.assert_close(64.0, tc['dw_front_bottom'], 0.01)
   NxTest.assert_equal(%w[dishwasher], tc['appliance_expects'])
   NxTest.refute(tc.key?('appliance_refs'), 'sablona nenesie vazbu na konkretny spotrebic')
-  NxTest.assert_equal(17, tc['config_schema'], 'a stampuje aktualny marker')
+  NxTest.assert_equal(NxS1E.cb::CONFIG_SCHEMA, tc['config_schema'], 'a stampuje aktualny marker')
 end
 
 NxTest.test('S1-E R2c: `merge_template` ZACHOVA vazby CIELA') do

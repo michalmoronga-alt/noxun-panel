@@ -658,6 +658,9 @@ normalizovaná škára čiel, jedna zóna, dvojica čiel) a `Bom` si ho drží *
 v jednej skrinke neznamenajú dva prepočty čiel. Z tej istej funkcie ide aj **`interior`**: vlastný výpočet by bol druhá pravda o tom, kam sa spotrebič zmestí.
 `bands` a `furniture_doors` sa čítajú zo **snapshotu položky** (`dims.front`) — z toho istého miesta ako `niche`, a teda z tej istej kópie listu, akou
 `ApplianceBinding.apply!` v jednej operácii naplnil aj `appliance_refs[]` na entite; zmena živého katalógu po väzbe nimi nepohne.
+**D-140 (v0.12.20): `mount_offset`** — výška osadenia chladničky sa berie z **refu tohto kusu** (`appliance_ref_mount(entry, item_id)` cez jediný čitač
+`Construction.appliance_mount_offset`), nie zo spoločného kontextu vlastníka: dve chladničky v jednej skrinke majú každá svoje. Neviazaný záznam nesie 0.
+Inspector (`Panel.appliance_check_record`) ho skladá z toho istého refu, takže Kontrola aj riadok Spotrebič merajú výšku niky a hranu čiel od toho istého dna.
 
 ### sheet_estimate.rb
 

@@ -277,6 +277,12 @@ module Noxun
       # a `PartKeys.human_label` jej ponecha „blenda".
       DW_FRONT_LABEL      = 'dv myčka'
 
+      # D-140: VYSKA OSADENIA chladnicky v skrinke (mm od hornej plochy dna po
+      # spodok niky — napr. vrch police). Kluc `mount_offset` na polozke
+      # `appliance_refs[]`; chybajuci = 0. Strop je len poistka proti preklepu
+      # (m namiesto mm) — skutocnu hranicu hlasi Kontrola vysky niky.
+      MOUNT_OFFSET_MAX    = 2000.0
+
       # `ref_key` tela spotrebica v `plan[:references]` (S1-F pridá chladnicku
       # pod vlastnym klucom).
       DW_BODY_REF_KEY = 'ref:appliance_body'
@@ -453,7 +459,8 @@ module Noxun
         h = pos_mm(niche['height_min'])
         return nil unless w && d && h
 
-        # Box stoji na HORNEJ PLOCHE DNA (`z_lo`), je CENTROVANY v sirke vnutra
+        # Box stoji na HORNEJ PLOCHE DNA (`z_lo`) zdvihnutej o VYSKU OSADENIA
+        # (D-140 — polica pod chladnickou), je CENTROVANY v sirke vnutra
         # (vnutro je symetricke, takze stred vnutra = stred korpusu) a LICUJE
         # s celnou rovinou korpusu (y = 0; hlbka ide dozadu). NIKDY sa
         # nedeformuje podla skrinky — ked je vacsi nez vnutro, TRCI a Kontrola
@@ -461,7 +468,8 @@ module Noxun
         rec = { ref_key: "#{NICHE_REF_PREFIX}#{item_id}", role: 'appliance_niche',
                 kind: BuildPlan::REFERENCE_KIND,
                 box: [w, d, h],
-                origin: [((cfg[:width].to_f - w) / 2.0), 0.0, dims[:z_lo].to_f],
+                origin: [((cfg[:width].to_f - w) / 2.0), 0.0,
+                         dims[:z_lo].to_f + appliance_mount_offset(ref)],
                 production_class: BuildPlan::REFERENCE_CLASS, manufactured: false,
                 source: 'catalog', item_id: item_id,
                 label: "#{niche_ref_label(ref)} — kontrolná nika" }
@@ -471,6 +479,17 @@ module Noxun
         bands = ref['bands'].is_a?(Hash) ? ref['bands'] : nil
         rec[:bands] = bands if bands && !bands.empty?
         rec
+      end
+
+      # D-140: JEDINY citac vysky osadenia (builder, Kontrola, Inspector, akcia
+      # panela aj prenos pri vymene modelu). Platne konecne cislo > 0 (orezane
+      # na `MOUNT_OFFSET_MAX`), inak 0 — neplatna hodnota nikdy nezhodi stavbu.
+      def appliance_mount_offset(h)
+        raw = h.is_a?(Hash) ? (h['mount_offset'] || h[:mount_offset]) : nil
+        v = raw.is_a?(Numeric) ? raw.to_f : nil
+        return 0.0 if v.nil? || !v.finite? || !v.positive?
+
+        [v, MOUNT_OFFSET_MAX].min
       end
 
       # Popis do modelu: VYROBCA a MODEL zo zaznamu vazby („Beko BCNA306E5ZSN"),

@@ -833,12 +833,14 @@ NxTest.test('S1-B2: panel NEZAPISUJE — deleguje na jediny transakcny vstup') d
   NxTest.assert(code.include?('ApplianceBinding.apply!'), 'zapis robi jadro')
   NxTest.assert(code.include?('foreign_document?'), 'identita dokumentu sa overuje')
   NxTest.assert(code.include?("op: (unbind ? 'unbind' : 'move')"), 'dve operacie, obe z jadra')
-  # S1-C: JEDINA vlastna operacia v tomto subore je zapis OCAKAVANI — ziadna
-  # polozka zakazky sa v nej nemeni, takze jadro vazby na nu nemá co pouzit.
-  # Vazba samotna ostava VYHRADNE na `ApplianceBinding.apply!`.
-  NxTest.assert_equal(1, code.scan('start_operation').length,
-                      'vlastnu operaciu ma LEN zapis `appliance_expects[]`')
-  NxTest.assert(code.include?('APPL_EXPECTS_OP'), 'a je pomenovana konstantou')
+  # S1-C + D-140: vlastne operacie v tomto subore su PRESNE DVE — zapis
+  # OCAKAVANI (config bez prestavby) a VYSKY OSADENIA (prestavba boxu niky).
+  # Ani v jednej sa polozka zakazky nemeni, takze jadro vazby nemá co pouzit;
+  # vazba samotna ostava VYHRADNE na `ApplianceBinding.apply!`.
+  NxTest.assert_equal(2, code.scan('start_operation').length,
+                      'vlastne operacie ma LEN zapis `appliance_expects[]` a osadenie')
+  NxTest.assert(code.include?('APPL_EXPECTS_OP'), 'a su pomenovane konstantou')
+  NxTest.assert(code.include?('model.start_operation(APPL_MOUNT_OP, true)'), 'aj osadenie')
   NxTest.assert(code.include?('CabinetBuilder.guarded'), 'zapis configu bezi pod ScaleWatch guardom')
 end
 

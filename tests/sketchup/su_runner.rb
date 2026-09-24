@@ -5076,6 +5076,243 @@ module NoxunSuRunner
     e::ApplianceCatalog.reset_state!
   end
 
+  # --- D-140: VYSKA OSADENIA CHLADNICKY (smoke S1, oprava C) ----------------
+  #
+  # CO SA TU OVERUJE A MIMO SKETCHUPU OVERIT NEDA:
+  #   * akcia panela `set_appliance_mount` naozaj ZDVIHNE box niky v modeli
+  #     (AABB od hornej plochy dna + osadenie) a je to JEDEN krok Spat,
+  #   * odmietnutia (stara povodna hodnota, zly vstup, cudzie echo/dokument,
+  #     nezmenena hodnota) NEZALOZIA ziadny krok Spat,
+  #   * bezna prestavba (dvierka) osadenie ZACHOVA (`config_to_params`),
+  #   * Kontrola vysky aj delenia ciel cez realny zber pocita od zdvihnuteho dna,
+  #   * zapis z OTVORENEHO komponentu skrinky najprv zatvori kontext (Astra C
+  #     FIX 4) a ostava jednym krokom Spat,
+  #   * vymena modelu chladnicky osadenie PRENESIE, presun na inu skrinku NIE,
+  #     kopia skrinky ho nema (vazba sa v kopii zahadzuje cela).
+  #
+  # Skrinka je VYSOKA (2226 -> vnutro 2090): bez osadenia je nika Beko privysoka
+  # (2090 > 1950 = ORANGE), s osadenim 150 sedi presne (1940).
+  D140_CAB = S1F_CAB.merge('height' => 2226.0, 'back_thickness' => 5.0).freeze
+
+  # Akcia PANELA nad OZNACENOU entitou — presne cesta popoveru riadku Spotrebic.
+  # Echo, PID aj dokument sa daju podvrhnut (guardy identity).
+  def d140_mount(model, inst, item_id, value, prev: 0.0, echo: nil, pid: nil, guid: nil, select: nil)
+    model.selection.clear
+    model.selection.add(select || inst)
+    payload = { 'item_id' => item_id, 'value' => value, 'prev' => prev,
+                'cabinet_id' => (echo.nil? ? e::Store.get(inst, 'cabinet_id').to_s : echo),
+                'pid' => (pid.nil? ? inst.persistent_id : pid) }
+    json = guid.nil? ? pg(model, payload) : payload.merge('model_guid' => guid).to_json
+    e::Panel.handle_set_appliance_mount(json)
+  end
+
+  def d140_mount_of(inst)
+    ref = s1b1_refs(inst).find { |r| r['category'].to_s == 'fridge' }
+    ref ? ref['mount_offset'] : nil
+  end
+
+  def d140_row(inst)
+    Array(e::Panel.cabinet_payload(inst)['appliance_rows']).find { |r| r['category'] == 'fridge' }
+  end
+
+  def d140_at?(inst, z)
+    (s1f_box_z(inst).to_f - z).abs < TOL
+  end
+
+  def run_d140(model)
+    cleanup(model)
+    r14_clear!(model)
+    root = File.join(Sketchup.temp_dir, "noxun_d140_#{Process.pid}_#{Time.now.to_i}")
+    FileUtils.mkdir_p(root)
+    fridge_id, = s1b1_catalog!(root)
+    # Druhy model chladnicky pre VYMENU MODELU — ina nika 560 x 555 x 1900.
+    _, other = e::ApplianceCatalog.create!(
+      'category' => 'fridge', 'manufacturer' => 'SU', 'name' => 'VYMENA 190',
+      'dims' => { 'body' => { 'width' => 540.0, 'height' => 1895.0, 'depth' => 545.0 },
+                  'niche' => { 'width_min' => 560.0, 'height_min' => 1900.0,
+                               'depth_min' => 555.0 } }
+    )
+    other_id = other[:record]['id'].to_s
+    cab = e::CabinetBuilder.build(model, D140_CAB)
+    return ok('D-140: fixtury (katalog + skrinka)', false) unless cab && !fridge_id.to_s.empty? && !other_id.empty?
+
+    cid = e::Store.get(cab, 'cabinet_id').to_s
+    s1b1_apply(model, 'create', attrs: { 'nazov' => 'Beko' }, catalog_id: fridge_id)
+    item_id = s1b1_items(model).first['id']
+    s1b2_pick(model, cab, item_id, echo: cid)
+    cab = s1f_cab(model, cid)
+
+    # (a) VYCHODZI STAV: box na dne, nika privysoka, riadok ma cip „osadenie 0 mm".
+    ok("D-140 (a): box stoji na dne (z = #{s1f_box_z(cab)}, cakam 118)", d140_at?(cab, 118.0))
+    ok("D-140 (a): bez osadenia je vyska ORANGE (2090 > 1950) #{s1f_codes(model).inspect}",
+       s1f_codes(model).include?('appliance_niche_clash|height'))
+    row = d140_row(cab)
+    ok("D-140 (a): riadok chladnicky nesie osadenie 0 (#{row && row['mount'].inspect})",
+       row && row['mount'].is_a?(Hash) && row['mount']['value'].to_f.zero?)
+
+    # (b) OSADENIE 150 = box +150, Kontrola OK, JEDEN krok Spat.
+    d140_mount(model, cab, item_id, 150.0, prev: 0.0)
+    cab = s1f_cab(model, cid)
+    box = s1f_box(cab)
+    ok("D-140 (b): osadenie 150 zdvihlo box na z = #{s1f_box_z(cab)} (cakam 268)", d140_at?(cab, 268.0))
+    ok("D-140 (b): box sa NEDEFORMOVAL (#{box.inspect})",
+       box && (box[0] - 560.0).abs < TOL && (box[2] - 1940.0).abs < TOL)
+    ok("D-140 (b): osadenie je v ref (#{d140_mount_of(cab).inspect})", d140_mount_of(cab) == 150.0)
+    ok("D-140 (b): nika teraz SEDI (2090 − 150 = 1940) #{s1f_codes(model).inspect}",
+       s1f_codes(model).none? { |c| c.start_with?('appliance_niche_clash') })
+    row = d140_row(cab)
+    ok("D-140 (b): riadok ukazuje osadenie 150 a vyska je OK (#{row && row['mount'].inspect})",
+       row && row['mount']['value'].to_f == 150.0 && row['check']['niche']['axes']['height'] == 'ok')
+    Sketchup.undo
+    cab = s1f_cab(model, cid)
+    ok("D-140 (b): JEDEN Spat vratil box na dno aj ref bez osadenia (z = #{s1f_box_z(cab)})",
+       d140_at?(cab, 118.0) && d140_mount_of(cab).nil?)
+    d140_mount(model, cab, item_id, 150.0, prev: 0.0)
+    cab = s1f_cab(model, cid)
+
+    # (c) ODMIETNUTIA nezalozia ziadny krok Spat (marker zmizne PRVYM Spat).
+    markers = []
+    {
+      'stara povodna hodnota (prev 0 pri 150)' => -> { d140_mount(model, cab, item_id, 90.0, prev: 0.0) },
+      'zaporna hodnota' => -> { d140_mount(model, cab, item_id, -5.0, prev: 150.0) },
+      'nad strop 2000' => -> { d140_mount(model, cab, item_id, 2500.0, prev: 150.0) },
+      'retazec namiesto cisla' => -> { d140_mount(model, cab, item_id, '90', prev: 150.0) },
+      'cudzie echo skrinky' => -> { d140_mount(model, cab, item_id, 90.0, prev: 150.0, echo: 'CAB-999') },
+      'cudzi PID' => -> { d140_mount(model, cab, item_id, 90.0, prev: 150.0, pid: 1) },
+      'cudzi dokument' => -> { d140_mount(model, cab, item_id, 90.0, prev: 150.0, guid: 'iny-dokument') },
+      'nezmenena hodnota (150,04 -> 150)' => -> { d140_mount(model, cab, item_id, 150.04, prev: 150.0) }
+    }.each do |what, call|
+      mk = r03_marker(model, markers)
+      call.call
+      cab = s1f_cab(model, cid)
+      same = d140_mount_of(cab) == 150.0 && d140_at?(cab, 268.0)
+      Sketchup.undo
+      ok("D-140 (c): #{what} — nic sa nezapisalo a NEVZNIKOL krok Spat", same && !mk.valid?)
+      cab = s1f_cab(model, cid)
+    end
+    r03_clear_markers(model, markers)
+
+    # (d) BEZNA PRESTAVBA (dvierka) osadenie ZACHOVA; delenie ciel od dna niky.
+    s1f_two_doors(model, cab, 869.0) # vrch dolneho cela 971 -> hrana 971 − 268 = 703
+    cab = s1f_cab(model, cid)
+    chk = s1f_check(cab)
+    split = chk ? chk['door_split'] : {}
+    ok("D-140 (d): prestavba osadenie ZACHOVALA (#{d140_mount_of(cab).inspect}, z = #{s1f_box_z(cab)})",
+       d140_mount_of(cab) == 150.0 && d140_at?(cab, 268.0))
+    ok("D-140 (d): hrana delenia sa meria od DNA NIKY (#{split['edge'].inspect}, cakam 703)",
+       (split['edge'].to_f - 703.0).abs < 0.05 && split['state'] == 'ok')
+    ok("D-140 (d): Kontrola delenie NEHLASI #{s1f_codes(model).inspect}",
+       !s1f_codes(model).include?('appliance_door_split'))
+    pv = Array(e::Panel.cabinet_payload(cab)['preview']['appliances']).first
+    sp = pv ? pv['split'] : nil
+    ok("D-140 (d): nahlad kresli box aj pasmo hrany od zdvihnuteho dna (#{pv && pv['box'].inspect})",
+       pv && (pv['box']['z'].to_f - 268.0).abs < TOL && sp &&
+       (sp['lo'].to_f - 947.0).abs < TOL && (sp['edge'].to_f - 971.0).abs < TOL)
+
+    # (e) ZAPIS Z OTVORENEHO KOMPONENTU: kontext sa najprv zatvori (Astra C FIX 4).
+    part = cab.definition.entities.find do |en|
+      e::Store.noxun?(en) && e::Store.get(en, 'cabinet_id').to_s == cid
+    end
+    opened = begin
+      model.active_path = [cab]
+      !model.active_path.nil? && model.active_path.length.positive?
+    rescue StandardError
+      false
+    end
+    if opened && part
+      d140_mount(model, cab, item_id, 120.0, prev: 150.0, select: part)
+      closed = model.active_path.nil? || model.active_path.empty?
+      cab = s1f_cab(model, cid)
+      ok("D-140 (e): zapis z otvorenej skrinky zatvoril kontext a prestavil (z = #{s1f_box_z(cab)}, cakam 238)",
+         closed && d140_mount_of(cab) == 120.0 && d140_at?(cab, 238.0))
+      Sketchup.undo
+      cab = s1f_cab(model, cid)
+      ok("D-140 (e): JEDEN Spat vratil osadenie 150 (#{d140_mount_of(cab).inspect})",
+         d140_mount_of(cab) == 150.0 && d140_at?(cab, 268.0))
+    else
+      tools1_close_context(model)
+      info('D-140 (e): otvorenie komponentu sa nepodarilo — kontext sa nemeria')
+    end
+
+    # (f) VYMENA MODELU chladnicky osadenie PRENESIE (kus ostava v tejto skrinke).
+    s1b1_apply(model, 'rebind_model', item_id: item_id, catalog_id: other_id)
+    cab = s1f_cab(model, cid)
+    box = s1f_box(cab)
+    ok("D-140 (f): vymena modelu = novy box #{box.inspect} na TOM ISTOM osadeni (z = #{s1f_box_z(cab)})",
+       box && (box[2] - 1900.0).abs < TOL && d140_at?(cab, 268.0) && d140_mount_of(cab) == 150.0)
+    Sketchup.undo
+    cab = s1f_cab(model, cid)
+    back = s1f_box(cab)
+    ok("D-140 (f): JEDEN Spat vratil povodny model aj osadenie (#{back.inspect})",
+       back && (back[2] - 1940.0).abs < TOL && d140_mount_of(cab) == 150.0)
+
+    # (g) PRESUN na inu skrinku osadenie NEPRENASA — ani ked cielova skrinka nesie
+    #     JEDNOSTRANNY (stary) zaznam toho isteho kusu s vlastnym osadenim
+    #     (Codex #389 kolo 2, P2); taky riadok cip osadenia NEMA (server by zapis
+    #     aj tak odmietol). Spat vrati kus s osadenim prvej skrinke.
+    cab2 = e::CabinetBuilder.build(
+      model, D140_CAB, transform: Geom::Transformation.translation(e::Units.point(2000.0, 0, 0))
+    )
+    if cab2
+      cid2 = e::Store.get(cab2, 'cabinet_id').to_s
+      stale = s1b1_refs(cab).find { |r| r['item_id'].to_s == item_id }.merge('mount_offset' => 90.0)
+      e::CabinetBuilder.guarded do
+        model.start_operation('SU-TEST D-140 jednostranny zaznam', true)
+        e::CabinetBuilder.write_appliance_refs!(model, cab2, [stale])
+        model.commit_operation
+      end
+      cab2 = s1f_cab(model, cid2)
+      row2 = d140_row(cab2)
+      ok("D-140 (g): jednostranny zaznam v cudzej skrinke cip osadenia NEMA (#{row2 ? row2['mount'].inspect : 'bez riadku'})",
+         row2 && !row2.key?('mount') && d140_mount_of(cab2) == 90.0)
+      s1b2_pick(model, cab2, item_id, echo: cid2)
+      cab2 = s1f_cab(model, cid2)
+      ok("D-140 (g): presun osadenie NEPRENIESOL ani zo stareho zaznamu ciela (z = #{s1f_box_z(cab2)}, cakam 118)",
+         d140_mount_of(cab2).nil? && d140_at?(cab2, 118.0) && s1b1_owner(model, item_id)['id'].to_s == cid2)
+      Sketchup.undo
+      cab = s1f_cab(model, cid)
+      cab2 = s1f_cab(model, cid2)
+      ok('D-140 (g): JEDEN Spat vratil kus s osadenim 150 do prvej skrinky (ciel ma zase len stary zaznam)',
+         d140_mount_of(cab) == 150.0 && d140_mount_of(cab2) == 90.0)
+      cab2.erase! if cab2 && cab2.valid?
+    else
+      ok('D-140 (g): fixtura druhej skrinky', false)
+    end
+
+    # (h) KOPIA skrinky („Vložiť kópiu") vazbu ani osadenie NEMA.
+    cab = s1f_cab(model, cid)
+    before = cabinets(model).length
+    e::Panel.handle_insert_copy(pg(model, 'cabinet_id' => cid))
+    copy = model.selection.to_a.find do |i|
+      e::Store.kind(i) == 'cabinet' && e::Store.get(i, 'cabinet_id').to_s != cid
+    end
+    ok("D-140 (h): kopia skrinky vazbu ani osadenie NEMA (#{copy ? s1b1_refs(copy).inspect : 'ziadna kopia'})",
+       copy && s1b1_refs(copy).empty? && s1f_niche(copy).nil? && cabinets(model).length == before + 1)
+    copy.erase! if copy && copy.valid?
+    cab = s1f_cab(model, cid)
+    ok('D-140 (h): povodna skrinka osadenie drzi', d140_mount_of(cab) == 150.0)
+
+    # (i) OSADENIE 0 kluc ZMAZE — box je zase na dne.
+    d140_mount(model, cab, item_id, 0.0, prev: 150.0)
+    cab = s1f_cab(model, cid)
+    ok("D-140 (i): osadenie 0 kluc zmazalo a box stoji na dne (z = #{s1f_box_z(cab)})",
+       s1b1_refs(cab).length == 1 && !s1b1_refs(cab).first.key?('mount_offset') && d140_at?(cab, 118.0))
+
+    s1b1_apply(model, 'remove', item_id: item_id)
+    r14_clear!(model)
+    cleanup(model)
+    ok('D-140: cleanup (0 korpusov, rozpocet prazdny)',
+       cabinets(model).empty? && s1b1_items(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: run_d140 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    tools1_close_context(model)
+    r14_clear!(model)
+    cleanup(model)
+  ensure
+    e::ApplianceCatalog.test_dir_override = nil
+    e::ApplianceCatalog.reset_state!
+  end
+
   # --- S1-C: OCAKAVANY SPOTREBIC (`appliance_expects[]`) --------------------
   #
   # CO SA TU OVERUJE A MIMO SKETCHUPU OVERIT NEDA:
@@ -25825,6 +26062,7 @@ module NoxunSuRunner
     run_s1b1(model)          # S1-B1: SPOTREBIC V ZAKAZKE — priradenie z katalogu, presun, odpojenie a zmazanie ako JEDEN krok Spat (polozka + `appliance_refs[]` vlastnika + prestavba naraz), sirota po Delete (nalez BEZ `owner_id`) a jej naprava, trieda umyvacky vs slot, „dodáva zákazník" (medzisucet 0 + stitok v ponuke), legacy zakazka na kanonicke kody, ROLLBACK po riadenych zlyhaniach a bariera observera
     run_s1b2(model)          # S1-B2: POHLAD V ZAKAZKE + riadok Spotrebica ? ocakavanie zo sablony a ponuka filtrovana podla niky, priradenie AKCIOU PANELA (ciel z oznacenej entity) a 1x Spat, telo slotu prekreslene z katalogu (448 x 550) a spat na genericke, doska bez prestavby, tabulka pohladu nad realnym zberom, Delete vlastnika -> sirota -> odpojenie -> Spat vrati oboje
     run_s1f(model)           # S1-F: KONTROLNA GEOMETRIA CHLADNICKY — box niky 560 x 555 x 1940 na hornej ploche dna (prestavba ho zachova, 1x Spat), box nikdy v zbere ani v kusovniku, Kontrola niky per os (1924 -> ORANGE vyska -> zvysenie -> OK), delenie ciel (hrana 682 mimo 679-727 -> posun -> OK) + nahlad, presun vazby medzi skrinkami, rebind_model na iny box, zmena ziveho katalogu snapshotom nepohne, odpojenie a Spat
+    run_d140(model)          # D-140: VYSKA OSADENIA CHLADNICKY — akcia panela zdvihne box niky (z 118 -> 268) a Kontrola vysky/delenia pocita od zdvihnuteho dna, 1x Spat, odmietnutia (stara hodnota, zly vstup, cudzie echo/PID/dokument, nezmenena) bez kroku Spat, prestavba dvierok osadenie zachova, zapis z otvoreneho komponentu zatvori kontext, vymena modelu prenesie, presun na inu skrinku nie, kopia ho nema, 0 kluc zmaze
     run_s1c(model)           # S1-C: OCAKAVANY SPOTREBIC — cely cyklus sablony (uloz s ocakavaniami -> vloz ghostom -> config -> Kontrola 2x ORANGE -> priradenie -> OK -> 2x Spat), ocakavanie BEZ sablony v riadku Spotrebic (1x Spat, geometria netknuta, peciatka schemy, nezmenene = ziadny krok, cudzie echo/PID nezapisu nic, viazanu kategoriu zrusit nedas), bariera observera po nativnej kopii, slot bez modelu (ORANGE + podvrh odmietnuty), aplikovanie sablony na viazanu skrinku (vazba ostava, ocakavania unia)
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
     run_r03(model)           # R-03: sev prepare_insert/commit_insert — ciste pripravenie, vlastny rigidny transform, odmietnutia, edit kontext
