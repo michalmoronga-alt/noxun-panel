@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"$d = $env:CLAUDE_PROJECT_DIR; if (-not $d) { $d = (Get-Location).Path }; & (Join-Path $d '.claude/hooks/post_edit_check.ps1'); exit $LASTEXITCODE\"",
+            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command '$d = $env:CLAUDE_PROJECT_DIR; if (-not $d) { $d = (Get-Location).Path }; & (Join-Path $d .claude/hooks/post_edit_check.ps1); exit $LASTEXITCODE'; exit $LASTEXITCODE",
             "timeout": 30
           }
         ]
