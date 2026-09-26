@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **DOCS — štart bloku 7 · KONŠTRUKCIA K1+K2: debata, fakty z kódu, krížový audit a reconcile (26.–27.9.2026, PR #?, len dokumentácia).**
+- **DOCS — štart bloku 7 · KONŠTRUKCIA K1+K2: debata, fakty z kódu, krížový audit a reconcile (26.–27.9.2026, PR #398, len dokumentácia).**
   Michal 26.9. vybral blok K1+K2 (po smoke S1 PASS) a v debate rozhodol **M1–M10** — komín bežne ~50 mm (X = o koľko sú dno a strop kratšie ako bok),
   pri komíne + drážke drážka len v bokoch a na dne a strope chrbát presahuje, zapustený strop pre **dolnú aj hornú**, pri lištách vnútro pred lištami
   **v celej výške**, lišty vo výstupoch **jeden riadok 2 ks „Chrb HD"**, zo šablón **len Chladničková**. Pri debate vznikol výrobný nález **D-143**
