@@ -17,6 +17,13 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **NÁSTROJ — ukazovateľ kontextu orchestrátora (26.9.2026, PR #392, hook Claude Code; verzia pluginu sa nemení).** Orchestrátor nevidí, ako je zaplnené
+  jeho kontextové okno, a kompresia ho zaskočila (auto pri 969k z 1M). Michal 26.9. schválil hook `.claude/hooks/context_meter.js` (Node): z transkriptu session
+  prečíta posledné usage hlavného agenta a vloží mu riadok `Kontext orchestrátora: 612k z 1M (61 %).` — pri každej správe Michala vždy, po nástroji len pri
+  prechode do vyššieho pásma (50/60/70/75/80/85/90/95 %); pokles po kompresii pásmo ticho resetne, subagenti sú ticho. Okno: `NOXUN_CTX_WINDOW` → model `[1m]`
+  alebo natívny 1M model → inak 200k. Preskakuje syntetické správy (hlášky limitu) a hneď po kompresii berie stav z jej hranice. Príkaz je `node -e` bez
+  PowerShellu (beží po každom nástroji). Pravidlo v CLAUDE.md (Lokálne hooky): od 75 % zapísať stav do repa/pamäte a čítanie delegovať, od 90 % navrhnúť
+  Michalovi `/compact` na hranici dávky. Testy `tests/js/test_context_meter.js`.
 - **PROCES — slepá predrecenzia pred PR + spresnené pravidlo 3 kôl (25.9.2026, PR #391, docs; verzia pluginu sa nemení).** Z retrospektívy bloku S1 (Michal
   24.–25.9.): **(1) nový skill `predrecenzia`** — dávka audit-povinná alebo výrobná/cenová prejde pred `gh pr create` nezávislým Opus subagentom bez kontextu
   orchestrátora (len zadanie + `git diff main...HEAD`), jeho P1/P2 sa opravia pred PR a výsledok ide do PR popisu; pri iných kódových dávkach odporúčaná. Dôvody:
