@@ -1,23 +1,25 @@
 ---
 name: predrecenzia
-description: Slepá predrecenzia diffu vetvy PRED `gh pr create` — nezávislý Opus subagent bez kontextu orchestrátora hľadá chyby skôr, než ich nájde GitHub Codex. Povinná pre dávky audit-povinné (kontrakt, schéma, migrácia, observer/undo lifecycle, nový modul) a výrobné/cenové; odporúčaná pri iných kódových dávkach s väčším diffom alebo novou UI interakciou. Vráti číslované nálezy P1/P2/P3 a verdikt; P1/P2 sa opravia pred otvorením PR.
+description: Slepá predrecenzia diffu vetvy PRED `gh pr create` — nezávislý slepý recenzent (subagent bez kontextu orchestrátora) hľadá chyby skôr, než ich nájde GitHub Codex. Robí sa pri dávkach audit-povinných (kontrakt, schéma, migrácia, observer/undo lifecycle, nový modul), výrobných/cenových a pri bežnej dávke nad 300 zmenených riadkov kódu pluginu (bez testov a dokumentácie) alebo s novým ovládacím prvkom v UI. Vráti číslované nálezy P1/P2/P3 a verdikt; P1/P2 sa opravia pred otvorením PR.
 ---
 
 # Slepá predrecenzia pred PR
 
 **Prečo (Michal 25.9.2026, retrospektíva bloku S1):** GH Codex kolo stojí 10–25 min a pri audit-povinných a výrobných/cenových
-dávkach sa po KAŽDEJ oprave opakuje celé — delta-verifikácia tam nestačí (CLAUDE.md, Git workflow). PR #389 (D-140, výška osadenia
-chladničky) preto potreboval **3 plné kolá na 6 drobných P2** (Escape z tlačidla, jednostranná väzba, fokus po zatvorení…), ktoré by
-jedna slepá recenzia pred PR chytila naraz. Druhý dôvod: subagent si kód číta sám, takže orchestrátorovi nezaberá kontext — pri dlhých
-blokoch je to poistka proti kompresii kontextu.
+dávkach sa po oprave opakovalo celé. PR #389 (D-140, výška osadenia chladničky) preto potreboval **3 plné kolá na 6 drobných P2**
+(Escape z tlačidla, jednostranná väzba, fokus po zatvorení…), ktoré by jedna slepá recenzia pred PR chytila naraz. Od 26.9.2026 platí aj
+opačný smer: dávka, ktorá prešla predrecenziou, smie po drobných nálezoch GH kola ísť cez internú deltu namiesto nového plného kola
+(CLAUDE.md, Git workflow). Druhý dôvod: subagent si kód číta sám, takže orchestrátorovi nezaberá kontext — pri dlhých blokoch je to
+poistka proti kompresii kontextu.
 
 ## Kedy
 
 | Dávka | Predrecenzia |
 |---|---|
-| audit-povinná (kontrakt, schéma, migrácia, observer/undo lifecycle, nový modul — tá istá trieda ako `codex-audit`) | **povinná** |
-| výrobná alebo cenová (kusovník, VEPO, nákup, ceny, cenová ponuka) | **povinná** |
-| iný kód s väčším diffom alebo novou UI interakciou (klávesnica, fokus, popover, prepnutie dokumentu, prekreslenie) | odporúčaná |
+| audit-povinná (kontrakt, schéma, migrácia, observer/undo lifecycle, nový modul — tá istá trieda ako `codex-audit`) | **áno** |
+| výrobná alebo cenová (jediná definícia v CLAUDE.md: mení rozmery alebo počty dielov, hrany, kusovník, VEPO, nákupné zoznamy, kovanie alebo ceny) | **áno** |
+| bežná dávka nad 300 zmenených riadkov kódu pluginu (bez testov a dokumentácie) alebo s novým ovládacím prvkom v UI | **áno** (hranica N18, 26.9.2026) |
+| iný kód s novou UI interakciou (klávesnica, fokus, prepnutie dokumentu, prekreslenie) | odporúčaná |
 | docs-only, len zmena verzie | nie |
 
 Predrecenzia **nenahrádza** `codex-audit` (ten je PRED implementáciou a posudzuje návrh) ani `codex-po-pr` (GH review ostáva
@@ -25,21 +27,23 @@ povinné pre každý PR). Je to lacnejšie kolo navyše medzi hotovým kódom a 
 
 ## Postup
 
-1. **Vetva je hotová:** testy zelené (headless + všetky JS sady; in-SU pri builderoch, observeroch a undo), docs na mieste, všetko commitnuté.
+1. **Vetva je hotová:** testy zelené (headless + všetky JS sady; in-SU podľa zoznamu spúšťačov v CLAUDE.md, sekcia Testovanie), docs na mieste, všetko commitnuté.
 2. **Kvóta PRED spustením** (subagent míňa Claude kvótu, orientačne 200–350 k tokenov na beh; skill `usage`, bod 4):
    `& ".claude\skills\usage\usage.ps1" -Label "predrecenzia <dávka>" -Phase before -Gate claude` — **exit 3** (Claude weekly na dne) =
-   subagenta nespúšťaj a použi náhradu z bodu 7; keď je Claude session nad 80 % a reset je ďaleko, povedz to Michalovi pred štartom.
-3. **Spusti subagenta:** Agent tool — `subagent_type: general-purpose`, `model: opus`, `run_in_background: true`, prompt podľa vzoru
-   nižšie. **Slepý** = dostane len ZADANIE (čo sa má zmeniť pre používateľa a kľúčové rozhodnutia z briefu) a rozsah diffu — nie výsledky
-   auditu, nie vlastné hodnotenie orchestrátora, nie zoznam „na čo si dať pozor". Medzitým orchestrátor pripravuje PR popis.
+   subagenta nespúšťaj a použi náhradu z bodu 7. **Claude session nad 80 %** → nový subagent sa nespúšťa (hranica N18): počkaj na reset
+   session, alebo použi náhradu z bodu 7.
+3. **Spusti slepého recenzenta:** Agent tool — `subagent_type: general-purpose`, `run_in_background: true`, model podľa roly **slepý recenzent**
+   v tabuľke Obsadenie rolí (`SYSTEM/WORKFLOW.md`), prompt podľa vzoru nižšie. **Slepý** = dostane len ZADANIE (čo sa má zmeniť pre používateľa
+   a kľúčové rozhodnutia z briefu) a rozsah diffu — nie výsledky auditu, nie vlastné hodnotenie orchestrátora, nie zoznam „na čo si dať pozor".
+   Medzitým orchestrátor pripravuje PR popis.
 4. **Po výsledku** zapíš spotrebu: `& ".claude\skills\usage\usage.ps1" -Label "predrecenzia <dávka>" -Phase after` (ten istý Label).
 5. **Nálezy:** P1/P2 oprav pred PR (commit `predrecenzia: …`, testy znova). P3 zváž — oprav, alebo v PR uveď, prečo nie. Oprava, ktorá
    mení koncept riešenia → späť k briefu; pri audit-povinnej dávke aj k auditu.
 6. **PR popis** má sekciu **„Predrecenzia"**: počty P1/P2/P3 a čo sa opravilo (pri „bez nálezov" jedna veta; pri náhrade aj prečo).
-7. **Náhrada pri nedostatku Claude kvóty = lokálny Codex CLI s modelom Sol** (výslovne — predvolený model v `~/.codex/config.toml`
-   je Astra, ktorá míňa viac Codex kvóty). Najprv Codex brána `& ".claude\skills\usage\usage.ps1" -Label "predrecenzia <dávka>" -Phase before -Gate codex`
+7. **Náhrada pri nedostatku Claude kvóty = lokálny Codex CLI s modelom roly bežný audit a delta** (vždy výslovne cez `--model` — na predvolený
+   model z `~/.codex/config.toml` sa nespolieha, rozhodnutie N13). Najprv Codex brána `& ".claude\skills\usage\usage.ps1" -Label "predrecenzia <dávka>" -Phase before -Gate codex`
    (exit 3 = ani náhradu nespúšťaj, predrecenzia sa odloží po resete a PR to prizná), potom cez **PowerShell tool** s tým istým promptom:
-   `$prompt = Get-Content -Raw '<prompt-file>'; node "<companion>" task --background --model gpt-5.6-sol $prompt`.
+   `$prompt = Get-Content -Raw '<prompt-file>'; node "<companion>" task --background --model <model roly bežný audit a delta> $prompt`.
    Nájdenie companionu, čakanie so stall guardom a vytiahnutie výsledku: skill `codex-audit`, kroky 1 a 4–5.
 
 **Závažnosť:** **P1** = chybné výrobné dáta alebo ceny, strata či poškodenie dát, pád, zápis do cudzieho dokumentu · **P2** = zlé správanie

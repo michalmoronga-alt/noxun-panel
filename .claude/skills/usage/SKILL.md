@@ -1,6 +1,6 @@
 ---
 name: usage
-description: Aktuálny stav kvót Claude (session 5 h, weekly, Fable-only) a Codex (weekly) v jednom riadku na providera cez CodexBar CLI — pre plánovanie orchestrácie (kedy sa resetuje, koľko ostáva, brána pred Codex auditom / GH kolom) a voliteľný lokálny log spotreby behov. Volať na začiatku okna a pred drahými krokmi, nie v slučke.
+description: Aktuálny stav kvót Claude (session 5 h, weekly) a Codex (weekly) v jednom riadku na providera cez CodexBar CLI — pre plánovanie orchestrácie (kedy sa resetuje, koľko ostáva, brána pred Codex auditom / GH kolom / `gh pr create`, prah pre nový implementačný subagent) a voliteľný lokálny log spotreby behov. Volať na začiatku okna a pred drahými krokmi, nie v slučke.
 ---
 
 # Kvóty — stav pre orchestrátora (od 13.9.2026)
@@ -41,10 +41,10 @@ Percentá sú **použité** (used), nie zostatok; brána počíta **zostatok = 1
 
 ## Kedy volať
 
-1. **Na začiatku okna** (spolu s STAV/PLAN): `usage.ps1` bez parametrov — do prvej správy Michalovi jednou vetou, ak niečo obmedzuje plán (napr. Codex weekly > 85 %).
+1. **Na začiatku okna** (spolu s STAV/PLAN): `usage.ps1` bez parametrov — do prvej správy Michalovi jednou vetou, ak niečo obmedzuje plán (napr. Codex weekly > 85 %). Je to prvá časť kontroly štartu okna; ďalšie dve (lokálne nástroje a register `agent-register`) popisuje CLAUDE.md, sekcia Kvóty a štart okna.
 2. **Pred Codex auditom** (`codex-audit`, krok 3): `-Label "audit <dávka>" -Phase before -Gate codex` (číta oboch providerov kvôli logu). Exit 3 = **neposielaj**; ohlás a pokračuj s prísnejšou vlastnou kontrolou / odlož po resete — výnimka: audit-povinná dávka alebo P0/P1 fix → **spýtaj sa Michala**, môže kolo povoliť. Po výsledku (krok 5) `-Label "audit <dávka>" -Phase after`.
-3. **Pred vyžiadaním GH kola** (`codex-po-pr`: `gh pr create` / `gh pr ready` / `@codex review`): `-Gate codex` (číta len Codex — nezaťažuje Claude endpoint). Exit 3 = kolo sa nevyžiada, platí **náhradná brána** (slepý Opus reviewer s reprodukciami + interná delta-verifikácia; vzor 31.8. a 9.9.2026) a do PR sa zapíše, prečo; tá istá výnimka pre audit-povinné/P1 ako v bode 2.
-4. **Pred spustením implementačného subagenta** (drahé Claude okno): `-Label "dávka <názov>" -Phase before` — ak Claude session > 80 % a reset je ďaleko, povedz to Michalovi pred štartom; po reporte subagenta `-Phase after` (spotreba dávky do logu).
+3. **Pred vyžiadaním GH kola** (`codex-po-pr`: `gh pr create` / `gh pr ready` / `@codex review`): `-Gate codex` (číta len Codex — nezaťažuje Claude endpoint). Exit 3 = kolo sa nevyžiada — **pred `gh pr create` to znamená PR ako draft** (Codex draft nerecenzuje; hranica N18, 26.9.2026) — platí **náhradná brána** (slepý recenzent s reprodukciami + interná delta-verifikácia; vzor 31.8. a 9.9.2026) a do PR sa zapíše, prečo; tá istá výnimka pre audit-povinné/výrobné/cenové a P0/P1 ako v bode 2.
+4. **Pred spustením implementačného subagenta** (drahé Claude okno): `-Label "dávka <názov>" -Phase before` — **Claude session nad 80 % → nový implementačný subagent sa nespúšťa, počká sa na reset session** (hranica N18, 26.9.2026; nahrádza niekdajšie „ak je reset ďaleko"); po reporte subagenta `-Phase after` (spotreba dávky do logu).
 
 **Frekvencia:** Claude usage endpoint je rate-limitovaný (13.9.: po ~6 volaniach za pár minút vracia chybu). Preto brána číta len Codex, log sa robí len na začiatku/konci behu a skill sa nevolá v slučke ani pri každom kroku — typický PR flow = 2–3 volania, nie 10. Prázdny/„docasne nedostupne" Claude riadok je **normálny stav**, nie porucha; skript nerobí retry.
 
@@ -54,10 +54,11 @@ Percentá sú **použité** (used), nie zostatok; brána počíta **zostatok = 1
 - **Codex weekly resety chodia aj náhodne** (Michal 13.9.) — delta v logu môže byť záporná; skript to prizná („zaporne = medzitym reset").
 - `tempo` = odhad CodexBaru (farbehind / slightlybehind / farahead …) a či kvóta vydrží do resetu.
 - `-Gate claude` gatuje **weekly** okno Claude (session sa negatuje — mení sa každých 5 h; pri subagentovi sa číta z riadku, bod 4).
+- Ďalšie okná, ktoré CodexBar v riadku Claude hlási (napr. `Fable-only`), sú len údaj vo výpise a v logu — žiadne pravidlo ich nepoužíva.
 
 ## Log behov (voliteľný, lokálny, mimo repa)
 
-`%APPDATA%\NOXUN\Agent\usage_log.jsonl` (UTF-8 bez BOM, jeden JSON na riadok) — riadok na každé volanie s `-Label` (ts, label, phase, percentá a resety oboch providerov; pri `after` aj `delta` = Codex weekly, Claude session/weekly, Fable-only). Ukladajú sa **len percentá a časy** — žiadny plán, e-mail ani identifikátor účtu. Účel: po pár týždňoch vedieť, koľko weekly percent stojí Astra audit alebo implementačná dávka (GH kolo sa samostatne nemeria — bolo by to ďalšie volanie za nič) → lepší odhad pri plánovaní. Nič viac sa z toho nerobí, kým Michal nepovie, že to má hodnotu (zhodnotenie po ~2 týždňoch). Log nerotuje a pri paralelných zápisoch (dva subagenti naraz) môže riadok vypadnúť — je to orientačná evidencia, nie účtovníctvo.
+`%APPDATA%\NOXUN\Agent\usage_log.jsonl` (UTF-8 bez BOM, jeden JSON na riadok) — riadok na každé volanie s `-Label` (ts, label, phase, percentá a resety oboch providerov; pri `after` aj `delta` = Codex weekly, Claude session/weekly, Fable-only). Ukladajú sa **len percentá a časy** — žiadny plán, e-mail ani identifikátor účtu. Účel: po pár týždňoch vedieť, koľko weekly percent stojí audit audítora audit-povinných alebo implementačná dávka (GH kolo sa samostatne nemeria — bolo by to ďalšie volanie za nič) → lepší odhad pri plánovaní. Nič viac sa z toho nerobí, kým Michal nepovie, že to má hodnotu (zhodnotenie po ~2 týždňoch). Log nerotuje a pri paralelných zápisoch (dva subagenti naraz) môže riadok vypadnúť — je to orientačná evidencia, nie účtovníctvo.
 
 ## Pasce
 
