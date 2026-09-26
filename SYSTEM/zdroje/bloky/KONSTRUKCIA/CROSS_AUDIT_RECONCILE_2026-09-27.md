@@ -37,8 +37,8 @@ chrbát 10 mm pred zadnou hranou, s komínom za zadnými hranami dna a stropu).
 | Codex FIX 10 + Grok 9 — scale: tichá odmietacia cesta, statické minimum 150 | **Berieme:** config-aware minimum hĺbky podľa tých istých pravidiel + jeden krok Späť overený in-SU; hláška pri odmietnutí | KON-A |
 | Codex FIX 11 — nová šablóna sa do knižnice STD 6 sama nedoseje | **Berieme:** STD 6 → 7 + jednorazový seed; neprepísať rovnomennú vlastnú šablónu ani neobnoviť zmazaný seed; seed nesie `config_schema` | KON-D (audit-povinná — STD) |
 | Codex FIX 12 — dnešný golden D-143 nepotvrdí | **Berieme:** geometrické goldeny ostávajú; nový reťazový test snapshot → kusovník → formát platne → VEPO → cena (dekor, poškodený námer, reopen, starý config) | KON-0 |
-| Codex FIX 13 + Grok 1, 2 — X nie je voľný kanál; Chladničková 580/50 = vnútro 530 | **Berieme:** v UI a bokoryse rozlíšiť „komín X" a „voľný kanál `X − bt`"; **rozmery Chladničkovej rozhodne Michal** (§4); kontrola niky vetranie nepotvrdzuje (vetranie ostáva mimo V1, na šablóne veta o otvoroch v sokli a hore) | KON-A · KON-D · §4 |
-| Grok 3 + Codex Q7 — groove: skok vnútra pri malom X | **Berieme:** nenulový komín **najmenej `10 + bt`** (HDF 3 → 13 mm), inak odmietnuť s vetou — vnútro sa potom s rastúcim komínom len zmenšuje | KON-A |
+| Codex FIX 13 + Grok 1, 2 — X nie je voľný kanál; Chladničková 580/50 = vnútro 530 | **Berieme:** v UI a bokoryse rozlíšiť „komín X" a „voľný kanál" **podľa režimu** (§5: `overlay`/`groove` `X − bt`, `inset`/`rails` `X`, `none` bez kanála); **rozmery Chladničkovej rozhodne Michal** (§4); kontrola niky vetranie nepotvrdzuje (vetranie ostáva mimo V1, na šablóne veta o otvoroch v sokli a hore) | KON-A · KON-D · §4 |
+| Grok 3 + Codex Q7 — groove: skok vnútra pri malom X | **Berieme, spresnené review PR #398 (§5):** minimum **podľa účinného režimu chrbta** — `groove` `X ≥ 10 + bt` (HDF 3 → 13 mm), `overlay` `X ≥ bt`, `inset`/`rails`/`none` bez minima (skrytá hrúbka chrbta sa nepočíta); inak odmietnuť s vetou | KON-A |
 | Grok 4 — pri prekryve výstuh odmietnuť, nie tichý clamp | **Berieme** (súhlasí s FIX 5) | KON-A |
 | Grok 5 — lišty na celej výške môžu zhodiť výsuv o celý stupeň 50 mm | **Berieme ako vedomý dôsledok M5** — ukáže mockup a PR popis; bez zmeny návrhu | KON-B · mockup |
 | Grok 7 + Codex Q3 — plný rozmer HDF nie je doložená norma (prax +~15 mm oproti svetlosti); plocha +12 %; karta má ukázať oba rozmery; prestavba starej zákazky zmení cenu | **M8 ostáva** (rozhodnutie dielne). Karta dielca ukáže „do nárezu 600 × 720 · v modeli 564 × 684"; PR a KRONIKA priznajú vyššiu plochu a zmenu po prestavbe | KON-0 · mockup |
@@ -64,3 +64,14 @@ chrbát 10 mm pred zadnou hranou, s komínom za zadnými hranami dna a stropu).
 2. **D-144** (nová stará chyba): používaš niekde vložený chrbát alebo chrbát v drážke spolu s **výstuhami na výšku**? Ak áno, oprava ide skôr.
 3. **Komín pod 13 mm** sa bude odmietať („komín 0 alebo aspoň 13 mm") — v poriadku?
 4. **Po KON-0 musí mať aj Lucia hneď novú verziu** — inak jej plugin zákazky z tvojho PC neprestaví ani nevyexportuje (to je zámer, chráni pred malým chrbtom).
+
+## 5 · Review PR #398 — GH Codex kolo 1 (27.9.2026)
+
+| Nález | Rozhodnutie | Kam |
+|---|---|---|
+| **P1** — zvýšenie schémy nechráni pred **starými snapshotmi v novom plugine**: skrinka s chrbtom v drážke postavená pred KON-0 vydá ďalej 564 × 684, kým sa neprestaví, a nič to neprizná | **Berieme:** KON-0 pridá kontrolu **zastaraného chrbta v drážke** (skrinka s `groove` bez `cut_size` / pod aktivačnou schémou, vzor `*_ACTIVATION_SCHEMA`) → Kontrola s výzvou „prestav skrinku" + **zastavenie výrobných exportov**, kým sa neprestaví; tvar brány a hromadnú prestavbu rozhodne audit KON-0 | koncept §11 · KON-0 |
+| P2 — `cut_size` chýba v autoritatívnom kontrakte (STANDARD §8.2 definuje `length`/`width` ako výrobné rozmery) | **Berieme:** KON-0 zapíše `cut_size` do STANDARD §8.2 (rozdiel voči rozmeru dielca, fallback, poškodený údaj) | koncept §11 · KON-0 |
+| P2 — voľný kanál `X − bt` platí len pre `overlay` a `groove` pri komíne | **Berieme:** kanál podľa režimu — `overlay`/`groove` `X − bt`, `inset`/`rails` `X`, `none` bez ohraničeného kanála | koncept §1 · KON-A · KON-C |
+| P2 — minimum `10 + bt` nezávisle od režimu (skrytá hrúbka pri `rails`/`none` by blokovala platný komín) | **Berieme:** minimum podľa účinného režimu (tabuľka §2, riadok Grok 3) | koncept §1 · KON-A |
+
+Kolo vrátilo P1 → oprava v tomto PR a **nové plné GH kolo** (`@codex review`) podľa `codex-po-pr`.

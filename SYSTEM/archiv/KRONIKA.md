@@ -30,7 +30,10 @@
   chrbta; odmietnutia namiesto tichých klampov; dve roly líšt; STD 7 pre seed šablóny; **Chladničková 580 × komín 50 by mala vnútro 530 < 550 niky**
   → rozmery rozhodne Michal (návrh hĺbka 610). Audit našiel aj **starú výrobnú chybu D-144** (vložený chrbát / chrbát v drážke + výstuhy na výšku —
   chrbát prechádza zadnou výstuhou, v kusovníku je vyšší), oprava v KON-A. PLAN dostal **blok 7** (KON-0 · A · B · C · D), K1/K2 z bloku 4 odkazujú
-  naň; DOGFOODING skupinu KONŠTRUKCIA K1+K2 s D-143 a D-144. Ďalší krok: mockup na schválenie Michalom → packages.
+  naň; DOGFOODING skupinu KONŠTRUKCIA K1+K2 s D-143 a D-144. **GH Codex kolo 1 na tomto PR** (1× P1 + 3× P2, všetko prijaté, reconcile §5): zvýšenie
+  schémy nechráni pred **starými snapshotmi v novom plugine** → KON-0 dostane kontrolu zastaraného chrbta v drážke (výzva prestaviť + zastavené
+  výrobné exporty); `cut_size` do STANDARD §8.2; voľný kanál a minimum komína **podľa účinného režimu chrbta**. Kvôli P1 nové plné GH kolo.
+  Ďalší krok: mockup na schválenie Michalom → packages.
 
 - **DOCS — smoke S1 PASS a odškrtnutie V1 vízie (26.9.2026, PR #397, len dokumentácia; verzia pluginu sa nemení).**
   Michal 26.9. večer potvrdil **smoke bloku SPOTREBIČE S1 = PASS** („PASS — ideme ďalej"); zápis v [S1_ZAVER_2026-09-24.md](S1_ZAVER_2026-09-24.md)

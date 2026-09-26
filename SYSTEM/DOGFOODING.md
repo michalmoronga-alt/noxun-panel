@@ -51,7 +51,8 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
   **v plnom rozmere ako naložený chrbát** tej istej skrinky (**600 × 720**) a v dielni sa zreže na mieru — „zrezať si to viem, prilepiť je horšie".
   Model má chrbát ďalej ukazovať v drážke. *Stav: OTVORENÉ — prvá dávka bloku (**KON-0**); plugin dnes všade predpokladá, že rozmer do nárezu
   = rozmer v modeli (textúry, kontrola olepov, smer dekoru), preto oprava potrebuje nový údaj „rozmer do nárezu" (`cut_size`) a zvýšenie
-  `CONFIG_SCHEMA` (krížový audit 27.9.). **Kým nebude oprava v maine, chrbát v drážke v objednávke kontrolovať ručne.***
+  `CONFIG_SCHEMA` (krížový audit 27.9.); skrinky postavené pred opravou dostanú v Kontrole výzvu na prestavbu a výrobné exporty ich zastavia, kým sa
+  neprestavia (review PR #398). **Kým nebude oprava v maine, chrbát v drážke v objednávke kontrolovať ručne.***
 - **D-144 · Vložený chrbát alebo chrbát v drážke prechádza výstuhou na výšku** (krížový audit Codex 27.9.2026, blok KONŠTRUKCIA) — pri strope
   „Dve výstuhy" **na výšku** sa horná hrana chrbta ráta pod stropom (`back_z_hi`), nie pod výstuhami (`interior.z_hi`); naložený chrbát stojí za
   výstuhami a je v poriadku, ale **vložený** chrbát a chrbát **v drážke** prechádzajú zadnou výstuhou (pri výstuhe 100 a korpuse 18 až o 82 mm)
