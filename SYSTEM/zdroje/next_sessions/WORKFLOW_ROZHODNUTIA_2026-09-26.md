@@ -82,3 +82,22 @@
 - **PR D** — oficiálny plugin `xai-org/grok-build-plugin-cc` (pred inštaláciou prejsť; lokálny grok 1.0.34 → 1.0.40).
 - **Mimo repa (orchestrátor):** N15, N16.
 - **Po V1:** spoločné pravidlá do AGENTS.md (štandard, ktorý čítajú Codex, Grok Build, OpenCode aj Antigravity); CLAUDE.md ho importuje.
+
+## 6 · Spresnenia pri review PR #393 (26.9.)
+
+Michalove odpovede na otázky implementátora (Q1–Q6) a opravy nálezov review (GH Codex kolo 1, slepá delta); zapracované v PR #393.
+
+- **Q1 · Predrecenzia** pri bežnej dávke nad 300 zmenených riadkov kódu pluginu alebo s novým ovládacím prvkom v UI je **povinná** (N18-1).
+- **Q2 · Hranica 80 % Claude session** platí len pre implementačného subagenta, nie pre predrecenziu (N18-2).
+- **Q3 · Pravidlo 3 kôl (a):** P2/P3 nájdené slepou deltou opraví pôvodný implementátor, finálne overí orchestrátor — slučka tým končí (Z4).
+- **Q4 · Draft pre kvótu:** pred mergom `gh pr ready` spustí kolo Codexu; pri kvóte stále pod 10 % sa naň nečaká (náhradná brána už prebehla),
+  neskorší nález rieši nový fix PR; ak sa kvóta obnovila, na kolo sa čaká. Kvótová brána pri `gh pr ready` rozhoduje len o čakaní.
+- **Q5 · Priečinok bloku:** debata aj mockup nových blokov sú v `SYSTEM/zdroje/bloky/<BLOK>/`; po uzávere sa celý priečinok fyzicky presúva
+  do `SYSTEM/archiv/bloky/<BLOK>/` s kontrolou odkazov; existujúce mockupy v `zdroje/ui20/` sa nepresúvajú (N6, N12).
+- **Q6 · Backlog N4** (runner po teste vráti pôvodnú verziu pluginu) je v zásobníku PLAN.
+- **Kvóta Codexu pod 10 %:** rozlišuje sa trieda dávky — bežná → náhradná brána; audit-povinná, výrobná/cenová alebo oprava P0/P1 → rozhodne
+  Michal a dávka čaká (N8, N18-6); platí aj v bráne mergu. Kvótová brána beží aj tesne pred auditom návrhu, nielen pred PR.
+- **Číslo PR:** všade, kde ho dávka píše (PLAN, KRONIKA, STAV, `DOGFOODING_vyriesene`), sa pred `gh pr create` píše `PR #?`; doplní ho
+  samostatný commit hneď po vytvorení PR, ktorý pred mergom skontroluje orchestrátor.
+- **Model subagentov:** tabuľka Obsadenie rolí uvádza `model:` pre Agent tool — implementátor a slepý recenzent `opus` (= Opus 5.5),
+  rešerš na webe `sonnet` (Z1, N13).

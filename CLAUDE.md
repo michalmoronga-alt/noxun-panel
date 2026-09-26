@@ -99,7 +99,7 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Architektúra sa udr
 |---|---|
 | P0/P1 v review | oprava + nové plné GH kolo; ak oprava mení koncept → PR zavrieť a rozdeliť |
 | in-SU test zlyhá | nemergovať; najviac 2 pokusy o opravu, potom dávka čaká a ide do reportu; test nikdy neobchádzať |
-| Codex weekly zostatok < 10 % | bežná dávka → náhradná brána (slepý subagent + delta); audit-povinná/výrobná/cenová → otázka Michalovi, kým neodpovie, dávka čaká a pokračuje sa ďalšou nezávislou |
+| Codex weekly zostatok < 10 % | bežná dávka → náhradná brána (slepý subagent + delta); audit-povinná/výrobná/cenová alebo oprava P0/P1 → otázka Michalovi, kým neodpovie, dávka čaká a pokračuje sa ďalšou nezávislou |
 | nejasnosť v zadaní | otázka do chatu; kým neodpovie, bezpečnejšia vratná voľba len ak nemení dáta ani výrobné/cenové čísla — označiť v PR aj reporte; inak dávka čaká |
 | červený main · riziko pre zákazku · zaseknutý SketchUp/PC · potreba hesla | zastaviť celý beh a čakať na Michala |
 
@@ -123,8 +123,9 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Architektúra sa udr
   `SYSTEM/STAV.md` + APPEND odsek navrch „Záznamy dávok" v `SYSTEM/archiv/KRONIKA.md`** → v `SYSTEM/PLAN.md` ostáva riadok dávky v bloku
   **s ✅ a číslom PR** (presúva sa až s uzáverom bloku).
 - **Checklist dokumentačného PR:** odsek navrch „Záznamy dávok" v KRONIKE **áno**; STAV, VERSION ani `?v=` **nie**.
-- **Číslo PR v PLAN a KRONIKE:** pred `gh pr create` sa píše `PR #?`; hneď po vytvorení PR ho doplní samostatný commit, ktorý mení len
-  číslo (patrí do internej delta-kontroly).
+- **Číslo PR** (všade, kde ho dávka píše — PLAN, KRONIKA, STAV, `DOGFOODING_vyriesene`): pred `gh pr create` sa píše `PR #?`; hneď po
+  vytvorení PR ho doplní samostatný commit, ktorý mení len číslo. Ten **pred mergom skontroluje orchestrátor** (pri čistom kole 1 inak
+  žiadna delta nebeží; keď delta beží, patrí do nej).
 - **Uzáver bloku (vetva `release/<blok>`):** minor bump + `?v=` → hotový blok z `SYSTEM/PLAN.md` plným textom do
   `SYSTEM/archiv/ROADMAP_hotove_etapy.md` (v PLAN ostávajú len nehotové bloky a trvalé pravidlá) → **celý priečinok bloku** do
   `SYSTEM/archiv/bloky/<BLOK>/` + kontrola odkazov → V1_VIZIA, README, STAV, KRONIKA. Skupina „smoke po uzávere" v DOGFOODING je

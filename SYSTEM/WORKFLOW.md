@@ -133,13 +133,13 @@ flowchart TD
   T1["Testy: headless<br/>+ každá JS sada zvlášť"]:::auto
   Q2{"Buildery, observery, undo a operácie,<br/>geometria, zápis panela do modelu?"}:::gate
   SU["Test v SketchUpe = brána mergu<br/>runner -CloseWhenDone"]:::auto
-  DOC["Docs v tej istej dávke: architektúra na mieste,<br/>D-čísla do archívu, STAV, KRONIKA,<br/>v PLAN riadok s ✅ a PR #?"]:::sub
+  DOC["Docs v tej istej dávke: architektúra na mieste,<br/>D-čísla do archívu, STAV, KRONIKA, v PLAN riadok s ✅<br/>číslo PR zatiaľ PR #?"]:::sub
   Q3{"Audit-povinná, výrobná/cenová,<br/>nad 300 riadkov alebo nový prvok UI?"}:::gate
   PRE["Predrecenzia: slepý recenzent<br/>P1/P2 opraviť pred PR"]:::sub
   QK{"Codex weekly<br/>zostatok pod 10 %?"}:::gate
   PR["gh pr create"]:::orch
   PRD["PR ako draft<br/>ďalej podľa triedy dávky · mapa 3"]:::orch
-  NUM["Doplniť číslo PR v PLAN a KRONIKE<br/>samostatný commit, len číslo<br/>patrí do internej delta-kontroly"]:::orch
+  NUM["Doplniť číslo PR všade, kde je PR #?<br/>samostatný commit, len číslo<br/>pred mergom ho skontroluje orchestrátor"]:::orch
   RV["Review po PR · mapa 3"]:::ext
   MG["Merge s pripnutou hlavou<br/>CI zelené + kolo uzavreté"]:::orch
   NM["checkout main + pull"]:::orch
@@ -183,10 +183,13 @@ flowchart TD
   classDef gate fill:#ffffff,stroke:#1b3a4b,color:#1b3a4b
 ```
 
+*Vetva, ktorú diagram nekreslí:* Michal audit pod prahom nepovolí → audit aj dávka sa odložia po resete kvóty a pokračuje sa ďalšou nezávislou dávkou.
+
 **Kvóta Codexu** (`-Gate codex`) sa kontroluje tesne pred auditom návrhu aj pred otvorením PR — dlhý blok môže medzitým kvótu minúť.
-**Číslo PR** v PLAN aj KRONIKE je do otvorenia PR `PR #?`; hneď po `gh pr create` ho doplní samostatný commit, ktorý mení len číslo
-(patrí do internej delta-kontroly). **Dokumentačné PR** (bez kódu pluginu) idú skrátene: vetva `docs/…` → odsek v KRONIKE → headless
-testy (guardy dokumentácie) → kvóta → PR → číslo PR → review → merge. Verzia, `?v=`, STAV ani predrecenzia sa pri nich nerobia.
+**Číslo PR** je všade, kde ho dávka píše (PLAN, KRONIKA, STAV, `DOGFOODING_vyriesene`), do otvorenia PR `PR #?`; hneď po `gh pr create`
+ho doplní samostatný commit, ktorý mení len číslo — ten pred mergom skontroluje orchestrátor (pri čistom kole 1 inak žiadna delta nebeží).
+**Dokumentačné PR** (bez kódu pluginu) idú skrátene: vetva `docs/…` → odsek v KRONIKE → headless testy (guardy dokumentácie) → kvóta →
+PR → číslo PR → review → merge. Verzia, `?v=`, STAV ani predrecenzia sa pri nich nerobia.
 
 ## 5 · Review po PR
 
@@ -248,6 +251,9 @@ flowchart TD
   classDef gate fill:#ffffff,stroke:#1b3a4b,color:#1b3a4b
   classDef danger fill:#fbe9e7,stroke:#c62828,color:#5d1010
 ```
+
+*Vetvy, ktoré diagram nekreslí:* Michal povolí GH kolo aj pod prahom → kolo sa vyžiada (pri drafte `gh pr ready`) a vybaví sa bežne ·
+kvóta sa pri `gh pr ready` medzitým obnovila → na spustené kolo sa čaká a vybaví sa podľa skillu `codex-po-pr`.
 
 Po drobnostiach (len P2/P3) stačí interná kontrola opravy — aj pri audit-povinných a výrobných/cenových dávkach, ak prešli
 predrecenziou. Nové plné kolo sa vyžaduje pri P0/P1 alebo oprave, ktorá mení koncept. Opravu robí pôvodný implementátor, kontrolu

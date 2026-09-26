@@ -30,7 +30,13 @@
   runner vždy s `-CloseWhenDone` · počty testov z CLAUDE.md preč. **Skilly** `codex-po-pr`, `codex-audit` (model vždy `--model`), `predrecenzia`, `usage`
   a `antigravity-outside-in` zladené; **SYSTEM/README, STAV a PLAN** — hlavičky a pravidlá. Guard dĺžky riadkov a odkazov stráži aj WORKFLOW.md; status riadok
   záznamu rozhodnutí dostal tvar, ktorý žiada guard konceptov. Pravidlo Z7 (ukazovateľ kontextu) je v CLAUDE.md z PR #392 (záznam nižšie). Mimo repa
-  (orchestrátor): N15, N16; ďalej PR C (register agentov) a PR D (Grok plugin).
+  (orchestrátor): N15, N16; ďalej PR C (register agentov) a PR D (Grok plugin). **Review:** GH Codex kolo 1 = 5× P2 (pri Codex kvóte pod 10 % rozhoduje
+  trieda dávky · hranica 80 % len pre implementátora · `PR #?` doplnený samostatným commitom po `gh pr create` · kvótová brána aj pred auditom · `model:`
+  v tabuľke rolí) + Michalove spresnenia Q1–Q6 (predrecenzia nad 300 riadkov alebo s novým prvkom UI povinná · `gh pr ready` pri drafte spustí kolo, pri
+  kvóte pod 10 % sa naň nečaká · debata a mockup v priečinku bloku, po uzávere fyzický presun s kontrolou odkazov, `zdroje/ui20/` ostáva · backlog N4
+  v zásobníku PLAN); slepá delta opráv (1× P2 + 4× P3) doplnila opravu P0/P1 medzi prípady pre Michala, `gh pr ready` rozhoduje len o čakaní na kolo,
+  `PR #?` všade (aj STAV a DOGFOODING_vyriesene) s kontrolou orchestrátorom, poznámky k vetvám diagramov a dodatok §6 v zázname rozhodnutí — bez
+  nového GH kola.
 - **NÁSTROJ — oprava hooku kontroly kódovania po úprave súboru (26.9.2026, PR #394, hook Claude Code; verzia pluginu sa nemení).** Hook `post_edit_check.ps1`
   (od 24.7.) reálne nebežal: Claude Code spúšťa hooky na Windows cez Git Bash a ten z príkazu v dvojitých úvodzovkách zjedol `$d`/`$env:` → parse error PowerShellu
   pri každom Edit/Write (v transkripte orchestrátora 172× `hook_non_blocking_error`; nález pri PR #392). Príkaz v `.claude/settings.json` má skript v jednoduchých
