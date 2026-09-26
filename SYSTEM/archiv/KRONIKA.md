@@ -17,6 +17,19 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **DOCS — smoke S1 PASS a odškrtnutie V1 vízie (26.9.2026, PR #?, len dokumentácia; verzia pluginu sa nemení).**
+  Michal 26.9. večer potvrdil **smoke bloku SPOTREBIČE S1 = PASS** („PASS — ideme ďalej"); zápis v [S1_ZAVER_2026-09-24.md](S1_ZAVER_2026-09-24.md)
+  (sekcia Smoke Michala 21.–26.9.). Dočasná skupina „SPOTREBIČE S1 — smoke po uzávere" v DOGFOODING **zanikla** — D-136 až D-140 sú v archíve,
+  D-141 a D-142 v zásobníku Po V1. **V1_VIZIA overená proti PLAN, archívu etáp a KRONIKE:** bod **4 Kovanie** `[x]` (blok KOVANIE v0.10.0 + balík Čiel
+  v0.11.0, v PLANe nie je otvorená V1 položka kovania) · bod **7 Dvaja používatelia** `[x]` (D-52, M-R VZHĽAD v0.12.0, Inspector + Štúdio s D-51, D-122
+  #343, D-124 #344; D-48 je mimo V1) · bod **1 Návrh** ostáva `[ ]` — GHOST-D1/D2 opravené na hotové (v0.9.27 / v0.9.28), ostáva test na kompletnej
+  reálnej zákazke (riadok „V1.0 zostavy") · bod **6 Výstupy** ostáva `[ ]` — pri D-94 (#361) a D-121 (#324/#325) doplnené „hotové", otvorené ostávajú
+  ceny materiálov/ABS, viac URL a nárezový plán · bod 2 Konštrukcia sa nemenil. **Osirotená veta v skupine INFRA** (DOGFOODING, „*Stav: na návrhovú
+  dávku — od 26.8. SAMOSTATNE…*" bez položky) bola podľa `git log -S` zvyšok položky **D-52** (vznikla v 633c0a4b); uzáver D-52 (e77e8ba1, v0.9.14)
+  odstránil len jej prvý riadok. Veta je preč, skupina INFRA nesie poznámku „Skupina je prázdna". **Smoke starších opráv (Michal 26.9.):** **D-128**
+  ručná výška dreveného boxu (#364) = **PASS** a **D-131** Kresba čiel jedným klikom (#365) = **PASS** — zapísané aj pri ich plných textoch
+  v DOGFOODING_vyriesene; **D-132** (#367), **D-133** (#368) a **D-134** (#369) ďalej čakajú na smoke. Ďalší blok **KONŠTRUKCIA K1+K2** (výber Michala 26.9.)
+  sa pripravuje v samostatnom PR.
 - **DOCS — rešerš a krížový audit na grok-4.7 (26.9.2026, PR #396, len dokumentácia; verzia pluginu sa nemení).**
   Rozhodnutie Michala 26.9.: rola „rešerš / krížový audit" v tabuľke Obsadenie rolí (`SYSTEM/WORKFLOW.md`) používa `grok-4.7` (predvolený model Grok CLI 1.0.41)
   namiesto `grok-4.6`; iné živé zmienky o grok-4.6 v repe neboli.

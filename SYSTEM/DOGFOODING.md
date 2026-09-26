@@ -44,13 +44,8 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
 
 ## INFRA
 
-  *Stav: na návrhovú dávku — od 26.8. SAMOSTATNE (bez väzby na D-48, ktorý je mimo V1); distribučný kanál jednoducho, napr. zdieľaný priečinok.*
-## SPOTREBIČE S1 — smoke po uzávere bloku (v0.13.0, opravy v0.13.x)
-
-*(Blok S1 je uzavretý vo v0.13.0 (24.9.2026). Michalov smoke z 21.–24.9. priniesol **D-136** až **D-140** — všetky opravené (#386–#389), plné texty
-v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md); **D-141** a **D-142** sú v zásobníku nižšie. Kontrola „čelo presahuje max výšku čela modelu
-z listu" sa pri D-139 **nezaviedla** — kontroly slotu ostávajú dve (rozhodnutie 20.9.); keď si ju prax vypýta, bude to nový postreh. Michalov smoke pokračuje
-podľa checklistu v [archiv/S1_ZAVER_2026-09-24.md](archiv/S1_ZAVER_2026-09-24.md) — nové nálezy sa zapíšu sem a opravia ako v0.13.x.)*
+*(Skupina je prázdna — **D-52 uzavreté 3.9.2026** (v0.9.14), plný text v
+[archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md); **D-48** je mimo V1, v skupine Po V1 — zásobník.)*
 
 ## Po V1 — zásobník
 

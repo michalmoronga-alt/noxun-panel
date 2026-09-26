@@ -378,7 +378,7 @@ riadok → „zrušiť" → jeden krok Späť → prechod na dvierka → po zru�
 
 ### D-131 — kresba čiel celej zákazky jedným klikom, vyriešené 13.9.2026
 
-**Výsledok: PR #365, v0.12.3.** V **Štúdiu → Materiály → Predvoľby projektu** je nový riadok **„Kresba čiel"**: voľba *Podľa materiálu · Pozdĺžna · Priečna* a tlačidlo
+**Výsledok: PR #365, v0.12.3.** Michal 26.9.2026 potvrdil smoke **PASS**. V **Štúdiu → Materiály → Predvoľby projektu** je nový riadok **„Kresba čiel"**: voľba *Podľa materiálu · Pozdĺžna · Priečna* a tlačidlo
 **„Použiť na všetky čelá (N)"**. Jeden klik zapíše smer dekoru **všetkým fyzickým čelám všetkých skriniek zákazky** — dvierkam (každému krídlu zvlášť), zásuvkovým čelám,
 výklopom/sklopom aj blendám — a prestaví ich v **jednej operácii = jeden krok Späť**. Vedľa tlačidla stojí read-only stav („teraz: 8× priečna · 4× podľa materiálu"), takže
 je vidieť, čo v zákazke platí, ešte pred klikom. Výsledok sa overí existujúcim prepínačom **Kontrola kresby**.
@@ -431,7 +431,7 @@ blokáda, cudzí `model_guid` a prázdna zákazka bez kroku Späť). Deväť ove
 
 ### D-128 — ručná výška dreveného boxu zásuvky, vyriešené 13.9.2026
 
-**Výsledok: PR #364, v0.12.2.** Pri drevenom boxe (Quadro V6) sa výška boxu dá **ručne znížiť**. V riadku Zásuvka v kontexte Kovanie **aj v karte zásuvkového čela** stojí
+**Výsledok: PR #364, v0.12.2.** Michal 26.9.2026 potvrdil smoke **PASS**. Pri drevenom boxe (Quadro V6) sa výška boxu dá **ručne znížiť**. V riadku Zásuvka v kontexte Kovanie **aj v karte zásuvkového čela** stojí
 tretí chip osi — **„box 360"** vedľa „NL 450" — a hneď vedľa neho malé číselné pole s rozsahom v nápovede (napr. `58–360`). Používateľ napíše vlastnú výšku a stlačí Enter
 (alebo klikne mimo poľa); dielce boxu — **2 boky, vnútorné čelo a chrbát** — sa narežú na ňu, **dno sa nemení**. Klik na chip v stave „automat" zamkne aktuálny automat, klik
 na zamknutý chip zámok pustí. Nad automat sa zamknúť **nedá** (box väčší než zóna neexistuje) a pod minimum tiež nie (čelo a chrbát boxu potrebujú svojich 30 mm nad dnom).
