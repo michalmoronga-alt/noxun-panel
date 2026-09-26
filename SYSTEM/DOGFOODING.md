@@ -48,7 +48,7 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
   v režime „V drážke" (predvolený pri hornej skrinke) na **vnútorný rozmer** skrinky: šírka medzi bokmi, výška medzi dnom a stropom (horná
   600 × 720, korpus 18 → chrbát **564 × 684**). V dielni sa drážka frézuje do hĺbky, takže chrbát je v nárezovom zozname aj vo VEPO **malý** —
   výrobná chyba. Presný prídavok by bol 9 mm na každú stranu s drážkou, ale Michal pre V1 rozhodol **nekomplikovať**: chrbát v drážke ide do nárezu
-  **v plnom rozmere ako naložený chrbát** tej istej skrinky (**600 × 720**) a v dielni sa zreže na mieru — „zrezať si to viem, prilepiť je horšie".
+  **v plnom rozmere skrinky** — šírka skrinky × výška od spodku dna po vrch, bez komína rovnako ako naložený chrbát (**600 × 720**) — a v dielni sa zreže na mieru — „zrezať si to viem, prilepiť je horšie".
   Model má chrbát ďalej ukazovať v drážke. *Stav: OTVORENÉ — prvá dávka bloku (**KON-0**); plugin dnes všade predpokladá, že rozmer do nárezu
   = rozmer v modeli (textúry, kontrola olepov, smer dekoru), preto oprava potrebuje nový údaj „rozmer do nárezu" (`cut_size`) a zvýšenie
   `CONFIG_SCHEMA` (krížový audit 27.9.); skrinky postavené pred opravou dostanú v Kontrole výzvu na prestavbu a výrobné exporty ich zastavia, kým sa

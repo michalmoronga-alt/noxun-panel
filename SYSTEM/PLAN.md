@@ -530,7 +530,8 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 tak, aby chladničkové, rúrové a drezové skrinky išli z pluginu bez ručných úprav. **Priečinok bloku (autorita počas bloku):**
 [zdroje/bloky/KONSTRUKCIA/](zdroje/bloky/KONSTRUKCIA/) — koncept v2 s rozhodnutiami Michala (M1–M10), fakty z kódu, krížový audit Grok + Codex
 a reconcile. **Stav 27.9.2026:** audit bloku hotový (2 BLOCKER prijaté a zapracované); čaká sa na **schválenie mockupu** Michalom, potom packages.
-Každá dávka okrem KON-C je výrobná; KON-0, A, B a D sú audit-povinné (schémy); in-SU test je brána mergu. Poradie:
+KON-0, A a B sú výrobné; KON-0, A, B a D sú audit-povinné (schémy); in-SU test je brána mergu pri dávkach meniacich buildery a geometriu
+(KON-0, A, B; pri C a D podľa spúšťačov v CLAUDE.md). Poradie:
 
 - **KON-0 · D-143 · Chrbát v drážke do nárezu v plnom rozmere** — nové pole rozmeru do nárezu `cut_size` (geometria ostáva v drážke), `CONFIG_SCHEMA` 19,
   STANDARD §8.2, kontrola starých skriniek s chrbtom v drážke (výzva prestaviť, výrobné exporty stoja, kým sa neprestavia).

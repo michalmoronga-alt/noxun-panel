@@ -51,7 +51,7 @@ chrbát 10 mm pred zadnou hranou, s komínom za zadnými hranami dna a stropu).
 ## 3 · Čo sa mení v dávkach
 
 - **KON-0 · D-143** — `cut_size` + `CONFIG_SCHEMA` 19 + ABS výnimka + reťazový test + rozhodnutie o odpojenom dielci; audit-povinná, výrobná.
-- **KON-A · K1** — doraz dna/stropu (B2), minimum komína `10 + bt`, odmietnutia namiesto tichých klampov, nohy podľa dorazu, config-aware scale,
+- **KON-A · K1** — doraz dna/stropu (B2), minimum komína podľa účinného režimu chrbta, výstuhy: orezanie s upozornením len keď výsledok ostane platný, inak odmietnutie, nohy podľa dorazu, config-aware scale,
   explicitné predvoľby v šablónach, JS parita v tej istej dávke, **D-144** (inset/groove + upright výstuhy); `CONFIG_SCHEMA` 20.
 - **KON-B · K2** — dve roly lišty (dolná stojaca), jeden riadok len pri zhodných kusoch, horná lišta na `interior.z_hi`, JS parita; `CONFIG_SCHEMA` 21, BuildPlan 6, ABS seed 5.
 - **KON-C** — len bokorys v rohu náhľadu (+ „voľný kanál").
@@ -62,7 +62,7 @@ chrbát 10 mm pred zadnou hranou, s komínom za zadnými hranami dna a stropu).
 1. **Rozmery Chladničkovej:** aby vstavaná chladnička mala niku 560 a komín 50, celková hĺbka vychádza **610** (vnútro 560, voľný kanál 47 mm pri HDF 3).
    Súhlasíš s 600 × 2100 × 610, alebo robíte chladničkové skrine inak (iná hĺbka, iný komín, iná výška)?
 2. **D-144** (nová stará chyba): používaš niekde vložený chrbát alebo chrbát v drážke spolu s **výstuhami na výšku**? Ak áno, oprava ide skôr.
-3. **Komín pod 13 mm** sa bude odmietať („komín 0 alebo aspoň 13 mm") — v poriadku?
+3. **Minimálny komín podľa typu chrbta:** pri chrbte **v drážke** aspoň 10 mm + hrúbka chrbta (HDF 3 → 13 mm, pevný 18 → 28 mm), pri **naloženom** aspoň hrúbka chrbta (aby netrčal za boky), pri vloženom, lištách a bez chrbta bez minima — v poriadku?
 4. **Po KON-0 musí mať aj Lucia hneď novú verziu** — inak jej plugin zákazky z tvojho PC neprestaví ani nevyexportuje (to je zámer, chráni pred malým chrbtom).
 
 ## 5 · Review PR #398 — GH Codex kolo 1 (27.9.2026)
@@ -87,3 +87,9 @@ Kolo vrátilo P1 → oprava v tomto PR a **nové plné GH kolo** (`@codex review
 
 Kolo 2 vrátilo P1 → oprava a **3. plné GH kolo**. Aby tretie kolo nenarážalo na rozpory medzi pôvodným textom a dodatkom, **v2 je zapracovaná
 priamo do §1–§8 konceptu** (§11 je už len prehľad zmien). Pravidlo 3 kôl: ak 3. kolo vráti P0/P1 alebo zmenu konceptu, PR sa zavrie a rozdelí.
+
+**Slepá kontrola dokumentov pred 3. kolom** (nový slepý recenzent, 27.9.; 2× P2 + 4× P3, všetko opravené): minimum komína podľa režimu aj v §3
+a v otázke pre Michala (§4 ot. 3) · jednotné pravidlo výstuh — flat orezanie s upozornením `rail_depth_clamped` a odmietnutie len pod minimom 20 mm,
+upright odmietnutie; to isté pri absorpcii mierky (koncept §1, §2) · D-144 v tabuľke §1 (inset, groove bez komína) a výnimka z „pri X = 0 sa nič
+nemení" · odkaz na STANDARD opravený na §7.2 („výstupy čítajú výhradne snapshot") a §11.1 · trieda KON-D (nie výrobná) a in-SU podľa spúšťačov
+v PLAN · minimum plného stropu určí audit KON-A · M8 a D-143 formulované ako „plný rozmer skrinky `w × (h − s)`" (pri komíne sa líši od naloženého).
