@@ -1,4 +1,4 @@
-> Stav: research packet a audit návrhu (surový výstup audítora) — nie rozhodnutie; syntéza a reconcile v CROSS_AUDIT_RECONCILE_2026-09-27.md.
+> Stav: research packet a audit návrhu (surový výstup audítora) — nie rozhodnutie; rozhodnutia v ROZHODNUTIA_BLOKU_2026-09-27.md (podrobný reconcile je pracovná poznámka v histórii PR #399).
 > Beh: Codex CLI 0.154 cez companion 1.0.5, model gpt-6-astra, 14 min, 27.9.2026 ~00:05–00:20 (Codex weekly +6 %); worktree docs/blok-konstrukcia ceccd915, nič nemenil.
 
 # K1K2 cross audit — Codex / gpt-6-astra — 27.9.2026

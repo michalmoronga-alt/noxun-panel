@@ -28,8 +28,11 @@
   podklady bloku (fakty z kódu, koncept, krížový audit, reconcile) a prešlo **tromi GH kolami, každé s P1** — všetky nálezy spresňovali návrh dávok
   (staré snapshoty v novom plugine, zastaranosť podľa aktivačnej schémy, pravidlá výstuh, olepený chrbát v drážke, názvy líšt, D-144 len pri
   výstuhe vyššej než korpus). Podľa **pravidla 3 kôl (b)** sa nezmergovalo, ale **zavrelo a rozdelilo**: tento PR nesie blok 7 v PLAN, postrehy
-  D-143/D-144 a — po review kolo 1 (P1 + 2× P2, reconcile §8) — aj priečinok bloku `zdroje/bloky/KONSTRUKCIA/` (fakty, krížový audit, reconcile
-  §5–§8, koncept ako **pracovný podklad**, lebo pravidlo repa drží priečinok bloku v repe od štartu). **KON-0 (D-143) na schválenie mockupu nečaká**;
+  D-143/D-144 a priečinok bloku `zdroje/bloky/KONSTRUKCIA/` (review kolo 1: pravidlo repa drží priečinok v repe od štartu bloku). Review kolo 2
+  (2× P1 + 2× P2 — opäť spresnenia detailov návrhu: zastaraný riadok o olepenom chrbte, odpojené staré chrbty D-144, spoločný názov líšt priamo na
+  „Chrb HD", rúrové skrinky mimo cieľa) viedlo k **zoštíhleniu**: namiesto pracovného konceptu so vzorcami a podrobného reconcile nesie priečinok
+  stručné **ROZHODNUTIA_BLOKU** (rozhodnutia Michala + prijaté požiadavky pre každú dávku), fakty z kódu a surové výsledky auditu; pracovný koncept
+  ostáva v histórii PR (commit b870179b) a na vetve `docs/blok-konstrukcia` ako poznámky. **KON-0 (D-143) na schválenie mockupu nečaká**;
   audit návrhu majú len dávky meniace kontrakt alebo schému (KON-0, A, B, D). Mockup a packages prídu samostatným PR. Poučenie: úvodný dokument
   bloku drží rozhodnutia a smer, **nie implementačné vzorce** — tie patria do package dávky. Ďalší krok: package a audit KON-0, schválenie mockupu.
 

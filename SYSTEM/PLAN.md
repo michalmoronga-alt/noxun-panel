@@ -527,10 +527,10 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 ### 7 · KONŠTRUKCIA K1+K2 (V1 bod 2 · štart 26.9.2026)
 
 **Cieľ:** komín vzadu a zapustený strop vpredu (K1), chrbát z dvoch líšt (K2), chrbát v drážke správne do nárezu (D-143) a šablóna Chladničková —
-tak, aby chladničkové, rúrové a drezové skrinky išli z pluginu bez ručných úprav. **Rozhodnutia Michala z debaty 26.9.:** komín bežne ~50 mm
+tak, aby chladničkové a drezové skrinky išli z pluginu bez ručných úprav (rúrové skrinky sú mimo bloku — rúra potrebuje iné vetranie). **Rozhodnutia Michala z debaty 26.9.:** komín bežne ~50 mm
 (o koľko sú dno a strop vzadu kratšie ako bok), zapustený strop pre dolnú aj hornú skrinku, pri lištách vnútro pred lištami v celej výške, lišty
 vo výstupoch jeden riadok „Chrb HD" (2 ks), zo šablón len Chladničková. **Stav 27.9.2026:** krížový audit bloku (Grok + Codex) hotový. **Priečinok bloku:**
-[zdroje/bloky/KONSTRUKCIA/](zdroje/bloky/KONSTRUKCIA/) — fakty z kódu, koncept (pracovný podklad), krížový audit a reconcile; mockup a packages
+[zdroje/bloky/KONSTRUKCIA/](zdroje/bloky/KONSTRUKCIA/) — **rozhodnutia a vstupy pre packages**, fakty z kódu a krížový audit; mockup a packages
 pribudnú po schválení mockupu Michalom. **KON-0 (výrobná chyba D-143) na mockup nečaká** — ide hneď po audite svojho package; ostatné dávky
 po schválení mockupu. Audit návrhu majú dávky meniace kontrakt alebo schému (KON-0, A, B a D — knižnica šablón STD 7); KON-C (UI) nie. Poradie:
 

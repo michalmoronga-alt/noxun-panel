@@ -1,4 +1,4 @@
-> Stav: research packet (surový výstup audítora) — nie rozhodnutie; syntéza a reconcile v CROSS_AUDIT_RECONCILE_2026-09-27.md.
+> Stav: research packet (surový výstup audítora) — nie rozhodnutie; rozhodnutia v ROZHODNUTIA_BLOKU_2026-09-27.md (podrobný reconcile je pracovná poznámka v histórii PR #399).
 > Beh: Grok Build CLI 1.0.41, model grok-4.7, --reasoning-effort xhigh, nástroje len web_search + web_fetch (GROK_WEB_FETCH=1), zadanie CROSS_AUDIT_PROMPT_2026-09-27.md + KONCEPT inline, 27.9.2026 ~00:40–01:00.
 > Úvodná veta modelu pred nadpisom je ponechaná bez úprav.
 

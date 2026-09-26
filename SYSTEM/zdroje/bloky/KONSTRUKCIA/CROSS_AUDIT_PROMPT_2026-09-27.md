@@ -1,8 +1,8 @@
 # Krížový audit bloku KONŠTRUKCIA K1+K2 + D-143 — zadanie (rovnaké pre všetkých audítorov)
 
 > Záznam zadania krížového auditu bloku (27.9.2026). Audítori: **Grok** (`grok-4.7`, web, bez repa) a **Codex** (`gpt-6-astra`, s prístupom
-> k repu); Gemini podľa rozhodnutia Michala 26.9. nebeží. Za týmto zadaním nasleduje inline celý [KONCEPT_K1K2_2026-09-26.md](KONCEPT_K1K2_2026-09-26.md).
-> Výsledky: `CROSS_AUDIT_GROK_2026-09-27.md`, `CROSS_AUDIT_CODEX_2026-09-27.md`; syntéza a reconcile: `CROSS_AUDIT_RECONCILE_2026-09-27.md`.
+> k repu); Gemini podľa rozhodnutia Michala 26.9. nebeží. Za týmto zadaním nasledoval inline celý pracovný koncept `KONCEPT_K1K2_2026-09-26.md` (v1; je v histórii PR #399 a na vetve `docs/blok-konstrukcia`).
+> Výsledky: `CROSS_AUDIT_GROK_2026-09-27.md`, `CROSS_AUDIT_CODEX_2026-09-27.md`; rozhodnutia: `ROZHODNUTIA_BLOKU_2026-09-27.md`.
 
 ## Rola
 
