@@ -54,8 +54,8 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
 - **D-144 · Vložený chrbát alebo chrbát v drážke prechádza výstuhou na výšku** (krížový audit Codex 27.9.2026, blok KONŠTRUKCIA) — pri strope
   „Dve výstuhy" **na výšku** sa horná hrana vloženého chrbta a chrbta v drážke ráta pod stropom, nie pod výstuhami. Keď je výstuha vyššia než hrúbka
   korpusu (bežne 100 oproti 18), chrbát prechádza zadnou výstuhou (až o 82 mm) a v kusovníku je **vyšší, než sa zmestí**. Naložený chrbát (bežná
-  dolná) ani plný strop (bežná horná) sa to netýka. *Stav: OTVORENÉ — oprava v dávke **KON-A** vrátane skriniek postavených pred opravou; ak sa
-  kombinácia používa na zákazkách, oprava ide skôr.*
+  dolná) ani plný strop (bežná horná) sa to netýka. *Stav: OTVORENÉ — oprava v dávke **KON-A** vrátane skriniek postavených pred opravou (Michal 27.9. kombináciu na zákazkách
+  nepoužíva). **Kým nebude oprava v maine, pri tejto kombinácii kontrolovať výšku chrbta v objednávke ručne.***
 
 ## INFRA
 
@@ -64,6 +64,9 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
 
 ## Po V1 — zásobník
 
+- **D-145 · Náhľad Inspectora v lepšej 3D forme** (Michal 27.9.2026, pri schvaľovaní mockupu bloku KONŠTRUKCIA) — hĺbkové veci korpusu (komín vzadu,
+  zapustený strop, lišty chrbta) dnešný čelný náhľad neukáže; malý bokorys v rohu náhľadu Michal **zamietol** kvôli zahlteniu priestoru panela. Neskôr
+  navrhnúť celý náhľad v lepšej 3D forme, kde sa to dá zobraziť. *Stav: zásobník — bez termínu.*
 - **D-141 · Typ „Umývačka" vo vkladacej karte neskôr ako „Spotrebič"** (Michal 21.9.2026, smoke S1) — samostatné tlačidlo typu pre jeden spotrebič je
   nesystémové; keď pribudne ďalší fyzický spotrebič ako samostatný objekt (voľne stojaca chladnička, sporák…), tlačidlo sa premenuje na **„Spotrebič"**
   a konkrétny druh sa vyberie pod ním. *Stav: zásobník — kým je slot umývačky jediný objekt bez korpusu, ostáva „Umývačka".*

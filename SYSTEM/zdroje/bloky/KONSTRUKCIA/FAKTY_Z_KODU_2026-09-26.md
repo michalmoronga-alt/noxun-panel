@@ -91,7 +91,7 @@ Guard parity existuje len pre polia slotu (`tests/pure/test_s1e_slot.rb:624` PAR
 | # | Konzument | Kde | Čo číta | Keby sa chrbát posunul dopredu o X (komín) |
 |---|---|---|---|---|
 | 1 | Strom zón | construction.rb:134–136 (`zbox y1 = back_front_y`) → `ZoneTree.compute` | hĺbka všetkých zón, `zones[].depth` v configu, ghost boxy | zóny kratšie o X; zóny sa delia len v X a Z, takže **zámky polí nepadnú** |
-| 2 | Police | zone_tree.rb:547–567 (`sd = y1 − y0 − 20`, `SHELF_FRONT_INSET` 25) | hĺbka zóny | **police kratšie o X — mení sa kusovník aj VEPO**; zóna ≤ 20 mm → warning `shelf_skipped_shallow_zone` |
+| 2 | Police | zone_tree.rb:547–567 (`sd = y1 − y0 − 20`, `SHELF_FRONT_INSET` 20) | hĺbka zóny | **police kratšie o X — mení sa kusovník aj VEPO**; zóna ≤ 20 mm → warning `shelf_skipped_shallow_zone` |
 | 3 | Priečky | zone_tree.rb:521–541 (plná hĺbka zóny) | hĺbka zóny | priečky kratšie o X (výrobná zmena) |
 | 4 | Recepty zásuviek | `context_for` 1091–1130 (`clear_depth` 1124) → `Recipes.resolve` drawer_recipes.rb:507–647 | svetlá hĺbka | automatická **NL sa ticho skráti** (606–612: najväčšia NL s `min_depth ≤ clear_d`) → iné dielce boxu aj iný výsuv v nákupe; **zamknutá NL** sa neprispôsobí → RED `nl_lock_invalid` (598–604); nič sa nezmestí → RED `drawer_no_fit`. RED zásuvky zastavia nákup, rozpočet a ponuku (`BUILD_BLOCKERS`, production_core.rb:1267–1293) |
 | 5 | Chipy osí zásuvky v Inspectore | `drawer_contexts` 1052–1069 → `CabinetBuilder.drawer_axis_contexts` | ten istý `ctx` | ponuka NL/výšok sa zúži |

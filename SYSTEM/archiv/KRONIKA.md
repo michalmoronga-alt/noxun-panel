@@ -33,6 +33,10 @@
   „Chrb HD", rúrové skrinky mimo cieľa) viedlo k **zoštíhleniu**: namiesto pracovného konceptu so vzorcami a podrobného reconcile nesie priečinok
   stručné **ROZHODNUTIA_BLOKU** (rozhodnutia Michala + prijaté požiadavky pre každú dávku), fakty z kódu a surové výsledky auditu; pracovný koncept
   ostáva v histórii PR (commit b870179b) a na vetve `docs/blok-konstrukcia` ako poznámky. **KON-0 (D-143) na schválenie mockupu nečaká**;
+  **Michal 27.9. (v noci):** nika spotrebiča sa pri komíne ráta **z hĺbky boku** (listy kótujú min. hĺbku boku, chladnička zasahuje do komína —
+  prax), Chladničková **600 × 2100 × 560, komín 50, bez chrbta**, **bokorys v náhľade nie** (KON-C vypadol → D-145 zásobník), mockup schválený,
+  samostatné chrbty nepoužíva (starý samostatný chrbát → ORANGE), D-144 kombináciu nepoužíva, minimum komína podľa typu chrbta áno. Audit návrhu
+  KON-0 (NOT SOUND: 2 BLOCKER pri samostatných chrbtoch + 4 FIX) je spracovaný v ROZHODNUTIACH;
   audit návrhu majú len dávky meniace kontrakt alebo schému (KON-0, A, B, D). Mockup a packages prídu samostatným PR. Poučenie: úvodný dokument
   bloku drží rozhodnutia a smer, **nie implementačné vzorce** — tie patria do package dávky. Ďalší krok: package a audit KON-0, schválenie mockupu.
 

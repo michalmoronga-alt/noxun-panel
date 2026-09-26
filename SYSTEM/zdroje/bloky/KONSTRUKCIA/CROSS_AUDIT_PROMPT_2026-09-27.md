@@ -64,7 +64,7 @@ a čo sa pokazí vo výrobe.
   medzi bokmi. **Sokel/nohy** podľa `floor_height`.
 - **Predvolené:** dolná 600 × 720 × 510, sokel 100, dno pod bokmi, chrbát naložený HDF 3 · horná 600 × 720 × 320, bez sokla, dno medzi bokmi,
   chrbát v drážke HDF 3. Vysoká skrinka = dolná s väčšou výškou (vlastný typ neexistuje). Slot umývačky má vlastný plán bez korpusu.
-- **Vnútorná hĺbka** má jedinú autoritu `interior_dims.back_front_y`; číta ju 10+ konzumentov: zóny, police (hĺbka zóny − 20, predné odsadenie 25),
+- **Vnútorná hĺbka** má jedinú autoritu `interior_dims.back_front_y`; číta ju 10+ konzumentov: zóny, police (hĺbka zóny − 20, predné odsadenie 20),
   priečky, recepty zásuviek (**NL = najväčšia s `min_depth ≤ svetlá hĺbka`**; zamknutá NL, ktorá sa nezmestí → RED; RED zastaví nákup, rozpočet
   aj ponuku), legacy pravidlo výsuvu, výklop AVENTOS HL (`depth_min` 264), kontrola niky spotrebičov (chladnička Š/V/H, rúra a mikrovlnka Š/H),
   ponuka „zmestí sa", Inspector.
