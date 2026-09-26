@@ -17,6 +17,20 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **PROCES — pravidlá workflowu podľa rozhodnutí 25.–26.9.2026 (26.9.2026, PR #393, docs; verzia pluginu sa nemení).** Michal prešiel s orchestrátorom mapu
+  workflowu a schválil rozhodnutia **Z1–Z9 a N1–N18** (záznam „prečo": [WORKFLOW_ROZHODNUTIA_2026-09-26.md](../zdroje/next_sessions/WORKFLOW_ROZHODNUTIA_2026-09-26.md));
+  táto dávka ich zapísala do pravidiel. **Nový [WORKFLOW.md](../WORKFLOW.md)** — roly, jediná tabuľka **obsadenia rolí** (mení Michal), tri diagramy (blok · dávka
+  · review), brány a hranice. **CLAUDE.md:** sekcia Roly a modely (pravidlá o rolách, trailer = skutočný model session, Fable z pravidiel vypadol) · delegovanie na
+  subagentov · opravy z review robí pôvodný implementátor, kontrolu nový slepý subagent · interná delta aj pri audit-povinných a výrobných/cenových dávkach, ak
+  prešli predrecenziou · predrecenzia aj pri bežnej dávke nad 300 riadkov kódu pluginu alebo s novým prvkom UI · jedna definícia výrobnej/cenovej dávky · zmena
+  schémy = každé zvýšenie `CONFIG_SCHEMA` / BuildPlan `SCHEMA` / STD · štart okna (kvóty, nástroje, `agent-register`) · Claude session nad 80 % = bez nového
+  implementátora, Codex pod 10 % = PR ako draft · autonómny beh s tabuľkou predvolených reakcií, reportom pri konci či zastavení a uzáverom bloku variant B
+  s poistkou (nový blok až po smoke PASS alebo „ideme ďalej") · každé zvýšenie VERSION = prepis STAV, docs PR len KRONIKA · uzáver bloku vo vetve
+  `release/<blok>` · zadania bloku v `SYSTEM/zdroje/bloky/<BLOK>/` · po každom mergi inštalácia mainu · jeden zoznam spúšťačov in-SU testu (brána mergu),
+  runner vždy s `-CloseWhenDone` · počty testov z CLAUDE.md preč. **Skilly** `codex-po-pr`, `codex-audit` (model vždy `--model`), `predrecenzia`, `usage`
+  a `antigravity-outside-in` zladené; **SYSTEM/README, STAV a PLAN** — hlavičky a pravidlá. Guard dĺžky riadkov a odkazov stráži aj WORKFLOW.md; status riadok
+  záznamu rozhodnutí dostal tvar, ktorý žiada guard konceptov. Mimo repa (orchestrátor): N15, N16; súbežne PR A #392 (ukazovateľ kontextu), ďalej PR C
+  (register agentov) a PR D (Grok plugin).
 - **PROCES — slepá predrecenzia pred PR + spresnené pravidlo 3 kôl (25.9.2026, PR #391, docs; verzia pluginu sa nemení).** Z retrospektívy bloku S1 (Michal
   24.–25.9.): **(1) nový skill `predrecenzia`** — dávka audit-povinná alebo výrobná/cenová prejde pred `gh pr create` nezávislým Opus subagentom bez kontextu
   orchestrátora (len zadanie + `git diff main...HEAD`), jeho P1/P2 sa opravia pred PR a výsledok ide do PR popisu; pri iných kódových dávkach odporúčaná. Dôvody:
