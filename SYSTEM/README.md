@@ -5,6 +5,7 @@
 > napísané, ktorý súbor je autorita na čo, v akom poradí sa číta a čo sa kam zapisuje.
 > Pravidlá práce v repe (workflow, verzie, checklist uzáveru dávky, testovanie) žijú
 > v [../CLAUDE.md](../CLAUDE.md) — tento súbor ich nenahrádza, len ukazuje na dokumenty.
+> Mapa workflowu (roly a ich obsadenie, diagramy blok · dávka · review, brány) je v [WORKFLOW.md](WORKFLOW.md).
 
 ## Poradie čítania
 
@@ -27,6 +28,7 @@ Na otázku **„prečo je to takto?"** sa nečíta nič z hora — na to je [arc
 | [VEPO_KONTRAKT.md](VEPO_KONTRAKT.md) | formát výstupu do VEPO | ostatné výstupy |
 | [POJMY.md](POJMY.md) | glosár + trvalé fakty stolárskej domény | plán ani stav |
 | [V1_VIZIA.md](V1_VIZIA.md) | definícia „V1 hotové" + nemenné princípy | plán (ten je v PLAN.md) |
+| [WORKFLOW.md](WORKFLOW.md) | mapa workflowu: roly a **obsadenie rolí** (mení Michal), diagramy blok · dávka · review, brány, hranice | záväzné znenie pravidiel (to je v ../CLAUDE.md a skilloch) |
 
 ## Vrstvy
 
@@ -39,14 +41,20 @@ Na otázku **„prečo je to takto?"** sa nečíta nič z hora — na to je [arc
   kontrakt** (slovný zdroj pravdy UI 2.0 vrátane sekcie ŠTÚDIO KONCEPT a §7 vedomých
   odchýlok); odkazujú naň `docs/UI_DIZAJN.md`, `docs/architecture/ui-lifecycle.md` aj
   [STAV.md](STAV.md). Býva tu z historických dôvodov a **zostáva tu** — je to jediný
-  záväzný súbor vo vrstve `zdroje/`, všetko ostatné v nej je podklad, nie autorita.
+  trvalo záväzný súbor vo vrstve `zdroje/`, všetko ostatné v nej je podklad, nie autorita.
+  **VÝNIMKA POČAS BLOKU (od 26.9.2026):** priečinok bloku `zdroje/bloky/<BLOK>/` — debata,
+  schválený mockup, zadania (packages), briefy a smoke checklist, v repe **od štartu bloku**
+  (nie v `_dev/` ani v chate) — je počas bloku **autoritou**. Po uzávere bloku sa **celý priečinok
+  fyzicky presúva** do `archiv/bloky/<BLOK>/` s kontrolou odkazov. Staršie mockupy
+  v `zdroje/ui20/` sa nepresúvajú.
 - **[archiv/](archiv/)** — história a uzavreté rozhodnutia: [KRONIKA.md](archiv/KRONIKA.md)
   (záznam každej dávky), [ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md) (plné
   texty hotových blokov a etáp), [DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md)
   (index + plné texty vyriešených D-čísel), staršie analýzy a vízie. V archíve sa
   **existujúce záznamy neprepisujú** — pribúdať však pribúda priebežne, presne ako káže
   checklist uzáveru v CLAUDE.md: záznam dávky navrch KRONIKY, vyriešené D-číslo navrch
-  indexu v DOGFOODING_vyriesene.md, hotový blok plným textom do ROADMAP_hotove_etapy.md.
+  indexu v DOGFOODING_vyriesene.md, hotový blok plným textom do ROADMAP_hotove_etapy.md
+  a pri uzávere bloku jeho celý priečinok (debata, mockup, zadania, briefy, smoke checklist) do `archiv/bloky/<BLOK>/`.
   Jediná výnimka z neprepisovania: záznam **práve prebiehajúcej dávky** sa smie dorovnávať
   až do jej mergu (napr. keď review zmení výsledný stav, ktorý záznam opisuje).
 
@@ -77,7 +85,10 @@ Na otázku **„prečo je to takto?"** sa nečíta nič z hora — na to je [arc
   a PLAN to legitímne robí (seed podklady, merač D-25, mockupy) — **odkaz nie je autorita**.
   Záväzné znenie patrí do [STANDARD.md](STANDARD.md), [PLAN.md](PLAN.md) alebo `docs/`.
   Testom sa to overiť nedá: rozdiel medzi „citujem podklad" a „stojím na ňom" je vo význame
-  vety, nie v tvare odkazu. Jediná výnimka vo vrstve `zdroje/` je menovite uvedený
-  `ui20/UI20_KONTRAKT.md` (vyššie).
-- **Po každej väčšej otestovanej dávke sa docs aktualizujú** podľa **checklistu uzáveru
-  dávky** v [../CLAUDE.md](../CLAUDE.md) — nie „niekedy neskôr", ale v tej istej dávke.
+  vety, nie v tvare odkazu. Výnimky vo vrstve `zdroje/` sú len dve (vyššie): trvalo
+  `ui20/UI20_KONTRAKT.md` a počas bloku jeho priečinok `zdroje/bloky/<BLOK>/` (debata, mockup,
+  zadania, briefy, smoke checklist).
+- **Každá dávka, ktorá zvyšuje VERSION, aktualizuje docs** podľa **checklistu uzáveru
+  dávky** v [../CLAUDE.md](../CLAUDE.md) vrátane **prepisu STAV** — nie „niekedy neskôr",
+  ale v tej istej dávke. **Dokumentačné PR** majú krátky checklist: KRONIKA áno, STAV
+  a VERSION nie.

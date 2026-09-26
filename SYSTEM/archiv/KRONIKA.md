@@ -17,6 +17,26 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **PROCES — pravidlá workflowu podľa rozhodnutí 25.–26.9.2026 (26.9.2026, PR #393, docs; verzia pluginu sa nemení).** Michal prešiel s orchestrátorom mapu
+  workflowu a schválil rozhodnutia **Z1–Z9 a N1–N18** (záznam „prečo": [WORKFLOW_ROZHODNUTIA_2026-09-26.md](../zdroje/next_sessions/WORKFLOW_ROZHODNUTIA_2026-09-26.md));
+  táto dávka ich zapísala do pravidiel. **Nový [WORKFLOW.md](../WORKFLOW.md)** — roly, jediná tabuľka **obsadenia rolí** (mení Michal), tri diagramy (blok · dávka
+  · review), brány a hranice. **CLAUDE.md:** sekcia Roly a modely (pravidlá o rolách, trailer = skutočný model session, Fable z pravidiel vypadol) · delegovanie na
+  subagentov · opravy z review robí pôvodný implementátor, kontrolu nový slepý subagent · interná delta aj pri audit-povinných a výrobných/cenových dávkach, ak
+  prešli predrecenziou · predrecenzia aj pri bežnej dávke nad 300 riadkov kódu pluginu alebo s novým prvkom UI · jedna definícia výrobnej/cenovej dávky · zmena
+  schémy = každé zvýšenie `CONFIG_SCHEMA` / BuildPlan `SCHEMA` / STD · štart okna (kvóty, nástroje, `agent-register`) · Claude session nad 80 % = bez nového
+  implementátora, Codex pod 10 % = PR ako draft · autonómny beh s tabuľkou predvolených reakcií, reportom pri konci či zastavení a uzáverom bloku variant B
+  s poistkou (nový blok až po smoke PASS alebo „ideme ďalej") · každé zvýšenie VERSION = prepis STAV, docs PR len KRONIKA · uzáver bloku vo vetve
+  `release/<blok>` · zadania bloku v `SYSTEM/zdroje/bloky/<BLOK>/` · po každom mergi inštalácia mainu · jeden zoznam spúšťačov in-SU testu (brána mergu),
+  runner vždy s `-CloseWhenDone` · počty testov z CLAUDE.md preč. **Skilly** `codex-po-pr`, `codex-audit` (model vždy `--model`), `predrecenzia`, `usage`
+  a `antigravity-outside-in` zladené; **SYSTEM/README, STAV a PLAN** — hlavičky a pravidlá. Guard dĺžky riadkov a odkazov stráži aj WORKFLOW.md; status riadok
+  záznamu rozhodnutí dostal tvar, ktorý žiada guard konceptov. Pravidlo Z7 (ukazovateľ kontextu) je v CLAUDE.md z PR #392 (záznam nižšie). Mimo repa
+  (orchestrátor): N15, N16; ďalej PR C (register agentov) a PR D (Grok plugin). **Review:** GH Codex kolo 1 = 5× P2 (pri Codex kvóte pod 10 % rozhoduje
+  trieda dávky · hranica 80 % len pre implementátora · `PR #?` doplnený samostatným commitom po `gh pr create` · kvótová brána aj pred auditom · `model:`
+  v tabuľke rolí) + Michalove spresnenia Q1–Q6 (predrecenzia nad 300 riadkov alebo s novým prvkom UI povinná · `gh pr ready` pri drafte spustí kolo, pri
+  kvóte pod 10 % sa naň nečaká · debata a mockup v priečinku bloku, po uzávere fyzický presun s kontrolou odkazov, `zdroje/ui20/` ostáva · backlog N4
+  v zásobníku PLAN); slepá delta opráv (1× P2 + 4× P3) doplnila opravu P0/P1 medzi prípady pre Michala, `gh pr ready` rozhoduje len o čakaní na kolo,
+  `PR #?` všade (aj STAV a DOGFOODING_vyriesene) s kontrolou orchestrátorom, poznámky k vetvám diagramov a dodatok §6 v zázname rozhodnutí — bez
+  nového GH kola.
 - **NÁSTROJ — oprava hooku kontroly kódovania po úprave súboru (26.9.2026, PR #394, hook Claude Code; verzia pluginu sa nemení).** Hook `post_edit_check.ps1`
   (od 24.7.) reálne nebežal: Claude Code spúšťa hooky na Windows cez Git Bash a ten z príkazu v dvojitých úvodzovkách zjedol `$d`/`$env:` → parse error PowerShellu
   pri každom Edit/Write (v transkripte orchestrátora 172× `hook_non_blocking_error`; nález pri PR #392). Príkaz v `.claude/settings.json` má skript v jednoduchých
