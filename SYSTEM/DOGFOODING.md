@@ -42,6 +42,24 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
   *(Piaty kus tej istej odkladovej sady — EN DANIELI textový export — je v skupine KONTROLA + VÝROBA; DOCX/PDF generátor a rodina dokumentov sú od 26.8. v skupine Po V1 — zásobník.)*
   *Stav: čaká na prax — vytiahne sa, keď si to reálna zákazka vypýta.*
 
+## KONŠTRUKCIA K1+K2 (blok 7)
+
+- **D-143 · Chrbát v drážke ide do nárezu bez prídavku do drážky** (Michal 26.9.2026, pri príprave bloku KONŠTRUKCIA K1+K2) — plugin počíta chrbát
+  v režime „V drážke" (predvolený pri hornej skrinke) na **vnútorný rozmer** skrinky: šírka medzi bokmi, výška medzi dnom a stropom (horná
+  600 × 720, korpus 18 → chrbát **564 × 684**). V dielni sa drážka frézuje do hĺbky, takže chrbát je v nárezovom zozname aj vo VEPO **malý** —
+  výrobná chyba. Presný prídavok by bol 9 mm na každú stranu s drážkou, ale Michal pre V1 rozhodol **nekomplikovať**: chrbát v drážke ide do nárezu
+  **v plnom rozmere skrinky** — šírka skrinky × výška od spodku dna po vrch, bez komína rovnako ako naložený chrbát (**600 × 720**) — a v dielni sa zreže na mieru — „zrezať si to viem, prilepiť je horšie".
+  Model má chrbát ďalej ukazovať v drážke. *Stav: OTVORENÉ — prvá dávka bloku (**KON-0**); plugin dnes všade predpokladá, že rozmer do nárezu
+  = rozmer v modeli (textúry, kontrola olepov, smer dekoru), preto oprava potrebuje nový údaj „rozmer do nárezu" (`cut_size`) a zvýšenie
+  `CONFIG_SCHEMA` (krížový audit 27.9.); skrinky postavené pred opravou dostanú v Kontrole výzvu na prestavbu a výrobné exporty ich zastavia, kým sa
+  neprestavia (review PR #398). **Kým nebude oprava v maine, chrbát v drážke v objednávke kontrolovať ručne.***
+- **D-144 · Vložený chrbát alebo chrbát v drážke prechádza výstuhou na výšku** (krížový audit Codex 27.9.2026, blok KONŠTRUKCIA) — pri strope
+  „Dve výstuhy" **na výšku** sa horná hrana chrbta ráta pod stropom (`back_z_hi`), nie pod výstuhami (`interior.z_hi`); naložený chrbát stojí za
+  výstuhami a je v poriadku, ale **vložený** chrbát a chrbát **v drážke** prechádzajú zadnou výstuhou (pri výstuhe 100 a korpuse 18 až o 82 mm)
+  a v kusovníku sú **vyššie, než sa zmestia**. Týka sa len tejto kombinácie (bežná dolná má naložený chrbát, bežná horná plný strop).
+  *Stav: OTVORENÉ — oprava v dávke **KON-A** (tá istá geometria chrbta) vrátane kontroly už postavených skriniek s touto kombináciou (výzva
+  prestaviť, výrobné exporty stoja, kým sa neprestavia — review PR #398); ak sa kombinácia používa na zákazkách, oprava ide skôr.*
+
 ## INFRA
 
 *(Skupina je prázdna — **D-52 uzavreté 3.9.2026** (v0.9.14), plný text v

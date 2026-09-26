@@ -269,7 +269,7 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   hodnota per skrinka (komín vzadu: dno a strop kratšie, chrbát na ich zadnej hrane · strop zapustený vpredu), nastaviteľné, nefixované · **K2 chrbát z výstuh** — nový typ chrbta:
   dve lišty medzi bokmi, výška parameter, ABS len hrana viditeľná z vnútra · **K3 rohová skrinka** (dolná, slepá s CR lištou: dolná skrinka + 5 dielcov rohovej zostavy + dverová
   zóna, cr1, cr2, prepínač L/P; **nízka priorita, posledná vo V1**; outside-in + audit). Balík V0.4.8 (rohové spoje per strana, poldrážka, „bez dielca") a V1-07 čelo ako cenová
-  položka sú **mimo V1** (zásobník). K1/K2 = audit-povinné (CONFIG_SCHEMA).
+  položka sú **mimo V1** (zásobník). K1/K2 = audit-povinné (CONFIG_SCHEMA). **K1 a K2 sa od 26.9.2026 riešia v bloku 7 · KONŠTRUKCIA K1+K2** (nižšie); **K3 ostáva tu.**
 - **V1.0 zostavy — V1 rozsah PO ROZHODNUTÍ 4.9.2026:** prisunutie a kopírovanie korpusov po vlastnej osi (snaper + mower logika → draft NÁSTROJE-1) · dosky (pracovná doska, pilaster,
   soklová lišta, krycí panel) vkladané a kreslené prichytením na rohy skriniek (drafty GHOST-D1/D2) · test na kompletnej reálnej zákazke. **PO V1** (rozhodnutie 4.9., koncept 02):
   segmentová automatika — soklová lišta v celku pre segment, obklady a krycie prvky segmentu vrátane pilastra (priznaný vs. skrytý) ako generované diely, pracovné a horné krycie dosky
@@ -523,6 +523,25 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   napíš 6000 → plugin odmietne s limitom; klikni počiatok a hneď napíš 2400 Enter → doska ide po osi podľa rotácie.
   **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → `construction.md` (`BoardBuilder.replan`, fázy kreslenia, geometria lúča/projekcie, degenerácie, lifecycle zámkov —
   Codex #296 P1), `ui-lifecycle.md` (ghost D2, `interaction: drawing`, `draw_board`, zámky, Shift, VCB), `docs/UI_DIZAJN.md` (tlačidlá karty Dosky) → STAV/KRONIKA/PLAN.
+
+### 7 · KONŠTRUKCIA K1+K2 (V1 bod 2 · štart 26.9.2026)
+
+**Cieľ:** komín vzadu a zapustený strop vpredu (K1), chrbát z dvoch líšt (K2), chrbát v drážke správne do nárezu (D-143) a šablóna Chladničková —
+tak, aby chladničkové, rúrové a drezové skrinky išli z pluginu bez ručných úprav. **Priečinok bloku (autorita počas bloku):**
+[zdroje/bloky/KONSTRUKCIA/](zdroje/bloky/KONSTRUKCIA/) — koncept v2 s rozhodnutiami Michala (M1–M10), fakty z kódu, krížový audit Grok + Codex
+a reconcile. **Stav 27.9.2026:** audit bloku hotový (2 BLOCKER prijaté a zapracované); čaká sa na **schválenie mockupu** Michalom, potom packages.
+KON-0, A a B sú výrobné; KON-0, A, B a D sú audit-povinné (schémy); in-SU test je brána mergu pri dávkach meniacich buildery a geometriu
+(KON-0, A, B; pri C a D podľa spúšťačov v CLAUDE.md). Poradie:
+
+- **KON-0 · D-143 · Chrbát v drážke do nárezu v plnom rozmere** — nové pole rozmeru do nárezu `cut_size` (geometria ostáva v drážke), `CONFIG_SCHEMA` 19,
+  STANDARD §8.2, kontrola starých skriniek s chrbtom v drážke (výzva prestaviť, výrobné exporty stoja, kým sa neprestavia).
+- **KON-A · K1 odsadenia** — komín vzadu (minimum podľa typu chrbta) a zapustený strop vpredu (dolná aj horná), odmietnutia namiesto tichých klampov,
+  config-aware scale, oprava **D-144** vrátane kontroly starých skriniek s touto kombináciou (výzva prestaviť, výrobné exporty stoja); `CONFIG_SCHEMA` 20.
+- **KON-B · K2 chrbát z líšt** — dve lišty z korpusu, vnútro pred lištami v celej výške, jeden riadok „Chrb HD"; `CONFIG_SCHEMA` 21, BuildPlan 6, ABS seed 5.
+- **KON-C · bokorys v rohu náhľadu** — komín, voľný kanál, zapustenie a lišty viditeľné v Inspectore (UI).
+- **KON-D · šablóna Chladničková** — komín 50, očakáva chladničku, rozmery podľa Michala; knižnica šablón STD 7.
+- **D-143 · Chrbát v drážke ide do nárezu bez prídavku** — dnes 564 × 684 pri hornej 600 × 720; Michal: do nárezu 600 × 720, dielňa zreže (→ KON-0).
+- **D-144 · Vložený chrbát alebo chrbát v drážke prechádza výstuhou na výšku** — chrbát je v kusovníku vyšší, než sa zmestí (→ KON-A).
 
 ### 6 · INFRA (priebežne, podľa potreby)
 
