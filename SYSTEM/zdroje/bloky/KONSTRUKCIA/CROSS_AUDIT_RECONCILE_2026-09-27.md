@@ -93,3 +93,16 @@ a v otázke pre Michala (§4 ot. 3) · jednotné pravidlo výstuh — flat oreza
 upright odmietnutie; to isté pri absorpcii mierky (koncept §1, §2) · D-144 v tabuľke §1 (inset, groove bez komína) a výnimka z „pri X = 0 sa nič
 nemení" · odkaz na STANDARD opravený na §7.2 („výstupy čítajú výhradne snapshot") a §11.1 · trieda KON-D (nie výrobná) a in-SU podľa spúšťačov
 v PLAN · minimum plného stropu určí audit KON-A · M8 a D-143 formulované ako „plný rozmer skrinky `w × (h − s)`" (pri komíne sa líši od naloženého).
+
+## 7 · Review PR #398 — GH Codex kolo 3 (27.9.2026) a rozdelenie PR
+
+| Nález | Rozhodnutie | Kam |
+|---|---|---|
+| **P1** — chrbát v drážke s ručným olepením by pri výnimke ostal 564 × 684 a ORANGE by výrobu pustil | **Berieme:** taký chrbát **zastaví výrobné výstupy** (RED s dôvodom „chrbát v drážke s olepením — zruš olepenie alebo zmeň typ chrbta"), kým sa olepenie alebo režim nevyrieši; neskôr prípadne tok „olepiť po zrezaní" | package KON-0 |
+| P2 — `SHORT_NAMES`/`NAME_PAIRS` menia len VEPO; kusovník v Štúdiu spája surové `names` (`studio.js:283`), takže dve roly líšt by dali „… / …" | **Berieme:** obe lišty dostanú **rovnaký názov v builderi** (roly ostávajú dve kvôli hranám), VEPO skratka priamo zo `SHORT_NAMES` | package KON-B |
+| P2 — zastaranosť D-144 len pri skutočnom prekryve: starý chrbát končí na `h − offset − t`, výstuha začína na `h − offset − rd` | **Berieme:** D-144 platí len pri **`rd > t`**; oprava berie **nižšiu** z dnešnej a novej hornej hrany (inak by sa chrbát pri `t > rd` predĺžil); predikát zastaranosti `inset`/`groove` + výstuhy na výšku + `rd > t` + `config_schema < 20` | package KON-A |
+
+**Rozdelenie (pravidlo 3 kôl, b):** kolo 3 vrátilo P1, teda PR #398 sa **nezmerguje — zavrie sa a rozdelí**. Príčina: podrobnosti návrhu jednotlivých
+dávok (KON-0, KON-A, KON-B) sa riešili v úvodnom dokumente bloku, kde ich každé kolo review ďalej spresňovalo; patria do packages s vlastným
+auditom návrhu dávky. Nový rez: (1) **malé PR so záznamom bloku** — PLAN blok 7, postrehy D-143 a D-144, KRONIKA; (2) **podklady bloku** (tento
+priečinok vrátane §5–§7) prídu do `main` spolu s mockupom a packages po schválení mockupu Michalom — nálezy všetkých troch kôl sú vstupom packages.
