@@ -1,6 +1,6 @@
 # Workflow — rozhodnutia 25.–26. 9. 2026
 
-> Stav: **SCHVÁLENÉ Michalom** (mapa workflowu = artefakt „Workflow Noxun Engine", databáza rozhodnutí N1–N18 + chat 26.9.).
+> Stav: KONCEPT / záznam rozhodnutí — **SCHVÁLENÉ Michalom** (mapa workflowu = artefakt „Workflow Noxun Engine", databáza rozhodnutí N1–N18 + chat 26.9.).
 > Zdroj súpisu nejasností: slepý súpis pravidiel (subagent, 25.9.). Tento dokument je autorita pre dokumentačnú dávku workflowu;
 > po jej zapracovaní do CLAUDE.md, skillov a `SYSTEM/WORKFLOW.md` slúži ako záznam „prečo".
 
