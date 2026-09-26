@@ -27,10 +27,11 @@
   aj starú výrobnú chybu **D-144** (vložený chrbát / chrbát v drážke pri výstuhách na výšku prechádza zadnou výstuhou). **Pôvodné PR #398** nieslo
   podklady bloku (fakty z kódu, koncept, krížový audit, reconcile) a prešlo **tromi GH kolami, každé s P1** — všetky nálezy spresňovali návrh dávok
   (staré snapshoty v novom plugine, zastaranosť podľa aktivačnej schémy, pravidlá výstuh, olepený chrbát v drážke, názvy líšt, D-144 len pri
-  výstuhe vyššej než korpus). Podľa **pravidla 3 kôl (b)** sa nezmergovalo, ale **zavrelo a rozdelilo**: tento PR nesie len blok 7 v PLAN a postrehy
-  D-143/D-144; podklady bloku (vetva `docs/blok-konstrukcia`, reconcile §5–§7 so všetkými nálezmi kôl) prídu do `zdroje/bloky/KONSTRUKCIA/` spolu
-  s mockupom a packages, kde každá dávka prejde vlastným auditom návrhu. Poučenie: úvodný dokument bloku drží rozhodnutia a smer, **nie
-  implementačné vzorce** — tie patria do package dávky. Ďalší krok: schválenie mockupu Michalom.
+  výstuhe vyššej než korpus). Podľa **pravidla 3 kôl (b)** sa nezmergovalo, ale **zavrelo a rozdelilo**: tento PR nesie blok 7 v PLAN, postrehy
+  D-143/D-144 a — po review kolo 1 (P1 + 2× P2, reconcile §8) — aj priečinok bloku `zdroje/bloky/KONSTRUKCIA/` (fakty, krížový audit, reconcile
+  §5–§8, koncept ako **pracovný podklad**, lebo pravidlo repa drží priečinok bloku v repe od štartu). **KON-0 (D-143) na schválenie mockupu nečaká**;
+  audit návrhu majú len dávky meniace kontrakt alebo schému (KON-0, A, B, D). Mockup a packages prídu samostatným PR. Poučenie: úvodný dokument
+  bloku drží rozhodnutia a smer, **nie implementačné vzorce** — tie patria do package dávky. Ďalší krok: package a audit KON-0, schválenie mockupu.
 
 - **DOCS — smoke S1 PASS a odškrtnutie V1 vízie (26.9.2026, PR #397, len dokumentácia; verzia pluginu sa nemení).**
   Michal 26.9. večer potvrdil **smoke bloku SPOTREBIČE S1 = PASS** („PASS — ideme ďalej"); zápis v [S1_ZAVER_2026-09-24.md](S1_ZAVER_2026-09-24.md)

@@ -529,9 +529,10 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 **Cieľ:** komín vzadu a zapustený strop vpredu (K1), chrbát z dvoch líšt (K2), chrbát v drážke správne do nárezu (D-143) a šablóna Chladničková —
 tak, aby chladničkové, rúrové a drezové skrinky išli z pluginu bez ručných úprav. **Rozhodnutia Michala z debaty 26.9.:** komín bežne ~50 mm
 (o koľko sú dno a strop vzadu kratšie ako bok), zapustený strop pre dolnú aj hornú skrinku, pri lištách vnútro pred lištami v celej výške, lišty
-vo výstupoch jeden riadok „Chrb HD" (2 ks), zo šablón len Chladničková. **Stav 27.9.2026:** krížový audit bloku (Grok + Codex) hotový; čaká sa
-na **schválenie mockupu** Michalom. Podklady bloku (fakty z kódu, krížový audit, reconcile, koncept) pribudnú do
-`zdroje/bloky/KONSTRUKCIA/` spolu s mockupom a packages; každá dávka prejde vlastným auditom návrhu. Poradie:
+vo výstupoch jeden riadok „Chrb HD" (2 ks), zo šablón len Chladničková. **Stav 27.9.2026:** krížový audit bloku (Grok + Codex) hotový. **Priečinok bloku:**
+[zdroje/bloky/KONSTRUKCIA/](zdroje/bloky/KONSTRUKCIA/) — fakty z kódu, koncept (pracovný podklad), krížový audit a reconcile; mockup a packages
+pribudnú po schválení mockupu Michalom. **KON-0 (výrobná chyba D-143) na mockup nečaká** — ide hneď po audite svojho package; ostatné dávky
+po schválení mockupu. Audit návrhu majú dávky meniace kontrakt alebo schému (KON-0, A, B a D — knižnica šablón STD 7); KON-C (UI) nie. Poradie:
 
 - **KON-0 · D-143** — chrbát v drážke do nárezu v plnom rozmere skrinky, model ho ďalej ukazuje v drážke.
 - **KON-A · K1** — komín vzadu a zapustený strop vpredu; oprava D-144.
