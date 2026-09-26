@@ -15,7 +15,7 @@ Pravidlá hovoria o **rolách**, nie o modeloch — model aj nástroj každej ro
 |---|---|---|
 | **Michal** | vyberá bloky a ich poradie, vedie debatu, schvaľuje blok a mockup, robí smoke a píše postrehy, po inštalácii reštartuje SketchUp | blok a poradie, mockup, výnimky z kvót, výsledok smoke, obsadenie rolí; nemerguje |
 | **orchestrátor** | hlavné okno: drží kontext bloku, píše zadania, spúšťa audity a subagentov, triedi postrehy do D-čísel, merguje, inštaluje main, píše report a handoff | závažnosť nálezov, výnimku 3. kola, merge po bránach |
-| **implementátor** | subagent vo worktree: dávka podľa zadania vrátane testov a docs; opravy z review vo svojej dávke | nič — vráti vetvu, SHA a report |
+| **implementátor** | subagent vo worktree: dávka podľa zadania vrátane testov, docs a PR (pri povinnej predrecenzii až na pokyn orchestrátora); opravy z review vo svojej dávke | nič — vráti vetvu, SHA a report |
 | **slepý recenzent** | subagent bez kontextu orchestrátora: predrecenzia pred PR, kontrola opravy (delta), overenie checklistu voči kódu | nič — vráti nálezy P1–P3 a verdikt |
 | **audítor** | audit návrhu pred kódom (audit bloku, audit-povinné dávky), bežné audity a delta | nič — nálezy BLOCKER / FIX / NOTE |
 | **rešeršér** | outside-in rešerš (čo už SketchUp a CAD svet rieši), krížový audit bloku | nič — výstup triedi orchestrátor (reconcile) |
@@ -140,11 +140,11 @@ flowchart TD
   SU["Test v SketchUpe = brána mergu<br/>runner -CloseWhenDone"]:::auto
   DOC["Docs v tej istej dávke: architektúra na mieste,<br/>D-čísla do archívu, STAV, KRONIKA, v PLAN riadok s ✅<br/>číslo PR zatiaľ PR #?"]:::sub
   Q3{"Audit-povinná, výrobná/cenová,<br/>nad 300 riadkov alebo nový prvok UI?"}:::gate
-  PRE["Predrecenzia: slepý recenzent<br/>P1/P2 opraviť pred PR"]:::sub
+  PRE["Implementátor po pushi stojí, PR neotvára<br/>predrecenziu spustí orchestrátor: slepý recenzent<br/>P1/P2 opraví implementátor, PR až na pokyn"]:::sub
   QK{"Codex weekly<br/>zostatok pod 10 %?"}:::gate
-  PR["gh pr create"]:::orch
-  PRD["PR ako draft<br/>ďalej podľa triedy dávky · mapa 3"]:::orch
-  NUM["Doplniť číslo PR všade, kde je PR #?<br/>samostatný commit, len číslo<br/>pred mergom ho skontroluje orchestrátor"]:::orch
+  PR["gh pr create<br/>implementátor"]:::sub
+  PRD["PR ako draft, implementátor<br/>ďalej podľa triedy dávky · mapa 3"]:::sub
+  NUM["Doplniť číslo PR všade, kde je PR #?<br/>samostatný commit implementátora, len číslo<br/>pred mergom ho skontroluje orchestrátor"]:::sub
   RV["Review po PR · mapa 3"]:::ext
   MG["Merge s pripnutou hlavou<br/>CI zelené + kolo uzavreté"]:::orch
   NM["checkout main + pull"]:::orch
@@ -191,6 +191,8 @@ flowchart TD
 *Vetva, ktorú diagram nekreslí:* Michal audit pod prahom nepovolí → audit aj dávka sa odložia po resete kvóty a pokračuje sa ďalšou nezávislou dávkou.
 
 **Kvóta Codexu** (`-Gate codex`) sa kontroluje tesne pred auditom návrhu aj pred otvorením PR — dlhý blok môže medzitým kvótu minúť.
+**PR otvára implementátor.** Pri dávke s povinnou predrecenziou po pushi vetvy stojí a vráti report; predrecenziu spúšťa orchestrátor
+(subagent ďalších subagentov nespúšťa) a PR sa otvorí až na jeho pokyn po oprave P1/P2.
 **Číslo PR** je všade, kde ho dávka píše (PLAN, KRONIKA, STAV, `DOGFOODING_vyriesene`), do otvorenia PR `PR #?`; hneď po `gh pr create`
 ho doplní samostatný commit, ktorý mení len číslo — ten pred mergom skontroluje orchestrátor (pri čistom kole 1 inak žiadna delta nebeží).
 **Dokumentačné PR** (bez kódu pluginu) idú skrátene: vetva `docs/…` → odsek v KRONIKE → headless testy (guardy dokumentácie) → kvóta →
