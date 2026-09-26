@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **NÁSTROJ — register agentov a štart okna jedným príkazom (26.9.2026, PR #?, typy subagentov + skript; verzia pluginu sa nemení).** Podľa
+- **NÁSTROJ — register agentov a štart okna jedným príkazom (26.9.2026, PR #395, typy subagentov + skript; verzia pluginu sa nemení).** Podľa
   rozhodnutí Z6 a Z9 (Michal 26.9.) má projekt **typy subagentov** v `.claude/agents/` — orchestrátor ich vyberá podľa popisu, model, effort
   a nástroje sú v definícii: `implementator` (Opus, effort high, izolovaný worktree, celý postup dávky po PR, nikdy nemerguje), `slepy-recenzent`
   (Opus, high, len čítanie — predrecenzia a kontrola opráv), `reserser` (Sonnet, medium, web so zdrojmi a dátumami, bez zápisu) a `agy-reserser`
