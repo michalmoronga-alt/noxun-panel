@@ -17,6 +17,20 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **NÁSTROJ — register agentov a štart okna jedným príkazom (26.9.2026, PR #?, typy subagentov + skript; verzia pluginu sa nemení).** Podľa
+  rozhodnutí Z6 a Z9 (Michal 26.9.) má projekt **typy subagentov** v `.claude/agents/` — orchestrátor ich vyberá podľa popisu, model, effort
+  a nástroje sú v definícii: `implementator` (Opus, effort high, izolovaný worktree, celý postup dávky po PR, nikdy nemerguje), `slepy-recenzent`
+  (Opus, high, len čítanie — predrecenzia a kontrola opráv), `reserser` (Sonnet, medium, web so zdrojmi a dátumami, bez zápisu) a `agy-reserser`
+  (Haiku, tenký obal `agy -p` zo skillu antigravity-outside-in, nikdy bez obsluhy; Haiku effort nepodporuje, preto ho nemá). Codex a Grok nemajú
+  vlastné obaly — oficiálne pluginy `codex:codex-rescue` a `grok-build:grok-delegate`; Grok plugin `xai-org/grok-build-plugin-cc` 0.2.1 je
+  nainštalovaný v používateľskom rozsahu a Grok CLI aktualizované 1.0.34 → 1.0.41 cez `grok update`. **Štart okna** `scripts\start_okna.ps1`:
+  kvóty, verzie `claude`/`codex`/`agy`/`grok`/`gemini`, register `agent-register` (varovanie, keď je `stav.json` starší ako 3 dni; nové záznamy
+  `ZMENY.md` podľa odtlačkov videných záznamov v `%APPDATA%\NOXUN\Engine\agent_register_videne.txt`, lebo záznamy nesú dátum zdroja, nie dátum
+  zápisu) a porovnanie `grok` s najnovšou oficiálnou verziou z registra; text registra sa vypisuje len ako orezané ASCII riadky. CLAUDE.md
+  (štart okna, typy agentov nesú model a effort roly), WORKFLOW.md (Obsadenie rolí s typmi, PR C a PR D z „Pripravované" preč), skilly
+  `predrecenzia` (typ `slepy-recenzent`), `antigravity-outside-in` (`agy-reserser`) a `usage` (odkaz na skript). Guard
+  `tests/pure/test_agent_definitions.rb` (platný YAML, name = súbor, popis, model a effort, každý typ vo WORKFLOW.md); encoding guard
+  kontroluje aj `.claude/agents`.
 - **PROCES — pravidlá workflowu podľa rozhodnutí 25.–26.9.2026 (26.9.2026, PR #393, docs; verzia pluginu sa nemení).** Michal prešiel s orchestrátorom mapu
   workflowu a schválil rozhodnutia **Z1–Z9 a N1–N18** (záznam „prečo": [WORKFLOW_ROZHODNUTIA_2026-09-26.md](../zdroje/next_sessions/WORKFLOW_ROZHODNUTIA_2026-09-26.md));
   táto dávka ich zapísala do pravidiel. **Nový [WORKFLOW.md](../WORKFLOW.md)** — roly, jediná tabuľka **obsadenia rolí** (mení Michal), tri diagramy (blok · dávka

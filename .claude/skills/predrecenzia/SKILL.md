@@ -31,8 +31,10 @@ povinné pre každý PR). Je to lacnejšie kolo navyše medzi hotovým kódom a 
 2. **Kvóta PRED spustením** (subagent míňa Claude kvótu, orientačne 200–350 k tokenov na beh; skill `usage`, bod 4):
    `& ".claude\skills\usage\usage.ps1" -Label "predrecenzia <dávka>" -Phase before -Gate claude` — **exit 3** (Claude weekly na dne) =
    subagenta nespúšťaj a použi náhradu z bodu 7. (Hranica „Claude session nad 80 %" platí len pre implementačného subagenta, nie pre predrecenziu.)
-3. **Spusti slepého recenzenta:** Agent tool — `subagent_type: general-purpose`, `run_in_background: true` a **`model:` vždy výslovne** podľa roly
-   **slepý recenzent** v tabuľke Obsadenie rolí (`SYSTEM/WORKFLOW.md`) — bez neho subagent beží na predvolenom modeli; prompt podľa vzoru nižšie. **Slepý** = dostane len ZADANIE (čo sa má zmeniť pre používateľa
+3. **Spusti slepého recenzenta:** Agent tool — `subagent_type: slepy-recenzent` (typ z `.claude/agents/`: model, effort a nástroje len na čítanie
+   sú v jeho definícii podľa roly **slepý recenzent** v tabuľke Obsadenie rolí, `SYSTEM/WORKFLOW.md`), `run_in_background: true`; prompt podľa vzoru
+   nižšie. Keď typ v session ešte nie je (nový priečinok agentov sa načíta až v novej session), `subagent_type: general-purpose` s **`model:` výslovne**
+   podľa tabuľky — bez neho subagent beží na predvolenom modeli. **Slepý** = dostane len ZADANIE (čo sa má zmeniť pre používateľa
    a kľúčové rozhodnutia z briefu) a rozsah diffu — nie výsledky auditu, nie vlastné hodnotenie orchestrátora, nie zoznam „na čo si dať pozor".
    Medzitým orchestrátor pripravuje PR popis.
 4. **Po výsledku** zapíš spotrebu: `& ".claude\skills\usage\usage.ps1" -Label "predrecenzia <dávka>" -Phase after` (ten istý Label).
