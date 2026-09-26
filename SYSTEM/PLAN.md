@@ -1,7 +1,10 @@
 # PLAN — čo sa ide robiť (bloky prác)
 
-> Roadmapa **bez histórie**: bloky v poradí, každý s cieľom a zaradenými položkami. Blok NEMÁ číslo verzie vopred — **dostane ho pri štarte** (uzáver etapy = minor bump).
-> **Údržba:** pri uzávere dávky sa jej riadok z bloku odstráni, odsek o nej ide do [archiv/KRONIKA.md](archiv/KRONIKA.md) a prepíše sa [STAV.md](STAV.md). Plné znenie otvorených postrehov žije v [DOGFOODING.md](DOGFOODING.md) **v skupinách podľa týchto blokov** — tu je len číslo, názov a jedna veta.
+> Roadmapa **bez histórie**: bloky v poradí, každý s cieľom a zaradenými položkami. Blok NEMÁ číslo verzie vopred — **dostane ho pri štarte** (minor bump = výhradne uzáver bloku).
+> **Evidencia (od 26.9.2026):** hotová dávka **ostáva v bloku ako riadok s ✅ a číslom PR**; odsek o nej ide do [archiv/KRONIKA.md](archiv/KRONIKA.md) a pri zvýšení VERSION sa prepíše [STAV.md](STAV.md).
+> Blok sa presúva plným textom do [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md) až s **uzáverom bloku** (fajka patrí do riadku, nikdy do nadpisu — stráži guard).
+> Plné znenie otvorených postrehov žije v [DOGFOODING.md](DOGFOODING.md) **v skupinách podľa týchto blokov** — tu je len číslo, názov a jedna veta; skupina „smoke po uzávere" je dočasná a zanikne s posledným nálezom.
+> **Zadania bloku** (packages, briefy, smoke checklist) sú od štartu bloku v `SYSTEM/zdroje/bloky/<BLOK>/` — nie v `_dev/` ani v chate; blok tu na ne odkazuje a po uzávere sa priečinok presúva do `SYSTEM/archiv/bloky/<BLOK>/`.
 
 ## Bloky
 
