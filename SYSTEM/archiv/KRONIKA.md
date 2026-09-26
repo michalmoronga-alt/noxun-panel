@@ -17,6 +17,9 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **DOCS — rešerš a krížový audit na grok-4.7 (26.9.2026, PR #?, len dokumentácia; verzia pluginu sa nemení).**
+  Rozhodnutie Michala 26.9.: rola „rešerš / krížový audit" v tabuľke Obsadenie rolí (`SYSTEM/WORKFLOW.md`) používa `grok-4.7` (predvolený model Grok CLI 1.0.41)
+  namiesto `grok-4.6`; iné živé zmienky o grok-4.6 v repe neboli.
 - **NÁSTROJ — register agentov a štart okna jedným príkazom (26.9.2026, PR #395, typy subagentov + skript; verzia pluginu sa nemení).** Podľa
   rozhodnutí Z6 a Z9 (Michal 26.9.) má projekt **typy subagentov** v `.claude/agents/` — orchestrátor ich vyberá podľa popisu, model, effort
   a nástroje sú v definícii: `implementator` (Opus, effort high, izolovaný worktree, celý postup dávky po PR, nikdy nemerguje), `slepy-recenzent`
