@@ -19,7 +19,8 @@
 
 - **DOCS — smoke S1 PASS a odškrtnutie V1 vízie (26.9.2026, PR #397, len dokumentácia; verzia pluginu sa nemení).**
   Michal 26.9. večer potvrdil **smoke bloku SPOTREBIČE S1 = PASS** („PASS — ideme ďalej"); zápis v [S1_ZAVER_2026-09-24.md](S1_ZAVER_2026-09-24.md)
-  (sekcia Smoke Michala 21.–26.9.). Dočasná skupina „SPOTREBIČE S1 — smoke po uzávere" v DOGFOODING **zanikla** — D-136 až D-140 sú v archíve,
+  (sekcia Smoke Michala 21.–26.9.) — výsledok časti B checklistu sa po bodoch nezaznamenával, ďalšie postrehy k funkciám S1 idú ako nové D-čísla
+  do DOGFOODING podľa bloku (nie ako smoke opravy v0.13.x); bod A.7 a úvod časti B to odkazom priznávajú. Dočasná skupina „SPOTREBIČE S1 — smoke po uzávere" v DOGFOODING **zanikla** — D-136 až D-140 sú v archíve,
   D-141 a D-142 v zásobníku Po V1. **V1_VIZIA overená proti PLAN, archívu etáp a KRONIKE:** bod **4 Kovanie** `[x]` (blok KOVANIE v0.10.0 + balík Čiel
   v0.11.0, v PLANe nie je otvorená V1 položka kovania) · bod **7 Dvaja používatelia** `[x]` (D-52, M-R VZHĽAD v0.12.0, Inspector + Štúdio s D-51, D-122
   #343, D-124 #344; D-48 je mimo V1) · bod **1 Návrh** ostáva `[ ]` — GHOST-D1/D2 opravené na hotové (v0.9.27 / v0.9.28), ostáva test na kompletnej
