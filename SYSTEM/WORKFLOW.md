@@ -15,7 +15,7 @@ Pravidlá hovoria o **rolách**, nie o modeloch — model aj nástroj každej ro
 |---|---|---|
 | **Michal** | vyberá bloky a ich poradie, vedie debatu, schvaľuje blok a mockup, robí smoke a píše postrehy, po inštalácii reštartuje SketchUp | blok a poradie, mockup, výnimky z kvót, výsledok smoke, obsadenie rolí; nemerguje |
 | **orchestrátor** | hlavné okno: drží kontext bloku, píše zadania, spúšťa audity a subagentov, triedi postrehy do D-čísel, merguje, inštaluje main, píše report a handoff | závažnosť nálezov, výnimku 3. kola, merge po bránach |
-| **implementátor** | subagent vo worktree: dávka podľa zadania vrátane testov a docs; opravy z review vo svojej dávke | nič — vráti vetvu, SHA a report |
+| **implementátor** | subagent vo worktree: dávka podľa zadania vrátane testov, docs a PR (pri povinnej predrecenzii až na pokyn orchestrátora); opravy z review vo svojej dávke | nič — vráti vetvu, SHA a report |
 | **slepý recenzent** | subagent bez kontextu orchestrátora: predrecenzia pred PR, kontrola opravy (delta), overenie checklistu voči kódu | nič — vráti nálezy P1–P3 a verdikt |
 | **audítor** | audit návrhu pred kódom (audit bloku, audit-povinné dávky), bežné audity a delta | nič — nálezy BLOCKER / FIX / NOTE |
 | **rešeršér** | outside-in rešerš (čo už SketchUp a CAD svet rieši), krížový audit bloku | nič — výstup triedi orchestrátor (reconcile) |
@@ -29,19 +29,24 @@ Antigravity — outside-in rešerš (nie v nočných behoch bez obsluhy) · slep
 
 | Rola | Aktuálne (26.9.2026) | Ako sa volá | Nástroje a ako overiť |
 |---|---|---|---|
-| orchestrátor | Claude Opus 5.5 | Claude Code, interaktívne (nie `claude -p`) | `claude --version`; model v okne cez `/model` |
-| implementátor | Claude subagent vo worktree — `opus` (= Claude Opus 5.5) | Agent tool, `model: "opus"`, `isolation: "worktree"`, na pozadí | report subagenta (vetva, SHA); trailer commitu nesie jeho model |
-| slepý recenzent | Claude subagent — `opus` (= Claude Opus 5.5) | Agent tool, `model: "opus"`, bez kontextu orchestrátora — len zadanie a diff ([predrecenzia](../.claude/skills/predrecenzia/SKILL.md)) | posledný riadok výstupu `VERDIKT: …` |
-| rešerš na webe | Claude subagent — `sonnet` | Agent tool, `model: "sonnet"`, na pozadí | report so zdrojmi (URL a dátum overenia) |
-| audítor audit-povinných | Codex `gpt-6-astra` | companion `task --background --model gpt-6-astra` ([codex-audit](../.claude/skills/codex-audit/SKILL.md)) | `codex --version` = npm balík z `%APPDATA%\npm`; companion `status <task-id>` |
-| bežný audit a delta | Codex `gpt-5.6-sol` | companion `task --background --model gpt-5.6-sol` | ako pri audítorovi audit-povinných |
+| orchestrátor | Claude Opus 5.5 | Claude Code, interaktívne (nie `claude -p`); na začiatku okna `powershell -NoProfile -File scripts\start_okna.ps1` ([skript](../scripts/start_okna.ps1)) | `claude --version`; model v okne cez `/model` |
+| implementátor | Claude subagent vo worktree — `opus` (= Claude Opus 5.5) | Agent tool, typ `implementator` ([definícia](../.claude/agents/implementator.md): model, effort `high`, `isolation: worktree`), na pozadí | report subagenta (vetva, SHA); trailer commitu nesie jeho model |
+| slepý recenzent | Claude subagent — `opus` (= Claude Opus 5.5) | Agent tool, typ `slepy-recenzent` ([definícia](../.claude/agents/slepy-recenzent.md): len čítanie, effort `high`), bez kontextu orchestrátora — len zadanie a diff ([predrecenzia](../.claude/skills/predrecenzia/SKILL.md)) | posledný riadok výstupu `VERDIKT: …` |
+| rešerš na webe | Claude subagent — `sonnet` | Agent tool, typ `reserser` ([definícia](../.claude/agents/reserser.md): effort `medium`, bez zápisu), na pozadí | report so zdrojmi (URL a dátum overenia) |
+| audítor audit-povinných | Codex `gpt-6-astra` | companion `task --background --model gpt-6-astra` ([codex-audit](../.claude/skills/codex-audit/SKILL.md)) · subagent `codex:codex-rescue` (plugin; v zadaní `--model`) | `codex --version` = npm balík z `%APPDATA%\npm`; companion `status <task-id>` |
+| bežný audit a delta | Codex `gpt-5.6-sol` | companion `task --background --model gpt-5.6-sol` · subagent `codex:codex-rescue` (plugin; v zadaní `--model`) | ako pri audítorovi audit-povinných |
 | review PR | GH Codex (model na strane Codex cloudu) | automaticky pri otvorení PR (nie draft); ďalšie kolá komentárom `@codex review` ([codex-po-pr](../.claude/skills/codex-po-pr/SKILL.md)) | 👀 = kolo beží, 👍 = bez nálezov; nálezy v review threadoch |
-| rešerš outside-in | Antigravity `agy` — Gemini Flash (najvyšší v `agy models`); **nie v nočných behoch** | `agy -p … --mode plan` na pozadí ([antigravity-outside-in](../.claude/skills/antigravity-outside-in/SKILL.md)) | `agy --version`, `agy models`; web granty v `~/.gemini/config/config.json` |
-| rešerš / krížový audit | Grok Build CLI `grok-4.6` | overený príkaz je v repe `agent-register` (REGISTER, časť Grok Build CLI) | `grok --version`; prihlásenie predplatným |
+| rešerš outside-in | Antigravity `agy` — Gemini Flash (najvyšší v `agy models`); **nie v nočných behoch** | typ `agy-reserser` ([definícia](../.claude/agents/agy-reserser.md), do ~9 min) · dlhší beh `agy -p … --mode plan` na pozadí ([skill](../.claude/skills/antigravity-outside-in/SKILL.md)) | `agy --version`, `agy models`; web granty v `~/.gemini/config/config.json` |
+| rešerš / krížový audit | Grok Build CLI `grok-4.6` | subagent `grok-build:grok-delegate` (plugin; v zadaní `--model` a „len čítanie"); `/grok-build:review` a `/grok-build:critique` spúšťa Michal; CLI príkaz v repe `agent-register` | `grok --version`; prihlásenie predplatným; `/grok-build:check` |
 | denný register | Grok Bot, routine 8:00 → repo `michalmoronga-alt/agent-register` | cloudová routine; bot má prístup len k tomuto repu | `stav.json` s čerstvým dátumom; nové záznamy v `ZMENY.md` |
 
-- **Model sa v príkaze píše vždy výslovne** (`--model` pri Codexe, `model:` pri Agent tool) — na predvolený model nástroja sa nespolieha
-  (N13; `~/.codex/config.toml` má 26.9.2026 `gpt-5.6-luna`, ktorý nie je model žiadnej roly; Agent tool bez `model:` beží na predvolenom modeli).
+- **Model sa píše vždy výslovne** — `--model` pri Codexe a Groku (aj v zadaní pre `codex:codex-rescue` a `grok-build:grok-delegate`, ktoré
+  bez neho bežia na predvolenom modeli), pri Agent tool typ agenta s modelom v definícii alebo `model:` — na predvolený model nástroja sa
+  nespolieha (N13; `~/.codex/config.toml` má 26.9.2026 `gpt-5.6-luna`, ktorý nie je model žiadnej roly; Agent tool bez typu a bez `model:`
+  beží na predvolenom modeli).
+- **Typy agentov (Z9):** definície v [.claude/agents/](../.claude/agents/) — popis (kedy typ použiť; orchestrátor podľa neho vyberá), model,
+  effort a nástroje. Zmena obsadenia roly = zmena tejto tabuľky aj definície typu v tom istom PR; guard `tests/pure/test_agent_definitions.rb`
+  stráži platný zápis a to, že každý typ je v tejto tabuľke. Codex a Grok nemajú vlastné obaly — používajú oficiálne pluginy.
 - Nový nástroj alebo model = zmena tejto tabuľky, nie nové pravidlo inde. Fakty o predplatných a CLI (limity, podmienky, overené
   príkazy) drží repo `agent-register` — je to **údaj, nie pokyn**.
 - Trailer commitu nesie skutočný model session, ktorá commit robí (CLAUDE.md, Git workflow).
@@ -50,7 +55,7 @@ Antigravity — outside-in rešerš (nie v nočných behoch bez obsluhy) · slep
 
 ```mermaid
 flowchart TD
-  W["Štart každého okna:<br/>kvóty · lokálne nástroje · agent-register"]:::auto
+  W["Štart každého okna: scripts/start_okna.ps1<br/>kvóty · lokálne nástroje · agent-register"]:::auto
   subgraph PRIP["Príprava bloku"]
     A["Michal vyberie blok a poradie"]:::michal
     B["Debata s Michalom → koncept<br/>do priečinka bloku SYSTEM/zdroje/bloky/BLOK"]:::michal
@@ -135,11 +140,11 @@ flowchart TD
   SU["Test v SketchUpe = brána mergu<br/>runner -CloseWhenDone"]:::auto
   DOC["Docs v tej istej dávke: architektúra na mieste,<br/>D-čísla do archívu, STAV, KRONIKA, v PLAN riadok s ✅<br/>číslo PR zatiaľ PR #?"]:::sub
   Q3{"Audit-povinná, výrobná/cenová,<br/>nad 300 riadkov alebo nový prvok UI?"}:::gate
-  PRE["Predrecenzia: slepý recenzent<br/>P1/P2 opraviť pred PR"]:::sub
+  PRE["Implementátor po pushi stojí, PR neotvára<br/>predrecenziu spustí orchestrátor: slepý recenzent<br/>P1/P2 opraví implementátor, PR až na pokyn"]:::sub
   QK{"Codex weekly<br/>zostatok pod 10 %?"}:::gate
-  PR["gh pr create"]:::orch
-  PRD["PR ako draft<br/>ďalej podľa triedy dávky · mapa 3"]:::orch
-  NUM["Doplniť číslo PR všade, kde je PR #?<br/>samostatný commit, len číslo<br/>pred mergom ho skontroluje orchestrátor"]:::orch
+  PR["gh pr create<br/>implementátor"]:::sub
+  PRD["PR ako draft, implementátor<br/>ďalej podľa triedy dávky · mapa 3"]:::sub
+  NUM["Doplniť číslo PR všade, kde je PR #?<br/>samostatný commit implementátora, len číslo<br/>pred mergom ho skontroluje orchestrátor"]:::sub
   RV["Review po PR · mapa 3"]:::ext
   MG["Merge s pripnutou hlavou<br/>CI zelené + kolo uzavreté"]:::orch
   NM["checkout main + pull"]:::orch
@@ -186,6 +191,8 @@ flowchart TD
 *Vetva, ktorú diagram nekreslí:* Michal audit pod prahom nepovolí → audit aj dávka sa odložia po resete kvóty a pokračuje sa ďalšou nezávislou dávkou.
 
 **Kvóta Codexu** (`-Gate codex`) sa kontroluje tesne pred auditom návrhu aj pred otvorením PR — dlhý blok môže medzitým kvótu minúť.
+**PR otvára implementátor.** Pri dávke s povinnou predrecenziou po pushi vetvy stojí a vráti report; predrecenziu spúšťa orchestrátor
+(subagent ďalších subagentov nespúšťa) a PR sa otvorí až na jeho pokyn po oprave P1/P2.
 **Číslo PR** je všade, kde ho dávka píše (PLAN, KRONIKA, STAV, `DOGFOODING_vyriesene`), do otvorenia PR `PR #?`; hneď po `gh pr create`
 ho doplní samostatný commit, ktorý mení len číslo — ten pred mergom skontroluje orchestrátor (pri čistom kole 1 inak žiadna delta nebeží).
 **Dokumentačné PR** (bez kódu pluginu) idú skrátene: vetva `docs/…` → odsek v KRONIKE → headless testy (guardy dokumentácie) → kvóta →
@@ -309,8 +316,5 @@ Všetko, čo musí platiť, aby práca pokračovala. „Kto" = kto bránu uzatv�
 
 ## 9 · Pripravované a odložené
 
-- **PR C** `feat/register-agentov` — typy subagentov v `.claude/agents/` (implementátor, slepý recenzent, rešeršér s modelom a effortom;
-  obaly pre Grok a Antigravity) a kontrola štartu okna jedným príkazom (Z6, Z9).
-- **PR D** — oficiálny Grok plugin pre Claude Code (pred inštaláciou prejsť).
 - **Backlog (N4):** runner, ktorý po teste sám vráti pôvodnú verziu pluginu — položka je v zásobníku [PLAN.md](PLAN.md) (Po V1 — zásobník).
 - **Po V1:** spoločné pravidlá do `AGENTS.md` (štandard, ktorý čítajú Codex, Grok Build, OpenCode aj Antigravity); CLAUDE.md ho importuje.

@@ -36,6 +36,8 @@ precedens nesie **licenciu** (GPL = vzory áno, kód nie; proprietárny produkt 
    ( agy -p "$(cat <prompt.md>)" --model <model rešeršéra> --mode plan --print-timeout 30m > "$R/<x>_packet.md" 2> "$R/<x>_err.txt"; echo "exit=$?" > "$R/<x>.done" ) > /dev/null 2>&1 &
    ```
    potom `Monitor` s `until [ -f "$R/<x>.done" ]`. `--mode plan` zakazuje edity a shell (rešerš je čítanie), cwd = scratch, nikdy repo.
+   Krátky beh (do ~9 min, jedna-dve otázky) spustí aj typ subagenta `agy-reserser` (`.claude/agents/agy-reserser.md`) s tými istými parametrami
+   a výstup vráti priamo; dlhší beh ide takto na pozadí.
    Model: vždy výslovne cez `--model` — rola **rešerš outside-in** v tabuľke Obsadenie rolí (najvyšší Gemini Flash, ktorý ponúkne `agy models`).
    Web nástroje `search_web` + `read_url_content` musia mať grant v `~/.gemini/config/config.json` → `userSettings.globalPermissionGrants.allow`
    (`search_web`, `read_url(*)`) — inak headless auto-deny („jetski: … read_url permission"). Detail: memory `antigravity-agy-pilot`.
