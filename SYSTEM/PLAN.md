@@ -1,10 +1,12 @@
 # PLAN — čo sa ide robiť (bloky prác)
 
 > Roadmapa **bez histórie**: bloky v poradí, každý s cieľom a zaradenými položkami. Blok NEMÁ číslo verzie vopred — **dostane ho pri štarte** (minor bump = výhradne uzáver bloku).
-> **Evidencia (od 26.9.2026):** hotová dávka **ostáva v bloku ako riadok s ✅ a číslom PR**; odsek o nej ide do [archiv/KRONIKA.md](archiv/KRONIKA.md) a pri zvýšení VERSION sa prepíše [STAV.md](STAV.md).
+> **Evidencia (od 26.9.2026):** hotová dávka **ostáva v bloku ako riadok s ✅ a číslom PR** (pred `gh pr create` `PR #?`, číslo doplní samostatný commit hneď po vytvorení PR);
+> odsek o nej ide do [archiv/KRONIKA.md](archiv/KRONIKA.md) a pri zvýšení VERSION sa prepíše [STAV.md](STAV.md).
 > Blok sa presúva plným textom do [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md) až s **uzáverom bloku** (fajka patrí do riadku, nikdy do nadpisu — stráži guard).
 > Plné znenie otvorených postrehov žije v [DOGFOODING.md](DOGFOODING.md) **v skupinách podľa týchto blokov** — tu je len číslo, názov a jedna veta; skupina „smoke po uzávere" je dočasná a zanikne s posledným nálezom.
-> **Zadania bloku** (packages, briefy, smoke checklist) sú od štartu bloku v `SYSTEM/zdroje/bloky/<BLOK>/` — nie v `_dev/` ani v chate; blok tu na ne odkazuje a po uzávere sa priečinok presúva do `SYSTEM/archiv/bloky/<BLOK>/`.
+> **Priečinok bloku** (debata, mockup, packages, briefy, smoke checklist) je od štartu bloku v `SYSTEM/zdroje/bloky/<BLOK>/` — nie v `_dev/` ani v chate; blok tu naň odkazuje
+> a po uzávere sa celý priečinok fyzicky presúva do `SYSTEM/archiv/bloky/<BLOK>/` s kontrolou odkazov (staršie mockupy v `zdroje/ui20/` sa nepresúvajú).
 
 ## Bloky
 
@@ -632,6 +634,8 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 
 ## Po V1 — zásobník (nezaradené, nestratiť)
 
+- **Runner testov v SketchUpe po teste sám vráti pôvodnú verziu pluginu** (workflow N4, 26.9.2026) — `scripts\run_su_tests.ps1` dnes nechá nasadenú
+  rozpracovanú vetvu; dovtedy platí pravidlo „po každom mergi nainštalovať main" (CLAUDE.md, Verzia a uzáver).
 - **M-R nadstavby zo smoke 12.9.2026:** **D-126** otočenie zdrojového obrázka o ±90° pred uložením; **D-127** prirodzenejšie umiestnenie textúry (náhodný posun, nadväzovanie na skrinke alebo ručné umiestnenie — výber podľa praxe Lucie). Odložené, bez termínu, neblokujú uzáver M-R; plný kontext v [DOGFOODING.md](DOGFOODING.md).
 
 - **Mimo V1 z bloku KOVANIE** (FINAL §12; presunuté sem 10.9.2026 pri uzávere bloku): **D-109** pomerový člen setu „1 ks na N nôh" (= **R-05**; výsledok dnes dáva pravidlo

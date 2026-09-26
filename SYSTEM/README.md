@@ -42,10 +42,11 @@ Na otázku **„prečo je to takto?"** sa nečíta nič z hora — na to je [arc
   odchýlok); odkazujú naň `docs/UI_DIZAJN.md`, `docs/architecture/ui-lifecycle.md` aj
   [STAV.md](STAV.md). Býva tu z historických dôvodov a **zostáva tu** — je to jediný
   trvalo záväzný súbor vo vrstve `zdroje/`, všetko ostatné v nej je podklad, nie autorita.
-  **VÝNIMKA POČAS BLOKU (od 26.9.2026):** zadania (packages), briefy a smoke checklist bloku
-  sú v repe **od štartu bloku** v priečinku `zdroje/bloky/<BLOK>/` (nie v `_dev/` ani v chate)
-  a počas bloku sú **autoritou** — spolu so **schváleným mockupom a debatou bloku**. Po uzávere
-  bloku sa priečinok presúva do `archiv/bloky/<BLOK>/`; mockup a debata sú odvtedy už len história.
+  **VÝNIMKA POČAS BLOKU (od 26.9.2026):** priečinok bloku `zdroje/bloky/<BLOK>/` — debata,
+  schválený mockup, zadania (packages), briefy a smoke checklist, v repe **od štartu bloku**
+  (nie v `_dev/` ani v chate) — je počas bloku **autoritou**. Po uzávere bloku sa **celý priečinok
+  fyzicky presúva** do `archiv/bloky/<BLOK>/` s kontrolou odkazov. Staršie mockupy
+  v `zdroje/ui20/` sa nepresúvajú.
 - **[archiv/](archiv/)** — história a uzavreté rozhodnutia: [KRONIKA.md](archiv/KRONIKA.md)
   (záznam každej dávky), [ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md) (plné
   texty hotových blokov a etáp), [DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md)
@@ -53,7 +54,7 @@ Na otázku **„prečo je to takto?"** sa nečíta nič z hora — na to je [arc
   **existujúce záznamy neprepisujú** — pribúdať však pribúda priebežne, presne ako káže
   checklist uzáveru v CLAUDE.md: záznam dávky navrch KRONIKY, vyriešené D-číslo navrch
   indexu v DOGFOODING_vyriesene.md, hotový blok plným textom do ROADMAP_hotove_etapy.md
-  a pri uzávere bloku jeho priečinok (zadania, briefy, smoke checklist) do `archiv/bloky/<BLOK>/`.
+  a pri uzávere bloku jeho celý priečinok (debata, mockup, zadania, briefy, smoke checklist) do `archiv/bloky/<BLOK>/`.
   Jediná výnimka z neprepisovania: záznam **práve prebiehajúcej dávky** sa smie dorovnávať
   až do jej mergu (napr. keď review zmení výsledný stav, ktorý záznam opisuje).
 
@@ -85,8 +86,8 @@ Na otázku **„prečo je to takto?"** sa nečíta nič z hora — na to je [arc
   Záväzné znenie patrí do [STANDARD.md](STANDARD.md), [PLAN.md](PLAN.md) alebo `docs/`.
   Testom sa to overiť nedá: rozdiel medzi „citujem podklad" a „stojím na ňom" je vo význame
   vety, nie v tvare odkazu. Výnimky vo vrstve `zdroje/` sú len dve (vyššie): trvalo
-  `ui20/UI20_KONTRAKT.md` a počas bloku jeho priečinok `zdroje/bloky/<BLOK>/` spolu so
-  schváleným mockupom a debatou bloku.
+  `ui20/UI20_KONTRAKT.md` a počas bloku jeho priečinok `zdroje/bloky/<BLOK>/` (debata, mockup,
+  zadania, briefy, smoke checklist).
 - **Každá dávka, ktorá zvyšuje VERSION, aktualizuje docs** podľa **checklistu uzáveru
   dávky** v [../CLAUDE.md](../CLAUDE.md) vrátane **prepisu STAV** — nie „niekedy neskôr",
   ale v tej istej dávke. **Dokumentačné PR** majú krátky checklist: KRONIKA áno, STAV

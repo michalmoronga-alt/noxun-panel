@@ -1,6 +1,6 @@
 ---
 name: predrecenzia
-description: Slepá predrecenzia diffu vetvy PRED `gh pr create` — nezávislý slepý recenzent (subagent bez kontextu orchestrátora) hľadá chyby skôr, než ich nájde GitHub Codex. Robí sa pri dávkach audit-povinných (kontrakt, schéma, migrácia, observer/undo lifecycle, nový modul), výrobných/cenových a pri bežnej dávke nad 300 zmenených riadkov kódu pluginu (bez testov a dokumentácie) alebo s novým ovládacím prvkom v UI. Vráti číslované nálezy P1/P2/P3 a verdikt; P1/P2 sa opravia pred otvorením PR.
+description: Slepá predrecenzia diffu vetvy PRED `gh pr create` — nezávislý slepý recenzent (subagent bez kontextu orchestrátora) hľadá chyby skôr, než ich nájde GitHub Codex. Povinná pri dávkach audit-povinných (kontrakt, schéma, migrácia, observer/undo lifecycle, nový modul), výrobných/cenových a pri bežnej dávke nad 300 zmenených riadkov kódu pluginu (bez testov a dokumentácie) alebo s novým ovládacím prvkom v UI. Vráti číslované nálezy P1/P2/P3 a verdikt; P1/P2 sa opravia pred otvorením PR.
 ---
 
 # Slepá predrecenzia pred PR
@@ -16,9 +16,9 @@ poistka proti kompresii kontextu.
 
 | Dávka | Predrecenzia |
 |---|---|
-| audit-povinná (kontrakt, schéma, migrácia, observer/undo lifecycle, nový modul — tá istá trieda ako `codex-audit`) | **áno** |
-| výrobná alebo cenová (jediná definícia v CLAUDE.md: mení rozmery alebo počty dielov, hrany, kusovník, VEPO, nákupné zoznamy, kovanie alebo ceny) | **áno** |
-| bežná dávka nad 300 zmenených riadkov kódu pluginu (bez testov a dokumentácie) alebo s novým ovládacím prvkom v UI | **áno** (hranica N18, 26.9.2026) |
+| audit-povinná (kontrakt, schéma, migrácia, observer/undo lifecycle, nový modul — tá istá trieda ako `codex-audit`) | **povinná** |
+| výrobná alebo cenová (jediná definícia v CLAUDE.md: mení rozmery alebo počty dielov, hrany, kusovník, VEPO, nákupné zoznamy, kovanie alebo ceny) | **povinná** |
+| bežná dávka nad 300 zmenených riadkov kódu pluginu (bez testov a dokumentácie) alebo s novým ovládacím prvkom v UI | **povinná** (hranica N18, 26.9.2026) |
 | iný kód s novou UI interakciou (klávesnica, fokus, prepnutie dokumentu, prekreslenie) | odporúčaná |
 | docs-only, len zmena verzie | nie |
 
@@ -30,10 +30,9 @@ povinné pre každý PR). Je to lacnejšie kolo navyše medzi hotovým kódom a 
 1. **Vetva je hotová:** testy zelené (headless + všetky JS sady; in-SU podľa zoznamu spúšťačov v CLAUDE.md, sekcia Testovanie), docs na mieste, všetko commitnuté.
 2. **Kvóta PRED spustením** (subagent míňa Claude kvótu, orientačne 200–350 k tokenov na beh; skill `usage`, bod 4):
    `& ".claude\skills\usage\usage.ps1" -Label "predrecenzia <dávka>" -Phase before -Gate claude` — **exit 3** (Claude weekly na dne) =
-   subagenta nespúšťaj a použi náhradu z bodu 7. **Claude session nad 80 %** → nový subagent sa nespúšťa (hranica N18): počkaj na reset
-   session, alebo použi náhradu z bodu 7.
-3. **Spusti slepého recenzenta:** Agent tool — `subagent_type: general-purpose`, `run_in_background: true`, model podľa roly **slepý recenzent**
-   v tabuľke Obsadenie rolí (`SYSTEM/WORKFLOW.md`), prompt podľa vzoru nižšie. **Slepý** = dostane len ZADANIE (čo sa má zmeniť pre používateľa
+   subagenta nespúšťaj a použi náhradu z bodu 7. (Hranica „Claude session nad 80 %" platí len pre implementačného subagenta, nie pre predrecenziu.)
+3. **Spusti slepého recenzenta:** Agent tool — `subagent_type: general-purpose`, `run_in_background: true` a **`model:` vždy výslovne** podľa roly
+   **slepý recenzent** v tabuľke Obsadenie rolí (`SYSTEM/WORKFLOW.md`) — bez neho subagent beží na predvolenom modeli; prompt podľa vzoru nižšie. **Slepý** = dostane len ZADANIE (čo sa má zmeniť pre používateľa
    a kľúčové rozhodnutia z briefu) a rozsah diffu — nie výsledky auditu, nie vlastné hodnotenie orchestrátora, nie zoznam „na čo si dať pozor".
    Medzitým orchestrátor pripravuje PR popis.
 4. **Po výsledku** zapíš spotrebu: `& ".claude\skills\usage\usage.ps1" -Label "predrecenzia <dávka>" -Phase after` (ten istý Label).
