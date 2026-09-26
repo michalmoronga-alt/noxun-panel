@@ -17,6 +17,21 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **DOCS — blok 7 · KONŠTRUKCIA K1+K2: záznam bloku, postrehy D-143 a D-144 (27.9.2026, PR #?, len dokumentácia).**
+  Michal 26.9. vybral blok K1+K2 (po smoke S1 PASS) a v debate rozhodol: komín bežne ~50 mm (o koľko sú dno a strop vzadu kratšie ako bok), pri
+  komíne a drážke je drážka len v bokoch a na dne a strope chrbát presahuje, zapustený strop pre dolnú aj hornú, pri lištách vnútro pred lištami
+  v celej výške, lišty vo výstupoch jeden riadok „Chrb HD", zo šablón len Chladničková. Pri debate vznikol výrobný nález **D-143** (chrbát v drážke
+  ide do nárezu na vnútorný rozmer 564 × 684; Michal: do nárezu v plnom rozmere 600 × 720, dielňa zreže) — implementátor ho zastavil pred kódom,
+  lebo rozmer do nárezu sa dnes všade rovná rozmeru v modeli a oprava potrebuje nový údaj (zmena kontraktu, audit dávky) → prvá dávka bloku KON-0.
+  Krížový audit bloku (Grok 4.7 s webom, 9 nálezov; Codex gpt-6-astra s repom, 2 BLOCKER · 11 FIX · 3 NOTE; Gemini podľa Michala nebežal) našiel
+  aj starú výrobnú chybu **D-144** (vložený chrbát / chrbát v drážke pri výstuhách na výšku prechádza zadnou výstuhou). **Pôvodné PR #398** nieslo
+  podklady bloku (fakty z kódu, koncept, krížový audit, reconcile) a prešlo **tromi GH kolami, každé s P1** — všetky nálezy spresňovali návrh dávok
+  (staré snapshoty v novom plugine, zastaranosť podľa aktivačnej schémy, pravidlá výstuh, olepený chrbát v drážke, názvy líšt, D-144 len pri
+  výstuhe vyššej než korpus). Podľa **pravidla 3 kôl (b)** sa nezmergovalo, ale **zavrelo a rozdelilo**: tento PR nesie len blok 7 v PLAN a postrehy
+  D-143/D-144; podklady bloku (vetva `docs/blok-konstrukcia`, reconcile §5–§7 so všetkými nálezmi kôl) prídu do `zdroje/bloky/KONSTRUKCIA/` spolu
+  s mockupom a packages, kde každá dávka prejde vlastným auditom návrhu. Poučenie: úvodný dokument bloku drží rozhodnutia a smer, **nie
+  implementačné vzorce** — tie patria do package dávky. Ďalší krok: schválenie mockupu Michalom.
+
 - **DOCS — smoke S1 PASS a odškrtnutie V1 vízie (26.9.2026, PR #397, len dokumentácia; verzia pluginu sa nemení).**
   Michal 26.9. večer potvrdil **smoke bloku SPOTREBIČE S1 = PASS** („PASS — ideme ďalej"); zápis v [S1_ZAVER_2026-09-24.md](S1_ZAVER_2026-09-24.md)
   (sekcia Smoke Michala 21.–26.9.) — výsledok časti B checklistu sa po bodoch nezaznamenával, ďalšie postrehy k funkciám S1 idú ako nové D-čísla
