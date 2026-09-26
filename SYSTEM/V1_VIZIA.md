@@ -11,14 +11,16 @@ označené „V1 rozsah" v blokoch [PLAN.md](PLAN.md). **Bod sa odškrtáva, až
 v PLANe prázdny**; V1 je hotové, keď je odškrtnuté všetko. Stav dopĺňajú uzávery dávok.
 
 1. [ ] **Návrh:** vloženie skriniek na klik (GHOST, **hotové** v0.9.0) · prisunutie a kópia po vlastnej osi (NÁSTROJE-1, **hotové** v0.9.25) · dosky vkladané a kreslené
-   prichytením na skrinky (GHOST-D1/D2, packages v PLANe) · šablóny s kovaním = opakované typy na 1 klik (KOV-I). *(Zostavy, segmenty, sektory a viazané diely = PO V1, rozhodnutie 4.9.2026.)*
+   prichytením na skrinky (GHOST-D1/D2, **hotové** v0.9.27 / v0.9.28) · šablóny s kovaním = opakované typy na 1 klik (KOV-I, **hotové** v bloku KOVANIE) ·
+   **ostáva:** test na kompletnej reálnej zákazke (riadok „V1.0 zostavy" v PLAN, blok 4). *(Zostavy, segmenty, sektory a viazané diely = PO V1, rozhodnutie 4.9.2026.)*
 2. [ ] **Konštrukcia (rozhodnuté 6.9.2026):** **K1 odsadenia** — komín vzadu (dno a strop kratšie, chrbát na ich zadnej hrane) a strop zapustený vpredu, jedna nastaviteľná hodnota
    per skrinka · **K2 chrbát z výstuh** (dve lišty medzi bokmi, výška parameter) · **K3 rohová skrinka** dolná, slepá s CR lištou, prepínač L/P (nízka priorita, posledná) ·
    výstuhy v interiéri (hotové, D-80), sokel/nohy podľa výšky (hotové, D-79). *(Rohové spoje per strana, poldrážka, „bez dielca", čelo ako cenová položka V1-07 = mimo V1.)*
 3. [x] **Materiály:** katalóg z Demosu, skupinové farby, ABS automatika so semaforom, vyhľadávač s kontextom *(hotové — Materiály 2.0 + PICKER-1/2/3)*.
-4. [ ] **Kovanie:** blok KOVANIE (architektúra V1 FINAL 2.9.2026): sety s klasifikáciou a katalóg (A, B, H hotové), recepty a odvodené dielce zásuviek (C), resolver + zámky (D),
+4. [x] **Kovanie:** blok KOVANIE (architektúra V1 FINAL 2.9.2026): sety s klasifikáciou a katalóg (A, B, H hotové), recepty a odvodené dielce zásuviek (C), resolver + zámky (D),
    výklopy podľa hmotnosti (E), závesy max(výška, hmotnosť) + úchytka + Tip-On (F), nohy 4/6 + príchyty (G), šablóny s kovaním (I), UI/UX balík Čiel (D-114 + D-119 presah
-   per strana + D-120 UKW na dolnej a bočných hranách). *(Plný model výklopov, výplne fáza B, D-109 pomer setu = mimo V1.)*
+   per strana + D-120 UKW na dolnej a bočných hranách) *(hotové — blok KOVANIE v0.10.0 a balík Čiel v0.11.0; plné texty v [archíve](archiv/ROADMAP_hotove_etapy.md))*.
+   *(Plný model výklopov, výplne fáza B, D-109 pomer setu = mimo V1.)*
 5. [x] **Spotrebiče S1 (rozhodnuté 6.9.2026, rozšírené 20.9.2026; hotové v0.13.0, 24.9.2026 — [výsledok a overenie](archiv/S1_ZAVER_2026-09-24.md)):** ručný katalóg s odkazmi, technickými listami a **galériou príloh** · spotrebič patrí zákazke a vlastníkovi
    podľa kategórie (skrinka · **slot umývačky** · pracovná doska · len zákazka) · cena len v rozpočte · **slot umývačky = nový typ skrinky** (telo ako referencia, jediný dielec čelo,
    výplň hore ručne) · **telo chladničky = kontrolný box niky s pásmami dverí** + Kontrola niky (chladnička; rúra/mikro len Š + H) a delenia čiel podľa praxe · šablóna s tagom
@@ -26,11 +28,11 @@ v PLANe prázdny**; V1 je hotové, keď je odškrtnuté všetko. Stav dopĺňaj�
    Zo smoke (21.–24.9.): výška čela slotu sa dopočíta z linky, soklu a medzery hore (výplň nad umývačkou = samostatný nízky korpus) a chladnička má výšku osadenia.
    *(Delené čelo umývačky, kontrola výšky/hmotnosti čela, police podľa niky, vetranie, digestorový korpus, telá rúry/mikra/dosky/digestora = mimo V1.)*
 6. [ ] **Výstupy:** VEPO CSV, kusovník, nákup kovania, rozpočet s cenami, XLSX cenová ponuka *(hotové — dávky E + fáza ŠTÚDIO)* · **zvyšok V1-03 (rozhodnuté 6.9.2026):**
-   manuálne 1-klik overenie ceny + viac URL na položke („na faktúru" vyradené) · **D-94** nákup s pôvodom · **nárezový plán primitívny** (horná hranica počtu platní podľa zvoleného rozloženia namiesto odhadu z m²; objednáva človek) ·
-   **D-121** názvy dielcov do 20 znakov (fix). *(D-95 odškrtávanie diel po diele = preč natrvalo, stráž kolízií a EN DANIELI = mimo V1.)*
-7. [ ] **Dvaja používatelia:** Michal aj **Lucia** (testuje od 6.9.2026) — updater D-52 (**hotové**) · **M-R VZHĽAD** (rozhodnuté 6.9.2026, nahrádza „Demos fotku": ručné textúry
-   z knižnice, mierka + PBR v editore SketchUpu, „Uložiť vzhľad" do `.skm`, orientácia podľa smeru dekoru, aj ABS hrany a dosky) · zrozumiteľné UI *(Inspector + Štúdio hotové,
-   D-51 uzavreté)* · D-122 Kontrola zoskupí UNI · D-124 predvoľby projektu rozbalené. *(Zdieľanie knižníc D-48 = prvá funkcia PO V1, viď Mimo V1.)*
+   manuálne 1-klik overenie ceny (katalógové kovanie **hotové** — CENY-KOV v0.10.4–v0.10.5; **ostávajú materiály/ABS**) + viac URL na položke („na faktúru" vyradené) · **D-94** nákup s pôvodom (**hotové** v0.12.1, PR #361) · **nárezový plán primitívny** (horná hranica počtu platní podľa zvoleného rozloženia namiesto odhadu z m²; objednáva človek) ·
+   **D-121** názvy dielcov do 20 znakov (**hotové** v0.9.45–v0.9.46, PR #324/#325). *(D-95 odškrtávanie diel po diele = preč natrvalo, stráž kolízií a EN DANIELI = mimo V1.)*
+7. [x] **Dvaja používatelia:** Michal aj **Lucia** (testuje od 6.9.2026) — updater D-52 (**hotové**) · **M-R VZHĽAD** (rozhodnuté 6.9.2026, nahrádza „Demos fotku": ručné textúry
+   z knižnice, mierka + PBR v editore SketchUpu, „Uložiť vzhľad" do `.skm`, orientácia podľa smeru dekoru, aj ABS hrany a dosky; **hotové** v0.12.0) · zrozumiteľné UI *(Inspector + Štúdio hotové,
+   D-51 uzavreté)* · D-122 Kontrola zoskupí UNI (**hotové**, PR #343) · D-124 predvoľby projektu rozbalené (**hotové**, PR #344). *(Zdieľanie knižníc D-48 = prvá funkcia PO V1, viď Mimo V1.)*
 
 **Mimo V1 (vedome; revízia 6.9.2026):** **D-48 zdieľané knižnice** = **prvá funkcia po uzávere V1** (Odoslať / Aktualizovať s verziami, koreň na Disku) ·
 zostavy, segmenty, sektory, viazané diely (koncept 02) · D-95 plošná kontrola presety / X-ray, stráž kolízií, EN DANIELI · rohové spoje per strana, poldrážka, „bez dielca",
