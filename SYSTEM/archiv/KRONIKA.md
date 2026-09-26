@@ -29,8 +29,15 @@
   `release/<blok>` · zadania bloku v `SYSTEM/zdroje/bloky/<BLOK>/` · po každom mergi inštalácia mainu · jeden zoznam spúšťačov in-SU testu (brána mergu),
   runner vždy s `-CloseWhenDone` · počty testov z CLAUDE.md preč. **Skilly** `codex-po-pr`, `codex-audit` (model vždy `--model`), `predrecenzia`, `usage`
   a `antigravity-outside-in` zladené; **SYSTEM/README, STAV a PLAN** — hlavičky a pravidlá. Guard dĺžky riadkov a odkazov stráži aj WORKFLOW.md; status riadok
-  záznamu rozhodnutí dostal tvar, ktorý žiada guard konceptov. Mimo repa (orchestrátor): N15, N16; súbežne PR A #392 (ukazovateľ kontextu), ďalej PR C
-  (register agentov) a PR D (Grok plugin).
+  záznamu rozhodnutí dostal tvar, ktorý žiada guard konceptov. Pravidlo Z7 (ukazovateľ kontextu) je v CLAUDE.md z PR #392 (záznam nižšie). Mimo repa
+  (orchestrátor): N15, N16; ďalej PR C (register agentov) a PR D (Grok plugin).
+- **NÁSTROJ — ukazovateľ kontextu orchestrátora (26.9.2026, PR #392, hook Claude Code; verzia pluginu sa nemení).** Orchestrátor nevidí, ako je zaplnené
+  jeho kontextové okno, a kompresia ho zaskočila (auto pri 969k z 1M). Michal 26.9. schválil hook `.claude/hooks/context_meter.js` (Node): z transkriptu session
+  prečíta posledné usage hlavného agenta a vloží mu riadok `Kontext orchestrátora: 612k z 1M (61 %).` — pri každej správe Michala vždy, po nástroji len pri
+  prechode do vyššieho pásma (50/60/70/75/80/85/90/95 %); pokles po kompresii pásmo ticho resetne, subagenti sú ticho. Okno: `NOXUN_CTX_WINDOW` → model `[1m]`
+  alebo natívny 1M model → inak 200k. Preskakuje syntetické správy (hlášky limitu) a hneď po kompresii berie stav z jej hranice. Príkaz je `node -e` bez
+  PowerShellu (beží po každom nástroji). Pravidlo v CLAUDE.md (Lokálne hooky): od 75 % zapísať stav do repa/pamäte a čítanie delegovať, od 90 % navrhnúť
+  Michalovi `/compact` na hranici dávky. Testy `tests/js/test_context_meter.js`.
 - **PROCES — slepá predrecenzia pred PR + spresnené pravidlo 3 kôl (25.9.2026, PR #391, docs; verzia pluginu sa nemení).** Z retrospektívy bloku S1 (Michal
   24.–25.9.): **(1) nový skill `predrecenzia`** — dávka audit-povinná alebo výrobná/cenová prejde pred `gh pr create` nezávislým Opus subagentom bez kontextu
   orchestrátora (len zadanie + `git diff main...HEAD`), jeho P1/P2 sa opravia pred PR a výsledok ide do PR popisu; pri iných kódových dávkach odporúčaná. Dôvody:
