@@ -75,3 +75,15 @@ chrbát 10 mm pred zadnou hranou, s komínom za zadnými hranami dna a stropu).
 | P2 — minimum `10 + bt` nezávisle od režimu (skrytá hrúbka pri `rails`/`none` by blokovala platný komín) | **Berieme:** minimum podľa účinného režimu (tabuľka §2, riadok Grok 3) | koncept §1 · KON-A |
 
 Kolo vrátilo P1 → oprava v tomto PR a **nové plné GH kolo** (`@codex review`) podľa `codex-po-pr`.
+
+## 6 · Review PR #398 — GH Codex kolo 2 (27.9.2026)
+
+| Nález | Rozhodnutie | Kam |
+|---|---|---|
+| **P1** — oprava D-144 len v builderi nechá staré skrinky (`inset`/`groove` + výstuhy na výšku) s kolidujúcim chrbtom v snapshote | **Berieme:** KON-A pridá kontrolu zastaraných skriniek podľa **aktivačnej schémy 20** pre túto kombináciu → Kontrola s výzvou prestaviť + zastavené výrobné exporty, kým sa neprestavia | koncept §11 · KON-A |
+| P2 — zastaranosť „`groove` bez `cut_size`" by navždy blokovala prestavaný chrbát s ručným olepením (ten `cut_size` zámerne nemá) | **Berieme:** zastaranosť sa určuje **aktivačnou schémou** (`groove` a `config_schema < 19`), nie prítomnosťou `cut_size` | koncept §4 · KON-0 |
+| P2 — odsek Validácia v §1 ešte uvádzal `X < bt` pre `overlay` aj `groove` | **Berieme:** odsek uvádza minimum podľa režimu (`groove` `10 + bt`) | koncept §1 |
+| P2 — clamp výstuh `rd ≤ R/2 − 10` ignoruje `Y` a orientáciu (upright zaberá `t`) | **Berieme:** flat `rd ≤ (R − Y)/2 − 10`, upright `Y + 2t + 20 ≤ R`, pri nesplnení odmietnutie | koncept §1, §2 |
+
+Kolo 2 vrátilo P1 → oprava a **3. plné GH kolo**. Aby tretie kolo nenarážalo na rozpory medzi pôvodným textom a dodatkom, **v2 je zapracovaná
+priamo do §1–§8 konceptu** (§11 je už len prehľad zmien). Pravidlo 3 kôl: ak 3. kolo vráti P0/P1 alebo zmenu konceptu, PR sa zavrie a rozdelí.

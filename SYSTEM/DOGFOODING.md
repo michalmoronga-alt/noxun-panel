@@ -57,7 +57,8 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
   „Dve výstuhy" **na výšku** sa horná hrana chrbta ráta pod stropom (`back_z_hi`), nie pod výstuhami (`interior.z_hi`); naložený chrbát stojí za
   výstuhami a je v poriadku, ale **vložený** chrbát a chrbát **v drážke** prechádzajú zadnou výstuhou (pri výstuhe 100 a korpuse 18 až o 82 mm)
   a v kusovníku sú **vyššie, než sa zmestia**. Týka sa len tejto kombinácie (bežná dolná má naložený chrbát, bežná horná plný strop).
-  *Stav: OTVORENÉ — oprava v dávke **KON-A** (tá istá geometria chrbta); ak sa kombinácia používa na zákazkách, oprava ide skôr.*
+  *Stav: OTVORENÉ — oprava v dávke **KON-A** (tá istá geometria chrbta) vrátane kontroly už postavených skriniek s touto kombináciou (výzva
+  prestaviť, výrobné exporty stoja, kým sa neprestavia — review PR #398); ak sa kombinácia používa na zákazkách, oprava ide skôr.*
 
 ## INFRA
 

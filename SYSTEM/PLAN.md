@@ -535,7 +535,7 @@ Každá dávka okrem KON-C je výrobná; KON-0, A, B a D sú audit-povinné (sch
 - **KON-0 · D-143 · Chrbát v drážke do nárezu v plnom rozmere** — nové pole rozmeru do nárezu `cut_size` (geometria ostáva v drážke), `CONFIG_SCHEMA` 19,
   STANDARD §8.2, kontrola starých skriniek s chrbtom v drážke (výzva prestaviť, výrobné exporty stoja, kým sa neprestavia).
 - **KON-A · K1 odsadenia** — komín vzadu (minimum podľa typu chrbta) a zapustený strop vpredu (dolná aj horná), odmietnutia namiesto tichých klampov,
-  config-aware scale, oprava **D-144**; `CONFIG_SCHEMA` 20.
+  config-aware scale, oprava **D-144** vrátane kontroly starých skriniek s touto kombináciou (výzva prestaviť, výrobné exporty stoja); `CONFIG_SCHEMA` 20.
 - **KON-B · K2 chrbát z líšt** — dve lišty z korpusu, vnútro pred lištami v celej výške, jeden riadok „Chrb HD"; `CONFIG_SCHEMA` 21, BuildPlan 6, ABS seed 5.
 - **KON-C · bokorys v rohu náhľadu** — komín, voľný kanál, zapustenie a lišty viditeľné v Inspectore (UI).
 - **KON-D · šablóna Chladničková** — komín 50, očakáva chladničku, rozmery podľa Michala; knižnica šablón STD 7.

@@ -33,6 +33,9 @@
   naň; DOGFOODING skupinu KONŠTRUKCIA K1+K2 s D-143 a D-144. **GH Codex kolo 1 na tomto PR** (1× P1 + 3× P2, všetko prijaté, reconcile §5): zvýšenie
   schémy nechráni pred **starými snapshotmi v novom plugine** → KON-0 dostane kontrolu zastaraného chrbta v drážke (výzva prestaviť + zastavené
   výrobné exporty); `cut_size` do STANDARD §8.2; voľný kanál a minimum komína **podľa účinného režimu chrbta**. Kvôli P1 nové plné GH kolo.
+  **Kolo 2** (1× P1 + 3× P2, prijaté, reconcile §6): kontrola zastaraných skriniek aj pre **D-144** (aktivačná schéma 20); zastaranosť D-143 podľa
+  aktivačnej schémy, nie podľa chýbajúceho `cut_size` (prestavaný chrbát s olepením by inak ostal blokovaný); pôdorysová podmienka výstuh podľa `Y`
+  a orientácie; **v2 zapracovaná priamo do §1–§8 konceptu**, §11 je už len prehľad zmien. Kvôli P1 3. plné GH kolo.
   Ďalší krok: mockup na schválenie Michalom → packages.
 
 - **DOCS — smoke S1 PASS a odškrtnutie V1 vízie (26.9.2026, PR #397, len dokumentácia; verzia pluginu sa nemení).**
