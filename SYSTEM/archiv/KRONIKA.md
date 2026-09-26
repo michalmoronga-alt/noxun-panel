@@ -17,6 +17,21 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **DOCS — štart bloku 7 · KONŠTRUKCIA K1+K2: debata, fakty z kódu, krížový audit a reconcile (26.–27.9.2026, PR #?, len dokumentácia).**
+  Michal 26.9. vybral blok K1+K2 (po smoke S1 PASS) a v debate rozhodol **M1–M10** — komín bežne ~50 mm (X = o koľko sú dno a strop kratšie ako bok),
+  pri komíne + drážke drážka len v bokoch a na dne a strope chrbát presahuje, zapustený strop pre **dolnú aj hornú**, pri lištách vnútro pred lištami
+  **v celej výške**, lišty vo výstupoch **jeden riadok 2 ks „Chrb HD"**, zo šablón **len Chladničková**. Pri debate vznikol výrobný nález **D-143**
+  (chrbát v drážke ide do nárezu na vnútorný rozmer 564 × 684; Michal: do nárezu v plnom rozmere 600 × 720, dielňa zreže). Implementátor D-143
+  **zastavil pred kódom** — `prod = box` stráži PartFaces a AppearanceMapping, plný rozmer pri geometrii v drážke preto potrebuje nový údaj
+  „rozmer do nárezu" (zmena kontraktu) — a D-143 sa stal prvou dávkou bloku (KON-0). Priečinok bloku [../zdroje/bloky/KONSTRUKCIA/](../zdroje/bloky/KONSTRUKCIA/)
+  (prvý podľa pravidla z 26.9.): fakty z kódu (read-only), **koncept v2**, zadanie a surové packety **krížového auditu Grok 4.7 (9 nálezov, web) +
+  Codex gpt-6-astra (2 BLOCKER · 11 FIX · 3 NOTE, s repom)** — Gemini podľa Michala nebežal — a **reconcile**: B1 D-143 zvyšuje `CONFIG_SCHEMA`
+  už v KON-0 (starší plugin by vydal malý chrbát), B2 oprava vzorca zadného dorazu pri naloženom chrbte; pole `cut_size`; nenulový komín ≥ 10 + hrúbka
+  chrbta; odmietnutia namiesto tichých klampov; dve roly líšt; STD 7 pre seed šablóny; **Chladničková 580 × komín 50 by mala vnútro 530 < 550 niky**
+  → rozmery rozhodne Michal (návrh hĺbka 610). Audit našiel aj **starú výrobnú chybu D-144** (vložený chrbát / chrbát v drážke + výstuhy na výšku —
+  chrbát prechádza zadnou výstuhou, v kusovníku je vyšší), oprava v KON-A. PLAN dostal **blok 7** (KON-0 · A · B · C · D), K1/K2 z bloku 4 odkazujú
+  naň; DOGFOODING skupinu KONŠTRUKCIA K1+K2 s D-143 a D-144. Ďalší krok: mockup na schválenie Michalom → packages.
+
 - **DOCS — smoke S1 PASS a odškrtnutie V1 vízie (26.9.2026, PR #397, len dokumentácia; verzia pluginu sa nemení).**
   Michal 26.9. večer potvrdil **smoke bloku SPOTREBIČE S1 = PASS** („PASS — ideme ďalej"); zápis v [S1_ZAVER_2026-09-24.md](S1_ZAVER_2026-09-24.md)
   (sekcia Smoke Michala 21.–26.9.) — výsledok časti B checklistu sa po bodoch nezaznamenával, ďalšie postrehy k funkciám S1 idú ako nové D-čísla
