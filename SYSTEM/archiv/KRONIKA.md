@@ -31,6 +31,12 @@
   a `antigravity-outside-in` zladené; **SYSTEM/README, STAV a PLAN** — hlavičky a pravidlá. Guard dĺžky riadkov a odkazov stráži aj WORKFLOW.md; status riadok
   záznamu rozhodnutí dostal tvar, ktorý žiada guard konceptov. Pravidlo Z7 (ukazovateľ kontextu) je v CLAUDE.md z PR #392 (záznam nižšie). Mimo repa
   (orchestrátor): N15, N16; ďalej PR C (register agentov) a PR D (Grok plugin).
+- **NÁSTROJ — oprava hooku kontroly kódovania po úprave súboru (26.9.2026, PR #394, hook Claude Code; verzia pluginu sa nemení).** Hook `post_edit_check.ps1`
+  (od 24.7.) reálne nebežal: Claude Code spúšťa hooky na Windows cez Git Bash a ten z príkazu v dvojitých úvodzovkách zjedol `$d`/`$env:` → parse error PowerShellu
+  pri každom Edit/Write (v transkripte orchestrátora 172× `hook_non_blocking_error`; nález pri PR #392). Príkaz v `.claude/settings.json` má skript v jednoduchých
+  úvodzovkách a na konci `; exit $LASTEXITCODE` (v Git Bash prázdna premenná → exit kód PowerShellu, v PowerShelli prenesie 2), takže kontrola beží v oboch shelloch
+  a nález dostane agent ako spätnú väzbu. Encoding guard `tests/pure/test_encoding_guard.rb` kontroluje aj `.claude/hooks/*.js`. Overené naživo cez `claude -p`
+  (čistý Write/Edit bez hlásenia, zámerné mojibake → „mojibake signatura"). Známa hranica signatúr: mojibake z cp1252 (napr. „á" prehnané cez cp1252) nechytia.
 - **NÁSTROJ — ukazovateľ kontextu orchestrátora (26.9.2026, PR #392, hook Claude Code; verzia pluginu sa nemení).** Orchestrátor nevidí, ako je zaplnené
   jeho kontextové okno, a kompresia ho zaskočila (auto pri 969k z 1M). Michal 26.9. schválil hook `.claude/hooks/context_meter.js` (Node): z transkriptu session
   prečíta posledné usage hlavného agenta a vloží mu riadok `Kontext orchestrátora: 612k z 1M (61 %).` — pri každej správe Michala vždy, po nástroji len pri
