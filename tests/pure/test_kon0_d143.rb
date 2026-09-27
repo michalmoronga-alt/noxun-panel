@@ -448,7 +448,11 @@ if NxTest.headless?
       b::CUT_INVALID => NxKon0.issues(NxKon0.upper_back_snapshot.merge('cut_size' => { 'length' => 1 })),
       b::BACK_EDGED => NxKon0.issues(edged),
       b::BACK_INCOMPLETE => NxKon0.issues(incomplete),
-      b::BACK_STALE => [b.back_stale_issue('CAB-1', 1, NxKon0.stale_cfg)]
+      b::BACK_STALE => [b.back_stale_issue('CAB-1', 1, NxKon0.stale_cfg)],
+      # D-144 (KON-A): ten isty register brany.
+      b::BACK_RAIL_STALE => [b.back_rail_stale_issue('CAB-1', 1, NxKon0.stale_cfg(
+        'config_schema' => 19, 'back_mode' => 'inset', 'top_mode' => 'two_rails', 'rails_orientation' => 'upright'
+      ))]
     }
     NxTest.assert_equal(b::CUT_BLOCKERS.sort, reasons.keys.sort, 'test pokryva cely register')
     reasons.each do |code, list|
@@ -567,18 +571,19 @@ end
 # 4. SCHEMA A KOMPATIBILITA
 # ============================================================================
 
-NxTest.test('D-143: CONFIG_SCHEMA 19 + aktivacna schema 19 + HISTORIA + dopredna brana') do
+NxTest.test('D-143: CONFIG_SCHEMA 19+ + aktivacna schema 19 + HISTORIA + dopredna brana') do
   cb = NxKon0::CB
-  NxTest.assert_equal(19, cb::CONFIG_SCHEMA)
+  # KON-A zvysila schemu na 20 — D-143 plati od 19 VRATANE (aktivacna ostava).
+  NxTest.assert(cb::CONFIG_SCHEMA >= 19, "CONFIG_SCHEMA #{cb::CONFIG_SCHEMA}")
   NxTest.assert_equal(19, cb::BACK_CUT_ACTIVATION_SCHEMA)
   NxTest.assert_equal([5, 9, 11], [cb::DRAWER_ACTIVATION_SCHEMA, cb::HINGE_ACTIVATION_SCHEMA, cb::LIFT_ACTIVATION_SCHEMA],
                       'starsie aktivacne konstanty sa nehybu')
   NxTest.assert(NxKon0.src('noxun_engine', 'core', 'cabinet_builder.rb').include?('#  19 = D-143'),
                 'HISTORIA musi povedat, PRECO sa bumplo')
-  NxTest.assert(cb.newer_config?({ 'config_schema' => 20 }), 'novsi config (20) prestavbu zastavi')
+  NxTest.assert(cb.newer_config?({ 'config_schema' => cb::CONFIG_SCHEMA + 1 }), 'novsi config prestavbu zastavi')
   NxTest.refute(cb.newer_config?({ 'config_schema' => 19 }))
-  NxTest.assert_equal(19, cb.cabinet_config(cb.normalize('type' => 'upper'))[:config_schema],
-                      'stavba zapisuje schemu 19 — prestavana skrinka prestane byt zastarana')
+  NxTest.assert(cb.cabinet_config(cb.normalize('type' => 'upper'))[:config_schema] >= 19,
+                'stavba zapisuje schemu >= 19 — prestavana skrinka prestane byt zastarana')
 end
 
 # ============================================================================

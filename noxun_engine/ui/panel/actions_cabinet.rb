@@ -14,7 +14,7 @@ module Noxun
       # Zakladnych a idu tou istou apply cestou) — preto patria do whitelistu.
       PARAM_KEYS = %w[type width height depth thickness floor_height bottom_mode top_mode back_mode
                       back_thickness plinth_mode plinth_recess rail_depth rails_orientation
-                      rails_top_offset name
+                      rails_top_offset back_setback top_front_setback name
                       dw_class dw_body_height dw_front_bottom].freeze
 
       # S1-E: SK nazov typu skrinky v 1. pade (hlasky Studia aj panela). Jedna

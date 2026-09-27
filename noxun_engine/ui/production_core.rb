@@ -1217,7 +1217,10 @@ module Noxun
         Bom::BACK_EDGED => ['chrbát v drážke s olepením', 'zruš olepenie alebo zmeň typ chrbta'],
         Bom::BACK_INCOMPLETE => ['chrbát v drážke bez rozmeru do nárezu', 'prestav skrinku'],
         Bom::BACK_STALE => ['chrbát v drážke zo staršej verzie (do nárezu by išiel v rozmere modelu)',
-                            'prestav skrinky (Kontrola → Prestaviť zastarané skrinky)']
+                            'prestav skrinky (Kontrola → Prestaviť zastarané skrinky)'],
+        # D-144 (KON-A): konzervativny predikat — veta netvrdi koliziu.
+        Bom::BACK_RAIL_STALE => ['chrbát pri výstuhách na výšku zo staršej verzie (môže prechádzať zadnou výstuhou)',
+                                 'prestav skrinky (Kontrola → Prestaviť zastarané skrinky)']
       }.freeze
 
       # -> [veta, …] v poradi registra (prazdne = nic neblokuje).
@@ -1245,10 +1248,11 @@ module Noxun
       # `Panel.back_rebuild_stale` (`CabinetBuilder.rebuild_many` = jedna
       # operacia, jeden krok Späť, pri chybe rollback). Rozsah = skrinky
       # zakazky (`Ids.top_level_scan`, ten isty ako vystupy) a zastaranost =
-      # TEN ISTY predikat ako Kontrola a brana (`Bom.back_stale?`).
+      # TEN ISTY predikat ako Kontrola a brana — od KON-A SPOLOCNY pre D-143
+      # aj D-144 (`Bom.rebuild_stale?`, audit KON-A NOTE 8).
       def back_stale_entry(id, cfg, detached)
         c = cfg.is_a?(Hash) ? cfg : {}
-        { 'id' => id.to_s, 'stale' => Bom.back_stale?(c),
+        { 'id' => id.to_s, 'stale' => Bom.rebuild_stale?(c),
           # Neznamy generic typ kovania: `rebuild_many` by na nom zhodil CELU
           # spolocnu operaciu (vzor `front_grain_entry`).
           'unknown_hw' => (defined?(CabinetBuilder) && CabinetBuilder.unknown_hardware?(c)) ? true : false,
@@ -1297,14 +1301,14 @@ module Noxun
       end
 
       def back_stale_empty_msg(plan)
-        return 'Žiadna skrinka nemá zastaraný chrbát v drážke — nič sa neprestavovalo.' if plan['stale'].to_i.zero?
+        return 'Žiadna skrinka nie je zastaraná — nič sa neprestavovalo.' if plan['stale'].to_i.zero?
 
         "Zastarané skrinky sa nedali prestaviť#{back_stale_skipped_tail(plan)}."
       end
 
       def back_stale_done_msg(plan)
         n = Array(plan['jobs']).length
-        "Prestavané zastarané skrinky: #{n} (chrbát v drážke ide do nárezu v plnom rozmere; " \
+        "Prestavané zastarané skrinky: #{n} (chrbát je teraz podľa aktuálnej verzie; " \
           "jeden krok Späť)#{back_stale_skipped_tail(plan)}."
       end
 

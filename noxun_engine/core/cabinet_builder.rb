@@ -277,7 +277,19 @@ module Noxun
       #       `ProductionCore.export_blockers`). Skrinka `groove` pod schemou 19
       #       je ZASTARANA (`BACK_CUT_ACTIVATION_SCHEMA`) — Kontrola RED
       #       a vyrobne exporty stoja, kym sa neprestavi.
-      CONFIG_SCHEMA = 19
+      #  20 = KON-A · K1 — KOMIN VZADU A ZAPUSTENIE STROPU VPREDU + D-144.
+      #       Config smie niest `back_setback` (X) a `top_front_setback` (Y),
+      #       mm Float 0..300, zapisane LEN ked su > 0. Plugin schemy 19 ich
+      #       NEPOZNA: whitelist `normalize` by ich zahodil a pri prestavbe by
+      #       narezal dno a strop na plnu hlbku (chrbat by sa vratil za boky),
+      #       teda iny kusovnik bez hlasky. A D-144 (chrbat vlozeny alebo
+      #       v drazke pri vystuhach NA VYSKU konci POD nimi, aj v rozmere do
+      #       narezu) by starsi plugin prestavbou vratil na chrbat cez vystuhu.
+      #       Brany su tie iste ako pri 5-19 (`newer_config?`,
+      #       `ProductionCore.export_blockers`). Skrinka s kombinaciou D-144
+      #       pod schemou 20 je ZASTARANA (`BACK_RAIL_ACTIVATION_SCHEMA`) —
+      #       Kontrola RED a vyrobne exporty stoja, kym sa neprestavi.
+      CONFIG_SCHEMA = 20
 
       # KOV-C2b: schema, OD KTOREJ stavba emituje dielce zasuviek z receptu.
       # VLASTNA konstanta (nie `CONFIG_SCHEMA`), lebo pri bumpe na 6 (KOV-D1a)
@@ -313,6 +325,22 @@ module Noxun
       # a vyklopoch — buduci bump schemy nesmie spravit zo skriniek schemy 19
       # nemigrovane.
       BACK_CUT_ACTIVATION_SCHEMA = 19
+
+      # D-144 (KON-A): schema, OD KTOREJ chrbat VLOZENY alebo V DRAZKE pri
+      # vystuhach NA VYSKU konci pod vystuhami (aj v rozmere do narezu).
+      # Skrinka s touto kombinaciou ulozena POD nou ma chrbat, ktory moze
+      # prechadzat zadnou vystuhou a v kusovniku je vyssi, nez sa zmesti.
+      # O zastaranosti rozhoduje VYHRADNE schema + ulozene rezimy (vyrobne
+      # rozmery sa nepocitaju — predikat je konzervativny). VLASTNA konstanta
+      # z toho isteho dovodu ako `BACK_CUT_ACTIVATION_SCHEMA`.
+      BACK_RAIL_ACTIVATION_SCHEMA = 20
+
+      # KON-A · K1: konstrukcne polia komina (X) a zapustenia (Y). JEDEN zoznam
+      # pre `normalize`, `cabinet_config`, `config_to_params` aj sablony —
+      # dva opisane zoznamy by sa rozisli a komin by pri prestavbe ticho vypadol.
+      SETBACK_KEYS = %i[back_setback top_front_setback].freeze
+      # Retazec, ktory je CELY cislom (`norm_setback`) — nie „50oops“ ani „50-20“.
+      SETBACK_NUM_RE = /\A[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?\z/.freeze
 
       # S1-E0 (Michal 20.9.2026): VYSKA ide od 80 mm, nie od 200. Nad umyvackou
       # (a pod linkou) ostava casto len 80-110 mm a stolar tam kladie NIZKY
@@ -2458,7 +2486,9 @@ module Noxun
         def draw_legs(ents, cfg, qty)
           # D-37: nohy patria pod NOSNE dno (konstrukcna hlbka) — zadny rad nesmie
           # trcat pod nalozenym chrbtom (pri hrubke az 50 mm by visel vo vzduchu).
-          w = cfg[:width]; d = Construction.carcass_depth(cfg); h = cfg[:floor_height]
+          # KON-A (Grok 9): pri komine podla hlbky DNA — zadny doraz `back_stop`
+          # (bez komina presne dnesna `carcass_depth`).
+          w = cfg[:width]; d = Construction.back_stop(cfg); h = cfg[:floor_height]
           r = LEG_DIAMETER / 2.0
           count = [qty, LEG_RENDER_MAX].min
           # D-13/D-17 (Codex F4): pri prednom sokli predny rad noh posunut ZA dosku
@@ -2856,6 +2886,16 @@ module Noxun
           # horna skrinka ostavaju BAJTOVO rovnake ako pred S1-E (golden
           # fixtury zakaziek sa nesmu pohnut).
           DW_KEYS.each { |k| out[k] = cfg[k] } if cfg[:type] == 'dishwasher'
+          # KON-A · K1: komin a zapustenie sa zapisuju LEN ked su > 0 (vzor
+          # S1-E „zapisovat len ked treba") — config existujucich skriniek sa
+          # prestavbou NEMENI a golden fixtury ostavaju bajtovo rovnake.
+          # Vnorene odvodene objekty `top`/`back` ostavaju bez zmeny.
+          unless cfg[:type] == 'dishwasher'
+            SETBACK_KEYS.each do |k|
+              v = norm_setback(cfg[k])
+              out[k] = v if v.positive?
+            end
+          end
           # Rezervovane vazby: kluc sa objavi LEN ked skrinka naozaj nieco
           # nesie (nil = „o vazbe nic nevieme", nie „vazba nie je").
           out[:appliance_refs] = cfg[:appliance_refs] if cfg[:appliance_refs].is_a?(Array)
@@ -3023,6 +3063,10 @@ module Noxun
             rail_depth: clampf(fetchf(p, :rail_depth, d[:rail_depth]), 20.0, 400.0),
             rails_orientation: enum_val(p, :rails_orientation, %w[flat upright], d[:rails_orientation]),
             rails_top_offset: clampf(fetchf(p, :rails_top_offset, d[:rails_top_offset]), 0.0, 500.0),
+            # KON-A · K1: komin vzadu a zapustenie stropu — PRISNE parsovanie
+            # (`norm_setback`); slot umyvacky ich nema (jeho plan ich necita).
+            back_setback: slot ? 0.0 : norm_setback(raw(p, :back_setback)),
+            top_front_setback: slot ? 0.0 : norm_setback(raw(p, :top_front_setback)),
             # V0.2b: strom zon (police su per-zona) + cela (fixed/auto s lockmi)
             zone_tree: norm_zone_tree(p),
             fronts: fronts_cfg,
@@ -3856,6 +3900,11 @@ module Noxun
             'rail_depth' => cfg['rail_depth'] || 100.0,
             'rails_orientation' => cfg['rails_orientation'] || 'flat',
             'rails_top_offset' => cfg['rails_top_offset'] || 0.0,
+            # KON-A · K1: chybajuci kluc = 0 (skrinka pred KON-A komin nema).
+            # Ide cez neho KAZDY round-trip zo stored configu (prestavba,
+            # absorpcia scale, kopie, „Nahradit UNI", hromadne zmeny).
+            'back_setback' => cfg['back_setback'] || 0.0,
+            'top_front_setback' => cfg['top_front_setback'] || 0.0,
             # strom zon: novy config ho ma; stary korpus -> koren so starymi policami
             'zone_tree' => cfg['zone_tree'] || ZoneTree.default_tree((cfg['shelves'] || 0).to_i),
             # cela: novy config = hash; stary = string ('none'/'1'/'2'/'auto') -> Fronts.normalize
@@ -3998,6 +4047,24 @@ module Noxun
           return nil if v.nil?
           s = v.to_s.strip
           s.empty? ? nil : s
+        end
+
+        # KON-A · K1 (audit FIX 5): PRISNE citanie komina/zapustenia. Platne je
+        # LEN konecne cislo — Numeric alebo retazec, ktory je CELY cislom
+        # („50", „12.5"); „50oops", „50-20", NaN, Infinity, objekt, nil = 0.
+        # Potom klamp 0..`Construction::SETBACK_MAX` (zaporne -> 0). Vzor
+        # `plinth_recess` s `.to_f` nestaci („50oops" -> 50, NaN prejde).
+        def norm_setback(v)
+          f =
+            case v
+            when Integer, Float, Rational then v.to_f
+            when String
+              str = v.strip
+              SETBACK_NUM_RE.match?(str) ? str.to_f : nil
+            end
+          return 0.0 if f.nil? || !f.finite? || f <= 0.0
+
+          [f, Construction::SETBACK_MAX].min
         end
 
         def fetchf(p, key, default)

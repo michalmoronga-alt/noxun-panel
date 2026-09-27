@@ -520,16 +520,20 @@ NxTest.test('construction: D-80 orezanie odsadenia hlasi warning a NEodmietne re
                 'odsadenie v limite sa nesmie hlasit ako orezane')
 end
 
-NxTest.test('construction: D-80 chrbat — inset/groove sa skratia LEN o odsadenie, overlay nie') do
+NxTest.test('construction: D-80 + D-144 chrbat — inset/groove pod vystuhami, overlay nie') do
   h = NxConsHelp
   # [back_mode, orientacia, odsadenie, ocakavana vyska chrbta, popis]
+  # D-144 (KON-A): pri vystuhach NA VYSKU (100 mm > hrubka 18) konci vlozeny aj
+  # drazkovy chrbat POD nimi — nizsia z dnesnej (h - off - t) a spodnej hrany
+  # vystuh (h - off - 100). Dolna 720 / sokel 100: 720 - 100 - 118 = 502.
   [
     ['inset',   'flat',    0.0,  584.0, 'inset bez odsadenia = povodna vyska (h - t - z_lo)'],
     ['inset',   'flat',    30.0, 554.0, 'inset s odsadenim 30: presne o 30 kratsi'],
-    ['inset',   'upright', 0.0,  584.0, 'upright bez odsadenia nemeni chrbat'],
-    ['inset',   'upright', 30.0, 554.0, 'upright: skratenie LEN o odsadenie, NIE o vysku vystuhy'],
+    ['inset',   'upright', 0.0,  502.0, 'D-144: upright 100 — chrbat konci pod vystuhami'],
+    ['inset',   'upright', 30.0, 472.0, 'D-144: upright s odsadenim 30 — pod vystuhami'],
     ['groove',  'flat',    0.0,  584.0, 'groove bez odsadenia = povodna vyska'],
     ['groove',  'flat',    30.0, 554.0, 'groove s odsadenim 30'],
+    ['groove',  'upright', 0.0,  502.0, 'D-144: groove upright 100 — pod vystuhami'],
     ['overlay', 'flat',    30.0, 620.0, 'overlay je nalozeny zozadu — odsadenie ho NEMENI (h - sokel)'],
     ['overlay', 'upright', 30.0, 620.0, 'overlay pri upright rovnako nezmeneny']
   ].each do |bkm, ori, off, bh, label|

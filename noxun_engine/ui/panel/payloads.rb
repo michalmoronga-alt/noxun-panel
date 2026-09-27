@@ -660,13 +660,16 @@ module Noxun
         def appliance_interior(cfg)
           return nil unless cfg.is_a?(Hash) && defined?(Construction)
 
-          dims = Construction.interior_dims(cfg.transform_keys(&:to_sym))
+          sym = cfg.transform_keys(&:to_sym)
+          dims = Construction.interior_dims(sym)
           return nil unless dims.is_a?(Hash)
 
           t = cfg['thickness'].to_f
+          # KON-A (M9): ten isty pomocnik hlbky niky ako Kontrola niky
+          # (`ApplianceChecks.context`) — pri komine hlbka BOKU.
           { 'width' => (cfg['width'].to_f - (2 * t)).round(2),
             'height' => dims[:avail_h].to_f.round(2),
-            'depth' => dims[:back_front_y].to_f.round(2) }
+            'depth' => Construction.niche_depth(sym, dims).to_f.round(2) }
         rescue StandardError
           nil
         end
@@ -2319,6 +2322,13 @@ module Noxun
           # S1-E: polia SLOTU cestuju so sablonou — bez nich by z „Umývačky 60"
           # vznikol slot s generickymi rozmermi namiesto tych ulozenych.
           CabinetBuilder::DW_KEYS.each { |k| tc[k.to_s] = cfg[k.to_s] if cfg.key?(k.to_s) }
+          # KON-A · K1 (Codex FIX 7): komin a zapustenie sablona zapisuje
+          # VYSLOVNE, aj 0 — pri pouziti na inu skrinku tak nova sablona 0
+          # prepise na 0 a len STARA sablona (kluc chyba) necha hodnotu ciela
+          # (`TemplatesDialog.merge_template`). Slot ich nema.
+          unless cfg['type'].to_s == 'dishwasher'
+            CabinetBuilder::SETBACK_KEYS.each { |k| tc[k.to_s] = CabinetBuilder.norm_setback(cfg[k.to_s]) }
+          end
           # S1-E (R2c): sablona nesie OCAKAVANIE (`appliance_expects[]`), NIKDY
           # vazbu na konkretny spotrebic — ten je majetkom JEDNEJ skrinky
           # v JEDNEJ zakazke a v sablone by z neho bola sirota.
