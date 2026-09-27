@@ -273,7 +273,7 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   dve lišty medzi bokmi, výška parameter, ABS len hrana viditeľná z vnútra · **K3 rohová skrinka** (dolná, slepá s CR lištou: dolná skrinka + 5 dielcov rohovej zostavy + dverová
   zóna, cr1, cr2, prepínač L/P; **nízka priorita, posledná vo V1**; outside-in + audit). Balík V0.4.8 (rohové spoje per strana, poldrážka, „bez dielca") a V1-07 čelo ako cenová
   položka sú **mimo V1** (zásobník). K1/K2 = audit-povinné (CONFIG_SCHEMA). **K1 a K2 sú hotové v bloku 7 · KONŠTRUKCIA K1+K2 (v0.14.0, 27.9.2026)** —
-  [výsledok a smoke](archiv/KONSTRUKCIA_ZAVER_2026-09-27.md); **K3 ostáva tu.**
+  [výsledok a smoke](archiv/KONSTRUKCIA_ZAVER_2026-09-27.md); **K3 sa robí v bloku 8 · K3 ROHOVÁ SKRINKA** (štart 27.9.2026).
 - **V1.0 zostavy — V1 rozsah PO ROZHODNUTÍ 4.9.2026:** prisunutie a kopírovanie korpusov po vlastnej osi (snaper + mower logika → draft NÁSTROJE-1) · dosky (pracovná doska, pilaster,
   soklová lišta, krycí panel) vkladané a kreslené prichytením na rohy skriniek (drafty GHOST-D1/D2) · test na kompletnej reálnej zákazke. **PO V1** (rozhodnutie 4.9., koncept 02):
   segmentová automatika — soklová lišta v celku pre segment, obklady a krycie prvky segmentu vrátane pilastra (priznaný vs. skrytý) ako generované diely, pracovné a horné krycie dosky
@@ -528,6 +528,18 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → `construction.md` (`BoardBuilder.replan`, fázy kreslenia, geometria lúča/projekcie, degenerácie, lifecycle zámkov —
   Codex #296 P1), `ui-lifecycle.md` (ghost D2, `interaction: drawing`, `draw_board`, zámky, Shift, VCB), `docs/UI_DIZAJN.md` (tlačidlá karty Dosky) → STAV/KRONIKA/PLAN.
 
+### 8 · K3 ROHOVÁ SKRINKA (V1 bod 2 · štart 27.9.2026)
+
+**Cieľ:** dolná **slepá rohová skrinka s CR lištou** z pluginu bez ručného dopočítavania — dvere v dverovej časti, rohová zostava (blenda korpusová,
+výstuha závesov, rohová výstuha, CR 1, CR 2) podľa DC „Rohová", ktorú dielňa roky používa, strana dverí vľavo/vpravo; kusovník, VEPO a kovanie
+ako pri dolnej. Horná rohová, rohové mechanizmy (LeMans) a kolízie so susedným radom sú mimo bloku. **Priečinok bloku:** [zdroje/bloky/ROHOVA/](zdroje/bloky/ROHOVA/)
+— **rozhodnutia Michala** (R1–R9), fakty z kódu, presná geometria DC, rešerš precedensov a surové výsledky krížového auditu; packages pribudnú s dávkami.
+**Stav 28.9.2026:** krížový audit hotový; mockup ovládačov čaká na Michalovo schválenie. Poradie:
+
+- **ROH-A1 · jadro rohovej** — nový typ skrinky, stavba oboch strán, výstupy (kusovník, VEPO, ponuka) a ochrany; bez nových ovládačov (R8). *PR #?*
+- **ROH-A2 · vkladanie a náhľad** — tlačidlo „Rohová" vo vkladacej karte, dvere a pánty v náhľade na správnom mieste. *PR #?*
+- **ROH-B · ovládače** — dverová časť, CR lišty a prepínač strany v Inspectore podľa schváleného mockupu. *PR #?*
+
 ### 6 · INFRA (priebežne, podľa potreby)
 
 **Cieľ:** aby plugin a knižnice fungovali na dvoch pracoviskách (Michal + Lucia).
@@ -680,7 +692,7 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 ## Hranica: TYP vs. ŠABLÓNA vs. PARAMETER (rozhodnuté 15.7.2026)
 
 Tri úrovne — odpoveď na otázku „kedy nový typ korpusu":
-1. **TYP (builder)** = iná **topológia**: iná množina dielcov a vzťahov, iné zóny, parametre ktoré inde nedávajú zmysel. Vlastný generovací kód. → dolná, horná; neskôr **rohová** (L-pôdorys, 2 čelné roviny — určite typ), vysoká/potravinová veža.
+1. **TYP (builder)** = iná **topológia**: iná množina dielcov a vzťahov, iné zóny, parametre ktoré inde nedávajú zmysel. Vlastný generovací kód. → dolná, horná; neskôr **rohová** (slepá dolná s rohovou zostavou a CR lištami pred čelnou rovinou — blok 8), vysoká/potravinová veža.
 2. **ŠABLÓNA (template, čisté dáta)** = pomenovaná sada nastavení TYPU — žiadny nový kód. → **drezová** (= dolná + výstuhy na výšku), **varná** (= dolná + výstuhy −20 mm), klasik, zásuvková… Používateľ si tvorí vlastné (Blum „My Library" princíp).
 3. **PARAMETER** = individuálna hodnota konkrétnej skrinky.
 Pravidlo: kým sa dá vec vyjadriť hodnotou/variantom existujúceho dielca → parameter/šablóna. Nový typ až keď sa mení topológia.
