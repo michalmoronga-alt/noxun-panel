@@ -132,6 +132,12 @@ set('back_setback', 0); set('top_front_setback', 0); set('depth', 150);
 set('thickness', 50); set('back_thickness', 50); set('top_mode', 'two_rails'); set('rails_orientation', 'upright');
 eq(run('validateFields(true)'), true, 'X = Y = 0: ziadne nove odmietnutie ani pri hranicnom configu auditu');
 reset();
+set('back_setback', '5-3');                // rozpisany vyraz (= 2) vo fokusovanom poli
+doc.activeElement = nodes.back_setback;
+run('validateFields(true)');
+ok(!nodes.back_setback.cls.bad && nodes.back_setback.title === '', 'rozpisany vyraz pole nezocervie (nie je to hodnota)');
+doc.activeElement = null;
+reset();
 set('back_setback', 400);
 eq(run('validateFields(true)'), false, 'komin nad 300 je mimo LIMITS');
 

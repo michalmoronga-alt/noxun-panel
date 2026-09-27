@@ -248,6 +248,10 @@
     if (cabTypeNow() === 'dishwasher' || typeof nxSetbackError !== 'function') return '';
     // X = Y = 0 (alebo pole chyba) -> ziadne nove pravidlo; nic sa necita.
     var xs = el('back_setback'), ys = el('top_front_setback');
+    // Rozpisany vyraz vo fokusovanom poli (`50-2` pocas pisania `50-20`) nie je
+    // hodnota — nezocervenie a neposudzuje sa (vzor hlavneho cyklu validacie).
+    var ae = document.activeElement;
+    if (ae && (ae === xs || ae === ys) && isExprStr(ae.value)) return '';
     var xv = (xs && xs.value !== '') ? evalDim(xs.value) : 0, yv = (ys && ys.value !== '') ? evalDim(ys.value) : 0;
     if (!(xv > 0) && !(yv > 0)) return '';
     var h = cabFieldOrDefault('height'), sokel = (getType() === 'upper') ? 0 : cabFieldOrDefault('floor_height');

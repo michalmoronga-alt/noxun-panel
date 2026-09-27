@@ -3437,8 +3437,9 @@ module NoxunSuRunner
     ok('rails D-80: inset chrbat skrateny presne o odsadenie (644)',
        bk && (part_height(bk) - 644.0).abs < TOL)
 
-    # 2) upright bez odsadenia: vnutro konci pod CELOU vystuhou (760), chrbat sa
-    #    o jej vysku NEskracuje — bezi za vystuhami (674).
+    # 2) upright bez odsadenia: vnutro konci pod CELOU vystuhou (760). D-144
+    #    (KON-A): vlozeny chrbat konci POD vystuhami (592) — predtym (674)
+    #    prechadzal zadnou vystuhou a v kusovniku bol vyssi, nez sa zmesti.
     up = e::CabinetBuilder.config_to_params(e::Store.config(inst))
                           .merge('rails_orientation' => 'upright', 'rails_top_offset' => 0.0)
     e::CabinetBuilder.rebuild(model, inst, up)
@@ -3447,8 +3448,8 @@ module NoxunSuRunner
        rfu && (part_z0(rfu) - 760.0).abs < TOL && (part_height(rfu) - 100.0).abs < TOL)
     ok('rails D-80: upright svetla vyska = 592 (860 - 100 - 168)',
        ((e::Store.config(inst) || {})['available_height'].to_f - 592.0).abs < 0.01)
-    ok('rails D-80: chrbat pri upright NIE JE skrateny o vysku vystuhy (674)',
-       (part_height(find_part(inst, 'cabinet/back')) - 674.0).abs < TOL)
+    ok('rails D-80 + D-144: vlozeny chrbat pri upright konci pod vystuhami (592, predtym 674)',
+       (part_height(find_part(inst, 'cabinet/back')) - 592.0).abs < TOL)
 
     # 3) extremne odsadenie + 4 police: odsadenie sa OREZE (warning) a clenenie sa
     #    do zmenseneho vnutra nezmesti -> rebuild sa odmietne zrozumitelnou hlaskou
@@ -5406,7 +5407,7 @@ module NoxunSuRunner
     ok("KON-0 (a): snapshot chrbta nesie do narezu 600 x 720 a znacku groove (#{bc['cut_size'].inspect}, #{bc['back_mode'].inspect})",
        kon0_cut(cab) == [600.0, 720.0] && bc['back_mode'] == 'groove' &&
        (bc['length'].to_f - 564.0).abs < TOL && (bc['width'].to_f - 684.0).abs < TOL)
-    ok("KON-0 (a): skrinka je v schéme #{kon0_schema(cab)} (cakam 19)", kon0_schema(cab) == 19)
+    ok("KON-0 (a): skrinka je v schéme #{kon0_schema(cab)} (cakam aktualnu)", kon0_schema(cab) == e::CabinetBuilder::CONFIG_SCHEMA)
 
     # (b) VYROBNE VYSTUPY z realneho zberu
     rows = kon0_back_rows(model, cid)
@@ -5491,7 +5492,7 @@ module NoxunSuRunner
     ok("KON-0 (e): prestavane 2 skrinky, tretia (odpojeny dielec) preskocena a vymenovana: #{msg}",
        msg.to_s.include?('Prestavané zastarané skrinky: 2') && msg.to_s.include?(cid3) && err)
     ok("KON-0 (e): prestavane skrinky su v schéme 19 s rozmerom do narezu (#{[kon0_schema(cab), kon0_schema(cab2)].inspect})",
-       kon0_schema(cab) == 19 && kon0_schema(cab2) == 19 && kon0_cut(cab) == [600.0, 720.0] &&
+       kon0_schema(cab) == e::CabinetBuilder::CONFIG_SCHEMA && kon0_schema(cab2) == e::CabinetBuilder::CONFIG_SCHEMA && kon0_cut(cab) == [600.0, 720.0] &&
        kon0_cut(cab2) == [600.0, 720.0])
     ok("KON-0 (e): preskocena skrinka ostala zastarana a blokovana (#{kon0_schema(cab3)})",
        kon0_schema(cab3) == 18 && kon0_issue_codes(model).include?([e::Bom::BACK_STALE, cid3]))
@@ -5501,7 +5502,7 @@ module NoxunSuRunner
     if Sketchup.respond_to?(:redo)
       Sketchup.redo
       ok("KON-0 (e): Redo vratilo prestavbu spolu so schemou (#{[kon0_schema(cab), kon0_cut(cab).inspect].inspect})",
-         kon0_schema(cab) == 19 && kon0_cut(cab) == [600.0, 720.0] && kon0_schema(cab2) == 19)
+         kon0_schema(cab) == e::CabinetBuilder::CONFIG_SCHEMA && kon0_cut(cab) == [600.0, 720.0] && kon0_schema(cab2) == e::CabinetBuilder::CONFIG_SCHEMA)
     else
       info('KON-0 (e): Sketchup.redo nedostupne — Redo vetva netestovana')
       kon0_rebuild_stale(model)
@@ -5515,7 +5516,7 @@ module NoxunSuRunner
     end
     msg2, = kon0_rebuild_stale(model)
     ok("KON-0 (e): po odstraneni odpojeneho kusu sa prestavi aj tretia (#{msg2})",
-       kon0_schema(cab3) == 19 && kon0_issue_codes(model).empty?)
+       kon0_schema(cab3) == e::CabinetBuilder::CONFIG_SCHEMA && kon0_issue_codes(model).empty?)
     msg3, err3 = kon0_rebuild_stale(model)
     ok("KON-0 (e): nic zastarane = ziadna operacia a pokojna hlaska (#{msg3})",
        msg3.to_s.include?('nič sa neprestavovalo') && !err3)
@@ -5527,7 +5528,7 @@ module NoxunSuRunner
       e::Store.kind(i) == 'cabinet' && ![cid, cid2, cid3].include?(e::Store.get(i, 'cabinet_id').to_s)
     end
     ok("KON-0 (f): kopia nesie cut_size a schemu 19 (#{copy ? [kon0_cut(copy), kon0_schema(copy)].inspect : 'ziadna'})",
-       copy && kon0_cut(copy) == [600.0, 720.0] && kon0_schema(copy) == 19 && cabinets(model).length == before + 1)
+       copy && kon0_cut(copy) == [600.0, 720.0] && kon0_schema(copy) == e::CabinetBuilder::CONFIG_SCHEMA && cabinets(model).length == before + 1)
     copy.erase! if copy && copy.valid?
 
     # (g) ABSORPCIA SCALE: sirka 600 -> 900 prepocita rozmer do narezu; 1x Spat vrati oboje
@@ -5537,7 +5538,7 @@ module NoxunSuRunner
     model.commit_operation
     e::ScaleWatch.absorb(cab)
     ok("KON-0 (g): absorpcia scale — do narezu 900 x 720 (#{kon0_cut(cab).inspect}), schema #{kon0_schema(cab)}",
-       kon0_cut(cab) == [900.0, 720.0] && kon0_schema(cab) == 19)
+       kon0_cut(cab) == [900.0, 720.0] && kon0_schema(cab) == e::CabinetBuilder::CONFIG_SCHEMA)
     Sketchup.undo
     ok("KON-0 (g): 1x Spat vratil scale aj rozmer do narezu (#{kon0_cut(cab).inspect})",
        kon0_cut(cab) == [600.0, 720.0] && cab.transformation.to_a == before_tr)
@@ -5549,7 +5550,7 @@ module NoxunSuRunner
     saved = loaded.entities.grep(Sketchup::ComponentInstance).select { |p| e::Store.kind(p) == 'cabinet' }
     cuts = saved.map { |s| kon0_cut(s) }
     ok("KON-0 (h): nacitane skrinky nesu rozmer do narezu aj schemu 19 (#{cuts.inspect})",
-       !saved.empty? && cuts.all? { |c| c == [600.0, 720.0] } && saved.all? { |s| kon0_schema(s) == 19 })
+       !saved.empty? && cuts.all? { |c| c == [600.0, 720.0] } && saved.all? { |s| kon0_schema(s) == e::CabinetBuilder::CONFIG_SCHEMA })
 
     cleanup(model)
     ok('KON-0: cleanup (0 korpusov)', cabinets(model).empty?)
@@ -5560,6 +5561,260 @@ module NoxunSuRunner
   ensure
     # dekor s paskou az PO uprateni modelu (pouzity material by sa nezmazal)
     sync_cleanup_decors(seed[:k], seed[:b]) if defined?(seed) && seed
+  end
+
+  # --- KON-A · K1: KOMIN VZADU, ZAPUSTENY STROP, D-144 ---------------------
+  #
+  # Overuje sa MODEL, nie len plan: (a) plan <-> model 1:1 pre maticu
+  # chrbat x strop x X x Y (+ dno medzi bokmi) na JEDNEJ instancii prestavbou,
+  # (b) jeden krok Spat po zmene komina, (c) mierka hlbky pod minimum -> klamp
+  # na najmensiu platnu hlbku + jedno Spat, (d) ulozenie a nacitanie .skp,
+  # (e) D-144 stara skrinka (schema 19) -> zastarana -> hromadna prestavba cez
+  # SKUTOCNY vyber kandidatov -> OK, jedno Spat, (f) sablona s kominom na inu
+  # skrinku -> komin prenesony, stara sablona -> komin ciela ostane, vklad zo
+  # sablony ghostom -> komin, (g) kopia nesie komin.
+  KONA_CAB = { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0 }.freeze
+  KONA_TPL = '__SU_TEST_KONA_KOMIN__'
+  KONA_TPL_OLD = '__SU_TEST_KONA_STARA__'
+
+  def kona_cfg(inst)
+    e::Store.config(inst) || {}
+  end
+
+  def kona_params(inst)
+    e::CabinetBuilder.config_to_params(kona_cfg(inst))
+  end
+
+  def kona_part(inst, key)
+    inst.definition.entities.grep(Sketchup::ComponentInstance).find do |p|
+      e::Store.kind(p) == 'part' && e::Store.get(p, 'part_key').to_s == key
+    end
+  end
+
+  # Plan <-> model 1:1: pocet, mnozina part_key, origin a box KAZDEHO dielca.
+  # -> [] (zhoda) alebo zoznam nezhod.
+  def kona_sync_bad(inst)
+    cid = e::Store.get(inst, 'cabinet_id').to_s
+    plan = e::Construction.build_plan(e::CabinetBuilder.normalize(kona_params(inst)), cid)
+    parts = inst.definition.entities.grep(Sketchup::ComponentInstance).select { |i| e::Store.kind(i) == 'part' }
+    bad = []
+    bad << "pocet #{plan[:parts].length} != #{parts.length}" if plan[:parts].length != parts.length
+    plan[:parts].each do |pd|
+      pi = parts.find { |i| e::Store.get(i, 'part_key') == pd[:part_key].to_s }
+      next bad << "#{pd[:part_key]} chyba" unless pi
+
+      po = pi.transformation.origin
+      org = [mm(po.x), mm(po.y), mm(po.z)]
+      bad << "#{pd[:part_key]} origin #{org.map { |v| v.round(1) }} != #{pd[:origin]}" unless
+        org.zip(pd[:origin]).all? { |a, b| (a - b.to_f).abs <= TOL }
+      b = pi.definition.bounds
+      dims = [mm(b.width), mm(b.height), mm(b.depth)]
+      bad << "#{pd[:part_key]} box #{dims.map { |v| v.round(1) }} != #{pd[:box]}" unless
+        dims.zip(pd[:box]).all? { |a, bx| (a - bx.to_f).abs <= TOL }
+    end
+    bad
+  end
+
+  def kona_depth_of(inst, key)
+    p = kona_part(inst, key)
+    p ? (e::Store.config(p) || {})['width'].to_f : nil
+  end
+
+  def kona_issue_codes(model)
+    Array(e::Bom.collect(model)[:cut_issues]).map { |i| [i['code'], i['owner_id']] }
+  end
+
+  def run_kona(model)
+    cleanup(model)
+    cab = e::CabinetBuilder.build(model, KONA_CAB)
+    return ok('KON-A: fixtura dolnej skrinky', false) unless cab
+
+    cid = e::Store.get(cab, 'cabinet_id').to_s
+    ok("KON-A: skrinka bez komina nema nove kluce configu (#{kona_cfg(cab).keys.grep(/setback/).inspect})",
+       kona_cfg(cab).keys.grep(/setback/).empty?)
+
+    # (a) MATICA plan <-> model 1:1
+    tops = { 'full' => { 'top_mode' => 'full' }, 'none' => { 'top_mode' => 'none' },
+             'flat' => { 'top_mode' => 'two_rails', 'rails_orientation' => 'flat' },
+             'upright' => { 'top_mode' => 'two_rails', 'rails_orientation' => 'upright' } }
+    mins = { 'overlay' => 3.0, 'groove' => 13.0 }
+    fails = []
+    n = 0
+    base = kona_params(cab)
+    %w[overlay inset groove none].each do |bm|
+      tops.each do |tname, tpar|
+        [0.0, 30.0].each do |y|
+          [mins[bm] || 1.0, 50.0].each do |x|
+            e::CabinetBuilder.rebuild(model, cab, base.merge('back_mode' => bm, 'back_setback' => x,
+                                                             'top_front_setback' => y).merge(tpar))
+            bad = kona_sync_bad(cab)
+            fails << "#{bm}/#{tname}/X#{x}/Y#{y}: #{bad.first(2).join('; ')}" unless bad.empty?
+            n += 1
+          end
+        end
+      end
+      e::CabinetBuilder.rebuild(model, cab, base.merge('back_mode' => bm, 'bottom_mode' => 'between_sides',
+                                                       'back_setback' => 50.0, 'top_front_setback' => 30.0))
+      bad = kona_sync_bad(cab)
+      fails << "#{bm}/between/X50/Y30: #{bad.first(2).join('; ')}" unless bad.empty?
+      n += 1
+    end
+    ok("KON-A (a): plan = model pre #{n} kombinacii chrbat x strop x X x Y (#{fails.length} nezhod)" \
+       "#{fails.empty? ? '' : ' — ' + fails.first(3).join(' | ')}", fails.empty? && n == 68)
+
+    # (b) ZMENA KOMINA = jeden krok Spat; smoke 1 v cislach
+    e::CabinetBuilder.rebuild(model, cab, base)
+    ok('KON-A (b): navrat na predvolby — bok 507, bez klucov komina',
+       (kona_depth_of(cab, 'cabinet/side:left') - 507.0).abs < TOL && kona_cfg(cab).keys.grep(/setback/).empty?)
+    e::CabinetBuilder.rebuild(model, cab, base.merge('back_setback' => 50.0))
+    bk = e::Store.config(kona_part(cab, 'cabinet/back')) || {}
+    ok("KON-A (b): komin 50 — boky 510, dno 460, chrbat 564 x 620, vnutro 460 (#{[kona_depth_of(cab, 'cabinet/side:left'),
+       kona_depth_of(cab, 'cabinet/bottom'), bk['length'], bk['width'], kona_cfg(cab)['available_depth']].inspect})",
+       (kona_depth_of(cab, 'cabinet/side:left') - 510.0).abs < TOL &&
+       (kona_depth_of(cab, 'cabinet/bottom') - 460.0).abs < TOL &&
+       (bk['length'].to_f - 564.0).abs < TOL && (bk['width'].to_f - 620.0).abs < TOL &&
+       (kona_cfg(cab)['available_depth'].to_f - 460.0).abs < TOL && kona_cfg(cab)['back_setback'] == 50.0)
+    ok("KON-A (b): schema #{kona_cfg(cab)['config_schema']} (cakam #{e::CabinetBuilder::CONFIG_SCHEMA})",
+       kona_cfg(cab)['config_schema'] == e::CabinetBuilder::CONFIG_SCHEMA)
+    Sketchup.undo
+    ok('KON-A (b): JEDEN Spat vratil geometriu aj config (bok 507, bez komina)',
+       (kona_depth_of(cab, 'cabinet/side:left') - 507.0).abs < TOL && kona_cfg(cab)['back_setback'].nil? &&
+       kona_sync_bad(cab).empty?)
+    # Odmietnutie: komin 2 pri HDF 3 — model sa nezmeni.
+    before = kona_cfg(cab)
+    e::CabinetBuilder.rebuild(model, cab, base.merge('back_setback' => 2.0)) rescue nil
+    ok('KON-A (b): komin 2 pri HDF 3 odmietnuty, config netknuty', kona_cfg(cab) == before)
+
+    # (c) MIERKA hlbky pod minimum: komin 100 -> najmenej 160 (plny strop 60)
+    e::CabinetBuilder.rebuild(model, cab, base.merge('back_setback' => 100.0))
+    before_tr = cab.transformation.to_a
+    model.start_operation('SU-TEST KON-A user scale', true)
+    cab.transformation = cab.transformation * Geom::Transformation.scaling(ORIGIN, 1.0, 0.25, 1.0)
+    model.commit_operation
+    e::ScaleWatch.absorb(cab)
+    ok("KON-A (c): absorpcia hlbky 127 -> klamp na 160 (#{kona_cfg(cab)['depth'].inspect}), komin ostal " \
+       "#{kona_cfg(cab)['back_setback'].inspect}, plan = model",
+       (kona_cfg(cab)['depth'].to_f - 160.0).abs < TOL && kona_cfg(cab)['back_setback'] == 100.0 &&
+       kona_sync_bad(cab).empty? && (kona_depth_of(cab, 'cabinet/top') - 60.0).abs < TOL)
+    Sketchup.undo
+    ok("KON-A (c): 1x Spat vratil scale aj hlbku (#{kona_cfg(cab)['depth'].inspect})",
+       (kona_cfg(cab)['depth'].to_f - 510.0).abs < TOL && cab.transformation.to_a == before_tr)
+    e::CabinetBuilder.rebuild(model, cab, base.merge('back_setback' => 50.0, 'top_front_setback' => 30.0))
+
+    # (g) KOPIA nesie komin aj zapustenie
+    cnt = cabinets(model).length
+    e::Panel.handle_insert_copy(pg(model, 'cabinet_id' => cid))
+    copy = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' && e::Store.get(i, 'cabinet_id').to_s != cid }
+    ok("KON-A (g): kopia nesie komin 50 a zapustenie 30 (#{copy ? [kona_cfg(copy)['back_setback'], kona_cfg(copy)['top_front_setback']].inspect : 'ziadna'})",
+       copy && kona_cfg(copy)['back_setback'] == 50.0 && kona_cfg(copy)['top_front_setback'] == 30.0 &&
+       cabinets(model).length == cnt + 1 && kona_sync_bad(copy).empty?)
+    copy.erase! if copy && copy.valid?
+
+    # (d) ULOZENIE a NACITANIE .skp
+    saved_path = File.join(File.dirname(OUT), 'ENGINEtests_kona_saved.skp')
+    ok('KON-A (d): SKP save_copy', model.save_copy(saved_path))
+    loaded = model.definitions.load(saved_path)
+    saved = loaded.entities.grep(Sketchup::ComponentInstance).find { |p| e::Store.kind(p) == 'cabinet' }
+    ok("KON-A (d): nacitana skrinka nesie komin a zapustenie a geometriu (#{saved ? [kona_cfg(saved)['back_setback'], kona_depth_of(saved, 'cabinet/bottom')].inspect : 'ziadna'})",
+       saved && kona_cfg(saved)['back_setback'] == 50.0 && kona_cfg(saved)['top_front_setback'] == 30.0 &&
+       (kona_depth_of(saved, 'cabinet/bottom').to_f - 460.0).abs < TOL)
+
+    # (f) SABLONY
+    kona_templates(model, cab)
+
+    # (e) D-144: stara skrinka so schemou 19
+    cleanup(model)
+    d144 = { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'back_mode' => 'groove',
+             'top_mode' => 'two_rails', 'rails_orientation' => 'upright' }
+    c1 = e::CabinetBuilder.build(model, d144)
+    c2 = e::CabinetBuilder.build(model, d144.merge('back_mode' => 'inset'),
+                                 transform: Geom::Transformation.translation(e::Units.point(1000.0, 0, 0)))
+    return ok('KON-A (e): fixtury D-144', false) unless c1 && c2
+
+    id1 = e::Store.get(c1, 'cabinet_id').to_s
+    id2 = e::Store.get(c2, 'cabinet_id').to_s
+    b1 = e::Store.config(kona_part(c1, 'cabinet/back')) || {}
+    ok("KON-A (e): novy chrbat v drazke pod vystuhami 564 x 502, do narezu 600 x 538 (#{[b1['length'], b1['width'], b1['cut_size']].inspect})",
+       (b1['width'].to_f - 502.0).abs < TOL && b1['cut_size'].is_a?(Hash) &&
+       (b1['cut_size']['width'].to_f - 538.0).abs < TOL && kona_sync_bad(c1).empty?)
+    ok('KON-A (e): aktualne skrinky D-144 nie su zastarane', kona_issue_codes(model).empty?)
+    [c1, c2].each do |c|
+      e::CabinetBuilder.guarded do
+        model.start_operation('SU-TEST KON-A stara schema', true)
+        e::Store.write_config(c, kona_cfg(c).merge('config_schema' => 19))
+        model.commit_operation
+      end
+    end
+    codes = kona_issue_codes(model)
+    ok("KON-A (e): schema 19 = zastarane RED (#{codes.inspect})",
+       codes.include?([e::Bom::BACK_RAIL_STALE, id1]) && codes.include?([e::Bom::BACK_RAIL_STALE, id2]))
+    stop = e::ProductionCore.cut_stop(e::Bom.collect(model)).to_s
+    ok("KON-A (e): brana zastavi vyrobne exporty (#{stop[0, 120]})", stop.include?('NEVYKONAL') && stop.include?(id1))
+    item = Array(e::ProductionCore.control_payload(e::Bom.collect(model))['items']).find do |i|
+      i['category'] == e::Validation::CAT_BACK_CUT && i['owner_id'] == id2
+    end
+    ok('KON-A (e): Kontrola ponuka hromadnu prestavbu', item && item['fix'] == 'rebuild_stale')
+    plan = e::ProductionCore.back_stale_plan(e::ProductionCore.back_stale_scan(model))
+    ok("KON-A (e): skutocny vyber kandidatov vzal obe skrinky D-144 (#{plan['jobs'].map { |j| j['id'] }.inspect})",
+       plan['jobs'].map { |j| j['id'] }.sort == [id1, id2].sort)
+    msg, = kon0_rebuild_stale(model)
+    ok("KON-A (e): hromadna prestavba — #{msg}",
+       msg.to_s.include?('Prestavané zastarané skrinky: 2') && kona_issue_codes(model).empty? &&
+       kona_cfg(c1)['config_schema'] == e::CabinetBuilder::CONFIG_SCHEMA)
+    Sketchup.undo
+    ok("KON-A (e): JEDEN Spat vratil obe skrinky do schemy 19 (#{[kona_cfg(c1)['config_schema'], kona_cfg(c2)['config_schema']].inspect})",
+       kona_cfg(c1)['config_schema'] == 19 && kona_cfg(c2)['config_schema'] == 19 &&
+       kona_issue_codes(model).count { |c, _| c == e::Bom::BACK_RAIL_STALE } == 2)
+
+    cleanup(model)
+    ok('KON-A: cleanup (0 korpusov)', cabinets(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: run_kona vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  ensure
+    [KONA_TPL, KONA_TPL_OLD].each do |t|
+      e::TemplateStore.delete('cabinet', t) if e::TemplateStore.find('cabinet', t)
+    end
+  end
+
+  # (f) sablona s kominom -> na inu skrinku; stara sablona -> komin ciela
+  # ostane; vklad zo sablony ghostom -> komin.
+  def kona_templates(model, src)
+    [KONA_TPL, KONA_TPL_OLD].each { |t| e::TemplateStore.delete('cabinet', t) if e::TemplateStore.find('cabinet', t) }
+    model.selection.clear
+    model.selection.add(src)
+    e::Panel.handle_save_template_as(
+      pg(model, 'cabinet_id' => e::Store.get(src, 'cabinet_id'), 'name' => KONA_TPL, 'type' => 'lower')
+    )
+    rec = e::TemplateStore.find('cabinet', KONA_TPL)
+    ok("KON-A (f): sablona nesie komin 50 a zapustenie 30 (#{rec ? rec['config'].values_at('back_setback', 'top_front_setback').inspect : 'ziadna'})",
+       rec && rec['config']['back_setback'] == 50.0 && rec['config']['top_front_setback'] == 30.0)
+    return unless rec
+
+    tgt = e::CabinetBuilder.build(model, KONA_CAB,
+                                  transform: Geom::Transformation.translation(e::Units.point(3000.0, 0, 0)))
+    model.selection.clear
+    model.selection.add(tgt)
+    e::TemplatesDialog.handle_apply({ 'template' => KONA_TPL }.to_json)
+    ok("KON-A (f): sablona na inu skrinku preniesla komin (#{[kona_cfg(tgt)['back_setback'], kona_cfg(tgt)['top_front_setback']].inspect})",
+       kona_cfg(tgt)['back_setback'] == 50.0 && kona_cfg(tgt)['top_front_setback'] == 30.0 && kona_sync_bad(tgt).empty?)
+    # STARA sablona (bez klucov) na skrinku s kominom 70 -> komin ostane.
+    e::CabinetBuilder.rebuild(model, tgt, kona_params(tgt).merge('back_setback' => 70.0))
+    old_cfg = rec['config'].reject { |k, _| %w[back_setback top_front_setback config_schema].include?(k) }
+    e::TemplateStore.upsert('cabinet', KONA_TPL_OLD, old_cfg)
+    model.selection.clear
+    model.selection.add(tgt)
+    e::TemplatesDialog.handle_apply({ 'template' => KONA_TPL_OLD }.to_json)
+    ok("KON-A (f): stara sablona komin ciela nechala (#{kona_cfg(tgt)['back_setback'].inspect})",
+       kona_cfg(tgt)['back_setback'] == 70.0)
+    tgt.erase! if tgt.valid?
+    # VKLAD zo sablony (ghost cesta panela)
+    payload = rec['config'].merge('template_kind' => 'cabinet', 'template_name' => KONA_TPL)
+    inst = ghost_place!(model, payload, [4200.0, 300.0])
+    ghost_teardown!(model)
+    ok("KON-A (f): vklad zo sablony nesie komin (#{inst ? kona_cfg(inst)['back_setback'].inspect : 'ziadna'})",
+       inst && kona_cfg(inst)['back_setback'] == 50.0 && kona_sync_bad(inst).empty?)
+    inst.erase! if inst && inst.valid?
   end
 
   # --- S1-C: OCAKAVANY SPOTREBIC (`appliance_expects[]`) --------------------
@@ -26312,6 +26567,7 @@ module NoxunSuRunner
     run_s1b2(model)          # S1-B2: POHLAD V ZAKAZKE + riadok Spotrebica ? ocakavanie zo sablony a ponuka filtrovana podla niky, priradenie AKCIOU PANELA (ciel z oznacenej entity) a 1x Spat, telo slotu prekreslene z katalogu (448 x 550) a spat na genericke, doska bez prestavby, tabulka pohladu nad realnym zberom, Delete vlastnika -> sirota -> odpojenie -> Spat vrati oboje
     run_s1f(model)           # S1-F: KONTROLNA GEOMETRIA CHLADNICKY — box niky 560 x 555 x 1940 na hornej ploche dna (prestavba ho zachova, 1x Spat), box nikdy v zbere ani v kusovniku, Kontrola niky per os (1924 -> ORANGE vyska -> zvysenie -> OK), delenie ciel (hrana 682 mimo 679-727 -> posun -> OK) + nahlad, presun vazby medzi skrinkami, rebind_model na iny box, zmena ziveho katalogu snapshotom nepohne, odpojenie a Spat
     run_kon0(model)          # KON-0 · D-143: CHRBAT V DRAZKE DO NAREZU — horna 600 x 720 stoji v modeli 564 x 684 (plan = model), snapshot/kusovnik/VEPO/karta 600 x 720, olepenie cez prestavbu = bez cut_size + RED a 1x Spat, zastarane skrinky (schema 18) RED + brana, hromadna prestavba z Kontroly = 1 operacia (Spat/Redo vratia snapshot aj schemu spolu), odpojeny dielec skip + ORANGE, kopia, absorpcia scale 900 x 720, ulozenie a nacitanie .skp
+    run_kona(model)          # KON-A · K1: KOMIN VZADU A ZAPUSTENY STROP — plan = model pre 68 kombinacii chrbat x strop x X x Y (+ dno medzi bokmi) na jednej instancii, zmena komina = 1 Spat, odmietnutie komina 2 bez zmeny, absorpcia hlbky pod minimum -> 160 + 1 Spat, kopia, ulozenie a nacitanie .skp, sablona tam aj stara sablona (komin ciela ostane), vklad zo sablony ghostom; D-144 schema 19 -> RED + brana + hromadna prestavba cez skutocny vyber kandidatov + 1 Spat
     run_d140(model)          # D-140: VYSKA OSADENIA CHLADNICKY — akcia panela zdvihne box niky (z 118 -> 268) a Kontrola vysky/delenia pocita od zdvihnuteho dna, 1x Spat, odmietnutia (stara hodnota, zly vstup, cudzie echo/PID/dokument, nezmenena) bez kroku Spat, prestavba dvierok osadenie zachova, zapis z otvoreneho komponentu zatvori kontext, vymena modelu prenesie, presun na inu skrinku nie, kopia ho nema, 0 kluc zmaze
     run_s1c(model)           # S1-C: OCAKAVANY SPOTREBIC — cely cyklus sablony (uloz s ocakavaniami -> vloz ghostom -> config -> Kontrola 2x ORANGE -> priradenie -> OK -> 2x Spat), ocakavanie BEZ sablony v riadku Spotrebic (1x Spat, geometria netknuta, peciatka schemy, nezmenene = ziadny krok, cudzie echo/PID nezapisu nic, viazanu kategoriu zrusit nedas), bariera observera po nativnej kopii, slot bez modelu (ORANGE + podvrh odmietnuty), aplikovanie sablony na viazanu skrinku (vazba ostava, ocakavania unia)
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
