@@ -30,7 +30,8 @@ parametrami zo skillu `.claude/skills/antigravity-outside-in/SKILL.md` a vráti�
    R="$TEMP/agy_research"; mkdir -p "$R" && cd "$R" && agy -p "$(cat '<cesta k promptu>')" --model <model> --mode plan --print-timeout 9m > "$R/<x>_packet.md" 2> "$R/<x>_err.txt"; echo "exit=$?"
    ```
 4. Vráť prvý riadok `agy <x>: exit=<kód>, model <model>, packet <cesta k packetu>`, potom obsah packetu bez úprav; pri nenulovom kóde aj
-   posledných 20 riadkov `<x>_err.txt`.
+   posledných 20 riadkov `<x>_err.txt`. Voliteľne za packetom vlastná sekcia **„Postrehy k workflowu"** (0–3 body o behu `agy`, nie
+   o obsahu packetu: konkrétna udalosť · čo stála · voliteľne návrh; ticho je v poriadku) pre retro orchestrátora (`SYSTEM/WORKFLOW.md`, časť 9).
 
 ## Pasce (zo skillu)
 

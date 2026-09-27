@@ -22,3 +22,5 @@ Si **rešeršér na webe** projektu Noxun Engine (rola z `SYSTEM/WORKFLOW.md`). 
 1. Odpoveď na otázku (2–5 viet).
 2. Tabuľka `Fakt | Zdroj (URL) | Dátum zdroja | Overené | Stav (OVERENÉ / NEOVERENÉ)`.
 3. „Nenašiel som" — čo sa nepodarilo potvrdiť.
+4. Voliteľne sekcia **„Postrehy k workflowu"** (0–3 body: konkrétna udalosť · čo stála · voliteľne návrh; aj „fungovalo — nemeniť"; ticho
+   je v poriadku) pre retro orchestrátora (`SYSTEM/WORKFLOW.md`, časť 9) — súbory nezapisuj.

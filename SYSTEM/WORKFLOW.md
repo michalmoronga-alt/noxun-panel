@@ -3,7 +3,8 @@
 > **Načo je tento súbor:** jedna mapa, ako práca v repe beží — kto čo robí, cez aké kroky ide blok, dávka a review a ktoré brány
 > musia platiť. **Záväzné znenie pravidiel** je v [../CLAUDE.md](../CLAUDE.md) a v skilloch `.claude/skills/`; tento súbor ich
 > nenahrádza, ukazuje súvislosti a drží **jedinú tabuľku obsadenia rolí**. Prečo je to takto:
-> [záznam rozhodnutí 25.–26. 9. 2026](zdroje/next_sessions/WORKFLOW_ROZHODNUTIA_2026-09-26.md) (Z1–Z9, N1–N18).
+> [záznam rozhodnutí 25.–26. 9. 2026](zdroje/next_sessions/WORKFLOW_ROZHODNUTIA_2026-09-26.md) (Z1–Z9, N1–N18) a spracované
+> retro vyhodnotenia v [archiv/retro/](archiv/retro/) (prvé: [blok 7, 27.9.2026](archiv/retro/VYHODNOTENIE_2026-09-27_blok7.md)).
 > **Údržba:** zmena pravidla = zmena CLAUDE.md alebo skillu a v tom istom PR aj tejto mapy (diagram, brána, hranica).
 > Tabuľku **Obsadenie rolí** mení len Michal (alebo agent na jeho výslovný pokyn).
 
@@ -13,7 +14,7 @@ Pravidlá hovoria o **rolách**, nie o modeloch — model aj nástroj každej ro
 
 | Rola | Čo robí | Rozhoduje |
 |---|---|---|
-| **Michal** | vyberá bloky a ich poradie, vedie debatu, schvaľuje blok a mockup, robí smoke a píše postrehy, po inštalácii reštartuje SketchUp | blok a poradie, mockup, výnimky z kvót, výsledok smoke, obsadenie rolí; nemerguje |
+| **Michal** | vyberá bloky a ich poradie, vedie debatu, schvaľuje blok a mockup, robí smoke a píše postrehy, po inštalácii reštartuje SketchUp | blok a poradie, mockup a jeho otvorené body, výnimky z kvót, výsledok smoke, obsadenie rolí, návrhy z retro; nemerguje |
 | **orchestrátor** | hlavné okno: drží kontext bloku, píše zadania, spúšťa audity a subagentov, triedi postrehy do D-čísel, merguje, inštaluje main, píše report a handoff | závažnosť nálezov, výnimku 3. kola, merge po bránach |
 | **implementátor** | subagent vo worktree: dávka podľa zadania vrátane testov, docs a PR (pri povinnej predrecenzii až na pokyn orchestrátora); opravy z review vo svojej dávke | nič — vráti vetvu, SHA a report |
 | **slepý recenzent** | subagent bez kontextu orchestrátora: predrecenzia pred PR, kontrola opravy (delta), overenie checklistu voči kódu | nič — vráti nálezy P1–P3 a verdikt |
@@ -58,17 +59,19 @@ flowchart TD
   W["Štart každého okna: scripts/start_okna.ps1<br/>kvóty · lokálne nástroje · agent-register"]:::auto
   subgraph PRIP["Príprava bloku"]
     A["Michal vyberie blok a poradie"]:::michal
-    B["Debata s Michalom → koncept<br/>do priečinka bloku SYSTEM/zdroje/bloky/BLOK"]:::michal
+    B["Debata s Michalom → rozhodnutia a koncept<br/>do priečinka bloku SYSTEM/zdroje/bloky/BLOK"]:::michal
     C["Outside-in rešerš + krížový audit bloku<br/>raz, pred packages"]:::ext
     D["Reconcile: orchestrátor<br/>nálezy overí sondou v SketchUpe"]:::orch
     G1{"Bez BLOCKER?"}:::gate
     F["Mockup do priečinka bloku"]:::orch
-    G2{"Michal schváli mockup"}:::gateM
-    H["Packages, briefy, smoke checklist<br/>do priečinka bloku"]:::orch
+    G2{"Michal schváli mockup<br/>každé „návrh — potvrdí Michal“ zodpovedané"}:::gateM
+    UP["Úvodné PR bloku: len rozhodnutia Michala a mockup<br/>+ fakty z kódu, surové výsledky rešerše a auditu"]:::orch
+    H["Packages s technickými požiadavkami, briefy,<br/>smoke checklist do priečinka bloku"]:::orch
   end
   subgraph REAL["Autonómny beh"]
     I["Dávky 1 až N jedna po druhej<br/>implementácia = subagent · mapa 2"]:::orch
     RP["Report pri konci alebo zastavení behu<br/>najneskôr večer"]:::orch
+    RT["Retro: voliteľný záznam do lokálneho inboxu<br/>úplne posledný krok behu · časť 9"]:::orch
   end
   subgraph UZ["Uzáver bloku hneď po poslednej dávke"]
     K{"Kontext orchestrátora<br/>nad 70 %?"}:::gate
@@ -91,9 +94,11 @@ flowchart TD
   G1 -->|"áno"| F
   F --> G2
   G2 -->|"úpravy"| F
-  G2 -->|"schválené"| H
+  G2 -->|"schválené"| UP
+  UP --> H
   H --> I
   I --> RP
+  RP -.-> RT
   I -->|"posledná dávka"| K
   K -->|"nie"| L1
   K -->|"áno"| L2
@@ -120,6 +125,10 @@ orchestrátor (vzor: [S1_CROSS_AUDIT_2026-09-20.md](zdroje/next_sessions/S1_CROS
 kontraktu (mapa 2). **Priečinok bloku** `zdroje/bloky/<BLOK>/` drží od štartu debatu, mockup, packages, briefy a smoke checklist a počas
 bloku je autoritou; pri uzávere sa celý fyzicky presúva do `archiv/bloky/<BLOK>/` s kontrolou odkazov (staršie mockupy v `zdroje/ui20/`
 sa nepresúvajú). Uzáver ide hneď po poslednej dávke (variant B); ďalší blok až po smoke PASS alebo výslovnom „ideme ďalej".
+**Od 27.9.2026 (retro bloku 7; záväzné znenie v CLAUDE.md, Git workflow):** schválenie mockupu uzatvára aj všetky jeho body „návrh —
+potvrdí Michal" (zmena po schválení = rámček „platí" v mockupe + zápis do rozhodnutí bloku) · úvodné PR bloku nesie len rozhodnutia
+Michala a mockup, technické požiadavky až package dávky s jej auditom návrhu · počas implementácie dávky N sa smie písať package
+a bežať audit dávky N+1, implementácia ostáva sekvenčná (CLAUDE.md, Autonómne bloky).
 
 ## 4 · Jedna kódová dávka (PR)
 
@@ -128,6 +137,7 @@ flowchart TD
   S["Čerstvý main"]:::auto
   R0["Povinné čítanie podľa typu zásahu<br/>+ zadanie z priečinka bloku"]:::orch
   Q1{"Mení kontrakt, schému alebo STD,<br/>migráciu, observer/undo, nový modul?"}:::gate
+  SO["Sonda na kóde: kľúčové tvrdenia package<br/>overiť bez zápisu do modelu, výsledok do package"]:::orch
   QA{"Codex weekly zostatok<br/>pod 10 %? (-Gate codex)"}:::gate
   MA["Rozhodne Michal, či audit aj pod prahom<br/>kým neodpovie, dávka čaká"]:::michal
   AU["Audit návrhu: audítor audit-povinných<br/>BLOCKER opraviť v návrhu"]:::ext
@@ -137,7 +147,7 @@ flowchart TD
   VV["Verzia: patch 2×<br/>+ všetky ?v= v HTML"]:::sub
   T1["Testy: headless<br/>+ každá JS sada zvlášť"]:::auto
   Q2{"Buildery, observery, undo a operácie,<br/>geometria, zápis panela do modelu?"}:::gate
-  SU["Test v SketchUpe = brána mergu<br/>runner -CloseWhenDone"]:::auto
+  SU["Test v SketchUpe = brána mergu<br/>runner -CloseWhenDone · znova len pri zmene<br/>Ruby spúšťača po poslednom behu"]:::auto
   DOC["Docs v tej istej dávke: architektúra na mieste,<br/>D-čísla do archívu, STAV, KRONIKA, v PLAN riadok s ✅<br/>číslo PR zatiaľ PR #?"]:::sub
   Q3{"Audit-povinná, výrobná/cenová,<br/>nad 300 riadkov alebo nový prvok UI?"}:::gate
   PRE["Implementátor po pushi stojí, PR neotvára<br/>predrecenziu spustí orchestrátor: slepý recenzent<br/>P1/P2 opraví implementátor, PR až na pokyn"]:::sub
@@ -152,7 +162,8 @@ flowchart TD
   NX["Ďalšia dávka"]:::orch
   S --> R0
   R0 --> Q1
-  Q1 -->|"áno"| QA
+  Q1 -->|"áno"| SO
+  SO --> QA
   QA -->|"nie"| AU
   QA -->|"áno"| MA
   MA -->|"povolí"| AU
@@ -190,6 +201,12 @@ flowchart TD
 
 *Vetva, ktorú diagram nekreslí:* Michal audit pod prahom nepovolí → audit aj dávka sa odložia po resete kvóty a pokračuje sa ďalšou nezávislou dávkou.
 
+**Sonda pred auditom** (CLAUDE.md, Git workflow; postup skill `codex-audit`, krok 0): kľúčové tvrdenia package overí orchestrátor krátkou
+sondou na kóde skôr, než ich pošle audítorovi — audit má chytať chyby návrhu, nie tvrdenia napísané z úvahy.
+**Paralelná príprava** (CLAUDE.md, Autonómne bloky): package a audit návrhu dávky N+1 smú bežať počas implementácie dávky N; mapa sa
+pre N+1 začína až na čerstvom maine po mergi N — keď merge N zmenil kontrakt, na ktorý package stavia, package sa zladí (pri zmene kontraktu nový audit).
+**In-SU na finálnej hlave** (CLAUDE.md, Testovanie): keď commity po poslednom behu menia len JS, texty, dokumentáciu alebo testy, beh sa
+neopakuje a PR uvedie, na ktorej hlave bežal; zmena Ruby spúšťača = beh znova.
 **Kvóta Codexu** (`-Gate codex`) sa kontroluje tesne pred auditom návrhu aj pred otvorením PR — dlhý blok môže medzitým kvótu minúť.
 **PR otvára implementátor.** Pri dávke s povinnou predrecenziou po pushi vetvy stojí a vráti report; predrecenziu spúšťa orchestrátor
 (subagent ďalších subagentov nespúšťa) a PR sa otvorí až na jeho pokyn po oprave P1/P2.
@@ -278,11 +295,11 @@ Všetko, čo musí platiť, aby práca pokračovala. „Kto" = kto bránu uzatv�
 |---|---|---|---|
 | blok a poradie schválené | pred štartom bloku; schválenie = súhlas s naplánovanými dávkami | Michal | CLAUDE.md · Autonómne bloky |
 | audit bloku bez BLOCKER | raz, pred packages | rešeršéri + audítor → orchestrátor (reconcile) | CLAUDE.md · Git workflow (rešerš a krížový audit) |
-| mockup schválený | pred packages, pri blokoch s UI | Michal | CLAUDE.md · Git workflow (poradie bloku) |
-| audit návrhu dávky bez BLOCKER | dávka mení dátový kontrakt, schému (každé zvýšenie `CONFIG_SCHEMA`, BuildPlan `SCHEMA` alebo STD), migráciu, observer/undo alebo pridáva modul | audítor → orchestrátor | skill `codex-audit` |
+| mockup schválený | pred packages, pri blokoch s UI; každý bod „návrh — potvrdí Michal" zodpovedaný | Michal | CLAUDE.md · Git workflow (poradie bloku, otvorené body mockupu) |
+| audit návrhu dávky bez BLOCKER | dávka mení dátový kontrakt, schému (každé zvýšenie `CONFIG_SCHEMA`, BuildPlan `SCHEMA` alebo STD), migráciu, observer/undo alebo pridáva modul; pred ním sonda na kóde | audítor → orchestrátor | skill `codex-audit` |
 | kvóta | štart okna; pred auditom, implementačným subagentom, predrecenziou, `gh pr create` a `@codex review` | skript `usage` → orchestrátor | CLAUDE.md · Kvóty a štart okna · skill `usage` |
 | testy zelené | vždy headless + každá JS sada zvlášť | CI + orchestrátor | CLAUDE.md · Testovanie |
-| test v SketchUpe zelený | buildery, observery, undo a operácie, geometria, akcie panela zapisujúce do modelu | runner → orchestrátor | CLAUDE.md · Testovanie |
+| test v SketchUpe zelený | buildery, observery, undo a operácie, geometria, akcie panela zapisujúce do modelu; na finálnej hlave znova len pri zmene Ruby spúšťača po poslednom behu (PR uvedie hlavu behu) | runner → orchestrátor | CLAUDE.md · Testovanie |
 | docs a verzia na mieste | kódová dávka: celý checklist; dokumentačné PR: len KRONIKA | orchestrátor + guard testy | CLAUDE.md · Verzia a uzáver dávky |
 | predrecenzia bez P1/P2 | audit-povinné a výrobné/cenové dávky; bežná dávka nad 300 riadkov kódu pluginu alebo s novým prvkom UI | slepý recenzent → orchestrátor | skill `predrecenzia` |
 | review kolo uzavreté | pred mergom, pre aktuálnu hlavu vetvy | review PR alebo náhradná brána → orchestrátor | skill `codex-po-pr` |
@@ -314,7 +331,25 @@ Všetko, čo musí platiť, aby práca pokračovala. „Kto" = kto bránu uzatv�
 - **Uzáver bloku pri viac ako ~70 %** skladá čerstvý subagent len z repa (PLAN, KRONIKA, DOGFOODING, PR); orchestrátor ho skontroluje
   a zmerguje (Z5). Čo subagent v repe nenájde, žilo len v chate.
 
-## 9 · Pripravované a odložené
+## 9 · Retro — pokus 27.9.–11.10.2026
+
+Michal 27.9.2026 zaviedol po hodnotení bloku 7 ([prvé vyhodnotenie](archiv/retro/VYHODNOTENIE_2026-09-27_blok7.md)) pokus: pravidlá
+workflowu sa zlepšujú z **konkrétnych udalostí** zapísaných hneď po behu, nie z pamäte na konci bloku. Veta v CLAUDE.md (Autonómne bloky)
+odkazuje sem; postup krok za krokom: skill [retro](../.claude/skills/retro/SKILL.md); formát záznamu: [retro/README.md](retro/README.md).
+
+| Čo | Pravidlo |
+|---|---|
+| **Kedy** | orchestrátor ako **úplne posledný krok behu** — po poslednom mergi, inštalácii mainu a reporte. **Ticho = žiadny záznam** (všetko OK, nič nenapadá). |
+| **Kam** | lokálny inbox `SYSTEM/retro/inbox/`, súbor `<YYYY-MM-DD>_<téma>.md` — **git ho ignoruje** (žiadne PR ani kolo review za poznámku); formát popisuje verzionovaný [retro/README.md](retro/README.md) |
+| **Formát a kvalita** | najviac ~10 riadkov; každý bod = **konkrétna udalosť** (čo sa stalo · čo to stálo — čas, kolo, kvóta · voliteľne návrh); aj pozitívne („toto fungovalo — nemeniť"); **žiadne všeobecné rady** a žiadne písanie nasilu |
+| **Opakovanie** | pred zápisom pozrieť inbox — pri rovnakom postrehu len pripísať „znova <dátum>" k existujúcemu bodu (opakovanie = najsilnejší signál) |
+| **Subagenti** | implementátor, slepý recenzent, rešeršéri, Explore: v závere reportu **voliteľná** sekcia „Postrehy k workflowu" (0–3 body, rovnaké pravidlá kvality); orchestrátor ich prevezme do svojho záznamu, subagenti súbory nezapisujú; typy z `.claude/agents/` to majú v definícii, Explore a ostatným ju orchestrátor pýta v zadaní |
+| **Vyhodnotenie** | len na pokyn Michala („vyhodnoť retro"): čerstvý subagent prečíta inbox a aktuálne pravidlá, zoskupí postrehy, spočíta opakovania a navrhne **najviac 3 zmeny s dôkazmi** (+ čo zahodiť, čo sledovať) → **rozhodne Michal** |
+| **Po rozhodnutí** | prijaté zmeny idú dokumentačným PR do pravidiel; spracované záznamy sa zhrnú do [archiv/retro/](archiv/retro/) `VYHODNOTENIE_<dátum>.md` a z inboxu sa odstránia. **Retro nikdy nemení pravidlá samo.** |
+| **Pamäť** | postrehy k workflowu idú do retro inboxu, **nie do pamäte agenta** ako varovania (tam zapadali); pamäť ostáva pre fakty o Michalovi a projekte |
+| **Koniec pokusu 11.10.2026** | vyhodnotí sa aj samotný pokus (koľko návrhov Michal prijal, koľko to stálo) → ponechať, upraviť alebo zrušiť |
+
+## 10 · Pripravované a odložené
 
 - **Backlog (N4):** runner, ktorý po teste sám vráti pôvodnú verziu pluginu — položka je v zásobníku [PLAN.md](PLAN.md) (Po V1 — zásobník).
 - **Po V1:** spoločné pravidlá do `AGENTS.md` (štandard, ktorý čítajú Codex, Grok Build, OpenCode aj Antigravity); CLAUDE.md ho importuje.

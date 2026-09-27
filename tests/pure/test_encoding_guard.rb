@@ -36,6 +36,8 @@ NxTest.test('encoding: ziadne mojibake/C1 bajty v UI a docs suboroch + html char
             Dir[File.join(root, 'scripts', '*.{ps1,rb}')] +
             Dir[File.join(root, 'tests', '**', '*.{rb,js}')] +
             Dir[File.join(root, %q(.claude), %q({skills,hooks,agents}), %q(**), %q(*.{md,ps1,js}))]  # skilly + hooky vrátane .js (PR #363, #392) + typy agentov (register agentov 26.9.2026); NIE worktrees
+  # Retro inbox (pokus 27.9.2026) je lokalny a git-ignorovany — neverzionovane poznamky nesmu zhodit lokalny beh sady.
+  targets = targets.reject { |p| p.include?('/SYSTEM/retro/inbox/') }
   # GH P2 doplnok: \xC3\x82\xC2 = double-encoded C2-xx znaky (±, ·, °...) — presne
   # tato medzera nechala v prvej verzii opravy prejst poskodeny znak ± (bez
   # doslovneho prikladu tu — guard by chytil sam seba).

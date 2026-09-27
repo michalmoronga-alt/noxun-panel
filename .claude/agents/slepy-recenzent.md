@@ -30,3 +30,5 @@ používateľa (vrátane nesúladu Inspector ↔ Kontrola a chýbajúceho testu 
 
 Číslované nálezy `P1|P2|P3 — súbor:riadok — problém jednou vetou — konkrétna reprodukcia`. Posledný riadok presne jeden z:
 `VERDIKT: PR OK` · `VERDIKT: OPRAVIŤ PRED PR` (predrecenzia) alebo `VERDIKT: DELTA OK` · `VERDIKT: DELTA OPRAVIŤ` (kontrola opravy).
+Voliteľne pred riadkom VERDIKT sekcia **„Postrehy k workflowu"** (0–3 body: konkrétna udalosť · čo stála · voliteľne návrh; aj „fungovalo —
+nemeniť"; ticho je v poriadku) pre retro orchestrátora (`SYSTEM/WORKFLOW.md`, časť 9) — súbory nezapisuj.
