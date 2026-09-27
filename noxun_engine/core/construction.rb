@@ -1241,7 +1241,9 @@ module Noxun
       #   overlay -> d - bt (chrbat NALOZENY zozadu zabera zadnych bt z celkovej d)
       #   inset / groove -> d (chrbat je VNUTRI obrysu — uz dnes splnaju celkovu d)
       #   none -> d (ziadny chrbat)
-      # POZOR: inset/groove sa tymto helperom NESMU skratit (audit NOTE 9).
+      #   rails -> d (KON-B: listy stoja VNUTRI obrysu, zadna plocha v rovine d;
+      #            vnutro konci pred nimi — `interior_dims` R − t)
+      # POZOR: inset/groove/rails sa tymto helperom NESMU skratit (audit NOTE 9).
       # KON-A: plati BEZ KOMINA. Citatelia hlbky dielcov sa pytaju pomocnikov
       # `back_stop` (dno, strop, vystuhy, nohy) a `side_depth` (boky) — pri
       # komine 0 vracaju presne tuto hodnotu.

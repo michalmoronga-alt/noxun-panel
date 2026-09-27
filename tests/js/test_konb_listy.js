@@ -101,6 +101,7 @@ vm.runInContext("DEFAULTS.lower = { width: 600, height: 720, depth: 510, thickne
                 "DEFAULTS.dishwasher = { width: 600, height: 880, depth: 560, thickness: 18, floor_height: 0 };", ctx);
 function run(code){ return vm.runInContext(code, ctx); }
 function set(id, v){ nodes[id].value = String(v); }
+function meta0(c){ return run('setbackMetaTexts(' + JSON.stringify(c, (k, v) => (typeof v === 'number' && isNaN(v) ? '__NaN__' : v)).replace(/"__NaN__"/g, 'NaN') + ')'); }
 const SMOKE3 = FX.cases.find(c => c.case === 'smoke 3: H290 v dolnej 720').error;
 
 // --- 2) integracia: listy BEZ komina ---------------------------------------------
@@ -151,6 +152,28 @@ close(sR.area,
   ok(!nodes.back_rail_height.cls.bad, `${p[0]}/${p[1]}: ani po validacii nie je H cervene`);
 });
 run("setType('lower')");
+// Predrecenzia P3: skryte neplatne H sa pri „Aplikuj" NEPOSIELA (server necha
+// ulozenu hodnotu skrinky); platne skryte H ide, pri listach ide vzdy.
+reset();
+set('back_rail_height', 999); set('back_mode', 'overlay');
+ok(!('back_rail_height' in run('collectConstruction()')), 'skryte H 999 sa neposiela (nie ticho 300)');
+set('back_rail_height', '');
+ok(!('back_rail_height' in run('collectConstruction()')), 'skryte prazdne H sa neposiela (nie reset na 100)');
+set('back_rail_height', 150);
+eq(run('collectConstruction()').back_rail_height, 150, 'skryte platne H ide (pamata sa)');
+set('back_mode', 'rails'); set('back_rail_height', 999);
+eq(run('collectConstruction()').back_rail_height, 999, 'pri listach ide napisane (validacia ho zastavi)');
+// Predrecenzia P3: vyska mimo rozsahu — veta rozsahu, nie veta s orezanou 300.
+reset();
+set('back_rail_height', 400);
+eq(run('validateFields(true)'), false, 'H 400 sa neaplikuje');
+eq(nodes.back_rail_height.title, 'Výška líšt musí byť 20 až 300 mm.', 'tooltip = rozsah pola, nie „po 300 mm"');
+eq(run('nxCabFieldError()'), 'Výška líšt musí byť 20 až 300 mm.', 'stavova veta tiez');
+eq(meta0({ back_mode: 'rails', back_rail_height: 400, back_setback: 0, top_mode: 'full' }).back, 'z líšt',
+   'suhrn neukazuje orezane cislo');
+eq(meta0({ back_mode: 'rails', back_rail_height: NaN, back_setback: 50, top_mode: 'full' }).back, 'z líšt · komín 50',
+   'neplatne H: suhrn bez cisla');
+eq(meta0({ back_mode: 'rails', back_setback: 0, top_mode: 'full' }).back, 'z líšt 100', 'chybajuci kluc = 100');
 // Rozpisany vyraz vo fokusovanom poli H nie je hodnota — nezocervie.
 reset();
 set('back_rail_height', '300-2');

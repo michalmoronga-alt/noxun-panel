@@ -13,6 +13,14 @@
         out[f.id] = val(f.id);
       }
     });
+    // KON-B (predrecenzia P3): pri SKRYTOM riadku „Výška líšt" (iny typ chrbta)
+    // sa neplatny alebo prazdny vstup NEPOSIELA — server si necha ulozenu
+    // hodnotu skrinky (apply prebera len poslane kluce, novy vklad dostane
+    // predvolbu). Inak by sa napisane 999 ticho ulozilo ako 300.
+    if (!backRailsActive()){
+      var hv = out.back_rail_height, lim = LIMITS.back_rail_height;
+      if (hv === '' || typeof hv !== 'number' || hv < lim[0] || hv > lim[1]) delete out.back_rail_height;
+    }
     return out;
   }
   function collectFronts(){
@@ -177,6 +185,7 @@
   // by inak zablokovala „Aplikuj" v poli, ktore pouzivatel nevidi. Validuju sa
   // preto VYHRADNE pri aktivnom `rails`; skrytie zrusi cervenu aj tooltip.
   var RAIL_FIELDS = { back_rail_height: 1 };
+  var RAIL_RANGE_MSG = 'Výška líšt musí byť 20 až 300 mm.';
   // Cez `el` (nie `val` z core.js) — Node sady nacitavaju form.js aj bez core.js.
   function backRailsActive(){
     var bm = el('back_mode');
@@ -351,7 +360,12 @@
     // poli „Výška líšt" — pole komina ju neoznacuje.
     var cc = hErr ? null : cabinetCheckCarcass();
     var sErr = cc ? nxSetbacksOnlyError(cc) : '';
-    var rErr = (cc && !sErr) ? nxBackRailsError(cc) : '';
+    // Predrecenzia P3: vyska mimo 20–300 (uz cervena z hlavneho cyklu) ma
+    // prednost pred vetou list — tá by hovorila o OREZANEJ hodnote (400 -> 300),
+    // ktoru pouzivatel nenapisal.
+    var hfe = el('back_rail_height');
+    var hRange = railsNow && hfe && hfe.classList.contains('bad');
+    var rErr = hRange ? RAIL_RANGE_MSG : ((cc && !sErr) ? nxBackRailsError(cc) : '');
     markSetbackError(sErr);
     // Cervenu (aj pri cisle mimo LIMITS) riadi hlavny cyklus vyssie; tu sa len
     // prida veta — alebo zrusi tooltip, ked veta nie je (aj pri skrytom riadku).
@@ -854,7 +868,13 @@
     var slot = c.type === 'dishwasher';
     // KON-B · K2 (A7): „z líšt 100 · komín 50" — vyska len pri listach.
     var back = [];
-    if (!slot && c.back_mode === 'rails') back.push('z líšt ' + nxFmtMm(nxBackRailHeight(c)));
+    // Predrecenzia P3: cislo len ked je platne (20–300) — orezanu hodnotu, ktoru
+    // pouzivatel nenapisal, suhrn neukazuje. Chybajuci kluc = predvolba 100.
+    if (!slot && c.back_mode === 'rails'){
+      var hr = (c.back_rail_height === undefined || c.back_rail_height === null) ? NX_BACK_RAIL_H_DFLT : c.back_rail_height;
+      var hOk = typeof hr === 'number' && isFinite(hr) && hr >= NX_BACK_RAIL_H_MIN && hr <= NX_BACK_RAIL_H_MAX;
+      back.push(hOk ? ('z líšt ' + nxFmtMm(hr)) : 'z líšt');
+    }
     if (!slot && x > 0) back.push('komín ' + nxFmtMm(x));
     return { top: (!slot && c.top_mode !== 'none' && y > 0) ? ('zap. ' + nxFmtMm(y)) : '',
              back: back.join(' · ') };

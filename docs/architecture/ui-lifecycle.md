@@ -846,7 +846,9 @@ ticho zapísal inej. Bokorys v náhľade **nie** (M11, D-145). Testy: `tests/js/
 Naložený · Vložený · V drážke · Z líšt · Bez chrbta. Riadok `#backRailRow` „Výška líšt" (`back_rail_height`, mm, tooltip z mockupu) sedí **na mieste** `#backThRow`
 — nikdy nie sú naraz: `toggleBackTh` pri lištách skryje hrúbku a ukáže výšku, pri „Bez chrbta" skryje obe, pri slote riadok líšt nie je; **hodnoty sa pamätajú**.
 **H sa validuje LEN pri aktívnych lištách** (`RAIL_FIELDS` + `backRailsActive`, audit FIX 3 — `validateFields` inak validuje aj skryté polia a neviditeľné neplatné H
-by zablokovalo „Aplikuj"); skrytie riadku zruší červenú aj tooltip. Zrkadlo validácie: `cabinetCheckCarcass` (form.js) **neskončí** pri X = Y = 0, keď sú lišty
+by zablokovalo „Aplikuj"); skrytie riadku zruší červenú aj tooltip a `collectConstruction` skryté neplatné/prázdne H **neposiela** (server
+nechá uloženú hodnotu skrinky — nič sa ticho neoreže na 300). Pri H mimo 20–300 má prednosť veta rozsahu poľa („Výška líšt musí byť 20 až 300 mm.") a súhrn
+ukáže len „z líšt" bez orezaného čísla. Zrkadlo validácie: `cabinetCheckCarcass` (form.js) **neskončí** pri X = Y = 0, keď sú lišty
 (audit NOTE 4), veta komína/zapustenia (`nxSetbacksOnlyError`) ide na polia komína, veta líšt (`nxBackRailsError`, `2H + 20 ≤ vnútro`, tá istá ako Ruby) na pole
 „Výška líšt" (`markRailError`). **JS zrkadlá** (core.js): `nxBackRails`, `nxBackRailHeight` (prísne, 20–300, inak 100), `nxInteriorDepth` pri lištách `R − t`,
 `nxSetbackError` = `nxSetbacksOnlyError || nxBackRailsError` (fixtúra `tests/fixtures/konb_cases.json`). **Súhrn** `#backMeta` „z líšt 100 · komín 50" (výška len
