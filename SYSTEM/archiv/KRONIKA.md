@@ -32,8 +32,10 @@
   „Rohová" a náhľad sú ROH-A2. **Schémy:** `CONFIG_SCHEMA` 22 · BuildPlan `SCHEMA` 7 · ABS `SEED_VERSION` 6 (STD šablón bez zmeny). Pripnuté čísla v starších sadách
   zladené (KON-B/S1-E/KON-0/KOV-D5/KOV-W/ABS zámok), golden plány dolnej a hornej sa nepohli. STANDARD (§2.4, §2.5 história 22, §4.2 rohová vo V1 — opravené
   „rohové korpusy mimo scope" aj v §12, §5.3 výnimka R7, §7.5), VEPO_KONTRAKT, POJMY, architektúra na mieste; drobnosť: zatúlaný U+FEFF v CROSS_AUDIT_CODEX odstránený.
-  **Testy:** headless 4688 · JS 135 sád · **in-SU 3208 PASS / 0 FAIL** (nový `run_roha1` — 10 kombinácií plán = model, Späť, odmietnutia, šablóny, tri kópie, scale
+  **Testy:** headless 4689 · JS 135 sád · **in-SU 3208 PASS / 0 FAIL** (hlava opráv predrecenzie) (nový `run_roha1` — 10 kombinácií plán = model, Späť, odmietnutia, šablóny, tri kópie, scale
   šírky, .skp, výstupy — a `run_roha1_async`). Smoke rohovej sa robí spolu s ROH-A2 (A1 nemá tlačidlo vkladania).
+  **Predrecenzia** (slepý recenzent 28.9., hlava b00994fb): PR OK, 0× P1/P2, 3× P3 — ručný názov „Rohová skrinka N" na nerohovej skrinke sa už nestratí
+  (automatický je len pri `corner_blind`), komentár hrúbky CR opravený; pevné minimum šírky rohovej v paneli (584) → ROH-B (limit zo servera).
 
 - **DOCS — štart bloku 8 · K3 ROHOVÁ SKRINKA (27.–28.9.2026, PR #409, len dokumentácia; verzia pluginu sa nemení).**
   Michal 27.9. večer po smoke PASS bloku 7 vybral **K3 rohovú skrinku** ako nočný blok. **Rozhodnutia** (R1–R9, `zdroje/bloky/ROHOVA/ROZHODNUTIA_MICHALA_2026-09-27.md`):
