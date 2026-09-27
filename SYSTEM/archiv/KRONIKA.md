@@ -24,7 +24,10 @@
   ovládačov. **Podklady v priečinku bloku:** fakty z kódu (typy, čelá, zrkadlenie, uzavreté zoznamy rolí), **presná geometria DC „Rohová"** zmeraná sondou
   v samostatnom SketchUpe nad kópiou knižnice (CR 2 a rohová výstuha trčia ~97 mm pred korpus, pri zmene šírky rastie len slepá časť, pravá verzia = zrkadlo),
   rešerš precedensov (CR ~80 mm sedí s praxou — IKEA ≥ 75 mm) a **krížový audit** (Codex `gpt-6-astra` 3 BLOCKER · 6 FIX · 5 NOTE, Grok `grok-4.7`
-  2 BLOCKER · 7 FIX · 2 NOTE; Antigravity v noci nebeží). Technické závery auditu idú po triáži do **package dávky ROH-A1** (pravidlo štartu bloku) — sem nie.
+  2 BLOCKER · 7 FIX · 2 NOTE; Antigravity v noci nebeží). **Vyhodnotenie každého nálezu** (reconcile — všetky BLOCKERy prijaté) je v priečinku
+  bloku ako samostatný dokument; auditovaný koncept v1 je tam zachovaný ako **surový vstup auditu** (nie zadanie — Codex review kolo 1 chcel dohľadateľné
+  odkazy nálezov). Technické riešenie určí **package dávky ROH-A1** po vlastnom audite návrhu (pravidlo štartu bloku) — rozhodnutia bloku nesú len
+  produktové rozhodnutia a otvorené otázky (review kolo 1, P1).
   **Dávky:** ROH-A1 jadro → ROH-A2 vkladanie a náhľad (rez odporučil audit) → ROH-B ovládače po schválení mockupu. PLAN: nový blok 8, v bloku 4 odkaz na blok 8,
   zdôvodnenie typu v trvalom pravidle opravené (rohová nie je L-pôdorys, ale slepá dolná s rohovou zostavou).
 

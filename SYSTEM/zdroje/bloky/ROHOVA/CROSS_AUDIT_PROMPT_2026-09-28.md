@@ -77,7 +77,7 @@ výrobcov, precedensy; (2) **devil's advocate** — čo návrh prehliada a čo s
 
 # NÁVRH NA AUDIT
 
-Audítori dostali za týmto zadaním **inline celý pracovný koncept v1** (`ROH_KONCEPT_K3.md`, scratchpad orchestrátora, 28.9.2026 ~00:10):
-typ `corner_blind`, polia rohovej, päť nových rolí, dverová časť ako otvor čiel, zrkadlenie v pláne, dávky ROH-A/ROH-B. Koncept je
-**pracovný podklad, nie zadanie** — jeho technické závery po triáži nálezov (reconcile) prechádzajú do **package dávky ROH-A1** (s vlastným
-auditom návrhu); do úvodného PR bloku sa vedome nedáva (pravidlo štartu bloku z 27.9.2026).
+Audítori dostali za týmto zadaním **inline celý pracovný koncept v1** (28.9.2026 ~00:10) — jeho presná kópia je zachovaná ako **surový vstup
+auditu** v [KONCEPT_K3_v1_AUDITOVANY_2026-09-28.md](KONCEPT_K3_v1_AUDITOVANY_2026-09-28.md) (tam sa dajú dohľadať odkazy nálezov `§2`, `§5`…).
+Koncept **nie je zadanie**: vyhodnotenie každého nálezu je v [RECONCILE_KRIZOVEHO_AUDITU_2026-09-28.md](RECONCILE_KRIZOVEHO_AUDITU_2026-09-28.md),
+technické riešenie určí **package dávky ROH-A1** po vlastnom audite návrhu (pravidlo štartu bloku z 27.9.2026).

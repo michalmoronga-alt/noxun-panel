@@ -7,7 +7,9 @@
 > Ďalšie súbory priečinka: fakty z kódu [FAKTY_Z_KODU_2026-09-27.md](FAKTY_Z_KODU_2026-09-27.md) · presná geometria DC
 > [DC_ROHOVA_GEOMETRIA_2026-09-27.md](DC_ROHOVA_GEOMETRIA_2026-09-27.md) · rešerš precedensov [RESERS_OUTSIDE_IN_2026-09-27.md](RESERS_OUTSIDE_IN_2026-09-27.md) ·
 > krížový audit [CROSS_AUDIT_PROMPT_2026-09-28.md](CROSS_AUDIT_PROMPT_2026-09-28.md), [CROSS_AUDIT_CODEX_2026-09-28.md](CROSS_AUDIT_CODEX_2026-09-28.md),
-> [CROSS_AUDIT_GROK_2026-09-28.md](CROSS_AUDIT_GROK_2026-09-28.md). Packages dávok pribudnú s dávkami.
+> [CROSS_AUDIT_GROK_2026-09-28.md](CROSS_AUDIT_GROK_2026-09-28.md), auditovaný koncept v1 ako surový vstup
+> [KONCEPT_K3_v1_AUDITOVANY_2026-09-28.md](KONCEPT_K3_v1_AUDITOVANY_2026-09-28.md) (nie zadanie) · vyhodnotenie nálezov
+> [RECONCILE_KRIZOVEHO_AUDITU_2026-09-28.md](RECONCILE_KRIZOVEHO_AUDITU_2026-09-28.md). Packages dávok pribudnú s dávkami.
 
 ## 1 · Rozhodnutia
 
@@ -32,7 +34,16 @@ Každá dávka dostane package v tomto priečinku; audit-povinné dávky prejdú
 
 ## 3 · Otvorené otázky (odpovie Michal pri schvaľovaní mockupu)
 
-Predvolené rozmery a konštrukcia (hĺbka, strop, chrbát ako dolná alebo ako DC), rozsahy dverovej časti a CR (audit: CR pod ~50–75 mm narazí
-úchytka susedného radu), medzera dverí pri rohu, názvy dielcov v kusovníku a VEPO, ABS podľa DC, **priečky v rohovej** (A1 ich z bezpečnosti
-nepovolí — prechádzali by blendou; vnútri len police podľa R6), **polica pretína výstuhu závesov** (DC to rieši výrezom v dielni — A1 dá
-upozornenie v Kontrole), CR lišty a „Kresba čiel", riadky v Inspectore a prepínač strany.
+Otázky, nie rozhodnutia — technické riešenie každej dávky určuje jej package po audite návrhu; vyhodnotenie nálezov krížového auditu je v
+[RECONCILE_KRIZOVEHO_AUDITU_2026-09-28.md](RECONCILE_KRIZOVEHO_AUDITU_2026-09-28.md).
+
+1. Predvolené rozmery a konštrukcia rohovej — hĺbka, strop, chrbát ako pri dolnej, alebo ako v DC (dve nadnože, pevný vložený chrbát)?
+2. Rozsahy dverovej časti a CR lišiet (audit upozorňuje, že CR pod ~50–75 mm môže naraziť úchytka susedného radu) a medzera dverí pri rohu.
+3. Názvy dielcov v kusovníku a VEPO; hrany (ABS) podľa DC?
+4. Priečky vo vnútri rohovej — sú potrebné? (R6 hovorí o policiach cez celú šírku; priečka v slepej časti by narazila na blendu.)
+5. Polica prechádza výstuhou závesov (DC to rieši výrezom v dielni) — má na to plugin upozorniť?
+6. Majú CR lišty ísť s hromadnou „Kresbou čiel" ako dvere?
+7. Kde v Inspectore budú riadky rohovej a prepínač strany dverí.
+
+Kým Michal neodpovie, dávky ROH-A1 a ROH-A2 (R8) vychádzajú z DC „Rohová" a z debaty 6.9.; každú takú voľbu ich package aj PR výslovne označí
+ako návrh, ktorý Michalova odpoveď môže zmeniť.

@@ -533,8 +533,10 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 **Cieľ:** dolná **slepá rohová skrinka s CR lištou** z pluginu bez ručného dopočítavania — dvere v dverovej časti, rohová zostava (blenda korpusová,
 výstuha závesov, rohová výstuha, CR 1, CR 2) podľa DC „Rohová", ktorú dielňa roky používa, strana dverí vľavo/vpravo; kusovník, VEPO a kovanie
 ako pri dolnej. Horná rohová, rohové mechanizmy (LeMans) a kolízie so susedným radom sú mimo bloku. **Priečinok bloku:** [zdroje/bloky/ROHOVA/](zdroje/bloky/ROHOVA/)
-— **rozhodnutia Michala** (R1–R9), fakty z kódu, presná geometria DC, rešerš precedensov a surové výsledky krížového auditu; packages pribudnú s dávkami.
-**Stav 28.9.2026:** krížový audit hotový; mockup ovládačov čaká na Michalovo schválenie. Poradie:
+— **rozhodnutia Michala** (R1–R9 a otvorené otázky), fakty z kódu, presná geometria DC, rešerš precedensov, krížový audit (zadanie, auditovaný koncept
+ako surový vstup, výsledky) a jeho **vyhodnotenie**; packages pribudnú s dávkami.
+**Stav 28.9.2026:** krížový audit hotový a vyhodnotený (všetky BLOCKERy prijaté, riešia ich packages). **Mockup ovládačov (ROH-B) sa pripravuje** —
+do priečinka pôjde po Michalovom schválení; ROH-A1 a ROH-A2 idú podľa R8 bez nových ovládačov s hodnotami z DC ako návrhom. Poradie:
 
 - **ROH-A1 · jadro rohovej** — nový typ skrinky, stavba oboch strán, výstupy (kusovník, VEPO, ponuka) a ochrany; bez nových ovládačov (R8). *PR #?*
 - **ROH-A2 · vkladanie a náhľad** — tlačidlo „Rohová" vo vkladacej karte, dvere a pánty v náhľade na správnom mieste. *PR #?*
