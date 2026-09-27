@@ -4,7 +4,9 @@
 > ktoré ešte nemajú package. Pri písaní package dávky sa každá požiadavka overí proti aktuálnemu kódu a package prejde **auditom návrhu dávky** —
 > až package je záväzný. Produktové rozhodnutia: [ROZHODNUTIA_MICHALA_2026-09-27.md](ROZHODNUTIA_MICHALA_2026-09-27.md); KON-0 má hotový package
 > [PACKAGE_KON0_D143.md](PACKAGE_KON0_D143.md), **KON-A** [PACKAGE_KONA_K1.md](PACKAGE_KONA_K1.md) a **KON-B** [PACKAGE_KONB_K2.md](PACKAGE_KONB_K2.md)
-> (autority dávok — sekcie KON-A a KON-B nižšie sú už len historický vstup); tento súbor ostáva vstupom pre KON-D. Kde sa tento súbor líši od rozhodnutí Michala, platia rozhodnutia Michala.
+> (autority dávok — sekcie KON-A a KON-B nižšie sú už len historický vstup) a **KON-D** [PACKAGE_KOND_CHLADNICKOVA.md](PACKAGE_KOND_CHLADNICKOVA.md)
+> (+ audit návrhu [AUDIT_KOND_2026-09-27.md](AUDIT_KOND_2026-09-27.md)). **Všetky dávky bloku už majú package — tento súbor splnil účel** a ostáva len
+> historickým vstupom. Kde sa tento súbor líši od rozhodnutí Michala, platia rozhodnutia Michala.
 
 **KON-A · K1 odsadenia + D-144** (výrobná, audit-povinná, `CONFIG_SCHEMA` 20 — čísla schém podľa poradia mergov)
 - Pri **komíne 0** sa nesmie zmeniť nič (golden plány) — okrem opravy D-144; pri komíne > 0 majú boky plnú hĺbku a dno, strop a zadná výstuha

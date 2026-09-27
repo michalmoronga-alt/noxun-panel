@@ -5,8 +5,9 @@
 > sa zapisujú do **package každej dávky** a prejdú jej auditom návrhu: KON-0 [PACKAGE_KON0_D143.md](PACKAGE_KON0_D143.md) (+ audit návrhu
 > [AUDIT_KON0_2026-09-27.md](AUDIT_KON0_2026-09-27.md)), KON-A [PACKAGE_KONA_K1.md](PACKAGE_KONA_K1.md) (+ audit návrhu
 > [AUDIT_KONA_2026-09-27.md](AUDIT_KONA_2026-09-27.md)), KON-B [PACKAGE_KONB_K2.md](PACKAGE_KONB_K2.md) (+ audit návrhu
-> [AUDIT_KONB_2026-09-27.md](AUDIT_KONB_2026-09-27.md)); pre KON-D zatiaľ [VSTUPY_PRE_PACKAGES_2026-09-27.md](VSTUPY_PRE_PACKAGES_2026-09-27.md)
-> (vstup, nie autorita). Ďalšie súbory priečinka: fakty z kódu [FAKTY_Z_KODU_2026-09-26.md](FAKTY_Z_KODU_2026-09-26.md) · krížový audit
+> [AUDIT_KONB_2026-09-27.md](AUDIT_KONB_2026-09-27.md)), KON-D [PACKAGE_KOND_CHLADNICKOVA.md](PACKAGE_KOND_CHLADNICKOVA.md) (+ audit návrhu
+> [AUDIT_KOND_2026-09-27.md](AUDIT_KOND_2026-09-27.md)); pôvodné vstupy [VSTUPY_PRE_PACKAGES_2026-09-27.md](VSTUPY_PRE_PACKAGES_2026-09-27.md)
+> sú už len historický vstup (nie autorita). Ďalšie súbory priečinka: fakty z kódu [FAKTY_Z_KODU_2026-09-26.md](FAKTY_Z_KODU_2026-09-26.md) · krížový audit
 > [CROSS_AUDIT_PROMPT_2026-09-27.md](CROSS_AUDIT_PROMPT_2026-09-27.md), [CROSS_AUDIT_GROK_2026-09-27.md](CROSS_AUDIT_GROK_2026-09-27.md),
 > [CROSS_AUDIT_CODEX_2026-09-27.md](CROSS_AUDIT_CODEX_2026-09-27.md) · schválený mockup [MOCKUP_KONSTRUKCIA_2026-09-27.html](MOCKUP_KONSTRUKCIA_2026-09-27.html)
 > (sekcia B — bokorys — zamietnutá).
