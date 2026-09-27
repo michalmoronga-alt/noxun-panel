@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.13.3 · 27.9.2026 — BEŽÍ BLOK 7 · KONŠTRUKCIA K1+K2; hotové KON-0 (#401), KON-A (#402) a KON-B · K2** (PR #?). Chrbát má novú voľbu
+**v0.13.3 · 27.9.2026 — BEŽÍ BLOK 7 · KONŠTRUKCIA K1+K2; hotové KON-0 (#401), KON-A (#402) a KON-B · K2** (PR #403). Chrbát má novú voľbu
 **„Z líšt"**: namiesto dosky chrbta **dve vodorovné lišty z korpusovej dosky** medzi bokmi — dolná na dne, horná pod stropom (pod výstuhami, pri „Bez stropu"
 po vrch bokov); riadok **„Výška líšt"** (predvolene 100) sedí na mieste hrúbky chrbta. Dolná 600 × 720 × 510 → dve lišty **564 × 100 × 18**, „Vnút. hĺbka"
 **492** — police, priečky a zásuvky končia pred lištami v celej výške. **Kusovník: jeden riadok, 2 ks „Lista chrbta"**, VEPO **„Chrb HD"**, páska na jednej
@@ -26,14 +26,14 @@ zákazku neprestaví ani nevyexportuje. **Dáta rozpočtu sú od S1-B1 v `BUDGET
 **Pred prvou výrobou s lištami aktualizovať OBE PC (aj Luciino)** — starší plugin „Z líšt" nepozná (prestavbou by vrátil dosku chrbta) a samostatne prenesenú
 lištu by vo VEPO vydal pod plným názvom.
 
-**Testy (posledná kódová dávka, KON-B · K2 #?):** **4621 headless · 133 JS sád · 3158 in-SU PASS / 0 FAIL**. KON-A (#402): 4600 · 132 · 3136.
+**Testy (posledná kódová dávka, KON-B · K2 #403):** **4621 headless · 133 JS sád · 3158 in-SU PASS / 0 FAIL**. KON-A (#402): 4600 · 132 · 3136.
 **KON-0 (#401):** 4577 · 131 · 3111. **S1-C:** 4499 · 127 · 3036. **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 
 ## Robí sa
 
 **Blok 7 · KONŠTRUKCIA K1+K2** ([PLAN.md](PLAN.md), priečinok [zdroje/bloky/KONSTRUKCIA/](zdroje/bloky/KONSTRUKCIA/)) — po KON-0, KON-A a KON-B zostáva
 **KON-D** (šablóna Chladničková); audit-povinná dávka prejde auditom svojho návrhu. Potom uzáver bloku (minor verzia + smoke).
-**Čakajú na smoke:** **KON-0** (#401), **KON-A** (#402), **KON-B** (#?), **D-132** (#367), **D-133** (#368), **D-134** (#369). **D-141**, **D-142** a **D-145** sú v zásobníku.
+**Čakajú na smoke:** **KON-0** (#401), **KON-A** (#402), **KON-B** (#403), **D-132** (#367), **D-133** (#368), **D-134** (#369). **D-141**, **D-142** a **D-145** sú v zásobníku.
 **Blok 1d** podľa kapacity — hotové po R-14, ďalej R-18; **R-13 čaká na Michala**.
 
 ## Ďalší krok
@@ -48,7 +48,7 @@ Smoke KON-A (v0.13.2) a KON-0 (v0.13.1) platia ďalej ([archiv/KRONIKA.md](archi
 
 ## Posledné uzávery
 
-- **KON-B · K2** (v0.13.2 → **v0.13.3**, 27.9.2026, PR #?) — chrbát z dvoch líšt, vnútro pred lištami, jeden riadok „Chrb HD", `CONFIG_SCHEMA` 21, BuildPlan 6,
+- **KON-B · K2** (v0.13.2 → **v0.13.3**, 27.9.2026, PR #403) — chrbát z dvoch líšt, vnútro pred lištami, jeden riadok „Chrb HD", `CONFIG_SCHEMA` 21, BuildPlan 6,
   ABS seed 5. Plné znenie v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 - **KON-A · K1** (v0.13.1 → **v0.13.2**, 27.9.2026, PR #402) — komín vzadu a zapustenie stropu, nika z hĺbky boku, config-aware minimum hĺbky pri mierke,
   oprava D-144 so zastaranými skrinkami v registri výrobnej brány, `CONFIG_SCHEMA` 20.

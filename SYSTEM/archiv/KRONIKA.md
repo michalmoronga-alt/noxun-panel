@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **KON-B · K2 — chrbát z dvoch líšt (v0.13.2 → v0.13.3, 27.9.2026, PR #?, blok 7 KONŠTRUKCIA, tretia dávka).**
+- **KON-B · K2 — chrbát z dvoch líšt (v0.13.2 → v0.13.3, 27.9.2026, PR #403, blok 7 KONŠTRUKCIA, tretia dávka).**
   Výrobná a audit-povinná dávka (package v2 so zapracovaným auditom návrhu Codex 27.9.: NOT SOUND 0 BLOCKER + 3 FIX + 2 NOTE — všetko v Scope IN).
   **Dáta:** `back_mode` smie byť **`rails`** („Z líšt"), config smie niesť **`back_rail_height`** (H, mm 20–300, predvolene 100, **prísne parsované** `norm_rail_height`,
   **zápis len pri H ≠ 100**, pri inom type chrbta sa pamätá); celá reťaz whitelistov ako komín v KON-A (`normalize`, `cabinet_config`, `config_to_params`,
