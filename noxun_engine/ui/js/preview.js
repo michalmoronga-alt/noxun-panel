@@ -415,6 +415,9 @@
     g.bottomD = r;
     g.topD = r - g.topFrontSetback;
     g.innerD = nxInteriorDepth(c);
+    // PR #402 (Codex kolo 1 P2): pas vystuh v intervale Y … R builder OREZE
+    // (`rail_geometry`) — odhad musi pocitat UCINNU hlbku, nie pozadovanu.
+    if (c.top_mode === 'two_rails') g.railDepth = nxRailGeom(c).depth;
     // Nalozeny chrbat pri komine sedi MEDZI bokmi (w − 2t).
     if (g.backSetback > 0 && c.back_mode === 'overlay') g.backW = Math.max(0, g.W - 2 * g.t);
     return g;

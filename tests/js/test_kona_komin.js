@@ -88,7 +88,7 @@ const ctx = { document: doc, window: {}, console, setTimeout: () => 0, clearTime
               NXInsert: { state: { kind: 'board', lastMode: '' }, insertType: () => 'lower' } };
 ctx.window = ctx;
 vm.createContext(ctx);
-['expr.js', 'core.js', 'form.js'].forEach(function(f){
+['expr.js', 'core.js', 'form.js', 'preview.js'].forEach(function(f){
   vm.runInContext(fs.readFileSync(path.join(DIR, f), 'utf8'), ctx, { filename: f });
 });
 // Predvolby, ktore do panela posiela server (`CabinetBuilder::LOWER_DEFAULTS`).
@@ -226,6 +226,20 @@ ok(typeof prev.nxDraftStats === 'function', 'nxDraftStats je exportovany');
         'komin: dno a strop do R, uzsi nalozeny chrbat');
   ok(s1.area < s0.area, 'odhad pri komine mensi nez bez neho');
 }
+// PR #402 (Codex kolo 1 P2): most pvGeom posiela do odhadu UCINNU (orezanu)
+// hlbku pasu vystuh — priklad d 260, X 50, Y 70, pas 100 -> builder stavia 60.
+reset();
+set('depth', 260); set('back_setback', 50); set('top_front_setback', 70); set('top_mode', 'two_rails');
+const gr = run('pvSetbackDepths({ W: 600, H: 720, t: 18, D: 260, fh: 100, topMode: "two_rails", backMode: "overlay", railDepth: 100 })');
+eq(gr.railDepth, 60, 'odhad pocita pas 60 mm (ako builder), nie pozadovanych 100');
+const sr = prev.nxDraftStats(JSON.parse(JSON.stringify(gr)), [], []);
+const sr100 = prev.nxDraftStats(Object.assign(JSON.parse(JSON.stringify(gr)), { railDepth: 100 }), [], []);
+close(sr100.area - sr.area, Math.round(2 * 564 * 40 / 1000) / 1000, 'rozdiel plochy = 2 pasy x 564 x 40 mm');
+set('back_setback', 0); set('top_front_setback', 0);
+const g0r = run('pvSetbackDepths({ W: 600, H: 720, t: 18, D: 260, fh: 100, topMode: "two_rails", backMode: "overlay", railDepth: 100 })');
+eq(g0r.railDepth, 100, 'X = Y = 0: odhad sa nemeni (pozadovana hlbka ako doteraz)');
+eq(g0r.sideD, undefined, 'X = Y = 0: ziadne nove kluce');
+
 const prevSrc = fs.readFileSync(path.join(DIR, 'preview.js'), 'utf8');
 ok(prevSrc.indexOf('if (!(g.backSetback > 0) && !(g.topFrontSetback > 0)) return g;') > 0,
    'pri X = Y = 0 odhad ostava presne dnesny');
