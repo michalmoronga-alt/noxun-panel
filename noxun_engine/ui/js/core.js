@@ -1585,9 +1585,46 @@
   function nxSideDepth(c){
     return (nxBackSetback(c) > 0) ? nxNum(c.depth) : nxCarcassDepth(c);
   }
+  // ===== KON-B · K2: CHRBAT Z LIST ============================================
+  // Zrkadlo Ruby `Construction.back_rail_height` / `back_rails_error` a vetvy
+  // `interior_dims[:back_front_y]` pri `back_mode 'rails'`. Hodnoty aj vety
+  // strazi SPOLOCNA fixtura `tests/fixtures/konb_cases.json`.
+  var NX_BACK_RAIL_H_DFLT = 100.0;   // Construction::BACK_RAIL_HEIGHT_DEFAULT
+  var NX_BACK_RAIL_H_MIN  = 20.0;    // Construction::BACK_RAIL_HEIGHT_RANGE
+  var NX_BACK_RAIL_H_MAX  = 300.0;
+  var NX_BACK_RAIL_GAP    = 20.0;    // Construction::BACK_RAIL_GAP_MIN
+  var NX_MIN_AVAIL_H      = 10.0;    // Construction::MIN_AVAIL_H
+  function nxBackRails(c){ return !!c && c.type !== 'dishwasher' && c.back_mode === 'rails'; }
+  // Prisne: konecne cislo orezane na 20–300, inak predvolba 100.
+  function nxBackRailHeight(c){
+    var v = c ? c.back_rail_height : undefined;
+    if (typeof v === 'string'){
+      var s = v.trim();
+      if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(s)) return NX_BACK_RAIL_H_DFLT;
+      v = parseFloat(s);
+    }
+    if (typeof v !== 'number' || !isFinite(v)) return NX_BACK_RAIL_H_DFLT;
+    return Math.min(Math.max(v, NX_BACK_RAIL_H_MIN), NX_BACK_RAIL_H_MAX);
+  }
+  // Veta odmietnutia list (ta ista ako Ruby `back_rails_error`) alebo ''.
+  // Pri vnutri, ktore neprejde vseobecnymi pravidlami vysky, mlci (tam hovori
+  // krizova kontrola vysky `cabinetHeightError`).
+  function nxBackRailsError(c){
+    if (!nxBackRails(c)) return '';
+    var avail = nxInteriorZ(c).availH;
+    if (avail <= NX_MIN_AVAIL_H) return '';
+    if (c.top_mode === 'two_rails' && avail < NX_MIN_INTERIOR_H - 0.01) return '';
+    var hr = nxBackRailHeight(c);
+    if (2 * hr + NX_BACK_RAIL_GAP <= avail + 0.005) return '';
+    return 'Dve lišty po ' + nxFmtMm(hr) + ' mm sa do vnútra ' + nxFmtMm(avail) +
+           ' mm nezmestia — zmenši výšku líšt alebo zväčši skrinku.';
+  }
+
   // Svetla hlbka vnutra (back_front_y) — JEDINA JS autorita „Vnút. hĺbky".
   function nxInteriorDepth(c){
     var d = nxNum(c.depth), bt = nxBackTh(c), bm = c.back_mode;
+    // KON-B · K2 (M5): pri listach vnutro konci pred nimi v celej vyske — R − t.
+    if (nxBackRails(c)) return nxBackStop(c) - nxNum(c.thickness);
     if (nxBackSetback(c) > 0){
       var r = nxBackStop(c);
       return (bm === 'inset') ? (r - bt) : r;
@@ -1607,8 +1644,12 @@
     return (f === Math.round(f)) ? String(Math.round(f)) : String(f).replace('.', ',');
   }
   // Veta odmietnutia (ta ista ako Ruby `Construction.setback_error`) alebo ''.
-  // Pri X = Y = 0 NIKDY nic (audit KON-A FIX 4).
+  // Vety komina a zapustenia pri X = Y = 0 NIKDY (audit KON-A FIX 4); KON-B:
+  // veta list plati aj bez komina (audit KON-B NOTE 4) — az po nich.
   function nxSetbackError(c){
+    return nxSetbacksOnlyError(c) || nxBackRailsError(c);
+  }
+  function nxSetbacksOnlyError(c){
     var x = nxBackSetback(c), y = nxTopFrontSetback(c);
     if (!(x > 0) && !(y > 0)) return '';
     var r = nxBackStop(c);
@@ -1700,7 +1741,10 @@
       // KON-A (audit FIX 2): komin a zapustenie — bez nich by limit vystuh,
       // „Vnút. hĺbka" aj zrkadlo validacie ticho pocitali bez X/Y.
       type: getType(),
-      back_setback: numv('back_setback') || 0, top_front_setback: numv('top_front_setback') || 0
+      back_setback: numv('back_setback') || 0, top_front_setback: numv('top_front_setback') || 0,
+      // KON-B · K2: vyska list chrbta (prazdne/neplatne pole = NaN -> 100
+      // v `nxBackRailHeight`, zrkadlo Ruby `normalize`).
+      back_rail_height: numv('back_rail_height')
     };
     if (over){ for (var k in over){ if (Object.prototype.hasOwnProperty.call(over, k)) c[k] = over[k]; } }
     return c;
@@ -1722,6 +1766,10 @@
     // pole NASTAVIT na 0 — inak by ostal komin predtym oznacenej skrinky
     // a „Aplikuj" by ho ticho zapisal inej.
     { id:'back_setback', kind:'num', dflt:0 }, { id:'top_front_setback', kind:'num', dflt:0 },
+    // KON-B · K2: vyska list chrbta. `dflt: 100` = RIEDKY CONFIG — skrinka bez
+    // kluca (H = 100 sa nezapisuje) musi pole nastavit na 100, nie nechat
+    // hodnotu predtym oznacenej skrinky.
+    { id:'back_rail_height', kind:'num', dflt:100 },
     // S1-E: polia SLOTU UMYVACKY. Idu TOU ISTOU cestou ako ostatne konstrukcne
     // polia (zber, validacia, auto-apply) — zrkadlo Ruby `Panel::PARAM_KEYS`.
     // Pri dolnej a hornej skrinke su prazdne a server ich ignoruje.
@@ -1778,6 +1826,8 @@
       nxBackSetback: nxBackSetback, nxTopFrontSetback: nxTopFrontSetback, nxBackStop: nxBackStop,
       nxSideDepth: nxSideDepth, nxInteriorDepth: nxInteriorDepth, nxSetbackError: nxSetbackError,
       nxFmtMm: nxFmtMm, CONSTRUCTION_FIELDS: CONSTRUCTION_FIELDS,
+      // KON-B · K2 (tests/js/test_konb_listy.js) — chrbat z list.
+      nxBackRails: nxBackRails, nxBackRailHeight: nxBackRailHeight, nxBackRailsError: nxBackRailsError,
       NX_MIN_INTERIOR_H: NX_MIN_INTERIOR_H,
       // D-90 (tests/js/test_d90_profil_ui.js) — ciste funkcie volby profilu;
       // register sa testom odovzdava parametrom (global plni az NX.init z Ruby).

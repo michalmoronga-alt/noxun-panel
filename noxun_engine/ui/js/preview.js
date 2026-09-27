@@ -409,6 +409,13 @@
     var c = currentCarcass({ depth: g.D, thickness: g.t });
     g.backSetback = nxBackSetback(c);
     g.topFrontSetback = nxTopFrontSetback(c);
+    // KON-B · K2 (audit NOTE 4): chrbat z list plati AJ bez komina — vyska
+    // list pre odhad dvoch dielcov a vnutro R − t pre police a priecky sa
+    // doplnia PRED skorym navratom pri X = Y = 0.
+    if (typeof nxBackRails === 'function' && nxBackRails(c)){
+      g.backRailH = nxBackRailHeight(c);
+      g.innerD = nxInteriorDepth(c);
+    }
     if (!(g.backSetback > 0) && !(g.topFrontSetback > 0)) return g;
     var r = nxBackStop(c);
     g.sideD = nxSideDepth(c);
@@ -520,7 +527,9 @@
     add(1, (g.bottomBetween ? Math.max(0, W - 2 * t) : W) * botD); // dno
     if (g.topMode === 'two_rails') add(2, Math.max(0, W - 2 * t) * nxNumOr(g.railDepth, 100));
     else if (g.topMode !== 'none') add(1, Math.max(0, W - 2 * t) * topD);
-    if (g.backMode && g.backMode !== 'none') add(1, backW * bodyH);
+    // KON-B · K2: chrbat z list = 2 × (W − 2t) × H z korpusu namiesto dosky chrbta.
+    if (g.backMode === 'rails') add(2, Math.max(0, W - 2 * t) * nxNumOr(g.backRailH, 100));
+    else if (g.backMode && g.backMode !== 'none') add(1, backW * bodyH);
     (zones || []).forEach(function(z){
       if (!z) return;
       if (z.leaf){
