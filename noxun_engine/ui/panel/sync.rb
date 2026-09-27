@@ -42,7 +42,9 @@ module Noxun
               upper: CabinetBuilder::UPPER_DEFAULTS,
               # S1-E: predvolby SLOTU UMYVACKY (vkladacia karta aj krizova
               # validacia v paneli citaju TIE ISTE cisla ako builder).
-              dishwasher: CabinetBuilder::DISHWASHER_DEFAULTS
+              dishwasher: CabinetBuilder::DISHWASHER_DEFAULTS,
+              # ROH-A1: predvolby ROHOVEJ (vkladanie ich pouzije az A2).
+              corner_blind: CabinetBuilder::CORNER_DEFAULTS
             },
             # D-27: viditelnost NOXUN tagov v modeli — JEDEN stav pre okno
             # tagov v raile aj pre checkbox „Zobraziť zóny (ghost)". Samostatne

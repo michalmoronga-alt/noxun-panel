@@ -79,7 +79,15 @@ module Noxun
         'Priecka vodorovna'  => 'Priecka V',
         # KON-B · K2 (M6): obe listy chrbta nesu spolocny nazov z buildera
         # (`Construction::BACK_RAIL_NAME`) — jeden riadok, 2 ks, „Chrb HD".
-        'Lista chrbta'       => 'Chrb HD'
+        'Lista chrbta'       => 'Chrb HD',
+        # ROH-A1 · K3 (NAVRH — potvrdi Michal): rohova zostava. CR 1 a CR 2
+        # pri zhodnom rozmere v jednom riadku = „CR 1 2" (cisla na konci
+        # tokenu sa zlucuju, D-121b).
+        'Blenda rohova'      => 'Blenda roh',
+        'Vystuha zavesov'    => 'Vyst zav',
+        'Vystuha rohova'     => 'Vyst roh',
+        'CR lista 1'         => 'CR 1',
+        'CR lista 2'         => 'CR 2'
       }.freeze
       DOOR_SIDE = /\ADvierka (\d+) (lave|prave)\z/.freeze
       DOOR_WING = /\ADvierka (\d+) kridlo (\d+)\/\d+\z/.freeze

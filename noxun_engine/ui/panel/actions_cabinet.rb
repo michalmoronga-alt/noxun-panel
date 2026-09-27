@@ -12,16 +12,26 @@ module Noxun
       # set_cabinet_material; insert ich nesie explicitne v payloade (build/normalize ich pozna).
       # S1-E: polia SLOTU su bezne konstrukcne polia panela (menia sa v
       # Zakladnych a idu tou istou apply cestou) — preto patria do whitelistu.
+      # ROH-A1: + polia rohovej (server ich prijme, ked pridu). JS ich v A1
+      # NEPOSIELA (nie su v CONSTRUCTION_FIELDS — bez ovladaca by isli ako
+      # `null`, krizovy audit C6); `handle_apply` kopiruje len PRITOMNE kluce,
+      # takze ulozene hodnoty ostavaju z configu. Zmena STRANY sa v A1
+      # odmieta (`corner_change_refusal`).
       PARAM_KEYS = %w[type width height depth thickness floor_height bottom_mode top_mode back_mode
                       back_thickness plinth_mode plinth_recess rail_depth rails_orientation
                       rails_top_offset back_setback top_front_setback back_rail_height name
-                      dw_class dw_body_height dw_front_bottom].freeze
+                      dw_class dw_body_height dw_front_bottom
+                      corner_side corner_door_w corner_cr1 corner_cr2].freeze
 
       # S1-E: SK nazov typu skrinky v 1. pade (hlasky Studia aj panela). Jedna
       # tabulka — tri opisane ternary by sa casom rozisli a slot by v jednej
       # hlaske ostal „dolna".
       TEMPLATE_TYPE_WORDS = { 'lower' => 'dolná', 'upper' => 'horná',
-                              'dishwasher' => 'umývačka' }.freeze
+                              'dishwasher' => 'umývačka', 'corner_blind' => 'rohová' }.freeze
+
+      # ROH-A1: vety ochran rohovej (typ a strana sa v A1 nemenia ziadnou cestou).
+      CORNER_TYPE_MSG = 'Typ rohovej skrinky sa nedá zmeniť.'
+      CORNER_SIDE_MSG = 'Strana dverí rohovej sa zatiaľ nedá zmeniť — príde s prepínačom strany.'
 
       # D-39: polia vkladacej karty, ktore mozu niest zamok (JS zrkadlo: NXInsert.LOCK_FIELDS).
       INSERT_LOCK_FIELDS = %w[width height depth thickness floor_height].freeze
@@ -31,7 +41,12 @@ module Noxun
       class << self
         # D-120: cisty vypocet nad aktualnym formularom; ZIADNY builder,
         # snapshot, inicializacia katalogov ani Undo. Identita sa iba vracia.
-        def front_preflight_result(data)
+        # ROH-A1 (audit A1 NOTE 5): `stored` = ULOZENY config OZNACENEJ skrinky
+        # (nil pri vkladani). Otvor sa pocita pre KAZDY typ cez
+        # `Construction.front_opening`; pri rohovej so stranou a dverovou
+        # castou z ulozeneho configu (server je autorita, JS ich neposiela)
+        # a so ZIVOU sirkou z formulara — pri dverach vpravo posuva `x0 = W − D`.
+        def front_preflight_result(data, stored = nil)
           out = data.slice('model_guid', 'cabinet_id', 'insert_session', 'revision')
           # S1-E (Astra FIX E8): preflight sa pyta na TEN ISTY virtualny otvor,
           # z ktoreho stavia `Construction.build_plan`. Bez toho by slot
@@ -52,7 +67,12 @@ module Noxun
                  (0.0..500.0).cover?(dims[2])
             raise 'Rozmery skrinky sú mimo povoleného rozsahu.'
           end
-          opening = slot ? slot_preflight_opening(data, dims[0], dims[1]) : nil
+          corner = corner_preflight_src(data, stored)
+          opening = if slot
+                      slot_preflight_opening(data, dims[0], dims[1])
+                    else
+                      Construction.front_opening(preflight_opening_cfg(data, corner, dims))
+                    end
           cfg = data['fronts']
           raise 'Neplatný návrh čiel.' unless cfg.is_a?(Hash) && cfg['items'].is_a?(Array)
           # D-139: riadok slotu sa pred preflightom KANONIZUJE tym istym
@@ -70,11 +90,45 @@ module Noxun
             v = it['height']
             raise 'Pevná výška čela musí byť číslo.' unless v.is_a?(Numeric) && v.to_f.finite?
           end
+          # ROH-A1: medzera pri rohu 1–20 mm — ta ista veta ako stavba.
+          raise Construction::CORNER_GAP_MSG if corner && !corner_gap_ok?(cfg, corner['corner_side'])
+
           result = Fronts.preflight(cfg, *dims, opening: opening)
           out.merge(result).merge('slots' => front_slots_payload(result['items']))
         rescue RuntimeError => e
           out.merge('valid' => false, 'items' => [], 'slots' => {},
                     'errors' => [{ 'message' => e.message }])
+        end
+
+        # Zdroj poli rohovej pre preflight, alebo nil (nie je rohova). Oznacena
+        # skrinka = jej ULOZENY config; vkladanie = payload (A2 ho posle).
+        def corner_preflight_src(data, stored)
+          if stored.is_a?(Hash)
+            return stored['type'].to_s == Construction::CORNER_TYPE ? stored : nil
+          end
+
+          data['type'].to_s == Construction::CORNER_TYPE ? data : nil
+        end
+
+        # cfg pre `Construction.front_opening` z rozmerov preflightu (dims =
+        # [sirka, vyska, sokel] uz prekontrolovane).
+        def preflight_opening_cfg(data, corner, dims)
+          cfg = { type: data['type'].to_s, width: dims[0], height: dims[1], floor_height: dims[2] }
+          return cfg unless corner
+
+          cfg.merge(type: Construction::CORNER_TYPE, corner_side: corner['corner_side'],
+                    corner_door_w: corner['corner_door_w'])
+        end
+
+        # Medzera PRI ROHU v navrhu ciel v rozsahu 1–20 mm? Nevalidny tvar
+        # riesi dalej `Fronts.preflight` vlastnou vetou.
+        def corner_gap_ok?(fronts, side)
+          key = side.to_s == 'right' ? 'gap_left' : 'gap_right'
+          v = fronts.is_a?(Hash) ? fronts[key] : nil
+          return true unless v.is_a?(Numeric)
+
+          lo, hi = Construction::CORNER_GAP_RANGE
+          v.to_f >= lo - 0.005 && v.to_f <= hi + 0.005
         end
 
         # S1-E: virtualny otvor slotu z PAYLOADU preflightu. Autoritou tvaru je
@@ -108,13 +162,15 @@ module Noxun
           return if DocKey.foreign?(data['model_guid'], model)
           return unless data['revision'].is_a?(Integer) && data['revision'].positive?
           cid = data['cabinet_id']
+          stored = nil
           if cid.is_a?(String) && !cid.empty?
             cab = find_cabinet(model)
             return unless cab && Store.get(cab, 'cabinet_id').to_s == cid
+            stored = Store.config(cab) # ROH-A1: polia rohovej su autoritou servera
           else
             return unless data['insert_session'].is_a?(Integer) && data['insert_session'].positive?
           end
-          js("NX.frontPreflight(#{front_preflight_result(data).to_json})")
+          js("NX.frontPreflight(#{front_preflight_result(data, stored).to_json})")
         end
 
         # D-39 (audit B5): zamky vkladacej karty ziju v PAMATI Panel modulu — preziju
@@ -487,6 +543,11 @@ module Noxun
           # `appliance_expects[]` by z neho vypadli a zo slotovej sablony by
           # vznikol slot s generickymi rozmermi a bez ocakavania.
           apply_template_slot_fields!(params, tpl_ref)
+          # ROH-A1 (R6): rohova sablona s porusenym invariantom ciel sa ODMIETNE
+          # (nie ticho oreze v `normalize`). Autorita = ULOZENY ZAZNAM.
+          if (tpl_msg = corner_template_refusal(tpl_ref))
+            return set_status("#{tpl_msg} Nič sa nevložilo.", true)
+          end
           hw_status, hw = take_insert_hardware!(params) # H2 (D-76)
           if hw_status == :lossy
             return set_status("Šablóna nesie kovanie, ktoré sa nedá prečítať (#{Array(hw).join(', ')}) — " \
@@ -551,6 +612,20 @@ module Noxun
             v = params[key]
             params[key] = cfg[key] if v.nil? || v.to_s.strip.empty?
           end
+          # ROH-A1 (audit A1 FIX 3): TA ISTA cesta pre polia ROHOVEJ — formular
+          # ich neposiela, takze bez tohto by sablona „vpravo / 600 / 120 / 90"
+          # skoncila na predvolbach „vlavo / 450 / 80 / 80". Rozsahy a strana
+          # sa zvaliduju v `normalize` (`norm_corner`) ako pri kazdom vstupe.
+          if cfg['type'].to_s == CabinetBuilder::CORNER_TYPE
+            params['type'] = cfg['type']
+            CabinetBuilder::CORNER_KEYS.each do |k|
+              key = k.to_s
+              next unless cfg.key?(key)
+
+              v = params[key]
+              params[key] = cfg[key] if v.nil? || v.to_s.strip.empty?
+            end
+          end
           if cfg['appliance_expects'].is_a?(Array)
             params['appliance_expects'] = cfg['appliance_expects']
           else
@@ -562,6 +637,34 @@ module Noxun
         rescue StandardError => e
           Engine.log_error(e, 'Panel.apply_template_slot_fields!')
           params
+        end
+
+        # ROH-A1: veta, ked ULOZENY zaznam rohovej sablony porusuje invariant
+        # ciel (jeden riadok dvierok, jedno kridlo, medzera pri rohu 1–20),
+        # inak nil. Sablona bez kluca `fronts` (predvolene cela) je v poriadku.
+        def corner_template_refusal(tpl_ref)
+          return nil if tpl_ref.nil?
+
+          tpl = TemplateStore.find(*tpl_ref)
+          cfg = tpl && tpl['config']
+          return nil unless cfg.is_a?(Hash) && cfg['type'].to_s == CabinetBuilder::CORNER_TYPE
+
+          corner_template_fronts_error(cfg)
+        end
+
+        # Cista kontrola ciel ULOZENEHO rohoveho zaznamu (vklad aj pouzitie
+        # sablony na skrinku) — ta ista pravda ako `corner_fronts_refusal`.
+        def corner_template_fronts_error(cfg)
+          return nil unless cfg.key?('fronts')
+
+          fr = Fronts.normalize_config(cfg['fronts'])
+          return "Šablóna rohovej: #{Construction::CORNER_FRONTS_MSG}" unless CabinetBuilder.corner_fronts_ok?(fr)
+          return "Šablóna rohovej: #{Construction::CORNER_GAP_MSG}" unless corner_gap_ok?(fr, cfg['corner_side'])
+
+          nil
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.corner_template_fronts_error')
+          "Šablóna rohovej má poškodené čelá — #{e.message}"
         end
 
         # GHOST-FB4: rucne prestavenie LOCKNUTEJ vysky z Ghost pasika.
@@ -756,6 +859,12 @@ module Noxun
           return set_status('Najprv oznac NOXUN korpus v modeli.', true) if cab.nil?
 
           params = existing_params(cab)
+          # ROH-A1: typ z/na rohovu a strana rohovej sa nemenia (0 krokov Spat).
+          if (msg = corner_change_refusal(params, data))
+            set_status(msg, true)
+            push_selected(model) # UI resync na ulozeny stav
+            return
+          end
           PARAM_KEYS.each do |k|
             params[k] = data[k] if data.key?(k)
           end
@@ -794,6 +903,12 @@ module Noxun
           if (msg = slot_fronts_refusal(params, data['fronts']))
             return set_status(msg, true)
           end
+          # ROH-A1: invariant ciel rohovej (R6) a medzera pri rohu (C3).
+          if (msg = corner_fronts_refusal(params, data['fronts']))
+            set_status(msg, true)
+            push_selected(model)
+            return
+          end
           # KOV-C2b: `drawer.system` a `drawer.recipe_refs` su SERVEROVE.
           # Payload panela nahradza cela VCELKU, takze stale alebo podvrhnute
           # pole by pripnutu verziu receptu prepisalo — a s nou GEOMETRIU uz
@@ -821,6 +936,43 @@ module Noxun
         rescue StandardError => e
           Engine.log_error(e, 'Panel.slot_fronts_refusal')
           nil
+        end
+
+        # ROH-A1 (R6 + krizovy audit C3/G3): cela ROHOVEJ — jeden riadok
+        # dvierok, `auto`, jedno kridlo, medzera pri rohu 1–20 mm. Zmena poctu
+        # riadkov, typu, kridiel alebo rezimu sa ODMIETNE (config sa nedotkne);
+        # smer, profil, medzery v rozsahu, material a kovanie povolene ostavaju.
+        # `params` = ULOZENY stav skrinky (typ a strana su z neho).
+        def corner_fronts_refusal(params, incoming)
+          return nil unless params['type'].to_s == Construction::CORNER_TYPE
+          return nil if incoming.nil?
+
+          cfg = Fronts.normalize_config(incoming)
+          return Construction::CORNER_FRONTS_MSG unless CabinetBuilder.corner_fronts_ok?(cfg)
+          return Construction::CORNER_GAP_MSG unless corner_gap_ok?(cfg, params['corner_side'])
+
+          nil
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.corner_fronts_refusal')
+          nil
+        end
+
+        # ROH-A1 (krizovy audit G1 + C5): zmena TYPU z/na rohovu a zmena STRANY
+        # existujucej rohovej sa v A1 odmietaju — poistka servera (panel typ
+        # po oprave registrov posiela spravne, stranu neposiela vobec). Strana
+        # sa porovnava NORMALIZOVANA (neznama hodnota = `left`, vzor normalize).
+        def corner_change_refusal(params, data)
+          have = params['type'].to_s
+          corner = Construction::CORNER_TYPE
+          if data.key?('type')
+            want = data['type'].to_s
+            return CORNER_TYPE_MSG if want != have && (want == corner || have == corner)
+          end
+          return nil unless have == corner && data.key?('corner_side')
+
+          side = data['corner_side'].to_s
+          side = 'left' unless CabinetBuilder::CORNER_SIDES.include?(side)
+          side == Construction.corner_side(params) ? nil : CORNER_SIDE_MSG
         end
 
         # V0.2c AUTO-APPLY: jedna zmena poľa (konstrukcia AJ cela) -> 1 rebuild, 1 undo krok.
@@ -859,7 +1011,10 @@ module Noxun
           # S1-E: invariant jedneho pevneho cela (pocet, typ, rezim). D-139:
           # vyska sa neposudzuje — riadok z klienta nesie staru, `normalize`
           # ju odvodi z vysky linky, soklu a medzery hore tej istej davky.
-          if (msg = slot_fronts_refusal(params, data['fronts']))
+          # ROH-A1: to iste pre rohovu — cela (R6, C3), typ a strana (G1, C5).
+          if (msg = slot_fronts_refusal(params, data['fronts']) ||
+                    corner_fronts_refusal(params, data['fronts']) ||
+                    corner_change_refusal(params, data))
             set_status(msg, true)
             push_selected(model)
             return push_manual_result(op, false, msg)

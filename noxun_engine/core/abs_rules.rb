@@ -54,7 +54,11 @@ module Noxun
       # na hrane viditelnej zvnutra) — bez bumpu by ich `merge_seed_roles` na
       # existujucich PC nedoplnil a listy by sa postavili BEZ pasky; vlastne
       # (ulozene) pravidla ostavaju nedotknute.
-      SEED_VERSION = 5
+      # 6 = ROH-A1 · K3 roly rohovej zostavy (corner_blind_panel · hinge_rail ·
+      # corner_rail · cr_front · cr_side) — bez bumpu by ich `merge_seed_roles`
+      # na existujucich PC nedoplnil a CR listy by sa postavili BEZ pasky
+      # (rovnaka lekcia ako 3, 4 a 5); vlastne pravidla ostavaju nedotknute.
+      SEED_VERSION = 6
       # Roly, ktore pri bumpe na SEED_VERSION 2 dostanu novy default aj v EXISTUJUCOM
       # subore, ale IBA ak su tam ulozene ako PRESNE prazdny hash {} (povodny stock stav).
       RAIL_MIGRATION_ROLES = %w[rail_front rail_back].freeze
@@ -99,7 +103,17 @@ module Noxun
         # dolna STOJI ako chrbat zasuvky (L1 = horna plocha) — obe L1 = hrana
         # viditelna zvnutra.
         'back_rail_top'      => { 'L1' => 'Dolná', 'L2' => 'Horná', 'W1' => 'Ľavá', 'W2' => 'Pravá' },
-        'back_rail_bottom'   => { 'L1' => 'Horná', 'L2' => 'Dolná', 'W1' => 'Ľavá', 'W2' => 'Pravá' }
+        'back_rail_bottom'   => { 'L1' => 'Horná', 'L2' => 'Dolná', 'W1' => 'Ľavá', 'W2' => 'Pravá' },
+        # ROH-A1 · K3: rohova zostava. Blenda a CR 1 stoja v ROVINE CIEL
+        # (`AXES_FRONT` — L = zvisle strany); vystuha zavesov, rohova vystuha
+        # a CR 2 stoja ako BOK (`AXES_UPRIGHT` — L1 = min Y = predna). Mapy su
+        # symetricke v X, takze zrkadlo (dvere vpravo) fyzicky olepene hrany
+        # nemeni.
+        'corner_blind_panel' => { 'L1' => 'Ľavá',   'L2' => 'Pravá',  'W1' => 'Dolná', 'W2' => 'Horná' },
+        'cr_front'           => { 'L1' => 'Ľavá',   'L2' => 'Pravá',  'W1' => 'Dolná', 'W2' => 'Horná' },
+        'hinge_rail'         => { 'L1' => 'Predná', 'L2' => 'Zadná',  'W1' => 'Dolná', 'W2' => 'Horná' },
+        'corner_rail'        => { 'L1' => 'Predná', 'L2' => 'Zadná',  'W1' => 'Dolná', 'W2' => 'Horná' },
+        'cr_side'            => { 'L1' => 'Predná', 'L2' => 'Zadná',  'W1' => 'Dolná', 'W2' => 'Horná' }
       }.freeze
       EDGE_LABELS_DEFAULT = { 'L1' => 'Hrana 1', 'L2' => 'Hrana 2', 'W1' => 'Hrana 3', 'W2' => 'Hrana 4' }.freeze
 
@@ -167,7 +181,17 @@ module Noxun
         # KON-B · K2 (SEED_VERSION 5): listy chrbta — paska na JEDNEJ dlhej hrane
         # viditelnej zvnutra (M4, M6); rovnaka mapa hran = jeden riadok kusovnika.
         'back_rail_top'      => { 'L1' => 1.0 },
-        'back_rail_bottom'   => { 'L1' => 1.0 }
+        'back_rail_bottom'   => { 'L1' => 1.0 },
+        # ROH-A1 · K3 (SEED_VERSION 6, hrany podla DC „Rohová"):
+        #   blenda korpusova  -> BEZ ABS (DC ju neolepuje, hrany su skryte)
+        #   vystuha zavesov   -> L2 = ZADNA hrana (viditelna zvnutra skrinky)
+        #   rohova vystuha    -> L1 + W1 + W2 = predna + spodna + horna
+        #   CR 1 / CR 2       -> dookola (R4 — ako celo)
+        'corner_blind_panel' => {},
+        'hinge_rail'         => { 'L2' => 1.0 },
+        'corner_rail'        => { 'L1' => 1.0, 'W1' => 1.0, 'W2' => 1.0 },
+        'cr_front'           => { 'L1' => 1.0, 'L2' => 1.0, 'W1' => 1.0, 'W2' => 1.0 },
+        'cr_side'            => { 'L1' => 1.0, 'L2' => 1.0, 'W1' => 1.0, 'W2' => 1.0 }
       }.freeze
 
       module_function
@@ -459,9 +483,14 @@ module Noxun
 
       # Mapa hrana -> strana v 2D karte (top/bottom/left/right) pre rolu. Cela maju L na zvislych
       # stranach; ostatne (lezace) L na vodorovnych. UI (SVG) kresli hrany + labely + klik podla tejto mapy.
+      # ROH-A1 (audit A1 FIX 4): CR 1 a blenda korpusova stoja v rovine ciel
+      # (`AXES_FRONT`) — karta dielca im kresli, popisuje a klika hrany ako
+      # celu (L1 vlavo, W2 hore). Stojace roly rohovej (vystuhy, CR 2) maju
+      # mapu boku = lezaca (default).
       def edge_sides(role)
         case role.to_s
-        when 'front_door', 'drawer_front', 'flap', 'false_front' then EDGE_SIDES_FRONT
+        when 'front_door', 'drawer_front', 'flap', 'false_front',
+             'cr_front', 'corner_blind_panel' then EDGE_SIDES_FRONT
         when *STANDING_ROLES then EDGE_SIDES_STANDING
         else EDGE_SIDES_LYING
         end

@@ -333,7 +333,15 @@ NxTest.test('abs_rules: seed pravidla — ZAMOK presnej mapy VSETKYCH roli (D-30
     'drawer_inner_front' => { 'L1' => 1.0 },
     # KON-B · K2 (SEED_VERSION 5): listy chrbta — paska na hrane viditelnej zvnutra.
     'back_rail_top'      => { 'L1' => 1.0 },
-    'back_rail_bottom'   => { 'L1' => 1.0 }
+    'back_rail_bottom'   => { 'L1' => 1.0 },
+    # ROH-A1 · K3 (SEED_VERSION 6): rohova zostava podla DC — blenda bez ABS,
+    # vystuha zavesov zadna hrana, rohova vystuha predna + spodna + horna,
+    # CR listy dookola (R4).
+    'corner_blind_panel' => {},
+    'hinge_rail'         => { 'L2' => 1.0 },
+    'corner_rail'        => { 'L1' => 1.0, 'W1' => 1.0, 'W2' => 1.0 },
+    'cr_front'           => { 'L1' => 1.0, 'L2' => 1.0, 'W1' => 1.0, 'W2' => 1.0 },
+    'cr_side'            => { 'L1' => 1.0, 'L2' => 1.0, 'W1' => 1.0, 'W2' => 1.0 }
   }
   NxTest.assert_equal(expected, rules::SEED_RULES, 'SEED_RULES sa lisia od zamknutej mapy')
   NxTest.assert_equal(expected, rules.load, 'cerstvy subor musi vratit presne seed mapu')

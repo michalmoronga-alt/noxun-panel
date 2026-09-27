@@ -173,7 +173,12 @@
   // S1-E: sirka a vyska maju INE hranice per TYP — slot nema vnutro, takze
   // korpusove 200/80 mm by nedavali zmysel, a naopak „umyvacka" 3000 mm tiez
   // nie. Zrkadlo `CabinetBuilder::DW_WIDTH_RANGE` / `DW_HEIGHT_RANGE`.
-  var TYPE_LIMITS = { dishwasher: { width:[300,1200], height:[500,1200] } };
+  // ROH-A1: rohová = limity dolnej + najmenšia šírka rohovej pri predvoľbách
+  // (zrkadlo Ruby `CabinetBuilder::CORNER_MIN_WIDTH`, guard test
+  // `tests/pure/test_roha1_rohova.rb`); presné minimum pre konkrétny config
+  // vracia server (`Construction.min_valid_width`).
+  var TYPE_LIMITS = { dishwasher: { width:[300,1200], height:[500,1200] },
+                      corner_blind: { width:[584,3000] } };
   // PR #381 (Codex kolo 1, P2): polia, ktore existuju LEN pri slote. Su v DOM
   // aj pri dolnej a hornej skrinke (len skryte), takze bez tohto filtra by
   // hodnota, ktoru tam nechal predchadzajuci slot, CERVENELA a zablokovala by

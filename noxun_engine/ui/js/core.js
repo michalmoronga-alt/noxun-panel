@@ -1119,7 +1119,8 @@
   // slovenske nazvy typov nepisali na dvoch miestach.
   // PR #381 (Codex kolo 1, P2): JEDINA mapa typ -> SK popisok pre hlavicku
   // Inspectora. Bez `dishwasher` hlasila hlavicka nad slotom „Dolná".
-  var NX_TYPE_LABEL = { lower: 'Dolná', upper: 'Horná', dishwasher: 'Umývačka' };
+  // ROH-A1: + rohová (hlavička Inspectora nad rohovou nesmie hlásiť „Dolná").
+  var NX_TYPE_LABEL = { lower: 'Dolná', upper: 'Horná', dishwasher: 'Umývačka', corner_blind: 'Rohová' };
   function nxCabInfo(c){
     var p = c || {};
     var n = parseInt(p.parts_count, 10);
@@ -1524,7 +1525,9 @@
   var cabTypeVal = 'lower';
   // S1-E: tretia hodnota je SLOT UMYVACKY. Zoznam je zrkadlom Ruby
   // `CabinetBuilder::TYPES` (guard test `tests/pure/test_s1e_slot.rb`).
-  var CAB_TYPES = ['lower', 'upper', 'dishwasher'];
+  // ROH-A1 (krízový audit G1): + rohová. Bez nej by `setType` označenú
+  // rohovú sklopil na dolnú a každý zápis by ju poslal späť ako `lower`.
+  var CAB_TYPES = ['lower', 'upper', 'dishwasher', 'corner_blind'];
   function getType(){ return cabTypeVal; }
   function setType(t){
     cabTypeVal = (CAB_TYPES.indexOf(t) >= 0) ? t : 'lower';

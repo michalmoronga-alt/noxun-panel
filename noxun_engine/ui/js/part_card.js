@@ -8,7 +8,10 @@
       // typ čela (server: PartKeys.flap_label; karta čela príde v KOV-A2).
       flap:'Výklop/sklop', false_front:'Blenda',
       // KON-B · K2: listy chrbta (zrkadlo `ProductionCore::ROLE_LABELS`).
-      back_rail_top:'Lišta chrbta horná', back_rail_bottom:'Lišta chrbta dolná' };
+      back_rail_top:'Lišta chrbta horná', back_rail_bottom:'Lišta chrbta dolná',
+      // ROH-A1: rohová zostava (zrkadlo `ProductionCore::ROLE_LABELS`).
+      corner_blind_panel:'Blenda korpusová', hinge_rail:'Výstuha závesov', corner_rail:'Rohová výstuha',
+      cr_front:'CR lišta 1', cr_side:'CR lišta 2' };
     return m[role] || role;
   }
   function sheetLabelOf(id){
@@ -49,8 +52,10 @@
     // ostatne dielce presnu hrubku dielca — tu ju meni material/hrubka celej skrinky.
     // KOV-A1 (audit #14 FIX 9): bez flap/false_front by bol 19 mm materiál na
     // výklope aj blende v pickeri neaktívny — server ich pritom postaví.
+    // ROH-A1: CR listy sú z čelového materiálu (18,6/19 mm musí byť aktívne).
     var isFront = (pc.role === 'front_door' || pc.role === 'drawer_front' ||
-                   pc.role === 'flap' || pc.role === 'false_front');
+                   pc.role === 'flap' || pc.role === 'false_front' ||
+                   pc.role === 'cr_front' || pc.role === 'cr_side');
     var matFn = isFront ? frontMatch() : thMatch(pc.thickness);
     var selectedMaterial = pc.has_material_override ? (pc.material_id || '') : '';
     var inheritLabel = '(dedí: '+sheetLabelOf(pc.material_id)+')';

@@ -6113,6 +6113,379 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # --- ROH-A1 · K3: ROHOVA SKRINKA (jadro) -----------------------------------
+  #
+  # Overuje sa MODEL, nie len plan: (a) plan <-> model 1:1 pre DC pripad
+  # a 4 kombinacie (W, D, CR, gC, celovy 19 cez kanal aj override CR 2 16)
+  # na OBOCH stranach, (b) vklad ghostom = 1 krok Spat, prestavba = 1 krok,
+  # odmietnutie = 0 krokov, (c) odmietnutia cez akcie panela (cela, zony,
+  # typ, strana cez sablonu) a sablona rovnakej strany prejde, (d) tri kopie
+  # (panel, Mower, nativna + dedup), (e) absorpcia scale SIRKY (rast slepej
+  # casti obe strany, zmensenie pod minimum = klamp + veta, 1 Spat),
+  # (f) ulozenie a nacitanie .skp, (g) kusovnik / VEPO / kovanie z modelu.
+  # Async cast (Scale -> hned Mower -> Spat/Znova) je v `run_roha1_async`.
+  ROHA1_TPL = '__SU_TEST_ROHA1__'
+  ROHA1_FRONTS = { 'gap_top' => 5.0, 'gap_bottom' => 0.0, 'gap_left' => 2.0, 'gap_right' => 2.0 }.freeze
+
+  def roha1_params(extra = {})
+    { 'type' => 'corner_blind', 'width' => 1100.0, 'height' => 862.0, 'depth' => 510.0,
+      'thickness' => 18.0, 'floor_height' => 150.0, 'material_id' => 'R1A18', 'front_material_id' => 'R1A18',
+      'fronts' => ROHA1_FRONTS.dup }.merge(extra)
+  end
+
+  # Katalog: telo/celo 18, celovy 19 a 16 (hrubky CR), paska dookola.
+  def roha1_catalog_json
+    sheet = lambda do |id, th|
+      { 'material_id' => id, 'manufacturer' => 'Egger', 'decor' => 'ROHA1', 'type' => 'DTDL',
+        'thickness' => th, 'grain' => 'none', 'sheet_size' => [2800.0, 2070.0], 'color' => [230, 225, 215],
+        'production_class' => 'sheet', 'group_id' => 'GRP-ROHA1', 'structure' => 'SM' }
+    end
+    { 'std' => 1, 'schema' => 2,
+      'sheets' => [sheet.call('R1A18', 18.0), sheet.call('R1A19', 19.0), sheet.call('R1A16', 16.0)],
+      'edges' => [{ 'abs_id' => 'R1A_ABS_23X10', 'decor' => 'ROHA1', 'thickness' => 1.0, 'width' => 23.0,
+                    'color' => [230, 225, 215], 'group_id' => 'GRP-ROHA1', 'structure' => 'SM' }] }
+  end
+
+  # Plan <-> model 1:1 s UCINNYMI hrubkami (tak, ako stavia `build_into`):
+  # CR z celoveho kanala/overridu, dvere materializovane na katalogovu hrubku.
+  def roha1_sync_bad(model, inst)
+    cid = e::Store.get(inst, 'cabinet_id').to_s
+    norm = e::CabinetBuilder.normalize(kona_params(inst))
+    eff = e::CabinetBuilder.effective_materials(model, norm)
+    plan = e::Construction.build_plan(norm, cid, part_thicknesses: e::CabinetBuilder.plan_thicknesses(norm, eff))
+    fsheet = e::Materials.sheet(eff['front'])
+    fth = fsheet ? fsheet['thickness'].to_f : 0.0
+    parts = inst.definition.entities.grep(Sketchup::ComponentInstance).select { |i| e::Store.kind(i) == 'part' }
+    bad = []
+    bad << "pocet #{plan[:parts].length} != #{parts.length}" if plan[:parts].length != parts.length
+    plan[:parts].each do |raw|
+      pd = e::CabinetBuilder.materialized_part(raw, { sheet_thickness: fth })
+      pi = parts.find { |i| e::Store.get(i, 'part_key') == pd[:part_key].to_s }
+      next bad << "#{pd[:part_key]} chyba" unless pi
+
+      po = pi.transformation.origin
+      org = [mm(po.x), mm(po.y), mm(po.z)]
+      bad << "#{pd[:part_key]} origin #{org.map { |v| v.round(1) }} != #{pd[:origin]}" unless
+        org.zip(pd[:origin]).all? { |a, b| (a - b.to_f).abs <= TOL }
+      b = pi.definition.bounds
+      dims = [mm(b.width), mm(b.height), mm(b.depth)]
+      bad << "#{pd[:part_key]} box #{dims.map { |v| v.round(1) }} != #{pd[:box]}" unless
+        dims.zip(pd[:box]).all? { |a, bx| (a - bx.to_f).abs <= TOL }
+    end
+    bad
+  end
+
+  def roha1_origin_x(inst, key)
+    p = kona_part(inst, key)
+    p ? mm(p.transformation.origin.x) : nil
+  end
+
+  def roha1_fields(inst)
+    kona_cfg(inst).values_at('corner_side', 'corner_door_w', 'corner_cr1', 'corner_cr2')
+  end
+
+  def run_roha1(model)
+    cleanup(model)
+    tmp = File.join(Dir.tmpdir, "noxun_roha1_#{Process.pid}")
+    FileUtils.mkdir_p(tmp)
+    File.binwrite(File.join(tmp, 'materials.json'), JSON.pretty_generate(roha1_catalog_json))
+    e::Materials.test_dir_override = tmp
+    e::Materials.reload!
+    begin
+      cab = e::CabinetBuilder.build(model, roha1_params)
+      return ok('ROH-A1: vlozenie rohovej', false) unless cab
+
+      cid = e::Store.get(cab, 'cabinet_id').to_s
+      ok("ROH-A1: typ, polia a schema (#{kona_cfg(cab).values_at('type', 'config_schema', 'plan_schema').inspect})",
+         kona_cfg(cab)['type'] == 'corner_blind' && kona_cfg(cab)['config_schema'] == 22 &&
+         kona_cfg(cab)['plan_schema'] == 7 && roha1_fields(cab) == ['left', 450.0, 80.0, 80.0])
+
+      # (a) MATICA plan <-> model 1:1 na jednej instancii
+      combos = {
+        'DC' => {},
+        'W900 D300 CR50/120 gC1' => { 'width' => 900.0, 'corner_door_w' => 300.0, 'corner_cr1' => 50.0,
+                                       'corner_cr2' => 120.0, 'gc' => 1.0 },
+        'W1300 D600 CR120/50 gC10' => { 'width' => 1300.0, 'corner_door_w' => 600.0, 'corner_cr1' => 120.0,
+                                         'corner_cr2' => 50.0, 'gc' => 10.0 },
+        'celovy 19 (kanal)' => { 'front_material_id' => 'R1A19' },
+        'CR 2 16 (override) W 582' => { 'width' => 582.0,
+                                         'part_overrides' => { 'cabinet/cr:2' => { 'material_id' => 'R1A16' } } }
+      }
+      fails = []
+      n = 0
+      %w[left right].each do |side|
+        combos.each do |label, c|
+          c = c.dup
+          gc = c.delete('gc') || 2.0
+          fr = side == 'right' ? ROHA1_FRONTS.merge('gap_left' => gc) : ROHA1_FRONTS.merge('gap_right' => gc)
+          e::CabinetBuilder.rebuild(model, cab, roha1_params(c).merge('corner_side' => side, 'fronts' => fr))
+          bad = roha1_sync_bad(model, cab)
+          bad << 'chyba zostava' unless %w[cabinet/corner_panel cabinet/hinge_rail cabinet/cr:1 cabinet/cr:2
+                                          cabinet/corner_rail].all? { |k| kona_part(cab, k) }
+          fails << "#{side}/#{label}: #{bad.first(2).join('; ')}" unless bad.empty?
+          n += 1
+        end
+      end
+      ok("ROH-A1 (a): plan = model pre #{n} kombinacii (strana x W/D/CR/gC/hrubky) (#{fails.length} nezhod)" \
+         "#{fails.empty? ? '' : ' — ' + fails.first(3).join(' | ')}", fails.empty? && n == 10)
+      e::CabinetBuilder.rebuild(model, cab, roha1_params('front_material_id' => 'R1A19'))
+      cr1 = e::Store.config(kona_part(cab, 'cabinet/cr:1')) || {}
+      ok("ROH-A1 (a): CR 1 z celoveho 19 — hrubka 19, material R1A19 (#{cr1.values_at('thickness', 'material_id').inspect})",
+         (cr1['thickness'].to_f - 19.0).abs < TOL && cr1['material_id'] == 'R1A19')
+      ok("ROH-A1 (a): DC cisla v modeli s CR 19 — blenda x 450, CR 2 x 530, rohova vystuha x 549 (450 + 80 + 19) " \
+         "(#{%w[cabinet/corner_panel cabinet/cr:2 cabinet/corner_rail].map { |k| roha1_origin_x(cab, k).to_f.round(1) }.inspect})",
+         (roha1_origin_x(cab, 'cabinet/corner_panel').to_f - 450.0).abs < TOL &&
+         (roha1_origin_x(cab, 'cabinet/cr:2').to_f - 530.0).abs < TOL &&
+         (roha1_origin_x(cab, 'cabinet/corner_rail').to_f - 549.0).abs < TOL)
+
+      # (b) PRESTAVBA = 1 krok; polia rohovej prezivaju
+      e::CabinetBuilder.rebuild(model, cab, roha1_params('corner_side' => 'right', 'corner_door_w' => 500.0))
+      e::CabinetBuilder.rebuild(model, cab, kona_params(cab).merge('width' => 1200.0))
+      ok("ROH-A1 (b): prestavba drzi polia (#{roha1_fields(cab).inspect})",
+         roha1_fields(cab) == ['right', 500.0, 80.0, 80.0] && kona_cfg(cab)['width'] == 1200.0 &&
+         roha1_sync_bad(model, cab).empty?)
+      Sketchup.undo
+      ok("ROH-A1 (b): 1 Spat vratil sirku 1100 (#{kona_cfg(cab)['width']})",
+         kona_cfg(cab)['width'] == 1100.0 && roha1_fields(cab) == ['right', 500.0, 80.0, 80.0] &&
+         roha1_sync_bad(model, cab).empty?)
+
+      # (c) ODMIETNUTIA cez akcie panela = 0 krokov Spat
+      e::CabinetBuilder.rebuild(model, cab, kona_params(cab).merge('width' => 1250.0)) # posledny realny krok
+      model.selection.clear
+      model.selection.add(cab)
+      before = kona_cfg(cab)
+      two = ROHA1_FRONTS.merge('gap_left' => 2.0, 'items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'auto', 'wings' => '1' },
+                                                           { 'id' => 'F2', 'type' => 'door', 'mode' => 'auto', 'wings' => '1' }])
+      e::Panel.handle_apply_fronts(pg(model, 'cabinet_id' => cid, 'fronts' => two))
+      drw = ROHA1_FRONTS.merge('items' => [{ 'id' => 'F1', 'type' => 'drawer_front', 'mode' => 'auto' }])
+      e::Panel.handle_apply_all(pg(model, 'cabinet_id' => cid, 'fronts' => drw))
+      e::Panel.handle_apply(pg(model, 'cabinet_id' => cid, 'type' => 'lower', 'width' => 1250.0))
+      e::Panel.handle_apply(pg(model, 'cabinet_id' => cid, 'type' => 'corner_blind', 'corner_side' => 'left'))
+      e::Panel.handle_split_zone(pg(model, 'cabinet_id' => cid, 'zone_id' => "#{cid}-Z1", 'axis' => 'v', 'count' => 2))
+      ok('ROH-A1 (c): cela 2 riadky / zasuvka, typ dolna, strana vlavo, delenie zony — config netknuty',
+         kona_cfg(cab) == before && e::ZoneTree.leaf?(kona_cfg(cab)['zone_tree']))
+      Sketchup.undo
+      ok("ROH-A1 (c): odmietnutia nepridali krok — 1 Spat vratil posledny realny krok (sirka #{kona_cfg(cab)['width']})",
+         kona_cfg(cab)['width'] == 1100.0)
+      # povolena zmena ciel: smer + medzera pri rohu v rozsahu
+      ok_fr = ROHA1_FRONTS.merge('gap_left' => 4.0, 'items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'auto',
+                                                               'wings' => '1', 'direction' => 'right' }])
+      e::Panel.handle_apply_fronts(pg(model, 'cabinet_id' => cid, 'fronts' => ok_fr))
+      it = Array(kona_cfg(cab)['front_items']).first || {}
+      ok("ROH-A1 (c): povolena zmena ciel (smer vpravo, medzera pri rohu 4) prejde (#{it['direction'].inspect})",
+         it['direction'] == 'right' && kona_cfg(cab)['fronts']['gap_left'] == 4.0 && roha1_sync_bad(model, cab).empty?)
+
+      # (c2) SABLONY: rovnaka strana prejde, ina strana odmietnuta
+      roha1_templates(model, cab, cid)
+
+      # (d) TRI KOPIE — polia rohovej a geometria idu s nimi
+      roha1_copies(model, cab, cid)
+
+      # (e) ABSORPCIA SCALE SIRKY
+      roha1_scale(model, cab)
+
+      # (f) ULOZENIE a NACITANIE .skp
+      saved_path = File.join(File.dirname(OUT), 'ENGINEtests_roha1_saved.skp')
+      ok('ROH-A1 (f): SKP save_copy', model.save_copy(saved_path))
+      loaded = model.definitions.load(saved_path)
+      saved = loaded.entities.grep(Sketchup::ComponentInstance).find { |p| e::Store.kind(p) == 'cabinet' }
+      ok("ROH-A1 (f): nacitana rohova nesie typ a polia (#{saved ? roha1_fields(saved).inspect : 'ziadna'})",
+         saved && kona_cfg(saved)['type'] == 'corner_blind' && roha1_fields(saved) == roha1_fields(cab) &&
+         !kona_part(saved, 'cabinet/cr:2').nil?)
+
+      # (g) VYSTUPY z modelu
+      roha1_outputs(model)
+    ensure
+      e::Materials.test_dir_override = nil
+      e::Materials.reload!
+      cleanup(model)
+      e::TemplateStore.delete('cabinet', ROHA1_TPL) if e::TemplateStore.find('cabinet', ROHA1_TPL)
+      begin
+        FileUtils.rm_rf(tmp)
+      rescue StandardError
+        nil
+      end
+    end
+    ok('ROH-A1: cleanup (0 korpusov)', cabinets(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: run_roha1 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    ghost_teardown!(model)
+    cleanup(model)
+  end
+
+  # Sablona z rohovej (vpravo 500) -> vklad ghostom nesie polia; sablona ine
+  # strany sa na existujucu rohovu nepouzije; rovnaka strana prejde.
+  def roha1_templates(model, cab, cid)
+    e::TemplateStore.delete('cabinet', ROHA1_TPL) if e::TemplateStore.find('cabinet', ROHA1_TPL)
+    e::CabinetBuilder.rebuild(model, cab, kona_params(cab).merge('corner_cr2' => 120.0))
+    model.selection.clear
+    model.selection.add(cab)
+    e::Panel.handle_save_template_as(pg(model, 'cabinet_id' => cid, 'name' => ROHA1_TPL, 'type' => 'lower'))
+    rec = e::TemplateStore.find('cabinet', ROHA1_TPL)
+    ok("ROH-A1 (c2): sablona rohovej — typ zamknuty, polia ulozene (#{rec ? rec['config'].values_at('type', 'corner_side', 'corner_door_w', 'corner_cr2').inspect : 'ziadna'})",
+       rec && rec['config']['type'] == 'corner_blind' && rec['config']['corner_side'] == 'right' &&
+       rec['config']['corner_door_w'] == 500.0 && rec['config']['corner_cr2'] == 120.0)
+    return unless rec
+
+    # vklad ghostom (formular polia rohovej neposiela — server ich cita zo zaznamu)
+    payload = roha1_params.reject { |k, _| k.start_with?('corner_') }
+                          .merge('template_kind' => 'cabinet', 'template_name' => ROHA1_TPL)
+    before = cabinets(model).length
+    inst = ghost_place!(model, payload, [6200.0, 300.0])
+    ghost_teardown!(model)
+    ok("ROH-A1 (c2): vklad zo sablony nesie vpravo / 500 / CR 2 120 (#{inst ? roha1_fields(inst).inspect : 'ziadna'})",
+       inst && roha1_fields(inst) == ['right', 500.0, 80.0, 120.0] && roha1_sync_bad(model, inst).empty? &&
+       cabinets(model).length == before + 1)
+    if inst
+      Sketchup.undo
+      ok('ROH-A1 (b): vklad ghostom = 1 krok Spat', !inst.valid? && cabinets(model).length == before)
+    end
+    # ina strana na existujucu rohovu -> odmietnutie
+    tgt = e::CabinetBuilder.build(model, roha1_params('corner_side' => 'left'),
+                                  transform: Geom::Transformation.translation(e::Units.point(8000.0, 0, 0)))
+    tb = kona_cfg(tgt)
+    model.selection.clear
+    model.selection.add(tgt)
+    e::TemplatesDialog.handle_apply({ 'template' => ROHA1_TPL }.to_json)
+    ok('ROH-A1 (c2): sablona inej strany sa na rohovu nepouzije (config netknuty)', kona_cfg(tgt) == tb)
+    # rovnaka strana (vpravo) prejde a prenesie CR 2
+    e::CabinetBuilder.rebuild(model, tgt, kona_params(tgt).merge('corner_side' => 'right'))
+    model.selection.clear
+    model.selection.add(tgt)
+    e::TemplatesDialog.handle_apply({ 'template' => ROHA1_TPL }.to_json)
+    ok("ROH-A1 (c2): sablona rovnakej strany prejde (#{roha1_fields(tgt).inspect})",
+       roha1_fields(tgt) == ['right', 500.0, 80.0, 120.0] && roha1_sync_bad(model, tgt).empty?)
+    tgt.erase! if tgt.valid?
+  end
+
+  def roha1_copies(model, cab, cid)
+    e::CabinetBuilder.rebuild(model, cab, roha1_params('corner_side' => 'right', 'corner_cr1' => 60.0))
+    want = roha1_fields(cab)
+    cnt = cabinets(model).length
+    e::Panel.handle_insert_copy(pg(model, 'cabinet_id' => cid))
+    copy = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' && e::Store.get(i, 'cabinet_id').to_s != cid }
+    ok("ROH-A1 (d): kopia z panela nesie polia (#{copy ? roha1_fields(copy).inspect : 'ziadna'})",
+       copy && roha1_fields(copy) == want && roha1_sync_bad(model, copy).empty? && cabinets(model).length == cnt + 1)
+    copy.erase! if copy && copy.valid?
+    mcopy = e::Tools::Mower.send(:copy_cabinet, model, cab, :right)
+    ok("ROH-A1 (d): kopia nastrojom (Mower) nesie polia (#{mcopy ? roha1_fields(mcopy).inspect : 'ziadna'})",
+       mcopy && mcopy.valid? && roha1_fields(mcopy) == want && roha1_sync_bad(model, mcopy).empty?)
+    mcopy.erase! if mcopy && mcopy.valid?
+    ncopy = nil
+    e::ScaleWatch.guard do
+      model.start_operation('SU-TEST ROH-A1 nativna kopia', true)
+      ncopy = model.entities.add_instance(cab.definition, Geom::Transformation.translation(e::Units.point(12_000, 0, 0)))
+      cab.attribute_dictionaries.each { |dict| dict.each_pair { |k, v| ncopy.set_attribute(dict.name, k, v) } }
+      model.commit_operation
+    end
+    done = e::CabinetBuilder.dedup_copies(model, fresh_ids: [ncopy.entityID])
+    ok("ROH-A1 (d): nativna kopia + dedup — nove ID a polia (#{roha1_fields(ncopy).inspect})",
+       done == [ncopy] && e::Store.get(ncopy, 'cabinet_id').to_s != cid && roha1_fields(ncopy) == want &&
+       roha1_sync_bad(model, ncopy).empty?)
+    ncopy.erase! if ncopy.valid?
+  end
+
+  def roha1_scale(model, cab)
+    %w[left right].each do |side|
+      e::CabinetBuilder.rebuild(model, cab, roha1_params('corner_side' => side))
+      xs = %w[cabinet/hinge_rail cabinet/cr:1 cabinet/cr:2 cabinet/corner_rail].map { |k| roha1_origin_x(cab, k) }
+      before_tr = cab.transformation.to_a
+      model.start_operation('SU-TEST ROH-A1 user scale', true)
+      cab.transformation = cab.transformation * Geom::Transformation.scaling(ORIGIN, 1300.0 / 1100.0, 1.0, 1.0)
+      model.commit_operation
+      e::ScaleWatch.absorb(cab)
+      xs2 = %w[cabinet/hinge_rail cabinet/cr:1 cabinet/cr:2 cabinet/corner_rail].map { |k| roha1_origin_x(cab, k) }
+      shift = side == 'right' ? 200.0 : 0.0
+      grew = xs.zip(xs2).all? { |a, b| a && b && ((b - a) - shift).abs <= TOL }
+      panel_w = ((e::Store.config(kona_part(cab, 'cabinet/corner_panel')) || {})['width']).to_f
+      ok("ROH-A1 (e) #{side}: scale 1100 -> 1300 — rastie LEN slepa cast (blenda #{panel_w.round(1)}, zostava #{side == 'right' ? '+200' : 'na mieste'})",
+         kona_cfg(cab)['width'] == 1300.0 && grew && (panel_w - 832.0).abs < TOL && roha1_sync_bad(model, cab).empty?)
+      Sketchup.undo
+      ok("ROH-A1 (e) #{side}: 1 Spat vratil scale aj absorpciu (#{kona_cfg(cab)['width']})",
+         kona_cfg(cab)['width'] == 1100.0 && cab.transformation.to_a == before_tr)
+      # zmensenie pod minimum -> klamp na 584 + nemodalna veta
+      rec = []
+      install_js_recorder(rec)
+      begin
+        model.start_operation('SU-TEST ROH-A1 user scale pod minimum', true)
+        cab.transformation = cab.transformation * Geom::Transformation.scaling(ORIGIN, 0.3, 1.0, 1.0)
+        model.commit_operation
+        e::ScaleWatch.absorb(cab)
+      ensure
+        remove_js_recorder
+      end
+      said = rec.any? { |s| s.include?('najmenej 584') }
+      ok("ROH-A1 (e) #{side}: zmensenie pod minimum = klamp 584 + nemodalna veta (#{kona_cfg(cab)['width']}, veta #{said})",
+         kona_cfg(cab)['width'] == 584.0 && said && roha1_sync_bad(model, cab).empty?)
+      Sketchup.undo
+    end
+  end
+
+  def roha1_outputs(model)
+    cleanup(model)
+    inst = e::CabinetBuilder.build(model, roha1_params('zone_tree' => { 'id' => 'Z1', 'shelves' => 2, 'children' => [] }))
+    return ok('ROH-A1 (g): vlozenie pre vystupy', false) unless inst
+
+    rows = e::Bom.compute(e::Bom.collect(model))[:rows]
+    names = rows.flat_map { |r| Array(r['names']) }
+    ok("ROH-A1 (g): kusovnik ma dielce zostavy (#{names.grep(/rohova|zavesov|CR lista/).uniq.inspect})",
+       ['Blenda rohova', 'Vystuha zavesov', 'Vystuha rohova', 'CR lista 1', 'CR lista 2'].all? { |n| names.include?(n) })
+    blend = rows.find { |r| Array(r['names']).include?('Blenda rohova') }
+    ok("ROH-A1 (g): blenda 676 x 632 (#{blend ? [blend['length'], blend['width']].inspect : 'ziadna'})",
+       blend && (blend['length'].to_f - 676.0).abs < TOL && (blend['width'].to_f - 632.0).abs < TOL)
+    vnames = rows.map { |r| e::VepoExport.row_name(r) }
+    ok("ROH-A1 (g): VEPO nazvy <= 20 (#{vnames.grep(/roh|zav|CR/).inspect})",
+       vnames.all? { |v| v.length <= e::VepoExport::NAME_MAX } && vnames.any? { |v| v.start_with?('Vyst zav') })
+    hw = Array(kona_cfg(inst)['hardware'])
+    legs = hw.select { |h| h['generic_type'] == 'leg' }.sum { |h| h['quantity'].to_i }
+    hinges = hw.select { |h| h['generic_type'] == 'hinge' }.map { |h| [h['owner_part_key'], h['quantity']] }
+    ok("ROH-A1 (g): kovanie — nohy #{legs}, zavesy #{hinges.inspect}",
+       legs == 6 && hinges == [['front:F1/wing:single', 2]])
+    notch = Array(kona_cfg(inst)['warnings']).count { |w| w['code'] == 'corner_shelf_notch' }
+    ok("ROH-A1 (g): ORANGE vyrez police x vystuha zavesov (#{notch})", notch == 1)
+  end
+
+  # ROH-A1 async: Scale (cakajuca absorpcia) -> HNED kopia nastrojom ->
+  # dobeh -> Spat/Znova bez dalsieho kroku casovaca (bariera `flush_pending!`).
+  def run_roha1_async(model, state, steps)
+    steps << [0.3, lambda do
+      cleanup(model)
+      inst = e::CabinetBuilder.build(model, roha1_params('material_id' => nil, 'front_material_id' => nil))
+      state[:roha1] = inst
+      model.start_operation('SU-TEST ROH-A1 user scale pred kopiou', true)
+      inst.transformation = inst.transformation * Geom::Transformation.scaling(ORIGIN, 1300.0 / 1100.0, 1.0, 1.0)
+      model.commit_operation
+      state[:roha1_pending] = e::ScaleWatch.pending?
+      tools1_select(model, inst)
+      state[:roha1_copy] = e::Tools::Mower.copy(:right)
+    end]
+    steps << [SETTLE, lambda do
+      inst = state[:roha1]
+      copy = state[:roha1_copy]
+      ok('async ROH-A1: Scale naozaj zalozil observeru pracu', state[:roha1_pending] == true)
+      ok("async ROH-A1: bariera absorbovala Scale PRED kopiou (sirka #{inst && inst.valid? ? kona_cfg(inst)['width'] : '?'})",
+         inst && inst.valid? && kona_cfg(inst)['width'] == 1300.0)
+      ok('async ROH-A1: kopia nesie rohovu (1300, polia) a observer je v pokoji',
+         copy && copy.valid? && kona_cfg(copy)['type'] == 'corner_blind' && kona_cfg(copy)['width'] == 1300.0 &&
+         e::ScaleWatch.pending? == false)
+      Sketchup.undo
+      state[:roha1_after_undo] = [cabinets(model).length, inst && inst.valid? ? kona_cfg(inst)['width'] : nil]
+      state[:roha1_redo] = Sketchup.respond_to?(:redo)
+      Sketchup.redo if state[:roha1_redo]
+    end]
+    steps << [SETTLE, lambda do
+      ok("async ROH-A1: 1 Spat vratil LEN kopiu, absorpcia drzi (#{state[:roha1_after_undo].inspect})",
+         state[:roha1_after_undo] == [1, 1300.0])
+      if state[:roha1_redo]
+        ok('async ROH-A1: Znova vratilo kopiu a NIC ine (bez dalsieho kroku casovaca)',
+           cabinets(model).length == 2 && e::ScaleWatch.pending? == false)
+      else
+        info('async ROH-A1: Sketchup.redo nedostupne — Redo vetva netestovana')
+      end
+      cleanup(model)
+    end]
+  end
+
   # --- S1-C: OCAKAVANY SPOTREBIC (`appliance_expects[]`) --------------------
   #
   # CO SA TU OVERUJE A MIMO SKETCHUPU OVERIT NEDA:
@@ -26768,6 +27141,10 @@ module NoxunSuRunner
     # Move ? bariera musi observer dotiahnut do pokoja EST PRED vlastnou operaciou.
     run_tools1_async(model, state, steps)
 
+    # ROH-A1: Scale rohovej -> HNED kopia nastrojom -> Spat/Znova bez dalsieho
+    # kroku casovaca (absorpcia sirky bezi v bariere, nie po operacii kopie).
+    run_roha1_async(model, state, steps)
+
     # S6b: zachytna siet v KONTROLE — ked uz dva kusy na jednom mieste vzniknu
     # (starsi projekt, paste-in-place), semafor ich MUSI ukazat. Overuje CELU
     # retaz Bom.collect -> Validation.run(placements:), nielen cistu funkciu.
@@ -26866,6 +27243,7 @@ module NoxunSuRunner
     run_kona(model)          # KON-A · K1: KOMIN VZADU A ZAPUSTENY STROP — plan = model pre 68 kombinacii chrbat x strop x X x Y (+ dno medzi bokmi) na jednej instancii, zmena komina = 1 Spat, odmietnutie komina 2 bez zmeny, absorpcia hlbky pod minimum -> 160 + 1 Spat, kopia, ulozenie a nacitanie .skp, sablona tam aj stara sablona (komin ciela ostane), vklad zo sablony ghostom; D-144 schema 19 -> RED + brana + hromadna prestavba cez skutocny vyber kandidatov + 1 Spat
     run_konb(model)          # KON-B · K2: CHRBAT Z LIST — plan = model pre 48 kombinacii strop x dno x komin x vyska list, prepnutie na listy = 1 Spat, odmietnutie 2H + 20 > vnutro bez zmeny, nalozeny -> listy -> nalozeny (dormantny rucny zasah chrbta sa vrati), kopia, ulozenie a nacitanie .skp, sablona tam aj stara (H ciela ostane) a vklad ghostom, Kontrola olepov (paska na hornej ploche dolnej a dolnej ploche hornej listy), kusovnik z modelu 1 riadok 2 ks / s vystuhami 4 ks a VEPO „Chrb HD“
     run_kond(model)          # KON-D: VSTAVANA SABLONA „Chladničková" — seed v cerstvej kniznici STD 7 so schemou 21, vklad ghostom = plan <-> model 1:1, dno a strop 510, boky 560, bez chrbta, 2 fyzicke dvierka 719 + 1274 so smerom „neurceny" (Kontrola 2 nalezy), ocakava chladnicku (ORANGE), nika 560, 1 krok Spat vrati vklad
+    run_roha1(model)         # ROH-A1 · K3: ROHOVA SKRINKA — plan = model pre 10 kombinacii (strana x W/D/CR/gC/celovy 19/CR 2 16 pri W 582), prestavba drzi polia (1 Spat), odmietnutia panela (cela, typ, strana, zony) = 0 krokov, sablona uloz -> vloz ghostom (1 Spat) / ina strana odmietnuta / rovnaka prejde, tri kopie, scale sirky (rast slepej casti obe strany, klamp 584 + veta), ulozenie .skp, kusovnik/VEPO/kovanie z modelu
     run_d140(model)          # D-140: VYSKA OSADENIA CHLADNICKY — akcia panela zdvihne box niky (z 118 -> 268) a Kontrola vysky/delenia pocita od zdvihnuteho dna, 1x Spat, odmietnutia (stara hodnota, zly vstup, cudzie echo/PID/dokument, nezmenena) bez kroku Spat, prestavba dvierok osadenie zachova, zapis z otvoreneho komponentu zatvori kontext, vymena modelu prenesie, presun na inu skrinku nie, kopia ho nema, 0 kluc zmaze
     run_s1c(model)           # S1-C: OCAKAVANY SPOTREBIC — cely cyklus sablony (uloz s ocakavaniami -> vloz ghostom -> config -> Kontrola 2x ORANGE -> priradenie -> OK -> 2x Spat), ocakavanie BEZ sablony v riadku Spotrebic (1x Spat, geometria netknuta, peciatka schemy, nezmenene = ziadny krok, cudzie echo/PID nezapisu nic, viazanu kategoriu zrusit nedas), bariera observera po nativnej kopii, slot bez modelu (ORANGE + podvrh odmietnuty), aplikovanie sablony na viazanu skrinku (vazba ostava, ocakavania unia)
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11

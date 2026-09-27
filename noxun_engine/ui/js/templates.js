@@ -67,7 +67,7 @@
   function tplArg(v){ return tplEsc(JSON.stringify(String(v == null ? '' : v))); }
   function tplIco(n){ return '<svg class="ic" aria-hidden="true"><use href="#i-' + n + '"/></svg>'; }
   // S1-E: tretí typ. Zrkadlo Ruby `Panel::TEMPLATE_TYPE_WORDS`.
-  var TPL_TYPE_WORDS = { upper: 'horná', lower: 'dolná', dishwasher: 'umývačka' };
+  var TPL_TYPE_WORDS = { upper: 'horná', lower: 'dolná', dishwasher: 'umývačka', corner_blind: 'rohová' };
   function tplTypeLabel(t){ return TPL_TYPE_WORDS[t] || 'dolná'; }
   // Kľúč cache náhľadov. Oddeľovač NESMIE byť znak, ktorý sa môže objaviť
   // v mene šablóny — a už vôbec nie NUL bajt: ten spraví z celého súboru

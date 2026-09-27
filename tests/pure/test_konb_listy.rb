@@ -269,24 +269,26 @@ end
 # 2. SCHEMY
 # ============================================================================
 
-NxTest.test('KON-B: CONFIG_SCHEMA 21 + HISTORIA, BuildPlan SCHEMA 6 + ROLES, aktivacne schemy sa nehybu') do
+# ROH-A1 dvihla schemy (CONFIG 22, BuildPlan 7, ABS seed 6) — presne hodnoty
+# drzi `test_roha1_rohova.rb`; tu sa strazi, ze bump KON-B nastal.
+NxTest.test('KON-B: CONFIG_SCHEMA >= 21 + HISTORIA, BuildPlan SCHEMA >= 6 + ROLES, aktivacne schemy sa nehybu') do
   cb = NxKonB::CB
-  NxTest.assert_equal(21, cb::CONFIG_SCHEMA)
+  NxTest.assert(cb::CONFIG_SCHEMA >= 21, 'KON-B bump nastal (21)')
   NxTest.assert(NxKonB.src('noxun_engine', 'core', 'cabinet_builder.rb').include?('#  21 = KON-B · K2'),
                 'HISTORIA hovori, preco sa bumplo')
   NxTest.assert_equal([5, 9, 11, 19, 20], [cb::DRAWER_ACTIVATION_SCHEMA, cb::HINGE_ACTIVATION_SCHEMA,
                                            cb::LIFT_ACTIVATION_SCHEMA, cb::BACK_CUT_ACTIVATION_SCHEMA,
                                            cb::BACK_RAIL_ACTIVATION_SCHEMA])
-  NxTest.assert(cb.newer_config?({ 'config_schema' => 22 }), 'dopredna brana: schema 22 je novsia')
+  NxTest.assert(cb.newer_config?({ 'config_schema' => cb::CONFIG_SCHEMA + 1 }), 'dopredna brana: vyssia schema je novsia')
   NxTest.refute(cb.newer_config?({ 'config_schema' => 21 }))
-  NxTest.assert_equal(21, NxKonB.stored('back_mode' => 'rails')['config_schema'])
-  NxTest.assert_equal(6, NxKonB::BP::SCHEMA)
+  NxTest.assert_equal(cb::CONFIG_SCHEMA, NxKonB.stored('back_mode' => 'rails')['config_schema'])
+  NxTest.assert(NxKonB::BP::SCHEMA >= 6, 'KON-B bump planu nastal (6)')
   NxTest.assert(%w[back_rail_top back_rail_bottom].all? { |r| NxKonB::BP::ROLES.include?(r) }, 'nove roly v ROLES')
   NxTest.assert_equal(%w[overlay inset groove], NxKonB::BP::BACK_MODES, 'BACK_MODES sa NEROZSIRUJE (znacka povodu)')
   pl = NxKonB.plan('back_mode' => 'rails')
-  NxTest.assert_equal(6, pl[:schema])
+  NxTest.assert_equal(NxKonB::BP::SCHEMA, pl[:schema])
   NxTest.refute(pl[:parts].any? { |pd| pd.key?(:back_mode) }, 'listy znacku povodu `back_mode` nenesu')
-  NxTest.assert_equal(5, NxKonB::ABS::SEED_VERSION)
+  NxTest.assert(NxKonB::ABS::SEED_VERSION >= 5, 'KON-B bump seedu nastal (5)')
   NxTest.assert_equal(1, Noxun::Engine::PartKeys::SCHEMA, 'PartKeys bez zmeny')
 end
 
@@ -472,7 +474,8 @@ NxTest.test('KON-B: ABS seed 5 — merge doplni listy na existujucom PC, vlastne
   NxTest.assert_equal({ 'L1' => 1.0 }, got['back_rail_top'], 'horna lista doplnena')
   NxTest.assert_equal({ 'L1' => 1.0 }, got['back_rail_bottom'], 'dolna lista doplnena')
   NxTest.assert_equal({ 'L1' => 2.0, 'L2' => 1.0 }, got['shelf'], 'vlastne pravidlo police ostalo')
-  NxTest.assert_equal(5, Noxun::Engine::JsonFileStore.read(abs.path)['seed_version'], 'subor nesie seed 5')
+  NxTest.assert_equal(abs::SEED_VERSION, Noxun::Engine::JsonFileStore.read(abs.path)['seed_version'],
+                      'subor nesie aktualny seed (5 = KON-B, 6 = ROH-A1)')
   # Vlastne pravidlo listy (ulozene pod seedom 4) sa neprepise.
   NxKonB.reset_abs_file!
   Noxun::Engine::JsonFileStore.write(abs.path, { 'std' => 1, 'seed_version' => 4,

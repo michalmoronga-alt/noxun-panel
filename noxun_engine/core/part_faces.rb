@@ -165,7 +165,11 @@ module Noxun
         # Kazda rola ma PRAVE JEDNEHO kandidata — dno lezi, chrbat a vnutorne celo
         # stoja v rovine XZ, bok boxu v rovine YZ (dlzka = NL po hlbke).
         'drawer_bottom' => [AXES_LYING], 'drawer_back' => [AXES_WALL],
-        'drawer_inner_front' => [AXES_WALL], 'box_side' => [AXES_WALL_DEPTH]
+        'drawer_inner_front' => [AXES_WALL], 'box_side' => [AXES_WALL_DEPTH],
+        # ROH-A1 · K3: rohova zostava (`Construction.corner_parts`). Blenda a CR 1
+        # stoja v rovine ciel, vystuhy a CR 2 ako bok (dlzka = vyska).
+        'corner_blind_panel' => [AXES_FRONT], 'cr_front' => [AXES_FRONT],
+        'hinge_rail' => [AXES_UPRIGHT], 'corner_rail' => [AXES_UPRIGHT], 'cr_side' => [AXES_UPRIGHT]
       }.freeze
 
       # Osi dielca z jeho ROLY + rozmerov kvadra (mm) a vyrobnych udajov snapshotu.

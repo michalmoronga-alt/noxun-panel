@@ -2322,6 +2322,12 @@ module Noxun
           # S1-E: polia SLOTU cestuju so sablonou — bez nich by z „Umývačky 60"
           # vznikol slot s generickymi rozmermi namiesto tych ulozenych.
           CabinetBuilder::DW_KEYS.each { |k| tc[k.to_s] = cfg[k.to_s] if cfg.key?(k.to_s) }
+          # ROH-A1: polia ROHOVEJ vyslovne vsetky styri (strana, dverova cast,
+          # CR 1, CR 2) — bez nich by sa z rohovej sablony vlozila rohova na
+          # predvolbach. Pri inom type sa nezapisuju (golden sablony sa nehnu).
+          if cfg['type'].to_s == CabinetBuilder::CORNER_TYPE
+            CabinetBuilder::CORNER_KEYS.each { |k| tc[k.to_s] = cfg[k.to_s] if cfg.key?(k.to_s) }
+          end
           # KON-A · K1 (Codex FIX 7): komin a zapustenie sablona zapisuje
           # VYSLOVNE, aj 0 — pri pouziti na inu skrinku tak nova sablona 0
           # prepise na 0 a len STARA sablona (kluc chyba) necha hodnotu ciela

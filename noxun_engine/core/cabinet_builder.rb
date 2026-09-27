@@ -50,9 +50,52 @@ module Noxun
         dw_class: 600, dw_body_height: 820.0, dw_front_bottom: 100.0
       }.freeze
 
+      # ROH-A1 · K3: DOLNA SLEPA ROHOVA SKRINKA. Konstrukcia (hlbka, dno,
+      # strop, chrbat, sokel, nohy) je PRESNE ako dolna (DC mal dve nadnoze
+      # a pevny vlozeny chrbat — potvrdi Michal v mockupe; zmena predvolieb
+      # nemeni kontrakt). Navyse rohova zostava na prednej rovine: dvere
+      # v DVEROVEJ CASTI, blenda korpusova cez slepu cast, vystuha zavesov,
+      # CR 1, CR 2 a rohova vystuha (`Construction.corner_parts`). Cela su
+      # VZDY jeden riadok dvierok s jednym kridlom (`corner_fronts!`) — tu je
+      # len informativna predvolba pre panel (A2), invariant drzi `normalize`.
+      CORNER_TYPE = 'corner_blind'
+      CORNER_DEFAULTS = LOWER_DEFAULTS.merge(
+        type: CORNER_TYPE, width: 1100.0,
+        fronts: { 'items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'auto',
+                                'wings' => '1' }.freeze].freeze }.freeze,
+        corner_side: 'left', corner_door_w: 450.0, corner_cr1: 80.0, corner_cr2: 80.0
+      ).freeze
+
       # JEDINY zoznam typov korpusu. Kazde miesto, ktore sa pyta „aky typ",
       # sa pyta TOHTO zoznamu (guard testy ho porovnavaju s JS zrkadlom).
-      TYPES = %w[lower upper dishwasher].freeze
+      TYPES = %w[lower upper dishwasher corner_blind].freeze
+
+      # ROH-A1: UZAVRETE polia rohovej (vzor `DW_KEYS`) — JEDEN zoznam pre
+      # `normalize`, `cabinet_config`, `config_to_params`, sablony aj panelovy
+      # whitelist. Zapisuju sa LEN pri `type corner_blind`, vzdy vsetky styri.
+      CORNER_KEYS = %i[corner_side corner_door_w corner_cr1 corner_cr2].freeze
+      # Strana DVEROVEJ casti spredu; roh je na opacnej strane. Ina hodnota ->
+      # `left` (uzavrety slovnik, vzor `DW_CLASSES`).
+      CORNER_SIDES = %w[left right].freeze
+      # Rozsahy (mm) — NAVRH, potvrdi Michal v mockupe ROH-B (zmena rozsahu =
+      # len clamp, kontrakt sa nemeni). CR pod ~50 by narazila uchytka
+      # susedneho radu (krizovy audit G6).
+      CORNER_RANGES = {
+        corner_door_w: [250.0, 800.0],
+        corner_cr1: [50.0, 250.0],
+        corner_cr2: [50.0, 250.0]
+      }.freeze
+      # R7 (Michal 27.9.2026): panty rohovej su PREDVOLENE pri rohu — na
+      # vystuhe zavesov. Dvere vlavo = roh vpravo = panty vpravo. JEDINA
+      # heuristika smeru v plugine (vynimka z O1); cita ju VYHRADNE
+      # `corner_fronts!` a len ked riadok dvierok kluc smeru NEMA. Pin testom
+      # `tests/pure/test_roha1_rohova.rb`.
+      CORNER_HINGE_SIDE = { 'left' => 'right', 'right' => 'left' }.freeze
+      # Najmensia sirka rohovej pri PREDVOLBACH (dvere 450, CR 1 80, CR 2 z
+      # celoveho 18, korpus 18: 450 + 80 + 18 + 2 x 18). Zrkadlo JS
+      # `TYPE_LIMITS.corner_blind` (form.js) — skutocne minimum pocita server
+      # sondou (`Construction.min_valid_width`); zhodu strazi guard test.
+      CORNER_MIN_WIDTH = 584.0
 
       # S1-E: UZAVRETE polia slotu. Su tu vymenovane, aby ich `normalize`,
       # `cabinet_config` aj `config_to_params` mohli prejst JEDNYM zoznamom —
@@ -86,7 +129,8 @@ module Noxun
       # S1-E: pribudol automaticky nazov slotu („Umývačka 60 (slot)") — platí
       # preň to isté ako pre korpusy: nesmie sa zapiecť do configu, inak by
       # po zmene triedy natrvalo klamal.
-      AUTO_NAME_RE = /\A(?:(?:horn(?:a|á)|spodn(?:a|á))\s+skrinka\s+\d+|um(?:y|ý)va[cč]ka\s+\d+\s*\(slot\))\z/i
+      # ROH-A1: + „Rohová skrinka W" (automaticky nazov rohovej sleduje sirku).
+      AUTO_NAME_RE = /\A(?:(?:horn(?:a|á)|spodn(?:a|á)|rohov(?:a|á))\s+skrinka\s+\d+|um(?:y|ý)va[cč]ka\s+\d+\s*\(slot\))\z/i
       NAME_MAX_LEN = 80 # JS zrkadlo: CAB_NAME_MAX v ui/js/core.js
 
       GAP_BETWEEN_CABS = 50.0    # medzera medzi korpusmi pri vkladani vedla seba
@@ -302,7 +346,16 @@ module Noxun
       #       5-20 (`newer_config?`, `ProductionCore.export_blockers`). Samostatne
       #       prenesenu listu schema nechrani (existujuca hranica, audit KON-B
       #       NOTE 5) — obe PC treba aktualizovat pred prvou vyrobou s listami.
-      CONFIG_SCHEMA = 21
+      #  22 = ROH-A1 · K3 — ROHOVA SKRINKA. Config nesie NOVY TYP
+      #       (`corner_blind`) so styrmi vlastnymi polami (`corner_side`,
+      #       `corner_door_w`, `corner_cr1`, `corner_cr2`). Plugin schemy 21 typ
+      #       NEPOZNA: `norm_type` mu ho sklopi na `lower`, takze by z rohovej
+      #       pri prvej prestavbe vyrobil DOLNU skrinku s dvierkami cez celu
+      #       sirku — bez blendy, vystuh a CR list, teda INY kusovnik, VEPO aj
+      #       kovanie bez hlasky — a polia rohovej by whitelistom zahodil. Brany
+      #       su tie iste ako pri 5-21 (`newer_config?`,
+      #       `ProductionCore.export_blockers`).
+      CONFIG_SCHEMA = 22
 
       # KOV-C2b: schema, OD KTOREJ stavba emituje dielce zasuviek z receptu.
       # VLASTNA konstanta (nie `CONFIG_SCHEMA`), lebo pri bumpe na 6 (KOV-D1a)
@@ -425,6 +478,11 @@ module Noxun
         # KOV-A1: vyklop/sklop (rola flap) a blenda (false_front) su tiez cela.
         'flap'         => 'Noxun/Čelá',
         'false_front'  => 'Noxun/Čelá',
+        # ROH-A1: CR listy su z celoveho materialu a stoja v rovine ciel —
+        # skryvaju sa s celami. Blenda korpusova, vystuha zavesov a rohova
+        # vystuha su z korpusu (tag Korpus = default, zamerne bez riadku).
+        'cr_front'     => 'Noxun/Čelá',
+        'cr_side'      => 'Noxun/Čelá',
         'shelf'        => 'Noxun/Vnútro',
         'divider_v'    => 'Noxun/Vnútro',
         'divider_h'    => 'Noxun/Vnútro',
@@ -1044,8 +1102,11 @@ module Noxun
           # material pri Atire ticho presiel a Quadro by ratalo predok/chrbat
           # z nespravnej hrubky dna.
           eff = effective_materials(model, cfg)
+          # ROH-A1 (krizovy audit C1/G2): CR listy rohovej dostavaju UCINNU
+          # hrubku celoveho materialu TYM ISTYM kanalom ako zasuvky — jeden
+          # vypocet pre stavbu, validaciu, zrkadlo aj sondu sirky.
           plan = Construction.build_plan(cfg, cid, hardware_rules: rules,
-                                                   part_thicknesses: drawer_thicknesses(cfg, eff),
+                                                   part_thicknesses: plan_thicknesses(cfg, eff),
                                                    materials: part_materials(cfg, eff),
                                                    manual_flap_owners: manual_flap_owners(cfg, model)) # validuje interne
           # KOV-F1 (Codex #329 kolo 2 P1): protajsok ORANGE `library_incompatible`
@@ -1509,6 +1570,11 @@ module Noxun
           # ich porovnava s `DrawerRecipes::ROLE_*`).
           when *DRAWER_ROLES
             thickness_in_range?(have) || (have - want).abs < 0.05
+          # ROH-A1: CR listy su z CELOVEHO materialu — tolerancia ciel (18,6 /
+          # 19 / 25 mm nezhodi stavbu). Hrubku im dava `corner_thicknesses`
+          # UZ PRED planom, takze deskriptor a katalog sa zhoduju.
+          when *Construction::CR_ROLES
+            thickness_in_range?(have) || (have - want).abs < 0.05
           else
             (have - want).abs < 0.05
           end
@@ -1570,6 +1636,57 @@ module Noxun
             end
           end
           out
+        end
+
+        # --- ROH-A1: ucinne hrubky CR list PRED planom ------------------------
+        #
+        # Vzor `drawer_thicknesses` (krizovy audit C1/G2): CR 1 a CR 2 su
+        # z CELOVEHO materialu a ich hrubka urcuje GEOMETRIU rohovej zostavy
+        # (CR 2 stoji kolmo, jej hrubka je v osi X). `materialized_part` ju
+        # preto dodatocne prepisat NESMIE — plan ju musi poznat uz pri vypocte.
+        # Retaz: override dielca (`part_overrides[key]['material_id']`) ->
+        # kanal `front` -> UNI / neznamy / mimo rozsahu korpusu = 18,0
+        # (placeholder cela `Fronts::FRONT_THICKNESS`, vtedy katalogova hrubka
+        # mimo rozsahu zhodi stavbu v `validate_material_thickness!` ako pri
+        # celach). -> { 'cabinet/cr:1' => mm, 'cabinet/cr:2' => mm } alebo {}.
+        def corner_thicknesses(cfg, eff)
+          return {} unless cfg.is_a?(Hash) && raw(cfg, :type).to_s == CORNER_TYPE
+
+          ov_all = raw(cfg, :part_overrides)
+          overrides = ov_all.is_a?(Hash) ? ov_all : {}
+          front = eff.is_a?(Hash) ? eff['front'] : nil
+          Construction::CR_PART_KEYS.each_with_object({}) do |key, out|
+            ov = overrides[key].is_a?(Hash) ? overrides[key]['material_id'] : nil
+            out[key] = cr_sheet_thickness(present(ov) || front)
+          end
+        end
+
+        # Hrubka jednej CR listy z materialu (jedine miesto, kde sa cita).
+        def cr_sheet_thickness(material_id)
+          sheet = (material_id && defined?(Materials)) ? Materials.sheet(material_id) : nil
+          return Fronts::FRONT_THICKNESS if sheet.nil? || (defined?(Materials) && Materials.uni?(sheet))
+
+          th = sheet_thickness_of(sheet)
+          th && thickness_in_range?(th) ? th : Fronts::FRONT_THICKNESS
+        end
+
+        # JEDINA mapa hrubok, ktoru dostava `build_plan` stavby: zasuvky + CR.
+        def plan_thicknesses(cfg, eff)
+          drawer_thicknesses(cfg, eff).merge(corner_thicknesses(cfg, eff))
+        end
+
+        # ROH-A1 (audit A1 FIX 2): hrubky pre POMOCNE plany (premapovanie ABS,
+        # sondy vysky/hlbky/sirky v absorpcii scale). Len CR listy — dielce
+        # zasuviek sa v pomocnych planoch zamerne NEMENIA (vid
+        # `orphan_drawer_part_overrides`: prave UNI 16 fallback je tam spravny).
+        # `params` smie byt surovy aj normalizovany; model = projektove predvolby.
+        def aux_part_thicknesses(params, model = axis_model)
+          return {} unless params.is_a?(Hash)
+
+          corner_thicknesses(params, effective_materials(model, params))
+        rescue StandardError => e
+          Engine.log_error(e, 'aux_part_thicknesses') if defined?(Engine)
+          {}
         end
 
         # --- KOV-W: materialy dielcov PRED planom ----------------------------
@@ -2085,9 +2202,14 @@ module Noxun
           nil
         end
 
+        # ROH-A1 (audit A1 FIX 2): plan dostava UCINNE hrubky CR list — s
+        # placeholderom 18 by pri tenkej CR 2 na minimalnej sirke plan zlyhal
+        # (prazdna mapa) a premapovanie rucnych ABS by dielce ticho preskocilo.
         def plan_parts_by_key(params)
           cfg = normalize(params)
-          Construction.build_plan(cfg)[:parts].each_with_object({}) do |pd, map|
+          Construction.build_plan(cfg, 'CAB-000',
+                                  part_thicknesses: aux_part_thicknesses(params))[:parts]
+                      .each_with_object({}) do |pd, map|
             map[PartKeys.for_descriptor(pd)] = pd
           end
         rescue StandardError => e
@@ -2905,6 +3027,9 @@ module Noxun
           # horna skrinka ostavaju BAJTOVO rovnake ako pred S1-E (golden
           # fixtury zakaziek sa nesmu pohnut).
           DW_KEYS.each { |k| out[k] = cfg[k] } if cfg[:type] == 'dishwasher'
+          # ROH-A1: polia rohovej LEN pri `corner_blind` a VZDY vsetky styri
+          # (vzor slotu) — dolna, horna a slot ostavaju bajtovo rovnake.
+          CORNER_KEYS.each { |k| out[k] = cfg[k] } if cfg[:type] == CORNER_TYPE
           # KON-A · K1: komin a zapustenie sa zapisuju LEN ked su > 0 (vzor
           # S1-E „zapisovat len ked treba") — config existujucich skriniek sa
           # prestavbou NEMENI a golden fixtury ostavaju bajtovo rovnake.
@@ -2933,6 +3058,7 @@ module Noxun
           case type
           when 'upper' then 'noxun-upper-18'
           when 'dishwasher' then 'noxun-dishwasher'
+          when CORNER_TYPE then 'noxun-corner-blind'
           else 'noxun-lower-18'
           end
         end
@@ -2993,6 +3119,8 @@ module Noxun
           # S1-E: slot sa menuje podla TRIEDY (60/45), nie podla sirky —
           # „Umývačka 590" by pri uzsom slote klamala o tom, co tam stoji.
           when 'dishwasher' then "Umývačka #{dw_class_label(cfg)} (slot)"
+          # ROH-A1: nazov sleduje sirku (vzor `AUTO_NAME_RE`).
+          when CORNER_TYPE then "Rohová skrinka #{w}"
           else "Spodná skrinka #{w}"
           end
         end
@@ -3007,6 +3135,7 @@ module Noxun
           case type
           when 'upper' then 'base-upper-18'
           when 'dishwasher' then 'dishwasher-slot-18'
+          when CORNER_TYPE then 'corner-blind-18'
           else 'base-lower-18'
           end
         end
@@ -3048,6 +3177,7 @@ module Noxun
           case type
           when 'upper' then UPPER_DEFAULTS
           when 'dishwasher' then DISHWASHER_DEFAULTS
+          when CORNER_TYPE then CORNER_DEFAULTS
           else LOWER_DEFAULTS
           end
         end
@@ -3064,6 +3194,12 @@ module Noxun
           slot_h = slot ? clampf(fetchf(p, :height, d[:height]), *DW_HEIGHT_RANGE) : nil
           dw = slot ? norm_dishwasher(p, d, slot_h, fronts_cfg['gap_top']) : {}
           fronts_cfg = slot_fronts!(fronts_cfg, dw) if slot
+          # ROH-A1: polia rohovej + INVARIANT jedneho riadku dvierok s jednym
+          # kridlom (R6) a predvoleny smer pantov pri rohu (R7). Konstrukcia
+          # (sokel, podpora, chrbat) ide dalej presne ako pri dolnej.
+          corner = type == CORNER_TYPE
+          cn = corner ? norm_corner(p, d) : {}
+          fronts_cfg = corner_fronts!(fronts_cfg, cn[:corner_side]) if corner
           out = {
             type: type,
             width:  slot ? clampf(fetchf(p, :width, d[:width]), *DW_WIDTH_RANGE)
@@ -3131,7 +3267,69 @@ module Noxun
             # sa pri najblizsej prestavbe vrati na zivy nazov.
             name: sanitize_name(raw(p, :name))
           }
-          out.merge(dw)
+          out.merge(dw).merge(cn)
+        end
+
+        # --- ROH-A1: polia rohovej skrinky -----------------------------------
+
+        # Uzavrety whitelist poli rohovej. Strana je enum (`left` | `right`,
+        # ine -> `left`), rozmery su PRISNE parsovane mm (vzor `norm_setback`:
+        # necislo / nekonecno -> PREDVOLBA pola, nie 0) a klampnute na
+        # `CORNER_RANGES`.
+        def norm_corner(p, d)
+          side = raw(p, :corner_side).to_s
+          out = { corner_side: CORNER_SIDES.include?(side) ? side : d[:corner_side] }
+          CORNER_RANGES.each do |key, range|
+            out[key] = norm_corner_mm(raw(p, key), d[key], range)
+          end
+          out
+        end
+
+        def norm_corner_mm(v, default, range)
+          f =
+            case v
+            when Integer, Float, Rational then v.to_f
+            when String
+              str = v.strip
+              SETBACK_NUM_RE.match?(str) ? str.to_f : nil
+            end
+          return default.to_f if f.nil? || !f.finite?
+
+          f.clamp(*range)
+        end
+
+        # R6 + R7: JEDEN riadok `door`, `auto`, jedno kridlo — POSLEDNA obrana
+        # (panel a sablona invariant porusit nedovolia, `corner_fronts_ok?`).
+        # Na rozdiel od slotu (`slot_fronts!`) sa ZACHOVA identita riadku (ID),
+        # smer, profil, hrana profilu, otvaranie aj dormant polia — rucne
+        # zasahy kovania a overridy na `front:<id>/wing:single` tak nezaniknu.
+        # Chybajuce cela -> novy `F1`. Viac riadkov alebo iny typ -> ostane
+        # PRVY riadok `door` (inak novy `F1`).
+        # R7: riadok BEZ kluca `direction` (nova rohova — legacy data rohova
+        # nema) dostane stranu PRI ROHU (`CORNER_HINGE_SIDE`). `unset`, `left`
+        # aj `right` su vedoma volba a nemenia sa.
+        def corner_fronts!(fronts_cfg, side)
+          src = Array(fronts_cfg['items']).find { |it| it.is_a?(Hash) && it['type'].to_s == 'door' }
+          item = src ? src.dup : { 'id' => 'F1' }
+          item['type'] = 'door'
+          item['mode'] = 'auto'
+          item['height'] = nil
+          item['locked'] = false
+          item['wings'] = '1'
+          item['direction'] = corner_hinge_side(side) unless item.key?('direction')
+          fronts_cfg.merge('items' => Fronts.normalize_items([item]))
+        end
+
+        # R7: strana pantov pri rohu (roh je oproti dverovej casti).
+        def corner_hinge_side(side)
+          CORNER_HINGE_SIDE[side.to_s] || CORNER_HINGE_SIDE[CORNER_DEFAULTS[:corner_side]]
+        end
+
+        # Splna config ciel invariant rohovej? Cista otazka pre ZAPISOVE cesty
+        # (akcie ciel, sablona) — tie zmenu ODMIETNU, nie ticho orezu.
+        # Povolene zmeny: smer, uchytkovy profil, medzery, material, kovanie.
+        def corner_fronts_ok?(fronts_cfg)
+          Construction.corner_fronts_ok?(fronts_cfg)
         end
 
         # --- S1-E: polia slotu umyvacky -------------------------------------
@@ -3973,6 +4171,10 @@ module Noxun
           # `hardware_sets` (GH #126 P1). Zahodenie `appliance_refs[]` robi
           # VYHRADNE `strip_appliance_refs!` v kopirovacich cestach (FIX E4).
           DW_KEYS.each { |k| params[k.to_s] = cfg[k.to_s] if cfg.key?(k.to_s) }
+          # ROH-A1: polia rohovej tou istou cestou (prestavba, kopia, scale,
+          # sablona, „Nahradiť UNI") — bez nich by rohova po prvej prestavbe
+          # ticho skocila na predvolby (strana, dverova cast, CR).
+          CORNER_KEYS.each { |k| params[k.to_s] = cfg[k.to_s] if cfg.key?(k.to_s) }
           params['appliance_refs'] = cfg['appliance_refs'] if cfg['appliance_refs'].is_a?(Array)
           params['appliance_expects'] = cfg['appliance_expects'] if cfg['appliance_expects'].is_a?(Array)
           migrate_legacy_part_keys(params, cfg)

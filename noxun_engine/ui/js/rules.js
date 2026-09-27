@@ -294,6 +294,12 @@
       return 'na každý výklop aj sklop';
     }
     if (role === 'shelf') return 'na každú policu';
+    // ROH-A1: roly rohovej zostavy (rola sa v pravidle nesmie ukázať surovo).
+    if (role === 'corner_blind_panel') return 'na blendu korpusovú rohovej';
+    if (role === 'hinge_rail') return 'na výstuhu závesov rohovej';
+    if (role === 'corner_rail') return 'na rohovú výstuhu';
+    if (role === 'cr_front') return 'na CR lištu 1';
+    if (role === 'cr_side') return 'na CR lištu 2';
     return role;
   }
 

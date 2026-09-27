@@ -496,9 +496,11 @@ NxTest.test('KON-A: ScaleWatch.clamp_depth — klamp na min_valid_depth + nemoda
   src = NxKonA.src('noxun_engine', 'core', 'scale_observer.rb')
   absorb = src[/def absorb\(inst\)(.*?)\n        end\n/m, 1].to_s
   NxTest.assert(absorb.include?('if new_d < base_d'), 'sonda len pri zmenseni hlbky')
-  NxTest.assert(absorb.include?('clamp_depth(params, new_d, cid)'), 'absorpcia klampuje config-aware')
-  NxTest.assert(absorb.index('notify_user(depth_note)') > absorb.index('refresh_panel(model)'),
+  # ROH-A1: sondy dostavaju ucinne hrubky CR list (4. argument).
+  NxTest.assert(absorb.include?('clamp_depth(params, new_d, cid'), 'absorpcia klampuje config-aware')
+  NxTest.assert(absorb.index('notify_user(') > absorb.index('refresh_panel(model)'),
                 'hlaska az po refreshi panela')
+  NxTest.assert(absorb.include?('depth_note'), 'veta hlbky ide do tej istej hlasky')
   NxTest.assert(absorb.include?('transparent: true'), 'jeden krok Spat (transparentna operacia)')
 end
 

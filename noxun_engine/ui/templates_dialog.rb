@@ -422,6 +422,13 @@ module Noxun
             return set_status("Šablóna je pre iný typ (#{Panel::TEMPLATE_TYPE_WORDS[tpl_type] || 'dolná'}) " \
                               'než označená skrinka — nepoužitá.', true)
           end
+          # ROH-A1 (krizovy audit C5 + R6): rohova sablona INEJ STRANY sa na
+          # existujucu rohovu nepouzije (overridy hran by po zrkadleni ukazovali
+          # na opacnu hranu — prepinac s premapovanim prinesie ROH-B) a sablona
+          # s porusenym invariantom ciel sa odmietne, nie ticho oreze.
+          if (corner_msg = corner_template_apply_refusal(Store.config(cab) || {}, tpl['config'] || {}))
+            return set_status("#{corner_msg} Nepoužitá, nič sa nezmenilo.", true)
+          end
 
           # GH #133 P2: kovanie sablony sa cita BEZSTRATOVO alebo vobec. Sablona
           # z novsej verzie (neznamy typ kovania) ci rucne upravena by ocesanou
@@ -528,8 +535,27 @@ module Noxun
           note.empty? ? nil : { note: note }
         end
 
+        # ROH-A1: veta odmietnutia pouzitia sablony na ROHOVU skrinku, inak nil.
+        # Cista funkcia (headless test) — `cab_cfg` = ulozeny config ciela.
+        def corner_template_apply_refusal(cab_cfg, tpl_cfg)
+          return nil unless cab_cfg['type'].to_s == CabinetBuilder::CORNER_TYPE
+          return nil unless tpl_cfg['type'].to_s == CabinetBuilder::CORNER_TYPE
+
+          if tpl_cfg.key?('corner_side') &&
+             Construction.corner_side(tpl_cfg) != Construction.corner_side(cab_cfg)
+            return Panel::CORNER_SIDE_MSG
+          end
+          Panel.corner_template_fronts_error(tpl_cfg)
+        end
+
         def merge_template(target_params, tpl_config)
           merged = tpl_config.dup
+          # ROH-A1: polia rohovej — chybajuci kluc v sablone = zachovaj CIEL
+          # (vzor komina); inu stranu odmietla `corner_template_apply_refusal`.
+          CabinetBuilder::CORNER_KEYS.each do |k|
+            key = k.to_s
+            merged[key] = target_params[key] if !tpl_config.key?(key) && target_params.key?(key)
+          end
           merged['part_overrides'] = target_params['part_overrides'] || {}
           merged['hardware_overrides'] = target_params['hardware_overrides'] || []
           merged['hardware_sets'] = merge_hardware_sets(target_params, tpl_config)

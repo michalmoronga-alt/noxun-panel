@@ -36,7 +36,8 @@
     // S1-E: pribudol SLOT UMYVACKY. Zrkadlo Ruby `CabinetBuilder::TYPES`
     // + 'board' (doska nie je typ korpusu, ale je to volba vkladacej karty) —
     // zhodu strazi guard test `tests/pure/test_s1e_slot.rb`.
-    var INSERT_TYPES = ['lower', 'upper', 'dishwasher', 'board'];
+    // ROH-A1: + rohová (zoznam povolených typov; tlačidlo „Rohová" pridá A2).
+    var INSERT_TYPES = ['lower', 'upper', 'dishwasher', 'corner_blind', 'board'];
     // UI-C1c: umiestnenie vkladanej dosky (zrkadlo Ruby BoardBuilder::ORIENTATIONS).
     // Je to stav vkladania, NIE vyrobny udaj — do zamkov ani do materialov nepatri.
     var BOARD_ORIENTATIONS = ['leziaca', 'stojaca', 'na_stenu'];
@@ -254,16 +255,18 @@
     }
     // Typ korpusovej sablony (legacy zaznam bez `type` je dolna skrinka).
     // S1-E: `dishwasher` je tretia platna hodnota.
+    // ROH-A1: rohová šablóna NESMIE padnúť do „dolnej" (vložila by sa ako
+    // dolná bez rohovej zostavy).
     function templateType(tp){
       var t = tp && tp.config && tp.config.type;
-      if (t === 'upper' || t === 'dishwasher') return t;
+      if (t === 'upper' || t === 'dishwasher' || t === 'corner_blind') return t;
       return 'lower';
     }
     // UI-C1b: ponuka pre ZVOLENY typ vkladania. 'board' = doskove sablony,
     // 'lower'/'upper' = korpusove sablony toho typu.
     function templatesForType(list, type){
       if (type === 'board') return templatesOfKind(list, 'board');
-      var want = (type === 'upper' || type === 'dishwasher') ? type : 'lower';
+      var want = (type === 'upper' || type === 'dishwasher' || type === 'corner_blind') ? type : 'lower';
       return templatesOfKind(list, 'cabinet').filter(function(tp){ return templateType(tp) === want; });
     }
     // Poradove cislo posledneho pouzitia (UI-C1a: `used_seq` z template_usage.json;

@@ -41,7 +41,13 @@ module Noxun
         # Preco sa delenie odmietne (nil = smie sa). Presna hlaska sa sklada TU,
         # aby pouzivatel nedostal len „nepodarilo sa"; `set_split!` je posledna
         # poistka rovnakych podmienok.
+        # ROH-A1 (R6, krizovy audit C2): ROHOVA delenie nepozna — priecka by
+        # v slepej casti narazila na blendu. Vnutri su len police cez celu
+        # sirku; invariant drzi aj `Construction.validate!` (sablona ho neobide).
         def split_refusal(ctx)
+          cfg = Store.config(ctx[:cab]) || {}
+          return Construction::CORNER_ZONES_MSG if cfg['type'].to_s == Construction::CORNER_TYPE
+
           node = zone_node(ctx)
           return 'Zóna sa nerozdelila — obnov panel (zóna sa v skrinke nenašla).' if node.nil?
           unless ZoneTree.leaf?(node)

@@ -544,10 +544,15 @@ module Noxun
 
       # Police v listovej zone — rovnomerne v z-rozsahu zony, odsadene od cela.
       # Prilis plytka zona (hlbka <= inset) uz police nepreskakuje ticho — hlasi warning.
+      # ROH-A1 (audit A1 BLOCKER 1): box smie niest `shelf_inset` — predne
+      # odsadenie polic ROHOVEJ je `max(20, t)`, aby polica nepretala blendu
+      # korpusovu (y 0..t). Bez kluca (vsetky ostatne typy) plati
+      # `SHELF_FRONT_INSET` a plan je bajtovo rovnaky ako doteraz.
       def add_shelves(count, box, t, suffix_path, node_id, acc)
         layout = Shelves.layout(box[:z0], box[:z1], t, count)
         w = box[:x1] - box[:x0]
-        sd = (box[:y1] - box[:y0]) - SHELF_FRONT_INSET
+        inset = box[:shelf_inset] || SHELF_FRONT_INSET
+        sd = (box[:y1] - box[:y0]) - inset
         if sd <= 0
           (acc[:warnings] ||= []) << BuildPlan.warning('shelf_skipped_shallow_zone',
                                                        "Zona #{node_id}: prilis plytka na police (#{count} ks preskocenych).",
@@ -559,7 +564,7 @@ module Noxun
           acc[:shelves] << {
             suffix: "SHELF-#{suffix_path}-#{i + 1}", part_key: PartKeys.zone(node_id, 'shelf', i + 1),
             role: 'shelf', name: "Polica #{i + 1}",
-            material: :korpus, box: [w, sd, t], origin: [box[:x0], box[:y0] + SHELF_FRONT_INSET, sh[:z]],
+            material: :korpus, box: [w, sd, t], origin: [box[:x0], box[:y0] + inset, sh[:z]],
             prod: { length: r2(w), width: r2(sd), thickness: r2(t) },
             axes: PartFaces::AXES_LYING
           }

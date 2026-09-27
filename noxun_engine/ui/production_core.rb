@@ -1817,7 +1817,11 @@ module Noxun
         'box_side' => 'Bok boxu', 'drawer_inner_front' => 'Vnútorné čelo zásuvky',
         # KON-B · K2: listy chrbta (spolocny nazov dielca „Lista chrbta", rola
         # rozlisuje hornu a dolnu — stlpec Rola „Lišta chrbta horná · … dolná").
-        'back_rail_top' => 'Lišta chrbta horná', 'back_rail_bottom' => 'Lišta chrbta dolná'
+        'back_rail_top' => 'Lišta chrbta horná', 'back_rail_bottom' => 'Lišta chrbta dolná',
+        # ROH-A1 · K3: rohova zostava (nazvy dielcov z buildera su ASCII,
+        # stlpec Rola je s diakritikou).
+        'corner_blind_panel' => 'Blenda korpusová', 'hinge_rail' => 'Výstuha závesov',
+        'corner_rail' => 'Rohová výstuha', 'cr_front' => 'CR lišta 1', 'cr_side' => 'CR lišta 2'
       }.freeze
 
       def role_label(role)
