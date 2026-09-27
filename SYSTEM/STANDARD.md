@@ -434,8 +434,9 @@ zapustenie 0 a výška líšt 100 **výslovne**, `appliance_expects: ['fridge']`
 z pásma chladničky Beko v katalógu a je **návrhom na potvrdenie** pri smoke. Pravidlá seedov knižnice:
 - seed je **markerový** — pridá sa jednorazovo pri prechode markera, **vlastnú rovnomennú šablónu neprepíše** (identita `(kind, name)`, presné meno) a **zmazaný
   neobnoví**; núdzová náhrada poškodenej knižnice (`build_predefined`) nové seedy **nemá**;
-- **migrácia knižnice zapisuje LEN nad zdravým primárom** (súbor sa parsuje a `templates` je pole) — nikdy nad tichou náhradou zo zálohy `.bak` ani nad núdzovými
-  predvoľbami; nezdravý stav sa číta, nezapisuje, a seed sa pridá, až keď je primár zdravý;
+- **migrácia knižnice nikdy nezapisuje nad poškodeným primárom** (súbor existuje, ale nie je JSON alebo `templates` nie je pole) — ani obsah zálohy `.bak`, ani
+  núdzové predvoľby; taký stav sa číta, nezapisuje, a seed sa pridá, až keď je primár zdravý. **Chýbajúci primár s platnou zálohou** nie je poškodený — migrácia
+  knižnicu zo zálohy obnoví a seed pridá (sémantika `JsonFileStore.degraded?`);
 - **súhrn konštrukcie na dlaždici** (Štúdio aj vkladanie) je **odvodený** z účinných hodnôt (komín > 0 · zapustenie > 0 mimo „Bez stropu" · lišty len pri chrbte
   z líšt · slot nikdy) a spolu s vetou o vetraní pri šablóne s chladničkou sa **nikdy neukladá** — nový kľúč záznamu ani bump `STD` kvôli nim nevzniká.
 

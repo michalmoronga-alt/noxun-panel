@@ -463,14 +463,16 @@ module Noxun
       # cerstvo z disku). Chybajuci subor = cerstva instalacia (korpusovy aj
       # doskovy seed naraz, uz s orientaciou).
       #
-      # KON-D (audit BLOCKER 1): ked subor existuje, migracia ZAPISUJE LEN NAD
-      # ZDRAVYM PRIMAROM (`healthy_primary`). Pri poskodenom primari by
+      # KON-D (audit BLOCKER 1): migracia NIKDY nezapisuje nad POSKODENYM
+      # primarom (`migration_source`). Pri poskodenom primari by
       # `JsonFileStore.read` potichu vratil `.bak` a migracia by z NEJ zapisala
       # novy primar (vsetko medzi zalohou a poskodenim prec); pri `templates`,
       # ktore nie su pole, by sa ulozili nudzove predvolby `build_predefined`
       # (+ seedy) namiesto kniznice. V oboch pripadoch sa NEZAPISUJE — citanie
       # ide dalej zo zalohy / predvolieb (`load`), seed sa prida az nad zdravym
-      # primarom.
+      # primarom. CHYBAJUCI primar s platnou zalohou poskodeny nie je (zhodne
+      # s `JsonFileStore.degraded?`): nic sa nestratilo, migracia obnovi
+      # kniznicu zo zalohy a prida seed (ako pred KON-D).
       #
       # UI-C1c (Codex audit B2): migracia je STUPNOVANA podla STAREHO markera,
       # nie podla obsahu — kroky sa skladaju a zapisu sa RAZ:
@@ -485,7 +487,7 @@ module Noxun
                             build_predefined_boards)
         end
 
-        data = healthy_primary
+        data = migration_source
         return refuse_migration if data.nil?
 
         old_std = data['std'].is_a?(Integer) ? data['std'] : 1
@@ -507,29 +509,41 @@ module Noxun
         false
       end
 
-      # KON-D (audit BLOCKER 1): PRIMARNY subor precitany PRIAMO z disku — bez
+      # KON-D (audit BLOCKER 1): ZDROJ migracie precitany PRIAMO z disku — bez
       # sekundovej cache a BEZ tichej nahrady zo `.bak` (`JsonFileStore.read`
-      # by ju urobil). Zdravy = parsuje sa a ma tvar `{std, templates: Array}`
-      # (chybajuci `std` = legacy 1, ako doteraz). Inak nil = migracia
-      # nezapisuje. Chybajuci primar pri existujucej `.bak` zdravy NIE JE —
-      # precitana by bola opat len zaloha. I/O chyby ine nez „nie je / nie je
-      # JSON" VEDOME prebublaju do `migrate!` (rescue = neuspesny zapis), vzor
-      # `JsonFileStore.degraded?`.
-      def healthy_primary
-        data = JSON.parse(File.binread(path))
+      # by ju urobila). Semantika zhodna s `JsonFileStore.degraded?`:
+      #   * primar EXISTUJE -> zdroj je VYHRADNE on; poskodeny (nie je JSON)
+      #     alebo zleho tvaru (nie `{std, templates: Array}`) = nil, migracia
+      #     NEZAPISUJE (zaloha by prepisala to, co je medzi nou a poskodenim),
+      #   * primar CHYBA a zaloha je platna -> zdroj je zaloha (nic sa
+      #     nestratilo — obnova zo zalohy + seed, ako pred KON-D),
+      #   * chyba oboje -> sem sa nedojde (cista instalacia v `migrate!`).
+      # Chybajuci `std` = legacy 1 (ako doteraz). I/O chyby ine nez „nie je /
+      # nie je JSON" VEDOME prebublaju do `migrate!` (rescue = neuspesny zapis).
+      def migration_source
+        return library_doc(path) if File.exist?(path)
+
+        library_doc("#{path}.bak")
+      end
+
+      # Kniznica v zdravom tvare, inak nil (nie je JSON / nie je / zly tvar).
+      def library_doc(file)
+        data = JSON.parse(File.binread(file))
         data.is_a?(Hash) && data['templates'].is_a?(Array) ? data : nil
       rescue JSON::ParserError, Errno::ENOENT
         nil
       end
 
-      # Migracia nad nezdravym primarom: NIC sa nezapisuje, kniznica sa cita
+      # Migracia nad POSKODENYM primarom: NIC sa nezapisuje, kniznica sa cita
       # ako doteraz (zo zalohy alebo z nudzovych predvolieb) a pokus sa zopakuje
-      # pri dalsom nacitani — ked pouzivatel subor opravi alebo zmaze. Log raz
-      # za beh (inak by kazdy `load` pisal ten isty riadok).
+      # pri dalsom nacitani — ked pouzivatel subor opravi alebo zmaze (zmazany
+      # primar s platnou zalohou sa uz zmigruje). Log raz za beh (inak by kazdy
+      # `load` pisal ten isty riadok).
       def refuse_migration
         unless @unhealthy_logged
-          Engine.log("TemplateStore: #{FILE} je poskodeny alebo chyba — migracia na std #{STD} " \
-                     'preskocena (kniznica sa cita zo zalohy alebo predvolieb, nic sa nezapisuje)')
+          Engine.log("TemplateStore: #{FILE} je poskodeny alebo ma zly tvar — migracia na std #{STD} " \
+                     'preskocena (kniznica sa cita zo zalohy alebo predvolieb, nic sa nezapisuje; ' \
+                     'po oprave alebo zmazani suboru sa zopakuje)')
           @unhealthy_logged = true
         end
         false

@@ -388,11 +388,13 @@ Escapom a otvoriť iný — a `renameSaved` by mu ten **cudzí rozpísaný formu
 `locked` + F2 `auto` so smerom **`Fronts::DIRECTION_UNSET`** (chýbajúci kľúč by Kontrola brala ako staré dáta bez nálezu; strana pántov sa nehádá) a `config_schema`
 = aktuálna `CONFIG_SCHEMA` (starší plugin seed čisto odmietne, inak by komín zahodil). Čistá inštalácia ho zapíše so všetkými seedmi (**10 šablón, 7 korpusových**),
 krok `old_std < 7` (`missing_fridge_seed`) ho pridá na koniec, len keď korpusová šablóna rovnakého mena neexistuje (presné porovnanie mena); zmazaný sa neobnoví.
-**Audit KON-D BLOCKER 1:** keď súbor existuje, `migrate!` číta **`healthy_primary`** — primár priamo z disku (bez cache a bez tichej náhrady zo `.bak`), zdravý =
-parsuje sa a `templates` je pole (chýbajúci `std` = legacy 1). **Poškodený primár + záloha, chýbajúci primár + záloha aj `{std, templates: null}` → migrácia
-NEZAPISUJE** (`refuse_migration`, log raz za beh): čítanie ide ďalej zo zálohy / núdzových predvolieb a seed sa pridá až nad zdravým primárom. Iné I/O chyby
-prebublajú do rescue (`false`, vzor `JsonFileStore.degraded?`). **Vedomá hranica:** bežný `upsert` nad takým stavom zapisuje ako doteraz (zo zálohy) a marker
-posunie na 7 bez seedu — mimo rozsahu dávky. **Súhrn pre dlaždicu:** čisté `construction_summary(config)` (`{has, text}` — „komín vzadu N" pri komíne > 0 ·
+**Audit KON-D BLOCKER 1:** `migrate!` číta **`migration_source`** priamo z disku (bez cache a bez tichej náhrady zo `.bak`), so sémantikou
+`JsonFileStore.degraded?`: **existujúci primár** je jediný zdroj — zdravý = parsuje sa a `templates` je pole (chýbajúci `std` = legacy 1); **poškodený alebo
+zlého tvaru** (`{std, templates: null}`, pole na najvyššej úrovni) → migrácia **NEZAPISUJE** (`refuse_migration`, log raz za beh), čítanie ide ďalej zo zálohy /
+núdzových predvolieb a seed sa pridá až nad zdravým primárom. **Chýbajúci primár s platnou zálohou** poškodený nie je (nič sa nestratilo) — migrácia obnoví
+knižnicu zo zálohy a pridá seed (predrecenzia P3; inak by po zmazaní `templates.json` Chladničková nevznikla nikdy). Záloha zlého tvaru = žiadny zápis. Iné
+I/O chyby prebublajú do rescue (`false`). **Vedomá hranica:** bežný `upsert`/`rename`/`delete` nad poškodeným primárom zapisuje ako doteraz (obsah zo zálohy,
+marker 7 bez seedu) — brána zápisu v `refuse_write` je mimo rozsahu dávky. **Súhrn pre dlaždicu:** čisté `construction_summary(config)` (`{has, text}` — „komín vzadu N" pri komíne > 0 ·
 „zap. N" pri zapustení > 0 a strope ≠ „Bez stropu" · „z líšt H" **len** pri `back_mode`/`back.mode` `rails`, aj pri predvolenej 100 · slot nikdy; čísla cez
 `CabinetBuilder.norm_setback`/`norm_rail_height`) a `ventilation_note(config)` (veta o vetraní pri šablóne, ktorá očakáva chladničku) — odvodené, nikdy na disk.
 Starší plugin (`STD` 6) prepne knižnicu 7 do režimu len na čítanie — **aktualizovať obe PC**. Zmena seedu po smoke sa do existujúcich knižníc sama nedostane

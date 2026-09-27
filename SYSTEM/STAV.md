@@ -11,9 +11,9 @@ V Štúdiu (Šablóny) aj pri vkladaní pribudla vstavaná šablóna **„Chladn
 boky 560), **bez chrbta**, očakáva chladničku, **dve dvierka nad sebou — dolné 719, horné 1274** so smerom otvárania **neurčený** (Kontrola vyzve zvoliť stranu
 pántov). Nika chladničky sa meria z hĺbky boku (560); vnútro na výšku 1964 → po priradení chladničky Beko treba **výšku osadenia 14–24 mm**. Delenie 719 / 1274
 je **návrh na potvrdenie pri smoke**. Dlaždica šablóny ukazuje **„komín vzadu 50"** (súhrn komína, zapustenia a líšt — len keď niečo z toho má) a tooltip vetu
-o vetraní. **Knižnica šablón je v STD 7** — migrácia pridá Chladničkovú raz, vlastnú rovnomennú šablónu neprepíše, zmazanú nevráti a **nikdy nezapisuje nad
-zálohou ani nad núdzovými predvoľbami** (poškodený súbor šablón ostáva, ako je). Pod tým KON-B (chrbát z líšt, v0.13.3), KON-A (komín a zapustenie, v0.13.2),
-KON-0 (chrbát v drážke do nárezu, v0.13.1), blok **SPOTREBIČE S1** (v0.13.0, smoke **PASS 26.9.**).
+o vetraní. **Knižnica šablón je v STD 7** — migrácia pridá Chladničkovú raz, vlastnú rovnomennú šablónu neprepíše, zmazanú nevráti a poškodený súbor šablón
+**migrácia neprepíše** (prvé uloženie šablóny ho však nahradí obsahom zálohy — vedomá hranica, `docs/architecture/model-a-identita.md`). Pod tým KON-B (v0.13.3),
+KON-A (v0.13.2), KON-0 (v0.13.1), blok **SPOTREBIČE S1** (v0.13.0, smoke **PASS 26.9.**).
 Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **trinástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · **Spotrebiče** · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine. Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -27,7 +27,7 @@ zákazku neprestaví ani nevyexportuje. **Dáta rozpočtu sú od S1-B1 v `BUDGET
 **Aktualizovať OBE PC (aj Luciino)** — starší plugin „Z líšt" nepozná (prestavbou by vrátil dosku chrbta, samostatnú lištu by vo VEPO vydal pod plným názvom) a knižnicu šablón STD 7 len číta (nedá sa v nej
 ukladať, premenovať ani mazať).
 
-**Testy (posledná kódová dávka, KON-D #?):** **4641 headless · 134 JS sád · 3172 in-SU PASS / 0 FAIL**. KON-B (#403): 4621 · 133 · 3158. KON-A (#402): 4600 · 132 · 3136.
+**Testy (posledná kódová dávka, KON-D #?):** **4643 headless · 134 JS sád · 3172 in-SU PASS / 0 FAIL**. KON-B (#403): 4621 · 133 · 3158. KON-A (#402): 4600 · 132 · 3136.
 **KON-0 (#401):** 4577 · 131 · 3111. **S1-C:** 4499 · 127 · 3036. **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 
 ## Robí sa

@@ -10,8 +10,10 @@
 #   * kniznica `STD` 6 -> 7: jednorazovy krok migracie seed prida, vlastnu
 #     rovnomennu sablonu NEPREPISE, zmazany seed NEOBNOVI; seed NIE JE
 #     v `build_predefined` (nudzova nahrada);
-#   * migracia ZAPISUJE LEN NAD ZDRAVYM PRIMAROM (audit BLOCKER 1) — nikdy nad
-#     tichou nahradou zo `.bak` ani nad nudzovymi predvolbami;
+#   * migracia NIKDY nezapisuje nad POSKODENYM primarom (audit BLOCKER 1) —
+#     nie je JSON alebo zly tvar = ziadny zapis (ani zo `.bak`, ani nudzove
+#     predvolby); CHYBAJUCI primar s platnou zalohou sa obnovi + seed (ako
+#     `JsonFileStore.degraded?` — predrecenzia P3);
 #   * suhrn konstrukcie na dlazdici z UCINNYCH hodnot (oba payloady) + veta
 #     o vetrani pri sablone, ktora ocakava chladnicku.
 #
@@ -310,27 +312,54 @@ ensure
   NxKonD.reset! if NxTest.headless?
 end
 
-NxTest.test('KON-D zdravie primara: CHYBAJUCI primar + zaloha STD 6 -> ZIADNY zapis (cita sa len zaloha)') do
+NxTest.test('KON-D zdravie primara: CHYBAJUCI primar + platna zaloha STD 6 -> obnova zo zalohy + seed (ako JsonFileStore.degraded?)') do
   NxTest.skip!('TemplateStore testy bezia len headless (APPDATA sandbox)') unless NxTest.headless?
   NxKonD.reset!
-  NxKonD.write!(NxKonD.std6_payload, "#{NxKonD::TS.path}.bak")
+  bak = NxKonD.std6_payload
+  NxKonD.write!(bak, "#{NxKonD::TS.path}.bak")
+  NxTest.assert_equal(false, Noxun::Engine::JsonFileStore.degraded?(NxKonD::TS.path), 'chybajuci primar degraded NIE JE')
   list = NxKonD::TS.reload!
-  NxTest.refute(File.exist?(NxKonD::TS.path), 'primar sa zo zalohy NEVYROBIL')
-  NxTest.assert_equal(9, list.length)
-  NxTest.assert_equal(false, NxKonD::TS.healthy_primary.is_a?(Hash))
+  raw = JSON.parse(File.binread(NxKonD::TS.path))
+  NxTest.assert_equal(7, raw['std'], 'primar sa obnovil zo zalohy uz na STD 7')
+  NxTest.assert_equal(bak['templates'], raw['templates'][0...-1], 'obsah zalohy nedotknuty')
+  NxTest.assert_equal(NxKonD.seed, raw['templates'].last, 'Chladničková pribudla (zmazany templates.json ju neukradne)')
+  NxTest.assert_equal(10, list.length)
 ensure
   NxKonD.reset! if NxTest.headless?
 end
 
-NxTest.test('KON-D zdravie primara: zdravy tvar = Hash s polom `templates` (chybajuci std = legacy 1)') do
+NxTest.test('KON-D zdravie primara: CHYBAJUCI primar + zaloha ZLEHO TVARU -> ZIADNY zapis') do
   NxTest.skip!('TemplateStore testy bezia len headless (APPDATA sandbox)') unless NxTest.headless?
   NxKonD.reset!
-  NxKonD.write!('[1, 2]')
-  NxTest.assert_equal(nil, NxKonD::TS.healthy_primary, 'pole na najvyssej urovni nie je kniznica')
-  NxKonD.write!('{"std": 6, "templates": {"a": 1}}')
-  NxTest.assert_equal(nil, NxKonD::TS.healthy_primary, 'templates nie je pole')
+  NxKonD.write!('{"std": 6, "templates": null}', "#{NxKonD::TS.path}.bak")
+  list = NxKonD::TS.reload!
+  NxTest.refute(File.exist?(NxKonD::TS.path), 'z nepouzitelnej zalohy sa primar nevyrobil')
+  NxTest.assert_equal(nil, list.find { |t| t['name'] == NxKonD::NAME }, 'ani seed')
+ensure
+  NxKonD.reset! if NxTest.headless?
+end
+
+NxTest.test('KON-D zdravie primara: ZLY TVAR primara (pole, templates ako objekt) -> ZIADNY zapis ani pri platnej zalohe') do
+  NxTest.skip!('TemplateStore testy bezia len headless (APPDATA sandbox)') unless NxTest.headless?
+  ['[1, 2]', '{"std": 6, "templates": {"a": 1}}'].each do |bad|
+    NxKonD.reset!
+    NxKonD.write!(NxKonD.std6_payload, "#{NxKonD::TS.path}.bak")
+    NxKonD.write!(bad)
+    NxTest.assert_equal(nil, NxKonD::TS.migration_source, "#{bad}: zdroj migracie nie je")
+    NxKonD::TS.reload!
+    NxTest.assert_equal(bad.b, File.binread(NxKonD::TS.path), "#{bad}: primar ostal presne taky, aky bol")
+  end
+ensure
+  NxKonD.reset! if NxTest.headless?
+end
+
+NxTest.test('KON-D zdravie primara: zdroj migracie — zdravy tvar = Hash s polom `templates` (chybajuci std = legacy 1)') do
+  NxTest.skip!('TemplateStore testy bezia len headless (APPDATA sandbox)') unless NxTest.headless?
+  NxKonD.reset!
   NxKonD.write!('{"templates": []}')
-  NxTest.assert_equal({ 'templates' => [] }, NxKonD::TS.healthy_primary, 'legacy bez std je zdravy')
+  NxTest.assert_equal({ 'templates' => [] }, NxKonD::TS.migration_source, 'legacy bez std je zdravy')
+  NxKonD.write!('{"std": 5, "templates": []}', "#{NxKonD::TS.path}.bak")
+  NxTest.assert_equal({ 'templates' => [] }, NxKonD::TS.migration_source, 'existujuci primar ma prednost pred zalohou')
 ensure
   NxKonD.reset! if NxTest.headless?
 end
