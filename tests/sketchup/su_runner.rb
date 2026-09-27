@@ -5313,6 +5313,242 @@ module NoxunSuRunner
     e::ApplianceCatalog.reset_state!
   end
 
+  # --- KON-0 · D-143: CHRBAT V DRAZKE DO NAREZU V PLNOM ROZMERE --------------
+  #
+  # CO SA TU OVERUJE A MIMO SKETCHUPU OVERIT NEDA: plan <-> model 1:1 (chrbat
+  # v drazke STOJI v modeli 564 x 684, snapshot nesie do narezu 600 x 720),
+  # realny zber kusovnika z entit, olepenie chrbta cez PRESTAVBU (builder
+  # rozmer do narezu nezapise) a jeden krok Spat, zastarane skrinky zo starsej
+  # verzie (sonda „stareho pluginu" = schema 18 + snapshot bez `cut_size`),
+  # HROMADNA prestavba akciou Kontroly (jeden krok Spat vrati snapshot AJ
+  # schemu spolu, Redo ich vrati spolu), skrinka s odpojenym dielcom sa
+  # preskoci a vymenuje, kopia, absorpcia Scale a ulozenie + nacitanie .skp.
+  KON0_CAB = { 'type' => 'upper', 'width' => 600.0, 'height' => 720.0 }.freeze
+
+  def kon0_back(inst)
+    return nil unless inst && inst.valid?
+
+    inst.definition.entities.grep(Sketchup::ComponentInstance).find do |p|
+      e::Store.kind(p) == 'part' && e::Store.get(p, 'part_key').to_s == 'cabinet/back'
+    end
+  end
+
+  def kon0_back_cfg(inst)
+    b = kon0_back(inst)
+    b ? (e::Store.config(b) || {}) : {}
+  end
+
+  def kon0_cut(inst)
+    c = kon0_back_cfg(inst)['cut_size']
+    c.is_a?(Hash) ? [c['length'].to_f, c['width'].to_f] : nil
+  end
+
+  def kon0_schema(inst)
+    e::CabinetBuilder.config_schema_of(e::Store.config(inst) || {})
+  end
+
+  # Rozmery DEFINICIE dielca v mm (geometria modelu, nie snapshot).
+  def kon0_def_dims(part)
+    b = part.definition.bounds
+    [b.width, b.height, b.depth].map { |v| e::Units.to_mm(v).round(1) }
+  end
+
+  def kon0_issue_codes(model)
+    Array(e::Bom.collect(model)[:cut_issues]).map { |i| [i['code'], i['owner_id']] }
+  end
+
+  def kon0_back_rows(model, cid)
+    Array(e::Bom.collect(model)[:records]).select do |r|
+      r['role'] == 'back' && r['owner_id'].to_s == cid
+    end
+  end
+
+  # Sonda „stareho pluginu" (schema 18): config skrinky so starsim markerom
+  # a snapshot chrbta BEZ rozmeru do narezu aj bez znacky povodu — presne to,
+  # co v .skp nechala v0.13.0. Jedna operacia (Spat by ju vratila).
+  def kon0_make_stale!(model, inst)
+    cfg = e::Store.config(inst) || {}
+    part = kon0_back(inst)
+    pcfg = part ? (e::Store.config(part) || {}) : {}
+    e::CabinetBuilder.guarded do
+      model.start_operation('SU-TEST KON-0 stara schema', true)
+      e::Store.write_config(inst, cfg.merge('config_schema' => 18))
+      e::Store.write_config(part, pcfg.reject { |k, _| %w[cut_size back_mode].include?(k) }) if part
+      model.commit_operation
+    end
+  end
+
+  def kon0_rebuild_stale(model)
+    msg = nil
+    err = nil
+    e::Panel.back_rebuild_stale(model, { 'gen' => 1, 'model_guid' => e::Panel.model_guid(model) },
+                                generation: 1, status: ->(m, x = false) { msg = m; err = x },
+                                repush: -> {})
+    [msg, err]
+  end
+
+  def run_kon0(model)
+    cleanup(model)
+    cab = e::CabinetBuilder.build(model, KON0_CAB)
+    return ok('KON-0: fixtura hornej skrinky', false) unless cab
+
+    cid = e::Store.get(cab, 'cabinet_id').to_s
+
+    # (a) PLAN <-> MODEL 1:1 + snapshot s rozmerom do narezu
+    params = e::CabinetBuilder.normalize(e::CabinetBuilder.config_to_params(e::Store.config(cab) || {}))
+    pd = e::Construction.build_plan(params, cid)[:parts].find { |p| p[:role] == 'back' }
+    part = kon0_back(cab)
+    dims = part ? kon0_def_dims(part) : nil
+    ok("KON-0 (a): chrbat stoji v modeli v drazke 564 x 3 x 684 = box planu (#{dims.inspect} vs #{pd && pd[:box].inspect})",
+       dims && pd && dims.zip(pd[:box]).all? { |m, p| (m - p).abs < TOL } && (dims[0] - 564.0).abs < TOL &&
+       (dims[2] - 684.0).abs < TOL)
+    bc = kon0_back_cfg(cab)
+    ok("KON-0 (a): snapshot chrbta nesie do narezu 600 x 720 a znacku groove (#{bc['cut_size'].inspect}, #{bc['back_mode'].inspect})",
+       kon0_cut(cab) == [600.0, 720.0] && bc['back_mode'] == 'groove' &&
+       (bc['length'].to_f - 564.0).abs < TOL && (bc['width'].to_f - 684.0).abs < TOL)
+    ok("KON-0 (a): skrinka je v schéme #{kon0_schema(cab)} (cakam 19)", kon0_schema(cab) == 19)
+
+    # (b) VYROBNE VYSTUPY z realneho zberu
+    rows = kon0_back_rows(model, cid)
+    ok("KON-0 (b): kusovnik ma chrbat 600 x 720 (#{rows.map { |r| [r['length'], r['width']] }.inspect})",
+       rows.length == 1 && (rows[0]['length'] - 600.0).abs < TOL && (rows[0]['width'] - 720.0).abs < TOL)
+    ok("KON-0 (b): ziadny nalez D-143 (#{kon0_issue_codes(model).inspect})", kon0_issue_codes(model).empty?)
+    ok('KON-0 (b): brana D-143 exporty pusti', e::ProductionCore.cut_stop(e::Bom.collect(model)).nil?)
+    csv = k1_vepo_csv(model)
+    ok('KON-0 (b): VEPO nesie chrbat 600 x 720, nie 564 x 684', csv.include?('"600"') && csv.include?('"720"') &&
+       !csv.include?('"564"'))
+    stats = e::Panel.cabinet_stats(cab)
+    card = e::Panel.part_card_payload(model, cab, part)
+    ok("KON-0 (b): karta dielca „Do nárezu #{card && card['cut_text']}“, Dĺžka/Šírka modelu #{card && [card['length'], card['width']].inspect}",
+       card && card['cut_text'] == '600 × 720' && (card['length'].to_f - 564.0).abs < TOL)
+    info("KON-0 (b): plocha skrinky v Inspectore #{stats['parts_area_m2']} m2 (chrbat v nej 0,432)")
+
+    # (c) OLEPENIE chrbta cez prestavbu -> bez cut_size + RED; JEDEN krok Spat
+    pov = { 'cabinet/back' => { 'edges' => { 'L2' => 'SU_KON0_ABS' } } }
+    e::CabinetBuilder.rebuild(model, cab, e::CabinetBuilder.config_to_params(e::Store.config(cab) || {})
+                                                            .merge('part_overrides' => pov))
+    ok("KON-0 (c): olepeny chrbat v drazke rozmer do narezu NEMA (#{kon0_back_cfg(cab)['cut_size'].inspect})",
+       kon0_cut(cab).nil? && kon0_back_cfg(cab)['back_mode'] == 'groove')
+    ok("KON-0 (c): Kontrola RED „olepená hrana“ a brana stoji (#{kon0_issue_codes(model).inspect})",
+       kon0_issue_codes(model) == [[e::Bom::BACK_EDGED, cid]] &&
+       !e::ProductionCore.cut_stop(e::Bom.collect(model)).nil?)
+    ok('KON-0 (c): override olepenia ostal v configu (nezmizol)',
+       (e::Store.config(cab)['part_overrides'] || {}).key?('cabinet/back'))
+    Sketchup.undo
+    ok("KON-0 (c): JEDEN Spat vratil rozmer do narezu (#{kon0_cut(cab).inspect}) a nalez zhasol",
+       kon0_cut(cab) == [600.0, 720.0] && kon0_issue_codes(model).empty?)
+
+    # (d) ZASTARANE SKRINKY — dve bezne + tretia s odpojenym chrbtom
+    cab2 = e::CabinetBuilder.build(model, KON0_CAB, transform: Geom::Transformation.translation(e::Units.point(1000.0, 0, 0)))
+    cab3 = e::CabinetBuilder.build(model, KON0_CAB, transform: Geom::Transformation.translation(e::Units.point(2000.0, 0, 0)))
+    return ok('KON-0 (d): fixtury dalsich skriniek', false) unless cab2 && cab3
+
+    cid2 = e::Store.get(cab2, 'cabinet_id').to_s
+    cid3 = e::Store.get(cab3, 'cabinet_id').to_s
+    [cab, cab2, cab3].each { |c| kon0_make_stale!(model, c) }
+    # odpojeny STARY chrbat tretej skrinky (kopia na koren modelu s jej atributmi)
+    old_back = kon0_back(cab3)
+    detached = nil
+    e::CabinetBuilder.guarded do
+      model.start_operation('SU-TEST KON-0 odpojeny chrbat', true)
+      detached = model.entities.add_instance(old_back.definition,
+                                             Geom::Transformation.translation(e::Units.point(2000.0, -800.0, 0)))
+      old_back.attribute_dictionary(e::Store::DICT).each_pair { |k, v| detached.set_attribute(e::Store::DICT, k, v) }
+      model.commit_operation
+    end
+    codes = kon0_issue_codes(model)
+    stale_ids = codes.select { |c, _| c == e::Bom::BACK_STALE }.map(&:last).sort
+    ok("KON-0 (d): tri zastarane skrinky RED (#{codes.inspect})", stale_ids == [cid, cid2, cid3].sort)
+    ok('KON-0 (d): odpojeny stary chrbat bez znacky = ORANGE „over rozmer“',
+       codes.include?([e::Bom::BACK_ORIGIN, cid3]))
+    col = e::Bom.collect(model)
+    stop = e::ProductionCore.cut_stop(col).to_s
+    ok("KON-0 (d): brana zastavi exporty a menuje skrinky (#{stop[0, 160]})",
+       stop.include?('NEVYKONAL') && stop.include?(cid) && stop.include?('staršej verzie'))
+    stale_item = Array(e::ProductionCore.control_payload(col)['items']).find do |i|
+      i['category'] == e::Validation::CAT_BACK_CUT && i['owner_id'] == cid
+    end
+    ok('KON-0 (d): riadok Kontroly ponuka hromadnu prestavbu (fix rebuild_stale)',
+       stale_item && stale_item['severity'] == 'red' && stale_item['fix'] == 'rebuild_stale')
+    rows = kon0_back_rows(model, cid)
+    ok("KON-0 (d): stary chrbat ide do kusovnika v rozmere modelu (#{rows.map { |r| r['length'] }.inspect})",
+       rows.length == 1 && (rows[0]['length'] - 564.0).abs < TOL)
+
+    # (e) HROMADNA PRESTAVBA akciou Kontroly — JEDNA operacia
+    markers = []
+    mk = r03_marker(model, markers)
+    msg, err = kon0_rebuild_stale(model)
+    ok("KON-0 (e): prestavane 2 skrinky, tretia (odpojeny dielec) preskocena a vymenovana: #{msg}",
+       msg.to_s.include?('Prestavané zastarané skrinky: 2') && msg.to_s.include?(cid3) && err)
+    ok("KON-0 (e): prestavane skrinky su v schéme 19 s rozmerom do narezu (#{[kon0_schema(cab), kon0_schema(cab2)].inspect})",
+       kon0_schema(cab) == 19 && kon0_schema(cab2) == 19 && kon0_cut(cab) == [600.0, 720.0] &&
+       kon0_cut(cab2) == [600.0, 720.0])
+    ok("KON-0 (e): preskocena skrinka ostala zastarana a blokovana (#{kon0_schema(cab3)})",
+       kon0_schema(cab3) == 18 && kon0_issue_codes(model).include?([e::Bom::BACK_STALE, cid3]))
+    Sketchup.undo
+    ok("KON-0 (e): JEDEN Spat vratil OBE skrinky — snapshot aj schemu spolu (#{[kon0_schema(cab), kon0_cut(cab).inspect].inspect})",
+       kon0_schema(cab) == 18 && kon0_schema(cab2) == 18 && kon0_cut(cab).nil? && kon0_cut(cab2).nil? && mk.valid?)
+    if Sketchup.respond_to?(:redo)
+      Sketchup.redo
+      ok("KON-0 (e): Redo vratilo prestavbu spolu so schemou (#{[kon0_schema(cab), kon0_cut(cab).inspect].inspect})",
+         kon0_schema(cab) == 19 && kon0_cut(cab) == [600.0, 720.0] && kon0_schema(cab2) == 19)
+    else
+      info('KON-0 (e): Sketchup.redo nedostupne — Redo vetva netestovana')
+      kon0_rebuild_stale(model)
+    end
+    r03_clear_markers(model, markers)
+    # odpojeny kus prec -> druhe kolo prestavby vezme aj tretiu skrinku
+    e::CabinetBuilder.guarded do
+      model.start_operation('SU-TEST KON-0 zmaz odpojeny', true)
+      detached.erase! if detached && detached.valid?
+      model.commit_operation
+    end
+    msg2, = kon0_rebuild_stale(model)
+    ok("KON-0 (e): po odstraneni odpojeneho kusu sa prestavi aj tretia (#{msg2})",
+       kon0_schema(cab3) == 19 && kon0_issue_codes(model).empty?)
+    msg3, err3 = kon0_rebuild_stale(model)
+    ok("KON-0 (e): nic zastarane = ziadna operacia a pokojna hlaska (#{msg3})",
+       msg3.to_s.include?('nič sa neprestavovalo') && !err3)
+
+    # (f) KOPIA skrinky nesie rozmer do narezu aj schemu
+    before = cabinets(model).length
+    e::Panel.handle_insert_copy(pg(model, 'cabinet_id' => cid))
+    copy = model.selection.to_a.find do |i|
+      e::Store.kind(i) == 'cabinet' && ![cid, cid2, cid3].include?(e::Store.get(i, 'cabinet_id').to_s)
+    end
+    ok("KON-0 (f): kopia nesie cut_size a schemu 19 (#{copy ? [kon0_cut(copy), kon0_schema(copy)].inspect : 'ziadna'})",
+       copy && kon0_cut(copy) == [600.0, 720.0] && kon0_schema(copy) == 19 && cabinets(model).length == before + 1)
+    copy.erase! if copy && copy.valid?
+
+    # (g) ABSORPCIA SCALE: sirka 600 -> 900 prepocita rozmer do narezu; 1x Spat vrati oboje
+    before_tr = cab.transformation.to_a
+    model.start_operation('SU-TEST KON-0 user scale', true)
+    cab.transformation = cab.transformation * Geom::Transformation.scaling(ORIGIN, 1.5, 1.0, 1.0)
+    model.commit_operation
+    e::ScaleWatch.absorb(cab)
+    ok("KON-0 (g): absorpcia scale — do narezu 900 x 720 (#{kon0_cut(cab).inspect}), schema #{kon0_schema(cab)}",
+       kon0_cut(cab) == [900.0, 720.0] && kon0_schema(cab) == 19)
+    Sketchup.undo
+    ok("KON-0 (g): 1x Spat vratil scale aj rozmer do narezu (#{kon0_cut(cab).inspect})",
+       kon0_cut(cab) == [600.0, 720.0] && cab.transformation.to_a == before_tr)
+
+    # (h) ULOZENIE a NACITANIE .skp: snapshot prezije subor
+    saved_path = File.join(File.dirname(OUT), 'ENGINEtests_kon0_saved.skp')
+    ok('KON-0 (h): SKP save_copy', model.save_copy(saved_path))
+    loaded = model.definitions.load(saved_path)
+    saved = loaded.entities.grep(Sketchup::ComponentInstance).select { |p| e::Store.kind(p) == 'cabinet' }
+    cuts = saved.map { |s| kon0_cut(s) }
+    ok("KON-0 (h): nacitane skrinky nesu rozmer do narezu aj schemu 19 (#{cuts.inspect})",
+       !saved.empty? && cuts.all? { |c| c == [600.0, 720.0] } && saved.all? { |s| kon0_schema(s) == 19 })
+
+    cleanup(model)
+    ok('KON-0: cleanup (0 korpusov)', cabinets(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: run_kon0 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    tools1_close_context(model)
+    cleanup(model)
+  end
+
   # --- S1-C: OCAKAVANY SPOTREBIC (`appliance_expects[]`) --------------------
   #
   # CO SA TU OVERUJE A MIMO SKETCHUPU OVERIT NEDA:
@@ -26062,6 +26298,7 @@ module NoxunSuRunner
     run_s1b1(model)          # S1-B1: SPOTREBIC V ZAKAZKE — priradenie z katalogu, presun, odpojenie a zmazanie ako JEDEN krok Spat (polozka + `appliance_refs[]` vlastnika + prestavba naraz), sirota po Delete (nalez BEZ `owner_id`) a jej naprava, trieda umyvacky vs slot, „dodáva zákazník" (medzisucet 0 + stitok v ponuke), legacy zakazka na kanonicke kody, ROLLBACK po riadenych zlyhaniach a bariera observera
     run_s1b2(model)          # S1-B2: POHLAD V ZAKAZKE + riadok Spotrebica ? ocakavanie zo sablony a ponuka filtrovana podla niky, priradenie AKCIOU PANELA (ciel z oznacenej entity) a 1x Spat, telo slotu prekreslene z katalogu (448 x 550) a spat na genericke, doska bez prestavby, tabulka pohladu nad realnym zberom, Delete vlastnika -> sirota -> odpojenie -> Spat vrati oboje
     run_s1f(model)           # S1-F: KONTROLNA GEOMETRIA CHLADNICKY — box niky 560 x 555 x 1940 na hornej ploche dna (prestavba ho zachova, 1x Spat), box nikdy v zbere ani v kusovniku, Kontrola niky per os (1924 -> ORANGE vyska -> zvysenie -> OK), delenie ciel (hrana 682 mimo 679-727 -> posun -> OK) + nahlad, presun vazby medzi skrinkami, rebind_model na iny box, zmena ziveho katalogu snapshotom nepohne, odpojenie a Spat
+    run_kon0(model)          # KON-0 · D-143: CHRBAT V DRAZKE DO NAREZU — horna 600 x 720 stoji v modeli 564 x 684 (plan = model), snapshot/kusovnik/VEPO/karta 600 x 720, olepenie cez prestavbu = bez cut_size + RED a 1x Spat, zastarane skrinky (schema 18) RED + brana, hromadna prestavba z Kontroly = 1 operacia (Spat/Redo vratia snapshot aj schemu spolu), odpojeny dielec skip + ORANGE, kopia, absorpcia scale 900 x 720, ulozenie a nacitanie .skp
     run_d140(model)          # D-140: VYSKA OSADENIA CHLADNICKY — akcia panela zdvihne box niky (z 118 -> 268) a Kontrola vysky/delenia pocita od zdvihnuteho dna, 1x Spat, odmietnutia (stara hodnota, zly vstup, cudzie echo/PID/dokument, nezmenena) bez kroku Spat, prestavba dvierok osadenie zachova, zapis z otvoreneho komponentu zatvori kontext, vymena modelu prenesie, presun na inu skrinku nie, kopia ho nema, 0 kluc zmaze
     run_s1c(model)           # S1-C: OCAKAVANY SPOTREBIC — cely cyklus sablony (uloz s ocakavaniami -> vloz ghostom -> config -> Kontrola 2x ORANGE -> priradenie -> OK -> 2x Spat), ocakavanie BEZ sablony v riadku Spotrebic (1x Spat, geometria netknuta, peciatka schemy, nezmenene = ziadny krok, cudzie echo/PID nezapisu nic, viazanu kategoriu zrusit nedas), bariera observera po nativnej kopii, slot bez modelu (ORANGE + podvrh odmietnuty), aplikovanie sablony na viazanu skrinku (vazba ostava, ocakavania unia)
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
