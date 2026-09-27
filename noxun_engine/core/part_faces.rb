@@ -25,8 +25,10 @@
 #                      celo  axes L=Z,W=X,T=Y -> L1 na X=0 = Lava,    W1 na Z=0 = Dolna
 #                      chrbat axes L=X,W=Z,T=Y -> L1 na Z=0 = Dolna,  W1 na X=0 = Lava
 #
-# VYNIMKA — STOJACE DIELCE ZASUVKY (KOV-D5, Astra #20 F15): u rol
-# `drawer_back`/`box_side`/`drawer_inner_front` je L1 podla ABS pravidla aj podla
+# VYNIMKA — STOJACE DIELCE (KOV-D5, Astra #20 F15; KON-B · K2): u rol
+# `drawer_back`/`box_side`/`drawer_inner_front` a DOLNEJ LISTY CHRBTA
+# `back_rail_bottom` (prva KORPUSOVA stojaca rola — vedoma zmena invariantu
+# „stojace su len dielce zasuvky", KON-B) je L1 podla ABS pravidla aj podla
 # `AbsRules::EDGE_LABELS` HORNA dlha hrana (tam ide olep), kym default vyssie by
 # ju polozil na MINIMUM osi sirky = spodok. Pre tieto roly (`STANDING_ROLES`)
 # preto plati OTOCENA dvojica L1/L2 (`STANDING_EDGE_FACES`) — os sirky je u nich
@@ -35,6 +37,10 @@
 # a mapa je JEDINA pre farbenie plosok (CabinetBuilder.paint_edge_faces) aj pre
 # zvyraznenie Kontroly/hoveru (EdgeCheck, HoverEdge) — dve mapy by znamenali, ze
 # sa zvyrazni ina hrana, nez sa zafarbi.
+# KON-B: dolna lista stoji na dne a jej L1 je HORNA plocha; horna lista
+# (`back_rail_top`, nestojaca) ma L1 na DOLNEJ ploche — paska je tak u oboch na
+# hrane viditelnej zvnutra a obe maju ROVNAKU mapu hran `{L1}` (jeden riadok
+# kusovnika, M6).
 #
 # BEZPECNOSTNY VENTIL: ked deskriptor osi nenesie, alebo ked osi NESEDIA s rozmermi
 # (box[os] != prod[rozmer] nad toleranciu), mapovanie sa NEHADA — vrati sa nil a
@@ -75,7 +81,8 @@ module Noxun
       # Roly s otocenou dvojicou. JEDINY literalny zoznam v celom pluginu —
       # `AbsRules::STANDING_ROLES` (2D karta dielca) je jeho ALIAS, aby sa
       # zvyraznena a zafarbena hrana nemohli casom rozist.
-      STANDING_ROLES = %w[drawer_back box_side drawer_inner_front].freeze
+      # KON-B · K2: + dolna lista chrbta (prva korpusova stojaca rola).
+      STANDING_ROLES = %w[drawer_back box_side drawer_inner_front back_rail_bottom].freeze
 
       module_function
 
@@ -151,6 +158,8 @@ module Noxun
         'front_door' => [AXES_FRONT], 'drawer_front' => [AXES_FRONT],
         'flap' => [AXES_FRONT], 'false_front' => [AXES_FRONT],
         'back' => [AXES_WALL], 'plinth' => [AXES_WALL],
+        # KON-B · K2: listy chrbta stoja v rovine XZ ako chrbat (jediny kandidat).
+        'back_rail_top' => [AXES_WALL], 'back_rail_bottom' => [AXES_WALL],
         'rail_front' => [AXES_LYING, AXES_WALL], 'rail_back' => [AXES_LYING, AXES_WALL],
         # KOV-D5: dielce zasuviek (recept ich stava v `Construction.drawer_part_descriptor`).
         # Kazda rola ma PRAVE JEDNEHO kandidata — dno lezi, chrbat a vnutorne celo

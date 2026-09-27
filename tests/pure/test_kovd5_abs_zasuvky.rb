@@ -269,7 +269,8 @@ end
 NxTest.test('KOV-D5: zoznam stojacich roli je JEDINY (AbsRules je alias PartFaces)') do
   NxTest.assert(NxD5::ABS::STANDING_ROLES.equal?(NxD5::PF::STANDING_ROLES),
                 'AbsRules::STANDING_ROLES musi byt TEN ISTY objekt ako PartFaces::STANDING_ROLES')
-  NxTest.assert_equal(%w[drawer_back box_side drawer_inner_front], NxD5::PF::STANDING_ROLES)
+  # KON-B · K2: + dolna lista chrbta (prva korpusova stojaca rola).
+  NxTest.assert_equal(%w[drawer_back box_side drawer_inner_front back_rail_bottom], NxD5::PF::STANDING_ROLES)
 end
 
 NxTest.test('KOV-D5: dve mapy hran sa lisia PRESNE v dvojici L1/L2') do
@@ -303,20 +304,38 @@ end
 # 5) CHARAKTERIZACIA — korpus, recept a vystupy sa NEMENIA
 # ---------------------------------------------------------------------------
 
-NxTest.test('KOV-D5: korpusove dielce mapuju hrany PRESNE ako pred D5 (rola nic nemeni)') do
+# KON-B · K2 (VEDOMA ZMENA INVARIANTU): korpusova rola smie byt stojaca LEN
+# ako DOLNA LISTA CHRBTA (`back_rail_bottom`) — stoji na dne a jej paska L1 je
+# HORNA plocha (hrana viditelna zvnutra). Vsetky ostatne korpusove roly
+# (vratane hornej listy) mapuju hrany presne ako pred D5.
+NxTest.test('KOV-D5 + KON-B: korpusove dielce mapuju hrany ako pred D5; stojaca je LEN dolna lista chrbta') do
   d = NxD5
-  pl = d.plan({ 'type' => 'drawer_front' },
-              'plinth_mode' => 'front', 'top_mode' => 'two_rails',
-              'rails_orientation' => 'upright', 'back_mode' => 'overlay',
-              'zone_tree' => { 'id' => 'Z1', 'shelves' => 1, 'children' => [] })
-  corpus = pl[:parts].reject { |p| p[:material] == :drawer }
-  NxTest.assert(corpus.length >= 6, "plan ma korpusove dielce (#{corpus.length})")
-  corpus.each do |pd|
-    NxTest.assert(!NxD5::PF::STANDING_ROLES.include?(pd[:role].to_s),
-                  "#{pd[:role]}: korpusova rola nesmie byt stojaca")
-    NxTest.assert_equal(d.face_map(pd, nil), d.map_of(pd),
-                        "#{pd[:role]}/#{pd[:suffix]}: mapa s rolou = mapa bez roly")
+  base = { 'plinth_mode' => 'front', 'top_mode' => 'two_rails', 'rails_orientation' => 'upright',
+           'zone_tree' => { 'id' => 'Z1', 'shelves' => 1, 'children' => [] } }
+  standing_corpus = []
+  %w[overlay rails].each do |bm|
+    pl = d.plan({ 'type' => 'drawer_front' }, base.merge('back_mode' => bm))
+    corpus = pl[:parts].reject { |p| p[:material] == :drawer }
+    NxTest.assert(corpus.length >= 6, "plan ma korpusove dielce (#{corpus.length})")
+    corpus.each do |pd|
+      role = pd[:role].to_s
+      if role == 'back_rail_bottom'
+        standing_corpus << role
+        NxTest.assert(NxD5::PF::STANDING_ROLES.include?(role), 'dolna lista je stojaca')
+        m = d.map_of(pd)
+        NxTest.assert_equal([2, :max], m['L1'], 'dolna lista: L1 = HORNA plocha (viditelna zvnutra)')
+        NxTest.assert_equal([2, :min], m['L2'], 'dolna lista: L2 = dolna plocha')
+        next
+      end
+      NxTest.assert(!NxD5::PF::STANDING_ROLES.include?(role),
+                    "#{role}: korpusova rola nesmie byt stojaca (vynimka je len dolna lista chrbta)")
+      NxTest.assert_equal(d.face_map(pd, nil), d.map_of(pd),
+                          "#{role}/#{pd[:suffix]}: mapa s rolou = mapa bez roly")
+    end
   end
+  NxTest.assert_equal(['back_rail_bottom'], standing_corpus, 'jedina stojaca korpusova rola')
+  top = d.role_part(d.plan({ 'type' => 'drawer_front' }, base.merge('back_mode' => 'rails')), 'back_rail_top')
+  NxTest.assert_equal([2, :min], d.map_of(top)['L1'], 'horna lista: L1 = DOLNA plocha (viditelna zvnutra)')
 end
 
 NxTest.test('KOV-D5: golden mapa hran roli korpusu (bok, polica, celo, chrbat)') do
@@ -338,7 +357,8 @@ NxTest.test('KOV-D5: golden mapa hran roli korpusu (bok, polica, celo, chrbat)')
 end
 
 NxTest.test('KOV-D5: recept ani ABS pravidla dielcov zasuviek sa nemenia') do
-  NxTest.assert_equal(4, NxD5::ABS::SEED_VERSION, 'seed sa nebumpuje — pravidla su rovnake')
+  # KON-B · K2 bumpla seed na 5 (listy chrbta) — pravidla zasuviek su rovnake.
+  NxTest.assert_equal(5, NxD5::ABS::SEED_VERSION, 'D5 seed nebumpla (5 = KON-B listy chrbta)')
   { 'drawer_bottom' => {}, 'drawer_back' => { 'L1' => 1.0 },
     'box_side' => { 'L1' => 1.0 }, 'drawer_inner_front' => { 'L1' => 1.0 } }.each do |role, want|
     NxTest.assert_equal(want, NxD5::ABS::SEED_RULES[role], "#{role}: seed pravidlo")

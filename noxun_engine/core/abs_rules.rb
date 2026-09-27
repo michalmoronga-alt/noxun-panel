@@ -18,6 +18,8 @@
 #   front_door/drawer_front    : celo pred korpusom (length=vyska Z, width=sirka X)
 #       L1=Lava(X=0)    L2=Prava(X=max) W1=Dolna(Z=0)  W2=Horna(Z=max)
 #   back/plinth                : ABS sa neaplikuje (pravidlo prazdne) — labely best-effort
+#   back_rail_top/_bottom      : listy chrbta (KON-B) — L1 = hrana viditelna zvnutra
+#       (horna lista L1=Dolna, dolna lista STOJI -> L1=Horna, viz PartFaces::STANDING_ROLES)
 #   rail_front/rail_back       : vystuhy maju DVE orientacie (flat naplocho / upright na hranu)
 #       a fyzicky vyznam hran sa medzi nimi meni (flat L1=predna dolu, upright L1=dolna/horna).
 #       Pravidlo aj labely su preto ORIENTACNE NEUTRALNE: L1 = dlha (pozdlzna) hrana,
@@ -48,7 +50,11 @@ module Noxun
       # box_side · drawer_inner_front) — bez bumpu by ich `merge_seed_roles`
       # na existujucich instalaciach nikdy nedoplnil a zasuvka by sa postavila
       # BEZ olepu (rovnaka lekcia ako flap/false_front pri bumpe na 3).
-      SEED_VERSION = 4
+      # 5 = KON-B · K2 listy chrbta (back_rail_top · back_rail_bottom, obe L1 1,0 mm
+      # na hrane viditelnej zvnutra) — bez bumpu by ich `merge_seed_roles` na
+      # existujucich PC nedoplnil a listy by sa postavili BEZ pasky; vlastne
+      # (ulozene) pravidla ostavaju nedotknute.
+      SEED_VERSION = 5
       # Roly, ktore pri bumpe na SEED_VERSION 2 dostanu novy default aj v EXISTUJUCOM
       # subore, ale IBA ak su tam ulozene ako PRESNE prazdny hash {} (povodny stock stav).
       RAIL_MIGRATION_ROLES = %w[rail_front rail_back].freeze
@@ -88,7 +94,12 @@ module Noxun
                                   'W1' => 'Priečna 1', 'W2' => 'Priečna 2' },
         'drawer_back'        => { 'L1' => 'Horná', 'L2' => 'Dolná', 'W1' => 'Ľavá', 'W2' => 'Pravá' },
         'box_side'           => { 'L1' => 'Horná', 'L2' => 'Dolná', 'W1' => 'Predná', 'W2' => 'Zadná' },
-        'drawer_inner_front' => { 'L1' => 'Horná', 'L2' => 'Dolná', 'W1' => 'Ľavá', 'W2' => 'Pravá' }
+        'drawer_inner_front' => { 'L1' => 'Horná', 'L2' => 'Dolná', 'W1' => 'Ľavá', 'W2' => 'Pravá' },
+        # KON-B · K2: horna lista chrbta lezi ako chrbat (L1 = dolna plocha),
+        # dolna STOJI ako chrbat zasuvky (L1 = horna plocha) — obe L1 = hrana
+        # viditelna zvnutra.
+        'back_rail_top'      => { 'L1' => 'Dolná', 'L2' => 'Horná', 'W1' => 'Ľavá', 'W2' => 'Pravá' },
+        'back_rail_bottom'   => { 'L1' => 'Horná', 'L2' => 'Dolná', 'W1' => 'Ľavá', 'W2' => 'Pravá' }
       }.freeze
       EDGE_LABELS_DEFAULT = { 'L1' => 'Hrana 1', 'L2' => 'Hrana 2', 'W1' => 'Hrana 3', 'W2' => 'Hrana 4' }.freeze
 
@@ -152,7 +163,11 @@ module Noxun
         'drawer_bottom'      => {},
         'drawer_back'        => { 'L1' => 1.0 },
         'box_side'           => { 'L1' => 1.0 },
-        'drawer_inner_front' => { 'L1' => 1.0 }
+        'drawer_inner_front' => { 'L1' => 1.0 },
+        # KON-B · K2 (SEED_VERSION 5): listy chrbta — paska na JEDNEJ dlhej hrane
+        # viditelnej zvnutra (M4, M6); rovnaka mapa hran = jeden riadok kusovnika.
+        'back_rail_top'      => { 'L1' => 1.0 },
+        'back_rail_bottom'   => { 'L1' => 1.0 }
       }.freeze
 
       module_function
