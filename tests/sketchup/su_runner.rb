@@ -6047,6 +6047,72 @@ module NoxunSuRunner
     end
   end
 
+  # --- KON-D: VSTAVANA SABLONA „Chladničková" --------------------------------
+  #
+  # Runner ma CERSTVU kniznicu v izolovanom %APPDATA% (STD 7), takze seed tam
+  # je. Overuje sa MODEL: vklad zo seedu ghostom (presne cesta panela) ->
+  # plan <-> model 1:1, dno a strop 510, boky 560, ziadny chrbat, 2 fyzicke
+  # dvierka 719 + 1274 so smerom „neurceny" (Kontrola ich hlasi), ocakava
+  # chladnicku (ORANGE), a JEDEN krok Spat vklad cely vrati.
+  KOND_TPL = 'Chladničková'
+
+  def run_kond(model)
+    cleanup(model)
+    rec = e::TemplateStore.find('cabinet', KOND_TPL)
+    ok("KON-D: kniznica STD #{e::TemplateStore::STD} ma seed „#{KOND_TPL}“", rec && e::TemplateStore::STD == 7)
+    return unless rec
+
+    ok("KON-D: seed nesie aktualnu schemu #{rec['config']['config_schema'].inspect}",
+       rec['config']['config_schema'] == e::CabinetBuilder::CONFIG_SCHEMA)
+    before = cabinets(model).length
+    payload = rec['config'].merge('template_kind' => 'cabinet', 'template_name' => KOND_TPL)
+    inst = ghost_place!(model, payload, [5200.0, 300.0])
+    ghost_teardown!(model)
+    ok('KON-D: vklad zo seedu ghostom prebehol', inst && inst.valid? && cabinets(model).length == before + 1)
+    return unless inst && inst.valid?
+
+    cfg = kona_cfg(inst)
+    bad = kona_sync_bad(inst)
+    ok("KON-D: plan = model 1:1 (#{bad.length} nezhod)#{bad.empty? ? '' : ' — ' + bad.first(3).join(' | ')}", bad.empty?)
+    t = cfg['thickness'].to_f
+    ok("KON-D: config — 600 x 2100 x 560, komin 50, bez chrbta, zapustenie 0 (#{cfg.values_at('width', 'height',
+       'depth', 'back_setback', 'back_mode', 'top_front_setback').inspect}, t #{t})",
+       cfg['width'].to_f == 600.0 && cfg['height'].to_f == 2100.0 && cfg['depth'].to_f == 560.0 &&
+       cfg['back_setback'].to_f == 50.0 && cfg['back_mode'] == 'none' && cfg['top_front_setback'].to_f.zero? &&
+       cfg['config_schema'] == e::CabinetBuilder::CONFIG_SCHEMA)
+    bot = e::Store.config(kona_part(inst, 'cabinet/bottom') || inst) || {}
+    top = e::Store.config(kona_part(inst, 'cabinet/top') || inst) || {}
+    side = e::Store.config(kona_part(inst, 'cabinet/side:left') || inst) || {}
+    ok("KON-D: dno a strop 510, boky 560 (#{[bot['width'], top['width'], side['width']].inspect})",
+       (bot['width'].to_f - 510.0).abs < TOL && (top['width'].to_f - 510.0).abs < TOL &&
+       (side['width'].to_f - 560.0).abs < TOL)
+    ok('KON-D: ziadny chrbat ani listy', kona_part(inst, 'cabinet/back').nil? &&
+       kona_part(inst, 'cabinet/back_rail:bottom').nil?)
+    doors = inst.definition.entities.grep(Sketchup::ComponentInstance).select do |p|
+      e::Store.kind(p) == 'part' && e::Store.get(p, 'part_key').to_s.start_with?('front:')
+    end
+    heights = doors.map { |p| (e::Store.config(p) || {})['length'].to_f.round(1) }.sort
+    ok("KON-D: 2 fyzicke dvierka 719 + 1274 (#{heights.inspect})", heights == [719.0, 1274.0])
+    dirs = Array(cfg['front_items']).map { |i| i['direction'] }
+    ok("KON-D: smer oboch dvierok neurceny (#{dirs.inspect})", dirs == %w[unset unset])
+    hw = Array(e::Bom.collect(model)[:hardware_issues]).select { |i| i['code'] == 'front_direction_unset' }
+    ok("KON-D: Kontrola vyzve zvolit stranu pantov (#{hw.length} nalezy)", hw.length == 2)
+    ok("KON-D: ocakava chladnicku (#{cfg['appliance_expects'].inspect}, Kontrola #{s1c_missing(model).inspect})",
+       cfg['appliance_expects'] == %w[fridge] && s1c_missing(model) == ['missing|fridge'])
+    ok("KON-D: nika z hlbky boku 560 (#{e::ApplianceChecks.context(cfg)['interior'].inspect})",
+       e::ApplianceChecks.context(cfg)['interior']['depth'] == 560.0)
+
+    # JEDEN krok Spat vrati cely vklad.
+    Sketchup.undo
+    ok('KON-D: jeden krok Spat vklad vratil', !inst.valid? && cabinets(model).length == before)
+    cleanup(model)
+    ok('KON-D: cleanup (0 korpusov)', cabinets(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: run_kond vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    ghost_teardown!(model)
+    cleanup(model)
+  end
+
   # --- S1-C: OCAKAVANY SPOTREBIC (`appliance_expects[]`) --------------------
   #
   # CO SA TU OVERUJE A MIMO SKETCHUPU OVERIT NEDA:
@@ -26799,6 +26865,7 @@ module NoxunSuRunner
     run_kon0(model)          # KON-0 · D-143: CHRBAT V DRAZKE DO NAREZU — horna 600 x 720 stoji v modeli 564 x 684 (plan = model), snapshot/kusovnik/VEPO/karta 600 x 720, olepenie cez prestavbu = bez cut_size + RED a 1x Spat, zastarane skrinky (schema 18) RED + brana, hromadna prestavba z Kontroly = 1 operacia (Spat/Redo vratia snapshot aj schemu spolu), odpojeny dielec skip + ORANGE, kopia, absorpcia scale 900 x 720, ulozenie a nacitanie .skp
     run_kona(model)          # KON-A · K1: KOMIN VZADU A ZAPUSTENY STROP — plan = model pre 68 kombinacii chrbat x strop x X x Y (+ dno medzi bokmi) na jednej instancii, zmena komina = 1 Spat, odmietnutie komina 2 bez zmeny, absorpcia hlbky pod minimum -> 160 + 1 Spat, kopia, ulozenie a nacitanie .skp, sablona tam aj stara sablona (komin ciela ostane), vklad zo sablony ghostom; D-144 schema 19 -> RED + brana + hromadna prestavba cez skutocny vyber kandidatov + 1 Spat
     run_konb(model)          # KON-B · K2: CHRBAT Z LIST — plan = model pre 48 kombinacii strop x dno x komin x vyska list, prepnutie na listy = 1 Spat, odmietnutie 2H + 20 > vnutro bez zmeny, nalozeny -> listy -> nalozeny (dormantny rucny zasah chrbta sa vrati), kopia, ulozenie a nacitanie .skp, sablona tam aj stara (H ciela ostane) a vklad ghostom, Kontrola olepov (paska na hornej ploche dolnej a dolnej ploche hornej listy), kusovnik z modelu 1 riadok 2 ks / s vystuhami 4 ks a VEPO „Chrb HD“
+    run_kond(model)          # KON-D: VSTAVANA SABLONA „Chladničková" — seed v cerstvej kniznici STD 7 so schemou 21, vklad ghostom = plan <-> model 1:1, dno a strop 510, boky 560, bez chrbta, 2 fyzicke dvierka 719 + 1274 so smerom „neurceny" (Kontrola 2 nalezy), ocakava chladnicku (ORANGE), nika 560, 1 krok Spat vrati vklad
     run_d140(model)          # D-140: VYSKA OSADENIA CHLADNICKY — akcia panela zdvihne box niky (z 118 -> 268) a Kontrola vysky/delenia pocita od zdvihnuteho dna, 1x Spat, odmietnutia (stara hodnota, zly vstup, cudzie echo/PID/dokument, nezmenena) bez kroku Spat, prestavba dvierok osadenie zachova, zapis z otvoreneho komponentu zatvori kontext, vymena modelu prenesie, presun na inu skrinku nie, kopia ho nema, 0 kluc zmaze
     run_s1c(model)           # S1-C: OCAKAVANY SPOTREBIC — cely cyklus sablony (uloz s ocakavaniami -> vloz ghostom -> config -> Kontrola 2x ORANGE -> priradenie -> OK -> 2x Spat), ocakavanie BEZ sablony v riadku Spotrebic (1x Spat, geometria netknuta, peciatka schemy, nezmenene = ziadny krok, cudzie echo/PID nezapisu nic, viazanu kategoriu zrusit nedas), bariera observera po nativnej kopii, slot bez modelu (ORANGE + podvrh odmietnuty), aplikovanie sablony na viazanu skrinku (vazba ostava, ocakavania unia)
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
