@@ -141,9 +141,10 @@ rozhodol **nekomplikovať**: chrbát v drážke ide do nárezu **v plnom rozmere
 
 **Čo sa zmenilo.** Chrbát v drážke nesie nový údaj **„rozmer do nárezu"** a s ním počíta **kusovník, kontrola formátu platne, VEPO, plocha pre rozpočet a cenovú
 ponuku aj plocha skrinky v Inspectore**; pri priečnom dekore ide do VEPO 720 × 600. Hmotnosť ostáva podľa modelu. Karta dielca ukazuje pod Hrúbkou riadok
-**„Do nárezu 600 × 720"** (Dĺžka/Šírka ostávajú 564 × 684 — rozmer v modeli). **Tri nové výrobné brány** (Kontrola RED a zastavené všetky štyri exporty: VEPO,
-nákup kovania, rozpočet, ponuka): **olepený chrbát v drážke** (ručne aj pravidlom olepu — „zruš olepenie alebo zmeň typ chrbta"), **poškodený rozmer do nárezu**
-a **zastaraná skrinka** — skrinka s chrbtom v drážke uložená staršou verziou (schéma < 19) má v súbore chrbát v rozmere modelu, kým sa neprestaví. Kontrola pri nej
+**„Do nárezu 600 × 720"** (Dĺžka/Šírka ostávajú 564 × 684 — rozmer v modeli). **Jedna výrobná brána so štyrmi dôvodmi** (`Bom::CUT_BLOCKERS`; Kontrola RED
+a zastavené všetky štyri exporty: VEPO, nákup kovania, rozpočet, ponuka): **olepený chrbát v drážke** (ručne aj pravidlom olepu — „zruš olepenie alebo zmeň typ
+chrbta"), **poškodený rozmer do nárezu**, **chrbát v drážke bez rozmeru do nárezu** (neúplný záznam) a **zastaraná skrinka** — skrinka s chrbtom v drážke
+uložená staršou verziou (schéma < 19) má v súbore chrbát v rozmere modelu, kým sa neprestaví. Kontrola pri nej
 ponúka **„Prestaviť zastarané skrinky"** — všetky naraz, jeden krok Späť; skrinka s odpojeným dielcom sa preskočí a vymenuje. **Samostatný starý chrbát**
 (odpojený, skopírovaný, bez značky pôvodu) je ORANGE „over rozmer do nárezu" a export pustí — vedomé rozhodnutie Michala 27.9.2026 (samostatné chrbty nepoužíva).
 

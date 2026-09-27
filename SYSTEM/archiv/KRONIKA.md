@@ -33,7 +33,7 @@
   `back_mode`), POJMY (prídavok 9 mm vs. V1 plný rozmer), architektúra construction/outputs/model-a-identita/ui-lifecycle na mieste.
   **Odchýlky od package:** (1) spúšťač hromadnej prestavby je akcia riadku Kontroly (package ho nemenoval; Scope OUT „ďalšie UI" — vzor „Nahradiť UNI…");
   (2) DoD „odpojenie chrbta so `cut_size` odmietnuté" je zvyšok package v1 — plugin odpájaciu akciu nemá (odpojenie je natívne), preto overené ako „odpojený nový
-  chrbát ostáva chránený značkou a do nárezu ide v plnom rozmere". **Testy:** 4573 headless (nová sada `test_kon0_d143.rb`, 24 testov vrátane
+  chrbát ostáva chránený značkou a do nárezu ide v plnom rozmere". **Testy:** 4574 headless (nová sada `test_kon0_d143.rb`, 25 testov vrátane
   „každý blokujúci dôvod × každý zo štyroch exportov = nula volaní pickera aj zápisu") · 131 JS sád (nová `test_kon0_do_narezu.js`) · in-SU 3111 PASS / 0 FAIL
   (nový scenár `run_kon0`: plán ↔ model, snapshot/kusovník/VEPO/karta 600 × 720, olepenie cez prestavbu + 1× Späť, zastarané skrinky + brána, hromadná prestavba
   Späť/Redo vracajú snapshot aj schému spolu, odpojený dielec, kópia, absorpcia Scale 900 × 720, uloženie a načítanie .skp). **Mutácie** (3, všetky padli):

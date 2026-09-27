@@ -555,3 +555,17 @@ NxTest.test('D-143: zapis hromadnej prestavby zije v Paneli (brana 1b-3) a ide j
   NxTest.refute(pc.include?('CabinetBuilder.rebuild_many(model, jobs, op_name: \'NOXUN: Prestaviť'),
                 'citacie jadro nezapisuje')
 end
+
+NxTest.test('D-143 vyber: oznaceny DIELEC prestavanej skrinky sa vrati (karta dielca ostane) — vzor D-131') do
+  s = NxKon0.src('noxun_engine', 'ui', 'panel', 'actions_cabinet.rb')
+  body = s[/def back_rebuild_stale\(.*?\n        rescue StandardError/m].to_s
+  NxTest.assert(body.include?('rebuilt_selected ? find_selected_part(model) : nil'),
+                'dielec sa hlada LEN pri prestavanej skrinke')
+  NxTest.assert(body.include?('canonical_part_key(existing_params(selected), part_identity(selected, part))'),
+                'navrat ide cez stabilny part_key (entity po prestavbe zaniknu)')
+  NxTest.assert(body.index('find_selected_part') < body.index('rebuild_many'),
+                'dielec sa zisti PRED prestavbou')
+  NxTest.assert(body.index('focus_part(model, selected, part_key)') > body.index('rebuild_many'),
+                'a fokus sa vrati AZ PO nej')
+  NxTest.assert(body.include?('reselect(model, selected)'), 'bez dielca sa oznaci skrinka ako doteraz')
+end

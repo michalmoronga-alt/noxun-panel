@@ -1091,11 +1091,23 @@ module Noxun
           end
 
           jobs = plan['jobs'].map { |ent| [ent['ref'], existing_params(ent['ref'])] }
+          # Vyber sa obnovuje LEN pri naozaj prestavanej skrinke; ked bol
+          # oznaceny DIELEC (napr. chrbat s otvorenou kartou), vracia sa DIELEC
+          # cez `part_key` — prestavba stare entity zahodi (vzor D-131
+          # `MaterialsDialog.fronts_grain_apply`, Codex #365 kolo 2 P2).
           selected = find_cabinet(model)
           rebuilt_selected = selected && plan['jobs'].any? { |ent| ent['ref'] == selected }
+          part = rebuilt_selected ? find_selected_part(model) : nil
+          part_key = part ? canonical_part_key(existing_params(selected), part_identity(selected, part)) : nil
           suspend_selection_sync do
             CabinetBuilder.rebuild_many(model, jobs, op_name: 'NOXUN: Prestaviť zastarané skrinky')
-            reselect(model, selected) if rebuilt_selected && selected.valid?
+            if rebuilt_selected && selected.valid?
+              if part_key
+                focus_part(model, selected, part_key)
+              else
+                reselect(model, selected)
+              end
+            end
           end
           status.call(pc.back_stale_done_msg(plan), !plan['skipped'].empty?)
           push_selected(model)

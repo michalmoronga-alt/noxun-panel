@@ -24,7 +24,7 @@ V1 ciele **Materiály, Kovanie, Spotrebiče a Dvaja používatelia** sú odškrt
 **Dáta rozpočtu sú od S1-B1 v `BUDGET_STD` 2** (starší plugin zákazku po prvej mutácii rozpočtu needituje a zastaví oba cenové exporty).
 **Pred prvým použitím v0.13.1 aktualizovať OBE PC (aj Luciino)** — starší plugin rozmer do nárezu nepozná a samostatný chrbát by vydal malý.
 
-**Testy (posledná kódová dávka, KON-0 · D-143 #?):** **4573 headless · 131 JS sád · 3111 in-SU PASS / 0 FAIL**. Smoke oprava C (#389): 4545 · 129 · 3081.
+**Testy (posledná kódová dávka, KON-0 · D-143 #?):** **4574 headless · 131 JS sád · 3111 in-SU PASS / 0 FAIL**. Smoke oprava C (#389): 4545 · 129 · 3081.
 **S1-C:** 4499 · 127 · 3036. **S1-B1:** 4369 · 124 · 2935. **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 
 ## Robí sa
