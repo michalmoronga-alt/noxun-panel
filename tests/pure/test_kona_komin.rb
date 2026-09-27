@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # KON-A · K1 — KOMIN VZADU, ZAPUSTENY STROP VPREDU, OPRAVA D-144 (blok 7
-# KONŠTRUKCIA). Package: SYSTEM/zdroje/bloky/KONSTRUKCIA/PACKAGE_KONA_K1.md.
+# KONŠTRUKCIA). Package: SYSTEM/archiv/bloky/KONSTRUKCIA/PACKAGE_KONA_K1.md.
 #
 # CO PLATI:
 #   * config smie niest `back_setback` (X) a `top_front_setback` (Y), mm Float
