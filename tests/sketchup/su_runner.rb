@@ -5817,6 +5817,236 @@ module NoxunSuRunner
     inst.erase! if inst && inst.valid?
   end
 
+  # --- KON-B · K2: CHRBAT Z DVOCH LIST --------------------------------------
+  #
+  # Overuje sa MODEL: (a) plan <-> model 1:1 pre maticu strop x dno x komin x
+  # vyska list na JEDNEJ instancii prestavbou, (b) prepnutie na listy = jeden
+  # krok Spat, odmietnutie 2H + 20 > vnutro bez zmeny, (c) nalozeny -> z list ->
+  # nalozeny: rucny zasah na chrbte caka dormantny a vrati sa, (d) kopia,
+  # (e) ulozenie a nacitanie .skp, (f) sablona tam, stara sablona (H ciela
+  # ostane) a vklad ghostom, (g) Kontrola olepov: paska na hornej ploche dolnej
+  # listy a na dolnej ploche hornej listy (kontrastna paska D-88), ziadna hrana
+  # bez olepu, (h) kusovnik z modelu: 1 riadok 2 ks „Lista chrbta", VEPO
+  # „Chrb HD", s vystuhami 100 1 riadok 4 ks.
+  KONB_CAB = { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0 }.freeze
+  KONB_TPL = '__SU_TEST_KONB_LISTY__'
+  KONB_TPL_OLD = '__SU_TEST_KONB_STARA__'
+
+  def konb_rails_parts(inst)
+    %w[cabinet/back_rail:bottom cabinet/back_rail:top].map { |k| kona_part(inst, k) }
+  end
+
+  def konb_rows(model)
+    e::Bom.compute(e::Bom.collect(model))[:rows]
+  end
+
+  def konb_rail_row(model)
+    konb_rows(model).find { |r| Array(r['names']).include?('Lista chrbta') }
+  end
+
+  def run_konb(model)
+    cleanup(model)
+    cab = e::CabinetBuilder.build(model, KONB_CAB)
+    return ok('KON-B: fixtura dolnej skrinky', false) unless cab
+
+    cid = e::Store.get(cab, 'cabinet_id').to_s
+    base = kona_params(cab)
+    ok("KON-B: skrinka bez list nema kluc vysky list (#{kona_cfg(cab).keys.grep(/rail_height/).inspect})",
+       kona_cfg(cab).keys.grep(/rail_height/).empty?)
+
+    # (a) MATICA plan <-> model 1:1
+    tops = { 'full' => { 'top_mode' => 'full' }, 'none' => { 'top_mode' => 'none' },
+             'flat' => { 'top_mode' => 'two_rails', 'rails_orientation' => 'flat' },
+             'upright' => { 'top_mode' => 'two_rails', 'rails_orientation' => 'upright' } }
+    fails = []
+    n = 0
+    tops.each do |tname, tpar|
+      %w[under_sides between_sides].each do |bot|
+        [0.0, 50.0].each do |x|
+          [20.0, 100.0, 150.0].each do |hr|
+            e::CabinetBuilder.rebuild(model, cab, base.merge('back_mode' => 'rails', 'bottom_mode' => bot,
+                                                             'back_setback' => x, 'back_rail_height' => hr)
+                                                      .merge(tpar))
+            bad = kona_sync_bad(cab)
+            bot_p, top_p = konb_rails_parts(cab)
+            bad << 'chyba lista' unless bot_p && top_p
+            bad << 'ostal chrbat' if kona_part(cab, 'cabinet/back')
+            fails << "#{tname}/#{bot}/X#{x}/H#{hr}: #{bad.first(2).join('; ')}" unless bad.empty?
+            n += 1
+          end
+        end
+      end
+    end
+    ok("KON-B (a): plan = model pre #{n} kombinacii strop x dno x komin x vyska (#{fails.length} nezhod)" \
+       "#{fails.empty? ? '' : ' — ' + fails.first(3).join(' | ')}", fails.empty? && n == 48)
+
+    # (b) PREPNUTIE na listy = jeden krok Spat; smoke 1 v cislach
+    e::CabinetBuilder.rebuild(model, cab, base)
+    e::CabinetBuilder.rebuild(model, cab, base.merge('back_mode' => 'rails'))
+    bot_p, top_p = konb_rails_parts(cab)
+    bc = bot_p ? (e::Store.config(bot_p) || {}) : {}
+    ok("KON-B (b): listy 564 x 100 x 18, vnutro 492, bez chrbta (#{[bc['length'], bc['width'], bc['thickness'],
+       kona_cfg(cab)['available_depth']].inspect})",
+       bot_p && top_p && (bc['length'].to_f - 564.0).abs < TOL && (bc['width'].to_f - 100.0).abs < TOL &&
+       (bc['thickness'].to_f - 18.0).abs < TOL && (kona_cfg(cab)['available_depth'].to_f - 492.0).abs < TOL &&
+       kona_part(cab, 'cabinet/back').nil? && kona_cfg(cab)['back_mode'] == 'rails' &&
+       !kona_cfg(cab).key?('back_rail_height'))
+    ok("KON-B (b): schema #{kona_cfg(cab)['config_schema']} / plan #{kona_cfg(cab)['plan_schema']}",
+       kona_cfg(cab)['config_schema'] == e::CabinetBuilder::CONFIG_SCHEMA &&
+       kona_cfg(cab)['plan_schema'] == e::BuildPlan::SCHEMA)
+    Sketchup.undo
+    ok('KON-B (b): JEDEN Spat vratil nalozeny chrbat (config aj geometria)',
+       kona_cfg(cab)['back_mode'] == 'overlay' && kona_part(cab, 'cabinet/back') &&
+       konb_rails_parts(cab).compact.empty? && kona_sync_bad(cab).empty?)
+    before = kona_cfg(cab)
+    e::CabinetBuilder.rebuild(model, cab, base.merge('back_mode' => 'rails', 'back_rail_height' => 290.0)) rescue nil
+    ok('KON-B (b): listy 290 pri vnutri 584 odmietnute, config netknuty', kona_cfg(cab) == before)
+
+    # (c) NALOZENY -> Z LIST -> NALOZENY: rucny zasah na chrbte caka dormantny
+    sheet = e::Materials.sheets.find { |s| (s['thickness'].to_f - 3.0).abs < 0.01 }
+    ov = sheet ? { 'material_id' => sheet['material_id'] } : { 'grain_direction' => 'width' }
+    e::CabinetBuilder.rebuild(model, cab, base.merge('part_overrides' => { 'cabinet/back' => ov }))
+    e::CabinetBuilder.rebuild(model, cab, kona_params(cab).merge('back_mode' => 'rails'))
+    dormant = (kona_cfg(cab)['part_overrides'] || {})['cabinet/back']
+    e::CabinetBuilder.rebuild(model, cab, kona_params(cab).merge('back_mode' => 'overlay'))
+    back_cfg = e::Store.config(kona_part(cab, 'cabinet/back')) || {}
+    back_ok = sheet ? back_cfg['material_id'] == sheet['material_id'] : back_cfg['grain_direction'].to_s != ''
+    ok("KON-B (c): rucny zasah chrbta prezil listy dormantny a vratil sa (#{dormant.inspect} -> #{back_cfg['material_id']})",
+       dormant == ov && back_ok && kona_sync_bad(cab).empty?)
+    e::CabinetBuilder.rebuild(model, cab, base.merge('back_mode' => 'rails', 'back_rail_height' => 150.0,
+                                                     'back_setback' => 50.0))
+
+    # (d) KOPIA nesie listy, vysku aj komin
+    cnt = cabinets(model).length
+    e::Panel.handle_insert_copy(pg(model, 'cabinet_id' => cid))
+    copy = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' && e::Store.get(i, 'cabinet_id').to_s != cid }
+    ok("KON-B (d): kopia nesie listy 150 a komin 50 (#{copy ? kona_cfg(copy).values_at('back_mode', 'back_rail_height').inspect : 'ziadna'})",
+       copy && kona_cfg(copy)['back_mode'] == 'rails' && kona_cfg(copy)['back_rail_height'] == 150.0 &&
+       kona_cfg(copy)['back_setback'] == 50.0 && cabinets(model).length == cnt + 1 && kona_sync_bad(copy).empty?)
+    copy.erase! if copy && copy.valid?
+
+    # (e) ULOZENIE a NACITANIE .skp
+    saved_path = File.join(File.dirname(OUT), 'ENGINEtests_konb_saved.skp')
+    ok('KON-B (e): SKP save_copy', model.save_copy(saved_path))
+    loaded = model.definitions.load(saved_path)
+    saved = loaded.entities.grep(Sketchup::ComponentInstance).find { |p| e::Store.kind(p) == 'cabinet' }
+    sb = saved ? konb_rails_parts(saved) : []
+    ok("KON-B (e): nacitana skrinka nesie listy a vysku (#{saved ? kona_cfg(saved).values_at('back_mode', 'back_rail_height').inspect : 'ziadna'})",
+       saved && kona_cfg(saved)['back_mode'] == 'rails' && kona_cfg(saved)['back_rail_height'] == 150.0 &&
+       sb.compact.length == 2 && ((e::Store.config(sb[0]) || {})['width'].to_f - 150.0).abs < TOL)
+
+    # (f) SABLONY
+    konb_templates(model, cab)
+
+    # (g) KONTROLA OLEPOV + (h) KUSOVNIK z modelu
+    konb_edges_and_bom(model)
+
+    cleanup(model)
+    ok('KON-B: cleanup (0 korpusov)', cabinets(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: run_konb vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  ensure
+    [KONB_TPL, KONB_TPL_OLD].each do |t|
+      e::TemplateStore.delete('cabinet', t) if e::TemplateStore.find('cabinet', t)
+    end
+  end
+
+  # (f) sablona s listami -> na inu skrinku; stara sablona -> H ciela ostane;
+  # vklad zo sablony ghostom -> listy.
+  def konb_templates(model, src)
+    [KONB_TPL, KONB_TPL_OLD].each { |t| e::TemplateStore.delete('cabinet', t) if e::TemplateStore.find('cabinet', t) }
+    model.selection.clear
+    model.selection.add(src)
+    e::Panel.handle_save_template_as(
+      pg(model, 'cabinet_id' => e::Store.get(src, 'cabinet_id'), 'name' => KONB_TPL, 'type' => 'lower')
+    )
+    rec = e::TemplateStore.find('cabinet', KONB_TPL)
+    ok("KON-B (f): sablona nesie listy 150 (#{rec ? rec['config'].values_at('back_mode', 'back_rail_height').inspect : 'ziadna'})",
+       rec && rec['config']['back_mode'] == 'rails' && rec['config']['back_rail_height'] == 150.0)
+    return unless rec
+
+    tgt = e::CabinetBuilder.build(model, KONB_CAB,
+                                  transform: Geom::Transformation.translation(e::Units.point(3000.0, 0, 0)))
+    model.selection.clear
+    model.selection.add(tgt)
+    e::TemplatesDialog.handle_apply({ 'template' => KONB_TPL }.to_json)
+    ok("KON-B (f): sablona na inu skrinku preniesla listy (#{kona_cfg(tgt).values_at('back_mode', 'back_rail_height').inspect})",
+       kona_cfg(tgt)['back_mode'] == 'rails' && kona_cfg(tgt)['back_rail_height'] == 150.0 &&
+       konb_rails_parts(tgt).compact.length == 2 && kona_sync_bad(tgt).empty?)
+    # STARA sablona (bez kluca vysky) na skrinku s listami 80 -> vyska ostane.
+    e::CabinetBuilder.rebuild(model, tgt, kona_params(tgt).merge('back_rail_height' => 80.0))
+    old_cfg = rec['config'].reject { |k, _| %w[back_rail_height config_schema].include?(k) }
+    e::TemplateStore.upsert('cabinet', KONB_TPL_OLD, old_cfg)
+    model.selection.clear
+    model.selection.add(tgt)
+    e::TemplatesDialog.handle_apply({ 'template' => KONB_TPL_OLD }.to_json)
+    ok("KON-B (f): stara sablona vysku list ciela nechala (#{kona_cfg(tgt)['back_rail_height'].inspect})",
+       kona_cfg(tgt)['back_rail_height'] == 80.0)
+    tgt.erase! if tgt.valid?
+    payload = rec['config'].merge('template_kind' => 'cabinet', 'template_name' => KONB_TPL)
+    inst = ghost_place!(model, payload, [4200.0, 300.0])
+    ghost_teardown!(model)
+    ok("KON-B (f): vklad zo sablony nesie listy (#{inst ? kona_cfg(inst).values_at('back_mode', 'back_rail_height').inspect : 'ziadna'})",
+       inst && kona_cfg(inst)['back_mode'] == 'rails' && kona_cfg(inst)['back_rail_height'] == 150.0 &&
+       kona_sync_bad(inst).empty?)
+    inst.erase! if inst && inst.valid?
+  end
+
+  # (g) Kontrola olepov nad kontrastnou paskou D-88 + (h) kusovnik a VEPO.
+  def konb_edges_and_bom(model)
+    cleanup(model)
+    tmp = File.join(Dir.tmpdir, "noxun_konb_#{Process.pid}")
+    FileUtils.mkdir_p(tmp)
+    File.binwrite(File.join(tmp, 'materials.json'), JSON.pretty_generate(d88_catalog_json))
+    e::Materials.test_dir_override = tmp
+    e::Materials.reload!
+    hneda = d88_abs_name('D88E_HNEDA_23X10')
+    begin
+      inst = e::CabinetBuilder.build(model, d88_params('back_mode' => 'rails', 'fronts' => { 'items' => [] },
+                                                       'zone_tree' => { 'id' => 'Z1', 'shelves' => 0, 'children' => [] }))
+      return ok('KON-B (g): vlozenie skrinky s listami', false) unless inst
+
+      lo = d88_part(inst, 'back_rail_bottom')
+      hi = d88_part(inst, 'back_rail_top')
+      ok("KON-B (g): obe listy maju pravidlovu pasku L1 (#{[lo, hi].map { |p| ((p && e::Store.config(p)) || {}).dig('edges', 'L1') }.inspect})",
+         [lo, hi].all? { |p| p && (e::Store.config(p) || {}).dig('edges', 'L1') == 'D88E_HNEDA_23X10' })
+      ok('KON-B (g): dolna lista — paska na HORNEJ ploche (Z max), dolna cista',
+         lo && d88_face_mat(lo, 2, :max) == hneda && d88_face_mat(lo, 2, :min).nil?)
+      ok('KON-B (g): horna lista — paska na DOLNEJ ploche (Z min), horna cista',
+         hi && d88_face_mat(hi, 2, :min) == hneda && d88_face_mat(hi, 2, :max).nil?)
+      if e::EdgeCheck.available?(model)
+        st = e::EdgeCheck.toggle(model)
+        ok("KON-B (g): Kontrola olepov — ziadna hrana bez olepu (#{st['count']}, unresolved #{st['unresolved']})",
+           st['active'] == true && st['count'].to_i.zero? && st['unresolved'].to_i.zero?)
+        e::EdgeCheck.toggle(model) if e::EdgeCheck.ui_state(model)['active']
+      end
+      # (h) kusovnik a VEPO z modelu
+      row = konb_rail_row(model)
+      ok("KON-B (h): kusovnik — 1 riadok, 2 ks „Lista chrbta“ 564 x 100 (#{row ? [row['names'], row['quantity'], row['length'], row['width']].inspect : 'ziadny'})",
+         row && row['names'] == ['Lista chrbta'] && row['quantity'] == 2 &&
+         (row['length'].to_f - 564.0).abs < TOL && (row['width'].to_f - 100.0).abs < TOL &&
+         konb_rows(model).count { |r| Array(r['names']).include?('Lista chrbta') } == 1)
+      vname = row ? e::VepoExport.row_name(row) : ''
+      ok("KON-B (h): VEPO nazov #{vname.inspect}", vname.start_with?('Chrb HD s'))
+      e::CabinetBuilder.rebuild(model, inst, kona_params(inst).merge('top_mode' => 'two_rails',
+                                                                    'rails_orientation' => 'upright'))
+      row4 = konb_rail_row(model)
+      v4 = row4 ? e::VepoExport.row_name(row4) : ''
+      ok("KON-B (h): s vystuhami 100 na vysku — 1 riadok 4 ks, VEPO #{v4.inspect}",
+         row4 && row4['quantity'] == 4 && v4.start_with?('Vyst PZ/Chrb HD s'))
+    ensure
+      e::Materials.test_dir_override = nil
+      e::Materials.reload!
+      cleanup(model)
+      begin
+        FileUtils.rm_rf(tmp)
+      rescue StandardError
+        nil
+      end
+    end
+  end
+
   # --- S1-C: OCAKAVANY SPOTREBIC (`appliance_expects[]`) --------------------
   #
   # CO SA TU OVERUJE A MIMO SKETCHUPU OVERIT NEDA:
@@ -26568,6 +26798,7 @@ module NoxunSuRunner
     run_s1f(model)           # S1-F: KONTROLNA GEOMETRIA CHLADNICKY — box niky 560 x 555 x 1940 na hornej ploche dna (prestavba ho zachova, 1x Spat), box nikdy v zbere ani v kusovniku, Kontrola niky per os (1924 -> ORANGE vyska -> zvysenie -> OK), delenie ciel (hrana 682 mimo 679-727 -> posun -> OK) + nahlad, presun vazby medzi skrinkami, rebind_model na iny box, zmena ziveho katalogu snapshotom nepohne, odpojenie a Spat
     run_kon0(model)          # KON-0 · D-143: CHRBAT V DRAZKE DO NAREZU — horna 600 x 720 stoji v modeli 564 x 684 (plan = model), snapshot/kusovnik/VEPO/karta 600 x 720, olepenie cez prestavbu = bez cut_size + RED a 1x Spat, zastarane skrinky (schema 18) RED + brana, hromadna prestavba z Kontroly = 1 operacia (Spat/Redo vratia snapshot aj schemu spolu), odpojeny dielec skip + ORANGE, kopia, absorpcia scale 900 x 720, ulozenie a nacitanie .skp
     run_kona(model)          # KON-A · K1: KOMIN VZADU A ZAPUSTENY STROP — plan = model pre 68 kombinacii chrbat x strop x X x Y (+ dno medzi bokmi) na jednej instancii, zmena komina = 1 Spat, odmietnutie komina 2 bez zmeny, absorpcia hlbky pod minimum -> 160 + 1 Spat, kopia, ulozenie a nacitanie .skp, sablona tam aj stara sablona (komin ciela ostane), vklad zo sablony ghostom; D-144 schema 19 -> RED + brana + hromadna prestavba cez skutocny vyber kandidatov + 1 Spat
+    run_konb(model)          # KON-B · K2: CHRBAT Z LIST — plan = model pre 48 kombinacii strop x dno x komin x vyska list, prepnutie na listy = 1 Spat, odmietnutie 2H + 20 > vnutro bez zmeny, nalozeny -> listy -> nalozeny (dormantny rucny zasah chrbta sa vrati), kopia, ulozenie a nacitanie .skp, sablona tam aj stara (H ciela ostane) a vklad ghostom, Kontrola olepov (paska na hornej ploche dolnej a dolnej ploche hornej listy), kusovnik z modelu 1 riadok 2 ks / s vystuhami 4 ks a VEPO „Chrb HD“
     run_d140(model)          # D-140: VYSKA OSADENIA CHLADNICKY — akcia panela zdvihne box niky (z 118 -> 268) a Kontrola vysky/delenia pocita od zdvihnuteho dna, 1x Spat, odmietnutia (stara hodnota, zly vstup, cudzie echo/PID/dokument, nezmenena) bez kroku Spat, prestavba dvierok osadenie zachova, zapis z otvoreneho komponentu zatvori kontext, vymena modelu prenesie, presun na inu skrinku nie, kopia ho nema, 0 kluc zmaze
     run_s1c(model)           # S1-C: OCAKAVANY SPOTREBIC — cely cyklus sablony (uloz s ocakavaniami -> vloz ghostom -> config -> Kontrola 2x ORANGE -> priradenie -> OK -> 2x Spat), ocakavanie BEZ sablony v riadku Spotrebic (1x Spat, geometria netknuta, peciatka schemy, nezmenene = ziadny krok, cudzie echo/PID nezapisu nic, viazanu kategoriu zrusit nedas), bariera observera po nativnej kopii, slot bez modelu (ORANGE + podvrh odmietnuty), aplikovanie sablony na viazanu skrinku (vazba ostava, ocakavania unia)
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
