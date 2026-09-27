@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **KON-D — vstavaná šablóna „Chladničková" (v0.13.3 → v0.13.4, 27.9.2026, PR #?, blok 7 KONŠTRUKCIA, štvrtá a posledná dávka).**
+- **KON-D — vstavaná šablóna „Chladničková" (v0.13.3 → v0.13.4, 27.9.2026, PR #404, blok 7 KONŠTRUKCIA, štvrtá a posledná dávka).**
   Audit-povinná dávka (knižnica šablón `STD` 6 → 7; package v2 so zapracovaným auditom návrhu Codex 27.9.: NOT SOUND 1 BLOCKER + 3 FIX + 2 NOTE — všetko v Scope IN).
   Nie je výrobná (dielce existujúcich skriniek ani výstupy sa nemenia). **Seed** (`build_predefined_fridge`, samostatný zoznam — nie núdzová náhrada
   `build_predefined`): dolná 600 × 2100 × 560, sokel 100, komín 50, bez chrbta (hrúbka 3 pamätaná), zapustenie 0 a výška líšt 100 **výslovne**, `appliance_expects:

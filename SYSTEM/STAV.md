@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.13.4 · 27.9.2026 — BEŽÍ BLOK 7 · KONŠTRUKCIA K1+K2; hotové všetky štyri dávky — KON-0 (#401), KON-A (#402), KON-B (#403) a KON-D** (PR #?).
+**v0.13.4 · 27.9.2026 — BEŽÍ BLOK 7 · KONŠTRUKCIA K1+K2; hotové všetky štyri dávky — KON-0 (#401), KON-A (#402), KON-B (#403) a KON-D** (PR #404).
 V Štúdiu (Šablóny) aj pri vkladaní pribudla vstavaná šablóna **„Chladničková"**: vysoká skriňa **600 × 2100 × 560**, sokel 100, **komín 50** (dno a strop 510,
 boky 560), **bez chrbta**, očakáva chladničku, **dve dvierka nad sebou — dolné 719, horné 1274** so smerom otvárania **neurčený** (Kontrola vyzve zvoliť stranu
 pántov). Nika chladničky sa meria z hĺbky boku (560); vnútro na výšku 1964 → po priradení chladničky Beko treba **výšku osadenia 14–24 mm**. Delenie 719 / 1274
@@ -27,14 +27,14 @@ zákazku neprestaví ani nevyexportuje. **Dáta rozpočtu sú od S1-B1 v `BUDGET
 **Aktualizovať OBE PC (aj Luciino)** — starší plugin „Z líšt" nepozná (prestavbou by vrátil dosku chrbta, samostatnú lištu by vo VEPO vydal pod plným názvom) a knižnicu šablón STD 7 len číta (nedá sa v nej
 ukladať, premenovať ani mazať).
 
-**Testy (posledná kódová dávka, KON-D #?):** **4643 headless · 134 JS sád · 3172 in-SU PASS / 0 FAIL**. KON-B (#403): 4621 · 133 · 3158. KON-A (#402): 4600 · 132 · 3136.
+**Testy (posledná kódová dávka, KON-D #404):** **4643 headless · 134 JS sád · 3172 in-SU PASS / 0 FAIL**. KON-B (#403): 4621 · 133 · 3158. KON-A (#402): 4600 · 132 · 3136.
 **KON-0 (#401):** 4577 · 131 · 3111. **S1-C:** 4499 · 127 · 3036. **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 
 ## Robí sa
 
 **Blok 7 · KONŠTRUKCIA K1+K2** ([PLAN.md](PLAN.md), priečinok [zdroje/bloky/KONSTRUKCIA/](zdroje/bloky/KONSTRUKCIA/)) — všetky štyri dávky hotové;
 nasleduje **uzáver bloku** (vetva `release/`, minor verzia **v0.14.0** + smoke checklist bloku).
-**Čakajú na smoke:** **KON-0** (#401), **KON-A** (#402), **KON-B** (#403), **KON-D** (#?), **D-132** (#367), **D-133** (#368), **D-134** (#369). **D-141**, **D-142** a **D-145** sú v zásobníku.
+**Čakajú na smoke:** **KON-0** (#401), **KON-A** (#402), **KON-B** (#403), **KON-D** (#404), **D-132** (#367), **D-133** (#368), **D-134** (#369). **D-141**, **D-142** a **D-145** sú v zásobníku.
 **Blok 1d** podľa kapacity — hotové po R-14, ďalej R-18; **R-13 čaká na Michala**.
 
 ## Ďalší krok
@@ -48,7 +48,7 @@ Smoke KON-B (v0.13.3), KON-A (v0.13.2) a KON-0 (v0.13.1) platia ďalej ([archiv/
 
 ## Posledné uzávery
 
-- **KON-D** (v0.13.3 → **v0.13.4**, 27.9.2026, PR #?) — vstavaná šablóna Chladničková, knižnica šablón STD 7 (migrácia len nad zdravým primárom), súhrn
+- **KON-D** (v0.13.3 → **v0.13.4**, 27.9.2026, PR #404) — vstavaná šablóna Chladničková, knižnica šablón STD 7 (migrácia len nad zdravým primárom), súhrn
   konštrukcie na dlaždici šablóny. Plné znenie v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 - **KON-B · K2** (**v0.13.3**, PR #403) — chrbát z dvoch líšt, jeden riadok „Chrb HD", `CONFIG_SCHEMA` 21, BuildPlan 6, ABS seed 5 · **KON-A · K1** (**v0.13.2**,
   PR #402) — komín vzadu a zapustenie stropu, nika z hĺbky boku, oprava D-144, `CONFIG_SCHEMA` 20 · **KON-0 · D-143** (**v0.13.1**, PR #401) — chrbát v drážke
