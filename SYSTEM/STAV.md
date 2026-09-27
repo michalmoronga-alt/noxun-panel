@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.13.2 · 27.9.2026 — BEŽÍ BLOK 7 · KONŠTRUKCIA K1+K2; hotové KON-0 (D-143, PR #401) a KON-A · K1** (PR #?). Skrinka má v Inspectore nové
+**v0.13.2 · 27.9.2026 — BEŽÍ BLOK 7 · KONŠTRUKCIA K1+K2; hotové KON-0 (D-143, PR #401) a KON-A · K1** (PR #402). Skrinka má v Inspectore nové
 nastavenia: **„Komín vzadu"** (Chrbát) — dno, strop a zadná výstuha končia o komín skôr ako boky, chrbát sa posunie dopredu na ich zadné hrany a za ním
 ostane vzduchový kanál (dolná 600 × 720 × 510, komín 50 → boky 510, dno a strop 460, naložený chrbát **medzi bokmi 564 × 620**, „Vnút. hĺbka" 460) —
 a **„Zapustenie vpredu"** (Strop) — plný strop alebo predná výstuha začína za prednou hranou boku, dno sa neposúva. Neplatný komín (napr. 2 pri HDF 3)
@@ -26,14 +26,14 @@ V1 ciele **Materiály, Kovanie, Spotrebiče a Dvaja používatelia** sú odškrt
 **Dáta rozpočtu sú od S1-B1 v `BUDGET_STD` 2** (starší plugin zákazku po prvej mutácii rozpočtu needituje a zastaví oba cenové exporty).
 **Pred prvým použitím v0.13.2 aktualizovať OBE PC (aj Luciino)** — starší plugin komín nepozná (prestavbou by narezal dno a strop na plnú hĺbku).
 
-**Testy (posledná kódová dávka, KON-A · K1 #?):** **4600 headless · 132 JS sád · 3136 in-SU PASS / 0 FAIL**. KON-0 (#401): 4577 · 131 · 3111.
+**Testy (posledná kódová dávka, KON-A · K1 #402):** **4600 headless · 132 JS sád · 3136 in-SU PASS / 0 FAIL**. KON-0 (#401): 4577 · 131 · 3111.
 **Smoke oprava C (#389):** 4545 · 129 · 3081. **S1-C:** 4499 · 127 · 3036. **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 
 ## Robí sa
 
 **Blok 7 · KONŠTRUKCIA K1+K2** ([PLAN.md](PLAN.md), priečinok [zdroje/bloky/KONSTRUKCIA/](zdroje/bloky/KONSTRUKCIA/)) — po KON-0 a KON-A nasledujú **KON-B**
 (chrbát z dvoch líšt) a **KON-D** (šablóna Chladničková); každá audit-povinná dávka prejde auditom svojho návrhu.
-**Čakajú na smoke:** **KON-0** (#401), **KON-A** (#?), **D-132** (#367), **D-133** (#368), **D-134** (#369). **D-141** a **D-142** sú v zásobníku.
+**Čakajú na smoke:** **KON-0** (#401), **KON-A** (#402), **D-132** (#367), **D-133** (#368), **D-134** (#369). **D-141** a **D-142** sú v zásobníku.
 **Blok 1d** podľa kapacity — hotové po R-14, ďalej R-18; **R-13 čaká na Michala**.
 
 ## Ďalší krok
@@ -47,7 +47,7 @@ Smoke KON-0 (v0.13.1) platí ďalej. Potom package **KON-B**.
 
 ## Posledné uzávery
 
-- **KON-A · K1** (v0.13.1 → **v0.13.2**, 27.9.2026, PR #?) — komín vzadu a zapustenie stropu, nika z hĺbky boku, config-aware minimum hĺbky pri mierke,
+- **KON-A · K1** (v0.13.1 → **v0.13.2**, 27.9.2026, PR #402) — komín vzadu a zapustenie stropu, nika z hĺbky boku, config-aware minimum hĺbky pri mierke,
   oprava D-144 so zastaranými skrinkami v registri výrobnej brány, `CONFIG_SCHEMA` 20. Plné znenie v [archiv/KRONIKA.md](archiv/KRONIKA.md) a [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md).
 - **KON-0 · D-143** (v0.13.0 → **v0.13.1**, 27.9.2026, PR #401) — chrbát v drážke do nárezu v plnom rozmere, jedna výrobná brána, zastarané skrinky, `CONFIG_SCHEMA` 19.
 - **BLOK SPOTREBIČE S1 UZAVRETÝ** (v0.12.9 → **v0.13.0**, 20.–24.9.2026, PR #375–#389 + uzáver #390; smoke PASS 26.9.). Katalóg spotrebičov, spotrebič v zákazke,

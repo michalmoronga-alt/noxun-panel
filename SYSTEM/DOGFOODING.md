@@ -44,7 +44,7 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
 
 ## KONŠTRUKCIA K1+K2 (blok 7)
 
-*(Skupina je prázdna — **D-143** vyriešila dávka KON-0 (PR #401) a **D-144** dávka KON-A (PR #?); plné texty v
+*(Skupina je prázdna — **D-143** vyriešila dávka KON-0 (PR #401) a **D-144** dávka KON-A (PR #402); plné texty v
 [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md).)*
 
 ## INFRA

@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **KON-A · K1 — komín vzadu, zapustený strop vpredu, oprava D-144 (v0.13.1 → v0.13.2, 27.9.2026, PR #?, blok 7 KONŠTRUKCIA, druhá dávka).**
+- **KON-A · K1 — komín vzadu, zapustený strop vpredu, oprava D-144 (v0.13.1 → v0.13.2, 27.9.2026, PR #402, blok 7 KONŠTRUKCIA, druhá dávka).**
   Výrobná a audit-povinná dávka (package v2 so zapracovaným auditom návrhu Codex 27.9.: NOT SOUND 1 BLOCKER + 5 FIX + 2 NOTE — všetko v Scope IN).
   **Dáta:** config smie niesť `back_setback` (X) a `top_front_setback` (Y), mm 0–300, **prísne parsované** (`norm_setback` — `"50oops"`, `"50-20"`, NaN, objekt → 0;
   audit FIX 5) a **zapisované len keď sú > 0** (config skriniek bez komína sa nemení); celá reťaz whitelistov vrátane `template_config_from` (nové šablóny výslovne aj 0,
