@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # KON-B · K2 — CHRBAT Z DVOCH LIST (blok 7 KONŠTRUKCIA).
-# Package: SYSTEM/zdroje/bloky/KONSTRUKCIA/PACKAGE_KONB_K2.md.
+# Package: SYSTEM/archiv/bloky/KONSTRUKCIA/PACKAGE_KONB_K2.md.
 #
 # CO PLATI:
 #   * `back_mode 'rails'`: namiesto dosky chrbta dve listy z korpusovej dosky

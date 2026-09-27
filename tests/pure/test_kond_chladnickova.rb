@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # KON-D — VSTAVANA SABLONA „Chladničková" (blok 7 KONŠTRUKCIA, posledna davka).
-# Package: SYSTEM/zdroje/bloky/KONSTRUKCIA/PACKAGE_KOND_CHLADNICKOVA.md.
+# Package: SYSTEM/archiv/bloky/KONSTRUKCIA/PACKAGE_KOND_CHLADNICKOVA.md.
 #
 # CO PLATI:
 #   * seed „Chladničková": dolna 600 x 2100 x 560, sokel 100, komin 50, BEZ
