@@ -382,6 +382,22 @@ Escapom a otvoriť iný — a `renameSaved` by mu ten **cudzí rozpísaný formu
 (3) **Mazanie klasifikuje „zmizla" až po návrate zo zámku** — pred-kontrola `find` beží mimo zámku, takže medzi ňou a zamknutým `delete` môže šablónu zmazať druhá inštancia;
 `false` sa preto ešte raz overí `find`om a až potom sa hlási novšia schéma/disk (spoločné telo `template_gone`).
 
+**KON-D — `STD` 7: vstavaná šablóna „Chladničková" a migrácia LEN nad zdravým primárom.** Seed (`build_predefined_fridge`, **samostatný zoznam** — nie
+`build_predefined`, ktorý je aj núdzovou náhradou poškodenej knižnice v `load`) je dolná 600 × 2100 × 560, sokel 100, **komín 50**, **bez chrbta** (hrúbka 3 pamätaná),
+**zapustenie 0 a výška líšt 100 výslovne** (šablóna bez kľúča by pri použití hodnotu cieľa zachovala), `appliance_expects: ['fridge']`, dvoje dvierka F1 `fixed` 719
+`locked` + F2 `auto` so smerom **`Fronts::DIRECTION_UNSET`** (chýbajúci kľúč by Kontrola brala ako staré dáta bez nálezu; strana pántov sa nehádá) a `config_schema`
+= aktuálna `CONFIG_SCHEMA` (starší plugin seed čisto odmietne, inak by komín zahodil). Čistá inštalácia ho zapíše so všetkými seedmi (**10 šablón, 7 korpusových**),
+krok `old_std < 7` (`missing_fridge_seed`) ho pridá na koniec, len keď korpusová šablóna rovnakého mena neexistuje (presné porovnanie mena); zmazaný sa neobnoví.
+**Audit KON-D BLOCKER 1:** keď súbor existuje, `migrate!` číta **`healthy_primary`** — primár priamo z disku (bez cache a bez tichej náhrady zo `.bak`), zdravý =
+parsuje sa a `templates` je pole (chýbajúci `std` = legacy 1). **Poškodený primár + záloha, chýbajúci primár + záloha aj `{std, templates: null}` → migrácia
+NEZAPISUJE** (`refuse_migration`, log raz za beh): čítanie ide ďalej zo zálohy / núdzových predvolieb a seed sa pridá až nad zdravým primárom. Iné I/O chyby
+prebublajú do rescue (`false`, vzor `JsonFileStore.degraded?`). **Vedomá hranica:** bežný `upsert` nad takým stavom zapisuje ako doteraz (zo zálohy) a marker
+posunie na 7 bez seedu — mimo rozsahu dávky. **Súhrn pre dlaždicu:** čisté `construction_summary(config)` (`{has, text}` — „komín vzadu N" pri komíne > 0 ·
+„zap. N" pri zapustení > 0 a strope ≠ „Bez stropu" · „z líšt H" **len** pri `back_mode`/`back.mode` `rails`, aj pri predvolenej 100 · slot nikdy; čísla cez
+`CabinetBuilder.norm_setback`/`norm_rail_height`) a `ventilation_note(config)` (veta o vetraní pri šablóne, ktorá očakáva chladničku) — odvodené, nikdy na disk.
+Starší plugin (`STD` 6) prepne knižnicu 7 do režimu len na čítanie — **aktualizovať obe PC**. Zmena seedu po smoke sa do existujúcich knižníc sama nedostane
+(audit NOTE 6: ručná úprava alebo ďalší krok `STD` 8, ktorý obnoví len **celý nedotknutý** seed, precedens D-139).
+
 **D-139 — `STD` 6: obnova NEDOTKNUTÝCH slotových seedov.** Krok `old_std < 6` (`refresh_slot_seed`) prepíše na nové predvoľby (linka 880, sokel 100, marker
 schémy 17, bez uloženej výšky čela) **len** záznam, ktorý je **celý** zhodný s pôvodným seedom S1-E (`legacy_slot_seeds` — zamrazené literály 915/64/776,
 schéma 16) po JSON round-tripe: meno, druh, config a žiadne ďalšie kľúče. Odtlačok z vybraných rozmerov by prepísal aj šablónu so zmeneným dekorom, hrúbkou,

@@ -1642,7 +1642,9 @@ odznačenie.
 Kresba dlaždice je **schéma z configu** (`nxTplGlyph` — riadky čiel / krídla / police) a **nenesie ani jednu farbu** — obrys aj výplň dávajú tokeny v `panel.css`; dosková dlaždica
 má badge hrúbky. **KOV-I:** `Panel.template_list` dopĺňa odvodené `hardware: {has, labels}` z `TemplateStore.hardware_tile_summary`; údaj sa neukladá do knižnice.
 `nxTplHardwareBadge` kreslí existujúcu sprite ikonu `wrench` s `aria-label`, zatiaľ čo `nxTplBadge` zachováva textový kontrakt hrúbky. `nxTplTitle` dopĺňa súhrn
-uložených setov a ručných položiek s upozornením „zámky sa neprenášajú“. `setTplMeta` pri vybratej šablóne s kovaním použije existujúci `#tplHint` pre
+uložených setov a ručných položiek s upozornením „zámky sa neprenášajú“. **KON-D:** `template_list` nesie aj odvodené `construction` (`{has, text}`,
+„komín vzadu 50") a `vent_note` (veta o vetraní pri šablóne s chladničkou) — **úprava `tile_row` sa do Inspectora nedostane**, preto ich pridáva priamo zoznam.
+`nxTplTitle` ich vypíše do tooltipu v poradí súhrn konštrukcie · kovanie · vetranie; dlaždica ani popisok nenarastú a klient nič neodvodzuje (`has: false` = nič). `setTplMeta` pri vybratej šablóne s kovaním použije existujúci `#tplHint` pre
 „Kovanie zo šablóny: …“ (najviac 80 znakov, celý text v `title`, jeden riadok). Bez kovania sa vráti pôvodná pomoc ku klikaniu; výška dlaždíc ani karty nerastie.
 
 **UI-D2 — PNG náhľad a schéma zdieľajú TEN ISTÝ box** (`.tplpic`, výška 38 px, `object-fit: cover` = orez, nie deformácia), takže **výška dlaždice sa nikdy nemení** (pravidlo
@@ -3255,6 +3257,13 @@ majú vlastný `kind` guard, HTML nie je ochrana, takže doskovú šablónu sa o
 **KOV-I:** `tile_row` nesie `{name, preview_rev, config, hardware}`. `config` ostáva orezaný na typ a tri rozmery, `hardware` je len odvodené `{has, labels}`
 z tej istej funkcie ako v Inspectore; celé definície setov do Štúdia nechodia. `templates.js` kreslí pri názve ikonu `wrench` s `aria-label` a súhrn v `title`
 vrátane upozornenia na neprenosné zámky. Existujúce aplikačné a kompatibilitné brány zostávajú autoritou vloženia/použitia.
+
+**S1-C + KON-D — ďalšie odvodené kľúče dlaždice:** `appliance_expects` (`{has, codes, text}`, riadok „očakáva chladničku"), **`construction`** (`{has, text}`
+z `TemplateStore.construction_summary` — „komín vzadu 50 · zap. 30 · z líšt 100" z **účinných** hodnôt) a **`vent_note`** (`TemplateStore.ventilation_note` —
+veta o vetraní pri šablóne, ktorá očakáva chladničku, inak `''`). Poradie kľúčov riadku je `name · preview_rev · config · hardware · appliance_expects ·
+construction · vent_note` (stráži `test_st3c_tpl.rb`). `TILE_CONFIG_KEYS` ostáva orezaný — komín ani lišty v ňom nie sú, súhrn skladá server. `templates.js`
+kreslí riadok `.stplmeta.stplkon` **len pri neprázdnom súhrne** (medzi rozmermi a očakávaním, mockup E2 — ostatné dlaždice sa nemenia) a vetu o vetraní
+pridá do `title` dlaždice za súhrn kovania. Nič z toho sa do `templates.json` nezapisuje.
 
 **R-12 (v0.9.3) — `handle_apply` odmietne šablónu z NOVŠEJ verzie.** Guard prestavby chráni cieľovú skrinku, nie zdroj: config šablóny by sa do cieľa zlial už orezaný
 (`merge_template` + `normalize` sú uzavreté whitelisty) a rebuild by to nemal ako zbadať. Kontroluje sa preto **RAW config uloženého záznamu**
