@@ -6,7 +6,9 @@
       // KOV-A1: rola `flap` je SPOLOČNÁ pre výklop aj sklop, preto neutrálny
       // názov — „Výklop" by pri každom sklope klamal. Konkrétny text povie až
       // typ čela (server: PartKeys.flap_label; karta čela príde v KOV-A2).
-      flap:'Výklop/sklop', false_front:'Blenda' };
+      flap:'Výklop/sklop', false_front:'Blenda',
+      // KON-B · K2: listy chrbta (zrkadlo `ProductionCore::ROLE_LABELS`).
+      back_rail_top:'Lišta chrbta horná', back_rail_bottom:'Lišta chrbta dolná' };
     return m[role] || role;
   }
   function sheetLabelOf(id){

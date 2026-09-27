@@ -40,8 +40,9 @@ module Noxun
       # KOV-A1: flap/false_front hned za drawer_front — cela drzia pokope.
       # KOV-C2a: roly dielcov zasuviek idu NA KONIEC (po celach) — su to dielce
       # vnutra, nie korpusu, a prehlad ma zacinat tym, co pouzivatel vidi.
+      # KON-B · K2: listy chrbta hned za chrbtom.
       ABS_ROLE_ORDER = %w[side_left side_right top bottom shelf divider_v divider_h
-                          back rail_front rail_back plinth front_door drawer_front
+                          back back_rail_top back_rail_bottom rail_front rail_back plinth front_door drawer_front
                           flap false_front free_panel
                           drawer_bottom box_side drawer_back drawer_inner_front].freeze
 

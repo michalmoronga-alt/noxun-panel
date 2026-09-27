@@ -11,6 +11,7 @@
 #   dno:    under_sides (default dolna) / between_sides (default horna)
 #   vrch:   full / two_rails / none
 #   chrbat: overlay / inset / groove   (hrubka = cfg[:back_thickness], napr. 3 HDF / 18 pevny)
+#           / rails (KON-B: dve listy z korpusu, vyska cfg[:back_rail_height]) / none
 #   sokel:  none (nohy) / front (predny zapusteny panel)
 module Noxun
   module Engine
@@ -128,6 +129,8 @@ module Noxun
         parts.concat(top_parts(cfg, warnings))
         bk = back_part(cfg, interior)
         parts << bk if bk
+        # KON-B · K2: chrbat z list = dva dielce namiesto dosky chrbta.
+        parts.concat(back_rail_parts(cfg, interior))
         parts.concat(plinth_parts(cfg))
 
         # Vnutro = strom zon nad vnutornym boxom (3D). Priecky + police su dielce korpusu.
@@ -1238,7 +1241,9 @@ module Noxun
       #   overlay -> d - bt (chrbat NALOZENY zozadu zabera zadnych bt z celkovej d)
       #   inset / groove -> d (chrbat je VNUTRI obrysu — uz dnes splnaju celkovu d)
       #   none -> d (ziadny chrbat)
-      # POZOR: inset/groove sa tymto helperom NESMU skratit (audit NOTE 9).
+      #   rails -> d (KON-B: listy stoja VNUTRI obrysu, zadna plocha v rovine d;
+      #            vnutro konci pred nimi — `interior_dims` R − t)
+      # POZOR: inset/groove/rails sa tymto helperom NESMU skratit (audit NOTE 9).
       # KON-A: plati BEZ KOMINA. Citatelia hlbky dielcov sa pytaju pomocnikov
       # `back_stop` (dno, strop, vystuhy, nohy) a `side_depth` (boky) — pri
       # komine 0 vracaju presne tuto hodnotu.
@@ -1336,6 +1341,45 @@ module Noxun
         when 'groove'  then GROOVE_OFFSET + back_thickness(cfg)
         else 0.0
         end
+      end
+
+      # === KON-B · K2: CHRBAT Z LIST ==========================================
+      #
+      # `back_mode 'rails'` (M4): namiesto dosky chrbta DVE vodorovne listy
+      # z korpusovej dosky medzi bokmi — dolna stoji na dne, horna je pod
+      # stropom (pod vystuhami, pri „Bez stropu" po vrch bokov). Vyska listy
+      # `back_rail_height` (H), hrubka = hrubka korpusu `t`, zadna plocha
+      # v zadnom doraze R (pri komine posunuta o komin). Vnutro konci pred
+      # listami v CELEJ vyske (M5): `back_front_y = R − t`.
+      BACK_RAIL_HEIGHT_DEFAULT = 100.0
+      # 20 = minimum vystuhy (D-80), 300 = strop zmysluplnej listy.
+      BACK_RAIL_HEIGHT_RANGE = [20.0, 300.0].freeze
+      # Najmensie svetlo MEDZI listami (vzor `MIN_INTERIOR_H`): 2H + 20 <= vnutro.
+      BACK_RAIL_GAP_MIN = 20.0
+      # Spolocny nazov oboch list v builderi (M6: kusovnik spaja surove nazvy
+      # riadku — dve mena by dali „… / …"). VEPO ho skracuje na „Chrb HD".
+      BACK_RAIL_NAME = 'Lista chrbta'
+      # Rezimy, pri ktorych sa MATERIAL CHRBTA (HDF) nepouzije — preflighty
+      # hrubky chrbta ich preskakuju (bez chrbta D-31, listy su z korpusu).
+      BACK_MATERIAL_UNUSED_MODES = %w[none rails].freeze
+
+      def back_rails?(cfg)
+        cfg.is_a?(Hash) && cfg[:type] != 'dishwasher' && cfg[:back_mode] == 'rails'
+      end
+
+      # Pouzije rezim chrbta material chrbta? (nie pri „Bez chrbta" a pri listach)
+      def back_material_used?(mode)
+        !BACK_MATERIAL_UNUSED_MODES.include?(mode.to_s)
+      end
+
+      # PRISNE citanie H z (normalizovaneho) configu: konecne cislo orezane na
+      # 20–300; cokolvek ine = predvolba 100 (vzor `setback_value` — rucne
+      # skladane configy testov a ulozene configy nikdy nezhodia stavbu).
+      def back_rail_height(cfg)
+        v = cfg.is_a?(Hash) ? cfg[:back_rail_height] : nil
+        return BACK_RAIL_HEIGHT_DEFAULT unless v.is_a?(Numeric) && v.to_f.finite?
+
+        v.to_f.clamp(*BACK_RAIL_HEIGHT_RANGE)
       end
 
       # D-80: geometria hornych vystuh na JEDNOM mieste. rail_parts (dielce),
@@ -1507,7 +1551,11 @@ module Noxun
           else                  h - t
           end
         back_front_y =
-          if back_setback(cfg).positive?
+          if back_rails?(cfg)
+            # KON-B · K2 (M5): vnutro konci PRED listami v celej vyske — R − t
+            # pri komine aj bez neho (R = zadny doraz, bez komina `d`).
+            back_stop(cfg) - t
+          elsif back_setback(cfg).positive?
             # KON-A: pri komine chrbat sedi na zadnom doraze R — naloženy a v
             # drazke ZA dnom a stropom (vnutro po R), vlozeny PRED R (R − bt),
             # bez chrbta po R. Jediny zdroj pre zony, police, recepty zasuviek,
@@ -1671,6 +1719,9 @@ module Noxun
       # aj v rozmere do narezu (`cut_size.width = (h − s) − Δ`).
       def back_part(cfg, interior)
         return nil if cfg[:back_mode] == 'none' # D-31: explicitne (else vetva by vyrobila overlay!)
+        # KON-B · K2: chrbat z list stavia `back_rail_parts` — doska chrbta nevznika
+        # (else vetva nizsie aj `setback_back_part` by postavili naloženy chrbat).
+        return nil if cfg[:back_mode] == 'rails'
         w = cfg[:width]; d = cfg[:depth]; h = cfg[:height]; t = cfg[:thickness]; s = cfg[:floor_height]
         bt = interior[:back_thickness]
         return setback_back_part(cfg, interior) if back_setback(cfg).positive?
@@ -1716,6 +1767,32 @@ module Noxun
                          prod: { length: w - 2 * t, width: bh, thickness: bt })
         out[:cut_size] = { length: w, width: bh } if cfg[:back_mode] == 'groove'
         out
+      end
+
+      # KON-B · K2: DVE LISTY CHRBTA medzi bokmi (M4). Zadna plocha v zadnom
+      # doraze R (Y = R − t … R), dolna stoji na dne (`z_lo`), horna konci na
+      # strope vnutra (`z_hi` — pod plnym stropom, pod vystuhami, pri „Bez
+      # stropu" vrch bokov). Pri vystuhach NA VYSKU stoji horna lista tesne pod
+      # zadnou vystuhou v tej istej rovine [R − t, R].
+      # Obe listy maju ROVNAKY `prod` a spolocny nazov → pri rovnakom olepe
+      # jeden riadok kusovnika (M6). Dolna rola je STOJACA (`PartFaces::
+      # STANDING_ROLES`) — olep `L1` je u oboch na hrane viditelnej zvnutra.
+      def back_rail_parts(cfg, interior)
+        return [] unless back_rails?(cfg)
+
+        w = cfg[:width].to_f; t = cfg[:thickness].to_f
+        hr = back_rail_height(cfg)
+        len = w - 2 * t
+        y0 = back_stop(cfg) - t
+        base = { name: BACK_RAIL_NAME, material: :korpus, axes: PartFaces::AXES_WALL, box: [len, t, hr] }
+        [
+          base.merge(suffix: 'BACK-RAIL-B', part_key: PartKeys.cabinet('back_rail', 'bottom'),
+                     role: 'back_rail_bottom', origin: [t, y0, interior[:z_lo].to_f],
+                     prod: { length: len, width: hr, thickness: t }),
+          base.merge(suffix: 'BACK-RAIL-T', part_key: PartKeys.cabinet('back_rail', 'top'),
+                     role: 'back_rail_top', origin: [t, y0, interior[:z_hi].to_f - hr],
+                     box: [len, t, hr], prod: { length: len, width: hr, thickness: t })
+        ]
       end
 
       # Sokel — len variant 'front' (predny zapusteny panel).
@@ -1786,10 +1863,37 @@ module Noxun
       end
 
       # -> veta | nil. Cista funkcia (aj pre `min_valid_depth` a testy).
+      # KON-B · K2: pribudlo pravidlo list (`back_rails_error`) — plati aj pri
+      # X = Y = 0, preto sa vyhodnoti MIMO brany `setbacks?`, az po vetach
+      # komina a zapustenia. Panelove zrkadlo `nxSetbackError` ma to iste poradie.
       def setback_error(cfg, interior = nil)
-        return nil unless setbacks?(cfg)
+        interior ||= interior_dims(cfg)
+        setbacks_only_error(cfg, interior) || back_rails_error(cfg, interior)
+      end
+
+      # KON-B · K2 (package 3.1): dve listy sa musia zmestit do vnutra —
+      # `2H + 20 <= avail_h`. Ked vnutro neprejde vseobecnymi pravidlami vysky
+      # (`MIN_AVAIL_H`, rezerva pod vystuhami), prednost ma ich veta (panel ju
+      # ukazuje krizovou kontrolou vysky) — tu sa preto mlci.
+      def back_rails_error(cfg, interior = nil)
+        return nil unless back_rails?(cfg)
 
         interior ||= interior_dims(cfg)
+        avail = interior[:avail_h].to_f
+        return nil if avail <= MIN_AVAIL_H
+        return nil if cfg[:top_mode] == 'two_rails' && avail < MIN_INTERIOR_H - 0.01
+
+        hr = back_rail_height(cfg)
+        return nil if 2 * hr + BACK_RAIL_GAP_MIN <= avail + 0.005
+
+        "Dve lišty po #{fmt_mm(hr)} mm sa do vnútra #{fmt_mm(avail)} mm nezmestia — " \
+          'zmenši výšku líšt alebo zväčši skrinku.'
+      end
+
+      # Vety komina a zapustenia (KON-A). Pri X = Y = 0 nic.
+      def setbacks_only_error(cfg, interior)
+        return nil unless setbacks?(cfg)
+
         x = back_setback(cfg)
         y = top_front_setback(cfg)
         r = back_stop(cfg)

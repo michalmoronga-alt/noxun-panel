@@ -877,6 +877,13 @@ z `VepoExport::NAME_MAX` (guard test to stráži).
 namiesto čísla interné id čela (`Dno zasuvky Fmslwqdm2-9-464wsa`) — dostane tvar **bez čísla** (`Zas dno s1`): id človeku nič nepovie, tak sa do skratky
 neprenáša (`num_suffix` berie len čisto číselný token).
 
+**Lišty chrbta (KON-B · K2, v0.13.3, M6).** `SHORT_NAMES['Lista chrbta'] = 'Chrb HD'` — obe lišty nesú spoločný názov z buildera (`Construction::BACK_RAIL_NAME`),
+takže riadok je `Chrb HD s15` (2 ks, hrana `—` pozdĺž). Agregačný kľúč (`Bom.row_key`) orientáciu, rolu ani názov nenesie, preto sa lišty zlúčia aj s výstuhami
+**na výšku aj naplocho** rovnakého rozmeru, materiálu a olepu: `Vyst PZ/Chrb HD s12` (4 ks, 18 znakov), dve skrinky `Vyst PZ/Chrb HD +2`. `NAME_PAIRS` sa nemení.
+Ručný zásah na jednej lište = dva riadky, oba `Chrb HD`. Kusovník Štúdia ukazuje plný názov („Vystuha predna / Vystuha zadna / Lista chrbta") a stĺpec Rola
+„Lišta chrbta horná · Lišta chrbta dolná" (`ProductionCore::ROLE_LABELS`). Starší plugin by samostatne prenesenú lištu vydal pod plným názvom „Lista chrbta"
+(existujúca hranica ochrany, audit KON-B NOTE 5).
+
 **Voľné názvy dosiek sa neskracujú ani nepárujú (GH #287 P2).** Názov samostatnej dosky je **voľný text používateľa**, nie názov z buildera — tabuľka skratiek naň nesmie siahnuť
 (doska `Bok lavy` nie je bok skrinky) a nesmie sa spárovať s dielcom skrinky do klamlivého `Bok LP`. Pôvod nesie riadok v aditívnom kľúči **`free_names`** z `Bom.aggregate_rows`
 (riadok môže byť zliatok dosky a dielca skrinky, takže samotné `names` pôvod nepovedia); `join_names` drží pri každom tokene príznak „voľný" a páruje výhradne tokeny zo skratky

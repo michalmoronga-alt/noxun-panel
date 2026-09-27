@@ -13,6 +13,14 @@
         out[f.id] = val(f.id);
       }
     });
+    // KON-B (predrecenzia P3): pri SKRYTOM riadku „Výška líšt" (iny typ chrbta)
+    // sa neplatny alebo prazdny vstup NEPOSIELA — server si necha ulozenu
+    // hodnotu skrinky (apply prebera len poslane kluce, novy vklad dostane
+    // predvolbu). Inak by sa napisane 999 ticho ulozilo ako 300.
+    if (!backRailsActive()){
+      var hv = out.back_rail_height, lim = LIMITS.back_rail_height;
+      if (hv === '' || typeof hv !== 'number' || hv < lim[0] || hv > lim[1]) delete out.back_rail_height;
+    }
     return out;
   }
   function collectFronts(){
@@ -151,6 +159,10 @@
                  // KON-A · K1: komin vzadu a zapustenie stropu — zrkadlo Ruby
                  // `Construction::SETBACK_MAX` (guard `tests/pure/test_kona_komin.rb`).
                  back_setback:[0,300], top_front_setback:[0,300],
+                 // KON-B · K2: vyska list chrbta — zrkadlo Ruby
+                 // `Construction::BACK_RAIL_HEIGHT_RANGE`; validuje sa LEN pri
+                 // aktivnom chrbte z list (`RAIL_FIELDS`, audit KON-B FIX 3).
+                 back_rail_height:[20,300],
                  // S1-E: polia SLOTU UMYVACKY — zrkadlo Ruby `CabinetBuilder::DW_RANGES`
                  // (guard test `tests/pure/test_s1e_slot.rb`). D-139: vyska cela uz
                  // pole NIE JE — odvodi sa (`nxSlotFrontEval`) a jej rozsah strazi
@@ -168,6 +180,17 @@
   // vlozenie uplne inej skrinky — v poli, ktore pouzivatel nevidi a nema ako
   // opravit. Validuju sa preto VYHRADNE v type, ktoremu patria.
   var SLOT_FIELDS = { dw_body_height: 1, dw_front_bottom: 1 };
+  // KON-B · K2 (audit FIX 3): polia, ktore platia LEN pri chrbte Z LIST. Pri
+  // inom type chrbta (aj pri slote) je riadok skryty — neplatna hodnota v nom
+  // by inak zablokovala „Aplikuj" v poli, ktore pouzivatel nevidi. Validuju sa
+  // preto VYHRADNE pri aktivnom `rails`; skrytie zrusi cervenu aj tooltip.
+  var RAIL_FIELDS = { back_rail_height: 1 };
+  var RAIL_RANGE_MSG = 'Výška líšt musí byť 20 až 300 mm.';
+  // Cez `el` (nie `val` z core.js) — Node sady nacitavaju form.js aj bez core.js.
+  function backRailsActive(){
+    var bm = el('back_mode');
+    return cabTypeNow() !== 'dishwasher' && !!bm && bm.value === 'rails';
+  }
   // Typ korpusu BEZPECNE: `getType` zije v core.js a Node testy tohto suboru
   // ho nemusia mat nacitany (rovnaky vzor ako `typeof nxLegs… === 'function'`).
   function cabTypeNow(){ return (typeof getType === 'function') ? getType() : 'lower'; }
@@ -245,20 +268,29 @@
   // cez core.js `nxSetbackError`) — pole zocervenie UZ V PANELI a apply sa
   // zastavi. Pri X = Y = 0 nikdy nic. Slot pole nema.
   function cabinetSetbackError(){
-    if (cabTypeNow() === 'dishwasher' || typeof nxSetbackError !== 'function') return '';
+    var c = cabinetCheckCarcass();
+    return c ? nxSetbackError(c) : '';
+  }
+  // Carcass pre zrkadlo validacie komina, zapustenia a list — alebo null, ked
+  // sa nema co posudzovat. KON-B (audit NOTE 4): skory navrat pri X = Y = 0
+  // NEPLATI pri chrbte z list — ich pravidlo (2H + 20 <= vnutro) plati aj bez
+  // komina.
+  function cabinetCheckCarcass(){
+    if (cabTypeNow() === 'dishwasher' || typeof nxSetbackError !== 'function') return null;
     // X = Y = 0 (alebo pole chyba) -> ziadne nove pravidlo; nic sa necita.
-    var xs = el('back_setback'), ys = el('top_front_setback');
+    var xs = el('back_setback'), ys = el('top_front_setback'), hs = el('back_rail_height');
+    var rails = backRailsActive();
     // Rozpisany vyraz vo fokusovanom poli (`50-2` pocas pisania `50-20`) nie je
     // hodnota — nezocervenie a neposudzuje sa (vzor hlavneho cyklu validacie).
     var ae = document.activeElement;
-    if (ae && (ae === xs || ae === ys) && isExprStr(ae.value)) return '';
+    if (ae && (ae === xs || ae === ys || (rails && ae === hs)) && isExprStr(ae.value)) return null;
     var xv = (xs && xs.value !== '') ? evalDim(xs.value) : 0, yv = (ys && ys.value !== '') ? evalDim(ys.value) : 0;
-    if (!(xv > 0) && !(yv > 0)) return '';
+    if (!(xv > 0) && !(yv > 0) && !rails) return null;
     var h = cabFieldOrDefault('height'), sokel = (getType() === 'upper') ? 0 : cabFieldOrDefault('floor_height');
     var hr = cabFieldOrDefault('thickness'), d = cabFieldOrDefault('depth');
     // Bez predvolieb zo servera sa NEHADA (vzor cabinetHeightError).
-    if (isNaN(h) || isNaN(sokel) || isNaN(hr) || isNaN(d)) return '';
-    return nxSetbackError(currentCarcass({ height: h, floor_height: sokel, thickness: hr, depth: d }));
+    if (isNaN(h) || isNaN(sokel) || isNaN(hr) || isNaN(d)) return null;
+    return currentCarcass({ height: h, floor_height: sokel, thickness: hr, depth: d });
   }
   // Oznaci pole komina a/alebo zapustenia (to, ktore je nenulove). Dovod do
   // `title` — rovnako ako pri vyske; stavovu vetu berie `nxCabFieldError`.
@@ -269,6 +301,12 @@
       var v = (e.value === '') ? 0 : evalDim(e.value);
       if (message && v > 0){ e.classList.add('bad'); e.title = message; } else { e.title = ''; }
     });
+  }
+  // KON-B · K2: oznaci pole „Výška líšt" vetou pravidla list. Bez vety (aj pri
+  // skrytom riadku) sa tooltip ZRUSI — cervenu nastavuje/rusi hlavny cyklus.
+  function markRailError(message){
+    var e = el('back_rail_height'); if (!e) return;
+    if (message){ e.classList.add('bad'); e.title = message; } else { e.title = ''; }
   }
   // Posledna krizova veta formulara (vyska/podstavec alebo komin/zapustenie)
   // — stavovy riadok ju ukaze namiesto vseobecneho „Skontroluj červené polia".
@@ -289,9 +327,12 @@
     var ok = true;
     var ae = document.activeElement;
     var slotNow = (cabTypeNow() === 'dishwasher');
+    var railsNow = backRailsActive();
     for (var id in LIMITS){
       var e = el(id); if (!e) continue;
       if (SLOT_FIELDS[id] && !slotNow){ e.classList.remove('bad'); continue; }
+      // KON-B (audit FIX 3): pole list len pri aktivnom chrbte z list.
+      if (RAIL_FIELDS[id] && !railsNow){ e.classList.remove('bad'); e.title = ''; continue; }
       if (e === ae && isExprStr(e.value)) continue; // rozpisany vyraz — nechaj tak
       if (e.value === ''){ e.classList.remove('bad'); continue; }
       var v = evalDim(e.value);
@@ -315,10 +356,22 @@
     markHeightError(hErr);
     if (hErr) ok = false;
     // KON-A: komin a zapustenie (zrkadlo `Construction.setback_error`).
-    var sErr = hErr ? '' : cabinetSetbackError();
+    // KON-B: veta list az po nich (to iste poradie ako server) a na VLASTNOM
+    // poli „Výška líšt" — pole komina ju neoznacuje.
+    var cc = hErr ? null : cabinetCheckCarcass();
+    var sErr = cc ? nxSetbacksOnlyError(cc) : '';
+    // Predrecenzia P3: vyska mimo 20–300 (uz cervena z hlavneho cyklu) ma
+    // prednost pred vetou list — tá by hovorila o OREZANEJ hodnote (400 -> 300),
+    // ktoru pouzivatel nenapisal.
+    var hfe = el('back_rail_height');
+    var hRange = railsNow && hfe && hfe.classList.contains('bad');
+    var rErr = hRange ? RAIL_RANGE_MSG : ((cc && !sErr) ? nxBackRailsError(cc) : '');
     markSetbackError(sErr);
-    if (sErr) ok = false;
-    cabFieldErrorMsg = hErr || sErr || '';
+    // Cervenu (aj pri cisle mimo LIMITS) riadi hlavny cyklus vyssie; tu sa len
+    // prida veta — alebo zrusi tooltip, ked veta nie je (aj pri skrytom riadku).
+    markRailError(rErr);
+    if (sErr || rErr) ok = false;
+    cabFieldErrorMsg = hErr || sErr || rErr || '';
     if (!skipFrontDraft && typeof nxFrontDraftReady === 'function' && !nxFrontDraftReady()) ok = false;
     return ok;
   }
@@ -747,9 +800,34 @@
   }
   // D-31: Bez chrbta skryje riadok hrubky — HODNOTA selectu sa NEMENI (navrat
   // rezimu ju obnovi; sablony a config ju drzia dalej).
+  // KON-B · K2 (A5): „Výška líšt" sedi na mieste „Hrúbky chrbta" — nikdy nie su
+  // naraz. Pri listach je hrubka chrbta skryta a vyska viditelna, pri „Bez
+  // chrbta" obe skryte; hodnoty sa pamataju. Skryty riadok list nesmie niest
+  // cervenu ani tooltip chyby (audit FIX 3) — plati aj pri prepnuti na slot.
   function toggleBackTh(){
-    var r = el('backThRow'); if (r) r.style.display = (val('back_mode') === 'none') ? 'none' : '';
+    var bm = val('back_mode');
+    var rails = backRailsActive();
+    var r = el('backThRow'); if (r) r.style.display = (bm === 'none' || bm === 'rails') ? 'none' : '';
+    var rr = el('backRailRow'); if (rr) rr.style.display = rails ? '' : 'none';
+    if (!rails){
+      var hf = el('back_rail_height');
+      if (hf){ hf.classList.remove('bad'); hf.title = ''; }
+    }
+    updateBackMaterialNote(bm);
     toggleBackSetback();
+  }
+  // KON-B · K2: veta pod materialom chrbta v sekcii Materialy — pri listach
+  // a bez chrbta sa material chrbta nepouzije (vzor mockupu A).
+  function backMaterialNote(bm){
+    if (bm === 'rails') return '(nepoužije sa — chrbát z líšt je z korpusu)';
+    if (bm === 'none') return '(nepoužije sa — bez chrbta)';
+    return '';
+  }
+  function updateBackMaterialNote(bm){
+    var n = el('cabBackNote'); if (!n) return;
+    var txt = (cabTypeNow() === 'dishwasher') ? '' : backMaterialNote(bm);
+    n.textContent = txt;
+    n.hidden = !txt;
   }
   // KON-A · K1 (A1): „Zapustenie vpredu" pri „Bez stropu" nema co posunut —
   // riadok sa skryje, HODNOTA sa pamata (vzor `backThRow`). Slot riadok nema.
@@ -777,7 +855,8 @@
               '0 = bez komína. Chrbát sa posunie dopredu na zadné hrany dna a stropu, vnútro sa o komín skráti. ' +
               'Pri tomto chrbte ' + min + '.';
     if (x > 0 && bm !== 'none'){
-      var chan = (bm === 'inset') ? x : (x - bt);
+      // KON-B: pri listach je ich zadna plocha v rovine R — volny kanal = X.
+      var chan = (bm === 'inset' || bm === 'rails') ? x : (x - bt);
       out += ' Voľný kanál za chrbtom je teraz ' + nxFmtMm(Math.max(chan, 0)) + ' mm.';
     }
     return out;
@@ -787,8 +866,18 @@
   function setbackMetaTexts(c){
     var y = nxNum(c.top_front_setback, 0), x = nxNum(c.back_setback, 0);
     var slot = c.type === 'dishwasher';
+    // KON-B · K2 (A7): „z líšt 100 · komín 50" — vyska len pri listach.
+    var back = [];
+    // Predrecenzia P3: cislo len ked je platne (20–300) — orezanu hodnotu, ktoru
+    // pouzivatel nenapisal, suhrn neukazuje. Chybajuci kluc = predvolba 100.
+    if (!slot && c.back_mode === 'rails'){
+      var hr = (c.back_rail_height === undefined || c.back_rail_height === null) ? NX_BACK_RAIL_H_DFLT : c.back_rail_height;
+      var hOk = typeof hr === 'number' && isFinite(hr) && hr >= NX_BACK_RAIL_H_MIN && hr <= NX_BACK_RAIL_H_MAX;
+      back.push(hOk ? ('z líšt ' + nxFmtMm(hr)) : 'z líšt');
+    }
+    if (!slot && x > 0) back.push('komín ' + nxFmtMm(x));
     return { top: (!slot && c.top_mode !== 'none' && y > 0) ? ('zap. ' + nxFmtMm(y)) : '',
-             back: (!slot && x > 0) ? ('komín ' + nxFmtMm(x)) : '' };
+             back: back.join(' · ') };
   }
   function updateSetbackMeta(){
     var m = setbackMetaTexts(currentCarcass());

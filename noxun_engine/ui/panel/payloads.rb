@@ -2328,6 +2328,10 @@ module Noxun
           # (`TemplatesDialog.merge_template`). Slot ich nema.
           unless cfg['type'].to_s == 'dishwasher'
             CabinetBuilder::SETBACK_KEYS.each { |k| tc[k.to_s] = CabinetBuilder.norm_setback(cfg[k.to_s]) }
+            # KON-B · K2: vysku list chrbta tiez VYSLOVNE, aj predvolbu 100 —
+            # stara sablona (kluc chyba) necha pri pouziti H CIELA.
+            key = CabinetBuilder::BACK_RAIL_KEY.to_s
+            tc[key] = CabinetBuilder.norm_rail_height(cfg[key])
           end
           # S1-E (R2c): sablona nesie OCAKAVANIE (`appliance_expects[]`), NIKDY
           # vazbu na konkretny spotrebic — ten je majetkom JEDNEJ skrinky

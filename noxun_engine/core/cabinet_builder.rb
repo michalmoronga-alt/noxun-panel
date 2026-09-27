@@ -15,7 +15,9 @@ module Noxun
         floor_height: 100.0, shelves: 0, fronts: 'none',
         bottom_mode: 'under_sides', top_mode: 'full', back_mode: 'overlay', back_thickness: 3.0,
         plinth_mode: 'none', plinth_recess: 40.0,
-        rail_depth: 100.0, rails_orientation: 'flat', rails_top_offset: 0.0
+        rail_depth: 100.0, rails_orientation: 'flat', rails_top_offset: 0.0,
+        # KON-B · K2: vyska list chrbta (uplatni sa len pri `back_mode 'rails'`).
+        back_rail_height: 100.0
       }.freeze
 
       # Horna skrinka: bez sokla (floor_height 0), dno aj vrch medzi bokmi (boky plna vyska),
@@ -25,7 +27,8 @@ module Noxun
         floor_height: 0.0, shelves: 0, fronts: 'none',
         bottom_mode: 'between_sides', top_mode: 'full', back_mode: 'groove', back_thickness: 3.0,
         plinth_mode: 'none', plinth_recess: 40.0,
-        rail_depth: 100.0, rails_orientation: 'flat', rails_top_offset: 0.0
+        rail_depth: 100.0, rails_orientation: 'flat', rails_top_offset: 0.0,
+        back_rail_height: 100.0
       }.freeze
 
       # S1-E: SLOT UMYVACKY. Nie je to korpus — nema boky, dno, strop, chrbat,
@@ -289,7 +292,17 @@ module Noxun
       #       `ProductionCore.export_blockers`). Skrinka s kombinaciou D-144
       #       pod schemou 20 je ZASTARANA (`BACK_RAIL_ACTIVATION_SCHEMA`) —
       #       Kontrola RED a vyrobne exporty stoja, kym sa neprestavi.
-      CONFIG_SCHEMA = 20
+      #  21 = KON-B · K2 — CHRBAT Z LIST. `back_mode` smie byt `'rails'` (dve
+      #       listy z korpusu namiesto dosky chrbta) a config smie niest
+      #       `back_rail_height` (H, mm Float 20..300, zapisane LEN ked H != 100).
+      #       Plugin schemy 20 hodnotu `rails` NEPOZNA: `normalize` by ju ticho
+      #       zmenil na predvoleny chrbat typu a pri prestavbe by do kusovnika
+      #       dal DOSKU CHRBTA namiesto dvoch list (a vnutro o hrubku listy
+      #       hlbsie) — teda iny kusovnik bez hlasky. Brany su tie iste ako pri
+      #       5-20 (`newer_config?`, `ProductionCore.export_blockers`). Samostatne
+      #       prenesenu listu schema nechrani (existujuca hranica, audit KON-B
+      #       NOTE 5) — obe PC treba aktualizovat pred prvou vyrobou s listami.
+      CONFIG_SCHEMA = 21
 
       # KOV-C2b: schema, OD KTOREJ stavba emituje dielce zasuviek z receptu.
       # VLASTNA konstanta (nie `CONFIG_SCHEMA`), lebo pri bumpe na 6 (KOV-D1a)
@@ -341,6 +354,9 @@ module Noxun
       SETBACK_KEYS = %i[back_setback top_front_setback].freeze
       # Retazec, ktory je CELY cislom (`norm_setback`) — nie „50oops“ ani „50-20“.
       SETBACK_NUM_RE = /\A[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?\z/.freeze
+      # KON-B · K2: vyska list chrbta (H). JEDEN kluc pre `normalize`,
+      # `cabinet_config`, `config_to_params` aj sablony (vzor `SETBACK_KEYS`).
+      BACK_RAIL_KEY = :back_rail_height
 
       # S1-E0 (Michal 20.9.2026): VYSKA ide od 80 mm, nie od 200. Nad umyvackou
       # (a pod linkou) ostava casto len 80-110 mm a stolar tam kladie NIZKY
@@ -401,6 +417,9 @@ module Noxun
       # Tagy dielov (V0.2c) — hromadne hide cez nativny Tags panel. Default = Noxun/Korpus.
       PART_TAGS = {
         'back'         => 'Noxun/Chrbát',
+        # KON-B · K2: listy chrbta sa skryvaju spolu s chrbtami (tag Chrbát).
+        'back_rail_top'    => 'Noxun/Chrbát',
+        'back_rail_bottom' => 'Noxun/Chrbát',
         'front_door'   => 'Noxun/Čelá',
         'drawer_front' => 'Noxun/Čelá',
         # KOV-A1: vyklop/sklop (rola flap) a blenda (false_front) su tiez cela.
@@ -2895,6 +2914,11 @@ module Noxun
               v = norm_setback(cfg[k])
               out[k] = v if v.positive?
             end
+            # KON-B · K2: vyska list LEN ked sa lisi od predvolby 100 (vzor
+            # KON-A) — config existujucich skriniek sa nemeni. Pri inom type
+            # chrbta sa hodnota PAMATA (vzor `back_thickness` pri „Bez chrbta").
+            hr = norm_rail_height(cfg[BACK_RAIL_KEY])
+            out[BACK_RAIL_KEY] = hr unless hr == Construction::BACK_RAIL_HEIGHT_DEFAULT
           end
           # Rezervovane vazby: kluc sa objavi LEN ked skrinka naozaj nieco
           # nesie (nil = „o vazbe nic nevieme", nie „vazba nie je").
@@ -3054,7 +3078,8 @@ module Noxun
             floor_height: (type == 'upper' || slot) ? 0.0 : clampf(fetchf(p, :floor_height, d[:floor_height]), 0.0, 500.0),
             bottom_mode: enum_val(p, :bottom_mode, %w[between_sides under_sides], d[:bottom_mode]),
             top_mode:    enum_val(p, :top_mode,    %w[full two_rails none],       d[:top_mode]),
-            back_mode:   enum_val(p, :back_mode,   %w[overlay inset groove none], d[:back_mode]), # D-31: + none
+            # D-31: + none · KON-B · K2: + rails (chrbat z dvoch list)
+            back_mode:   enum_val(p, :back_mode,   %w[overlay inset groove rails none], d[:back_mode]),
             # hrubka chrbta ako Float mm (3 HDF / 18 pevny / ine); clamp 1..50
             back_thickness: clampf(fetchf(p, :back_thickness, d[:back_thickness]), 1.0, 50.0),
             plinth_mode: (type == 'upper' || slot) ? 'none' : enum_val(p, :plinth_mode, %w[none front], d[:plinth_mode]),
@@ -3067,6 +3092,9 @@ module Noxun
             # (`norm_setback`); slot umyvacky ich nema (jeho plan ich necita).
             back_setback: slot ? 0.0 : norm_setback(raw(p, :back_setback)),
             top_front_setback: slot ? 0.0 : norm_setback(raw(p, :top_front_setback)),
+            # KON-B · K2: vyska list chrbta — PRISNE parsovanie, klamp 20..300,
+            # neplatne = predvolba 100. V normalizovanych parametroch VZDY cislo.
+            back_rail_height: slot ? Construction::BACK_RAIL_HEIGHT_DEFAULT : norm_rail_height(raw(p, :back_rail_height)),
             # V0.2b: strom zon (police su per-zona) + cela (fixed/auto s lockmi)
             zone_tree: norm_zone_tree(p),
             fronts: fronts_cfg,
@@ -3905,6 +3933,9 @@ module Noxun
             # absorpcia scale, kopie, „Nahradit UNI", hromadne zmeny).
             'back_setback' => cfg['back_setback'] || 0.0,
             'top_front_setback' => cfg['top_front_setback'] || 0.0,
+            # KON-B · K2: chybajuci kluc = predvolba 100 (config ho nesie LEN
+            # pri H != 100, skrinka pred KON-B ho nema vobec).
+            'back_rail_height' => cfg['back_rail_height'] || Construction::BACK_RAIL_HEIGHT_DEFAULT,
             # strom zon: novy config ho ma; stary korpus -> koren so starymi policami
             'zone_tree' => cfg['zone_tree'] || ZoneTree.default_tree((cfg['shelves'] || 0).to_i),
             # cela: novy config = hash; stary = string ('none'/'1'/'2'/'auto') -> Fronts.normalize
@@ -4065,6 +4096,22 @@ module Noxun
           return 0.0 if f.nil? || !f.finite? || f <= 0.0
 
           [f, Construction::SETBACK_MAX].min
+        end
+
+        # KON-B · K2: PRISNE citanie vysky list chrbta (vzor `norm_setback`).
+        # Neplatny vstup (nil, prazdny, „100oops", NaN, objekt) = predvolba 100;
+        # platne cislo sa klampuje na 20..300 (zaporne a 0 -> 20).
+        def norm_rail_height(v)
+          f =
+            case v
+            when Integer, Float, Rational then v.to_f
+            when String
+              str = v.strip
+              SETBACK_NUM_RE.match?(str) ? str.to_f : nil
+            end
+          return Construction::BACK_RAIL_HEIGHT_DEFAULT if f.nil? || !f.finite?
+
+          f.clamp(*Construction::BACK_RAIL_HEIGHT_RANGE)
         end
 
         def fetchf(p, key, default)
