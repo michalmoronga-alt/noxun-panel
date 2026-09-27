@@ -942,6 +942,9 @@ callback CEF by po prepnutí dokumentu prestaval cudzí model.
 **`Panel.zone_path` vracia pri poškodenom ID `nil`, NIE koreň** — dovtedajší fallback `[1]` znamenal, že preklep alebo orezaný reťazec poslal „Vyčistiť zónu“ na koreň a zmazal celé
 vnútro skrinky.
 
+**ROH-A1 — rohová delenie nepozná.** `split_refusal` pri skrinke typu `corner_blind` vráti `Construction::CORNER_ZONES_MSG` (obe osi `v` aj `h`) ešte pred
+kontrolou listu — priečka by v slepej časti narazila na blendu korpusovú. Police ostávajú; invariant drží aj `Construction.validate!` (šablóna ho neobíde).
+
 **`apply_zone_mod` vetví návratovú hodnotu mutácie**: `false` = strom sa nezmenil ⇒ chybový status a **žiadny rebuild** (predtým sa skrinka prestavala a status hlásil úspech), a
 volajúci hlási úspech až po úspešnej mutácii. Presnú príčinu odmietnutia skladá handler sám (`split_refusal`) — používateľ dostane „zóna je už delená, najprv Vyčistiť“ alebo „strom
 má najviac 3 úrovne“, nie „nepodarilo sa“. `handle_set_zone_field` pred zápisom volá `ZoneTree.validate_cuts` so **svetlým priestorom zóny z PLÁNU** (`zone_clear_span` — tá istá
@@ -2045,6 +2048,19 @@ a „Vkladacia karta". **Poradie guardov (R-02): identita dokumentu PRVÁ**, až
 **D-143 (KON-0): `back_rebuild_stale`** — hromadná prestavba skriniek so zastaraným chrbtom v drážke z Kontroly Štúdia (tok a guardy v sekcii KONTROLA nižšie; plán
 a texty sú čisté funkcie `ProductionCore.back_stale_*`, zápis `rebuild_many` = jedna operácia, výber zastaraných skriniek až po `ScaleWatch.flush_pending!`).
 
+**ROH-A1 · K3 — ochrany ROHOVEJ na serveri (A1 nemá nové ovládače, rohová v otvorenom `.skp` je však editovateľná bežnými riadkami).** `PARAM_KEYS` pozná
+`corner_side`/`corner_door_w`/`corner_cr1`/`corner_cr2`, ale JS ich v A1 **neposiela** (nie sú v `CONSTRUCTION_FIELDS` — bez ovládača by išli ako `null`, krížový audit
+C6); `handle_apply` kopíruje len prítomné kľúče, takže uložené hodnoty ostávajú. **`corner_change_refusal(params, data)`** — zmena **typu** z/na rohovú a zmena
+**strany** existujúcej rohovej (normalizovanej) sa odmietne vetou `CORNER_TYPE_MSG` / `CORNER_SIDE_MSG` **pred** prepisom params (0 krokov Späť, resync panela);
+volá ju `handle_apply` aj `handle_apply_all`. **`corner_fronts_refusal(params, incoming)`** — čelá rohovej musia ostať jeden riadok `door`/`auto`/jedno krídlo
+(`CabinetBuilder.corner_fronts_ok?`) a medzera pri rohu 1–20 (`corner_gap_ok?` — `gap_right` pri dverách vľavo, `gap_left` vpravo); `handle_apply_fronts`
+a `handle_apply_all` (vzor `slot_fronts_refusal`). Smer, úchytkový profil, medzery v rozsahu, materiál a kovanie povolené ostávajú. **Vloženie zo šablóny
+(audit A1 FIX 3):** `apply_template_slot_fields!` číta zo **záznamu** šablóny okrem polí slotu aj typ a polia rohovej (payload má prednosť, dopĺňa sa chýbajúce)
+a **`corner_template_refusal(tpl_ref)`** odmietne rohovú šablónu s porušeným invariantom čiel ešte **pred** ghostom (nie ticho oreže). **Preflight čiel (audit A1
+NOTE 5):** `front_preflight_result(data, stored)` počíta otvor pre **každý typ** cez `Construction.front_opening` (`preflight_opening_cfg`); pri rohovej so stranou
+a dverovou časťou z **uloženého configu označenej skrinky** (`handle_front_preflight` ho pošle) a so živou šírkou z formulára — pri dverách vpravo `x0 = W − D`;
+ostatné typy dostanú tie isté čísla ako predtým bez `opening`. JS kresba náhľadu z otvoru je ROH-A2. `TEMPLATE_TYPE_WORDS` pozná „rohová".
+
 #### Vloženie skrinky = ghost na kurzore (GHOST V1-04)
 
 **„Vložiť" už NEVKLADÁ.** `handle_insert` pripraví **zmrazený plán** (R-03 `CabinetBuilder.prepare_insert`) a zavesí ghost skrinky na kurzor; skrinka vznikne až **klikom
@@ -2201,6 +2217,10 @@ _(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
 Doména panela: šablóny a ručné odfotenie náhľadu (`Panel.capture_preview_for`). Kontrakt je v odseku „Vkladacia karta — šablóny, typ a doska" a v
 [model-a-identita.md](model-a-identita.md), odsek `template_previews.rb`. Od v0.8.13 tu žije aj **`handle_tag_visible`** (D-27) — jediný handler viditeľnosti NOXUN tagov pre OBA
 ovládače (okno tagov v raile aj checkbox ghost zón); vystriedal `handle_toggle_zones`.
+
+**ROH-A1 — typ šablóny rohovej je zamknutý:** `apply_template_type!` pri `corner_blind` vráti skôr (ako pri slote) — „uložené ako DOLNÁ" by zo šablóny rohovej
+vyrobilo dolnú skrinku bez rohovej zostavy. Zámok v UI modalu je ROH-A2 (server je autorita už teraz). `template_config_from` (payloads) zapisuje pri rohovej
+**výslovne všetky štyri** polia rohovej.
 
 **KOV-I — mini-modal uloženia:** existujúci `#tplModal` ostáva ručným modalom. Checkbox „Uložiť aj kovanie (sety a ručné položky)“ má default zapnuté a pamäť
 `localStorage['noxun.tpl.with_hardware']` na tomto PC; pamätá sa aj zmena pred Zrušiť. `saveTemplateAs` posiela boolean `with_hardware`, chýbajúca voľba starého
@@ -3250,6 +3270,10 @@ vtedy, keď naozaj niečo bežalo).
 
 ### templates_dialog.rb
 
+**ROH-A1 — šablóna na ROHOVÚ skrinku:** `corner_template_apply_refusal(cab_cfg, tpl_cfg)` (čistá) odmietne šablónu **inej strany** (overridy hrán by po zrkadlení
+ukazovali na opačnú hranu — prepínač strany s premapovaním prinesie ROH-B, krížový audit C5) aj šablónu s porušeným invariantom čiel; rovnaká strana prejde.
+`merge_template`: chýbajúci kľúč rohovej v šablóne = zachovaj hodnotu **cieľa** (vzor komína).
+
 **`templates_dialog.rb` — od ŠT-3c-1 už NIE JE OKNO** (ostal serverový modul; obsah je sekcia `tpl` Štúdia — popis nižšie v odseku `templates`;
 história okna: **UI-C1a: okno spravuje VÝHRADNE korpusové šablóny** — payload je `Panel.template_list(kind: 'cabinet', previews: true)` a `find`/`upsert`/`delete`/`set_preview`
 majú vlastný `kind` guard, HTML nie je ochrana, takže doskovú šablónu sa odtiaľ nedá použiť, vymazať ani odfotiť.
@@ -3760,7 +3784,15 @@ Rámik okna sa dopočíta z rozdielu outer/inner, aby sa fit pri ďalšom otvore
 
 ### CONSTRUCTION_FIELDS
 
-Jediný zoznam polí = `CONSTRUCTION_FIELDS` v core.js ↔ `Panel::PARAM_KEYS` (nové pole na 1+1 mieste).
+Jediný zoznam polí = `CONSTRUCTION_FIELDS` v core.js ↔ `Panel::PARAM_KEYS` (nové pole na 1+1 mieste). **Výnimka ROH-A1:** polia rohovej sú v `PARAM_KEYS`,
+ale v `CONSTRUCTION_FIELDS` **nie** — kým nemajú ovládač (ROH-B), JS ich neposiela a server ich drží z configu.
+
+**ROH-A1 — JS registre typu a rolí (bez nového ovládača).** `core.js` `CAB_TYPES` += `corner_blind` (krížový audit G1: `setType` by inak označenú rohovú sklopil na
+dolnú a každý zápis by ju poslal späť ako `lower`) a `NX_TYPE_LABEL` „Rohová" · `form.js` `TYPE_LIMITS.corner_blind` = šírka od `CORNER_MIN_WIDTH` 584 (minimum
+predvolieb; presné minimum konkrétneho configu vracia server sondou) · `insert_state.js` `INSERT_TYPES` a `templateType`/`templatesForType` (rohová šablóna nepadne
+do „dolnej") · `templates.js` „rohová" · `part_card.js` `roleLabel` pre päť rolí a `isFront` pre CR (čelové materiály aktívne) · `rules.js` `rdRoleDesc` · `sync.rb`
+`DEFAULTS.corner_blind`. Tlačidlo „Rohová", `applyVisibility`, náhľad (dvere a pánty v dverovej časti), náhľad nôh a zámok typu v modale šablóny sú **ROH-A2**;
+kým A2 nepríde, náhľad rohovej kreslí dvere cez celú šírku (server je autorita).
 
 ### Trvalé UI pravidlo (Michal 20.7.2026): VERTIKÁLNY priestor panela je vzácny
 

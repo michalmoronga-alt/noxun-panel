@@ -538,7 +538,8 @@ ako surový vstup, výsledky) a jeho **vyhodnotenie**; packages pribudnú s dáv
 **Stav 28.9.2026:** krížový audit hotový a vyhodnotený (všetky BLOCKERy prijaté, riešia ich packages). **Mockup ovládačov (ROH-B) sa pripravuje** —
 do priečinka pôjde po Michalovom schválení; ROH-A1 a ROH-A2 idú podľa R8 bez nových ovládačov s hodnotami z DC ako návrhom. Poradie:
 
-- **ROH-A1 · jadro rohovej** — nový typ skrinky, stavba oboch strán, výstupy (kusovník, VEPO, ponuka) a ochrany; bez nových ovládačov (R8). *PR #?*
+- ✅ **ROH-A1 · jadro rohovej** (v0.14.1) — nový typ skrinky `corner_blind`, stavba oboch strán, výstupy (kusovník, VEPO, ponuka) a ochrany; bez nových
+  ovládačov (R8). Package [PACKAGE_ROHA1.md](zdroje/bloky/ROHOVA/PACKAGE_ROHA1.md) + audit návrhu. *PR #?*
 - **ROH-A2 · vkladanie a náhľad** — tlačidlo „Rohová" vo vkladacej karte, dvere a pánty v náhľade na správnom mieste. *PR #?*
 - **ROH-B · ovládače** — dverová časť, CR lišty a prepínač strany v Inspectore podľa schváleného mockupu. *PR #?*
 
@@ -694,7 +695,7 @@ do priečinka pôjde po Michalovom schválení; ROH-A1 a ROH-A2 idú podľa R8 b
 ## Hranica: TYP vs. ŠABLÓNA vs. PARAMETER (rozhodnuté 15.7.2026)
 
 Tri úrovne — odpoveď na otázku „kedy nový typ korpusu":
-1. **TYP (builder)** = iná **topológia**: iná množina dielcov a vzťahov, iné zóny, parametre ktoré inde nedávajú zmysel. Vlastný generovací kód. → dolná, horná; neskôr **rohová** (slepá dolná s rohovou zostavou a CR lištami pred čelnou rovinou — blok 8), vysoká/potravinová veža.
+1. **TYP (builder)** = iná **topológia**: iná množina dielcov a vzťahov, iné zóny, parametre ktoré inde nedávajú zmysel. Vlastný generovací kód. → dolná, horná, slot umývačky, **rohová** (`corner_blind` od v0.14.1 — slepá dolná s rohovou zostavou a CR lištami pred čelnou rovinou, blok 8); neskôr vysoká/potravinová veža.
 2. **ŠABLÓNA (template, čisté dáta)** = pomenovaná sada nastavení TYPU — žiadny nový kód. → **drezová** (= dolná + výstuhy na výšku), **varná** (= dolná + výstuhy −20 mm), klasik, zásuvková… Používateľ si tvorí vlastné (Blum „My Library" princíp).
 3. **PARAMETER** = individuálna hodnota konkrétnej skrinky.
 Pravidlo: kým sa dá vec vyjadriť hodnotou/variantom existujúceho dielca → parameter/šablóna. Nový typ až keď sa mení topológia.

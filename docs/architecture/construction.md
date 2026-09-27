@@ -201,6 +201,25 @@ item_id:}`; `dw_body_reference` z nej skladá deskriptor (pri katalógovom tele 
 aj `Panel.slot_payload` a `Bom.appliance_slot_record`. Dva výpočty by znamenali, že v modeli stojí jedno telo a Kontrola meria iné. Väzba sa zapisuje cez
 prestavbu (`CabinetBuilder.write_appliance_refs!` v operácii `ApplianceBinding`), takže telo sa prekreslí **v tom istom kroku Späť** ako položka rozpočtu.
 
+**ROH-A1 · K3 (v0.14.1) — ROHOVÁ SKRINKA `corner_blind` = dolná skrinka + `corner_parts`.** Korpus ide celou dnešnou vetvou `build_plan` (boky, dno, strop,
+chrbát, lišty, sokel, zóny) — rohová **nemá vlastný plán** ako slot; za `plinth_parts` sa pripojí **`corner_parts(cfg, interior, part_thicknesses)`** (pri inom type
+`[]`): blenda korpusová `cabinet/corner_panel` (`corner_blind_panel`, `AXES_FRONT`, `:korpus`), výstuha závesov `cabinet/hinge_rail` (`AXES_UPRIGHT`, hĺbka
+`HINGE_RAIL_DEPTH` 80), CR 1 `cabinet/cr:1` (`cr_front`, `AXES_FRONT`, `:front`), CR 2 `cabinet/cr:2` (`cr_side`, `AXES_UPRIGHT`, `:front`) a rohová výstuha
+`cabinet/corner_rail` (`AXES_UPRIGHT`, `:korpus`, od spodku po vrch skrinky, pred korpusom). Čísla sú tabuľka package (overené na DC „Rohová"); **dvere vpravo =
+zrkadlo `x' = W − x − box[0]`** pre päť dielcov zostavy — korpus je symetrický a nemení sa, kľúče ani roly tiež. Blenda a výstuha závesov stoja **medzi dnom
+a stropom** (`interior_dims` `z_lo..z_hi`), CR majú **obrys riadku dverí** (`zf0 = s + gap_bottom`, `hf = (h − s) − gap_top − gap_bottom` — pri UKW je panel dverí
+nižší, CR nie). **Hrúbka CR je VSTUP** (vzor zásuviek): `corner_cr_thicknesses(part_thicknesses)` číta kľúče `CR_PART_KEYS` z mapy buildera (chýbajúci = 18),
+takže stavba, validácia, zrkadlo aj sondy počítajú z **tých istých** čísel. **`front_opening`** pri rohovej = dverová časť `{x0: 0 | W − D, w: D, z0: s, h: h − s}`.
+**`corner_error(cfg, interior, part_thicknesses)`** (volá ho `validate!`, teda ho dedia aj sondy): medzera pri rohu `CORNER_GAP_RANGE` 1–20 (`gap_right` pri dverách
+vľavo, `gap_left` vpravo) · `D + c1 + th2 + t ≤ W − t` · `back_front_y ≥ 80` · **`corner_fronts_ok?`** (jeden riadok `door`, `auto`, `wings '1'` — JEDINÁ definícia,
+`CabinetBuilder.corner_fronts_ok?` na ňu deleguje) · strom zón je list (bez priečok). Vety `CORNER_GAP_MSG` / `CORNER_FRONTS_MSG` / `CORNER_ZONES_MSG` sú jediný zdroj
+aj pre panel. Zóny rohovej dostanú v boxe `shelf_inset = max(20, t)` (`corner_shelf_inset`, audit A1 BLOCKER 1 — polica nesmie pretínať blendu pri korpuse
+hrubšom než 20) a pri policiach vznikne **jeden** ORANGE `corner_shelf_notch` („výrez t × (80 − odsadenie) robí dielňa", `part_key` výstuhy závesov).
+**`min_valid_width(cfg, part_thicknesses:)`** = sonda cez celý plán polením (vzor `min_valid_depth`, horná hranica `MAX_WIDTH` 3000) — **len pri rohovej**, iné typy
+vracajú `CabinetBuilder::MIN[:width]` bez sondy. **Všetky tri sondy** (`min_valid_height`/`_depth`/`_width`) prijímajú `part_thicknesses:` a posielajú ho do
+`build_plan` (audit A1 FIX 2); bez neho platí placeholder 18. `FRONT_MATERIAL_ROLES` obsahuje aj `cr_front`/`cr_side` (R4 — čelový kanál z definície roly), blenda
+korpusová nie (vždy korpus).
+
 ### cabinet_builder.rb
 
 **MR-1B2 — živý vzhľad pri prestavbe a kópii.** Pred `clear!` sa z konkrétnej inštancie zachytia materiály pôvodných dielcov; preferencie sa vyhodnocujú až
@@ -216,6 +235,22 @@ Chyba UV mapovania sa neprehltne; existujúca operácia zruší celý vklad/pres
 **MR-3B:** recyklácia pomenovaných definícií dielcov a nôh je prípustná iba bez platných inštancií. Po izolácii vzhľadu môže pôvodnú kanonickú definíciu
 stále používať cudzí dielec alebo odpojená skrinka; následný rebuild ju nesmie vyčistiť. Obsadené meno dostane novú definíciu, bez premenovania cudzej
 alebo vyhľadávania náhrad podľa podobného mena. Čistenie nepoužívaných definícií sa nezavádza.
+
+**ROH-A1 · K3 (v0.14.1, `CONFIG_SCHEMA` 22) — TYP `corner_blind`.** `TYPES` = `lower upper dishwasher corner_blind` (JS zrkadlá `CAB_TYPES`/`INSERT_TYPES`),
+`CORNER_DEFAULTS` = `LOWER_DEFAULTS` + šírka 1100 + informatívny jeden riadok dvierok + polia rohovej. **Polia `CORNER_KEYS`** (`corner_side`, `corner_door_w`,
+`corner_cr1`, `corner_cr2`) idú jedným zoznamom cez `normalize` (`norm_corner`: strana enum `CORNER_SIDES`, rozmery **prísne** cez `SETBACK_NUM_RE` — nečíslo /
+nekonečno = predvoľba poľa — a klamp `CORNER_RANGES` 250–800 / 50–250), `cabinet_config` (**len pri rohovej, vždy všetky štyri**), `config_to_params` (18 volaní —
+prestavba, kópie, scale, šablóna) a panelové whitelisty. Vetvenia podľa typu rozhodnuté výslovne: `construction_preset_for` `noxun-corner-blind` · `template_id_for`
+`corner-blind-18` · `default_name` „Rohová skrinka W" (+ `AUTO_NAME_RE`) · `defaults_for` → `CORNER_DEFAULTS` · `home_z` 0, podpora a sokel ako dolná (`floor_height`
+ani `plinth_mode` sa nevynucujú). **`corner_fronts!(fronts_cfg, side)`** v `normalize` je posledná obrana R6: ostane **prvý** riadok `door` (ID, smer, profil,
+otváranie a dormant polia sa **zachovajú** — na rozdiel od `slot_fronts!`, ktorý prepisuje ID na F1), vynúti `auto`, `height nil`, `locked false`, `wings '1'`;
+bez dvierok vznikne `F1`. **R7:** riadok **bez kľúča** `direction` dostane stranu pri rohu cez `corner_hinge_side` (`CORNER_HINGE_SIDE` `left → right`,
+`right → left`) — jediná heuristika smeru v plugine (guard `test_kova1_cela.rb` ju nechytí, pin je v `test_roha1_rohova.rb`). **Účinné hrúbky CR pred plánom:**
+`corner_thicknesses(cfg, eff)` (override dielca → kanál `front` → UNI / neznámy / mimo rozsahu korpusu = `Fronts::FRONT_THICKNESS` 18 cez `cr_sheet_thickness`) a
+`build_into` posiela plánu **jednu mapu** `plan_thicknesses` = zásuvky + CR. CR **nie sú** v `materialized_part` (hrúbku majú už z plánu) a `thickness_ok_for?` im
+dáva toleranciu čiel (`Construction::CR_ROLES`). **Pomocné plány (audit A1 FIX 2):** `aux_part_thicknesses(params, model)` = len CR (dielce zásuviek v pomocných
+plánoch zámerne ostávajú na UNI 16 — `orphan_drawer_part_overrides`); dostáva ho `plan_parts_by_key` (premapovanie ručných ABS, `parts_blocking_thickness`, strict
+vlastník ad-hoc kovania) aj absorpcia scale. Tagy: `cr_front`/`cr_side` → `Noxun/Čelá`, zvyšok zostavy default Korpus.
 
 **ŠEV VKLADANIA (R-03, v0.8.20): `prepare_insert` → `commit_insert`; `build` je len ich kompozícia** a správanie všetkých doterajších volajúcich je nezmenené.
 `prepare_insert(model, params)` vydá **zmrazený `InsertPlan`** (config + `home_z`) — *žiadna* mutácia modelu, entít, ID ani Undo stacku, a **zámerne ani `ensure_root_context`**
@@ -884,6 +919,11 @@ ostáva zámerne tolerantná (je to **opravná** vrstva legacy stromov), ale zap
 zóny ostávajú **bez jediného nového kľúča** (idú do uloženého configu, takže by sa zmenil obsah modelu) a naďalej nesú `r2`; surový kanál číta výhradne
 `Construction.context_for`. To isté robí `Fronts.layout` cez `bounds` — `items` (= `front_items`) ostávajú nedotknuté.
 
+**ROH-A1 — `shelf_inset` v boxe (audit A1 BLOCKER 1).** Box zóny smie niesť voliteľný kľúč `shelf_inset` (predné odsadenie políc); bez neho platí
+`SHELF_FRONT_INSET` 20, takže plán všetkých ostatných typov je bajtovo rovnaký. Posiela ho **len** rohová (`Construction.corner_shelf_inset` = `max(20, t)`):
+blenda korpusová zaberá `y 0..t` a polica od 20 by ju pri korpuse hrubšom než 20 mm prerazila v celej slepej časti. Hranica „príliš plytká zóna" počíta s tým istým
+odsadením.
+
 ### front_profiles.rb
 
 **D-90 úchytkové profily** (UKW-7): JEDINÝ zdroj konštánt — skrátenie čela (36 mm), názvy pre UI (`options` do `push_init`) a presný prierez pre vizuál (`geometry`: 83 bodov,
@@ -958,7 +998,9 @@ navyše kontroluje zhodu s box/prod — pri nezhode sa **nefarbí nič** (radše
 `AbsRules::STANDING_ROLES` je **alias** tejto konštanty, takže zoznam existuje raz; `drawer_bottom` leží a ostáva na defaulte. Mapu čítajú `edge_code_for_center` (farbenie plôšok
 v `CabinetBuilder.paint_edge_faces`) aj `rect_axis_side`/`face_rect_mm` (zvýraznenie Kontroly `EdgeCheck` a hover `HoverEdge`) — všetky posielajú ROLU dielca, žiadny z nich
 nemá vlastnú kópiu mapy (stráži zdrojový guard). `ROLE_AXES` pozná všetky štyri roly zásuvky (jeden kandidát na rolu), takže osi sa dopočítajú aj pri **starej zákazke**
-postavenej ešte bez `axes` v pláne; od KON-B aj obe lišty chrbta (`AXES_WALL`, jeden kandidát).
+postavenej ešte bez `axes` v pláne; od KON-B aj obe lišty chrbta (`AXES_WALL`, jeden kandidát); od ROH-A1 päť rolí rohovej zostavy — `corner_blind_panel`
+a `cr_front` `AXES_FRONT`, `hinge_rail`, `corner_rail` a `cr_side` `AXES_UPRIGHT` (jeden kandidát). **Žiadna rola rohovej nie je stojaca** — nepribudla do
+`STANDING_ROLES` (L1 výstuh a CR 2 = min Y = predná, ako pri boku).
 
 ### edge_check.rb
 
@@ -1145,6 +1187,15 @@ jedno Späť ďalej vráti scale AJ absorpciu (in-SU `run_s1e0` body c, e a f, r
 normalizovaným configom (sonda cez celý plán, dedí aj minimum vnútra 40 pri komíne). Keď hĺbku zdvihla **konštrukcia** (nie holé typové minimum), absorpcia po
 `refresh_panel` pošle **nemodálnu hlášku** `notify_user` („Hĺbka skrinky CAB-004 je pri komíne 100 mm najmenej 160 mm — nastavená na 160."). Tichá odmietacia cesta
 `reject_scale` sa pri hĺbke týmto nedosiahne; pre iné príčiny ostáva. Jedno Späť vráti scale aj absorpciu (in-SU `run_kona` bod c).
+
+**ROH-A1 — ŠÍRKA ROHOVEJ sa pri ZMENŠENÍ klampuje CONFIG-AWARE (`clamp_corner_width`, krížový audit G9 / Codex Q5).** Rohová zostava sa musí zmestiť pred slepú
+časť, takže holé `MIN['width']` 200 by pri zúžení vyrobilo neplatnú konštrukciu a tichý `reject_scale`. Keď `new_w < base_w` **a** skrinka je rohová
+(`Construction.corner?`), hranica je prísnejšia z `min_for('width')` a `Construction.min_valid_width` (sonda cez celý plán); klamp beží **pred** skúšaním hĺbky
+a výšky (tie už počítajú s novou šírkou) a keď šírku zdvihla zostava, po `refresh_panel` príde nemodálna veta („Šírka rohovej skrinky CAB-009 je pri tejto rohovej
+zostave najmenej 584 mm — nastavená na 584."; pri súčasnom klampe hĺbky obe vety v jednej hláške). Ostatné typy ostávajú na holom minime. **Všetky tri sondy
+absorpcie** dostávajú `part_thicknesses` z **jedného** volania `CabinetBuilder.aux_part_thicknesses(params, model)` (audit A1 FIX 2 — tie isté účinné hrúbky CR,
+s akými prestavba naozaj postaví). Prestavba je jedna transparentná operácia a `flush_pending!` sa zvnútra absorpcie nevolá (in-SU `run_roha1` bod e,
+`run_roha1_async`).
 
 **BARIÉRA PRED MUTÁCIOU NÁSTROJA — `flush_pending!(model)` (NÁSTROJE-1, v0.9.24).** `guard` zabráni len NOVÝM udalostiam; už naplnené fronty (`@dirty`, `@added`, `@requested`,
 `@prune_models`) a bežiaci debounce timer zostávajú — a keď timer dobehne PO operácii nástroja, jeho **transparentná** reakcia (dedup kópií, presun ghost zón) sa prilepí na krok

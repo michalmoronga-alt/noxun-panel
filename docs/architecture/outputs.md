@@ -25,6 +25,11 @@ dva verejné pohľady — `duplicate_owner_ids` (len `KIND_CABINET`, teda kusy, 
 ešte preosieva `ProductionCore.dup_partition` cez skutočnú expanziu — detail v odseku `production_core.rb`. Kind-ová podmienka je tá istá, aká rozhoduje o znení nálezu
 v `duplicate_id_item`, takže sa hláška a brána nemôžu rozísť.)*
 
+**ROH-A1 — CR lišty sú pre Kontrolu čelo.** `FRONT_ROLES` = `front_door drawer_front flap false_front cr_front cr_side`: CR bez jedinej ABS hrany dostane ORANGE
+„čelo nemá žiadnu ABS hranu" a hrúbkové pravidlo ide cez `CabinetBuilder.thickness_ok_for?` (tolerancia čiel — katalógové 18,6/19 nie sú RED drift). Rohová zostava
+pridáva build warning **`corner_shelf_notch`** (ORANGE, jeden na skrinku s policami: „výrez robí dielňa", kategória stavba) — Kontrola ho zobrazí bez zmeny
+`check_build`.
+
 **KOV-A1 — RED kategória `front_direction` (`CAT_FRONT_DIR`), jediný RED BEZ brány.** Vstupom je aditívny `collected[:hardware_issues]` z `Bom.collect` (`nil`/chýbajúci =
 kontrola sa preskočí, vzor `placements:`); `check_hardware_issues` spracuje **výhradne** kód `front_direction_unset` — ostatné kódy (KOV-C/D: `drawer_no_fit`, owner bez
 resolved setu…) sa zámerne ignorujú, aby sa do Kontroly nedostali skôr než ich vlastná brána. `stable_key` = `front_direction|owner_id|part_key`, takže klik-select po prestavbe
@@ -816,6 +821,10 @@ z disku, I/O chyby vyletia ako neúspešný zápis) je v [model-a-identita.md](m
 
 ### vepo_export.rb
 
+**ROH-A1 · K3 — skratky rohovej zostavy (návrh, potvrdí Michal):** `SHORT_NAMES` dostali presné názvy z buildera (`Construction::CORNER_NAMES`) —
+`Blenda rohova` → `Blenda roh`, `Vystuha zavesov` → `Vyst zav`, `Vystuha rohova` → `Vyst roh`, `CR lista 1` → `CR 1`, `CR lista 2` → `CR 2`; CR 1 a CR 2 rovnakého
+rozmeru a materiálu sú jeden riadok kusovníka (agregácia nenesie rolu, C11) a zlúčený token `CR 1 2`. Smer dekoru CR je ako pri dverách (dĺžka = výška).
+
 **Čo to je.** Rezací výstup pre objednávkový systém VEPO — CSV skupiny + LOG, priamo z `Bom.compute[:rows]` (bez OCL medzikroku). Formát je zdroj pravdy v
 [SYSTEM/VEPO_KONTRAKT.md](../../SYSTEM/VEPO_KONTRAKT.md); modul je **čistý** (žiadny SketchUp, žiadne cesty pri stavbe) — katalógové lookupy dostáva ako mapy, čas a verziu ako
 parametre. Na disk zapisuje `write` **atomickou výmenou celej dávky** (staging → dvojkrokový swap, rollback pri zlyhaní, guard cudzích súborov v cieli).
@@ -901,6 +910,9 @@ in-SU `run_k1` (rotácia dekoru v reálnom CSV).
 ### cp_export.rb
 
 _(kostra — dokumentuje sa postupne pri zásahoch)_
+
+**ROH-A1 — CR lišty sú v ponuke „dvierka".** `FRONT_ROLES` (kategória `material_category`) obsahuje aj `cr_front` a `cr_side` — sú z čelového materiálu a zákazník
+ich vidí ako čelo; blenda korpusová, výstuha závesov a rohová výstuha idú ako „vnútorné korpusy".
 
 **Spotrebiče v cenovej ponuke (S1-B1, v0.12.13).** Kategória špecifikácie sa volá **„SPOTREBIČE A VYBAVENIE"**. Položku, ktorú **dodáva zákazník**, by `candidates`
 zahodilo už na filtri nulových súm (jej `spolu` je 0), lenže zákazník ju v ponuke vidieť **má** — je to kus, ktorý si kupuje sám a ktorý v kuchyni stojí. Ide preto
