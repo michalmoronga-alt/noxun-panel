@@ -129,8 +129,12 @@ module Noxun
       # S1-E: pribudol automaticky nazov slotu („Umývačka 60 (slot)") — platí
       # preň to isté ako pre korpusy: nesmie sa zapiecť do configu, inak by
       # po zmene triedy natrvalo klamal.
-      # ROH-A1: + „Rohová skrinka W" (automaticky nazov rohovej sleduje sirku).
-      AUTO_NAME_RE = /\A(?:(?:horn(?:a|á)|spodn(?:a|á)|rohov(?:a|á))\s+skrinka\s+\d+|um(?:y|ý)va[cč]ka\s+\d+\s*\(slot\))\z/i
+      AUTO_NAME_RE = /\A(?:(?:horn(?:a|á)|spodn(?:a|á))\s+skrinka\s+\d+|um(?:y|ý)va[cč]ka\s+\d+\s*\(slot\))\z/i
+      # ROH-A1: „Rohová skrinka W" je automaticky nazov LEN pri type
+      # `corner_blind` (sleduje sirku). Na inom type je to RUCNY nazov —
+      # dolna skrinka zo zakazky pred K3 s rucnym „Rohová skrinka 1100" ho
+      # pri prestavbe nesmie stratit (predrecenzia ROH-A1, P3-1).
+      CORNER_AUTO_NAME_RE = /\Arohov(?:a|á)\s+skrinka\s+\d+\z/i
       NAME_MAX_LEN = 80 # JS zrkadlo: CAB_NAME_MAX v ui/js/core.js
 
       GAP_BETWEEN_CABS = 50.0    # medzera medzi korpusmi pri vkladani vedla seba
@@ -3086,22 +3090,29 @@ module Noxun
 
         # Ocisteny RUCNY nazov z configu, alebo nil (prazdny / automaticky vzor).
         def manual_name(cfg)
-          sanitize_name(cfg.is_a?(Hash) ? raw(cfg, :name) : nil)
+          return sanitize_name(nil) unless cfg.is_a?(Hash)
+
+          sanitize_name(raw(cfg, :name), raw(cfg, :type))
         end
 
         # JEDINA autorita ocistenia nazvu (callback panela ju vola pred zapisom).
         # nil = "bez rucneho nazvu" (= vrat sa na zivy default).
-        def sanitize_name(value)
+        # `type` = typ skrinky, ktorej nazov patri (ROH-A1: „Rohová skrinka W"
+        # je automaticky len pri rohovej).
+        def sanitize_name(value, type = nil)
           s = value.to_s.gsub(/\s+/, ' ').strip
           s = nfc(s)
           s = s[0, NAME_MAX_LEN].to_s.strip
-          return nil if s.empty? || auto_name?(s)
+          return nil if s.empty? || auto_name?(s, type)
 
           s
         end
 
-        def auto_name?(value)
-          !(AUTO_NAME_RE =~ nfc(value.to_s.gsub(/\s+/, ' ').strip)).nil?
+        def auto_name?(value, type = nil)
+          s = nfc(value.to_s.gsub(/\s+/, ' ').strip)
+          return true unless (AUTO_NAME_RE =~ s).nil?
+
+          type.to_s == CORNER_TYPE && !(CORNER_AUTO_NAME_RE =~ s).nil?
         end
 
         # Rozlozena diakritika (macOS/kopirovanie z webu) by vzor minula.
@@ -3265,7 +3276,7 @@ module Noxun
             # D-100: nazov prechadza cez JEDINU ocistovaciu cestu — stary
             # zapeceny default (aj bez diakritiky) sa tu zmeni na nil a skrinka
             # sa pri najblizsej prestavbe vrati na zivy nazov.
-            name: sanitize_name(raw(p, :name))
+            name: sanitize_name(raw(p, :name), type)
           }
           out.merge(dw).merge(cn)
         end

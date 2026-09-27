@@ -241,7 +241,7 @@ alebo vyhľadávania náhrad podľa podobného mena. Čistenie nepoužívaných 
 `corner_cr1`, `corner_cr2`) idú jedným zoznamom cez `normalize` (`norm_corner`: strana enum `CORNER_SIDES`, rozmery **prísne** cez `SETBACK_NUM_RE` — nečíslo /
 nekonečno = predvoľba poľa — a klamp `CORNER_RANGES` 250–800 / 50–250), `cabinet_config` (**len pri rohovej, vždy všetky štyri**), `config_to_params` (18 volaní —
 prestavba, kópie, scale, šablóna) a panelové whitelisty. Vetvenia podľa typu rozhodnuté výslovne: `construction_preset_for` `noxun-corner-blind` · `template_id_for`
-`corner-blind-18` · `default_name` „Rohová skrinka W" (+ `AUTO_NAME_RE`) · `defaults_for` → `CORNER_DEFAULTS` · `home_z` 0, podpora a sokel ako dolná (`floor_height`
+`corner-blind-18` · `default_name` „Rohová skrinka W" (automatický **len pri type `corner_blind`** — `CORNER_AUTO_NAME_RE`, `sanitize_name(value, type)`; na inom type je to ručný názov) · `defaults_for` → `CORNER_DEFAULTS` · `home_z` 0, podpora a sokel ako dolná (`floor_height`
 ani `plinth_mode` sa nevynucujú). **`corner_fronts!(fronts_cfg, side)`** v `normalize` je posledná obrana R6: ostane **prvý** riadok `door` (ID, smer, profil,
 otváranie a dormant polia sa **zachovajú** — na rozdiel od `slot_fronts!`, ktorý prepisuje ID na F1), vynúti `auto`, `height nil`, `locked false`, `wings '1'`;
 bez dvierok vznikne `F1`. **R7:** riadok **bez kľúča** `direction` dostane stranu pri rohu cez `corner_hinge_side` (`CORNER_HINGE_SIDE` `left → right`,

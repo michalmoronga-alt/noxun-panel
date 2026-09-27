@@ -243,10 +243,33 @@ end
 NxTest.test('ROH-A1: auto nazov „Rohová skrinka W" sleduje sirku (nie je rucny)') do
   cb = NxRohA1::CB
   NxTest.assert_equal('Rohová skrinka 1100', cb.default_name('type' => 'corner_blind', 'width' => 1100.0))
-  NxTest.assert(cb.auto_name?('Rohová skrinka 1100'))
-  NxTest.assert(cb.auto_name?('Rohova skrinka 900'), 'aj bez diakritiky')
-  NxTest.assert_equal(nil, cb.sanitize_name('Rohová skrinka 1100'), 'zapeceny default sa neulozi')
-  NxTest.assert_equal('Roh pri okne', cb.sanitize_name('Roh pri okne'))
+  NxTest.assert(cb.auto_name?('Rohová skrinka 1100', 'corner_blind'))
+  NxTest.assert(cb.auto_name?('Rohova skrinka 900', 'corner_blind'), 'aj bez diakritiky')
+  NxTest.assert_equal(nil, cb.sanitize_name('Rohová skrinka 1100', 'corner_blind'), 'zapeceny default sa neulozi')
+  NxTest.assert_equal('Roh pri okne', cb.sanitize_name('Roh pri okne', 'corner_blind'))
+  # Rohova s auto nazvom -> po zmene sirky sa premenuje podla novej sirky.
+  n = cb.normalize('type' => 'corner_blind', 'width' => 900.0, 'name' => 'Rohová skrinka 1100')
+  NxTest.assert_equal(nil, n[:name], 'rohova: zapeceny auto nazov sa zahodi')
+  NxTest.assert_equal('Rohová skrinka 900', cb.display_name(n), 'rohova: nazov sleduje novu sirku')
+end
+
+NxTest.test('ROH-A1 (predrecenzia P3-1): rucny „Rohová skrinka N" na NEROHOVEJ skrinke sa nestrati') do
+  cb = NxRohA1::CB
+  %w[lower upper dishwasher].each do |t|
+    NxTest.refute(cb.auto_name?('Rohová skrinka 1100', t), "#{t}: „Rohová skrinka 1100“ je rucny nazov")
+    NxTest.assert_equal('Rohová skrinka 1100', cb.sanitize_name('Rohová skrinka 1100', t))
+  end
+  NxTest.refute(cb.auto_name?('Rohová skrinka 1100'), 'bez typu = nie je auto (bezpecna strana)')
+  # Dolna zo zakazky pred K3 s rucnym nazvom -> zmena sirky -> nazov ostane.
+  n = cb.normalize('type' => 'lower', 'width' => 900.0, 'name' => 'Rohová skrinka 1100')
+  NxTest.assert_equal('Rohová skrinka 1100', n[:name], 'dolna: rucny nazov prezije normalize')
+  NxTest.assert_equal('Rohová skrinka 1100', cb.display_name(n), 'dolna: zobrazeny nazov ostane')
+  st = JSON.parse(JSON.generate(cb.cabinet_config(n)))
+  NxTest.assert_equal('Rohová skrinka 1100', cb.manual_name(st), 'dolna: rucny nazov prezije ulozenie')
+  # Spravanie „Horná/Spodná" sa nemeni — su automaticke na kazdom type.
+  NxTest.assert(cb.auto_name?('Spodná skrinka 600', 'lower'))
+  NxTest.assert(cb.auto_name?('Spodná skrinka 600', 'corner_blind'))
+  NxTest.assert(cb.auto_name?('Horná skrinka 600'))
 end
 
 # ============================================================================

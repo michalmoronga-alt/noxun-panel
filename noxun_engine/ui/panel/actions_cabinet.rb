@@ -824,7 +824,7 @@ module Noxun
           end
 
           cfg = Store.config(cab) || {}
-          name = CabinetBuilder.sanitize_name(data['name'])
+          name = CabinetBuilder.sanitize_name(data['name'], cfg['type'])
           if name == CabinetBuilder.manual_name(cfg)
             push_selected(model, dedup: false) # UI resync (input -> text), model netreba menit
             return
