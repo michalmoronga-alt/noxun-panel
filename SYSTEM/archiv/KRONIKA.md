@@ -17,6 +17,18 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **DOCS · pravidlá workflowu z retro bloku 7 + pokus „retro" (27.9.2026, PR #406, bez zmeny verzie).** Michal z hodnotenia bloku 7 prijal
+  návrhy 1, 2, 3, 4 a 6 (rozpočet Codexu na blok a skorší smoke nie); záznam „prečo" = prvé spracované vyhodnotenie
+  [retro/VYHODNOTENIE_2026-09-27_blok7.md](retro/VYHODNOTENIE_2026-09-27_blok7.md). **CLAUDE.md:** úvodné PR bloku nesie len rozhodnutia
+  Michala a mockup, technické požiadavky až package dávky s auditom (dôvod: PR #398 a #399 zavreté po P1 v každom kole) · každý bod mockupu
+  „návrh — potvrdí Michal" dostane odpoveď pred packages · sonda na kóde pred auditom návrhu (postup: skill `codex-audit`, nový krok 0) ·
+  in-SU sa na finálnej hlave neopakuje, keď neskoršie commity nemenia Ruby spúšťače (PR uvedie hlavu behu) · paralelná príprava package
+  a auditu dávky N+1 počas implementácie N (implementácia ostáva sekvenčná). **Pokus retro do 11.10.2026:** voliteľný záznam orchestrátora
+  ako posledný krok behu do lokálneho git-ignorovaného inboxu `SYSTEM/retro/inbox/` (formát `SYSTEM/retro/README.md`), vyhodnotenie len na
+  pokyn Michala čerstvým subagentom (najviac 3 návrhy s dôkazmi, rozhoduje Michal), spracované do `archiv/retro/`; pravidlá vo WORKFLOW.md
+  (nová časť 9; diagramy bloku a dávky, brány, rola Michala doplnené), nový skill `retro`, voliteľná sekcia „Postrehy k workflowu" v reportoch
+  typov agentov (bez zmeny modelu či effortu), mapa autorít `SYSTEM/README.md`. Guard kódovania preskakuje `SYSTEM/retro/inbox/` (neverzionované
+  poznámky nesmú zhodiť lokálny beh sady). Testy: headless a všetky JS sady zelené; in-SU netreba (bez kódu pluginu).
 - **BLOK 7 · KONŠTRUKCIA K1+K2 UZAVRETÝ (27.9.2026, v0.13.4 → v0.14.0, PR #401–#404 + uzáver PR #405, variant B).** Blok vybral Michal 26.9. po smoke S1 PASS;
   debata 26.–27.9. (rozhodnutia M1–M12), krížový audit bloku (Grok + Codex), mockup schválený 27.9. bez bokorysu, podklady #400. Dávky za jeden deň:
   **KON-0** #401 (D-143 — chrbát v drážke do nárezu v plnom rozmere, zastarané skrinky a hromadná prestavba, schéma 19) · **KON-A** #402 (komín vzadu,

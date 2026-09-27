@@ -1,6 +1,6 @@
 ---
 name: codex-audit
-description: Nezávislý Codex audit návrhu PRED implementáciou (devil's advocate). Risk-based od 12.8.2026 — povinný LEN pre dávky meniace dátový kontrakt, schému (každé zvýšenie CONFIG_SCHEMA, BuildPlan SCHEMA alebo STD), migráciu, observer/undo lifecycle alebo pridávajúce nový modul (ak je Codex CLI dostupný). Model sa zadáva vždy výslovne (--model podľa tabuľky Obsadenie rolí). Odošle návrh do lokálneho Codex CLI, počká na dobehnutie a vráti číslované nálezy BLOCKER/FIX/NOTE.
+description: Nezávislý Codex audit návrhu PRED implementáciou (devil's advocate). Risk-based od 12.8.2026 — povinný LEN pre dávky meniace dátový kontrakt, schému (každé zvýšenie CONFIG_SCHEMA, BuildPlan SCHEMA alebo STD), migráciu, observer/undo lifecycle alebo pridávajúce nový modul (ak je Codex CLI dostupný). Model sa zadáva vždy výslovne (--model podľa tabuľky Obsadenie rolí). Pred odoslaním overí kľúčové tvrdenia package krátkou sondou na kóde (krok 0). Odošle návrh do lokálneho Codex CLI, počká na dobehnutie a vráti číslované nálezy BLOCKER/FIX/NOTE.
 ---
 
 # Codex audit návrhu (devil's advocate)
@@ -14,6 +14,13 @@ description: Nezávislý Codex audit návrhu PRED implementáciou (devil's advoc
 
 ## Postup
 
+0. **Sonda pred auditom (pravidlo v CLAUDE.md, Git workflow; od 27.9.2026):** pred zostavením promptu orchestrátor vypíše z package
+   **kľúčové tvrdenia o správaní kódu** — napr. „pri nulových hodnotách sa plán nemení", minimá a rozsahy, parsovanie vstupov („nečíselné → 0"),
+   odkaz na vzor („robí to isté ako X") — a každé overí **krátkou sondou na kóde**: čistý Ruby alebo JS beh nad reálnymi modulmi (headless,
+   ako testy v `tests/pure/` či `tests/js/`), **bez zápisu do modelu**; keď tvrdenie závisí od geometrie, sonda ide len do `_dev\ENGINEtests.skp`.
+   Výsledok (tvrdenie · príkaz alebo skript · čo vrátil) sa **zapíše do package**; nepravdivé tvrdenie sa opraví v package ešte pred auditom.
+   Do promptu (sekcia „known facts") ide už overený stav. Dôvod: v bloku 7 audit trikrát chytil tvrdenie, ktoré orchestrátor napísal z úvahy
+   (komín 0, `.to_f` ako vzor pre „nečíselné → 0", osadenie „≥ 14" namiesto „14–24") — sonda je lacnejšia ako kolo auditu.
 1. **Nájdi companion runtime** (Glob v home adresári; cesta sa mení s verziou pluginu):
    `~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs`
    (fallback: `~/.claude/plugins/marketplaces/openai-codex/plugins/codex/scripts/codex-companion.mjs`).
