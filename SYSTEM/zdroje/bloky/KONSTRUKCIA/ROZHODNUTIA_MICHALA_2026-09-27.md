@@ -2,9 +2,9 @@
 
 > **Produktové rozhodnutia bloku** z debát s Michalom 26. a 27.9.2026 — čo a ako má plugin robiť z pohľadu stolára. **Technické požiadavky**
 > (formát dát, verzie configu a šablón, výrobné brány exportov, zastarané skrinky, samostatné dielce, seed Chladničkovej s verziou configu…)
-> sa zapisujú do **package každej dávky** a prejdú jej auditom návrhu. Pracovný zoznam prijatých technických požiadaviek z krížového auditu,
-> z auditu návrhu KON-0 a z troch kôl review je v histórii PR #399 (commit `b85fcaa2`, `ROZHODNUTIA_BLOKU_2026-09-27.md` §2) — je to vstup
-> pre packages, nie autorita. Ďalšie súbory priečinka: fakty z kódu [FAKTY_Z_KODU_2026-09-26.md](FAKTY_Z_KODU_2026-09-26.md) · krížový audit
+> sa zapisujú do **package každej dávky** a prejdú jej auditom návrhu: KON-0 [PACKAGE_KON0_D143.md](PACKAGE_KON0_D143.md) (+ audit návrhu
+> [AUDIT_KON0_2026-09-27.md](AUDIT_KON0_2026-09-27.md)); pre KON-A, B, D zatiaľ [VSTUPY_PRE_PACKAGES_2026-09-27.md](VSTUPY_PRE_PACKAGES_2026-09-27.md)
+> (vstup, nie autorita). Ďalšie súbory priečinka: fakty z kódu [FAKTY_Z_KODU_2026-09-26.md](FAKTY_Z_KODU_2026-09-26.md) · krížový audit
 > [CROSS_AUDIT_PROMPT_2026-09-27.md](CROSS_AUDIT_PROMPT_2026-09-27.md), [CROSS_AUDIT_GROK_2026-09-27.md](CROSS_AUDIT_GROK_2026-09-27.md),
 > [CROSS_AUDIT_CODEX_2026-09-27.md](CROSS_AUDIT_CODEX_2026-09-27.md) · schválený mockup [MOCKUP_KONSTRUKCIA_2026-09-27.html](MOCKUP_KONSTRUKCIA_2026-09-27.html)
 > (sekcia B — bokorys — zamietnutá).

@@ -529,7 +529,8 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 **Cieľ:** komín vzadu a zapustený strop vpredu (K1), chrbát z dvoch líšt (K2), chrbát v drážke správne do nárezu (D-143) a šablóna Chladničková —
 tak, aby chladničkové a drezové skrinky išli z pluginu bez ručného dopočítavania konštrukcie (vetracie otvory a výrezy ostávajú na stolárovi; rúrové
 skrinky sú mimo bloku — rúra potrebuje iné vetranie). **Priečinok bloku:** [zdroje/bloky/KONSTRUKCIA/](zdroje/bloky/KONSTRUKCIA/) — **rozhodnutia
-Michala** (ROZHODNUTIA_MICHALA), schválený mockup, fakty z kódu a surové výsledky krížového auditu; technické požiadavky pre dávky vznikajú v ich packages.
+Michala** (ROZHODNUTIA_MICHALA), schválený mockup, **package KON-0** s auditom návrhu, vstupy pre packages KON-A, B, D, fakty z kódu a surové
+výsledky krížového auditu.
 **Stav 27.9.2026:** krížový audit hotový, **mockup schválený bez bokorysu**; packages vznikajú postupne, každá audit-povinná dávka (KON-0, A, B a D —
 knižnica šablón STD 7) prejde auditom svojho návrhu. **KON-0 (výrobná chyba D-143) ide prvá.** Poradie:
 

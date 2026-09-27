@@ -40,9 +40,8 @@
   (vypadnutá požiadavka „seed Chladničkovej nesie verziu configu") → podľa pravidla 3 kôl (b) **zavreté a rozdelené druhý raz**: tento PR nesie len
   **produktové rozhodnutia Michala** (ROZHODNUTIA_MICHALA, M1–M12), schválený mockup, fakty a surové audity; **technické požiadavky** idú do package
   každej dávky (pracovný zoznam v histórii #399, commit b85fcaa2). Poučenie 2: ani zoznam technických požiadaviek nepatrí do úvodného PR bloku;
-  audit návrhu majú len dávky meniace kontrakt alebo schému (KON-0, A, B, D). Mockup a packages prídu samostatným PR. Poučenie: úvodný dokument
-  bloku drží rozhodnutia a smer, **nie implementačné vzorce** — tie patria do package dávky. Ďalší krok: package a audit KON-0, schválenie mockupu.
-
+  audit návrhu majú len dávky meniace kontrakt alebo schému (KON-0, A, B, D). Poučenie: úvodný dokument
+  bloku drží rozhodnutia a smer, **nie implementačné vzorce** — tie patria do package dávky. **Ďalší krok:** implementácia KON-0 podľa [PACKAGE_KON0_D143.md](../zdroje/bloky/KONSTRUKCIA/PACKAGE_KON0_D143.md) (package a audit návrhu sú v tomto PR; mockup schválený).
 - **DOCS — smoke S1 PASS a odškrtnutie V1 vízie (26.9.2026, PR #397, len dokumentácia; verzia pluginu sa nemení).**
   Michal 26.9. večer potvrdil **smoke bloku SPOTREBIČE S1 = PASS** („PASS — ideme ďalej"); zápis v [S1_ZAVER_2026-09-24.md](S1_ZAVER_2026-09-24.md)
   (sekcia Smoke Michala 21.–26.9.) — výsledok časti B checklistu sa po bodoch nezaznamenával, ďalšie postrehy k funkciám S1 idú ako nové D-čísla
