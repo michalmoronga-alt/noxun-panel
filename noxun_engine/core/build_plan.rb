@@ -29,7 +29,10 @@
 #                          5 = KOV-G1a (slovnik GENERIC_TYPES sa rozsiril o `plinth_clip` —
 #                          prichyt soklovej listy; presne ten isty dovod ako pri `lift`
 #                          v schema 3: polozka s nim je pre STARSI plugin neznamy typ,
-#                          ktory jeho `guard_unknown_hardware!` odmietne).
+#                          ktory jeho `guard_unknown_hardware!` odmietne);
+#                          6 = KON-B · K2 (chrbat z list: nove roly `back_rail_top` /
+#                          `back_rail_bottom`; precedens schemy 4 — plan, ktory ich moze
+#                          niest, uz nie je plan schemy 5).
 #   parts       [dielec] — deskriptory REALNE POSTAVITELNYCH dielcov. Degenerovane dielce
 #                          (nekladny rozmer boxu, napr. z extremne uzkych zon) sa do parts
 #                          NEdostanu — plan ich vyradi s warningom part_skipped_degenerate,
@@ -92,7 +95,7 @@
 module Noxun
   module Engine
     module BuildPlan
-      SCHEMA = 5
+      SCHEMA = 6
 
       # Najmensi vyrobitelny rozmer (mm). JEDINY prah degenerovanosti v systeme:
       # plan (partition v Construction.build_plan) aj builder (positive_box?) ho zdielaju —
@@ -105,11 +108,14 @@ module Noxun
       # KOV-C2b: dielce zasuviek z receptu (`drawer_bottom` · `drawer_back` ·
       # `box_side` · `drawer_inner_front`) — roly su ZHODNE s `Recipes::ROLE_*`
       # (guard test ich porovnava) a s ABS seedom 4 aj `CabinetBuilder::DRAWER_ROLES`.
+      # KON-B · K2 (SCHEMA 6): listy chrbta `back_rail_top` / `back_rail_bottom`
+      # (dve roly — mapa hran rozlisuje rolu, nie variant; dolna je stojaca).
       ROLES = %w[
         side_left side_right bottom top back shelf divider_v divider_h
         front_door drawer_front flap cover_panel false_front rail_front rail_back
         plinth gola_profile free_panel
         drawer_bottom drawer_back box_side drawer_inner_front
+        back_rail_top back_rail_bottom
       ].freeze
 
       PRODUCTION_CLASSES = %w[sheet linear counted reference none].freeze
@@ -510,6 +516,8 @@ module Noxun
       # `back_mode` = znacka povodu chrbta (rezim, v ktorom ho postavila tato
       # verzia). Builder ju zapise do snapshotu dielca, aby aj SAMOSTATNY
       # (odpojeny, skopirovany) chrbat niesol, ci bol v drazke.
+      # KON-B · K2: `rails` sem VEDOME NEPATRI — je to znacka povodu dielca
+      # s rolou `back`, nie zoznam hodnot configu; listy ju nenesu.
       BACK_MODES = %w[overlay inset groove].freeze
 
       # Tolerancia porovnania rozmeru do narezu s geometriou (mm). Snapshot

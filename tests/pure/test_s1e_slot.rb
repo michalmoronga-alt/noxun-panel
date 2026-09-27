@@ -319,7 +319,7 @@ NxTest.test('S1-E E2 (+S1-F): skrinka BEZ vazby ma PRAZDNY zoznam referencii') d
   # S1-F pridal korpusovemu planu kluc `references` (box niky chladnicky), ale
   # BEZ VAZBY je prazdny — skrinka, ktora spotrebic iba ocakava, geometriu nema.
   NxTest.assert_equal([], pl[:references], 'bez vazby ziadna referencia')
-  NxTest.assert_equal(5, NxS1E.bp::SCHEMA, 'plan sa neperzistuje, takze schema ostava')
+  NxTest.assert_equal(6, NxS1E.bp::SCHEMA, 'plan sa neperzistuje, takze schema ostava (6 = KON-B)')
 end
 
 NxTest.test('S1-E R4: konstanty zakladne tela ziju na JEDNOM mieste') do

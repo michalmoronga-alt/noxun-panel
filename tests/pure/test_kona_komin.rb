@@ -628,17 +628,17 @@ end
 # 8. SCHEMA
 # ============================================================================
 
-NxTest.test('KON-A: CONFIG_SCHEMA 20 + HISTORIA + aktivacna schema D-144 = 20, ostatne sa nehybu') do
+NxTest.test('KON-A: CONFIG_SCHEMA >= 20 + HISTORIA + aktivacna schema D-144 = 20, ostatne sa nehybu') do
   cb = NxKonA::CB
-  NxTest.assert_equal(20, cb::CONFIG_SCHEMA)
+  # KON-B · K2 bumpla na 21 (chrbat z list) — vlastne cislo drzi jej sada.
+  NxTest.assert(cb::CONFIG_SCHEMA >= 20, 'schema pod KON-A neklesne')
   NxTest.assert_equal(20, cb::BACK_RAIL_ACTIVATION_SCHEMA)
   NxTest.assert_equal([5, 9, 11, 19], [cb::DRAWER_ACTIVATION_SCHEMA, cb::HINGE_ACTIVATION_SCHEMA,
                                        cb::LIFT_ACTIVATION_SCHEMA, cb::BACK_CUT_ACTIVATION_SCHEMA])
   NxTest.assert(NxKonA.src('noxun_engine', 'core', 'cabinet_builder.rb').include?('#  20 = KON-A · K1'),
                 'HISTORIA hovori, preco sa bumplo')
-  NxTest.assert(cb.newer_config?({ 'config_schema' => 21 }))
+  NxTest.assert(cb.newer_config?({ 'config_schema' => cb::CONFIG_SCHEMA + 1 }))
   NxTest.refute(cb.newer_config?({ 'config_schema' => 20 }))
-  NxTest.assert_equal(20, NxKonA.stored('back_setback' => 50)['config_schema'])
-  NxTest.assert_equal(5, Noxun::Engine::BuildPlan::SCHEMA, 'BuildPlan SCHEMA bez zmeny')
+  NxTest.assert_equal(cb::CONFIG_SCHEMA, NxKonA.stored('back_setback' => 50)['config_schema'])
   NxTest.assert_equal(1, Noxun::Engine::PartKeys::SCHEMA, 'PartKeys bez zmeny')
 end

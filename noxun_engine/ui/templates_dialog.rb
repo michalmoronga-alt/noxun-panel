@@ -539,6 +539,10 @@ module Noxun
             key = k.to_s
             merged[key] = target_params[key] unless tpl_config.key?(key)
           end
+          # KON-B · K2: TEN ISTY vzor pre vysku list chrbta — stara sablona bez
+          # kluca zachova H ciela (nova ho nesie vyslovne, aj 100).
+          rail_key = CabinetBuilder::BACK_RAIL_KEY.to_s
+          merged[rail_key] = target_params[rail_key] unless tpl_config.key?(rail_key)
           # D-100 (GH #149 P2): sablona nazov skrinky NENESIE (template_config_from
           # ho neuklada) — bez tohto by merge zacal od sablony a rucny nazov ciela
           # („Chladnickova") by po pouziti sablony ticho zmizol. Rovnaky vzor ako

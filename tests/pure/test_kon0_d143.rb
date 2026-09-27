@@ -218,7 +218,7 @@ NxTest.test('D-143: BuildPlan odmietne poskodeny cut_size / back_mode (pritomne 
   NxTest.assert_raise('back_mode') { NxKon0::BP.validate_part!(good.merge(back_mode: 'drazka'), {}) }
   side = NxKon0.plan('type' => 'upper')[:parts].find { |p| p[:role] == 'side_left' }
   NxTest.assert_raise('nie je chrbat') { NxKon0::BP.validate_part!(side.merge(back_mode: 'groove'), {}) }
-  NxTest.assert_equal(5, NxKon0::BP::SCHEMA, 'aditivny volitelny kluc — BuildPlan SCHEMA sa nebumpuje')
+  NxTest.assert_equal(6, NxKon0::BP::SCHEMA, 'aditivny volitelny kluc — KON-0 SCHEMA nebumpla (6 = KON-B, roly list)')
 end
 
 # ============================================================================

@@ -68,7 +68,7 @@ NxTest.test('CELA-A: config JSON a copy/rebuild params zachovaju asymetriu a sch
   cfg = cb.normalize('width' => 600, 'height' => 720, 'depth' => 510, 'fronts' => NxCelaA.fronts)
   saved = JSON.parse(JSON.generate(cb.cabinet_config(cfg)))
   NxTest.assert_equal(cb::CONFIG_SCHEMA, saved['config_schema'])
-  NxTest.assert_equal(5, NxCelaA::E::BuildPlan::SCHEMA)
+  NxTest.assert_equal(6, NxCelaA::E::BuildPlan::SCHEMA) # KON-B · K2: roly list chrbta
   3.times do
     cfg = cb.normalize(cb.config_to_params(saved))
     saved = JSON.parse(JSON.generate(cb.cabinet_config(cfg)))
