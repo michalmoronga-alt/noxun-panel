@@ -14,7 +14,7 @@ module Noxun
       # Zakladnych a idu tou istou apply cestou) — preto patria do whitelistu.
       PARAM_KEYS = %w[type width height depth thickness floor_height bottom_mode top_mode back_mode
                       back_thickness plinth_mode plinth_recess rail_depth rails_orientation
-                      rails_top_offset back_setback top_front_setback name
+                      rails_top_offset back_setback top_front_setback back_rail_height name
                       dw_class dw_body_height dw_front_bottom].freeze
 
       # S1-E: SK nazov typu skrinky v 1. pade (hlasky Studia aj panela). Jedna
@@ -156,9 +156,10 @@ module Noxun
         # automaticky a NAHLAS: 1) korpusovy material rovnakej hrubky, 2) material
         # rovnakeho dekoru ako doterajsi chrbat, 3) jediny kandidat hrubky; inak
         # zmenu odmietne s jasnou hlaskou (ziadne tiche prepisanie). Pri back_mode
-        # 'none' sa material/hrubka nekontroluje vobec (D-31).
+        # 'none' sa material/hrubka nekontroluje vobec (D-31); KON-B · K2: rovnako
+        # pri chrbte z list (listy su z korpusu, material chrbta sa nepouzije).
         def back_preflight(params, model)
-          return nil if params['back_mode'] == 'none'
+          return nil unless Construction.back_material_used?(params['back_mode'])
           want = params['back_thickness'].to_f
           return nil unless want.positive?
           return nil unless defined?(Materials)

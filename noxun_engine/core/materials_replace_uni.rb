@@ -219,7 +219,8 @@ module Noxun
               end.uniq
             end
           end
-          if !blocked_reason && roles_now.include?('back') && params['back_mode'].to_s != 'none'
+          # KON-B · K2: chrbat z list material chrbta nepouziva (ako „Bez chrbta").
+          if !blocked_reason && roles_now.include?('back') && Construction.back_material_used?(params['back_mode'])
             # Chrbát: vlastná cesta (audit BLOCKER 3) — cieľ je daný, jeho
             # hrúbka sa PREVEZME do back_thickness (žiadny auto-pick iného
             # materiálu). Mimo rozsahu builderu (1–50) = blokácia.
