@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **DOCS — smoke bloku 7 KONŠTRUKCIA K1+K2 PASS (27.9.2026, PR #?, len dokumentácia; verzia pluginu sa nemení).**
+- **DOCS — smoke bloku 7 KONŠTRUKCIA K1+K2 PASS (27.9.2026, PR #408, len dokumentácia; verzia pluginu sa nemení).**
   Michal 27.9. večer prešiel smoke bloku 7 podľa checklistu v [KONSTRUKCIA_ZAVER_2026-09-27.md](KONSTRUKCIA_ZAVER_2026-09-27.md): **„všetko sedí, nenašiel som
   chybu"** — výsledok zapísaný ako celok, nie po bodoch; ďalšie postrehy k funkciám bloku 7 idú ako nové D-čísla do DOGFOODING podľa bloku. **Delenie čiel
   Chladničkovej 719 / 1274 potvrdené** („sedí") — šablóna ostáva, bod v „Otvorené body" záveru je uzavretý. Jediná otázka zo smoke: chrbát v drážke pri komíne
