@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **NÁSTROJ — kontrola kódovania: hook a CI test s jednou implementáciou, správna slovenčina veľkými už nie je „mojibake" (27.9.2026, PR #?, nástroj; verzia pluginu sa nemení).**
+- **NÁSTROJ — kontrola kódovania: hook a CI test s jednou implementáciou, správna slovenčina veľkými už nie je „mojibake" (27.9.2026, PR #407, nástroj; verzia pluginu sa nemení).**
   Hlásenie implementátora KON-D: hook `post_edit_check.ps1` označil `docs/architecture/ui-lifecycle.md` za poškodený kvôli slovu **PAMÄŤ**, hoci CI bolo zelené.
   **Príčina:** signatúra `\xC3\x84[\xC2\xC4\xC5]` („Ä" + znak zo skupiny C4/C5) chytala aj legitímne veľké Ä pred Ť/Č (PAMÄŤ, PÄŤSTUPŇOVÁ, VÄČŠÍ) — známa hranica
   od ŠT-3b-2c2 — a test `docs/architecture/` vôbec nečítal (glob `docs/*.md` nie je rekurzívny), takže ten istý poplach videl len hook (KOV-A1 #280: „rozšíriť glob
