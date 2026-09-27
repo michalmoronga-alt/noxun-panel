@@ -994,6 +994,11 @@ module Noxun
                    'message_sk' => iss['message'].to_s,
                    'stable_key' => [CAT_BACK_CUT, code, oid, pkey, iss['pid'].to_s].join('|') }
           item['fix'] = 'rebuild_stale' if iss['rebuild_stale'] == true
+          # Codex #401 kolo 1 P2: PID ZDROJOVEHO dielca (mimo `stable_key` sa
+          # nemeni nic). Dva samostatne chrbty s tym istym povodnym
+          # `cabinet_id` + `part_key` su dva riadky — klik musi oznacit TEN
+          # jeden kus (`ProductionCore.pids_for_problem`), nie oba.
+          item['pid'] = iss['pid'] if iss['pid'].is_a?(Integer) && iss['pid'].positive?
           items << item
         end
       end

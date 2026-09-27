@@ -593,6 +593,16 @@ module Noxun
           return [ent.persistent_id] if ent
         end
 
+        # D-143 (Codex #401 kolo 1 P2): nalez chrbta nad SAMOSTATNYM dielcom
+        # (odpojeny/skopirovany kus na koreni modelu) nesie PID toho kusu.
+        # Vseobecna vetva nizsie by podla `owner_id` + `part_key` oznacila
+        # VSETKY samostatne chrbty so zhodnym povodnym ID. Fail-open: zivy
+        # top-level `part` s tym PID, inak dnesna vetva.
+        if item['category'].to_s == Validation::CAT_BACK_CUT
+          ent = standalone_part_entity(model, item['pid'])
+          return [ent.persistent_id] if ent
+        end
+
         oid = item['owner_id'].to_s
         pkey = item['part_key'].to_s
         # KOV-A1 (Codex #280 P2-A): nalez, ktory nesie `owner_pid`, adresuje
@@ -663,6 +673,22 @@ module Noxun
         ent
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.newer_config_entity')
+        nil
+      end
+
+      # D-143: zivy TOP-LEVEL vyrobny dielec (`kind: part`) podla PID, alebo nil.
+      # Vnoreny dielec sa tu NEADRESUJE (tam plati vseobecna vetva a scope).
+      def standalone_part_entity(model, pid)
+        return nil unless pid.is_a?(Integer) && pid.positive?
+
+        ent = model.find_entity_by_persistent_id(pid)
+        return nil unless ent.is_a?(Sketchup::ComponentInstance) && ent.valid?
+        return nil unless ent.parent.is_a?(Sketchup::Model)
+        return nil unless Store.kind(ent).to_s == 'part'
+
+        ent
+      rescue StandardError => e
+        Engine.log_error(e, 'ProductionCore.standalone_part_entity')
         nil
       end
 

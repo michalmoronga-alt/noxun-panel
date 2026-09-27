@@ -230,7 +230,7 @@ module Noxun
                            role: Store.get(pi, 'role').to_s,
                            pid: pi.persistent_id)
               records << rec
-              cut_issues.concat(cut_issues_for(pcfg, rec, owner_pid: inst.persistent_id))
+              cut_issues.concat(cut_issues_for(pcfg, rec, owner_pid: inst.persistent_id, owner_cfg: ccfg))
               key = rec['part_key'].to_s
               nested[key] = rec unless key.empty? || nested.key?(key)
             end
@@ -1442,7 +1442,14 @@ module Noxun
       #       - bez `cut_size` -> RED neuplny snapshot, brana;
       #   * samostatny chrbat BEZ znacky povodu -> ORANGE „over rozmer do
       #     narezu", export ide (vedome rozhodnutie Michal 27.9.2026).
-      def cut_issues_for(cfg, rec, owner_pid: nil, standalone: false)
+      #
+      # `owner_cfg` (Codex #401 kolo 1 P1) = config VLASTNICKEJ skrinky pri
+      # VNORENOM dielci. Aktualna skrinka (schema >= 19) s chrbtom v drazke
+      # UZ VIE, ze jej chrbat je v drazke — aj keby snapshot dielca znacku
+      # stratil alebo ju mal poskodenu. Taky chrbat sa preto posudzuje ako
+      # `groove` a bez rozmeru do narezu zlyha BEZPECNE (neuplny zaznam),
+      # namiesto tichého navratu na geometriu (maly chrbat v exportoch).
+      def cut_issues_for(cfg, rec, owner_pid: nil, standalone: false, owner_cfg: nil)
         c = cfg.is_a?(Hash) ? cfg : {}
         r = rec.is_a?(Hash) ? rec : {}
         out = []
@@ -1451,7 +1458,7 @@ module Noxun
         return out unless r['role'].to_s == 'back'
 
         mode = c['back_mode']
-        if mode.to_s == 'groove'
+        if mode.to_s == 'groove' || current_groove_owner?(owner_cfg)
           if edged?(c['edges'])
             out << cut_issue(BACK_EDGED, 'red', r, owner_pid, back_edged_message(r))
           elsif state == :none
@@ -1461,6 +1468,15 @@ module Noxun
           out << cut_issue(BACK_ORIGIN, 'orange', r, owner_pid, back_origin_message(r))
         end
         out
+      end
+
+      # Je vlastnicka skrinka AKTUALNA skrinka s chrbtom v drazke? Ta ista
+      # semantika rezimu ako `back_stale?` (`stored_back_mode`), opacna schema.
+      def current_groove_owner?(cfg)
+        return false unless cfg.is_a?(Hash) && defined?(CabinetBuilder)
+
+        stored_back_mode(cfg) == 'groove' &&
+          CabinetBuilder.config_schema_of(cfg) >= CabinetBuilder::BACK_CUT_ACTIVATION_SCHEMA
       end
 
       def edged?(edges)

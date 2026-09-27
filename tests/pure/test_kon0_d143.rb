@@ -334,6 +334,37 @@ NxTest.test('D-143: neolepeny groove chrbat so znackou bez cut_size = neuplny sn
   NxTest.assert_equal([NxKon0::BOM::BACK_INCOMPLETE], NxKon0.codes(NxKon0.issues(cfg)))
 end
 
+NxTest.test('D-143 (Codex #401 P1): aktualna groove skrinka + chrbat bez znacky aj cut_size = neuplny zaznam') do
+  owner = NxKon0.stale_cfg('config_schema' => 19)
+  lost = NxKon0.upper_back_snapshot.reject { |k, _| %w[cut_size back_mode].include?(k) }
+  b = NxKon0::BOM
+  list = b.cut_issues_for(lost, NxKon0.rec(lost), owner_pid: 7, owner_cfg: owner)
+  NxTest.assert_equal([b::BACK_INCOMPLETE], NxKon0.codes(list), 'snapshot stratil nove polia — RED, nie geometria')
+  NxTest.assert(b::CUT_BLOCKERS.include?(b::BACK_INCOMPLETE), 'a brana stoji')
+  NxTest.refute(NxKon0::PC.cut_stop(NxKon0.collected(list)).nil?)
+  # poskodena znacka: to iste
+  bad = lost.merge('back_mode' => 42)
+  NxTest.assert_equal([b::BACK_INCOMPLETE],
+                      NxKon0.codes(b.cut_issues_for(bad, NxKon0.rec(bad), owner_cfg: owner)))
+  # legacy zapis rezimu vlastnika (`back.mode`) sa cita rovnako
+  legacy_owner = { 'config_schema' => 19, 'back' => { 'mode' => 'groove' } }
+  NxTest.assert_equal([b::BACK_INCOMPLETE],
+                      NxKon0.codes(b.cut_issues_for(lost, NxKon0.rec(lost), owner_cfg: legacy_owner)))
+  # olepeny chrbat bez znacky v aktualnej groove skrinke = olepena hrana
+  edged = lost.merge('edges' => { 'L1' => 'A', 'L2' => nil, 'W1' => nil, 'W2' => nil })
+  NxTest.assert_equal([b::BACK_EDGED], NxKon0.codes(b.cut_issues_for(edged, NxKon0.rec(edged), owner_cfg: owner)))
+  # uplny snapshot v aktualnej skrinke = ziadny nalez; zastarana (schema 18) ani overlay vlastnik nie
+  NxTest.assert_equal([], b.cut_issues_for(NxKon0.upper_back_snapshot, NxKon0.rec(NxKon0.upper_back_snapshot),
+                                           owner_cfg: owner))
+  NxTest.assert_equal([], b.cut_issues_for(lost, NxKon0.rec(lost), owner_cfg: NxKon0.stale_cfg),
+                      'schema 18 riesi zastaranost skrinky, nie dielec')
+  NxTest.assert_equal([], b.cut_issues_for(lost, NxKon0.rec(lost),
+                                           owner_cfg: NxKon0.stale_cfg('config_schema' => 19, 'back_mode' => 'overlay')))
+  # zber posiela config vlastnika pri VNORENOM dielci
+  src = NxKon0.src('noxun_engine', 'core', 'bom.rb')
+  NxTest.assert(src.include?('cut_issues_for(pcfg, rec, owner_pid: inst.persistent_id, owner_cfg: ccfg)'))
+end
+
 NxTest.test('D-143: samostatny chrbat — novy so znackou chraneny, stary bez znacky ORANGE') do
   fresh = NxKon0.upper_back_snapshot
   NxTest.assert_equal([], NxKon0.issues(fresh, standalone: true), 'novy odpojeny chrbat so cut_size = OK')
@@ -453,6 +484,82 @@ NxTest.test('D-143: brana je vo VSETKYCH STYROCH exportoch hned po zbere a PRED 
     picker = body.index('UI.select_directory') || body.index('UI.savepanel')
     NxTest.assert(i_cut && i_col < i_cut && i_cut < picker, "#{m}: poradie zber -> brana D-143 -> picker")
     NxTest.assert(i_cut < (body.index('hardware_expansion(') || picker), "#{m}: brana pred expanziou")
+  end
+end
+
+NxTest.test('D-143 (Codex #401 P2): nalez samostatneho chrbta nesie PID zdrojoveho kusu') do
+  old = NxKon0.upper_back_snapshot.reject { |k, _| %w[cut_size back_mode].include?(k) }
+  list = [NxKon0::BOM.cut_issues_for(old, NxKon0.rec(old, pid: 101), standalone: true),
+          NxKon0::BOM.cut_issues_for(old, NxKon0.rec(old, pid: 102), standalone: true)].flatten
+  items = NxKon0::VAL.run({ records: [], cut_issues: list })['items']
+                     .select { |i| i['category'] == NxKon0::VAL::CAT_BACK_CUT }
+  NxTest.assert_equal([101, 102], items.map { |i| i['pid'] }.sort, 'dva riadky, kazdy so svojim PID')
+end
+
+# Stub SketchUp tried pre `ProductionCore.pids_for_problem` (vzor
+# test_ghost_d1_dosky.rb — stub zije VNUTRI modulu; znovuotvorenie tried je
+# neskodne, ked uz existuju).
+unless NxTest::IN_SKETCHUP
+  module Noxun
+    module Engine
+      module ProductionCore
+        module Sketchup
+          class ComponentInstance; end
+          class Model; end
+        end
+      end
+    end
+  end
+end
+
+if NxTest.headless?
+  NXK0_SU = Noxun::Engine::ProductionCore::Sketchup
+  NXK0_ROOT = NXK0_SU::Model.new
+
+  class NxK0FakePart < NXK0_SU::ComponentInstance
+    attr_reader :persistent_id, :parent
+
+    def initialize(pid, cid, pkey, root: true)
+      super()
+      @persistent_id = pid
+      @attrs = { 'kind' => 'part', 'cabinet_id' => cid, 'part_key' => pkey }
+      @parent = root ? NXK0_ROOT : Object.new
+    end
+
+    def valid?
+      true
+    end
+
+    def get_attribute(_dict, key, default = nil)
+      @attrs.fetch(key, default)
+    end
+  end
+
+  class NxK0FakeModel
+    attr_reader :entities
+
+    def initialize(entities)
+      @entities = entities
+    end
+
+    def find_entity_by_persistent_id(pid)
+      @entities.find { |e| e.persistent_id == pid }
+    end
+  end
+
+  NxTest.test('D-143 (Codex #401 P2): klik na samostatny chrbat oznaci TEN kus, nie vsetky zhodne') do
+    a = NxK0FakePart.new(101, 'CAB-001', 'cabinet/back')
+    b = NxK0FakePart.new(102, 'CAB-001', 'cabinet/back')
+    model = NxK0FakeModel.new([a, b])
+    pc = NxKon0::PC
+    base = { 'category' => NxKon0::VAL::CAT_BACK_CUT, 'owner_id' => 'CAB-001', 'part_key' => 'cabinet/back' }
+    NxTest.assert_equal([102], pc.pids_for_problem(model, base.merge('pid' => 102)))
+    NxTest.assert_equal([101], pc.pids_for_problem(model, base.merge('pid' => 101)))
+    # vnoreny dielec PID-om neadresuje (plati vseobecna vetva, fail-open)
+    nested = NxK0FakePart.new(103, 'CAB-001', 'cabinet/back', root: false)
+    NxTest.assert_equal(nil, pc.standalone_part_entity(NxK0FakeModel.new([nested]), 103))
+    NxTest.assert_equal(nil, pc.standalone_part_entity(model, nil))
+    NxTest.assert_equal(nil, pc.standalone_part_entity(model, 999))
   end
 end
 
