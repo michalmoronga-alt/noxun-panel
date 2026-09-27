@@ -14,6 +14,12 @@ Plánovač, buildery, strom zón, modulové výpočty (police, čelá), kontrakt
 
 plánovač cfg→BuildPlan (kovanie sa vyhodnocuje po vyradení degenerovaných dielcov; `support_type`).
 
+**D-143 (KON-0, v0.13.1) — chrbát nesie ZNAČKU PÔVODU a chrbát v drážke ROZMER DO NÁREZU.** `back_part` dáva každému deskriptoru chrbta aditívny kľúč
+`back_mode` (`overlay`/`inset`/`groove`) a chrbtu **v drážke** navyše `cut_size: {length: w, width: h − s}` — plný rozmer skrinky od spodku dna po vrch v **tých
+istých osiach ako `prod`** (`length` = X, `width` = Z; horná 600 × 720 → do nárezu **600 × 720**). `box` = `prod` = geometria sa **nemenia** — model ukazuje chrbát
+v drážke 564 × 684 a rovnosť `box`/`prod` stráži `PartFaces`/`AppearanceMapping`. Rozhodnutie Michala 26.9.2026: presne by bolo +9 mm na stranu s drážkou (POJMY),
+pre V1 ide do nárezu plný rozmer a dielňa ho zreže. Prítomné pole validuje `BuildPlan.validate_cut_size!` (konečné, kladné, ≥ geometrii); BuildPlan `SCHEMA` ostáva 5.
+
 **KOV-C1 — dva ADITÍVNE surové kanály v pláne.** `plan[:zone_bounds]` (`{ zone_id => {x0…z1} }` zo `ZoneTree`) a `plan[:front_bounds]`
 (`{ front_id => {z0, z1, height} }` z `Fronts.layout`) nesú **NEZAOKRÚHLENÉ** hranice. `CabinetBuilder.merge_final` kopíruje len menovitý zoznam kľúčov, takže do
 uloženého configu (a teda do modelu, kusovníka ani VEPO) sa **nedostanú** — `zones` aj `front_items` ostávajú presne také, aké boli. Dôvod: recepty zásuviek porovnávajú
@@ -284,6 +290,13 @@ skrinky zrazu netvárili ako nemigrované.
 **`LIFT_ACTIVATION_SCHEMA` = 11** je tretia z tejto rodiny (KOV-E1b): skrinka postavená pod nižšou schémou vznikla PRED pravidlami výklopov, takže jej čelo `flap`
 nemá ani mechanizmus (`up`), ani závesy (`down`) — zber ju priznáva RED `flap_stale` ([outputs.md](outputs.md)). Rozhoduje **PROVENIENCIA STAVBY** (delta audit Sol
 FIX 4), nie prítomnosť seed pravidiel: používateľ smie mať vlastné (aj vypnuté) výklopové pravidlo, seed sa mu vtedy nedoplní a RED by nezhasol nikdy.
+**`BACK_CUT_ACTIVATION_SCHEMA` = 19** je štvrtá (D-143, KON-0, `CONFIG_SCHEMA` 18 → 19): skrinka s chrbtom v drážke (`back_mode || back.mode` — tá istá sémantika
+ako `config_to_params`, aj legacy zápis) uložená pod ňou má v .skp chrbát v rozmere modelu — zber ju priznáva RED `back_groove_stale` a **všetky štyri výrobné exporty**
+stoja ([outputs.md](outputs.md)). Rozhoduje **výhradne schéma**, nie prítomnosť `cut_size` na dielci. **Snapshot chrbta** zapisuje `add_part`: značku `back_mode` vždy
+a `cut_size` cez čistý `snapshot_cut_size(pd, edges)` **len neolepenému dielcu** — chrbát v drážke s účinným ABS (ručný override alebo pravidlo olepu pre rolu `back`)
+rozmer do nárezu zámerne nedostane a zber ho z dvojice značka `groove` + hrana prizná RED (override olepu sa nemaže). **Hromadná prestavba zastaraných skriniek**
+(akcia riadku Kontroly) je `Panel.back_rebuild_stale` nad existujúcim `rebuild_many` (jedna operácia s rollbackom = jeden krok Späť): výber skriniek robí čerstvý zber
+`ProductionCore.back_stale_scan` **až po `ScaleWatch.flush_pending!`**, skrinky s odpojeným dielcom alebo neznámym kovaním sa preskočia a vymenujú (ich blokácia ostáva).
 
 **PROVENIENCIA JE DVOJITÁ — schéma A SEED PRAVIDIEL (Codex #333 kolo 1 P1).** Config nesie aditívne pole **`rules_seed_version`**: seed pravidiel, s ktorým stavba
 naozaj bežala (`HardwareRules.effective_seed_version(model)`, čítané v `build_into` **až po** `ensure_project_rules!` — ten mohol snapshot práve zmraziť; hodnota ide

@@ -1217,6 +1217,17 @@ Podľa sekcie 2.1: **ploché kľúče = identita, názov a filtre; všetko rozme
 
 - `length`/`width`/`thickness` = **reálne** výrobné rozmery v mm Float. **Obchodná hrúbka** (18/36) sa **dopočíta pri exporte** podľa VEPO kontraktu (18.0–19.1 → 18; 36.0–38.1 → 36) — v modeli držíme reálne.
 - `quantity` — počet identických kusov.
+- **`cut_size` — rozmer DO NÁREZU (D-143, v0.13.1, `CONFIG_SCHEMA` 19).** Voliteľné `{length, width}` v **tých istých osiach ako `length`/`width`**; nesie ho dielec,
+  ktorý sa reže **väčší, než stojí v modeli** — dnes **chrbát v drážke**: plný rozmer skrinky `šírka × (výška − sokel)` (horná 600 × 720 → do nárezu **600 × 720**,
+  v modeli 564 × 684; dielňa ho zreže do drážky, rozhodnutie Michala 26.9.2026). `length`/`width` ostávajú **rozmer dielca v modeli** (geometria, hmotnosť, kresba hrán).
+  **Kto zapisuje:** výhradne builder (`CabinetBuilder.add_part`) z deskriptora plánu (`BuildPlan.validate_cut_size!`) — a **len neolepenému dielcu** (olepený chrbát
+  v drážke ho zámerne nemá a je to RED). **Kto číta:** všetky výrobné výstupy cez jediné miesto `Bom.cut_dims` — kusovník, kontrola formátu platne, VEPO, plocha
+  pre rozpočet a cenovú ponuku, plocha skrinky v Inspectore a texty „výrobne" karty dielca; rozmer do nárezu sa uplatní **pred** otočením podľa dekoru.
+  **Fallback:** chýbajúce pole = geometria. **Poškodený údaj** (nie objekt, nečíselný, nekonečný, ≤ 0 alebo menší než geometria) = geometria + **RED a stop všetkých
+  štyroch výrobných exportov** (jedna brána D-143, `Bom::CUT_BLOCKERS`).
+- **`back_mode` — značka pôvodu chrbta (D-143).** `overlay` / `inset` / `groove` na snapshote každého chrbta postaveného od v0.13.1; nesie ju aj **samostatný** (odpojený,
+  skopírovaný) chrbát. Chrbát so značkou `groove` bez `cut_size` a bez ABS je **neúplný snapshot** (RED + brána); **samostatný chrbát BEZ značky** (zo staršej verzie)
+  je ORANGE „over rozmer do nárezu" a export pustí (vedomé rozhodnutie Michala 27.9.2026). Skrinka s chrbtom v drážke uložená pod schémou 19 je **zastaraná** (§2.5).
 
 **Linear dielec:**
 

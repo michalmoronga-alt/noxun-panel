@@ -1445,6 +1445,10 @@ na detaile toho dekoru** (`nxDecorLinkState` → `openStudio('mat', material_id)
 **v existujúcom riadku** (pravidlo vertikálneho priestoru), pri dielci bez rozhodnutého materiálu je `aria-disabled` s dôvodom (D-78), a **ABS pásky sa neprelinkúvajú** — hrana má
 vlastný tok. Rozmery dielca sú **VÝSTUP** (počíta ich korpus), preto sú to informačné riadky `.inforow` v tej istej mriežke `.basicgrid`/`.infocol` ako Základné korpusu — nikdy
 polia („výstup nikdy nevyzerá ako vstup"); pôvodný jednoriadkový `#pcDim` zanikol.
+**D-143 (KON-0, v0.13.1) — riadok „Do nárezu":** pri dielci, ktorému server pošle platný `cut_size` (dnes chrbát v drážke), pribudne pod **Hrúbku** (pravý stĺpec má jeden
+riadok, ľavý dva — karta **nenarastie**, schválený mockup sekcia D) informačný riadok „Do nárezu 600 × 720 mm" s tooltipom „…zrezať do drážky v dielni". **Dĺžka/Šírka
+ostávajú rozmer MODELU** (564 × 684) a ich tooltip to vysvetlí. Všetky texty skladá server (`Panel.part_cut_payload`: `cut_text`, `cut_title`, `model_title`); poškodený
+údaj riadok nedostane. Texty „výrobne" segmentu Smer dekoru (`part_grain_payload`) počítajú od D-143 z rozmeru **do nárezu** (`Bom.cut_dims`, priečny dekor 720 × 600).
 
 **`Smer dekoru` je od K1 (D-108, v0.7.23) VSTUP** — pôvodná vedomá odchýlka UI-D1 („smer je len informácia") tým skončila. Je to statický segment `#pcGrainRow` v riadkovom tvare
 „popisok + ovládač" (trieda `.pcgrain`, rovnaká mriežka ako `Materiál`, takže karta nenarástla o samostatný riadok) s tromi voľbami `inherit | length | width`; zápis ide vlastným
@@ -2002,6 +2006,8 @@ dielcov a ABS, pričom má vlastnú identitu a definíciu. Vzhľadový zdroj sa 
 Doména panela: vloženie skrinky (`handle_insert`, `handle_insert_copy`), premenovanie (`handle_rename_cabinet`, D-100) a zápisy konštrukcie/čiel (`handle_apply`,
 `handle_apply_fronts`, `handle_apply_all` = auto-apply). Materiálové preflighty (D-45: telo → chrbát → remap ABS) a zámky vkladacej karty (D-39) sú v odsekoch „Obsah Korpusu"
 a „Vkladacia karta". **Poradie guardov (R-02): identita dokumentu PRVÁ**, až potom echo `cabinet_id` — `CAB-001` je v každej zákazke, takže echo prepnutý dokument nerozozná.
+**D-143 (KON-0): `back_rebuild_stale`** — hromadná prestavba skriniek so zastaraným chrbtom v drážke z Kontroly Štúdia (tok a guardy v sekcii KONTROLA nižšie; plán
+a texty sú čisté funkcie `ProductionCore.back_stale_*`, zápis `rebuild_many` = jedna operácia, výber zastaraných skriniek až po `ScaleWatch.flush_pending!`).
 
 #### Vloženie skrinky = ghost na kurzore (GHOST V1-04)
 
@@ -2703,7 +2709,12 @@ sekcie Nákup — `cabinet_id` + `owner_part_key`, vždy s `focus_inspector`).
 
 **Kontextová oprava je len tam, kde existuje:** UNI nález ponúka **„Nahradiť UNI…"** cez vlastný callback `replace_uni` → `MaterialsDialog.request_replace_uni` (**plne funkčný
 modal**, nie sľub), rozpočtový nález nemá entitu v modeli a **od ŠT-1c PR B1 vedie do SEKCIE Rozpočet toho istého okna** (`studioGoSection('budget')` + `budGoto(budget_section)` —
-server skladá adresu, klik zostáva v okne; premostenie do okna Výroba zaniklo spolu s ním).
+server skladá adresu, klik zostáva v okne; premostenie do okna Výroba zaniklo spolu s ním). **D-143 (KON-0, v0.13.1):** RED „chrbát v drážke zo staršej verzie"
+(kategória `back_cut`, serverový príznak `fix: 'rebuild_stale'`) ponúka **„Prestaviť zastarané skrinky"** (`data-act="rebuild"`, ikona `refresh-cw`). Je to **ZÁPIS** do modelu,
+preto ide flush handshakom ako D-131: callback `back_rebuild_stale` → `StudioDialog.handle_back_rebuild_stale` → `NX.studioRelayBackRebuild` v paneli (flush rozpísanej zmeny,
+červené pole = `flush_blocked`) → `studio_do_back_rebuild` → **`Panel.back_rebuild_stale`** (zápisová cesta, brána 1b-3). Server overí `gen`, `flush_blocked`, `model_guid`
+(prísne) a pokoj observera, skrinky vyberie z **čerstvého zberu** (nie z DOM) a prestaví ich `rebuild_many` = **jeden krok Späť**; preskočené (odpojený dielec, neznáme
+kovanie) vymenuje v statuse. Klient drží zámok `ctrlRebuildBusy` proti dvojkliku, zhodí ho každý plný push (každá vetva servera končí `repush`).
 
 **Š10 lišta sekcie** nesie od KOV-A2b TRI prepínače: „Zvýrazniť hrany" ako tlačidlo s **rohovým trojuholníkom** (klik na telo prepína, klik na roh otvára 3-stavové nastavenie —
 zdieľaný `edge_menu.js`, od ŠT-1c PR B3 **druhá (a posledná) inštancia**, poloha cez `.ecmenu-studio`), „Smer kresby" (K2/D-87) a **„Smer otvárania"** (KOV-A2b, `dcBtn`/`data-dc`,

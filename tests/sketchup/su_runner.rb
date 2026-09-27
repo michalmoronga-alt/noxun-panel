@@ -5415,28 +5415,38 @@ module NoxunSuRunner
     ok("KON-0 (b): ziadny nalez D-143 (#{kon0_issue_codes(model).inspect})", kon0_issue_codes(model).empty?)
     ok('KON-0 (b): brana D-143 exporty pusti', e::ProductionCore.cut_stop(e::Bom.collect(model)).nil?)
     csv = k1_vepo_csv(model)
-    ok('KON-0 (b): VEPO nesie chrbat 600 x 720, nie 564 x 684', csv.include?('"600"') && csv.include?('"720"') &&
-       !csv.include?('"564"'))
+    # (dno a vrch hornej su 564 x 320 — preto sa meria riadok chrbta, nie cislo 564)
+    ok('KON-0 (b): VEPO nesie chrbat 600 x 720, rozmer modelu 684 nikde',
+       csv.lines.any? { |l| l.include?('"600";') && l.include?('"720";') } && !csv.include?('"684"'))
     stats = e::Panel.cabinet_stats(cab)
     card = e::Panel.part_card_payload(model, cab, part)
     ok("KON-0 (b): karta dielca „Do nárezu #{card && card['cut_text']}“, Dĺžka/Šírka modelu #{card && [card['length'], card['width']].inspect}",
        card && card['cut_text'] == '600 × 720' && (card['length'].to_f - 564.0).abs < TOL)
     info("KON-0 (b): plocha skrinky v Inspectore #{stats['parts_area_m2']} m2 (chrbat v nej 0,432)")
 
-    # (c) OLEPENIE chrbta cez prestavbu -> bez cut_size + RED; JEDEN krok Spat
-    pov = { 'cabinet/back' => { 'edges' => { 'L2' => 'SU_KON0_ABS' } } }
-    e::CabinetBuilder.rebuild(model, cab, e::CabinetBuilder.config_to_params(e::Store.config(cab) || {})
-                                                            .merge('part_overrides' => pov))
-    ok("KON-0 (c): olepeny chrbat v drazke rozmer do narezu NEMA (#{kon0_back_cfg(cab)['cut_size'].inspect})",
-       kon0_cut(cab).nil? && kon0_back_cfg(cab)['back_mode'] == 'groove')
-    ok("KON-0 (c): Kontrola RED „olepená hrana“ a brana stoji (#{kon0_issue_codes(model).inspect})",
-       kon0_issue_codes(model) == [[e::Bom::BACK_EDGED, cid]] &&
-       !e::ProductionCore.cut_stop(e::Bom.collect(model)).nil?)
-    ok('KON-0 (c): override olepenia ostal v configu (nezmizol)',
-       (e::Store.config(cab)['part_overrides'] || {}).key?('cabinet/back'))
-    Sketchup.undo
-    ok("KON-0 (c): JEDEN Spat vratil rozmer do narezu (#{kon0_cut(cab).inspect}) a nalez zhasol",
-       kon0_cut(cab) == [600.0, 720.0] && kon0_issue_codes(model).empty?)
+    # (c) OLEPENIE chrbta cez prestavbu -> bez cut_size + RED; JEDEN krok Spat.
+    #     Paska musi byt REALNA (override neznameho abs_id normalizacia zahodi) —
+    #     dekor s paskami si scenar zalozi sam a na konci ho zmaze.
+    seed = sync_seed_decors
+    abs_id = seed ? Array(seed[:k]['edges']).first : nil
+    if abs_id
+      pov = { 'cabinet/back' => { 'edges' => { 'L2' => abs_id } } }
+      e::CabinetBuilder.rebuild(model, cab, e::CabinetBuilder.config_to_params(e::Store.config(cab) || {})
+                                                              .merge('part_overrides' => pov))
+      ok("KON-0 (c): olepeny chrbat v drazke rozmer do narezu NEMA (#{kon0_back_cfg(cab)['cut_size'].inspect}, " \
+         "hrany #{kon0_back_cfg(cab)['edges'].inspect})",
+         kon0_cut(cab).nil? && kon0_back_cfg(cab)['back_mode'] == 'groove')
+      ok("KON-0 (c): Kontrola RED „olepená hrana“ a brana stoji (#{kon0_issue_codes(model).inspect})",
+         kon0_issue_codes(model) == [[e::Bom::BACK_EDGED, cid]] &&
+         !e::ProductionCore.cut_stop(e::Bom.collect(model)).nil?)
+      ok('KON-0 (c): override olepenia ostal v configu (nezmizol)',
+         (e::Store.config(cab)['part_overrides'] || {}).key?('cabinet/back'))
+      Sketchup.undo
+      ok("KON-0 (c): JEDEN Spat vratil rozmer do narezu (#{kon0_cut(cab).inspect}) a nalez zhasol",
+         kon0_cut(cab) == [600.0, 720.0] && kon0_issue_codes(model).empty?)
+    else
+      ok('KON-0 (c): fixtura dekoru s paskou (sync_seed_decors)', false)
+    end
 
     # (d) ZASTARANE SKRINKY — dve bezne + tretia s odpojenym chrbtom
     cab2 = e::CabinetBuilder.build(model, KON0_CAB, transform: Geom::Transformation.translation(e::Units.point(1000.0, 0, 0)))
@@ -5547,6 +5557,9 @@ module NoxunSuRunner
     log_line("FAIL: run_kon0 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
     tools1_close_context(model)
     cleanup(model)
+  ensure
+    # dekor s paskou az PO uprateni modelu (pouzity material by sa nezmazal)
+    sync_cleanup_decors(seed[:k], seed[:b]) if defined?(seed) && seed
   end
 
   # --- S1-C: OCAKAVANY SPOTREBIC (`appliance_expects[]`) --------------------

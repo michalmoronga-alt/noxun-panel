@@ -44,13 +44,6 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
 
 ## KONŠTRUKCIA K1+K2 (blok 7)
 
-- **D-143 · Chrbát v drážke ide do nárezu bez prídavku do drážky** (Michal 26.9.2026, pri príprave bloku KONŠTRUKCIA K1+K2) — plugin počíta chrbát
-  v režime „V drážke" (predvolený pri hornej skrinke) na **vnútorný rozmer** skrinky (horná 600 × 720, korpus 18 → **564 × 684**). V dielni sa drážka
-  frézuje do hĺbky, takže chrbát je v nárezovom zozname aj vo VEPO **malý** — výrobná chyba. Presne by bolo +9 mm na každú stranu s drážkou; Michal
-  pre V1 rozhodol **nekomplikovať**: chrbát v drážke ide do nárezu **v plnom rozmere skrinky** (šírka × výška od spodku dna po vrch — **600 × 720**)
-  a dielňa ho zreže („zrezať si to viem, prilepiť je horšie"); model ho ďalej ukazuje v drážke. *Stav: OTVORENÉ — prvá dávka bloku (**KON-0**), na schválenie mockupu
-  nečaká; oprava potrebuje nový údaj „rozmer do nárezu" (zmena dátového kontraktu, audit dávky) a musí zachytiť aj skrinky postavené pred opravou.
-  **Kým nebude oprava v maine, chrbát v drážke v objednávke kontrolovať ručne.***
 - **D-144 · Vložený chrbát alebo chrbát v drážke prechádza výstuhou na výšku** (krížový audit Codex 27.9.2026, blok KONŠTRUKCIA) — pri strope
   „Dve výstuhy" **na výšku** sa horná hrana vloženého chrbta a chrbta v drážke ráta pod stropom, nie pod výstuhami. Keď je výstuha vyššia než hrúbka
   korpusu (bežne 100 oproti 18), chrbát prechádza zadnou výstuhou (až o 82 mm) a v kusovníku je **vyšší, než sa zmestí**. Naložený chrbát (bežná
