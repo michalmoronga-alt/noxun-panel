@@ -17,6 +17,20 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **DOCS — štart bloku 8 · K3 ROHOVÁ SKRINKA (27.–28.9.2026, PR #409, len dokumentácia; verzia pluginu sa nemení).**
+  Michal 27.9. večer po smoke PASS bloku 7 vybral **K3 rohovú skrinku** ako nočný blok. **Rozhodnutia** (R1–R9, `zdroje/bloky/ROHOVA/ROZHODNUTIA_MICHALA_2026-09-27.md`):
+  platí špecifikácia z debaty 6.9. (dolná slepá rohová s CR lištou podľa DC „Rohová", CR z čelového materiálu s ABS dookola, bežné kovanie, horná rohová mimo V1) +
+  nové 27.9.: v dverovej časti **len jedny dvierka** (vnútri police cez celú šírku), pánty **voliteľné, predvolene pri rohu**, noc = príprava + jadro bez nových
+  ovládačov. **Podklady v priečinku bloku:** fakty z kódu (typy, čelá, zrkadlenie, uzavreté zoznamy rolí), **presná geometria DC „Rohová"** zmeraná sondou
+  v samostatnom SketchUpe nad kópiou knižnice (CR 2 a rohová výstuha trčia ~97 mm pred korpus, pri zmene šírky rastie len slepá časť, pravá verzia = zrkadlo),
+  rešerš precedensov (CR ~80 mm sedí s praxou — IKEA ≥ 75 mm) a **krížový audit** (Codex `gpt-6-astra` 3 BLOCKER · 6 FIX · 5 NOTE, Grok `grok-4.7`
+  2 BLOCKER · 7 FIX · 2 NOTE; Antigravity v noci nebeží). **Vyhodnotenie každého nálezu** (reconcile — všetky BLOCKERy prijaté) je v priečinku
+  bloku ako samostatný dokument; auditovaný koncept v1 je tam zachovaný ako **surový vstup auditu** (nie zadanie — Codex review kolo 1 chcel dohľadateľné
+  odkazy nálezov). Technické riešenie určí **package dávky ROH-A1** po vlastnom audite návrhu (pravidlo štartu bloku) — rozhodnutia bloku nesú len
+  produktové rozhodnutia a otvorené otázky (review kolo 1, P1).
+  **Dávky:** ROH-A1 jadro → ROH-A2 vkladanie a náhľad (rez odporučil audit) → ROH-B ovládače po schválení mockupu. PLAN: nový blok 8, v bloku 4 odkaz na blok 8,
+  zdôvodnenie typu v trvalom pravidle opravené (rohová nie je L-pôdorys, ale slepá dolná s rohovou zostavou).
+
 - **DOCS — smoke bloku 7 KONŠTRUKCIA K1+K2 PASS (27.9.2026, PR #408, len dokumentácia; verzia pluginu sa nemení).**
   Michal 27.9. večer prešiel smoke bloku 7 podľa checklistu v [KONSTRUKCIA_ZAVER_2026-09-27.md](KONSTRUKCIA_ZAVER_2026-09-27.md): **„všetko sedí, nenašiel som
   chybu"** — výsledok zapísaný ako celok, nie po bodoch; ďalšie postrehy k funkciám bloku 7 idú ako nové D-čísla do DOGFOODING podľa bloku. **Delenie čiel
