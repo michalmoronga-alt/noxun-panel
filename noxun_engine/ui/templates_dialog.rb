@@ -140,7 +140,12 @@ module Noxun
             # S1-C: OCAKAVANIA sablony (jeden riadok textu, ziadne nove
             # ovladanie). Odvodeny udaj — do `templates.json` sa nikdy
             # nezapisuje (rovnako ako `hardware` a `preview_rev`).
-            'appliance_expects' => TemplateStore.appliance_expects_summary(cfg) }
+            'appliance_expects' => TemplateStore.appliance_expects_summary(cfg),
+            # KON-D (E2): suhrn konstrukcie z UCINNYCH hodnot („komín vzadu 50")
+            # a veta o vetrani pri chladnicke — tiez odvodene, nikdy na disk.
+            # `TILE_CONFIG_KEYS` ostava orezany (komin ani listy v nom nie su).
+            'construction' => TemplateStore.construction_summary(cfg),
+            'vent_note' => TemplateStore.ventilation_note(cfg) }
         end
 
         # --- Ruby -> JS -----------------------------------------------------

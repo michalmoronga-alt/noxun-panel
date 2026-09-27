@@ -977,11 +977,20 @@
     return text ? '<i class="tplhw" role="img" aria-label="' + esc(text) + '">' +
       '<svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg></i>' : '';
   }
+  // KON-D (E2): suhrn konstrukcie („komín vzadu 50") a veta o vetrani pri
+  // chladnicke skladá SERVER (`Panel.template_list`) — klient ich len vypíše
+  // do TOOLTIPU (dlaždica nenarastie). Staršia knižnica kľúče nemá = nič.
+  function nxTplConstructionText(tp){
+    var c = tp && tp.construction;
+    return (c && c.has === true) ? String(c.text || '') : '';
+  }
   function nxTplTitle(tp){
     var note = nxTplOrientationNote(tp);
     var hw = nxTplHardwareText(tp);
+    var kon = nxTplConstructionText(tp);
+    var vent = (tp && tp.vent_note) ? String(tp.vent_note) : '';
     return tp.name + (note ? ' · ' + note : '') + ' — klik = vybrať · dvojklik = vlož hneď' +
-      (hw ? '\n' + hw : '');
+      (kon ? '\n' + kon : '') + (hw ? '\n' + hw : '') + (vent ? '\n' + vent : '');
   }
   // UI-D2: KLUC nahladu v cache. Nahlad je viazany na TROJICU (druh, nazov,
   // revizia suboru) — po prepise sablony sa `rev` zmeni a stary obrazok sa uz
