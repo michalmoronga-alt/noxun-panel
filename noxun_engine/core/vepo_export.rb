@@ -76,7 +76,10 @@ module Noxun
         'Vystuha zadna'      => 'Vyst Z',
         'Sokel predny'       => 'Sokel',
         'Priecka zvisla'     => 'Priecka Z',
-        'Priecka vodorovna'  => 'Priecka V'
+        'Priecka vodorovna'  => 'Priecka V',
+        # KON-B · K2 (M6): obe listy chrbta nesu spolocny nazov z buildera
+        # (`Construction::BACK_RAIL_NAME`) — jeden riadok, 2 ks, „Chrb HD".
+        'Lista chrbta'       => 'Chrb HD'
       }.freeze
       DOOR_SIDE = /\ADvierka (\d+) (lave|prave)\z/.freeze
       DOOR_WING = /\ADvierka (\d+) kridlo (\d+)\/\d+\z/.freeze

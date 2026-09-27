@@ -1814,7 +1814,10 @@ module Noxun
         # (Pravidlá -> ABS) cita roly zo seedu a bez nich by ukazal holé
         # identifikatory `drawer_bottom`.
         'drawer_bottom' => 'Dno zásuvky', 'drawer_back' => 'Chrbát zásuvky',
-        'box_side' => 'Bok boxu', 'drawer_inner_front' => 'Vnútorné čelo zásuvky'
+        'box_side' => 'Bok boxu', 'drawer_inner_front' => 'Vnútorné čelo zásuvky',
+        # KON-B · K2: listy chrbta (spolocny nazov dielca „Lista chrbta", rola
+        # rozlisuje hornu a dolnu — stlpec Rola „Lišta chrbta horná · … dolná").
+        'back_rail_top' => 'Lišta chrbta horná', 'back_rail_bottom' => 'Lišta chrbta dolná'
       }.freeze
 
       def role_label(role)
