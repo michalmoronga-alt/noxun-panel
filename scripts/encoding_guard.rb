@@ -6,9 +6,11 @@
 # kopiu signatur v PowerShelli a test nevidel docs/architecture/ — hook tam hlasil falosny
 # poplach na slove PAMÄŤ, ktory CI nikdy nevidelo.) Pravidla sa menia VYHRADNE tu.
 #
-# CLI:  ruby scripts/encoding_guard.rb SUBOR [SUBOR...]   exit 1 + riadky „subor: problem"
+# CLI:  ruby scripts/encoding_guard.rb SUBOR [SUBOR...]   exit 3 + riadky „subor: problem"
 #       ruby scripts/encoding_guard.rb --repo              cely repozitar (rozsah CI testu)
-#       exit 0 = cisto, 1 = nalezy, 2 = zle pouzitie
+#       exit 0 = cisto, 3 = nalezy, 2 = zle pouzitie. Nalez NIE JE 1 zamerne: exit 1 dava
+#       Ruby sam pri pade ci syntaktickej chybe tohto suboru a hook ich nesmie zamenit
+#       (realny pripad 27.9.2026: hook cital guard prave vo chvili zapisu).
 #
 # MOJIBAKE = UTF-8 text precitany ako jednobajtove kodovanie (cp1250, cp1252, latin1) a
 # zapisany spat ako UTF-8 — incident 21.7.: panel.html s rozbitou diakritikou, ktoru videl
@@ -27,13 +29,16 @@
 # pismenom alebo koncom slova); mojibake vznika uprostred bezneho slova s malymi pismenami.
 # Zname hranice (bajtovo nerozlisitelne od spravneho textu, ine signatury ich v subore
 # takmer vzdy chytia): VELKE slovo s Ď cez cp1250/cp1252, samostatne pismeno č cez cp1250,
-# velke Ň na konci slova cez cp1250. Meranie 27.9.2026 na 19 480 slovach z repa:
-# zachyt cp1250 99,96 %, cp1252 99,98 %, latin1 100 %, dvojite cp1250/cp1252 100 %
-# (stara sada: 92 %, 42 %, 45 %, 62 %) a 0 falosnych poplachov na tych istych slovach
-# VELKYMI, s velkym zaciatkom a v uvodzovkach, zatvorkach ci za pomlckou.
+# velke Ň na konci slova cez cp1250. Meranie 27.9.2026 na 19 480 slovach z repa (stara
+# sada v zatvorke): zachyt cp1250 99,96 % (92 %), cp1252 99,98 % (42 %), latin1 100 %
+# (45 %), dvojite cp1250 100 % (62 %); falosne poplachy na tych istych slovach VELKYMI,
+# s velkym zaciatkom, v uvodzovkach, zatvorkach ci za pomlckou 0 (stara sada 1 215 tvarov).
 
 module NxEncodingGuard
   EXTENSIONS = %w[.rb .js .html .css .md .ps1].freeze
+  # Lokalne, gitignorovane priecinky — do repa nikdy nejdu, preto ich lokalny beh sady
+  # nesmie citat: testovacie modely (_dev/) a retro inbox orchestratora (PR #406).
+  LOCAL_ONLY_DIRS = %w[_dev/ SYSTEM/retro/inbox/].freeze
 
   # Velke slovenske pismena, ktorych UTF-8 zacina bajtom C4/C5: Č Ď Ĺ Ľ Ň Ŕ Š Ť Ž.
   SK_UPPER_C4C5 = '(?:\xC4[\x8C\x8E\xB9\xBD]|\xC5[\x87\x94\xA0\xA4\xBD])'
@@ -108,12 +113,12 @@ module NxEncodingGuard
 
   # Rozsah CI testu = vsetky subory s EXTENSIONS v repozitari (relativne cesty). Glob
   # nevstupuje do bodkovych priecinkov (.git, .claude/worktrees s kopiami repa), z .claude
-  # sa berie len to, co je v gite; _dev/ je lokalny a gitignorovany.
+  # sa berie len to, co je v gite (skilly, hooky, typy agentov).
   def repo_files(root)
     exts = EXTENSIONS.map { |e| e.delete('.') }.join(',')
     files = Dir.glob("**/*.{#{exts}}", base: root) +
             Dir.glob(".claude/{skills,hooks,agents}/**/*.{#{exts}}", base: root)
-    files.reject { |rel| rel.start_with?('_dev/') }.uniq.sort
+    files.reject { |rel| rel.start_with?(*LOCAL_ONLY_DIRS) }.uniq.sort
   end
 
   def line_of(bytes, pos)
@@ -139,5 +144,5 @@ if File.expand_path($PROGRAM_NAME) == File.expand_path(__FILE__)
       found += 1
     end
   end
-  exit(found.zero? ? 0 : 1)
+  exit(found.zero? ? 0 : 3)
 end

@@ -54,12 +54,13 @@ if ($ext -eq '.rb') {
 }
 
 # --- 2) kontrola kodovania: spolocna implementacia s CI testom ------------
-# CLI kontrakt (scripts/encoding_guard.rb): exit 0 = cisto, 1 = nalezy ako riadky
-# "subor: problem"; iny kod = guard sa nepodarilo spustit (povie sa, nezamlci).
+# CLI kontrakt (scripts/encoding_guard.rb): exit 0 = cisto, 3 = nalezy ako riadky
+# "subor: problem"; iny kod (1 = pad Ruby ci syntax chyba guardu) = guard sa
+# nepodarilo spustit - povie sa to, nezamlci ani nevyda za nalez v subore.
 $guard = Join-Path $PSScriptRoot '../../scripts/encoding_guard.rb'
 if (Test-Path -LiteralPath $guard) {
   $r = Invoke-Ruby @($guard, $file)
-  if ($r.Code -eq 1) {
+  if ($r.Code -eq 3) {
     $prefix = "${file}: "
     foreach ($line in $r.Out) {
       if ($line.StartsWith($prefix)) { $line = $line.Substring($prefix.Length) }

@@ -47,8 +47,8 @@ NxTest.test('encoding: cely repozitar bez poskodeneho kodovania (rozsah ako hook
      scripts/encoding_guard.rb tests/pure/test_encoding_guard.rb].each do |rel|
     NxTest.assert(files.include?(rel), "rozsah guardu musi zahrnat #{rel}")
   end
-  NxTest.refute(files.any? { |rel| rel.start_with?('_dev/', '.claude/worktrees/', '.git/') },
-                'lokalne kopie repa ani _dev/ do rozsahu nepatria')
+  NxTest.refute(files.any? { |rel| rel.start_with?('_dev/', 'SYSTEM/retro/inbox/', '.claude/worktrees/', '.git/') },
+                'lokalne kopie repa, _dev/ ani retro inbox (PR #406) do rozsahu nepatria')
   bad = files.flat_map { |rel| NxEncodingGuard.check_file(File.join(root, rel)).map { |p| "#{rel}: #{p}" } }
   NxTest.assert(bad.empty?, "Poskodene kodovanie:\n  #{bad.join("\n  ")}")
 end
@@ -65,6 +65,18 @@ NxTest.test('encoding: rozsah guardu pokryva kazdy sledovany subor (git ls-files
   guarded = tracked.select { |rel| NxEncodingGuard::EXTENSIONS.include?(File.extname(rel).downcase) }
   missing = guarded - NxEncodingGuard.repo_files(root)
   NxTest.assert(missing.empty?, "sledovane subory mimo rozsahu guardu (dopln repo_files): #{missing.first(10).join(', ')}")
+end
+
+NxTest.test('encoding: rozsah necita lokalne priecinky (_dev, retro inbox) ani kopie repa') do
+  Dir.mktmpdir('nx-enc-scope-') do |dir|
+    %w[_dev/pokus.md SYSTEM/retro/inbox/poznamka.md SYSTEM/STAV.md docs/architecture/a.md
+       .claude/skills/s/SKILL.md .claude/worktrees/w/CLAUDE.md .claude/settings.local.md].each do |rel|
+      FileUtils.mkdir_p(File.dirname(File.join(dir, rel)))
+      File.write(File.join(dir, rel), 'x')
+    end
+    NxTest.assert_equal(%w[.claude/skills/s/SKILL.md SYSTEM/STAV.md docs/architecture/a.md],
+                        NxEncodingGuard.repo_files(dir))
+  end
 end
 
 NxTest.test('encoding: spravna slovencina aj VELKYMI pismenami nie je mojibake') do
@@ -96,7 +108,7 @@ NxTest.test('encoding: skutocne mojibake sa chyti (cp1250 z incidentu, cp1252, l
   # Generovane z beznych a vyrobnych slov — vratane tych istych slov, ktore VELKYMI prejdu.
   words = ['časť', 'čas', 'meč', 'šírka', 'hĺbka', 'dĺžka', 'vŕtanie', 'Vŕtanie', 'skriňa', 'PLATŇA', 'už', 'až',
            'ďalej', 'päť', 'väčší', 'ľavý', 'ťah', 'žltá', 'účet', 'Zóny', 'ŠÍRKA', 'DĹŽKA', 'PAMÄŤ', 'ŤAŽKÝ', 'ĽAD',
-           'm²', '±2 mm', '§ 5', '90°', 'a – b', '„úvodzovky“', 'hotovo ✓', 'atď…']
+           'HOTOVÉ', 'ÔSMY', 'm²', '±2 mm', '§ 5', '90°', 'a – b', '„úvodzovky“', 'hotovo ✓', 'atď…']
   ENC_ROUTES.each do |enc|
     words.each do |w|
       NxTest.assert(enc_mojibake?(enc_mangle(" #{w} ", enc)), "#{w} prehnane cez #{enc} musi byt mojibake")
@@ -130,7 +142,7 @@ NxTest.test('encoding: ostatne kontroly guardu (BOM, NUL, C0, C1, UTF-8, cyrilik
   NxTest.assert(NxEncodingGuard.problems('bez charsetu'.b, 'a.md').empty?, 'charset sa pyta len od .html')
 end
 
-NxTest.test('encoding: CLI guardu (kontrakt hooku) — exit 0/1/2 a riadky „subor: problem"') do
+NxTest.test('encoding: CLI guardu (kontrakt hooku) — exit 0/3/2 a riadky „subor: problem"') do
   NxTest.skip!('v SketchUpe sa externe procesy nespustaju') unless NxTest.headless?
   guard = File.join(NxTest::ROOT, 'scripts', 'encoding_guard.rb')
   Dir.mktmpdir('nx-enc-cli-') do |dir|
@@ -139,7 +151,8 @@ NxTest.test('encoding: CLI guardu (kontrakt hooku) — exit 0/1/2 a riadky „su
     bad = File.join(dir, 'bad.md')
     File.binwrite(bad, enc_mangle("časť\n", 'Windows-1250'))
     out = IO.popen([RbConfig.ruby, guard, ok, bad], err: %i[child out], &:read)
-    NxTest.assert_equal(1, $?.exitstatus, "nalez = exit 1 (#{out})")
+    # Nalez = 3, nie 1: exit 1 dava Ruby sam pri pade guardu a hook ich nesmie zamenit.
+    NxTest.assert_equal(3, $?.exitstatus, "nalez = exit 3 (#{out})")
     NxTest.assert(!out.empty? && out.lines.all? { |l| l.start_with?("#{bad}: ") }, "riadky len pre zly subor: #{out}")
     out = IO.popen([RbConfig.ruby, guard, ok], err: %i[child out], &:read)
     NxTest.assert_equal(0, $?.exitstatus, "cisty subor = exit 0 (#{out})")
@@ -156,10 +169,10 @@ NxTest.test('encoding: hook po uprave suboru hovori to iste ako guard (spusteny 
   NxTest.refute(src.match?(/0xC[2-5]|\\xC[2-5]|\[regex\]::IsMatch/i), 'hook nesmie mat vlastnu kopiu signatur (drift do 27.9.2026)')
   ps = %w[powershell.exe pwsh].find { |exe| system(exe, '-NoProfile', '-Command', 'exit 0', out: File::NULL, err: File::NULL) }
   NxTest.skip!('PowerShell nie je k dispozicii — hook sa naostro neoveri') unless ps
-  run = lambda do |path|
+  run = lambda do |hook_path, path|
     args = [ps, '-NoProfile']
     args += %w[-ExecutionPolicy Bypass] if Gem.win_platform?
-    out = IO.popen(args + ['-File', hook], 'r+', err: %i[child out]) do |io|
+    out = IO.popen(args + ['-File', hook_path], 'r+', err: %i[child out]) do |io|
       io.write(JSON.generate('tool_input' => { 'file_path' => path }))
       io.close_write
       io.read
@@ -171,10 +184,18 @@ NxTest.test('encoding: hook po uprave suboru hovori to iste ako guard (spusteny 
     File.binwrite(ok, "**PAMÄŤ DRAFTU DRŽÍ** ŤAŽKÝ ĽAD\n")
     bad = File.join(dir, 'bad.md')
     File.binwrite(bad, enc_mangle("časť\n", 'Windows-1250'))
-    code, out = run.call(ok)
+    code, out = run.call(hook, ok)
     NxTest.assert_equal(0, code, "spravna slovencina VELKYMI: hook ticho (#{out})")
-    code, out = run.call(bad)
+    code, out = run.call(hook, bad)
     NxTest.assert_equal(2, code, "mojibake: hook exit 2 (#{out})")
     NxTest.assert(out.include?('mojibake signatura na riadku 1'), "hook hovori to iste ako guard: #{out}")
+    # Pokazeny guard (syntax chyba = Ruby exit 1) sa NESMIE vydavat za nalez v subore.
+    broken = File.join(dir, 'kopia')
+    FileUtils.mkdir_p([File.join(broken, '.claude', 'hooks'), File.join(broken, 'scripts')])
+    FileUtils.cp(hook, File.join(broken, '.claude', 'hooks'))
+    File.write(File.join(broken, 'scripts', 'encoding_guard.rb'), "def rozbite(\n")
+    code, out = run.call(File.join(broken, '.claude', 'hooks', 'post_edit_check.ps1'), ok)
+    NxTest.assert_equal(2, code, "pokazeny guard: hook to povie (#{out})")
+    NxTest.assert(out.include?('kontrolu kodovania sa nepodarilo spustit (exit 1)'), "pad guardu nie je nalez v subore: #{out}")
   end
 end
