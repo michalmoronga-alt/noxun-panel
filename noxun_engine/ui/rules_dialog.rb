@@ -44,7 +44,8 @@ module Noxun
       ABS_ROLE_ORDER = %w[side_left side_right top bottom shelf divider_v divider_h
                           back back_rail_top back_rail_bottom rail_front rail_back plinth front_door drawer_front
                           flap false_front free_panel
-                          drawer_bottom box_side drawer_back drawer_inner_front].freeze
+                          drawer_bottom box_side drawer_back drawer_inner_front
+                          corner_blind_panel hinge_rail corner_rail cr_front cr_side].freeze
 
       # Strop zoznamu rucnych zasahov (F15). „Použiť na podobné" vie vyrobit
       # desiatky riadkov naraz — nekonecny zoznam by zo sekcie spravil vypis.

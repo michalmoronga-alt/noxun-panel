@@ -47,7 +47,9 @@ module Noxun
 
       # KOV-A1: + flap (vyklop/sklop) a false_front (blenda) — ORANGE „celo bez
       # ABS" a hrubkove pravidlo ciel platia aj pre ne.
-      FRONT_ROLES = %w[front_door drawer_front flap false_front].freeze
+      # ROH-A1: + CR listy rohovej (celovy material s ABS dookola, R4) — bez
+      # pasky ORANGE a katalogove celove hrubky (18,6/19) nie su RED drift.
+      FRONT_ROLES = %w[front_door drawer_front flap false_front cr_front cr_side].freeze
       PANEL_ROLE  = 'free_panel'
       EDGE_CODES  = %w[L1 L2 W1 W2].freeze
 

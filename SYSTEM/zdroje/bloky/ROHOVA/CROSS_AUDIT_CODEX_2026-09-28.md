@@ -1,7 +1,7 @@
 > Surový výstup krížového auditu bloku 8 (Codex `gpt-6-astra` cez companion, task `task-mukcjj8z-376s7d`, 28.9.2026 ~00:30–00:55; +8 % Codex weekly).
 > Zadanie: [CROSS_AUDIT_PROMPT_2026-09-28.md](CROSS_AUDIT_PROMPT_2026-09-28.md). Triáž (reconcile) je v package dávky ROH-A1.
 
-﻿# K3 rohová cross audit — Codex / GPT-6 Astra — 27. 9. 2026
+# K3 rohová cross audit — Codex / GPT-6 Astra — 27. 9. 2026
 
 **3 BLOCKER · 6 FIX · 5 NOTE. Koncept v1 treba upraviť pred implementáciou.** Najväčšie riziko sú nesprávne výrobné rozmery a vzájomné prieniky dielcov pri nastaveniach, ktoré návrh povoľuje. R1–R9 rešpektujem.
 

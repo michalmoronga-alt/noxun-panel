@@ -32,7 +32,10 @@
 #                          ktory jeho `guard_unknown_hardware!` odmietne);
 #                          6 = KON-B · K2 (chrbat z list: nove roly `back_rail_top` /
 #                          `back_rail_bottom`; precedens schemy 4 — plan, ktory ich moze
-#                          niest, uz nie je plan schemy 5).
+#                          niest, uz nie je plan schemy 5);
+#                          7 = ROH-A1 · K3 (rohova skrinka: nove roly
+#                          `corner_blind_panel` / `hinge_rail` / `corner_rail`
+#                          / `cr_front` / `cr_side`; precedens schem 4 a 6).
 #   parts       [dielec] — deskriptory REALNE POSTAVITELNYCH dielcov. Degenerovane dielce
 #                          (nekladny rozmer boxu, napr. z extremne uzkych zon) sa do parts
 #                          NEdostanu — plan ich vyradi s warningom part_skipped_degenerate,
@@ -95,7 +98,7 @@
 module Noxun
   module Engine
     module BuildPlan
-      SCHEMA = 6
+      SCHEMA = 7
 
       # Najmensi vyrobitelny rozmer (mm). JEDINY prah degenerovanosti v systeme:
       # plan (partition v Construction.build_plan) aj builder (positive_box?) ho zdielaju —
@@ -110,12 +113,15 @@ module Noxun
       # (guard test ich porovnava) a s ABS seedom 4 aj `CabinetBuilder::DRAWER_ROLES`.
       # KON-B · K2 (SCHEMA 6): listy chrbta `back_rail_top` / `back_rail_bottom`
       # (dve roly — mapa hran rozlisuje rolu, nie variant; dolna je stojaca).
+      # ROH-A1 (SCHEMA 7): rohova zostava — blenda korpusova, vystuha
+      # zavesov, rohova vystuha (korpus) a CR lista 1 / 2 (celovy material).
       ROLES = %w[
         side_left side_right bottom top back shelf divider_v divider_h
         front_door drawer_front flap cover_panel false_front rail_front rail_back
         plinth gola_profile free_panel
         drawer_bottom drawer_back box_side drawer_inner_front
         back_rail_top back_rail_bottom
+        corner_blind_panel hinge_rail corner_rail cr_front cr_side
       ].freeze
 
       PRODUCTION_CLASSES = %w[sheet linear counted reference none].freeze

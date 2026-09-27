@@ -491,13 +491,25 @@ module Noxun
           new_d = clamp_min('depth',  (base_d * sy).round.to_f, cid, type)
 
           params = CabinetBuilder.config_to_params(cfg)
+          # ROH-A1 (audit A1 FIX 2): UCINNE hrubky CR list pre VSETKY sondy
+          # tejto absorpcie — tie iste, s akymi prestavba naozaj postavi.
+          # Pri inom type prazdna mapa (spravanie sond bez zmeny).
+          th = CabinetBuilder.aux_part_thicknesses(params, model)
+          # ROH-A1 (krizovy audit G9): sirka ROHOVEJ sa pri ZMENSENI klampuje
+          # CONFIG-AWARE (rohova zostava sa musi zmestit pred slepu cast) —
+          # sondou cez cely plan, PRED skusanim hlbky a vysky. Ine typy ostavaju
+          # na holom typovom minime (dnesne spravanie).
+          width_note = nil
+          if new_w < base_w && Construction.corner?(cfg)
+            new_w, width_note = clamp_corner_width(params, new_w, cid, th)
+          end
           params['width']  = new_w
           # KON-A (Codex FIX 10): hlbka sa pri ZMENSENI klampuje aj CONFIG-AWARE
           # (komin, zapustenie, vystuhy, minimum vnutra) — vzor `clamp_height`.
           # Sonda bezi len pri zmenseni: zvacsenie hlbky konstrukciu nezhorsi.
           depth_note = nil
           if new_d < base_d
-            new_d, depth_note = clamp_depth(params, new_d, cid)
+            new_d, depth_note = clamp_depth(params, new_d, cid, th)
           end
           params['depth']  = new_d
           # S1-E0 (Codex #375 P2): vyska sa klampuje AZ TU a CONFIG-AWARE.
@@ -506,7 +518,7 @@ module Noxun
           # pouzivatel by po tiahnuti uchopu dostal reject + POVODNY rozmer
           # namiesto najnizsej platnej skrinky. Sirka a hlbka taky problem
           # nemaju (ich MIN je vzdy nad hranicou validacie).
-          params['height'] = clamp_height(params, (base_h * sz).round.to_f, cid)
+          params['height'] = clamp_height(params, (base_h * sz).round.to_f, cid, th)
           new_h = params['height']
 
           clean = clean_transform(inst.transformation)
@@ -527,8 +539,10 @@ module Noxun
           remember_transform(inst)
           refresh_panel(model) # V0.4.7e: karta uz neukazuje stare rozmery do reselect-u
           # KON-A: hlbku zdvihla KONSTRUKCIA — nemodalna hlaska AZ po refreshi
-          # panela (inak by ju prepisal jeho stav).
-          notify_user(depth_note) if depth_note
+          # panela (inak by ju prepisal jeho stav). ROH-A1: to iste pre sirku
+          # rohovej; obe vety naraz, ked zasiahli obe.
+          notes = [width_note, depth_note].compact
+          notify_user(notes.join(' ')) unless notes.empty?
 
           Engine.log("scale absorb #{cid}: #{base_w.round}x#{base_h.round}x#{base_d.round} -> " \
                      "#{new_w.round}x#{new_h.round}x#{new_d.round} (f=#{sx.round(3)},#{sy.round(3)},#{sz.round(3)})")
@@ -568,14 +582,15 @@ module Noxun
         # `normalize` je tu ZAMERNE ta ista cesta, ktorou o chvilu prejde
         # `rebuild` — takze sa pocita proti configu, ktory sa naozaj postavi
         # (a pri hornej skrinke sokel korektne vypadne na 0).
-        def clamp_height(params, val, cid)
+        def clamp_height(params, val, cid, part_thicknesses = nil)
           # D-139 (Astra B2 FIX 5): pri SLOTE je vyska linky viazana na
           # odvodene celo (sokel + medzera hore + 300 .. + 1200). Hranice sa
           # beru BEZ `normalize` ulozeneho configu — stary slot moze byt pod
           # novym pravidlom neplatny a absorpcia by padla aj pri platnom cieli.
           return clamp_slot_height(params, val, cid) if params['type'].to_s == 'dishwasher'
 
-          floor = Construction.min_valid_height(CabinetBuilder.normalize(params))
+          floor = Construction.min_valid_height(CabinetBuilder.normalize(params),
+                                                part_thicknesses: part_thicknesses)
           m = [min_for('height', params['type']), floor].max
           return val if val >= m
           Engine.log("scale absorb #{cid}: height #{val.round} < min #{m.round} " \
@@ -589,11 +604,11 @@ module Noxun
         # z `MIN['depth']` a `Construction.min_valid_depth` (sonda cez cely plan,
         # dedi aj minimum vnutra pri komine). -> [hlbka, hlaska | nil]; hlaska
         # len ked hlbku zdvihla KONSTRUKCIA (nie holé typove minimum).
-        def clamp_depth(params, val, cid)
+        def clamp_depth(params, val, cid, part_thicknesses = nil)
           return [val, nil] if params['type'].to_s == 'dishwasher'
 
           norm = CabinetBuilder.normalize(params)
-          floor = Construction.min_valid_depth(norm)
+          floor = Construction.min_valid_depth(norm, part_thicknesses: part_thicknesses)
           base = min_for('depth', params['type'])
           m = [base, floor].max
           return [val, nil] if val >= m
@@ -614,6 +629,27 @@ module Noxun
             end
           "Hĺbka skrinky #{cid} je #{why} najmenej #{Construction.fmt_mm(depth)} mm — nastavená na " \
             "#{Construction.fmt_mm(depth)}."
+        end
+
+        # ROH-A1 (krizovy audit G9 / Codex Q5): spodna hranica SIRKY rohovej
+        # = prisnejsie z typoveho minima a `Construction.min_valid_width` (sonda
+        # cez cely plan s ucinnymi hrubkami CR). -> [sirka, hlaska | nil];
+        # hlaska len ked sirku zdvihla ROHOVA ZOSTAVA (vzor `clamp_depth`).
+        def clamp_corner_width(params, val, cid, part_thicknesses = nil)
+          norm = CabinetBuilder.normalize(params)
+          floor = Construction.min_valid_width(norm, part_thicknesses: part_thicknesses)
+          base = min_for('width', params['type'])
+          m = [base, floor].max
+          return [val, nil] if val >= m
+
+          Engine.log("scale absorb #{cid}: width #{val.round} < min #{m.round} (rohova zostava) — clampujem na #{m.round}")
+          note = floor > base ? width_clamp_message(cid, m) : nil
+          [m, note]
+        end
+
+        def width_clamp_message(cid, width)
+          "Šírka rohovej skrinky #{cid} je pri tejto rohovej zostave najmenej " \
+            "#{Construction.fmt_mm(width)} mm — nastavená na #{Construction.fmt_mm(width)}."
         end
 
         def clamp_slot_height(params, val, cid)

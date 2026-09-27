@@ -145,7 +145,7 @@ NxTest.test('CELA-B: legacy top identicke vyrobne udaje a profile_band; roundtri
   # kazdeho bumpu si drzi `test_r12_config_schema.rb` a sada tej davky.
   NxTest.assert(c::E::CabinetBuilder::CONFIG_SCHEMA >= 14,
                 "schema configu #{c::E::CabinetBuilder::CONFIG_SCHEMA} < 14")
-  NxTest.assert_equal(6, c::E::BuildPlan::SCHEMA) # KON-B · K2: roly list chrbta
+  NxTest.assert_equal(7, c::E::BuildPlan::SCHEMA) # ROH-A1: roly rohovej zostavy
 end
 
 NxTest.test('CELA-B: nakup nikdy nehada dlzku pri neplatnej explicitnej anotacii') do

@@ -490,6 +490,16 @@ horná plocha (`EDGE_LABELS` ako `drawer_back`: L1 Horná, `edge_sides` → `EDG
 „Lišta chrbta horná/dolná". Preflighty materiálu chrbta sa pri lištách správajú ako pri „Bez chrbta" (`Construction.back_material_used?`): `Panel.back_preflight`
 hrúbku nekontroluje, brána projektového chrbta v `MaterialsDialog` skrinku s lištami nezablokuje a „Nahradiť UNI" jej hrúbku chrbta neprevezme.
 
+**ROH-A1 · K3 — `SEED_VERSION` 5 → 6: roly rohovej zostavy** (hrany podľa DC „Rohová"): `corner_blind_panel` (blenda korpusová) **bez ABS** · `hinge_rail`
+(výstuha závesov) **L2** = zadná hrana viditeľná zvnútra · `corner_rail` (rohová výstuha) **L1 + W1 + W2** · `cr_front` a `cr_side` (CR lišty z čelového
+materiálu) **dookola** 1,0 (R4). `EDGE_LABELS`: blenda a CR 1 ako čelo (Ľavá/Pravá/Dolná/Horná), výstuhy a CR 2 ako bok (Predná/Zadná/Dolná/Horná).
+**`edge_sides` (audit A1 FIX 4)** má vlastný uzavretý zoznam — `cr_front` a `corner_blind_panel` v ňom dostali **`EDGE_SIDES_FRONT`** (L1 vľavo, W2 hore), inak
+by karta dielca (`part_card.js`) kreslila, popisovala aj klikala hrany ako pri ležiacom dielci; stojace roly rohovej sa správajú ako bok (lying mapa). Žiadna rola
+rohovej nie je v `STANDING_ROLES`. Mapy sú symetrické v X, takže zrkadlo (dvere vpravo) fyzicky olepené hrany nemení — ručný override ľavej/pravej hrany pri
+zmene strany premapuje až ROH-B. Bez bumpu by `merge_seed_roles` roly na existujúcich PC nedoplnil a CR by sa postavili bez pásky. V `ABS_ROLE_ORDER` na konci,
+v `ROLE_LABELS` „Blenda korpusová · Výstuha závesov · Rohová výstuha · CR lišta 1 · CR lišta 2". Materiálový kanál: CR sú v `Construction::FRONT_MATERIAL_ROLES`
+(čelový z definície roly), blenda korpusová **nie** (vždy korpus); hrúbka CR je vstup plánu (`CabinetBuilder.corner_thicknesses`, [construction.md](construction.md)).
+
 **UI konzument od ŠT-3b-2a: skupina „ABS podľa roly dielca" v sekcii `rules` okna ŠTÚDIO — LEN NA ČÍTANIE** (editor pravidiel ABS v pluginu neexistuje a hint sekcie to priznáva).
 Riadok skladá SERVER (`RulesDialog.abs_rule_row`) z `EDGE_LABELS` + `ProductionCore.role_label`; hovorí o **HRÚBKE** („predná 1,0 mm"), **nikdy o páske ani dekore** — ten sa
 dopočíta z materiálu dielca až pri stavbe. Poradie rolí určuje `RulesDialog::ABS_ROLE_ORDER` (rola z novšej verzie sa pripojí na koniec, nezamlčí sa).

@@ -50,8 +50,9 @@ eq(NXShell.ctxLockedBy('zony'), '', 'navrat na dolnu skrinku zamok pusti');
 
 // ============ 2) VKLADACIA KARTA ============================================
 const NXInsert = require(path.join(JS, 'insert_state.js'));
-eq(NXInsert.INSERT_TYPES, ['lower', 'upper', 'dishwasher', 'board'],
-   'vkladacia karta ponuka styri typy objektu');
+// ROH-A1: + rohová (zoznam povolených typov; tlačidlo pridá ROH-A2).
+eq(NXInsert.INSERT_TYPES, ['lower', 'upper', 'dishwasher', 'corner_blind', 'board'],
+   'vkladacia karta pozna vsetky typy objektu');
 eq(NXInsert.setInsertType('dishwasher'), true, 'prepnutie na Umývačku');
 eq(NXInsert.insertType(), 'dishwasher', 'stav drzi novy typ');
 eq(NXInsert.state.kind, 'cabinet', 'slot je KORPUSOVY druh, nie doska');

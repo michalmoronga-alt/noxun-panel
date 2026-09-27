@@ -159,9 +159,11 @@ module NxKovW
   end
 
   # Charakterizacia PREDKOVA `base_material_for` (stav pred KOV-W, doslovne).
+  # ROH-A1: + CR listy rohovej (`cr_front`, `cr_side`) — celovy kanal
+  # z definicie roly (R4), rovnako ako cela; pripnuta kopia sa vedome rozsiruje.
   def legacy_base_material(role, mat_sym, body_m, front_m, back_m, drawer_m)
     case role.to_s
-    when 'front_door', 'drawer_front', 'flap', 'false_front' then front_m
+    when 'front_door', 'drawer_front', 'flap', 'false_front', 'cr_front', 'cr_side' then front_m
     when 'back' then back_m
     when *CB::DRAWER_ROLES then drawer_m || body_m
     else

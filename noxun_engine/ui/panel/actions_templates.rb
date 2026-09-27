@@ -220,9 +220,13 @@ module Noxun
         TEMPLATE_TYPE_LABELS = { 'upper' => 'HORNÁ', 'lower' => 'DOLNÁ',
                                  'dishwasher' => 'UMÝVAČKA' }.freeze
 
+        # ROH-A1: ROHOVA ma typ sablony tiez ZAMKNUTY (skory navrat ako slot) —
+        # „ulozene ako DOLNA" by zo sablony rohovej vyrobilo dolnu skrinku bez
+        # rohovej zostavy. Zamok typu v modale je UI a pride s ROH-A2.
         def apply_template_type!(config, raw)
           have = (config['type'] || 'lower').to_s
           return '' if have == 'dishwasher'
+          return '' if have == CabinetBuilder::CORNER_TYPE
 
           want = raw.to_s.strip.downcase
           return '' unless %w[lower upper].include?(want)

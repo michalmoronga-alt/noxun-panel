@@ -357,8 +357,9 @@ NxTest.test('KOV-D5: golden mapa hran roli korpusu (bok, polica, celo, chrbat)')
 end
 
 NxTest.test('KOV-D5: recept ani ABS pravidla dielcov zasuviek sa nemenia') do
-  # KON-B · K2 bumpla seed na 5 (listy chrbta) — pravidla zasuviek su rovnake.
-  NxTest.assert_equal(5, NxD5::ABS::SEED_VERSION, 'D5 seed nebumpla (5 = KON-B listy chrbta)')
+  # KON-B · K2 bumpla seed na 5 (listy chrbta), ROH-A1 na 6 (rohova zostava)
+  # — pravidla zasuviek su rovnake.
+  NxTest.assert_equal(6, NxD5::ABS::SEED_VERSION, 'D5 seed nebumpla (6 = ROH-A1 rohova zostava)')
   { 'drawer_bottom' => {}, 'drawer_back' => { 'L1' => 1.0 },
     'box_side' => { 'L1' => 1.0 }, 'drawer_inner_front' => { 'L1' => 1.0 } }.each do |role, want|
     NxTest.assert_equal(want, NxD5::ABS::SEED_RULES[role], "#{role}: seed pravidlo")

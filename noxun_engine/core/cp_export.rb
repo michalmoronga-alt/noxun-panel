@@ -91,7 +91,10 @@ module Noxun
       # GH #139 P2: `plinth` sem PATRI — Construction.plinth_parts ho vyrobi LEN
       # pri `plinth_mode == 'front'`, teda je to VIDITELNY predny sokel, nie
       # vnutorna cast korpusu (nohy su kovanie a maju vlastnu kategoriu).
-      FRONT_ROLES = %w[front_door drawer_front flap cover_panel false_front gola_profile plinth].freeze
+      # ROH-A1: + CR listy rohovej (celovy material, viditelne ako celo).
+      # Blenda korpusova, vystuha zavesov a rohova vystuha su korpus.
+      FRONT_ROLES = %w[front_door drawer_front flap cover_panel false_front gola_profile plinth
+                       cr_front cr_side].freeze
 
       # Kategoria katalogu kovania -> kategoria specifikacie.
       HW_CATEGORY_MAP = {

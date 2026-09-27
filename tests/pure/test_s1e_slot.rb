@@ -120,7 +120,7 @@ end
 # ---------------------------------------------------------------------------
 
 NxTest.test('S1-E R1: TYPES je JEDINY zoznam typov a obsahuje dishwasher') do
-  NxTest.assert_equal(%w[lower upper dishwasher], NxS1E.cb::TYPES)
+  NxTest.assert_equal(%w[lower upper dishwasher corner_blind], NxS1E.cb::TYPES) # ROH-A1: + rohova
   # Neznamy typ sa (ako doteraz) sklapa na dolnu skrinku — skrinku z NOVSEJ
   # verzie zastavi dopredny guard EST PRED normalizaciou.
   NxTest.assert_equal('lower', NxS1E.cb.normalize('type' => 'nieco')[:type])
@@ -319,7 +319,7 @@ NxTest.test('S1-E E2 (+S1-F): skrinka BEZ vazby ma PRAZDNY zoznam referencii') d
   # S1-F pridal korpusovemu planu kluc `references` (box niky chladnicky), ale
   # BEZ VAZBY je prazdny — skrinka, ktora spotrebic iba ocakava, geometriu nema.
   NxTest.assert_equal([], pl[:references], 'bez vazby ziadna referencia')
-  NxTest.assert_equal(6, NxS1E.bp::SCHEMA, 'plan sa neperzistuje, takze schema ostava (6 = KON-B)')
+  NxTest.assert_equal(7, NxS1E.bp::SCHEMA, 'plan sa neperzistuje, takze schema ostava (7 = ROH-A1)')
 end
 
 NxTest.test('S1-E R4: konstanty zakladne tela ziju na JEDNOM mieste') do

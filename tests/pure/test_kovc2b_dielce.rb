@@ -132,7 +132,7 @@ NxTest.test('KOV-C2b (R1): dielce maju PLNU geometriu v svetlom priestore niky')
   NxTest.assert_close(134.0, back[:origin][2], 0.001, 'stoji NA dne')
   # Deskriptory prechadzaju kontraktom planu (vratane novych roli a schemy 5 —
   # KOV-G1a rozsirila slovnik typov kovania o `plinth_clip`).
-  NxTest.assert_equal(6, NxC2bD::BP::SCHEMA) # KON-B · K2: roly list chrbta
+  NxTest.assert_equal(7, NxC2bD::BP::SCHEMA) # ROH-A1: roly rohovej zostavy
   NxTest.assert_equal(pl, NxC2bD::BP.validate!(pl))
 end
 

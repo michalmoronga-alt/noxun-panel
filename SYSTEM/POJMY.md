@@ -36,6 +36,20 @@
   Vyrába **jediný dielec — čelo** (blenda, rola `false_front`) a telo umývačky kreslí ako **referenciu**. Jeho **výška je výška LINKY** (horná hrana
   susedných korpusov), nie výška korpusu; „sokel" slotu je **spodná hrana čela od podlahy** (vlastné pole, do výšky korpusu nikdy netečie).
   Trieda je 600 alebo 450 (60 / 45 cm).
+- **Rohová (slepá) skrinka** (`type: corner_blind`, ROH-A1, v0.14.1 — podľa DC „Rohová", ktorú dielňa roky používa) — **dolná skrinka** (dno, strop alebo
+  výstuhy, chrbát, sokel, nohy, police) s **rohovou zostavou na prednej rovine**. Jedna časť má dvere (**dverová časť**), zvyšok je **slepá časť** schovaná v rohu
+  za susedným kolmým radom. Strana dverí vľavo alebo vpravo (zrkadlí sa celá zostava, korpus je rovnaký); typicky 1100 / dvere 450. Vnútri len police cez celú
+  šírku (bez priečok), dvere sú vždy **jedno krídlo**, pánty predvolene **pri rohu** (na výstuhe závesov).
+  - **Dverová časť** — šírka od vonkajšej plochy boku po os medzery dvere ↔ CR 1 (DC „Šírka dverí", predvolene 450); dvere sú o medzery užšie (446).
+  - **Slepá časť** — zvyšok šírky za dverovou časťou; pri zmene šírky skrinky rastie len ona (dverová časť a CR sú absolútne).
+  - **Blenda korpusová** — vnútorná čelná doska **z korpusu** (nie čelo) cez slepú časť, medzi dnom a stropom v rovine prednej hrany (bez ABS); iný pojem ako
+    **blenda** v rade čiel (`false_front`). Police v rohovej začínajú až za ňou.
+  - **Výstuha závesov** — zvislá doska z korpusu hĺbky 80 mm hneď za hranou dverovej časti; nesú ju pánty dverí pri rohu. Polica cez celú šírku ňou
+    prechádza — **výrez robí dielňa** (Kontrola to pripomenie).
+  - **CR lišta 1** — lišta z **čelového** materiálu na prednej rovine vedľa dverí (medzi dvermi a rohom), ABS dookola.
+  - **CR lišta 2** — lišta z čelového materiálu **kolmo dopredu** (vracia sa k susednému radu), ABS dookola; CR 1 a CR 2 sa nastavujú každá zvlášť — dolaďuje
+    sa nimi pár milimetrov v rohu.
+  - **Rohová výstuha** — zvislá doska z korpusu **pred korpusom** za CR 2 (od spodku po vrch skrinky), drží CR zostavu; olepená spredu, hore aj dole.
 - **Telo spotrebiča (referencia)** — geometria v modeli, ktorá **nie je dielec**: `kind: reference`, `manufactured: false`,
   `production_class: reference`. Kupuje ju zákazník, plugin ju **nevyrába ani neobjednáva**, takže ju nikdy nevidí kusovník, VEPO, nákup ani rozpočet —
   kreslí sa len preto, aby bolo vidno, čo do slotu príde. Nikdy sa nedeformuje podľa skrinky: keď je širšia, **trčí** a Kontrola to prizná.

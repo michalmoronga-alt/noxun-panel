@@ -257,14 +257,14 @@ end
 
 # --- KOV-B1: `lift` v slovniku typov kovania + plan_schema -------------------
 
-NxTest.test('KOV-B1: `GENERIC_TYPES` obsahuje `lift`; KOV-G1a + KON-B: plan_schema je 6') do
+NxTest.test('KOV-B1: `GENERIC_TYPES` obsahuje `lift`; KOV-G1a + KON-B + ROH-A1: plan_schema je 7') do
   bp = Noxun::Engine::BuildPlan
   NxTest.assert(bp::GENERIC_TYPES.include?('lift'),
                 'vyklopy/sklopy — presunute z KOV-E, aby sa dal ulozit vyklopovy set')
   NxTest.assert(bp::GENERIC_TYPES.include?('plinth_clip'),
                 'KOV-G1a: prichyt soklovej listy (pravidlo az G1b)')
-  NxTest.assert_equal(6, bp::SCHEMA,
-                      'rozsirenie slovnika, roly zasuviek aj list chrbta (KON-B) = plan, ktoremu STARSI plugin nerozumie')
+  NxTest.assert_equal(7, bp::SCHEMA,
+                      'rozsirenie slovnika, roly zasuviek aj list chrbta (KON-B) aj rohovej zostavy (ROH-A1) = plan, ktoremu STARSI plugin nerozumie')
   NxTest.assert_equal([], bp.unknown_generic_types([{ 'generic_type' => 'lift' }]),
                       'nam je `lift` znamy')
   NxTest.assert_equal(['sliding'], bp.unknown_generic_types([{ 'generic_type' => 'sliding' }]),

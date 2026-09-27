@@ -70,7 +70,10 @@ module Noxun
       # Roly, ktore su celom Z DEFINICIE (dedia kanal `front` bez ohladu na
       # materialovy signal deskriptora). `cover_panel` medzi nimi VEDOME nie je
       # — o jeho kanale rozhoduje signal deskriptora, presne ako doteraz.
-      FRONT_MATERIAL_ROLES = %w[front_door drawer_front flap false_front].freeze
+      # ROH-A1: + CR listy rohovej (`cr_front`, `cr_side`) — R4: z celoveho
+      # materialu s ABS dookola ako celo. Blenda korpusova (`corner_blind_panel`)
+      # medzi nimi VEDOME nie je: je VZDY z korpusu (R2).
+      FRONT_MATERIAL_ROLES = %w[front_door drawer_front flap false_front cr_front cr_side].freeze
 
       # role + materialovy signal deskriptora (`pd[:material]`) -> kanal.
       def material_channel(role, mat_sym = nil)
@@ -120,7 +123,7 @@ module Noxun
         w = cfg[:width]; h = cfg[:height]; t = cfg[:thickness]
 
         interior = interior_dims(cfg)
-        validate!(cfg, interior)
+        validate!(cfg, interior, part_thicknesses)
         warnings = []
 
         parts = []
@@ -132,14 +135,21 @@ module Noxun
         # KON-B · K2: chrbat z list = dva dielce namiesto dosky chrbta.
         parts.concat(back_rail_parts(cfg, interior))
         parts.concat(plinth_parts(cfg))
+        # ROH-A1 · K3: rohova zostava (blenda, vystuhy, CR listy). Korpus
+        # vyssie je presne ako dolna skrinka — pri inych typoch prazdne pole.
+        parts.concat(corner_parts(cfg, interior, part_thicknesses))
 
         # Vnutro = strom zon nad vnutornym boxom (3D). Priecky + police su dielce korpusu.
         zbox = { x0: t, x1: w - t, y0: 0.0, y1: interior[:back_front_y],
                  z0: interior[:z_lo], z1: interior[:z_hi] }
+        # ROH-A1 (audit A1 BLOCKER 1): police rohovej zacinaju za BLENDOU
+        # (`max(20, t)`); ine typy kluc nedostanu a ich plan sa nemeni.
+        zbox[:shelf_inset] = corner_shelf_inset(cfg) if corner?(cfg)
         zres = compute_zone_tree!(cfg, interior, zbox, t, cabinet_id)
         parts.concat(zres[:dividers])
         parts.concat(zres[:shelves])
         warnings.concat(zres[:warnings] || [])
+        corner_shelf_warning(cfg, zres[:shelves], warnings)
 
         # Cela pred korpusom (fixed + auto s lockmi). S1-E: otvor uz nepocita
         # `Fronts` sam — je to jedna autorita zdielana s preflightom panela.
@@ -544,8 +554,210 @@ module Noxun
                    h: cfg[:height].to_f - cfg[:dw_front_bottom].to_f }
         end
 
+        # ROH-A1: otvor ciel rohovej je LEN DVEROVA CAST — `D` od vonkajsieho
+        # boku; pri dverach vpravo zacina na `W − D` (zrkadlo zostavy).
+        if corner?(cfg)
+          d = corner_door_w(cfg)
+          x0 = corner_side(cfg) == 'right' ? cfg[:width].to_f - d : 0.0
+          return { x0: x0, w: d, z0: cfg[:floor_height].to_f,
+                   h: cfg[:height].to_f - cfg[:floor_height].to_f }
+        end
+
         { x0: 0.0, w: cfg[:width].to_f, z0: cfg[:floor_height].to_f,
           h: cfg[:height].to_f - cfg[:floor_height].to_f }
+      end
+
+      # === ROH-A1 · K3: ROHOVA SKRINKA (dolna slepa, DC „Rohová") ==============
+      #
+      # Korpus je dolna skrinka; NAVYSE rohova zostava na prednej rovine.
+      # Kreslene pre DVERE VLAVO (dverova cast x 0..D, slepa cast D..W, roh
+      # vpravo); dvere vpravo = ZRKADLO `x' = W − x − box[0]` pre pat dielcov
+      # zostavy A otvor ciel. Korpus je symetricky a nemeni sa. Kluce ani roly
+      # sa zrkadlenim nemenia. Ciselne overene na DC (package ROH-A1, bod 3).
+      #   D = `corner_door_w`, c1/c2 = `corner_cr1/cr2`, gC = medzera dveri PRI
+      #   ROHU (`gap_right` pri dverach vlavo, `gap_left` pri dverach vpravo),
+      #   th1/th2 = UCINNA hrubka CR 1/CR 2 (`part_thicknesses`, builder ju
+      #   vyriesi z celoveho kanala PRED planom — `CabinetBuilder.corner_thicknesses`).
+      CORNER_TYPE = 'corner_blind'
+      # Roly CR list (celovy material, tolerancia hrubky ciel).
+      CR_ROLES = %w[cr_front cr_side].freeze
+      # Vsetky roly rohovej zostavy (guard testy ich porovnavaju so zoznamami).
+      CORNER_ROLES = %w[corner_blind_panel hinge_rail cr_front cr_side corner_rail].freeze
+      # Kluce dielcov, ktorych hrubka je VSTUP planu (vzor zasuviek).
+      CR_PART_KEYS = [PartKeys.cabinet('cr', '1'), PartKeys.cabinet('cr', '2')].freeze
+      # Hlbka vystuhy zavesov (DC: konstanta 80 mm, nezavisi od CR).
+      HINGE_RAIL_DEPTH = 80.0
+      # Medzera dveri pri rohu (krizovy audit C3): zaporna by dvere prekryla
+      # s CR 1, velka by rozbila zostavu.
+      CORNER_GAP_RANGE = [1.0, 20.0].freeze
+      # Nazvy dielcov v builderi (ASCII ako ostatne; NAVRH — potvrdi Michal).
+      CORNER_NAMES = {
+        'corner_blind_panel' => 'Blenda rohova', 'hinge_rail' => 'Vystuha zavesov',
+        'corner_rail' => 'Vystuha rohova', 'cr_front' => 'CR lista 1', 'cr_side' => 'CR lista 2'
+      }.freeze
+      # Vety odmietnuti (JEDINY zdroj — panel ich cita odtialto).
+      CORNER_GAP_MSG    = 'Medzera dverí pri rohu musí byť 1–20 mm.'
+      CORNER_FRONTS_MSG = 'Rohová skrinka má v dverovej časti jedny dvierka (jedno krídlo na celú výšku).'
+      CORNER_ZONES_MSG  = 'Rohová skrinka má vnútri len police cez celú šírku (bez priečok).'
+
+      def corner?(cfg)
+        cfg.is_a?(Hash) && (cfg[:type] || cfg['type']).to_s == CORNER_TYPE
+      end
+
+      # Strana DVEROVEJ casti. Cita normalizovany cfg (symbol) aj ulozeny
+      # config (string); neznama hodnota = `left` (vzor `norm_corner`).
+      def corner_side(cfg)
+        v = (cfg[:corner_side] || cfg['corner_side']).to_s
+        v == 'right' ? 'right' : 'left'
+      end
+
+      def corner_door_w(cfg)
+        corner_num(cfg, :corner_door_w, 450.0)
+      end
+
+      def corner_cr1(cfg)
+        corner_num(cfg, :corner_cr1, 80.0)
+      end
+
+      def corner_cr2(cfg)
+        corner_num(cfg, :corner_cr2, 80.0)
+      end
+
+      # Konecne kladne cislo, inak predvolba (plan nikdy nespadne na smeti;
+      # autoritu rozsahu drzi `CabinetBuilder.norm_corner`).
+      def corner_num(cfg, key, default)
+        v = cfg[key]
+        v = cfg[key.to_s] if v.nil?
+        f = v.is_a?(Numeric) ? v.to_f : nil
+        f && f.finite? && f.positive? ? f : default
+      end
+
+      # Medzera dveri PRI ROHU (z normalizovaneho configu ciel).
+      def corner_gap(cfg)
+        fr = Fronts.normalize_config(cfg[:fronts])
+        (corner_side(cfg) == 'right' ? fr['gap_left'] : fr['gap_right']).to_f
+      end
+
+      # Ucinne hrubky [th1, th2] z mapy od buildera; chybajuci kluc = 18
+      # (placeholder cela — pomocne volania bez materialov).
+      def corner_cr_thicknesses(part_thicknesses)
+        src = part_thicknesses.is_a?(Hash) ? part_thicknesses : {}
+        CR_PART_KEYS.map do |k|
+          v = src[k]
+          v.is_a?(Numeric) && v.to_f.finite? && v.to_f.positive? ? v.to_f : Fronts::FRONT_THICKNESS
+        end
+      end
+
+      # Predne odsadenie polic rohovej: police zacinaju ZA blendou (y 0..t).
+      def corner_shelf_inset(cfg)
+        [ZoneTree::SHELF_FRONT_INSET, cfg[:thickness].to_f].max
+      end
+
+      # Najmensia sirka, pri ktorej sa rohova zostava zmesti pred slepu cast:
+      # `D + c1 + th2 + t <= W − t` (rovnaka nerovnost ako `corner_error`).
+      def corner_fit_width(cfg, part_thicknesses)
+        _th1, th2 = corner_cr_thicknesses(part_thicknesses)
+        t = cfg[:thickness].to_f
+        corner_door_w(cfg) + corner_cr1(cfg) + th2 + 2 * t
+      end
+
+      # Pat deskriptorov zostavy (pri inom type []). Cisla pre dvere vlavo,
+      # dvere vpravo sa zrkadlia v X.
+      def corner_parts(cfg, interior, part_thicknesses)
+        return [] unless corner?(cfg)
+
+        w = cfg[:width].to_f; h = cfg[:height].to_f; t = cfg[:thickness].to_f
+        s = cfg[:floor_height].to_f
+        d = corner_door_w(cfg); c1 = corner_cr1(cfg); c2 = corner_cr2(cfg)
+        gc = corner_gap(cfg)
+        th1, th2 = corner_cr_thicknesses(part_thicknesses)
+        fr = Fronts.normalize_config(cfg[:fronts])
+        # Obrys riadku dveri (jediny auto riadok): CR maju vysku RIADKU, nie
+        # panelu (pri UKW je panel dveri nizsi, CR nie — DC).
+        zf0 = s + fr['gap_bottom'].to_f
+        hf = (h - s) - fr['gap_top'].to_f - fr['gap_bottom'].to_f
+        z_lo = interior[:z_lo].to_f
+        hh = interior[:z_hi].to_f - z_lo
+        side_depth = c2 - gc + th1
+        rail_depth = c2 + th1
+        list = [
+          corner_desc('CORNER-PANEL', PartKeys.cabinet('corner_panel'), 'corner_blind_panel', :korpus,
+                      [w - t - d, t, hh], [d, 0.0, z_lo], { length: hh, width: w - t - d, thickness: t },
+                      PartFaces::AXES_FRONT),
+          corner_desc('HINGE-RAIL', PartKeys.cabinet('hinge_rail'), 'hinge_rail', :korpus,
+                      [t, HINGE_RAIL_DEPTH, hh], [d - t, 0.0, z_lo],
+                      { length: hh, width: HINGE_RAIL_DEPTH, thickness: t }, PartFaces::AXES_UPRIGHT),
+          corner_desc('CR-1', CR_PART_KEYS[0], 'cr_front', :front,
+                      [c1 - gc, th1, hf], [d + gc, -th1, zf0], { length: hf, width: c1 - gc, thickness: th1 },
+                      PartFaces::AXES_FRONT),
+          corner_desc('CR-2', CR_PART_KEYS[1], 'cr_side', :front,
+                      [th2, side_depth, hf], [d + c1, -side_depth, zf0],
+                      { length: hf, width: side_depth, thickness: th2 }, PartFaces::AXES_UPRIGHT),
+          corner_desc('CORNER-RAIL', PartKeys.cabinet('corner_rail'), 'corner_rail', :korpus,
+                      [t, rail_depth, h - s], [d + c1 + th2, -rail_depth, s],
+                      { length: h - s, width: rail_depth, thickness: t }, PartFaces::AXES_UPRIGHT)
+        ]
+        return list unless corner_side(cfg) == 'right'
+
+        list.each { |pd| pd[:origin] = [w - pd[:origin][0] - pd[:box][0], pd[:origin][1], pd[:origin][2]] }
+      end
+
+      def corner_desc(suffix, key, role, material, box, origin, prod, axes)
+        { suffix: suffix, part_key: key, role: role, name: CORNER_NAMES[role], material: material,
+          box: box, origin: origin, prod: prod, axes: axes }
+      end
+
+      # ORANGE (NAVRH — potvrdi Michal): polica rohovej ide ako v DC cez
+      # celu sirku a pretina vystuhu zavesov. Kusovnik a VEPO ostavaju
+      # obdlznik; vyrez robi dielna. JEDEN warning na skrinku (nie na policu).
+      def corner_shelf_warning(cfg, shelves, warnings)
+        return unless corner?(cfg) && Array(shelves).any?
+
+        t = cfg[:thickness].to_f
+        notch = HINGE_RAIL_DEPTH - corner_shelf_inset(cfg)
+        return unless notch.positive?
+
+        warnings << BuildPlan.warning(
+          'corner_shelf_notch',
+          "Polica prechádza výstuhou závesov — výrez #{fmt_mm(t)} × #{fmt_mm(notch)} mm robí dielňa.",
+          part_key: PartKeys.cabinet('hinge_rail'),
+          data: { 'notch_w' => t, 'notch_d' => notch }
+        )
+      end
+
+      # Odmietnutia rohovej (veta | nil). Cista funkcia — vola ju `validate!`
+      # a sondy (`min_valid_width` ich dedi cez cely plan).
+      def corner_error(cfg, interior, part_thicknesses)
+        return nil unless corner?(cfg)
+
+        gc = corner_gap(cfg)
+        return CORNER_GAP_MSG unless gc >= CORNER_GAP_RANGE[0] - 0.005 && gc <= CORNER_GAP_RANGE[1] + 0.005
+
+        need = corner_fit_width(cfg, part_thicknesses)
+        if need > cfg[:width].to_f + 0.005
+          return "Rohová zostava sa do šírky #{fmt_mm(cfg[:width])} mm nezmestí — dverová časť, CR 1, CR 2 " \
+                 "a rohová výstuha potrebujú šírku aspoň #{fmt_mm(need)} mm."
+        end
+        if interior[:back_front_y].to_f < HINGE_RAIL_DEPTH - 0.005
+          return "Výstuha závesov (#{fmt_mm(HINGE_RAIL_DEPTH)} mm) sa do vnútornej hĺbky " \
+                 "#{fmt_mm([interior[:back_front_y].to_f, 0.0].max)} mm nezmestí — zväčši hĺbku alebo zmenši komín."
+        end
+        return CORNER_FRONTS_MSG unless corner_fronts_ok?(Fronts.normalize_config(cfg[:fronts]))
+        return CORNER_ZONES_MSG unless ZoneTree.leaf?(ZoneTree.sanitize(cfg[:zone_tree]))
+
+        nil
+      end
+
+      # R6: splna config ciel invariant rohovej (jeden riadok `door`, `auto`,
+      # jedno kridlo)? JEDINA definicia — cita ju `corner_error` aj zapisove
+      # cesty panela a sablon (cez `CabinetBuilder.corner_fronts_ok?`).
+      def corner_fronts_ok?(fronts_cfg)
+        items = fronts_cfg.is_a?(Hash) ? fronts_cfg['items'] : nil
+        return false unless items.is_a?(Array) && items.length == 1
+
+        it = items.first
+        it.is_a?(Hash) && it['type'].to_s == 'door' && it['mode'].to_s == 'auto' &&
+          it['wings'].to_s == '1'
       end
 
       # --- KOV-F1/E1b: anotacia klasifikacie ciel -----------------------------
@@ -1441,7 +1653,11 @@ module Noxun
       # Pravidla kovania sa nacitaju RAZ a posielaju do kazdej sondy — inak by
       # jedno tiahnutie uchopu precitalo kniznicu pravidiel desatkrat.
       # Vracia CELE milimetre (absorpcia aj panel pracuju s celymi mm).
-      def min_valid_height(cfg, hardware_rules: nil)
+      # ROH-A1 (audit A1 FIX 2): VSETKY sondy dostavaju `part_thicknesses:` —
+      # TIE ISTE ucinne hrubky CR list ako stavba (`CabinetBuilder.
+      # aux_part_thicknesses`). S placeholderom 18 by sonda pri tenkej CR 2
+      # vratila ine minimum, nez aky config naozaj postavi.
+      def min_valid_height(cfg, hardware_rules: nil, part_thicknesses: nil)
         # S1-E: slot vnutro nema. D-139: spodnu hranicu vysky linky urcuje
         # odvodene celo (sokel + medzera hore + 300) — ta ista funkcia ako
         # v absorpcii scale, bez `normalize` (Astra B2 FIX 5).
@@ -1452,19 +1668,19 @@ module Noxun
         # nez vrch korpusu, takze `avail_h <= h - sokel - hrubka dna`. Je to
         # startovaci bod hladania, nie vysledok.
         lo = (cfg[:floor_height].to_f + cfg[:thickness].to_f + min_avail_for(cfg)).ceil.to_f
-        return lo if buildable_at?(cfg, lo, rules)
+        return lo if buildable_at?(cfg, lo, rules, part_thicknesses)
 
         hi = MAX_HEIGHT
         # Ked neprejde ani strop legalneho rozsahu, config nie je postavitelny
         # v ZIADNEJ vyske (napr. zamknute zony alebo neplatna hrana profilu).
         # Vratime geometricke minimum a rebuild necháme padnut vlastnou
         # zrozumitelnou hlaskou — hadat vyssiu vysku by problem len zakrylo.
-        return lo unless buildable_at?(cfg, hi, rules)
+        return lo unless buildable_at?(cfg, hi, rules, part_thicknesses)
 
         while hi - lo > 1.0
           mid = ((lo + hi) / 2.0).ceil.to_f
           mid = hi if mid >= hi # poistka proti zaseknutiu na hranici
-          if buildable_at?(cfg, mid, rules)
+          if buildable_at?(cfg, mid, rules, part_thicknesses)
             hi = mid
           else
             lo = mid
@@ -1482,8 +1698,9 @@ module Noxun
 
       # Postavil by sa TENTO config pri tejto vyske? Cista sonda — ziadny model,
       # ziadny zapis; plan sa zahodi. `CAB-PROBE` je len menovka part_keys.
-      def buildable_at?(cfg, height, rules)
-        build_plan(cfg.merge(height: height), 'CAB-PROBE', hardware_rules: rules)
+      def buildable_at?(cfg, height, rules, part_thicknesses = nil)
+        build_plan(cfg.merge(height: height), 'CAB-PROBE', hardware_rules: rules,
+                                                            part_thicknesses: part_thicknesses)
         true
       rescue StandardError
         false
@@ -1498,22 +1715,22 @@ module Noxun
       # jeho hlbku klampuje len typove minimum).
       MAX_DEPTH = 2000.0
 
-      def min_valid_depth(cfg, hardware_rules: nil)
+      def min_valid_depth(cfg, hardware_rules: nil, part_thicknesses: nil)
         return 0.0 if cfg[:type] == 'dishwasher'
 
         rules = hardware_rules || HardwareRules.load
         lo = defined?(CabinetBuilder) ? CabinetBuilder::MIN[:depth] : 150.0
-        return lo if buildable_depth_at?(cfg, lo, rules)
+        return lo if buildable_depth_at?(cfg, lo, rules, part_thicknesses)
 
         hi = MAX_DEPTH
         # Nepostavitelne v ziadnej hlbke (napr. zamknute zony) — vratime
         # absolutne minimum a rebuild padne vlastnou vetou (vzor vysky).
-        return lo unless buildable_depth_at?(cfg, hi, rules)
+        return lo unless buildable_depth_at?(cfg, hi, rules, part_thicknesses)
 
         while hi - lo > 1.0
           mid = ((lo + hi) / 2.0).ceil.to_f
           mid = hi if mid >= hi
-          if buildable_depth_at?(cfg, mid, rules)
+          if buildable_depth_at?(cfg, mid, rules, part_thicknesses)
             hi = mid
           else
             lo = mid
@@ -1522,8 +1739,47 @@ module Noxun
         hi
       end
 
-      def buildable_depth_at?(cfg, depth, rules)
-        build_plan(cfg.merge(depth: depth), 'CAB-PROBE', hardware_rules: rules)
+      def buildable_depth_at?(cfg, depth, rules, part_thicknesses = nil)
+        build_plan(cfg.merge(depth: depth), 'CAB-PROBE', hardware_rules: rules,
+                                                          part_thicknesses: part_thicknesses)
+        true
+      rescue StandardError
+        false
+      end
+
+      # ROH-A1 (krizovy audit G9 / Codex Q5): NAJMENSIA sirka, pri ktorej by
+      # prestavba TOHTO configu presla — sonda cez CELY `build_plan` (vzor
+      # `min_valid_depth`), s ucinnymi hrubkami CR list; ziadny rucny vzorec
+      # vedla `corner_error`. Pre ine typy DNESNE spravanie: typove minimum
+      # `CabinetBuilder::MIN[:width]` bez sondy (absorpcia ich sirku klampuje
+      # len holym minimom). Cele mm; horna hranica = horny clamp `normalize`.
+      MAX_WIDTH = 3000.0
+
+      def min_valid_width(cfg, hardware_rules: nil, part_thicknesses: nil)
+        lo = defined?(CabinetBuilder) ? CabinetBuilder::MIN[:width] : 200.0
+        return lo unless corner?(cfg)
+
+        rules = hardware_rules || HardwareRules.load
+        return lo if buildable_width_at?(cfg, lo, rules, part_thicknesses)
+
+        hi = MAX_WIDTH
+        return lo unless buildable_width_at?(cfg, hi, rules, part_thicknesses)
+
+        while hi - lo > 1.0
+          mid = ((lo + hi) / 2.0).ceil.to_f
+          mid = hi if mid >= hi
+          if buildable_width_at?(cfg, mid, rules, part_thicknesses)
+            hi = mid
+          else
+            lo = mid
+          end
+        end
+        hi
+      end
+
+      def buildable_width_at?(cfg, width, rules, part_thicknesses = nil)
+        build_plan(cfg.merge(width: width), 'CAB-PROBE', hardware_rules: rules,
+                                                          part_thicknesses: part_thicknesses)
         true
       rescue StandardError
         false
@@ -1832,7 +2088,7 @@ module Noxun
                                       data: { 'wanted' => wanted.to_f, 'used' => used.to_f })
       end
 
-      def validate!(cfg, interior)
+      def validate!(cfg, interior, part_thicknesses = nil)
         w = cfg[:width]; h = cfg[:height]; t = cfg[:thickness]; s = cfg[:floor_height]
         raise 'Sirka je prilis mala vzhladom na hrubku materialu.' if w <= 2 * t + 10
         # KON-A: komin a zapustenie PRED vseobecnou hlbkou — pri komine je veta
@@ -1842,6 +2098,10 @@ module Noxun
         raise 'Podstavec/sokel nesmie byt vyssi nez korpus.' if s >= h
         raise 'Vnutorna vyska je nulova alebo zaporna (skontroluj vysku, podstavec a hrubky).' if
           interior[:avail_h] <= MIN_AVAIL_H
+        # ROH-A1: pravidla rohovej zostavy (medzera pri rohu, zmestenie,
+        # vystuha zavesov pred chrbtom, jedny dvierka, bez priecok).
+        corner_msg = corner_error(cfg, interior, part_thicknesses)
+        raise corner_msg if corner_msg
         # D-80 (Codex P2 na PR #134): pri vrchu "dve vystuhy" musi pod nimi ostat
         # aspon MIN_INTERIOR_H svetla — inak vznikne zona mensia nez ZoneTree::MIN_FIELD
         # (a pri upright dokonca vystuha tenka pod svoje vlastne minimum). Kombinacia

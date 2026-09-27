@@ -123,8 +123,14 @@ Rola dielca/modulu je **explicitná hodnota** v `NOXUN/role`, nikdy sa neodvodzu
 side_left · side_right · bottom · top · back · shelf · divider_v · divider_h ·
 front_door · drawer_front · flap · cover_panel · false_front · rail_front · rail_back · plinth ·
 gola_profile · hinge · slide · leg · handle · shelf_pin · connector · free_panel ·
-drawer_bottom · drawer_back · box_side · drawer_inner_front · back_rail_top · back_rail_bottom
+drawer_bottom · drawer_back · box_side · drawer_inner_front · back_rail_top · back_rail_bottom ·
+corner_blind_panel · hinge_rail · corner_rail · cr_front · cr_side
 ```
+
+**Rohová zostava (ROH-A1 · K3, v0.14.1, BuildPlan `SCHEMA` 7):** `corner_blind_panel` (blenda korpusová cez slepú časť, `cabinet/corner_panel`) ·
+`hinge_rail` (výstuha závesov, `cabinet/hinge_rail`) · `corner_rail` (rohová výstuha pred korpusom, `cabinet/corner_rail`) — materiál **vždy z korpusu** ·
+`cr_front` (CR lišta 1 na prednej rovine, `cabinet/cr:1`) · `cr_side` (CR lišta 2 kolmo dopredu, `cabinet/cr:2`) — **čelový** materiál (`FRONT_MATERIAL_ROLES`,
+R4) s účinnou hrúbkou vyriešenou **pred plánom** (§4.2). Emituje ich len typ `corner_blind`; žiadna z nich nie je stojaca (§7.5), kovanie nemajú.
 
 **Lišty chrbta (KON-B · K2, v0.13.3, BuildPlan `SCHEMA` 6):** `back_rail_top` (horná lišta, kľúč `cabinet/back_rail:top`) · `back_rail_bottom` (dolná,
 `cabinet/back_rail:bottom`) — dve roly, lebo mapa hrán rozlišuje rolu, nie variant (dolná je **stojaca**, §7.5). Stavia ich chrbát „Z líšt" (§3.4), materiál
@@ -267,6 +273,12 @@ meria výšku niky (vnútro − osadenie) aj hranu delenia čiel. Je to vlastnos
   Starší plugin (schéma 20) `rails` nepozná — `normalize` by ho ticho zmenil na predvolený chrbát typu a do kusovníka dal dosku chrbta. Brány sú tie isté ako
   pri 5–20; zároveň **BuildPlan `SCHEMA` 6** (nové roly, §2.4) a **ABS `SEED_VERSION` 5** (§7.5). `BuildPlan::BACK_MODES` (značka pôvodu dielca `back`) sa
   **nerozširuje**. Samostatne prenesenú lištu schéma nechráni (existujúca hranica) — **obe PC sa aktualizujú pred prvou výrobou s lištami**.
+- **`22 = ROH-A1 · K3` (v0.14.1): rohová skrinka.** Nový typ **`corner_blind`** so štyrmi poľami `corner_side` / `corner_door_w` / `corner_cr1` / `corner_cr2`
+  (§4.2), zapisovanými **len pri rohovej a vždy všetky** (vzor polí slotu). Starší plugin (schéma 21) typ nepozná — `norm_type` by ho sklopil na `lower`, takže by
+  z rohovej prestavbou vyrobil dolnú skrinku s dvierkami cez celú šírku (bez blendy, výstuh a CR líšt) a polia by whitelistom zahodil. Brány sú tie isté ako pri
+  5–21; zároveň **BuildPlan `SCHEMA` 7** (päť nových rolí, §2.4) a **ABS `SEED_VERSION` 6** (§7.5). `TemplateStore::STD` sa nemení — šablóna nesie polia rohovej
+  v configu (výslovne všetky štyri, pri vklade ich server číta zo **záznamu** šablóny) a starší plugin ju odmietne markerom `config_schema`. **Obe PC sa aktualizujú
+  pred prvou rohovou.**
 - **`rules_seed_version` — DRUHÁ proveniencia stavby (KOV-E1b, v0.9.54).** Config nesie **aditívne** pole so **seed verziou pravidiel kovania, s ktorou stavba bežala**
   (`HardwareRules.effective_seed_version`; chýbajúce pole = `0`). Zapisuje ho **výhradne stavba** (`cabinet_config`) — z klientskeho payloadu sa **nikdy nepreberá**,
   presne ako `config_schema`. Dôvod: projektový snapshot pravidiel sa zámerne nemerguje sám, takže prestavba starej zákazky zapíše aktuálnu schému, ale kovanie
@@ -400,7 +412,23 @@ Korpus = **obálka + konštrukcia + zóny + rozhrania.** Nie master komponent s 
 
 ### 4.2 Typy korpusov na štart
 
-**V1: DOLNÁ, HORNÁ a — od S1-E — UMÝVAČKA (slot).** Dolná a horná pokryjú 60–70 % potrieb; ostatné (vysoká, spotrebičová, drezová, rohová…) sa **odvodia** od týchto dvoch neskôr. Rohové a atypické korpusy sú mimo scope V1 (sekcia 12 / mimo scope).
+**V1: DOLNÁ, HORNÁ, — od S1-E — UMÝVAČKA (slot) a — od ROH-A1 (K3, blok 8) — ROHOVÁ (dolná slepá).** Dolná a horná pokryjú 60–70 % potrieb; ostatné
+(vysoká, spotrebičová, drezová…) sa **odvodia** od týchto dvoch. **Dolná slepá rohová skrinka s CR lištou je vo V1** (rozhodnutie Michala 6.9.2026); **horná
+rohová, rohové vybavenie (LeMans, karusel) a atypické (L, šikmé) korpusy sú mimo scope V1** (sekcia 12 / mimo scope).
+
+**ROHOVÁ (`type: corner_blind`, CONFIG_SCHEMA 22) = dolná skrinka + rohová zostava na prednej rovine.** Konštrukcia (hĺbka, dno, strop, chrbát, sokel, nohy) je
+**presne ako dolná** (predvoľby `CORNER_DEFAULTS` = dolná + šírka 1100 + jeden riadok dvierok); navyše štyri polia configu, **zapisované len pri rohovej a vždy
+všetky**: `corner_side` (`left` | `right` — strana **dverovej časti** spredu, roh je oproti; iné → `left`), `corner_door_w` (mm 250–800, predvolene 450 — dverová
+časť od vonkajšej plochy boku po os medzery dvere ↔ CR 1), `corner_cr1` a `corner_cr2` (mm 50–250, predvolene 80). Rozmery sa čítajú **prísne** (nečíslo =
+predvoľba poľa, nie 0) a klampujú; rozsahy sú návrh (potvrdí Michal v mockupe ROH-B). Zostava (dvere vľavo; dvere vpravo = zrkadlo `x' = W − x − box[0]`, korpus
+sa nemení): **blenda korpusová** `[W − t − D, t, z_hi − z_lo]` @ `[D, 0, z_lo]` · **výstuha závesov** `[t, 80, z_hi − z_lo]` @ `[D − t, 0, z_lo]` · **CR 1**
+`[c1 − gC, th1, hf]` @ `[D + gC, −th1, zf0]` · **CR 2** `[th2, c2 − gC + th1, hf]` @ `[D + c1, −(c2 − gC + th1), zf0]` · **rohová výstuha** `[t, c2 + th1, h − s]`
+@ `[D + c1 + th2, −(c2 + th1), s]`, kde `gC` = medzera dverí pri rohu, `th1/th2` = **účinná hrúbka** CR z čelového kanála (override dielca → čelový materiál →
+UNI/neznámy = 18), vyriešená **pred plánom** (jediná mapa pre stavbu, validáciu aj sondy), `zf0`/`hf` = obrys riadku dverí. **Čelá:** otvor čiel = dverová časť
+(`x0` 0 alebo `W − D`), **presne jeden riadok dvierok s jedným krídlom** (R6 — invariant `normalize`, akcie čiel aj šablóna ho odmietnu porušiť), medzera pri rohu
+1–20 mm; chýbajúci smer pántov = **strana pri rohu** (R7 — jediná výnimka zo zákazu predvoleného smeru, §5.3). **Vnútri len police** cez celú šírku (bez priečok),
+predné odsadenie `max(20, t)` (za blendou); polica prechádza výstuhou závesov — výrez robí dielňa (ORANGE). **Odmietnutia:** `D + c1 + th2 + t ≤ W − t`,
+vnútorná hĺbka ≥ 80 (výstuha závesov pred chrbtom). **Typ ani strana** existujúcej rohovej sa v A1 **nemenia** žiadnou cestou (prepínač strany príde s ROH-B).
 
 **UMÝVAČKA (`type: dishwasher`) je typ BEZ KORPUSU.** Nemá boky, dno, strop, chrbát ani zóny a **podpora je vždy `none`** (nohy ani sokel nedostane). Vyrába
 **jediný dielec — čelo** (jeden pevný item typu `blind`, rola `false_front`, viď 5.3) a telo umývačky kreslí ako **referenciu** (`kind: reference`, viď 2.1).
@@ -415,7 +443,7 @@ Výplň medzi horným okrajom čela a líniou linky sa **negeneruje** — rieši
 
 Korpus nesie konštrukciu ako dáta, s pomenovanými predvoľbami:
 
-- `noxun-lower-18` (spodný 18 mm), `noxun-upper-18` (horný 18 mm), `noxun-16` (16 mm)…
+- `noxun-lower-18` (spodný 18 mm), `noxun-upper-18` (horný 18 mm), `noxun-dishwasher` (slot), `noxun-corner-blind` (rohová, ROH-A1), `noxun-16` (16 mm)…
 - Každá predvoľba nastaví hrúbky, spôsob uloženia dna/vrchu, typ chrbta, odsadenia.
 - **Každé pole má pokročilý override** — predvoľba je štart, nie väzenie.
 
@@ -533,6 +561,10 @@ zápis ho uloží explicitne — inak by starší plugin (§2, schéma 11) neved
 **DORMANT:** všetkých päť sa v configu drží bez ohľadu na aktuálny typ a počet krídel (prepnutie typu ani `1 ↔ 2 ↔ auto` hodnotu nezahodí, po návrate sa obnoví).
 **Aplikovateľnosť smeru má JEDINÚ definíciu** — `Fronts.direction_slots(resolved_item)` nad efektívnym `wings_n` (nie surovým `wings`): 1 krídlo → `single` · 2 → nič (odvodené
 Ľ+P) · 3 → `p2` · 4 → `p2`+`p3` · ne-dvierka → nič. **Nikde v kóde (Ruby, JS, náhľad ani overlay) nesmie existovať default ani heuristika smeru.**
+**JEDINÁ VÝNIMKA — rohová skrinka (R7, Michal 27.9.2026, ROH-A1):** riadok dvierok rohovej **bez kľúča** `direction` (nová rohová — legacy dáta rohová nemá) dostane
+v `normalize` **stranu pri rohu** (dvere vľavo → pánty vpravo na výstuhe závesov, dvere vpravo → vľavo; `CabinetBuilder::CORNER_HINGE_SIDE` cez jedinú funkciu
+`corner_hinge_side`, volanú len z `corner_fronts!`). `unset`, `left` aj `right` sú vedomá voľba a nemenia sa; ostatné typy skriniek smer nikdy nedostanú. Výnimku
+pripína test `tests/pure/test_roha1_rohova.rb`.
 
 `items[].type: "none"` (D-18 „Bez čela"): riadok `none` drží výšku v rade presne ako čelo (fixed/auto/lock, rovnaká matematika),
 ale panel sa negeneruje = otvorená nika v rade čiel.
@@ -1195,6 +1227,11 @@ Každý plošný dielec nesie hrany **per strana** ako dáta (nezávislé od viz
 - **Lišty chrbta (KON-B · K2, `SEED_VERSION` 5):** `back_rail_top` aj `back_rail_bottom` **L1 1,0 mm** — páska na jednej dlhej hrane **viditeľnej zvnútra**
   (horná lišta dolná hrana, dolná lišta horná hrana); rovnaká mapa hrán → jeden riadok kusovníka (§8.2). Seed-merge doplní roly aj na existujúcom PC,
   vlastné pravidlá neprepíše.
+- **Rohová zostava (ROH-A1 · K3, `SEED_VERSION` 6, hrany podľa DC „Rohová"):** `corner_blind_panel` (blenda korpusová) **bez ABS** · `hinge_rail` (výstuha
+  závesov) **L2** = zadná hrana, viditeľná zvnútra · `corner_rail` (rohová výstuha) **L1 + W1 + W2** = predná, spodná a horná · `cr_front` a `cr_side` (CR lišty)
+  **dookola** ako čelo (R4). Blenda a CR 1 stoja v rovine čiel (`AXES_FRONT`, karta dielca má čelnú mapu strán — L1 vľavo, W2 hore), výstuhy a CR 2 ako bok
+  (`AXES_UPRIGHT`, L1 = predná); žiadna nie je stojaca. Mapy sú symetrické v X, takže zrkadlo (dvere vpravo) fyzicky olepené hrany nemení; ručný override ľavej
+  či pravej hrany pri zmene strany premapuje až prepínač strany (ROH-B). Seed-merge doplní roly aj na existujúcom PC, vlastné pravidlá neprepíše.
 - Výnimky pravidlami: hrúbka < prah → nič; rola v zozname výnimiek → nič.
 - Ručný override per dielec vždy víťazí.
 
@@ -1547,5 +1584,5 @@ Zámerne nerozhodnuté — overia sa na prototype/V1 v SketchUpe (SkAgent), nie 
 
 ### Mimo scope štandardu v1 (nie „otvorené" — zámerne vynechané)
 
-Vŕtacie pozície a CNC rastre kovania • nesting / nárezové plány • automatické výkresy • cloud • rohové a atypické korpusy • šikmé/zakrivené dielce • kompletný kuchynský CAD.
+Vŕtacie pozície a CNC rastre kovania • nesting / nárezové plány • automatické výkresy • cloud • horná rohová, rohové vybavenie (LeMans, karusel) a atypické korpusy (L, šikmé) — dolná slepá rohová je vo V1 (§4.2) • šikmé/zakrivené dielce • kompletný kuchynský CAD.
 K týmto sa systém dostane, až keď jadro (štandard → referenčný korpus → childy → kovania → výstupy) stojí a je overené.

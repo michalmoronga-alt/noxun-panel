@@ -138,13 +138,23 @@ neho by dva boky Quadro boxu mali rovnaký kľúč). Sú **ADITÍVNE**, takže `
 „F2 · bok boxu ľavý"). Kľúče sú deterministické z `front_id` + roly, preto sa dajú zložiť **bez plánu** — na tom stojí výpočet hrúbok kanála `:drawer` PRED plánom
 (`CabinetBuilder.drawer_thicknesses`, [materials.md](materials.md)).
 
+**ROH-A1 — päť kľúčov rohovej zostavy:** `cabinet/corner_panel` · `cabinet/hinge_rail` · `cabinet/corner_rail` · `cabinet/cr:1` · `cabinet/cr:2`. Sú **ADITÍVNE**
+(`PartKeys::SCHEMA` sa nebumpuje) a **nezávisia od strany dverí** — zrkadlo mení len polohu, takže override dielca prežije aj budúcu zmenu strany (ROH-B ho len
+premapuje, kde treba). Kľúče CR sú deterministické, preto sa hrúbky čelového kanála dajú vyriešiť **bez plánu** (`Construction::CR_PART_KEYS`,
+`CabinetBuilder.corner_thicknesses`). `human_label` ich nepozná (vráti surový kľúč, ako pri ostatných `cabinet/…`).
+
 **KOV-A2b — `front_id(key)`:** čistý parser, ktorý z kľúča dielca vytiahne ID čela (`front:F2/wing:single` → `F2`), inak `nil`. Formát kľúča je kontrakt tohto modulu, takže druhý
 parser inde by sa časom rozišiel; jediný čitateľ je zatiaľ deep-link „klik na RED nález otvorí kartu čela" (`ProductionCore.do_select` → `Panel.push_focus_front`).
 
 ### build_plan.rb
 
-**ZÁVÄZNÝ kontrakt plánu** (SCHEMA 6 — posledný bump KON-B · K2: nové roly líšt chrbta `back_rail_top` / `back_rail_bottom`; MIN_DIM, validátor, `warnings[]`, hardware string-keyed s GENERIC_TYPES/limitmi/referenčnou integritou ownera). Geometria, kusovník aj VEPO
+**ZÁVÄZNÝ kontrakt plánu** (SCHEMA 7 — posledný bump ROH-A1 · K3: päť rolí rohovej zostavy; MIN_DIM, validátor, `warnings[]`, hardware string-keyed s GENERIC_TYPES/limitmi/referenčnou integritou ownera). Geometria, kusovník aj VEPO
 čítajú TEN ISTÝ plán.
+
+**`SCHEMA` 6 → 7 (ROH-A1 · K3, v0.14.1): ROHOVÁ ZOSTAVA.** `ROLES` dostali `corner_blind_panel` · `hinge_rail` · `corner_rail` (korpus) a `cr_front` · `cr_side`
+(čelový materiál). Precedens schém 4 a 6: plán, ktorý môže niesť rolu neznámu staršiemu pluginu, už nie je plánom schémy 6. Kľúče `cabinet/corner_panel`,
+`cabinet/hinge_rail`, `cabinet/corner_rail`, `cabinet/cr:1`, `cabinet/cr:2` prijíma existujúce `cabinet/` pravidlo (`PartKeys::SCHEMA` sa nebumpuje); CR 2 a rohová
+výstuha majú **záporný origin Y** (pred korpusom), čo `validate_part!` pripúšťa. Kompatibilitu typu drží `CONFIG_SCHEMA` 22 ([construction.md](construction.md)).
 
 **`GENERIC_TYPES` + `lift` a `SCHEMA` 2 → 3 (KOV-B1, v0.9.19).** Slovník typov kovania dostal `lift` (výklopy a sklopy) — presunuté z KOV-E podľa auditu #17 BLOCKER 2, lebo
 kanonická mapa `use_type → generic_type` v `hardware_sets.rb` ho potrebuje UŽ TERAZ (inak sa výklopový set nedá uložiť). PRAVIDLÁ ani seed mapovanie k nemu zatiaľ NIE SÚ — tie

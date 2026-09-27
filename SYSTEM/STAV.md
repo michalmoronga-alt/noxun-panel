@@ -6,46 +6,47 @@
 
 ## Stav
 
-**v0.14.0 · 27.9.2026 — BLOK 7 · KONŠTRUKCIA K1+K2 UZAVRETÝ** (KON-0 · KON-A · KON-B · KON-D, PR #401–#404 + uzáver PR #405):
-**KON-0** — chrbát v drážke ide do nárezu, VEPO aj ceny v plnom rozmere skrinky (horná 600 × 720), model ho ukazuje v drážke; staré skrinky Kontrola označí
-a prestavia sa jedným klikom (D-143) · **KON-A** — **komín vzadu** (dno, strop a zadná výstuha kratšie ako bok, nika spotrebiča z hĺbky boku) a **zapustený strop
-vpredu**; vložený a drážkový chrbát končí pod výstuhami na výšku (D-144) · **KON-B** — chrbát **„Z líšt"**: dve lišty z korpusu, vnútro pred nimi v celej výške,
-v kusovníku jeden riadok, vo VEPO „Chrb HD" · **KON-D** — vstavaná šablóna **„Chladničková"** 600 × 2100 × 560, komín 50, bez chrbta, očakáva chladničku.
-Výsledok a smoke checklist: [archiv/KONSTRUKCIA_ZAVER_2026-09-27.md](archiv/KONSTRUKCIA_ZAVER_2026-09-27.md). Pod tým blok **SPOTREBIČE S1** (v0.13.0, smoke **PASS 26.9.**).
+**v0.14.1 · 28.9.2026 — BLOK 8 · K3 ROHOVÁ SKRINKA beží: ROH-A1 jadro rohovej** (PR #410). Plugin pozná nový typ **„Rohová"** (`corner_blind`) — dolnú slepú
+rohovú skrinku podľa DC „Rohová": korpus ako dolná + rohová zostava na prednej rovine (**blenda korpusová**, **výstuha závesov**, **CR 1**, **CR 2**, **rohová
+výstuha**), dvere vľavo aj vpravo (zrkadlo), jedny dvierka s pántmi predvolene pri rohu, vnútri len police. Ide do **kusovníka, VEPO, nákupu aj ponuky** (CR z čelového
+materiálu s ABS dookola, nohy 6 pri 1100, závesy podľa výšky dverí). **Tlačidlo „Rohová" a náhľad ešte nie sú** — prinesie ich **ROH-A2**; rohová v otvorenom modeli je
+editovateľná bežnými riadkami Inspectora a chránená serverom (typ ani stranu nezmeníš, čelá ostanú jedny dvierka, zóny sa nedelia).
+Pod tým **blok 7 · KONŠTRUKCIA K1+K2** (v0.14.0, smoke **PASS 27.9.**, delenie čiel Chladničkovej 719 / 1274 potvrdené) a blok **SPOTREBIČE S1** (v0.13.0, smoke PASS 26.9.).
 Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **trinástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · **Spotrebiče** · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine. Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
 Etapa **V0.6 (katalógy a ceny) je obsahovo splnená**. **Od 20.8. sa z pluginu objednávajú REÁLNE zákazky** — zákazka KLINIKA (254 dielcov) je postavená čisto z pluginu; nálezy z výroby a chyby v cenách majú **najvyššiu prioritu** ([PLAN.md](PLAN.md)).
-V1 ciele **Materiály, Kovanie, Spotrebiče a Dvaja používatelia** sú odškrtnuté ([V1_VIZIA.md](V1_VIZIA.md)); pri **Konštrukcii** (bod 2) sú K1 a K2 hotové, ostáva K3 rohová skrinka.
+V1 ciele **Materiály, Kovanie, Spotrebiče a Dvaja používatelia** sú odškrtnuté ([V1_VIZIA.md](V1_VIZIA.md)); pri **Konštrukcii** (bod 2) sú K1 a K2 hotové, **K3 rohová skrinka beží** (blok 8).
 
 **Hotové veľké celky:** INSPECTOR REWORK (UI-A…UI-D) · **fáza ŠTÚDIO** (ŠT-1a…ŠT-4b, PR #192–#228) — **zaniklo šesť okien** · **blok KRESBA** · **blok GHOST VKLADANIE**
 (v0.9.0) · **blok KOVANIE** (v0.10.0) · **blok M-R VZHĽAD** (v0.12.0) · **blok SPOTREBIČE S1** (v0.13.0) · **blok KONŠTRUKCIA K1+K2** (v0.14.0) — plné texty
 v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).
-**Kompatibilita:** skrinka je v **schéme 21**, **doska v schéme 2**, **šablóny v STD 7**, výrobný plán v **schéme 6**, ABS pravidlá v **seede 5** — starší plugin
-zákazku neprestaví ani nevyexportuje. **Dáta rozpočtu sú od S1-B1 v `BUDGET_STD` 2** (starší plugin zákazku po prvej mutácii rozpočtu needituje a zastaví oba cenové exporty).
-**Aktualizovať OBE PC (aj Luciino) pred prvou zákazkou** — starší plugin „Z líšt" nepozná (prestavbou by vrátil dosku chrbta, samostatnú lištu by vo VEPO vydal
-pod plným názvom) a knižnicu šablón STD 7 len číta (nedá sa v nej ukladať, premenovať ani mazať).
+**Kompatibilita:** skrinka je v **schéme 22** (ROH-A1: typ `corner_blind`), **doska v schéme 2**, **šablóny v STD 7**, výrobný plán v **schéme 7**, ABS pravidlá
+v **seede 6** — starší plugin zákazku neprestaví ani nevyexportuje (rohovú by sklopil na dolnú). **Dáta rozpočtu sú od S1-B1 v `BUDGET_STD` 2** (starší plugin zákazku
+po prvej mutácii rozpočtu needituje a zastaví oba cenové exporty). **Aktualizovať OBE PC (aj Luciino) pred prvou rohovou** — starší plugin rohovú nepozná a knižnicu
+šablón STD 7 len číta (nedá sa v nej ukladať, premenovať ani mazať).
 
-**Testy (posledná kódová dávka, KON-D #404):** **4643 headless · 134 JS sád · 3172 in-SU PASS / 0 FAIL** (uzáver v0.14.0 mení kód len číslom verzie — headless
-a JS sady zelené). KON-B (#403): 4621 · 133 · 3158. KON-A (#402): 4600 · 132 · 3136. **KON-0 (#401):** 4577 · 131 · 3111. **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
+**Testy (posledná kódová dávka, ROH-A1 #410):** **4689 headless · 135 JS sád · 3208 in-SU PASS / 0 FAIL**. KON-D (#404): 4643 · 134 · 3172. KON-B (#403): 4621 · 133 · 3158.
+**M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 
 ## Robí sa
 
-**Michalov smoke bloku 7** podľa checklistu v [archiv/KONSTRUKCIA_ZAVER_2026-09-27.md](archiv/KONSTRUKCIA_ZAVER_2026-09-27.md) — nové nálezy sa zapíšu do
-[DOGFOODING.md](DOGFOODING.md) (skupina „smoke po uzávere bloku 7") a opravia ako v0.14.x. Pri smoke **potvrdiť delenie čiel Chladničkovej 719 / 1274**.
-**Tiež čakajú na smoke:** **D-132** (#367), **D-133** (#368), **D-134** (#369). **D-141**, **D-142** a **D-145** sú v zásobníku.
-**Blok 1d** podľa kapacity — hotové po R-14, ďalej R-18; **R-13 čaká na Michala**.
+**Blok 8 · K3 ROHOVÁ SKRINKA** ([PLAN.md](PLAN.md), priečinok [zdroje/bloky/ROHOVA/](zdroje/bloky/ROHOVA/)): ✅ **ROH-A1** jadro → **ROH-A2** vkladanie a náhľad
+(tlačidlo „Rohová", dvere a pánty v náhľade v dverovej časti) → **ROH-B** ovládače (dverová časť, CR lišty, prepínač strany) po Michalovom schválení mockupu.
+Návrhy na potvrdenie (mockup ROH-B): rozsahy dverovej časti a CR, názvy dielcov a VEPO skratky, predvolená konštrukcia (ako dolná vs. DC), výrez police × výstuha
+závesov ako ORANGE. **Smoke rohovej** sa robí spolu s ROH-A2 (vrátane skúšky závesu Sensys na výstuhe závesov v dielni).
+**Čakajú na smoke:** **D-132** (#367), **D-133** (#368), **D-134** (#369). **D-141**, **D-142** a **D-145** sú v zásobníku. **Blok 1d** podľa kapacity — R-18; **R-13 čaká na Michala**.
 
 ## Ďalší krok
 
-**Aktualizovať plugin na oboch PC** (Michal aj Lucia) a smoke bloku 7. **Ďalší blok vyberá Michal** ([PLAN.md](PLAN.md)) až po smoke **PASS** alebo výslovnom
-„ideme ďalej". Kandidáti z plánu: **K3 rohová skrinka** (blok 4, nízka priorita, posledná vo V1) · **ceny materiálov/ABS** a viac URL na položke (zvyšok V1-03) ·
-**nárezový plán primitívny** · **V1.0 zostavy** (test na kompletnej reálnej zákazke) · blok 1d. Nálezy z výroby a cien majú prednosť.
+**ROH-A2** z čerstvého `main` po mergi ROH-A1. **Aktualizovať plugin na oboch PC** (Michal aj Lucia) pred prvou rohovou. Po bloku 8 vyberá ďalší blok Michal
+([PLAN.md](PLAN.md)) — kandidáti: **ceny materiálov/ABS** a viac URL na položke (zvyšok V1-03) · **nárezový plán primitívny** · **V1.0 zostavy** · blok 1d.
+Nálezy z výroby a cien majú prednosť.
 
 ## Posledné uzávery
 
-- **BLOK 7 · KONŠTRUKCIA K1+K2 UZAVRETÝ** (v0.13.0 → **v0.14.0**, 26.–27.9.2026, PR #401–#404 + uzáver PR #405). Chrbát v drážke do nárezu v plnom rozmere,
-  komín vzadu a zapustený strop, oprava D-144, chrbát z líšt, šablóna Chladničková; priečinok bloku je od uzáveru v [archiv/bloky/KONSTRUKCIA/](archiv/bloky/KONSTRUKCIA/).
+- **BLOK 7 · KONŠTRUKCIA K1+K2 UZAVRETÝ** (v0.13.0 → **v0.14.0**, 26.–27.9.2026, PR #401–#404 + uzáver PR #405; smoke **PASS 27.9.**). Chrbát v drážke do nárezu v plnom
+  rozmere, komín vzadu a zapustený strop, oprava D-144, chrbát z líšt, šablóna Chladničková; priečinok bloku je od uzáveru v [archiv/bloky/KONSTRUKCIA/](archiv/bloky/KONSTRUKCIA/).
   [Plný blok](archiv/ROADMAP_hotove_etapy.md) · [výsledok, dávky a checklist](archiv/KONSTRUKCIA_ZAVER_2026-09-27.md) · priebeh v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 - **BLOK SPOTREBIČE S1 UZAVRETÝ** (v0.12.9 → **v0.13.0**, 20.–24.9.2026, PR #375–#389 + uzáver #390; smoke PASS 26.9.). Katalóg spotrebičov, spotrebič v zákazke,
   slot umývačky, telo chladničky s Kontrolou niky a delenia čiel, očakávaný spotrebič; smoke opravy D-136 až D-140.

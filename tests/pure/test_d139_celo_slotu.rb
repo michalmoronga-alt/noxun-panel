@@ -198,7 +198,8 @@ NxTest.test('D-139 (Astra FIX 5): hranice vysky linky slotu su zo sokla a medzer
     { type: 'dishwasher', dw_front_bottom: 300.0, fronts: { 'gap_top' => 0.0 } }
   ), 0.01, 'min_valid_height pre slot = ta ista spodna hranica (normalizovany config)')
   scale = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'scale_observer.rb'), encoding: 'UTF-8')
-  body = scale[/def clamp_height\(params, val, cid\).*?\n        end\n/m].to_s
+  # ROH-A1: signatura dostala volitelne `part_thicknesses` (sondy s CR).
+  body = scale[/def clamp_height\(params, val, cid(?:, [^)]*)?\).*?\n        end\n/m].to_s
   NxTest.assert(body.index('clamp_slot_height') < body.index('CabinetBuilder.normalize'),
                 'slot odbocuje PRED normalize ulozeneho configu')
 end

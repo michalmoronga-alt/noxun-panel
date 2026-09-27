@@ -17,6 +17,26 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **ROH-A1 · JADRO ROHOVEJ SKRINKY (28.9.2026, PR #410, v0.14.0 → v0.14.1, blok 8 · K3).** Package v2 [PACKAGE_ROHA1.md](../zdroje/bloky/ROHOVA/PACKAGE_ROHA1.md)
+  (krížový audit bloku + audit návrhu Codex `gpt-6-astra` 1 BLOCKER · 3 FIX · 1 NOTE — surový výstup [AUDIT_ROHA1_2026-09-28.md](../zdroje/bloky/ROHOVA/AUDIT_ROHA1_2026-09-28.md)).
+  **Čo pribudlo:** nový typ **`corner_blind`** (dolná slepá rohová) — korpus ako dolná + rohová zostava na prednej rovine: **blenda korpusová**, **výstuha závesov**,
+  **CR 1**, **CR 2** a **rohová výstuha** (`Construction.corner_parts`, čísla presne ako DC „Rohová", dvere vpravo = zrkadlo `x' = W − x − box[0]`), štyri polia configu
+  (`corner_side`, `corner_door_w` 250–800, `corner_cr1`/`corner_cr2` 50–250 — rozsahy návrh), otvor čiel = dverová časť. **Účinné hrúbky CR pred plánom** (čelový
+  kanál, override dielca, UNI = 18) — jedna mapa pre stavbu, pomocné plány (`plan_parts_by_key`, ABS remap) aj sondy výšky/hĺbky/**šírky** (nová `min_valid_width`,
+  klamp šírky rohovej v `ScaleWatch` s nemodálnou vetou). **Ochrany:** jedny dvierka s jedným krídlom (normalize + odmietnutie v akciách čiel a šablóne), medzera pri
+  rohu 1–20, bez priečok (akcia zón aj `validate!`), police za blendou `max(20, t)` (audit A1 BLOCKER 1) + ORANGE „výrez robí dielňa", `back_front_y ≥ 80`, predvolený
+  smer pántov pri rohu (R7 — jediná výnimka z O1, pin testom), typ ani strana sa nemenia (apply, šablóna), polia zo záznamu šablóny pri vkladaní (FIX 3), preflight
+  otvoru čiel pre každý typ (NOTE 5), `edge_sides` čelná mapa pre CR 1 a blendu (FIX 4). **Výstupy:** roly vo všetkých uzavretých zoznamoch (BuildPlan, ABS seed 6
+  podľa DC, osi, tagy, kusovník, VEPO skratky `Blenda roh`/`Vyst zav`/`Vyst roh`/`CR 1`/`CR 2`, ponuka „dvierka" pre CR, karta dielca, pravidlá), kovanie ako dolná
+  (nohy 6 pri 1100, závesy podľa výšky dverí). **JS:** len registre typu (`CAB_TYPES`, `NX_TYPE_LABEL`, `TYPE_LIMITS`, `INSERT_TYPES`, typ šablóny) — tlačidlo
+  „Rohová" a náhľad sú ROH-A2. **Schémy:** `CONFIG_SCHEMA` 22 · BuildPlan `SCHEMA` 7 · ABS `SEED_VERSION` 6 (STD šablón bez zmeny). Pripnuté čísla v starších sadách
+  zladené (KON-B/S1-E/KON-0/KOV-D5/KOV-W/ABS zámok), golden plány dolnej a hornej sa nepohli. STANDARD (§2.4, §2.5 história 22, §4.2 rohová vo V1 — opravené
+  „rohové korpusy mimo scope" aj v §12, §5.3 výnimka R7, §7.5), VEPO_KONTRAKT, POJMY, architektúra na mieste; drobnosť: zatúlaný U+FEFF v CROSS_AUDIT_CODEX odstránený.
+  **Testy:** headless 4689 · JS 135 sád · **in-SU 3208 PASS / 0 FAIL** (hlava opráv predrecenzie) (nový `run_roha1` — 10 kombinácií plán = model, Späť, odmietnutia, šablóny, tri kópie, scale
+  šírky, .skp, výstupy — a `run_roha1_async`). Smoke rohovej sa robí spolu s ROH-A2 (A1 nemá tlačidlo vkladania).
+  **Predrecenzia** (slepý recenzent 28.9., hlava b00994fb): PR OK, 0× P1/P2, 3× P3 — ručný názov „Rohová skrinka N" na nerohovej skrinke sa už nestratí
+  (automatický je len pri `corner_blind`), komentár hrúbky CR opravený; pevné minimum šírky rohovej v paneli (584) → ROH-B (limit zo servera).
+
 - **DOCS — štart bloku 8 · K3 ROHOVÁ SKRINKA (27.–28.9.2026, PR #409, len dokumentácia; verzia pluginu sa nemení).**
   Michal 27.9. večer po smoke PASS bloku 7 vybral **K3 rohovú skrinku** ako nočný blok. **Rozhodnutia** (R1–R9, `zdroje/bloky/ROHOVA/ROZHODNUTIA_MICHALA_2026-09-27.md`):
   platí špecifikácia z debaty 6.9. (dolná slepá rohová s CR lištou podľa DC „Rohová", CR z čelového materiálu s ABS dookola, bežné kovanie, horná rohová mimo V1) +
