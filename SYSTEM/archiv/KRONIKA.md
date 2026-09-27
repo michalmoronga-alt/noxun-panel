@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **DOCS — štart bloku 8 · K3 ROHOVÁ SKRINKA (27.–28.9.2026, PR #?, len dokumentácia; verzia pluginu sa nemení).**
+- **DOCS — štart bloku 8 · K3 ROHOVÁ SKRINKA (27.–28.9.2026, PR #409, len dokumentácia; verzia pluginu sa nemení).**
   Michal 27.9. večer po smoke PASS bloku 7 vybral **K3 rohovú skrinku** ako nočný blok. **Rozhodnutia** (R1–R9, `zdroje/bloky/ROHOVA/ROZHODNUTIA_MICHALA_2026-09-27.md`):
   platí špecifikácia z debaty 6.9. (dolná slepá rohová s CR lištou podľa DC „Rohová", CR z čelového materiálu s ABS dookola, bežné kovanie, horná rohová mimo V1) +
   nové 27.9.: v dverovej časti **len jedny dvierka** (vnútri police cez celú šírku), pánty **voliteľné, predvolene pri rohu**, noc = príprava + jadro bez nových
