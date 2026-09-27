@@ -2,7 +2,7 @@
 
 > **ARCHÍV (založené 24.7.2026 pri uzávere V0.5).** Kompaktné riadky hotových etáp drží [KRONIKA.md](KRONIKA.md) (časová os) — tu sú plné pôvodné texty (história rozhodnutí, rozsahov a PR). Otvorené záväzky z týchto textov sú od 11.8.2026 zaradené do blokov [../PLAN.md](../PLAN.md) — tento súbor je čisto referenčný.
 
-## BLOK KONŠTRUKCIA K1+K2 (V1 bod 2) — UZAVRETÝ (27.9.2026, v0.14.0, PR #401–#404 + uzáver PR #?)
+## BLOK KONŠTRUKCIA K1+K2 (V1 bod 2) — UZAVRETÝ (27.9.2026, v0.14.0, PR #401–#404 + uzáver PR #405)
 
 **Chrbát v drážke do nárezu v plnom rozmere skrinky** (D-143; model ho ďalej ukazuje v drážke, staré skrinky sa prestavia hromadne z Kontroly) · **komín vzadu**
 (dno, strop a zadná výstuha kratšie ako bok, chrbát na ich zadnej hrane, nika spotrebiča z hĺbky boku) a **zapustený strop vpredu** · oprava **D-144** (vložený
@@ -35,7 +35,7 @@ knižnica šablón STD 7) prejde auditom svojho návrhu. **KON-0 (výrobná chyb
 - ✅ **D-143 · Chrbát v drážke ide do nárezu bez prídavku** — vyriešené dávkou KON-0 (PR #401, v0.13.1); plný text v [DOGFOODING_vyriesene.md](DOGFOODING_vyriesene.md).
 - ✅ **D-144 · Vložený chrbát alebo chrbát v drážke prechádza výstuhou na výšku** — vyriešené dávkou KON-A (PR #402, v0.13.2); plný text v [DOGFOODING_vyriesene.md](DOGFOODING_vyriesene.md).
 - *(Bokorys v náhľade Inspectora — pôvodne KON-C — **vypadol** (Michal 27.9.: priestor panela); neskôr lepší 3D náhľad = **D-145** v zásobníku Po V1.)*
-- ✅ **Uzáver bloku** *(PR #?, v0.14.0 — docs a verzia)* — blok do archívu, priečinok bloku do `archiv/bloky/KONSTRUKCIA/`, V1_VIZIA (bod 2 doplnený, K3 ostáva),
+- ✅ **Uzáver bloku** *(PR #405, v0.14.0 — docs a verzia)* — blok do archívu, priečinok bloku do `archiv/bloky/KONSTRUKCIA/`, V1_VIZIA (bod 2 doplnený, K3 ostáva),
   README, STAV, KRONIKA; výsledok a smoke checklist v [KONSTRUKCIA_ZAVER_2026-09-27.md](KONSTRUKCIA_ZAVER_2026-09-27.md).
 
 ## BLOK SPOTREBIČE S1 (V1-02) — UZAVRETÝ (24.9.2026, v0.13.0, PR #375–#389 + uzáver #390)

@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **BLOK 7 · KONŠTRUKCIA K1+K2 UZAVRETÝ (27.9.2026, v0.13.4 → v0.14.0, PR #401–#404 + uzáver PR #?, variant B).** Blok vybral Michal 26.9. po smoke S1 PASS;
+- **BLOK 7 · KONŠTRUKCIA K1+K2 UZAVRETÝ (27.9.2026, v0.13.4 → v0.14.0, PR #401–#404 + uzáver PR #405, variant B).** Blok vybral Michal 26.9. po smoke S1 PASS;
   debata 26.–27.9. (rozhodnutia M1–M12), krížový audit bloku (Grok + Codex), mockup schválený 27.9. bez bokorysu, podklady #400. Dávky za jeden deň:
   **KON-0** #401 (D-143 — chrbát v drážke do nárezu v plnom rozmere, zastarané skrinky a hromadná prestavba, schéma 19) · **KON-A** #402 (komín vzadu,
   zapustený strop, nika z hĺbky boku, oprava D-144, schéma 20) · **KON-B** #403 (chrbát z dvoch líšt, „Chrb HD", schéma 21, BuildPlan 6, ABS seed 5) ·

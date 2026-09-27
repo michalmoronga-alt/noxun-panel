@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.14.0 · 27.9.2026 — BLOK 7 · KONŠTRUKCIA K1+K2 UZAVRETÝ** (KON-0 · KON-A · KON-B · KON-D, PR #401–#404 + uzáver PR #?):
+**v0.14.0 · 27.9.2026 — BLOK 7 · KONŠTRUKCIA K1+K2 UZAVRETÝ** (KON-0 · KON-A · KON-B · KON-D, PR #401–#404 + uzáver PR #405):
 **KON-0** — chrbát v drážke ide do nárezu, VEPO aj ceny v plnom rozmere skrinky (horná 600 × 720), model ho ukazuje v drážke; staré skrinky Kontrola označí
 a prestavia sa jedným klikom (D-143) · **KON-A** — **komín vzadu** (dno, strop a zadná výstuha kratšie ako bok, nika spotrebiča z hĺbky boku) a **zapustený strop
 vpredu**; vložený a drážkový chrbát končí pod výstuhami na výšku (D-144) · **KON-B** — chrbát **„Z líšt"**: dve lišty z korpusu, vnútro pred nimi v celej výške,
@@ -44,7 +44,7 @@ a JS sady zelené). KON-B (#403): 4621 · 133 · 3158. KON-A (#402): 4600 · 132
 
 ## Posledné uzávery
 
-- **BLOK 7 · KONŠTRUKCIA K1+K2 UZAVRETÝ** (v0.13.0 → **v0.14.0**, 26.–27.9.2026, PR #401–#404 + uzáver PR #?). Chrbát v drážke do nárezu v plnom rozmere,
+- **BLOK 7 · KONŠTRUKCIA K1+K2 UZAVRETÝ** (v0.13.0 → **v0.14.0**, 26.–27.9.2026, PR #401–#404 + uzáver PR #405). Chrbát v drážke do nárezu v plnom rozmere,
   komín vzadu a zapustený strop, oprava D-144, chrbát z líšt, šablóna Chladničková; priečinok bloku je od uzáveru v [archiv/bloky/KONSTRUKCIA/](archiv/bloky/KONSTRUKCIA/).
   [Plný blok](archiv/ROADMAP_hotove_etapy.md) · [výsledok, dávky a checklist](archiv/KONSTRUKCIA_ZAVER_2026-09-27.md) · priebeh v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 - **BLOK SPOTREBIČE S1 UZAVRETÝ** (v0.12.9 → **v0.13.0**, 20.–24.9.2026, PR #375–#389 + uzáver #390; smoke PASS 26.9.). Katalóg spotrebičov, spotrebič v zákazke,

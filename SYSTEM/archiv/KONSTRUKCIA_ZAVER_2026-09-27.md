@@ -2,7 +2,7 @@
 
 Blok 7 vybral Michal 26.9.2026 po smoke S1 PASS. Debata 26.–27.9. dala produktové rozhodnutia M1–M12 ([bloky/KONSTRUKCIA/ROZHODNUTIA_MICHALA_2026-09-27.md](bloky/KONSTRUKCIA/ROZHODNUTIA_MICHALA_2026-09-27.md)),
 krížový audit bloku (Grok s webom, Codex s repom) našiel aj starú výrobnú chybu D-144 a mockup ([bloky/KONSTRUKCIA/MOCKUP_KONSTRUKCIA_2026-09-27.html](bloky/KONSTRUKCIA/MOCKUP_KONSTRUKCIA_2026-09-27.html))
-Michal schválil 27.9. **bez bokorysu**. Implementácia bežala 27.9. (PR #401–#404, podklady #400); uzáver PR #? vo **v0.14.0** mení len dokumentáciu a verziu.
+Michal schválil 27.9. **bez bokorysu**. Implementácia bežala 27.9. (PR #401–#404, podklady #400); uzáver PR #405 vo **v0.14.0** mení len dokumentáciu a verziu.
 Plný text bloku je v [ROADMAP_hotove_etapy.md](ROADMAP_hotove_etapy.md), celý priečinok bloku (rozhodnutia, mockup, packages s auditmi návrhu, krížový audit,
 fakty z kódu) v [bloky/KONSTRUKCIA/](bloky/KONSTRUKCIA/).
 
@@ -34,7 +34,7 @@ fakty z kódu) v [bloky/KONSTRUKCIA/](bloky/KONSTRUKCIA/).
 | KON-A · K1 | #402 | 0.13.2 | komín vzadu, zapustený strop, nika z hĺbky boku, oprava D-144, `CONFIG_SCHEMA` 20 |
 | KON-B · K2 | #403 | 0.13.3 | chrbát z dvoch líšt, jeden riadok „Chrb HD", `CONFIG_SCHEMA` 21, BuildPlan 6, ABS seed 5 |
 | KON-D | #404 | 0.13.4 | šablóna Chladničková, knižnica šablón STD 7, súhrn konštrukcie na dlaždici |
-| Uzáver | #? | 0.14.0 | dokumentácia a verzia, priečinok bloku do archívu |
+| Uzáver | #405 | 0.14.0 | dokumentácia a verzia, priečinok bloku do archívu |
 
 Bokorys v náhľade Inspectora (pôvodne KON-C) vypadol — Michal 27.9. kvôli priestoru panela; neskôr lepší 3D náhľad (D-145, zásobník Po V1).
 

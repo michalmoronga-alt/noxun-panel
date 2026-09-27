@@ -25,7 +25,7 @@ plný text vrátane výsledku je v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADM
 plný text so všetkými task packages a výsledkom uzáveru je v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), priebeh dávok v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 Balík **Čiel (D-114/D-119/D-120)** je tiež uzavretý — **v0.11.0, 11.9.2026**, plný text v tom istom archíve. Zoznam **Mimo V1** ostáva v sekcii **Po V1 — zásobník**.)*
 *(Blok **5 · SPOTREBIČE S1** (V1-02) je hotový — **v0.12.9 → v0.13.0, 20.–24.9.2026**, PR #375 → #389 + uzáver #390 (E0 · A1 · A2 · E · B1 · B2 · F · C + smoke opravy A–C); plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), výsledok a checklist v [archiv/S1_ZAVER_2026-09-24.md](archiv/S1_ZAVER_2026-09-24.md).)*
-*(Blok **7 · KONŠTRUKCIA K1+K2** (V1 bod 2) je hotový — **v0.13.0 → v0.14.0, 26.–27.9.2026**, PR #401 → #404 + uzáver PR #? (KON-0 · KON-A · KON-B · KON-D);
+*(Blok **7 · KONŠTRUKCIA K1+K2** (V1 bod 2) je hotový — **v0.13.0 → v0.14.0, 26.–27.9.2026**, PR #401 → #404 + uzáver PR #405 (KON-0 · KON-A · KON-B · KON-D);
 plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), výsledok a smoke checklist v [archiv/KONSTRUKCIA_ZAVER_2026-09-27.md](archiv/KONSTRUKCIA_ZAVER_2026-09-27.md),
 priečinok bloku v [archiv/bloky/KONSTRUKCIA/](archiv/bloky/KONSTRUKCIA/).)*
 
