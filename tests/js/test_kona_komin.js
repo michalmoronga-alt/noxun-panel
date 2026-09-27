@@ -235,10 +235,21 @@ eq(gr.railDepth, 60, 'odhad pocita pas 60 mm (ako builder), nie pozadovanych 100
 const sr = prev.nxDraftStats(JSON.parse(JSON.stringify(gr)), [], []);
 const sr100 = prev.nxDraftStats(Object.assign(JSON.parse(JSON.stringify(gr)), { railDepth: 100 }), [], []);
 close(sr100.area - sr.area, Math.round(2 * 564 * 40 / 1000) / 1000, 'rozdiel plochy = 2 pasy x 564 x 40 mm');
-set('back_setback', 0); set('top_front_setback', 0);
-const g0r = run('pvSetbackDepths({ W: 600, H: 720, t: 18, D: 260, fh: 100, topMode: "two_rails", backMode: "overlay", railDepth: 100 })');
-eq(g0r.railDepth, 100, 'X = Y = 0: odhad sa nemeni (pozadovana hlbka ako doteraz)');
+// X = Y = 0: pas 150 by builder orezal na 118,5 (cd/2 − 10), ale odhad sa pri
+// nulach NEMENI — ostava pozadovanych 150 ako doteraz. Keby sa orezanie
+// presunulo pred skory navrat, dostali by sme 118,5 (delta P3 #1).
+set('back_setback', 0); set('top_front_setback', 0); set('rail_depth', 150);
+close(run('nxRailGeom(currentCarcass()).depth'), 118.5, '(builder by pri nulach orezal na 118,5)');
+const g0r = run('pvSetbackDepths({ W: 600, H: 720, t: 18, D: 260, fh: 100, topMode: "two_rails", backMode: "overlay", railDepth: 150 })');
+eq(g0r.railDepth, 150, 'X = Y = 0: odhad sa nemeni (pozadovana hlbka ako doteraz)');
 eq(g0r.sideD, undefined, 'X = Y = 0: ziadne nove kluce');
+// Vystuhy NA VYSKU s kominom (delta P3 #2): vyska 300, pas 200, komin 50 ->
+// builder (Ruby `rail_geometry`) oreze vysku pasu na 162 = h − (s + t) − 20.
+reset();
+set('height', 300); set('rail_depth', 200); set('back_setback', 50);
+set('top_mode', 'two_rails'); set('rails_orientation', 'upright');
+const gu = run('pvSetbackDepths({ W: 600, H: 300, t: 18, D: 510, fh: 100, topMode: "two_rails", backMode: "overlay", railDepth: 200 })');
+eq(gu.railDepth, 162, 'upright s kominom: odhad pocita orezanu vysku pasu 162 (ako Ruby rail_geometry)');
 
 const prevSrc = fs.readFileSync(path.join(DIR, 'preview.js'), 'utf8');
 ok(prevSrc.indexOf('if (!(g.backSetback > 0) && !(g.topFrontSetback > 0)) return g;') > 0,
