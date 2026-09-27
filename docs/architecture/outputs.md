@@ -126,6 +126,12 @@ existujúcou cestou `counts`. **Čo je splnené, rozhoduje obojsmerný dôkaz** 
 ktorú volá `Bom.appliance_expected_records` **aj riadok Spotrebič v Inspectore**: ani recyklované ID vlastníka, ani osirelý záznam v `appliance_refs[]` po zmazanej
 položke očakávanie nesplnia, a panel preto v takom stave **ponúka výber modelu** namiesto toho, aby ho potlačil. Kontrakt očakávaní je v [appliances.md](appliances.md).
 
+**D-143 (KON-0) — kategória `back_cut` (RED s bránou vo VŠETKÝCH štyroch exportoch, ORANGE bez brány).** `check_cut_issues(collected[:cut_issues], items)` beží
+**nezávisle od katalógu aj od predčasného návratu pre UNI** v `check_record` (vlastný kľúč zberu). Vetu skladá zber (`Bom.cut_issues_for`, `Bom.back_stale_issue`), Kontrola
+ju len prevezme; `stable_key` = `back_cut|kód|owner_id|part_key|pid` (dva samostatné chrbty toho istého vlastníka sú dva riadky). Nález zastaranej skrinky nemá `part_key`
+(klik označí skrinku) a nesie aditívny **`fix: 'rebuild_stale'`** — riadok Kontroly v Štúdiu pri ňom ponúkne „Prestaviť zastarané skrinky" ([ui-lifecycle.md](ui-lifecycle.md)).
+Chýbajúci kľúč = kontrola sa preskočí (vzor `placements:`).
+
 ### production_core.rb — zdieľané čisté jadro výstupov zákazky (ŠT-1a PR A)
 
 `do_select` rešpektuje `flush_blocked` po kontrole generácie okna. Nedokončený návrh v Inspectore oznámi cez status pôvodného Štúdia a model ani výber pri tom nečíta/neprepíše.
@@ -207,6 +213,14 @@ v `tests/pure/test_kovh1_adhoc.rb`.
 P2-B). Dôvod: zákazka z novšej verzie nemusí vyexpandovať ani jeden **známy** nákupný riadok (alebo jej rozpočet vôbec nevznikne), takže skorý návrat „model nemá žiadne
 kovanie" / „rozpočet sa nepodarilo zostaviť" by bránu **predbehol** a používateľ by sa nedozvedel ani ID skriniek, ani to, že má aktualizovať plugin. `newer:` preto do
 **neskorého** `export_blockers` (spolu s `dups:`/`cp:`) už nechodí — skladá ho výhradne `newer_config_stop`, jedno miesto pre všetky štyri exporty.
+
+**D-143 (KON-0, v0.13.1) — JEDNA VÝROBNÁ BRÁNA CHRBTA V DRÁŽKE: `cut_stop(collected)`.** Hneď za `newer_config_stop` vo **všetkých štyroch** exportoch (VEPO, nákupný CSV,
+rozpočet XLSX, ponuka XLSX) — pred expanziou, rozpočtom aj pred výberom súboru/priečinka, takže picker sa pri blokáde ani neotvorí. Na rozdiel od registra kovania
+**stojí aj VEPO**: chybný rozmer do nárezu je chyba rezacích dát a z nich aj plochy v rozpočte a ponuke. Zdrojom je **jeden zoznam** `Bom::CUT_BLOCKERS` nad
+`collected[:cut_issues]` — z toho istého zoznamu robí Kontrola RED (`Validation.check_cut_issues`, kategória `back_cut`), takže riadok a veta brány nemôžu tvrdiť dve veci.
+`cut_blockers` skladá jednu vetu na kód v poradí registra s ID v strope `ids_text` („tri + a ďalšie N"); ORANGE `back_origin_unknown` bránu nemá. Dôkaz „každý dôvod ×
+každý export = nula volaní pickera aj zápisu" drží `tests/pure/test_kon0_d143.rb`. **Hromadná prestavba** zastaraných skriniek má v jadre len **čistý plán a texty**
+(`back_stale_entry` / `back_stale_skip_reason` / `back_stale_plan` / `back_stale_scan` — čítanie; vzor D-131); zápis je `Panel.back_rebuild_stale` (brána 1b-3).
 
 **KOV-C2b (v0.9.31) — BRÁNA ZÁSUVIEK (`drawer:`).** Register `Recipes::DRAWER_BLOCKERS` (11 kódov) má dve polovice a každá blokuje **iné** výstupy:
 **`BUILD_BLOCKERS` (9)** = fail-closed konflikty STAVBY — zásuvka nevydala ani dielec ani položku výsuvu, takže objednávka aj rozpočet by boli neúplné → nákupný CSV,
@@ -547,6 +561,24 @@ Rozdiel medzi (1) a (3) je vecný a zámerný: **blokuje sa NEKOMPATIBILNÁ VERZ
 ### bom.rb
 
 Zber modelu a agregácia riadkov kusovníka (`Bom.collect`, `Bom.compute`, `Bom.row_key`); správanie je popísané v odsekoch, ktoré ho volajú.
+
+**D-143 (KON-0, v0.13.1) — ROZMER DO NÁREZU má JEDNO miesto čítania.** `record` berie `length`/`width` cez čistú `cut_dims(cfg)` → `[dĺžka, šírka, stav]`:
+platný `cut_size` snapshotu (Hash, konečné kladné čísla ≥ geometrii − `BuildPlan::CUT_TOL`) = **rozmer do nárezu** a záznam navyše nesie `geo_length`/`geo_width` + `cut_size: true`;
+chýbajúce pole = geometria (overlay, staré zákazky); poškodené = geometria + `cut_invalid`. Tým jediným krokom idú do nárezu **kusovník (agregácia aj stĺpce), kontrola
+formátu platne, VEPO, plocha pre rozpočet a ponuku** (`SheetEstimate` číta riadky BOM) — a `cut_size` sa uplatní **pred** otočením podľa dekoru (`VepoExport.oriented`).
+Tú istú `cut_dims` volá plocha skrinky v Inspectore (`Panel.cabinet_stats`) a karta dielca; **hmotnosť ostáva z geometrie** (`weight_totals` dostáva surové snapshoty).
+Zber popri tom skladá aditívny kľúč **`cut_issues`** (`compute()` ho ignoruje): `cut_issues_for(cfg, rec, standalone:)` na každom výrobnom zázname (vnorenom, doske aj
+samostatnom dielci) a `back_stale_issue` na skrinke. Kódy a register brány `CUT_BLOCKERS` (poradie = poradie viet): `cut_size_invalid` · `back_groove_edged` (značka
+`groove` + účinná hrana ABS) · `back_groove_incomplete` (značka `groove`, bez ABS, bez `cut_size`) · `back_groove_stale` (skrinka `groove` pod
+`BACK_CUT_ACTIVATION_SCHEMA`; `stored_back_mode` = `back_mode || back.mode`, odolné voči nehash `back`). Mimo registra je ORANGE **`back_origin_unknown`** — SAMOSTATNÝ
+chrbát bez značky pôvodu (starý odpojený kus; vnorený starý chrbát rieši zastaranosť skrinky). **Vedomé rozhodnutie Michala 27.9.2026:** export pustí.
+**Vnorený chrbát sa posudzuje aj podľa VLASTNÍKA (Codex #401 kolo 1 P1):** zber posiela `owner_cfg`; aktuálna skrinka (schéma ≥ 19) s režimom `groove`
+(`current_groove_owner?`, sémantika `stored_back_mode`) berie svoj chrbát ako chrbát v drážke, aj keď snapshot značku stratil alebo ju má poškodenú — bez rozmeru
+do nárezu je to `back_groove_incomplete` (RED + brána), nikdy tichý návrat na geometriu. Nález samostatného dielca nesie jeho **PID** (Kontrola ho prenáša, klik
+označí práve ten kus — `ProductionCore.standalone_part_entity`).
+**PRIZNANÝ LIMIT SPÄTNEJ KOMPATIBILITY (Codex #401 kolo 1 P1, vedome ponechané):** plugin v0.13.0 a starší číta samostatný `part` bez kontroly schémy a `cut_size`
+nepozná, takže **samostatný (odpojený, skopírovaný) nový chrbát vydá v geometrii** (564 × 684); brána R-12 chráni len dielce vnorené v skrinke schémy 19. Starší
+plugin sa dodatočne zmeniť nedá. Mitigácia: pred prvým použitím v0.13.1 aktualizovať **obe PC** (updater D-52); samostatné chrbty Michal nepoužíva (package KON-0 bod 6).
 
 **KOV-W — `weight_totals(records, sheets)` (v0.9.47).** Hmotnosť výrobných záznamov v kg; `sheets` je tá istá mapa `{ material_id => záznam }`, akú stavia
 `ProductionCore.sheets_map` pre `Validation.run`. Vracia `{ 'kg' => Float (2 des.), 'estimated_parts' => Integer, 'estimated_density' => Float | nil }`. Súčet ide cez

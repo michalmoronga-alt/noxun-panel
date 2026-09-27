@@ -113,6 +113,10 @@
   Nie je to iný dekor (vzor je ten istý), je to obchodné číslo produktovej rady. Dôsledok pre dáta:
   číslo dekoru v našej skupine ostáva **F800** a dodávateľské číslo je samostatné voliteľné pole **„Dekor u dodávateľa"** na variante — inak sa cena a kód kompaktu nedajú stiahnuť nikdy.
   Pri objednávaní a hľadaní treba počítať s oboma číslami.
+- **Chrbát v drážke sa reže väčší, než stojí v modeli (D-143, Michal 26.9.2026):** drážka v bokoch (a dne/strope) je hlboká ~9 mm, takže presný rozmer do nárezu
+  je **rozmer medzi bokmi + 9 mm na každú stranu s drážkou** (prídavok do drážky). **Pre V1 ide do nárezu PLNÝ rozmer skrinky** `šírka × (výška − sokel)` — horná
+  600 × 720 → **600 × 720** (model ukazuje 564 × 684) — a dielňa ho zreže („zrezať viem, prilepiť je horšie"). Objednaná plocha HDF je tým o ~12 % väčšia.
+  Chrbát v drážke sa **neolepuje** (páska by skončila v drážke); tok „olepiť po zrezaní" je mimo V1.
 - **Rovnaký dekor existuje ako DTDL aj PD s INOU štruktúrou povrchu:** Kronospan K2738 Torro Cremona Oak = DTDL „PW BU" (DK 532848) + PD „FP" (DK 532772). → otvorená otázka kľúča skupiny (nižšie).
 
 ### Výškové skladanie kuchyne

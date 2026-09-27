@@ -2837,7 +2837,7 @@ module Noxun
             'edge_overrides' => (ov['edges'] || {}), # ktore hrany maju rucny override (UI odlisi "dedi")
             'has_material_override' => !ov['material_id'].nil?,
             'cabinet_id' => Store.get(cab, 'cabinet_id')
-          }.merge(part_edge_texts(role, cfg)).merge(part_grain_payload(cfg, ov))
+          }.merge(part_edge_texts(role, cfg)).merge(part_grain_payload(cfg, ov)).merge(part_cut_payload(cfg))
         rescue StandardError => e
           Engine.log_error(e, 'part_card_payload')
           nil
@@ -2879,8 +2879,11 @@ module Noxun
           locked = (mat == 'none')
           # TA ISTA funkcia, akou pocita builder — ziadny druhy vypocet retaze.
           pending = defined?(CabinetBuilder) ? CabinetBuilder.effective_grain(sheet, override) : snapshot
-          l = cfg['length'].to_f
-          w = cfg['width'].to_f
+          # D-143 (KON-0, audit FIX 5): texty „výrobne" ukazuju VYROBNY rozmer —
+          # pri chrbte v drazke rozmer DO NAREZU (uplatneny PRED otocenim podla
+          # dekoru, presne ako VEPO: priecny dekor 720 x 600). Dĺžka/Šírka karty
+          # a nakres hran ostavaju geometricke.
+          l, w, = Bom.cut_dims(cfg)
           {
             'grain_value' => override.empty? ? 'inherit' : override,
             'grain_material' => mat,
@@ -2902,6 +2905,27 @@ module Noxun
           }
         rescue StandardError => e
           Engine.log_error(e, 'part_grain_payload')
+          {}
+        end
+
+        # D-143 (KON-0): riadok „Do nárezu" karty dielca. Kluce ide LEN pri
+        # PLATNOM rozmere do narezu (dnes chrbat v drazke) — karta bez nich
+        # vyzera presne ako doteraz. Poskodeny udaj riadok NEDOSTANE (karta si
+        # cislo nevymysla); hlasi ho Kontrola a brana exportov. Texty sklada
+        # SERVER (vzor D-102), JS len maluje.
+        def part_cut_payload(cfg)
+          len, wid, state = Bom.cut_dims(cfg)
+          return {} unless state == :ok
+
+          dims = "#{fmt_mm(len)} × #{fmt_mm(wid)}"
+          model_dims = "#{fmt_mm(cfg['length'])} × #{fmt_mm(cfg['width'])}"
+          { 'cut_size' => { 'length' => len, 'width' => wid },
+            'cut_text' => dims,
+            'cut_title' => "Chrbát v drážke ide do nárezu v plnom rozmere #{dims} mm — zrezať do drážky " \
+                           "v dielni. V modeli sedí v drážke #{model_dims} mm; hmotnosť sa počíta podľa modelu.",
+            'model_title' => "Rozmer v modeli — do nárezu ide #{dims} mm." }
+        rescue StandardError => e
+          Engine.log_error(e, 'part_cut_payload')
           {}
         end
 

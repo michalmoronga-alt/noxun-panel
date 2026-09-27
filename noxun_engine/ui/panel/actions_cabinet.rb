@@ -1045,6 +1045,80 @@ module Noxun
           name.empty? ? nil : name
         end
 
+        # --- D-143 (KON-0): „Prestaviť zastarané skrinky" z Kontroly ----------
+        #
+        # ZAPIS do modelu (preto zije v Paneli, nie v citacom jadre — brana
+        # 1b-3). Klik prisiel zo Studia cez flush handshake panela (rozpisana
+        # zmena Inspectora sa najprv aplikuje). Guardy bezia na SERVERI:
+        #   gen           — klik zo stareho DOM,
+        #   flush_blocked — cervene pole v Inspectore,
+        #   model_guid    — medzitym prepnuty dokument (PRISNE — zapis),
+        #   observer      — `ScaleWatch.flush_pending!`: vyber zastaranych
+        #                   skriniek sa robi az PO ustaleni observera (kopia,
+        #                   absorpcia Scale), inak by odlozeny tik dobehol po
+        #                   nasej operacii.
+        # Vyber je CERSTVY zber (`ProductionCore.back_stale_scan`), nie DOM.
+        # Vsetko v JEDNEJ operacii (`rebuild_many`) = jeden krok Späť; skrinky
+        # s odpojenym dielcom alebo neznamym kovanim sa preskocia a VYMENUJU.
+        # KAZDA vetva konci `repush` — plny push odomkne tlacidlo v Kontrole.
+        def back_rebuild_stale(model, data, generation:, status:, repush:)
+          pc = ProductionCore
+          if model.nil?
+            repush.call
+            return status.call('Žiadny aktívny model.', true)
+          end
+          unless data['gen'].to_i == generation.to_i
+            repush.call
+            return status.call('Kontrola sa medzitým zmenila — obnovené, klikni znova.', true)
+          end
+          if data['flush_blocked']
+            repush.call
+            return status.call('Najprv sa dokončí rozpísaná zmena v Inspectore — klikni znova.', true)
+          end
+          if DocKey.foreign?(data['model_guid'], model)
+            repush.call
+            return status.call('Model sa medzitým prepol — obnovené, klikni znova.', true)
+          end
+          if defined?(ScaleWatch) && ScaleWatch.respond_to?(:flush_pending!) && ScaleWatch.flush_pending!(model) != true
+            repush.call
+            return status.call('Model ešte dokončuje predchádzajúcu zmenu — klikni znova.', true)
+          end
+
+          plan = pc.back_stale_plan(pc.back_stale_scan(model))
+          if plan['jobs'].empty?
+            repush.call
+            return status.call(pc.back_stale_empty_msg(plan), !plan['stale'].to_i.zero?)
+          end
+
+          jobs = plan['jobs'].map { |ent| [ent['ref'], existing_params(ent['ref'])] }
+          # Vyber sa obnovuje LEN pri naozaj prestavanej skrinke; ked bol
+          # oznaceny DIELEC (napr. chrbat s otvorenou kartou), vracia sa DIELEC
+          # cez `part_key` — prestavba stare entity zahodi (vzor D-131
+          # `MaterialsDialog.fronts_grain_apply`, Codex #365 kolo 2 P2).
+          selected = find_cabinet(model)
+          rebuilt_selected = selected && plan['jobs'].any? { |ent| ent['ref'] == selected }
+          part = rebuilt_selected ? find_selected_part(model) : nil
+          part_key = part ? canonical_part_key(existing_params(selected), part_identity(selected, part)) : nil
+          suspend_selection_sync do
+            CabinetBuilder.rebuild_many(model, jobs, op_name: 'NOXUN: Prestaviť zastarané skrinky')
+            if rebuilt_selected && selected.valid?
+              if part_key
+                focus_part(model, selected, part_key)
+              else
+                reselect(model, selected)
+              end
+            end
+          end
+          status.call(pc.back_stale_done_msg(plan), !plan['skipped'].empty?)
+          push_selected(model)
+          repush.call
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.back_rebuild_stale')
+          # `rebuild_many` operaciu pri vynimke ABORTUJE sama (nic ostane rozrobene).
+          repush.call
+          status.call("Prestavba sa nevykonala: #{e.message}", true)
+        end
+
       end
     end
   end

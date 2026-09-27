@@ -276,6 +276,9 @@ module Noxun
           # handshake ako exporty. Rozpisana zmena ciel v Inspectore meni, KTORE
           # cela v zakazke su, takze prestavba musi cakat na jej flush.
           cb(dlg, 'studio_do_fronts_grain') { |p| StudioDialog.do_fronts_grain_all(p) }
+          # D-143 (KON-0): „Prestaviť zastarané skrinky" z Kontroly — TEN ISTY
+          # flush handshake (hromadna prestavba nad cerstvym stavom Inspectora).
+          cb(dlg, 'studio_do_back_rebuild') { |p| StudioDialog.do_back_rebuild_stale(p) }
           # GHOST-FB4: pole locknutej vysky v Ghost pasiku (mm). Meni stav
           # BEZIACEJ session, nie model — guard identity dokumentu je preto
           # rovnaky ako pri zapisovych handleroch (R-02).

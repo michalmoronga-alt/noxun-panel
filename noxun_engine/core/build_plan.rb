@@ -50,11 +50,17 @@
 #             prod      {length, width, thickness — Float > 0} — vyrobne rozmery
 #   VOLITELNE (default): production_class 'sheet' | manufactured true | quantity 1 |
 #             grain_lock false (zakaz rotacie dekoru pri nestingu/VEPO)
+#             D-143: back_mode 'overlay'|'inset'|'groove' (znacka povodu, len rola
+#             `back`) | cut_size {length, width} — ROZMER DO NAREZU v osiach `prod`,
+#             >= geometrii (chrbat v drazke: plny rozmer skrinky). Aditivne, bez
+#             bumpu SCHEMA; validuje `validate_cut_size!`.
 #
 # SEMANTIKA prod (zavazna pre vystupy): prod = HOTOVY rozmer dielca (s nalepenym ABS).
 # VYSTUPY POSIELAJU HOTOVY ROZMER BEZ UPRAV — VEPO si odpocet ABS robi SAM z kodov
 # hran (oprava 20.7., Michal — povodna veta o odpocte pri exporte bola omyl);
 # obchodna hrubka (18/36) a suhrnne kody hran (—/=) sa dopocitaju pri exporte (SYSTEM/03).
+# D-143: ked dielec nesie `cut_size`, VYROBNE vystupy (kusovnik, format platne, VEPO,
+# plocha rozpoctu) citaju JU namiesto `prod`; hmotnost a kresba ostavaju z `prod`.
 # Konvencia hran: L1/L2 lezia na prod[:length], W1/W2 na prod[:width];
 # pri celach prod[:length] = VYSKA cela, prod[:width] = sirka (fronts.rb box_desc).
 #
@@ -449,6 +455,8 @@ module Noxun
         end
 
         validate_axes!(key, pd[:axes])
+        validate_back_mode!(key, pd)
+        validate_cut_size!(key, pd)
 
         pc = pd.fetch(:production_class, 'sheet').to_s
         raise "BuildPlan: dielec #{key} ma neznamu production_class '#{pc}'." unless PRODUCTION_CLASSES.include?(pc)
@@ -491,6 +499,54 @@ module Noxun
           raise "BuildPlan: referencia #{key} nema label." if rd[:label].to_s.strip.empty?
         end
         list
+      end
+
+      # --- D-143 (KON-0): rozmer DO NAREZU a znacka povodu chrbta ------------
+      #
+      # Oba kluce su VOLITELNE a ADITIVNE (precedens `references`,
+      # `hardware_conflicts`) — `SCHEMA` sa preto NEBUMPUJE. Kompatibilitu so
+      # starsim pluginom drzi `CONFIG_SCHEMA` 19 (R-12 brany), nie plan.
+      #
+      # `back_mode` = znacka povodu chrbta (rezim, v ktorom ho postavila tato
+      # verzia). Builder ju zapise do snapshotu dielca, aby aj SAMOSTATNY
+      # (odpojeny, skopirovany) chrbat niesol, ci bol v drazke.
+      BACK_MODES = %w[overlay inset groove].freeze
+
+      # Tolerancia porovnania rozmeru do narezu s geometriou (mm). Snapshot
+      # zaokruhluje na 2 desatiny, takze 0,01 pokryje zaokruhlenie a nic viac.
+      CUT_TOL = 0.01
+
+      def validate_back_mode!(key, pd)
+        return nil unless pd.key?(:back_mode)
+
+        mode = pd[:back_mode]
+        raise "BuildPlan: dielec #{key} ma neplatny back_mode (#{mode.inspect})." unless BACK_MODES.include?(mode)
+        raise "BuildPlan: dielec #{key} nesie back_mode, ale nie je chrbat." unless pd[:role].to_s == 'back'
+
+        mode
+      end
+
+      # `cut_size` = {length, width} v TYCH ISTYCH osiach ako `prod`; obe hodnoty
+      # konecne, kladne a >= geometrii (rozmer do narezu nikdy nie je mensi nez
+      # dielec v modeli — `prod`/`box` ostavaju geometria a ich rovnost strazi
+      # PartFaces/AppearanceMapping). Pritomne pole = uplne a platne, inak raise.
+      def validate_cut_size!(key, pd)
+        return nil unless pd.key?(:cut_size)
+
+        cut = pd[:cut_size]
+        raise "BuildPlan: dielec #{key} ma neplatny cut_size (#{cut.inspect})." unless cut.is_a?(Hash)
+
+        prod = pd[:prod]
+        %i[length width].each do |f|
+          v = cut[f]
+          unless v.is_a?(Numeric) && v.to_f.finite? && v.positive?
+            raise "BuildPlan: dielec #{key} ma neplatny cut_size #{f} (#{v.inspect})."
+          end
+          if v.to_f < prod[f].to_f - CUT_TOL
+            raise "BuildPlan: dielec #{key} ma cut_size #{f} mensi nez geometria (#{v} < #{prod[f]})."
+          end
+        end
+        cut
       end
 
       # D-88: osi deskriptora (mapovanie hrana -> plocha kvadra, core/part_faces.rb).

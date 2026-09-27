@@ -118,16 +118,26 @@
   // (`Panel.part_grain_payload`, vzor D-102), aby panel nemohol povedat nieco
   // ine, nez postavi builder.
   // Ciste skladanie riadkov (testovane v Node): dva vlavo, jeden vpravo.
+  // D-143 (KON-0): riadok „Do nárezu" sadne do VOLNEHO miesta pod Hrúbku
+  // (vlavo su dva riadky, vpravo jeden) — karta nenarastie (trvale pravidlo
+  // „vertikálny priestor je vzácny", schvaleny mockup sekcia D). Existuje LEN
+  // ked server posle platny `cut_size` (dnes chrbat v drazke); vsetky texty
+  // (rozmer aj tooltipy) sklada server (`Panel.part_cut_payload`).
   function nxPartBasicRows(pc){
     var p = pc || {};
+    var cut = !!(p.cut_size && p.cut_text);
+    var modelTitle = cut ? String(p.model_title || '') : '';
+    var right = [ { label: 'Hrúbka', value: fmtmm(p.thickness), unit: 'mm',
+                    title: 'Hrúbku dielca určuje materiál korpusu.' } ];
+    if (cut) right.push({ label: 'Do nárezu', value: String(p.cut_text), unit: 'mm',
+                          title: String(p.cut_title || 'Zrezať do drážky v dielni.') });
     return {
-      left: [ { label: 'Dĺžka', value: fmtmm(p.length), unit: 'mm' },
-              { label: 'Šírka', value: fmtmm(p.width), unit: 'mm' } ],
+      left: [ { label: 'Dĺžka', value: fmtmm(p.length), unit: 'mm', title: modelTitle },
+              { label: 'Šírka', value: fmtmm(p.width), unit: 'mm', title: modelTitle } ],
       // Hrúbka klikatelna NIE JE: urcuje ju material KORPUSU a ten sa v rezime
       // dielca neda z panela otvorit (sektor Materiály patri kontextu Korpus).
       // Nikam nevedie => nepredstiera, ze vedie (UI-D3, N13).
-      right: [ { label: 'Hrúbka', value: fmtmm(p.thickness), unit: 'mm',
-                 title: 'Hrúbku dielca určuje materiál korpusu.' } ]
+      right: right
     };
   }
   // ===== K1 (D-108): SMER DEKORU = VSTUP ====================================

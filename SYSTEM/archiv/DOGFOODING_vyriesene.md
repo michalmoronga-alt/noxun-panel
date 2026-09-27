@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-143** — Chrbát v drážke ide do nárezu, VEPO aj ceny v plnom rozmere skrinky (horná 600 × 720 → 600 × 720, model ďalej 564 × 684); karta dielca „Do nárezu"; olepený chrbát v drážke, poškodený údaj aj zastarané skrinky (schéma < 19) zastavia všetky štyri výrobné exporty; hromadná prestavba z Kontroly — 27.9.2026, PR #401, v0.13.1
 - **D-140** — Výška osadenia chladničky v skrinke: čip „osadenie N mm" v riadku Spotrebič otvorí malé okienko s číslom (od hornej plochy dna, napr. vrch police); box niky aj pásma dverí sa posunú a Kontrola výšky aj delenia čiel počíta od zdvihnutého dna — 24.9.2026, PR #389, v0.12.20
 - **D-139** — Výška čela slotu umývačky sa dopočíta: výška linky − sokel − medzera hore zo schémy medzier; vstup „Čelo V" zanikol, predvolený slot 880 / 100 (čelo 778), výplň nad umývačkou = slot po jej spodok — 24.9.2026, PR #388, v0.12.19
 - **D-138** — Čelo slotu umývačky je „Dv myčka" so symbolom sklopu (model aj náhľad), v Čelách „Dvere umývačky" a v Kovaní/Nákupe „F1 · dv myčka"; kovanie ostáva len úchytka — 24.9.2026, PR #387 + #388, v0.12.18–v0.12.19
@@ -129,6 +130,31 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-143 — Chrbát v drážke ide do nárezu v plnom rozmere, vyriešené 27.9.2026
+
+**Výsledok: PR #401, v0.13.1 (CONFIG_SCHEMA 19), blok 7 KONŠTRUKCIA dávka KON-0.** Pôvodné znenie (Michal 26.9.2026, pri príprave bloku KONŠTRUKCIA K1+K2):
+plugin počítal chrbát v režime „V drážke" (predvolený pri hornej skrinke) na **vnútorný rozmer** skrinky (horná 600 × 720, korpus 18 → **564 × 684**). V dielni sa
+drážka frézuje do hĺbky, takže chrbát bol v nárezovom zozname aj vo VEPO **malý** — výrobná chyba. Presne by bolo +9 mm na každú stranu s drážkou; Michal pre V1
+rozhodol **nekomplikovať**: chrbát v drážke ide do nárezu **v plnom rozmere skrinky** (šírka × výška od spodku dna po vrch — **600 × 720**) a dielňa ho zreže
+(„zrezať si to viem, prilepiť je horšie"); model ho ďalej ukazuje v drážke.
+
+**Čo sa zmenilo.** Chrbát v drážke nesie nový údaj **„rozmer do nárezu"** a s ním počíta **kusovník, kontrola formátu platne, VEPO, plocha pre rozpočet a cenovú
+ponuku aj plocha skrinky v Inspectore**; pri priečnom dekore ide do VEPO 720 × 600. Hmotnosť ostáva podľa modelu. Karta dielca ukazuje pod Hrúbkou riadok
+**„Do nárezu 600 × 720"** (Dĺžka/Šírka ostávajú 564 × 684 — rozmer v modeli). **Jedna výrobná brána so štyrmi dôvodmi** (`Bom::CUT_BLOCKERS`; Kontrola RED
+a zastavené všetky štyri exporty: VEPO, nákup kovania, rozpočet, ponuka): **olepený chrbát v drážke** (ručne aj pravidlom olepu — „zruš olepenie alebo zmeň typ
+chrbta"), **poškodený rozmer do nárezu**, **chrbát v drážke bez rozmeru do nárezu** (neúplný záznam) a **zastaraná skrinka** — skrinka s chrbtom v drážke
+uložená staršou verziou (schéma < 19) má v súbore chrbát v rozmere modelu, kým sa neprestaví. Kontrola pri nej
+ponúka **„Prestaviť zastarané skrinky"** — všetky naraz, jeden krok Späť; skrinka s odpojeným dielcom sa preskočí a vymenuje. **Samostatný starý chrbát**
+(odpojený, skopírovaný, bez značky pôvodu) je ORANGE „over rozmer do nárezu" a export pustí — vedomé rozhodnutie Michala 27.9.2026 (samostatné chrbty nepoužíva).
+
+**Prečo tak (audit návrhu Codex 27.9.2026 — 2 BLOCKER, 4 FIX, 2 NOTE; package v2):** geometria v modeli sa nemení (rovnosť rozmerov dielca a plôch stráži
+mapovanie ABS/UV) · jedno miesto čítania rozmeru do nárezu pre všetky výstupy · jedna brána pre Kontrolu aj všetky exporty (dovtedy VEPO výsledok Kontroly len
+logoval) · zastaranosť podľa schémy, nie podľa prítomnosti údaja (prestavaný olepený chrbát ho zámerne nemá) · legacy zápis režimu chrbta sa číta rovnako ako pri
+prestavbe · každý nový chrbát nesie značku pôvodu, takže aj odpojený kus ostáva chránený.
+
+**Kompatibilita.** `CONFIG_SCHEMA` 19: plugin v0.13.0 takú skrinku neprestaví ani nevyexportuje (brány R-12). Starší plugin rozmer do nárezu ani značku nepozná —
+samostatný chrbát by vydal malý. **Pred prvým použitím aktualizovať obe PC (aj Luciino).**
 
 ### D-140 — Výška osadenia chladničky v skrinke, vyriešené 24.9.2026
 

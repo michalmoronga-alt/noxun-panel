@@ -127,6 +127,14 @@ module Noxun
       # ostali ako „krytky bez mechanizmu", preto sa zastavuje nakup, rozpocet
       # a cenova ponuka; VEPO bezi dalej (geometria cela je spravna).
       CAT_HW_INCOMPLETE = 'hardware_incomplete'
+      # D-143 (KON-0): chrbat v drazke a rozmer DO NAREZU. RED s EXPORTNOU
+      # BRANOU vo VSETKYCH STYROCH vystupoch (VEPO, nakup, rozpocet, ponuka) pre
+      # kody `Bom::CUT_BLOCKERS` (poskodeny `cut_size`, olepeny chrbat v drazke,
+      # neuplny snapshot, zastarana skrinka); ORANGE bez brany pre samostatny
+      # stary chrbat bez znacky povodu (`back_origin_unknown`, Michal 27.9.).
+      # Kontrola bezi nad `collected[:cut_issues]` NEZAVISLE od katalogu
+      # a predcasneho navratu pre UNI v `check_record`.
+      CAT_BACK_CUT = 'back_cut'
       # ORANGE — S1-E: SLOT UMYVACKY. Dva kody:
       #   `dw_body_fit`   — telo spotrebica je sirsie nez slot (telo sa nikdy
       #                     nedeformuje, takze by v modeli TRCALO),
@@ -228,6 +236,7 @@ module Noxun
         check_hardware_issues(collected[:hardware_issues], items,
                               collected[:hardware_overrides])
         check_newer_configs(collected[:newer_configs], items)
+        check_cut_issues(collected[:cut_issues], items)
         check_hardware_manual(collected[:hardware_manual], items)
         # S1-E: udaje slotu chodia TOU ISTOU cestou ako vsetko ostatne —
         # `Bom.collect` -> `Validation.run` (Astra S1-E FIX E12). Chybajuci
@@ -957,6 +966,40 @@ module Noxun
                                      'nevytvoria (VEPO, nákupný zoznam kovania, rozpočet, ' \
                                      'cenová ponuka); aktualizuj plugin.',
                      'stable_key' => "#{CAT_NEWER_CFG}|#{id}" }
+        end
+      end
+
+      # --- D-143 (KON-0): chrbat v drazke / rozmer do narezu -----------------
+      #
+      # Aditivny kluc zberu `cut_issues`; nil / chybajuci = kontrola sa preskoci
+      # (vzor `placements:`). Vetu sklada ZBER (`Bom.cut_issues_for`,
+      # `Bom.back_stale_issue`) — Kontrola ju len prevezme, aby Kontrola a veta
+      # brany hovorili to iste. `stable_key` nesie KOD aj PID dielca: dva
+      # samostatne chrbty s tym istym vlastnikom su DVA riadky. Nalez zastaranej
+      # skrinky nesie aditivny `fix: 'rebuild_stale'` — Kontrola pri nom ponukne
+      # hromadnu prestavbu zastaranych skriniek.
+      def check_cut_issues(issues, items)
+        Array(issues).each do |iss|
+          next unless iss.is_a?(Hash)
+
+          code = iss['code'].to_s
+          next if code.empty?
+
+          oid = iss['owner_id'].to_s
+          pkey = iss['part_key'].to_s
+          sev = iss['severity'].to_s == 'orange' ? ORANGE : RED
+          item = { 'severity' => sev, 'category' => CAT_BACK_CUT,
+                   'owner_id' => oid, 'part_key' => (pkey.empty? ? nil : pkey), 'hw_key' => nil,
+                   'owner_pid' => iss['owner_pid'],
+                   'message_sk' => iss['message'].to_s,
+                   'stable_key' => [CAT_BACK_CUT, code, oid, pkey, iss['pid'].to_s].join('|') }
+          item['fix'] = 'rebuild_stale' if iss['rebuild_stale'] == true
+          # Codex #401 kolo 1 P2: PID ZDROJOVEHO dielca (mimo `stable_key` sa
+          # nemeni nic). Dva samostatne chrbty s tym istym povodnym
+          # `cabinet_id` + `part_key` su dva riadky — klik musi oznacit TEN
+          # jeden kus (`ProductionCore.pids_for_problem`), nie oba.
+          item['pid'] = iss['pid'] if iss['pid'].is_a?(Integer) && iss['pid'].positive?
+          items << item
         end
       end
 

@@ -175,6 +175,13 @@ ani nečíta). **`CONFIG_SCHEMA` sa ale bumpuje (8 → 9, Codex #329 kolo 1 P1):
 je v [construction.md](construction.md).
 
 
+**D-143 (KON-0, v0.13.1) — dva voliteľné kľúče DIELCA: `back_mode` a `cut_size`.** `back_mode` (`overlay`/`inset`/`groove`) je **značka pôvodu** chrbta —
+smie ju niesť len rola `back` (`validate_back_mode!`). `cut_size: {length, width}` je **rozmer do nárezu** v osiach `prod`; prítomné pole musí byť úplné, konečné,
+kladné a **≥ geometrii** (`validate_cut_size!`, tolerancia `CUT_TOL` 0,01 mm) — `box` = `prod` ostáva geometria. Oba kľúče builder prenesie do **výrobného snapshotu
+na entite** (`config.back_mode`, `config.cut_size`; `cut_size` len neolepenému dielcu) a výstupy čítajú rozmer do nárezu výhradne cez `Bom.cut_dims`
+([outputs.md](outputs.md)). Aditívne voliteľné pole → `SCHEMA` ostáva **5** (precedens `references`, `hardware_conflicts`); kompatibilitu so starším pluginom drží
+`CONFIG_SCHEMA` 19 ([construction.md](construction.md)).
+
 **`hardware_set_key_type` pozná prefix `class:`** (triedny kľúč mapovania setov, [hardware.md](hardware.md)): vracia z neho prvý segment, takže `class:lift|classic` prestavbu
 neblokuje a `class:sliding|classic` z novšej verzie áno. `parse_hardware_set_key` pre triedny kľúč vracia `nil` — nie je to výber podľa typu ani podľa dielca.
 

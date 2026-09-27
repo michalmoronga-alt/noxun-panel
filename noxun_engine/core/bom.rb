@@ -61,6 +61,11 @@ module Noxun
         hardware_issues = [] # KOV-A1: tvrde nalezy kovania (zatial len smer dvierok)
         newer_configs = []   # KOV-H1 (R-12 exportna brana): ID skriniek z NOVSEJ verzie
         hardware_manual = [] # KOV-H1: ad-hoc polozky kovania (mimo setov)
+        # D-143 (KON-0): nalezy chrbta v drazke a rozmeru do narezu. ADITIVNY
+        # kluc — `compute()` ho IGNORUJE; citaju ho `Validation.run` (RED/ORANGE
+        # kategoria `back_cut`) a vyrobna brana vsetkych styroch exportov
+        # (`ProductionCore.cut_stop`). Zbiera sa v TOM ISTOM prechode.
+        cut_issues = []
         # KOV-H2: resolved cela per skrinka. Aditivny kluc — `compute()` ho
         # IGNORUJE. Sluzi VYHRADNE na LUDSKY popis vlastnika v rozklikanom
         # povode nakupneho riadku (`PartKeys.human_label` potrebuje `front_items`,
@@ -208,17 +213,24 @@ module Noxun
             # ŠT-3b-2a: mapa VNORENYCH dielcov korpusu (part_key -> zaznam) sa
             # stavia POPRI zbere — je to jediny podklad, proti ktoremu sa daju
             # sparovat rucne zasahy (nizsie), a nestoji ziadny dalsi prechod.
+            # D-143 (KON-0): skrinka s chrbtom v drazke spred schemy 19 =
+            # ZASTARANA (chrbat v .skp v rozmere modelu). Rozhoduje schema,
+            # nie pritomnost `cut_size`.
+            bs = back_stale_issue(cid, inst.persistent_id, ccfg)
+            cut_issues << bs if bs
             nested = {}
             inst.definition.entities.grep(Sketchup::ComponentInstance).each do |pi|
               next unless Store.kind(pi) == 'part'
               next unless Store.get(pi, 'manufactured') == true
               next unless Store.get(pi, 'production_class').to_s == 'sheet'
-              rec = record(Store.config(pi) || {}, owner_id: cid,
+              pcfg = Store.config(pi) || {}
+              rec = record(pcfg, owner_id: cid,
                            name: Store.get(pi, 'name').to_s,
                            part_key: Store.get(pi, 'part_key').to_s,
                            role: Store.get(pi, 'role').to_s,
                            pid: pi.persistent_id)
               records << rec
+              cut_issues.concat(cut_issues_for(pcfg, rec, owner_pid: inst.persistent_id, owner_cfg: ccfg))
               key = rec['part_key'].to_s
               nested[key] = rec unless key.empty? || nested.key?(key)
             end
@@ -256,23 +268,30 @@ module Noxun
             Array(bcfg['warnings']).each do |w|
               warnings << (w.is_a?(Hash) ? w.merge('owner_id' => bid) : { 'message' => w.to_s, 'owner_id' => bid })
             end
-            records << record(bcfg, owner_id: bid,
-                              name: (bcfg['name'] || 'Doska').to_s,
-                              part_key: Store.get(inst, 'part_key').to_s,
-                              role: (Store.get(inst, 'role') || bcfg['role']).to_s,
-                              pid: inst.persistent_id)
+            brec = record(bcfg, owner_id: bid,
+                          name: (bcfg['name'] || 'Doska').to_s,
+                          part_key: Store.get(inst, 'part_key').to_s,
+                          role: (Store.get(inst, 'role') || bcfg['role']).to_s,
+                          pid: inst.persistent_id)
+            records << brec
+            cut_issues.concat(cut_issues_for(bcfg, brec, owner_pid: inst.persistent_id))
           when 'part'
             # Codex GH #47 P2: odpojeny/vytiahnuty vyrobny dielec priamo v modeli
             # (standard 01: detached dielce ostavaju citatelne pre BOM). Vlastnika
             # drzi povodne cabinet_id v atributoch.
             next unless Store.get(inst, 'manufactured') == true
             next unless Store.get(inst, 'production_class').to_s == 'sheet'
-            records << record(Store.config(inst) || {},
-                              owner_id: Store.get(inst, 'cabinet_id').to_s,
-                              name: Store.get(inst, 'name').to_s,
-                              part_key: Store.get(inst, 'part_key').to_s,
-                              role: Store.get(inst, 'role').to_s,
-                              pid: inst.persistent_id)
+            pcfg = Store.config(inst) || {}
+            prec = record(pcfg,
+                          owner_id: Store.get(inst, 'cabinet_id').to_s,
+                          name: Store.get(inst, 'name').to_s,
+                          part_key: Store.get(inst, 'part_key').to_s,
+                          role: Store.get(inst, 'role').to_s,
+                          pid: inst.persistent_id)
+            records << prec
+            # D-143: SAMOSTATNY dielec — vlastnik (skrinka) ho neprestavi, takze
+            # o nom hovori VYHRADNE jeho vlastny snapshot (znacka povodu).
+            cut_issues.concat(cut_issues_for(pcfg, prec, owner_pid: nil, standalone: true))
           end
         end
         # KOV-F1 (Codex #329 kolo 3 P1): stav PRAVIDIEL CELEHO PROJEKTU. Nalez
@@ -286,6 +305,7 @@ module Noxun
           placements: placements, identities: identities,
           hardware_issues: hardware_issues, newer_configs: newer_configs,
           hardware_manual: hardware_manual, cabinet_fronts: cabinet_fronts,
+          cut_issues: cut_issues,
           appliance_slots: appliance_slots,
           appliances: appliance_records(appliances_doc, appliance_owners),
           warnings: warnings, cabinets: cabinets, boards: boards }
@@ -1290,12 +1310,20 @@ module Noxun
       # role (V0.5 D, nalez 1): rola dielca sa CITA Z ENTITY (na instancii dielca aj
       # dosky existuje ploche NOXUN/role) — kontrola ciel/dosiek bez ABS ju potrebuje.
       # Odvodenie z nazvu/part_key by bolo krehke a je zakazane.
+      #
+      # D-143 (KON-0): `length`/`width` zaznamu su VYROBNE rozmery — ked snapshot
+      # nesie platny `cut_size`, su to rozmery DO NAREZU (a zaznam navyse nesie
+      # `geo_length`/`geo_width` = rozmer v modeli a `cut_size` true). Tymto
+      # jedinym miestom idu do kusovnika, formatu platne, VEPO aj plochy
+      # rozpoctu. Neplatny `cut_size` = geometria + `cut_invalid` (nalez aj
+      # brana vznikaju v `cut_issues_for`, nie tu).
       def record(cfg, owner_id:, name:, part_key:, role: '', pid: nil)
         edges = cfg['edges'].is_a?(Hash) ? cfg['edges'] : {}
+        len, wid, cut_state = cut_dims(cfg)
         out = {
           'name' => name, 'part_key' => part_key, 'owner_id' => owner_id, 'pid' => pid,
           'role' => role.to_s,
-          'length' => cfg['length'].to_f, 'width' => cfg['width'].to_f,
+          'length' => len, 'width' => wid,
           'thickness' => cfg['thickness'].to_f,
           'quantity' => [cfg['quantity'].to_i, 1].max,
           'material_id' => cfg['material_id'].to_s,
@@ -1309,7 +1337,186 @@ module Noxun
           out['material_source'] = { 'material_id' => ms['material_id'].to_s,
                                      'multiplier' => ms['multiplier'].to_i }
         end
+        case cut_state
+        when :ok
+          out['cut_size'] = true
+          out['geo_length'] = cfg['length'].to_f
+          out['geo_width'] = cfg['width'].to_f
+        when :invalid
+          out['cut_invalid'] = true
+        end
         out
+      end
+
+      # --- D-143 (KON-0): rozmer DO NAREZU a vyrobna brana chrbta v drazke ---
+      #
+      # Kody nalezov (`cut_issues` zberu). JEDEN register blokujucich dovodov —
+      # z neho robi Kontrola RED a `ProductionCore.cut_stop` tvrdy stop VSETKYCH
+      # STYROCH exportov (VEPO, nakupny CSV, rozpocet, ponuka). Poradie = poradie
+      # viet brany.
+      CUT_INVALID     = 'cut_size_invalid'        # poskodeny `cut_size`
+      BACK_EDGED      = 'back_groove_edged'       # chrbat v drazke s ucinnym ABS
+      BACK_INCOMPLETE = 'back_groove_incomplete'  # groove schemy 19 bez `cut_size`
+      BACK_STALE      = 'back_groove_stale'       # skrinka groove pod schemou 19
+      BACK_ORIGIN     = 'back_origin_unknown'     # ORANGE: samostatny stary chrbat
+      CUT_BLOCKERS = [CUT_INVALID, BACK_EDGED, BACK_INCOMPLETE, BACK_STALE].freeze
+
+      # Tolerancia porovnania s geometriou — TA ISTA ako vo validatore planu.
+      CUT_TOL = BuildPlan::CUT_TOL
+
+      # -> [dlzka, sirka, stav]; stav :none (pole chyba — geometria), :ok (rozmer
+      # do narezu) alebo :invalid (pole JE, ale je poskodene: nie Hash,
+      # nečíselne/nekonecne/<= 0 alebo mensie nez geometria — geometria + nalez).
+      # CISTA funkcia; zdiela ju zaznam kusovnika, plocha skrinky v Inspectore
+      # aj karta dielca, aby tri miesta nemohli povedat tri rozne cisla.
+      def cut_dims(cfg)
+        c = cfg.is_a?(Hash) ? cfg : {}
+        gl = c['length'].to_f
+        gw = c['width'].to_f
+        return [gl, gw, :none] unless c.key?('cut_size')
+
+        cut = c['cut_size']
+        return [gl, gw, :invalid] unless cut.is_a?(Hash)
+
+        l = cut_num(cut['length'])
+        w = cut_num(cut['width'])
+        return [gl, gw, :invalid] if l.nil? || w.nil? || l < gl - CUT_TOL || w < gw - CUT_TOL
+
+        [l, w, :ok]
+      end
+
+      def cut_num(v)
+        return nil unless v.is_a?(Numeric)
+
+        f = v.to_f
+        f.finite? && f.positive? ? f : nil
+      end
+
+      # Rezim chrbta ULOZENEJ skrinky — ta ista semantika ako
+      # `CabinetBuilder.config_to_params` (`back_mode || legacy back.mode`,
+      # audit FIX 4), len odolna voci nehash `back` (zber nesmie padnut na
+      # rucne pokazenom atribute). Vyrobne rozmery sa tu NEPOCITAJU.
+      def stored_back_mode(cfg)
+        c = cfg.is_a?(Hash) ? cfg : {}
+        flat = c['back_mode']
+        return flat.to_s if flat
+
+        legacy = c['back'].is_a?(Hash) ? c['back']['mode'] : nil
+        (legacy || 'overlay').to_s
+      end
+
+      # Je skrinka ZASTARANA pre D-143? Chrbat v drazke + schema pod aktivacnou.
+      # NEZAVISLE od pritomnosti `cut_size` na dielci (prestavany chrbat s ABS
+      # ho zamerne nema).
+      def back_stale?(cfg)
+        return false unless defined?(CabinetBuilder)
+
+        stored_back_mode(cfg) == 'groove' &&
+          CabinetBuilder.config_schema_of(cfg) < CabinetBuilder::BACK_CUT_ACTIVATION_SCHEMA
+      end
+
+      # -> nalez | nil. Klik-select mieri na SKRINKU (part_key nil) — naprava je
+      # prestavba celej skrinky; `rebuild_stale` hovori Kontrole, ze ponuka
+      # hromadnu prestavbu.
+      def back_stale_issue(owner_id, owner_pid, ccfg)
+        return nil unless back_stale?(ccfg)
+
+        c = ccfg.is_a?(Hash) ? ccfg : {}
+        w = c['width'].to_f
+        cut_h = c['height'].to_f - c['floor_height'].to_f
+        cut_txt = w.positive? && cut_h.positive? ? " (#{fmt_mm(w)} × #{fmt_mm(cut_h)})" : ''
+        { 'code' => BACK_STALE, 'severity' => 'red',
+          'owner_id' => owner_id.to_s, 'owner_pid' => owner_pid, 'part_key' => nil, 'pid' => nil,
+          'rebuild_stale' => true,
+          'message' => "Skrinka #{owner_id} má chrbát v drážke zo staršej verzie — do nárezu by išiel " \
+                       "v rozmere modelu namiesto plného rozmeru skrinky#{cut_txt}. Prestav ju " \
+                       '(Kontrola → Prestaviť zastarané skrinky); dovtedy výrobné exporty stoja.' }
+      end
+
+      # Nalezy jedneho vyrobneho zaznamu (snapshot `cfg` + hotovy zaznam `rec`).
+      # CISTA funkcia. `standalone` = top-level dielec bez vlastnika v modeli
+      # (odpojeny, vytiahnuty, skopirovany) — prestavba skrinky ho NENAHRADI.
+      #   * poskodeny `cut_size` (akykolvek dielec) -> RED, brana;
+      #   * chrbat so znackou `groove`:
+      #       - ucinne ABS -> RED „zruš olepenie alebo zmeň typ chrbta", brana,
+      #       - bez `cut_size` -> RED neuplny snapshot, brana;
+      #   * samostatny chrbat BEZ znacky povodu -> ORANGE „over rozmer do
+      #     narezu", export ide (vedome rozhodnutie Michal 27.9.2026).
+      #
+      # `owner_cfg` (Codex #401 kolo 1 P1) = config VLASTNICKEJ skrinky pri
+      # VNORENOM dielci. Aktualna skrinka (schema >= 19) s chrbtom v drazke
+      # UZ VIE, ze jej chrbat je v drazke — aj keby snapshot dielca znacku
+      # stratil alebo ju mal poskodenu. Taky chrbat sa preto posudzuje ako
+      # `groove` a bez rozmeru do narezu zlyha BEZPECNE (neuplny zaznam),
+      # namiesto tichého navratu na geometriu (maly chrbat v exportoch).
+      def cut_issues_for(cfg, rec, owner_pid: nil, standalone: false, owner_cfg: nil)
+        c = cfg.is_a?(Hash) ? cfg : {}
+        r = rec.is_a?(Hash) ? rec : {}
+        out = []
+        _l, _w, state = cut_dims(c)
+        out << cut_issue(CUT_INVALID, 'red', r, owner_pid, cut_invalid_message(r)) if state == :invalid
+        return out unless r['role'].to_s == 'back'
+
+        mode = c['back_mode']
+        if mode.to_s == 'groove' || current_groove_owner?(owner_cfg)
+          if edged?(c['edges'])
+            out << cut_issue(BACK_EDGED, 'red', r, owner_pid, back_edged_message(r))
+          elsif state == :none
+            out << cut_issue(BACK_INCOMPLETE, 'red', r, owner_pid, back_incomplete_message(r))
+          end
+        elsif mode.nil? && standalone
+          out << cut_issue(BACK_ORIGIN, 'orange', r, owner_pid, back_origin_message(r))
+        end
+        out
+      end
+
+      # Je vlastnicka skrinka AKTUALNA skrinka s chrbtom v drazke? Ta ista
+      # semantika rezimu ako `back_stale?` (`stored_back_mode`), opacna schema.
+      def current_groove_owner?(cfg)
+        return false unless cfg.is_a?(Hash) && defined?(CabinetBuilder)
+
+        stored_back_mode(cfg) == 'groove' &&
+          CabinetBuilder.config_schema_of(cfg) >= CabinetBuilder::BACK_CUT_ACTIVATION_SCHEMA
+      end
+
+      def edged?(edges)
+        return false unless edges.is_a?(Hash)
+
+        edges.values.any? { |v| !v.nil? && !v.to_s.strip.empty? }
+      end
+
+      def cut_issue(code, severity, rec, owner_pid, message)
+        { 'code' => code, 'severity' => severity,
+          'owner_id' => rec['owner_id'].to_s, 'owner_pid' => owner_pid,
+          'part_key' => (rec['part_key'].to_s.empty? ? nil : rec['part_key'].to_s),
+          'pid' => rec['pid'], 'name' => rec['name'].to_s, 'message' => message }
+      end
+
+      def cut_where(rec)
+        oid = rec['owner_id'].to_s
+        oid.empty? ? '—' : oid
+      end
+
+      def cut_invalid_message(rec)
+        n = rec['name'].to_s.strip
+        "Dielec „#{n.empty? ? 'dielec' : n}“ (#{cut_where(rec)}) má poškodený rozmer do nárezu — " \
+          'prestav skrinku; dovtedy výrobné exporty stoja.'
+      end
+
+      def back_edged_message(rec)
+        "Chrbát v drážke (#{cut_where(rec)}) má olepenú hranu — do nárezu ide v plnom rozmere, " \
+          'páska by skončila v drážke. Zruš olepenie alebo zmeň typ chrbta; dovtedy výrobné exporty stoja.'
+      end
+
+      def back_incomplete_message(rec)
+        "Chrbát v drážke (#{cut_where(rec)}) nemá rozmer do nárezu (neúplný záznam) — prestav skrinku; " \
+          'dovtedy výrobné exporty stoja.'
+      end
+
+      def back_origin_message(rec)
+        n = rec['name'].to_s.strip
+        "Samostatný chrbát „#{n.empty? ? 'Chrbat' : n}“ (#{cut_where(rec)}) je zo staršej verzie — over " \
+          'rozmer do nárezu (chrbát v drážke ide do nárezu v plnom rozmere skrinky).'
       end
 
       # --- cisty vypocet (headless) ----------------------------------------

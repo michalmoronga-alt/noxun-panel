@@ -17,6 +17,31 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KON-0 · D-143 — chrbát v drážke do nárezu v plnom rozmere (v0.13.0 → v0.13.1, 27.9.2026, PR #401, blok 7 KONŠTRUKCIA, prvá dávka).**
+  Výrobná a audit-povinná dávka (package v2 so zapracovaným auditom návrhu Codex 27.9.: NOT SOUND 2 BLOCKER + 4 FIX + 2 NOTE, BLOCKERy vyriešené rozhodnutím
+  Michala). **Čo sa zmenilo:** deskriptor aj snapshot chrbta v drážke nesú nové voliteľné pole **`cut_size`** = plný rozmer skrinky `w × (h − s)` v osiach `prod`
+  (horná 600 × 720 → 600 × 720, model ďalej 564 × 684; `box` = `prod` = geometria sa nemenia) a **každý chrbát značku pôvodu `back_mode`**. Builder zapíše
+  `cut_size` len neolepenému chrbtu. Výstupy čítajú rozmer do nárezu **jediným miestom** `Bom.cut_dims` (cez `Bom.record`): kusovník, formát platne, VEPO (pred
+  otočením podľa dekoru), plocha pre rozpočet a ponuku, plocha skrinky v Inspectore (audit FIX 6) a texty „výrobne" karty dielca (FIX 5); hmotnosť z geometrie.
+  **Jedna výrobná brána D-143** (FIX 3): register `Bom::CUT_BLOCKERS` (poškodený `cut_size` · olepený chrbát v drážke · neúplný snapshot · zastaraná skrinka)
+  → RED v Kontrole (kategória `back_cut`, nezávisle od katalógu a UNI) **a** `ProductionCore.cut_stop` hneď po zbere vo **všetkých štyroch** exportoch pred
+  pickerom. **Zastaranosť** = `back_mode || back.mode` = `groove` a `config_schema` < `BACK_CUT_ACTIVATION_SCHEMA` 19 (FIX 4 — legacy zápis; nie podľa `cut_size`).
+  **Samostatný starý chrbát bez značky = ORANGE** (Michal 27.9., B). **Hromadná prestavba** (NOTE 7): akcia riadku Kontroly „Prestaviť zastarané skrinky" →
+  flush handshake panela → `Panel.back_rebuild_stale` (čerstvý výber po `ScaleWatch.flush_pending!`, `rebuild_many` = jeden krok Späť, skrinky s odpojeným
+  dielcom/neznámym kovaním preskočené a vymenované). `CONFIG_SCHEMA` 18 → 19, BuildPlan `SCHEMA` ostáva 5 (aditívne pole, vlastná validácia
+  `validate_cut_size!`/`validate_back_mode!`). Karta dielca: riadok „Do nárezu" pod Hrúbkou (mockup sekcia D). STANDARD §2.5 (schéma 19) a §8.2 (`cut_size`,
+  `back_mode`), POJMY (prídavok 9 mm vs. V1 plný rozmer), architektúra construction/outputs/model-a-identita/ui-lifecycle na mieste.
+  **Odchýlky od package:** (1) spúšťač hromadnej prestavby je akcia riadku Kontroly (package ho nemenoval; Scope OUT „ďalšie UI" — vzor „Nahradiť UNI…");
+  (2) DoD „odpojenie chrbta so `cut_size` odmietnuté" je zvyšok package v1 — plugin odpájaciu akciu nemá (odpojenie je natívne), preto overené ako „odpojený nový
+  chrbát ostáva chránený značkou a do nárezu ide v plnom rozmere". **Testy:** 4577 headless (nová sada `test_kon0_d143.rb`, 28 testov vrátane
+  „každý blokujúci dôvod × každý zo štyroch exportov = nula volaní pickera aj zápisu") · 131 JS sád (nová `test_kon0_do_narezu.js`) · in-SU 3111 PASS / 0 FAIL
+  (nový scenár `run_kon0`: plán ↔ model, snapshot/kusovník/VEPO/karta 600 × 720, olepenie cez prestavbu + 1× Späť, zastarané skrinky + brána, hromadná prestavba
+  Späť/Redo vracajú snapshot aj schému spolu, odpojený dielec, kópia, absorpcia Scale 900 × 720, uloženie a načítanie .skp). **Mutácie** (3, všetky padli):
+  čitateľ ignoruje `cut_size` · zastaranosť podľa `cut_size` · olepený chrbát bez RED. **Aktualizovať obe PC** (starší plugin rozmer do nárezu nepozná).
+  **Predrecenzia** (slepý recenzent 27.9.): PR OK, 0× P1/P2, 2× P3 opravené (výber dielca po hromadnej prestavbe, text D-143). **GH Codex kolo 1** (2× P1 + P2):
+  vnorený chrbát aktuálnej groove skrinky bez značky/`cut_size` = neúplný záznam podľa vlastníka (`owner_cfg`) · nález samostatného chrbta nesie PID pre klik ·
+  samostatný chrbát v staršom plugine = **priznaný limit spätnej kompatibility** (rozhodnutie Michala, zdokumentované v kóde, outputs.md a STANDARD §8.2).
+
 - **DOCS — blok 7 · KONŠTRUKCIA K1+K2: rozhodnutia Michala, mockup, postrehy D-143 až D-145 (27.9.2026, PR #400, len dokumentácia).**
   Michal 26.9. vybral blok K1+K2 (po smoke S1 PASS) a v debate rozhodol: komín bežne ~50 mm (o koľko sú dno a strop vzadu kratšie ako bok), pri
   komíne a drážke je drážka len v bokoch a na dne a strope chrbát presahuje, zapustený strop pre dolnú aj hornú, pri lištách vnútro pred lištami

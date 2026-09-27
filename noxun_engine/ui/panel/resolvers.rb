@@ -188,6 +188,11 @@ module Noxun
         # material_id aj hotove rozmery, takze sucet je `Bom.weight_totals` nad
         # TYMI ISTYMI zaznamami (jeden vzorec pre plan aj Inspector). Dielec s
         # neznamou hustotou sa nevynecha, len sa prizna cez `weight_estimated_*`.
+        #
+        # D-143 (KON-0, audit FIX 6): PLOCHA je VYROBNA — chrbat v drazke do nej
+        # ide rozmerom DO NAREZU (`Bom.cut_dims`, to iste cislo ako kusovnik,
+        # VEPO aj rozpocet: horna 600 x 720 -> 0,432 m2, nie 0,386). HMOTNOST
+        # ostava z GEOMETRIE (surovy snapshot — odrezok sa nevazi).
         def cabinet_stats(cab)
           count = 0
           area = 0.0
@@ -196,7 +201,8 @@ module Noxun
             cfg = Store.config(part) || {}
             qty = [cfg['quantity'].to_i, 1].max
             count += qty
-            area += cfg['length'].to_f * cfg['width'].to_f * qty
+            len, wid, = Bom.cut_dims(cfg)
+            area += len * wid * qty
             records << cfg
           end
           weight = Bom.weight_totals(records, weight_sheets_map)

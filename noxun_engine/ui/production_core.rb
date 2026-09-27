@@ -593,6 +593,16 @@ module Noxun
           return [ent.persistent_id] if ent
         end
 
+        # D-143 (Codex #401 kolo 1 P2): nalez chrbta nad SAMOSTATNYM dielcom
+        # (odpojeny/skopirovany kus na koreni modelu) nesie PID toho kusu.
+        # Vseobecna vetva nizsie by podla `owner_id` + `part_key` oznacila
+        # VSETKY samostatne chrbty so zhodnym povodnym ID. Fail-open: zivy
+        # top-level `part` s tym PID, inak dnesna vetva.
+        if item['category'].to_s == Validation::CAT_BACK_CUT
+          ent = standalone_part_entity(model, item['pid'])
+          return [ent.persistent_id] if ent
+        end
+
         oid = item['owner_id'].to_s
         pkey = item['part_key'].to_s
         # KOV-A1 (Codex #280 P2-A): nalez, ktory nesie `owner_pid`, adresuje
@@ -663,6 +673,22 @@ module Noxun
         ent
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.newer_config_entity')
+        nil
+      end
+
+      # D-143: zivy TOP-LEVEL vyrobny dielec (`kind: part`) podla PID, alebo nil.
+      # Vnoreny dielec sa tu NEADRESUJE (tam plati vseobecna vetva a scope).
+      def standalone_part_entity(model, pid)
+        return nil unless pid.is_a?(Integer) && pid.positive?
+
+        ent = model.find_entity_by_persistent_id(pid)
+        return nil unless ent.is_a?(Sketchup::ComponentInstance) && ent.valid?
+        return nil unless ent.parent.is_a?(Sketchup::Model)
+        return nil unless Store.kind(ent).to_s == 'part'
+
+        ent
+      rescue StandardError => e
+        Engine.log_error(e, 'ProductionCore.standalone_part_entity')
         nil
       end
 
@@ -1174,6 +1200,112 @@ module Noxun
       def newer_config_stop(collected)
         blockers = export_blockers(newer: newer_configs(collected))
         blockers.empty? ? nil : export_blocked_status(blockers)
+      end
+
+      # --- D-143 (KON-0): JEDNA VYROBNA BRANA chrbta v drazke ----------------
+      #
+      # Jeden zoznam blokujucich dovodov (`Bom::CUT_BLOCKERS` nad aditivnym
+      # `collected[:cut_issues]`) — z TOHO ISTEHO zoznamu robi Kontrola RED
+      # (`Validation.check_cut_issues`). Na rozdiel od registra kovania plati
+      # pre VSETKY STYRI exporty VRATANE VEPO: chybny rozmer do narezu je chyba
+      # REZACICH dat (a z nich plochy v rozpocte aj ponuke), nie len nakupu.
+      # Vola sa HNED po `newer_config_stop` — pred expanziou, pred rozpoctom aj
+      # pred vyberom suboru/priecinka (picker sa pri blokade ani neotvori).
+      # Poradie viet = poradie registra; ID su v strope „tri + a ďalšie N".
+      CUT_BLOCKER_TEXTS = {
+        Bom::CUT_INVALID => ['poškodený rozmer do nárezu', 'prestav skrinku'],
+        Bom::BACK_EDGED => ['chrbát v drážke s olepením', 'zruš olepenie alebo zmeň typ chrbta'],
+        Bom::BACK_INCOMPLETE => ['chrbát v drážke bez rozmeru do nárezu', 'prestav skrinku'],
+        Bom::BACK_STALE => ['chrbát v drážke zo staršej verzie (do nárezu by išiel v rozmere modelu)',
+                            'prestav skrinky (Kontrola → Prestaviť zastarané skrinky)']
+      }.freeze
+
+      # -> [veta, …] v poradi registra (prazdne = nic neblokuje).
+      def cut_blockers(collected)
+        issues = Array(collected.is_a?(Hash) ? collected[:cut_issues] : nil).select { |i| i.is_a?(Hash) }
+        Bom::CUT_BLOCKERS.each_with_object([]) do |code, out|
+          ids = issues.select { |i| i['code'].to_s == code }.map { |i| i['owner_id'].to_s }
+          next if ids.empty?
+
+          ids = ids.map { |id| id.empty? ? '—' : id }.uniq
+          what, fix = CUT_BLOCKER_TEXTS[code]
+          out << "#{what} (#{ids_text(ids)}) — #{fix}"
+        end
+      end
+
+      # Hotova hlaska brany D-143, alebo nil.
+      def cut_stop(collected)
+        blockers = cut_blockers(collected)
+        blockers.empty? ? nil : export_blocked_status(blockers)
+      end
+
+      # --- D-143 (KON-0, audit NOTE 7): HROMADNA PRESTAVBA ZASTARANYCH SKRINIEK
+      #
+      # Tu zije LEN cisty plan a texty (citacia cesta — brana 1b-3); ZAPIS je
+      # `Panel.back_rebuild_stale` (`CabinetBuilder.rebuild_many` = jedna
+      # operacia, jeden krok Späť, pri chybe rollback). Rozsah = skrinky
+      # zakazky (`Ids.top_level_scan`, ten isty ako vystupy) a zastaranost =
+      # TEN ISTY predikat ako Kontrola a brana (`Bom.back_stale?`).
+      def back_stale_entry(id, cfg, detached)
+        c = cfg.is_a?(Hash) ? cfg : {}
+        { 'id' => id.to_s, 'stale' => Bom.back_stale?(c),
+          # Neznamy generic typ kovania: `rebuild_many` by na nom zhodil CELU
+          # spolocnu operaciu (vzor `front_grain_entry`).
+          'unknown_hw' => (defined?(CabinetBuilder) && CabinetBuilder.unknown_hardware?(c)) ? true : false,
+          'detached' => detached ? true : false }
+      end
+
+      # PRECO sa zastarana skrinka preskoci, alebo nil. ODPOJENY DIELEC: prestavba
+      # by vyrobila DVOJNIKA (vnoreny novy chrbat popri odpojenom starom) —
+      # skrinka sa vymenuje a jej blokacia ostava (vzor D-131/D-134).
+      def back_stale_skip_reason(ent)
+        return 'má kovanie neznámeho typu — aktualizuj plugin' if ent['unknown_hw']
+        return Ids::DETACHED_PART_REASON if ent['detached']
+
+        nil
+      end
+
+      # CISTA funkcia: { 'jobs' => [entry…], 'skipped' => [[id, dovod]…], 'stale' => N }
+      def back_stale_plan(entries)
+        jobs = []
+        skipped = []
+        stale = 0
+        Array(entries).each do |ent|
+          next unless ent.is_a?(Hash) && ent['stale']
+
+          stale += 1
+          why = back_stale_skip_reason(ent)
+          why ? skipped << [ent['id'].to_s, why] : jobs << ent
+        end
+        { 'jobs' => jobs, 'skipped' => skipped, 'stale' => stale }
+      end
+
+      # Zber pre plan (CITANIE). Vstupom su zive entity skriniek zakazky.
+      def back_stale_scan(model)
+        scan = Ids.top_level_scan(model)
+        scan['cabinets'].map do |inst|
+          cid = Store.get(inst, 'cabinet_id').to_s
+          ent = back_stale_entry(cid, Store.config(inst) || {}, scan['detached'][cid].to_i.positive?)
+          ent['ref'] = inst
+          ent
+        end
+      end
+
+      def back_stale_skipped_tail(plan)
+        list = Array(plan['skipped']).map { |id, why| "#{id} (#{why})" }
+        list.empty? ? '' : " · preskočené: #{list.join(', ')}"
+      end
+
+      def back_stale_empty_msg(plan)
+        return 'Žiadna skrinka nemá zastaraný chrbát v drážke — nič sa neprestavovalo.' if plan['stale'].to_i.zero?
+
+        "Zastarané skrinky sa nedali prestaviť#{back_stale_skipped_tail(plan)}."
+      end
+
+      def back_stale_done_msg(plan)
+        n = Array(plan['jobs']).length
+        "Prestavané zastarané skrinky: #{n} (chrbát v drážke ide do nárezu v plnom rozmere; " \
+          "jeden krok Späť)#{back_stale_skipped_tail(plan)}."
       end
 
       # Strop na tri ID + „a ďalšie N" — jedno znenie pre sufix, zoznam dovodov
@@ -1789,6 +1921,9 @@ module Noxun
         collected = fresh_collect(model)
         newer_stop = newer_config_stop(collected)
         return status.call(newer_stop, true) if newer_stop
+        # D-143 (KON-0): vyrobna brana chrbta v drazke — VSETKY STYRI exporty.
+        cut_msg = cut_stop(collected)
+        return status.call(cut_msg, true) if cut_msg
 
         # KOV-C2b: VEPO uz ma branu zasuviek — ale LEN pre chybajuci kit
         # (`scope: :kit`). Dielce su rezane na konkretnu NL, takze bez kitu tej
@@ -1884,6 +2019,9 @@ module Noxun
         # ani ID skriniek, ani to, ze ma aktualizovat plugin.
         newer_stop = newer_config_stop(collected)
         return status.call(newer_stop, true) if newer_stop
+        # D-143 (KON-0): vyrobna brana chrbta v drazke — VSETKY STYRI exporty.
+        cut_msg = cut_stop(collected)
+        return status.call(cut_msg, true) if cut_msg
 
         exp = hardware_expansion(model, collected)
         return status.call('Nákupný zoznam sa nedá zostaviť (pozri Ruby konzolu).', true) if exp.nil?
@@ -3023,6 +3161,9 @@ module Noxun
         # ktore by nekompatibilnu zakazku prekryli inou hlaskou.
         newer_stop = newer_config_stop(collected)
         return status.call(newer_stop, true) if newer_stop
+        # D-143 (KON-0): vyrobna brana chrbta v drazke — VSETKY STYRI exporty.
+        cut_msg = cut_stop(collected)
+        return status.call(cut_msg, true) if cut_msg
 
         bom = Bom.compute(collected)
         # Expanzia sa pocita RAZ a odovzda sa rozpoctu (inak by ju zostavil
@@ -3099,6 +3240,9 @@ module Noxun
         # KOV-H1 / review #283 P2-B: TA ISTA brana ako pri rozpocte — najprv.
         newer_stop = newer_config_stop(collected)
         return status.call(newer_stop, true) if newer_stop
+        # D-143 (KON-0): vyrobna brana chrbta v drazke — VSETKY STYRI exporty.
+        cut_msg = cut_stop(collected)
+        return status.call(cut_msg, true) if cut_msg
 
         bom = Bom.compute(collected)
         smap = sheets_map
