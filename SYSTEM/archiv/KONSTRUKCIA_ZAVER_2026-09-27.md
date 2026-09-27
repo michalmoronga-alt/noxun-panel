@@ -66,17 +66,25 @@ by chrbát vydal malý a lištu pod plným názvom. **Preto aktualizovať obe PC
 - **Naložený chrbát pri komíne** sedí medzi bokmi — je užší (šírka − 2 × hrúbka korpusu) a boky sú v plnej hĺbke: iný kusovník než bez komína.
 - **Komín mení vnútro** — police, priečky a výsuvy zásuviek sú kratšie; zamknutý výsuv, ktorý sa nezmestí, je RED ako doteraz.
 - Neskoršia zmena šablóny Chladničková sa do existujúcich knižníc sama nedostane (ručná úprava na každom PC alebo ďalšia migrácia knižnice).
+- **Chrbát v drážke má v modeli iný rozmer než do nárezu** (otázka zo smoke 27.9.2026, zámer): model a riadky Dĺžka/Šírka karty dielca ukazujú chrbát
+  v jeho polohe **medzi bokmi** (napr. šírka 564), kusovník, VEPO a riadok karty **„Do nárezu"** plný rozmer skrinky (600). Drážka v bokoch sa nemodeluje,
+  takže plný rozmer v modeli by prerazil boky; do výroby ide riadok „Do nárezu" (rozhodnutie M8, D-143). Platí aj pri komíne.
 
 ## Otvorené body
 
-- **Delenie čiel Chladničkovej 719 / 1274** — návrh na potvrdenie pri smoke (bod 4.3). Ak prax chce iné čísla, upravia sa v šablóne.
+- ~~**Delenie čiel Chladničkovej 719 / 1274**~~ — **potvrdené 27.9.2026** (Michal pri smoke, bod 4.3: „sedí"); šablóna ostáva bez zmeny.
 - **D-145** — náhľad Inspectora v lepšej 3D forme (komín, zapustenie a lišty čelný náhľad neukáže); zásobník Po V1.
 - **K3 rohová skrinka** ostáva v bloku 4 (V1 bod 2 preto ešte nie je odškrtnutý).
 
 ## Smoke checklist bloku (v poradí práce v dielni)
 
+**Smoke PASS — Michal 27.9.2026 večer, bez nálezov** („všetko sedí, nenašiel som chybu"). Výsledok sa zaznamenal ako celok, nie po bodoch; jediná otázka
+(chrbát v drážke 564 v modeli vs. 600 do nárezu) je zámer — pozri Známe dôsledky. Delenie čiel Chladničkovej (bod 4.3) potvrdené. Dočasná skupina smoke
+v DOGFOODING zanikla; ďalšie postrehy k funkciám bloku 7 sa zapisujú ako **nové D-čísla do [DOGFOODING.md](../DOGFOODING.md) podľa bloku** (nie ako opravy v0.14.x).
+Checklist nižšie ostáva ako záznam.
+
 Zlúčené zo sekcií „Smoke pre Michala" všetkých štyroch packages (KON-0, A, B, D) — bez duplicít, pri každom bode je dávka, z ktorej pochádza.
-Nové nálezy sa zapíšu do [DOGFOODING.md](../DOGFOODING.md) (skupina „KONŠTRUKCIA K1+K2 — smoke po uzávere bloku 7") a opravia ako v0.14.x.
+Nálezy zo smoke mali ísť do DOGFOODING (dočasná skupina „KONŠTRUKCIA K1+K2 — smoke po uzávere bloku 7") ako opravy v0.14.x — žiadne neboli, skupina po PASS zanikla.
 
 **0 · Príprava**
 1. Aktualizuj plugin na **0.14.0 na oboch PC** (Michal aj Lucia; updater v Štúdiu → O plugine) a reštartuj SketchUp; over verziu v O plugine. *(KON-0 až KON-D)*
@@ -110,7 +118,7 @@ Nové nálezy sa zapíšu do [DOGFOODING.md](../DOGFOODING.md) (skupina „KONŠ
 2. Štúdio → Šablóny: dlaždica **„Chladničková"** — „dolná · 600 × 2100 × 560", „očakáva chladničku", **„komín vzadu 50"**; tooltip s vetou o vetraní
    (aj pri vkladaní). Ostatné dlaždice bez zmeny. *(KON-D)*
 3. Vlož ju (Inspector → Šablóna → Všetky šablóny): dno a strop 510, boky 560, **bez chrbta**, dve dvierka (dolné 719, horné 1274); Kontrola: „očakáva chladničku"
-   a neurčený smer otvárania — zvoľ stranu pántov. **Potvrď, či delenie 719 / 1274 sedí na vašu prax** (ak nie, povedz iné čísla). *(KON-D)*
+   a neurčený smer otvárania — zvoľ stranu pántov. **Potvrď, či delenie 719 / 1274 sedí na vašu prax** (ak nie, povedz iné čísla). *(KON-D)* *(Potvrdené 27.9.2026: „sedí".)*
 4. Priraď chladničku Beko: nika meria hĺbku **560** (hĺbka boku, nie po chrbát) a sedí; výška hlási ORANGE, kým nenastavíš **výšku osadenia 14–24 mm**. *(KON-A, KON-D)*
 
 **5 · Výstupy pre dielňu** (kusovník, VEPO, Kontrola olepov)

@@ -431,7 +431,7 @@ plugin, prepne knižnicu do **režimu len na čítanie** (ukladanie, premenovani
 `7 = KON-D`: seed **„Chladničková"** — dolná 600 × 2100 × 560, sokel 100, komín 50 (dno a strop 510, boky 560, nika spotrebiča 560 podľa §3.4), bez chrbta,
 zapustenie 0 a výška líšt 100 **výslovne**, `appliance_expects: ['fridge']`, dvoje dvierka F1 719 (pevné, zamknuté) + F2 automatické so smerom otvárania
 **„neurčený"** (Kontrola vyzve zvoliť stranu pántov) a `config_schema` = aktuálna schéma (starší plugin šablónu odmietne, §2.5). Delenie 719 / auto je odvodené
-z pásma chladničky Beko v katalógu a je **návrhom na potvrdenie** pri smoke. Pravidlá seedov knižnice:
+z pásma chladničky Beko v katalógu a Michal ho **potvrdil 27.9.2026** pri smoke bloku 7. Pravidlá seedov knižnice:
 - seed je **markerový** — pridá sa jednorazovo pri prechode markera, **vlastnú rovnomennú šablónu neprepíše** (identita `(kind, name)`, presné meno) a **zmazaný
   neobnoví**; núdzová náhrada poškodenej knižnice (`build_predefined`) nové seedy **nemá**;
 - **migrácia knižnice nikdy nezapisuje nad poškodeným primárom** (súbor existuje, ale nie je JSON alebo `templates` nie je pole) — ani obsah zálohy `.bak`, ani
