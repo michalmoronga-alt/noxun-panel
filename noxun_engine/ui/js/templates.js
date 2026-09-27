@@ -237,10 +237,14 @@
     // staršie okno kľúč nemá, takže riadok jednoducho nie je.
     var exp = (tp.appliance_expects && tp.appliance_expects.has === true)
       ? String(tp.appliance_expects.text || '') : '';
+    // KON-D (E2): súhrn konštrukcie („komín vzadu 50") — riadok LEN keď je
+    // neprázdny, ostatné dlaždice sa nemenia. Veta o vetraní ide do tooltipu.
+    var kon = (tp.construction && tp.construction.has === true) ? String(tp.construction.text || '') : '';
+    var tip = [hw, tp.vent_note ? String(tp.vent_note) : ''].filter(Boolean).join('\n');
     var id = tplDomIdAt(kind, idx == null ? 0 : idx);
     TPL_DOM[tplKey(kind, tp.name, '')] = { id: id, rev: tp.preview_rev };
     var h = '<div class="stpltile" data-kind="' + tplEsc(kind) + '" data-name="' + tplEsc(tp.name) + '"' +
-      (hw ? ' title="' + tplEsc(hw) + '"' : '') + '>' +
+      (tip ? ' title="' + tplEsc(tip) + '"' : '') + '>' +
       '<div class="stplpic" id="tplpic-' + tplEsc(id) + '">' +
       (tp.preview_rev ? '<img alt="">' : '') +
       '<span class="stplph">' + (tp.preview_rev ? '' : 'schéma') + '</span></div>' +
@@ -248,6 +252,7 @@
       tplIco('wrench') + '</i>' : '') + '<span>' + tplEsc(tp.name) + '</span></b>' +
       '<span class="stplmeta">' + tplEsc(isCab ? tplTypeLabel(type) : 'doska') +
       (dims ? ' · ' + tplEsc(dims) : '') + '</span>' +
+      (kon ? '<span class="stplmeta stplkon">' + tplEsc(kon) + '</span>' : '') +
       // S1-C: OČAKÁVANIA šablóny — jeden riadok TEXTU zo servera, žiadne nové
       // ovládanie a žiadna mapa popiskov v klientovi.
       (exp ? '<span class="stplmeta stplexp">' + tplEsc(exp) + '</span>' : '') +

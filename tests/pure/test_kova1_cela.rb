@@ -618,6 +618,17 @@ module NxTest
       rel if File.read(p, encoding: 'UTF-8').match?(literal)
     end.sort
     assert_equal(allow.sort, found, 'literal `unset` mimo allowlistu')
+    # KON-D (audit FIX 2): druhy serverovy VYROBCA stavu „neurcene" je seed
+    # vstavanej sablony „Chladničková" — dvierka, ktorym stolar stranu pantov
+    # MUSI zvolit (chybajuci kluc by Kontrola brala ako stare data bez nalezu).
+    # Seed literal nepozna: berie konstantu `Fronts::DIRECTION_UNSET` a ta smie
+    # zit LEN v zdroji (fronts.rb) a v seede (templates.rb).
+    const_users = Dir[File.join(NxKovA1::SRC_DIR, '**', '*.rb')].filter_map do |p|
+      rel = p.sub("#{NxKovA1::SRC_DIR}/", '')
+      rel if File.read(p, encoding: 'UTF-8').include?('DIRECTION_UNSET')
+    end.sort
+    assert_equal(%w[core/templates.rb modules/fronts.rb], const_users, 'DIRECTION_UNSET mimo allowlistu')
+    assert_equal('unset', Noxun::Engine::Fronts::DIRECTION_UNSET)
   end
 
   test('KOV-A1 GUARD: klientsky PROFILELESS_FRONT_TYPES sedi s Fronts::PROFILELESS_TYPES') do

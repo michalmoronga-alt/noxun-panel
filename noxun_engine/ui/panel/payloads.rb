@@ -2483,6 +2483,11 @@ module Noxun
             # POVODNY objekt zo skladu).
             rec = seq ? t.merge('used_seq' => seq["#{t['kind']}:#{t['name']}"]) : t.dup
             rec['hardware'] = TemplateStore.hardware_tile_summary(t['config'])
+            # KON-D (audit FIX 4): suhrn konstrukcie a veta o vetrani pre
+            # TOOLTIP dlazdice vkladania — uprava `tile_row` (Studio) sa do
+            # Inspectora nedostane. Odvodene udaje, do kniznice sa nezapisuju.
+            rec['construction'] = TemplateStore.construction_summary(t['config'])
+            rec['vent_note'] = TemplateStore.ventilation_note(t['config'])
             rec = rec.merge('preview_rev' => TemplatePreviews.rev_for(t['kind'], t['name'])) if previews
             out << rec
           end

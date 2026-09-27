@@ -426,6 +426,20 @@ Konštrukčné varianty (ArchiWood vzor, dnešné `f_dno`/`f_strop`):
 - **Vrch:** plný ↔ predná/zadná priečka ↔ dve priečky (`two_rails`) ↔ bez vrchu.
 - **Chrbát:** vložený medzi boky ↔ naložený zozadu ↔ v drážke (`groove`) ↔ delený ↔ bez chrbta.
 
+**Vstavané šablóny — knižnica `TemplateStore::STD` 7 (KON-D, v0.13.4).** Knižnica šablón (`templates.json`) nesie vlastný marker `std`; vyšší marker, než pozná
+plugin, prepne knižnicu do **režimu len na čítanie** (ukladanie, premenovanie, mazanie, náhľady ani pečiatky použitia) — pri bumpe sa **aktualizujú obe PC**.
+`7 = KON-D`: seed **„Chladničková"** — dolná 600 × 2100 × 560, sokel 100, komín 50 (dno a strop 510, boky 560, nika spotrebiča 560 podľa §3.4), bez chrbta,
+zapustenie 0 a výška líšt 100 **výslovne**, `appliance_expects: ['fridge']`, dvoje dvierka F1 719 (pevné, zamknuté) + F2 automatické so smerom otvárania
+**„neurčený"** (Kontrola vyzve zvoliť stranu pántov) a `config_schema` = aktuálna schéma (starší plugin šablónu odmietne, §2.5). Delenie 719 / auto je odvodené
+z pásma chladničky Beko v katalógu a je **návrhom na potvrdenie** pri smoke. Pravidlá seedov knižnice:
+- seed je **markerový** — pridá sa jednorazovo pri prechode markera, **vlastnú rovnomennú šablónu neprepíše** (identita `(kind, name)`, presné meno) a **zmazaný
+  neobnoví**; núdzová náhrada poškodenej knižnice (`build_predefined`) nové seedy **nemá**;
+- **migrácia knižnice nikdy nezapisuje nad poškodeným primárom** (súbor existuje, ale nie je JSON alebo `templates` nie je pole) — ani obsah zálohy `.bak`, ani
+  núdzové predvoľby; taký stav sa číta, nezapisuje, a seed sa pridá, až keď je primár zdravý. **Chýbajúci primár s platnou zálohou** nie je poškodený — migrácia
+  knižnicu zo zálohy obnoví a seed pridá (sémantika `JsonFileStore.degraded?`);
+- **súhrn konštrukcie na dlaždici** (Štúdio aj vkladanie) je **odvodený** z účinných hodnôt (komín > 0 · zapustenie > 0 mimo „Bez stropu" · lišty len pri chrbte
+  z líšt · slot nikdy) a spolu s vetou o vetraní pri šablóne s chladničkou sa **nikdy neukladá** — nový kľúč záznamu ani bump `STD` kvôli nim nevzniká.
+
 ### 4.5 Čistý priestor a rozhrania
 
 Korpus **vypočíta a nesie** (v `config`, ako cache — zdroj pravdy zostáva rozmerový config):

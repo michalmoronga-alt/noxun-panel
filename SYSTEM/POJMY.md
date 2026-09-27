@@ -49,6 +49,12 @@
   na dne. Nastavuje sa čipom „osadenie N mm“ v riadku Spotrebič. Posunie **box niky** aj **pásma dverí**, Kontrola výšky počíta s **vnútrom − osadenie** a hrana delenia čiel sa
   meria od zdvihnutého dna; pri **výkrese výrobcu** (odporúčané dolné dvere pre chladničku na dne) musia byť dolné nábytkové dvere o osadenie vyššie. Patrí kusu v tejto
   skrinke — výmena modelu ho prenesie, presun do inej skrinky ani kópia nie.
+- **Chladničková** (vstavaná šablóna, KON-D, v0.13.4) — vysoká skriňa na vstavanú chladničku tak, ako ju Michal vyrába (M7): **600 × 2100 × 560**, sokel 100,
+  **komín 50** (dno a strop 510, boky 560 — za dnom a stropom vzadu ostáva vzduchový kanál), **bez chrbta**, očakáva chladničku, dve dvierka nad sebou —
+  dolné **719** (pevné), horné dopočítané **1274**; smer otvárania je **neurčený**, stranu pántov volí stolár. Pri komíne sa nika meria z **hĺbky boku** (560).
+  Vnútro na výšku je 1964, bežná chladnička ~194 cm chce niku 1940–1950 → po priradení treba nastaviť **výšku osadenia 14–24 mm** (inak oranžová „výška niky");
+  delenie 719 sedí pre Beko z katalógu (hrana 679–727 od dna niky) a je **návrhom na potvrdenie**. **Vetracie otvory** v sokli a hore plugin nemodeluje —
+  rieši ich stolár podľa **montážneho listu spotrebiča** (veta v tooltipe dlaždice).
 - **Pásma dverí spotrebiča** (S1-F) — vodorovné hrany na čelnej ploche boxu niky v miestach, kde sú hrany **dverí samotnej chladničky**. Viažu sa **ZDOLA**
   (Beko: spodok 40 + dolné dvere 629 = 669 je presné, medzera 71, horné pásmo je zvyšok do výšky niky — list ho presne nekótuje). Sú to kontrolné čiary,
   nie nábytkové čelá.

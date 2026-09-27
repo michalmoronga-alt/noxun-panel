@@ -379,7 +379,7 @@ end
 NxTest.test('S1-C (C2): ocakavania ziju v CONFIGU — zaznam sablony novy kluc NEMA') do
   # S1-C `TemplateStore::STD` NEbumpovalo (ostalo 5). Od D-139 je 6 z INEHO
   # dovodu — jednorazova obnova slotovych seedov; ocakavania ho nepotrebuju.
-  NxTest.assert_equal(6, NxS1C::TS::STD, 'STD 6 = D-139 (seedy slotu), nie ocakavania')
+  NxTest.assert_equal(7, NxS1C::TS::STD, 'STD 6 = D-139 (seedy slotu), 7 = KON-D (Chladničková), nie ocakavania')
   hdr = NxS1C.src('noxun_engine', 'core', 'templates.rb')
   NxTest.refute(hdr.include?("'expects'"), 'zaznam sablony ziadny novy kluc NEMA')
 end

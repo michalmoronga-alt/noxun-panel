@@ -928,10 +928,12 @@ aj `lift`/`fall`/`blind`; `PROFILELESS_TYPES` obsahuje iba `none`. Ovládanie pr
 **KOV-A1 — ŠTYRI NOVÉ POLIA POLOŽKY (trojstav + dormant):** `direction` (smer otvárania = **strana pántov**, `left` = pánty vľavo) · `wing_directions` (`{p2, p3}` pre stredné
 krídla 3/4-krídlových dvierok) · `opening_mode` (`classic|tipon`) · `drawer` (`{construction: metal|wood|other, variant: standard|internal}`, pod-polia nezávisle).
 **TROJSTAV smeru (audit #14 B1):** kľúč CHÝBA = legacy — **nikdy sa nedopĺňa** a nikdy nedá nález · `unset` = vedome neurčené (RED) · `left`/`right` = vyriešené.
-`unset` vzniká VÝHRADNE používateľskou akciou (A2) alebo z **poškodenej hodnoty** (neznámy neprázdny string → `unset`, fail-visible; `nil`/`''`/iný typ → kľúč sa zahodí).
+`unset` vzniká VÝHRADNE používateľskou akciou (A2), z **poškodenej hodnoty** (neznámy neprázdny string → `unset`, fail-visible; `nil`/`''`/iný typ → kľúč sa zahodí)
+alebo zo **seedu vstavanej šablóny** (KON-D „Chladničková" — dvierka, ktorým stolár stranu pántov musí zvoliť; cez konštantu `Fronts::DIRECTION_UNSET`, nie literál).
 Neplatný `opening_mode` a `drawer` bez platného pod-poľa → kľúč preč (tam žiadny „neurčený" stav neexistuje). **DORMANT (B3):** všetky štyri sa v configu držia bez ohľadu na
 aktuálny typ a počet krídel, takže prepnutie typu alebo `1 ↔ 2 ↔ auto` hodnotu nezahodí; po návrate sa obnoví. Guard test stráži, že **žiadna cesta v Ruby ani JS** nedopĺňa
-default smeru a že literál `unset` žije len v `fronts.rb` (výrobca) a `bom.rb` (čitateľ).
+default smeru, že literál `unset` žije len na allowliste (`fronts.rb` výrobca, `bom.rb` a `direction_check.rb` čitatelia, `core.js` klientsky výrobca) a konštantu
+`DIRECTION_UNSET` smie okrem `fronts.rb` použiť len `templates.rb` (seed).
 
 **`Fronts.direction_slots(resolved_item)` = JEDINÁ definícia „kde sa smer pýta"** — čistá funkcia nad **resolved** položkou (`front_items`), rozhoduje **efektívny `wings_n`**
 (auto okolo 600 mm na čelnom otvore), nikdy surové `wings`: 1 krídlo → `single` · 2 → `[]` (odvodené Ľ+P) · 3 → `p2` · 4 → `p2`+`p3` · ne-dvierka → `[]`. Vracia

@@ -243,7 +243,7 @@ NxTest.test('D-139: kniznica std 5 so seedmi S1-E sa pri nacitani obnovi na std 
   ts.reload!
   list = ts.load
   data = JSON.parse(File.binread(ts.path))
-  NxTest.assert_equal(6, data['std'], 'marker sa posunul')
+  NxTest.assert_equal(ts::STD, data['std'], 'marker sa posunul (od KON-D na 7)')
   s60 = list.find { |t| t['name'] == 'Umývačka 60' }
   s45 = list.find { |t| t['name'] == 'Umývačka 45' }
   NxTest.assert_close(880.0, s60['config']['height'], 0.01, 'nedotknuty seed dostal nove predvolby')

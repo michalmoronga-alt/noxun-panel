@@ -48,8 +48,11 @@ module Noxun
       # TROJSTAV (audit #14 BLOCKER 1): kluc CHYBA = legacy (ziadny nalez, NIKDY
       # sa nedoplna) · 'unset' = pouzivatel vedome nechal neurcene (RED) ·
       # 'left'/'right' = vyriesene. `unset` vznika VYHRADNE pouzivatelskou
-      # akciou (KOV-A2) alebo z POSKODENEJ hodnoty (fail-visible, nizsie).
+      # akciou (KOV-A2), z POSKODENEJ hodnoty (fail-visible, nizsie) alebo
+      # zo seedu vstavanej sablony (KON-D „Chladničková" — dvierka, ktorym
+      # musi stolar stranu pantov zvolit; cez `DIRECTION_UNSET`, nie literal).
       DIRECTIONS = %w[left right unset].freeze
+      DIRECTION_UNSET = DIRECTIONS.last
       # 3/4-kridlove dvierka (audit #14 BLOCKER 2, Michal 3.9. — variant a):
       # KRAJNE kridla su ODVODENE (p1 = panty vlavo, posledne = panty vpravo,
       # nic sa neuklada), STREDNE maju vlastny trojstav. p2 plati pri 3 aj 4

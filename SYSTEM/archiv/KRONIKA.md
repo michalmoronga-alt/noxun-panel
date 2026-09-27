@@ -17,6 +17,37 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KON-D — vstavaná šablóna „Chladničková" (v0.13.3 → v0.13.4, 27.9.2026, PR #404, blok 7 KONŠTRUKCIA, štvrtá a posledná dávka).**
+  Audit-povinná dávka (knižnica šablón `STD` 6 → 7; package v2 so zapracovaným auditom návrhu Codex 27.9.: NOT SOUND 1 BLOCKER + 3 FIX + 2 NOTE — všetko v Scope IN).
+  Nie je výrobná (dielce existujúcich skriniek ani výstupy sa nemenia). **Seed** (`build_predefined_fridge`, samostatný zoznam — nie núdzová náhrada
+  `build_predefined`): dolná 600 × 2100 × 560, sokel 100, komín 50, bez chrbta (hrúbka 3 pamätaná), zapustenie 0 a výška líšt 100 **výslovne**, `appliance_expects:
+  ['fridge']`, dvoje dvierka F1 `fixed` 719 zamknuté + F2 `auto` (1274) so smerom **`Fronts::DIRECTION_UNSET`** (audit FIX 2 — chýbajúci kľúč by Kontrola brala
+  ako staré dáta; guard allowlistu `unset` zladený: seed literál nepozná, konštanta smie žiť len vo `fronts.rb` a `templates.rb`), `config_schema` = 21.
+  **Migrácia** `old_std < 7` (`missing_fridge_seed`) pridá seed na koniec, vlastnú rovnomennú korpusovú šablónu neprepíše, zmazaný neobnoví; čistá inštalácia
+  10 šablón (7 korpusových). **Audit BLOCKER 1:** `migrate!` číta `migration_source` (priamo z disku, bez cache a bez tichej náhrady zo `.bak`; sémantika
+  `JsonFileStore.degraded?`) — existujúci primár poškodený alebo zlého tvaru (`{std: 6, templates: null}`) → **žiadny zápis** (`refuse_migration`, log raz za
+  beh); **chýbajúci primár s platnou zálohou** → obnova zo zálohy + seed (predrecenzia P3 — pôvodne sa bral ako nezdravý navždy). **Dlaždica:** čisté `TemplateStore.construction_summary` (účinné hodnoty — komín > 0, zapustenie > 0 mimo „Bez stropu", lišty len pri `rails`
+  aj pri 100, slot nikdy; čísla cez `norm_setback`/`norm_rail_height`) a `ventilation_note` (veta o vetraní pri šablóne s chladničkou) v **oboch** cestách —
+  `tile_row` (Štúdio: riadok `.stplkon` len pri neprázdnom súhrne, veta v tooltipe) a `Panel.template_list` (tooltip `nxTplTitle` popri kovaní); `TILE_CONFIG_KEYS`
+  ostáva orezaný, na disk sa nič nezapisuje. **Známe dôsledky (smoke):** výška niky 1964 vs. Beko 1940–1950 → ORANGE, kým sa nenastaví osadenie 14–24 mm
+  (pri 24,25 výška prejde toleranciou, delenie nie); ORANGE „očakáva chladničku" a RED neurčený smer, kým sa nevyriešia; delenie 719 / 1274 je návrh na
+  potvrdenie. **Vedomá hranica:** bežný `upsert` nad nezdravým primárom zapisuje ako doteraz (zo zálohy) a marker posunie na 7 bez seedu — mimo rozsahu.
+  **Testy:** 4643 headless (nová `test_kond_chladnickova.rb`, 22 testov: obsah seedu, dvierka a smer, stavba 510/560/bez chrbta/2 dvierka 719 + 1274, Kontrola
+  smeru, osadenie 0/14/24/24,25/25 (výška niky aj delenie), čistá inštalácia, núdzová náhrada bez seedu, migrácia 6 → 7 bajtovo, vlastná rovnomenná, zmazaný
+  seed, zdravie primára 6× (poškodený, zlý tvar, chýbajúci primár so zálohou platnou aj zlou), STD 7 len na čítanie pre STD 6, R-12 pri schéme 20, použitie na skrinku so zapustením, súhrn účinných hodnôt, veta o vetraní,
+  skutočné payloady oboch ciest) · 134 JS sád (nová `test_kond_chladnickova.js`, 18 kontrol) · in-SU **3172 PASS / 0 FAIL** (nový `run_kond`, 14 kontrol: seed
+  v čerstvej knižnici, vklad ghostom = plán ↔ model 1:1, dno a strop 510, boky 560, bez chrbta, 2 dvierka 719 + 1274, smer neurčený a 2 nálezy Kontroly,
+  očakávanie ORANGE, nika 560, 1× Späť). **Mutácie** (8, všetky padli): seed bez `config_schema` · migrácia prepíše vlastnú rovnomennú · seed
+  v `build_predefined` · chýba výslovné `top_front_setback 0` · migrácia zapíše nad zálohou · „z líšt" aj pri inom chrbte · dvierka bez smeru · chýbajúci primár so zálohou braný ako nezdravý navždy.
+  **Vedomé zmeny existujúcich testov:** piny `STD` 6 → 7 (S1-C, S1-E, D-139), počty seedov (+1 korpusová), kľúče riadku dlaždice (+`construction`, `vent_note`).
+  **Aktualizovať obe PC** (knižnica šablón 7).
+  **Smoke KON-B (prenesené zo STAV, v0.13.3):** (1) dolná 600 × 720 × 510, Chrbát **„Z líšt"**, výška 100 → v modeli dve lišty 564 × 100 × 18 (dole na dne, hore
+  pod stropom); „Vnút. hĺbka" 492; kusovník **1 riadok, 2 ks „Lista chrbta"**, VEPO „Chrb HD s…", páska na jednej dlhej hrane · (2) tá istá skrinka so stropom
+  „Dve výstuhy" (100) → 1 riadok **4 ks**, VEPO „Vyst PZ/Chrb HD s…" · (3) výška líšt 290 → pole červené a veta „Dve lišty po 290 mm sa do vnútra 584 mm
+  nezmestia", nič sa nepostaví · (4) späť na „Naložený" → chrbát HDF sa vráti (aj s ručným materiálom, ak bol) · (5) Kontrola olepov: páska na hornej hrane
+  dolnej lišty a na dolnej hrane hornej · (6) komín 50 + lišty → lišty posunuté o 50 dopredu, vnútro 442 · (6a) ručne zmeň materiál len jednej lišty →
+  kusovník 2 riadky (správne) · (6b) „Z líšt" → výška 999 → „Bez chrbta" → „Aplikuj" funguje · (7) aktualizovať plugin aj u Lucie (schéma 21).
+
 - **KON-B · K2 — chrbát z dvoch líšt (v0.13.2 → v0.13.3, 27.9.2026, PR #403, blok 7 KONŠTRUKCIA, tretia dávka).**
   Výrobná a audit-povinná dávka (package v2 so zapracovaným auditom návrhu Codex 27.9.: NOT SOUND 0 BLOCKER + 3 FIX + 2 NOTE — všetko v Scope IN).
   **Dáta:** `back_mode` smie byť **`rails`** („Z líšt"), config smie niesť **`back_rail_height`** (H, mm 20–300, predvolene 100, **prísne parsované** `norm_rail_height`,
