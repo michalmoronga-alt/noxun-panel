@@ -443,6 +443,27 @@
       p.flush_blocked = blocked;
       if (window.sketchup && sketchup.studio_do_fronts_grain) sketchup.studio_do_fronts_grain(JSON.stringify(p));
     },
+    // D-143 (KON-0): „Prestaviť zastarané skrinky" z Kontroly Štúdia. ZÁPIS do
+    // modelu — ten istý flush guard ako D-131: rozpísaná zmena v Inspectore sa
+    // najprv aplikuje (prestavba beží nad čerstvým stavom), červené pole akciu
+    // ZASTAVÍ (server to povie a okno obnoví).
+    studioRelayBackRebuild: function(p){
+      var blocked = false;
+      try {
+        if (typeof validateFields === 'function' && typeof selectedCabId !== 'undefined' &&
+            selectedCabId && !validateFields()) blocked = true;
+        var badBr = document.querySelector('#boardCard input.bad, #boardCard .bad');
+        if (badBr) blocked = true;
+      } catch (e) { blocked = false; }
+      if (!blocked){
+        if (typeof nxCabinetAction === 'function'){
+          if (!nxCabinetAction(function(){ NX.studioRelayBackRebuild(p); }, function(){ p.flush_blocked = true; if (window.sketchup && sketchup.studio_do_back_rebuild) sketchup.studio_do_back_rebuild(JSON.stringify(p)); })) return;
+        } else if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+        if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
+      }
+      p.flush_blocked = blocked;
+      if (window.sketchup && sketchup.studio_do_back_rebuild) sketchup.studio_do_back_rebuild(JSON.stringify(p));
+    },
     // ŠT-1c PR B1 (Š12): XLSX rozpoctu zo sekcie Rozpocet. Ten isty flush guard
     // ako pri VEPO — rozpisany edit korpusu meni kusovnik, teda aj platne, olep
     // a montaz v rozpocte (cervene pole preto export ZASTAVI).

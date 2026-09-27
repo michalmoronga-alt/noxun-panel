@@ -1472,6 +1472,15 @@ module Noxun
       # Chrbat — overlay / inset / groove / none (D-31: none = ziadny dielec).
       # D-37: VSETKY rezimy koncia najneskor na celkovej hlbke d — overlay chrbat
       # lezi v pasme [d-bt, d] ZA skratenym korpusom (uz nie za celkovou hlbkou).
+      #
+      # D-143 (KON-0): kazdy chrbat nesie ZNACKU POVODU `back_mode` (builder ju
+      # zapise do snapshotu dielca) a chrbat V DRAZKE navyse ROZMER DO NAREZU
+      # `cut_size` = plny rozmer skrinky `w x (h - s)` v tych istych osiach ako
+      # `prod` (length = X sirka skrinky, width = Z vyska od spodku dna po vrch).
+      # Rozhodnutie Michal 26.9.2026: presne by bolo +9 mm na stranu s drazkou,
+      # pre V1 ide do narezu plny rozmer a dielna ho zreze. `box` = `prod` =
+      # geometria sa NEMENIA (model ukazuje chrbat v drazke; rovnost strazi
+      # PartFaces/AppearanceMapping).
       def back_part(cfg, interior)
         return nil if cfg[:back_mode] == 'none' # D-31: explicitne (else vetva by vyrobila overlay!)
         w = cfg[:width]; d = cfg[:depth]; h = cfg[:height]; t = cfg[:thickness]; s = cfg[:floor_height]
@@ -1482,17 +1491,17 @@ module Noxun
           z0 = interior[:z_lo]; bh = z_hi - z0
           { suffix: 'BACK', part_key: PartKeys.cabinet('back'), role: 'back', name: 'Chrbat', material: :korpus,
             box: [w - 2 * t, bt, bh], origin: [t, d - bt, z0], prod: { length: w - 2 * t, width: bh, thickness: bt },
-            axes: PartFaces::AXES_WALL }
+            axes: PartFaces::AXES_WALL, back_mode: 'inset' }
         when 'groove'
           z0 = interior[:z_lo]; bh = z_hi - z0
           y0 = d - GROOVE_OFFSET - bt
           { suffix: 'BACK', part_key: PartKeys.cabinet('back'), role: 'back', name: 'Chrbat', material: :korpus,
             box: [w - 2 * t, bt, bh], origin: [t, y0, z0], prod: { length: w - 2 * t, width: bh, thickness: bt },
-            axes: PartFaces::AXES_WALL }
+            axes: PartFaces::AXES_WALL, back_mode: 'groove', cut_size: { length: w, width: h - s } }
         else # overlay
           { suffix: 'BACK', part_key: PartKeys.cabinet('back'), role: 'back', name: 'Chrbat', material: :korpus,
             box: [w, bt, h - s], origin: [0, d - bt, s], prod: { length: w, width: h - s, thickness: bt },
-            axes: PartFaces::AXES_WALL }
+            axes: PartFaces::AXES_WALL, back_mode: 'overlay' }
         end
       end
 

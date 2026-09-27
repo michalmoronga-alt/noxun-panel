@@ -484,6 +484,28 @@ module Noxun
                                                                         repush: repush_proc)
         end
 
+        # D-143 (KON-0): „Prestaviť zastarané skrinky" (akcia riadku Kontroly pri
+        # zastaranej skrinke s chrbtom v drážke). MENI MODEL — preto TEN ISTY
+        # flush handshake ako D-131: klik precka panel (`NX.studioRelayBackRebuild`
+        # -> flush rozpisanych editov) a az potom sa vrati sem. Telo je ZAPISOVA
+        # cesta Panela (brana 1b-3 — citacie jadro ani toto okno nezapisuju).
+        def handle_back_rebuild_stale(payload)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          if Panel.dialog_alive?
+            Panel.js("NX.studioRelayBackRebuild(#{data.to_json})")
+          else
+            do_back_rebuild_stale(data)
+          end
+        end
+
+        # Vstup PO flushi (relay z panela) alebo priamo, ked panel nezije.
+        def do_back_rebuild_stale(payload)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          Panel.back_rebuild_stale(Sketchup.active_model, data, generation: @generation,
+                                                                status: status_proc,
+                                                                repush: repush_proc)
+        end
+
         # Š10: „Zvýrazniť hrany" (telo tlacidla).
         def do_edge_check(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
@@ -1418,6 +1440,9 @@ module Noxun
           # preto NEJDE cez `mat_actions` (telo je v `ProductionCore`, nie
           # v `MaterialsDialog`) a ma vlastny riadok.
           cb(dlg, 'fronts_grain_all')     { |p| handle_fronts_grain_all(p) }
+          # D-143 (KON-0): druhy callback Kontroly, ktory ZAPISUJE do modelu —
+          # hromadna prestavba zastaranych skriniek (flush handshake ako D-131).
+          cb(dlg, 'back_rebuild_stale')   { |p| handle_back_rebuild_stale(p) }
           # ŠT-3a-1, sekcia KOVANIE. Mena callbackov su TIE ISTE, ake pouziva
           # okno „Katalóg kovania" — presunuty JS (`js/hw_catalog.js`,
           # `js/hw_sets.js`) tak vola presne to, co volal doteraz, a nikde

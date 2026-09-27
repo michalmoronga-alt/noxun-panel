@@ -244,6 +244,10 @@ meria výšku niky (vnútro − osadenie) aj hranu delenia čiel. Je to vlastnos
 - **`18 = D-140` (v0.12.20): výška osadenia chladničky.** Záznam `appliance_refs[]` kategórie `fridge` smie niesť `mount_offset` (§2.5). Kľúč by starší plugin síce
   pri normalizácii nezahodil (refs idú celé), ale **ignoroval** by ho — box niky aj Kontrola delenia čiel by ostali na dne — a pri výmene modelu chladničky by ho
   **ticho zahodil** (Astra C BLOCKER 1). Brány sú tie isté ako pri 5–17; bez migrácie (chýbajúci kľúč = 0 = doterajšie správanie).
+- **`19 = D-143` (v0.13.1, KON-0): chrbát v drážke do nárezu v plnom rozmere.** Snapshot chrbta nesie `cut_size` a značku pôvodu `back_mode` (§8.2). Starší plugin
+  (schéma 18) pole nepozná — kusovník, VEPO aj ceny by vydal v rozmere modelu (horná 600 × 720 → 564 × 684) a prestavbou by snapshot bez `cut_size` zvečnil.
+  Brány sú tie isté ako pri 5–18. **`BACK_CUT_ACTIVATION_SCHEMA` = 19** je aktivačná konštanta: skrinka s chrbtom v drážke (`back_mode || back.mode` = `groove`)
+  uložená pod ňou je **zastaraná** — Kontrola RED a všetky štyri výrobné exporty stoja, kým sa neprestaví (§8.2). Pri budúcich bumpoch sa nehýbe.
 - **`rules_seed_version` — DRUHÁ proveniencia stavby (KOV-E1b, v0.9.54).** Config nesie **aditívne** pole so **seed verziou pravidiel kovania, s ktorou stavba bežala**
   (`HardwareRules.effective_seed_version`; chýbajúce pole = `0`). Zapisuje ho **výhradne stavba** (`cabinet_config`) — z klientskeho payloadu sa **nikdy nepreberá**,
   presne ako `config_schema`. Dôvod: projektový snapshot pravidiel sa zámerne nemerguje sám, takže prestavba starej zákazky zapíše aktuálnu schému, ale kovanie

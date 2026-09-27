@@ -268,7 +268,16 @@ module Noxun
       #       (box aj kontrola delenia ciel by ostali na dne) a pri vymene modelu
       #       by ho ticho zahodil (Astra C BLOCKER 1). Brany su tie iste ako
       #       pri 5-17.
-      CONFIG_SCHEMA = 18
+      #  19 = D-143 (KON-0) — CHRBAT V DRAZKE DO NAREZU V PLNOM ROZMERE. Snapshot
+      #       chrbta nesie `cut_size` (horna 600 x 720 -> do narezu 600 x 720,
+      #       model ostava 564 x 684) a znacku povodu `back_mode`. Plugin
+      #       schemy 18 pole NEPOZNA: kusovnik, VEPO aj ceny by vydal v rozmere
+      #       modelu (564 x 684) a prestavbou by snapshot bez `cut_size`
+      #       zvecnil. Brany su tie iste ako pri 5-18 (`newer_config?`,
+      #       `ProductionCore.export_blockers`). Skrinka `groove` pod schemou 19
+      #       je ZASTARANA (`BACK_CUT_ACTIVATION_SCHEMA`) — Kontrola RED
+      #       a vyrobne exporty stoja, kym sa neprestavi.
+      CONFIG_SCHEMA = 19
 
       # KOV-C2b: schema, OD KTOREJ stavba emituje dielce zasuviek z receptu.
       # VLASTNA konstanta (nie `CONFIG_SCHEMA`), lebo pri bumpe na 6 (KOV-D1a)
@@ -294,6 +303,16 @@ module Noxun
       # isteho dovodu ako pri zasuvkach a zavesoch (buduci bump schemy nesmie
       # spravit zo skriniek schemy 11 nemigrovane).
       LIFT_ACTIVATION_SCHEMA = 11
+
+      # D-143 (KON-0): schema, OD KTOREJ snapshot chrbta V DRAZKE nesie rozmer
+      # do narezu (`cut_size`). Skrinka s chrbtom v drazke ulozena POD nou ma
+      # v .skp chrbat v rozmere modelu (564 x 684 pri hornej 600 x 720) —
+      # nedonarezany kus. O zastaranosti rozhoduje VYHRADNE schema (NIE
+      # pritomnost `cut_size`: prestavany chrbat s ABS ho zamerne nema).
+      # VLASTNA konstanta z toho isteho dovodu ako pri zasuvkach, zavesoch
+      # a vyklopoch — buduci bump schemy nesmie spravit zo skriniek schemy 19
+      # nemigrovane.
+      BACK_CUT_ACTIVATION_SCHEMA = 19
 
       # S1-E0 (Michal 20.9.2026): VYSKA ide od 80 mm, nie od 200. Nad umyvackou
       # (a pod linkou) ostava casto len 80-110 mm a stolar tam kladie NIZKY
@@ -2103,6 +2122,15 @@ module Noxun
             material_id: resolved[:material_id], grain_direction: resolved[:grain_direction] || 'none',
             edges: resolved[:edges]
           }
+          # D-143 (KON-0): znacka povodu chrbta + rozmer DO NAREZU. `cut_size`
+          # sa zapise LEN neolepenemu dielcu — chrbat v drazke s ucinnym ABS
+          # (rucny override alebo pravidlo olepu) ho zamerne NEMA a zber ho
+          # z toho (znacka `groove` + hrana) prizna RED a zastavi vyrobne
+          # exporty (`Bom.cut_issues_for`). Override olepu sa pri tom NEMAZE.
+          cfg_out[:back_mode] = pd[:back_mode] if pd[:back_mode]
+          if (cut = snapshot_cut_size(pd, resolved[:edges]))
+            cfg_out[:cut_size] = cut
+          end
           # 2B-1 (D-43): duplak vazba je sucast VYROBNEHO snapshotu (standard 8.3)
           # — validacia bezi na materializovanom configu tesne pred zapisom
           # (audit F6: plan sa validuje pred resolve_part, tade vazba neprejde).
@@ -2119,6 +2147,26 @@ module Noxun
             config: cfg_out
           })
           inst
+        end
+
+        # D-143: `cut_size` do snapshotu dielca, alebo nil. Zapisuje sa LEN, ked
+        # deskriptor rozmer do narezu nesie A dielec nema ANI JEDNU ucinnu hranu
+        # ABS — olepeny chrbat v drazke by sa do narezu dostal v plnom rozmere
+        # s paskou na hrane, ktora skonci v drazke (tok „olepiť po zrezaní" je
+        # mimo V1). CISTA funkcia (headless test).
+        def snapshot_cut_size(pd, edges)
+          cut = pd[:cut_size]
+          return nil unless cut.is_a?(Hash)
+          return nil if edged?(edges)
+
+          { length: cut[:length].to_f.round(2), width: cut[:width].to_f.round(2) }
+        end
+
+        # Ma dielec aspon jednu hranu s paskou? (nil / prazdny retazec = bez ABS)
+        def edged?(edges)
+          return false unless edges.is_a?(Hash)
+
+          edges.values.any? { |v| !v.nil? && !v.to_s.strip.empty? }
         end
 
         # --- vizual kovania (V0.4: zatial len nohy) --------------------------

@@ -446,6 +446,15 @@
         ' aria-label="Otvoriť sekciu Rozpočet">' + ico('euro') + '</button>';
     }
     var h = '';
+    // D-143 (KON-0): zastaraná skrinka s chrbtom v drážke — hromadná prestavba
+    // VŠETKÝCH zastaraných skriniek zákazky (jeden krok Späť). Príznak `fix`
+    // nesie SERVER; výber skriniek robí server z čerstvého zberu, nie DOM.
+    if (it.category === 'back_cut' && it.fix === 'rebuild_stale'){
+      h += '<button type="button" class="goact" data-act="rebuild"' +
+        (ctrlRebuildBusy ? ' aria-disabled="true"' : '') +
+        ' title="' + (ctrlRebuildBusy ? 'Prestavujem…' : 'Prestaviť zastarané skrinky (jeden krok Späť)') + '"' +
+        ' aria-label="Prestaviť zastarané skrinky">' + ico('refresh-cw') + '</button>';
+    }
     // D-83: uni_id nesie SERVER — klient si ho nevymýšľa.
     if (it.category === 'uni_material' && it.uni_id){
       h += '<button type="button" class="goact" data-act="uni" data-uni="' + esc(it.uni_id) + '"' +
@@ -973,6 +982,9 @@
       // a maže sa LEN pri zmene dokumentu (vzor `ctrlUniOpen` vyššie).
       if (!ST || !data || ST.model_guid !== data.model_guid) buyOpen = {};
       ST = data || null;
+      // D-143: plný push = server dokončil (alebo odmietol) prestavbu — tlačidlo
+      // „Prestaviť zastarané skrinky" sa odomkne.
+      ctrlRebuildBusy = false;
       // PLNY payload = cerstve cisla zo servera, takze „neaktuálne" padá —
       // a to PRED renderom, inak by lišta este raz nakreslila jantar.
       // Zhadzuje ho VYHRADNE tento push: echa nizsie (lista VEPO, prepinace,
@@ -1777,6 +1789,18 @@
                                           model_guid: ST.model_guid || '' }));
   }
 
+  // D-143 (KON-0): „Prestaviť zastarané skrinky". Je to ZÁPIS do modelu, preto
+  // ide flush handshakom cez panel (vzor „Použiť na všetky čelá", D-131);
+  // generáciu aj dokument overuje SERVER. Zámok bráni dvojkliku, kým nepríde
+  // plný push (ten ho zhodí vždy — aj po odmietnutí).
+  var ctrlRebuildBusy = false;
+  function requestRebuildStale(){
+    if (ctrlRebuildBusy || !ST || !window.sketchup || !sketchup.back_rebuild_stale) return;
+    ctrlRebuildBusy = true;
+    renderBody();
+    sketchup.back_rebuild_stale(JSON.stringify({ gen: ST.gen, model_guid: ST.model_guid || '' }));
+  }
+
   function edgeCheckToggle(){
     if (!ST || !window.sketchup || !sketchup.edge_check_toggle) return;
     sketchup.edge_check_toggle(JSON.stringify(edgeCheckPayload(ST)));
@@ -1961,6 +1985,7 @@
         var cact = t.closest('button.goact');
         var what = cact ? cact.getAttribute('data-act') : '';
         if (what === 'uni'){ requestReplaceUni(cact.getAttribute('data-uni')); return; }
+        if (what === 'rebuild'){ requestRebuildStale(); return; }
         // ŠT-1c PR B1: rozpočtové upozornenie NEMÁ entitu v modeli — vedie do
         // sekcie Rozpočet TOHO ISTÉHO okna, rovno na časť, ktorej sa týka
         // (`budget_section` skladá server). Žiadne premostenie do iného okna.
