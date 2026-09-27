@@ -17,6 +17,16 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **DOCS — smoke bloku 7 KONŠTRUKCIA K1+K2 PASS (27.9.2026, PR #?, len dokumentácia; verzia pluginu sa nemení).**
+  Michal 27.9. večer prešiel smoke bloku 7 podľa checklistu v [KONSTRUKCIA_ZAVER_2026-09-27.md](KONSTRUKCIA_ZAVER_2026-09-27.md): **„všetko sedí, nenašiel som
+  chybu"** — výsledok zapísaný ako celok, nie po bodoch; ďalšie postrehy k funkciám bloku 7 idú ako nové D-čísla do DOGFOODING podľa bloku. **Delenie čiel
+  Chladničkovej 719 / 1274 potvrdené** („sedí") — šablóna ostáva, bod v „Otvorené body" záveru je uzavretý. Jediná otázka zo smoke: chrbát v drážke pri komíne
+  má v modeli a v riadkoch Dĺžka/Šírka karty dielca **564**, kusovník a VEPO **600** — **zámer**: model ukazuje chrbát v jeho polohe medzi bokmi (drážka v bokoch
+  sa nemodeluje, plný rozmer by v modeli prerazil boky), do výroby ide riadok „Do nárezu" (rozhodnutie M8, D-143); doplnené do „Známe dôsledky" záveru.
+  POJMY heslo „Chrbát v drážke sa reže väčší, než stojí v modeli" to už hovorí — bez zmeny. Dočasná skupina „KONŠTRUKCIA K1+K2 — smoke po uzávere bloku 7"
+  v DOGFOODING **zanikla** (bez nálezov; vzor PR #397 po S1). Package KON-D v archíve bloku sa nemení (historický podklad). **STAV pri najbližšej kódovej
+  dávke:** smoke bloku 7 PASS 27.9. (dnes STAV ešte žiada potvrdiť delenie čiel pri smoke) — dokumentačné PR STAV nemení.
+
 - **NÁSTROJ — kontrola kódovania: hook a CI test s jednou implementáciou, správna slovenčina veľkými už nie je „mojibake" (27.9.2026, PR #407, nástroj; verzia pluginu sa nemení).**
   Hlásenie implementátora KON-D: hook `post_edit_check.ps1` označil `docs/architecture/ui-lifecycle.md` za poškodený kvôli slovu **PAMÄŤ**, hoci CI bolo zelené.
   **Príčina:** signatúra `\xC3\x84[\xC2\xC4\xC5]` („Ä" + znak zo skupiny C4/C5) chytala aj legitímne veľké Ä pred Ť/Č (PAMÄŤ, PÄŤSTUPŇOVÁ, VÄČŠÍ) — známa hranica

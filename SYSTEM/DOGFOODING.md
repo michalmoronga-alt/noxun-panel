@@ -47,13 +47,6 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
 *(Skupina je prázdna — **D-52 uzavreté 3.9.2026** (v0.9.14), plný text v
 [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md); **D-48** je mimo V1, v skupine Po V1 — zásobník.)*
 
-## KONŠTRUKCIA K1+K2 — smoke po uzávere bloku 7 (v0.14.0, opravy v0.14.x)
-
-*(Blok 7 je uzavretý vo v0.14.0 (27.9.2026). **D-143** (KON-0, PR #401) a **D-144** (KON-A, PR #402) sú vyriešené — plné texty
-v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md); **D-145** (3D náhľad) je v zásobníku nižšie. Michalov smoke ide podľa checklistu
-v [archiv/KONSTRUKCIA_ZAVER_2026-09-27.md](archiv/KONSTRUKCIA_ZAVER_2026-09-27.md) — nové nálezy sa zapíšu sem a opravia ako v0.14.x. Skupina je dočasná
-a zanikne s posledným nálezom.)*
-
 ## Po V1 — zásobník
 
 - **D-145 · Náhľad Inspectora v lepšej 3D forme** (Michal 27.9.2026, pri schvaľovaní mockupu bloku KONŠTRUKCIA) — hĺbkové veci korpusu (komín vzadu,
