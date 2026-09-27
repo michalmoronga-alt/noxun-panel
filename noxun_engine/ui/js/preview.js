@@ -385,7 +385,7 @@
   function pvGeom(){
     var gl = nxNumOr(numv('fr_gap_left'), 2), gr = nxNumOr(numv('fr_gap_right'), 2);
     var gap = 3; var gv = numv('fr_gap'); if (!isNaN(gv)) gap = gv;
-    return { W: numv('width')||600, H: numv('height')||720, t: numv('thickness')||18,
+    return pvSetbackDepths({ W: numv('width')||600, H: numv('height')||720, t: numv('thickness')||18,
              D: numv('depth')||0,
              fh: nxCabFloorHeight(),
              topNone: val('top_mode') === 'none',
@@ -397,7 +397,27 @@
              // UI-C1b: vo VKLADANI server resolved cela nema (skrinka este
              // neexistuje a `frontItems` je tu null — pasca Codex FIX 11),
              // preto ich dopocita cisty draft resolver z hodnot karty.
-             fronts: pvLiveFronts() };
+             fronts: pvLiveFronts() });
+  }
+
+  // KON-A · K1 (audit FIX 2 + NOTE 7): most pvGeom -> komin a zapustenie.
+  // Hlbky dielcov pre ODHAD (`nxDraftStats`) z TYCH ISTYCH pomocnikov core.js
+  // ako „Vnút. hĺbka" (nxBackStop / nxSideDepth / nxInteriorDepth). Pri X = Y
+  // = 0 sa kluce NEPRIDAVAJU — odhad ostava presne dnesny (celkova D).
+  function pvSetbackDepths(g){
+    if (typeof currentCarcass !== 'function' || typeof nxBackSetback !== 'function') return g;
+    var c = currentCarcass({ depth: g.D, thickness: g.t });
+    g.backSetback = nxBackSetback(c);
+    g.topFrontSetback = nxTopFrontSetback(c);
+    if (!(g.backSetback > 0) && !(g.topFrontSetback > 0)) return g;
+    var r = nxBackStop(c);
+    g.sideD = nxSideDepth(c);
+    g.bottomD = r;
+    g.topD = r - g.topFrontSetback;
+    g.innerD = nxInteriorDepth(c);
+    // Nalozeny chrbat pri komine sedi MEDZI bokmi (w − 2t).
+    if (g.backSetback > 0 && c.back_mode === 'overlay') g.backW = Math.max(0, g.W - 2 * g.t);
+    return g;
   }
 
   // ---- UI-C1b: cela NAVRHU (draft resolver) --------------------------------
@@ -489,19 +509,23 @@
     var bodyH = Math.max(0, H - fh);
     var n = 0, mm2 = 0;
     function add(k, a){ n += k; mm2 += k * Math.max(0, a); }
-    add(2, bodyH * D);                                        // boky
-    add(1, (g.bottomBetween ? Math.max(0, W - 2 * t) : W) * D); // dno
+    // KON-A (NOTE 7): hlbky dielcov pri komine/zapusteni dodava `pvSetbackDepths`;
+    // chybajuci kluc = dnesny odhad (celkova D).
+    var sideD = nxNumOr(g.sideD, D), botD = nxNumOr(g.bottomD, D), topD = nxNumOr(g.topD, D);
+    var innD = nxNumOr(g.innerD, D), backW = nxNumOr(g.backW, W);
+    add(2, bodyH * sideD);                                        // boky
+    add(1, (g.bottomBetween ? Math.max(0, W - 2 * t) : W) * botD); // dno
     if (g.topMode === 'two_rails') add(2, Math.max(0, W - 2 * t) * nxNumOr(g.railDepth, 100));
-    else if (g.topMode !== 'none') add(1, Math.max(0, W - 2 * t) * D);
-    if (g.backMode && g.backMode !== 'none') add(1, W * bodyH);
+    else if (g.topMode !== 'none') add(1, Math.max(0, W - 2 * t) * topD);
+    if (g.backMode && g.backMode !== 'none') add(1, backW * bodyH);
     (zones || []).forEach(function(z){
       if (!z) return;
       if (z.leaf){
         var sh = parseInt(z.shelves, 10) || 0;
-        if (sh > 0) add(sh, nxNumOr(z.w, 0) * D);
+        if (sh > 0) add(sh, nxNumOr(z.w, 0) * innD);
       } else if (z.split){
         var c = (parseInt(z.split.count, 10) || 1) - 1;
-        if (c > 0) add(c, (z.split.axis === 'v' ? nxNumOr(z.h, 0) : nxNumOr(z.w, 0)) * D);
+        if (c > 0) add(c, (z.split.axis === 'v' ? nxNumOr(z.h, 0) : nxNumOr(z.w, 0)) * innD);
       }
     });
     var ow = Math.max(0, W - nxFrontSide(g, 'gapLeft') - nxFrontSide(g, 'gapRight'));

@@ -433,7 +433,9 @@
     <!-- N3b: skupiny Nastaveni nesu ikonu dielca, o ktorom hovoria (mapa GRPICON
          z mockupu). Ostatne kontexty (Zony/Cela/Kovanie) ikony dostanu v UI-C. -->
     <details data-key="top" data-s4="korpus">
-      <summary><svg class="ic gic" aria-hidden="true"><use href="#i-p-top"/></svg>Strop</summary>
+      <!-- KON-A (A7): suhrn v zbalenej hlavicke („zap. 30") len pri nenulovej
+           hodnote — text sklada `setbackMetaTexts` (form.js). -->
+      <summary class="ghdr"><svg class="ic gic" aria-hidden="true"><use href="#i-p-top"/></svg>Strop<span class="gtools"><span class="meta" id="topMeta"></span></span></summary>
       <div class="body">
         <div class="row"><label>Konštrukcia</label>
           <select id="top_mode" onchange="toggleTwoRails(); onField()">
@@ -442,6 +444,12 @@
             <option value="none">Bez stropu</option>
           </select><span class="unit"></span>
         </div>
+        <!-- KON-A · K1 (A1): zapustenie stropu hned pod Konstrukciou — plati pre
+             plny strop aj prednu vystuhu; pri „Bez stropu" sa riadok skryje,
+             HODNOTA sa pamata (vzor backThRow). -->
+        <div class="row" id="topSetbackRow"><label>Zapustenie vpredu<button type="button" class="nxtip inl" aria-label="Pomoc"
+            data-tip="Strop alebo predná výstuha začína o túto hodnotu za prednou hranou boku — napr. kvôli drezu. Dno sa neposúva. 0 = lícuje s bokom."
+            onclick="nxTipStop(event)"><svg class="ic" aria-hidden="true"><use href="#i-help-circle"/></svg></button></label><input id="top_front_setback" type="text" inputmode="decimal" oninput="onField()"><span class="unit">mm</span></div>
         <div id="twoRailsGroup">
           <div class="row"><label>Orientácia výstuh</label>
             <select id="rails_orientation" onchange="onField()">
@@ -476,17 +484,15 @@
       </div>
     </details>
 
-    <details data-key="sides" data-s4="korpus">
-      <summary><svg class="ic gic" aria-hidden="true"><use href="#i-p-side"/></svg>Boky</summary>
-      <div class="body">
-        <div class="hint">Boky obaľujú korpus (hrúbka podľa Základné). Per-bok nastavenia (rohové spoje, odsadenia) pribudnú v ďalšej verzii.</div>
-      </div>
-    </details>
+    <!-- KON-A (A2): skupina Boky ZANIKLA — nemala nic na nastavenie. -->
 
     <details data-key="back" data-s4="korpus">
-      <summary><svg class="ic gic" aria-hidden="true"><use href="#i-p-back"/></svg>Chrbát</summary>
+      <summary class="ghdr"><svg class="ic gic" aria-hidden="true"><use href="#i-p-back"/></svg>Chrbát<span class="gtools"><span class="meta" id="backMeta"></span></span></summary>
       <div class="body">
-        <div class="row"><label>Konštrukcia</label>
+        <!-- KON-A (A6): pomocna veta o celkovej hlbke je tooltip pri Konstrukcii (D-130a). -->
+        <div class="row"><label>Konštrukcia<button type="button" class="nxtip inl" aria-label="Pomoc"
+            data-tip="Hĺbka korpusu je CELKOVÁ vrátane chrbta. Naložený chrbát bez komína skráti telo o svoju hrúbku; s komínom sedí medzi bokmi na zadných hranách dna a stropu. V drážke ide do nárezu v plnom rozmere (do drážky ho zreže dielňa)."
+            onclick="nxTipStop(event)"><svg class="ic" aria-hidden="true"><use href="#i-help-circle"/></svg></button></label>
           <select id="back_mode" onchange="toggleBackTh(); onField()">
             <option value="overlay">Naložený zozadu</option>
             <option value="inset">Vložený medzi boky</option>
@@ -494,6 +500,12 @@
             <option value="none">Bez chrbta</option>
           </select><span class="unit"></span>
         </div>
+        <!-- KON-A · K1 (A4): komin vzadu ma PEVNE miesto hned pod Konstrukciou
+             (plati pre kazdy rezim chrbta — polia „nelietaju", D-130). Tooltip
+             (minimum a volny kanal podla rezimu) prepisuje `toggleBackSetback`. -->
+        <div class="row" id="backSetbackRow"><label>Komín vzadu<button type="button" class="nxtip inl" id="backSetbackTip" aria-label="Pomoc"
+            data-tip="O koľko sú dno a strop vzadu kratšie ako bok — za chrbtom vznikne vzduchový kanál. 0 = bez komína."
+            onclick="nxTipStop(event)"><svg class="ic" aria-hidden="true"><use href="#i-help-circle"/></svg></button></label><input id="back_setback" type="text" inputmode="decimal" oninput="onField()"><span class="unit">mm</span></div>
         <!-- D-31: pri "Bez chrbta" sa riadok skryva; HODNOTA sa zachovava (navrat
              na overlay/drazku obnovi predchadzajucu volbu, sablony round-tripuju) -->
         <div class="row" id="backThRow"><label>Hrúbka chrbta</label>
@@ -502,7 +514,6 @@
             <option value="18">Pevný 18 mm</option>
           </select><span class="unit"></span>
         </div>
-        <div class="hint">Hĺbka korpusu je CELKOVÁ vrátane chrbta — pri naloženom chrbte sa telo skráti o jeho hrúbku.</div>
       </div>
     </details>
 

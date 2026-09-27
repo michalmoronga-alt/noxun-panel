@@ -62,6 +62,9 @@
   // a polia zon — pripajaju ich rendery; bc_quantity je POCET, vyrazy nema).
   function bindExprFields(){
     ['width','height','depth','thickness','floor_height','plinth_recess','rails_top_offset','rail_depth',
+     // KON-A (audit FIX 3): komin a zapustenie — bez pripojenia by debounce
+     // pri pisani `50-20` odoslal medzistav `50-2` (komin 48).
+     'back_setback','top_front_setback',
      'fr_gap','fr_gap_top','fr_gap_bottom','fr_gap_left','fr_gap_right'] // D-119 medzery/presahy cel
       .forEach(function(id){ attachExprField(el(id), { flushFn: flushCabinetEditsNow }); });
     // E-03: ib_thickness je pri UNI materiali editovatelne dim pole (pri realnom

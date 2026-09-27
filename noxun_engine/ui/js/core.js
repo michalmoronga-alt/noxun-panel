@@ -1549,21 +1549,131 @@
     return (c.back_mode === 'overlay') ? (d - bt) : d;
   }
 
+  // ===== KON-A · K1: KOMIN VZADU (X) A ZAPUSTENIE STROPU (Y) =================
+  // Zrkadlo Ruby `Construction.back_setback` / `back_stop` / `side_depth` /
+  // `interior_dims[:back_front_y]` / `setback_error`. Hodnoty aj vety stráži
+  // SPOLOCNA fixtura `tests/fixtures/kona_cases.json` (Ruby aj JS strana).
+  var NX_SETBACK_MAX    = 300.0;  // Construction::SETBACK_MAX
+  var NX_GROOVE_OFFSET  = 10.0;   // Construction::GROOVE_OFFSET
+  var NX_MIN_SB_INNER   = 40.0;   // ZoneTree::SHELF_FRONT_INSET + ZoneTree::MIN_FIELD
+  var NX_MIN_TOP_DEPTH  = 60.0;   // Construction::MIN_TOP_DEPTH
+
+  // Prisne: konecne cislo > 0 (orezane na 300), inak 0. Slot pole nema.
+  function nxSetbackOf(c, key){
+    if (!c || c.type === 'dishwasher') return 0;
+    var v = c[key];
+    if (typeof v === 'string'){
+      var s = v.trim();
+      if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(s)) return 0;
+      v = parseFloat(s);
+    }
+    if (typeof v !== 'number' || !isFinite(v) || !(v > 0)) return 0;
+    return Math.min(v, NX_SETBACK_MAX);
+  }
+  function nxBackSetback(c){ return nxSetbackOf(c, 'back_setback'); }
+  function nxTopFrontSetback(c){ return nxSetbackOf(c, 'top_front_setback'); }
+  function nxBackTh(c){
+    var bt = nxNum(c.back_thickness, NX_BACK_TH_DFLT);
+    return (bt > 0) ? bt : NX_BACK_TH_DFLT;
+  }
+  // Zadny doraz R dna, stropu a zadnej vystuhy (bez komina = D-37 telo).
+  function nxBackStop(c){
+    var x = nxBackSetback(c);
+    return (x > 0) ? (nxNum(c.depth) - x) : nxCarcassDepth(c);
+  }
+  // Hlbka bokov: pri komine plna d.
+  function nxSideDepth(c){
+    return (nxBackSetback(c) > 0) ? nxNum(c.depth) : nxCarcassDepth(c);
+  }
+  // Svetla hlbka vnutra (back_front_y) — JEDINA JS autorita „Vnút. hĺbky".
+  function nxInteriorDepth(c){
+    var d = nxNum(c.depth), bt = nxBackTh(c), bm = c.back_mode;
+    if (nxBackSetback(c) > 0){
+      var r = nxBackStop(c);
+      return (bm === 'inset') ? (r - bt) : r;
+    }
+    if (bm === 'none') return d;
+    if (bm === 'groove') return d - NX_GROOVE_OFFSET - bt;
+    return d - bt; // overlay aj inset
+  }
+  function nxMinBackSetback(c){
+    if (c.back_mode === 'overlay') return nxBackTh(c);
+    if (c.back_mode === 'groove') return NX_GROOVE_OFFSET + nxBackTh(c);
+    return 0;
+  }
+  // Cele mm bez „.0", desatiny s ciarkou (zrkadlo Ruby Construction.fmt_mm).
+  function nxFmtMm(v){
+    var f = Math.round(nxNum(v) * 10) / 10;
+    return (f === Math.round(f)) ? String(Math.round(f)) : String(f).replace('.', ',');
+  }
+  // Veta odmietnutia (ta ista ako Ruby `Construction.setback_error`) alebo ''.
+  // Pri X = Y = 0 NIKDY nic (audit KON-A FIX 4).
+  function nxSetbackError(c){
+    var x = nxBackSetback(c), y = nxTopFrontSetback(c);
+    if (!(x > 0) && !(y > 0)) return '';
+    var r = nxBackStop(c);
+    if (x > 0){
+      var minX = nxMinBackSetback(c);
+      if (x < minX - 0.005){
+        if (c.back_mode === 'groove'){
+          return 'Komín pri chrbte v drážke musí byť 0 alebo aspoň ' + nxFmtMm(minX) + ' mm (drážka ' +
+                 nxFmtMm(NX_GROOVE_OFFSET) + ' + chrbát ' + nxFmtMm(nxBackTh(c)) + ').';
+        }
+        return 'Komín pri naloženom chrbte musí byť 0 alebo aspoň ' + nxFmtMm(minX) +
+               ' mm (hrúbka chrbta) — inak by chrbát trčal za boky.';
+      }
+      var inner = nxInteriorDepth(c);
+      if (inner < NX_MIN_SB_INNER - 0.005){
+        return 'Pri komíne ' + nxFmtMm(x) + ' mm ostane vnútro len ' + nxFmtMm(Math.max(inner, 0)) +
+               ' mm — police sa nezmestia; zmenši komín alebo zväčši hĺbku.';
+      }
+    }
+    if (c.top_mode === 'full' && r - y < NX_MIN_TOP_DEPTH - 0.005){
+      var left = nxFmtMm(Math.max(r - y, 0));
+      if (!(y > 0)){
+        return 'Pri komíne ' + nxFmtMm(x) + ' mm by strop mal len ' + left + ' mm (najmenej ' +
+               nxFmtMm(NX_MIN_TOP_DEPTH) + ') — zmenši komín alebo zväčši hĺbku.';
+      }
+      return 'Zapustenie ' + nxFmtMm(y) + ' mm nenechá strop — ostalo by z neho ' + left +
+             ' mm (najmenej ' + nxFmtMm(NX_MIN_TOP_DEPTH) + ').';
+    }
+    if (c.top_mode === 'two_rails'){
+      var t = nxNum(c.thickness);
+      if (c.rails_orientation === 'upright'){
+        var need = y + 2 * t + 20;
+        if (need > r + 0.005){
+          return 'Výstuhy na výšku sa medzi zapustenie a komín nezmestia — potrebujú ' + nxFmtMm(need) +
+                 ' mm hĺbky, ostáva ' + nxFmtMm(Math.max(r, 0)) + ' mm.';
+        }
+      } else {
+        var lim = nxRailGeom(c).flatLimit;
+        if (lim < 20 - 0.005){
+          return 'Výstuhy naplocho sa medzi zapustenie a komín nezmestia — na každú by ostalo ' +
+                 nxFmtMm(Math.max(lim, 0)) + ' mm (najmenej 20).';
+        }
+      }
+    }
+    return '';
+  }
+
   // Geometria vystuh: odsadenie od vrchu + kolko zaberu na vysku. Clampy su
   // zhodne s Ruby Construction.rail_geometry (vratane rezervy MIN_INTERIOR_H).
+  // KON-A: flat limit (R − Y)/2 − 10 (pri X = Y = 0 dnesne cd/2 − 10).
   function nxRailGeom(c){
     var h = nxNum(c.height), t = nxNum(c.thickness), s = nxNum(c.floor_height);
     var head = Math.max(h - (s + t) - NX_MIN_INTERIOR_H, 0);
     var wantDepth = nxNum(c.rail_depth), wantOff = nxNum(c.rails_top_offset);
     var upright = (c.rails_orientation === 'upright');
-    var limit = upright ? head : (nxCarcassDepth(c) / 2 - 10);
+    var flatLimit = (nxBackStop(c) - nxTopFrontSetback(c)) / 2 - 10;
+    var limit = upright ? head : flatLimit;
     var dep = Math.min(wantDepth, limit);
     if (dep < NX_RAIL_MIN) dep = NX_RAIL_MIN;
     var occupy = upright ? dep : t;
     var maxOff = Math.max(head - occupy, 0);
     var off = Math.min(Math.max(wantOff, 0), maxOff);
     return { offset:off, wantedOffset:wantOff, depth:dep, wantedDepth:wantDepth,
-             occupy:occupy, upright:upright, zTop:(h - off), zBottom:(h - off - occupy) };
+             occupy:occupy, upright:upright, zTop:(h - off), zBottom:(h - off - occupy),
+             flatLimit:flatLimit };
   }
 
   // Svetle vnutro korpusu: { zLo, zHi, availH }. two_rails konci na SPODNEJ hrane
@@ -1586,7 +1696,11 @@
       depth: numv('depth') || 0,
       back_mode: val('back_mode'), back_thickness: numv('back_thickness') || NX_BACK_TH_DFLT,
       top_mode: val('top_mode'), rails_orientation: val('rails_orientation'),
-      rails_top_offset: numv('rails_top_offset') || 0, rail_depth: numv('rail_depth') || 100
+      rails_top_offset: numv('rails_top_offset') || 0, rail_depth: numv('rail_depth') || 100,
+      // KON-A (audit FIX 2): komin a zapustenie — bez nich by limit vystuh,
+      // „Vnút. hĺbka" aj zrkadlo validacie ticho pocitali bez X/Y.
+      type: getType(),
+      back_setback: numv('back_setback') || 0, top_front_setback: numv('top_front_setback') || 0
     };
     if (over){ for (var k in over){ if (Object.prototype.hasOwnProperty.call(over, k)) c[k] = over[k]; } }
     return c;
@@ -1603,6 +1717,11 @@
     { id:'back_mode', kind:'sel' }, { id:'back_thickness', kind:'num', dflt:3 },
     { id:'plinth_mode', kind:'sel' }, { id:'plinth_recess', kind:'num' },
     { id:'rails_orientation', kind:'sel' }, { id:'rails_top_offset', kind:'num' }, { id:'rail_depth', kind:'num' },
+    // KON-A · K1: komin vzadu a zapustenie stropu. `dflt: 0` = RIEDKY CONFIG
+    // (Codex FIX 9): skrinka bez kluca (X = 0 sa do configu nezapisuje) musi
+    // pole NASTAVIT na 0 — inak by ostal komin predtym oznacenej skrinky
+    // a „Aplikuj" by ho ticho zapisal inej.
+    { id:'back_setback', kind:'num', dflt:0 }, { id:'top_front_setback', kind:'num', dflt:0 },
     // S1-E: polia SLOTU UMYVACKY. Idu TOU ISTOU cestou ako ostatne konstrukcne
     // polia (zber, validacia, auto-apply) — zrkadlo Ruby `Panel::PARAM_KEYS`.
     // Pri dolnej a hornej skrinke su prazdne a server ich ignoruje.
@@ -1654,6 +1773,11 @@
       // D-80 (tests/js/test_interior_height.js) — zrkadlo Construction: svetla
       // vyska a geometria vystuh. currentCarcass sa NEexportuje (cita DOM).
       nxInteriorZ: nxInteriorZ, nxRailGeom: nxRailGeom, nxCarcassDepth: nxCarcassDepth,
+      // KON-A · K1 (tests/js/test_kona_komin.js) — komin, zapustenie, vnutro,
+      // veta odmietnutia; zoznam konstrukcnych poli pre guard parity.
+      nxBackSetback: nxBackSetback, nxTopFrontSetback: nxTopFrontSetback, nxBackStop: nxBackStop,
+      nxSideDepth: nxSideDepth, nxInteriorDepth: nxInteriorDepth, nxSetbackError: nxSetbackError,
+      nxFmtMm: nxFmtMm, CONSTRUCTION_FIELDS: CONSTRUCTION_FIELDS,
       NX_MIN_INTERIOR_H: NX_MIN_INTERIOR_H,
       // D-90 (tests/js/test_d90_profil_ui.js) — ciste funkcie volby profilu;
       // register sa testom odovzdava parametrom (global plni az NX.init z Ruby).

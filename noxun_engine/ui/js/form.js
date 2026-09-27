@@ -148,6 +148,9 @@
   // zhodu vsetkych troch miest strazi `tests/pure/test_s1e0_min_vyska.rb`.
   var LIMITS = { width:[200,3000], height:[80,3000], depth:[150,2000], thickness:[6,50],
                  floor_height:[0,500], plinth_recess:[0,300], rail_depth:[20,400], rails_top_offset:[0,500],
+                 // KON-A · K1: komin vzadu a zapustenie stropu — zrkadlo Ruby
+                 // `Construction::SETBACK_MAX` (guard `tests/pure/test_kona_komin.rb`).
+                 back_setback:[0,300], top_front_setback:[0,300],
                  // S1-E: polia SLOTU UMYVACKY — zrkadlo Ruby `CabinetBuilder::DW_RANGES`
                  // (guard test `tests/pure/test_s1e_slot.rb`). D-139: vyska cela uz
                  // pole NIE JE — odvodi sa (`nxSlotFrontEval`) a jej rozsah strazi
@@ -237,6 +240,37 @@
       if (message){ e.classList.add('bad'); e.title = message; } else { e.title = ''; }
     });
   }
+  // ===== KON-A · K1: ZRKADLO VALIDACIE KOMINA A ZAPUSTENIA ==================
+  // Ta ista veta, akou by server prestavbu ODMIETOL (`Construction.setback_error`
+  // cez core.js `nxSetbackError`) — pole zocervenie UZ V PANELI a apply sa
+  // zastavi. Pri X = Y = 0 nikdy nic. Slot pole nema.
+  function cabinetSetbackError(){
+    if (cabTypeNow() === 'dishwasher' || typeof nxSetbackError !== 'function') return '';
+    // X = Y = 0 (alebo pole chyba) -> ziadne nove pravidlo; nic sa necita.
+    var xs = el('back_setback'), ys = el('top_front_setback');
+    var xv = (xs && xs.value !== '') ? evalDim(xs.value) : 0, yv = (ys && ys.value !== '') ? evalDim(ys.value) : 0;
+    if (!(xv > 0) && !(yv > 0)) return '';
+    var h = cabFieldOrDefault('height'), sokel = (getType() === 'upper') ? 0 : cabFieldOrDefault('floor_height');
+    var hr = cabFieldOrDefault('thickness'), d = cabFieldOrDefault('depth');
+    // Bez predvolieb zo servera sa NEHADA (vzor cabinetHeightError).
+    if (isNaN(h) || isNaN(sokel) || isNaN(hr) || isNaN(d)) return '';
+    return nxSetbackError(currentCarcass({ height: h, floor_height: sokel, thickness: hr, depth: d }));
+  }
+  // Oznaci pole komina a/alebo zapustenia (to, ktore je nenulove). Dovod do
+  // `title` — rovnako ako pri vyske; stavovu vetu berie `nxCabFieldError`.
+  var SETBACK_FIELDS = ['back_setback', 'top_front_setback'];
+  function markSetbackError(message){
+    SETBACK_FIELDS.forEach(function(id){
+      var e = el(id); if (!e) return;
+      var v = (e.value === '') ? 0 : evalDim(e.value);
+      if (message && v > 0){ e.classList.add('bad'); e.title = message; } else { e.title = ''; }
+    });
+  }
+  // Posledna krizova veta formulara (vyska/podstavec alebo komin/zapustenie)
+  // — stavovy riadok ju ukaze namiesto vseobecneho „Skontroluj červené polia".
+  var cabFieldErrorMsg = '';
+  function nxCabFieldError(){ return cabFieldErrorMsg; }
+
   // D-139: odvodene celo slotu mimo rozsahu = veta pre obe polia. Pri
   // prazdnom/nezmyselnom vstupe sa NEHADA (oznacil ho hlavny cyklus).
   function slotFrontError(h){
@@ -276,6 +310,11 @@
     var hErr = cabinetHeightError();
     markHeightError(hErr);
     if (hErr) ok = false;
+    // KON-A: komin a zapustenie (zrkadlo `Construction.setback_error`).
+    var sErr = hErr ? '' : cabinetSetbackError();
+    markSetbackError(sErr);
+    if (sErr) ok = false;
+    cabFieldErrorMsg = hErr || sErr || '';
     if (!skipFrontDraft && typeof nxFrontDraftReady === 'function' && !nxFrontDraftReady()) ok = false;
     return ok;
   }
@@ -449,6 +488,7 @@
     schedulePreview();                     // D-02: nahlad sa neprekresluje pri kazdom pismene
     updateAvailable();
     updateCabfrontMeta();                  // D-130b: meta skupiny „Spoločné" ukazuje PRAVE napisane cisla
+    toggleBackSetback();                   // KON-A: tooltip komina (volny kanal) + suhrn hlavicky Strop/Chrbát
     // KOV-G2 (D-111): riadok Noh vo VKLADANI. Dotaz odide LEN pri zmene toho,
     // na com nohy zavisia (typ, sirka, sokel, rezim sokla) — funkcia si to
     // stripuje sama, aby `onField` nemusel vediet, ktore pole sa menilo.
@@ -488,7 +528,9 @@
     }
     if (!selectedCabId){ if (nativeOp) nxNativeFlushDone(nativeOp.token, 'nothing'); return; }
     if (!validateFields()) {
-      NX.setStatus((frontDraft && frontDraft.message) || 'Skontroluj červené polia (mimo rozsahu).', true);
+      NX.setStatus((frontDraft && frontDraft.message) ||
+                   (typeof nxCabFieldError === 'function' ? nxCabFieldError() : '') ||
+                   'Skontroluj červené polia (mimo rozsahu).', true);
       if (nativeOp) nxNativeFlushDone(nativeOp.token, 'invalid');
       return;
     }
@@ -566,10 +608,9 @@
     // D-37: svetla hlbka zrkadli interior_dims — hlbka je CELKOVA vratane chrbta:
     // overlay/inset: d - bt; groove: d - 10 - bt; none: d (audit FIX 5 — bez tohto
     // by navrh noveho korpusu ukazoval zlu hodnotu az do prveho rebuildu).
-    var bm = val('back_mode'), bt = numv('back_thickness') || 3;
-    var ad = d;
-    if (bm === 'overlay' || bm === 'inset') ad = d - bt;
-    else if (bm === 'groove') ad = d - 10 - bt;
+    // KON-A (A8): pri komine po posunuty chrbat — JEDINA JS autorita
+    // `nxInteriorDepth` (core.js), ziadna druha kopia vzorca.
+    var ad = nxInteriorDepth(currentCarcass({ depth: d, thickness: t }));
     setOut('av_depth', Math.max(0, Math.round(ad)));
     // D-80: svetla vyska cez JEDINU zdielanu funkciu (core.js nxInteriorZ) —
     // pri two_rails ju urcuje spodna hrana vystuh (odsadenie + orientacia).
@@ -696,10 +737,61 @@
     if (u) u.textContent = text;
   }
   function toggleRecess(){ el('recessRow').style.display = (val('plinth_mode') === 'front') ? '' : 'none'; }
-  function toggleTwoRails(){ el('twoRailsGroup').style.display = (val('top_mode') === 'two_rails') ? '' : 'none'; }
+  function toggleTwoRails(){
+    el('twoRailsGroup').style.display = (val('top_mode') === 'two_rails') ? '' : 'none';
+    toggleTopSetback();
+  }
   // D-31: Bez chrbta skryje riadok hrubky — HODNOTA selectu sa NEMENI (navrat
   // rezimu ju obnovi; sablony a config ju drzia dalej).
-  function toggleBackTh(){ var r = el('backThRow'); if (r) r.style.display = (val('back_mode') === 'none') ? 'none' : ''; }
+  function toggleBackTh(){
+    var r = el('backThRow'); if (r) r.style.display = (val('back_mode') === 'none') ? 'none' : '';
+    toggleBackSetback();
+  }
+  // KON-A · K1 (A1): „Zapustenie vpredu" pri „Bez stropu" nema co posunut —
+  // riadok sa skryje, HODNOTA sa pamata (vzor `backThRow`). Slot riadok nema.
+  function toggleTopSetback(){
+    var r = el('topSetbackRow'); if (!r) return;
+    r.style.display = (val('top_mode') === 'none' || cabTypeNow() === 'dishwasher') ? 'none' : '';
+    updateSetbackMeta();
+  }
+  // KON-A · K1 (A4): „Komín vzadu" plati pre KAZDY rezim chrbta (pevne miesto
+  // pod Konstrukciou). Tooltip povie minimum a volny kanal podla rezimu.
+  function toggleBackSetback(){
+    var r = el('backSetbackRow'); if (!r) return;
+    r.style.display = (cabTypeNow() === 'dishwasher') ? 'none' : '';
+    var tip = el('backSetbackTip');
+    if (tip) tip.setAttribute('data-tip', backSetbackTipText(currentCarcass()));
+    updateSetbackMeta();
+  }
+  // Text tooltipu komina (cista funkcia nad carcass objektom — Node test).
+  function backSetbackTipText(c){
+    var bm = c.back_mode, bt = nxNum(c.back_thickness, 3), x = nxNum(c.back_setback, 0);
+    var min = (bm === 'overlay') ? ('najmenej ' + nxFmtMm(bt) + ' mm (hrúbka chrbta)')
+            : (bm === 'groove') ? ('najmenej ' + nxFmtMm(10 + bt) + ' mm (drážka 10 + chrbát ' + nxFmtMm(bt) + ')')
+            : 'bez minima';
+    var out = 'O koľko sú dno a strop vzadu kratšie ako bok — za chrbtom vznikne vzduchový kanál. ' +
+              '0 = bez komína. Chrbát sa posunie dopredu na zadné hrany dna a stropu, vnútro sa o komín skráti. ' +
+              'Pri tomto chrbte ' + min + '.';
+    if (x > 0 && bm !== 'none'){
+      var chan = (bm === 'inset') ? x : (x - bt);
+      out += ' Voľný kanál za chrbtom je teraz ' + nxFmtMm(Math.max(chan, 0)) + ' mm.';
+    }
+    return out;
+  }
+  // A7: suhrn v ZBALENEJ hlavicke skupiny — len pri nenulovej hodnote
+  // (vzor meta skupin Čelá). Text skladaju ciste funkcie `setbackMetaTexts`.
+  function setbackMetaTexts(c){
+    var y = nxNum(c.top_front_setback, 0), x = nxNum(c.back_setback, 0);
+    var slot = c.type === 'dishwasher';
+    return { top: (!slot && c.top_mode !== 'none' && y > 0) ? ('zap. ' + nxFmtMm(y)) : '',
+             back: (!slot && x > 0) ? ('komín ' + nxFmtMm(x)) : '' };
+  }
+  function updateSetbackMeta(){
+    var m = setbackMetaTexts(currentCarcass());
+    var tm = el('topMeta'), bm = el('backMeta');
+    if (tm) tm.textContent = m.top;
+    if (bm) bm.textContent = m.back;
+  }
 
   // ===== UI-C1b: TYP VKLADANEHO OBJEKTU (tri segmentove tlacidla) ===========
   // Nahradilo dvojicu radiov (kind Korpus/Doska + ctype Dolna/Horna). Autorita
@@ -2647,6 +2739,12 @@
                        // D-139: odvodene celo (krizova kontrola), schema medzier
                        // slotu a preklik „Medzera hore".
                        SLOT_HIDDEN_GAPS: SLOT_HIDDEN_GAPS, cabinetHeightError: cabinetHeightError,
+                       // KON-A · K1: zrkadlo validacie komina/zapustenia, tooltip,
+                       // suhrn hlavicky a stavova veta formulara.
+                       cabinetSetbackError: cabinetSetbackError, nxCabFieldError: nxCabFieldError,
+                       backSetbackTipText: backSetbackTipText, setbackMetaTexts: setbackMetaTexts,
+                       toggleTopSetback: toggleTopSetback, toggleBackSetback: toggleBackSetback,
+                       updateAvailable: updateAvailable,
                        onInfoDwGap: onInfoDwGap,
                        // D-138: nazov a ikona RIADKU cela (slot = dvere umyvacky)
                        // vs. vseobecne typove ikony (pas „pridať čelo", dlazdice).
