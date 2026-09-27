@@ -17,6 +17,22 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **NÁSTROJ — kontrola kódovania: hook a CI test s jednou implementáciou, správna slovenčina veľkými už nie je „mojibake" (27.9.2026, PR #407, nástroj; verzia pluginu sa nemení).**
+  Hlásenie implementátora KON-D: hook `post_edit_check.ps1` označil `docs/architecture/ui-lifecycle.md` za poškodený kvôli slovu **PAMÄŤ**, hoci CI bolo zelené.
+  **Príčina:** signatúra `\xC3\x84[\xC2\xC4\xC5]` („Ä" + znak zo skupiny C4/C5) chytala aj legitímne veľké Ä pred Ť/Č (PAMÄŤ, PÄŤSTUPŇOVÁ, VÄČŠÍ) — známa hranica
+  od ŠT-3b-2c2 — a test `docs/architecture/` vôbec nečítal (glob `docs/*.md` nie je rekurzívny), takže ten istý poplach videl len hook (KOV-A1 #280: „rozšíriť glob
+  len SPOLU so spresnením vzoru"). Hook mal navyše vlastnú kópiu pravidiel, ktorá sa rozišla aj inak (NUL, C0 a charset nekontroloval, BOM zas nekontrolovalo CI).
+  **Riešenie:** jediná implementácia `scripts/encoding_guard.rb` (mojibake, BOM, UTF-8, C0/C1/NUL, cyrilika, charset + CLI `--repo`), ktorú volá CI test nad celým
+  repom aj hook na upravený súbor. Pri Ä a Ĺ rozhoduje kontext: správne stoja vo VEĽKOM slove, mojibake vzniká uprostred slova s malými písmenami (pasca: „č" cez
+  cp1250 je bajtovo presne „ÄŤ" z PAMÄŤ, takže samotný vzor sa zúžiť nedá). Nález = exit 3, nie 1 — exit 1 dáva Ruby sám pri páde a pri overovaní hook raz čítal
+  guard práve počas zápisu a vydal pád za nález v súbore. Rozsah = všetky sledované .rb/.js/.html/.css/.md/.ps1 (pribudli docs/architecture, koreňový .ps1, html
+  mockupy a fixtúry Demos; charset akceptuje aj `UTF-8` a tvar HTML4), úplnosť stráži porovnanie s `git ls-files`; lokálne `_dev/` a retro inbox (#406) sa nečítajú.
+  **Meranie** na 19 480 slovách z repa: záchyt poškodenia cez cp1250 92 → 99,96 %, cp1252 42 → 99,98 %, latin1 45 → 100 %, dvojité cp1250 62 → 100 % („á" cez
+  cp1252 stará sada nechytala vôbec — hranica zapísaná pri #394); falošné poplachy na tých istých slovách veľkými, v úvodzovkách a zátvorkách 1 215 tvarov → 0.
+  Známe hranice (bajtovo nerozlíšiteľné): veľké slovo s Ď, samostatné „č" a veľké Ň na konci slova cez cp1250. **Testy:** headless **4650 / 0 / 0** (8 testov
+  kódovania vrátane hooku spusteného naostro cez PowerShell a pokazeného guardu), **134 JS sád**, **13 mutácií** — každá zhodená. **Zhoda hook ↔ test na celom
+  repe** skutočným hookom (Windows PowerShell 5.1, 2 010 behov): 674 súborov z rozsahu — hook aj test 674/674 čisté; 662 kópií so slovenčinou prehnaných cez
+  cp1250 — hook aj guard 662/662 hlásia; starý hook na tých istých súboroch hlásil 4 správne súbory (dva v `docs/architecture/`, dva nové so slovom PAMÄŤ).
 - **DOCS · pravidlá workflowu z retro bloku 7 + pokus „retro" (27.9.2026, PR #406, bez zmeny verzie).** Michal z hodnotenia bloku 7 prijal
   návrhy 1, 2, 3, 4 a 6 (rozpočet Codexu na blok a skorší smoke nie); záznam „prečo" = prvé spracované vyhodnotenie
   [retro/VYHODNOTENIE_2026-09-27_blok7.md](retro/VYHODNOTENIE_2026-09-27_blok7.md). **CLAUDE.md:** úvodné PR bloku nesie len rozhodnutia

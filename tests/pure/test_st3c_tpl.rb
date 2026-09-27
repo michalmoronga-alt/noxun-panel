@@ -374,9 +374,10 @@ end
 
 NxTest.test('ŠT-3c-1 (review #225 P1): ziadny zdrojak nesmie byt pre git BINARNY') do
   # NUL bajt zo suboru spravi binarku — git ho prestane diffovat a KAZDE review
-  # ho vidi ako „Bin 0 -> 0 bytes". Guard zije v `test_encoding_guard.rb`; tu sa
-  # kontroluje LEN to, ze ho niekto nezrusil (a novy klientsky subor je cisty).
-  guard = File.read(File.join(NxTest::ROOT, 'tests', 'pure', 'test_encoding_guard.rb'),
+  # ho vidi ako „Bin 0 -> 0 bytes". Guard zije v `scripts/encoding_guard.rb` (od 27.9.2026
+  # spolocny pre CI test aj hook); tu sa kontroluje LEN to, ze ho niekto nezrusil (a novy
+  # klientsky subor je cisty).
+  guard = File.read(File.join(NxTest::ROOT, 'scripts', 'encoding_guard.rb'),
                     encoding: 'UTF-8')
   NxTest.assert(guard.include?('0.chr.b'), 'kontrola NUL bajtu je v encoding guarde')
   js = File.binread(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'templates.js'))

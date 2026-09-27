@@ -1,10 +1,15 @@
-# Claude Code PostToolUse hook (Edit|Write) — Noxun Engine.
-# Kontroluje IBA prave editovany subor: (1) ruby -c syntax pre .rb,
-# (2) encoding guard pre .rb/.js/.html/.css/.md/.ps1 — rovnake kontroly ako
-# tests/pure/test_encoding_guard.rb (valid UTF-8, mojibake signatury, C1 znaky,
-# cyrilicke homoglyfy)
-# + BOM (konvencia repa: UTF-8 BEZ BOM).
-# POZOR (vedomy kontrakt): PostToolUse subor NEVRACIA — edit uz je zapisany.
+# Claude Code PostToolUse hook (Edit|Write) - Noxun Engine.
+# Kontroluje IBA prave editovany subor:
+#   (1) ruby -c syntax pre .rb,
+#   (2) kontrola kodovania pre .rb/.js/.html/.css/.md/.ps1 cez scripts/encoding_guard.rb
+#       (BOM, validne UTF-8, mojibake signatury, C1/C0/NUL, cyrilicke homoglyfy, charset
+#       v .html) - TU ISTU implementaciu vola CI test tests/pure/test_encoding_guard.rb
+#       nad celym repozitarom, takze hook a test nemozu hovorit nieco ine. Do 27.9.2026
+#       mal hook vlastnu kopiu signatur v PowerShelli a test nevidel docs/architecture/:
+#       hook tam hlasil falosny poplach na spravnom slove PAMAT (velke A s dvoma bodkami
+#       + velke T s makcenom), ktory CI nikdy nevidelo. Pravidla sa menia VYHRADNE
+#       v scripts/encoding_guard.rb, nie tu.
+# POZOR (vedomy kontrakt): PostToolUse subor NEVRACIA - edit uz je zapisany.
 # Hook je RYCHLA SPATNA VAZBA pre agenta (exit 2 + stderr -> agent chybu hned
 # opravi); vynucovanie ostava na CI (testy bezia na kazdy push/PR).
 # Fail-open: bez ruby / bez file_path / necitatelny stdin -> exit 0
@@ -19,56 +24,51 @@ try {
 } catch { exit 0 }
 
 $ext = [System.IO.Path]::GetExtension($file).ToLowerInvariant()
+if ($ext -notin @('.rb', '.js', '.html', '.css', '.md', '.ps1')) { exit 0 }
+
+$ruby = 'C:\Ruby32-x64\bin\ruby.exe'
+if (-not (Test-Path $ruby)) {
+  $cmd = Get-Command ruby -ErrorAction SilentlyContinue
+  $ruby = if ($cmd) { $cmd.Source } else { $null }
+}
+if (-not $ruby) { exit 0 }
+
+# Spusti ruby, vrati exit kod a riadky vystupu. PS 5.1 pasca: 2>&1 na native exe
+# + ErrorActionPreference Stop = pad skriptu, preto docasne Continue. Prazdny riadok
+# na stderr prichadza ako text 'System.Management.Automation.RemoteException' - sum.
+function Invoke-Ruby([string[]]$RubyArgs) {
+  $ea = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+  $out = @(& $ruby @RubyArgs 2>&1 | ForEach-Object { $_.ToString() } |
+    Where-Object { $_ -ne 'System.Management.Automation.RemoteException' })
+  $code = $LASTEXITCODE
+  $ErrorActionPreference = $ea
+  return @{ Code = $code; Out = $out }
+}
+
 $problems = @()
 
 # --- 1) ruby -c pre .rb --------------------------------------------------
 if ($ext -eq '.rb') {
-  $ruby = 'C:\Ruby32-x64\bin\ruby.exe'
-  if (-not (Test-Path $ruby)) {
-    $cmd = Get-Command ruby -ErrorAction SilentlyContinue
-    $ruby = if ($cmd) { $cmd.Source } else { $null }
-  }
-  if ($ruby) {
-    # PS 5.1 pasca: 2>&1 na native exe + ErrorActionPreference Stop = pad skriptu.
-    $ea = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    $out = & $ruby -c $file 2>&1 | ForEach-Object { $_.ToString() }
-    $ErrorActionPreference = $ea
-    if ($LASTEXITCODE -ne 0) {
-      $problems += "ruby -c syntax chyba: $($out -join ' | ')"
-    }
-  }
+  $r = Invoke-Ruby @('-c', $file)
+  if ($r.Code -ne 0) { $problems += "ruby -c syntax chyba: $($r.Out -join ' | ')" }
 }
 
-# --- 2) encoding guard (zhodna logika s tests/pure/test_encoding_guard.rb) ---
-if ($ext -in @('.rb', '.js', '.html', '.css', '.md', '.ps1')) {
-  $bytes = [System.IO.File]::ReadAllBytes($file)
-  if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
-    $problems += 'UTF-8 BOM na zaciatku suboru (konvencia repa: UTF-8 bez BOM - typicka pasca Out-File/Set-Content)'
+# --- 2) kontrola kodovania: spolocna implementacia s CI testom ------------
+# CLI kontrakt (scripts/encoding_guard.rb): exit 0 = cisto, 3 = nalezy ako riadky
+# "subor: problem"; iny kod (1 = pad Ruby ci syntax chyba guardu) = guard sa
+# nepodarilo spustit - povie sa to, nezamlci ani nevyda za nalez v subore.
+$guard = Join-Path $PSScriptRoot '../../scripts/encoding_guard.rb'
+if (Test-Path -LiteralPath $guard) {
+  $r = Invoke-Ruby @($guard, $file)
+  if ($r.Code -eq 3) {
+    $prefix = "${file}: "
+    foreach ($line in $r.Out) {
+      if ($line.StartsWith($prefix)) { $line = $line.Substring($prefix.Length) }
+      $problems += $line
+    }
+  } elseif ($r.Code -ne 0) {
+    $problems += "kontrolu kodovania sa nepodarilo spustit (exit $($r.Code)): $($r.Out -join ' | ')"
   }
-  $strict = New-Object System.Text.UTF8Encoding($false, $true)
-  try { [void]$strict.GetString($bytes) } catch {
-    $problems += 'subor nie je validne UTF-8'
-  }
-  # Byte-level kontrola cez latin1 projekciu (1 bajt = 1 znak). Vzory sa
-  # skladaju z kodov, aby skript sam neobsahoval mojibake bajty.
-  $latin1 = [System.Text.Encoding]::GetEncoding(28591).GetString($bytes)
-  function B { param([int[]]$c) (($c | ForEach-Object { [char]$_ }) -join '') }
-  $sig = @(
-    (B 0xC3,0xA2) + '[' + (B 0xC2) + (B 0xE2) + ']'
-    (B 0xC4,0x82) + '[' + (B 0xCB) + (B 0xC2) + (B 0xC4) + (B 0xC5) + ']'
-    (B 0xC4,0xB9) + '[' + (B 0xCB) + (B 0xC2) + (B 0xA0) + '-' + (B 0xBF) + ']'
-    (B 0xC4,0x8C,0xCB,0x87)
-    (B 0xC3,0x84) + '[' + (B 0xC2) + (B 0xC4) + (B 0xC5) + ']'
-    (B 0xC3,0x85) + '[' + (B 0xC2) + (B 0xC4) + (B 0xC5) + ']'
-    (B 0xC3,0x82,0xC2)
-  ) -join '|'
-  $c1 = (B 0xC2) + '[' + (B 0x80) + '-' + (B 0x9F) + ']'
-  if ([regex]::IsMatch($latin1, $sig)) { $problems += 'mojibake signatura (double-encoding diakritiky)' }
-  if ([regex]::IsMatch($latin1, $c1))  { $problems += 'C1 kontrolny znak U+0080..U+009F (zvysok zleho prekodovania)' }
-  # Cyrilika = homoglyfy latinky (PR #223 review): rozsah escapmi, aby skript
-  # nenasiel sam seba — zrkadlo tests/pure/test_encoding_guard.rb.
-  $utf8 = [System.Text.Encoding]::UTF8.GetString($bytes)
-  if ([regex]::IsMatch($utf8, '[\u0400-\u04FF]')) { $problems += 'cyrilicky znak (homoglyf latinky - U+0400..U+04FF)' }
 }
 
 if ($problems.Count -gt 0) {
