@@ -17,6 +17,24 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **BLOK 7 · KONŠTRUKCIA K1+K2 UZAVRETÝ (27.9.2026, v0.13.4 → v0.14.0, PR #401–#404 + uzáver PR #?, variant B).** Blok vybral Michal 26.9. po smoke S1 PASS;
+  debata 26.–27.9. (rozhodnutia M1–M12), krížový audit bloku (Grok + Codex), mockup schválený 27.9. bez bokorysu, podklady #400. Dávky za jeden deň:
+  **KON-0** #401 (D-143 — chrbát v drážke do nárezu v plnom rozmere, zastarané skrinky a hromadná prestavba, schéma 19) · **KON-A** #402 (komín vzadu,
+  zapustený strop, nika z hĺbky boku, oprava D-144, schéma 20) · **KON-B** #403 (chrbát z dvoch líšt, „Chrb HD", schéma 21, BuildPlan 6, ABS seed 5) ·
+  **KON-D** #404 (šablóna Chladničková, knižnica šablón STD 7). Bokorys (KON-C) vypadol → D-145 v zásobníku. Uzáver mení len dokumentáciu a verziu:
+  blok plným textom do [ROADMAP_hotove_etapy.md](ROADMAP_hotove_etapy.md), **celý priečinok bloku** `zdroje/bloky/KONSTRUKCIA/` → [bloky/KONSTRUKCIA/](bloky/KONSTRUKCIA/)
+  (`git mv`, obsah bez zmeny; opravené odkazy v PLAN, STAV, KRONIKE (odkaz na package KON-0) a v hlavičkách testov `test_kona_komin.rb`, `test_konb_listy.rb`,
+  `test_kond_chladnickova.rb`), výsledok, dávky, známe dôsledky a **zlúčený smoke checklist** v [KONSTRUKCIA_ZAVER_2026-09-27.md](KONSTRUKCIA_ZAVER_2026-09-27.md),
+  V1_VIZIA bod 2 **doplnený, nie odškrtnutý** (K1 a K2 hotové, K3 rohová ostáva v bloku 4), PLAN (blok 4: K1 a K2 hotové), README, DOGFOODING (skupina bloku 7
+  zanikla, dočasná skupina „smoke po uzávere bloku 7"), STAV. Pri poslednej dávke **4643 headless · 134 JS sád · 3172 in-SU PASS / 0 FAIL**; pri uzávere
+  headless a JS sady zelené (in-SU netreba — kód len číslom verzie). Kompatibilita: skrinka schéma 21, BuildPlan 6, ABS seed 5, šablóny STD 7 — **aktualizovať
+  obe PC pred prvou zákazkou**. Otvorené: potvrdenie delenia čiel Chladničkovej 719 / 1274 pri smoke, D-145.
+  **Poučenie (prvý blok s priečinkom bloku):** produktové rozhodnutia žili v jednom súbore ROZHODNUTIA_MICHALA (čo a ako z pohľadu stolára), technické
+  požiadavky (formát dát, schémy, výrobné brány, migrácie) v **package každej dávky** so zapracovaným auditom návrhu — pôvodné „vstupy pre packages" ostali
+  len historickým vstupom. Každá z audit-povinných dávok mala Codex audit NOT SOUND a zapracovanie pred kódom sa vyplatilo (BLOCKERy chytené pred implementáciou).
+  Presun priečinka do archívu sa robil prvýkrát: relatívne odkazy vnútri priečinka ostali platné (rovnaká hĺbka `zdroje/bloky/` ↔ `archiv/bloky/`, žiadny odkaz
+  von z priečinka), opravovali sa len odkazy zvonku; guard odkazov stráži len navigačné súbory — KRONIKA a hlavičky testov sa kontrolovali grepom.
+
 - **KON-D — vstavaná šablóna „Chladničková" (v0.13.3 → v0.13.4, 27.9.2026, PR #404, blok 7 KONŠTRUKCIA, štvrtá a posledná dávka).**
   Audit-povinná dávka (knižnica šablón `STD` 6 → 7; package v2 so zapracovaným auditom návrhu Codex 27.9.: NOT SOUND 1 BLOCKER + 3 FIX + 2 NOTE — všetko v Scope IN).
   Nie je výrobná (dielce existujúcich skriniek ani výstupy sa nemenia). **Seed** (`build_predefined_fridge`, samostatný zoznam — nie núdzová náhrada
@@ -155,7 +173,7 @@
   (s auditom návrhu) a **vstupy pre packages** KON-A, B, D; technické požiadavky sú záväzné až v package dávky s jej auditom. Poučenie 2: technické
   požiadavky patria do úvodného PR bloku len ako vstup, nie ako autorita;
   audit návrhu majú len dávky meniace kontrakt alebo schému (KON-0, A, B, D). Poučenie: úvodný dokument
-  bloku drží rozhodnutia a smer, **nie implementačné vzorce** — tie patria do package dávky. **Ďalší krok:** implementácia KON-0 podľa [PACKAGE_KON0_D143.md](../zdroje/bloky/KONSTRUKCIA/PACKAGE_KON0_D143.md) (package a audit návrhu sú v tomto PR; mockup schválený).
+  bloku drží rozhodnutia a smer, **nie implementačné vzorce** — tie patria do package dávky. **Ďalší krok:** implementácia KON-0 podľa [PACKAGE_KON0_D143.md](bloky/KONSTRUKCIA/PACKAGE_KON0_D143.md) (package a audit návrhu sú v tomto PR; mockup schválený).
 - **DOCS — smoke S1 PASS a odškrtnutie V1 vízie (26.9.2026, PR #397, len dokumentácia; verzia pluginu sa nemení).**
   Michal 26.9. večer potvrdil **smoke bloku SPOTREBIČE S1 = PASS** („PASS — ideme ďalej"); zápis v [S1_ZAVER_2026-09-24.md](S1_ZAVER_2026-09-24.md)
   (sekcia Smoke Michala 21.–26.9.) — výsledok časti B checklistu sa po bodoch nezaznamenával, ďalšie postrehy k funkciám S1 idú ako nové D-čísla

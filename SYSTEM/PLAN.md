@@ -25,6 +25,9 @@ plný text vrátane výsledku je v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADM
 plný text so všetkými task packages a výsledkom uzáveru je v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), priebeh dávok v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 Balík **Čiel (D-114/D-119/D-120)** je tiež uzavretý — **v0.11.0, 11.9.2026**, plný text v tom istom archíve. Zoznam **Mimo V1** ostáva v sekcii **Po V1 — zásobník**.)*
 *(Blok **5 · SPOTREBIČE S1** (V1-02) je hotový — **v0.12.9 → v0.13.0, 20.–24.9.2026**, PR #375 → #389 + uzáver #390 (E0 · A1 · A2 · E · B1 · B2 · F · C + smoke opravy A–C); plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), výsledok a checklist v [archiv/S1_ZAVER_2026-09-24.md](archiv/S1_ZAVER_2026-09-24.md).)*
+*(Blok **7 · KONŠTRUKCIA K1+K2** (V1 bod 2) je hotový — **v0.13.0 → v0.14.0, 26.–27.9.2026**, PR #401 → #404 + uzáver PR #? (KON-0 · KON-A · KON-B · KON-D);
+plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), výsledok a smoke checklist v [archiv/KONSTRUKCIA_ZAVER_2026-09-27.md](archiv/KONSTRUKCIA_ZAVER_2026-09-27.md),
+priečinok bloku v [archiv/bloky/KONSTRUKCIA/](archiv/bloky/KONSTRUKCIA/).)*
 
 
 ### 1b · STABILIZAČNÁ REVÍZIA (dlhy fázy ŠTÚDIO — pred blokom KOVANIE)
@@ -269,7 +272,8 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   hodnota per skrinka (komín vzadu: dno a strop kratšie, chrbát na ich zadnej hrane · strop zapustený vpredu), nastaviteľné, nefixované · **K2 chrbát z výstuh** — nový typ chrbta:
   dve lišty medzi bokmi, výška parameter, ABS len hrana viditeľná z vnútra · **K3 rohová skrinka** (dolná, slepá s CR lištou: dolná skrinka + 5 dielcov rohovej zostavy + dverová
   zóna, cr1, cr2, prepínač L/P; **nízka priorita, posledná vo V1**; outside-in + audit). Balík V0.4.8 (rohové spoje per strana, poldrážka, „bez dielca") a V1-07 čelo ako cenová
-  položka sú **mimo V1** (zásobník). K1/K2 = audit-povinné (CONFIG_SCHEMA). **K1 a K2 sa od 26.9.2026 riešia v bloku 7 · KONŠTRUKCIA K1+K2** (nižšie); **K3 ostáva tu.**
+  položka sú **mimo V1** (zásobník). K1/K2 = audit-povinné (CONFIG_SCHEMA). **K1 a K2 sú hotové v bloku 7 · KONŠTRUKCIA K1+K2 (v0.14.0, 27.9.2026)** —
+  [výsledok a smoke](archiv/KONSTRUKCIA_ZAVER_2026-09-27.md); **K3 ostáva tu.**
 - **V1.0 zostavy — V1 rozsah PO ROZHODNUTÍ 4.9.2026:** prisunutie a kopírovanie korpusov po vlastnej osi (snaper + mower logika → draft NÁSTROJE-1) · dosky (pracovná doska, pilaster,
   soklová lišta, krycí panel) vkladané a kreslené prichytením na rohy skriniek (drafty GHOST-D1/D2) · test na kompletnej reálnej zákazke. **PO V1** (rozhodnutie 4.9., koncept 02):
   segmentová automatika — soklová lišta v celku pre segment, obklady a krycie prvky segmentu vrátane pilastra (priznaný vs. skrytý) ako generované diely, pracovné a horné krycie dosky
@@ -523,25 +527,6 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   napíš 6000 → plugin odmietne s limitom; klikni počiatok a hneď napíš 2400 Enter → doska ide po osi podľa rotácie.
   **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → `construction.md` (`BoardBuilder.replan`, fázy kreslenia, geometria lúča/projekcie, degenerácie, lifecycle zámkov —
   Codex #296 P1), `ui-lifecycle.md` (ghost D2, `interaction: drawing`, `draw_board`, zámky, Shift, VCB), `docs/UI_DIZAJN.md` (tlačidlá karty Dosky) → STAV/KRONIKA/PLAN.
-
-### 7 · KONŠTRUKCIA K1+K2 (V1 bod 2 · štart 26.9.2026)
-
-**Cieľ:** komín vzadu a zapustený strop vpredu (K1), chrbát z dvoch líšt (K2), chrbát v drážke správne do nárezu (D-143) a šablóna Chladničková —
-tak, aby chladničkové a drezové skrinky išli z pluginu bez ručného dopočítavania konštrukcie (vetracie otvory a výrezy ostávajú na stolárovi; rúrové
-skrinky sú mimo bloku — rúra potrebuje iné vetranie). **Priečinok bloku:** [zdroje/bloky/KONSTRUKCIA/](zdroje/bloky/KONSTRUKCIA/) — **rozhodnutia
-Michala** (ROZHODNUTIA_MICHALA), schválený mockup, **package KON-0** s auditom návrhu, vstupy pre packages KON-A, B, D, fakty z kódu a surové
-výsledky krížového auditu.
-**Stav 27.9.2026:** krížový audit hotový, **mockup schválený bez bokorysu**; packages vznikajú postupne, každá audit-povinná dávka (KON-0, A, B a D —
-knižnica šablón STD 7) prejde auditom svojho návrhu. **KON-0 (výrobná chyba D-143) ide prvá.** Poradie:
-
-- ✅ **KON-0 · D-143** — chrbát v drážke do nárezu v plnom rozmere skrinky, model ho ďalej ukazuje v drážke; staré skrinky sa prestavia (hromadne). **PR #401, v0.13.1.**
-- ✅ **KON-A · K1** — komín vzadu (nika spotrebiča sa pri komíne ráta z hĺbky boku) a zapustený strop vpredu; oprava D-144. **PR #402, v0.13.2.**
-- ✅ **KON-B · K2** — chrbát z dvoch líšt z korpusu, vnútro pred lištami v celej výške, jeden riadok „Chrb HD". **PR #403, v0.13.3.**
-- ✅ **KON-D** — šablóna Chladničková 600 × 2100 × 560, komín 50, bez chrbta, očakáva chladničku; knižnica šablón STD 7 (migrácia len nad zdravým primárom),
-  „komín vzadu 50" na dlaždici šablóny. **PR #404, v0.13.4.**
-- ✅ **D-143 · Chrbát v drážke ide do nárezu bez prídavku** — vyriešené dávkou KON-0 (PR #401, v0.13.1); plný text v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md).
-- ✅ **D-144 · Vložený chrbát alebo chrbát v drážke prechádza výstuhou na výšku** — vyriešené dávkou KON-A (PR #402, v0.13.2); plný text v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md).
-- *(Bokorys v náhľade Inspectora — pôvodne KON-C — **vypadol** (Michal 27.9.: priestor panela); neskôr lepší 3D náhľad = **D-145** v zásobníku Po V1.)*
 
 ### 6 · INFRA (priebežne, podľa potreby)
 

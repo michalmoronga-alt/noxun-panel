@@ -2,6 +2,42 @@
 
 > **ARCHÍV (založené 24.7.2026 pri uzávere V0.5).** Kompaktné riadky hotových etáp drží [KRONIKA.md](KRONIKA.md) (časová os) — tu sú plné pôvodné texty (história rozhodnutí, rozsahov a PR). Otvorené záväzky z týchto textov sú od 11.8.2026 zaradené do blokov [../PLAN.md](../PLAN.md) — tento súbor je čisto referenčný.
 
+## BLOK KONŠTRUKCIA K1+K2 (V1 bod 2) — UZAVRETÝ (27.9.2026, v0.14.0, PR #401–#404 + uzáver PR #?)
+
+**Chrbát v drážke do nárezu v plnom rozmere skrinky** (D-143; model ho ďalej ukazuje v drážke, staré skrinky sa prestavia hromadne z Kontroly) · **komín vzadu**
+(dno, strop a zadná výstuha kratšie ako bok, chrbát na ich zadnej hrane, nika spotrebiča z hĺbky boku) a **zapustený strop vpredu** · oprava **D-144** (vložený
+a drážkový chrbát končí pod výstuhami na výšku) · **chrbát z dvoch líšt** z korpusu (vnútro pred lištami v celej výške, jeden riadok „Chrb HD") · vstavaná šablóna
+**„Chladničková"** 600 × 2100 × 560, komín 50, bez chrbta, očakáva chladničku.
+Dávky: KON-0 #401 (v0.13.1) · KON-A #402 (v0.13.2) · KON-B #403 (v0.13.3) · KON-D #404 (v0.13.4); podklady a rozhodnutia #400 (docs). Každá dávka bola
+audit-povinná a mala Codex audit návrhu pred kódom, predrecenziu a in-SU bránu. Pri poslednej dávke 4643 headless · 134 JS sád · 3172 in-SketchUp PASS / 0 FAIL.
+Výsledok, dávky, overenie a zlúčený smoke checklist: [KONSTRUKCIA_ZAVER_2026-09-27.md](KONSTRUKCIA_ZAVER_2026-09-27.md). Priečinok bloku (rozhodnutia Michala M1–M12,
+schválený mockup, packages s auditmi návrhu, krížový audit, fakty z kódu) je od uzáveru v [bloky/KONSTRUKCIA/](bloky/KONSTRUKCIA/) — prvý presunutý priečinok bloku.
+Kompatibilita: skrinka schéma 21, BuildPlan 6, ABS seed 5, knižnica šablón STD 7 — aktualizovať obe PC. **Vedomé revízie:** bokorys (pôvodne KON-C) vypadol
+(Michal 27.9. — priestor panela → D-145 v zásobníku); K3 rohová skrinka ostáva v bloku 4.
+
+### Pôvodný plný text bloku pri uzávere
+
+### 7 · KONŠTRUKCIA K1+K2 (V1 bod 2 · štart 26.9.2026)
+
+**Cieľ:** komín vzadu a zapustený strop vpredu (K1), chrbát z dvoch líšt (K2), chrbát v drážke správne do nárezu (D-143) a šablóna Chladničková —
+tak, aby chladničkové a drezové skrinky išli z pluginu bez ručného dopočítavania konštrukcie (vetracie otvory a výrezy ostávajú na stolárovi; rúrové
+skrinky sú mimo bloku — rúra potrebuje iné vetranie). **Priečinok bloku:** [bloky/KONSTRUKCIA/](bloky/KONSTRUKCIA/) — **rozhodnutia
+Michala** (ROZHODNUTIA_MICHALA), schválený mockup, **package KON-0** s auditom návrhu, vstupy pre packages KON-A, B, D, fakty z kódu a surové
+výsledky krížového auditu.
+**Stav 27.9.2026:** krížový audit hotový, **mockup schválený bez bokorysu**; packages vznikajú postupne, každá audit-povinná dávka (KON-0, A, B a D —
+knižnica šablón STD 7) prejde auditom svojho návrhu. **KON-0 (výrobná chyba D-143) ide prvá.** Poradie:
+
+- ✅ **KON-0 · D-143** — chrbát v drážke do nárezu v plnom rozmere skrinky, model ho ďalej ukazuje v drážke; staré skrinky sa prestavia (hromadne). **PR #401, v0.13.1.**
+- ✅ **KON-A · K1** — komín vzadu (nika spotrebiča sa pri komíne ráta z hĺbky boku) a zapustený strop vpredu; oprava D-144. **PR #402, v0.13.2.**
+- ✅ **KON-B · K2** — chrbát z dvoch líšt z korpusu, vnútro pred lištami v celej výške, jeden riadok „Chrb HD". **PR #403, v0.13.3.**
+- ✅ **KON-D** — šablóna Chladničková 600 × 2100 × 560, komín 50, bez chrbta, očakáva chladničku; knižnica šablón STD 7 (migrácia len nad zdravým primárom),
+  „komín vzadu 50" na dlaždici šablóny. **PR #404, v0.13.4.**
+- ✅ **D-143 · Chrbát v drážke ide do nárezu bez prídavku** — vyriešené dávkou KON-0 (PR #401, v0.13.1); plný text v [DOGFOODING_vyriesene.md](DOGFOODING_vyriesene.md).
+- ✅ **D-144 · Vložený chrbát alebo chrbát v drážke prechádza výstuhou na výšku** — vyriešené dávkou KON-A (PR #402, v0.13.2); plný text v [DOGFOODING_vyriesene.md](DOGFOODING_vyriesene.md).
+- *(Bokorys v náhľade Inspectora — pôvodne KON-C — **vypadol** (Michal 27.9.: priestor panela); neskôr lepší 3D náhľad = **D-145** v zásobníku Po V1.)*
+- ✅ **Uzáver bloku** *(PR #?, v0.14.0 — docs a verzia)* — blok do archívu, priečinok bloku do `archiv/bloky/KONSTRUKCIA/`, V1_VIZIA (bod 2 doplnený, K3 ostáva),
+  README, STAV, KRONIKA; výsledok a smoke checklist v [KONSTRUKCIA_ZAVER_2026-09-27.md](KONSTRUKCIA_ZAVER_2026-09-27.md).
+
 ## BLOK SPOTREBIČE S1 (V1-02) — UZAVRETÝ (24.9.2026, v0.13.0, PR #375–#389 + uzáver #390)
 
 Katalóg spotrebičov s odkazmi, technickými listami a galériou príloh (seed 9 overených modelov) · spotrebič v zákazke s kópiou rozmerov a vlastníkom podľa kategórie
