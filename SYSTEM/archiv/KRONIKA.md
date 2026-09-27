@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **DOCS · pravidlá workflowu z retro bloku 7 + pokus „retro" (27.9.2026, PR #?, bez zmeny verzie).** Michal z hodnotenia bloku 7 prijal
+- **DOCS · pravidlá workflowu z retro bloku 7 + pokus „retro" (27.9.2026, PR #406, bez zmeny verzie).** Michal z hodnotenia bloku 7 prijal
   návrhy 1, 2, 3, 4 a 6 (rozpočet Codexu na blok a skorší smoke nie); záznam „prečo" = prvé spracované vyhodnotenie
   [retro/VYHODNOTENIE_2026-09-27_blok7.md](retro/VYHODNOTENIE_2026-09-27_blok7.md). **CLAUDE.md:** úvodné PR bloku nesie len rozhodnutia
   Michala a mockup, technické požiadavky až package dávky s auditom (dôvod: PR #398 a #399 zavreté po P1 v každom kole) · každý bod mockupu
