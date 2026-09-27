@@ -194,11 +194,13 @@ eq(NX_TYPE_LABEL.upper, 'Horná', 'slovensky nazov typu zije na JEDNOM mieste');
 
 (function(){
   // Skupiny Korpusu maju ikony (N3b), koliesko ma tri sekcie z kontraktu.
-  [['#i-p-top', 'Strop'], ['#i-p-bottom', 'Dno'], ['#i-p-side', 'Boky'], ['#i-p-back', 'Chrbát']]
+  // KON-A (A2): skupina Boky ZANIKLA — nemala nic na nastavenie.
+  [['#i-p-top', 'Strop'], ['#i-p-bottom', 'Dno'], ['#i-p-back', 'Chrbát']]
     .forEach(function(o){
       ok(new RegExp('<use href="' + o[0] + '"/></svg>' + o[1]).test(PANEL_HTML),
          'skupina ' + o[1] + ' ma svoju ikonu');
     });
+  ok(PANEL_HTML.indexOf('data-key="sides"') < 0, 'KON-A: skupina Boky v Nastaveniach korpusu nie je');
   const cfg = PANEL_HTML.slice(PANEL_HTML.indexOf('<div id="cfgModal"'), PANEL_HTML.indexOf('<div id="status">'));
   ok(cfg.indexOf('id="cfg_theme"') > 0, 'koliesko ma sekciu Vzhľad');
   ok(cfg.indexOf('id="cfg_series"') > 0, 'koliesko ma sekciu Rozmerové rady');

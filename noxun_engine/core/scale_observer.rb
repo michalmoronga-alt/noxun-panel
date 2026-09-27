@@ -492,6 +492,13 @@ module Noxun
 
           params = CabinetBuilder.config_to_params(cfg)
           params['width']  = new_w
+          # KON-A (Codex FIX 10): hlbka sa pri ZMENSENI klampuje aj CONFIG-AWARE
+          # (komin, zapustenie, vystuhy, minimum vnutra) — vzor `clamp_height`.
+          # Sonda bezi len pri zmenseni: zvacsenie hlbky konstrukciu nezhorsi.
+          depth_note = nil
+          if new_d < base_d
+            new_d, depth_note = clamp_depth(params, new_d, cid)
+          end
           params['depth']  = new_d
           # S1-E0 (Codex #375 P2): vyska sa klampuje AZ TU a CONFIG-AWARE.
           # Hole `MIN['height']` nestaci: pri sokli 100 by 80 mm vyrobilo config
@@ -519,6 +526,9 @@ module Noxun
                                  transparent: true)
           remember_transform(inst)
           refresh_panel(model) # V0.4.7e: karta uz neukazuje stare rozmery do reselect-u
+          # KON-A: hlbku zdvihla KONSTRUKCIA — nemodalna hlaska AZ po refreshi
+          # panela (inak by ju prepisal jeho stav).
+          notify_user(depth_note) if depth_note
 
           Engine.log("scale absorb #{cid}: #{base_w.round}x#{base_h.round}x#{base_d.round} -> " \
                      "#{new_w.round}x#{new_h.round}x#{new_d.round} (f=#{sx.round(3)},#{sy.round(3)},#{sz.round(3)})")
@@ -572,6 +582,38 @@ module Noxun
                      "(sokel #{params['floor_height'].to_f.round}, hrubka #{params['thickness'].to_f.round}) " \
                      "— clampujem na #{m.round}")
           m
+        end
+
+        # KON-A (Codex FIX 10, Grok 9): spodna hranica HLBKY zavisi od configu —
+        # komin, zapustenie a vystuhy musia nechat platnu konstrukciu. Prisnejsie
+        # z `MIN['depth']` a `Construction.min_valid_depth` (sonda cez cely plan,
+        # dedi aj minimum vnutra pri komine). -> [hlbka, hlaska | nil]; hlaska
+        # len ked hlbku zdvihla KONSTRUKCIA (nie holé typove minimum).
+        def clamp_depth(params, val, cid)
+          return [val, nil] if params['type'].to_s == 'dishwasher'
+
+          norm = CabinetBuilder.normalize(params)
+          floor = Construction.min_valid_depth(norm)
+          base = min_for('depth', params['type'])
+          m = [base, floor].max
+          return [val, nil] if val >= m
+
+          Engine.log("scale absorb #{cid}: depth #{val.round} < min #{m.round} (konstrukcia) — clampujem na #{m.round}")
+          note = floor > base ? depth_clamp_message(cid, norm, m) : nil
+          [m, note]
+        end
+
+        # Veta pre cloveka: PRECO je hlbka vyssia, nez kam ju potiahol.
+        def depth_clamp_message(cid, norm, depth)
+          x = Construction.back_setback(norm)
+          y = Construction.top_front_setback(norm)
+          why =
+            if x.positive? then "pri komíne #{Construction.fmt_mm(x)} mm"
+            elsif y.positive? then "pri zapustení stropu #{Construction.fmt_mm(y)} mm"
+            else 'pri tejto konštrukcii'
+            end
+          "Hĺbka skrinky #{cid} je #{why} najmenej #{Construction.fmt_mm(depth)} mm — nastavená na " \
+            "#{Construction.fmt_mm(depth)}."
         end
 
         def clamp_slot_height(params, val, cid)

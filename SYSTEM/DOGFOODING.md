@@ -44,11 +44,8 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
 
 ## KONŠTRUKCIA K1+K2 (blok 7)
 
-- **D-144 · Vložený chrbát alebo chrbát v drážke prechádza výstuhou na výšku** (krížový audit Codex 27.9.2026, blok KONŠTRUKCIA) — pri strope
-  „Dve výstuhy" **na výšku** sa horná hrana vloženého chrbta a chrbta v drážke ráta pod stropom, nie pod výstuhami. Keď je výstuha vyššia než hrúbka
-  korpusu (bežne 100 oproti 18), chrbát prechádza zadnou výstuhou (až o 82 mm) a v kusovníku je **vyšší, než sa zmestí**. Naložený chrbát (bežná
-  dolná) ani plný strop (bežná horná) sa to netýka. *Stav: OTVORENÉ — oprava v dávke **KON-A** vrátane skriniek postavených pred opravou (Michal 27.9. kombináciu na zákazkách
-  nepoužíva). **Kým nebude oprava v maine, pri tejto kombinácii kontrolovať výšku chrbta v objednávke ručne.***
+*(Skupina je prázdna — **D-143** vyriešila dávka KON-0 (PR #401) a **D-144** dávka KON-A (PR #402); plné texty v
+[archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md).)*
 
 ## INFRA
 

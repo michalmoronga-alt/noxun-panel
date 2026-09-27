@@ -20,6 +20,22 @@ istých osiach ako `prod`** (`length` = X, `width` = Z; horná 600 × 720 → do
 v drážke 564 × 684 a rovnosť `box`/`prod` stráži `PartFaces`/`AppearanceMapping`. Rozhodnutie Michala 26.9.2026: presne by bolo +9 mm na stranu s drážkou (POJMY),
 pre V1 ide do nárezu plný rozmer a dielňa ho zreže. Prítomné pole validuje `BuildPlan.validate_cut_size!` (konečné, kladné, ≥ geometrii); BuildPlan `SCHEMA` ostáva 5.
 
+**KON-A · K1 (v0.13.2) — KOMÍN VZADU A ZAPUSTENIE STROPU; hĺbka dielcov má DVOCH pomocníkov.** `back_setback(cfg)` (X) a `top_front_setback(cfg)` (Y) čítajú
+konečné číslo > 0 orezané na `SETBACK_MAX` (300), inak 0 (slot vždy 0) — neplatná hodnota nikdy nezhodí stavbu. **`back_stop(cfg)` = zadný doraz `R`** dna, stropu,
+zadnej výstuhy a nôh (X = 0 → presne `carcass_depth`, X > 0 → `d − X`) a **`side_depth(cfg)`** = hĺbka bokov (X > 0 → plná `d` vo všetkých režimoch chrbta).
+`carcass_depth` ostáva (D-37 bez komína), ale dielce ju už nečítajú priamo. Plný strop a predná výstuha začínajú na `Y` (`front_setback_origin` vracia pri Y = 0
+**celé číslo 0**, aby golden plány ostali bajtovo rovnaké), `rail_geometry` počíta flat limit `(R − Y)/2 − 10` a aditívne vydá `flat_limit` a `span`.
+**Chrbát pri komíne** má vlastnú vetvu `setback_back_part` (dnešné vetvy `back_part` sú pri X = 0 nedotknuté): naložený a v drážke medzi bokmi na `R`
+(`[w − 2t, bt, h − s]`, drážka nesie `cut_size {w, h − s}`), vložený pred `R`. `interior_dims[:back_front_y]` pri komíne = `R` (vložený `R − bt`) — jediný zdroj
+pre zóny, police, recepty zásuviek, kovanie aj „Vnút. hĺbku". **`niche_depth(cfg, interior)`** (M9) = hĺbka boku pri komíne, inak `back_front_y`; čítajú ho
+`ApplianceChecks.context` aj `Panel.appliance_interior`. **Odmietnutia** skladá čistá `setback_error(cfg, interior)` (volá ju `validate!` ešte PRED všeobecnou
+„Hĺbka je príliš malá") a platia **len pri X > 0 alebo Y > 0** (`setbacks?`): minimum komína `min_back_setback` (naložený `bt`, drážka `GROOVE_OFFSET + bt`),
+vnútro pri komíne ≥ `min_setback_interior` (= `ZoneTree::SHELF_FRONT_INSET + MIN_FIELD` = 40 — audit BLOCKER 1: pri menšom vnútri by `ZoneTree` police len s ORANGE
+vynechal), plný strop ≥ `MIN_TOP_DEPTH` (60), výstuhy naplocho s `flat_limit` < 20 a na výšku s `Y + 2t + 20 > R`. Vety zrkadlí panel (`nxSetbackError`,
+spoločná fixtúra `tests/fixtures/kona_cases.json`). **D-144:** `back_z_hi` pri `two_rails` = nižšia z `h − offset − t` a `interior[:z_hi]` a `back_rail_drop(cfg)`
+(`max(occupy − t, 0)`) zníži `cut_size.width` chrbta v drážke bez komína o ten istý rozdiel. **`min_valid_depth(cfg)`** = najmenšia hĺbka, pri ktorej prejde celý
+`build_plan` (vzor `min_valid_height`: polenie od `CabinetBuilder::MIN[:depth]` po `MAX_DEPTH` 2000, slot 0) — dedí tak všetky pravidlá vyššie vrátane minima vnútra.
+
 **KOV-C1 — dva ADITÍVNE surové kanály v pláne.** `plan[:zone_bounds]` (`{ zone_id => {x0…z1} }` zo `ZoneTree`) a `plan[:front_bounds]`
 (`{ front_id => {z0, z1, height} }` z `Fronts.layout`) nesú **NEZAOKRÚHLENÉ** hranice. `CabinetBuilder.merge_final` kopíruje len menovitý zoznam kľúčov, takže do
 uloženého configu (a teda do modelu, kusovníka ani VEPO) sa **nedostanú** — `zones` aj `front_items` ostávajú presne také, aké boli. Dôvod: recepty zásuviek porovnávajú
@@ -297,6 +313,13 @@ a `cut_size` cez čistý `snapshot_cut_size(pd, edges)` **len neolepenému dielc
 rozmer do nárezu zámerne nedostane a zber ho z dvojice značka `groove` + hrana prizná RED (override olepu sa nemaže). **Hromadná prestavba zastaraných skriniek**
 (akcia riadku Kontroly) je `Panel.back_rebuild_stale` nad existujúcim `rebuild_many` (jedna operácia s rollbackom = jeden krok Späť): výber skriniek robí čerstvý zber
 `ProductionCore.back_stale_scan` **až po `ScaleWatch.flush_pending!`**, skrinky s odpojeným dielcom alebo neznámym kovaním sa preskočia a vymenujú (ich blokácia ostáva).
+**`BACK_RAIL_ACTIVATION_SCHEMA` = 20** je piata (D-144, KON-A, `CONFIG_SCHEMA` 19 → 20): skrinka s chrbtom `inset`/`groove`, stropom `two_rails` a výstuhami `upright`
+(režimy ako `config_to_params`, aj legacy vnorený zápis) uložená pod ňou má chrbát, ktorý môže prechádzať zadnou výstuhou — zber ju priznáva RED `back_rail_stale` v **tom
+istom registri** ako D-143 a hromadná prestavba ju vezme cez **spoločný predikát** `Bom.rebuild_stale?` (D-143 ALEBO D-144). Predikát je konzervatívny (rozmery nepočíta).
+**KON-A · K1 — polia `back_setback` / `top_front_setback` (`SETBACK_KEYS`).** `normalize` ich číta **prísne** (`norm_setback`: Numeric alebo reťazec, ktorý je celý
+číslom podľa `SETBACK_NUM_RE`, inak 0; klamp 0–300; slot 0), `cabinet_config` ich zapisuje **len keď sú > 0** (config existujúcich skriniek sa nemení; vnorené
+`top`/`back` bez zmeny) a `config_to_params` pri chýbajúcom kľúči dá 0.0 — ním idú všetky round-tripy (prestavba, absorpcia, kópie, dedup, „Nahradiť UNI", hromadné
+zmeny). Nohy (`draw_legs`) stoja podľa `Construction.back_stop`.
 
 **PROVENIENCIA JE DVOJITÁ — schéma A SEED PRAVIDIEL (Codex #333 kolo 1 P1).** Config nesie aditívne pole **`rules_seed_version`**: seed pravidiel, s ktorým stavba
 naozaj bežala (`HardwareRules.effective_seed_version(model)`, čítané v `build_into` **až po** `ensure_project_rules!` — ten mohol snapshot práve zmraziť; hodnota ide
@@ -433,6 +456,7 @@ modelu. Samotný `validate!` nestačí (kolo 2 P2): skrinka s JEDNOU policou ho 
 vzorec sa preto nepíše.** Hľadá sa polením intervalu od nutnej (nie postačujúcej) hranice `sokel + hrúbka + rezerva` po `MAX_HEIGHT` (3000 = horný clamp `normalize`), pravidlá
 kovania sa načítajú **raz** a putujú do každej sondy. Keď neprejde ani strop rozsahu (config nepostaviteľný v žiadnej výške), vráti sa štartovacia hranica a rebuild padne
 vlastnou zrozumiteľnou hláškou — klamp na 3000 by problém len zakryl. Jediný čítateľ je dnes `ScaleWatch.clamp_height` (odsek `scale_observer.rb` nižšie).
+Sestra pre hĺbku je **`min_valid_depth(cfg)`** (KON-A, odsek `construction.rb` vyššie) — čítateľ `ScaleWatch.clamp_depth`.
 
 **PRERUŠENIE STAVBY** (`abort_safely`): výnimka kdekoľvek vnútri `build`/`rebuild` ruší CELÚ operáciu a **neprehĺta sa** — volajúci sa o nej dozvie. Rollback vracia geometriu
 (inštanciu aj definície dielcov) **a zároveň modelové atribúty**, teda aj projektové snapshoty kovania, ktoré `build_into` cestou `HardwareRules.ensure_project_rules!` /
@@ -1092,8 +1116,14 @@ rozmere.
 s policou by geometria prešla, ale stavba padla na `validate_shelves!` — rebuild by zlyhal, `reject_scale` by vrátil PÔVODNÚ skrinku a používateľ by po ťahaní úchopu nedostal
 nič (720 mm späť namiesto 94). Hranica je preto **prísnejšia z dvoch**: `MIN['height']` a `Construction.min_valid_height` nad **kompletným** configom, ktorý o chvíľu pôjde do
 `rebuild`u (normalizuje sa **tou istou cestou**, takže pri hornej skrinke sokel korektne vypadne na 0).
-Šírka a hĺbka taký problém nemajú — ich `MIN` je vždy nad hranicou validácie. Lifecycle absorpcie sa tým **nemení**: klamp žije vnútri tej istej transparentnej operácie, takže
+Šírka taký problém nemá — jej `MIN` je vždy nad hranicou validácie. Lifecycle absorpcie sa tým **nemení**: klamp žije vnútri tej istej transparentnej operácie, takže
 jedno Späť ďalej vráti scale AJ absorpciu (in-SU `run_s1e0` body c, e a f, reálny debounce tik `async S1`).
+
+**HĹBKA sa pri ZMENŠENÍ klampuje CONFIG-AWARE (`clamp_depth`, KON-A · Codex FIX 10, Grok 9).** Komín, zapustenie a výstuhy robia z hĺbky konštrukčnú hranicu
+(komín 100 + naložený chrbát + plný strop → najmenej 160). Keď `new_d < base_d`, hranica je prísnejšia z `MIN['depth']` a `Construction.min_valid_depth` nad
+normalizovaným configom (sonda cez celý plán, dedí aj minimum vnútra 40 pri komíne). Keď hĺbku zdvihla **konštrukcia** (nie holé typové minimum), absorpcia po
+`refresh_panel` pošle **nemodálnu hlášku** `notify_user` („Hĺbka skrinky CAB-004 je pri komíne 100 mm najmenej 160 mm — nastavená na 160."). Tichá odmietacia cesta
+`reject_scale` sa pri hĺbke týmto nedosiahne; pre iné príčiny ostáva. Jedno Späť vráti scale aj absorpciu (in-SU `run_kona` bod c).
 
 **BARIÉRA PRED MUTÁCIOU NÁSTROJA — `flush_pending!(model)` (NÁSTROJE-1, v0.9.24).** `guard` zabráni len NOVÝM udalostiam; už naplnené fronty (`@dirty`, `@added`, `@requested`,
 `@prune_models`) a bežiaci debounce timer zostávajú — a keď timer dobehne PO operácii nástroja, jeho **transparentná** reakcia (dedup kópií, presun ghost zón) sa prilepí na krok

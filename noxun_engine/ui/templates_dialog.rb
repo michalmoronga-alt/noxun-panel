@@ -531,6 +531,14 @@ module Noxun
           # D-13 (Codex F3): legacy sablona BEZ plinth_recess nesmie cielovy korpus
           # ticho stiahnut na novy default — chybajuci kluc = zachovaj hodnotu ciela.
           merged['plinth_recess'] = target_params['plinth_recess'] unless tpl_config.key?('plinth_recess')
+          # KON-A · K1 (M10): TEN ISTY vzor pre komin a zapustenie — kluc
+          # v sablone = hodnota sablony (aj 0), chybajuci kluc (stara sablona)
+          # = zachovaj hodnotu CIELA. Bez toho by stara sablona komin skrinky
+          # ticho vratila na 0 a dno so stropom by sa narezali na plnu hlbku.
+          CabinetBuilder::SETBACK_KEYS.each do |k|
+            key = k.to_s
+            merged[key] = target_params[key] unless tpl_config.key?(key)
+          end
           # D-100 (GH #149 P2): sablona nazov skrinky NENESIE (template_config_from
           # ho neuklada) — bez tohto by merge zacal od sablony a rucny nazov ciela
           # („Chladnickova") by po pouziti sablony ticho zmizol. Rovnaky vzor ako

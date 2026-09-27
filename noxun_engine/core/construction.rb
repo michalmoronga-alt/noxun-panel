@@ -1239,8 +1239,103 @@ module Noxun
       #   inset / groove -> d (chrbat je VNUTRI obrysu — uz dnes splnaju celkovu d)
       #   none -> d (ziadny chrbat)
       # POZOR: inset/groove sa tymto helperom NESMU skratit (audit NOTE 9).
+      # KON-A: plati BEZ KOMINA. Citatelia hlbky dielcov sa pytaju pomocnikov
+      # `back_stop` (dno, strop, vystuhy, nohy) a `side_depth` (boky) — pri
+      # komine 0 vracaju presne tuto hodnotu.
       def carcass_depth(cfg)
         cfg[:back_mode] == 'overlay' ? cfg[:depth] - back_thickness(cfg) : cfg[:depth]
+      end
+
+      # === KON-A · K1: KOMIN VZADU A ZAPUSTENIE STROPU VPREDU ==================
+      #
+      # `back_setback` (X, komin) = o kolko dno, strop a zadna vystuha koncia
+      # skor ako boky; chrbat sa posunie dopredu na ich zadne hrany a za nim
+      # vznikne vzduchovy kanal. `top_front_setback` (Y, zapustenie) = o kolko
+      # plny strop alebo predna vystuha zacina za prednou hranou boku (dno sa
+      # neposuva). Obe su mm Float 0..SETBACK_MAX, 0 = dnesne spravanie BAJTOVO
+      # (golden plany). Config ich nesie LEN ked su > 0 (`cabinet_config`).
+      SETBACK_MAX = 300.0
+
+      # Najmensie vnutro PRI KOMINE (audit KON-A BLOCKER 1): polica ma predne
+      # odsadenie `ZoneTree::SHELF_FRONT_INSET` (20) a najmensie zmysluplne
+      # pole `ZoneTree::MIN_FIELD` (20) — pri mensom vnutri by `ZoneTree` police
+      # len s ORANGE vynechal a export by ich nezastavil. Hodnota je citana zo
+      # ZoneTree (jeden zdroj), tu je len pomenovana.
+      def min_setback_interior
+        ZoneTree::SHELF_FRONT_INSET + ZoneTree::MIN_FIELD
+      end
+
+      # Najmensi plny strop pri zapusteni (mockup A: „ostalo by z neho 40 mm").
+      MIN_TOP_DEPTH = 60.0
+
+      # PRISNE citanie X/Y z (normalizovaneho) configu: konecne cislo > 0,
+      # orezane na SETBACK_MAX; cokolvek ine = 0. Construction dostava
+      # normalizovany cfg, ale cita ho aj nad ulozenym configom (Kontrola niky)
+      # a nad rucne skladanymi configmi testov — neplatna hodnota nikdy nezhodi
+      # stavbu. Slot umyvacky pole NEMA (vzdy 0).
+      def back_setback(cfg)
+        setback_value(cfg, :back_setback)
+      end
+
+      def top_front_setback(cfg)
+        setback_value(cfg, :top_front_setback)
+      end
+
+      def setback_value(cfg, key)
+        return 0.0 unless cfg.is_a?(Hash)
+        return 0.0 if cfg[:type] == 'dishwasher'
+
+        v = cfg[key]
+        return 0.0 unless v.is_a?(Numeric)
+
+        f = v.to_f
+        return 0.0 unless f.finite? && f.positive?
+
+        [f, SETBACK_MAX].min
+      end
+
+      # ZADNY DORAZ `R` dna, stropu a zadnej vystuhy (audit KON-A B2 — jeden
+      # pomocnik pre vsetkych citatelov). Bez komina = dnesna `carcass_depth`
+      # (D-37), s kominom `d − X` vo VSETKYCH rezimoch chrbta.
+      def back_stop(cfg)
+        x = back_setback(cfg)
+        x.positive? ? cfg[:depth].to_f - x : carcass_depth(cfg)
+      end
+
+      # HLBKA BOKOV: bez komina dnesna `carcass_depth`; s kominom PLNA `d`
+      # (chrbat uz nie je za bokmi, ale medzi nimi — pri naloženom je bok o `bt`
+      # dlhsi ako bez komina).
+      def side_depth(cfg)
+        back_setback(cfg).positive? ? cfg[:depth].to_f : carcass_depth(cfg)
+      end
+
+      # Plati komin alebo zapustenie? Nove odmietnutia (minimum komina, vnutra,
+      # stropu a vystuh) sa pri X = Y = 0 NEUPLATNIA (audit KON-A FIX 4).
+      def setbacks?(cfg)
+        back_setback(cfg).positive? || top_front_setback(cfg).positive?
+      end
+
+      # M9: HLBKA NIKY spotrebica. S kominom sa meria z HLBKY BOKU (technicke
+      # listy kotuju min. hlbku boku, chladnicka zasahuje aj do komina); bez
+      # komina dnesne meranie po chrbat (`back_front_y`). Citaju ho OBAJA
+      # citatelia — Kontrola niky (`ApplianceChecks.context`) aj ponuka „zmesti
+      # sa" (`Panel.appliance_interior`) — rovnake cislo na oboch miestach.
+      def niche_depth(cfg, interior = nil)
+        return cfg[:depth].to_f if back_setback(cfg).positive?
+
+        (interior || interior_dims(cfg))[:back_front_y]
+      end
+
+      # Minimum NENULOVEHO komina podla UCINNEHO rezimu chrbta (M10): naloženy
+      # aspon hrubka chrbta, v drazke drazka 10 + hrubka chrbta, vlozeny a bez
+      # chrbta bez minima (skryta hrubka chrbta pri `none` sa nepocita).
+      # -> mm (0.0 = bez minima)
+      def min_back_setback(cfg)
+        case cfg[:back_mode]
+        when 'overlay' then back_thickness(cfg)
+        when 'groove'  then GROOVE_OFFSET + back_thickness(cfg)
+        else 0.0
+        end
       end
 
       # D-80: geometria hornych vystuh na JEDNOM mieste. rail_parts (dielce),
@@ -1260,15 +1355,21 @@ module Noxun
       # je nezmysel, preto sa TU nic neohyba — invariant "two_rails => vnutro aspon
       # MIN_INTERIOR_H" strazi validate! vlastnou zrozumitelnou hlaskou.
       # rail_geometry ostava CISTY kalkulator (ziadna vynimka) — presne to zrkadli JS.
+      # KON-A: vystuhy lezia v hlbkovom intervale Y … R (od zapustenia po zadny
+      # doraz). Flat limit je `(R − Y)/2 − 10` — pri X = Y = 0 je to presne
+      # dnesne `cd/2 − 10`. `flat_limit` nesie limit PRED minimom 20, aby
+      # `validate!` vedel pri komine/zapusteni odmietnut vystuhu, ktora by sa
+      # orezala pod 20 (dnes vyhra minimum a vystuhy sa mozu prekryt).
       def rail_geometry(cfg)
         h = cfg[:height].to_f; t = cfg[:thickness].to_f; s = cfg[:floor_height].to_f
-        d = carcass_depth(cfg)
+        span = back_stop(cfg) - top_front_setback(cfg)
         # kolko smie odsadenie + vystuha spolu zabrat z vysky korpusu
         head = [h - (s + t) - MIN_INTERIOR_H, 0.0].max
         want_depth = cfg[:rail_depth].to_f
         want_off   = cfg[:rails_top_offset].to_f
         upright = cfg[:rails_orientation] == 'upright'
-        limit = upright ? head : (d / 2.0 - 10.0)
+        flat_limit = span / 2.0 - 10.0
+        limit = upright ? head : flat_limit
         dep = [want_depth, limit].min
         dep = 20.0 if dep < 20.0
         occupy = upright ? dep : t
@@ -1276,7 +1377,7 @@ module Noxun
         off = [[want_off, 0.0].max, max_off].min
         { offset: off, wanted_offset: want_off, depth: dep, wanted_depth: want_depth,
           occupy: occupy, upright: upright, clamp_label: (upright ? 'vyska' : 'hlbka'),
-          z_top: h - off, z_bottom: h - off - occupy }
+          z_top: h - off, z_bottom: h - off - occupy, flat_limit: flat_limit, span: span }
       end
 
       # S1-E0 (Codex #375 P2 + kolo 2): NAJNIZSIA vyska korpusu, pri ktorej by
@@ -1344,6 +1445,46 @@ module Noxun
         false
       end
 
+      # KON-A (Codex FIX 10, Grok 9): NAJMENSIA hlbka, pri ktorej by PRESTAVBA
+      # TOHTO configu PRESLA — TYM ISTYM vzorom ako `min_valid_height`: sonda
+      # cez CELY `build_plan`, ziadny druhy vzorec. Dedi tak aj pravidla
+      # komina a zapustenia (minimum komina, vnutra 40 mm, stropu 60 mm,
+      # vystuh). Hlada sa polenim od `CabinetBuilder::MIN[:depth]` po
+      # `MAX_DEPTH` (horny clamp `normalize`). Cele mm. Slot: 0 (nema vnutro,
+      # jeho hlbku klampuje len typove minimum).
+      MAX_DEPTH = 2000.0
+
+      def min_valid_depth(cfg, hardware_rules: nil)
+        return 0.0 if cfg[:type] == 'dishwasher'
+
+        rules = hardware_rules || HardwareRules.load
+        lo = defined?(CabinetBuilder) ? CabinetBuilder::MIN[:depth] : 150.0
+        return lo if buildable_depth_at?(cfg, lo, rules)
+
+        hi = MAX_DEPTH
+        # Nepostavitelne v ziadnej hlbke (napr. zamknute zony) — vratime
+        # absolutne minimum a rebuild padne vlastnou vetou (vzor vysky).
+        return lo unless buildable_depth_at?(cfg, hi, rules)
+
+        while hi - lo > 1.0
+          mid = ((lo + hi) / 2.0).ceil.to_f
+          mid = hi if mid >= hi
+          if buildable_depth_at?(cfg, mid, rules)
+            hi = mid
+          else
+            lo = mid
+          end
+        end
+        hi
+      end
+
+      def buildable_depth_at?(cfg, depth, rules)
+        build_plan(cfg.merge(depth: depth), 'CAB-PROBE', hardware_rules: rules)
+        true
+      rescue StandardError
+        false
+      end
+
       # Svetla vyska configu pri INEJ vyske korpusu (cista sonda pre testy
       # a pre `min_avail_for` — hranicu vnutra meria `interior_dims`).
       def avail_at(cfg, height)
@@ -1366,11 +1507,20 @@ module Noxun
           else                  h - t
           end
         back_front_y =
-          case cfg[:back_mode]
-          when 'none'   then d # D-31: ziadny chrbat — vnutro az po zadnu rovinu
-          when 'inset'  then d - bt
-          when 'groove' then d - GROOVE_OFFSET - bt
-          else d - bt # D-37 overlay: chrbat zabera zadnych bt CELKOVEJ hlbky
+          if back_setback(cfg).positive?
+            # KON-A: pri komine chrbat sedi na zadnom doraze R — naloženy a v
+            # drazke ZA dnom a stropom (vnutro po R), vlozeny PRED R (R − bt),
+            # bez chrbta po R. Jediny zdroj pre zony, police, recepty zasuviek,
+            # kovanie aj „Vnút. hĺbku".
+            r = back_stop(cfg)
+            cfg[:back_mode] == 'inset' ? r - bt : r
+          else
+            case cfg[:back_mode]
+            when 'none'   then d # D-31: ziadny chrbat — vnutro az po zadnu rovinu
+            when 'inset'  then d - bt
+            when 'groove' then d - GROOVE_OFFSET - bt
+            else d - bt # D-37 overlay: chrbat zabera zadnych bt CELKOVEJ hlbky
+            end
           end
         { z_lo: z_lo, z_hi: z_hi, avail_h: (z_hi - z_lo), back_front_y: back_front_y, back_thickness: bt }
       end
@@ -1380,9 +1530,10 @@ module Noxun
         v.positive? ? v : BACK_THICKNESS_DEFAULT
       end
 
-      # Boky — KONSTRUKCNA hlbka (D-37). Z-start podla variantu dna.
+      # Boky — KONSTRUKCNA hlbka (D-37), pri komine plna `d` (`side_depth`).
+      # Z-start podla variantu dna.
       def side_parts(cfg)
-        w = cfg[:width]; d = carcass_depth(cfg); t = cfg[:thickness]; s = cfg[:floor_height]; h = cfg[:height]
+        w = cfg[:width]; d = side_depth(cfg); t = cfg[:thickness]; s = cfg[:floor_height]; h = cfg[:height]
         z0 = cfg[:bottom_mode] == 'under_sides' ? (s + t) : 0.0
         sh = h - z0
         [
@@ -1398,8 +1549,10 @@ module Noxun
       end
 
       # Dno — vzdy na urovni Z = floor_height (priestor pod nim = nohy / sokel).
+      # Hlbka = zadny doraz R (pri komine o X kratsie ako bok); zapustenie Y
+      # sa dna netyka (M3).
       def bottom_part(cfg)
-        w = cfg[:width]; d = carcass_depth(cfg); t = cfg[:thickness]; s = cfg[:floor_height]
+        w = cfg[:width]; d = back_stop(cfg); t = cfg[:thickness]; s = cfg[:floor_height]
         if cfg[:bottom_mode] == 'under_sides'
           { suffix: 'BOTTOM', part_key: PartKeys.cabinet('bottom'), role: 'bottom', name: 'Dno', material: :korpus,
             box: [w, d, t], origin: [0, 0, s], prod: { length: w, width: d, thickness: t },
@@ -1412,8 +1565,11 @@ module Noxun
       end
 
       # Vrch — full / two_rails / none. warnings: volitelny kolektor (BuildPlan kontrakt).
+      # KON-A: plny strop zacina na zapusteni Y a konci na zadnom doraze R.
       def top_parts(cfg, warnings = nil)
-        w = cfg[:width]; d = carcass_depth(cfg); t = cfg[:thickness]; h = cfg[:height]
+        w = cfg[:width]; t = cfg[:thickness]; h = cfg[:height]
+        y0 = front_setback_origin(cfg)
+        d = back_stop(cfg) - y0
         case cfg[:top_mode]
         when 'none'
           []
@@ -1421,16 +1577,25 @@ module Noxun
           rail_parts(cfg, warnings)
         else # full
           [{ suffix: 'TOP', part_key: PartKeys.cabinet('top'), role: 'top', name: 'Vrch', material: :korpus,
-             box: [w - 2 * t, d, t], origin: [t, 0, h - t], prod: { length: w - 2 * t, width: d, thickness: t },
+             box: [w - 2 * t, d, t], origin: [t, y0, h - t], prod: { length: w - 2 * t, width: d, thickness: t },
              axes: PartFaces::AXES_LYING }]
         end
+      end
+
+      # Y-origin prednych dielcov stropu. Bez zapustenia CELE CISLO 0 — presne
+      # to, co plan niesol pred KON-A (golden plany sa nesmu pohnut ani typom).
+      def front_setback_origin(cfg)
+        y = top_front_setback(cfg)
+        y.positive? ? y : 0
       end
 
       # Dve horne vystuhy (rail_front / rail_back). flat = naplocho, upright = na hranu.
       # Orezanie hlbky/vysky vystuhy uz nie je tiche — hlasi sa do warnings (ak je kolektor).
       # D-37: zadna vystuha sedi na KONSTRUKCNEJ hlbke (pri overlay pred chrbtom).
+      # KON-A: predna zacina na zapusteni Y, zadna konci na zadnom doraze R.
       def rail_parts(cfg, warnings = nil)
-        w = cfg[:width]; d = carcass_depth(cfg); t = cfg[:thickness]
+        w = cfg[:width]; d = back_stop(cfg); t = cfg[:thickness]
+        yf = front_setback_origin(cfg)
         g = rail_geometry(cfg) # D-80: JEDINY zdroj clampov (zdielany s interior_dims)
         rail_clamp_warning(warnings, g[:wanted_depth], g[:depth], g[:clamp_label])
         rail_offset_warning(warnings, g[:wanted_offset], g[:offset])
@@ -1441,7 +1606,7 @@ module Noxun
           [
             { suffix: 'TOP-RAIL-F', part_key: PartKeys.cabinet('rail', 'front'),
               role: 'rail_front', name: 'Vystuha predna', material: :korpus,
-              box: [w - 2 * t, t, rd], origin: [t, 0, z0], prod: prod, axes: PartFaces::AXES_WALL },
+              box: [w - 2 * t, t, rd], origin: [t, yf, z0], prod: prod, axes: PartFaces::AXES_WALL },
             { suffix: 'TOP-RAIL-B', part_key: PartKeys.cabinet('rail', 'back'),
               role: 'rail_back', name: 'Vystuha zadna', material: :korpus,
               box: [w - 2 * t, t, rd], origin: [t, d - t, z0], prod: prod, axes: PartFaces::AXES_WALL }
@@ -1450,7 +1615,7 @@ module Noxun
           [
             { suffix: 'TOP-RAIL-F', part_key: PartKeys.cabinet('rail', 'front'),
               role: 'rail_front', name: 'Vystuha predna', material: :korpus,
-              box: [w - 2 * t, rd, t], origin: [t, 0, z0], prod: prod, axes: PartFaces::AXES_LYING },
+              box: [w - 2 * t, rd, t], origin: [t, yf, z0], prod: prod, axes: PartFaces::AXES_LYING },
             { suffix: 'TOP-RAIL-B', part_key: PartKeys.cabinet('rail', 'back'),
               role: 'rail_back', name: 'Vystuha zadna', material: :korpus,
               box: [w - 2 * t, rd, t], origin: [t, d - rd, z0], prod: prod, axes: PartFaces::AXES_LYING }
@@ -1462,11 +1627,24 @@ module Noxun
       # chrbat bezi ZA vystuhami, preto sa skracuje LEN o odsadenie vystuh
       # (rails_top_offset), NIE o vysku upright vystuhy. Pri offsete 0 vrati presne
       # povodne h - t => bez odsadenia sa vyroba chrbta NEMENI.
-      # POZN: finalny konstrukcny detail (napr. ci ma chrbat pri upright vystuhe
-      # koncit este nizsie) potvrdi Michal pri teste — je to zmena na 1 riadku.
+      # D-144 (KON-A): chrbat vlozeny alebo v drazke by pri vystuhach NA VYSKU
+      # vyssich nez hrubka korpusu prechadzal zadnou vystuhou (a v kusovniku bol
+      # vyssi, nez sa zmesti). Horna hrana je preto NIZSIA z dnesnej
+      # (`h − offset − t`) a spodnej hrany vystuh (`interior[:z_hi]`) — pri
+      # vystuhach naplocho a pri vystuhe na vysku <= t sa nemeni nic.
       def back_z_hi(cfg, interior)
         return interior[:z_hi] unless cfg[:top_mode] == 'two_rails'
-        cfg[:height].to_f - rail_geometry(cfg)[:offset] - cfg[:thickness].to_f
+        legacy = cfg[:height].to_f - rail_geometry(cfg)[:offset] - cfg[:thickness].to_f
+        [legacy, interior[:z_hi].to_f].min
+      end
+
+      # D-144: o kolko sa chrbat v drazke (bez komina) pri vystuhach skrati
+      # proti plnemu rozmeru — Δ = max(occupy − t, 0). Ten isty rozdiel ako
+      # horna hrana v modeli, takze rozmer do narezu klesne presne o nu.
+      def back_rail_drop(cfg)
+        return 0.0 unless cfg[:top_mode] == 'two_rails'
+
+        [rail_geometry(cfg)[:occupy].to_f - cfg[:thickness].to_f, 0.0].max
       end
 
       # Chrbat — overlay / inset / groove / none (D-31: none = ziadny dielec).
@@ -1481,10 +1659,22 @@ module Noxun
       # pre V1 ide do narezu plny rozmer a dielna ho zreze. `box` = `prod` =
       # geometria sa NEMENIA (model ukazuje chrbat v drazke; rovnost strazi
       # PartFaces/AppearanceMapping).
+      #
+      # KON-A · K1 (komin X > 0): chrbat sa posunie na ZADNY DORAZ R —
+      #   overlay a groove: MEDZI bokmi, nalozeny na zadne hrany dna a stropu
+      #     (M2: drazka len v bokoch) — box [w − 2t, bt, h − s], origin [t, R, s];
+      #     chrbat v drazke nesie `cut_size` {w, h − s} (pravidlo KON-0) a stoji
+      #     ZA vystuhami, takze D-144 sa ho netyka;
+      #   inset: zadna plocha v rovine R (origin [t, R − bt, z_lo]), horna
+      #     hrana podla D-144.
+      # D-144 bez komina: chrbat v drazke pri vystuhach na vysku klesne pod ne
+      # aj v rozmere do narezu (`cut_size.width = (h − s) − Δ`).
       def back_part(cfg, interior)
         return nil if cfg[:back_mode] == 'none' # D-31: explicitne (else vetva by vyrobila overlay!)
         w = cfg[:width]; d = cfg[:depth]; h = cfg[:height]; t = cfg[:thickness]; s = cfg[:floor_height]
         bt = interior[:back_thickness]
+        return setback_back_part(cfg, interior) if back_setback(cfg).positive?
+
         z_hi = back_z_hi(cfg, interior)
         case cfg[:back_mode]
         when 'inset'
@@ -1495,14 +1685,37 @@ module Noxun
         when 'groove'
           z0 = interior[:z_lo]; bh = z_hi - z0
           y0 = d - GROOVE_OFFSET - bt
+          drop = back_rail_drop(cfg)
+          cut_w = drop.positive? ? (h - s) - drop : h - s
           { suffix: 'BACK', part_key: PartKeys.cabinet('back'), role: 'back', name: 'Chrbat', material: :korpus,
             box: [w - 2 * t, bt, bh], origin: [t, y0, z0], prod: { length: w - 2 * t, width: bh, thickness: bt },
-            axes: PartFaces::AXES_WALL, back_mode: 'groove', cut_size: { length: w, width: h - s } }
+            axes: PartFaces::AXES_WALL, back_mode: 'groove', cut_size: { length: w, width: cut_w } }
         else # overlay
           { suffix: 'BACK', part_key: PartKeys.cabinet('back'), role: 'back', name: 'Chrbat', material: :korpus,
             box: [w, bt, h - s], origin: [0, d - bt, s], prod: { length: w, width: h - s, thickness: bt },
             axes: PartFaces::AXES_WALL, back_mode: 'overlay' }
         end
+      end
+
+      # Chrbat pri KOMINE (X > 0) — vlastna vetva, aby dnesne vetvy ostali
+      # bajtovo nedotknute. Rezim `none` sem nechodi (D-31 vyssie).
+      def setback_back_part(cfg, interior)
+        w = cfg[:width]; h = cfg[:height]; t = cfg[:thickness]; s = cfg[:floor_height]
+        bt = interior[:back_thickness]
+        r = back_stop(cfg)
+        base = { suffix: 'BACK', part_key: PartKeys.cabinet('back'), role: 'back', name: 'Chrbat',
+                 material: :korpus, axes: PartFaces::AXES_WALL, back_mode: cfg[:back_mode].to_s }
+        if cfg[:back_mode] == 'inset'
+          z0 = interior[:z_lo]; bh = back_z_hi(cfg, interior) - z0
+          return base.merge(box: [w - 2 * t, bt, bh], origin: [t, r - bt, z0],
+                            prod: { length: w - 2 * t, width: bh, thickness: bt })
+        end
+
+        bh = h - s
+        out = base.merge(box: [w - 2 * t, bt, bh], origin: [t, r, s],
+                         prod: { length: w - 2 * t, width: bh, thickness: bt })
+        out[:cut_size] = { length: w, width: bh } if cfg[:back_mode] == 'groove'
+        out
       end
 
       # Sokel — len variant 'front' (predny zapusteny panel).
@@ -1545,6 +1758,9 @@ module Noxun
       def validate!(cfg, interior)
         w = cfg[:width]; h = cfg[:height]; t = cfg[:thickness]; s = cfg[:floor_height]
         raise 'Sirka je prilis mala vzhladom na hrubku materialu.' if w <= 2 * t + 10
+        # KON-A: komin a zapustenie PRED vseobecnou hlbkou — pri komine je veta
+        # o minime vnutra zrozumitelnejsia nez „Hlbka je prilis mala".
+        validate_setbacks!(cfg, interior)
         raise 'Hlbka je prilis mala.' if interior[:back_front_y] <= 10
         raise 'Podstavec/sokel nesmie byt vyssi nez korpus.' if s >= h
         raise 'Vnutorna vyska je nulova alebo zaporna (skontroluj vysku, podstavec a hrubky).' if
@@ -1558,6 +1774,77 @@ module Noxun
         raise 'Vnútro je príliš nízke na výstuhy (ostáva ' \
               "#{interior[:avail_h].to_f.round(1)} mm) — zväčši výšku korpusu, zmenši podstavec " \
               'alebo prepni vrch na plný.'
+      end
+
+      # KON-A: odmietnutia komina a zapustenia (model sa nezmeni, veta ide do
+      # statusu). JEDINY zdroj viet — panel ich zrkadli (`nxSetbackError`
+      # v core.js, spolocna fixtura `tests/fixtures/kona_cases.json`). Pri X = Y
+      # = 0 sa NEUPLATNI ziadne (audit KON-A FIX 4).
+      def validate_setbacks!(cfg, interior)
+        msg = setback_error(cfg, interior)
+        raise msg if msg
+      end
+
+      # -> veta | nil. Cista funkcia (aj pre `min_valid_depth` a testy).
+      def setback_error(cfg, interior = nil)
+        return nil unless setbacks?(cfg)
+
+        interior ||= interior_dims(cfg)
+        x = back_setback(cfg)
+        y = top_front_setback(cfg)
+        r = back_stop(cfg)
+        if x.positive?
+          min_x = min_back_setback(cfg)
+          if x < min_x - 0.005
+            return "Komín pri chrbte v drážke musí byť 0 alebo aspoň #{fmt_mm(min_x)} mm " \
+                   "(drážka #{fmt_mm(GROOVE_OFFSET)} + chrbát #{fmt_mm(back_thickness(cfg))})." if cfg[:back_mode] == 'groove'
+
+            return "Komín pri naloženom chrbte musí byť 0 alebo aspoň #{fmt_mm(min_x)} mm " \
+                   '(hrúbka chrbta) — inak by chrbát trčal za boky.'
+          end
+          inner = interior[:back_front_y].to_f
+          if inner < min_setback_interior - 0.005
+            return "Pri komíne #{fmt_mm(x)} mm ostane vnútro len #{fmt_mm([inner, 0.0].max)} mm — " \
+                   'police sa nezmestia; zmenši komín alebo zväčši hĺbku.'
+          end
+        end
+        if cfg[:top_mode] == 'full' && r - y < MIN_TOP_DEPTH - 0.005
+          left = fmt_mm([r - y, 0.0].max)
+          return "Pri komíne #{fmt_mm(x)} mm by strop mal len #{left} mm (najmenej #{fmt_mm(MIN_TOP_DEPTH)}) — " \
+                 'zmenši komín alebo zväčši hĺbku.' unless y.positive?
+
+          return "Zapustenie #{fmt_mm(y)} mm nenechá strop — ostalo by z neho #{left} mm " \
+                 "(najmenej #{fmt_mm(MIN_TOP_DEPTH)})."
+        end
+        rails_setback_error(cfg, r, y)
+      end
+
+      # Vystuhy v hlbkovom intervale Y … R (audit bloku FIX 5, Grok 4). Flat:
+      # vacsia hlbka pasu sa oreze s upozornenim (`rail_depth_clamped`), ale
+      # orez POD 20 mm je odmietnutie. Upright: hrubku orezat nemozno —
+      # `Y + 2t + 20 <= R`.
+      def rails_setback_error(cfg, r, y)
+        return nil unless cfg[:top_mode] == 'two_rails'
+
+        t = cfg[:thickness].to_f
+        if cfg[:rails_orientation] == 'upright'
+          need = y + 2 * t + 20.0
+          return nil if need <= r + 0.005
+
+          return 'Výstuhy na výšku sa medzi zapustenie a komín nezmestia — potrebujú ' \
+                 "#{fmt_mm(need)} mm hĺbky, ostáva #{fmt_mm([r, 0.0].max)} mm."
+        end
+        limit = rail_geometry(cfg)[:flat_limit]
+        return nil if limit >= 20.0 - 0.005
+
+        'Výstuhy naplocho sa medzi zapustenie a komín nezmestia — na každú by ostalo ' \
+          "#{fmt_mm([limit, 0.0].max)} mm (najmenej 20)."
+      end
+
+      # Cele mm bez „.0" (vety pre cloveka); desatiny len ked naozaj su.
+      def fmt_mm(v)
+        f = v.to_f.round(1)
+        f == f.round ? f.round.to_s : f.to_s.tr('.', ',')
       end
     end
   end

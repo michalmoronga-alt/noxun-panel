@@ -535,11 +535,11 @@ výsledky krížového auditu.
 knižnica šablón STD 7) prejde auditom svojho návrhu. **KON-0 (výrobná chyba D-143) ide prvá.** Poradie:
 
 - ✅ **KON-0 · D-143** — chrbát v drážke do nárezu v plnom rozmere skrinky, model ho ďalej ukazuje v drážke; staré skrinky sa prestavia (hromadne). **PR #401, v0.13.1.**
-- **KON-A · K1** — komín vzadu (nika spotrebiča sa pri komíne ráta z hĺbky boku) a zapustený strop vpredu; oprava D-144.
+- ✅ **KON-A · K1** — komín vzadu (nika spotrebiča sa pri komíne ráta z hĺbky boku) a zapustený strop vpredu; oprava D-144. **PR #402, v0.13.2.**
 - **KON-B · K2** — chrbát z dvoch líšt z korpusu, vnútro pred lištami v celej výške, jeden riadok „Chrb HD".
 - **KON-D** — šablóna Chladničková 600 × 2100 × 560, komín 50, bez chrbta, očakáva chladničku.
 - ✅ **D-143 · Chrbát v drážke ide do nárezu bez prídavku** — vyriešené dávkou KON-0 (PR #401, v0.13.1); plný text v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md).
-- **D-144 · Vložený chrbát alebo chrbát v drážke prechádza výstuhou na výšku** — keď je výstuha vyššia než hrúbka korpusu, chrbát je v kusovníku vyšší, než sa zmestí (→ KON-A).
+- ✅ **D-144 · Vložený chrbát alebo chrbát v drážke prechádza výstuhou na výšku** — vyriešené dávkou KON-A (PR #402, v0.13.2); plný text v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md).
 - *(Bokorys v náhľade Inspectora — pôvodne KON-C — **vypadol** (Michal 27.9.: priestor panela); neskôr lepší 3D náhľad = **D-145** v zásobníku Po V1.)*
 
 ### 6 · INFRA (priebežne, podľa potreby)

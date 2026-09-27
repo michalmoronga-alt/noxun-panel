@@ -85,7 +85,8 @@ module Noxun
         fronts = fronts_context(sym)
         { 'interior' => { 'width' => (cfg['width'].to_f - (2 * t)).round(2),
                           'height' => dims[:avail_h].to_f.round(2),
-                          'depth' => dims[:back_front_y].to_f.round(2) },
+                          # KON-A (M9): hlbka niky pri komine z hlbky BOKU.
+                          'depth' => Construction.niche_depth(sym, dims).to_f.round(2) },
           'z_lo' => dims[:z_lo].to_f,
           'gap' => fronts['gap'],
           'single_zone' => single_zone?(cfg),

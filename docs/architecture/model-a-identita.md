@@ -115,9 +115,10 @@ a reprodukcie recyklácie cez skutočný `PanelAppObserver#onOpenModel` (vzor sc
 
 prístup k `NOXUN` dictionary.
 
-**Verzia kontraktu configu `config_schema` je dnes `7`** (KOV-D2a — výškový zámok zásuvky, pole `height_variant` v `hardware_overrides`); `DRAWER_ACTIVATION_SCHEMA`
-ostáva `5`. Zápis markera, dopredný guard aj celá **história čísel** žijú v odseku `cabinet_builder.rb` ([construction.md](construction.md)) — tu je len ukazovateľ,
-aby sa aktuálne číslo dalo nájsť od dát.
+**Verzia kontraktu configu `config_schema` je dnes `20`** (KON-A · K1 — komín vzadu `back_setback` a zapustenie stropu `top_front_setback`, oprava D-144).
+Aktivačné konštanty sa pri bumpe nehýbu: `DRAWER_ACTIVATION_SCHEMA` 5 · `HINGE_ACTIVATION_SCHEMA` 9 · `LIFT_ACTIVATION_SCHEMA` 11 · `BACK_CUT_ACTIVATION_SCHEMA` 19 ·
+`BACK_RAIL_ACTIVATION_SCHEMA` 20. Zápis markera, dopredný guard aj celá **história čísel** žijú v odseku `cabinet_builder.rb` ([construction.md](construction.md))
+a v komentári `HISTORIA` pri konštante — tu je len ukazovateľ, aby sa aktuálne číslo dalo nájsť od dát.
 
 ### part_keys.rb
 

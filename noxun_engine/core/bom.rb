@@ -218,6 +218,11 @@ module Noxun
             # nie pritomnost `cut_size`.
             bs = back_stale_issue(cid, inst.persistent_id, ccfg)
             cut_issues << bs if bs
+            # D-144 (KON-A): vlozeny chrbat / chrbat v drazke pri vystuhach NA
+            # VYSKU spred schemy 20 — TEN ISTY register brany a ta ista
+            # hromadna prestavba ako D-143.
+            br = back_rail_stale_issue(cid, inst.persistent_id, ccfg)
+            cut_issues << br if br
             nested = {}
             inst.definition.entities.grep(Sketchup::ComponentInstance).each do |pi|
               next unless Store.kind(pi) == 'part'
@@ -1358,8 +1363,9 @@ module Noxun
       BACK_EDGED      = 'back_groove_edged'       # chrbat v drazke s ucinnym ABS
       BACK_INCOMPLETE = 'back_groove_incomplete'  # groove schemy 19 bez `cut_size`
       BACK_STALE      = 'back_groove_stale'       # skrinka groove pod schemou 19
+      BACK_RAIL_STALE = 'back_rail_stale'         # D-144: inset/groove + upright pod 20
       BACK_ORIGIN     = 'back_origin_unknown'     # ORANGE: samostatny stary chrbat
-      CUT_BLOCKERS = [CUT_INVALID, BACK_EDGED, BACK_INCOMPLETE, BACK_STALE].freeze
+      CUT_BLOCKERS = [CUT_INVALID, BACK_EDGED, BACK_INCOMPLETE, BACK_STALE, BACK_RAIL_STALE].freeze
 
       # Tolerancia porovnania s geometriou — TA ISTA ako vo validatore planu.
       CUT_TOL = BuildPlan::CUT_TOL
@@ -1415,22 +1421,97 @@ module Noxun
           CabinetBuilder.config_schema_of(cfg) < CabinetBuilder::BACK_CUT_ACTIVATION_SCHEMA
       end
 
+      # Rezim stropu a orientacia vystuh ULOZENEJ skrinky — ta ista semantika
+      # ako `CabinetBuilder.config_to_params` (`top_mode || legacy top.mode`,
+      # `rails_orientation || 'flat'`), odolna voci poskodenemu atributu.
+      def stored_top_mode(cfg)
+        c = cfg.is_a?(Hash) ? cfg : {}
+        flat = c['top_mode']
+        return flat.to_s if flat
+
+        legacy = c['top'].is_a?(Hash) ? c['top']['mode'] : nil
+        legacy.nil? || legacy.to_s == 'full_panel' ? 'full' : legacy.to_s
+      end
+
+      def stored_rails_orientation(cfg)
+        c = cfg.is_a?(Hash) ? cfg : {}
+        (c['rails_orientation'] || 'flat').to_s
+      end
+
+      # D-144 (KON-A): je skrinka ZASTARANA? Chrbat VLOZENY alebo V DRAZKE +
+      # strop „dve vystuhy" NA VYSKU + schema pod `BACK_RAIL_ACTIVATION_SCHEMA`.
+      # KONZERVATIVNE (audit KON-A): vyrobne rozmery sa NEPOCITAJU — pri
+      # vystuhe na vysku nizsej alebo rovnej hrubke korpusu je poplach falosny
+      # a prestavba ho zrusi. Veta preto hovori „treba prestavbu".
+      def back_rail_stale?(cfg)
+        return false unless defined?(CabinetBuilder)
+
+        %w[inset groove].include?(stored_back_mode(cfg)) &&
+          stored_top_mode(cfg) == 'two_rails' &&
+          stored_rails_orientation(cfg) == 'upright' &&
+          CabinetBuilder.config_schema_of(cfg) < CabinetBuilder::BACK_RAIL_ACTIVATION_SCHEMA
+      end
+
+      # SPOLOCNY predikat vyberu kandidatov hromadnej prestavby (audit KON-A
+      # NOTE 8): zastarana je skrinka D-143 ALEBO D-144. Cita ho vyber
+      # `ProductionCore.back_stale_entry` — jeden vyber pre obe brany.
+      def rebuild_stale?(cfg)
+        back_stale?(cfg) || back_rail_stale?(cfg)
+      end
+
+      # Rozmer chrbta v drazke DO NAREZU v texte D-143 — TYM ISTYM pravidlom
+      # ako builder (audit KON-A FIX 6): pri D-144 klesne o Δ pod vystuhy
+      # (`Construction.back_rail_drop`). Rezimy sa citaju ako `config_to_params`.
+      # -> [sirka, vyska] | nil (neurcite = text bez rozmeru).
+      def stale_back_cut_dims(cfg)
+        c = cfg.is_a?(Hash) ? cfg : {}
+        w = c['width'].to_f
+        cut_h = c['height'].to_f - c['floor_height'].to_f
+        return nil unless w.positive? && cut_h.positive?
+
+        if defined?(Construction)
+          sym = { height: c['height'].to_f, thickness: c['thickness'].to_f,
+                  floor_height: c['floor_height'].to_f, depth: c['depth'].to_f,
+                  back_mode: stored_back_mode(c), back_thickness: c['back_thickness'],
+                  top_mode: stored_top_mode(c), rails_orientation: stored_rails_orientation(c),
+                  rail_depth: (c['rail_depth'] || 100.0).to_f,
+                  rails_top_offset: (c['rails_top_offset'] || 0.0).to_f }
+          cut_h -= Construction.back_rail_drop(sym)
+        end
+        cut_h.positive? ? [w, cut_h] : nil
+      rescue StandardError
+        nil
+      end
+
       # -> nalez | nil. Klik-select mieri na SKRINKU (part_key nil) — naprava je
       # prestavba celej skrinky; `rebuild_stale` hovori Kontrole, ze ponuka
       # hromadnu prestavbu.
       def back_stale_issue(owner_id, owner_pid, ccfg)
         return nil unless back_stale?(ccfg)
 
-        c = ccfg.is_a?(Hash) ? ccfg : {}
-        w = c['width'].to_f
-        cut_h = c['height'].to_f - c['floor_height'].to_f
-        cut_txt = w.positive? && cut_h.positive? ? " (#{fmt_mm(w)} × #{fmt_mm(cut_h)})" : ''
+        dims = stale_back_cut_dims(ccfg)
+        cut_txt = dims ? " (#{fmt_mm(dims[0])} × #{fmt_mm(dims[1])})" : ''
         { 'code' => BACK_STALE, 'severity' => 'red',
           'owner_id' => owner_id.to_s, 'owner_pid' => owner_pid, 'part_key' => nil, 'pid' => nil,
           'rebuild_stale' => true,
           'message' => "Skrinka #{owner_id} má chrbát v drážke zo staršej verzie — do nárezu by išiel " \
                        "v rozmere modelu namiesto plného rozmeru skrinky#{cut_txt}. Prestav ju " \
                        '(Kontrola → Prestaviť zastarané skrinky); dovtedy výrobné exporty stoja.' }
+      end
+
+      # D-144 (KON-A): nalez zastaranej skrinky — ten isty tvar a ta ista
+      # hromadna prestavba ako D-143. Veta NETVRDI preukazanu koliziu
+      # (predikat je konzervativny).
+      def back_rail_stale_issue(owner_id, owner_pid, ccfg)
+        return nil unless back_rail_stale?(ccfg)
+
+        what = stored_back_mode(ccfg) == 'inset' ? 'vložený chrbát' : 'chrbát v drážke'
+        { 'code' => BACK_RAIL_STALE, 'severity' => 'red',
+          'owner_id' => owner_id.to_s, 'owner_pid' => owner_pid, 'part_key' => nil, 'pid' => nil,
+          'rebuild_stale' => true,
+          'message' => "Skrinka #{owner_id} má #{what} spolu s výstuhami na výšku zo staršej verzie — " \
+                       'treba ju prestaviť (chrbát môže prechádzať zadnou výstuhou). Kontrola → Prestaviť ' \
+                       'zastarané skrinky; dovtedy výrobné exporty stoja.' }
       end
 
       # Nalezy jedneho vyrobneho zaznamu (snapshot `cfg` + hotovy zaznam `rec`).
@@ -1504,7 +1585,7 @@ module Noxun
       end
 
       def back_edged_message(rec)
-        "Chrbát v drážke (#{cut_where(rec)}) má olepenú hranu — do nárezu ide v plnom rozmere, " \
+        "Chrbát v drážke (#{cut_where(rec)}) má olepenú hranu — do nárezu ide väčší (plná šírka skrinky), " \
           'páska by skončila v drážke. Zruš olepenie alebo zmeň typ chrbta; dovtedy výrobné exporty stoja.'
       end
 
@@ -1516,7 +1597,7 @@ module Noxun
       def back_origin_message(rec)
         n = rec['name'].to_s.strip
         "Samostatný chrbát „#{n.empty? ? 'Chrbat' : n}“ (#{cut_where(rec)}) je zo staršej verzie — over " \
-          'rozmer do nárezu (chrbát v drážke ide do nárezu v plnom rozmere skrinky).'
+          'rozmer do nárezu (chrbát v drážke ide do nárezu väčší — plná šírka skrinky).'
       end
 
       # --- cisty vypocet (headless) ----------------------------------------
