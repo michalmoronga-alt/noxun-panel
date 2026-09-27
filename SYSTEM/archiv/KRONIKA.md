@@ -17,6 +17,32 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **DOCS — blok 7 · KONŠTRUKCIA K1+K2: rozhodnutia Michala, mockup, postrehy D-143 až D-145 (27.9.2026, PR #?, len dokumentácia).**
+  Michal 26.9. vybral blok K1+K2 (po smoke S1 PASS) a v debate rozhodol: komín bežne ~50 mm (o koľko sú dno a strop vzadu kratšie ako bok), pri
+  komíne a drážke je drážka len v bokoch a na dne a strope chrbát presahuje, zapustený strop pre dolnú aj hornú, pri lištách vnútro pred lištami
+  v celej výške, lišty vo výstupoch jeden riadok „Chrb HD", zo šablón len Chladničková. Pri debate vznikol výrobný nález **D-143** (chrbát v drážke
+  ide do nárezu na vnútorný rozmer 564 × 684; Michal: do nárezu v plnom rozmere 600 × 720, dielňa zreže) — implementátor ho zastavil pred kódom,
+  lebo rozmer do nárezu sa dnes všade rovná rozmeru v modeli a oprava potrebuje nový údaj (zmena kontraktu, audit dávky) → prvá dávka bloku KON-0.
+  Krížový audit bloku (Grok 4.7 s webom, 9 nálezov; Codex gpt-6-astra s repom, 2 BLOCKER · 11 FIX · 3 NOTE; Gemini podľa Michala nebežal) našiel
+  aj starú výrobnú chybu **D-144** (vložený chrbát / chrbát v drážke pri výstuhách na výšku prechádza zadnou výstuhou). **Pôvodné PR #398** nieslo
+  podklady bloku (fakty z kódu, koncept, krížový audit, reconcile) a prešlo **tromi GH kolami, každé s P1** — všetky nálezy spresňovali návrh dávok
+  (staré snapshoty v novom plugine, zastaranosť podľa aktivačnej schémy, pravidlá výstuh, olepený chrbát v drážke, názvy líšt, D-144 len pri
+  výstuhe vyššej než korpus). Podľa **pravidla 3 kôl (b)** sa nezmergovalo, ale **zavrelo a rozdelilo**: tento PR nesie blok 7 v PLAN, postrehy
+  D-143/D-144 a priečinok bloku `zdroje/bloky/KONSTRUKCIA/` (review kolo 1: pravidlo repa drží priečinok v repe od štartu bloku). Review kolo 2
+  (2× P1 + 2× P2 — opäť spresnenia detailov návrhu: zastaraný riadok o olepenom chrbte, odpojené staré chrbty D-144, spoločný názov líšt priamo na
+  „Chrb HD", rúrové skrinky mimo cieľa) viedlo k **zoštíhleniu**: namiesto pracovného konceptu so vzorcami a podrobného reconcile nesie priečinok
+  stručné **ROZHODNUTIA_BLOKU** (rozhodnutia Michala + prijaté požiadavky pre každú dávku), fakty z kódu a surové výsledky auditu; pracovný koncept
+  ostáva v histórii PR (commit b870179b) a na vetve `docs/blok-konstrukcia` ako poznámky. **KON-0 (D-143) na schválenie mockupu nečaká**;
+  **Michal 27.9. (v noci):** nika spotrebiča sa pri komíne ráta **z hĺbky boku** (listy kótujú min. hĺbku boku, chladnička zasahuje do komína —
+  prax), Chladničková **600 × 2100 × 560, komín 50, bez chrbta**, **bokorys v náhľade nie** (KON-C vypadol → D-145 zásobník), mockup schválený,
+  samostatné chrbty nepoužíva (starý samostatný chrbát → ORANGE), D-144 kombináciu nepoužíva, minimum komína podľa typu chrbta áno. Audit návrhu
+  KON-0 (NOT SOUND: 2 BLOCKER pri samostatných chrbtoch + 4 FIX) je spracovaný v pracovnom zozname požiadaviek. **Aj PR #399 vrátilo v 3. kole P1**
+  (vypadnutá požiadavka „seed Chladničkovej nesie verziu configu") → podľa pravidla 3 kôl (b) **zavreté a rozdelené druhý raz**: tento PR nesie len
+  **produktové rozhodnutia Michala** (ROZHODNUTIA_MICHALA, M1–M12), schválený mockup, fakty a surové audity; **technické požiadavky** idú do package
+  každej dávky (pracovný zoznam v histórii #399, commit b85fcaa2). Poučenie 2: ani zoznam technických požiadaviek nepatrí do úvodného PR bloku;
+  audit návrhu majú len dávky meniace kontrakt alebo schému (KON-0, A, B, D). Mockup a packages prídu samostatným PR. Poučenie: úvodný dokument
+  bloku drží rozhodnutia a smer, **nie implementačné vzorce** — tie patria do package dávky. Ďalší krok: package a audit KON-0, schválenie mockupu.
+
 - **DOCS — smoke S1 PASS a odškrtnutie V1 vízie (26.9.2026, PR #397, len dokumentácia; verzia pluginu sa nemení).**
   Michal 26.9. večer potvrdil **smoke bloku SPOTREBIČE S1 = PASS** („PASS — ideme ďalej"); zápis v [S1_ZAVER_2026-09-24.md](S1_ZAVER_2026-09-24.md)
   (sekcia Smoke Michala 21.–26.9.) — výsledok časti B checklistu sa po bodoch nezaznamenával, ďalšie postrehy k funkciám S1 idú ako nové D-čísla

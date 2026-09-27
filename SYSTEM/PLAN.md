@@ -269,7 +269,7 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   hodnota per skrinka (komín vzadu: dno a strop kratšie, chrbát na ich zadnej hrane · strop zapustený vpredu), nastaviteľné, nefixované · **K2 chrbát z výstuh** — nový typ chrbta:
   dve lišty medzi bokmi, výška parameter, ABS len hrana viditeľná z vnútra · **K3 rohová skrinka** (dolná, slepá s CR lištou: dolná skrinka + 5 dielcov rohovej zostavy + dverová
   zóna, cr1, cr2, prepínač L/P; **nízka priorita, posledná vo V1**; outside-in + audit). Balík V0.4.8 (rohové spoje per strana, poldrážka, „bez dielca") a V1-07 čelo ako cenová
-  položka sú **mimo V1** (zásobník). K1/K2 = audit-povinné (CONFIG_SCHEMA).
+  položka sú **mimo V1** (zásobník). K1/K2 = audit-povinné (CONFIG_SCHEMA). **K1 a K2 sa od 26.9.2026 riešia v bloku 7 · KONŠTRUKCIA K1+K2** (nižšie); **K3 ostáva tu.**
 - **V1.0 zostavy — V1 rozsah PO ROZHODNUTÍ 4.9.2026:** prisunutie a kopírovanie korpusov po vlastnej osi (snaper + mower logika → draft NÁSTROJE-1) · dosky (pracovná doska, pilaster,
   soklová lišta, krycí panel) vkladané a kreslené prichytením na rohy skriniek (drafty GHOST-D1/D2) · test na kompletnej reálnej zákazke. **PO V1** (rozhodnutie 4.9., koncept 02):
   segmentová automatika — soklová lišta v celku pre segment, obklady a krycie prvky segmentu vrátane pilastra (priznaný vs. skrytý) ako generované diely, pracovné a horné krycie dosky
@@ -523,6 +523,23 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   napíš 6000 → plugin odmietne s limitom; klikni počiatok a hneď napíš 2400 Enter → doska ide po osi podľa rotácie.
   **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → `construction.md` (`BoardBuilder.replan`, fázy kreslenia, geometria lúča/projekcie, degenerácie, lifecycle zámkov —
   Codex #296 P1), `ui-lifecycle.md` (ghost D2, `interaction: drawing`, `draw_board`, zámky, Shift, VCB), `docs/UI_DIZAJN.md` (tlačidlá karty Dosky) → STAV/KRONIKA/PLAN.
+
+### 7 · KONŠTRUKCIA K1+K2 (V1 bod 2 · štart 26.9.2026)
+
+**Cieľ:** komín vzadu a zapustený strop vpredu (K1), chrbát z dvoch líšt (K2), chrbát v drážke správne do nárezu (D-143) a šablóna Chladničková —
+tak, aby chladničkové a drezové skrinky išli z pluginu bez ručného dopočítavania konštrukcie (vetracie otvory a výrezy ostávajú na stolárovi; rúrové
+skrinky sú mimo bloku — rúra potrebuje iné vetranie). **Priečinok bloku:** [zdroje/bloky/KONSTRUKCIA/](zdroje/bloky/KONSTRUKCIA/) — **rozhodnutia
+Michala** (ROZHODNUTIA_MICHALA), schválený mockup, fakty z kódu a surové výsledky krížového auditu; technické požiadavky pre dávky vznikajú v ich packages.
+**Stav 27.9.2026:** krížový audit hotový, **mockup schválený bez bokorysu**; packages vznikajú postupne, každá audit-povinná dávka (KON-0, A, B a D —
+knižnica šablón STD 7) prejde auditom svojho návrhu. **KON-0 (výrobná chyba D-143) ide prvá.** Poradie:
+
+- **KON-0 · D-143** — chrbát v drážke do nárezu v plnom rozmere skrinky, model ho ďalej ukazuje v drážke; staré skrinky sa prestavia (hromadne).
+- **KON-A · K1** — komín vzadu (nika spotrebiča sa pri komíne ráta z hĺbky boku) a zapustený strop vpredu; oprava D-144.
+- **KON-B · K2** — chrbát z dvoch líšt z korpusu, vnútro pred lištami v celej výške, jeden riadok „Chrb HD".
+- **KON-D** — šablóna Chladničková 600 × 2100 × 560, komín 50, bez chrbta, očakáva chladničku.
+- **D-143 · Chrbát v drážke ide do nárezu bez prídavku** — dnes 564 × 684 pri hornej 600 × 720; Michal: do nárezu 600 × 720, dielňa zreže (→ KON-0).
+- **D-144 · Vložený chrbát alebo chrbát v drážke prechádza výstuhou na výšku** — keď je výstuha vyššia než hrúbka korpusu, chrbát je v kusovníku vyšší, než sa zmestí (→ KON-A).
+- *(Bokorys v náhľade Inspectora — pôvodne KON-C — **vypadol** (Michal 27.9.: priestor panela); neskôr lepší 3D náhľad = **D-145** v zásobníku Po V1.)*
 
 ### 6 · INFRA (priebežne, podľa potreby)
 
