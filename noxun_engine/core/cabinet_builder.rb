@@ -1650,9 +1650,12 @@ module Noxun
         # preto dodatocne prepisat NESMIE — plan ju musi poznat uz pri vypocte.
         # Retaz: override dielca (`part_overrides[key]['material_id']`) ->
         # kanal `front` -> UNI / neznamy / mimo rozsahu korpusu = 18,0
-        # (placeholder cela `Fronts::FRONT_THICKNESS`, vtedy katalogova hrubka
-        # mimo rozsahu zhodi stavbu v `validate_material_thickness!` ako pri
-        # celach). -> { 'cabinet/cr:1' => mm, 'cabinet/cr:2' => mm } alebo {}.
+        # (placeholder cela `Fronts::FRONT_THICKNESS`). ROZDIEL oproti celam:
+        # celovy material s katalogovou hrubkou MIMO rozsahu (napr. sklo 4 mm)
+        # dvere pustia, rohova vsak skonci zrozumitelnym odmietnutim stavby —
+        # plan CR ma placeholder 18, katalog 4 a `validate_material_thickness!`
+        # ho netoleruje. Zamerne: CR lista zo 4 mm skla nedava zmysel.
+        # -> { 'cabinet/cr:1' => mm, 'cabinet/cr:2' => mm } alebo {}.
         def corner_thicknesses(cfg, eff)
           return {} unless cfg.is_a?(Hash) && raw(cfg, :type).to_s == CORNER_TYPE
 
