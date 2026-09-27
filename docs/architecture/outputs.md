@@ -571,8 +571,14 @@ Zber popri tom skladá aditívny kľúč **`cut_issues`** (`compute()` ho ignoru
 samostatnom dielci) a `back_stale_issue` na skrinke. Kódy a register brány `CUT_BLOCKERS` (poradie = poradie viet): `cut_size_invalid` · `back_groove_edged` (značka
 `groove` + účinná hrana ABS) · `back_groove_incomplete` (značka `groove`, bez ABS, bez `cut_size`) · `back_groove_stale` (skrinka `groove` pod
 `BACK_CUT_ACTIVATION_SCHEMA`; `stored_back_mode` = `back_mode || back.mode`, odolné voči nehash `back`). Mimo registra je ORANGE **`back_origin_unknown`** — SAMOSTATNÝ
-chrbát bez značky pôvodu (starý odpojený kus; vnorený starý chrbát rieši zastaranosť skrinky). **Vedomé rozhodnutie Michala 27.9.2026:** export pustí; priznaný zvyšok
-je, že starší plugin `cut_size` ani značku nepozná, preto sa pred prvým použitím aktualizujú obe PC.
+chrbát bez značky pôvodu (starý odpojený kus; vnorený starý chrbát rieši zastaranosť skrinky). **Vedomé rozhodnutie Michala 27.9.2026:** export pustí.
+**Vnorený chrbát sa posudzuje aj podľa VLASTNÍKA (Codex #401 kolo 1 P1):** zber posiela `owner_cfg`; aktuálna skrinka (schéma ≥ 19) s režimom `groove`
+(`current_groove_owner?`, sémantika `stored_back_mode`) berie svoj chrbát ako chrbát v drážke, aj keď snapshot značku stratil alebo ju má poškodenú — bez rozmeru
+do nárezu je to `back_groove_incomplete` (RED + brána), nikdy tichý návrat na geometriu. Nález samostatného dielca nesie jeho **PID** (Kontrola ho prenáša, klik
+označí práve ten kus — `ProductionCore.standalone_part_entity`).
+**PRIZNANÝ LIMIT SPÄTNEJ KOMPATIBILITY (Codex #401 kolo 1 P1, vedome ponechané):** plugin v0.13.0 a starší číta samostatný `part` bez kontroly schémy a `cut_size`
+nepozná, takže **samostatný (odpojený, skopírovaný) nový chrbát vydá v geometrii** (564 × 684); brána R-12 chráni len dielce vnorené v skrinke schémy 19. Starší
+plugin sa dodatočne zmeniť nedá. Mitigácia: pred prvým použitím v0.13.1 aktualizovať **obe PC** (updater D-52); samostatné chrbty Michal nepoužíva (package KON-0 bod 6).
 
 **KOV-W — `weight_totals(records, sheets)` (v0.9.47).** Hmotnosť výrobných záznamov v kg; `sheets` je tá istá mapa `{ material_id => záznam }`, akú stavia
 `ProductionCore.sheets_map` pre `Validation.run`. Vracia `{ 'kg' => Float (2 des.), 'estimated_parts' => Integer, 'estimated_density' => Float | nil }`. Súčet ide cez

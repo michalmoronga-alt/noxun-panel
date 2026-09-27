@@ -2127,6 +2127,14 @@ module Noxun
           # (rucny override alebo pravidlo olepu) ho zamerne NEMA a zber ho
           # z toho (znacka `groove` + hrana) prizna RED a zastavi vyrobne
           # exporty (`Bom.cut_issues_for`). Override olepu sa pri tom NEMAZE.
+          # PRIZNANY LIMIT SPATNEJ KOMPATIBILITY (Codex #401 kolo 1 P1, vedome
+          # rozhodnutie Michal 27.9.2026, package KON-0 bod 6): SAMOSTATNY
+          # (odpojeny/skopirovany) chrbat s tymto snapshotom vydá plugin
+          # v0.13.0 a starsi v GEOMETRII (564 x 684) — jeho `Bom.collect` cita
+          # samostatny `part` bez kontroly schemy a `cut_size` nepozna; R-12
+          # brana chrani len dielce vnorene v skrinke schemy 19. Starsi plugin
+          # sa dodatocne zmenit neda. Mitigacia: pred prvym pouzitim aktualizovat
+          # OBE PC (updater D-52); samostatne chrbty Michal nepouziva.
           cfg_out[:back_mode] = pd[:back_mode] if pd[:back_mode]
           if (cut = snapshot_cut_size(pd, resolved[:edges]))
             cfg_out[:cut_size] = cut

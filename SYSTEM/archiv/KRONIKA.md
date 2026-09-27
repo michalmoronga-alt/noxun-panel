@@ -33,11 +33,14 @@
   `back_mode`), POJMY (prídavok 9 mm vs. V1 plný rozmer), architektúra construction/outputs/model-a-identita/ui-lifecycle na mieste.
   **Odchýlky od package:** (1) spúšťač hromadnej prestavby je akcia riadku Kontroly (package ho nemenoval; Scope OUT „ďalšie UI" — vzor „Nahradiť UNI…");
   (2) DoD „odpojenie chrbta so `cut_size` odmietnuté" je zvyšok package v1 — plugin odpájaciu akciu nemá (odpojenie je natívne), preto overené ako „odpojený nový
-  chrbát ostáva chránený značkou a do nárezu ide v plnom rozmere". **Testy:** 4574 headless (nová sada `test_kon0_d143.rb`, 25 testov vrátane
+  chrbát ostáva chránený značkou a do nárezu ide v plnom rozmere". **Testy:** 4577 headless (nová sada `test_kon0_d143.rb`, 28 testov vrátane
   „každý blokujúci dôvod × každý zo štyroch exportov = nula volaní pickera aj zápisu") · 131 JS sád (nová `test_kon0_do_narezu.js`) · in-SU 3111 PASS / 0 FAIL
   (nový scenár `run_kon0`: plán ↔ model, snapshot/kusovník/VEPO/karta 600 × 720, olepenie cez prestavbu + 1× Späť, zastarané skrinky + brána, hromadná prestavba
   Späť/Redo vracajú snapshot aj schému spolu, odpojený dielec, kópia, absorpcia Scale 900 × 720, uloženie a načítanie .skp). **Mutácie** (3, všetky padli):
   čitateľ ignoruje `cut_size` · zastaranosť podľa `cut_size` · olepený chrbát bez RED. **Aktualizovať obe PC** (starší plugin rozmer do nárezu nepozná).
+  **Predrecenzia** (slepý recenzent 27.9.): PR OK, 0× P1/P2, 2× P3 opravené (výber dielca po hromadnej prestavbe, text D-143). **GH Codex kolo 1** (2× P1 + P2):
+  vnorený chrbát aktuálnej groove skrinky bez značky/`cut_size` = neúplný záznam podľa vlastníka (`owner_cfg`) · nález samostatného chrbta nesie PID pre klik ·
+  samostatný chrbát v staršom plugine = **priznaný limit spätnej kompatibility** (rozhodnutie Michala, zdokumentované v kóde, outputs.md a STANDARD §8.2).
 
 - **DOCS — blok 7 · KONŠTRUKCIA K1+K2: rozhodnutia Michala, mockup, postrehy D-143 až D-145 (27.9.2026, PR #400, len dokumentácia).**
   Michal 26.9. vybral blok K1+K2 (po smoke S1 PASS) a v debate rozhodol: komín bežne ~50 mm (o koľko sú dno a strop vzadu kratšie ako bok), pri

@@ -1228,6 +1228,9 @@ Podľa sekcie 2.1: **ploché kľúče = identita, názov a filtre; všetko rozme
 - **`back_mode` — značka pôvodu chrbta (D-143).** `overlay` / `inset` / `groove` na snapshote každého chrbta postaveného od v0.13.1; nesie ju aj **samostatný** (odpojený,
   skopírovaný) chrbát. Chrbát so značkou `groove` bez `cut_size` a bez ABS je **neúplný snapshot** (RED + brána); **samostatný chrbát BEZ značky** (zo staršej verzie)
   je ORANGE „over rozmer do nárezu" a export pustí (vedomé rozhodnutie Michala 27.9.2026). Skrinka s chrbtom v drážke uložená pod schémou 19 je **zastaraná** (§2.5).
+  Vnorený chrbát **aktuálnej** skrinky s chrbtom v drážke (schéma ≥ 19) je chrbát v drážke aj bez značky — bez `cut_size` je to neúplný záznam (RED + brána).
+  **Priznaný limit spätnej kompatibility:** plugin v0.13.0 a starší samostatný chrbát so `cut_size` vydá v geometrii (samostatný dielec číta bez kontroly schémy
+  a pole nepozná) — preto sa pred prvým použitím v0.13.1 aktualizujú **obe PC**.
 
 **Linear dielec:**
 
