@@ -33,7 +33,7 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Architektúra sa udr
   v `.claude/agents/` nesú model a effort svojej roly — menia sa spolu s tabuľkou v tom istom PR. Pravidlá sa píšu nezávisle
   od nástroja (možný budúci prechod mimo Claude Code).
 
-## Git workflow (záväzné od 16.7.2026, revízie RETRO 12.8. a WORKFLOW 26.9.2026)
+## Git workflow (záväzné od 16.7.2026, revízie RETRO 12.8., WORKFLOW 26.9. a retro bloku 7 27.9.2026)
 
 - **Žiadne priame commity do `main`.** Každá zmena: **vetva → commity → PR → review → merge po splnení brán** (nižšie). Vetvy
   `feat/<krátky-popis>`, `fix/<popis>`, `docs/<popis>`; **uzáver bloku `release/<blok>`**. Paralelné úlohy: každá vo vlastnej vetve
@@ -61,7 +61,9 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Architektúra sa udr
   schému, migráciu, observer/undo lifecycle** alebo pridávajúce **nový modul** — rozhoduje OBSAH zásahu, nie žáner dávky (aj „fix"
   observera je audit-povinný). **Zmena schémy = každé zvýšenie `CONFIG_SCHEMA`, BuildPlan `SCHEMA` alebo STD.** Ostatné fix, docs a UI
   dávky idú rovno do implementácie (v prostredí bez Codex CLI krok neblokuje — ohlás a pokračuj). Skill `codex-po-pr` po odoslaní PR je
-  povinný **bez výnimky**. Skilly sú v `.claude/skills/`.
+  povinný **bez výnimky**. Skilly sú v `.claude/skills/`. **Sonda pred auditom (od 27.9.2026):** kľúčové tvrdenia package (správanie
+  pri nulových hodnotách, minimá, rozsahy, parsovanie vstupov) orchestrátor pred odoslaním do auditu overí **krátkou sondou na kóde** bez
+  zápisu do modelu a výsledok zapíše do package — postup: skill `codex-audit`, krok 0.
 - **Slepá predrecenzia PRED PR (skill `predrecenzia`):** **povinná** pri dávke **audit-povinnej** (tá istá trieda ako `codex-audit`),
   **výrobnej/cenovej** a **aj pri bežnej dávke nad 300 zmenených riadkov kódu pluginu** (bez testov a dokumentácie) **alebo s novým
   ovládacím prvkom v UI**; pri docs-only nie. Slepý recenzent dostane len zadanie a `git diff main...HEAD`; jeho P1/P2 sa opravia ešte
@@ -71,6 +73,11 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Architektúra sa udr
   sa najprv overia sondou v SketchUpe) → mockup (schvaľuje Michal) → packages → dávky → review. **Audit dávky** už len pri zmene
   kontraktu (trieda `codex-audit` vyššie). Outside-in rešerš: skill `antigravity-outside-in` (nie pre fix, docs a čisto dátové dávky);
   nástroje a ich roly: WORKFLOW.md.
+- **Štart bloku (od 27.9.2026):** úvodné PR bloku nesie **len rozhodnutia Michala a mockup** (+ fakty z kódu, surové výsledky rešerše
+  a krížového auditu); **technické požiadavky** (vzorce, rozsahy, kontrakt) patria **výhradne do package dávky** s jej auditom návrhu.
+  Dôvod: PR #398 a #399 niesli technické vzorce v úvodnom dokumente → P1 v každom kole → zavreté (~3 h).
+- **Otvorené body mockupu (od 27.9.2026):** pri schvaľovaní mockupu musí **každý bod označený „návrh — potvrdí Michal" dostať Michalovu
+  odpoveď pred písaním packages**. Zmena po schválení sa zapíše do mockupu (rámček „platí") aj do rozhodnutí bloku.
 - **Bezpečnosť externých nástrojov:** Antigravity (`agy`) **nie v nočných behoch bez obsluhy** (riziko automatickej blokácie Google
   účtu) · žiadne proxy ani OAuth doplnky typu „predplatné v cudzom programe" (bany) · orchestrátor beží **interaktívne**, nie cez
   `claude -p` (programové použitie môže Anthropic účtovať zvlášť) · externý bot má prístup len k vlastnému repu (Grok Bot → len `agent-register`).
@@ -90,11 +97,14 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Architektúra sa udr
   výrobná/cenová dávka alebo P0/P1** → rozhodne Michal (keď neodpovie: tabuľka v sekcii Autonómne bloky).
 - **Claude session nad 80 % → nový implementačný subagent sa nespúšťa**, počká sa na reset session. Plánovanie blokov rešpektuje okná resetu.
 
-## Autonómne bloky (od 12.8.2026, revízia 26.9.2026)
+## Autonómne bloky (od 12.8.2026, revízie 26.9. a 27.9.2026)
 
 - **Schválenie bloku = súhlas s naplánovanými dávkami** — pýtať sa len pri nových, nečakaných veciach. Dávky schváleného bloku sa
   spracúvajú **sekvenčne bez čakania na pokyn medzi dávkami**, každá z čerstvého `main` po mergi predchodcu (nestackovať). Výber
   a poradie práce určuje Michal ([SYSTEM/PLAN.md](SYSTEM/PLAN.md)) — agent si sám dávky nevyberá.
+- **Paralelná príprava (od 27.9.2026):** počas implementácie dávky N smie orchestrátor napísať package dávky N+1 a spustiť jej audit návrhu;
+  **implementácia ostáva sekvenčná** (N+1 štartuje z čerstvého `main` po mergi N). Keď merge N zmení kontrakt, na ktorý package N+1 stavia,
+  orchestrátor package pred štartom implementácie zladí (pri zmene kontraktu nový audit).
 - **Keď Michal neodpovie — predvolené reakcie:**
 
 | Situácia | Reakcia |
@@ -107,6 +117,9 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Architektúra sa udr
 
 - **Report** vždy, keď autonómny beh **skončí alebo sa zastaví**, najneskôr večer — zrozumiteľný z mobilu, bez čítania diffu: čo je
   v maine · čo čaká a prečo · čo zlyhalo · čo večer otestovať.
+- **Retro (pokus 27.9.–11.10.2026):** úplne posledný krok behu (po mergi, inštalácii a reporte) je **voliteľný** krátky záznam orchestrátora
+  do lokálneho inboxu `SYSTEM/retro/inbox/` (git ho ignoruje; ticho = žiadny záznam); vyhodnotenie len na pokyn Michala a pravidlá mení
+  výhradne Michal. Pravidlá pokusu: [SYSTEM/WORKFLOW.md](SYSTEM/WORKFLOW.md) (sekcia Retro), postup: skill `retro`.
 - **Uzáver bloku = variant B:** hneď po poslednej dávke (minor verzia + smoke checklist v archíve; postup v sekcii Verzia a uzáver);
   nálezy zo smoke sú opravy x.y.z. **Poistka:** nový blok sa začína až po Michalovom **smoke PASS** alebo výslovnom **„ideme ďalej"**.
 - **Uzáver pri plnom kontexte:** keď má orchestrátor pred uzáverom viac ako ~70 % kontextu, uzáver poskladá **čerstvý subagent len
@@ -158,6 +171,9 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Architektúra sa udr
 - **In-SU test je brána mergu**, keď dávka mení **buildery, observery, undo a operácie, geometriu alebo akcie panela zapisujúce do
   modelu** (jediný zoznam spúšťačov; headless sada geometriu ani undo neoverí). Runner `scripts\run_su_tests.ps1`: deploy → inštancia nad
   kópiou ENGINEtests.skp → poll → výsledok; overuje geometriu plán↔model a undo scenáre; výsledkový grep až PO dobehu (output sa dopisuje).
+  **Finálna hlava (od 27.9.2026):** nový beh netreba, keď commity po poslednom behu **nemenia Ruby kód spúšťačov** (buildery, observery,
+  undo a operácie, geometria, akcie panela na strane Ruby) — len JS, texty, dokumentáciu alebo testy (JS zmeny kryjú JS sady); **PR uvedie,
+  na ktorej hlave in-SU bežal** a čo sa zmenilo potom. Pri akejkoľvek zmene Ruby spúšťača beh znova.
 - **Agent spúšťa runner VŽDY s `-CloseWhenDone`** (bez neho len Michalovo ručné spustenie): inštancia po koncovom markeri sama uloží
   run-kópiu modelu a ukončí sa; runner počká na zánik procesu (max 120 s) a nikdy nezabíja. Teardown po celej sade končí kódom
   0xC0000374 až PO zapísaní výsledku — verdikt to nemení (detail v hlavičke runnera). **Paralelné behy sa vylučujú**

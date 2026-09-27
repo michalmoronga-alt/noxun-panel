@@ -4,3 +4,5 @@ _dev/
 Thumbs.db
 desktop.ini
 .claude/worktrees/
+# Retro inbox (pokus 27.9.-11.10.2026): lokalne poznamky orchestratora, nikdy do gitu - pravidla v SYSTEM/retro/README.md
+SYSTEM/retro/inbox/

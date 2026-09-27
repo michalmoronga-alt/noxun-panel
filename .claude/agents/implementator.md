@@ -40,4 +40,5 @@ hash opravy ku každému nálezu.
 ## Report (po slovensky, funkčne, max ~250 slov)
 
 vetva · plný SHA hlavy · PR URL, alebo „PR čaká na predrecenziu" s hranicou, ktorá platí · výsledky testov · čo sa zmenilo pre používateľa ·
-odchýlky od zadania a otvorené otázky.
+odchýlky od zadania a otvorené otázky. Voliteľne na konci sekcia **„Postrehy k workflowu"** (0–3 body: konkrétna udalosť · čo stála ·
+voliteľne návrh; aj „fungovalo — nemeniť"; ticho je v poriadku) pre retro orchestrátora (`SYSTEM/WORKFLOW.md`, časť 9) — súbory nezapisuj.
