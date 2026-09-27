@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-144** — Vložený chrbát a chrbát v drážke pri stropu „Dve výstuhy" na výšku končí pod výstuhami — v modeli aj do nárezu (dolná 720 / sokel 100 / výstuhy 100 → 564 × 502, do nárezu 600 × 538); skrinky postavené pred opravou sú zastarané (Kontrola RED, výrobné exporty stoja, hromadná prestavba) — 27.9.2026, PR #?, v0.13.2
 - **D-143** — Chrbát v drážke ide do nárezu, VEPO aj ceny v plnom rozmere skrinky (horná 600 × 720 → 600 × 720, model ďalej 564 × 684); karta dielca „Do nárezu"; olepený chrbát v drážke, poškodený údaj aj zastarané skrinky (schéma < 19) zastavia všetky štyri výrobné exporty; hromadná prestavba z Kontroly — 27.9.2026, PR #401, v0.13.1
 - **D-140** — Výška osadenia chladničky v skrinke: čip „osadenie N mm" v riadku Spotrebič otvorí malé okienko s číslom (od hornej plochy dna, napr. vrch police); box niky aj pásma dverí sa posunú a Kontrola výšky aj delenia čiel počíta od zdvihnutého dna — 24.9.2026, PR #389, v0.12.20
 - **D-139** — Výška čela slotu umývačky sa dopočíta: výška linky − sokel − medzera hore zo schémy medzier; vstup „Čelo V" zanikol, predvolený slot 880 / 100 (čelo 778), výplň nad umývačkou = slot po jej spodok — 24.9.2026, PR #388, v0.12.19
@@ -130,6 +131,24 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-144 — Vložený chrbát alebo chrbát v drážke prechádza výstuhou na výšku, vyriešené 27.9.2026
+
+**Výsledok: PR #?, v0.13.2 (CONFIG_SCHEMA 20), blok 7 KONŠTRUKCIA dávka KON-A · K1.** Pôvodné znenie (krížový audit Codex 27.9.2026, blok KONŠTRUKCIA):
+pri strope „Dve výstuhy" **na výšku** sa horná hrana vloženého chrbta a chrbta v drážke rátala pod stropom, nie pod výstuhami. Keď je výstuha vyššia než hrúbka
+korpusu (bežne 100 oproti 18), chrbát prechádzal zadnou výstuhou (až o 82 mm) a v kusovníku bol **vyšší, než sa zmestí**. Naložený chrbát (bežná dolná) ani plný
+strop (bežná horná) sa to netýkalo; Michal kombináciu na zákazkách nepoužíva (27.9.2026).
+
+**Čo sa zmenilo.** Horná hrana vloženého chrbta a chrbta v drážke pri výstuhách je **nižšia z dnešnej a spodnej hrany výstuh** — mení sa len pri výstuhách na výšku
+vyšších než hrúbka korpusu. Chrbát v drážke klesne o ten istý rozdiel aj **do nárezu**: dolná 720, sokel 100, `t` 18, výstuhy 100 → model **564 × 502** (dovtedy
+564 × 584), do nárezu **600 × 538** (dovtedy 600 × 620). Pri komíne (KON-A) stojí chrbát v drážke za výstuhami a ide v plnej výške. **Skrinky postavené pred
+opravou** (chrbát vložený/v drážke + dve výstuhy na výšku, schéma < 20) sú **zastarané** v tom istom registri výrobnej brány ako D-143: Kontrola RED, všetky štyri
+výrobné exporty stoja a **„Prestaviť zastarané skrinky"** ich prestaví spolu so skrinkami D-143 (spoločný výber kandidátov, jeden krok Späť). Predikát je
+konzervatívny (rozmery nepočíta) — pri výstuhe na výšku nie vyššej než hrúbka korpusu je poplach falošný a prestavba ho zruší; veta preto hovorí „treba prestaviť",
+netvrdí kolíziu. Text D-143 počíta rozmer do nárezu tým istým pravidlom ako builder (pri D-144 600 × 538) a hláška po hromadnej prestavbe je všeobecná.
+
+**Priznaný zvyšok (audit KON-A):** samostatný (odpojený) chrbát so značkou KON-0 postavený vo v0.13.1 pri tejto kombinácii sa nerozozná — Michal samostatné
+chrbty ani túto kombináciu nepoužíva. **Kompatibilita:** `CONFIG_SCHEMA` 20 — plugin v0.13.1 takú skrinku neprestaví ani nevyexportuje; **aktualizovať obe PC.**
 
 ### D-143 — Chrbát v drážke ide do nárezu v plnom rozmere, vyriešené 27.9.2026
 

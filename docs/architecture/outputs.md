@@ -127,7 +127,8 @@ ktorú volá `Bom.appliance_expected_records` **aj riadok Spotrebič v Inspector
 položke očakávanie nesplnia, a panel preto v takom stave **ponúka výber modelu** namiesto toho, aby ho potlačil. Kontrakt očakávaní je v [appliances.md](appliances.md).
 
 **D-143 (KON-0) — kategória `back_cut` (RED s bránou vo VŠETKÝCH štyroch exportoch, ORANGE bez brány).** `check_cut_issues(collected[:cut_issues], items)` beží
-**nezávisle od katalógu aj od predčasného návratu pre UNI** v `check_record` (vlastný kľúč zberu). Vetu skladá zber (`Bom.cut_issues_for`, `Bom.back_stale_issue`), Kontrola
+**nezávisle od katalógu aj od predčasného návratu pre UNI** v `check_record` (vlastný kľúč zberu). Vetu skladá zber (`Bom.cut_issues_for`, `Bom.back_stale_issue`,
+od KON-A aj `Bom.back_rail_stale_issue` — D-144), Kontrola
 ju len prevezme; `stable_key` = `back_cut|kód|owner_id|part_key|pid` (dva samostatné chrbty toho istého vlastníka sú dva riadky). Nález zastaranej skrinky nemá `part_key`
 (klik označí skrinku) a nesie aditívny **`fix: 'rebuild_stale'`** — riadok Kontroly v Štúdiu pri ňom ponúkne „Prestaviť zastarané skrinky" ([ui-lifecycle.md](ui-lifecycle.md)).
 Chýbajúci kľúč = kontrola sa preskočí (vzor `placements:`).
@@ -221,6 +222,10 @@ rozpočet XLSX, ponuka XLSX) — pred expanziou, rozpočtom aj pred výberom sú
 `cut_blockers` skladá jednu vetu na kód v poradí registra s ID v strope `ids_text` („tri + a ďalšie N"); ORANGE `back_origin_unknown` bránu nemá. Dôkaz „každý dôvod ×
 každý export = nula volaní pickera aj zápisu" drží `tests/pure/test_kon0_d143.rb`. **Hromadná prestavba** zastaraných skriniek má v jadre len **čistý plán a texty**
 (`back_stale_entry` / `back_stale_skip_reason` / `back_stale_plan` / `back_stale_scan` — čítanie; vzor D-131); zápis je `Panel.back_rebuild_stale` (brána 1b-3).
+**KON-A (v0.13.2, audit NOTE 8):** register má piaty kód **`back_rail_stale`** (D-144, veta „chrbát pri výstuhách na výšku zo staršej verzie (môže prechádzať
+zadnou výstuhou)") a **výber kandidátov** hromadnej prestavby sa pýta **spoločného predikátu** `Bom.rebuild_stale?` (D-143 ALEBO D-144) — `rebuild_stale` na náleze
+len zapína ponuku, kandidátov určuje `back_stale_entry`. Hlášky sú všeobecné: „Žiadna skrinka nie je zastaraná…" a „Prestavané zastarané skrinky: N (chrbát je teraz
+podľa aktuálnej verzie; jeden krok Späť)" (predtým hovorili len o drážke „v plnom rozmere").
 
 **KOV-C2b (v0.9.31) — BRÁNA ZÁSUVIEK (`drawer:`).** Register `Recipes::DRAWER_BLOCKERS` (11 kódov) má dve polovice a každá blokuje **iné** výstupy:
 **`BUILD_BLOCKERS` (9)** = fail-closed konflikty STAVBY — zásuvka nevydala ani dielec ani položku výsuvu, takže objednávka aj rozpočet by boli neúplné → nákupný CSV,
@@ -570,7 +575,11 @@ Tú istú `cut_dims` volá plocha skrinky v Inspectore (`Panel.cabinet_stats`) a
 Zber popri tom skladá aditívny kľúč **`cut_issues`** (`compute()` ho ignoruje): `cut_issues_for(cfg, rec, standalone:)` na každom výrobnom zázname (vnorenom, doske aj
 samostatnom dielci) a `back_stale_issue` na skrinke. Kódy a register brány `CUT_BLOCKERS` (poradie = poradie viet): `cut_size_invalid` · `back_groove_edged` (značka
 `groove` + účinná hrana ABS) · `back_groove_incomplete` (značka `groove`, bez ABS, bez `cut_size`) · `back_groove_stale` (skrinka `groove` pod
-`BACK_CUT_ACTIVATION_SCHEMA`; `stored_back_mode` = `back_mode || back.mode`, odolné voči nehash `back`). Mimo registra je ORANGE **`back_origin_unknown`** — SAMOSTATNÝ
+`BACK_CUT_ACTIVATION_SCHEMA`; `stored_back_mode` = `back_mode || back.mode`, odolné voči nehash `back`) · **`back_rail_stale`** (KON-A · D-144: skrinka s chrbtom
+`inset`/`groove` + `two_rails` + `upright` pod `BACK_RAIL_ACTIVATION_SCHEMA` 20; `stored_top_mode` = `top_mode || top.mode`, `stored_rails_orientation` =
+`rails_orientation || 'flat'`; konzervatívny predikát bez výrobných rozmerov, veta „treba prestavbu", netvrdí kolíziu). **Text D-143** počíta rozmer do nárezu **tým
+istým pravidlom ako builder** (`stale_back_cut_dims` → `Construction.back_rail_drop`): skrinka, ktorú zasiahne aj D-144, dostane 600 × 538, nie 600 × 620
+(audit KON-A FIX 6). Mimo registra je ORANGE **`back_origin_unknown`** — SAMOSTATNÝ
 chrbát bez značky pôvodu (starý odpojený kus; vnorený starý chrbát rieši zastaranosť skrinky). **Vedomé rozhodnutie Michala 27.9.2026:** export pustí.
 **Vnorený chrbát sa posudzuje aj podľa VLASTNÍKA (Codex #401 kolo 1 P1):** zber posiela `owner_cfg`; aktuálna skrinka (schéma ≥ 19) s režimom `groove`
 (`current_groove_owner?`, sémantika `stored_back_mode`) berie svoj chrbát ako chrbát v drážke, aj keď snapshot značku stratil alebo ju má poškodenú — bez rozmeru

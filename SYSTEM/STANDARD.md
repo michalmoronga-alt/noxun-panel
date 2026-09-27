@@ -248,6 +248,14 @@ meria výšku niky (vnútro − osadenie) aj hranu delenia čiel. Je to vlastnos
   (schéma 18) pole nepozná — kusovník, VEPO aj ceny by vydal v rozmere modelu (horná 600 × 720 → 564 × 684) a prestavbou by snapshot bez `cut_size` zvečnil.
   Brány sú tie isté ako pri 5–18. **`BACK_CUT_ACTIVATION_SCHEMA` = 19** je aktivačná konštanta: skrinka s chrbtom v drážke (`back_mode || back.mode` = `groove`)
   uložená pod ňou je **zastaraná** — Kontrola RED a všetky štyri výrobné exporty stoja, kým sa neprestaví (§8.2). Pri budúcich bumpoch sa nehýbe.
+- **`20 = KON-A · K1` (v0.13.2): komín vzadu a zapustenie stropu + D-144.** Config smie niesť **`back_setback`** (X, komín) a **`top_front_setback`** (Y, zapustenie
+  plného stropu alebo prednej výstuhy), mm Float **0–300**. **Prísne parsovanie** (`CabinetBuilder.norm_setback`): platné je len konečné číslo — Numeric alebo reťazec,
+  ktorý je celý číslom; `"50oops"`, `"50-20"`, NaN, nekonečno, objekt → 0; potom klamp 0–300. **Zápis len keď je hodnota > 0** — config skrinky bez komína sa
+  prestavbou nemení a chýbajúci kľúč = 0; vnorené odvodené objekty `top`/`back` ostávajú bez zmeny. Slot umývačky polia nemá. Šablóna ich zapisuje **výslovne aj 0**;
+  použitie **starej** šablóny (kľúč chýba) zachová hodnotu cieľa (vzor D-13). Starší plugin (schéma 19) polia nepozná — prestavbou by narezal dno a strop na plnú
+  hĺbku a chrbát vrátil za boky. **D-144:** chrbát vložený a v drážke pri výstuhách na výšku končí pod výstuhami (§3.4, §8.2); **`BACK_RAIL_ACTIVATION_SCHEMA` = 20** —
+  skrinka s chrbtom `inset`/`groove`, stropom `two_rails` a výstuhami `upright` uložená pod ňou je **zastaraná** (Kontrola RED, všetky štyri výrobné exporty stoja,
+  hromadná prestavba). Brány sú tie isté ako pri 5–19; BuildPlan `SCHEMA`, `PartKeys::SCHEMA` ani ABS `SEED_VERSION` sa nemenia.
 - **`rules_seed_version` — DRUHÁ proveniencia stavby (KOV-E1b, v0.9.54).** Config nesie **aditívne** pole so **seed verziou pravidiel kovania, s ktorou stavba bežala**
   (`HardwareRules.effective_seed_version`; chýbajúce pole = `0`). Zapisuje ho **výhradne stavba** (`cabinet_config`) — z klientskeho payloadu sa **nikdy nepreberá**,
   presne ako `config_schema`. Dôvod: projektový snapshot pravidiel sa zámerne nemerguje sám, takže prestavba starej zákazky zapíše aktuálnu schému, ale kovanie
@@ -346,6 +354,24 @@ Toto je invariant a jeden z hlavných dôvodov existencie štandardu:
   Bežné metre ABS sú voči otočeniu **invariantné** (tá istá fyzická hrana), a to je zároveň krížová kontrola, či niekde druhý swap nevznikol.
 
 Poučenie: v OCL sa opakovane zamieňala šírka s hrúbkou pri rotovaných dielcoch. Keď rozmery kladie Ruby z konfigurácie, tento problém nevzniká.
+
+### 3.4 Hĺbka korpusu — celková hĺbka, komín a zapustenie (D-37, KON-A · K1)
+
+- **`depth` (`d`) je CELKOVÁ hĺbka vrátane chrbta** vo všetkých režimoch chrbta (D-37). Bez komína sú boky, dno a strop pri naloženom chrbte kratšie o jeho hrúbku
+  (`d − bt`), inak `d`.
+- **Komín vzadu `X`** (`back_setback`): dno, strop a zadná výstuha končia na **zadnom doraze `R = d − X`**, boky majú **plnú `d`** vo všetkých režimoch chrbta
+  (pri naloženom teda o `bt` dlhšie ako bez komína). Chrbát sa posunie na `R`: **naložený a v drážke** sedia **medzi bokmi** na zadných hranách dna a stropu
+  (`[w − 2t, bt, h − s]`, origin `[t, R, s]`; drážka len v bokoch — M2), **vložený** má zadnú plochu v rovine `R`. Bez komína `R` = dnešná hĺbka tela. Za chrbtom
+  ostáva **voľný kanál** `X − bt` (naložený, drážka), `X` (vložený).
+- **Zapustenie `Y`** (`top_front_setback`): plný strop a predná výstuha začínajú na `Y` (strop hĺbky `R − Y`); dno sa neposúva. Platí aj bez komína.
+- **Vnútorná hĺbka** (`available_depth`, po prednú plochu chrbta): s komínom `R` (naložený, drážka, bez chrbta) a `R − bt` (vložený); bez komína ako dnes.
+  **Nika spotrebiča** sa pri komíne meria z **hĺbky boku** (M9), bez komína po chrbát.
+- **Odmietnutie prestavby** (len pri `X > 0` alebo `Y > 0` — pri nulách sa nemení nič): komín menší než minimum podľa chrbta (naložený `bt`, drážka `10 + bt`,
+  vložený a bez chrbta bez minima) · **vnútro pri komíne pod 40 mm** (predné odsadenie police 20 + najmenšie pole 20 — inak by police vypadli len s ORANGE) ·
+  plný strop kratší než 60 mm · výstuhy naplocho, ktoré by sa medzi `Y` a `R` orezali pod 20 mm (väčší pás sa oreže s upozornením) · výstuhy na výšku, keď
+  `Y + 2t + 20 > R`.
+- **D-144:** horná hrana chrbta vloženého a v drážke pri stropu „dve výstuhy" = **nižšia** z `h − odsadenie − t` a spodnej hrany výstuh — mení sa len pri výstuhách
+  na výšku vyšších než hrúbka korpusu (pri komíne stojí chrbát v drážke za výstuhami a D-144 sa ho netýka).
 
 ---
 
@@ -1231,6 +1257,10 @@ Podľa sekcie 2.1: **ploché kľúče = identita, názov a filtre; všetko rozme
   Vnorený chrbát **aktuálnej** skrinky s chrbtom v drážke (schéma ≥ 19) je chrbát v drážke aj bez značky — bez `cut_size` je to neúplný záznam (RED + brána).
   **Priznaný limit spätnej kompatibility:** plugin v0.13.0 a starší samostatný chrbát so `cut_size` vydá v geometrii (samostatný dielec číta bez kontroly schémy
   a pole nepozná) — preto sa pred prvým použitím v0.13.1 aktualizujú **obe PC**.
+- **`cut_size` pri D-144 a komíne (KON-A, v0.13.2, `CONFIG_SCHEMA` 20).** Chrbát v drážke bez komína pri výstuhách na výšku klesne do nárezu o ten istý rozdiel ako
+  horná hrana v modeli: `cut_size.width = (h − s) − Δ`, `Δ = max(použitá výška výstuhy − t, 0)`, `length` ostáva `w` (dolná 720, sokel 100, `t` 18, výstuhy 100 →
+  model 564 × 502, do nárezu **600 × 538**). Pri komíne stojí chrbát v drážke za výstuhami → plná výška, `cut_size = {w, h − s}`. Skrinka s touto kombináciou
+  uložená pod schémou 20 je zastaraná (§2.5) — ten istý register brány ako D-143.
 
 **Linear dielec:**
 

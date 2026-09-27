@@ -82,6 +82,14 @@
   novej skrinky a stred otáčania merajú **ju**, takže presahujúce čelo, proxy kovania ani telo spotrebiča doraz neposúvajú (a výsledok nezávisí od toho,
   ktoré tagy má kto zapnuté).
 - **Šablóna vs TYP vs parameter** — tri úrovne konfigurácie — hranica definovaná v [PLAN.md](PLAN.md) (sekcia „Hranica: TYP vs. ŠABLÓNA vs. PARAMETER")
+- **Komín vzadu** (`back_setback`, KON-A · K1) — o koľko sú **dno a strop (aj zadná výstuha) vzadu kratšie ako bok**; chrbát sa posunie dopredu na ich zadné
+  hrany a za ním vznikne vzduchový kanál (bežne ~50 mm, M1). Skrinka drží zadanú **celkovú hĺbku**, boky majú plnú hĺbku. Naložený chrbát aj chrbát v drážke
+  pri komíne sedia **medzi bokmi** na zadných hranách dna a stropu (drážka len v bokoch, M2). Najmenší nenulový komín: naložený = hrúbka chrbta, v drážke =
+  10 + hrúbka chrbta, vložený a bez chrbta bez minima (M10).
+- **Voľný kanál** — skutočná medzera **za chrbtom** pri komíne: naložený a v drážke `komín − hrúbka chrbta`, vložený `komín` (HDF 3 pri komíne 50 → 47 mm,
+  pevný 18 → 32 mm; výrobcovia chladničiek chcú spravidla ≥ 40). Pri „bez chrbta" sa neukazuje. Tooltip „Komín vzadu" ho povie.
+- **Zapustenie stropu (vpredu)** (`top_front_setback`, KON-A · K1) — o koľko **plný strop alebo predná výstuha** začína za prednou hranou boku (napr. pri dreze);
+  **dno sa neposúva** (M3). Platí pre dolnú aj hornú skrinku; pri „Bez stropu" nemá význam.
 
 ## Stolárske poznatky (doména)
 
@@ -117,6 +125,9 @@
   je **rozmer medzi bokmi + 9 mm na každú stranu s drážkou** (prídavok do drážky). **Pre V1 ide do nárezu PLNÝ rozmer skrinky** `šírka × (výška − sokel)` — horná
   600 × 720 → **600 × 720** (model ukazuje 564 × 684) — a dielňa ho zreže („zrezať viem, prilepiť je horšie"). Objednaná plocha HDF je tým o ~12 % väčšia.
   Chrbát v drážke sa **neolepuje** (páska by skončila v drážke); tok „olepiť po zrezaní" je mimo V1.
+- **Chrbát nesmie prechádzať výstuhou (D-144, KON-A):** vložený chrbát a chrbát v drážke pri stropu „dve výstuhy" **na výšku** končí **pod** výstuhami — v modeli aj
+  do nárezu (dolná 720, sokel 100, výstuhy 100 → model 564 × 502, do nárezu 600 × 538). Pri výstuhách naplocho a pri výstuhe na výšku nie vyššej než hrúbka
+  korpusu sa nemení nič; pri komíne stojí chrbát v drážke za výstuhami, takže ide v plnej výške.
 - **Rovnaký dekor existuje ako DTDL aj PD s INOU štruktúrou povrchu:** Kronospan K2738 Torro Cremona Oak = DTDL „PW BU" (DK 532848) + PD „FP" (DK 532772). → otvorená otázka kľúča skupiny (nižšie).
 
 ### Výškové skladanie kuchyne

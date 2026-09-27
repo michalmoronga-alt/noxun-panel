@@ -17,6 +17,31 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KON-A · K1 — komín vzadu, zapustený strop vpredu, oprava D-144 (v0.13.1 → v0.13.2, 27.9.2026, PR #?, blok 7 KONŠTRUKCIA, druhá dávka).**
+  Výrobná a audit-povinná dávka (package v2 so zapracovaným auditom návrhu Codex 27.9.: NOT SOUND 1 BLOCKER + 5 FIX + 2 NOTE — všetko v Scope IN).
+  **Dáta:** config smie niesť `back_setback` (X) a `top_front_setback` (Y), mm 0–300, **prísne parsované** (`norm_setback` — `"50oops"`, `"50-20"`, NaN, objekt → 0;
+  audit FIX 5) a **zapisované len keď sú > 0** (config skriniek bez komína sa nemení); celá reťaz whitelistov vrátane `template_config_from` (nové šablóny výslovne aj 0,
+  Codex FIX 7) a `merge_template` (stará šablóna zachová cieľ, M10). `CONFIG_SCHEMA` 19 → 20, `BACK_RAIL_ACTIVATION_SCHEMA` 20; BuildPlan, PartKeys ani ABS seed sa nemenia.
+  **Geometria (`construction.rb`, audit B2):** dva pomocníky `back_stop` (R) a `side_depth` — boky plná `d` pri komíne, dno/strop/zadná výstuha do `R`, strop a predná
+  výstuha od `Y`, naložený a drážkový chrbát **medzi bokmi na R** (vlastná vetva `setback_back_part`, dnešné vetvy nedotknuté), vložený pred `R`, vnútro podľa chrbta,
+  nohy podľa `R`; pri X = 0 origin stropu ostáva celé číslo 0 — **golden plány bajtovo rovnaké**. **Nika** pri komíne z hĺbky boku (`niche_depth`, oba čitatelia).
+  **Odmietnutia** (`setback_error`, len pri X > 0 alebo Y > 0 — FIX 4): minimum komína podľa chrbta, **vnútro 40 pri komíne** (BLOCKER 1 — inak police vypadnú len
+  s ORANGE), strop 60, výstuhy v intervale Y … R. **Mierka:** `min_valid_depth` (sonda cez celý plán) + `ScaleWatch.clamp_depth` s nemodálnou hláškou (Codex FIX 10).
+  **D-144:** horná hrana vloženého a drážkového chrbta = nižšia z dnešnej a spodnej hrany výstuh, `cut_size.width = (h − s) − Δ` (dolná 720/100/výstuhy 100 → 564 × 502,
+  do nárezu 600 × 538); zastarané skrinky (`inset`/`groove` + `two_rails` + `upright`, schéma < 20) v registri brány KON-0 (`back_rail_stale`), **spoločný výber
+  kandidátov** hromadnej prestavby `Bom.rebuild_stale?` (NOTE 8), text D-143 počíta rozmer pravidlom buildera a hláška po prestavbe je všeobecná (FIX 6).
+  **UI (mockup A):** riadky „Zapustenie vpredu" (Strop) a „Komín vzadu" (Chrbát, tooltip s minimom a voľným kanálom), skupina Boky zanikla, šedá veta → tooltip,
+  súhrn v zbalenej hlavičke, zrkadlo validácie (červené pole + veta servera), JS zrkadlá `nxBackStop`/`nxSideDepth`/`nxInteriorDepth`/`nxSetbackError` so spoločnou
+  fixtúrou `tests/fixtures/kona_cases.json`, mosty `currentCarcass`/`pvGeom` a `bindExprFields` (FIX 2, FIX 3), riedky config `dflt: 0` (Codex FIX 9), odhad
+  `nxDraftStats` (NOTE 7). **Testy:** 4600 headless (nová sada `test_kona_komin.rb`, 23 testov: matica 192 kombinácií X × chrbát × strop × dno × Y, parsovanie,
+  whitelisty, validácia, nika, mierka, D-144 register a výber, konzumenti NL/HL) · 132 JS sád (nová `test_kona_komin.js` — parita s fixtúrou, integrácia formulár →
+  most → výpočet nad skutočným core.js + form.js, riedky config, výrazy, riadky) · in-SU 3136 PASS / 0 FAIL (nový `run_kona`: plán = model pre 68 kombinácií,
+  1× Späť, odmietnutie, mierka 127 → 160 + 1× Späť, kópia, .skp, šablóny tam aj stará, vklad ghostom, D-144 schéma 19 → RED → hromadná prestavba cez skutočný výber
+  + 1× Späť). **Mutácie** (12, všetky padli): vnútro ignoruje X · boky bez komína · `config_to_params` zahodí X · stará šablóna → 0 · D-144 bez „nižšej z dvoch" ·
+  nika z vnútra · chýba minimum vnútra · výber kandidátov len D-143 · JS riedky config · most bez X/Y · chýba minimum komína · zápis aj nuly.
+  **Vedomé zmeny existujúcich testov:** D-80 (headless aj in-SU `run_sync_rails`) — vložený chrbát pri výstuhách na výšku 100 mal 584/674, po D-144 502/592;
+  KON-0 in-SU a schéma testy čítajú aktuálnu `CONFIG_SCHEMA` namiesto 19. **Aktualizovať obe PC** (schéma 20).
+
 - **KON-0 · D-143 — chrbát v drážke do nárezu v plnom rozmere (v0.13.0 → v0.13.1, 27.9.2026, PR #401, blok 7 KONŠTRUKCIA, prvá dávka).**
   Výrobná a audit-povinná dávka (package v2 so zapracovaným auditom návrhu Codex 27.9.: NOT SOUND 2 BLOCKER + 4 FIX + 2 NOTE, BLOCKERy vyriešené rozhodnutím
   Michala). **Čo sa zmenilo:** deskriptor aj snapshot chrbta v drážke nesú nové voliteľné pole **`cut_size`** = plný rozmer skrinky `w × (h − s)` v osiach `prod`

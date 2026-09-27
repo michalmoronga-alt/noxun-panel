@@ -826,6 +826,22 @@ jantárovým prizvukom vľavo od boxu s číslami koncov a čiarou súčasnej hr
 box sa nikdy nedeformuje, takže práve vtedy, keď Kontrola hlási „nezmestí sa", by ho fit orezal. Globál `applPreview` plní `bridge.js` z toho istého pushu ako
 `appliance_rows`; chýbajúci kľúč (staršie okno) = prázdne pole, odchod z výberu ho **zahodí** — nikdy zvyšok po predchádzajúcej skrinke.
 
+**KON-A · K1 (v0.13.2) — Nastavenia korpusu: Komín vzadu a Zapustenie vpredu (schválený mockup A).** Sektor Nastavenia má v kontexte Korpus **tri skupiny**
+(Strop · Dno & podstavec · Chrbát) — skupina **Boky zanikla** (A2, nemala čo nastaviť). **Strop:** riadok `#topSetbackRow` „Zapustenie vpredu" (`top_front_setback`)
+hneď pod Konštrukciou; pri „Bez stropu" ho `toggleTopSetback` skryje, **hodnota sa pamätá** (vzor `backThRow`). **Chrbát:** riadok `#backSetbackRow` „Komín vzadu"
+(`back_setback`) má **pevné miesto** pod Konštrukciou pre každý režim chrbta (polia nelietajú, D-130); tooltip `#backSetbackTip` prepisuje `toggleBackSetback` čistou
+`backSetbackTipText` (minimum podľa režimu a **voľný kanál** — naložený/drážka `X − bt`, vložený `X`, bez chrbta sa kanál neukazuje). Šedá veta o celkovej hĺbke
+sa stala tooltipom pri Konštrukcii (A6, D-130a). **Súhrn v zbalenej hlavičke** (`#topMeta` „zap. 30", `#backMeta` „komín 50", `.ghdr` + `.gtools` ako Čelá) len pri
+nenulovej hodnote (`setbackMetaTexts`). Slot umývačky oba riadky skrýva. **JS zrkadlá** (core.js): `nxBackSetback`/`nxTopFrontSetback` (prísne číslo 0–300),
+`nxBackStop` (R), `nxSideDepth`, `nxInteriorDepth` (jediná JS autorita „Vnút. hĺbky" — `updateAvailable` už nemá vlastný vzorec), `nxRailGeom` s intervalom Y … R
+a `nxSetbackError` = tá istá veta ako Ruby `Construction.setback_error` (spoločná fixtúra `tests/fixtures/kona_cases.json`). Zrkadlo validácie
+`cabinetSetbackError` (form.js) po krížovej kontrole výšky zočervená pole komína/zapustenia s vetou v `title` a `nxCabFieldError` ju dá do stavového riadku namiesto
+všeobecného „Skontroluj červené polia". **Tri JS zoznamy mimo `CONSTRUCTION_FIELDS`** museli pribrať polia (audit FIX 2, FIX 3): DOM most **`currentCarcass`**
+(nesie aj `type`, `back_setback`, `top_front_setback`), **`pvGeom`** cez `pvSetbackDepths` (hĺbky dielcov pre odhad `nxDraftStats` — dno a strop do R, strop od Y,
+police a priečky podľa vnútra, užší naložený chrbát; pri X = Y = 0 sa kľúče nepridávajú a odhad ostáva dnešný) a **`bindExprFields`** (boot.js). **Riedky config**
+(Codex FIX 9): `CONSTRUCTION_FIELDS` nesú `dflt: 0`, takže skrinka bez kľúča pole nastaví na 0 — inak by ostal komín predtým označenej skrinky a apply by ho
+ticho zapísal inej. Bokorys v náhľade **nie** (M11, D-145). Testy: `tests/js/test_kona_komin.js` (integrácia formulár → most → výpočet nad skutočným core.js + form.js).
+
 ### Náhľad = kontextová projekcia + spodný pás (UI-B2, ui/js/preview.js)
 
 každý kontext kreslí **svoj** pohľad (výmena, nie vrstvenie) — **Korpus** čelný rez s kótami (Š dole, V vpravo, sokel/telo vľavo, hĺbka kótou na náznaku skosenia hornej plochy),
@@ -1719,6 +1735,8 @@ odišlo spolu s oknom (taby sa vysťahovali postupne: `rows`/`sheets`/`edging` v
 ### Výrazy v rozmerových poliach
 
 `expr.js` parser bez eval (`650-36` + Enter, živý náhľad `= 614`, šípky ±1/±10); surový výraz neopúšťa JS; auto-apply s identity guardom (snapshot cabinet/board id).
+Statické polia pripája `bindExprFields` (boot.js) menovitým zoznamom — **nové rozmerové pole doň musí pribudnúť** (KON-A: `back_setback`, `top_front_setback`), inak
+by debounce pri písaní `50-20` odoslal medzistav `50-2`.
 
 ### D-41 modal chýbajúcej ABS
 
