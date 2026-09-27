@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **ROH-A1 · JADRO ROHOVEJ SKRINKY (28.9.2026, PR #?, v0.14.0 → v0.14.1, blok 8 · K3).** Package v2 [PACKAGE_ROHA1.md](../zdroje/bloky/ROHOVA/PACKAGE_ROHA1.md)
+- **ROH-A1 · JADRO ROHOVEJ SKRINKY (28.9.2026, PR #410, v0.14.0 → v0.14.1, blok 8 · K3).** Package v2 [PACKAGE_ROHA1.md](../zdroje/bloky/ROHOVA/PACKAGE_ROHA1.md)
   (krížový audit bloku + audit návrhu Codex `gpt-6-astra` 1 BLOCKER · 3 FIX · 1 NOTE — surový výstup [AUDIT_ROHA1_2026-09-28.md](../zdroje/bloky/ROHOVA/AUDIT_ROHA1_2026-09-28.md)).
   **Čo pribudlo:** nový typ **`corner_blind`** (dolná slepá rohová) — korpus ako dolná + rohová zostava na prednej rovine: **blenda korpusová**, **výstuha závesov**,
   **CR 1**, **CR 2** a **rohová výstuha** (`Construction.corner_parts`, čísla presne ako DC „Rohová", dvere vpravo = zrkadlo `x' = W − x − box[0]`), štyri polia configu
