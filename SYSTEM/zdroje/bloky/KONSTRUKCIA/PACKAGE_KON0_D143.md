@@ -4,7 +4,7 @@
 > Michala, FIX 3–6 v Scope IN) a rozhodnutia Michala (`ROZHODNUTIA_MICHALA_2026-09-27.md`). Autorita počas dávky: tento package. Podklady: `SYSTEM/zdroje/bloky/KONSTRUKCIA/`
 > — [ROZHODNUTIA_MICHALA_2026-09-27.md](ROZHODNUTIA_MICHALA_2026-09-27.md), [VSTUPY_PRE_PACKAGES_2026-09-27.md](VSTUPY_PRE_PACKAGES_2026-09-27.md), fakty z kódu §2, §5, §6.
 > **Trieda:** výrobná + **audit-povinná** (dátový kontrakt snapshotu + `CONFIG_SCHEMA` 18 → 19) → `codex-audit` pred kódom · predrecenzia
-> pred PR · **in-SU test je brána mergu** · GH Codex review. **Na schválenie mockupu nečaká** (výrobná chyba má prednosť — review #399 P1).
+> pred PR · **in-SU test je brána mergu** · GH Codex review. Mockup schválený 27.9. (M11); KON-0 ide prvá (výrobná chyba má prednosť).
 > Verzia v0.13.0 → **v0.13.1**.
 
 ## Cieľ
@@ -65,7 +65,7 @@ snapshot dielca (nové pole) · BuildPlan deskriptor (voliteľný kľúč) · `C
 
 - **Headless:** deskriptor a snapshot `cut_size` (groove áno; overlay/inset/none nie) · reťaz snapshot → kusovník (agregácia, stĺpce) → formát
   platne → VEPO → plocha/cena (horná 600 × 720 → 600 × 720, plocha 0,432 m²) · otočenie podľa dekoru · hmotnosť z geometrie · poškodený `cut_size`
-  → RED a stop výstupov · chrbát v drážke s ručným ABS → RED a bez `cut_size` · zastaraná skrinka (groove, schéma < 19) → RED + stop exportov;
+  → RED a stop výstupov · chrbát v drážke s ABS (ručný override **aj pravidlo olepu** pre rolu `back`) → RED a bez `cut_size` · zastaraná skrinka (groove, schéma < 19) → RED + stop exportov;
   prestavaná → OK · `CONFIG_SCHEMA` 19 + dopredná brána (novší config) · odpojenie chrbta so `cut_size` odmietnuté. **Golden plány:** geometria
   (box/origin/prod/axes) **bajtovo rovnaká**; `cut_size` overuje nový reťazový test (dnešný golden whitelist ho neporovnáva).
 - **JS:** karta dielca — riadok „Do nárezu" pri `cut_size`, bez neho nič.
@@ -86,7 +86,7 @@ vyššia plocha HDF (+12 %) v rozpočte.
 
 1. Nová horná skrinka 600 × 720 (chrbát v drážke): kusovník aj VEPO „Chrbat" **600 × 720**; karta dielca „Do nárezu 600 × 720", Dĺžka/Šírka 564 × 684.
 2. Otvor staršiu zákazku s hornými skrinkami: Kontrola hlási zastarané skrinky, VEPO sa nevyexportuje; prestav ich (Aplikuj zmeny / hromadne) → OK a VEPO ide.
-3. Chrbát v drážke + ručné olepenie hrany → Kontrola RED, VEPO stojí; zruš olepenie → OK.
+3. Chrbát v drážke + ručné olepenie hrany (a zvlášť pravidlo olepu pre chrbty) → Kontrola RED, VEPO stojí; zruš olepenie → OK.
 4. Dolná skrinka s naloženým chrbtom: nič sa nemení.
 5. Aktualizuj plugin aj u Lucie (jej starší plugin takú zákazku zastaví).
 
@@ -96,7 +96,7 @@ VERSION 0.13.1 (2×) + všetky `?v=` · testy (headless, JS, in-SU) · `docs/arc
 `cut_size`, brány), `model-a-identita.md` (snapshot) na mieste · STANDARD §8.2 · POJMY (prídavok 9 mm; V1 plný rozmer) · D-143 plným textom do
 `archiv/DOGFOODING_vyriesene.md` + riadok INDEXU, z DOGFOODING preč · PLAN blok 7 riadok KON-0 s ✅ a `PR #?` · **STAV prepis** (v0.13.1, D-143;
 smoke S1 PASS 26.9.; smoke D-128 a D-131 PASS, D-132/133/134 čakajú; V1_VIZIA body 4 a 7 odškrtnuté; blok 7 beží; kompatibilita: schéma 19,
-aktualizovať obe PC) · KRONIKA · tento package do `SYSTEM/zdroje/bloky/KONSTRUKCIA/PACKAGE_KON0_D143.md`.
+aktualizovať obe PC) · KRONIKA.
 
 ---
 
@@ -113,6 +113,7 @@ Surový výsledok: [AUDIT_KON0_2026-09-27.md](AUDIT_KON0_2026-09-27.md). Zmeny p
   pôvodom** (pôvod neodvodzovať z rozmerov ani `cabinet_id`). → **OTÁZKA PRE MICHALA (dávka čaká):** starý samostatný chrbát (bez značky) —
   (A) **blokovať výrobné exporty**, kým ho nenahradíš/neodstrániš (bezpečné, ale zablokuje aj samostatný naložený chrbát, ktorý je správny), alebo
   (B) **ORANGE upozornenie „over rozmer do nárezu"** a export pustiť (dnešné správanie, bez regresie). Nové chrbty (so značkou) chránené vždy.
+  → **Michal 27.9.2026: (B)** — samostatné chrbty nepoužíva; zapracované v Scope IN bod 6.
 - **FIX 3 — jedna výrobná brána D-143:** jeden zoznam problémov D-143 → RED v Kontrole **aj tvrdý stop po čerstvom zbere vo všetkých štyroch
   exportoch** (VEPO, nákupný CSV, rozpočet XLSX, ponuka XLSX) — dnes VEPO výsledok Kontroly len loguje (`production_core.rb:1836`) a `BUILD_BLOCKERS`
   má užší rozsah (`:1285`); poškodený údaj overiť pred agregáciou, nezávisle od katalógu a UNI (`validation.rb:330`). DoD: **každý blokujúci dôvod ×

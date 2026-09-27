@@ -36,10 +36,11 @@
   **Michal 27.9. (v noci):** nika spotrebiča sa pri komíne ráta **z hĺbky boku** (listy kótujú min. hĺbku boku, chladnička zasahuje do komína —
   prax), Chladničková **600 × 2100 × 560, komín 50, bez chrbta**, **bokorys v náhľade nie** (KON-C vypadol → D-145 zásobník), mockup schválený,
   samostatné chrbty nepoužíva (starý samostatný chrbát → ORANGE), D-144 kombináciu nepoužíva, minimum komína podľa typu chrbta áno. Audit návrhu
-  KON-0 (NOT SOUND: 2 BLOCKER pri samostatných chrbtoch + 4 FIX) je spracovaný v pracovnom zozname požiadaviek. **Aj PR #399 vrátilo v 3. kole P1**
-  (vypadnutá požiadavka „seed Chladničkovej nesie verziu configu") → podľa pravidla 3 kôl (b) **zavreté a rozdelené druhý raz**: tento PR nesie len
-  **produktové rozhodnutia Michala** (ROZHODNUTIA_MICHALA, M1–M12), schválený mockup, fakty a surové audity; **technické požiadavky** idú do package
-  každej dávky (pracovný zoznam v histórii #399, commit b85fcaa2). Poučenie 2: ani zoznam technických požiadaviek nepatrí do úvodného PR bloku;
+  KON-0 (NOT SOUND: 2 BLOCKER pri samostatných chrbtoch + 4 FIX) je zapracovaný v package KON-0. **Aj PR #399 vrátilo v 3. kole P1**
+  (vypadnutá požiadavka „seed Chladničkovej nesie verziu configu") → podľa pravidla 3 kôl (b) **zavreté a rozdelené druhý raz**: tento PR nesie
+  **produktové rozhodnutia Michala** (ROZHODNUTIA_MICHALA, M1–M12), schválený mockup, fakty a surové audity a — po review kolo 1 — aj **package KON-0**
+  (s auditom návrhu) a **vstupy pre packages** KON-A, B, D; technické požiadavky sú záväzné až v package dávky s jej auditom. Poučenie 2: technické
+  požiadavky patria do úvodného PR bloku len ako vstup, nie ako autorita;
   audit návrhu majú len dávky meniace kontrakt alebo schému (KON-0, A, B, D). Poučenie: úvodný dokument
   bloku drží rozhodnutia a smer, **nie implementačné vzorce** — tie patria do package dávky. **Ďalší krok:** implementácia KON-0 podľa [PACKAGE_KON0_D143.md](../zdroje/bloky/KONSTRUKCIA/PACKAGE_KON0_D143.md) (package a audit návrhu sú v tomto PR; mockup schválený).
 - **DOCS — smoke S1 PASS a odškrtnutie V1 vízie (26.9.2026, PR #397, len dokumentácia; verzia pluginu sa nemení).**
