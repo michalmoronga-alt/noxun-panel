@@ -842,6 +842,20 @@ police a priečky podľa vnútra, užší naložený chrbát; pri X = Y = 0 sa k
 (Codex FIX 9): `CONSTRUCTION_FIELDS` nesú `dflt: 0`, takže skrinka bez kľúča pole nastaví na 0 — inak by ostal komín predtým označenej skrinky a apply by ho
 ticho zapísal inej. Bokorys v náhľade **nie** (M11, D-145). Testy: `tests/js/test_kona_komin.js` (integrácia formulár → most → výpočet nad skutočným core.js + form.js).
 
+**KON-B · K2 (v0.13.3) — Chrbát „Z líšt" a riadok „Výška líšt" (schválený mockup A3, A5, A7).** Select `#back_mode` má piatu voľbu **„Z líšt"** (`rails`) v poradí
+Naložený · Vložený · V drážke · Z líšt · Bez chrbta. Riadok `#backRailRow` „Výška líšt" (`back_rail_height`, mm, tooltip z mockupu) sedí **na mieste** `#backThRow`
+— nikdy nie sú naraz: `toggleBackTh` pri lištách skryje hrúbku a ukáže výšku, pri „Bez chrbta" skryje obe, pri slote riadok líšt nie je; **hodnoty sa pamätajú**.
+**H sa validuje LEN pri aktívnych lištách** (`RAIL_FIELDS` + `backRailsActive`, audit FIX 3 — `validateFields` inak validuje aj skryté polia a neviditeľné neplatné H
+by zablokovalo „Aplikuj"); skrytie riadku zruší červenú aj tooltip. Zrkadlo validácie: `cabinetCheckCarcass` (form.js) **neskončí** pri X = Y = 0, keď sú lišty
+(audit NOTE 4), veta komína/zapustenia (`nxSetbacksOnlyError`) ide na polia komína, veta líšt (`nxBackRailsError`, `2H + 20 ≤ vnútro`, tá istá ako Ruby) na pole
+„Výška líšt" (`markRailError`). **JS zrkadlá** (core.js): `nxBackRails`, `nxBackRailHeight` (prísne, 20–300, inak 100), `nxInteriorDepth` pri lištách `R − t`,
+`nxSetbackError` = `nxSetbacksOnlyError || nxBackRailsError` (fixtúra `tests/fixtures/konb_cases.json`). **Súhrn** `#backMeta` „z líšt 100 · komín 50" (výška len
+pri lištách). Tooltip komína: pri lištách bez minima a voľný kanál = `X`. **Veta pod materiálom chrbta** `#cabBackNote` v sekcii Materiály — „(nepoužije sa —
+chrbát z líšt je z korpusu)" pri lištách, „(nepoužije sa — bez chrbta)" pri „Bez chrbta", inak skrytá (`backMaterialNote`). Zoznamy mimo `CONSTRUCTION_FIELDS`
+(`{id:'back_rail_height', dflt:100}` — riedky config): `currentCarcass`, `pvGeom` → `pvSetbackDepths` (lišty doplní **pred** skorým návratom pri X = Y = 0: `innerD`
+= `R − t` pre police a priečky, `backRailH`), `bindExprFields`. Odhad `nxDraftStats` pri lištách = 2 × `(W − 2t) × H` z korpusu namiesto dosky chrbta.
+Testy: `tests/js/test_konb_listy.js`.
+
 ### Náhľad = kontextová projekcia + spodný pás (UI-B2, ui/js/preview.js)
 
 každý kontext kreslí **svoj** pohľad (výmena, nie vrstvenie) — **Korpus** čelný rez s kótami (Š dole, V vpravo, sokel/telo vľavo, hĺbka kótou na náznaku skosenia hornej plochy),
@@ -1735,7 +1749,7 @@ odišlo spolu s oknom (taby sa vysťahovali postupne: `rows`/`sheets`/`edging` v
 ### Výrazy v rozmerových poliach
 
 `expr.js` parser bez eval (`650-36` + Enter, živý náhľad `= 614`, šípky ±1/±10); surový výraz neopúšťa JS; auto-apply s identity guardom (snapshot cabinet/board id).
-Statické polia pripája `bindExprFields` (boot.js) menovitým zoznamom — **nové rozmerové pole doň musí pribudnúť** (KON-A: `back_setback`, `top_front_setback`), inak
+Statické polia pripája `bindExprFields` (boot.js) menovitým zoznamom — **nové rozmerové pole doň musí pribudnúť** (KON-A: `back_setback`, `top_front_setback`; KON-B: `back_rail_height`), inak
 by debounce pri písaní `50-20` odoslal medzistav `50-2`.
 
 ### D-41 modal chýbajúcej ABS

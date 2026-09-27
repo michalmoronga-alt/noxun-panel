@@ -90,6 +90,12 @@
   pevný 18 → 32 mm; výrobcovia chladničiek chcú spravidla ≥ 40). Pri „bez chrbta" sa neukazuje. Tooltip „Komín vzadu" ho povie.
 - **Zapustenie stropu (vpredu)** (`top_front_setback`, KON-A · K1) — o koľko **plný strop alebo predná výstuha** začína za prednou hranou boku (napr. pri dreze);
   **dno sa neposúva** (M3). Platí pre dolnú aj hornú skrinku; pri „Bez stropu" nemá význam.
+- **Chrbát z líšt** (`back_mode 'rails'`, KON-B · K2) — namiesto dosky chrbta **dve vodorovné lišty z korpusovej dosky** medzi bokmi: dolná stojí na dne, horná je
+  pod stropom (pod výstuhami, pri „Bez stropu" po vrch bokov). Výška lišty `back_rail_height` (predvolene 100, 20–300), hrúbka = hrúbka korpusu, zadná plocha
+  v zadnom doraze. **Vnútro končí pred lištami v celej výške** (police, priečky a zásuvky sú o hrúbku lišty kratšie — M5). Páska len na hrane **viditeľnej
+  zvnútra** (kus sa pri montáži len otočí). Materiál chrbta (HDF) sa nepoužije. Dve lišty sa musia zmestiť: `2 × výška + 20 ≤ vnútro`.
+- **„Chrb HD"** — VEPO skratka líšt chrbta (M6): obe lišty sú **jeden riadok, 2 ks** („Lista chrbta"); s výstuhami rovnakého rozmeru a materiálu jeden riadok
+  `Vyst PZ/Chrb HD` (4 ks) — výrobne ten istý kus.
 
 ## Stolárske poznatky (doména)
 

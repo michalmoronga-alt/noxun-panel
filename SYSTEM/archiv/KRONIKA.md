@@ -17,6 +17,38 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KON-B · K2 — chrbát z dvoch líšt (v0.13.2 → v0.13.3, 27.9.2026, PR #?, blok 7 KONŠTRUKCIA, tretia dávka).**
+  Výrobná a audit-povinná dávka (package v2 so zapracovaným auditom návrhu Codex 27.9.: NOT SOUND 0 BLOCKER + 3 FIX + 2 NOTE — všetko v Scope IN).
+  **Dáta:** `back_mode` smie byť **`rails`** („Z líšt"), config smie niesť **`back_rail_height`** (H, mm 20–300, predvolene 100, **prísne parsované** `norm_rail_height`,
+  **zápis len pri H ≠ 100**, pri inom type chrbta sa pamätá); celá reťaz whitelistov ako komín v KON-A (`normalize`, `cabinet_config`, `config_to_params`,
+  `PARAM_KEYS`, `CONSTRUCTION_FIELDS` s `dflt: 100`, `currentCarcass`, `pvGeom`, `bindExprFields`, `LIMITS`, predvoľby typov, šablóna výslovne aj 100, stará šablóna
+  zachová H cieľa). Dve nové roly **`back_rail_top` / `back_rail_bottom`** (kľúče `cabinet/back_rail:top|bottom`, spoločný názov „Lista chrbta"). `CONFIG_SCHEMA`
+  20 → 21, **BuildPlan `SCHEMA` 5 → 6**, **ABS `SEED_VERSION` 4 → 5**; `BuildPlan::BACK_MODES` sa nerozširuje.
+  **Geometria (`construction.rb`):** `back_part` pri `rails` nič, `back_rail_parts` dve lišty `[w − 2t, t, H]` v rovine `[R − t, R]` (dolná na dne, horná na strope
+  vnútra — pod stropom, pod výstuhami, pri „Bez stropu" po vrch bokov); **vnútro `R − t`** v celej výške (M5); odmietnutie **`2H + 20 > vnútro`** (`back_rails_error`,
+  aj bez komína; mlčí, keď hovorí všeobecná veta výšky), mierka ho dedí sondou (`min_valid_height` pri lištách 356). Ostatné režimy chrbta **bajtovo bez zmeny**.
+  **Hrany:** obe roly seed **`{L1}`**, **dolná lišta = prvá korpusová STOJACIA rola** (vedomá zmena invariantu D5 — test aj text prepísané): páska je u oboch na
+  hrane viditeľnej zvnútra a mapa hrán rovnaká → **jeden riadok kusovníka, 2 ks**; `ROLE_AXES`, `EDGE_LABELS`, tag Chrbát, `ROLE_LABELS`, `ABS_ROLE_ORDER`, karta
+  dielca. „Použiť na podobné" bez zmeny (audit FIX 1). **Výstupy:** VEPO `Lista chrbta` → **„Chrb HD"**, s výstuhami rovnakého rozmeru na výšku aj naplocho jeden
+  riadok 4 ks „Vyst PZ/Chrb HD", ručný zásah na jednej lište = 2 riadky. **Materiál chrbta pri lištách ako „Bez chrbta"** (`Construction.back_material_used?` —
+  preflight chrbta, brána projektového chrbta, „Nahradiť UNI"). **UI (mockup A3/A5/A7):** voľba „Z líšt", riadok „Výška líšt" na mieste hrúbky chrbta, **H sa
+  validuje len pri lištách** a skrytie ruší chybu (audit FIX 3), zrkadlo validácie a odhad fungujú aj bez komína (NOTE 4), súhrn „z líšt 100 · komín 50", tooltip
+  komína (kanál = X, bez minima), veta pod materiálom chrbta (pri lištách aj pri „Bez chrbta"). **Testy:** 4621 headless (nová `test_konb_listy.rb`, 20 testov:
+  matica 48 kombinácií strop × dno × komín × H, parsovanie, whitelisty a guard parity, šablóny, schémy, validácia a fixtúra, ABS seed-merge, plochy olepu, kusovník
+  a VEPO, preflighty) · 133 JS sád (nová `test_konb_listy.js`, 473 kontrol — parita s fixtúrou `konb_cases.json` (80 prípadov), integrácia bez komína s policou,
+  priečkou a červeným H, skryté H pri Naloženom/Bez chrbta/slote, riadky, súhrn, riedky config, výrazy) · in-SU 3158 PASS / 0 FAIL (nový `run_konb`, 22 kontrol: plán = model
+  pre 48 kombinácií, 1× Späť, odmietnutie bez zmeny, dormantný zásah chrbta sa vráti, kópia, .skp, šablóny tam aj stará, vklad ghostom, páska na správnej ploche
+  oboch líšt, Kontrola olepov 0, kusovník z modelu 1 riadok 2 ks / 4 ks, VEPO). **Mutácie** (12, všetky padli): vnútro bez `− t` · dolná lišta nestojacia (padne
+  na polohe pásky, nie na počte riadkov — FIX 2) · chýba seed bump · `rails` mimo enumu · chýba výnimka preflightu · chýba `ROLE_AXES` · H validované aj skryté ·
+  most `pvGeom` až po skorom návrate · skorý návrat zrkadla validácie · zápis H aj pri 100 · stará šablóna prepíše H · VEPO bez skratky.
+  **Vedomé zmeny existujúcich testov:** čísla schém (BuildPlan 6 v šiestich sadách, ABS seed 5 v D5, KON-A číta aktuálnu `CONFIG_SCHEMA`), zamknutá mapa seedu ABS
+  o dve roly, invariant „korpusová rola nesmie byť stojacá" → výnimka pre dolnú lištu. **Aktualizovať obe PC** (schéma 21).
+  **Smoke KON-A (prenesené zo STAV, v0.13.2):** (1) dolná 600 × 720 × 510, naložený HDF 3, **Komín vzadu 50** → „Vnút. hĺbka" 460; kusovník boky 510, dno a strop 460,
+  chrbát 564 × 620; hlavička Chrbát „komín 50" · (2) komín 2 → červené pole a veta, nič sa nepostaví · (3) horná 600 × 720 × 320 v drážke: komín 12 → odmietnutie,
+  13 → vnútro 307, do nárezu 600 × 720 · (4) Strop „Zapustenie vpredu 30" → strop začína 30 mm za hranou, dno nie; pri „Bez stropu" riadok zmizne · (5) chladnička
+  v skrinke 600 × 2100 × 560 bez chrbta, komín 50 → nika meria 560 · (6) potiahni hĺbku skrinky s komínom 100 pod minimum → zastaví sa na 160 + hláška, jedno Späť
+  vráti · (7) šablóna s komínom na inú skrinku → komín ide; stará šablóna → komín ostane · (8) do poľa Komín napíš `50-20` → 30 · (9) plugin aj u Lucie.
+
 - **KON-A · K1 — komín vzadu, zapustený strop vpredu, oprava D-144 (v0.13.1 → v0.13.2, 27.9.2026, PR #402, blok 7 KONŠTRUKCIA, druhá dávka).**
   Výrobná a audit-povinná dávka (package v2 so zapracovaným auditom návrhu Codex 27.9.: NOT SOUND 1 BLOCKER + 5 FIX + 2 NOTE — všetko v Scope IN).
   **Dáta:** config smie niesť `back_setback` (X) a `top_front_setback` (Y), mm 0–300, **prísne parsované** (`norm_setback` — `"50oops"`, `"50-20"`, NaN, objekt → 0;

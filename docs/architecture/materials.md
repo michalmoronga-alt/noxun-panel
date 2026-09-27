@@ -482,6 +482,14 @@ platí ďalej, mení sa len to, KTORÚ plochu kvádra kód L1 pomenúva. Bump ve
 `RulesDialog::ABS_ROLE_ORDER` (na konci, za čelami) a v `ProductionCore::ROLE_LABELS` („Dno zásuvky", „Chrbát zásuvky", „Bok boxu", „Vnútorné čelo zásuvky") — prehľad ABS
 pravidiel ich číta zo seedu, takže bez názvov by ukázal holé identifikátory. Dielce samotné ešte **nikto neemituje** (to je C2b).
 
+**KON-B · K2 — `SEED_VERSION` 4 → 5: lišty chrbta** (`back_rail_top`, `back_rail_bottom`, chrbát „Z líšt"). Obe majú **L1 1,0 mm** — páska na jednej dlhej hrane
+**viditeľnej zvnútra**; bez bumpu by ich `merge_seed_roles` na existujúcich PC nedoplnil a lišty by sa postavili bez pásky (doplní len chýbajúce roly, vlastné
+pravidlá vrátane vedomého „bez ABS" ostanú). **Dolná lišta je prvá KORPUSOVÁ stojacia rola** (`PartFaces::STANDING_ROLES`, alias tu) — stojí na dne a jej L1 je
+horná plocha (`EDGE_LABELS` ako `drawer_back`: L1 Horná, `edge_sides` → `EDGE_SIDES_STANDING`); horná lišta leží ako chrbát (L1 Dolná, lying mapa). Obe tak majú
+**rovnakú mapu hrán `{L1}`** → rovnaký agregačný kľúč kusovníka (jeden riadok, 2 ks). V `RulesDialog::ABS_ROLE_ORDER` hneď za `back`, v `ROLE_LABELS`
+„Lišta chrbta horná/dolná". Preflighty materiálu chrbta sa pri lištách správajú ako pri „Bez chrbta" (`Construction.back_material_used?`): `Panel.back_preflight`
+hrúbku nekontroluje, brána projektového chrbta v `MaterialsDialog` skrinku s lištami nezablokuje a „Nahradiť UNI" jej hrúbku chrbta neprevezme.
+
 **UI konzument od ŠT-3b-2a: skupina „ABS podľa roly dielca" v sekcii `rules` okna ŠTÚDIO — LEN NA ČÍTANIE** (editor pravidiel ABS v pluginu neexistuje a hint sekcie to priznáva).
 Riadok skladá SERVER (`RulesDialog.abs_rule_row`) z `EDGE_LABELS` + `ProductionCore.role_label`; hovorí o **HRÚBKE** („predná 1,0 mm"), **nikdy o páske ani dekore** — ten sa
 dopočíta z materiálu dielca až pri stavbe. Poradie rolí určuje `RulesDialog::ABS_ROLE_ORDER` (rola z novšej verzie sa pripojí na koniec, nezamlčí sa).

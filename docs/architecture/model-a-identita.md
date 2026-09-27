@@ -115,7 +115,7 @@ a reprodukcie recyklácie cez skutočný `PanelAppObserver#onOpenModel` (vzor sc
 
 prístup k `NOXUN` dictionary.
 
-**Verzia kontraktu configu `config_schema` je dnes `20`** (KON-A · K1 — komín vzadu `back_setback` a zapustenie stropu `top_front_setback`, oprava D-144).
+**Verzia kontraktu configu `config_schema` je dnes `21`** (KON-B · K2 — chrbát z líšt `back_mode 'rails'` a výška líšt `back_rail_height`; 20 = KON-A komín a zapustenie).
 Aktivačné konštanty sa pri bumpe nehýbu: `DRAWER_ACTIVATION_SCHEMA` 5 · `HINGE_ACTIVATION_SCHEMA` 9 · `LIFT_ACTIVATION_SCHEMA` 11 · `BACK_CUT_ACTIVATION_SCHEMA` 19 ·
 `BACK_RAIL_ACTIVATION_SCHEMA` 20. Zápis markera, dopredný guard aj celá **história čísel** žijú v odseku `cabinet_builder.rb` ([construction.md](construction.md))
 a v komentári `HISTORIA` pri konštante — tu je len ukazovateľ, aby sa aktuálne číslo dalo nájsť od dát.
@@ -143,7 +143,7 @@ parser inde by sa časom rozišiel; jediný čitateľ je zatiaľ deep-link „kl
 
 ### build_plan.rb
 
-**ZÁVÄZNÝ kontrakt plánu** (SCHEMA 5 — posledný bump KOV-G1a: nový generický typ `plinth_clip`; MIN_DIM, validátor, `warnings[]`, hardware string-keyed s GENERIC_TYPES/limitmi/referenčnou integritou ownera). Geometria, kusovník aj VEPO
+**ZÁVÄZNÝ kontrakt plánu** (SCHEMA 6 — posledný bump KON-B · K2: nové roly líšt chrbta `back_rail_top` / `back_rail_bottom`; MIN_DIM, validátor, `warnings[]`, hardware string-keyed s GENERIC_TYPES/limitmi/referenčnou integritou ownera). Geometria, kusovník aj VEPO
 čítajú TEN ISTÝ plán.
 
 **`GENERIC_TYPES` + `lift` a `SCHEMA` 2 → 3 (KOV-B1, v0.9.19).** Slovník typov kovania dostal `lift` (výklopy a sklopy) — presunuté z KOV-E podľa auditu #17 BLOCKER 2, lebo
@@ -166,6 +166,10 @@ smie navyše niesť voliteľné **`locked: true`** — a to VÝHRADNE pri `sourc
 prepísané"). Plán má aditívny kľúč **`drawer_conflicts`** (fail-closed dôvody; validuje `validate_drawer_conflicts!` proti registru `Recipes::DRAWER_BLOCKERS`) a dva
 zápisové kanály pre builder — `drawer_writes` a `drawer_override_writes`. Rozšírenie je pre STARŠÍ plugin neznáma rola aj neznámy `source`, takže plán, ktorý ich môže niesť,
 už nie je plánom schémy 3 — odtiaľ bump.
+
+**`SCHEMA` 5 → 6 (KON-B · K2, v0.13.3): LIŠTY CHRBTA.** `ROLES` dostali `back_rail_top` · `back_rail_bottom` (kľúče `cabinet/back_rail:top|bottom`, `PartKeys.valid?`
+ich prijíma existujúcim `cabinet/` pravidlom — `PartKeys::SCHEMA` sa nebumpuje). Precedens schémy 4: plán, ktorý môže niesť rolu neznámu staršiemu pluginu, už nie je
+plánom schémy 5. **`BACK_MODES`** (značka pôvodu dielca s rolou `back`) sa **nerozširuje** — lišty ju nenesú; `rails` je hodnota configu, nie značka dielca.
 
 **KOV-F1 (v0.9.48): aditívny kľúč plánu `hardware_conflicts`.** `[{owner_part_key, code, message}]` — dôvody, pre ktoré je VYDANÁ položka kovania
 nesprávna (dnes `door_height_out_of_table`: dvierka vyššie než tabuľka závesov). Validuje `BuildPlan.validate_hardware_conflicts!` proti uzavretému

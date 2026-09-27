@@ -29,12 +29,25 @@ zadnej výstuhy a nôh (X = 0 → presne `carcass_depth`, X > 0 → `d − X`) a
 (`[w − 2t, bt, h − s]`, drážka nesie `cut_size {w, h − s}`), vložený pred `R`. `interior_dims[:back_front_y]` pri komíne = `R` (vložený `R − bt`) — jediný zdroj
 pre zóny, police, recepty zásuviek, kovanie aj „Vnút. hĺbku". **`niche_depth(cfg, interior)`** (M9) = hĺbka boku pri komíne, inak `back_front_y`; čítajú ho
 `ApplianceChecks.context` aj `Panel.appliance_interior`. **Odmietnutia** skladá čistá `setback_error(cfg, interior)` (volá ju `validate!` ešte PRED všeobecnou
-„Hĺbka je príliš malá") a platia **len pri X > 0 alebo Y > 0** (`setbacks?`): minimum komína `min_back_setback` (naložený `bt`, drážka `GROOVE_OFFSET + bt`),
+„Hĺbka je príliš malá"; od KON-B = `setbacks_only_error || back_rails_error`) a vety komína a zapustenia platia **len pri X > 0 alebo Y > 0** (`setbacks?`): minimum komína `min_back_setback` (naložený `bt`, drážka `GROOVE_OFFSET + bt`),
 vnútro pri komíne ≥ `min_setback_interior` (= `ZoneTree::SHELF_FRONT_INSET + MIN_FIELD` = 40 — audit BLOCKER 1: pri menšom vnútri by `ZoneTree` police len s ORANGE
 vynechal), plný strop ≥ `MIN_TOP_DEPTH` (60), výstuhy naplocho s `flat_limit` < 20 a na výšku s `Y + 2t + 20 > R`. Vety zrkadlí panel (`nxSetbackError`,
 spoločná fixtúra `tests/fixtures/kona_cases.json`). **D-144:** `back_z_hi` pri `two_rails` = nižšia z `h − offset − t` a `interior[:z_hi]` a `back_rail_drop(cfg)`
 (`max(occupy − t, 0)`) zníži `cut_size.width` chrbta v drážke bez komína o ten istý rozdiel. **`min_valid_depth(cfg)`** = najmenšia hĺbka, pri ktorej prejde celý
 `build_plan` (vzor `min_valid_height`: polenie od `CabinetBuilder::MIN[:depth]` po `MAX_DEPTH` 2000, slot 0) — dedí tak všetky pravidlá vyššie vrátane minima vnútra.
+
+**KON-B · K2 (v0.13.3) — CHRBÁT Z LÍŠT (`back_mode 'rails'`).** `back_part` pri `rails` vracia `nil` (explicitne, vzor D-31 — `else` vetva aj `setback_back_part`
+by postavili naložený chrbát) a `build_plan` pripojí **`back_rail_parts(cfg, interior)`**: dva dielce `back_rail_bottom` (`cabinet/back_rail:bottom`, suffix
+`BACK-RAIL-B`) a `back_rail_top` (`…:top`, `BACK-RAIL-T`), box `[w − 2t, t, H]`, origin `[t, R − t, z_lo]` a `[t, R − t, z_hi − H]` (`R = back_stop`, `z_lo`/`z_hi`
+z `interior_dims` — horná lišta tak sedí pod plným stropom, pod výstuhami a pri „Bez stropu" po vrch bokov), `prod {w − 2t, H, t}` pre obe, osi `AXES_WALL`,
+materiál `:korpus`, **spoločný názov `BACK_RAIL_NAME` „Lista chrbta"** (M6 — jeden riadok kusovníka). Značku pôvodu `back_mode` lišty **nenesú**
+(`BuildPlan::BACK_MODES` sa nerozširuje). `back_rail_height(cfg)` číta H prísne (konečné číslo klamp 20–300, inak 100), `back_rails?(cfg)` (nie slot).
+**`interior_dims[:back_front_y]` pri `rails` = `R − t`** (s komínom aj bez neho — M5; vetva je PRED komínovou, ostatné režimy bajtovo bez zmeny).
+**`setback_error`** = `setbacks_only_error` (KON-A, len pri X/Y > 0) **||** `back_rails_error` (`2H + BACK_RAIL_GAP_MIN (20) ≤ avail_h`, platí aj bez komína;
+mlčí, keď vnútro neprejde všeobecnými pravidlami výšky — `MIN_AVAIL_H` a rezerva pod výstuhami — aby prednosť mala ich veta). Panel zrkadlí to isté poradie
+(`nxSetbackError`, fixtúra `tests/fixtures/konb_cases.json`); `min_valid_height`/`min_valid_depth` pravidlo dedia sondou. `min_back_setback` pri `rails` = 0 (M10).
+**`back_material_used?(mode)`** (`BACK_MATERIAL_UNUSED_MODES` = `none`, `rails`) je jediná otázka „použije sa materiál chrbta" pre preflighty chrbta
+(`Panel.back_preflight`, brána projektového chrbta v `MaterialsDialog`, `Materials` „Nahradiť UNI").
 
 **KOV-C1 — dva ADITÍVNE surové kanály v pláne.** `plan[:zone_bounds]` (`{ zone_id => {x0…z1} }` zo `ZoneTree`) a `plan[:front_bounds]`
 (`{ front_id => {z0, z1, height} }` z `Fronts.layout`) nesú **NEZAOKRÚHLENÉ** hranice. `CabinetBuilder.merge_final` kopíruje len menovitý zoznam kľúčov, takže do
@@ -320,6 +333,11 @@ istom registri** ako D-143 a hromadná prestavba ju vezme cez **spoločný predi
 číslom podľa `SETBACK_NUM_RE`, inak 0; klamp 0–300; slot 0), `cabinet_config` ich zapisuje **len keď sú > 0** (config existujúcich skriniek sa nemení; vnorené
 `top`/`back` bez zmeny) a `config_to_params` pri chýbajúcom kľúči dá 0.0 — ním idú všetky round-tripy (prestavba, absorpcia, kópie, dedup, „Nahradiť UNI", hromadné
 zmeny). Nohy (`draw_legs`) stoja podľa `Construction.back_stop`.
+**KON-B · K2 — chrbát z líšt (`back_mode 'rails'`, pole `back_rail_height`, `BACK_RAIL_KEY`).** `normalize` pozná `rails` v enume chrbta (bez neho by ho ticho
+zmenil na predvolený chrbát typu) a výšku líšt číta **prísne** (`norm_rail_height`: vzor `norm_setback`, neplatné → 100, klamp 20–300, slot 100). `cabinet_config`
+zapisuje H **len pri H ≠ 100** (aj pri inom type chrbta — hodnota sa pamätá), `config_to_params` pri chýbajúcom kľúči dá 100. `LOWER_DEFAULTS`/`UPPER_DEFAULTS`
+nesú `back_rail_height: 100` (predvoľby panela). `PART_TAGS`: obe roly líšt → tag **Chrbát**. `CONFIG_SCHEMA` 21 (HISTORIA). Aktivačné konštanty sa nehýbu —
+skrinka s lištami nie je zastaraná pre D-143 ani D-144 (`stored_back_mode` vráti `rails`).
 
 **PROVENIENCIA JE DVOJITÁ — schéma A SEED PRAVIDIEL (Codex #333 kolo 1 P1).** Config nesie aditívne pole **`rules_seed_version`**: seed pravidiel, s ktorým stavba
 naozaj bežala (`HardwareRules.effective_seed_version(model)`, čítané v `build_into` **až po** `ensure_project_rules!` — ten mohol snapshot práve zmraziť; hodnota ide
@@ -933,11 +951,12 @@ navyše kontroluje zhodu s box/prod — pri nezhode sa **nefarbí nič** (radše
 
 **KOV-D5 — orientácia hrán STOJACICH rolí (Astra #20 F15).** Preklad kódu hrany na stenu kvádra žije v DVOCH pomenovaných mapách: `EDGE_FACES` (default, hore) a
 `STANDING_EDGE_FACES`, kde je **L1 = MAXIMUM osi šírky = HORNÁ plocha** a L2 dolná (W1/W2 sa nemenia). Druhú mapu dostávajú výhradne roly v `PartFaces::STANDING_ROLES`
-(`drawer_back` · `box_side` · `drawer_inner_front`) — dielce zásuvky, ktoré STOJA a ich olepená „jednotka" je hore (`AbsRules::EDGE_LABELS` L1 = Horná, seed 4 L1 = 1,0 mm).
+(`drawer_back` · `box_side` · `drawer_inner_front`) — dielce zásuvky, ktoré STOJA a ich olepená „jednotka" je hore (`AbsRules::EDGE_LABELS` L1 = Horná, seed 4 L1 = 1,0 mm)
+— a od KON-B · K2 **dolná lišta chrbta `back_rail_bottom`** (prvá korpusová stojacia rola, vedomá zmena invariantu; horná lišta stojacia nie je, jej L1 = dolná plocha).
 `AbsRules::STANDING_ROLES` je **alias** tejto konštanty, takže zoznam existuje raz; `drawer_bottom` leží a ostáva na defaulte. Mapu čítajú `edge_code_for_center` (farbenie plôšok
 v `CabinetBuilder.paint_edge_faces`) aj `rect_axis_side`/`face_rect_mm` (zvýraznenie Kontroly `EdgeCheck` a hover `HoverEdge`) — všetky posielajú ROLU dielca, žiadny z nich
 nemá vlastnú kópiu mapy (stráži zdrojový guard). `ROLE_AXES` pozná všetky štyri roly zásuvky (jeden kandidát na rolu), takže osi sa dopočítajú aj pri **starej zákazke**
-postavenej ešte bez `axes` v pláne.
+postavenej ešte bez `axes` v pláne; od KON-B aj obe lišty chrbta (`AXES_WALL`, jeden kandidát).
 
 ### edge_check.rb
 

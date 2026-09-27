@@ -123,8 +123,12 @@ Rola dielca/modulu je **explicitná hodnota** v `NOXUN/role`, nikdy sa neodvodzu
 side_left · side_right · bottom · top · back · shelf · divider_v · divider_h ·
 front_door · drawer_front · flap · cover_panel · false_front · rail_front · rail_back · plinth ·
 gola_profile · hinge · slide · leg · handle · shelf_pin · connector · free_panel ·
-drawer_bottom · drawer_back · box_side · drawer_inner_front
+drawer_bottom · drawer_back · box_side · drawer_inner_front · back_rail_top · back_rail_bottom
 ```
+
+**Lišty chrbta (KON-B · K2, v0.13.3, BuildPlan `SCHEMA` 6):** `back_rail_top` (horná lišta, kľúč `cabinet/back_rail:top`) · `back_rail_bottom` (dolná,
+`cabinet/back_rail:bottom`) — dve roly, lebo mapa hrán rozlišuje rolu, nie variant (dolná je **stojaca**, §7.5). Stavia ich chrbát „Z líšt" (§3.4), materiál
+z korpusu, spoločný názov dielca „Lista chrbta".
 
 **Dielce zásuvky (KOV-C2b, v0.9.31):** `drawer_bottom` (dno) · `drawer_back` (chrbát) · `box_side` (bok boxu — kľúč nesie stranu `:left`/`:right`) ·
 `drawer_inner_front` (vnútorné čelo). Emituje ich **recept** (`Recipes.resolve`), nie zóny ani čelá; ich materiál je **4. kanál** (`:drawer`, §7.2) a ABS
@@ -256,6 +260,13 @@ meria výšku niky (vnútro − osadenie) aj hranu delenia čiel. Je to vlastnos
   hĺbku a chrbát vrátil za boky. **D-144:** chrbát vložený a v drážke pri výstuhách na výšku končí pod výstuhami (§3.4, §8.2); **`BACK_RAIL_ACTIVATION_SCHEMA` = 20** —
   skrinka s chrbtom `inset`/`groove`, stropom `two_rails` a výstuhami `upright` uložená pod ňou je **zastaraná** (Kontrola RED, všetky štyri výrobné exporty stoja,
   hromadná prestavba). Brány sú tie isté ako pri 5–19; BuildPlan `SCHEMA`, `PartKeys::SCHEMA` ani ABS `SEED_VERSION` sa nemenia.
+- **`21 = KON-B · K2` (v0.13.3): chrbát z líšt.** `back_mode` smie byť **`rails`** (UI „Z líšt"; plochý aj vnorený `back.mode`) a config smie niesť
+  **`back_rail_height`** (H, výška líšt), mm Float **20–300**, predvolene **100**. **Prísne parsovanie** (`CabinetBuilder.norm_rail_height`, vzor `norm_setback`):
+  neplatný vstup → 100, platné číslo klamp 20–300. **Zápis len keď H ≠ 100** — config skriniek bez líšt sa nemení; pri inom type chrbta sa hodnota **pamätá**
+  (vzor `back_thickness` pri „Bez chrbta"). Slot umývačky pole nemá. Šablóna ho zapisuje **výslovne aj 100**; **stará** šablóna (kľúč chýba) zachová H cieľa.
+  Starší plugin (schéma 20) `rails` nepozná — `normalize` by ho ticho zmenil na predvolený chrbát typu a do kusovníka dal dosku chrbta. Brány sú tie isté ako
+  pri 5–20; zároveň **BuildPlan `SCHEMA` 6** (nové roly, §2.4) a **ABS `SEED_VERSION` 5** (§7.5). `BuildPlan::BACK_MODES` (značka pôvodu dielca `back`) sa
+  **nerozširuje**. Samostatne prenesenú lištu schéma nechráni (existujúca hranica) — **obe PC sa aktualizujú pred prvou výrobou s lištami**.
 - **`rules_seed_version` — DRUHÁ proveniencia stavby (KOV-E1b, v0.9.54).** Config nesie **aditívne** pole so **seed verziou pravidiel kovania, s ktorou stavba bežala**
   (`HardwareRules.effective_seed_version`; chýbajúce pole = `0`). Zapisuje ho **výhradne stavba** (`cabinet_config`) — z klientskeho payloadu sa **nikdy nepreberá**,
   presne ako `config_schema`. Dôvod: projektový snapshot pravidiel sa zámerne nemerguje sám, takže prestavba starej zákazky zapíše aktuálnu schému, ale kovanie
@@ -372,6 +383,12 @@ Poučenie: v OCL sa opakovane zamieňala šírka s hrúbkou pri rotovaných diel
   `Y + 2t + 20 > R`.
 - **D-144:** horná hrana chrbta vloženého a v drážke pri stropu „dve výstuhy" = **nižšia** z `h − odsadenie − t` a spodnej hrany výstuh — mení sa len pri výstuhách
   na výšku vyšších než hrúbka korpusu (pri komíne stojí chrbát v drážke za výstuhami a D-144 sa ho netýka).
+- **Chrbát z líšt (`rails`, KON-B · K2, M4–M5):** namiesto dosky chrbta **dve vodorovné lišty z korpusovej dosky** medzi bokmi, box `[w − 2t, t, H]`, zadná plocha
+  v zadnom doraze `R` (origin `[t, R − t, …]`; pri `rails` bez komína `R = d`): **dolná** stojí na dne (`z = s + t`), **horná** končí na strope vnútra (pod plným
+  stropom `h − t`, pod výstuhami na ich spodnej hrane — pri výstuhách na výšku tesne pod zadnou výstuhou v tej istej rovine —, pri „Bez stropu" vrch bokov `h`).
+  `prod = {w − 2t, H, t}` pre obe. **Vnútro končí pred lištami v celej výške:** `available_depth = R − t` (s komínom aj bez neho; police, priečky, zásuvky, nika).
+  Komín pri lištách **nemá minimum** (M10), voľný kanál = `X`. **Odmietnutie:** `2H + 20 > vnútorná výška` („Dve lišty po 100 mm sa do vnútra 180 mm nezmestia —
+  zmenši výšku líšt alebo zväčši skrinku.") — platí aj pri `X = Y = 0`; keď vnútro neprejde všeobecnými pravidlami výšky, hovorí ich veta.
 
 ---
 
@@ -1161,6 +1178,9 @@ Každý plošný dielec nesie hrany **per strana** ako dáta (nezávislé od viz
 - Čelo: hranovanie dookola. Polica: len predná. Chrbát v drážke: nič.
 - **Dielce zásuviek (KOV-C2a, v0.9.30):** `drawer_bottom` **bez olepu** (dno sadá na prírubu zargy, hrana nie je vidieť); `drawer_back`, `box_side` a `drawer_inner_front`
   majú **L1 = hornú dlhú hranu** („jednotka"), ostatné hrany sú skryté v boxe a ostávajú bez olepu.
+- **Lišty chrbta (KON-B · K2, `SEED_VERSION` 5):** `back_rail_top` aj `back_rail_bottom` **L1 1,0 mm** — páska na jednej dlhej hrane **viditeľnej zvnútra**
+  (horná lišta dolná hrana, dolná lišta horná hrana); rovnaká mapa hrán → jeden riadok kusovníka (§8.2). Seed-merge doplní roly aj na existujúcom PC,
+  vlastné pravidlá neprepíše.
 - Výnimky pravidlami: hrúbka < prah → nič; rola v zozname výnimiek → nič.
 - Ručný override per dielec vždy víťazí.
 
@@ -1170,6 +1190,8 @@ Vykonateľná podoba pravidiel ABS (defaulty rolí, resolver obchodnej hrúbky, 
 > `axes: { length:, width:, thickness: }`, ktorý zapisuje ten, kto box stavia. Keď osi chýbajú alebo nesedia s rozmermi, mapovanie sa **neháda** (radšej žiadna farba než farba na zlej hrane).
 > **Stojace dielce zásuviek (KOV-D5):** roly `drawer_back`, `box_side` a `drawer_inner_front` majú L1 = **hornú** hranu (tam ide páska), preto sa im dvojica L1/L2 mapuje
 > **otočene** — L1 na MAXIMUM osi šírky. Je to jedna zdieľaná mapa pre farbenie plôšok v modeli aj pre zvýraznenie Kontroly olepov; pravidlo (L1 = 1,0 mm) ani recept sa nemenia.
+> **KON-B · K2 (vedomá zmena invariantu):** prvou **korpusovou** stojacou rolou je **dolná lišta chrbta** `back_rail_bottom` (L1 = horná plocha); horná lišta
+> stojacia nie je (L1 = dolná plocha). Iná korpusová rola stojacia byť nesmie (guard test).
 > **Vedomá legacy výnimka (D-104):** deskriptor s osami žije len v pláne, na entite uložený nie je — kontrola olepov nad **už postavenou** zákazkou preto osi odvodí
 > z **ROLY** dielca a overí ich proti skutočnému kvádru; platí **výhradne jednoznačná zhoda** (nula alebo dve zhody = `nil` a dielec sa nezvýrazní), takže to nie je
 > zakázané hádanie z hodnôt rozmerov. Vykonateľná podoba kontraktu: [`noxun_engine/core/part_faces.rb`](../noxun_engine/core/part_faces.rb).
@@ -1261,6 +1283,10 @@ Podľa sekcie 2.1: **ploché kľúče = identita, názov a filtre; všetko rozme
   horná hrana v modeli: `cut_size.width = (h − s) − Δ`, `Δ = max(použitá výška výstuhy − t, 0)`, `length` ostáva `w` (dolná 720, sokel 100, `t` 18, výstuhy 100 →
   model 564 × 502, do nárezu **600 × 538**). Pri komíne stojí chrbát v drážke za výstuhami → plná výška, `cut_size = {w, h − s}`. Skrinka s touto kombináciou
   uložená pod schémou 20 je zastaraná (§2.5) — ten istý register brány ako D-143.
+- **Lišty chrbta v kusovníku a VEPO (KON-B · K2, M6).** Obe lišty majú rovnaký výrobný rozmer, materiál aj mapu hrán `{L1}` a spoločný názov „Lista chrbta" →
+  **jeden riadok, 2 ks**, VEPO skratka **„Chrb HD"** (`Chrb HD s15`). Agregačný kľúč neobsahuje orientáciu, rolu ani názov, takže lišty sa zlúčia aj
+  s **výstuhami na výšku aj naplocho** rovnakého rozmeru, materiálu a olepu (dolná s výstuhami 100 → 1 riadok **4 ks**, `Vyst PZ/Chrb HD s12`) — širšie než text
+  M6 (výstuhy na výšku), výrobne ten istý kus. Ručný zásah na jednej lište (materiál, olep) = **dva riadky** (kusy sa naozaj líšia), oba „Chrb HD".
 
 **Linear dielec:**
 
