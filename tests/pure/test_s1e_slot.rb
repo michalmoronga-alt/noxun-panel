@@ -493,9 +493,9 @@ NxTest.test('S1-E E5: STARSI plugin (schema 15) seedovanu sablonu ODMIETNE') do
                 'sablona je pre schemu 15 NOVSIA — `newer_template_refusal` ju zastavi')
 end
 
-NxTest.test('S1-E R6: seed je MARKEROVY (zmazanu sablonu nevrati) — STD 6 od D-139') do
+NxTest.test('S1-E R6: seed je MARKEROVY (zmazanu sablonu nevrati) — STD 6 od D-139, 7 od KON-D') do
   ts = Noxun::Engine::TemplateStore
-  NxTest.assert_equal(6, ts::STD)
+  NxTest.assert_equal(7, ts::STD)
   # `missing_slot_seed` je CISTA funkcia — nad zoznamom, kde uz sablona je,
   # vrati prazdno (preto sa seed nikdy neopakuje).
   have = ts.build_predefined_slots

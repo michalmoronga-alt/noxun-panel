@@ -30,6 +30,12 @@
 #       zaznam, ktory je CELY zhodny s povodnym seedom S1-E (meno, druh aj
 #       config po JSON round-tripe — Astra B2 BLOCKER 1); upraveny, premenovany
 #       alebo inak odlisny zaznam ostava nedotknuty.
+#   7 = KON-D: seed vstavanej sablony „Chladničková" (vysoka dolna 600 x 2100 x
+#       560, komin 50, bez chrbta, ocakava chladnicku, dvoje dvierka). Nesie
+#       `config['config_schema']` = CONFIG_SCHEMA (starsi plugin by komin
+#       zahodil a postavil dno 560). Krok migracie ZAPISUJE LEN NAD ZDRAVYM
+#       PRIMAROM (audit KON-D BLOCKER 1) — nikdy nad tichou nahradou zo `.bak`
+#       ani nad nudzovymi predvolbami `build_predefined`.
 # Migracia je LAZY (pri prvom `load`) a STUPNOVANA (Codex audit C1c B2):
 # `migrate!` si precita STARY marker PRED zapisom a podla neho spusti
 #   old_std < 2 -> doseje doskove sablony (uz s orientaciou aj markerom),
@@ -37,6 +43,7 @@
 #   old_std < 4 -> doplni marker schemy existujucim doskovym sablonam,
 #   old_std < 5 -> doseje chybajuce slotove sablony umyvacky,
 #   old_std < 6 -> obnovi NEDOTKNUTE slotove seedy S1-E na predvolby D-139,
+#   old_std < 7 -> doseje chybajucu „Chladničkovú" (KON-D),
 # VSETKO JEDNYM atomickym zapisom pod JEDNYM zamkom (ziadny medzistav na disku).
 # Seed je MARKEROVY, nie obsahovy: viaze sa na prechod markera, nie na
 # pritomnost zaznamov, takze sa uz nikdy neopakuje (zmazanu doskovu sablonu
@@ -63,7 +70,7 @@ require 'tmpdir'
 module Noxun
   module Engine
     module TemplateStore
-      STD  = 6
+      STD  = 7
       FILE = 'templates.json'
       KINDS = %w[cabinet board].freeze
       DEFAULT_KIND = 'cabinet'
@@ -173,6 +180,53 @@ module Noxun
         labels = codes.map { |c| ApplianceCatalog.category_label_acc(c) }
         { 'has' => !codes.empty?, 'codes' => codes,
           'text' => (codes.empty? ? '' : "očakáva #{labels.join(', ')}") }
+      end
+
+      # KON-D (E2, audit FIX 4): SUHRN KONSTRUKCIE sablony pre dlazdicu — riadok
+      # „komín vzadu 50" v Studiu a tooltip pri vkladani. Odvodeny udaj (vzor
+      # `appliance_expects_summary`): cista funkcia bez IO, do `templates.json`
+      # sa nikdy nezapisuje, `STD` ani `CONFIG_SCHEMA` sa kvoli nemu nemenia.
+      # Kontrakt UCINNYCH hodnot (to, co sablona naozaj postavi):
+      #   * „komín vzadu N" len pri komine > 0,
+      #   * „zap. N" len pri zapusteni > 0 A strope, ktory nie je „Bez stropu"
+      #     (bez stropu sa zapustenie neuplatni),
+      #   * „z líšt H" LEN pri chrbte `rails` — aj pri predvolenej 100; ulozena
+      #     (pamatana) vyska pri inom chrbte sa neukazuje,
+      #   * slot umyvacky NIKDY (polia nema, builder ich ignoruje).
+      # Cisla cez PRISNE parsovanie buildera (`norm_setback`, `norm_rail_height`)
+      # — ta ista autorita, ktora ich pri vlozeni pouzije. Texty ako JS
+      # `setbackMetaTexts` (zbalene hlavicky Konstrukcie).
+      def construction_summary(config)
+        cfg = config.is_a?(Hash) ? config : {}
+        parts = []
+        unless cfg['type'].to_s == 'dishwasher'
+          x = CabinetBuilder.norm_setback(cfg['back_setback'])
+          y = CabinetBuilder.norm_setback(cfg['top_front_setback'])
+          parts << "komín vzadu #{Construction.fmt_mm(x)}" if x.positive?
+          parts << "zap. #{Construction.fmt_mm(y)}" if y.positive? && cfg['top_mode'].to_s != 'none'
+          if tile_back_mode(cfg) == 'rails'
+            parts << "z líšt #{Construction.fmt_mm(CabinetBuilder.norm_rail_height(cfg['back_rail_height']))}"
+          end
+        end
+        { 'has' => !parts.empty?, 'text' => parts.join(' · ') }
+      end
+
+      # Typ chrbta sablony: ploche `back_mode` (tak ho zapisuje sablona), inak
+      # vnoreny `back.mode` (config skopirovany zo skrinky).
+      def tile_back_mode(cfg)
+        flat = cfg['back_mode'].to_s
+        return flat unless flat.empty?
+
+        cfg['back'].is_a?(Hash) ? cfg['back']['mode'].to_s : ''
+      end
+
+      # KON-D: veta o VETRANI do tooltipu dlazdice (Studio aj vkladanie) pri
+      # KAZDEJ sablone, ktora ocakava chladnicku — odvodene z ocakavani, ziadny
+      # novy kluc (UI_DIZAJN: pomocny text patri do tooltipu).
+      VENT_NOTE = 'Vetracie otvory v sokli a hore rieši stolár podľa montážneho listu spotrebiča.'
+
+      def ventilation_note(config)
+        appliance_expects_summary(config)['codes'].include?('fridge') ? VENT_NOTE : ''
       end
 
       # Prida/prepise sablonu podla DVOJICE (kind, name). Vrati true/false.
@@ -409,6 +463,15 @@ module Noxun
       # cerstvo z disku). Chybajuci subor = cerstva instalacia (korpusovy aj
       # doskovy seed naraz, uz s orientaciou).
       #
+      # KON-D (audit BLOCKER 1): ked subor existuje, migracia ZAPISUJE LEN NAD
+      # ZDRAVYM PRIMAROM (`healthy_primary`). Pri poskodenom primari by
+      # `JsonFileStore.read` potichu vratil `.bak` a migracia by z NEJ zapisala
+      # novy primar (vsetko medzi zalohou a poskodenim prec); pri `templates`,
+      # ktore nie su pole, by sa ulozili nudzove predvolby `build_predefined`
+      # (+ seedy) namiesto kniznice. V oboch pripadoch sa NEZAPISUJE — citanie
+      # ide dalej zo zalohy / predvolieb (`load`), seed sa prida az nad zdravym
+      # primarom.
+      #
       # UI-C1c (Codex audit B2): migracia je STUPNOVANA podla STAREHO markera,
       # nie podla obsahu — kroky sa skladaju a zapisu sa RAZ:
       #   old_std < 2 -> doseje chybajuce doskove sablony,
@@ -418,13 +481,15 @@ module Noxun
         return true if current? # medzitym to stihla ina instancia
 
         unless JsonFileStore.available?(path)
-          return write_list(build_predefined + build_predefined_slots + build_predefined_boards)
+          return write_list(build_predefined + build_predefined_slots + build_predefined_fridge +
+                            build_predefined_boards)
         end
 
-        data = JsonFileStore.read(path, copy: false)
-        old_std = data.is_a?(Hash) && data['std'].is_a?(Integer) ? data['std'] : 1
-        raw = data.is_a?(Hash) ? data['templates'] : nil
-        list = normalize_list(raw.is_a?(Array) ? raw : build_predefined)
+        data = healthy_primary
+        return refuse_migration if data.nil?
+
+        old_std = data['std'].is_a?(Integer) ? data['std'] : 1
+        list = normalize_list(data['templates'])
         list += missing_board_seed(list) if old_std < 2
         list = fill_orientations(list) if old_std < 3
         list = fill_board_schema(list) if old_std < 4
@@ -433,9 +498,40 @@ module Noxun
         list += missing_slot_seed(list) if old_std < 5
         # D-139: nedotknute seedy S1-E (915/64/776) -> predvolby 880/100.
         list = refresh_slot_seed(list) if old_std < 6
+        # KON-D: seed „Chladničková" je MARKEROVY ako sloty — zmazanu plugin
+        # uz nevrati, vlastnu rovnomennu korpusovu sablonu neprepise.
+        list += missing_fridge_seed(list) if old_std < 7
         write_list(list)
       rescue StandardError => e
         Engine.log_error(e, 'TemplateStore.migrate!')
+        false
+      end
+
+      # KON-D (audit BLOCKER 1): PRIMARNY subor precitany PRIAMO z disku — bez
+      # sekundovej cache a BEZ tichej nahrady zo `.bak` (`JsonFileStore.read`
+      # by ju urobil). Zdravy = parsuje sa a ma tvar `{std, templates: Array}`
+      # (chybajuci `std` = legacy 1, ako doteraz). Inak nil = migracia
+      # nezapisuje. Chybajuci primar pri existujucej `.bak` zdravy NIE JE —
+      # precitana by bola opat len zaloha. I/O chyby ine nez „nie je / nie je
+      # JSON" VEDOME prebublaju do `migrate!` (rescue = neuspesny zapis), vzor
+      # `JsonFileStore.degraded?`.
+      def healthy_primary
+        data = JSON.parse(File.binread(path))
+        data.is_a?(Hash) && data['templates'].is_a?(Array) ? data : nil
+      rescue JSON::ParserError, Errno::ENOENT
+        nil
+      end
+
+      # Migracia nad nezdravym primarom: NIC sa nezapisuje, kniznica sa cita
+      # ako doteraz (zo zalohy alebo z nudzovych predvolieb) a pokus sa zopakuje
+      # pri dalsom nacitani — ked pouzivatel subor opravi alebo zmaze. Log raz
+      # za beh (inak by kazdy `load` pisal ten isty riadok).
+      def refuse_migration
+        unless @unhealthy_logged
+          Engine.log("TemplateStore: #{FILE} je poskodeny alebo chyba — migracia na std #{STD} " \
+                     'preskocena (kniznica sa cita zo zalohy alebo predvolieb, nic sa nezapisuje)')
+          @unhealthy_logged = true
+        end
         false
       end
 
@@ -639,6 +735,14 @@ module Noxun
         end
       end
 
+      # KON-D: seed sa nikdy nepretlaci cez existujucu KORPUSOVU sablonu
+      # rovnakeho mena (presne porovnanie mena, NFC/NFD sa nezjednocuje).
+      def missing_fridge_seed(list)
+        build_predefined_fridge.reject do |seed|
+          list.any? { |t| t['kind'] == 'cabinet' && t['name'] == seed['name'] }
+        end
+      end
+
       # D-139 (std 5 -> 6): zaznam, ktory je PREUKAZATELNE nedotknuty seed S1-E,
       # dostane novy seed toho isteho mena. „Nedotknuty" = CELY zaznam (meno,
       # druh, config a ziadne dalsie kluce) je po JSON round-tripe zhodny
@@ -715,6 +819,45 @@ module Noxun
           tpl('Umývačka 60', slot_base(600, 600.0, 820.0)),
           tpl('Umývačka 45', slot_base(450, 450.0, 815.0))
         ]
+      end
+
+      # KON-D: vstavana sablona „Chladničková" (M7 — tak ju Michal vyraba).
+      # SAMOSTATNY zoznam, NIE `build_predefined`: ten je aj NUDZOVA nahrada
+      # poskodenej kniznice (`load`) a seed by sa tak dostal aj tam, kde nema.
+      # Cerstva instalacia ho zapise spolu s ostatnymi seedmi, existujuca
+      # kniznica jednorazovo krokom `old_std < 7`.
+      def build_predefined_fridge
+        [tpl('Chladničková', fridge_base)]
+      end
+
+      # Vysoka dolna 600 x 2100 x 560, sokel 100, komin 50 (dno a strop 510,
+      # boky 560 — nika chladnicky sa pri komine meria z hlbky boku, M9), bez
+      # chrbta (hrubka 3 je PAMATANA hodnota). Predvolby KON-A/KON-B su VYSLOVNE
+      # (zapustenie 0, vyska list 100) — sablona bez kluca by pri pouziti na
+      # skrinku hodnotu ciela ZACHOVALA. `config_schema` = aktualna schema:
+      # starsi plugin seed odmietne (R-12), inak by komin zahodil a postavil
+      # dno 560.
+      def fridge_base
+        lower_base('height' => 2100.0, 'depth' => 560.0, 'back_mode' => 'none',
+                   'back_setback' => 50.0, 'top_front_setback' => 0.0, 'back_rail_height' => 100.0,
+                   'appliance_expects' => ['fridge'], 'fronts' => fridge_fronts,
+                   'config_schema' => CabinetBuilder::CONFIG_SCHEMA)
+      end
+
+      # Dvoje dvierka nad sebou (cela sa kladu ODSPODU): F1 dolne pevne 719
+      # (zamknute), F2 horne `auto` (2000 − 2 − 2 − 3 − 719 = 1274). 719 je
+      # odvodene z jedinej chladnicky katalogu (Beko BCNA306E5ZSN — deliaca
+      # hrana 679–727 od dna niky, stred 703; dno niky 118 → 703 + 16) a je to
+      # NAVRH na potvrdenie Michalom pri smoke. Smer otvarania oboch dvierok
+      # je VYSLOVNE „neurceny" (audit KON-D FIX 2): chybajuci kluc by Kontrola
+      # brala ako stare data bez upozornenia — stranu pantov sa NEHADA.
+      def fridge_fronts
+        door = { 'type' => 'door', 'wings' => 'auto', 'profile' => FrontProfiles::NONE,
+                 'direction' => Fronts::DIRECTION_UNSET }
+        Fronts.empty_config.merge('items' => [
+                                    door.merge('id' => 'F1', 'mode' => 'fixed', 'height' => 719.0, 'locked' => true),
+                                    door.merge('id' => 'F2', 'mode' => 'auto', 'height' => nil, 'locked' => false)
+                                  ])
       end
 
       def slot_base(dw_class, width, body_h)
