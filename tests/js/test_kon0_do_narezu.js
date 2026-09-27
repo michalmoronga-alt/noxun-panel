@@ -29,7 +29,7 @@ function ok(cond, msg){ n++; assert.ok(cond, msg); }
 // --- 1) karta dielca ---------------------------------------------------------
 const BACK = { length: 564, width: 684, thickness: 3,
                cut_size: { length: 600, width: 720 }, cut_text: '600 × 720',
-               cut_title: 'Chrbát v drážke ide do nárezu v plnom rozmere 600 × 720 mm — zrezať do drážky v dielni.',
+               cut_title: 'Chrbát v drážke ide do nárezu väčší — 600 × 720 mm (plná šírka skrinky) — zrezať do drážky v dielni.',
                model_title: 'Rozmer v modeli — do nárezu ide 600 × 720 mm.' };
 const r = nxPartBasicRows(BACK);
 eq(r.left.length, 2, 'vlavo ostavaju dva riadky');

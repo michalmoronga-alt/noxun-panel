@@ -2931,7 +2931,7 @@ module Noxun
           model_dims = "#{fmt_mm(cfg['length'])} × #{fmt_mm(cfg['width'])}"
           { 'cut_size' => { 'length' => len, 'width' => wid },
             'cut_text' => dims,
-            'cut_title' => "Chrbát v drážke ide do nárezu v plnom rozmere #{dims} mm — zrezať do drážky " \
+            'cut_title' => "Chrbát v drážke ide do nárezu väčší — #{dims} mm (plná šírka skrinky) — zrezať do drážky " \
                            "v dielni. V modeli sedí v drážke #{model_dims} mm; hmotnosť sa počíta podľa modelu.",
             'model_title' => "Rozmer v modeli — do nárezu ide #{dims} mm." }
         rescue StandardError => e

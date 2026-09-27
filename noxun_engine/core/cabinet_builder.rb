@@ -2187,7 +2187,7 @@ module Noxun
 
         # D-143: `cut_size` do snapshotu dielca, alebo nil. Zapisuje sa LEN, ked
         # deskriptor rozmer do narezu nesie A dielec nema ANI JEDNU ucinnu hranu
-        # ABS — olepeny chrbat v drazke by sa do narezu dostal v plnom rozmere
+        # ABS — olepeny chrbat v drazke by sa do narezu dostal vacsi (plna sirka skrinky)
         # s paskou na hrane, ktora skonci v drazke (tok „olepiť po zrezaní" je
         # mimo V1). CISTA funkcia (headless test).
         def snapshot_cut_size(pd, edges)

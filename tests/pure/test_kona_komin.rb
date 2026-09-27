@@ -586,6 +586,14 @@ NxTest.test('KON-A: text D-143 pocita rozmer do narezu pravidlom buildera — pr
                       end, 'text = to iste cislo, ake po prestavbe vyda builder')
 end
 
+NxTest.test('KON-A (predrecenzia P3): texty chrbta v drazke netvrdia „plny rozmer" (pri D-144 ide do narezu 600 x 538)') do
+  %w[noxun_engine/ui/panel.html noxun_engine/core/bom.rb noxun_engine/ui/panel/payloads.rb].each do |rel|
+    NxTest.refute(NxKonA.src(*rel.split('/')).include?('v plnom rozmere'), "#{rel}: veta o plnom rozmere")
+  end
+  msg = NxKonA::BOM.send(:back_edged_message, { 'owner_id' => 'CAB-1', 'name' => 'Chrbat' })
+  NxTest.assert(msg.include?('plná šírka skrinky'), msg)
+end
+
 # ============================================================================
 # 7. KONZUMENTI VNUTRA (vedoma vyrobna zmena, M10)
 # ============================================================================

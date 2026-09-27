@@ -1585,7 +1585,7 @@ module Noxun
       end
 
       def back_edged_message(rec)
-        "Chrbát v drážke (#{cut_where(rec)}) má olepenú hranu — do nárezu ide v plnom rozmere, " \
+        "Chrbát v drážke (#{cut_where(rec)}) má olepenú hranu — do nárezu ide väčší (plná šírka skrinky), " \
           'páska by skončila v drážke. Zruš olepenie alebo zmeň typ chrbta; dovtedy výrobné exporty stoja.'
       end
 
@@ -1597,7 +1597,7 @@ module Noxun
       def back_origin_message(rec)
         n = rec['name'].to_s.strip
         "Samostatný chrbát „#{n.empty? ? 'Chrbat' : n}“ (#{cut_where(rec)}) je zo staršej verzie — over " \
-          'rozmer do nárezu (chrbát v drážke ide do nárezu v plnom rozmere skrinky).'
+          'rozmer do nárezu (chrbát v drážke ide do nárezu väčší — plná šírka skrinky).'
       end
 
       # --- cisty vypocet (headless) ----------------------------------------
