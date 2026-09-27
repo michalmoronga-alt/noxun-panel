@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.13.1 · 27.9.2026 — BEŽÍ BLOK 7 · KONŠTRUKCIA K1+K2; prvá dávka KON-0 · D-143 hotová** (PR #?). **Chrbát v drážke** (predvolený pri hornej
+**v0.13.1 · 27.9.2026 — BEŽÍ BLOK 7 · KONŠTRUKCIA K1+K2; prvá dávka KON-0 · D-143 hotová** (PR #401). **Chrbát v drážke** (predvolený pri hornej
 skrinke) ide do **nárezu, VEPO aj cien v plnom rozmere skrinky** — horná 600 × 720 → **600 × 720** (dovtedy 564 × 684); model ho ďalej ukazuje v drážke
 a hmotnosť počíta podľa modelu. Karta dielca má pod Hrúbkou riadok **„Do nárezu 600 × 720"**. Olepený chrbát v drážke, poškodený rozmer do nárezu
 a **zastarané skrinky** (chrbát v drážke uložený staršou verziou) sú v Kontrole RED a **zastavia všetky štyri výrobné exporty**; Kontrola ponúka
@@ -24,7 +24,7 @@ V1 ciele **Materiály, Kovanie, Spotrebiče a Dvaja používatelia** sú odškrt
 **Dáta rozpočtu sú od S1-B1 v `BUDGET_STD` 2** (starší plugin zákazku po prvej mutácii rozpočtu needituje a zastaví oba cenové exporty).
 **Pred prvým použitím v0.13.1 aktualizovať OBE PC (aj Luciino)** — starší plugin rozmer do nárezu nepozná a samostatný chrbát by vydal malý.
 
-**Testy (posledná kódová dávka, KON-0 · D-143 #?):** **4574 headless · 131 JS sád · 3111 in-SU PASS / 0 FAIL**. Smoke oprava C (#389): 4545 · 129 · 3081.
+**Testy (posledná kódová dávka, KON-0 · D-143 #401):** **4574 headless · 131 JS sád · 3111 in-SU PASS / 0 FAIL**. Smoke oprava C (#389): 4545 · 129 · 3081.
 **S1-C:** 4499 · 127 · 3036. **S1-B1:** 4369 · 124 · 2935. **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 
 ## Robí sa
@@ -43,7 +43,7 @@ zapustený strop, oprava D-144), **KON-B** (chrbát z dvoch líšt) a **KON-D** 
 
 ## Posledné uzávery
 
-- **KON-0 · D-143** (v0.13.0 → **v0.13.1**, 27.9.2026, PR #?) — chrbát v drážke do nárezu v plnom rozmere, jedna výrobná brána, zastarané skrinky + hromadná prestavba,
+- **KON-0 · D-143** (v0.13.0 → **v0.13.1**, 27.9.2026, PR #401) — chrbát v drážke do nárezu v plnom rozmere, jedna výrobná brána, zastarané skrinky + hromadná prestavba,
   `CONFIG_SCHEMA` 19. Plné znenie v [archiv/KRONIKA.md](archiv/KRONIKA.md) a [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md).
 - **BLOK SPOTREBIČE S1 UZAVRETÝ** (v0.12.9 → **v0.13.0**, 20.–24.9.2026, PR #375–#389 + uzáver #390; smoke PASS 26.9.). Katalóg spotrebičov, spotrebič v zákazke,
   slot umývačky, telo chladničky s Kontrolou niky a delenia čiel, očakávaný spotrebič; smoke opravy D-136 až D-140.

@@ -4,7 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
-- **D-143** — Chrbát v drážke ide do nárezu, VEPO aj ceny v plnom rozmere skrinky (horná 600 × 720 → 600 × 720, model ďalej 564 × 684); karta dielca „Do nárezu"; olepený chrbát v drážke, poškodený údaj aj zastarané skrinky (schéma < 19) zastavia všetky štyri výrobné exporty; hromadná prestavba z Kontroly — 27.9.2026, PR #?, v0.13.1
+- **D-143** — Chrbát v drážke ide do nárezu, VEPO aj ceny v plnom rozmere skrinky (horná 600 × 720 → 600 × 720, model ďalej 564 × 684); karta dielca „Do nárezu"; olepený chrbát v drážke, poškodený údaj aj zastarané skrinky (schéma < 19) zastavia všetky štyri výrobné exporty; hromadná prestavba z Kontroly — 27.9.2026, PR #401, v0.13.1
 - **D-140** — Výška osadenia chladničky v skrinke: čip „osadenie N mm" v riadku Spotrebič otvorí malé okienko s číslom (od hornej plochy dna, napr. vrch police); box niky aj pásma dverí sa posunú a Kontrola výšky aj delenia čiel počíta od zdvihnutého dna — 24.9.2026, PR #389, v0.12.20
 - **D-139** — Výška čela slotu umývačky sa dopočíta: výška linky − sokel − medzera hore zo schémy medzier; vstup „Čelo V" zanikol, predvolený slot 880 / 100 (čelo 778), výplň nad umývačkou = slot po jej spodok — 24.9.2026, PR #388, v0.12.19
 - **D-138** — Čelo slotu umývačky je „Dv myčka" so symbolom sklopu (model aj náhľad), v Čelách „Dvere umývačky" a v Kovaní/Nákupe „F1 · dv myčka"; kovanie ostáva len úchytka — 24.9.2026, PR #387 + #388, v0.12.18–v0.12.19
@@ -133,7 +133,7 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ### D-143 — Chrbát v drážke ide do nárezu v plnom rozmere, vyriešené 27.9.2026
 
-**Výsledok: PR #?, v0.13.1 (CONFIG_SCHEMA 19), blok 7 KONŠTRUKCIA dávka KON-0.** Pôvodné znenie (Michal 26.9.2026, pri príprave bloku KONŠTRUKCIA K1+K2):
+**Výsledok: PR #401, v0.13.1 (CONFIG_SCHEMA 19), blok 7 KONŠTRUKCIA dávka KON-0.** Pôvodné znenie (Michal 26.9.2026, pri príprave bloku KONŠTRUKCIA K1+K2):
 plugin počítal chrbát v režime „V drážke" (predvolený pri hornej skrinke) na **vnútorný rozmer** skrinky (horná 600 × 720, korpus 18 → **564 × 684**). V dielni sa
 drážka frézuje do hĺbky, takže chrbát bol v nárezovom zozname aj vo VEPO **malý** — výrobná chyba. Presne by bolo +9 mm na každú stranu s drážkou; Michal pre V1
 rozhodol **nekomplikovať**: chrbát v drážke ide do nárezu **v plnom rozmere skrinky** (šírka × výška od spodku dna po vrch — **600 × 720**) a dielňa ho zreže

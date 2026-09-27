@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **KON-0 · D-143 — chrbát v drážke do nárezu v plnom rozmere (v0.13.0 → v0.13.1, 27.9.2026, PR #?, blok 7 KONŠTRUKCIA, prvá dávka).**
+- **KON-0 · D-143 — chrbát v drážke do nárezu v plnom rozmere (v0.13.0 → v0.13.1, 27.9.2026, PR #401, blok 7 KONŠTRUKCIA, prvá dávka).**
   Výrobná a audit-povinná dávka (package v2 so zapracovaným auditom návrhu Codex 27.9.: NOT SOUND 2 BLOCKER + 4 FIX + 2 NOTE, BLOCKERy vyriešené rozhodnutím
   Michala). **Čo sa zmenilo:** deskriptor aj snapshot chrbta v drážke nesú nové voliteľné pole **`cut_size`** = plný rozmer skrinky `w × (h − s)` v osiach `prod`
   (horná 600 × 720 → 600 × 720, model ďalej 564 × 684; `box` = `prod` = geometria sa nemenia) a **každý chrbát značku pôvodu `back_mode`**. Builder zapíše
