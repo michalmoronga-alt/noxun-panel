@@ -545,7 +545,7 @@ ovládačov s hodnotami z DC ako návrhom. Poradie:
   nohy pri vkladaní, zámok typu v modale šablóny. Package [PACKAGE_ROHA2.md](zdroje/bloky/ROHOVA/PACKAGE_ROHA2.md). *PR #411*
 - ✅ **ROH-B1 · ovládače a prepínač strany** (v0.14.3) — riadok rohovej v Základných aj vo vkladacej karte (dverová časť, CR 1, CR 2, strana dverí), minimum šírky
   z polí a účinných hrúbok, prepnutie strany = zrkadlo zostavy, pántov, okrajov a ručných hrán (1 krok Späť). Package [PACKAGE_ROHB1.md](zdroje/bloky/ROHOVA/PACKAGE_ROHB1.md)
-  + audit návrhu [AUDIT_ROHB1_2026-09-28.md](zdroje/bloky/ROHOVA/AUDIT_ROHB1_2026-09-28.md). *PR #?*
+  + audit návrhu [AUDIT_ROHB1_2026-09-28.md](zdroje/bloky/ROHOVA/AUDIT_ROHB1_2026-09-28.md). *PR #412*
 - **ROH-B2 · kresba a čelá rohovej** — kresba zostavy v náhľade (blenda, CR 1, CR 2, rohová výstuha), karta Čelá rohovej (jedny dvierka, pánty „Pri boku / Pri rohu"),
   návrhy O12 (šírka dverí v pravom stĺpci, súhrn v lište, kláves strany pri vkladaní), odhad dielcov so zostavou; rozhodnutie o jantárovom O8 (Michal).
 

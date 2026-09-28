@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **ROH-B1 · OVLÁDAČE ROHOVEJ A PREPÍNAČ STRANY DVERÍ (28.9.2026, PR #?, v0.14.2 → v0.14.3, blok 8 · K3).** Package [PACKAGE_ROHB1.md](../zdroje/bloky/ROHOVA/PACKAGE_ROHB1.md)
+- **ROH-B1 · OVLÁDAČE ROHOVEJ A PREPÍNAČ STRANY DVERÍ (28.9.2026, PR #412, v0.14.2 → v0.14.3, blok 8 · K3).** Package [PACKAGE_ROHB1.md](../zdroje/bloky/ROHOVA/PACKAGE_ROHB1.md)
   nad schváleným mockupom [MOCKUP_ROHOVA_2026-09-28.html](../zdroje/bloky/ROHOVA/MOCKUP_ROHOVA_2026-09-28.html) (Michal 28.9.: O1–O12 podľa návrhu → rozhodnutie **R10**);
   dobrovoľný audit návrhu Codex `gpt-6-astra` **0 BLOCKER · 5 FIX · 2 NOTE** ([AUDIT_ROHB1_2026-09-28.md](../zdroje/bloky/ROHOVA/AUDIT_ROHB1_2026-09-28.md)), všetko zapracované.
   Kontrakt ani schéma sa nemenia. **Čo pribudlo:** v Základné → Rozmery **riadok rohovej** (`#cornerRow`, ten istý aj vo vkladacej karte) — dverová časť, CR 1 (ikona
