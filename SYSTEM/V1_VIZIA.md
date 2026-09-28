@@ -18,8 +18,8 @@ v PLANe prázdny**; V1 je hotové, keď je odškrtnuté všetko. Stav dopĺňaj�
    výstuhy v interiéri (hotové, D-80), sokel/nohy podľa výšky (hotové, D-79). *(Rohové spoje per strana, poldrážka, „bez dielca", čelo ako cenová položka V1-07 = mimo V1.)*
    **K1 + K2 hotové v bloku 7 (v0.14.0, 27.9.2026)** spolu s chrbtom v drážke do nárezu v plnom rozmere (D-143), opravou D-144 a šablónou Chladničková —
    [výsledok a overenie](archiv/KONSTRUKCIA_ZAVER_2026-09-27.md). **K3 hotová v bloku 8 (v0.15.0, 28.9.2026)** — dolná slepá rohová s CR lištou podľa DC „Rohová",
-   jedny dvierka, prepínač strany, kusovník/VEPO/kovanie — [výsledok a smoke](archiv/ROHOVA_ZAVER_2026-09-28.md). V1 rozsah bodu je tým prázdny; ostáva len
-   Michalov smoke rohovej a overenie závesu na výstuhe závesov v dielni (nálezy = opravy v0.15.x).
+   jedny dvierka, prepínač strany, kusovník/VEPO/kovanie — [výsledok a smoke](archiv/ROHOVA_ZAVER_2026-09-28.md). V1 rozsah bodu je tým prázdny; Michalov smoke
+   rohovej **PASS 28.9.2026** (bez nálezov), ostáva len overenie závesu na výstuhe závesov v dielni pri prvej rohovej.
 3. [x] **Materiály:** katalóg z Demosu, skupinové farby, ABS automatika so semaforom, vyhľadávač s kontextom *(hotové — Materiály 2.0 + PICKER-1/2/3)*.
 4. [x] **Kovanie:** blok KOVANIE (architektúra V1 FINAL 2.9.2026): sety s klasifikáciou a katalóg (A, B, H hotové), recepty a odvodené dielce zásuviek (C), resolver + zámky (D),
    výklopy podľa hmotnosti (E), závesy max(výška, hmotnosť) + úchytka + Tip-On (F), nohy 4/6 + príchyty (G), šablóny s kovaním (I), UI/UX balík Čiel (D-114 + D-119 presah

@@ -14,8 +14,8 @@ Dávky: ROH-A1 #410 (v0.14.1) · ROH-A2 #411 (v0.14.2) · ROH-B1 #412 (v0.14.3) 
 predrecenziu a in-SU bránu. Pri poslednej dávke 4721 headless · 138 JS sád · 3260 in-SketchUp PASS / 0 FAIL.
 Výsledok, dávky, overenie, známe obmedzenia a zlúčený smoke checklist: [ROHOVA_ZAVER_2026-09-28.md](ROHOVA_ZAVER_2026-09-28.md). Priečinok bloku (rozhodnutia
 Michala R1–R10, schválený mockup, packages s auditmi návrhu, krížový audit a jeho vyhodnotenie, geometria DC, fakty z kódu) je od uzáveru v [bloky/ROHOVA/](bloky/ROHOVA/).
-Kompatibilita: skrinka schéma 22, BuildPlan 7, ABS seed 6, knižnica šablón STD 7 — aktualizovať obe PC. **Otvorené:** jantárové upozornenie „výrez police ×
-výstuha závesov" (O8) čaká na Michalov pokyn; overenie závesu na výstuhe závesov v dielni pri prvej rohovej.
+Kompatibilita: skrinka schéma 22, BuildPlan 7, ABS seed 6, knižnica šablón STD 7 — aktualizovať obe PC. **Smoke PASS 28.9.2026** (Michal, bez nálezov);
+jantárové upozornenie „výrez police × výstuha závesov" (O8) ponechané. **Otvorené:** overenie závesu na výstuhe závesov v dielni pri prvej rohovej.
 
 ### Pôvodný plný text bloku pri uzávere
 
