@@ -21,7 +21,7 @@
   Michal 28.9. večer (v druhom okne, súbežne so smoke bloku 8) spustil **posledný otvorený bod bloku 2 KONTROLA + VÝROBA** — primitívny nárezový plán rozhodnutý 6.9.
   **Rozhodnutia** (N1–N11, [zdroje/bloky/NAREZ/ROZHODNUTIA_MICHALA_2026-09-28.md](../zdroje/bloky/NAREZ/ROZHODNUTIA_MICHALA_2026-09-28.md)): prerez 5 mm a orez 10 mm ako
   nastavenia, VEPO účtuje celé tabule a zvyšky sú Michalove, orez len pre bežné platne (pracovná doska, kompakt a zástena bez orezu), duplák s prídavkom +10 mm na stranu,
-  **plán neotáča žiadny dielec** (či VEPO otáča dielce bez smeru, sa nevie — počet je tak bezpečný), porovnanie s reálnou objednávkou VEPO až po V1 na novej testovacej
+  **plán neotáča žiadny dielec** (či VEPO otáča dielce bez smeru, sa nevie — počet je tak opatrnejší), porovnanie s reálnou objednávkou VEPO až po V1 na novej testovacej
   zákazke (vhodná zákazka teraz nie je; voliteľne nepotvrdená objednávka), **mockup schválený** s prahom upozornenia na poslednú platňu 20 %. **Podklady v priečinku bloku:**
   fakty z kódu (dvaja rešeršéri: rozpočet dnes kupuje `ceil(count_max)` platní a z toho počíta porez aj montáž, „Nastavenia rozpočtu" sú globálne, Kontrola `oversize`
   nepočíta s orezom), outside-in rešerš Antigravity (3 behy), krížový audit Codex `gpt-5.6-sol` (5 BLOCKER · 6 FIX · 3 NOTE) a Grok `grok-4.7` (2 BLOCKER · 4 FIX · 4 NOTE),
