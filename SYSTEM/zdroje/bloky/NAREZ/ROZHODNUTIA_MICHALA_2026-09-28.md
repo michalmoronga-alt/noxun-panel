@@ -4,8 +4,12 @@
 > výrobné a cenové brány, testy…) sa zapisujú do **package každej dávky** a prejdú jej auditom návrhu.
 > Pôvodná debata: [../../next_sessions/V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md](../../next_sessions/V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md) §0 a návrh
 > rozsahu [../../next_sessions/NAREZ_PLAN_NAVRH_2026-09-06.md](../../next_sessions/NAREZ_PLAN_NAVRH_2026-09-06.md) (Codex #322/#323). Tento súbor ich
-> **nenahrádza** — dopĺňa rozhodnutia zo štartu bloku. Rešerš precedensov: [RESERS_OUTSIDE_IN_2026-09-28.md](RESERS_OUTSIDE_IN_2026-09-28.md).
-> Ďalšie súbory priečinka (fakty z kódu, krížový audit, mockup, packages) pribudnú počas prípravy bloku.
+> **nenahrádza** — dopĺňa rozhodnutia zo štartu bloku. Ďalšie súbory priečinka: fakty z kódu [FAKTY_Z_KODU_2026-09-28.md](FAKTY_Z_KODU_2026-09-28.md) ·
+> rešerš precedensov [RESERS_OUTSIDE_IN_2026-09-28.md](RESERS_OUTSIDE_IN_2026-09-28.md) · krížový audit [CROSS_AUDIT_PROMPT_2026-09-28.md](CROSS_AUDIT_PROMPT_2026-09-28.md),
+> [CROSS_AUDIT_CODEX_2026-09-28.md](CROSS_AUDIT_CODEX_2026-09-28.md), [CROSS_AUDIT_GROK_2026-09-28.md](CROSS_AUDIT_GROK_2026-09-28.md), auditovaný koncept v1 ako
+> surový vstup [KONCEPT_NP_v1_2026-09-28.md](KONCEPT_NP_v1_2026-09-28.md) (nie zadanie) · vyhodnotenie nálezov
+> [RECONCILE_KRIZOVEHO_AUDITU_2026-09-28.md](RECONCILE_KRIZOVEHO_AUDITU_2026-09-28.md) · schválený mockup [MOCKUP_NAREZ_2026-09-28.html](MOCKUP_NAREZ_2026-09-28.html).
+> Packages dávok pribudnú s dávkami.
 
 ## 1 · Rozhodnutia
 
@@ -22,11 +26,13 @@
 | N9 | Orez pracovnej dosky | **pracovná doska vždy bez orezu** — aj s ABS hranou (nie len postforming); krížový audit navrhoval orez pri PD s ABS, Michal ponechal N6 | 28.9. |
 | N10 | Porovnanie s VEPO (N5) | vhodná reálna zákazka teraz nie je (KLINIKA je stará — polovica funkcií vtedy nebola). Porovnanie 1:1 **po V1** na novej zákazke, ktorá sa stane testovacím štandardom. **Ak je test nevyhnutný skôr:** vytvoríme objednávku, Michal ju pošle VEPO **bez potvrdenia** — príde výpis a nacenenie, bez objednania | 28.9. |
 
+| N11 | Mockup | **mockup schválený** ([MOCKUP_NAREZ_2026-09-28.html](MOCKUP_NAREZ_2026-09-28.html)): O1–O12 podľa návrhu, **O2 so zmenou** — upozornenie na poslednú platňu pri využití **pod 20 %** alebo pri **najviac 2 dielcoch** (len pri materiáli s aspoň 2 platňami); „ideme ďalej" | 28.9. |
+
 **Postreh mimo V1 (28.9.):** „falošný duplák" — pohľadová je len jedna strana, spodná vrstva sa skladá zo 100 mm širokých výstuh (šetrí materiál aj
 váhu, keď nie sú obe strany pohľadové). Zapísané ako **D-146** do zásobníka Po V1.
 
-## 2 · Otvorené — rozhodne Michal pri mockupe
+## 2 · Otvorené body mockupu — zodpovedané (N11)
 
-- zobrazenie v Štúdiu (sekcia **Nárezový plán**) a riadok v Rozpočte — podľa mockupu (každý bod označený „návrh — potvrdí Michal" dostane odpoveď pred packages),
-- prepínač „ceny podľa plánu" v rozpočte (návrh 6.9.: odhad ostáva predvolený, plán je voľba používateľa),
-- kde sa nastavuje prerez a orez (jedno nastavenie pre všetky zákazky alebo per zákazka) — podľa zhodnotenia náročnosti (N3).
+Všetky body mockupu (O1–O12) Michal zodpovedal 28.9.2026 večer: zobrazenie v Štúdiu a riadok v Rozpočte podľa mockupu, prepínač „ceny podľa plánu“
+per zákazka predvolene vypnutý (O5), porez podľa plánu a montáž z odhadu (O6), prerez, orez a prídavok dupláku v Nastaveniach rozpočtu raz pre všetky
+zákazky (O7, O12), prah upozornenia poslednej platne **20 %** alebo najviac 2 dielce (O2). Nič otvorené pred packages neostáva.

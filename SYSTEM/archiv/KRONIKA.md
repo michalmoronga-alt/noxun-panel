@@ -17,6 +17,19 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **DOCS — štart bloku 2 · Nárezový plán (primitívny) (28.9.2026, PR #?, len dokumentácia; verzia pluginu sa nemení).**
+  Michal 28.9. večer (v druhom okne, súbežne so smoke bloku 8) spustil **posledný otvorený bod bloku 2 KONTROLA + VÝROBA** — primitívny nárezový plán rozhodnutý 6.9.
+  **Rozhodnutia** (N1–N11, [zdroje/bloky/NAREZ/ROZHODNUTIA_MICHALA_2026-09-28.md](../zdroje/bloky/NAREZ/ROZHODNUTIA_MICHALA_2026-09-28.md)): prerez 5 mm a orez 10 mm ako
+  nastavenia, VEPO účtuje celé tabule a zvyšky sú Michalove, orez len pre bežné platne (pracovná doska, kompakt a zástena bez orezu), duplák s prídavkom +10 mm na stranu,
+  **plán neotáča žiadny dielec** (či VEPO otáča dielce bez smeru, sa nevie — počet je tak bezpečný), porovnanie s reálnou objednávkou VEPO až po V1 na novej testovacej
+  zákazke (vhodná zákazka teraz nie je; voliteľne nepotvrdená objednávka), **mockup schválený** s prahom upozornenia na poslednú platňu 20 %. **Podklady v priečinku bloku:**
+  fakty z kódu (dvaja rešeršéri: rozpočet dnes kupuje `ceil(count_max)` platní a z toho počíta porez aj montáž, „Nastavenia rozpočtu" sú globálne, Kontrola `oversize`
+  nepočíta s orezom), outside-in rešerš Antigravity (3 behy), krížový audit Codex `gpt-5.6-sol` (5 BLOCKER · 6 FIX · 3 NOTE) a Grok `grok-4.7` (2 BLOCKER · 4 FIX · 4 NOTE),
+  auditovaný koncept v1 ako surový vstup a **vyhodnotenie každého nálezu** (reconcile: prídavok dupláku, pomenovanie „horná hranica" len pri úplnom pláne so skutočným
+  formátom, cenová spôsobilosť per materiál s pádom na odhad, dopredná brána nastavení dodávateľa, jedna funkcia „zmestí sa" pre plán aj Kontrolu; Grokov orez pracovnej
+  dosky s ABS zamietol Michal). **Dávky:** NP-1 jadro → NP-2 nastavenia + Kontrola → NP-3 sekcia Nárezový plán → NP-4 ceny podľa plánu; technické požiadavky dostane
+  package každej dávky s vlastným auditom. Bokom **D-146 falošný duplák** (spodná vrstva zo 100 mm výstuh) do zásobníka Po V1.
+
 - **DOCS — smoke bloku 8 K3 ROHOVÁ SKRINKA PASS (28.9.2026, PR #415, len dokumentácia; verzia pluginu sa nemení).**
   Michal 28.9. popoludní prešiel smoke bloku 8 krok po kroku podľa checklistu v [ROHOVA_ZAVER_2026-09-28.md](ROHOVA_ZAVER_2026-09-28.md): **„smoke rohovej
   PASS, všetko sedí, super práca"** — výsledok zapísaný ako celok, nie po bodoch; ďalšie postrehy k funkciám bloku 8 idú ako nové D-čísla do DOGFOODING podľa
