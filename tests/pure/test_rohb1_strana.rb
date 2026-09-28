@@ -29,13 +29,28 @@
 #   M5 riedka mapa doplni `L1: nil`                               -> „riedka mapa"
 require_relative '../helper' unless defined?(NxTest)
 require 'json'
+require 'fileutils'
+require 'tmpdir'
 
 if NxTest.headless?
   require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core')
-  %w[actions_cabinet actions_templates payloads].each do |f|
+  # sync + resolvers: `foreign_document?`, `parse`, `part_count` (vzor test_d140_osadenie.rb).
+  %w[actions_cabinet actions_templates payloads sync resolvers].each do |f|
     require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', f)
   end
   require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'templates_dialog')
+  # ScaleWatch (bariera prepinaca) — vzor `test_roha1_rohova.rb`: observer
+  # triedy nad `Sketchup::*Observer` sa na chvilu podstrcia a hned upracu.
+  unless defined?(Noxun::Engine::ScaleWatch)
+    su = Module.new
+    %w[EntityObserver EntitiesObserver AppObserver].each { |c| su.const_set(c, Class.new) }
+    Object.const_set(:Sketchup, su)
+    begin
+      require File.join(NxTest::ROOT, 'noxun_engine', 'core', 'scale_observer')
+    ensure
+      Object.send(:remove_const, :Sketchup)
+    end
+  end
 end
 
 module NxRohB1
@@ -290,4 +305,227 @@ NxTest.test('ROH-B1: JS zrkadla — rozsahy, predvolby `dflt`, `only`, corner_th
   NxTest.assert(icons.include?("'corner-l':") && icons.include?("'corner-r':"), 'ikony strany v sprite')
   ui = NxRohB1.src('docs', 'UI_DIZAJN.md')
   NxTest.assert(ui.include?('`corner-l` / `corner-r`'), 'ikony v inventari UI_DIZAJN §4')
+end
+
+# ===========================================================================
+# Predrecenzia P2-2: SPRAVANIE (nie len poradie v zdrojaku) — ucinne hrubky
+# pri VKLADANI a vetvy akcie `handle_corner_side`.
+# ===========================================================================
+module NxRohB1
+  module_function
+
+  # Katalog: telo 25, celovy 19 a 18 (vzor `roha1_catalog_json` v in-SU).
+  def catalog_json
+    sheet = lambda do |id, th|
+      { 'material_id' => id, 'manufacturer' => 'Egger', 'decor' => 'ROHB1', 'type' => 'DTDL',
+        'thickness' => th, 'grain' => 'none', 'sheet_size' => [2800.0, 2070.0], 'color' => [230, 225, 215],
+        'production_class' => 'sheet', 'group_id' => 'GRP-ROHB1', 'structure' => 'SM' }
+    end
+    { 'std' => 1, 'schema' => 2,
+      'sheets' => [sheet.call('B1K25', 25.0), sheet.call('B1F19', 19.0), sheet.call('B1K18', 18.0)],
+      'edges' => [] }
+  end
+
+  def with_catalog
+    mat = E::Materials
+    prev = mat.test_dir_override
+    dir = File.join(Dir.tmpdir, "nx_rohb1_#{Process.pid}")
+    FileUtils.mkdir_p(dir)
+    File.binwrite(File.join(dir, 'materials.json'), JSON.generate(catalog_json))
+    mat.test_dir_override = dir
+    mat.reload!
+    yield
+  ensure
+    mat.test_dir_override = prev
+    mat.reload!
+    FileUtils.rm_rf(dir) if dir
+  end
+
+  def with_locks(locks)
+    pn = E::Panel
+    prev = pn.instance_variable_get(:@insert_locks)
+    pn.instance_variable_set(:@insert_locks, locks)
+    yield
+  ensure
+    pn.instance_variable_set(:@insert_locks, prev)
+  end
+
+  def insert_data(over = {})
+    { 'model_guid' => 'G', 'cabinet_id' => '', 'insert_session' => 1, 'revision' => 1, 'type' => 'corner_blind',
+      'width' => 1100.0, 'height' => 862.0, 'floor_height' => 150.0, 'corner_side' => 'left',
+      'corner_door_w' => 450.0, 'thickness' => 18.0 }.merge(over)
+  end
+
+  # --- akcia prepinaca: falosny model, skrinka a zaznam volani -------------
+  class FakeModel
+    def path
+      'C:/tmp/rohb1.skp'
+    end
+  end
+
+  class FakeCab
+    def initialize(cfg, cid = 'CAB-7')
+      @a = { 'kind' => 'cabinet', 'cabinet_id' => cid, 'config' => JSON.generate(cfg) }
+    end
+
+    def get_attribute(dict, key, default = nil)
+      dict == 'NOXUN' ? @a.fetch(key.to_s, default) : default
+    end
+  end
+
+  # Stub singleton metod (aj tych, ktore headless nema — tie sa po teste zmazu).
+  def with_stubs(entries)
+    saved = []
+    entries.each do |(mod, name, impl)|
+      sc = mod.singleton_class
+      had = sc.method_defined?(name) || sc.private_method_defined?(name)
+      saved << [sc, name, had ? sc.instance_method(name) : nil]
+      sc.send(:define_method, name, &impl)
+    end
+    yield
+  ensure
+    saved.reverse_each do |(sc, name, orig)|
+      orig ? sc.send(:define_method, name, orig) : sc.send(:remove_method, name)
+    end
+  end
+
+  # Spusti `handle_corner_side` s podstrcenym prostredim; -> zaznam volani.
+  def switch(cab:, data:, barrier: true, rebuild: nil)
+    model = FakeModel.new
+    guid = E::DocKey.key(model)
+    log = []
+    pn = E::Panel
+    su = Module.new
+    su.define_singleton_method(:active_model) { model }
+    rebuild ||= ->(_m, _c, params, **kw) { log << [:rebuild, params['corner_side'], kw[:op_name]] }
+    stubs = [
+      [pn, :find_cabinet, ->(_m) { cab }],
+      [pn, :push_selected, ->(_m, **_kw) { log << [:push] }],
+      [pn, :set_status, ->(msg, err = false) { log << [:status, msg, err] }],
+      [pn, :js, ->(script) { log << [:js, script] }],
+      [pn, :reselect, ->(_m, _c) { log << [:reselect] }],
+      [pn, :status_with_warnings, ->(_c, msg) { log << [:status, msg, false] }],
+      [pn, :part_count, ->(_c) { 42 }],
+      [pn, :suspend_selection_sync, ->(&blk) { blk.call }],
+      [E::ScaleWatch, :flush_pending!, ->(_m = nil) { log << [:barrier]; barrier }],
+      [CB, :rebuild, rebuild]
+    ]
+    Object.const_set(:Sketchup, su)
+    begin
+      with_stubs(stubs) do
+        payload = { 'model_guid' => guid, 'cabinet_id' => 'CAB-7', 'corner_side' => 'right',
+                    'switch_token' => 'tok-1' }.merge(data)
+        payload['model_guid'] = 'CUDZI' if data['model_guid'] == :foreign
+        begin
+          pn.handle_corner_side(payload.to_json)
+        rescue StandardError => e
+          log << [:raised, e.message]
+        end
+      end
+    ensure
+      Object.send(:remove_const, :Sketchup)
+    end
+    log
+  end
+
+  def ack(log)
+    s = log.select { |l| l[0] == :js }.map { |l| l[1] }.grep(/NX\.cornerSideResult/).last.to_s
+    j = s[/\((\{.*\})\)/, 1]
+    j ? JSON.parse(j) : nil
+  end
+
+  def corner_cfg(over = {})
+    stored(over)
+  end
+end
+
+NxTest.test('ROH-B1 (predrecenzia P2-2a): corner_ctx pri VKLADANI — hrubka tela z materialu, CR 2 z celoveho sablony') do
+  pn = NxRohB1::E::Panel
+  NxRohB1.with_catalog do
+    NxRohB1.with_locks({}) do
+      ctx = pn.corner_preflight_ctx(NxRohB1.insert_data('material_id' => 'B1K25', 'front_material_id' => 'B1F19'), nil, nil)
+      NxTest.assert_equal({ 'th2' => 19.0, 't' => 25.0 }, ctx, 'vklad prevezme hrubku tela 25 (odomknuta) a CR 2 19')
+      cfg = NxRohB1::CB.normalize(NxRohB1.params('thickness' => ctx['t']))
+      NxTest.assert_close(599.0, NxRohB1::CN.corner_fit_width(cfg, { 'cabinet/cr:2' => ctx['th2'] }), 0.001,
+                          'minimum pri korpuse 25 a celovom 19 = 599 (audit B1 FIX 4)')
+      none = pn.corner_preflight_ctx(NxRohB1.insert_data, nil, nil)
+      NxTest.assert_equal({ 'th2' => 18.0, 't' => 18.0 }, none, 'bez materialov navrhu: projekt mimo katalogu -> 18 / zivy t')
+      front18 = pn.corner_preflight_ctx(NxRohB1.insert_data('front_material_id' => 'B1K18'), nil, nil)
+      NxTest.assert_equal(18.0, front18['th2'], 'celovy 18 -> th2 18')
+    end
+    NxRohB1.with_locks({ 'thickness' => 18.0 }) do
+      locked = pn.corner_preflight_ctx(NxRohB1.insert_data('material_id' => 'B1K25', 'front_material_id' => 'B1F19'), nil, nil)
+      NxTest.assert_equal({ 'th2' => 19.0, 't' => 18.0 }, locked,
+                          'zamknuta hrubka 18 so sablonou 25 -> t ostava 18 (vklad by konflikt odmietol, nie prevzal)')
+    end
+  end
+end
+
+NxTest.test('ROH-B1 (predrecenzia P2-2b): handle_corner_side — uspech, cudzi dokument, bez vyberu, bariera, vynimka') do
+  cfg = NxRohB1.corner_cfg
+  cab = NxRohB1::FakeCab.new(cfg)
+  busy = NxRohB1::E::Panel::CORNER_SIDE_BUSY_MSG
+
+  # Uspech: bariera -> JEDNA prestavba so zrkadlom -> push -> odpoved ok.
+  log = NxRohB1.switch(cab: cab, data: {})
+  kinds = log.map(&:first)
+  NxTest.assert_equal([:rebuild, 'right', 'NOXUN: Strana dverí rohovej'], log.find { |l| l[0] == :rebuild },
+                      'jedna prestavba, strana vpravo, vlastna operacia')
+  NxTest.assert(kinds.index(:barrier) < kinds.index(:rebuild), 'bariera observera pred prestavbou')
+  NxTest.assert(kinds.index(:reselect) && kinds.rindex(:push) < kinds.rindex(:js), 'push stavu pred odpovedou')
+  NxTest.assert_equal({ 'model_guid' => log.find { |l| l[0] == :js }[1][/"model_guid":"([^"]+)"/, 1],
+                        'cabinet_id' => 'CAB-7', 'switch_token' => 'tok-1', 'ok' => true }, NxRohB1.ack(log))
+
+  # Cudzi dokument (R-02): ziadna bariera, ziadna prestavba, odpoved ok false.
+  log = NxRohB1.switch(cab: cab, data: { 'model_guid' => :foreign })
+  NxTest.refute(log.any? { |l| %i[barrier rebuild].include?(l[0]) }, 'cudzi dokument: nic sa nedeje')
+  NxTest.assert(log.any? { |l| l[0] == :status && l[1].include?('panel patrí inému dokumentu') }, 'hlasi sa nahlas')
+  NxTest.assert_equal(false, NxRohB1.ack(log)['ok'], 'odpoved ok false')
+
+  # Bez oznacenej skrinky.
+  log = NxRohB1.switch(cab: nil, data: {})
+  NxTest.refute(log.any? { |l| %i[barrier rebuild].include?(l[0]) }, 'bez vyberu: ziadna bariera ani prestavba')
+  NxTest.assert(log.any? { |l| l[0] == :status && l[1].include?('Najprv označ rohovú skrinku') }, 'veta bez vyberu')
+  NxTest.assert_equal(false, NxRohB1.ack(log)['ok'])
+
+  # Cudzie echo cabinet_id.
+  log = NxRohB1.switch(cab: cab, data: { 'cabinet_id' => 'CAB-999' })
+  NxTest.refute(log.any? { |l| l[0] == :rebuild }, 'cudzie echo: ziadna prestavba')
+  NxTest.assert_equal(false, NxRohB1.ack(log)['ok'])
+
+  # Neuspesna bariera observera.
+  log = NxRohB1.switch(cab: cab, data: {}, barrier: false)
+  NxTest.refute(log.any? { |l| l[0] == :rebuild }, 'bariera zlyhala: ziadna prestavba')
+  NxTest.assert(log.any? { |l| l[0] == :status && l[1] == busy && l[2] == true }, 'veta CORNER_SIDE_BUSY_MSG')
+  NxTest.assert(log.any? { |l| l[0] == :push }, 'resync panela')
+  NxTest.assert_equal(false, NxRohB1.ack(log)['ok'])
+
+  # Vynimka prestavby: resync, vynimka ide dalej (cb wrapper), odpoved ok false.
+  boom = ->(_m, _c, _p, **_kw) { raise 'prestavba zlyhala' }
+  log = NxRohB1.switch(cab: cab, data: {}, rebuild: boom)
+  kinds = log.map(&:first)
+  NxTest.assert(kinds.include?(:raised), 'vynimka sa nezamlci (status da cb wrapper)')
+  NxTest.assert(kinds.index(:push) && kinds.index(:push) < kinds.rindex(:js), 'resync pred odpovedou')
+  NxTest.assert_equal(false, NxRohB1.ack(log)['ok'], 'odpoved ok false aj pri vynimke')
+
+  # Nerohova skrinka / rovnaka strana / neznama strana.
+  low = NxRohB1::FakeCab.new(NxRohB1::JSON_LOWER)
+  log = NxRohB1.switch(cab: low, data: {})
+  NxTest.refute(log.any? { |l| l[0] == :rebuild }, 'dolna: ziadna prestavba')
+  NxTest.assert(log.any? { |l| l[0] == :status && l[1] == 'Stranu dverí má len rohová skrinka.' })
+  NxTest.assert_equal(false, NxRohB1.ack(log)['ok'])
+  log = NxRohB1.switch(cab: cab, data: { 'corner_side' => 'left' })
+  NxTest.refute(log.any? { |l| l[0] == :rebuild }, 'rovnaka strana: ziadny krok Spat')
+  NxTest.assert_equal(true, NxRohB1.ack(log)['ok'])
+  log = NxRohB1.switch(cab: cab, data: { 'corner_side' => 'hore' })
+  NxTest.refute(log.any? { |l| l[0] == :rebuild }, 'neznama strana: nic')
+  NxTest.assert_equal(false, NxRohB1.ack(log)['ok'])
+
+  # Bez tokenu (stary klient) sa odpoved neposiela, prestavba prebehne.
+  log = NxRohB1.switch(cab: cab, data: { 'switch_token' => nil })
+  NxTest.assert(log.any? { |l| l[0] == :rebuild } && NxRohB1.ack(log).nil?, 'bez tokenu ziadna odpoved')
+end
+
+module NxRohB1
+  JSON_LOWER = { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0, 'thickness' => 18.0 }.freeze
 end
