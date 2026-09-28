@@ -549,7 +549,7 @@ ovládačov s hodnotami z DC ako návrhom. Poradie:
 - ✅ **ROH-B2 · kresba a čelá rohovej** (v0.14.4) — kresba zostavy v náhľade zo servera (blenda šrafovaná, CR 1, CR 2, rohová výstuha, koty 450 / 80, obe strany,
   nezmestenie červenou; Korpus aj s dverami), karta Čelá rohovej (jedny dvierka, pánty „Pri boku / Pri rohu"), bez delenia zón, návrhy O12 (šírka dverí, súhrn
   v lište, kláves D pri vkladaní), ikona z mockupu, odhad dielcov so zostavou. Jantárové O8 bez zmeny (čaká na Michala). Package
-  [PACKAGE_ROHB2.md](zdroje/bloky/ROHOVA/PACKAGE_ROHB2.md). *PR #?*
+  [PACKAGE_ROHB2.md](zdroje/bloky/ROHOVA/PACKAGE_ROHB2.md). *PR #413*
 
 ### 6 · INFRA (priebežne, podľa potreby)
 

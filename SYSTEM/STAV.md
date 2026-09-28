@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.14.4 · 28.9.2026 — BLOK 8 · K3 ROHOVÁ SKRINKA: posledná kódová dávka ROH-B2** (PR #?) nad **ROH-B1** (v0.14.3, PR #412, ovládače a prepínač strany),
+**v0.14.4 · 28.9.2026 — BLOK 8 · K3 ROHOVÁ SKRINKA: posledná kódová dávka ROH-B2** (PR #413) nad **ROH-B1** (v0.14.3, PR #412, ovládače a prepínač strany),
 **ROH-A2** (v0.14.2, PR #411, vkladanie) a **ROH-A1 jadrom** (v0.14.1, PR #410). Plugin pozná typ **„Rohová"** (`corner_blind`) — dolnú slepú rohovú skrinku podľa
 DC „Rohová": korpus ako dolná + rohová zostava (**blenda korpusová**, **výstuha závesov**, **CR 1**, **CR 2**, **rohová výstuha**), jedny dvierka s pántmi predvolene
 pri rohu, vnútri len police; ide do **kusovníka, VEPO, nákupu aj ponuky**. V **Základné → Rozmery** (aj vo vkladacej karte) je riadok **Dverová časť · CR 1 · CR 2 ·
@@ -29,7 +29,7 @@ v **seede 6** — starší plugin zákazku neprestaví ani nevyexportuje (rohov�
 po prvej mutácii rozpočtu needituje a zastaví oba cenové exporty). **Aktualizovať OBE PC (aj Luciino) pred prvou rohovou** — starší plugin rohovú nepozná a knižnicu
 šablón STD 7 len číta (nedá sa v nej ukladať, premenovať ani mazať).
 
-**Testy (posledná kódová dávka, ROH-B2 PR #?):** **4721 headless · 138 JS sád · 3260 in-SU PASS / 0 FAIL**. ROH-B1 (#412): 4710 · 137 · 3244. ROH-A2 (#411): 4698 · 136 · 3222.
+**Testy (posledná kódová dávka, ROH-B2 PR #413):** **4721 headless · 138 JS sád · 3260 in-SU PASS / 0 FAIL**. ROH-B1 (#412): 4710 · 137 · 3244. ROH-A2 (#411): 4698 · 136 · 3222.
 **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 
 ## Robí sa

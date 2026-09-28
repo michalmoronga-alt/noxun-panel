@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **ROH-B2 · KRESBA ROHOVEJ ZOSTAVY, KARTA ČELÁ ROHOVEJ A NÁVRHY O12 (28.9.2026, PR #?, v0.14.3 → v0.14.4, blok 8 · K3).** Package
+- **ROH-B2 · KRESBA ROHOVEJ ZOSTAVY, KARTA ČELÁ ROHOVEJ A NÁVRHY O12 (28.9.2026, PR #413, v0.14.3 → v0.14.4, blok 8 · K3).** Package
   [PACKAGE_ROHB2.md](../zdroje/bloky/ROHOVA/PACKAGE_ROHB2.md) nad schváleným mockupom (sekcie C, B · Čelá, O12, A); kontrakt ani schéma sa nemenia (`codex-audit` nie),
   predrecenzia povinná (nové ovládače, klávesa v nástroji ghostu, > 300 riadkov). **Kresba zostavy počíta server:** `Panel.corner_preview_json` = `CabinetBuilder.normalize`
   → `Construction.corner_parts` (tá istá autorita ako stavba) → dielce v poradí kreslenia (blenda, rohová výstuha, CR 1, CR 2), koty dverovej časti a CR 1, `fits`/`need`,
