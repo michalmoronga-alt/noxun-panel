@@ -180,11 +180,42 @@ module Noxun
 
       # --- hlavny builder ----------------------------------------------------
 
+      # NP-1: JEDNA priprava riadka pre VEPO aj narezovy plan (SheetLayout).
+      # Presne kroky, ktorymi `build` riadok prijme alebo vyradi, v NEZMENENOM
+      # poradi: validate_row -> oriented (jedina vymena pri grain 'width') ->
+      # finished_dimensions (ABS mimo katalogu; poradie hran PO vymene urcuje
+      # text „neznama ABS <id>") -> commercial_thickness -> zaokruhlenie
+      # rozmerov na cele mm (Integer, polovica od nuly — bajty CSV).
+      # Vrati { 'ok' => true, 'row' => orientovany riadok (vratane
+      # material_source), 'dims' => [l, w] Integer, 'commercial' => Integer,
+      # 'edges' => hrany orientovaneho riadka } alebo { 'ok' => false,
+      # 'reason' => presny text dovodu, ako ide do errors/LOGu }.
+      # Spravanie pri chybnych datach je TO ISTE ako v `build` (NaN/nekonecno
+      # vyhodi FloatDomainError, zle hrany TypeError) — ochranu vstupu robi
+      # volajuci (SheetLayout), VEPO sa nemeni (charakterizacne testy NP-1).
+      def prepare_row(raw, edge_thicknesses)
+        reason = validate_row(raw)
+        return { 'ok' => false, 'reason' => reason } if reason
+
+        row = oriented(raw)
+        dims, dim_err = finished_dimensions(row, edge_thicknesses)
+        return { 'ok' => false, 'reason' => dim_err } if dim_err
+
+        commercial = commercial_thickness(row['thickness'])
+        return { 'ok' => false, 'reason' => "chybná hrúbka #{row['thickness']}" } if commercial.nil?
+
+        { 'ok' => true, 'row' => row, 'dims' => [dims[0].round, dims[1].round],
+          'commercial' => commercial, 'edges' => row['edges'] || {} }
+      end
+
       # rows: Bom.compute[:rows] (agregovane vyrobne riadky — uzamknute testom, N12).
       # materials: {material_id => {'label' => String}}; edge_thicknesses: {abs_id => Float}.
+      # Kazdy riadok prechadza `prepare_row` (NP-1 — ta ista priprava ako narezovy plan).
       # Vrati: { 'project_slug', 'groups' => [{filename, csv, rows, pieces, material_ids,
-      #          material_label, tag, notes}], 'errors' => [{name, reason, owners}],
-      #          'log_text', 'total_rows', 'total_pieces' }
+      #          material_label, tag, display_labels, notes}], 'errors' => [{name, reason,
+      #          material_id, owners, full?}], 'shortened' => [{full, name, reason, length,
+      #          width, thickness, quantity, owners, filename}], 'log_text', 'total_rows',
+      #          'total_pieces' }
       # validation: vysledok Validation.run ({ 'items' => [...], 'counts' => {...} })
       # — sekcia KONTROLA v LOGu vznika z NEHO (nalez 5: ten isty cerstvy vysledok
       # ako status okna). Nahrada za povodny `warnings:` param a sekciu "Upozornenia
@@ -202,22 +233,14 @@ module Noxun
         buckets = {} # [label, tag] => {rows:[csv polia], material_ids:Set-like pole, label:, tag:}
 
         Array(rows).each do |raw|
-          reason = validate_row(raw)
-          if reason
-            errors << error_entry(raw, reason)
+          prep = prepare_row(raw, edge_thicknesses)
+          unless prep['ok']
+            errors << error_entry(raw, prep['reason'])
             next
           end
-          row = oriented(raw)
-          dims, dim_err = finished_dimensions(row, edge_thicknesses)
-          if dim_err
-            errors << error_entry(raw, dim_err)
-            next
-          end
-          commercial = commercial_thickness(row['thickness'])
-          if commercial.nil?
-            errors << error_entry(raw, "chybná hrúbka #{row['thickness']}")
-            next
-          end
+          row = prep['row']
+          dims = prep['dims']
+          commercial = prep['commercial']
 
           label = material_label(row['material_id'], materials)
           tag = merge_18_36 && [18, 36].include?(commercial) ? '18_36' : commercial.to_s
@@ -237,8 +260,8 @@ module Noxun
           # D-112: poznamka sa cita z ORIENTOVANEHO riadku — poradie hran je to
           # iste, s akym idu kody `—`/`=` do CSV.
           note = abs_note(row, edge_decors, sheet_decors)
-          b[:rows] << [name, dims[0].round, edge_code(e['L1'], e['L2']),
-                       dims[1].round, edge_code(e['W1'], e['W2']), commercial, qty, label, note]
+          b[:rows] << [name, dims[0], edge_code(e['L1'], e['L2']),
+                       dims[1], edge_code(e['W1'], e['W2']), commercial, qty, label, note]
           b[:notes] << { 'name' => name, 'note' => note } unless note.empty?
           b[:material_ids] << row['material_id'] unless b[:material_ids].include?(row['material_id'])
           # 2A-4b (audit F8): zobrazovaci label so strukturou ide VYHRADNE do
