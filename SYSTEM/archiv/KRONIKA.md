@@ -17,6 +17,27 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **ROH-B2 · KRESBA ROHOVEJ ZOSTAVY, KARTA ČELÁ ROHOVEJ A NÁVRHY O12 (28.9.2026, PR #?, v0.14.3 → v0.14.4, blok 8 · K3).** Package
+  [PACKAGE_ROHB2.md](../zdroje/bloky/ROHOVA/PACKAGE_ROHB2.md) nad schváleným mockupom (sekcie C, B · Čelá, O12, A); kontrakt ani schéma sa nemenia (`codex-audit` nie),
+  predrecenzia povinná (nové ovládače, klávesa v nástroji ghostu, > 300 riadkov). **Kresba zostavy počíta server:** `Panel.corner_preview_json` = `CabinetBuilder.normalize`
+  → `Construction.corner_parts` (tá istá autorita ako stavba) → dielce v poradí kreslenia (blenda, rohová výstuha, CR 1, CR 2), koty dverovej časti a CR 1, `fits`/`need`,
+  `door_w` (`Fronts.resolve_layout`) a `stats`; payload označenej rohovej nesie uložený stav (`corner_preview`), preflight živé polia (`corner_preview_params`,
+  `preflight_corner_mm` — tá istá funkcia ako otvor dverí; JS posiela pri rohovej aj CR a strop). Panel len kreslí (`drawCornerAssembly`, `drawCornerDims`):
+  blenda tlmená a šrafovaná, 18 mm pásy, nezmestenie červenou, Korpus aj s dverami (bez interakcie), Čelá/Kovanie tlmia dielce korpusu, vkladanie so zostavou,
+  Zóny bez nej; ostatné typy **parita s mainom 180 / 180 scén**. **Čelá rohovej (O10):** veta „Rohová skrinka má v dverovej časti jedny dvierka." namiesto radu
+  „Pridať čelo", zamknutý krížik (`delFrontRow` bez prázdneho apply), výška AUTO na čítanie, zamknuté dlaždice typu a krídla 2–4 s bublinou, pánty „Pri boku /
+  Pri rohu" (`frontCornerHingeWord` — len popis, dáta `left`/`right`), súhrn „pánty pri rohu". **Zóny:** skupina „Delenie zóny" pri rohovej skrytá. **O12:**
+  „Šírka dverí" v pravom stĺpci (len označená rohová) s preklikom do Čelá → F1, súhrn „dvere vľavo 450" v lište Základné, **kláves D** počas ghostu rohovej —
+  nástroj len ohlási stranu (`NX.ghostCornerSide`), prepne ju tá istá `onCornerSide` ako prepínač karty (zrkadlo návrhu čiel) a ghost sa prevesí cez
+  `handle_ghost_corner_side` → `handle_insert(…, keep_point: true)` s prevzatou polohou (pri zlyhaní starý ghost končí); pásik „dvere vľavo / vpravo". D preto,
+  že šípky, Alt, Esc a Shift sú obsadené, TAB je fallback kotiev a D nemá v SketchUpe skratku (in-SU overené nad `Sketchup.get_shortcuts` Michalovho PC: 51
+  skratiek, D žiadna). Ikona „Rohová" z mockupu (O4), odhad „≈ Dielcov" + 5 dielcov zostavy. **O8** (jantárové upozornenie police × výstuha) **bez zmeny** —
+  čaká na Michala. **Testy:** headless 4720 · JS 138 sád (nová `test_rohb2_nahlad.js` 101 kontrol, `test_rohb2_nahlad.rb`) · **in-SU 3260 PASS / 0 FAIL** (nový
+  `run_rohb2`: kresba servera = geometria modelu obe strany, šírka dverí = dvere v modeli, preflight so živými poľami, kláves D → prevesenie → pravá rohová so
+  zrkadlenými čelami, 1 Späť; D pri dolnej nie je náš, D bez skratky). **Mutácie 9/9 chytené** (bez kôt rohovej, preflight bez CR, kláves bez `onCornerSide`,
+  karta bez slov, `nxSlotFrontsLock` bez rohovej, D bez podmienky rohovej, prevesenie bez polohy, poradie dielcov, vkladanie bez zostavy). In-SU bežal na obsahu
+  d5e3c1c4 — potom len dokumentácia. Zladené zdrojové guardy (signatúra `handle_insert`, `frontRowSummary`, B1 test „CR sa na otvor nepýta").
+
 - **ROH-B1 · OVLÁDAČE ROHOVEJ A PREPÍNAČ STRANY DVERÍ (28.9.2026, PR #412, v0.14.2 → v0.14.3, blok 8 · K3).** Package [PACKAGE_ROHB1.md](../zdroje/bloky/ROHOVA/PACKAGE_ROHB1.md)
   nad schváleným mockupom [MOCKUP_ROHOVA_2026-09-28.html](../zdroje/bloky/ROHOVA/MOCKUP_ROHOVA_2026-09-28.html) (Michal 28.9.: O1–O12 podľa návrhu → rozhodnutie **R10**);
   dobrovoľný audit návrhu Codex `gpt-6-astra` **0 BLOCKER · 5 FIX · 2 NOTE** ([AUDIT_ROHB1_2026-09-28.md](../zdroje/bloky/ROHOVA/AUDIT_ROHB1_2026-09-28.md)), všetko zapracované.

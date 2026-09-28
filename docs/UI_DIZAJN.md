@@ -283,10 +283,11 @@ Nastavení; `brace` čaká na skupinu Výstuhy z bloku UI-C),
 `palette` (UI-B3 — sekcia Vzhľad v koliesku),
 `cab-low` / `cab-high` (UI-C1b — typ vkladaného objektu: skrinka na sokli vs.
 zavesená; tretí typ „Doska" používa existujúci `slab`),
-`cab-corner` (ROH-A2 — typ vkladaného objektu **Rohová**: dvere len v ľavej,
-dverovej časti s úchytkou pri voľnej hrane, vpravo slepá časť a pod skrinkou
-pri dverách CR lišta do tvaru „L"; kreslí predvoľbu „dvere vľavo" — stranu
-ikona nerozlišuje),
+`cab-corner` (typ vkladaného objektu **Rohová**; od ROH-B2 presne podľa
+schváleného mockupu, O4: ako „Dolná" skrinka **na sokli**, vľavo dvere
+s úchytkou pri voľnej hrane, vpravo **prekrížená slepá časť** — prekríženie
+= blenda, ten istý jazyk ako `front-blind`; kreslí predvoľbu „dvere vľavo",
+stranu nesie `corner-l` / `corner-r`),
 `corner-l` / `corner-r` (ROH-B1 — **strana dverí rohovej** v prepínači riadku
 rohovej: dvere s úchytkou v jednej časti a **prekrížená slepá časť** — ten istý
 jazyk ako `front-blind` = blenda; `corner-r` je zrkadlo),
@@ -621,6 +622,17 @@ Zásady kreslenia:
   neho. Kým otvor rohovej nie je známy, čelá sa **nekreslia vôbec** — dvere cez
   celú šírku by boli klamstvo. Ostatné typy majú otvor = celú šírku a serverovú
   hodnotu zámerne ignorujú (parita stráži JS test).
+- **Rohová zostava sa kreslí zo servera (ROH-B2, mockup C).** Blenda korpusová
+  je **tlmená a šrafovaná** (slepá časť — nie je to čelo), rohová výstuha a CR 2
+  stoja kolmo na čelo, preto sú spredu **18 mm pásy**, CR 1 je čelový pás vedľa
+  dverí; kóty **dverová časť · CR 1** stoja tesne pod skrinkou a šírka o riadok
+  nižšie. Súradnice aj bubliny dielcov posiela server — panel nemá druhý vzorec
+  polôh. **Nezmestená zostava** (šírka pod minimom) má výstuhu a CR lišty
+  v červenej chybného poľa (`--nx-danger-line` / `--nx-err-bg`) — vidno, kde to
+  nesedí. **Korpus rohovej kreslí aj dvere** (O12 — inak by kóty 450 / 80 viseli
+  nad prázdnom; klik na dvere tam nič nerobí, patrí kontextu Čelá), Čelá
+  a Kovanie majú dielce korpusu tlmené, Zóny zostavu nekreslia (blenda by
+  zakryla vnútro); vkladanie ju kreslí, kým je vrstva Čelá zapnutá.
 - **Výsuv sa kreslí tak, ako ho vidno spredu** (schválené Michalom 20.8. nad mini
   náhľadom — nahradilo pás naprieč čelom): pri **oboch** bokoch **koľajnica ako
   „L" profil** (zvislá nožička na **vnútornom líci boku** + vodorovná pätka smerom
@@ -731,6 +743,12 @@ Sektor **Základné** je rozdelený na **vstupy vľavo a dopočítané údaje vp
   rozsahu (O2) pole zčervenie a **stavová veta povie minimum** („… potrebujú
   šírku aspoň 599 mm") — skrinka sa neprestaví; pri nezmestení zostavy sú
   červené šírka, dverová časť aj CR 1 (čo z toho zmeníš, rozhodneš ty).
+- **„Šírka dverí" a súhrn strany (ROH-B2, O12).** V pravom stĺpci označenej
+  rohovej je výstup **„Šírka dverí 446"** (číslo zo servera — dverová časť mínus
+  oba okraje) a klik otvorí **Čelá → F1**; pravý stĺpec je kratší než rozmery
+  vľavo, takže riadok nič nezaberie. Vo vkladaní riadok nie je (kontext Čelá tam
+  neexistuje — klik by nemal kam viesť). Lišta sektora Základné povie aj zbalená
+  **„… · dvere vľavo 450"**.
 
 **Koliesko = Nastavenia Inspectora** otvára **modal** (nie ďalší kontext railu):
 sú to nastavenia počítača, musia byť dostupné aj vtedy, keď nie je označené nič,
@@ -798,6 +816,12 @@ Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html`
   bez toho, aby čokoľvek pribudlo. Pri korpuse „Nakresliť" **nie je** (kresliť
   sa dá len doska). Každé tlačidlo ide **vlastným serverovým callbackom**
   (`insert_board` / `draw_board`) — názov ani `disabled` nie sú ochrana.
+- **Strana dverí rohovej sa dá prepnúť aj počas ghostu (ROH-B2, O12)** —
+  kláves **D** („dvere"), ten istý význam ako prepínač v riadku rohovej a tá
+  istá funkcia karty; ghost ostane pod kurzorom a pásik ukáže **„dvere vľavo /
+  vpravo"** v tom istom riadku (segment `gbCorner`). D sme vybrali preto, že
+  šípky, Alt, Esc a Shift sú obsadené, TAB je rezervovaný pre kotvy a D nemá
+  v SketchUpe predvolenú skratku; pri inej skrinke ho nástroj nevlastní.
 - **Pásik ghostu pri kreslení mení OBSAH, nie výšku.** Piktogram kotiev zmizne
   (počiatok je pevná kotva, Alt nemá čo prepínať) a na jeho mieste stojí **fáza
   s hodnotou** („Dĺžka 2400 mm"); zamknutá fáza to prizná. Neznáma hodnota je
@@ -858,6 +882,9 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Zones`).
   **Alt ho vypína**), nedosiahnuteľný zlomok sa neponúka. Číslo v poli je rozmer
   vo **svetlom priestore**, takže 1/2 z 864 mm pri hrúbke 18 je 423, nie 432.
 - **Police sú pilulky 0–6** — jeden klik, žiadny select s tlačidlom „nastav“.
+- **Rohová skupinu „Delenie zóny“ nemá (ROH-B2).** Rohová pozná len police cez
+  celú šírku (server delenie odmieta), preto sa celá skupina pri nej nezobrazí —
+  žiadne mŕtve dlaždice; strom aj Police ostávajú.
 - **Vnútro je rezervovaný slot** (vnútorné zásuvky, koše, tyče) — prázdna skupina
   s vysvetlením je poctivejšia než chýbajúce miesto: hovorí, že sa naň myslelo.
 
@@ -1067,6 +1094,15 @@ staršia `mockup_inspector_c.html` (`s4Fronts`) pre zvyšok kontextu.
   stav rozbalenia.
 - **Interaktívne prvky v riadku STOPUJÚ bublanie** (lekcia: rozbaľovačka sa
   zatvárala) — platí pre chip AUTO, šípku radu aj riadok kovania.
+- **Čelá rohovej = „jedny dvierka" (ROH-B2, O10).** Rad „Pridať čelo" nahradí
+  **na tom istom mieste** veta „Rohová skrinka má v dverovej časti jedny
+  dvierka." (ikona `info`, žiadny riadok navyše, žiadne mŕtve tlačidlá). Krížik
+  pri F1 ostáva viditeľný, ale neaktívny s dôvodom; výška je AUTO na čítanie.
+  V karte sú ostatné dlaždice typu a krídla 2–4 **zamknuté s bublinou**
+  (`aria-disabled`, vzor D-78) a smer sa volá **„Pánty": Pri boku / Pri rohu** —
+  pri rohovej jasnejšie než Ľavé / Pravé a platí aj po prepnutí strany dverí;
+  ikona ukazuje skutočnú stranu, súhrn riadku povie „pánty pri rohu". Dáta
+  ostávajú `left` / `right`.
 
 ### 5.8 D-89a — hover hrany zvýrazní hranu v MODELI
 
