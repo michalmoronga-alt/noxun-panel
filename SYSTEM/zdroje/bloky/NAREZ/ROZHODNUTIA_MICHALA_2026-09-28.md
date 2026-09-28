@@ -18,6 +18,9 @@
 | N5 | Overenie na praxi | Michal pohľadá **jednoduchú reálnu zákazku s počtami platní z objednávky VEPO** — plán sa na nej porovná s realitou (test a smoke) | 28.9. |
 | N6 | Orez podľa materiálu | orez okraja platí **len pre bežné platne** (DTD, MDF, HDF a iné dosky); **pracovná doska, kompakt a zástena bez orezu** — hrany sú hotové | 28.9. |
 | N7 | Duplák | VEPO reže obe vrstvy dupláku **s prídavkom +10 mm na stranu**, potom ich zlepí a oreže na hotový rozmer — plán musí prírezy vrstiev zväčšiť o prídavok | 28.9. |
+| N8 | Otáčanie dielcov | či VEPO otáča dielce bez smeru dekoru, Michal nevie → **plán neotáča žiadny dielec** (len výmena podľa smeru dekoru ako vo VEPO CSV); počet je tak bezpečný, nanajvýš o niečo vyšší. Otáčanie sa smie zapnúť neskôr, keď porovnanie s reálnou objednávkou ukáže, že VEPO otáča | 28.9. |
+| N9 | Orez pracovnej dosky | **pracovná doska vždy bez orezu** — aj s ABS hranou (nie len postforming); krížový audit navrhoval orez pri PD s ABS, Michal ponechal N6 | 28.9. |
+| N10 | Porovnanie s VEPO (N5) | vhodná reálna zákazka teraz nie je (KLINIKA je stará — polovica funkcií vtedy nebola). Porovnanie 1:1 **po V1** na novej zákazke, ktorá sa stane testovacím štandardom. **Ak je test nevyhnutný skôr:** vytvoríme objednávku, Michal ju pošle VEPO **bez potvrdenia** — príde výpis a nacenenie, bez objednania | 28.9. |
 
 **Postreh mimo V1 (28.9.):** „falošný duplák" — pohľadová je len jedna strana, spodná vrstva sa skladá zo 100 mm širokých výstuh (šetrí materiál aj
 váhu, keď nie sú obe strany pohľadové). Zapísané ako **D-146** do zásobníka Po V1.
