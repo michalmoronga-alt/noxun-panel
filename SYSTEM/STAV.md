@@ -6,11 +6,13 @@
 
 ## Stav
 
-**v0.14.1 · 28.9.2026 — BLOK 8 · K3 ROHOVÁ SKRINKA beží: ROH-A1 jadro rohovej** (PR #410). Plugin pozná nový typ **„Rohová"** (`corner_blind`) — dolnú slepú
-rohovú skrinku podľa DC „Rohová": korpus ako dolná + rohová zostava na prednej rovine (**blenda korpusová**, **výstuha závesov**, **CR 1**, **CR 2**, **rohová
-výstuha**), dvere vľavo aj vpravo (zrkadlo), jedny dvierka s pántmi predvolene pri rohu, vnútri len police. Ide do **kusovníka, VEPO, nákupu aj ponuky** (CR z čelového
-materiálu s ABS dookola, nohy 6 pri 1100, závesy podľa výšky dverí). **Tlačidlo „Rohová" a náhľad ešte nie sú** — prinesie ich **ROH-A2**; rohová v otvorenom modeli je
-editovateľná bežnými riadkami Inspectora a chránená serverom (typ ani stranu nezmeníš, čelá ostanú jedny dvierka, zóny sa nedelia).
+**v0.14.2 · 28.9.2026 — BLOK 8 · K3 ROHOVÁ SKRINKA beží: ROH-A2 vkladanie a náhľad** (PR #411) nad **ROH-A1 jadrom** (v0.14.1, PR #410). Plugin pozná typ
+**„Rohová"** (`corner_blind`) — dolnú slepú rohovú skrinku podľa DC „Rohová": korpus ako dolná + rohová zostava na prednej rovine (**blenda korpusová**, **výstuha
+závesov**, **CR 1**, **CR 2**, **rohová výstuha**), dvere vľavo aj vpravo, jedny dvierka s pántmi predvolene pri rohu, vnútri len police; ide do **kusovníka, VEPO,
+nákupu aj ponuky**. **Od ROH-A2 sa dá vložiť z panela** — vkladacia karta má tlačidlo **„Rohová"** (Dolná · Horná · Rohová · Umývačka · Doska, jeden rad), rohové
+šablóny sa ponúkajú len pri nej, náhľad kreslí **dvere len v dverovej časti** (otvor počíta server, pri zmene šírky pravej rohovej sa posúva) a **pánty na strane podľa
+smeru** (neurčené = „?", staré dvierka bez smeru bez značky — oprava aj pre dolnú), riadok **Nohy** funguje aj pri rohovej a modal „Uložiť ako šablónu" má typ rohovej
+zamknutý. Strana, dverová časť a CR sa zatiaľ nastavujú len šablónou — ovládače prinesie **ROH-B**.
 Pod tým **blok 7 · KONŠTRUKCIA K1+K2** (v0.14.0, smoke **PASS 27.9.**, delenie čiel Chladničkovej 719 / 1274 potvrdené) a blok **SPOTREBIČE S1** (v0.13.0, smoke PASS 26.9.).
 Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **trinástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · **Spotrebiče** · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine. Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
@@ -26,20 +28,21 @@ v **seede 6** — starší plugin zákazku neprestaví ani nevyexportuje (rohov�
 po prvej mutácii rozpočtu needituje a zastaví oba cenové exporty). **Aktualizovať OBE PC (aj Luciino) pred prvou rohovou** — starší plugin rohovú nepozná a knižnicu
 šablón STD 7 len číta (nedá sa v nej ukladať, premenovať ani mazať).
 
-**Testy (posledná kódová dávka, ROH-A1 #410):** **4689 headless · 135 JS sád · 3208 in-SU PASS / 0 FAIL**. KON-D (#404): 4643 · 134 · 3172. KON-B (#403): 4621 · 133 · 3158.
+**Testy (posledná kódová dávka, ROH-A2 #411):** **4698 headless · 136 JS sád · 3222 in-SU PASS / 0 FAIL**. ROH-A1 (#410): 4689 · 135 · 3208. KON-D (#404): 4643 · 134 · 3172.
 **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 
 ## Robí sa
 
-**Blok 8 · K3 ROHOVÁ SKRINKA** ([PLAN.md](PLAN.md), priečinok [zdroje/bloky/ROHOVA/](zdroje/bloky/ROHOVA/)): ✅ **ROH-A1** jadro → **ROH-A2** vkladanie a náhľad
-(tlačidlo „Rohová", dvere a pánty v náhľade v dverovej časti) → **ROH-B** ovládače (dverová časť, CR lišty, prepínač strany) po Michalovom schválení mockupu.
+**Blok 8 · K3 ROHOVÁ SKRINKA** ([PLAN.md](PLAN.md), priečinok [zdroje/bloky/ROHOVA/](zdroje/bloky/ROHOVA/)): ✅ **ROH-A1** jadro → ✅ **ROH-A2** vkladanie a náhľad
+→ **ROH-B** ovládače (dverová časť, CR lišty, prepínač strany, kresba CR a blendy v náhľade) po Michalovom schválení mockupu.
 Návrhy na potvrdenie (mockup ROH-B): rozsahy dverovej časti a CR, názvy dielcov a VEPO skratky, predvolená konštrukcia (ako dolná vs. DC), výrez police × výstuha
-závesov ako ORANGE. **Smoke rohovej** sa robí spolu s ROH-A2 (vrátane skúšky závesu Sensys na výstuhe závesov v dielni).
+závesov ako ORANGE. **Smoke rohovej je teraz možný** — checklist v [PACKAGE_ROHA2.md](zdroje/bloky/ROHOVA/PACKAGE_ROHA2.md) (sekcia Smoke), vrátane skúšky závesu
+Sensys na výstuhe závesov v dielni.
 **Čakajú na smoke:** **D-132** (#367), **D-133** (#368), **D-134** (#369). **D-141**, **D-142** a **D-145** sú v zásobníku. **Blok 1d** podľa kapacity — R-18; **R-13 čaká na Michala**.
 
 ## Ďalší krok
 
-**ROH-A2** z čerstvého `main` po mergi ROH-A1. **Aktualizovať plugin na oboch PC** (Michal aj Lucia) pred prvou rohovou. Po bloku 8 vyberá ďalší blok Michal
+**Smoke rohovej** (Michal) a schválenie mockupu **ROH-B**. **Aktualizovať plugin na oboch PC** (Michal aj Lucia) pred prvou rohovou. Po bloku 8 vyberá ďalší blok Michal
 ([PLAN.md](PLAN.md)) — kandidáti: **ceny materiálov/ABS** a viac URL na položke (zvyšok V1-03) · **nárezový plán primitívny** · **V1.0 zostavy** · blok 1d.
 Nálezy z výroby a cien majú prednosť.
 

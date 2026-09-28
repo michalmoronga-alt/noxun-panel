@@ -397,9 +397,47 @@
   // Preflight nema zapis; potvrdenie apply uvolni najviac jednu naviazanu akciu.
   var frontDraftSession = 1, frontDraftRevision = 0, frontDraft = null;
   var cabDraftRevision = 0, cabDraftDirty = false, cabApplyRequest = null, cabAfterApply = null;
+  // ROH-A2: STRANA a DVEROVA CAST rohovej pre preflight otvoru. V DOM nie su
+  // (ovladace pridu v ROH-B), preto ich drzi tento register: pri vkladani
+  // z predvolieb typu (`DEFAULTS.corner_blind`) alebo zo sablony, pri
+  // oznacenej rohovej z jej payloadu. Pri oznacenej je autoritou aj tak
+  // ULOZENY config (server ho v preflighte uprednostni); do apply ani insert
+  // payloadu sa NEPOSIELAJU (C6 — polia rohovej doplna server).
+  var cornerDraft = null;
+  function nxCornerDraftOf(src){
+    if (!src || src.type !== 'corner_blind') return null;
+    var out = {};
+    ['corner_side', 'corner_door_w'].forEach(function(k){
+      if (src[k] !== undefined && src[k] !== null && src[k] !== '') out[k] = src[k];
+    });
+    return out;
+  }
+  function nxSetCornerDraft(src){ cornerDraft = nxCornerDraftOf(src); }
+  // ROH-A2: payload OZNACENEJ skrinky -> otvor ciel ulozeneho stavu, ulozene
+  // sloty smeru (znacky zavesov, kym preflight bezi alebo je navrh neplatny)
+  // a register rohovej. Vola ho `loadSelected` len mimo rozpisaneho navrhu.
+  function nxAdoptCabinetDraft(c){
+    var p = c || {};
+    frontOpening = (p.front_opening && typeof p.front_opening === 'object') ? p.front_opening : null;
+    frontSlotsSaved = (p.front_slots && typeof p.front_slots === 'object') ? p.front_slots : null;
+    nxSetCornerDraft(p);
+  }
+  // ROH-A2 (predrecenzia P2-1): VKLADACIA karta, ktorej identitu zresetoval
+  // `nxFrontDraftReset` bez materializacie (Spat/Znova, prazdny vyber
+  // vkladanie -> vkladanie), si otvor vypyta znova. Pri oznacenej skrinke
+  // nic (otvor prinesie jej `loadSelected`). -> true = dotaz odisiel.
+  function nxInsertDraftResume(){
+    if (typeof selectedCabId !== 'undefined' && selectedCabId) return false;
+    nxFrontDraftAsk();
+    return true;
+  }
   function nxFrontDraftReset(){
     var cancelled = cabAfterApply;
     frontDraftSession++;
+    // ROH-A2: otvor patri identite (skrinke alebo vkladacej relacii) —
+    // novy vyber ho dostane z payloadu, vkladanie z prveho preflightu.
+    frontOpening = null;
+    frontSlotsSaved = null;
     frontDraft = null; cabDraftDirty = false; cabApplyRequest = null; cabAfterApply = null;
     cabEditsInFlight = false;
     cancelCabinetEdits();
@@ -421,6 +459,13 @@
     if (t === 'dishwasher'){
       // D-139: vysku cela preflight ODVODI zo sokla, vysky linky a medzery hore.
       out.dw_front_bottom = c.dw_front_bottom === '' ? d.dw_front_bottom : c.dw_front_bottom;
+    }
+    // ROH-A2: otvor rohovej = dverova cast. Pri VKLADANI ho server pocita
+    // z tychto dvoch poli (predvolby typu alebo sablona), pri oznacenej
+    // rohovej ich prebije ulozeny config — signatura sa nimi len spresni.
+    if (t === 'corner_blind' && cornerDraft){
+      if (cornerDraft.corner_side !== undefined) out.corner_side = cornerDraft.corner_side;
+      if (cornerDraft.corner_door_w !== undefined) out.corner_door_w = cornerDraft.corner_door_w;
     }
     return out;
   }
@@ -457,6 +502,9 @@
     if (!r || !result || result.revision !== r.revision || result.model_guid !== nxDocGuid() ||
         result.cabinet_id !== (selectedCabId || '') || result.insert_session !== frontDraftSession ||
         f.signature !== nxFrontDraftSignature()) return;
+    // ROH-A2: otvor AKTUALNEJ revizie (ziva sirka) — aj z odmietnutej
+    // odpovede, ked ho server stihol spocitat. Bez neho ostava posledny znamy.
+    if (result.opening && typeof result.opening === 'object') frontOpening = result.opening;
     f.pending = false; f.valid = result.valid === true; f.items = result.items || [];
     f.message = (result.errors || []).map(function(e){ return e.message; }).join(' ');
     frontSlots = result.slots || {};
@@ -1298,6 +1346,10 @@
     syncTemplateTiles();
     var src = NXInsert.composeSource(DEFAULTS[st.type] || {}, tp ? tp.config : null);
     writeConstruction(src);                  // krok 1: konstrukcia (plny obraz)
+    // ROH-A2: strana a dverova cast rohovej (predvolby typu alebo sablona) —
+    // len pre preflight otvoru; insert payload ich nenesie (C6, server ich
+    // doplni z predvolieb alebo zo zaznamu sablony).
+    nxSetCornerDraft(src);
     buildFrontHwBadges([]);                  // navrh nema kovanie (Codex PR #30)
     frontItems = null;                       // ani resolved ≈ vysky
     // KOV-A2a: NAVRH nemá resolved čelá, takže server nevie povedať, kde sa
@@ -1484,15 +1536,34 @@
   // Zrkadlo typu do modalu + zámok pri slote. JEDINÉ miesto, ktoré s poľom
   // typu pracuje; server ostáva autoritou (`Panel.apply_template_type!` pri
   // slote typ nemení bez ohľadu na payload).
+  // ROH-A2: ROHOVÁ je zamknutá rovnako (server typ jej šablóny nepreklopí —
+  // `apply_template_type!`): „uložené ako dolná" by stratilo rohovú zostavu.
+  // Veta bubliny je per typ; text je TU, HTML nesie len predvolbu slotu.
+  var TPL_TYPE_LOCK = {
+    dishwasher: { title: 'Typ určuje sám slot umývačky — prepnúť sa nedá.',
+                  tip: 'Typ určuje sám slot umývačky — nemá korpus, takže sa na dolnú ani hornú skrinku prepnúť nedá.' },
+    corner_blind: { title: 'Typ určuje rohová skrinka — prepnúť sa nedá.',
+                    tip: 'Rohová skrinka nesie rohovú zostavu (blenda, výstuhy, CR lišty) — šablóna z nej je vždy rohová, na dolnú ani hornú sa prepnúť nedá.' }
+  };
   function nxSyncTplSaveType(t){
     var sel = el('tplSaveType');
     if (!sel) return;
-    var slot = (t === 'dishwasher');
+    var lock = Object.prototype.hasOwnProperty.call(TPL_TYPE_LOCK, t) ? TPL_TYPE_LOCK[t] : null;
+    // Zamknuté typy sa ponúkajú LEN nad sebou — nad dolnou skrinkou by voľba
+    // „Rohová" či „Umývačka" nič nespravila (server whitelist `lower|upper`).
+    var opts = sel.options || [];
+    for (var i = 0; i < opts.length; i++){
+      var ov = opts[i].value;
+      if (Object.prototype.hasOwnProperty.call(TPL_TYPE_LOCK, ov)) opts[i].hidden = (ov !== t);
+    }
     setVal('tplSaveType', t);
-    sel.disabled = slot;
-    sel.title = slot ? 'Typ určuje sám slot umývačky — prepnúť sa nedá.' : '';
+    sel.disabled = !!lock;
+    sel.title = lock ? lock.title : '';
     var tip = el('tplSaveTypeTip');
-    if (tip) tip.hidden = !slot;
+    if (tip){
+      tip.hidden = !lock;
+      if (lock && tip.setAttribute) tip.setAttribute('data-tip', lock.tip);
+    }
   }
 
   // --- S1-C: pole „Očakáva" v modale D-14 ------------------------------------

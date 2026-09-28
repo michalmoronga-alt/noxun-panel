@@ -73,6 +73,12 @@ module Noxun
                     else
                       Construction.front_opening(preflight_opening_cfg(data, corner, dims))
                     end
+          # ROH-A2: otvor ide aj do ODPOVEDE (kazdy typ) — nahlad rohovej z neho
+          # kresli dvere v dverovej casti. Zapisuje sa do `out` HNED, takze ho
+          # nesie aj odmietnutie nizsie (napr. medzera pri rohu mimo rozsahu):
+          # nahlad sa nesmie vratit na dvere cez celu sirku len preto, ze celo
+          # neprislo cez kontrolu.
+          out['opening'] = opening_json(opening)
           cfg = data['fronts']
           raise 'Neplatný návrh čiel.' unless cfg.is_a?(Hash) && cfg['items'].is_a?(Array)
           # D-139: riadok slotu sa pred preflightom KANONIZUJE tym istym
@@ -100,8 +106,17 @@ module Noxun
                     'errors' => [{ 'message' => e.message }])
         end
 
+        # ROH-A2: otvor `{x0, w, z0, h}` (mm od laveho boku a od podlahy) ako
+        # JSON pre panel. Jedina serializacia — preflight aj payload skrinky.
+        def opening_json(opening)
+          return nil unless opening.is_a?(Hash)
+
+          %i[x0 w z0 h].to_h { |k| [k.to_s, opening[k].to_f.round(2)] }
+        end
+
         # Zdroj poli rohovej pre preflight, alebo nil (nie je rohova). Oznacena
-        # skrinka = jej ULOZENY config; vkladanie = payload (A2 ho posle).
+        # skrinka = jej ULOZENY config; vkladanie = payload (A2 posiela stranu
+        # a dverovu cast z predvolieb alebo zo sablony — v DOM nie su).
         def corner_preflight_src(data, stored)
           if stored.is_a?(Hash)
             return stored['type'].to_s == Construction::CORNER_TYPE ? stored : nil

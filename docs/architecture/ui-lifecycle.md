@@ -725,7 +725,8 @@ rozmermi a iným setom nôh sú dva rôzne dotazy.
 **Odchod z riadku = SKRYŤ AJ ZNEPLATNIŤ.** `nxLegsInsertReset` (`loadSelected`, `loadBoard`, `clearSelected` a **`materializeInsertBoardCard`** — Codex #339 N2: prepnutie vkladania
 na Dosku predikát `nxLegsInsertMode` len umlčí, riadok samotný neschová nikto a v doskovej karte ostával visieť text skrinky) riadok schová, zabudne pamäť vstupov **a zdvihne
 generáciu** (`nxLegsInsertDrop`). To isté robí prechod na **hornú** skrinku vo `nxLegsApplyVisibility` (N3): bez zdvihnutia generácie by odpoveď na už neplatný dotaz riadok znova
-odkryla — natrvalo. Druhá poistka je v `nxLegsInsertResult`: odpoveď sa prijme len `getType() === 'lower'`.
+odkryla — natrvalo. Druhá poistka je v `nxLegsInsertResult`: odpoveď sa prijme len pri type s nohami — `nxLegsTypeHasLegs` (`LEGS_INSERT_TYPES` = `lower`
+a od ROH-A2 aj `corner_blind`, ktorá stojí na nohách ako dolná; horná a slot nie).
 
 **Ľahký push obnovuje OBE cesty.** `NX.setHardwareSets` (živý refresh po zmene v Štúdiu) pri **označenej** skrinke prekreslí vetu riadku (`legs_summary`, N4). **Bez označenej skrinky** riadok
 patrí náhľadu vkladania a `legs_summary` v pushi nechodí — dovtedy sa teda nedialo nič. Lenže práve ten push nesie zmenu **mapovania nôh, definície setu alebo názvov položiek**, a to sú
@@ -877,8 +878,25 @@ sú vtedy neaktívne s vysvetlením. Sektor Náhľad sa už pri vkladaní dosky 
 
 **Žiadne nové dáta:** kreslí sa výhradne z payloadov, ktoré panel už dostáva — rozmery formulára, `front_items`, **`config.hardware` (uložený do `hwItems` pri tom istom pushi,
 ktorý plní sekciu kovania)** a strom zón; odvodenie (pozícia značky z `owner_part_key` + `generic_type`, medzera ako rozdiel susedných čiel, dedup stĺpcov zón) sú **čisté funkcie**
-`nxHwMarks` / `nxSlideGeom` / `nxHwSummary` / `nxFrontDims` / `nxZoneSpans`. Kovanie sa ani tu **nečíta z geometrie** (invariant) a značka je **orientačná** — strana závesu
-jednokrídlových dvierok v dátach nie je, preto tooltip pomenúva vlastníka presne.
+`nxHwMarks` / `nxSlideGeom` / `nxHwSummary` / `nxFrontDims` / `nxZoneSpans`. Kovanie sa ani tu **nečíta z geometrie** (invariant) a značka je **orientačná**.
+**Strana pántov (ROH-A2, krížový audit C8)** rozhoduje čistá `nxHingeSide(wkey, idx, n, entry)`: krajné krídla viackrídlových dvierok sú odvodené (`left`/`p1` vľavo,
+`right`/posledné vpravo — A1 kontrakt), jednokrídlové (`wing:single`) a stredné krídla čítajú **stav smeru zo slotu servera** (`front_slots[front_id]`, do `pvGeom`
+ako `g.slots` cez `pvHingeSlots`) cez `frontDirSymbol` z `core.js`. Zdrojom sú **uložené sloty označenej skrinky** (`frontSlotsSaved`, plní ich `nxAdoptCabinetDraft`
+z payloadu) — patria uloženému kovaniu `hwItems` a preflight ich nezhodí (`frontSlots` je počas preflightu `null` a pri neplatnom návrhu prázdne; predrecenzia P3);
+bez uložených slotov (vkladanie) sa berú sloty posledného preflightu — `left`/`right` = krúžok s krížikom na tej hrane, **neurčené** = značka `unknown` (prerušovaný jantárový kruh s „?"
+v strede krídla, `hwMarkSvg`), **legacy bez kľúča smeru = žiadna značka** (O1: strana sa nehádá). Do A2 sa jednokrídlové pánty kreslili vždy vľavo — oprava platí pre
+každý typ.
+
+**ROH-A2 — čelný otvor.** Rohová má čelá len v **dverovej časti**. Otvor `{x0, w, z0, h}` je **serverový** (`Construction.front_opening`): payload označenej skrinky
+nesie `front_opening` uloženého stavu (`Panel.front_opening_payload`) a každá odpoveď preflightu čiel `opening` pre **aktuálnu revíziu** (živá šírka — pri dverách
+vpravo `x0 = W − D`); obe plnia globál `frontOpening` (`core.js`, z payloadu cez `nxAdoptCabinetDraft` len mimo rozpísaného návrhu `holdDraft`), ktorý
+`nxFrontDraftReset` pri zmene identity zahodí. Reset bez materializácie karty (**Späť/Znova** vo vkladaní — `NX.historyRefresh`, prázdny výber vkladanie →
+vkladanie — `NX.clearSelected`) si otvor vypýta znova cez `nxInsertDraftResume` (predrecenzia P2-1; pri označenej skrinke nič — otvor prinesie jej
+`loadSelected`). `pvGeom` z neho cez čistú
+`nxFrontOpeningFor(type, W, op)` vloží `fx0`/`fw` a **všetci čitatelia šírky čiel** (`frontsExtent`, `nxFrontsExtent`, `nxDraftStats`, `renderFrontsPreview`,
+`drawFrontDims`, `nxHwMarks`, `drawFrontsGhost`) merajú od otvoru. Ostatné typy dostanú vždy `{x0: 0, w: W}` a serverový otvor **ignorujú** — kresba dolnej, hornej aj
+slotu je pixel po pixeli rovnaká (parita v `tests/js/test_roha2_vkladanie.js`, jednorazovo aj proti `main`: 180 scén bez rozdielu). Rohová **bez známeho otvoru**
+(odpoveď preflightu po zmene identity ešte neprišla) čelá nekreslí vôbec (`frontsPending`) — dvere cez celú šírku by boli klamstvo. Kresba CR líšt a blendy je ROH-B.
 
 **UI-C4 dala značke `data-owner`** (ten istý `owner_part_key`, ktorý už prišiel v payloade — žiadne nové dáta): klik ide na `nxHwMarkPick` v `hardware.js`, teda označí vlastníka v
 modeli a dotiahne jeho box v sekcii Kovanie; keď box neexistuje (sekcia ešte nemá dáta), ostáva pôvodné správanie z UI-B2 — popis položky v statuse. Geometriu berú všetky vrstvy z
@@ -1610,6 +1628,15 @@ neprepína (`apply_template_type!` pri `dishwasher` nerobí nič) — slot sa na
 má tretiu voľbu **Umývačka** a pri slote je **zamknutý** (`disabled` + bublina „typ určuje sám slot"). Opačný smer je rovnako uzavretý — voľba `dishwasher` nad
 **dolnou** skrinkou sa ignoruje (whitelist ostáva `lower|upper`), lebo jej config nemá `dw_*`. Autoritou je server, HTML je zrkadlo.
 
+**ROH-A2 — piaty typ objektu: Rohová.** Rad typov je `Dolná · Horná · Rohová · Umývačka · Doska` (stále jeden rad, ikona `cab-corner`, `data-ins-type="corner_blind"`);
+stav, `aria-pressed`, filter šablón aj `applyVisibility` (rohová = ako dolná) idú cestami z A1 a UI-C1b. Karta sa materializuje z `DEFAULTS.corner_blind`
+(`CORNER_DEFAULTS` zo `sync.rb`) alebo zo šablóny; **strana a dverová časť v DOM nie sú** (ovládače ROH-B), preto ich drží register `cornerDraft` vo `form.js`
+(`nxSetCornerDraft` z `materializeInsertCabCard` a z `loadSelected` cez `nxAdoptCabinetDraft`) **výhradne pre preflight otvoru** (`nxFrontDraftData` ich pošle pri type `corner_blind`) —
+insert ani apply payload ich nenesie (C6: server ich doplní z predvolieb alebo zo záznamu šablóny `apply_template_slot_fields!`). Riadok **Nohy** vo vkladacej karte platí
+aj pre rohovú (`nxLegsTypeHasLegs` v `hardware.js` = `lower` + `corner_blind`). Modal „Uložiť ako šablónu" má voľbu **Rohová** a pri rohovej je typ zamknutý
+s vlastnou bublinou (`TPL_TYPE_LOCK` vo `form.js`, vzor slotu); zamknuté typy (slot, rohová) sa v selecte ponúkajú **len nad sebou** — nad dolnou by voľba nič
+nespravila (server prepína len `lower|upper`).
+
 **S1-C — modal „Uložiť ako šablónu" (D-14) má pole „Očakáva".** NXModal multi-select nemá, preto je to **skupina checkboxov** v `panel.html` (`#tplSaveExpects`,
 `data-tplexp="<kód>"`) serializovaná ako Array; ponuka je **matica skrinky** (`fridge · oven · microwave`), pri **slote** sa riadok skryje a nahradí ho veta „Slot umývačky
 očakáva umývačku vždy" (`nxSyncTplSaveExpects`, zrkadlo `nxSyncTplSaveType`). Predvyplní sa z `appliance_expects[]` **označenej skrinky** (globál `cabApplianceExpects`
@@ -1632,7 +1659,7 @@ v `resolve_part`): katalógový materiál mimo rozsahu čiel prestavbu zastaví,
 
 #### UI-C1b (vzhľad a správanie karty)
 
-typ vkladania je **jedna voľba z troch** (`Dolná · Horná · Doska`) v segmentových tlačidlách — dvojica rádií `ikind`+`ctype` zanikla a **autorita je čistý stav**
+typ vkladania je **jedna voľba** v segmentových tlačidlách (UI-C1b tri, od S1-E a ROH-A2 päť v jednom rade) — dvojica rádií `ikind`+`ctype` zanikla a **autorita je čistý stav**
 `NXInsert.insertType()/setInsertType` (DOM je len zrkadlo; `getType()` v `core.js` už rádiá nečíta). Zmena **typu korpusu** zahodí korpusovú šablónu (ponuka je typovo filtrovaná —
 D-32), prepnutie Korpus↔Doska výbery **nezahadzuje** (každý druh má vlastný sklad `template`/`boardTemplate`).
 
@@ -1781,7 +1808,12 @@ Doména panela: skladanie payloadov pre klienta. Kontrakt vkladacej karty a kni�
 aplikovateľnosti smeru (`Fronts.direction_slots`, KOV-A1) nad **uloženým** `front_items`. Je to **čistá projekcia**: žiadny zápis, žiadny prepočet plánu a `state` prechádza
 **nezmenený** (nil = legacy — kľúč v configu nie je, `unset` = vedome neurčené, `left`/`right` = vyriešené). Tým je server **autoritou na otázku „kde sa smer pýta"**; panel si ju
 z počtu krídel neodvodzuje. **`wings_n` je súčasťou záznamu** (Codex #281 P2-A) a pri neznámom počte je `nil`: legacy záznam bez `wings_n` (pred D-07) tak dá `{ nil, [] }` —
-prázdne sloty **a priznané neznámo**, takže karta o ňom nepovie ani „pýtam sa", ani „je to dvojkrídlo".
+prázdne sloty **a priznané neznámo**, takže karta o ňom nepovie ani „pýtam sa", ani „je to dvojkrídlo". Od **ROH-A2** zo slotov kreslí aj náhľad Kovania stranu
+pántov (`nxHingeSide`).
+
+**`front_opening` (ROH-A2).** `cabinet_payload` posiela čelný otvor **uloženého** stavu `{x0, w, z0, h}` — `front_opening_payload` poskladá z configu vstup
+`Construction.front_opening` (jediná autorita, tá istá ako plán a preflight) a serializuje ho `opening_json` (`actions_cabinet.rb`); poškodený config = otvor
+s nulovou šírkou, výnimka = `nil`. Náhľad z neho kreslí rohovú, kým nepríde preflight so živou šírkou; ostatné typy ho ignorujú.
 
 **`axes` — stav osí zámku (KOV-D2a Astra #20 F7, tretia os D-128).** `drawer_axes_map` skladá pre každé klasifikované zásuvkové čelo mapu
 `owner_part_key → { height?: {...}, box?: {...}, nl: {...} }` a vešia ju **na obe strany**: na emitovanú položku výsuvu (`attach_drawer_axes`, len `source: 'recipe'`) **aj** na riadok
@@ -2059,7 +2091,10 @@ a `handle_apply_all` (vzor `slot_fronts_refusal`). Smer, úchytkový profil, med
 a **`corner_template_refusal(tpl_ref)`** odmietne rohovú šablónu s porušeným invariantom čiel ešte **pred** ghostom (nie ticho oreže). **Preflight čiel (audit A1
 NOTE 5):** `front_preflight_result(data, stored)` počíta otvor pre **každý typ** cez `Construction.front_opening` (`preflight_opening_cfg`); pri rohovej so stranou
 a dverovou časťou z **uloženého configu označenej skrinky** (`handle_front_preflight` ho pošle) a so živou šírkou z formulára — pri dverách vpravo `x0 = W − D`;
-ostatné typy dostanú tie isté čísla ako predtým bez `opening`. JS kresba náhľadu z otvoru je ROH-A2. `TEMPLATE_TYPE_WORDS` pozná „rohová".
+ostatné typy dostanú tie isté čísla ako predtým bez `opening`. **ROH-A2:** otvor ide aj do **odpovede** (`opening` `{x0, w, z0, h}` cez `opening_json`, pre každý typ
+vrátane slotu) a zapisuje sa do nej hneď po výpočte, takže ho nesie aj odmietnutie (medzera pri rohu mimo rozsahu); keď výnimka padne skôr (rozmer mimo rozsahu),
+kľúč chýba a panel drží posledný známy. Pri **vkladaní** (bez uloženého configu) berie `corner_preflight_src` stranu a dverovú časť z payloadu — panel ich posiela
+z predvolieb typu alebo zo šablóny. JS kresba z otvoru: odsek „Náhľad" vyššie. `TEMPLATE_TYPE_WORDS` pozná „rohová".
 
 #### Vloženie skrinky = ghost na kurzore (GHOST V1-04)
 
@@ -3791,8 +3826,8 @@ ale v `CONSTRUCTION_FIELDS` **nie** — kým nemajú ovládač (ROH-B), JS ich n
 dolnú a každý zápis by ju poslal späť ako `lower`) a `NX_TYPE_LABEL` „Rohová" · `form.js` `TYPE_LIMITS.corner_blind` = šírka od `CORNER_MIN_WIDTH` 584 (minimum
 predvolieb; presné minimum konkrétneho configu vracia server sondou) · `insert_state.js` `INSERT_TYPES` a `templateType`/`templatesForType` (rohová šablóna nepadne
 do „dolnej") · `templates.js` „rohová" · `part_card.js` `roleLabel` pre päť rolí a `isFront` pre CR (čelové materiály aktívne) · `rules.js` `rdRoleDesc` · `sync.rb`
-`DEFAULTS.corner_blind`. Tlačidlo „Rohová", `applyVisibility`, náhľad (dvere a pánty v dverovej časti), náhľad nôh a zámok typu v modale šablóny sú **ROH-A2**;
-kým A2 nepríde, náhľad rohovej kreslí dvere cez celú šírku (server je autorita).
+`DEFAULTS.corner_blind`. Tlačidlo „Rohová", náhľad (dvere a pánty v dverovej časti), náhľad nôh a zámok typu v modale šablóny prinieslo **ROH-A2** (odseky
+„Náhľad" a „Vkladacia karta"); ovládače strany, dverovej časti a CR sú ROH-B.
 
 ### Trvalé UI pravidlo (Michal 20.7.2026): VERTIKÁLNY priestor panela je vzácny
 

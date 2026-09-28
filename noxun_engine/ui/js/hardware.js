@@ -2455,10 +2455,18 @@
   function nxLegsInsertResult(res){
     if (!res || Number(res.gen) !== legsGen) return false;
     if (!nxLegsInsertMode()) return false;
-    if (getType() !== 'lower') return false;
+    // ROH-A2: rohova stoji na nohach ako dolna (6 pri 1100) — jej odpoved sa
+    // uz nezahadzuje. Horna a slot nohy nemaju.
+    if (!nxLegsTypeHasLegs(getType())) return false;
     if (String(res.tone || 'none') === 'none') return nxLegsHideRow();
     return nxLegsSetText(res.text, String(res.tone), res.text);
   }
+
+  // ROH-A2: typy, pri ktorych vkladacia karta nohy UKAZUJE (dolna a rohova —
+  // obe stoja na sokli/nohach). JEDINA otazka pre odpoved servera; ze horna
+  // a slot riadok skryvaju, riesi `nxLegsInsertSend` a `nxLegsApplyVisibility`.
+  var LEGS_INSERT_TYPES = ['lower', 'corner_blind'];
+  function nxLegsTypeHasLegs(t){ return LEGS_INSERT_TYPES.indexOf(t) >= 0; }
 
   // Viditelnost podla typu — presne ako `#fhRow` (horna skrinka nohy nema).
   // Pri prechode na hornu skrinku sa uz nic nedopytuje a dotaz V LETE sa

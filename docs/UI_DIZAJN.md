@@ -283,6 +283,10 @@ Nastavení; `brace` čaká na skupinu Výstuhy z bloku UI-C),
 `palette` (UI-B3 — sekcia Vzhľad v koliesku),
 `cab-low` / `cab-high` (UI-C1b — typ vkladaného objektu: skrinka na sokli vs.
 zavesená; tretí typ „Doska" používa existujúci `slab`),
+`cab-corner` (ROH-A2 — typ vkladaného objektu **Rohová**: dvere len v ľavej,
+dverovej časti s úchytkou pri voľnej hrane, vpravo slepá časť a pod skrinkou
+pri dverách CR lišta do tvaru „L"; kreslí predvoľbu „dvere vľavo" — stranu
+ikona nerozlišuje),
 `ori-lying` / `ori-stand` / `ori-wall` (UI-C1c — umiestnenie dosky; v každej je
 **podlaha** ako vodorovná čiara, v `ori-wall` navyše zvislá čiara steny),
 `columns-3` / `rows-2` / `rows-3` (UI-C2 — dlaždice delenia zóny; spolu
@@ -601,9 +605,19 @@ Zásady kreslenia:
   Odvodené hodnoty (pozícia značky, medzera medzi čelami) žijú v JS ako čisté
   funkcie; do dát ani kontraktu nepribudlo nič.
 - **Značky kovania sú orientačné** — hovoria *čo, koľko a kde zhruba*, nie
-  presné miesto vŕtania (strana závesu jednokrídlových dvierok v dátach nie je).
-  Klik na značku vypíše jej popis do statusu; výber vlastníka v modeli patrí
-  dávke UI-C4.
+  presné miesto vŕtania. **Strana pántov sa nehádá (ROH-A2, C8):** krajné krídla
+  viackrídlových dvierok sú odvodené (prvé vľavo, posledné vpravo), jednokrídlové
+  a stredné krídla idú podľa **smeru otvárania zo servera** (`front_slots`);
+  „neurčené" je **prerušovaný jantárový kruh s „?"** v strede krídla (ten istý
+  jazyk ako symbol v Čelách a overlay v modeli) a **legacy dvierka bez smeru
+  značku nemajú vôbec**. Klik na značku (aj „?") označí vlastníka v modeli
+  (UI-C4).
+- **Čelá sa kreslia v ČELNOM OTVORE (ROH-A2).** Rohová má dvere len v dverovej
+  časti — otvor `{x0, w}` posiela **server** (payload skrinky + preflight so živou
+  šírkou) a všetky vrstvy (čelá, kóty, medzery, kovanie, ghost) sa merajú od
+  neho. Kým otvor rohovej nie je známy, čelá sa **nekreslia vôbec** — dvere cez
+  celú šírku by boli klamstvo. Ostatné typy majú otvor = celú šírku a serverovú
+  hodnotu zámerne ignorujú (parita stráži JS test).
 - **Výsuv sa kreslí tak, ako ho vidno spredu** (schválené Michalom 20.8. nad mini
   náhľadom — nahradilo pás naprieč čelom): pri **oboch** bokoch **koľajnica ako
   „L" profil** (zvislá nožička na **vnútornom líci boku** + vodorovná pätka smerom
@@ -713,11 +727,18 @@ Vkladanie je **jediné miesto, kde sa objekt vytvára**, preto má vlastný vzor
 Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html`
 (`insTypeRow` / `sectInsertTpl` / `.segrow` / `.tpltiles`).
 
-- **Typ objektu = tri segmentové tlačidlá** (`.segrow`): Dolná · Horná · Doska.
-  Rádiá zanikli — je to jedna voľba z troch, nie dve nezávislé otázky. Aktívne
-  tlačidlo nesie **výberovú rodinu** (teal), nie zelenú: je to *stav*, nie akcia.
-  Ikona ukazuje, **kde objekt stojí** (`cab-low` na sokli · `cab-high` zavesená ·
-  `slab` doska).
+- **Typ objektu = segmentové tlačidlá v JEDNOM rade** (`.segrow`): Dolná · Horná ·
+  Rohová · Umývačka · Doska (S1-E pridal Umývačku, ROH-A2 Rohovú). Rádiá zanikli —
+  je to jedna voľba z viacerých, nie dve nezávislé otázky. Aktívne tlačidlo nesie
+  **výberovú rodinu** (teal), nie zelenú: je to *stav*, nie akcia. Ikona ukazuje,
+  **čo a kde objekt je** (`cab-low` na sokli · `cab-high` zavesená · `cab-corner`
+  rohová s dverami v dverovej časti · `appliance` slot umývačky · `slab` doska).
+  **Nový typ ide do toho istého radu** (tlačidlá sú stĺpce ikona nad textom
+  a delia si šírku) — druhý rad typov by zožral vertikálny priestor bez zisku;
+  pri 470 px Inspectora sa zmestí päť typov s textom do ~9 znakov. Typ, ktorý
+  má v modale „Uložiť ako šablónu" pevnú hodnotu (slot, rohová), sa tam ponúka
+  **len nad sebou** a je zamknutý s bublinou — nad dolnou skrinkou by voľba
+  nič nespravila (server prepína len `lower|upper`).
 - **Šablóny sú dlaždice** (`.tpltiles` / `.tpltile`, 3 stĺpce, výška ~56 px) v
   **zrolovateľnej** sekcii — vertikálny priestor je vzácny a mriežka je aj tak
   vidieť „na jeden pohľad". Dve skupiny: **Naposledy použité** (max 3, N16 — vynechá

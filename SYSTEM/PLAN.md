@@ -540,7 +540,8 @@ do priečinka pôjde po Michalovom schválení; ROH-A1 a ROH-A2 idú podľa R8 b
 
 - ✅ **ROH-A1 · jadro rohovej** (v0.14.1) — nový typ skrinky `corner_blind`, stavba oboch strán, výstupy (kusovník, VEPO, ponuka) a ochrany; bez nových
   ovládačov (R8). Package [PACKAGE_ROHA1.md](zdroje/bloky/ROHOVA/PACKAGE_ROHA1.md) + audit návrhu. *PR #410*
-- **ROH-A2 · vkladanie a náhľad** — tlačidlo „Rohová" vo vkladacej karte, dvere a pánty v náhľade na správnom mieste. *PR #?*
+- ✅ **ROH-A2 · vkladanie a náhľad** (v0.14.2) — tlačidlo „Rohová" vo vkladacej karte, dvere a pánty v náhľade na správnom mieste (otvor zo servera),
+  nohy pri vkladaní, zámok typu v modale šablóny. Package [PACKAGE_ROHA2.md](zdroje/bloky/ROHOVA/PACKAGE_ROHA2.md). *PR #411*
 - **ROH-B · ovládače** — dverová časť, CR lišty a prepínač strany v Inspectore podľa schváleného mockupu. *PR #?*
 
 ### 6 · INFRA (priebežne, podľa potreby)

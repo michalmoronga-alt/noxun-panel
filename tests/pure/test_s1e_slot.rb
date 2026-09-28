@@ -669,7 +669,9 @@ NxTest.test('S1-E (P2 #2): modal „Uložiť ako šablónu" pozna slot a server 
   # JS zamok je LEN zrkadlo — existuje a nastavuje `disabled`.
   js = NxS1E.src('noxun_engine', 'ui', 'js', 'form.js')
   fn = js[/function nxSyncTplSaveType\(t\)\{.*?\n  \}/m].to_s
-  NxTest.assert(fn.include?('sel.disabled = slot'), 'modal typ pri slote ZAMKNE')
+  # ROH-A2: zamok je tabulka TPL_TYPE_LOCK (slot + rohova), select sa zamyka podla nej.
+  NxTest.assert(fn.include?('sel.disabled = !!lock'), 'modal typ pri slote ZAMKNE')
+  NxTest.assert(js[/var TPL_TYPE_LOCK = \{(.*?)\n  \};/m, 1].to_s.include?('dishwasher:'), 'slot je v tabulke zamknutych typov')
 end
 
 NxTest.test('S1-E (P2 #6): preflighty TELA a CHRBTA sa slotu netykaju') do
