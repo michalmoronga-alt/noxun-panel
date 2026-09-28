@@ -17,6 +17,23 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **NP-1 · Nárezový plán — jadro výpočtu (29.9.2026, v0.15.0 → v0.15.1, PR #?; blok 2, prvá dávka).**
+  Nový čistý modul `core/sheet_layout.rb` (**zatiaľ nikam nenapojený** — pre používateľa sa nič nemení, zobrazí ho NP-3): z riadkov kusovníka, katalógu dosiek
+  a mapy hrúbok ABS vypočíta **per nákupný materiál** pásové (gilotínové) rozloženie na platne — počet platní, využitie, polohy, najväčší zvyšok (aj nad
+  nižším dielcom v páse, audit F9), nezaradené dielce (`oversize` / `needs_rotation` / `no_usable_area`) a **`upper_bound`** len pri úplnom a spoľahlivom
+  pláne (bez fallbacku, UNI, vyradených riadkov, konfliktu hrúbky, chýbajúcej väzby dupláku a zablokovaných dát). Prerez 5, orez 10 (PD, kompakt, zástena bez
+  orezu) a prídavok dupláku 10 mm na stranu sú predvolené konštanty (nastavenia príde s NP-2); **žiadny dielec sa neotáča** (N8). Riadok prijíma
+  **`VepoExport.prepare_row`** — kroky prijatia vytiahnuté z `build` v nezmenenom poradí, **najprv charakterizačné testy** (bajty CSV, celý LOG, `errors`
+  v poradí; oba režimy 18/36) a až potom extrakcia (audit F3); VEPO výstup bajtovo rovnaký. Pre Kontrolu v NP-2 sú pripravené `purchase_rect` (celá príprava
+  nákupného obdĺžnika — na pokyn orchestrátora vracia geometriu aj pri odmietnutí z dôvodu mimo rozmerov), `fits_rect?(allow_rotation:)` a
+  `rotation_allowed?` (otáča všetko okrem `length`/`width`). Audit návrhu Codex `gpt-6-astra`: **2 BLOCKER · 7 FIX — všetky prijaté** (surový výstup
+  a package v [zdroje/bloky/NAREZ/](../zdroje/bloky/NAREZ/)). STANDARD §3.3, §7.1 (`sheet_size[0]` = dĺžka = smer kresby), nová §11.4 a §12 (primitívny plán
+  je vo V1); architektúra `outputs.md` (nový odsek `sheet_layout.rb`, `prepare_row` vo `vepo_export.rb`). **Testy:** 4762 headless · 138 JS sád zelené;
+  **20 mutácií, všetky zabité** (prerez pred prvým dielcom, bez prerezu medzi pásmi, prídavok raz/vôbec, nový pás len na poslednej platni, bez tolerancie,
+  orez pri PD, vyradené riadky / blocked / fallback-UNI ignorované v `upper_bound`, neúplné radenie, zvyšok bez kandidátov nad dielcami, otáčanie v pláne,
+  otáčanie len pri `none`, bez kontroly hrúbky, ignorovaná väzba dupláku, bez `zero_after_rounding`, geometria odmietnutia); výkon ~2000 obdĺžnikov ≈ 0,02 s.
+  In-SU netreba (čistý modul).
+
 - **DOCS — štart bloku 2 · Nárezový plán (primitívny) (28.–29.9.2026, PR #417, len dokumentácia; verzia pluginu sa nemení).**
   Michal 28.9. večer (v druhom okne, súbežne so smoke bloku 8) spustil **posledný otvorený bod bloku 2 KONTROLA + VÝROBA** — primitívny nárezový plán rozhodnutý 6.9.
   **Rozhodnutia** (N1–N11, [zdroje/bloky/NAREZ/ROZHODNUTIA_MICHALA_2026-09-28.md](../zdroje/bloky/NAREZ/ROZHODNUTIA_MICHALA_2026-09-28.md)): prerez 5 mm a orez 10 mm ako
