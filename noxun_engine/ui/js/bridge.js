@@ -639,7 +639,12 @@
     frontPreflight: function(result){ nxFrontPreflightResult(result); },
     frontApplyResult: function(result){ nxFrontApplyResult(result); },
     historyRefresh: function(guid){
-      if (guid === nxDocGuid()) nxFrontDraftReset();
+      if (guid !== nxDocGuid()) return;
+      nxFrontDraftReset();
+      // ROH-A2 (predrecenzia P2-1): vo VKLADANI po Spat/Znova nepride
+      // `loadSelected` ani materializacia karty — otvor rohovej si preto
+      // vypyta znova (inak by nahlad ostal bez dveri, kym sa nezmeni pole).
+      if (typeof nxInsertDraftResume === 'function' && nxInsertDraftResume()) renderPreview();
     },
     loadSelected: function(c){
       // R-02 (review #264 kolo 3): IDENTITA DOKUMENTU JE PRVA VEC V PUSHI.
@@ -690,12 +695,10 @@
       // na otazku „kde sa smer pyta" (Fronts.direction_slots). Panel si ju
       // NEODVODZUJE z poctu kridiel.
       if (!holdDraft) frontSlots = c.front_slots || {};
-      // ROH-A2: otvor ciel ULOZENEHO stavu (server) + strana a dverova cast
-      // rohovej pre preflight. Ziva sirka prida otvor az odpovedou preflightu.
-      if (!holdDraft){
-        frontOpening = (c.front_opening && typeof c.front_opening === 'object') ? c.front_opening : null;
-        if (typeof nxSetCornerDraft === 'function') nxSetCornerDraft(c);
-      }
+      // ROH-A2: otvor ciel ULOZENEHO stavu (server), ulozene sloty smeru a
+      // strana + dverova cast rohovej pre preflight (`nxAdoptCabinetDraft`,
+      // form.js). Rozpisany navrh (`holdDraft`) sa NEPREPISUJE.
+      if (!holdDraft && typeof nxAdoptCabinetDraft === 'function') nxAdoptCabinetDraft(c);
       // KOV-C2c: riadok zasuvky karty cela — TEN ISTY push, vlastny kluc.
       // Stary payload bez kluca = mapa je prazdna a karta riadok nekresli.
       frontDrawer = c.front_drawer || {};
@@ -877,6 +880,10 @@
         clearApplianceRows('boardApplRows');
       }
       clearCabinetMaterials();   // korpusove material selecty na "dedi" + disabled
+      // ROH-A2 (predrecenzia P2-1): prechod vkladanie -> vkladanie kartu
+      // nematerializuje, reset hore vsak otvor zahodil — preflight sa pyta
+      // znova (pri skutocnej materializacii je to no-op, signatura sedi).
+      if (typeof nxInsertDraftResume === 'function') nxInsertDraftResume();
       refreshZoneUI(); renderPreview();
     },
     setStatus: function(msg, err){ var e = el('status'); e.textContent = msg; e.className = err ? 'err' : 'ok'; },

@@ -413,12 +413,31 @@
     return out;
   }
   function nxSetCornerDraft(src){ cornerDraft = nxCornerDraftOf(src); }
+  // ROH-A2: payload OZNACENEJ skrinky -> otvor ciel ulozeneho stavu, ulozene
+  // sloty smeru (znacky zavesov, kym preflight bezi alebo je navrh neplatny)
+  // a register rohovej. Vola ho `loadSelected` len mimo rozpisaneho navrhu.
+  function nxAdoptCabinetDraft(c){
+    var p = c || {};
+    frontOpening = (p.front_opening && typeof p.front_opening === 'object') ? p.front_opening : null;
+    frontSlotsSaved = (p.front_slots && typeof p.front_slots === 'object') ? p.front_slots : null;
+    nxSetCornerDraft(p);
+  }
+  // ROH-A2 (predrecenzia P2-1): VKLADACIA karta, ktorej identitu zresetoval
+  // `nxFrontDraftReset` bez materializacie (Spat/Znova, prazdny vyber
+  // vkladanie -> vkladanie), si otvor vypyta znova. Pri oznacenej skrinke
+  // nic (otvor prinesie jej `loadSelected`). -> true = dotaz odisiel.
+  function nxInsertDraftResume(){
+    if (typeof selectedCabId !== 'undefined' && selectedCabId) return false;
+    nxFrontDraftAsk();
+    return true;
+  }
   function nxFrontDraftReset(){
     var cancelled = cabAfterApply;
     frontDraftSession++;
     // ROH-A2: otvor patri identite (skrinke alebo vkladacej relacii) —
     // novy vyber ho dostane z payloadu, vkladanie z prveho preflightu.
     frontOpening = null;
+    frontSlotsSaved = null;
     frontDraft = null; cabDraftDirty = false; cabApplyRequest = null; cabAfterApply = null;
     cabEditsInFlight = false;
     cancelCabinetEdits();

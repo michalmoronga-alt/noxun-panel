@@ -36,6 +36,11 @@
   // nahlad ho cita len pri rohovej (`nxFrontOpeningFor`), ostatne typy kreslia
   // cez celu sirku ako doteraz. null = otvor este nie je znamy (zmena identity).
   var frontOpening = null;
+  // ROH-A2 (predrecenzia P3): `front_slots` ULOZENEHO stavu oznacenej skrinky.
+  // `frontSlots` prepisuje kazdy preflight (pocas neho null, pri neplatnom
+  // navrhu prazdne), ale znacky zavesov v projekcii Kovanie patria ULOZENEMU
+  // kovaniu (`hwItems`) — kreslia sa preto z tychto slotov. null = nic oznacene.
+  var frontSlotsSaved = null;
   // KOV-C2c: `front_drawer` z Ruby — mapa front_id -> zaznam riadku zasuvky
   // ({ state, text, detail[], sync, message, locked_note }). SERVER je jedina
   // autorita: panel z klasifikacie ani z kovania NIC neodvodzuje a text si

@@ -97,6 +97,11 @@
     var t = (typeof getType === 'function') ? getType() : 'lower';
     return nxFrontOpeningFor(t, W, (typeof frontOpening !== 'undefined') ? frontOpening : null);
   }
+  // ROH-A2 (predrecenzia P3): zdroj slotov smeru pre znacky zavesov.
+  function pvHingeSlots(){
+    if (typeof frontSlotsSaved !== 'undefined' && frontSlotsSaved) return frontSlotsSaved;
+    return (typeof frontSlots !== 'undefined') ? frontSlots : null;
+  }
   // D-07: rozsah ciel v modelovych mm (presahy mozu ist mimo obrys korpusu).
   // ROH-A2: bocne okraje sa merajú od OTVORU (pri ostatnych typoch 0…W).
   function frontsExtent(){
@@ -423,8 +428,10 @@
     return pvSetbackDepths({ W: W0, H: numv('height')||720, t: numv('thickness')||18,
              fx0: op ? op.x0 : 0, fw: op ? op.w : 0, frontsPending: !op,
              // ROH-A2 (C8): sloty smeru zo servera — znacky zavesov sa kreslia
-             // na strane pantov, nie natvrdo vlavo.
-             slots: (typeof frontSlots !== 'undefined') ? frontSlots : null,
+             // na strane pantov, nie natvrdo vlavo. Predrecenzia P3: ULOZENE
+             // sloty oznacenej skrinky (patria ulozenemu kovaniu `hwItems`
+             // a preflight ich nezhodi); bez nich sloty posledneho preflightu.
+             slots: pvHingeSlots(),
              D: numv('depth')||0,
              fh: nxCabFloorHeight(),
              topNone: val('top_mode') === 'none',
@@ -1879,6 +1886,6 @@
                        // ROH-A2 (tests/js/test_roha2_vkladanie.js): celny otvor
                        // rohovej, strana pantov znacky zavesu a geometria nahladu.
                        nxFrontOpeningFor: nxFrontOpeningFor, nxHingeSide: nxHingeSide,
-                       pvGeom: pvGeom, hwMarkSvg: hwMarkSvg };
+                       pvGeom: pvGeom, hwMarkSvg: hwMarkSvg, pvHingeSlots: pvHingeSlots };
   }
 
