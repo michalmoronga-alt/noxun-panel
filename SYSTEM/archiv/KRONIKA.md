@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **DOCS — štart bloku 2 · Nárezový plán (primitívny) (28.–29.9.2026, PR #?, len dokumentácia; verzia pluginu sa nemení).**
+- **DOCS — štart bloku 2 · Nárezový plán (primitívny) (28.–29.9.2026, PR #417, len dokumentácia; verzia pluginu sa nemení).**
   Michal 28.9. večer (v druhom okne, súbežne so smoke bloku 8) spustil **posledný otvorený bod bloku 2 KONTROLA + VÝROBA** — primitívny nárezový plán rozhodnutý 6.9.
   **Rozhodnutia** (N1–N11, [zdroje/bloky/NAREZ/ROZHODNUTIA_MICHALA_2026-09-28.md](../zdroje/bloky/NAREZ/ROZHODNUTIA_MICHALA_2026-09-28.md)): prerez 5 mm a orez 10 mm ako
   nastavenia, VEPO účtuje celé tabule a zvyšky sú Michalove, orez len pre bežné platne (pracovná doska, kompakt a zástena bez orezu), každá vrstva dupláku s prídavkom
