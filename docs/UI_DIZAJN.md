@@ -287,6 +287,9 @@ zavesená; tretí typ „Doska" používa existujúci `slab`),
 dverovej časti s úchytkou pri voľnej hrane, vpravo slepá časť a pod skrinkou
 pri dverách CR lišta do tvaru „L"; kreslí predvoľbu „dvere vľavo" — stranu
 ikona nerozlišuje),
+`corner-l` / `corner-r` (ROH-B1 — **strana dverí rohovej** v prepínači riadku
+rohovej: dvere s úchytkou v jednej časti a **prekrížená slepá časť** — ten istý
+jazyk ako `front-blind` = blenda; `corner-r` je zrkadlo),
 `ori-lying` / `ori-stand` / `ori-wall` (UI-C1c — umiestnenie dosky; v každej je
 **podlaha** ako vodorovná čiara, v `ori-wall` navyše zvislá čiara steny),
 `columns-3` / `rows-2` / `rows-3` (UI-C2 — dlaždice delenia zóny; spolu
@@ -713,6 +716,21 @@ Sektor **Základné** je rozdelený na **vstupy vľavo a dopočítané údaje vp
   nôh** — presne ten z kontextu Kovanie → Sety, s tou istou zapisovacou akciou.
   Žiadny druhý ovládač na tú istú vec: zmena na jednom mieste sa objaví aj na
   druhom (obe kreslí serverový push).
+
+- **Riadok rohovej (ROH-B1, mockup B1 / A1).** Pri **rohovej** stojí nad riadkom
+  Nohy **jeden** riadok cez oba stĺpce: **Dverová časť · CR (šírka, hĺbka) · strana
+  dverí · ?** — žiadny nadpis, žiadna skupina v Nastaveniach (hodnoty sú pod
+  náhľadom, ktorý ich kreslí; +1 riadok len pri rohovej). CR 1 nesie ikonu
+  **šírky**, CR 2 ikonu **hĺbky** — tie isté ako Šírka a Hĺbka skrinky; rámik
+  `.crin` nesie aj červenú chybného poľa. **Ten istý riadok je aj vo vkladacej
+  karte** (`#basicCard` je spoločný), takže stranu zvolíš už pred vložením.
+  **Strana = dvojstavový segment** (`corner-l` / `corner-r`, `aria-pressed`,
+  výberová rodina — je to stav, nie akcia) s tooltipom „zrkadlí celú rohovú
+  zostavu". Klik na označenej rohovej je **samostatná akcia** (jeden krok Späť,
+  prepínač ukáže novú stranu až server), vo vkladaní len zmení návrh. Mimo
+  rozsahu (O2) pole zčervenie a **stavová veta povie minimum** („… potrebujú
+  šírku aspoň 599 mm") — skrinka sa neprestaví; pri nezmestení zostavy sú
+  červené šírka, dverová časť aj CR 1 (čo z toho zmeníš, rozhodneš ty).
 
 **Koliesko = Nastavenia Inspectora** otvára **modal** (nie ďalší kontext railu):
 sú to nastavenia počítača, musia byť dostupné aj vtedy, keď nie je označené nič,

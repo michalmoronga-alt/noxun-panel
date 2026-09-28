@@ -535,14 +535,19 @@ výstuha závesov, rohová výstuha, CR 1, CR 2) podľa DC „Rohová", ktorú d
 ako pri dolnej. Horná rohová, rohové mechanizmy (LeMans) a kolízie so susedným radom sú mimo bloku. **Priečinok bloku:** [zdroje/bloky/ROHOVA/](zdroje/bloky/ROHOVA/)
 — **rozhodnutia Michala** (R1–R9 a otvorené otázky), fakty z kódu, presná geometria DC, rešerš precedensov, krížový audit (zadanie, auditovaný koncept
 ako surový vstup, výsledky) a jeho **vyhodnotenie**; packages pribudnú s dávkami.
-**Stav 28.9.2026:** krížový audit hotový a vyhodnotený (všetky BLOCKERy prijaté, riešia ich packages). **Mockup ovládačov (ROH-B) sa pripravuje** —
-do priečinka pôjde po Michalovom schválení; ROH-A1 a ROH-A2 idú podľa R8 bez nových ovládačov s hodnotami z DC ako návrhom. Poradie:
+**Stav 28.9.2026:** krížový audit hotový a vyhodnotený (všetky BLOCKERy prijaté, riešia ich packages). **Mockup ovládačov schválený** (Michal 28.9.: O1–O12
+podľa návrhu — [MOCKUP_ROHOVA_2026-09-28.html](zdroje/bloky/ROHOVA/MOCKUP_ROHOVA_2026-09-28.html), rozhodnutie R10); ROH-A1 a ROH-A2 išli podľa R8 bez nových
+ovládačov s hodnotami z DC ako návrhom. Poradie:
 
 - ✅ **ROH-A1 · jadro rohovej** (v0.14.1) — nový typ skrinky `corner_blind`, stavba oboch strán, výstupy (kusovník, VEPO, ponuka) a ochrany; bez nových
   ovládačov (R8). Package [PACKAGE_ROHA1.md](zdroje/bloky/ROHOVA/PACKAGE_ROHA1.md) + audit návrhu. *PR #410*
 - ✅ **ROH-A2 · vkladanie a náhľad** (v0.14.2) — tlačidlo „Rohová" vo vkladacej karte, dvere a pánty v náhľade na správnom mieste (otvor zo servera),
   nohy pri vkladaní, zámok typu v modale šablóny. Package [PACKAGE_ROHA2.md](zdroje/bloky/ROHOVA/PACKAGE_ROHA2.md). *PR #411*
-- **ROH-B · ovládače** — dverová časť, CR lišty a prepínač strany v Inspectore podľa schváleného mockupu. *PR #?*
+- ✅ **ROH-B1 · ovládače a prepínač strany** (v0.14.3) — riadok rohovej v Základných aj vo vkladacej karte (dverová časť, CR 1, CR 2, strana dverí), minimum šírky
+  z polí a účinných hrúbok, prepnutie strany = zrkadlo zostavy, pántov, okrajov a ručných hrán (1 krok Späť). Package [PACKAGE_ROHB1.md](zdroje/bloky/ROHOVA/PACKAGE_ROHB1.md)
+  + audit návrhu [AUDIT_ROHB1_2026-09-28.md](zdroje/bloky/ROHOVA/AUDIT_ROHB1_2026-09-28.md). *PR #?*
+- **ROH-B2 · kresba a čelá rohovej** — kresba zostavy v náhľade (blenda, CR 1, CR 2, rohová výstuha), karta Čelá rohovej (jedny dvierka, pánty „Pri boku / Pri rohu"),
+  návrhy O12 (šírka dverí v pravom stĺpci, súhrn v lište, kláves strany pri vkladaní), odhad dielcov so zostavou; rozhodnutie o jantárovom O8 (Michal).
 
 ### 6 · INFRA (priebežne, podľa potreby)
 

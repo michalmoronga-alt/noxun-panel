@@ -17,6 +17,27 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **ROH-B1 · OVLÁDAČE ROHOVEJ A PREPÍNAČ STRANY DVERÍ (28.9.2026, PR #?, v0.14.2 → v0.14.3, blok 8 · K3).** Package [PACKAGE_ROHB1.md](../zdroje/bloky/ROHOVA/PACKAGE_ROHB1.md)
+  nad schváleným mockupom [MOCKUP_ROHOVA_2026-09-28.html](../zdroje/bloky/ROHOVA/MOCKUP_ROHOVA_2026-09-28.html) (Michal 28.9.: O1–O12 podľa návrhu → rozhodnutie **R10**);
+  dobrovoľný audit návrhu Codex `gpt-6-astra` **0 BLOCKER · 5 FIX · 2 NOTE** ([AUDIT_ROHB1_2026-09-28.md](../zdroje/bloky/ROHOVA/AUDIT_ROHB1_2026-09-28.md)), všetko zapracované.
+  Kontrakt ani schéma sa nemenia. **Čo pribudlo:** v Základné → Rozmery **riadok rohovej** (`#cornerRow`, ten istý aj vo vkladacej karte) — dverová časť, CR 1 (ikona
+  šírky), CR 2 (ikona hĺbky), prepínač strany (nové ikony `corner-l`/`corner-r`) a `?`; viditeľnosť len pri rohovej cez `applyVisibility`. Polia idú cez
+  `CONSTRUCTION_FIELDS` s novým `only: 'corner_blind'` — dolná, horná a slot neposielajú ani kľúč navyše (parita s mainom doslovným zoznamom kľúčov), strana sa
+  v apply neposiela nikdy. **Minimum šírky** = presne `Construction.corner_fit_width` (`nxCornerMinWidth`, aj desatinné — FIX 5), z účinných hrúbok návrhu: th2
+  z payloadu (`corner_th2`) alebo z `corner_ctx` preflightu, t pri vkladaní tak, ako ho upraví vklad (FIX 4: korpus 25 + čelový 19 → 599); pevné JS minimum 584 zaniklo.
+  Preflight označenej rohovej berie stranu z uloženého configu a dverovú časť zo živého formulára (NOTE 6). **Prepínač strany** = samostatná akcia
+  `handle_corner_side` (R-02, povinné echo, **bariéra observera pred čítaním configu** — FIX 3, jedna operácia prestavby = 1 krok Späť, korelovaná odpoveď
+  `NX.cornerSideResult` v každej vetve) nad jedinou čistou funkciou `CabinetBuilder.corner_mirror_params`: okraje čiel vľavo ↔ vpravo, smer pántov a strana profilu
+  (`unset` a chýbajúci kľúč ostávajú), ručné hrany `L1 ↔ L2` podľa osí (`Construction::CORNER_MIRROR_EDGE_KEYS` = AXES_FRONT dielce zostavy + krídla dverí; výstuhy,
+  CR 2 a korpus bez zmeny; riedka mapa ostáva riedka — NOTE 7). Panel prepína až po potvrdenom auto-apply, počas prepínania auto-apply odkladá a korelovaná odpoveď
+  prevezme čelá servera (FIX 1). Vo vkladacej karte prepnutie zrkadlí aj návrh čiel šablóny (FIX 2) a vklad nesie stranu len pri rohovej. Ostatné cesty stranu
+  ďalej odmietajú novou vetou „Stranu dverí zmeň prepínačom v riadku rohovej." **Testy:** headless 4708 · JS 137 sád (nová `test_rohb1_ovladace.js` 92 asercií,
+  `test_rohb1_strana.rb`) · **in-SU 3244 PASS / 0 FAIL** (nový `run_rohb1` + `run_rohb1_async`: prepnutie cez akciu panela s ručnými hranami — plocha pásky v modeli
+  X' = W − X, pánty pri rohu, okraje, 1 Späť = presne pôvodný config, späť = pôvodné; odmietnutia 0 krokov; vklad pravej z karty; Scale → hneď prepnutie → Späť/Znova).
+  **Mutácie 14/14 chytené** (hrany aj pri stojacich dielcoch, bez výmeny okrajov, smer bez zrkadla, `unset` → strana, riedka mapa s `L1: nil`, zber polí pri dolnej,
+  prepínač bez čakania na apply, vkladanie bez zrkadla čiel, minimum bez účinnej hrúbky, neodložený auto-apply, odpoveď bez prevzatia čiel, preflight z uloženej
+  dverovej časti, bez bariéry observera, strana v apply). Zladené staršie testy (A1/A2 C6, minimum 584, počet vetiev flushu NASTROJE-1, stĺpec UI-B3).
+
 - **ROH-A2 · VKLADANIE A NÁHĽAD ROHOVEJ (28.9.2026, PR #411, v0.14.1 → v0.14.2, blok 8 · K3).** Package [PACKAGE_ROHA2.md](../zdroje/bloky/ROHOVA/PACKAGE_ROHA2.md)
   (bod 4 zladený s mainom po A1; kontrakt, schéma ani geometria sa nemenia — `codex-audit` nepovinný, predrecenzia povinná pre nový ovládač v UI).
   **Čo pribudlo:** vo vkladacej karte tlačidlo **„Rohová"** (Dolná · Horná · Rohová · Umývačka · Doska — jeden rad, nová ikona `cab-corner`); karta sa plní

@@ -218,7 +218,10 @@ hrubšom než 20) a pri policiach vznikne **jeden** ORANGE `corner_shelf_notch` 
 **`min_valid_width(cfg, part_thicknesses:)`** = sonda cez celý plán polením (vzor `min_valid_depth`, horná hranica `MAX_WIDTH` 3000) — **len pri rohovej**, iné typy
 vracajú `CabinetBuilder::MIN[:width]` bez sondy. **Všetky tri sondy** (`min_valid_height`/`_depth`/`_width`) prijímajú `part_thicknesses:` a posielajú ho do
 `build_plan` (audit A1 FIX 2); bez neho platí placeholder 18. `FRONT_MATERIAL_ROLES` obsahuje aj `cr_front`/`cr_side` (R4 — čelový kanál z definície roly), blenda
-korpusová nie (vždy korpus).
+korpusová nie (vždy korpus). **ROH-B1:** `corner_fit_width` je **presná** hranica pre panel (`nxCornerMinWidth` ju zrkadlí aj s desatinami; `min_valid_width` sonduje
+celé mm a ostáva pre klamp Scale). **`CORNER_MIRROR_EDGE_KEYS`** (blenda korpusová, CR 1) + `CORNER_MIRROR_EDGE_SWAP` (`L1 ↔ L2`) = tabuľka zrkadla ručných hrán pri
+prepnutí strany: dielce zostavy, ktoré sa presúvajú a majú dlhé hrany v X (`AXES_FRONT`); stojace (`AXES_UPRIGHT` — výstuhy, CR 2) a korpus sa nemenia. Zhodu
+s `corner_parts` stráži `test_rohb1_strana.rb`.
 
 ### cabinet_builder.rb
 
@@ -245,7 +248,12 @@ prestavba, kópie, scale, šablóna) a panelové whitelisty. Vetvenia podľa typ
 ani `plinth_mode` sa nevynucujú). **`corner_fronts!(fronts_cfg, side)`** v `normalize` je posledná obrana R6: ostane **prvý** riadok `door` (ID, smer, profil,
 otváranie a dormant polia sa **zachovajú** — na rozdiel od `slot_fronts!`, ktorý prepisuje ID na F1), vynúti `auto`, `height nil`, `locked false`, `wings '1'`;
 bez dvierok vznikne `F1`. **R7:** riadok **bez kľúča** `direction` dostane stranu pri rohu cez `corner_hinge_side` (`CORNER_HINGE_SIDE` `left → right`,
-`right → left`) — jediná heuristika smeru v plugine (guard `test_kova1_cela.rb` ju nechytí, pin je v `test_roha1_rohova.rb`). **Účinné hrúbky CR pred plánom:**
+`right → left`) — jediná heuristika smeru v plugine (guard `test_kova1_cela.rb` ju nechytí, pin je v `test_roha1_rohova.rb`). **ROH-B1 — `corner_mirror_params(params,
+side)`** = JEDINÁ čistá funkcia prepnutia strany (hlboká kópia, vstup nemení): `corner_side`, okraje čiel `gap_left ↔ gap_right`, smer pántov a `profile_edge`
+`left ↔ right` (`CORNER_MIRROR_SIDE`; `unset` ostáva, **chýbajúci kľúč ostáva chýbať** — `corner_fronts!` mu dá R7 pri rohu), ručné hrany `edges` + `edge_warnings`
+`L1 ↔ L2` na `Construction::CORNER_MIRROR_EDGE_KEYS` a krídlach riadkov čiel (`front:<id>/wing:*`) — riedka mapa ostáva riedka (`{L1: X}` → iba `{L2: X}`, žiadne
+`L1: nil`, audit B1 NOTE 7); materiál, smer dekoru a kovanie bez zmeny; rovnaká strana = kópia; dvakrát = identita. Volá ju výhradne `Panel.handle_corner_side`
+([ui-lifecycle.md](ui-lifecycle.md)). **Účinné hrúbky CR pred plánom:**
 `corner_thicknesses(cfg, eff)` (override dielca → kanál `front` → UNI / neznámy / mimo rozsahu korpusu = `Fronts::FRONT_THICKNESS` 18 cez `cr_sheet_thickness`) a
 `build_into` posiela plánu **jednu mapu** `plan_thicknesses` = zásuvky + CR. CR **nie sú** v `materialized_part` (hrúbku majú už z plánu) a `thickness_ok_for?` im
 dáva toleranciu čiel (`Construction::CR_ROLES`). **Pomocné plány (audit A1 FIX 2):** `aux_part_thicknesses(params, model)` = len CR (dielce zásuviek v pomocných
