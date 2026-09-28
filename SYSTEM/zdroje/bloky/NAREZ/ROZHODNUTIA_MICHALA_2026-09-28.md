@@ -3,8 +3,9 @@
 > **Produktové rozhodnutia bloku** — čo a ako má plugin robiť z pohľadu stolára. **Technické požiadavky** (tvar výsledku, verzie dát,
 > výrobné a cenové brány, testy…) sa zapisujú do **package každej dávky** a prejdú jej auditom návrhu.
 > Pôvodná debata: [../../next_sessions/V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md](../../next_sessions/V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md) §0 a návrh
-> rozsahu [../../next_sessions/NAREZ_PLAN_NAVRH_2026-09-06.md](../../next_sessions/NAREZ_PLAN_NAVRH_2026-09-06.md) (Codex #322/#323). Tento súbor ich
-> **nenahrádza** — dopĺňa rozhodnutia zo štartu bloku. Ďalšie súbory priečinka: fakty z kódu [FAKTY_Z_KODU_2026-09-28.md](FAKTY_Z_KODU_2026-09-28.md) ·
+> rozsahu [../../next_sessions/NAREZ_PLAN_NAVRH_2026-09-06.md](../../next_sessions/NAREZ_PLAN_NAVRH_2026-09-06.md) (Codex #322/#323) sú **historický vstup**:
+> **kde sa s nimi rozchádzajú, platia rozhodnutia tohto súboru** (napr. otáčanie dielcov bez smeru — N8, predvolený prerez 5 mm — N3, prídavok dupláku — N7).
+> Ďalšie súbory priečinka: fakty z kódu [FAKTY_Z_KODU_2026-09-28.md](FAKTY_Z_KODU_2026-09-28.md) ·
 > surová rešerš precedensov [RESERS_OUTSIDE_IN_2026-09-28.md](RESERS_OUTSIDE_IN_2026-09-28.md) · surový krížový audit [CROSS_AUDIT_PROMPT_2026-09-28.md](CROSS_AUDIT_PROMPT_2026-09-28.md),
 > [CROSS_AUDIT_CODEX_2026-09-28.md](CROSS_AUDIT_CODEX_2026-09-28.md), [CROSS_AUDIT_GROK_2026-09-28.md](CROSS_AUDIT_GROK_2026-09-28.md) · schválený mockup
 > [MOCKUP_NAREZ_2026-09-28.html](MOCKUP_NAREZ_2026-09-28.html). **Ako sa naloží s každým nálezom rešerše a krížového auditu, uvedie package dávky, ktorá ho rieši**
