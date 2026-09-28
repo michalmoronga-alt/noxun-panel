@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # ROH-A1 · K3 — JADRO ROHOVEJ SKRINKY (blok 8, typ `corner_blind`).
-# Package: SYSTEM/zdroje/bloky/ROHOVA/PACKAGE_ROHA1.md (v2, po audite navrhu).
+# Package: SYSTEM/archiv/bloky/ROHOVA/PACKAGE_ROHA1.md (v2, po audite navrhu).
 #
 # CO PLATI:
 #   * novy typ `corner_blind` = dolna skrinka + rohova zostava na prednej

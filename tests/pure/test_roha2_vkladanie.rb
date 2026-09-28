@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # ROH-A2 · K3 — VKLADANIE A NAHLAD ROHOVEJ (blok 8, typ `corner_blind`).
-# Package: SYSTEM/zdroje/bloky/ROHOVA/PACKAGE_ROHA2.md (kontrakt z ROH-A1 sa nemeni).
+# Package: SYSTEM/archiv/bloky/ROHOVA/PACKAGE_ROHA2.md (kontrakt z ROH-A1 sa nemeni).
 #
 # CO PLATI:
 #   * preflight ciel vracia CELNY OTVOR `opening {x0, w, z0, h}` pre KAZDY typ

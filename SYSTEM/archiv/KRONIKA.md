@@ -17,8 +17,27 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **BLOK 8 · K3 ROHOVÁ SKRINKA UZAVRETÝ (28.9.2026, v0.14.4 → v0.15.0, podklady PR #409, dávky PR #410–#413 + uzáver PR #414, variant B).** Blok vybral Michal
+  27.9. večer po smoke PASS bloku 7 ako nočný blok; rozhodnutia R1–R9, krížový audit bloku (Codex + Grok, 5 BLOCKERov → všetky prijaté v reconcile), mockup
+  schválený 28.9. (O1–O12 podľa návrhu, R10). Dávky za necelý deň: **ROH-A1** #410 (typ `corner_blind`, rohová zostava, účinné hrúbky CR, výstupy, ochrany;
+  schéma 22, BuildPlan 7, ABS seed 6; audit návrhu 1 BLOCKER) · **ROH-A2** #411 (tlačidlo „Rohová", čelný otvor zo servera, značky pántov podľa smeru) ·
+  **ROH-B1** #412 (riadok rohovej, minimum šírky z účinných hrúbok, prepínač strany = zrkadlo; dobrovoľný audit 0 BLOCKER · 5 FIX) · **ROH-B2** #413 (kresba
+  zostavy zo servera, karta Čelá rohovej, O12 vrátane klávesu D). Uzáver mení len dokumentáciu a verziu: blok plným textom do [ROADMAP_hotove_etapy.md](ROADMAP_hotove_etapy.md),
+  **celý priečinok bloku** `zdroje/bloky/ROHOVA/` → [bloky/ROHOVA/](bloky/ROHOVA/) (`git mv`; opravené odkazy v PLAN, STAV, v tejto KRONIKE (záznamy #409–#413),
+  v hlavičkách testov `test_roha1_rohova.rb`, `test_roha2_vkladanie.rb`, `test_rohb1_strana.rb`, `test_rohb2_nahlad.rb` a v ceste k mockupu v `test_rohb2_nahlad.js`
+  (sada číta ikonu z mockupu); vnútri priečinka jediný odkaz von — na debatu v `zdroje/next_sessions/` v ROZHODNUTIA_MICHALA — prepísaný na `../../../zdroje/…`),
+  výsledok, dávky, overenie, známe obmedzenia a **zlúčený smoke checklist** v [ROHOVA_ZAVER_2026-09-28.md](ROHOVA_ZAVER_2026-09-28.md), **V1_VIZIA bod 2
+  Konštrukcia odškrtnutý** (K1 + K2 blok 7, K3 blok 8), PLAN (poznámka o hotovom bloku, blok 4: K3 hotová), README (koreň aj SYSTEM), DOGFOODING (dočasná
+  skupina „smoke po uzávere bloku 8"), STAV; v STANDARD §4.2 opravená zastaraná veta „strana sa v A1 nemení, prepínač príde s ROH-B" (stranu mení výhradne
+  prepínač ROH-B1). Pri poslednej dávke **4721 headless · 138 JS sád · 3260 in-SU PASS / 0 FAIL**; pri uzávere headless a JS sady zelené (in-SU netreba —
+  kód len číslom verzie). Kompatibilita: skrinka schéma 22, BuildPlan 7, ABS seed 6, šablóny STD 7 — **aktualizovať obe PC pred prvou rohovou**.
+  Otvorené: **O8** (jantárové upozornenie výrez police × výstuha závesov) čaká na Michala; overenie závesu na výstuhe závesov v dielni.
+  **Poučenie:** druhý presun priečinka bloku odhalil dve veci, ktoré prvý nemal — **odkaz von z priečinka** (relatívna cesta `../../next_sessions/` by po presune
+  ukazovala do `archiv/`, nie do `zdroje/`) a **test, ktorý číta súbor z priečinka bloku** (JS sada ROH-B2 porovnáva ikonu s mockupom); pri ďalšom uzávere grepovať aj `'bloky'`
+  v `tests/` a relatívne odkazy `../` vnútri priečinka.
+
 - **ROH-B2 · KRESBA ROHOVEJ ZOSTAVY, KARTA ČELÁ ROHOVEJ A NÁVRHY O12 (28.9.2026, PR #413, v0.14.3 → v0.14.4, blok 8 · K3).** Package
-  [PACKAGE_ROHB2.md](../zdroje/bloky/ROHOVA/PACKAGE_ROHB2.md) nad schváleným mockupom (sekcie C, B · Čelá, O12, A); kontrakt ani schéma sa nemenia (`codex-audit` nie),
+  [PACKAGE_ROHB2.md](bloky/ROHOVA/PACKAGE_ROHB2.md) nad schváleným mockupom (sekcie C, B · Čelá, O12, A); kontrakt ani schéma sa nemenia (`codex-audit` nie),
   predrecenzia povinná (nové ovládače, klávesa v nástroji ghostu, > 300 riadkov). **Kresba zostavy počíta server:** `Panel.corner_preview_json` = `CabinetBuilder.normalize`
   → `Construction.corner_parts` (tá istá autorita ako stavba) → dielce v poradí kreslenia (blenda, rohová výstuha, CR 1, CR 2), koty dverovej časti a CR 1, `fits`/`need`,
   `door_w` (`Fronts.resolve_layout`) a `stats`; payload označenej rohovej nesie uložený stav (`corner_preview`), preflight živé polia (`corner_preview_params`,
@@ -41,9 +60,9 @@
   zdroj D, strana z hlásenia ghostu, sync bez `setSelected`, prevesenie bez zrušenia starého ghostu). In-SU bežal na obsahu d5e3c1c4 — potom dokumentácia,
   JS a čítací preflight (`preflight_corner_mm`, bez zápisu do modelu). Zladené zdrojové guardy (signatúra `handle_insert`, `frontRowSummary`, B1 test „CR sa na otvor nepýta").
 
-- **ROH-B1 · OVLÁDAČE ROHOVEJ A PREPÍNAČ STRANY DVERÍ (28.9.2026, PR #412, v0.14.2 → v0.14.3, blok 8 · K3).** Package [PACKAGE_ROHB1.md](../zdroje/bloky/ROHOVA/PACKAGE_ROHB1.md)
-  nad schváleným mockupom [MOCKUP_ROHOVA_2026-09-28.html](../zdroje/bloky/ROHOVA/MOCKUP_ROHOVA_2026-09-28.html) (Michal 28.9.: O1–O12 podľa návrhu → rozhodnutie **R10**);
-  dobrovoľný audit návrhu Codex `gpt-6-astra` **0 BLOCKER · 5 FIX · 2 NOTE** ([AUDIT_ROHB1_2026-09-28.md](../zdroje/bloky/ROHOVA/AUDIT_ROHB1_2026-09-28.md)), všetko zapracované.
+- **ROH-B1 · OVLÁDAČE ROHOVEJ A PREPÍNAČ STRANY DVERÍ (28.9.2026, PR #412, v0.14.2 → v0.14.3, blok 8 · K3).** Package [PACKAGE_ROHB1.md](bloky/ROHOVA/PACKAGE_ROHB1.md)
+  nad schváleným mockupom [MOCKUP_ROHOVA_2026-09-28.html](bloky/ROHOVA/MOCKUP_ROHOVA_2026-09-28.html) (Michal 28.9.: O1–O12 podľa návrhu → rozhodnutie **R10**);
+  dobrovoľný audit návrhu Codex `gpt-6-astra` **0 BLOCKER · 5 FIX · 2 NOTE** ([AUDIT_ROHB1_2026-09-28.md](bloky/ROHOVA/AUDIT_ROHB1_2026-09-28.md)), všetko zapracované.
   Kontrakt ani schéma sa nemenia. **Čo pribudlo:** v Základné → Rozmery **riadok rohovej** (`#cornerRow`, ten istý aj vo vkladacej karte) — dverová časť, CR 1 (ikona
   šírky), CR 2 (ikona hĺbky), prepínač strany (nové ikony `corner-l`/`corner-r`) a `?`; viditeľnosť len pri rohovej cez `applyVisibility`. Polia idú cez
   `CONSTRUCTION_FIELDS` s novým `only: 'corner_blind'` — dolná, horná a slot neposielajú ani kľúč navyše (parita s mainom doslovným zoznamom kľúčov), strana sa
@@ -65,7 +84,7 @@
   prepínač bez čakania na apply, vkladanie bez zrkadla čiel, minimum bez účinnej hrúbky, neodložený auto-apply, odpoveď bez prevzatia čiel, preflight z uloženej
   dverovej časti, bez bariéry observera, strana v apply; po predrecenzii ctx vkladania bez hrúbky z materiálu, výnimka bez resyncu, bez odpovede v ensure, pole bez výrazov, čelá bez zámku). In-SU bežal na 2ecee5b1 — potom sa menil len JS, testy a dokumentácia. Zladené staršie testy (A1/A2 C6, minimum 584, počet vetiev flushu NASTROJE-1, stĺpec UI-B3).
 
-- **ROH-A2 · VKLADANIE A NÁHĽAD ROHOVEJ (28.9.2026, PR #411, v0.14.1 → v0.14.2, blok 8 · K3).** Package [PACKAGE_ROHA2.md](../zdroje/bloky/ROHOVA/PACKAGE_ROHA2.md)
+- **ROH-A2 · VKLADANIE A NÁHĽAD ROHOVEJ (28.9.2026, PR #411, v0.14.1 → v0.14.2, blok 8 · K3).** Package [PACKAGE_ROHA2.md](bloky/ROHOVA/PACKAGE_ROHA2.md)
   (bod 4 zladený s mainom po A1; kontrakt, schéma ani geometria sa nemenia — `codex-audit` nepovinný, predrecenzia povinná pre nový ovládač v UI).
   **Čo pribudlo:** vo vkladacej karte tlačidlo **„Rohová"** (Dolná · Horná · Rohová · Umývačka · Doska — jeden rad, nová ikona `cab-corner`); karta sa plní
   z `DEFAULTS.corner_blind`, polia rohovej do insert payloadu nejdú (C6 — server ich doplní z predvolieb alebo zo záznamu šablóny), rohové šablóny sa ponúkajú len
@@ -84,8 +103,8 @@
   JS 136 sád (sada ROH-A2 94 asercií) a headless 4698 zelené; in-SU bežal na 8cc405f4 — potom sa menil len JS, testy a dokumentácia.
   Kresba CR líšt a blendy v náhľade a ovládače strany, dverovej časti a CR sú ROH-B.
 
-- **ROH-A1 · JADRO ROHOVEJ SKRINKY (28.9.2026, PR #410, v0.14.0 → v0.14.1, blok 8 · K3).** Package v2 [PACKAGE_ROHA1.md](../zdroje/bloky/ROHOVA/PACKAGE_ROHA1.md)
-  (krížový audit bloku + audit návrhu Codex `gpt-6-astra` 1 BLOCKER · 3 FIX · 1 NOTE — surový výstup [AUDIT_ROHA1_2026-09-28.md](../zdroje/bloky/ROHOVA/AUDIT_ROHA1_2026-09-28.md)).
+- **ROH-A1 · JADRO ROHOVEJ SKRINKY (28.9.2026, PR #410, v0.14.0 → v0.14.1, blok 8 · K3).** Package v2 [PACKAGE_ROHA1.md](bloky/ROHOVA/PACKAGE_ROHA1.md)
+  (krížový audit bloku + audit návrhu Codex `gpt-6-astra` 1 BLOCKER · 3 FIX · 1 NOTE — surový výstup [AUDIT_ROHA1_2026-09-28.md](bloky/ROHOVA/AUDIT_ROHA1_2026-09-28.md)).
   **Čo pribudlo:** nový typ **`corner_blind`** (dolná slepá rohová) — korpus ako dolná + rohová zostava na prednej rovine: **blenda korpusová**, **výstuha závesov**,
   **CR 1**, **CR 2** a **rohová výstuha** (`Construction.corner_parts`, čísla presne ako DC „Rohová", dvere vpravo = zrkadlo `x' = W − x − box[0]`), štyri polia configu
   (`corner_side`, `corner_door_w` 250–800, `corner_cr1`/`corner_cr2` 50–250 — rozsahy návrh), otvor čiel = dverová časť. **Účinné hrúbky CR pred plánom** (čelový
@@ -105,7 +124,7 @@
   (automatický je len pri `corner_blind`), komentár hrúbky CR opravený; pevné minimum šírky rohovej v paneli (584) → ROH-B (limit zo servera).
 
 - **DOCS — štart bloku 8 · K3 ROHOVÁ SKRINKA (27.–28.9.2026, PR #409, len dokumentácia; verzia pluginu sa nemení).**
-  Michal 27.9. večer po smoke PASS bloku 7 vybral **K3 rohovú skrinku** ako nočný blok. **Rozhodnutia** (R1–R9, `zdroje/bloky/ROHOVA/ROZHODNUTIA_MICHALA_2026-09-27.md`):
+  Michal 27.9. večer po smoke PASS bloku 7 vybral **K3 rohovú skrinku** ako nočný blok. **Rozhodnutia** (R1–R9, `archiv/bloky/ROHOVA/ROZHODNUTIA_MICHALA_2026-09-27.md`):
   platí špecifikácia z debaty 6.9. (dolná slepá rohová s CR lištou podľa DC „Rohová", CR z čelového materiálu s ABS dookola, bežné kovanie, horná rohová mimo V1) +
   nové 27.9.: v dverovej časti **len jedny dvierka** (vnútri police cez celú šírku), pánty **voliteľné, predvolene pri rohu**, noc = príprava + jadro bez nových
   ovládačov. **Podklady v priečinku bloku:** fakty z kódu (typy, čelá, zrkadlenie, uzavreté zoznamy rolí), **presná geometria DC „Rohová"** zmeraná sondou

@@ -491,7 +491,7 @@ function frowFake(){
 
 // ============ 6) IKONA „Rohová" = schvaleny mockup (O4) =======================
 {
-  const mock = fs.readFileSync(path.join(ROOT, 'SYSTEM', 'zdroje', 'bloky', 'ROHOVA', 'MOCKUP_ROHOVA_2026-09-28.html'), 'utf8');
+  const mock = fs.readFileSync(path.join(ROOT, 'SYSTEM', 'archiv', 'bloky', 'ROHOVA', 'MOCKUP_ROHOVA_2026-09-28.html'), 'utf8');
   const want = (mock.match(/<symbol id="i-cab-corner"[^>]*>(.*?)<\/symbol>/) || [])[1];
   const have = (fs.readFileSync(path.join(JS, 'icons.js'), 'utf8').match(/'cab-corner': '([^']*)'/) || [])[1];
   ok(want && have, 'ikona je v mockupe aj v sprite');

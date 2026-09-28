@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # ROH-B2 · K3 — KRESBA ROHOVEJ ZOSTAVY, klavesa strany dveri pri vkladani (blok 8).
-# Package: SYSTEM/zdroje/bloky/ROHOVA/PACKAGE_ROHB2.md (mockup C, B · Čelá, O12, A).
+# Package: SYSTEM/archiv/bloky/ROHOVA/PACKAGE_ROHB2.md (mockup C, B · Čelá, O12, A).
 #
 # CO PLATI:
 #   * KRESBU pocita server: `Panel.corner_preview_json` = `Construction.corner_parts`

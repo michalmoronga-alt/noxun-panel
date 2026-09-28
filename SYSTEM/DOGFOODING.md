@@ -47,6 +47,12 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
 *(Skupina je prázdna — **D-52 uzavreté 3.9.2026** (v0.9.14), plný text v
 [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md); **D-48** je mimo V1, v skupine Po V1 — zásobník.)*
 
+## K3 ROHOVÁ — smoke po uzávere bloku 8 (v0.15.0, opravy v0.15.x)
+
+*(Blok 8 je uzavretý vo v0.15.0 (28.9.2026) bez otvorených D-čísel. Michalov smoke ide podľa checklistu
+v [archiv/ROHOVA_ZAVER_2026-09-28.md](archiv/ROHOVA_ZAVER_2026-09-28.md) — nové nálezy sa zapíšu sem a opravia ako v0.15.x; tam je aj otvorený bod **O8**
+(či ostane jantárové upozornenie „výrez police × výstuha závesov") a overenie závesu na výstuhe závesov v dielni. Skupina je dočasná a zanikne s posledným nálezom.)*
+
 ## Po V1 — zásobník
 
 - **D-145 · Náhľad Inspectora v lepšej 3D forme** (Michal 27.9.2026, pri schvaľovaní mockupu bloku KONŠTRUKCIA) — hĺbkové veci korpusu (komín vzadu,
