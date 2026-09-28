@@ -486,9 +486,53 @@ NxTest.test('NP-1 hrubka vs. nakupny material: 18 a 36 mm pri jednom material_id
   # pasma obchodnej hrubky: 19 mm na zazname 18 = ta ista platna; zaznam bez hrubky = bez kontroly
   ok = NxSL.mat(NxSL.compute([NxSL.row('thickness' => 19.0)]), 'DTD18')
   NxTest.assert_equal([false, true], ok.values_at('thickness_conflict', 'upper_bound'))
-  nothk = NxSL.mat(NxSL.compute([NxSL.row('material_id' => 'NOTHK'),
-                                 NxSL.row('material_id' => 'NOTHK', 'thickness' => 36.0)]), 'NOTHK')
-  NxTest.assert_equal(false, nothk['thickness_conflict'])
+end
+
+NxTest.test('NP-1 jednotna hrubka aj bez hrubky v katalogu: 18 a 36 pri jednom material_id = thickness_conflict') do
+  rows = [NxSL.row('names' => ['T18'], 'material_id' => 'NOTHK'),
+          NxSL.row('names' => ['T36'], 'material_id' => 'NOTHK', 'thickness' => 36.0)]
+  m = NxSL.mat(NxSL.compute(rows), 'NOTHK')
+  NxTest.assert_equal([true, false], m.values_at('thickness_conflict', 'upper_bound'))
+  NxTest.assert_equal([{ 'reason' => 'thickness_conflict', 'detail' => 'rôzne obchodné hrúbky 18, 36', 'names' => [] }],
+                      m['conflicts'])
+  NxTest.assert_equal(2, m['placed_count'], 'bez katalogu sa neda povedat, ktory je zly — rozlozia sa oba')
+  # záznam s hrúbkou 0 = ako bez hrúbky; 18 a 19 sú to isté obchodné pásmo
+  zero = NxSL.compute([NxSL.row('material_id' => 'NOTHK', 'thickness' => 18.0),
+                       NxSL.row('names' => ['B'], 'material_id' => 'NOTHK', 'thickness' => 19.0)])
+  NxTest.assert_equal(false, NxSL.mat(zero, 'NOTHK')['thickness_conflict'])
+  sheets0 = NxSL::SHEETS.merge('NOTHK' => NxSL::SHEETS['NOTHK'].merge('thickness' => 0))
+  z = NxSL.sl.compute(rows, sheets: sheets0, edge_thicknesses: NxSL::EDGES)
+  NxTest.assert_equal(true, NxSL.mat(z, 'NOTHK')['thickness_conflict'])
+  # vrstvy dupláku (hrúbka zdroja) sa do jednotnosti nerátajú
+  dup = NxSL.compute([NxSL.row('material_id' => 'NOTHK'),
+                      NxSL.row('names' => ['D'], 'material_id' => 'X36', 'thickness' => 36.0,
+                               'material_source' => { 'material_id' => 'NOTHK', 'multiplier' => 2 })])
+  NxTest.assert_equal([false, true], NxSL.mat(dup, 'NOTHK').values_at('thickness_conflict', 'upper_bound'))
+end
+
+NxTest.test('NP-1 bezny riadok ma rozmery v celych mm (Integer), duplak s pridavkom Float') do
+  m = NxSL.mat(NxSL.compute([NxSL.row('length' => 720.4, 'width' => 559.5)]), 'DTD18')
+  NxTest.assert_equal([Integer, Integer], [m['rows'][0]['l'].class, m['rows'][0]['w'].class])
+  NxTest.assert_equal([720, 560], m['rows'][0].values_at('l', 'w'))
+  rect = NxSL.sl.purchase_rect(NxSL.row('edges' => { 'L1' => 'NEZNAMA', 'L2' => nil, 'W1' => nil, 'W2' => nil }),
+                               sheets: NxSL::SHEETS, edge_thicknesses: NxSL::EDGES)
+  NxTest.assert_equal([Integer, Integer], [rect['l'].class, rect['w'].class], 'aj geometria odmietnutia')
+  d = NxSL.mat(NxSL.compute([NxSL.row('material_id' => 'DTD36', 'thickness' => 36.0,
+                                      'material_source' => { 'material_id' => 'DTD18', 'multiplier' => 2 })]), 'DTD18')
+  NxTest.assert_equal([740.0, 580.0], d['rows'][0].values_at('l', 'w'))
+end
+
+NxTest.test('NP-1 ochrana vstupu: retazec na nekonecno a zachranna vetva ostavaju na znamom materiali') do
+  inf = NxSL.row('names' => ['INFS'], 'length' => '1e400', 'key' => nil,
+                 'edges' => { 'L1' => 'NEZNAMA', 'L2' => nil, 'W1' => nil, 'W2' => nil })
+  # kľúč s NaN: JSON.generate zlyhá až po prijatí riadka -> záchranná vetva
+  nan_key = NxSL.row('names' => ['KEY'], 'key' => [Float::NAN])
+  r = NxSL.compute([NxSL.row('names' => ['OK']), inf, nan_key])
+  NxTest.assert_equal(0, r['rejected_without_material'])
+  m = NxSL.mat(r, 'DTD18')
+  NxTest.assert_equal([%w[INFS invalid_row], %w[KEY invalid_row]],
+                      m['rejected'].map { |e| [e['names'].first, e['reason']] }.sort)
+  NxTest.assert_equal([2, false], m.values_at('rejected_rows', 'upper_bound'))
 end
 
 NxTest.test('NP-1 duplak bez vazby v riadku: duplak_link_missing na zdroji, ziadne domyslenie (B2)') do
@@ -522,6 +566,9 @@ NxTest.test('NP-1 blocked: all aj per material (aj cez duplakovy material riadku
   NxTest.assert_equal(['duplak', false], NxSL.mat(dup, 'DTD18').values_at('blocked', 'upper_bound'))
   empty = NxSL.compute(rows, blocked: { 'DTD18' => '' })
   NxTest.assert_equal('blocked', NxSL.mat(empty, 'DTD18')['blocked'])
+  # kľúč „všetky" aj ako reťazec (z JSON)
+  str = NxSL.compute(rows, blocked: { 'all' => 'z JSON' })
+  NxTest.assert(str['materials'].all? { |m| m['blocked'] == 'z JSON' && !m['upper_bound'] }, "blocked 'all' ako retazec")
 end
 
 NxTest.test('NP-1 prepare_row: rovnake vyradenia a texty ako VepoExport.build (G3)') do

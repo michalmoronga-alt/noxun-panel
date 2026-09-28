@@ -250,7 +250,8 @@ module Noxun
         # C1/N7: pridavok vrstvy duplaku az PO zaokruhleni (VEPO dostava
         # zaokruhleny hotovy rozmer). Pri chybajucej vazbe sa NEdomysla —
         # geometria je vrstva bez pridavku na materiali riadku.
-        p2 = doubled ? 2 * prm['dup_allowance'] : 0.0
+        # Bezny riadok ostava v celych mm (Integer, ako VEPO); len duplak dostane pridavok.
+        p2 = doubled ? 2 * prm['dup_allowance'] : 0
         geo_mid = link_missing ? rmid : pmid
         geo = { hash: hash, mid: geo_mid, p2: p2, sheets: sheets, prm: prm }
         unless prep['ok']
@@ -282,7 +283,10 @@ module Noxun
           'key_text' => key_text(hash, prep), 'names' => names
         )
       rescue StandardError
-        rejected(nil, nil, 'invalid_row', nil, [])
+        # Zachrana: riadok so ZNAMYM nakupnym materialom ostava pripisany jemu
+        # (inak by material neopravnene drzal upper_bound); pmid/rmid/names su
+        # nil, ak vynimka prisla skor, nez sa urcili.
+        rejected(pmid, rmid, 'invalid_row', nil, names || [])
       end
 
       # Doplni do odmietnutia geometriu (l, w, format, orez, smer) — len ked
@@ -319,12 +323,14 @@ module Noxun
       end
 
       # Ochrana vstupu planu (audit F4) — VEPO sa nemeni: nekonecne/NaN
-      # rozmery ci hrubka a hrany mimo tvaru {kod => id} riadok vyradia.
+      # rozmery ci hrubka (aj retazec typu „1e400", ktory sa prevedie na
+      # nekonecno) a hrany mimo tvaru {kod => id} riadok vyradia.
       def sane_input?(hash)
         %w[length width thickness].each do |k|
           v = hash[k]
-          next if v.nil? || v.is_a?(String)
-          return false unless v.is_a?(Numeric) && v.to_f.finite?
+          next if v.nil?
+          return false unless v.is_a?(Numeric) || v.is_a?(String)
+          return false unless v.to_f.finite?
         end
         e = hash['edges']
         e.nil? || e.is_a?(Hash)
@@ -394,6 +400,7 @@ module Noxun
       def material_result(mid, acc, sheets, work, invalid, blocked)
         fr = frame(mid, sheets, work['trim'])
         rows = acc[:rows].values.sort_by { |e| [e['key'], e['l'], e['w']] }
+        mixed_thickness!(acc, rows)
         rects = []
         rows.each_with_index do |e, idx|
           (1..e['count']).each { |n| rects << [e['l'], e['w'], e['key'], n, idx] }
@@ -437,10 +444,26 @@ module Noxun
         out
       end
 
+      # B1 aj bez hrubky v katalogu: vsetky PRIJATE riadky jedneho nakupneho
+      # materialu (okrem vrstiev duplaku — maju hrubku zdroja) musia mat
+      # rovnaku obchodnu hrubku. Rozne hrubky = thickness_conflict materialu
+      # (riadky sa rozlozia, ale plan nie je horna hranica — ktory je zly,
+      # sa bez katalogu povedat neda).
+      def mixed_thickness!(acc, rows)
+        ts = rows.reject { |e| e['doubled'] }.map { |e| e['rect']['commercial'] }.uniq.sort
+        return if ts.length < 2
+
+        acc[:thickness_conflict] = true
+        acc[:conflicts] << { 'reason' => 'thickness_conflict',
+                             'detail' => "rôzne obchodné hrúbky #{ts.join(', ')}", 'names' => [] }
+      end
+
+      # Kluc „vsetky materialy" je Symbol :all alebo retazec 'all' (NP-3/NP-4
+      # ho mozu poskladat z JSON); ine kluce su material_id.
       def blocked_for(blocked, mid, row_mids)
         return nil unless blocked.is_a?(Hash)
 
-        v = blocked[:all]
+        v = blocked.key?(:all) ? blocked[:all] : blocked['all']
         return reason_text(v) unless v.nil? || v == false
 
         ([mid] + row_mids.sort).each do |id|

@@ -710,6 +710,8 @@ Inspector (`Panel.appliance_check_record`) ho skladá z toho istého refu, takž
 
 ### sheet_estimate.rb
 
+_(kontrakt `estimate` zatiaľ nezdokumentovaný — doplniť pri najbližšom zásahu do výpočtu)_
+
 Odhad počtu platní (2B-1/D-43) — zmienky v odseku `production_core.rb` a v sekcii Kusovník v [ui-lifecycle.md](ui-lifecycle.md).
 **Od NP-1 nie je „fáza 2" jeho vnútro:** nárezový plán je samostatný modul `sheet_layout.rb` (nižšie); odhad z m² ostáva ako porovnanie
 a predvolená cena. `sheet_size_for` je jediná pravda o formáte platne a fallbacku 2800 × 2070 — číta ju aj plán.
@@ -721,7 +723,7 @@ NP-2 až NP-4). Čistý modul: z `Bom.compute[:rows]`, celého `ProductionCore.s
 vypočíta **per nákupný materiál** deterministické pásové (gilotínové) rozloženie obdĺžnikov na platne. Je to **rozloženie heuristiky, nie
 minimum** — reže VEPO vlastnou optimalizáciou, plán slúži objednávke. Package: `SYSTEM/zdroje/bloky/NAREZ/PACKAGE_NP1_JADRO.md`.
 
-**Tri verejné funkcie.**
+**Štyri verejné funkcie.**
 - `compute(rows, sheets:, edge_thicknesses:, params: {}, blocked: nil)` — celý plán. Pre dátový problém **nikdy nevyhodí výnimku**.
 - `purchase_rect(hash, sheets:, edge_thicknesses:, params:)` — **celá rozhodujúca príprava nákupného obdĺžnika** z riadku kusovníka
   **alebo** záznamu dielca: prijatie (`VepoExport.prepare_row` + ochrana vstupu), zaokrúhlenie, voľba nákupného materiálu (zdroj
@@ -733,12 +735,14 @@ minimum** — reže VEPO vlastnou optimalizáciou, plán slúži objednávke. Pa
   `plan_material_id` = komu plán riadok pripíše (pri dupláku vždy zdroj).
 - `fits_rect?(rect, allow_rotation:)` — jediná nerovnosť „zmestí sa na prázdnu platňu": `l <= Lu + DIM_TOL && w <= Wu + DIM_TOL`
   (`Validation::DIM_TOL`); pri `allow_rotation: true` skúša obe polohy. Plán volá **vždy** `allow_rotation: false`, Kontrola
-  `allow_rotation: rotation_allowed?(grain)` — otáča všetko okrem `length`/`width` (dnešné správanie `fits_on_sheet?`).
+  `allow_rotation: rotation_allowed?(grain)`.
+- `rotation_allowed?(grain)` — smie Kontrola dielec otočiť? Áno pre všetko okrem `length`/`width` (dnešné správanie `fits_on_sheet?`:
+  `none`, prázdny aj neznámy smer = obe polohy). Plán neotáča nikdy — z tejto funkcie len odvodí `needs_rotation` vs. `oversize`.
 
 **Vstup a prijatie riadka.** Riadok prijíma `VepoExport.prepare_row` — tie isté vyradenia, tá istá jediná výmena pri `width`, to isté
 zaokrúhlenie na celé mm; **nič ďalšie sa neotáča, ani dielec bez smeru** (N8). `l` beží po `sheet_size[0]` (dĺžka platne = smer kresby).
-Ochrana vstupu **nad** VEPO (VEPO sa nemení): nie Hash, NaN/nekonečný rozmer či hrúbka, hrany mimo tvaru `{kód => id}` alebo výnimka
-z prípravy → `invalid_row`; rozmer ≤ 0 po zaokrúhlení (dĺžku 0,1 VEPO vydá ako 0 mm) → `zero_after_rounding`; odmietnutie VEPO → `vepo`
+Ochrana vstupu **nad** VEPO (VEPO sa nemení): nie Hash, NaN/nekonečný rozmer či hrúbka (aj reťazec typu `"1e400"`), hrany mimo tvaru
+`{kód => id}` alebo výnimka z prípravy → `invalid_row` (riadok ostáva pripísaný svojmu nákupnému materiálu, ak je známy); rozmer ≤ 0 po zaokrúhlení (dĺžku 0,1 VEPO vydá ako 0 mm) → `zero_after_rounding`; odmietnutie VEPO → `vepo`
 s **presným textom** dôvodu (`detail`). Riadok s materiálom ide do `rejected_rows` svojho nákupného materiálu — počítajú sa **riadky, nie
 kusy** (počet 0 by súčet nezvýšil); riadok bez materiálu do `rejected_without_material` na vrchnej úrovni.
 
@@ -746,8 +750,10 @@ kusy** (počet 0 by súčet nezvýšil); riadok bez materiálu do `rejected_with
 `quantity × multiplier` obdĺžnikov **zdrojového** materiálu s rozmerom `(l + 2p) × (w + 2p)` (N7; prídavok **po** zaokrúhlení, lebo VEPO
 dostane zaokrúhlený hotový rozmer). Katalógový duplák (`Materials.duplak?`) **bez** väzby v riadku sa **nedomýšľa**: riadok sa
 nerozkladá a zdroj z katalógu dostane `duplak_link_missing`. Obchodná hrúbka riadku sa porovná s hrúbkou záznamu nákupného materiálu
-(obe cez `commercial_thickness`); nesúlad → `thickness_conflict` (riadok sa nerozkladá). Vrstvy dupláku majú hrúbku zdroja, preto sa
-nekontrolujú; záznam bez hrúbky = bez kontroly (priznané).
+(obe cez `commercial_thickness`); nesúlad → `thickness_conflict` (riadok sa nerozkladá). Navyše **všetky prijaté riadky jedného nákupného
+materiálu musia mať rovnakú obchodnú hrúbku** — aj keď záznam hrúbku nemá alebo má 0; rôzne hrúbky → `thickness_conflict` materiálu (riadky
+sa rozložia, ktorý je zlý, sa bez katalógu nedá povedať; `conflicts` nesie „rôzne obchodné hrúbky …"). Vrstvy dupláku majú hrúbku zdroja,
+preto sa do oboch kontrol nerátajú. Bežný riadok má rozmery v celých mm (Integer, ako VEPO); len obdĺžnik dupláku s prídavkom je Float.
 
 **Formát a orez.** Formát = `SheetEstimate.sheet_size_for` (fallback + príznak), UNI = `Materials.uni?`. Orez `trim` na každej hrane
 okrem `NO_TRIM_TYPES = PD KOMPAKT ZASTENA` (N6, N9; vlastná konštanta — `format_in_identity?` má iný význam). Parametre `kerf`, `trim`,
@@ -771,7 +777,8 @@ neplatných parametrov, `blocked`, konfliktu hrúbky, chýbajúcej väzby duplá
 v použiteľnej ploche (po oreze). „N platní (horná hranica)" smie UI povedať len pri `upper_bound`.
 
 **`blocked:` (audit F5).** Agregácia stratí `cut_invalid` (poškodený rozmer do nárezu), hoci export zastaví samostatná brána — volajúci
-preto odovzdá `{ all: dôvod }` alebo `{ material_id => dôvod }` (zhoda aj cez materiál riadku, napr. duplákový); rozloženie sa spočíta,
+preto odovzdá `{ all: dôvod }` (kľúč Symbol `:all` aj reťazec `'all'` z JSON) alebo `{ material_id => dôvod }` (zhoda aj cez materiál
+riadku, napr. duplákový); rozloženie sa spočíta,
 ale bez `upper_bound`. **Kto `blocked` skladá, určí NP-3/NP-4.**
 
 **Testy:** `tests/pure/test_sheet_layout.rb` (golden rozloženia, `fits_rect?` oddelene od `compute`, permutácie, dolná hranica z plochy,

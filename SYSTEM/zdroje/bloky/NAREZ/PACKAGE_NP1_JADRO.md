@@ -244,11 +244,18 @@ a neúplný plán = cena z odhadu podľa O11); C5 rozhodol Michal (N10), G2 Mich
   platí verejná `SheetLayout.rotation_allowed?(grain)`; plán z nej odvodzuje `needs_rotation` vs. `oversize`. `fits_rect?(allow_rotation: true)` skúša obe polohy.
 - Zaokrúhlenie rozmerov má jedinú definíciu `VepoExport.rounded_dims` (volá ju `prepare_row` aj geometria odmietnutého riadka; bajty CSV bez zmeny).
 
+**Rozhodnutie orchestrátora po predrecenzii (29.9.):** hrúbka sa kontroluje **aj bez hrúbky v katalógu** — všetky prijaté riadky jedného nákupného
+materiálu (mimo vrstiev dupláku, ktoré majú hrúbku zdroja) musia mať **rovnakú obchodnú hrúbku**; rôzne hrúbky → `thickness_conflict` materiálu (aj keď
+záznam hrúbku nemá alebo má 0). Riadky sa rozložia (bez katalógu sa nedá povedať, ktorý je zlý), `upper_bound` je false. Veta §2.2 „záznam bez hrúbky =
+bez kontroly" tým neplatí.
+
 **Výklad implementátora (kompaktný tvar zvolený podľa §2.5):**
 - Hrúbka (B1): obe strany cez `VepoExport.commercial_thickness` (18,6 aj 19 na zázname 18 = tá istá platňa); vrstvy dupláku sa nekontrolujú („vrstvy
-  majú hrúbku zdroja"); záznam bez hrúbky = bez kontroly.
+  majú hrúbku zdroja").
 - Parametre: platné len reálne konečné čísla ≥ 0 (reťazec „5" je nečíselný); chýbajúci kľúč alebo `nil` = predvolená hodnota; kľúče String aj Symbol.
 - `utilization` materiálu aj platne v **percentách** (1 desatinné miesto); súradnice a zvyšok zaokrúhlené na 0,001 mm.
 - Riadky s `thickness_conflict` / `duplak_link_missing` nie sú v `rejected_rows` (tie počítajú len prijatie riadka), ale v zozname `conflicts`
   a v príznakoch — `upper_bound` ich vylučuje oboma cestami.
-- `blocked` zasiahne materiál aj cez materiál jeho riadku (duplákový `material_id` zablokuje zdroj); prázdny dôvod = text `blocked`.
+- `blocked` zasiahne materiál aj cez materiál jeho riadku (duplákový `material_id` zablokuje zdroj); prázdny dôvod = text `blocked`; kľúč „všetky"
+  je Symbol `:all` aj reťazec `'all'` (predrecenzia P3).
+- Bežný riadok má `l`, `w` v celých mm (Integer, ako VEPO); len obdĺžnik dupláku s prídavkom je Float (predrecenzia P3).

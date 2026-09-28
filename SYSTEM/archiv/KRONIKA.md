@@ -28,11 +28,14 @@
   nákupného obdĺžnika — na pokyn orchestrátora vracia geometriu aj pri odmietnutí z dôvodu mimo rozmerov), `fits_rect?(allow_rotation:)` a
   `rotation_allowed?` (otáča všetko okrem `length`/`width`). Audit návrhu Codex `gpt-6-astra`: **2 BLOCKER · 7 FIX — všetky prijaté** (surový výstup
   a package v [zdroje/bloky/NAREZ/](../zdroje/bloky/NAREZ/)). STANDARD §3.3, §7.1 (`sheet_size[0]` = dĺžka = smer kresby), nová §11.4 a §12 (primitívny plán
-  je vo V1); architektúra `outputs.md` (nový odsek `sheet_layout.rb`, `prepare_row` vo `vepo_export.rb`). **Testy:** 4762 headless · 138 JS sád zelené;
-  **20 mutácií, všetky zabité** (prerez pred prvým dielcom, bez prerezu medzi pásmi, prídavok raz/vôbec, nový pás len na poslednej platni, bez tolerancie,
-  orez pri PD, vyradené riadky / blocked / fallback-UNI ignorované v `upper_bound`, neúplné radenie, zvyšok bez kandidátov nad dielcami, otáčanie v pláne,
-  otáčanie len pri `none`, bez kontroly hrúbky, ignorovaná väzba dupláku, bez `zero_after_rounding`, geometria odmietnutia); výkon ~2000 obdĺžnikov ≈ 0,02 s.
-  In-SU netreba (čistý modul).
+  je vo V1); architektúra `outputs.md` (nový odsek `sheet_layout.rb`, `prepare_row` vo `vepo_export.rb`). **Slepá predrecenzia:** PR OK, 0× P1/P2, 4× P3
+  opravené (záchranná vetva ostáva na známom materiáli a reťazec „1e400" je `invalid_row`; bežný riadok v celých mm Integer; `blocked` s kľúčom `'all'`
+  z JSON; dokumentácia) + na pokyn orchestrátora **kontrola jednotnej obchodnej hrúbky** materiálu aj bez hrúbky v katalógu. **Testy:** 4765 headless ·
+  138 JS sád zelené; **25 mutácií — 24 zabitých, 1 ekvivalentná** (odstránenie kontroly reťazca na nekonečno: výsledok rovnaký cez záchrannú vetvu)
+  (prerez pred prvým dielcom, bez prerezu medzi pásmi, prídavok raz/vôbec, nový pás len na poslednej platni, bez tolerancie, orez pri PD, vyradené riadky /
+  blocked / fallback-UNI ignorované v `upper_bound`, neúplné radenie, zvyšok bez kandidátov nad dielcami, otáčanie v pláne, otáčanie len pri `none`, bez
+  kontroly hrúbky aj jednotnej hrúbky, ignorovaná väzba dupláku, bez `zero_after_rounding`, geometria odmietnutia, Float rozmery, záchranná vetva, `'all'`);
+  výkon ~2000 obdĺžnikov ≈ 0,02 s. In-SU netreba (čistý modul).
 
 - **DOCS — štart bloku 2 · Nárezový plán (primitívny) (28.–29.9.2026, PR #417, len dokumentácia; verzia pluginu sa nemení).**
   Michal 28.9. večer (v druhom okne, súbežne so smoke bloku 8) spustil **posledný otvorený bod bloku 2 KONTROLA + VÝROBA** — primitívny nárezový plán rozhodnutý 6.9.
