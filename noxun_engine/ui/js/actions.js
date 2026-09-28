@@ -394,6 +394,12 @@
                    'Skontroluj červené polia (neplatný rozmer).', true);
       return;
     }
+    // R-02: identita dokumentu ide s KAZDYM zapisovym payloadom (nxDocPayload).
+    if (window.sketchup && sketchup.insert_cabinet) sketchup.insert_cabinet(nxDocPayload(nxInsertPayload()));
+  }
+  // ROH-B2: payload vkladu korpusu z karty — JEDEN zdroj pre „Vložiť" aj pre
+  // prepnutie strany klavesou D pocas ghostu (`nxGhostCornerSide`).
+  function nxInsertPayload(){
     var p = collectAll(); p.zone_tree = currentZoneTree;
     // ROH-B1 (O4 A1): STRANA DVERI rohovej zvolena vo vkladacej karte. Nie je
     // to pole formulara (apply ju nikdy neposiela), preto ide sem vyslovne —
@@ -425,8 +431,30 @@
       p.template_kind = ref.kind;
       p.template_name = ref.name;
     }
-    // R-02: identita dokumentu ide s KAZDYM zapisovym payloadom (nxDocPayload).
-    if (window.sketchup && sketchup.insert_cabinet) sketchup.insert_cabinet(nxDocPayload(p));
+    return p;
+  }
+  // ROH-B2 (O12): KLAVESA STRANY DVERI pocas ghostu rohovej. Ruby (nastroj
+  // ghostu) ohlasi klavesu `NX.ghostCornerSide(strana ghostu)`; stranu
+  // prepne TA ISTA funkcia ako prepinac v riadku vkladacej karty
+  // (`onCornerSide` — register + zrkadlo navrhu ciel, audit B1 FIX 2) a ghost
+  // sa prevesi na novy zmrazeny plan z karty (`ghost_corner_side` -> ten isty
+  // `handle_insert`, poloha kurzora ostava). Preflight ciel sa necaka: zrkadlo
+  // platnost ciel nemeni a guardy stavby bezia v commite ako pri kazdom vklade.
+  // -> true = ziadost odisla.
+  function nxGhostCornerSide(side){
+    if ((typeof selectedCabId !== 'undefined' && selectedCabId) || cabTypeNow() !== 'corner_blind'){
+      NX.setStatus('Klávesa D prepína stranu dverí len pri vkladaní rohovej z karty — zmeň ju prepínačom v riadku rohovej.', true);
+      return false;
+    }
+    if (!validateFields(true)){
+      NX.setStatus((typeof nxCabFieldError === 'function' && nxCabFieldError()) ||
+                   'Skontroluj červené polia — strana dverí sa neprepla.', true);
+      return false;
+    }
+    onCornerSide(side === 'right' ? 'left' : 'right');
+    if (!(window.sketchup && sketchup.ghost_corner_side)) return false;
+    sketchup.ghost_corner_side(nxDocPayload(nxInsertPayload()));
+    return true;
   }
   // B3 „Vlozit kopiu": PRESNA SERVEROVA kopia oznacenej skrinky — config sa cita
   // z modelu (nie z DOM formulara), takze kopia nesie aj materialy, part_overrides,

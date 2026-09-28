@@ -602,6 +602,16 @@ module Noxun
           Engine.log_error(e, 'Panel.push_ghost')
         end
 
+        # ROH-B2 (O12): klavesa D v nastroji ghostu ROHOVEJ. Panel dostane
+        # stranu, ktoru ghost PRAVE nesie; prepnutie robi vkladacia karta tou
+        # istou funkciou ako prepinac v riadku rohovej a ghost prevesi cez
+        # `ghost_corner_side` (`handle_ghost_corner_side`).
+        def ghost_corner_side_key(side)
+          js("NX.ghostCornerSide(#{side.to_s.to_json})")
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.ghost_corner_side_key')
+        end
+
         def set_status(msg, error = false)
           js("NX.setStatus(#{msg.to_json}, #{error ? 'true' : 'false'})")
         end

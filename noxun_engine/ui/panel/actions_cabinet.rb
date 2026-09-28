@@ -146,13 +146,59 @@ module Noxun
         end
 
         def preflight_door_w(data, corner)
-          v = data['corner_door_w']
-          lo, hi = CabinetBuilder::CORNER_RANGES[:corner_door_w]
+          preflight_corner_mm(data, corner, :corner_door_w)
+        end
+
+        # ROH-B2: to iste pravidlo pre KAZDE pole rohovej (dverova cast, CR 1,
+        # CR 2) — zive pole v rozsahu, inak posledny platny zdroj. Kresba
+        # zostavy tak stoji na tych istych cislach ako otvor dveri.
+        def preflight_corner_mm(data, corner, key)
+          v = data[key.to_s]
+          lo, hi = CabinetBuilder::CORNER_RANGES[key]
           if v.is_a?(Numeric) && v.to_f.finite? && v.to_f >= lo && v.to_f <= hi
             v.to_f
           else
-            corner['corner_door_w']
+            corner[key.to_s]
           end
+        end
+
+        # ROH-B2: ZIVE polia navrhu, ktore menia kresbu zostavy (vyska vnutra pri
+        # strope z vystuh) — ostatne konstrukcne polia celny pohlad nemenia.
+        CORNER_PREVIEW_LIVE_KEYS = %w[top_mode rail_depth rails_orientation rails_top_offset].freeze
+
+        # ROH-B2: vstup kresby zostavy pre AKTUALNU reviziu preflightu (cista).
+        # Oznacena rohova = ULOZENY config (strana, materialy, rucne overridy)
+        # + zive rozmery a polia; vkladanie = payload karty. Hrubka korpusu je
+        # ta ista ucinna, z ktorej panel pocita minimum sirky (`ctx['t']`).
+        def corner_preview_params(data, stored, corner, ctx)
+          base = stored.is_a?(Hash) ? CabinetBuilder.config_to_params(stored) : {}
+          p = base.merge('type' => Construction::CORNER_TYPE, 'width' => data['width'],
+                         'height' => data['height'], 'floor_height' => data['floor_height'],
+                         'thickness' => ctx['t'], 'corner_side' => corner['corner_side'],
+                         'fronts' => data['fronts'])
+          CabinetBuilder::CORNER_RANGES.each_key { |k| p[k.to_s] = preflight_corner_mm(data, corner, k) }
+          CORNER_PREVIEW_LIVE_KEYS.each do |k|
+            v = data[k]
+            p[k] = v unless v.nil? || v.to_s.strip.empty?
+          end
+          unless stored.is_a?(Hash)
+            %w[material_id front_material_id].each do |k|
+              p[k] = data[k] if data[k].is_a?(String) && !data[k].strip.empty?
+            end
+          end
+          p
+        end
+
+        # ROH-B2: kresba zostavy do odpovede preflightu, alebo nil (nie je rohova).
+        def corner_preflight_preview(data, stored, model, ctx)
+          corner = corner_preflight_src(data, stored)
+          return nil unless corner && ctx
+
+          params = corner_preview_params(data, stored, corner, ctx)
+          corner_preview_json(params, CabinetBuilder.aux_part_thicknesses(params, model))
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.corner_preflight_preview')
+          nil
         end
 
         # Medzera PRI ROHU v navrhu ciel v rozsahu 1–20 mm? Nevalidny tvar
@@ -209,6 +255,10 @@ module Noxun
           # ROH-B1 (audit B1 FIX 4): UCINNE hrubky pre minimum sirky rohovej.
           ctx = corner_preflight_ctx(data, stored, model)
           res['corner_ctx'] = ctx if ctx
+          # ROH-B2: kresba rohovej zostavy pre ZIVE polia tejto revizie — len
+          # ked preflight rozmery prijal (inak ani otvor nie je znamy).
+          cp = res['opening'] ? corner_preflight_preview(data, stored, model, ctx) : nil
+          res['corner_preview'] = cp if cp
           js("NX.frontPreflight(#{res.to_json})")
         end
 
@@ -583,7 +633,9 @@ module Noxun
         # stlaceni „Vlozit" — hlaska je ta ista (`ghost_insert_failed`).
         # `Construction.build_plan` sa do `prepare_insert` zamerne nepresuva
         # (vedoma hranica R-03).
-        def handle_insert(payload)
+        # ROH-B2: `keep_point:` = prevesenie ghostu klavesou strany dveri
+        # (`handle_ghost_corner_side`) — nova session prevezme polohu starej.
+        def handle_insert(payload, keep_point: false)
           model = Sketchup.active_model
           params = parse(payload)
           # R-02: identita DOKUMENTU pred cimkolvek inym — vklad je najkritickejsia
@@ -652,15 +704,46 @@ module Noxun
           end
           # Stara session konci PRED vznikom novej (druhe „Vlozit" = novy
           # snapshot); `GhostTool.start` to robi ako prvy krok.
-          if GhostTool.start(model, plan, hardware: hw, template_ref: tpl_ref, note: note).nil?
-            return set_status('Ghost vkladanie sa nepodarilo spustiť — skús to znova.', true)
-          end
+          s = GhostTool.start(model, plan, hardware: hw, template_ref: tpl_ref, note: note, keep_point: keep_point)
+          return set_status('Ghost vkladanie sa nepodarilo spustiť — skús to znova.', true) if s.nil?
+
           # Poznamku preflightov (D-45 prevzata hrubka, materialove noty)
           # vypisuje AZ `ghost_after_commit` — pri stlaceni „Vlozit" sa este
           # nic nestalo, takze hlasit „hrubka prevzata" by bolo predcasne
           # a po kliku by sa to zopakovalo druhy raz (review #268 P3-7).
+          # ROH-B2 (O12): rohova ma navyse klavesu strany dveri a jej stav.
+          if s.corner?
+            return set_status("Rohová (#{GhostTool::CORNER_SIDE_LABELS[s.corner_side]}) visí na kurzore — klikni, " \
+                              'kam ju položiť. D prepne stranu dverí, šípky ←/→ otáčajú, Alt prepína kotvu, Esc zruší.')
+          end
+
           set_status('Skrinka visí na kurzore — klikni, kam ju položiť. ' \
                      'Šípky ←/→ otáčajú, Alt prepína kotvu, ↓ drží domácu výšku, ↑ pustí voľnú výšku, Esc zruší.')
+        end
+
+        # ROH-B2 (O12): PREVESENIE GHOSTU ROHOVEJ po klavese strany dveri. Karta
+        # uz stranu prepla (`onCornerSide` — register + zrkadlo navrhu ciel)
+        # a posiela TEN ISTY payload ako „Vložiť"; tu ide TOU ISTOU cestou
+        # (`handle_insert` — vsetky preflighty, zmrazeny plan) s prevzatou
+        # polohou. Ked sa novy ghost nezalozi, STARY sa zrusi — karta uz
+        # ukazuje novu stranu a ghost so starou by po kliku vlozil inu skrinku,
+        # nez akú karta ukazuje. Nic sa nezapisuje (0 krokov Spat).
+        def handle_ghost_corner_side(payload)
+          model = Sketchup.active_model
+          data = parse(payload)
+          return if foreign_document?(data, model, 'Strana dverí sa neprepla')
+
+          old = GhostTool.session
+          unless old && old.active? && old.corner? && old.plan.for_model?(model)
+            return set_status('Rohová už nevisí na kurzore — stranu dverí zmeň prepínačom v riadku rohovej.', true)
+          end
+
+          handle_insert(payload, keep_point: true)
+          now = GhostTool.session
+          return if now && !now.equal?(old) && now.active?
+
+          GhostTool.cancel_session('strana dverí sa neprepla', deferred: false)
+          set_status('Strana dverí sa neprepla (skontroluj kartu) — vkladanie sa zrušilo, vlož rohovú znova.', true)
         end
 
         # S1-E (FIX E7): doplni do vkladacieho payloadu to, co vie LEN ULOZENY

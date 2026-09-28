@@ -354,7 +354,9 @@ function selCtx(){
   ctx.nxFrontDraftAsk();
   eq([SENT[0].corner_side, SENT[0].corner_door_w, SENT[0].thickness], ['left', 450, 18], 'preflight: strana, dverová časť, hrúbka');
   eq([SENT[0].material_id, SENT[0].front_material_id], ['KORP25', 'CELO19'], 'vkladanie: materiály návrhu (šablóna) pre corner_ctx');
-  ok(!('corner_cr1' in SENT[0]), 'CR sa na otvor nepýta');
+  // ROH-B2: CR 1 a CR 2 idu do preflightu — server z nich kresli ROHOVU
+  // ZOSTAVU (otvor dveri na nich nezavisi, kresba ano).
+  eq([SENT[0].corner_cr1, SENT[0].corner_cr2], [80, 80], 'ROH-B2: CR idú do preflightu (kresba zostavy)');
   ctx.nxFrontDraftAsk();
   eq(SENT.length, 1, 'bez zmeny žiadny nový dotaz');
   setF(ctx, { corner_door_w: 500 });

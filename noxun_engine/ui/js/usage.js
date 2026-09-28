@@ -49,7 +49,8 @@
                     'pv:vrstva:zony', 'pv:vrstva:cela', 'pv:vrstva:kovanie', 'pv:vrstva:olep',
                     'rad:sirka', 'rad:vyska', 'rad:hlbka', 'rad:sokel', 'rad:vyska_cela',
                     // D-139: „Medzera hore" slotu vedie do schemy medzier v Celach.
-                    'info:dielce', 'info:material', 'info:dw-medzera',
+                    // ROH-B2 (O12): „Šírka dverí" rohovej vedie do Čelá → F1.
+                    'info:dielce', 'info:material', 'info:dw-medzera', 'info:rohova-dvere',
                     'ctx:korpus',
                     // UI-C2: dlazdice delenia zony. Kluc je STATICKY (os + pocet
                     // poli), nikdy z dat — merac tak povie, ktore delenie sa

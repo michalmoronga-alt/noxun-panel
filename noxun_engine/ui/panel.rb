@@ -285,6 +285,7 @@ module Noxun
           # BEZIACEJ session, nie model — guard identity dokumentu je preto
           # rovnaky ako pri zapisovych handleroch (R-02).
           cb(dlg, 'ghost_lock_z')       { |p| handle_ghost_lock_z(p) }
+          cb(dlg, 'ghost_corner_side')  { |p| handle_ghost_corner_side(p) } # ROH-B2 (O12): klavesa D
           # V0.4.7c: samostatna doska — vlozenie + karta (fields/material/ABS hrana)
           cb(dlg, 'insert_board')       { |p| handle_insert_board(p) }
           # GHOST-D2: „Nakresliť" — SAMOSTATNY callback (kreslenie dvoma tahmi).

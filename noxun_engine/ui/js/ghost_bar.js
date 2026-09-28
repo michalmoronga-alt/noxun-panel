@@ -26,6 +26,9 @@
   // má umiestnenie).
   var NX_GHOST_HELP = {
     cabinet: '←/→ otočí o 90° · Alt prepne kotvu · ↓ zámok výšky · ↑ voľná výška · Esc zruší · klik vloží',
+    // ROH-B2 (O12): rohová má navyše klávesu STRANY DVERÍ (D = dvere).
+    corner: '←/→ otočí o 90° · D prepne stranu dverí · Alt prepne kotvu · ↓ zámok výšky · ↑ voľná výška · ' +
+      'Esc zruší · klik vloží',
     board: '←/→ otočí o 90° · ↑/↓ zmení umiestnenie · Alt prepne kotvu · Esc zruší · klik vloží',
     // GHOST-D2: kreslenie má inú nápovedu — kotva je pevná (počiatok), zato
     // pribudlo meracie pole a Shift.
@@ -104,6 +107,15 @@
   // ukáže Kontrola). Rozhoduje SERVER, pásik ho len farbí.
   function nxGhostLegsWarn(state){
     return nxGhostLegsText(state) !== '' && String(state.legs_tone || '') === 'warn';
+  }
+
+  // ROH-B2 (O12): „dvere vľavo / vpravo" vkladanej ROHOVEJ. Text sklada SERVER
+  // (`corner_label` zo zmrazeneho planu session) — pasik si nic neodvodzuje;
+  // prazdny retazec = segment sa nekresli (iny typ, doska, starsi push).
+  function nxGhostCornerText(state){
+    if (!state || nxGhostSubject(state) !== 'cabinet' || nxGhostDrawing(state)) return '';
+    var t = state.corner_label;
+    return (t === null || t === undefined) ? '' : String(t);
   }
 
   // Zrkadlo `GhostTool::Calc.lock_z_value`: cislo v mm v rozumnom rozsahu,
@@ -207,8 +219,16 @@
       legs.className = nxGhostLegsWarn(state) ? 'gbtxt gblegs warn' : 'gbtxt gblegs';
       legs.setAttribute('title', txt === '' ? '' : 'Nohy a príchyty sokla, ktoré skrinka dostane');
     }
+    // ROH-B2 (O12): STRANA DVERI rohovej — ten isty rad, ziadny riadok navyse.
+    var ctext = nxGhostCornerText(state);
+    var corner = nxGhostEl('gbCorner');
+    if (corner){
+      corner.hidden = (ctext === '');
+      corner.textContent = ctext;
+      corner.setAttribute('title', ctext === '' ? '' : 'Strana dverí rohovej — klávesa D ju prepne (zrkadlí celú rohovú zostavu)');
+    }
     var info = nxGhostEl('gbInfo');
-    if (info) info.setAttribute('title', NX_GHOST_HELP[drawing ? 'drawing' : (isBoard ? 'board' : 'cabinet')]);
+    if (info) info.setAttribute('title', NX_GHOST_HELP[drawing ? 'drawing' : (isBoard ? 'board' : (ctext ? 'corner' : 'cabinet'))]);
     if (isBoard) nxGhostSyncCard(state);
     return true;
   }
@@ -274,6 +294,8 @@
       // KOV-G2 (D-111) — tests/js/test_kovg2_nohy_ui.js
       legsText: nxGhostLegsText,
       legsWarn: nxGhostLegsWarn,
+      // ROH-B2 — tests/js/test_rohb2_nahlad.js
+      cornerText: nxGhostCornerText,
       HELP: NX_GHOST_HELP,
       PHASES: NX_GHOST_PHASES
     };

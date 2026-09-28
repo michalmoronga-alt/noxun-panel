@@ -184,6 +184,13 @@
       var out = [mm.join(' × ')];
       var p = metaMm(d.plinth);
       if (p && d.plinth_visible !== false) out.push('sokel ' + p);
+      // ROH-B2 (O12, mockup B3): rohova povie aj zbalena STRANU a DVEROVU CAST
+      // („dvere vľavo 450") — bez cisla len strana (nic sa nevymysla).
+      var c = d.corner;
+      if (c && (c.side === 'left' || c.side === 'right')){
+        var dw = metaMm(c.door);
+        out.push('dvere ' + (c.side === 'right' ? 'vpravo' : 'vľavo') + (dw ? ' ' + dw : ''));
+      }
       return out.join(' · ');
     }
 
@@ -570,9 +577,14 @@
     if (NXShell.mode() === 'insert' && nxMetaInsertKind() === 'board')
       return { w: numv('ib_length'), h: numv('ib_width'), d: numv('ib_thickness') };
     var fh = el('fhRow');
-    return { w: numv('width'), h: numv('height'), d: numv('depth'),
-             plinth: numv('floor_height'),
-             plinth_visible: !(fh && fh.style.display === 'none') };
+    var out = { w: numv('width'), h: numv('height'), d: numv('depth'),
+                plinth: numv('floor_height'),
+                plinth_visible: !(fh && fh.style.display === 'none') };
+    // ROH-B2 (O12): strana dveri (prepinac riadku rohovej) a dverova cast
+    // (pole riadku) — len pri rohovej, inak kluc nie je a meta je dnesna.
+    if (typeof getType === 'function' && getType() === 'corner_blind' && typeof nxCornerSide === 'function')
+      out.corner = { side: nxCornerSide(), door: numv('corner_door_w') };
+    return out;
   }
   // ID materialu -> popis z AKTUALNEHO katalogu (sheetLabelOf). Dielec a doska
   // maju vlastnu kartu v S4, vkladanie korpusu material v paneli nevolí (ten
@@ -635,7 +647,7 @@
   // JEDEN delegovany listener namiesto zasahov do form.js/materials.js — meta je
   // len ZOBRAZENIE, nesmie sa votierat do zapisovych ciest. Zmenu kontextu,
   // rezimu aj serverovy push pokryva nxShellApply, otvorenie skupiny boot.js.
-  var NX_META_FIELDS = ['width', 'height', 'depth', 'floor_height',
+  var NX_META_FIELDS = ['width', 'height', 'depth', 'floor_height', 'corner_door_w',
                         'ib_length', 'ib_width', 'ib_thickness',
                         'cab_body', 'cab_front', 'cab_front_c', 'cab_back', 'ib_material'];
   if (typeof document !== 'undefined'){

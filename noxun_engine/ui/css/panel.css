@@ -257,6 +257,16 @@
     padding-top: 6px; border-top: 1px solid var(--nx-border-soft); }
   .nx-inspector .addrow .addl { flex: 0 0 auto; font-size: 11px; color: var(--nx-ink-faint); }
   .nx-inspector .front-add-types { flex: 1 1 0; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:6px; margin-top:0; }
+  /* ROH-B2 (O10): pri ROHOVEJ rad „Pridať čelo" nahradi veta na tom istom
+     mieste. `display` vyssie prebija UA pravidlo pre `[hidden]` — preto tu. */
+  .nx-inspector .addrow .addl[hidden], .nx-inspector .front-add-types[hidden] { display: none; }
+  .nx-inspector .addrow .addnote { display: flex; align-items: center; gap: 6px; font-size: 11px;
+    color: var(--nx-ink-soft); }
+  .nx-inspector .addrow .addnote[hidden] { display: none; }
+  .nx-inspector .addrow .addnote .ic { width: 14px; height: 14px; flex: 0 0 auto; color: var(--nx-select); }
+  /* ROH-B2 (O10): zamknuty krizik rohovej — ostava viditelny s dovodom (D-78). */
+  .frow .fdel[aria-disabled="true"] { opacity: .45; cursor: default; }
+  .frow .fdel[aria-disabled="true"]:hover { background: none; color: inherit; border-color: transparent; }
 
   /* ===== D-130a R8: TOOLTIP `.nxtip` (pomocny text za ikonou `?`) =========
      PRECO NIE NATIVNY `title`: CEF ho ukazuje s velkym oneskorenim, neda sa
@@ -481,6 +491,12 @@
                    font-weight: 600; }
   /* „Neurcene" je STAV, nie chyba — jantar (RED nalez patri Kontrole). */
   .nx-inspector .fcard .segrow button.warnstate.on { background: var(--nx-warn-bg-soft); color: var(--nx-warnchip-fg); }
+  /* ROH-B2 (O10): zamknute volby a dlazdice rohovej (typ, krídla) — `.off`
+     + aria-disabled s dovodom v bubline (vzor D-78), nikdy HTML `disabled`. */
+  .nx-inspector .fcard .segrow button[aria-disabled="true"],
+  .nx-inspector .fcard .typetile[aria-disabled="true"] { opacity: .45; cursor: default; }
+  .nx-inspector .fcard .segrow button[aria-disabled="true"]:hover { background: none; color: inherit; }
+  .nx-inspector .fcard .typetile[aria-disabled="true"]:hover { border-color: var(--nx-border); color: inherit; }
   .nx-inspector .fcard .segrow .ic { width: 13px; height: 13px; }
   .nx-inspector .fcard .inforow { display: block; font-size: 11px; color: var(--nx-ink-muted);
                    margin-top: 6px; line-height: 1.4; }
@@ -1639,6 +1655,10 @@
   .nx-inspector body.mode-cab[data-view-ctx="zony"] [data-s4="zony"],
   .nx-inspector body.mode-cab[data-view-ctx="cela"] [data-s4="cela"],
   .nx-inspector body.mode-cab[data-view-ctx="kovanie"] [data-s4="kovanie"] { display: block; }
+  /* ROH-B2: skupina skryta TYPOM skrinky (`hidden` — „Delenie zóny" pri
+     rohovej) prebije kontextove `display: block` vyssie (rovnaka specificita,
+     neskorsie pravidlo). */
+  .nx-inspector body.mode-cab [data-s4][hidden] { display: none; }
   /* Karty dielca/dosky riadi ich renderer (inline display) — mimo svojho
      rezimu ich CSS drzi skryte (poistka, nie jediny mechanizmus). */
   .nx-inspector body.mode-insert #boardCard, .nx-inspector body.mode-cab #boardCard,

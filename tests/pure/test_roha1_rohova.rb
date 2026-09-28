@@ -692,7 +692,7 @@ NxTest.test('ROH-A1 (audit A1 FIX 3): sablona uložiť -> vložiť nesie vpravo 
   ensure
     ts.delete('cabinet', name) if ts.find('cabinet', name)
   end
-  body = NxRohA1.src('noxun_engine', 'ui', 'panel', 'actions_cabinet.rb')[/def handle_insert\(payload\).*?\n        end\n/m].to_s
+  body = NxRohA1.src('noxun_engine', 'ui', 'panel', 'actions_cabinet.rb')[/def handle_insert\(payload(?:, keep_point: false)?\).*?\n        end\n/m].to_s
   NxTest.assert(body.index('apply_template_slot_fields!') < body.index('corner_template_refusal') &&
                 body.index('corner_template_refusal') < body.index('prepare_insert'), 'kontrola PRED ghostom')
 end

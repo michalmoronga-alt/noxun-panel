@@ -479,6 +479,12 @@
     var d = (typeof DEFAULTS === 'object' && DEFAULTS && DEFAULTS.corner_blind) || {};
     return d.corner_side === 'right' ? 'right' : 'left';
   }
+  // ROH-B2 (O10): strana dveri pre KARTU CIEL a suhrn riadku („pánty pri
+  // rohu / pri boku") — len pri rohovej, inak null (karta ostatnych typov sa
+  // nemeni).
+  function nxCornerCardSide(){
+    return cabTypeNow() === 'corner_blind' ? nxCornerSide() : null;
+  }
   // Ucinna hrubka CR 2 pre minimum sirky: payload/predvolby -> 18 (placeholder).
   function nxCornerTh2(){
     if (cornerDraft && cornerDraft.corner_th2) return cornerDraft.corner_th2;
@@ -569,6 +575,9 @@
     nxCornerRowSync();
     renderFronts(nxCornerMirrorFronts(collectFronts()));
     onField();
+    // ROH-B2 (O12): suhrn v liste Základné („dvere vpravo 450") hned — klik na
+    // prepinac nie je `input` pola, ktory by meta obnovil sam.
+    if (typeof nxSectorMetaApply === 'function') nxSectorMetaApply();
   }
   // ROH-A2: payload OZNACENEJ skrinky -> otvor ciel ulozeneho stavu, ulozene
   // sloty smeru (znacky zavesov, kym preflight bezi alebo je navrh neplatny)
@@ -577,7 +586,10 @@
     var p = c || {};
     frontOpening = (p.front_opening && typeof p.front_opening === 'object') ? p.front_opening : null;
     frontSlotsSaved = (p.front_slots && typeof p.front_slots === 'object') ? p.front_slots : null;
+    // ROH-B2: kresba rohovej zostavy ULOZENEHO stavu (ina skrinka kluc nema).
+    cornerPreview = (p.corner_preview && typeof p.corner_preview === 'object') ? p.corner_preview : null;
     nxSetCornerDraft(p);
+    nxCornerInfoSync();
   }
   // ROH-A2 (predrecenzia P2-1): VKLADACIA karta, ktorej identitu zresetoval
   // `nxFrontDraftReset` bez materializacie (Spat/Znova, prazdny vyber
@@ -598,6 +610,7 @@
     // novy vyber ho dostane z payloadu, vkladanie z prveho preflightu.
     frontOpening = null;
     frontSlotsSaved = null;
+    cornerPreview = null; // ROH-B2: kresba zostavy patri identite rovnako ako otvor
     frontDraft = null; cabDraftDirty = false; cabApplyRequest = null; cabAfterApply = null;
     cabEditsInFlight = false;
     cancelCabinetEdits();
@@ -631,6 +644,13 @@
       // pre minimum sirky — hrubku korpusu tak, ako ju upravi vklad, a pri
       // vkladani materialy navrhu (sablona; bez nich projektove predvolby).
       out.thickness = c.thickness === '' ? d.thickness : c.thickness;
+      // ROH-B2: server z tych istych poli kresli ROHOVU ZOSTAVU (CR 1, CR 2,
+      // blenda po strop) — ich zmena zmeni signaturu a kresba sa prepocita.
+      out.corner_cr1 = c.corner_cr1 === '' ? d.corner_cr1 : c.corner_cr1;
+      out.corner_cr2 = c.corner_cr2 === '' ? d.corner_cr2 : c.corner_cr2;
+      ['top_mode', 'rail_depth', 'rails_orientation', 'rails_top_offset'].forEach(function(k){
+        if (c[k] !== undefined && c[k] !== '') out[k] = c[k];
+      });
       if (!selectedCabId && typeof NXInsert !== 'undefined' && NXInsert.state){
         var m = NXInsert.state.materials || {};
         if (m.material_id) out.material_id = m.material_id;
@@ -675,6 +695,9 @@
     // ROH-A2: otvor AKTUALNEJ revizie (ziva sirka) — aj z odmietnutej
     // odpovede, ked ho server stihol spocitat. Bez neho ostava posledny znamy.
     if (result.opening && typeof result.opening === 'object') frontOpening = result.opening;
+    // ROH-B2: kresba rohovej zostavy AKTUALNEJ revizie (zive polia). Bez kluca
+    // (rozmery neprijate) ostava posledna znama — ako otvor.
+    if (result.corner_preview && typeof result.corner_preview === 'object') cornerPreview = result.corner_preview;
     // ROH-B1 (audit B1 FIX 4): ucinne hrubky rohovej AKTUALNEJ revizie —
     // minimum sirky sa hned prepocita (cervena + veta), bez cakania na pole.
     var ctxChanged = nxAdoptCornerCtx(result.corner_ctx);
@@ -685,6 +708,12 @@
     nxFrontDraftMessage(f.message);
     updateFrontDirBadges(); updateFrontPlaceholders();
     refreshFrontCards(); renderPreview();
+    // ROH-B2: „Šírka dverí" a odhad „≈ Dielcov" pri vkladani z tej istej kresby.
+    if (cabTypeNow() === 'corner_blind'){
+      nxCornerInfoSync();
+      if (!selectedCabId && typeof NXInsert !== 'undefined' && NXInsert.state &&
+          NXInsert.state.kind !== 'board' && typeof nxDraftStats === 'function') setInsertCabInfo();
+    }
     if (ctxChanged) validateFields(true);
     if (f.valid && cabDraftDirty && selectedCabId) nxScheduleCabinetApply();
   }
@@ -954,6 +983,10 @@
       return;
     }
     var st = nxDraftStats(pvGeom(), computeZones(), pvInsertFronts());
+    // ROH-B2 (A2 odchylka 4): pri rohovej + dielce ROHOVEJ ZOSTAVY (pocet
+    // a plocha zo servera — `corner_preview.stats`, ziadny vzorec v JS).
+    if (typeof nxCornerStatsAdd === 'function' && typeof pvCornerPreview === 'function')
+      st = nxCornerStatsAdd(st, pvCornerPreview());
     setOut('inf_parts', st.count > 0 ? ('≈ ' + st.count) : '—');
     setOut('inf_area', st.area > 0 ? ('≈ ' + mmLabel(st.area) + ' m²') : '—');
     var pn = el('infParts'), an = el('infArea');
@@ -997,6 +1030,13 @@
     var crow = el('cornerRow');
     if (crow) crow.hidden = (t !== 'corner_blind');
     nxCornerRowSync();
+    // ROH-B2 (package bod 3): rohova delenie zon NEPOZNA (server ho odmieta od
+    // A1 — `CORNER_ZONES_MSG`), preto sa skupina „Delenie zóny" pri nej vobec
+    // nezobrazi; strom aj pocet polic ostavaju.
+    var zsplit = (typeof document !== 'undefined' && document.querySelector)
+      ? document.querySelector('details[data-key="zsplit"]') : null;
+    if (zsplit) zsplit.hidden = (t === 'corner_blind');
+    nxCornerInfoSync();
     SLOT_ONLY_ROWS.forEach(function(id){ var n = el(id); if (n) n.hidden = !slot; });
     SLOT_HIDDEN_ROWS.forEach(function(id){ var n = el(id); if (n) n.style.display = slot ? 'none' : ''; });
     SLOT_HIDDEN_GAPS.forEach(function(id){ var n = el(id); if (n) n.hidden = slot; });
@@ -2127,7 +2167,7 @@
           '<span class="miniopts" data-dim-key="vyska_cela" data-dim-input="' + esc(fhId) + '"></span>' +
         '</span>' +
       '</span>' +
-      '<button class="fdel" title="Odstrániť" aria-label="Odstrániť čelo" onclick="delFrontRow(this); onField()">' + NXIcons.svg('x') + '</button>';
+      '<button class="fdel" title="Odstrániť" aria-label="Odstrániť čelo" onclick="if (delFrontRow(this)) onField()">' + NXIcons.svg('x') + '</button>';
     wrap.insertBefore(row, wrap.firstChild); // D-23: navrch — DOM je obrateny
     if (item.height !== null && item.height !== undefined && item.height !== '') row.querySelector('.fh').value = item.height;
     // UI-C3: `item.locked` sa uz necita — zamok JE vypisana hodnota.
@@ -2218,10 +2258,15 @@
     updateFrontRowSummary(row); // suhrn hovori o type, kridlach, uchytke aj kovani
     refreshFrontProfileUI();    // D-96: zmena typu meni rozsah aj vetu stavu
   }
+  // -> true = riadok zmizol (volajuci spusti `onField`). ROH-B2: zamknuty
+  // krizik rohovej (`aria-disabled`) nerobi nic — ziadny prazdny apply.
   function delFrontRow(btn){
+    if (btn && btn.getAttribute && btn.getAttribute('aria-disabled') === 'true') return false;
     var row = btn.closest('.frow');
-    if (row && row.dataset.frontId === openFrontCardId) openFrontCardId = null;
+    if (!row) return false;
+    if (row.dataset.frontId === openFrontCardId) openFrontCardId = null;
     row.remove(); renumberFronts(); refreshFrontProfileUI();
+    return true;
   }
 
   // ===== KOV-A2a: KARTA CELA =============================================
@@ -2382,7 +2427,7 @@
     var m = frontCardModel(item, frontSlotsOf(row.dataset.frontId),
                            frontDrawerOf(row.dataset.frontId),
                            frontLiftOf(row.dataset.frontId),
-                           { slot: cabTypeNow() === 'dishwasher' });
+                           { slot: cabTypeNow() === 'dishwasher', corner: nxCornerCardSide() });
     // Tab, ktory NEEXISTUJE (blenda, „bez čela" kovanie nemaju), sa ticho
     // vrati na „Čelo" — stav panela nesmie ukazat prazdno.
     var has = m.tabs.some(function(t){ return t.key === openFrontCardTab; });
@@ -2404,9 +2449,14 @@
     if (m.tiles.length){
       h += '<div class="typegrid" role="group" aria-label="Typ čela">';
       m.tiles.forEach(function(t){
-        h += '<button type="button" class="typetile' + (t.on ? ' on' : '') + '"' +
+        // ROH-B2 (O10): zamknuta dlazdica = `aria-disabled` s dovodom (vzor
+        // D-78, nikdy HTML `disabled`); klik ju `onFrontTile` ignoruje.
+        var tip = t.lock ? (frontTypeTile(t.type) + ' — ' + FRONT_CORNER_LOCK_TIP)
+                         : frontTypeTileTitle(t.type);
+        h += '<button type="button" class="typetile' + (t.on ? ' on' : '') + (t.lock ? ' off' : '') + '"' +
              ' data-t="' + esc(t.type) + '" aria-pressed="' + (t.on ? 'true' : 'false') + '"' +
-             ' title="' + esc(frontTypeTileTitle(t.type)) + '" onclick="onFrontTile(this)">' +
+             (t.lock ? ' aria-disabled="true"' : '') +
+             ' title="' + esc(tip) + '" onclick="onFrontTile(this)">' +
              NXIcons.svg(frontTypeIcon(t.type)) +
              '<span class="tl">' + esc(frontTypeTile(t.type)) + '</span></button>';
       });
@@ -2468,10 +2518,11 @@
            '<span class="segrow" role="group" aria-label="' + esc(r.label) + '">';
       r.options.forEach(function(o){
         h += '<button type="button" class="' + (o.warn ? 'warnstate ' : '') +
-             (o.value === r.active ? 'on' : '') + '"' +
+             (o.value === r.active ? 'on' : '') + (o.disabled ? ' off' : '') + '"' +
              ' data-k="' + esc(r.key) + '" data-v="' + esc(o.value) + '"' +
              (r.wing ? ' data-w="' + esc(r.wing) + '"' : '') +
              ' aria-pressed="' + (o.value === r.active ? 'true' : 'false') + '"' +
+             (o.disabled ? ' aria-disabled="true"' : '') +
              (o.title ? ' title="' + esc(o.title) + '"' : '') +
              ' onclick="onFrontSeg(this)">' +
              (o.icon ? NXIcons.svg(o.icon) : '') + esc(o.label) + '</button>';
@@ -2534,6 +2585,8 @@
   // na iny typ NIC NEMAZE (dormant).
   function onFrontTile(btn){
     var row = btn.closest('.frow'); if (!row) return;
+    // ROH-B2 (O10): zamknuta dlazdica (rohova) nerobi nic — dovod je v bubline.
+    if (btn.getAttribute && btn.getAttribute('aria-disabled') === 'true') return;
     var t = btn.dataset.t;
     if (!t || row.dataset.frontType === t) return; // klik na uz nasadeny typ = ziadny prazdny krok Spat
     row.dataset.frontType = t;
@@ -2550,6 +2603,8 @@
     // (ten istý guard má dlaždica typu). Aktívny stav nesie `aria-pressed`,
     // ktorý karta kreslí z view-modelu — netreba druhý výpočet toho istého.
     if (btn.getAttribute('aria-pressed') === 'true') return;
+    // ROH-B2 (O10): zamknuta volba (krídla rohovej) nerobi nic.
+    if (btn.getAttribute('aria-disabled') === 'true') return;
     // D-130a R5: KRIDLA su jediny segment, ktoreho hodnota nezije v dormant
     // poliach, ale vo VLASTNOM datasete riadku (`frontWings`) — presne tam,
     // odkial ju cita `collectFronts`. Zapis preto ide svojou cestou.
@@ -2863,26 +2918,79 @@
     if (inp.select) inp.select();
   }
 
+  // ROH-B2 (O12, mockup B5): „Šírka dverí 446" v pravom stlpci Zakladnych —
+  // VYSTUP (text v tlacidle), nie pole. Cislo posiela SERVER (`corner_preview.
+  // door_w` = otvor − oba okraje z `Fronts.resolve_layout`), panel nic nepocita.
+  // Len pri OZNACENEJ rohovej: vo vkladani kontext Čelá neexistuje a preklik
+  // by nemal kam viest (N13) — mockup A ho tam nema. Kym server nepovie, „—".
+  function nxCornerInfoSync(){
+    var row = el('infCornerDoor'); if (!row) return;
+    var show = cabTypeNow() === 'corner_blind' && (typeof selectedCabId !== 'undefined') && !!selectedCabId;
+    row.hidden = !show;
+    if (!show) return;
+    var cp = (typeof cornerPreview !== 'undefined' && cornerPreview) ? cornerPreview : null;
+    var v = cp ? parseFloat(cp.door_w) : NaN;
+    setOut('inf_corner_door', (isFinite(v) && v > 0) ? mmLabel(v) : '—');
+    var gl = frontGapVal('fr_gap_left', 2.0), gr = frontGapVal('fr_gap_right', 2.0);
+    var d = cabFieldOrDefault('corner_door_w');
+    row.title = 'Šírka dverí = dverová časť ' + (isNaN(d) ? '?' : mmLabel(d)) + ' − okraje čiel ' +
+                mmLabel(gl) + ' a ' + mmLabel(gr) + ' — klik otvorí Čelá → F1';
+  }
+  // Klik = kontext Čelá, karta PRVEHO (jedineho) cela otvorena a v pohlade.
+  function onInfoCornerDoor(){
+    if (typeof setViewContext === 'function') setViewContext('cela');
+    var wrap = el('frontRows');
+    var rows = wrap ? wrap.querySelectorAll('.frow') : [];
+    var row = rows.length ? rows[rows.length - 1] : null; // D-23: F1 je SPODNY riadok DOM
+    if (!row) return;
+    if (openFrontCardId !== row.dataset.frontId){
+      openFrontCardId = row.dataset.frontId;
+      openFrontCardTab = 'celo';
+      refreshFrontCards();
+    }
+    if (typeof nxRevealTarget === 'function') nxRevealTarget(row);
+    if (row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });
+  }
+
   // S1-E: SLOT MA JEDNO PEVNE CELO. UI to len PRIZNA (schova „Pridať čelo",
   // krizik a vysku da na citanie) — vynucuje to SERVER (`slot_fronts_refusal`
   // v `actions_cabinet.rb`), lebo HTML nie je ochrana.
+  // ROH-B2 (O10): ROHOVA ma v dverovej casti JEDNY DVIERKA (R6, server iny
+  // stav odmietne — `corner_fronts_refusal`). Rad „Pridať čelo" NAHRADI veta
+  // na tom istom mieste (ziadny riadok navyse), krizik ostane viditelny, ale
+  // `aria-disabled` s dovodom (vzor D-78), vyska je AUTO na citanie (riadok je
+  // vzdy `auto` — celá výška dverovej časti).
+  var FRONT_CORNER_DEL_TIP = 'Rohová skrinka má v dverovej časti jedny dvierka — zmazať sa nedajú';
   function nxSlotFrontsLock(){
     var slot = (cabTypeNow() === 'dishwasher');
+    var corner = (cabTypeNow() === 'corner_blind');
     var box = el('frontAddTypes');
     var addRow = (box && box.closest) ? box.closest('.addrow') : null;
     if (addRow) addRow.style.display = slot ? 'none' : '';
+    if (box) box.hidden = corner;
+    var lbl = addRow && addRow.querySelector ? addRow.querySelector('.addl') : null;
+    if (lbl) lbl.hidden = corner;
+    var note = el('frontOneDoor');
+    if (note) note.hidden = !corner;
     var wrap = el('frontRows');
     var rows = wrap ? wrap.querySelectorAll('.frow') : [];
     for (var i = 0; i < rows.length; i++){
       var fh = rows[i].querySelector('.fh');
       if (fh){
-        fh.readOnly = slot;
-        fh.title = slot ? 'Výška čela slotu = výška linky − sokel − medzera hore (Základné a schéma medzier).' : '';
+        fh.readOnly = slot || corner;
+        fh.title = slot ? 'Výška čela slotu = výška linky − sokel − medzera hore (Základné a schéma medzier).'
+                 : (corner ? 'Dvierka rohovej majú celú výšku dverovej časti (AUTO) — výšku riadi výška skrinky, sokel a okraje čiel.' : '');
       }
       var auto = rows[i].querySelector('.fauto');
-      if (auto) auto.style.display = slot ? 'none' : '';
+      if (auto) auto.style.display = (slot || corner) ? 'none' : '';
       var del = rows[i].querySelector('.fdel');
-      if (del) del.style.display = slot ? 'none' : '';
+      if (del){
+        del.style.display = slot ? 'none' : '';
+        if (corner){ del.setAttribute('aria-disabled', 'true'); del.title = FRONT_CORNER_DEL_TIP; }
+        else if (del.getAttribute && del.getAttribute('aria-disabled') === 'true'){
+          del.removeAttribute('aria-disabled'); del.title = 'Odstrániť';
+        }
+      }
     }
   }
 
@@ -2939,7 +3047,7 @@
     var buy = (typeof frontHwBuy === 'function') ? frontHwBuy(fid) : null;
     var hw = [badge, buy].filter(function(t){ return !!t; }).join(' → ');
     var parts = frontRowSummary(frontRowItem(row), frontSlotsOf(fid), hw, FRONT_PROFILES,
-                                frontDrawerOf(fid));
+                                frontDrawerOf(fid), nxCornerCardSide());
     var html = '', plain = [], hwText = '';
     parts.forEach(function(p){
       // R3-f: kovanie NIE JE cast textu suhrnu — je to SURODENE tlacidlo.
