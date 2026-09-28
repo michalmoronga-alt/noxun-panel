@@ -2,9 +2,11 @@
 # Noxun Engine — D-19: orientacny prepocet poctu platni per material.
 #
 # NIE narezovy plan — hruby ROZSAH (koeficient prerezu 10-25 %, Michal 20.7.).
-# Vstupom su VZDY jednotlive BOM riadky (rozmery, pocty, material) — nie sucty:
-# stabilna hranica pre buducu fazu 2 (guillotine nesting s kerf/orezkami/dekorom)
-# vymeni len vnutro vypoctu, kontrakt estimate() a UI ostanu (Codex audit D19 B1).
+# Vstupom su VZDY jednotlive BOM riadky (rozmery, pocty, material) — nie sucty.
+# NP-1 (blok 2): „faza 2" (pasove rozlozenie s prerezom, orezom a dekorom) je
+# SAMOSTATNY modul SheetLayout, nie vnutro tohto odhadu — odhad z m2 ostava ako
+# porovnanie a predvolena cena; `sheet_size_for` je jedina pravda o formate
+# platne a fallbacku, ktoru cita aj SheetLayout.
 # Format platne per material zije v katalogu (sheet_size); chybajuci/poskodeny
 # format = fallback 2800x2070 + priznak (estimator NIKDY nedeli nulou — F4).
 module Noxun

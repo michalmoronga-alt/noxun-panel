@@ -58,6 +58,7 @@ DC pasce [DC_PRAVIDLA.md](DC_PRAVIDLA.md) · UI dizajn [UI_DIZAJN.md](UI_DIZAJN.
 | `appliance_binding` (jediný transakčný vstup pre spotrebič v zákazke: položka + `appliance_refs[]` oboch vlastníkov + prestavba v JEDNEJ operácii) | [architecture/appliances.md](architecture/appliances.md) |
 | `appliance_checks` (jediná autorita verdiktu niky a delenia čiel: `context` · `niche_verdict` · `door_split_verdict` · `findings` — číta ju Kontrola aj Inspector) | [architecture/appliances.md](architecture/appliances.md) |
 | `validation` · `bom` · `budget` · `budget_store` · `sheet_estimate` | [architecture/outputs.md](architecture/outputs.md) |
+| `sheet_layout` (NP-1 nárezový plán: pásové rozloženie na platne per nákupný materiál + spoločná príprava obdĺžnika a „zmestí sa" pre Kontrolu) | [architecture/outputs.md](architecture/outputs.md) |
 | `price_refresh` · `supplier_settings` · `vepo_export` · `cp_export` · `xlsx_writer` | [architecture/outputs.md](architecture/outputs.md) |
 | `usage_stats` | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |
 | `updater` (D-52a jadro — manifest, staging, swap, zámok/lease, restart latch; recovery žije v loaderi · D-52b UI — sekcia „O plugine": asynchrónny check s tokenom, bariéra zatvorenia okien, natívne hlášky) | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |

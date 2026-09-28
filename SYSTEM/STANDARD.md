@@ -373,6 +373,7 @@ Toto je invariant a jeden z hlavných dôvodov existencie štandardu:
 - `grain_direction`: `"length"` / `"width"` / `"none"` — smer dekoru vzhľadom na výrobný rozmer dielca (nie vzhľadom na os modelu). Explicitný atribút, nie odvodený z natočenia textúry ani z pomeru rozmerov (štvorcový dielec je nerozhodnuteľný).
 - **Rotácia dielca kvôli kresbe je vec VÝSTUPU, nie modelu** (K1). Snapshot dielca nesie **geometrické** rozmery + `grain_direction`;
   výmenu `dĺžka ↔ šírka` **spolu s výmenou dvojíc hrán** `L↔W` robí výhradne export do VEPO (`VepoExport.oriented`) a zrkadlovo kontrola nárezu (`Validation.fits_on_sheet?`).
+  Nárezový plán (`SheetLayout`, §11.4) orientuje **cez tú istú prípravu riadka ako VEPO** (`VepoExport.prepare_row`) — výmenu robí stále len `VepoExport.oriented`.
   Rovnaká výmena sa **nikdy nesmie zopakovať** na inom mieste reťazca — dvojitý swap by dielec objednal v pôvodnej orientácii.
   Bežné metre ABS sú voči otočeniu **invariantné** (tá istá fyzická hrana), a to je zároveň krížová kontrola, či niekde druhý swap nevznikol.
 
@@ -959,6 +960,9 @@ Záznam variantu:
 ```
 
 Kusovník podľa materiálov sa delí podľa **material_id (variant) + hrúbka**.
+
+**Poradie formátu platne (NP-1):** `sheet_size[0]` je **dĺžka platne = smer kresby dekoru platne**, `sheet_size[1]` šírka. Dvojica sa
+nikde nenormalizuje (nezoraďuje) — dielec orientovaný pre VEPO (dĺžka pozdĺž dekoru) beží v nárezovom pláne po `sheet_size[0]`.
 
 **M-R spoločný vzhľad (MR-1A, SCHEMA 10):** voliteľný `appearance` patrí
 **povrchu dekorovej skupiny** (`group_id` + normalizovaná `structure`), spoločne pre
@@ -1570,6 +1574,19 @@ z katalógu — zákazka odvtedy na živom katalógu **nezávisí**), `owner {ki
   nie až úprava spotrebičov. Od tej chvíle **starší plugin zákazku needituje** a **zastaví aj oba cenové exporty** (XLSX rozpočtu aj cenovej ponuky). Čítanie,
   kusovník ani VEPO blokované nie sú.
 
+### 11.4 Nárezový plán (výpočet, nie exportér)
+
+Primitívny nárezový plán je vo V1 (blok 2, rozhodnutia N1–N11): **koľko platní najviac treba pri zvolenom rozložení** — podklad pre objednávku
+a rozhodovanie, **nie výrobný dokument** (reže VEPO vlastnou optimalizáciou). Vykonateľná podoba: [`core/sheet_layout.rb`](../noxun_engine/core/sheet_layout.rb).
+
+- **Vstup = príprava riadka VEPO** (`VepoExport.prepare_row`): tie isté vyradenia, tá istá jediná výmena podľa smeru dekoru a to isté zaokrúhlenie
+  na celé mm. **Žiadny dielec sa ďalej neotáča** — ani bez smeru dekoru (N8); plán je tým opatrnejší, počet VEPO sa môže líšiť.
+- **Orez okraja** platí pre bežné platne; **pracovná doska, kompakt a zástena bez orezu** (N6, N9). **Prerez** len medzi dielcami a medzi pásmi.
+- **Duplák** sa plánuje ako prírezy **zdrojového** materiálu — každá vrstva s **prídavkom na každú stranu** (N7).
+- **Horná hranica** (`upper_bound`) platí **len pre úplný plán**: bez nezaradených a vyradených dielcov, bez konfliktu hrúbky či chýbajúcej väzby dupláku,
+  bez zablokovaných výrobných dát a s platnými parametrami. **UNI materiál a chýbajúci formát (fallback) sú vždy len orientačné.**
+- **§11.1 („exportéry nepočítajú rozmery") sa naň nevzťahuje** — plán **nič neexportuje**, je to výpočet nad kusovníkom; VEPO CSV ostáva bez zmeny.
+
 ---
 
 ## 12. Otvorené body
@@ -1585,5 +1602,5 @@ Zámerne nerozhodnuté — overia sa na prototype/V1 v SketchUpe (SkAgent), nie 
 
 ### Mimo scope štandardu v1 (nie „otvorené" — zámerne vynechané)
 
-Vŕtacie pozície a CNC rastre kovania • nesting / nárezové plány • automatické výkresy • cloud • horná rohová, rohové vybavenie (LeMans, karusel) a atypické korpusy (L, šikmé) — dolná slepá rohová je vo V1 (§4.2) • šikmé/zakrivené dielce • kompletný kuchynský CAD.
+Vŕtacie pozície a CNC rastre kovania • optimalizácia nárezu (viac heuristík, hľadanie poradia, otáčanie dielcov) — primitívny nárezový plán **je** vo V1 (§11.4) • automatické výkresy • cloud • horná rohová, rohové vybavenie (LeMans, karusel) a atypické korpusy (L, šikmé) — dolná slepá rohová je vo V1 (§4.2) • šikmé/zakrivené dielce • kompletný kuchynský CAD.
 K týmto sa systém dostane, až keď jadro (štandard → referenčný korpus → childy → kovania → výstupy) stojí a je overené.
