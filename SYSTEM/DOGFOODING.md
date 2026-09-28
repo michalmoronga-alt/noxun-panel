@@ -55,6 +55,9 @@ v [archiv/ROHOVA_ZAVER_2026-09-28.md](archiv/ROHOVA_ZAVER_2026-09-28.md) — nov
 
 ## Po V1 — zásobník
 
+- **D-146 · Falošný duplák** (Michal 28.9.2026, pri štarte bloku Nárezový plán) — duplák, ktorý je pohľadový len z jednej strany: spodná vrstva sa neskladá
+  z celej dosky, ale zo **100 mm širokých výstuh** — šetrí materiál aj váhu, keď obe strany nie sú pohľadové. Dnešný duplák (dve alebo tri plné vrstvy
+  zdrojovej dosky) takú skladbu nepozná. *Stav: zásobník — Michal: „mimo V1, na zápis".*
 - **D-145 · Náhľad Inspectora v lepšej 3D forme** (Michal 27.9.2026, pri schvaľovaní mockupu bloku KONŠTRUKCIA) — hĺbkové veci korpusu (komín vzadu,
   zapustený strop, lišty chrbta) dnešný čelný náhľad neukáže; malý bokorys v rohu náhľadu Michal **zamietol** kvôli zahlteniu priestoru panela. Neskôr
   navrhnúť celý náhľad v lepšej 3D forme, kde sa to dá zobraziť. *Stav: zásobník — bez termínu.*

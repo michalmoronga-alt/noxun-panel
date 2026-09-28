@@ -16,6 +16,11 @@
 | N3 | Prerez a orez | **hrúbka kotúča (prerez) 5 mm** a **orez okraja platne 10 mm** ako predvolené hodnoty; **obe nastaviteľné** („hrúbka kotúča aj orez sa môžu líšiť" — zmena dodávateľa, iné štandardy), ak to nekomplikuje prácu — **agent zhodnotí náročnosť** pevnej hodnoty oproti nastaveniu a navrhne | 28.9. |
 | N4 | Ako VEPO účtuje | **celé tabule, zvyšky sú moje** — cena materiálu podľa počtu platní z plánu má teda zmysel (podklad pre voľbu „ceny podľa plánu" v rozpočte) | 28.9. |
 | N5 | Overenie na praxi | Michal pohľadá **jednoduchú reálnu zákazku s počtami platní z objednávky VEPO** — plán sa na nej porovná s realitou (test a smoke) | 28.9. |
+| N6 | Orez podľa materiálu | orez okraja platí **len pre bežné platne** (DTD, MDF, HDF a iné dosky); **pracovná doska, kompakt a zástena bez orezu** — hrany sú hotové | 28.9. |
+| N7 | Duplák | VEPO reže obe vrstvy dupláku **s prídavkom +10 mm na stranu**, potom ich zlepí a oreže na hotový rozmer — plán musí prírezy vrstiev zväčšiť o prídavok | 28.9. |
+
+**Postreh mimo V1 (28.9.):** „falošný duplák" — pohľadová je len jedna strana, spodná vrstva sa skladá zo 100 mm širokých výstuh (šetrí materiál aj
+váhu, keď nie sú obe strany pohľadové). Zapísané ako **D-146** do zásobníka Po V1.
 
 ## 2 · Otvorené — rozhodne Michal pri mockupe
 
