@@ -17,6 +17,24 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **DOCS — štart bloku 2 · Nárezový plán (primitívny) (28.–29.9.2026, PR #417, len dokumentácia; verzia pluginu sa nemení).**
+  Michal 28.9. večer (v druhom okne, súbežne so smoke bloku 8) spustil **posledný otvorený bod bloku 2 KONTROLA + VÝROBA** — primitívny nárezový plán rozhodnutý 6.9.
+  **Rozhodnutia** (N1–N11, [zdroje/bloky/NAREZ/ROZHODNUTIA_MICHALA_2026-09-28.md](../zdroje/bloky/NAREZ/ROZHODNUTIA_MICHALA_2026-09-28.md)): prerez 5 mm a orez 10 mm ako
+  nastavenia, VEPO účtuje celé tabule a zvyšky sú Michalove, orez len pre bežné platne (pracovná doska, kompakt a zástena bez orezu), každá vrstva dupláku s prídavkom
+  +10 mm na stranu, **plán neotáča žiadny dielec** (či VEPO otáča dielce bez smeru, sa nevie — počet je tak opatrnejší), porovnanie s reálnou objednávkou VEPO až po V1
+  na novej testovacej zákazke (voliteľne nepotvrdená objednávka), **mockup schválený** s prahom upozornenia na poslednú platňu 20 %; neúplný plán = cena z odhadu,
+  export sa nezastaví. **Podklady v priečinku bloku:** fakty z kódu (dvaja rešeršéri), surová outside-in rešerš Antigravity (3 behy) a surový krížový audit Codex
+  `gpt-5.6-sol` (5 BLOCKER · 6 FIX · 3 NOTE) a Grok `grok-4.7` (2 BLOCKER · 4 FIX · 4 NOTE). **Dávky:** NP-1 jadro → NP-2 nastavenia + Kontrola → NP-3 sekcia
+  Nárezový plán → NP-4 ceny podľa plánu; ako sa naloží s každým nálezom rešerše a auditu, uvedie package dávky s vlastným auditom. Bokom **D-146 falošný duplák**
+  (spodná vrstva zo 100 mm výstuh) do zásobníka Po V1.
+  **Prvý pokus PR #416 zavretý podľa pravidla 3 kôl (b):** každé z troch GH kôl vrátilo P1 — dvakrát technické požiadavky mimo package (vyhodnotenie auditu
+  s dôsledkami pre dávky, riadok NP-1 v PLAN), raz rozpor vyhodnotenia s už schváleným mockupom (exportná brána vs. O11) a neúplnosť dispozície (vyradené
+  riadky VEPO a cena). Re-rez: úvodné PR nesie **len rozhodnutia, schválený mockup, fakty a surové výstupy** — vyhodnotenie nálezov a koncept v1 nejdú do
+  repa samostatne, ale do package dávky, ktorá nález rieši. **Poučenie:** aj „len verdikt a dávka" v samostatnom vyhodnotení je pre review konkurenčná
+  špecifikácia; úvodné PR bloku bez vyhodnotenia (vzor #400) prešlo, s ním (#409, #416) vždy P1. Mockupové P2 z kôl #416 (finálne body O1–O12, desatinný
+  prerez, zvyšok nad nižším dielcom, Kontrola pri dielci bez smeru otáča, žiadny sľub počtu VEPO, spojené stavy orientačný + neúplný, jeden nález na duplák,
+  trojvrstvový duplák) sú v mockupe tohto PR opravené.
+
 - **DOCS — smoke bloku 8 K3 ROHOVÁ SKRINKA PASS (28.9.2026, PR #415, len dokumentácia; verzia pluginu sa nemení).**
   Michal 28.9. popoludní prešiel smoke bloku 8 krok po kroku podľa checklistu v [ROHOVA_ZAVER_2026-09-28.md](ROHOVA_ZAVER_2026-09-28.md): **„smoke rohovej
   PASS, všetko sedí, super práca"** — výsledok zapísaný ako celok, nie po bodoch; ďalšie postrehy k funkciám bloku 8 idú ako nové D-čísla do DOGFOODING podľa

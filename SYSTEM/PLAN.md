@@ -216,10 +216,18 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   **v1.2** — názov riadku má VŽDY ≤ 20 znakov (import objednávky dlhšie pole odmieta): zlúčenie číslovaných tokenov (`Polica 1 2 3`), deterministický orez po celých slovách
   bez výpustky a priznanie orezu (ORANGE nález Kontroly `name_long` + oddiel LOGu „Skrátené názvy"). Plný text v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md).
 - ✅ **D-122 · Kontrola zoskupí UNI dielce** — zbalená skupina s počtom dielcov; deti držia výber v modeli, Inspector aj náhradu konkrétneho UNI. Semafor/badge stále počítajú jednotlivé nálezy. **PR #343, v0.10.2.**
-- **Nárezový plán fáza 2 — PRIMITÍVNY, V1 rozsah (rozhodnuté 6.9.2026):** dnes je počet platní len odhad z m² (D-19, koeficient 10–25 %); po primitívnom pláne máme **hornú hranicu počtu platní podľa zvoleného rozloženia** (deterministická heuristika, nie optimum — iné rozloženie môže
-  vyjsť lepšie) a vidíme, keď 1 dielec vychádza na celú platňu. Guillotine heuristika v čistom Ruby (OpenCutList je GPL — algoritmus áno, kód nie), smer dekoru, kerf,
-  výstup = počet platní + využitie + zvyšok + jednoduchý obrázok v sekcii Nárezový plán, rozpočet ukáže vedľa odhadu „plán: N platní (horná hranica)" — informácia pre objednávku, **nie povinné množstvo** (objednáva človek). Rezy NP-1 (algoritmus, audit ÁNO) → NP-2
-  (sekcia + rozpočet). Návrh rozsahu (vstup vrátane rozvinutia duplákov, algoritmus, výstup, scope OUT): `zdroje/next_sessions/NAREZ_PLAN_NAVRH_2026-09-06.md` (PR #323); rozhodnutie: [zdroje/next_sessions/V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md).
+- **Nárezový plán fáza 2 — PRIMITÍVNY, V1 rozsah (rozhodnuté 6.9.2026; blok beží od 28.9.2026 — priečinok [zdroje/bloky/NAREZ/](zdroje/bloky/NAREZ/)):** dnes je počet platní len odhad
+  z m² (D-19, koeficient 10–25 %); po primitívnom pláne máme **hornú hranicu počtu platní podľa zvoleného rozloženia** (deterministická heuristika, nie optimum — iné rozloženie môže
+  vyjsť lepšie) a vidíme, keď 1 dielec vychádza na celú platňu. Pásové (gilotínové) rozloženie v čistom Ruby (OpenCutList je GPL — vzory áno, kód nie); dielce sa **neotáčajú**
+  (orientácia ako vo VEPO súbore), **prerez 5 mm, orez 10 mm a prídavok dupláku 10 mm na stranu** sú nastavenia; výstup = počet platní + využitie + zvyšok + obrázok v sekcii
+  Nárezový plán, rozpočet ukáže „plán: N platní" a voliteľne **ceny podľa plánu** — informácia pre objednávku, **nie povinné množstvo** (objednáva človek). Rozhodnutia Michala
+  N1–N11, schválený mockup, fakty z kódu, surová rešerš a surový krížový audit sú v priečinku bloku; pôvodný návrh `zdroje/next_sessions/NAREZ_PLAN_NAVRH_2026-09-06.md` (PR #323),
+  rozhodnutie 6.9.: [zdroje/next_sessions/V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md). **Dávky (po poradí):**
+  - **NP-1 · jadro výpočtu** — plugin vie spočítať rozloženie a počet platní; zatiaľ bez viditeľnej zmeny (zobrazí ho NP-3).
+  - **NP-2 · nastavenia + Kontrola** — prerez, orez a prídavok dupláku v Nastaveniach rozpočtu; Kontrola „nezmestí sa" počíta s orezom.
+  - **NP-3 · sekcia Nárezový plán** — Štúdio: karty materiálov s malými platňami, detail platne, upozornenie na poslednú platňu, dielce, ktoré sa nezmestia;
+    poznámka „plán: N platní" v Rozpočte a XLSX (ceny sa nemenia).
+  - **NP-4 · ceny podľa plánu** — prepínač pre zákazku (predvolene vypnutý), porez podľa plánu, montáž z odhadu; materiál bez spoľahlivého plánu ostáva na odhade.
 
 ### 3 · STABILITA
 
@@ -644,6 +652,7 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 
 - **Runner testov v SketchUpe po teste sám vráti pôvodnú verziu pluginu** (workflow N4, 26.9.2026) — `scripts\run_su_tests.ps1` dnes nechá nasadenú
   rozpracovanú vetvu; dovtedy platí pravidlo „po každom mergi nainštalovať main" (CLAUDE.md, Verzia a uzáver).
+- **D-146 · Falošný duplák** (Michal 28.9.2026) — spodná vrstva dupláku zo 100 mm širokých výstuh namiesto plnej dosky (šetrí materiál aj váhu, keď obe strany nie sú pohľadové); plné znenie v [DOGFOODING.md](DOGFOODING.md).
 - **M-R nadstavby zo smoke 12.9.2026:** **D-126** otočenie zdrojového obrázka o ±90° pred uložením; **D-127** prirodzenejšie umiestnenie textúry (náhodný posun, nadväzovanie na skrinke alebo ručné umiestnenie — výber podľa praxe Lucie). Odložené, bez termínu, neblokujú uzáver M-R; plný kontext v [DOGFOODING.md](DOGFOODING.md).
 
 - **Mimo V1 z bloku KOVANIE** (FINAL §12; presunuté sem 10.9.2026 pri uzávere bloku): **D-109** pomerový člen setu „1 ks na N nôh" (= **R-05**; výsledok dnes dáva pravidlo
