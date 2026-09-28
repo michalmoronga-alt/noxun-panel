@@ -17,6 +17,22 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **ROH-A2 · VKLADANIE A NÁHĽAD ROHOVEJ (28.9.2026, PR #?, v0.14.1 → v0.14.2, blok 8 · K3).** Package [PACKAGE_ROHA2.md](../zdroje/bloky/ROHOVA/PACKAGE_ROHA2.md)
+  (bod 4 zladený s mainom po A1; kontrakt, schéma ani geometria sa nemenia — `codex-audit` nepovinný, predrecenzia povinná pre nový ovládač v UI).
+  **Čo pribudlo:** vo vkladacej karte tlačidlo **„Rohová"** (Dolná · Horná · Rohová · Umývačka · Doska — jeden rad, nová ikona `cab-corner`); karta sa plní
+  z `DEFAULTS.corner_blind`, polia rohovej do insert payloadu nejdú (C6 — server ich doplní z predvolieb alebo zo záznamu šablóny), rohové šablóny sa ponúkajú len
+  pri nej. **Čelný otvor zo servera:** preflight čiel vracia `opening {x0, w, z0, h}` pre každý typ (aj pri odmietnutí, keď ho stihol spočítať) a payload skrinky
+  `front_opening` uloženého stavu (`Construction.front_opening` — jediná autorita); pri vkladaní posiela panel preflightu stranu a dverovú časť z registra
+  `cornerDraft` (v DOM nie sú). **Náhľad:** čelá, kóty šírky, medzery a ich jantárové pásy, kovanie aj ghost vrstva sa merajú od otvoru (`nxFrontOpeningFor`,
+  `pvGeom.fx0/fw`) — rohová W 1100 kreslí dvere 2–448 / 652–1098, pri živej šírke pravej rohovej ide `x0 = W − D` z odpovede preflightu; rohová bez známeho otvoru
+  čelá nekreslí vôbec. Ostatné typy serverový otvor ignorujú — **parita dolnej, hornej a slotu** v JS teste a jednorazovo proti `main` (180 scén, 0 rozdielov).
+  **Značky závesov podľa smeru (C8, `nxHingeSide`):** jednokrídlové a stredné krídla podľa slotu servera, neurčené = jantárový „?", legacy bez smeru = bez značky
+  (do A2 vždy vľavo — oprava aj pre dolnú). Riadok **Nohy** vo vkladacej karte aj pre rohovú (`LEGS_INSERT_TYPES`). Modal „Uložiť ako šablónu" má voľbu Rohová,
+  pri rohovej zamknutú s vlastnou bublinou (`TPL_TYPE_LOCK`, vzor slotu); zamknuté typy sa ponúkajú len nad sebou. Guard slotu v `test_s1e_slot.rb` zladený
+  s tabuľkou zámkov. **Testy:** headless 4698 · JS 136 sád · **in-SU 3222 PASS / 0 FAIL** (hlava 8cc405f4; nový `run_roha2` — vklad cez cestu panela bez šablóny a so šablónou pravej
+  strany, 1 krok Späť, plán = model, preflight so živou šírkou). **Predrecenzia:** čaká (orchestrátor).
+  Kresba CR líšt a blendy v náhľade a ovládače strany, dverovej časti a CR sú ROH-B.
+
 - **ROH-A1 · JADRO ROHOVEJ SKRINKY (28.9.2026, PR #410, v0.14.0 → v0.14.1, blok 8 · K3).** Package v2 [PACKAGE_ROHA1.md](../zdroje/bloky/ROHOVA/PACKAGE_ROHA1.md)
   (krížový audit bloku + audit návrhu Codex `gpt-6-astra` 1 BLOCKER · 3 FIX · 1 NOTE — surový výstup [AUDIT_ROHA1_2026-09-28.md](../zdroje/bloky/ROHOVA/AUDIT_ROHA1_2026-09-28.md)).
   **Čo pribudlo:** nový typ **`corner_blind`** (dolná slepá rohová) — korpus ako dolná + rohová zostava na prednej rovine: **blenda korpusová**, **výstuha závesov**,
