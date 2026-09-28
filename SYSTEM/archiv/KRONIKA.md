@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **DOCS — smoke bloku 8 K3 ROHOVÁ SKRINKA PASS (28.9.2026, PR #?, len dokumentácia; verzia pluginu sa nemení).**
+- **DOCS — smoke bloku 8 K3 ROHOVÁ SKRINKA PASS (28.9.2026, PR #415, len dokumentácia; verzia pluginu sa nemení).**
   Michal 28.9. popoludní prešiel smoke bloku 8 krok po kroku podľa checklistu v [ROHOVA_ZAVER_2026-09-28.md](ROHOVA_ZAVER_2026-09-28.md): **„smoke rohovej
   PASS, všetko sedí, super práca"** — výsledok zapísaný ako celok, nie po bodoch; ďalšie postrehy k funkciám bloku 8 idú ako nové D-čísla do DOGFOODING podľa
   bloku. **O8** (jantárové upozornenie Kontroly „polica prechádza výstuhou závesov — výrez robí dielňa", bod 6.4) **ponechané** — Michal povedal „všetko
