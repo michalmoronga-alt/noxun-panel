@@ -2,7 +2,7 @@
 
 > **ARCHÍV (založené 24.7.2026 pri uzávere V0.5).** Kompaktné riadky hotových etáp drží [KRONIKA.md](KRONIKA.md) (časová os) — tu sú plné pôvodné texty (história rozhodnutí, rozsahov a PR). Otvorené záväzky z týchto textov sú od 11.8.2026 zaradené do blokov [../PLAN.md](../PLAN.md) — tento súbor je čisto referenčný.
 
-## BLOK K3 ROHOVÁ SKRINKA (V1 bod 2) — UZAVRETÝ (28.9.2026, v0.15.0, podklady PR #409, dávky PR #410–#413 + uzáver PR #?)
+## BLOK K3 ROHOVÁ SKRINKA (V1 bod 2) — UZAVRETÝ (28.9.2026, v0.15.0, podklady PR #409, dávky PR #410–#413 + uzáver PR #414)
 
 **Dolná slepá rohová skrinka s CR lištou** (nový typ `corner_blind`, podľa DC „Rohová") — korpus ako dolná + rohová zostava na prednej rovine: **blenda korpusová**,
 **výstuha závesov**, **CR 1**, **CR 2** a **rohová výstuha**; jedny dvierka v dverovej časti s pántmi predvolene pri rohu, vnútri police cez celú šírku, bez priečok ·
@@ -41,7 +41,7 @@ ovládačov s hodnotami z DC ako návrhom. Poradie:
   nezmestenie červenou; Korpus aj s dverami), karta Čelá rohovej (jedny dvierka, pánty „Pri boku / Pri rohu"), bez delenia zón, návrhy O12 (šírka dverí, súhrn
   v lište, kláves D pri vkladaní), ikona z mockupu, odhad dielcov so zostavou. Jantárové O8 bez zmeny (čaká na Michala). Package
   [PACKAGE_ROHB2.md](bloky/ROHOVA/PACKAGE_ROHB2.md). *PR #413*
-- ✅ **Uzáver bloku** *(PR #?, v0.15.0 — docs a verzia)* — blok do archívu, priečinok bloku do `archiv/bloky/ROHOVA/`, V1_VIZIA (bod 2 odškrtnutý), README,
+- ✅ **Uzáver bloku** *(PR #414, v0.15.0 — docs a verzia)* — blok do archívu, priečinok bloku do `archiv/bloky/ROHOVA/`, V1_VIZIA (bod 2 odškrtnutý), README,
   DOGFOODING (dočasná skupina smoke), STAV, KRONIKA; výsledok a smoke checklist v [ROHOVA_ZAVER_2026-09-28.md](ROHOVA_ZAVER_2026-09-28.md).
 
 ## BLOK KONŠTRUKCIA K1+K2 (V1 bod 2) — UZAVRETÝ (27.9.2026, v0.14.0, PR #401–#404 + uzáver PR #405)

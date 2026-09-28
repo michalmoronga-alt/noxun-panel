@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **BLOK 8 · K3 ROHOVÁ SKRINKA UZAVRETÝ (28.9.2026, v0.14.4 → v0.15.0, podklady PR #409, dávky PR #410–#413 + uzáver PR #?, variant B).** Blok vybral Michal
+- **BLOK 8 · K3 ROHOVÁ SKRINKA UZAVRETÝ (28.9.2026, v0.14.4 → v0.15.0, podklady PR #409, dávky PR #410–#413 + uzáver PR #414, variant B).** Blok vybral Michal
   27.9. večer po smoke PASS bloku 7 ako nočný blok; rozhodnutia R1–R9, krížový audit bloku (Codex + Grok, 5 BLOCKERov → všetky prijaté v reconcile), mockup
   schválený 28.9. (O1–O12 podľa návrhu, R10). Dávky za necelý deň: **ROH-A1** #410 (typ `corner_blind`, rohová zostava, účinné hrúbky CR, výstupy, ochrany;
   schéma 22, BuildPlan 7, ABS seed 6; audit návrhu 1 BLOCKER) · **ROH-A2** #411 (tlačidlo „Rohová", čelný otvor zo servera, značky pántov podľa smeru) ·

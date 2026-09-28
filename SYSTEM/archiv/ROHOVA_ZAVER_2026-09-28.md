@@ -41,7 +41,7 @@ celý priečinok bloku (rozhodnutia, mockup, packages s auditmi návrhu, krížo
 | ROH-A2 · vkladanie a náhľad | #411 | 0.14.2 | tlačidlo „Rohová", čelný otvor zo servera, dvere a pánty v náhľade, nohy pri vkladaní, zámok typu v modale šablóny |
 | ROH-B1 · ovládače a strana | #412 | 0.14.3 | riadok rohovej (Základné aj vkladanie), minimum šírky z účinných hrúbok, prepínač strany = zrkadlo (1 krok Späť) |
 | ROH-B2 · kresba a čelá | #413 | 0.14.4 | kresba zostavy zo servera, karta Čelá rohovej, bez delenia zón, O12 (šírka dverí, súhrn, kláves D), ikona, odhad dielcov |
-| Uzáver | #? | 0.15.0 | dokumentácia a verzia, priečinok bloku do archívu |
+| Uzáver | #414 | 0.15.0 | dokumentácia a verzia, priečinok bloku do archívu |
 
 ## Overenie
 

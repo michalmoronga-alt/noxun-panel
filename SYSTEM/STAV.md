@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.15.0 · 28.9.2026 — BLOK 8 · K3 ROHOVÁ SKRINKA UZAVRETÝ** (v0.14.0 → v0.15.0, podklady PR #409, dávky PR #410–#413 + uzáver PR #?; uzáver mení len dokumentáciu
+**v0.15.0 · 28.9.2026 — BLOK 8 · K3 ROHOVÁ SKRINKA UZAVRETÝ** (v0.14.0 → v0.15.0, podklady PR #409, dávky PR #410–#413 + uzáver PR #414; uzáver mení len dokumentáciu
 a verziu). Plugin pozná typ **„Rohová"** (`corner_blind`) — dolnú slepú rohovú skrinku podľa DC „Rohová": korpus ako dolná + rohová zostava (**blenda korpusová**,
 **výstuha závesov**, **CR 1**, **CR 2**, **rohová výstuha**), jedny dvierka s pántmi predvolene pri rohu, vnútri len police; ide do **kusovníka, VEPO, nákupu aj ponuky**.
 Vkladá sa tlačidlom **„Rohová"** (kláves **D** prepne stranu), v **Základné → Rozmery** (aj vo vkladacej karte) je riadok **Dverová časť · CR 1 · CR 2 · strana dverí**;
@@ -45,7 +45,7 @@ nálezy idú do dočasnej skupiny v [DOGFOODING.md](DOGFOODING.md) ako opravy v0
 
 ## Posledné uzávery
 
-- **BLOK 8 · K3 ROHOVÁ SKRINKA UZAVRETÝ** (v0.14.0 → **v0.15.0**, 27.–28.9.2026, podklady #409, PR #410–#413 + uzáver PR #?; smoke čaká). Typ „Rohová" s rohovou zostavou,
+- **BLOK 8 · K3 ROHOVÁ SKRINKA UZAVRETÝ** (v0.14.0 → **v0.15.0**, 27.–28.9.2026, podklady #409, PR #410–#413 + uzáver PR #414; smoke čaká). Typ „Rohová" s rohovou zostavou,
   vkladanie, riadok rohovej a prepínač strany, kresba zostavy a karta Čelá rohovej; priečinok bloku je od uzáveru v [archiv/bloky/ROHOVA/](archiv/bloky/ROHOVA/).
   [Plný blok](archiv/ROADMAP_hotove_etapy.md) · [výsledok, dávky a checklist](archiv/ROHOVA_ZAVER_2026-09-28.md) · priebeh v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 - **BLOK 7 · KONŠTRUKCIA K1+K2 UZAVRETÝ** (v0.13.0 → **v0.14.0**, 26.–27.9.2026, PR #401–#404 + uzáver PR #405; smoke **PASS 27.9.**). Chrbát v drážke do nárezu,

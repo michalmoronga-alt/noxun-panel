@@ -28,7 +28,7 @@ Balík **Čiel (D-114/D-119/D-120)** je tiež uzavretý — **v0.11.0, 11.9.2026
 *(Blok **7 · KONŠTRUKCIA K1+K2** (V1 bod 2) je hotový — **v0.13.0 → v0.14.0, 26.–27.9.2026**, PR #401 → #404 + uzáver PR #405 (KON-0 · KON-A · KON-B · KON-D);
 plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), výsledok a smoke checklist v [archiv/KONSTRUKCIA_ZAVER_2026-09-27.md](archiv/KONSTRUKCIA_ZAVER_2026-09-27.md),
 priečinok bloku v [archiv/bloky/KONSTRUKCIA/](archiv/bloky/KONSTRUKCIA/).)*
-*(Blok **8 · K3 ROHOVÁ SKRINKA** (V1 bod 2) je hotový — **v0.14.0 → v0.15.0, 27.–28.9.2026**, podklady PR #409, dávky PR #410 → #413 + uzáver PR #? (ROH-A1 · ROH-A2 · ROH-B1 · ROH-B2);
+*(Blok **8 · K3 ROHOVÁ SKRINKA** (V1 bod 2) je hotový — **v0.14.0 → v0.15.0, 27.–28.9.2026**, podklady PR #409, dávky PR #410 → #413 + uzáver PR #414 (ROH-A1 · ROH-A2 · ROH-B1 · ROH-B2);
 plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), výsledok a smoke checklist v [archiv/ROHOVA_ZAVER_2026-09-28.md](archiv/ROHOVA_ZAVER_2026-09-28.md),
 priečinok bloku v [archiv/bloky/ROHOVA/](archiv/bloky/ROHOVA/).)*
 
