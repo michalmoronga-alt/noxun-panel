@@ -712,8 +712,10 @@ stojí „—". **PASS-THROUGH GUARD:** text je VÝSTUP — do `collectAll()` an
 **ROH-B1 — RIADOK ROHOVEJ (`#cornerRow`, mockup B1 / A1).** Nad riadkom Nohy stojí pri rohovej **jeden** riadok cez oba stĺpce: **Dverová časť** · **CR** (CR 1 s ikonou
 šírky, CR 2 s ikonou hĺbky v rámikoch `.crin`) · **prepínač strany** (`#cornerSideL`/`#cornerSideR`, ikony `corner-l`/`corner-r`, `aria-pressed` + `.on`) · `?`. Ten istý
 riadok slúži **označenej rohovej aj vkladacej karte** (`#basicCard` je spoločný). Viditeľnosť rieši **jediná autorita** `applyVisibility` (`hidden` pri inom type),
-stav prepínača `nxCornerRowSync` z registra `cornerDraft` (`nxCornerSide`). Polia idú **bežnou cestou poľa** (`oninput="onField()"`, výrazy, validácia, debounce
-apply, zber cez `CONSTRUCTION_FIELDS` s `only`). **Krížová kontrola `cabinetCornerError`** (v `validateFields`, len pri rohovej): veta k poľu mimo rozsahu
+stav prepínača `nxCornerRowSync` z registra `cornerDraft` (`nxCornerSide`). Polia idú **bežnou cestou poľa** (`oninput="onField()"`, výrazy cez `bindExprFields` v `boot.js`
+— rozpísaný výraz „600+" nič neodošle, Enter/blur ho potvrdí; predrecenzia P2-1 —, validácia, debounce apply, zber cez `CONSTRUCTION_FIELDS` s `only`).
+Každé číselné pole v `#basicCard` musí byť v `bindExprFields` (guard v `test_rohb1_ovladace.js`; výnimka popover osadenia `aprMountVal`, ktorý zapisuje
+len tlačidlo); tým dostali výrazy aj polia slotu `dw_body_height` a `dw_front_bottom`. **Krížová kontrola `cabinetCornerError`** (v `validateFields`, len pri rohovej): veta k poľu mimo rozsahu
 (`LIMITS` = `CORNER_RANGES` 250–800 / 50–250, validujú sa len pri rohovej — `CORNER_FIELDS`, vzor `SLOT_FIELDS`) a **najmenšia šírka** `D + c1 + th2 + 2t` =
 presne `Construction.corner_fit_width` (`nxCornerMinWidth` / `nxCornerFitError` v `core.js`, tá istá veta ako server; audit B1 FIX 5 — celé mm sondy
 `min_valid_width` ostávajú len pre klamp Scale); pri nezmestení červená **šírka, dverová časť a CR 1** (rámik `.crin` cez `nxCornerBoxesSync`) a veta ide do

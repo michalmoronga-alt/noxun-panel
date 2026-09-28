@@ -49,6 +49,7 @@ function fakeEl(id){
     getAttribute(k){ return Object.prototype.hasOwnProperty.call(a, k) ? a[k] : null; },
     setAttribute(k, v){ a[k] = String(v); },
     querySelector(){ return null; }, querySelectorAll(){ return []; }, closest(){ return null; },
+    addEventListener(){}, removeAttribute(k){ delete a[k]; }, hasAttribute(k){ return Object.prototype.hasOwnProperty.call(a, k); },
     classList: { add(c){ cls.add(c); }, remove(c){ cls.delete(c); }, contains(c){ return cls.has(c); },
                  toggle(c, on){ if (on === undefined ? !cls.has(c) : on) cls.add(c); else cls.delete(c); } }
   };
@@ -374,6 +375,38 @@ function selCtx(){
   ctx.nxFrontDraftAsk();
   const lo = SENT[SENT.length - 1];
   ok(!('corner_side' in lo) && !('corner_door_w' in lo) && !('thickness' in lo), 'dolná: preflight bez polí rohovej (parita)');
+}
+
+// ============ 7) VYRAZOVE POLIA (predrecenzia P2-1) ============================
+{
+  // Guard: KAZDE ciselne pole v #basicCard ma vyrazovu podporu (bindExprFields)
+  // — inak debounce pri pisani `600+` odosle medzistav (prazdne pole).
+  const html = fs.readFileSync(path.join(ROOT, 'noxun_engine', 'ui', 'panel.html'), 'utf8');
+  const card = html.slice(html.indexOf('<fieldset id="basicCard">'), html.indexOf('<!-- ===== S3 · MATERIALY'));
+  const ids = [];
+  const re = /<input id="([a-zA-Z0-9_]+)"[^>]*type="text"/g;
+  let m;
+  while ((m = re.exec(card))) ids.push(m[1]);
+  // Popover osadenia (D-140) zapisuje LEN tlacidlo „Použiť", nie debounce pola.
+  const EXEMPT = ['aprMountVal'];
+  const boot = fs.readFileSync(path.join(JS, 'boot.js'), 'utf8');
+  const list = boot.slice(boot.indexOf('function bindExprFields'), boot.indexOf('// E-03'));
+  ok(ids.indexOf('corner_door_w') >= 0 && ids.length >= 10, `#basicCard má číselné polia (${ids.length})`);
+  ids.filter(id => EXEMPT.indexOf(id) < 0).forEach(function(id){
+    ok(list.indexOf("'" + id + "'") >= 0, `pole ${id} má výrazovú podporu (bindExprFields)`);
+  });
+  // Spravanie: rozpisany vyraz v dverovej casti NEODOSLE apply ani sa nenaplanuje.
+  const ctx = selCtx();
+  ctx.sketchup.front_preflight = () => {};
+  const d = ctx.__node('corner_door_w');
+  ctx.attachExprField(d, {});
+  eq(d.getAttribute('data-expr'), '1', 'pole dverovej časti je výrazové');
+  d.value = '600+';
+  ctx.document.activeElement = d;
+  ctx.onField();
+  eq(get(ctx, 'applyTimer'), null, 'rozpísaný výraz „600+" nenaplánuje apply (žiadny medzistav)');
+  eq(ctx.__sent.length, 0, 'nič neodišlo');
+  ctx.document.activeElement = null;
 }
 
 console.log(`test_rohb1_ovladace.js: ${n} asercii OK`);
