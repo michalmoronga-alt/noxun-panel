@@ -1,13 +1,13 @@
 # Nárezový plán (primitívny, V1) — návrh rozsahu NP-1 / NP-2 (6.9.2026)
 
-> **Stav od 28.9.2026: historický vstup — kde sa líši, platia rozhodnutia bloku** [../bloky/NAREZ/ROZHODNUTIA_MICHALA_2026-09-28.md](../bloky/NAREZ/ROZHODNUTIA_MICHALA_2026-09-28.md)
-> (napr. žiadne otáčanie dielcov — N8, prerez 5 mm — N3, prídavok dupláku — N7) a packages dávok NP-1…NP-4.
->
-> Pôvodný stav: KONCEPT — neimplementovať priamo · zdroj: debata Michal + Fable 6.9.2026 (rozhodnutie v [V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md](V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md) §0)
+> Stav: KONCEPT — neimplementovať priamo · zdroj: debata Michal + Fable 6.9.2026 (rozhodnutie v [V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md](V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md) §0)
 > + Codex #322 kolá 1–3 (nálezy zapracované, §7) · auditované proti kódu: ČIASTOČNE (`SheetEstimate` kontrakt D-19 vrátane duplákov, `sheet_size` z katalógu, K1 `grain_direction`) ·
 > task package vznikne po `codex-audit` tohto návrhu (nový modul).
 >
 > Pred implementáciou platí postup z [README.md](README.md).
+>
+> **Od 28.9.2026 historický vstup — kde sa líši, platia rozhodnutia bloku** [../bloky/NAREZ/ROZHODNUTIA_MICHALA_2026-09-28.md](../bloky/NAREZ/ROZHODNUTIA_MICHALA_2026-09-28.md)
+> (napr. žiadne otáčanie dielcov — N8, prerez 5 mm — N3, prídavok dupláku — N7) a packages dávok NP-1…NP-4.
 
 ## 0 · Prečo (Michal 6.9.)
 
