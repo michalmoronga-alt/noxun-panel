@@ -204,8 +204,15 @@ module Noxun
         commercial = commercial_thickness(row['thickness'])
         return { 'ok' => false, 'reason' => "chybná hrúbka #{row['thickness']}" } if commercial.nil?
 
-        { 'ok' => true, 'row' => row, 'dims' => [dims[0].round, dims[1].round],
+        { 'ok' => true, 'row' => row, 'dims' => rounded_dims(row),
           'commercial' => commercial, 'edges' => row['edges'] || {} }
+      end
+
+      # Rozmery ORIENTOVANEHO riadka tak, ako idu do CSV: [dlzka, sirka] na
+      # cele mm (Integer, polovica od nuly). Jedina definicia zaokruhlenia —
+      # SheetLayout ju pouziva aj pre geometriu vyradeneho riadka (NP-1).
+      def rounded_dims(row)
+        [row['length'].to_f.round, row['width'].to_f.round]
       end
 
       # rows: Bom.compute[:rows] (agregovane vyrobne riadky — uzamknute testom, N12).

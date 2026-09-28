@@ -74,7 +74,7 @@ module Noxun
         without = []
         Array(rows).each do |raw|
           r = prepare_rect(raw, sheets, edge_thicknesses, work)
-          mid = r['material_id']
+          mid = r['plan_material_id']
           if mid.nil?
             without << reject_entry(r)
             next
@@ -105,15 +105,26 @@ module Noxun
       #                       zero_after_rounding | duplak_link_missing |
       #                       thickness_conflict,
       #   'detail'          — text dovodu VEPO (presne ako v errors/LOGu),
-      #   'material_id'     — NAKUPNY material (pri duplaku zdroj; nil = bez materialu),
+      #   'material_id'     — material, na ktorom je GEOMETRIA (nakupny; pri
+      #                       duplaku zdroj; pri duplak_link_missing material
+      #                       riadku; nil = bez materialu),
+      #   'plan_material_id'— material, ktoremu plan riadok pripise (pri duplaku
+      #                       vzdy zdroj — aj pri chybajucej vazbe),
       #   'row_material_id' — material riadku,
       #   'l', 'w'          — rozmer obdlznika po zaokruhleni (a s pridavkom duplaku),
-      #   'count'           — pocet obdlznikov (quantity, pri duplaku x nasobok),
-      #   'grain'           — POVODNY smer dekoru (Kontrola: allow_rotation pri 'none'),
-      #   'sheet_size', 'usable', 'trim', 'fallback', 'uni' — format nakupneho materialu.
+      #   'count'           — pocet obdlznikov (quantity, pri duplaku x nasobok; len pri ok),
+      #   'grain'           — POVODNY smer dekoru (Kontrola: `rotation_allowed?`),
+      #   'sheet_size', 'usable', 'trim', 'fallback', 'uni' — format materialu geometrie.
+      # GEOMETRIA (l, w, usable, trim, grain) je vyplnena aj pri ok: false, ked
+      # dovod s rozmermi nesuvisi (VEPO: neznama ABS, chybna hrubka, pocet;
+      # thickness_conflict; duplak_link_missing — tam vrstva BEZ pridavku na
+      # materiali riadku), aby Kontrola nadrozmeru hodnotila aj taky dielec.
+      # Chyba pri invalid_row, zero_after_rounding, nekladnom rozmere a bez materialu.
       def purchase_rect(hash, sheets:, edge_thicknesses:, params: {})
         prm, bad = normalize_params(params)
-        return { 'ok' => false, 'reason' => 'invalid_params', 'material_id' => nil } unless bad.empty?
+        unless bad.empty?
+          return { 'ok' => false, 'reason' => 'invalid_params', 'material_id' => nil, 'plan_material_id' => nil }
+        end
 
         prepare_rect(hash, sheets.is_a?(Hash) ? sheets : {},
                      edge_thicknesses.is_a?(Hash) ? edge_thicknesses : {}, prm)
@@ -121,8 +132,9 @@ module Noxun
 
       # „Zmesti sa na prazdnu platnu": l <= Lu + DIM_TOL && w <= Wu + DIM_TOL.
       # rect = vysledok `purchase_rect` (staci 'l', 'w', 'usable'). Plan vola
-      # VZDY allow_rotation: false (N8); Kontrola allow_rotation: (grain == 'none').
-      # Nepouzitelna plocha alebo chybny rect = false (nikdy vynimka).
+      # VZDY allow_rotation: false (N8); Kontrola allow_rotation:
+      # rotation_allowed?(rect['grain']). Pri allow_rotation: true skusa obe
+      # polohy. Nepouzitelna plocha alebo chybny rect = false (nikdy vynimka).
       def fits_rect?(rect, allow_rotation: false)
         return false unless rect.is_a?(Hash)
 
@@ -138,16 +150,26 @@ module Noxun
         fit_one?(l, w, lu, wu) || (allow_rotation ? fit_one?(w, l, lu, wu) : false)
       end
 
+      # Smie Kontrola nadrozmeru dielec otocit? Ano pre vsetko okrem smeru
+      # 'length' a 'width' (dnesne spravanie `Validation.fits_on_sheet?`:
+      # 'none', prazdny aj neznamy smer = obe polohy). Plan NEOTACA nikdy (N8) —
+      # tato funkcia mu len hovori, ci nezaradeny dielec Kontrola hlasi.
+      def rotation_allowed?(grain)
+        !%w[length width].include?(grain.to_s)
+      end
+
       # Dovod nezaradenia obdlznika v PLANE (nil = zmesti sa bez otocenia):
       #   no_usable_area — orez nenechal ziadnu plochu,
-      #   needs_rotation — dielec BEZ smeru, ktory sa zmesti len otoceny
-      #                    (plan neotaca — N8; Kontrola ho NEHLASI),
-      #   oversize       — nezmesti sa ani otoceny (to iste hlasi Kontrola).
+      #   needs_rotation — dielec, ktory smie Kontrola otocit (bez smeru) a
+      #                    zmesti sa len otoceny (plan neotaca — N8; Kontrola
+      #                    ho NEHLASI),
+      #   oversize       — nezmesti sa ani v polohe, ktoru pripusta Kontrola
+      #                    (to iste hlasi Kontrola).
       def unplaced_reason(rect)
         u = rect['usable']
         return 'no_usable_area' unless usable_area?(u[0].to_f, u[1].to_f)
         return nil if fits_rect?(rect, allow_rotation: false)
-        return 'needs_rotation' if rect['grain'].to_s == 'none' && fits_rect?(rect, allow_rotation: true)
+        return 'needs_rotation' if rotation_allowed?(rect['grain']) && fits_rect?(rect, allow_rotation: true)
 
         'oversize'
       end
@@ -224,31 +246,53 @@ module Noxun
           nil
         end
         return rejected(pmid, rmid, 'invalid_row', nil, names) if prep.nil?
-        return rejected(pmid, rmid, 'vepo', prep['reason'], names) unless prep['ok']
+
+        # C1/N7: pridavok vrstvy duplaku az PO zaokruhleni (VEPO dostava
+        # zaokruhleny hotovy rozmer). Pri chybajucej vazbe sa NEdomysla —
+        # geometria je vrstva bez pridavku na materiali riadku.
+        p2 = doubled ? 2 * prm['dup_allowance'] : 0.0
+        geo_mid = link_missing ? rmid : pmid
+        geo = { hash: hash, mid: geo_mid, p2: p2, sheets: sheets, prm: prm }
+        unless prep['ok']
+          # dovod VEPO (ABS, hrubka, pocet): geometria z tej istej orientacie
+          # a zaokruhlenia; nekladny rozmer ci chybajuci material ju nemaju.
+          dims = pmid && VepoExport.rounded_dims(VepoExport.oriented(hash))
+          return with_geometry(rejected(pmid, rmid, 'vepo', prep['reason'], names), dims, geo)
+        end
 
         l, w = prep['dims']
         return rejected(pmid, rmid, 'zero_after_rounding', nil, names) if l <= 0 || w <= 0
         # B2: katalog hovori „duplak", riadok vazbu nenesie — nedomyslat.
-        return rejected(pmid, rmid, 'duplak_link_missing', nil, names) if link_missing
+        if link_missing
+          return with_geometry(rejected(pmid, rmid, 'duplak_link_missing', nil, names), [l, w], geo)
+        end
         # B1: obchodna hrubka riadku vs. nakupny material. Vrstvy duplaku maju
         # hrubku ZDROJA (su z neho rezane), preto sa pri duplaku nekontroluju.
         if !doubled && thickness_conflict?(sheets[pmid], prep['commercial'])
-          return rejected(pmid, rmid, 'thickness_conflict', nil, names)
+          return with_geometry(rejected(pmid, rmid, 'thickness_conflict', nil, names), [l, w], geo)
         end
 
         qty = prep['row']['quantity'].to_i
-        p2 = doubled ? 2 * prm['dup_allowance'] : 0.0
         fr = frame(pmid, sheets, prm['trim'])
         fr.merge(
-          'ok' => true, 'reason' => nil, 'detail' => nil, 'material_id' => pmid, 'row_material_id' => rmid,
-          # C1/N7: pridavok az PO zaokruhleni (VEPO dostava zaokruhleny hotovy rozmer).
-          'l' => l + p2, 'w' => w + p2, 'count' => doubled ? qty * mult : qty,
+          'ok' => true, 'reason' => nil, 'detail' => nil, 'material_id' => pmid, 'plan_material_id' => pmid,
+          'row_material_id' => rmid, 'l' => l + p2, 'w' => w + p2, 'count' => doubled ? qty * mult : qty,
           'quantity' => qty, 'multiplier' => doubled ? mult : 1, 'doubled' => doubled,
           'grain' => hash['grain_direction'].to_s, 'commercial' => prep['commercial'],
           'key_text' => key_text(hash, prep), 'names' => names
         )
       rescue StandardError
         rejected(nil, nil, 'invalid_row', nil, [])
+      end
+
+      # Doplni do odmietnutia geometriu (l, w, format, orez, smer) — len ked
+      # su oba zaokruhlene rozmery kladne a material je znamy.
+      def with_geometry(rej, dims, geo)
+        return rej unless dims.is_a?(Array) && geo[:mid] && dims.all? { |d| d.positive? }
+
+        rej.merge(frame(geo[:mid], geo[:sheets], geo[:prm]['trim']))
+           .merge('material_id' => geo[:mid], 'l' => dims[0] + geo[:p2], 'w' => dims[1] + geo[:p2],
+                  'grain' => geo[:hash]['grain_direction'].to_s)
       end
 
       # [nakupny material, duplak?, nasobok, chyba_vazba?]. Uplna vazba zo
@@ -318,7 +362,7 @@ module Noxun
 
       def rejected(pmid, rmid, reason, detail, names)
         { 'ok' => false, 'reason' => reason, 'detail' => detail, 'material_id' => pmid,
-          'row_material_id' => rmid, 'names' => names }
+          'plan_material_id' => pmid, 'row_material_id' => rmid, 'names' => names }
       end
 
       def reject_entry(r)

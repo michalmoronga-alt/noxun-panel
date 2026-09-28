@@ -141,7 +141,62 @@ NxTest.test('NP-1 purchase_rect + fits_rect?: dielec bez smeru 2000x2500 — pla
   NxTest.assert(rect['ok'], 'priprava ok')
   NxTest.assert_equal('none', rect['grain'])
   NxTest.refute(NxSL.sl.fits_rect?(rect, allow_rotation: false), 'plan neotaca')
-  NxTest.assert(NxSL.sl.fits_rect?(rect, allow_rotation: rect['grain'] == 'none'), 'Kontrola otoci dielec bez smeru')
+  NxTest.assert(NxSL.sl.fits_rect?(rect, allow_rotation: NxSL.sl.rotation_allowed?(rect['grain'])),
+                'Kontrola otoci dielec bez smeru')
+end
+
+NxTest.test('NP-1 rotation_allowed?: Kontrola otaca vsetko okrem length/width (ako fits_on_sheet?)') do
+  sl = NxSL.sl
+  NxTest.assert_equal([false, false, true, true, true, true],
+                      ['length', 'width', 'none', '', nil, 'diagonal'].map { |g| sl.rotation_allowed?(g) })
+  # prázdny smer: plán dielec neotočí, ale Kontrola by ho otočila -> needs_rotation, nie oversize
+  m = NxSL.mat(NxSL.compute([NxSL.row('length' => 2000.0, 'width' => 2500.0, 'grain_direction' => '')]), 'DTD18')
+  NxTest.assert_equal([[0, 1, 'needs_rotation']], m['unplaced'])
+end
+
+NxTest.test('NP-1 purchase_rect: geometria aj pri odmietnuti, ktore nesuvisi s rozmermi (pre Kontrolu NP-2)') do
+  sl = NxSL.sl
+  prep = ->(over) { sl.purchase_rect(NxSL.row(over), sheets: NxSL::SHEETS, edge_thicknesses: NxSL::EDGES) }
+  geo = %w[ok reason material_id plan_material_id l w usable trim grain]
+  abs = prep.call('length' => 2900.0, 'width' => 2100.0, 'grain_direction' => 'none',
+                  'edges' => { 'L1' => 'NEZNAMA', 'L2' => nil, 'W1' => nil, 'W2' => nil })
+  NxTest.assert_equal([false, 'vepo', 'DTD18', 'DTD18', 2900, 2100, [2780.0, 2050.0], 10.0, 'none'], abs.values_at(*geo))
+  NxTest.assert_equal('neznáma ABS NEZNAMA', abs['detail'])
+  NxTest.refute(sl.fits_rect?(abs, allow_rotation: true), 'Kontrola vyhodnoti nadrozmer aj pri chybe ABS')
+  # orientacia width aj pri chybnej hrubke (VEPO) — ta ista jedina vymena
+  thk = prep.call('length' => 400.4, 'width' => 900.5, 'thickness' => 0.0, 'grain_direction' => 'width')
+  NxTest.assert_equal([false, 'vepo', 901, 400], thk.values_at('ok', 'reason', 'l', 'w'))
+  conf = prep.call('length' => 1380.0, 'width' => 2050.0, 'thickness' => 36.0)
+  NxTest.assert_equal([false, 'thickness_conflict', 'DTD18', 1380, 2050], conf.values_at('ok', 'reason', 'material_id', 'l', 'w'))
+  NxTest.assert(sl.fits_rect?(conf), 'konfliktny dielec sa na platnu zmesti')
+  # duplak bez vazby: vrstva BEZ pridavku na materiali riadku; plan ho pripise zdroju
+  link = prep.call('length' => 1380.0, 'width' => 2030.0, 'material_id' => 'DTD36', 'thickness' => 36.0)
+  NxTest.assert_equal([false, 'duplak_link_missing', 'DTD36', 'DTD18', 1380, 2030, [2780.0, 2050.0]],
+                      link.values_at('ok', 'reason', 'material_id', 'plan_material_id', 'l', 'w', 'usable'))
+  # duplak s vazbou a chybou ABS: geometria vrstvy S pridavkom na zdroji (ako pri ok)
+  dup = prep.call('length' => 600.0, 'width' => 400.0, 'material_id' => 'DTD36', 'thickness' => 36.0,
+                  'material_source' => { 'material_id' => 'DTD18', 'multiplier' => 2 },
+                  'edges' => { 'L1' => 'NEZNAMA', 'L2' => nil, 'W1' => nil, 'W2' => nil })
+  NxTest.assert_equal([false, 'vepo', 'DTD18', 620.0, 420.0], dup.values_at('ok', 'reason', 'material_id', 'l', 'w'))
+  NxTest.refute(dup.key?('count'), 'pocet obdlznikov len pri ok')
+end
+
+NxTest.test('NP-1 purchase_rect: bez geometrie pri invalid_row, zero_after_rounding, nekladnom rozmere a bez materialu') do
+  sl = NxSL.sl
+  prep = ->(r) { sl.purchase_rect(r, sheets: NxSL::SHEETS, edge_thicknesses: NxSL::EDGES) }
+  cases = { 'invalid_row' => NxSL.row('length' => Float::NAN, 'key' => nil),
+            'zero_after_rounding' => NxSL.row('length' => 0.2),
+            'vepo nekladna' => NxSL.row('width' => -10.0),
+            'vepo bez materialu' => NxSL.row('material_id' => '') }
+  cases.each do |name, r|
+    out = prep.call(r)
+    NxTest.assert_equal(false, out['ok'], name)
+    NxTest.refute(out.key?('l') || out.key?('usable'), "#{name}: geometria nema byt")
+  end
+  NxTest.assert_equal([nil, nil], prep.call(NxSL.row('material_id' => '')).values_at('material_id', 'plan_material_id'))
+  NxTest.assert_equal('invalid_params',
+                      sl.purchase_rect(NxSL.row, sheets: NxSL::SHEETS, edge_thicknesses: NxSL::EDGES,
+                                                 params: { 'kerf' => -1 })['reason'])
 end
 
 NxTest.test('NP-1 unplaced: 2900x2100 je oversize aj bez smeru; 2000x2500 so smerom je oversize') do
