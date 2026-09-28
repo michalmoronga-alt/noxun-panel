@@ -29,7 +29,7 @@ v **seede 6** — starší plugin zákazku neprestaví ani nevyexportuje (rohov�
 po prvej mutácii rozpočtu needituje a zastaví oba cenové exporty). **Aktualizovať OBE PC (aj Luciino) pred prvou rohovou** — starší plugin rohovú nepozná a knižnicu
 šablón STD 7 len číta (nedá sa v nej ukladať, premenovať ani mazať).
 
-**Testy (posledná kódová dávka, ROH-B2 PR #?):** **4720 headless · 138 JS sád · 3260 in-SU PASS / 0 FAIL**. ROH-B1 (#412): 4710 · 137 · 3244. ROH-A2 (#411): 4698 · 136 · 3222.
+**Testy (posledná kódová dávka, ROH-B2 PR #?):** **4721 headless · 138 JS sád · 3260 in-SU PASS / 0 FAIL**. ROH-B1 (#412): 4710 · 137 · 3244. ROH-A2 (#411): 4698 · 136 · 3222.
 **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 
 ## Robí sa

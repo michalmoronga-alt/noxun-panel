@@ -32,11 +32,14 @@
   `handle_ghost_corner_side` → `handle_insert(…, keep_point: true)` s prevzatou polohou (pri zlyhaní starý ghost končí); pásik „dvere vľavo / vpravo". D preto,
   že šípky, Alt, Esc a Shift sú obsadené, TAB je fallback kotiev a D nemá v SketchUpe skratku (in-SU overené nad `Sketchup.get_shortcuts` Michalovho PC: 51
   skratiek, D žiadna). Ikona „Rohová" z mockupu (O4), odhad „≈ Dielcov" + 5 dielcov zostavy. **O8** (jantárové upozornenie police × výstuha) **bez zmeny** —
-  čaká na Michala. **Testy:** headless 4720 · JS 138 sád (nová `test_rohb2_nahlad.js` 101 kontrol, `test_rohb2_nahlad.rb`) · **in-SU 3260 PASS / 0 FAIL** (nový
+  čaká na Michala. **Predrecenzia** (slepý recenzent, hlava 9e181111): 0× P1, 0× P2, 4× P3, všetky opravené v 2e171574 — P3-1 vkladanie s neplatnou dverovou
+  časťou: otvor aj kresba z toho istého orezaného čísla (`norm_corner_mm`), P3-2 dvojité D počíta stranu z karty, P3-3 „Šírka dverí" synchronizuje `setSelected`
+  (poradie `loadSelected`), P3-4 behaviorálne testy `handle_ghost_corner_side`. **Testy:** headless 4721 · JS 138 sád (nová `test_rohb2_nahlad.js` 104 kontrol, `test_rohb2_nahlad.rb`) · **in-SU 3260 PASS / 0 FAIL** (nový
   `run_rohb2`: kresba servera = geometria modelu obe strany, šírka dverí = dvere v modeli, preflight so živými poľami, kláves D → prevesenie → pravá rohová so
-  zrkadlenými čelami, 1 Späť; D pri dolnej nie je náš, D bez skratky). **Mutácie 9/9 chytené** (bez kôt rohovej, preflight bez CR, kláves bez `onCornerSide`,
-  karta bez slov, `nxSlotFrontsLock` bez rohovej, D bez podmienky rohovej, prevesenie bez polohy, poradie dielcov, vkladanie bez zostavy). In-SU bežal na obsahu
-  d5e3c1c4 — potom len dokumentácia. Zladené zdrojové guardy (signatúra `handle_insert`, `frontRowSummary`, B1 test „CR sa na otvor nepýta").
+  zrkadlenými čelami, 1 Späť; D pri dolnej nie je náš, D bez skratky). **Mutácie 13/13 chytené** (bez kôt rohovej, preflight bez CR, kláves bez `onCornerSide`,
+  karta bez slov, `nxSlotFrontsLock` bez rohovej, D bez podmienky rohovej, prevesenie bez polohy, poradie dielcov, vkladanie bez zostavy; po predrecenzii surový
+  zdroj D, strana z hlásenia ghostu, sync bez `setSelected`, prevesenie bez zrušenia starého ghostu). In-SU bežal na obsahu d5e3c1c4 — potom dokumentácia,
+  JS a čítací preflight (`preflight_corner_mm`, bez zápisu do modelu). Zladené zdrojové guardy (signatúra `handle_insert`, `frontRowSummary`, B1 test „CR sa na otvor nepýta").
 
 - **ROH-B1 · OVLÁDAČE ROHOVEJ A PREPÍNAČ STRANY DVERÍ (28.9.2026, PR #412, v0.14.2 → v0.14.3, blok 8 · K3).** Package [PACKAGE_ROHB1.md](../zdroje/bloky/ROHOVA/PACKAGE_ROHB1.md)
   nad schváleným mockupom [MOCKUP_ROHOVA_2026-09-28.html](../zdroje/bloky/ROHOVA/MOCKUP_ROHOVA_2026-09-28.html) (Michal 28.9.: O1–O12 podľa návrhu → rozhodnutie **R10**);
