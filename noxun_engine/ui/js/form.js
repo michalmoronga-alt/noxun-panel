@@ -589,7 +589,8 @@
     // ROH-B2: kresba rohovej zostavy ULOZENEHO stavu (ina skrinka kluc nema).
     cornerPreview = (p.corner_preview && typeof p.corner_preview === 'object') ? p.corner_preview : null;
     nxSetCornerDraft(p);
-    nxCornerInfoSync();
+    // „Šírka dverí" synchronizuje az `setSelected` (actions.js) — tu este
+    // `selectedCabId` patri predoslemu vyberu (predrecenzia P3-3).
   }
   // ROH-A2 (predrecenzia P2-1): VKLADACIA karta, ktorej identitu zresetoval
   // `nxFrontDraftReset` bez materializacie (Spat/Znova, prazdny vyber

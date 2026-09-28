@@ -721,7 +721,8 @@ presne `Construction.corner_fit_width` (`nxCornerMinWidth` / `nxCornerFitError` 
 `min_valid_width` ostávajú len pre klamp Scale); pri nezmestení červená **šírka, dverová časť a CR 1** (rámik `.crin` cez `nxCornerBoxesSync`) a veta ide do
 `nxCabFieldError` (flush apply aj `insertCabinet` ju ukážu). Hrúbky: **th2** z payloadu (`corner_th2`) alebo z `corner_ctx` preflightu, **t** pri vkladaní
 z `corner_ctx` (hrúbka, ktorú použije vklad), inak z poľa (`nxCornerT`) — `nxAdoptCornerCtx` pri zmene prevalidovanie spustí (audit B1 FIX 4).
-**ROH-B2 (O12):** v pravom stĺpci je pri **označenej** rohovej výstup **„Šírka dverí"** (`#infCornerDoor`, `nxCornerInfoSync` — číslo `corner_preview.door_w` zo
+**ROH-B2 (O12):** v pravom stĺpci je pri **označenej** rohovej výstup **„Šírka dverí"** (`#infCornerDoor`, `nxCornerInfoSync` volaný zo `setSelected` — `loadSelected`
+prevezme kresbu skôr, než zmení identitu, predrecenzia P3-3 — a z `applyVisibility` a odpovede preflightu; číslo `corner_preview.door_w` zo
 servera, „—" kým nepríde; vo vkladaní ani pri inom type riadok nie je, kontext Čelá by nemal kam viesť) a klik (`onInfoCornerDoor`) prepne kontext Čelá a otvorí
 kartu F1 (spodný riadok DOM). Súhrn v lište Základné (`NXShell.metaDims`) nesie pri rohovej aj **„dvere vľavo 450"** (`nxMetaDims` → `corner: {side, door}`,
 strana z registra, dverová časť z poľa; `onCornerSide` vo vkladaní meta obnoví sám — klik nie je `input` poľa).
@@ -1696,7 +1697,8 @@ nespravila (server prepína len `lower|upper`).
 
 **ROH-B2 — strana dverí klávesom počas ghostu (O12) a odhad s rohovou zostavou.** Kláves **D** v nástroji ghostu rohovej (odsek `ghost_tool.rb` v
 [construction.md](construction.md)) len ohlási stranu, ktorú ghost práve nesie (`NX.ghostCornerSide(side)` → `nxGhostCornerSide` v `actions.js`). Stranu prepne
-**tá istá funkcia ako prepínač v riadku karty** (`onCornerSide` — register + zrkadlo návrhu čiel, audit B1 FIX 2) a karta pošle **ten istý payload ako
+**tá istá funkcia ako prepínač v riadku karty** (`onCornerSide` — register + zrkadlo návrhu čiel, audit B1 FIX 2); **nová strana sa počíta zo stavu karty**
+(`nxCornerSide`), nie z hlásenia ghostu — rýchle dvojité D tak skončí na pôvodnej strane (predrecenzia P3-2). Karta pošle **ten istý payload ako
 „Vložiť"** (`nxInsertPayload`, spoločný s `insertCabinet`) callbackom `ghost_corner_side` → `Panel.handle_ghost_corner_side` ghost prevesí na nový zmrazený plán
 s prevzatou polohou. Front-draft preflight sa nečaká (`validateFields(true)` — zrkadlo platnosť čiel nemení, guardy stavby bežia v commite); označená skrinka,
 iný typ karty alebo červené pole kláves odmietnu so stavovou vetou a nič neprepnú. Pásik ghostu nesie segment `#gbCorner` („dvere vľavo / vpravo" —
@@ -2187,7 +2189,9 @@ z predvolieb typu alebo zo šablóny. JS kresba z otvoru: odsek „Náhľad" vy�
 **ROH-B2:** `handle_front_preflight` pridá rohovej aj **`corner_preview`** (kresba zostavy, odsek payloads.rb) — len keď preflight rozmery prijal (je `opening`)
 a sú účinné hrúbky (`corner_ctx`). Vstup skladá čistá `corner_preview_params(data, stored, corner, ctx)`: uložený config označenej (strana, materiály, overridy)
 alebo payload karty pri vkladaní + živé rozmery, hrúbka korpusu z `ctx['t']`, dverová časť, CR 1 a CR 2 cez **`preflight_corner_mm`** (tá istá funkcia ako otvor —
-`preflight_door_w` je jej obal: živé pole v rozsahu, inak posledný platný zdroj) a živý strop (`CORNER_PREVIEW_LIVE_KEYS`).
+`preflight_door_w` je jej obal: živé pole v rozsahu, inak zdroj — uložená hodnota označenej skrinky, pri **vkladaní** hodnota **orezaná do rozsahu** tým istým
+`CabinetBuilder.norm_corner_mm` ako stavba; predrecenzia P3-1: surová 900 by posunula otvor dverí inam než kresbu, ktorú oreže `normalize`) a živý strop
+(`CORNER_PREVIEW_LIVE_KEYS`). Otvor dverí aj kresba zostavy tak stoja **vždy na tom istom čísle**.
 **ROH-B2 — prevesenie ghostu klávesom strany (`handle_ghost_corner_side`, callback `ghost_corner_side`).** Poradie: identita dokumentu (R-02) → živá session
 **rohovej** v tomto dokumente → **`handle_insert(payload, keep_point: true)`** (tá istá cesta ako „Vložiť" — všetky preflighty, zmrazený plán; nová session prevezme
 polohu starej) → keď nová session nevznikla, **stará sa zruší** (karta už ukazuje novú stranu a ghost so starou by vložil inú skrinku) a status to povie. Nič

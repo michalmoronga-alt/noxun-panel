@@ -150,16 +150,17 @@ module Noxun
         end
 
         # ROH-B2: to iste pravidlo pre KAZDE pole rohovej (dverova cast, CR 1,
-        # CR 2) — zive pole v rozsahu, inak posledny platny zdroj. Kresba
-        # zostavy tak stoji na tych istych cislach ako otvor dveri.
+        # CR 2) — zive pole v rozsahu, inak ZDROJ: ulozena hodnota oznacenej
+        # skrinky, pri vkladani (zdrojom je sam payload) hodnota OREZANA do
+        # rozsahu tym istym `norm_corner_mm` ako stavba (predrecenzia P3-1: surova
+        # 900 by otvor posunula inam nez kresbu zostavy, ktoru oreze `normalize`).
+        # Otvor dveri aj kresba zostavy tak stoja VZDY na tom istom cisle.
         def preflight_corner_mm(data, corner, key)
           v = data[key.to_s]
-          lo, hi = CabinetBuilder::CORNER_RANGES[key]
-          if v.is_a?(Numeric) && v.to_f.finite? && v.to_f >= lo && v.to_f <= hi
-            v.to_f
-          else
-            corner[key.to_s]
-          end
+          range = CabinetBuilder::CORNER_RANGES[key]
+          return v.to_f if v.is_a?(Numeric) && v.to_f.finite? && v.to_f >= range[0] && v.to_f <= range[1]
+
+          CabinetBuilder.norm_corner_mm(corner[key.to_s], CabinetBuilder::CORNER_DEFAULTS[key], range)
         end
 
         # ROH-B2: ZIVE polia navrhu, ktore menia kresbu zostavy (vyska vnutra pri

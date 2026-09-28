@@ -440,6 +440,10 @@
   // sa prevesi na novy zmrazeny plan z karty (`ghost_corner_side` -> ten isty
   // `handle_insert`, poloha kurzora ostava). Preflight ciel sa necaka: zrkadlo
   // platnost ciel nemeni a guardy stavby bezia v commite ako pri kazdom vklade.
+  // Predrecenzia P3-2: NOVA strana sa pocita zo STAVU KARTY (`nxCornerSide` —
+  // jedina pravda), nie z hlasenia ghostu: pri rychlom dvojitom D ghost este
+  // hlasi staru stranu, kym sa prevesenie dokonci, a dve stlacenia by skoncili
+  // na tej istej strane. `side` (strana ghostu) je len informacia.
   // -> true = ziadost odisla.
   function nxGhostCornerSide(side){
     if ((typeof selectedCabId !== 'undefined' && selectedCabId) || cabTypeNow() !== 'corner_blind'){
@@ -451,7 +455,7 @@
                    'Skontroluj červené polia — strana dverí sa neprepla.', true);
       return false;
     }
-    onCornerSide(side === 'right' ? 'left' : 'right');
+    onCornerSide(nxCornerSide() === 'right' ? 'left' : 'right');
     if (!(window.sketchup && sketchup.ghost_corner_side)) return false;
     sketchup.ghost_corner_side(nxDocPayload(nxInsertPayload()));
     return true;
@@ -526,6 +530,11 @@
 
   function setSelected(cid){
     selectedCabId = cid;
+    // ROH-B2 (predrecenzia P3-3): „Šírka dverí" patri OZNACENEJ rohovej —
+    // `loadSelected` prevezme kresbu servera (`nxAdoptCabinetDraft`) SKOR, nez
+    // sa tu zmeni identita, takze riadok sa synchronizuje az TU (pri kazdom vybere
+    // aj zruseni vyberu), nie az po preflighte.
+    if (typeof nxCornerInfoSync === 'function') nxCornerInfoSync();
     // (applyTplBtn zije v okne Sablony — disabled stav riesi TemplatesDialog.push_state)
   }
 

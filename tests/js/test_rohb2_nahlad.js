@@ -331,11 +331,23 @@ function frowFake(){
 {
   const ctx = formCtx();
   ctx.setType('corner_blind');
-  vm.runInContext("selectedCabId = 'CAB-1'", ctx);
+  // SKUTOCNE PORADIE `loadSelected` (predrecenzia P3-3): kresba sa prevezme
+  // (`nxAdoptCabinetDraft`) SKOR, nez sa zmeni identita (`setSelected`).
+  const bridgeSrc = fs.readFileSync(path.join(JS, 'bridge.js'), 'utf8');
+  const loadSel = bridgeSrc.slice(bridgeSrc.indexOf('loadSelected: function(c){'));
+  ok(loadSel.indexOf('nxAdoptCabinetDraft(c)') > 0 &&
+     loadSel.indexOf('nxAdoptCabinetDraft(c)') < loadSel.indexOf('setSelected(c.cabinet_id || null)'),
+     'loadSelected: prevzatie kresby PRED zmenou identity (to je poradie, ktoré test prehráva)');
+  vm.runInContext('selectedCabId = null', ctx);
+  ctx.__node('infCornerDoor').hidden = true;
   ctx.nxAdoptCabinetDraft({ type: 'corner_blind', corner_side: 'left', corner_preview: CP_L, front_opening: { x0: 0, w: 450 } });
   eq(get(ctx, 'cornerPreview'), CP_L, 'payload označenej rohovej = kresba uloženého stavu');
+  ctx.setSelected('CAB-1');
   eq([ctx.__node('infCornerDoor').hidden, ctx.__node('inf_corner_door').textContent], [false, '446'],
-     '„Šírka dverí 446" zo servera (door_w)');
+     'výber rohovej z prázdneho výberu: „Šírka dverí 446" hneď po setSelected (nie až po preflighte)');
+  ctx.setSelected(null);
+  eq(ctx.__node('infCornerDoor').hidden, true, 'zrušenie výberu riadok schová');
+  ctx.setSelected('CAB-1');
   ok(ctx.__node('infCornerDoor').title.indexOf('Čelá → F1') > 0, 'bublina povie, kam klik vedie');
   // Klik: kontext Čelá a karta F1.
   let ctxSwitch = null, refreshed = 0;
@@ -430,8 +442,13 @@ function frowFake(){
   eq(SENT.length, 1, 'ghost sa prevesí vlastným callbackom (nie „Vložiť")');
   eq([SENT[0].type, SENT[0].corner_side, SENT[0].model_guid, SENT[0].fronts.gap_left, SENT[0].fronts.items[0].direction],
      ['corner_blind', 'right', 'G-1', 2, 'left'], 'payload = vklad z karty s novou stranou a zrkadlenými čelami');
-  eq(ctx.nxGhostCornerSide('right'), true, 'druhé stlačenie (ghost vpravo)');
-  eq([ctx.nxCornerSide(), SENT[1].corner_side, SENT[1].fronts.gap_left], ['left', 'left', 0], 'späť vľavo = pôvodné okraje');
+  // Rychle DVOJITE D (predrecenzia P3-2): ghost este nesie staru stranu
+  // (prevesenie sa nedokoncilo) a hlasi znova „left" — nova strana sa
+  // pocita z KARTY, takze druhe stlacenie vrati vlavo.
+  eq(ctx.nxGhostCornerSide('left'), true, 'druhé stlačenie hneď za prvým (ghost ešte hlási vľavo)');
+  eq([ctx.nxCornerSide(), SENT[1].corner_side, SENT[1].fronts.gap_left], ['left', 'left', 0],
+     'dve stlačenia = späť vľavo s pôvodnými okrajmi (strana z karty, nie z hlásenia ghostu)');
+  eq(calls, ['right', 'left'], 'obe stlačenia idú tou istou funkciou karty');
   // Odmietnutia: oznacena skrinka, iny typ, cervene pole — nic sa nemeni ani neposiela.
   vm.runInContext("selectedCabId = 'CAB-1'", ctx);
   eq(ctx.nxGhostCornerSide('left'), false, 'označená skrinka: kláves nič neprepína');

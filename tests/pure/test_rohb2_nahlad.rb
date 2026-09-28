@@ -85,6 +85,55 @@ module NxRohB2
     def initialize
       @tools = FakeTools.new
     end
+
+    def path
+      'C:/tmp/rohb2.skp'
+    end
+  end
+
+  # Stub singleton metod (vzor test_rohb1_strana.rb; chybajuce sa po teste zmazu).
+  def with_stubs(entries)
+    saved = []
+    entries.each do |(mod, name, impl)|
+      sc = mod.singleton_class
+      had = sc.method_defined?(name) || sc.private_method_defined?(name)
+      saved << [sc, name, had ? sc.instance_method(name) : nil]
+      sc.send(:define_method, name, &impl)
+    end
+    yield
+  ensure
+    saved.reverse_each do |(sc, name, orig)|
+      orig ? sc.send(:define_method, name, orig) : sc.send(:remove_method, name)
+    end
+  end
+
+  # Spusti `handle_ghost_corner_side` s podstrcenym prostredim.
+  #   live   = session, ktora visi na kurzore (alebo nil)
+  #   insert = co spravi `handle_insert` (lambda nad logom), foreign = cudzi dokument
+  # -> [log, session po volani]
+  def ghost_switch(model:, live:, insert:, foreign: false)
+    log = []
+    su = Module.new
+    su.define_singleton_method(:active_model) { model }
+    prev = GT.session
+    GT.instance_variable_set(:@session, live)
+    stubs = [
+      [PN, :set_status, ->(msg, err = false) { log << [:status, msg, err] }],
+      [PN, :js, ->(script) { log << [:js, script] }],
+      [PN, :handle_insert, ->(payload, keep_point: false) { log << [:insert, keep_point]; insert.call(payload, log) }]
+    ]
+    Object.const_set(:Sketchup, su)
+    begin
+      with_stubs(stubs) do
+        payload = { 'model_guid' => foreign ? 'CUDZI' : E::DocKey.key(model), 'type' => 'corner_blind',
+                    'corner_side' => 'right' }
+        PN.handle_ghost_corner_side(payload.to_json)
+      end
+      [log, GT.session]
+    ensure
+      Object.send(:remove_const, :Sketchup)
+      GT.instance_variable_set(:@session, prev)
+    end
   end
 
   def fresh_memory
@@ -203,6 +252,20 @@ NxTest.test('ROH-B2: preflight — strana z ULOZENEHO configu, D/CR zive v rozsa
   # Otvor dveri a kresba stoja na tom istom D (ta ista funkcia).
   NxTest.assert_equal(pn.preflight_door_w(data, st), p['corner_door_w'])
   NxTest.assert_equal(450.0, pn.preflight_door_w(data.merge('corner_door_w' => 900.0), st), 'D mimo rozsahu = ulozene')
+  # Predrecenzia P3-1: VKLADANIE s neplatnou dverovou castou (pole cervene) —
+  # otvor dveri aj kresba zostavy stoja na TOM ISTOM cisle (orezanom do rozsahu).
+  %w[left right].each do |side|
+    ins = data.merge('corner_side' => side, 'corner_door_w' => 900.0, 'cabinet_id' => '', 'insert_session' => 1,
+                     'revision' => 1, 'width' => 1500.0)
+    op = pn.front_preflight_result(ins)['opening']
+    cp = pn.corner_preflight_preview(ins, nil, nil, { 't' => 18.0, 'th2' => 18.0 })
+    door = cp['dims'][0]
+    NxTest.assert_equal([op['x0'], op['x0'] + op['w']], door.values_at('x0', 'x1'),
+                        "#{side}: otvor dveri = kota dverovej casti v kresbe (ziadne prekrytie)")
+    NxTest.assert_equal(800.0, op['w'], "#{side}: 900 mimo rozsahu -> 800 (ten isty `norm_corner_mm` ako stavba)")
+  end
+  garbage = data.merge('corner_door_w' => 'x', 'cabinet_id' => '', 'insert_session' => 1, 'revision' => 1)
+  NxTest.assert_equal(450.0, pn.preflight_door_w(garbage, garbage), 'vkladanie s necislom = predvolba 450')
 end
 
 NxTest.test('ROH-B2: zdroj — kresba v odpovedi preflightu len s prijatymi rozmermi, payload len pri rohovej') do
@@ -293,6 +356,45 @@ NxTest.test('ROH-B2: prevesenie ghostu (keep_point) prevezme polohu, bezne „Vl
   ensure
     gt.cancel_session('test', deferred: false)
     gt.instance_variable_set(:@session, prev_session)
+    gt.reset_memory!
+  end
+end
+
+NxTest.test('ROH-B2 (predrecenzia P3-4): handle_ghost_corner_side — cudzi dokument, neziva session, odmietnuty vklad, uspech') do
+  m = NxRohB2::FakeModel.new
+  gt = NxRohB2::GT
+  nope = ->(_p, _log) {}
+  statuses = ->(log) { log.select { |l| l[0] == :status }.map { |l| [l[1], l[2]] } }
+  begin
+    # Cudzi dokument (R-02): nic sa nevola, ghost zije dalej.
+    live = NxRohB2.session({}, model: m)
+    log, after = NxRohB2.ghost_switch(model: m, live: live, insert: nope, foreign: true)
+    NxTest.refute(log.any? { |l| l[0] == :insert }, 'cudzi dokument: vklad sa nevola')
+    NxTest.assert(statuses.call(log).any? { |s| s[0].include?('panel patrí inému dokumentu') && s[1] }, 'hlasi sa nahlas')
+    NxTest.assert(after.equal?(live) && live.active?, 'ghost nedotknuty')
+    # Ziadna ziva session / dolna / iny dokument: veta „Rohová už nevisí na kurzore".
+    [nil, NxRohB2.session({ 'type' => 'lower', 'width' => 600.0 }, model: m), NxRohB2.session({}, model: Object.new)].each do |s|
+      log, = NxRohB2.ghost_switch(model: m, live: s, insert: nope)
+      NxTest.refute(log.any? { |l| l[0] == :insert }, "#{s ? s.type_key : 'bez session'}: vklad sa nevola")
+      NxTest.assert(statuses.call(log).any? { |x| x[0].start_with?('Rohová už nevisí na kurzore') && x[1] },
+                    "#{s ? s.type_key : 'bez session'}: veta a chyba")
+    end
+    # Vklad payload ODMIETNE (nova session nevznikla): stary ghost konci, veta povie preco.
+    live = NxRohB2.session({}, model: m)
+    refuse = ->(_p, lg) { lg << [:status, 'Chyba: zamitnute', true] }
+    log, after = NxRohB2.ghost_switch(model: m, live: live, insert: refuse)
+    NxTest.assert_equal([[:insert, true]], log.select { |l| l[0] == :insert }, 'ide cestou „Vložiť" s prevzatou polohou')
+    NxTest.assert_equal([:cancelled, nil], [live.state, after], 'stary ghost :cancelled a slot je volny')
+    NxTest.assert(statuses.call(log).last[0].include?('Strana dverí sa neprepla') && statuses.call(log).last[1],
+                  'posledna veta: strana sa neprepla, vloz znova')
+    # Uspech: nova ziva session = nic sa neruší, ziadna chybova veta navyse.
+    live = NxRohB2.session({}, model: m)
+    fresh = NxRohB2.session({ 'corner_side' => 'right' }, model: m)
+    ok_ins = ->(_p, _lg) { gt.instance_variable_set(:@session, fresh) }
+    log, after = NxRohB2.ghost_switch(model: m, live: live, insert: ok_ins)
+    NxTest.assert(after.equal?(fresh) && fresh.active?, 'nova session ostava')
+    NxTest.refute(statuses.call(log).any? { |s| s[0].include?('neprepla') }, 'ziadna chybova veta')
+  ensure
     gt.reset_memory!
   end
 end
