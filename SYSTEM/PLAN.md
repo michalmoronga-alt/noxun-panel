@@ -28,6 +28,9 @@ Balík **Čiel (D-114/D-119/D-120)** je tiež uzavretý — **v0.11.0, 11.9.2026
 *(Blok **7 · KONŠTRUKCIA K1+K2** (V1 bod 2) je hotový — **v0.13.0 → v0.14.0, 26.–27.9.2026**, PR #401 → #404 + uzáver PR #405 (KON-0 · KON-A · KON-B · KON-D);
 plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), výsledok a smoke checklist v [archiv/KONSTRUKCIA_ZAVER_2026-09-27.md](archiv/KONSTRUKCIA_ZAVER_2026-09-27.md),
 priečinok bloku v [archiv/bloky/KONSTRUKCIA/](archiv/bloky/KONSTRUKCIA/).)*
+*(Blok **8 · K3 ROHOVÁ SKRINKA** (V1 bod 2) je hotový — **v0.14.0 → v0.15.0, 27.–28.9.2026**, podklady PR #409, dávky PR #410 → #413 + uzáver PR #? (ROH-A1 · ROH-A2 · ROH-B1 · ROH-B2);
+plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), výsledok a smoke checklist v [archiv/ROHOVA_ZAVER_2026-09-28.md](archiv/ROHOVA_ZAVER_2026-09-28.md),
+priečinok bloku v [archiv/bloky/ROHOVA/](archiv/bloky/ROHOVA/).)*
 
 
 ### 1b · STABILIZAČNÁ REVÍZIA (dlhy fázy ŠTÚDIO — pred blokom KOVANIE)
@@ -273,7 +276,8 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   dve lišty medzi bokmi, výška parameter, ABS len hrana viditeľná z vnútra · **K3 rohová skrinka** (dolná, slepá s CR lištou: dolná skrinka + 5 dielcov rohovej zostavy + dverová
   zóna, cr1, cr2, prepínač L/P; **nízka priorita, posledná vo V1**; outside-in + audit). Balík V0.4.8 (rohové spoje per strana, poldrážka, „bez dielca") a V1-07 čelo ako cenová
   položka sú **mimo V1** (zásobník). K1/K2 = audit-povinné (CONFIG_SCHEMA). **K1 a K2 sú hotové v bloku 7 · KONŠTRUKCIA K1+K2 (v0.14.0, 27.9.2026)** —
-  [výsledok a smoke](archiv/KONSTRUKCIA_ZAVER_2026-09-27.md); **K3 sa robí v bloku 8 · K3 ROHOVÁ SKRINKA** (štart 27.9.2026).
+  [výsledok a smoke](archiv/KONSTRUKCIA_ZAVER_2026-09-27.md); **K3 je hotová v bloku 8 · K3 ROHOVÁ SKRINKA (v0.15.0, 28.9.2026)** —
+  [výsledok a smoke](archiv/ROHOVA_ZAVER_2026-09-28.md). V1 rozsah Konštrukcie je tým prázdny.
 - **V1.0 zostavy — V1 rozsah PO ROZHODNUTÍ 4.9.2026:** prisunutie a kopírovanie korpusov po vlastnej osi (snaper + mower logika → draft NÁSTROJE-1) · dosky (pracovná doska, pilaster,
   soklová lišta, krycí panel) vkladané a kreslené prichytením na rohy skriniek (drafty GHOST-D1/D2) · test na kompletnej reálnej zákazke. **PO V1** (rozhodnutie 4.9., koncept 02):
   segmentová automatika — soklová lišta v celku pre segment, obklady a krycie prvky segmentu vrátane pilastra (priznaný vs. skrytý) ako generované diely, pracovné a horné krycie dosky
@@ -528,29 +532,6 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → `construction.md` (`BoardBuilder.replan`, fázy kreslenia, geometria lúča/projekcie, degenerácie, lifecycle zámkov —
   Codex #296 P1), `ui-lifecycle.md` (ghost D2, `interaction: drawing`, `draw_board`, zámky, Shift, VCB), `docs/UI_DIZAJN.md` (tlačidlá karty Dosky) → STAV/KRONIKA/PLAN.
 
-### 8 · K3 ROHOVÁ SKRINKA (V1 bod 2 · štart 27.9.2026)
-
-**Cieľ:** dolná **slepá rohová skrinka s CR lištou** z pluginu bez ručného dopočítavania — dvere v dverovej časti, rohová zostava (blenda korpusová,
-výstuha závesov, rohová výstuha, CR 1, CR 2) podľa DC „Rohová", ktorú dielňa roky používa, strana dverí vľavo/vpravo; kusovník, VEPO a kovanie
-ako pri dolnej. Horná rohová, rohové mechanizmy (LeMans) a kolízie so susedným radom sú mimo bloku. **Priečinok bloku:** [zdroje/bloky/ROHOVA/](zdroje/bloky/ROHOVA/)
-— **rozhodnutia Michala** (R1–R9 a otvorené otázky), fakty z kódu, presná geometria DC, rešerš precedensov, krížový audit (zadanie, auditovaný koncept
-ako surový vstup, výsledky) a jeho **vyhodnotenie**; packages pribudnú s dávkami.
-**Stav 28.9.2026:** krížový audit hotový a vyhodnotený (všetky BLOCKERy prijaté, riešia ich packages). **Mockup ovládačov schválený** (Michal 28.9.: O1–O12
-podľa návrhu — [MOCKUP_ROHOVA_2026-09-28.html](zdroje/bloky/ROHOVA/MOCKUP_ROHOVA_2026-09-28.html), rozhodnutie R10); ROH-A1 a ROH-A2 išli podľa R8 bez nových
-ovládačov s hodnotami z DC ako návrhom. Poradie:
-
-- ✅ **ROH-A1 · jadro rohovej** (v0.14.1) — nový typ skrinky `corner_blind`, stavba oboch strán, výstupy (kusovník, VEPO, ponuka) a ochrany; bez nových
-  ovládačov (R8). Package [PACKAGE_ROHA1.md](zdroje/bloky/ROHOVA/PACKAGE_ROHA1.md) + audit návrhu. *PR #410*
-- ✅ **ROH-A2 · vkladanie a náhľad** (v0.14.2) — tlačidlo „Rohová" vo vkladacej karte, dvere a pánty v náhľade na správnom mieste (otvor zo servera),
-  nohy pri vkladaní, zámok typu v modale šablóny. Package [PACKAGE_ROHA2.md](zdroje/bloky/ROHOVA/PACKAGE_ROHA2.md). *PR #411*
-- ✅ **ROH-B1 · ovládače a prepínač strany** (v0.14.3) — riadok rohovej v Základných aj vo vkladacej karte (dverová časť, CR 1, CR 2, strana dverí), minimum šírky
-  z polí a účinných hrúbok, prepnutie strany = zrkadlo zostavy, pántov, okrajov a ručných hrán (1 krok Späť). Package [PACKAGE_ROHB1.md](zdroje/bloky/ROHOVA/PACKAGE_ROHB1.md)
-  + audit návrhu [AUDIT_ROHB1_2026-09-28.md](zdroje/bloky/ROHOVA/AUDIT_ROHB1_2026-09-28.md). *PR #412*
-- ✅ **ROH-B2 · kresba a čelá rohovej** (v0.14.4) — kresba zostavy v náhľade zo servera (blenda šrafovaná, CR 1, CR 2, rohová výstuha, koty 450 / 80, obe strany,
-  nezmestenie červenou; Korpus aj s dverami), karta Čelá rohovej (jedny dvierka, pánty „Pri boku / Pri rohu"), bez delenia zón, návrhy O12 (šírka dverí, súhrn
-  v lište, kláves D pri vkladaní), ikona z mockupu, odhad dielcov so zostavou. Jantárové O8 bez zmeny (čaká na Michala). Package
-  [PACKAGE_ROHB2.md](zdroje/bloky/ROHOVA/PACKAGE_ROHB2.md). *PR #413*
-
 ### 6 · INFRA (priebežne, podľa potreby)
 
 **Cieľ:** aby plugin a knižnice fungovali na dvoch pracoviskách (Michal + Lucia).
@@ -676,7 +657,7 @@ ovládačov s hodnotami z DC ako návrhom. Poradie:
   horná rohová skrinka · digestorový korpus · LeMans rohový výsuv · materiál per rola dielca (D-124b) · kontrola rúra/mikro + police podľa niky + vetranie (S1 V1+) ·
   zdieľanie `.skm` (D-48). **D-48** = prvá funkcia po V1 (blok 6).
 - **D-107 · Izolácia objektu pred fotením náhľadu šablóny** — automatické dočasné skrytie zvyšku modelu pred `view.write_image`. *Michal 20.8.: nízka priorita / vysoká náročnosť (skrývanie geometrie = zápis do modelu, undo kroky, observery). Medzitým stačí ručné „Odfotiť" v okne Šablóny — skrinku si naaranžuje a izoluje používateľ sám.*
-- **Horná** rohová skrinka (dolná slepá rohová **K3 je vo V1**, blok 4) a vysoká/potravinová skrinka ako **nové TYPY builderov** (odvodia sa od dolnej/hornej).
+- **Horná** rohová skrinka (dolná slepá rohová **K3 je hotová** v bloku 8, v0.15.0) a vysoká/potravinová skrinka ako **nové TYPY builderov** (odvodia sa od dolnej/hornej).
 - Zóny priamo vo viewporte (variant B vízie) — nadstavba 2D náhľadu.
 - **Interact pre čelá** — dráhy otvárania, klik = otvorenie, merač kolízií pri otvorení (dáta máme: origin čiel na hrane pántu; typ pántu určuje dráhu).
 - Náhľad povýšiť na „otvárací náhľad" panela so zobrazovaním zvolených elementov.

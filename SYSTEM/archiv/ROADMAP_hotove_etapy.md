@@ -2,6 +2,48 @@
 
 > **ARCHÍV (založené 24.7.2026 pri uzávere V0.5).** Kompaktné riadky hotových etáp drží [KRONIKA.md](KRONIKA.md) (časová os) — tu sú plné pôvodné texty (história rozhodnutí, rozsahov a PR). Otvorené záväzky z týchto textov sú od 11.8.2026 zaradené do blokov [../PLAN.md](../PLAN.md) — tento súbor je čisto referenčný.
 
+## BLOK K3 ROHOVÁ SKRINKA (V1 bod 2) — UZAVRETÝ (28.9.2026, v0.15.0, podklady PR #409, dávky PR #410–#413 + uzáver PR #?)
+
+**Dolná slepá rohová skrinka s CR lištou** (nový typ `corner_blind`, podľa DC „Rohová") — korpus ako dolná + rohová zostava na prednej rovine: **blenda korpusová**,
+**výstuha závesov**, **CR 1**, **CR 2** a **rohová výstuha**; jedny dvierka v dverovej časti s pántmi predvolene pri rohu, vnútri police cez celú šírku, bez priečok ·
+tlačidlo **„Rohová"** vo vkladacej karte, náhľad kreslí celú zostavu zo servera · riadok **Dverová časť · CR 1 · CR 2 · strana dverí** v Základných aj pri vkladaní,
+prepnutie strany zrkadlí zostavu, pánty, okraje aj ručné hrany (1 krok Späť), pri vkladaní kláves **D** · karta Čelá „jedny dvierka", pánty „Pri boku / Pri rohu",
+„Šírka dverí" v pravom stĺpci · kusovník, VEPO (krátke názvy), nákup kovania a ponuka ako pri dolnej.
+Dávky: ROH-A1 #410 (v0.14.1) · ROH-A2 #411 (v0.14.2) · ROH-B1 #412 (v0.14.3) · ROH-B2 #413 (v0.14.4); podklady a rozhodnutia #409 (docs). Krížový audit bloku
+(Codex + Grok, 5 BLOCKERov → všetky prijaté v reconcile), audit návrhu A1 (1 BLOCKER) a dobrovoľný audit B1 (0 BLOCKER · 5 FIX); každá kódová dávka mala
+predrecenziu a in-SU bránu. Pri poslednej dávke 4721 headless · 138 JS sád · 3260 in-SketchUp PASS / 0 FAIL.
+Výsledok, dávky, overenie, známe obmedzenia a zlúčený smoke checklist: [ROHOVA_ZAVER_2026-09-28.md](ROHOVA_ZAVER_2026-09-28.md). Priečinok bloku (rozhodnutia
+Michala R1–R10, schválený mockup, packages s auditmi návrhu, krížový audit a jeho vyhodnotenie, geometria DC, fakty z kódu) je od uzáveru v [bloky/ROHOVA/](bloky/ROHOVA/).
+Kompatibilita: skrinka schéma 22, BuildPlan 7, ABS seed 6, knižnica šablón STD 7 — aktualizovať obe PC. **Otvorené:** jantárové upozornenie „výrez police ×
+výstuha závesov" (O8) čaká na Michalov pokyn; overenie závesu na výstuhe závesov v dielni pri prvej rohovej.
+
+### Pôvodný plný text bloku pri uzávere
+
+### 8 · K3 ROHOVÁ SKRINKA (V1 bod 2 · štart 27.9.2026)
+
+**Cieľ:** dolná **slepá rohová skrinka s CR lištou** z pluginu bez ručného dopočítavania — dvere v dverovej časti, rohová zostava (blenda korpusová,
+výstuha závesov, rohová výstuha, CR 1, CR 2) podľa DC „Rohová", ktorú dielňa roky používa, strana dverí vľavo/vpravo; kusovník, VEPO a kovanie
+ako pri dolnej. Horná rohová, rohové mechanizmy (LeMans) a kolízie so susedným radom sú mimo bloku. **Priečinok bloku:** [bloky/ROHOVA/](bloky/ROHOVA/)
+— **rozhodnutia Michala** (R1–R9 a otvorené otázky), fakty z kódu, presná geometria DC, rešerš precedensov, krížový audit (zadanie, auditovaný koncept
+ako surový vstup, výsledky) a jeho **vyhodnotenie**; packages pribudnú s dávkami.
+**Stav 28.9.2026:** krížový audit hotový a vyhodnotený (všetky BLOCKERy prijaté, riešia ich packages). **Mockup ovládačov schválený** (Michal 28.9.: O1–O12
+podľa návrhu — [MOCKUP_ROHOVA_2026-09-28.html](bloky/ROHOVA/MOCKUP_ROHOVA_2026-09-28.html), rozhodnutie R10); ROH-A1 a ROH-A2 išli podľa R8 bez nových
+ovládačov s hodnotami z DC ako návrhom. Poradie:
+
+- ✅ **ROH-A1 · jadro rohovej** (v0.14.1) — nový typ skrinky `corner_blind`, stavba oboch strán, výstupy (kusovník, VEPO, ponuka) a ochrany; bez nových
+  ovládačov (R8). Package [PACKAGE_ROHA1.md](bloky/ROHOVA/PACKAGE_ROHA1.md) + audit návrhu. *PR #410*
+- ✅ **ROH-A2 · vkladanie a náhľad** (v0.14.2) — tlačidlo „Rohová" vo vkladacej karte, dvere a pánty v náhľade na správnom mieste (otvor zo servera),
+  nohy pri vkladaní, zámok typu v modale šablóny. Package [PACKAGE_ROHA2.md](bloky/ROHOVA/PACKAGE_ROHA2.md). *PR #411*
+- ✅ **ROH-B1 · ovládače a prepínač strany** (v0.14.3) — riadok rohovej v Základných aj vo vkladacej karte (dverová časť, CR 1, CR 2, strana dverí), minimum šírky
+  z polí a účinných hrúbok, prepnutie strany = zrkadlo zostavy, pántov, okrajov a ručných hrán (1 krok Späť). Package [PACKAGE_ROHB1.md](bloky/ROHOVA/PACKAGE_ROHB1.md)
+  + audit návrhu [AUDIT_ROHB1_2026-09-28.md](bloky/ROHOVA/AUDIT_ROHB1_2026-09-28.md). *PR #412*
+- ✅ **ROH-B2 · kresba a čelá rohovej** (v0.14.4) — kresba zostavy v náhľade zo servera (blenda šrafovaná, CR 1, CR 2, rohová výstuha, koty 450 / 80, obe strany,
+  nezmestenie červenou; Korpus aj s dverami), karta Čelá rohovej (jedny dvierka, pánty „Pri boku / Pri rohu"), bez delenia zón, návrhy O12 (šírka dverí, súhrn
+  v lište, kláves D pri vkladaní), ikona z mockupu, odhad dielcov so zostavou. Jantárové O8 bez zmeny (čaká na Michala). Package
+  [PACKAGE_ROHB2.md](bloky/ROHOVA/PACKAGE_ROHB2.md). *PR #413*
+- ✅ **Uzáver bloku** *(PR #?, v0.15.0 — docs a verzia)* — blok do archívu, priečinok bloku do `archiv/bloky/ROHOVA/`, V1_VIZIA (bod 2 odškrtnutý), README,
+  DOGFOODING (dočasná skupina smoke), STAV, KRONIKA; výsledok a smoke checklist v [ROHOVA_ZAVER_2026-09-28.md](ROHOVA_ZAVER_2026-09-28.md).
+
 ## BLOK KONŠTRUKCIA K1+K2 (V1 bod 2) — UZAVRETÝ (27.9.2026, v0.14.0, PR #401–#404 + uzáver PR #405)
 
 **Chrbát v drážke do nárezu v plnom rozmere skrinky** (D-143; model ho ďalej ukazuje v drážke, staré skrinky sa prestavia hromadne z Kontroly) · **komín vzadu**

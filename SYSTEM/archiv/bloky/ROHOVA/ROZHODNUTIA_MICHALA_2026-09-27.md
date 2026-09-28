@@ -2,7 +2,7 @@
 
 > **Produktové rozhodnutia bloku** — čo a ako má plugin robiť z pohľadu stolára. **Technické požiadavky** (formát dát, verzie configu
 > a výrobného plánu, roly dielcov, výrobné brány…) sa zapisujú do **package každej dávky** a prejdú jej auditom návrhu.
-> Pôvodná debata: [../../next_sessions/V1_DEBATA_2026-09-05_KONSTRUKCIA.md](../../next_sessions/V1_DEBATA_2026-09-05_KONSTRUKCIA.md) §3
+> Pôvodná debata: [../../../zdroje/next_sessions/V1_DEBATA_2026-09-05_KONSTRUKCIA.md](../../../zdroje/next_sessions/V1_DEBATA_2026-09-05_KONSTRUKCIA.md) §3
 > (špecifikácia z DC „Rohová", ktorú dielňa roky používa). Tento súbor ju **nenahrádza** — dopĺňa rozhodnutia zo štartu bloku.
 > Ďalšie súbory priečinka: fakty z kódu [FAKTY_Z_KODU_2026-09-27.md](FAKTY_Z_KODU_2026-09-27.md) · presná geometria DC
 > [DC_ROHOVA_GEOMETRIA_2026-09-27.md](DC_ROHOVA_GEOMETRIA_2026-09-27.md) · rešerš precedensov [RESERS_OUTSIDE_IN_2026-09-27.md](RESERS_OUTSIDE_IN_2026-09-27.md) ·

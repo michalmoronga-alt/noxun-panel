@@ -13,11 +13,13 @@ v PLANe prázdny**; V1 je hotové, keď je odškrtnuté všetko. Stav dopĺňaj�
 1. [ ] **Návrh:** vloženie skriniek na klik (GHOST, **hotové** v0.9.0) · prisunutie a kópia po vlastnej osi (NÁSTROJE-1, **hotové** v0.9.25) · dosky vkladané a kreslené
    prichytením na skrinky (GHOST-D1/D2, **hotové** v0.9.27 / v0.9.28) · šablóny s kovaním = opakované typy na 1 klik (KOV-I, **hotové** v bloku KOVANIE) ·
    **ostáva:** test na kompletnej reálnej zákazke (riadok „V1.0 zostavy" v PLAN, blok 4). *(Zostavy, segmenty, sektory a viazané diely = PO V1, rozhodnutie 4.9.2026.)*
-2. [ ] **Konštrukcia (rozhodnuté 6.9.2026):** **K1 odsadenia** — komín vzadu (dno a strop kratšie, chrbát na ich zadnej hrane) a strop zapustený vpredu, jedna nastaviteľná hodnota
+2. [x] **Konštrukcia (rozhodnuté 6.9.2026):** **K1 odsadenia** — komín vzadu (dno a strop kratšie, chrbát na ich zadnej hrane) a strop zapustený vpredu, jedna nastaviteľná hodnota
    per skrinka (**hotové** v0.13.2) · **K2 chrbát z výstuh** (dve lišty medzi bokmi, výška parameter; **hotové** v0.13.3) · **K3 rohová skrinka** dolná, slepá s CR lištou, prepínač L/P (nízka priorita, posledná) ·
    výstuhy v interiéri (hotové, D-80), sokel/nohy podľa výšky (hotové, D-79). *(Rohové spoje per strana, poldrážka, „bez dielca", čelo ako cenová položka V1-07 = mimo V1.)*
    **K1 + K2 hotové v bloku 7 (v0.14.0, 27.9.2026)** spolu s chrbtom v drážke do nárezu v plnom rozmere (D-143), opravou D-144 a šablónou Chladničková —
-   [výsledok a overenie](archiv/KONSTRUKCIA_ZAVER_2026-09-27.md). **Ostáva:** K3 rohová skrinka (blok 4) — preto bod ešte nie je odškrtnutý.
+   [výsledok a overenie](archiv/KONSTRUKCIA_ZAVER_2026-09-27.md). **K3 hotová v bloku 8 (v0.15.0, 28.9.2026)** — dolná slepá rohová s CR lištou podľa DC „Rohová",
+   jedny dvierka, prepínač strany, kusovník/VEPO/kovanie — [výsledok a smoke](archiv/ROHOVA_ZAVER_2026-09-28.md). V1 rozsah bodu je tým prázdny; ostáva len
+   Michalov smoke rohovej a overenie závesu na výstuhe závesov v dielni (nálezy = opravy v0.15.x).
 3. [x] **Materiály:** katalóg z Demosu, skupinové farby, ABS automatika so semaforom, vyhľadávač s kontextom *(hotové — Materiály 2.0 + PICKER-1/2/3)*.
 4. [x] **Kovanie:** blok KOVANIE (architektúra V1 FINAL 2.9.2026): sety s klasifikáciou a katalóg (A, B, H hotové), recepty a odvodené dielce zásuviek (C), resolver + zámky (D),
    výklopy podľa hmotnosti (E), závesy max(výška, hmotnosť) + úchytka + Tip-On (F), nohy 4/6 + príchyty (G), šablóny s kovaním (I), UI/UX balík Čiel (D-114 + D-119 presah

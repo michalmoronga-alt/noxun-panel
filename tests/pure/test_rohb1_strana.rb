@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # ROH-B1 · K3 — OVLADACE ROHOVEJ A PREPINAC STRANY DVERI (blok 8).
-# Package: SYSTEM/zdroje/bloky/ROHOVA/PACKAGE_ROHB1.md (+ audit navrhu B1).
+# Package: SYSTEM/archiv/bloky/ROHOVA/PACKAGE_ROHB1.md (+ audit navrhu B1).
 #
 # CO PLATI:
 #   * PREPNUTIE STRANY = JEDINA cista funkcia `CabinetBuilder.corner_mirror_params`:

@@ -428,7 +428,8 @@ UNI/neznámy = 18), vyriešená **pred plánom** (jediná mapa pre stavbu, valid
 (`x0` 0 alebo `W − D`), **presne jeden riadok dvierok s jedným krídlom** (R6 — invariant `normalize`, akcie čiel aj šablóna ho odmietnu porušiť), medzera pri rohu
 1–20 mm; chýbajúci smer pántov = **strana pri rohu** (R7 — jediná výnimka zo zákazu predvoleného smeru, §5.3). **Vnútri len police** cez celú šírku (bez priečok),
 predné odsadenie `max(20, t)` (za blendou); polica prechádza výstuhou závesov — výrez robí dielňa (ORANGE). **Odmietnutia:** `D + c1 + th2 + t ≤ W − t`,
-vnútorná hĺbka ≥ 80 (výstuha závesov pred chrbtom). **Typ ani strana** existujúcej rohovej sa v A1 **nemenia** žiadnou cestou (prepínač strany príde s ROH-B).
+vnútorná hĺbka ≥ 80 (výstuha závesov pred chrbtom). **Typ** existujúcej rohovej sa **nemení** žiadnou cestou; **stranu** mení výhradne prepínač strany
+(ROH-B1 — zrkadlo zostavy, pántov, okrajov a ručných hrán, 1 krok Späť), úprava ani šablóna nie.
 
 **UMÝVAČKA (`type: dishwasher`) je typ BEZ KORPUSU.** Nemá boky, dno, strop, chrbát ani zóny a **podpora je vždy `none`** (nohy ani sokel nedostane). Vyrába
 **jediný dielec — čelo** (jeden pevný item typu `blind`, rola `false_front`, viď 5.3) a telo umývačky kreslí ako **referenciu** (`kind: reference`, viď 2.1).
