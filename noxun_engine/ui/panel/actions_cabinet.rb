@@ -12,11 +12,11 @@ module Noxun
       # set_cabinet_material; insert ich nesie explicitne v payloade (build/normalize ich pozna).
       # S1-E: polia SLOTU su bezne konstrukcne polia panela (menia sa v
       # Zakladnych a idu tou istou apply cestou) — preto patria do whitelistu.
-      # ROH-A1: + polia rohovej (server ich prijme, ked pridu). JS ich v A1
-      # NEPOSIELA (nie su v CONSTRUCTION_FIELDS — bez ovladaca by isli ako
-      # `null`, krizovy audit C6); `handle_apply` kopiruje len PRITOMNE kluce,
-      # takze ulozene hodnoty ostavaju z configu. Zmena STRANY sa v A1
-      # odmieta (`corner_change_refusal`).
+      # ROH-A1: + polia rohovej (server ich prijme, ked pridu); `handle_apply`
+      # kopiruje len PRITOMNE kluce. ROH-B1: JS posiela dverovu cast a CR
+      # (`CONSTRUCTION_FIELDS`) LEN pri rohovej — pri inom type ani kluc
+      # (krizovy audit C6). STRANU apply nemeni nikdy (`corner_change_refusal`):
+      # meni ju VYHRADNE prepinac strany (`handle_corner_side`).
       PARAM_KEYS = %w[type width height depth thickness floor_height bottom_mode top_mode back_mode
                       back_thickness plinth_mode plinth_recess rail_depth rails_orientation
                       rails_top_offset back_setback top_front_setback back_rail_height name
@@ -29,9 +29,15 @@ module Noxun
       TEMPLATE_TYPE_WORDS = { 'lower' => 'dolná', 'upper' => 'horná',
                               'dishwasher' => 'umývačka', 'corner_blind' => 'rohová' }.freeze
 
-      # ROH-A1: vety ochran rohovej (typ a strana sa v A1 nemenia ziadnou cestou).
+      # ROH-A1: vety ochran rohovej. Typ sa nemeni ziadnou cestou; STRANU meni
+      # od ROH-B1 len prepinac v riadku rohovej (apply, sablona na existujucu
+      # rohovu a hromadny zapis ju dalej odmietaju touto vetou).
       CORNER_TYPE_MSG = 'Typ rohovej skrinky sa nedá zmeniť.'
-      CORNER_SIDE_MSG = 'Strana dverí rohovej sa zatiaľ nedá zmeniť — príde s prepínačom strany.'
+      CORNER_SIDE_MSG = 'Stranu dverí zmeň prepínačom v riadku rohovej.'
+      # ROH-B1: nazov operacie prepinaca strany (jeden krok Spat) a vety akcie.
+      CORNER_SIDE_OP = 'NOXUN: Strana dverí rohovej'
+      CORNER_SIDE_WORDS = { 'left' => 'vľavo', 'right' => 'vpravo' }.freeze
+      CORNER_SIDE_BUSY_MSG = 'Model ešte dokončuje predchádzajúcu zmenu — strana dverí sa nezmenila, skús to znova.'
 
       # D-39: polia vkladacej karty, ktore mozu niest zamok (JS zrkadlo: NXInsert.LOCK_FIELDS).
       INSERT_LOCK_FIELDS = %w[width height depth thickness floor_height].freeze
@@ -127,12 +133,26 @@ module Noxun
 
         # cfg pre `Construction.front_opening` z rozmerov preflightu (dims =
         # [sirka, vyska, sokel] uz prekontrolovane).
+        # ROH-B1: STRANA ide vzdy zo zdroja (`corner` — ulozeny config
+        # oznacenej, payload vkladania); DVEROVA CAST je ZIVA z formulara,
+        # ked je to konecne cislo v rozsahu (`CORNER_RANGES`) — pole mimo
+        # rozsahu je v paneli cervene a otvor drzi posledny platny zdroj.
         def preflight_opening_cfg(data, corner, dims)
           cfg = { type: data['type'].to_s, width: dims[0], height: dims[1], floor_height: dims[2] }
           return cfg unless corner
 
           cfg.merge(type: Construction::CORNER_TYPE, corner_side: corner['corner_side'],
-                    corner_door_w: corner['corner_door_w'])
+                    corner_door_w: preflight_door_w(data, corner))
+        end
+
+        def preflight_door_w(data, corner)
+          v = data['corner_door_w']
+          lo, hi = CabinetBuilder::CORNER_RANGES[:corner_door_w]
+          if v.is_a?(Numeric) && v.to_f.finite? && v.to_f >= lo && v.to_f <= hi
+            v.to_f
+          else
+            corner['corner_door_w']
+          end
         end
 
         # Medzera PRI ROHU v navrhu ciel v rozsahu 1–20 mm? Nevalidny tvar
@@ -185,7 +205,44 @@ module Noxun
           else
             return unless data['insert_session'].is_a?(Integer) && data['insert_session'].positive?
           end
-          js("NX.frontPreflight(#{front_preflight_result(data, stored).to_json})")
+          res = front_preflight_result(data, stored)
+          # ROH-B1 (audit B1 FIX 4): UCINNE hrubky pre minimum sirky rohovej.
+          ctx = corner_preflight_ctx(data, stored, model)
+          res['corner_ctx'] = ctx if ctx
+          js("NX.frontPreflight(#{res.to_json})")
+        end
+
+        # ROH-B1 (audit B1 FIX 4): `{ 'th2', 't' }` = UCINNA hrubka CR 2 a korpusu,
+        # z ktorych panel pocita najmensiu sirku rohovej (`D + c1 + th2 + 2t`),
+        # alebo nil (nie je rohova). Citacie, bez zapisu a bez Undo.
+        #   * OZNACENA rohova: th2 z ULOZENEHO configu (override CR 2 -> celovy
+        #     kanal -> 18; zmena materialu pride novym pushom a novym dotazom),
+        #     t zo ZIVEHO formulara (prazdne = ulozene).
+        #   * VKLADANIE: materialy navrhu (sablona, inak projekt) a hrubka tak,
+        #     ako ju upravi SAM VKLAD (`insert_thickness_preflight` — prevzatie
+        #     z materialu tela, zamok hrubky); th2 z celoveho materialu navrhu.
+        def corner_preflight_ctx(data, stored, model)
+          return nil unless corner_preflight_src(data, stored)
+
+          live = data['thickness']
+          live = nil unless live.is_a?(Numeric) && live.to_f.finite? && live.to_f.positive?
+          if stored.is_a?(Hash)
+            params = CabinetBuilder.config_to_params(stored)
+            t = live ? live.to_f : params['thickness'].to_f
+          else
+            params = { 'type' => Construction::CORNER_TYPE, 'thickness' => live }
+            %w[material_id front_material_id].each do |k|
+              v = data[k]
+              params[k] = v if v.is_a?(String) && !v.strip.empty?
+            end
+            insert_thickness_preflight(params, model)
+            t = params['thickness'].to_f
+          end
+          t = CabinetBuilder::LOWER_DEFAULTS[:thickness].to_f unless t.finite? && t.positive?
+          { 'th2' => corner_th2_payload(model, params), 't' => t.round(2) }
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.corner_preflight_ctx')
+          nil
         end
 
         # D-39 (audit B5): zamky vkladacej karty ziju v PAMATI Panel modulu — preziju
@@ -988,6 +1045,96 @@ module Noxun
           side = data['corner_side'].to_s
           side = 'left' unless CabinetBuilder::CORNER_SIDES.include?(side)
           side == Construction.corner_side(params) ? nil : CORNER_SIDE_MSG
+        end
+
+        # ROH-B1 (O5): PREPINAC STRANY DVERI rohovej — samostatna akcia (jedina
+        # cesta, ktora stranu meni). Guardy v poradi R-02: identita dokumentu
+        # PRVA, potom oznacena skrinka a POVINNE echo `cabinet_id` (klik patri
+        # skrinke, nad ktorou bol riadok vykresleny). Audit B1 FIX 3: BARIERA
+        # OBSERVERA (`ScaleWatch.flush_pending!`) PRED citanim vychodiskoveho
+        # configu — oneskorena absorpcia Scale sa inak prilepi k tejto operacii
+        # a poskodi jej Redo; pri neuspechu odmietnutie, po bariere sa dokument
+        # aj cielova skrinka overia ZNOVA. Potom typ rohova a platna strana.
+        # Rovnaka strana = nic (ziadny prazdny krok Spat). Zmena = JEDNA
+        # operacia prestavby nad `CabinetBuilder.corner_mirror_params`
+        # (zrkadlo ciel a rucnych hran podla osi) = jeden krok Spat; pri chybe
+        # ju `rebuild` zrusi bez stopy a panel sa vrati na ulozeny stav.
+        # Audit B1 FIX 1: klient caka na KORELOVANU odpoved (`switch_token` ->
+        # `NX.cornerSideResult`) — posiela sa v KAZDEJ vetve (aj pri tichom
+        # zahodeni a vynimke), AZ PO pushi stavu; dovtedy panel auto-apply odklada.
+        def handle_corner_side(payload)
+          model = Sketchup.active_model
+          data = parse(payload)
+          ok = false
+          return if foreign_document?(data, model, 'Strana dverí sa nezmenila') # R-02
+
+          target = corner_side_target(model, data)
+          return unless target
+          unless ScaleWatch.flush_pending!(model) == true
+            set_status(CORNER_SIDE_BUSY_MSG, true)
+            return push_selected(model)
+          end
+          # Po bariere ZNOVA: observer mohol medzitym prestavat skrinku alebo
+          # zmenit vyber (dokument sa pocas synchronneho volania nemeni, ale
+          # guard je lacny a drzi poradie R-02).
+          return if foreign_document?(data, model, 'Strana dverí sa nezmenila')
+
+          cab = corner_side_target(model, data)
+          return unless cab
+
+          cid = Store.get(cab, 'cabinet_id').to_s
+          params = existing_params(cab)
+          unless params['type'].to_s == Construction::CORNER_TYPE
+            set_status('Stranu dverí má len rohová skrinka.', true)
+            return push_selected(model)
+          end
+          want = data['corner_side'].to_s
+          unless CabinetBuilder::CORNER_SIDES.include?(want)
+            set_status('Neznáma strana dverí — nič sa nezmenilo.', true)
+            return push_selected(model)
+          end
+          if want == Construction.corner_side(params)
+            ok = true
+            return push_selected(model, dedup: false)
+          end
+
+          mirrored = CabinetBuilder.corner_mirror_params(params, want)
+          begin
+            suspend_selection_sync do
+              CabinetBuilder.rebuild(model, cab, mirrored, op_name: CORNER_SIDE_OP)
+              reselect(model, cab)
+            end
+          rescue StandardError
+            push_selected(model, dedup: false) # prepinac sa vrati na ULOZENU stranu
+            raise
+          end
+          status_with_warnings(cab, "Dvere #{CORNER_SIDE_WORDS[want]} — #{cid} zrkadlená "                                     "(#{part_count(cab)} dielcov). Späť vráti stranu jedným krokom.")
+          push_selected(model)
+          ok = true
+        ensure
+          if data.is_a?(Hash) && data['switch_token'].is_a?(String)
+            ack = data.slice('model_guid', 'cabinet_id', 'switch_token')
+            ack['ok'] = ok == true
+            js("NX.cornerSideResult(#{ack.to_json})")
+          end
+        end
+
+        # Oznacena skrinka, ktorej patri klik (povinne echo `cabinet_id`), inak
+        # nil + status a resync panela.
+        def corner_side_target(model, data)
+          cab = find_cabinet(model)
+          if cab.nil?
+            set_status('Najprv označ rohovú skrinku v modeli.', true)
+            return nil
+          end
+          cid = Store.get(cab, 'cabinet_id').to_s
+          echo = data['cabinet_id'].to_s
+          return cab if !echo.empty? && echo == cid
+
+          Engine.log("corner_side zahodeny — echo #{echo.inspect} nesedi s vyberom #{cid}")
+          set_status('Výber sa medzitým zmenil — strana dverí sa nezmenila.', true)
+          push_selected(model)
+          nil
         end
 
         # V0.2c AUTO-APPLY: jedna zmena poľa (konstrukcia AJ cela) -> 1 rebuild, 1 undo krok.

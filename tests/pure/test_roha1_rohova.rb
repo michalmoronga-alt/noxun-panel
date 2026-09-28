@@ -921,18 +921,21 @@ end
 NxTest.test('ROH-A1: JS registre typu a roli (zdroj) — CAB_TYPES, NX_TYPE_LABEL, TYPE_LIMITS, sablony, karta, pravidla') do
   js = ->(f) { NxRohA1.src('noxun_engine', 'ui', 'js', f) }
   NxTest.assert(js.call('core.js').include?("corner_blind: 'Rohová'"), 'NX_TYPE_LABEL')
-  lim = js.call('form.js')[/corner_blind:\s*\{\s*width:\s*\[(\d+),\s*(\d+)\]/, 1].to_f
-  NxTest.assert_equal(NxRohA1::CB::CORNER_MIN_WIDTH, lim, 'TYPE_LIMITS min sirka = CORNER_MIN_WIDTH')
+  # ROH-B1 (O2 + P3-2): pevne JS minimum 584 zaniklo — minimum pocita krizova
+  # kontrola (`nxCornerMinWidth`, parita v test_rohb1_strana.rb / _ovladace.js).
+  NxTest.refute(js.call('form.js').match?(/corner_blind:\s*\{\s*width:/), 'TYPE_LIMITS rohovej bez pevneho minima')
   NxTest.assert(js.call('templates.js').include?("corner_blind: 'rohová'"), 'TPL_TYPE_WORDS')
   NxTest.assert_equal('rohová', Noxun::Engine::Panel::TEMPLATE_TYPE_WORDS['corner_blind'])
   core = js.call('core.js')
   block = core[/var\s+CONSTRUCTION_FIELDS\s*=\s*\[(.*?)\];/m, 1].to_s
-  NxRohA1::CB::CORNER_KEYS.each do |k|
-    NxTest.refute(block.include?("id:'#{k}'"), "C6: #{k} nie je v CONSTRUCTION_FIELDS (bez ovladaca by islo null)")
+  # ROH-B1: dverova cast a CR su polia (len pri rohovej — `only`), strana nie.
+  NxTest.refute(block.include?("id:'corner_side'"), 'strana nie je pole (prepinac so samostatnou akciou)')
+  %w[corner_door_w corner_cr1 corner_cr2].each do |k|
+    NxTest.assert(block.match?(/id:'#{k}', kind:'num', dflt:\d+, only:'corner_blind'/), "#{k} len pri rohovej (C6)")
   end
   NxTest.assert(js.call('part_card.js').include?("pc.role === 'cr_front'"), 'isFront pozna CR')
   NxTest.assert_equal(Noxun::Engine::CabinetBuilder::CORNER_DEFAULTS,
                       Noxun::Engine::CabinetBuilder.defaults_for('corner_blind'))
   sync = NxRohA1.src('noxun_engine', 'ui', 'panel', 'sync.rb')
-  NxTest.assert(sync.include?('corner_blind: CabinetBuilder::CORNER_DEFAULTS'), 'DEFAULTS pre JS')
+  NxTest.assert(sync.include?('corner_blind: corner_insert_defaults(model)'), 'DEFAULTS pre JS (ROH-B1: + corner_th2)')
 end

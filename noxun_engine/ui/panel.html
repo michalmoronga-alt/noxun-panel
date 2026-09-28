@@ -12,7 +12,7 @@
      Vsetky nove CSS pravidla kostry visia pod nou, aby panel.css ostal
      bezpecne zdielatelny so satelitnymi oknami. -->
 <script>document.documentElement.className = 'nx-inspector';</script>
-<link rel="stylesheet" href="css/panel.css?v=0.14.2">
+<link rel="stylesheet" href="css/panel.css?v=0.14.3">
 
 <!-- ===== RAIL (A9: staticke ID pre merac D-25) =============================
      Kontexty su platne LEN nad oznacenym korpusom — pri dielci/doske/vkladani
@@ -316,6 +316,28 @@
           <button type="button" class="inforow click" id="infParts" onclick="onInfoParts()" data-nx-usage="info:dielce" title="Klik = označí výrobné dielce tejto skrinky v modeli"><span>Dielcov</span><b id="inf_parts">—</b></button>
           <button type="button" class="inforow click" id="infArea" onclick="onInfoArea()" data-nx-usage="info:material" title="Klik = otvorí ŠTÚDIO → Kusovník, zúžený na túto skrinku"><span>Materiál</span><b id="inf_area">—</b></button>
           <div class="inforow" id="infWeight" title="Hmotnosť výrobných dielcov skrinky (Σ dĺžka × šírka × hrúbka × hustota typu)"><span>Hmotnosť</span><b id="inf_weight">—</b></div>
+        </div>
+        <!-- ROH-B1 (mockup B1 / A1, O2–O5): RIADOK ROHOVEJ. Jeden riadok cez OBA
+             stlpce mriezky (vzor riadku Nohy) — dverova cast, CR 1 (ikona sirky),
+             CR 2 (ikona hlbky) a prepinac strany dveri. Ten isty riadok sluzi
+             oznacenej rohovej aj vkladacej karte (#basicCard je spolocny).
+             Viditelnost LEN pri rohovej riesi `applyVisibility`; polia idu
+             bezne pole cestou (`CONSTRUCTION_FIELDS`, `only` = len rohova),
+             prepinac ma vlastnu akciu (`onCornerSide` -> `corner_side`). -->
+        <div class="cornerrow" id="cornerRow" hidden>
+          <svg class="ic lead" aria-hidden="true"><use href="#i-cab-corner"/></svg>
+          <label class="crl" for="corner_door_w">Dverová časť</label>
+          <input id="corner_door_w" class="crD" type="text" inputmode="decimal" oninput="onField()" title="Dverová časť — od vonkajšej plochy boku po os škáry medzi dverami a CR 1 (250–800 mm)">
+          <span class="crsep" aria-hidden="true"></span><span class="crl">CR</span>
+          <span class="crin" id="cornerCr1Box" title="CR 1 — do šírky: od hranice dverovej časti po líce CR 2 (50–250 mm)"><svg class="ic" aria-hidden="true"><use href="#i-arr-h"/></svg><input id="corner_cr1" type="text" inputmode="decimal" oninput="onField()" aria-label="CR 1 do šírky"></span>
+          <span class="crin" id="cornerCr2Box" title="CR 2 — do hĺbky: od líca dverí po čelo rohovej výstuhy (50–250 mm)"><svg class="ic" aria-hidden="true"><use href="#i-arr-d"/></svg><input id="corner_cr2" type="text" inputmode="decimal" oninput="onField()" aria-label="CR 2 do hĺbky"></span>
+          <span class="unit">mm</span><span class="crsp"></span>
+          <span class="sidesg" id="cornerSideSeg" role="group" aria-label="Strana dverí">
+            <button type="button" id="cornerSideL" data-corner-side="left" onclick="onCornerSide('left')" aria-pressed="true" aria-label="Dvere vľavo — slepá časť vpravo" title="Dvere vľavo — zrkadlí celú rohovú zostavu"><svg class="ic" aria-hidden="true"><use href="#i-corner-l"/></svg></button>
+            <button type="button" id="cornerSideR" data-corner-side="right" onclick="onCornerSide('right')" aria-pressed="false" aria-label="Dvere vpravo — slepá časť vľavo" title="Dvere vpravo — zrkadlí celú rohovú zostavu"><svg class="ic" aria-hidden="true"><use href="#i-corner-r"/></svg></button>
+          </span>
+          <button type="button" class="nxtip r inl" aria-label="Pomoc" onclick="nxTipStop(event)"
+            data-tip="Dverová časť = od vonkajšej plochy boku po os škáry medzi dverami a CR 1 (v DC „Šírka dverí“). CR 1 (ikona šírky) posúva rovinu susedného kolmého radu do šírky, CR 2 (ikona hĺbky) jeho odstup od dverí do hĺbky — nimi sa dolaďujú milimetre v rohu. Strana = kde sú dvere pri pohľade spredu; prepnutie zrkadlí celú rohovú zostavu, pánty ostanú voči rohu a ručne zmenená hrana prejde so zrkadlom (jeden krok Späť)."><svg class="ic" aria-hidden="true"><use href="#i-help-circle"/></svg></button>
         </div>
         <!-- KOV-G2 (D-111): NOHY. Jeden riadok cez OBA stlpce mriezky — text
              (co skrinka pri tejto vyske sokla a sirke dostane) a pri OZNACENEJ
@@ -1042,57 +1064,57 @@
      musi existovat pred prvym renderom aj pred ready), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.14.2"></script>
+<script src="js/errors.js?v=0.14.3"></script>
 <!-- D-77 / A7: minimalna OBSAHOVA velkost okna pri otvoreni. UI-B1 stanovil
      jednu pravdu sirky Inspectora — 470 px OBSAHU (rail 44 + karta). Vyska 810
      pokryva nahlad + dva rozbalene sektory. Dorovnava sa oboma smermi, raz pri
      nacitani a nikdy nad plochu obrazovky (js/win_fit.js). -->
 <script>window.NX_FIT_MIN = { w: 470, h: 810 };</script>
-<script src="js/win_fit.js?v=0.14.2"></script>
-<script src="js/icons.js?v=0.14.2"></script>
+<script src="js/win_fit.js?v=0.14.3"></script>
+<script src="js/icons.js?v=0.14.3"></script>
 <!-- R-23.1: JEDEN dokumentový Escape handler s prioritným zoznamom vrstiev
      (ten istý súbor načítava aj studio.html). Musí byť PRED skriptami, ktoré
      modály otvárajú — jeho listener má bežať ako PRVÝ, aby vedel udalosť
      spotrebovať skôr, než ju dostane handler okna. -->
-<script src="js/nx_esc.js?v=0.14.2"></script>
+<script src="js/nx_esc.js?v=0.14.3"></script>
 <!-- KOV-H2: zdieľaná kostra modalov D-15 (ten istý súbor načítava aj
      studio.html). Musí byť ZA nx_esc.js (reťaz Escape má bežať prvá) a PRED
      core.js/hardware.js — modal ručnej položky kovania ju volá menom. -->
-<script src="js/nx_modal.js?v=0.14.2"></script>
+<script src="js/nx_modal.js?v=0.14.3"></script>
 <!-- ŠT-4a: zdieľaný obsah „O plugine" (rovnaký súbor načítava aj studio.html). -->
-<script src="js/about.js?v=0.14.2"></script>
+<script src="js/about.js?v=0.14.3"></script>
 <!-- D-85 (UI-03): zdielany combobox. Musi byt PRED core/part/board — tie ho pri
      renderi kariet volaju (NXCombo.scan). Sam na nikom nezavisi (ikony si berie
      defenzivne cez NXIcons, ak sprite existuje). -->
-<script src="js/nx_combo.js?v=0.14.2"></script>
+<script src="js/nx_combo.js?v=0.14.3"></script>
 <!-- v0.7.28: ZDIELANE 3-stavove nastavenie kontroly hran (rohovy trojuholnik pri
      ABS kontrole v raile). TEN ISTY subor nacitava aj okno Studio — jeden markup,
      jeden stav. Musi byt PRED shell.js (rohove okno kresli NXEdgeMenu). -->
-<script src="js/edge_menu.js?v=0.14.2"></script>
-<script src="js/tag_menu.js?v=0.14.2"></script>
-<script src="js/core.js?v=0.14.2"></script>
-<script src="js/expr.js?v=0.14.2"></script>
-<script src="js/insert_state.js?v=0.14.2"></script>
-<script src="js/form.js?v=0.14.2"></script>
-<script src="js/zone_tree.js?v=0.14.2"></script>
-<script src="js/preview.js?v=0.14.2"></script>
+<script src="js/edge_menu.js?v=0.14.3"></script>
+<script src="js/tag_menu.js?v=0.14.3"></script>
+<script src="js/core.js?v=0.14.3"></script>
+<script src="js/expr.js?v=0.14.3"></script>
+<script src="js/insert_state.js?v=0.14.3"></script>
+<script src="js/form.js?v=0.14.3"></script>
+<script src="js/zone_tree.js?v=0.14.3"></script>
+<script src="js/preview.js?v=0.14.3"></script>
 <!-- UI-B1: kostra Inspectora — stavovy stroj vyber x kontext, rail, sektory. -->
-<script src="js/shell.js?v=0.14.2"></script>
-<script src="js/actions.js?v=0.14.2"></script>
+<script src="js/shell.js?v=0.14.3"></script>
+<script src="js/actions.js?v=0.14.3"></script>
 <!-- GHOST-FB4: Ghost pasik vkladacej karty. Musi byt PRED bridge.js
      (NX.setGhost vola nxGhostApply); sam na nikom nezavisi. -->
-<script src="js/ghost_bar.js?v=0.14.2"></script>
+<script src="js/ghost_bar.js?v=0.14.3"></script>
 <!-- UI-B3: nastavenia Inspectora (koliesko) + rozmerove rady N6. Musi byt PRED
      bridge.js (NX.setUiSettings volá nxApplyUiSettings) a za core.js (el/esc). -->
-<script src="js/settings.js?v=0.14.2"></script>
-<script src="js/bridge.js?v=0.14.2"></script>
-<script src="js/materials.js?v=0.14.2"></script>
-<script src="js/part_card.js?v=0.14.2"></script>
-<script src="js/board_card.js?v=0.14.2"></script>
-<script src="js/hardware.js?v=0.14.2"></script>
+<script src="js/settings.js?v=0.14.3"></script>
+<script src="js/bridge.js?v=0.14.3"></script>
+<script src="js/materials.js?v=0.14.3"></script>
+<script src="js/part_card.js?v=0.14.3"></script>
+<script src="js/board_card.js?v=0.14.3"></script>
+<script src="js/hardware.js?v=0.14.3"></script>
 <!-- S1-B2: riadok „Spotrebič" v Základných aj v karte dosky. Vlastný súbor
      (nie hardware.js) zámerne: s kovaním nemá nič spoločné a payload mu
      chodí vlastným kľúčom (`appliance_rows`). -->
-<script src="js/appliance_row.js?v=0.14.2"></script>
-<script src="js/usage.js?v=0.14.2"></script>
-<script src="js/boot.js?v=0.14.2"></script>
+<script src="js/appliance_row.js?v=0.14.3"></script>
+<script src="js/usage.js?v=0.14.3"></script>
+<script src="js/boot.js?v=0.14.3"></script>

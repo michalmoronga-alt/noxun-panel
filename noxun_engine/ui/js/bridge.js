@@ -638,6 +638,8 @@
     },
     frontPreflight: function(result){ nxFrontPreflightResult(result); },
     frontApplyResult: function(result){ nxFrontApplyResult(result); },
+    // ROH-B1 (audit B1 FIX 1): korelovana odpoved prepinaca strany rohovej.
+    cornerSideResult: function(result){ nxCornerSideResult(result); },
     historyRefresh: function(guid){
       if (guid !== nxDocGuid()) return;
       nxFrontDraftReset();

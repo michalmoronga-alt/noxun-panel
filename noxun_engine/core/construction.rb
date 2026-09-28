@@ -585,6 +585,17 @@ module Noxun
       CORNER_ROLES = %w[corner_blind_panel hinge_rail cr_front cr_side corner_rail].freeze
       # Kluce dielcov, ktorych hrubka je VSTUP planu (vzor zasuviek).
       CR_PART_KEYS = [PartKeys.cabinet('cr', '1'), PartKeys.cabinet('cr', '2')].freeze
+      # ROH-B1 (O5, krizovy audit Codex Q4): PREPNUTIE STRANY zrkadli zostavu
+      # v X. Rucne hrany sa premapuju PODLA OSI DIELCA, nie vseobecnym swapom:
+      # dielce, ktore sa zrkadlenim PRESUVAJU a maju dlhe hrany v X
+      # (`AXES_FRONT` — blenda korpusova a CR 1; kridlo dveri sa urcuje podla
+      # ID riadku `front:<id>/wing:*`), si vymenia L1 (lava) a L2 (prava);
+      # W1/W2 (spodok/vrch) ostavaju. Stojace dielce zostavy (`AXES_UPRIGHT` —
+      # vystuha zavesov, rohova vystuha, CR 2: hrany predna/zadna a
+      # spodok/vrch) aj cely korpus sa NEMENIA. Zhodu zoznamu s `corner_parts`
+      # (vsetky `AXES_FRONT` dielce zostavy) strazi `test_rohb1_strana.rb`.
+      CORNER_MIRROR_EDGE_KEYS = [PartKeys.cabinet('corner_panel'), PartKeys.cabinet('cr', '1')].freeze
+      CORNER_MIRROR_EDGE_SWAP = { 'L1' => 'L2', 'L2' => 'L1' }.freeze
       # Hlbka vystuhy zavesov (DC: konstanta 80 mm, nezavisi od CR).
       HINGE_RAIL_DEPTH = 80.0
       # Medzera dveri pri rohu (krizovy audit C3): zaporna by dvere prekryla

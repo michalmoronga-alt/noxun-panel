@@ -197,6 +197,11 @@
     // do tvaru „L" (trci dopredu ako v modeli). Kresba ukazuje predvolbu
     // (dvere vlavo); strana sa ikonou nerozlisuje.
     'cab-corner': '<rect x="3" y="4" width="18" height="12" rx="1"/><path d="M11 4v12"/><path d="M5.5 10h.01"/><path d="M13 16v5h6"/>',
+    // ROH-B1 (mockup B1, O5): STRANA DVERI rohovej v prepinaci riadku rohovej.
+    // Dvere s uchytkou v jednej casti, SLEPA cast prekrizena (ako `front-blind`
+    // = blenda) — 'corner-l' dvere vlavo, 'corner-r' zrkadlo (dvere vpravo).
+    'corner-l': '<rect x="3" y="5" width="18" height="14" rx="1"/><path d="M11 5v14"/><path d="m11 5 10 14"/><path d="m21 5-10 14"/><path d="M6.5 10.5v3"/>',
+    'corner-r': '<rect x="3" y="5" width="18" height="14" rx="1"/><path d="M13 5v14"/><path d="M3 5l10 14"/><path d="M13 5 3 19"/><path d="M17.5 10.5v3"/>',
     // ===== UI-C1c: orientacia dosky (3 segmentove tlacidla) ==================
     // Vlastne symboly (Lucide nabytkarske polohy nema) — vzdy je v nich PODLAHA
     // (vodorovna ciara dole), aby bolo vidno, ako doska v modeli stoji:

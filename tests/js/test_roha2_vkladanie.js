@@ -82,8 +82,10 @@ function get(ctx, expr){ return vm.runInContext(expr, ctx); }
   eq(BTNS[2].getAttribute('aria-pressed'), 'false', 'návrat na Dolnú Rohovú odznačí');
   // Predvolby: zdroj karty pri rohovej (DEFAULTS zo servera) nesie stranu a
   // dverovu cast — register ich podrzi pre preflight.
-  eq(ctx.nxCornerDraftOf({ type: 'corner_blind', corner_side: 'left', corner_door_w: 450, corner_cr1: 80 }),
-     { corner_side: 'left', corner_door_w: 450 }, 'register rohovej = strana + dverová časť (nič viac)');
+  // ROH-B1: dverova cast je POLE formulara; register drzi stranu (prepinac)
+  // a ucinnu hrubku CR 2 (minimum sirky).
+  eq(ctx.nxCornerDraftOf({ type: 'corner_blind', corner_side: 'left', corner_door_w: 450, corner_cr1: 80, corner_th2: 19 }),
+     { corner_side: 'left', corner_th2: 19 }, 'register rohovej = strana + hrúbka CR 2 (nič viac)');
   eq(ctx.nxCornerDraftOf({ type: 'lower', corner_side: 'left' }), null, 'iný typ register nemá');
   eq(ctx.nxCornerDraftOf(null), null, 'bez zdroja nič');
 }
@@ -257,7 +259,7 @@ const CORNER_ITEM = [{ id: 'F1', type: 'door', mode: 'auto', z: 150, height: 707
   ctx.getInsertKind = () => 'cabinet';
   ctx.selectedCabId = null;
   ctx.DEFAULTS = { corner_blind: { width: 1100, height: 862, floor_height: 150 }, lower: { width: 600, height: 720, floor_height: 100 } };
-  let F = { width: '1100', height: '862', floor_height: '150' };
+  let F = { width: '1100', height: '862', floor_height: '150', corner_door_w: '500' };
   ctx.val = id => (F[id] === undefined ? '' : F[id]);
   ctx.numv = id => parseFloat(F[id]);
   ctx.evalDim = v => parseFloat(v);
@@ -266,12 +268,12 @@ const CORNER_ITEM = [{ id: 'F1', type: 'door', mode: 'auto', z: 150, height: 707
   ['updateFrontDirBadges', 'updateFrontPlaceholders', 'refreshFrontCards', 'renderPreview',
    'cancelCabinetEdits'].forEach(k => { ctx[k] = () => {}; });
   ctx.setType('corner_blind');
-  ctx.nxSetCornerDraft({ type: 'corner_blind', corner_side: 'right', corner_door_w: 500, corner_cr1: 80 });
+  ctx.nxSetCornerDraft({ type: 'corner_blind', corner_side: 'right' });
   ctx.nxFrontDraftReset();
   ctx.nxFrontDraftAsk();
   eq(SENT.length, 1, 'preflight sa opýta');
   eq([SENT[0].type, SENT[0].corner_side, SENT[0].corner_door_w], ['corner_blind', 'right', 500],
-     'vkladanie rohovej posiela stranu a dverovú časť (zo šablóny / predvolieb)');
+     'vkladanie rohovej posiela stranu (register) a dverovú časť (pole riadku rohovej)');
   ok(!Object.prototype.hasOwnProperty.call(SENT[0], 'corner_cr1'), 'CR sa na otvor nepýta — neposiela sa');
   eq(get(ctx, 'frontOpening'), null, 'kým server neodpovie, otvor nie je');
   const r1 = SENT[0].revision;
@@ -409,7 +411,9 @@ function reply(ctx, req, opening){
   ctx.nxFrontDraftReset();
   ctx.nxFrontDraftAsk();
   const req = ctx.__sent[ctx.__sent.length - 1];
-  eq([req.corner_side, req.corner_door_w], ['right', 500],
+  // ROH-B1: dverova cast ide z POLA (writeConstruction je tu stub — pole
+  // drzi predvolbu); strana zo sablony cez register.
+  eq([req.corner_side, req.corner_door_w], ['right', 450],
      'šablóna pravej rohovej: preflight karty dostane stranu zo šablóny (M4)');
 
   // --- (M7) Spat vo vkladani: NX.historyRefresh
@@ -445,7 +449,7 @@ function reply(ctx, req, opening){
                             front_opening: { x0: 650, w: 450, z0: 150, h: 712 }, front_slots: SL });
   eq(get(ctx, 'frontOpening'), { x0: 650, w: 450, z0: 150, h: 712 }, 'loadSelected: otvor uloženého stavu z payloadu (M5)');
   eq(get(ctx, 'frontSlotsSaved'), SL, 'uložené sloty smeru (značky závesov)');
-  eq(get(ctx, 'cornerDraft'), { corner_side: 'right', corner_door_w: 450 }, 'register rohovej z payloadu');
+  eq(get(ctx, 'cornerDraft'), { corner_side: 'right' }, 'register rohovej z payloadu (strana; dverová časť je pole)');
   ctx.nxAdoptCabinetDraft({ type: 'lower' });
   eq([get(ctx, 'frontOpening'), get(ctx, 'frontSlotsSaved'), get(ctx, 'cornerDraft')], [null, null, null],
      'payload bez kľúčov = nič (staršie okno, iný typ)');
