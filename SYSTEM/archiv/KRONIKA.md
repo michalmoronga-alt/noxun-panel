@@ -30,7 +30,10 @@
   (do A2 vždy vľavo — oprava aj pre dolnú). Riadok **Nohy** vo vkladacej karte aj pre rohovú (`LEGS_INSERT_TYPES`). Modal „Uložiť ako šablónu" má voľbu Rohová,
   pri rohovej zamknutú s vlastnou bublinou (`TPL_TYPE_LOCK`, vzor slotu); zamknuté typy sa ponúkajú len nad sebou. Guard slotu v `test_s1e_slot.rb` zladený
   s tabuľkou zámkov. **Testy:** headless 4698 · JS 136 sád · **in-SU 3222 PASS / 0 FAIL** (hlava 8cc405f4; nový `run_roha2` — vklad cez cestu panela bez šablóny a so šablónou pravej
-  strany, 1 krok Späť, plán = model, preflight so živou šírkou). **Predrecenzia:** čaká (orchestrátor).
+  strany, 1 krok Späť, plán = model, preflight so živou šírkou). **Predrecenzia** (slepý recenzent, hlava b363df76): 0× P1, 2× P2, 1× P3 — P2-1 Späť/Znova
+  a prázdny výber vo vkladaní rohovej už nestratia dvere (`nxInsertDraftResume`, f7996293), P2-2 testy napojení `loadSelected`/`materializeInsertCabCard`
+  s overenými mutáciami M4–M8 (napojenie zlúčené do `nxAdoptCabinetDraft`), P3 značky závesov z uložených slotov (`frontSlotsSaved`, f7996293). Po opravách
+  JS 136 sád (sada ROH-A2 94 asercií) a headless 4698 zelené; in-SU bežal na 8cc405f4 — potom sa menil len JS, testy a dokumentácia.
   Kresba CR líšt a blendy v náhľade a ovládače strany, dverovej časti a CR sú ROH-B.
 
 - **ROH-A1 · JADRO ROHOVEJ SKRINKY (28.9.2026, PR #410, v0.14.0 → v0.14.1, blok 8 · K3).** Package v2 [PACKAGE_ROHA1.md](../zdroje/bloky/ROHOVA/PACKAGE_ROHA1.md)

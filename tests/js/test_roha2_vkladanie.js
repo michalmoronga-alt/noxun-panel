@@ -345,4 +345,130 @@ const CORNER_ITEM = [{ id: 'F1', type: 'door', mode: 'auto', z: 150, height: 707
   eq(ctx.nxLegsInsertResult({ gen: gen, text: '4× noha', tone: 'ok' }), false, 'horná ostáva bez nôh');
 }
 
+// ============ 7) PREDRECENZIA: NAPOJENIA (bridge.js · form.js) ===============
+// MUTACIE (overene rucne pri oprave, kazda zhodi uvedenu aserciu):
+//   M4 zmaz `nxSetCornerDraft(src);` v materializeInsertCabCard
+//      -> „sablona pravej rohovej: preflight karty dostane stranu zo sablony"
+//   M5 zmaz riadok `frontOpening = … p.front_opening …` v nxAdoptCabinetDraft
+//      -> „loadSelected: otvor ulozeneho stavu z payloadu"
+//   M6 `!holdDraft &&` z volania nxAdoptCabinetDraft v loadSelected
+//      -> „holdDraft: rozpisany navrh sa neprepise"
+//   M7 zmaz `nxInsertDraftResume()` v historyRefresh / clearSelected
+//      -> „Spat vo vkladani: otvor sa vypyta znova" / „prazdny vyber vkladanie -> vkladanie"
+//   M8 `pvHingeSlots` prestane citat `frontSlotsSaved`
+//      -> „pocas preflightu kresli z ulozenych slotov (P3)"
+function formBridgeCtx(){
+  const ctx = mkCtx({ frontRows: fakeEl(), frontDraftMessage: fakeEl() });
+  load(ctx, 'core.js');
+  load(ctx, 'insert_state.js');
+  load(ctx, 'form.js');
+  load(ctx, 'bridge.js');
+  ctx.__sent = [];
+  ctx.sketchup = { front_preflight: j => ctx.__sent.push(JSON.parse(j)) };
+  ctx.window.sketchup = ctx.sketchup;
+  ctx.nxDocGuid = () => 'G-1';
+  ctx.getInsertKind = () => 'cabinet';
+  ctx.DEFAULTS = { corner_blind: { type: 'corner_blind', width: 1100, height: 862, floor_height: 150,
+                                   corner_side: 'left', corner_door_w: 450, corner_cr1: 80, corner_cr2: 80 } };
+  ctx.__f = { width: '1100', height: '862', floor_height: '150' };
+  ctx.val = id => (ctx.__f[id] === undefined ? '' : ctx.__f[id]);
+  ctx.numv = id => parseFloat(ctx.__f[id]);
+  ctx.evalDim = v => parseFloat(v);
+  ctx.collectFronts = () => ({ gap: 3, gap_top: 5, gap_bottom: 0, gap_left: 2, gap_right: 2,
+                               items: [{ id: 'F1', type: 'door', mode: 'auto', wings: '1' }] });
+  ctx.__renders = 0;
+  ['updateFrontDirBadges', 'updateFrontPlaceholders', 'refreshFrontCards', 'cancelCabinetEdits',
+   'setType', 'syncTemplateTiles', 'writeConstruction', 'buildFrontHwBadges', 'closeFrontCard', 'renderFronts',
+   'applyInsertLockValues', 'renderInsertLocks', 'applyVisibility', 'refreshMaterialFilters', 'validateFields',
+   'updateAvailable', 'refreshZoneUI', 'nxSectorMetaApply', 'nxSetModelGuid', 'cancelBoardEdits',
+   'renderBoardCard', 'setSelected', 'setCabInfo', 'setCtxNote', 'setIdbar', 'setUiMode',
+   'invalidateFrontPlaceholders', 'fitPreview', 'renderPartCard', 'renderHardware', 'clearCabinetMaterials']
+    .forEach(k => { ctx[k] = () => {}; });
+  ctx.renderPreview = () => { ctx.__renders++; };
+  ctx.insertFrontsOf = () => ({});
+  ctx.sanitizeTree = t => t;
+  ctx.defaultTree = () => ({ id: 'Z1' });
+  ctx.setType('corner_blind');
+  vm.runInContext("cabTypeVal = 'corner_blind'", ctx);
+  return ctx;
+}
+function reply(ctx, req, opening){
+  ctx.nxFrontPreflightResult({ revision: req.revision, model_guid: 'G-1', cabinet_id: req.cabinet_id,
+                               insert_session: req.insert_session, valid: true, items: [], errors: [], slots: {},
+                               opening: opening });
+}
+{
+  // --- (M4) sablona pravej rohovej vo vkladacej karte
+  const ctx = formBridgeCtx();
+  const TPL = { name: 'Rohova P', kind: 'cabinet',
+                config: { type: 'corner_blind', corner_side: 'right', corner_door_w: 500, width: 1100 } };
+  const NXI = get(ctx, 'NXInsert');
+  NXI.state.type = 'corner_blind'; NXI.state.kind = 'cabinet'; NXI.state.template = 'Rohova P';
+  ctx.findTemplateFor = () => TPL;
+  ctx.materializeInsertCabCard();
+  ctx.nxFrontDraftReset();
+  ctx.nxFrontDraftAsk();
+  const req = ctx.__sent[ctx.__sent.length - 1];
+  eq([req.corner_side, req.corner_door_w], ['right', 500],
+     'šablóna pravej rohovej: preflight karty dostane stranu zo šablóny (M4)');
+
+  // --- (M7) Spat vo vkladani: NX.historyRefresh
+  reply(ctx, req, { x0: 600, w: 500, z0: 150, h: 712 });
+  eq(get(ctx, 'frontOpening').x0, 600, 'otvor šablóny je známy');
+  const before = ctx.__sent.length;
+  ctx.window.NX.historyRefresh('G-1');
+  eq(ctx.__sent.length, before + 1, 'Späť vo vkladaní: otvor sa vypýta znova (M7)');
+  ok(ctx.__renders > 0, 'a náhľad sa prekreslí');
+  reply(ctx, ctx.__sent[ctx.__sent.length - 1], { x0: 600, w: 500, z0: 150, h: 712 });
+  eq(get(ctx, 'frontOpening').x0, 600, 'po odpovedi sú dvere späť (nie frontsPending)');
+  ctx.window.NX.historyRefresh('G-INY');
+  eq(get(ctx, 'frontOpening').x0, 600, 'Späť v inom dokumente sa karty nedotkne');
+
+  // --- (M7) prazdny vyber vkladanie -> vkladanie: NX.clearSelected
+  const b2 = ctx.__sent.length;
+  ctx.window.NX.clearSelected('G-1');
+  eq(ctx.__sent.length, b2 + 1, 'prázdny výber vkladanie → vkladanie: preflight znova (M7)');
+  reply(ctx, ctx.__sent[ctx.__sent.length - 1], { x0: 600, w: 500, z0: 150, h: 712 });
+  eq(get(ctx, 'frontOpening').w, 500, 'otvor obnovený');
+
+  // Oznacena skrinka: resume nic neposiela (otvor prinesie jej loadSelected).
+  ctx.selectedCabId = 'CAB-1';
+  vm.runInContext("selectedCabId = 'CAB-1'", ctx);
+  eq(ctx.nxInsertDraftResume(), false, 'pri označenej skrinke resume nepýta nič');
+  vm.runInContext('selectedCabId = null', ctx);
+}
+{
+  // --- (M5) nxAdoptCabinetDraft: payload oznacenej skrinky
+  const ctx = formBridgeCtx();
+  const SL = { F1: { wings_n: 1, slots: [{ wing: 'single', state: 'left' }] } };
+  ctx.nxAdoptCabinetDraft({ type: 'corner_blind', corner_side: 'right', corner_door_w: 450,
+                            front_opening: { x0: 650, w: 450, z0: 150, h: 712 }, front_slots: SL });
+  eq(get(ctx, 'frontOpening'), { x0: 650, w: 450, z0: 150, h: 712 }, 'loadSelected: otvor uloženého stavu z payloadu (M5)');
+  eq(get(ctx, 'frontSlotsSaved'), SL, 'uložené sloty smeru (značky závesov)');
+  eq(get(ctx, 'cornerDraft'), { corner_side: 'right', corner_door_w: 450 }, 'register rohovej z payloadu');
+  ctx.nxAdoptCabinetDraft({ type: 'lower' });
+  eq([get(ctx, 'frontOpening'), get(ctx, 'frontSlotsSaved'), get(ctx, 'cornerDraft')], [null, null, null],
+     'payload bez kľúčov = nič (staršie okno, iný typ)');
+  // (M6) v loadSelected sa napojenie vola LEN mimo rozpisaneho navrhu.
+  const br = fs.readFileSync(path.join(JS, 'bridge.js'), 'utf8');
+  const ls = br.slice(br.indexOf('loadSelected: function(c){'), br.indexOf('loadBoard: function(b){'));
+  ok(ls.indexOf("if (!holdDraft && typeof nxAdoptCabinetDraft === 'function') nxAdoptCabinetDraft(c);") > 0,
+     'holdDraft: rozpísaný návrh sa neprepíše (M6)');
+  ok(ls.indexOf('front_opening') < 0, 'loadSelected nemá druhé miesto, ktoré by otvor plnilo');
+  ok(ls.indexOf('nxFrontDraftReset()') < ls.indexOf('nxAdoptCabinetDraft(c)'), 'reset identity ide PRED prevzatím payloadu');
+}
+{
+  // --- (P3) znacky zavesov z ULOZENYCH slotov, aj ked preflight bezi
+  const ctx = previewCtx();
+  const SL = { F1: { wings_n: 1, slots: [{ wing: 'single', state: 'right' }] } };
+  ctx.frontSlotsSaved = SL;
+  ctx.frontSlots = null;                       // preflight prave bezi
+  eq(ctx.pvHingeSlots(), SL, 'počas preflightu kreslí z uložených slotov (P3)');
+  ctx.frontSlots = {};                         // neplatny navrh ciel
+  eq(ctx.pvHingeSlots(), SL, 'pri neplatnom návrhu tiež');
+  ctx.frontSlotsSaved = null;
+  ctx.frontSlots = { F2: { wings_n: 1, slots: [] } };
+  eq(ctx.pvHingeSlots(), { F2: { wings_n: 1, slots: [] } }, 'bez uložených (vkladanie) sloty preflightu');
+}
+
 console.log(`test_roha2_vkladanie.js: ${n} asercii OK`);
