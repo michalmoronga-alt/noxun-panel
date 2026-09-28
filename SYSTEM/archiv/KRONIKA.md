@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **ROH-A2 · VKLADANIE A NÁHĽAD ROHOVEJ (28.9.2026, PR #?, v0.14.1 → v0.14.2, blok 8 · K3).** Package [PACKAGE_ROHA2.md](../zdroje/bloky/ROHOVA/PACKAGE_ROHA2.md)
+- **ROH-A2 · VKLADANIE A NÁHĽAD ROHOVEJ (28.9.2026, PR #411, v0.14.1 → v0.14.2, blok 8 · K3).** Package [PACKAGE_ROHA2.md](../zdroje/bloky/ROHOVA/PACKAGE_ROHA2.md)
   (bod 4 zladený s mainom po A1; kontrakt, schéma ani geometria sa nemenia — `codex-audit` nepovinný, predrecenzia povinná pre nový ovládač v UI).
   **Čo pribudlo:** vo vkladacej karte tlačidlo **„Rohová"** (Dolná · Horná · Rohová · Umývačka · Doska — jeden rad, nová ikona `cab-corner`); karta sa plní
   z `DEFAULTS.corner_blind`, polia rohovej do insert payloadu nejdú (C6 — server ich doplní z predvolieb alebo zo záznamu šablóny), rohové šablóny sa ponúkajú len
