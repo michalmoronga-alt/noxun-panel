@@ -506,6 +506,7 @@ Sketchup.require 'noxun_engine/core/vepo_export'   # V0.5 C VEPO CSV export (pri
 Sketchup.require 'noxun_engine/core/sheet_estimate' # D-19 orientacny odhad platni
 Sketchup.require 'noxun_engine/core/debug'         # read-only diagnostika stavu (bugcatch cez MCP)
 Sketchup.require 'noxun_engine/core/validation'    # V0.5 D kontrolny semafor vyroby (RED/ORANGE)
+Sketchup.require 'noxun_engine/core/sheet_layout'  # NP-1 narezovy plan — jadro vypoctu (po vepo_export/sheet_estimate/validation, pred budget)
 Sketchup.require 'noxun_engine/core/edge_check'     # D-104 kontrola hran (po validation — zdiela jeho definicie UNI/nelepitelnych)
 Sketchup.require 'noxun_engine/core/hover_edge'     # D-89a hrana pod kurzorom (pred edge_overlay — ten definuje jej Overlay triedu)
 Sketchup.require 'noxun_engine/core/grain_check'    # K2/D-87 smer kresby (po edge_check — zdiela jeho prechod modelom; pred edge_overlay)
