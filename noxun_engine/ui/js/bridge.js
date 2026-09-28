@@ -690,6 +690,12 @@
       // na otazku „kde sa smer pyta" (Fronts.direction_slots). Panel si ju
       // NEODVODZUJE z poctu kridiel.
       if (!holdDraft) frontSlots = c.front_slots || {};
+      // ROH-A2: otvor ciel ULOZENEHO stavu (server) + strana a dverova cast
+      // rohovej pre preflight. Ziva sirka prida otvor az odpovedou preflightu.
+      if (!holdDraft){
+        frontOpening = (c.front_opening && typeof c.front_opening === 'object') ? c.front_opening : null;
+        if (typeof nxSetCornerDraft === 'function') nxSetCornerDraft(c);
+      }
       // KOV-C2c: riadok zasuvky karty cela — TEN ISTY push, vlastny kluc.
       // Stary payload bez kluca = mapa je prazdna a karta riadok nekresli.
       frontDrawer = c.front_drawer || {};

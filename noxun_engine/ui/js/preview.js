@@ -75,12 +75,37 @@
   // zasahu pohlad DRZI (Michalov "lock") — reset tlacidlom ⛶ alebo pri zmene skrinky.
   var pvView = null;        // {x,y,w,h} v mm sceny
   var pvUserView = false;   // true = pouzivatel si pohlad nastavil sam
+  // ===== ROH-A2: CELNY OTVOR (kde sa cela kreslia) ==========================
+  // Ciste (Node testy). Rohova ma cela LEN v dverovej casti — otvor `{x0, w}`
+  // posiela SERVER (`front_opening` v payloade, `opening` v preflighte); panel
+  // si ho neodvodzuje. Ostatne typy maju otvor = celu sirku a serverovu
+  // hodnotu ZAMERNE ignoruju: ich kresba sa nesmie pohnut ani o pixel
+  // (parita v tests/js/test_roha2_vkladanie.js). null = rohova, ktorej otvor
+  // este nepozname (prvy preflight bezi) — cela sa vtedy NEKRESLIA, lebo
+  // dvere cez celu sirku by boli klamstvo.
+  function nxFrontOpeningFor(type, W, op){
+    if (type !== 'corner_blind') return { x0: 0, w: W };
+    if (!op || typeof op !== 'object') return null;
+    var x0 = nxNumOr(op.x0, NaN), w = nxNumOr(op.w, NaN);
+    if (isNaN(x0) || !(w > 0)) return null;
+    return { x0: x0, w: w };
+  }
+  // Otvor pre AKTUALNY typ nad posledným otvorom servera. `W` je sirka, s akou
+  // kresli volajuci (kazdy si ju cita po svojom — `|| 600` vs `|| 0`), takze
+  // ostatne typy dostanu presne jeho dnesne cislo.
+  function pvFrontOpening(W){
+    var t = (typeof getType === 'function') ? getType() : 'lower';
+    return nxFrontOpeningFor(t, W, (typeof frontOpening !== 'undefined') ? frontOpening : null);
+  }
   // D-07: rozsah ciel v modelovych mm (presahy mozu ist mimo obrys korpusu).
+  // ROH-A2: bocne okraje sa merajú od OTVORU (pri ostatnych typoch 0…W).
   function frontsExtent(){
     var items = frontItems; if (!items || !items.length) return null;
     var W = numv('width')||600, H = numv('height')||720;
     var gl = nxNumOr(numv('fr_gap_left'), 2), gr = nxNumOr(numv('fr_gap_right'), 2);
-    var e = { minX: Math.min(0, gl), maxX: Math.max(W, W - gr), minZ: 0, maxZ: H };
+    var op = pvFrontOpening(W);
+    if (!op) return null;
+    var e = { minX: Math.min(0, op.x0 + gl), maxX: Math.max(W, op.x0 + op.w - gr), minZ: 0, maxZ: H };
     items.forEach(function(it){
       e.minZ = Math.min(e.minZ, it.z);
       e.maxZ = Math.max(e.maxZ, it.z + it.height);
@@ -124,15 +149,20 @@
   // `nxFrontsExtent` (Node testy).
   function insertFrontsExtent(){
     if (previewMode !== 'insert' || pvInsertBoard()) return null;
-    return nxFrontsExtent(pvInsertFronts(), numv('width') || 0, numv('height') || 0,
-                          numv('fr_gap_left'), numv('fr_gap_right'));
+    var W = numv('width') || 0;
+    var op = pvFrontOpening(W);
+    if (!op) return null;
+    return nxFrontsExtent(pvInsertFronts(), W, numv('height') || 0,
+                          numv('fr_gap_left'), numv('fr_gap_right'), op.x0, op.w);
   }
   // Ciste (Node testy): obalka korpus ∪ cela. Zaporny bocny okraj = cela sirsie
   // nez korpus; zaporne medzery hore/dole = cela nad/pod obrysom.
-  function nxFrontsExtent(items, W, H, gapLeft, gapRight){
+  // ROH-A2: `x0`/`ow` = celny otvor (rohova: dverova cast); bez nich cela sirka.
+  function nxFrontsExtent(items, W, H, gapLeft, gapRight, x0, ow){
     if (!items || !items.length) return null;
     var gl = nxNumOr(gapLeft, 2), gr = nxNumOr(gapRight, gl), w = nxNumOr(W, 0), h = nxNumOr(H, 0);
-    var e = { minX: Math.min(0, gl), maxX: Math.max(w, w - gr), minZ: 0, maxZ: h };
+    var ox = nxNumOr(x0, 0), owv = nxNumOr(ow, w);
+    var e = { minX: Math.min(0, ox + gl), maxX: Math.max(w, ox + owv - gr), minZ: 0, maxZ: h };
     items.forEach(function(it){
       if (!it) return;
       e.minZ = Math.min(e.minZ, nxNumOr(it.z, 0));
@@ -385,7 +415,16 @@
   function pvGeom(){
     var gl = nxNumOr(numv('fr_gap_left'), 2), gr = nxNumOr(numv('fr_gap_right'), 2);
     var gap = 3; var gv = numv('fr_gap'); if (!isNaN(gv)) gap = gv;
-    return pvSetbackDepths({ W: numv('width')||600, H: numv('height')||720, t: numv('thickness')||18,
+    // ROH-A2: celny otvor — vsetky vrstvy kreslia cela od `fx0` v sirke `fw`
+    // (ostatne typy 0…W, teda presne ako doteraz). Rohova bez znameho otvoru
+    // cela nekresli vobec (`frontsPending`), kym nepride preflight.
+    var W0 = numv('width')||600;
+    var op = pvFrontOpening(W0);
+    return pvSetbackDepths({ W: W0, H: numv('height')||720, t: numv('thickness')||18,
+             fx0: op ? op.x0 : 0, fw: op ? op.w : 0, frontsPending: !op,
+             // ROH-A2 (C8): sloty smeru zo servera — znacky zavesov sa kreslia
+             // na strane pantov, nie natvrdo vlavo.
+             slots: (typeof frontSlots !== 'undefined') ? frontSlots : null,
              D: numv('depth')||0,
              fh: nxCabFloorHeight(),
              topNone: val('top_mode') === 'none',
@@ -397,7 +436,7 @@
              // UI-C1b: vo VKLADANI server resolved cela nema (skrinka este
              // neexistuje a `frontItems` je tu null — pasca Codex FIX 11),
              // preto ich dopocita cisty draft resolver z hodnot karty.
-             fronts: pvLiveFronts() });
+             fronts: op ? pvLiveFronts() : [] });
   }
 
   // KON-A · K1 (audit FIX 2 + NOTE 7): most pvGeom -> komin a zapustenie.
@@ -540,7 +579,8 @@
         if (c > 0) add(c, (z.split.axis === 'v' ? nxNumOr(z.h, 0) : nxNumOr(z.w, 0)) * innD);
       }
     });
-    var ow = Math.max(0, W - nxFrontSide(g, 'gapLeft') - nxFrontSide(g, 'gapRight'));
+    // ROH-A2: sirka ciel = celny OTVOR (rohova: dverova cast), inak cela sirka.
+    var ow = Math.max(0, nxNumOr(g.fw, W) - nxFrontSide(g, 'gapLeft') - nxFrontSide(g, 'gapRight'));
     (fronts || []).forEach(function(it){
       if (!it || it.type === 'none' || !(it.height > 0)) return;
       var wn = parseInt(it.wings_n, 10);
@@ -875,6 +915,9 @@
   // a medzera sa uz necitaju z formulara druhykrat.
   function renderFrontsPreview(S, rx, ry, g){
     var W = g.W, H = g.H, items = g.fronts;
+    // ROH-A2: rohova, ktorej otvor este nepozname, necha cela prazdne — veta
+    // „nastav v sekcii Čelá" by klamala (cela ma, len sa pocitaju).
+    if (g.frontsPending) return;
     if (!items || !items.length){
       // odhad z formulara (bez presnych vysok) — len info
       S.push('<text x="'+rx(W/2)+'" y="'+ry(H/2)+'" font-size="20" fill="#90a4ae" text-anchor="middle">Čelá: nastav v sekcii Čelá</text>');
@@ -882,8 +925,11 @@
     }
     // D-07: okraje/medzera z poli (0 je platna hodnota — NIE || default);
     // zaporny bocny okraj = cela sirsie nez korpus (presah).
-    var gs = nxFrontSide(g, 'gapLeft'), gap = g.gap;
-    var ow = W - gs - nxFrontSide(g, 'gapRight');
+    // ROH-A2: vsetko sa meria od CELNEHO OTVORU `fx0`/`fw` (rohova: dverova
+    // cast); ostatne typy maju fx0 = 0 a fw = W, teda dnesne cisla.
+    var fx0 = nxNumOr(g.fx0, 0), fw = nxNumOr(g.fw, W), fxc = fx0 + fw / 2;
+    var gs = fx0 + nxFrontSide(g, 'gapLeft'), gap = g.gap;
+    var ow = fw - nxFrontSide(g, 'gapLeft') - nxFrontSide(g, 'gapRight');
     items.forEach(function(it, i){
       var z = it.z, h = it.height, col = (it.type==='drawer_front')?PV_FRONT_DRAWER:PV_FRONT_DOOR;
       var fnum = 'F' + (i + 1);
@@ -892,7 +938,7 @@
         // D-18: pásmo Bez čela = čiarkovaný obrys bez výplne (otvorená nika v rade).
         // D-23: aj none pás je súčasťou skupiny — klik vedie na jeho riadok v zozname.
         S.push('<rect x="'+rx(gs)+'" y="'+ry(z+h)+'" width="'+ow+'" height="'+h+'" fill="none" stroke="#90a4ae" stroke-width="1.5" stroke-dasharray="7 5"/>');
-        S.push('<text x="'+rx(W/2)+'" y="'+ry(z+h/2)+'" font-size="18" fill="#90a4ae" text-anchor="middle" dominant-baseline="middle">'+fnum+' · bez čela '+Math.round(h)+'</text>');
+        S.push('<text x="'+rx(fxc)+'" y="'+ry(z+h/2)+'" font-size="18" fill="#90a4ae" text-anchor="middle" dominant-baseline="middle">'+fnum+' · bez čela '+Math.round(h)+'</text>');
         S.push('</g>');
         return;
       }
@@ -927,7 +973,7 @@
       // cislo ostava vyskou RIADKU — presne to, co je v zozname ciel.
       // D-115 HALO: text dostane obrys farbou VYPLNE panelu (`col`, PV_* zrkadlo
       // tokenu), inak by ho X zasuvky/blendy preskrtlo. Ziadna nova farba.
-      S.push('<text x="'+rx(W/2)+'" y="'+ry(panelZ+(ph > 0 ? ph : h)/2)+'" font-size="18" fill="'+PV_SELECT_ACCENT+'" paint-order="stroke" stroke="'+col+'" stroke-width="4" text-anchor="middle" dominant-baseline="middle">'+fnum+' · '+frontTypeDesc(it.type)+' '+Math.round(h)+'</text>');
+      S.push('<text x="'+rx(fxc)+'" y="'+ry(panelZ+(ph > 0 ? ph : h)/2)+'" font-size="18" fill="'+PV_SELECT_ACCENT+'" paint-order="stroke" stroke="'+col+'" stroke-width="4" text-anchor="middle" dominant-baseline="middle">'+fnum+' · '+frontTypeDesc(it.type)+' '+Math.round(h)+'</text>');
       S.push('</g>');
     });
   }
@@ -1070,11 +1116,14 @@
     var dims = nxFrontDims(g.fronts, g);
     if (!dims.length) return;
     var gl = nxFrontSide(g, 'gapLeft'), gr = nxFrontSide(g, 'gapRight');
-    var xr = Math.max(g.W, g.W - gr) + 26;
+    // ROH-A2: medzery, pasy aj kota sirky patria CELNEMU OTVORU (rohova:
+    // dverova cast) — ostatne typy fx0 = 0, fw = W, teda dnesne cisla.
+    var fx0 = nxNumOr(g.fx0, 0), fw = nxNumOr(g.fw, g.W);
+    var xr = Math.max(g.W, fx0 + fw - gr) + 26;
     // N26: pasy medzier sa kreslia PRED kotami, aby cisla ostali navrchu.
     var hot = pvGapsHot();
     if (hot){
-      var x0 = Math.min(gl, 0), x1 = Math.max(g.W, g.W - gr);
+      var x0 = Math.min(fx0 + gl, fx0), x1 = Math.max(fx0 + fw, fx0 + fw - gr);
       dims.forEach(function(d){
         if (d.kind !== 'gap') return;
         S.push('<rect x="' + rx(x0) + '" y="' + ry(d.z2) + '" width="' + (x1 - x0) + '" height="' + (d.z2 - d.z1) +
@@ -1083,10 +1132,10 @@
     }
     dims.forEach(function(d){
       if (d.kind === 'front') pvDimV(S, rx, ry, xr, d.z1, d.z2, String(Math.round(d.size)), 18);
-      else pvText(S, rx(-14), ry((d.z1 + d.z2)/2), String(Math.round(d.size)), 15, 'end',
+      else pvText(S, rx(fx0 - 14), ry((d.z1 + d.z2)/2), String(Math.round(d.size)), 15, 'end',
                   hot ? PV_GAP_TEXT : null);
     });
-    pvDimH(S, rx, ry, gl, g.W - gr, -26, String(Math.round(g.W - gl - gr)), 18);
+    pvDimH(S, rx, ry, fx0 + gl, fx0 + fw - gr, -26, String(Math.round(fw - gl - gr)), 18);
   }
 
   // Ciste (Node testy): rozklad radu ciel na kotovatelne useky.
@@ -1135,9 +1184,11 @@
     var out = [];
     if (!items || !items.length) return out;
     var W = g.W, fh = g.fh || 0;
-    var gs = nxFrontSide(g, 'gapLeft');
+    // ROH-A2: cela a ich kridla lezia v CELNOM OTVORE (rohova: dverova cast).
+    var fx0 = nxNumOr(g.fx0, 0), fw = nxNumOr(g.fw, W);
+    var gs = fx0 + nxFrontSide(g, 'gapLeft');
     var gap = (g.gap == null) ? 3 : g.gap;
-    var ow = W - gs - nxFrontSide(g, 'gapRight');
+    var ow = fw - nxFrontSide(g, 'gapLeft') - nxFrontSide(g, 'gapRight');
     // Svetly priestor KORPUSU (vnutorne lica bokov) — kovanie, ktore sa montuje
     // na bok (vysuv), sa kotvi sem; cela a ich kridla ostavaju na gs/ow.
     var t = (g.t > 0) ? g.t : 0, ix0 = t, ix1 = W - t;
@@ -1181,17 +1232,22 @@
         if (wkey === 'right') idx = cols.length - 1;
         else if (wkey.charAt(0) === 'p') idx = Math.min(cols.length - 1, Math.max(0, parseInt(wkey.slice(1), 10) - 1));
         var col = cols[idx] || cols[0];
-        // Zavesova HRANA: prave kridlo (a posledny panel viackridloveho cela) sa
-        // otvara od praveho okraja, ostatne od laveho. Presnu stranu data nenesu,
-        // preto je znacka ORIENTACNA — tooltip pomenuva vlastnika presne.
-        var right = (wkey === 'right') ||
-                    (wkey.charAt(0) === 'p' && cols.length > 1 && idx === cols.length - 1);
-        var cx = right ? (col.x + col.w - 26) : (col.x + 26);
+        // ROH-A2 (C8): STRANA PANTOV. Krajne kridla viackridlovych dvierok su
+        // ODVODENE (lave = panty vlavo, posledne = vpravo — A1 kontrakt);
+        // jednokridlove a stredne kridla maju stranu v SLOTE servera
+        // (`front_slots`, stav smeru). Nic sa nehada: `unset` = znacka „?"
+        // v strede kridla, legacy (kluc smeru v configu nie je) = ziadna znacka.
+        var side = nxHingeSide(wkey, idx, cols.length, g.slots ? g.slots[fr.id] : null);
+        if (!side) return;
+        var cx = (side === 'right') ? (col.x + col.w - 26)
+               : (side === 'left') ? (col.x + 26) : (col.x + col.w / 2);
         var nh = Math.min(qty, 6), pad2 = Math.min(90, fr.height * 0.22);
         for (var k = 0; k < nh; k++){
           var cz = (nh === 1) ? (fr.z + fr.height/2)
                               : (fr.z + pad2 + (fr.height - 2*pad2) * k / (nh - 1));
-          out.push({ kind: 'hinge', x: cx, z: cz, r: 16, owner: owner, title: title });
+          var mk = { kind: 'hinge', x: cx, z: cz, r: 16, owner: owner, title: title };
+          if (side === 'unknown') mk.unknown = true;
+          out.push(mk);
         }
         return;
       }
@@ -1216,6 +1272,28 @@
       }
     });
     return out;
+  }
+
+  // ROH-A2 (C8) · ciste (Node testy): STRANA PANTOV znacky zavesu.
+  //   wkey  = kluc kridla z `owner_part_key` (single | left | right | p1…p4)
+  //   idx   = index stlpca kridla, n = pocet kridiel v kresbe
+  //   entry = zaznam `front_slots[front_id]` zo servera ({ wings_n, slots })
+  // -> 'left' | 'right' | 'unknown' (neurcene — kresli sa „?") | null (LEGACY
+  //    bez kluca smeru: znacka sa nekresli vobec, stranu nehadame — O1).
+  // Krajne kridla viackridlovych dvierok su odvodene geometricky (A1 kontrakt:
+  // prve = panty vlavo, posledne = vpravo) — rovnako ako `frontWingSymbols`.
+  function nxHingeSide(wkey, idx, n, entry){
+    var k = String(wkey || 'single');
+    if (k === 'left') return 'left';
+    if (k === 'right') return 'right';
+    if (k.charAt(0) === 'p' && n > 1){
+      if (idx === 0) return 'left';
+      if (idx === n - 1) return 'right';
+    }
+    var slots = (entry && Array.isArray(entry.slots)) ? entry.slots : [];
+    var state = null;
+    slots.forEach(function(s){ if (s && s.wing === k) state = s.state; });
+    return (typeof frontDirSymbol === 'function') ? frontDirSymbol(state) : null;
   }
 
   // Ciste (Node testy): geometria znacky VYSUVU v mm sceny.
@@ -1253,7 +1331,15 @@
     var stroke = ghost ? PV_GHOST : PV_SELECT;
     var fill = ghost ? 'none' : PV_FRONT_DOOR;
     var body;
-    if (m.kind === 'hinge'){
+    if (m.kind === 'hinge' && m.unknown){
+      // ROH-A2 (C8): strana pantov NEURCENA — ten isty jazyk ako symbol v celach
+      // a overlay v modeli: prerusovany kruh s „?" (jantar), nie krizik na hrane.
+      var qc = ghost ? PV_GHOST : PV_DIR_WARN;
+      body = '<circle cx="'+rx(m.x)+'" cy="'+ry(m.z)+'" r="'+m.r+'" fill="'+fill+'" stroke="'+qc+
+        '" stroke-width="2.5" stroke-dasharray="5 4"/>' +
+        '<text x="'+rx(m.x)+'" y="'+ry(m.z)+'" font-size="'+Math.round(m.r*1.3)+'" font-weight="700" fill="'+qc+
+        '" text-anchor="middle" dominant-baseline="middle">?</text>';
+    } else if (m.kind === 'hinge'){
       body = '<circle cx="'+rx(m.x)+'" cy="'+ry(m.z)+'" r="'+m.r+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="2.5"/>' +
         '<path d="M'+(rx(m.x)-m.r*0.55)+' '+(ry(m.z)-m.r*0.55)+' l'+(m.r*1.1)+' '+(m.r*1.1)+
         ' M'+(rx(m.x)-m.r*0.55)+' '+(ry(m.z)+m.r*0.55)+' l'+(m.r*1.1)+' '+(-m.r*1.1)+
@@ -1386,7 +1472,9 @@
   function drawFrontsGhost(S, rx, ry, g){
     var items = g.fronts;
     if (!items || !items.length) return;
-    var gs = nxFrontSide(g, 'gapLeft'), ow = g.W - gs - nxFrontSide(g, 'gapRight'), L = [];
+    // ROH-A2: od celneho otvoru (ostatne typy fx0 = 0, fw = W).
+    var fx0 = nxNumOr(g.fx0, 0), fw = nxNumOr(g.fw, g.W);
+    var gs = fx0 + nxFrontSide(g, 'gapLeft'), ow = fw - nxFrontSide(g, 'gapLeft') - nxFrontSide(g, 'gapRight'), L = [];
     items.forEach(function(it){
       if (!it || !(it.height > 0)) return;
       L.push('M'+rx(gs)+' '+ry(it.z)+'h'+ow+'V'+ry(it.z + it.height)+'h'+(-ow)+'Z');
@@ -1787,6 +1875,10 @@
                        nxRefExtent: nxRefExtent, drawApplianceRefs: drawApplianceRefs,
                        drawApplianceSplit: drawApplianceSplit,
                        pvApplianceRefs: pvApplianceRefs,
-                       PV_APPL_GUTTER: PV_APPL_GUTTER };
+                       PV_APPL_GUTTER: PV_APPL_GUTTER,
+                       // ROH-A2 (tests/js/test_roha2_vkladanie.js): celny otvor
+                       // rohovej, strana pantov znacky zavesu a geometria nahladu.
+                       nxFrontOpeningFor: nxFrontOpeningFor, nxHingeSide: nxHingeSide,
+                       pvGeom: pvGeom, hwMarkSvg: hwMarkSvg };
   }
 

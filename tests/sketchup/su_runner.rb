@@ -6486,6 +6486,139 @@ module NoxunSuRunner
     end]
   end
 
+  # === ROH-A2 · K3: VKLADANIE ROHOVEJ CEZ CESTU PANELA ======================
+  # (a) payload PRESNE ako vkladacia karta po kliku na „Rohová" bez sablony
+  #     (konstrukcia z `DEFAULTS.corner_blind`, BEZ poli rohovej — C6; cela
+  #     z karty bez kluca smeru) -> preflight karty prejde (otvor 0/450) ->
+  #     ghost -> klik = rohova s polami `CORNER_DEFAULTS`, smer R7 pri rohu,
+  #     plan = model, 1 krok Spat; payload skrinky nesie ulozeny otvor;
+  # (b) rohova sablona PRAVEJ strany cez vkladaciu kartu: preflight karty so
+  #     stranou zo sablony (otvor 600/500), vklad = vpravo / 500, 1 krok Spat;
+  # (c) preflight oznacenej pravej rohovej so ZIVOU sirkou 1200 -> x0 750
+  #     (W − D), ulozeny config prebije payload; ostatne typy = cela sirka.
+  ROHA2_TPL = '__SU_TEST_ROHA2__'
+
+  # Tvar `collectAll()` vkladacej karty: konstrukcne polia DEFAULTS rohovej
+  # (bez `corner_*`), cela z riadkov karty, strom zon. Materialy ani sablona
+  # sa bez sablony neposielaju.
+  def roha2_insert_payload(extra = {})
+    p = {}
+    e::CabinetBuilder::CORNER_DEFAULTS.each do |k, v|
+      next if e::CabinetBuilder::CORNER_KEYS.include?(k) || k == :fronts
+
+      p[k.to_s] = v
+    end
+    p['fronts'] = { 'split_axis' => 'height', 'gap' => 3.0, 'gap_top' => 2.0, 'gap_bottom' => 2.0,
+                    'gap_left' => 2.0, 'gap_right' => 2.0, 'edge_limit_off' => false,
+                    'items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'auto', 'height' => nil,
+                                  'locked' => false, 'wings' => '1', 'profile' => 'none' }] }
+    p['zone_tree'] = { 'id' => 'Z1', 'shelves' => 1, 'children' => [] }
+    p.merge(extra)
+  end
+
+  # Preflight karty (ta ista cesta ako `NX.frontPreflight`) — vkladanie nema
+  # ulozeny config, strana a dverova cast idu z registra karty.
+  def roha2_insert_preflight(payload, side, door_w)
+    data = payload.slice('type', 'width', 'height', 'floor_height', 'fronts')
+                  .merge('corner_side' => side, 'corner_door_w' => door_w, 'revision' => 1, 'insert_session' => 1)
+    e::Panel.front_preflight_result(data)
+  end
+
+  def run_roha2(model)
+    cleanup(model)
+    e::TemplateStore.delete('cabinet', ROHA2_TPL) if e::TemplateStore.find('cabinet', ROHA2_TPL)
+    d = e::CabinetBuilder::CORNER_DEFAULTS
+    # Predvolby rohovej maju konstrukciu DOLNEJ (vyska a sokel z LOWER_DEFAULTS),
+    # otvor je dverova cast od sokla po vrch.
+    dflt_op = { 'x0' => 0.0, 'w' => d[:corner_door_w].to_f, 'z0' => d[:floor_height].to_f,
+                'h' => (d[:height] - d[:floor_height]).to_f }
+    # (a) VKLAD BEZ SABLONY
+    payload = roha2_insert_payload
+    pf = roha2_insert_preflight(payload, d[:corner_side], d[:corner_door_w])
+    ok("ROH-A2 (a): preflight vkladacej karty prejde, otvor = dverova cast 0/450 od sokla (#{pf['opening'].inspect} #{pf['errors'].inspect})",
+       pf['valid'] == true && pf['opening'] == dflt_op)
+    before = cabinets(model).length
+    inst = ghost_place!(model, payload, [300.0, 300.0])
+    ghost_teardown!(model)
+    ok("ROH-A2 (a): klik = rohova s predvolbami (#{inst ? [kona_cfg(inst)['type'], kona_cfg(inst)['width'], roha1_fields(inst)].inspect : 'ziadna'})",
+       inst && kona_cfg(inst)['type'] == 'corner_blind' && kona_cfg(inst)['width'] == 1100.0 &&
+       roha1_fields(inst) == [d[:corner_side], d[:corner_door_w], d[:corner_cr1], d[:corner_cr2]] &&
+       cabinets(model).length == before + 1)
+    return ok('ROH-A2: vklad rohovej cez panel', false) unless inst
+
+    it = Array(kona_cfg(inst)['front_items']).first || {}
+    ok("ROH-A2 (a): jedny dvierka, panty pri rohu (R7) (#{it.values_at('type', 'wings_n', 'direction').inspect})",
+       it['type'] == 'door' && it['wings_n'].to_i == 1 && it['direction'] == 'right')
+    bad = roha1_sync_bad(model, inst)
+    ok("ROH-A2 (a): plan = model, zostava kompletna (#{bad.first(2).inspect})",
+       bad.empty? && %w[cabinet/corner_panel cabinet/hinge_rail cabinet/cr:1 cabinet/cr:2
+                        cabinet/corner_rail].all? { |k| kona_part(inst, k) })
+    ok("ROH-A2 (a): payload skrinky nesie ulozeny otvor (#{e::Panel.front_opening_payload(e::Store.config(inst)).inspect})",
+       e::Panel.front_opening_payload(e::Store.config(inst)) == dflt_op)
+    Sketchup.undo
+    ok('ROH-A2 (a): vklad = 1 krok Spat', !inst.valid? && cabinets(model).length == before)
+
+    # (b) SABLONA PRAVEJ STRANY cez vkladaciu kartu
+    src = e::CabinetBuilder.build(model, roha1_params('corner_side' => 'right', 'corner_door_w' => 500.0,
+                                                      'material_id' => nil, 'front_material_id' => nil),
+                                  transform: Geom::Transformation.translation(e::Units.point(9000.0, 0, 0)))
+    model.selection.clear
+    model.selection.add(src)
+    e::Panel.handle_save_template_as(pg(model, 'cabinet_id' => e::Store.get(src, 'cabinet_id').to_s,
+                                            'name' => ROHA2_TPL, 'type' => 'corner_blind'))
+    rec = e::TemplateStore.find('cabinet', ROHA2_TPL)
+    ok("ROH-A2 (b): sablona pravej rohovej ulozena (#{rec ? rec['config'].values_at('type', 'corner_side', 'corner_door_w').inspect : 'ziadna'})",
+       rec && rec['config']['type'] == 'corner_blind' && rec['config']['corner_side'] == 'right' &&
+       rec['config']['corner_door_w'] == 500.0)
+    src.erase! if src.valid?
+    if rec
+      tp = roha2_insert_payload('width' => rec['config']['width'], 'height' => rec['config']['height'],
+                                'floor_height' => rec['config']['floor_height'],
+                                'template_kind' => 'cabinet', 'template_name' => ROHA2_TPL)
+      tp['fronts'] = tp['fronts'].merge('gap_left' => 2.0, 'gap_right' => 2.0)
+      pf = roha2_insert_preflight(tp, rec['config']['corner_side'], rec['config']['corner_door_w'])
+      ok("ROH-A2 (b): preflight karty so stranou zo sablony — otvor 600/500 (#{pf['opening'].inspect})",
+         pf['valid'] == true && pf['opening'] && pf['opening']['x0'] == 600.0 && pf['opening']['w'] == 500.0)
+      before = cabinets(model).length
+      tinst = ghost_place!(model, tp, [300.0, 1500.0])
+      ghost_teardown!(model)
+      ok("ROH-A2 (b): vklad zo sablony = vpravo / 500 (#{tinst ? roha1_fields(tinst).inspect : 'ziadna'})",
+         tinst && roha1_fields(tinst)[0, 2] == ['right', 500.0] && roha1_sync_bad(model, tinst).empty? &&
+         cabinets(model).length == before + 1)
+      if tinst
+        Sketchup.undo
+        ok('ROH-A2 (b): vklad zo sablony = 1 krok Spat', !tinst.valid? && cabinets(model).length == before)
+      end
+    end
+
+    # (c) PREFLIGHT OZNACENEJ PRAVEJ ROHOVEJ SO ZIVOU SIRKOU
+    cab = e::CabinetBuilder.build(model, roha1_params('corner_side' => 'right', 'material_id' => nil,
+                                                      'front_material_id' => nil))
+    stored = e::Store.config(cab)
+    live = { 'type' => 'corner_blind', 'width' => 1200.0, 'height' => 862.0, 'floor_height' => 150.0,
+             'fronts' => ROHA1_FRONTS.merge('gap' => 3.0, 'items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'auto',
+                                                                         'wings' => '1', 'direction' => 'left' }]),
+             'corner_side' => 'left', 'revision' => 2, 'cabinet_id' => e::Store.get(cab, 'cabinet_id').to_s }
+    res = e::Panel.front_preflight_result(live, stored)
+    ok("ROH-A2 (c): ziva sirka 1200 vpravo -> x0 750, ulozena strana vyhrava (#{res['opening'].inspect})",
+       res['valid'] == true && res['opening'] == { 'x0' => 750.0, 'w' => 450.0, 'z0' => 150.0, 'h' => 712.0 })
+    ok("ROH-A2 (c): payload skrinky = ulozeny stav 650 (#{e::Panel.front_opening_payload(stored).inspect})",
+       e::Panel.front_opening_payload(stored)['x0'] == 650.0)
+    low = e::Panel.front_preflight_result(live.merge('type' => 'lower', 'width' => 900.0,
+                                                     'fronts' => ROHA1_FRONTS.merge('gap' => 3.0, 'items' => [
+                                                       { 'id' => 'F1', 'type' => 'door', 'mode' => 'auto', 'wings' => 'auto' }
+                                                     ])))
+    ok("ROH-A2 (c): dolna = otvor cez celu sirku (#{low['opening'].inspect})",
+       low['opening'] == { 'x0' => 0.0, 'w' => 900.0, 'z0' => 150.0, 'h' => 712.0 })
+  rescue StandardError => ex
+    log_line("FAIL: run_roha2 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  ensure
+    ghost_teardown!(model)
+    cleanup(model)
+    e::TemplateStore.delete('cabinet', ROHA2_TPL) if e::TemplateStore.find('cabinet', ROHA2_TPL)
+    ok('ROH-A2: cleanup (0 korpusov)', cabinets(model).empty?)
+  end
+
   # --- S1-C: OCAKAVANY SPOTREBIC (`appliance_expects[]`) --------------------
   #
   # CO SA TU OVERUJE A MIMO SKETCHUPU OVERIT NEDA:
@@ -27244,6 +27377,7 @@ module NoxunSuRunner
     run_konb(model)          # KON-B · K2: CHRBAT Z LIST — plan = model pre 48 kombinacii strop x dno x komin x vyska list, prepnutie na listy = 1 Spat, odmietnutie 2H + 20 > vnutro bez zmeny, nalozeny -> listy -> nalozeny (dormantny rucny zasah chrbta sa vrati), kopia, ulozenie a nacitanie .skp, sablona tam aj stara (H ciela ostane) a vklad ghostom, Kontrola olepov (paska na hornej ploche dolnej a dolnej ploche hornej listy), kusovnik z modelu 1 riadok 2 ks / s vystuhami 4 ks a VEPO „Chrb HD“
     run_kond(model)          # KON-D: VSTAVANA SABLONA „Chladničková" — seed v cerstvej kniznici STD 7 so schemou 21, vklad ghostom = plan <-> model 1:1, dno a strop 510, boky 560, bez chrbta, 2 fyzicke dvierka 719 + 1274 so smerom „neurceny" (Kontrola 2 nalezy), ocakava chladnicku (ORANGE), nika 560, 1 krok Spat vrati vklad
     run_roha1(model)         # ROH-A1 · K3: ROHOVA SKRINKA — plan = model pre 10 kombinacii (strana x W/D/CR/gC/celovy 19/CR 2 16 pri W 582), prestavba drzi polia (1 Spat), odmietnutia panela (cela, typ, strana, zony) = 0 krokov, sablona uloz -> vloz ghostom (1 Spat) / ina strana odmietnuta / rovnaka prejde, tri kopie, scale sirky (rast slepej casti obe strany, klamp 584 + veta), ulozenie .skp, kusovnik/VEPO/kovanie z modelu
+    run_roha2(model)         # ROH-A2 · K3: VKLADANIE ROHOVEJ cez cestu panela — preflight karty (otvor 0/450) -> ghost -> klik = CORNER_DEFAULTS, R7 panty pri rohu, plan = model, 1 Spat; sablona PRAVEJ strany (otvor 600/500, vpravo/500, 1 Spat); preflight oznacenej so zivou sirkou 1200 (x0 750), payload otvoru, dolna cela sirka
     run_d140(model)          # D-140: VYSKA OSADENIA CHLADNICKY — akcia panela zdvihne box niky (z 118 -> 268) a Kontrola vysky/delenia pocita od zdvihnuteho dna, 1x Spat, odmietnutia (stara hodnota, zly vstup, cudzie echo/PID/dokument, nezmenena) bez kroku Spat, prestavba dvierok osadenie zachova, zapis z otvoreneho komponentu zatvori kontext, vymena modelu prenesie, presun na inu skrinku nie, kopia ho nema, 0 kluc zmaze
     run_s1c(model)           # S1-C: OCAKAVANY SPOTREBIC — cely cyklus sablony (uloz s ocakavaniami -> vloz ghostom -> config -> Kontrola 2x ORANGE -> priradenie -> OK -> 2x Spat), ocakavanie BEZ sablony v riadku Spotrebic (1x Spat, geometria netknuta, peciatka schemy, nezmenene = ziadny krok, cudzie echo/PID nezapisu nic, viazanu kategoriu zrusit nedas), bariera observera po nativnej kopii, slot bez modelu (ORANGE + podvrh odmietnuty), aplikovanie sablony na viazanu skrinku (vazba ostava, ocakavania unia)
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11

@@ -29,6 +29,13 @@
   // JEDINA odpoved na otazku „kde sa smer pyta"; panel si ju NEODVODZUJE
   // z poctu kridiel. null = nic oznacene (alebo payload bez ciel).
   var frontSlots = null;
+  // ROH-A2: CELNY OTVOR zo SERVERA `{x0, w, z0, h}` — kde sa cela kreslia
+  // (rohova = len dverova cast, `x0 = W − D` pri dverach vpravo). Plni ho
+  // payload oznacenej skrinky (`front_opening`, ulozeny stav) a kazda odpoved
+  // preflightu pre AKTUALNU revizu (`opening`, ziva sirka). Panel si ho NEODVODZUJE;
+  // nahlad ho cita len pri rohovej (`nxFrontOpeningFor`), ostatne typy kreslia
+  // cez celu sirku ako doteraz. null = otvor este nie je znamy (zmena identity).
+  var frontOpening = null;
   // KOV-C2c: `front_drawer` z Ruby — mapa front_id -> zaznam riadku zasuvky
   // ({ state, text, detail[], sync, message, locked_note }). SERVER je jedina
   // autorita: panel z klasifikacie ani z kovania NIC neodvodzuje a text si

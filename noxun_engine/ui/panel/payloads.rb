@@ -81,6 +81,10 @@ module Noxun
           # kresli VYHRADNE to, co je tu. Cista projekcia nad ulozenym
           # `front_items` (ziadny zapis, ziadny prepocet planu).
           params['front_slots'] = front_slots_payload(cfg['front_items'])
+          # ROH-A2: CELNY OTVOR ulozeneho stavu (rohova = dverova cast, inak cela
+          # sirka). Nahlad z neho kresli cela, kym nepride preflight so ZIVOU
+          # sirkou (`front_preflight_result` -> `opening`); JS si ho neodvodzuje.
+          params['front_opening'] = front_opening_payload(cfg)
           # KOV-D2a: STAV KAZDEJ OSI zamku (vyska, vyska boxu, NL) — server
           # pocita, JS len kresli (chipy su D2b). Mapa sa stavia RAZ a vesia sa
           # na TRI miesta: emitovanu polozku vysuvu, osiroteny riadok zasahu
@@ -916,6 +920,23 @@ module Noxun
         def owner_zone_id(key)
           m = key.to_s.match(%r{\Azone:([^/]+)/})
           m ? m[1] : nil
+        end
+
+        # ROH-A2: otvor ciel ULOZENEHO configu cez JEDINU autoritu
+        # (`Construction.front_opening`) — ta ista, z ktorej stavia plan aj
+        # preflight. Citacie, bez zapisu; poskodeny config = nil (nahlad rohovej
+        # vtedy caka na preflight a dvere cez celu sirku nekresli).
+        def front_opening_payload(cfg)
+          c = cfg.is_a?(Hash) ? cfg : {}
+          op = Construction.front_opening(
+            type: c['type'].to_s, width: c['width'].to_f, height: c['height'].to_f,
+            floor_height: c['floor_height'].to_f, dw_front_bottom: c['dw_front_bottom'].to_f,
+            corner_side: c['corner_side'], corner_door_w: c['corner_door_w']
+          )
+          opening_json(op)
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.front_opening_payload')
+          nil
         end
 
         # KOV-A2a: mapa `front_id -> { 'wings_n' =>, 'slots' => [...] }` z JEDINEJ
