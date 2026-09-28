@@ -6,8 +6,12 @@
 
 ## Stav
 
-**v0.15.0 · 28.9.2026 — BLOK 8 · K3 ROHOVÁ SKRINKA UZAVRETÝ** (v0.14.0 → v0.15.0, podklady PR #409, dávky PR #410–#413 + uzáver PR #414; uzáver mení len dokumentáciu
-a verziu). Plugin pozná typ **„Rohová"** (`corner_blind`) — dolnú slepú rohovú skrinku podľa DC „Rohová": korpus ako dolná + rohová zostava (**blenda korpusová**,
+**v0.15.1 · 29.9.2026 — BLOK 2 · NÁREZOVÝ PLÁN (primitívny) beží:** štart bloku PR #417 (rozhodnutia N1–N11, schválený mockup), prvá dávka **NP-1 · jadro výpočtu**
+(PR #418). Plugin vie **spočítať rozloženie dielcov na platne a počet platní** (pásové rozloženie, prerez 5 / orez 10 / prídavok dupláku 10 mm, dielce sa neotáčajú),
+ale výpočet **zatiaľ nikde nezobrazuje** — pre používateľa sa nič nemení (zobrazí ho NP-3). VEPO export je bajtovo rovnaký.
+
+**v0.15.0 · 28.9.2026 — BLOK 8 · K3 ROHOVÁ SKRINKA UZAVRETÝ** (v0.14.0 → v0.15.0, podklady PR #409, dávky PR #410–#413 + uzáver PR #414; **smoke PASS 28.9.**, O8 ponechané).
+Plugin pozná typ **„Rohová"** (`corner_blind`) — dolnú slepú rohovú skrinku podľa DC „Rohová": korpus ako dolná + rohová zostava (**blenda korpusová**,
 **výstuha závesov**, **CR 1**, **CR 2**, **rohová výstuha**), jedny dvierka s pántmi predvolene pri rohu, vnútri len police; ide do **kusovníka, VEPO, nákupu aj ponuky**.
 Vkladá sa tlačidlom **„Rohová"** (kláves **D** prepne stranu), v **Základné → Rozmery** (aj vo vkladacej karte) je riadok **Dverová časť · CR 1 · CR 2 · strana dverí**;
 prepnutie strany zrkadlí zostavu, pánty aj ručné hrany jedným krokom Späť. Náhľad kreslí celú zostavu, karta **Čelá** povie „jedny dvierka" a pánty „Pri boku / Pri rohu".
@@ -27,25 +31,24 @@ v **seede 6** — starší plugin zákazku neprestaví ani nevyexportuje (rohov�
 po prvej mutácii rozpočtu needituje a zastaví oba cenové exporty). **Aktualizovať OBE PC (aj Luciino) na 0.15.0 pred prvou rohovou** — starší plugin rohovú nepozná
 a knižnicu šablón STD 7 len číta (nedá sa v nej ukladať, premenovať ani mazať).
 
-**Testy (posledná kódová dávka, ROH-B2 PR #413):** **4721 headless · 138 JS sád · 3260 in-SU PASS / 0 FAIL**; pri uzávere headless a JS sady zelené (in-SU netreba — kód len číslom verzie).
+**Testy (posledná kódová dávka, NP-1 PR #418):** **4765 headless · 138 JS sád** zelené; in-SU netreba (čistý výpočtový modul, žiadny builder, observer ani zápis do modelu).
 **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 
 ## Robí sa
 
-**Nič nové — blok 8 je uzavretý a čaká na Michala:** **smoke rohovej** podľa checklistu v [archiv/ROHOVA_ZAVER_2026-09-28.md](archiv/ROHOVA_ZAVER_2026-09-28.md)
-(vrátane klávesu D pri vkladaní — či ho SketchUp naozaj doručí — a pri prvej rohovej v dielni závesu Sensys na výstuhe závesov, prekrytia 16 a dverí bez dotyku CR 1);
-nálezy idú do dočasnej skupiny v [DOGFOODING.md](DOGFOODING.md) ako opravy v0.15.x. **Rozhodnutie O8:** či ostane jantárové upozornenie „výrez police × výstuha závesov".
-**Čakajú na smoke:** **D-132** (#367), **D-133** (#368), **D-134** (#369). **D-141**, **D-142** a **D-145** sú v zásobníku. **Blok 1d** podľa kapacity — R-18; **R-13 čaká na Michala**.
+**Blok 2 · Nárezový plán** (priečinok [zdroje/bloky/NAREZ/](zdroje/bloky/NAREZ/), dávky v [PLAN.md](PLAN.md)): **NP-1** jadro výpočtu (PR #418) → **NP-2** nastavenia
+prerezu, orezu a prídavku + Kontrola „nezmestí sa" s orezom → **NP-3** sekcia Nárezový plán v Štúdiu → **NP-4** ceny podľa plánu. Pri prvej rohovej v dielni ostáva overiť
+záves Sensys na výstuhe závesov. **Čakajú na smoke:** **D-132** (#367), **D-133** (#368), **D-134** (#369). **D-141**, **D-142**, **D-145** a **D-146** sú v zásobníku.
+**Blok 1d** podľa kapacity — R-18; **R-13 čaká na Michala**.
 
 ## Ďalší krok
 
-**Smoke rohovej** (Michal) a **aktualizovať plugin na oboch PC** (Michal aj Lucia) na 0.15.0. Nový blok sa začína až po smoke PASS alebo výslovnom „ideme ďalej";
-**ďalší blok vyberá Michal** ([PLAN.md](PLAN.md)) — kandidáti: **ceny materiálov/ABS** a viac URL na položke (zvyšok V1-03) · **nárezový plán primitívny** · **V1.0 zostavy**
-(test na kompletnej reálnej zákazke) · blok 1d. Nálezy z výroby a cien majú prednosť.
+**NP-2** (package a audit návrhu pripravuje orchestrátor). Smoke bloku 2 príde s NP-3 — NP-1 ani NP-2 nemajú vlastnú viditeľnú sekciu.
+**Aktualizovať plugin na oboch PC** (Michal aj Lucia). Nálezy z výroby a cien majú prednosť.
 
 ## Posledné uzávery
 
-- **BLOK 8 · K3 ROHOVÁ SKRINKA UZAVRETÝ** (v0.14.0 → **v0.15.0**, 27.–28.9.2026, podklady #409, PR #410–#413 + uzáver PR #414; smoke čaká). Typ „Rohová" s rohovou zostavou,
+- **BLOK 8 · K3 ROHOVÁ SKRINKA UZAVRETÝ** (v0.14.0 → **v0.15.0**, 27.–28.9.2026, podklady #409, PR #410–#413 + uzáver PR #414; smoke **PASS 28.9.**, PR #415). Typ „Rohová" s rohovou zostavou,
   vkladanie, riadok rohovej a prepínač strany, kresba zostavy a karta Čelá rohovej; priečinok bloku je od uzáveru v [archiv/bloky/ROHOVA/](archiv/bloky/ROHOVA/).
   [Plný blok](archiv/ROADMAP_hotove_etapy.md) · [výsledok, dávky a checklist](archiv/ROHOVA_ZAVER_2026-09-28.md) · priebeh v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 - **BLOK 7 · KONŠTRUKCIA K1+K2 UZAVRETÝ** (v0.13.0 → **v0.14.0**, 26.–27.9.2026, PR #401–#404 + uzáver PR #405; smoke **PASS 27.9.**). Chrbát v drážke do nárezu,

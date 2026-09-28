@@ -176,6 +176,7 @@ unless NxTest::IN_SKETCHUP
     core/vepo_export
     core/sheet_estimate
     core/validation
+    core/sheet_layout
     core/edge_check
     core/grain_check
     core/direction_check

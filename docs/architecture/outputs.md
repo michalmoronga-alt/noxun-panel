@@ -710,9 +710,80 @@ Inspector (`Panel.appliance_check_record`) ho skladá z toho istého refu, takž
 
 ### sheet_estimate.rb
 
-_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+_(kontrakt `estimate` zatiaľ nezdokumentovaný — doplniť pri najbližšom zásahu do výpočtu)_
 
 Odhad počtu platní (2B-1/D-43) — zmienky v odseku `production_core.rb` a v sekcii Kusovník v [ui-lifecycle.md](ui-lifecycle.md).
+**Od NP-1 nie je „fáza 2" jeho vnútro:** nárezový plán je samostatný modul `sheet_layout.rb` (nižšie); odhad z m² ostáva ako porovnanie
+a predvolená cena. `sheet_size_for` je jediná pravda o formáte platne a fallbacku 2800 × 2070 — číta ju aj plán.
+
+### sheet_layout.rb
+
+**NP-1 (blok 2 · Nárezový plán, v0.15.1) — jadro výpočtu, zatiaľ nikam nenapojené** (Štúdio, rozpočet ani exporty ho nečítajú; napojenie
+NP-2 až NP-4). Čistý modul: z `Bom.compute[:rows]`, celého `ProductionCore.sheets_map` a mapy hrúbok ABS (**tej istej, akú dostáva VEPO**)
+vypočíta **per nákupný materiál** deterministické pásové (gilotínové) rozloženie obdĺžnikov na platne. Je to **rozloženie heuristiky, nie
+minimum** — reže VEPO vlastnou optimalizáciou, plán slúži objednávke. Package: `SYSTEM/zdroje/bloky/NAREZ/PACKAGE_NP1_JADRO.md`.
+
+**Štyri verejné funkcie.**
+- `compute(rows, sheets:, edge_thicknesses:, params: {}, blocked: nil)` — celý plán. Pre dátový problém **nikdy nevyhodí výnimku**.
+- `purchase_rect(hash, sheets:, edge_thicknesses:, params:)` — **celá rozhodujúca príprava nákupného obdĺžnika** z riadku kusovníka
+  **alebo** záznamu dielca: prijatie (`VepoExport.prepare_row` + ochrana vstupu), zaokrúhlenie, voľba nákupného materiálu (zdroj
+  dupláku), prídavok, kontrola hrúbky a väzby dupláku, formát a orez podľa typu. Kontrola `oversize` (NP-2) ju zavolá nad záznamom
+  a **žiadny z týchto krokov nesmie opakovať sama**; `grain` vo výsledku je **pôvodný** smer. **Geometriu** (`l`, `w`, `usable`,
+  `trim`, `grain`) vracia aj pri `ok: false`, keď dôvod s rozmermi nesúvisí (VEPO: neznáma ABS, chybná hrúbka, počet; `thickness_conflict`;
+  `duplak_link_missing` — tam vrstva **bez** prídavku na materiáli riadku), aby Kontrola hodnotila nadrozmer aj pri súbežnej chybe;
+  nevracia ju pri `invalid_row`, `zero_after_rounding`, nekladnom rozmere a bez materiálu. `material_id` = materiál geometrie,
+  `plan_material_id` = komu plán riadok pripíše (pri dupláku vždy zdroj).
+- `fits_rect?(rect, allow_rotation:)` — jediná nerovnosť „zmestí sa na prázdnu platňu": `l <= Lu + DIM_TOL && w <= Wu + DIM_TOL`
+  (`Validation::DIM_TOL`); pri `allow_rotation: true` skúša obe polohy. Plán volá **vždy** `allow_rotation: false`, Kontrola
+  `allow_rotation: rotation_allowed?(grain)`.
+- `rotation_allowed?(grain)` — smie Kontrola dielec otočiť? Áno pre všetko okrem `length`/`width` (dnešné správanie `fits_on_sheet?`:
+  `none`, prázdny aj neznámy smer = obe polohy). Plán neotáča nikdy — z tejto funkcie len odvodí `needs_rotation` vs. `oversize`.
+
+**Vstup a prijatie riadka.** Riadok prijíma `VepoExport.prepare_row` — tie isté vyradenia, tá istá jediná výmena pri `width`, to isté
+zaokrúhlenie na celé mm; **nič ďalšie sa neotáča, ani dielec bez smeru** (N8). `l` beží po `sheet_size[0]` (dĺžka platne = smer kresby).
+Ochrana vstupu **nad** VEPO (VEPO sa nemení): nie Hash, NaN/nekonečný rozmer či hrúbka (aj reťazec typu `"1e400"`), hrany mimo tvaru
+`{kód => id}` alebo výnimka z prípravy → `invalid_row` (riadok ostáva pripísaný svojmu nákupnému materiálu, ak je známy); rozmer ≤ 0 po zaokrúhlení (dĺžku 0,1 VEPO vydá ako 0 mm) → `zero_after_rounding`; odmietnutie VEPO → `vepo`
+s **presným textom** dôvodu (`detail`). Riadok s materiálom ide do `rejected_rows` svojho nákupného materiálu — počítajú sa **riadky, nie
+kusy** (počet 0 by súčet nezvýšil); riadok bez materiálu do `rejected_without_material` na vrchnej úrovni.
+
+**Nákupný materiál a duplák.** Úplná väzba zo snapshotu (`material_source` s `multiplier >= 2`, stráž ako `SheetEstimate`) →
+`quantity × multiplier` obdĺžnikov **zdrojového** materiálu s rozmerom `(l + 2p) × (w + 2p)` (N7; prídavok **po** zaokrúhlení, lebo VEPO
+dostane zaokrúhlený hotový rozmer). Katalógový duplák (`Materials.duplak?`) **bez** väzby v riadku sa **nedomýšľa**: riadok sa
+nerozkladá a zdroj z katalógu dostane `duplak_link_missing`. Obchodná hrúbka riadku sa porovná s hrúbkou záznamu nákupného materiálu
+(obe cez `commercial_thickness`); nesúlad → `thickness_conflict` (riadok sa nerozkladá). Navyše **všetky prijaté riadky jedného nákupného
+materiálu musia mať rovnakú obchodnú hrúbku** — aj keď záznam hrúbku nemá alebo má 0; rôzne hrúbky → `thickness_conflict` materiálu (riadky
+sa rozložia, ktorý je zlý, sa bez katalógu nedá povedať; `conflicts` nesie „rôzne obchodné hrúbky …"). Vrstvy dupláku majú hrúbku zdroja,
+preto sa do oboch kontrol nerátajú. Bežný riadok má rozmery v celých mm (Integer, ako VEPO); len obdĺžnik dupláku s prídavkom je Float.
+
+**Formát a orez.** Formát = `SheetEstimate.sheet_size_for` (fallback + príznak), UNI = `Materials.uni?`. Orez `trim` na každej hrane
+okrem `NO_TRIM_TYPES = PD KOMPAKT ZASTENA` (N6, N9; vlastná konštanta — `format_in_identity?` má iný význam). Parametre `kerf`, `trim`,
+`dup_allowance` (predvolene 5 / 10 / 10 mm, NP-2 ich nahradí nastaveniami); neplatný (nečíselný, nekonečný, záporný) → `invalid_params`
+na každom materiáli, žiadne rozloženie.
+
+**Algoritmus.** Použiteľná plocha `Lu = L − 2t`, `Wu = W − 2t`; pri `≤ DIM_TOL` všetko `no_usable_area`. Radenie úplne určené:
+`w`↓, `l`↓, `JSON.generate(row['key'])`↑, `n`↑ (nezávisí od poradia vstupu). First-fit: (1) prvý pás na platniach v poradí, kam sa
+obdĺžnik zmestí; (2) inak **prvá platňa v poradí** s miestom na nový pás; (3) inak nová platňa. Výška pásu = `w` prvého obdĺžnika.
+Prerez **len medzi** dielcami v páse a medzi pásmi, nikdy pri orezanom okraji. Nezaradené: `oversize` (nezmestí sa ani v polohe, ktorú pripúšťa
+Kontrola), `needs_rotation` (Kontrola by ho otočila a otočený sa zmestí — **nehlási** ho), `no_usable_area`. **Najväčší zvyšok** platne = najväčší
+samostatný obdĺžnik z kandidátov spodok · koniec každého pásu · **nad každým nižším dielcom v páse** (audit F9); pri zhode menšie `y`,
+potom `x`; susedné odrezky sa nezlučujú.
+
+**Výsledok.** `{params, invalid_params (mená), rejected_without_material (+ _rows), materials}`; materiály podľa `material_id`, každý:
+`sheet_size`, `usable`, `trim`, `fallback`, `uni`, `invalid_params`, `sheets` (počet), `utilization` (% z celých platní; pri 0 platniach
+**chýba**), `placed_count`, `rejected_rows` + `rejected`, `thickness_conflict`, `duplak_link_missing`, `conflicts`, `blocked` (dôvod | nil),
+`doubled_pieces`, `rows` (`key`, `names`, `l`, `w`, `count`, `doubled`), `layouts` (`placements [riadok, n, x, y]`, `strips [y, h]`,
+`utilization` %, `offcut [x, y, l, w] | nil`), `unplaced [riadok, n, dôvod]` a **`upper_bound`** — `true` **len** bez fallbacku, UNI,
+neplatných parametrov, `blocked`, konfliktu hrúbky, chýbajúcej väzby dupláku, nezaradených a vyradených riadkov (C2). Súradnice sú
+v použiteľnej ploche (po oreze). „N platní (horná hranica)" smie UI povedať len pri `upper_bound`.
+
+**`blocked:` (audit F5).** Agregácia stratí `cut_invalid` (poškodený rozmer do nárezu), hoci export zastaví samostatná brána — volajúci
+preto odovzdá `{ all: dôvod }` (kľúč Symbol `:all` aj reťazec `'all'` z JSON) alebo `{ material_id => dôvod }` (zhoda aj cez materiál
+riadku, napr. duplákový); rozloženie sa spočíta,
+ale bez `upper_bound`. **Kto `blocked` skladá, určí NP-3/NP-4.**
+
+**Testy:** `tests/pure/test_sheet_layout.rb` (golden rozloženia, `fits_rect?` oddelene od `compute`, permutácie, dolná hranica z plochy,
+geometria s prerezom, neúplnosť a ochrana vstupu, `blocked`, zhoda s `build`, výkon ~2000 obdĺžnikov) a charakterizačné
+`tests/pure/test_np1_vepo_charakterizacia.rb` (bajty VEPO pred a po vytiahnutí `prepare_row`).
 
 ### budget.rb
 
@@ -832,8 +903,17 @@ parametre. Na disk zapisuje `write` **atomickou výmenou celej dávky** (staging
 **Invarianty, ktoré sa nesmú porušiť.**
 - **Rozmery sú HOTOVÉ** — žiadna aritmetika, hrúbku ABS si VEPO odratáva samo z kódov hrán (`—`/`=`). Oprava z 20.7.2026, overená krížovou validáciou proti starému flow.
 - **Rotácia dekoru sa robí LEN tu** (`oriented`, grain `width` = swap dĺžka↔šírka A ZÁROVEŇ dvojíc hrán). Druhý swap kdekoľvek inde by znamenal objednať dielec otočený.
+  Nárezový plán (`sheet_layout.rb`) orientuje **cez `prepare_row`**, teda tou istou jedinou výmenou — vlastnú nemá.
 - **Bajty CSV** vznikajú výhradne cez `CSV.generate(col_sep: ';', force_quotes: true, row_sep: CRLF)`, UTF-8 bez BOM, bez hlavičky. Žiadne ručné skladanie reťazca.
 - Riadok s neznámou ABS, chybnou hrúbkou, bez materiálu alebo s nekladným rozmerom **ide von z CSV** do `errors` (a do LOGu s dôvodom) — radšej neobjednať než objednať naslepo.
+
+**`prepare_row` — jedna príprava riadka pre VEPO aj nárezový plán (NP-1, v0.15.1).** Kroky, ktorými `build` riadok prijme alebo vyradí,
+sú verejná funkcia `prepare_row(raw, edge_thicknesses)` v **nezmenenom poradí**: `validate_row` → `oriented` → `finished_dimensions`
+(poradie hrán **po** výmene určuje text „neznáma ABS <id>") → `commercial_thickness` → zaokrúhlenie rozmerov na celé mm (Integer, polovica
+od nuly — jediná definícia `rounded_dims`). Vracia `{ok, row, dims, commercial, edges}` alebo `{ok: false, reason}` s **presným** textom
+pre `errors` a LOG. `build` ju volá;
+CSV, LOG aj `errors` sú bajtovo rovnaké ako pred extrakciou (charakterizačné testy `test_np1_vepo_charakterizacia.rb`). Správanie pri
+chybných dátach sa nemení (NaN vyhodí výnimku, dĺžka 0,1 ide do CSV ako 0) — ochranu robí volajúci `SheetLayout`, nie VEPO.
 
 **Poznámka pre VEPO — 9. stĺpec (D-112, v0.9.22).** CSV má deviaty stĺpec `poznamka`, **vždy prítomný** (prázdny reťazec, keď riadok poznámku nemá). Skladá ho čistá
 `abs_note(row, edge_decors, sheet_decors)`: pre každý kód hrany `L1 L2 W1 W2` porovná záznam pásky so záznamom dosky a pri **rozdiele** vypíše `ABS <dekor> <názov dekoru>` (viac
