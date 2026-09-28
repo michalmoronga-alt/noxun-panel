@@ -502,10 +502,24 @@
   // servera (`nxCornerSideResult`) alebo zmena identity (`nxFrontDraftReset`).
   var cornerSwitch = null;
   var CORNER_SWITCH_BUSY = 'Strana dverí sa ešte prepína — chvíľu počkaj.';
+  // Predrecenzia P3-3: kym prepnutie bezi, su skupiny kontextu Čelá ZAMKNUTE
+  // (`inert` — ziadny klik, fokus ani klavesnica): cela po odpovedi prevezme
+  // server a uprava zo zamku by sa ticho stratila. Odomyka odpoved servera
+  // aj zmena identity.
+  function nxCornerSwitchLock(on){
+    var list = (typeof document !== 'undefined' && document.querySelectorAll) ?
+      document.querySelectorAll('details[data-s4="cela"]') : [];
+    for (var i = 0; i < list.length; i++){
+      var g = list[i];
+      if (on){ g.setAttribute('inert', ''); g.setAttribute('aria-busy', 'true'); }
+      else if (g.removeAttribute){ g.removeAttribute('inert'); g.removeAttribute('aria-busy'); }
+    }
+  }
   function nxCornerSideResult(res){
     var s = cornerSwitch;
     if (!s || !res || res.switch_token !== s.token) return;
     cornerSwitch = null;
+    nxCornerSwitchLock(false);
     if (res.model_guid !== s.model_guid || res.cabinet_id !== s.cabinet_id ||
         s.model_guid !== nxDocGuid() || s.cabinet_id !== selectedCabId) return;
     // Push prepnutia prisiel POCAS rozpisanej zmeny (`holdDraft` v
@@ -544,6 +558,7 @@
       if (!(window.sketchup && sketchup.corner_side)) return;
       cornerSwitch = { token: 'cs-' + frontDraftSession + '-' + (++frontDraftRevision),
                        cabinet_id: selectedCabId, model_guid: nxDocGuid(), side: side, echo: null };
+      nxCornerSwitchLock(true);
       NX.setStatus('Prepínam stranu dverí…');
       sketchup.corner_side(nxDocPayload({ cabinet_id: selectedCabId, corner_side: side,
                                           switch_token: cornerSwitch.token }));
@@ -578,7 +593,7 @@
     frontDraftSession++;
     // ROH-B1: rozbehnute prepnutie strany patri identite — nova skrinka,
     // dokument ci Spat/Znova ho zahodia (neskora odpoved sa ignoruje).
-    cornerSwitch = null;
+    if (cornerSwitch){ cornerSwitch = null; nxCornerSwitchLock(false); }
     // ROH-A2: otvor patri identite (skrinke alebo vkladacej relacii) —
     // novy vyber ho dostane z payloadu, vkladanie z prveho preflightu.
     frontOpening = null;

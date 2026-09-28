@@ -724,7 +724,8 @@ z `corner_ctx` (hrúbka, ktorú použije vklad), inak z poľa (`nxCornerT`) — 
 
 **Prepínač strany (`onCornerSide`, O5).** Klik na zvolenú stranu nič nerobí. **Označená rohová:** najprv `nxCabinetAction` (rozpísané polia sa dopíšu, červené
 pole akciu zastaví; klik počas debounce aj počas odoslaného apply sa vykoná až po **potvrdenom** apply), potom `sketchup.corner_side` s `switch_token` a **len**
-`{cabinet_id, corner_side, switch_token, model_guid}`; prepínač ukáže novú stranu až push servera. Kým beží (`cornerSwitch`), **auto-apply sa odkladá**
+`{cabinet_id, corner_side, switch_token, model_guid}`; prepínač ukáže novú stranu až push servera. Kým beží (`cornerSwitch`), sú skupiny kontextu Čelá **zamknuté** (`nxCornerSwitchLock` — `inert` + `aria-busy`
+na `details[data-s4="cela"]`; čelá po odpovedi prevezme server, takže úprava počas prepínania by sa ticho stratila — predrecenzia P3-3), **auto-apply sa odkladá**
 (`flushCabinetEdits` — natívna kópia dostane `invalid`), iné akcie čakajú (`nxCabinetAction`) a druhý klik nič nepošle; koniec = korelovaná odpoveď
 `NX.cornerSideResult` (`nxCornerSideResult`: cudzí token sa ignoruje; keď push prepnutia prišiel počas rozpísanej zmeny — `holdDraft` —, **čelá, strana a otvor
 sa prevezmú zo servera** z pamätaného echa a až potom ide odložený apply, audit B1 FIX 1) alebo zmena identity (`nxFrontDraftReset`). **Vkladanie:** zmena registra

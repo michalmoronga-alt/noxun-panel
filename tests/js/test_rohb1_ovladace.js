@@ -409,4 +409,22 @@ function selCtx(){
   ctx.document.activeElement = null;
 }
 
+// ============ 8) ZAMOK CIEL POCAS PREPINANIA (predrecenzia P3-3) ==============
+{
+  const ctx = selCtx();
+  const G = [fakeEl('fronts'), fakeEl('cabfront')];
+  ctx.document.querySelectorAll = sel => (sel === 'details[data-s4="cela"]' ? G : []);
+  ctx.onCornerSide('right');
+  ok(G.every(g => g.hasAttribute('inert')), 'počas prepínania sú skupiny Čelá zamknuté (inert)');
+  const tok = ctx.__sent[0][1].switch_token;
+  ctx.nxCornerSideResult({ switch_token: 'iny', model_guid: 'G-1', cabinet_id: 'CAB-1', ok: true });
+  ok(G.every(g => g.hasAttribute('inert')), 'cudzia odpoveď nič neodomkne');
+  ctx.nxCornerSideResult({ switch_token: tok, model_guid: 'G-1', cabinet_id: 'CAB-1', ok: true });
+  ok(G.every(g => !g.hasAttribute('inert')), 'po odpovedi sa odomknú');
+  ctx.onCornerSide('right');
+  ok(G.every(g => g.hasAttribute('inert')), 'druhé prepnutie znova zamkne');
+  ctx.nxFrontDraftReset();
+  ok(G.every(g => !g.hasAttribute('inert')), 'zmena identity odomkne');
+}
+
 console.log(`test_rohb1_ovladace.js: ${n} asercii OK`);
