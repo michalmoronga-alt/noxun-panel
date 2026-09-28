@@ -1,0 +1,1508 @@
+<!DOCTYPE html>
+<html lang="sk" data-nx-theme="noxun">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Noxun Engine — mockup NÁREZOVÝ PLÁN · Štúdio, Rozpočet, Nastavenia, Kontrola</title>
+<!--
+  Blok 2 · KONTROLA + VÝROBA — Nárezový plán (primitívny). SCHVÁLENÉ Michalom 28.9.2026: O1–O12 podľa návrhu, O2 s prahom 20 %.
+  Podklad: SYSTEM/zdroje/bloky/NAREZ/KONCEPT_NP_v1_2026-09-28.md (§1 P1–P6), ROZHODNUTIA_MICHALA_2026-09-28.md (N1–N5; N6 a N7
+           doplnené 28.9. cez orchestrátora), FAKTY_Z_KODU_2026-09-28.md, RESERS_OUTSIDE_IN_2026-09-28.md (Q3 UX).
+  Vzhľad = Štúdio v0.15.0: ui/studio.html (navigácia, lišta, telo sekcie, Kontrola, Rozpočet), ui/css/panel.css (:root),
+           ui/js/budget.js (sekcia Materiál, prepínač v <summary> ako „sčítať do rozpočtu"), ui/js/studio_settings.js
+           (fieldset „Výpočet a upozornenia"), ui/js/studio.js (navigácia, Kusovník → Platne).
+  Čísla počíta skript nižšie PRAVIDLOM KONCEPTU §3 (pásy zľava doprava, prvý pás, kde sa dielec zmestí, inak nový pás na
+  aktuálnej platni, inak nová platňa; prerez len medzi dielcami a pásmi; orez len bežné platne; duplák = prírezy podľa
+  počtu vrstiev (2 alebo 3), každý s prídavkom) a odhad z m² ako dnešný SheetEstimate (+10 až 25 %, nahor na desatiny) — preto A, B, C a E sedia.
+  Tokeny = kópia :root z panel.css + prepisy témy Lucia z win_fit.js. --mk-* = LEN anotácie mockupu.
+  --mat-* = farby dekorov z katalógu (dáta materiálu, v plugine rgbHex z [r,g,b]) — nie sú to UI tokeny.
+-->
+<style>
+  :root{
+    --nx-bg:#f4f5f7; --nx-surface:#fff; --nx-surface-sunken:#eceff1; --nx-surface-readonly:#f4f6f8;
+    --nx-surface-preview:#fafcff; --nx-surface-th:#f5f7f8; --nx-part-bg:#f2fafb;
+    --nx-ink:#263238; --nx-ink-title:#1b3a4b; --nx-ink-strong:#37474f; --nx-ink-label:#455a64;
+    --nx-ink-muted:#607d8b; --nx-ink-soft:#78909c; --nx-ink-faint:#90a4ae;
+    --nx-border:#cfd8dc; --nx-border-strong:#b0bec5; --nx-border-soft:#eceff1;
+    --nx-action:#2e7d32; --nx-action-hover:#1b5e20; --nx-on-accent:#fff;
+    --nx-select:#107787; --nx-select-strong:#0B5661; --nx-select-accent:#0e6b7a;
+    --nx-select-bg:#e0f2f4; --nx-select-bg-soft:#f0f9fa; --nx-select-bg-hover:#d6eef1; --nx-part-border:#7fc4cf;
+    --nx-ok-bg:#e8f5e9; --nx-ok-fg:#1b5e20; --nx-ok-border:#c8e6c9;
+    --nx-err-bg:#fdecea; --nx-err-fg:#b71c1c; --nx-err-border:#f5c6cb;
+    --nx-danger:#c62828; --nx-danger-bg:#fbe9e7; --nx-danger-border:#ffccbc;
+    --nx-danger-line:#e53935; --nx-danger-bg-soft:#fff5f5;
+    --nx-warn:#ffb74d; --nx-warn-bg:#fff8ef; --nx-warn-bg-soft:#fff3e0; --nx-warn-fg:#e65100;
+    --nx-warnchip-fg:#b26a00; --nx-warnchip-border:#ffcc80;
+    --nx-warnrow-fg:#7a5000; --nx-warnrow-border:#ffe0b2;
+    --nx-modalwarn-fg:#8d5a00; --nx-wbadge-fg:#4e2e00;
+    --nx-ghost-hover:#e0e4e7; --nx-logo:#78909c;
+    --nx-state-red:#d32f2f; --nx-state-orange:#f9a825; --nx-state-green:#388e3c;
+    --nx-scrim:rgba(38,50,56,.45); --nx-modal-shadow:rgba(0,0,0,.25);
+    /* LEN anotácie mockupu (nie sú to tokeny pluginu) — tie isté ako v schválenom mockupe ROHOVÁ */
+    --mk-page:#e6e9ec; --mk-bar:#2b3a42; --mk-bar-ink:#dfe7ec; --mk-bar-sub:#8ea3ae;
+    --mk-win-border:#b6c0c6; --mk-win-head:#dfe4e7; --mk-win-dot:#bcc6cc; --mk-shadow:rgba(20,30,45,.16);
+    --mk-bg:#fffdf3; --mk-border:#d8cfa8; --mk-ink:#6b5d1f; --mk-ink-strong:#5b4f18;
+    --mk-pin:#f6d860; --mk-pin-border:#c9a83a; --mk-pin-ink:#4a3f10; --mk-row:#fffbe6;
+    /* DÁTA: farby dekorov z katalógu (vzorka materiálu) */
+    --mat-h1181:#7c5a3a; --mat-w1000:#f2f1ec; --mat-hdf:#efeadd; --mat-uni:#a9a9b2; --mat-k001:#d9ccb4; --mat-pd:#b08658;
+  }
+  /* Téma Lucia — prepisuje VÝHRADNE výberovú rodinu (win_fit.js NX_THEME_TOKENS.lucia) */
+  :root[data-nx-theme="lucia"]{
+    --nx-select:#c2185b; --nx-select-strong:#880e4f; --nx-select-accent:#ad1457; --nx-select-bg:#fce4ec;
+    --nx-select-bg-soft:#fdf1f5; --nx-select-bg-hover:#fce4ec; --nx-part-border:#f48fb1; --nx-part-bg:#fff5f9;
+  }
+  *{box-sizing:border-box}
+  html{overflow-x:clip}
+  html,body{margin:0}
+  body{font-family:"Segoe UI",Tahoma,sans-serif;font-size:13px;color:var(--nx-ink);background:var(--mk-page);padding:0 0 70px}
+  button,input,select{font-family:inherit;font-size:inherit}
+  .ic{width:15px;height:15px;flex:0 0 auto;vertical-align:middle;fill:none;stroke:currentColor;
+      stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+  .nw{white-space:nowrap}
+
+  /* ===== stránka mockupu ===== */
+  .mockbar{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;padding:8px 16px;background:var(--mk-bar);color:var(--mk-bar-ink)}
+  .mockbar .mb-title{font-weight:600;font-size:13px}
+  .mockbar .mb-ver{font-size:11px;color:var(--mk-bar-sub)}
+  .mockbar .mb-sp{flex:1}
+  .mockbar .mb-ctl{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--mk-bar-sub)}
+  .mockbar .mb-ctl button{font-size:11px;padding:2px 9px;border-radius:6px;border:1px solid var(--mk-bar-sub);background:transparent;
+                          color:var(--mk-bar-ink);cursor:pointer}
+  .mockbar .mb-ctl button.on{background:var(--mk-bar-ink);color:var(--mk-bar)}
+  .mockbar label{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--mk-bar-ink);cursor:pointer}
+  .notestrip{display:flex;align-items:flex-start;gap:8px;padding:6px 16px;font-size:11.5px;line-height:1.45;
+             background:var(--nx-warn-bg-soft);color:var(--nx-warnchip-fg);border-bottom:1px solid var(--nx-warnchip-border)}
+  .notestrip .ic{margin-top:1px}
+  .page{max-width:1540px;margin:0 auto;padding:0 16px}
+  .intro{margin:16px auto 0;max-width:1180px;background:var(--nx-surface);border:1px solid var(--nx-border);border-radius:8px;
+         padding:12px 16px;line-height:1.5}
+  .intro h1{font-size:16px;margin:0 0 4px;color:var(--nx-ink-title)}
+  .stat{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:1px 8px;border-radius:9px;
+        background:var(--nx-warn-bg-soft);color:var(--nx-warnchip-fg);border:1px solid var(--nx-warnchip-border);vertical-align:2px;margin-left:6px}
+  .intro p{margin:6px 0}
+  .intro ul{margin:6px 0 0;padding-left:18px}
+  .intro li{margin:2px 0}
+  .intro .src{font-size:11.5px;color:var(--nx-ink-soft)}
+  .intro .legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:8px;font-size:11.5px;color:var(--nx-ink-muted)}
+  .intro .legend span{display:inline-flex;align-items:center;gap:6px}
+  .intro .dec{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:6px 0 2px;font-size:12px}
+  .intro .dec b{color:var(--nx-ink-strong)}
+  .sh{margin:34px auto 0;display:flex;align-items:baseline;gap:6px 10px;flex-wrap:wrap;justify-content:center;text-align:center}
+  .sh h2{margin:0;font-size:16px;color:var(--nx-ink-title)}
+  .sh .shl{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:22px;padding:0 7px;border-radius:6px;
+           background:var(--mk-bar);color:var(--nx-on-accent);font-size:12px;font-weight:700}
+  .sh .shsub{flex-basis:100%;font-size:12px;color:var(--nx-ink-muted)}
+  .sh .shsub>span{display:inline-block;max-width:980px}
+  .stagewrap{padding:12px 0 0;display:flex;gap:18px;justify-content:center;align-items:flex-start;flex-wrap:wrap}
+  .stage{min-width:0;max-width:100%}
+  .winscroll{max-width:calc(100% + 48px);overflow-x:auto;padding:4px 24px 36px;margin:0 -24px -20px}
+  .side{width:380px;max-width:100%;flex:0 1 380px;min-width:0}
+  .side.wide{width:560px;flex-basis:560px}
+  .win{background:var(--nx-surface);border:1px solid var(--mk-win-border);border-radius:9px;box-shadow:0 12px 34px var(--mk-shadow);overflow:hidden}
+  .winhead{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--mk-win-head);border-bottom:1px solid var(--nx-border);
+           font-size:12px;font-weight:600;color:var(--nx-ink-strong)}
+  .winhead .wdots{display:flex;gap:4px}
+  .winhead .wdots i{width:9px;height:9px;border-radius:50%;background:var(--mk-win-dot);display:block}
+  .winhead .wsub{font-weight:400;color:var(--nx-ink-muted)}
+  .winhead .wsize{margin-left:auto;font-weight:400;font-size:11px;color:var(--nx-ink-faint);white-space:nowrap}
+  .wincap{font-size:11.5px;color:var(--nx-ink-muted);margin:0 0 6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .wincap b{color:var(--nx-ink-strong)}
+  .mocknote{background:var(--mk-bg);border:1px dashed var(--mk-border);border-radius:8px;padding:10px 13px;font-size:12px;
+            color:var(--mk-ink);line-height:1.55;margin-bottom:12px}
+  .mocknote b{color:var(--mk-ink-strong)}
+  .mocknote h4{margin:0 0 4px;font-size:12.5px;color:var(--mk-ink-strong)}
+  .mocknote ol{margin:4px 0 0;padding-left:0;list-style:none}
+  .mocknote li{margin:5px 0;padding-left:32px;position:relative}
+  .mocknote ul.dots{margin:6px 0 0;padding-left:0;list-style:none}
+  .mocknote ul.dots li{padding-left:14px}
+  .mocknote ul.dots li::before{content:'';position:absolute;left:3px;top:8px;width:5px;height:5px;border-radius:50%;background:var(--mk-border)}
+  .npin{position:absolute;left:0;top:1px;min-width:26px;height:16px;padding:0 4px;border-radius:8px;background:var(--mk-pin);
+        color:var(--mk-pin-ink);border:1px solid var(--mk-pin-border);font:700 9.5px/14px "Segoe UI",sans-serif;text-align:center}
+  /* štítky O… = SCHVÁLENÉ body (N11, 28.9.2026) — zelené, nič nepôsobí ako otvorené */
+  .oref{display:inline-block;font-size:9.5px;font-weight:700;padding:0 6px;border-radius:9px;border:1px solid var(--nx-ok-border);
+        color:var(--nx-ok-fg);background:var(--nx-ok-bg);vertical-align:1px;white-space:nowrap;text-decoration:none}
+  .oref.ok{border-color:var(--nx-ok-border);color:var(--nx-ok-fg);background:var(--nx-ok-bg)}
+  /* žlté štítky = zmena oproti dnešnému pluginu; zelené O… = schválený bod */
+  .mpin{display:inline-block;min-width:18px;height:16px;padding:0 4px;border-radius:8px;background:var(--mk-pin);color:var(--mk-pin-ink);
+        border:1px solid var(--mk-pin-border);font:700 9px/14px "Segoe UI",sans-serif;text-align:center;letter-spacing:0;text-transform:none;
+        vertical-align:1px;box-shadow:0 1px 2px rgba(0,0,0,.16);font-style:normal;margin:0 4px;flex:0 0 auto}
+  .otag{display:inline-block;height:16px;padding:0 6px;border-radius:8px;background:var(--nx-ok-bg);color:var(--nx-ok-fg);
+        border:1px solid var(--nx-ok-border);font:700 9px/14px "Segoe UI",sans-serif;white-space:nowrap;vertical-align:1px;
+        text-decoration:none;letter-spacing:0;text-transform:none;font-style:normal;margin:0 3px;flex:0 0 auto}
+  .otag.ok{background:var(--nx-ok-bg);color:var(--nx-ok-fg);border-color:var(--nx-ok-border)}
+  body.nopins .mpin, body.nopins .otag{display:none}
+  .mkhl{background:var(--mk-row);outline:1px dashed var(--mk-border);outline-offset:1px;border-radius:3px}
+  body.nopins .mkhl{background:none;outline:none}
+  .flash{animation:flash 1.6s ease}
+  @keyframes flash{0%,40%{box-shadow:0 0 0 3px var(--nx-warn)}100%{box-shadow:0 0 0 0 transparent}}
+
+  /* ===== schválené body O1–O12 (hlavička mockupu) ===== */
+  .ohead{max-width:1180px;margin:18px auto 0}
+  .ohead h2{font-size:15px;margin:0;color:var(--nx-ink-title)}
+  .ohead .osub{font-size:12px;color:var(--nx-ink-muted);margin:2px 0 8px}
+  .ogrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:10px}
+  .obox{border:1.5px dashed var(--nx-warn);background:var(--nx-surface);border-radius:8px;padding:8px 11px 9px;font-size:12px;line-height:1.48}
+  .obox:target{box-shadow:0 0 0 3px var(--nx-ok-border)}
+  .obox .oh{display:flex;align-items:baseline;gap:4px 8px;flex-wrap:wrap;margin:0 0 3px}
+  .obox .oh b{font-size:12.5px;color:var(--nx-ink-title)}
+  .obox .otagi{display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:9px;background:var(--nx-warn-bg-soft);
+               color:var(--nx-warnchip-fg);border:1px solid var(--nx-warnchip-border);white-space:nowrap}
+  .obox dl{display:grid;grid-template-columns:70px minmax(0,1fr);gap:2px 8px;margin:3px 0 0}
+  .obox dt{color:var(--nx-warnrow-fg);font-weight:600}
+  .obox dd{margin:0}
+  .obox .where{font-size:11px;color:var(--nx-ink-soft);margin-top:4px}
+  .obox .where a{color:var(--nx-select);text-decoration:none;font-weight:600}
+  .obox .where a:hover{text-decoration:underline}
+  .obox.ok{border:1.5px solid var(--nx-ok-border);background:var(--nx-ok-bg)}
+  .obox.ok .otagi{background:var(--nx-surface);color:var(--nx-ok-fg);border-color:var(--nx-ok-border)}
+  .obox .oalt{margin-top:4px;font-size:11px;color:var(--nx-ink-faint)}
+  .obox .oalt s{text-decoration:none}
+  .approved{margin:14px auto 0;max-width:1180px;padding:10px 14px;border:2px solid var(--nx-action);border-radius:8px;
+            background:var(--nx-ok-bg);color:var(--nx-ok-fg);font-weight:600;font-size:14px;line-height:1.45}
+  .obox.ok dt{color:var(--nx-ok-fg)}
+  .fyi{max-width:1180px;margin:30px auto 0;background:var(--nx-surface);border:1px solid var(--nx-border);border-left:4px solid var(--nx-ink-faint);
+       border-radius:8px;padding:10px 16px 12px 14px;line-height:1.5;font-size:12.5px}
+  .fyi h3{margin:0 0 4px;font-size:13.5px;color:var(--nx-ink-title)}
+  .fyi ul{margin:0;padding-left:18px}
+  .fyi li{margin:4px 0}
+
+  /* =====================================================================
+     ŠTÚDIO — zrkadlo ui/studio.html + panel.css (scope .stu)
+     ===================================================================== */
+  .stu{font-size:13px;color:var(--nx-ink);background:var(--nx-bg)}
+  .stu button{padding:7px 8px;border:0;border-radius:6px;cursor:pointer;font:inherit;font-size:12px;font-weight:600}
+  .stu .primary{background:var(--nx-action);color:var(--nx-on-accent)}
+  .stu .primary:hover{background:var(--nx-action-hover)}
+  .stu .ghostbtn{background:var(--nx-surface-sunken);color:var(--nx-ink-strong);border:1px solid var(--nx-border)}
+  .stu .ghostbtn:hover{background:var(--nx-ghost-hover)}
+  .stu.full{display:flex;flex-direction:column;width:1060px;height:640px}
+  .stu .studio{flex:1;display:flex;min-height:0}
+  .stu .snav{flex:0 0 208px;background:var(--nx-bg);border-right:1px solid var(--nx-border);padding:8px 6px;overflow:auto}
+  .stu .sgrp{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--nx-ink-faint);padding:9px 8px 3px}
+  .stu .sgrp:first-child{padding-top:2px}
+  .stu .navitem{display:flex;width:100%;align-items:center;gap:8px;padding:6px 8px;margin:1px 0;border:0;border-radius:6px;background:none;
+                font-size:12.5px;font-weight:400;color:var(--nx-ink-strong);text-align:left}
+  .stu .navitem:hover{background:var(--nx-select-bg-soft)}
+  .stu .navitem.on{background:var(--nx-select-bg);color:var(--nx-select);font-weight:600;box-shadow:inset 3px 0 0 var(--nx-select)}
+  .stu .navitem .ic{width:15px;height:15px;color:var(--nx-ink-muted);flex:0 0 15px}
+  .stu .navitem.on .ic{color:var(--nx-select)}
+  .stu .navitem span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .stu .navitem .mpin{flex:0 0 auto}
+  .stu .navfoot{margin-top:10px;padding-top:6px;border-top:1px solid var(--nx-border-soft)}
+  .stu .nbadge{display:inline-flex;gap:3px;align-items:center;flex:0 0 auto}
+  .stu .nbadge i{font-style:normal;font-size:10px;font-weight:700;border-radius:9px;padding:0 5px;line-height:15px}
+  .stu .nbadge i.r{background:var(--nx-err-bg);color:var(--nx-err-fg);border:1px solid var(--nx-err-border)}
+  .stu .nbadge i.o{background:var(--nx-warn-bg-soft);color:var(--nx-wbadge-fg);border:1px solid var(--nx-warnchip-border)}
+  .stu .sbody{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--nx-surface)}
+  .stu.part{width:852px}
+  .stu.part .sbody{min-height:0}
+  .stu .sechead{display:flex;align-items:baseline;gap:8px;padding:9px 12px;border-bottom:1px solid var(--nx-border);background:var(--nx-bg)}
+  .stu .sechead h2{font-size:14px;margin:0;color:var(--nx-ink-title);font-weight:700}
+  .stu .sechead .sechint{font-size:11px;color:var(--nx-ink-soft);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .stu .sechead .secmodel{margin-left:auto;font-size:11px;color:var(--nx-ink-faint);white-space:nowrap}
+  .stu .sectools{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--nx-border-soft);flex-wrap:wrap;position:relative}
+  .stu .sectools .spacer{flex:1}
+  .stu .sectools .primary,.stu .sectools .ghostbtn{display:inline-flex;align-items:center;gap:5px;padding:6px 10px}
+  .stu .sectools .primary{padding:6px 12px}
+  .stu .sectools .ic{width:14px;height:14px}
+  .stu .sectools .sechint{font-size:11px;color:var(--nx-ink-soft)}
+  .stu .secscroll{flex:1;overflow:auto;padding:10px 12px 20px;min-height:0}
+  .stu .status{font-size:11px;padding:7px 12px;background:var(--nx-surface-sunken);color:var(--nx-ink-label);border-top:1px solid var(--nx-border);
+               min-height:30px;line-height:1.35}
+  .stu .status.ok{background:var(--nx-ok-bg);color:var(--nx-ok-fg);border-top-color:var(--nx-ok-border)}
+  .stu .spacer{flex:1}
+  .stu .linkbtn{background:none;border:0;padding:0;color:var(--nx-select);text-decoration:underline;font-size:11.5px;font-weight:600;cursor:pointer}
+  .stu .linkbtn .ic{width:12px;height:12px}
+  /* tooltip „?" (.nxtip, D-130a) */
+  .nxtip{position:relative;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:18px;height:18px;padding:0!important;
+         border:0;border-radius:50%;background:none;color:var(--nx-ink-faint);cursor:help;vertical-align:middle}
+  .nxtip:hover,.nxtip:focus{color:var(--nx-select);outline:none}
+  .nxtip:focus-visible{outline:2px solid var(--nx-select);outline-offset:1px}
+  .nxtip .ic{width:13px;height:13px}
+  .nxtip::after{content:attr(data-tip);display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:130;width:270px;max-width:70vw;
+                padding:7px 9px;border-radius:6px;background:var(--nx-ink);color:var(--nx-surface);font-size:11px;font-weight:400;line-height:1.45;
+                white-space:pre-line;text-align:left;box-shadow:0 6px 18px var(--nx-modal-shadow);text-transform:none;letter-spacing:0}
+  .nxtip.r::after{left:auto;right:0}
+  .nxtip.up::after{top:auto;bottom:calc(100% + 6px)}
+  .nxtip:hover::after,.nxtip:focus::after{display:block}
+  .chev{width:6px;height:6px;border-right:2px solid var(--nx-ink-faint);border-bottom:2px solid var(--nx-ink-faint);transform:rotate(45deg);
+        flex:0 0 6px;position:relative;top:-2px;transition:transform .12s;display:inline-block}
+
+  /* ===== NOVÉ · sekcia Nárezový plán ===== */
+  .stu .npparam{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:99px;background:var(--nx-surface);
+                border:1px solid var(--nx-border-strong);color:var(--nx-ink-label);font-size:11.5px;font-weight:600}
+  .stu .npparam:hover{border-color:var(--nx-select);color:var(--nx-select);background:var(--nx-select-bg-soft)}
+  .stu .npparam .ic{width:13px;height:13px}
+  .stu .npsum{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;padding:7px 10px;border:1px solid var(--nx-border);border-radius:6px;
+              background:var(--nx-surface-th);font-size:12.5px;color:var(--nx-ink-strong);margin:0 0 10px}
+  .stu .npsum b{color:var(--nx-ink-title)}
+  .stu .npsum .tmuted{color:var(--nx-ink-muted)}
+  .npchip{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:600;border-radius:6px;padding:1px 7px;white-space:nowrap;
+          line-height:16px;vertical-align:1px}
+  .npchip .ic{width:11px;height:11px}
+  .npchip.info{background:var(--nx-surface-sunken);color:var(--nx-ink-muted);border:1px solid var(--nx-border)}
+  .npchip.warn{background:var(--nx-warn-bg-soft);color:var(--nx-warnchip-fg);border:1px solid var(--nx-warnchip-border)}
+  .npchip.err{background:var(--nx-err-bg);color:var(--nx-err-fg);border:1px solid var(--nx-err-border)}
+  .stu .npcard{border:1px solid var(--nx-border);border-radius:8px;margin:0 0 10px;background:var(--nx-surface)}
+  .stu .nphead{padding:6px 10px 6px;background:var(--nx-surface-th);border-bottom:1px solid var(--nx-border);border-radius:8px 8px 0 0}
+  .stu .npcard.closed .nphead{border-bottom:0;border-radius:8px}
+  .stu .npcard.closed .chev{transform:rotate(-45deg);top:0}
+  .stu .npcard.closed .npbody{display:none}
+  .stu .nptog{display:flex;align-items:center;gap:8px;width:100%;min-width:0;padding:1px 0!important;background:none;border:0;
+              text-align:left;font-weight:400!important;cursor:pointer}
+  .stu .nptog:hover .npname{color:var(--nx-select)}
+  .stu .nptog .sw{width:16px;height:16px;border-radius:3px;flex:0 0 16px;border:1px solid var(--nx-border-strong)}
+  .stu .npname{font-weight:600;font-size:12.5px;color:var(--nx-ink-strong);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .stu .npman{font-size:11px;color:var(--nx-ink-muted);white-space:nowrap}
+  .stu .npstate{display:inline-flex;align-items:center;gap:3px}
+  .stu .npstate .ic{width:14px;height:14px}
+  .stu .npstate .w{color:var(--nx-warn-fg)}
+  .stu .npstate .e{color:var(--nx-err-fg)}
+  .stu .npcount{white-space:nowrap;font-size:12px;color:var(--nx-ink-muted)}
+  .stu .npcount b{font-size:13px;color:var(--nx-ink-title)}
+  .stu .npcount small{font-size:11px}
+  .stu .npcount.orient{color:var(--nx-warnchip-fg)}
+  .stu .npcount.orient b{color:var(--nx-warnchip-fg)}
+  .stu .npcount.inc small{color:var(--nx-err-fg)}
+  .stu .npl2{display:flex;align-items:center;flex-wrap:wrap;gap:3px 6px;padding:2px 0 0 36px;font-size:11px;color:var(--nx-ink-muted);
+             font-variant-numeric:tabular-nums}
+  .stu .npl2 .nxtip{width:16px;height:16px;margin-left:-3px}
+  .stu .npl2 .sep{color:var(--nx-border-strong)}
+  .stu .npl2 b{color:var(--nx-ink-strong);font-weight:600}
+  .stu .npbody{padding:8px 10px 9px}
+  .stu .npgrid{display:flex;flex-wrap:wrap;gap:8px}
+  .stu .npthumb{display:flex;flex-direction:column;gap:3px;padding:5px 6px 6px;border:1px solid var(--nx-border);border-radius:6px;
+                background:var(--nx-surface);font-weight:400;text-align:left}
+  .stu .npthumb:hover{border-color:var(--nx-select);background:var(--nx-select-bg-soft)}
+  .stu .npthumb.on{border-color:var(--nx-select);box-shadow:0 0 0 1px var(--nx-select);background:var(--nx-select-bg-soft)}
+  .stu .npthumb.warn{border-color:var(--nx-warnchip-border);background:var(--nx-warn-bg)}
+  .stu .npthumb.warn.on{border-color:var(--nx-select)}
+  .stu .npthumb.orient{border-style:dashed}
+  .stu .npthumb.orient svg{opacity:.72}
+  .stu .npthd{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--nx-ink-muted)}
+  .stu .npthd .ic{width:12px;height:12px;color:var(--nx-warn-fg)}
+  .stu .npthd .u{margin-left:auto;font-weight:700;color:var(--nx-ink-strong);font-variant-numeric:tabular-nums}
+  .stu .npthumb.warn .npthd .u{color:var(--nx-warn-fg)}
+  .stu .npthumb svg{display:block}
+  .stu .npwarn{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:8px;padding:5px 9px;border:1px solid var(--nx-warnchip-border);
+               border-radius:6px;background:var(--nx-warn-bg);color:var(--nx-warnrow-fg);font-size:12px}
+  .stu .npwarn>.ic{width:14px;height:14px;color:var(--nx-warn-fg)}
+  .stu .npwarn b{color:var(--nx-warn-fg)}
+  .stu .npmiss{margin-top:8px;border:1px solid var(--nx-err-border);border-radius:6px;background:var(--nx-err-bg);color:var(--nx-err-fg);font-size:12px}
+  .stu .npmisshd{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:5px 9px;border-bottom:1px solid var(--nx-err-border)}
+  .stu .npmisshd .ic{width:14px;height:14px}
+  .stu .npmisshd .why{font-size:11px;color:var(--nx-err-fg);opacity:.85}
+  .stu .npmissrow{display:grid;grid-template-columns:minmax(0,1fr) 90px 100px 44px 28px;align-items:center;gap:8px;padding:3px 9px;
+                  font-variant-numeric:tabular-nums}
+  .stu .npmissrow .num{text-align:right}
+  .stu .npmissrow .npwhy{display:block;font-size:10.5px;opacity:.85}
+  .stu .eyebtn{width:24px;height:22px;padding:0!important;border:1px solid var(--nx-border)!important;border-radius:6px;background:var(--nx-surface);
+               color:var(--nx-ink-muted);display:inline-flex;align-items:center;justify-content:center}
+  .stu .eyebtn:hover{color:var(--nx-select);border-color:var(--nx-select)!important}
+  .stu .eyebtn .ic{width:13px;height:13px}
+  /* detail platne */
+  .stu .npbar{display:inline-flex;align-items:center;gap:0;border:1px solid var(--nx-border-strong);border-radius:6px;overflow:hidden}
+  .stu .npbar button{border-radius:0;padding:5px 7px;background:var(--nx-surface);color:var(--nx-ink-muted)}
+  .stu .npbar button:hover{background:var(--nx-select-bg-soft);color:var(--nx-select)}
+  .stu .npbar .pg{padding:5px 10px;font-size:12px;font-weight:600;color:var(--nx-ink-strong);border-left:1px solid var(--nx-border-soft);
+                  border-right:1px solid var(--nx-border-soft);white-space:nowrap;font-variant-numeric:tabular-nums}
+  .stu .npbar .ic{width:14px;height:14px}
+  .stu .flipx{transform:scaleX(-1)}
+  .stu .npdhd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 6px;font-size:12px;color:var(--nx-ink-muted)}
+  .stu .npdhd .sw{width:14px;height:14px;border-radius:3px;border:1px solid var(--nx-border-strong)}
+  .stu .npdhd b{color:var(--nx-ink-strong)}
+  .stu .npdsvg{display:block;margin:0 0 8px}
+  .stu .nplist{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;border:1px solid var(--nx-border);border-radius:6px;overflow:hidden}
+  .stu .nplist th{background:var(--nx-surface-th);color:var(--nx-ink-label);font-weight:600;font-size:11px;text-align:left;padding:4px 8px;
+                  border-bottom:1px solid var(--nx-border);white-space:nowrap}
+  .stu .nplist td{padding:3px 8px;border-bottom:1px solid var(--nx-border-soft);color:var(--nx-ink);vertical-align:middle}
+  .stu .nplist tr:last-child td{border-bottom:0}
+  .stu .nplist .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .stu .nplist td.own{color:var(--nx-ink-muted);max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .stu .nplist tbody tr:hover td,.stu .nplist tbody tr.hl td{background:var(--nx-select-bg-soft)}
+  .stu .nplist td.act{width:34px;text-align:right}
+  .stu .nplist .sub{font-size:10.5px;color:var(--nx-ink-soft)}
+  /* SVG platne — farby VÝHRADNE cez triedy a tokeny (téma-bezpečné) */
+  .np-sheet{fill:var(--nx-surface-sunken)}
+  .np-waste.s{fill:url(#npHatchS)}
+  .np-waste.l{fill:url(#npHatchL)}
+  .np-hatch{stroke:var(--nx-border-strong);stroke-width:1}
+  .np-hatchd{stroke:var(--nx-ink-faint);stroke-width:1}
+  .np-trim{fill:url(#npHatchD)}
+  .np-edge{fill:none;stroke:var(--nx-ink-faint);stroke-width:1}
+  .np-part{fill:var(--nx-surface);stroke:var(--nx-ink-soft);stroke-width:.7}
+  .np-part.d{stroke-width:1}
+  .np-part.dup{fill:var(--nx-surface-th)}
+  .np-part.lone{fill:var(--nx-warn-bg-soft);stroke:var(--nx-warn-fg)}
+  .np-part.hl{fill:var(--nx-select-bg);stroke:var(--nx-select);stroke-width:1.6}
+  .np-left{fill:none;stroke:var(--nx-ink-muted);stroke-width:1;stroke-dasharray:5 4}
+  .np-lbl{fill:var(--nx-ink-strong);font-size:12px;font-weight:600}
+  .np-dim{fill:var(--nx-ink-muted);font-size:11px;font-variant-numeric:tabular-nums}
+  .np-dup{fill:var(--nx-ink-muted);font-size:9.5px}
+  .np-leftlbl{fill:var(--nx-ink-muted);font-size:11px;font-style:italic;font-weight:600}
+  .np-cap{fill:var(--nx-ink-soft);font-size:10.5px}
+  .np-grain{stroke:var(--nx-ink-muted);stroke-width:1.3;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .np-part,.np-lbl,.np-dim{transition:fill .08s}
+
+  /* ===== Kontrola (zrkadlo studio.html) ===== */
+  .stu .semafor{display:flex;gap:8px;margin-bottom:10px}
+  .stu .schip{flex:1;border:1px solid var(--nx-border);border-radius:6px;padding:8px 10px;background:var(--nx-surface);display:flex;align-items:center;
+              gap:8px;font-weight:400;text-align:left}
+  .stu .schip .dot{width:12px;height:12px;border-radius:50%;flex:0 0 12px}
+  .stu .schip .n{font-size:19px;font-weight:700;color:var(--nx-ink-title);line-height:1}
+  .stu .schip .t{font-size:11px;color:var(--nx-ink-muted)}
+  .stu .schip.s-red .dot{background:var(--nx-state-red)}
+  .stu .schip.s-orange .dot{background:var(--nx-state-orange)}
+  .stu .schip.s-green .dot{background:var(--nx-state-green)}
+  .stu .ctrlrow{display:flex;align-items:center;gap:9px;padding:7px 9px;border:1px solid var(--nx-border);border-radius:6px;margin-bottom:6px;
+                background:var(--nx-surface);font-size:12.5px;width:100%;font-weight:400;text-align:left}
+  .stu .ctrlrow:hover{background:var(--nx-select-bg-soft);border-color:var(--nx-select)}
+  .stu .ctrlrow .dot{width:10px;height:10px;border-radius:50%;flex:0 0 10px}
+  .stu .ctrlrow.ctrl-red .dot{background:var(--nx-state-red)}
+  .stu .ctrlrow.ctrl-orange .dot{background:var(--nx-state-orange)}
+  .stu .ctrlrow .msg{flex:1;min-width:0;color:var(--nx-ink)}
+  .stu .ctrlrow .where{color:var(--nx-ink-muted);font-size:11.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .stu .ctrlrow .rowact{display:flex;gap:3px}
+  .stu .ctrlrow .goact{width:24px;height:22px;padding:0;border:1px solid var(--nx-border);border-radius:6px;background:var(--nx-surface);
+                       color:var(--nx-ink-muted);display:inline-flex;align-items:center;justify-content:center}
+  .stu .ctrlrow .goact .ic{width:13px;height:13px}
+  .stu .ctrluni-toggle{border-color:var(--nx-warnchip-border);background:var(--nx-warn-bg)}
+  .stu .ctrluni-toggle .msg{font-weight:600}
+  .stu .ctrlrow.mk{outline:2px dashed var(--mk-pin-border);outline-offset:1px}
+  body.nopins .stu .ctrlrow.mk{outline:none}
+  .stu .ctrlok{padding:10px;border:1px dashed var(--nx-border);border-radius:6px;color:var(--nx-ink-muted);font-size:12px;margin-bottom:6px}
+  .stu .ecbtn{display:inline-flex;align-items:center;gap:5px;padding:6px 10px}
+
+  /* ===== Rozpočet (zrkadlo studio.html ŠT-1c) ===== */
+  .stu .bseg{display:flex;border:1px solid var(--nx-border-strong);border-radius:6px;overflow:hidden;font-size:11.5px;flex:0 0 auto}
+  .stu .bseg button{border:0;background:var(--nx-surface);padding:5px 10px;border-radius:0;color:var(--nx-ink-label);font-size:11.5px;font-weight:400;min-width:46px}
+  .stu .bseg button+button{border-left:1px solid var(--nx-border-soft)}
+  .stu .bseg button.on{background:var(--nx-select);color:var(--nx-on-accent);font-weight:600}
+  .stu details.bsec{background:var(--nx-surface);border:1px solid var(--nx-border);border-radius:8px;margin:0 0 8px;overflow:hidden}
+  .stu details.bsec>summary{display:flex;align-items:center;gap:9px;padding:7px 12px;flex-wrap:wrap;font-weight:400;cursor:pointer;list-style:none;user-select:none}
+  .stu details.bsec>summary::-webkit-details-marker{display:none}
+  .stu details.bsec>summary::before{content:'';display:inline-block;width:6px;height:6px;border-right:2px solid var(--nx-ink-faint);
+      border-bottom:2px solid var(--nx-ink-faint);transform:rotate(-45deg);transition:transform .12s;position:relative;top:-1px}
+  .stu details.bsec[open]>summary::before{transform:rotate(45deg);top:-2px}
+  .stu details.bsec>summary h3{margin:0;font-size:11.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--nx-ink-strong);font-weight:600}
+  .stu .bcnt{font-size:11px;color:var(--nx-ink-faint)}
+  .stu .bsubt{margin-left:auto;font-weight:700;font-variant-numeric:tabular-nums;color:var(--nx-ink-title);font-size:13px}
+  .stu .bappl{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--nx-ink-label);cursor:pointer}
+  .stu .bappl input{accent-color:var(--nx-select);margin:0}
+  .stu .bappl.onst{color:var(--nx-select-strong);font-weight:600}
+  .stu .btab{width:100%;border-collapse:collapse;font-size:12px}
+  .stu .btab th{background:var(--nx-surface-th);color:var(--nx-ink-label);font-weight:600;text-align:left;font-size:10.5px;padding:4px 12px;
+                border-top:1px solid var(--nx-border-soft);border-bottom:1px solid var(--nx-border)}
+  .stu .btab td{padding:3px 10px;border-bottom:1px solid var(--nx-border-soft);vertical-align:middle}
+  .stu .btab tr:last-child td{border-bottom:0}
+  .stu .btab th.bnum,.stu .btab td.bnum{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .stu .btab td.bmut{color:var(--nx-ink-muted)}
+  .stu .bfnt{color:var(--nx-ink-faint);font-size:11px}
+  .stu .btab tr.bmiss td{background:var(--nx-warn-bg)}
+  .stu .bmisslbl{color:var(--nx-warn-fg);font-size:11px}
+  .stu .bedit{font:inherit;font-size:12px;border:1px solid var(--nx-border-strong);border-radius:6px;padding:2px 5px;background:var(--nx-surface);
+              color:var(--nx-ink);width:90px;text-align:right;font-variant-numeric:tabular-nums}
+  .stu .qtag{display:inline-block;font-size:9.5px;font-weight:700;border-radius:9px;padding:0 6px;margin-right:6px;vertical-align:1px;line-height:15px;cursor:help}
+  .stu .qtag.plan{background:var(--nx-surface-sunken);color:var(--nx-ink-muted);border:1px solid var(--nx-border)}
+  .stu .qtag.est{background:var(--nx-warn-bg-soft);color:var(--nx-warnchip-fg);border:1px solid var(--nx-warnchip-border)}
+  .stu .bnote2{font-size:10.5px;color:var(--nx-ink-faint);padding:2px 12px 8px;line-height:1.45}
+  .stu tr.chg td{background:var(--mk-row)}
+  body.nopins .stu tr.chg td{background:none}
+  .xlsx{font-family:Consolas,"Courier New",monospace;font-size:11px;background:var(--nx-surface);border:1px solid var(--nx-border);border-radius:6px;
+        margin-top:10px;overflow:hidden}
+  .xlsx .xh,.xlsx .xr{display:grid;grid-template-columns:minmax(0,1fr) 60px 50px 90px 90px}
+  .xlsx .xh{background:var(--nx-surface-th);font-weight:700;color:var(--nx-ink-label)}
+  .xlsx .xh>span,.xlsx .xr>span{padding:3px 7px;border-right:1px solid var(--nx-border-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .xlsx .xr>span:first-child{white-space:normal}
+  .xlsx .xr{border-top:1px solid var(--nx-border-soft)}
+  .xlsx .r{text-align:right}
+
+  /* ===== Nastavenia rozpočtu (zrkadlo studio.html ŠT-4a) ===== */
+  .stu .sshead{font-size:11.5px;color:var(--nx-ink-faint);margin:0 0 8px}
+  .stu fieldset{border:1px solid var(--nx-border);border-radius:8px;padding:8px 12px 12px;margin:0 0 12px;background:var(--nx-surface)}
+  .stu legend{font-size:11px;font-weight:600;color:var(--nx-ink-label);padding:0 4px}
+  .stu .ssgrid{width:100%;border-collapse:collapse;font-size:12px}
+  .stu .ssgrid td{padding:4px 8px;border-bottom:1px solid var(--nx-border-soft)}
+  .stu .ssgrid td.n{text-align:right;width:92px}
+  .stu .ssgrid td.u{color:var(--nx-ink-faint);font-size:11px;width:68px}
+  .stu .ssgrid input{width:82px;text-align:right;font:inherit;font-size:12px;border:1px solid var(--nx-border-strong);border-radius:6px;
+                     padding:3px 6px;background:var(--nx-surface);color:var(--nx-ink)}
+  .stu .ssgrid input.bad{border-color:var(--nx-danger-line);background:var(--nx-danger-bg-soft)}
+  .stu .ssgrid tr:hover td{background:var(--nx-select-bg-soft)}
+  .stu .ssgrid tr.new td{background:var(--mk-row)}
+  body.nopins .stu .ssgrid tr.new td{background:none}
+  .stu .ssgrid .lbl{display:inline-flex;align-items:center;gap:3px}
+  .stu .sshint{font-size:10.5px;color:var(--nx-ink-faint);margin:4px 0 10px;line-height:1.45}
+  .stu .ssfold{font-size:11.5px;color:var(--nx-ink-muted);padding:6px 10px;border:1px dashed var(--nx-border);border-radius:8px;margin:0 0 12px}
+
+  @media (max-width:760px){
+    .sh{justify-content:flex-start;text-align:left}
+    .ogrid{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <!-- šrafovanie odpadu a orezu (farba čiary = trieda .np-hatch / .np-hatchd → token) -->
+    <pattern id="npHatchS" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="np-hatch" d="M0 0V4"/></pattern>
+    <pattern id="npHatchL" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="np-hatch" d="M0 0V7"/></pattern>
+    <pattern id="npHatchD" width="2.5" height="2.5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="np-hatchd" d="M0 0V2.5"/></pattern>
+    <!-- sprite = výrez z ui/js/icons.js (Lucide 24×24, stroke 2) -->
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></symbol>
+    <symbol id="i-clipboard-check" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></symbol>
+    <symbol id="i-cart" viewBox="0 0 24 24"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></symbol>
+    <symbol id="i-euro" viewBox="0 0 24 24"><path d="M4 10h12"/><path d="M4 14h9"/><path d="M19 6a7.7 7.7 0 0 0-5.2-2A7.9 7.9 0 0 0 6 12c0 4.4 3.5 8 7.8 8 2 0 3.8-.8 5.2-2"/></symbol>
+    <symbol id="i-file-text" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v5h5"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol>
+    <symbol id="i-scissors" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></symbol>
+    <symbol id="i-hammer" viewBox="0 0 24 24"><path d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5"/></symbol>
+    <symbol id="i-appliance" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M5 10h14"/><path d="M15 5v2"/><path d="M15 13v3"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></symbol>
+    <symbol id="i-truck" viewBox="0 0 24 24"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M14 9h4l4 4v4a1 1 0 0 1-1 1h-1"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+    <symbol id="i-panel-left" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></symbol>
+    <symbol id="i-refresh-cw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+    <symbol id="i-help-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></symbol>
+    <symbol id="i-grain" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="1.5"/><path d="M6 9.5h12"/><path d="M6 12h12"/><path d="M6 14.5h12"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-rotate-ccw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+    <symbol id="i-arrow-left-right" viewBox="0 0 24 24"><path d="m8 3-4 4 4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></symbol>
+    <symbol id="i-shell" viewBox="0 0 24 24"><path d="M14 11a2 2 0 1 1-4 0 4 4 0 0 1 8 0 6 6 0 0 1-12 0 8 8 0 0 1 16 0 10 10 0 1 1-20 0 11.93 11.93 0 0 1 2.42-7.22 2 2 0 1 1 3.16 2.44"/></symbol>
+    <symbol id="i-direction" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1.5"/><path d="m9 8 5 4-5 4" stroke-dasharray="3 2"/></symbol>
+  </defs>
+</svg>
+
+<div class="mockbar">
+  <span class="mb-title">Noxun Engine — mockup NÁREZOVÝ PLÁN (blok 2 · primitívny plán)</span>
+  <span class="mb-ver">Štúdio · Rozpočet · Nastavenia rozpočtu · Kontrola · SCHVÁLENÉ 28.9.2026 (O2 prah 20 %) · klikateľné</span>
+  <span class="mb-sp"></span>
+  <span class="mb-ctl">téma okna: <button type="button" data-theme="noxun" class="on">NOXUN</button><button type="button" data-theme="lucia">Lucia</button></span>
+  <label><input type="checkbox" id="pinTog" checked> štítky a rámčeky</label>
+</div>
+<div class="notestrip">
+  <svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>
+  <span>Mockup, nie živý plugin. Klikaj: karty materiálov (zbalenie), malé platne (otvoria detail v B), šípky v detaile, oko pri dielci, prepínač témy hore. V časti D zmeň prerez, orez alebo prídavok dupláku a daj <b>Uložiť</b> — A, B, C aj E sa prepočítajú. <b>Zelené štítky O… = schválené body</b> (zoznam hneď nižšie), žlté = zmena oproti dnešnému pluginu.</span>
+</div>
+
+<main class="page">
+
+<div class="approved" role="note">platí — schválené Michalom 28.9.2026: O1–O12 podľa návrhu, O2 s prahom 20 % (upozornenie na poslednú platňu pri využití pod 20 % alebo najviac 2 dielcoch, len keď má materiál aspoň 2 platne).</div>
+
+<section class="intro" aria-labelledby="introH">
+  <h1 id="introH">Čo mockup ukazuje <span class="stat">schválené 28.9.2026 · O2 prah 20 %</span></h1>
+  <p>Sekcia <b>Nárezový plán</b> v Štúdiu (dnes sivá „fáza 2") rozloží dielce zákazky na platne a povie <b>hornú hranicu</b>: s týmto jednoduchým rozložením v pásoch stačí N platní. Je to podklad pre objednávku a rozhodovanie; reže VEPO, ktoré optimalizuje samo a jeho počet sa môže líšiť — overíme porovnaním s reálnou objednávkou po V1. Dnes je počet platní len odhad z m² (+10 až 25 %) a na plán sa nedá pozrieť, keď „1 dielec vychádza na celú platňu".</p>
+  <div class="dec">
+    <b>Rozhodnuté</b><span>N1 plán je vo V1 (horná hranica) · N2 reže VEPO, objednáva človek · N3 prerez 5 mm a orez 10 mm, obe nastaviteľné · N4 VEPO účtuje celé tabule, zvyšky sú tvoje · N5 overenie na reálnej objednávke VEPO · <b>N6</b> orez len bežné platne (DTD, MDF, HDF, iné) · <b>N7</b> duplák = prírezy podľa počtu vrstiev (2 alebo 3), každý s prídavkom +10 mm na stranu (VEPO zlepí a oreže na hotový rozmer) · <b>N8</b> plán <b>neotáča žiadny dielec</b> — orientácia presne ako vo VEPO súbore · <b>N9</b> pracovná doska vždy bez orezu (aj s ABS hranou), rovnako kompakt a zástena</span>
+    <b>Pomenovanie</b><span>„N platní <b>(horná hranica)</b>" len pri úplnom pláne so skutočným formátom z katalógu · keď sa dielec nezmestí alebo ho VEPO odmietne (neúplný plán): „N platní pre zaradené dielce — celkový počet neznámy" · bez formátu a UNI: „orientačne N platní pri formáte 2800 × 2070"</span>
+  </div>
+  <p class="src" style="margin-top:4px">Poznámka (nie je to otvorený bod): <b>porovnanie s reálnou objednávkou VEPO</b> — po V1 na novej testovacej zákazke; voliteľne skôr cez nepotvrdenú objednávku (N10).</p>
+  <ul>
+    <li><a href="#secA"><b>A</b></a> · Štúdio → Nárezový plán — okno v skutočnej veľkosti (1060 × 640): súhrn, karty materiálov, malé platne, upozornenia</li>
+    <li><a href="#secB"><b>B</b></a> · Detail jednej platne — po kliku na malú platňu</li>
+    <li><a href="#secC"><b>C</b></a> · Rozpočet → Materiál a Služby — prepínač „ceny podľa plánu" vypnutý aj zapnutý</li>
+    <li><a href="#secD"><b>D</b></a> · Nastavenia rozpočtu — prerez, orez a prídavok dupláku</li>
+    <li><a href="#secE"><b>E</b></a> · Kontrola — „nezmestí sa" počíta s orezom</li>
+  </ul>
+  <div class="legend">
+    <span><i class="mpin" style="margin:0">A1</i> zmena oproti dnešnému pluginu (opis vedľa okna)</span>
+    <span><i class="otag" style="margin:0">O1</i> schválený bod (odkaz na zoznam nižšie)</span>
+  </div>
+  <p class="src">Zákazka je vymyslená a zámerne ukazuje všetky prípady naraz: kuchyňa s 3 dolnými skrinkami a umývačkou, hornou, vysokou na chladničku (boky až po strop), otvorenou hornou v UNI, 4 bočnicami 36 mm (duplák), krycím bokom, bielou obkladovou doskou 600 × 2400 (bez smeru — zmestí sa len otočená), policami z K001 a pracovnou doskou s barovým pultom. Čísla (platne, %, odhad, ceny) počíta mockup tým istým pravidlom, aké navrhuje koncept, preto sedia medzi A až E. Čísla v mockupe počíta ukážkový výpočet — nie je zadaním; pravidlá výpočtu určí package dávky NP-1 s vlastným auditom.</p>
+</section>
+
+<section class="ohead" aria-labelledby="oH">
+  <h2 id="oH">Schválené body O1–O12</h2>
+  <div class="osub">Michal ich schválil 28.9.2026 (N11) — všetky podľa návrhu, O2 s prahom 20 %. Každý bod má odkaz na obrazovku, kde ho vidno; pôvodné alternatívy sú uvedené len pre úplnosť a <b>neboli zvolené</b>.</div>
+  <div class="ogrid" id="ogrid"></div>
+</section>
+
+<!-- ============================ A · ŠTÚDIO → NÁREZOVÝ PLÁN ============================ -->
+<div class="sh" id="secA"><span class="shl">A</span><h2>Štúdio → Nárezový plán</h2>
+  <span class="shsub"><span>Okno Štúdia v skutočnej veľkosti obsahu (1060 × 640 px, telo sekcie 828 px) — čo nevidno, je pod zlomom a roluje sa. Klik na hlavičku karty ju zbalí na dva riadky, klik na malú platňu otvorí jej detail (v plugine v tom istom okne, tu v časti B).</span></span></div>
+<div class="stagewrap">
+  <div class="stage">
+    <div class="winscroll">
+      <div class="win" style="width:1062px">
+        <div class="winhead"><span class="wdots"><i></i><i></i><i></i></span> Noxun Engine — Štúdio <span class="wsub">· zákazka KUCHYNA_vzor</span><span class="wsize">obsah 1060 × 640</span></div>
+        <div class="stu full">
+          <div class="studio">
+            <nav class="snav" id="aNav" aria-label="Sekcie Štúdia"></nav>
+            <div class="sbody">
+              <div class="sechead" id="aHead"></div>
+              <div class="sectools" id="aTools"></div>
+              <div class="secscroll" id="aBody"></div>
+            </div>
+          </div>
+          <div class="status" id="aStatus" role="status">Pripravené.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="side">
+    <div class="mocknote">
+      <h4>A · Čo pribudne v Štúdiu</h4>
+      <ol>
+        <li><span class="npin">A1</span><b>Položka „Nárezový plán" ožije</b> — dnes je sivá s bublinou „fáza 2", ikona nožníc ostáva.</li>
+        <li><span class="npin">A2</span><b>Lišta:</b> „Obnoviť" (ako v Kusovníku — zožltne po zmene modelu) a <b>chip s parametrami</b> „prerez · orez · duplák"; klik otvorí Nastavenia rozpočtu (D). <a class="oref" href="#O7">O7</a></li>
+        <li><span class="npin">A3</span><b>Súhrn v jednom riadku:</b> materiály, platne podľa plánu, pre porovnanie odhad z m² (toľko platní dnes počíta rozpočet) a koľko materiálov je neúplných či len orientačných.</li>
+        <li><span class="npin">A4</span><b>Karta nákupného materiálu:</b> vzorka, názov, počet platní, formát, smer kresby, využitie, odhad z m² a príznaky ako chipy. „(horná hranica)" len pri úplnom pláne so skutočným formátom; „?" pri kresbe povie, že dielce sa neotáčajú (ako vo VEPO súbore). Zbalená karta = 2 riadky, ktoré povedia všetko podstatné. <a class="oref" href="#O1">O1</a></li>
+        <li><span class="npin">A5</span><b>Malé platne</b> (~170 px): dielce v pásoch zľava doprava, šípka smeru kresby, šrafovaný odpad, % využitia; klik = detail (B). <a class="oref" href="#O1">O1</a></li>
+        <li><span class="npin">A6</span><b>Upozornenie na poslednú platňu</b> (jantár): „Posledná platňa: 1 dielec — Krycí bok 720 × 560 · využitie 7 %", rada v „?" a tlačidlo na platňu. <a class="oref" href="#O2">O2</a></li>
+        <li><span class="npin">A7</span><b>Nezmestí sa:</b> červený zoznam s okom, „plán neúplný" a počet „N platní pre zaradené dielce — celkový počet neznámy" — bok vysokej skrinky 2795 mm sa z platne po oreze nevyrobí. Doska bez smeru dekoru 600 × 2400 by sa zmestila len otočená: plán ju neotočí (N8), preto je tiež nezaradená s dôvodom „nezmestí sa bez otočenia" (cena z odhadu), ale Kontrola ju nehlási. <a class="oref" href="#O11">O11</a></li>
+        <li><span class="npin">A8</span><b>Orientačne:</b> materiál bez formátu v katalógu a UNI — „orientačne N platní pri formáte 2800 × 2070", jantárový chip, tlmené platne s prerušovaným rámom. <a class="oref" href="#O10">O10</a></li>
+        <li><span class="npin">A9</span><b>Duplák</b> sa ukáže v karte zdrojového materiálu ako prírezy s prídavkom; <b>pracovná doska</b> má chip „bez orezu — hrany hotové". <a class="oref" href="#O12">O12</a> <a class="oref ok" href="#O8">O8</a></li>
+      </ol>
+      <ul class="dots">
+        <li>Poradie kariet je rovnaké ako riadky v Rozpočte (podľa materiálu). Zbalenie si pamätá tento počítač, ako skupiny v Kusovníku.</li>
+        <li>Plán sa v Štúdiu neprepočítava pri každej zmene modelu — ako Kusovník a Rozpočet ho obnoví otvorenie okna alebo „Obnoviť".</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ B · DETAIL PLATNE ============================ -->
+<div class="sh" id="secB"><span class="shl">B</span><h2>Detail jednej platne</h2>
+  <span class="shsub"><span>Výrez: telo sekcie po kliku na malú platňu (v plugine nahradí prehľad v tom istom okne). Šípkami listuješ platne materiálu, prejdenie myšou nad dielcom v zozname ho zvýrazní v obrázku a naopak. Klikni v A na inú platňu — detail sa prepne.</span></span></div>
+<div class="stagewrap">
+  <div class="stage">
+    <div class="winscroll">
+      <div class="win" style="width:854px">
+        <div class="winhead"><span class="wdots"><i></i><i></i><i></i></span> Noxun Engine — Štúdio <span class="wsub">· výrez: telo sekcie Nárezový plán — detail platne</span><span class="wsize">852 px (obsah 828)</span></div>
+        <div class="stu part">
+          <div class="sbody">
+            <div class="sechead" id="bHead"></div>
+            <div class="sectools" id="bTools"></div>
+            <div class="secscroll" id="bBody"></div>
+          </div>
+          <div class="status" id="bStatus" role="status">Pripravené.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="side">
+    <div class="mocknote">
+      <h4>B · Detail platne</h4>
+      <ol>
+        <li><span class="npin">B1</span><b>Lišta detailu:</b> „Prehľad" vráti karty, šípky listujú platne toho istého materiálu; „Obnoviť" a chip parametrov ostávajú.</li>
+        <li><span class="npin">B2</span><b>Platňa v mierke na šírku sekcie:</b> orez ako tenký šrafovaný okraj, dielce v pásoch zľava doprava s krátkym názvom a rozmerom (neotočené — ako vo VEPO súbore), šípka smeru kresby, šrafovaný odpad — <b>najväčší zvyšok s rozmerom</b>.</li>
+        <li><span class="npin">B3</span><b>Prírezy dupláku</b> sú označené „Duplák" a majú rozmer s prídavkom (z hotových 820 × 580 je prírez 840 × 600); v zozname je aj hotový rozmer. <a class="oref" href="#O12">O12</a></li>
+        <li><span class="npin">B4</span><b>Zoznam dielcov na platni:</b> názov (ako v Kusovníku) · skrinka · rozmer · počet · oko. Oko označí v modeli <b>všetky rovnaké kusy</b> (aj z iných platní), tá istá cesta ako riadok Kusovníka. <a class="oref" href="#O3">O3</a></li>
+      </ol>
+      <ul class="dots">
+        <li>Klik do obrázka nič neoznačuje — len zvýrazní riadok v zozname (rešerš: kreslené plány v SketchUpe vyberajú zo zoznamu, nie z obrázka).</li>
+        <li>Rozmery sú hotové (vrátane ABS), rovnako ako do VEPO — plán z nich je skôr opatrný.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ C · ROZPOČET ============================ -->
+<div class="sh" id="secC"><span class="shl">C</span><h2>Rozpočet → Materiál a Služby</h2>
+  <span class="shsub"><span>Dva stavy tej istej zákazky: <b>C1</b> prepínač vypnutý (predvolené — množstvo z odhadu ako dnes, pribudne len poznámka), <b>C2</b> zapnutý (množstvo z plánu len tam, kde je plán úplný a formát z katalógu) a pod ním výrez XLSX rozpočtu. Žltý podklad = riadok sa oproti dnešku mení.</span></span></div>
+<div class="stagewrap" id="cWrap"></div>
+<div class="stagewrap">
+  <div class="side wide">
+    <div class="mocknote">
+      <h4>C · Čo sa mení v Rozpočte</h4>
+      <ol>
+        <li><span class="npin">C1</span><b>Poznámka riadku materiálu</b> dostane na koniec „plán: N platní (horná hranica)"; pri neúplnom pláne „… pre zaradené dielce — celkový počet neznámy", bez formátu a pri UNI „orientačne … pri formáte 2800 × 2070". Tá istá poznámka ide do <b>XLSX rozpočtu</b>. Cenová ponuka počty platní neukáže nikdy. <a class="oref" href="#O4">O4</a></li>
+        <li><span class="npin">C2</span><b>Prepínač „ceny podľa plánu"</b> v hlavičke sekcie Materiál — ten istý vzor ako „sčítať do rozpočtu" pri Spotrebičoch; platí pre túto zákazku, predvolene vypnutý. <a class="oref" href="#O5">O5</a></li>
+        <li><span class="npin">C3</span><b>Zapnutý:</b> na plán ide len materiál s úplným plánom a skutočným formátom — značka „podľa plánu" a v poznámke „cena podľa plánu". Ostatné ostávajú na odhade so značkou „z odhadu" a vetou prečo: „plán neúplný — cena z odhadu", „formát chýba — cena z odhadu", „materiál neurčený — cena z odhadu" — tá istá veta ide do XLSX (výrez pod oknom C2). Export sa nezastaví. <a class="oref" href="#O10">O10</a> <a class="oref" href="#O11">O11</a></li>
+        <li><span class="npin">C4</span><b>Porez</b> ide za počtom platní v Materiáli, <b>montáž</b> ostáva z odhadu. <a class="oref" href="#O6">O6</a></li>
+      </ol>
+      <ul class="dots" id="cDiff"></ul>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ D · NASTAVENIA ROZPOČTU ============================ -->
+<div class="sh" id="secD"><span class="shl">D</span><h2>Nastavenia rozpočtu → Výpočet a upozornenia</h2>
+  <span class="shsub"><span>Tri nové riadky v existujúcom fieldsete (aj desatinné mm, napr. prerez 4,4). Skús napríklad orez 0 a „Uložiť" — bok vysokej skrinky sa zmestí a nález v Kontrole zmizne; biela W1000 ostane neúplná kvôli doske 600 × 2400, ktorá sa zmestí len otočená.</span></span></div>
+<div class="stagewrap">
+  <div class="stage">
+    <div class="winscroll">
+      <div class="win" style="width:854px">
+        <div class="winhead"><span class="wdots"><i></i><i></i><i></i></span> Noxun Engine — Štúdio <span class="wsub">· výrez: telo sekcie Nastavenia rozpočtu</span><span class="wsize">852 px (obsah 828)</span></div>
+        <div class="stu part">
+          <div class="sbody">
+            <div class="sechead"><h2>Nastavenia rozpočtu</h2><span class="sechint">sadzby, režimy a prahy · globálne pre všetky zákazky, do zákazky sa nemrazia</span><span class="secmodel" data-secmodel></span></div>
+            <div class="sectools">
+              <button type="button" class="ghostbtn" data-ss="reload" title="Zahodí neuložené zmeny a načíta súbor nanovo"><svg class="ic" aria-hidden="true"><use href="#i-rotate-ccw"/></svg> Načítať nanovo</button>
+              <span class="spacer"></span>
+              <button type="button" class="primary" data-ss="save"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Uložiť</button>
+            </div>
+            <div class="secscroll" id="dBody"></div>
+          </div>
+          <div class="status" id="dStatus" role="status">Pripravené.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="side">
+    <div class="mocknote">
+      <h4>D · Nové nastavenia</h4>
+      <ol>
+        <li><span class="npin">D1</span><b>Prerez píly (hrúbka kotúča)</b> 5 mm — plán ho počíta medzi každými dvoma dielcami a pásmi, nie pri okraji platne. <a class="oref" href="#O7">O7</a></li>
+        <li><span class="npin">D2</span><b>Orez okraja platne</b> 10 mm — z každej hrany bežnej platne; pracovná doska (aj s ABS hranou), kompakt a zástena sa neorezávajú nikdy. <a class="oref ok" href="#O8">O8</a></li>
+        <li><span class="npin">D3</span><b>Prídavok dupláku na stranu</b> 10 mm = +20 mm v každom rozmere prírezu (N7). <a class="oref" href="#O12">O12</a></li>
+      </ol>
+      <ul class="dots">
+        <li>Sú to nastavenia <b>tohto počítača</b> pre všetky zákazky, ako sadzby služieb — na druhom počítači ich treba nastaviť rovnako.</li>
+        <li>Po uložení sa Štúdio prepočíta hneď (plán, rozpočet aj Kontrola), rovnako ako dnes po zmene sadzieb.</li>
+        <li>Chýbajúce alebo nezmyselné číslo pole zčervená a neuloží sa (dnešné pravidlo sekcie).</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ E · KONTROLA ============================ -->
+<div class="sh" id="secE"><span class="shl">E</span><h2>Kontrola — „nezmestí sa" počíta s orezom</h2>
+  <span class="shsub"><span>Výrez sekcie Kontrola. Existujúci červený nález „nezmestí sa na formát platne" rozumie orezu — tá istá pravda ako červený zoznam v pláne.</span></span></div>
+<div class="stagewrap">
+  <div class="stage">
+    <div class="winscroll">
+      <div class="win" style="width:854px">
+        <div class="winhead"><span class="wdots"><i></i><i></i><i></i></span> Noxun Engine — Štúdio <span class="wsub">· výrez: telo sekcie Kontrola</span><span class="wsize">852 px (obsah 828)</span></div>
+        <div class="stu part">
+          <div class="sbody">
+            <div class="sechead"><h2>Kontrola</h2><span class="sechint">semafor filtruje zoznam · klik na nález ho označí v modeli · prepínače hrán a kresby</span><span class="secmodel" data-secmodel></span></div>
+            <div class="sectools">
+              <button type="button" class="ghostbtn ecbtn" title="Zvýrazniť hrany v modeli"><svg class="ic" aria-hidden="true"><use href="#i-shell"/></svg> Zvýrazniť hrany</button>
+              <button type="button" class="ghostbtn ecbtn" title="Kontrola smeru kresby v modeli"><svg class="ic" aria-hidden="true"><use href="#i-grain"/></svg> Kontrola kresby</button>
+              <button type="button" class="ghostbtn ecbtn" title="Smer otvárania v modeli"><svg class="ic" aria-hidden="true"><use href="#i-direction"/></svg> Smer otvárania</button>
+              <span class="spacer"></span>
+              <span class="sechint">Zoradené podľa závažnosti — poradie určuje server.</span>
+              <button type="button" class="ghostbtn" data-refresh="e"><svg class="ic" aria-hidden="true"><use href="#i-refresh-cw"/></svg> Obnoviť</button>
+            </div>
+            <div class="secscroll" id="eBody"></div>
+          </div>
+          <div class="status" id="eStatus" role="status">Pripravené.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="side">
+    <div class="mocknote">
+      <h4>E · Kontrola</h4>
+      <ol>
+        <li><span class="npin">E1</span><b>Nález počíta s orezom:</b> „… sa nezmestí na platňu 2800 × 2070 po oreze 10 mm (použiteľná plocha 2780 × 2050)". Dnes by tieto boky prešli (2795 ≤ 2800), hoci VEPO ich z takej platne nenareže. <a class="oref" href="#O9">O9</a></li>
+      </ol>
+      <ul class="dots">
+        <li>Ostáva červený a nič nezastaví — dnešná zásada „červený nález neblokuje export"; cena materiálu pri neúplnom pláne ostane z odhadu. <a class="oref" href="#O11">O11</a></li>
+        <li>Materiál bez formátu v katalógu a UNI Kontrola ako dnes nekontroluje (formát nepozná) — plán ich iba označí ako orientačné.</li>
+        <li>Dielec <b>bez smeru dekoru</b> Kontrola skúša v oboch polohách (dnešné pravidlo výroby): doska 600 × 2400 z bielej W1000 sa zmestí otočená, preto tu <b>nie je</b> červená — v pláne ostáva nezaradená „nezmestí sa bez otočenia" (plán neotáča, N8; cena z odhadu).</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<section class="fyi">
+  <h3>Na vedomie — teraz nerozhoduješ</h3>
+  <ul>
+    <li><b>Horná hranica, nie presné číslo:</b> plán skladá dielce jednoduchým pravidlom (pásy zľava doprava, bez hľadania najlepšieho poradia) — horná hranica znamená, že <b>s týmto rozložením stačí N platní</b>. VEPO optimalizuje sám a jeho počet sa môže líšiť — overíme porovnaním s reálnou objednávkou po V1 na novej testovacej zákazke, voliteľne skôr cez nepotvrdenú objednávku (N10). Objednáva človek (N1, N2).</li>
+    <li><b>Bez otáčania (N8):</b> plán neotáča žiadny dielec — ani bielu W1000, HDF či UNI bez kresby; orientácia je presne ako vo VEPO súbore a kresba platne beží po jej dĺžke (2800). Počet je preto opatrnejší — nanajvýš o niečo vyšší, než keby sa dielce otáčali; počet VEPO sa môže líšiť. Dielec bez smeru, ktorý sa zmestí len otočený, ostane v pláne nezaradený („nezmestí sa bez otočenia" → plán neúplný, cena z odhadu); Kontrola ho nehlási, lebo výroba ho otočiť smie.</li>
+    <li><b>Neúplný plán:</b> niektorý dielec sa nezmestí alebo ho VEPO odmietne (neznáma ABS páska, chybná hrúbka, nulový rozmer) — počet platí len pre zaradené dielce a cena materiálu ostáva z odhadu (O11). Duplák je v zozname jeden hotový dielec s počtom vrstiev (2 alebo 3) a rozmerom prírezu; Kontrola ho hlási raz.</li>
+    <li><b>Nemení sa:</b> VEPO CSV, Kusovník, Nákup kovania a odhad z m² (ostáva ako porovnanie aj ako predvolená cena). Cenová ponuka počty platní nikdy neukáže — pri zapnutom prepínači sa zmení len suma.</li>
+    <li><b>Staršia verzia pluginu:</b> prepínač „ceny podľa plánu" je nový údaj zákazky — po prvej úprave rozpočtu v novej verzii ho staršia verzia (napr. na druhom počítači) needituje ani nevyexportuje. Pred použitím treba aktualizovať oba počítače, ako pri predošlých zmenách rozpočtu.</li>
+    <li><b>Mimo bloku:</b> optimalizácia na minimum odpadu, výkres a poradie rezov pre pílu, ručné presúvanie dielcov, sklad a evidencia zvyškov, hrany (ABS) v pláne, klik do obrázka ako výber v 3D, polovičné platne.</li>
+  </ul>
+</section>
+
+</main>
+
+<script>
+(function(){
+  'use strict';
+  function $(id){ return document.getElementById(id); }
+  function each(sel, fn){ Array.prototype.forEach.call(document.querySelectorAll(sel), fn); }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]; }); }
+  function ico(n, cls){ return '<svg class="ic' + (cls ? ' ' + cls : '') + '" aria-hidden="true"><use href="#i-' + n + '"/></svg>'; }
+  function pin(t){ return '<i class="mpin">' + t + '</i>'; }
+  function otag(o, ok){ return '<a class="otag' + (ok ? ' ok' : '') + '" href="#' + o + '">' + o + '</a>'; }
+  function tip(text, cls){ return '<button type="button" class="nxtip' + (cls ? ' ' + cls : '') + '" data-tip="' + esc(text) + '" aria-label="' + esc(text) + '">' + ico('help-circle') + '</button>'; }
+  function f1(v){ return Math.round(v * 100) / 100; }
+  function num(v, dec){ return Number(v).toFixed(dec || 0).replace('.', ','); }
+  // mm s desatinnou čiarkou: celé číslo bez desatín, inak jedno desatinné miesto (prerez 4,4 mm)
+  function nf(v){ var r = Math.round(Number(v) * 10) / 10; return (r === Math.round(r) ? String(Math.round(r)) : r.toFixed(1)).replace('.', ','); }
+  function dm(a, b){ return '<span class="nw">' + nf(a) + ' × ' + nf(b) + '</span>'; }
+  function dmt(a, b){ return nf(a) + '\u00A0×\u00A0' + nf(b); } // nezalomiteľné medzery (escape, nie neviditeľný znak) — rozmer sa nerozdelí na dva riadky
+  function pct(v){ return Math.round(v * 100) + ' %'; }
+  function pl(n, one, few, many){ var a = Math.abs(n); return a === 1 ? one : (a >= 2 && a <= 4 ? few : many); }
+  function platni(n){ return n + ' ' + pl(n, 'platňa', 'platne', 'platní'); }
+  function dielcov(n){ return n + ' ' + pl(n, 'dielec', 'dielce', 'dielcov'); }
+  function materialov(n){ return n + ' ' + pl(n, 'materiál', 'materiály', 'materiálov'); }
+  function eur(v){
+    if (v == null || isNaN(v)) return '—';
+    var s = Math.abs(v).toFixed(2).split('.');
+    return (v < 0 ? '−' : '') + s[0].replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0') + ',' + s[1] + ' €';
+  }
+  // server `Budget.fmt`: celé číslo bez desatín, inak 2 desatinné bez koncovej nuly
+  function sfmt(v){ var r = Math.round(v * 100) / 100; if (r === Math.round(r)) return String(Math.round(r)); return r.toFixed(2).replace(/0$/, '').replace('.', ','); }
+  function range(a, b){ return a === b ? num(a, 1) : num(a, 1) + '–' + num(b, 1); }
+
+  // ---------------- parametre (Nastavenia rozpočtu, globálne) ----------------
+  var DEF = { kerf:5, trim:10, dup:10 };
+  var P = { kerf:5, trim:10, dup:10 };
+  var MODEL = 'zákazka: KUCHYNA_vzor · v0.16.0';
+
+  // ---------------- dáta zákazky (riadky kusovníka = hotové rozmery vrátane ABS) ----------------
+  // l = dĺžka pozdĺž kresby, w = šírka; dup = násobok dupláku (prírezy zo zdrojového materiálu)
+  var MATS = [
+    { id:'H1181', label:'H1181 ST37 Dub Halifax tabakový', man:'Egger', th:18, type:'DTDL', fmt:[2800, 2070], grain:'length',
+      cvar:'--mat-h1181', price:36.5, blabel:'H1181 ST37 Dub Halifax tabakový DTDL 18 mm',
+      rows:[
+        { key:'r1', names:['Bočnica 36'], sn:'Duplák', owner:'BRD-001, BRD-002', l:820, w:580, q:4, dup:2 },
+        { key:'r2', names:['Dvierka 1'], sn:'Dvierka', owner:'CAB-003', l:716, w:596, q:1 },
+        { key:'r3', names:['Zasuvkove celo 3'], sn:'Čelo 3', owner:'CAB-001', l:296, w:596, q:1 },
+        { key:'r4', names:['Zasuvkove celo 2'], sn:'Čelo 2', owner:'CAB-001', l:236, w:596, q:1 },
+        { key:'r5', names:['Zasuvkove celo 1'], sn:'Čelo 1', owner:'CAB-001', l:176, w:596, q:1 },
+        { key:'r6', names:['Krycí bok'], sn:'Krycí bok', owner:'BRD-003', l:720, w:560, q:1 }
+      ] },
+    { id:'W1000', label:'W1000 ST9 Biela', man:'Egger', th:18, type:'DTDL', fmt:[2800, 2070], grain:'none',
+      cvar:'--mat-w1000', price:26.9, blabel:'W1000 ST9 Biela DTDL 18 mm',
+      rows:[
+        { key:'w01', names:['Bok lavy', 'Bok pravy'], sn:'Bok', owner:'CAB-004', l:2795, w:560, q:2 },
+        { key:'w02', names:['Dvierka 1'], sn:'Dvierka', owner:'CAB-004', l:1776, w:596, q:1 },
+        { key:'w03', names:['Dvierka 2'], sn:'Dvierka', owner:'CAB-004', l:911, w:596, q:1 },
+        { key:'w04', names:['Dvierka 1', 'Dv myčka'], sn:'Dvierka', owner:'CAB-002, CAB-005, CAB-007', l:716, w:596, q:3 },
+        { key:'w05', names:['Bok lavy', 'Bok pravy'], sn:'Bok', owner:'CAB-001, CAB-002, CAB-003', l:720, w:560, q:6 },
+        { key:'w06', names:['Dno', 'Vrch', 'Polica 1'], sn:'Dno / Vrch', owner:'CAB-001 … CAB-004', l:564, w:560, q:6 },
+        { key:'w07', names:['Polica 1'], sn:'Polica', owner:'CAB-003', l:564, w:520, q:1 },
+        { key:'w08', names:['Bok lavy', 'Bok pravy'], sn:'Bok', owner:'CAB-005', l:720, w:320, q:2 },
+        { key:'w09', names:['Dno', 'Vrch'], sn:'Dno / Vrch', owner:'CAB-005', l:564, w:320, q:2 },
+        { key:'w10', names:['Polica 1'], sn:'Polica', owner:'CAB-005', l:564, w:300, q:1 },
+        { key:'w11', names:['Vystuha predna', 'Vystuha zadna'], sn:'Výstuha', owner:'CAB-001, CAB-002, CAB-003', l:564, w:100, q:6 },
+        // doska bez smeru dekoru, ktorá sa zmestí LEN otočená (2400 pozdĺž platne) — plán ju neotočí (N8), Kontrola ju nehlási
+        { key:'w12', names:['Obklad steny'], sn:'Obklad', owner:'BRD-007', l:600, w:2400, q:1 }
+      ] },
+    { id:'HDF', label:'HDF biela', man:'', th:3, type:'HDF', fmt:[2800, 2070], grain:'none',
+      cvar:'--mat-hdf', price:5.4, blabel:'Biela HDF 3 mm',
+      rows:[ { key:'h1', names:['Chrbat'], sn:'Chrbát', owner:'CAB-001, 002, 003, 005, 006', l:716, w:596, q:5 } ] },
+    { id:'UNI', label:'Korpus UNI', man:'', th:18, type:'DTDL', fmt:[2800, 2070], grain:'none', uni:true,
+      cvar:'--mat-uni', price:null, blabel:'Korpus UNI DTDL 18 mm',
+      rows:[
+        { key:'u1', names:['Bok lavy', 'Bok pravy'], sn:'Bok', owner:'CAB-006', l:720, w:320, q:2 },
+        { key:'u2', names:['Dno', 'Vrch'], sn:'Dno / Vrch', owner:'CAB-006', l:564, w:320, q:2 },
+        { key:'u3', names:['Polica 1'], sn:'Polica', owner:'CAB-006', l:564, w:300, q:1 }
+      ] },
+    { id:'K001', label:'K001', man:'Kronospan', th:18, type:'DTDL', fmt:null, grain:'length',
+      cvar:'--mat-k001', price:31.2, blabel:'K001 DTDL 18 mm',
+      rows:[ { key:'k1', names:['Polica'], sn:'Polica', owner:'BRD-004', l:1196, w:250, q:3 } ] },
+    { id:'PD', label:'Pracovná doska Dub', man:'', th:38, type:'PD', fmt:[4100, 600], grain:'length', noTrim:true,
+      cvar:'--mat-pd', price:62, blabel:'Dub PD 38 mm',
+      rows:[
+        { key:'p1', names:['Pracovná doska'], sn:'Pracovná doska', owner:'BRD-005', l:2400, w:600, q:1 },
+        { key:'p2', names:['Barový pult'], sn:'Barový pult', owner:'BRD-006', l:1600, w:600, q:1 }
+      ] }
+  ];
+  function byId(id){ for (var i = 0; i < MATS.length; i++) if (MATS[i].id === id) return MATS[i]; return null; }
+  function manTh(m){ return (m.man ? m.man + ' · ' : '') + m.th + ' mm'; }
+  function rowName(r){ return r.names.join(' / '); }
+
+  // ---------------- plán: policová heuristika podľa konceptu §3 ----------------
+  // N8: plán NEOTÁČA žiadny dielec — dĺžka dielca ide vždy pozdĺž dĺžky platne, presne ako vo VEPO súbore.
+  function ceilTenth(x){ return Math.ceil(Math.round(x * 10 * 1e6) / 1e6) / 10; }
+  function plan(m){
+    var fallback = !m.fmt, fmt = m.fmt || [2800, 2070];
+    var trim = m.noTrim ? 0 : P.trim, kerf = P.kerf;
+    var UL = fmt[0] - 2 * trim, UW = fmt[1] - 2 * trim;
+    var items = [], rejected = [];
+    m.rows.forEach(function(r){
+      // Riadok, ktorý VEPO ODMIETNE (neznáma ABS páska, chybná hrúbka, nulový rozmer — príznak `reject` s dôvodom),
+      // plán nezaradí a materiál je „plán neúplný — cena z odhadu" rovnako ako pri dielci, ktorý sa nezmestí.
+      if (r.reject || !(r.l > 0 && r.w > 0)){ rejected.push(r); return; }
+      // Duplák = `dup` vrstiev (2 alebo 3); KAŽDÁ vrstva je prírez s prídavkom na každú stranu.
+      var n = r.q * (r.dup || 1), add = r.dup ? 2 * P.dup : 0;
+      for (var i = 1; i <= n; i++) items.push({ row:r, n:i, a:r.l + add, b:r.w + add, dup:!!r.dup });
+    });
+    items.sort(function(p, q){ return (q.b - p.b) || (q.a - p.a) || (p.row.key < q.row.key ? -1 : p.row.key > q.row.key ? 1 : 0) || (p.n - q.n); });
+    var plates = [], shelves = [], unplaced = [];
+    function orients(it){ return [[it.a, it.b, false]]; }
+    function addShelf(pp, os, it){
+      var y = pp.y + (pp.shelves.length ? kerf : 0);
+      for (var k = 0; k < os.length; k++){
+        var o = os[k];
+        if (y + o[1] <= UW && o[0] <= UL){
+          var sh = { plate:pp, y:y, h:o[1], x:o[0], cnt:1 };
+          pp.shelves.push(sh); shelves.push(sh); pp.y = y + o[1];
+          pp.parts.push({ it:it, x:0, y:y, w:o[0], h:o[1], rot:o[2], sh:sh });
+          return true;
+        }
+      }
+      return false;
+    }
+    items.forEach(function(it){
+      var os = orients(it);
+      if (!os.some(function(o){ return o[0] <= UL && o[1] <= UW; })){
+        // Dôvod pre zoznam a Kontrolu: dielec BEZ smeru dekoru, ktorý by sa zmestil otočený, plán nezaradí (N8 — neotáča),
+        // ale výroba ho otočiť smie → Kontrola ho NEhlási (dnešný kontrakt: bez smeru = obe orientácie).
+        it.reason = (m.grain === 'none' && it.b <= UL && it.a <= UW) ? 'rot' : 'size';
+        unplaced.push(it); return;
+      }
+      for (var s = 0; s < shelves.length; s++){
+        var sh = shelves[s];
+        for (var k = 0; k < os.length; k++){
+          var o = os[k], x = sh.x + (sh.cnt ? kerf : 0);
+          if (o[1] <= sh.h && x + o[0] <= UL){
+            sh.plate.parts.push({ it:it, x:x, y:sh.y, w:o[0], h:o[1], rot:o[2], sh:sh });
+            sh.x = x + o[0]; sh.cnt++; return;
+          }
+        }
+      }
+      var cur = plates[plates.length - 1];
+      if (cur && addShelf(cur, os, it)) return;
+      var np = { idx:plates.length + 1, y:0, shelves:[], parts:[] };
+      plates.push(np); addShelf(np, os, it);
+    });
+    var full = fmt[0] * fmt[1], placed = 0;
+    plates.forEach(function(pp){
+      var a = 0; pp.parts.forEach(function(p){ a += p.w * p.h; });
+      pp.util = a / full; placed += a;
+      // najväčší zvyšok: koniec pásu · spodok platne · obdĺžnik NAD nižším dielcom v páse (výška pásu − výška dielca − prerez)
+      var best = null;
+      function cand(x, y, w, h){ if (w > 0 && h > 0 && (!best || w * h > best.area)) best = { area:w * h, x:x, y:y, w:w, h:h }; }
+      pp.shelves.forEach(function(sh){ cand(sh.x + kerf, sh.y, UL - sh.x - kerf, sh.h); });
+      pp.parts.forEach(function(p){ cand(p.x, p.y + p.h + kerf, p.w, p.sh.h - p.h - kerf); });
+      cand(0, pp.y + kerf, UL, UW - pp.y - kerf);
+      pp.left = best;
+    });
+    // odhad z m² — ako dnešný SheetEstimate (hotové rozmery × počet × násobok dupláku, vrátane nezaradených)
+    var m2 = 0;
+    m.rows.forEach(function(r){ m2 += r.l * r.w * r.q * (r.dup || 1) / 1e6; });
+    m2 = Math.round(m2 * 1000) / 1000;
+    var sm2 = full / 1e6;
+    var cmin = ceilTenth(m2 * 1.10 / sm2), cmax = ceilTenth(m2 * 1.25 / sm2);
+    var n = plates.length, last = n ? plates[n - 1] : null;
+    // O2 schválené 28.9.: využitie POD 20 % alebo najviac 2 dielce, len pri aspoň 2 platniach
+    var warn = (n >= 2 && last && (last.util < 0.20 || last.parts.length <= 2)) ? last : null;
+    var dupRows = m.rows.filter(function(r){ return r.dup; });
+    // počty HOTOVÝCH dielcov mimo plánu (duplák = 1 dielec, nie počet jeho vrstiev)
+    var missPieces = 0; unplaced.forEach(function(it){ missPieces += it.dup ? 1 / it.row.dup : 1; });
+    missPieces = Math.round(missPieces);
+    var rejPieces = 0; rejected.forEach(function(r){ rejPieces += r.q; });
+    return { fmt:fmt, fallback:fallback, trim:trim, kerf:kerf, UL:UL, UW:UW, plates:plates, unplaced:unplaced, rejected:rejected,
+             missPieces:missPieces, rejPieces:rejPieces,
+             util: n ? placed / (n * full) : null, m2:m2, sm2:sm2, cmin:cmin, cmax:cmax,
+             est: Math.ceil(Math.round(cmax * 1e6) / 1e6), warn:warn, dupRows:dupRows,
+             orient: !!(m.uni || fallback), incomplete: unplaced.length > 0 || rejected.length > 0 };
+  }
+  function computeAll(){ MATS.forEach(function(m){ m.res = plan(m); }); }
+
+  // ---------------- výber v detaile a zbalené karty ----------------
+  var SEL = { mid:'H1181', pi:0 };
+  var CLOSED = {};
+  try { CLOSED = JSON.parse(localStorage.getItem('np_mock_closed') || '{}') || {}; } catch (e) { CLOSED = {}; }
+  function saveClosed(){ try { localStorage.setItem('np_mock_closed', JSON.stringify(CLOSED)); } catch (e) {} }
+
+  // ---------------- kontrola (oversize s orezom) ----------------
+  function ctrlFindings(){
+    var out = [];
+    MATS.forEach(function(m){
+      var r = m.res;
+      if (r.orient) return; // UNI a bez formátu Kontrola nekontroluje (ako dnes)
+      r.unplaced.forEach(function(it){
+        // Kontrola skúša pri dielci BEZ smeru obe orientácie (dnešný kontrakt výroby) — „len bez otočenia" nie je červený nález
+        if (it.reason !== 'size') return;
+        var rr = it.row;
+        // duplák = JEDEN hotový dielec: nález len pri prvej vrstve každého kusu (nie 2–3 rovnaké riadky)
+        if (it.dup && (it.n - 1) % rr.dup !== 0) return;
+        var piece = it.dup ? Math.ceil(it.n / rr.dup) : it.n, nm = rr.names[(piece - 1) % rr.names.length];
+        var layers = it.dup ? ' (duplák — ' + rr.dup + ' ' + pl(rr.dup, 'prírez', 'prírezy', 'prírezov') + ' ' + nf(it.a) + '×' + nf(it.b) + ' mm)' : '';
+        out.push({ msg:'Dielec „' + nm + '“ ' + rr.l + '×' + rr.w + ' mm' + layers + ' sa nezmestí na platňu ' + r.fmt[0] + '×' + r.fmt[1] +
+                      ' mm po oreze ' + nf(r.trim) + ' mm (použiteľná plocha ' + nf(r.UL) + '×' + nf(r.UW) + ' mm) — materiál ' + m.blabel + '.',
+                   where:rr.owner, row:rr, mid:m.id });
+      });
+    });
+    return out;
+  }
+  function ctrlCounts(){ var red = ctrlFindings().length; return { red:red, orange:6, clean: red ? 5 : 6 }; }
+
+  // ---------------- spoločné kúsky Štúdia ----------------
+  var NAV = [
+    { grp:'ZÁKAZKA', items:[
+      { id:'bom', ic:'list', t:'Kusovník' }, { id:'ctrl', ic:'clipboard-check', t:'Kontrola', badge:true },
+      { id:'buy', ic:'cart', t:'Nákup kovania' }, { id:'budget', ic:'euro', t:'Rozpočet' },
+      { id:'offer', ic:'file-text', t:'Cenová ponuka' }, { id:'cut', ic:'scissors', t:'Nárezový plán', on:true } ] },
+    { grp:'KATALÓGY', items:[
+      { id:'mat', ic:'layers', t:'Materiály' }, { id:'hw', ic:'hammer', t:'Kovanie' }, { id:'appl', ic:'appliance', t:'Spotrebiče' },
+      { id:'rules', ic:'settings', t:'Pravidlá' }, { id:'tpl', ic:'star', t:'Šablóny' } ] },
+    { grp:'NASTAVENIA', items:[
+      { id:'sup', ic:'truck', t:'Dodávateľ / Demos' }, { id:'bset', ic:'euro', t:'Nastavenia rozpočtu' }, { id:'about', ic:'info', t:'O plugine' } ] }
+  ];
+  function navHtml(){
+    var c = ctrlCounts(), h = '';
+    NAV.forEach(function(g){
+      h += '<div class="sgrp">' + g.grp + '</div>';
+      g.items.forEach(function(it){
+        var tt = it.on ? 'Nárezový plán — koľko platní stačí pri tomto rozložení (horná hranica)' : it.t + ' (v mockupe sa neprepína)';
+        h += '<button type="button" class="navitem' + (it.on ? ' on' : '') + '" title="' + esc(tt) + '"' +
+             (it.id === 'bset' ? ' data-go="secD"' : it.id === 'ctrl' ? ' data-go="secE"' : it.id === 'budget' ? ' data-go="secC"' : '') + '>' +
+             ico(it.ic) + '<span>' + esc(it.t) + '</span>' + (it.on ? pin('A1') : '') +
+             (it.badge ? '<span class="nbadge">' + (c.red ? '<i class="r">' + c.red + '</i>' : '') + '<i class="o">' + c.orange + '</i></span>' : '') +
+             '</button>';
+      });
+    });
+    return h + '<div class="navfoot"><button type="button" class="navitem" title="Zbaliť navigáciu na ikony">' + ico('panel-left') + '<span>Zbaliť na ikony</span></button></div>';
+  }
+  function secHead(){ return '<h2>Nárezový plán</h2><span class="sechint">koľko platní stačí pri tomto rozložení · podklad pre objednávku — reže VEPO</span><span class="secmodel">' + esc(MODEL) + '</span>'; }
+  function paramChip(pinTxt){
+    return '<button type="button" class="npparam" data-param title="Parametre plánu z Nastavení rozpočtu — platia pre všetky zákazky. Klik otvorí nastavenia.">' +
+           ico('settings') + 'prerez ' + nf(P.kerf) + ' mm · orez ' + nf(P.trim) + ' mm · duplák +' + nf(P.dup) + ' mm</button>' + (pinTxt ? pin(pinTxt) : '');
+  }
+  function refreshBtn(k){ return '<button type="button" class="ghostbtn" data-refresh="' + k + '" title="Prepočítať nárezový plán z aktuálneho modelu">' + ico('refresh-cw') + ' Obnoviť</button>'; }
+
+  // ---------------- kreslenie platne (SVG ako reťazec; farby = triedy s tokenmi) ----------------
+  function textW(s, fs){ return s.length * fs * 0.56; }
+  function plateSvg(m, pp, o){
+    var r = m.res, f = r.fmt, s = o.w / f[0];
+    var top = o.detail ? 24 : (m.grain === 'length' ? 10 : 0);
+    var ph = f1(f[1] * s), W = o.w, H = f1(ph + top + (o.detail ? 2 : 0));
+    var X = function(v){ return f1(v * s); };
+    var S = [];
+    S.push('<svg xmlns="http://www.w3.org/2000/svg" class="' + (o.detail ? 'npdsvg' : '') + '" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' +
+           esc('Platňa ' + pp.idx + ' — ' + dielcov(pp.parts.length) + ', využitie ' + pct(pp.util)) + '">');
+    // smer kresby — šípka nad platňou (len materiál s kresbou)
+    if (m.grain === 'length'){
+      if (o.detail){
+        S.push('<path class="np-grain" d="M4 11H104M98 6l6 5-6 5"/>');
+        S.push('<text class="np-cap" x="112" y="15">smer kresby — po dĺžke platne</text>');
+      } else {
+        S.push('<path class="np-grain" d="M3 5H27M23 2l4 3-4 3"/>');
+      }
+    } else if (o.detail){
+      S.push('<text class="np-cap" x="2" y="15">bez smeru kresby — dielce sa neotáčajú (ako vo VEPO súbore)</text>');
+    }
+    if (o.detail){
+      S.push('<text class="np-cap" x="' + (W - 2) + '" y="15" text-anchor="end">' + esc('platňa ' + dmt(f[0], f[1]) + ' mm · ' +
+             (r.trim ? 'orez ' + nf(r.trim) + ' mm (šrafovaný okraj)' : 'bez orezu — hrany hotové') + ' · prerez ' + nf(r.kerf) + ' mm') + '</text>');
+    }
+    // platňa: podklad + šrafovaný odpad (dielce ho prekryjú)
+    S.push('<rect class="np-sheet" x="0" y="' + top + '" width="' + W + '" height="' + ph + '"/>');
+    S.push('<rect class="np-waste ' + (o.detail ? 'l' : 's') + '" x="0" y="' + top + '" width="' + W + '" height="' + ph + '"/>');
+    var t = r.trim;
+    if (o.detail && t > 0){
+      var tw = Math.max(X(t), 2.2);
+      S.push('<g class="np-trimg"><title>' + esc('orez ' + t + ' mm z každej hrany') + '</title>' +
+             '<rect class="np-trim" x="0" y="' + top + '" width="' + W + '" height="' + tw + '"/>' +
+             '<rect class="np-trim" x="0" y="' + f1(top + ph - tw) + '" width="' + W + '" height="' + tw + '"/>' +
+             '<rect class="np-trim" x="0" y="' + top + '" width="' + tw + '" height="' + ph + '"/>' +
+             '<rect class="np-trim" x="' + f1(W - tw) + '" y="' + top + '" width="' + tw + '" height="' + ph + '"/></g>');
+    }
+    // najväčší zvyšok
+    if (o.detail && pp.left){
+      var L = pp.left, lx = X(L.x + t), ly = top + X(L.y + t), lw = X(L.w), lh = X(L.h);
+      S.push('<rect class="np-left" x="' + (lx + 1) + '" y="' + (ly + 1) + '" width="' + Math.max(lw - 2, 1) + '" height="' + Math.max(lh - 2, 1) + '"><title>' +
+             esc('najväčší zvyšok ' + dmt(L.w, L.h) + ' mm') + '</title></rect>');
+      var lt = 'zvyšok ' + dmt(L.w, L.h);
+      if (lh >= 16 && lw >= textW(lt, 11) + 8){
+        S.push('<text class="np-leftlbl" x="' + f1(lx + lw / 2) + '" y="' + f1(ly + lh / 2 + 4) + '" text-anchor="middle">' + esc(lt) + '</text>');
+      } else if (lw >= 16 && lh >= textW(lt, 11) + 8){
+        var cx0 = f1(lx + lw / 2 + 4), cy0 = f1(ly + lh / 2);
+        S.push('<text class="np-leftlbl" x="' + cx0 + '" y="' + cy0 + '" text-anchor="middle" transform="rotate(-90 ' + cx0 + ' ' + cy0 + ')">' + esc(lt) + '</text>');
+      }
+    }
+    // dielce
+    var lone = (r.warn === pp && pp.parts.length <= 2);
+    pp.parts.forEach(function(p){
+      var rr = p.it.row, x = X(p.x + t), y = top + X(p.y + t), w = X(p.w), h = X(p.h);
+      var cls = 'np-part' + (o.detail ? ' d' : '') + (p.it.dup ? ' dup' : '') + (lone ? ' lone' : '') + (o.hl === rr.key ? ' hl' : '');
+      var real = p.it.dup ? dmt(rr.l + 2 * P.dup, rr.w + 2 * P.dup) : dmt(rr.l, rr.w);
+      var ttl = rowName(rr) + (p.it.dup ? ' — prírez dupláku ' + real + ' (hotový ' + dmt(rr.l, rr.w) + ')' : ' — ' + real) + ' · ' + rr.owner;
+      S.push('<g data-rk="' + esc(rr.key) + '"><title>' + esc(ttl) + '</title><rect class="' + cls + '" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '"/>');
+      if (o.detail){
+        var name = rr.sn, dims = real;
+        var cx = f1(x + w / 2), cy = f1(y + h / 2);
+        if (w >= Math.max(textW(name, 12), textW(dims, 11)) + 8 && h >= 34){
+          S.push('<text class="np-lbl" x="' + cx + '" y="' + f1(cy - 3) + '" text-anchor="middle">' + esc(name) + '</text>' +
+                 '<text class="np-dim" x="' + cx + '" y="' + f1(cy + 12) + '" text-anchor="middle">' + esc(dims) + '</text>');
+        } else if (h >= Math.max(textW(name, 12), textW(dims, 11)) + 8 && w >= 34){
+          S.push('<g transform="rotate(-90 ' + cx + ' ' + cy + ')"><text class="np-lbl" x="' + cx + '" y="' + f1(cy - 3) + '" text-anchor="middle">' + esc(name) + '</text>' +
+                 '<text class="np-dim" x="' + cx + '" y="' + f1(cy + 12) + '" text-anchor="middle">' + esc(dims) + '</text></g>');
+        } else if (w >= textW(dims, 11) + 6 && h >= 14){
+          S.push('<text class="np-dim" x="' + cx + '" y="' + f1(cy + 4) + '" text-anchor="middle">' + esc(dims) + '</text>');
+        } else if (h >= textW(dims, 11) + 6 && w >= 14){
+          S.push('<text class="np-dim" x="' + cx + '" y="' + f1(cy + 3.5) + '" text-anchor="middle" transform="rotate(-90 ' + cx + ' ' + cy + ')">' + esc(dims) + '</text>');
+        }
+      }
+      S.push('</g>');
+    });
+    S.push('<rect class="np-edge" x=".5" y="' + (top + .5) + '" width="' + (W - 1) + '" height="' + f1(ph - 1) + '"/>');
+    S.push('</svg>');
+    return S.join('');
+  }
+
+  // ---------------- A · telo sekcie ----------------
+  // „(horná hranica)" LEN pri úplnom pláne so skutočným formátom z katalógu (audit C2)
+  // JEDNA veta o výsledku plánu — tá istá v karte, v poznámke Rozpočtu aj v XLSX. Obe podmienky spolu:
+  // orientačný formát (UNI / bez formátu) A zároveň nezaradený dielec sa nesmú navzájom schovať.
+  function planPhrase(m){
+    var r = m.res, s = platni(r.plates.length), f = 'pri formáte ' + dmt(r.fmt[0], r.fmt[1]);
+    if (r.orient && r.incomplete) return { pre:'orientačne ', n:s, post:f + ' — pre zaradené dielce, celkový počet neznámy', cls:'orient' };
+    if (r.orient) return { pre:'orientačne ', n:s, post:f, cls:'orient' };
+    if (r.incomplete) return { pre:'', n:s, post:'pre zaradené dielce — celkový počet neznámy', cls:'inc' };
+    return { pre:'', n:s, post:'(horná hranica)', cls:'' };
+  }
+  function countHtml(m){
+    var p = planPhrase(m);
+    return '<span class="npcount' + (p.cls ? ' ' + p.cls : '') + '">' + esc(p.pre) + '<b>' + p.n + '</b> <small>' + esc(p.post) + '</small></span>';
+  }
+  function complete(m){ var r = m.res; return !r.orient && !r.incomplete; }
+  function summaryHtml(){
+    var cPl = 0, cN = 0, est = 0, inc = 0, ori = 0;
+    MATS.forEach(function(m){ var r = m.res; est += r.est; if (r.incomplete) inc++; if (r.orient) ori++; if (complete(m)){ cN++; cPl += r.plates.length; } });
+    return '<div class="npsum">' + pin('A3') + '<span><b>' + materialov(MATS.length) + '</b> · úplný plán: <b>' + platni(cPl) + '</b> (horná hranica) pri ' +
+           cN + ' ' + pl(cN, 'materiáli', 'materiáloch', 'materiáloch') + '</span>' +
+           (inc ? '<span class="npchip err">' + ico('alert') + inc + ' neúplný</span>' : '') +
+           (ori ? '<span class="npchip warn">' + ori + ' orientačne</span>' : '') +
+           '<span class="tmuted">· odhad z m² spolu: ' + platni(est) + '</span>' +
+           '<span class="spacer"></span>' +
+           tip('Horná hranica = s týmto rozložením (pásy zľava doprava) stačí N platní — len pri úplnom pláne so skutočným formátom z katalógu. VEPO optimalizuje sám a jeho počet sa môže líšiť — overíme porovnaním s reálnou objednávkou po V1.\n' +
+               'Neúplný = niektorý dielec sa nezmestí alebo ho VEPO odmietne (neznáma ABS páska, chybná hrúbka, nulový rozmer) — počet platí len pre zaradené dielce, celkový je neznámy a cena ostáva z odhadu.\n' +
+               'Orientačne = materiál bez formátu v katalógu alebo UNI — počítané na formáte 2800 × 2070.\n' +
+               'Odhad z m² je dnešný výpočet (+10 až 25 %) — toľko platní dnes počíta rozpočet.', 'r') + '</div>';
+  }
+  function cardHtml(m){
+    var r = m.res, n = r.plates.length, closed = !!CLOSED[m.id];
+    var dupq = 0, dupn = 0, dupEx = null;
+    r.dupRows.forEach(function(d){ dupq += d.q; dupn += d.q * d.dup; if (!dupEx) dupEx = d; });
+    var state = '';
+    if (r.warn) state += '<span class="npstate" title="Posledná platňa je takmer prázdna">' + ico('alert', 'w') + '</span>';
+    if (r.incomplete) state += '<span class="npstate" title="Plán je neúplný — niektorý dielec sa nezmestí">' + ico('alert', 'e') + '</span>';
+    var sub = [];
+    sub.push('formát ' + dm(r.fmt[0], r.fmt[1]) + (r.fallback ? ' <span class="bfnt">(náhradný)</span>' : m.uni ? ' <span class="bfnt">(pracovný)</span>' : ''));
+    sub.push((m.grain === 'length' ? ico('grain') + ' kresba po dĺžke platne' : 'bez smeru kresby') +
+             tip('Dielce sa neotáčajú — ako vo VEPO súbore. Počet je preto opatrnejší — nanajvýš o niečo vyšší, než keby sa dielce otáčali; počet VEPO sa môže líšiť.' +
+                 (m.grain === 'length' ? '\nKresba platne beží po jej dĺžke (' + r.fmt[0] + ' mm).' : '')));
+    if (r.util != null) sub.push('využitie <b>' + pct(r.util) + '</b>');
+    sub.push('odhad z m²: <b>' + range(r.cmin, r.cmax) + '</b> <span class="bfnt">(v rozpočte dnes ' + r.est + ')</span>');
+    var chips = '';
+    if (dupq) chips += '<span class="npchip info" title="Duplák sa lepí z prírezov zdrojového materiálu — toľko, koľko má vrstiev (2 alebo 3); každý prírez má prídavok ' + nf(P.dup) + ' mm na stranu. VEPO ich zlepí a oreže na hotový rozmer.">vrátane ' + dupq + ' ' +
+                       pl(dupq, 'dupláku', 'duplákov', 'duplákov') + ' = ' + dupn + ' ' + pl(dupn, 'prírez', 'prírezy', 'prírezov') +
+                       ' s prídavkom (' + dmt(dupEx.l, dupEx.w) + ' → ' + dmt(dupEx.l + 2 * P.dup, dupEx.w + 2 * P.dup) + ')</span>' + pin('A9');
+    if (m.noTrim) chips += '<span class="npchip info">bez orezu — hrany hotové</span>' + otag('O8', true);
+    if (r.fallback) chips += '<span class="npchip warn">' + ico('alert') + 'formát chýba — plán len orientačný</span>' + pin('A8');
+    if (m.uni) chips += '<span class="npchip warn">materiál neurčený — orientačné</span>' + pin('A8');
+    if (r.incomplete) chips += '<span class="npchip err">' + ico('alert') + 'plán neúplný</span>';
+    var h = '<div class="npcard' + (closed ? ' closed' : '') + '" data-mid="' + m.id + '"><div class="nphead">' +
+      '<button type="button" class="nptog" data-card="' + m.id + '" aria-expanded="' + (!closed) + '" title="Klik zbalí / rozbalí kartu">' +
+        '<span class="chev"></span><span class="sw" style="background:var(' + m.cvar + ')"></span>' +
+        '<span class="npname">' + esc(m.label) + '</span><span class="npman">' + esc(manTh(m)) + '</span>' +
+        (m.id === 'H1181' ? pin('A4') : '') + '<span class="spacer"></span>' + state + countHtml(m) + '</button>' +
+      '<div class="npl2">' + sub.join('<span class="sep">·</span>') + (chips ? '<span class="sep">·</span>' + chips : '') + '</div>' +
+      '</div><div class="npbody">';
+    // malé platne
+    h += '<div class="npgrid">';
+    r.plates.forEach(function(pp, i){
+      var w = m.id === 'PD' ? 344 : 164, on = (SEL.mid === m.id && SEL.pi === i), wr = (r.warn === pp);
+      h += '<button type="button" class="npthumb' + (on ? ' on' : '') + (wr ? ' warn' : '') + (r.orient ? ' orient' : '') + '" data-thumb="' + m.id + ':' + i + '" title="' +
+           esc('Platňa ' + pp.idx + ' — ' + dielcov(pp.parts.length) + ' · využitie ' + pct(pp.util) + ' · klik otvorí detail') + '">' +
+           '<span class="npthd">' + (wr ? ico('alert') : '') + 'Platňa ' + pp.idx + (r.orient ? ' · orientačne' : '') +
+           '<span class="u">' + pct(pp.util) + '</span></span>' + plateSvg(m, pp, { w:w }) + '</button>';
+    });
+    if (m.id === 'H1181') h += '<span style="align-self:center">' + pin('A5') + '</span>';
+    h += '</div>';
+    // upozornenie na poslednú platňu
+    if (r.warn){
+      var pw = r.warn, k = pw.parts.length, one = pw.parts[0].it.row;
+      var what = k === 1 ? esc(rowName(one)) + ' ' + dm(one.l, one.w) : pw.parts.map(function(p){ return esc(p.it.row.sn); }).join(', ');
+      var prevLeft = r.plates.length > 1 ? r.plates[r.plates.length - 2].left : null;
+      h += '<div class="npwarn">' + ico('alert') + '<span><b>Posledná platňa:</b> ' + dielcov(k) + ' — ' + what + ' · využitie ' + pct(pw.util) + '</span>' +
+           tip('Kvôli ' + (k === 1 ? 'jednému dielcu' : k + ' dielcom') + ' kupuješ celú platňu (VEPO účtuje celé tabule). Čo s tým:\n' +
+               '• zmenšiť alebo rozdeliť dielec, aby sa zmestil do zvyšku predošlej platne' + (prevLeft ? ' (najväčší ' + dmt(prevLeft.w, prevLeft.h) + ')' : '') + '\n' +
+               '• vyrobiť ho z iného materiálu, ktorý má na platni miesto\n' +
+               (pw.left ? '• platňu kúpiť a zvyšok (tu ' + dmt(pw.left.w, pw.left.h) + ') použiť na ďalšiu zákazku — zvyšky sú tvoje'
+                        : '• platňa je bez využiteľného zvyšku — dielce ju vyplnia celú')) +
+           '<button type="button" class="linkbtn" data-open="' + m.id + ':' + (r.plates.length - 1) + '">Ukázať platňu ' + pw.idx + '</button>' +
+           pin('A6') + otag('O2') + '</div>';
+    }
+    // nezmestí sa / VEPO odmietne — plán neúplný
+    if (r.incomplete){
+      var grp = {};
+      r.unplaced.forEach(function(it){ var g = grp[it.row.key] = grp[it.row.key] || { row:it.row, layers:0, reason:it.reason, a:it.a, b:it.b }; g.layers++; });
+      var hasMiss = r.unplaced.length > 0, hasRej = r.rejected.length > 0;
+      h += '<div class="npmiss"><div class="npmisshd">' + ico('alert') + '<b>' + (hasMiss && hasRej ? 'Nezmestí sa alebo ho VEPO odmietne' : hasMiss ? 'Nezmestí sa' : 'VEPO odmietne') +
+           ' — plán neúplný</b><span class="why">' + (hasMiss ? 'platňa po oreze má ' + dmt(r.UL, r.UW) + ' (' + dmt(r.fmt[0], r.fmt[1]) + ' mínus ' + nf(r.trim) + ' mm z každej hrany) · ' : '') +
+           'cena materiálu ostane z odhadu</span>' + pin('A7') + otag('O11') + '</div>';
+      Object.keys(grp).forEach(function(k2){
+        var g = grp[k2], rr = g.row, fin = rr.dup ? Math.round(g.layers / rr.dup) : g.layers;
+        var why = g.reason === 'rot' ? 'nezmestí sa bez otočenia — plán dielce neotáča (N8); otočený by sa zmestil, preto ho Kontrola nehlási'
+                : (m.grain === 'none' ? 'nezmestí sa ani otočený — hlási aj Kontrola' : 'nezmestí sa (s kresbou sa neotáča) — hlási aj Kontrola');
+        // duplák: hotový dielec RAZ, počet vrstiev a rozmer prírezu zvlášť (2 alebo 3 vrstvy podľa násobku)
+        if (rr.dup) why = 'duplák: ' + fin + ' ks = ' + g.layers + ' ' + pl(g.layers, 'prírez', 'prírezy', 'prírezov') + ' ' + dmt(g.a, g.b) + ' — ' + why;
+        h += '<div class="npmissrow"><span>' + esc(rowName(rr)) + '<span class="npwhy">' + esc(why) + '</span></span><span>' + esc(rr.owner) + '</span><span class="num">' + dm(rr.l, rr.w) + '</span>' +
+             '<span class="num">' + fin + ' ks</span><button type="button" class="eyebtn" data-eye="' + m.id + ':' + rr.key + '" title="Označiť v modeli všetky rovnaké kusy" aria-label="Označiť v modeli">' + ico('eye') + '</button></div>';
+      });
+      r.rejected.forEach(function(rr){
+        h += '<div class="npmissrow"><span>' + esc(rowName(rr)) + '<span class="npwhy">' + esc('VEPO riadok odmietne — ' + (rr.reject || 'nulový rozmer') + '; plán ho preto nezaradí') + '</span></span><span>' + esc(rr.owner) +
+             '</span><span class="num">' + dm(rr.l, rr.w) + '</span><span class="num">' + rr.q + ' ks</span><button type="button" class="eyebtn" data-eye="' + m.id + ':' + rr.key + '" title="Označiť v modeli všetky rovnaké kusy" aria-label="Označiť v modeli">' + ico('eye') + '</button></div>';
+      });
+      h += '</div>';
+    }
+    return h + '</div></div>';
+  }
+  function renderA(){
+    $('aNav').innerHTML = navHtml();
+    $('aHead').innerHTML = secHead();
+    $('aTools').innerHTML = refreshBtn('a') + paramChip('A2') + otag('O7') + '<span class="spacer"></span><span class="sechint">klik na platňu otvorí jej detail</span>';
+    $('aBody').innerHTML = summaryHtml() + MATS.map(cardHtml).join('');
+  }
+
+  // ---------------- B · detail platne ----------------
+  function renderB(){
+    var m = byId(SEL.mid), r = m.res;
+    if (SEL.pi >= r.plates.length) SEL.pi = Math.max(r.plates.length - 1, 0);
+    var pp = r.plates[SEL.pi];
+    $('bHead').innerHTML = secHead();
+    $('bTools').innerHTML = '<button type="button" class="ghostbtn" data-go="secA" title="Späť na karty materiálov">' + ico('arrow-left') + ' Prehľad</button>' +
+      '<span class="npbar"><button type="button" data-pg="-1" title="Predošlá platňa" aria-label="Predošlá platňa">' + ico('chevron-right', 'flipx') + '</button>' +
+      '<span class="pg">Platňa ' + pp.idx + ' z ' + r.plates.length + '</span>' +
+      '<button type="button" data-pg="1" title="Ďalšia platňa" aria-label="Ďalšia platňa">' + ico('chevron-right') + '</button></span>' + pin('B1') +
+      '<span class="spacer"></span>' + refreshBtn('b') + paramChip();
+    var dupOn = 0; pp.parts.forEach(function(p){ if (p.it.dup) dupOn++; });
+    var h = '<div class="npdhd"><span class="sw" style="background:var(' + m.cvar + ')"></span><b>' + esc(m.label) + '</b><span>' + esc(manTh(m)) + '</span>' +
+      '<span class="sep">·</span><span><b>' + dielcov(pp.parts.length) + '</b>' + (dupOn ? ' (z toho ' + dupOn + ' ' + pl(dupOn, 'prírez', 'prírezy', 'prírezov') + ' dupláku)' : '') + '</span>' +
+      '<span class="sep">·</span><span>využitie <b>' + pct(pp.util) + '</b></span>' +
+      (pp.left ? '<span class="sep">·</span><span>najväčší zvyšok <b>' + dm(pp.left.w, pp.left.h) + '</b></span>' : '') +
+      (r.orient ? '<span class="npchip warn">orientačne pri formáte ' + dmt(r.fmt[0], r.fmt[1]) + '</span>' : '') +
+      (r.incomplete ? '<span class="npchip err">' + ico('alert') + 'plán neúplný — ' + dielcov(r.missPieces + r.rejPieces) + ' mimo plánu</span>' : '') + pin('B2') + '</div>';
+    h += plateSvg(m, pp, { w:780, detail:true, hl:SEL.hl });
+    if (r.warn === pp){
+      h += '<div class="npwarn" style="margin:0 0 8px">' + ico('alert') + '<span><b>Posledná platňa:</b> ' + dielcov(pp.parts.length) + ' · využitie ' + pct(pp.util) + ' — pozri radu v karte materiálu</span>' + otag('O2') + '</div>';
+    }
+    // zoznam dielcov na platni (zoskupené podľa riadku kusovníka)
+    var grp = [], idx = {};
+    pp.parts.forEach(function(p){
+      var k = p.it.row.key;
+      if (!(k in idx)){ idx[k] = grp.length; grp.push({ row:p.it.row, n:0, dup:p.it.dup }); }
+      grp[idx[k]].n++;
+    });
+    h += '<table class="nplist"><thead><tr><th>Dielec' + pin('B4') + otag('O3') + '</th><th>Skrinka</th><th class="num">Rozmer</th><th class="num">Na platni</th><th></th></tr></thead><tbody>';
+    grp.forEach(function(g){
+      var rr = g.row;
+      var dims = g.dup ? dm(rr.l + 2 * P.dup, rr.w + 2 * P.dup) + ' <span class="sub">prírez · hotový ' + dmt(rr.l, rr.w) + '</span>' : dm(rr.l, rr.w);
+      var cnt = g.dup ? g.n + ' ' + pl(g.n, 'prírez', 'prírezy', 'prírezov') + ' <span class="sub">(' + (g.n / rr.dup) + ' ks × ' + rr.dup + ')</span>' : g.n + ' ks';
+      h += '<tr data-rk="' + esc(rr.key) + '"' + (SEL.hl === rr.key ? ' class="hl"' : '') + '><td>' + esc(rowName(rr)) +
+           (g.dup ? ' <span class="npchip info">Duplák</span>' + (SEL.mid === 'H1181' ? pin('B3') + otag('O12') : '') : '') + '</td>' +
+           '<td class="own" title="' + esc(rr.owner) + '">' + esc(rr.owner) + '</td><td class="num">' + dims + '</td><td class="num">' + cnt + '</td>' +
+           '<td class="act"><button type="button" class="eyebtn" data-eye="' + m.id + ':' + rr.key + '" title="Označiť v modeli všetky rovnaké kusy" aria-label="Označiť v modeli">' + ico('eye') + '</button></td></tr>';
+    });
+    h += '</tbody></table>';
+    $('bBody').innerHTML = h;
+  }
+
+  // ---------------- C · rozpočet ----------------
+  var RATE_POREZ = 17, RATE_MONTAZ = 15, M2_PER_PLATE = 5.8;
+  function perPlate(m){ var r = m.res; return m.price == null ? null : Math.round(m.price * r.fmt[0] * r.fmt[1] / 1e6 * 100) / 100; }
+  // poznámka plánu v riadku Rozpočtu (aj v XLSX) — pomenovanie podľa auditu C2
+  function planNote(m){ var p = planPhrase(m); return 'plán: ' + p.pre + p.n + ' ' + p.post; }
+  function eligible(m){ return complete(m); }
+  // veta pri ZAPNUTOM prepínači (C3/C10) — tá istá ide do XLSX rozpočtu
+  function onNote(m){
+    var r = m.res;
+    if (r.incomplete && r.fallback) return 'formát chýba, plán neúplný — cena z odhadu';
+    if (r.incomplete && m.uni) return 'materiál neurčený, plán neúplný — cena z odhadu';
+    if (r.incomplete) return 'plán neúplný — cena z odhadu';
+    if (r.fallback) return 'formát chýba — cena z odhadu';
+    if (m.uni) return 'materiál neurčený — cena z odhadu';
+    return 'cena podľa plánu';
+  }
+  function estReason(m){
+    var r = m.res;
+    if (r.incomplete) return 'Plán je neúplný (' + [r.missPieces ? dielcov(r.missPieces) + ' sa nezmestí' : '', r.rejPieces ? dielcov(r.rejPieces) + ' VEPO odmietne' : '']
+                               .filter(Boolean).join(', ') + ') — množstvo a cena ostávajú z odhadu z m².';
+    if (r.fallback) return 'Materiál nemá formát platne v katalógu — plán je len orientačný, množstvo ostáva z odhadu z m².';
+    return 'Materiál je neurčený (UNI) — plán je len orientačný, množstvo ostáva z odhadu z m².';
+  }
+  function budget(on){
+    var rows = [], sub = 0, porez = 0, montPlates = 0;
+    MATS.forEach(function(m){
+      var r = m.res, useP = on && eligible(m), q = useP ? r.plates.length : r.est, pp = perPlate(m);
+      var notes = [sfmt(r.m2) + ' m²', 'formát ' + r.fmt[0] + '×' + r.fmt[1] + ' mm'];
+      if (r.fallback) notes.push('formát platne nie je v katalógu — odhad podľa 2800×2070');
+      if (m.uni) notes.push('materiál neurčený (UNI) — počet platní je orientačný');
+      // ako server (budget.rb): JEDNA poznámka za materiál — súčet kusov duplákov a ich plochy × násobok vrstiev
+      var dq = 0, dm2 = 0; r.dupRows.forEach(function(d){ dq += d.q; dm2 += d.l * d.w * d.q * d.dup / 1e6; });
+      if (dq) notes.push('vrátane ' + dq + ' ks duplákov (' + sfmt(dm2) + ' m²)');
+      var spolu = pp == null ? null : Math.round(q * pp * 100) / 100;
+      if (spolu != null) sub += spolu;
+      porez += q; montPlates += r.est;
+      rows.push({ m:m, q:q, useP:useP, pp:pp, spolu:spolu, notes:notes, changed: on && useP && q !== r.est });
+    });
+    return { rows:rows, sub:Math.round(sub * 100) / 100, porez:porez, montPlates:montPlates };
+  }
+  function budgetWin(on){
+    var b = budget(on), off = budget(false);
+    var h = '<div class="stage"><div class="wincap"><b>' + (on ? 'C2 · prepínač zapnutý' : 'C1 · prepínač vypnutý (predvolené)') + '</b>' +
+      (on ? 'množstvo z plánu, kde je úplný a má formát z katalógu' : 'množstvo z odhadu z m² ako dnes, pribudne len poznámka') + '</div>' +
+      '<div class="winscroll"><div class="win" style="width:854px"><div class="winhead"><span class="wdots"><i></i><i></i><i></i></span> Noxun Engine — Štúdio <span class="wsub">· výrez: telo sekcie Rozpočet</span><span class="wsize">852 px (obsah 828)</span></div>' +
+      '<div class="stu part"><div class="sbody"><div class="sechead"><h2>Rozpočet</h2><span class="sechint">rozpočet zákazky · ceny kovania sú spoločné pre všetky zákazky</span><span class="secmodel">' + esc(MODEL) + '</span></div>' +
+      '<div class="sectools"><div class="bseg"><button type="button" class="on">s DPH</button><button type="button">bez DPH</button></div>' +
+      '<div class="bseg"><button type="button">€</button><button type="button" class="on">€€</button><button type="button">€€€</button></div>' +
+      '<button type="button" class="ghostbtn">' + ico('refresh-cw') + ' Prepočítať ceny</button>' + refreshBtn('c') + '<span class="spacer"></span>' +
+      '<button type="button" class="primary">' + ico('download') + ' XLSX rozpočet</button><button type="button" class="ghostbtn">' + ico('settings') + ' Nastavenia</button></div>' +
+      '<div class="secscroll">';
+    // sekcia Materiál
+    h += '<details class="bsec" open><summary><h3>Materiál</h3><span class="bcnt">' + b.rows.length + ' ' + pl(b.rows.length, 'položka', 'položky', 'položiek') + '</span>' +
+      '<label class="bappl' + (on ? ' onst' : '') + '" onclick="event.stopPropagation()" title="V mockupe pevný stav — druhý stav je vedľa"><input type="checkbox"' + (on ? ' checked' : '') +
+      ' onclick="return false"> ceny podľa plánu</label>' +
+      '<span onclick="event.stopPropagation();event.preventDefault()">' + tip('Zapnuté: počet platní berie rozpočet z nárezového plánu (horná hranica) — len pri materiáli s úplným plánom a formátom platne z katalógu. Ostatné ostávajú na odhade z m².\nPlatí len pre túto zákazku, predvolene vypnuté — otvorenie staršej zákazky ceny nezmení.') + '</span>' +
+      pin('C2') + otag('O5') + '<span class="bsubt">' + eur(b.sub) + '</span></summary>';
+    h += '<table class="btab"><thead><tr><th>Materiál</th><th class="bnum">Množstvo</th><th class="bnum">MJ</th><th class="bnum">€ / MJ</th><th class="bnum">Overená</th><th class="bnum">Medzisúčet</th></tr></thead><tbody>';
+    b.rows.forEach(function(x, i){
+      var m = x.m, miss = x.pp == null;
+      var tag = on ? (x.useP ? '<span class="qtag plan" title="Množstvo z nárezového plánu (horná hranica)">podľa plánu</span>'
+                              : '<span class="qtag est" title="' + esc(estReason(m)) + '">z odhadu</span>') : '';
+      h += '<tr class="' + (miss ? 'bmiss' : '') + (x.changed ? ' chg' : '') + '"><td>' + esc(m.blabel) + ' <span class="bfnt">· ' + esc(x.notes.join(' · ')) +
+           ' · <span class="mkhl">' + esc(planNote(m)) + (on ? ' · ' + esc(onNote(m)) : '') + '</span></span>' +
+           (i === 0 && !on ? pin('C1') + otag('O4') : '') + (i === 0 && on ? pin('C3') : '') + '</td>' +
+           '<td class="bnum">' + tag + x.q + '</td><td class="bnum">PLATŇA</td>' +
+           '<td class="bnum">' + (miss ? '<span class="bmisslbl">chýba cena</span>' : eur(x.pp) + ' <span class="bfnt">(' + eur(m.price) + '/m²)</span>') + '</td>' +
+           '<td class="bnum"><span class="bfnt">—</span></td><td class="bnum">' + eur(x.spolu) + '</td></tr>';
+    });
+    h += '</tbody></table></details>';
+    // sekcia Služby
+    var olep = 86.4, dupl = 200, pd = 100;
+    var porezSum = b.porez * RATE_POREZ, montM2 = Math.round(b.montPlates * M2_PER_PLATE * 100) / 100, montSum = montM2 * RATE_MONTAZ;
+    var nPlan = b.rows.filter(function(x){ return x.useP; }).length;
+    var servSub = olep + porezSum + dupl + pd + montSum;
+    var porezChg = on && b.porez !== off.porez;
+    h += '<details class="bsec" open><summary><h3>Služby</h3><span class="bcnt">5 položiek</span><span class="bsubt">' + eur(servSub) + '</span></summary>' +
+      '<table class="btab"><thead><tr><th>Položka</th><th class="bnum">Výpočet</th><th class="bnum">Medzisúčet</th></tr></thead><tbody>' +
+      '<tr><td>Olepovanie ABS hrán</td><td class="bnum bmut">96,00 BM × 0,90 € <span class="bfnt">· bm vrátane rezervy</span></td><td class="bnum"><input class="bedit" value="86,40" aria-label="Suma riadku" readonly></td></tr>' +
+      '<tr class="' + (porezChg ? 'chg' : '') + '"><td>Porez platní' + pin('C4') + otag('O6') + '</td><td class="bnum bmut">' + num(b.porez, 2) + ' PLATŇA × 17,00 €' +
+        (on ? ' <span class="bfnt">· platne z Materiálu (' + nPlan + ' podľa plánu, ' + (b.rows.length - nPlan) + ' z odhadu)</span>' : '') + '</td><td class="bnum"><input class="bedit" value="' + num(porezSum, 2) + '" aria-label="Suma riadku" readonly></td></tr>' +
+      '<tr><td>Lepenie duplákov</td><td class="bnum bmut">4,00 KS × 50,00 € <span class="bfnt">· 4 ks zlepených dielcov</span></td><td class="bnum"><input class="bedit" value="200,00" aria-label="Suma riadku" readonly></td></tr>' +
+      '<tr><td>Opracovanie pracovnej dosky</td><td class="bnum bmut">1,00 FIX × 100,00 €</td><td class="bnum"><input class="bedit" value="100,00" aria-label="Suma riadku" readonly></td></tr>' +
+      '<tr><td>Montáž</td><td class="bnum bmut">' + num(montM2, 2) + ' M2 × 15,00 € <span class="bfnt">· ' + b.montPlates + ' platní × 5,8 m²' + (on ? ' · z odhadu' : '') + '</span></td><td class="bnum"><input class="bedit" value="' + num(montSum, 2) + '" aria-label="Suma riadku" readonly></td></tr>' +
+      '</tbody></table></details>';
+    h += '<div class="bnote2">… ABS hrany, Kovanie, Štandardné riadky a ďalšie sekcie sú bez zmeny.</div>';
+    h += '</div></div></div></div></div>';
+    // XLSX výrez pod zapnutým stavom — bunka MATERIÁL = názov · poznámka (tá istá poznámka ako v Štúdiu, vrátane vety o cene).
+    // Pri vypnutom prepínači je v XLSX tá istá poznámka bez vety o cene (ako v C1).
+    if (on){
+      h += '<div class="xlsx" style="width:854px"><div class="xh"><span>MATERIÁL — výrez XLSX rozpočtu (prepínač zapnutý)</span><span class="r">MJ</span><span class="r">POČET</span>' +
+           '<span class="r">CENA za 1 MJ</span><span class="r">SPOLU</span></div>';
+      b.rows.forEach(function(x){
+        h += '<div class="xr"><span>' + esc(x.m.blabel + ' · ' + x.notes.join(' · ')) + ' · <span class="mkhl">' + esc(planNote(x.m)) + ' · ' + esc(onNote(x.m)) +
+             '</span></span><span class="r">PLATŇA</span><span class="r">' + x.q + '</span><span class="r">' + (x.pp == null ? '—' : num(x.pp, 2)) +
+             '</span><span class="r">' + (x.spolu == null ? '—' : num(x.spolu, 2)) + '</span></div>';
+      });
+      h += '</div>';
+    }
+    return h + '</div>';
+  }
+  function renderC(){
+    $('cWrap').innerHTML = budgetWin(false) + budgetWin(true);
+    var a = budget(false), b = budget(true), dm2 = Math.round((b.sub - a.sub) * 100) / 100, dpor = (b.porez - a.porez) * RATE_POREZ;
+    var ch = b.rows.filter(function(x){ return x.changed; }).map(function(x){ return x.m.blabel + ' ' + x.m.res.est + ' → ' + x.q; });
+    var tot = Math.round((dm2 + dpor) * 100) / 100;
+    var same = b.rows.filter(function(x){ return x.useP && !x.changed && x.m.res.warn; });
+    var stay = b.rows.filter(function(x){ return !x.useP; }).map(function(x){ return x.m.label + ' (' + onNote(x.m).replace(' — cena z odhadu', '') + ')'; });
+    $('cDiff').innerHTML = '<li><b>V tejto ukážke</b> zapnutie ' + (tot === 0 ? 'rozpočet nezmení' : (tot < 0 ? 'zníži' : 'zvýši') + ' rozpočet o <b>' + eur(Math.abs(tot)) + '</b>') +
+      (ch.length ? ' (' + esc(ch.join(', ')) + ' ' + pl(ch.length, 'platňa', 'platne', 'platní') + ': materiál ' + eur(dm2) + ', porez ' + eur(dpor) + ')' : '') + '.</li>' +
+      same.map(function(x){ return '<li>' + esc(x.m.label) + ': plán aj odhad ' + platni(x.q) + ' — plán navyše ukáže prečo (posledná platňa nesie ' +
+        dielcov(x.m.res.warn.parts.length) + ', využitie ' + pct(x.m.res.warn.util) + ').</li>'; }).join('') +
+      (stay.length ? '<li>Na odhade ostávajú aj pri zapnutom prepínači: ' + esc(stay.join(', ')) + '. Korpus UNI nemá cenu ako dnes (jantárový riadok „chýba cena").</li>' : '');
+  }
+
+  // ---------------- D · nastavenia ----------------
+  var SS_ROWS = [
+    { k:'abs', t:'ABS rezerva', v:'10', u:'%' },
+    { k:'m2', t:'m² na jednu platňu (montáž)', v:'5,8', u:'m²' },
+    { k:'kerf', t:'Prerez píly (hrúbka kotúča)', u:'mm', neu:'D1', lo:0, hi:10,
+      tip:'Šírka rezu kotúča píly — materiál, ktorý zje každý rez. Nárezový plán ju počíta medzi každými dvoma dielcami a medzi pásmi, nie pri okraji platne.\nPlatí pre všetky zákazky na tomto počítači (ako sadzby služieb).' },
+    { k:'trim', t:'Orez okraja platne', u:'mm', neu:'D2', lo:0, hi:50,
+      tip:'Koľko sa odreže z každej hrany platne pred rezaním (poškodené okraje). Platňa 2800 × 2070 má pri 10 mm použiteľnú plochu 2780 × 2050.\nPracovná doska (aj s ABS hranou), kompakt a zástena sa neorezávajú nikdy — hrany sú hotové.\nPlatí pre všetky zákazky na tomto počítači; počíta s ním aj Kontrola „nezmestí sa".' },
+    { k:'dup', t:'Prídavok dupláku na stranu', u:'mm', neu:'D3', lo:0, hi:30,
+      tip:'Duplák sa lepí z prírezov podľa počtu vrstiev (2 alebo 3), ktoré VEPO nareže väčšie a po zlepení oreže na hotový rozmer. Prídavok platí pre každú vrstvu: 10 mm na stranu = +20 mm v každom rozmere (820 × 580 → 840 × 600).\nPlatí pre všetky zákazky na tomto počítači.' },
+    { k:'round', t:'Zaokrúhlenie ponuky nahor na', v:'1', u:'€' },
+    { k:'stale', t:'Upozorniť na cenu staršiu ako', v:'30', u:'dní' },
+    { k:'cp', t:'Samostatný riadok v cenovej ponuke od', v:'150', u:'€' }
+  ];
+  function renderD(){
+    var h = '<div class="sshead">dodávateľ: Demos · globálne pre všetky zákazky · v0.16.0</div>' +
+      '<div class="ssfold">Sadzby služieb (porez 17 €/platňa, montáž 15 €/m², …) a Štandardné riadky nad týmto fieldsetom sú bez zmeny.</div>' +
+      '<fieldset><legend>Výpočet a upozornenia</legend><table class="ssgrid"><tbody>';
+    SS_ROWS.forEach(function(r){
+      var val = r.neu ? nf(P[r.k]) : r.v;
+      h += '<tr class="' + (r.neu ? 'new' : '') + '"><td><span class="lbl">' + esc(r.t) + (r.tip ? tip(r.tip) : '') + (r.neu ? pin(r.neu) : '') +
+           (r.k === 'kerf' || r.k === 'trim' ? otag('O7') : '') + (r.k === 'dup' ? otag('O12') : '') + '</span></td>' +
+           '<td class="n"><input type="text" inputmode="decimal" value="' + esc(val) + '"' + (r.neu ? ' data-p="' + r.k + '"' : ' readonly') + ' aria-label="' + esc(r.t) + '"></td>' +
+           '<td class="u">' + r.u + '</td></tr>';
+    });
+    h += '</tbody></table></fieldset><div class="sshint">Režim je sada predvolieb, nie zámok — v zákazke sa dá každý riadok prepísať a ručný prepis prežije zmenu režimu. Prah cenovej ponuky je len NÁVRH: každú položku vieš v sekcii Rozpočet prepnúť medzi „samostatne v ponuke" a „v zostave".</div>';
+    $('dBody').innerHTML = h;
+  }
+  function saveD(){
+    var ok = true, nv = {};
+    each('#dBody input[data-p]', function(inp){
+      var k = inp.getAttribute('data-p'), row = SS_ROWS.filter(function(r){ return r.k === k; })[0];
+      // konečné desatinné číslo v rozsahu — desatinná čiarka aj bodka (prerez 4,4 mm je bežný)
+      var s = inp.value.trim().replace(',', '.'), v = /^\d+(\.\d+)?$/.test(s) ? Number(s) : NaN;
+      var bad = !isFinite(v) || v < row.lo || v > row.hi;
+      inp.classList.toggle('bad', bad);
+      if (bad) ok = false; else nv[k] = v;
+    });
+    if (!ok){
+      $('dStatus').className = 'status';
+      $('dStatus').textContent = 'Neuložené — červené pole musí byť číslo v mm, aj desatinné (prerez 0–10, orez 0–50, prídavok 0–30; čiarka aj bodka).';
+      return;
+    }
+    P.kerf = nv.kerf; P.trim = nv.trim; P.dup = nv.dup;
+    rerender();
+    $('dStatus').className = 'status ok';
+    $('dStatus').textContent = 'Uložené: prerez ' + nf(P.kerf) + ' mm · orez ' + nf(P.trim) + ' mm · prídavok dupláku ' + nf(P.dup) + ' mm. Štúdio sa prepočítalo (nárezový plán, rozpočet, Kontrola).';
+  }
+
+  // ---------------- E · kontrola ----------------
+  function renderE(){
+    var f = ctrlFindings(), c = ctrlCounts();
+    var h = '<div class="semafor">' +
+      '<button type="button" class="schip s-red"><span class="dot"></span><span><span class="n">' + c.red + '</span> <span class="t">blokuje výrobu</span></span></button>' +
+      '<button type="button" class="schip s-orange"><span class="dot"></span><span><span class="n">' + c.orange + '</span> <span class="t">skontroluj pred objednávkou</span></span></button>' +
+      '<div class="schip s-green"><span class="dot"></span><span><span class="n">' + c.clean + '</span> <span class="t">skriniek bez nálezu</span></span></div></div>';
+    if (!f.length) h += '<div class="ctrlok">Pri oreze ' + nf(P.trim) + ' mm sa každý dielec zmestí na svoju platňu — nález „nezmestí sa" v zozname nie je.</div>';
+    f.forEach(function(x, i){
+      h += '<div class="ctrlrow ctrl-red mk" title="Klik označí nález v modeli."><span class="dot" aria-hidden="true"></span><span class="msg">' + esc(x.msg) +
+           (i === 0 ? pin('E1') + otag('O9') : '') + '</span><span class="where">' + esc(x.where) + '</span><span class="rowact">' +
+           '<button type="button" class="goact" data-eye="' + x.mid + ':' + x.row.key + '" title="Označiť v modeli">' + ico('eye') + '</button>' +
+           '<button type="button" class="goact" title="Označiť a upraviť v Inspectore">' + ico('pencil') + '</button></span></div>';
+    });
+    h += '<button type="button" class="ctrlrow ctrl-orange ctrluni-toggle" aria-expanded="false"><span class="dot" aria-hidden="true"></span><span class="msg">Nenahradené UNI materiály</span><span class="where">5 dielcov</span>' + ico('chevron-right') + '</button>' +
+         '<div class="ctrlrow ctrl-orange" title="Prejde do sekcie Rozpočet — rovno na časť, ktorej sa nález týka."><span class="dot" aria-hidden="true"></span><span class="msg">Rozpočet: materiál Korpus UNI DTDL 18 mm nemá cenu — do súčtu sa nezapočíta.</span><span class="where">Rozpočet</span><span class="rowact"><button type="button" class="goact" title="Otvoriť sekciu Rozpočet na mieste nálezu">' + ico('euro') + '</button></span></div>';
+    $('eBody').innerHTML = h;
+  }
+
+  // ---------------- schválené body O1–O12 (hlavička) ----------------
+  var OQ = [
+    { id:'O1', t:'Rozloženie sekcie', w:[['A', 'secA'], ['B', 'secB']],
+      n:'Karta pre každý nákupný materiál (počet platní, využitie, odhad, príznaky) a pod ňou mriežka malých platní; klik na platňu otvorí jej detail na celú šírku s tlačidlom späť. Karty sa dajú zbaliť na 2 riadky.',
+      a:'Všetky platne rovno veľké pod sebou (dlhé rolovanie) · alebo len tabuľka počtov bez obrázkov.' },
+    { id:'O2', t:'Upozornenie na poslednú platňu', w:[['A', 'secA']],
+      n:'Jantárová veta pod kartou, keď má materiál aspoň 2 platne a posledná má využitie pod 20 % alebo najviac 2 dielce: „Posledná platňa: 1 dielec — Krycí bok 720 × 560 · využitie 7 %". Rada je v „?" (zmenšiť, iný materiál, zvyšok využiť), vedľa tlačidlo na tú platňu.',
+      a:'Prah pod 30 % (pôvodný návrh) · alebo len jantárovo zvýraznená malá platňa bez vety.' },
+    { id:'O3', t:'Označenie dielca v modeli', w:[['B', 'secB']],
+      n:'Oko v zozname dielcov platne označí v modeli všetky rovnaké kusy — tá istá cesta ako riadok Kusovníka. Klik do obrázka nič neoznačuje, len zvýrazní riadok.',
+      a:'Označiť presne jeden kus (treba novú identitu dielca — väčšia dávka) · alebo výber klikom priamo v obrázku (bez precedensu v SketchUp nástrojoch).' },
+    { id:'O4', t:'Poznámka v Rozpočte a v XLSX', w:[['C', 'secC']],
+      n:'Riadok materiálu dostane na koniec poznámky „plán: N platní (horná hranica)" (pri neúplnom a orientačnom pláne ich vlastné pomenovanie); pri zapnutom prepínači navyše „cena podľa plánu" alebo dôvod „… — cena z odhadu". Tá istá poznámka ide do XLSX rozpočtu. Cenová ponuka počty platní neukáže nikdy.',
+      a:'Vlastný stĺpec „Plán" v tabuľke (zúži ostatné stĺpce) · alebo poznámka len v Štúdiu, nie v XLSX.' },
+    { id:'O5', t:'Prepínač „ceny podľa plánu"', w:[['C', 'secC']],
+      n:'Checkbox v hlavičke sekcie Materiál (ako „sčítať do rozpočtu" pri Spotrebičoch), platí pre túto zákazku, predvolene vypnutý — staré zákazky sa neprecenia. Zapnutý berie plán len pri úplnom pláne s formátom z katalógu.',
+      a:'Jedno nastavenie pre všetky zákazky · alebo plán vždy, bez prepínača.' },
+    { id:'O6', t:'Porez a montáž', w:[['C', 'secC']],
+      n:'Porez (€ za platňu) ide za počtom platní v Materiáli — pri zapnutom prepínači teda z plánu. Montáž ostáva z odhadu (závisí od dielcov, nie od odpadu).',
+      a:'Aj montáž z plánu · alebo aj porez vždy z odhadu.' },
+    { id:'O7', t:'Kde sa nastavuje prerez a orez', w:[['D', 'secD'], ['A', 'secA']],
+      n:'V Nastaveniach rozpočtu → „Výpočet a upozornenia", raz pre všetky zákazky na tomto počítači (ako sadzby dodávateľa). V lište plánu ich ukazuje chip s preklikom.',
+      a:'Per zákazka (cestuje so .skp; staršia verzia pluginu by potom rozpočet zákazky needitovala).' },
+    { id:'O8', ok:true, dec:'N6, N9', t:'Ktoré platne majú orez', w:[['A', 'secA'], ['D', 'secD']],
+      n:'Orez len pre bežné platne (DTD, MDF, HDF a iné dosky). Pracovná doska vždy bez orezu (aj s ABS hranou), rovnako kompakt a zástena — hrany sú hotové. Karta pracovnej dosky to povie chipom „bez orezu — hrany hotové".',
+      a:'—' },
+    { id:'O9', t:'Kontrola „nezmestí sa" s orezom', w:[['E', 'secE']],
+      n:'Existujúci červený nález počíta s orezom — jedna pravda s plánom. Bok 2795 × 560 dnes prejde (2795 ≤ 2800), po zmene ho Kontrola ohlási. Export ako dnes nezastaví.',
+      a:'Kontrola ostane bez orezu a nesúlad ukáže len Nárezový plán.' },
+    { id:'O10', t:'Chýbajúci formát a UNI', w:[['A', 'secA'], ['C', 'secC']],
+      n:'Plán sa spočíta na pracovnom formáte 2800 × 2070, ale je len orientačný: karta píše „orientačne N platní pri formáte 2800 × 2070", jantárový chip a tlmené platne. V rozpočte ostane cena z odhadu aj pri zapnutom prepínači, s vetou „formát chýba — cena z odhadu" / „materiál neurčený — cena z odhadu".',
+      a:'Počítať ich do ceny ako ostatné · alebo pre ne plán vôbec nekresliť.' },
+    { id:'O11', t:'Neúplný plán', w:[['A', 'secA'], ['C', 'secC'], ['E', 'secE']],
+      n:'Neúplný = niektorý dielec sa nezmestí alebo ho VEPO odmietne (neznáma ABS páska, chybná hrúbka, nulový rozmer). Karta ukáže červený zoznam s okom a dôvodom a počet „N platní pre zaradené dielce — celkový počet neznámy". V rozpočte cena materiálu z odhadu s vetou „plán neúplný — cena z odhadu" (aj v XLSX). Exporty sa nezastavia (ako dnes pri dielci väčšom ako platňa).',
+      a:'Zastaviť XLSX rozpočtu a cenovej ponuky, kým sa dielec neopraví.' },
+    { id:'O12', t:'Prídavok dupláku ako nastavenie', w:[['D', 'secD'], ['A', 'secA'], ['B', 'secB']],
+      n:'Tretí riadok v Nastaveniach rozpočtu „Prídavok dupláku na stranu", predvolene 10 mm = +20 mm v každom rozmere. Plán kreslí prírezy dupláku s prídavkom — toľko, koľko má duplák vrstiev (2 alebo 3), prídavok pre každú vrstvu (820 × 580 → 840 × 600) — a označí ich „Duplák".',
+      a:'Pevných 10 mm bez nastavenia.' }
+  ];
+  // Všetky body sú FINÁLNE (N11, 28.9.2026): O8 rozhodnuté skôr (N6, N9), ostatné schválené podľa návrhu (O2 s prahom 20 %).
+  // Pôvodná alternatíva sa ukazuje len tlmene ako „nezvolená" — nič nesmie pôsobiť ako otvorený bod.
+  function renderO(){
+    $('ogrid').innerHTML = OQ.map(function(q){
+      var tag = q.dec ? 'rozhodnuté 28.9. (' + q.dec + ') · ' + q.id
+                      : 'schválené 28.9. (N11)' + (q.id === 'O2' ? ' · prah 20 %' : '') + ' · ' + q.id;
+      return '<div class="obox ok" id="' + q.id + '"><div class="oh"><span class="otagi">' + tag + '</span><b>' + esc(q.t) + '</b></div>' +
+        '<dl><dt>Platí</dt><dd>' + esc(q.n) + '</dd></dl>' +
+        (q.a && q.a !== '—' ? '<div class="oalt">pôvodná alternatíva — nezvolená: ' + esc(q.a) + '</div>' : '') +
+        '<div class="where">kde v mockupe: ' + q.w.map(function(x){ return '<a href="#' + x[1] + '">' + x[0] + '</a>'; }).join(' · ') + '</div></div>';
+    }).join('');
+  }
+
+  // ---------------- udalosti ----------------
+  function status(id, txt, ok){ var s = $(id); if (!s) return; s.className = 'status' + (ok ? ' ok' : ''); s.textContent = txt; }
+  function statusFor(el){ var w = el.closest('.win'); var s = w && w.querySelector('.status'); return s ? s.id : 'aStatus'; }
+  function goTo(id){ var t = $(id); if (t) t.scrollIntoView({ behavior:'smooth', block:'start' }); }
+  function openPlate(mid, pi){
+    SEL = { mid:mid, pi:pi };
+    renderA(); renderB();
+    goTo('secB');
+  }
+  function highlight(rk){
+    if (SEL.hl === rk) return;
+    SEL.hl = rk;
+    each('#bBody .np-part', function(r){ var g = r.parentNode; r.classList.toggle('hl', !!rk && g.getAttribute('data-rk') === rk); });
+    each('#bBody .nplist tbody tr', function(tr){ tr.classList.toggle('hl', !!rk && tr.getAttribute('data-rk') === rk); });
+  }
+  document.addEventListener('click', function(ev){
+    var t = ev.target.closest('button, a');
+    if (!t) return;
+    if (t.hasAttribute('data-card')){
+      var id = t.getAttribute('data-card'); CLOSED[id] = !CLOSED[id]; saveClosed();
+      var card = t.closest('.npcard'); card.classList.toggle('closed', !!CLOSED[id]); t.setAttribute('aria-expanded', String(!CLOSED[id]));
+      return;
+    }
+    if (t.hasAttribute('data-thumb') || t.hasAttribute('data-open')){
+      var v = (t.getAttribute('data-thumb') || t.getAttribute('data-open')).split(':');
+      openPlate(v[0], Number(v[1])); return;
+    }
+    if (t.hasAttribute('data-pg')){
+      var m = byId(SEL.mid), n = m.res.plates.length;
+      SEL.pi = (SEL.pi + Number(t.getAttribute('data-pg')) + n) % n; SEL.hl = null;
+      renderA(); renderB(); return;
+    }
+    if (t.hasAttribute('data-go')){ goTo(t.getAttribute('data-go')); return; }
+    if (t.hasAttribute('data-param')){
+      goTo('secD');
+      setTimeout(function(){ each('#dBody tr.new', function(tr){ tr.classList.remove('flash'); void tr.offsetWidth; tr.classList.add('flash'); }); }, 350);
+      return;
+    }
+    if (t.hasAttribute('data-refresh')){
+      status(statusFor(t), 'Prepočítané z aktuálneho modelu — nárezový plán, rozpočet aj Kontrola (v mockupe bez zmeny).', true); return;
+    }
+    if (t.hasAttribute('data-eye')){
+      var e = t.getAttribute('data-eye').split(':'), mm = byId(e[0]), row = mm.rows.filter(function(r){ return r.key === e[1]; })[0];
+      status(statusFor(t), 'V modeli označené: ' + rowName(row) + ' — ' + row.q + ' ks (' + row.owner + '), všetky rovnaké kusy aj z iných platní. Je to len výber, krok Späť nevzniká.', true);
+      return;
+    }
+    if (t.hasAttribute('data-ss')){
+      if (t.getAttribute('data-ss') === 'save') saveD();
+      else { renderD(); status('dStatus', 'Načítané nanovo — neuložené zmeny zahodené.'); }
+      return;
+    }
+    if (t.hasAttribute('data-theme')){
+      var th = t.getAttribute('data-theme');
+      document.documentElement.setAttribute('data-nx-theme', th);
+      each('[data-theme]', function(b){ b.classList.toggle('on', b.getAttribute('data-theme') === th); });
+      return;
+    }
+  });
+  document.addEventListener('mouseover', function(ev){
+    var g = ev.target.closest && ev.target.closest('#bBody [data-rk]');
+    highlight(g ? g.getAttribute('data-rk') : null);
+  });
+  $('pinTog').addEventListener('change', function(){ document.body.classList.toggle('nopins', !this.checked); });
+
+  // ---------------- štart ----------------
+  function rerender(){ computeAll(); renderA(); renderB(); renderC(); renderE(); each('[data-secmodel]', function(s){ s.textContent = MODEL; }); }
+  computeAll(); renderO(); renderD(); rerender();
+})();
+</script>
+</body>
+</html>
