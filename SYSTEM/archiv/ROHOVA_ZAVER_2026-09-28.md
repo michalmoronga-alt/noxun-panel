@@ -68,8 +68,8 @@ na dolnú). **Preto aktualizovať obe PC skôr, ako sa na nich otvorí zákazka 
 ## Známe obmedzenia (vedome, nie chyby)
 
 - **Obálka prisunutia a ghostu nevidí CR 2 a rohovú výstuhu** (trčia pred korpus) — pri prisúvaní k susednému radu treba roh skontrolovať okom (R9, G10).
-- **Výrez police pre výstuhu závesov robí dielňa** — polica ide cez celú šírku (O8); plugin k tomu dáva jantárové (ORANGE) upozornenie — či ostane, rozhodne
-  Michal (Otvorené body).
+- **Výrez police pre výstuhu závesov robí dielňa** — polica ide cez celú šírku (O8); plugin k tomu dáva jantárové (ORANGE) upozornenie, ktoré **ostáva**
+  (Michal pri smoke 28.9.2026: „všetko sedí").
 - **CR lišty nejdú s hromadnou „Kresbou čiel"** — kreslia sa zvislo ako doteraz (O9).
 - **Priečky v rohovej sú zakázané** (priečka by prešla blendou) a rohová má len jedny dvierka — zásuvky ani iné čelá nie.
 - **Strana dverí sa mení len prepínačom** v riadku rohovej; šablóna inej strany sa na existujúcu rohovú odmietne, typ sa nemení ani šablónou, ani úpravou.
@@ -78,15 +78,20 @@ na dolnú). **Preto aktualizovať obe PC skôr, ako sa na nich otvorí zákazka 
 
 ## Otvorené body
 
-- **O8 — jantárové upozornenie „výrez police × výstuha závesov":** ROH-A1 ho pridal navyše k mockupu ako vratnú voľbu; **čaká na Michalov pokyn**, či ostane
-  (keď nie, odstráni ho malá oprava v0.15.x).
+- ~~**O8 — jantárové upozornenie „výrez police × výstuha závesov"**~~ — **ponechané 28.9.2026** (Michal pri smoke, bod 6.4: „všetko sedí"). ROH-A1 ho pridal
+  navyše k mockupu ako vratnú voľbu; ostáva bez zmeny. Keby ho Michal neskôr chcel inak, príde ako nové D-číslo.
 - **Overenie v dielni pri prvej rohovej** (C9): záves Sensys 9071205 + podložka D1,5 zo setu KLASIK **na výstuhe závesov**, **prekrytie 16 mm**, dvere sa
   otvoria **bez dotyku CR 1** (medzera 4 mm).
 
 ## Smoke checklist bloku (v poradí práce v dielni)
 
-Zlúčené zo sekcií „Smoke pre Michala" packages ROH-A1, A2, B1 a B2 — bez duplicít, pri každom bode je dávka, z ktorej pochádza. Nálezy zo smoke idú do
-[DOGFOODING.md](../DOGFOODING.md) (dočasná skupina „K3 ROHOVÁ — smoke po uzávere bloku 8") ako opravy v0.15.x.
+**Smoke PASS — Michal 28.9.2026 popoludní, bez nálezov** („smoke rohovej PASS, všetko sedí, super práca"). Checklist prešiel krok po kroku; výsledok sa
+zaznamenal ako celok, nie po bodoch. Jantárové upozornenie O8 (bod 6.4) ostáva — pozri Otvorené body. Dočasná skupina smoke v DOGFOODING zanikla; ďalšie
+postrehy k funkciám bloku 8 sa zapisujú ako **nové D-čísla do [DOGFOODING.md](../DOGFOODING.md) podľa bloku** (nie ako opravy v0.15.x). **Overenie v dielni
+pri prvej rohovej** (sekcia 7) nie je súčasťou smoke v SketchUpe a ostáva otvorené. Checklist nižšie ostáva ako záznam.
+
+Zlúčené zo sekcií „Smoke pre Michala" packages ROH-A1, A2, B1 a B2 — bez duplicít, pri každom bode je dávka, z ktorej pochádza. Nálezy zo smoke mali ísť do
+DOGFOODING (dočasná skupina „K3 ROHOVÁ — smoke po uzávere bloku 8") ako opravy v0.15.x — žiadne neboli, skupina po PASS zanikla.
 
 **0 · Príprava**
 1. Aktualizuj plugin na **0.15.0 na oboch PC** (Michal aj Lucia; updater v Štúdiu → O plugine) a reštartuj SketchUp; over verziu v O plugine. *(celý blok)*
@@ -123,7 +128,7 @@ Zlúčené zo sekcií „Smoke pre Michala" packages ROH-A1, A2, B1 a B2 — bez
 1. Kusovník / Štúdio: blenda, výstuha závesov, rohová výstuha, CR 1, CR 2 (CR z čelového materiálu). *(A1, A2)*
 2. VEPO export: nové riadky s krátkymi názvami (Blenda roh, Vyst zav, Vyst roh, CR 1, CR 2; ≤ 20 znakov), CR s ABS dookola. *(A2)*
 3. Nákup kovania: **2 závesy, 6 nôh** (pri 1100). Cenová ponuka: CR ako „dvierka". *(A1, A2)*
-4. Kontrola: jantárové upozornenie „výrez police × výstuha závesov" — **povedz, či ho chceš nechať** (O8). *(A1)*
+4. Kontrola: jantárové upozornenie „výrez police × výstuha závesov" — **povedz, či ho chceš nechať** (O8). *(A1)* *(28.9.2026: „všetko sedí" — ostáva.)*
 5. Regresia: kópia reálnej zákazky bez rohovej — kusovník, VEPO a ponuka sa nemenia. *(celý blok)*
 
 **7 · Overenie v dielni pri prvej rohovej** *(A1, C9)*

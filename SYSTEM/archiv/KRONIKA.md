@@ -17,6 +17,16 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **DOCS — smoke bloku 8 K3 ROHOVÁ SKRINKA PASS (28.9.2026, PR #?, len dokumentácia; verzia pluginu sa nemení).**
+  Michal 28.9. popoludní prešiel smoke bloku 8 krok po kroku podľa checklistu v [ROHOVA_ZAVER_2026-09-28.md](ROHOVA_ZAVER_2026-09-28.md): **„smoke rohovej
+  PASS, všetko sedí, super práca"** — výsledok zapísaný ako celok, nie po bodoch; ďalšie postrehy k funkciám bloku 8 idú ako nové D-čísla do DOGFOODING podľa
+  bloku. **O8** (jantárové upozornenie Kontroly „polica prechádza výstuhou závesov — výrez robí dielňa", bod 6.4) **ponechané** — Michal povedal „všetko
+  sedí"; uzavreté v „Otvorené body" a „Známe obmedzenia" záveru, v rozhodnutí R10 ([bloky/ROHOVA/ROZHODNUTIA_MICHALA_2026-09-27.md](bloky/ROHOVA/ROZHODNUTIA_MICHALA_2026-09-27.md))
+  a v súhrne bloku v [ROADMAP_hotove_etapy.md](ROADMAP_hotove_etapy.md); keby ho chcel inak, príde nové D-číslo. V [V1_VIZIA.md](../V1_VIZIA.md) bod 2 už nečaká
+  na smoke. Otvorené ostáva **overenie závesu na výstuhe závesov v dielni pri prvej rohovej**. Dočasná skupina „K3 ROHOVÁ — smoke po uzávere bloku 8"
+  v DOGFOODING **zanikla** (bez nálezov; vzor PR #408 a #397). Archivované packages bloku sa nemenia (historický podklad). **STAV pri najbližšej kódovej
+  dávke:** smoke bloku 8 PASS 28.9., O8 ponechané — dokumentačné PR STAV nemení.
+
 - **BLOK 8 · K3 ROHOVÁ SKRINKA UZAVRETÝ (28.9.2026, v0.14.4 → v0.15.0, podklady PR #409, dávky PR #410–#413 + uzáver PR #414, variant B).** Blok vybral Michal
   27.9. večer po smoke PASS bloku 7 ako nočný blok; rozhodnutia R1–R9, krížový audit bloku (Codex + Grok, 5 BLOCKERov → všetky prijaté v reconcile), mockup
   schválený 28.9. (O1–O12 podľa návrhu, R10). Dávky za necelý deň: **ROH-A1** #410 (typ `corner_blind`, rohová zostava, účinné hrúbky CR, výstupy, ochrany;
