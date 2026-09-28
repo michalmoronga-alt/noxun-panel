@@ -7,7 +7,7 @@
 ## Stav
 
 **v0.15.1 · 29.9.2026 — BLOK 2 · NÁREZOVÝ PLÁN (primitívny) beží:** štart bloku PR #417 (rozhodnutia N1–N11, schválený mockup), prvá dávka **NP-1 · jadro výpočtu**
-(PR #?). Plugin vie **spočítať rozloženie dielcov na platne a počet platní** (pásové rozloženie, prerez 5 / orez 10 / prídavok dupláku 10 mm, dielce sa neotáčajú),
+(PR #418). Plugin vie **spočítať rozloženie dielcov na platne a počet platní** (pásové rozloženie, prerez 5 / orez 10 / prídavok dupláku 10 mm, dielce sa neotáčajú),
 ale výpočet **zatiaľ nikde nezobrazuje** — pre používateľa sa nič nemení (zobrazí ho NP-3). VEPO export je bajtovo rovnaký.
 
 **v0.15.0 · 28.9.2026 — BLOK 8 · K3 ROHOVÁ SKRINKA UZAVRETÝ** (v0.14.0 → v0.15.0, podklady PR #409, dávky PR #410–#413 + uzáver PR #414; **smoke PASS 28.9.**, O8 ponechané).
@@ -31,12 +31,12 @@ v **seede 6** — starší plugin zákazku neprestaví ani nevyexportuje (rohov�
 po prvej mutácii rozpočtu needituje a zastaví oba cenové exporty). **Aktualizovať OBE PC (aj Luciino) na 0.15.0 pred prvou rohovou** — starší plugin rohovú nepozná
 a knižnicu šablón STD 7 len číta (nedá sa v nej ukladať, premenovať ani mazať).
 
-**Testy (posledná kódová dávka, NP-1 PR #?):** **4765 headless · 138 JS sád** zelené; in-SU netreba (čistý výpočtový modul, žiadny builder, observer ani zápis do modelu).
+**Testy (posledná kódová dávka, NP-1 PR #418):** **4765 headless · 138 JS sád** zelené; in-SU netreba (čistý výpočtový modul, žiadny builder, observer ani zápis do modelu).
 **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 
 ## Robí sa
 
-**Blok 2 · Nárezový plán** (priečinok [zdroje/bloky/NAREZ/](zdroje/bloky/NAREZ/), dávky v [PLAN.md](PLAN.md)): **NP-1** jadro výpočtu (PR #?) → **NP-2** nastavenia
+**Blok 2 · Nárezový plán** (priečinok [zdroje/bloky/NAREZ/](zdroje/bloky/NAREZ/), dávky v [PLAN.md](PLAN.md)): **NP-1** jadro výpočtu (PR #418) → **NP-2** nastavenia
 prerezu, orezu a prídavku + Kontrola „nezmestí sa" s orezom → **NP-3** sekcia Nárezový plán v Štúdiu → **NP-4** ceny podľa plánu. Pri prvej rohovej v dielni ostáva overiť
 záves Sensys na výstuhe závesov. **Čakajú na smoke:** **D-132** (#367), **D-133** (#368), **D-134** (#369). **D-141**, **D-142**, **D-145** a **D-146** sú v zásobníku.
 **Blok 1d** podľa kapacity — R-18; **R-13 čaká na Michala**.

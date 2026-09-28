@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **NP-1 · Nárezový plán — jadro výpočtu (29.9.2026, v0.15.0 → v0.15.1, PR #?; blok 2, prvá dávka).**
+- **NP-1 · Nárezový plán — jadro výpočtu (29.9.2026, v0.15.0 → v0.15.1, PR #418; blok 2, prvá dávka).**
   Nový čistý modul `core/sheet_layout.rb` (**zatiaľ nikam nenapojený** — pre používateľa sa nič nemení, zobrazí ho NP-3): z riadkov kusovníka, katalógu dosiek
   a mapy hrúbok ABS vypočíta **per nákupný materiál** pásové (gilotínové) rozloženie na platne — počet platní, využitie, polohy, najväčší zvyšok (aj nad
   nižším dielcom v páse, audit F9), nezaradené dielce (`oversize` / `needs_rotation` / `no_usable_area`) a **`upper_bound`** len pri úplnom a spoľahlivom

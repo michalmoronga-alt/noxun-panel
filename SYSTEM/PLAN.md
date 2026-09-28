@@ -223,7 +223,7 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   Nárezový plán, rozpočet ukáže „plán: N platní" a voliteľne **ceny podľa plánu** — informácia pre objednávku, **nie povinné množstvo** (objednáva človek). Rozhodnutia Michala
   N1–N11, schválený mockup, fakty z kódu, surová rešerš a surový krížový audit sú v priečinku bloku; pôvodný návrh `zdroje/next_sessions/NAREZ_PLAN_NAVRH_2026-09-06.md` (PR #323),
   rozhodnutie 6.9.: [zdroje/next_sessions/V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md). **Dávky (po poradí):**
-  - ✅ **NP-1 · jadro výpočtu** — plugin vie spočítať rozloženie a počet platní; zatiaľ bez viditeľnej zmeny (zobrazí ho NP-3). **PR #?, v0.15.1**
+  - ✅ **NP-1 · jadro výpočtu** — plugin vie spočítať rozloženie a počet platní; zatiaľ bez viditeľnej zmeny (zobrazí ho NP-3). **PR #418, v0.15.1**
     ([package](zdroje/bloky/NAREZ/PACKAGE_NP1_JADRO.md)).
   - **NP-2 · nastavenia + Kontrola** — prerez, orez a prídavok dupláku v Nastaveniach rozpočtu; Kontrola „nezmestí sa" počíta s orezom.
   - **NP-3 · sekcia Nárezový plán** — Štúdio: karty materiálov s malými platňami, detail platne, upozornenie na poslednú platňu, dielce, ktoré sa nezmestia;
