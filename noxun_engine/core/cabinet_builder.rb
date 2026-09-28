@@ -91,10 +91,15 @@ module Noxun
       # `corner_fronts!` a len ked riadok dvierok kluc smeru NEMA. Pin testom
       # `tests/pure/test_roha1_rohova.rb`.
       CORNER_HINGE_SIDE = { 'left' => 'right', 'right' => 'left' }.freeze
+      # ROH-B1 (O5): zrkadlo strany pri PREPNUTI strany rohovej (smer pantov,
+      # strana profilu). Iny vyznam nez `CORNER_HINGE_SIDE` (ta hovori, kde je
+      # roh) — zhodne cisla su nahoda, preto dve konstanty.
+      CORNER_MIRROR_SIDE = { 'left' => 'right', 'right' => 'left' }.freeze
       # Najmensia sirka rohovej pri PREDVOLBACH (dvere 450, CR 1 80, CR 2 z
-      # celoveho 18, korpus 18: 450 + 80 + 18 + 2 x 18). Zrkadlo JS
-      # `TYPE_LIMITS.corner_blind` (form.js) — skutocne minimum pocita server
-      # sondou (`Construction.min_valid_width`); zhodu strazi guard test.
+      # celoveho 18, korpus 18: 450 + 80 + 18 + 2 x 18) — referencne cislo
+      # (zhoda so sondou `Construction.min_valid_width` je v teste). Panel od
+      # ROH-B1 pevne minimum NEMA: pocita ho z poli rohovej a ucinnych hrubok
+      # (`nxCornerMinWidth`, zrkadlo `Construction.corner_fit_width`).
       CORNER_MIN_WIDTH = 584.0
 
       # S1-E: UZAVRETE polia slotu. Su tu vymenovane, aby ich `normalize`,
@@ -3344,6 +3349,98 @@ module Noxun
         # Povolene zmeny: smer, uchytkovy profil, medzery, material, kovanie.
         def corner_fronts_ok?(fronts_cfg)
           Construction.corner_fronts_ok?(fronts_cfg)
+        end
+
+        # ROH-B1 (O5): PREPNUTIE STRANY rohovej — JEDINA funkcia premapovania.
+        # Cista (headless test), vracia NOVE params (hlboka kopia), vstup
+        # nemeni. Pri zmene strany `side` -> `side'`:
+        #   * `corner_side` = nova strana (neznama hodnota = odmietnutie
+        #     volajuceho; tu sa normalizuje ako v `norm_corner`),
+        #   * CELA: okraje `gap_left` <-> `gap_right` (vonkajsi ostane
+        #     vonkajsi, okraj pri rohu pri rohu — O11); smer pantov kazdeho
+        #     riadku `left` <-> `right` (`unset` ostane, CHYBAJUCI kluc ostane
+        #     chybat — `corner_fronts!` mu da predvolbu rohovej, panty pri
+        #     rohu); explicitna strana profilu `profile_edge` `left`/`right`
+        #     zrkadlom tiez; ID, profil, zamky ani ostatne polia sa nemenia,
+        #   * RUCNE HRANY (`part_overrides[key]['edges']` + `edge_warnings`)
+        #     podla osi dielca (`Construction::CORNER_MIRROR_EDGE_KEYS` +
+        #     kridla riadkov ciel): `L1` <-> `L2`; ostatne dielce bez zmeny.
+        #     Material, smer dekoru a kovanie sa nemenia (kluce ostavaju).
+        # Rovnaka strana = kopia bez zmeny (volajuci ju ani nezapisuje).
+        def corner_mirror_params(params, side)
+          out = deep_copy_cfg(params.is_a?(Hash) ? params : {})
+          want = CORNER_SIDES.include?(side.to_s) ? side.to_s : CORNER_DEFAULTS[:corner_side]
+          have = Construction.corner_side(out)
+          out.delete(:corner_side)
+          out['corner_side'] = want
+          return out if want == have
+
+          ids = corner_mirror_fronts!(out)
+          corner_mirror_overrides!(out, ids)
+          out
+        end
+
+        # Cela v `params` (in-place na KOPII): okraje, smer, strana profilu.
+        # -> zoznam ID riadkov (ich kridla sa zrkadlia v `part_overrides`).
+        def corner_mirror_fronts!(out)
+          key = out.key?('fronts') ? 'fronts' : (out.key?(:fronts) ? :fronts : nil)
+          return [] if key.nil? || out[key].nil?
+
+          raw = out[key]
+          fr = raw.is_a?(Hash) ? raw : Fronts.normalize_config(raw)
+          norm = Fronts.normalize_config(fr)
+          fr = fr.reject { |k, _| %w[gap_left gap_right gap_sides].include?(k.to_s) }
+          fr['gap_left'] = norm['gap_right']
+          fr['gap_right'] = norm['gap_left']
+          ikey = fr.key?('items') ? 'items' : (fr.key?(:items) ? :items : 'items')
+          items = Array(fr[ikey]).map do |it|
+            next it unless it.is_a?(Hash)
+
+            it = it.dup
+            %w[direction profile_edge].each do |k|
+              sk = it.key?(k) ? k : (it.key?(k.to_sym) ? k.to_sym : nil)
+              next if sk.nil?
+
+              v = it[sk].to_s
+              it[sk] = CORNER_MIRROR_SIDE[v] if CORNER_MIRROR_SIDE.key?(v)
+            end
+            it
+          end
+          fr[ikey] = items
+          out[key] = fr
+          items.map { |it| it.is_a?(Hash) ? (it['id'] || it[:id]).to_s : '' }.reject(&:empty?)
+        end
+
+        # Rucne hrany podla osi dielca (in-place na KOPII `params`).
+        def corner_mirror_overrides!(out, front_ids)
+          key = out.key?('part_overrides') ? 'part_overrides' : (out.key?(:part_overrides) ? :part_overrides : nil)
+          return if key.nil? || !out[key].is_a?(Hash)
+
+          out[key] = out[key].each_with_object({}) do |(pk, rec), acc|
+            acc[pk] = corner_mirror_key?(pk.to_s, front_ids) && rec.is_a?(Hash) ? corner_mirror_edge_rec(rec) : rec
+          end
+        end
+
+        # Zrkadli sa dielec zostavy `AXES_FRONT` alebo kridlo riadku ciel.
+        def corner_mirror_key?(part_key, front_ids)
+          return true if Construction::CORNER_MIRROR_EDGE_KEYS.include?(part_key)
+
+          m = part_key.match(%r{\Afront:([^/]+)/wing:[^/]+\z})
+          !m.nil? && front_ids.include?(m[1])
+        end
+
+        # `edges` aj `edge_warnings` si vymenia L1 a L2 (W1/W2 ostavaju).
+        def corner_mirror_edge_rec(rec)
+          rec = rec.dup
+          %w[edges edge_warnings].each do |k|
+            sk = rec.key?(k) ? k : (rec.key?(k.to_sym) ? k.to_sym : nil)
+            next if sk.nil? || !rec[sk].is_a?(Hash)
+
+            rec[sk] = rec[sk].each_with_object({}) do |(code, v), acc|
+              acc[Construction::CORNER_MIRROR_EDGE_SWAP.fetch(code.to_s, code.to_s)] = v
+            end
+          end
+          rec
         end
 
         # --- S1-E: polia slotu umyvacky -------------------------------------

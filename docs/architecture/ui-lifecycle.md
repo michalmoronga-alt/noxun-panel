@@ -709,6 +709,28 @@ kanálom `NX.insertLegsPreview` s **generáciou dotazu** (`gen`) — staršie ko
 v karte) postaví `legs_preview_summary`. **Override sa vo vkladaní neponúka** — set sa mení až na vloženej skrinke. Kým odpoveď nepríde (starší plugin bez callbacku), v riadku
 stojí „—". **PASS-THROUGH GUARD:** text je VÝSTUP — do `collectAll()` ani do vkladacieho payloadu sa nedostane nič z neho (`test_kovg2_nohy_ui.js`, `test_insert_state.js`).
 
+**ROH-B1 — RIADOK ROHOVEJ (`#cornerRow`, mockup B1 / A1).** Nad riadkom Nohy stojí pri rohovej **jeden** riadok cez oba stĺpce: **Dverová časť** · **CR** (CR 1 s ikonou
+šírky, CR 2 s ikonou hĺbky v rámikoch `.crin`) · **prepínač strany** (`#cornerSideL`/`#cornerSideR`, ikony `corner-l`/`corner-r`, `aria-pressed` + `.on`) · `?`. Ten istý
+riadok slúži **označenej rohovej aj vkladacej karte** (`#basicCard` je spoločný). Viditeľnosť rieši **jediná autorita** `applyVisibility` (`hidden` pri inom type),
+stav prepínača `nxCornerRowSync` z registra `cornerDraft` (`nxCornerSide`). Polia idú **bežnou cestou poľa** (`oninput="onField()"`, výrazy cez `bindExprFields` v `boot.js`
+— rozpísaný výraz „600+" nič neodošle, Enter/blur ho potvrdí; predrecenzia P2-1 —, validácia, debounce apply, zber cez `CONSTRUCTION_FIELDS` s `only`).
+Každé číselné pole v `#basicCard` musí byť v `bindExprFields` (guard v `test_rohb1_ovladace.js`; výnimka popover osadenia `aprMountVal`, ktorý zapisuje
+len tlačidlo); tým dostali výrazy aj polia slotu `dw_body_height` a `dw_front_bottom`. **Krížová kontrola `cabinetCornerError`** (v `validateFields`, len pri rohovej): veta k poľu mimo rozsahu
+(`LIMITS` = `CORNER_RANGES` 250–800 / 50–250, validujú sa len pri rohovej — `CORNER_FIELDS`, vzor `SLOT_FIELDS`) a **najmenšia šírka** `D + c1 + th2 + 2t` =
+presne `Construction.corner_fit_width` (`nxCornerMinWidth` / `nxCornerFitError` v `core.js`, tá istá veta ako server; audit B1 FIX 5 — celé mm sondy
+`min_valid_width` ostávajú len pre klamp Scale); pri nezmestení červená **šírka, dverová časť a CR 1** (rámik `.crin` cez `nxCornerBoxesSync`) a veta ide do
+`nxCabFieldError` (flush apply aj `insertCabinet` ju ukážu). Hrúbky: **th2** z payloadu (`corner_th2`) alebo z `corner_ctx` preflightu, **t** pri vkladaní
+z `corner_ctx` (hrúbka, ktorú použije vklad), inak z poľa (`nxCornerT`) — `nxAdoptCornerCtx` pri zmene prevalidovanie spustí (audit B1 FIX 4).
+
+**Prepínač strany (`onCornerSide`, O5).** Klik na zvolenú stranu nič nerobí. **Označená rohová:** najprv `nxCabinetAction` (rozpísané polia sa dopíšu, červené
+pole akciu zastaví; klik počas debounce aj počas odoslaného apply sa vykoná až po **potvrdenom** apply), potom `sketchup.corner_side` s `switch_token` a **len**
+`{cabinet_id, corner_side, switch_token, model_guid}`; prepínač ukáže novú stranu až push servera. Kým beží (`cornerSwitch`), sú skupiny kontextu Čelá **zamknuté** (`nxCornerSwitchLock` — `inert` + `aria-busy`
+na `details[data-s4="cela"]`; čelá po odpovedi prevezme server, takže úprava počas prepínania by sa ticho stratila — predrecenzia P3-3), **auto-apply sa odkladá**
+(`flushCabinetEdits` — natívna kópia dostane `invalid`), iné akcie čakajú (`nxCabinetAction`) a druhý klik nič nepošle; koniec = korelovaná odpoveď
+`NX.cornerSideResult` (`nxCornerSideResult`: cudzí token sa ignoruje; keď push prepnutia prišiel počas rozpísanej zmeny — `holdDraft` —, **čelá, strana a otvor
+sa prevezmú zo servera** z pamätaného echa a až potom ide odložený apply, audit B1 FIX 1) alebo zmena identity (`nxFrontDraftReset`). **Vkladanie:** zmena registra
++ zrkadlo návrhu čiel (odsek „Vkladacia karta").
+
 **Rozmery korpusu patria do payloadu aj do kľúča (Codex #339 kolo 2 N2).** Korpusové pravidlo `leg`/`plinth_clip` sa smie riadiť ktorýmkoľvek kľúčom kontextu
 (`HardwareRules::CONTEXT_KEYS` cez `input_value`), takže pásma podľa **výšky** alebo **hĺbky** sú legitímne — preto `height` a `depth` sú v `INSERT_LEGS_KEYS`. Bez nich by
 `CabinetBuilder.normalize` dosadila svoje **predvoľby**, kým vklad by to isté pravidlo vyhodnotil nad rozmermi, ktoré používateľ naozaj zadal — karta by sľubovala iný počet nôh.
@@ -896,7 +918,9 @@ vkladanie — `NX.clearSelected`) si otvor vypýta znova cez `nxInsertDraftResum
 `nxFrontOpeningFor(type, W, op)` vloží `fx0`/`fw` a **všetci čitatelia šírky čiel** (`frontsExtent`, `nxFrontsExtent`, `nxDraftStats`, `renderFrontsPreview`,
 `drawFrontDims`, `nxHwMarks`, `drawFrontsGhost`) merajú od otvoru. Ostatné typy dostanú vždy `{x0: 0, w: W}` a serverový otvor **ignorujú** — kresba dolnej, hornej aj
 slotu je pixel po pixeli rovnaká (parita v `tests/js/test_roha2_vkladanie.js`, jednorazovo aj proti `main`: 180 scén bez rozdielu). Rohová **bez známeho otvoru**
-(odpoveď preflightu po zmene identity ešte neprišla) čelá nekreslí vôbec (`frontsPending`) — dvere cez celú šírku by boli klamstvo. Kresba CR líšt a blendy je ROH-B.
+(odpoveď preflightu po zmene identity ešte neprišla) čelá nekreslí vôbec (`frontsPending`) — dvere cez celú šírku by boli klamstvo. **ROH-B1:** dverová časť
+je živé pole — jej zmena mení signatúru preflightu (`nxFrontDraftData` posiela `corner_door_w` z poľa), takže otvor a náhľad sa prepočítajú aj pri označenej rohovej
+(server berie stranu z uloženého configu, dverovú časť zo živého formulára). Kresba CR líšt a blendy je ROH-B2.
 
 **UI-C4 dala značke `data-owner`** (ten istý `owner_part_key`, ktorý už prišiel v payloade — žiadne nové dáta): klik ide na `nxHwMarkPick` v `hardware.js`, teda označí vlastníka v
 modeli a dotiahne jeho box v sekcii Kovanie; keď box neexistuje (sekcia ešte nemá dáta), ostáva pôvodné správanie z UI-B2 — popis položky v statuse. Geometriu berú všetky vrstvy z
@@ -1630,9 +1654,13 @@ má tretiu voľbu **Umývačka** a pri slote je **zamknutý** (`disabled` + bubl
 
 **ROH-A2 — piaty typ objektu: Rohová.** Rad typov je `Dolná · Horná · Rohová · Umývačka · Doska` (stále jeden rad, ikona `cab-corner`, `data-ins-type="corner_blind"`);
 stav, `aria-pressed`, filter šablón aj `applyVisibility` (rohová = ako dolná) idú cestami z A1 a UI-C1b. Karta sa materializuje z `DEFAULTS.corner_blind`
-(`CORNER_DEFAULTS` zo `sync.rb`) alebo zo šablóny; **strana a dverová časť v DOM nie sú** (ovládače ROH-B), preto ich drží register `cornerDraft` vo `form.js`
-(`nxSetCornerDraft` z `materializeInsertCabCard` a z `loadSelected` cez `nxAdoptCabinetDraft`) **výhradne pre preflight otvoru** (`nxFrontDraftData` ich pošle pri type `corner_blind`) —
-insert ani apply payload ich nenesie (C6: server ich doplní z predvolieb alebo zo záznamu šablóny `apply_template_slot_fields!`). Riadok **Nohy** vo vkladacej karte platí
+(`CORNER_DEFAULTS` zo `sync.rb`, od ROH-B1 cez `corner_insert_defaults` s `corner_th2`) alebo zo šablóny. **ROH-B1:** dverová časť a CR sú polia **riadku rohovej**
+(`#cornerRow` v `#basicCard` — ten istý riadok ako pri označenej rohovej, O4 A1) a idú do insert payloadu bežným zberom; **strana** je stav prepínača v registri
+`cornerDraft` (`nxSetCornerDraft` z `materializeInsertCabCard` a z `loadSelected` cez `nxAdoptCabinetDraft`) a do insert payloadu ju **výslovne** pridá `insertCabinet`
+(`actions.js`) — **len pri rohovej**. Prepnutie strany vo vkladaní zrkadlí aj **návrh čiel** (`nxCornerMirrorFronts` v `core.js`: okraje vľavo ↔ vpravo, smer pántov
+a strana profilu; `unset` a chýbajúci kľúč ostávajú — audit B1 FIX 2: šablóna s asymetrickými okrajmi by inak mala okraj pri rohu 0 a pánty pri boku); ručné hrany nová
+skrinka nemá, takže sa nič iné nepremapúva. Šablóna, ktorej pole chýba, dostane predvoľbu (`dflt` v `CONSTRUCTION_FIELDS`); server dopĺňa chýbajúce polia zo záznamu
+šablóny (`apply_template_slot_fields!`). Riadok **Nohy** vo vkladacej karte platí
 aj pre rohovú (`nxLegsTypeHasLegs` v `hardware.js` = `lower` + `corner_blind`). Modal „Uložiť ako šablónu" má voľbu **Rohová** a pri rohovej je typ zamknutý
 s vlastnou bublinou (`TPL_TYPE_LOCK` vo `form.js`, vzor slotu); zamknuté typy (slot, rohová) sa v selecte ponúkajú **len nad sebou** — nad dolnou by voľba nič
 nespravila (server prepína len `lower|upper`).
@@ -1814,6 +1842,10 @@ pántov (`nxHingeSide`).
 **`front_opening` (ROH-A2).** `cabinet_payload` posiela čelný otvor **uloženého** stavu `{x0, w, z0, h}` — `front_opening_payload` poskladá z configu vstup
 `Construction.front_opening` (jediná autorita, tá istá ako plán a preflight) a serializuje ho `opening_json` (`actions_cabinet.rb`); poškodený config = otvor
 s nulovou šírkou, výnimka = `nil`. Náhľad z neho kreslí rohovú, kým nepríde preflight so živou šírkou; ostatné typy ho ignorujú.
+
+**`corner_th2` (ROH-B1).** Pri **rohovej** (len pri nej — parita payloadu ostatných typov) nesie `cabinet_payload` účinnú hrúbku CR 2 (`corner_th2_payload` =
+`CabinetBuilder.aux_part_thicknesses` → override dielca → čelový kanál → 18) — panel z nej počíta najmenšiu šírku. Predvoľby vkladania `DEFAULTS.corner_blind`
+skladá `corner_insert_defaults(model)` (`CORNER_DEFAULTS` + `corner_th2` z projektových predvolieb; konštanta buildera sa nemení).
 
 **`axes` — stav osí zámku (KOV-D2a Astra #20 F7, tretia os D-128).** `drawer_axes_map` skladá pre každé klasifikované zásuvkové čelo mapu
 `owner_part_key → { height?: {...}, box?: {...}, nl: {...} }` a vešia ju **na obe strany**: na emitovanú položku výsuvu (`attach_drawer_axes`, len `source: 'recipe'`) **aj** na riadok
@@ -2080,17 +2112,28 @@ a „Vkladacia karta". **Poradie guardov (R-02): identita dokumentu PRVÁ**, až
 **D-143 (KON-0): `back_rebuild_stale`** — hromadná prestavba skriniek so zastaraným chrbtom v drážke z Kontroly Štúdia (tok a guardy v sekcii KONTROLA nižšie; plán
 a texty sú čisté funkcie `ProductionCore.back_stale_*`, zápis `rebuild_many` = jedna operácia, výber zastaraných skriniek až po `ScaleWatch.flush_pending!`).
 
-**ROH-A1 · K3 — ochrany ROHOVEJ na serveri (A1 nemá nové ovládače, rohová v otvorenom `.skp` je však editovateľná bežnými riadkami).** `PARAM_KEYS` pozná
-`corner_side`/`corner_door_w`/`corner_cr1`/`corner_cr2`, ale JS ich v A1 **neposiela** (nie sú v `CONSTRUCTION_FIELDS` — bez ovládača by išli ako `null`, krížový audit
-C6); `handle_apply` kopíruje len prítomné kľúče, takže uložené hodnoty ostávajú. **`corner_change_refusal(params, data)`** — zmena **typu** z/na rohovú a zmena
-**strany** existujúcej rohovej (normalizovanej) sa odmietne vetou `CORNER_TYPE_MSG` / `CORNER_SIDE_MSG` **pred** prepisom params (0 krokov Späť, resync panela);
-volá ju `handle_apply` aj `handle_apply_all`. **`corner_fronts_refusal(params, incoming)`** — čelá rohovej musia ostať jeden riadok `door`/`auto`/jedno krídlo
+**ROH-A1 · K3 — ochrany ROHOVEJ na serveri.** `PARAM_KEYS` pozná `corner_side`/`corner_door_w`/`corner_cr1`/`corner_cr2`; od **ROH-B1** JS posiela dverovú
+časť a CR **len pri rohovej** (`only` v `CONSTRUCTION_FIELDS` — pri inom type ani kľúč, krížový audit C6), stranu **nikdy**; `handle_apply` kopíruje len prítomné kľúče.
+**`corner_change_refusal(params, data)`** — zmena **typu** z/na rohovú a zmena **strany** existujúcej rohovej (normalizovanej) sa odmietne vetou `CORNER_TYPE_MSG` /
+`CORNER_SIDE_MSG` („Stranu dverí zmeň prepínačom v riadku rohovej.") **pred** prepisom params (0 krokov Späť, resync panela); volá ju `handle_apply` aj
+`handle_apply_all`, tú istú vetu vracia šablóna inej strany na existujúcu rohovú (`templates_dialog.rb`).
+
+**ROH-B1 — PREPÍNAČ STRANY `handle_corner_side` (callback `corner_side`, jediná cesta, ktorá stranu mení).** Poradie guardov: identita dokumentu (R-02) →
+označená skrinka s **povinným** echom `cabinet_id` (`corner_side_target`) → **bariéra observera** `ScaleWatch.flush_pending!` **pred čítaním východiskového configu**
+(audit B1 FIX 3 — oneskorená absorpcia Scale by sa prilepila k tejto operácii; neúspech = odmietnutie `CORNER_SIDE_BUSY_MSG`) → **po bariére znova** dokument a cieľ →
+typ rohová → platná strana. Rovnaká strana = nič (žiadny prázdny krok Späť). Zmena = **jedna** operácia `CabinetBuilder.rebuild(..., op_name: CORNER_SIDE_OP)` nad
+`CabinetBuilder.corner_mirror_params` ([construction.md](construction.md) — zrkadlo čiel a ručných hrán podľa osí) = **jeden krok Späť**; výnimka stavby operáciu
+zruší (`abort_safely`) a panel dostane resync. **Korelovaná odpoveď** (audit B1 FIX 1): payload nesie `switch_token`, server v `ensure` **každej** vetvy (aj tiché
+zahodenie a výnimka) pošle `NX.cornerSideResult({model_guid, cabinet_id, switch_token, ok})` **až po** pushi stavu. **`corner_fronts_refusal(params, incoming)`** — čelá rohovej musia ostať jeden riadok `door`/`auto`/jedno krídlo
 (`CabinetBuilder.corner_fronts_ok?`) a medzera pri rohu 1–20 (`corner_gap_ok?` — `gap_right` pri dverách vľavo, `gap_left` vpravo); `handle_apply_fronts`
 a `handle_apply_all` (vzor `slot_fronts_refusal`). Smer, úchytkový profil, medzery v rozsahu, materiál a kovanie povolené ostávajú. **Vloženie zo šablóny
 (audit A1 FIX 3):** `apply_template_slot_fields!` číta zo **záznamu** šablóny okrem polí slotu aj typ a polia rohovej (payload má prednosť, dopĺňa sa chýbajúce)
 a **`corner_template_refusal(tpl_ref)`** odmietne rohovú šablónu s porušeným invariantom čiel ešte **pred** ghostom (nie ticho oreže). **Preflight čiel (audit A1
-NOTE 5):** `front_preflight_result(data, stored)` počíta otvor pre **každý typ** cez `Construction.front_opening` (`preflight_opening_cfg`); pri rohovej so stranou
-a dverovou časťou z **uloženého configu označenej skrinky** (`handle_front_preflight` ho pošle) a so živou šírkou z formulára — pri dverách vpravo `x0 = W − D`;
+NOTE 5):** `front_preflight_result(data, stored)` počíta otvor pre **každý typ** cez `Construction.front_opening` (`preflight_opening_cfg`); pri rohovej so **stranou
+z uloženého configu** označenej skrinky (`handle_front_preflight` ho pošle), od **ROH-B1** s **dverovou časťou zo živého formulára** (`preflight_door_w` — konečné
+číslo v `CORNER_RANGES`, inak uložená; audit B1 NOTE 6) a so živou šírkou — pri dverách vpravo `x0 = W − D`. Odpoveď rohovej nesie navyše **`corner_ctx`
+`{th2, t}`** (`corner_preflight_ctx`, audit B1 FIX 4): pri označenej th2 z uloženého configu a t zo živého poľa, pri **vkladaní** hrúbku tak, ako ju upraví sám vklad
+(`insert_thickness_preflight` — prevzatie z materiálu tela, zámok) a th2 z čelového materiálu návrhu (`material_id`/`front_material_id` šablóny v dotaze);
 ostatné typy dostanú tie isté čísla ako predtým bez `opening`. **ROH-A2:** otvor ide aj do **odpovede** (`opening` `{x0, w, z0, h}` cez `opening_json`, pre každý typ
 vrátane slotu) a zapisuje sa do nej hneď po výpočte, takže ho nesie aj odmietnutie (medzera pri rohu mimo rozsahu); keď výnimka padne skôr (rozmer mimo rozsahu),
 kľúč chýba a panel drží posledný známy. Pri **vkladaní** (bez uloženého configu) berie `corner_preflight_src` stranu a dverovú časť z payloadu — panel ich posiela
@@ -3819,15 +3862,16 @@ Rámik okna sa dopočíta z rozdielu outer/inner, aby sa fit pri ďalšom otvore
 
 ### CONSTRUCTION_FIELDS
 
-Jediný zoznam polí = `CONSTRUCTION_FIELDS` v core.js ↔ `Panel::PARAM_KEYS` (nové pole na 1+1 mieste). **Výnimka ROH-A1:** polia rohovej sú v `PARAM_KEYS`,
-ale v `CONSTRUCTION_FIELDS` **nie** — kým nemajú ovládač (ROH-B), JS ich neposiela a server ich drží z configu.
+Jediný zoznam polí = `CONSTRUCTION_FIELDS` v core.js ↔ `Panel::PARAM_KEYS` (nové pole na 1+1 mieste). **ROH-B1:** pole smie niesť `only: '<typ>'` —
+`collectConstruction` ho pošle **len** pri tom type (pri inom ani kľúč; parita payloadu stráži `test_rohb1_ovladace.js` doslovným zoznamom kľúčov). Tak idú
+`corner_door_w`/`corner_cr1`/`corner_cr2` (`dflt` = `CORNER_DEFAULTS`); **strana** v zozname nie je — je to prepínač so samostatnou akciou.
 
 **ROH-A1 — JS registre typu a rolí (bez nového ovládača).** `core.js` `CAB_TYPES` += `corner_blind` (krížový audit G1: `setType` by inak označenú rohovú sklopil na
-dolnú a každý zápis by ju poslal späť ako `lower`) a `NX_TYPE_LABEL` „Rohová" · `form.js` `TYPE_LIMITS.corner_blind` = šírka od `CORNER_MIN_WIDTH` 584 (minimum
-predvolieb; presné minimum konkrétneho configu vracia server sondou) · `insert_state.js` `INSERT_TYPES` a `templateType`/`templatesForType` (rohová šablóna nepadne
+dolnú a každý zápis by ju poslal späť ako `lower`) a `NX_TYPE_LABEL` „Rohová" · pevné JS minimum šírky 584 (`TYPE_LIMITS.corner_blind`) **zaniklo v ROH-B1**
+(krížová kontrola `cabinetCornerError` nižšie) · `insert_state.js` `INSERT_TYPES` a `templateType`/`templatesForType` (rohová šablóna nepadne
 do „dolnej") · `templates.js` „rohová" · `part_card.js` `roleLabel` pre päť rolí a `isFront` pre CR (čelové materiály aktívne) · `rules.js` `rdRoleDesc` · `sync.rb`
 `DEFAULTS.corner_blind`. Tlačidlo „Rohová", náhľad (dvere a pánty v dverovej časti), náhľad nôh a zámok typu v modale šablóny prinieslo **ROH-A2** (odseky
-„Náhľad" a „Vkladacia karta"); ovládače strany, dverovej časti a CR sú ROH-B.
+„Náhľad" a „Vkladacia karta"); ovládače strany, dverovej časti a CR priniesol **ROH-B1** (odsek „Riadok rohovej" v Obsahu Korpusu).
 
 ### Trvalé UI pravidlo (Michal 20.7.2026): VERTIKÁLNY priestor panela je vzácny
 

@@ -33,7 +33,7 @@ const FLUSH_EDITS = extract(/function flushCabinetEdits\(cabSnapshot, guidSnapsh
 // `var x = deps.x` bezi az po hoistingu deklaracie funkcie a zahodil by ju.
 const DEPS = ['frontDraft', 'cabApplyRequest', 'cabDraftDirty', 'nxStampCabinetApply', 'selectedCabId', 'applyTimer', 'applyPendingGuid', 'document', 'window', 'sketchup',
               'NX', 'isExprInput', 'isExprStr', 'validateFields', 'collectAll', 'nxDocPayload',
-              'nxNativeFlushDone', 'cancelCabinetEdits', 'flushCabinetEdits'];
+              'nxNativeFlushDone', 'cancelCabinetEdits', 'flushCabinetEdits', 'cornerSwitch'];
 
 function run(fnSrc, deps, call){
   const declared = /function\s+(\w+)\s*\(/.exec(fnSrc)[1];
@@ -58,6 +58,8 @@ function env(opts){
     applyTimer: 'timer' in opts ? opts.timer : null,
     applyPendingGuid: 'G1',
     cabApplyRequest: null, cabDraftDirty: false,
+    // ROH-B1 (audit B1 FIX 1): rozbehnute prepnutie strany rohovej.
+    cornerSwitch: 'cornerSwitch' in opts ? opts.cornerSwitch : null,
     nxStampCabinetApply: function(){},
     document: { activeElement: opts.active || null },
     window: { sketchup: { apply_all: function(p){ calls.push(['apply_all', p]); } } },
@@ -134,6 +136,16 @@ d = env({ valid: false });
 run(FLUSH_EDITS, d, "flushCabinetEdits('CAB-001', 'G1', " + JSON.stringify(OP) + ")");
 eq(d.calls.map(function(c){ return c[0]; }), ['status', 'done'], 'neplatne polia: hlaska + odpoved');
 eq(d.calls[1], ['done', 'tx', 'invalid'], 'a odpoved je invalid');
+
+// ROH-B1 (audit B1 FIX 1): pocas prepnutia strany rohovej sa edity ODKLADAJU —
+// ziadny apply_all (formular este nesie cela pred zrkadlom); nativna kopia
+// dostane odpoved invalid (server nesmie cakat do timeoutu).
+d = env({ cornerSwitch: { token: 'cs-1' } });
+run(FLUSH_EDITS, d, "flushCabinetEdits('CAB-001', 'G1', null)");
+eq(d.calls, [], 'prepinanie strany: odlozeny apply nic neodosle');
+d = env({ cornerSwitch: { token: 'cs-1' } });
+run(FLUSH_EDITS, d, "flushCabinetEdits('CAB-001', 'G1', " + JSON.stringify(OP) + ")");
+eq(d.calls, [['done', 'tx', 'invalid']], 'prepinanie strany: nativna kopia dostane invalid');
 
 // Uspesna cesta: apply_all nesie `native_op` a ZIADNA priama odpoved sa neposiela.
 d = env({});

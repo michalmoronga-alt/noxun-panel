@@ -4,6 +4,9 @@
   function collectConstruction(){
     var out = { type: getType() };
     CONSTRUCTION_FIELDS.forEach(function(f){
+      // ROH-B1: pole typu (`only`) ide LEN pri tom type — pri inom ani kluc
+      // (krizovy audit C6: chybajuci ovladac nesmie ist ako prazdna hodnota).
+      if (f.only && f.only !== out.type) return;
       if (f.kind === 'num'){
         var raw = val(f.id);
         if (raw === null || String(raw).trim() === ''){ out[f.id] = ''; return; }
@@ -168,23 +171,28 @@
                  // pole NIE JE — odvodi sa (`nxSlotFrontEval`) a jej rozsah strazi
                  // krizova kontrola `cabinetHeightError`.
                  dw_body_height:[700,1000], dw_front_bottom:[0,300],
+                 // ROH-B1 (O2): polia ROHOVEJ — zrkadlo Ruby `CabinetBuilder::CORNER_RANGES`
+                 // (guard `tests/pure/test_rohb1_strana.rb`); validuju sa LEN pri rohovej.
+                 corner_door_w:[250,800], corner_cr1:[50,250], corner_cr2:[50,250],
                  // D-07: medzery/presahy cel — zaporny okraj = presah cez obrys (limit zhodny s Fronts::EDGE_LIMIT)
                  fr_gap:[0,50], fr_gap_top:[-100,100], fr_gap_bottom:[-100,100], fr_gap_left:[-100,100], fr_gap_right:[-100,100] };
   // S1-E: sirka a vyska maju INE hranice per TYP — slot nema vnutro, takze
   // korpusove 200/80 mm by nedavali zmysel, a naopak „umyvacka" 3000 mm tiez
   // nie. Zrkadlo `CabinetBuilder::DW_WIDTH_RANGE` / `DW_HEIGHT_RANGE`.
-  // ROH-A1: rohová = limity dolnej + najmenšia šírka rohovej pri predvoľbách
-  // (zrkadlo Ruby `CabinetBuilder::CORNER_MIN_WIDTH`, guard test
-  // `tests/pure/test_roha1_rohova.rb`); presné minimum pre konkrétny config
-  // vracia server (`Construction.min_valid_width`).
-  var TYPE_LIMITS = { dishwasher: { width:[300,1200], height:[500,1200] },
-                      corner_blind: { width:[584,3000] } };
+  // ROH-B1 (O2 + P3-2 z A1): rohova uz NEMA pevne minimum sirky 584 —
+  // najmensiu sirku pocita krizova kontrola `cabinetCornerError` z poli
+  // rohovej, ucinnej hrubky CR 2 a hrubky korpusu (zrkadlo
+  // `Construction.min_valid_width`).
+  var TYPE_LIMITS = { dishwasher: { width:[300,1200], height:[500,1200] } };
   // PR #381 (Codex kolo 1, P2): polia, ktore existuju LEN pri slote. Su v DOM
   // aj pri dolnej a hornej skrinke (len skryte), takze bez tohto filtra by
   // hodnota, ktoru tam nechal predchadzajuci slot, CERVENELA a zablokovala by
   // vlozenie uplne inej skrinky — v poli, ktore pouzivatel nevidi a nema ako
   // opravit. Validuju sa preto VYHRADNE v type, ktoremu patria.
   var SLOT_FIELDS = { dw_body_height: 1, dw_front_bottom: 1 };
+  // ROH-B1: to iste pre polia ROHOVEJ — su v DOM pri kazdom type (skryte),
+  // cervenat a blokovat smu LEN pri rohovej.
+  var CORNER_FIELDS = { corner_door_w: 1, corner_cr1: 1, corner_cr2: 1 };
   // KON-B · K2 (audit FIX 3): polia, ktore platia LEN pri chrbte Z LIST. Pri
   // inom type chrbta (aj pri slote) je riadok skryty — neplatna hodnota v nom
   // by inak zablokovala „Aplikuj" v poli, ktore pouzivatel nevidi. Validuju sa
@@ -328,14 +336,59 @@
     return ev.error || '';
   }
 
+  // ===== ROH-B1: KRIZOVA KONTROLA ROHOVEJ (O2) ================================
+  // Rozsahy poli riesi hlavny cyklus (LIMITS, len pri rohovej); tu je VETA
+  // k poli mimo rozsahu a NAJMENSIA SIRKA `D + c1 + th2 + 2t` (zrkadlo
+  // `Construction.corner_error` — ta ista veta cez `nxCornerFitError`).
+  // Prazdne pole = predvolba typu (`cabFieldOrDefault`, vzor vysky).
+  var CORNER_RANGE_LABEL = { corner_door_w: 'Dverová časť', corner_cr1: 'CR 1', corner_cr2: 'CR 2' };
+  function cabinetCornerError(cornerNow){
+    var ids = ['corner_door_w', 'corner_cr1', 'corner_cr2'];
+    var we = el('width');
+    if (we) we.title = '';
+    if (!cornerNow){ nxCornerBoxesSync(); return ''; }
+    var ae = document.activeElement, msg = '';
+    ids.forEach(function(id){
+      var e = el(id); if (!e || msg) return;
+      if (e === ae && isExprStr(e.value)) return;
+      if (e.value === '') return;
+      var v = evalDim(e.value), lim = LIMITS[id];
+      if (isNaN(v)) msg = 'Zadaj ' + CORNER_RANGE_LABEL[id] + ' v mm (' + lim[0] + '–' + lim[1] + ').';
+      else if (v < lim[0] || v > lim[1]) msg = CORNER_RANGE_LABEL[id] + ' ' + nxFmtMm(v) + ' mm je mimo rozsahu ' +
+                                              lim[0] + '–' + lim[1] + ' mm.';
+    });
+    var fit = '';
+    // Rozpisany vyraz v poli sirky (alebo v poli rohovej) nie je hodnota —
+    // minimum sa posudi az po jeho dopisani (vzor hlavneho cyklu).
+    var typing = ae && (ae === we || CORNER_FIELDS[ae.id]) && isExprStr(ae.value);
+    if (!msg && !typing){
+      fit = nxCornerFitError(cabFieldOrDefault('width'), cabFieldOrDefault('corner_door_w'),
+                             cabFieldOrDefault('corner_cr1'), nxCornerTh2(), nxCornerT());
+      if (fit){ ['width', 'corner_door_w', 'corner_cr1'].forEach(function(id){ var e = el(id); if (e) e.classList.add('bad'); }); }
+    }
+    if (we) we.title = fit;
+    nxCornerBoxesSync();
+    return msg || fit;
+  }
+  // Ramy CR (`.crin`) nesu cervenu svojho pola — samotny input je v ramiku
+  // bez okraja (mockup B1), trieda `bad` by na nom nebola vidiet.
+  function nxCornerBoxesSync(){
+    [['cornerCr1Box', 'corner_cr1'], ['cornerCr2Box', 'corner_cr2']].forEach(function(p){
+      var b = el(p[0]), e = el(p[1]);
+      if (b && b.classList) b.classList.toggle('bad', !!(e && e.classList && e.classList.contains('bad')));
+    });
+  }
+
   function validateFields(skipFrontDraft){
     var ok = true;
     var ae = document.activeElement;
     var slotNow = (cabTypeNow() === 'dishwasher');
+    var cornerNow = (cabTypeNow() === 'corner_blind');
     var railsNow = backRailsActive();
     for (var id in LIMITS){
       var e = el(id); if (!e) continue;
       if (SLOT_FIELDS[id] && !slotNow){ e.classList.remove('bad'); continue; }
+      if (CORNER_FIELDS[id] && !cornerNow){ e.classList.remove('bad'); continue; }
       // KON-B (audit FIX 3): pole list len pri aktivnom chrbte z list.
       if (RAIL_FIELDS[id] && !railsNow){ e.classList.remove('bad'); e.title = ''; continue; }
       if (e === ae && isExprStr(e.value)) continue; // rozpisany vyraz — nechaj tak
@@ -376,7 +429,12 @@
     // prida veta — alebo zrusi tooltip, ked veta nie je (aj pri skrytom riadku).
     markRailError(rErr);
     if (sErr || rErr) ok = false;
-    cabFieldErrorMsg = hErr || sErr || rErr || '';
+    // ROH-B1 (O2): polia rohovej mimo rozsahu a NAJMENSIA SIRKA (zostava sa
+    // musi zmestit) — veta so skutocnym minimom, cervena na sirke, dverovej
+    // casti a CR 1 (mockup B · O2). Pri inom type nic (a rámy CR sa zhasnu).
+    var cErr = cabinetCornerError(cornerNow);
+    if (cErr) ok = false;
+    cabFieldErrorMsg = hErr || sErr || rErr || cErr || '';
     if (!skipFrontDraft && typeof nxFrontDraftReady === 'function' && !nxFrontDraftReady()) ok = false;
     return ok;
   }
@@ -397,22 +455,121 @@
   // Preflight nema zapis; potvrdenie apply uvolni najviac jednu naviazanu akciu.
   var frontDraftSession = 1, frontDraftRevision = 0, frontDraft = null;
   var cabDraftRevision = 0, cabDraftDirty = false, cabApplyRequest = null, cabAfterApply = null;
-  // ROH-A2: STRANA a DVEROVA CAST rohovej pre preflight otvoru. V DOM nie su
-  // (ovladace pridu v ROH-B), preto ich drzi tento register: pri vkladani
-  // z predvolieb typu (`DEFAULTS.corner_blind`) alebo zo sablony, pri
-  // oznacenej rohovej z jej payloadu. Pri oznacenej je autoritou aj tak
-  // ULOZENY config (server ho v preflighte uprednostni); do apply ani insert
-  // payloadu sa NEPOSIELAJU (C6 — polia rohovej doplna server).
+  // ROH-A2 + ROH-B1: STRANA DVERI rohovej (stav prepinaca v riadku rohovej)
+  // a UCINNA HRUBKA CR 2 (minimum sirky). Dverova cast a CR su od ROH-B1
+  // POLIA formulara (`CONSTRUCTION_FIELDS`), strana nie — je to prepinac:
+  // pri vkladani sa meni v tomto registri (zdroj: predvolby typu alebo
+  // sablona) a ide do insert payloadu, pri OZNACENEJ rohovej je to ULOZENA
+  // strana z payloadu a meni ju VYHRADNE serverova akcia `corner_side`
+  // (`onCornerSide`). Do apply payloadu strana nejde nikdy.
   var cornerDraft = null;
   function nxCornerDraftOf(src){
     if (!src || src.type !== 'corner_blind') return null;
     var out = {};
-    ['corner_side', 'corner_door_w'].forEach(function(k){
-      if (src[k] !== undefined && src[k] !== null && src[k] !== '') out[k] = src[k];
-    });
+    if (src.corner_side === 'left' || src.corner_side === 'right') out.corner_side = src.corner_side;
+    var th = parseFloat(src.corner_th2);
+    if (isFinite(th) && th > 0) out.corner_th2 = th;
     return out;
   }
-  function nxSetCornerDraft(src){ cornerDraft = nxCornerDraftOf(src); }
+  function nxSetCornerDraft(src){ cornerDraft = nxCornerDraftOf(src); nxCornerRowSync(); }
+  // Strana, ktoru riadok UKAZUJE (a vkladanie posle) — bez registra predvolba
+  // typu, inak `left` (zrkadlo `norm_corner`).
+  function nxCornerSide(){
+    if (cornerDraft && cornerDraft.corner_side) return cornerDraft.corner_side;
+    var d = (typeof DEFAULTS === 'object' && DEFAULTS && DEFAULTS.corner_blind) || {};
+    return d.corner_side === 'right' ? 'right' : 'left';
+  }
+  // Ucinna hrubka CR 2 pre minimum sirky: payload/predvolby -> 18 (placeholder).
+  function nxCornerTh2(){
+    if (cornerDraft && cornerDraft.corner_th2) return cornerDraft.corner_th2;
+    var d = (typeof DEFAULTS === 'object' && DEFAULTS && DEFAULTS.corner_blind) || {};
+    var th = parseFloat(d.corner_th2);
+    return (isFinite(th) && th > 0) ? th : 18;
+  }
+  // Prepinac strany v riadku rohovej = zrkadlo stavu (`aria-pressed` + `.on`).
+  function nxCornerRowSync(){
+    var side = nxCornerSide();
+    ['left', 'right'].forEach(function(v){
+      var b = el(v === 'left' ? 'cornerSideL' : 'cornerSideR');
+      if (!b) return;
+      if (b.setAttribute) b.setAttribute('aria-pressed', side === v ? 'true' : 'false');
+      if (b.classList) b.classList.toggle('on', side === v);
+    });
+  }
+  // ROH-B1 (audit B1 FIX 1): rozbehnute prepnutie strany OZNACENEJ rohovej
+  // `{ token, cabinet_id, model_guid, side, echo }` alebo null. Pocas neho sa
+  // auto-apply odklada a ine akcie cakaju; konci ho korelovana odpoved
+  // servera (`nxCornerSideResult`) alebo zmena identity (`nxFrontDraftReset`).
+  var cornerSwitch = null;
+  var CORNER_SWITCH_BUSY = 'Strana dverí sa ešte prepína — chvíľu počkaj.';
+  // Predrecenzia P3-3: kym prepnutie bezi, su skupiny kontextu Čelá ZAMKNUTE
+  // (`inert` — ziadny klik, fokus ani klavesnica): cela po odpovedi prevezme
+  // server a uprava zo zamku by sa ticho stratila. Odomyka odpoved servera
+  // aj zmena identity.
+  function nxCornerSwitchLock(on){
+    var list = (typeof document !== 'undefined' && document.querySelectorAll) ?
+      document.querySelectorAll('details[data-s4="cela"]') : [];
+    for (var i = 0; i < list.length; i++){
+      var g = list[i];
+      if (on){ g.setAttribute('inert', ''); g.setAttribute('aria-busy', 'true'); }
+      else if (g.removeAttribute){ g.removeAttribute('inert'); g.removeAttribute('aria-busy'); }
+    }
+  }
+  function nxCornerSideResult(res){
+    var s = cornerSwitch;
+    if (!s || !res || res.switch_token !== s.token) return;
+    cornerSwitch = null;
+    nxCornerSwitchLock(false);
+    if (res.model_guid !== s.model_guid || res.cabinet_id !== s.cabinet_id ||
+        s.model_guid !== nxDocGuid() || s.cabinet_id !== selectedCabId) return;
+    // Push prepnutia prisiel POCAS rozpisanej zmeny (`holdDraft` v
+    // `loadSelected`): formular si nechal konstrukciu pouzivatela, ale aj cela
+    // a stranu SPRED prepnutia. Tie sa prevezmu zo servera (zrkadlo robi len
+    // server) a az potom ide odlozeny apply — inak by vratil stare cela.
+    var echo = s.echo;
+    if (echo && (cabDraftDirty || applyTimer)){
+      frontItems = echo.front_items || [];
+      frontSlots = echo.front_slots || {};
+      nxAdoptCabinetDraft(echo);
+      renderFronts(echo.fronts);
+      frontDraft = null;
+      nxFrontDraftAsk();
+      validateFields();
+      renderPreview();
+    }
+    if (cabDraftDirty) nxScheduleCabinetApply();
+  }
+  // ROH-B1 (O5): KLIK NA STRANU DVERI.
+  //   * OZNACENA rohova: samostatna serverova akcia `corner_side` (jeden krok
+  //     Spat, zrkadlo ciel aj rucnych hran robi server). Rozpisane polia sa
+  //     najprv dopisu (`nxCabinetAction` — cervene pole akciu zastavi);
+  //     prepinac ukaze novu stranu az push servera (autorita je model).
+  //   * VKLADANIE: zmena registra + ZRKADLO NAVRHU CIEL (okraje, panty,
+  //     strana profilu — `nxCornerMirrorFronts`), aby panty ostali voci rohu
+  //     aj pri sablone; preflight a nahlad sa prepocitaju cez `onField`.
+  // Klik na uz zvolenu stranu nerobi nic (ziadny prazdny krok Spat).
+  function onCornerSide(side){
+    if (side !== 'left' && side !== 'right') return;
+    if (cabTypeNow() !== 'corner_blind') return;
+    if (side === nxCornerSide()) return;
+    if (typeof selectedCabId !== 'undefined' && selectedCabId){
+      if (cornerSwitch){ NX.setStatus(CORNER_SWITCH_BUSY, true); return; }
+      if (!nxCabinetAction(function(){ onCornerSide(side); })) return;
+      if (!(window.sketchup && sketchup.corner_side)) return;
+      cornerSwitch = { token: 'cs-' + frontDraftSession + '-' + (++frontDraftRevision),
+                       cabinet_id: selectedCabId, model_guid: nxDocGuid(), side: side, echo: null };
+      nxCornerSwitchLock(true);
+      NX.setStatus('Prepínam stranu dverí…');
+      sketchup.corner_side(nxDocPayload({ cabinet_id: selectedCabId, corner_side: side,
+                                          switch_token: cornerSwitch.token }));
+      return;
+    }
+    cornerDraft = cornerDraft || {};
+    cornerDraft.corner_side = side;
+    nxCornerRowSync();
+    renderFronts(nxCornerMirrorFronts(collectFronts()));
+    onField();
+  }
   // ROH-A2: payload OZNACENEJ skrinky -> otvor ciel ulozeneho stavu, ulozene
   // sloty smeru (znacky zavesov, kym preflight bezi alebo je navrh neplatny)
   // a register rohovej. Vola ho `loadSelected` len mimo rozpisaneho navrhu.
@@ -434,6 +591,9 @@
   function nxFrontDraftReset(){
     var cancelled = cabAfterApply;
     frontDraftSession++;
+    // ROH-B1: rozbehnute prepnutie strany patri identite — nova skrinka,
+    // dokument ci Spat/Znova ho zahodia (neskora odpoved sa ignoruje).
+    if (cornerSwitch){ cornerSwitch = null; nxCornerSwitchLock(false); }
     // ROH-A2: otvor patri identite (skrinke alebo vkladacej relacii) —
     // novy vyber ho dostane z payloadu, vkladanie z prveho preflightu.
     frontOpening = null;
@@ -460,12 +620,22 @@
       // D-139: vysku cela preflight ODVODI zo sokla, vysky linky a medzery hore.
       out.dw_front_bottom = c.dw_front_bottom === '' ? d.dw_front_bottom : c.dw_front_bottom;
     }
-    // ROH-A2: otvor rohovej = dverova cast. Pri VKLADANI ho server pocita
-    // z tychto dvoch poli (predvolby typu alebo sablona), pri oznacenej
-    // rohovej ich prebije ulozeny config — signatura sa nimi len spresni.
-    if (t === 'corner_blind' && cornerDraft){
-      if (cornerDraft.corner_side !== undefined) out.corner_side = cornerDraft.corner_side;
-      if (cornerDraft.corner_door_w !== undefined) out.corner_door_w = cornerDraft.corner_door_w;
+    // ROH-A2 + ROH-B1: otvor rohovej = dverova cast. Strana je stav
+    // prepinaca (pri oznacenej ju server berie z ulozeneho configu), dverova
+    // cast je ZIVE pole (prazdne = predvolba typu) — jej zmena zmeni
+    // signaturu, takze preflight a nahlad sa prepocitaju.
+    if (t === 'corner_blind'){
+      out.corner_side = nxCornerSide();
+      out.corner_door_w = c.corner_door_w === '' ? d.corner_door_w : c.corner_door_w;
+      // Audit B1 FIX 4: server z tychto poli vrati UCINNE hrubky (`corner_ctx`)
+      // pre minimum sirky — hrubku korpusu tak, ako ju upravi vklad, a pri
+      // vkladani materialy navrhu (sablona; bez nich projektove predvolby).
+      out.thickness = c.thickness === '' ? d.thickness : c.thickness;
+      if (!selectedCabId && typeof NXInsert !== 'undefined' && NXInsert.state){
+        var m = NXInsert.state.materials || {};
+        if (m.material_id) out.material_id = m.material_id;
+        if (m.front_material_id) out.front_material_id = m.front_material_id;
+      }
     }
     return out;
   }
@@ -505,6 +675,9 @@
     // ROH-A2: otvor AKTUALNEJ revizie (ziva sirka) — aj z odmietnutej
     // odpovede, ked ho server stihol spocitat. Bez neho ostava posledny znamy.
     if (result.opening && typeof result.opening === 'object') frontOpening = result.opening;
+    // ROH-B1 (audit B1 FIX 4): ucinne hrubky rohovej AKTUALNEJ revizie —
+    // minimum sirky sa hned prepocita (cervena + veta), bez cakania na pole.
+    var ctxChanged = nxAdoptCornerCtx(result.corner_ctx);
     f.pending = false; f.valid = result.valid === true; f.items = result.items || [];
     f.message = (result.errors || []).map(function(e){ return e.message; }).join(' ');
     frontSlots = result.slots || {};
@@ -512,7 +685,24 @@
     nxFrontDraftMessage(f.message);
     updateFrontDirBadges(); updateFrontPlaceholders();
     refreshFrontCards(); renderPreview();
+    if (ctxChanged) validateFields(true);
     if (f.valid && cabDraftDirty && selectedCabId) nxScheduleCabinetApply();
+  }
+  // -> true, ked sa ucinna hrubka CR 2 alebo korpusu zmenila.
+  function nxAdoptCornerCtx(ctx){
+    if (!ctx || typeof ctx !== 'object' || cabTypeNow() !== 'corner_blind') return false;
+    var th2 = parseFloat(ctx.th2), t = parseFloat(ctx.t);
+    cornerDraft = cornerDraft || {};
+    var before = JSON.stringify([cornerDraft.corner_th2, cornerDraft.corner_t]);
+    if (isFinite(th2) && th2 > 0) cornerDraft.corner_th2 = th2;
+    if (isFinite(t) && t > 0) cornerDraft.corner_t = t;
+    return before !== JSON.stringify([cornerDraft.corner_th2, cornerDraft.corner_t]);
+  }
+  // Hrubka korpusu pre minimum sirky: pri VKLADANI ta, ktoru pouzije vklad
+  // (server, `corner_ctx.t`), inak pole formulara (prazdne = predvolba typu).
+  function nxCornerT(){
+    if (!selectedCabId && cornerDraft && cornerDraft.corner_t) return cornerDraft.corner_t;
+    return cabFieldOrDefault('thickness');
   }
   function nxFrontDraftItems(){
     return frontDraft && frontDraft.signature === nxFrontDraftSignature() ? frontDraft.items : null;
@@ -534,6 +724,9 @@
   function nxRememberCabinetEcho(c){
     var r = cabApplyRequest;
     if (r && c && c.model_guid === r.model_guid && c.cabinet_id === r.cabinet_id) r.echo = c;
+    // ROH-B1: push prepnutia strany (korelovany odpovedou `cornerSideResult`).
+    var s = cornerSwitch;
+    if (s && c && c.model_guid === s.model_guid && c.cabinet_id === s.cabinet_id) s.echo = c;
   }
   function nxFrontApplyResult(result){
     var r = cabApplyRequest;
@@ -565,6 +758,11 @@
   // false = akcia bud caka na potvrdenie, alebo bola odmietnuta.
   function nxCabinetAction(run, fail){
     if (!selectedCabId) return true;
+    // ROH-B1 (audit B1 FIX 1): kym bezi prepnutie strany, ina akcia caka.
+    if (cornerSwitch){
+      NX.setStatus(CORNER_SWITCH_BUSY, true);
+      if (fail) fail(); return false;
+    }
     var ae = document.activeElement;
     if ((ae && isExprInput(ae) && isExprStr(ae.value)) || !validateFields()){
       NX.setStatus((frontDraft && frontDraft.message) || 'Dokonči alebo oprav rozpísané polia.', true);
@@ -645,6 +843,10 @@
       return;
     }
     if (cabApplyRequest){ if (nativeOp) nxNativeFlushDone(nativeOp.token, 'invalid'); return; }
+    // ROH-B1 (audit B1 FIX 1): pocas prepnutia strany sa edity ODKLADAJU —
+    // formular este nesie cela PRED zrkadlom; odoslu sa az po korelovanej
+    // odpovedi (`nxCornerSideResult` prevezme cela servera a naplanuje apply).
+    if (cornerSwitch){ if (nativeOp) nxNativeFlushDone(nativeOp.token, 'invalid'); return; }
     var payload = collectAll();
     nxStampCabinetApply(payload);
     payload.cabinet_id = cabSnapshot || selectedCabId;
@@ -789,6 +991,12 @@
     // D-11: vyska sokla v Zakladnych, horna ju nema. S1-E: slot ju nema tiez —
     // jeho „sokel" je spodna hrana CELA (`dw_front_bottom`), nie vyska korpusu.
     el('fhRow').style.display = (t === 'upper' || slot) ? 'none' : '';
+    // ROH-B1 (O3 B1 / O4 A1): riadok rohovej LEN pri rohovej — oznacenej aj
+    // vo vkladacej karte (jeden riadok v #basicCard). Pri inom type skryty
+    // a jeho polia sa neposielaju (`only` v `CONSTRUCTION_FIELDS`).
+    var crow = el('cornerRow');
+    if (crow) crow.hidden = (t !== 'corner_blind');
+    nxCornerRowSync();
     SLOT_ONLY_ROWS.forEach(function(id){ var n = el(id); if (n) n.hidden = !slot; });
     SLOT_HIDDEN_ROWS.forEach(function(id){ var n = el(id); if (n) n.style.display = slot ? 'none' : ''; });
     SLOT_HIDDEN_GAPS.forEach(function(id){ var n = el(id); if (n) n.hidden = slot; });

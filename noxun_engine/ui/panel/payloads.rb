@@ -85,6 +85,11 @@ module Noxun
           # sirka). Nahlad z neho kresli cela, kym nepride preflight so ZIVOU
           # sirkou (`front_preflight_result` -> `opening`); JS si ho neodvodzuje.
           params['front_opening'] = front_opening_payload(cfg)
+          # ROH-B1 (O2 + P3-2 z A1): UCINNA hrubka CR 2 (override dielca ->
+          # celovy kanal -> 18) — panel z nej pocita NAJMENSIU SIRKU rohovej
+          # (`D + c1 + th2 + 2t`, zrkadlo `Construction.min_valid_width`).
+          # Len pri rohovej; ine typy kluc nedostanu (parita payloadu).
+          params['corner_th2'] = corner_th2_payload(entity_model(cab), params) if Construction.corner?(cfg)
           # KOV-D2a: STAV KAZDEJ OSI zamku (vyska, vyska boxu, NL) — server
           # pocita, JS len kresli (chipy su D2b). Mapa sa stavia RAZ a vesia sa
           # na TRI miesta: emitovanu polozku vysuvu, osiroteny riadok zasahu
@@ -920,6 +925,25 @@ module Noxun
         def owner_zone_id(key)
           m = key.to_s.match(%r{\Azone:([^/]+)/})
           m ? m[1] : nil
+        end
+
+        # ROH-B1: ucinna hrubka CR 2 z TEJ ISTEJ retaze, z ktorej stavia plan
+        # (`CabinetBuilder.aux_part_thicknesses` -> `corner_thicknesses`).
+        # Citacie; chyba = placeholder cela 18 (vzor `corner_cr_thicknesses`).
+        def corner_th2_payload(model, params)
+          th = CabinetBuilder.aux_part_thicknesses(params, model)[Construction::CR_PART_KEYS[1]]
+          th.is_a?(Numeric) && th.to_f.finite? && th.to_f.positive? ? th.to_f : Fronts::FRONT_THICKNESS
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.corner_th2_payload')
+          Fronts::FRONT_THICKNESS
+        end
+
+        # ROH-B1: predvolby VKLADANIA rohovej = `CORNER_DEFAULTS` + ucinna
+        # hrubka CR 2 z projektovych predvolieb (celovy kanal). Novy hash —
+        # zmrazena konstanta buildera sa nemeni.
+        def corner_insert_defaults(model)
+          d = CabinetBuilder::CORNER_DEFAULTS
+          d.merge(corner_th2: corner_th2_payload(model, d))
         end
 
         # ROH-A2: otvor ciel ULOZENEHO configu cez JEDINU autoritu

@@ -6619,6 +6619,253 @@ module NoxunSuRunner
     ok('ROH-A2: cleanup (0 korpusov)', cabinets(model).empty?)
   end
 
+  # === ROH-B1 · K3: PREPINAC STRANY DVERI A OVLADACE ROHOVEJ ================
+  # (a) rohova VLAVO s rucnymi hranami na dverach, CR 1, blende, vystuhe
+  #     zavesov, rohovej vystuhe a CR 2, vonkajsi okraj 0 / pri rohu 2 ->
+  #     AKCIA PANELA `handle_corner_side` -> plan = model (zrkadlo), rucne
+  #     hrany na SPRAVNYCH FYZICKYCH stranach (plocha pasky v modeli: X' = W − X
+  #     pri dielcoch v rovine ciel, stojace dielce drzia svoju hranu), panty
+  #     pri rohu, okraje prehodene, korelovana odpoved; 1 krok Spat vrati
+  #     PRESNE povodny config; prepnutie spat = povodne cela aj hrany;
+  # (b) odmietnutia akcie (cudzie echo, rovnaka strana, neznama strana,
+  #     dolna skrinka) = 0 krokov Spat;
+  # (c) vklad PRAVEJ rohovej cez cestu panela (payload vkladacej karty so
+  #     stranou a polami riadku) = vpravo, panty pri rohu, 1 krok Spat;
+  # (d) payload oznacenej rohovej nesie `corner_th2` (celovy 19 -> 19).
+  # Async cast (Scale -> hned prepnutie -> Spat/Znova) je v `run_rohb1_async`.
+  ROHB1_ABS = 'R1A_ABS_23X10'
+
+  def rohb1_overrides
+    { 'front:F1/wing:single' => { 'edges' => { 'L1' => nil, 'L2' => ROHB1_ABS } },
+      'cabinet/cr:1' => { 'edges' => { 'L1' => ROHB1_ABS, 'L2' => nil } },
+      'cabinet/corner_panel' => { 'edges' => { 'L2' => ROHB1_ABS } },
+      'cabinet/hinge_rail' => { 'edges' => { 'L1' => ROHB1_ABS } },
+      'cabinet/corner_rail' => { 'edges' => { 'L2' => nil } },
+      'cabinet/cr:2' => { 'edges' => { 'L1' => nil } } }
+  end
+
+  # Stred PLOCHY hrany `code` dielca v suradniciach skrinky (mm) — ta ista
+  # mapa osi, ktorou olep kresli Kontrola hran (`PartFaces.rect_axis_side`).
+  def rohb1_edge_face(cab, key, code)
+    part = kona_part(cab, key)
+    return nil unless part
+
+    role = e::Store.get(part, 'role').to_s
+    ax = Array(e::PartFaces::ROLE_AXES[role]).first
+    axis, side = e::PartFaces.rect_axis_side(code, ax, role)
+    return nil if axis.nil?
+
+    b = part.definition.bounds
+    c = [b.center.x, b.center.y, b.center.z]
+    c[axis] = side == :min ? [b.min.x, b.min.y, b.min.z][axis] : [b.max.x, b.max.y, b.max.z][axis]
+    pt = Geom::Point3d.new(*c).transform(part.transformation)
+    [mm(pt.x), mm(pt.y), mm(pt.z)]
+  end
+
+  def rohb1_edges(cab, key)
+    part = kona_part(cab, key)
+    part ? ((e::Store.config(part) || {})['edges'] || {}) : {}
+  end
+
+  def rohb1_switch(model, cab, side, token = 't-rohb1', extra = {})
+    rec = []
+    install_js_recorder(rec)
+    begin
+      e::Panel.handle_corner_side(pg(model, { 'cabinet_id' => e::Store.get(cab, 'cabinet_id').to_s,
+                                              'corner_side' => side, 'switch_token' => token }.merge(extra)))
+    ensure
+      remove_js_recorder
+    end
+    rec
+  end
+
+  def run_rohb1(model)
+    cleanup(model)
+    tmp = File.join(Dir.tmpdir, "noxun_rohb1_#{Process.pid}")
+    FileUtils.mkdir_p(tmp)
+    File.binwrite(File.join(tmp, 'materials.json'), JSON.pretty_generate(roha1_catalog_json))
+    e::Materials.test_dir_override = tmp
+    e::Materials.reload!
+    begin
+      fr = ROHA1_FRONTS.merge('gap_left' => 0.0, 'gap_right' => 2.0)
+      cab = e::CabinetBuilder.build(model, roha1_params('fronts' => fr, 'part_overrides' => rohb1_overrides))
+      return ok('ROH-B1: vlozenie rohovej', false) unless cab
+
+      cid = e::Store.get(cab, 'cabinet_id').to_s
+      w = kona_cfg(cab)['width'].to_f
+      keys = %w[front:F1/wing:single cabinet/cr:1 cabinet/corner_panel cabinet/hinge_rail cabinet/corner_rail cabinet/cr:2]
+      e::CabinetBuilder.rebuild(model, cab, kona_params(cab).merge('width' => 1150.0)) # posledny realny krok
+      e::CabinetBuilder.rebuild(model, cab, kona_params(cab).merge('width' => w))
+      before_cfg = JSON.generate(kona_cfg(cab))
+      before_edges = keys.to_h { |k| [k, rohb1_edges(cab, k)] }
+      it0 = Array(kona_cfg(cab)['front_items']).first || {}
+      ok("ROH-B1 (a): vychodisko vlavo — panty pri rohu (vpravo), okraj vonku 0 / pri rohu 2, plan = model (#{it0['direction'].inspect})",
+         it0['direction'] == 'right' && kona_cfg(cab)['fronts'].values_at('gap_left', 'gap_right') == [0.0, 2.0] &&
+         roha1_sync_bad(model, cab).empty?)
+      ok("ROH-B1 (a): rucne hrany v snapshote dveri #{before_edges['front:F1/wing:single'].slice('L1', 'L2').inspect}",
+         before_edges['front:F1/wing:single']['L1'].nil? && before_edges['front:F1/wing:single']['L2'] == ROHB1_ABS)
+      faces0 = { door: rohb1_edge_face(cab, 'front:F1/wing:single', 'L2'),
+                 cr1: rohb1_edge_face(cab, 'cabinet/cr:1', 'L1'),
+                 panel: rohb1_edge_face(cab, 'cabinet/corner_panel', 'L2'),
+                 hinge: rohb1_edge_face(cab, 'cabinet/hinge_rail', 'L1') }
+      tr0 = cab.transformation.to_a
+      model.selection.clear
+      model.selection.add(cab)
+
+      rec = rohb1_switch(model, cab, 'right', 'tok-a')
+      it = Array(kona_cfg(cab)['front_items']).first || {}
+      ok("ROH-B1 (a): prepnutie cez akciu panela — strana vpravo, skrinka na mieste (#{roha1_fields(cab).inspect})",
+         roha1_fields(cab) == ['right', 450.0, 80.0, 80.0] && kona_cfg(cab)['width'] == w && cab.transformation.to_a == tr0)
+      bad = roha1_sync_bad(model, cab)
+      ok("ROH-B1 (a): plan = model po zrkadle (#{bad.first(2).inspect})", bad.empty?)
+      ok("ROH-B1 (a): panty ostali pri rohu (smer #{it['direction'].inspect}), okraje prehodene " \
+         "(#{kona_cfg(cab)['fronts'].values_at('gap_left', 'gap_right').inspect})",
+         it['direction'] == 'left' && kona_cfg(cab)['fronts'].values_at('gap_left', 'gap_right') == [2.0, 0.0])
+      after_edges = keys.to_h { |k| [k, rohb1_edges(cab, k)] }
+      swap = ->(h) { h.to_h { |c, v| [{ 'L1' => 'L2', 'L2' => 'L1' }.fetch(c, c), v] } }
+      moved_ok = %w[front:F1/wing:single cabinet/cr:1 cabinet/corner_panel].all? { |k| after_edges[k] == swap.call(before_edges[k]) }
+      stay_ok = %w[cabinet/hinge_rail cabinet/corner_rail cabinet/cr:2].all? { |k| after_edges[k] == before_edges[k] }
+      ok("ROH-B1 (a): hrany v snapshote — dvere/CR 1/blenda L1 <-> L2, vystuhy a CR 2 bez zmeny (dvere #{after_edges['front:F1/wing:single'].slice('L1', 'L2').inspect})",
+         moved_ok && stay_ok)
+      faces1 = { door: rohb1_edge_face(cab, 'front:F1/wing:single', 'L1'),
+                 cr1: rohb1_edge_face(cab, 'cabinet/cr:1', 'L2'),
+                 panel: rohb1_edge_face(cab, 'cabinet/corner_panel', 'L1'),
+                 hinge: rohb1_edge_face(cab, 'cabinet/hinge_rail', 'L1') }
+      phys = %i[door cr1 panel].all? { |k| faces0[k] && faces1[k] && (faces1[k][0] - (w - faces0[k][0])).abs <= TOL } &&
+             faces0[:hinge] && faces1[:hinge] && (faces1[:hinge][1] - faces0[:hinge][1]).abs <= TOL &&
+             (faces1[:hinge][0] - (w - faces0[:hinge][0])).abs <= 18.0 + TOL
+      ok("ROH-B1 (a): paska na SPRAVNEJ FYZICKEJ strane — plocha X' = W − X (dvere #{faces0[:door] && faces0[:door][0].round(1)} -> " \
+         "#{faces1[:door] && faces1[:door][0].round(1)}), vystuha zavesov drzi prednu hranu", phys)
+      ack = rec.grep(/NX\.cornerSideResult/).last.to_s
+      ok("ROH-B1 (a): korelovana odpoved AZ PO pushi stavu (#{ack[0, 90]})",
+         ack.include?('"switch_token":"tok-a"') && ack.include?('"ok":true') &&
+         rec.index { |s| s.include?('NX.loadSelected') }.to_i < rec.index { |s| s.include?('NX.cornerSideResult') }.to_i)
+      Sketchup.undo
+      ok('ROH-B1 (a): 1 krok Spat vrati PRESNE povodny config a geometriu',
+         JSON.generate(kona_cfg(cab)) == before_cfg && roha1_sync_bad(model, cab).empty? &&
+         keys.all? { |k| rohb1_edges(cab, k) == before_edges[k] })
+      Sketchup.undo
+      ok("ROH-B1 (a): dalsi Spat uz vracia predosly krok (sirka #{kona_cfg(cab)['width']})", kona_cfg(cab)['width'] == 1150.0)
+      Sketchup.redo
+      model.selection.clear
+      model.selection.add(cab)
+      rohb1_switch(model, cab, 'right', 'tok-a2')
+      rohb1_switch(model, cab, 'left', 'tok-a3')
+      back = kona_cfg(cab)
+      ok('ROH-B1 (a): vpravo -> vlavo = povodne cela, strana aj rucne hrany',
+         JSON.parse(before_cfg).values_at('corner_side', 'fronts', 'part_overrides') ==
+           back.values_at('corner_side', 'fronts', 'part_overrides') &&
+         keys.all? { |k| rohb1_edges(cab, k) == before_edges[k] } && roha1_sync_bad(model, cab).empty?)
+
+      # (b) ODMIETNUTIA = 0 krokov Spat
+      e::CabinetBuilder.rebuild(model, cab, kona_params(cab).merge('width' => 1120.0)) # posledny realny krok
+      model.selection.clear
+      model.selection.add(cab)
+      snap = JSON.generate(kona_cfg(cab))
+      r1 = rohb1_switch(model, cab, 'right', 'tok-b1', 'cabinet_id' => 'CAB-999')
+      r2 = rohb1_switch(model, cab, 'left', 'tok-b2')
+      r3 = rohb1_switch(model, cab, 'hore', 'tok-b3')
+      acks = [r1, r2, r3].map { |r| r.grep(/NX\.cornerSideResult/).last.to_s }
+      ok("ROH-B1 (b): cudzie echo / rovnaka strana / neznama strana — config netknuty, odpoved v kazdej vetve (#{acks.map { |a| a[/"ok":(true|false)/] }.inspect})",
+         JSON.generate(kona_cfg(cab)) == snap && acks.all? { |a| a.include?('switch_token') } &&
+         acks[0].include?('"ok":false') && acks[1].include?('"ok":true') && acks[2].include?('"ok":false'))
+      Sketchup.undo
+      ok("ROH-B1 (b): odmietnutia nepridali krok — Spat vratil posledny realny krok (sirka #{kona_cfg(cab)['width']})",
+         kona_cfg(cab)['width'] == w)
+      low = e::CabinetBuilder.build(model, roha1_params('type' => 'lower', 'width' => 600.0),
+                                    transform: Geom::Transformation.translation(e::Units.point(3000.0, 0, 0)))
+      model.selection.clear
+      model.selection.add(low)
+      lsnap = JSON.generate(kona_cfg(low))
+      rl = rohb1_switch(model, low, 'right', 'tok-b4')
+      ok('ROH-B1 (b): dolna skrinka stranu nema — nic sa nezmenilo, odpoved ok false',
+         JSON.generate(kona_cfg(low)) == lsnap && rl.grep(/NX\.cornerSideResult/).last.to_s.include?('"ok":false'))
+      cleanup(model)
+
+      # (c) VKLAD PRAVEJ rohovej cez cestu panela (ako posiela vkladacia karta od ROH-B1)
+      payload = roha2_insert_payload('corner_side' => 'right', 'corner_door_w' => 500.0, 'corner_cr1' => 90.0,
+                                     'corner_cr2' => 70.0)
+      before = cabinets(model).length
+      inst = ghost_place!(model, payload, [300.0, 300.0])
+      ghost_teardown!(model)
+      iti = inst ? (Array(kona_cfg(inst)['front_items']).first || {}) : {}
+      ok("ROH-B1 (c): vklad z karty so stranou vpravo = vpravo / 500 / 90 / 70, panty pri rohu (#{inst ? [roha1_fields(inst), iti['direction']].inspect : 'ziadna'})",
+         inst && roha1_fields(inst) == ['right', 500.0, 90.0, 70.0] && iti['direction'] == 'left' &&
+         roha1_sync_bad(model, inst).empty? && cabinets(model).length == before + 1)
+      if inst
+        Sketchup.undo
+        ok('ROH-B1 (c): vklad = 1 krok Spat', !inst.valid? && cabinets(model).length == before)
+      end
+
+      # (d) payload oznacenej rohovej nesie UCINNU hrubku CR 2
+      c19 = e::CabinetBuilder.build(model, roha1_params('front_material_id' => 'R1A19'))
+      pay = e::Panel.cabinet_payload(c19)
+      ok("ROH-B1 (d): payload oznacenej — corner_th2 z celoveho 19 (#{pay['corner_th2'].inspect}), " \
+         "dolna kluc nema",
+         pay['corner_th2'] == 19.0 &&
+         !e::Panel.cabinet_payload(e::CabinetBuilder.build(model, roha1_params('type' => 'lower', 'width' => 600.0),
+                                                           transform: Geom::Transformation.translation(e::Units.point(3000.0, 0, 0)))).key?('corner_th2'))
+    ensure
+      e::Materials.test_dir_override = nil
+      e::Materials.reload!
+      ghost_teardown!(model)
+      cleanup(model)
+      begin
+        FileUtils.rm_rf(tmp)
+      rescue StandardError
+        nil
+      end
+    end
+    ok('ROH-B1: cleanup (0 korpusov)', cabinets(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: run_rohb1 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    ghost_teardown!(model)
+    cleanup(model)
+  end
+
+  # ROH-B1 async (audit B1 FIX 3): Scale rohovej (cakajuca absorpcia) -> HNED
+  # prepnutie strany -> bariera absorbuje PRED prepnutim -> 1 Spat vrati LEN
+  # prepnutie, Znova len prepnutie (bez dalsieho kroku casovaca).
+  def run_rohb1_async(model, state, steps)
+    steps << [0.3, lambda do
+      cleanup(model)
+      inst = e::CabinetBuilder.build(model, roha1_params('material_id' => nil, 'front_material_id' => nil))
+      state[:rohb1] = inst
+      model.start_operation('SU-TEST ROH-B1 user scale pred prepnutim', true)
+      inst.transformation = inst.transformation * Geom::Transformation.scaling(ORIGIN, 1300.0 / 1100.0, 1.0, 1.0)
+      model.commit_operation
+      state[:rohb1_pending] = e::ScaleWatch.pending?
+      model.selection.clear
+      model.selection.add(inst)
+      e::Panel.handle_corner_side(pg(model, 'cabinet_id' => e::Store.get(inst, 'cabinet_id').to_s,
+                                            'corner_side' => 'right', 'switch_token' => 'tok-async'))
+    end]
+    steps << [SETTLE, lambda do
+      inst = state[:rohb1]
+      ok('async ROH-B1: Scale naozaj zalozil observeru pracu', state[:rohb1_pending] == true)
+      ok("async ROH-B1: bariera absorbovala Scale PRED prepnutim (#{inst && inst.valid? ? [kona_cfg(inst)['width'], roha1_fields(inst)[0]].inspect : '?'})",
+         inst && inst.valid? && kona_cfg(inst)['width'] == 1300.0 && roha1_fields(inst)[0] == 'right' &&
+         e::ScaleWatch.pending? == false && roha1_sync_bad(model, inst).empty?)
+      Sketchup.undo
+      state[:rohb1_after_undo] = inst && inst.valid? ? [kona_cfg(inst)['width'], roha1_fields(inst)[0]] : nil
+      state[:rohb1_redo] = Sketchup.respond_to?(:redo)
+      Sketchup.redo if state[:rohb1_redo]
+    end]
+    steps << [SETTLE, lambda do
+      inst = state[:rohb1]
+      ok("async ROH-B1: 1 Spat vratil LEN prepnutie, absorpcia drzi (#{state[:rohb1_after_undo].inspect})",
+         state[:rohb1_after_undo] == [1300.0, 'left'])
+      if state[:rohb1_redo]
+        ok('async ROH-B1: Znova vratilo prepnutie a NIC ine (bez dalsieho kroku casovaca)',
+           inst && inst.valid? && roha1_fields(inst)[0] == 'right' && kona_cfg(inst)['width'] == 1300.0 &&
+           e::ScaleWatch.pending? == false)
+      else
+        info('async ROH-B1: Sketchup.redo nedostupne — Redo vetva netestovana')
+      end
+      cleanup(model)
+    end]
+  end
+
   # --- S1-C: OCAKAVANY SPOTREBIC (`appliance_expects[]`) --------------------
   #
   # CO SA TU OVERUJE A MIMO SKETCHUPU OVERIT NEDA:
@@ -27278,6 +27525,10 @@ module NoxunSuRunner
     # kroku casovaca (absorpcia sirky bezi v bariere, nie po operacii kopie).
     run_roha1_async(model, state, steps)
 
+    # ROH-B1 (audit B1 FIX 3): Scale rohovej -> HNED prepnutie strany ->
+    # Spat/Znova (bariera observera PRED citanim configu prepinaca).
+    run_rohb1_async(model, state, steps)
+
     # S6b: zachytna siet v KONTROLE — ked uz dva kusy na jednom mieste vzniknu
     # (starsi projekt, paste-in-place), semafor ich MUSI ukazat. Overuje CELU
     # retaz Bom.collect -> Validation.run(placements:), nielen cistu funkciu.
@@ -27377,6 +27628,7 @@ module NoxunSuRunner
     run_konb(model)          # KON-B · K2: CHRBAT Z LIST — plan = model pre 48 kombinacii strop x dno x komin x vyska list, prepnutie na listy = 1 Spat, odmietnutie 2H + 20 > vnutro bez zmeny, nalozeny -> listy -> nalozeny (dormantny rucny zasah chrbta sa vrati), kopia, ulozenie a nacitanie .skp, sablona tam aj stara (H ciela ostane) a vklad ghostom, Kontrola olepov (paska na hornej ploche dolnej a dolnej ploche hornej listy), kusovnik z modelu 1 riadok 2 ks / s vystuhami 4 ks a VEPO „Chrb HD“
     run_kond(model)          # KON-D: VSTAVANA SABLONA „Chladničková" — seed v cerstvej kniznici STD 7 so schemou 21, vklad ghostom = plan <-> model 1:1, dno a strop 510, boky 560, bez chrbta, 2 fyzicke dvierka 719 + 1274 so smerom „neurceny" (Kontrola 2 nalezy), ocakava chladnicku (ORANGE), nika 560, 1 krok Spat vrati vklad
     run_roha1(model)         # ROH-A1 · K3: ROHOVA SKRINKA — plan = model pre 10 kombinacii (strana x W/D/CR/gC/celovy 19/CR 2 16 pri W 582), prestavba drzi polia (1 Spat), odmietnutia panela (cela, typ, strana, zony) = 0 krokov, sablona uloz -> vloz ghostom (1 Spat) / ina strana odmietnuta / rovnaka prejde, tri kopie, scale sirky (rast slepej casti obe strany, klamp 584 + veta), ulozenie .skp, kusovnik/VEPO/kovanie z modelu
+    run_rohb1(model)         # ROH-B1 · K3: PREPINAC STRANY cez akciu panela — rucne hrany na dverach/CR 1/blende (L1 <-> L2) a vystuhach/CR 2 (bez zmeny), plocha pasky X' = W − X, panty pri rohu, okraje prehodene, plan = model, 1 Spat = presne povodny config, spat = povodne; odmietnutia 0 krokov + odpoved v kazdej vetve; vklad pravej z karty (1 Spat); corner_th2 v payloade
     run_roha2(model)         # ROH-A2 · K3: VKLADANIE ROHOVEJ cez cestu panela — preflight karty (otvor 0/450) -> ghost -> klik = CORNER_DEFAULTS, R7 panty pri rohu, plan = model, 1 Spat; sablona PRAVEJ strany (otvor 600/500, vpravo/500, 1 Spat); preflight oznacenej so zivou sirkou 1200 (x0 750), payload otvoru, dolna cela sirka
     run_d140(model)          # D-140: VYSKA OSADENIA CHLADNICKY — akcia panela zdvihne box niky (z 118 -> 268) a Kontrola vysky/delenia pocita od zdvihnuteho dna, 1x Spat, odmietnutia (stara hodnota, zly vstup, cudzie echo/PID/dokument, nezmenena) bez kroku Spat, prestavba dvierok osadenie zachova, zapis z otvoreneho komponentu zatvori kontext, vymena modelu prenesie, presun na inu skrinku nie, kopia ho nema, 0 kluc zmaze
     run_s1c(model)           # S1-C: OCAKAVANY SPOTREBIC — cely cyklus sablony (uloz s ocakavaniami -> vloz ghostom -> config -> Kontrola 2x ORANGE -> priradenie -> OK -> 2x Spat), ocakavanie BEZ sablony v riadku Spotrebic (1x Spat, geometria netknuta, peciatka schemy, nezmenene = ziadny krok, cudzie echo/PID nezapisu nic, viazanu kategoriu zrusit nedas), bariera observera po nativnej kopii, slot bez modelu (ORANGE + podvrh odmietnuty), aplikovanie sablony na viazanu skrinku (vazba ostava, ocakavania unia)

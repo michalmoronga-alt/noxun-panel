@@ -59,15 +59,18 @@ const LIB = [{ name: 'Rohova 1100', kind: 'cabinet', config: { type: 'corner_bli
 eq(NXInsert.templatesForType(LIB, 'corner_blind').map(t => t.name), ['Rohova 1100'], 'filter rohovych sablon');
 eq(NXInsert.templatesForType(LIB, 'lower').map(t => t.name), ['Dolna klasik'], 'dolna ponuka rohovu nevidi');
 const limits = vm.runInContext('TYPE_LIMITS', ctx);
-eq(Array.from(limits.corner_blind.width), [584, 3000], 'TYPE_LIMITS rohovej (Ruby CORNER_MIN_WIDTH)');
-eq(Array.from(vm.runInContext("limitFor('width')", ctx)), [584, 3000], 'limit sirky pri rohovej');
+// ROH-B1 (O2 + P3-2): pevne minimum 584 zaniklo — najmensiu sirku pocita
+// krizova kontrola z poli rohovej a ucinnych hrubok (test_rohb1_ovladace.js).
+ok(!limits.corner_blind, 'TYPE_LIMITS rohovej uz nema pevne minimum (ROH-B1)');
+eq(Array.from(vm.runInContext("limitFor('width')", ctx)), [200, 3000], 'limit sirky pri rohovej = korpus (minimum riesi kontrola)');
+eq(ctx.nxCornerMinWidth(450, 80, 18, 18), 584, 'minimum predvolieb 450 + 80 + 18 + 2 x 18');
 ctx.setType('lower');
 eq(Array.from(vm.runInContext("limitFor('width')", ctx)), [200, 3000], 'dolna ma dalej 200');
 ctx.setType('corner_blind');
 const tplSrc = fs.readFileSync(path.join(JS, 'templates.js'), 'utf8');
 ok(tplSrc.indexOf("corner_blind: 'rohová'") >= 0, 'TPL_TYPE_WORDS pozna rohovu');
 
-// ============ 3) collectConstruction bez poli rohovej (C6) ====================
+// ============ 3) collectConstruction: polia rohovej od ROH-B1, strana nikdy =====
 const FIELDS = { width: '1100', height: '862', depth: '510', thickness: '18', floor_height: '150',
                  back_mode: 'overlay', back_thickness: '3', top_mode: 'full', bottom_mode: 'under_sides',
                  plinth_mode: 'none', plinth_recess: '40', rail_depth: '100', rails_orientation: 'flat',
@@ -78,12 +81,12 @@ ctx.numv = id => parseFloat(FIELDS[id]);
 ctx.evalDim = v => parseFloat(v);
 const out = ctx.collectConstruction();
 eq(out.type, 'corner_blind', 'apply posiela typ rohovej (poistka servera ho nepotrebuje zahodit)');
-['corner_side', 'corner_door_w', 'corner_cr1', 'corner_cr2'].forEach(function(k){
-  ok(!Object.prototype.hasOwnProperty.call(out, k), `C6: ${k} sa neposiela (server ho drzi z configu)`);
-});
+ok(!Object.prototype.hasOwnProperty.call(out, 'corner_side'), 'strana sa v apply NEPOSIELA (meni ju len prepinac)');
+eq([out.corner_door_w, out.corner_cr1, out.corner_cr2], [600, 120, 90], 'ROH-B1: dverova cast a CR idu z riadku rohovej');
 const ids = core.CONSTRUCTION_FIELDS.map(f => f.id);
-['corner_side', 'corner_door_w', 'corner_cr1', 'corner_cr2'].forEach(function(k){
-  ok(ids.indexOf(k) < 0, `CONSTRUCTION_FIELDS nema ${k} (ovladace pridu v ROH-B)`);
+ok(ids.indexOf('corner_side') < 0, 'CONSTRUCTION_FIELDS nema stranu (prepinac, nie pole)');
+['corner_door_w', 'corner_cr1', 'corner_cr2'].forEach(function(k){
+  eq(core.CONSTRUCTION_FIELDS.find(f => f.id === k).only, 'corner_blind', `${k} len pri rohovej (C6)`);
 });
 
 // ============ 4) karta dielca a pravidla ======================================

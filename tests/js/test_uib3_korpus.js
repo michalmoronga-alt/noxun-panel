@@ -175,7 +175,9 @@ eq(NX_TYPE_LABEL.upper, 'Horná', 'slovensky nazov typu zije na JEDNOM mieste');
   });
   // Informacny stlpec konci pred riadkami Spotrebic (S1-B2) — za nimi zije
   // popover vysky osadenia (D-140), ktory je VEDOMY vstup, nie vystup stlpca.
-  const info = grid.slice(grid.indexOf('<div class="infocol">'), grid.indexOf('id="applRows"'));
+  // ROH-B1: hned za stlpcom stoji riadok ROHOVEJ (VSTUPY cez oba stlpce) —
+  // stlpec konci pred nim.
+  const info = grid.slice(grid.indexOf('<div class="infocol">'), grid.indexOf('id="cornerRow"'));
   ok(info.length > 0 && info.indexOf('<input') < 0, 'informacny stlpec NEMA polia — vystupy sa netvaria ako vstupy');
   ok(grid.indexOf('id="aprMountPop"') > grid.indexOf('id="applRows"'),
      'popover osadenia stoji AZ ZA riadkami Spotrebic, mimo informacneho stlpca');

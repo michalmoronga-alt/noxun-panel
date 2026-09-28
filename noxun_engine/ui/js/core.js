@@ -1790,8 +1790,54 @@
     // Pri dolnej a hornej skrinke su prazdne a server ich ignoruje.
     // D-139: `dw_front_height` uz NIE JE vstup — odvodi sa (`nxSlotFrontEval`).
     { id:'dw_class', kind:'sel' }, { id:'dw_body_height', kind:'num' },
-    { id:'dw_front_bottom', kind:'num' }
+    { id:'dw_front_bottom', kind:'num' },
+    // ROH-B1: polia ROHOVEJ (riadok v Zakladnych, O3 B1). `only` = zber ich
+    // posle LEN pri tomto type (`collectConstruction`) — pri dolnej, hornej
+    // a slote ani kluc (krizovy audit C6, parita payloadu). `dflt` = zrkadlo
+    // `CabinetBuilder::CORNER_DEFAULTS` (guard `tests/pure/test_rohb1_strana.rb`);
+    // skrinka bez kluca tak nenecha hodnotu predtym oznacenej rohovej.
+    // STRANA tu NIE JE — nie je to pole, ale prepinac so samostatnou akciou
+    // (`onCornerSide`, server `handle_corner_side`); apply ju nikdy neposiela.
+    { id:'corner_door_w', kind:'num', dflt:450, only:'corner_blind' },
+    { id:'corner_cr1', kind:'num', dflt:80, only:'corner_blind' },
+    { id:'corner_cr2', kind:'num', dflt:80, only:'corner_blind' }
   ];
+  // ROH-B1 (O2 + P3-2 z A1): NAJMENSIA SIRKA rohovej = dverova cast + CR 1 +
+  // ucinna hrubka CR 2 + 2 × hrubka korpusu (rohova vystuha a bok). Zrkadlo
+  // `Construction.corner_fit_width` / `min_valid_width` (parita tabulkou
+  // v `tests/js/test_rohb1_ovladace.js` + sonda package). NaN vstup = NaN.
+  function nxCornerMinWidth(doorW, cr1, th2, t){
+    var v = [doorW, cr1, th2, t].map(function(x){ return parseFloat(x); });
+    if (v.some(function(x){ return !isFinite(x); })) return NaN;
+    return v[0] + v[1] + v[2] + 2 * v[3];
+  }
+  // Veta, ktorou by server prestavbu odmietol (`Construction.corner_error`),
+  // alebo '' — skrinka sa zmesti (tolerancia 0,005 ako server).
+  function nxCornerFitError(width, doorW, cr1, th2, t){
+    var need = nxCornerMinWidth(doorW, cr1, th2, t), w = parseFloat(width);
+    if (!isFinite(need) || !isFinite(w) || need <= w + 0.005) return '';
+    return 'Rohová zostava sa do šírky ' + nxFmtMm(w) + ' mm nezmestí — dverová časť, CR 1, CR 2 ' +
+           'a rohová výstuha potrebujú šírku aspoň ' + nxFmtMm(need) + ' mm.';
+  }
+  // ROH-B1 (O5): ZRKADLO NAVRHU CIEL pri prepnuti strany vo VKLADACEJ karte —
+  // ta ista cast pravidla ako `CabinetBuilder.corner_mirror_params` (okraje
+  // vlavo <-> vpravo, smer pantov a strana profilu `left` <-> `right`;
+  // `unset` a chybajuci kluc ostavaju). Nova skrinka rucne hrany nema, preto
+  // sa tu nic ine nepremapuje. Cista funkcia, vstup nemeni.
+  var NX_CORNER_MIRROR = { left: 'right', right: 'left' };
+  function nxCornerMirrorFronts(cfg){
+    if (!cfg || typeof cfg !== 'object') return cfg;
+    var out = JSON.parse(JSON.stringify(cfg));
+    var gl = out.gap_left, gr = out.gap_right;
+    out.gap_left = gr; out.gap_right = gl;
+    (Array.isArray(out.items) ? out.items : []).forEach(function(it){
+      if (!it || typeof it !== 'object') return;
+      ['direction', 'profile_edge'].forEach(function(k){
+        if (Object.prototype.hasOwnProperty.call(NX_CORNER_MIRROR, it[k])) it[k] = NX_CORNER_MIRROR[it[k]];
+      });
+    });
+    return out;
+  }
   // Zapise hodnoty zdroja (defaulty / sablona / oznaceny korpus) do formulara.
   // Prazdne hodnoty ostavaju nedotknute (ako povodne setNum/setVal), dflt zrkadli povodne "|| 3".
   function writeConstruction(src){
@@ -1841,6 +1887,10 @@
       nxBackSetback: nxBackSetback, nxTopFrontSetback: nxTopFrontSetback, nxBackStop: nxBackStop,
       nxSideDepth: nxSideDepth, nxInteriorDepth: nxInteriorDepth, nxSetbackError: nxSetbackError,
       nxFmtMm: nxFmtMm, CONSTRUCTION_FIELDS: CONSTRUCTION_FIELDS,
+      // ROH-B1 (tests/js/test_rohb1_ovladace.js) — minimum sirky rohovej,
+      // veta odmietnutia a zrkadlo navrhu ciel vo vkladacej karte.
+      nxCornerMinWidth: nxCornerMinWidth, nxCornerFitError: nxCornerFitError,
+      nxCornerMirrorFronts: nxCornerMirrorFronts,
       // KON-B · K2 (tests/js/test_konb_listy.js) — chrbat z list.
       nxBackRails: nxBackRails, nxBackRailHeight: nxBackRailHeight, nxBackRailsError: nxBackRailsError,
       NX_MIN_INTERIOR_H: NX_MIN_INTERIOR_H,

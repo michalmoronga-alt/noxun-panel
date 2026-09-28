@@ -24,6 +24,7 @@
 | R7 | Pánty | **voliteľné smerom dverí, predvolene pri rohu**: pri rohu sedia pánty na výstuhe závesov (ako DC), pri vonkajšom boku na boku skrinky | 27.9. |
 | R8 | Nočný beh 27./28.9. | príprava bloku (fakty z kódu, koncept, rešerš, krížový audit, mockup) **a jadro rohovej** — rohová sa postaví, ide do kusovníka aj VEPO, zapne sa **typom „Rohová" v existujúcom prepínači typu** (rad tlačidiel typu vo vkladacej karte: Dolná · Horná · Umývačka) s predvolenými rozmermi; **nové ovládače** (šírka dverovej časti, CR lišty, strana dverí) prídu až **po Michalovom schválení mockupu** | 27.9. |
 | R9 | Mimo bloku | **horná rohová** (mimo V1) · rohové vybavenie — **LeMans / karusel** (po V1, zásobník) · **kolízia CR 2 so susednou skrinkou** (neskôr, zostavy) | 6.9. |
+| R10 | Mockup ovládačov schválený | **Mockup [MOCKUP_ROHOVA_2026-09-28.html](MOCKUP_ROHOVA_2026-09-28.html) schválený — O1–O12 podľa návrhu** („pozrel som mock, všetko sedí“): **O1** predvolená konštrukcia ako dolná (1100 × 720 × 510, sokel 100, dverová časť 450, CR 80 / 80, dvere vľavo, pánty pri rohu) · **O2** dverová časť 250–800, CR 1 aj CR 2 50–250, skrinka aspoň dverová časť + CR 1 + CR 2 hrúbka + 2 × korpus (pri 450 / 80 = 584); mimo rozsahu pole zčervená a skrinka sa neprestaví · **O3** ovládače = jeden riadok v Základné → Rozmery (B1) · **O4** ten istý riadok aj vo vkladacej karte (A1), tlačidlo „Rohová“ s ikonou · **O5** prepnutie strany zrkadlí celú zostavu aj dvere, skrinka ostane na mieste, pánty ostanú voči rohu, okraje čiel sa prehodia, ručne zmenená hrana prejde so zrkadlom, jeden krok Späť · **O6** skrátené názvy dielcov (Blenda roh, Vyst zav, Vyst roh, CR 1, CR 2) · **O7** ABS korpusových dielcov podľa DC · **O8** polica ide cez celú šírku, výrez pre výstuhu závesov robí dielňa — ROH-A1 navyše pridal jantárové (ORANGE) upozornenie; je to vratná voľba a **čaká na Michalov pokyn**, či ostane · **O9** CR lišty kresbu zvislo, hromadná „Kresba čiel“ ich nezasiahne · **O10** čelá rohovej = jedny dvierka, pánty slovami „Pri boku / Pri rohu“ · **O11** okraj pri rohu v schéme okrajov (predvolene 2 mm → dvere 446, CR 1 78) · **O12** návrhy navyše (šírka dverí v pravom stĺpci, súhrn v lište, kresba zostavy v náhľade, kláves strany pri vkladaní) áno. Poradie dávok: **ROH-B1** ovládače a prepínač strany · **ROH-B2** kresba zostavy, karta Čelá rohovej a návrhy O12 | 28.9. |
 
 ## 2 · Dávky bloku (po krížovom audite 28.9.)
 
@@ -32,7 +33,7 @@ v A1 nemení) · **ROH-A2 · vkladanie a náhľad** — tlačidlo „Rohová" vo
 až po A2) · **ROH-B · ovládače** — riadky v Inspectore a prepínač strany podľa schváleného mockupu. Rez A1/A2 odporučil krížový audit (Codex Q6).
 Každá dávka dostane package v tomto priečinku; audit-povinné dávky prejdú auditom návrhu.
 
-## 3 · Otvorené otázky (odpovie Michal pri schvaľovaní mockupu)
+## 3 · Otvorené otázky — ZODPOVEDANÉ 28.9.2026 (R10, mockup O1–O12 podľa návrhu)
 
 Otázky, nie rozhodnutia — technické riešenie každej dávky určuje jej package po audite návrhu; vyhodnotenie nálezov krížového auditu je v
 [RECONCILE_KRIZOVEHO_AUDITU_2026-09-28.md](RECONCILE_KRIZOVEHO_AUDITU_2026-09-28.md).

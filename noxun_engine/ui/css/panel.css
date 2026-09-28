@@ -1728,6 +1728,42 @@
   .nx-inspector .legsrow .legssel { flex: 0 1 auto; min-width: 0; }
   .nx-inspector .legsrow .legssel:empty { display: none; }
   .nx-inspector .legsrow .hwsetsel { max-width: 150px; font-size: 11px; }
+  /* ROH-B1 (mockup B1 / A1): RIADOK ROHOVEJ pod rozmermi — ta ista logika ako
+     riadok noh (cez OBA stlpce mriezky, jeden riadok, bez nadpisu). Polia
+     dverovej casti a CR su VSTUPY (zarovnane doprava, rozmer je cislo); CR
+     nesie ikonu sirky/hlbky v spolocnom ramiku `.crin`, ktory nesie aj
+     cervenu chybneho pola (input v nom okraj nema). Prepinac strany je
+     dvojstavovy segment (vyberova rodina = stav, nie akcia). */
+  .nx-inspector .cornerrow { grid-column: 1 / -1; display: flex; align-items: center; gap: 5px;
+             margin-top: 4px; padding: 5px 0 1px; border-top: 1px solid var(--nx-border-soft); min-width: 0; }
+  .nx-inspector .cornerrow[hidden] { display: none; }
+  .nx-inspector .cornerrow > .lead { flex: 0 0 auto; width: 13px; height: 13px; color: var(--nx-ink-faint); }
+  .nx-inspector .cornerrow .crl { flex: 0 0 auto; font-size: 12px; color: var(--nx-ink-label); white-space: nowrap; }
+  .nx-inspector .cornerrow input { text-align: right; font: inherit; font-size: 13px; font-weight: 600;
+             color: var(--nx-ink); border: 1px solid var(--nx-border-strong); border-radius: 6px;
+             padding: 4px 5px; min-width: 0; background: var(--nx-surface); }
+  .nx-inspector .cornerrow input.crD { width: 46px; }
+  .nx-inspector .cornerrow input.bad { border-color: var(--nx-danger-line); background: var(--nx-danger-bg-soft); }
+  .nx-inspector .cornerrow .crsep { flex: 0 0 auto; width: 1px; height: 18px; background: var(--nx-border-soft); margin: 0 2px; }
+  .nx-inspector .cornerrow .crin { flex: 0 0 auto; display: inline-flex; align-items: center; height: 26px;
+             border: 1px solid var(--nx-border-strong); border-radius: 6px; background: var(--nx-surface); padding-left: 4px; }
+  .nx-inspector .cornerrow .crin .ic { width: 12px; height: 12px; color: var(--nx-ink-faint); }
+  .nx-inspector .cornerrow .crin input { width: 33px; border: 0; padding: 0 5px 0 2px; height: 24px;
+             border-radius: 0 6px 6px 0; background: none; }
+  .nx-inspector .cornerrow .crin input.bad { background: none; }
+  .nx-inspector .cornerrow .crin.bad { border-color: var(--nx-danger-line); background: var(--nx-danger-bg-soft); }
+  .nx-inspector .cornerrow .unit { flex: 0 0 auto; color: var(--nx-ink-faint); font-size: 10.5px; }
+  .nx-inspector .cornerrow .crsp { flex: 1 1 auto; min-width: 2px; }
+  .nx-inspector .cornerrow .sidesg { flex: 0 0 auto; display: inline-flex; border: 1px solid var(--nx-border-strong);
+             border-radius: 6px; overflow: hidden; }
+  .nx-inspector .cornerrow .sidesg button { width: 28px; height: 24px; padding: 0; border: 0;
+             border-right: 1px solid var(--nx-border-soft); background: var(--nx-surface); color: var(--nx-ink-muted);
+             cursor: pointer; display: inline-flex; align-items: center; justify-content: center; border-radius: 0; }
+  .nx-inspector .cornerrow .sidesg button:last-child { border-right: 0; }
+  .nx-inspector .cornerrow .sidesg button .ic { width: 16px; height: 16px; }
+  .nx-inspector .cornerrow .sidesg button:hover { background: var(--nx-select-bg-soft); color: var(--nx-select); }
+  .nx-inspector .cornerrow .sidesg button.on { background: var(--nx-select-bg); color: var(--nx-select-strong); }
+  .nx-inspector .cornerrow .sidesg button:focus-visible { outline: 2px solid var(--nx-select); outline-offset: -2px; }
   /* S1-B2 (mockup R9): RIADOK SPOTREBICA. Ta ista logika ako riadok noh —
      cez OBA stlpce mriezky, bez nadpisu — ale DVOJRIADKOVY: hore popisok
      a ovladac (ponuka modelov alebo „odpojit"), dole veta servera. Ten isty

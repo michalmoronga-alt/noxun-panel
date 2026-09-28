@@ -387,8 +387,18 @@
   function insertCabinet(){
     // V0.4.7e (Codex GH #35): vlozenie MUSI prejst validaciou — neplatny rozmer
     // ('650mm') by sa inak ticho zmenil na default a neplatna vyska cela na auto.
-    if (!validateFields()){ NX.setStatus('Skontroluj červené polia (neplatný rozmer).', true); return; }
+    // ROH-B1 (O2): konkretna veta krizovej kontroly (napr. najmensia sirka
+    // rohovej), ked ju formular ma — inak vseobecna.
+    if (!validateFields()){
+      NX.setStatus((typeof nxCabFieldError === 'function' && nxCabFieldError()) ||
+                   'Skontroluj červené polia (neplatný rozmer).', true);
+      return;
+    }
     var p = collectAll(); p.zone_tree = currentZoneTree;
+    // ROH-B1 (O4 A1): STRANA DVERI rohovej zvolena vo vkladacej karte. Nie je
+    // to pole formulara (apply ju nikdy neposiela), preto ide sem vyslovne —
+    // a LEN pri rohovej (dolna, horna ani slot kluc nedostanu).
+    if (p.type === 'corner_blind' && typeof nxCornerSide === 'function') p.corner_side = nxCornerSide();
     // D-33/F6: materialy zo sablony idu do insert payloadu EXPLICITNE (drzi ich
     // insert stav, nie disabled selecty). Vedome MIMO PARAM_KEYS/CONSTRUCTION_FIELDS:
     // PARAM_KEYS je zaroven apply whitelist a materialy maju vlastny kanal

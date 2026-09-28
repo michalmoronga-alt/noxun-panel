@@ -67,6 +67,12 @@
      'back_setback','top_front_setback',
      // KON-B · K2: vyska list chrbta — ten isty dovod (medzistav vyrazu).
      'back_rail_height',
+     // S1-E: polia slotu umyvacky a ROH-B1 (predrecenzia P2-1): dverova cast
+     // a CR rohovej — bez pripojenia by debounce pri pisani `600+` odoslal
+     // prazdne pole (server = predvolba 450) a skrinka by sa prestavala na
+     // medzistave; Enter/blur by vyraz nepotvrdili. Kazde ciselne pole
+     // v #basicCard ma byt tu (guard `test_rohb1_ovladace.js`).
+     'dw_body_height','dw_front_bottom','corner_door_w','corner_cr1','corner_cr2',
      'fr_gap','fr_gap_top','fr_gap_bottom','fr_gap_left','fr_gap_right'] // D-119 medzery/presahy cel
       .forEach(function(id){ attachExprField(el(id), { flushFn: flushCabinetEditsNow }); });
     // E-03: ib_thickness je pri UNI materiali editovatelne dim pole (pri realnom

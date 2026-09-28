@@ -141,7 +141,8 @@ end
 
 NxTest.test('ROH-A2: vkladanie — DEFAULTS rohovej zo servera, JS polia rohovej do payloadu neposiela') do
   sync = NxRohA2.src('noxun_engine', 'ui', 'panel', 'sync.rb')
-  NxTest.assert(sync.include?('corner_blind: CabinetBuilder::CORNER_DEFAULTS'), 'DEFAULTS.corner_blind')
+  # ROH-B1: predvolby = CORNER_DEFAULTS + ucinna hrubka CR 2 (`corner_insert_defaults`).
+  NxTest.assert(sync.include?('corner_blind: corner_insert_defaults(model)'), 'DEFAULTS.corner_blind')
   d = NxRohA2::CB::CORNER_DEFAULTS
   NxTest.assert_equal(['left', 450.0, 80.0, 80.0, 1100.0],
                       [d[:corner_side], d[:corner_door_w], d[:corner_cr1], d[:corner_cr2], d[:width]])
@@ -151,9 +152,14 @@ NxTest.test('ROH-A2: vkladanie — DEFAULTS rohovej zo servera, JS polia rohovej
   NxTest.assert_equal(['left', 450.0, 80.0, 80.0], n.values_at(:corner_side, :corner_door_w, :corner_cr1, :corner_cr2))
   NxTest.assert_equal('right', n[:fronts]['items'].first['direction'], 'R7: panty pri rohu (vpravo pri dverach vlavo)')
   form = NxRohA2.src('noxun_engine', 'ui', 'js', 'form.js')
-  NxTest.assert(form.include?("if (t === 'corner_blind' && cornerDraft)"), 'preflight dostane stranu a dverovu cast')
+  # ROH-B1: strana z registra (prepinac), dverova cast z POLA riadku rohovej.
+  NxTest.assert(form.include?('out.corner_side = nxCornerSide();'), 'preflight dostane stranu')
+  NxTest.assert(form.include?("out.corner_door_w = c.corner_door_w === '' ? d.corner_door_w : c.corner_door_w;"),
+                'preflight dostane zivu dverovu cast')
   actions = NxRohA2.src('noxun_engine', 'ui', 'js', 'actions.js')
-  NxTest.refute(actions.include?('cornerDraft'), 'insert payload polia rohovej NENESIE (C6)')
+  NxTest.refute(actions.include?('cornerDraft'), 'insert payload register nečíta priamo')
+  NxTest.assert(actions.include?("if (p.type === 'corner_blind' && typeof nxCornerSide === 'function') p.corner_side = nxCornerSide();"),
+                'ROH-B1: vklad nesie zvolenu stranu LEN pri rohovej')
 end
 
 # ============================================================================
