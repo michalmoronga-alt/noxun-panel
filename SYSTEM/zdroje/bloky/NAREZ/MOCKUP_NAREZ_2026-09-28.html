@@ -517,7 +517,7 @@
     <span><i class="mpin" style="margin:0">A1</i> zmena oproti dnešnému pluginu (opis vedľa okna)</span>
     <span><i class="otag" style="margin:0">O1</i> schválený bod (odkaz na zoznam nižšie)</span>
   </div>
-  <p class="src">Zákazka je vymyslená a zámerne ukazuje všetky prípady naraz: kuchyňa s 3 dolnými skrinkami a umývačkou, hornou, vysokou na chladničku (boky až po strop), otvorenou hornou v UNI, 4 bočnicami 36 mm (duplák), krycím bokom, bielou obkladovou doskou 600 × 2400 (bez smeru — zmestí sa len otočená), policami z K001 a pracovnou doskou s barovým pultom. Čísla (platne, %, odhad, ceny) počíta mockup tým istým pravidlom, aké navrhuje koncept, preto sedia medzi A až E.</p>
+  <p class="src">Zákazka je vymyslená a zámerne ukazuje všetky prípady naraz: kuchyňa s 3 dolnými skrinkami a umývačkou, hornou, vysokou na chladničku (boky až po strop), otvorenou hornou v UNI, 4 bočnicami 36 mm (duplák), krycím bokom, bielou obkladovou doskou 600 × 2400 (bez smeru — zmestí sa len otočená), policami z K001 a pracovnou doskou s barovým pultom. Čísla (platne, %, odhad, ceny) počíta mockup tým istým pravidlom, aké navrhuje koncept, preto sedia medzi A až E. Čísla v mockupe počíta ukážkový výpočet — nie je zadaním; pravidlá výpočtu určí package dávky NP-1 s vlastným auditom.</p>
 </section>
 
 <section class="ohead" aria-labelledby="oH">
@@ -1029,11 +1029,18 @@
 
   // ---------------- A · telo sekcie ----------------
   // „(horná hranica)" LEN pri úplnom pláne so skutočným formátom z katalógu (audit C2)
+  // JEDNA veta o výsledku plánu — tá istá v karte, v poznámke Rozpočtu aj v XLSX. Obe podmienky spolu:
+  // orientačný formát (UNI / bez formátu) A zároveň nezaradený dielec sa nesmú navzájom schovať.
+  function planPhrase(m){
+    var r = m.res, s = platni(r.plates.length), f = 'pri formáte ' + dmt(r.fmt[0], r.fmt[1]);
+    if (r.orient && r.incomplete) return { pre:'orientačne ', n:s, post:f + ' — pre zaradené dielce, celkový počet neznámy', cls:'orient' };
+    if (r.orient) return { pre:'orientačne ', n:s, post:f, cls:'orient' };
+    if (r.incomplete) return { pre:'', n:s, post:'pre zaradené dielce — celkový počet neznámy', cls:'inc' };
+    return { pre:'', n:s, post:'(horná hranica)', cls:'' };
+  }
   function countHtml(m){
-    var r = m.res, n = r.plates.length;
-    if (r.orient) return '<span class="npcount orient">orientačne <b>' + platni(n) + '</b> <small>pri formáte ' + dmt(r.fmt[0], r.fmt[1]) + '</small></span>';
-    if (r.incomplete) return '<span class="npcount inc"><b>' + platni(n) + '</b> <small>pre zaradené dielce — celkový počet neznámy</small></span>';
-    return '<span class="npcount"><b>' + platni(n) + '</b> <small>(horná hranica)</small></span>';
+    var p = planPhrase(m);
+    return '<span class="npcount' + (p.cls ? ' ' + p.cls : '') + '">' + esc(p.pre) + '<b>' + p.n + '</b> <small>' + esc(p.post) + '</small></span>';
   }
   function complete(m){ var r = m.res; return !r.orient && !r.incomplete; }
   function summaryHtml(){
@@ -1099,7 +1106,8 @@
            tip('Kvôli ' + (k === 1 ? 'jednému dielcu' : k + ' dielcom') + ' kupuješ celú platňu (VEPO účtuje celé tabule). Čo s tým:\n' +
                '• zmenšiť alebo rozdeliť dielec, aby sa zmestil do zvyšku predošlej platne' + (prevLeft ? ' (najväčší ' + dmt(prevLeft.w, prevLeft.h) + ')' : '') + '\n' +
                '• vyrobiť ho z iného materiálu, ktorý má na platni miesto\n' +
-               '• platňu kúpiť a zvyšok (tu ' + dmt(pw.left.w, pw.left.h) + ') použiť na ďalšiu zákazku — zvyšky sú tvoje') +
+               (pw.left ? '• platňu kúpiť a zvyšok (tu ' + dmt(pw.left.w, pw.left.h) + ') použiť na ďalšiu zákazku — zvyšky sú tvoje'
+                        : '• platňa je bez využiteľného zvyšku — dielce ju vyplnia celú')) +
            '<button type="button" class="linkbtn" data-open="' + m.id + ':' + (r.plates.length - 1) + '">Ukázať platňu ' + pw.idx + '</button>' +
            pin('A6') + otag('O2') + '</div>';
     }
@@ -1174,16 +1182,13 @@
   var RATE_POREZ = 17, RATE_MONTAZ = 15, M2_PER_PLATE = 5.8;
   function perPlate(m){ var r = m.res; return m.price == null ? null : Math.round(m.price * r.fmt[0] * r.fmt[1] / 1e6 * 100) / 100; }
   // poznámka plánu v riadku Rozpočtu (aj v XLSX) — pomenovanie podľa auditu C2
-  function planNote(m){
-    var r = m.res, n = r.plates.length;
-    if (r.incomplete) return 'plán: ' + platni(n) + ' pre zaradené dielce — celkový počet neznámy';
-    if (r.orient) return 'plán: orientačne ' + platni(n) + ' pri formáte ' + dmt(r.fmt[0], r.fmt[1]);
-    return 'plán: ' + platni(n) + ' (horná hranica)';
-  }
+  function planNote(m){ var p = planPhrase(m); return 'plán: ' + p.pre + p.n + ' ' + p.post; }
   function eligible(m){ return complete(m); }
   // veta pri ZAPNUTOM prepínači (C3/C10) — tá istá ide do XLSX rozpočtu
   function onNote(m){
     var r = m.res;
+    if (r.incomplete && r.fallback) return 'formát chýba, plán neúplný — cena z odhadu';
+    if (r.incomplete && m.uni) return 'materiál neurčený, plán neúplný — cena z odhadu';
     if (r.incomplete) return 'plán neúplný — cena z odhadu';
     if (r.fallback) return 'formát chýba — cena z odhadu';
     if (m.uni) return 'materiál neurčený — cena z odhadu';

@@ -25,9 +25,8 @@
   zákazke (vhodná zákazka teraz nie je; voliteľne nepotvrdená objednávka), **mockup schválený** s prahom upozornenia na poslednú platňu 20 %. **Podklady v priečinku bloku:**
   fakty z kódu (dvaja rešeršéri: rozpočet dnes kupuje `ceil(count_max)` platní a z toho počíta porez aj montáž, „Nastavenia rozpočtu" sú globálne, Kontrola `oversize`
   nepočíta s orezom), outside-in rešerš Antigravity (3 behy), krížový audit Codex `gpt-5.6-sol` (5 BLOCKER · 6 FIX · 3 NOTE) a Grok `grok-4.7` (2 BLOCKER · 4 FIX · 4 NOTE),
-  auditovaný koncept v1 ako surový vstup a **vyhodnotenie každého nálezu** (reconcile: prídavok dupláku, pomenovanie „horná hranica" len pri úplnom pláne so skutočným
-  formátom, cenová spôsobilosť per materiál s pádom na odhad, dopredná brána nastavení dodávateľa, jedna funkcia „zmestí sa" pre plán aj Kontrolu; Grokov orez pracovnej
-  dosky s ABS zamietol Michal). **Dávky:** NP-1 jadro → NP-2 nastavenia + Kontrola → NP-3 sekcia Nárezový plán → NP-4 ceny podľa plánu; technické požiadavky dostane
+  auditovaný koncept v1 ako surový vstup a **vyhodnotenie každého nálezu** (reconcile — pri každom náleze verdikt a dávka,
+  ktorá ho rieši; Grokov orez pracovnej dosky s ABS zamietol Michal). **Dávky:** NP-1 jadro → NP-2 nastavenia + Kontrola → NP-3 sekcia Nárezový plán → NP-4 ceny podľa plánu; technické požiadavky dostane
   package každej dávky s vlastným auditom. Bokom **D-146 falošný duplák** (spodná vrstva zo 100 mm výstuh) do zásobníka Po V1.
 
 - **DOCS — smoke bloku 8 K3 ROHOVÁ SKRINKA PASS (28.9.2026, PR #415, len dokumentácia; verzia pluginu sa nemení).**

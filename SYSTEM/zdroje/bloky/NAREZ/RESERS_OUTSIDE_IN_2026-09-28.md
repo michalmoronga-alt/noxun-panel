@@ -11,13 +11,13 @@
 |---|---|---|---|
 | Q1 · 1 | nástroje vyžadujú gilotínové delenie, orez na oboch protiľahlých hranách, kerf, zámok otáčania podľa dekoru | **berieme** (potvrdenie) | zhoda s návrhom §1–§2 a bodom §8.1 (orez per hrana) |
 | Q1 · 2 | deterministická policová heuristika (FFDH) je korektná voľba pre realizovateľnú hornú hranicu | **berieme** (potvrdenie) | vlastná heuristika v Ruby ostáva |
-| Q1 · 3 | kerf len **medzi** dielcami (N dielcov na polici = N − 1 rezov), nie pri orezanom okraji; dielec presne na použiteľnú šírku sa musí zmestiť | **berieme — spresňuje návrh** | do package NP-1: pravidlo kerfu + hraničný test „dielec = použiteľná šírka/výška" |
+| Q1 · 3 | kerf len **medzi** dielcami (N dielcov na polici = N − 1 rezov), nie pri orezanom okraji; dielec presne na použiteľnú šírku sa musí zmestiť | **berieme** | rieši package NP-1 (s vlastným auditom) |
 | Q1 · 4 | OpenCutList nemá verejné API, licencia GPLv3 | **neberieme** (bez akcie) | kód nepreberáme ani nevoláme — len vzory |
 | Q1 · 5 | JS knižnice (maxrects-packer, potpack, binpackingjs) nedávajú gilotínové rozloženie; guillotine-packer je neudržiavaný a bez zámku dekoru | **neberieme** | nerezateľné na formátovacej píle; výpočet ostáva v Ruby (headless testovateľný) |
 | Q3 · 1–2 | výkres platne: ID a rozmery dielcov, šípka dekoru, šrafovaný odpad, najväčší zvyšok, % využitia platne; súhrn materiálu: počet platní + využitie; poradie rezov je pre externý nárez šum | **berieme do mockupu** | presne rozsah návrhu §3 |
 | Q3 · 3 | nadrozmerné dielce ako samostatná kategória s červeným upozornením | **berieme** (potvrdenie) | RED + `incomplete` (návrh §2, §4) |
-| Q3 · 4 | klik na obdĺžnik v 2D diagrame → výber v 3D nemá v SketchUp pluginoch precedens (OpenCutList vyberá z tabuľky) | **otvorené — mockup** | vo V1 najviac výber zo **zoznamu** dielcov (vzor D-94), nie zo SVG; rozhodne Michal pri mockupe |
-| Q3 · 5 | vlastné upozornenie „posledná platňa nesie 1 dielec / využitie 8 %" (bez precedensu, UNVERIFIED) | **berieme do mockupu ako návrh** | priamo Michalova bolesť (rozhodnutie N1) |
+| Q3 · 4 | klik na obdĺžnik v 2D diagrame → výber v 3D nemá v SketchUp pluginoch precedens (OpenCutList vyberá z tabuľky) | **rozhodnuté mockupom (O3)** | výber v modeli zo zoznamu dielcov, nie zo SVG |
+| Q3 · 5 | vlastné upozornenie „posledná platňa nesie 1 dielec / využitie 8 %" (bez precedensu, UNVERIFIED) | **schválené mockupom (O2)** | prah: posledná platňa pod 20 % alebo najviac 2 dielce |
 | Q3 · 6 | hrany (ABS) a ručné presúvanie v pláne = balast | **potvrdenie scope OUT** | návrh §5 |
 | Q4 · 1 | prerez priemyselných píl 4,4 mm (rozsah 4,0–5,0) | **Michal rozhodol 5 mm** (N3) | rešerš potvrdzuje rozsah; nastaviteľné |
 | Q4 · 2 | orez 10–15 mm na hranu | **Michal rozhodol 10 mm** (N3) | nastaviteľné |

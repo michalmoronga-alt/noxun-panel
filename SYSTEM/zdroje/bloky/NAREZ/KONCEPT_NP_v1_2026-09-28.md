@@ -5,6 +5,9 @@
 > s vlastným auditom návrhu. Podklady: návrh 6.9. [../../next_sessions/NAREZ_PLAN_NAVRH_2026-09-06.md](../../next_sessions/NAREZ_PLAN_NAVRH_2026-09-06.md)
 > (Codex #322/#323) · fakty [FAKTY_Z_KODU_2026-09-28.md](FAKTY_Z_KODU_2026-09-28.md) (časti A/B, odkazy `súbor:riadok`) · rešerš
 > [RESERS_OUTSIDE_IN_2026-09-28.md](RESERS_OUTSIDE_IN_2026-09-28.md). Body označené **(M)** sú „návrh — potvrdí Michal" (mockup).
+> **Prekonané po audite (platí ROZHODNUTIA N6–N11 a RECONCILE):** plán **neotáča** žiadny dielec (N8 — pravidlo otáčania v §2–§3 neplatí) · duplák
+> s prídavkom na stranu (N7) · pracovná doska vždy bez orezu (N9) · prah upozornenia poslednej platne 20 % (N11/O2) · neúplný plán = cena z odhadu
+> bez zastavenia exportu (O11) · rez dávok je štvordielny (RECONCILE časť 3). Telo súboru ostáva nezmenené ako záznam toho, čo audit posudzoval.
 
 ## 1 · Čo uvidí používateľ
 

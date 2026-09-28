@@ -14,13 +14,13 @@
 |---|---|---|---|---|
 | C1 | BLOCKER | koncept nepočíta prídavok dupláku (N7) → podhodnotí počet platní | **berieme** | NP-1 (nastavenie NP-2) |
 | C2 | BLOCKER | počet bez nezaradených dielcov, s chýbajúcim formátom alebo UNI nie je horná hranica | **berieme** — „horná hranica" len pri úplnom pláne so skutočným formátom | NP-1, texty NP-3 |
-| C3 | BLOCKER | „bez exportnej brány" je bezpečné len vtedy, keď neistý plán nikdy nepríde do ceny | **berieme v upravenej forme** — materiál bez spoľahlivého plánu ostáva na dnešnom odhade a riadok povie prečo; či to stačí bez zastavenia exportu, rozhodne audit NP-4 | NP-4 |
+| C3 | BLOCKER | „bez exportnej brány" je bezpečné len vtedy, keď neistý plán nikdy nepríde do ceny | **berieme v upravenej forme — rozhodol Michal (mockup O11)**: materiál bez spoľahlivého plánu ostáva na dnešnom odhade a riadok povie prečo; cenové exporty sa **nezastavujú** (rovnako ako dnes pri dielci väčšom než platňa) | NP-4 |
 | C4 | BLOCKER | nové nastavenia zahodí starší plugin pri uložení sadzieb | **berieme** — ochrana pred staršou verziou; priznaný limit pre plugin v0.15.x a starší na tom istom PC | NP-2 |
 | C5 | BLOCKER | blok uzavrieť až po porovnaní s reálnou objednávkou VEPO (N5) | **neberieme — rozhodol Michal (N10)**: vhodná zákazka teraz nie je, porovnanie po V1; bezpečnosť drží konzervatívny plán a vypnutý prepínač cien | — |
 | C6 | FIX | heuristiku formálne popísať a nevolať ju minimum | **berieme** | NP-1 |
 | C7 | NOTE | vstup z kusovníka je správna cesta | **potvrdenie** | — |
 | C8 | FIX | vstup rozdeliť na prijatie riadka, podobu pre VEPO a nákupné prírezy; neznámy smer neotáčať | **berieme** (s N8 sa neotáča nič) | NP-1 |
-| C9 | FIX | jedna pravda o tom, či sa dielec zmestí, pre plán aj Kontrolu | **berieme** | NP-1 (funkcia), NP-2 (Kontrola) |
+| C9 | FIX | jedna pravda o tom, či sa dielec zmestí, pre plán aj Kontrolu | **berieme** | NP-1, NP-2 |
 | C10 | FIX | porez a montáž dnes berú jeden súčet platní | **berieme** — montáž ostáva z odhadu (mockup O6) | NP-4 |
 | C11 | NOTE | zvýšenie verzie dát rozpočtu je správna cesta pre prepínač | **berieme** | NP-4 |
 | C12 | FIX | celé rozloženie v každom obnovení Štúdia zaťaží aj toho, kto sekciu neotvorí | **berieme** | NP-3 |
@@ -46,7 +46,7 @@
 
 | Dávka | Čo prinesie používateľovi | Audit návrhu |
 |---|---|---|
-| **NP-1 · jadro výpočtu** | nič viditeľné — výpočet rozloženia, počtu platní a jedna spoločná kontrola „zmestí sa" | áno (nový modul) |
+| **NP-1 · jadro výpočtu** | nič viditeľné — plugin vie spočítať rozloženie a počet platní | áno (nový modul) |
 | **NP-2 · nastavenia + Kontrola** | prerez, orez a prídavok dupláku v Nastaveniach rozpočtu; Kontrola „nezmestí sa" počíta s orezom | áno (verzia súboru nastavení) |
 | **NP-3 · sekcia Nárezový plán** | Štúdio ukáže plán podľa mockupu; Rozpočet a XLSX dostanú poznámku „plán: N platní" (ceny sa nemenia) | nie (UI) |
 | **NP-4 · ceny podľa plánu** | prepínač „ceny podľa plánu" v Rozpočte | áno (verzia dát rozpočtu) |
