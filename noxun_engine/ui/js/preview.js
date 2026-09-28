@@ -54,6 +54,15 @@
   // Kontrola. PASMO PRIPUSTNEJ HRANY ciel je jantarovy prizvuk vlavo od boxu
   // (mockup R12) a sirku gutteru potrebuje aj scena, inak ho fit oreze.
   var PV_APPL_GUTTER = 22;
+  // ROH-B2 (mockup C): ROHOVA ZOSTAVA. Dielce korpusu (blenda, rohova vystuha)
+  // maju tie iste farby ako dielce v `drawCarcass`, CR listy farbu ciel;
+  // NEZMESTENA zostava sa kresli cervenou chybneho pola (zrkadlo tokenov
+  // --nx-danger-line / --nx-err-bg). Slepa cast = blenda TLMENA a SRAFOVANA.
+  var PV_PART_FILL = '#e5d8b8', PV_PART_STROKE = '#c9b784';
+  var PV_DANGER = '#e53935';        // --nx-danger-line
+  var PV_DANGER_BG = '#fdecea';     // --nx-err-bg
+  // Koty rohovej: dverova cast a CR 1 tesne pod skrinkou, sirka pod nimi.
+  var PV_CORNER_DIM_Z = -26, PV_CORNER_WIDTH_Z = -62;
   var dragState = null;
   // ===== D-08 / UI-B1: kontext prepina nahlad AJ viditelne skupiny (CSS cez
   // data-view-ctx na <body>). Rezimove taby v hlavicke nahradil RAIL — stavovy
@@ -406,6 +415,72 @@
   function pvApplianceRefs(){
     if (previewMode !== 'cab') return [];
     return (typeof applPreview !== 'undefined' && applPreview) ? applPreview : [];
+  }
+
+  // ===== ROH-B2 (mockup C): KRESBA ROHOVEJ ZOSTAVY ==========================
+  // Geometriu posiela SERVER (`cornerPreview` v core.js — payload oznacenej
+  // rohovej a kazda odpoved preflightu so zivymi polami); panel NIC nepocita,
+  // len kresli obdlzniky a koty. Iny typ = null, teda jeho kresba sa nemeni.
+  function pvCornerPreview(){
+    if (typeof getType !== 'function' || getType() !== 'corner_blind') return null;
+    var cp = (typeof cornerPreview !== 'undefined') ? cornerPreview : null;
+    return (cp && typeof cp === 'object' && Array.isArray(cp.parts)) ? cp : null;
+  }
+  // Ciste (Node testy): odhad navrhu + dielce zostavy (pocet a plocha zo
+  // servera, `stats`). Bez kresby = odhad bez zmeny.
+  function nxCornerStatsAdd(st, cp){
+    var s = st || { count: 0, area: 0 };
+    var x = (cp && cp.stats && typeof cp.stats === 'object') ? cp.stats : null;
+    if (!x) return s;
+    return { count: nxNumOr(s.count, 0) + nxNumOr(x.count, 0),
+             area: Math.round((nxNumOr(s.area, 0) + nxNumOr(x.area, 0)) * 1000) / 1000 };
+  }
+  // Ciste (Node testy): dielce zostavy do SVG v PORADI servera (blenda vzadu,
+  // potom vystuha a CR listy). `mute` = kontext, ktoreho zakladom su cela alebo
+  // kovanie — dielce KORPUSU (blenda, vystuha) su tlmene. Nezmestena zostava
+  // (`fits === false`) ma vystuhu a CR listy cervene — vidno, kde nesedi.
+  // Kazdy dielec nesie bublinu servera (`<title>`); klik nikam nevedie.
+  function drawCornerAssembly(S, rx, ry, cp, mute){
+    if (!cp || !Array.isArray(cp.parts) || !cp.parts.length) return;
+    var bad = cp.fits === false;
+    S.push('<defs><pattern id="pvCornerHatch" width="24" height="24" patternUnits="userSpaceOnUse"' +
+           ' patternTransform="rotate(45)"><path d="M0 0V24" stroke="' + PV_PART_STROKE +
+           '" stroke-width="3" opacity=".6"/></pattern></defs>');
+    cp.parts.forEach(function(p){
+      if (!p) return;
+      var x0 = nxNumOr(p.x0, NaN), x1 = nxNumOr(p.x1, NaN), z0 = nxNumOr(p.z0, NaN), z1 = nxNumOr(p.z1, NaN);
+      if (isNaN(x0) || isNaN(x1) || isNaN(z0) || isNaN(z1) || !(x1 > x0) || !(z1 > z0)) return;
+      var at = 'x="' + rx(x0) + '" y="' + ry(z1) + '" width="' + (x1 - x0) + '" height="' + (z1 - z0) + '"';
+      var body, korpus = false;
+      if (p.role === 'corner_blind_panel'){
+        korpus = true;
+        body = '<rect ' + at + ' fill="' + PV_PART_FILL + '" fill-opacity=".35" stroke="' + PV_PART_STROKE + '"/>' +
+               '<rect ' + at + ' fill="url(#pvCornerHatch)" stroke="none"/>';
+      } else if (p.role === 'corner_rail'){
+        korpus = true;
+        body = '<rect ' + at + ' fill="' + (bad ? PV_DANGER_BG : PV_PART_FILL) + '" stroke="' +
+               (bad ? PV_DANGER : PV_PART_STROKE) + '"' + (bad ? ' stroke-width="2"' : '') + '/>';
+      } else if (p.role === 'cr_front'){
+        body = '<rect ' + at + ' fill="' + PV_FRONT_DOOR + '" stroke="' + (bad ? PV_DANGER : PV_FRONT_STROKE) +
+               '" stroke-width="' + (bad ? 2 : 1.5) + '"/>';
+      } else {
+        body = '<rect ' + at + ' fill="' + PV_FRONT_STROKE + '" stroke="' + (bad ? PV_DANGER : PV_FRONT_STROKE) + '"' +
+               (bad ? ' stroke-width="2"' : '') + '/>';
+      }
+      S.push('<g class="pvcorner" data-role="' + esc(p.role || '') + '"' +
+             ((mute && korpus) ? ' opacity=".55"' : '') + '><title>' + esc(p.title || '') + '</title>' +
+             body + '</g>');
+    });
+  }
+  // Koty dverovej casti a CR 1 (rozsahy zo servera, zrkadlene pri dverach
+  // vpravo) tesne pod skrinkou — sirka skrinky ide o riadok nizsie.
+  function drawCornerDims(S, rx, ry, cp){
+    ((cp && cp.dims) || []).forEach(function(d){
+      if (!d) return;
+      var x0 = nxNumOr(d.x0, NaN), x1 = nxNumOr(d.x1, NaN);
+      if (isNaN(x0) || isNaN(x1) || !(x1 > x0)) return;
+      pvDimH(S, rx, ry, x0, x1, PV_CORNER_DIM_Z, String(d.label == null ? '' : d.label), 18);
+    });
   }
 
   // S1-E: výška sokla KORPUSU. Horná skrinka ju nemá a slot umývačky tiež nie
@@ -819,14 +894,19 @@
       drawCarcass(S, rx, ry, g, (previewMode === 'cab' || previewMode === 'insert') ? pvDepthSkew() : 0);
     }
 
+    // ROH-B2 (mockup C): rohova zostava zo servera — len pri rohovej, inak null
+    // a kazda vetva nizsie kresli presne to, co doteraz.
+    var corner = pvCornerPreview();
     if (previewMode==='zones'){
       drawZonesBase(S, rx, ry, g);
     } else if (previewMode === 'fronts'){
       // cela pohlad + koty vysok a medzier
+      if (corner) drawCornerAssembly(S, rx, ry, corner, true);
       renderFrontsPreview(S, rx, ry, g);
       drawFrontDims(S, rx, ry, g);
     } else if (previewMode === 'hw'){
       // UI-B2: kontext Kovanie ma vlastnu projekciu — pozicie kovania
+      if (corner) drawCornerAssembly(S, rx, ry, corner, true);
       drawHwBase(S, rx, ry, g);
     } else if (previewMode === 'insert' && slot){
       // S1-E: vkladany slot kresli TEN ISTY detail ako oznaceny slot —
@@ -836,6 +916,9 @@
       // UI-C1b (N9): sablona TAK, AKO BUDE VLOZENA. Cela su PREPINATELNA vrstva
       // (chip Čelá je defaultne zapnuty) — po zhasnuti vidno vnutro sablony.
       if (NXLayers.stateOf('insert', 'cela', pvAvail()) === 'on'){
+        // ROH-B2: rohova sa vklada aj so zostavou (mockup A6) — zhasnute cela
+        // odkryvaju vnutro, preto vtedy zostava (blenda pred vnutrom) nie.
+        if (corner) drawCornerAssembly(S, rx, ry, corner, false);
         renderFrontsPreview(S, rx, ry, g);
       } else if (NXLayers.stateOf('insert', 'zony', pvAvail()) !== 'on'){
         // Codex #175 P2: zhasnute cela ODKRYVAJU vnutro — zony sa vtedy kreslia
@@ -844,13 +927,23 @@
         // Je to ten isty vzor ako v projekcii Kovanie (drawHwBase).
         drawZonesGhost(S, rx, ry, g);
       }
-      renderCabOutline(S, rx, ry, W, H, g.fh);
+      renderCabOutline(S, rx, ry, W, H, g.fh, corner);
     } else if (slot){
       // S1-E: kontext Korpus nad slotom — celo, pasmo výplne a koty.
       drawSlotDetail(S, rx, ry, g, slot);
     } else {
+      // ROH-B2 (O12, mockup B2): Korpus rohovej kresli aj DVERE a ZOSTAVU —
+      // inak by koty dverovej casti a CR 1 viseli nad prazdnom (vzor slotu,
+      // ktory v Korpuse kresli svoje celo). Dvere su tu len kresba (klik na
+      // celo patri kontextu Čelá), preto bez interakcie.
+      if (corner){
+        drawCornerAssembly(S, rx, ry, corner, false);
+        S.push('<g pointer-events="none">');
+        renderFrontsPreview(S, rx, ry, g);
+        S.push('</g>');
+      }
       // D-08: kontext Korpus — kotovany celny rez (Š/V/sokel + naznak hlbky)
-      renderCabOutline(S, rx, ry, W, H, g.fh);
+      renderCabOutline(S, rx, ry, W, H, g.fh, corner);
     }
     // S1-F: kontrolna geometria chladnicky NAD podkladom korpusu (kontext
     // Korpus) — je to referencia, nie dielec, takze sa kresli ako posledna
@@ -1048,9 +1141,13 @@
   // sokel a telo vlavo, hlbka kotou na naznaku skosenia (nie textom v strede).
   // Obrys, dielce aj skosenie kresli spolocna drawCarcass; VSETKY hodnoty su
   // z payloadu/formulara — ziadne konstanty.
-  function renderCabOutline(S, rx, ry, W, H, fh){
+  // ROH-B2: `corner` (kresba rohovej zo servera) prida koty dverovej casti
+  // a CR 1 tesne pod skrinku (mockup C: 450 / 80) a sirku posunie o riadok
+  // nizsie; bez nej je kresba presne dnesna.
+  function renderCabOutline(S, rx, ry, W, H, fh, corner){
     var D = numv('depth') || 0, sk = pvDepthSkew();
-    pvDimH(S, rx, ry, 0, W, -26, 'Š ' + Math.round(W) + ' mm', 22);
+    if (corner) drawCornerDims(S, rx, ry, corner);
+    pvDimH(S, rx, ry, 0, W, corner ? PV_CORNER_WIDTH_Z : -26, 'Š ' + Math.round(W) + ' mm', 22);
     pvDimV(S, rx, ry, W + 26, 0, H, 'V ' + Math.round(H), 22);
     // D-11: vlavo koty sokla (0..fh) a tela (fh..H) — len ked sokel existuje
     if (fh > 0){
@@ -1886,6 +1983,9 @@
                        // ROH-A2 (tests/js/test_roha2_vkladanie.js): celny otvor
                        // rohovej, strana pantov znacky zavesu a geometria nahladu.
                        nxFrontOpeningFor: nxFrontOpeningFor, nxHingeSide: nxHingeSide,
-                       pvGeom: pvGeom, hwMarkSvg: hwMarkSvg, pvHingeSlots: pvHingeSlots };
+                       pvGeom: pvGeom, hwMarkSvg: hwMarkSvg, pvHingeSlots: pvHingeSlots,
+                       // ROH-B2 (tests/js/test_rohb2_nahlad.js): kresba rohovej zostavy.
+                       pvCornerPreview: pvCornerPreview, nxCornerStatsAdd: nxCornerStatsAdd,
+                       drawCornerAssembly: drawCornerAssembly, drawCornerDims: drawCornerDims };
   }
 

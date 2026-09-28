@@ -41,6 +41,12 @@
   // navrhu prazdne), ale znacky zavesov v projekcii Kovanie patria ULOZENEMU
   // kovaniu (`hwItems`) — kreslia sa preto z tychto slotov. null = nic oznacene.
   var frontSlotsSaved = null;
+  // ROH-B2 (mockup C): KRESBA ROHOVEJ ZOSTAVY zo SERVERA — `{ side, fits, need,
+  // door_w, parts[], dims[], stats }` (`Panel.corner_preview_json`). Plni ju
+  // payload oznacenej rohovej (`corner_preview`, ulozeny stav) a kazda odpoved
+  // preflightu (zive polia). Panel z nej NIC nepocita — kresli obdlzniky,
+  // koty a riadok „Šírka dverí". null = nie je rohova alebo este nie je znama.
+  var cornerPreview = null;
   // KOV-C2c: `front_drawer` z Ruby — mapa front_id -> zaznam riadku zasuvky
   // ({ state, text, detail[], sync, message, locked_note }). SERVER je jedina
   // autorita: panel z klasifikacie ani z kovania NIC neodvodzuje a text si
@@ -199,6 +205,34 @@
     { value: FRONT_DIR_RIGHT, label: 'Pravé', icon: 'dir-right',
       title: 'Pánty vpravo — krídlo sa otvára doľava' }
   ];
+  // ROH-B2 (O10): PANTY ROHOVEJ SLOVAMI. Data ostavaju `left`/`right` (guard O1
+  // bez zmeny) — meni sa LEN POPIS podla STRANY DVERI. Nie je to heuristika
+  // smeru (predvolbu R7 dosadza vyhradne server v `corner_fronts!`), len
+  // geometria rohovej: roh (CR lista) lezi vzdy OPROTI dverovej casti, takze
+  // pri dverach vlavo su panty „pri rohu" vpravo a naopak. Iny smer (unset,
+  // legacy) = null — slovo sa nevymysla.
+  var FRONT_CORNER_HINGE_AT_CORNER = { left: FRONT_DIR_RIGHT, right: FRONT_DIR_LEFT };
+  function frontCornerHingeWord(side, dir){
+    var atCorner = FRONT_CORNER_HINGE_AT_CORNER[side === 'right' ? 'right' : 'left'];
+    if (dir === atCorner) return 'pri rohu';
+    if (dir === FRONT_DIR_LEFT || dir === FRONT_DIR_RIGHT) return 'pri boku';
+    return null;
+  }
+  // Volby smeru pri ROHOVEJ: tie iste hodnoty a ikony (ikona ukazuje skutocnu
+  // stranu), popisky „Pri boku / Pri rohu" podla strany dveri.
+  function frontCornerDirOptions(side){
+    return FRONT_DIR_OPTIONS.map(function(o){
+      var w = frontCornerHingeWord(side, o.value);
+      if (!w) return o;
+      var roh = (w === 'pri rohu');
+      var edge = (o.value === FRONT_DIR_LEFT) ? 'vľavo' : 'vpravo';
+      return { value: o.value, label: roh ? 'Pri rohu' : 'Pri boku', icon: o.icon,
+               title: roh ? 'Pánty pri rohu (' + edge + ') — na výstuhe závesov pri CR lište'
+                          : 'Pánty pri boku (' + edge + ') — na boku skrinky; dvere sa otvárajú smerom k rohu' };
+    });
+  }
+  // Dovod zamknutej dlazdice typu pri rohovej (bublina, O10).
+  var FRONT_CORNER_LOCK_TIP = 'rohová skrinka má v dverovej časti jedny dvierka';
   var FRONT_OPENING_OPTIONS = [
     { value: 'classic', label: 'Klasické' },
     { value: 'tipon', label: 'Tip-On' }
@@ -456,7 +490,9 @@
   }
   // `drawer` = ZAZNAM SERVERA `front_drawer[fid]` (volitelny) — vstupuje LEN
   // do predikatu „bez klasifikácie", aby bol ZHODNY s `frontCardModel`.
-  function frontRowSummary(item, entry, hw, reg, drawer){
+  // ROH-B2 (O10): `corner` = strana dveri rohovej — smer sa povie slovami
+  // „pánty pri rohu / pri boku" (mockup Č1), inak „ľavé / pravé" ako doteraz.
+  function frontRowSummary(item, entry, hw, reg, drawer, corner){
     var it = item || {};
     var type = it.type || 'door';
     var parts = [];
@@ -477,7 +513,9 @@
       if (n == null) parts.push({ text: 'auto' });
       else parts.push({ text: (n === 1 ? '1 krídlo' : n + ' krídla') +
                               ((it.wings == null || it.wings === '' || it.wings === 'auto') ? ' (auto)' : '') });
+      var cw = corner ? frontCornerHingeWord(corner, it.direction) : null;
       if (frontSumDirUnset(it, entry)) parts.push({ badge: 'smer?' });
+      else if (n === 1 && cw) parts.push({ text: 'pánty ' + cw });
       else if (n === 1 && FRONT_SUM_DIR[it.direction])
         parts.push({ text: FRONT_SUM_DIR[it.direction] });
       // Dvojkridlo o smere MLCI — je odvodeny z geometrie (vzor karty).
@@ -575,7 +613,15 @@
     var type = it.type || 'door';
     var known = FRONT_CARD_TYPES.indexOf(type) >= 0;
     var slot = !!(opts && opts.slot);
-    var tiles = slot ? [] : FRONT_CARD_TYPES.map(function(t){ return { type: t, on: t === type }; });
+    // ROH-B2 (O10): `opts.corner` = STRANA DVERI rohovej ('left'|'right').
+    // Typ aj pocet kridiel su dane (R6 — server iny odmietne), preto su ostatne
+    // dlazdice a krídla ZAMKNUTE s dovodom (vzor D-78), panty maju slova.
+    var corner = (opts && (opts.corner === 'left' || opts.corner === 'right')) ? opts.corner : null;
+    var tiles = slot ? [] : FRONT_CARD_TYPES.map(function(t){
+      var tile = { type: t, on: t === type };
+      if (corner && t !== 'door') tile.lock = true;
+      return tile;
+    });
     var tabs = frontCardTabs(type, type === 'door' && frontSumDirUnset(it, entry));
     var rows = [], hwRows = [];
     if (slot && type === 'blind'){
@@ -601,7 +647,17 @@
     // D-130a R5: POCET KRIDIEL sa presunul z riadku do karty (`select.fw`
     // v riadku zanikol — rozbijal mriezku a pri nedvierkach stal prazdny).
     // Hodnota zije v `dataset.frontWings` a `collectFronts` ju cita odtial.
-    if (type === 'door'){
+    if (type === 'door' && corner){
+      rows.push({ kind: 'seg', key: 'wings', label: 'Krídla',
+                  options: FRONT_WINGS_OPTIONS.filter(function(o){ return o.value !== 'auto'; })
+                    .map(function(o){
+                      return o.value === '1' ? o : { value: o.value, label: o.label, disabled: true,
+                                                      title: 'Rohová má v dverovej časti jedno krídlo' };
+                    }),
+                  active: '1',
+                  tip: 'Rohová skrinka má v dverovej časti jedny dvierka s jedným krídlom — ' +
+                       'typ čela ani počet krídel sa nemení.' });
+    } else if (type === 'door'){
       rows.push({ kind: 'seg', key: 'wings', label: 'Krídla',
                   options: FRONT_WINGS_OPTIONS,
                   active: it.wings == null || it.wings === '' ? 'auto' : String(it.wings),
@@ -617,7 +673,12 @@
           var wing = (s && s.wing) ? s.wing : '';
           var dirTip = 'Strana pántov. „Neurčené" je otvorená otázka — Kontrola ' +
                        'ju hlási ako červený nález a výroba ju potrebuje.';
-          if (wing === 'single'){
+          if (wing === 'single' && corner){
+            rows.push({ kind: 'seg', key: 'direction', wing: wing, label: 'Pánty',
+                        options: frontCornerDirOptions(corner), active: frontDirValue(it, wing),
+                        tip: 'Pri rohu = pánty na výstuhe závesov pri CR lište (predvolené), pri boku = ' +
+                             'na boku skrinky. Platí aj po prepnutí strany dverí. ' + dirTip });
+          } else if (wing === 'single'){
             rows.push({ kind: 'seg', key: 'direction', wing: wing, label: 'Smer',
                         options: FRONT_DIR_OPTIONS, active: frontDirValue(it, wing),
                         tip: dirTip });
@@ -1891,6 +1952,9 @@
       // veta odmietnutia a zrkadlo navrhu ciel vo vkladacej karte.
       nxCornerMinWidth: nxCornerMinWidth, nxCornerFitError: nxCornerFitError,
       nxCornerMirrorFronts: nxCornerMirrorFronts,
+      // ROH-B2 (tests/js/test_rohb2_nahlad.js) — panty rohovej slovami (karta
+      // ciel a suhrn riadku, O10).
+      frontCornerHingeWord: frontCornerHingeWord, frontCornerDirOptions: frontCornerDirOptions,
       // KON-B · K2 (tests/js/test_konb_listy.js) — chrbat z list.
       nxBackRails: nxBackRails, nxBackRailHeight: nxBackRailHeight, nxBackRailsError: nxBackRailsError,
       NX_MIN_INTERIOR_H: NX_MIN_INTERIOR_H,

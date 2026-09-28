@@ -183,7 +183,8 @@ NxTest.test('D-130a R5: `collectFronts` cita kridla z DATASETU (select v riadku 
 end
 
 NxTest.test('D-130a R3: suhrn riadku je CISTA funkcia v core.js a je exportovana') do
-  NxTest.assert(D130A_CORE.include?('function frontRowSummary(item, entry, hw, reg, drawer)'),
+  # ROH-B2 (O10): + volitelna strana dveri rohovej (panty „pri rohu / pri boku").
+  NxTest.assert(D130A_CORE.include?('function frontRowSummary(item, entry, hw, reg, drawer, corner)'),
                 'suhrn sklada `frontRowSummary` (testovatelna bez DOM)')
   NxTest.assert(D130A_CORE.include?('frontRowSummary: frontRowSummary'),
                 'a je exportovana pre Node sady')

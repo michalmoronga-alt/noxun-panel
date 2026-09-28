@@ -90,6 +90,12 @@ module Noxun
           # (`D + c1 + th2 + 2t`, zrkadlo `Construction.min_valid_width`).
           # Len pri rohovej; ine typy kluc nedostanu (parita payloadu).
           params['corner_th2'] = corner_th2_payload(entity_model(cab), params) if Construction.corner?(cfg)
+          # ROH-B2 (mockup C): KRESBA ROHOVEJ ZOSTAVY ulozeneho stavu (blenda,
+          # CR 1, CR 2, rohova vystuha, koty, sirka dveri). Geometriu pocita
+          # `Construction.corner_parts` — panel ju len kresli, kym nepride
+          # preflight so zivymi polami (`corner_preview` v odpovedi). Len pri
+          # rohovej; ine typy kluc nedostanu (parita payloadu).
+          params['corner_preview'] = corner_preview_stored(entity_model(cab), cfg) if Construction.corner?(cfg)
           # KOV-D2a: STAV KAZDEJ OSI zamku (vyska, vyska boxu, NL) — server
           # pocita, JS len kresli (chipy su D2b). Mapa sa stavia RAZ a vesia sa
           # na TRI miesta: emitovanu polozku vysuvu, osiroteny riadok zasahu
@@ -936,6 +942,104 @@ module Noxun
         rescue StandardError => e
           Engine.log_error(e, 'Panel.corner_th2_payload')
           Fronts::FRONT_THICKNESS
+        end
+
+        # === ROH-B2 · KRESBA ROHOVEJ ZOSTAVY (mockup C) =======================
+        #
+        # Celny pohlad na rohovu zostavu pre nahlad panela. GEOMETRIU dielcov
+        # pocita JEDINA autorita planu — `Construction.corner_parts` nad
+        # `CabinetBuilder.normalize` (ten isty vstup, z ktoreho stavia builder),
+        # takze kresba a model sa nemozu rozist. Panel z toho NIC nepocita, len
+        # kresli obdlzniky a koty (vzor `preview.appliances`, S1-F).
+        #   parts — v PORADI KRESLENIA (blenda je za CR listami a vystuhou):
+        #           `{ role, x0, x1, z0, z1, title }` v mm od laveho boku a od
+        #           podlahy. Vystuha zavesov je za dverami — v kresbe nie je.
+        #   dims  — koty dverovej casti a CR 1 (`{ x0, x1, label, title }`,
+        #           zrkadlene pri dverach vpravo).
+        #   fits  — zmesti sa zostava do sirky (`corner_fit_width`)? `need` =
+        #           najmensia sirka. Nezmestena zostava sa kresli cervenou.
+        #   door_w — sirka dveri (otvor − oba okraje; `Fronts.resolve_layout`,
+        #           nil pri neplatnom navrhu ciel) — riadok „Šírka dverí".
+        #   stats — `{ count, area }` VSETKYCH dielcov zostavy (aj vystuhy
+        #           zavesov) pre odhad „≈ Dielcov / ≈ Materiál" pri vkladani.
+        # Citacie, bez zapisu; chyba = nil (nahlad vtedy zostavu nekresli).
+        CORNER_PREVIEW_ROLES = %w[corner_blind_panel corner_rail cr_front cr_side].freeze
+
+        def corner_preview_json(params, part_thicknesses)
+          cfg = CabinetBuilder.normalize(params)
+          return nil unless Construction.corner?(cfg)
+
+          pt = part_thicknesses.is_a?(Hash) ? part_thicknesses : {}
+          list = Construction.corner_parts(cfg, Construction.interior_dims(cfg), pt)
+          by_role = list.to_h { |pd| [pd[:role], pd] }
+          w = cfg[:width].to_f
+          d = Construction.corner_door_w(cfg)
+          c1 = Construction.corner_cr1(cfg)
+          side = Construction.corner_side(cfg)
+          need = Construction.corner_fit_width(cfg, pt)
+          span = side == 'right' ? ->(a, b) { [w - b, w - a] } : ->(a, b) { [a, b] }
+          { 'side' => side, 'fits' => need <= w + 0.005, 'need' => need.round(2),
+            'door_w' => corner_preview_door_w(cfg),
+            'parts' => CORNER_PREVIEW_ROLES.filter_map { |role| corner_preview_part(by_role[role]) },
+            'dims' => [corner_preview_dim(span.call(0.0, d), d, 'Dverová časť — od vonkajšej plochy boku po os škáry medzi dverami a CR 1'),
+                       corner_preview_dim(span.call(d, d + c1), c1, 'CR 1 — do šírky: od hranice dverovej časti po líce CR 2')],
+            'stats' => corner_preview_stats(list) }
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.corner_preview_json')
+          nil
+        end
+
+        # Ulozeny stav oznacenej rohovej (payload skrinky) — ta ista retaz
+        # hrubok CR ako plan (`aux_part_thicknesses`).
+        def corner_preview_stored(model, cfg)
+          params = CabinetBuilder.config_to_params(cfg)
+          corner_preview_json(params, CabinetBuilder.aux_part_thicknesses(params, model))
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.corner_preview_stored')
+          nil
+        end
+
+        def corner_preview_part(pd)
+          return nil unless pd.is_a?(Hash)
+
+          x0 = pd[:origin][0].to_f
+          z0 = pd[:origin][2].to_f
+          { 'role' => pd[:role], 'x0' => x0.round(2), 'x1' => (x0 + pd[:box][0].to_f).round(2),
+            'z0' => z0.round(2), 'z1' => (z0 + pd[:box][2].to_f).round(2),
+            'title' => corner_preview_title(pd) }
+        end
+
+        # Bublina dielca v nahlade (rozmery z deskriptora planu, nie z JS).
+        def corner_preview_title(pd)
+          w = fmt_mm(pd[:prod][:width]); l = fmt_mm(pd[:prod][:length])
+          case pd[:role]
+          when 'corner_blind_panel' then "Slepá časť — blenda korpusová #{w} × #{l} (materiál korpusu)"
+          when 'corner_rail'
+            "Rohová výstuha — kolmo na čelo, trčí #{fmt_mm(pd[:box][1])} mm pred korpus; spredu len hrana #{fmt_mm(pd[:box][0])} mm"
+          when 'cr_front' then "CR 1 — lišta v rovine dverí #{w} × #{l} (materiál čiel)"
+          else "CR 2 — kolmá lišta #{fmt_mm(pd[:box][1])} mm do hĺbky; spredu len hrana #{fmt_mm(pd[:box][0])} mm (materiál čiel)"
+          end
+        end
+
+        def corner_preview_dim(span, value, title)
+          { 'x0' => span[0].round(2), 'x1' => span[1].round(2), 'label' => fmt_mm(value), 'title' => title }
+        end
+
+        # Sirka dveri = otvor − oba okraje: TA ISTA `Fronts.resolve_layout`, ktora
+        # dvere postavi (nie druhy vzorec). Neplatny navrh ciel = nil („—").
+        def corner_preview_door_w(cfg)
+          r = Fronts.resolve_layout(cfg[:fronts], cfg[:width].to_f, cfg[:height].to_f, cfg[:floor_height].to_f,
+                                    opening: Construction.front_opening(cfg))
+          v = r[:opening_w]
+          v.is_a?(Numeric) && v.to_f.positive? ? v.to_f.round(2) : nil
+        rescue StandardError
+          nil
+        end
+
+        # Pocet a plocha (m², 3 des. miesta) vsetkych dielcov zostavy.
+        def corner_preview_stats(list)
+          mm2 = list.sum { |pd| pd[:prod][:length].to_f * pd[:prod][:width].to_f }
+          { 'count' => list.length, 'area' => (mm2 / 1_000_000.0).round(3) }
         end
 
         # ROH-B1: predvolby VKLADANIA rohovej = `CORNER_DEFAULTS` + ucinna

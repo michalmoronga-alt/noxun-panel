@@ -435,7 +435,8 @@ end
 
 NxTest.test('ghost sev: handle_insert UZ NESTAVIA — pripravi plan a zavesi ghost') do
   src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_cabinet.rb'), encoding: 'UTF-8')
-  body = src[/def handle_insert\(payload\).*?\n        end\n/m].to_s
+  # ROH-B2: `keep_point:` = prevesenie ghostu klavesou strany dveri rohovej.
+  body = src[/def handle_insert\(payload(?:, keep_point: false)?\).*?\n        end\n/m].to_s
   NxTest.assert(!body.empty?, 'handle_insert sa nenasiel')
   NxTest.assert(!body.include?('CabinetBuilder.build('),
                 'handle_insert stavia priamo — skrinka ma vzniknut az klikom cez commit_insert')
@@ -647,7 +648,7 @@ end
 
 NxTest.test('ghost sev: poznamka preflightov ide do statusu PRAVE RAZ (po vlozeni)') do
   src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_cabinet.rb'), encoding: 'UTF-8')
-  ins = src[/def handle_insert\(payload\).*?\n        end\n/m].to_s
+  ins = src[/def handle_insert\(payload(?:, keep_point: false)?\).*?\n        end\n/m].to_s
   after = src[/def ghost_after_commit\(model, inst, session\).*?\n        end\n/m].to_s
   NxTest.assert(after.include?('session.note'), 'ghost_after_commit nevypisuje poznamku preflightov')
   # Status pri zaveseni ghostu poznamku UZ neopakuje — inak by ju pouzivatel

@@ -928,7 +928,10 @@
     // (kotva, otocenie, rezim vysky, locknuta vyska). `active = false` pasik
     // SCHOVA — chodi pri kazdom konci session (vlozenie, Esc, prepnutie
     // dokumentu, zavretie Inspectora). Panel si stav nedrzi ani nedopocitava.
-    setGhost: function(state){ if (typeof nxGhostApply === 'function') nxGhostApply(state); }
+    setGhost: function(state){ if (typeof nxGhostApply === 'function') nxGhostApply(state); },
+    // ROH-B2 (O12): klavesa D v nastroji ghostu rohovej — strana, ktoru ghost
+    // PRAVE nesie; prepnutie robi karta (`nxGhostCornerSide`, actions.js).
+    ghostCornerSide: function(side){ if (typeof nxGhostCornerSide === 'function') nxGhostCornerSide(side); }
   };
 
   // UI-B3: informacny stlpec Zakladnych. Texty sklada cista funkcia nxCabInfo

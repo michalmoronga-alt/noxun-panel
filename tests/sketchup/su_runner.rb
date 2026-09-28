@@ -6866,6 +6866,158 @@ module NoxunSuRunner
     end]
   end
 
+  # === ROH-B2 · K3: KRESBA ROHOVEJ ZOSTAVY A KLAVESA STRANY DVERI ==========
+  # (a) kresba servera (`corner_preview` v payloade oznacenej rohovej) =
+  #     SKUTOCNA geometria modelu (obe strany: blenda, rohova vystuha, CR 1,
+  #     CR 2 ako obdlznik celneho pohladu) a „Šírka dverí" = sirka dveri v modeli;
+  # (b) preflight oznacenej rohovej so zivou sirkou a CR -> kresba zo zivych
+  #     poli, strana ulozena;
+  # (c) KLAVESA D pocas ghostu rohovej: nastroj len ohlasi stranu panelu
+  #     (`NX.ghostCornerSide`), karta posle zrkadleny navrh (`ghost_corner_side`)
+  #     -> ghost sa prevesi (poloha ostava, pasik „dvere vpravo", 0 zapisov),
+  #     klik = PRAVA rohova so zrkadlenymi celami, plan = model, 1 krok Spat;
+  # (d) D pri dolnej skrinke nie je nasa (ide SketchUpu); D nema v SketchUpe
+  #     tohto PC ziadnu skratku (skutocne `Sketchup.get_shortcuts`).
+  ROHB2_KEYS = { 'corner_blind_panel' => 'cabinet/corner_panel', 'corner_rail' => 'cabinet/corner_rail',
+                 'cr_front' => 'cabinet/cr:1', 'cr_side' => 'cabinet/cr:2' }.freeze
+
+  # Obdlznik dielca v celnom pohlade (X a Z v suradniciach skrinky, mm).
+  def rohb2_part_rect(inst, key)
+    part = kona_part(inst, key)
+    return nil unless part
+
+    b = part.bounds
+    [mm(b.min.x), mm(b.max.x), mm(b.min.z), mm(b.max.z)]
+  end
+
+  def rohb2_preview_bad(inst, cp)
+    return ['bez kresby'] unless cp.is_a?(Hash) && cp['parts'].is_a?(Array) && cp['parts'].length == 4
+
+    cp['parts'].filter_map do |p|
+      got = rohb2_part_rect(inst, ROHB2_KEYS[p['role']])
+      want = p.values_at('x0', 'x1', 'z0', 'z1')
+      next nil if got && got.zip(want).all? { |a, b| (a - b.to_f).abs <= TOL }
+
+      "#{p['role']}: model #{got && got.map { |v| v.round(1) }.inspect} vs kresba #{want.inspect}"
+    end
+  end
+
+  def rohb2_payload(side)
+    left = side == 'left'
+    p = roha2_insert_payload('corner_side' => side)
+    # Karta po zrkadle (`nxCornerMirrorFronts`): vonkajsi okraj 0, pri rohu 2,
+    # panty pri rohu — pri pravej zrkadlovo.
+    p['fronts'] = p['fronts'].merge('gap_left' => left ? 0.0 : 2.0, 'gap_right' => left ? 2.0 : 0.0,
+                                    'items' => [p['fronts']['items'][0].merge('direction' => left ? 'right' : 'left')])
+    p
+  end
+
+  def run_rohb2(model)
+    cleanup(model)
+    # (a) KRESBA SERVERA = MODEL
+    %w[left right].each do |side|
+      cab = e::CabinetBuilder.build(model, roha1_params('corner_side' => side, 'material_id' => nil,
+                                                        'front_material_id' => nil))
+      next ok("ROH-B2 (a) #{side}: vlozenie rohovej", false) unless cab
+
+      pay = e::Panel.cabinet_payload(cab)
+      cp = pay['corner_preview']
+      bad = rohb2_preview_bad(cab, cp)
+      ok("ROH-B2 (a) #{side}: kresba servera = geometria modelu (blenda, vystuha, CR 1, CR 2) (#{bad.first(2).inspect})",
+         bad.empty? && cp['side'] == side && cp['fits'] == true)
+      door = rohb2_part_rect(cab, 'front:F1/wing:single')
+      ok("ROH-B2 (a) #{side}: „Šírka dverí\" #{cp && cp['door_w'].inspect} = dvere v modeli #{door && (door[1] - door[0]).round(1)}",
+         door && cp && (cp['door_w'].to_f - (door[1] - door[0])).abs <= TOL)
+      cleanup(model)
+    end
+    low = e::CabinetBuilder.build(model, roha1_params('type' => 'lower', 'width' => 600.0, 'material_id' => nil,
+                                                      'front_material_id' => nil))
+    ok('ROH-B2 (a): dolna skrinka kresbu rohovej v payloade nema', low && !e::Panel.cabinet_payload(low).key?('corner_preview'))
+    cleanup(model)
+
+    # (b) PREFLIGHT OZNACENEJ so zivymi polami
+    cab = e::CabinetBuilder.build(model, roha1_params('corner_side' => 'right', 'material_id' => nil,
+                                                      'front_material_id' => nil))
+    stored = e::Store.config(cab)
+    data = { 'type' => 'corner_blind', 'width' => 1200.0, 'height' => 862.0, 'floor_height' => 150.0,
+             'thickness' => 18.0, 'corner_side' => 'left', 'corner_door_w' => 500.0, 'corner_cr1' => 100.0,
+             'corner_cr2' => 80.0, 'cabinet_id' => e::Store.get(cab, 'cabinet_id').to_s,
+             'fronts' => ROHA1_FRONTS.merge('gap' => 3.0, 'items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'auto', 'wings' => '1' }]) }
+    ctx = e::Panel.corner_preflight_ctx(data, stored, model)
+    cp = e::Panel.corner_preflight_preview(data, stored, model, ctx)
+    ok("ROH-B2 (b): preflight — ziva sirka 1200, D 500, CR 1 100, strana ulozena vpravo (#{cp && cp['dims'].map { |d| d.values_at('x0', 'x1') }.inspect})",
+       cp && cp['side'] == 'right' && cp['dims'][0].values_at('x0', 'x1') == [700.0, 1200.0] &&
+       cp['dims'][1].values_at('x0', 'x1') == [600.0, 700.0] && cp['door_w'] == 496.0)
+    cleanup(model)
+
+    # (c) KLAVESA D POCAS GHOSTU ROHOVEJ
+    at = [300.0, 300.0]
+    e::Panel.handle_insert(pg(model, rohb2_payload('left')))
+    s0 = ghost_session
+    ok("ROH-B2 (c): ghost rohovej vlavo, pasik „dvere vľavo\" (#{s0 && e::GhostTool.state_payload(s0)['corner_label'].inspect})",
+       s0 && s0.corner? && e::GhostTool.state_payload(s0)['corner_label'] == 'dvere vľavo')
+    return ok('ROH-B2 (c): ghost rohovej', false) unless s0 && ghost_tool
+
+    ghost_camera!(model, at, 0.0)
+    ghost_move!(model, [at[0], at[1], 0.0])
+    p0 = s0.last_point
+    before = cabinets(model).length
+    rec = []
+    install_js_recorder(rec)
+    begin
+      handled = ghost_key!(model, e::GhostTool::CORNER_SIDE_KEY)
+    ensure
+      remove_js_recorder
+    end
+    ok("ROH-B2 (c): D = nastroj len ohlasi stranu panelu (#{rec.grep(/ghostCornerSide/).first.to_s[0, 60]})",
+       handled == true && rec.any? { |x| x.include?('NX.ghostCornerSide("left")') } &&
+       ghost_session.equal?(s0) && s0.corner_side == 'left')
+    e::Panel.handle_ghost_corner_side(pg(model, rohb2_payload('right')))
+    s1 = ghost_session
+    ok("ROH-B2 (c): ghost prevesený — vpravo, poloha ostala, stara session skoncila (#{s1 && [s1.corner_side, s1.last_point].inspect})",
+       s1 && !s1.equal?(s0) && s1.active? && s1.corner_side == 'right' && s1.last_point == p0 &&
+       s0.state == :cancelled && ghost_tool && ghost_tool.instance_variable_get(:@session).equal?(s1))
+    ok('ROH-B2 (c): pasik „dvere vpravo", v modeli sa nic nezapisalo',
+       e::GhostTool.state_payload(s1)['corner_label'] == 'dvere vpravo' && cabinets(model).length == before)
+    ghost_click!(model, [at[0], at[1], 0.0])
+    inst = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' }
+    it = inst ? (Array(kona_cfg(inst)['front_items']).first || {}) : {}
+    ok("ROH-B2 (c): klik = PRAVA rohova so zrkadlenymi celami (#{inst ? [roha1_fields(inst)[0], kona_cfg(inst)['fronts'].values_at('gap_left', 'gap_right'), it['direction']].inspect : 'ziadna'})",
+       inst && roha1_fields(inst)[0] == 'right' && kona_cfg(inst)['fronts'].values_at('gap_left', 'gap_right') == [2.0, 0.0] &&
+       it['direction'] == 'left' && roha1_sync_bad(model, inst).empty? && cabinets(model).length == before + 1)
+    ok('ROH-B2 (c): vlozena rohova je presne tam, kde ghost stal', inst && ghost_on_used?(ghost_origin_mm(inst)))
+    if inst
+      Sketchup.undo
+      ok('ROH-B2 (c): 1 krok Spat vrati vklad — prepnutie strany ziadny krok nepridalo',
+         !inst.valid? && cabinets(model).length == before)
+    end
+    ghost_teardown!(model)
+
+    # (d) DOLNA: D nie je nasa · D nema skratku
+    e::Panel.handle_insert(pg(model, roha2_insert_payload.merge('type' => 'lower', 'width' => 600.0)))
+    rec = []
+    install_js_recorder(rec)
+    begin
+      handled = ghost_session ? ghost_key!(model, e::GhostTool::CORNER_SIDE_KEY) : nil
+    ensure
+      remove_js_recorder
+    end
+    ok('ROH-B2 (d): pri dolnej D ide SketchUpu (nie je nasa, nic sa neohlasi)',
+       handled == false && rec.grep(/ghostCornerSide/).empty?)
+    ghost_teardown!(model)
+    sc = Sketchup.respond_to?(:get_shortcuts) ? Array(Sketchup.get_shortcuts) : nil
+    bound = Array(sc).select { |l| l.to_s.split("\t").first.to_s.strip.casecmp?('D') }
+    ok("ROH-B2 (d): klavesa D nema v SketchUpe tohto PC skratku (#{sc ? "#{sc.length} skratiek, D: #{bound.inspect}" : 'get_shortcuts nedostupne'})",
+       !sc.nil? && bound.empty?)
+  rescue StandardError => ex
+    log_line("FAIL: run_rohb2 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  ensure
+    remove_js_recorder
+    ghost_teardown!(model)
+    cleanup(model)
+    ok('ROH-B2: cleanup (0 korpusov)', cabinets(model).empty?)
+  end
+
   # --- S1-C: OCAKAVANY SPOTREBIC (`appliance_expects[]`) --------------------
   #
   # CO SA TU OVERUJE A MIMO SKETCHUPU OVERIT NEDA:
@@ -27629,6 +27781,7 @@ module NoxunSuRunner
     run_kond(model)          # KON-D: VSTAVANA SABLONA „Chladničková" — seed v cerstvej kniznici STD 7 so schemou 21, vklad ghostom = plan <-> model 1:1, dno a strop 510, boky 560, bez chrbta, 2 fyzicke dvierka 719 + 1274 so smerom „neurceny" (Kontrola 2 nalezy), ocakava chladnicku (ORANGE), nika 560, 1 krok Spat vrati vklad
     run_roha1(model)         # ROH-A1 · K3: ROHOVA SKRINKA — plan = model pre 10 kombinacii (strana x W/D/CR/gC/celovy 19/CR 2 16 pri W 582), prestavba drzi polia (1 Spat), odmietnutia panela (cela, typ, strana, zony) = 0 krokov, sablona uloz -> vloz ghostom (1 Spat) / ina strana odmietnuta / rovnaka prejde, tri kopie, scale sirky (rast slepej casti obe strany, klamp 584 + veta), ulozenie .skp, kusovnik/VEPO/kovanie z modelu
     run_rohb1(model)         # ROH-B1 · K3: PREPINAC STRANY cez akciu panela — rucne hrany na dverach/CR 1/blende (L1 <-> L2) a vystuhach/CR 2 (bez zmeny), plocha pasky X' = W − X, panty pri rohu, okraje prehodene, plan = model, 1 Spat = presne povodny config, spat = povodne; odmietnutia 0 krokov + odpoved v kazdej vetve; vklad pravej z karty (1 Spat); corner_th2 v payloade
+    run_rohb2(model)         # ROH-B2 · K3: KRESBA ROHOVEJ = MODEL (obe strany, sirka dveri), preflight zo zivych poli; KLAVESA D pocas ghostu: ohlasi stranu panelu, prevesenie (poloha ostava, 0 zapisov), klik = prava rohova so zrkadlenymi celami, 1 Spat; dolna D nevlastni; D bez skratky v SketchUpe
     run_roha2(model)         # ROH-A2 · K3: VKLADANIE ROHOVEJ cez cestu panela — preflight karty (otvor 0/450) -> ghost -> klik = CORNER_DEFAULTS, R7 panty pri rohu, plan = model, 1 Spat; sablona PRAVEJ strany (otvor 600/500, vpravo/500, 1 Spat); preflight oznacenej so zivou sirkou 1200 (x0 750), payload otvoru, dolna cela sirka
     run_d140(model)          # D-140: VYSKA OSADENIA CHLADNICKY — akcia panela zdvihne box niky (z 118 -> 268) a Kontrola vysky/delenia pocita od zdvihnuteho dna, 1x Spat, odmietnutia (stara hodnota, zly vstup, cudzie echo/PID/dokument, nezmenena) bez kroku Spat, prestavba dvierok osadenie zachova, zapis z otvoreneho komponentu zatvori kontext, vymena modelu prenesie, presun na inu skrinku nie, kopia ho nema, 0 kluc zmaze
     run_s1c(model)           # S1-C: OCAKAVANY SPOTREBIC — cely cyklus sablony (uloz s ocakavaniami -> vloz ghostom -> config -> Kontrola 2x ORANGE -> priradenie -> OK -> 2x Spat), ocakavanie BEZ sablony v riadku Spotrebic (1x Spat, geometria netknuta, peciatka schemy, nezmenene = ziadny krok, cudzie echo/PID nezapisu nic, viazanu kategoriu zrusit nedas), bariera observera po nativnej kopii, slot bez modelu (ORANGE + podvrh odmietnuty), aplikovanie sablony na viazanu skrinku (vazba ostava, ocakavania unia)

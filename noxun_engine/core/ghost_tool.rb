@@ -59,6 +59,17 @@ module Noxun
       LOCK_Z_MIN_MM = 0.0
       LOCK_Z_MAX_MM = 3000.0
 
+      # ROH-B2 (O12): klavesa STRANY DVERI pocas ghostu ROHOVEJ — „D" (dvere).
+      # Virtualny kod klavesy pismena na Windows = ASCII velkeho pismena.
+      # Preco D: ←/→ (rotacia), ↑/↓ (vyska), Alt (kotvy), Esc a Shift (kreslenie
+      # dosky) su obsadene, TAB je zapisany fallback kotiev; D nema v SketchUpe
+      # predvolenu skratku (in-SU sada to overi nad skutocnymi skratkami
+      # `Sketchup.get_shortcuts`) a klavesu vlastnime LEN pri rohovej — pri inej
+      # skrinke ide D dalej SketchUpu nedotknuta. Meracie pole (VCB) je pri
+      # umiestnovani vypnute, takze pismeno do neho nevtecie.
+      CORNER_SIDE_KEY = 'D'.ord
+      CORNER_SIDE_LABELS = { 'left' => 'dvere vľavo', 'right' => 'dvere vpravo' }.freeze
+
       # Farby ghostu (GL). Zamerne NIE `EdgeCheck::COLORS` (tri stavy olepu) —
       # ghost hovori o polohe, nie o vyrobe. Obrys = neutralna tmava
       # (`--nx-ink-strong`), kotva = rodina vyberu `--nx-select`.
@@ -121,9 +132,15 @@ module Noxun
         # aktivuje Tool. Stara session sa rusi PRED vznikom novej.
         # `push_tool` (NIE `select_tool`) — po vlozeni sa pouzivatel vrati
         # k nastroju, ktory mal predtym.
+        # ROH-B2 (O12): `keep_point: true` = PREVESENIE ghostu na novy plan
+        # (klavesa strany dveri rohovej) — nova session prevezme POLOHU starej
+        # (bod pod kurzorom a polozitelnost), aby ghost nezmizol, kym sa mys
+        # nepohne. Len skrinka pri umiestnovani v tom istom dokumente; inak sa
+        # spravanie nemeni (druhe „Vlozit" z panela polohu nededi).
         def start(model, plan, hardware: nil, template_ref: nil, note: nil,
                   subject: :cabinet, interaction: DEFAULT_INTERACTION, orientation: nil,
-                  locks: nil)
+                  locks: nil, keep_point: false)
+          carry = keep_point ? carried_point(@session, model) : nil
           # Stara session KONCI PRED vznikom novej a jej nastroj sa popne
           # SYNCHRONNE — inak by nam odlozeny `pop_tool` zhodil prave
           # pushnuty novy nastroj (dva ghosty na stacku).
@@ -132,6 +149,7 @@ module Noxun
                                    template_ref: template_ref, note: note,
                                    subject: subject, interaction: interaction,
                                    orientation: orientation, locks: locks)
+          s.set_point(carry[0], carry[1]) if carry && s.cabinet? && s.placement?
           @session = s
           model.tools.push_tool(Tool.new)
           # CEF si po navrate z HtmlDialog callbacku vezme fokus spat — bez
@@ -148,6 +166,31 @@ module Noxun
           # nech je co popnut aj pri chybe uprostred nej.
           end_tool(deferred: false)
           nil
+        end
+
+        # ROH-B2: poloha ZIVEJ skrinkovej session v tom istom dokumente
+        # `[bod_mm, polozitelna]`, alebo nil (niet co prevziat).
+        def carried_point(prev, model)
+          return nil unless prev && prev.active? && prev.cabinet? && prev.placement?
+          return nil unless prev.model.equal?(model) && prev.last_point
+
+          [prev.last_point, prev.placeable]
+        end
+
+        # ROH-B2 (O12): klavesa STRANY DVERI — nastroj ju len OHLASI panelu.
+        # Stranu prepina vkladacia karta TOU ISTOU funkciou ako prepinac
+        # v riadku rohovej (register + zrkadlo navrhu ciel) a ghost prevesi
+        # na novy plan (`Panel.handle_ghost_corner_side`). Nastroj si ziadnu
+        # vlastnu kopiu zrkadla nedrzi. -> true = ohlasene.
+        def request_corner_side(s)
+          return false unless s && s.active? && s.cabinet? && s.placement? && s.corner?
+          return false unless defined?(Panel) && Panel.respond_to?(:ghost_corner_side_key)
+
+          Panel.ghost_corner_side_key(s.corner_side)
+          true
+        rescue StandardError => e
+          Engine.log_error(e, 'GhostTool.request_corner_side')
+          false
         end
 
         # Zrusi beziacu session (idempotentne). Vracia true, ak sa naozaj nieco
@@ -219,6 +262,12 @@ module Noxun
           if legs
             out['legs_short'] = legs['short'].to_s
             out['legs_tone'] = legs['tone'].to_s
+          end
+          # ROH-B2 (O12): STRANA DVERI vkladanej rohovej zo ZMRAZENEHO planu —
+          # pasik povie „dvere vľavo"; kluce su aditivne (len pri rohovej).
+          if s.cabinet? && s.corner?
+            out['corner_side'] = s.corner_side
+            out['corner_label'] = CORNER_SIDE_LABELS[s.corner_side].to_s
           end
           out
         end
@@ -468,8 +517,11 @@ module Noxun
           end
 
           lock = s.z_mode == :locked ? "výška #{fmt_mm(s.lock_plane_z)} mm" : 'voľná výška'
-          "Ghost: klik položí skrinku · ←/→ otočiť · Alt kotva · ↓ zámok výšky · ↑ voľná výška · Esc zruší " \
-            "| kotva #{ANCHOR_LABELS[s.anchor]} · #{lock} · otočenie #{s.rotation_index * 90}°#{warn}"
+          # ROH-B2 (O12): rohova ma navyse klavesu strany dveri a jej stav.
+          ckey = s.corner? ? ' · D strana dverí' : ''
+          cside = s.corner? ? "#{CORNER_SIDE_LABELS[s.corner_side]} · " : ''
+          "Ghost: klik položí skrinku · ←/→ otočiť#{ckey} · Alt kotva · ↓ zámok výšky · ↑ voľná výška · Esc zruší " \
+            "| #{cside}kotva #{ANCHOR_LABELS[s.anchor]} · #{lock} · otočenie #{s.rotation_index * 90}°#{warn}"
         end
 
         def fmt_mm(v)
@@ -1194,6 +1246,16 @@ module Noxun
 
         def drawing?
           @interaction == :drawing
+        end
+
+        # ROH-B2 (O12): vkladana skrinka je ROHOVA (typ zo zmrazeneho planu).
+        def corner?
+          cabinet? && @type_key == 'corner_blind'
+        end
+
+        # Strana dveri zo ZMRAZENEHO planu — jedina autorita `Construction.corner_side`.
+        def corner_side
+          Construction.corner_side(@plan.config)
         end
 
         # =================================================================
@@ -2052,6 +2114,16 @@ module Noxun
             s = live_session
             next unless s && s.active?
 
+            # ROH-B2 (O12): D = strana dveri — LEN pri ghoste rohovej (inak
+            # klavesa ide SketchUpu nedotknuta). Drzana klavesa neprepina.
+            if corner_side_key?(s, key)
+              res = true
+              next if repeat.to_i > 1
+
+              GhostTool.request_corner_side(s)
+              next
+            end
+
             owned = owned_key(key)
             next unless owned
 
@@ -2109,7 +2181,7 @@ module Noxun
           guarded('onKeyUp') do
             s = live_session
             owned = s.nil? || !s.active? ? nil : owned_key(key)
-            res = !owned.nil?
+            res = !owned.nil? || (!s.nil? && s.active? && corner_side_key?(s, key))
             # GHOST-D2: pustenie Shiftu ODOMKNE inferenciu (hold-to-lock).
             next unless owned == :shift
 
@@ -2747,6 +2819,12 @@ module Noxun
           return :shift if drawing_session? && vk(:VK_SHIFT) == key
 
           nil
+        end
+
+        # ROH-B2 (O12): klavesa strany dveri a zaroven ghost ROHOVEJ pri
+        # umiestnovani (kreslenie dosky ani ina skrinka ju nevlastnia).
+        def corner_side_key?(s, key)
+          key == CORNER_SIDE_KEY && s.respond_to?(:corner?) && s.corner? && s.placement?
         end
 
         def drawing_session?

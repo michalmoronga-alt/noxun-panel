@@ -783,7 +783,16 @@ ghost tak nikdy neobsluhuje ani nekreslí session, ktorá patrí novému. Globá
 a vracia true (minimalizuje aktiváciu menu-baru Windows). Klávesu vlastníme len so **živou** session; ostatné vracajú `false`. **Hranica testovania:** headless ani in-SU sada
 nedokáže overiť, či Windows Alt do Toolu naozaj **doručí** a či sa pritom neaktivuje menu lišta — testy overujú len správanie handlera. Systémové doručenie Alt patrí
 **Michalovmu smoke checklistu** (`SYSTEM/PLAN.md`, sekcia GHOST, bod 2); zapísaný fallback pri zlyhaní je **TAB** (Scope OUT dávky, cyklovanie kotiev je preto jedna volateľná
-metóda `PlacementSession#cycle_anchor!`). **Každý Tool callback je obalený** (`guarded`) — výnimka v callbacku sa inak ticho prehltne a nástroj „záhadne" prestane kresliť.
+metóda `PlacementSession#cycle_anchor!`).
+**ROH-B2 (O12) — kláves D = strana dverí rohovej** (`CORNER_SIDE_KEY` = kód 68). Vlastníme ho **len** pri ghoste rohovej pri umiestňovaní (`corner_side_key?` —
+`PlacementSession#corner?` = typ zmrazeného plánu `corner_blind`); pri inej skrinke, doske aj kreslení ide D SketchUpu nedotknutý. Prečo D: ←/→, ↑/↓, Alt, Esc
+a Shift sú obsadené, TAB je zapísaný fallback kotiev; D nemá v SketchUpe predvolenú skratku (in-SU `run_rohb2` to overí nad `Sketchup.get_shortcuts` Michalovho
+PC) a meracie pole je pri umiestňovaní vypnuté, takže písmeno do neho nevtečie. Nástroj **nič nezrkadlí sám** — `GhostTool.request_corner_side` len ohlási
+panelu stranu, ktorú ghost nesie (`Panel.ghost_corner_side_key` → `NX.ghostCornerSide`); stranu prepne vkladacia karta tou istou funkciou ako prepínač v riadku
+rohovej a ghost sa **prevesí** cez `Panel.handle_ghost_corner_side` → `handle_insert(…, keep_point: true)` → `GhostTool.start(…, keep_point: true)`: nová
+session **prevezme bod a položiteľnosť** živej skrinkovej session v tom istom dokumente (`carried_point`), aby ghost nezmizol, kým sa myš nepohne (bežné
+„Vložiť" polohu nededí). Rotácia, kotva a režim výšky idú z pamäte ako pri každej session. Stav strany nesie `state_payload` (`corner_side`, `corner_label`)
+a `status_text`; držaný D neprepína (`repeat > 1`), pustenie D je tiež naše. **Každý Tool callback je obalený** (`guarded`) — výnimka v callbacku sa inak ticho prehltne a nástroj „záhadne" prestane kresliť.
 **V `draw` sa NIKDY nevolá `Construction.build_plan`** — obálka je 8 bodov spočítaných RAZ zo zmrazeného configu.
 **Farby ghostu:** obrys neutrálna tmavá (`OUTLINE_RGB`), kotva rodina výberu (`ANCHOR_RGB`), nepoložiteľný stav stlmený (`DIM_RGB`) a **predná stena JASNÁ ZELENÁ**
 (`FRONT_RGB = #00C85A`, v0.8.25). Pôvodný tmavý teal `--nx-select` v modeli **splýval** s obrysom ghostu aj s čiernymi hranami geometrie (Michalov živý test 31.8.) —

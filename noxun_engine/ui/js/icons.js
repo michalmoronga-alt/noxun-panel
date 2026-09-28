@@ -192,11 +192,11 @@
     // Tretim typom je doska — ta ma uz vlastny symbol 'slab' (rail UI-B1).
     'cab-low': '<rect x="4" y="4" width="16" height="12" rx="1"/><path d="M12 4v12"/><path d="M9.5 9h.01"/><path d="M14.5 9h.01"/><rect x="6" y="18" width="12" height="3" rx="1" fill="currentColor" stroke="none"/>',
     'cab-high': '<path d="M3 3h18"/><path d="M7 3v3"/><path d="M17 3v3"/><rect x="4" y="6" width="16" height="12" rx="1"/><path d="M12 6v12"/><path d="M9.5 15h.01"/><path d="M14.5 15h.01"/>',
-    // ROH-A2: ROHOVA skrinka — dvere LEN v lavej (dverovej) casti s uchytkou
-    // pri volnej hrane, vpravo slepa cast a pod skrinkou pri dverach CR lista
-    // do tvaru „L" (trci dopredu ako v modeli). Kresba ukazuje predvolbu
-    // (dvere vlavo); strana sa ikonou nerozlisuje.
-    'cab-corner': '<rect x="3" y="4" width="18" height="12" rx="1"/><path d="M11 4v12"/><path d="M5.5 10h.01"/><path d="M13 16v5h6"/>',
+    // ROH-B2 (O4, schvaleny mockup A): ROHOVA skrinka ako „Dolná" — skrinka NA
+    // SOKLI, vlavo dvere s uchytkou pri volnej hrane, vpravo PREKRIZENA slepa
+    // cast (prekrizenie = blenda, ten isty jazyk ako `front-blind`). Kresba
+    // ukazuje predvolbu (dvere vlavo); stranu nesie `corner-l` / `corner-r`.
+    'cab-corner': '<rect x="4" y="4" width="16" height="12" rx="1"/><path d="M11 4v12"/><path d="m11 4 9 12"/><path d="m20 4-9 12"/><path d="M7.5 8.5v3"/><rect x="6" y="18" width="12" height="3" rx="1" fill="currentColor" stroke="none"/>',
     // ROH-B1 (mockup B1, O5): STRANA DVERI rohovej v prepinaci riadku rohovej.
     // Dvere s uchytkou v jednej casti, SLEPA cast prekrizena (ako `front-blind`
     // = blenda) — 'corner-l' dvere vlavo, 'corner-r' zrkadlo (dvere vpravo).
