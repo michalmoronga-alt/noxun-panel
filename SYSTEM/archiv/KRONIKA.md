@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **NP-3 · Nárezový plán — sekcia Štúdia + veta plánu v poznámke rozpočtu (29.9.2026, v0.15.2 → v0.15.3, PR #?; blok 2, tretia dávka).**
+- **NP-3 · Nárezový plán — sekcia Štúdia + veta plánu v poznámke rozpočtu (29.9.2026, v0.15.2 → v0.15.3, PR #420; blok 2, tretia dávka).**
   **Štúdio → Nárezový plán** (posledná neaktívna položka „fáza 2") ožil ako sekcia `cut` podľa schváleného mockupu A a B: lišta „Obnoviť" + chip
   „prerez · orez · duplák" (preklik do Nastavení rozpočtu, jantárový pri predvolených hodnotách), súhrnný riadok, karta pre každý nákupný materiál
   (vzorka, formát, kresba, využitie, odhad z m², chipy — duplák ako prírezy s prídavkom, „bez orezu — hrany hotové", formát chýba, UNI, plán neúplný),
