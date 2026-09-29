@@ -259,8 +259,14 @@ module Noxun
       end
 
       # Nastavenia AKTIVNEHO dodavatela — jediny vstup pre Budget.
+      # (Bez zistovania zdroja — `degraded?` cita disk a `active` vola rozpocet
+      # pri kazdom vypocte; zdroj si pyta len ten, kto ho potrebuje.)
       def active
-        active_with_source.first
+        supplier_of(load)
+      end
+
+      def supplier_of(doc)
+        supplier_by_id(doc, doc['active']) || doc['suppliers'].first || seed_supplier
       end
 
       # NP-2: aktivny dodavatel + ZDROJ dat -> [supplier, source], source je
@@ -269,8 +275,7 @@ module Noxun
       # iste poradie ako brany v `write`).
       def active_with_source
         doc, origin = load_with_origin
-        sup = supplier_by_id(doc, doc['active']) || doc['suppliers'].first || seed_supplier
-        [sup, refine_origin(origin)]
+        [supplier_of(doc), refine_origin(origin)]
       end
 
       def refine_origin(origin)
