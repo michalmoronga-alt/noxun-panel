@@ -624,6 +624,7 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 
 - **Runner testov v SketchUpe po teste sám vráti pôvodnú verziu pluginu** (workflow N4, 26.9.2026) — `scripts\run_su_tests.ps1` dnes nechá nasadenú
   rozpracovanú vetvu; dovtedy platí pravidlo „po každom mergi nainštalovať main" (CLAUDE.md, Verzia a uzáver).
+- **D-147 · Nárezový plán: menšie dielce nad seba v páse** (Michal 29.9.2026, smoke bloku 2) — vnárať menšie dielce do voľného miesta pásu nad nižším dielcom (plán býva niekedy o platňu opatrnejší, než musí); plné znenie v [DOGFOODING.md](DOGFOODING.md).
 - **D-146 · Falošný duplák** (Michal 28.9.2026) — spodná vrstva dupláku zo 100 mm širokých výstuh namiesto plnej dosky (šetrí materiál aj váhu, keď obe strany nie sú pohľadové); plné znenie v [DOGFOODING.md](DOGFOODING.md).
 - **M-R nadstavby zo smoke 12.9.2026:** **D-126** otočenie zdrojového obrázka o ±90° pred uložením; **D-127** prirodzenejšie umiestnenie textúry (náhodný posun, nadväzovanie na skrinke alebo ručné umiestnenie — výber podľa praxe Lucie). Odložené, bez termínu, neblokujú uzáver M-R; plný kontext v [DOGFOODING.md](DOGFOODING.md).
 
