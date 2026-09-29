@@ -344,7 +344,9 @@
       'každý prírez má prídavok na každú stranu. VEPO ich zlepí a oreže na hotový rozmer.';
     if (!one){
       tip += '\n' + dups.map(function(r){
-        return (r.n || '') + ': ' + r.q + ' ks = ' + npRects(r.c) + ' ' + npDim(r.fl, r.fw) + ' → ' + npDim(r.l, r.w);
+        // Slepá delta #420 (P3): hotový rozmer v zátvorke — „= 4 prírezy 820 × 580"
+        // by sa dalo čítať, že prírezy majú hotový rozmer.
+        return (r.n || '') + ': ' + r.q + ' ks (hotový ' + npDim(r.fl, r.fw) + ') = ' + npRects(r.c) + ' ' + npDim(r.l, r.w);
       }).join('\n');
     }
     return '<span class="npchip info" title="' + npEsc(tip) + '">vrátane ' + dq + ' ' +

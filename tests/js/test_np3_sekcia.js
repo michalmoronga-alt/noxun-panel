@@ -98,8 +98,13 @@ const rowsD = mat().rows;
 let chip = NP.npDupChipHtml([rowsD[1], DUP2]);
 ok(chip.indexOf('>vrátane 5 duplákov = 10 prírezov s prídavkom</span>') >= 0, 'rôzne rozmery: súčty bez rozmeru prvého riadku');
 ok(chip.slice(chip.indexOf('">') + 2).indexOf('820') < 0, 'rozmer prvého riadku nie je v texte chipu');
-ok(chip.indexOf('Bočnica 36: 2 ks = 4 prírezy 820 × 580 → 840 × 600') >= 0 &&
-   chip.indexOf('Bočnica 36 vysoká: 3 ks = 6 prírezov 2000 × 580 → 2020 × 600') >= 0, 'rozpis po riadkoch v tooltipe');
+ok(chip.indexOf('Bočnica 36: 2 ks (hotový 820 × 580) = 4 prírezy 840 × 600') >= 0 &&
+   chip.indexOf('Bočnica 36 vysoká: 3 ks (hotový 2000 × 580) = 6 prírezov 2020 × 600') >= 0,
+   'rozpis po riadkoch v tooltipe: hotový rozmer v zátvorke, prírezy s prídavkom');
+// Slepá delta #420 (P3): meno riadku ide do atribútu `title` escapované.
+chip = NP.npDupChipHtml([Object.assign({}, rowsD[1], { n: 'A"<b>' }), DUP2]);
+ok(chip.indexOf('A&quot;&lt;b&gt;: 2 ks') >= 0, 'meno riadku v tooltipe je escapované');
+ok(chip.indexOf('A"<b>') < 0, 'surové meno sa do HTML nedostane');
 chip = NP.npDupChipHtml([rowsD[1], DUP_SAME]);
 ok(chip.indexOf('>vrátane 3 duplákov = 6 prírezov s prídavkom (820 × 580 → 840 × 600)</span>') >= 0,
    'rovnaký rozmer vo viacerých riadkoch: rozmer ostáva');
