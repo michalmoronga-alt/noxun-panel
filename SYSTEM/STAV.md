@@ -7,7 +7,7 @@
 ## Stav
 
 **v0.15.4 · 29.9.2026 — BLOK 2 · NÁREZOVÝ PLÁN (primitívny) — všetky štyri dávky hotové:** štart PR #417, **NP-1** jadro výpočtu (PR #418), **NP-2** nastavenia
-a Kontrola s orezom (PR #419), **NP-3** sekcia Nárezový plán (PR #420), **NP-4** ceny podľa plánu (PR #?). **Štúdio → Nárezový plán** ukazuje karty materiálov, malé platne,
+a Kontrola s orezom (PR #419), **NP-3** sekcia Nárezový plán (PR #420), **NP-4** ceny podľa plánu (PR #421). **Štúdio → Nárezový plán** ukazuje karty materiálov, malé platne,
 upozornenie na poslednú platňu, dielce, ktoré sa nezmestia, a detail platne. **Rozpočet → Materiál** má prepínač **„ceny podľa plánu"** (per zákazka, predvolene
 **vypnutý** — dovtedy dnešné ceny): zapnutý berie počet platní z plánu pri materiáli s úplným plánom a formátom z katalógu, ostatné ostávajú na odhade so značkou
 „z odhadu" a vetou prečo (aj v XLSX); porez za platňami, montáž z odhadu; ponuka mení len sumu. Čakajúci zápis rozpočtu už neodíde do inej zákazky (audit B1).
@@ -31,13 +31,13 @@ v **seede 6** — starší plugin zákazku neprestaví ani nevyexportuje (rohov�
 v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a zastaví oba cenové exporty). **Nastavenia dodávateľa sú od NP-2 vo verzii súboru 2** (v0.15.1 a starší pri uložení nové polia zahodí).
 **Aktualizovať OBE PC (aj Luciino) na 0.15.4** — starší plugin rohovú nepozná, knižnicu šablón STD 7 len číta a rozpočet `BUDGET_STD` 3 needituje.
 
-**Testy (posledná kódová dávka, NP-4 PR #?):** **4842 headless · 142 JS sád** zelené; **in-SU 3266 PASS** (prepínač = 1 krok Späť s markerom 3).
+**Testy (posledná kódová dávka, NP-4 PR #421):** **4842 headless · 142 JS sád** zelené; **in-SU 3266 PASS** (prepínač = 1 krok Späť s markerom 3).
 **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 
 ## Robí sa
 
 **Blok 2 · Nárezový plán** (priečinok [zdroje/bloky/NAREZ/](zdroje/bloky/NAREZ/), dávky v [PLAN.md](PLAN.md)): **NP-1** jadro výpočtu (PR #418) → **NP-2** nastavenia
-prerezu, orezu a prídavku + Kontrola „nezmestí sa" s orezom (PR #419) → **NP-3** sekcia Nárezový plán v Štúdiu (PR #420) → **NP-4** ceny podľa plánu (PR #?). Pri prvej rohovej v dielni ostáva overiť
+prerezu, orezu a prídavku + Kontrola „nezmestí sa" s orezom (PR #419) → **NP-3** sekcia Nárezový plán v Štúdiu (PR #420) → **NP-4** ceny podľa plánu (PR #421). Pri prvej rohovej v dielni ostáva overiť
 záves Sensys na výstuhe závesov. **Čakajú na smoke:** **D-132** (#367), **D-133** (#368), **D-134** (#369). **D-141**, **D-142**, **D-145** a **D-146** sú v zásobníku. **Blok 1d** podľa kapacity — R-18; **R-13 čaká na Michala**.
 
 ## Ďalší krok

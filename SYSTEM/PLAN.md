@@ -230,7 +230,7 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   - ✅ **NP-3 · sekcia Nárezový plán** — Štúdio: karty materiálov s malými platňami, detail platne, upozornenie na poslednú platňu, dielce, ktoré sa nezmestia;
     poznámka „plán: N platní" v Rozpočte a XLSX (ceny sa nemenia). **PR #420, v0.15.3** ([package](zdroje/bloky/NAREZ/PACKAGE_NP3_SEKCIA.md)).
   - ✅ **NP-4 · ceny podľa plánu** — prepínač pre zákazku (predvolene vypnutý), porez podľa plánu, montáž z odhadu; materiál bez spoľahlivého plánu ostáva na odhade
-    s dôvodom; `BUDGET_STD` 3. **PR #?, v0.15.4** ([package](zdroje/bloky/NAREZ/PACKAGE_NP4_CENY.md)). Po mergi **uzáver bloku 2** (release, minor, smoke).
+    s dôvodom; `BUDGET_STD` 3. **PR #421, v0.15.4** ([package](zdroje/bloky/NAREZ/PACKAGE_NP4_CENY.md)). Po mergi **uzáver bloku 2** (release, minor, smoke).
 
 ### 3 · STABILITA
 

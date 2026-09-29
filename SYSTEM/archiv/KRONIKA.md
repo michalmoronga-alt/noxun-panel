@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **NP-4 · Nárezový plán — ceny podľa plánu (29.9.2026, v0.15.3 → v0.15.4, PR #?; blok 2, štvrtá a posledná dávka).**
+- **NP-4 · Nárezový plán — ceny podľa plánu (29.9.2026, v0.15.3 → v0.15.4, PR #421; blok 2, štvrtá a posledná dávka).**
   **Rozpočet → Materiál** má v hlavičke prepínač **„ceny podľa plánu"** (mockup C, O5) — per zákazka, **predvolene vypnutý**: vypnutý dáva presne dnešné čísla,
   riadky aj oba XLSX (zlatý charakterizačný test `test_np4_golden.rb`, odtlačok z mainu v0.15.3 vygenerovaný prvým commitom vetvy). Zapnutý berie **počet
   platní z nárezového plánu** len pri **cenovo spôsobilom** materiáli — jediná autorita `SheetLayout.price_basis`: plán existuje a je horná hranica
