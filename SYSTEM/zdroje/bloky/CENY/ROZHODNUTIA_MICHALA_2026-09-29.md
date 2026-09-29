@@ -19,10 +19,12 @@
 | C5 | Štart bloku | blok sa robí **teraz ako posledný kódový bod V1** (nie „keď si to prax vypýta") — po ňom je V1 rozsah Výstupov prázdny | 29.9. |
 | C6 | Rozsah (Q1) | **áno** — rovnaký vzor ako kovanie: pri doske a ABS **bez Demos väzby** ikona „Otvoriť produkt" + akcia „Overiť cenu" (formulár, „Potvrdiť cenu k dnešku") v **Štúdiu → Materiály aj v Rozpočte**; Rozpočet ukazuje vek ich ceny a počíta ich medzi ceny „na kontrolu"; UNI a duplák bez akcií | 29.9. |
 | C7 | Odkaz (Q2) | **jeden odkaz** na položku ako pri kovaní — **mení C2** (zoznam odkazov sa nerobí; zmena obchodu = prepísať odkaz) | 29.9. |
-| C8 | Cena vo formulári (Q3) | dosky: cena sa zadáva **za platňu**, plugin ju prepočíta na €/m² podľa formátu a formulár ukáže obe; ABS za bežný meter | 29.9. |
+| C8 | Cena vo formulári (Q3) | dosky: cena sa zadáva **za platňu**, plugin ju prepočíta na €/m² podľa formátu a formulár ukáže obe; ABS za bežný meter. **Keď cenu neprepíšeš, potvrdenie ju nezmení ani o cent** (C1 „cena sedí"); ako katalóg uloží presnú cenu za platňu, rozhodne package s auditom | 29.9. |
 | C9 | Postup (Q4) | **sedí** — bez novej outside-in rešerše (vzor aj rešerš z CENY-KOV 10.9.), krížový audit bloku nahradí povinný Codex audit návrhu každej dávky; dávky **CENY-M1** (dáta + Štúdio → Materiály) → **CENY-M2** (Rozpočet) | 29.9. |
 | C10 | Reálna zákazka | test na kompletnej reálnej zákazke (V1 bod 1 „Návrh") **až po V1** — Michal teraz nemá zákazku, na ktorej by ho spravil; **po dobehnutí bodov pred V1 (blok CENY, R-13) určí ďalší postup** | 29.9. |
 | C11 | Mockup | **schválený** ([MOCKUP_CENY_2026-09-30.html](MOCKUP_CENY_2026-09-30.html)): **O1–O9 podľa návrhu** (odporúčania v kartách mockupu — umiestnenie ikon, „na kontrolu" vrátane položky bez ceny, sklo bez formátu za m², 0 € platná, texty stavu, čo overenie zruší, presná cena za platňu, prednosť Demosu, overenie aj bez odkazu); Michal: „moc sedí, môžeš pokračovať" = blok schválený | 30.9. |
+| C12 | Materiál bez formátu v Rozpočte (O10) | **áno, v tomto bloku (CENY-M2):** materiál bez formátu (sklo na mieru) sa v Rozpočte počíta podľa **skutočných m² dielcov** × overená cena za m², nie ako fiktívna platňa 2800 × 2070 (Codex #425 P1) | 30.9. |
+| C13 | V1 bod „Návrh" | **odškrtnutý** — test na kompletnej reálnej zákazke je **akceptačný test po V1** (C10), nie podmienka uzáveru V1 (Codex #425 P2: inak by sa V1 nedalo uzavrieť) | 30.9. |
 
 ## 2 · Otázky pre Michala — zodpovedané 29.9.2026 (C6–C9)
 

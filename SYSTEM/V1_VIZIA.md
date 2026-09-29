@@ -10,10 +10,10 @@ Odškrtávací checklist — **súhrn, nie úplný výpočet**: autoritou rozsah
 označené „V1 rozsah" v blokoch [PLAN.md](PLAN.md). **Bod sa odškrtáva, až keď je jeho V1 rozsah
 v PLANe prázdny**; V1 je hotové, keď je odškrtnuté všetko. Stav dopĺňajú uzávery dávok.
 
-1. [ ] **Návrh:** vloženie skriniek na klik (GHOST, **hotové** v0.9.0) · prisunutie a kópia po vlastnej osi (NÁSTROJE-1, **hotové** v0.9.25) · dosky vkladané a kreslené
+1. [x] **Návrh:** vloženie skriniek na klik (GHOST, **hotové** v0.9.0) · prisunutie a kópia po vlastnej osi (NÁSTROJE-1, **hotové** v0.9.25) · dosky vkladané a kreslené
    prichytením na skrinky (GHOST-D1/D2, **hotové** v0.9.27 / v0.9.28) · šablóny s kovaním = opakované typy na 1 klik (KOV-I, **hotové** v bloku KOVANIE) ·
-   **ostáva:** test na kompletnej reálnej zákazke (riadok „V1.0 zostavy" v PLAN, blok 4) — **Michal 29.9.2026: až po V1** (teraz nemá vhodnú zákazku;
-   po bodoch pred V1 v PLAN, blok 4 „Poradie pred uzáverom V1", určí ďalší postup). *(Zostavy, segmenty, sektory a viazané diely = PO V1, rozhodnutie 4.9.2026.)*
+   V1 rozsah bodu je prázdny: **test na kompletnej reálnej zákazke je akceptačný test PO V1** (Michal 29.–30.9.2026 — teraz nemá vhodnú zákazku;
+   po bodoch pred V1 v PLAN, blok 4 „Poradie pred uzáverom V1", určí ďalší postup), nie podmienka uzáveru V1. *(Zostavy, segmenty, sektory a viazané diely = PO V1, rozhodnutie 4.9.2026.)*
 2. [x] **Konštrukcia (rozhodnuté 6.9.2026):** **K1 odsadenia** — komín vzadu (dno a strop kratšie, chrbát na ich zadnej hrane) a strop zapustený vpredu, jedna nastaviteľná hodnota
    per skrinka (**hotové** v0.13.2) · **K2 chrbát z výstuh** (dve lišty medzi bokmi, výška parameter; **hotové** v0.13.3) · **K3 rohová skrinka** dolná, slepá s CR lištou, prepínač L/P (nízka priorita, posledná) ·
    výstuhy v interiéri (hotové, D-80), sokel/nohy podľa výšky (hotové, D-79). *(Rohové spoje per strana, poldrážka, „bez dielca", čelo ako cenová položka V1-07 = mimo V1.)*

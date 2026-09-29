@@ -146,7 +146,7 @@
   .flash{animation:flash 1.6s ease}
   @keyframes flash{0%,40%{box-shadow:0 0 0 3px var(--nx-warn)}100%{box-shadow:0 0 0 0 transparent}}
 
-  /* ===== otvorené body O1–O9 (hlavička mockupu) ===== */
+  /* ===== schválené body O1–O10 (hlavička mockupu) ===== */
   .ohead{max-width:1180px;margin:18px auto 0}
   .ohead h2{font-size:15px;margin:0;color:var(--nx-ink-title)}
   .ohead .osub{font-size:12px;color:var(--nx-ink-muted);margin:2px 0 8px}
@@ -518,7 +518,7 @@
 </div>
 <div class="notestrip">
   <svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>
-  <span>Mockup, nie živý plugin. Klikaj: ikonu odkazu a ikonu overenia v riadkoch (A aj D) — otvoria formulár B / B2 alebo úpravu C. Vo formulári prepíš cenu (prepočet na €/m² beží pri písaní) a daj <b>Potvrdiť cenu k dnešku</b> — zmení sa stav v A aj v D. Skús aj prepísať cenu priamo v bunke €/m² v A (O6). <b>Jantárové štítky O… = body na potvrdenie</b> (zoznam hneď nižšie), žlté = zmena oproti dnešnému pluginu.</span>
+  <span>Mockup, nie živý plugin. Klikaj: ikonu odkazu a ikonu overenia v riadkoch (A aj D) — otvoria formulár B / B2 alebo úpravu C. Vo formulári prepíš cenu (prepočet na €/m² beží pri písaní) a daj <b>Potvrdiť cenu k dnešku</b> — zmení sa stav v A aj v D. Skús aj prepísať cenu priamo v bunke €/m² v A (O6). <b>Jantárové štítky O… = body schválené 30.9.2026</b> (zoznam hneď nižšie), žlté = zmena oproti dnešnému pluginu.</span>
 </div>
 
 <main class="page">
@@ -530,7 +530,7 @@
   <p>Pri <b>doske a ABS páske bez väzby na Demos</b> pribudne to, čo už má katalógové kovanie: <b>jeden odkaz na produkt</b> (ikona „Otvoriť produkt") a akcia <b>„Overiť cenu"</b> — otvorí sa obchod a vedľa formulár; „Potvrdiť cenu k dnešku" uloží cenu a dnešný dátum. <b>Samotný klik na odkaz nič nezapisuje.</b> Rozpočet tieto položky začne <b>ukazovať</b> — vek ručne overenej ceny v stĺpci „Overená" a počet medzi cenami „na kontrolu". Dnes sú v ňom prakticky neviditeľné (majú napevno „ručná", dátum sa ignoruje).</p>
   <div class="dec">
     <b>Rozhodnuté</b><span><b>C6</b> rovnaký vzor ako kovanie v Štúdiu → Materiály aj v Rozpočte; UNI a duplák bez akcií; položky s Demos väzbou sa nemenia · <b>C7</b> jeden odkaz na položku (iný obchod = prepísať odkaz) · <b>C8</b> doska: cena sa zadáva <b>za platňu</b>, plugin ju prepočíta na €/m² podľa formátu a ukáže obe; ABS za bežný meter · <b>C9</b> dávky CENY-M1 (dáta + Štúdio → Materiály) → CENY-M2 (Rozpočet), každá s auditom návrhu</span>
-    <b>Otvorené</b><span>O1–O9 nižšie — umiestnenie ikon, kedy je cena „na kontrolu", sklo bez formátu, nula, texty, čo overenie zruší, presnosť prepočtu, neskoršia Demos väzba a overenie bez odkazu</span>
+    <b>Schválené 30.9.</b><span>O1–O9 podľa návrhu (C11) a O10 (C12) nižšie — umiestnenie ikon, kedy je cena „na kontrolu", sklo bez formátu, nula, texty, čo overenie zruší, presnosť prepočtu, neskoršia Demos väzba a overenie bez odkazu</span>
   </div>
   <ul>
     <li><a href="#secA"><b>A</b></a> · Štúdio → Materiály → detail skupiny H1180 — okno v skutočnej veľkosti (1060 × 640): doska s Demosom, DTDL a zástena bez Demosu, duplák, ABS</li>
@@ -541,14 +541,14 @@
   </ul>
   <div class="legend">
     <span><i class="mpin" style="margin:0">A1</i> zmena oproti dnešnému pluginu (opis vedľa okna)</span>
-    <span><i class="otag" style="margin:0">O1</i> bod na potvrdenie — návrh (odkaz na zoznam nižšie)</span>
+    <span><i class="otag" style="margin:0">O1</i> schválený bod (odkaz na zoznam nižšie)</span>
   </div>
   <p class="src">Dáta sú vymyslené, ale kopírujú tvoj katalóg z 29.9.: bez Demosu je len 5 nákupných položiek (2× DTDL, zástena, sklo, 1 ABS 0,8 mm), z toho 3 bez ceny. Dnešný dátum mockupu je 30.9.2026, prah veku ceny 30 dní (Nastavenia dodávateľa). Adresy obchodov sú vymyslené (example.sk). Čísla počíta mockup rovnakou aritmetikou ako Rozpočet (cena za platňu = €/m² × plocha platne, zaokrúhlené na centy), preto A, B a D sedia — nie je to zadanie; pravidlá určia packages s auditom.</p>
 </section>
 
 <section class="ohead" aria-labelledby="oH">
-  <h2 id="oH">Body na potvrdenie O1–O9</h2>
-  <div class="osub">Každý bod: otázka, <b>čo odporúčam</b> (zelené), prečo a alternatíva. Odpoveď stačí „O1 áno, O3 bez prepínača…". Zmena po schválení sa zapíše do mockupu (rámček „platí") aj do rozhodnutí bloku.</div>
+  <h2 id="oH">Schválené body O1–O10</h2>
+  <div class="osub">Každý bod: otázka, <b>schválené znenie</b> (zelené — Michal 30.9.2026: O1–O9 podľa návrhu, O10 súhlas), prečo a alternatíva. Zmena po schválení sa zapíše do mockupu (rámček „platí") aj do rozhodnutí bloku.</div>
   <div class="ogrid" id="ogrid"></div>
 </section>
 
@@ -647,11 +647,11 @@
     <div class="mocknote">
       <h4>B · Formulár pre dosku</h4>
       <ol>
-        <li><span class="npin">B1</span><b>Otvorí sa obchod aj formulár</b> naraz; „Potvrdiť" funguje, až keď sa obchod otvoril (ako pri kovaní). Esc, krížik aj „Zrušiť" = nič sa nezapíše.</li>
+        <li><span class="npin">B1</span><b>Otvorí sa formulár a popri ňom obchod</b>, ak má položka odkaz (otvorenie prehliadača je len pomoc — keď odkaz chýba alebo sa prehliadač neotvorí, „Potvrdiť" funguje aj tak, O9). Esc, krížik aj „Zrušiť" = nič sa nezapíše.</li>
         <li><span class="npin">B2</span><b>Hlavička:</b> dodávateľ a odkaz, pod ňou položka ako text — kód, formát a plocha platne. Údaje sa tu nemenia (na to je ceruzka, C).</li>
         <li><span class="npin">B3</span><b>Cena za platňu s DPH</b> — vedľa hneď prepočet na €/m² a formát, z ktorého sa počíta. Pri skle bez formátu sa zadáva za m². <a class="oref" href="#O3">O3</a> <a class="oref" href="#O7">O7</a></li>
-        <li><span class="npin">B4</span><b>Oproti katalógu:</b> „bez zmeny — stačí potvrdiť", alebo rozdiel v € a %. Pole je predvyplnené cenou z katalógu, takže keď cena sedí, stačí jeden klik.</li>
-        <li><span class="npin">B5</span><b>„Potvrdiť cenu k dnešku"</b> uloží cenu a dnešný dátum. Poznámka dole povie posledné ručné potvrdenie. Prázdne pole potvrdiť nejde; 0 € áno (návrh). <a class="oref" href="#O4">O4</a></li>
+        <li><span class="npin">B4</span><b>Oproti katalógu:</b> „bez zmeny — stačí potvrdiť", alebo rozdiel v € a %. Pole je predvyplnené cenou z katalógu, takže keď cena sedí, stačí jeden klik — <b>a keď cenu neprepíšeš, potvrdenie ju nezmení ani o cent</b> (zapíše sa len dátum, C1).</li>
+        <li><span class="npin">B5</span><b>„Potvrdiť cenu k dnešku"</b> uloží cenu a dnešný dátum. Poznámka dole povie posledné ručné potvrdenie. Prázdne pole potvrdiť nejde; 0 € áno (O4). <a class="oref" href="#O4">O4</a></li>
       </ol>
       <ul class="dots">
         <li>Potvrdená cena platí v <b>celom katalógu</b> — Rozpočet každej zákazky ju prepočíta (zákazka cenu nenesie, číta katalóg živo).</li>
@@ -1040,9 +1040,11 @@
     if (it.kind === 'sheet'){
       f.mode = it.fmt ? 'plate' : 'm2';
       f.val = it.price == null ? '' : num2(f.mode === 'plate' ? r2(it.price * area(it)) : it.price);
+      f.orig = f.val; f.origMode = f.mode;
     } else {
       f.mode = 'bm';
       f.val = it.price == null ? '' : num2(it.price);
+      f.orig = f.val; f.origMode = f.mode;
     }
     return f;
   }
@@ -1158,7 +1160,9 @@
       rerender(); status(st, 'Nezapísané — chýba formát platne.', 'warn'); return;
     }
     var before = it.price;
-    it.price = f.mode === 'plate' ? v / area(it) : v;
+    // C1: pole nedotknuté (tá istá hodnota v tom istom režime) = cena sa nemení ani o cent, zapíše sa len dátum
+    var untouched = before != null && f.val === f.orig && f.mode === f.origMode;
+    it.price = untouched ? before : (f.mode === 'plate' ? v / area(it) : v);
     it.mchecked = TODAY;
     var msg = 'Cena potvrdená k ' + dmy(TODAY) + ': ' +
       (f.mode === 'plate' ? num2(v) + ' € za platňu = ' + num2(it.price) + ' €/m²' : num2(v) + (f.mode === 'm2' ? ' €/m²' : ' €/bm')) +
@@ -1396,11 +1400,11 @@
     { id:'O2', t:'Kedy je cena „na kontrolu" a čo položka bez ceny', w:[['D', 'secD'], ['A', 'secA']],
       q:'Kedy sa ručná cena ozve a ako sa ukáže položka, ktorá cenu nemá vôbec?',
       n:'Na kontrolu je, keď cenu nikto ručne nepotvrdil, alebo je potvrdenie staršie ako prah z Nastavení dodávateľa (dnes 30 dní — ten istý ako pri Demose). Položka bez ceny je tiež na kontrolu („Overiť cenu" je cesta, ako cenu doplniť); jantárový riadok „chýba cena" a nález v Kontrole ostávajú ako dnes. Čip „N cien na kontrolu" ich počíta spolu so starými Demos cenami.',
-      why:'Jeden prah, jedno miesto. Hneď po aktualizácii sa ukáže všetkých 5 tvojich položiek bez Demosu (3 bez ceny, 2 s cenou, ktorú nikto nepotvrdil) — raz ich prejdeš a ďalej sa ozvú až po 30 dňoch.',
+      why:'Jeden prah, jedno miesto. Rozpočet ukáže na kontrolu len položky použité v otvorenej zákazke; stav každej položky katalógu vidíš v Štúdiu → Materiály (jantárová ikona overenia). Po prvom potvrdení sa položka ozve až po 30 dňoch.',
       alt:'vlastný, dlhší prah pre ručné ceny (napr. 90 dní — sklo a zástena sa menia zriedka) · položku bez ceny nerátať (hlási ju už Kontrola).' },
     { id:'O3', t:'Sklo a iné dosky bez formátu', w:[['B', 'secB'], ['A2', 'secA2']],
       q:'Cena sa zadáva za platňu (C8) — čo, keď katalóg formát nepozná (sklo na mieru)?',
-      n:'Formulár má prepínač „za platňu / za m²". Keď katalóg formát pozná, predvolené je „za platňu" s prepočtom na €/m²; keď formát chýba, predvolené je „za m²" a nič sa neprepočítava. Pri „za platňu" bez formátu formulár povie, že treba doplniť formát (ceruzka).',
+      n:'Formulár má prepínač „za platňu / za m²". Keď katalóg formát pozná, predvolené je „za platňu" s prepočtom na €/m²; keď formát chýba, predvolené je „za m²" a nič sa neprepočítava. Pri „za platňu" bez formátu formulár povie, že treba doplniť formát (ceruzka). V Rozpočte sa taký materiál počíta podľa skutočných m² (O10).',
       why:'Sklenár aj obchod pri skle na mieru dávajú cenu za m². Vymyslený formát (2800 × 2070) by cenu pokazil. Zástena formát má vždy (je súčasť jej identity), tá ide za platňu.',
       alt:'bez prepínača — bez formátu vždy za m², s formátom vždy za platňu · formulár si formát vypýta a uloží ho do katalógu.' },
     { id:'O4', t:'Je 0 € platná cena?', w:[['B', 'secB']],
@@ -1420,7 +1424,7 @@
       alt:'prepísanie ceny v bunke = zároveň overenie k dnešku (rýchlejšie, ale „overené" potom neznamená „pozrel som do obchodu").' },
     { id:'O7', t:'Presnosť prepočtu z platne na m²', w:[['B', 'secB'], ['A', 'secA']],
       q:'Katalóg drží €/m² — ako zaručiť, že Rozpočet ukáže presne zadanú cenu za platňu?',
-      n:'Keď zadáš 179,90 € za platňu, Rozpočet ukáže za platňu presne 179,90 €. Katalóg si preto €/m² pamätá presne; v Štúdiu (bunka aj formulár) sa ukazuje zaokrúhlené na 2 desatinné (31.04).',
+      n:'Keď zadáš 179,90 € za platňu, Rozpočet ukáže za platňu presne 179,90 €; v Štúdiu (bunka aj formulár) sa €/m² ukazuje zaokrúhlené na 2 desatinné (31,04). Ako to katalóg uloží, rozhodne package CENY-M1 s auditom návrhu — mockup predpisuje len výsledok.',
       why:'Pri zaokrúhlení na centy by z 179,90 € vyšlo späť 179,91 € (31,04 × 5,796 m²) — a v Rozpočte by „nesedela" cena, ktorú si práve potvrdil. Dnes bunka ukazuje číslo tak, ako je uložené, takže bez zaokrúhlenia by v nej svietilo 31.038654…',
       alt:'zaokrúhliť €/m² na centy a rozdiel 1–2 centy na platni tolerovať.' },
     { id:'O8', t:'Položka neskôr dostane Demos väzbu', w:[['C', 'secC']],
@@ -1432,7 +1436,12 @@
       q:'Pri kovaní sa bez odkazu overiť nedá (klik vedie na doplnenie odkazu). Platí to aj pre sklo a zástenu od miestneho dodávateľa?',
       n:'Jantárová ikona odkazu vedie na doplnenie odkazu ako pri kovaní. Ikona „Overiť cenu" však otvorí formulár aj bez odkazu — len bez prehliadača, s vetou „Bez odkazu — cenu si over u dodávateľa (telefón, e-mail, ponuka)".',
       why:'Sklenár či miestny dodávateľ zásten často e-shop nemá; bez výnimky by sa jeho cena nedala potvrdiť vôbec a položka by svietila na kontrolu navždy.',
-      alt:'presne ako kovanie — bez odkazu sa overiť nedá, klik vedie na doplnenie odkazu.' }
+      alt:'presne ako kovanie — bez odkazu sa overiť nedá, klik vedie na doplnenie odkazu.' },
+    { id:'O10', t:'Materiál bez formátu v Rozpočte (sklo na mieru)', w:[['D', 'secD'], ['A2', 'secA2']],
+      q:'Rozpočet dnes počíta každý materiál na platne a pri chýbajúcom formáte dosadí fiktívnu platňu 2800 × 2070 (5,8 m²) — čo so sklom na mieru?',
+      n:'Materiál bez formátu sa v Rozpočte počíta podľa skutočných m² dielcov (MJ „m²") × overená cena za m², nie ako fiktívna platňa. Robí sa v dávke CENY-M2 (Michal 30.9.2026 — C12).',
+      why:'Sklo s plochou 0,9 m² by sa inak nacenilo ako celá 5,8 m² platňa — zhruba 6× drahšie. Overená cena za m² má zmysel, len keď ju Rozpočet násobí skutočnou plochou.',
+      alt:'nechať fiktívnu platňu a riešiť po V1.' }
   ];
   function renderO(){
     $('ogrid').innerHTML = OQ.map(function(q){
