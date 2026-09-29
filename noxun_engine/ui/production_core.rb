@@ -1198,8 +1198,16 @@ module Noxun
       # pouzivatel by dostal „model nema kovanie" namiesto zoznamu skriniek
       # a pokynu aktualizovat plugin.
       def newer_config_stop(collected)
-        blockers = export_blockers(newer: newer_configs(collected))
+        blockers = newer_config_reasons(collected)
         blockers.empty? ? nil : export_blocked_status(blockers)
+      end
+
+      # NP-3 (audit F5): STRUKTUROVANE dovody brany novsej schemy — BEZ
+      # exportnej vety „Export sa NEVYKONAL". Cita ich export (cez
+      # `newer_config_stop`) aj narezovy plan (`layout_block_reasons`) — jedna
+      # autorita, dve formatovania.
+      def newer_config_reasons(collected)
+        export_blockers(newer: newer_configs(collected))
       end
 
       # --- D-143 (KON-0): JEDNA VYROBNA BRANA chrbta v drazke ----------------
@@ -1515,17 +1523,23 @@ module Noxun
       # zavesove. Premenovanie by bolo cisto kozmeticka zmena osmich miest;
       # co brana zastavuje, hovori register, nie meno metody.
       def drawer_stop(collected, expansion, scope: :all)
+        reasons = drawer_reasons(collected, expansion, scope: scope)
+        reasons.empty? ? nil : export_blocked_status(reasons)
+      end
+
+      # NP-3 (audit F5): STRUKTUROVANE dovody brany kovania (bez exportnej
+      # vety). `drawer_stop` ich formatuje pre export, narezovy plan ich cita
+      # ako `blocked` (scope :kit — ta ista brana, ktora zastavi VEPO).
+      def drawer_reasons(collected, expansion, scope: :all)
         if hardware_expansion_unproven?(collected, expansion, scope: scope)
           # Veta menuje LEN to, co sa v tomto scope naozaj nedokazalo — vo VEPO
           # sa zostava vyklopu neoveruje, takze ju ani nesmie spominat.
           co = scope == :all ? 'kit zásuviek ani zostava výklopov' : 'kit zásuviek'
-          return export_blocked_status(
-            ["nákupný zoznam kovania sa nedá zostaviť, takže sa nedá overiť #{co} " \
-             '(pozri Ruby konzolu)']
-          )
+          return ["nákupný zoznam kovania sa nedá zostaviť, takže sa nedá overiť #{co} " \
+                  '(pozri Ruby konzolu)']
         end
         reasons = hardware_blockers(collected, expansion, scope: scope)
-        reasons.empty? ? nil : export_blocked_status(export_blockers(hardware: reasons))
+        reasons.empty? ? [] : export_blockers(hardware: reasons)
       end
 
       def export_blockers(dups: [], cp: nil, newer: [], hardware: [])
@@ -2214,6 +2228,11 @@ module Noxun
           return status.call(source_focus_status(targets.length, source_cab, focus,
                                                  data['focus_inspector'] == true))
         end
+        # NP-3 (O3): oko v Narezovom plane oznaci VSETKY rovnake kusy riadku
+        # (ta ista cesta `parts_key` ako Kusovnik) — veta to hovori nahlas,
+        # inak by oznacenie kusov z inych platni vyzeralo ako chyba.
+        return status.call(cut_select_status(targets.length)) if data['origin'] == 'cut'
+
         status.call("Vybraných #{targets.length} položiek v modeli." \
                     "#{focus ? ' Inspector je vpredu — dielec sa dá hneď upraviť.' : ''}")
       rescue StandardError => e
@@ -2243,6 +2262,17 @@ module Noxun
         return item if front_id.to_s.empty? && hw_row.nil?
 
         item.merge('part_key' => nil)
+      end
+
+      # NP-3: veta po kliku na oko v Narezovom plane (O3).
+      def cut_select_status(count)
+        n = count.to_i
+        what = if n == 1 then 'Vybraný 1 kus'
+               elsif n.between?(2, 4) then "Vybrané #{n} kusy"
+               else "Vybraných #{n} kusov"
+               end
+        "#{what} v modeli — všetky rovnaké kusy riadku kusovníka, aj z iných platní. " \
+          'Je to len výber, krok Späť nevzniká.'
       end
 
       # Veta po kliku s ceruzkou na nalez o CELE. Hovori o SKRINKE (nie
@@ -2377,7 +2407,8 @@ module Noxun
       # `Validation.run` (payload Kontroly aj klik na nalez — rozne parametre
       # by nalez po kliku „stratili"). Prerez, orez a pridavok su zo ziveho
       # aktivneho dodavatela (`SupplierSettings.layout_params`, vratane POVODU
-      # — pri `:seed_fallback` to Kontrola prizna). Hrubky ABS sa ODVODIA
+      # — pri `:seed_fallback` aj `:unreadable` to Kontrola prizna). Od NP-3 ho
+      # cita aj narezovy plan (`layout_for`). Hrubky ABS sa ODVODIA
       # z UZ NACITANEJ mapy `edges_map` (audit F3): `vepo_edge_thicknesses`
       # by pri chybe katalogu ABS vyhodil vynimku a zhodil celu Kontrolu;
       # `nil` mapa = prazdne hrubky (geometriu `purchase_rect` vrati aj pri
@@ -2403,7 +2434,14 @@ module Noxun
       # autorita cisel). ŠT-1b: telo sa stahuje sem, lebo rozpoctove upozornenia
       # su sucastou KONTROLY a tu uz cita aj Studio. Zlyhanie NIKDY nezhodi okno —
       # vrati nil a zvysok okna zije dalej.
-      def budget_payload(model, bom, collected, estimate = nil, hw_exp = nil, smap = nil)
+      #
+      # NP-3: rozpocet nesie aj NAREZOVY PLAN (len veta v poznamke riadku
+      # materialu — cisla sa nemenia). `layout` = plan, ktory volajuci uz ma
+      # (push Studia); bez neho si ho spocita SAM z TOHO ISTEHO zberu (vzor
+      # odhadu platni) — vsetkych 5 volajucich tak nesie ten isty plan a tu
+      # istu poznamku. `layout_for` je fail-soft (vlastny rescue), takze chyba
+      # planu tento rescue nikdy nespusti (audit F7).
+      def budget_payload(model, bom, collected, estimate = nil, hw_exp = nil, smap = nil, layout = nil)
         smap ||= sheets_map
         est = estimate || SheetEstimate.estimate(
           bom[:rows],
@@ -2411,12 +2449,216 @@ module Noxun
           uni_ids: smap.each_with_object({}) { |(id, s), out| out[id] = true if Materials.uni?(s) }
         )
         exp = hw_exp || hardware_expansion(model, collected)
+        lay = layout || layout_for(collected, bom, smap, exp)
         Budget.payload_for(model, bom, sheets: smap, edges: (edges_map || {}),
                            hardware_expansion: exp, hardware_catalog: hardware_catalog_items,
-                           sheet_estimate: est)
+                           sheet_estimate: est, sheet_layout: lay)
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.budget_payload')
         nil
+      end
+
+      # --- NP-3: NAREZOVY PLAN zakazky --------------------------------------
+      #
+      # JEDEN vypocet planu na zber: push Studia ho spocita raz a odovzda ho
+      # rozpoctu aj sekcii; ostatni volajuci `budget_payload` si ho spocitaju
+      # z TOHO ISTEHO zberu. Ziadny druhy sken modelu (`collected` prichadza).
+      # Parametre = TIE ISTE ako Kontrola (`control_layout` — zdroj
+      # `SupplierSettings.layout_params` aj s povodom a hrubky ABS z uz
+      # nacitanej mapy). `blocked` = vsetky brany, ktore by nad tymto zberom
+      # zastavili VEPO (audit B1). FAIL-SOFT: pri chybe {'error' => veta},
+      # nikdy vynimka (audit F7 — rozpocet, XLSX ani prepocet cien nespadnu).
+      def layout_for(collected, bom, smap, hw_exp)
+        lay = control_layout(edges_map)
+        reasons = layout_block_reasons(collected, hw_exp)
+        blocked = reasons.empty? ? nil : { 'all' => "VEPO export by sa zastavil: #{reasons.join(' · ')}" }
+        plan = SheetLayout.compute(Array(bom.is_a?(Hash) ? bom[:rows] : nil), sheets: smap || {},
+                                   edge_thicknesses: lay[:edge_thicknesses],
+                                   params: lay[:params], blocked: blocked)
+        plan['params_source'] = lay[:source].to_s
+        plan['blocked_all'] = blocked && blocked['all']
+        plan
+      rescue StandardError => e
+        Engine.log_error(e, 'ProductionCore.layout_for')
+        { 'error' => SheetLayout::UNAVAILABLE_NOTE }
+      end
+
+      # Audit B1 + F5: STRUKTUROVANE dovody vsetkych bran, ktore VEPO export
+      # vyhodnoti nad tym istym zberom — v TOM ISTOM poradi ako `do_export`
+      # (novsia schema · chrbat v drazke D-143 · kit zasuviek `scope: :kit`
+      # s tou istou expanziou). Ziadna kopia podmienok: volaju sa tie iste
+      # funkcie, ktore skladaju vetu exportu.
+      def layout_block_reasons(collected, hw_exp)
+        newer_config_reasons(collected) + cut_blockers(collected) +
+          drawer_reasons(collected, hw_exp, scope: :kit)
+      end
+
+      # Payload sekcie Narezovy plan (mockup A, B). KOMPAKTNY tvar: mena
+      # riadkov su raz v `rows`, rozlozenie su polia [riadok, x, y] na 0,1 mm
+      # (audit F10), zvysok [x, y, dlzka, sirka]. Texty (veta o pocte, dovody
+      # nezaradenia) sklada SERVER — klient ich len zobrazi.
+      def sheet_layout_payload(plan, bom, smap, estimate)
+        return { 'ok' => false, 'error' => SheetLayout::UNAVAILABLE_NOTE } if !plan.is_a?(Hash) || plan['error']
+
+        by_key = {}
+        Array(bom.is_a?(Hash) ? bom[:rows] : nil).each do |r|
+          by_key[r['key']] ||= r if r.is_a?(Hash) && r['key'].is_a?(Array)
+        end
+        est = Array(estimate).each_with_object({}) { |e, o| o[e['material_id'].to_s] = e if e.is_a?(Hash) }
+        mats = Array(plan['materials'])
+        smap = {} unless smap.is_a?(Hash)
+        labels = material_labels(mats.map { |m| m['material_id'].to_s }, smap)
+        unrel = SheetLayout.unreliable_source?(plan['params_source'])
+        prm = plan['params'].is_a?(Hash) ? plan['params'] : {}
+        without = Array(plan['rejected_without_material_rows'])
+        {
+          'ok' => true, 'params' => prm, 'source' => plan['params_source'].to_s, 'unreliable' => unrel,
+          'blocked' => plan['blocked_all'],
+          'without_material' => { 'rows' => without.length,
+                                  'pieces' => without.sum { |e| layout_row_qty(by_key[e['key']]) || 1 },
+                                  'items' => without.map { |e| layout_reject_payload(e, by_key, nil) } },
+          'materials' => mats.map do |m|
+            mid = m['material_id'].to_s
+            layout_material_payload(m, smap[mid], labels[mid], est[mid], by_key, unrel, prm)
+          end
+        }
+      rescue StandardError => e
+        Engine.log_error(e, 'ProductionCore.sheet_layout_payload')
+        { 'ok' => false, 'error' => SheetLayout::UNAVAILABLE_NOTE }
+      end
+
+      def layout_material_payload(mat, rec, label, est, by_key, unrel, prm)
+        rec = {} unless rec.is_a?(Hash)
+        dup = prm['dup_allowance'].to_f
+        orient = SheetLayout.orientational?(mat)
+        rows = Array(mat['rows']).map { |e| layout_row_payload(e, by_key, dup) }
+        grain = rec['grain'].to_s
+        {
+          'id' => mat['material_id'].to_s, 'label' => label.to_s, 'manufacturer' => rec['manufacturer'].to_s.strip,
+          'th' => (rec['thickness'].to_f.positive? ? rec['thickness'].to_f : nil),
+          'rgb' => catalog_color(rec), 'grain' => grain.empty? ? 'none' : grain,
+          'size' => Array(mat['sheet_size']).map { |v| r1(v) }, 'usable' => Array(mat['usable']).map { |v| r1(v) },
+          'trim' => r1(mat['trim']), 'no_trim' => SheetLayout::NO_TRIM_TYPES.include?(Materials.canonical_type(rec['type'])),
+          'fallback' => mat['fallback'] == true, 'uni' => mat['uni'] == true, 'orient' => orient,
+          'incomplete' => SheetLayout.incomplete?(mat), 'upper_bound' => mat['upper_bound'] == true,
+          'invalid_params' => mat['invalid_params'] == true, 'blocked' => mat['blocked'],
+          'sheets' => mat['sheets'].to_i, 'util' => mat['utilization'],
+          'phrase' => SheetLayout.count_phrase(mat, unreliable: unrel),
+          'est' => est ? [est['count_min'], est['count_max']] : nil,
+          'est_budget' => est ? Budget.plates_of(est) : nil,
+          'rows' => rows,
+          'plates' => Array(mat['layouts']).map do |s|
+            { 'u' => s['utilization'],
+              'p' => Array(s['placements']).map { |idx, _n, x, y| [idx, r1(x), r1(y)] },
+              'o' => s['offcut'] ? s['offcut'].map { |v| r1(v) } : nil }
+          end,
+          'unplaced' => layout_unplaced_payload(mat, rows, orient),
+          'rejected' => Array(mat['rejected']).map { |e| layout_reject_payload(e, by_key, rows) },
+          'conflicts' => Array(mat['conflicts']).map { |e| layout_reject_payload(e, by_key, rows) }
+        }
+      end
+
+      # Riadok planu: `k` nativny kluc (oko -> `nx_select` s `parts_key`; len
+      # ked riadok v kusovniku naozaj je — inak by oko nemalo co oznacit),
+      # `c` pocet obdlznikov, pri duplaku `q` hotovych kusov, `m` vrstiev
+      # a hotovy rozmer `fl × fw` (prirez = hotovy + pridavok na kazdu stranu).
+      def layout_row_payload(e, by_key, dup)
+        br = e['key'].is_a?(Array) ? by_key[e['key']] : nil
+        names = Array(e['names']).map(&:to_s)
+        mult = e['doubled'] ? [e['multiplier'].to_i, 1].max : 1
+        p2 = e['doubled'] ? 2 * dup : 0.0
+        { 'k' => br ? e['key'] : nil, 'n' => names.join(' / '), 's' => names.first.to_s, 'o' => layout_owners(br),
+          'l' => r1(e['l']), 'w' => r1(e['w']), 'c' => e['count'].to_i, 'd' => e['doubled'] == true,
+          'm' => mult, 'q' => (e['count'].to_i / mult), 'fl' => r1(e['l'].to_f - p2), 'fw' => r1(e['w'].to_f - p2) }
+      end
+
+      # Nezaradene obdlzniky zoskupene po riadkoch a dovodoch; veta dovodu je
+      # SERVEROVA. Duplak je JEDEN hotovy dielec — pocet vrstiev a rozmer
+      # prirezu sa hovori zvlast (Codex #416).
+      def layout_unplaced_payload(mat, rows, orient)
+        groups = {}
+        Array(mat['unplaced']).each do |idx, _n, reason|
+          g = groups[[idx, reason]] ||= { 'r' => idx, 'reason' => reason.to_s, 'c' => 0 }
+          g['c'] += 1
+        end
+        groups.values.sort_by { |g| [g['r'].to_i, g['reason']] }.map do |g|
+          row = rows[g['r'].to_i] || {}
+          plan_row = Array(mat['rows'])[g['r'].to_i]
+          why = layout_unplaced_text(g['reason'], plan_row.is_a?(Hash) ? plan_row['grain'] : nil, orient)
+          if row['d']
+            fin = (g['c'] / [row['m'].to_i, 1].max)
+            why = "duplák: #{fin} ks = #{g['c']} #{rects_word(g['c'])} " \
+                  "#{SheetLayout.dim_text(row['l'])} × #{SheetLayout.dim_text(row['w'])} — #{why}"
+            g['q'] = fin
+          else
+            g['q'] = g['c']
+          end
+          g.merge('t' => why)
+        end
+      end
+
+      def rects_word(n)
+        return 'prírez' if n == 1
+        return 'prírezy' if n.between?(2, 4)
+
+        'prírezov'
+      end
+
+      # Ludska veta dovodu nezaradenia. „hlási aj Kontrola" LEN pri materiali,
+      # ktory Kontrola kontroluje (nie fallback ani UNI — `check_oversize`).
+      def layout_unplaced_text(reason, grain, orient)
+        case reason.to_s
+        when 'needs_rotation'
+          'nezmestí sa bez otočenia (plán neotáča) — otočený by sa zmestil, preto ho Kontrola nehlási'
+        when 'no_usable_area'
+          'orez nenechal na platni žiadnu použiteľnú plochu'
+        else
+          base = SheetLayout.rotation_allowed?(grain) ? 'nezmestí sa ani otočený' : 'nezmestí sa (s kresbou sa neotáča)'
+          orient ? base : "#{base} — hlási aj Kontrola"
+        end
+      end
+
+      # Vyradeny riadok / konflikt: ludsky dovod, nativny kluc a udaje riadku
+      # kusovnika (pocet, rozmer, skrinky) — nie su v plane, doplnia sa podla kluca.
+      def layout_reject_payload(e, by_key, _rows)
+        br = e['key'].is_a?(Array) ? by_key[e['key']] : nil
+        { 'reason' => e['reason'].to_s, 't' => layout_reject_text(e), 'n' => Array(e['names']).join(' / '),
+          'k' => br ? e['key'] : nil, 'q' => layout_row_qty(br), 'o' => layout_owners(br),
+          'l' => br ? r1(br['length']) : nil, 'w' => br ? r1(br['width']) : nil }
+      end
+
+      def layout_reject_text(e)
+        detail = e['detail'].to_s
+        case e['reason'].to_s
+        when 'vepo' then "VEPO riadok odmietne — #{detail.empty? ? 'neznámy dôvod' : detail}; plán ho preto nezaradí"
+        when 'zero_after_rounding' then 'nulový rozmer po zaokrúhlení na celé mm — VEPO ho nevydá; plán ho nezaradí'
+        when 'thickness_conflict'
+          if detail.empty?
+            'hrúbka dielca nesedí s hrúbkou materiálu v katalógu — plán ho nezaradí'
+          else
+            "konflikt hrúbky: #{detail} — plán nie je horná hranica"
+          end
+        when 'duplak_link_missing'
+          'duplák bez väzby na zdrojový materiál (prestav skrinku) — plán ho nezaradí'
+        else 'poškodený riadok (rozmer, hrúbka alebo hrany) — plán ho nezaradí'
+        end
+      end
+
+      def layout_row_qty(br)
+        br.is_a?(Hash) ? br['quantity'].to_i : nil
+      end
+
+      def layout_owners(br)
+        return '' unless br.is_a?(Hash)
+
+        Array(br['kde']).map { |k| k.is_a?(Hash) ? k['owner_id'].to_s : k.to_s }.reject(&:empty?).uniq.join(', ')
+      end
+
+      def r1(v)
+        return nil if v.nil?
+
+        f = v.to_f
+        f.finite? ? f.round(1) : nil
       end
 
       # Katalog kovania pre scan veku cien; chyba katalogu = scan sa preskoci

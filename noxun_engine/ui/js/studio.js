@@ -61,7 +61,7 @@
 
   // ZRKADLO `StudioDialog::SECTIONS` — autoritou whitelistu je RUBY, tento
   // zoznam len zabrani, aby z okna vyletela hodnota, ktora sekciu nepomenuva.
-  var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat', 'hw', 'appl', 'rules', 'tpl',
+  var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget', 'offer', 'cut', 'mat', 'hw', 'appl', 'rules', 'tpl',
                          'sup', 'bset', 'about'];
 
   // ŠT-1b (Š10): 3-stavove nastavenie kontroly hran je ZDIELANY komponent —
@@ -87,9 +87,9 @@
     { k: 'role',  t: 'Rola',         on: false }
   ];
 
-  // Navigacia. Polozka je bud SEKCIA (zije tu), PREMOSTENIE (obsah je zatial
-  // v inom okne — klik ho otvori a tooltip to prizna) alebo `disabled`
-  // s vysvetlenim (vzor D-78: ziadne mrtve tlacidlo bez dovodu).
+  // Navigacia. Od NP-3 je KAZDA polozka SEKCIA (posledna neaktivna — Narezovy
+  // plan — ozila). Vetva `disabled` (vzor D-78: dovod v tooltipe) v kresleni
+  // ostava pre buducu polozku, ktora by prisla skor nez jej obsah.
   var NAV = [
     { grp: 'ZÁKAZKA', items: [
       { id: 'bom',    ic: 'list',            t: 'Kusovník' },
@@ -104,8 +104,11 @@
       // ŠT-1c PR B2 (Š14–Š15): Cenová ponuka je od tejto dávky VLASTNÁ sekcia
       // — zákaznícka projekcia toho istého rozpočtu (suma sa nikdy nelíši).
       { id: 'offer',  ic: 'file-text',       t: 'Cenová ponuka' },
+      // NP-3 (blok 2, mockup A): Nárezový plán je SEKCIA — koľko platní stačí
+      // pri jednoduchom rozložení v pásoch (horná hranica). Kreslí ho
+      // `js/sheet_layout.js` (načítava sa AŽ ZA týmto súborom).
       { id: 'cut',    ic: 'scissors',        t: 'Nárezový plán',
-        disabled: 'fáza 2 — nárezový plán zatiaľ neexistuje' }
+        hint: 'koľko platní stačí pri tomto rozložení (horná hranica)' }
     ] },
     { grp: 'KATALÓGY', items: [
       // ŠT-2a: Materiály sú SEKCIA — prvá živá položka skupiny KATALÓGY.
@@ -147,6 +150,9 @@
               hint: 'rozpočet zákazky · ceny kovania sú spoločné pre všetky zákazky' },
     offer: { t: 'Cenová ponuka',
              hint: 'zákaznícky pohľad na ten istý rozpočet · rečou zákazníka, bez interných kódov' },
+    // NP-3 (mockup A): hint = sechint mockupu (plán je podklad, reže VEPO).
+    cut: { t: 'Nárezový plán',
+           hint: 'koľko platní stačí pri tomto rozložení · podklad pre objednávku — reže VEPO' },
     // ŠT-2a: hint nesie to, co v okne Materialy stal podtitul (`#mdline`) —
     // co sekcia spravuje a co je v nej GLOBALNE (katalog) vs projektove.
     mat: { t: 'Materiály',
@@ -1258,6 +1264,14 @@
       else box.innerHTML = '';
       return;
     }
+    // NP-3: lištu Nárezového plánu (Obnoviť + chip parametrov, v detaile aj
+    // listovanie platní) kreslí `js/sheet_layout.js`. Jantárový príznak mu
+    // podávame — `staleFlag` má jedinú autoritu, tu.
+    if (studioSec === 'cut'){
+      if (typeof npRenderTools === 'function') npRenderTools(staleFlag);
+      else box.innerHTML = '';
+      return;
+    }
     // Š10: lišta sekcie Kontrola nesie OBA prepínače (a nič iné — exporty
     // kontrola nemá). Jeden riadok, žiadny nový blok: vertikálny priestor
     // je vzácny a nastavenie hrán je overlay pod tlačidlom.
@@ -1465,6 +1479,12 @@
     if (studioSec === 'sup' || studioSec === 'bset' || studioSec === 'about'){
       if (typeof ssRenderBody === 'function') ssRenderBody();
       else box.innerHTML = '<div class="muted">Nastavenia sa nenačítali (js/studio_settings.js).</div>';
+      return;
+    }
+    // NP-3: telo Nárezového plánu (karty materiálov / detail platne).
+    if (studioSec === 'cut'){
+      if (typeof npRenderBody === 'function') npRenderBody();
+      else box.innerHTML = '<div class="muted">Nárezový plán sa nenačítal (js/sheet_layout.js).</div>';
       return;
     }
     if (studioSec === 'ctrl') box.innerHTML = ctrlSection();
@@ -1709,6 +1729,8 @@
   var REFRESH_STATUS = { ctrl: 'Prepočítavam kontrolu…',
                          buy: 'Prepočítavam nákupný zoznam…', budget: 'Prepočítavam rozpočet…',
                          offer: 'Prepočítavam cenovú ponuku…',
+                         // NP-3: plán sa prepočíta z toho istého zberu ako rozpočet.
+                         cut: 'Prepočítavam nárezový plán…',
                          // ŠT-2a: v Materiáloch sa z modelu prepočítava JEDINÉ —
                          // koľko dielcov ktorý dekor používa (katalóg je globálny
                          // a chodí echom). Hláška to musí povedať presne, inak
@@ -1895,7 +1917,7 @@
     if (!it) return;
     if (it.disabled){ NX.setStatus(it.t + ' — ' + it.disabled, true); return; }
     // ŠT-4a: vetva premostenia zanikla — každá položka je odteraz SEKCIA
-    // (alebo jediný `disabled` Nárezový plán vyššie).
+    // (od NP-3 aj Nárezový plán; vetva `disabled` vyššie ostáva ako poistka).
     // ŠT-1c PR B2: klientske `goto` (položka navigácie, ktorej obsah bol ČASŤOU
     // inej sekcie) ZANIKLO spolu s náhľadom cenovej ponuky vnútri Rozpočtu —
     // `offer` je od tejto dávky plnohodnotná sekcia.

@@ -51,6 +51,12 @@ module NxSL
     res['materials'].find { |m| m['material_id'] == id }
   end
 
+  # NP-3 (audit B2, B3): záznamy `rejected`/`conflicts` nesú navyše natívny
+  # `key` a `row_material_id` — pôvodné očakávania NP-1 porovnávajú jadro.
+  def core(list)
+    Array(list).map { |e| e.slice('reason', 'detail', 'names') }
+  end
+
   # Umiestnenia materiálu ako [číslo platne od 1, l, w, x, y] v poradí platní.
   def placed(m)
     out = []
@@ -424,10 +430,15 @@ NxTest.test('NP-1 neuplnost: vyradene riadky (neznama ABS, hrubka, bez materialu
   m = NxSL.mat(r, 'DTD18')
   NxTest.assert_equal(2, m['rejected_rows'])
   NxTest.assert_equal([{ 'reason' => 'vepo', 'detail' => 'chybná hrúbka 0.0', 'names' => ['HR'] },
-                       { 'reason' => 'vepo', 'detail' => 'neznáma ABS NEZNAMA', 'names' => ['ABS'] }], m['rejected'])
+                       { 'reason' => 'vepo', 'detail' => 'neznáma ABS NEZNAMA', 'names' => ['ABS'] }],
+                      NxSL.core(m['rejected']))
+  # NP-3 (B2): vyradený riadok nesie NATÍVNY kľúč (oko v červenom zozname)
+  NxTest.assert_equal(rows[2]['key'], m['rejected'][0]['key'])
+  NxTest.assert_equal('DTD18', m['rejected'][0]['row_material_id'])
   NxTest.assert_equal(1, r['rejected_without_material'])
   NxTest.assert_equal([{ 'reason' => 'vepo', 'detail' => 'chýba materiál', 'names' => ['BEZ'] }],
-                      r['rejected_without_material_rows'])
+                      NxSL.core(r['rejected_without_material_rows']))
+  NxTest.assert_equal(rows[3]['key'], r['rejected_without_material_rows'][0]['key'])
   NxTest.assert_equal(1, m['sheets'], 'zdravy riadok sa rozlozi')
   NxTest.assert_equal(false, m['upper_bound'])
 end
@@ -479,7 +490,9 @@ NxTest.test('NP-1 hrubka vs. nakupny material: 18 a 36 mm pri jednom material_id
           NxSL.row('names' => ['T36'], 'length' => 1380.0, 'width' => 2050.0, 'thickness' => 36.0)]
   m = NxSL.mat(NxSL.compute(rows), 'DTD18')
   NxTest.assert_equal(true, m['thickness_conflict'])
-  NxTest.assert_equal([{ 'reason' => 'thickness_conflict', 'detail' => nil, 'names' => ['T36'] }], m['conflicts'])
+  NxTest.assert_equal([{ 'reason' => 'thickness_conflict', 'detail' => nil, 'names' => ['T36'] }],
+                      NxSL.core(m['conflicts']))
+  NxTest.assert_equal([rows[1]['key'], 'DTD18'], m['conflicts'][0].values_at('key', 'row_material_id'))
   NxTest.assert_equal(1, m['placed_count'], 'konfliktny riadok sa nerozklada')
   NxTest.assert_equal(0, m['rejected_rows'])
   NxTest.assert_equal(false, m['upper_bound'])
@@ -493,8 +506,9 @@ NxTest.test('NP-1 jednotna hrubka aj bez hrubky v katalogu: 18 a 36 pri jednom m
           NxSL.row('names' => ['T36'], 'material_id' => 'NOTHK', 'thickness' => 36.0)]
   m = NxSL.mat(NxSL.compute(rows), 'NOTHK')
   NxTest.assert_equal([true, false], m.values_at('thickness_conflict', 'upper_bound'))
-  NxTest.assert_equal([{ 'reason' => 'thickness_conflict', 'detail' => 'rôzne obchodné hrúbky 18, 36', 'names' => [] }],
-                      m['conflicts'])
+  NxTest.assert_equal([{ 'reason' => 'thickness_conflict', 'detail' => 'rôzne obchodné hrúbky 18, 36', 'names' => [],
+                         'key' => nil, 'row_material_id' => nil }],
+                      m['conflicts'], 'konflikt materiálu nemá riadok — kľúč aj materiál riadku sú nil')
   NxTest.assert_equal(2, m['placed_count'], 'bez katalogu sa neda povedat, ktory je zly — rozlozia sa oba')
   # záznam s hrúbkou 0 = ako bez hrúbky; 18 a 19 sú to isté obchodné pásmo
   zero = NxSL.compute([NxSL.row('material_id' => 'NOTHK', 'thickness' => 18.0),
@@ -542,7 +556,11 @@ NxTest.test('NP-1 duplak bez vazby v riadku: duplak_link_missing na zdroji, ziad
   m = NxSL.mat(r, 'DTD18')
   NxTest.assert_equal(true, m['duplak_link_missing'])
   NxTest.assert_equal([0, 0, false], m.values_at('sheets', 'placed_count', 'upper_bound'))
-  NxTest.assert_equal([{ 'reason' => 'duplak_link_missing', 'detail' => nil, 'names' => ['DUP'] }], m['conflicts'])
+  NxTest.assert_equal([{ 'reason' => 'duplak_link_missing', 'detail' => nil, 'names' => ['DUP'] }],
+                      NxSL.core(m['conflicts']))
+  # NP-3 (B3): konflikt nesie MATERIÁL RIADKU (duplák) — most k riadku rozpočtu
+  NxTest.assert_equal('DTD36', m['conflicts'][0]['row_material_id'])
+  NxTest.assert(m['conflicts'][0]['key'].is_a?(Array), 'natívny kľúč riadku (B2)')
   # s vazbou: 2 vrstvy 1400 x 2050 (s pridavkom) = 2 zdrojove platne
   linked = NxSL.mat(NxSL.compute([NxSL.row('length' => 1380.0, 'width' => 2030.0, 'material_id' => 'DTD36',
                                            'thickness' => 36.0,

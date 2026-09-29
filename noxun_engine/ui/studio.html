@@ -5,7 +5,7 @@
      to isté zdieľané jadro `ProductionCore`).
      Vizuálna referencia: SYSTEM/zdroje/ui20/mockup_studio.html -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.15.2">
+<link rel="stylesheet" href="css/panel.css?v=0.15.3">
 <style>
   /* Štýly sú ZÁMERNE inline v studio.html (rovnaký dôvod, aký mala production.html):
      panel.css je zdieľaný s Inspectorom a rozloženie tohto okna doňho nepatrí.
@@ -703,6 +703,149 @@
   @media (max-width: 1100px) {
     .apbody { grid-template-columns: 1fr; }
   }
+
+  /* ===== NP-3: sekcia NÁREZOVÝ PLÁN (mockup A, B — SYSTEM/zdroje/bloky/NAREZ/) =====
+     Farby VÝHRADNE tokeny --nx-* (obe témy); SVG platne kreslí js/sheet_layout.js
+     len triedami `.np-*` — žiadne inline fill/stroke. Vzorka dekoru je dátová
+     farba v HTML štvorčeku `.sw`, nie v SVG. */
+  .studio .npparam { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 99px;
+                     background: var(--nx-surface); border: 1px solid var(--nx-border-strong);
+                     color: var(--nx-ink-label); font-size: 11.5px; font-weight: 600; cursor: pointer; }
+  .studio .npparam:hover { border-color: var(--nx-select); color: var(--nx-select); background: var(--nx-select-bg-soft); }
+  .studio .npparam.warn { background: var(--nx-warn-bg-soft); border-color: var(--nx-warnchip-border);
+                          color: var(--nx-warnchip-fg); }
+  .studio .npparam .ic { width: 13px; height: 13px; }
+  .studio .npsum { display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap; padding: 7px 10px;
+                   border: 1px solid var(--nx-border); border-radius: 6px; background: var(--nx-surface-th);
+                   font-size: 12.5px; color: var(--nx-ink-strong); margin: 0 0 10px; }
+  .studio .npsum b { color: var(--nx-ink-title); }
+  .studio .npsum .tmuted { color: var(--nx-ink-muted); }
+  .studio .npsum .spacer, .studio .nptog .spacer { flex: 1; }
+  .studio .npbanner { display: flex; align-items: flex-start; gap: 7px; padding: 6px 10px; margin: 0 0 10px;
+                      border-radius: 6px; font-size: 12px; line-height: 1.45; }
+  .studio .npbanner .ic { width: 14px; height: 14px; flex: 0 0 14px; margin-top: 1px; }
+  .studio .npbanner.err { background: var(--nx-err-bg); color: var(--nx-err-fg); border: 1px solid var(--nx-err-border); }
+  .studio .npbanner.warn { background: var(--nx-warn-bg); color: var(--nx-warnrow-fg);
+                           border: 1px solid var(--nx-warnchip-border); }
+  .studio .npchip { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 600;
+                    border-radius: 6px; padding: 1px 7px; white-space: nowrap; line-height: 16px; vertical-align: 1px; }
+  .studio .npchip .ic { width: 11px; height: 11px; }
+  .studio .npchip.info { background: var(--nx-surface-sunken); color: var(--nx-ink-muted); border: 1px solid var(--nx-border); }
+  .studio .npchip.warn { background: var(--nx-warn-bg-soft); color: var(--nx-warnchip-fg); border: 1px solid var(--nx-warnchip-border); }
+  .studio .npchip.err { background: var(--nx-err-bg); color: var(--nx-err-fg); border: 1px solid var(--nx-err-border); }
+  .studio .npcard { border: 1px solid var(--nx-border); border-radius: 8px; margin: 0 0 10px; background: var(--nx-surface); }
+  .studio .nphead { padding: 6px 10px; background: var(--nx-surface-th); border-bottom: 1px solid var(--nx-border);
+                    border-radius: 8px 8px 0 0; }
+  .studio .npcard.closed .nphead { border-bottom: 0; border-radius: 8px; }
+  .studio .nptog { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; padding: 1px 0;
+                   background: none; border: 0; text-align: left; font: inherit; font-weight: 400; cursor: pointer; }
+  .studio .nptog:hover .npname { color: var(--nx-select); }
+  .studio .nptog .chev { width: 6px; height: 6px; border-right: 2px solid var(--nx-ink-faint);
+                         border-bottom: 2px solid var(--nx-ink-faint); transform: rotate(45deg); flex: 0 0 6px;
+                         position: relative; top: -2px; transition: transform .12s; }
+  .studio .npcard.closed .nptog .chev { transform: rotate(-45deg); top: 0; }
+  .studio .nptog .sw, .studio .npdhd .sw { width: 16px; height: 16px; border-radius: 3px; flex: 0 0 16px;
+                                           border: 1px solid var(--nx-border-strong); background: var(--nx-surface-sunken); }
+  .studio .npname { font-weight: 600; font-size: 12.5px; color: var(--nx-ink-strong); white-space: nowrap;
+                    overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .studio .npman { font-size: 11px; color: var(--nx-ink-muted); white-space: nowrap; }
+  .studio .npstate { display: inline-flex; align-items: center; }
+  .studio .npstate .ic { width: 14px; height: 14px; }
+  .studio .npstate .ic.w { color: var(--nx-warn-fg); }
+  .studio .npstate .ic.e { color: var(--nx-err-fg); }
+  .studio .npcount { white-space: nowrap; font-size: 12px; color: var(--nx-ink-muted); }
+  .studio .npcount b { font-size: 13px; color: var(--nx-ink-title); }
+  .studio .npcount small { font-size: 11px; }
+  .studio .npcount.orient, .studio .npcount.orient b { color: var(--nx-warnchip-fg); }
+  .studio .npcount.inc small { color: var(--nx-err-fg); }
+  .studio .npl2 { display: flex; align-items: center; flex-wrap: wrap; gap: 3px 6px; padding: 2px 0 0 36px;
+                  font-size: 11px; color: var(--nx-ink-muted); font-variant-numeric: tabular-nums; }
+  .studio .npl2 .ic { width: 13px; height: 13px; }
+  .studio .npl2 .sep, .studio .npdhd .sep { color: var(--nx-border-strong); }
+  .studio .npl2 b { color: var(--nx-ink-strong); font-weight: 600; }
+  .studio .npl2 .bfnt { color: var(--nx-ink-faint); }
+  .studio .npbody { padding: 8px 10px 9px; }
+  .studio .npgrid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .studio .npthumb { display: flex; flex-direction: column; gap: 3px; padding: 5px 6px 6px; border: 1px solid var(--nx-border);
+                     border-radius: 6px; background: var(--nx-surface); font: inherit; font-weight: 400;
+                     text-align: left; cursor: pointer; }
+  .studio .npthumb:hover { border-color: var(--nx-select); background: var(--nx-select-bg-soft); }
+  .studio .npthumb.warn { border-color: var(--nx-warnchip-border); background: var(--nx-warn-bg); }
+  .studio .npthumb.orient { border-style: dashed; }
+  .studio .npthumb.orient svg { opacity: .72; }
+  .studio .npthd { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--nx-ink-muted); }
+  .studio .npthd .ic { width: 12px; height: 12px; color: var(--nx-warn-fg); }
+  .studio .npthd .u { margin-left: auto; font-weight: 700; color: var(--nx-ink-strong); font-variant-numeric: tabular-nums; }
+  .studio .npthumb.warn .npthd .u { color: var(--nx-warn-fg); }
+  .studio .npthumb svg { display: block; }
+  .studio .npwarn { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-top: 8px; padding: 5px 9px;
+                    border: 1px solid var(--nx-warnchip-border); border-radius: 6px; background: var(--nx-warn-bg);
+                    color: var(--nx-warnrow-fg); font-size: 12px; }
+  .studio .npwarn > .ic { width: 14px; height: 14px; color: var(--nx-warn-fg); }
+  .studio .npwarn b { color: var(--nx-warn-fg); }
+  .studio .npwarn .linkbtn, .studio .npmiss .linkbtn { background: none; border: 0; padding: 0; color: var(--nx-select);
+                                                     text-decoration: underline; font: inherit; font-size: 11.5px;
+                                                     font-weight: 600; cursor: pointer; }
+  .studio .npmiss { margin-top: 8px; border: 1px solid var(--nx-err-border); border-radius: 6px; background: var(--nx-err-bg);
+                    color: var(--nx-err-fg); font-size: 12px; }
+  .studio .npmisshd { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; padding: 5px 9px;
+                      border-bottom: 1px solid var(--nx-err-border); }
+  .studio .npmisshd .ic { width: 14px; height: 14px; }
+  .studio .npmisshd .why { font-size: 11px; opacity: .85; }
+  .studio .npmissrow { display: grid; grid-template-columns: minmax(0, 1fr) 150px 100px 54px 28px; align-items: center;
+                       gap: 8px; padding: 3px 9px; font-variant-numeric: tabular-nums; }
+  .studio .npmissrow .num { text-align: right; white-space: nowrap; }
+  .studio .npmissrow .own { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .studio .npmissrow .npwhy { display: block; font-size: 10.5px; opacity: .85; }
+  .studio .eyebtn { width: 24px; height: 22px; padding: 0; border: 1px solid var(--nx-border); border-radius: 6px;
+                    background: var(--nx-surface); color: var(--nx-ink-muted); display: inline-flex;
+                    align-items: center; justify-content: center; cursor: pointer; }
+  .studio .eyebtn:hover { color: var(--nx-select); border-color: var(--nx-select); }
+  .studio .eyebtn .ic { width: 13px; height: 13px; }
+  .studio .npbar { display: inline-flex; align-items: center; border: 1px solid var(--nx-border-strong);
+                   border-radius: 6px; overflow: hidden; }
+  .studio .npbar button { border: 0; border-radius: 0; padding: 5px 7px; background: var(--nx-surface);
+                          color: var(--nx-ink-muted); cursor: pointer; display: inline-flex; }
+  .studio .npbar button:hover { background: var(--nx-select-bg-soft); color: var(--nx-select); }
+  .studio .npbar .pg { padding: 5px 10px; font-size: 12px; font-weight: 600; color: var(--nx-ink-strong);
+                       border-left: 1px solid var(--nx-border-soft); border-right: 1px solid var(--nx-border-soft);
+                       white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .studio .npbar .ic { width: 14px; height: 14px; }
+  .studio .flipx { transform: scaleX(-1); }
+  .studio .npdhd { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 6px; font-size: 12px;
+                   color: var(--nx-ink-muted); }
+  .studio .npdhd b { color: var(--nx-ink-strong); }
+  .studio .npdsvg { display: block; margin: 0 0 8px; }
+  .studio .nplist { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px;
+                    border: 1px solid var(--nx-border); border-radius: 6px; overflow: hidden; margin-top: 8px; }
+  .studio .nplist th { background: var(--nx-surface-th); color: var(--nx-ink-label); font-weight: 600; font-size: 11px;
+                       text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--nx-border); white-space: nowrap; }
+  .studio .nplist td { padding: 3px 8px; border-bottom: 1px solid var(--nx-border-soft); color: var(--nx-ink); vertical-align: middle; }
+  .studio .nplist tr:last-child td { border-bottom: 0; }
+  .studio .nplist .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .studio .nplist td.own { color: var(--nx-ink-muted); max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .studio .nplist tbody tr:hover td, .studio .nplist tbody tr.hl td { background: var(--nx-select-bg-soft); }
+  .studio .nplist td.act { width: 34px; text-align: right; }
+  .studio .nplist .sub { font-size: 10.5px; color: var(--nx-ink-soft); }
+  /* SVG platne — farby VÝHRADNE cez triedy a tokeny (téma-bezpečné) */
+  .np-sheet { fill: var(--nx-surface-sunken); }
+  .np-waste.s { fill: url(#npHatchS); }
+  .np-waste.l { fill: url(#npHatchL); }
+  .np-hatch { stroke: var(--nx-border-strong); stroke-width: 1; }
+  .np-hatchd { stroke: var(--nx-ink-faint); stroke-width: 1; }
+  .np-trim { fill: url(#npHatchD); }
+  .np-edge { fill: none; stroke: var(--nx-ink-faint); stroke-width: 1; }
+  .np-part { fill: var(--nx-surface); stroke: var(--nx-ink-soft); stroke-width: .7; }
+  .np-part.d { stroke-width: 1; }
+  .np-part.dup { fill: var(--nx-surface-th); }
+  .np-part.lone { fill: var(--nx-warn-bg-soft); stroke: var(--nx-warn-fg); }
+  .np-part.hl { fill: var(--nx-select-bg); stroke: var(--nx-select); stroke-width: 1.6; }
+  .np-left { fill: none; stroke: var(--nx-ink-muted); stroke-width: 1; stroke-dasharray: 5 4; }
+  .np-lbl { fill: var(--nx-ink-strong); font-size: 12px; font-weight: 600; }
+  .np-dim { fill: var(--nx-ink-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .np-leftlbl { fill: var(--nx-ink-muted); font-size: 11px; font-style: italic; font-weight: 600; }
+  .np-cap { fill: var(--nx-ink-soft); font-size: 10.5px; }
+  .np-grain { stroke: var(--nx-ink-muted); stroke-width: 1.3; fill: none; stroke-linecap: round; stroke-linejoin: round; }
 </style>
 
 <div class="studio" id="studio">
@@ -1065,41 +1208,51 @@
   </fieldset>
 </template>
 <div id="status">Pripravené.</div>
+<!-- NP-3: šrafovanie odpadu a orezu Nárezového plánu. JEDNA definícia pre
+     všetky platne okna (vzor mockupu); farbu čiary dávajú triedy `.np-hatch` /
+     `.np-hatchd` → tokeny, takže šrafa sleduje obe témy. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <pattern id="npHatchS" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="np-hatch" d="M0 0V4"/></pattern>
+    <pattern id="npHatchL" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="np-hatch" d="M0 0V7"/></pattern>
+    <pattern id="npHatchD" width="2.5" height="2.5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="np-hatchd" d="M0 0V2.5"/></pattern>
+  </defs>
+</svg>
 
-<script src="js/errors.js?v=0.15.2"></script>
+<script src="js/errors.js?v=0.15.3"></script>
 <!-- D-51/D-77: minimálna OBSAHOVÁ veľkosť okna pri otvorení (js/win_fit.js).
      Navigácia 208 px + tabuľka Kusovníka so 7 stĺpcami a stĺpcom akcií — v užšom
      okne končí pravá časť riadku mimo. Trojica NX_FIT_MIN → width/height →
      min_width/min_height je v docs/UI_DIZAJN.md (tabuľka D-51). -->
 <script>window.NX_FIT_MIN = { w: 1060, h: 640 };</script>
-<script src="js/win_fit.js?v=0.15.2"></script>
+<script src="js/win_fit.js?v=0.15.3"></script>
 <!-- Sprite ikon (žiadne emoji v ovládacích prvkoch). Musí byť PRED studio.js —
      navigácia aj hover akcie riadkov používajú <use href="#i-…">. -->
-<script src="js/icons.js?v=0.15.2"></script>
+<script src="js/icons.js?v=0.15.3"></script>
 <!-- R-23.1: JEDEN dokumentový Escape handler s prioritným zoznamom vrstiev
      (ten istý súbor načítava aj panel.html). Musí byť PRED nx_modal.js
      aj studio.js — jeho listener má bežať ako PRVÝ, aby vedel udalosť
      spotrebovať skôr, než ju dostane handler okna. Kostre D-15, rozbaľovacím
      nastaveniam a `budPrModal` sa vyhýba sám (zoznam FOREIGN). -->
-<script src="js/nx_esc.js?v=0.15.2"></script>
+<script src="js/nx_esc.js?v=0.15.3"></script>
 <!-- ŠT-1b: ZDIELANE 3-stavove nastavenie kontroly hran. TEN ISTY subor nacitava
      aj Inspector (rohovy trojuholnik pri ABS kontrole v raile) — jeden markup,
      jeden stav. Musi byt PRED studio.js (lista sekcie Kontrola ho vola pri
      renderi). ŠT-1c PR B3: okno Vyroba zaniklo — prepinace su TU. -->
-<script src="js/edge_menu.js?v=0.15.2"></script>
+<script src="js/edge_menu.js?v=0.15.3"></script>
 <!-- ŠT-1c PR B2 (D-15): ZDIELANA kostra modalov („pridávačiek"). Musí byť PRED
      studio.js aj budget.js — Escape handler Štúdia sa pýta `NXModal.isOpen()`
      a rozpočet ním otvára svoje pridávačky. Ďalšie inštancie (D-69 editor
      materiálu, položka/set kovania) sa naň napoja bez kopírovania. -->
-<script src="js/nx_modal.js?v=0.15.2"></script>
-<script src="js/studio.js?v=0.15.2"></script>
+<script src="js/nx_modal.js?v=0.15.3"></script>
+<script src="js/studio.js?v=0.15.3"></script>
 <!-- ŠT-1c PR B1: sekcia ROZPOČET (Š12–Š13). MUSÍ byť AŽ ZA studio.js — číta
      jeho globálny payload `ST` a hlavne OBALUJE `NX.setStudio` (uvoľnenie
      frontu zápisov po príchode čerstvej generácie). studio.js pritom NX
      PRIRAĎUJE celý (`window.NX = {…}`), takže v opačnom poradí by obal aj
      `NX.budgetResult`/`NX.priceRefresh` prepísal a rozpočet by po prvom zápise
      zamrzol. Poradie stráži guard test (tests/pure/test_st1c_rozpocet.rb). -->
-<script src="js/budget.js?v=0.15.2"></script>
+<script src="js/budget.js?v=0.15.3"></script>
 <!-- ŠT-2a/2b: sekcia MATERIÁLY. Okno „Materiály projektu" ZANIKLO, takže tento
      súbor beží už len TU; príznak nižšie ostáva ako explicitné prihlásenie sa
      do režimu sekcie (a ako poistka Node testov, ktoré ho nenastavujú).
@@ -1113,14 +1266,14 @@
      handlerov; `demos_add.js` nesie modal „Pridať z Demosu". Oba používajú
      výhradne vlastné prefixy (`mdd*` / `nxda*`), takže v okne so studio.js
      a budget.js nič neprepisujú (stráži guard test). -->
-<script src="js/demos_diff.js?v=0.15.2"></script>
-<script src="js/demos_add.js?v=0.15.2"></script>
+<script src="js/demos_diff.js?v=0.15.3"></script>
+<script src="js/demos_add.js?v=0.15.3"></script>
 <!-- PICKER-1: vyhľadávač materiálov (`nx_combo`) je TEN ISTÝ komponent ako
      v Inspectore — predvoľby projektu v sekcii Materiály ho používajú tiež.
      Musí byť PRED proj_materials.js, ktorý ho pri renderi volá. -->
-<script src="js/nx_combo.js?v=0.15.2"></script>
-<script src="js/proj_materials.js?v=0.15.2"></script>
-<script src="js/md_appearance.js?v=0.15.2"></script>
+<script src="js/nx_combo.js?v=0.15.3"></script>
+<script src="js/proj_materials.js?v=0.15.3"></script>
+<script src="js/md_appearance.js?v=0.15.3"></script>
 <!-- ŠT-3a-1/3a-2: sekcia KOVANIE (Š16). Okno „Katalóg kovania" ZANIKLO, takže
      oba súbory bežia už len TU; príznak nižšie ostáva ako čitateľné prihlásenie
      sa do režimu sekcie (a ako marker poradia skriptov pre guard test).
@@ -1131,30 +1284,35 @@
      projektu" volajú jeho funkcie. Poradie stráži guard test
      (tests/pure/test_st3a_hw.rb). -->
 <script>window.NX_HW_SECTION = true;</script>
-<script src="js/hw_sets.js?v=0.15.2"></script>
-<script src="js/hw_catalog.js?v=0.15.2"></script>
+<script src="js/hw_sets.js?v=0.15.3"></script>
+<script src="js/hw_catalog.js?v=0.15.3"></script>
 <!-- S1-A2: sekcia SPOTREBIČE (`appl`). MUSÍ byť AŽ ZA studio.js — obaľuje jeho
      `NX.setStudio` (rovnaký dôvod ako rozpočet, materiály a kovanie) a lištu/telo
      sekcie kreslí cez `apRenderTools`/`apRenderBody`, ktoré studio.js volá cez
      `typeof`. Prijímače `NX.applTree`/`NX.applCard`/`NX.applResult` pridáva DO
      `window.NX` (studio.js ho priraďuje CELÝ), takže v opačnom poradí by zmizli.
      Poradie stráži guard test (tests/pure/test_s1a2_sekcia.rb). -->
-<script src="js/appliances.js?v=0.15.2"></script>
+<script src="js/appliances.js?v=0.15.3"></script>
 <!-- ŠT-3b-1: sekcia PRAVIDLÁ (Š17). Okno „Pravidlá kovania" ZANIKLO, takže
      tento súbor beží už len TU. MUSÍ byť AŽ ZA studio.js (obaľuje jeho
      `NX.setStudio` — rovnaký dôvod ako rozpočet, materiály a kovanie)
      a lištu/telo sekcie kreslí cez `rulesRenderTools`/`rulesRenderBody`,
      ktoré studio.js volá cez `typeof`. Poradie stráži guard test
      (tests/pure/test_st3b_rules.rb). -->
-<script src="js/rules.js?v=0.15.2"></script>
+<script src="js/rules.js?v=0.15.3"></script>
 <!-- ŠT-3c-1: sekcia Šablóny (Š18). Načítava sa AŽ ZA studio.js — obaľuje
      jeho NX.setStudio, rovnako ako všetky predošlé sekcie. -->
-<script src="js/templates.js?v=0.15.2"></script>
+<script src="js/templates.js?v=0.15.3"></script>
 <!-- ŠT-4a: „O plugine" je JEDEN OBSAH, DVA VSTUPY (kontrakt Š19) — ten istý
      `js/about.js` načítava aj panel.html. Musí byť PRED studio_settings.js,
      ktorý ho volá pri kreslení sekcie `about`. -->
-<script src="js/about.js?v=0.15.2"></script>
+<script src="js/about.js?v=0.15.3"></script>
 <!-- ŠT-4a: sekcie Nastavenia (`sup` · `bset` · `about`, Š19) — obsah
      zaniknutého okna „Nastavenia rozpočtu" (POSLEDNÝ satelit). Načítava sa AŽ
      ZA studio.js: obaľuje jeho NX.setStudio, rovnako ako všetky predošlé sekcie. -->
-<script src="js/studio_settings.js?v=0.15.2"></script>
+<script src="js/studio_settings.js?v=0.15.3"></script>
+<!-- NP-3: sekcia NÁREZOVÝ PLÁN (`cut`, mockup A + B). Načítava sa AŽ ZA
+     studio.js — ten volá jej lištu a telo cez `typeof npRenderTools /
+     npRenderBody` a ona číta jeho `ST`, `refreshBtnHtml` a `rgbHex`.
+     `NX.setStudio` NEOBAĽUJE (nemá rozpísaný formulár ani lazy kanál). -->
+<script src="js/sheet_layout.js?v=0.15.3"></script>

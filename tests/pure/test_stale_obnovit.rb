@@ -19,6 +19,7 @@ module NxStale
   BUD = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'budget.js'), encoding: 'UTF-8')
   HTML = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio.html'), encoding: 'UTF-8')
   MAIN = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'main.rb'), encoding: 'UTF-8')
+  NP = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'sheet_layout.js'), encoding: 'UTF-8')
 
   def self.body(src, sig)
     src[/#{Regexp.escape(sig)}.*?\n        end\n/m].to_s
@@ -182,6 +183,13 @@ NxTest.test('STALE: tlacidlo „Obnoviť" ma JEDEN markup pre vsetkych 5 mist') 
                       'budget.js v dvoch (Rozpocet + Ponuka)')
   NxTest.assert_equal(1, NxStale::JS.scan(/t\.closest\('#refreshBtn'\)/).length,
                       'a vsetky idu JEDNYM handlerom (ziadna druha serverova cesta)')
+  # NP-3: SIESTE miesto — Nárezový plán (prehľad aj detail platne) kreslí
+  # tlačidlo TÝM ISTÝM helperom, cez jeden vlastný obal `npRefreshHtml`.
+  NxTest.refute(NxStale::NP.include?('id="refreshBtn"'), 'sheet_layout.js si vlastnu kopiu tlacidla nekresli')
+  NxTest.assert_equal(1, NxStale::NP.scan(/f\(stale === true, /).length, 'jedno volanie helpera')
+  NxTest.assert(NxStale::NP.include?("typeof refreshBtnHtml === 'function'"), 'helper zo studio.js')
+  NxTest.assert_equal(3, NxStale::NP.scan('npRefreshHtml(stale)').length,
+                      'prehľad, detail a stav bez planu — vsetko cez jeden obal')
 end
 
 NxTest.test('STALE: tooltip PRIZNAVA sirku signalu') do
