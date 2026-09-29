@@ -181,6 +181,10 @@ NxTest.test('NP-3 veta (F8): predvolene nastavenia = „orientačne … nastaven
                       'pre zaradené dielce, celkový počet neznámy', f::SL.count_phrase(over, unreliable: true)['text'])
   bad = f.mat(f.plan([f.row], params: { 'kerf' => -1 }), 'H18')
   NxTest.assert(f::SL.count_phrase(bad)['text'].start_with?('plán nedostupný'), 'neplatne parametre = ziadny pocet')
+  # Predrecenzia P3-3: poznamka rozpoctu bez zdvojeneho „plán: plán …"
+  bad_plan = f.plan([f.row], params: { 'kerf' => -1 })
+  NxTest.assert_equal('plán nedostupný — neplatné nastavenie prerezu, orezu alebo prídavku',
+                      f::SL.budget_note(bad_plan, 'H18', f::SHEETS))
 end
 
 NxTest.test('NP-3 veta: skladanie vety zije PRAVE v jednej funkcii (karta, rozpocet, XLSX)') do
@@ -516,6 +520,110 @@ NxTest.test('NP-3 limit (F9): ~2000 obdlznikov — payload sekcie <= 250 kB, vyp
        "cast pushu (rows+odhad+rozpocet+plan) #{push_bytes} B, vypocet+JSON #{best.round(1)} ms"
   NxTest.assert(bytes <= 250_000, "payload #{bytes} B")
   NxTest.assert(best <= 150.0, "cas #{best.round(1)} ms")
+end
+
+# Predrecenzia P3-1 (audit F9): meria sa CELY `data.to_json` skutocneho
+# `StudioDialog.push_state` — zber, kusovnik, odhad, kontrola, rozpocet aj plan
+# idu realnym kodom nad syntetickou zakazkou (~2000 dielcov). Zastubovane su
+# len vstupy z modelu (zber, katalogy) a sekcie katalogov, ktore s velkostou
+# ZAKAZKY nerastu (materialy, kovanie, spotrebice, pravidla, sablony, nastavenia).
+module NxNp3Push
+  class FakeModel < NxTest::FakeEntity
+    def title
+      'SYNT_2000'
+    end
+  end
+
+  EDGES = { 'L1' => nil, 'L2' => nil, 'W1' => nil, 'W2' => nil }.freeze
+
+  module_function
+
+  def collected
+    mids = %w[H18 W18 PD]
+    recs = []
+    pid = 0
+    400.times do |i|
+      mid = mids[i % 3]
+      5.times do |k|
+        pid += 1
+        recs << { 'name' => "P#{i}", 'part_key' => "cabinet/p#{i}:#{k}", 'owner_id' => "CAB-#{(i * 5 + k) % 60}",
+                  'pid' => pid, 'role' => 'shelf', 'length' => 150.0 + (i * 37) % 1100,
+                  'width' => 80.0 + (i * 53) % (mid == 'PD' ? 400 : 700),
+                  'thickness' => mid == 'PD' ? 38.0 : 18.0, 'quantity' => 1, 'material_id' => mid,
+                  'grain_direction' => 'none', 'edges' => EDGES.dup }
+      end
+    end
+    { records: recs, hardware: [], hardware_overrides: [], cabinet_sets: {}, cabinet_set_conflicts: {},
+      placements: [], warnings: [], identities: [], hardware_issues: [], cut_issues: [] }
+  end
+
+  # -> [bajty celeho JSON pushu, ms celeho push_state, data]
+  def push(col)
+    e = Noxun::Engine
+    sd = e::StudioDialog
+    pc = e::ProductionCore
+    sent = nil
+    model = FakeModel.new
+    sk = Module.new
+    sk.define_singleton_method(:active_model) { model }
+    Object.const_set(:Sketchup, sk)
+    stubs_sd = { js: ->(s) { sent = s; true }, mat_payload: ->(*_a) { nil }, hw_payload: ->(*_a) { nil },
+                 appl_payload: ->(*_a) { nil }, rules_payload: ->(*_a) { nil }, tpl_payload: ->(*_a) { nil },
+                 settings_payload: ->(*_a) { nil } }
+    stubs_pc = { fresh_collect: ->(*_a) { col }, sheets_map: ->(*_a) { NxNp3::SHEETS },
+                 edges_map: ->(*_a) { {} }, hardware_expansion: ->(*_a) { { 'rows' => [], 'unmapped' => [] } },
+                 hardware_catalog_items: ->(*_a) { nil }, model_guid: ->(*_a) { 'g' },
+                 project_name: ->(*_a) { 'SYNT' }, default_project_name: ->(*_a) { 'SYNT' },
+                 merge_18_36: ->(*_a) { true } }
+    checks = [e.const_defined?(:EdgeCheck) ? e::EdgeCheck : nil, e.const_defined?(:GrainCheck) ? e::GrainCheck : nil,
+              e.const_defined?(:DirectionCheck) ? e::DirectionCheck : nil].compact
+    ms = nil
+    NxNp3.with_stubs(sd, stubs_sd) do
+      NxNp3.with_stubs(pc, stubs_pc) do
+        with_checks(checks) do
+          t0 = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+          sd.send(:push_state)
+          ms = (Process.clock_gettime(Process::CLOCK_MONOTONIC) - t0) * 1000.0
+        end
+      end
+    end
+    json = sent.to_s[/\ANX\.setStudio\((.*)\)\z/m, 1].to_s
+    [json.bytesize, ms, JSON.parse(json)]
+  ensure
+    Object.send(:remove_const, :Sketchup) if Object.const_defined?(:Sketchup, false)
+  end
+
+  def with_checks(mods, &blk)
+    return blk.call if mods.empty?
+
+    NxNp3.with_stubs(mods.first, ui_state: ->(*_a) { nil }) { with_checks(mods.drop(1), &blk) }
+  end
+end
+
+# Limity podla merania 29.9.2026 s rezervou: cely JSON 377 kB (z toho kusovnik
+# 247 kB, plan 118 kB, rozpocet 10 kB) -> 450 kB (~20 %); push_state ~105 ms
+# lokalne -> 250 ms (CI je pomalsi). Nafuknuta ktorakolvek cast pushu limit prekroci.
+NxTest.test('NP-3 limit (F9, predrecenzia P3-1): CELY JSON pushu Studia ~2000 dielcov <= 450 kB a <= 250 ms') do
+  NxTest.skip!('headless: docasna konstanta Sketchup') unless NxTest.headless?
+  col = NxNp3Push.collected
+  best = nil
+  bytes = 0
+  data = nil
+  NxNp3.with_sandbox do
+    3.times do
+      b, ms, d = NxNp3Push.push(col)
+      bytes = b
+      data = d
+      best = ms if best.nil? || ms < best
+    end
+  end
+  parts = %w[rows control budget sheet_layout].map { |k| "#{k} #{data[k].to_json.bytesize}" }.join(', ')
+  puts "    [NP-3 push] #{col[:records].length} dielcov: cely JSON pushu #{bytes} B (#{parts}), push_state #{best.round(1)} ms"
+  NxTest.assert(data['sheet_layout'].is_a?(Hash) && data['sheet_layout']['ok'], 'push nesie plan')
+  NxTest.assert(data['budget'].is_a?(Hash), 'push nesie rozpocet')
+  NxTest.assert_equal(2000, data['rows'].sum { |r| r['quantity'].to_i }, 'kusovnik celej zakazky')
+  NxTest.assert(bytes <= 450_000, "cely JSON pushu #{bytes} B (limit 450 kB)")
+  NxTest.assert(best <= 250.0, "push_state #{best.round(1)} ms (limit 250 ms)")
 end
 
 # ============================================================================

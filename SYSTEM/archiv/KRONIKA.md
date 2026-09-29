@@ -29,9 +29,12 @@
   (aj v XLSX) tú istú vetu „plán: …" (`SheetLayout.count_phrase`/`budget_note` — jediné miesto); čísla rozpočtu, porez, montáž aj XLSX ponuky sú overené
   ako nezmenené. SheetLayout: natívny kľúč riadku a `row_material_id` v `rejected`/`conflicts` (duplák bez väzby má v rozpočte vlastnú vetu). Navigácia
   bez neaktívnej položky (zrkadlá sekcií + guardy). Audit návrhu Codex `gpt-5.6-sol`: **4 BLOCKER · 8 FIX · 2 NOTE — všetky prijaté** (surový výstup
-  a package s doplnením v [zdroje/bloky/NAREZ/](../zdroje/bloky/NAREZ/)). Merania: ~2000 obdĺžnikov = payload sekcie 105 kB, výpočet + JSON ≈ 35 ms,
-  render ≈ 3 ms. Mutácie 14/14 zabité. Spolu s dávkou tri P3 zo slepej delty #419 (komentáre `unreadable`, pravidlo `.primary[aria-disabled]`,
-  banner hovorí vypnutie zápisu raz). **Testy:** 4816 headless · 141 JS sád zelené; in-SU netreba (sekcia nič nezapisuje).
+  a package s doplnením v [zdroje/bloky/NAREZ/](../zdroje/bloky/NAREZ/)). Merania (~2000 dielcov): **celý JSON pushu Štúdia 377 kB** (kusovník 247,
+  plán 118, rozpočet 10 kB; limit testu 450 kB), `push_state` ≈ 105 ms (limit 250), výpočet plánu + JSON ≈ 35 ms, render sekcie ≈ 3 ms. Mutácie 17/17
+  zabité. Spolu s dávkou tri P3 zo slepej delty #419 (komentáre `unreadable`, pravidlo `.primary[aria-disabled]`, banner hovorí vypnutie zápisu raz).
+  **Slepá predrecenzia:** PR OK — 0× P1/P2, 3× P3 opravené pred PR (test meria celý JSON pushu, nie len plán; test tém dokazuje tokeny v CSS namiesto
+  porovnania dvoch rovnakých renderov; poznámka pri neplatných parametroch bez zdvojeného „plán: plán"). **Testy:** 4817 headless · 141 JS sád zelené;
+  in-SU netreba (sekcia nič nezapisuje).
 
 - **NP-2 · Nárezový plán — nastavenia prerezu, orezu a prídavku + Kontrola s orezom (29.9.2026, v0.15.1 → v0.15.2, PR #419; blok 2, druhá dávka).**
   **Nastavenia rozpočtu → Výpočet a upozornenia** dostali tri polia (mockup D, poradie medzi „m² na platňu" a „Zaokrúhlenie"): **prerez píly** 5 mm (0–10),

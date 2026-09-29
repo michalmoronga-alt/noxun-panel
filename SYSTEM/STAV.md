@@ -32,7 +32,7 @@ v **seede 6** — starší plugin zákazku neprestaví ani nevyexportuje (rohov�
 po prvej mutácii rozpočtu needituje a zastaví oba cenové exporty). **Nastavenia dodávateľa sú od NP-2 vo verzii súboru 2** (v0.15.1 a starší pri uložení nové polia zahodí). **Aktualizovať OBE PC (aj Luciino) na 0.15.0 pred prvou rohovou** — starší plugin rohovú nepozná
 a knižnicu šablón STD 7 len číta (nedá sa v nej ukladať, premenovať ani mazať).
 
-**Testy (posledná kódová dávka, NP-3 PR #?):** **4816 headless · 141 JS sád** zelené; in-SU netreba (sekcia len číta, výber ide existujúcou cestou `nx_select`).
+**Testy (posledná kódová dávka, NP-3 PR #?):** **4817 headless · 141 JS sád** zelené; in-SU netreba (sekcia len číta, výber ide existujúcou cestou `nx_select`).
 **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 
 ## Robí sa

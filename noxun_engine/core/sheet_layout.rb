@@ -267,7 +267,10 @@ module Noxun
         mid = material_id.to_s
         mat = Array(plan['materials']).find { |m| m.is_a?(Hash) && m['material_id'].to_s == mid }
         if mat
-          return "plán: #{count_phrase(mat, unreliable: unreliable_source?(plan['params_source']))['text']}"
+          text = count_phrase(mat, unreliable: unreliable_source?(plan['params_source']))['text']
+          # Predrecenzia P3-3: veta, ktora sama zacina „plán …" (neplatne
+          # parametre), predponu „plán: " nedostane — inak „plán: plán …".
+          return text.start_with?('plán ') ? text : "plán: #{text}"
         end
 
         rec = sheets.is_a?(Hash) ? sheets[mid] : nil

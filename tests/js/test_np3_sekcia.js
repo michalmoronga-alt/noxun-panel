@@ -199,8 +199,28 @@ svgs.forEach(function(s){
   ok(!/#[0-9a-f]{3,6}\b|rgba?\(|hsla?\(/i.test(s.replace(/url\(#npHatch[SLD]\)/g, '')), 'SVG bez tvrdých farieb');
 });
 ok(/style="background:#7c5a3a"/.test(svgAll), 'jediná dátová farba = vzorka dekoru (mimo SVG)');
-global.document.documentElement = { getAttribute: function(){ return 'lucia'; } };
-eq(NP.npBodyHtml(A, { closed: {} }), NP.npBodyHtml(A, { closed: {} }), 'téma markup nemení — farby dávajú tokeny');
+// Predrecenzia P3-2: dôkaz „obe témy" = každá trieda, ktorú SVG použije, má
+// v studio.html pravidlo a jeho farby idú VÝHRADNE cez `var(--nx-*)` (téma
+// prepína tokeny); kreslenie tému nečíta vôbec.
+const fs = require('node:fs');
+const path = require('node:path');
+const HTML = fs.readFileSync(path.join(__dirname, '../../noxun_engine/ui/studio.html'), 'utf8');
+const SRC = fs.readFileSync(path.join(__dirname, '../../noxun_engine/ui/js/sheet_layout.js'), 'utf8');
+ok(!/data-nx-theme|nxTheme|lucia/i.test(SRC), 'kreslenie tému nečíta — rozhodujú tokeny v CSS');
+const used = {};
+svgs.join('').replace(/class="([^"]+)"/g, function(_m, c){ c.split(/\s+/).forEach(function(x){ if (/^np-/.test(x)) used[x] = true; }); });
+ok(Object.keys(used).length >= 6, 'SVG používa triedy np-*');
+Object.keys(used).forEach(function(cls){
+  const rules = HTML.match(new RegExp('\\.' + cls + '(?![a-z-])[^{]*\\{([^}]*)\\}', 'g')) || [];
+  ok(rules.length >= 1, 'trieda .' + cls + ' má pravidlo v studio.html');
+  rules.forEach(function(r){
+    const decl = r.slice(r.indexOf('{') + 1);
+    (decl.match(/(?:^|;)\s*(?:fill|stroke|color|background)\s*:\s*[^;}]+/g) || []).forEach(function(d){
+      const v = d.split(':').slice(1).join(':').trim();
+      ok(/^(var\(--nx-[a-z-]+\)|url\(#npHatch[SLD]\)|none)$/.test(v), '.' + cls + ' ' + d.trim() + ' ide cez token');
+    });
+  });
+});
 
 // --- 8) výkon renderu (F9): ~2000 obdĺžnikov --------------------------------
 const big = [];

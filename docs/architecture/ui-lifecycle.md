@@ -3299,7 +3299,8 @@ a ten istý plán odovzdá rozpočtu (`budget_payload(…, layout)` → veta v p
 mená riadkov raz v `rows` (`k` natívny kľúč riadku kusovníka, `c` obdĺžniky, pri dupláku `q` hotové kusy, `m` vrstvy a hotový rozmer `fl × fw`), platne `p: [[riadok, x, y]]`
 na 0,1 mm + `o` najväčší zvyšok, `unplaced`/`rejected`/`conflicts` s **ľudským dôvodom `t` zo servera**, `phrase` = veta o počte (`SheetLayout.count_phrase` — tá istá ide do
 Rozpočtu a XLSX). Globálny stav (`blocked`, `without_material`) nepatrí karte — sekcia ho ukáže **bannerom nad kartami** aj pri prázdnom zozname (audit B4). Chyba plánu =
-`{ok: false}` a veta v sekcii; rozpočet ani exporty to nezhodí (F7). Meranie (F9): ~2000 obdĺžnikov ≈ 105 kB payloadu sekcie, výpočet + JSON ≈ 35 ms, render ≈ 3 ms
+`{ok: false}` a veta v sekcii; rozpočet ani exporty to nezhodí (F7). Meranie (F9): ~2000 dielcov = celý JSON pushu ≈ 377 kB (z toho plán ≈ 118 kB),
+`push_state` ≈ 105 ms, výpočet plánu + JSON ≈ 35 ms, render ≈ 3 ms
 (`tests/pure/test_np3_sekcia.rb`, `tests/js/test_np3_sekcia.js`) — lazy PULL detailu preto nie je (audit F6).
 
 **Klient kreslí, nepočíta.** `sheet_layout.js` (globálne mená s prefixom `np`, volá ho `studio.js` cez `typeof npRenderTools / npRenderBody`, `NX.setStudio` neobaľuje)
