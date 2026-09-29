@@ -255,4 +255,32 @@ function state(over){
   ok(/data-act="eye"/.test(plain), 'bežný nález oko má ďalej');
 })();
 
+// --- 5) NP-4 (predrecenzia P3-3): poškodený skalár sa dá opraviť „Uložiť" ---
+
+(function(){
+  const bad = state();
+  bad.supplier = Object.assign({}, bad.supplier, { repaired_scalars: ['trim_mm'] });
+  S.setStudioSection('bset');
+  T.ssApplyState(bad);
+  const inp = findAll(ELS.secbody, function(x){ return x.tagName === 'INPUT'; });
+  const trim = inp.filter(function(i){ return i.getAttribute('data-ss') === 'scalar:trim_mm'; })[0];
+  const kerf = inp.filter(function(i){ return i.getAttribute('data-ss') === 'scalar:kerf_mm'; })[0];
+  ok(trim.classList.contains('bad'), 'poškodené pole je zvýraznené');
+  ok(/neplatná hodnota/.test(trim.getAttribute('title') || '') && /Uložiť/.test(trim.getAttribute('title')),
+     'a povie dôvod aj postup');
+  ok(!kerf.classList.contains('bad'), 'zdravé pole nie');
+  SENT.length = 0;
+  T.ssSave();
+  eq(SENT.length, 1, '„Uložiť" bez úpravy poškodený skalár ZAPÍŠE');
+  const sent = JSON.parse(SENT[0][1]);
+  eq(sent.patch, { trim_mm: 10 }, 'len poškodený kľúč so zobrazenou (predvolenou) hodnotou');
+  T.SS.saved();
+  // zdravý súbor: bez zmeny sa nič neposiela (dnešné správanie)
+  T.ssApplyState(state());
+  SENT.length = 0;
+  T.ssSave();
+  eq(SENT.length, 0, 'bez poškodenia a bez zmeny sa nič neodošle');
+  ok(/Nič sa nezmenilo/.test(ELS.status.textContent));
+})();
+
 console.log(`OK — test_np2_nastavenia.js: ${n} testov preslo`);

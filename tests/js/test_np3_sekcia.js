@@ -267,4 +267,17 @@ ok(ms < 300, 'render celej sekcie pod 300 ms (' + ms + ' ms)');
 const closedAll = NP.npBodyHtml(BIG, { closed: { M0: true, M1: true, M2: true } });
 eq((closedAll.match(/<svg xmlns/g) || []).length, 0, 'zbalené karty = 0 SVG uzlov');
 
+// --- NP-4 (predrecenzia P2): „v rozpočte N" = číslo HOTOVÉHO rozpočtu -------
+let card = NP.npBodyHtml(sl([mat({ est_budget: 2 })]), { closed: {} });
+ok(card.indexOf('(v rozpočte dnes 2)') >= 0, 'bez rozpočtu v payloade (starší server): odhad ako dnes');
+card = NP.npBodyHtml(sl([mat({ est_budget: 2, budget_qty: 3, budget_src: 'plan' })]), { closed: {} });
+ok(card.indexOf('(v rozpočte 3 podľa plánu)') >= 0, 'zapnuté ceny podľa plánu: číslo a zdroj z rozpočtu');
+ok(card.indexOf('v rozpočte dnes 2') < 0, 'žiadna druhá pravda (odhad) pri karte');
+card = NP.npBodyHtml(sl([mat({ est_budget: 2, budget_qty: 2, budget_src: 'estimate' })]), { closed: {} });
+ok(card.indexOf('(v rozpočte 2 z odhadu)') >= 0, 'nespôsobilý materiál: z odhadu');
+card = NP.npBodyHtml(sl([mat({ est_budget: 2, budget_qty: 2, budget_src: null })]), { closed: {} });
+ok(card.indexOf('(v rozpočte dnes 2)') >= 0, 'vypnutý prepínač: dnešná veta');
+ok(card.indexOf('nie sú zapnuté ceny podľa plánu') >= 0 && card.indexOf('toľko platní dnes počíta rozpočet') < 0,
+   'tooltip súhrnu netvrdí, že rozpočet vždy počíta z odhadu');
+
 console.log('test_np3_sekcia: ' + passed + ' OK');

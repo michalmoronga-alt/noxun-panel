@@ -653,7 +653,8 @@ module Noxun
           'message_sk' => "Nastavenia prerezu a orezu sú v súbore poškodené (#{labels.join(', ')}) — " \
                           "Kontrola aj nárezový plán počítajú s predvolenými hodnotami (prerez #{mm2(prm['kerf'])} mm, " \
                           "orez #{mm2(prm['trim'])} mm, prídavok dupláku #{mm2(prm['dup_allowance'])} mm) " \
-                          'a ceny podľa plánu ostávajú z odhadu. Oprav ich v Nastaveniach rozpočtu.',
+                          'a ceny podľa plánu ostávajú z odhadu. V Nastaveniach rozpočtu je pole zvýraznené — ' \
+                          'oprav hodnotu alebo len klikni na Uložiť.',
           'stable_key' => "#{CAT_LAYOUT_SETTINGS}|repaired"
         }
       end

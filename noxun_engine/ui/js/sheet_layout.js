@@ -43,7 +43,8 @@
     'nulový rozmer) — počet platí len pre zaradené dielce, celkový je neznámy.\n' +
     'Orientačne = materiál bez formátu v katalógu alebo UNI (počítané na formáte 2800 × 2070), alebo ' +
     'nastavenia prerezu a orezu, ktoré sa nepodarilo načítať.\n' +
-    'Odhad z m² je dnešný výpočet (+10 až 25 %) — toľko platní dnes počíta rozpočet.';
+    'Odhad z m² je dnešný výpočet (+10 až 25 %) — z neho počíta rozpočet, kým v Rozpočte → Materiál nie sú ' +
+    'zapnuté ceny podľa plánu. Pri karte je vždy číslo, s ktorým rozpočet naozaj počíta.';
   var NP_TIP_ROT = 'Dielce sa neotáčajú — ako vo VEPO súbore. Počet je preto opatrnejší — nanajvýš o niečo ' +
     'vyšší, než keby sa dielce otáčali; počet VEPO sa môže líšiť.';
 
@@ -238,6 +239,15 @@
       '</b> <small>' + npEsc(p.post || '') + '</small></span>';
   }
 
+  // NP-4 (predrecenzia P2): číslo „v rozpočte" je z HOTOVÉHO rozpočtu toho
+  // istého pushu (server) — pri zapnutých cenách podľa plánu aj so zdrojom.
+  function npBudgetNote(mat){
+    var n = (mat.budget_qty != null) ? mat.budget_qty : mat.est_budget;
+    if (mat.budget_src === 'plan') return 'v rozpočte ' + npEsc(n) + ' podľa plánu';
+    if (mat.budget_src === 'estimate') return 'v rozpočte ' + npEsc(n) + ' z odhadu';
+    return 'v rozpočte dnes ' + npEsc(n);
+  }
+
   function npSummaryHtml(sl){
     var mats = sl.materials || [];
     var cPl = 0, cN = 0, est = 0, inc = 0, ori = 0;
@@ -369,8 +379,7 @@
     if (mat.util != null) sub.push('využitie <b>' + npPct(mat.util) + '</b>');
     if (mat.est){
       var a = npNf(mat.est[0]), b = npNf(mat.est[1]);
-      sub.push('odhad z m²: <b>' + (a === b ? a : a + '–' + b) + '</b> <span class="bfnt">(v rozpočte dnes ' +
-               npEsc(mat.est_budget) + ')</span>');
+      sub.push('odhad z m²: <b>' + (a === b ? a : a + '–' + b) + '</b> <span class="bfnt">(' + npBudgetNote(mat) + ')</span>');
     }
     var chips = '';
     var dups = (mat.rows || []).filter(function(r){ return r.d; });

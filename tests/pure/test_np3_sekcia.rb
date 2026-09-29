@@ -440,7 +440,8 @@ NxTest.test('NP-3 push: plan z TOHO ISTEHO zberu (ziadny druhy sken), ten isty p
   NxTest.refute(push.include?('Bom.collect'), 'ziadny druhy sken modelu')
   NxTest.assert(push.include?('layout = ProductionCore.layout_for(collected, bom, smap, hw_exp)'))
   NxTest.assert(push.include?('budget_payload(model, bom, collected, estimate, hw_exp, smap, layout)'))
-  NxTest.assert(push.include?('sheet_layout: ProductionCore.sheet_layout_payload(layout, bom, smap, estimate)'))
+  # NP-4 (predrecenzia P2): sekcia dostane aj TEN ISTY rozpocet („v rozpočte N").
+  NxTest.assert(push.include?('sheet_layout: ProductionCore.sheet_layout_payload(layout, bom, smap, estimate, budget)'))
   NxTest.assert(push.index('layout_for') < push.index('budget_payload'), 'plan pred rozpoctom')
   lf = f.body('ui/production_core.rb', 'layout_for')
   %w[fresh_collect Bom.collect Bom.compute].each { |bad| NxTest.refute(lf.include?(bad), "layout_for nesmie #{bad}") }

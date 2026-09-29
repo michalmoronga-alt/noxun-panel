@@ -190,14 +190,30 @@
     return b;
   }
 
+  // NP-4 (predrecenzia P3-3): skaláre, ktoré mali v súbore NEPLATNÚ hodnotu
+  // (server ich nahradil predvolenou — `repaired_scalars` v dodávateľovi).
+  function ssRepaired(){
+    var s = (SS_STATE && SS_STATE.supplier) ? SS_STATE.supplier.repaired_scalars : null;
+    return Array.isArray(s) ? s : [];
+  }
+
+  var SS_REPAIRED_TIP = 'V súbore nastavení bola neplatná hodnota — počíta sa s predvolenou (zobrazenou). ' +
+    'Oprav ju alebo nechaj a klikni na Uložiť — ceny podľa plánu sa potom opäť použijú.';
+
   function ssRenderScalars(t){
+    var rep = ssRepaired();
     SS_SCALARS.forEach(function(s){
       var tr = document.createElement('tr');
       var td = ssMk('td');
       td.appendChild(ssMk('span', null, s[1]));
       if (s[3]) td.appendChild(ssTip(s[3]));
       tr.appendChild(td);
-      ssCell(tr, 'n', ssInput('scalar:' + s[0], SS_STATE.supplier[s[0]]));
+      var inp = ssInput('scalar:' + s[0], SS_STATE.supplier[s[0]]);
+      if (rep.indexOf(s[0]) >= 0 && SS_DIRTY['scalar:' + s[0]] === undefined){
+        if (inp.classList) inp.classList.toggle('bad', true);
+        inp.setAttribute('title', SS_REPAIRED_TIP);
+      }
+      ssCell(tr, 'n', inp);
       ssCell(tr, 'u', ssMk('span', null, s[2]));
       t.appendChild(tr);
     });
@@ -721,6 +737,14 @@
       SS.setStatus('Neuložené: ' + built.errors.join(' · '), true);
       return;
     }
+    // NP-4 (predrecenzia P3-3): poškodený skalár (v súbore neplatná hodnota,
+    // zobrazená predvolená) sa uloží AJ BEZ úpravy — inak by „Uložiť" hlásilo
+    // „Nič sa nezmenilo" a nález Kontroly by sa nedal odstrániť.
+    ssRepaired().forEach(function(k){
+      if (Object.prototype.hasOwnProperty.call(built.patch, k)) return;
+      var v = Number(SS_STATE.supplier[k]);
+      if (isFinite(v)) built.patch[k] = v;
+    });
     if (!Object.keys(built.patch).length){
       SS.setStatus('Nič sa nezmenilo.');
       return;

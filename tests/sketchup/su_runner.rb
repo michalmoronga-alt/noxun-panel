@@ -15746,6 +15746,25 @@ module NoxunSuRunner
     porez = Array(bud && bud['sections']).find { |s| s['key'] == 'services' }.to_h['rows'].to_a
                                          .find { |r| r['key'] == 'service:porez' }
     ok('NP-4: porez = suma mnozstva Materiálu', porez && porez['mnozstvo'].to_i == rows.sum { |r| r['mnozstvo'].to_i })
+    # Predrecenzia P3-5: montaz VZDY z odhadu (Σ estimate_qty × m² na platnu).
+    montaz = Array(bud && bud['sections']).find { |s| s['key'] == 'services' }.to_h['rows'].to_a
+                                          .find { |r| r['key'] == 'service:montaz' }
+    per = e::SupplierSettings.scalar(e::SupplierSettings.active, 'montaz_m2_per_plate').to_f
+    want = (rows.sum { |r| r['estimate_qty'].to_i } * per).round(2)
+    ok("NP-4: montaz = Σ odhadu × m² na platnu (#{montaz && montaz['mnozstvo']} = #{want})",
+       montaz && (montaz['mnozstvo'].to_f - want).abs < 0.01)
+    # Plan v cene sa da dokazat LEN nad nastaveniami, ktorym sa veri — runner
+    # zive nastavenia %APPDATA% NEPREPISUJE (su to Michalove sadzby). Pri
+    # nespolahlivych nastaveniach sa to povie nahlas (nie ticho „PASS").
+    lp = e::SupplierSettings.layout_params
+    trusted = %i[file backup].include?(lp[:source]) && lp[:version_ok] == true && Array(lp[:repaired]).empty?
+    srcs = rows.map { |r| "#{r['material_id']}=#{r['qty_source']}" }.join(', ')
+    if trusted
+      ok("NP-4: nad spolahlivymi nastaveniami ide aspon jeden material podla planu (#{srcs})",
+         rows.any? { |r| r['qty_source'] == 'plan' })
+    else
+      log_line("INFO: NP-4 plan v cene neovereny — nastavenia nie su spolahlive (#{lp[:source]}); #{srcs}")
+    end
     Sketchup.undo
     ok("NP-4: `plan_prices` = PRESNE 1 krok Späť (prepinac aj marker spat: #{read.call(model).inspect})",
        read.call(model) == before)

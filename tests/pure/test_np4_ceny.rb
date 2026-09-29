@@ -21,6 +21,9 @@ require 'json'
 require 'fileutils'
 require 'tmpdir'
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core') if NxTest.headless? && !defined?(Noxun::Engine::ProductionCore)
+if NxTest.headless? && !defined?(Noxun::Engine::SupplierSettingsDialog)
+  require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'supplier_settings_dialog')
+end
 require_relative 'test_np4_golden' unless defined?(NxNp4Golden)
 
 module NxNp4
@@ -498,6 +501,16 @@ NxTest.test('NP-4 B3: seed-merge poskodeny subor NEPREPISE (dokaz neprepadne) �
     NxTest.assert_equal(before, File.binread(f::SS.path), 'seed-merge nezapisal')
     NxTest.assert_equal(['trim_mm'], f::SS.layout_params[:repaired])
     NxTest.assert(f::SS.revision(f::SS.active).length == 12, 'revizia sa da spocitat')
+    # Predrecenzia P3-3: sekcia Nastavenia dostane zoznam poskodenych klucov (zvyrazni
+    # pole) a „Uložiť" bez upravy posle zobrazenu predvolenu hodnotu — to subor opravi.
+    pay = Noxun::Engine::SupplierSettingsDialog.settings_payload
+    NxTest.assert_equal(['trim_mm'], pay['supplier']['repaired_scalars'], 'payload sekcie nesie poskodene kluce')
+    ok, errs = f::SS.patch_active!('trim_mm' => 10.0)
+    NxTest.assert(ok, errs.inspect)
+    Noxun::Engine::JsonFileStore.invalidate
+    NxTest.assert_equal([], f::SS.layout_params[:repaired], 'ulozenie predvolenej hodnoty bez zmeny opravi subor')
+    f.write_json(f::SS.path, doc)
+    Noxun::Engine::JsonFileStore.invalidate
     ok, errs = f::SS.patch_active!('kerf_mm' => 4.0)
     NxTest.assert(ok, errs.inspect)
     Noxun::Engine::JsonFileStore.invalidate
@@ -534,6 +547,42 @@ NxTest.test('NP-4 F4: plan pri exporte zlyhal -> subor ma odhad, status to povie
     NxTest.refute(msg.include?('z odhadu'), msg)
     NxTest.assert_equal(0, pushes)
   end
+end
+
+NxTest.test('NP-4 F4 (predrecenzia P3-2): „a N ďalší/ďalšie/ďalších" — tvar podla poctu materialov') do
+  f = NxNp4
+  bud = lambda do |n|
+    rows = (1..n).map { |i| { 'nazov' => "M#{i}", 'qty_source' => 'estimate' } }
+    { 'plan_prices' => true, 'sections' => [{ 'key' => 'materials', 'rows' => rows }] }
+  end
+  NxTest.assert_equal(' · z odhadu (nie podľa plánu): M1, M2, M3', f::PC.plan_export_note(bud.call(3)))
+  NxTest.assert(f::PC.plan_export_note(bud.call(4)).end_with?('M1, M2, M3 a 1 ďalší'))
+  NxTest.assert(f::PC.plan_export_note(bud.call(5)).end_with?('M3 a 2 ďalšie'))
+  NxTest.assert(f::PC.plan_export_note(bud.call(7)).end_with?('M3 a 4 ďalšie'))
+  NxTest.assert(f::PC.plan_export_note(bud.call(8)).end_with?('M3 a 5 ďalších'))
+end
+
+NxTest.test('NP-4 P2: karta Nárezového plánu povie „v rozpočte" cislo HOTOVEHO rozpoctu (jedna pravda)') do
+  f = NxNp4
+  rows = f::G.mixed_rows
+  pl = f.plan(rows)
+  est = f.estimate(rows, f::G::SHEETS)
+  on = f.compute(rows, pl)
+  pay = f::PC.sheet_layout_payload(pl, { rows: rows }, f::G::SHEETS, est, on)
+  h18 = pay['materials'].find { |m| m['id'] == 'H18' }
+  NxTest.assert_equal([f.mat_row(on, 'H18')['mnozstvo'], 'plan'], h18.values_at('budget_qty', 'budget_src'),
+                      'karta = mnozstvo rozpoctu (5 z planu)')
+  NxTest.assert_equal(4, h18['est_budget'], 'odhad z m² ostava odhadom (sucet v suhrne)')
+  w18 = pay['materials'].find { |m| m['id'] == 'W18' }
+  NxTest.assert_equal([f.mat_row(on, 'W18')['mnozstvo'], 'estimate'], w18.values_at('budget_qty', 'budget_src'))
+  off = f.compute(rows, pl, on: false)
+  h_off = f::PC.sheet_layout_payload(pl, { rows: rows }, f::G::SHEETS, est, off)['materials'].find { |m| m['id'] == 'H18' }
+  NxTest.assert_equal([4, nil], h_off.values_at('budget_qty', 'budget_src'), 'vypnuty prepinac: odhad, bez zdroja')
+  h_none = f::PC.sheet_layout_payload(pl, { rows: rows }, f::G::SHEETS, est)['materials'].find { |m| m['id'] == 'H18' }
+  NxTest.assert_equal([4, nil], h_none.values_at('budget_qty', 'budget_src'), 'bez rozpoctu (legacy volanie): odhad')
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog.rb'), encoding: 'UTF-8')
+  NxTest.assert(src.include?('sheet_layout_payload(layout, bom, smap, estimate, budget)'),
+                'push Studia odovzda sekcii TEN ISTY rozpocet')
 end
 
 NxTest.test('NP-4 F4: plan_export_note — bez vety pri zapnutom a vsetkom z planu') do

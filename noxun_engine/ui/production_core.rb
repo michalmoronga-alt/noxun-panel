@@ -2503,7 +2503,11 @@ module Noxun
       # riadkov su raz v `rows`, rozlozenie su polia [riadok, x, y] na 0,1 mm
       # (audit F10), zvysok [x, y, dlzka, sirka]. Texty (veta o pocte, dovody
       # nezaradenia) sklada SERVER — klient ich len zobrazi.
-      def sheet_layout_payload(plan, bom, smap, estimate)
+      # NP-4 (predrecenzia P2): `budget` = HOTOVY rozpocet toho isteho pushu —
+      # karta hovori „v rozpočte N" z JEHO riadku Materiálu (mnozstvo aj zdroj
+      # plan/odhad), nie vlastnym odhadom; jedna pravda aj pri zapnutych cenach
+      # podla planu. Bez rozpoctu (legacy volanie, chyba) = odhad z m².
+      def sheet_layout_payload(plan, bom, smap, estimate, budget = nil)
         return { 'ok' => false, 'error' => SheetLayout::UNAVAILABLE_NOTE } if !plan.is_a?(Hash) || plan['error']
 
         by_key = {}
@@ -2511,6 +2515,7 @@ module Noxun
           by_key[r['key']] ||= r if r.is_a?(Hash) && r['key'].is_a?(Array)
         end
         est = Array(estimate).each_with_object({}) { |e, o| o[e['material_id'].to_s] = e if e.is_a?(Hash) }
+        bud = budget_material_rows(budget)
         mats = Array(plan['materials'])
         smap = {} unless smap.is_a?(Hash)
         labels = material_labels(mats.map { |m| m['material_id'].to_s }, smap)
@@ -2525,7 +2530,7 @@ module Noxun
                                   'items' => without.map { |e| layout_reject_payload(e, by_key, nil) } },
           'materials' => mats.map do |m|
             mid = m['material_id'].to_s
-            layout_material_payload(m, smap[mid], labels[mid], est[mid], by_key, unrel, prm)
+            layout_material_payload(m, smap[mid], labels[mid], est[mid], by_key, unrel, prm, bud[mid])
           end
         }
       rescue StandardError => e
@@ -2533,7 +2538,17 @@ module Noxun
         { 'ok' => false, 'error' => SheetLayout::UNAVAILABLE_NOTE }
       end
 
-      def layout_material_payload(mat, rec, label, est, by_key, unrel, prm)
+      # NP-4: riadky Materiálu hotoveho rozpoctu podla material_id.
+      def budget_material_rows(budget)
+        return {} unless budget.is_a?(Hash)
+
+        sec = Array(budget['sections']).find { |s| s.is_a?(Hash) && s['key'] == 'materials' }
+        Array(sec && sec['rows']).each_with_object({}) do |r, o|
+          o[r['material_id'].to_s] = r if r.is_a?(Hash)
+        end
+      end
+
+      def layout_material_payload(mat, rec, label, est, by_key, unrel, prm, brow = nil)
         rec = {} unless rec.is_a?(Hash)
         dup = prm['dup_allowance'].to_f
         orient = SheetLayout.orientational?(mat)
@@ -2552,6 +2567,9 @@ module Noxun
           'phrase' => SheetLayout.count_phrase(mat, unreliable: unrel),
           'est' => est ? [est['count_min'], est['count_max']] : nil,
           'est_budget' => est ? Budget.plates_of(est) : nil,
+          # NP-4: s cim naozaj pocita rozpocet (mnozstvo jeho riadku a zdroj).
+          'budget_qty' => brow ? brow['mnozstvo'] : (est ? Budget.plates_of(est) : nil),
+          'budget_src' => brow ? brow['qty_source'] : nil,
           'rows' => rows,
           'plates' => Array(mat['layouts']).map do |s|
             { 'u' => s['utilization'],
@@ -3431,8 +3449,16 @@ module Noxun
 
         names = rows.first(PLAN_EXPORT_NAMES).map { |r| r['nazov'].to_s }.join(', ')
         more = rows.length - PLAN_EXPORT_NAMES
-        names += " a #{more} #{more.between?(1, 4) ? 'ďalšie' : 'ďalších'}" if more.positive?
+        names += " a #{more} #{more_word(more)}" if more.positive?
         " · z odhadu (nie podľa plánu): #{names}"
+      end
+
+      # „materiál" je muzsky rod: 1 ďalší · 2–4 ďalšie · 5+ ďalších (predrecenzia P3-2).
+      def more_word(n)
+        return 'ďalší' if n == 1
+        return 'ďalšie' if n.between?(2, 4)
+
+        'ďalších'
       end
 
       # ↗ v riadku: URL sa NEBERIE z klienta — dohladava sa v modeli podla ID
