@@ -6,17 +6,16 @@
 
 ## Stav
 
-**v0.15.3 · 29.9.2026 — BLOK 2 · NÁREZOVÝ PLÁN (primitívny) beží:** štart PR #417, **NP-1** jadro výpočtu (PR #418), **NP-2** nastavenia a Kontrola s orezom (PR #419),
-**NP-3** sekcia Nárezový plán (PR #420). **Štúdio → Nárezový plán** ožil: karty materiálov (počet platní „horná hranica" / „celkový počet neznámy" / „orientačne",
-využitie, odhad z m²), malé platne, **upozornenie na poslednú platňu** (pod 20 % alebo ≤ 2 dielce), dielce, ktoré sa nezmestia, a **detail platne** s okom.
-**Rozpočet → Materiál** a XLSX majú v poznámke tú istú vetu „plán: …"; **ceny sa nemenia** (NP-4). Prerez/orez/prídavok z NP-2; VEPO export bajtovo rovnaký.
+**v0.15.4 · 29.9.2026 — BLOK 2 · NÁREZOVÝ PLÁN (primitívny) — všetky štyri dávky hotové:** štart PR #417, **NP-1** jadro výpočtu (PR #418), **NP-2** nastavenia
+a Kontrola s orezom (PR #419), **NP-3** sekcia Nárezový plán (PR #420), **NP-4** ceny podľa plánu (PR #?). **Štúdio → Nárezový plán** ukazuje karty materiálov, malé platne,
+upozornenie na poslednú platňu, dielce, ktoré sa nezmestia, a detail platne. **Rozpočet → Materiál** má prepínač **„ceny podľa plánu"** (per zákazka, predvolene
+**vypnutý** — dovtedy dnešné ceny): zapnutý berie počet platní z plánu pri materiáli s úplným plánom a formátom z katalógu, ostatné ostávajú na odhade so značkou
+„z odhadu" a vetou prečo (aj v XLSX); porez za platňami, montáž z odhadu; ponuka mení len sumu. Čakajúci zápis rozpočtu už neodíde do inej zákazky (audit B1).
 
 **v0.15.0 · 28.9.2026 — BLOK 8 · K3 ROHOVÁ SKRINKA UZAVRETÝ** (v0.14.0 → v0.15.0, podklady PR #409, dávky PR #410–#413 + uzáver PR #414; **smoke PASS 28.9.**, O8 ponechané).
-Plugin pozná typ **„Rohová"** (`corner_blind`) — dolnú slepú rohovú skrinku podľa DC „Rohová": korpus ako dolná + rohová zostava (**blenda korpusová**,
-**výstuha závesov**, **CR 1**, **CR 2**, **rohová výstuha**), jedny dvierka s pántmi predvolene pri rohu, vnútri len police; ide do **kusovníka, VEPO, nákupu aj ponuky**.
-Vkladá sa tlačidlom **„Rohová"** (kláves **D** prepne stranu), v **Základné → Rozmery** (aj vo vkladacej karte) je riadok **Dverová časť · CR 1 · CR 2 · strana dverí**;
-prepnutie strany zrkadlí zostavu, pánty aj ručné hrany jedným krokom Späť. Náhľad kreslí celú zostavu, karta **Čelá** povie „jedny dvierka" a pánty „Pri boku / Pri rohu".
-Pod tým **blok 7 · KONŠTRUKCIA K1+K2** (v0.14.0, smoke **PASS 27.9.**) a blok **SPOTREBIČE S1** (v0.13.0, smoke PASS 26.9.).
+Plugin pozná typ **„Rohová"** (`corner_blind`) — dolnú slepú rohovú skrinku s rohovou zostavou (blenda, výstuha závesov, CR 1, CR 2, rohová výstuha), jedny dvierka;
+ide do kusovníka, VEPO, nákupu aj ponuky, vkladá sa tlačidlom **„Rohová"** (kláves **D** prepne stranu). Pod tým **blok 7 · KONŠTRUKCIA K1+K2** (v0.14.0, smoke
+**PASS 27.9.**) a blok **SPOTREBIČE S1** (v0.13.0, smoke PASS 26.9.).
 Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 so **štrnástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · **Nárezový plán** · Materiály · Kovanie · Spotrebiče · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine. Neaktívna položka navigácie už nie je žiadna.
 
@@ -28,23 +27,23 @@ V1 ciele **Konštrukcia** (K1 + K2 blok 7, K3 blok 8), **Materiály, Kovanie, Sp
 (v0.9.0) · **blok KOVANIE** (v0.10.0) · **blok M-R VZHĽAD** (v0.12.0) · **blok SPOTREBIČE S1** (v0.13.0) · **blok KONŠTRUKCIA K1+K2** (v0.14.0) · **blok K3 ROHOVÁ**
 (v0.15.0) — plné texty v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).
 **Kompatibilita:** skrinka je v **schéme 22** (typ `corner_blind`), **doska v schéme 2**, **šablóny v STD 7**, výrobný plán v **schéme 7**, ABS pravidlá
-v **seede 6** — starší plugin zákazku neprestaví ani nevyexportuje (rohovú by sklopil na dolnú). **Dáta rozpočtu sú od S1-B1 v `BUDGET_STD` 2** (starší plugin zákazku
-po prvej mutácii rozpočtu needituje a zastaví oba cenové exporty). **Nastavenia dodávateľa sú od NP-2 vo verzii súboru 2** (v0.15.1 a starší pri uložení nové polia zahodí). **Aktualizovať OBE PC (aj Luciino) na 0.15.0 pred prvou rohovou** — starší plugin rohovú nepozná
-a knižnicu šablón STD 7 len číta (nedá sa v nej ukladať, premenovať ani mazať).
+v **seede 6** — starší plugin zákazku neprestaví ani nevyexportuje (rohovú by sklopil na dolnú). **Dáta rozpočtu sú od NP-4 v `BUDGET_STD` 3** (prvá úprava rozpočtu
+v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a zastaví oba cenové exporty). **Nastavenia dodávateľa sú od NP-2 vo verzii súboru 2** (v0.15.1 a starší pri uložení nové polia zahodí).
+**Aktualizovať OBE PC (aj Luciino) na 0.15.4** — starší plugin rohovú nepozná, knižnicu šablón STD 7 len číta a rozpočet `BUDGET_STD` 3 needituje.
 
-**Testy (posledná kódová dávka, NP-3 PR #420):** **4817 headless · 141 JS sád** zelené; in-SU netreba (sekcia len číta, výber ide existujúcou cestou `nx_select`).
+**Testy (posledná kódová dávka, NP-4 PR #?):** **4840 headless · 142 JS sád** zelené; **in-SU 3264 PASS** (prepínač = 1 krok Späť s markerom 3).
 **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 
 ## Robí sa
 
 **Blok 2 · Nárezový plán** (priečinok [zdroje/bloky/NAREZ/](zdroje/bloky/NAREZ/), dávky v [PLAN.md](PLAN.md)): **NP-1** jadro výpočtu (PR #418) → **NP-2** nastavenia
-prerezu, orezu a prídavku + Kontrola „nezmestí sa" s orezom (PR #419) → **NP-3** sekcia Nárezový plán v Štúdiu (PR #420) → **NP-4** ceny podľa plánu. Pri prvej rohovej v dielni ostáva overiť
+prerezu, orezu a prídavku + Kontrola „nezmestí sa" s orezom (PR #419) → **NP-3** sekcia Nárezový plán v Štúdiu (PR #420) → **NP-4** ceny podľa plánu (PR #?). Pri prvej rohovej v dielni ostáva overiť
 záves Sensys na výstuhe závesov. **Čakajú na smoke:** **D-132** (#367), **D-133** (#368), **D-134** (#369). **D-141**, **D-142**, **D-145** a **D-146** sú v zásobníku. **Blok 1d** podľa kapacity — R-18; **R-13 čaká na Michala**.
 
 ## Ďalší krok
 
-**NP-4** — ceny podľa plánu (prepínač, predvolene vypnutý); smoke bloku 2 po nej. NP-3 sa dá skúsiť už teraz (Štúdio → Nárezový plán, Rozpočet → poznámka „plán: …").
-**Aktualizovať plugin na oboch PC** (Michal aj Lucia). Nálezy z výroby a cien majú prednosť.
+**Uzáver bloku 2** (release, minor verzia, smoke checklist) a Michalov smoke: Štúdio → Nárezový plán; Rozpočet → Materiál → zapni „ceny podľa plánu"
+(značky, dôvody, porez sa zmení, montáž nie; Späť, potom Obnoviť); XLSX rozpočtu a ponuky. **Aktualizovať plugin na oboch PC** (Michal aj Lucia) — `BUDGET_STD` 3. Nálezy z výroby a cien majú prednosť.
 
 ## Posledné uzávery
 

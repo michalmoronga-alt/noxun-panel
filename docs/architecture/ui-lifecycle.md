@@ -3190,12 +3190,23 @@ zákazka z NOVŠIEHO pluginu (alebo s poškodeným markerom `budget_std`) sa **�
 `budget.budget_std` (`{ state, blocked, reason }`, skladá ho `Budget.std_payload`) a klient z neho robí tri veci — **v OBOCH sekciách, Rozpočet aj Cenová ponuka**:
 **(1) trvalý banner** `budStdBannerHtml` navrchu tela (nie status — ten by zmizol pri prvom prekreslení, a payload chodí po každom kliku; vzor bannerov R-07/R-11, trieda `.hwbanner`),
 **(2) vypnuté ovládače** — jeden prechod `budStdDisable(box)` po každom zo štyroch kreslení (telo + lišta, obe sekcie) nad `[data-bud]` uzlami podľa zoznamu `BUD_STD_OFF`
-(režim, prepis sumy, násobok, m², spotrebiče v súčte, pridávačky, ⋯ editor, mazanie, inline polia, prepínač „samostatne" **a oba XLSX exporty**). Jeden prechod nad hotovým DOM je
+(režim, prepis sumy, násobok, m², spotrebiče v súčte, od NP-4 „ceny podľa plánu", pridávačky, ⋯ editor, mazanie, inline polia, prepínač „samostatne" **a oba XLSX exporty**). Jeden prechod nad hotovým DOM je
 zámerne lacnejší než podmienka v pätnástich markup funkciách — a nedá sa zabudnúť pri pridaní ďalšieho ovládača (stačí ho zapísať do `BUD_STD_OFF`).
 **ZÁMERNE zapnuté ostávajú** prepínač DPH a „Obnoviť" (číre zobrazenie) a **„Prepočítať ceny"** — ten zapisuje do KATALÓGU cien, nie do zákazky, a jeho výsledok je správny bez ohľadu na verziu dát rozpočtu.
 **(3) poistka v odosielacej ceste** (`budSend`, `budXlsx`, `budCpExport`): klik zo zastaraného DOM sa NEPOŠLE a okno povie dôvod červeným statusom.
 Autorita je server v oboch smeroch — mutácie odmieta `BudgetStore.write!`, exporty `ProductionCore.budget_std_block`, a znenie hlášky má **jeden zdroj** (`BudgetStore.std_block_reason`), takže klient si žiadny text neskladá.
 Kanál odmietnutia je ten istý, aký má každý neúspešný zápis: `do_budget` → `NX.budgetResult(op, false)` → čerstvý payload → červený status („Nezapísané: …").
+
+#### CENY PODĽA PLÁNU (NP-4, v0.15.4, mockup C)
+
+Checkbox **„ceny podľa plánu"** v `<summary>` sekcie Materiál (`budSectionHtml`, vzor „sčítať do rozpočtu" pri Spotrebičoch — `label.bappl` so `stopPropagation`,
+inak by klik zbalil sekciu) + tooltip `.nxtip` s textom `BUD_PLAN_TIP` (čo robí, že VEPO účtuje celé tabule a jeho počet sa môže líšiť, porez/montáž, platí pre
+zákazku, **„Po Späť klikni na Obnoviť"**) — tlačidlo tooltipu má vlastné `stopPropagation` + `preventDefault` a `details.bsec` pri hover/fokuse tooltipu povolí
+`overflow: visible` (`:has`), aby ho sekcia neorezala. Stav berie z ozveny `budget.plan_prices`, zmena pošle mutáciu **`plan_prices {enabled}`** (1 zmena = 1 krok
+Späť), ovládač je v `BUD_STD_OFF`. **Značka zdroja množstva** `budQtyTagHtml` — `.qtag.plan` „podľa plánu" (tlmená) / `.qtag.est` „z odhadu" (jantárová, tokeny
+`--nx-warn*`) pred číslom v bunke Množstvo — sa kreslí **len pri riadku s `qty_source`**, teda len pri zapnutom prepínači; tooltip (`title`) je serverový `qty_tip`.
+**Späť (audit F5):** životný cyklus Štúdia sa nemení — Undo okno len označí ako neaktuálne (jantárové „Obnoviť"), checkbox a ceny sa vrátia až po „Obnoviť";
+in-SU `st1c_plan_prices` overuje stav modelu aj marker po Späť.
 
 #### GENERAČNÝ KONTRAKT (audit #1) — najdôležitejšia vec dávky
 
@@ -3204,6 +3215,13 @@ nemení `rows`/`refs`, takže rozkliknutý riadok Kusovníka ani rozrobený expo
 drží to, že KAŽDÁ iná zmena (model, katalóg, prepnutie dokumentu, refresh z iného okna) generáciu bumpne ako doteraz — a mutácia so starým `gen` sa odmietne. Prvý push generáciu
 zdvihne vždy (`gen 0` = „žiadne dáta"). Fronta zápisov (`BUD_BUSY`/`BUD_QUEUE`, GH #138 P2) sa preto uvoľňuje **VÝHRADNE v `NX.setStudio`** (audit #6) — malé echá
 `setVepoBar`/`setEdgeCheck`/`setGrainCheck` čerstvú `gen` nenesú a zápis odoslaný na ne by server odmietol ako zastaraný.
+
+**Identita čakajúceho zápisu (NP-4, audit B1 — staršia chyba všetkých mutácií rozpočtu).** Položka fronty bola len `[op, extra]` a identitu doplnila až pri odoslaní —
+a `budDocSwitched` frontu bez otvoreného modalu nerušil: zápis kliknutý v zákazke A preto po príchode payloadu B odišiel s `model_guid` aj `gen` zákazky B a server ho prijal.
+Odteraz **každá položka nesie `{op, extra, doc, gen}` z okamihu kliknutia** (`budSend` — pri modale identita modalu, inak `budModelGuid()`), odošle sa **s nimi** (nie
+s identitou nového payloadu), `budDocSwitched` pri **každej** zmene dokumentu vyhodí z fronty zápisy iného dokumentu (aj bez modalu) a `budAfterPush` cudzí zápis
+neodošle ani cez poistný timer. Push po mutácii rozpočtu generáciu nedvíha, takže bežný ďalší zápis s gen z kliknutia prejde; po zmene modelu či dokumentu ho server
+odmietne ako zastaraný (radšej „skús znova" než tichý zápis nad iným stavom). Test: `tests/js/test_np4_ceny.js`.
 
 Poistný timer `BUD_BUSY_MS = 6 s` je len záchranná sieť: in-SketchUp meranie dáva push ~3 ms a celú mutáciu vrátane repushu ~4 ms.
 
@@ -3225,7 +3243,7 @@ k sadzbám (#20), hoci to isté okno otvára aj položka navigácie.
 **PR B2 dokončil dve odložené veci:** inline drafty vlastnej položky a spotrebiča nahradil **D-15 modal** (nižšie) a náhľad cenovej ponuky sa presunul do **vlastnej sekcie** — v
 tele Rozpočtu po ňom ostal len **tenký preklik** `budCpLinkHtml` (suma ponuky + stav + šípka), takže druhá kópia tabuľky, ktorá by sa časom rozišla, neexistuje. S ňou odišiel z
 lišty aj export „Cenová ponuka (zákazník)" — patrí sekcii, ktorá dokument vyrába (a lišta tým schudla o najdlhší popisok, review PR #198 #4). Testy:
-`tests/pure/test_st1c_rozpocet.rb`, `tests/js/test_budget_ui.js`, in-SketchUp sekcia `run_st1c` (12 operácií × „jeden krok Späť", gen a guid guardy, odmietnutý zápis nechá draft
+`tests/pure/test_st1c_rozpocet.rb`, `tests/js/test_budget_ui.js`, in-SketchUp sekcia `run_st1c` (13 operácií × „jeden krok Späť" vrátane NP-4 prepínača, gen a guid guardy, odmietnutý zápis nechá draft
 otvorený, dôkaz `bump: false` klikom v Kusovníku so starou generáciou, XLSX guardy bez dialógu, meranie #19).
 
 #### SPOTREBIČ Z KATALÓGU, VLASTNÍK A „DODÁVA ZÁKAZNÍK" (S1-B1, v0.12.13)
