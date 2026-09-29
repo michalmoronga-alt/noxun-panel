@@ -2116,10 +2116,14 @@ module Noxun
           # GH #127 P2: klik-resolve MUSI ratat s rovnakym vstupom ako
           # push_state — bez hardware_expansion by sa stable kluce novych
           # ORANGE (hardware_unmapped/hardware_code) nikdy nenasli.
-          item = Validation.run(collected, sheets: sheets_map, edges: edges_map,
+          # NP-2: TEN ISTY `layout:` ako `control_payload` (nastavenia orezu
+          # a pridavku) — inak by nalez nadrozmeru po kliku „zmizol".
+          emap = edges_map
+          item = Validation.run(collected, sheets: sheets_map, edges: emap,
                                 hardware_expansion: hardware_expansion(model, collected),
                                 placements: collected[:placements],
-                                identities: collected[:identities])['items']
+                                identities: collected[:identities],
+                                layout: control_layout(emap))['items']
                            .find { |it| it['stable_key'] == data['problem_key'] }
           if item.nil?
             repush.call
@@ -2358,13 +2362,41 @@ module Noxun
       # nepodaril zostavit a jeho ORANGE do zoznamu nepribudnu.
       def control_payload(collected, hardware_expansion: nil, budget: nil, sheets: nil)
         smap = sheets || sheets_map
-        control = Validation.run(collected, sheets: smap, edges: edges_map,
+        emap = edges_map
+        control = Validation.run(collected, sheets: smap, edges: emap,
                                  hardware_expansion: hardware_expansion,
                                  placements: collected[:placements],
-                                 identities: collected[:identities])
+                                 identities: collected[:identities],
+                                 layout: control_layout(emap))
         return control unless budget.is_a?(Hash)
 
         Validation.with_budget(control, budget['budget_check'])
+      end
+
+      # NP-2: JEDINY zdroj parametra `layout:` pre OBOCH volajucich
+      # `Validation.run` (payload Kontroly aj klik na nalez — rozne parametre
+      # by nalez po kliku „stratili"). Prerez, orez a pridavok su zo ziveho
+      # aktivneho dodavatela (`SupplierSettings.layout_params`, vratane POVODU
+      # — pri `:seed_fallback` to Kontrola prizna). Hrubky ABS sa ODVODIA
+      # z UZ NACITANEJ mapy `edges_map` (audit F3): `vepo_edge_thicknesses`
+      # by pri chybe katalogu ABS vyhodil vynimku a zhodil celu Kontrolu;
+      # `nil` mapa = prazdne hrubky (geometriu `purchase_rect` vrati aj pri
+      # „neznamej ABS", takze rozmerove kontroly bezia dalej).
+      def control_layout(emap)
+        lp = SupplierSettings.layout_params
+        { params: lp[:params], source: lp[:source], edge_thicknesses: edge_thicknesses_of(emap) }
+      rescue StandardError => e
+        Engine.log_error(e, 'ProductionCore.control_layout')
+        { params: SheetLayout::PARAM_DEFAULTS.dup, source: :seed_fallback,
+          edge_thicknesses: edge_thicknesses_of(emap) }
+      end
+
+      # Tie iste kluce ako `vepo_edge_thicknesses` ({abs_id => Float}), ale
+      # z hotovej mapy — bez druheho citania katalogu.
+      def edge_thicknesses_of(emap)
+        return {} unless emap.is_a?(Hash)
+
+        emap.each_with_object({}) { |(id, a), out| out[id] = (a.is_a?(Hash) ? a['thickness'] : 0).to_f }
       end
 
       # V0.6 E-b: payload rozpoctu z TYCH ISTYCH dat ako kusovnik/semafor (jedna

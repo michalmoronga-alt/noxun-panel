@@ -20,13 +20,16 @@
 # „zmesti sa na prazdnu platnu". Kontrola ich zavola nad zaznamom dielca a
 # nesmie ziaden z tych krokov opakovat sama.
 #
-# V NP-1 sa modul NIKAM nenapaja (Studio, rozpocet ani exporty ho necitaju).
+# Od NP-2 ho cita Kontrola „nezmesti sa" (`Validation.check_oversize` cez
+# `purchase_rect` + `fits_rect?`); plan v Studiu, rozpocet ani exporty zatial nie.
 require 'json'
 
 module Noxun
   module Engine
     module SheetLayout
-      # Predvolene hodnoty (N3, N7) — NP-2 ich nahradi nastaveniami rozpoctu.
+      # Predvolene hodnoty (N3, N7). Od NP-2 ich volajuci beru z nastaveni
+      # dodavatela (`SupplierSettings.layout_params`, zhodne predvolene 5/10/10);
+      # tu ostavaju pre chybajuci kluc v `params`.
       DEFAULT_KERF = 5.0          # prerez (hrubka kotuca)
       DEFAULT_TRIM = 10.0         # orez okraja platne na KAZDEJ hrane
       DEFAULT_DUP_ALLOWANCE = 10.0 # pridavok vrstvy duplaku na KAZDU stranu
@@ -253,7 +256,8 @@ module Noxun
         # Bezny riadok ostava v celych mm (Integer, ako VEPO); len duplak dostane pridavok.
         p2 = doubled ? 2 * prm['dup_allowance'] : 0
         geo_mid = link_missing ? rmid : pmid
-        geo = { hash: hash, mid: geo_mid, p2: p2, sheets: sheets, prm: prm }
+        geo = { hash: hash, mid: geo_mid, p2: p2, sheets: sheets, prm: prm,
+                doubled: doubled, mult: doubled ? mult : 1 }
         unless prep['ok']
           # dovod VEPO (ABS, hrubka, pocet): geometria z tej istej orientacie
           # a zaokruhlenia; nekladny rozmer ci chybajuci material ju nemaju.
@@ -291,12 +295,15 @@ module Noxun
 
       # Doplni do odmietnutia geometriu (l, w, format, orez, smer) — len ked
       # su oba zaokruhlene rozmery kladne a material je znamy.
+      # NP-2: aj `doubled`/`multiplier` (Kontrola nimi sklada vetu o prirezoch
+      # dupláku aj pri sucasnej chybe ABS — geometria uz pridavok nesie).
       def with_geometry(rej, dims, geo)
         return rej unless dims.is_a?(Array) && geo[:mid] && dims.all? { |d| d.positive? }
 
         rej.merge(frame(geo[:mid], geo[:sheets], geo[:prm]['trim']))
            .merge('material_id' => geo[:mid], 'l' => dims[0] + geo[:p2], 'w' => dims[1] + geo[:p2],
-                  'grain' => geo[:hash]['grain_direction'].to_s)
+                  'grain' => geo[:hash]['grain_direction'].to_s,
+                  'doubled' => geo[:doubled] == true, 'multiplier' => geo[:mult])
       end
 
       # [nakupny material, duplak?, nasobok, chyba_vazba?]. Uplna vazba zo

@@ -10,11 +10,13 @@
 # zakazka (rezim, overridy, nasobky, vlastne polozky) — tie drzi BudgetStore.
 #
 # ============================== STRUKTURA ==============================
-# { "std": 1, "seed_version": 1, "active": "default",
+# { "std": 2, "seed_version": 1, "active": "default",
 #   "suppliers": [ { "id": "default", "name": "Noxun",
 #                    "rates": { olep|porez|duplaky|pd_opracovanie|montaz },
 #                    "stale_days": 30, "rounding_step": 1.0,
 #                    "abs_reserve_pct": 10.0, "montaz_m2_per_plate": 5.8,
+#                    "cp_highlight_threshold": 150.0,
+#                    "kerf_mm": 5.0, "trim_mm": 10.0, "dup_allowance_mm": 10.0,
 #                    "standard_rows": [ {key,name,kind,rate,default_multiplier} ],
 #                    "mode_values": { row_key => {nizky,standard,vysoky} } } ] }
 # Architektura je na VIAC dodavatelov, V1 pouziva jedneho (active).
@@ -23,6 +25,20 @@
 # Prvy beh vytvori seed. Kazdy dalsi beh LEN DOPLNI chybajuce kluce, riadky
 # a rezimove hodnoty (vzor HardwareRules.merge_seed) — Michalom upravena
 # hodnota sa NIKDY neprepise. `std` je verzia formatu pre buduce migracie.
+#
+# =================== NP-2: VERZIA 2 A DOPREDNA BRANA ===================
+# STD 2 prinieslo tri skalare narezoveho planu (kerf_mm, trim_mm,
+# dup_allowance_mm). Normalizacia je WHITELIST — plugin, ktory pole nepozna,
+# ho pri prvom zapise ZAHODI. Preto (vzor HardwareRules KOV-F1):
+#   * KAZDY zapis peciatkuje `std = STD` (inak by subor ostal navzdy 1 a
+#     buduca brana by nemala co porovnat),
+#   * subor z NOVSIEHO pluginu (`std > STD`) sa CITA (zakazka sa musi dat
+#     dokoncit), ale NIKDY sa don nezapisuje — ani seed-merge; brana
+#     `newer_write_blocked?` stoji v `write` pod zamkom hned za degradovanym
+#     suborom (R-11) a verziu cita CERSTVO z disku (audit NP-2 F4).
+# PRIZNANY LIMIT: verzie pred NP-2 (v0.15.1 a starsie) branu nemaju — ked na
+# tom istom %APPDATA% ulozia nastavenia, nove kluce zahodia a `std` 2 nechaju;
+# novsi plugin potom doplni predvolene 5/10/10 bez varovania.
 #
 # ======================= SADZBY vs STANDARDNE RIADKY ===================
 # SLUZBY (rates) su AUTOMATICKE — mnozstvo pocita engine z BOM/odhadu platni:
@@ -40,7 +56,7 @@ require 'digest'
 module Noxun
   module Engine
     module SupplierSettings
-      STD          = 1 # verzia formatu suboru (buduce migracie)
+      STD          = 2 # verzia formatu suboru (NP-2: skalare narezoveho planu + dopredna brana)
       SEED_VERSION = 1 # verzia seedu (merge doplna nove kluce/riadky/rezimy)
       FILE         = 'supplier_settings.json'
 
@@ -72,12 +88,19 @@ module Noxun
       #     samostatny riadok (prieskum 22 CP: najlacnejsia samostatne uvedena
       #     polozka 27 €, najdrahsia zlucena ~700 € -> navrh 150 €). Je to LEN
       #     navrh — rozhodnutie per polozka zije v zakazke (cp_overrides).
+      #   kerf_mm / trim_mm / dup_allowance_mm — NP-2 (N3, O7, O12): prerez
+      #     pily, orez okraja platne a pridavok vrstvy duplaku na stranu (mm,
+      #     desatinne povolene). Citaju ich narezovy plan (SheetLayout) a
+      #     Kontrola „nezmesti sa" cez `layout_params` — JEDINY vstup.
       SCALAR_DEFAULTS = {
         'stale_days'          => 30,
         'rounding_step'       => 1.0,
         'abs_reserve_pct'     => 10.0,
         'montaz_m2_per_plate' => 5.8,
-        'cp_highlight_threshold' => 150.0
+        'cp_highlight_threshold' => 150.0,
+        'kerf_mm'             => 5.0,
+        'trim_mm'             => 10.0,
+        'dup_allowance_mm'    => 10.0
       }.freeze
 
       ROW_KINDS = %w[fixed per_m2].freeze
@@ -124,13 +147,37 @@ module Noxun
       RESERVE_RANGE    = (0.0..100.0)
       M2_PER_PLATE_RANGE = (0.1..100.0)
       CP_THRESHOLD_RANGE = (0.0..1_000_000.0)
+      KERF_RANGE          = (0.0..10.0) # NP-2: prerez 0–10 mm
+      TRIM_RANGE          = (0.0..50.0) # NP-2: orez 0–50 mm
+      DUP_ALLOWANCE_RANGE = (0.0..30.0) # NP-2: pridavok duplaku 0–30 mm
 
       # Skalare editovatelne patchom z okna Nastavenia + ich rozsahy (jedna
       # autorita pre validaciu aj chybovu hlasku).
       SCALAR_RANGES = {
         'rounding_step' => ROUNDING_RANGE, 'abs_reserve_pct' => RESERVE_RANGE,
-        'montaz_m2_per_plate' => M2_PER_PLATE_RANGE, 'cp_highlight_threshold' => CP_THRESHOLD_RANGE
+        'montaz_m2_per_plate' => M2_PER_PLATE_RANGE, 'cp_highlight_threshold' => CP_THRESHOLD_RANGE,
+        'kerf_mm' => KERF_RANGE, 'trim_mm' => TRIM_RANGE, 'dup_allowance_mm' => DUP_ALLOWANCE_RANGE
       }.freeze
+
+      # NP-2: ludske mena a jednotky skalarov pre CHYBU ROZSAHU (predtym
+      # surovy kluc „kerf_mm: hodnota mimo…").
+      SCALAR_LABELS = {
+        'abs_reserve_pct' => ['ABS rezerva', '%'],
+        'montaz_m2_per_plate' => ['m² na jednu platňu', 'm²'],
+        'kerf_mm' => ['Prerez píly', 'mm'],
+        'trim_mm' => ['Orez okraja platne', 'mm'],
+        'dup_allowance_mm' => ['Prídavok dupláku na stranu', 'mm'],
+        'rounding_step' => ['Zaokrúhlenie ponuky', '€'],
+        'stale_days' => ['Upozorniť na cenu staršiu ako', 'dní'],
+        'cp_highlight_threshold' => ['Samostatný riadok v cenovej ponuke od', '€']
+      }.freeze
+
+      # NP-2: kluce parametrov SheetLayout -> kluce skalarov dodavatela.
+      LAYOUT_KEYS = { 'kerf' => 'kerf_mm', 'trim' => 'trim_mm', 'dup_allowance' => 'dup_allowance_mm' }.freeze
+
+      FALLBACK_REASON = 'Súbor nastavení dodávateľa sa nepodarilo prečítať — zobrazujú sa ' \
+                        'predvolené hodnoty (prerez 5, orez 10, prídavok dupláku 10 mm) a počíta ' \
+                        's nimi aj Kontrola. Skontroluj súbor alebo ulož nastavenia nanovo.'
 
       module_function
 
@@ -159,18 +206,40 @@ module Noxun
       # Cely dokument (normalizovany, po seed-merge). Poskodeny/chybajuci subor
       # = seed (vzor HardwareRules.load — fallback NIKDY nevrati nil).
       def load
+        load_with_origin.first
+      end
+
+      # NP-2 (audit B2): TO ISTE citanie, ale s POVODOM dat -> [dokument, povod]:
+      #   :file          — subor sa precital (ci z primaru alebo zo zalohy,
+      #                    rozlisi az `active_with_source` — `degraded?` cita
+      #                    disk a `load` bezi pri kazdom vypocte rozpoctu),
+      #   :newer_file    — subor z NOVSIEHO pluginu (cita sa, nezapisuje sa),
+      #   :seed_fallback — citanie ZLYHALO a vracia sa seed. Kto z nastaveni
+      #                    pocita vyrobny verdikt (Kontrola), to MUSI priznat —
+      #                    ulozeny orez 50 nahradeny predvolenym 10 by inak
+      #                    potichu zmenil vysledok.
+      # Povod sa urcuje TU, nie rescue-om vo volajucom: `load` chybu pohlti
+      # a vrati seed, takze neskor sa fallback od suboru rozlisit neda.
+      def load_with_origin
         ensure_seeded
         merged, changed = read_doc
-        return merged unless changed
-        persist_seed_merge!(merged)
+        origin = doc_std_unsupported?(merged) ? :newer_file : :file
+        merged = persist_seed_merge!(merged) if changed
+        [merged, origin]
       rescue StandardError => e
         Engine.log_error(e, 'SupplierSettings.load') if defined?(Engine)
-        seed_doc
+        [seed_doc, :seed_fallback]
       end
 
       # CISTE citanie + seed-merge BEZ zapisu -> [dokument, changed].
+      # NP-2: dokument z NOVSIEHO pluginu sa v pamati normalizuje a doplni
+      # (rozpocet aj Kontrola ho potrebuju cely), ale `changed` je vzdy false —
+      # seed-merge sa don NEZAPISUJE (brana v `write` by ho aj tak odmietla;
+      # takto sa o zapis ani nepokusa pri kazdom nacitani).
       def read_doc
-        merge_seed(normalize(JsonFileStore.read(path, copy: true)))
+        raw = JsonFileStore.read(path, copy: true)
+        doc, changed = merge_seed(normalize(raw))
+        [doc, changed && !doc_std_unsupported?(raw)]
       end
 
       # R-08 (audit 1d #2/#10): seed-merge je READ-MODIFY-WRITE. Pod zamkom sa
@@ -191,8 +260,74 @@ module Noxun
 
       # Nastavenia AKTIVNEHO dodavatela — jediny vstup pre Budget.
       def active
-        doc = load
-        supplier_by_id(doc, doc['active']) || doc['suppliers'].first || seed_supplier
+        active_with_source.first
+      end
+
+      # NP-2: aktivny dodavatel + ZDROJ dat -> [supplier, source], source je
+      # :file | :backup | :newer_file | :seed_fallback. `:backup` = poskodeny
+      # primar s platnou zalohou (R-11); ma prednost pred `:newer_file` (to
+      # iste poradie ako brany v `write`).
+      def active_with_source
+        doc, origin = load_with_origin
+        sup = supplier_by_id(doc, doc['active']) || doc['suppliers'].first || seed_supplier
+        [sup, refine_origin(origin)]
+      end
+
+      def refine_origin(origin)
+        return origin if origin == :seed_fallback
+        return :backup if degraded_now?
+
+        origin
+      end
+
+      # Chyba pri zisteni degradacie = „nevieme" -> povod ostava (zapisova
+      # brana si ho aj tak overi sama pod zamkom a fail-closed).
+      def degraded_now?
+        JsonFileStore.degraded?(path)
+      rescue StandardError
+        false
+      end
+
+      # NP-2: parametre narezoveho planu pre volajucich (Kontrola; NP-3 plan).
+      # -> { params: {'kerf', 'trim', 'dup_allowance'} (Float mm), source: }
+      # Pri `:seed_fallback` su hodnoty PREDVOLENE a volajuci to musi priznat.
+      def layout_params
+        sup, source = active_with_source
+        params = LAYOUT_KEYS.each_with_object({}) { |(k, sk), out| out[k] = scalar(sup, sk).to_f }
+        { params: params, source: source }
+      end
+
+      # NP-2: stav suboru pre sekciu Nastavenia rozpoctu (banner + vypnute
+      # „Uložiť" pri `degraded` a `newer`).
+      # -> { 'state' => ok|degraded|newer|fallback, 'reason' => veta }
+      def settings_state(source)
+        case source
+        when :backup then { 'state' => 'degraded', 'reason' => degraded_reason }
+        when :newer_file then { 'state' => 'newer', 'reason' => std_block_reason(disk_std) }
+        when :seed_fallback then { 'state' => 'fallback', 'reason' => FALLBACK_REASON }
+        else { 'state' => 'ok', 'reason' => '' }
+        end
+      end
+
+      # Verzia suboru na disku (pre vetu brany); chyba citania = „novsia".
+      def disk_std
+        doc = JsonFileStore.read(path, copy: false)
+        doc.is_a?(Hash) ? doc['std'].to_i : STD + 1
+      rescue StandardError
+        STD + 1
+      end
+
+      # NP-2: je dokument z NOVSEJ verzie formatu? JEDINA autorita otazky
+      # (citanie, seed-merge aj zapisova brana). Chybajuci `std` = format 1.
+      def doc_std_unsupported?(doc)
+        doc.is_a?(Hash) && doc.key?('std') && doc['std'].to_i > STD
+      end
+
+      # Veta zablokovaneho zapisu pre subor z novsieho pluginu — jedno znenie
+      # pre patch, banner aj log.
+      def std_block_reason(std)
+        "Nastavenia dodávateľa uložil novší plugin (verzia súboru #{std}, tento plugin pozná #{STD}) — " \
+          'dajú sa len čítať, zápisy sú vypnuté (aktualizuj plugin).'
       end
 
       def supplier_by_id(doc, id)
@@ -221,11 +356,15 @@ module Noxun
       # 1d/R-11: presne ten predpovedany guard. Poskodeny primar s platnou
       # `.bak` sa cita zo ZALOHY — zapis by nastavenia prepisal STARSIM
       # obsahom, takze sa ODMIETNE (bez vynimky) a `write` vrati `false`.
+      #
+      # NP-2: za degradovanym suborom stoji DRUHA brana — subor z NOVSIEHO
+      # pluginu (`newer_write_blocked?`) — a kazdy zapis PECIATKUJE `std = STD`.
       def write(doc)
         with_catalog_lock do
           next false if degraded_write_blocked?
+          next false if newer_write_blocked?
 
-          JsonFileStore.write(path, normalize(doc))
+          JsonFileStore.write(path, normalize(doc).merge('std' => STD))
         end
       rescue StandardError => e
         Engine.log_error(e, 'SupplierSettings.write') if defined?(Engine)
@@ -247,10 +386,38 @@ module Noxun
         @write_block_reason = ''
         return false unless JsonFileStore.degraded?(path)
 
-        @write_block_reason = 'Nastavenia dodávateľa sú poškodené — číta sa záloha, zápisy sú ' \
-                              "vypnuté (oprav alebo zmaž súbor #{path})"
+        @write_block_reason = degraded_reason
         # Log LEN pri ZMENE stavu — seed-merge sa o zapis pokusa pri kazdom
         # nacitani, takze bezpodmienecny zapis by zaplavil Ruby konzolu.
+        if prev.to_s != @write_block_reason && defined?(Engine)
+          Engine.log("supplier settings: zapis odmietnuty — #{@write_block_reason}")
+        end
+        true
+      end
+
+      def degraded_reason
+        'Nastavenia dodávateľa sú poškodené — číta sa záloha, zápisy sú ' \
+          "vypnuté (oprav alebo zmaž súbor #{path})"
+      end
+
+      # NP-2: DRUHA zapisova brana — subor z NOVSIEHO pluginu. Bezi POD ZAMKOM
+      # (vola ju len `write`) a verziu cita CERSTVO z disku: sekundova cache
+      # `JsonFileStore.read` by nahriatu starsiu verziu vratila aj vtedy, ked
+      # medzitym novsi plugin subor prepisal (audit NP-2 F4 — `write` je
+      # verejny a nie kazdy volajuci pred nim robi `reload!`).
+      # Neprecitatelny subor sem NEPATRI (jeho branu drzi R-11) — nil = nie novsi.
+      # `@write_block_reason` LEN doplna: pri degradacii sa sem nedojde.
+      def newer_write_blocked?
+        doc = begin
+          JsonFileStore.reload!(path)
+          JsonFileStore.read(path, copy: false)
+        rescue StandardError
+          nil
+        end
+        return false unless doc_std_unsupported?(doc)
+
+        prev = @write_block_reason
+        @write_block_reason = std_block_reason(doc['std'].to_i)
         if prev.to_s != @write_block_reason && defined?(Engine)
           Engine.log("supplier settings: zapis odmietnuty — #{@write_block_reason}")
         end
@@ -389,6 +556,11 @@ module Noxun
                                             SCALAR_DEFAULTS['montaz_m2_per_plate'])
         out['cp_highlight_threshold'] = num_in(raw['cp_highlight_threshold'], CP_THRESHOLD_RANGE,
                                                SCALAR_DEFAULTS['cp_highlight_threshold'])
+        # NP-2: skalare narezoveho planu (chybajuce/mimo rozsahu = predvolene).
+        out['kerf_mm'] = num_in(raw['kerf_mm'], KERF_RANGE, SCALAR_DEFAULTS['kerf_mm'])
+        out['trim_mm'] = num_in(raw['trim_mm'], TRIM_RANGE, SCALAR_DEFAULTS['trim_mm'])
+        out['dup_allowance_mm'] = num_in(raw['dup_allowance_mm'], DUP_ALLOWANCE_RANGE,
+                                         SCALAR_DEFAULTS['dup_allowance_mm'])
         out
       end
 
@@ -532,11 +704,11 @@ module Noxun
         SCALAR_RANGES.each do |key, range|
           next unless p.key?(key)
           f = num(p[key])
-          errors << "#{key}: hodnota mimo rozsahu #{range.first}–#{range.last}" if f.nil? || !range.cover?(f)
+          errors << range_error(key, range) if f.nil? || !range.cover?(f)
         end
         if p.key?('stale_days')
           i = int_or_nil(p['stale_days'])
-          errors << "stale_days: povolené je #{STALE_DAYS_RANGE.first}–#{STALE_DAYS_RANGE.last} dní" if i.nil? || !STALE_DAYS_RANGE.cover?(i)
+          errors << range_error('stale_days', STALE_DAYS_RANGE) if i.nil? || !STALE_DAYS_RANGE.cover?(i)
         end
         if p.key?('rates')
           rates = p['rates']
@@ -645,6 +817,21 @@ module Noxun
           return [false, [reason.empty? ? 'nastavenia sa nepodarilo uložiť' : reason], :write_failed]
         end
         [true, [], :ok]
+      end
+
+      # NP-2: chyba rozsahu LUDSKY — „Prerez píly: hodnota mimo rozsahu 0–10 mm"
+      # (nie surovy kluc; desatinna ciarka ako v celom UI).
+      def range_error(key, range)
+        label, unit = SCALAR_LABELS[key.to_s] || [key.to_s, '']
+        unit_txt = unit.to_s.empty? ? '' : " #{unit}"
+        "#{label}: hodnota mimo rozsahu #{range_num(range.first)}–#{range_num(range.last)}#{unit_txt}"
+      end
+
+      def range_num(v)
+        f = v.to_f
+        return f.round.to_s if (f - f.round).abs < 1e-9
+
+        f.to_s.tr('.', ',')
       end
 
       # --- pomocne -------------------------------------------------------------

@@ -123,13 +123,20 @@ module Noxun
         # su to tri pohlady na ten isty maly dokument, takze druhy kanal by bol
         # drahsi nez cely payload. Model sa NEODOVZDAVA — nastavenia su
         # GLOBALNE (rovnako ako sablony).
+        #
+        # NP-2: payload nesie aj `settings_state` (ok | degraded | newer |
+        # fallback + veta) — sekcia ukaze BANNER hned, nie az pri pokuse
+        # o ulozenie, a pri `degraded`/`newer` vypne „Uložiť" — a `scalar_ranges`
+        # (klientska kontrola rozsahu cita TIE ISTE rozsahy ako server).
         def settings_payload
-          sup = SupplierSettings.active
+          sup, source = SupplierSettings.active_with_source
           rev = SupplierSettings.revision(sup)
           data = {
             'version' => Engine::VERSION,
             'revision' => rev,
             'supplier' => sup,
+            'settings_state' => SupplierSettings.settings_state(source),
+            'scalar_ranges' => scalar_ranges,
             'modes' => SupplierSettings::MODES,
             'mode_labels' => SupplierSettings::MODE_LABELS,
             'rate_keys' => SupplierSettings::RATE_KEYS,
@@ -147,6 +154,17 @@ module Noxun
         rescue StandardError => e
           Engine.log_error(e, 'SupplierSettingsDialog.settings_payload')
           nil
+        end
+
+        # NP-2: rozsahy skalarov pre klienta {kluc => [min, max]} — JEDNA
+        # autorita (`SupplierSettings::SCALAR_RANGES` + `STALE_DAYS_RANGE`).
+        def scalar_ranges
+          out = SupplierSettings::SCALAR_RANGES.each_with_object({}) do |(k, r), h|
+            h[k] = [r.first.to_f, r.last.to_f]
+          end
+          r = SupplierSettings::STALE_DAYS_RANGE
+          out['stale_days'] = [r.first.to_f, r.last.to_f]
+          out
         end
 
         # Sekcia `sup` — „Dodávateľ / Demos". POCTIVO: dnes NEEXISTUJU ziadne
