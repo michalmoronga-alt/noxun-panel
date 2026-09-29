@@ -2,7 +2,7 @@
 
 > Stav: **surový research packet** — nie zadanie. Rešeršér: Antigravity `agy` (Gemini 3.8 Flash High, `--mode plan`, beh s obsluhou),
 > tri behy po jednej otázke (skill `antigravity-outside-in`): **Q1+Q2** algoritmus a knižnice · **Q3** UX precedensy · **Q4** prax nárezových centier SR/ČR.
-> Kontext rešerše = návrh [../../next_sessions/NAREZ_PLAN_NAVRH_2026-09-06.md](../../next_sessions/NAREZ_PLAN_NAVRH_2026-09-06.md) (inline v promptoch).
+> Kontext rešerše = návrh [../../../zdroje/next_sessions/NAREZ_PLAN_NAVRH_2026-09-06.md](../../../zdroje/next_sessions/NAREZ_PLAN_NAVRH_2026-09-06.md) (inline v promptoch).
 > Surové packety sú nižšie bez úprav; UNVERIFIED = hypotéza. Ako sa naloží s každým nálezom, uvedie package dávky, ktorá ho rieši.
 
 ## Surový packet Q1+Q2 — algoritmus a knižnice

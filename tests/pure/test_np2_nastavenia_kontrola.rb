@@ -2,7 +2,7 @@
 # NP-2 (blok 2 · Narezovy plan): nastavenia prerezu, orezu a pridavku duplaku
 # (SupplierSettings, verzia suboru 2 + dopredna brana) a Kontrola „nezmesti sa"
 # cez SPOLOCNU pripravu s planom (SheetLayout.purchase_rect + fits_rect?).
-# Package: SYSTEM/zdroje/bloky/NAREZ/PACKAGE_NP2_NASTAVENIA.md (+ nalezy auditu
+# Package: SYSTEM/archiv/bloky/NAREZ/PACKAGE_NP2_NASTAVENIA.md (+ nalezy auditu
 # B1, B2, F3, F4, N5, N6 — maju prednost).
 #
 # Nastavenia sa testuju v IZOLOVANOM priecinku (`Materials.test_dir_override`,

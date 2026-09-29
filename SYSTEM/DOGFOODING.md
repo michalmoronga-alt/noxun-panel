@@ -18,8 +18,9 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
 
 ## KONTROLA + VÝROBA
 
-*(Skupina je prázdna — **D-94 uzavreté 12.9.2026** (v0.12.1), plný text v
-[archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md).)*
+*(Skupina je prázdna a **blok 2 je uzavretý vo v0.16.0 (29.9.2026)** — D-94, D-112, D-113, D-121 a D-122 majú plné texty v
+[archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md), primitívny nárezový plán (posledný bod bloku) je v [archiv/NAREZ_ZAVER_2026-09-29.md](archiv/NAREZ_ZAVER_2026-09-29.md).
+Nové postrehy k týmto funkciám idú do skupiny podľa bloku, nálezy zo smoke do dočasnej skupiny „NÁREZOVÝ PLÁN — smoke po uzávere bloku 2" nižšie.)*
 
 ## STABILITA
 
@@ -46,6 +47,13 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
 
 *(Skupina je prázdna — **D-52 uzavreté 3.9.2026** (v0.9.14), plný text v
 [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md); **D-48** je mimo V1, v skupine Po V1 — zásobník.)*
+
+## NÁREZOVÝ PLÁN — smoke po uzávere bloku 2 (v0.16.0, opravy v0.16.x)
+
+*(Blok 2 je uzavretý vo v0.16.0 (29.9.2026) bez otvorených D-čísel. Michalov smoke ide podľa checklistu
+v [archiv/NAREZ_ZAVER_2026-09-29.md](archiv/NAREZ_ZAVER_2026-09-29.md) — nové nálezy sa zapíšu sem a opravia ako v0.16.x. **Pred prvou úpravou rozpočtu
+aktualizovať obe PC** (Michal aj Lucia — `BUDGET_STD` 3, nastavenia dodávateľa verzie 2). Porovnanie s reálnou objednávkou VEPO (N10) nie je súčasť smoke —
+príde po V1 na novej zákazke. Skupina je dočasná a zanikne s posledným nálezom.)*
 
 ## Po V1 — zásobník
 

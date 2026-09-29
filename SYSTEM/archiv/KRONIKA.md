@@ -17,6 +17,31 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **BLOK 2 · KONTROLA + VÝROBA UZAVRETÝ (29.9.2026, v0.15.4 → v0.16.0, uzáver PR #422, variant B).** Posledný bod bloku — **primitívny nárezový plán** (V1 bod 6,
+  rozhodnutý 6.9.) — Michal spustil 28.9. večer; štart **#417** (re-rez zavretého #416: rozhodnutia N1–N11, schválený mockup, fakty, surová rešerš a krížový audit)
+  a štyri dávky za jeden deň: **NP-1** #418 (jadro `sheet_layout.rb`, `prepare_row`; audit 2 BLOCKER) · **NP-2** #419 (prerez/orez/prídavok v Nastaveniach
+  rozpočtu, súbor dodávateľa verzia 2, Kontrola s orezom; audit 2 BLOCKER, GH kolo 1 P1) · **NP-3** #420 (sekcia Nárezový plán, veta plánu v Rozpočte a XLSX;
+  audit 4 BLOCKER) · **NP-4** #421 (ceny podľa plánu, `BUDGET_STD` 3, oprava fronty zápisov rozpočtu; audit 3 BLOCKER). Staršie položky bloku (D-94 #361,
+  D-112 + D-113 #287, D-121 #324/#325, D-122 #343) boli hotové skôr. **Review bloku:** #416 zavreté podľa pravidla 3 kôl (b) — P1 v každom z troch kôl;
+  re-rez #417 Codex kolo 1 = 1× P2 (prednosť rozhodnutí pred návrhom 6.9.) → oprava + slepá delta OK · NP-1 predrecenzia PR OK (4× P3 opravené), Codex kolo 1
+  👍 bez nálezov · NP-2 predrecenzia 2× P2 + 4× P3 opravené, kolo 1 = 1× P1 (duplák bez formátu v katalógu → Kontrola voči zdroju) + 1× P2 (pôvod súboru po
+  seed-merge pod zámkom) → `acf94bc9`, kolo 2 = 2× P2 (tlmené „Uložiť", stav `unreadable`) → `beaba495`, slepá delta OK (3× P3 presunuté do NP-3) · NP-3
+  predrecenzia PR OK (3× P3 opravené), kolo 1 = 1× P2 (chip duplákov s rozmerom prvého riadku) → `a0981a6e`, slepá delta OK (2× P3 presunuté do NP-4) · NP-4
+  predrecenzia 1× P2 + 4× P3 opravené, in-SU 3266 PASS, Codex kolo 1 👍 bez nálezov. Audity návrhu (Codex): NP-1 Astra 2 BLOCKER + 7 FIX · NP-2 Astra
+  2 BLOCKER + 2 FIX + 2 NOTE · NP-3 Sol 4 BLOCKER + 8 FIX + 2 NOTE · NP-4 Astra 3 BLOCKER + 2 FIX + 1 NOTE — všetko zapracované pred implementáciou.
+  Uzáver mení len dokumentáciu a verziu: blok plným textom do
+  [ROADMAP_hotove_etapy.md](ROADMAP_hotove_etapy.md), **celý priečinok bloku** `zdroje/bloky/NAREZ/` → [bloky/NAREZ/](bloky/NAREZ/) (`git mv`; opravené odkazy
+  v PLAN, STAV, v tejto KRONIKE (záznamy #417–#421), v `zdroje/next_sessions/NAREZ_PLAN_NAVRH_2026-09-06.md`, v `docs/architecture/outputs.md`
+  a `ui-lifecycle.md`, v komentároch `sheet_layout.rb`, `sheet_layout.js` a `studio.html` a v hlavičkách testov `test_sheet_layout.rb`,
+  `test_np2_nastavenia_kontrola.rb`, `test_np3_sekcia.rb`, `test_np4_ceny.rb`; vnútri priečinka odkazy von na `zdroje/next_sessions/` v ROZHODNUTIA_MICHALA,
+  CROSS_AUDIT_PROMPT a RESERS_OUTSIDE_IN prepísané na `../../../zdroje/…`; žiadny test nečíta súbor z priečinka bloku). **Surové výstupy auditov** (absolútne
+  cesty do už zmazaných worktree) a textové zmienky ciest v packages sa nemenia — historický podklad. Výsledok, dávky, overenie, priznané limity a **zlúčený
+  smoke checklist** (NP-2 až NP-4 + mockup) v [NAREZ_ZAVER_2026-09-29.md](NAREZ_ZAVER_2026-09-29.md); **V1_VIZIA bod 6** — nárezový plán hotový (bod ostáva
+  neodškrtnutý: manuálne overenie cien materiálov/ABS a viac URL), PLAN (poznámka o hotovom bloku), README (koreň aj SYSTEM), DOGFOODING (skupina KONTROLA +
+  VÝROBA uzavretá, dočasná skupina „NÁREZOVÝ PLÁN — smoke po uzávere bloku 2"), STAV. Pri poslednej dávke **4842 headless · 142 JS sád · 3266 in-SU PASS**;
+  pri uzávere 4842 headless · 142 JS sád zelené (in-SU netreba — kód len číslom verzie a cestami v komentároch). Kompatibilita: rozpočet `BUDGET_STD` 3, nastavenia
+  dodávateľa verzia súboru 2 — **aktualizovať obe PC pred prvou úpravou rozpočtu**. Otvorené: Michalov smoke; porovnanie s reálnou objednávkou VEPO (N10) po V1.
+
 - **NP-4 · Nárezový plán — ceny podľa plánu (29.9.2026, v0.15.3 → v0.15.4, PR #421; blok 2, štvrtá a posledná dávka).**
   **Rozpočet → Materiál** má v hlavičke prepínač **„ceny podľa plánu"** (mockup C, O5) — per zákazka, **predvolene vypnutý**: vypnutý dáva presne dnešné čísla,
   riadky aj oba XLSX (zlatý charakterizačný test `test_np4_golden.rb`, odtlačok z mainu v0.15.3 vygenerovaný prvým commitom vetvy). Zapnutý berie **počet
@@ -34,7 +59,7 @@
   aj `gen` z okamihu kliknutia a zmena dokumentu frontu cudzích zápisov zahodí. Späť: okno sa vráti až po „Obnoviť" (audit F5 — životný cyklus Štúdia sa
   nemení; tooltip prepínača to hovorí). Spolu s dávkou 2× P3 zo slepej delty #420 (tooltip chipu duplákov „2 ks (hotový 820 × 580) = 4 prírezy 840 × 600",
   test escapovania mena). Audit návrhu Codex `gpt-6-astra`: **3 BLOCKER · 2 FIX · 1 NOTE — všetky prijaté** (surový výstup a package s doplnením
-  v [zdroje/bloky/NAREZ/](../zdroje/bloky/NAREZ/)). **Slepá predrecenzia:** 0× P1 · 1× P2 · 4× P3 — opravené pred PR: karta Nárezového plánu
+  v [bloky/NAREZ/](bloky/NAREZ/)). **Slepá predrecenzia:** 0× P1 · 1× P2 · 4× P3 — opravené pred PR: karta Nárezového plánu
   hovorí „v rozpočte N" číslom hotového rozpočtu (predtým odhad aj pri zapnutých cenách podľa plánu — dve pravdy), „a 1 ďalší" v statuse exportu,
   Nastavenia zvýraznia poškodený skalár a „Uložiť" ho zapíše aj bez úpravy; **priznané (P3-4):** čakajúci zápis sa odmietne aj v tom istom dokumente
   po mutácii, ktorá zdvihla generáciu (spotrebič s prestavbou) — bezpečný smer, klikne sa znova. Mutácie 21/21 zabité. **Testy:** 4842 headless ·
@@ -53,7 +78,7 @@
   (aj v XLSX) tú istú vetu „plán: …" (`SheetLayout.count_phrase`/`budget_note` — jediné miesto); čísla rozpočtu, porez, montáž aj XLSX ponuky sú overené
   ako nezmenené. SheetLayout: natívny kľúč riadku a `row_material_id` v `rejected`/`conflicts` (duplák bez väzby má v rozpočte vlastnú vetu). Navigácia
   bez neaktívnej položky (zrkadlá sekcií + guardy). Audit návrhu Codex `gpt-5.6-sol`: **4 BLOCKER · 8 FIX · 2 NOTE — všetky prijaté** (surový výstup
-  a package s doplnením v [zdroje/bloky/NAREZ/](../zdroje/bloky/NAREZ/)). Merania (~2000 dielcov): **celý JSON pushu Štúdia 377 kB** (kusovník 247,
+  a package s doplnením v [bloky/NAREZ/](bloky/NAREZ/)). Merania (~2000 dielcov): **celý JSON pushu Štúdia 377 kB** (kusovník 247,
   plán 118, rozpočet 10 kB; limit testu 450 kB), `push_state` ≈ 105 ms (limit 250), výpočet plánu + JSON ≈ 35 ms, render sekcie ≈ 3 ms. Mutácie 17/17
   zabité. Spolu s dávkou tri P3 zo slepej delty #419 (komentáre `unreadable`, pravidlo `.primary[aria-disabled]`, banner hovorí vypnutie zápisu raz).
   **Slepá predrecenzia:** PR OK — 0× P1/P2, 3× P3 opravené pred PR (test meria celý JSON pushu, nie len plán; test tém dokazuje tokeny v CSS namiesto
@@ -74,7 +99,7 @@
   `3000 × 0`, `3000 × 0,4` a NaN mali dovtedy len `oversize`) a ORANGE **`layout_settings`**, keď sa súbor nastavení nedá prečítať a Kontrola počíta s predvolenými
   hodnotami (audit B2 — pôvod dát nesie `load_with_origin` / `active_with_source`, klik vedie do Nastavení). **Priznané zmeny výsledku:** hraničné dielce
   (2781–2800 mm pri oreze 10) a dupláky nad použiteľnou plochou mínus prídavok sú odteraz RED; dva počítače s iným orezom dajú iný nález. Audit návrhu Codex
-  `gpt-6-astra`: **2 BLOCKER · 2 FIX · 2 NOTE — všetky prijaté** (surový výstup a package v [zdroje/bloky/NAREZ/](../zdroje/bloky/NAREZ/)). STANDARD §3.3, §10,
+  `gpt-6-astra`: **2 BLOCKER · 2 FIX · 2 NOTE — všetky prijaté** (surový výstup a package v [bloky/NAREZ/](bloky/NAREZ/)). STANDARD §3.3, §10,
   §11.4 a nová **§11.5 Nastavenia dodávateľa**; architektúra `outputs.md` (`validation.rb`, `production_core.rb`, `sheet_layout.rb`, `supplier_settings.rb` —
   prvý úplný odsek) a `ui-lifecycle.md` (`supplier_settings_dialog.rb`, Kontrola). **Slepá predrecenzia:** OPRAVIŤ PRED PR — 0× P1, 2× P2 (chýbajúce testy:
   prírezy dupláku pri neznámej ABS, klik na nález `layout_settings`) a 4× P3 (jednotné znenie chyby rozsahu server = klient, orez a plocha vo vete na 2 desatinné,
@@ -102,7 +127,7 @@
   v poradí; oba režimy 18/36) a až potom extrakcia (audit F3); VEPO výstup bajtovo rovnaký. Pre Kontrolu v NP-2 sú pripravené `purchase_rect` (celá príprava
   nákupného obdĺžnika — na pokyn orchestrátora vracia geometriu aj pri odmietnutí z dôvodu mimo rozmerov), `fits_rect?(allow_rotation:)` a
   `rotation_allowed?` (otáča všetko okrem `length`/`width`). Audit návrhu Codex `gpt-6-astra`: **2 BLOCKER · 7 FIX — všetky prijaté** (surový výstup
-  a package v [zdroje/bloky/NAREZ/](../zdroje/bloky/NAREZ/)). STANDARD §3.3, §7.1 (`sheet_size[0]` = dĺžka = smer kresby), nová §11.4 a §12 (primitívny plán
+  a package v [bloky/NAREZ/](bloky/NAREZ/)). STANDARD §3.3, §7.1 (`sheet_size[0]` = dĺžka = smer kresby), nová §11.4 a §12 (primitívny plán
   je vo V1); architektúra `outputs.md` (nový odsek `sheet_layout.rb`, `prepare_row` vo `vepo_export.rb`). **Slepá predrecenzia:** PR OK, 0× P1/P2, 4× P3
   opravené (záchranná vetva ostáva na známom materiáli a reťazec „1e400" je `invalid_row`; bežný riadok v celých mm Integer; `blocked` s kľúčom `'all'`
   z JSON; dokumentácia) + na pokyn orchestrátora **kontrola jednotnej obchodnej hrúbky** materiálu aj bez hrúbky v katalógu. **Testy:** 4765 headless ·
@@ -114,7 +139,7 @@
 
 - **DOCS — štart bloku 2 · Nárezový plán (primitívny) (28.–29.9.2026, PR #417, len dokumentácia; verzia pluginu sa nemení).**
   Michal 28.9. večer (v druhom okne, súbežne so smoke bloku 8) spustil **posledný otvorený bod bloku 2 KONTROLA + VÝROBA** — primitívny nárezový plán rozhodnutý 6.9.
-  **Rozhodnutia** (N1–N11, [zdroje/bloky/NAREZ/ROZHODNUTIA_MICHALA_2026-09-28.md](../zdroje/bloky/NAREZ/ROZHODNUTIA_MICHALA_2026-09-28.md)): prerez 5 mm a orez 10 mm ako
+  **Rozhodnutia** (N1–N11, [bloky/NAREZ/ROZHODNUTIA_MICHALA_2026-09-28.md](bloky/NAREZ/ROZHODNUTIA_MICHALA_2026-09-28.md)): prerez 5 mm a orez 10 mm ako
   nastavenia, VEPO účtuje celé tabule a zvyšky sú Michalove, orez len pre bežné platne (pracovná doska, kompakt a zástena bez orezu), každá vrstva dupláku s prídavkom
   +10 mm na stranu, **plán neotáča žiadny dielec** (či VEPO otáča dielce bez smeru, sa nevie — počet je tak opatrnejší), porovnanie s reálnou objednávkou VEPO až po V1
   na novej testovacej zákazke (voliteľne nepotvrdená objednávka), **mockup schválený** s prahom upozornenia na poslednú platňu 20 %; neúplný plán = cena z odhadu,

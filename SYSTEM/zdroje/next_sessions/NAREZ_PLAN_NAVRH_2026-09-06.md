@@ -6,7 +6,7 @@
 >
 > Pred implementáciou platí postup z [README.md](README.md).
 >
-> **Od 28.9.2026 historický vstup — kde sa líši, platia rozhodnutia bloku** [../bloky/NAREZ/ROZHODNUTIA_MICHALA_2026-09-28.md](../bloky/NAREZ/ROZHODNUTIA_MICHALA_2026-09-28.md)
+> **Od 28.9.2026 historický vstup — kde sa líši, platia rozhodnutia bloku** [../../archiv/bloky/NAREZ/ROZHODNUTIA_MICHALA_2026-09-28.md](../../archiv/bloky/NAREZ/ROZHODNUTIA_MICHALA_2026-09-28.md)
 > (napr. žiadne otáčanie dielcov — N8, prerez 5 mm — N3, prídavok dupláku — N7) a packages dávok NP-1…NP-4.
 
 ## 0 · Prečo (Michal 6.9.)

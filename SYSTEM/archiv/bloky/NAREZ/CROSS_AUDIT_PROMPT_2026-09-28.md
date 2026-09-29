@@ -59,7 +59,7 @@ Odpovedaj na otázky **§7 konceptu (1–8)** a navyše:
 
 > Stav: **KONCEPT v1 — surový vstup pre krížový audit bloku, nie zadanie.** Záväzné sú len rozhodnutia Michala
 > ([ROZHODNUTIA_MICHALA_2026-09-28.md](ROZHODNUTIA_MICHALA_2026-09-28.md), N1–N5) a po schválení mockup; technické požiadavky dostane **package každej dávky**
-> s vlastným auditom návrhu. Podklady: návrh 6.9. [../../next_sessions/NAREZ_PLAN_NAVRH_2026-09-06.md](../../next_sessions/NAREZ_PLAN_NAVRH_2026-09-06.md)
+> s vlastným auditom návrhu. Podklady: návrh 6.9. [../../../zdroje/next_sessions/NAREZ_PLAN_NAVRH_2026-09-06.md](../../../zdroje/next_sessions/NAREZ_PLAN_NAVRH_2026-09-06.md)
 > (Codex #322/#323) · fakty [FAKTY_Z_KODU_2026-09-28.md](FAKTY_Z_KODU_2026-09-28.md) (časti A/B, odkazy `súbor:riadok`) · rešerš
 > [RESERS_OUTSIDE_IN_2026-09-28.md](RESERS_OUTSIDE_IN_2026-09-28.md). Body označené **(M)** sú „návrh — potvrdí Michal" (mockup).
 
