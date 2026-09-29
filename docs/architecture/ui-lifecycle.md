@@ -2378,10 +2378,10 @@ _(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
 
 cieľové JEDNO okno zákazky (kontrakt `SYSTEM/zdroje/ui20/UI20_KONTRAKT.md`, sekcia ŠTÚDIO KONCEPT) — ľavá navigácia, obsah sekcie vpravo.
 
-**Živých je DVANÁSŤ sekcií** (`SECTIONS` = `bom ctrl buy budget offer mat hw rules tpl sup bset about`) — od ŠT-4a je sekciou KAŽDÁ položka navigácie okrem Nárezového plánu (fáza
-2): **KUSOVNÍK** (Š1–Š6, pohľady **Dielce · Platne · ABS**), od ŠT-1b **KONTROLA** (Š8–Š11), od ŠT-1c PR A **NÁKUP KOVANIA** (Š7 — presun tabu Kovanie 1:1), od ŠT-1c PR B1
+**Živých je ŠTRNÁSŤ sekcií** (`SECTIONS` = `bom ctrl buy budget offer cut mat hw appl rules tpl sup bset about`) — od NP-3 je sekciou KAŽDÁ položka navigácie (Nárezový plán
+`cut` ožil, S1-A2 pridala Spotrebiče `appl`): **KUSOVNÍK** (Š1–Š6, pohľady **Dielce · Platne · ABS**), od ŠT-1b **KONTROLA** (Š8–Š11), od ŠT-1c PR A **NÁKUP KOVANIA** (Š7 — presun tabu Kovanie 1:1), od ŠT-1c PR B1
 **ROZPOČET** (Š12–Š13) a od ŠT-1c PR B2 **CENOVÁ PONUKA** (Š14–Š15; každá má vlastný odsek nižšie); od ŠT-3c-1 **ŠABLÓNY** (`tpl`) a od **ŠT-4a NASTAVENIA** (`sup` · `bset` ·
-`about`, Š19 — posledná skupina navigácie).
+`about`, Š19 — posledná skupina navigácie) a od NP-3 **NÁREZOVÝ PLÁN** (`cut`, vlastný odsek nižšie).
 
 **PREMOSTENIA ZANIKLI CELE** (`WINDOW_BRIDGES`, `BRIDGE_STATUS`, `do_bridge`, `bridge_window`, klientske `bridge:`/`bridgeTo`/`.nbridge` aj callback `studio_bridge`): premostenie
 bol dočasný most do satelitu, ktorý ešte žil — ŠT-4a odstránila **posledný satelit**, takže niet kam premosťovať a most bez oboch koncov by bol mŕtvy kód, ktorý prežije prvé „to sa
@@ -2425,8 +2425,8 @@ ochranu, ktorá tam nie je.
 premostenie, alebo má dôvod. Prepnutie sekcie z kódu má **jedno miesto** `studioGoSection(id)` (globálne na `window`, lebo ho volá aj `budget.js`, ktorý sa načítava až za
 `studio.js`).
 
-**Jediná `aria-disabled` položka je (a od ŠT-4a jediná neživá vôbec) Nárezový plán** („fáza 2", vzor D-78 — žiadne mŕtve tlačidlo bez dôvodu). O cieli premostenia rozhoduje
-**uzavretý whitelist v Ruby**, klient posiela iba kľúč.
+**Neaktívna položka navigácie od NP-3 neexistuje** — posledná (Nárezový plán, „fáza 2") ožila. Vetva `disabled` v kreslení navigácie (`aria-disabled` s dôvodom, vzor D-78)
+ostáva ako poistka pre položku, ktorá by prišla skôr než jej obsah. O sekcii rozhoduje **uzavretý whitelist v Ruby**, klient posiela iba kľúč.
 
 **Čísla nesie zdieľané jadro `ProductionCore`** (do ŠT-1c PR B3 z neho čítalo aj okno Výroba); **kanál okna je vlastný** (audit #3): vlastný `@generation`, vlastný relay
 `NX.studioRelay`/`studioRelayExport` → `studio_do_select`/`studio_do_export` v `panel.rb`, s **identickým flush handshakom** (červené pole panela export zastaví). Cudzí push tak
@@ -3288,6 +3288,32 @@ fokus (`data-bkey="sep:…"`) by spadol na `<body>` práve tam, kde sa kliká na
 zobrazuje, priznáva `<small>` pri nej. Riadok zaokrúhlenia stojí **v oboch sekciách** — je to JEDNO serverové číslo v dvoch úlohách (v Rozpočte vysvetľuje, ako sa súčet stal
 konečnou sumou; v Ponuke je to riadok dokumentu), nie dve pravdy. Testy: `tests/pure/test_st1c_ponuka.rb`, `tests/js/test_st1c_ponuka.js`, in-SketchUp sekcia `run_st1c`
 (`st1c_offer`).
+
+### Sekcia NÁREZOVÝ PLÁN v Štúdiu (NP-3, blok 2 · v0.15.3, ui/js/sheet_layout.js)
+
+posledná neaktívna položka navigácie („fáza 2") ožila — **id ostáva `cut`** (Codex C13), `SECTIONS` a obe JS zrkadlá ju majú za Cenovou ponukou. Vzhľad a texty sú
+schválený mockup `SYSTEM/zdroje/bloky/NAREZ/MOCKUP_NAREZ_2026-09-28.html` (A prehľad, B detail platne); package `PACKAGE_NP3_SEKCIA.md` v tom istom priečinku.
+
+**Dáta: jeden výpočet na push.** `push_state` spočíta plán RAZ (`ProductionCore.layout_for` z toho istého `collected`, `bom`, `smap` a expanzie kovania — žiadny druhý sken)
+a ten istý plán odovzdá rozpočtu (`budget_payload(…, layout)` → veta v poznámke riadku materiálu) aj sekcii (`sheet_layout_payload` → kľúč `sheet_layout`). Kompaktný tvar:
+mená riadkov raz v `rows` (`k` natívny kľúč riadku kusovníka, `c` obdĺžniky, pri dupláku `q` hotové kusy, `m` vrstvy a hotový rozmer `fl × fw`), platne `p: [[riadok, x, y]]`
+na 0,1 mm + `o` najväčší zvyšok, `unplaced`/`rejected`/`conflicts` s **ľudským dôvodom `t` zo servera**, `phrase` = veta o počte (`SheetLayout.count_phrase` — tá istá ide do
+Rozpočtu a XLSX). Globálny stav (`blocked`, `without_material`) nepatrí karte — sekcia ho ukáže **bannerom nad kartami** aj pri prázdnom zozname (audit B4). Chyba plánu =
+`{ok: false}` a veta v sekcii; rozpočet ani exporty to nezhodí (F7). Meranie (F9): ~2000 obdĺžnikov ≈ 105 kB payloadu sekcie, výpočet + JSON ≈ 35 ms, render ≈ 3 ms
+(`tests/pure/test_np3_sekcia.rb`, `tests/js/test_np3_sekcia.js`) — lazy PULL detailu preto nie je (audit F6).
+
+**Klient kreslí, nepočíta.** `sheet_layout.js` (globálne mená s prefixom `np`, volá ho `studio.js` cez `typeof npRenderTools / npRenderBody`, `NX.setStudio` neobaľuje)
+kreslí súhrn, karty (predvolene otvorená prvá a každá s problémom — neúplný plán, upozornenie, nezaradené; ostatné zbalené, **zbalená karta SVG vôbec nevytvára**, voľba
+v `localStorage` `nx_np_closed` s try/catch), malé platne a detail platne v tom istom okne (stav okna `npDetail`, pri novom pushi sa overí — zmiznutý materiál vráti prehľad,
+menej platní skráti index). Jediné, čo si odvodzuje, je **upozornenie na poslednú platňu (O2)**: aspoň 2 platne a posledná pod 20 % alebo najviac 2 dielce.
+**SVG platne je téma-bezpečné:** farby sú výhradne CSS triedy `.np-*` s tokenmi `--nx-*` v `studio.html` (šrafy sú `<pattern>` s triedou v skrytom `<svg>` okna); jediná
+dátová farba je vzorka dekoru (`rgbHex`) v HTML štvorčeku mimo SVG (guard F12).
+
+**Lišta:** „Obnoviť" (zdieľaný `refreshBtnHtml`, šieste miesto) + chip „prerez · orez · duplák" z `params` (desatinná čiarka) → preklik do Nastavení rozpočtu (`studioGoSection('bset')`);
+pri predvolených hodnotách (`source` `seed_fallback`/`unreadable`) je chip jantárový s vetou. Detail: „Prehľad" + listovanie platní.
+
+**Oko = výber, nie zápis.** `nx_select` s `parts_key` = **natívny kľúč riadku** (pole `Bom.row_key`, nikdy pids) + `origin: 'cut'`, ide existujúcou cestou `refs_for` (všetky
+rovnaké kusy riadku, O3) a relay cez panel; `origin` len vyberie vetu statusu (`cut_select_status`). In-SU test netreba — sekcia nič nezapisuje.
 
 ### JEDEN push kanál nad modelom (uzavretá nota ŠT-1a, audit #15)
 

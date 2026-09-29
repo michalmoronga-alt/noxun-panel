@@ -1598,6 +1598,12 @@ a rozhodovanie, **nie výrobný dokument** (reže VEPO vlastnou optimalizáciou)
   bez zablokovaných výrobných dát a s platnými parametrami. **UNI materiál a chýbajúci formát (fallback) sú vždy len orientačné.**
 - **§11.1 („exportéry nepočítajú rozmery") sa naň nevzťahuje** — plán **nič neexportuje**, je to výpočet nad kusovníkom; VEPO CSV ostáva bez zmeny.
 - **Parametre** (prerez, orez, prídavok dupláku) sú od NP-2 nastavenia dodávateľa (§11.5); tú istú prípravu obdĺžnika používa Kontrola „nezmestí sa" (§10).
+  Parametre z **predvolených** hodnôt (nastavenia sa nepodarilo načítať) robia plán **orientačným** — nikdy „horná hranica".
+- **Jedna veta o počte (NP-3):** karta sekcie Nárezový plán v Štúdiu, **poznámka riadku materiálu v Rozpočte** a XLSX rozpočtu nesú **tú istú**
+  serverovú vetu („N platní (horná hranica)" · „… pre zaradené dielce — celkový počet neznámy" · „orientačne …"). **Cenová ponuka počty platní
+  nikdy neukáže.** V rozpočte je plán **len poznámka** — množstvo platní, cena, porez aj montáž ostávajú z odhadu z m² (ceny podľa plánu = NP-4).
+- **Neúplný je aj plán nad zablokovanými výrobnými dátami:** každá brána, ktorá by nad tým istým zberom zastavila VEPO export (novšia schéma,
+  poškodený rozmer do nárezu, kit zásuviek), zruší hornú hranicu celej zákazky.
 
 ### 11.5 Nastavenia dodávateľa (globálny súbor)
 

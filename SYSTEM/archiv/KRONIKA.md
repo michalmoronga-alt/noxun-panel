@@ -17,6 +17,22 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **NP-3 · Nárezový plán — sekcia Štúdia + veta plánu v poznámke rozpočtu (29.9.2026, v0.15.2 → v0.15.3, PR #?; blok 2, tretia dávka).**
+  **Štúdio → Nárezový plán** (posledná neaktívna položka „fáza 2") ožil ako sekcia `cut` podľa schváleného mockupu A a B: lišta „Obnoviť" + chip
+  „prerez · orez · duplák" (preklik do Nastavení rozpočtu, jantárový pri predvolených hodnotách), súhrnný riadok, karta pre každý nákupný materiál
+  (vzorka, formát, kresba, využitie, odhad z m², chipy — duplák ako prírezy s prídavkom, „bez orezu — hrany hotové", formát chýba, UNI, plán neúplný),
+  malé platne v SVG, **upozornenie na poslednú platňu** (O2: aspoň 2 platne a posledná pod 20 % alebo najviac 2 dielce, rada v „?"), červený zoznam
+  nezaradených a vyradených s ľudským dôvodom zo servera a **detail platne** v tom istom okne (orez, dielce s názvom a rozmerom, najväčší zvyšok, zoznam
+  dielcov s okom — `nx_select` s natívnym kľúčom riadku, všetky rovnaké kusy, O3). Karty sú zbaliteľné (predvolene otvorená prvá a problémová, zbalená
+  SVG nevytvára, pamäť tohto PC). **Jeden výpočet plánu na zber** (`ProductionCore.layout_for`) dostane push aj `budget_payload` (všetkých 5 volajúcich),
+  fail-soft; `blocked` = všetky brány VEPO nad tým istým zberom cez štruktúrované dôvody bez exportnej vety. **Rozpočet → Materiál** nesie v poznámke
+  (aj v XLSX) tú istú vetu „plán: …" (`SheetLayout.count_phrase`/`budget_note` — jediné miesto); čísla rozpočtu, porez, montáž aj XLSX ponuky sú overené
+  ako nezmenené. SheetLayout: natívny kľúč riadku a `row_material_id` v `rejected`/`conflicts` (duplák bez väzby má v rozpočte vlastnú vetu). Navigácia
+  bez neaktívnej položky (zrkadlá sekcií + guardy). Audit návrhu Codex `gpt-5.6-sol`: **4 BLOCKER · 8 FIX · 2 NOTE — všetky prijaté** (surový výstup
+  a package s doplnením v [zdroje/bloky/NAREZ/](../zdroje/bloky/NAREZ/)). Merania: ~2000 obdĺžnikov = payload sekcie 105 kB, výpočet + JSON ≈ 35 ms,
+  render ≈ 3 ms. Mutácie 14/14 zabité. Spolu s dávkou tri P3 zo slepej delty #419 (komentáre `unreadable`, pravidlo `.primary[aria-disabled]`,
+  banner hovorí vypnutie zápisu raz). **Testy:** 4816 headless · 141 JS sád zelené; in-SU netreba (sekcia nič nezapisuje).
+
 - **NP-2 · Nárezový plán — nastavenia prerezu, orezu a prídavku + Kontrola s orezom (29.9.2026, v0.15.1 → v0.15.2, PR #419; blok 2, druhá dávka).**
   **Nastavenia rozpočtu → Výpočet a upozornenia** dostali tri polia (mockup D, poradie medzi „m² na platňu" a „Zaokrúhlenie"): **prerez píly** 5 mm (0–10),
   **orez okraja platne** 10 mm (0–50), **prídavok dupláku na stranu** 10 mm (0–30) — desatinné s čiarkou aj bodkou, `inputmode="decimal"`, tooltip „?" (`.nxtip`

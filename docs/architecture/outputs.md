@@ -531,6 +531,18 @@ a prídavok berie zo `SupplierSettings.layout_params` **vrátane pôvodu** (`:se
 **odvodí z už načítanej `edges_map`** (`edge_thicknesses_of`, audit F3) — `vepo_edge_thicknesses` by pri chybe katalógu ABS vyhodil výnimku
 a zhodil celú Kontrolu; `nil` mapa = prázdne hrúbky a rozmerové kontroly bežia ďalej.
 
+**NP-3: NÁREZOVÝ PLÁN zákazky — `layout_for(collected, bom, smap, hw_exp)`.** Jeden výpočet plánu na zber: `push_state` ho spočíta raz a odovzdá
+`budget_payload(…, layout)` (7. parameter) aj `sheet_layout_payload` (sekcia Štúdia); `budget_payload` bez plánu si ho spočíta **sám z toho istého
+zberu** (vzor odhadu platní), takže všetkých päť volajúcich (push, VEPO kontrola, XLSX rozpočtu, XLSX ponuky, prepočet cien) nesie ten istý plán
+a tú istú poznámku. Parametre = `control_layout(edges_map)` (tie isté ako Kontrola, s pôvodom → `params_source`); `blocked` = **`layout_block_reasons`**
+= `newer_config_reasons` + `cut_blockers` + `drawer_reasons(scope: :kit)` — **štruktúrované dôvody** tých istých brán, ktoré VEPO vyhodnotí nad tým istým
+zberom (audit B1), bez exportnej vety: `newer_config_stop` a `drawer_stop` ich len formátujú cez `export_blocked_status` (F5, bajty exportných hlášok sa
+nezmenili). **Fail-soft (F7):** vlastný rescue → `{'error' => 'plán nedostupný'}`; rozpočet, oba XLSX ani prepočet cien nespadnú, riadok materiálu
+dostane vetu „plán nedostupný". `sheet_layout_payload` skladá kompaktný payload sekcie (`layout_*` pomocníci: riadky s natívnym kľúčom len keď riadok
+v kusovníku je, ľudské dôvody nezaradenia/vyradenia — „hlási aj Kontrola" len pri materiáli, ktorý Kontrola kontroluje, súradnice na 0,1 mm) — detail
+v [ui-lifecycle.md](ui-lifecycle.md), sekcia NÁREZOVÝ PLÁN. `do_select` s `origin: 'cut'` (oko v pláne) len vymení vetu statusu (`cut_select_status` —
+všetky rovnaké kusy riadku, krok Späť nevzniká); výber ide cestou `parts_key` → `refs_for`.
+
 **`replace_uni`** (skratka „Nahradiť UNI…" → `MaterialsDialog.request_replace_uni`) a **zdieľané telá prepínačov** `edge_check_guard` (dostupnosť Overlay API + `identity_guard`) ·
 `identity_guard` (generácia okna + dokument — zdieľa ho aj kresba, ktorá si dostupnosť overuje **vlastnú** a hlási ju vetou o kresbe, nie o hranách) · `do_edge_check` ·
 `do_edge_check_option` · `do_grain_check` + texty statusov (`edge_check_status`, `EDGE_OPTION_LABELS`/`edge_check_option_status`, `grain_check_status`, `grain_part_plural`). Okno
@@ -746,7 +758,9 @@ a predvolená cena. `sheet_size_for` je jediná pravda o formáte platne a fallb
 ### sheet_layout.rb
 
 **NP-1 (blok 2 · Nárezový plán, v0.15.1) — jadro výpočtu.** Od NP-2 (v0.15.2) ho číta **Kontrola „nezmestí sa"** (`purchase_rect` +
-`fits_rect?` nad záznamom dielca, odsek `validation.rb`); plán v Štúdiu, rozpočet ani exporty zatiaľ nie (NP-3, NP-4). Čistý modul: z `Bom.compute[:rows]`, celého `ProductionCore.sheets_map` a mapy hrúbok ABS (**tej istej, akú dostáva VEPO**)
+`fits_rect?` nad záznamom dielca, odsek `validation.rb`); od **NP-3 (v0.15.3)** ho počíta `ProductionCore.layout_for` **raz na zber** pre sekciu Štúdia
+Nárezový plán a **vetu v poznámke riadku materiálu** v Rozpočte a XLSX rozpočtu (odsek `production_core.rb`, sekcia NP-3). Ceny, porez ani montáž z neho
+zatiaľ nie sú (NP-4). Čistý modul: z `Bom.compute[:rows]`, celého `ProductionCore.sheets_map` a mapy hrúbok ABS (**tej istej, akú dostáva VEPO**)
 vypočíta **per nákupný materiál** deterministické pásové (gilotínové) rozloženie obdĺžnikov na platne. Je to **rozloženie heuristiky, nie
 minimum** — reže VEPO vlastnou optimalizáciou, plán slúži objednávke. Package: `SYSTEM/zdroje/bloky/NAREZ/PACKAGE_NP1_JADRO.md`.
 
@@ -799,18 +813,32 @@ potom `x`; susedné odrezky sa nezlučujú.
 **Výsledok.** `{params, invalid_params (mená), rejected_without_material (+ _rows), materials}`; materiály podľa `material_id`, každý:
 `sheet_size`, `usable`, `trim`, `fallback`, `uni`, `invalid_params`, `sheets` (počet), `utilization` (% z celých platní; pri 0 platniach
 **chýba**), `placed_count`, `rejected_rows` + `rejected`, `thickness_conflict`, `duplak_link_missing`, `conflicts`, `blocked` (dôvod | nil),
-`doubled_pieces`, `rows` (`key`, `names`, `l`, `w`, `count`, `doubled`), `layouts` (`placements [riadok, n, x, y]`, `strips [y, h]`,
+`doubled_pieces`, `rows` (`key`, `names`, `l`, `w`, `count`, `doubled`, `multiplier`, `grain`), `layouts` (`placements [riadok, n, x, y]`, `strips [y, h]`,
 `utilization` %, `offcut [x, y, l, w] | nil`), `unplaced [riadok, n, dôvod]` a **`upper_bound`** — `true` **len** bez fallbacku, UNI,
 neplatných parametrov, `blocked`, konfliktu hrúbky, chýbajúcej väzby dupláku, nezaradených a vyradených riadkov (C2). Súradnice sú
 v použiteľnej ploche (po oreze). „N platní (horná hranica)" smie UI povedať len pri `upper_bound`.
 
+**Kľúč riadku je natívny (NP-3, audit B2).** `rows[].key`, `rejected[].key` aj `conflicts[].key` sú **natívne pole `Bom.row_key`** (nil, keď riadok
+kľúč nemá alebo sa nedá serializovať do JSON — NaN) — presne to, čo porovnáva `ProductionCore.refs_for`, takže oko v Štúdiu vyberá bez dekódovania. Text
+`JSON.generate(key)` slúži už len na radenie (interný `key_text`, do výsledku nejde). Záznamy `rejected`/`conflicts` nesú aj **`row_material_id`**
+(materiál riadku — duplák bez väzby sa tak dá spojiť s riadkom rozpočtu, ktorý ho drží pod ID dupláku, B3).
+
 **`blocked:` (audit F5).** Agregácia stratí `cut_invalid` (poškodený rozmer do nárezu), hoci export zastaví samostatná brána — volajúci
 preto odovzdá `{ all: dôvod }` (kľúč Symbol `:all` aj reťazec `'all'` z JSON) alebo `{ material_id => dôvod }` (zhoda aj cez materiál
 riadku, napr. duplákový); rozloženie sa spočíta,
-ale bez `upper_bound`. **Kto `blocked` skladá, určí NP-3/NP-4.**
+ale bez `upper_bound`. **Od NP-3 ho skladá `ProductionCore.layout_block_reasons`** — `{ 'all' => "VEPO export by sa zastavil: …" }` zo **všetkých**
+brán, ktoré VEPO vyhodnotí nad tým istým zberom (novšia schéma, chrbát D-143, kit zásuviek `scope: :kit` s tou istou expanziou; audit B1).
+
+**Veta o počte — jediné miesto (NP-3, audit C2, F8).** `count_phrase(mat, unreliable:)` skladá **jedinú** vetu o výsledku materiálu, ktorú ukáže karta
+v Štúdiu, poznámka riadku Rozpočtu aj XLSX rozpočtu: „N platní (horná hranica)" (úplný plán) · „N platní pre zaradené dielce — celkový počet neznámy"
+(`incomplete?`: nezaradené, vyradené, konflikt hrúbky, duplák bez väzby, `blocked`) · „orientačne N platní pri formáte L × W" (fallback/UNI) ·
+„orientačne N platní — nastavenia prerezu a orezu sa nepodarilo načítať" (`unreliable_source?`: `seed_fallback`, `unreadable`); kombinácie spolu, žiadny príznak
+iný neschová. `budget_note(plan, material_id, sheets)` = „plán: <veta>" pre riadok rozpočtu; materiál bez výsledku a katalógový duplák → „plán neúplný —
+duplák bez väzby na zdrojový materiál" (B3); plán `{'error'}` → „plán nedostupný" (F7); plán nil (legacy volanie) → žiadna veta.
 
 **Testy:** `tests/pure/test_sheet_layout.rb` (golden rozloženia, `fits_rect?` oddelene od `compute`, permutácie, dolná hranica z plochy,
-geometria s prerezom, neúplnosť a ochrana vstupu, `blocked`, zhoda s `build`, výkon ~2000 obdĺžnikov) a charakterizačné
+geometria s prerezom, neúplnosť a ochrana vstupu, `blocked`, zhoda s `build`, výkon ~2000 obdĺžnikov), `tests/pure/test_np3_sekcia.rb` (veta,
+poznámka rozpočtu, `blocked` z brán, natívny kľúč cez `refs_for`, limit payloadu) a charakterizačné
 `tests/pure/test_np1_vepo_charakterizacia.rb` (bajty VEPO pred a po vytiahnutí `prepare_row`).
 
 ### budget.rb
@@ -819,6 +847,12 @@ _(kostra založená dávkou 1d/R-14 — doplniť pri ďalších zásahoch)_
 
 Čistý výpočet rozpočtu: `compute(bom, state, settings, …)` je funkcia bez modelu (BOM + katalógy + stav zákazky + sadzby dodávateľa → payload), `payload_for(model, …)` je jej tenká SketchUp nadstavba (`BudgetStore.state` + `SupplierSettings.active`).
 Cenová ponuka je VIEW nad hotovým payloadom (`cp_preview`), nie druhý výpočet — STANDARD §11.3.
+
+**Nárezový plán v poznámke (NP-3, v0.15.3).** `compute(…, sheet_layout:)` / `payload_for(…, sheet_layout:)` prijme hotový plán (`ProductionCore.layout_for`)
+a riadku materiálu **pripojí na koniec `poznamka`** vetu `SheetLayout.budget_note` („plán: 3 platne (horná hranica)" a spol. — tá istá veta ako karta v Štúdiu,
+mockup C1). **Množstvo (`count_max` odhadu), cena, porez, montáž ani cenová ponuka sa nemenia** (test porovná payload bez poznámky a oba XLSX); XLSX
+rozpočtu nesie poznámku v názve položky (`item_name`), CP ju nečíta. Skladanie vety je fail-soft (`layout_note` — chyba = „plán nedostupný"). Bez plánu
+(`sheet_layout: nil`, legacy a čisté testy) sa poznámka nemení. Ceny podľa plánu = NP-4.
 
 **Kompatibilita dát cestuje v payloade (1d/R-14).** `normalize_state` prijíma aj kľúč `std` (stav markera `budget_std` zo `BudgetStore.std_state`) a `compute` z neho skladá `payload['budget_std'] = { state, blocked, reason }`.
 Je to **jediná cesta**, ktorou sa o nekompatibilných dátach dozvie ktokoľvek ďalej: banner sekcie Rozpočet aj Cenová ponuka (`ui/js/budget.js`) a brána oboch cenových exportov (`ProductionCore.budget_std_block`) čítajú TENTO kľúč — nikto sa nepýta modelu druhýkrát a nikto si stav neodvodzuje sám.
