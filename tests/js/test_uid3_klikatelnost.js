@@ -97,7 +97,7 @@ eq(typeof NXShell.studioLink, 'undefined', 'aj skladanie payloadu deep-linku na 
 
 // --- 3) ST-1a: deep-link do okna STUDIO -------------------------------------
 
-eq(NXShell.STUDIO_SECTIONS, ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat', 'hw', 'appl', 'rules', 'tpl', 'sup', 'bset', 'about'],
+eq(NXShell.STUDIO_SECTIONS, ['bom', 'ctrl', 'buy', 'budget', 'offer', 'cut', 'mat', 'hw', 'appl', 'rules', 'tpl', 'sup', 'bset', 'about'],
    'zoznam sekcii je ZRKADLO StudioDialog::SECTIONS');
 eq(NXShell.studioSection('bom'), 'bom', 'platna sekcia prejde');
 eq(NXShell.studioSection('ctrl'), 'ctrl', 'ŠT-1b: Kontrola je ZIVA sekcia Studia (uz nie premostenie)');
@@ -111,7 +111,7 @@ eq(NXShell.studioSection('tpl'), 'tpl', 'ŠT-3c-1: Šablóny su ZIVA sekcia Stud
 eq(NXShell.studioSection('sup'), 'sup', 'ŠT-4a: Dodávateľ / Demos je ZIVA sekcia Studia');
 eq(NXShell.studioSection('bset'), 'bset', 'ŠT-4a: Nastavenia rozpočtu tiez');
 eq(NXShell.studioSection('about'), 'about', 'ŠT-4a: aj O plugine (zrkadlo kolieska Inspectora)');
-eq(NXShell.studioSection('cut'), null, 'Nárezový plán je faza 2 — nie je to sekcia');
+eq(NXShell.studioSection('cut'), 'cut', 'NP-3: Nárezový plán je ZIVA sekcia Studia (deep-link funguje)');
 eq(NXShell.studioSection(''), null, 'prazdna hodnota = bez deep-linku');
 eq(NXShell.studioSection(null), null, 'chybajuca hodnota = bez deep-linku');
 eq(NXShell.studioSection('__proto__'), null, 'zoznam sa pyta indexOf, nie vlastnosti objektu');

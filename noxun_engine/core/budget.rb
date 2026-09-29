@@ -92,9 +92,13 @@ module Noxun
       #   kovanie sa do scanu cerstvosti nezapocita
       # sheet_estimate — hotovy odhad platni (okno Studio ho uz ma); nil =
       #   Budget si ho spocita sam z TYCH ISTYCH dat (jedna autorita cisel)
+      # sheet_layout — NP-3: hotovy narezovy plan (`ProductionCore.layout_for`,
+      #   alebo {'error'} pri jeho chybe); nil = bez planu (legacy volanie).
+      #   Pridava LEN vetu do poznamky riadku materialu — mnozstvo, cena,
+      #   porez ani montaz sa z neho NEPOCITAJU (NP-4).
       # =====================================================================
       def compute(bom, state, settings, sheets: {}, edges: {}, hardware_expansion: nil,
-                  hardware_catalog: nil, sheet_estimate: nil, now: nil)
+                  hardware_catalog: nil, sheet_estimate: nil, now: nil, sheet_layout: nil)
         b = bom.is_a?(Hash) ? bom : {}
         st = normalize_state(state)
         sup = settings.is_a?(Hash) ? settings : SupplierSettings.seed_supplier
@@ -105,7 +109,7 @@ module Noxun
         price_ref = now.is_a?(Time) ? now : Time.now.utc
         price_days = (num(SupplierSettings.scalar(sup, 'stale_days')) || 30).to_i
 
-        materials = materials_section(est, smap)
+        materials = materials_section(est, smap, sheet_layout)
         abs = abs_section(list(b, :edging), emap, SupplierSettings.scalar(sup, 'abs_reserve_pct'))
         hardware = hardware_section(hardware_expansion, hardware_catalog, stale_days: price_days, now: price_ref)
         services = services_section(est, materials, abs, smap, sup, st, mode)
@@ -163,10 +167,11 @@ module Noxun
       # Tenka nadstavba pre SketchUp cestu (E-b): stav zo zakazky + globalne
       # nastavenia. Vypocet samotny ostava CISTY.
       def payload_for(model, bom, sheets: {}, edges: {}, hardware_expansion: nil,
-                      hardware_catalog: nil, sheet_estimate: nil)
+                      hardware_catalog: nil, sheet_estimate: nil, sheet_layout: nil)
         payload = compute(bom, BudgetStore.state(model), SupplierSettings.active,
                           sheets: sheets, edges: edges, hardware_expansion: hardware_expansion,
-                          hardware_catalog: hardware_catalog, sheet_estimate: sheet_estimate)
+                          hardware_catalog: hardware_catalog, sheet_estimate: sheet_estimate,
+                          sheet_layout: sheet_layout)
         # S1-B1 (R4): PONUKA VLASTNIKOV je MODELOVA (skrinky, sloty a dosky
         # TEJTO zakazky) — preto zije tu, nie v cistom `compute`. Cestuje
         # v payloade dokumentu, takze prepnutie dokumentu ponuku vymeni samo
@@ -191,7 +196,7 @@ module Noxun
       # Riadok per NAKUPNY material: cele platne x cena za platnu.
       # Cena katalogu je EUR/m2 -> prepocet na platnu ma JEDINU autoritu
       # (price_per_plate), aby sa €/m2 a €/platna nikdy nerozisli.
-      def materials_section(estimate, sheets)
+      def materials_section(estimate, sheets, layout = nil)
         rows = Array(estimate).map do |g|
           next nil unless g.is_a?(Hash)
           mid = g['material_id'].to_s
@@ -209,6 +214,9 @@ module Noxun
           if g['doubled_quantity'].to_i.positive?
             notes << "vrátane #{g['doubled_quantity'].to_i} ks duplákov (#{fmt(g['doubled_m2'])} m²)"
           end
+          # NP-3 (mockup C1): TA ISTA veta o narezovom plane ako karta v Studiu.
+          plan_note = layout_note(layout, mid, sheets)
+          notes << plan_note if plan_note
           row = base_row(
             key: "material:#{mid}",
             nazov: sheet_label(rec, mid),
@@ -255,6 +263,19 @@ module Noxun
       def plates_of(group)
         v = num(group['count_max']) || 0.0
         v <= 0 ? 0 : v.round(6).ceil
+      end
+
+      # NP-3: veta planu do poznamky riadku (`SheetLayout.budget_note` — jedina
+      # autorita vety). FAIL-SOFT (audit F7): chyba skladania vety nesmie zhodit
+      # rozpocet, XLSX ani prepocet cien — riadok dostane „plán nedostupný"
+      # a jeho cisla ostanu nedotknute.
+      def layout_note(layout, material_id, sheets)
+        return nil if layout.nil? || !defined?(SheetLayout)
+
+        SheetLayout.budget_note(layout, material_id, sheets)
+      rescue StandardError => e
+        Engine.log_error(e, 'Budget.layout_note') if defined?(Engine) && Engine.respond_to?(:log_error)
+        SheetLayout::UNAVAILABLE_NOTE
       end
 
       # --- sekcia ABS ----------------------------------------------------------

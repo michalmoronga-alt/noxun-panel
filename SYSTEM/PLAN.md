@@ -227,8 +227,8 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
     ([package](zdroje/bloky/NAREZ/PACKAGE_NP1_JADRO.md)).
   - ✅ **NP-2 · nastavenia + Kontrola** — prerez, orez a prídavok dupláku v Nastaveniach rozpočtu; Kontrola „nezmestí sa" počíta s orezom. **PR #419, v0.15.2**
     ([package](zdroje/bloky/NAREZ/PACKAGE_NP2_NASTAVENIA.md)).
-  - **NP-3 · sekcia Nárezový plán** — Štúdio: karty materiálov s malými platňami, detail platne, upozornenie na poslednú platňu, dielce, ktoré sa nezmestia;
-    poznámka „plán: N platní" v Rozpočte a XLSX (ceny sa nemenia).
+  - ✅ **NP-3 · sekcia Nárezový plán** — Štúdio: karty materiálov s malými platňami, detail platne, upozornenie na poslednú platňu, dielce, ktoré sa nezmestia;
+    poznámka „plán: N platní" v Rozpočte a XLSX (ceny sa nemenia). **PR #420, v0.15.3** ([package](zdroje/bloky/NAREZ/PACKAGE_NP3_SEKCIA.md)).
   - **NP-4 · ceny podľa plánu** — prepínač pre zákazku (predvolene vypnutý), porez podľa plánu, montáž z odhadu; materiál bez spoľahlivého plánu ostáva na odhade.
 
 ### 3 · STABILITA

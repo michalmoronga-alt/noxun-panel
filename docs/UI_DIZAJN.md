@@ -1400,6 +1400,15 @@ v `HtmlDialog.new` sú **vonkajšie** — obsah + rámik okna (Windows ≈ 16 px
   sa presunie sem. `aria-disabled` (vzor D-78) dostane len to, čo **nikde
   neexistuje** — v ŠT-1a jediný Nárezový plán („fáza 2"). Rozdiel je vecný:
   premostenie vedie tam, kam ukazuje; disabled hovorí, prečo zatiaľ nikam.
+  **Od NP-3 (v0.15.3) nie je v navigácii Štúdia ani premostenie, ani
+  neaktívna položka** — Nárezový plán ožil; pravidlo platí pre budúcu položku.
+- **Nárezový plán (NP-3) kreslí SVG TRIEDAMI, nie atribútmi.** Na rozdiel od
+  2D náhľadu Inspectora (farby sú zrkadlom tokenov v atribútoch) má SVG platní
+  farby výhradne v CSS triedach `.np-*` s `var(--nx-*)` v `studio.html` —
+  sleduje tak obe témy bez druhej kópie hodnôt; šrafy sú `<pattern>` s triedou.
+  Jediná dátová farba je vzorka dekoru v HTML štvorčeku (mimo SVG). Karty
+  materiálov sú zbaliteľné (pamäť tohto počítača), predvolene otvorená prvá
+  a každá s problémom; zbalená karta SVG nevytvára (vertikálny priestor aj DOM).
 - **Neexistujúci export je viditeľné `aria-disabled` tlačidlo s dôvodom —
   ale LEN keď ten dôvod má dátum.** Michal porovnáva panel 1:1 s mockupom,
   takže chýbajúci ovládač vyzerá ako chyba implementácie a priznaný ovládač

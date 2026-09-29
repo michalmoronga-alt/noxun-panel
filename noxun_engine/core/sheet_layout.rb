@@ -21,7 +21,10 @@
 # nesmie ziaden z tych krokov opakovat sama.
 #
 # Od NP-2 ho cita Kontrola „nezmesti sa" (`Validation.check_oversize` cez
-# `purchase_rect` + `fits_rect?`); plan v Studiu, rozpocet ani exporty zatial nie.
+# `purchase_rect` + `fits_rect?`). Od NP-3 ho pocita `ProductionCore.layout_for`
+# RAZ na zber (push Studia aj `budget_payload`): sekcia Narezovy plan a poznamka
+# riadku materialu v Rozpocte/XLSX (`budget_note` — jedna veta `count_phrase`).
+# Ceny, porez ani montaz sa z neho zatial nepocitaju (NP-4).
 require 'json'
 
 module Noxun
@@ -60,7 +63,8 @@ module Noxun
       #         chybajuci alebo nil = predvolena hodnota).
       # blocked: nil | { all: '<dovod>' } | { material_id => '<dovod>' } —
       #         neplatne vyrobne data, ktore agregacia nevidi (audit F5);
-      #         kto ho sklada, urci NP-3/NP-4.
+      #         od NP-3 ho sklada `ProductionCore.layout_block_reasons` zo
+      #         VSETKYCH bran, ktore by nad tym istym zberom zastavili VEPO.
       # Vysledok: pozri docs/architecture/outputs.md (odsek sheet_layout.rb).
       # Pre datovy problem NIKDY nevyhodi vynimku.
       def compute(rows, sheets:, edge_thicknesses:, params: {}, blocked: nil)
@@ -177,6 +181,102 @@ module Noxun
         'oversize'
       end
 
+      # --- veta o pocte platni (NP-3) --------------------------------------
+      #
+      # JEDINE miesto, kde sa sklada veta o vysledku planu materialu — tu istu
+      # vetu ukaze karta v Studiu (payload sekcie), poznamka riadku Rozpoctu
+      # aj XLSX rozpoctu (audit C2, F8). Klient ju len zobrazi.
+      #   „N platní (horná hranica)"                      — uplny plan,
+      #   „N platní pre zaradené dielce — celkový počet neznámy" — neuplny,
+      #   „orientačne N platní pri formáte L × W"          — fallback/UNI,
+      #   „orientačne N platní — nastavenia prerezu …"     — predvolene parametre,
+      # kombinacie spolu (ziadny priznak nesmie schovat iny).
+      UNRELIABLE_SOURCES = %w[seed_fallback unreadable].freeze
+      UNAVAILABLE_NOTE = 'plán nedostupný'
+      DUPLAK_UNLINKED_NOTE = 'plán neúplný — duplák bez väzby na zdrojový materiál'
+
+      # Parametre z predvolenych hodnot (nastavenia sa nepodarilo nacitat —
+      # NP-2 `:seed_fallback` aj `:unreadable`) = plan je len orientacny.
+      def unreliable_source?(source)
+        UNRELIABLE_SOURCES.include?(source.to_s)
+      end
+
+      # Neuplny plan: nieco sa do neho nedostalo alebo mu nemozno verit.
+      def incomplete?(mat)
+        return true if mat['blocked'] || mat['thickness_conflict'] || mat['duplak_link_missing']
+
+        !Array(mat['unplaced']).empty? || mat['rejected_rows'].to_i.positive?
+      end
+
+      def orientational?(mat)
+        mat['fallback'] == true || mat['uni'] == true
+      end
+
+      # -> { 'pre', 'n', 'post', 'cls', 'text' } — `n` je pocet so slovom,
+      # `cls` trieda karty (orient | inc | ''), `text` cela veta.
+      def count_phrase(mat, unreliable: false)
+        m = mat.is_a?(Hash) ? mat : {}
+        if m['invalid_params']
+          return phrase_parts('', '', 'plán nedostupný — neplatné nastavenie prerezu, orezu alebo prídavku', 'inc')
+        end
+
+        n = m['sheets'].to_i
+        orient = orientational?(m)
+        inc = incomplete?(m)
+        count = "#{n} #{sheets_word(n)}"
+        return phrase_parts('', count, inc ? 'pre zaradené dielce — celkový počet neznámy' : '(horná hranica)',
+                            inc ? 'inc' : '') unless orient || unreliable
+
+        size = Array(m['sheet_size'])
+        head = orient ? "pri formáte #{dim_text(size[0])} × #{dim_text(size[1])}" : ''
+        tails = []
+        tails << 'nastavenia prerezu a orezu sa nepodarilo načítať' if unreliable
+        tails << 'pre zaradené dielce, celkový počet neznámy' if inc
+        post = [head, tails.empty? ? nil : "— #{tails.join('; ')}"].reject { |s| s.nil? || s.empty? }.join(' ')
+        phrase_parts('orientačne ', count, post, 'orient')
+      end
+
+      def phrase_parts(pre, count, post, cls)
+        text = ["#{pre}#{count}", post].map(&:strip).reject(&:empty?).join(' ')
+        { 'pre' => pre, 'n' => count, 'post' => post, 'cls' => cls, 'text' => text }
+      end
+
+      # 1 platňa · 2–4 platne · 0 a 5+ platní.
+      def sheets_word(n)
+        return 'platňa' if n == 1
+        return 'platne' if n.between?(2, 4)
+
+        'platní'
+      end
+
+      # Rozmer do vety: cele mm bez desatin, inak jedno desatinne miesto s ciarkou.
+      def dim_text(v)
+        f = v.to_f.round(1)
+        f == f.round ? f.round.to_s : f.to_s.tr('.', ',')
+      end
+
+      # Poznamka riadku materialu v Rozpocte (a XLSX) — TA ISTA veta ako karta.
+      # Riadok rozpoctu sa hlada podla MATERIALU RIADKU (audit B3): duplak bez
+      # vazby drzi odhad pod ID duplaku, plan pod zdrojom — most je explicitny.
+      # plan: vysledok `compute` s `params_source`, alebo {'error' => …} pri
+      # chybe vypoctu (F7), alebo nil = rozpocet bez planu (legacy volanie).
+      def budget_note(plan, material_id, sheets = {})
+        return nil unless plan.is_a?(Hash)
+        return UNAVAILABLE_NOTE if plan['error']
+
+        mid = material_id.to_s
+        mat = Array(plan['materials']).find { |m| m.is_a?(Hash) && m['material_id'].to_s == mid }
+        if mat
+          text = count_phrase(mat, unreliable: unreliable_source?(plan['params_source']))['text']
+          # Predrecenzia P3-3: veta, ktora sama zacina „plán …" (neplatne
+          # parametre), predponu „plán: " nedostane — inak „plán: plán …".
+          return text.start_with?('plán ') ? text : "plán: #{text}"
+        end
+
+        rec = sheets.is_a?(Hash) ? sheets[mid] : nil
+        Materials.duplak?(rec) ? DUPLAK_UNLINKED_NOTE : nil
+      end
+
       # --- parametre ----------------------------------------------------------
 
       # [params, zoznam_neplatnych]. Platna hodnota = realne konecne cislo >= 0.
@@ -238,17 +338,21 @@ module Noxun
       def prepare_rect(hash, sheets, edge_thicknesses, prm)
         return rejected(nil, nil, 'invalid_row', nil, []) unless hash.is_a?(Hash)
 
+        # NP-3 (audit B2): NATIVNY kluc riadku (`Bom.row_key` — pole) nesie
+        # prijaty riadok aj kazde odmietnutie; nim sa v Studiu vybera v modeli
+        # (`refs_for` porovnava natívne pole). Text `key_text` sluzi LEN na radenie.
+        nkey = native_key(hash)
         names = row_names(hash)
         rmid = hash['material_id'].to_s
         pmid, doubled, mult, link_missing = purchase_material(hash, rmid, sheets)
-        return rejected(pmid, rmid, 'invalid_row', nil, names) unless sane_input?(hash)
+        return rejected(pmid, rmid, 'invalid_row', nil, names, nkey) unless sane_input?(hash)
 
         prep = begin
           VepoExport.prepare_row(hash, edge_thicknesses)
         rescue StandardError
           nil
         end
-        return rejected(pmid, rmid, 'invalid_row', nil, names) if prep.nil?
+        return rejected(pmid, rmid, 'invalid_row', nil, names, nkey) if prep.nil?
 
         # C1/N7: pridavok vrstvy duplaku az PO zaokruhleni (VEPO dostava
         # zaokruhleny hotovy rozmer). Pri chybajucej vazbe sa NEdomysla —
@@ -262,19 +366,19 @@ module Noxun
           # dovod VEPO (ABS, hrubka, pocet): geometria z tej istej orientacie
           # a zaokruhlenia; nekladny rozmer ci chybajuci material ju nemaju.
           dims = pmid && VepoExport.rounded_dims(VepoExport.oriented(hash))
-          return with_geometry(rejected(pmid, rmid, 'vepo', prep['reason'], names), dims, geo)
+          return with_geometry(rejected(pmid, rmid, 'vepo', prep['reason'], names, nkey), dims, geo)
         end
 
         l, w = prep['dims']
-        return rejected(pmid, rmid, 'zero_after_rounding', nil, names) if l <= 0 || w <= 0
+        return rejected(pmid, rmid, 'zero_after_rounding', nil, names, nkey) if l <= 0 || w <= 0
         # B2: katalog hovori „duplak", riadok vazbu nenesie — nedomyslat.
         if link_missing
-          return with_geometry(rejected(pmid, rmid, 'duplak_link_missing', nil, names), [l, w], geo)
+          return with_geometry(rejected(pmid, rmid, 'duplak_link_missing', nil, names, nkey), [l, w], geo)
         end
         # B1: obchodna hrubka riadku vs. nakupny material. Vrstvy duplaku maju
         # hrubku ZDROJA (su z neho rezane), preto sa pri duplaku nekontroluju.
         if !doubled && thickness_conflict?(sheets[pmid], prep['commercial'])
-          return with_geometry(rejected(pmid, rmid, 'thickness_conflict', nil, names), [l, w], geo)
+          return with_geometry(rejected(pmid, rmid, 'thickness_conflict', nil, names, nkey), [l, w], geo)
         end
 
         qty = prep['row']['quantity'].to_i
@@ -284,13 +388,26 @@ module Noxun
           'row_material_id' => rmid, 'l' => l + p2, 'w' => w + p2, 'count' => doubled ? qty * mult : qty,
           'quantity' => qty, 'multiplier' => doubled ? mult : 1, 'doubled' => doubled,
           'grain' => hash['grain_direction'].to_s, 'commercial' => prep['commercial'],
-          'key_text' => key_text(hash, prep), 'names' => names
+          'key_text' => key_text(hash, prep), 'key' => nkey, 'names' => names
         )
       rescue StandardError
         # Zachrana: riadok so ZNAMYM nakupnym materialom ostava pripisany jemu
         # (inak by material neopravnene drzal upper_bound); pmid/rmid/names su
         # nil, ak vynimka prisla skor, nez sa urcili.
-        rejected(pmid, rmid, 'invalid_row', nil, names || [])
+        rejected(pmid, rmid, 'invalid_row', nil, names || [], nkey)
+      end
+
+      # NP-3 (audit B2): nativny kluc riadku kusovnika, alebo nil. Kluc musi
+      # byt pole serializovatelne do JSON (NaN/nekonecno ho vyradi) — inak by
+      # ho payload Studia nevedel poslat a vyber v modeli by nemal adresu.
+      def native_key(hash)
+        key = hash.is_a?(Hash) ? hash['key'] : nil
+        return nil unless key.is_a?(Array)
+
+        JSON.generate(key)
+        key
+      rescue StandardError
+        nil
       end
 
       # Doplni do odmietnutia geometriu (l, w, format, orez, smer) — len ked
@@ -373,13 +490,17 @@ module Noxun
         names
       end
 
-      def rejected(pmid, rmid, reason, detail, names)
+      def rejected(pmid, rmid, reason, detail, names, key = nil)
         { 'ok' => false, 'reason' => reason, 'detail' => detail, 'material_id' => pmid,
-          'plan_material_id' => pmid, 'row_material_id' => rmid, 'names' => names }
+          'plan_material_id' => pmid, 'row_material_id' => rmid, 'names' => names, 'key' => key }
       end
 
+      # NP-3 (audit B2, B3): zaznam odmietnuteho riadku nesie aj NATIVNY kluc
+      # (oko v cervenom zozname Studia) a material RIADKU (duplak bez vazby sa
+      # tak da spojit s riadkom rozpoctu, ktory ho drzi pod ID duplaku).
       def reject_entry(r)
-        { 'reason' => r['reason'], 'detail' => r['detail'], 'names' => Array(r['names']) }
+        { 'reason' => r['reason'], 'detail' => r['detail'], 'names' => Array(r['names']),
+          'key' => r['key'], 'row_material_id' => r['row_material_id'] }
       end
 
       def sort_rejects(list)
@@ -392,8 +513,9 @@ module Noxun
         case r['reason']
         when nil
           k = [r['key_text'], r['l'], r['w']]
-          ent = acc[:rows][k] ||= { 'key' => r['key_text'], 'names' => [], 'l' => r['l'], 'w' => r['w'],
-                                    'count' => 0, 'doubled' => r['doubled'], 'rect' => r }
+          ent = acc[:rows][k] ||= { 'key' => r['key'], 'key_text' => r['key_text'], 'names' => [],
+                                    'l' => r['l'], 'w' => r['w'], 'count' => 0, 'doubled' => r['doubled'],
+                                    'multiplier' => r['multiplier'], 'grain' => r['grain'], 'rect' => r }
           ent['count'] += r['count']
           r['names'].each { |n| ent['names'] << n unless ent['names'].include?(n) }
         when 'thickness_conflict', 'duplak_link_missing'
@@ -406,11 +528,11 @@ module Noxun
 
       def material_result(mid, acc, sheets, work, invalid, blocked)
         fr = frame(mid, sheets, work['trim'])
-        rows = acc[:rows].values.sort_by { |e| [e['key'], e['l'], e['w']] }
+        rows = acc[:rows].values.sort_by { |e| [e['key_text'], e['l'], e['w']] }
         mixed_thickness!(acc, rows)
         rects = []
         rows.each_with_index do |e, idx|
-          (1..e['count']).each { |n| rects << [e['l'], e['w'], e['key'], n, idx] }
+          (1..e['count']).each { |n| rects << [e['l'], e['w'], e['key_text'], n, idx] }
         end
         # Uplne urcene radenie: w zostupne, l zostupne, kanonicky text, n.
         rects.sort_by! { |l, w, key, n, _i| [-w, -l, key, n] }
@@ -439,7 +561,7 @@ module Noxun
           'thickness_conflict' => acc[:thickness_conflict], 'duplak_link_missing' => acc[:duplak_link_missing],
           'conflicts' => sort_rejects(acc[:conflicts]), 'blocked' => blocked_reason,
           'doubled_pieces' => rows.select { |e| e['doubled'] }.sum { |e| e['count'] },
-          'rows' => rows.map { |e| e.reject { |k, _| k == 'rect' } },
+          'rows' => rows.map { |e| e.reject { |k, _| %w[rect key_text].include?(k) } },
           'layouts' => layouts.map { |s| sheet_result(s, fr, work['kerf'], area_sheet) },
           'unplaced' => unplaced
         }
@@ -462,7 +584,8 @@ module Noxun
 
         acc[:thickness_conflict] = true
         acc[:conflicts] << { 'reason' => 'thickness_conflict',
-                             'detail' => "rôzne obchodné hrúbky #{ts.join(', ')}", 'names' => [] }
+                             'detail' => "rôzne obchodné hrúbky #{ts.join(', ')}", 'names' => [],
+                             'key' => nil, 'row_material_id' => nil }
       end
 
       # Kluc „vsetky materialy" je Symbol :all alebo retazec 'all' (NP-3/NP-4

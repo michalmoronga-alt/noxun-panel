@@ -42,7 +42,7 @@ function ok(cond, msg){ n++; assert.ok(cond, msg); }
 // okna Vyroba. Zoznam je ZRKADLO `StudioDialog::SECTIONS`.
 // ŠT-2a: pribudla sekcia Materiály (`mat`) — prva ziva polozka skupiny KATALÓGY.
 // ŠT-3a-1: a Kovanie (`hw`) — druha.
-eq(S.STUDIO_SECTIONS, ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat', 'hw', 'appl', 'rules', 'tpl', 'sup', 'bset', 'about'],
+eq(S.STUDIO_SECTIONS, ['bom', 'ctrl', 'buy', 'budget', 'offer', 'cut', 'mat', 'hw', 'appl', 'rules', 'tpl', 'sup', 'bset', 'about'],
    'v Studiu ziju sekcie Kusovník, Kontrola, Nákup kovania, Rozpočet, Cenová ponuka, Materiály, Kovanie, Pravidlá a Šablóny');
 
 // --- 2) hladanie bez diakritiky (Š6) ----------------------------------------
@@ -200,10 +200,15 @@ ok(!OFFER_ITEM.goto,
 const BUY_ITEM = S.navItem('buy');
 ok(BUY_ITEM && !BUY_ITEM.bridge && !BUY_ITEM.disabled, 'Nákup kovania je ZIVA sekcia tohto okna');
 
+// NP-3: Nárezový plán OŽIL — v navigácii už nie je ŽIADNA neaktívna položka.
 const CUT = S.navItem('cut');
-ok(CUT && CUT.disabled, 'Nárezový plán je JEDINA neaktivna polozka');
-ok(!CUT.bridge, 'a nema kam premostit — neexistuje okno, ktore by ho ukazalo');
-ok(/fáza 2/.test(CUT.disabled), 'dovod je v tooltipe (vzor D-78 — ziadne mrtve tlacidlo bez vysvetlenia)');
+ok(CUT && !CUT.disabled && !CUT.bridge, 'Nárezový plán je ZIVA sekcia tohto okna (NP-3)');
+ok(S.STUDIO_SECTIONS.indexOf('cut') >= 0, 'a je v zrkadle whitelistu sekcii');
+eq(CUT.ic, 'scissors', 'ikona noznic ostava (mockup A1)');
+ok(/horná hranica/.test(CUT.hint || ''), 'tooltip povie, co sekcia robi');
+S.NAV.forEach(function(g){
+  g.items.forEach(function(it){ ok(!it.disabled, `polozka „${it.t}" nie je neaktivna — ziadna uz nie je`); });
+});
 
 const BOM_ITEM = S.navItem('bom');
 ok(BOM_ITEM && !BOM_ITEM.bridge && !BOM_ITEM.disabled, 'Kusovník je ZIVA sekcia tohto okna');

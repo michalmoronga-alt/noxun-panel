@@ -16318,8 +16318,9 @@ module NoxunSuRunner
       # „Katalóg kovania" zatial zije, ale navigacia don uz nevedie.
       # ŠT-3c-1 pridala osmu `tpl` (Sablony) — okno „Šablóny" zaniklo.
       # S1-A2 pridala trinastu `appl` (Spotrebice) — katalog modelov tohto PC.
-      ok('ŠT-1c B3: sekcie Studia su vsetky (bom · ctrl · buy · budget · offer · mat · hw · appl · rules · tpl)',
-         e::StudioDialog::SECTIONS == %w[bom ctrl buy budget offer mat hw appl rules tpl sup bset about])
+      # NP-3 pridala strnastu `cut` (Narezovy plan) — neaktivna polozka zanikla.
+      ok('ŠT-1c B3: sekcie Studia su vsetky (bom · ctrl · buy · budget · offer · cut · mat · hw · appl · rules · tpl)',
+         e::StudioDialog::SECTIONS == %w[bom ctrl buy budget offer cut mat hw appl rules tpl sup bset about])
     end
 
     dlg = e::StudioDialog.instance_variable_get(:@dialog)

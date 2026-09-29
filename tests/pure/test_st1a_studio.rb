@@ -44,7 +44,7 @@ NxTest.test('ST-1a: SECTIONS je whitelist v RUBY a JS je jeho ZRKADLO') do
   # ŠT-1b pridala sekciu Kontrola (`ctrl`) — dovtedy premostenie do okna Vyroba.
   # ŠT-1c PR A pridala Nakup kovania (`buy`) — presun tabu Kovanie 1:1 (Š7).
   # ŠT-1c PR B1 pridala Rozpocet (`budget`) — POSLEDNY tab okna Vyroba.
-  NxTest.assert_equal(%w[bom ctrl buy budget offer mat hw appl rules tpl sup bset about], rb,
+  NxTest.assert_equal(%w[bom ctrl buy budget offer cut mat hw appl rules tpl sup bset about], rb,
                       'v Studiu ziju sekcie Kusovník, Kontrola, Nákup, Rozpočet, Ponuka, Materiály, Kovanie, Pravidlá a Šablóny')
   NxTest.assert_equal(rb, js, 'JS zoznam sekcii sa nesmie rozist s Ruby autoritou')
   NxTest.assert_equal(rb, Noxun::Engine::StudioDialog::SECTIONS,
@@ -929,8 +929,11 @@ NxTest.test('SMOKE 22.8. (1A–1D): LISTA Kusovnika a rohove nastavenie VEPO —
                 'nastavenie VEPO ma hlavicku')
   NxTest.assert(ST1B_STUDIO_HTML.include?('.vepomenu .mgrp'), 'a jej styl (klon .colmenu .mgrp)')
 
-  # Review #5: pravidlo pre neaktivne ovladace listy ZANIKLO spolu s poslednym
-  # z nich — mrtve CSS sluby vzor, ktory sa uz nekresli.
+  # Review #5: vseobecne pravidlo pre neaktivne ovladace listy ZANIKLO spolu
+  # s poslednym z nich — mrtve CSS sluby vzor, ktory sa uz nekresli. NP-2 vratila
+  # len UZKE pravidlo `.sectools .primary[aria-disabled]` (zelene „Uložiť"
+  # Nastaveni rozpoctu aj „Nový spotrebič" katalogu spotrebicov pri
+  # `writable=false`, vzor D-78) — vseobecne ostava zmazane.
   NxTest.refute(ST1B_STUDIO_HTML.include?('.sectools [aria-disabled="true"]'),
                 'mrtve pravidlo `.sectools [aria-disabled]` je zmazane')
 
@@ -1057,12 +1060,13 @@ NxTest.test('ŠT-4a: PREMOSTENIA ZANIKLI CELE — niet uz kam premostovat') do
                 'a zmizla aj sipka ↗, ktora premostenie oznacovala')
 end
 
-NxTest.test('ST-1a: „Nárezový plán" je JEDINA neaktivna polozka a ma dovod (D-78)') do
+NxTest.test('NP-3: v navigacii Studia nie je ZIADNA neaktivna polozka (Narezovy plan ozil)') do
   nav = ST1B_STUDIO_JS[/var NAV = \[.*?\n  \];/m].to_s
   NxTest.assert(!nav.empty?, 'navigacia sa nasla')
-  NxTest.assert_equal(1, nav.scan(/disabled:/).length,
-                      'jedina neaktivna polozka — vsetko ostatne je premostenie')
-  NxTest.assert(nav.include?("disabled: 'fáza 2"), 'a dovod je vypisany, nie zamlcany')
+  NxTest.assert_equal(0, nav.scan(/disabled:/).length,
+                      'posledna neaktivna polozka (Nárezový plán, „fáza 2") ozila v NP-3')
+  NxTest.refute(nav.include?('fáza 2'), 'dovod „fáza 2" z navigacie zmizol')
+  NxTest.assert(nav.include?("id: 'cut'"), 'polozka ostava s id `cut` (Codex C13)')
 end
 
 # --- 6) okno Vyroba ZANIKLO --------------------------------------------------

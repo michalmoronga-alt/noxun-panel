@@ -313,7 +313,8 @@ module Noxun
 
       # NP-2: parametre narezoveho planu pre volajucich (Kontrola; NP-3 plan).
       # -> { params: {'kerf', 'trim', 'dup_allowance'} (Float mm), source: }
-      # Pri `:seed_fallback` su hodnoty PREDVOLENE a volajuci to musi priznat.
+      # Pri `:seed_fallback` aj `:unreadable` su hodnoty PREDVOLENE a volajuci
+      # to musi priznat (Kontrola ORANGE nalezom, plan vetou „orientačne").
       def layout_params
         sup, source = active_with_source
         params = LAYOUT_KEYS.each_with_object({}) { |(k, sk), out| out[k] = scalar(sup, sk).to_f }
@@ -321,7 +322,7 @@ module Noxun
       end
 
       # NP-2: stav suboru pre sekciu Nastavenia rozpoctu (banner + vypnute
-      # „Uložiť" pri `degraded` a `newer`).
+      # „Uložiť" pri `degraded`, `newer` a `unreadable`).
       # -> { 'state' => ok|degraded|newer|fallback|unreadable, 'reason' => veta }
       def settings_state(source)
         case source

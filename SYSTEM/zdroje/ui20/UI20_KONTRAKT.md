@@ -573,7 +573,9 @@ zmysle, že **mockup už nie je poslednou pravdou tam, kde tu stojí niečo iné
    `aria-disabled` platí len na sľub, ktorý príde **najbližšou dávkou**, ovládač visiaci celý blok
    sa skryje. Prvý prípad: XLSX/CSV kusovníka odišli z lišty.
 5. **Nárezový plán ostáva jedinou `aria-disabled` položkou navigácie** — patrí do fázy 2 a dôvod
-   je v tooltipe. Je to jediné miesto, kde navigácia niečo nesľubuje.
+   je v tooltipe. Je to jediné miesto, kde navigácia niečo nesľubuje. **Prekonané NP-3 (blok 2
+   Nárezový plán, v0.15.3):** položka ožila ako sekcia `cut` — v navigácii už nie je žiadna
+   neaktívna položka.
 6. **Nákup kovania a Katalóg kovania sa presunuli 1:1 BEZ redizajnu** (rozhodnutie 21.8.) —
    redizajn príde s blokom KOVANIE, keď pribudnú dáta kovania.
 7. **Premostenia zanikli CELE** (`WINDOW_BRIDGES`/`BRIDGE_STATUS`/`do_bridge`/`bridge_window`/

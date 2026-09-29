@@ -598,7 +598,7 @@
   // disku zotaviť bez zatvorenia Štúdia, a hláška v tele na ňu odkazuje
   // (review #227 kolo 2).
   // `blocked` (NP-2) = dôvod, prečo sa do súboru nedá zapisovať (novší plugin,
-  // poškodený súbor). „Uložiť" ostáva VIDITEĽNÉ s `aria-disabled` a dôvodom
+  // poškodený alebo nečitateľný súbor). „Uložiť" ostáva VIDITEĽNÉ s `aria-disabled` a dôvodom
   // v title — nikdy HTML `disabled` (D-78); klik dôvod povie v statuse.
   function ssToolsHtml(sec, failed, blocked){
     if (sec !== 'bset') return '';
@@ -644,8 +644,12 @@
     var st = (s && s.settings_state) ? s.settings_state : null;
     if (!st || !st.state || st.state === 'ok') return null;
     var stop = SS_WRITE_BLOCK_STATES.indexOf(st.state) >= 0;
-    return ssMk('div', stop ? 'hwbanner hwbanner-stop' : 'hwbanner',
-                String(st.reason || '') + (stop ? ' Uloženie je vypnuté.' : ''));
+    // Slepá delta #419 (P3): serverové dôvody `newer`/`degraded`/`unreadable`
+    // už „zápisy sú vypnuté" hovoria — druhá veta by to opakovala. Doplní sa
+    // LEN dôvodu, ktorý to nepovie (napr. prázdny).
+    var reason = String(st.reason || '');
+    if (stop && !/vypnut/.test(reason)) reason = (reason ? reason + ' ' : '') + 'Uloženie je vypnuté.';
+    return ssMk('div', stop ? 'hwbanner hwbanner-stop' : 'hwbanner', reason);
   }
 
   function ssRenderTools(){
@@ -705,8 +709,8 @@
 
   function ssSave(){
     if (!SS_STATE) return;
-    // NP-2: súbor z novšieho pluginu alebo poškodený (číta sa záloha) — zápis
-    // by server aj tak odmietol; klik povie DÔVOD hneď (vzor D-78).
+    // NP-2: súbor z novšieho pluginu, poškodený (číta sa záloha) alebo
+    // nečitateľný — zápis by server aj tak odmietol; klik povie DÔVOD hneď (vzor D-78).
     var block = ssWriteBlock(SS_STATE);
     if (block){
       SS.setStatus('Neuložené: ' + block, true);

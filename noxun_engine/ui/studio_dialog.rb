@@ -49,7 +49,10 @@ module Noxun
       # okrem Narezoveho planu (faza 2) a v okne nie je uz ziadne premostenie.
       # S1-A2 pridala SPOTREBICE (`appl`) — 13. sekcia, v skupine KATALOGY
       # medzi Kovanim a Pravidlami (katalog modelov spotrebicov tohto PC).
-      SECTIONS = %w[bom ctrl buy budget offer mat hw appl rules tpl sup bset about].freeze
+      # NP-3 (blok 2) ozivila NAREZOVY PLAN (`cut` — id ostava, Codex C13) —
+      # 14. sekcia, v skupine ZAKAZKA za Cenovou ponukou. V navigacii uz nie je
+      # ZIADNA neaktivna polozka.
+      SECTIONS = %w[bom ctrl buy budget offer cut mat hw appl rules tpl sup bset about].freeze
 
       # ŠT-2a/2b: akcie katalogu materialov, ktore smie poslat SEKCIA `mat`,
       # ziju v JEDINOM zozname — `MaterialsDialog::SECTION_ACTIONS`. Telo
@@ -65,8 +68,8 @@ module Noxun
 
       # ŠT-4a: PREMOSTENIA ZANIKLI CELE — `WINDOW_BRIDGES`, `BRIDGE_STATUS`,
       # `do_bridge` aj `bridge_window`. Nastavenia boli POSLEDNY satelit, takze
-      # niet kam premostovat: kazda polozka navigacie je odteraz bud SEKCIA
-      # tohto okna, alebo (jediny Narezovy plan) `aria-disabled` s dovodom.
+      # niet kam premostovat: kazda polozka navigacie je SEKCIA tohto okna
+      # (od NP-3 aj Narezovy plan — neaktivna polozka uz neexistuje).
       # Predtym postupne zanikli: `mat` (ŠT-2a/2b) · `hw` (ŠT-3a) · `rules`
       # (ŠT-3b-1) · `tpl` (ŠT-3c-1) · `PRODUCTION_BRIDGES` (ŠT-1c PR B3).
       # Klientska strana (`bridge:` v NAV, `bridgeTo`, `.nbridge`, callback
@@ -1617,7 +1620,11 @@ module Noxun
           # (Kontrola z neho berie svoje upozornenia), z uz hotoveho odhadu
           # platni — ziadny druhy vypocet.
           hw_exp = ProductionCore.hardware_expansion(model, collected)
-          budget = ProductionCore.budget_payload(model, bom, collected, estimate, hw_exp, smap)
+          # NP-3: NAREZOVY PLAN — RAZ na push, z TOHO ISTEHO zberu (ziadny druhy
+          # sken). Ten isty plan dostane rozpocet (veta v poznamke riadku
+          # materialu) aj sekcia `cut`; fail-soft, push nikdy nezhodi.
+          layout = ProductionCore.layout_for(collected, bom, smap, hw_exp)
+          budget = ProductionCore.budget_payload(model, bom, collected, estimate, hw_exp, smap, layout)
           control = ProductionCore.control_payload(collected, hardware_expansion: hw_exp,
                                                               budget: budget, sheets: smap)
           data = {
@@ -1660,6 +1667,10 @@ module Noxun
             # (sekcie, sumy, vek cien, upozornenia, nahlad cenovej ponuky).
             # JS z neho LEN cita — ZIADNA suma sa v prehliadaci nepocita.
             budget: budget,
+            # NP-3, sekcia NAREZOVY PLAN (mockup A, B): kompaktny plan per
+            # material z TOHO ISTEHO vypoctu ako poznamka Rozpoctu; vetu o pocte
+            # aj dovody nezaradenia sklada SERVER.
+            sheet_layout: ProductionCore.sheet_layout_payload(layout, bom, smap, estimate),
             # Š10: stav oboch prepinacov listy. Vypnuty prepinac nic neskenuje.
             edge_check: (defined?(EdgeCheck) ? EdgeCheck.ui_state(model) : nil),
             grain_check: (defined?(GrainCheck) ? GrainCheck.ui_state(model) : nil),
