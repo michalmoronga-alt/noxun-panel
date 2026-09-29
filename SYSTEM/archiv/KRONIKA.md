@@ -17,6 +17,14 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **DOCS — štart bloku CENY · overenie cien materiálov a ABS (29.–30.9.2026, PR #?, len dokumentácia; verzia pluginu sa nemení).** Michal 29.9. večer pri
+  otázke „čo ešte pred V1" vybral **posledný kódový bod V1** — ručné overenie cien dosiek a ABS bez Demos väzby (zvyšok V1-03). Fakty z kódu a reálnych dát:
+  zo 76 nákupných záznamov je bez Demosu len 5 (2× DTDL, zástena, sklo, 1 ABS; 3 bez ceny) a v Rozpočte sú dnes prakticky neviditeľné. Rozhodnutia
+  **C1–C11** ([zdroje/bloky/CENY/ROZHODNUTIA_MICHALA_2026-09-29.md](../zdroje/bloky/CENY/ROZHODNUTIA_MICHALA_2026-09-29.md)): vzor ako kovanie (CENY-KOV), **jeden odkaz** (C7 mení
+  pôvodné C2 „zoznam odkazov"), doska **za platňu** s prepočtom na €/m², bez novej outside-in rešerše (vzor aj rešerš z CENY-KOV), povinný Codex audit
+  každej dávky; **mockup schválený 30.9.** (O1–O9 podľa návrhu — „moc sedí"). Zároveň **poradie pred V1** v [PLAN.md](../PLAN.md), blok 4: CENY → R-13 →
+  R-37 → R-35 (R-37 a R-35 Michal zaradil 30.9.); **test na reálnej zákazke až po V1** ([V1_VIZIA.md](../V1_VIZIA.md) bod 1). Dávky CENY-M1 → CENY-M2.
+
 - **DOCS — previerka registra auditu + R-13 rozhodnuté (29.9.2026, PR #424, len dokumentácia; verzia pluginu sa nemení).** Michal 29.9. večer pri otázke
   „čo ešte pred V1" dal pokyn na previerku [AUDIT_REGISTER.md](../AUDIT_REGISTER.md) z 29.8. proti dnešnému kódu (~170 PR neskôr). Read-only subagent
   overil 29 otvorených položiek: **3 čiastočne** (R-25 — PR #350 chráni len cestu skrinky, R-27, R-32), ostatné **platia**; R-39 je vedome otvorená

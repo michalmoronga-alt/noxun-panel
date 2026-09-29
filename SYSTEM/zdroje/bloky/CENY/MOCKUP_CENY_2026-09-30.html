@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Noxun Engine — mockup CENY · overenie cien materiálov a ABS</title>
 <!--
-  Blok CENY — ručné overenie cien dosiek a ABS bez väzby na Demos. NÁVRH 30.9.2026 — body O1–O9 čakajú na Michala.
+  Blok CENY — ručné overenie cien dosiek a ABS bez väzby na Demos. SCHVÁLENÉ Michalom 30.9.2026: O1–O9 podľa návrhu (C11).
   Podklad: SYSTEM/zdroje/bloky/CENY/ROZHODNUTIA_MICHALA_2026-09-29.md (C1–C10; záväzné C6–C9, C7 mení C2),
            SYSTEM/zdroje/bloky/CENY/FAKTY_Z_KODU_2026-09-29.md (dnešný stav, reálne počty: 5 položiek bez Demosu, 3 bez ceny).
   Vzhľad = Štúdio v0.16.0:
@@ -132,7 +132,7 @@
   .mocknote ul.dots li::before{content:'';position:absolute;left:3px;top:8px;width:5px;height:5px;border-radius:50%;background:var(--mk-border)}
   .npin{position:absolute;left:0;top:1px;min-width:26px;height:16px;padding:0 4px;border-radius:8px;background:var(--mk-pin);
         color:var(--mk-pin-ink);border:1px solid var(--mk-pin-border);font:700 9.5px/14px "Segoe UI",sans-serif;text-align:center}
-  /* štítky O… = OTVORENÉ body (návrh — potvrdí Michal) — jantárové; žlté čísla = zmena oproti dnešnému pluginu */
+  /* štítky O… = body SCHVÁLENÉ 30.9.2026 (C11; pôvodne „návrh — potvrdí Michal") — jantárové; žlté čísla = zmena oproti dnešnému pluginu */
   .oref,.otag{display:inline-block;height:16px;padding:0 6px;border-radius:8px;background:var(--nx-warn-bg-soft);color:var(--nx-warnchip-fg);
         border:1px solid var(--nx-warnchip-border);font:700 9px/14px "Segoe UI",sans-serif;white-space:nowrap;vertical-align:1px;
         text-decoration:none;letter-spacing:0;text-transform:none;font-style:normal;margin:0 3px;flex:0 0 auto}
@@ -510,7 +510,7 @@
 
 <div class="mockbar">
   <span class="mb-title">Noxun Engine — mockup CENY (overenie cien materiálov a ABS)</span>
-  <span class="mb-ver">Štúdio → Materiály · formulár „Overiť cenu" · úprava odkazu · Rozpočet · NÁVRH 30.9.2026 · klikateľné</span>
+  <span class="mb-ver">Štúdio → Materiály · formulár „Overiť cenu" · úprava odkazu · Rozpočet · SCHVÁLENÉ 30.9.2026 (O1–O9 podľa návrhu) · klikateľné</span>
   <span class="mb-sp"></span>
   <span class="mb-ctl">téma okna: <button type="button" data-theme="noxun" class="on">NOXUN</button><button type="button" data-theme="lucia">Lucia</button></span>
   <span class="mb-ctl"><button type="button" data-reset="1" title="Vráti ukážkové dáta do pôvodného stavu">pôvodné dáta</button></span>
@@ -523,10 +523,10 @@
 
 <main class="page">
 
-<div class="pending" role="note">NÁVRH — čaká na Michala: body O1–O9 treba potvrdiť pred písaním packages (pravidlo „Otvorené body mockupu"). Rozhodnutia C6–C9 z 29.9.2026 sú v mockupe už zapracované.</div>
+<div class="pending" role="note">SCHVÁLENÉ Michalom 30.9.2026 — platí: body O1–O9 podľa návrhu (odporúčania v kartách nižšie), rozhodnutie C11. Rozhodnutia C6–C9 z 29.9.2026 sú zapracované.</div>
 
 <section class="intro" aria-labelledby="introH">
-  <h1 id="introH">Čo mockup ukazuje <span class="stat">návrh 30.9.2026 · čaká na O1–O9</span></h1>
+  <h1 id="introH">Čo mockup ukazuje <span class="stat">schválené 30.9.2026 · O1–O9 podľa návrhu</span></h1>
   <p>Pri <b>doske a ABS páske bez väzby na Demos</b> pribudne to, čo už má katalógové kovanie: <b>jeden odkaz na produkt</b> (ikona „Otvoriť produkt") a akcia <b>„Overiť cenu"</b> — otvorí sa obchod a vedľa formulár; „Potvrdiť cenu k dnešku" uloží cenu a dnešný dátum. <b>Samotný klik na odkaz nič nezapisuje.</b> Rozpočet tieto položky začne <b>ukazovať</b> — vek ručne overenej ceny v stĺpci „Overená" a počet medzi cenami „na kontrolu". Dnes sú v ňom prakticky neviditeľné (majú napevno „ručná", dátum sa ignoruje).</p>
   <div class="dec">
     <b>Rozhodnuté</b><span><b>C6</b> rovnaký vzor ako kovanie v Štúdiu → Materiály aj v Rozpočte; UNI a duplák bez akcií; položky s Demos väzbou sa nemenia · <b>C7</b> jeden odkaz na položku (iný obchod = prepísať odkaz) · <b>C8</b> doska: cena sa zadáva <b>za platňu</b>, plugin ju prepočíta na €/m² podľa formátu a ukáže obe; ABS za bežný meter · <b>C9</b> dávky CENY-M1 (dáta + Štúdio → Materiály) → CENY-M2 (Rozpočet), každá s auditom návrhu</span>
@@ -1436,7 +1436,7 @@
   ];
   function renderO(){
     $('ogrid').innerHTML = OQ.map(function(q){
-      return '<div class="obox" id="' + q.id + '"><div class="oh"><span class="otagi">návrh — potvrdí Michal · ' + q.id + '</span><b>' + esc(q.t) + '</b></div>' +
+      return '<div class="obox" id="' + q.id + '"><div class="oh"><span class="otagi">schválené 30.9. · ' + q.id + '</span><b>' + esc(q.t) + '</b></div>' +
         '<dl><dt>Otázka</dt><dd>' + esc(q.q) + '</dd><dt class="rec">Odporúčam</dt><dd class="rec">' + esc(q.n) + '</dd><dt>Prečo</dt><dd>' + esc(q.why) + '</dd></dl>' +
         '<div class="oalt"><b>Inak:</b> ' + esc(q.alt) + '</div>' +
         '<div class="where">kde v mockupe: ' + q.w.map(function(x){ return '<a href="#' + x[1] + '">' + x[0] + '</a>'; }).join(' · ') + '</div></div>';
