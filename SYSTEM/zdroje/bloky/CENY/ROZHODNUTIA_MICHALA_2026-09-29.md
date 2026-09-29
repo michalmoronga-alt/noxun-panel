@@ -26,6 +26,9 @@
 | C12 | Materiál bez formátu v Rozpočte (O10) | **áno, v tomto bloku (CENY-M2):** materiál bez formátu (sklo na mieru) sa v Rozpočte počíta podľa **skutočných m² dielcov** × overená cena za m², nie ako fiktívna platňa 2800 × 2070 (Codex #425 P1) | 30.9. |
 | C13 | V1 bod „Návrh" | **odškrtnutý** — test na kompletnej reálnej zákazke je **akceptačný test po V1** (C10), nie podmienka uzáveru V1 (Codex #425 P2: inak by sa V1 nedalo uzavrieť) | 30.9. |
 
+*Rozhodnutie orchestrátora (nie produktové, 30.9.2026):* dávka **CENY-M1 sa reže na M1a (odkaz na produkt) → M1b (ručné overenie)** podľa vzoru CENY-KOV-A/B —
+odhad ~940 riadkov kódu; M2 (Rozpočet) ostáva. Package a audit M1 pribudnú do priečinka s dávkou M1a.
+
 ## 2 · Otázky pre Michala — zodpovedané 29.9.2026 (C6–C9)
 
 Podklad: [FAKTY_Z_KODU_2026-09-29.md](FAKTY_Z_KODU_2026-09-29.md) — zo 76 nákupných záznamov je bez Demos väzby len 5 (2× DTDL, zástena, sklo, 1 ABS; 3 bez ceny)

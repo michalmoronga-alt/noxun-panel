@@ -877,7 +877,7 @@
   function reset(){ ITEMS = BASE.map(function(o){ var c = {}; for (var k in o) c[k] = o[k]; return c; }); }
   function byId(id){ for (var i = 0; i < ITEMS.length; i++) if (ITEMS[i].id === id) return ITEMS[i]; return null; }
   function area(it){ return it.fmt ? it.fmt[0] * it.fmt[1] / 1e6 : null; }
-  // Rozpočet: JEDINÁ konverzia €/m² → € za platňu (bez formátu = pracovný 2800 × 2070)
+  // Rozpočet: konverzia €/m² → € za platňu (bez formátu len UNI odhad 2800 × 2070); materiál bez formátu ide cez lineTotal podľa m² (O10)
   function perPlate(it){ if (it.price == null) return null; return r2(it.price * (area(it) || A_PLATE)); }
   function manual(it){ return !it.demos && !it.uni && !it.dup; }
   function state(it){
@@ -1329,12 +1329,12 @@
       return '<tr class="' + (miss ? 'bmiss' : '') + chg + '"><td>' + bLink(it) + esc(it.blabel) + ' <span class="bfnt">· formát nie je v katalógu — počíta sa skutočná plocha (O10)</span>' + '</td>' +
         '<td class="bnum">' + nf(it.bm2) + '</td><td class="bnum">m²</td>' +
         '<td class="bnum">' + (miss ? '<span class="bmisslbl">chýba cena</span>' : esc(eur(r2(it.price)))) + '</td>' +
-        '<td class="bnum">' + freshCell(it) + '</td><td class="bnum">' + esc(miss ? '—' : eur(r2(it.price * it.bm2))) + '</td></tr>';
+        '<td class="bnum">' + freshCell(it) + '</td><td class="bnum">' + esc(miss ? '—' : eur(lineTotal(it))) + '</td></tr>';
     }
     return '<tr class="' + (miss ? 'bmiss' : '') + chg + '"><td>' + bLink(it) + esc(it.blabel) + ' <span class="bfnt">· ' + esc(notes.join(' · ')) + '</span></td>' +
       '<td class="bnum">' + it.bqty + '</td><td class="bnum">PLATŇA</td>' +
       '<td class="bnum">' + (miss ? '<span class="bmisslbl">chýba cena</span>' : esc(eur(pp)) + ' <span class="bfnt">(' + esc(eur(r2(it.price))) + '/m²)</span>') + '</td>' +
-      '<td class="bnum">' + freshCell(it) + '</td><td class="bnum">' + esc(miss ? '—' : eur(r2(pp * it.bqty))) + '</td></tr>';
+      '<td class="bnum">' + freshCell(it) + '</td><td class="bnum">' + esc(miss ? '—' : eur(lineTotal(it))) + '</td></tr>';
   }
   function absRow(it){
     var miss = it.price == null;
@@ -1343,7 +1343,9 @@
       '<td class="bnum">' + (miss ? '<span class="bmisslbl">chýba cena</span>' : esc(eur(r2(it.price)))) + '</td>' +
       '<td class="bnum">' + freshCell(it) + '</td><td class="bnum">' + esc(miss ? '—' : eur(r2(it.price * it.bqty))) + '</td></tr>';
   }
-  function matSub(){ return BMAT.map(byId).reduce(function(s, it){ var p = perPlate(it); return s + (p == null ? 0 : r2(p * it.bqty)); }, 0); }
+  // Medzisúčet riadku — tá istá logika ako matRow: bez formátu (a nie UNI) = cena za m² × skutočná plocha (O10 / C12)
+  function lineTotal(it){ if (it.price == null) return 0; if (!it.fmt && !it.uni) return r2(it.price * it.bm2); var p = perPlate(it); return p == null ? 0 : r2(p * it.bqty); }
+  function matSub(){ return BMAT.map(byId).reduce(function(s, it){ return s + lineTotal(it); }, 0); }
   function absSub(){ return BABS.map(byId).reduce(function(s, it){ return s + (it.price == null ? 0 : r2(it.price * it.bqty)); }, 0); }
   function listActions(it){
     if (it.demos){

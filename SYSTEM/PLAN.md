@@ -224,7 +224,8 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   bez Demos väzby a **jeden** odkaz na produkt (C7 nahradilo pôvodné „viac URL na položke"). Priečinok bloku [zdroje/bloky/CENY/](zdroje/bloky/CENY/) — rozhodnutia
   [ROZHODNUTIA_MICHALA_2026-09-29.md](zdroje/bloky/CENY/ROZHODNUTIA_MICHALA_2026-09-29.md) (C1–C11), schválený mockup
   [MOCKUP_CENY_2026-09-30.html](zdroje/bloky/CENY/MOCKUP_CENY_2026-09-30.html) (O1–O9 podľa návrhu, 30.9.). Štart bloku PR #425. Dávky (každá s auditom návrhu — mení formát katalógu):
-  - **CENY-M1** · odkaz na produkt a ručné overenie ceny dosky/ABS v dátach katalógu a v Štúdiu → Materiály — package pribudne v priečinku bloku.
+  - **CENY-M1a** · odkaz na produkt pri doske/ABS bez Demosu v dátach katalógu a v Štúdiu → Materiály (package M1 pribudne v priečinku bloku).
+  - **CENY-M1b** · ručné overenie ceny (doska za platňu / ABS za bm), zneplatnenie, prednosť Demosu, D-148.
   - **CENY-M2** · Rozpočet: vek ručne overených cien, „N cien na kontrolu", odkaz a „Overiť cenu" v sekcii Materiál a ABS hrany; materiál bez formátu
     podľa skutočných m² dielcov namiesto fiktívnej platne (C12).
 - **Poradie pred uzáverom V1 (Michal 29.–30.9.2026):** blok **CENY** (CENY-M1 → CENY-M2) → **R-13** (čítať `std` na entite, ORANGE „dielec z inej verzie
