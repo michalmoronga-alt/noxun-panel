@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **DOCS — smoke bloku 2 · Nárezový plán PASS (29.9.2026, PR #?, len dokumentácia; verzia pluginu sa nemení).** Michal 29.9. ráno prešiel smoke bloku 2
+- **DOCS — smoke bloku 2 · Nárezový plán PASS (29.9.2026, PR #423, len dokumentácia; verzia pluginu sa nemení).** Michal 29.9. ráno prešiel smoke bloku 2
   podľa checklistu v [NAREZ_ZAVER_2026-09-29.md](NAREZ_ZAVER_2026-09-29.md): **„prešiel som si to, nenašiel som chyby — smoke PASS"** — výsledok zapísaný
   ako celok, nie po bodoch. **Postreh (nie chyba):** zaskočila ho optimalizácia — pásové rozloženie nedá menšie dielce nad seba v páse, nad nižším dielcom
   ostáva voľné miesto ako zvyšok (plán býva niekedy o platňu opatrnejší) → nové **D-147** do skupiny Po V1 — zásobník v [DOGFOODING.md](../DOGFOODING.md)
