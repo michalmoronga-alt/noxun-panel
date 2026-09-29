@@ -14,8 +14,9 @@ NP-2 #419 (v0.15.2) · NP-3 #420 (v0.15.3) · NP-4 #421 (v0.15.4). Každá kódo
 predrecenziu; pri poslednej dávke 4842 headless · 142 JS sád · 3266 in-SketchUp PASS.
 Výsledok, dávky, overenie, priznané limity a zlúčený smoke checklist: [NAREZ_ZAVER_2026-09-29.md](NAREZ_ZAVER_2026-09-29.md). Priečinok bloku (rozhodnutia
 Michala N1–N11, schválený mockup, packages s auditmi návrhu, fakty z kódu, surová rešerš a krížový audit) je od uzáveru v [bloky/NAREZ/](bloky/NAREZ/).
-Kompatibilita: rozpočet `BUDGET_STD` 3, nastavenia dodávateľa vo verzii súboru 2 — aktualizovať obe PC. **Otvorené:** Michalov smoke a porovnanie s reálnou
-objednávkou VEPO (N10 — po V1 na novej zákazke, voliteľne cez nepotvrdenú objednávku).
+Kompatibilita: rozpočet `BUDGET_STD` 3, nastavenia dodávateľa vo verzii súboru 2 — aktualizovať obe PC. **Smoke PASS 29.9.2026** (Michal, bez chýb;
+postreh o pásovom rozložení = **D-147** v zásobníku Po V1). **Otvorené:** porovnanie s reálnou objednávkou VEPO (N10 — po V1 na novej zákazke, voliteľne
+cez nepotvrdenú objednávku).
 
 ### Pôvodný plný text bloku pri uzávere
 

@@ -17,6 +17,15 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **DOCS — smoke bloku 2 · Nárezový plán PASS (29.9.2026, PR #423, len dokumentácia; verzia pluginu sa nemení).** Michal 29.9. ráno prešiel smoke bloku 2
+  podľa checklistu v [NAREZ_ZAVER_2026-09-29.md](NAREZ_ZAVER_2026-09-29.md): **„prešiel som si to, nenašiel som chyby — smoke PASS"** — výsledok zapísaný
+  ako celok, nie po bodoch. **Postreh (nie chyba):** zaskočila ho optimalizácia — pásové rozloženie nedá menšie dielce nad seba v páse, nad nižším dielcom
+  ostáva voľné miesto ako zvyšok (plán býva niekedy o platňu opatrnejší) → nové **D-147** do skupiny Po V1 — zásobník v [DOGFOODING.md](../DOGFOODING.md)
+  a riadok v [PLAN.md](../PLAN.md) („doladíme po V1"). Dočasná skupina „NÁREZOVÝ PLÁN — smoke po uzávere bloku 2" v DOGFOODING **zanikla** (bez chýb; vzor
+  PR #415 a #408). Záver bloku, súhrn v [ROADMAP_hotove_etapy.md](ROADMAP_hotove_etapy.md) a bod 6 vo [V1_VIZIA.md](../V1_VIZIA.md) už nečakajú na smoke;
+  otvorené ostáva **porovnanie s reálnou objednávkou VEPO (N10) po V1**. Archivované packages bloku sa nemenia. **STAV pri najbližšej kódovej dávke:** smoke
+  bloku 2 PASS 29.9., D-147 v zásobníku — dokumentačné PR STAV nemení.
+
 - **BLOK 2 · KONTROLA + VÝROBA UZAVRETÝ (29.9.2026, v0.15.4 → v0.16.0, uzáver PR #422, variant B).** Posledný bod bloku — **primitívny nárezový plán** (V1 bod 6,
   rozhodnutý 6.9.) — Michal spustil 28.9. večer; štart **#417** (re-rez zavretého #416: rozhodnutia N1–N11, schválený mockup, fakty, surová rešerš a krížový audit)
   a štyri dávky za jeden deň: **NP-1** #418 (jadro `sheet_layout.rb`, `prepare_row`; audit 2 BLOCKER) · **NP-2** #419 (prerez/orez/prídavok v Nastaveniach

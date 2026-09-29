@@ -104,12 +104,20 @@ bez in-SU, nič nezapisovali do modelu). Pri uzávere **4842 headless · 142 JS 
 - **Porovnanie s reálnou objednávkou VEPO (N10):** vhodná reálna zákazka teraz nie je (KLINIKA je stará). Porovnanie 1:1 **po V1 na novej zákazke**, ktorá
   sa stane testovacím štandardom; ak bude test nevyhnutný skôr — objednávka z pluginu, Michal ju pošle VEPO **bez potvrdenia** (príde výpis a nacenenie,
   bez objednania). Až to ukáže, či VEPO otáča dielce (N8) a ako ďaleko je horná hranica od reality.
-- **Michalov smoke** podľa checklistu nižšie — nálezy idú do dočasnej skupiny v [DOGFOODING.md](../DOGFOODING.md) ako opravy v0.16.x.
+- ~~**Michalov smoke** podľa checklistu nižšie~~ — **PASS 29.9.2026** (Michal, bez chýb); postreh o pásovom rozložení je **D-147** v zásobníku Po V1
+  (pozri Smoke checklist).
 
 ## Smoke checklist bloku (v poradí práce)
 
+**Smoke PASS — Michal 29.9.2026 ráno, bez chýb** („prešiel som si to, nenašiel som chyby — smoke PASS"). Výsledok sa zaznamenal ako celok, nie po bodoch.
+**Postreh (nie chyba):** Michala zaskočila optimalizácia — pásové rozloženie nedá menšie dielce **nad seba** v páse, nad nižším dielcom ostáva voľné miesto
+ako zvyšok, takže plán býva opatrnejší (niekedy o platňu viac). Zapísané ako **D-147** do skupiny Po V1 — zásobník v [DOGFOODING.md](../DOGFOODING.md)
+(Michal: „doladíme po V1"). Dočasná skupina smoke v DOGFOODING zanikla; ďalšie postrehy k funkciám bloku 2 sa zapisujú ako **nové D-čísla podľa bloku**
+(nie ako opravy v0.16.x). **Porovnanie s VEPO (sekcia 7, N10)** nie je súčasť smoke v SketchUpe a ostáva otvorené. Checklist nižšie ostáva ako záznam.
+
 Zlúčené zo sekcií „Smoke pre Michala" packages NP-2, NP-3 a NP-4 a zo sekcií mockupu (A–E) — bez duplicít, pri každom bode je dávka, z ktorej pochádza
-(NP-1 viditeľnú zmenu nemá). Nálezy zapíš do DOGFOODING (skupina „NÁREZOVÝ PLÁN — smoke po uzávere bloku 2") — opravia sa ako v0.16.x.
+(NP-1 viditeľnú zmenu nemá). Nálezy zo smoke mali ísť do DOGFOODING (dočasná skupina „NÁREZOVÝ PLÁN — smoke po uzávere bloku 2") ako opravy v0.16.x — žiadne
+neboli, skupina po PASS zanikla.
 
 **0 · Príprava**
 1. Aktualizuj plugin na **0.16.0 na oboch PC** (Michal aj Lucia; updater v Štúdiu → O plugine) a reštartuj SketchUp; over verziu v O plugine. **Pred prvou
@@ -158,5 +166,5 @@ Zlúčené zo sekcií „Smoke pre Michala" packages NP-2, NP-3 a NP-4 a zo sekc
 
 ## Mimo bloku
 
-Optimalizácia na minimum odpadu a otáčanie dielcov (až po porovnaní s VEPO) · výkres a poradie rezov · sklad zvyškov · ABS v pláne · D-146 falošný duplák ·
+Optimalizácia na minimum odpadu a otáčanie dielcov (až po porovnaní s VEPO) · **D-147** vnáranie menších dielcov do voľného miesta pásu (smoke 29.9.) · výkres a poradie rezov · sklad zvyškov · ABS v pláne · D-146 falošný duplák ·
 EN DANIELI textový export (Po V1).
