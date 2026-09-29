@@ -1,7 +1,7 @@
   // ============ NÁREZOVÝ PLÁN — sekcia `cut` Štúdia (NP-3, blok 2) ============
   //
   // Mockup A (prehľad: súhrn, karty materiálov, malé platne, upozornenia) a B
-  // (detail jednej platne) v `SYSTEM/zdroje/bloky/NAREZ/MOCKUP_NAREZ_2026-09-28.html`.
+  // (detail jednej platne) v `SYSTEM/archiv/bloky/NAREZ/MOCKUP_NAREZ_2026-09-28.html`.
   //
   // ZÁSADY:
   //   * SERVER je autorita čísel AJ viet: počet platní, využitie, polohy dielcov,

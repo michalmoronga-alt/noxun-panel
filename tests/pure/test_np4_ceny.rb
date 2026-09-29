@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # NP-4 (blok 2 · Narezovy plan): CENY PODLA PLANU.
-# Package: SYSTEM/zdroje/bloky/NAREZ/PACKAGE_NP4_CENY.md (+ nalezy auditu
+# Package: SYSTEM/archiv/bloky/NAREZ/PACKAGE_NP4_CENY.md (+ nalezy auditu
 # B1–B3, F4, F5, N6 — maju prednost).
 #
 # Co sa tu dokazuje:

@@ -774,7 +774,7 @@ a predvolená cena. `sheet_size_for` je jediná pravda o formáte platne a fallb
 Nárezový plán a **vetu v poznámke riadku materiálu** v Rozpočte a XLSX rozpočtu (odsek `production_core.rb`, sekcia NP-3). **Od NP-4 (v0.15.4)** z neho
 Rozpočet pri zapnutom prepínači zákazky „ceny podľa plánu" berie **počet platní** cenovo spôsobilého materiálu (a tým porez; montáž ostáva z odhadu). Čistý modul: z `Bom.compute[:rows]`, celého `ProductionCore.sheets_map` a mapy hrúbok ABS (**tej istej, akú dostáva VEPO**)
 vypočíta **per nákupný materiál** deterministické pásové (gilotínové) rozloženie obdĺžnikov na platne. Je to **rozloženie heuristiky, nie
-minimum** — reže VEPO vlastnou optimalizáciou, plán slúži objednávke. Package: `SYSTEM/zdroje/bloky/NAREZ/PACKAGE_NP1_JADRO.md`.
+minimum** — reže VEPO vlastnou optimalizáciou, plán slúži objednávke. Package: `SYSTEM/archiv/bloky/NAREZ/PACKAGE_NP1_JADRO.md`.
 
 **Štyri verejné funkcie.**
 - `compute(rows, sheets:, edge_thicknesses:, params: {}, blocked: nil)` — celý plán. Pre dátový problém **nikdy nevyhodí výnimku**.

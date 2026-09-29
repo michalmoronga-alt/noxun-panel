@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # NP-3 (blok 2 · Narezovy plan): sekcia Studia + poznamka v Rozpocte.
-# Package: SYSTEM/zdroje/bloky/NAREZ/PACKAGE_NP3_SEKCIA.md (+ nalezy auditu
+# Package: SYSTEM/archiv/bloky/NAREZ/PACKAGE_NP3_SEKCIA.md (+ nalezy auditu
 # B1–B4, F5–F12 — maju prednost).
 #
 # Co sa tu dokazuje:

@@ -2,6 +2,59 @@
 
 > **ARCHÍV (založené 24.7.2026 pri uzávere V0.5).** Kompaktné riadky hotových etáp drží [KRONIKA.md](KRONIKA.md) (časová os) — tu sú plné pôvodné texty (história rozhodnutí, rozsahov a PR). Otvorené záväzky z týchto textov sú od 11.8.2026 zaradené do blokov [../PLAN.md](../PLAN.md) — tento súbor je čisto referenčný.
 
+## BLOK 2 · KONTROLA + VÝROBA — UZAVRETÝ (29.9.2026, v0.16.0; Nárezový plán: štart PR #417, dávky PR #418–#421 + uzáver PR #?)
+
+**Krížová kontrola zákazky pred výrobou a výrobné výstupy** — **D-94** nákup s pôvodom (#361, v0.12.1) · **D-112** zmenená ABS v stĺpci `poznamka` VEPO
+a **D-113** krátky popis korpusu v názvoch dielcov (#287, v0.9.22) · **D-121** názvy dielcov zásuviek a VEPO do 20 znakov (#324/#325, v0.9.45–v0.9.46) ·
+**D-122** Kontrola zoskupí UNI dielce (#343, v0.10.2) · a posledný bod bloku, **primitívny nárezový plán** (V1 bod 6): **Štúdio → Nárezový plán** (karty
+materiálov, malé platne, detail platne, upozornenie na poslednú platňu, dielce, ktoré sa nezmestia), poznámka „plán: N platní" v Rozpočte a XLSX,
+**prerez / orez / prídavok dupláku** v Nastaveniach rozpočtu, **Kontrola „nezmestí sa" s orezom** a prepínač **„ceny podľa plánu"** per zákazka (predvolene vypnutý).
+Dávky nárezového plánu: štart #417 (re-rez zavretého #416 — rozhodnutia N1–N11, mockup, fakty, surová rešerš a krížový audit) · NP-1 #418 (v0.15.1) ·
+NP-2 #419 (v0.15.2) · NP-3 #420 (v0.15.3) · NP-4 #421 (v0.15.4). Každá kódová dávka mala audit návrhu (Codex; spolu 11 BLOCKERov, všetky prijaté) a slepú
+predrecenziu; pri poslednej dávke 4842 headless · 142 JS sád · 3266 in-SketchUp PASS.
+Výsledok, dávky, overenie, priznané limity a zlúčený smoke checklist: [NAREZ_ZAVER_2026-09-29.md](NAREZ_ZAVER_2026-09-29.md). Priečinok bloku (rozhodnutia
+Michala N1–N11, schválený mockup, packages s auditmi návrhu, fakty z kódu, surová rešerš a krížový audit) je od uzáveru v [bloky/NAREZ/](bloky/NAREZ/).
+Kompatibilita: rozpočet `BUDGET_STD` 3, nastavenia dodávateľa vo verzii súboru 2 — aktualizovať obe PC. **Otvorené:** Michalov smoke a porovnanie s reálnou
+objednávkou VEPO (N10 — po V1 na novej zákazke, voliteľne cez nepotvrdenú objednávku).
+
+### Pôvodný plný text bloku pri uzávere
+
+### 2 · KONTROLA + VÝROBA
+
+**Cieľ:** dotiahnuť krížovú kontrolu zákazky pred odoslaním do výroby a výrobné výstupy.
+
+- ✅ **D-94 · Nákup s pôvodom** — riadok v sekcii Nákup kovania sa rozklikne na **pôvod zoskupený po skrinkách**: jeden riadok na skrinku s počtom kusov a za ním položky
+  s ľudským názvom vlastníka (kovanie celej skrinky sa priznáva slovami). **Klik na skrinku aj na čelo označí kus v modeli a zdvihne Inspector** — pri čele sa rovno otvorí
+  jeho karta. Rozklik **prežije „Obnoviť" aj prestavbu** (pamäť je kľúčovaná identitou riadku, nie poradím) a maže sa len pri prepnutí zákazky. Výstup zákazky sa nemení ani
+  o znak; invariant „súčet zdrojov = počet riadku" má od tejto dávky regresného strážcu. **PR #361, v0.12.1.**
+- ✅ **D-112 · Zmenená ABS viditeľná vo VEPO exporte** — VEPO CSV má **deviaty stĺpec `poznamka`** (`ABS H1181 Dub Halifax tabakový`), plnený automaticky, keď sa dekor pásky líši od
+  dekoru dosky; LOG dostal kontrolný oddiel „Poznámky pre VEPO" pred odoslaním objednávky. Variantu rozhodol Michalov import 3.9. — VEPO 9-stĺpcový súbor prijalo. Kontrakt je v1.1.
+  **PR #287, v0.9.22.**
+- ✅ **D-113 · Krátky popis korpusu v názvoch dielcov** — názov riadku vo VEPO CSV a LOGu nesie skratku dielca a skrinky (`Bok LP s1 s2`); riadok sa **nerozpadá per skrinka**
+  (nálepky VEPO tlačia ~20 znakov, agregácia kusovníka ostáva). Kusovník Štúdia má ďalej plné názvy. **PR #287, v0.9.22.**
+- ✅ **D-121 · Názvy odvodených dielcov zásuviek sú pre VEPO pridlhé** — **(a) PR #324, v0.9.45:** dielce zásuvky nesú ČÍSLO čela (`Dno zasuvky 2`) v modeli aj v kusovníku,
+  VEPO ich skracuje (`Zas dno 2 s1`, dvojica bokov `Zas bok LP 2 s1`); staré zákazky dostanú tvar bez čísla, kým sa skrinka neprestaví. **(b) PR #325, v0.9.46:** kontrakt VEPO
+  **v1.2** — názov riadku má VŽDY ≤ 20 znakov (import objednávky dlhšie pole odmieta): zlúčenie číslovaných tokenov (`Polica 1 2 3`), deterministický orez po celých slovách
+  bez výpustky a priznanie orezu (ORANGE nález Kontroly `name_long` + oddiel LOGu „Skrátené názvy"). Plný text v [DOGFOODING_vyriesene.md](DOGFOODING_vyriesene.md).
+- ✅ **D-122 · Kontrola zoskupí UNI dielce** — zbalená skupina s počtom dielcov; deti držia výber v modeli, Inspector aj náhradu konkrétneho UNI. Semafor/badge stále počítajú jednotlivé nálezy. **PR #343, v0.10.2.**
+- **Nárezový plán fáza 2 — PRIMITÍVNY, V1 rozsah (rozhodnuté 6.9.2026; blok beží od 28.9.2026 — priečinok [bloky/NAREZ/](bloky/NAREZ/)):** dnes je počet platní len odhad
+  z m² (D-19, koeficient 10–25 %); po primitívnom pláne máme **hornú hranicu počtu platní podľa zvoleného rozloženia** (deterministická heuristika, nie optimum — iné rozloženie môže
+  vyjsť lepšie) a vidíme, keď 1 dielec vychádza na celú platňu. Pásové (gilotínové) rozloženie v čistom Ruby (OpenCutList je GPL — vzory áno, kód nie); dielce sa **neotáčajú**
+  (orientácia ako vo VEPO súbore), **prerez 5 mm, orez 10 mm a prídavok dupláku 10 mm na stranu** sú nastavenia; výstup = počet platní + využitie + zvyšok + obrázok v sekcii
+  Nárezový plán, rozpočet ukáže „plán: N platní" a voliteľne **ceny podľa plánu** — informácia pre objednávku, **nie povinné množstvo** (objednáva človek). Rozhodnutia Michala
+  N1–N11, schválený mockup, fakty z kódu, surová rešerš a surový krížový audit sú v priečinku bloku; pôvodný návrh `zdroje/next_sessions/NAREZ_PLAN_NAVRH_2026-09-06.md` (PR #323),
+  rozhodnutie 6.9.: [../zdroje/next_sessions/V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md](../zdroje/next_sessions/V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md). **Dávky (po poradí):**
+  - ✅ **NP-1 · jadro výpočtu** — plugin vie spočítať rozloženie a počet platní; zatiaľ bez viditeľnej zmeny (zobrazí ho NP-3). **PR #418, v0.15.1**
+    ([package](bloky/NAREZ/PACKAGE_NP1_JADRO.md)).
+  - ✅ **NP-2 · nastavenia + Kontrola** — prerez, orez a prídavok dupláku v Nastaveniach rozpočtu; Kontrola „nezmestí sa" počíta s orezom. **PR #419, v0.15.2**
+    ([package](bloky/NAREZ/PACKAGE_NP2_NASTAVENIA.md)).
+  - ✅ **NP-3 · sekcia Nárezový plán** — Štúdio: karty materiálov s malými platňami, detail platne, upozornenie na poslednú platňu, dielce, ktoré sa nezmestia;
+    poznámka „plán: N platní" v Rozpočte a XLSX (ceny sa nemenia). **PR #420, v0.15.3** ([package](bloky/NAREZ/PACKAGE_NP3_SEKCIA.md)).
+  - ✅ **NP-4 · ceny podľa plánu** — prepínač pre zákazku (predvolene vypnutý), porez podľa plánu, montáž z odhadu; materiál bez spoľahlivého plánu ostáva na odhade
+    s dôvodom; `BUDGET_STD` 3. **PR #421, v0.15.4** ([package](bloky/NAREZ/PACKAGE_NP4_CENY.md)). Po mergi **uzáver bloku 2** (release, minor, smoke).
+  - ✅ **Uzáver bloku 2** *(PR #?, v0.16.0 — docs a verzia)* — blok do archívu, priečinok bloku do `archiv/bloky/NAREZ/`, V1_VIZIA (nárezový plán v bode 6
+    odškrtnutý), README, DOGFOODING (dočasná skupina smoke), STAV, KRONIKA; výsledok a smoke checklist v [NAREZ_ZAVER_2026-09-29.md](NAREZ_ZAVER_2026-09-29.md).
+
 ## BLOK K3 ROHOVÁ SKRINKA (V1 bod 2) — UZAVRETÝ (28.9.2026, v0.15.0, podklady PR #409, dávky PR #410–#413 + uzáver PR #414)
 
 **Dolná slepá rohová skrinka s CR lištou** (nový typ `corner_blind`, podľa DC „Rohová") — korpus ako dolná + rohová zostava na prednej rovine: **blenda korpusová**,

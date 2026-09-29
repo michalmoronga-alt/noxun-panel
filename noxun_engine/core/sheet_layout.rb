@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # Noxun Engine — NP-1 (blok 2 · Narezovy plan): jadro vypoctu rozlozenia
-# dielcov na platne. Package: SYSTEM/zdroje/bloky/NAREZ/PACKAGE_NP1_JADRO.md.
+# dielcov na platne. Package: SYSTEM/archiv/bloky/NAREZ/PACKAGE_NP1_JADRO.md.
 #
 # CO TO JE: cisty Ruby vypocet (ziadny SketchUp, ziadny zapis), ktory z
 # agregovanych riadkov kusovnika (Bom.compute[:rows]), zaznamov katalogu

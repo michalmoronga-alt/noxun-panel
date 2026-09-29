@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # NP-1 (blok 2 · Nárezový plán): testy jadra výpočtu `SheetLayout`.
-# Package: SYSTEM/zdroje/bloky/NAREZ/PACKAGE_NP1_JADRO.md (§4).
+# Package: SYSTEM/archiv/bloky/NAREZ/PACKAGE_NP1_JADRO.md (§4).
 #
 # Oddelené skupiny (audit F8):
 #   * `fits_rect?` — desatinné vstupy a tolerancia 0,1 mm, otáčanie,

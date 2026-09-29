@@ -3312,7 +3312,7 @@ konečnou sumou; v Ponuke je to riadok dokumentu), nie dve pravdy. Testy: `tests
 ### Sekcia NÁREZOVÝ PLÁN v Štúdiu (NP-3, blok 2 · v0.15.3, ui/js/sheet_layout.js)
 
 posledná neaktívna položka navigácie („fáza 2") ožila — **id ostáva `cut`** (Codex C13), `SECTIONS` a obe JS zrkadlá ju majú za Cenovou ponukou. Vzhľad a texty sú
-schválený mockup `SYSTEM/zdroje/bloky/NAREZ/MOCKUP_NAREZ_2026-09-28.html` (A prehľad, B detail platne); package `PACKAGE_NP3_SEKCIA.md` v tom istom priečinku.
+schválený mockup `SYSTEM/archiv/bloky/NAREZ/MOCKUP_NAREZ_2026-09-28.html` (A prehľad, B detail platne); package `PACKAGE_NP3_SEKCIA.md` v tom istom priečinku.
 
 **Dáta: jeden výpočet na push.** `push_state` spočíta plán RAZ (`ProductionCore.layout_for` z toho istého `collected`, `bom`, `smap` a expanzie kovania — žiadny druhý sken)
 a ten istý plán odovzdá rozpočtu (`budget_payload(…, layout)` → veta v poznámke riadku materiálu) aj sekcii (`sheet_layout_payload` → kľúč `sheet_layout`). Kompaktný tvar:
