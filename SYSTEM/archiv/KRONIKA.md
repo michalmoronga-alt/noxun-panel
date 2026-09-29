@@ -38,12 +38,15 @@
   pravdivá veta fallbacku, test záchrannej vetvy `control_layout`) — všetko opravené pred PR. **Codex review kolo 1:** 1× P1 (duplákový riadok katalógu bez
   `sheet_size` ticho vynechal nadrozmernú vrstvu zo zdroja — formát, fallback a UNI rozhoduje odteraz pripravený obdĺžnik, teda nákupný materiál) a 1× P2
   (pôvod súboru sa odvodzoval z čítania pred zámkom seed-merge — novší súbor zapísaný medzitým by sekcia ukázala ako `ok`; pôvod sa počíta z dokumentu po
-  seed-merge) — obe opravené s testom a mutáciou. **Testy:** 4794 headless · 140 JS sád zelené (nové
-  `test_np2_nastavenia_kontrola.rb`, `test_np2_nastavenia.js`, `test_np2_kontrola_klik.js`); **19 mutácií — 19 zabitých** (zápis bez pečiatky `std`, brána
+  seed-merge) — obe opravené s testom a mutáciou. **Kolo 2:** 2× P2 — vypnuté „Uložiť" vyzeralo ako živé (vrátené úzke pravidlo
+  `.sectools .primary[aria-disabled]` s tlmenými tokenmi bez hoveru) a chyba práv či disku sa tvárila ako zapisovateľný fallback (nový stav
+  `unreadable`: banner, „Uložiť" vypnuté, Kontrola ORANGE; `seed_fallback` len pre chýbajúci a poškodený súbor bez zálohy). **Testy:** 4796 headless · 140 JS sád zelené (nové
+  `test_np2_nastavenia_kontrola.rb`, `test_np2_nastavenia.js`, `test_np2_kontrola_klik.js`); **22 mutácií — 22 zabitých** (zápis bez pečiatky `std`, brána
   vypadnutá zo zápisu, seed-merge do novšieho súboru, brána z cache, orez pri PD, Kontrola bez prídavku dupláku, otáčanie pri `length`, klik bez `layout:`, klient
   bez kontroly rozsahu, fallback tváriaci sa ako súbor, neplatný rozmer bez nálezu, hrúbky ABS cez `vepo_edge_thicknesses`, geometria odmietnutia bez údaja
   o dupláku, klik na nález nastavení na server, `control_layout` bez záchrany, orez na 1 desatinné, iný popis poľa na serveri, stará stráž formátu materiálu
-  riadku, pôvod zo starého čítania). In-SU netreba (globálny súbor
+  riadku, pôvod zo starého čítania, chyba práv zlúčená s fallbackom, klient neblokuje `unreadable`, vypnuté „Uložiť" bez tlmeného
+  vzhľadu). In-SU netreba (globálny súbor
   + čítanie Kontroly, žiadny zápis do modelu).
 
 - **NP-1 · Nárezový plán — jadro výpočtu (29.9.2026, v0.15.0 → v0.15.1, PR #418; blok 2, prvá dávka).**

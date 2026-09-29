@@ -358,6 +358,56 @@ NxTest.test('NP-2 stav: ok / degraded (zaloha) / fallback (necitatelny subor) �
   end
 end
 
+NxTest.test('NP-2 stav (Codex #419 kolo 2): chyba PRAV/I/O = `unreadable` (zapisy vypnute), poskodeny bez zalohy = zapisovatelny `fallback`') do
+  NxTest.skip!('zapisuje do sandboxu nastaveni') unless NxTest.headless?
+  NxNp2.with_sandbox do
+    ss = NxNp2::SS
+    ss.load # subor existuje
+    store = NxNp2::STORE
+    orig = store.method(:read)
+    target = File.expand_path(ss.path)
+    store.define_singleton_method(:read) do |p, **kw|
+      raise Errno::EACCES, p if File.expand_path(p) == target
+
+      orig.call(p, **kw)
+    end
+    begin
+      store.invalidate
+      lp = ss.layout_params
+      st = ss.settings_state(ss.active_with_source.last)
+    ensure
+      store.define_singleton_method(:read, orig)
+    end
+    NxTest.assert_equal(:unreadable, lp[:source], 'chyba prav nie je „poskodeny subor, ulozenie ho opravi"')
+    NxTest.assert_equal({ 'kerf' => 5.0, 'trim' => 10.0, 'dup_allowance' => 10.0 }, lp[:params], 'predvolene hodnoty')
+    NxTest.assert_equal('unreadable', st['state'])
+    NxTest.assert(st['reason'].include?('nedá čítať') && st['reason'].include?('zápisy sú vypnuté'), st['reason'])
+    # Kontrola pri unreadable prizna predvolene hodnoty rovnako ako pri fallbacku
+    out = NxNp2.run([NxNp2.rec], NxNp2.layout(source: :unreadable))
+    ls = NxNp2.of(out, 'layout_settings')
+    NxTest.assert_equal(1, ls.length)
+    NxTest.assert_equal('layout_settings|unreadable', ls.first['stable_key'])
+    # poskodeny primar BEZ zalohy ostava zapisovatelny fallback (prvy zapis ho opravi)
+    FileUtils.rm_f("#{ss.path}.bak")
+    File.binwrite(ss.path, NxNp2::CORRUPT)
+    store.invalidate
+    NxTest.assert_equal(:seed_fallback, ss.layout_params[:source])
+    NxTest.assert_equal('fallback', ss.settings_state(:seed_fallback)['state'])
+    NxTest.assert(ss.patch_active!('kerf_mm' => 4.0).first, 'zapis pri fallbacku prejde a subor opravi')
+    NxTest.assert_close(4.0, NxNp2.disk['suppliers'].first['kerf_mm'], 1e-9)
+  end
+end
+
+NxTest.test('NP-2 GUARD (Codex #419 kolo 2): vypnute „Uložiť" v liste sekcie vyzera NEDOSTUPNE (aj bez hoveru)') do
+  html = NxNp2.src('ui/studio.html')
+  rule = html[/\.sectools \.primary\[aria-disabled="true"\],\s*\.sectools \.primary\[aria-disabled="true"\]:hover \{[^}]*\}/m].to_s
+  NxTest.assert(!rule.empty?, 'pravidlo pre nedostupne primarne tlacidlo listy (aj :hover)')
+  NxTest.assert(rule.include?('var(--nx-surface-sunken)') && rule.include?('var(--nx-ink-faint)'), 'tlmene tokeny --nx-*')
+  NxTest.refute(rule.include?('#'), 'ziadny hex — len tokeny')
+  js = NxNp2.src('ui/js/studio_settings.js')
+  NxTest.assert(js.include?("var SS_WRITE_BLOCK_STATES = ['newer', 'degraded', 'unreadable'];"))
+end
+
 NxTest.test('NP-2 payload sekcie: nesie `settings_state` a `scalar_ranges` (rozsahy = serverova autorita)') do
   NxTest.skip!('zapisuje do sandboxu nastaveni') unless NxTest.headless?
   NxNp2.with_sandbox do

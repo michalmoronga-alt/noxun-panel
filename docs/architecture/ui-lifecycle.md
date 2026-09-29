@@ -3606,10 +3606,13 @@ platne" · „Prídavok dupláku na stranu" (mm) stoja vo fieldsete **Výpočet 
 **Klientska kontrola rozsahu:** payload nesie `scalar_ranges` (`{kľúč: [min, max]}` zo `SupplierSettings::SCALAR_RANGES` + dni) — pole mimo
 rozsahu **zčervená** (`.bad` pri písaní aj po pushi rozpísanej hodnoty, `ssFieldBad`) a „Uložiť" povie dôvod ľudsky („Prerez píly (hrúbka
 kotúča): hodnota mimo rozsahu 0–10 mm", `ssRangeError`); server ostáva autoritou. **Stav súboru:** payload nesie `settings_state`
-(`ok | degraded | newer | fallback` + veta) — sekcia ukáže **banner hneď po otvorení** (`hwbanner`; pri `newer`/`degraded` červený
-`hwbanner-stop` s „Uloženie je vypnuté.") a „Uložiť" dostane `aria-disabled` s dôvodom v `title` (nikdy HTML `disabled`, D-78; klik povie
-dôvod v statuse, na server nič nejde). Degradovaný súbor sa tak prizná už pri otvorení, nie až chybou pri uložení. `fallback` (súbor sa nedal
-prečítať) má jantárový banner a **zápis nevypína** — prvý zápis súbor opraví a revízia chráni pred prepisom cudzej zmeny. Texty po uložení
+(`ok | degraded | newer | fallback | unreadable` + veta) — sekcia ukáže **banner hneď po otvorení** (`hwbanner`; pri `newer`/`degraded`/
+`unreadable` — zoznam `SS_WRITE_BLOCK_STATES` — červený `hwbanner-stop` s „Uloženie je vypnuté.") a „Uložiť" dostane `aria-disabled` s dôvodom
+v `title` (nikdy HTML `disabled`, D-78; klik povie dôvod v statuse, na server nič nejde) a **tlmený vzhľad bez hoveru** (`.sectools
+.primary[aria-disabled="true"]` v `studio.html`, tokeny `--nx-surface-sunken`/`--nx-ink-faint` — Codex #419 kolo 2). Degradovaný súbor sa tak
+prizná už pri otvorení, nie až chybou pri uložení. `fallback` (súbor chýba alebo je poškodený bez zálohy) má jantárový banner a **zápis
+nevypína** — prvý zápis súbor opraví a revízia chráni pred prepisom cudzej zmeny; `unreadable` (práva, zdieľanie, disk) zápis vypína, lebo
+by zlyhal tiež. Texty po uložení
 sa nemenia; Kontrola sa po uložení prepočíta tou istou cestou `refresh_studio`. Testy: `tests/js/test_np2_nastavenia.js`.
 
 **Uzavretý whitelist `SECTION_ACTIONS = ss_save · ss_reload · updater_check · updater_set_dir · updater_apply`** — mená sú prefixované zámerne: `save`/`reload`/`ready` sú príliš

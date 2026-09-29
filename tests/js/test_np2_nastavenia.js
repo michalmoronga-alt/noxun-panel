@@ -215,6 +215,15 @@ function state(over){
   T.ssApplyState(state({ settings_state: { state: 'degraded', reason: 'Nastavenia dodávateľa sú poškodené — číta sa záloha' } }));
   ok(/aria-disabled="true"/.test(ELS.sectools.innerHTML), 'poškodený súbor: „Uložiť" vypnuté (zjednotené s newer)');
 
+  // Codex #419 kolo 2: súbor sa nedá ČÍTAŤ (práva, zdieľanie, disk) — zápis by
+  // zlyhal tiež, takže „Uložiť" je vypnuté a banner červený.
+  const unr = state({ settings_state: { state: 'unreadable', reason: 'Súbor nastavení dodávateľa sa nedá čítať — zápisy sú vypnuté.' } });
+  eq(T.ssWriteBlock(unr), unr.settings_state.reason, 'nečitateľný súbor blokuje zápis');
+  T.ssApplyState(unr);
+  ok(/aria-disabled="true"/.test(ELS.sectools.innerHTML), 'nečitateľný súbor: „Uložiť" vypnuté');
+  const ub = findAll(ELS.secbody, function(x){ return x.classList && x.classList.contains('hwbanner'); });
+  ok(ub.length === 1 && ub[0].classList.contains('hwbanner-stop'), 'a červený banner s dôvodom');
+
   T.ssApplyState(state({ settings_state: { state: 'fallback', reason: 'Súbor nastavení dodávateľa sa nepodarilo prečítať' } }));
   const fb = findAll(ELS.secbody, function(x){ return x.classList && x.classList.contains('hwbanner'); });
   eq(fb.length, 1, 'fallback má banner…');

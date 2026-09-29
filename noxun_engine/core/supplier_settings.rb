@@ -219,7 +219,10 @@ module Noxun
       #   :seed_fallback — citanie ZLYHALO a vracia sa seed. Kto z nastaveni
       #                    pocita vyrobny verdikt (Kontrola), to MUSI priznat —
       #                    ulozeny orez 50 nahradeny predvolenym 10 by inak
-      #                    potichu zmenil vysledok.
+      #                    potichu zmenil vysledok. Len chybajuci/poskodeny
+      #                    subor bez zalohy — prvy zapis ho opravi,
+      #   :unreadable    — citanie ZLYHALO na pravach/zdielani/disku: seed ako
+      #                    pri fallbacku, ale zapisy su vypnute (`read_failure_origin`).
       # Povod sa urcuje TU, nie rescue-om vo volajucom: `load` chybu pohlti
       # a vrati seed, takze neskor sa fallback od suboru rozlisit neda.
       def load_with_origin
@@ -233,7 +236,17 @@ module Noxun
         [merged, origin]
       rescue StandardError => e
         Engine.log_error(e, 'SupplierSettings.load') if defined?(Engine)
-        [seed_doc, :seed_fallback]
+        [seed_doc, read_failure_origin(e)]
+      end
+
+      # Codex #419 kolo 2 (P2): ZAPISOVATELNY fallback je len chybajuci subor
+      # a poskodeny obsah bez pouzitelnej zalohy (`JSON::ParserError`,
+      # `Errno::ENOENT`) — tam prvy zapis subor opravi. Ostatne chyby citania
+      # (prava, zdielanie, disk) o subore NEHOVORIA NIC a zapis ich zamerne
+      # nepreskoci (`JsonFileStore.degraded?` ich propaguje) — sekcia teda
+      # nesmie slubovat, ze ulozenie pomoze: `:unreadable` = zapisy vypnute.
+      def read_failure_origin(err)
+        err.is_a?(JSON::ParserError) || err.is_a?(Errno::ENOENT) ? :seed_fallback : :unreadable
       end
 
       # CISTE citanie + seed-merge BEZ zapisu -> [dokument, changed].
@@ -275,7 +288,7 @@ module Noxun
       end
 
       # NP-2: aktivny dodavatel + ZDROJ dat -> [supplier, source], source je
-      # :file | :backup | :newer_file | :seed_fallback. `:backup` = poskodeny
+      # :file | :backup | :newer_file | :seed_fallback | :unreadable. `:backup` = poskodeny
       # primar s platnou zalohou (R-11); ma prednost pred `:newer_file` (to
       # iste poradie ako brany v `write`).
       def active_with_source
@@ -284,7 +297,7 @@ module Noxun
       end
 
       def refine_origin(origin)
-        return origin if origin == :seed_fallback
+        return origin if origin == :seed_fallback || origin == :unreadable
         return :backup if degraded_now?
 
         origin
@@ -309,14 +322,21 @@ module Noxun
 
       # NP-2: stav suboru pre sekciu Nastavenia rozpoctu (banner + vypnute
       # „Uložiť" pri `degraded` a `newer`).
-      # -> { 'state' => ok|degraded|newer|fallback, 'reason' => veta }
+      # -> { 'state' => ok|degraded|newer|fallback|unreadable, 'reason' => veta }
       def settings_state(source)
         case source
         when :backup then { 'state' => 'degraded', 'reason' => degraded_reason }
         when :newer_file then { 'state' => 'newer', 'reason' => std_block_reason(disk_std) }
         when :seed_fallback then { 'state' => 'fallback', 'reason' => FALLBACK_REASON }
+        when :unreadable then { 'state' => 'unreadable', 'reason' => unreadable_reason }
         else { 'state' => 'ok', 'reason' => '' }
         end
+      end
+
+      def unreadable_reason
+        'Súbor nastavení dodávateľa sa nedá čítať (prístup odmietnutý, súbor drží iný program alebo chyba ' \
+          'disku) — zobrazujú sa predvolené hodnoty a počíta s nimi rozpočet aj Kontrola; zápisy sú vypnuté. ' \
+          "Skontroluj súbor #{path} a klikni na Načítať nanovo."
       end
 
       # Verzia suboru na disku (pre vetu brany); chyba citania = „novsia".

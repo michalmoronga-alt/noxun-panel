@@ -906,12 +906,16 @@ montaz), `standard_rows` (8 fixných riadkov), `mode_values` (€/€€/€€�
 Chyba rozsahu je ľudská („Prerez píly (hrúbka kotúča): hodnota mimo rozsahu 0–10 mm", `range_error`), nie surový kľúč; popis
 v `SCALAR_LABELS` je **presne text riadku** v sekcii (JS `SS_SCALARS`), takže server aj klient hlásia to isté (zhodu stráži test).
 
-**Čítanie s pôvodom (NP-2, audit B2).** `load_with_origin` → `[dokument, :file | :newer_file | :seed_fallback]` — pôvod sa určí **v čítaní**,
-lebo `load` chybu pohltí a vráti seed a neskôr sa fallback od súboru rozlíšiť nedá. Pôvod sa odvodzuje až z dokumentu **po** seed-merge
+**Čítanie s pôvodom (NP-2, audit B2).** `load_with_origin` → `[dokument, :file | :newer_file | :seed_fallback | :unreadable]` — pôvod sa určí **v čítaní**,
+lebo `load` chybu pohltí a vráti seed a neskôr sa fallback od súboru rozlíšiť nedá. **Dva druhy zlyhania (Codex #419 kolo 2):**
+`:seed_fallback` = **zapisovateľný** fallback — len chýbajúci súbor a poškodený obsah bez použiteľnej zálohy (`JSON::ParserError`,
+`Errno::ENOENT`), prvý zápis súbor opraví; **`:unreadable`** = iná chyba čítania (práva, zdieľanie, disk) — o súbore nehovorí nič a zápis
+by zlyhal tiež (`JsonFileStore.degraded?` tie isté I/O chyby zámerne propaguje), preto sekcia vypne „Uložiť" a ukáže banner; hodnoty sú
+v oboch prípadoch predvolené a Kontrola to prizná ORANGE nálezom (`layout_settings|<pôvod>`). Rozhoduje `read_failure_origin`. Pôvod sa odvodzuje až z dokumentu **po** seed-merge
 (`persist_seed_merge!` číta súbor nanovo pod zámkom a medzitým ho mohol prepísať novší plugin — Codex #419 P2). `active_with_source` pridá `:backup` (poškodený primár
 s platnou zálohou, `JsonFileStore.degraded?` — číta disk, preto nie v `load`, ktorý beží pri každom výpočte rozpočtu). `layout_params` →
 `{params: {'kerf','trim','dup_allowance'}, source:}` je **jediný vstup** pre nárezový plán a Kontrolu; `settings_state(source)` →
-`{state: ok|degraded|newer|fallback, reason}` pre banner sekcie.
+`{state: ok|degraded|newer|fallback|unreadable, reason}` pre banner sekcie (zápis blokujú `degraded`, `newer` a `unreadable`).
 
 **Verzia súboru 2 a dopredná brána (NP-2, vzor `HardwareRules` KOV-F1).** `STD = 2`; **každý zápis pečiatkuje `std = STD`** (inak by súbor
 ostal navždy 1 a budúca brána by nemala čo porovnať). Súbor z **novšieho** pluginu (`doc_std_unsupported?` = `std > STD`) sa **číta** (známe

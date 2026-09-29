@@ -124,10 +124,16 @@
   .studio .updrow [aria-disabled="true"] { background: var(--nx-surface-sunken);
                                            color: var(--nx-ink-faint); border-color: var(--nx-border);
                                            cursor: default; }
-  /* Review #5: pravidlo pre `.sectools [aria-disabled]` ZANIKLO spolu s
-     posledným neaktívnym ovládačom lišty (XLSX/CSV kusovníka, SMOKE 22.8.).
-     Mŕtve CSS je horšie než žiadne — sľubuje vzor, ktorý sa už nekreslí.
-     Vráti sa s ovládačom, ktorý ho bude naozaj potrebovať. */
+  /* Review #5: všeobecné pravidlo pre `.sectools [aria-disabled]` ZANIKLO spolu
+     s posledným neaktívnym ovládačom lišty (XLSX/CSV kusovníka, SMOKE 22.8.).
+     NP-2 (Codex #419 kolo 2): vrátilo sa ÚZKO pre ovládač, ktorý ho naozaj
+     potrebuje — „Uložiť" Nastavení rozpočtu pri súbore z novšieho pluginu,
+     poškodenom alebo nečitateľnom (`aria-disabled` s dôvodom, D-78). Bez neho
+     by vyzeralo ako živé zelené tlačidlo aj s hoverom, hoci klik len povie dôvod. */
+  .sectools .primary[aria-disabled="true"],
+  .sectools .primary[aria-disabled="true"]:hover { background: var(--nx-surface-sunken);
+                                                   color: var(--nx-ink-faint);
+                                                   border-color: var(--nx-border); cursor: default; }
   .secscroll { flex: 1; overflow: auto; padding: 10px 12px 20px; }
 
   /* Review #9: 150 px (bolo 180) — lišta Kusovníka nesie od SMOKE dávky o jeden

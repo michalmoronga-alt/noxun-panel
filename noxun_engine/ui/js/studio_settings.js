@@ -625,13 +625,17 @@
   }
 
   // NP-2: stav súboru nastavení zo servera (`settings_state`). Zápis je
-  // zablokovaný pri `newer` (súbor uložil novší plugin) a `degraded`
-  // (poškodený primár — číta sa záloha). `fallback` (súbor sa nedal prečítať)
-  // zápis NEblokuje: prvý zápis súbor opraví a revízia chráni pred prepisom
-  // cudzej zmeny. -> '' | dôvod
+  // zablokovaný pri `newer` (súbor uložil novší plugin), `degraded`
+  // (poškodený primár — číta sa záloha) a `unreadable` (súbor sa nedá čítať —
+  // práva, zdieľanie, disk: zápis by zlyhal tiež, Codex #419 kolo 2).
+  // `fallback` (súbor chýba alebo je poškodený bez zálohy) zápis NEblokuje:
+  // prvý zápis súbor opraví a revízia chráni pred prepisom cudzej zmeny.
+  // -> '' | dôvod
+  var SS_WRITE_BLOCK_STATES = ['newer', 'degraded', 'unreadable'];
+
   function ssWriteBlock(s){
     var st = (s && s.settings_state) ? s.settings_state : null;
-    if (!st || (st.state !== 'newer' && st.state !== 'degraded')) return '';
+    if (!st || SS_WRITE_BLOCK_STATES.indexOf(st.state) < 0) return '';
     return String(st.reason || '') || 'Nastavenia sa teraz nedajú uložiť.';
   }
 
@@ -639,7 +643,7 @@
   function ssBanner(s){
     var st = (s && s.settings_state) ? s.settings_state : null;
     if (!st || !st.state || st.state === 'ok') return null;
-    var stop = (st.state === 'newer' || st.state === 'degraded');
+    var stop = SS_WRITE_BLOCK_STATES.indexOf(st.state) >= 0;
     return ssMk('div', stop ? 'hwbanner hwbanner-stop' : 'hwbanner',
                 String(st.reason || '') + (stop ? ' Uloženie je vypnuté.' : ''));
   }

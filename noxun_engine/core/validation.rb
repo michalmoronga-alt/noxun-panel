@@ -225,7 +225,7 @@ module Noxun
       #   z nastaveni dodavatela (`ProductionCore.control_layout`, JEDINY zdroj
       #   pre OBOCH volajucich). nil = legacy volanie: orez 0 a pridavok 0
       #   (dnesne spravanie bez orezu — headless testy a stare volania).
-      #   `source: :seed_fallback` prida jeden ORANGE nalez `layout_settings`.
+      #   `source: :seed_fallback` alebo `:unreadable` prida jeden ORANGE nalez `layout_settings`.
       def run(collected, sheets: {}, edges: nil, hardware_expansion: nil, placements: nil,
               identities: nil, layout: nil)
         collected = {} unless collected.is_a?(Hash)
@@ -612,8 +612,13 @@ module Noxun
 
       # Audit B2: nastavenia sa nepodarilo nacitat — Kontrola to PRIZNA (jeden
       # ORANGE nalez bez dielca), inak by nahradny orez potichu menil verdikt.
+      # Codex #419 kolo 2: to iste pri `unreadable` (subor sa neda citat —
+      # prava, zdielanie, disk); kluc nesie povod, veta je spolocna.
+      LAYOUT_FALLBACK_SOURCES = %w[seed_fallback unreadable].freeze
+
       def check_layout_settings(lay, items)
-        return unless lay[:source] == 'seed_fallback'
+        src = lay[:source]
+        return unless LAYOUT_FALLBACK_SOURCES.include?(src)
 
         prm = lay[:params]
         items << {
@@ -622,7 +627,7 @@ module Noxun
           'message_sk' => 'Nastavenia prerezu a orezu sa nepodarilo načítať — Kontrola počíta ' \
                           "s predvolenými hodnotami (prerez #{mm2(prm['kerf'])} mm, orez #{mm2(prm['trim'])} mm, " \
                           "prídavok dupláku #{mm2(prm['dup_allowance'])} mm). Skontroluj Nastavenia rozpočtu.",
-          'stable_key' => "#{CAT_LAYOUT_SETTINGS}|seed_fallback"
+          'stable_key' => "#{CAT_LAYOUT_SETTINGS}|#{src}"
         }
       end
 
