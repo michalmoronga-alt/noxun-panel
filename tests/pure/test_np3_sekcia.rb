@@ -398,9 +398,31 @@ end
 NxTest.test('NP-3 payload: predvoleny zdroj parametrov (seed_fallback) = unreliable + veta karty orientacna') do
   f = NxNp3
   rows = [f.row]
-  pay = f::PC.sheet_layout_payload(f.plan(rows, source: 'seed_fallback'), { rows: rows }, f::SHEETS, f.estimate(rows))
+  lay = f.plan(rows, source: 'seed_fallback')
+  pay = f::PC.sheet_layout_payload(lay, { rows: rows }, f::SHEETS, f.estimate(rows))
   NxTest.assert_equal(true, pay['unreliable'])
   NxTest.assert(pay['materials'][0]['phrase']['text'].start_with?('orientačne'))
+  # F8: TA ISTA veta v poznamke rozpoctu (aj XLSX) — nikdy „horná hranica"
+  note = f::SL.budget_note(lay, 'H18', f::SHEETS)
+  NxTest.assert_equal("plán: #{pay['materials'][0]['phrase']['text']}", note)
+  NxTest.refute(note.include?('horná hranica'), note)
+  NxTest.assert(f::SL.budget_note(f.plan(rows, source: 'unreadable'), 'H18', f::SHEETS).include?('orientačne'))
+end
+
+NxTest.test('NP-3 payload: „hlási aj Kontrola" len pri materiali, ktory Kontrola kontroluje (nie UNI/bez formatu)') do
+  f = NxNp3
+  rows = [f.row('material_id' => 'UNI', 'length' => 2900.0, 'grain_direction' => 'none'),
+          f.row('material_id' => 'W18', 'length' => 2900.0, 'grain_direction' => 'none'),
+          f.row('material_id' => 'H18', 'length' => 2900.0),
+          f.row('material_id' => 'W18', 'length' => 600.0, 'width' => 2400.0, 'grain_direction' => 'none')]
+  pay = f::PC.sheet_layout_payload(f.plan(rows), { rows: rows }, f::SHEETS, [])
+  t = ->(id) { pay['materials'].find { |m| m['id'] == id }['unplaced'].map { |g| g['t'] } }
+  NxTest.assert_equal(['nezmestí sa ani otočený'], t.call('UNI'), 'UNI Kontrola nekontroluje')
+  NxTest.assert_equal(['nezmestí sa (s kresbou sa neotáča) — hlási aj Kontrola'], t.call('H18'))
+  w = t.call('W18')
+  NxTest.assert(w.include?('nezmestí sa ani otočený — hlási aj Kontrola'), w.inspect)
+  NxTest.assert(w.any? { |x| x.start_with?('nezmestí sa bez otočenia (plán neotáča)') && x.include?('Kontrola nehlási') },
+                'needs_rotation: Kontrola ho nehlási')
 end
 
 # ============================================================================

@@ -188,7 +188,8 @@ NxTest.test('STALE: tlacidlo „Obnoviť" ma JEDEN markup pre vsetkych 5 mist') 
   NxTest.refute(NxStale::NP.include?('id="refreshBtn"'), 'sheet_layout.js si vlastnu kopiu tlacidla nekresli')
   NxTest.assert_equal(1, NxStale::NP.scan(/f\(stale === true, /).length, 'jedno volanie helpera')
   NxTest.assert(NxStale::NP.include?("typeof refreshBtnHtml === 'function'"), 'helper zo studio.js')
-  NxTest.assert_equal(3, NxStale::NP.scan('npRefreshHtml(stale)').length,
+  # `-1` = definicia obalu; zvysok su volacie miesta.
+  NxTest.assert_equal(3, NxStale::NP.scan('npRefreshHtml(stale)').length - 1,
                       'prehľad, detail a stav bez planu — vsetko cez jeden obal')
 end
 
