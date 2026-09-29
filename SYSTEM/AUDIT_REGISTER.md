@@ -17,16 +17,17 @@
 
 ## Stav po previerke 29.9.2026 (autorita — verdikty a poradie pred/po V1)
 
-**Kritérium „pred V1"** (pravidlo bloku 1d, spresnené pri previerke): výrobné alebo cenové riziko · **tichá strata uložených dát používateľa** ·
-blokovanie V1 rozsahu. Hlásená strata neuložených hodnôt, hygiena, texty, refaktor a veci len pre macOS = po V1. **O zaradení pred V1 rozhoduje Michal.**
+**Kritérium „pred V1"** (pravidlo bloku 1d, spresnené pri previerke): výrobné alebo cenové riziko · **tichá strata uložených dát používateľa pri bežnej
+práci** · pri **poškodenom súbore** len tichá strata, ktorá **mení výrobné alebo cenové čísla** (rozmery, počty, ceny, sadzby, prerez/orez) · blokovanie
+V1 rozsahu. Hlásená strata neuložených hodnôt, hygiena, texty, refaktor a veci len pre macOS = po V1. **O zaradení pred V1 rozhoduje Michal.**
 
 | R | Verdikt | Pred/po V1 | Veľk. | Funkčný dopad |
 |---|---|---|---|---|
 | R-37 | platí, zúžené na `supplier_settings` | **PRED V1** (kritérium splnené) | S | poškodený, ale platný súbor nastavení dodávateľa sa ticho nahradí predvolenými sadzbami a prerezom/orezom a zničí dobrú zálohu |
 | R-35 | platí | **PRED V1** (kritérium splnené — tichá strata pri dvoch oknách SketchUpu) | S/M | prvá zmena globálnych pravidiel kovania alebo rozmerových radov sa pri dvoch otvorených oknách ticho stratí |
 | R-13 | platí | **PRED V1 — rozhodnutie Michala 29.9.** | S | dielec z inej verzie štandardu Kontrola neoznačí |
-| R-38 | platí | hraničné (tichá strata len pri poškodenom súbore) | S | poškodený súbor VEPO nastavení (názvy zákaziek, zlúčenie 18/36) sa môže ticho prepísať staršou zálohou |
-| R-18 | platí | hraničné (strata neuložených hodnôt, s červenou hláškou) | S | pri súbehu úpravy bunky a ⋯ editora v Rozpočte sa rozpísané hodnoty môžu stratiť |
+| R-38 | platí | hraničné (len pri poškodenom súbore; stratí názvy zákaziek a prepínač zlúčenia 18/36 vo VEPO exporte — mení pomenovanie a členenie výstupu, nie rozmery, počty ani ceny) | S | poškodený súbor VEPO nastavení (názvy zákaziek, zlúčenie 18/36) sa môže ticho prepísať staršou zálohou |
+| R-18 | platí | po V1 (hlásená strata neuložených hodnôt — ⋯ editor sa zavrie ako uložený, zlyhaný zápis ohlási červený status) | S | pri súbehu úpravy bunky a ⋯ editora v Rozpočte sa rozpísané hodnoty môžu stratiť |
 | R-16 | platí | hraničné (XLSX má kód a dodávateľa) | M | dva rovnaké dekory od dvoch výrobcov majú v rozpočte rovnaký názov riadku |
 | R-25 | čiastočne (PR #350) | po V1 | S | pri vybranej doske s chybným rozmerom klik na riadok Štúdia rozpísanú zmenu zahodí |
 | R-27 | čiastočne (hint o Rozpočte zanikol) | po V1 | S | texty v Pravidlách sú nepresné |
@@ -328,7 +329,7 @@ SEED, `merge_seed` označí dokument za zmenený a `load` ho AUTO-ZAPÍŠE — a
 **Návrh:** minimálna shape brána pred seed/normalizačným AUTO-zápisom (dokument, ktorý nemá očakávaný koreňový tvar, sa NEMÁ
 prepisovať seedom — má sa priznať ako poškodený, vzor `assess_library_doc`); alternatíva je nezapisovať `.bak` pri zápise, ktorý
 vznikol iba z normalizácie. Samostatná dávka. **Odhad: S/M.**
-**Previerka 29.9.: PLATÍ, zúžené — odporúčanie PRED V1** (jediná položka so stratou dát a tichou zmenou cien aj prerezu/orezu). Týka sa hlavne
+**Previerka 29.9.: PLATÍ, zúžené — odporúčanie PRED V1** (tichá strata dát pri poškodenom súbore, ktorá mení ceny aj prerez/orez). Týka sa hlavne
 `supplier_settings` (prázdny `{}`/`[]` → seed → auto-zápis); `abs_rules`, `hardware_rules` a `dim_series` pri načítaní nezapisujú.
 
 ## Os VÝSTUPY — production_core · rozpočet · ponuka (pred D-95/KONTROLA+VÝROBA)

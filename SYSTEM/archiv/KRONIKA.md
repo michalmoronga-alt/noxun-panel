@@ -22,7 +22,7 @@
   overil 29 otvorených položiek: **3 čiastočne** (R-25 — PR #350 chráni len cestu skrinky, R-27, R-32), ostatné **platia**; R-39 je vedome otvorená
   brána (spúšťač preformulovaný — D-95 je vyradená) a R-30 stratila spúšťač. Kritérium „pred V1" (výroba/ceny · tichá strata uložených dát) spĺňajú
   **R-37** (poškodený, ale platný súbor nastavení dodávateľa sa ticho nahradí seedom a zničí zálohu) a **R-35** (dve okná SketchUpu si ticho prepíšu
-  pravidlá kovania/rozmerové rady); hraničné R-38, R-18, R-16 — rozhoduje Michal. Verdikty a poradie sú v registri (sekcia „Stav po previerke
+  pravidlá kovania/rozmerové rady); hraničné R-38 a R-16, R-18 po V1 — rozhoduje Michal. Verdikty a poradie sú v registri (sekcia „Stav po previerke
   29.9.2026"); Codex review kolo 1 vrátilo 3× P2 (R-25 nie je hotová · verdikty patria do živého registra · kritérium platí aj na R-35) — opravené, interná delta. Michal zároveň **rozhodol R-13: čítať** (ORANGE
   „dielec z inej verzie štandardu", samostatná dávka pred uzáverom V1). Dôkazy (súbor:riadok) a podklad pre R-13:
   [zdroje/PREVIERKA_REGISTRA_2026-09-29.md](../zdroje/PREVIERKA_REGISTRA_2026-09-29.md) (nezáväzný podklad). **STAV pri najbližšej
