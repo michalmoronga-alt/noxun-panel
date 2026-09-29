@@ -31,7 +31,7 @@ v **seede 6** — starší plugin zákazku neprestaví ani nevyexportuje (rohov�
 v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a zastaví oba cenové exporty). **Nastavenia dodávateľa sú od NP-2 vo verzii súboru 2** (v0.15.1 a starší pri uložení nové polia zahodí).
 **Aktualizovať OBE PC (aj Luciino) na 0.15.4** — starší plugin rohovú nepozná, knižnicu šablón STD 7 len číta a rozpočet `BUDGET_STD` 3 needituje.
 
-**Testy (posledná kódová dávka, NP-4 PR #?):** **4840 headless · 142 JS sád** zelené; **in-SU 3264 PASS** (prepínač = 1 krok Späť s markerom 3).
+**Testy (posledná kódová dávka, NP-4 PR #?):** **4842 headless · 142 JS sád** zelené; **in-SU 3266 PASS** (prepínač = 1 krok Späť s markerom 3).
 **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 
 ## Robí sa

@@ -550,8 +550,10 @@ cenovej spôsobilosti (`SheetLayout.price_basis`). `apply_budget_op` má **14. o
 `budget_op_status` pre ňu skladá vetu podľa smeru („Ceny podľa plánu zapnuté/vypnuté."). **Export (audit F4):** oba cenové exporty stavajú rozpočet
 **nanovo** — keď plán pri exporte zlyhá alebo sa medzitým zmení, súbor nesie pre materiál odhad, hoci okno ukazovalo plán. Nová brána sa nerobí:
 poznámka riadku v súbore dôvod nesie a pri zapnutom prepínači `plan_export_note` pridá do statusu **zoznam materiálov na odhade** („· z odhadu (nie
-podľa plánu): A, B, C a 2 ďalšie") a okno sa **obnoví** z toho istého stavu (`repush` **pred** statusom — push by status inak prekryl). Pri vypnutom
-prepínači sa status ani počet pushov nemení.
+podľa plánu): A, B, C a 2 ďalšie" — `more_word`: 1 ďalší · 2–4 ďalšie · 5+ ďalších) a okno sa **obnoví** z toho istého stavu (`repush` **pred** statusom —
+push by status inak prekryl). Pri vypnutom prepínači sa status ani počet pushov nemení. **Jedna pravda s kartou plánu (predrecenzia P2):**
+`sheet_layout_payload(plan, bom, smap, estimate, budget)` dostane z pushu **hotový rozpočet** a každá karta nesie `budget_qty` + `budget_src` z jeho riadku
+Materiálu („v rozpočte 5 podľa plánu" / „… z odhadu"); `est_budget` ostáva odhadom z m² (súčet v súhrne). Bez rozpočtu (legacy volanie) = odhad.
 
 **`replace_uni`** (skratka „Nahradiť UNI…" → `MaterialsDialog.request_replace_uni`) a **zdieľané telá prepínačov** `edge_check_guard` (dostupnosť Overlay API + `identity_guard`) ·
 `identity_guard` (generácia okna + dokument — zdieľa ho aj kresba, ktorá si dostupnosť overuje **vlastnú** a hlási ju vetou o kresbe, nie o hranách) · `do_edge_check` ·
@@ -992,7 +994,8 @@ z pôvodu **pred** `refine_origin`, lebo ten poškodený primár s **novšou** z
 a pôvod ostane `:file` — preto ich zaznamená do odvodeného `repaired_scalars` (`REPAIRED_KEY`; **chýbajúci** kľúč aj `null` sem nepatria — doplnenie legacy
 súboru je dovolené). Príznak žije **len v pamäti**: `write` ho whitelistom zahodí, `revision` ho z platných hodnôt nikdy nezloží. **`read_doc` súbor s opraveným
 skalárom plánu seed-mergom nezapisuje** — zápis by neplatnú hodnotu nahradil predvolenou a dôkaz (Kontrola ORANGE `layout_settings|repaired`, cena z odhadu)
-by potichu zmizol; opraví ho až vedomé uloženie v sekcii Nastavenia.
+by potichu zmizol; opraví ho až vedomé uloženie v sekcii Nastavenia — sekcia dostane `repaired_scalars` v dodávateľovi, poškodené pole zvýrazní (`.bad`
++ dôvod) a „Uložiť" ho zapíše **aj bez úpravy** (zobrazená predvolená hodnota), inak by hlásilo „Nič sa nezmenilo" (predrecenzia P3-3).
 
 **Verzia súboru 2 a dopredná brána (NP-2, vzor `HardwareRules` KOV-F1).** `STD = 2`; **každý zápis pečiatkuje `std = STD`** (inak by súbor
 ostal navždy 1 a budúca brána by nemala čo porovnať). Súbor z **novšieho** pluginu (`doc_std_unsupported?` = `std > STD`) sa **číta** (známe

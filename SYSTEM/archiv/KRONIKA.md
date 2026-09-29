@@ -34,8 +34,12 @@
   aj `gen` z okamihu kliknutia a zmena dokumentu frontu cudzích zápisov zahodí. Späť: okno sa vráti až po „Obnoviť" (audit F5 — životný cyklus Štúdia sa
   nemení; tooltip prepínača to hovorí). Spolu s dávkou 2× P3 zo slepej delty #420 (tooltip chipu duplákov „2 ks (hotový 820 × 580) = 4 prírezy 840 × 600",
   test escapovania mena). Audit návrhu Codex `gpt-6-astra`: **3 BLOCKER · 2 FIX · 1 NOTE — všetky prijaté** (surový výstup a package s doplnením
-  v [zdroje/bloky/NAREZ/](../zdroje/bloky/NAREZ/)). Mutácie 16/16 zabité. **Testy:** 4840 headless · 142 JS sád zelené; **in-SU 3264 PASS**
-  (`st1c_plan_prices`: zápis prepínača + marker 3 = 1 krok Späť).
+  v [zdroje/bloky/NAREZ/](../zdroje/bloky/NAREZ/)). **Slepá predrecenzia:** 0× P1 · 1× P2 · 4× P3 — opravené pred PR: karta Nárezového plánu
+  hovorí „v rozpočte N" číslom hotového rozpočtu (predtým odhad aj pri zapnutých cenách podľa plánu — dve pravdy), „a 1 ďalší" v statuse exportu,
+  Nastavenia zvýraznia poškodený skalár a „Uložiť" ho zapíše aj bez úpravy; **priznané (P3-4):** čakajúci zápis sa odmietne aj v tom istom dokumente
+  po mutácii, ktorá zdvihla generáciu (spotrebič s prestavbou) — bezpečný smer, klikne sa znova. Mutácie 21/21 zabité. **Testy:** 4842 headless ·
+  142 JS sád zelené; **in-SU 3266 PASS** (`st1c_plan_prices`: zápis prepínača + marker 3 = 1 krok Späť, porez = Σ Materiálu, montáž = Σ odhadu,
+  zdroj množstva zhodný s plánom — materiály testovacieho prostredia sú UNI, takže „podľa plánu" v SketchUpe dokazujú len headless testy).
 
 - **NP-3 · Nárezový plán — sekcia Štúdia + veta plánu v poznámke rozpočtu (29.9.2026, v0.15.2 → v0.15.3, PR #420; blok 2, tretia dávka).**
   **Štúdio → Nárezový plán** (posledná neaktívna položka „fáza 2") ožil ako sekcia `cut` podľa schváleného mockupu A a B: lišta „Obnoviť" + chip

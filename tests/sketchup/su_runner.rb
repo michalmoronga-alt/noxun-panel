@@ -15758,10 +15758,17 @@ module NoxunSuRunner
     # nespolahlivych nastaveniach sa to povie nahlas (nie ticho „PASS").
     lp = e::SupplierSettings.layout_params
     trusted = %i[file backup].include?(lp[:source]) && lp[:version_ok] == true && Array(lp[:repaired]).empty?
-    srcs = rows.map { |r| "#{r['material_id']}=#{r['qty_source']}" }.join(', ')
-    if trusted
-      ok("NP-4: nad spolahlivymi nastaveniami ide aspon jeden material podla planu (#{srcs})",
-         rows.any? { |r| r['qty_source'] == 'plan' })
+    srcs = rows.map { |r| "#{r['material_id']}=#{r['qty_source']} (#{r['poznamka'].to_s.split(' · ').last(2).join(' · ')})" }.join(', ')
+    # Materialy testovacieho prostredia mozu byt UNI alebo bez formatu — vtedy
+    # je odhad SPRAVNY. Dokazuje sa preto zhoda: riadok s planom „(horná
+    # hranica)" ide podla planu, kazdy iny ostava na odhade.
+    ub = rows.select { |r| r['poznamka'].to_s.include?('(horná hranica)') }
+    if trusted && !ub.empty?
+      ok("NP-4: material s uplnym planom ide podla planu, ostatne z odhadu (#{srcs})",
+         rows.all? { |r| r['qty_source'] == (ub.include?(r) ? 'plan' : 'estimate') })
+    elsif trusted
+      ok("NP-4: bez uplneho planu (UNI/format) ostava vsetko na odhade (#{srcs})",
+         rows.all? { |r| r['qty_source'] == 'estimate' })
     else
       log_line("INFO: NP-4 plan v cene neovereny — nastavenia nie su spolahlive (#{lp[:source]}); #{srcs}")
     end

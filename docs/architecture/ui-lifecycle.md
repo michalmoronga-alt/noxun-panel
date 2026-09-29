@@ -3221,7 +3221,9 @@ a `budDocSwitched` frontu bez otvoreného modalu nerušil: zápis kliknutý v z�
 Odteraz **každá položka nesie `{op, extra, doc, gen}` z okamihu kliknutia** (`budSend` — pri modale identita modalu, inak `budModelGuid()`), odošle sa **s nimi** (nie
 s identitou nového payloadu), `budDocSwitched` pri **každej** zmene dokumentu vyhodí z fronty zápisy iného dokumentu (aj bez modalu) a `budAfterPush` cudzí zápis
 neodošle ani cez poistný timer. Push po mutácii rozpočtu generáciu nedvíha, takže bežný ďalší zápis s gen z kliknutia prejde; po zmene modelu či dokumentu ho server
-odmietne ako zastaraný (radšej „skús znova" než tichý zápis nad iným stavom). Test: `tests/js/test_np4_ceny.js`.
+odmietne ako zastaraný (radšej „skús znova" než tichý zápis nad iným stavom). **Priznaný dôsledok (predrecenzia P3-4):** odmietne sa aj zápis v **tom
+istom** dokumente, ktorý čakal za mutáciou zdvíhajúcou generáciu (spotrebič s prestavbou skrinky) — je to bezpečný smer, používateľ klikne znova.
+Test: `tests/js/test_np4_ceny.js`.
 
 Poistný timer `BUD_BUSY_MS = 6 s` je len záchranná sieť: in-SketchUp meranie dáva push ~3 ms a celú mutáciu vrátane repushu ~4 ms.
 
@@ -3325,6 +3327,8 @@ Rozpočtu a XLSX). Globálny stav (`blocked`, `without_material`) nepatrí karte
 kreslí súhrn, karty (predvolene otvorená prvá a každá s problémom — neúplný plán, upozornenie, nezaradené; ostatné zbalené, **zbalená karta SVG vôbec nevytvára**, voľba
 v `localStorage` `nx_np_closed` s try/catch), malé platne a detail platne v tom istom okne (stav okna `npDetail`, pri novom pushi sa overí — zmiznutý materiál vráti prehľad,
 menej platní skráti index). Jediné, čo si odvodzuje, je **upozornenie na poslednú platňu (O2)**: aspoň 2 platne a posledná pod 20 % alebo najviac 2 dielce.
+**Od NP-4 (predrecenzia P2)** hovorí karta „v rozpočte N" číslom **hotového rozpočtu** toho istého pushu (`budget_qty` + `budget_src`, `npBudgetNote`: „v rozpočte 5 podľa
+plánu" / „… z odhadu"; bez zdroja — vypnutý prepínač — „v rozpočte dnes N"), takže karta a Rozpočet nikdy neukážu dve rôzne čísla.
 **SVG platne je téma-bezpečné:** farby sú výhradne CSS triedy `.np-*` s tokenmi `--nx-*` v `studio.html` (šrafy sú `<pattern>` s triedou v skrytom `<svg>` okna); jediná
 dátová farba je vzorka dekoru (`rgbHex`) v HTML štvorčeku mimo SVG (guard F12).
 

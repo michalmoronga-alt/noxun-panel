@@ -160,3 +160,8 @@ Skutočné API zmergovaného NP-3 (`dc9a179f`) sedí s package; overené v kóde
   1× Späť vráti prepínač aj marker; `R14_KEYS` + `budget_plan_prices`.
 - **Drobnosti NP-3** (slepá delta #420, 2× P3) v samostatnom commite: tooltip chipu duplákov „2 ks (hotový 820 × 580) = 4 prírezy 840 × 600" a test
   escapovania mena riadku.
+- **Predrecenzia (0× P1, 1× P2, 4× P3) — opravené pred PR:** P2 karta Nárezového plánu berie „v rozpočte N" z hotového rozpočtu toho istého pushu
+  (`sheet_layout_payload(…, budget)` → `budget_qty`/`budget_src`) a tooltip súhrnu už netvrdí, že rozpočet vždy počíta z odhadu · P3-2 „a 1 ďalší /
+  2–4 ďalšie / 5+ ďalších" · P3-3 Nastavenia zvýraznia poškodený skalár a „Uložiť" ho zapíše aj bez úpravy (veta nálezu povie postup) · P3-4 odmietnutie
+  čakajúceho zápisu po mutácii, ktorá zdvihla generáciu, je bezpečný smer — len priznané (ui-lifecycle, KRONIKA, PR) · P3-5 in-SU overí montáž =
+  Σ odhadu a pri spoľahlivých nastaveniach aspoň jeden materiál podľa plánu (inak INFO riadok).
