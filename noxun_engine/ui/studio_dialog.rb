@@ -1670,7 +1670,8 @@ module Noxun
             # NP-3, sekcia NAREZOVY PLAN (mockup A, B): kompaktny plan per
             # material z TOHO ISTEHO vypoctu ako poznamka Rozpoctu; vetu o pocte
             # aj dovody nezaradenia sklada SERVER.
-            sheet_layout: ProductionCore.sheet_layout_payload(layout, bom, smap, estimate),
+            # NP-4 (predrecenzia P2): karta cita „v rozpočte N" z TOHO ISTEHO rozpoctu.
+            sheet_layout: ProductionCore.sheet_layout_payload(layout, bom, smap, estimate, budget),
             # Š10: stav oboch prepinacov listy. Vypnuty prepinac nic neskenuje.
             edge_check: (defined?(EdgeCheck) ? EdgeCheck.ui_state(model) : nil),
             grain_check: (defined?(GrainCheck) ? GrainCheck.ui_state(model) : nil),

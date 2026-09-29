@@ -8413,7 +8413,7 @@ module NoxunSuRunner
   # neotvoril"; tu sa overuje PRIZNAK, z ktoreho brana cita.
   R14_KEYS = %w[budget_mode budget_overrides budget_std_multipliers budget_viz_m2
                 budget_custom_items budget_appliances budget_appliances_included
-                budget_cp_overrides budget_std].freeze
+                budget_cp_overrides budget_plan_prices budget_std].freeze
 
   def r14_marker(model)
     model.get_attribute(e::Store::DICT, e::BudgetStore::KEY_STD, nil)
@@ -15688,7 +15688,7 @@ module NoxunSuRunner
   # ============ ŠT-1c PR B1: sekcia ROZPOCET (Š12–Š13) =======================
   # Rozpocet je JEDINA cesta, ktora ZAPISUJE do modelu — a headless sada undo
   # neoveri. Tu sa dokazuje:
-  #   1) KAZDA z 12 operacii = PRESNE JEDEN krok Spat (`BudgetStore.write!`),
+  #   1) KAZDA z 13 operacii (NP-4: +ceny podla planu) = PRESNE JEDEN krok Spat (`BudgetStore.write!`),
   #   2) guardy: stara generacia aj CUDZI model_guid zapis ODMIETNU,
   #   3) odmietnuty zapis posle `NX.budgetResult(op,false)` — draft v okne
   #      ostane otvoreny aj s rozpisanymi hodnotami (GH #138 P2),
@@ -15723,6 +15723,60 @@ module NoxunSuRunner
     ok("ŠT-1c #{tag}: `#{op}` = PRESNE 1 krok Späť", read.call(model) == before)
   end
 
+  # NP-4: prepinac „ceny podľa plánu" cez TEN ISTY kanal okna (`do_budget`).
+  # Udaj aj marker `BUDGET_STD` 3 su JEDEN krok Späť (audit F5: po Späť sa
+  # overuje stav modelu aj marker — okno sa obnovi az „Obnoviť"). Medzi
+  # zapisom a Späť sa zostavi rozpocet zakazky: zapnuty prepinac musi dat
+  # riadkom Materiálu zdroj mnozstva a porez = suma Materiálu.
+  def st1c_plan_prices(model)
+    bs = e::BudgetStore
+    read = ->(m) { [bs.plan_prices?(m), r14_marker(m)] }
+    before = read.call(model)
+    e::StudioDialog.do_budget(st1c_bud_payload('plan_prices', 'enabled' => true).to_json)
+    after = read.call(model)
+    ok("NP-4: `plan_prices` zapol prepinac a zapisal marker #{bs::BUDGET_STD} (#{before.inspect} -> #{after.inspect})",
+       after == [true, bs::BUDGET_STD])
+    col = e::Bom.collect(model)
+    bud = e::ProductionCore.budget_payload(model, e::Bom.compute(col), col)
+    mats = Array(bud && bud['sections']).find { |s| s['key'] == 'materials' }
+    rows = Array(mats && mats['rows'])
+    ok("NP-4: rozpocet so zapnutym prepinacom — kazdy riadok Materiálu ma zdroj mnozstva (#{rows.length} riadkov)",
+       bud && bud['plan_prices'] == true && !rows.empty? &&
+       rows.all? { |r| %w[plan estimate].include?(r['qty_source']) && r.key?('estimate_qty') })
+    porez = Array(bud && bud['sections']).find { |s| s['key'] == 'services' }.to_h['rows'].to_a
+                                         .find { |r| r['key'] == 'service:porez' }
+    ok('NP-4: porez = suma mnozstva Materiálu', porez && porez['mnozstvo'].to_i == rows.sum { |r| r['mnozstvo'].to_i })
+    # Predrecenzia P3-5: montaz VZDY z odhadu (Σ estimate_qty × m² na platnu).
+    montaz = Array(bud && bud['sections']).find { |s| s['key'] == 'services' }.to_h['rows'].to_a
+                                          .find { |r| r['key'] == 'service:montaz' }
+    per = e::SupplierSettings.scalar(e::SupplierSettings.active, 'montaz_m2_per_plate').to_f
+    want = (rows.sum { |r| r['estimate_qty'].to_i } * per).round(2)
+    ok("NP-4: montaz = Σ odhadu × m² na platnu (#{montaz && montaz['mnozstvo']} = #{want})",
+       montaz && (montaz['mnozstvo'].to_f - want).abs < 0.01)
+    # Plan v cene sa da dokazat LEN nad nastaveniami, ktorym sa veri — runner
+    # zive nastavenia %APPDATA% NEPREPISUJE (su to Michalove sadzby). Pri
+    # nespolahlivych nastaveniach sa to povie nahlas (nie ticho „PASS").
+    lp = e::SupplierSettings.layout_params
+    trusted = %i[file backup].include?(lp[:source]) && lp[:version_ok] == true && Array(lp[:repaired]).empty?
+    srcs = rows.map { |r| "#{r['material_id']}=#{r['qty_source']} (#{r['poznamka'].to_s.split(' · ').last(2).join(' · ')})" }.join(', ')
+    # Materialy testovacieho prostredia mozu byt UNI alebo bez formatu — vtedy
+    # je odhad SPRAVNY. Dokazuje sa preto zhoda: riadok s planom „(horná
+    # hranica)" ide podla planu, kazdy iny ostava na odhade.
+    ub = rows.select { |r| r['poznamka'].to_s.include?('(horná hranica)') }
+    if trusted && !ub.empty?
+      ok("NP-4: material s uplnym planom ide podla planu, ostatne z odhadu (#{srcs})",
+         rows.all? { |r| r['qty_source'] == (ub.include?(r) ? 'plan' : 'estimate') })
+    elsif trusted
+      ok("NP-4: bez uplneho planu (UNI/format) ostava vsetko na odhade (#{srcs})",
+         rows.all? { |r| r['qty_source'] == 'estimate' })
+    else
+      log_line("INFO: NP-4 plan v cene neovereny — nastavenia nie su spolahlive (#{lp[:source]}); #{srcs}")
+    end
+    Sketchup.undo
+    ok("NP-4: `plan_prices` = PRESNE 1 krok Späť (prepinac aj marker spat: #{read.call(model).inspect})",
+       read.call(model) == before)
+  end
+
   def st1c_budget(model, inst)
     bs = e::BudgetStore
     before_ents = model.entities.length
@@ -15731,7 +15785,7 @@ module NoxunSuRunner
     custom = ->(m) { bs.custom_items(m) }
     appl = ->(m) { bs.appliances(m) }
 
-    # --- 1) 12 operacii = 12x „jedna zmena, jeden krok Späť" ----------------
+    # --- 1) 13 operacii = 13x „jedna zmena, jeden krok Späť" (NP-4 +1) -------
     st1c_bud_op(model, 'cenový režim', 'mode', { 'mode' => 'vysoky' },
                 ->(m) { bs.mode(m) })
     st1c_bud_op(model, 'prepis sumy', 'override',
@@ -15747,6 +15801,7 @@ module NoxunSuRunner
     st1c_bud_op(model, 'zaradenie v CP', 'cp_group',
                 { 'source_key' => 'material:SU-TEST', 'group' => 'samostatne' },
                 ->(m) { bs.cp_overrides(m) })
+    st1c_plan_prices(model)
     st1c_bud_op(model, 'nová položka', 'custom_add',
                 { 'attrs' => { 'popis' => 'SU test položka', 'pocet' => '2', 'cena' => '10' } },
                 custom)
@@ -27828,7 +27883,7 @@ module NoxunSuRunner
     run_smoke1(model)        # SMOKE PACK 1 (6A): rucne odfotenie nahladu k ULOZENEJ sablone — guardy vyberu, ziadny undo krok
     run_st1a(model)          # ST-1a: okno Studio — deep-link sekcie, kusovnik zo ziveho modelu, klik-select bez undo kroku, serverovy nazov projektu
     run_st1b(model)          # ŠT-1b: sekcia Kontrola v Studiu — jedno cislo semaforu, klik na nalez bez undo kroku, zdielane prepinace, trvanie pushov
-    run_st1c(model)          # ŠT-1c: sekcia Nákup kovania (PR A) + sekcia ROZPOCET (PR B1) — 12 mutacii = 12x jeden krok Spat, gen a guid guardy, bump:false kontrakt, XLSX guardy, meranie pushov
+    run_st1c(model)          # ŠT-1c: sekcia Nákup kovania (PR A) + sekcia ROZPOCET (PR B1) — 13 mutacii = 13x jeden krok Spat (NP-4: +ceny podla planu), gen a guid guardy, bump:false kontrakt, XLSX guardy, meranie pushov
     run_d94(model)           # D-94: klik na ZDROJ v rozkliku povodu (sekcia Nakup) — identita namiesto pids: prazdny kluc oznaci presne tu instanciu korpusu, kluc cela jeho dielce, ceruzka presunie vyber na vlastnika a posle deep-link karty cela; mrtvy zdroj vyber nezmeni a vyziada obnovu, rozpisana zmena ho zastavi — a ZIADNY z klikov nenecha krok Spat
     run_st2d(model)          # ŠT-2d: „Kde sa používa" — vyber podla materialu (aj DEDENEHO) a ABS, zuzenie na vlastnika, jednorazova kotva sekcie `mat`, ⋯ editor rozpoctu = 1 krok Spat
     run_st3a(model)          # ŠT-3a-2: modelove zapisy predvolieb setov ZO SEKCIE + zanik okna Katalog kovania — 1 zmena = 1 krok Spat, NO-OP merge_seed bez pushu aj bez undo kroku, jantar po vlastnom zapise nezozltne

@@ -96,7 +96,7 @@ module NxR14
     m.get_attribute(DICT, BS::KEY_STD)
   end
 
-  # VSETKYCH 12 mutacnych vstupov `BudgetStore` s PLATNYMI hodnotami — kazdy
+  # VSETKYCH 14 mutacnych vstupov `BudgetStore` (NP-4: +ceny podla planu) — kazdy
   # z nich musi pri nekompatibilnom markeri skoncit odmietnutim.
   # -> [meno, lambda(model) -> [ok, chyby]]
   def mutations
@@ -107,6 +107,7 @@ module NxR14
       ['set_std_multiplier!', ->(m) { BS.set_std_multiplier!(m, 'std:doprava', 2.0) }],
       ['set_viz_m2!', ->(m) { BS.set_viz_m2!(m, 12.5) }],
       ['set_appliances_included!', ->(m) { BS.set_appliances_included!(m, true) }],
+      ['set_plan_prices!', ->(m) { BS.set_plan_prices!(m, true) }],
       ['set_cp_group!', ->(m) { BS.set_cp_group!(m, 'material:DTDL18', 'samostatne') }],
       ['add_custom_item!', ->(m) { BS.add_custom_item!(m, 'popis' => 'Doprava', 'cena' => 50.0) }],
       ['update_custom_item!', ->(m) { BS.update_custom_item!(m, seeded_id(m, :custom), 'cena' => 99.0) }],
@@ -339,7 +340,7 @@ end
 
 # ============================ DOPREDNY GUARD ================================
 
-NxTest.test('R-14: NOVSI marker odmietne VSETKYCH 13 mutacnych vstupov — bez zapisu a bez operacie') do
+NxTest.test('R-14: NOVSI marker odmietne VSETKYCH 14 mutacnych vstupov — bez zapisu a bez operacie') do
   NxR14.mutations.each do |name, run|
     m = NxR14.seed_items!(NxR14.model(NxR14::BS::BUDGET_STD + 1))
     before = NxR14.dict_of(m)

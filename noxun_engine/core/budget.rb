@@ -29,6 +29,10 @@
 # 6) REZIM (nizky|standard|vysoky) je sada DEFAULTOV, nie zamok: prepocita
 #    LEN riadky BEZ overridu — rucny override zakazky prezije zmenu rezimu
 #    a zrusi sa VYHRADNE explicitnym resetom (audit 6).
+# 7) CENY PODLA PLANU (NP-4) su PREPINAC ZAKAZKY, default VYPNUTY: vypnuty =
+#    cisla aj riadky presne ako pred NP-4. Zapnuty = pocet platni z planu LEN
+#    pri cenovo sposobilom materiali (`SheetLayout.price_basis`), inak odhad
+#    s dovodom v poznamke; porez za Materiálom, montaz VZDY z odhadu (O6).
 require 'time'
 
 module Noxun
@@ -94,8 +98,11 @@ module Noxun
       #   Budget si ho spocita sam z TYCH ISTYCH dat (jedna autorita cisel)
       # sheet_layout — NP-3: hotovy narezovy plan (`ProductionCore.layout_for`,
       #   alebo {'error'} pri jeho chybe); nil = bez planu (legacy volanie).
-      #   Pridava LEN vetu do poznamky riadku materialu — mnozstvo, cena,
-      #   porez ani montaz sa z neho NEPOCITAJU (NP-4).
+      #   Pri VYPNUTOM prepinaci zakazky (`state['plan_prices']`, default)
+      #   pridava LEN vetu do poznamky riadku materialu. NP-4: pri ZAPNUTOM
+      #   berie Materiál pocet platni z planu tam, kde ho `SheetLayout.price_basis`
+      #   uzna (inak odhad s dovodom); porez ide za Materiálom, montaz ostava
+      #   z odhadu (O6).
       # =====================================================================
       def compute(bom, state, settings, sheets: {}, edges: {}, hardware_expansion: nil,
                   hardware_catalog: nil, sheet_estimate: nil, now: nil, sheet_layout: nil)
@@ -109,7 +116,7 @@ module Noxun
         price_ref = now.is_a?(Time) ? now : Time.now.utc
         price_days = (num(SupplierSettings.scalar(sup, 'stale_days')) || 30).to_i
 
-        materials = materials_section(est, smap, sheet_layout)
+        materials = materials_section(est, smap, sheet_layout, plan_prices: st['plan_prices'])
         abs = abs_section(list(b, :edging), emap, SupplierSettings.scalar(sup, 'abs_reserve_pct'))
         hardware = hardware_section(hardware_expansion, hardware_catalog, stale_days: price_days, now: price_ref)
         services = services_section(est, materials, abs, smap, sup, st, mode)
@@ -140,6 +147,8 @@ module Noxun
           },
           'viz_m2' => st['viz_m2'],
           'appliances_included' => st['appliances_included'],
+          # NP-4: ozvena prepinaca „ceny podľa plánu" (checkbox v hlavicke Materiálu).
+          'plan_prices' => st['plan_prices'],
           # S1-B1 (R1): kody a SK popisky kategorii chodia zo SERVERA — JS si
           # zoznam nedrzi natvrdo (dva zoznamy by sa rozisli a modal by ponukal
           # kategoriu, ktoru server nepozna).
@@ -196,12 +205,20 @@ module Noxun
       # Riadok per NAKUPNY material: cele platne x cena za platnu.
       # Cena katalogu je EUR/m2 -> prepocet na platnu ma JEDINU autoritu
       # (price_per_plate), aby sa €/m2 a €/platna nikdy nerozisli.
-      def materials_section(estimate, sheets, layout = nil)
+      #
+      # NP-4: `plan_prices` = prepinac zakazky. VYPNUTY (default) = riadok
+      # PRESNE ako pred NP-4 (zlaty test). ZAPNUTY = mnozstvo z planu pri
+      # cenovo sposobilom materiali, inak odhad; riadok nesie `qty_source`
+      # ('plan' | 'estimate'), `estimate_qty` (odhad z m² — montaz z neho
+      # pocita aj pri plane), `qty_tip` (tooltip znacky) a vetu o cene.
+      def materials_section(estimate, sheets, layout = nil, plan_prices: false)
         rows = Array(estimate).map do |g|
           next nil unless g.is_a?(Hash)
           mid = g['material_id'].to_s
           rec = sheets[mid].is_a?(Hash) ? sheets[mid] : {}
           plates = plates_of(g)
+          basis = plan_prices == true ? price_basis(layout, mid, sheets) : nil
+          qty = basis && basis['eligible'] ? basis['sheets'] : plates
           sheet_m2 = num(g['sheet_m2'])
           price_m2 = num(rec['price_per_m2'])
           per_plate = price_per_plate(price_m2, sheet_m2, g['sheet_size'])
@@ -217,13 +234,20 @@ module Noxun
           # NP-3 (mockup C1): TA ISTA veta o narezovom plane ako karta v Studiu.
           plan_note = layout_note(layout, mid, sheets)
           notes << plan_note if plan_note
+          # NP-4 (mockup C3): veta o CENE ide za vetu o plane — aj do XLSX.
+          notes << basis['note'] if basis
           row = base_row(
             key: "material:#{mid}",
             nazov: sheet_label(rec, mid),
             kod: rec['code'], dodavatel: rec['supplier'],
-            mj: MJ_PLATA, mnozstvo: plates, cena_mj: per_plate,
+            mj: MJ_PLATA, mnozstvo: qty, cena_mj: per_plate,
             poznamka: notes.join(' · '), zdroj: SRC_AUTO
           )
+          if basis
+            row['qty_source'] = basis['eligible'] ? 'plan' : 'estimate'
+            row['estimate_qty'] = plates
+            row['qty_tip'] = basis['tip']
+          end
           row['material_id'] = mid
           row['m2'] = num(g['m2'])
           row['price_per_m2'] = price_m2
@@ -276,6 +300,24 @@ module Noxun
       rescue StandardError => e
         Engine.log_error(e, 'Budget.layout_note') if defined?(Engine) && Engine.respond_to?(:log_error)
         SheetLayout::UNAVAILABLE_NOTE
+      end
+
+      # NP-4: cenova sposobilost materialu (`SheetLayout.price_basis` — jedina
+      # autorita podmienok aj viet). FAIL-SOFT smerom k ODHADU: chyba tu nesmie
+      # zhodit rozpocet a nikdy nesmie pustit plan do ceny.
+      PRICE_BASIS_FAILED = {
+        'eligible' => false, 'sheets' => nil, 'reasons' => ['unavailable'].freeze,
+        'note' => 'plán nedostupný — cena z odhadu',
+        'tip' => 'Nárezový plán sa nepodarilo vyhodnotiť. Množstvo a cena ostávajú z odhadu z m².'
+      }.freeze
+
+      def price_basis(layout, material_id, sheets)
+        return PRICE_BASIS_FAILED.dup unless defined?(SheetLayout)
+
+        SheetLayout.price_basis(layout, material_id, sheets)
+      rescue StandardError => e
+        Engine.log_error(e, 'Budget.price_basis') if defined?(Engine) && Engine.respond_to?(:log_error)
+        PRICE_BASIS_FAILED.dup
       end
 
       # --- sekcia ABS ----------------------------------------------------------
@@ -376,20 +418,29 @@ module Noxun
       #   duplaky = POCET zlepenych kusov (doubled_quantity, audit 4)
       #   pd      = fix, ak zakazka obsahuje pracovnu dosku (inak nulovy riadok)
       #   montaz  = platne x m2_na_platnu x sadzba (JEDINE miesto montaze)
+      #
+      # NP-4 (O6, krizovy audit C10): DVA sucty platni. Porez ide za
+      # mnozstvom riadkov Materiálu (pri zapnutych cenach podla planu teda
+      # z planu); montaz VZDY z odhadu z m² (`estimate_qty` — zavisi od
+      # dielcov, nie od odpadu). Pri vypnutom prepinaci su oba sucty zhodne
+      # s dnesnym jednym suctom a poznamky sa nemenia (zlaty test).
       def services_section(estimate, materials, abs, sheets, sup, state, mode)
         plates_total = materials['rows'].sum { |r| r['mnozstvo'].to_i }
+        montaz_plates = materials['rows'].sum { |r| (r.key?('estimate_qty') ? r['estimate_qty'] : r['mnozstvo']).to_i }
+        plan_on = state['plan_prices'] == true
         bm_total = abs['rows'].sum { |r| num(r['mnozstvo']) || 0.0 }.round(2)
         doubled = Array(estimate).sum { |g| g.is_a?(Hash) ? g['doubled_quantity'].to_i : 0 }
         pd_count = pd_present?(estimate, sheets) ? 1 : 0
         m2_per_plate = num(SupplierSettings.scalar(sup, 'montaz_m2_per_plate')) || 5.8
-        montaz_m2 = (plates_total * m2_per_plate).round(2)
+        montaz_m2 = (montaz_plates * m2_per_plate).round(2)
 
         quantities = {
           'olep' => bm_total, 'porez' => plates_total, 'duplaky' => doubled,
           'pd_opracovanie' => pd_count, 'montaz' => montaz_m2
         }
         notes = {
-          'montaz' => "#{plates_total} platní × #{fmt(m2_per_plate)} m²",
+          'montaz' => "#{montaz_plates} platní × #{fmt(m2_per_plate)} m²#{plan_on ? ' · z odhadu' : ''}",
+          'porez' => (plan_on ? porez_plan_note(materials) : nil),
           'olep' => 'bm vrátane rezervy',
           'duplaky' => (doubled.positive? ? "#{doubled} ks zlepených dielcov" : nil),
           'pd_opracovanie' => (pd_count.positive? ? nil : 'zákazka neobsahuje pracovnú dosku')
@@ -406,6 +457,14 @@ module Noxun
           apply_override(row, state)
         end
         section('services', rows)
+      end
+
+      # NP-4 (mockup C4): odkial ma porez platne — pocet MATERIALOV z planu
+      # a z odhadu (nie platni: tie su v stlpci mnozstva).
+      def porez_plan_note(materials)
+        rows = Array(materials['rows'])
+        n_plan = rows.count { |r| r['qty_source'] == 'plan' }
+        "platne z Materiálu (#{n_plan} podľa plánu, #{rows.length - n_plan} z odhadu)"
       end
 
       # Pracovna doska v zakazke = aspon jeden POUZITY material kanonickeho
@@ -830,6 +889,8 @@ module Noxun
           'appliances' => Array(s['appliances']).select { |i| i.is_a?(Hash) },
           'appliances_included' => (s['appliances_included'] == true),
           'cp_overrides' => (s['cp_overrides'].is_a?(Hash) ? s['cp_overrides'] : {}),
+          # NP-4: chybajuci kluc aj cokolvek ine nez `true` = vypnute.
+          'plan_prices' => (s['plan_prices'] == true),
           # R-14: verzia formatu dat rozpoctu. Stav bez tohto kluca (legacy
           # volanie vypoctu, ciste testy) = 'current' — vypocet je cista
           # funkcia a kompatibilitu neposudzuje, len ju NESIE dalej.

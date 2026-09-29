@@ -17,6 +17,30 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **NP-4 · Nárezový plán — ceny podľa plánu (29.9.2026, v0.15.3 → v0.15.4, PR #421; blok 2, štvrtá a posledná dávka).**
+  **Rozpočet → Materiál** má v hlavičke prepínač **„ceny podľa plánu"** (mockup C, O5) — per zákazka, **predvolene vypnutý**: vypnutý dáva presne dnešné čísla,
+  riadky aj oba XLSX (zlatý charakterizačný test `test_np4_golden.rb`, odtlačok z mainu v0.15.3 vygenerovaný prvým commitom vetvy). Zapnutý berie **počet
+  platní z nárezového plánu** len pri **cenovo spôsobilom** materiáli — jediná autorita `SheetLayout.price_basis`: plán existuje a je horná hranica
+  (`upper_bound`, audit N6) a parametre sú zo súboru, ktorému sa verí (zdroj súbor/záloha, verzia nastavení nie novšia ani v zálohe — audit B2, žiadny
+  prerez/orez/prídavok nebol v súbore neplatný — audit B3). Ostatné materiály ostávajú na odhade so značkou „z odhadu" a vetou prečo („plán neúplný —
+  cena z odhadu", „formát chýba", „materiál neurčený", „duplák bez väzby", „nastavenia …", „plán nedostupný"); spôsobilé „podľa plánu" / „cena podľa plánu"
+  — tá istá veta ide do XLSX rozpočtu. **Porez** ide za množstvom Materiálu, **montáž** vždy z odhadu (dva súčty, O6/C10). Cenová ponuka mení len sumu
+  (materiál môže preklopiť návrh „samostatne" cez prah 150 €). Nič sa nezastaví (O11); po exporte status vymenuje materiály, ktoré v súbore išli na odhad,
+  a okno sa obnoví (audit F4). **`BUDGET_STD` 3** (významový bump — starší plugin by kľúč `budget_plan_prices` ignoroval): prvá mutácia rozpočtu v0.15.4
+  zapíše 3 a v0.15.3 a starší potom zákazku v Rozpočte needituje ani nevyexportuje (banner) — aktualizovať obe PC. Nastavenia dodávateľa nesú
+  `version_ok` a `repaired` nezávisle od zdroja; súbor s poškodeným skalárom plánu seed-merge nezapisuje a Kontrola hlási ORANGE `layout_settings|repaired`.
+  **Oprava staršej chyby všetkých mutácií rozpočtu (audit B1):** čakajúci zápis vo fronte klienta niesol len operáciu a hodnotu a identitu dostal až pri
+  odoslaní — po prepnutí zákazky (bez otvoreného modalu) by odišiel s identitou a generáciou **inej** zákazky a server by ho prijal. Odteraz nesie dokument
+  aj `gen` z okamihu kliknutia a zmena dokumentu frontu cudzích zápisov zahodí. Späť: okno sa vráti až po „Obnoviť" (audit F5 — životný cyklus Štúdia sa
+  nemení; tooltip prepínača to hovorí). Spolu s dávkou 2× P3 zo slepej delty #420 (tooltip chipu duplákov „2 ks (hotový 820 × 580) = 4 prírezy 840 × 600",
+  test escapovania mena). Audit návrhu Codex `gpt-6-astra`: **3 BLOCKER · 2 FIX · 1 NOTE — všetky prijaté** (surový výstup a package s doplnením
+  v [zdroje/bloky/NAREZ/](../zdroje/bloky/NAREZ/)). **Slepá predrecenzia:** 0× P1 · 1× P2 · 4× P3 — opravené pred PR: karta Nárezového plánu
+  hovorí „v rozpočte N" číslom hotového rozpočtu (predtým odhad aj pri zapnutých cenách podľa plánu — dve pravdy), „a 1 ďalší" v statuse exportu,
+  Nastavenia zvýraznia poškodený skalár a „Uložiť" ho zapíše aj bez úpravy; **priznané (P3-4):** čakajúci zápis sa odmietne aj v tom istom dokumente
+  po mutácii, ktorá zdvihla generáciu (spotrebič s prestavbou) — bezpečný smer, klikne sa znova. Mutácie 21/21 zabité. **Testy:** 4842 headless ·
+  142 JS sád zelené; **in-SU 3266 PASS** (`st1c_plan_prices`: zápis prepínača + marker 3 = 1 krok Späť, porez = Σ Materiálu, montáž = Σ odhadu,
+  zdroj množstva zhodný s plánom — materiály testovacieho prostredia sú UNI, takže „podľa plánu" v SketchUpe dokazujú len headless testy).
+
 - **NP-3 · Nárezový plán — sekcia Štúdia + veta plánu v poznámke rozpočtu (29.9.2026, v0.15.2 → v0.15.3, PR #420; blok 2, tretia dávka).**
   **Štúdio → Nárezový plán** (posledná neaktívna položka „fáza 2") ožil ako sekcia `cut` podľa schváleného mockupu A a B: lišta „Obnoviť" + chip
   „prerez · orez · duplák" (preklik do Nastavení rozpočtu, jantárový pri predvolených hodnotách), súhrnný riadok, karta pre každý nákupný materiál

@@ -98,8 +98,13 @@ const rowsD = mat().rows;
 let chip = NP.npDupChipHtml([rowsD[1], DUP2]);
 ok(chip.indexOf('>vrátane 5 duplákov = 10 prírezov s prídavkom</span>') >= 0, 'rôzne rozmery: súčty bez rozmeru prvého riadku');
 ok(chip.slice(chip.indexOf('">') + 2).indexOf('820') < 0, 'rozmer prvého riadku nie je v texte chipu');
-ok(chip.indexOf('Bočnica 36: 2 ks = 4 prírezy 820 × 580 → 840 × 600') >= 0 &&
-   chip.indexOf('Bočnica 36 vysoká: 3 ks = 6 prírezov 2000 × 580 → 2020 × 600') >= 0, 'rozpis po riadkoch v tooltipe');
+ok(chip.indexOf('Bočnica 36: 2 ks (hotový 820 × 580) = 4 prírezy 840 × 600') >= 0 &&
+   chip.indexOf('Bočnica 36 vysoká: 3 ks (hotový 2000 × 580) = 6 prírezov 2020 × 600') >= 0,
+   'rozpis po riadkoch v tooltipe: hotový rozmer v zátvorke, prírezy s prídavkom');
+// Slepá delta #420 (P3): meno riadku ide do atribútu `title` escapované.
+chip = NP.npDupChipHtml([Object.assign({}, rowsD[1], { n: 'A"<b>' }), DUP2]);
+ok(chip.indexOf('A&quot;&lt;b&gt;: 2 ks') >= 0, 'meno riadku v tooltipe je escapované');
+ok(chip.indexOf('A"<b>') < 0, 'surové meno sa do HTML nedostane');
 chip = NP.npDupChipHtml([rowsD[1], DUP_SAME]);
 ok(chip.indexOf('>vrátane 3 duplákov = 6 prírezov s prídavkom (820 × 580 → 840 × 600)</span>') >= 0,
    'rovnaký rozmer vo viacerých riadkoch: rozmer ostáva');
@@ -261,5 +266,18 @@ eq(rects, 3 * 24 * 28);
 ok(ms < 300, 'render celej sekcie pod 300 ms (' + ms + ' ms)');
 const closedAll = NP.npBodyHtml(BIG, { closed: { M0: true, M1: true, M2: true } });
 eq((closedAll.match(/<svg xmlns/g) || []).length, 0, 'zbalené karty = 0 SVG uzlov');
+
+// --- NP-4 (predrecenzia P2): „v rozpočte N" = číslo HOTOVÉHO rozpočtu -------
+let card = NP.npBodyHtml(sl([mat({ est_budget: 2 })]), { closed: {} });
+ok(card.indexOf('(v rozpočte dnes 2)') >= 0, 'bez rozpočtu v payloade (starší server): odhad ako dnes');
+card = NP.npBodyHtml(sl([mat({ est_budget: 2, budget_qty: 3, budget_src: 'plan' })]), { closed: {} });
+ok(card.indexOf('(v rozpočte 3 podľa plánu)') >= 0, 'zapnuté ceny podľa plánu: číslo a zdroj z rozpočtu');
+ok(card.indexOf('v rozpočte dnes 2') < 0, 'žiadna druhá pravda (odhad) pri karte');
+card = NP.npBodyHtml(sl([mat({ est_budget: 2, budget_qty: 2, budget_src: 'estimate' })]), { closed: {} });
+ok(card.indexOf('(v rozpočte 2 z odhadu)') >= 0, 'nespôsobilý materiál: z odhadu');
+card = NP.npBodyHtml(sl([mat({ est_budget: 2, budget_qty: 2, budget_src: null })]), { closed: {} });
+ok(card.indexOf('(v rozpočte dnes 2)') >= 0, 'vypnutý prepínač: dnešná veta');
+ok(card.indexOf('nie sú zapnuté ceny podľa plánu') >= 0 && card.indexOf('toľko platní dnes počíta rozpočet') < 0,
+   'tooltip súhrnu netvrdí, že rozpočet vždy počíta z odhadu');
 
 console.log('test_np3_sekcia: ' + passed + ' OK');

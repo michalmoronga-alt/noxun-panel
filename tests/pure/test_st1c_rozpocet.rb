@@ -175,8 +175,9 @@ NxTest.test('ŠT-1c B1: mutacie, oba XLSX aj prepocet cien maju telo v jadre') d
   # S1-B1: 13. operacia = `appliance_owner` (zmena vlastnika spotrebica).
   # Spotrebicove vetvy uz nevolaju `BudgetStore` priamo — idu jedinym
   # transakcnym vstupom `ApplianceBinding.apply!` (polozka + vazba = 1 krok).
-  NxTest.assert_equal(13, S1CB_CORE_RB[/def apply_budget_op.*?\n      end\n/m].to_s.scan(/^        when /).length,
-                      'jadro pozna presne 13 operacii rozpoctu (jedna = jeden krok Spat)')
+  # NP-4: 14. operacia = `plan_prices` (prepinac „ceny podľa plánu").
+  NxTest.assert_equal(14, S1CB_CORE_RB[/def apply_budget_op.*?\n      end\n/m].to_s.scan(/^        when /).length,
+                      'jadro pozna presne 14 operacii rozpoctu (jedna = jeden krok Spat)')
 end
 
 NxTest.test('ŠT-1c B1 (audit #12): prepocet cien obnovi VSETKY okna nad KATALOGOM') do

@@ -1543,6 +1543,8 @@ Možnosti:
 - **Celkový sumár** — kusovník + m² + bm + ks + súčet cien materiálu/ABS/kovania.
 - **Rozpočet zákazky** — materiál, ABS, kovanie, **služby** (olepovanie, porez, lepenie duplákov, opracovanie PD, montáž — množstvá počíta engine z kusovníka
   a odhadu platní, ceny berie zo sadzieb dodávateľa), štandardné koncové riadky s násobkom, vlastné položky, spotrebiče a zaokrúhlenie konečnej sumy.
+  **Od NP-4:** pri zapnutom prepínači zákazky „ceny podľa plánu" (predvolene vypnutý) je množstvo platní materiálu **počet z nárezového plánu** — len pri
+  cenovo spôsobilom materiáli (§11.4), inak odhad z m² s dôvodom v poznámke; porez ide za množstvom Materiálu, montáž ostáva z odhadu.
 - **Cenová ponuka pre zákazníka** — pohľad NAD rozpočtom, nie druhý výpočet.
 - **VEPO CSV** — presne podľa `VEPO_KONTRAKT.md` (od v1.1 stĺpce `nazov;dlzka;hrana_pozdlz;sirka;hrana_naprieč;hrubka;pocet_ks;material;poznamka`, oddeľovač `;`, úvodzovky, `—`/`=` kódy hrán dopočítané z L1/L2/W1/W2, normalizácia hrúbok 18/36, slug názvy súborov `<projekt>_<material>_<hrubka>.csv`). Priamo z dielcov, **bez OCL medzikroku**.
   **Od v1.2 (D-121) má názov riadku VŽDY najviac 20 znakov** — import objednávky VEPO dlhšie pole `nazov` odmieta; orez sa prizná v Kontrole aj v LOGu exportu.
@@ -1561,19 +1563,19 @@ Možnosti:
 - **DPH sa nepripočítava.** Firma je neplatca, katalógové ceny sú konečné a prepočet „bez DPH" je len zobrazenie, nikdy základ výpočtu.
 - **Neznáma cena sa NIKDY nenahradí nulou** — riadok ju prizná, medzisúčet je len zo známych cien a súhrn nahlas povie, že nie je úplný.
 
-**Dáta rozpočtu v zákazke a ich verzia (záväzné od v0.9.4, R-14).** Per zákazka žije v `NOXUN` dictionary **na MODELI** deväť kľúčov: `budget_mode` · `budget_overrides` ·
+**Dáta rozpočtu v zákazke a ich verzia (záväzné od v0.9.4, R-14).** Per zákazka žije v `NOXUN` dictionary **na MODELI** desať kľúčov: `budget_mode` · `budget_overrides` ·
 `budget_std_multipliers` (cenové násobiče štandardných riadkov) · `budget_viz_m2` · `budget_custom_items[]` · `budget_appliances[]` · `budget_appliances_included` ·
-`budget_cp_overrides` · **`budget_std` (Integer) — verzia formátu týchto dát**. Čítajú sa cez uzavreté whitelisty, preto:
+`budget_cp_overrides` · `budget_plan_prices` (od NP-4, natívny bool) · **`budget_std` (Integer) — verzia formátu týchto dát**. Čítajú sa cez uzavreté whitelisty, preto:
 
-- **Marker je povinný v každej zákazke, do ktorej sa rozpočet zapísal**, a zapisuje sa **v jedinom zápisovom bode** (`BudgetStore.write!`, cez ktorý ide všetkých 12 mutácií) —
+- **Marker je povinný v každej zákazke, do ktorej sa rozpočet zapísal**, a zapisuje sa **v jedinom zápisovom bode** (`BudgetStore.write!`, cez ktorý ide všetkých 13 mutácií) —
   vždy ako **aktuálna** hodnota `BudgetStore::BUDGET_STD`, nikdy sa nepreberá z uloženého stavu ani z klientskeho payloadu. **Zapisuje sa v TEJ ISTEJ operácii ako údaj** (údaj + marker = jeden krok Späť).
 - **Chýbajúci atribút = legacy zákazka** (spred R-14): mutácie prejdú a prvá z nich marker získa. **Prítomná, ale neplatná hodnota** (nie celé číslo ≥ 1, alebo zlyhané čítanie) je
   **poškodenie dát** — mutácie sa odmietnu vlastnou hláškou. Fail-open `.to_i` je zakázaný: z poškodenej hodnoty nesmie vzniknúť povolenie.
 - **Dopredný guard:** uložené číslo **vyššie** než `BUDGET_STD` odmieta **VŠETKY mutácie rozpočtu** a **oba cenové exporty** (XLSX rozpočtu aj XLSX cenovej ponuky, zastavené ešte
   pred výberom súboru — ich čísla by boli počítané z orezaného stavu). **Čítanie, zobrazenie, kusovník ani VEPO sa neblokujú** (rozpočtové dáta nenesú). Pozor na rozdiel:
   blokuje sa **nekompatibilná verzia dát**, nie **rozpracovaný rozpočet** — ten je legitímny stav zákazky a rieši ho dvojkrokové potvrdenie vyššie v tejto sekcii.
-- **Disciplína bumpu:** číslo sa zvýši pri **každom rozšírení whitelistu rozpočtových dát o pole, ktorého tichá strata by poškodila cenu alebo objednávku** (nové pole vlastnej
-  položky, väzba spotrebiča na katalóg). Čisto odvodené alebo zobrazovacie pole bump nevyžaduje. Vykonateľná podoba: [`core/budget_store.rb`](../noxun_engine/core/budget_store.rb).
+- **Disciplína bumpu:** číslo sa zvýši pri **každom rozšírení whitelistu rozpočtových dát o pole, ktorého tichá strata alebo IGNOROVANIE by poškodilo cenu alebo objednávku** (nové pole vlastnej
+  položky, väzba spotrebiča na katalóg, kľúč, ktorý mení výpočet ceny — NP-4). Čisto odvodené alebo zobrazovacie pole bump nevyžaduje. Vykonateľná podoba: [`core/budget_store.rb`](../noxun_engine/core/budget_store.rb).
 
 **`BUDGET_STD` 2 — spotrebič má väzbu a vlastníka (od v0.12.13, S1-B1).** Položka `budget_appliances[]` nesie navyše `catalog_id`, `snapshot` (kópia rozmerov
 z katalógu — zákazka odvtedy na živom katalógu **nezávisí**), `owner {kind: cabinet|slot|board|job, id}` a `customer_supplied`. **Kódy kategórií sú kanonické**
@@ -1584,6 +1586,13 @@ z katalógu — zákazka odvtedy na živom katalógu **nezávisí**), `owner {ki
 - **Kompatibilita (priznané nahlas):** marker `BUDGET_STD` 2 zapíše **PRVÁ mutácia rozpočtu akéhokoľvek druhu** (zmena režimu, zaradenie v ponuke, prepis sumy…),
   nie až úprava spotrebičov. Od tej chvíle **starší plugin zákazku needituje** a **zastaví aj oba cenové exporty** (XLSX rozpočtu aj cenovej ponuky). Čítanie,
   kusovník ani VEPO blokované nie sú.
+
+**`BUDGET_STD` 3 — ceny podľa plánu (od v0.15.4, NP-4).** Nový kľúč `budget_plan_prices` (natívny bool; chýba = vypnuté) je **prepínač zákazky**, predvolene
+vypnutý — staré aj nové zákazky majú dnešné ceny, kým ho človek nezapne. Bump je **významový**: starší plugin kľúč nezmaže (mutácie píšu len svoje kľúče), ale
+**ignoruje** ho — jeho rozpočet aj oba cenové exporty by potichu počítali z odhadu, hoci zákazka má ceny podľa plánu zapnuté.
+
+- **Kompatibilita (priznané nahlas):** marker 3 zapíše **prvá mutácia rozpočtu akéhokoľvek druhu** (aj bez zapnutia prepínača). Od tej chvíle plugin **v0.15.3
+  a starší** zákazku v Rozpočte needituje a nevyrobí z nej XLSX rozpočtu ani ponuky (banner) — pred použitím aktualizovať oba počítače.
 
 ### 11.4 Nárezový plán (výpočet, nie exportér)
 
@@ -1601,7 +1610,16 @@ a rozhodovanie, **nie výrobný dokument** (reže VEPO vlastnou optimalizáciou)
   Parametre z **predvolených** hodnôt (nastavenia sa nepodarilo načítať) robia plán **orientačným** — nikdy „horná hranica".
 - **Jedna veta o počte (NP-3):** karta sekcie Nárezový plán v Štúdiu, **poznámka riadku materiálu v Rozpočte** a XLSX rozpočtu nesú **tú istú**
   serverovú vetu („N platní (horná hranica)" · „… pre zaradené dielce — celkový počet neznámy" · „orientačne …"). **Cenová ponuka počty platní
-  nikdy neukáže.** V rozpočte je plán **len poznámka** — množstvo platní, cena, porez aj montáž ostávajú z odhadu z m² (ceny podľa plánu = NP-4).
+  nikdy neukáže.** Pri **vypnutom** prepínači „ceny podľa plánu" (predvolené) je plán v rozpočte **len poznámka** — množstvo platní, cena, porez aj montáž
+  ostávajú z odhadu z m².
+- **Plán v cene (NP-4) — cenová spôsobilosť materiálu.** Pri **zapnutom** prepínači zákazky (§11.3, `BUDGET_STD` 3) berie rozpočet počet platní z plánu **len**
+  pre materiál, ktorého plán **existuje**, je **horná hranica** (`upper_bound` — úplný a spoľahlivý, bez fallbacku a UNI) **a** parametre sú zo súboru nastavení,
+  ktorému sa verí: pôvod súbor alebo platná záloha, verzia formátu nie je novšia (ani v zálohe) a žiadny skalár prerezu, orezu či prídavku nebol v súbore
+  neplatný a nahradený predvoleným. Inak ostáva **odhad z m²** a poznámka povie prečo („plán neúplný — cena z odhadu", „formát chýba — …", „materiál
+  neurčený — …", „duplák bez väzby — …", „nastavenia … — …", „plán nedostupný — …"); spôsobilý riadok nesie „cena podľa plánu". Tá istá veta ide do XLSX
+  rozpočtu. **Porez** ide za množstvom Materiálu, **montáž** vždy z odhadu (závisí od dielcov, nie od odpadu). **Nič sa nezastaví** — nespôsobilý materiál
+  nie je nález Kontroly ani exportná brána (O11); po exporte status vymenuje materiály, ktoré v súbore išli na odhad. Cenová ponuka mení len sumu.
+  Vykonateľná podoba: `SheetLayout.price_basis` (jediná autorita podmienok aj viet).
 - **Neúplný je aj plán nad zablokovanými výrobnými dátami:** každá brána, ktorá by nad tým istým zberom zastavila VEPO export (novšia schéma,
   poškodený rozmer do nárezu, kit zásuviek), zruší hornú hranicu celej zákazky.
 

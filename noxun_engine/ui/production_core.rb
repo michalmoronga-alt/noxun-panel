@@ -2413,13 +2413,16 @@ module Noxun
       # by pri chybe katalogu ABS vyhodil vynimku a zhodil celu Kontrolu;
       # `nil` mapa = prazdne hrubky (geometriu `purchase_rect` vrati aj pri
       # „neznamej ABS", takze rozmerove kontroly bezia dalej).
+      # NP-4 (audit B2, B3): nesie aj `version_ok` a `repaired` — cena podla
+      # planu ich potrebuje nezavisle od zdroja (novsia zaloha, opraveny skalar).
       def control_layout(emap)
         lp = SupplierSettings.layout_params
-        { params: lp[:params], source: lp[:source], edge_thicknesses: edge_thicknesses_of(emap) }
+        { params: lp[:params], source: lp[:source], edge_thicknesses: edge_thicknesses_of(emap),
+          version_ok: lp[:version_ok] == true, repaired: Array(lp[:repaired]) }
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.control_layout')
         { params: SheetLayout::PARAM_DEFAULTS.dup, source: :seed_fallback,
-          edge_thicknesses: edge_thicknesses_of(emap) }
+          edge_thicknesses: edge_thicknesses_of(emap), version_ok: true, repaired: [] }
       end
 
       # Tie iste kluce ako `vepo_edge_thicknesses` ({abs_id => Float}), ale
@@ -2476,6 +2479,9 @@ module Noxun
                                    edge_thicknesses: lay[:edge_thicknesses],
                                    params: lay[:params], blocked: blocked)
         plan['params_source'] = lay[:source].to_s
+        # NP-4: podklad cenovej sposobilosti (`SheetLayout.price_basis`).
+        plan['params_version_ok'] = lay[:version_ok] == true
+        plan['params_repaired'] = Array(lay[:repaired])
         plan['blocked_all'] = blocked && blocked['all']
         plan
       rescue StandardError => e
@@ -2497,7 +2503,11 @@ module Noxun
       # riadkov su raz v `rows`, rozlozenie su polia [riadok, x, y] na 0,1 mm
       # (audit F10), zvysok [x, y, dlzka, sirka]. Texty (veta o pocte, dovody
       # nezaradenia) sklada SERVER — klient ich len zobrazi.
-      def sheet_layout_payload(plan, bom, smap, estimate)
+      # NP-4 (predrecenzia P2): `budget` = HOTOVY rozpocet toho isteho pushu —
+      # karta hovori „v rozpočte N" z JEHO riadku Materiálu (mnozstvo aj zdroj
+      # plan/odhad), nie vlastnym odhadom; jedna pravda aj pri zapnutych cenach
+      # podla planu. Bez rozpoctu (legacy volanie, chyba) = odhad z m².
+      def sheet_layout_payload(plan, bom, smap, estimate, budget = nil)
         return { 'ok' => false, 'error' => SheetLayout::UNAVAILABLE_NOTE } if !plan.is_a?(Hash) || plan['error']
 
         by_key = {}
@@ -2505,6 +2515,7 @@ module Noxun
           by_key[r['key']] ||= r if r.is_a?(Hash) && r['key'].is_a?(Array)
         end
         est = Array(estimate).each_with_object({}) { |e, o| o[e['material_id'].to_s] = e if e.is_a?(Hash) }
+        bud = budget_material_rows(budget)
         mats = Array(plan['materials'])
         smap = {} unless smap.is_a?(Hash)
         labels = material_labels(mats.map { |m| m['material_id'].to_s }, smap)
@@ -2519,7 +2530,7 @@ module Noxun
                                   'items' => without.map { |e| layout_reject_payload(e, by_key, nil) } },
           'materials' => mats.map do |m|
             mid = m['material_id'].to_s
-            layout_material_payload(m, smap[mid], labels[mid], est[mid], by_key, unrel, prm)
+            layout_material_payload(m, smap[mid], labels[mid], est[mid], by_key, unrel, prm, bud[mid])
           end
         }
       rescue StandardError => e
@@ -2527,7 +2538,17 @@ module Noxun
         { 'ok' => false, 'error' => SheetLayout::UNAVAILABLE_NOTE }
       end
 
-      def layout_material_payload(mat, rec, label, est, by_key, unrel, prm)
+      # NP-4: riadky Materiálu hotoveho rozpoctu podla material_id.
+      def budget_material_rows(budget)
+        return {} unless budget.is_a?(Hash)
+
+        sec = Array(budget['sections']).find { |s| s.is_a?(Hash) && s['key'] == 'materials' }
+        Array(sec && sec['rows']).each_with_object({}) do |r, o|
+          o[r['material_id'].to_s] = r if r.is_a?(Hash)
+        end
+      end
+
+      def layout_material_payload(mat, rec, label, est, by_key, unrel, prm, brow = nil)
         rec = {} unless rec.is_a?(Hash)
         dup = prm['dup_allowance'].to_f
         orient = SheetLayout.orientational?(mat)
@@ -2546,6 +2567,9 @@ module Noxun
           'phrase' => SheetLayout.count_phrase(mat, unreliable: unrel),
           'est' => est ? [est['count_min'], est['count_max']] : nil,
           'est_budget' => est ? Budget.plates_of(est) : nil,
+          # NP-4: s cim naozaj pocita rozpocet (mnozstvo jeho riadku a zdroj).
+          'budget_qty' => brow ? brow['mnozstvo'] : (est ? Budget.plates_of(est) : nil),
+          'budget_src' => brow ? brow['qty_source'] : nil,
           'rows' => rows,
           'plates' => Array(mat['layouts']).map do |s|
             { 'u' => s['utilization'],
@@ -3319,6 +3343,7 @@ module Noxun
         when 'appliance_remove' then appliance_op(model, data, 'remove', attrs, id)
         when 'appliance_owner'  then appliance_op(model, data, appliance_owner_op(data), attrs, id)
         when 'cp_group'         then BudgetStore.set_cp_group!(model, data['source_key'], data['group'])
+        when 'plan_prices'      then BudgetStore.set_plan_prices!(model, data['enabled'])
         else [false, ['neznáma operácia rozpočtu']]
         end
       end
@@ -3394,11 +3419,46 @@ module Noxun
         'custom_remove' => 'Položka zmazaná.', 'appliance_add' => 'Spotrebič pridaný.',
         'appliance_update' => 'Spotrebič upravený.', 'appliance_remove' => 'Spotrebič zmazaný.',
         'appliance_owner' => 'Vlastník spotrebiča uložený.',
-        'cp_group' => 'Zaradenie v cenovej ponuke zmenené.'
+        'cp_group' => 'Zaradenie v cenovej ponuke zmenené.',
+        'plan_prices' => 'Ceny podľa plánu vypnuté.'
       }.freeze
 
+      # NP-4: prepinac ma DVE vety podla smeru (status hovori, co sa stalo).
       def budget_op_status(data)
-        BUDGET_OP_STATUS[data['op'].to_s] || 'Rozpočet uložený.'
+        op = data['op'].to_s
+        if op == 'plan_prices' && (data['enabled'] == true || data['enabled'].to_s == 'true')
+          return 'Ceny podľa plánu zapnuté.'
+        end
+
+        BUDGET_OP_STATUS[op] || 'Rozpočet uložený.'
+      end
+
+      # NP-4 (audit F4): export stavia rozpocet NANOVO — ked plan pri exporte
+      # zlyhal alebo sa medzitym zmenil, subor ma pre niektory material odhad,
+      # hoci okno ukazovalo plan. Bez novej brany: poznamka riadku v subore
+      # dovod nesie a status po exporte VYMENUJE materialy, ktore pri exporte
+      # isli na odhad (okno sa potom obnovi z toho isteho stavu).
+      PLAN_EXPORT_NAMES = 3
+
+      def plan_export_note(budget)
+        return '' unless budget.is_a?(Hash) && budget['plan_prices'] == true
+
+        mats = Array(budget['sections']).find { |s| s.is_a?(Hash) && s['key'] == 'materials' }
+        rows = Array(mats && mats['rows']).select { |r| r.is_a?(Hash) && r['qty_source'] == 'estimate' }
+        return '' if rows.empty?
+
+        names = rows.first(PLAN_EXPORT_NAMES).map { |r| r['nazov'].to_s }.join(', ')
+        more = rows.length - PLAN_EXPORT_NAMES
+        names += " a #{more} #{more_word(more)}" if more.positive?
+        " · z odhadu (nie podľa plánu): #{names}"
+      end
+
+      # „materiál" je muzsky rod: 1 ďalší · 2–4 ďalšie · 5+ ďalších (predrecenzia P3-2).
+      def more_word(n)
+        return 'ďalší' if n == 1
+        return 'ďalšie' if n.between?(2, 4)
+
+        'ďalších'
       end
 
       # ↗ v riadku: URL sa NEBERIE z klienta — dohladava sa v modeli podla ID
@@ -3496,7 +3556,11 @@ module Noxun
         note = export_confirmed_notes(unpriced)
         warn = note.empty? ? '' : " · POZOR: #{note.join(' · ')}"
         dup = dup_id_suffix(warn_dups)
-        status.call("Rozpočet uložený: #{fmt_eur(totals['total'])} → #{target}#{warn}#{dup}",
+        # NP-4 (audit F4): okno sa obnovi z TOHO ISTEHO stavu, aky sa prave
+        # exportoval (repush PRED statusom — push by status inak prekryl).
+        repush.call if budget['plan_prices'] == true
+        status.call("Rozpočet uložený: #{fmt_eur(totals['total'])} → #{target}#{warn}#{dup}" \
+                    "#{plan_export_note(budget)}",
                     !warn.empty? || !dup.empty?)
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_budget_xlsx')
@@ -3578,7 +3642,10 @@ module Noxun
         XlsxWriter.write_book(target, sheets, now: now)
         save_vepo_settings('last_dir' => File.dirname(target))
         warnings = cp_warnings(hits, warn_dups, unpriced)
-        status.call(cp_status(cp, spec, target, warnings), !warnings.empty?)
+        # NP-4 (audit F4): ponuka dovod padu na odhad necita — status ho povie
+        # (len Michalovi, nie zakaznikovi) a okno sa obnovi z exportovaneho stavu.
+        repush.call if budget['plan_prices'] == true
+        status.call("#{cp_status(cp, spec, target, warnings)}#{plan_export_note(budget)}", !warnings.empty?)
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_cp_xlsx')
         status.call("Export cenovej ponuky zlyhal: #{e.message}", true)

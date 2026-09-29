@@ -360,6 +360,11 @@ modeli). Vzory:
   (sekcia inak nemá viditeľný vstupný bod).
 - **Prepínače** (`.bseg`): s DPH / bez DPH je len zobrazenie (localStorage),
   režim €/€€/€€€ je zápis do zákazky; tooltipy nesú názvy režimov.
+- **Checkbox v hlavičke sekcie** (`label.bappl` v `<summary>` so `stopPropagation`):
+  „sčítať do rozpočtu" (Spotrebiče) a od NP-4 „ceny podľa plánu" (Materiál, s `.nxtip`).
+- **Značka zdroja čísla** (`.qtag`, NP-4) — malý badge (9 px rádius) pred číslom v bunke:
+  `.plan` tlmená (sunken + ink-muted), `.est` jantárová (`--nx-warn-bg-soft`/`--nx-warnchip-*`);
+  kreslí sa len keď ju server pošle (zapnutý prepínač).
 
 ### D-47 / D-91: hlavička panela — UZAVRETÉ dávkou UI-B1
 Dvojradová hlavička s tromi režimovými tabmi a satelitnými akciami

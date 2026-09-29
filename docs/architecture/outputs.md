@@ -44,7 +44,8 @@ počítače s iným orezom dajú iný nález; zaokrúhlenie ako VEPO posúva hra
 nečíslo, rozmer < 0,5 mm, ktorý VEPO zaokrúhli na 0); do NP-2 taký dielec hlásil náhodou len `oversize`, bez tejto kategórie by Kontrola
 zmĺkla; kľúč `invalid_dims|owner_id|part_key`, bez brány. ORANGE **`layout_settings`** (audit B2) — `source: :seed_fallback` (súbor
 nastavení sa nedal prečítať): jeden nález bez dielca „Kontrola počíta s predvolenými hodnotami…", klik vedie do Nastavení rozpočtu.
-Kontrola názvov (`name_check_records`) vynechá záznam s nečíselným rozmerom — agregácia by inak zhodila celú Kontrolu (`Bom.dmm`).
+**NP-4 (audit B3):** súbor sa prečítal, ale prerez, orez či prídavok v ňom mal neplatnú hodnotu (`layout:` nesie `repaired:`) → ORANGE
+`layout_settings|repaired` (`check_layout_repaired`) s menom poľa a vetou, že ceny podľa plánu ostávajú z odhadu. Kontrola názvov (`name_check_records`) vynechá záznam s nečíselným rozmerom — agregácia by inak zhodila celú Kontrolu (`Bom.dmm`).
 Testy: `tests/pure/test_np2_nastavenia_kontrola.rb`.
 
 **ROH-A1 — CR lišty sú pre Kontrolu čelo.** `FRONT_ROLES` = `front_door drawer_front flap false_front cr_front cr_side`: CR bez jedinej ABS hrany dostane ORANGE
@@ -529,7 +530,8 @@ miesto, kde vzniká číslo semaforu** — číta ho sekcia Kontrola v Štúdiu,
 v `do_select` — iné parametre by nález nadrozmeru po kliku „stratili"; guard: dve volania, dve `layout: control_layout(emap)`). Prerez, orez
 a prídavok berie zo `SupplierSettings.layout_params` **vrátane pôvodu** (`:seed_fallback` → ORANGE `layout_settings`); hrúbky ABS
 **odvodí z už načítanej `edges_map`** (`edge_thicknesses_of`, audit F3) — `vepo_edge_thicknesses` by pri chybe katalógu ABS vyhodil výnimku
-a zhodil celú Kontrolu; `nil` mapa = prázdne hrúbky a rozmerové kontroly bežia ďalej.
+a zhodil celú Kontrolu; `nil` mapa = prázdne hrúbky a rozmerové kontroly bežia ďalej. **Od NP-4** nesie aj `version_ok` a `repaired`
+(audit B2, B3 — odsek `supplier_settings.rb`); neprázdne `repaired` pridá ORANGE `layout_settings|repaired`.
 
 **NP-3: NÁREZOVÝ PLÁN zákazky — `layout_for(collected, bom, smap, hw_exp)`.** Jeden výpočet plánu na zber: `push_state` ho spočíta raz a odovzdá
 `budget_payload(…, layout)` (7. parameter) aj `sheet_layout_payload` (sekcia Štúdia); `budget_payload` bez plánu si ho spočíta **sám z toho istého
@@ -542,6 +544,16 @@ dostane vetu „plán nedostupný". `sheet_layout_payload` skladá kompaktný pa
 v kusovníku je, ľudské dôvody nezaradenia/vyradenia — „hlási aj Kontrola" len pri materiáli, ktorý Kontrola kontroluje, súradnice na 0,1 mm) — detail
 v [ui-lifecycle.md](ui-lifecycle.md), sekcia NÁREZOVÝ PLÁN. `do_select` s `origin: 'cut'` (oko v pláne) len vymení vetu statusu (`cut_select_status` —
 všetky rovnaké kusy riadku, krok Späť nevzniká); výber ide cestou `parts_key` → `refs_for`.
+
+**NP-4: CENY PODĽA PLÁNU v jadre.** `layout_for` pripíše plánu okrem `params_source` aj **`params_version_ok`** a **`params_repaired`** — podklad
+cenovej spôsobilosti (`SheetLayout.price_basis`). `apply_budget_op` má **14. operáciu `plan_prices {enabled}`** → `BudgetStore.set_plan_prices!`;
+`budget_op_status` pre ňu skladá vetu podľa smeru („Ceny podľa plánu zapnuté/vypnuté."). **Export (audit F4):** oba cenové exporty stavajú rozpočet
+**nanovo** — keď plán pri exporte zlyhá alebo sa medzitým zmení, súbor nesie pre materiál odhad, hoci okno ukazovalo plán. Nová brána sa nerobí:
+poznámka riadku v súbore dôvod nesie a pri zapnutom prepínači `plan_export_note` pridá do statusu **zoznam materiálov na odhade** („· z odhadu (nie
+podľa plánu): A, B, C a 2 ďalšie" — `more_word`: 1 ďalší · 2–4 ďalšie · 5+ ďalších) a okno sa **obnoví** z toho istého stavu (`repush` **pred** statusom —
+push by status inak prekryl). Pri vypnutom prepínači sa status ani počet pushov nemení. **Jedna pravda s kartou plánu (predrecenzia P2):**
+`sheet_layout_payload(plan, bom, smap, estimate, budget)` dostane z pushu **hotový rozpočet** a každá karta nesie `budget_qty` + `budget_src` z jeho riadku
+Materiálu („v rozpočte 5 podľa plánu" / „… z odhadu"); `est_budget` ostáva odhadom z m² (súčet v súhrne). Bez rozpočtu (legacy volanie) = odhad.
 
 **`replace_uni`** (skratka „Nahradiť UNI…" → `MaterialsDialog.request_replace_uni`) a **zdieľané telá prepínačov** `edge_check_guard` (dostupnosť Overlay API + `identity_guard`) ·
 `identity_guard` (generácia okna + dokument — zdieľa ho aj kresba, ktorá si dostupnosť overuje **vlastnú** a hlási ju vetou o kresbe, nie o hranách) · `do_edge_check` ·
@@ -759,8 +771,8 @@ a predvolená cena. `sheet_size_for` je jediná pravda o formáte platne a fallb
 
 **NP-1 (blok 2 · Nárezový plán, v0.15.1) — jadro výpočtu.** Od NP-2 (v0.15.2) ho číta **Kontrola „nezmestí sa"** (`purchase_rect` +
 `fits_rect?` nad záznamom dielca, odsek `validation.rb`); od **NP-3 (v0.15.3)** ho počíta `ProductionCore.layout_for` **raz na zber** pre sekciu Štúdia
-Nárezový plán a **vetu v poznámke riadku materiálu** v Rozpočte a XLSX rozpočtu (odsek `production_core.rb`, sekcia NP-3). Ceny, porez ani montáž z neho
-zatiaľ nie sú (NP-4). Čistý modul: z `Bom.compute[:rows]`, celého `ProductionCore.sheets_map` a mapy hrúbok ABS (**tej istej, akú dostáva VEPO**)
+Nárezový plán a **vetu v poznámke riadku materiálu** v Rozpočte a XLSX rozpočtu (odsek `production_core.rb`, sekcia NP-3). **Od NP-4 (v0.15.4)** z neho
+Rozpočet pri zapnutom prepínači zákazky „ceny podľa plánu" berie **počet platní** cenovo spôsobilého materiálu (a tým porez; montáž ostáva z odhadu). Čistý modul: z `Bom.compute[:rows]`, celého `ProductionCore.sheets_map` a mapy hrúbok ABS (**tej istej, akú dostáva VEPO**)
 vypočíta **per nákupný materiál** deterministické pásové (gilotínové) rozloženie obdĺžnikov na platne. Je to **rozloženie heuristiky, nie
 minimum** — reže VEPO vlastnou optimalizáciou, plán slúži objednávke. Package: `SYSTEM/zdroje/bloky/NAREZ/PACKAGE_NP1_JADRO.md`.
 
@@ -836,9 +848,18 @@ v Štúdiu, poznámka riadku Rozpočtu aj XLSX rozpočtu: „N platní (horná h
 iný neschová. `budget_note(plan, material_id, sheets)` = „plán: <veta>" pre riadok rozpočtu; materiál bez výsledku a katalógový duplák → „plán neúplný —
 duplák bez väzby na zdrojový materiál" (B3); plán `{'error'}` → „plán nedostupný" (F7); plán nil (legacy volanie) → žiadna veta.
 
+**Cenová spôsobilosť — jediné miesto (NP-4, audit B2, B3, N6).** `price_basis(plan, material_id, sheets)` → `{eligible, sheets, reasons, note, tip}`
+rozhodne, či smie Rozpočet vziať počet platní z plánu. Spôsobilý je materiál, ktorého plán **existuje** a má **`upper_bound`** (NP-3 ho už ruší pri vyradeniach,
+nezaradených, konflikte hrúbky, neviazanom dupláku, `blocked`, fallbacku aj UNI — druhá sada cenových kontrol sa nerobí) **a** parametre sú z dôveryhodného
+súboru: zdroj `file`/`backup` (`PRICE_TRUSTED_SOURCES`), `params_version_ok == true` (novšia záloha má zdroj `backup`, preto zvlášť) a prázdne `params_repaired`.
+**Neznámy zdroj aj chýbajúci príznak verzie = nespôsobilé** (fail-closed). Dôvody v poradí vety (`PRICE_REASONS`): plán nedostupný · duplák bez väzby · nastavenia
+sa nepodarilo načítať · nastavenia uložil novší plugin · nastavenia prerezu a orezu sú poškodené · formát chýba · materiál neurčený · plán neúplný (aj `upper_bound`
+false bez iného dôvodu). Poznámka: „cena podľa plánu" alebo „<dôvody čiarkou> — cena z odhadu" (mockup C3); `tip` je dlhšie vysvetlenie pre značku v Štúdiu.
+
 **Testy:** `tests/pure/test_sheet_layout.rb` (golden rozloženia, `fits_rect?` oddelene od `compute`, permutácie, dolná hranica z plochy,
 geometria s prerezom, neúplnosť a ochrana vstupu, `blocked`, zhoda s `build`, výkon ~2000 obdĺžnikov), `tests/pure/test_np3_sekcia.rb` (veta,
-poznámka rozpočtu, `blocked` z brán, natívny kľúč cez `refs_for`, limit payloadu) a charakterizačné
+poznámka rozpočtu, `blocked` z brán, natívny kľúč cez `refs_for`, limit payloadu), `tests/pure/test_np4_ceny.rb` (cenová spôsobilosť — každý dôvod,
+poradie, fail-closed) a charakterizačné
 `tests/pure/test_np1_vepo_charakterizacia.rb` (bajty VEPO pred a po vytiahnutí `prepare_row`).
 
 ### budget.rb
@@ -852,7 +873,17 @@ Cenová ponuka je VIEW nad hotovým payloadom (`cp_preview`), nie druhý výpoč
 a riadku materiálu **pripojí na koniec `poznamka`** vetu `SheetLayout.budget_note` („plán: 3 platne (horná hranica)" a spol. — tá istá veta ako karta v Štúdiu,
 mockup C1). **Množstvo (`count_max` odhadu), cena, porez, montáž ani cenová ponuka sa nemenia** (test porovná payload bez poznámky a oba XLSX); XLSX
 rozpočtu nesie poznámku v názve položky (`item_name`), CP ju nečíta. Skladanie vety je fail-soft (`layout_note` — chyba = „plán nedostupný"). Bez plánu
-(`sheet_layout: nil`, legacy a čisté testy) sa poznámka nemení. Ceny podľa plánu = NP-4.
+(`sheet_layout: nil`, legacy a čisté testy) sa poznámka nemení.
+
+**Ceny podľa plánu (NP-4, v0.15.4) — prepínač zákazky, predvolene VYPNUTÝ.** `normalize_state` prijme `plan_prices` (len natívne `true` = zapnuté), payload ho
+vráti ako ozvenu `plan_prices` (checkbox v hlavičke Materiálu). **Vypnutý = riadky, čísla aj oba XLSX presne ako pred NP-4** — stráži to zlatý test
+`tests/pure/test_np4_golden.rb` (odtlačok z mainu v0.15.3, `tests/fixtures/np4_golden/`). **Zapnutý:** `materials_section(…, plan_prices: true)` sa pre každý riadok
+spýta `SheetLayout.price_basis` (obal `Budget.price_basis` je fail-soft **smerom k odhadu** — chyba nikdy nepustí plán do ceny): spôsobilý materiál má
+`mnozstvo = sheets` z plánu, nespôsobilý dnešné `plates_of`; riadok nesie **`qty_source`** (`plan` | `estimate`), **`estimate_qty`** (odhad z m²), **`qty_tip`**
+(tooltip značky) a na konci poznámky za vetou plánu vetu o cene („cena podľa plánu" / „plán neúplný — cena z odhadu" — tá istá ide do XLSX). **Služby (O6,
+krížový audit C10) majú dva súčty:** porez = Σ `mnozstvo` Materiálu (ide za plánom sám), montáž = Σ `estimate_qty` (závisí od dielcov, nie od odpadu);
+poznámky „platne z Materiálu (N podľa plánu, M z odhadu)" a „… · z odhadu". `Budget.check` nový nález nemá (O11 — nespôsobilý materiál nie je chyba, export
+sa nezastaví). Cenová ponuka číta hotový payload: mení sa len **suma** materiálu (môže preklopiť návrh cez prah 150 €), počty ani vety plánu do nej nejdú.
 
 **Kompatibilita dát cestuje v payloade (1d/R-14).** `normalize_state` prijíma aj kľúč `std` (stav markera `budget_std` zo `BudgetStore.std_state`) a `compute` z neho skladá `payload['budget_std'] = { state, blocked, reason }`.
 Je to **jediná cesta**, ktorou sa o nekompatibilných dátach dozvie ktokoľvek ďalej: banner sekcie Rozpočet aj Cenová ponuka (`ui/js/budget.js`) a brána oboch cenových exportov (`ProductionCore.budget_std_block`) čítajú TENTO kľúč — nikto sa nepýta modelu druhýkrát a nikto si stav neodvodzuje sám.
@@ -885,8 +916,8 @@ Riadok kovania nesie `price_check` aj pre čerstvé ručné ceny, aby UI vedelo 
 
 _(kostra založená dávkou 1d/R-14 — doplniť pri ďalších zásahoch)_
 
-Dáta rozpočtu **konkrétnej zákazky** v `NOXUN` dictionary na MODELI (cestujú so `.skp`): `budget_mode`, `budget_overrides`, `budget_std_multipliers` (cenové násobiče), `budget_viz_m2`, `budget_custom_items[]`, `budget_appliances[]`, `budget_appliances_included`, `budget_cp_overrides` — a od 1d/R-14 aj `budget_std`.
-Každá z 12 mutácií má vlastnú malú metódu (`set_mode!`, `set_override!`, `add_custom_item!` …), validácia je serverová a beží **pred** otvorením operácie (chybný vstup neotvorí krok Späť), a všetky mutácie končia v jedinom zápisovom bode **`write!`** = jedna mutácia = jeden krok Späť.
+Dáta rozpočtu **konkrétnej zákazky** v `NOXUN` dictionary na MODELI (cestujú so `.skp`): `budget_mode`, `budget_overrides`, `budget_std_multipliers` (cenové násobiče), `budget_viz_m2`, `budget_custom_items[]`, `budget_appliances[]`, `budget_appliances_included`, `budget_cp_overrides`, od NP-4 **`budget_plan_prices`** (natívny bool, chýba = vypnuté) — a od 1d/R-14 aj `budget_std`.
+Každá z 13 mutácií (NP-4: `set_plan_prices!`) má vlastnú malú metódu (`set_mode!`, `set_override!`, `add_custom_item!` …), validácia je serverová a beží **pred** otvorením operácie (chybný vstup neotvorí krok Späť), a všetky mutácie končia v jedinom zápisovom bode **`write!`** = jedna mutácia = jeden krok Späť.
 
 **Verzia formátu dát `budget_std` (1d/R-14, v0.9.4).** Rozpočtové dáta sa čítajú cez uzavreté whitelisty (`build_custom` / `build_appliance` / `numeric_map`), takže zákazka uložená NOVŠÍM pluginom by prvým klikom v Rozpočte ticho prišla o polia, ktorým táto verzia nerozumie — a nasledujúci XLSX by niesol podhodnotené číslo. Preto:
 
@@ -899,7 +930,12 @@ Každá z 12 mutácií má vlastnú malú metódu (`set_mode!`, `set_override!`,
   `''`, `'abc'`, `1.0`, `0`, `-1` aj výnimka pri čítaní sú `:invalid` a mutácie sa odmietajú **vlastnou hláškou** o poškodených dátach; vyššie číslo je `:newer` s hláškou
   o novšej verzii. Poškodená hodnota sa NIKDY neprepisuje potichu.
 - **Čítanie sa neblokuje nikdy** — `state` novšiu zákazku prečíta a pridá do nej `'std'`; zastavené sú len mutácie a (cez payload) oba cenové exporty. VEPO a nákupný CSV kovania rozpočtové dáta nenesú, takže bránu nedostávajú.
-- **Disciplína bumpu:** číslo sa zvýši pri každom rozšírení whitelistu rozpočtových dát o pole, ktorého tichá strata by poškodila cenu alebo objednávku (blok 4 = väzba spotrebiča na katalóg). Detail v STANDARD §11.3.
+- **Disciplína bumpu:** číslo sa zvýši pri každom rozšírení whitelistu rozpočtových dát o pole, ktorého tichá strata **alebo ignorovanie** by poškodilo cenu alebo objednávku (blok 4 = väzba spotrebiča na katalóg, NP-4 = prepínač cien podľa plánu). Detail v STANDARD §11.3.
+
+**`BUDGET_STD` 3 — ceny podľa plánu (NP-4, v0.15.4).** Nový kľúč `budget_plan_prices` a `set_plan_prices!(model, enabled)` cez `write!` (údaj + marker = jeden
+krok Späť „Rozpočet — ceny podľa plánu"). Bump je **významový**: starší plugin kľúč nezmaže (mutácie píšu len svoje kľúče), ale **ignoruje** — jeho rozpočet aj
+oba cenové exporty by potichu počítali z odhadu. Marker 3 zapíše **prvá mutácia rozpočtu akéhokoľvek druhu**, potom zákazku staršia verzia (v0.15.3 a staršie)
+v Rozpočte needituje ani z nej nevyrobí XLSX rozpočtu či ponuky (banner) — aktualizovať oba počítače.
 
 **`BUDGET_STD` 2 — spotrebič má väzbu a vlastníka (S1-B1, v0.12.13).** Položka `budget_appliances[]` pribrala štyri polia: `catalog_id` (UUID modelu z katalógu),
 `snapshot` (**výstup `ApplianceCatalog.snapshot_for` bez zmien** — zákazka odvtedy na živom katalógu nezávisí), `owner` `{kind: cabinet|slot|board|job, id}` a
@@ -917,6 +953,7 @@ slovenské kódy a `LEGACY_TYPES` ich prevedie, **zápis je vždy kanón** — d
   Majú kľúčové parametre, takže **volanie s bezzátvorkovým hashom** (`add_appliance!(m, 'typ' => …)`) by Ruby 3 odovzdalo ako keywords a spadlo by na arite.
 
 Testy: `tests/pure/test_r14_budget_std.rb` (marker, guardy, kanály chýb) · `tests/pure/test_s1b1_vazba.rb` (kanonické kódy, std 2, väzba, matica, rollback) ·
+`tests/pure/test_np4_ceny.rb` (prepínač, std 3, marker 2 → 3, novší marker) ·
 `tests/js/test_r14_budget_std.js` (banner + vypnuté ovládače oboch sekcií) · in-SU `run_r14`, `run_r14_async` a `run_s1b1` (undo atómovosť — headless fake model kroky Späť nevracia).
 
 ### price_refresh.rb
@@ -948,8 +985,17 @@ by zlyhal tiež (`JsonFileStore.degraded?` tie isté I/O chyby zámerne propaguj
 v oboch prípadoch predvolené a Kontrola to prizná ORANGE nálezom (`layout_settings|<pôvod>`). Rozhoduje `read_failure_origin`. Pôvod sa odvodzuje až z dokumentu **po** seed-merge
 (`persist_seed_merge!` číta súbor nanovo pod zámkom a medzitým ho mohol prepísať novší plugin — Codex #419 P2). `active_with_source` pridá `:backup` (poškodený primár
 s platnou zálohou, `JsonFileStore.degraded?` — číta disk, preto nie v `load`, ktorý beží pri každom výpočte rozpočtu). `layout_params` →
-`{params: {'kerf','trim','dup_allowance'}, source:}` je **jediný vstup** pre nárezový plán a Kontrolu; `settings_state(source)` →
+`{params: {'kerf','trim','dup_allowance'}, source:, version_ok:, repaired:}` je **jediný vstup** pre nárezový plán a Kontrolu; `settings_state(source)` →
 `{state: ok|degraded|newer|fallback|unreadable, reason}` pre banner sekcie (zápis blokujú `degraded`, `newer` a `unreadable`).
+
+**Dva príznaky nezávislé od zdroja (NP-4, audit B2, B3) — pre ceny podľa plánu.** **`version_ok`** = dokument **nie je** z novšej verzie formátu; počíta sa
+z pôvodu **pred** `refine_origin`, lebo ten poškodený primár s **novšou** zálohou prepíše z `:newer_file` na `:backup` a zdroj sám by novšiu zálohu neprezradil.
+**`repaired`** = kľúče prerezu, orezu alebo prídavku, ktoré v súbore **boli, ale neplatné** (nečíslo, mimo rozsahu): `normalize_supplier` ich nahradí predvolenými
+a pôvod ostane `:file` — preto ich zaznamená do odvodeného `repaired_scalars` (`REPAIRED_KEY`; **chýbajúci** kľúč aj `null` sem nepatria — doplnenie legacy
+súboru je dovolené). Príznak žije **len v pamäti**: `write` ho whitelistom zahodí, `revision` ho z platných hodnôt nikdy nezloží. **`read_doc` súbor s opraveným
+skalárom plánu seed-mergom nezapisuje** — zápis by neplatnú hodnotu nahradil predvolenou a dôkaz (Kontrola ORANGE `layout_settings|repaired`, cena z odhadu)
+by potichu zmizol; opraví ho až vedomé uloženie v sekcii Nastavenia — sekcia dostane `repaired_scalars` v dodávateľovi, poškodené pole zvýrazní (`.bad`
++ dôvod) a „Uložiť" ho zapíše **aj bez úpravy** (zobrazená predvolená hodnota), inak by hlásilo „Nič sa nezmenilo" (predrecenzia P3-3).
 
 **Verzia súboru 2 a dopredná brána (NP-2, vzor `HardwareRules` KOV-F1).** `STD = 2`; **každý zápis pečiatkuje `std = STD`** (inak by súbor
 ostal navždy 1 a budúca brána by nemala čo porovnať). Súbor z **novšieho** pluginu (`doc_std_unsupported?` = `std > STD`) sa **číta** (známe
@@ -1092,6 +1138,14 @@ zahodilo už na filtri nulových súm (jej `spolu` je 0), lenže zákazník ju v
 pridáva `appliance_labels` do špecifikácie. Riadok **nemení žiadne číslo** (0 € do súčtu ani do `diff` nevstúpi). Platí preň **to isté existujúce pravidlo** ako pre
 zvyšok sekcie: pri **vypnutom** „sčítať do rozpočtu" sa spotrebiče do ponuky nedostanú **vôbec** — ani informačne.
 
+**Ceny podľa plánu (NP-4) ponuku nemenia inak než sumou.** Materiál ide do ponuky ako `[1, 'set']` a poznámku riadku `candidates` nečíta — pri zapnutom
+prepínači sa zmení len `amount` riadku materiálu, takže **návrh „samostatne" sa môže preklopiť cez prah** `cp_highlight_threshold` (150 €); porez ide
+do „Nábytkovej zostavy", „Montáž a výroba" ostáva z odhadu. Počty platní ani vety plánu sa do ponuky nedostanú nikdy (test: `test_np4_ceny.rb`).
+
 ### xlsx_writer.rb
 
-_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+_(kostra — dokumentuje sa postupne pri zásahoch)_
+
+**`BudgetXlsx` (XLSX rozpočtu) číta payload 1:1.** POČET = `mnozstvo` riadku, bunka MATERIÁL = `nazov · poznamka` (`item_name`) — preto ceny podľa plánu
+(NP-4) prejdú do hárku bez zmeny kódu: počet z plánu aj veta „cena podľa plánu" / „… — cena z odhadu" sú v tých istých bunkách ako v Štúdiu. Pri vypnutom
+prepínači je hárok zhodný s mainom pred NP-4 (zlatý test `test_np4_golden.rb`).
