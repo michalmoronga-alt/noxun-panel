@@ -235,6 +235,18 @@ NxTest.test('NP-2 brana: subor std 3 — citanie ano, patch odmietnuty s dovodom
     NxTest.assert_equal(:newer_file, source)
     NxTest.assert_equal(:newer_file, NxNp2::SS.layout_params[:source])
     NxTest.assert_equal(before, File.binread(NxNp2::SS.path), 'seed-merge NEZAPISAL (riadky chybaju, subor stoji)')
+    # Seed-merge sa o zapis do novsieho suboru ani NEPOKUSI (nie len „brana
+    # ho zastavi") — inak by kazde nacitanie bralo zamok a logovalo odmietnutie.
+    calls = 0
+    orig = NxNp2::SS.method(:write)
+    NxNp2::SS.define_singleton_method(:write) { |*a| calls += 1; orig.call(*a) }
+    begin
+      NxNp2::STORE.invalidate
+      NxNp2::SS.load
+    ensure
+      NxNp2::SS.define_singleton_method(:write, orig)
+    end
+    NxTest.assert_equal(0, calls, 'citanie novsieho suboru nevola `write`')
     ok, errs, status = NxNp2::SS.patch_active!('kerf_mm' => 4.0)
     NxTest.refute(ok)
     NxTest.assert_equal(:write_failed, status)
