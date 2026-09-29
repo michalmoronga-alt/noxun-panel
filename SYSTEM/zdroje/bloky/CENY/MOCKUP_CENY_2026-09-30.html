@@ -1187,7 +1187,7 @@
     h += frow('Typ *', inp(it.type)) + frow('Hrúbka *', inp(String(it.th), ' disabled'), 'mm') + '<div class="hint">Hrúbka definuje variant — pre inú hrúbku pridaj nový materiál.</div>';
     h += frow('Smer dekoru', '<select><option>Po dĺžke</option><option>Po šírke</option><option>Bez smeru</option></select>');
     h += frow('Cena', inp(cellNum(it.price), ' placeholder="nezadaná" data-cf="' + key + ':price"'), '€/m²');
-    h += frow('Kód', inp(it.code, ' placeholder="dodávateľský kód"')) + frow('Dodávateľ', inp(it.sup, ' placeholder="napr. Demos"'));
+    h += frow('Kód', inp(it.code, ' placeholder="dodávateľský kód" data-cf="' + key + ':code"')) + frow('Dodávateľ', inp(it.sup, ' placeholder="napr. Demos" data-cf="' + key + ':sup"'));
     if (it.type !== 'ZASTENA') h += frow('Dekor u dodávateľa', inp('', ' placeholder="napr. F8001"')) + '<div class="hint">Len ak dodávateľ používa iné číslo dekoru — napr. Egger kompakt F8001 pre dekor F800.</div>';
     h += linkRows(it, key);
     h += frow('Rodina', inp('', ' placeholder="voliteľné"')) + frow('Výrobca', inp(g.man || '', ' disabled placeholder="voliteľné"')) +
@@ -1208,7 +1208,7 @@
     h += frow('Šírka', inp(String(it.w), ' disabled placeholder="—"'), 'mm');
     h += frow('Hrúbka *', '<select disabled><option>' + nf(it.th) + '</option></select>', 'mm');
     h += frow('Cena', inp(cellNum(it.price), ' placeholder="nezadaná" data-cf="' + key + ':price"'), '€/bm');
-    h += frow('Kód', inp(it.code, ' placeholder="dodávateľský kód"')) + frow('Dodávateľ', inp(it.sup, ' placeholder="napr. Demos"'));
+    h += frow('Kód', inp(it.code, ' placeholder="dodávateľský kód" data-cf="' + key + ':code"')) + frow('Dodávateľ', inp(it.sup, ' placeholder="napr. Demos" data-cf="' + key + ':sup"'));
     h += linkRows(it, key);
     h += '<div class="btnrow"><button type="button" class="primary" data-c="' + key + '" data-ca="save">Uložiť</button><button type="button" class="ghostbtn" data-c="' + key + '" data-ca="cancel">Zrušiť</button></div></div>';
     return h;
@@ -1263,6 +1263,9 @@
       if (pv === null){ it.price = null; changed.push('cena'); }
       else if (!isNaN(pv) && pv >= 0){ it.price = pv; changed.push('cena'); }
     }
+    var ce = document.querySelector('[data-cf="c1:code"]'), se = document.querySelector('[data-cf="c1:sup"]');
+    if (ce && ce.value.trim() !== String(it.code || '').trim()){ it.code = ce.value.trim(); changed.push('kód'); }
+    if (se && se.value.trim() !== String(it.sup || '').trim()){ it.sup = se.value.trim(); changed.push('dodávateľ'); }
     if (it.kind === 'sheet'){
       var fl = parseNum((document.querySelector('[data-cf="c1:fl"]') || {}).value), fw = parseNum((document.querySelector('[data-cf="c1:fw"]') || {}).value);
       var nfmt = (fl > 0 && fw > 0) ? [fl, fw] : null;
@@ -1317,10 +1320,17 @@
     var pp = perPlate(it), miss = it.price == null;
     var notes = [nf(it.bm2) + ' m²'];
     if (it.fmt) notes.push('formát ' + it.fmt[0] + '×' + it.fmt[1]);
-    else notes.push('formát platne nie je v katalógu — odhad podľa 2800×2070');
+    else notes.push('formát platne nie je v katalógu — odhad podľa 2800×2070 (UNI)');
     if (it.uni) notes.push('materiál neurčený (UNI) — počet platní je orientačný');
     if (it.bplan) notes.push(it.bplan);
     var chg = manual(it) ? ' chg' : '';
+    if (!it.fmt && !it.uni){
+      // O10 / C12: materiál bez formátu = skutočné m² dielcov × cena za m² (nie fiktívna platňa 2800 × 2070)
+      return '<tr class="' + (miss ? 'bmiss' : '') + chg + '"><td>' + bLink(it) + esc(it.blabel) + ' <span class="bfnt">· formát nie je v katalógu — počíta sa skutočná plocha (O10)</span>' + '</td>' +
+        '<td class="bnum">' + nf(it.bm2) + '</td><td class="bnum">m²</td>' +
+        '<td class="bnum">' + (miss ? '<span class="bmisslbl">chýba cena</span>' : esc(eur(r2(it.price)))) + '</td>' +
+        '<td class="bnum">' + freshCell(it) + '</td><td class="bnum">' + esc(miss ? '—' : eur(r2(it.price * it.bm2))) + '</td></tr>';
+    }
     return '<tr class="' + (miss ? 'bmiss' : '') + chg + '"><td>' + bLink(it) + esc(it.blabel) + ' <span class="bfnt">· ' + esc(notes.join(' · ')) + '</span></td>' +
       '<td class="bnum">' + it.bqty + '</td><td class="bnum">PLATŇA</td>' +
       '<td class="bnum">' + (miss ? '<span class="bmisslbl">chýba cena</span>' : esc(eur(pp)) + ' <span class="bfnt">(' + esc(eur(r2(it.price))) + '/m²)</span>') + '</td>' +
@@ -1349,7 +1359,7 @@
     var manualOnly = !!label && !demosStale;
     $('dTools').innerHTML = '<div class="bseg" role="group" aria-label="Zobrazenie DPH"><button type="button" class="on" data-noop="1">s DPH</button><button type="button" data-noop="1">bez DPH</button></div>' +
       '<div class="bseg" role="group" aria-label="Cenový režim zákazky"><button type="button" data-noop="1">€</button><button type="button" class="on" data-noop="1">€€</button><button type="button" data-noop="1">€€€</button></div>' +
-      '<button type="button" class="ghostbtn' + (label ? ' bstalebtn' : '') + '" data-bud="pr" title="' + esc((label ? label + ' — ' : '') +
+      '<button type="button" class="ghostbtn' + (label ? ' bstalebtn' : '') + '" data-bud="pr" data-manual="' + (manualOnly ? 1 : 0) + '" title="' + esc((label ? label + ' — ' : '') +
         (manualOnly ? 'Otvorí zoznam položiek na ručné overenie ceny' : 'Stiahne aktuálne ceny všetkých položiek zákazky viazaných na Demos (medzi položkami je 3 s pauza — pravidlo Demosu)')) + '">' +
         ico(manualOnly ? 'clipboard-check' : 'refresh-cw') + ' ' + (manualOnly ? 'Skontrolovať ceny' : 'Prepočítať ceny') + '</button>' +
       '<button type="button" class="ghostbtn" data-noop="1" title="Prepočítať rozpočet z aktuálneho modelu">' + ico('refresh-cw') + ' Obnoviť</button>' +
@@ -1515,6 +1525,7 @@
       var b = t.getAttribute('data-bud');
       if (b === 'stale'){ STALE_OPEN = !STALE_OPEN; renderD(); return; }
       if (b === 'refresh_one'){ status('dStatus', 'Demos: obnovenie tejto ceny (v mockupe bez zmeny) — tá istá cesta ako Prepočítať ceny.', ''); return; }
+      if (b === 'pr' && t.getAttribute('data-manual') === '1'){ STALE_OPEN = true; renderD(); status('dStatus', 'Na kontrolu ostali len ručné ceny — zoznam je otvorený; Demos sa nesťahuje.', ''); return; }
       if (b === 'pr'){ status('dStatus', 'Prepočet stiahne len ceny viazané na Demos. Ručné položky sa nesťahujú — ostávajú v zozname na kontrolu. V mockupe sa nič nesťahuje.', ''); return; }
     }
     if (t.hasAttribute('data-go')){ goTo(t.getAttribute('data-go')); return; }

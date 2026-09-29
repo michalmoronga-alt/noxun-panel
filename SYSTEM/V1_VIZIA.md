@@ -33,7 +33,8 @@ v PLANe prázdny**; V1 je hotové, keď je odškrtnuté všetko. Stav dopĺňaj�
    Zo smoke (21.–24.9.): výška čela slotu sa dopočíta z linky, soklu a medzery hore (výplň nad umývačkou = samostatný nízky korpus) a chladnička má výšku osadenia.
    *(Delené čelo umývačky, kontrola výšky/hmotnosti čela, police podľa niky, vetranie, digestorový korpus, telá rúry/mikra/dosky/digestora = mimo V1.)*
 6. [ ] **Výstupy:** VEPO CSV, kusovník, nákup kovania, rozpočet s cenami, XLSX cenová ponuka *(hotové — dávky E + fáza ŠTÚDIO)* · **zvyšok V1-03 (rozhodnuté 6.9.2026):**
-   manuálne 1-klik overenie ceny (katalógové kovanie **hotové** — CENY-KOV v0.10.4–v0.10.5; **ostávajú materiály/ABS**) + viac URL na položke („na faktúru" vyradené) · **D-94** nákup s pôvodom (**hotové** v0.12.1, PR #361) · **nárezový plán primitívny** (horná hranica počtu platní podľa zvoleného rozloženia namiesto odhadu z m²; objednáva človek — **hotové** v0.15.1–v0.15.4, blok 2
+   manuálne 1-klik overenie ceny (katalógové kovanie **hotové** — CENY-KOV v0.10.4–v0.10.5; **ostávajú materiály/ABS** — blok CENY) + ~~viac URL na položke~~ → jeden odkaz (C7, 29.9.2026; „na faktúru" vyradené)
+   · **D-94** nákup s pôvodom (**hotové** v0.12.1, PR #361) · **nárezový plán primitívny** (horná hranica počtu platní podľa zvoleného rozloženia namiesto odhadu z m²; objednáva človek — **hotové** v0.15.1–v0.15.4, blok 2
    uzavretý v0.16.0, PR #418–#421: sekcia Nárezový plán, prerez/orez/prídavok dupláku, Kontrola s orezom, voliteľné ceny podľa plánu —
    [výsledok a smoke](archiv/NAREZ_ZAVER_2026-09-29.md); Michalov smoke **PASS 29.9.2026**; porovnanie s reálnou objednávkou VEPO po V1) ·
    **D-121** názvy dielcov do 20 znakov (**hotové** v0.9.45–v0.9.46, PR #324/#325). *(D-95 odškrtávanie diel po diele = preč natrvalo, stráž kolízií a EN DANIELI = mimo V1.)*
