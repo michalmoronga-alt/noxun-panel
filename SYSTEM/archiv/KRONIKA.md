@@ -22,7 +22,14 @@
   a štyri dávky za jeden deň: **NP-1** #418 (jadro `sheet_layout.rb`, `prepare_row`; audit 2 BLOCKER) · **NP-2** #419 (prerez/orez/prídavok v Nastaveniach
   rozpočtu, súbor dodávateľa verzia 2, Kontrola s orezom; audit 2 BLOCKER, GH kolo 1 P1) · **NP-3** #420 (sekcia Nárezový plán, veta plánu v Rozpočte a XLSX;
   audit 4 BLOCKER) · **NP-4** #421 (ceny podľa plánu, `BUDGET_STD` 3, oprava fronty zápisov rozpočtu; audit 3 BLOCKER). Staršie položky bloku (D-94 #361,
-  D-112 + D-113 #287, D-121 #324/#325, D-122 #343) boli hotové skôr. Uzáver mení len dokumentáciu a verziu: blok plným textom do
+  D-112 + D-113 #287, D-121 #324/#325, D-122 #343) boli hotové skôr. **Review bloku:** #416 zavreté podľa pravidla 3 kôl (b) — P1 v každom z troch kôl;
+  re-rez #417 Codex kolo 1 = 1× P2 (prednosť rozhodnutí pred návrhom 6.9.) → oprava + slepá delta OK · NP-1 predrecenzia PR OK (4× P3 opravené), Codex kolo 1
+  👍 bez nálezov · NP-2 predrecenzia 2× P2 + 4× P3 opravené, kolo 1 = 1× P1 (duplák bez formátu v katalógu → Kontrola voči zdroju) + 1× P2 (pôvod súboru po
+  seed-merge pod zámkom) → `acf94bc9`, kolo 2 = 2× P2 (tlmené „Uložiť", stav `unreadable`) → `beaba495`, slepá delta OK (3× P3 presunuté do NP-3) · NP-3
+  predrecenzia PR OK (3× P3 opravené), kolo 1 = 1× P2 (chip duplákov s rozmerom prvého riadku) → `a0981a6e`, slepá delta OK (2× P3 presunuté do NP-4) · NP-4
+  predrecenzia 1× P2 + 4× P3 opravené, in-SU 3266 PASS, Codex kolo 1 👍 bez nálezov. Audity návrhu (Codex): NP-1 Astra 2 BLOCKER + 7 FIX · NP-2 Astra
+  2 BLOCKER + 2 FIX + 2 NOTE · NP-3 Sol 4 BLOCKER + 8 FIX + 2 NOTE · NP-4 Astra 3 BLOCKER + 2 FIX + 1 NOTE — všetko zapracované pred implementáciou.
+  Uzáver mení len dokumentáciu a verziu: blok plným textom do
   [ROADMAP_hotove_etapy.md](ROADMAP_hotove_etapy.md), **celý priečinok bloku** `zdroje/bloky/NAREZ/` → [bloky/NAREZ/](bloky/NAREZ/) (`git mv`; opravené odkazy
   v PLAN, STAV, v tejto KRONIKE (záznamy #417–#421), v `zdroje/next_sessions/NAREZ_PLAN_NAVRH_2026-09-06.md`, v `docs/architecture/outputs.md`
   a `ui-lifecycle.md`, v komentároch `sheet_layout.rb`, `sheet_layout.js` a `studio.html` a v hlavičkách testov `test_sheet_layout.rb`,

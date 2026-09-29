@@ -56,10 +56,18 @@ bez in-SU, nič nezapisovali do modelu). Pri uzávere **4842 headless · 142 JS 
 
 - **Krížový audit bloku** (surový, pred packages): Codex 5 BLOCKER · 6 FIX · 3 NOTE, Grok 2 BLOCKER · 4 FIX · 4 NOTE — ako sa naložilo s každým nálezom,
   uvádza package dávky, ktorá ho riešila (sekcie „Nálezy krížového auditu").
-- **Audit návrhu každej kódovej dávky** (Codex): NP-1 2 BLOCKER · 7 FIX · NP-2 2 BLOCKER · 2 FIX · 2 NOTE · NP-3 4 BLOCKER · 8 FIX · 2 NOTE · NP-4 3 BLOCKER ·
-  2 FIX · 1 NOTE — **všetko prijaté** pred kódom.
-- **Slepá predrecenzia** pred každým PR: NP-1 0× P1/P2 (4× P3) · NP-2 2× P2 (4× P3) · NP-3 0× P1/P2 (3× P3) · NP-4 1× P2 (4× P3) — P1/P2 opravené pred PR.
-- **GitHub Codex review NP-2:** kolo 1 1× P1 (duplák bez formátu v katalógu vypadol zo zdroja) a 1× P2, kolo 2 2× P2 — opravené s testom a mutáciou.
+- **Audit návrhu každej kódovej dávky** (Codex): NP-1 (Astra) 2 BLOCKER · 7 FIX · NP-2 (Astra) 2 BLOCKER · 2 FIX · 2 NOTE · NP-3 (Sol) 4 BLOCKER · 8 FIX ·
+  2 NOTE · NP-4 (Astra) 3 BLOCKER · 2 FIX · 1 NOTE — **všetko zapracované** pred implementáciou.
+- **Slepá predrecenzia** pred každým PR: NP-1 PR OK (4× P3 opravené) · NP-2 2× P2 + 4× P3 opravené · NP-3 PR OK (3× P3 opravené) · NP-4 1× P2 + 4× P3
+  opravené — všetko pred otvorením PR.
+- **GitHub Codex review:**
+  - **Štart:** prvý pokus **#416 zavretý podľa pravidla 3 kôl (b)** — P1 v každom z troch kôl; re-rez **#417**: kolo 1 = 1× P2 (prednosť rozhodnutí bloku
+    pred návrhom zo 6.9.) → oprava + slepá delta OK.
+  - **NP-1 #418:** kolo 1 👍 bez nálezov.
+  - **NP-2 #419:** kolo 1 = 1× P1 (duplák bez formátu v katalógu → Kontrola voči zdroju) + 1× P2 (pôvod súboru po seed-merge pod zámkom) → `acf94bc9`;
+    kolo 2 = 2× P2 (tlmené „Uložiť", stav `unreadable`) → `beaba495`, slepá delta OK (3× P3 presunuté do NP-3).
+  - **NP-3 #420:** kolo 1 = 1× P2 (chip duplákov s rozmerom prvého riadku) → `a0981a6e`, slepá delta OK (2× P3 presunuté do NP-4).
+  - **NP-4 #421:** kolo 1 👍 bez nálezov (in-SU 3266 PASS).
 - **Mutácie:** NP-1 25 (24 zabitých, 1 ekvivalentná) · NP-2 22/22 · NP-3 17/17 · NP-4 21/21.
 - **Zlatý test NP-4:** s vypnutým aj chýbajúcim prepínačom sú rozpočet, XLSX rozpočtu aj hárok cien ponuky rovnaké ako vo v0.15.3 (odtlačok z mainu pred dávkou).
 - **Výkon** (~2000 dielcov): výpočet plánu + JSON ≈ 35 ms, celý push Štúdia 377 kB (plán 118 kB), render sekcie ≈ 3 ms.
