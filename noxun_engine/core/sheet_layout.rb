@@ -24,7 +24,9 @@
 # `purchase_rect` + `fits_rect?`). Od NP-3 ho pocita `ProductionCore.layout_for`
 # RAZ na zber (push Studia aj `budget_payload`): sekcia Narezovy plan a poznamka
 # riadku materialu v Rozpocte/XLSX (`budget_note` — jedna veta `count_phrase`).
-# Ceny, porez ani montaz sa z neho zatial nepocitaju (NP-4).
+# Od NP-4 z neho Rozpocet berie POCET PLATNI materialu (a tym porez) — len pri
+# zapnutom prepinaci zakazky „ceny podľa plánu" a len pre material, ktory
+# `price_basis` uzna za cenovo sposobily; montaz ostava z odhadu z m².
 require 'json'
 
 module Noxun
@@ -275,6 +277,100 @@ module Noxun
 
         rec = sheets.is_a?(Hash) ? sheets[mid] : nil
         Materials.duplak?(rec) ? DUPLAK_UNLINKED_NOTE : nil
+      end
+
+      # --- cena podla planu (NP-4) --------------------------------------------
+      #
+      # JEDINA autorita CENOVEJ SPOSOBILOSTI materialu: smie rozpocet vziat
+      # pocet platni z planu? Ano LEN ked plan pre material riadku existuje,
+      # je UPLNY a SPOLAHLIVY (`upper_bound` — NP-3 ho uz rusi pri vyradeniach,
+      # nezaradenych dielcoch, konflikte hrubky, neviazanom duplaku, `blocked`,
+      # fallbacku formatu aj UNI; audit N6) A parametre pochadzaju zo suboru
+      # nastaveni, ktoremu verime (zdroj `file`/`backup`, verzia formatu nie je
+      # novsia — audit B2 — a ziaden skalar prerezu/orezu/pridavku nebol
+      # opraveny na predvoleny — audit B3). Vsetko ostatne je NESPOSOBILE
+      # s dovodom; zlyha sa vzdy BEZPECNE na odhad z m² (O11 — nic sa nezastavi).
+      PRICE_TRUSTED_SOURCES = %w[file backup].freeze
+      # Poradie = poradie vo vete. [kluc, kratky dovod do poznamky, dlhe vysvetlenie do tooltipu]
+      PRICE_REASONS = [
+        ['unavailable', 'plán nedostupný', 'Nárezový plán sa pre tento materiál nepodarilo spočítať.'],
+        ['duplak_unlinked', 'duplák bez väzby',
+         'Duplák nemá väzbu na zdrojový materiál — plán ho k platniam zdroja nevie priradiť.'],
+        ['settings_unreadable', 'nastavenia sa nepodarilo načítať',
+         'Nastavenia prerezu a orezu sa nepodarilo načítať — plán počíta s predvolenými hodnotami.'],
+        ['settings_newer', 'nastavenia uložil novší plugin',
+         'Nastavenia dodávateľa uložil novší plugin — tejto verzii nemusia úplne zodpovedať.'],
+        ['settings_repaired', 'nastavenia prerezu a orezu sú poškodené',
+         'Prerez, orez alebo prídavok dupláku má v súbore nastavení neplatnú hodnotu — plán počíta s predvolenou.'],
+        ['no_format', 'formát chýba', 'Materiál nemá formát platne v katalógu — plán je len orientačný.'],
+        ['uni', 'materiál neurčený', 'Materiál je neurčený (UNI) — plán je len orientačný.'],
+        ['incomplete', 'plán neúplný',
+         'Plán je neúplný (dielec sa nezmestí, VEPO ho odmietne, chýba väzba dupláku alebo sú výrobné dáta zablokované).']
+      ].freeze
+      PRICE_PLAN_NOTE = 'cena podľa plánu'
+      PRICE_PLAN_TIP = 'Množstvo z nárezového plánu (horná hranica).'
+      PRICE_ESTIMATE_SUFFIX = 'cena z odhadu'
+
+      # -> { 'eligible' => bool, 'sheets' => Integer|nil, 'reasons' => [kluce],
+      #      'note' => veta do poznamky riadku, 'tip' => tooltip znacky }
+      # plan: vysledok `ProductionCore.layout_for` (s `params_source`,
+      # `params_version_ok`, `params_repaired`) alebo {'error'} alebo nil.
+      # Pre datovy problem NIKDY nevyhodi vynimku (Budget ma aj tak rescue).
+      def price_basis(plan, material_id, sheets = {})
+        reasons = price_reasons(plan, material_id.to_s, sheets)
+        return price_result(false, nil, reasons) unless reasons.empty?
+
+        mat = plan_material(plan, material_id.to_s)
+        price_result(true, mat['sheets'].to_i, [])
+      end
+
+      def price_reasons(plan, mid, sheets)
+        return ['unavailable'] if !plan.is_a?(Hash) || plan['error']
+
+        mat = plan_material(plan, mid)
+        unless mat
+          rec = sheets.is_a?(Hash) ? sheets[mid] : nil
+          return [Materials.duplak?(rec) ? 'duplak_unlinked' : 'unavailable']
+        end
+        out = settings_reasons(plan)
+        out << 'no_format' if mat['fallback'] == true
+        out << 'uni' if mat['uni'] == true
+        out << 'unavailable' if mat['invalid_params']
+        out << 'incomplete' if incomplete?(mat) || (mat['upper_bound'] != true && out.empty?)
+        order = PRICE_REASONS.map(&:first)
+        out.uniq.sort_by { |k| order.index(k) || order.length }
+      end
+
+      # Dovery parametrom: zdroj, verzia formatu a opravene skalare — kazdy
+      # zvlast (novsia zaloha ma zdroj `backup`, opraveny skalar `file`).
+      # Neznamy zdroj aj CHYBAJUCI priznak verzie = nevieme = nesposobile.
+      def settings_reasons(plan)
+        out = []
+        src = plan['params_source'].to_s
+        if src == 'newer_file' || plan['params_version_ok'] == false
+          out << 'settings_newer'
+        elsif !PRICE_TRUSTED_SOURCES.include?(src) || plan['params_version_ok'] != true
+          out << 'settings_unreadable'
+        end
+        out << 'settings_repaired' unless Array(plan['params_repaired']).empty?
+        out
+      end
+
+      def plan_material(plan, mid)
+        Array(plan['materials']).find { |m| m.is_a?(Hash) && m['material_id'].to_s == mid }
+      end
+
+      def price_result(eligible, count, reasons)
+        if eligible
+          return { 'eligible' => true, 'sheets' => count, 'reasons' => [],
+                   'note' => PRICE_PLAN_NOTE, 'tip' => PRICE_PLAN_TIP }
+        end
+
+        short = reasons.map { |k| (PRICE_REASONS.assoc(k) || [k, k])[1] }
+        long = reasons.map { |k| (PRICE_REASONS.assoc(k) || [k, k, k])[2] }
+        { 'eligible' => false, 'sheets' => nil, 'reasons' => reasons,
+          'note' => "#{short.join(', ')} — #{PRICE_ESTIMATE_SUFFIX}",
+          'tip' => "#{long.join(' ')} Množstvo a cena ostávajú z odhadu z m²." }
       end
 
       # --- parametre ----------------------------------------------------------

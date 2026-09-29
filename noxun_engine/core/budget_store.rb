@@ -10,6 +10,8 @@
 #   budget_appliances_included — sceituju sa spotrebice do SPOLU? (default NIE)
 #   budget_cp_overrides        — { zdrojovy_kluc => "samostatne"|"zostava" }
 #                                zaradenie polozky v CENOVEJ PONUKE (E-b2)
+#   budget_plan_prices         — NP-4: berie Materiál pocet platni z narezoveho
+#                                planu? (natívny bool, default NIE)
 #   budget_std                 — VERZIA FORMATU dat rozpoctu (R-14, Integer)
 #
 # ========================== ZAVAZNE PRAVIDLA ===========================
@@ -42,6 +44,8 @@ module Noxun
       KEY_APPLIANCES  = 'budget_appliances'
       KEY_APPL_INCL   = 'budget_appliances_included'
       KEY_CP_OVERRIDES = 'budget_cp_overrides'
+      # NP-4: prepinac „ceny podľa plánu" (per zakazka, natívny bool).
+      KEY_PLAN_PRICES = 'budget_plan_prices'
       # R-14 (blok 1d): VERZIA FORMATU DAT ROZPOCTU V ZAKAZKE.
       # POZOR na zamenu mien: `budget_std_multipliers` su CENOVE NASOBICE
       # standardnych riadkov, s verziou nemaju nic spolocne.
@@ -54,9 +58,10 @@ module Noxun
       #
       # DISCIPLINA BUMPU (SYSTEM/STANDARD.md 11.3, vzor CONFIG_SCHEMA): cislo
       # sa zvysi pri KAZDOM rozsireni whitelistu rozpoctovych dat o pole,
-      # ktoreho ticha strata by poskodila CENU alebo objednavku (nove pole
-      # vlastnej polozky, vazba spotrebica na katalog v bloku 4, novy kluc
-      # zaradenia v ponuke). Cisto odvodene/zobrazovacie pole bump nevyzaduje.
+      # ktoreho ticha strata ALEBO IGNOROVANIE by poskodilo CENU alebo
+      # objednavku (nove pole vlastnej polozky, vazba spotrebica na katalog
+      # v bloku 4, novy kluc zaradenia v ponuke, NP-4 prepinac, ktory meni
+      # vypocet ceny). Cisto odvodene/zobrazovacie pole bump nevyzaduje.
       #
       #   1 = V0.6 E-a (rezim, overridy, nasobky, m2, vlastne polozky, spotrebice)
       #   2 = S1-B1 — SPOTREBIC MA VAZBU NA KATALOG A VLASTNIKA: polozka
@@ -66,7 +71,12 @@ module Noxun
       #       zanikla VAZBA na skrinku, z ktorej S1-F kresli kontrolnu geometriu.
       #       Kody kategorii su od tejto verzie KANONICKE (`ApplianceCatalog`);
       #       legacy slovenske kody sa pri citani prevedu, zapisuje sa kanon.
-      BUDGET_STD = 2
+      #   3 = NP-4 — PREPINAC „ceny podľa plánu" (`budget_plan_prices`). Bump
+      #       je VYZNAMOVY: starsi plugin kluc NEZMAZE (mutacie pisu len svoje
+      #       kluce), ale IGNORUJE — rozpocet aj oba cenove exporty by potichu
+      #       pocitali z odhadu, hoci zakazka ma ceny podla planu zapnute.
+      #       Marker 3 zapise PRVA mutacia rozpoctu akehokolvek druhu.
+      BUDGET_STD = 3
 
       # Sentinel pre rozlisenie „atribut NIE JE" od „atribut je a je prazdny".
       # `read_attr` obe splostuje na nil a fail-open `.to_i` by z poskodenej
@@ -206,6 +216,7 @@ module Noxun
           'appliances' => appliances(model),
           'appliances_included' => appliances_included?(model),
           'cp_overrides' => cp_overrides(model),
+          'plan_prices' => plan_prices?(model),
           # R-14: kompatibilita dat cestuje SO STAVOM — payload rozpoctu z nej
           # sklada priznak pre obe sekcie okna aj pre branu cenovych exportov.
           'std' => std_state(model).to_s
@@ -240,6 +251,12 @@ module Noxun
 
       def appliances_included?(model)
         read_attr(model, KEY_APPL_INCL) == true
+      end
+
+      # NP-4: ceny podla planu. Chybajuci kluc aj cokolvek ine nez natívne
+      # `true` = VYPNUTE (staru zakazku otvorenie nepreceni).
+      def plan_prices?(model)
+        read_attr(model, KEY_PLAN_PRICES) == true
       end
 
       # E-b2: zaradenie polozky v cenovej ponuke. Chybajuci zaznam = "necham
@@ -328,6 +345,12 @@ module Noxun
       def set_appliances_included!(model, included)
         flag = included == true || included.to_s == 'true'
         write!(model, 'Rozpočet — spotrebiče v súčte') { write_attr(model, KEY_APPL_INCL, flag) }
+      end
+
+      # NP-4: prepinac „ceny podľa plánu" — jeden krok Spat (udaj + marker 3).
+      def set_plan_prices!(model, enabled)
+        flag = enabled == true || enabled.to_s == 'true'
+        write!(model, 'Rozpočet — ceny podľa plánu') { write_attr(model, KEY_PLAN_PRICES, flag) }
       end
 
       # E-b2: „samostatne v CP" / „v zostave" per polozka. Prazdna hodnota =
@@ -711,7 +734,7 @@ module Noxun
       # Jedna mutacia = jeden undo krok. Volat AZ PO validacii (chybny vstup
       # nesmie otvorit operaciu). -> [true, []] | [false, [chyby]]
       #
-      # R-14: JEDINY CHOKE POINT vsetkych 12 mutacii, takze dopredny guard
+      # R-14: JEDINY CHOKE POINT vsetkych 13 mutacii (NP-4: +ceny podla planu), guard
       # stoji TU — tesne pred `start_operation`, aby odmietnuta mutacia
       # nezalozila ziadny krok Spat. Marker sa zapisuje PO mutacnom bloku,
       # ale este PRED `commit_operation`: udaj a marker su tak JEDNA operacia

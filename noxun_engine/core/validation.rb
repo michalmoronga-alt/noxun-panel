@@ -225,7 +225,8 @@ module Noxun
       #   z nastaveni dodavatela (`ProductionCore.control_layout`, JEDINY zdroj
       #   pre OBOCH volajucich). nil = legacy volanie: orez 0 a pridavok 0
       #   (dnesne spravanie bez orezu — headless testy a stare volania).
-      #   `source: :seed_fallback` alebo `:unreadable` prida jeden ORANGE nalez `layout_settings`.
+      #   `source: :seed_fallback` alebo `:unreadable` prida jeden ORANGE nalez `layout_settings`;
+      #   NP-4: neprazdne `repaired:` (poskodene skalare v subore) tiez — kluc `layout_settings|repaired`.
       def run(collected, sheets: {}, edges: nil, hardware_expansion: nil, placements: nil,
               identities: nil, layout: nil)
         collected = {} unless collected.is_a?(Hash)
@@ -547,8 +548,10 @@ module Noxun
         params = h.key?(:params) ? h[:params] : h['params']
         et = h.key?(:edge_thicknesses) ? h[:edge_thicknesses] : h['edge_thicknesses']
         src = h.key?(:source) ? h[:source] : h['source']
+        rep = h.key?(:repaired) ? h[:repaired] : h['repaired']
         { params: params.is_a?(Hash) ? params : LEGACY_LAYOUT_PARAMS,
-          edge_thicknesses: et.is_a?(Hash) ? et : {}, source: src.to_s }
+          edge_thicknesses: et.is_a?(Hash) ? et : {}, source: src.to_s,
+          repaired: Array(rep).map(&:to_s) }
       end
 
       # RED: dielec sa nezmesti na format platne (po oreze podla typu, duplak
@@ -618,7 +621,7 @@ module Noxun
 
       def check_layout_settings(lay, items)
         src = lay[:source]
-        return unless LAYOUT_FALLBACK_SOURCES.include?(src)
+        return check_layout_repaired(lay, items) unless LAYOUT_FALLBACK_SOURCES.include?(src)
 
         prm = lay[:params]
         items << {
@@ -628,6 +631,30 @@ module Noxun
                           "s predvolenými hodnotami (prerez #{mm2(prm['kerf'])} mm, orez #{mm2(prm['trim'])} mm, " \
                           "prídavok dupláku #{mm2(prm['dup_allowance'])} mm). Skontroluj Nastavenia rozpočtu.",
           'stable_key' => "#{CAT_LAYOUT_SETTINGS}|#{src}"
+        }
+      end
+
+      # NP-4 (audit B3): subor sa precital, ale prerez, orez alebo pridavok
+      # dupláku v nom mal NEPLATNU hodnotu (necislo, mimo rozsahu) a Kontrola
+      # aj plan pocitaju s predvolenou. Jeden ORANGE nalez bez dielca (vzor
+      # NP-2) — ceny podla planu taky plan nepouziju.
+      def check_layout_repaired(lay, items)
+        keys = Array(lay[:repaired])
+        return if keys.empty?
+
+        labels = keys.map do |k|
+          lbl = defined?(SupplierSettings) ? Array(SupplierSettings::SCALAR_LABELS[k]).first : nil
+          lbl.to_s.empty? ? k : lbl
+        end
+        prm = lay[:params]
+        items << {
+          'severity' => ORANGE, 'category' => CAT_LAYOUT_SETTINGS,
+          'owner_id' => nil, 'part_key' => nil, 'hw_key' => nil,
+          'message_sk' => "Nastavenia prerezu a orezu sú v súbore poškodené (#{labels.join(', ')}) — " \
+                          "Kontrola aj nárezový plán počítajú s predvolenými hodnotami (prerez #{mm2(prm['kerf'])} mm, " \
+                          "orez #{mm2(prm['trim'])} mm, prídavok dupláku #{mm2(prm['dup_allowance'])} mm) " \
+                          'a ceny podľa plánu ostávajú z odhadu. Oprav ich v Nastaveniach rozpočtu.',
+          'stable_key' => "#{CAT_LAYOUT_SETTINGS}|repaired"
         }
       end
 

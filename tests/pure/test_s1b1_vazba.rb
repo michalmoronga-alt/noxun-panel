@@ -296,8 +296,10 @@ end
 
 # ============================ 2) BUDGET_STD 2 ===============================
 
-NxTest.test('S1-B1: BUDGET_STD je 2 a polozka nesie vazbu, snapshot aj priznak') do
-  NxTest.assert_equal(2, NxS1B1::BS::BUDGET_STD)
+NxTest.test('S1-B1: BUDGET_STD je aspon 2 a polozka nesie vazbu, snapshot aj priznak') do
+  # NP-4 zdvihlo verziu na 3 (prepinac „ceny podľa plánu") — vazba spotrebica
+  # (verzia 2) plati dalej; presne cislo strazi test_np4_ceny.rb.
+  NxTest.assert(NxS1B1::BS::BUDGET_STD >= 2, "BUDGET_STD #{NxS1B1::BS::BUDGET_STD}")
   m = NxS1B1::FakeModel.new
   snap = NxS1B1.fridge_snapshot
   item, errs = NxS1B1::BS.add_appliance!(

@@ -254,10 +254,15 @@ module Noxun
       # (rozpocet aj Kontrola ho potrebuju cely), ale `changed` je vzdy false —
       # seed-merge sa don NEZAPISUJE (brana v `write` by ho aj tak odmietla;
       # takto sa o zapis ani nepokusa pri kazdom nacitani).
+      # NP-4 (audit B3): ani subor s POSKODENYM skalarom narezoveho planu sa
+      # seed-merge nezapisuje — zapis by neplatnu hodnotu nahradil predvolenou
+      # a dokaz „nastavenia su poskodene" (Kontrola, cena podla planu) by
+      # potichu zmizol. Opravi ho az vedome ulozenie v sekcii Nastavenia.
       def read_doc
         raw = JsonFileStore.read(path, copy: true)
         doc, changed = merge_seed(normalize(raw))
-        [doc, changed && !doc_std_unsupported?(raw)]
+        repaired = Array(doc['suppliers']).any? { |s| !layout_repaired(s).empty? }
+        [doc, changed && !doc_std_unsupported?(raw) && !repaired]
       end
 
       # R-08 (audit 1d #2/#10): seed-merge je READ-MODIFY-WRITE. Pod zamkom sa
@@ -312,13 +317,22 @@ module Noxun
       end
 
       # NP-2: parametre narezoveho planu pre volajucich (Kontrola; NP-3 plan).
-      # -> { params: {'kerf', 'trim', 'dup_allowance'} (Float mm), source: }
+      # -> { params: {'kerf', 'trim', 'dup_allowance'} (Float mm), source:,
+      #      version_ok:, repaired: }
       # Pri `:seed_fallback` aj `:unreadable` su hodnoty PREDVOLENE a volajuci
       # to musi priznat (Kontrola ORANGE nalezom, plan vetou „orientačne").
+      # NP-4 (audit B2, B3) — dve priznania NEZAVISLE od `source`:
+      #   version_ok — dokument NIE JE z novsej verzie formatu. `refine_origin`
+      #     prepise `:newer_file` na `:backup`, ked je primar poskodeny, takze
+      #     zdroj sam novsiu zalohu neprezradi; cena podla planu ju nesmie brat.
+      #   repaired   — kluce prerezu/orezu/pridavku, ktore v subore BOLI
+      #     neplatne a normalizacia ich nahradila predvolenymi (zdroj ostal `:file`).
       def layout_params
-        sup, source = active_with_source
+        doc, origin = load_with_origin
+        sup = supplier_of(doc)
         params = LAYOUT_KEYS.each_with_object({}) { |(k, sk), out| out[k] = scalar(sup, sk).to_f }
-        { params: params, source: source }
+        { params: params, source: refine_origin(origin), version_ok: origin != :newer_file,
+          repaired: layout_repaired(sup) }
       end
 
       # NP-2: stav suboru pre sekciu Nastavenia rozpoctu (banner + vypnute
@@ -592,7 +606,39 @@ module Noxun
         out['trim_mm'] = num_in(raw['trim_mm'], TRIM_RANGE, SCALAR_DEFAULTS['trim_mm'])
         out['dup_allowance_mm'] = num_in(raw['dup_allowance_mm'], DUP_ALLOWANCE_RANGE,
                                          SCALAR_DEFAULTS['dup_allowance_mm'])
+        repaired = repaired_scalars(raw)
+        out[REPAIRED_KEY] = repaired unless repaired.empty?
         out
+      end
+
+      # NP-4 (audit B3): skalare, ktore v subore BOLI, ale mali neplatnu
+      # hodnotu (necislo, mimo rozsahu) — normalizacia ich potichu nahradila
+      # predvolenymi a povod suboru ostal `:file`. CHYBAJUCI kluc (legacy subor
+      # bez novych poli, aj `null`) sem NEPATRI — jeho doplnenie je dovolene.
+      # Odvodeny udaj LEN v pamati: zapis ho zahodi (whitelist `normalize`),
+      # `revision` ho z platnych hodnot nikdy nezlozi.
+      REPAIRED_KEY = 'repaired_scalars'
+      SCALAR_CHECKS = {
+        'stale_days' => STALE_DAYS_RANGE, 'rounding_step' => ROUNDING_RANGE,
+        'abs_reserve_pct' => RESERVE_RANGE, 'montaz_m2_per_plate' => M2_PER_PLATE_RANGE,
+        'cp_highlight_threshold' => CP_THRESHOLD_RANGE, 'kerf_mm' => KERF_RANGE,
+        'trim_mm' => TRIM_RANGE, 'dup_allowance_mm' => DUP_ALLOWANCE_RANGE
+      }.freeze
+
+      def repaired_scalars(raw)
+        SCALAR_CHECKS.each_with_object([]) do |(key, range), out|
+          next unless raw.key?(key) && !raw[key].nil?
+
+          v = key == 'stale_days' ? int_or_nil(raw[key]) : num(raw[key])
+          out << key if v.nil? || !range.cover?(v)
+        end
+      end
+
+      # NP-4: opravene skalare NAREZOVEHO PLANU aktivneho dodavatela (kluce
+      # skalarov, napr. ['trim_mm']).
+      def layout_repaired(supplier)
+        list = supplier.is_a?(Hash) ? Array(supplier[REPAIRED_KEY]) : []
+        LAYOUT_KEYS.values & list
       end
 
       def normalize_rows(raw)
