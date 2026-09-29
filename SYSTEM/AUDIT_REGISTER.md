@@ -11,8 +11,28 @@
 > a pri uzávere bloku sa presunie do sekcie „Vyriešené" na konci. Pravidlo 1d: rieši sa LEN výrobné riziko alebo
 > ponechaný V1 rozsah; dávka bez menovanej funkcie/dlhu sa nerobí. Čísla riadkov = stav k `dc2d53f`
 > (kód sa odvtedy hýbe — pri práci sa orientuj podľa MIEN metód; nové položky citujú mená, nie čísla).
-> **Previerka 29.9.2026 ([zdroje/PREVIERKA_REGISTRA_2026-09-29.md](zdroje/PREVIERKA_REGISTRA_2026-09-29.md)):** stav otvorených položiek overený proti `main` 2a1ff94c (v0.16.0) — verdikty, dôkazy a odporúčanie pred/po V1 sú tam;
-> pri položkách nižšie je len riadok „Previerka 29.9.".
+> **Previerka 29.9.2026:** stav otvorených položiek overený proti `main` 2a1ff94c (v0.16.0) — **verdikty a poradie pred/po V1 platia podľa sekcie
+> „Stav po previerke 29.9.2026" nižšie** (autorita je tento register); dôkazy súbor:riadok a podklad pre R-13 sú v nezáväznom podklade
+> [zdroje/PREVIERKA_REGISTRA_2026-09-29.md](zdroje/PREVIERKA_REGISTRA_2026-09-29.md).
+
+## Stav po previerke 29.9.2026 (autorita — verdikty a poradie pred/po V1)
+
+**Kritérium „pred V1"** (pravidlo bloku 1d, spresnené pri previerke): výrobné alebo cenové riziko · **tichá strata uložených dát používateľa** ·
+blokovanie V1 rozsahu. Hlásená strata neuložených hodnôt, hygiena, texty, refaktor a veci len pre macOS = po V1. **O zaradení pred V1 rozhoduje Michal.**
+
+| R | Verdikt | Pred/po V1 | Veľk. | Funkčný dopad |
+|---|---|---|---|---|
+| R-37 | platí, zúžené na `supplier_settings` | **PRED V1** (kritérium splnené) | S | poškodený, ale platný súbor nastavení dodávateľa sa ticho nahradí predvolenými sadzbami a prerezom/orezom a zničí dobrú zálohu |
+| R-35 | platí | **PRED V1** (kritérium splnené — tichá strata pri dvoch oknách SketchUpu) | S/M | prvá zmena globálnych pravidiel kovania alebo rozmerových radov sa pri dvoch otvorených oknách ticho stratí |
+| R-13 | platí | **PRED V1 — rozhodnutie Michala 29.9.** | S | dielec z inej verzie štandardu Kontrola neoznačí |
+| R-38 | platí | hraničné (tichá strata len pri poškodenom súbore) | S | poškodený súbor VEPO nastavení (názvy zákaziek, zlúčenie 18/36) sa môže ticho prepísať staršou zálohou |
+| R-18 | platí | hraničné (strata neuložených hodnôt, s červenou hláškou) | S | pri súbehu úpravy bunky a ⋯ editora v Rozpočte sa rozpísané hodnoty môžu stratiť |
+| R-16 | platí | hraničné (XLSX má kód a dodávateľa) | M | dva rovnaké dekory od dvoch výrobcov majú v rozpočte rovnaký názov riadku |
+| R-25 | čiastočne (PR #350) | po V1 | S | pri vybranej doske s chybným rozmerom klik na riadok Štúdia rozpísanú zmenu zahodí |
+| R-27 | čiastočne (hint o Rozpočte zanikol) | po V1 | S | texty v Pravidlách sú nepresné |
+| R-32 | čiastočne (5 prázdnych + 4 kostrové odseky) | po V1 | S | agent musí pri zásahu čítať kód |
+| R-39 | brána správne otvorená | — | S (docs) | smer dvierok dnes žiadny výstup nespotrebúva |
+| R-05 · R-09 · R-10 · R-15 · R-17 · R-19 (zvyšok) · R-20 · R-21 · R-22 · R-23 (2)+(3) · R-24 · R-26 · R-28 · R-29 · R-30 · R-31 · R-33 · R-36 · R-40 | platia | po V1 | S–L | bez výrobného/cenového rizika a bez tichej straty uložených dát — detail pri každej položke a v podklade |
 
 ## P0 — eskalované ako okamžité hotfix dávky · **✅ OBA HOTOVÉ dávkou P0-HF (PR #252, v0.8.14, 29.8.)**
 
@@ -396,8 +416,10 @@ kombinujúce znaky U+0300–U+036F vložené v regexe SUROVO (NFC nástroj ho ti
 ### R-25 · P3 · ui · `ui/js/bridge.js:325-329`
 `studioRelay` (klik na riadok) nemá guard rozpísanej editácie Inspectora, ktorý majú 4 exportné relaye. [B9]
 **Návrh:** rovnaký `validateFields` guard. **S.**
-**✅ PR #350 (ČELÁ-B2, v0.10.8)** — `studioRelay` ide cez `nxCabinetAction` s `validateFields` (zistené previerkou 29.9.; okrajový zvyšok:
-kontrola `#boardCard .bad`, ktorú majú exportné relaye, tu chýba).
+**Previerka 29.9.: ČIASTOČNE (PR #350, ČELÁ-B2, v0.10.8)** — cesta skrinky je chránená (`studioRelay` ide cez `nxCabinetAction`
+s `validateFields`). **Otvorené:** pri vybranej DOSKE `nxCabinetAction` hneď skončí (nie je `selectedCabId`) a relay po `flushBoardEditsNow`
+pokračuje na `studio_do_select` bez kontroly `#boardCard .bad`, ktorú majú exportné relaye — klik na riadok Štúdia tak rozpísanú
+neplatnú zmenu dosky zahodí. Po V1.
 
 ### R-26 · P3 · ui · `ui/studio_dialog.rb:161-167` + `core/grain_check.rb:367-373`
 `GrainCheck.restore!` pri otvorení Štúdia nerozposiela stav → rail tvrdí opak. [B11 ≡ C7]
@@ -467,6 +489,7 @@ pred preplietaním so seed-merge cestou), ale dve súbežne otvorené okná sa n
 **Návrh:** vzor, ktorý sety aj nastavenia dodávateľa už majú — `global_revision` (SHA odtlačok súboru) do payloadu
 sekcie → klient ju posiela späť → porovnanie POD zámkom → `:conflict` a načítanie formulára nanovo. Pri rozmerových
 radoch je alternatíva zápis PO KĽÚČOCH (rad je nezávislý per rozmer), ktorý revíziu nepotrebuje. **Odhad: S/M.**
+**Previerka 29.9.: PLATÍ — PRED V1** podľa kritéria (tichá strata uložených dát; pravidlá kovania menia nákup); o zaradení rozhoduje Michal.
 
 ### R-36 · P3 (macOS) · core · `core/scale_observer.rb` — `onEraseEntity` · `notify_erase`
 Zvyšok po R-01: pri `onEraseEntity` je entita **už neplatná**, takže jej dokument sa nedá zistiť. Taká požiadavka ide
