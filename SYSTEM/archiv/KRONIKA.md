@@ -17,6 +17,38 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **NP-2 · Nárezový plán — nastavenia prerezu, orezu a prídavku + Kontrola s orezom (29.9.2026, v0.15.1 → v0.15.2, PR #419; blok 2, druhá dávka).**
+  **Nastavenia rozpočtu → Výpočet a upozornenia** dostali tri polia (mockup D, poradie medzi „m² na platňu" a „Zaokrúhlenie"): **prerez píly** 5 mm (0–10),
+  **orez okraja platne** 10 mm (0–50), **prídavok dupláku na stranu** 10 mm (0–30) — desatinné s čiarkou aj bodkou, `inputmode="decimal"`, tooltip „?" (`.nxtip`
+  prenesený do Štúdia), klientska kontrola rozsahu zo serverových `scalar_ranges` (pole zčervená, „Uložiť" povie dôvod ľudsky); chyba rozsahu na serveri menuje
+  pole popisom namiesto kľúča (všetky skaláre). **Súbor nastavení dodávateľa má verziu 2 a doprednú bránu** (vzor KOV-F1): každý zápis pečiatkuje `std`, súbor
+  z novšieho pluginu sa číta, ale nezapisuje (ani seed-merge) — brána `newer_write_blocked?` pod zámkom za R-11 číta verziu čerstvo (audit F4); sekcia ukáže
+  **banner stavu súboru hneď po otvorení** a pri novšom aj poškodenom súbore vypne „Uložiť" (`aria-disabled` s dôvodom). **Priznaný limit:** v0.15.1 a staršie
+  bránu nemajú (downgrade na tom istom `%APPDATA%` nové polia zahodí). **Kontrola „nezmestí sa"** ide cez spoločnú prípravu NP-1 (`purchase_rect` + `fits_rect?`):
+  orez podľa typu (PD, kompakt, zástena bez orezu), duplák ako prírezy s prídavkom (jeden nález), otáča len dielec bez smeru; veta menuje použiteľnú plochu
+  a hovorí „hotový rozmer vrátane ABS" (audit N5 — kontrola je opatrná). Parametre skladá jediná `ProductionCore.control_layout` pre **oboch** volajúcich
+  `Validation.run` (hrúbky ABS z už načítanej `edges_map` — audit F3); bez `layout:` ostáva správanie pred NP-2. Nové nálezy: RED **`invalid_dims`** (audit B1 —
+  `3000 × 0`, `3000 × 0,4` a NaN mali dovtedy len `oversize`) a ORANGE **`layout_settings`**, keď sa súbor nastavení nedá prečítať a Kontrola počíta s predvolenými
+  hodnotami (audit B2 — pôvod dát nesie `load_with_origin` / `active_with_source`, klik vedie do Nastavení). **Priznané zmeny výsledku:** hraničné dielce
+  (2781–2800 mm pri oreze 10) a dupláky nad použiteľnou plochou mínus prídavok sú odteraz RED; dva počítače s iným orezom dajú iný nález. Audit návrhu Codex
+  `gpt-6-astra`: **2 BLOCKER · 2 FIX · 2 NOTE — všetky prijaté** (surový výstup a package v [zdroje/bloky/NAREZ/](../zdroje/bloky/NAREZ/)). STANDARD §3.3, §10,
+  §11.4 a nová **§11.5 Nastavenia dodávateľa**; architektúra `outputs.md` (`validation.rb`, `production_core.rb`, `sheet_layout.rb`, `supplier_settings.rb` —
+  prvý úplný odsek) a `ui-lifecycle.md` (`supplier_settings_dialog.rb`, Kontrola). **Slepá predrecenzia:** OPRAVIŤ PRED PR — 0× P1, 2× P2 (chýbajúce testy:
+  prírezy dupláku pri neznámej ABS, klik na nález `layout_settings`) a 4× P3 (jednotné znenie chyby rozsahu server = klient, orez a plocha vo vete na 2 desatinné,
+  pravdivá veta fallbacku, test záchrannej vetvy `control_layout`) — všetko opravené pred PR. **Codex review kolo 1:** 1× P1 (duplákový riadok katalógu bez
+  `sheet_size` ticho vynechal nadrozmernú vrstvu zo zdroja — formát, fallback a UNI rozhoduje odteraz pripravený obdĺžnik, teda nákupný materiál) a 1× P2
+  (pôvod súboru sa odvodzoval z čítania pred zámkom seed-merge — novší súbor zapísaný medzitým by sekcia ukázala ako `ok`; pôvod sa počíta z dokumentu po
+  seed-merge) — obe opravené s testom a mutáciou. **Kolo 2:** 2× P2 — vypnuté „Uložiť" vyzeralo ako živé (vrátené úzke pravidlo
+  `.sectools .primary[aria-disabled]` s tlmenými tokenmi bez hoveru) a chyba práv či disku sa tvárila ako zapisovateľný fallback (nový stav
+  `unreadable`: banner, „Uložiť" vypnuté, Kontrola ORANGE; `seed_fallback` len pre chýbajúci a poškodený súbor bez zálohy). **Testy:** 4796 headless · 140 JS sád zelené (nové
+  `test_np2_nastavenia_kontrola.rb`, `test_np2_nastavenia.js`, `test_np2_kontrola_klik.js`); **22 mutácií — 22 zabitých** (zápis bez pečiatky `std`, brána
+  vypadnutá zo zápisu, seed-merge do novšieho súboru, brána z cache, orez pri PD, Kontrola bez prídavku dupláku, otáčanie pri `length`, klik bez `layout:`, klient
+  bez kontroly rozsahu, fallback tváriaci sa ako súbor, neplatný rozmer bez nálezu, hrúbky ABS cez `vepo_edge_thicknesses`, geometria odmietnutia bez údaja
+  o dupláku, klik na nález nastavení na server, `control_layout` bez záchrany, orez na 1 desatinné, iný popis poľa na serveri, stará stráž formátu materiálu
+  riadku, pôvod zo starého čítania, chyba práv zlúčená s fallbackom, klient neblokuje `unreadable`, vypnuté „Uložiť" bez tlmeného
+  vzhľadu). In-SU netreba (globálny súbor
+  + čítanie Kontroly, žiadny zápis do modelu).
+
 - **NP-1 · Nárezový plán — jadro výpočtu (29.9.2026, v0.15.0 → v0.15.1, PR #418; blok 2, prvá dávka).**
   Nový čistý modul `core/sheet_layout.rb` (**zatiaľ nikam nenapojený** — pre používateľa sa nič nemení, zobrazí ho NP-3): z riadkov kusovníka, katalógu dosiek
   a mapy hrúbok ABS vypočíta **per nákupný materiál** pásové (gilotínové) rozloženie na platne — počet platní, využitie, polohy, najväčší zvyšok (aj nad

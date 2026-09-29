@@ -427,12 +427,16 @@
   function ctrlRowHtml(it, i){
     var red = it.severity === 'red';
     var bud = it.category === 'budget';
+    // NP-2: nastavenia prerezu/orezu sa nenačítali — nález nemá entitu
+    // v modeli, vedie do Nastavení rozpočtu (vzor rozpočtového nálezu).
+    var lset = it.category === 'layout_settings';
+    var title = bud ? 'Prejde do sekcie Rozpočet — rovno na časť, ktorej sa nález týka.'
+      : (lset ? 'Prejde do sekcie Nastavenia rozpočtu.' : 'Klik označí nález v modeli.');
     return '<div class="ctrlrow ' + (red ? 'ctrl-red' : 'ctrl-orange') + '" data-ci="' + i + '"' +
-      ' title="' + esc(bud ? 'Prejde do sekcie Rozpočet — rovno na časť, ktorej sa nález týka.'
-                           : 'Klik označí nález v modeli.') + '">' +
+      ' title="' + esc(title) + '">' +
       '<span class="dot" aria-hidden="true"></span>' +
       '<span class="msg">' + esc(it.message_sk) + '</span>' +
-      '<span class="where">' + (bud ? 'Rozpočet' : esc(it.owner_id || '—')) + '</span>' +
+      '<span class="where">' + (bud ? 'Rozpočet' : (lset ? 'Nastavenia' : esc(it.owner_id || '—'))) + '</span>' +
       '<span class="rowact">' + ctrlActionsHtml(it) + '</span></div>';
   }
 
@@ -444,6 +448,11 @@
       return '<button type="button" class="goact" data-act="budget"' +
         ' title="Otvoriť sekciu Rozpočet na mieste nálezu"' +
         ' aria-label="Otvoriť sekciu Rozpočet">' + ico('euro') + '</button>';
+    }
+    if (it.category === 'layout_settings'){
+      return '<button type="button" class="goact" data-act="bset"' +
+        ' title="Otvoriť Nastavenia rozpočtu (prerez, orez, prídavok dupláku)"' +
+        ' aria-label="Otvoriť Nastavenia rozpočtu">' + ico('settings') + '</button>';
     }
     var h = '';
     // D-143 (KON-0): zastaraná skrinka s chrbtom v drážke — hromadná prestavba
@@ -1994,6 +2003,8 @@
           if (typeof budGoto === 'function') budGoto(it.budget_section);
           return;
         }
+        // NP-2: nenačítané nastavenia prerezu/orezu — cieľ je sekcia, nie model.
+        if (it.category === 'layout_settings'){ studioGoSection('bset'); return; }
         if (!it.stable_key) return;
         selectProblem(it.stable_key, what === 'edit');
         return;

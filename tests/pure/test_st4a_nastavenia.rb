@@ -253,7 +253,8 @@ NxTest.test('ŠT-4a: `sup` NESLUBUJE nastavenia, ktore neexistuju') do
                 'namiesto toho VEDIE tam, kde vazba naozaj zije')
   NxTest.assert(sup.include?("'mat'") && sup.include?("'budget'"),
                 'do Materialov (vazba dekoru) a do Rozpoctu (prepocet cien)')
-  tools = code[/function ssToolsHtml\(sec, failed\).*?\n  \}/m].to_s
+  # NP-2: tretí parameter `blocked` (dôvod vypnutého „Uložiť").
+  tools = code[/function ssToolsHtml\(sec, failed(?:, blocked)?\).*?\n  \}/m].to_s
   NxTest.assert(tools.include?("if (sec !== 'bset') return '';"),
                 'a lista je prazdna — tlacidlo, ktore nema co robit, je horsie nez ziadne (D-78)')
 end
@@ -553,7 +554,7 @@ NxTest.test('ŠT-4a (review #227 P2): ZLYHANY payload sa PRIZNA, nie zamlci') do
   \}/m].to_s
   NxTest.assert(body.index('SS_FAILED') < body.index('SS_STATE'),
                 'chybovy stav sa kresli PRED formularom — stary formular nesmie ostat na obrazovke')
-  tools = code[/function ssToolsHtml\(sec, failed\).*?\n  \}/m].to_s
+  tools = code[/function ssToolsHtml\(sec, failed(?:, blocked)?\).*?\n  \}/m].to_s
   NxTest.assert(tools.include?('if (failed){'), 'lista pozna chybovy stav')
   failed_branch = tools[/if \(failed\)\{.*?\n    \}/m].to_s
   NxTest.refute(failed_branch.include?('ss-save'),

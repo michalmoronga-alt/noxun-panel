@@ -57,6 +57,16 @@ module Noxun
       CAT_MATERIAL  = 'material'   # RED
       CAT_THICKNESS = 'thickness'  # RED
       CAT_OVERSIZE  = 'oversize'   # RED
+      # RED — NP-2 (audit B1): VYROBNY rozmer dielca je neplatny (nula, zaporny
+      # alebo necislo — aj po zaokruhleni na cele mm, ktorym ho dostane VEPO).
+      # Do NP-2 taky dielec hlasil (nahodou) len `oversize`; spolocna priprava
+      # `SheetLayout.purchase_rect` mu geometriu nevrati, takze bez tejto
+      # kategorie by Kontrola zmlkla. Bez exportnej brany (ako `oversize`).
+      CAT_INVALID_DIMS = 'invalid_dims'
+      # ORANGE — NP-2 (audit B2): nastavenia prerezu/orezu sa NEPODARILO
+      # nacitat a Kontrola pocita s predvolenymi 5/10/10 mm. Jeden nalez bez
+      # dielca (klik vedie do Nastaveni rozpoctu).
+      CAT_LAYOUT_SETTINGS = 'layout_settings'
       CAT_ABS       = 'abs_missing' # RED — ABS paska hrany mimo katalogu (2A-2, F6)
       CAT_FRONT_ABS = 'front_abs'  # ORANGE
       CAT_PANEL_ABS = 'panel_abs'  # ORANGE
@@ -210,11 +220,18 @@ module Noxun
       # identities (1b-3): [{kind, id}] z Bom.collect — jeden zaznam na INSTANCIU.
       #   nil = kontrola sa cela preskoci (legacy volania a headless testy bez
       #   identit; vzor placements:).
+      # layout (NP-2): { params: {'kerf','trim','dup_allowance'}, source:,
+      #   edge_thicknesses: {abs_id => Float} | nil } — parametre nadrozmeru
+      #   z nastaveni dodavatela (`ProductionCore.control_layout`, JEDINY zdroj
+      #   pre OBOCH volajucich). nil = legacy volanie: orez 0 a pridavok 0
+      #   (dnesne spravanie bez orezu — headless testy a stare volania).
+      #   `source: :seed_fallback` alebo `:unreadable` prida jeden ORANGE nalez `layout_settings`.
       def run(collected, sheets: {}, edges: nil, hardware_expansion: nil, placements: nil,
-              identities: nil)
+              identities: nil, layout: nil)
         collected = {} unless collected.is_a?(Hash)
         smap = sheets.is_a?(Hash) ? sheets : {}
         emap = edges.is_a?(Hash) ? edges : nil
+        lay = layout_context(layout)
         items = []
         # V0.6 M-B1 (audit F4): dielce na UNI materiali — ich ABS build
         # warnings sa potlacaju (jedna jasna sprava "material neurceny"
@@ -228,7 +245,8 @@ module Noxun
           s = smap[r['material_id'].to_s]
           uni_parts["#{r['owner_id']}|#{r['part_key']}"] = true if uni_sheet?(s) || abs_impossible?(s)
         end
-        Array(collected[:records]).each { |r| check_record(r, smap, emap, items) }
+        Array(collected[:records]).each { |r| check_record(r, smap, emap, items, lay) }
+        check_layout_settings(lay, items)
         # D-121b: nad TYMI ISTYMI riadkami, ake pojdu do CSV (`Bom.aggregate_rows`).
         check_name_lengths(collected[:records], emap, items)
         Array(collected[:hardware_overrides]).each { |ov| check_hardware(ov, items) }
@@ -325,7 +343,7 @@ module Noxun
 
       # --- kontroly dielca ---------------------------------------------------
 
-      def check_record(r, sheets, edges_catalog, items)
+      def check_record(r, sheets, edges_catalog, items, lay = layout_context(nil))
         return unless r.is_a?(Hash)
         mat  = r['material_id'].to_s
         role = r['role'].to_s
@@ -353,7 +371,7 @@ module Noxun
           return
         elsif sheet
           check_thickness(r, role, sheet, items)
-          check_oversize(r, sheet, items)
+          check_oversize(r, sheet, sheets, lay, items)
         end
 
         check_abs_catalog(r, edges_catalog, items) if edges_catalog
@@ -413,6 +431,10 @@ module Noxun
       def name_check_records(records)
         Array(records).filter_map do |r|
           next unless r.is_a?(Hash)
+          # NP-2 (audit B1): necislo v rozmere (NaN, nekonecno) by v agregacii
+          # zhodilo CELU Kontrolu (`Bom.dmm` -> FloatDomainError). Taky dielec do
+          # CSV nepojde; nahlas ho hlasi `invalid_dims` (check_oversize).
+          next unless [r['length'], r['width'], r['thickness']].all? { |v| v.to_f.finite? }
 
           out = r.merge(
             # `quantity` ako `Bom.record` (vzdy >= 1) — fixtura bez pola nesmie
@@ -509,32 +531,134 @@ module Noxun
         end
       end
 
-      # RED: dielec sa nezmesti na format platne. Respektuje smer dekoru (nalez 3,
-      # rovnaka logika ako VEPO oriented): grain none = obe otocenia; length/width =
-      # LEN pripustna orientacia (dlzka pozdlz dekoru = pozdlz dlzky platne).
-      def check_oversize(r, sheet, items)
-        size = sheet['sheet_size']
-        return unless size.is_a?(Array) && size.size == 2
-        sl = size[0].to_f
-        sw = size[1].to_f
-        return unless sl > 0 && sw > 0
-        return if fits_on_sheet?(r['length'].to_f, r['width'].to_f, r['grain_direction'].to_s, sl, sw)
-        items << record_item(RED, CAT_OVERSIZE, r,
-                             "Dielec „#{disp_name(r)}“ (#{disp_owner(r)}) #{fmt(r['length'])}×#{fmt(r['width'])} mm " \
-                             "sa nezmestí na formát platne #{fmt(sl)}×#{fmt(sw)} mm (materiál #{r['material_id']}).")
+      # --- NP-2: nadrozmer cez SPOLOCNU pripravu s narezovym planom ----------
+      #
+      # JEDNA PRAVDA S PLANOM (C9, G4): cely „nakupny obdlznik" (prijatie VEPO,
+      # zaokruhlenie na cele mm, jedina vymena pri grain 'width', zdroj
+      # duplaku + pridavok, format a orez podla typu) robi
+      # `SheetLayout.purchase_rect` a nerovnost „zmesti sa" `fits_rect?`.
+      # Kontrola ZIADEN z tych krokov neopakuje. Otacat smie len dielec bez
+      # smeru (`rotation_allowed?` — dnesne pravidlo vyroby); plan neotaca nikdy.
+      # Legacy volanie bez `layout:` = orez 0 a pridavok 0 (dnesne spravanie).
+      LEGACY_LAYOUT_PARAMS = { 'kerf' => 0.0, 'trim' => 0.0, 'dup_allowance' => 0.0 }.freeze
+
+      def layout_context(layout)
+        h = layout.is_a?(Hash) ? layout : {}
+        params = h.key?(:params) ? h[:params] : h['params']
+        et = h.key?(:edge_thicknesses) ? h[:edge_thicknesses] : h['edge_thicknesses']
+        src = h.key?(:source) ? h[:source] : h['source']
+        { params: params.is_a?(Hash) ? params : LEGACY_LAYOUT_PARAMS,
+          edge_thicknesses: et.is_a?(Hash) ? et : {}, source: src.to_s }
       end
 
-      def fits_on_sheet?(l, w, grain, sl, sw)
-        case grain
-        when PANEL_ROLE then fit_one(l, w, sl, sw) # nikdy — obrana; grain je length/width/none
-        when 'width'    then fit_one(w, l, sl, sw)  # VEPO swap: dlzka pozdlz dekoru = povodna sirka
-        when 'length'   then fit_one(l, w, sl, sw)
-        else                 fit_one(l, w, sl, sw) || fit_one(w, l, sl, sw) # 'none' = obe otocenia
+      # RED: dielec sa nezmesti na format platne (po oreze podla typu, duplak
+      # ako prirezy s pridavkom). Podmienky: material dielca v katalogu a nie UNI
+      # (vybavi `check_record`); format, fallback a UNI rozhoduje NAKUPNY
+      # material z `purchase_rect` (pri duplaku zdroj — Codex #419 P1), bez
+      # platneho formatu sa nehlasi nic. Jeden nalez na zaznam, kluc
+      # `oversize|owner|part_key`.
+      # Opatrna kontrola (audit N5): porovnava HOTOVY rozmer vratane ABS —
+      # VEPO si ABS odpocita, takze hranicny dielec s hrubou paskou sa v realite
+      # este zmestit moze; veta to hovori nahlas.
+      def check_oversize(r, _sheet, sheets, lay, items)
+        rect = SheetLayout.purchase_rect(r, sheets: sheets, edge_thicknesses: lay[:edge_thicknesses],
+                                            params: lay[:params])
+        # Neplatne parametre (z nastaveni nemozu prist — rozsahy strazi patch)
+        # nie su chyba DIELCA: ziadny nalez, ziaden falosny „neplatny rozmer".
+        return if rect['reason'] == 'invalid_params'
+        return items << invalid_dims_item(r) unless rect_geometry?(rect)
+
+        # Codex #419 P1: format, fallback a UNI sa beru z PRIPRAVENEHO
+        # obdlznika — teda z NAKUPNEHO materialu (pri duplaku ZDROJ), nie
+        # z riadku materialu dielca. Duplakovy riadok katalogu bez
+        # `sheet_size` by inak nadrozmernu vrstvu zo zdroja ticho vynechal.
+        # Pri beznom dielci je nakupny material = material dielca, takze
+        # „bez platneho formatu = bez nalezu" plati ako doteraz (`fallback`).
+        return if rect['fallback'] || rect['uni']
+        return if SheetLayout.fits_rect?(rect, allow_rotation: SheetLayout.rotation_allowed?(rect['grain']))
+
+        items << record_item(RED, CAT_OVERSIZE, r, oversize_text(r, rect))
+      end
+
+      def rect_geometry?(rect)
+        rect.is_a?(Hash) && !rect['l'].nil? && !rect['w'].nil? && rect['usable'].is_a?(Array)
+      end
+
+      # Audit B1: bez geometrie (nula, zaporny rozmer, necislo, rozmer < 0,5 mm,
+      # ktory VEPO zaokruhli na 0) je dielec neobjednatelny — vlastny RED.
+      def invalid_dims_item(r)
+        record_item(RED, CAT_INVALID_DIMS, r,
+                    "Dielec „#{disp_name(r)}“ (#{disp_owner(r)}) — výrobný rozmer " \
+                    "#{disp_dim(r['length'])} × #{disp_dim(r['width'])} mm je neplatný (nula alebo " \
+                    'nečíslo po zaokrúhlení na celé mm) — dielec sa nedá objednať.')
+      end
+
+      def oversize_text(r, rect)
+        sl, sw = rect['sheet_size']
+        t = rect['trim'].to_f
+        txt = "Dielec „#{disp_name(r)}“ (#{disp_owner(r)}) #{disp_dim(r['length'])} × #{disp_dim(r['width'])} mm " \
+              "(hotový rozmer vrátane ABS) sa nezmestí na platňu #{mm2(sl)} × #{mm2(sw)} mm"
+        if t.positive?
+          lu, wu = rect['usable']
+          txt += " po oreze #{mm2(t)} mm (použiteľná plocha #{mm2(lu)} × #{mm2(wu)} mm)"
         end
+        if rect['doubled']
+          n = rect['multiplier'].to_i
+          txt += " — duplák: #{n} #{n.between?(2, 4) ? 'prírezy' : 'prírezov'} " \
+                 "#{mm2(rect['l'])} × #{mm2(rect['w'])} mm"
+        end
+        "#{txt} (materiál #{rect['material_id']})."
       end
 
-      def fit_one(a, b, sl, sw)
-        a <= sl + DIM_TOL && b <= sw + DIM_TOL
+      # Audit B2: nastavenia sa nepodarilo nacitat — Kontrola to PRIZNA (jeden
+      # ORANGE nalez bez dielca), inak by nahradny orez potichu menil verdikt.
+      # Codex #419 kolo 2: to iste pri `unreadable` (subor sa neda citat —
+      # prava, zdielanie, disk); kluc nesie povod, veta je spolocna.
+      LAYOUT_FALLBACK_SOURCES = %w[seed_fallback unreadable].freeze
+
+      def check_layout_settings(lay, items)
+        src = lay[:source]
+        return unless LAYOUT_FALLBACK_SOURCES.include?(src)
+
+        prm = lay[:params]
+        items << {
+          'severity' => ORANGE, 'category' => CAT_LAYOUT_SETTINGS,
+          'owner_id' => nil, 'part_key' => nil, 'hw_key' => nil,
+          'message_sk' => 'Nastavenia prerezu a orezu sa nepodarilo načítať — Kontrola počíta ' \
+                          "s predvolenými hodnotami (prerez #{mm2(prm['kerf'])} mm, orez #{mm2(prm['trim'])} mm, " \
+                          "prídavok dupláku #{mm2(prm['dup_allowance'])} mm). Skontroluj Nastavenia rozpočtu.",
+          'stable_key' => "#{CAT_LAYOUT_SETTINGS}|#{src}"
+        }
+      end
+
+      # Tenky obal nad `SheetLayout.fits_rect?` s orezom 0 — zrkadlo VEPO vymeny
+      # (grain 'width' = dlzka pozdlz dekoru je povodna sirka) a otacania
+      # dielca bez smeru. Volaju ho priame testy K1 a KON-0; Kontrola uz ide cez
+      # `purchase_rect` (vyssie).
+      def fits_on_sheet?(l, w, grain, sl, sw)
+        a, b = grain.to_s == 'width' ? [w, l] : [l, w]
+        SheetLayout.fits_rect?({ 'l' => a.to_f, 'w' => b.to_f, 'usable' => [sl.to_f, sw.to_f] },
+                               allow_rotation: SheetLayout.rotation_allowed?(grain))
+      end
+
+      # NP-2: mm vo vete nadrozmeru s presnostou NASTAVENI (UI uklada 2
+      # desatinne) — orez 12,25 a plocha 2775,5 si tak neprotirecia. Bez
+      # zbytocnych nul, desatinna ciarka.
+      def mm2(v)
+        f = v.to_f.round(2)
+        return f.round.to_s if (f - f.round).abs < 1e-9
+
+        format('%.2f', f).sub(/0\z/, '').tr('.', ',')
+      end
+
+      # Rozmer pre vetu — aj necislo (NaN, nekonecno) sa musi dat vypisat.
+      def disp_dim(v)
+        f = v.is_a?(Numeric) || v.is_a?(String) ? v.to_f : nil
+        return (v.nil? ? '—' : v.to_s) if f.nil? || !f.finite?
+
+        fmt(f)
+      rescue StandardError
+        v.to_s
       end
 
       # M-C: typy, ktore sa ABS-om NELEPIA — kompakt (monoliticka hrana) a PD

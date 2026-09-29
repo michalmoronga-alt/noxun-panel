@@ -6,9 +6,10 @@
 
 ## Stav
 
-**v0.15.1 · 29.9.2026 — BLOK 2 · NÁREZOVÝ PLÁN (primitívny) beží:** štart bloku PR #417 (rozhodnutia N1–N11, schválený mockup), prvá dávka **NP-1 · jadro výpočtu**
-(PR #418). Plugin vie **spočítať rozloženie dielcov na platne a počet platní** (pásové rozloženie, prerez 5 / orez 10 / prídavok dupláku 10 mm, dielce sa neotáčajú),
-ale výpočet **zatiaľ nikde nezobrazuje** — pre používateľa sa nič nemení (zobrazí ho NP-3). VEPO export je bajtovo rovnaký.
+**v0.15.2 · 29.9.2026 — BLOK 2 · NÁREZOVÝ PLÁN (primitívny) beží:** štart PR #417, **NP-1** jadro výpočtu (PR #418), **NP-2** nastavenia a Kontrola s orezom (PR #419).
+V **Nastaveniach rozpočtu** sú nové polia s „?": **prerez píly** 5, **orez okraja platne** 10 a **prídavok dupláku na stranu** 10 mm (desatinné, mimo rozsahu zčervená).
+**Kontrola „nezmestí sa"** počíta s orezom (PD, kompakt, zástena bez orezu) a duplák s prírezmi — hraničné dielce (bok 2785 mm v DTD) sú odteraz červené; nový RED
+„neplatný výrobný rozmer". Plán sa ešte nezobrazuje (NP-3); VEPO export je bajtovo rovnaký.
 
 **v0.15.0 · 28.9.2026 — BLOK 8 · K3 ROHOVÁ SKRINKA UZAVRETÝ** (v0.14.0 → v0.15.0, podklady PR #409, dávky PR #410–#413 + uzáver PR #414; **smoke PASS 28.9.**, O8 ponechané).
 Plugin pozná typ **„Rohová"** (`corner_blind`) — dolnú slepú rohovú skrinku podľa DC „Rohová": korpus ako dolná + rohová zostava (**blenda korpusová**,
@@ -28,22 +29,21 @@ V1 ciele **Konštrukcia** (K1 + K2 blok 7, K3 blok 8), **Materiály, Kovanie, Sp
 (v0.15.0) — plné texty v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).
 **Kompatibilita:** skrinka je v **schéme 22** (typ `corner_blind`), **doska v schéme 2**, **šablóny v STD 7**, výrobný plán v **schéme 7**, ABS pravidlá
 v **seede 6** — starší plugin zákazku neprestaví ani nevyexportuje (rohovú by sklopil na dolnú). **Dáta rozpočtu sú od S1-B1 v `BUDGET_STD` 2** (starší plugin zákazku
-po prvej mutácii rozpočtu needituje a zastaví oba cenové exporty). **Aktualizovať OBE PC (aj Luciino) na 0.15.0 pred prvou rohovou** — starší plugin rohovú nepozná
+po prvej mutácii rozpočtu needituje a zastaví oba cenové exporty). **Nastavenia dodávateľa sú od NP-2 vo verzii súboru 2** (v0.15.1 a starší pri uložení nové polia zahodí). **Aktualizovať OBE PC (aj Luciino) na 0.15.0 pred prvou rohovou** — starší plugin rohovú nepozná
 a knižnicu šablón STD 7 len číta (nedá sa v nej ukladať, premenovať ani mazať).
 
-**Testy (posledná kódová dávka, NP-1 PR #418):** **4765 headless · 138 JS sád** zelené; in-SU netreba (čistý výpočtový modul, žiadny builder, observer ani zápis do modelu).
+**Testy (posledná kódová dávka, NP-2 PR #419):** **4796 headless · 140 JS sád** zelené; in-SU netreba (globálny súbor nastavení a čítanie Kontroly, žiadny zápis do modelu).
 **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 
 ## Robí sa
 
 **Blok 2 · Nárezový plán** (priečinok [zdroje/bloky/NAREZ/](zdroje/bloky/NAREZ/), dávky v [PLAN.md](PLAN.md)): **NP-1** jadro výpočtu (PR #418) → **NP-2** nastavenia
-prerezu, orezu a prídavku + Kontrola „nezmestí sa" s orezom → **NP-3** sekcia Nárezový plán v Štúdiu → **NP-4** ceny podľa plánu. Pri prvej rohovej v dielni ostáva overiť
-záves Sensys na výstuhe závesov. **Čakajú na smoke:** **D-132** (#367), **D-133** (#368), **D-134** (#369). **D-141**, **D-142**, **D-145** a **D-146** sú v zásobníku.
-**Blok 1d** podľa kapacity — R-18; **R-13 čaká na Michala**.
+prerezu, orezu a prídavku + Kontrola „nezmestí sa" s orezom (PR #419) → **NP-3** sekcia Nárezový plán v Štúdiu → **NP-4** ceny podľa plánu. Pri prvej rohovej v dielni ostáva overiť
+záves Sensys na výstuhe závesov. **Čakajú na smoke:** **D-132** (#367), **D-133** (#368), **D-134** (#369). **D-141**, **D-142**, **D-145** a **D-146** sú v zásobníku. **Blok 1d** podľa kapacity — R-18; **R-13 čaká na Michala**.
 
 ## Ďalší krok
 
-**NP-2** (package a audit návrhu pripravuje orchestrátor). Smoke bloku 2 príde s NP-3 — NP-1 ani NP-2 nemajú vlastnú viditeľnú sekciu.
+**NP-3** — sekcia Nárezový plán v Štúdiu; smoke bloku 2 príde s ňou (NP-2 sa dá skúsiť už teraz: bok 2790 mm v DTD → červený nález, orez 0 → zmizne).
 **Aktualizovať plugin na oboch PC** (Michal aj Lucia). Nálezy z výroby a cien majú prednosť.
 
 ## Posledné uzávery

@@ -638,7 +638,8 @@ NxTest.test('nastavenia: prah sa da prepisat patchom a mimo rozsahu sa odmietne'
   NxTest.assert_equal(250.0, ss.active['cp_highlight_threshold'])
   bad, errs = ss.patch_active!('cp_highlight_threshold' => 'nie je cislo')
   NxTest.refute(bad)
-  NxTest.assert(errs.join.include?('cp_highlight_threshold'))
+  # NP-2: chyba rozsahu menuje pole LUDSKY (nie surovy kluc).
+  NxTest.assert(errs.join.include?('Samostatný riadok v cenovej ponuke od'), errs.inspect)
   NxTest.assert_equal(250.0, ss.reload!['suppliers'].first['cp_highlight_threshold'],
                       'odmietnuty patch nic nezmenil')
   ss.patch_active!('cp_highlight_threshold' => 150.0) # cistota pre dalsie testy
