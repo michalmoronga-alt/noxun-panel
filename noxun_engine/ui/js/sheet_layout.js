@@ -329,6 +329,29 @@
       (warn.pi + 1) + '</button></div>';
   }
 
+  // Chip duplákov karty. Súčty (hotové kusy, prírezy) sú za VŠETKY duplákové
+  // riadky materiálu; rozmer „hotový → prírez" sa ukáže LEN keď ho majú všetky
+  // rovnaký (Codex #420 P2 — rozmer prvého riadku by pri viacerých rozmeroch
+  // klamal). Pri rôznych rozmeroch je rozpis po riadkoch v tooltipe.
+  function npDupChipHtml(dups){
+    var dq = 0, dn = 0, sizes = {};
+    dups.forEach(function(r){
+      dq += r.q; dn += r.c;
+      sizes[[r.fl, r.fw, r.l, r.w].join('|')] = true;
+    });
+    var one = Object.keys(sizes).length === 1;
+    var tip = 'Duplák sa lepí z prírezov zdrojového materiálu — toľko, koľko má vrstiev (2 alebo 3); ' +
+      'každý prírez má prídavok na každú stranu. VEPO ich zlepí a oreže na hotový rozmer.';
+    if (!one){
+      tip += '\n' + dups.map(function(r){
+        return (r.n || '') + ': ' + r.q + ' ks = ' + npRects(r.c) + ' ' + npDim(r.fl, r.fw) + ' → ' + npDim(r.l, r.w);
+      }).join('\n');
+    }
+    return '<span class="npchip info" title="' + npEsc(tip) + '">vrátane ' + dq + ' ' +
+      npPl(dq, 'dupláku', 'duplákov', 'duplákov') + ' = ' + npRects(dn) + ' s prídavkom' +
+      (one ? ' (' + npDim(dups[0].fl, dups[0].fw) + ' → ' + npDim(dups[0].l, dups[0].w) + ')' : '') + '</span>';
+  }
+
   function npCardHtml(mat, idx, closed){
     var warn = npLastWarn(mat);
     var hex = npRgb(mat.rgb);
@@ -350,13 +373,7 @@
     var chips = '';
     var dups = (mat.rows || []).filter(function(r){ return r.d; });
     if (dups.length){
-      var dq = 0, dn = 0;
-      dups.forEach(function(r){ dq += r.q; dn += r.c; });
-      var ex = dups[0];
-      chips += '<span class="npchip info" title="Duplák sa lepí z prírezov zdrojového materiálu — toľko, koľko má vrstiev (2 alebo 3); ' +
-        'každý prírez má prídavok na každú stranu. VEPO ich zlepí a oreže na hotový rozmer.">vrátane ' + dq + ' ' +
-        npPl(dq, 'dupláku', 'duplákov', 'duplákov') + ' = ' + npRects(dn) + ' s prídavkom (' + npDim(ex.fl, ex.fw) + ' → ' +
-        npDim(ex.l, ex.w) + ')</span>';
+      chips += npDupChipHtml(dups);
     }
     if (mat.no_trim) chips += '<span class="npchip info">bez orezu — hrany hotové</span>';
     if (mat.fallback) chips += '<span class="npchip warn">' + npIco('alert') + 'formát chýba — plán len orientačný</span>';
@@ -608,7 +625,7 @@
       npParamChipHtml: npParamChipHtml, npToolsHtml: npToolsHtml, npPlateSvg: npPlateSvg,
       npSummaryHtml: npSummaryHtml, npBannersHtml: npBannersHtml, npCardHtml: npCardHtml,
       npDetailHtml: npDetailHtml, npBodyHtml: npBodyHtml, npValidDetail: npValidDetail,
-      npMissHtml: npMissHtml, npSelect: npSelect, npOnClick: npOnClick,
+      npMissHtml: npMissHtml, npSelect: npSelect, npOnClick: npOnClick, npDupChipHtml: npDupChipHtml,
       npRenderBody: npRenderBody, npRenderTools: npRenderTools,
       npSetState: function(sl){ npState = sl; },
       npGetDetail: function(){ return npDetail; },

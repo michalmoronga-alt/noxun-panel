@@ -91,6 +91,21 @@ ok(body.indexOf('npcount inc') >= 0 && body.indexOf('celkový počet neznámy') 
 ok(body.indexOf('data-np-param') < 0, 'chip parametrov patrí lište, nie telu');
 ok(body.indexOf('vrátane 2 duplákov = 4 prírezy s prídavkom (820 × 580 → 840 × 600)') >= 0,
    'duplák = hotové kusy + prírezy s prídavkom');
+// Codex #420 P2: viac duplákových riadkov — súčty za všetky; rozmer len keď je spoločný
+const DUP2 = { k: null, n: 'Bočnica 36 vysoká', s: 'Bočnica', o: 'BRD-002', l: 2020, w: 600, c: 6, d: true, m: 2, q: 3, fl: 2000, fw: 580 };
+const DUP_SAME = { k: null, n: 'Bočnica 36 B', s: 'Bočnica', o: 'BRD-003', l: 840, w: 600, c: 2, d: true, m: 2, q: 1, fl: 820, fw: 580 };
+const rowsD = mat().rows;
+let chip = NP.npDupChipHtml([rowsD[1], DUP2]);
+ok(chip.indexOf('>vrátane 5 duplákov = 10 prírezov s prídavkom</span>') >= 0, 'rôzne rozmery: súčty bez rozmeru prvého riadku');
+ok(chip.slice(chip.indexOf('">') + 2).indexOf('820') < 0, 'rozmer prvého riadku nie je v texte chipu');
+ok(chip.indexOf('Bočnica 36: 2 ks = 4 prírezy 820 × 580 → 840 × 600') >= 0 &&
+   chip.indexOf('Bočnica 36 vysoká: 3 ks = 6 prírezov 2000 × 580 → 2020 × 600') >= 0, 'rozpis po riadkoch v tooltipe');
+chip = NP.npDupChipHtml([rowsD[1], DUP_SAME]);
+ok(chip.indexOf('>vrátane 3 duplákov = 6 prírezov s prídavkom (820 × 580 → 840 × 600)</span>') >= 0,
+   'rovnaký rozmer vo viacerých riadkoch: rozmer ostáva');
+body = NP.npBodyHtml(sl([mat({ rows: mat().rows.concat([DUP2]) })]), { closed: {} });
+ok(body.indexOf('vrátane 5 duplákov = 10 prírezov s prídavkom</span>') >= 0, 'karta používa ten istý chip');
+body = NP.npBodyHtml(A, { closed: {} });
 ok(body.indexOf('Posledná platňa:') < 0 || /Posledná platňa:<\/b> 3 dielce/.test(body), 'upozornenie len kde má byť');
 // predvolené otvorenie (F11): prvá karta + karta s problémom; tretia zbalená a BEZ SVG
 const cards = body.split('<div class="npcard');
