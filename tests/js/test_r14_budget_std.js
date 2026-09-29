@@ -154,13 +154,15 @@ ok(body.indexOf('class="btotal"') > -1, 'sumy sa dalej ZOBRAZUJU (citanie sa neb
 ok(tools.indexOf('data-bud="xlsx"') > -1, 'export z listy nezmizol (len sa vypne)');
 
 const blocked = actionState();
-['mode', 'xlsx', 'draft', 'remove', 'more', 'override', 'multiplier', 'appl_included',
+['mode', 'xlsx', 'draft', 'remove', 'more', 'override', 'multiplier', 'appl_included', 'plan_prices',
  'custom_field', 'appl_field'].forEach(function(a){
   if (blocked[a] === undefined) return; // ovladac v tomto payloade nie je
   ok(blocked[a] === true, 'novsia zakazka: ovladac ' + a + ' je VYPNUTY');
 });
 ok(blocked.mode === true && blocked.xlsx === true,
    'rezim aj XLSX rozpocet su v tomto payloade a musia byt vypnute');
+ok(blocked.plan_prices === true,
+   'NP-4: prepinac „ceny podľa plánu" v tomto payloade JE (sekcia Materiál) a je vypnuty');
 ok(blocked.vat === false, 'prepinac DPH ostava — je to cire ZOBRAZENIE');
 ok(blocked.refresh === false, 'a „Prepočítať ceny" tiez (zapisuje do katalogu, nie do zakazky)');
 
@@ -242,7 +244,7 @@ ok(sandbox.budStdOff('xlsx', { budget_std: OKSTD }) === false,
 // Zoznam vypnutych akcii je KOMPLETNY voci mutaciam, ktore posiela klient:
 // kazdy `budSend('<op>')` v budget.js musi mat svoj ovladac v BUD_STD_OFF.
 const SRC = fs.readFileSync(path.join(JS_DIR, 'budget.js'), 'utf8');
-['mode', 'override', 'multiplier', 'viz_m2', 'appl_included', 'cp_sep', 'custom_field',
+['mode', 'override', 'multiplier', 'viz_m2', 'appl_included', 'plan_prices', 'cp_sep', 'custom_field',
  'appl_field', 'draft', 'remove', 'more', 'xlsx', 'cp'].forEach(function(a){
   ok(sandbox.BUD_STD_OFF[a] === 1, 'ovladac ' + a + ' patri medzi vypnute');
 });

@@ -3429,10 +3429,10 @@ module Noxun
         rows = Array(mats && mats['rows']).select { |r| r.is_a?(Hash) && r['qty_source'] == 'estimate' }
         return '' if rows.empty?
 
-        names = rows.first(PLAN_EXPORT_NAMES).map { |r| r['nazov'].to_s }
-        more = rows.length - names.length
-        names << "a #{more} ďalšie" if more.positive?
-        " · z odhadu (nie podľa plánu): #{names.join(', ')}"
+        names = rows.first(PLAN_EXPORT_NAMES).map { |r| r['nazov'].to_s }.join(', ')
+        more = rows.length - PLAN_EXPORT_NAMES
+        names += " a #{more} #{more.between?(1, 4) ? 'ďalšie' : 'ďalších'}" if more.positive?
+        " · z odhadu (nie podľa plánu): #{names}"
       end
 
       # ↗ v riadku: URL sa NEBERIE z klienta — dohladava sa v modeli podla ID

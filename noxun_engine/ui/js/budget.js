@@ -238,7 +238,7 @@
   // okna) a „Prepočítať ceny" — ten zapisuje do KATALOGU cien, nie do zakazky,
   // a jeho vysledok je spravny bez ohladu na verziu dat rozpoctu.
   var BUD_STD_OFF = { mode: 1, draft: 1, remove: 1, more: 1, override: 1, multiplier: 1,
-                      viz_m2: 1, appl_included: 1, cp_sep: 1, custom_field: 1,
+                      viz_m2: 1, appl_included: 1, plan_prices: 1, cp_sep: 1, custom_field: 1,
                       appl_field: 1, xlsx: 1, cp: 1 };
 
   var BUD_STD_FALLBACK = 'Dáta rozpočtu nie sú kompatibilné s touto verziou — úpravy a cenové ' +
@@ -569,6 +569,13 @@
     return base;
   }
 
+  // NP-4: pomocny text prepinaca „ceny podľa plánu" (mockup C2 + audit F5).
+  var BUD_PLAN_TIP = 'Zapnuté: počet platní berie rozpočet z nárezového plánu (horná hranica) — len pri ' +
+    'materiáli s úplným plánom a formátom platne z katalógu. Ostatné ostávajú na odhade z m² ' +
+    'a riadok povie prečo.\nPorez ide za počtom platní v Materiáli, montáž ostáva z odhadu. VEPO účtuje ' +
+    'celé tabule podľa vlastného rezania — jeho počet sa môže líšiť.\nPlatí len pre túto zákazku, ' +
+    'predvolene vypnuté — otvorenie staršej zákazky ceny nezmení. Po Späť klikni na Obnoviť.';
+
   function budSectionHtml(sec, b, d){
     var open = budSectionOpen(sec.key);
     var off = (sec.counts_in_total === false);
@@ -582,6 +589,17 @@
       h += '<label class="bappl" onclick="event.stopPropagation()">' +
            '<input type="checkbox" data-bud="appl_included"' +
            (sec.included ? ' checked' : '') + '> sčítať do rozpočtu</label>';
+    }
+    if (sec.key === 'materials'){
+      // NP-4 (mockup C2, O5): prepinac „ceny podľa plánu" — ten isty vzor ako
+      // pri Spotrebicoch; tooltip `?` nesmie zbalit sekciu (stopPropagation
+      // aj preventDefault — tlacidlo v <summary> by ju inak prepinalo).
+      h += '<label class="bappl" onclick="event.stopPropagation()">' +
+           '<input type="checkbox" data-bud="plan_prices"' +
+           (b && b.plan_prices === true ? ' checked' : '') + '> ceny podľa plánu</label>' +
+           '<button type="button" class="nxtip" aria-label="Pomoc" data-tip="' + bEsc(BUD_PLAN_TIP) + '"' +
+           ' onclick="event.stopPropagation();event.preventDefault()">' +
+           '<svg class="ic" aria-hidden="true"><use href="#i-help-circle"/></svg></button>';
     }
     h += '<span class="bsubt' + (off ? ' off' : '') + '">' + bEsc(budSub(sec.subtotal, d)) + '</span></summary>';
     h += budTableHtml(sec, b, d);
@@ -667,12 +685,22 @@
     var perM2 = (r.price_per_m2 != null)
       ? ' <span class="bfnt">(' + bEsc(budFmtEur(budDisplay(r.price_per_m2, BUD_VAT, d))) + '/m²)</span>' : '';
     return '<tr' + budRowClass(r) + '><td>' + bEsc(r.nazov) + budNoteHtml(r) + '</td>' +
-      '<td class="bnum">' + bEsc(budFmtNum(r.mnozstvo, 0)) + '</td>' +
+      '<td class="bnum">' + budQtyTagHtml(r) + bEsc(budFmtNum(r.mnozstvo, 0)) + '</td>' +
       '<td class="bnum">' + bEsc(r.mj) + '</td>' +
       '<td class="bnum">' + (r.price_missing ? '<span class="bmisslbl">chýba cena</span>'
         : bEsc(budSub(r.cena_mj, d)) + perM2) + '</td>' +
       '<td class="bnum">' + fresh + '</td>' +
       '<td class="bnum">' + bEsc(budSub(r.spolu, d)) + '</td></tr>';
+  }
+
+  // NP-4 (mockup C3): znacka zdroja mnozstva — LEN ked ju server poslal
+  // (zapnuty prepinac). Pri vypnutom riadok nema `qty_source` a znacka nie je.
+  // Text tooltipu sklada SERVER (`qty_tip`), klient ho len escapuje.
+  function budQtyTagHtml(r){
+    if (!r || (r.qty_source !== 'plan' && r.qty_source !== 'estimate')) return '';
+    var plan = r.qty_source === 'plan';
+    return '<span class="qtag ' + (plan ? 'plan' : 'est') + '" title="' + bEsc(r.qty_tip || '') + '">' +
+           (plan ? 'podľa plánu' : 'z odhadu') + '</span>';
   }
 
   // Vek ceny per riadok — stav aj vek počíta SERVER (stale.items), tu sa len
@@ -1792,7 +1820,10 @@
   // --- akcie ---------------------------------------------------------------
 
   // GH #138 P2: kym bezi predchadzajuci zapis, dalsi ide DO FRONTY (nie do
-  // koša) — odosle sa hned po prichode cerstveho payloadu, uz s novou `gen`.
+  // koša) — odosle sa hned po prichode cerstveho payloadu. NP-4 (audit B1):
+  // s identitou dokumentu a `gen` z OKAMIHU KLIKNUTIA (push po mutacii
+  // rozpoctu generaciu nedviha, takze bezny dalsi zapis prejde; po zmene
+  // modelu ci dokumentu ho server odmietne ako zastaraly).
   // S1-B1 (B4): identita dokumentu, ktoremu payload patri. Modal si ju drzi od
   // svojho otvorenia a posiela JU — nie aktualnu.
   var BUD_MODAL_DOC = null;
@@ -1865,7 +1896,15 @@
   // dotaz naseptavaca; ziadna odpoved z predchadzajuceho dokumentu sa uz
   // nesmie nikam zapisat.
   function budDocSwitched(guid){
-    if (BUD_MODAL_DOC === null || String(guid || '') === String(BUD_MODAL_DOC)) return false;
+    // NP-4 (audit B1): cakajuci zapis patri dokumentu, v ktorom sa KLIKLO —
+    // pri KAZDEJ zmene dokumentu (aj bez otvoreneho modalu) sa zapisy cudzieho
+    // dokumentu z fronty zahodia. Inak by `plan_prices` zo zakazky A po
+    // prichode payloadu B odisiel s identitou B a server by ho prijal.
+    var g = String(guid || '');
+    for (var qi = BUD_QUEUE.length - 1; qi >= 0; qi--){
+      if (String(BUD_QUEUE[qi].doc) !== g) BUD_QUEUE.splice(qi, 1);
+    }
+    if (BUD_MODAL_DOC === null || g === String(BUD_MODAL_DOC)) return false;
     BUD_MODAL_DOC = null;
     BUD_APPL_Q.done = null;
     BUD_APPL_Q.gen++;
@@ -1876,25 +1915,39 @@
     return true;
   }
 
-  function budSend(op, extra){
+  // `pinned` = {doc, gen} polozky fronty (len pri jej uvolneni) — identita
+  // z OKAMIHU KLIKNUTIA, nie z payloadu, ktory medzitym prisiel.
+  function budSend(op, extra, pinned){
     var st = budData();
     if (!st || !window.sketchup || !sketchup.budget_mutate) return;
     // R-14: poistka pre klik zo zastaraneho DOM (ovladace su vypnute uz pri
     // kresleni). Server mutaciu odmietne tak ci tak — toto ju len nepusti do
     // fronty a povie dovod hned.
     if (budStdBlocked(st.budget)){ NX.setStatus(budStdReason(st.budget), true); return; }
+    extra = extra || {};
     // S1-B1 (B4): zapis z MODALU ide s identitou dokumentu, v ktorom modal
     // vznikol. Server nezhodne ID odmietne — a to je spravne: medzitym
     // prepnuty dokument nesmie dostat cudziu polozku.
-    if (BUD_MODAL_DOC !== null && budModalOp(op) && budModalOpen()){
-      extra = extra || {};
-      extra.model_guid = BUD_MODAL_DOC;
+    // NP-4 (audit B1): KAZDY zapis nesie identitu dokumentu aj generaciu
+    // z okamihu kliknutia — aj ked caka vo fronte. Server tak cudzi alebo
+    // zastaraly zapis odmietne (guid aj gen), klient ho pri zmene dokumentu
+    // z fronty zahodi (`budDocSwitched`).
+    var doc, gen;
+    if (pinned){
+      doc = String(pinned.doc);
+      gen = pinned.gen;
+    } else {
+      doc = (BUD_MODAL_DOC !== null && budModalOp(op) && budModalOpen()) ? String(BUD_MODAL_DOC) : budModelGuid();
+      gen = st.gen;
     }
-    if (BUD_BUSY){ BUD_QUEUE.push([op, extra]); return; }
+    extra.model_guid = doc;
+    if (BUD_BUSY){ BUD_QUEUE.push({ op: op, extra: extra, doc: doc, gen: gen }); return; }
     BUD_BUSY = true;
     if (budBusyTimer) clearTimeout(budBusyTimer);
     budBusyTimer = setTimeout(budAfterPush, BUD_BUSY_MS);
-    sketchup.budget_mutate(JSON.stringify(budMutation(st, op, extra)));
+    var p = budMutation(st, op, extra);
+    p.gen = gen;
+    sketchup.budget_mutate(JSON.stringify(p));
   }
 
   // Vola sa po KAZDOM prichode payloadu (aj po odmietnutom zapise — server
@@ -1914,9 +1967,14 @@
     if (BUD_MORE && !(typeof window !== 'undefined' && window.NXModal && NXModal.isOpen())){
       BUD_MORE = null;
     }
-    if (!BUD_QUEUE.length) return;
-    var next = BUD_QUEUE.shift();
-    budSend(next[0], next[1]);
+    // NP-4 (audit B1): zapis z INEHO dokumentu sa neodosiela nikdy (poistka
+    // k `budDocSwitched` — napr. poistny timer bez noveho payloadu).
+    while (BUD_QUEUE.length){
+      var next = BUD_QUEUE.shift();
+      if (String(next.doc) !== budModelGuid()) continue;
+      budSend(next.op, next.extra, next);
+      return;
+    }
   }
 
   function budNumericSend(input, op, extra){
@@ -2092,7 +2150,7 @@
       // zapis z inej zakazky sa nesmie odoslat ani s novou generaciou.
       budDocSwitched(data ? data.model_guid : '');
       budPrevSetStudio(data);
-      budAfterPush(); // fronta sa odosiela AZ s cerstvou gen z tohto payloadu
+      budAfterPush(); // fronta sa odosiela AZ po tomto payloade (identita z kliknutia)
     };
     // S1-B1: odpoved naseptavaca katalogu spotrebicov (modal Rozpoctu).
     NX.applLookupResult = function(res){ budApplLookupResult(res); };
@@ -2218,6 +2276,9 @@
         budNumericSend(t, 'viz_m2', function(v){ return { value: v }; });
       } else if (a === 'appl_included'){
         budSend('appl_included', { included: t.checked === true });
+      } else if (a === 'plan_prices'){
+        // NP-4: prepinac „ceny podľa plánu" (1 zmena = 1 krok Späť).
+        budSend('plan_prices', { enabled: t.checked === true });
       } else if (a === 'cp_sep'){
         // Š14: per-riadok prepínač „samostatne" v sekcii Cenová ponuka. TÁ ISTÁ
         // mutácia `cp_group` ako predtým šípka v náhľade (1 zmena = 1 krok Späť).
