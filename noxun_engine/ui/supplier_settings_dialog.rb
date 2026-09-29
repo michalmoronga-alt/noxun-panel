@@ -125,8 +125,9 @@ module Noxun
         # GLOBALNE (rovnako ako sablony).
         #
         # NP-2: payload nesie aj `settings_state` (ok | degraded | newer |
-        # fallback + veta) — sekcia ukaze BANNER hned, nie az pri pokuse
-        # o ulozenie, a pri `degraded`/`newer` vypne „Uložiť" — a `scalar_ranges`
+        # fallback | unreadable + veta) — sekcia ukaze BANNER hned, nie az pri
+        # pokuse o ulozenie, a pri `degraded`/`newer`/`unreadable` vypne
+        # „Uložiť" — a `scalar_ranges`
         # (klientska kontrola rozsahu cita TIE ISTE rozsahy ako server).
         def settings_payload
           sup, source = SupplierSettings.active_with_source

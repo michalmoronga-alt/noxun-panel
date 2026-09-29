@@ -199,7 +199,9 @@ function state(over){
   const ban = findAll(ELS.secbody, function(x){ return x.classList && x.classList.contains('hwbanner'); });
   eq(ban.length, 1, 'banner je v tele hneď po otvorení');
   ok(ban[0].classList.contains('hwbanner-stop'), 'zablokovaný zápis = červený banner');
-  ok(/novší plugin/.test(ban[0].textContent) && /Uloženie je vypnuté/.test(ban[0].textContent));
+  ok(/novší plugin/.test(ban[0].textContent) && /zápisy sú vypnuté/.test(ban[0].textContent));
+  // NP-3 (slepá delta #419 P3): vypnutie sa povie RAZ — nie dvakrát.
+  eq((ban[0].textContent.match(/vypnut/g) || []).length, 1, 'jedna veta o vypnutí');
   ok(/aria-disabled="true"/.test(ELS.sectools.innerHTML), 'lišta sekcie má vypnuté „Uložiť"');
 
   const t = mkEl('input');
@@ -223,6 +225,10 @@ function state(over){
   ok(/aria-disabled="true"/.test(ELS.sectools.innerHTML), 'nečitateľný súbor: „Uložiť" vypnuté');
   const ub = findAll(ELS.secbody, function(x){ return x.classList && x.classList.contains('hwbanner'); });
   ok(ub.length === 1 && ub[0].classList.contains('hwbanner-stop'), 'a červený banner s dôvodom');
+  eq((ub[0].textContent.match(/vypnut/g) || []).length, 1, 'nečitateľný: vypnutie povie raz');
+  T.ssApplyState(state({ settings_state: { state: 'degraded', reason: '' } }));
+  const eb = findAll(ELS.secbody, function(x){ return x.classList && x.classList.contains('hwbanner'); });
+  ok(eb.length === 1 && /Uloženie je vypnuté\./.test(eb[0].textContent), 'dôvod bez vety o vypnutí ju dostane');
 
   T.ssApplyState(state({ settings_state: { state: 'fallback', reason: 'Súbor nastavení dodávateľa sa nepodarilo prečítať' } }));
   const fb = findAll(ELS.secbody, function(x){ return x.classList && x.classList.contains('hwbanner'); });

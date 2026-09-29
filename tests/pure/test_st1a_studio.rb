@@ -929,8 +929,11 @@ NxTest.test('SMOKE 22.8. (1A–1D): LISTA Kusovnika a rohove nastavenie VEPO —
                 'nastavenie VEPO ma hlavicku')
   NxTest.assert(ST1B_STUDIO_HTML.include?('.vepomenu .mgrp'), 'a jej styl (klon .colmenu .mgrp)')
 
-  # Review #5: pravidlo pre neaktivne ovladace listy ZANIKLO spolu s poslednym
-  # z nich — mrtve CSS sluby vzor, ktory sa uz nekresli.
+  # Review #5: vseobecne pravidlo pre neaktivne ovladace listy ZANIKLO spolu
+  # s poslednym z nich — mrtve CSS sluby vzor, ktory sa uz nekresli. NP-2 vratila
+  # len UZKE pravidlo `.sectools .primary[aria-disabled]` (zelene „Uložiť"
+  # Nastaveni rozpoctu aj „Nový spotrebič" katalogu spotrebicov pri
+  # `writable=false`, vzor D-78) — vseobecne ostava zmazane.
   NxTest.refute(ST1B_STUDIO_HTML.include?('.sectools [aria-disabled="true"]'),
                 'mrtve pravidlo `.sectools [aria-disabled]` je zmazane')
 

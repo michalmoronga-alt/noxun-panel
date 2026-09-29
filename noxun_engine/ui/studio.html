@@ -126,10 +126,11 @@
                                            cursor: default; }
   /* Review #5: všeobecné pravidlo pre `.sectools [aria-disabled]` ZANIKLO spolu
      s posledným neaktívnym ovládačom lišty (XLSX/CSV kusovníka, SMOKE 22.8.).
-     NP-2 (Codex #419 kolo 2): vrátilo sa ÚZKO pre ovládač, ktorý ho naozaj
-     potrebuje — „Uložiť" Nastavení rozpočtu pri súbore z novšieho pluginu,
-     poškodenom alebo nečitateľnom (`aria-disabled` s dôvodom, D-78). Bez neho
-     by vyzeralo ako živé zelené tlačidlo aj s hoverom, hoci klik len povie dôvod. */
+     NP-2 (Codex #419 kolo 2): vrátilo sa ÚZKO pre ZELENÉ (primárne) ovládače
+     lišty s `aria-disabled` a dôvodom (D-78) — „Uložiť" Nastavení rozpočtu pri
+     súbore z novšieho pluginu, poškodenom alebo nečitateľnom a „Nový spotrebič"
+     v katalógu spotrebičov pri `writable=false` (žiaduce, vzor D-78). Bez neho
+     by vyzerali ako živé zelené tlačidlá aj s hoverom, hoci klik len povie dôvod. */
   .sectools .primary[aria-disabled="true"],
   .sectools .primary[aria-disabled="true"]:hover { background: var(--nx-surface-sunken);
                                                    color: var(--nx-ink-faint);
