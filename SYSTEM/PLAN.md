@@ -220,7 +220,13 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 - ✅ **D-124 · Predvoľby projektu v Materiáloch** — default rozbalené, ručne zbaliteľné; štyri skupiny Korpus / Čelá / Chrbát / Zásuvky vedľa seba, náhľady **115 × 115 px**
   (schválený mockup mínus 20 %), celý názov variantu a údaje pod vzorkou; v úzkom okne dva stĺpce. Spoločný picker, potvrdenie/zrušenie a serverový kontrakt zachované.
   **PR #344, v0.10.3.** „Materiál per rola dielca" ostáva v zásobníku Po V1. Podklad: `zdroje/next_sessions/D124_OUTSIDE_IN_2026-09-10.md`.
-- **Ceny — zvyšok V1-03:** ručné overenie cien **materiálov/ABS** bez Demos väzby a viac URL na položke ostávajú v zásobníku; vytiahnuť podľa reálnej praxe.
+- **Ceny — zvyšok V1-03 → blok CENY (štart 29.9.2026, Michal: „poďme na ceny materiálov a ABS" — posledný kódový bod V1):** ručné overenie cien **materiálov/ABS**
+  bez Demos väzby a viac URL na položke. Priečinok bloku [zdroje/bloky/CENY/](zdroje/bloky/CENY/) — rozhodnutia
+  [ROZHODNUTIA_MICHALA_2026-09-29.md](zdroje/bloky/CENY/ROZHODNUTIA_MICHALA_2026-09-29.md); dávky pribudnú s packages.
+- **Poradie pred uzáverom V1 (Michal 29.–30.9.2026):** blok **CENY** (CENY-M1 → CENY-M2) → **R-13** (čítať `std` na entite, ORANGE „dielec z inej verzie
+  štandardu") → **R-37** (ochrana nastavení dodávateľa pred tichým prepísaním seedom) → **R-35** (dve okná SketchUpu si neprepíšu pravidlá kovania
+  a rozmerové rady) — plné znenia a verdikty v [AUDIT_REGISTER.md](AUDIT_REGISTER.md) (sekcia „Stav po previerke 29.9.2026"). **Test na kompletnej
+  reálnej zákazke až po V1** (Michal 29.9.: teraz nemá vhodnú zákazku); po dobehnutí týchto bodov Michal určí ďalší postup.
   **CENY-KOV-A/B je hotové** (10.9.2026, PR #345/#346, v0.10.4–v0.10.5): jeden produktový odkaz a ručné potvrdenie katalógového kovania; plný schválený rozsah v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).
   Pôvodná debata: [zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md). Prepínač „na faktúru“ je vyradený (existuje s DPH / bez DPH); DOCX/PDF ponuka a rodina dokumentov sú mimo V1.
 - ✅ **D-128 · Ručná výška dreveného boxu zásuvky (Quadro)** — tretia os zámku (`box_height`) popri NL a výškovom variante Atiry: chip „box 360" s malým číselným poľom

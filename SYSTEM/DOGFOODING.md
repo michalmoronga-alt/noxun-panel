@@ -41,7 +41,7 @@ Smoke bloku 2 **PASS 29.9.2026** (bez chýb); nové postrehy k týmto funkciám 
   (zvyšok V1-03; dnes ich „Prepočítať ceny" preskočí) · ~~prepínač „na faktúru" (×1,2)~~ — **vyradené 6.9.2026** (Michal: existuje prepínač s DPH / bez DPH); zvyšok rozhodnutý v `zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md`.
   **Katalógové kovanie je hotové (10.9., CENY-KOV-A/B, PR #345/#346):** jeden produktový odkaz, preklik a ručné potvrdenie ceny k dnešku v katalógu/Rozpočte. Materiály/ABS a viac URL sú naďalej otvorené.
   *(Piaty kus tej istej odkladovej sady — EN DANIELI textový export — je v skupine KONTROLA + VÝROBA; DOCX/PDF generátor a rodina dokumentov sú od 26.8. v skupine Po V1 — zásobník.)*
-  *Stav: čaká na prax — vytiahne sa, keď si to reálna zákazka vypýta.*
+  *Stav: **blok CENY štartuje 29.9.2026** (Michal: posledný kódový bod V1) — priečinok [zdroje/bloky/CENY/](zdroje/bloky/CENY/).*
 
 ## INFRA
 
