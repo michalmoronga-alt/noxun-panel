@@ -2903,6 +2903,10 @@ jadro je `ProductionCore.do_select`), **ceruzka** = to isté + `focus_inspector`
 adresou: `parts_key` (Kusovník), `hw_key` (generika), `material_key`/`abs_key` („Kde sa používa"), `rule_ref` (Pravidlá) a **od D-94 `source_ref`** (zdroj v rozklikanom pôvode
 sekcie Nákup — `cabinet_id` + `owner_part_key`, vždy s `focus_inspector`).
 
+**NP-2:** ORANGE nález **`layout_settings`** („nastavenia prerezu a orezu sa nepodarilo načítať") nemá entitu v modeli — riadok ukazuje
+miesto „Nastavenia", akciu `data-act="bset"` (ikona `settings`, bez oka a ceruzky) a klik vedie klientsky do sekcie Nastavenia rozpočtu
+(`studioGoSection('bset')`, vzor rozpočtového nálezu).
+
 **Kontextová oprava je len tam, kde existuje:** UNI nález ponúka **„Nahradiť UNI…"** cez vlastný callback `replace_uni` → `MaterialsDialog.request_replace_uni` (**plne funkčný
 modal**, nie sľub), rozpočtový nález nemá entitu v modeli a **od ŠT-1c PR B1 vedie do SEKCIE Rozpočet toho istého okna** (`studioGoSection('budget')` + `budGoto(budget_section)` —
 server skladá adresu, klik zostáva v okne; premostenie do okna Výroba zaniklo spolu s ním). **D-143 (KON-0, v0.13.1):** RED „chrbát v drážke zo staršej verzie"
@@ -3592,7 +3596,21 @@ mene kanála) a `sketchup.ready` z neho zaniklo.
 (audit #21).
 
 **Čo edituje:** GLOBÁLNE nastavenia aktívneho dodávateľa (`%APPDATA%\NOXUN\Engine\supplier_settings.json`) — sadzby služieb, režimové hodnoty €/€€/€€€, štandardné koncové riadky,
-prah veku cien, krok zaokrúhlenia; do zákazky sa **nemrazia** (rozpočet je pohyblivý obraz cien).
+prah veku cien, krok zaokrúhlenia a od NP-2 **prerez píly, orez okraja platne a prídavok dupláku** (parametre nárezového plánu a Kontroly); do zákazky sa **nemrazia** (rozpočet je pohyblivý obraz cien).
+
+**NP-2 — tri nové polia, tooltip, kontrola rozsahu a banner stavu súboru (mockup D).** Riadky „Prerez píly (hrúbka kotúča)" · „Orez okraja
+platne" · „Prídavok dupláku na stranu" (mm) stoja vo fieldsete **Výpočet a upozornenia** medzi „m² na platňu" a „Zaokrúhlenie" (`SS_SCALARS`
+= `[kľúč, popis, jednotka, tooltip?]`; zhodu kľúčov so serverovým `SCALAR_DEFAULTS` stráži Ruby guard). Každé pole má `inputmode="decimal"`
+(čiarka aj bodka). **Tooltip „?"** je tlačidlo `.nxtip.inl` s textom v `data-tip` (vzhľad Inspectora — Štúdio dostalo vlastné pravidlá
+`.studio .nxtip` v `studio.html`, `white-space: pre-line` kvôli odsekom); prerez priznáva, že ho zatiaľ použije len nárezový plán.
+**Klientska kontrola rozsahu:** payload nesie `scalar_ranges` (`{kľúč: [min, max]}` zo `SupplierSettings::SCALAR_RANGES` + dni) — pole mimo
+rozsahu **zčervená** (`.bad` pri písaní aj po pushi rozpísanej hodnoty, `ssFieldBad`) a „Uložiť" povie dôvod ľudsky („Prerez píly (hrúbka
+kotúča): hodnota mimo rozsahu 0–10 mm", `ssRangeError`); server ostáva autoritou. **Stav súboru:** payload nesie `settings_state`
+(`ok | degraded | newer | fallback` + veta) — sekcia ukáže **banner hneď po otvorení** (`hwbanner`; pri `newer`/`degraded` červený
+`hwbanner-stop` s „Uloženie je vypnuté.") a „Uložiť" dostane `aria-disabled` s dôvodom v `title` (nikdy HTML `disabled`, D-78; klik povie
+dôvod v statuse, na server nič nejde). Degradovaný súbor sa tak prizná už pri otvorení, nie až chybou pri uložení. `fallback` (súbor sa nedal
+prečítať) má jantárový banner a **zápis nevypína** — prvý zápis súbor opraví a revízia chráni pred prepisom cudzej zmeny. Texty po uložení
+sa nemenia; Kontrola sa po uložení prepočíta tou istou cestou `refresh_studio`. Testy: `tests/js/test_np2_nastavenia.js`.
 
 **Uzavretý whitelist `SECTION_ACTIONS = ss_save · ss_reload · updater_check · updater_set_dir · updater_apply`** — mená sú prefixované zámerne: `save`/`reload`/`ready` sú príliš
 všeobecné na to, aby žili v JEDNOM priestore callbackov okna vedľa akcií ostatných sekcií (`ready` by dokonca prepísal vlastný callback Štúdia). Tri `updater_*` akcie pribudli

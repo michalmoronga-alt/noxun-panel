@@ -374,6 +374,8 @@ Toto je invariant a jeden z hlavných dôvodov existencie štandardu:
 - **Rotácia dielca kvôli kresbe je vec VÝSTUPU, nie modelu** (K1). Snapshot dielca nesie **geometrické** rozmery + `grain_direction`;
   výmenu `dĺžka ↔ šírka` **spolu s výmenou dvojíc hrán** `L↔W` robí výhradne export do VEPO (`VepoExport.oriented`) a zrkadlovo kontrola nárezu (`Validation.fits_on_sheet?`).
   Nárezový plán (`SheetLayout`, §11.4) orientuje **cez tú istú prípravu riadka ako VEPO** (`VepoExport.prepare_row`) — výmenu robí stále len `VepoExport.oriented`.
+  **Od NP-2 ide cez ňu aj Kontrola nárezu:** `oversize` volá spoločnú prípravu plánu (`SheetLayout.purchase_rect` + `fits_rect?`), takže
+  Kontrola aj plán orientujú, zaokrúhľujú a orezávajú **jednou funkciou**; `Validation.fits_on_sheet?` ostal len tenkým obalom bez orezu.
   Rovnaká výmena sa **nikdy nesmie zopakovať** na inom mieste reťazca — dvojitý swap by dielec objednal v pôvodnej orientácii.
   Bežné metre ABS sú voči otočeniu **invariantné** (tá istá fyzická hrana), a to je zároveň krížová kontrola, či niekde druhý swap nevznikol.
 
@@ -1505,6 +1507,15 @@ Pred odovzdaním systém kontroluje minimálne (GPT debata sekcia 32):
 - príliš veľké/malé čelo
 - komponent bez výrobného zaradenia; group s výrobným materiálom; výrobný diel bez materiálu
 
+**„Nezmestí sa na platňu" (RED `oversize`, od NP-2).** Dielec sa porovnáva s **použiteľnou plochou** platne: formát mínus **orez okraja**
+na každej hrane — bežné platne (DTD, MDF, HDF, iné) áno, **pracovná doska, kompakt a zástena bez orezu** (hrany sú hotové). **Duplák** sa
+hodnotí ako prírezy zdrojového materiálu s **prídavkom na každú stranu** a hlási sa **raz** (jeden hotový dielec). Otáča sa **len dielec bez
+smeru dekoru**; so smerom `length`/`width` platí jediná poloha VEPO. Orez a prídavok sú nastavenia dodávateľa (§11.5) — Kontrola a nárezový
+plán používajú **jednu prípravu** (§3.3, §11.4). Kontrola je **opatrná**: porovnáva hotový rozmer vrátane ABS (VEPO si ABS odpočíta, takže
+hraničný dielec s hrubou páskou sa v realite ešte zmestiť môže). Neplatný výrobný rozmer (nula, záporný, nečíslo, rozmer, ktorý VEPO
+zaokrúhli na 0) je **samostatný RED** `invalid_dims`. Keď sa nastavenia nedajú prečítať, Kontrola počíta s predvolenými hodnotami a **prizná
+to** ORANGE nálezom. Ani jeden z týchto nálezov export nezastaví (semafor varuje, nezakazuje).
+
 **Semafor** — stav modelu na jeden pohľad (zelená = pripravené, žltá = varovania, červená = blokujúce chyby). Validácia **neiba vypíše chybu, ale ponúkne opravu:**
 
 ```
@@ -1586,6 +1597,22 @@ a rozhodovanie, **nie výrobný dokument** (reže VEPO vlastnou optimalizáciou)
 - **Horná hranica** (`upper_bound`) platí **len pre úplný plán**: bez nezaradených a vyradených dielcov, bez konfliktu hrúbky či chýbajúcej väzby dupláku,
   bez zablokovaných výrobných dát a s platnými parametrami. **UNI materiál a chýbajúci formát (fallback) sú vždy len orientačné.**
 - **§11.1 („exportéry nepočítajú rozmery") sa naň nevzťahuje** — plán **nič neexportuje**, je to výpočet nad kusovníkom; VEPO CSV ostáva bez zmeny.
+- **Parametre** (prerez, orez, prídavok dupláku) sú od NP-2 nastavenia dodávateľa (§11.5); tú istú prípravu obdĺžnika používa Kontrola „nezmestí sa" (§10).
+
+### 11.5 Nastavenia dodávateľa (globálny súbor)
+
+Sadzby služieb, cenové režimy, štandardné koncové riadky a **skaláre výpočtu** žijú v globálnom súbore počítača
+`%APPDATA%\NOXUN\Engine\supplier_settings.json` — **nie v zákazke** (§11.3; na inom počítači ich treba nastaviť rovnako). Vykonateľná podoba:
+[`core/supplier_settings.rb`](../noxun_engine/core/supplier_settings.rb).
+
+- **Skaláre:** prah veku ceny (dni), krok zaokrúhlenia ponuky, rezerva ABS (%), m² na platňu (montáž), prah samostatného riadku ponuky
+  a od NP-2 **prerez píly** 5 mm (0–10), **orez okraja platne** 10 mm (0–50) a **prídavok dupláku na stranu** 10 mm (0–30) — desatinné mm,
+  čiarka aj bodka. Hodnota mimo rozsahu sa neuloží (zápis je all-or-nothing, chyba menuje pole ľudsky).
+- **Verzia súboru `std` = 2 (od NP-2) a dopredná brána** (vzor §6 KOV-F1 a §11.3 R-14): **každý zápis pečiatkuje aktuálnu verziu**; súbor
+  s **vyššou** verziou (uložil ho novší plugin) sa **číta**, ale **nezapisuje** — ani doplnenie seedu; uloženie odmietne veta „aktualizuj
+  plugin" a sekcia Nastavenia to ukáže bannerom hneď po otvorení (rovnako poškodený súbor, ktorý sa číta zo zálohy — R-11).
+- **Priznaný limit:** verzie **pred NP-2 (v0.15.1 a staršie)** bránu nemajú — keď na tom istom `%APPDATA%` (dve verzie SketchUpu, downgrade)
+  uložia nastavenia, nové polia zahodia a verziu 2 nechajú; novší plugin potom doplní predvolené 5 / 10 / 10 mm bez varovania.
 
 ---
 

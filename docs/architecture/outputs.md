@@ -11,7 +11,7 @@ Kontrolný semafor a zdieľané čisté jadro výstupov zákazky. Kontrakt plán
 
 ### validation.rb
 
-**kontrolný semafor (V0.5-D):** RED = materiál mimo katalógu / hrúbkový drift / nezmestí sa na platňu (s rešpektom smeru dekoru) / ABS páska hrany mimo katalógu (2A-2 `abs_missing`
+**kontrolný semafor (V0.5-D):** RED = materiál mimo katalógu / hrúbkový drift / nezmestí sa na platňu (s rešpektom smeru dekoru; od NP-2 po oreze a s prídavkom dupláku — odsek nižšie) / neplatný výrobný rozmer (`invalid_dims`, NP-2) / ABS páska hrany mimo katalógu (2A-2 `abs_missing`
 — len keď volajúci dodá ABS katalóg cez `edges:`) · ORANGE = čelo/voľná doska bez ABS „skontroluj" / vypnuté kovanie (owner_part_key identita) / build warnings / **`duplicate_identity`
 (1b-3): dva top-level kusy toho istého druhu so ZHODNÝM ID** — kópia, ktorej ešte nikto nepridelil vlastnú identitu. Hlása ID, počet kusov aj výrobný dôsledok (záznamy oboch kusov
 majú rovnaké `owner_id`, takže expanzia setov s `per: 'owner'` započíta položku LEN RAZ — do objednávky by šlo menej kovania). Vstup je `identities:` z `Bom.collect` (jeden záznam na
@@ -24,6 +24,27 @@ zoznam; deterministický dedup + counts VÝHRADNE zo servera; sekcia KONTROLA v 
 dva verejné pohľady — `duplicate_owner_ids` (len `KIND_CABINET`, teda kusy, ktoré kovanie vôbec MAJÚ) a `duplicate_plain_ids` (zvyšok, vždy len varovanie). Kandidáta na blokovanie
 ešte preosieva `ProductionCore.dup_partition` cez skutočnú expanziu — detail v odseku `production_core.rb`. Kind-ová podmienka je tá istá, aká rozhoduje o znení nálezu
 v `duplicate_id_item`, takže sa hláška a brána nemôžu rozísť.)*
+
+**NP-2 — `oversize` cez SPOLOČNÚ prípravu s nárezovým plánom (jedna pravda, C9/G4).** `check_oversize` nad záznamom dielca zavolá
+`SheetLayout.purchase_rect` (prijatie VEPO, zaokrúhlenie na celé mm, jediná výmena pri `width`, zdroj dupláku + prídavok, formát a **orez
+podľa typu** — PD, kompakt a zástena bez orezu) a nerovnosť `SheetLayout.fits_rect?(rect, allow_rotation: rotation_allowed?(grain))` —
+**žiadny z tých krokov neopakuje**; otáča sa len dielec bez smeru (`length`/`width` nie). Podmienky ostali: materiál v katalógu, nie UNI,
+platný `sheet_size` materiálu dielca; navyše sa nehlási nad fallback formátom či UNI **nákupného** materiálu (zdroj dupláku). Duplák je
+**jeden nález** (jeden hotový dielec); `stable_key` sa nemení (`oversize|owner_id|part_key`). Veta: „… L × W mm (hotový rozmer vrátane ABS)
+sa nezmestí na platňu 2800 × 2070 mm po oreze 10 mm (použiteľná plocha 2780 × 2050 mm)" — časť o oreze len pri oreze > 0, pri dupláku
+„— duplák: 2 prírezy 2785 × 600 mm". **Kontrola je opatrná (audit N5):** porovnáva hotový rozmer vrátane ABS, VEPO si ABS odpočíta —
+hraničný dielec s hrubou páskou sa v realite ešte zmestiť môže (prídavok na prefrézovanie nie je známy). **Parametre** prichádzajú
+kwargom `layout: {params:, source:, edge_thicknesses:}`, ktorý oboch volajúcich skladá **jediná** `ProductionCore.control_layout`
+(odsek `production_core.rb`); **bez `layout:`** (legacy volania, headless testy) je orez aj prídavok 0 — správanie pred NP-2.
+`Validation.fits_on_sheet?` ostal ako tenký obal nad `fits_rect?` s orezom 0 (priame testy K1 a KON-0). **Priznané zmeny výsledku:**
+dielce medzi použiteľnou dĺžkou a formátom (2781–2800 mm pri oreze 10) a dupláky nad (použiteľná − 2 × prídavok) sú odteraz RED; dva
+počítače s iným orezom dajú iný nález; zaokrúhlenie ako VEPO posúva hranicu o < 0,5 mm.
+**Dve nové kategórie:** RED **`invalid_dims`** (audit B1) — záznam, ktorému `purchase_rect` nevráti geometriu (nula, záporný rozmer,
+nečíslo, rozmer < 0,5 mm, ktorý VEPO zaokrúhli na 0); do NP-2 taký dielec hlásil náhodou len `oversize`, bez tejto kategórie by Kontrola
+zmĺkla; kľúč `invalid_dims|owner_id|part_key`, bez brány. ORANGE **`layout_settings`** (audit B2) — `source: :seed_fallback` (súbor
+nastavení sa nedal prečítať): jeden nález bez dielca „Kontrola počíta s predvolenými hodnotami…", klik vedie do Nastavení rozpočtu.
+Kontrola názvov (`name_check_records`) vynechá záznam s nečíselným rozmerom — agregácia by inak zhodila celú Kontrolu (`Bom.dmm`).
+Testy: `tests/pure/test_np2_nastavenia_kontrola.rb`.
 
 **ROH-A1 — CR lišty sú pre Kontrolu čelo.** `FRONT_ROLES` = `front_door drawer_front flap false_front cr_front cr_side`: CR bez jedinej ABS hrany dostane ORANGE
 „čelo nemá žiadnu ABS hranu" a hrúbkové pravidlo ide cez `CabinetBuilder.thickness_ok_for?` (tolerancia čiel — katalógové 18,6/19 nie sú RED drift). Rohová zostava
@@ -503,6 +524,11 @@ navádza na existujúcu akciu „Pravidlá → Doplniť nové predvoľby"; na ge
 miesto, kde vzniká číslo semaforu** — číta ho sekcia Kontrola v Štúdiu, badge navigácie **aj `do_export`** (status aj sekcia KONTROLA vo VEPO LOGu; do review #1 mal export vlastný
 `Validation.run` **bez** rozpočtových nálezov a hlásil preto iné číslo než semafor), takže žiadne z týchto miest nemôže ukázať vlastné číslo; s ním sem prešli aj `budget_payload` a
 `hardware_catalog_items` (rozpočet sa počíta kvôli svojim ORANGE nálezom, hotový odhad platní sa mu odovzdáva, aby nevznikol druhý výpočet).
+**NP-2: `control_layout(emap)` je JEDINÝ zdroj kwargu `layout:`** pre oboch volajúcich `Validation.run` (`control_payload` aj klik na nález
+v `do_select` — iné parametre by nález nadrozmeru po kliku „stratili"; guard: dve volania, dve `layout: control_layout(emap)`). Prerez, orez
+a prídavok berie zo `SupplierSettings.layout_params` **vrátane pôvodu** (`:seed_fallback` → ORANGE `layout_settings`); hrúbky ABS
+**odvodí z už načítanej `edges_map`** (`edge_thicknesses_of`, audit F3) — `vepo_edge_thicknesses` by pri chybe katalógu ABS vyhodil výnimku
+a zhodil celú Kontrolu; `nil` mapa = prázdne hrúbky a rozmerové kontroly bežia ďalej.
 
 **`replace_uni`** (skratka „Nahradiť UNI…" → `MaterialsDialog.request_replace_uni`) a **zdieľané telá prepínačov** `edge_check_guard` (dostupnosť Overlay API + `identity_guard`) ·
 `identity_guard` (generácia okna + dokument — zdieľa ho aj kresba, ktorá si dostupnosť overuje **vlastnú** a hlási ju vetou o kresbe, nie o hranách) · `do_edge_check` ·
@@ -718,8 +744,8 @@ a predvolená cena. `sheet_size_for` je jediná pravda o formáte platne a fallb
 
 ### sheet_layout.rb
 
-**NP-1 (blok 2 · Nárezový plán, v0.15.1) — jadro výpočtu, zatiaľ nikam nenapojené** (Štúdio, rozpočet ani exporty ho nečítajú; napojenie
-NP-2 až NP-4). Čistý modul: z `Bom.compute[:rows]`, celého `ProductionCore.sheets_map` a mapy hrúbok ABS (**tej istej, akú dostáva VEPO**)
+**NP-1 (blok 2 · Nárezový plán, v0.15.1) — jadro výpočtu.** Od NP-2 (v0.15.2) ho číta **Kontrola „nezmestí sa"** (`purchase_rect` +
+`fits_rect?` nad záznamom dielca, odsek `validation.rb`); plán v Štúdiu, rozpočet ani exporty zatiaľ nie (NP-3, NP-4). Čistý modul: z `Bom.compute[:rows]`, celého `ProductionCore.sheets_map` a mapy hrúbok ABS (**tej istej, akú dostáva VEPO**)
 vypočíta **per nákupný materiál** deterministické pásové (gilotínové) rozloženie obdĺžnikov na platne. Je to **rozloženie heuristiky, nie
 minimum** — reže VEPO vlastnou optimalizáciou, plán slúži objednávke. Package: `SYSTEM/zdroje/bloky/NAREZ/PACKAGE_NP1_JADRO.md`.
 
@@ -732,7 +758,8 @@ minimum** — reže VEPO vlastnou optimalizáciou, plán slúži objednávke. Pa
   `trim`, `grain`) vracia aj pri `ok: false`, keď dôvod s rozmermi nesúvisí (VEPO: neznáma ABS, chybná hrúbka, počet; `thickness_conflict`;
   `duplak_link_missing` — tam vrstva **bez** prídavku na materiáli riadku), aby Kontrola hodnotila nadrozmer aj pri súbežnej chybe;
   nevracia ju pri `invalid_row`, `zero_after_rounding`, nekladnom rozmere a bez materiálu. `material_id` = materiál geometrie,
-  `plan_material_id` = komu plán riadok pripíše (pri dupláku vždy zdroj).
+  `plan_material_id` = komu plán riadok pripíše (pri dupláku vždy zdroj). Geometria odmietnutia nesie od NP-2 aj `doubled`
+  a `multiplier` (veta Kontroly o prírezoch dupláku aj pri súbežnej chybe ABS).
 - `fits_rect?(rect, allow_rotation:)` — jediná nerovnosť „zmestí sa na prázdnu platňu": `l <= Lu + DIM_TOL && w <= Wu + DIM_TOL`
   (`Validation::DIM_TOL`); pri `allow_rotation: true` skúša obe polohy. Plán volá **vždy** `allow_rotation: false`, Kontrola
   `allow_rotation: rotation_allowed?(grain)`.
@@ -757,7 +784,7 @@ preto sa do oboch kontrol nerátajú. Bežný riadok má rozmery v celých mm (I
 
 **Formát a orez.** Formát = `SheetEstimate.sheet_size_for` (fallback + príznak), UNI = `Materials.uni?`. Orez `trim` na každej hrane
 okrem `NO_TRIM_TYPES = PD KOMPAKT ZASTENA` (N6, N9; vlastná konštanta — `format_in_identity?` má iný význam). Parametre `kerf`, `trim`,
-`dup_allowance` (predvolene 5 / 10 / 10 mm, NP-2 ich nahradí nastaveniami); neplatný (nečíselný, nekonečný, záporný) → `invalid_params`
+`dup_allowance` (predvolene 5 / 10 / 10 mm; volajúci ich od NP-2 berú z nastavení dodávateľa cez `SupplierSettings.layout_params`); neplatný (nečíselný, nekonečný, záporný) → `invalid_params`
 na každom materiáli, žiadne rozloženie.
 
 **Algoritmus.** Použiteľná plocha `Lu = L − 2t`, `Wu = W − 2t`; pri `≤ DIM_TOL` všetko `no_usable_area`. Radenie úplne určené:
@@ -865,9 +892,33 @@ Každá cena ide existujúcou serverovou proposal cestou, jednotlivé položky s
 
 ### supplier_settings.rb
 
-_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+Globálne nastavenia dodávateľa v `%APPDATA%\NOXUN\Engine\supplier_settings.json` (+ `.bak` cez `JsonFileStore`) — **nie v zákazke**
+(STANDARD §11.3: sadzby sa nemrazia; §11.5 súbor a jeho verzia). UI je v [ui-lifecycle.md](ui-lifecycle.md), odsek `supplier_settings_dialog.rb`.
 
-Globálne nastavenia dodávateľa (sadzby, režimy €/€€/€€€, prah veku cien); UI je v [ui-lifecycle.md](ui-lifecycle.md), odsek o sekciách `sup`/`bset`/`about`.
+**Obsah.** `{std, seed_version, active, suppliers[]}`; dodávateľ = `id`, `name`, `rates` (olep · porez · duplaky · pd_opracovanie ·
+montaz), `standard_rows` (8 fixných riadkov), `mode_values` (€/€€/€€€) a **skaláre** `SCALAR_DEFAULTS`: `stale_days` 30 · `rounding_step` 1
+· `abs_reserve_pct` 10 · `montaz_m2_per_plate` 5,8 · `cp_highlight_threshold` 150 · **od NP-2 `kerf_mm` 5 (0–10) · `trim_mm` 10 (0–50) ·
+`dup_allowance_mm` 10 (0–30)** — prerez píly, orez okraja platne a prídavok vrstvy dupláku na stranu, desatinné mm. Normalizácia je
+**whitelist** (neznáme polia zahodí); chýbajúci či mimo rozsahu skalár dostane predvolenú hodnotu už pri čítaní. Zoznam skalárov žije na
+**troch miestach** (`SCALAR_DEFAULTS`, `SCALAR_RANGES`, riadok v `normalize_supplier`) + popis v `SCALAR_LABELS` a riadok v JS `SS_SCALARS`
+— zhodu stráži `tests/pure/test_np2_nastavenia_kontrola.rb` (patch neznámy kľúč **ticho vynechá**, zabudnutý rozsah = pole sa neuloží).
+Chyba rozsahu je ľudská („Prerez píly: hodnota mimo rozsahu 0–10 mm", `range_error`), nie surový kľúč.
+
+**Čítanie s pôvodom (NP-2, audit B2).** `load_with_origin` → `[dokument, :file | :newer_file | :seed_fallback]` — pôvod sa určí **v čítaní**,
+lebo `load` chybu pohltí a vráti seed a neskôr sa fallback od súboru rozlíšiť nedá. `active_with_source` pridá `:backup` (poškodený primár
+s platnou zálohou, `JsonFileStore.degraded?` — číta disk, preto nie v `load`, ktorý beží pri každom výpočte rozpočtu). `layout_params` →
+`{params: {'kerf','trim','dup_allowance'}, source:}` je **jediný vstup** pre nárezový plán a Kontrolu; `settings_state(source)` →
+`{state: ok|degraded|newer|fallback, reason}` pre banner sekcie.
+
+**Verzia súboru 2 a dopredná brána (NP-2, vzor `HardwareRules` KOV-F1).** `STD = 2`; **každý zápis pečiatkuje `std = STD`** (inak by súbor
+ostal navždy 1 a budúca brána by nemala čo porovnať). Súbor z **novšieho** pluginu (`doc_std_unsupported?` = `std > STD`) sa **číta** (známe
+polia), ale **nezapisuje**: `read_doc` pri ňom hlási `changed = false` (seed-merge sa o zápis ani nepokúsi) a `write` má za bránou R-11
+druhú bránu **`newer_write_blocked?`** — poradie **zámok → degradovaný → novší → zápis** (guard). Brána číta verziu **čerstvo priamo pod
+zámkom** (`reload!` + `read`, audit F4) — sekundová cache by nahriatu starú verziu vrátila aj po prepise novším pluginom. Dôvod ide cez
+`write_block_reason` do `[false, [dôvod], :write_failed]` („… uložil novší plugin (verzia súboru 3, tento plugin pozná 2) — dajú sa len čítať
+…, aktualizuj plugin"). **Priznaný limit (audit N6):** verzie **pred NP-2, teda v0.15.1 a staršie**, bránu nemajú — keď na tom istom
+`%APPDATA%` uložia nastavenia, nové kľúče zahodia a `std 2` nechajú; novší plugin potom doplní predvolené 5/10/10 bez varovania. Detektor
+sa nerobí (predvolené = Michalove hodnoty; iný počítač má vlastný `%APPDATA%`).
 
 **Zápis pod medziprocesovým zámkom a revízia v JADRE (1d/R-08).** `patch_active!` je klasický „prečítaj → uprav → zapíš" nad `%APPDATA%\NOXUN\Engine\supplier_settings.json`
 a kontrola revízie sedela **len v okne** (`supplier_settings_dialog.handle_save`) — medzi ňou a naším zápisom stihla druhá inštancia SketchUpu uložiť svoje sadzby a náš zápis ich
