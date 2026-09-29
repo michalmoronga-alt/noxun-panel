@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **DOCS — štart bloku CENY · overenie cien materiálov a ABS (29.–30.9.2026, PR #?, len dokumentácia; verzia pluginu sa nemení).** Michal 29.9. večer pri
+- **DOCS — štart bloku CENY · overenie cien materiálov a ABS (29.–30.9.2026, PR #425, len dokumentácia; verzia pluginu sa nemení).** Michal 29.9. večer pri
   otázke „čo ešte pred V1" vybral **posledný kódový bod V1** — ručné overenie cien dosiek a ABS bez Demos väzby (zvyšok V1-03). Fakty z kódu a reálnych dát:
   zo 76 nákupných záznamov je bez Demosu len 5 (2× DTDL, zástena, sklo, 1 ABS; 3 bez ceny) a v Rozpočte sú dnes prakticky neviditeľné. Rozhodnutia
   **C1–C11** ([zdroje/bloky/CENY/ROZHODNUTIA_MICHALA_2026-09-29.md](../zdroje/bloky/CENY/ROZHODNUTIA_MICHALA_2026-09-29.md)): vzor ako kovanie (CENY-KOV), **jeden odkaz** (C7 mení
