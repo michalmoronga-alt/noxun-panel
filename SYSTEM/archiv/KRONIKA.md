@@ -35,11 +35,15 @@
   §11.4 a nová **§11.5 Nastavenia dodávateľa**; architektúra `outputs.md` (`validation.rb`, `production_core.rb`, `sheet_layout.rb`, `supplier_settings.rb` —
   prvý úplný odsek) a `ui-lifecycle.md` (`supplier_settings_dialog.rb`, Kontrola). **Slepá predrecenzia:** OPRAVIŤ PRED PR — 0× P1, 2× P2 (chýbajúce testy:
   prírezy dupláku pri neznámej ABS, klik na nález `layout_settings`) a 4× P3 (jednotné znenie chyby rozsahu server = klient, orez a plocha vo vete na 2 desatinné,
-  pravdivá veta fallbacku, test záchrannej vetvy `control_layout`) — všetko opravené pred PR. **Testy:** 4792 headless · 140 JS sád zelené (nové
-  `test_np2_nastavenia_kontrola.rb`, `test_np2_nastavenia.js`, `test_np2_kontrola_klik.js`); **17 mutácií — 17 zabitých** (zápis bez pečiatky `std`, brána
+  pravdivá veta fallbacku, test záchrannej vetvy `control_layout`) — všetko opravené pred PR. **Codex review kolo 1:** 1× P1 (duplákový riadok katalógu bez
+  `sheet_size` ticho vynechal nadrozmernú vrstvu zo zdroja — formát, fallback a UNI rozhoduje odteraz pripravený obdĺžnik, teda nákupný materiál) a 1× P2
+  (pôvod súboru sa odvodzoval z čítania pred zámkom seed-merge — novší súbor zapísaný medzitým by sekcia ukázala ako `ok`; pôvod sa počíta z dokumentu po
+  seed-merge) — obe opravené s testom a mutáciou. **Testy:** 4794 headless · 140 JS sád zelené (nové
+  `test_np2_nastavenia_kontrola.rb`, `test_np2_nastavenia.js`, `test_np2_kontrola_klik.js`); **19 mutácií — 19 zabitých** (zápis bez pečiatky `std`, brána
   vypadnutá zo zápisu, seed-merge do novšieho súboru, brána z cache, orez pri PD, Kontrola bez prídavku dupláku, otáčanie pri `length`, klik bez `layout:`, klient
   bez kontroly rozsahu, fallback tváriaci sa ako súbor, neplatný rozmer bez nálezu, hrúbky ABS cez `vepo_edge_thicknesses`, geometria odmietnutia bez údaja
-  o dupláku, klik na nález nastavení na server, `control_layout` bez záchrany, orez na 1 desatinné, iný popis poľa na serveri). In-SU netreba (globálny súbor
+  o dupláku, klik na nález nastavení na server, `control_layout` bez záchrany, orez na 1 desatinné, iný popis poľa na serveri, stará stráž formátu materiálu
+  riadku, pôvod zo starého čítania). In-SU netreba (globálny súbor
   + čítanie Kontroly, žiadny zápis do modelu).
 
 - **NP-1 · Nárezový plán — jadro výpočtu (29.9.2026, v0.15.0 → v0.15.1, PR #418; blok 2, prvá dávka).**

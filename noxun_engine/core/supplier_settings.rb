@@ -225,8 +225,11 @@ module Noxun
       def load_with_origin
         ensure_seeded
         merged, changed = read_doc
-        origin = doc_std_unsupported?(merged) ? :newer_file : :file
         merged = persist_seed_merge!(merged) if changed
+        # Codex #419 P2: povod AZ z dokumentu PO seed-merge — `persist_seed_merge!`
+        # cita subor nanovo pod zamkom a medzitym ho mohol prepisat novsi plugin;
+        # povod zo stareho citania by povedal `ok` nad novsim suborom.
+        origin = doc_std_unsupported?(merged) ? :newer_file : :file
         [merged, origin]
       rescue StandardError => e
         Engine.log_error(e, 'SupplierSettings.load') if defined?(Engine)

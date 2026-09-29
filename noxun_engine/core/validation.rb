@@ -552,14 +552,15 @@ module Noxun
       end
 
       # RED: dielec sa nezmesti na format platne (po oreze podla typu, duplak
-      # ako prirezy s pridavkom). Dnesne podmienky ostavaju: material v katalogu,
-      # nie UNI (vybavi `check_record`) a platny `sheet_size` materialu dielca;
-      # navyse sa nehlasi nad fallback formatom ci UNI NAKUPNEHO materialu
-      # (zdroj duplaku). Jeden nalez na zaznam, kluc `oversize|owner|part_key`.
+      # ako prirezy s pridavkom). Podmienky: material dielca v katalogu a nie UNI
+      # (vybavi `check_record`); format, fallback a UNI rozhoduje NAKUPNY
+      # material z `purchase_rect` (pri duplaku zdroj — Codex #419 P1), bez
+      # platneho formatu sa nehlasi nic. Jeden nalez na zaznam, kluc
+      # `oversize|owner|part_key`.
       # Opatrna kontrola (audit N5): porovnava HOTOVY rozmer vratane ABS —
       # VEPO si ABS odpocita, takze hranicny dielec s hrubou paskou sa v realite
       # este zmestit moze; veta to hovori nahlas.
-      def check_oversize(r, sheet, sheets, lay, items)
+      def check_oversize(r, _sheet, sheets, lay, items)
         rect = SheetLayout.purchase_rect(r, sheets: sheets, edge_thicknesses: lay[:edge_thicknesses],
                                             params: lay[:params])
         # Neplatne parametre (z nastaveni nemozu prist — rozsahy strazi patch)
@@ -567,9 +568,12 @@ module Noxun
         return if rect['reason'] == 'invalid_params'
         return items << invalid_dims_item(r) unless rect_geometry?(rect)
 
-        size = sheet['sheet_size']
-        return unless size.is_a?(Array) && size.size == 2
-        return unless size[0].to_f > 0 && size[1].to_f > 0
+        # Codex #419 P1: format, fallback a UNI sa beru z PRIPRAVENEHO
+        # obdlznika — teda z NAKUPNEHO materialu (pri duplaku ZDROJ), nie
+        # z riadku materialu dielca. Duplakovy riadok katalogu bez
+        # `sheet_size` by inak nadrozmernu vrstvu zo zdroja ticho vynechal.
+        # Pri beznom dielci je nakupny material = material dielca, takze
+        # „bez platneho formatu = bez nalezu" plati ako doteraz (`fallback`).
         return if rect['fallback'] || rect['uni']
         return if SheetLayout.fits_rect?(rect, allow_rotation: SheetLayout.rotation_allowed?(rect['grain']))
 

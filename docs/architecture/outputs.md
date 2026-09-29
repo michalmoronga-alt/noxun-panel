@@ -28,8 +28,9 @@ v `duplicate_id_item`, takže sa hláška a brána nemôžu rozísť.)*
 **NP-2 — `oversize` cez SPOLOČNÚ prípravu s nárezovým plánom (jedna pravda, C9/G4).** `check_oversize` nad záznamom dielca zavolá
 `SheetLayout.purchase_rect` (prijatie VEPO, zaokrúhlenie na celé mm, jediná výmena pri `width`, zdroj dupláku + prídavok, formát a **orez
 podľa typu** — PD, kompakt a zástena bez orezu) a nerovnosť `SheetLayout.fits_rect?(rect, allow_rotation: rotation_allowed?(grain))` —
-**žiadny z tých krokov neopakuje**; otáča sa len dielec bez smeru (`length`/`width` nie). Podmienky ostali: materiál v katalógu, nie UNI,
-platný `sheet_size` materiálu dielca; navyše sa nehlási nad fallback formátom či UNI **nákupného** materiálu (zdroj dupláku). Duplák je
+**žiadny z tých krokov neopakuje**; otáča sa len dielec bez smeru (`length`/`width` nie). Podmienky: materiál dielca v katalógu a nie UNI;
+**formát, fallback a UNI rozhoduje nákupný materiál** z pripraveného obdĺžnika (pri dupláku zdroj — Codex #419 P1: duplákový riadok katalógu
+bez `sheet_size` nesmie nadrozmernú vrstvu zo zdroja ticho vynechať); bez platného formátu sa nehlási nič. Duplák je
 **jeden nález** (jeden hotový dielec); `stable_key` sa nemení (`oversize|owner_id|part_key`). Veta: „… L × W mm (hotový rozmer vrátane ABS)
 sa nezmestí na platňu 2800 × 2070 mm po oreze 10 mm (použiteľná plocha 2780 × 2050 mm)" — časť o oreze len pri oreze > 0, pri dupláku
 „— duplák: 2 prírezy 2785 × 600 mm". **Kontrola je opatrná (audit N5):** porovnáva hotový rozmer vrátane ABS, VEPO si ABS odpočíta —
@@ -906,7 +907,8 @@ Chyba rozsahu je ľudská („Prerez píly (hrúbka kotúča): hodnota mimo rozs
 v `SCALAR_LABELS` je **presne text riadku** v sekcii (JS `SS_SCALARS`), takže server aj klient hlásia to isté (zhodu stráži test).
 
 **Čítanie s pôvodom (NP-2, audit B2).** `load_with_origin` → `[dokument, :file | :newer_file | :seed_fallback]` — pôvod sa určí **v čítaní**,
-lebo `load` chybu pohltí a vráti seed a neskôr sa fallback od súboru rozlíšiť nedá. `active_with_source` pridá `:backup` (poškodený primár
+lebo `load` chybu pohltí a vráti seed a neskôr sa fallback od súboru rozlíšiť nedá. Pôvod sa odvodzuje až z dokumentu **po** seed-merge
+(`persist_seed_merge!` číta súbor nanovo pod zámkom a medzitým ho mohol prepísať novší plugin — Codex #419 P2). `active_with_source` pridá `:backup` (poškodený primár
 s platnou zálohou, `JsonFileStore.degraded?` — číta disk, preto nie v `load`, ktorý beží pri každom výpočte rozpočtu). `layout_params` →
 `{params: {'kerf','trim','dup_allowance'}, source:}` je **jediný vstup** pre nárezový plán a Kontrolu; `settings_state(source)` →
 `{state: ok|degraded|newer|fallback, reason}` pre banner sekcie.

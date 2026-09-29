@@ -263,6 +263,37 @@ NxTest.test('NP-2 brana: subor std 3 — citanie ano, patch odmietnuty s dovodom
   end
 end
 
+NxTest.test('NP-2 brana (Codex #419 P2): novsi plugin zapise subor MEDZI citanim a zamkom seed-merge -> povod `newer`, payload newer') do
+  NxTest.skip!('zapisuje do sandboxu nastaveni') unless NxTest.headless?
+  NxNp2.with_sandbox do
+    NxNp2.write_json(NxNp2::SS.path, NxNp2.v1_doc) # chybaju standardne riadky -> seed-merge sa pokusi zapisat
+    NxNp2::STORE.invalidate
+    newer = NxNp2.v1_doc('trim_mm' => 20.0)
+    newer['std'] = 3
+    ss = NxNp2::SS
+    orig = ss.method(:with_catalog_lock)
+    raced = false
+    # Subeh: az ked seed-merge ziada zamok, druha instancia (novsi plugin) subor prepise.
+    ss.define_singleton_method(:with_catalog_lock) do |&blk|
+      unless raced
+        raced = true
+        File.binwrite(ss.path, JSON.pretty_generate(newer))
+      end
+      orig.call(&blk)
+    end
+    begin
+      sup, source = ss.active_with_source
+    ensure
+      ss.define_singleton_method(:with_catalog_lock, orig)
+    end
+    NxTest.assert(raced, 'subeh sa naozaj odohral (seed-merge vzal zamok)')
+    NxTest.assert_equal(:newer_file, source, 'povod z dokumentu PO citani pod zamkom')
+    NxTest.assert_close(20.0, sup['trim_mm'], 1e-9, 'a hodnoty su z novsieho suboru')
+    NxTest.assert_equal(3, NxNp2.disk['std'], 'novsi subor ostal nedotknuty')
+    NxTest.assert_equal('newer', ss.settings_state(source)['state'], 'banner + vypnute „Uložiť" (klient cita stav)')
+  end
+end
+
 NxTest.test('NP-2 brana (audit F4): nahriata cache -> novsi subor na disku -> priame `write` = ODMIETNUTE') do
   NxTest.skip!('zapisuje do sandboxu nastaveni') unless NxTest.headless?
   NxNp2.with_sandbox do
@@ -398,6 +429,22 @@ NxTest.test('NP-2 Kontrola (predrecenzia P2-1): duplak s NEZNAMOU ABS — veta o
   over = f.of(f.run([dup], f.layout(et: {})), 'oversize')
   NxTest.assert_equal(1, over.length)
   NxTest.assert(over.first['message_sk'].include?('duplák: 2 prírezy 2785 × 600 mm'), over.first['message_sk'])
+end
+
+NxTest.test('NP-2 Kontrola (Codex #419 P1): duplakovy riadok katalogu BEZ formatu — vrstva sa hodnoti voci formatu ZDROJA') do
+  f = NxNp2
+  sheets = f::SHEETS.merge('DUP_NOFMT' => { 'material_id' => 'DUP_NOFMT', 'type' => 'DTDL', 'thickness' => 36.0,
+                                            'source_material_id' => 'DTD' })
+  dup = f.rec('material_id' => 'DUP_NOFMT', 'thickness' => 36.0, 'length' => 2765.0, 'width' => 580.0,
+              'material_source' => { 'material_id' => 'DTD', 'multiplier' => 2 })
+  over = f.of(f.run([dup], f.layout, sheets: sheets), 'oversize')
+  NxTest.assert_equal(1, over.length, 'nadrozmerna vrstva 2785 x 600 sa ticho nevynecha')
+  NxTest.assert(over.first['message_sk'].include?('na platňu 2800 × 2070 mm'), over.first['message_sk'])
+  NxTest.assert(over.first['message_sk'].include?('(materiál DTD)'))
+  NxTest.assert_equal(0, f.of(f.run([dup.merge('length' => 2700.0)], f.layout, sheets: sheets), 'oversize').length,
+                      'zmestena vrstva nalez nema')
+  # bezny dielec bez formatu ostava bez nalezu (nakupny material = material dielca, fallback)
+  NxTest.assert_equal(0, f.of(f.run([f.rec('material_id' => 'NOFMT', 'length' => 5000.0)]), 'oversize').length)
 end
 
 NxTest.test('NP-2 Kontrola (predrecenzia P3-4): orez a pouzitelna plocha s rovnakou presnostou ako nastavenia (2 desatinne)') do
