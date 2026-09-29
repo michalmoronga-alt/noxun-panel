@@ -81,6 +81,23 @@
   .studio .ssgrid input.bad { border-color: var(--nx-danger-line); background: var(--nx-danger-bg-soft); }
   .studio .ssgrid tr:hover td { background: var(--nx-select-bg-soft); }
   .studio .sshint { font-size: 10.5px; color: var(--nx-ink-faint); margin: 4px 0 10px; line-height: 1.45; }
+  /* NP-2: TOOLTIP „?" v Nastaveniach rozpočtu — ten istý vzhľad ako `.nxtip`
+     Inspectora (panel.css ho má len pod `.nx-inspector`). Pomocný text za
+     ikonou, nie `.hint` ani natívny `title` (UI_DIZAJN §5.7); `pre-line`
+     drží odseky textu (zlomy riadkov v `data-tip`). */
+  .studio .nxtip { position: relative; display: inline-flex; align-items: center; justify-content: center;
+                   flex: 0 0 auto; width: 15px; height: 15px; margin-left: 4px; padding: 0; border: 0;
+                   border-radius: 50%; background: none; color: var(--nx-ink-faint); cursor: help;
+                   vertical-align: -0.2em; }
+  .studio .nxtip:hover, .studio .nxtip:focus { color: var(--nx-select); outline: none; }
+  .studio .nxtip:focus-visible { outline: 2px solid var(--nx-select); outline-offset: 1px; }
+  .studio .nxtip .ic { width: 12px; height: 12px; }
+  .studio .nxtip::after { content: attr(data-tip); display: none; position: absolute;
+                          top: calc(100% + 6px); left: 0; z-index: 130; width: 250px; padding: 7px 9px;
+                          border-radius: 6px; background: var(--nx-ink); color: var(--nx-surface);
+                          font-size: 11px; font-weight: 400; line-height: 1.45; white-space: pre-line;
+                          text-align: left; box-shadow: 0 6px 18px var(--nx-modal-shadow); }
+  .studio .nxtip:hover::after, .studio .nxtip:focus::after { display: block; }
   .studio .ssrow { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; font-size: 12px; }
   .studio .ssrow .sslbl { flex: 0 0 190px; color: var(--nx-ink-label); }
   .studio .ssrow .ssval { flex: 1; color: var(--nx-ink); }

@@ -82,8 +82,12 @@
   function ssInput(key, value){
     var i = document.createElement('input');
     i.type = 'text';
+    // NP-2: číselná klávesnica s desatinnou čiarkou (prerez 4,4 mm je bežný).
+    i.setAttribute('inputmode', 'decimal');
     i.setAttribute('data-ss', key);
     i.value = (SS_DIRTY[key] !== undefined) ? SS_DIRTY[key] : ssNumText(value);
+    // Rozpísaná hodnota prežije push — aj jej červený stav musí.
+    if (SS_DIRTY[key] !== undefined && ssFieldBad(key, SS_DIRTY[key]) && i.classList) i.classList.toggle('bad', true);
     return i;
   }
 
@@ -138,9 +142,28 @@
   }
 
   // Skaláre — zvlášť, lebo nemajú režimy (sú to parametre výpočtu, nie ceny).
+  // [kľúč, popis, jednotka, tooltip?]. Zoznam kľúčov sa MUSÍ zhodovať so
+  // serverovým `SupplierSettings::SCALAR_DEFAULTS` (guard test NP-2) — pole,
+  // ktoré tu chýba, by sa nedalo nastaviť; navyše by ho server nepoznal.
   var SS_SCALARS = [
     ['abs_reserve_pct', 'ABS rezerva', '%'],
     ['montaz_m2_per_plate', 'm² na jednu platňu (montáž)', 'm²'],
+    // NP-2 (N3, O7, O12, mockup D): parametre nárezového plánu — globálne pre
+    // všetky zákazky na tomto počítači, desatinné mm s čiarkou aj bodkou.
+    ['kerf_mm', 'Prerez píly (hrúbka kotúča)', 'mm',
+     'Šírka rezu kotúča píly — materiál, ktorý zje každý rez. Použije ho nárezový plán: počíta sa ' +
+     'medzi každými dvoma dielcami a medzi pásmi, nie pri okraji platne.\n' +
+     'Platí pre všetky zákazky na tomto počítači (ako sadzby služieb).'],
+    ['trim_mm', 'Orez okraja platne', 'mm',
+     'Koľko sa odreže z každej hrany platne pred rezaním (poškodené okraje). Platňa 2800 × 2070 má ' +
+     'pri 10 mm použiteľnú plochu 2780 × 2050.\n' +
+     'Pracovná doska (aj s ABS hranou), kompakt a zástena sa neorezávajú nikdy — hrany sú hotové.\n' +
+     'Platí pre všetky zákazky na tomto počítači; počíta s ním aj Kontrola „nezmestí sa".'],
+    ['dup_allowance_mm', 'Prídavok dupláku na stranu', 'mm',
+     'Duplák sa lepí z prírezov podľa počtu vrstiev (2 alebo 3), ktoré VEPO nareže väčšie a po ' +
+     'zlepení oreže na hotový rozmer. Prídavok platí pre každú vrstvu: 10 mm na stranu = +20 mm ' +
+     'v každom rozmere (820 × 580 → 840 × 600).\n' +
+     'Platí pre všetky zákazky na tomto počítači; počíta s ním aj Kontrola „nezmestí sa".'],
     ['rounding_step', 'Zaokrúhlenie ponuky nahor na', '€'],
     ['stale_days', 'Upozorniť na cenu staršiu ako', 'dní'],
     // E-b2: od akej sumy navrhne cenová ponuka SAMOSTATNÝ riadok (rozhodnutie
@@ -148,14 +171,66 @@
     ['cp_highlight_threshold', 'Samostatný riadok v cenovej ponuke od', '€']
   ];
 
+  function ssScalarMeta(key){
+    for (var i = 0; i < SS_SCALARS.length; i++){ if (SS_SCALARS[i][0] === key) return SS_SCALARS[i]; }
+    return null;
+  }
+
+  // NP-2: tooltip „?" (vzor `.nxtip` Inspectora — pomocný text za ikonou,
+  // nie `.hint` ani natívny `title`). Text ide do `data-tip` cez setAttribute
+  // (žiadne innerHTML s dátami); SVG je konštanta zo spritu.
+  function ssTip(text){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'nxtip inl';
+    b.setAttribute('aria-label', 'Pomoc');
+    b.setAttribute('data-tip', text);
+    if (typeof NXIcons !== 'undefined' && NXIcons && typeof NXIcons.svg === 'function') b.innerHTML = NXIcons.svg('help-circle');
+    else b.textContent = '?';
+    return b;
+  }
+
   function ssRenderScalars(t){
     SS_SCALARS.forEach(function(s){
       var tr = document.createElement('tr');
-      tr.appendChild(ssMk('td', null, s[1]));
+      var td = ssMk('td');
+      td.appendChild(ssMk('span', null, s[1]));
+      if (s[3]) td.appendChild(ssTip(s[3]));
+      tr.appendChild(td);
       ssCell(tr, 'n', ssInput('scalar:' + s[0], SS_STATE.supplier[s[0]]));
       ssCell(tr, 'u', ssMk('span', null, s[2]));
       t.appendChild(tr);
     });
+  }
+
+  // --- NP-2: klientska kontrola rozsahu -------------------------------------
+  // Rozsahy posiela SERVER (`scalar_ranges`, tá istá autorita ako validácia
+  // patchu) — klient len skôr ukáže červené pole a ľudský dôvod. Server
+  // ostáva posledným slovom (patch je all-or-nothing).
+  function ssRanges(){
+    return (SS_STATE && SS_STATE.scalar_ranges) ? SS_STATE.scalar_ranges : {};
+  }
+
+  function ssRangeNum(v){ return String(Math.round(Number(v) * 100) / 100).replace('.', ','); }
+
+  // -> null (v poriadku) | text chyby „Prerez píly (hrúbka kotúča): hodnota mimo rozsahu 0–10 mm".
+  function ssRangeError(name, value, ranges){
+    var r = (ranges || ssRanges())[name];
+    if (!r || typeof value !== 'number' || isNaN(value)) return null;
+    if (isFinite(value) && value >= Number(r[0]) && value <= Number(r[1])) return null;
+    var meta = ssScalarMeta(name);
+    var label = meta ? meta[1] : name;
+    var unit = meta && meta[2] ? ' ' + meta[2] : '';
+    return label + ': hodnota mimo rozsahu ' + ssRangeNum(r[0]) + '–' + ssRangeNum(r[1]) + unit;
+  }
+
+  // Je pole červené? Nečíslo kdekoľvek; skalár navyše mimo rozsahu.
+  function ssFieldBad(key, text, ranges){
+    var v = ssParse(text);
+    if (typeof v === 'number' && isNaN(v)) return true;
+    var parts = String(key).split(':');
+    if (parts[0] !== 'scalar' || v === null) return false;
+    return ssRangeError(parts[1], v, ranges) !== null;
   }
 
   // Fieldset s nadpisom a hintom — presne to, čo malo okno v HTML. Stavia sa
@@ -171,6 +246,8 @@
   }
 
   function ssRenderBsetInto(box){
+    var ban = ssBanner(SS_STATE);
+    if (ban) box.appendChild(ban);
     box.appendChild(ssMk('div', 'sshead', 'dodávateľ: ' + (SS_STATE.supplier.name || '—') +
       ' · globálne pre všetky zákazky · v' + SS_STATE.version));
     ssRenderRates(ssFieldset(box, 'Sadzby služieb',
@@ -520,7 +597,10 @@
   // nechať „Načítať nanovo" — je to jediná cesta, ako sa z prechodnej chyby
   // disku zotaviť bez zatvorenia Štúdia, a hláška v tele na ňu odkazuje
   // (review #227 kolo 2).
-  function ssToolsHtml(sec, failed){
+  // `blocked` (NP-2) = dôvod, prečo sa do súboru nedá zapisovať (novší plugin,
+  // poškodený súbor). „Uložiť" ostáva VIDITEĽNÉ s `aria-disabled` a dôvodom
+  // v title — nikdy HTML `disabled` (D-78); klik dôvod povie v statuse.
+  function ssToolsHtml(sec, failed, blocked){
     if (sec !== 'bset') return '';
     if (failed){
       return '<span class="spacer"></span>' +
@@ -528,12 +608,40 @@
         ' title="Skúsi znova načítať súbor nastavení">' +
         '<svg class="ic" aria-hidden="true"><use href="#i-rotate-ccw"/></svg> Načítať nanovo</button>';
     }
+    var save = blocked
+      ? '<button type="button" class="primary" data-action="ss-save" aria-disabled="true" title="' +
+        ssAttr(blocked) + '">'
+      : '<button type="button" class="primary" data-action="ss-save">';
     return '<button type="button" class="ghostbtn" data-action="ss-reload"' +
       ' title="Zahodí neuložené zmeny a načíta súbor nanovo">' +
       '<svg class="ic" aria-hidden="true"><use href="#i-rotate-ccw"/></svg> Načítať nanovo</button>' +
-      '<span class="spacer"></span>' +
-      '<button type="button" class="primary" data-action="ss-save">' +
+      '<span class="spacer"></span>' + save +
       '<svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Uložiť</button>';
+  }
+
+  function ssAttr(s){
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // NP-2: stav súboru nastavení zo servera (`settings_state`). Zápis je
+  // zablokovaný pri `newer` (súbor uložil novší plugin) a `degraded`
+  // (poškodený primár — číta sa záloha). `fallback` (súbor sa nedal prečítať)
+  // zápis NEblokuje: prvý zápis súbor opraví a revízia chráni pred prepisom
+  // cudzej zmeny. -> '' | dôvod
+  function ssWriteBlock(s){
+    var st = (s && s.settings_state) ? s.settings_state : null;
+    if (!st || (st.state !== 'newer' && st.state !== 'degraded')) return '';
+    return String(st.reason || '') || 'Nastavenia sa teraz nedajú uložiť.';
+  }
+
+  // Banner sekcie: dôvod nahlas hneď po otvorení (nie až pri pokuse o uloženie).
+  function ssBanner(s){
+    var st = (s && s.settings_state) ? s.settings_state : null;
+    if (!st || !st.state || st.state === 'ok') return null;
+    var stop = (st.state === 'newer' || st.state === 'degraded');
+    return ssMk('div', stop ? 'hwbanner hwbanner-stop' : 'hwbanner',
+                String(st.reason || '') + (stop ? ' Uloženie je vypnuté.' : ''));
   }
 
   function ssRenderTools(){
@@ -542,7 +650,7 @@
     if (!sec || !box) return;
     // Nad neznámym stavom sa NEUKLADÁ — tlačidlo „Uložiť" by poslalo patch
     // proti revízii, ktorá sa práve nedá prečítať.
-    box.innerHTML = ssToolsHtml(sec, SS_FAILED);
+    box.innerHTML = ssToolsHtml(sec, SS_FAILED, ssWriteBlock(SS_STATE));
   }
 
   // --- patch ---------------------------------------------------------------
@@ -550,15 +658,21 @@
   // Zbiera LEN zmenené polia (SS_DIRTY) — nikdy sa neposiela celý dokument
   // (audit 10: klient nesmie prepisovať, čo nevidel).
   // -> { patch: {...}, errors: [texty] }
-  function ssBuildPatch(dirty){
+  // `ranges` (NP-2) = rozsahy skalárov {kľúč: [min, max]}; bez nich sa berú
+  // z posledného pushu (`SS_STATE.scalar_ranges`).
+  function ssBuildPatch(dirty, ranges){
     var patch = {};
     var errors = [];
+    var rng = ranges || ssRanges();
     Object.keys(dirty || {}).forEach(function(key){
       var parts = key.split(':');
       var kind = parts[0];
       var value = ssParse(dirty[key]);
+      // NP-2: skalár sa v hláške menuje popiskom z riadku, nie kľúčom.
+      var meta = (kind === 'scalar') ? ssScalarMeta(parts[1]) : null;
+      var who = meta ? meta[1] : key;
       if (typeof value === 'number' && isNaN(value)){
-        errors.push(key + ': hodnota musí byť číslo');
+        errors.push(who + ': hodnota musí byť číslo');
         return;
       }
       if (kind === 'rate'){
@@ -576,7 +690,9 @@
         patch.mode_values[parts[1]] = patch.mode_values[parts[1]] || {};
         patch.mode_values[parts[1]][parts[2]] = value;
       } else if (kind === 'scalar'){
-        if (value === null){ errors.push(parts[1] + ': hodnota nesmie byť prázdna'); return; }
+        if (value === null){ errors.push(who + ': hodnota nesmie byť prázdna'); return; }
+        var rerr = ssRangeError(parts[1], value, rng);
+        if (rerr){ errors.push(rerr); return; }
         patch[parts[1]] = value;
       }
     });
@@ -585,6 +701,13 @@
 
   function ssSave(){
     if (!SS_STATE) return;
+    // NP-2: súbor z novšieho pluginu alebo poškodený (číta sa záloha) — zápis
+    // by server aj tak odmietol; klik povie DÔVOD hneď (vzor D-78).
+    var block = ssWriteBlock(SS_STATE);
+    if (block){
+      SS.setStatus('Neuložené: ' + block, true);
+      return;
+    }
     var built = ssBuildPatch(SS_DIRTY);
     if (built.errors.length){
       SS.setStatus('Neuložené: ' + built.errors.join(' · '), true);
@@ -729,8 +852,8 @@
       // Prvé písmeno PRIPNE revíziu, nad ktorou sa formulár rozpisuje.
       if (SS_BASE_REV === null && SS_STATE) SS_BASE_REV = SS_STATE.revision;
       SS_DIRTY[key] = t.value;
-      var v = ssParse(t.value);
-      t.classList.toggle('bad', typeof v === 'number' && isNaN(v));
+      // NP-2: červené aj pole skaláru MIMO ROZSAHU (nielen nečíslo).
+      t.classList.toggle('bad', ssFieldBad(key, t.value));
     });
     // D-52b: Enter v poli cesty = uloženie (druhá cesta je mini-tlačidlo).
     // Pole žije mimo formulára, takže Enter by inak neurobil nič.
@@ -763,6 +886,10 @@
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { ssBuildPatch: ssBuildPatch, ssParse: ssParse, ssNumText: ssNumText,
                        ssToolsHtml: ssToolsHtml, ssApplyState: ssApplyState,
+                       // NP-2 (tests/js/test_np2_nastavenia.js)
+                       SS_SCALARS: SS_SCALARS, ssRangeError: ssRangeError, ssFieldBad: ssFieldBad,
+                       ssWriteBlock: ssWriteBlock, ssBanner: ssBanner, ssTip: ssTip,
+                       ssRenderScalars: ssRenderScalars, ssDirtyMap: function(){ return SS_DIRTY; },
                        ssRenderBody: ssRenderBody, ssRenderTools: ssRenderTools,
                        ssActive: ssActive, ssSave: ssSave, ssReload: ssReload,
                        ssBaseRev: function(){ return SS_BASE_REV; },
