@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.15.2 · 29.9.2026 — BLOK 2 · NÁREZOVÝ PLÁN (primitívny) beží:** štart PR #417, **NP-1** jadro výpočtu (PR #418), **NP-2** nastavenia a Kontrola s orezom (PR #?).
+**v0.15.2 · 29.9.2026 — BLOK 2 · NÁREZOVÝ PLÁN (primitívny) beží:** štart PR #417, **NP-1** jadro výpočtu (PR #418), **NP-2** nastavenia a Kontrola s orezom (PR #419).
 V **Nastaveniach rozpočtu** sú nové polia s „?": **prerez píly** 5, **orez okraja platne** 10 a **prídavok dupláku na stranu** 10 mm (desatinné, mimo rozsahu zčervená).
 **Kontrola „nezmestí sa"** počíta s orezom (PD, kompakt, zástena bez orezu) a duplák s prírezmi — hraničné dielce (bok 2785 mm v DTD) sú odteraz červené; nový RED
 „neplatný výrobný rozmer". Plán sa ešte nezobrazuje (NP-3); VEPO export je bajtovo rovnaký.
@@ -32,13 +32,13 @@ v **seede 6** — starší plugin zákazku neprestaví ani nevyexportuje (rohov�
 po prvej mutácii rozpočtu needituje a zastaví oba cenové exporty). **Nastavenia dodávateľa sú od NP-2 vo verzii súboru 2** (v0.15.1 a starší pri uložení nové polia zahodí). **Aktualizovať OBE PC (aj Luciino) na 0.15.0 pred prvou rohovou** — starší plugin rohovú nepozná
 a knižnicu šablón STD 7 len číta (nedá sa v nej ukladať, premenovať ani mazať).
 
-**Testy (posledná kódová dávka, NP-2 PR #?):** **4792 headless · 140 JS sád** zelené; in-SU netreba (globálny súbor nastavení a čítanie Kontroly, žiadny zápis do modelu).
+**Testy (posledná kódová dávka, NP-2 PR #419):** **4792 headless · 140 JS sád** zelené; in-SU netreba (globálny súbor nastavení a čítanie Kontroly, žiadny zápis do modelu).
 **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 
 ## Robí sa
 
 **Blok 2 · Nárezový plán** (priečinok [zdroje/bloky/NAREZ/](zdroje/bloky/NAREZ/), dávky v [PLAN.md](PLAN.md)): **NP-1** jadro výpočtu (PR #418) → **NP-2** nastavenia
-prerezu, orezu a prídavku + Kontrola „nezmestí sa" s orezom (PR #?) → **NP-3** sekcia Nárezový plán v Štúdiu → **NP-4** ceny podľa plánu. Pri prvej rohovej v dielni ostáva overiť
+prerezu, orezu a prídavku + Kontrola „nezmestí sa" s orezom (PR #419) → **NP-3** sekcia Nárezový plán v Štúdiu → **NP-4** ceny podľa plánu. Pri prvej rohovej v dielni ostáva overiť
 záves Sensys na výstuhe závesov. **Čakajú na smoke:** **D-132** (#367), **D-133** (#368), **D-134** (#369). **D-141**, **D-142**, **D-145** a **D-146** sú v zásobníku. **Blok 1d** podľa kapacity — R-18; **R-13 čaká na Michala**.
 
 ## Ďalší krok

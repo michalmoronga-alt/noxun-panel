@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **NP-2 · Nárezový plán — nastavenia prerezu, orezu a prídavku + Kontrola s orezom (29.9.2026, v0.15.1 → v0.15.2, PR #?; blok 2, druhá dávka).**
+- **NP-2 · Nárezový plán — nastavenia prerezu, orezu a prídavku + Kontrola s orezom (29.9.2026, v0.15.1 → v0.15.2, PR #419; blok 2, druhá dávka).**
   **Nastavenia rozpočtu → Výpočet a upozornenia** dostali tri polia (mockup D, poradie medzi „m² na platňu" a „Zaokrúhlenie"): **prerez píly** 5 mm (0–10),
   **orez okraja platne** 10 mm (0–50), **prídavok dupláku na stranu** 10 mm (0–30) — desatinné s čiarkou aj bodkou, `inputmode="decimal"`, tooltip „?" (`.nxtip`
   prenesený do Štúdia), klientska kontrola rozsahu zo serverových `scalar_ranges` (pole zčervená, „Uložiť" povie dôvod ľudsky); chyba rozsahu na serveri menuje
