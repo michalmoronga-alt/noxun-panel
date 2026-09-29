@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **DOCS — previerka registra auditu + R-13 rozhodnuté (29.9.2026, PR #?, len dokumentácia; verzia pluginu sa nemení).** Michal 29.9. večer pri otázke
+- **DOCS — previerka registra auditu + R-13 rozhodnuté (29.9.2026, PR #424, len dokumentácia; verzia pluginu sa nemení).** Michal 29.9. večer pri otázke
   „čo ešte pred V1" dal pokyn na previerku [AUDIT_REGISTER.md](../AUDIT_REGISTER.md) z 29.8. proti dnešnému kódu (~170 PR neskôr). Read-only subagent
   overil 29 otvorených položiek: **1 opravená** (R-25 už PR #350), **2 čiastočne** (R-27, R-32), ostatné **platia**; R-39 je vedome otvorená brána
   (spúšťač preformulovaný — D-95 je vyradená) a R-30 stratila spúšťač. Kritériom bloku 1d spĺňa **„pred V1" len R-37** (poškodený, ale platný súbor
