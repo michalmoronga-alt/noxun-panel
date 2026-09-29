@@ -11,6 +11,29 @@
 > a pri uzávere bloku sa presunie do sekcie „Vyriešené" na konci. Pravidlo 1d: rieši sa LEN výrobné riziko alebo
 > ponechaný V1 rozsah; dávka bez menovanej funkcie/dlhu sa nerobí. Čísla riadkov = stav k `dc2d53f`
 > (kód sa odvtedy hýbe — pri práci sa orientuj podľa MIEN metód; nové položky citujú mená, nie čísla).
+> **Previerka 29.9.2026:** stav otvorených položiek overený proti `main` 2a1ff94c (v0.16.0) — **verdikty a poradie pred/po V1 platia podľa sekcie
+> „Stav po previerke 29.9.2026" nižšie** (autorita je tento register); dôkazy súbor:riadok a podklad pre R-13 sú v nezáväznom podklade
+> [zdroje/PREVIERKA_REGISTRA_2026-09-29.md](zdroje/PREVIERKA_REGISTRA_2026-09-29.md).
+
+## Stav po previerke 29.9.2026 (autorita — verdikty a poradie pred/po V1)
+
+**Kritérium „pred V1"** (pravidlo bloku 1d, spresnené pri previerke): výrobné alebo cenové riziko · **tichá strata uložených dát používateľa pri bežnej
+práci** · pri **poškodenom súbore** len tichá strata, ktorá **mení výrobné alebo cenové čísla** (rozmery, počty, ceny, sadzby, prerez/orez) · blokovanie
+V1 rozsahu. Hlásená strata neuložených hodnôt, hygiena, texty, refaktor a veci len pre macOS = po V1. **O zaradení pred V1 rozhoduje Michal.**
+
+| R | Verdikt | Pred/po V1 | Veľk. | Funkčný dopad |
+|---|---|---|---|---|
+| R-37 | platí, zúžené na `supplier_settings` | **PRED V1** (kritérium splnené) | S | poškodený, ale platný súbor nastavení dodávateľa sa ticho nahradí predvolenými sadzbami a prerezom/orezom a zničí dobrú zálohu |
+| R-35 | platí | **PRED V1** (kritérium splnené — tichá strata pri dvoch oknách SketchUpu) | S/M | prvá zmena globálnych pravidiel kovania alebo rozmerových radov sa pri dvoch otvorených oknách ticho stratí |
+| R-13 | platí | **PRED V1 — rozhodnutie Michala 29.9.** | S | dielec z inej verzie štandardu Kontrola neoznačí |
+| R-38 | platí | hraničné (len pri poškodenom súbore; stratí názvy zákaziek a prepínač zlúčenia 18/36 vo VEPO exporte — mení pomenovanie a členenie výstupu, nie rozmery, počty ani ceny) | S | poškodený súbor VEPO nastavení (názvy zákaziek, zlúčenie 18/36) sa môže ticho prepísať staršou zálohou |
+| R-18 | platí | po V1 (hlásená strata neuložených hodnôt — ⋯ editor sa zavrie ako uložený, zlyhaný zápis ohlási červený status) | S | pri súbehu úpravy bunky a ⋯ editora v Rozpočte sa rozpísané hodnoty môžu stratiť |
+| R-16 | platí | hraničné (XLSX má kód a dodávateľa) | M | dva rovnaké dekory od dvoch výrobcov majú v rozpočte rovnaký názov riadku |
+| R-25 | čiastočne (PR #350) | po V1 | S | pri vybranej doske s chybným rozmerom klik na riadok Štúdia rozpísanú zmenu zahodí |
+| R-27 | čiastočne (hint o Rozpočte zanikol) | po V1 | S | texty v Pravidlách sú nepresné |
+| R-32 | čiastočne (5 prázdnych + 4 kostrové odseky) | po V1 | S | agent musí pri zásahu čítať kód |
+| R-39 | brána správne otvorená | — | S (docs) | smer dvierok dnes žiadny výstup nespotrebúva |
+| R-05 · R-09 · R-10 · R-15 · R-17 · R-19 (zvyšok) · R-20 · R-21 · R-22 · R-23 (2)+(3) · R-24 · R-26 · R-28 · R-29 · R-30 · R-31 · R-33 · R-36 · R-40 | platia | po V1 | S–L | bez výrobného/cenového rizika a bez tichej straty uložených dát — detail pri každej položke a v podklade |
 
 ## P0 — eskalované ako okamžité hotfix dávky · **✅ OBA HOTOVÉ dávkou P0-HF (PR #252, v0.8.14, 29.8.)**
 
@@ -274,6 +297,10 @@ in-SU beh však ukázal **charakterizáciu** (platí aj pre dnešný `guard_unkn
 nerozlišuje legacy/current/newer/invalid. **Rozhodnutie Michala:** doplniť čítanie (ORANGE „dielec z inej verzie
 štandardu" vo Validation), alebo pole zo štandardu vypustiť — stav „píšem, nečítam" je najhoršia možnosť.
 [E:R-07 + S-10] **Návrh:** podľa rozhodnutia; ORANGE variant **S**.
+**ROZHODNUTÉ (Michal 29.9.2026): ČÍTAŤ** — Kontrola dostane ORANGE nález „dielec z inej verzie štandardu" (variant S); pole zo štandardu
+sa nevypúšťa. Robí sa **pred uzáverom V1** ako samostatná dávka (pred D-48 zdieľaním knižníc, ktoré zvýši miešanie verzií medzi dvoma PC).
+Previerka 29.9.: stav platí — `std` sa píše na 9 miestach (`cabinet_builder`, `board_builder`, `zones`), nečíta nikde; miesta zápisu
+a návrh čítania v previerke, sekcia 3.
 
 ### R-14 · P2 · core · `core/budget_store.rb:428-466`
 Dáta rozpočtu v zákazke (8 NOXUN kľúčov) bez verzie formátu — prvý klik v Rozpočte nad zákazkou z novšieho
@@ -302,6 +329,8 @@ SEED, `merge_seed` označí dokument za zmenený a `load` ho AUTO-ZAPÍŠE — a
 **Návrh:** minimálna shape brána pred seed/normalizačným AUTO-zápisom (dokument, ktorý nemá očakávaný koreňový tvar, sa NEMÁ
 prepisovať seedom — má sa priznať ako poškodený, vzor `assess_library_doc`); alternatíva je nezapisovať `.bak` pri zápise, ktorý
 vznikol iba z normalizácie. Samostatná dávka. **Odhad: S/M.**
+**Previerka 29.9.: PLATÍ, zúžené — odporúčanie PRED V1** (tichá strata dát pri poškodenom súbore, ktorá mení ceny aj prerez/orez). Týka sa hlavne
+`supplier_settings` (prázdny `{}`/`[]` → seed → auto-zápis); `abs_rules`, `hardware_rules` a `dim_series` pri načítaní nezapisujú.
 
 ## Os VÝSTUPY — production_core · rozpočet · ponuka (pred D-95/KONTROLA+VÝROBA)
 
@@ -388,6 +417,10 @@ kombinujúce znaky U+0300–U+036F vložené v regexe SUROVO (NFC nástroj ho ti
 ### R-25 · P3 · ui · `ui/js/bridge.js:325-329`
 `studioRelay` (klik na riadok) nemá guard rozpísanej editácie Inspectora, ktorý majú 4 exportné relaye. [B9]
 **Návrh:** rovnaký `validateFields` guard. **S.**
+**Previerka 29.9.: ČIASTOČNE (PR #350, ČELÁ-B2, v0.10.8)** — cesta skrinky je chránená (`studioRelay` ide cez `nxCabinetAction`
+s `validateFields`). **Otvorené:** pri vybranej DOSKE `nxCabinetAction` hneď skončí (nie je `selectedCabId`) a relay po `flushBoardEditsNow`
+pokračuje na `studio_do_select` bez kontroly `#boardCard .bad`, ktorú majú exportné relaye — klik na riadok Štúdia tak rozpísanú
+neplatnú zmenu dosky zahodí. Po V1.
 
 ### R-26 · P3 · ui · `ui/studio_dialog.rb:161-167` + `core/grain_check.rb:367-373`
 `GrainCheck.restore!` pri otvorení Štúdia nerozposiela stav → rail tvrdí opak. [B11 ≡ C7]
@@ -396,6 +429,7 @@ kombinujúce znaky U+0300–U+036F vložené v regexe SUROVO (NFC nástroj ho ti
 ### R-27 · P3 · ui · `ui/rules_dialog.rb:192-228` + `ui/js/studio.js:139` + UI20_KONTRAKT
 Texty: nominálna trieda ABS písaná ako „1,0 mm"; „pravidlo sa neuplatní" pri čiastočnom override nepresné; hint
 „Rozpočet je jediná sekcia, ktorá mení model" už neplatí. [B7 + B13 + B8] **Návrh:** textová dávka + kontrakt. **S.**
+**Previerka 29.9.: čiastočne** — hint o Rozpočte zanikol; „1,0 mm" a „pravidlo sa neuplatní" platia.
 
 ### R-28 · P3 · core · `core/bom.rb:197-207`
 Mŕtvy hardware override sa kreslí ako aktívne rozhodnutie (filter len na existenciu dielca, nie zhodu so živým
@@ -407,6 +441,8 @@ Scroll sekcie neprežije prepnutie (UI20_KONTRAKT riadok 67 — súbor nemá §-
 ### R-30 · P3 · ui · `actions_parts.rb` / `actions_hardware.rb`
 Jantárové riadky sa po zápise z Inspectora neobnovia — KOLÍZIA so zámerným ručným refreshom Štúdia: rozhodnutie
 o kontrakte okna, nie bugfix. [B12] **Návrh:** rozhodnúť pri D-95 (kontrola je hlavný konzument).
+**Previerka 29.9.: spúšťač zanikol** — D-95 je od 6.9.2026 vyradená; rozhodnutie (ručný refresh so žltým indikátorom áno/nie) môže Michal
+urobiť rovno. Po V1.
 
 ## IDENTITA a proces
 
@@ -421,6 +457,8 @@ zápisovým vedľajším účinkom a migrácia „pri uložení" = observer (aud
 akcie). Kostry kontraktov pre všetkých 18 dodal externý audit (tabuľka v
 [zdroje/AUDIT_2026-08_externy_codex.md](zdroje/AUDIT_2026-08_externy_codex.md)). [E:R-15]
 **Návrh:** dopĺňať TESNE PRED prvým zásahom do modulu (overiť proti kódu), nie slepým hromadným prepisom.
+**Previerka 29.9.: čiastočne** — z 18 ostalo 5 prázdnych odsekov (`debug` v model-a-identita · `actions_settings`, `actions_usage`,
+`usage_stats` v ui-lifecycle · kontrakt `estimate` v outputs) + 4 kostrové v outputs.
 
 ### R-33 · P3 · docs/plán · testy
 Hygiena: D-87 bez vlastného nadpisu v DOGFOODING_vyriesene [B16] · XLSX/CSV kusovníka bez vlastníka v PLANe [B17] ·
@@ -452,6 +490,7 @@ pred preplietaním so seed-merge cestou), ale dve súbežne otvorené okná sa n
 **Návrh:** vzor, ktorý sety aj nastavenia dodávateľa už majú — `global_revision` (SHA odtlačok súboru) do payloadu
 sekcie → klient ju posiela späť → porovnanie POD zámkom → `:conflict` a načítanie formulára nanovo. Pri rozmerových
 radoch je alternatíva zápis PO KĽÚČOCH (rad je nezávislý per rozmer), ktorý revíziu nepotrebuje. **Odhad: S/M.**
+**Previerka 29.9.: PLATÍ — PRED V1** podľa kritéria (tichá strata uložených dát; pravidlá kovania menia nákup); o zaradení rozhoduje Michal.
 
 ### R-36 · P3 (macOS) · core · `core/scale_observer.rb` — `onEraseEntity` · `notify_erase`
 Zvyšok po R-01: pri `onEraseEntity` je entita **už neplatná**, takže jej dokument sa nedá zistiť. Taká požiadavka ide
@@ -478,8 +517,8 @@ a R-04 je platformovo nezávislá hygiena — všetky tri sa dorobia v 1d nezáv
 R-23.1 Escape (S, hocikedy) · R-18 · zvyšok podľa kapacity. R-32 kostry priebežne pred každým zásahom.
 
 **Otvorené rozhodnutia Michala:** R-05 (rozsah zaokrúhľovania pomeru per zákazka vs per skrinka — rozhodne
-USER-debata o setoch, PRED implementáciou D-109) · R-13 (`std` na entite: čítať vs vypustiť) · R-30 (jantárové
-riadky vs ručný refresh — pri D-95).
+USER-debata o setoch, PRED implementáciou D-109) · ~~R-13~~ (✔ rozhodnuté 29.9.2026: čítať — ORANGE) · R-30 (jantárové
+riadky vs ručný refresh — spúšťač D-95 zanikol, rozhodnúť rovno; po V1).
 
 ### R-39 · P1 · PRE-COMMITTED BRÁNA · smer dvierok `Neurčený` (O1, 2.9.2026)
 Rozhodnutie Michala O1 (reconcile cross-auditu KOVANIE): `direction = unset` je od KOV-A **RED nález bez exportnej brány** — smer dnes nemení žiadny
@@ -488,6 +527,9 @@ výrobné zadanie): vtedy `front_direction_unset` prejde z RED nálezu do `expor
 heuristika smeru nikde v kóde (ani preview/overlay); legacy configy bez poľa sa negatujú. **Otvorené, kým výstup so smerom nevznikne** — nezatvárať bez brány.
 RED kanál `front_direction` pristál v KOV-A1 (PR #280, v0.9.15) — brána ostáva otvorená.
 Overlay „Smer otvárania" kreslí **len uložený stav, žiadny default** (A2b, PR #282, v0.9.17): `left`/`right` šípka · `unset` otáznik · legacy NIČ; **brána stále otvorená**.
+**Previerka 29.9.:** brána správne otvorená — smer dvierok dnes žiadny výstup nespotrebúva (číta ho len Kontrola RED). Keďže D-95 je od 6.9. vyradená,
+spúšťač brány = **prvý výstup, ktorý použije smer dvierok (vŕtanie, CNC, výrobné zadanie)**. Výnimka z „žiadny default": od bloku ROHOVÁ
+dostane nová rohová skrinka smer pri rohu (schválené R7, zapísané v STANDARD) — brány sa to netýka.
 
 ### R-40 · P3 · ui/core · zápis configu skrinky BEZ prestavby (KOV-H1, 3.9.2026)
 Kandidát z auditu KOV-H (checkpoint #15, dôsledok rozhodnutia BLOCKER 1). Zmena, ktorá sa dotkne **len dát** configu a nemá žiadny
@@ -501,6 +543,8 @@ jediné miesto, kde sa stampuje `config_schema`, a položka by ostala pod starou
 a má vlastný `push_selected(dedup: false)`. **Podmienka:** kým je zoznam takých polí jedno-položkový, sa neoplatí — riziko druhej pravdy
 o configu je väčšie než ušetrené milisekundy. Robiť až keď sa trieda „dátových" zmien rozšíri (KOV-H2 úpravy položiek a ďalšie) alebo
 keď sa prestavba pri jednej položke ukáže ako reálna prekážka práce. **Odhad: S/M.**
+**Previerka 29.9.:** podmienka čiastočne splnená — S1-C pridal úzku cestu zápisu configu bez prestavby pre očakávaný spotrebič
+(`actions_appliance.rb`); pri R-40 zvážiť zjednotenie s ňou namiesto tretej cesty. Po V1.
 
 ### R-41 · P2 · ui · `ui/js/hw_sets.js` (HWS_EDIT) — draft editora setu posiela ČERSTVÚ revíziu, nie pripnutú (Codex audit KOV-B #17, BLOCKER 3, 3.9.2026)
 Draft `HWS_EDIT` zámerne prežíva push, ale pri uložení posiela `HWS_DATA.revision` z posledného payloadu — keď druhé okno medzitým zmení ten istý set a prvé dostane refresh,

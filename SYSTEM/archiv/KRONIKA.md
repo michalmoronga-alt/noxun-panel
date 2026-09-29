@@ -17,6 +17,17 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **DOCS — previerka registra auditu + R-13 rozhodnuté (29.9.2026, PR #424, len dokumentácia; verzia pluginu sa nemení).** Michal 29.9. večer pri otázke
+  „čo ešte pred V1" dal pokyn na previerku [AUDIT_REGISTER.md](../AUDIT_REGISTER.md) z 29.8. proti dnešnému kódu (~170 PR neskôr). Read-only subagent
+  overil 29 otvorených položiek: **3 čiastočne** (R-25 — PR #350 chráni len cestu skrinky, R-27, R-32), ostatné **platia**; R-39 je vedome otvorená
+  brána (spúšťač preformulovaný — D-95 je vyradená) a R-30 stratila spúšťač. Kritérium „pred V1" (výroba/ceny · tichá strata uložených dát) spĺňajú
+  **R-37** (poškodený, ale platný súbor nastavení dodávateľa sa ticho nahradí seedom a zničí zálohu) a **R-35** (dve okná SketchUpu si ticho prepíšu
+  pravidlá kovania/rozmerové rady); hraničné R-38 a R-16, R-18 po V1 — rozhoduje Michal. Verdikty a poradie sú v registri (sekcia „Stav po previerke
+  29.9.2026"); Codex review kolo 1 vrátilo 3× P2 (R-25 nie je hotová · verdikty patria do živého registra · kritérium platí aj na R-35) — opravené, interná delta. Michal zároveň **rozhodol R-13: čítať** (ORANGE
+  „dielec z inej verzie štandardu", samostatná dávka pred uzáverom V1). Dôkazy (súbor:riadok) a podklad pre R-13:
+  [zdroje/PREVIERKA_REGISTRA_2026-09-29.md](../zdroje/PREVIERKA_REGISTRA_2026-09-29.md) (nezáväzný podklad). **STAV pri najbližšej
+  kódovej dávke:** R-13 už nečaká na Michala — dokumentačné PR STAV nemení.
+
 - **DOCS — smoke bloku 2 · Nárezový plán PASS (29.9.2026, PR #423, len dokumentácia; verzia pluginu sa nemení).** Michal 29.9. ráno prešiel smoke bloku 2
   podľa checklistu v [NAREZ_ZAVER_2026-09-29.md](NAREZ_ZAVER_2026-09-29.md): **„prešiel som si to, nenašiel som chyby — smoke PASS"** — výsledok zapísaný
   ako celok, nie po bodoch. **Postreh (nie chyba):** zaskočila ho optimalizácia — pásové rozloženie nedá menšie dielce nad seba v páse, nad nižším dielcom
