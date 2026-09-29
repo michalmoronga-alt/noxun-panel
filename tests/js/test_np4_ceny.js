@@ -215,6 +215,18 @@ muts = mutations();
 eq(muts.length, 2, 'zápis rovnakého dokumentu sa odošle');
 eq(muts[1].gen, 12, 'so STAROU gen — server ho odmietne ako zastaraný (nie tichý zápis nad novým stavom)');
 
+// `budDocSwitched` sám (bez modalu): zapisy INÉHO dokumentu z fronty zmiznú, vlastné ostanú.
+SENT.length = 0;
+push({ guid: 'GA', gen: 15 });
+sandbox.budSend('mode', { mode: 'vysoky' });
+sandbox.budSend('viz_m2', { value: 3 });
+eq(sandbox.BUD_QUEUE.length, 1, 'jeden zápis čaká');
+eq(sandbox.budDocSwitched('GA'), false, 'ten istý dokument — nič sa nemení');
+eq(sandbox.BUD_QUEUE.length, 1, 'vlastný zápis ostal vo fronte');
+eq(sandbox.budDocSwitched('GB'), false, 'bez modalu nie je čo zatvárať');
+eq(sandbox.BUD_QUEUE.length, 0, 'B1: zmena dokumentu frontu vyprázdni aj BEZ modalu');
+push({ guid: 'GA', gen: 15 });
+
 // Poistka bez nového payloadu (poistný timer): cudzí zápis sa zahodí aj v `budAfterPush`.
 SENT.length = 0;
 push({ guid: 'GA', gen: 14 });
