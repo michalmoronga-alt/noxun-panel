@@ -47,7 +47,7 @@ Staršie položky bloku 2 boli hotové skôr: **D-94** nákup s pôvodom (#361),
 | NP-2 · nastavenia + Kontrola | #419 | 0.15.2 | prerez, orez, prídavok dupláku v Nastaveniach rozpočtu; súbor nastavení dodávateľa verzia 2 s doprednou bránou; Kontrola „nezmestí sa" s orezom |
 | NP-3 · sekcia Nárezový plán | #420 | 0.15.3 | sekcia Štúdia (karty, malé platne, detail, posledná platňa, nezaradené), jeden výpočet plánu na zber, veta plánu v Rozpočte a XLSX |
 | NP-4 · ceny podľa plánu | #421 | 0.15.4 | prepínač per zákazka, cenová spôsobilosť materiálu, porez z plánu, montáž z odhadu, `BUDGET_STD` 3, oprava fronty zápisov rozpočtu |
-| Uzáver | #? | 0.16.0 | dokumentácia a verzia, priečinok bloku do archívu |
+| Uzáver | #422 | 0.16.0 | dokumentácia a verzia, priečinok bloku do archívu |
 
 ## Overenie
 

@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **BLOK 2 · KONTROLA + VÝROBA UZAVRETÝ (29.9.2026, v0.15.4 → v0.16.0, uzáver PR #?, variant B).** Posledný bod bloku — **primitívny nárezový plán** (V1 bod 6,
+- **BLOK 2 · KONTROLA + VÝROBA UZAVRETÝ (29.9.2026, v0.15.4 → v0.16.0, uzáver PR #422, variant B).** Posledný bod bloku — **primitívny nárezový plán** (V1 bod 6,
   rozhodnutý 6.9.) — Michal spustil 28.9. večer; štart **#417** (re-rez zavretého #416: rozhodnutia N1–N11, schválený mockup, fakty, surová rešerš a krížový audit)
   a štyri dávky za jeden deň: **NP-1** #418 (jadro `sheet_layout.rb`, `prepare_row`; audit 2 BLOCKER) · **NP-2** #419 (prerez/orez/prídavok v Nastaveniach
   rozpočtu, súbor dodávateľa verzia 2, Kontrola s orezom; audit 2 BLOCKER, GH kolo 1 P1) · **NP-3** #420 (sekcia Nárezový plán, veta plánu v Rozpočte a XLSX;

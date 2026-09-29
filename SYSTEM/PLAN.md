@@ -32,7 +32,7 @@ priečinok bloku v [archiv/bloky/KONSTRUKCIA/](archiv/bloky/KONSTRUKCIA/).)*
 plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), výsledok a smoke checklist v [archiv/ROHOVA_ZAVER_2026-09-28.md](archiv/ROHOVA_ZAVER_2026-09-28.md),
 priečinok bloku v [archiv/bloky/ROHOVA/](archiv/bloky/ROHOVA/).)*
 *(Blok **2 · KONTROLA + VÝROBA** je hotový — **uzáver v0.16.0, 29.9.2026** (položky od v0.9.22 po v0.15.4, 4.–29.9.2026): D-94 (#361), D-112 + D-113 (#287), D-121 (#324/#325), D-122 (#343) a **Nárezový
-plán primitívny** — štart PR #417, dávky PR #418 → #421 + uzáver PR #? (NP-1 · NP-2 · NP-3 · NP-4); plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md),
+plán primitívny** — štart PR #417, dávky PR #418 → #421 + uzáver PR #422 (NP-1 · NP-2 · NP-3 · NP-4); plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md),
 výsledok a smoke checklist v [archiv/NAREZ_ZAVER_2026-09-29.md](archiv/NAREZ_ZAVER_2026-09-29.md), priečinok bloku v [archiv/bloky/NAREZ/](archiv/bloky/NAREZ/).)*
 
 

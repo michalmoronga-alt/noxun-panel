@@ -2,7 +2,7 @@
 
 > **ARCHÍV (založené 24.7.2026 pri uzávere V0.5).** Kompaktné riadky hotových etáp drží [KRONIKA.md](KRONIKA.md) (časová os) — tu sú plné pôvodné texty (história rozhodnutí, rozsahov a PR). Otvorené záväzky z týchto textov sú od 11.8.2026 zaradené do blokov [../PLAN.md](../PLAN.md) — tento súbor je čisto referenčný.
 
-## BLOK 2 · KONTROLA + VÝROBA — UZAVRETÝ (29.9.2026, v0.16.0; Nárezový plán: štart PR #417, dávky PR #418–#421 + uzáver PR #?)
+## BLOK 2 · KONTROLA + VÝROBA — UZAVRETÝ (29.9.2026, v0.16.0; Nárezový plán: štart PR #417, dávky PR #418–#421 + uzáver PR #422)
 
 **Krížová kontrola zákazky pred výrobou a výrobné výstupy** — **D-94** nákup s pôvodom (#361, v0.12.1) · **D-112** zmenená ABS v stĺpci `poznamka` VEPO
 a **D-113** krátky popis korpusu v názvoch dielcov (#287, v0.9.22) · **D-121** názvy dielcov zásuviek a VEPO do 20 znakov (#324/#325, v0.9.45–v0.9.46) ·
@@ -52,7 +52,7 @@ objednávkou VEPO (N10 — po V1 na novej zákazke, voliteľne cez nepotvrdenú 
     poznámka „plán: N platní" v Rozpočte a XLSX (ceny sa nemenia). **PR #420, v0.15.3** ([package](bloky/NAREZ/PACKAGE_NP3_SEKCIA.md)).
   - ✅ **NP-4 · ceny podľa plánu** — prepínač pre zákazku (predvolene vypnutý), porez podľa plánu, montáž z odhadu; materiál bez spoľahlivého plánu ostáva na odhade
     s dôvodom; `BUDGET_STD` 3. **PR #421, v0.15.4** ([package](bloky/NAREZ/PACKAGE_NP4_CENY.md)). Po mergi **uzáver bloku 2** (release, minor, smoke).
-  - ✅ **Uzáver bloku 2** *(PR #?, v0.16.0 — docs a verzia)* — blok do archívu, priečinok bloku do `archiv/bloky/NAREZ/`, V1_VIZIA (nárezový plán v bode 6
+  - ✅ **Uzáver bloku 2** *(PR #422, v0.16.0 — docs a verzia)* — blok do archívu, priečinok bloku do `archiv/bloky/NAREZ/`, V1_VIZIA (nárezový plán v bode 6
     odškrtnutý), README, DOGFOODING (dočasná skupina smoke), STAV, KRONIKA; výsledok a smoke checklist v [NAREZ_ZAVER_2026-09-29.md](NAREZ_ZAVER_2026-09-29.md).
 
 ## BLOK K3 ROHOVÁ SKRINKA (V1 bod 2) — UZAVRETÝ (28.9.2026, v0.15.0, podklady PR #409, dávky PR #410–#413 + uzáver PR #414)

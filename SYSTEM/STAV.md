@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.16.0 · 29.9.2026 — BLOK 2 · KONTROLA + VÝROBA UZAVRETÝ** (posledný bod — **primitívny nárezový plán**: štart PR #417, dávky PR #418–#421 + uzáver PR #?;
+**v0.16.0 · 29.9.2026 — BLOK 2 · KONTROLA + VÝROBA UZAVRETÝ** (posledný bod — **primitívny nárezový plán**: štart PR #417, dávky PR #418–#421 + uzáver PR #422;
 **čaká na Michalov smoke**). **Štúdio → Nárezový plán** ukazuje karty materiálov s počtom platní (horná hranica pri tomto rozložení, plán neotáča), malé platne,
 detail platne, upozornenie na poslednú platňu a dielce, ktoré sa nezmestia; prerez, orez a prídavok dupláku sú v Nastaveniach rozpočtu, Kontrola „nezmestí sa"
 počíta s orezom. **Rozpočet → Materiál** nesie vetu „plán: N platní" a prepínač **„ceny podľa plánu"** (per zákazka, predvolene vypnutý; zapnutý berie plán len
@@ -27,7 +27,7 @@ v **seede 6** — starší plugin zákazku neprestaví ani nevyexportuje (rohov�
 v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a zastaví oba cenové exporty). **Nastavenia dodávateľa sú od NP-2 vo verzii súboru 2** (v0.15.1 a starší pri uložení nové polia zahodí).
 **Aktualizovať OBE PC (aj Luciino) na 0.16.0 pred prvou úpravou rozpočtu** — starší plugin rohovú nepozná, knižnicu šablón STD 7 len číta a rozpočet `BUDGET_STD` 3 needituje.
 
-**Testy (uzáver bloku 2, PR #?):** **4842 headless · 142 JS sád** zelené (in-SU netreba — kód len číslom verzie); posledná kódová dávka NP-4 #421: **4842 · 142 · in-SU 3266 PASS**.
+**Testy (uzáver bloku 2, PR #422):** **4842 headless · 142 JS sád** zelené (in-SU netreba — kód len číslom verzie); posledná kódová dávka NP-4 #421: **4842 · 142 · in-SU 3266 PASS**.
 **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 
 ## Robí sa
@@ -44,7 +44,7 @@ VEPO (N10) po V1 na novej zákazke. Nálezy z výroby a cien majú prednosť.
 
 ## Posledné uzávery
 
-- **BLOK 2 · KONTROLA + VÝROBA UZAVRETÝ** (**v0.16.0**, 29.9.2026; nárezový plán: štart #417, PR #418–#421 + uzáver PR #?; smoke čaká). Nárezový plán v Štúdiu, nastavenia
+- **BLOK 2 · KONTROLA + VÝROBA UZAVRETÝ** (**v0.16.0**, 29.9.2026; nárezový plán: štart #417, PR #418–#421 + uzáver PR #422; smoke čaká). Nárezový plán v Štúdiu, nastavenia
   prerezu/orezu/prídavku, Kontrola s orezom, ceny podľa plánu; priečinok bloku v [archiv/bloky/NAREZ/](archiv/bloky/NAREZ/).
   [Výsledok, dávky a checklist](archiv/NAREZ_ZAVER_2026-09-29.md).
 - **BLOK 8 · K3 ROHOVÁ SKRINKA UZAVRETÝ** (v0.14.0 → **v0.15.0**, 27.–28.9.2026, podklady #409, PR #410–#413 + uzáver PR #414; smoke **PASS 28.9.**, PR #415). Typ „Rohová" s rohovou zostavou,
