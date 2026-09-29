@@ -186,11 +186,11 @@ NxTest.test('NP-2 nastavenia: chyba rozsahu je LUDSKA (popis + jednotka + desati
   NxTest.skip!('zapisuje do sandboxu nastaveni') unless NxTest.headless?
   NxNp2.with_sandbox do
     _ok, errs, = NxNp2::SS.patch_active!('kerf_mm' => 11)
-    NxTest.assert_equal(['Prerez píly: hodnota mimo rozsahu 0–10 mm'], errs)
+    NxTest.assert_equal(['Prerez píly (hrúbka kotúča): hodnota mimo rozsahu 0–10 mm'], errs)
     _ok, errs, = NxNp2::SS.patch_active!('trim_mm' => -3)
     NxTest.assert_equal(['Orez okraja platne: hodnota mimo rozsahu 0–50 mm'], errs)
     _ok, errs, = NxNp2::SS.patch_active!('rounding_step' => 0)
-    NxTest.assert_equal(['Zaokrúhlenie ponuky: hodnota mimo rozsahu 0,01–1000 €'], errs)
+    NxTest.assert_equal(['Zaokrúhlenie ponuky nahor na: hodnota mimo rozsahu 0,01–1000 €'], errs)
     NxTest.refute(errs.join.include?('rounding_step'), 'ziadny surovy kluc')
   end
 end
@@ -215,6 +215,10 @@ NxTest.test('NP-2 GUARD: zoznam skalarov Ruby (SCALAR_DEFAULTS) == JS (SS_SCALAR
   # Poradie z mockupu D: tri nove riadky medzi „m² na platňu" a „Zaokrúhlenie".
   NxTest.assert_equal(%w[abs_reserve_pct montaz_m2_per_plate kerf_mm trim_mm dup_allowance_mm
                          rounding_step stale_days cp_highlight_threshold], js_keys)
+  # Predrecenzia P3-3: chyba rozsahu hovori na serveri aj v klientovi TO ISTE —
+  # popis a jednotka riadku == `SCALAR_LABELS`.
+  js_meta = block.scan(/^\s*\['([a-z_0-9]+)', '([^']*)', '([^']*)'/).to_h { |k, l, u| [k, [l, u]] }
+  NxTest.assert_equal(NxNp2::SS::SCALAR_LABELS.to_h { |k, v| [k, v] }, js_meta)
 end
 
 # ============================================================================
@@ -381,6 +385,30 @@ NxTest.test('NP-2 Kontrola: duplak 2765 x 580 -> vrstva 2785 x 600 sa nezmesti =
   NxTest.assert(f.of(f.run([dup3]), 'oversize').first['message_sk'].include?('3 prírezy'))
 end
 
+NxTest.test('NP-2 Kontrola (predrecenzia P2-1): duplak s NEZNAMOU ABS — veta o prirezoch ostava (geometria odmietnutia nesie doubled/multiplier)') do
+  f = NxNp2
+  dup = f.rec('material_id' => 'DUP36', 'thickness' => 36.0, 'length' => 2765.0, 'width' => 580.0,
+              'material_source' => { 'material_id' => 'DTD', 'multiplier' => 2 },
+              'edges' => f.edges('L1' => 'NEZNAMA'))
+  rect = f::SL.purchase_rect(dup, sheets: f::SHEETS, edge_thicknesses: {},
+                             params: { 'kerf' => 5.0, 'trim' => 10.0, 'dup_allowance' => 10.0 })
+  NxTest.assert_equal('vepo', rect['reason'], 'VEPO riadok odmietne (neznama ABS)')
+  NxTest.assert_equal(true, rect['doubled'])
+  NxTest.assert_equal(2, rect['multiplier'])
+  over = f.of(f.run([dup], f.layout(et: {})), 'oversize')
+  NxTest.assert_equal(1, over.length)
+  NxTest.assert(over.first['message_sk'].include?('duplák: 2 prírezy 2785 × 600 mm'), over.first['message_sk'])
+end
+
+NxTest.test('NP-2 Kontrola (predrecenzia P3-4): orez a pouzitelna plocha s rovnakou presnostou ako nastavenia (2 desatinne)') do
+  f = NxNp2
+  msg = f.of(f.run([f.rec('length' => 2780.0)], f.layout(trim: 12.25)), 'oversize').first['message_sk']
+  NxTest.assert(msg.include?('po oreze 12,25 mm (použiteľná plocha 2775,5 × 2045,5 mm)'), msg)
+  NxTest.assert_equal('12,25', f::VAL.mm2(12.25))
+  NxTest.assert_equal('4,4', f::VAL.mm2(4.4))
+  NxTest.assert_equal('10', f::VAL.mm2(10.0))
+end
+
 NxTest.test('NP-2 Kontrola: dielec bez smeru sa OTOCI (2000 x 2500 bez nalezu), so smerom `length` RED') do
   f = NxNp2
   NxTest.assert_equal(0, f.of(f.run([f.rec('length' => 2000.0, 'width' => 2500.0, 'grain_direction' => 'none')]),
@@ -505,6 +533,21 @@ NxTest.test('NP-2 ProductionCore: control_payload cita orez z NASTAVENI; chyba k
       NxTest.assert_equal({}, lay[:edge_thicknesses])
     ensure
       mat.define_singleton_method(:edges, orig)
+    end
+    # Predrecenzia P3-6: zachranna vetva `control_layout` — chyba nastaveni
+    # Kontrolu nezhodi; bezi s predvolenymi hodnotami a PRIZNA to.
+    ss = NxNp2::SS
+    orig_lp = ss.method(:layout_params)
+    ss.define_singleton_method(:layout_params) { |*_a| raise IOError, 'nastavenia sa neda precitat' }
+    begin
+      lay = pc.control_layout({})
+      NxTest.assert_equal(:seed_fallback, lay[:source])
+      NxTest.assert_equal(Noxun::Engine::SheetLayout::PARAM_DEFAULTS, lay[:params])
+      out = pc.control_payload(collected, sheets: f::SHEETS)
+      NxTest.assert_equal(1, f.of(out, 'layout_settings').length, 'ORANGE nalez o predvolenych hodnotach')
+      NxTest.assert_equal(1, f.of(out, 'oversize').length, 'Kontrola bezi s predvolenym orezom 10')
+    ensure
+      ss.define_singleton_method(:layout_params, orig_lp)
     end
     # oba volajuci dostanu IDENTICKE parametre z jednej funkcie
     a = pc.control_layout(nil)

@@ -161,13 +161,15 @@ module Noxun
 
       # NP-2: ludske mena a jednotky skalarov pre CHYBU ROZSAHU (predtym
       # surovy kluc „kerf_mm: hodnota mimo…").
+      # Popis = PRESNE text riadku v sekcii (JS `SS_SCALARS`) — server aj klient
+      # tak hovoria to iste („Prerez píly (hrúbka kotúča): …"); zhodu strazi test.
       SCALAR_LABELS = {
         'abs_reserve_pct' => ['ABS rezerva', '%'],
-        'montaz_m2_per_plate' => ['m² na jednu platňu', 'm²'],
-        'kerf_mm' => ['Prerez píly', 'mm'],
+        'montaz_m2_per_plate' => ['m² na jednu platňu (montáž)', 'm²'],
+        'kerf_mm' => ['Prerez píly (hrúbka kotúča)', 'mm'],
         'trim_mm' => ['Orez okraja platne', 'mm'],
         'dup_allowance_mm' => ['Prídavok dupláku na stranu', 'mm'],
-        'rounding_step' => ['Zaokrúhlenie ponuky', '€'],
+        'rounding_step' => ['Zaokrúhlenie ponuky nahor na', '€'],
         'stale_days' => ['Upozorniť na cenu staršiu ako', 'dní'],
         'cp_highlight_threshold' => ['Samostatný riadok v cenovej ponuke od', '€']
       }.freeze
@@ -175,9 +177,9 @@ module Noxun
       # NP-2: kluce parametrov SheetLayout -> kluce skalarov dodavatela.
       LAYOUT_KEYS = { 'kerf' => 'kerf_mm', 'trim' => 'trim_mm', 'dup_allowance' => 'dup_allowance_mm' }.freeze
 
-      FALLBACK_REASON = 'Súbor nastavení dodávateľa sa nepodarilo prečítať — zobrazujú sa ' \
-                        'predvolené hodnoty (prerez 5, orez 10, prídavok dupláku 10 mm) a počíta ' \
-                        's nimi aj Kontrola. Skontroluj súbor alebo ulož nastavenia nanovo.'
+      FALLBACK_REASON = 'Súbor nastavení dodávateľa sa nepodarilo načítať — všetky sadzby a výpočtové ' \
+                        'hodnoty sú predvolené a počíta s nimi rozpočet aj Kontrola. Uložením sa súbor ' \
+                        'prepíše predvolenými hodnotami s tvojou zmenou.'
 
       module_function
 
@@ -824,7 +826,7 @@ module Noxun
         [true, [], :ok]
       end
 
-      # NP-2: chyba rozsahu LUDSKY — „Prerez píly: hodnota mimo rozsahu 0–10 mm"
+      # NP-2: chyba rozsahu LUDSKY — „Prerez píly (hrúbka kotúča): hodnota mimo rozsahu 0–10 mm"
       # (nie surovy kluc; desatinna ciarka ako v celom UI).
       def range_error(key, range)
         label, unit = SCALAR_LABELS[key.to_s] || [key.to_s, '']

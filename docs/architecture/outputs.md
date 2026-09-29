@@ -902,7 +902,8 @@ montaz), `standard_rows` (8 fixných riadkov), `mode_values` (€/€€/€€�
 **whitelist** (neznáme polia zahodí); chýbajúci či mimo rozsahu skalár dostane predvolenú hodnotu už pri čítaní. Zoznam skalárov žije na
 **troch miestach** (`SCALAR_DEFAULTS`, `SCALAR_RANGES`, riadok v `normalize_supplier`) + popis v `SCALAR_LABELS` a riadok v JS `SS_SCALARS`
 — zhodu stráži `tests/pure/test_np2_nastavenia_kontrola.rb` (patch neznámy kľúč **ticho vynechá**, zabudnutý rozsah = pole sa neuloží).
-Chyba rozsahu je ľudská („Prerez píly: hodnota mimo rozsahu 0–10 mm", `range_error`), nie surový kľúč.
+Chyba rozsahu je ľudská („Prerez píly (hrúbka kotúča): hodnota mimo rozsahu 0–10 mm", `range_error`), nie surový kľúč; popis
+v `SCALAR_LABELS` je **presne text riadku** v sekcii (JS `SS_SCALARS`), takže server aj klient hlásia to isté (zhodu stráži test).
 
 **Čítanie s pôvodom (NP-2, audit B2).** `load_with_origin` → `[dokument, :file | :newer_file | :seed_fallback]` — pôvod sa určí **v čítaní**,
 lebo `load` chybu pohltí a vráti seed a neskôr sa fallback od súboru rozlíšiť nedá. `active_with_source` pridá `:backup` (poškodený primár

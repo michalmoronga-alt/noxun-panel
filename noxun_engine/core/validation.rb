@@ -593,15 +593,15 @@ module Noxun
         sl, sw = rect['sheet_size']
         t = rect['trim'].to_f
         txt = "Dielec „#{disp_name(r)}“ (#{disp_owner(r)}) #{disp_dim(r['length'])} × #{disp_dim(r['width'])} mm " \
-              "(hotový rozmer vrátane ABS) sa nezmestí na platňu #{fmt(sl)} × #{fmt(sw)} mm"
+              "(hotový rozmer vrátane ABS) sa nezmestí na platňu #{mm2(sl)} × #{mm2(sw)} mm"
         if t.positive?
           lu, wu = rect['usable']
-          txt += " po oreze #{fmt(t)} mm (použiteľná plocha #{fmt(lu)} × #{fmt(wu)} mm)"
+          txt += " po oreze #{mm2(t)} mm (použiteľná plocha #{mm2(lu)} × #{mm2(wu)} mm)"
         end
         if rect['doubled']
           n = rect['multiplier'].to_i
           txt += " — duplák: #{n} #{n.between?(2, 4) ? 'prírezy' : 'prírezov'} " \
-                 "#{fmt(rect['l'])} × #{fmt(rect['w'])} mm"
+                 "#{mm2(rect['l'])} × #{mm2(rect['w'])} mm"
         end
         "#{txt} (materiál #{rect['material_id']})."
       end
@@ -616,8 +616,8 @@ module Noxun
           'severity' => ORANGE, 'category' => CAT_LAYOUT_SETTINGS,
           'owner_id' => nil, 'part_key' => nil, 'hw_key' => nil,
           'message_sk' => 'Nastavenia prerezu a orezu sa nepodarilo načítať — Kontrola počíta ' \
-                          "s predvolenými hodnotami (prerez #{fmt(prm['kerf'])} mm, orez #{fmt(prm['trim'])} mm, " \
-                          "prídavok dupláku #{fmt(prm['dup_allowance'])} mm). Skontroluj Nastavenia rozpočtu.",
+                          "s predvolenými hodnotami (prerez #{mm2(prm['kerf'])} mm, orez #{mm2(prm['trim'])} mm, " \
+                          "prídavok dupláku #{mm2(prm['dup_allowance'])} mm). Skontroluj Nastavenia rozpočtu.",
           'stable_key' => "#{CAT_LAYOUT_SETTINGS}|seed_fallback"
         }
       end
@@ -630,6 +630,16 @@ module Noxun
         a, b = grain.to_s == 'width' ? [w, l] : [l, w]
         SheetLayout.fits_rect?({ 'l' => a.to_f, 'w' => b.to_f, 'usable' => [sl.to_f, sw.to_f] },
                                allow_rotation: SheetLayout.rotation_allowed?(grain))
+      end
+
+      # NP-2: mm vo vete nadrozmeru s presnostou NASTAVENI (UI uklada 2
+      # desatinne) — orez 12,25 a plocha 2775,5 si tak neprotirecia. Bez
+      # zbytocnych nul, desatinna ciarka.
+      def mm2(v)
+        f = v.to_f.round(2)
+        return f.round.to_s if (f - f.round).abs < 1e-9
+
+        format('%.2f', f).sub(/0\z/, '').tr('.', ',')
       end
 
       # Rozmer pre vetu — aj necislo (NaN, nekonecno) sa musi dat vypisat.

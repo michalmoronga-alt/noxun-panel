@@ -33,10 +33,14 @@
   (2781–2800 mm pri oreze 10) a dupláky nad použiteľnou plochou mínus prídavok sú odteraz RED; dva počítače s iným orezom dajú iný nález. Audit návrhu Codex
   `gpt-6-astra`: **2 BLOCKER · 2 FIX · 2 NOTE — všetky prijaté** (surový výstup a package v [zdroje/bloky/NAREZ/](../zdroje/bloky/NAREZ/)). STANDARD §3.3, §10,
   §11.4 a nová **§11.5 Nastavenia dodávateľa**; architektúra `outputs.md` (`validation.rb`, `production_core.rb`, `sheet_layout.rb`, `supplier_settings.rb` —
-  prvý úplný odsek) a `ui-lifecycle.md` (`supplier_settings_dialog.rb`, Kontrola). **Testy:** 4790 headless · 139 JS sád zelené (nové
-  `test_np2_nastavenia_kontrola.rb` a `test_np2_nastavenia.js`); **12 mutácií — 12 zabitých** (zápis bez pečiatky `std`, brána vypadnutá zo zápisu, seed-merge do
-  novšieho súboru, brána z cache, orez pri PD, Kontrola bez prídavku dupláku, otáčanie pri `length`, klik bez `layout:`, klient bez kontroly rozsahu, fallback
-  tváriaci sa ako súbor, neplatný rozmer bez nálezu, hrúbky ABS cez `vepo_edge_thicknesses`). In-SU netreba (globálny súbor + čítanie Kontroly, žiadny zápis do modelu).
+  prvý úplný odsek) a `ui-lifecycle.md` (`supplier_settings_dialog.rb`, Kontrola). **Slepá predrecenzia:** OPRAVIŤ PRED PR — 0× P1, 2× P2 (chýbajúce testy:
+  prírezy dupláku pri neznámej ABS, klik na nález `layout_settings`) a 4× P3 (jednotné znenie chyby rozsahu server = klient, orez a plocha vo vete na 2 desatinné,
+  pravdivá veta fallbacku, test záchrannej vetvy `control_layout`) — všetko opravené pred PR. **Testy:** 4792 headless · 140 JS sád zelené (nové
+  `test_np2_nastavenia_kontrola.rb`, `test_np2_nastavenia.js`, `test_np2_kontrola_klik.js`); **17 mutácií — 17 zabitých** (zápis bez pečiatky `std`, brána
+  vypadnutá zo zápisu, seed-merge do novšieho súboru, brána z cache, orez pri PD, Kontrola bez prídavku dupláku, otáčanie pri `length`, klik bez `layout:`, klient
+  bez kontroly rozsahu, fallback tváriaci sa ako súbor, neplatný rozmer bez nálezu, hrúbky ABS cez `vepo_edge_thicknesses`, geometria odmietnutia bez údaja
+  o dupláku, klik na nález nastavení na server, `control_layout` bez záchrany, orez na 1 desatinné, iný popis poľa na serveri). In-SU netreba (globálny súbor
+  + čítanie Kontroly, žiadny zápis do modelu).
 
 - **NP-1 · Nárezový plán — jadro výpočtu (29.9.2026, v0.15.0 → v0.15.1, PR #418; blok 2, prvá dávka).**
   Nový čistý modul `core/sheet_layout.rb` (**zatiaľ nikam nenapojený** — pre používateľa sa nič nemení, zobrazí ho NP-3): z riadkov kusovníka, katalógu dosiek
