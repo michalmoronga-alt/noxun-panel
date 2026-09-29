@@ -17,6 +17,15 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **DOCS — previerka registra auditu + R-13 rozhodnuté (29.9.2026, PR #?, len dokumentácia; verzia pluginu sa nemení).** Michal 29.9. večer pri otázke
+  „čo ešte pred V1" dal pokyn na previerku [AUDIT_REGISTER.md](../AUDIT_REGISTER.md) z 29.8. proti dnešnému kódu (~170 PR neskôr). Read-only subagent
+  overil 29 otvorených položiek: **1 opravená** (R-25 už PR #350), **2 čiastočne** (R-27, R-32), ostatné **platia**; R-39 je vedome otvorená brána
+  (spúšťač preformulovaný — D-95 je vyradená) a R-30 stratila spúšťač. Kritériom bloku 1d spĺňa **„pred V1" len R-37** (poškodený, ale platný súbor
+  nastavení dodávateľa sa ticho nahradí seedom a zničí zálohu); hraničné R-18, R-35, R-16, R-38. Michal zároveň **rozhodol R-13: čítať** (ORANGE
+  „dielec z inej verzie štandardu", samostatná dávka pred uzáverom V1). Plné verdikty a podklad pre R-13:
+  [zdroje/PREVIERKA_REGISTRA_2026-09-29.md](../zdroje/PREVIERKA_REGISTRA_2026-09-29.md); v registri len riadky „Previerka 29.9.". **STAV pri najbližšej
+  kódovej dávke:** R-13 už nečaká na Michala — dokumentačné PR STAV nemení.
+
 - **DOCS — smoke bloku 2 · Nárezový plán PASS (29.9.2026, PR #423, len dokumentácia; verzia pluginu sa nemení).** Michal 29.9. ráno prešiel smoke bloku 2
   podľa checklistu v [NAREZ_ZAVER_2026-09-29.md](NAREZ_ZAVER_2026-09-29.md): **„prešiel som si to, nenašiel som chyby — smoke PASS"** — výsledok zapísaný
   ako celok, nie po bodoch. **Postreh (nie chyba):** zaskočila ho optimalizácia — pásové rozloženie nedá menšie dielce nad seba v páse, nad nižším dielcom

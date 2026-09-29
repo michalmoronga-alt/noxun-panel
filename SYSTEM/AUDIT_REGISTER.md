@@ -11,6 +11,8 @@
 > a pri uzávere bloku sa presunie do sekcie „Vyriešené" na konci. Pravidlo 1d: rieši sa LEN výrobné riziko alebo
 > ponechaný V1 rozsah; dávka bez menovanej funkcie/dlhu sa nerobí. Čísla riadkov = stav k `dc2d53f`
 > (kód sa odvtedy hýbe — pri práci sa orientuj podľa MIEN metód; nové položky citujú mená, nie čísla).
+> **Previerka 29.9.2026 ([zdroje/PREVIERKA_REGISTRA_2026-09-29.md](zdroje/PREVIERKA_REGISTRA_2026-09-29.md)):** stav otvorených položiek overený proti `main` 2a1ff94c (v0.16.0) — verdikty, dôkazy a odporúčanie pred/po V1 sú tam;
+> pri položkách nižšie je len riadok „Previerka 29.9.".
 
 ## P0 — eskalované ako okamžité hotfix dávky · **✅ OBA HOTOVÉ dávkou P0-HF (PR #252, v0.8.14, 29.8.)**
 
@@ -274,6 +276,10 @@ in-SU beh však ukázal **charakterizáciu** (platí aj pre dnešný `guard_unkn
 nerozlišuje legacy/current/newer/invalid. **Rozhodnutie Michala:** doplniť čítanie (ORANGE „dielec z inej verzie
 štandardu" vo Validation), alebo pole zo štandardu vypustiť — stav „píšem, nečítam" je najhoršia možnosť.
 [E:R-07 + S-10] **Návrh:** podľa rozhodnutia; ORANGE variant **S**.
+**ROZHODNUTÉ (Michal 29.9.2026): ČÍTAŤ** — Kontrola dostane ORANGE nález „dielec z inej verzie štandardu" (variant S); pole zo štandardu
+sa nevypúšťa. Robí sa **pred uzáverom V1** ako samostatná dávka (pred D-48 zdieľaním knižníc, ktoré zvýši miešanie verzií medzi dvoma PC).
+Previerka 29.9.: stav platí — `std` sa píše na 9 miestach (`cabinet_builder`, `board_builder`, `zones`), nečíta nikde; miesta zápisu
+a návrh čítania v previerke, sekcia 3.
 
 ### R-14 · P2 · core · `core/budget_store.rb:428-466`
 Dáta rozpočtu v zákazke (8 NOXUN kľúčov) bez verzie formátu — prvý klik v Rozpočte nad zákazkou z novšieho
@@ -302,6 +308,8 @@ SEED, `merge_seed` označí dokument za zmenený a `load` ho AUTO-ZAPÍŠE — a
 **Návrh:** minimálna shape brána pred seed/normalizačným AUTO-zápisom (dokument, ktorý nemá očakávaný koreňový tvar, sa NEMÁ
 prepisovať seedom — má sa priznať ako poškodený, vzor `assess_library_doc`); alternatíva je nezapisovať `.bak` pri zápise, ktorý
 vznikol iba z normalizácie. Samostatná dávka. **Odhad: S/M.**
+**Previerka 29.9.: PLATÍ, zúžené — odporúčanie PRED V1** (jediná položka so stratou dát a tichou zmenou cien aj prerezu/orezu). Týka sa hlavne
+`supplier_settings` (prázdny `{}`/`[]` → seed → auto-zápis); `abs_rules`, `hardware_rules` a `dim_series` pri načítaní nezapisujú.
 
 ## Os VÝSTUPY — production_core · rozpočet · ponuka (pred D-95/KONTROLA+VÝROBA)
 
@@ -388,6 +396,8 @@ kombinujúce znaky U+0300–U+036F vložené v regexe SUROVO (NFC nástroj ho ti
 ### R-25 · P3 · ui · `ui/js/bridge.js:325-329`
 `studioRelay` (klik na riadok) nemá guard rozpísanej editácie Inspectora, ktorý majú 4 exportné relaye. [B9]
 **Návrh:** rovnaký `validateFields` guard. **S.**
+**✅ PR #350 (ČELÁ-B2, v0.10.8)** — `studioRelay` ide cez `nxCabinetAction` s `validateFields` (zistené previerkou 29.9.; okrajový zvyšok:
+kontrola `#boardCard .bad`, ktorú majú exportné relaye, tu chýba).
 
 ### R-26 · P3 · ui · `ui/studio_dialog.rb:161-167` + `core/grain_check.rb:367-373`
 `GrainCheck.restore!` pri otvorení Štúdia nerozposiela stav → rail tvrdí opak. [B11 ≡ C7]
@@ -396,6 +406,7 @@ kombinujúce znaky U+0300–U+036F vložené v regexe SUROVO (NFC nástroj ho ti
 ### R-27 · P3 · ui · `ui/rules_dialog.rb:192-228` + `ui/js/studio.js:139` + UI20_KONTRAKT
 Texty: nominálna trieda ABS písaná ako „1,0 mm"; „pravidlo sa neuplatní" pri čiastočnom override nepresné; hint
 „Rozpočet je jediná sekcia, ktorá mení model" už neplatí. [B7 + B13 + B8] **Návrh:** textová dávka + kontrakt. **S.**
+**Previerka 29.9.: čiastočne** — hint o Rozpočte zanikol; „1,0 mm" a „pravidlo sa neuplatní" platia.
 
 ### R-28 · P3 · core · `core/bom.rb:197-207`
 Mŕtvy hardware override sa kreslí ako aktívne rozhodnutie (filter len na existenciu dielca, nie zhodu so živým
@@ -407,6 +418,8 @@ Scroll sekcie neprežije prepnutie (UI20_KONTRAKT riadok 67 — súbor nemá §-
 ### R-30 · P3 · ui · `actions_parts.rb` / `actions_hardware.rb`
 Jantárové riadky sa po zápise z Inspectora neobnovia — KOLÍZIA so zámerným ručným refreshom Štúdia: rozhodnutie
 o kontrakte okna, nie bugfix. [B12] **Návrh:** rozhodnúť pri D-95 (kontrola je hlavný konzument).
+**Previerka 29.9.: spúšťač zanikol** — D-95 je od 6.9.2026 vyradená; rozhodnutie (ručný refresh so žltým indikátorom áno/nie) môže Michal
+urobiť rovno. Po V1.
 
 ## IDENTITA a proces
 
@@ -421,6 +434,8 @@ zápisovým vedľajším účinkom a migrácia „pri uložení" = observer (aud
 akcie). Kostry kontraktov pre všetkých 18 dodal externý audit (tabuľka v
 [zdroje/AUDIT_2026-08_externy_codex.md](zdroje/AUDIT_2026-08_externy_codex.md)). [E:R-15]
 **Návrh:** dopĺňať TESNE PRED prvým zásahom do modulu (overiť proti kódu), nie slepým hromadným prepisom.
+**Previerka 29.9.: čiastočne** — z 18 ostalo 5 prázdnych odsekov (`debug` v model-a-identita · `actions_settings`, `actions_usage`,
+`usage_stats` v ui-lifecycle · kontrakt `estimate` v outputs) + 4 kostrové v outputs.
 
 ### R-33 · P3 · docs/plán · testy
 Hygiena: D-87 bez vlastného nadpisu v DOGFOODING_vyriesene [B16] · XLSX/CSV kusovníka bez vlastníka v PLANe [B17] ·
@@ -478,8 +493,8 @@ a R-04 je platformovo nezávislá hygiena — všetky tri sa dorobia v 1d nezáv
 R-23.1 Escape (S, hocikedy) · R-18 · zvyšok podľa kapacity. R-32 kostry priebežne pred každým zásahom.
 
 **Otvorené rozhodnutia Michala:** R-05 (rozsah zaokrúhľovania pomeru per zákazka vs per skrinka — rozhodne
-USER-debata o setoch, PRED implementáciou D-109) · R-13 (`std` na entite: čítať vs vypustiť) · R-30 (jantárové
-riadky vs ručný refresh — pri D-95).
+USER-debata o setoch, PRED implementáciou D-109) · ~~R-13~~ (✔ rozhodnuté 29.9.2026: čítať — ORANGE) · R-30 (jantárové
+riadky vs ručný refresh — spúšťač D-95 zanikol, rozhodnúť rovno; po V1).
 
 ### R-39 · P1 · PRE-COMMITTED BRÁNA · smer dvierok `Neurčený` (O1, 2.9.2026)
 Rozhodnutie Michala O1 (reconcile cross-auditu KOVANIE): `direction = unset` je od KOV-A **RED nález bez exportnej brány** — smer dnes nemení žiadny
@@ -488,6 +503,9 @@ výrobné zadanie): vtedy `front_direction_unset` prejde z RED nálezu do `expor
 heuristika smeru nikde v kóde (ani preview/overlay); legacy configy bez poľa sa negatujú. **Otvorené, kým výstup so smerom nevznikne** — nezatvárať bez brány.
 RED kanál `front_direction` pristál v KOV-A1 (PR #280, v0.9.15) — brána ostáva otvorená.
 Overlay „Smer otvárania" kreslí **len uložený stav, žiadny default** (A2b, PR #282, v0.9.17): `left`/`right` šípka · `unset` otáznik · legacy NIČ; **brána stále otvorená**.
+**Previerka 29.9.:** brána správne otvorená — smer dvierok dnes žiadny výstup nespotrebúva (číta ho len Kontrola RED). Keďže D-95 je od 6.9. vyradená,
+spúšťač brány = **prvý výstup, ktorý použije smer dvierok (vŕtanie, CNC, výrobné zadanie)**. Výnimka z „žiadny default": od bloku ROHOVÁ
+dostane nová rohová skrinka smer pri rohu (schválené R7, zapísané v STANDARD) — brány sa to netýka.
 
 ### R-40 · P3 · ui/core · zápis configu skrinky BEZ prestavby (KOV-H1, 3.9.2026)
 Kandidát z auditu KOV-H (checkpoint #15, dôsledok rozhodnutia BLOCKER 1). Zmena, ktorá sa dotkne **len dát** configu a nemá žiadny
@@ -501,6 +519,8 @@ jediné miesto, kde sa stampuje `config_schema`, a položka by ostala pod starou
 a má vlastný `push_selected(dedup: false)`. **Podmienka:** kým je zoznam takých polí jedno-položkový, sa neoplatí — riziko druhej pravdy
 o configu je väčšie než ušetrené milisekundy. Robiť až keď sa trieda „dátových" zmien rozšíri (KOV-H2 úpravy položiek a ďalšie) alebo
 keď sa prestavba pri jednej položke ukáže ako reálna prekážka práce. **Odhad: S/M.**
+**Previerka 29.9.:** podmienka čiastočne splnená — S1-C pridal úzku cestu zápisu configu bez prestavby pre očakávaný spotrebič
+(`actions_appliance.rb`); pri R-40 zvážiť zjednotenie s ňou namiesto tretej cesty. Po V1.
 
 ### R-41 · P2 · ui · `ui/js/hw_sets.js` (HWS_EDIT) — draft editora setu posiela ČERSTVÚ revíziu, nie pripnutú (Codex audit KOV-B #17, BLOCKER 3, 3.9.2026)
 Draft `HWS_EDIT` zámerne prežíva push, ale pri uložení posiela `HWS_DATA.revision` z posledného payloadu — keď druhé okno medzitým zmení ten istý set a prvé dostane refresh,
