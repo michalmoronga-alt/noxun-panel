@@ -39,6 +39,35 @@ výsledok a smoke checklist v [archiv/NAREZ_ZAVER_2026-09-29.md](archiv/NAREZ_ZA
 v [archiv/CENY_ZAVER_2026-09-30.md](archiv/CENY_ZAVER_2026-09-30.md), priečinok bloku v [archiv/bloky/CENY/](archiv/bloky/CENY/); Michalov smoke **PASS 30.9.2026** (bez nálezov).)*
 
 
+### 9 · HARDENING PO V1 (štart 1.10.2026 — krížový audit V1)
+
+**Cieľ:** pred funkciami po V1 opraviť zavádzajúce údaje v okne, spevniť ochranu dát a zlacniť ďalšie rozširovanie (nový typ skrinky, sekcia Štúdia,
+kovanie, zdieľané knižnice) — **bez zmeny výrobných a cenových čísel** (charakterizačné/golden testy pred zásahom; UI zmeny nič nepočítajú). Podklad:
+krížový audit 7 audítorov → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**; priečinok bloku [zdroje/bloky/HARDENING/](zdroje/bloky/HARDENING/)
+(rozhodnutia a výsledok triedenia, podklad, surové výstupy `CROSS_AUDIT_A*`, triediaca stránka). **Poradie = poradie tabuľky** (Michal 1.10.: bez viazania na
+noci — beh spracuje sekvenčne, koľko stihne). **H6 a H7 čakajú na Michalom schválený mockup** (mockupy sa pripravia počas H1–H5). Trieda dávky (audit,
+predrecenzia, in-SU) sa určí pri package podľa CLAUDE.md; stĺpec je predpoklad. Uzáver bloku = minor verzia + smoke.
+
+| Dávka | Položky (ID z triedenia) | Predpokladaná trieda |
+|---|---|---|
+| H1 · pravidlá čítania pre agentov (kapitoly namiesto celých súborov, PLAN bez hotových blokov, STAV po docs PR, hranice triedy dávky) | B-01 · B-04 · B-08 · B-09 | dokumentácia |
+| H2 · fotenie okien pre UI PR (prehrávač dát pluginu + fotky Inspectora a sekcií Štúdia) | D-10 | nástroj, plugin sa nemení |
+| H3 · zavádzajúce údaje v okne (platne v Kusovníku, tabuľka ponuky, semafor Kontroly, Nákup po slovensky, log po novom súbore, sadzby) | A-01 · A-02 · A-03 · A-04 · A-06 · A-07 | kód · výrobná/cenová (zobrazenie) |
+| H4 · jazyk, čísla a vzhľad (formát čísel a jednotiek, Obnoviť, texty, rozbaľovačky a stĺpce, ikona, ABS „dookola") | D-04 · D-06 · D-07 · D-08 · D-09 · D-11 | kód UI |
+| H5 · dokumentácia okien a UI dizajnu (aktuálny stav oddelený od histórie, strážca rastu, zastarané vety) | B-02 · B-03 · B-05 | dokumentácia |
+| H6 · priestor v Inspectore (nápovedy, pás, spodné tlačidlá, kóty náhľadu, súhrny sektorov) | D-01 · D-02 · D-05 | kód UI · mockup |
+| H7 · názov zákazky na jednom mieste + nastavenia exportu v jadre | A-05 · C-07 | kód · mockup |
+| H8 · dielec z inej verzie štandardu (ORANGE) | R-13 | kód · audit |
+| H9 · ochrana nastavení dodávateľa pred seedom | R-37 | kód · audit |
+| H10 · dve okná SketchUpu neprepíšu pravidlá kovania a rady | R-35 | kód · audit |
+| H11 · SketchUp 2026.2 (ukončenie bez pádu, načítanie súborov) + minimum SketchUp 2026 | F-01 · F-02 | kód · audit · in-SU |
+| H12 · typy skriniek na jednom mieste + mená rolí | C-01 · C-05 | kód · audit · in-SU · výrobná |
+| H13 · mapa rozširovacích bodov (vrátane pravidiel viazaných na typ) + tabuľka verzií dát | B-06 · B-07 | dokumentácia + guard testy (po H12) |
+| H14 · sekcie Štúdia na jednom mieste | C-02 | kód |
+| H15 · dáta kovania oddelené od mechaniky setov | C-03 | kód · audit · výrobná |
+| H16 · súpis knižníc (príprava D-48) | C-04 | kód · audit |
+| H17 · spoločná príprava exportov (prvý rez R-15) | C-06 | kód · audit · výrobná |
+
 ### 1b · STABILIZAČNÁ REVÍZIA (dlhy fázy ŠTÚDIO — pred blokom KOVANIE)
 
 **Cieľ:** doplatiť dlhy, ktoré fáza ŠTÚDIO vedome odložila, a spraviť refactory, na ktoré počas presunov nebol priestor.
@@ -632,10 +661,15 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 
 ## Po V1 — zásobník (nezaradené, nestratiť)
 
-- **Hardening z registra auditu — R-13 → R-37 → R-35** (Michal 30.9.2026: „zapíš ako post V1"; pôvodne zaradené pred V1 29.–30.9.) — **R-13** čítať `std`
-  na entite (ORANGE „dielec z inej verzie štandardu", rozhodnuté 29.9.) → **R-37** ochrana nastavení dodávateľa pred tichým prepísaním seedom → **R-35** dve
-  okná SketchUpu si neprepíšu pravidlá kovania a rozmerové rady; plné znenia a verdikty v [AUDIT_REGISTER.md](AUDIT_REGISTER.md) (sekcia „Stav po previerke
-  29.9.2026").
+- **Z krížového auditu V1 (1.10.2026) — 29 položiek Po V1** (plný zoznam a zdroje: [zdroje/bloky/HARDENING/ROZHODNUTIA_MICHALA_2026-10-01.md](zdroje/bloky/HARDENING/ROZHODNUTIA_MICHALA_2026-10-01.md);
+  R-13 → R-37 → R-35 sú od 1.10. v bloku 9 ako H8–H10): najsilnejší **E-01 snímka odovzdanej zákazky + „čo sa zmenilo od objednávky"** (4 audítori nezávisle; súvisí
+  **G-02** karta zákazky, **G-05** export všetkého do datovaného priečinka) · kód a API: C-08 zásuvky podľa tvaru receptu (s prvým novým systémom; **G-01** vzorky
+  z konfigurátora Blum — Michal má prístup), F-03 spoločný základ prekrytí, F-04 natívne fotenie náhľadu šablóny (jednoduchšia cesta pre **D-107**), F-05 skrytie
+  okien (SketchUp 2026.1+), F-06 hláška pri zamietnutej mierke, F-07 poistka výberu, F-08 výkresy cez LayOut, F-09 drobnosti API · dokumenty: B-10 strážca
+  modelov agentov, B-11 workflow pravidlá na jednom mieste, B-12 skill Codex auditu, B-13 rozdelenie runnera testov (spolu s položkou nižšie) · UI a nápady:
+  D-03 skratky cez menu, E-03 rad skriniek naraz, E-05/G-04 prehľad skriniek v Kusovníku, E-07 hmotnosť a logistika zákazky, E-08 Kusovník po stene, E-10 skok
+  z dielca na platňu, E-11 rozpracované zákazky, E-12 zákaznícky názov položky, E-13 odhad hodín dielne, G-06 poznámka ku skrinke, G-07 pravý klik na skrinku,
+  G-08 štetec dekoru.
 
 - **Runner testov v SketchUpe po teste sám vráti pôvodnú verziu pluginu** (workflow N4, 26.9.2026) — `scripts\run_su_tests.ps1` dnes nechá nasadenú
   rozpracovanú vetvu; dovtedy platí pravidlo „po každom mergi nainštalovať main" (CLAUDE.md, Verzia a uzáver).

@@ -17,6 +17,17 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **DOCS — štart bloku 9 · HARDENING PO V1: krížový audit V1 a triedenie (1.10.2026, PR #?, len dokumentácia; verzia pluginu sa nemení).** Michal 30.9. zadal ako
+  posledný krok V1 krížový audit všetkými providermi (refaktor a upratanie s ohľadom na rozširovanie, nápady po V1, UI/UX drobnosti). Matica 7 kariet (Antigravity
+  vyradený): Codex `gpt-6-astra` a Grok `grok-4.7` kód podľa scenárov S1–S5, Codex `gpt-5.6-sol` dokumenty, Claude Opus „nový agent" (test zaúčania: podľa tabuľky
+  čítania ~1 MB pred malou UI dávkou, ~1,5 MB pred novým typom skrinky, užitočných 3–4 %), Claude Opus „stolár + UX" nad 38 screenshotmi (vykreslené headless
+  Chrome z nahratých Ruby→JS dát pluginu — obrazovka PC bola zamknutá), dvaja Claude rešeršéri (trh; SketchUp Ruby API 2024–2026: Michal aj Lucia majú 26.0.429,
+  2026.2 volá zatváranie okien aj pri ukončení SketchUpu — pasca #1117). Zlúčené do 75 položiek; sondou v kóde overené: Kusovník sčítava zlomky platní naprieč
+  materiálmi, Nákup kovania ukazuje surové kódy kategórií, pravidlo závesov na stenu platí len pre typ `upper`. Michal roztriedil na interaktívnej stránke:
+  **35 Teraz · 29 Po V1 · 11 vyradených**; odpovede: B-08 a B-09 (pravidlá workflowu) súhlas, Lucia má rovnaký SketchUp 2026, G-01 Michal má prístup ku
+  konfigurátoru Blum. Blok **9 · HARDENING PO V1** v [PLAN.md](../PLAN.md) — 17 dávok H1–H17 (R-13, R-37, R-35 presunuté zo zásobníka ako H8–H10), poradie bez
+  viazania na noci; priečinok bloku [zdroje/bloky/HARDENING/](../zdroje/bloky/HARDENING/).
+
 - **DOCS — smoke bloku CENY PASS (30.9.2026, PR #431, len dokumentácia; verzia pluginu sa nemení).** Michal 30.9. prešiel smoke bloku CENY podľa checklistu
   v [CENY_ZAVER_2026-09-30.md](CENY_ZAVER_2026-09-30.md): **„smoke pass"** — výsledok zapísaný ako celok, nie po bodoch, **bez nálezov**. Dočasná skupina
   „CENY — smoke po uzávere bloku" v [DOGFOODING.md](../DOGFOODING.md) **zanikla** (vzor PR #423). Záver bloku, súhrn v [ROADMAP_hotove_etapy.md](ROADMAP_hotove_etapy.md),

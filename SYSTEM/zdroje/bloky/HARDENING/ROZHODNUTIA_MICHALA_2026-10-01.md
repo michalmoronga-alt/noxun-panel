@@ -140,4 +140,11 @@ Autorita pre zaradenie položiek. Plné znenia a dôkazy: [TRIEDENIE_krizovy_aud
 - **B-08** (dokumentačné PR smie prepísať „Robí sa" a „Ďalší krok" v STAV) a **B-09** (hranice triedy dávky s príkladmi) — **súhlas**, zapracuje dávka bloku HARDENING.
 - **G-01** — Po V1; Michal **má prístup ku konfigurátoru Blum** (vzorky zásuviek sa urobia pri prvom novom zásuvkovom systéme, napr. Antaro).
 - **G-11** (Pohoda) a **G-12** (import košíka Démos24Plus) — vyradené, nerieši sa.
-- **F-02** (minimum SketchUp 2026) — **otvorené: verzia SketchUpu u Lucie**; kontrola verzie pri štarte sa nezapne, kým nie je potvrdená.
+- **F-02** (minimum SketchUp 2026) — Michal 1.10.: **Lucia má rovnakú verziu SketchUp 2026** (jedna licencia na oboch PC) → minimum 2026 platí.
+
+## Plán bloku (Michal 1.10.2026 — súhlas s návrhom orchestrátora)
+
+- **17 dávok H1–H17** v poradí tabuľky bloku 9 v [../../../PLAN.md](../../../PLAN.md); R-13, R-37 a R-35 sú v bloku ako H8–H10 (pred refaktormi kódu, lebo chránia
+  dáta reálnych zákaziek).
+- **Bez viazania na noci:** každý beh spracuje sekvenčne, koľko stihne, a pokračuje ďalší (Michal: „nefixovať na časové obdobie").
+- **Mockup schvaľuje Michal** pred packages dávok H6 (priestor v Inspectore) a H7 (názov zákazky); mockupy sa pripravia počas H1–H5.
