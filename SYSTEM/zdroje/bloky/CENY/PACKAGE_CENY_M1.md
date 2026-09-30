@@ -17,6 +17,10 @@
 > zapracované:** BLOCKER → **R11a** (nezmenená cena = presná zhoda so **zobrazenou** hodnotou zo servera, nie interval ±0,005; R12 a D4 prepísané) ·
 > FIX-M1a-2 → **R6b** (formulár variantu drží vlastnú revíziu z otvorenia) · FIX-M1a-3 → **R6c** (kontrola + merge + zápis pod jedným zámkom) ·
 > FIX-M1b-4 → **R20b** (presná interná hodnota; samotné prepnutie jednotky cenu nemení).
+> **Delta audit (Codex gpt-5.6-sol, 30.9.2026, `AUDIT2_CENY_M1_2026-09-30.md`):** R6b, R6c, R20b RESOLVED; BLOCKER čiastočne → doplnené v R11a:
+> (1) celočíselné porovnanie v centoch **len pre `plate` a `m2`**, `bm` porovnáva normalizovaný vstup **presne** s uloženou hodnotou; (2) FIX-M1b:
+> `price_display.plate = nil` pri riadku **bez platného katalógového `sheet_size`** (Rozpočet tam používa odhad 2800 × 2070 — tvrdenie o zhode s Rozpočtom
+>  platí len pre riadky s formátom; bezformátový materiál ide v M2 podľa m², C12).
 
 ---
 
@@ -197,7 +201,9 @@ katalógom z M1b editoval cenu a nechal „overené"). Rozhodne orchestrátor; p
   formulára): **cena platne** = presne tá hodnota, ktorú ukáže Rozpočet (`Budget.price_per_plate(uložená_€/m², nil, sheet_size)` — tá istá funkcia, nie kópia
   vzorca), **€/m²** = jedna definovaná zaokrúhľovacia funkcia `Materials.display_m2` (napr. `BigDecimal(stored.to_s).round(2, :half_up)`; tá istá pre bunku,
   formulár, editor aj prefill), **€/bm** = uložená hodnota bez zaokrúhlenia. Klient čísla sám **nezaokrúhľuje** (prefill = `price_display` servera).
-  „Bez zmeny" ⇔ vstup prevedený na celé centy == zobrazená hodnota v celých centoch (celočíselné porovnanie). Testy: hodnoty na hranici pol centa (1,005 · 31,005 ·
+  „Bez zmeny" ⇔ pri **`plate` a `m2`** vstup prevedený na celé centy == zobrazená hodnota v celých centoch (celočíselné porovnanie); pri **`bm`**
+  normalizovaný vstup == uložená hodnota **presne** (napr. uložené 0,125 €/bm a vstup 0,13 = zmena — delta audit). `price_display.plate` je `nil`, keď
+  riadok nemá platný katalógový `sheet_size` (potvrdenie „za platňu" je tam aj tak odmietnuté, krok 5; zhoda s Rozpočtom sa sľubuje len pri formáte). Testy: hodnoty na hranici pol centa (1,005 · 31,005 ·
   2,675 · 0,125 · …) × formáty (1000 × 1000, 2800 × 2070, 4100 × 635) — vstup = zobrazená hodnota → bitovo bez zmeny; vstup = susedný cent → zmena a Rozpočet
   potom ukáže presne vstup. Mutácia M23 (interval namiesto presnej zhody).
   8. `merged` = existujúci + cena + `price_checked_at = Time.now.utc.iso8601` + `price_check_method = 'manual'` → `validate_sheet_attrs`/`validate_edge_attrs` →

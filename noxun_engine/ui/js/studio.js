@@ -985,6 +985,11 @@
           ((!ST && data) || (ST && (!data || ST.model_guid !== data.model_guid)))){
         hwProductContextChanged(studioSec, data ? data.model_guid : '');
       }
+      // CENY-M1b (R23): formular „Overiť cenu" materialu patri dokumentu.
+      if (typeof mdManualContextChanged === 'function' &&
+          ((!ST && data) || (ST && (!data || ST.model_guid !== data.model_guid)))){
+        mdManualContextChanged(studioSec, data ? data.model_guid : '');
+      }
       // Rozbalenie patrí dokumentu; po náhrade posledného UNI sa tiež zahodí.
       if (!ST || !data || ST.model_guid !== data.model_guid ||
           !(data.control || []).some(function(it){ return it.category === 'uni_material'; })){
@@ -1020,6 +1025,9 @@
       if (ST && ST.open_section && STUDIO_SECTIONS.indexOf(ST.open_section) >= 0){
         if (studioSec !== ST.open_section && typeof hwProductContextChanged === 'function'){
           hwProductContextChanged(ST.open_section, ST.model_guid || '');
+        }
+        if (studioSec !== ST.open_section && typeof mdManualContextChanged === 'function'){
+          mdManualContextChanged(ST.open_section, ST.model_guid || '');
         }
         // Review #8: deep-link je PRESKOK do inej sekcie — otvorené rohové menu
         // patrilo tej, z ktorej sme odišli. Bez vynulovania by sa `vepoMenuOpen`
@@ -1931,6 +1939,9 @@
     if (STUDIO_SECTIONS.indexOf(id) < 0) return;
     if (id !== studioSec && typeof hwProductContextChanged === 'function'){
       hwProductContextChanged(id, ST ? (ST.model_guid || '') : '');
+    }
+    if (id !== studioSec && typeof mdManualContextChanged === 'function'){
+      mdManualContextChanged(id, ST ? (ST.model_guid || '') : '');   // CENY-M1b (R23)
     }
     closeSectionMenus();   // review #8 — overlay patrí sekcii, z ktorej odchádzame
     // ŠT-2b: sekcia Materiály má modály MIMO tela sekcie (`#matModalRoot`) a

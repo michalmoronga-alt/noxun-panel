@@ -148,10 +148,13 @@ module Noxun
       # ze duplak ma vlastnu produktovu stranku u dodavatela.
       # CENY-M1a (sonda S4): ani `product_url` — odkaz na produkt patri
       # KUPOVANEJ zdrojovej doske; duplak by inak tvrdil vlastny obchod.
+      # CENY-M1b (R5): ani `price_check_method` — duplak sa oceňuje zdrojom,
+      # rucne overenie ceny ma zmysel len na kupovanej doske.
       def duplak_record_from(source, mult)
         rec = source.reject do |k, _|
           %w[material_id code supplier price_per_m2 supplier_decor
-             uni uni_role demos_url price_checked_at product_url].include?(k)
+             uni uni_role demos_url price_checked_at product_url
+             price_check_method].include?(k)
         end
         rec['thickness'] = (source['thickness'].to_f * mult).round(2)
         rec['source_material_id'] = source['material_id'].to_s
@@ -615,7 +618,9 @@ module Noxun
         Digest::SHA1.hexdigest(JSON.generate(rec))[0, 12]
       end
 
-      # Aplikuje patch na zaznam. Vrati [:ok, nil] | [:not_found, nil] |
+      # Aplikuje patch na zaznam. Vrati [:ok, {'manual_cleared' => bool}] (zapis;
+      # CENY-M1b: true = zrusilo rucne overenie ceny) | [:ok, nil] (echo
+      # zobrazenej €/m2 — nic sa nezapisalo) | [:not_found, nil] |
       # [:conflict, nil] (riadok sa medzitym zmenil) | [:invalid, chyba] |
       # [:code_conflict, [id...]] (duplicitny kod bez potvrdenia) |
       # [:write_failed, nil] | [:catalog_read_only, nil] (nudzovy rezim 2A-4a).
@@ -650,7 +655,19 @@ module Noxun
           end
           clean = patch.is_a?(Hash) ? patch.select { |k, _| PATCHABLE.fetch(kind, []).include?(k) } : {}
           return [:invalid, 'Žiadne editovateľné pole.'] if clean.empty?
+          # CENY-M1b (R12): bunka €/m2 ukazuje zaokruhlenu hodnotu — jej echo
+          # (vstup v centoch presne rovny zobrazenej hodnote) nie je zmena ceny.
+          # Kluc sa vyhodi; ked tym patch ostane prazdny, NIC sa nezapise.
+          if kind == 'sheet' && clean.key?('price_per_m2') &&
+             sheet_price_echo?(clean['price_per_m2'], existing['price_per_m2'])
+            clean.delete('price_per_m2')
+            return [:ok, nil] if clean.empty?
+          end
           merged = existing.merge(clean)
+          # CENY-M1b (R13, O6): zmena ceny, kodu, dodavatela alebo dekoru
+          # u dodavatela rusi RUCNE overenie ceny (metodu aj datum). Bezi PRED
+          # starsimi pravidlami datumu Demosu nizsie.
+          manual_cleared = reconcile_manual_check!(existing, merged)
           # D-98 (audit B2): zmena ALEBO vymazanie aliasu dekoru u dodavatela
           # rusi datum overenia ceny — cena/kod/URL ostavaju, ale ako NEOVERENE
           # (rovnaky kontrakt ako zmena demos_url vo formulari). Autorita je
@@ -700,9 +717,90 @@ module Noxun
           return [:invalid, 'Záznam sa nedá uložiť.'] if rec.nil?
           data[listk] = records.reject { |r| r[idk] == id } + [rec]
           return [:write_failed, nil] unless write(data)
-          [:ok, nil]
+          [:ok, { 'manual_cleared' => manual_cleared }]
         end
       end
+
+      # --- CENY-M1b (R11 / R11a): rucne potvrdenie ceny ------------------------
+      # „Cena sedi" (bez zmeny — bitovo ta ista cena, len datum) alebo nova
+      # cena + dnesny datum. Doska za platnu (`plate`, prepocet na €/m2
+      # NEZAOKRUHLENE — O7) alebo za m2 (`m2`), ABS za bm (`bm`). 0 je platna
+      # (O4), prazdna nie. Odkaz na produkt sa NEVYZADUJE (O9). Datum aj metodu
+      # generuje VYHRADNE server. Straz len `row_rev` riadku (S16 — ine riadky
+      # nekoliduju), cely read-check-write pod JEDNYM zamkom.
+      # -> [:ok, {'rec', 'unchanged', 'plate', 'price'}]
+      #  | [:not_found | :conflict | :invalid | :catalog_read_only | :write_failed, sprava, pole]
+      MANUAL_BASES = { 'sheet' => %w[plate m2], 'edge' => %w[bm] }.freeze
+
+      def confirm_manual_price(kind, id, price:, basis:, row_rev:)
+        return [:catalog_read_only, catalog_read_only_message, nil] if catalog_read_only?
+        kind = kind.to_s
+        amount = price.is_a?(String) || price.is_a?(Numeric) ? normalize_price(price) : nil
+        if amount.nil? || !amount.finite? || amount.negative?
+          return [:invalid, 'Vlož nezápornú cenu s DPH; prázdna cena sa nedá potvrdiť.', 'price']
+        end
+        basis = basis.to_s
+        unless MANUAL_BASES.fetch(kind, []).include?(basis)
+          return [:invalid, 'Neznámy spôsob zadania ceny — otvor overenie znova.', 'basis']
+        end
+        idk = kind == 'edge' ? 'abs_id' : 'material_id'
+        listk = kind == 'edge' ? 'edges' : 'sheets'
+        with_catalog_lock do
+          JsonFileStore.invalidate(path)
+          data = load
+          existing = data[listk].find { |r| r[idk] == id.to_s }
+          return [:not_found, 'Položka už v katalógu nie je.', nil] unless existing
+          if row_rev.to_s.empty? || row_rev.to_s != record_rev(existing)
+            return [:conflict, 'Položka sa medzitým zmenila — skontroluj aktuálne údaje.', nil]
+          end
+          return [:invalid, 'UNI je pracovný materiál bez nákupnej ceny.', nil] if uni?(existing)
+          return [:invalid, 'Duplák sa oceňuje zdrojovou doskou.', nil] if duplak?(existing)
+          unless existing['demos_url'].to_s.strip.empty?
+            return [:invalid, 'Položka je viazaná na Demos — cenu obnovuje Demos.', nil]
+          end
+          price_key, value, unchanged, err = manual_price_value(existing, basis, price, amount)
+          return [:invalid, err, 'basis'] if err
+          merged = existing.merge(price_key => value, 'price_checked_at' => Time.now.utc.iso8601,
+                                  'price_check_method' => 'manual')
+          ok, verr = kind == 'edge' ? validate_edge_attrs(merged) : validate_sheet_attrs(merged)
+          return [:invalid, verr, 'price'] unless ok
+          rec = kind == 'edge' ? normalize_edge(merged) : normalize_sheet(merged)
+          return [:invalid, 'Záznam sa nedá uložiť.', nil] if rec.nil?
+          data[listk] = data[listk].map { |r| r.equal?(existing) ? rec : r }
+          return [:write_failed, 'Cenu sa nepodarilo uložiť.', nil] unless write_unlocked(data)
+          [:ok, { 'rec' => rec, 'unchanged' => unchanged,
+                  'plate' => kind == 'edge' ? nil : price_display(rec)['plate'],
+                  'price' => rec[price_key] }]
+        end
+      end
+
+      # R11 kroky 5–7 + R11a: nova hodnota ceny pre potvrdenie.
+      # -> [kluc, hodnota, unchanged?, chyba]. „Bez zmeny" = vstup PRESNE
+      # rovny ZOBRAZENEJ hodnote servera: pri `plate` a `m2` celociselne
+      # v centoch (cena platne presne ako v Rozpocte, €/m2 z `display_m2`),
+      # pri `bm` normalizovany vstup == ulozena hodnota presne (0,125 vs 0,13
+      # = zmena). Vtedy ostava ULOZENA hodnota bitovo ta ista.
+      def manual_price_value(existing, basis, raw, amount)
+        if basis == 'bm'
+          stored = existing['price_per_bm']
+          same = stored.is_a?(Numeric) && amount == stored
+          return ['price_per_bm', same ? stored : amount, same, nil]
+        end
+        stored = existing['price_per_m2']
+        if basis == 'plate'
+          return [nil, nil, false, PLATE_NO_FORMAT_MSG] if plate_area(existing).nil?
+          plate_cents = cents_of(amount)
+          shown = price_display(existing)['plate']
+          if shown && cents_of(shown) == plate_cents
+            return ['price_per_m2', stored, true, nil]
+          end
+          return ['price_per_m2', plate_to_m2(plate_cents / 100.0, existing), false, nil]
+        end
+        same = (stored.is_a?(Numeric) && amount == stored) || sheet_price_echo?(raw, stored)
+        ['price_per_m2', same ? stored : amount, same, nil]
+      end
+
+      PLATE_NO_FORMAT_MSG = 'Cena za platňu sa bez formátu nedá prepočítať na €/m² — prepni na „za m²“ alebo doplň formát.'
 
       # --- V0.6 B-2a: atomicky zapis Demos aktualizacie (audit B6) -------------
       # items: [{'kind'=>'sheet'|'edge','id'=>,'row_rev'=>,
@@ -770,6 +868,7 @@ module Noxun
             return [:invalid, { 'id' => id, 'detail' => err }] if err
             return [:invalid, { 'id' => id, 'detail' => 'položka nič nemení' }] if patch.empty?
             merged = existing.merge(patch)
+            demos_over_manual!(existing, merged, patch)
             ok, verr = kind == 'edge' ? validate_edge_attrs(merged) : validate_sheet_attrs(merged)
             return [:invalid, { 'id' => id, 'detail' => verr }] unless ok
             # GH #97 P2: duplicitny par sa vycita LEN polozkam, ktore par
@@ -818,6 +917,19 @@ module Noxun
           [:ok, { 'applied' => merged_by_key.keys.map { |(_, id)| id },
                   'fields_written' => fields_written }]
         end
+      end
+
+      # CENY-M1b (R14, O8): Demos ma prednost pred rucnym overenim. Ked bol
+      # zaznam rucne overeny, vysledok Demos apply strati metodu; datum ostane
+      # LEN ked ho patch prave zapisal (nova alebo potvrdena Demos cena) —
+      # inak by kod-only apply nechal rucny datum tvarit sa ako datum z Demosu
+      # (sonda S8). Odkaz na produkt sa NEMAZE (odlozeny; vedoma odchylka od
+      # `HardwareCatalog.apply_price_proposal!`). Mutuje `merged`.
+      def demos_over_manual!(existing, merged, patch)
+        return merged unless existing['price_check_method'] == 'manual'
+        merged.delete('price_check_method')
+        merged.delete('price_checked_at') unless patch.key?('price_checked_at')
+        merged
       end
 
       # B-2b: accepts (LEN flagy z UI) + proposal store (SERVER) -> items pre

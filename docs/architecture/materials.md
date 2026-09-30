@@ -16,16 +16,33 @@ katalóg materiálov a dedenie projekt→skrinka→dielec (projektové defaulty 
 Výber živého pôvodného vzhľadu, aktuálnej knižničnej revízie alebo čistej RGB farby je spoločný v tomto helperi. `AppearanceError` sa nesmie zmeniť
 na tichý úspech farebnej stavby; caller abortuje svoju modelovú operáciu. Výrobné ID, dedenie materiálov ani pravidlá ABS sa nemenia.
 
-#### CENY-M1a — odkaz na produkt (SCHEMA 11, v0.16.1)
+#### CENY-M1a/M1b — odkaz na produkt a ručné overenie ceny (SCHEMA 11/12, v0.16.1–v0.16.2)
 
-`SCHEMA_PRODUCT_URL = 11` = `SCHEMA_CURRENT`. **`required_schema_for`** zdvihne 11 za **neprázdny** `product_url` (doska aj ABS); riadok vzhľadu má
+`SCHEMA_PRODUCT_URL = 11`, `SCHEMA_MANUAL_CHECK = 12` = `SCHEMA_CURRENT`. **`required_schema_for`** zdvihne 11 za **neprázdny** `product_url`
+a 12 za **kľúč** `price_check_method` (doska aj ABS); riadok vzhľadu má
 odteraz podmienku `need < SCHEMA_APPEARANCE` — bez nej by neskorší záznam so vzhľadom marker **znížil** a výsledok závisel od poradia záznamov
 (pasca S2, test všetkých permutácií). **`put_product_fields`** beží v `normalize_sheet` **až po** `put_uni_fields`/`put_duplak_fields`
 a v `normalize_edge` po `put_demos_fields`: uloží len výstup **`sanitize_product_url`** (http/https, host, bez medzier/úvodzoviek/`<>\` —
 lokálna kópia pravidiel `HardwareCatalog.sanitize_product_url` s parity testom; normalize nesmie závisieť od poradia načítania modulov), UNI
 ani duplák pole nedostanú a Demos väzba ho **nemaže** (odložený odkaz, O8). Pole tak prežije každú merge-safe cestu (bunka, editor „Upraviť…",
 Demos apply, názov/výrobca/premenovanie, vzhľad, `sync_duplaks_in!`). **`manual_product_record?`** (bez `demos_url`, nie UNI, nie duplák) je
-jediná autorita „ručného" záznamu pre payload aj otvorenie odkazu. Ručné overenie ceny (SCHEMA 12) je CENY-M1b.
+jediná autorita „ručného" záznamu pre payload, otvorenie odkazu aj ručné overenie.
+
+**Ručné overenie ceny (CENY-M1b).** **`put_price_check_fields`** (posledné pred vzhľadom, v `normalize_sheet` aj `normalize_edge`) nesie
+metódu **len** ako `'manual'` a **len** s neprázdnym `price_checked_at`, bez Demos väzby, nie pri UNI/dupláku; `'manual'` s Demos URL zahodí
+metódu **aj** dátum (ručný dátum sa nesmie tváriť ako dátum z Demosu — poistka O8), iná hodnota metódy sa zahodí. **`manual_price_state(rec,
+stale_days:, now:)`** je jediná autorita stavu (M2 ju prevezme do Rozpočtu): `nil` pri Demos/UNI/dupláku, inak `fresh`/`stale`/`never` s vekom
+(24 h `floor`, vzor `Budget.manual_hardware_freshness`); budúci či nečitateľný dátum a chýbajúca/záporná cena = `never`, odkaz sa nevyžaduje
+(O9). **Zobrazené ceny počíta len server** — `price_display(rec)`: doska `plate` = `Budget.price_per_plate` (tá istá funkcia ako Rozpočet;
+`nil` bez platného katalógového formátu — `plate_area` berie len dve čísla v `SHEET_SIZE_RANGE`), `m2` = `display_m2` (desiatkovo half-up
+cez `Rational` z krátkej reprezentácie čísla — 31,005 → 31,01; nie binárny `Float#round`), `area`; ABS `bm` = uložená hodnota. **`input_cents`**
+prevedie vstup na celé centy (jemnejší vstup = `nil`), **`sheet_price_echo?`** = vstup v centoch presne rovný zobrazenej €/m² (R11a — nie
+interval ±0,005, audit BLOCKER). **`plate_to_m2`** = cena za platňu / plocha **nezaokrúhlene** (O7: Rozpočet potom ukáže presne zadanú
+platňu — test mriežky 15 formátov × 0,00–200,00 €). **`reconcile_manual_check!(existing, rec)`** je jediná funkcia zneplatnenia (O6):
+pri ručne overenom `existing`, keď `rec` nenesie nové potvrdenie a zmenila sa cena (po echu), kód, dodávateľ, dekor u dodávateľa, odkaz alebo
+pri doske formát — alebo `rec` dostal Demos URL — zmaže metódu aj dátum a vráti `true` (volajúci povie vetu R22). Dátum, ktorý už zmazala
+iná pravidlová cesta (zmena Demos URL), sa nepočíta ako nové potvrdenie. **Nová zapisovacia cesta, ktorá môže zmeniť tieto polia, musí
+volať `reconcile_manual_check!`.**
 
 #### KOV-C2a — 4. materiálový kanál `:drawer` (v0.9.30)
 
@@ -195,6 +212,19 @@ zdrojovej doske), `uni_edit_error` ho počíta medzi nákupné polia (UNI s nepr
 zapisovacia cesta odkazu je formulár variantu (`MaterialsDialog.save_sheet_locked`/`save_edge_locked`, [ui-lifecycle.md](ui-lifecycle.md)).
 Demos cesty (`demos_patch_for`, `apply_demos_batch`, zakladanie z Demosu) odkaz nikdy nezapisujú ani nemažú.
 
+**CENY-M1b (v0.16.2) — ručné potvrdenie a zneplatnenie.** **`confirm_manual_price(kind, id, price:, basis:, row_rev:)`** je jediná cesta,
+ktorá zapisuje `price_check_method` a (pri ručnom zázname) `price_checked_at`: read-only brána, cena (String/Numeric → `normalize_price`;
+prázdna/záporná/nekonečná = `:invalid` s poľom `price`, **0 je platná**), `basis` (`plate`/`m2` doska, `bm` ABS), potom **pod jedným
+`with_catalog_lock`** čerstvý záznam, `row_rev` (prázdny/iný = `:conflict`; `catalog_rev` sa nepoužíva — iné riadky nekolidujú), UNI/duplák/
+Demos = `:invalid`; odkaz sa **nevyžaduje**. `manual_price_value` rozhodne hodnotu: `plate` bez platného formátu = `:invalid` (pole `basis`),
+inak cena na centy (D3) → ak sa v centoch rovná **zobrazenej** cene platne, uložená €/m² ostáva **bitovo** (`unchanged`), inak `plate_to_m2`;
+`m2` = echo zobrazenej €/m² alebo bitová rovnosť → bez zmeny, inak vstup; `bm` presná rovnosť → bez zmeny. Dátum `Time.now.utc.iso8601`
+a metóda `'manual'` zo servera, validácia + normalize, **náhrada na mieste** a jeden `write_unlocked` (marker 12). Vracia `[:ok, {rec,
+unchanged, plate, price}]`. **`patch_record`** (bunka): echo €/m² dosky kľúč vyhodí (prázdny patch = `[:ok, nil]` **bez zápisu**), potom
+`reconcile_manual_check!` pred staršími pravidlami dátumu Demosu a `[:ok, {'manual_cleared'}]`. **`apply_demos_batch`** volá
+`demos_over_manual!` (R14, O8): ručne overený záznam stratí metódu, dátum ostane len zapísaný práve Demosom (kód-only apply ručný dátum
+zmaže — sonda S8), odkaz ostáva. `duplak_record_from` nezdedí ani `price_check_method`.
+
 **MR-1A (v0.11.1):** legacy `upsert_sheet`, `upsert_edge` a `upsert_sheet_with_duplak_sync` preberajú serverový appearance z čerstvého riadka pod zámkom pred normalizáciou. Klient ho nesmie podsunúť ani obnoviť jeho staršiu verziu. `sync_duplaks_in!` prenáša aj appearance, vrátane neprítomnosti a explicitného návratu ku farbe; centrálny backstop chráni aj ostatné CRUD cesty.
 
 **KOV-C2a — UNI záznam 4. kanála a `ensure_drawer_uni!` (v0.9.30).** `UNI_SEED` má šiesty riadok `UNI_ZASUVKA_16` / „Zásuvka UNI" / rola `drawer` / 16 mm; fresh install aj
@@ -212,6 +242,12 @@ inak by taký legitímny záznam vracal `:conflict` pri každom štarte a fallba
 Zo splitu `materials_*`: skupinové operácie + `ensure_edge_for_sheet`.
 
 **MR-1A:** `save_decor`, batch, automatická ABS aj Demos používať s centrálnym `prepare_appearance_write!` vo `write_unlocked`; nový člen skupiny/povrchu preberá spoločný vzhľad dosiek aj ABS. Editor stále mení len povolené polia a farba zostáva vlastnosťou celej dekorovej skupiny.
+
+**CENY-M1b (v0.16.2) — editor „Upraviť…" a ručné overenie.** `save_decor_edit_sheet` najprv vyhodí **echo** zobrazenej €/m² (stĺpec
+editora ukazuje `price_display.m2` na 2 desatinné — nedotknutá bunka cenu nemení), potom `reconcile_manual_check!` nad zlúčeným záznamom
+(cena, kód, dodávateľ **aj formát platne** — do v0.16.1 editor dátum pri zmene formátu nerušil) pred pravidlom dátumu Demosu
+(`sd_stamp_killed?`); `save_decor_edit_edge` rovnako bez echa. Riadok nesie `manual_cleared` a `save_decor_locked` vráti ID zrušených overení
+v `info['manual_cleared']` (kľúč len keď nie je prázdny) — `MaterialsDialog.save_decor_status` z neho skladá vetu R22.
 
 ### materials_appearance.rb
 
@@ -412,8 +448,9 @@ jednotlivej otázke**. Na úrovni relácie by dve rýchle „Ukázať dopad" (ci
 Kontrakt, ktorý zdieľajú `materials.rb` aj celý split `materials_*` vyššie.
 
 **SCHEMA: 2 skupiny = povinný baseline po cutoveri; markery 3 duplák · 4 zástena · 5 demos polia · 6 image_url · 7 UNI · 8 PD hranová úprava + protiťahová zástena · 9 supplier_decor · 10 appearance ·
-11 product_url (CENY-M1a) = LAZY podľa OBSAHU** (`SCHEMA_CURRENT` v materials.rb; marker nikdy neklesá — ani po zmazaní posledného odkazu). Demos väzba na zázname: `demos_url` + `price_checked_at` (cena = pohyblivá cache; `manual_demos_url` sanitize + kanonické porovnanie —
-D-71).
+11 product_url (CENY-M1a) · 12 price_check_method (CENY-M1b) = LAZY podľa OBSAHU** (`SCHEMA_CURRENT` v materials.rb; marker nikdy neklesá — ani po zmazaní posledného odkazu). Demos väzba na zázname: `demos_url` + `price_checked_at` (cena = pohyblivá cache; `manual_demos_url` sanitize + kanonické porovnanie —
+D-71). Pri záznamoch **bez** Demos väzby nesie `price_checked_at` od CENY-M1b dátum **ručného** potvrdenia (s `price_check_method: 'manual'`);
+oba sú server-owned a zapisuje ich len `confirm_manual_price`.
 
 **UNI (SCHEMA 7, M-B1):** 5 rolí Korpus·Čelo·Dekor2·HDF·Doska; hrúbka záznamu je len default roly — pri stavbe dielca sa NEviaže (hrúbku určuje DIELEC; identita záznamu v katalógu
 hrúbku štandardne obsahuje); ABS/nákupné polia pre UNI zakázané server-side; semafor ORANGE „materiál neurčený".

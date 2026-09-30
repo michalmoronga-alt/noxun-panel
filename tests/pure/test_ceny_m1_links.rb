@@ -147,9 +147,9 @@ end
 
 # --- R1 / R2: marker 11 LEN obsahom, poradie, neklesa ------------------------
 
-NxTest.test('CENY-M1a (R1): SCHEMA_PRODUCT_URL = 11 = SCHEMA_CURRENT') do
+NxTest.test('CENY-M1a (R1): SCHEMA_PRODUCT_URL = 11 (CENY-M1b posunul SCHEMA_CURRENT na 12)') do
   NxTest.assert_equal(11, CenyM1::M::SCHEMA_PRODUCT_URL)
-  NxTest.assert_equal(CenyM1::M::SCHEMA_PRODUCT_URL, CenyM1::M::SCHEMA_CURRENT)
+  NxTest.assert(CenyM1::M::SCHEMA_CURRENT >= CenyM1::M::SCHEMA_PRODUCT_URL, 'plugin pozna odkaz na produkt')
 end
 
 NxTest.test('CENY-M1a (R2): required_schema_for nezavisi od poradia zaznamov (pasca S2)') do
@@ -411,7 +411,9 @@ NxTest.test('CENY-M1a (R6): podvrhnute server-owned polia a ozdoby payloadu sa s
   NxTest.assert(out.include?('ECHO'), out.inspect)
   NxTest.assert_equal(stamp, m.sheet(ids[:s18])['price_checked_at'], 'datum overenia NIKDY od klienta (S8/T20)')
   a_stamp = m.edge(ids[:e10])['price_checked_at']
-  out = CenyM1.call('update_edge', CenyM1.edge_form(ids[:e10], spoof.merge('code' => 'E1')))
+  # CENY-M1b (D-148): zmena kodu pri Demos polozke datum rusi — tu sa kod
+  # nemeni, takze datum ostava SERVEROVY (podvrhnuty sa nezapise).
+  out = CenyM1.call('update_edge', CenyM1.edge_form(ids[:e10], spoof.merge('supplier' => '')))
   NxTest.assert(out.include?('ECHO'), out.inspect)
   NxTest.assert_equal(a_stamp, m.edge(ids[:e10])['price_checked_at'])
   NxTest.refute(m.edge(ids[:e10]).key?('price_check_method'))

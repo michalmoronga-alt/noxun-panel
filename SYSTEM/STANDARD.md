@@ -1066,9 +1066,36 @@ znova aktívny; Demos URL vymazať a odkaz vložiť sa dá jedným uložením. K
 **nie je overenie ceny**. Dátum overenia `price_checked_at` je **server-owned** — formulár variantu ho
 od klienta strháva (rovnako ako ozdoby payloadu). Marker **11 sa dvíha lazy** prvým zápisom katalógu
 s neprázdnym odkazom a **nikdy neklesá** (po zmazaní posledného odkazu ostáva 11); starší plugin
-katalóg s markerom 11 **len číta** (zápis odmietne, inak by odkaz ticho zahodil). Časť B —
-**ručné overenie ceny** (`price_check_method: 'manual'`, SCHEMA 12, doska za platňu / ABS za bm,
-zneplatnenie) — prinesie dávka CENY-M1b.
+katalóg s markerom 11 **len číta** (zápis odmietne, inak by odkaz ticho zahodil).
+
+**Časť B — ručné overenie ceny (CENY-M1b, v0.16.2, SCHEMA 12):** doska a ABS **bez Demos väzby** (nie
+UNI, nie duplák) nesie po potvrdení **`price_check_method: 'manual'`** a `price_checked_at` = dátum
+ručného potvrdenia (UTC ISO 8601). Obe polia sú **server-owned** — zapisuje ich **výhradne**
+`Materials.confirm_manual_price` (jeden zámok, stráž `row_rev` riadku); klient ich nikdy neposiela.
+Normalizácia nesie metódu **len** ako `'manual'` a **len** s dátumom, bez Demos väzby, nie pri UNI
+ani dupláku; `'manual'` spolu s Demos URL zahodí **metódu aj dátum** (ručný dátum sa nikdy netvári
+ako dátum z Demosu). **Stav** (čerstvá / na kontrolu / nikdy) počíta jediná autorita
+`Materials.manual_price_state` — prah veku = `stale_days` z Nastavení dodávateľa (ten istý ako pri
+Demose), dátum v budúcnosti alebo nečitateľný, chýbajúca či záporná cena = „nikdy"; **odkaz sa
+nevyžaduje** (sklenár bez e-shopu). **Doska sa potvrdzuje za platňu** (cena sa zaokrúhli na centy
+a prepočíta na €/m² **nezaokrúhlene**, takže Rozpočet ukáže za platňu presne zadanú sumu — O7) alebo
+**za m²** (materiál bez formátu); **ABS za bm**. **0 € je platná cena**, prázdna nie. **„Bez zmeny"**
+znamená **presnú zhodu so zobrazenou hodnotou servera** (`price_display`): cena platne presne ako
+v Rozpočte (`Budget.price_per_plate`) a €/m² z jednej funkcie `Materials.display_m2` (desiatkovo
+half-up na 2 desatinné) sa porovnávajú **v celých centoch**, €/bm **presne** (0,125 oproti 0,13 je
+zmena); vtedy ostáva uložená hodnota **bitovo tá istá** a mení sa len dátum. Cena platne sa zobrazuje
+len pri platnom katalógovom formáte (bez formátu `price_display.plate = nil`). Echo zobrazenej €/m²
+(bunka, formulár variantu, editor „Upraviť…") cenu nemení. **Zneplatnenie (O6):** zmena **ceny, kódu,
+dodávateľa, odkazu na produkt, dekoru u dodávateľa** a pri doske **formátu platne** (pridanie, zmena
+aj zmazanie) mimo formulára „Overiť cenu" zruší metódu **aj** dátum — bunka, formulár variantu aj
+editor volajú jedinú funkciu `Materials.reconcile_manual_check!`; názov, farba, vzhľad, smer dekoru,
+obchodný názov, výrobca ani premenovanie dekoru overenie nerušia. **Demos má prednosť (O8):** Demos
+apply ručne overenej položke zruší metódu, dátum ostane len ten, ktorý práve zapísal Demos (nová alebo
+potvrdená cena), odkaz na produkt ostáva odložený; zrušenie Demos väzby ručné overenie **nevracia**.
+Formulár variantu pri položke **s** Demos väzbou pri zmene ceny, kódu, dodávateľa alebo formátu zruší
+dátum overenia z Demosu (D-148). Marker **12** sa dvíha lazy prvým zápisom kľúča metódy a nikdy
+neklesá; plugin v0.16.1 a starší katalóg s markerom 12 **len číta**. Rozpočet ručne overené ceny
+zatiaľ zobrazuje ako doteraz (vek a „na kontrolu" prinesie CENY-M2).
 
 **Duplák (D-43, dávka 2B-1 — SCHEMA 3):** variant dosky „zdvojený zo zdroja"
 (36 = 2× zlepená 18). Vlastné vstupy sú **výhradne** `source_material_id`

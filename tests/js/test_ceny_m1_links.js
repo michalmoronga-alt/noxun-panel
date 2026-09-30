@@ -11,7 +11,7 @@
 //        `product_url` pri zamku;
 //   R6b  formular drzi baseline z OTVORENIA — katalogove echo ho neomladi;
 //        konflikt servera formular otvori nanovo s cerstvymi udajmi;
-//   R1   MD_CLIENT_SCHEMA = 11.
+//   R1   MD_CLIENT_SCHEMA = 11 (od CENY-M1b 12).
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
@@ -76,7 +76,7 @@ function catalog(sheets, edges){
 M.mdSetCatalog(catalog([S25, S18D, UNI], [E08, E10D]));
 
 // --- R1 -----------------------------------------------------------------------
-eq(M.MD_CLIENT_SCHEMA, 11, 'klient hlasi schemu 11 (product_url)');
+eq(M.MD_CLIENT_SCHEMA, 12, 'klient hlasi schemu 12 (CENY-M1b price_check_method)');
 
 // --- R16: pevny slot -----------------------------------------------------------
 (function(){
@@ -147,7 +147,7 @@ eq(M.MD_CLIENT_SCHEMA, 11, 'klient hlasi schemu 11 (product_url)');
   const inp = el('ms_product_url');
   eq(inp.readOnly, false);
   eq(inp.value, S25L.product_url, 'prefill ulozeneho odkazu');
-  eq(el('ms_product_hint').textContent, 'Otvorí sa vo webovom prehliadači.');
+  eq(el('ms_product_hint').textContent, 'Otvorí sa vo webovom prehliadači. Cena zatiaľ nebola ručne overená.', 'CENY-M1b R22 veta za hintom');
   // zivy zamok pri pisani do Demos URL
   inp.value = 'https://rozpisany.example/p';
   el('ms_demos_url').value = 'https://www.demos-trade.sk/x';
@@ -213,7 +213,7 @@ eq(M.MD_CLIENT_SCHEMA, 11, 'klient hlasi schemu 11 (product_url)');
   p = last('update_edge');
   eq(p.product_url, 'https://abs.example/43');
   eq(p.row_rev, 're');
-  eq(p.catalog_schema, 11);
+  eq(p.catalog_schema, 12);
   eq(M.mdProductLockState('', '').locked, false);
   eq(M.mdProductLockState(' x ', '').hint.indexOf('Uložený ručný odkaz'), -1, 'bez odlozeneho odkazu veta chyba');
 })();
