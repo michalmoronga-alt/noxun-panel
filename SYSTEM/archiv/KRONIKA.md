@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **DOCS — H1 · pravidlá čítania pre agentov (1.10.2026, PR #?, blok 9 · HARDENING PO V1, len dokumentácia; verzia pluginu sa nemení).** Položky krížového
+- **DOCS — H1 · pravidlá čítania pre agentov (1.10.2026, PR #433, blok 9 · HARDENING PO V1, len dokumentácia; verzia pluginu sa nemení).** Položky krížového
   auditu **B-01, B-04, B-08, B-09**. **B-01:** tabuľka „Povinné čítanie" v [CLAUDE.md](../../CLAUDE.md) pri každom súbore nad ~50 kB menuje kapitolu alebo odsek
   a ako ho nájsť Grepom (riadok UI: UI_DIZAJN §1–§3 + odsek dotknutej sekcie Štúdia alebo kontextu Inspectora v `ui-lifecycle.md` + záväzný kontrakt Kusovníka
   `UI20_KONTRAKT.md` Š2 pri zmene stĺpcov či sekcií Štúdia); „podobná funkcia už bola" → priečinok bloku v `archiv/bloky/` a `archiv/<BLOK>_ZAVER_*`; „prečo" →

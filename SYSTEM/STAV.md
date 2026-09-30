@@ -36,7 +36,7 @@ počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení,
 
 **Blok 9 · HARDENING PO V1** (štart 1.10.2026, PR #432): krížový audit V1 sedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**;
 17 dávok **H1…H17** sekvenčne podľa tabuľky v [PLAN.md](PLAN.md), **bez zmeny výrobných a cenových čísel**; priečinok bloku [zdroje/bloky/HARDENING/](zdroje/bloky/HARDENING/).
-**H1** (pravidlá čítania, PLAN bez hotových blokov, STAV po docs PR, hranice triedy dávky) — PR #?. **H6 a H7 čakajú na schválený mockup** (R-38 v H7 potvrdí Michal).
+**H1** (pravidlá čítania, PLAN bez hotových blokov, STAV po docs PR, hranice triedy dávky) — PR #433. **H6 a H7 čakajú na schválený mockup** (R-38 v H7 potvrdí Michal).
 **Q1** (porez a montáž pri skle) bez odpovede · pri prvej rohovej v dielni overiť záves Sensys · **na smoke čakajú** D-132 (#367), D-133 (#368), D-134 (#369).
 
 ## Ďalší krok

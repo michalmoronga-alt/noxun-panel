@@ -2,7 +2,7 @@
 
 > **ARCHÍV (založené 24.7.2026 pri uzávere V0.5).** Kompaktné riadky hotových etáp drží [KRONIKA.md](KRONIKA.md) (časová os) — tu sú plné pôvodné texty (história rozhodnutí, rozsahov a PR). Otvorené záväzky z týchto textov sú od 11.8.2026 zaradené do blokov [../PLAN.md](../PLAN.md) — tento súbor je čisto referenčný.
 
-## Formálny uzáver starých blokov PLANu — 1b · 1c (poznámka) · 1d · 1e · 4 · 6 (1.10.2026, dávka H1 bloku 9 · HARDENING PO V1, PR #?)
+## Formálny uzáver starých blokov PLANu — 1b · 1c (poznámka) · 1d · 1e · 4 · 6 (1.10.2026, dávka H1 bloku 9 · HARDENING PO V1, PR #433)
 
 **Prečo teraz:** bloky **1b STABILIZAČNÁ REVÍZIA**, **1d REFAKTOR Z REGISTRA**, **1e PLÁNOVACIA DÁVKA**, **4 · V1 DOTIAHNUTIE** a **6 · INFRA** boli obsahovo
 hotové (1b, 1d a 1e 27.8.–1.9.2026, blok 4 so smoke PASS bloku CENY 30.9.2026 = V1 hotové, blok 6 s D-52 3.9.2026), ale nikdy sa formálne neuzavreli —
