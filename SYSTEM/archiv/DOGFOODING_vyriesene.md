@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-148** — Formulár ceruzky pri Demos položke ruší dátum overenia pri zmene ceny, kódu, dodávateľa alebo formátu (ako bunka a editor „Upraviť…"); ručne prepísaná Demos cena už neostáva „overená" a „Prepočítať ceny" ju overí znova — 30.9.2026, PR #?, v0.16.2
 - **D-144** — Vložený chrbát a chrbát v drážke pri stropu „Dve výstuhy" na výšku končí pod výstuhami — v modeli aj do nárezu (dolná 720 / sokel 100 / výstuhy 100 → 564 × 502, do nárezu 600 × 538); skrinky postavené pred opravou sú zastarané (Kontrola RED, výrobné exporty stoja, hromadná prestavba) — 27.9.2026, PR #402, v0.13.2
 - **D-143** — Chrbát v drážke ide do nárezu, VEPO aj ceny v plnom rozmere skrinky (horná 600 × 720 → 600 × 720, model ďalej 564 × 684); karta dielca „Do nárezu"; olepený chrbát v drážke, poškodený údaj aj zastarané skrinky (schéma < 19) zastavia všetky štyri výrobné exporty; hromadná prestavba z Kontroly — 27.9.2026, PR #401, v0.13.1
 - **D-140** — Výška osadenia chladničky v skrinke: čip „osadenie N mm" v riadku Spotrebič otvorí malé okienko s číslom (od hornej plochy dna, napr. vrch police); box niky aj pásma dverí sa posunú a Kontrola výšky aj delenia čiel počíta od zdvihnutého dna — 24.9.2026, PR #389, v0.12.20
@@ -131,6 +132,20 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-148 — Formulár ceruzky pri Demos položke nerušil dátum overenia, vyriešené 30.9.2026
+
+**Výsledok: PR #?, v0.16.2, blok CENY dávka CENY-M1b (požiadavka R13b package CENY-M1).** Pôvodné znenie (sonda pred auditom package CENY-M1,
+S9/T9h a T9j, nález F1 — 30.9.2026): formulár ceruzky pri **Demos** položke **nerušil dátum overenia** (`price_checked_at`) pri zmene **ceny, kódu,
+dodávateľa ani formátu** — ručne prepísaná Demos cena tak ostávala „overená" a Rozpočet ju bral ako čerstvú, hoci ju nikto neporovnal so stránkou
+Demosu. Bunka aj editor „Upraviť…" dátum pri zmene ceny, kódu a dodávateľa rušili už predtým; formulár ho rušil len pri zmene Demos URL
+a dekoru u dodávateľa. Orchestrátor 30.9.2026 zaradil opravu do M1b (cenová oprava v tej istej ceste zneplatnenia).
+
+**Čo sa zmenilo.** Formulár variantu (doska aj ABS) pri položke **s Demos väzbou, ktorú formulár nemení**, zmaže dátum overenia z Demosu, keď sa
+zmení **cena** (po echu zobrazenej €/m² — nedotknuté pole cenu nemení), **kód**, **dodávateľ** alebo pri doske **formát platne**. Status povie
+„Uložené — dátum overenia z Demosu sa zrušil, cenu obnoví Prepočítať ceny." a „Prepočítať ceny" položku znova overí. Zmena Demos URL a dekoru
+u dodávateľa rušia dátum ako doteraz. Beží v tej istej transakcii formulára pod zámkom katalógu (R6c); test O6/D-148 matica
+(`tests/pure/test_ceny_m1_manual.rb`) a mutácia M20.
 
 ### D-144 — Vložený chrbát alebo chrbát v drážke prechádza výstuhou na výšku, vyriešené 27.9.2026
 

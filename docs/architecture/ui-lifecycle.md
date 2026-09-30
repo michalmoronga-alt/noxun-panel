@@ -3419,8 +3419,8 @@ robia pred zámkom len rýchle `schema_ok?`; **kontrola schémy aj revízie, na�
 zámok). Baseline je **`row_rev` riadku z otvorenia formulára** (R6b), nie globálny `catalog_rev` — ten omladzuje každé echo, takže starý formulár
 by vrátil cenu aj Demos väzbu do stavu z otvorenia; prázdny baseline = konflikt (fail-closed). Konflikt pošle **najprv** `push_catalog`, potom
 `MD.formConflict(kind, id)` (klient formulár otvorí nanovo s čerstvými údajmi a novým baseline) a status. Pred merge sa strhnú server-owned polia
-a ozdoby payloadu (`FORM_STRIP_KEYS`: `price_checked_at`, `price_check_method`, `product_link`, `price_check`, `row_rev`, `label`, `row_label`,
-`row_key`, `image_file`). Kľúč `product_url` (`apply_product_url!`): nie text / neplatný = celý save odmietnutý, prázdny = zmazanie, chýbajúci = bez
+a ozdoby payloadu (`FORM_STRIP_KEYS`: `price_checked_at`, `price_check_method`, `product_link`, `price_check`, `price_display`, `row_rev`, `label`,
+`row_label`, `row_key`, `image_file`). Kľúč `product_url` (`apply_product_url!`): nie text / neplatný = celý save odmietnutý, prázdny = zmazanie, chýbajúci = bez
 zmeny; pri **výslednej** Demos URL sa uložený odkaz nesmie zmeniť ani zmazať (odložený, O8). Odmietnutý odkaz (`:product_error`) pošle
 `MD.formRejected(kind)` — klient formulár po odoslaní zatvára, takže ho otvorí nanovo s **rozpísanými** hodnotami (`mdReopenFromAttempt`, baseline
 pokusu) a kurzorom v poli odkazu; úprava ceny či kódu sa tak nestratí ani vtedy, keby klientska kontrola pustila niečo, čo server odmietne.
@@ -3432,7 +3432,38 @@ záznamoch (`product_link_extra!`), `row_rev` zo surového záznamu pred ozdobou
 `mdSlotHtml` v riadku aj hlavičke (duplák/univerzálna · Demos alebo odkaz · overenie — M1b), ikona `mdProductBtn` (sivá = otvorí serverom,
 jantárová = formulár s kurzorom v poli odkazu a krátkym zvýraznením riadku), pole „Odkaz na produkt" so **živým zámkom** podľa poľa Demos URL
 (`mdProductLockSync`; odomknutie vráti rozpísaný text alebo odložený odkaz), posiela sa len z editovateľného poľa; `mdEditing.rev` echo
-**neomladí** a `mdReopenFromAttempt` ho zachová (druhé uloženie pri duplicite kódu nesie baseline prvého). `MD_CLIENT_SCHEMA = 11`.
+**neomladí** a `mdReopenFromAttempt` ho zachová (druhé uloženie pri duplicite kódu nesie baseline prvého).
+
+**CENY-M1b (v0.16.2) — ručné overenie ceny.** Tá istá transakcia formulára variantu (R6c) navyše pod zámkom: **echo** zobrazenej €/m²
+(`Materials.sheet_price_echo?` — pole Cena sa predvypĺňa zobrazenou hodnotou, nedotknuté cenu nemení), **`form_price_check_note!`** = R13
+`reconcile_manual_check!` (ručne overená položka: cena, kód, dodávateľ, odkaz, formát, dekor u dodávateľa, nová Demos URL → overenie zrušené,
+status `MANUAL_CLEARED_MSG` „Uložené — ručné overenie ceny sa zrušilo, položka ide na kontrolu.") alebo R13b `demos_stamp_edit!` (D-148: položka
+**s** Demos väzbou, ktorú formulár nemení — zmena ceny, kódu, dodávateľa, formátu zruší dátum z Demosu, status `DEMOS_STAMP_CLEARED_MSG`).
+Bunka (`handle_patch`) povie vetu R22 z `manual_cleared`, echo bez zápisu = `push_catalog` + „Cena sa nezmenila."; editor (`save_decor_status`)
+pripojí počet zrušených overení. **Akcie formulára „Overiť cenu"** (R15, `SECTION_ACTIONS`, predpona `mat_`): `mat_manual_prepare` →
+`MD.manualReady(snapshot)` (echo `kind, id, token, section, model_guid` + čerstvý `item` s `label`, `price_display`, `price_check`, `row_rev`,
+`has_url`, `read_only`, `reason`, `stale_days`; nič nezapisuje; cudzí model = `item: nil`); `mat_manual_open` → `UI.openURL` len pre čerstvý
+ručný záznam s platným odkazom a **tou istou** `row_rev` (inak `conflict`); `openURL == false` alebo výnimka = **stále `ok`** s `opened: false`
+a vetou „Obchod sa nepodarilo otvoriť — cenu si over inak a potvrď." (**neblokuje** — mockup B1); `mat_manual_confirm` → schema brána (starý
+klient `schema`), model brána (`DocKey.foreign?` → `stale_model`, D10), `Materials.confirm_manual_price`; `:ok` → `after_catalog_change` +
+status „Cena potvrdená k 30.9.2026: 179,90 € za platňu = 31,04 €/m²." (+ „(bez zmeny ceny — len dátum)"), `conflict`/`not_found`/read-only →
+`push_catalog`; odpoveď `MD.manualResult` nesie `phase`, `ok`, `status`, `msg`, `errors` (pole `price` pri poli) a čerstvý snímok; výnimka
+vráti `error` s tokenom (modal sa odomkne). Tok **nepoužíva** Demos session — odchod zo sekcie ho na serveri neruší. **Payload**
+(`full_catalog_payload(stale_days)`) nesie na každom riadku `price_display` a pri ručnom zázname `price_check` (`manual_price_extra!`),
+`catalog_payload` kľúč `stale_days` (Nastavenia dodávateľa, fail-soft 30). **Klient** (`proj_materials.js`): ikona **„Overiť cenu"**
+`mdCheckBtn` na 3. pozícii slotu (sivá = čerstvá, jantárová `is-pending` = nikdy/stará; tooltip `mdManualTip` podľa O5; read-only `disabled`),
+bunka €/m², pole Cena formulára variantu a stĺpec editora ukazujú `price_display.m2` na 2 desatinné (`mdM2Shown`), hint pod odkazom nesie vetu
+R22 (`mdManualFormText`), Demos hint dátumu sa ukazuje len pri Demos väzbe. **Formulár „Overiť cenu ručne"** (NXModal, `busyLock`, `memoryKey:
+null`, vlastné pole `custom` `price`): skupina dodávateľ + odkaz / veta O9, „Položka" (kód, formát, plocha), prepínač **za platňu | za m²**
+(predvolené za platňu pri formáte, O3), pole ceny s jednotkou, živý prepočet (`mdManualCalc`), „Oproti katalógu" (`mdManualDiff`), poznámka
+(`mdManualNote`, veta O4 pri 0 €) a pás upozornenia. **R20b:** stav `{mode, text, touched, src}` — prepnutie bez písania dá text zvoleného
+režimu **presne** zo `price_display` (nikdy spätný prepočet), takže potvrdenie pošle zobrazenú hodnotu a server ju vyhodnotí ako bez zmeny;
+po písaní sa ukáže prepočet a odošle sa **napísané číslo v jeho režime** (`mdManualValue`). S odkazom 25 ms po otvorení `mat_manual_open`;
+potvrdenie čaká na odpoveď o pokuse (`browserPending`, chyba „Počkaj na otvorenie produktu…"), neúspech potvrdenie neblokuje; bez odkazu (O9)
+sa prehliadač neotvára. Odpovede s cudzím tokenom, sekciou alebo dokumentom sa zahodia; `conflict` otvorí nový formulár s čerstvými
+údajmi (pôvodná cena sa sama neposiela), `ok` zatvorí a povie status servera. Životný cyklus: `matCloseModals` → `mdManualClose`
+(zatvorí formulár aj čakajúci prepare/open), `studio.js` volá `mdManualContextChanged` na tých istých miestach ako `hwProductContextChanged`;
+katalógové echo formulár nezatvára. `MD_CLIENT_SCHEMA = 12`.
 
 **`materials_dialog.rb` — od ŠT-2b už NIE JE OKNO** (ostal serverový modul; obsah je sekcia `mat` Štúdia, popis je tu kvôli histórii): katalóg = mriežka dlaždíc podľa výrobcu + pás
 „Použité v projekte" — jediné echo je `push_catalog` BEZ scanu modelu; hľadanie názov/výrobca/kód/dodávateľ; klik na dlaždicu → detail dekoru s editovateľnými bunkami

@@ -17,6 +17,28 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **CENY-M1b — ručné overenie ceny dosky a ABS bez Demosu (30.9.2026, PR #?, v0.16.1 → v0.16.2).** Druhá kódová dávka bloku CENY podľa package
+  [PACKAGE_CENY_M1.md](../zdroje/bloky/CENY/PACKAGE_CENY_M1.md) (požiadavky **[B]**; audit Codex gpt-6-astra — BLOCKER R11a „bez zmeny = presná zhoda
+  so zobrazenou hodnotou, nie interval ±0,005" a FIX R20b; delta audit Codex gpt-5.6-sol
+  [AUDIT2_CENY_M1_2026-09-30.md](../zdroje/bloky/CENY/AUDIT2_CENY_M1_2026-09-30.md) — celočíselné centy len pre platňu a €/m², €/bm presne,
+  `price_display.plate = nil` bez formátu). **Pre používateľa:** v Štúdiu → Materiály má doska a ABS bez Demosu na 3. mieste slotu ikonu **„Overiť
+  cenu"** (sivá = čerstvo overená, jantárová = nikdy alebo staršia než prah z Nastavení dodávateľa; tooltip s dátumom a vekom). Klik otvorí obchod
+  (ak je odkaz — neúspech otvorenia potvrdenie **neblokuje**) a formulár **„Overiť cenu ručne"**: doska **za platňu** s živým prepočtom na €/m²
+  (sklo bez formátu za m²), ABS za bm, „Oproti katalógu", **0 € platná**; **„Potvrdiť cenu k dnešku"** zapíše dnešný dátum a nezmenená cena ostane
+  **bitovo tá istá** (aj po ľubovoľnom prepínaní jednotky). Cena za platňu sa ukladá ako **nezaokrúhlená €/m²**, takže Rozpočet ukáže za platňu
+  presne zadanú sumu (mriežka 15 formátov × 0,00–200,00 €, 0 chýb). **€/m² sa ukazuje na 2 desatinné** (bunka, ceruzka, editor „Upraviť…") a echo
+  zobrazenej hodnoty cenu nemení. Zmena ceny, kódu, dodávateľa, odkazu, dekoru u dodávateľa alebo formátu v bunke, ceruzke či editore overenie
+  **zruší** s vetou „ručné overenie ceny sa zrušilo" (jediná funkcia `reconcile_manual_check!`); **Demos má prednosť** (apply zruší ručné overenie,
+  odkaz ostane odložený, kód-only apply už nenechá ručný dátum tváriť sa ako Demos dátum). **D-148:** ceruzka pri Demos položke pri zmene ceny,
+  kódu, dodávateľa alebo formátu zruší dátum z Demosu. **Dáta:** `price_check_method: 'manual'` + `price_checked_at` (server-owned, jediný
+  zapisovateľ `Materials.confirm_manual_price` pod zámkom so stráženým `row_rev`), **SCHEMA 12** lazy; stav počíta `Materials.manual_price_state`
+  (payload `price_check`, `price_display`, `stale_days`). Nové akcie `mat_manual_prepare/open/confirm` (mimo Demos session, model guard).
+  **Rozpočet, XLSX, ponuka ani VEPO sa nemenia** (test R24: rovnaké riadky, čísla aj XLSX). **Odchýlky:** vstup jemnejší než cent (31,038) sa
+  nepovažuje za zobrazenú hodnotu (vždy zmena); po písaní a prepnutí jednotky formulár pošle **napísané** číslo v jeho režime (zámer), nie
+  prepočítaný text. **Testy:** 4893 headless (nová `test_ceny_m1_manual.rb`) · 144 JS sád (nová `test_ceny_m1_manual.js`; štyri sady so
+  schémou 11 → 12) · mutácie **M9–M21, M23 (aj plate), M24 zabité**; in-SU nie je brána (package §8). **Pre Luciu:** aktualizovať obe PC pred
+  prvým ručným overením — starší plugin katalóg so schémou 12 len číta.
+
 - **CENY-M1a — odkaz na produkt pri doske a ABS bez Demosu (30.9.2026, PR #426, v0.16.0 → v0.16.1).** Prvá kódová dávka bloku CENY podľa package
   [PACKAGE_CENY_M1.md](../zdroje/bloky/CENY/PACKAGE_CENY_M1.md) (požiadavky **[A]**; audit návrhu Codex gpt-6-astra
   [AUDIT_CENY_M1_2026-09-30.md](../zdroje/bloky/CENY/AUDIT_CENY_M1_2026-09-30.md): 1 BLOCKER [B] + 2× FIX-IN-M1a + 1 FIX-IN-M1b; orchestrátor prijal
