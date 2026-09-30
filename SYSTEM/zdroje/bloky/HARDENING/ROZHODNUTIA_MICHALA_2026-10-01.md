@@ -42,11 +42,14 @@ Všetko ostatné ide do **zásobníka Po V1** alebo sa **vyradí** s dôvodom. P
 ## Výsledok triedenia (Michal 1.10.2026, interaktívna stránka)
 
 Autorita pre zaradenie položiek. Plné znenia a dôkazy: [TRIEDENIE_krizovy_audit_v1.html](TRIEDENIE_krizovy_audit_v1.html) (stránka s popisom každej položky) a surové výstupy audítorov `CROSS_AUDIT_A*.md` v tomto priečinku (zdrojové ID v stĺpci Zdroj).
+Stránka je záznam toho, čo Michal videl pri triedení, a nemení sa. **Pozn. k B-01:** veta „Užitočné sú z toho 3–4 %" je neoverený odhad (poznámka v hlavičke
+`CROSS_AUDIT_A4`); zmerané sú len veľkosti povinného čítania.
 
 **Spolu:** 35 Teraz · 29 Po V1 · 11 Vyradiť (75 položiek). **Odchýlky od odporúčania orchestrátora:** B-10 Teraz → **Po V1** · D-03 Teraz → **Po V1** · D-11 Po V1 → **Teraz** · E-02 Po V1 → **Vyradiť** · E-04 Po V1 → **Vyradiť** · E-06 Po V1 → **Vyradiť** · E-09 Po V1 → **Vyradiť** · G-01 Teraz → **Po V1** · G-03 Po V1 → **Vyradiť** · G-09 Po V1 → **Vyradiť** · G-10 Po V1 → **Vyradiť**.
 
 **Dôvody odchýlok a vyradení (doplnok po review PR #432):** Michal pri triedení k odchýlkam ani k vyradeniu E-02, E-04, E-06, E-09, G-03, G-09, G-10
-poznámku neuviedol (stĺpec prázdny) — dôvodom je **jeho rozhodnutie pri triedení 1.10.2026**; orchestrátor dôvody nedomýšľa. **Vyradené** znamená
+poznámku neuviedol (stĺpec prázdny) — **okrem G-01** („mám prístup ku konfigurátoru Blum" → vzorky pri prvom novom zásuvkovom systéme, odpovede nižšie) —
+dôvodom je **jeho rozhodnutie pri triedení 1.10.2026**; orchestrátor dôvody nedomýšľa. **Vyradené** znamená
 „v pláne sa nerieši", nie trvalý zákaz: položka sa vráti len novým postrehom Michala (DOGFOODING). G-11 a G-12 Michal výslovne potvrdil „nerieši sa"
 (odpovede nižšie). Pôvodné zdôvodnenie každej položky (čo a prečo) ostáva na triediacej stránke a v surových výstupoch.
 

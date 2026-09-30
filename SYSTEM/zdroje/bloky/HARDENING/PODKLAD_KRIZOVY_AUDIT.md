@@ -90,7 +90,8 @@ Na konci: sekcia **„Doplnky k známym"** (číslo + nový fakt) a sekcia **„
 (poradie navigácie: Kusovník, Kontrola, Nákup kovania, Rozpočet, Cenová ponuka, Nárezový plán, Materiály, Kovanie, Spotrebiče, Pravidlá, Šablóny,
 Dodávateľ/Demos, Nastavenia rozpočtu, O plugine). Každý má aj `_long` variant (celá výška stránky).
 *(Doplnok po review PR #432: cesta vyššie bola dočasná. Dôkazné screenshoty v bežnej výške sú trvalo v gite v [screenshoty/](screenshoty/)
-(v0.17.0, ukážková kuchyňa 7 skriniek); `_long` varianty ostali len lokálne. Opakovateľný generátor fotiek z dát pluginu je dávka **H2** bloku 9.)*
+(v0.17.0, ukážková kuchyňa 7 skriniek) — navyše tých päť `_long` variantov, ktoré audit A5 cituje ako dôkaz (Kusovník, Korpus, Rozpočet, Materiály,
+Pravidlá); ostatné `_long` varianty nikto necituje a ostali len lokálne. Opakovateľný generátor fotiek z dát pluginu je dávka **H2** bloku 9.)*
 
 *Mená nástrojov a modelov v tomto priečinku (tabuľka nižšie, hlavičky `CROSS_AUDIT_A*`) sú **záznam pôvodu** — kto 1.10.2026 ktorý výstup vytvoril.
 Nie sú obsadením rolí; to platí výhradne v tabuľke „Obsadenie rolí" v [../../../WORKFLOW.md](../../../WORKFLOW.md).*
