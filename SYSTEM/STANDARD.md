@@ -1588,6 +1588,12 @@ Možnosti:
   a odhadu platní, ceny berie zo sadzieb dodávateľa), štandardné koncové riadky s násobkom, vlastné položky, spotrebiče a zaokrúhlenie konečnej sumy.
   **Od NP-4:** pri zapnutom prepínači zákazky „ceny podľa plánu" (predvolene vypnutý) je množstvo platní materiálu **počet z nárezového plánu** — len pri
   cenovo spôsobilom materiáli (§11.4), inak odhad z m² s dôvodom v poznámke; porez ide za množstvom Materiálu, montáž ostáva z odhadu.
+  **Od CENY-M2 (v0.16.3, C12 + C14):** materiál **bez platného formátu platne** — sklo, zrkadlo na mieru **aj bežná doska** (DTDL, MDF, HDF, PD, ZASTENA,
+  KOMPAKT; Michal 30.9.2026, C14) — je riadok v **m²**, ak nie je UNI ani záznam dupláku a záznam v katalógu existuje (duplák s väzbou sa počíta v ploche svojej zdrojovej
+  dosky, UNI a duplák bez väzby ostávajú na odhade platní): `mj: M2`, množstvo = **skutočná plocha
+  dielcov** (vrátane duplákov × násobok, **bez prerezu a odpadu**, 2 desatinné, najmenej 0,01), cena za MJ = **€/m² zaokrúhlená na centy** (tá istá hodnota
+  ako v Štúdiu), `qty_basis: 'area'`, poznámka „… (bez odpadu)" aj v XLSX. Typ materiálu nerozhoduje (jediná funkcia `Budget.area_priced_type?`); odhad
+  platní 2800 × 2070 ostáva len pre UNI, duplák bez väzby a chýbajúci záznam. Porez a montáž aj pri riadku v m² berú odhad platní (`estimate_qty`) — ich čísla sa nemenia (Q1).
 - **Cenová ponuka pre zákazníka** — pohľad NAD rozpočtom, nie druhý výpočet.
 - **VEPO CSV** — presne podľa `VEPO_KONTRAKT.md` (od v1.1 stĺpce `nazov;dlzka;hrana_pozdlz;sirka;hrana_naprieč;hrubka;pocet_ks;material;poznamka`, oddeľovač `;`, úvodzovky, `—`/`=` kódy hrán dopočítané z L1/L2/W1/W2, normalizácia hrúbok 18/36, slug názvy súborov `<projekt>_<material>_<hrubka>.csv`). Priamo z dielcov, **bez OCL medzikroku**.
   **Od v1.2 (D-121) má názov riadku VŽDY najviac 20 znakov** — import objednávky VEPO dlhšie pole `nazov` odmieta; orez sa prizná v Kontrole aj v LOGu exportu.
@@ -1637,6 +1643,16 @@ vypnutý — staré aj nové zákazky majú dnešné ceny, kým ho človek nezap
 - **Kompatibilita (priznané nahlas):** marker 3 zapíše **prvá mutácia rozpočtu akéhokoľvek druhu** (aj bez zapnutia prepínača). Od tej chvíle plugin **v0.15.3
   a starší** zákazku v Rozpočte needituje a nevyrobí z nej XLSX rozpočtu ani ponuky (banner) — pred použitím aktualizovať oba počítače.
 
+**Vek ručných cien dosiek a ABS v Rozpočte (od v0.16.3, CENY-M2).** Doska a ABS **bez Demos väzby** (nie UNI, nie duplák) nesú v scane cien stav ručného
+overenia z katalógu (`Materials.manual_price_state` — jediná autorita, CENY-M1b): čerstvo overená · staršia ako prah z Nastavení · nikdy neoverená alebo bez
+ceny (= „na kontrolu"; odkaz na produkt sa **nevyžaduje**). UNI a duplák sa ručne neoverujú a do scanu nepatria. Počty: `manual_hardware` (len kovanie),
+`manual_materials` (dosky a ABS), `manual_pending` (všetky nevyriešené ručné ceny, jeden priechod); čip „N cien na kontrolu" a „Skontrolovať ceny" čítajú
+`manual_pending`. Ručná cena sa **nikdy nesťahuje** — potvrdzuje ju formulár „Overiť cenu" (zápis do katalógu, nie do zákazky).
+
+- **`BUDGET_STD` sa nemení:** M2 nepridáva do zákazky žiadny kľúč — riadok v m² (§11.2) aj stav ručných cien sa počítajú živo z katalógu. **Priznané
+  prevádzkové riziko:** plugin **v0.16.2 a starší** tú istú zákazku so sklom alebo doskou bez formátu stále ocení fiktívnou platňou a vyexportuje XLSX rozpočtu aj ponuky
+  so starou cenou; žiadna brána to nezachytí (dáta zákazky sa nezmenili). **Pred porovnávaním alebo posielaním ponúk aktualizovať plugin na oboch PC.**
+
 ### 11.4 Nárezový plán (výpočet, nie exportér)
 
 Primitívny nárezový plán je vo V1 (blok 2, rozhodnutia N1–N11): **koľko platní najviac treba pri zvolenom rozložení** — podklad pre objednávku
@@ -1663,6 +1679,8 @@ a rozhodovanie, **nie výrobný dokument** (reže VEPO vlastnou optimalizáciou)
   rozpočtu. **Porez** ide za množstvom Materiálu, **montáž** vždy z odhadu (závisí od dielcov, nie od odpadu). **Nič sa nezastaví** — nespôsobilý materiál
   nie je nález Kontroly ani exportná brána (O11); po exporte status vymenuje materiály, ktoré v súbore išli na odhad. Cenová ponuka mení len sumu.
   Vykonateľná podoba: `SheetLayout.price_basis` (jediná autorita podmienok aj viet).
+- **Materiál podľa plochy nie je v cene podľa plánu (CENY-M2):** riadok v m² (§11.2 — materiál bez formátu okrem UNI a dupláku bez väzby) sa na plán nepýta, nemá vetu
+  plánu ani vetu o cene; plán pre taký materiál ostáva orientačný a karta sekcie Nárezový plán povie „v rozpočte 0,90 m² podľa plochy".
 - **Neúplný je aj plán nad zablokovanými výrobnými dátami:** každá brána, ktorá by nad tým istým zberom zastavila VEPO export (novšia schéma,
   poškodený rozmer do nárezu, kit zásuviek), zruší hornú hranicu celej zákazky.
 

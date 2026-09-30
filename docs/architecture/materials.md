@@ -31,7 +31,8 @@ jediná autorita „ručného" záznamu pre payload, otvorenie odkazu aj ručné
 **Ručné overenie ceny (CENY-M1b).** **`put_price_check_fields`** (posledné pred vzhľadom, v `normalize_sheet` aj `normalize_edge`) nesie
 metódu **len** ako `'manual'` a **len** s neprázdnym `price_checked_at`, bez Demos väzby, nie pri UNI/dupláku; `'manual'` s Demos URL zahodí
 metódu **aj** dátum (ručný dátum sa nesmie tváriť ako dátum z Demosu — poistka O8), iná hodnota metódy sa zahodí. **`manual_price_state(rec,
-stale_days:, now:)`** je jediná autorita stavu (M2 ju prevezme do Rozpočtu): `nil` pri Demos/UNI/dupláku, inak `fresh`/`stale`/`never` s vekom
+stale_days:, now:)`** je jediná autorita stavu (od CENY-M2 ju číta aj Rozpočet — `Budget.manual_material_freshness`, `never` = `manual`; a `display_m2`
+je cena za MJ riadku „podľa plochy", [outputs.md](outputs.md)): `nil` pri Demos/UNI/dupláku, inak `fresh`/`stale`/`never` s vekom
 (24 h `floor`, vzor `Budget.manual_hardware_freshness`); budúci či nečitateľný dátum a chýbajúca/záporná cena = `never`, odkaz sa nevyžaduje
 (O9). **Zobrazené ceny počíta len server** — `price_display(rec)`: doska `plate` = `Budget.price_per_plate` (tá istá funkcia ako Rozpočet;
 `nil` bez platného katalógového formátu — `plate_area` berie len dve čísla v `SHEET_SIZE_RANGE`), `m2` = `display_m2` (desiatkovo half-up

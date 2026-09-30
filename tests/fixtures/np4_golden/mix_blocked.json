@@ -26,26 +26,56 @@
             "material_id": "H18",
             "m2": 14.72,
             "price_per_m2": 36.5,
-            "estimated": false
+            "estimated": false,
+            "product_link": false,
+            "price_check": {
+              "kind": "sheet",
+              "id": "H18",
+              "label": "H1181 DTDL 18 mm",
+              "manual_check": true,
+              "state": "manual",
+              "checked_at": null,
+              "age_days": null,
+              "price_check_method": null,
+              "demos_url": null,
+              "product_link": false,
+              "price_missing": false
+            }
           },
           {
             "key": "material:NOF",
             "nazov": "K001 DTDL 18 mm",
             "kod": null,
             "dodavatel": null,
-            "mj": "PLATŇA",
-            "mnozstvo": 1,
-            "cena_mj": 180.84,
-            "spolu": 180.84,
-            "spolu_auto": 180.84,
-            "poznamka": "1,05 m² · formát 2800×2070 mm · formát platne nie je v katalógu — odhad podľa 2800×2070 · plán: orientačne 1 platňa pri formáte 2800 × 2070 — pre zaradené dielce, celkový počet neznámy",
+            "mj": "M2",
+            "mnozstvo": 1.05,
+            "cena_mj": 31.2,
+            "spolu": 32.76,
+            "spolu_auto": 32.76,
+            "poznamka": "formát platne nie je v katalógu — počíta sa skutočná plocha dielcov (bez odpadu)",
             "zdroj": "auto",
             "cp_skupina": "zostava",
             "price_missing": false,
+            "qty_basis": "area",
+            "estimate_qty": 1,
             "material_id": "NOF",
             "m2": 1.05,
             "price_per_m2": 31.2,
-            "estimated": true
+            "estimated": false,
+            "product_link": false,
+            "price_check": {
+              "kind": "sheet",
+              "id": "NOF",
+              "label": "K001 DTDL 18 mm",
+              "manual_check": true,
+              "state": "manual",
+              "checked_at": null,
+              "age_days": null,
+              "price_check_method": null,
+              "demos_url": null,
+              "product_link": false,
+              "price_missing": false
+            }
           },
           {
             "key": "material:PD",
@@ -64,7 +94,21 @@
             "material_id": "PD",
             "m2": 1.8,
             "price_per_m2": 62.0,
-            "estimated": false
+            "estimated": false,
+            "product_link": false,
+            "price_check": {
+              "kind": "sheet",
+              "id": "PD",
+              "label": "Dub PD 38 mm",
+              "manual_check": true,
+              "state": "manual",
+              "checked_at": null,
+              "age_days": null,
+              "price_check_method": null,
+              "demos_url": null,
+              "product_link": false,
+              "price_missing": false
+            }
           },
           {
             "key": "material:UNI",
@@ -103,7 +147,21 @@
             "material_id": "W18",
             "m2": 3.077,
             "price_per_m2": 26.9,
-            "estimated": false
+            "estimated": false,
+            "product_link": false,
+            "price_check": {
+              "kind": "sheet",
+              "id": "W18",
+              "label": "W1000 DTDL 18 mm",
+              "manual_check": true,
+              "state": "manual",
+              "checked_at": null,
+              "age_days": null,
+              "price_check_method": null,
+              "demos_url": null,
+              "product_link": false,
+              "price_missing": false
+            }
           },
           {
             "key": "material:W36",
@@ -125,7 +183,7 @@
             "estimated": false
           }
         ],
-        "subtotal": 1647.29,
+        "subtotal": 1499.21,
         "unknown_count": 1,
         "complete": false,
         "counts_in_total": true
@@ -426,41 +484,41 @@
             "dodavatel": null,
             "mj": "FIX",
             "mnozstvo": 1,
-            "cena_mj": 0.71,
-            "spolu": 0.71,
-            "spolu_auto": 0.71,
+            "cena_mj": 0.79,
+            "spolu": 0.79,
+            "spolu_auto": 0.79,
             "poznamka": "na 1 € nahor",
             "zdroj": "auto",
             "cp_skupina": "zostava",
             "price_missing": false
           }
         ],
-        "subtotal": 0.71,
+        "subtotal": 0.79,
         "unknown_count": 0,
         "complete": true,
         "counts_in_total": true
       }
     ],
     "totals": {
-      "raw_total": 3393.29,
-      "rounding": 0.71,
+      "raw_total": 3245.21,
+      "rounding": 0.79,
       "rounding_step": 1.0,
-      "total": 3394.0,
-      "total_novat": 2759.35,
+      "total": 3246.0,
+      "total_novat": 2639.02,
       "unknown_count": 2,
       "unknown_count_in_total": 2,
       "complete": false,
       "appliances_included": false,
       "appliances_subtotal": 0.0,
       "subtotals": {
-        "materials": 1647.29,
+        "materials": 1499.21,
         "abs": 0,
         "hardware": 0,
         "services": 1086.0,
         "standard_rows": 660.0,
         "custom": 0,
         "appliances": 0,
-        "rounding": 0.71
+        "rounding": 0.79
       }
     },
     "stale": {
@@ -470,64 +528,64 @@
           "kind": "sheet",
           "id": "H18",
           "label": "H1181 DTDL 18 mm",
+          "manual_check": true,
           "state": "manual",
           "checked_at": null,
           "age_days": null,
-          "demos_url": null
+          "price_check_method": null,
+          "demos_url": null,
+          "product_link": false,
+          "price_missing": false
         },
         {
           "kind": "sheet",
           "id": "NOF",
           "label": "K001 DTDL 18 mm",
+          "manual_check": true,
           "state": "manual",
           "checked_at": null,
           "age_days": null,
-          "demos_url": null
+          "price_check_method": null,
+          "demos_url": null,
+          "product_link": false,
+          "price_missing": false
         },
         {
           "kind": "sheet",
           "id": "PD",
           "label": "Dub PD 38 mm",
+          "manual_check": true,
           "state": "manual",
           "checked_at": null,
           "age_days": null,
-          "demos_url": null
-        },
-        {
-          "kind": "sheet",
-          "id": "UNI",
-          "label": "UNI DTDL 18 mm",
-          "state": "manual",
-          "checked_at": null,
-          "age_days": null,
-          "demos_url": null
+          "price_check_method": null,
+          "demos_url": null,
+          "product_link": false,
+          "price_missing": false
         },
         {
           "kind": "sheet",
           "id": "W18",
           "label": "W1000 DTDL 18 mm",
+          "manual_check": true,
           "state": "manual",
           "checked_at": null,
           "age_days": null,
-          "demos_url": null
-        },
-        {
-          "kind": "sheet",
-          "id": "W36",
-          "label": "W1000 duplák DTDL 36 mm",
-          "state": "manual",
-          "checked_at": null,
-          "age_days": null,
-          "demos_url": null
+          "price_check_method": null,
+          "demos_url": null,
+          "product_link": false,
+          "price_missing": false
         }
       ],
       "counts": {
         "stale": 0,
         "unverified": 0,
-        "manual": 6,
+        "manual": 4,
         "fresh": 0,
         "manual_hardware": 0,
-        "attention": 0
+        "manual_materials": 4,
+        "manual_pending": 4,
+        "attention": 4
       }
     },
     "settings": {
@@ -611,7 +669,7 @@
         {
           "key": "cp:assembly",
           "polozka": "Nábytková zostava – plošný a doplnkový materiál",
-          "cena": 403.71,
+          "cena": 436.55,
           "mnozstvo": 1,
           "mj": "set",
           "kind": "assembly"
@@ -634,16 +692,6 @@
           "mj": "set",
           "kind": "item",
           "source_key": "material:W36",
-          "suggested": true
-        },
-        {
-          "key": "cp:item:material:NOF",
-          "polozka": "K001 DTDL 18 mm",
-          "cena": 180.84,
-          "mnozstvo": 1,
-          "mj": "set",
-          "kind": "item",
-          "source_key": "material:NOF",
           "suggested": true
         },
         {
@@ -707,12 +755,12 @@
           "kind": "fixed"
         }
       ],
-      "total": 3394.0,
+      "total": 3246.0,
       "total_label": "SPOLU",
-      "budget_total": 3394.0,
+      "budget_total": 3246.0,
       "diff": 0.0,
       "consistent": true,
-      "assembly": 403.71,
+      "assembly": 436.55,
       "assembly_negative": false,
       "unknown_count": 2,
       "complete": false,
@@ -741,17 +789,6 @@
           "overridden": false
         },
         {
-          "source_key": "material:NOF",
-          "section": "materials",
-          "label": "K001 DTDL 18 mm",
-          "amount": 180.84,
-          "mnozstvo": 1,
-          "mj": "set",
-          "state": "samostatne",
-          "suggested": true,
-          "overridden": false
-        },
-        {
           "source_key": "material:W18",
           "section": "materials",
           "label": "W1000 DTDL 18 mm",
@@ -772,9 +809,20 @@
           "state": "samostatne",
           "suggested": true,
           "overridden": false
+        },
+        {
+          "source_key": "material:NOF",
+          "section": "materials",
+          "label": "K001 DTDL 18 mm",
+          "amount": 32.76,
+          "mnozstvo": 1,
+          "mj": "set",
+          "state": "zostava",
+          "suggested": false,
+          "overridden": false
         }
       ],
-      "separate_count": 5,
+      "separate_count": 4,
       "rezia_text": "Táto položka zahŕňa všetky nevyhnutné náklady súvisiace s realizáciou interiéru, vrátane prípravných prác, spotrebného a pomocného materiálu, logistiky, konzultácií, poradenstva, administratívnych prác a ostatných prevádzkových výdavkov potrebných na zabezpečenie kvalitnej a bezproblémovej realizácie projektu."
     }
   },
@@ -906,7 +954,7 @@
       [
         null,
         {
-          "v": "K001 DTDL 18 mm · 1,05 m² · formát 2800×2070 mm · formát platne nie je v katalógu — odhad podľa 2800×2070 · plán: orientačne 1 platňa pri formáte 2800 × 2070 — pre zaradené dielce, celkový počet neznámy",
+          "v": "K001 DTDL 18 mm · formát platne nie je v katalógu — počíta sa skutočná plocha dielcov (bez odpadu)",
           "s": 0,
           "n": false
         },
@@ -916,22 +964,22 @@
           "n": false
         },
         {
-          "v": "PLATŇA",
+          "v": "M2",
           "s": 0,
           "n": false
         },
         {
-          "v": 1.0,
+          "v": 1.05,
           "s": 3,
           "n": true
         },
         {
-          "v": 180.84,
+          "v": 31.2,
           "s": 3,
           "n": true
         },
         {
-          "v": 180.84,
+          "v": 32.76,
           "s": 3,
           "n": true
         }
@@ -1076,7 +1124,7 @@
           "n": false
         },
         {
-          "v": 1647.29,
+          "v": 1499.21,
           "s": 4,
           "n": true
         }
@@ -1575,12 +1623,12 @@
           "n": true
         },
         {
-          "v": 0.71,
+          "v": 0.79,
           "s": 3,
           "n": true
         },
         {
-          "v": 0.71,
+          "v": 0.79,
           "s": 3,
           "n": true
         }
@@ -1600,7 +1648,7 @@
           "n": false
         },
         {
-          "v": 3394.0,
+          "v": 3246.0,
           "s": 4,
           "n": true
         }
@@ -1679,7 +1727,7 @@
           "n": false
         },
         {
-          "v": 403.71,
+          "v": 436.55,
           "s": 3,
           "n": true
         },
@@ -1724,28 +1772,6 @@
         },
         {
           "v": 311.82,
-          "s": 3,
-          "n": true
-        },
-        {
-          "v": 1.0,
-          "s": 3,
-          "n": true
-        },
-        {
-          "v": "set",
-          "s": 0,
-          "n": false
-        }
-      ],
-      [
-        {
-          "v": "K001 DTDL 18 mm",
-          "s": 0,
-          "n": false
-        },
-        {
-          "v": 180.84,
           "s": 3,
           "n": true
         },
@@ -1921,7 +1947,7 @@
           "n": false
         },
         {
-          "v": 3394.0,
+          "v": 3246.0,
           "s": 4,
           "n": true
         }

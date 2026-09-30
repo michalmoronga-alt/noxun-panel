@@ -243,6 +243,10 @@
   // istého pushu (server) — pri zapnutých cenách podľa plánu aj so zdrojom.
   function npBudgetNote(mat){
     var n = (mat.budget_qty != null) ? mat.budget_qty : mat.est_budget;
+    // CENY-M2 (R7): materiál „podľa plochy" má v rozpočte m², nie platne.
+    if (mat.budget_src === 'area'){
+      return 'v rozpočte ' + npEsc(Number(n).toFixed(2).replace('.', ',')) + ' m² podľa plochy';
+    }
     if (mat.budget_src === 'plan') return 'v rozpočte ' + npEsc(n) + ' podľa plánu';
     if (mat.budget_src === 'estimate') return 'v rozpočte ' + npEsc(n) + ' z odhadu';
     return 'v rozpočte dnes ' + npEsc(n);

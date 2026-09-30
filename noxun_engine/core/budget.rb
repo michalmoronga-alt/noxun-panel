@@ -23,6 +23,13 @@
 #    zo znamych cien a totals.complete o tom hovori nahlas.
 # 4) CHYBAJUCI FORMAT PLATNE = odhad bezi na fallbacku 2800x2070, riadok nesie
 #    'estimated' + poznamku (audit 3) — cislo sa nikdy netvari isto.
+#    CENY-M2 (C12, R1a — Michal 30.9.2026, C14): material bez platneho
+#    formatu (sklo aj bezna doska) sa pocita podla SKUTOCNEJ plochy dielcov
+#    bez odpadu (`mj: M2`, `qty_basis: 'area'`); duplak s vazbou je v ploche
+#    svojho zdrojoveho materialu (odhad ho nevedie ako vlastnu platnu).
+#    Fallback 2800x2070 s 'estimated' ostava pre UNI, duplak bez vazby
+#    a chybajuci zaznam; podmienka typu zije v JEDINEJ funkcii
+#    `area_priced_type?`.
 # 5) ZAOKRUHLUJE SA KONECNA BRUTTO SUMA (firma je neplatca DPH, katalogove
 #    ceny su konecne) na `rounding_step` nahor; `total_novat` je LEN
 #    informativny prepocet /1,23 (audit 8).
@@ -116,8 +123,10 @@ module Noxun
         price_ref = now.is_a?(Time) ? now : Time.now.utc
         price_days = (num(SupplierSettings.scalar(sup, 'stale_days')) || 30).to_i
 
-        materials = materials_section(est, smap, sheet_layout, plan_prices: st['plan_prices'])
-        abs = abs_section(list(b, :edging), emap, SupplierSettings.scalar(sup, 'abs_reserve_pct'))
+        materials = materials_section(est, smap, sheet_layout, plan_prices: st['plan_prices'],
+                                                               stale_days: price_days, now: price_ref)
+        abs = abs_section(list(b, :edging), emap, SupplierSettings.scalar(sup, 'abs_reserve_pct'),
+                          stale_days: price_days, now: price_ref)
         hardware = hardware_section(hardware_expansion, hardware_catalog, stale_days: price_days, now: price_ref)
         services = services_section(est, materials, abs, smap, sup, st, mode)
         standard = standard_section(sup, st, mode)
@@ -211,11 +220,21 @@ module Noxun
       # cenovo sposobilom materiali, inak odhad; riadok nesie `qty_source`
       # ('plan' | 'estimate'), `estimate_qty` (odhad z m² — montaz z neho
       # pocita aj pri plane), `qty_tip` (tooltip znacky) a vetu o cene.
-      def materials_section(estimate, sheets, layout = nil, plan_prices: false)
+      #
+      # CENY-M2: `stale_days`/`now` = TA ISTA funkcia a cas ako `stale_scan`
+      # (vzor CENY-KOV-B) — riadok nesie stav rucnej ceny (`price_check`) a
+      # podklad ikony odkazu (`demos_link` / `product_link`, `catalog_links!`).
+      def materials_section(estimate, sheets, layout = nil, plan_prices: false, stale_days: 30, now: nil)
+        ref = now.is_a?(Time) ? now : Time.now.utc
         rows = Array(estimate).map do |g|
           next nil unless g.is_a?(Hash)
           mid = g['material_id'].to_s
           rec = sheets[mid].is_a?(Hash) ? sheets[mid] : {}
+          if area_priced?(g, rec)
+            row = area_row(g, rec, mid)
+            catalog_links!(row, 'sheet', mid, rec, stale_days, ref)
+            next row
+          end
           plates = plates_of(g)
           basis = plan_prices == true ? price_basis(layout, mid, sheets) : nil
           qty = basis && basis['eligible'] ? basis['sheets'] : plates
@@ -257,9 +276,83 @@ module Noxun
           cp = rec['cp_nazov'].to_s.strip
           row['cp_nazov'] = cp unless cp.empty?
           row['uni'] = true if g['uni'] == true
+          catalog_links!(row, 'sheet', mid, rec, stale_days, ref)
           row
         end.compact
         section('materials', rows)
+      end
+
+      # --- CENY-M2 (C12): material bez formatu podla SKUTOCNEJ plochy -------------
+
+      # R1: kto ide „podla plochy". Jedina pravda o platnom formate je
+      # `SheetEstimate.sheet_size_for` (priznak `fallback` odhadu — ten isty cita
+      # plan aj Kontrola). Zaznam v katalogu musi existovat, nie UNI, nie duplak
+      # (typ rozhoduje `area_priced_type?` — od R1a kazdy).
+      def area_priced?(group, rec)
+        group.is_a?(Hash) && group['fallback'] == true && rec.is_a?(Hash) && !rec.empty? &&
+          group['uni'] != true && !Materials.uni?(rec) && !Materials.duplak?(rec) &&
+          area_priced_type?(rec)
+      end
+
+      # R1a (Michal 30.9.2026, rozhodnutie C14 — Q2 „áno, aj bezna doska"):
+      # podla skutocnej plochy ide material bez platneho formatu KAZDEHO typu —
+      # sklo aj bezna doska (DTDL, MDF, HDF, PD, ZASTENA, KOMPAKT). UNI a duplak
+      # chrani `area_priced?` vyssie. Funkcia ostava JEDINYM miestom podmienky
+      # typu (keby sa rozhodnutie vratilo na obmedzeny R1: telo =
+      # `Materials.type_registry_entry(rec['type']).nil?` — normalizacia
+      # registra, nie hole `TYPE_REGISTRY.key?`, audit FIX-3).
+      def area_priced_type?(_rec)
+        true
+      end
+
+      AREA_NOTE = 'formát platne nie je v katalógu — počíta sa skutočná plocha dielcov (bez odpadu)'
+
+      # R2–R4: mnozstvo = NEZAOKRUHLENA plocha (`m2_exact`, vratane duplakov
+      # x nasobok) na 2 desatinne, min. 0,01 m² (drobny dielec sa nesmie
+      # ocenit nulou); cena za MJ = zobrazena €/m² (`Materials.display_m2` —
+      # ta ista funkcia ako bunka Studia), sucet = mnozstvo x cena za MJ na cent.
+      # Bez vety planu (NP-3) a bez NP-4 — cena nezavisi od platni (D6).
+      # `estimate_qty` nesie odhad platni VZDY: porez aj montaz z neho pocitaju
+      # dnesne cisla (D5).
+      def area_row(group, rec, mid)
+        qty = [(num(group['m2_exact']) || num(group['m2']) || 0.0).round(2), 0.01].max
+        price_m2 = num(rec['price_per_m2'])
+        notes = [AREA_NOTE]
+        if group['doubled_quantity'].to_i.positive?
+          notes << "vrátane #{group['doubled_quantity'].to_i} ks duplákov (#{fmt(group['doubled_m2'])} m²)"
+        end
+        row = base_row(
+          key: "material:#{mid}",
+          nazov: sheet_label(rec, mid),
+          kod: rec['code'], dodavatel: rec['supplier'],
+          mj: MJ_M2, mnozstvo: qty, cena_mj: (price_m2.nil? ? nil : Materials.display_m2(price_m2)),
+          poznamka: notes.join(' · '), zdroj: SRC_AUTO
+        )
+        row['qty_basis'] = 'area'
+        row['estimate_qty'] = plates_of(group)
+        row['material_id'] = mid
+        row['m2'] = num(group['m2'])
+        row['price_per_m2'] = price_m2
+        row['estimated'] = false
+        cp = rec['cp_nazov'].to_s.strip
+        row['cp_nazov'] = cp unless cp.empty?
+        row
+      end
+
+      # R11: podklad ikony odkazu a stavu rucnej ceny v riadku Materialu/ABS.
+      # Demos zaznam -> `demos_link`; rucny zaznam (bez Demosu, nie UNI, nie
+      # duplak) -> `product_link` (platny odkaz?) a `price_check` = TA ISTA
+      # polozka ako v `stale_scan` (aj `fresh` — riadok ukaze datum). Chybajuci
+      # zaznam, UNI a duplak nic.
+      def catalog_links!(row, kind, id, rec, stale_days, ref)
+        return row unless rec.is_a?(Hash) && !rec.empty?
+        if !rec['demos_url'].to_s.strip.empty?
+          row['demos_link'] = true
+        elsif Materials.manual_product_record?(rec)
+          row['product_link'] = !Materials.sanitize_product_url(rec['product_url']).nil?
+          row['price_check'] = freshness_item(kind, id.to_s, row['nazov'], rec, (num(stale_days) || 30).to_i, ref)
+        end
+        row
       end
 
       # JEDINA konverzia EUR/m2 -> EUR/platna v celom rozpocte.
@@ -322,7 +415,8 @@ module Noxun
 
       # --- sekcia ABS ----------------------------------------------------------
 
-      def abs_section(edging, edges, reserve_pct)
+      def abs_section(edging, edges, reserve_pct, stale_days: 30, now: nil)
+        ref = now.is_a?(Time) ? now : Time.now.utc
         pct = num(reserve_pct) || 0.0
         rows = Array(edging).map do |e|
           next nil unless e.is_a?(Hash)
@@ -341,6 +435,7 @@ module Noxun
           row['abs_id'] = abs_id
           row['bm'] = bm
           row['reserve_pct'] = pct
+          catalog_links!(row, 'edge', abs_id, rec, stale_days, ref) # CENY-M2 (R11)
           row
         end.compact
         section('abs', rows)
@@ -424,8 +519,12 @@ module Noxun
       # z planu); montaz VZDY z odhadu z m² (`estimate_qty` — zavisi od
       # dielcov, nie od odpadu). Pri vypnutom prepinaci su oba sucty zhodne
       # s dnesnym jednym suctom a poznamky sa nemenia (zlaty test).
+      #
+      # CENY-M2 (R5, D5 — Q1 „bez zmeny"): riadok „podla plochy" ma mnozstvo
+      # v m², nie v platniach — porez aj montaz preto beru jeho `estimate_qty`
+      # (odhad platni) a davaju PRESNE dnesne cisla.
       def services_section(estimate, materials, abs, sheets, sup, state, mode)
-        plates_total = materials['rows'].sum { |r| r['mnozstvo'].to_i }
+        plates_total = materials['rows'].sum { |r| (r['qty_basis'] == 'area' ? r['estimate_qty'] : r['mnozstvo']).to_i }
         montaz_plates = materials['rows'].sum { |r| (r.key?('estimate_qty') ? r['estimate_qty'] : r['mnozstvo']).to_i }
         plan_on = state['plan_prices'] == true
         bm_total = abs['rows'].sum { |r| num(r['mnozstvo']) || 0.0 }.round(2)
@@ -638,7 +737,13 @@ module Noxun
 
       # Scan LEN nad polozkami POUZITYMI v tomto rozpocte (audit 11).
       # Rucne potvrdene kovanie ma rovnaky vekovy prah ako Demos. Neoverene
-      # rucne kovanie ostava 'manual'; materialy/ABS si zachovavaju povodne stavy.
+      # rucne kovanie ostava 'manual'.
+      # CENY-M2 (R9/R10): rucne materialy a ABS maju stav z M1b
+      # (`Materials.manual_price_state`); UNI a duplak do scanu nepatria (nil).
+      # Pocty: `manual_hardware` = LEN kovanie (dnesny vyznam), `manual_materials`
+      # = dosky a ABS, `manual_pending` = JEDEN priechod cez vsetky nevyriesene
+      # rucne polozky (nie sucet dvoch poctov — poistka proti dvojnasobku, audit
+      # FIX-2). `attention` = stare ∪ nevyriesene rucne, bez dvojiteho zapoctu.
       def stale_scan(estimate, edging, hardware, sheets, edges, hardware_catalog, stale_days, now)
         days = (num(stale_days) || 30).to_i
         ref = now.is_a?(Time) ? now : Time.now.utc
@@ -671,7 +776,10 @@ module Noxun
         items.compact!
         counts = { 'stale' => 0, 'unverified' => 0, 'manual' => 0, 'fresh' => 0 }
         items.each { |i| counts[i['state']] = counts[i['state']].to_i + 1 }
-        counts['manual_hardware'] = items.count { |i| i['manual_check'] && i['state'] != 'fresh' }
+        pending = ->(i) { i['manual_check'] && i['state'] != 'fresh' }
+        counts['manual_hardware'] = items.count { |i| i['kind'] == 'hardware' && pending.call(i) }
+        counts['manual_materials'] = items.count { |i| MANUAL_MATERIAL_KINDS.include?(i['kind']) && pending.call(i) }
+        counts['manual_pending'] = items.count { |i| pending.call(i) }
         counts['attention'] = items.count { |i| i['state'] == 'stale' || (i['manual_check'] && i['state'] != 'fresh') }
         { 'stale_days' => days,
           'items' => items.reject { |i| i['state'] == 'fresh' }
@@ -679,9 +787,17 @@ module Noxun
           'counts' => counts }
       end
 
+      MANUAL_MATERIAL_KINDS = %w[sheet edge].freeze
+
+      # CENY-M2 (R9): dosky a ABS — UNI a duplak -> nil (rucne sa neoveruju,
+      # O2); Demos vazba -> dnesna vetva bajtovo; inak rucna cena z M1b.
       def freshness_item(kind, id, label, rec, stale_days, ref)
         url = rec['demos_url'].to_s.strip
         return manual_hardware_freshness(id, label, rec, stale_days, ref) if kind == 'hardware' && url.empty?
+        if MANUAL_MATERIAL_KINDS.include?(kind)
+          return nil if Materials.uni?(rec) || Materials.duplak?(rec)
+          return manual_material_freshness(kind, id, label, rec, stale_days, ref) if url.empty?
+        end
         checked = rec['price_checked_at'].to_s.strip
         state, age = if url.empty?
                        ['manual', nil]
@@ -722,6 +838,27 @@ module Noxun
           'checked_at' => (valid ? checked : nil), 'age_days' => age,
           'price_check_method' => (valid ? 'manual' : nil),
           'demos_url' => nil, 'product_link' => linked }
+      end
+
+      # CENY-M2 (R9): rucna doska/ABS. Stav NEPOCITA Rozpocet — jedina autorita
+      # je `Materials.manual_price_state` (M1b R10). Slovnik kovania: `never` =
+      # `manual` + `manual_check` („treba rucne overit"). Odkaz sa NEVYZADUJE
+      # (O9 — sklenar bez e-shopu; odchylka od kovania). Polozka bez ceny je
+      # `manual` a `price_missing` (O2 — na kontrolu, nikdy nula).
+      def manual_material_freshness(kind, id, label, rec, stale_days, ref)
+        # M1b rozlisuje ABS podla `abs_id` — mapa z katalogu ho ma vzdy, ciste
+        # volania (testy) nie; druh urcuje volajuci.
+        src = kind == 'edge' && !rec.key?('abs_id') ? rec.merge('abs_id' => id) : rec
+        st = Materials.manual_price_state(src, stale_days: stale_days, now: ref) ||
+             { 'state' => 'never', 'checked_at' => nil, 'age_days' => nil }
+        price = rec[kind == 'edge' ? 'price_per_bm' : 'price_per_m2']
+        valid = st['state'] == 'fresh' || st['state'] == 'stale'
+        { 'kind' => kind, 'id' => id, 'label' => label, 'manual_check' => true,
+          'state' => (valid ? st['state'] : 'manual'),
+          'checked_at' => (valid ? st['checked_at'] : nil), 'age_days' => (valid ? st['age_days'] : nil),
+          'price_check_method' => (valid ? 'manual' : nil), 'demos_url' => nil,
+          'product_link' => !Materials.sanitize_product_url(rec['product_url']).nil?,
+          'price_missing' => !(price.is_a?(Numeric) && price.real? && price.finite? && price >= 0) }
       end
 
       def parse_time(value)

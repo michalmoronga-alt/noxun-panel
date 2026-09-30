@@ -2569,7 +2569,9 @@ module Noxun
           'est_budget' => est ? Budget.plates_of(est) : nil,
           # NP-4: s cim naozaj pocita rozpocet (mnozstvo jeho riadku a zdroj).
           'budget_qty' => brow ? brow['mnozstvo'] : (est ? Budget.plates_of(est) : nil),
-          'budget_src' => brow ? brow['qty_source'] : nil,
+          # CENY-M2 (R7): riadok „podla plochy" ma mnozstvo v m² — karta to
+          # musi povedat (`area`), inak by m² ukazala ako pocet platni.
+          'budget_src' => brow ? (brow['qty_basis'] == 'area' ? 'area' : brow['qty_source']) : nil,
           'rows' => rows,
           'plates' => Array(mat['layouts']).map do |s|
             { 'u' => s['utilization'],

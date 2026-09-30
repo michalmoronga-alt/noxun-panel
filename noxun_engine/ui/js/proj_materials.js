@@ -2001,7 +2001,10 @@
     if (!nx || nx.isOpen()) return;
     if (MD_RO){ MD.setStatus('Katalóg je len na čítanie — úpravy sú vypnuté.', true); return; }
     var ctx = mdManualCtx();
-    if (!ctx.model_guid || ctx.section !== 'mat') return;
+    // CENY-M2 (R18): formular sa pyta aj z Rozpoctu (vzor `hwManualRequest`)
+    // a OSTAVA v nom — sekcia sa neprepina; kontext (sekcia + dokument) ho
+    // viaze rovnako ako v Materialoch (R23).
+    if (!ctx.model_guid || (ctx.section !== 'mat' && ctx.section !== 'budget')) return;
     var token = 'mat-manual-' + (++MD_MANUAL_SEQ);
     MD_MANUAL_PENDING = { kind: kind, id: String(id), token: token, section: ctx.section,
       model_guid: ctx.model_guid, trigger: trigger || null, modalGeneration: nx.generation() };
@@ -2145,6 +2148,47 @@
       return;
     }
     nx.showErrors(r.errors && r.errors.length ? r.errors : [{ msg: r.msg || 'Cenu sa nepodarilo potvrdiť.' }]);
+  }
+
+  // ============ CENY-M2: akcie dosky/ABS z Rozpočtu (R15, R18) ============
+  // Rozpočet ich len vykreslí (`budMatLinkHtml`, `budMatCheckHtml` v
+  // budget.js) — obsluha patrí vlastníkovi akcií materiálov. URL od klienta
+  // nikdy nechodí (server ju číta z čerstvého záznamu, M1a R7).
+
+  // Chýbajúci odkaz: prepne do Materiálov, otvorí detail dekoru a úpravu
+  // variantu s kurzorom v poli „Odkaz na produkt" (vzor `hwProductReady`).
+  // Nič nezapisuje.
+  function mdProductFromBudget(kind, id){
+    if (MD_RO){ MD.setStatus('Katalóg je len na čítanie — úpravy sú vypnuté.', true); return false; }
+    var list = kind === 'edge' ? MD_CATALOG.edges : MD_CATALOG.sheets;
+    var key = kind === 'edge' ? 'abs_id' : 'material_id';
+    var hit = (list || []).some(function(x){ return x && x[key] === id; });
+    if (!hit){ MD.setStatus('Položka sa v katalógu nenašla — obnov okno.', true); return false; }
+    matOpenAnchor(id);
+    if (typeof studioGoSection === 'function') studioGoSection('mat');
+    if (kind === 'edge') mdOpenEdgeForm(id, { focus: 'product_url' });
+    else mdOpenSheetForm(id, { focus: 'product_url' });
+    return true;
+  }
+
+  // Delegovaný klik `mat-*` (ikona odkazu a „Overiť cenu" v Rozpočte).
+  function mdBudgetAction(t){
+    var action = t.getAttribute('data-action');
+    var kind = t.getAttribute('data-kind');
+    var id = t.getAttribute('data-id') || '';
+    if ((kind !== 'sheet' && kind !== 'edge') || !id) return;
+    if (action === 'mat-manual-check'){ mdManualRequest(kind, id, t); return; }
+    if (action !== 'mat-link') return;
+    var src = t.getAttribute('data-src');
+    if (src === 'demos') mdDemosOpen(kind, id);
+    else if (src === 'product') mdManualSend('mat_product_open', { kind: kind, id: id });
+    else if (src === 'missing') mdProductFromBudget(kind, id);
+  }
+  if (typeof document !== 'undefined' && document.addEventListener){
+    document.addEventListener('click', function(ev){
+      var t = ev.target && ev.target.closest ? ev.target.closest('[data-action]') : null;
+      if (t && /^mat-/.test(t.getAttribute('data-action') || '')) mdBudgetAction(t);
+    });
   }
 
   function mdOpenEdgeForm(id, opts){
@@ -4017,6 +4061,8 @@
       mdManualSub: mdManualSub, mdManualInfo: mdManualInfo,
       mdManualRequest: mdManualRequest, mdManualClose: mdManualClose,
       mdManualContextChanged: mdManualContextChanged,
+      // CENY-M2 (tests/js/test_ceny_m2_budget.js): akcie materialov z Rozpoctu.
+      mdProductFromBudget: mdProductFromBudget, mdBudgetAction: mdBudgetAction,
       manualState: function(){ return MD_MANUAL ? { kind: MD_MANUAL.kind, id: MD_MANUAL.id, st: MD_MANUAL.st,
         browserPending: MD_MANUAL.browserPending, warn: MD_MANUAL.warn, rowRev: MD_MANUAL.rowRev } : null; },
       setModelGuidForTest: function(g){ MD_MODEL_GUID = g; },

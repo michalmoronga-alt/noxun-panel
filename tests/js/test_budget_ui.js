@@ -366,9 +366,12 @@ function payload(over){
   ok(bound.indexOf('data-kind="sheet"') > -1 && bound.indexOf('data-id="S1"') > -1,
      'akcia nesie identitu polozky');
   ok(bound.indexOf('#i-refresh-cw') > -1, 'sprite ikona (ziadne emoji)');
-  const manual = B.budStaleActionHtml({ kind: 'sheet', id: 'S9', label: 'Ručná', state: 'manual' });
+  // CENY-M2 (R21): rucna doska ma namiesto vety odkaz a „Overiť cenu".
+  const manual = B.budStaleActionHtml({ kind: 'sheet', id: 'S9', label: 'Ručná', state: 'manual',
+                                        manual_check: true, product_link: false });
   eq(manual.indexOf('data-bud'), -1, 'polozka bez vazby sa NEDA stiahnut');
-  ok(manual.indexOf('over v katalógu ručne') > -1, 'namiesto akcie odporucanie');
+  ok(manual.indexOf('data-action="mat-manual-check"') > -1, 'namiesto akcie „Overiť cenu"');
+  eq(manual.indexOf('over v katalógu ručne'), -1, 'veta „over v katalógu ručne" zanikla');
 })();
 
 // --- ŠT-1c PR B1: rozrezany render (LISTA sekcie vs TELO) --------------------

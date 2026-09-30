@@ -803,12 +803,20 @@ NxTest.test('CENY-M1b (R24): Rozpocet s rucne overenymi materialmi = tie iste ri
   b = g.roundtrip(snap.call(sheets2))
   NxTest.assert_equal(a['xlsx'], b['xlsx'], 'XLSX rozpoctu')
   NxTest.assert_equal(a['cp'], b['cp'], 'XLSX ponuky')
+  # CENY-M2: Rozpocet od M2 ZAMERNE ukazuje stav rucnej ceny (blok `stale`
+  # a aditivne kluce riadkov `price_check`/`product_link`/`demos_link` —
+  # overuje ich `test_ceny_m2_stale.rb`). Cisla, riadky a oba XLSX ostavaju.
   strip = lambda do |p|
-    Array(p.dig('stale', 'items')).each { |i| i.delete('checked_at') }
+    p.delete('stale')
+    Array(p['sections']).each do |s|
+      Array(s['rows']).each { |r| %w[price_check product_link demos_link].each { |k| r.delete(k) } }
+    end
     p
   end
+  h18 = b['payload']['sections'][0]['rows'].find { |r| r['material_id'] == 'H18' }
+  NxTest.assert_equal('fresh', h18['price_check']['state'], 'M2: riadok ukaze rucne overenie')
   NxTest.assert_equal(strip.call(a['payload']), strip.call(b['payload']),
-                      'payload rovnaky (jediny dovoleny rozdiel stale.items[].checked_at)')
+                      'payload rovnaky (dovoleny rozdiel: stav rucnej ceny z CENY-M2)')
 end
 
 # --- starsi plugin ---------------------------------------------------------------------

@@ -3206,7 +3206,27 @@ zákazku, **„Po Späť klikni na Obnoviť"**) — tlačidlo tooltipu má vlast
 Späť), ovládač je v `BUD_STD_OFF`. **Značka zdroja množstva** `budQtyTagHtml` — `.qtag.plan` „podľa plánu" (tlmená) / `.qtag.est` „z odhadu" (jantárová, tokeny
 `--nx-warn*`) pred číslom v bunke Množstvo — sa kreslí **len pri riadku s `qty_source`**, teda len pri zapnutom prepínači; tooltip (`title`) je serverový `qty_tip`.
 **Späť (audit F5):** životný cyklus Štúdia sa nemení — Undo okno len označí ako neaktuálne (jantárové „Obnoviť"), checkbox a ceny sa vrátia až po „Obnoviť";
-in-SU `st1c_plan_prices` overuje stav modelu aj marker po Späť.
+in-SU `st1c_plan_prices` overuje stav modelu aj marker po Späť. Od CENY-M2 `BUD_PLAN_TIP` dopĺňa vetu „Materiál bez formátu platne (sklo aj doska) sa počíta
+podľa skutočnej plochy dielcov bez odpadu (duplák v ploche svojej zdrojovej dosky) — plán ho nemení. UNI a duplák bez väzby ostávajú na odhade
+platní." (rozsah `Budget.area_priced?` po rozhodnutí C14).
+
+#### RUČNÉ CENY DOSIEK A ABS · MATERIÁL PODĽA PLOCHY (CENY-M2, v0.16.3, mockup D)
+
+Všetko je **projekcia payloadu** — stav ručnej ceny, počty aj riadok v m² skladá server (`Budget`, [outputs.md](outputs.md)); klient nič nepočíta.
+**Ikona odkazu pred názvom** materiálu aj pásky (`budMatLinkHtml(r, kind)`, kresba `.hw-product-link` + `.bmatlink`, riadok nepribúda): `demos_link` → sivá
+`data-src="demos"`, `product_link === true` → sivá `data-src="product"`, `product_link === false` → jantárová `is-missing` `data-src="missing"`; UNI, duplák
+a chýbajúci záznam ikonu nemajú. **Stĺpec „Overená"** pri riadku s `price_check` = tlačidlo `.bver` (`budMatCheckHtml`): „ručne 18.9." (sivé) · „ručne
+45 dní" (jantár `is-pending`) · „neoverená" (jantár); tooltip `budMatTip` je **kópia** textov `mdManualTip` (O5) a zhodu stráži parity test v
+`tests/js/test_ceny_m2_budget.js`. Demos a UNI riadky majú dnešnú bunku `budFreshCell`. **Riadok podľa plochy** (`qty_basis: 'area'`): množstvo na
+2 desatinné, MJ zobrazená „m²" (dáta `M2`), „€ / MJ" bez zátvorky „(…/m²)". **Čip a hlavné tlačidlo** sa rozhodujú podľa `counts.manual_pending`
+(`budManualPending`): „N cien na kontrolu" a pri samých ručných cenách „Skontrolovať ceny", ktoré otvorí zoznam (`budPrStart`). **Zoznam** (`budStaleActionHtml`):
+doska/ABS s `manual_check` → ikona + „Overiť cenu" (`data-action="mat-manual-check"`), Demos položka → ikona + dnešné obnovenie; veta „bez Demos väzby — over
+v katalógu ručne" zanikla. **Obsluha klikov `mat-*` patrí `proj_materials.js`** (vlastník akcií materiálov; delegovaný listener, vzor `hw-*` v `hw_catalog.js`):
+`demos` → `open_demos_url`, `product` → `mat_product_open` (URL od klienta nikdy), `missing` → `mdProductFromBudget` (read-only a chýbajúci záznam = status;
+inak `matOpenAnchor` → `studioGoSection('mat')` → formulár variantu s kurzorom v poli odkazu — nič nezapisuje); „Overiť cenu" → `mdManualRequest` so
+**`section: 'budget'`** — formulár M1b ostáva v Rozpočte a jeho životný cyklus (odchod zo sekcie, iný dokument, cudzí token) je ten istý ako v Materiáloch.
+Po potvrdení server obnoví Štúdio (`after_catalog_change`), riadok zosivie a čip klesne. Tlačidlá `mat-*` **nie sú v `BUD_STD_OFF`** — zapisujú katalóg,
+nie zákazku (ako „Prepočítať ceny").
 
 #### GENERAČNÝ KONTRAKT (audit #1) — najdôležitejšia vec dávky
 
@@ -3300,7 +3320,8 @@ V lište sekcie je **„Cenová ponuka (zákazník)"** (presun z lišty Rozpočt
 
 odkedy je export zákazníckeho dokumentu jedine v tejto sekcii, kreslí sa v nej celý `budWarnChips(b)` — staré ceny, spotrebiče aj rozpočtové upozornenia. Sú to **tie isté čísla**
 ako v Rozpočte (jedno miesto, jeden výpočet); mení sa **len cieľ kliku**, lebo v ponuke sa needituje nič: staré ceny → Rozpočet (tam je „Prepočítať ceny"), spotrebiče → Rozpočet
-rovno na ich sekciu (`data-section` + `budGoto`), upozornenia → Kontrola. Bez toho by sa dala ponuka poslať zákazníkovi z neaktuálnych cien bez jediného slova. Zoznam **„Zlúčené v
+rovno na ich sekciu (`data-section` + `budGoto`), upozornenia → Kontrola. Od CENY-M2 tooltip čipu pri ručných cenách na kontrolu (`manual_pending`) povie aj
+„ručné cez „Overiť cenu"". Bez toho by sa dala ponuka poslať zákazníkovi z neaktuálnych cien bez jediného slova. Zoznam **„Zlúčené v
 zostave"** je v `BUD_OPEN` pod kľúčom `cp_merged` (review #8) — štandardne zbalený, ale po otvorení prežije prekreslenie, inak by sa po každom prepnutí „samostatne" sám zabalil a
 fokus (`data-bkey="sep:…"`) by spadol na `<body>` práve tam, kde sa kliká najviac.
 
@@ -3328,7 +3349,8 @@ kreslí súhrn, karty (predvolene otvorená prvá a každá s problémom — ne�
 v `localStorage` `nx_np_closed` s try/catch), malé platne a detail platne v tom istom okne (stav okna `npDetail`, pri novom pushi sa overí — zmiznutý materiál vráti prehľad,
 menej platní skráti index). Jediné, čo si odvodzuje, je **upozornenie na poslednú platňu (O2)**: aspoň 2 platne a posledná pod 20 % alebo najviac 2 dielce.
 **Od NP-4 (predrecenzia P2)** hovorí karta „v rozpočte N" číslom **hotového rozpočtu** toho istého pushu (`budget_qty` + `budget_src`, `npBudgetNote`: „v rozpočte 5 podľa
-plánu" / „… z odhadu"; bez zdroja — vypnutý prepínač — „v rozpočte dnes N"), takže karta a Rozpočet nikdy neukážu dve rôzne čísla.
+plánu" / „… z odhadu"; bez zdroja — vypnutý prepínač — „v rozpočte dnes N"), takže karta a Rozpočet nikdy neukážu dve rôzne čísla. **Od CENY-M2** zdroj
+`area` (materiál bez formátu okrem UNI a dupláku bez väzby, Rozpočet ho počíta v m²) = „v rozpočte 0,90 m² podľa plochy" — m² sa nikdy netvária ako počet platní.
 **SVG platne je téma-bezpečné:** farby sú výhradne CSS triedy `.np-*` s tokenmi `--nx-*` v `studio.html` (šrafy sú `<pattern>` s triedou v skrytom `<svg>` okna); jediná
 dátová farba je vzorka dekoru (`rgbHex`) v HTML štvorčeku mimo SVG (guard F12).
 
@@ -3471,7 +3493,9 @@ potvrdenie čaká na odpoveď o pokuse (`browserPending`, chyba „Počkaj na ot
 sa prehliadač neotvára. Odpovede s cudzím tokenom, sekciou alebo dokumentom sa zahodia; `conflict` otvorí nový formulár s čerstvými
 údajmi (pôvodná cena sa sama neposiela), `ok` zatvorí a povie status servera. Životný cyklus: `matCloseModals` → `mdManualClose`
 (zatvorí formulár aj čakajúci prepare/open), `studio.js` volá `mdManualContextChanged` na tých istých miestach ako `hwProductContextChanged`;
-katalógové echo formulár nezatvára. `MD_CLIENT_SCHEMA = 12`.
+katalógové echo formulár nezatvára. `MD_CLIENT_SCHEMA = 12`. **Od CENY-M2** sa formulár pýta aj zo sekcie **`budget`** (`mdManualRequest` pustí `mat`
+aj `budget`, vzor `hwManualRequest`; server sekciu len ozvenou vracia) a ostáva v nej; klik z Rozpočtu (`mat-link`, `mat-manual-check`) obsluhuje
+delegovaný listener `mdBudgetAction` a chýbajúci odkaz `mdProductFromBudget` (sekcia Rozpočet vyššie).
 
 **`materials_dialog.rb` — od ŠT-2b už NIE JE OKNO** (ostal serverový modul; obsah je sekcia `mat` Štúdia, popis je tu kvôli histórii): katalóg = mriežka dlaždíc podľa výrobcu + pás
 „Použité v projekte" — jediné echo je `push_catalog` BEZ scanu modelu; hľadanie názov/výrobca/kód/dodávateľ; klik na dlaždicu → detail dekoru s editovateľnými bunkami

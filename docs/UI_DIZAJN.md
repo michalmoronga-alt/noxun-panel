@@ -365,6 +365,14 @@ modeli). Vzory:
 - **Značka zdroja čísla** (`.qtag`, NP-4) — malý badge (9 px rádius) pred číslom v bunke:
   `.plan` tlmená (sunken + ink-muted), `.est` jantárová (`--nx-warn-bg-soft`/`--nx-warnchip-*`);
   kreslí sa len keď ju server pošle (zapnutý prepínač).
+- **Ikona odkazu pred názvom** (CENY-M2, mockup D4) — materiál a páska majú pred názvom tú istú
+  kresbu ako kovanie (`.hw-product-link`, v tabuľke `.bmatlink` 20 px): sivá = otvorí Demos alebo
+  obchod, jantárová `is-missing` = odkaz chýba (klik vedie na doplnenie). Riadok nepribúda.
+- **Stav = tlačidlo** (`.bver`, CENY-M2, O1/O5) — v stĺpci „Overená" pri položke bez Demosu je stav
+  ručnej ceny zároveň akciou „Overiť cenu": malé textové tlačidlo s ikonou `#i-clipboard-check`,
+  sivé pri čerstvom overení, jantárové `is-pending` (`--nx-warn-bg` + `--nx-warnchip-border`) pri
+  „na kontrolu"; v jantárovom riadku bez ceny má pozadie `--nx-surface`. Text krátky („ručne 18.9.",
+  „ručne 45 dní", „neoverená"), plné znenie v `title`, `aria-label` nesie akciu, názov aj stav.
 
 ### D-47 / D-91: hlavička panela — UZAVRETÉ dávkou UI-B1
 Dvojradová hlavička s tromi režimovými tabmi a satelitnými akciami

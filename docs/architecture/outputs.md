@@ -554,6 +554,8 @@ podľa plánu): A, B, C a 2 ďalšie" — `more_word`: 1 ďalší · 2–4 ďal�
 push by status inak prekryl). Pri vypnutom prepínači sa status ani počet pushov nemení. **Jedna pravda s kartou plánu (predrecenzia P2):**
 `sheet_layout_payload(plan, bom, smap, estimate, budget)` dostane z pushu **hotový rozpočet** a každá karta nesie `budget_qty` + `budget_src` z jeho riadku
 Materiálu („v rozpočte 5 podľa plánu" / „… z odhadu"); `est_budget` ostáva odhadom z m² (súčet v súhrne). Bez rozpočtu (legacy volanie) = odhad.
+**CENY-M2:** riadok Rozpočtu s `qty_basis: 'area'` (materiál bez formátu okrem UNI a dupláku bez väzby) dá karte `budget_src: 'area'` a `budget_qty` v m²
+(„v rozpočte 0,90 m² podľa plochy") — inak by m² karta ukázala ako počet platní.
 
 **`replace_uni`** (skratka „Nahradiť UNI…" → `MaterialsDialog.request_replace_uni`) a **zdieľané telá prepínačov** `edge_check_guard` (dostupnosť Overlay API + `identity_guard`) ·
 `identity_guard` (generácia okna + dokument — zdieľa ho aj kresba, ktorá si dostupnosť overuje **vlastnú** a hlási ju vetou o kresbe, nie o hranách) · `do_edge_check` ·
@@ -761,7 +763,12 @@ Inspector (`Panel.appliance_check_record`) ho skladá z toho istého refu, takž
 
 ### sheet_estimate.rb
 
-_(kontrakt `estimate` zatiaľ nezdokumentovaný — doplniť pri najbližšom zásahu do výpočtu)_
+**Kontrakt `estimate(rows, sheet_sizes:, k_min:, k_max:, uni_ids:)`** (doplnený CENY-M2): vstupom sú jednotlivé riadky kusovníka, výstupom pole per
+**nákupný** materiál zoradené podľa `material_id` — `m2` (plocha dielcov vrátane duplákov × násobok, **bez prerezu**, zaokrúhlená na 3 desatinné —
+prezentačná hodnota), **`m2_exact`** (tá istá suma **nezaokrúhlená**, od CENY-M2 — Rozpočet z nej počíta riadok „podľa plochy" bez dvojitého zaokrúhlenia
+0,9345 → 0,935 → 0,94), `quantity` (kusy vlastných dielcov), `sheet_size` + `sheet_m2` + `fallback` (z `sheet_size_for`), `count_min`/`count_max` (plocha ×
+koeficient prerezu 1,10/1,25 ÷ plocha platne, nahor na desatinu), pri duplákoch `doubled_m2`/`doubled_quantity`, pri UNI `uni: true`. Duplák sa nikdy
+neobjaví ako vlastná platňa — jeho plocha × násobok sa pripočíta zdroju.
 
 Odhad počtu platní (2B-1/D-43) — zmienky v odseku `production_core.rb` a v sekcii Kusovník v [ui-lifecycle.md](ui-lifecycle.md).
 **Od NP-1 nie je „fáza 2" jeho vnútro:** nárezový plán je samostatný modul `sheet_layout.rb` (nižšie); odhad z m² ostáva ako porovnanie
@@ -885,6 +892,21 @@ krížový audit C10) majú dva súčty:** porez = Σ `mnozstvo` Materiálu (ide
 poznámky „platne z Materiálu (N podľa plánu, M z odhadu)" a „… · z odhadu". `Budget.check` nový nález nemá (O11 — nespôsobilý materiál nie je chyba, export
 sa nezastaví). Cenová ponuka číta hotový payload: mení sa len **suma** materiálu (môže preklopiť návrh cez prah 150 €), počty ani vety plánu do nej nejdú.
 
+**Materiál bez formátu podľa skutočnej plochy (CENY-M2, v0.16.3, C12 + C14).** `area_priced?(g, rec)` = fallback formátu odhadu (`SheetEstimate.sheet_size_for`
+— jediná pravda o platnom formáte; akákoľvek kladná dvojica, aj ručne zapísaných 300 × 200, je formát a počíta sa po platniach) ∧ záznam v katalógu
+existuje ∧ nie UNI ∧ nie duplák ∧ **`area_priced_type?(rec)`** — od rozhodnutia Michala **C14 (30.9.2026, vetva R1a) vracia `true` pre každý typ**, sklo
+aj bežnú dosku (DTDL, MDF, HDF, PD, ZASTENA, KOMPAKT). Funkcia ostáva **jediným miestom** podmienky typu (návrat k obmedzenému R1 by bolo telo
+`Materials.type_registry_entry(rec['type']).nil?` — normalizácia registra, nie holé `TYPE_REGISTRY.key?`). Taký riadok (`area_row`) má `mj: 'M2'`,
+`mnozstvo` = `m2_exact` na 2 desatinné (min 0,01), `cena_mj` = `Materials.display_m2(€/m²)` (tá istá €/m² ako bunka Štúdia), `spolu` = množstvo × cena
+na cent (`base_row`), `qty_basis: 'area'`, **`estimate_qty` vždy** (odhad platní), `estimated: false`, `m2`, surová `price_per_m2`, `material_id`,
+`cp_nazov` a kľúč `material:<mid>` bez zmeny (nesie `cp_overrides`). Poznámka „formát platne nie je v katalógu — počíta sa skutočná plocha dielcov (bez
+odpadu)" (+ veta duplákov) — **bez** vety plánu NP-3 a bez NP-4 (`price_basis` sa pre riadok nevolá, `plan_export_note` ho nevymenuje). **Služby sa
+nemenia (D5, Q1):** porez = Σ (`estimate_qty` pri area riadku, inak `mnozstvo`), montáž už číta `estimate_qty`. Odhad platní 2800 × 2070 s `estimated`
+ostáva len pre UNI, duplák bez väzby (vlastná skupina odhadu) a chýbajúci záznam; duplák s väzbou je v ploche zdrojového materiálu. XLSX číta riadok 1:1 (poznámka „(bez odpadu)" v názve), cenová ponuka mení len sumu (môže klesnúť pod prah 150 €
+a zo samostatných riadkov vypadnúť, ručné zaradenie platí). `BUDGET_STD` sa nemení (žiadny nový kľúč zákazky) — starší plugin tú istú zákazku ocení po starom
+(STANDARD §11.3). Zlaté testy: `tests/pure/test_np4_golden.rb` (fixtúry **pregenerované** po C14 — NOF 180,84 → 32,76 €, SPOLU 3394 → 3246 €) a
+`tests/pure/test_ceny_m2_golden.rb` (odtlačok zákazky so sklom a doskou bez formátu spred M2, zmena len na vymenovaných cestách).
+
 **Kompatibilita dát cestuje v payloade (1d/R-14).** `normalize_state` prijíma aj kľúč `std` (stav markera `budget_std` zo `BudgetStore.std_state`) a `compute` z neho skladá `payload['budget_std'] = { state, blocked, reason }`.
 Je to **jediná cesta**, ktorou sa o nekompatibilných dátach dozvie ktokoľvek ďalej: banner sekcie Rozpočet aj Cenová ponuka (`ui/js/budget.js`) a brána oboch cenových exportov (`ProductionCore.budget_std_block`) čítajú TENTO kľúč — nikto sa nepýta modelu druhýkrát a nikto si stav neodvodzuje sám.
 Stav bez kľúča (legacy volanie výpočtu, čisté testy) je `current`, teda **nikdy neblokuje** — výpočet kompatibilitu neposudzuje, len ju NESIE. Znenie hlášky skladá `BudgetStore.std_block_reason` (jeden textový zdroj pre mutácie, exporty aj UI).
@@ -907,10 +929,18 @@ Sekcia sa volá **„Spotrebiče a vybavenie"**. Kategóriu riadku normalizuje `
 z legacy zdroja). `payload_for` navyše prikladá **`appliance_owners`** (`matrix` + `options` per druh + `job_label`) zo `ApplianceBinding.owner_options_map`:
 ponuka vlastníkov je **modelová**, preto necestuje cez `compute`, ale s payloadom dokumentu — prepnutie zákazky ju vymení samo.
 
-**Ručná čerstvosť kovania (CENY-KOV-B, v0.10.5).** `freshness_item` pre neviazané kovanie používa ručný serverový marker, uložený odkaz, reálnu cenu/MJ a platný ISO dátum, ktorý nie je v budúcnosti.
-Bez platného potvrdenia zostáva stav `manual`; platné potvrdenie je `fresh` alebo `stale` podľa rovnakého `stale_days` ako Demos (vek ≥ prah). Materiály/ABS a viazané Demos položky používajú pôvodnú vetvu.
-Riadok kovania nesie `price_check` aj pre čerstvé ručné ceny, aby UI vedelo ukázať pôvod/dátum a opätovné overenie. Rovnaká funkcia a časová referencia tvoria scan aj riadok; `stale.items` naďalej vynecháva čerstvé ceny.
-`counts.manual_hardware` počíta nevyriešené ručné kovanie; `counts.attention` ho spája so starými cenami bez dvojitého započítania. Kontrolujú sa iba použité katalógové položky, voľné riadky sú mimo scanu.
+**Ručná čerstvosť cien — kovanie (CENY-KOV-B, v0.10.5) a dosky/ABS (CENY-M2, v0.16.3).** `freshness_item` má tri vetvy. **Neviazané kovanie**
+(`manual_hardware_freshness`) používa ručný serverový marker, uložený odkaz, reálnu cenu/MJ a platný ISO dátum, ktorý nie je v budúcnosti. **Doska a ABS**
+(`kind` `sheet`/`edge`): UNI a duplák → **`nil`** (ručne sa neoverujú, do scanu ani zoznamu nepatria — O2); s Demos väzbou dnešná vetva bajtovo
+(`unverified`/`stale`/`fresh`); inak `manual_material_freshness` nad **`Materials.manual_price_state`** (jediná autorita CENY-M1b — Rozpočet stav nepočíta
+sám): `never` → `manual`, `fresh`/`stale` podľa rovnakého `stale_days`; položka nesie `manual_check`, `price_check_method`, `product_link` a `price_missing`
+(bez ceny = na kontrolu, nikdy nula); **odkaz sa nevyžaduje** (O9 — odchýlka od kovania). Bez platného potvrdenia zostáva `manual`. Riadky kovania,
+Materiálu aj ABS nesú `price_check` aj pre čerstvé ručné ceny (UI ukáže dátum a opätovné overenie) — `materials_section`/`abs_section` dostávajú
+`stale_days`/`now` od `compute`, takže **tá istá funkcia a časová referencia tvoria scan aj riadok**; Demos záznam materiálu/ABS nesie `demos_link`,
+ručný `product_link` (`catalog_links!`); UNI, duplák a chýbajúci záznam nič. `stale.items` naďalej vynecháva čerstvé ceny. **Počty (audit FIX-2):**
+`manual_hardware` = **len** `kind == 'hardware'` (dnešný význam), `manual_materials` = dosky a ABS, `manual_pending` = **jeden priechod** cez všetky
+nevyriešené ručné položky (nie súčet dvoch počtov — poistka proti dvojnásobku); `attention` spája staré ceny s nevyriešenými ručnými bez dvojitého
+započítania. Kontrolujú sa iba použité katalógové položky, voľné riadky kovania sú mimo scanu.
 
 ### budget_store.rb
 
@@ -961,6 +991,9 @@ Testy: `tests/pure/test_r14_budget_std.rb` (marker, guardy, kanály chýb) · `t
 Sekvenčný beh prepočtu cien voči Demosu, iba pre položky použité v rozpočte. `targets_from_budget` vyžaduje `demos_url`; všeobecné `product_url` sa nikdy nefetchuje ani vtedy, keď má Demos host.
 Každá cena ide existujúcou serverovou proposal cestou, jednotlivé položky sa zapisujú samostatne a chyby sa priznajú v reporte. Zrušenie dokončí rozbehnutú položku a preskočí zvyšok.
 **CENY-KOV-B (v0.10.5):** `manual_from_budget` vracia iba nevyriešené neviazané položky, čerstvé ručné potvrdenie už do zoznamu nepatrí. Ručné potvrdenie vlastní HardwareCatalog; tento modul preň nevytvára druhý zápis.
+**CENY-M2 (v0.16.3):** kód sa nemení — `targets_from_budget` ďalej berie len položky s `demos_url` (ručný `product_url` dosky/ABS sa nesťahuje ani pri Demos
+hoste) a `manual_from_budget` od M2 vracia aj nevyriešené ručné dosky/ABS, **bez UNI** (tie scan nevydá) a bez čerstvo overených. Ručnú cenu materiálu
+potvrdzuje výhradne `Materials.confirm_manual_price` (formulár „Overiť cenu"); `manual_from_budget` nemá produkčného volajúceho (nález F5).
 
 ### supplier_settings.rb
 
