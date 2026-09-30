@@ -1,7 +1,7 @@
 # PACKAGE CENY-M2 · Rozpočet — vek ručných cien, odkaz a „Overiť cenu", materiál bez formátu podľa skutočných m² (C12)
 
 > **PLATÍ (30.9.2026, počas PR #428): Q2 rozhodnutá — Michal C14 „áno, aj bežná doska podľa skutočnej plochy dielcov (bez odpadu)" → platí vetva
-> R1a** (`Budget.area_priced_type?` = každý typ; UNI a duplák ostávajú na odhade), NP-4 golden pregenerovaný (NOF 180,84 → 32,76 €, SPOLU 3394 → 3246 €),
+> R1a** (`Budget.area_priced_type?` = každý typ; duplák s väzbou v ploche zdrojovej dosky, UNI a duplák bez väzby ostávajú na odhade), NP-4 golden pregenerovaný (NOF 180,84 → 32,76 €, SPOLU 3394 → 3246 €),
 > golden B podľa S22/E4 (NOF → 47,74 €, SPOLU → 2070 €). **Q1 bez odpovede — porez a montáž bez zmeny.** Text nižšie opisuje pôvodný stav s obmedzeným R1
 > tam, kde to R1a výslovne nemení; pri rozpore platí tento rámček a [ROZHODNUTIA_MICHALA_2026-09-29.md](ROZHODNUTIA_MICHALA_2026-09-29.md) (C14).
 

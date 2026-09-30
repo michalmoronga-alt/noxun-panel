@@ -24,10 +24,12 @@
 # 4) CHYBAJUCI FORMAT PLATNE = odhad bezi na fallbacku 2800x2070, riadok nesie
 #    'estimated' + poznamku (audit 3) — cislo sa nikdy netvari isto.
 #    CENY-M2 (C12, R1a — Michal 30.9.2026, C14): material bez platneho
-#    formatu (sklo aj bezna doska; nie UNI, nie duplak) sa pocita podla
-#    SKUTOCNEJ plochy dielcov bez odpadu (`mj: M2`, `qty_basis: 'area'`).
-#    Fallback 2800x2070 s 'estimated' ostava len pre UNI a chybajuci zaznam;
-#    podmienka typu zije v JEDINEJ funkcii `area_priced_type?`.
+#    formatu (sklo aj bezna doska) sa pocita podla SKUTOCNEJ plochy dielcov
+#    bez odpadu (`mj: M2`, `qty_basis: 'area'`); duplak s vazbou je v ploche
+#    svojho zdrojoveho materialu (odhad ho nevedie ako vlastnu platnu).
+#    Fallback 2800x2070 s 'estimated' ostava pre UNI, duplak bez vazby
+#    a chybajuci zaznam; podmienka typu zije v JEDINEJ funkcii
+#    `area_priced_type?`.
 # 5) ZAOKRUHLUJE SA KONECNA BRUTTO SUMA (firma je neplatca DPH, katalogove
 #    ceny su konecne) na `rounding_step` nahor; `total_novat` je LEN
 #    informativny prepocet /1,23 (audit 8).

@@ -10,7 +10,7 @@
 v stĺpci „Overená" stav („ručne 18.9." sivé · „ručne 45 dní" / „neoverená" jantárové), ktorý je zároveň tlačidlom **„Overiť cenu"** (formulár z M1b, ostáva
 sa v Rozpočte). Čip **„N cien na kontrolu"** a „Skontrolovať ceny" počítajú aj ručné materiály (UNI a duplák nie), pred názvom je ikona odkazu (Demos · obchod ·
 jantárová = doplniť odkaz). **Materiál bez formátu — sklo aj bežná doska (C14, Michal 30.9.) — sa v Rozpočte počíta podľa m²** (skutočná plocha dielcov
-× cena za m², bez odpadu; napr. DTD 1,05 m²: 180,84 → 32,76 €); UNI a duplák ostávajú na odhade platní, porez a montáž bez zmeny (Q1). Pod tým **blok 2 · KONTROLA + VÝROBA** (v0.16.0, smoke **PASS 29.9.**, PR #423), **blok 8 · K3 ROHOVÁ** (v0.15.0, smoke PASS 28.9.), **blok 7 · K1+K2** (v0.14.0).
+× cena za m², bez odpadu; napr. DTD 1,05 m²: 180,84 → 32,76 €); duplák v ploche zdrojovej dosky, UNI a duplák bez väzby na odhade platní; porez a montáž bez zmeny (Q1). Pod tým **blok 2 · KONTROLA + VÝROBA** (v0.16.0, smoke **PASS 29.9.**, PR #423), **blok 8 · K3 ROHOVÁ** (v0.15.0, smoke PASS 28.9.), **blok 7 · K1+K2** (v0.14.0).
 Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 so **štrnástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · **Nárezový plán** · Materiály · Kovanie · Spotrebiče · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine. Neaktívna položka navigácie už nie je žiadna.
 

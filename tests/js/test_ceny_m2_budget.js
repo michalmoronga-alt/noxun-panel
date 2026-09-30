@@ -149,9 +149,11 @@ const PC_FRESH = { kind: 'sheet', id: 'S25', label: 'H1180 DTDL 25 mm', manual_c
   const chipD = B.budOfferChipHtml({ id: 'stale', text: 'x' }, demosOld, 1.23);
   ok(chipD.includes('title="Staré ceny sa obnovujú v Rozpočte tlačidlom „Prepočítať ceny&quot; — ponuka'), 'Demos tooltip ostava');
   // R6
-  // R1a (C14, Michal 30.9.): podľa plochy ide KAŽDÝ materiál bez formátu okrem UNI a dupláku.
-  ok(B.BUD_PLAN_TIP.includes('\nMateriál bez formátu platne (sklo aj doska; okrem UNI a dupláku) sa počíta podľa ' +
-     'skutočnej plochy dielcov bez odpadu — plán ho nemení.'), 'BUD_PLAN_TIP');
+  // R1a (C14, Michal 30.9.): podľa plochy ide každý materiál bez formátu; väzbený duplák v ploche
+  // svojho zdroja, na odhade ostáva UNI a duplák bez väzby (delta #428 P3).
+  ok(B.BUD_PLAN_TIP.includes('\nMateriál bez formátu platne (sklo aj doska) sa počíta podľa skutočnej plochy dielcov ' +
+     'bez odpadu (duplák v ploche svojej zdrojovej dosky) — plán ho nemení. UNI a duplák bez väzby ostávajú na ' +
+     'odhade platní.'), 'BUD_PLAN_TIP');
   ok(B.BUD_PLAN_TIP.indexOf('Bežná doska bez formátu ostáva na odhade') < 0, 'veta obmedzeného R1 zanikla');
 })();
 

@@ -554,7 +554,7 @@ podľa plánu): A, B, C a 2 ďalšie" — `more_word`: 1 ďalší · 2–4 ďal�
 push by status inak prekryl). Pri vypnutom prepínači sa status ani počet pushov nemení. **Jedna pravda s kartou plánu (predrecenzia P2):**
 `sheet_layout_payload(plan, bom, smap, estimate, budget)` dostane z pushu **hotový rozpočet** a každá karta nesie `budget_qty` + `budget_src` z jeho riadku
 Materiálu („v rozpočte 5 podľa plánu" / „… z odhadu"); `est_budget` ostáva odhadom z m² (súčet v súhrne). Bez rozpočtu (legacy volanie) = odhad.
-**CENY-M2:** riadok Rozpočtu s `qty_basis: 'area'` (materiál bez formátu okrem UNI a dupláku) dá karte `budget_src: 'area'` a `budget_qty` v m²
+**CENY-M2:** riadok Rozpočtu s `qty_basis: 'area'` (materiál bez formátu okrem UNI a dupláku bez väzby) dá karte `budget_src: 'area'` a `budget_qty` v m²
 („v rozpočte 0,90 m² podľa plochy") — inak by m² karta ukázala ako počet platní.
 
 **`replace_uni`** (skratka „Nahradiť UNI…" → `MaterialsDialog.request_replace_uni`) a **zdieľané telá prepínačov** `edge_check_guard` (dostupnosť Overlay API + `identity_guard`) ·
@@ -902,7 +902,7 @@ na cent (`base_row`), `qty_basis: 'area'`, **`estimate_qty` vždy** (odhad platn
 `cp_nazov` a kľúč `material:<mid>` bez zmeny (nesie `cp_overrides`). Poznámka „formát platne nie je v katalógu — počíta sa skutočná plocha dielcov (bez
 odpadu)" (+ veta duplákov) — **bez** vety plánu NP-3 a bez NP-4 (`price_basis` sa pre riadok nevolá, `plan_export_note` ho nevymenuje). **Služby sa
 nemenia (D5, Q1):** porez = Σ (`estimate_qty` pri area riadku, inak `mnozstvo`), montáž už číta `estimate_qty`. Odhad platní 2800 × 2070 s `estimated`
-ostáva len pre UNI a chýbajúci záznam. XLSX číta riadok 1:1 (poznámka „(bez odpadu)" v názve), cenová ponuka mení len sumu (môže klesnúť pod prah 150 €
+ostáva len pre UNI, duplák bez väzby (vlastná skupina odhadu) a chýbajúci záznam; duplák s väzbou je v ploche zdrojového materiálu. XLSX číta riadok 1:1 (poznámka „(bez odpadu)" v názve), cenová ponuka mení len sumu (môže klesnúť pod prah 150 €
 a zo samostatných riadkov vypadnúť, ručné zaradenie platí). `BUDGET_STD` sa nemení (žiadny nový kľúč zákazky) — starší plugin tú istú zákazku ocení po starom
 (STANDARD §11.3). Zlaté testy: `tests/pure/test_np4_golden.rb` (fixtúry **pregenerované** po C14 — NOF 180,84 → 32,76 €, SPOLU 3394 → 3246 €) a
 `tests/pure/test_ceny_m2_golden.rb` (odtlačok zákazky so sklom a doskou bez formátu spred M2, zmena len na vymenovaných cestách).

@@ -1,11 +1,12 @@
 # frozen_string_literal: true
-# CENY-M2 — ZAKAZKA ZLATEHO TESTU B (sklo bez formatu). Jedna definicia pre
-# generator odtlacku (`generate_pre.rb`) aj test (`tests/pure/test_ceny_m2_golden.rb`).
+# CENY-M2 — ZAKAZKA ZLATEHO TESTU B (sklo aj doska bez formatu). Jedna definicia
+# pre generator odtlacku (`generate_pre.rb`) aj test (`tests/pure/test_ceny_m2_golden.rb`).
 #
-# Obsah = fixtura sondy package CENY-M2 (`sonda_m2.rb`, S22): sklo SK4 (typ SKLO,
-# mimo registra typov) 0,9 m² à 41,50 €/m², sklo bez ceny NOP, DTD bez formatu
-# NOF so zdrojovym duplakom D36 (typ DTDL = register — ostava platnou), UNI,
-# H18 (Demos, stara cena), H25 (rucna doska s formatom), ABS Demos aj rucna.
+# Obsah = fixtura sondy package CENY-M2 (`sonda_m2.rb`, S22): sklo SK4 (typ SKLO)
+# 0,9 m² à 41,50 €/m², sklo bez ceny NOP, DTD bez formatu NOF so zdrojovym
+# duplakom D36 (od C14 / R1a ide podla plochy: 1,05 + 0,24 × 2 = 1,53 m²), UNI
+# (ostava odhadom platni), H18 (Demos, stara cena), H25 (rucna doska s formatom),
+# ABS Demos aj rucna.
 require 'json'
 
 module NxCenyM2Golden

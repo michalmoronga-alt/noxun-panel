@@ -4,7 +4,8 @@
 #
 # Co sa tu dokazuje:
 #   R1a „podla plochy" ide KAZDY material bez platneho formatu — sklo aj bezna
-#       doska (Michal 30.9.2026, C14: Q2 „ano, aj bezna doska"); UNI, duplak,
+#       doska (Michal 30.9.2026, C14: Q2 „ano, aj bezna doska"; duplak s vazbou
+#       je v ploche zdroja — R2); UNI, duplak bez vazby,
 #       chybajuci zaznam a akykolvek kladny format (aj 300 × 200) ostavaju na
 #       odhade platni. Typ uz nerozhoduje (`area_priced_type?` = true).
 #   R2  mnozstvo = nezaokruhlena plocha na 2 desatinne (bez dvojiteho

@@ -150,7 +150,7 @@ preklik a ručné potvrdenie ceny k dnešku v katalógu/Rozpočte. *(Piaty kus t
 - **CENY-M2** (PR #428, v0.16.3) — **Rozpočet:** stĺpec „Overená" pri doske/ABS bez Demosu ukazuje stav („ručne 18.9." / „ručne 45 dní" / „neoverená")
   a je zároveň tlačidlom „Overiť cenu" (formulár M1b ostáva v Rozpočte); čip „N cien na kontrolu" a „Skontrolovať ceny" počítajú aj ručné materiály
   (UNI a duplák nie); ikona odkazu pred názvom materiálu a pásky; **materiál bez formátu — sklo aj bežná doska — sa počíta podľa skutočných m²
-  dielcov bez odpadu** (C12 + C14, Michal 30.9.2026; UNI a duplák ostávajú na odhade platní), porez a montáž bez zmeny (Q1).
+  dielcov bez odpadu** (C12 + C14, Michal 30.9.2026; duplák v ploche zdrojovej dosky, UNI a duplák bez väzby na odhade platní), porez a montáž bez zmeny (Q1).
   Package [../zdroje/bloky/CENY/PACKAGE_CENY_M2.md](../zdroje/bloky/CENY/PACKAGE_CENY_M2.md), audit [../zdroje/bloky/CENY/AUDIT_CENY_M2_2026-09-30.md](../zdroje/bloky/CENY/AUDIT_CENY_M2_2026-09-30.md).
 
 ### D-148 — Formulár ceruzky pri Demos položke nerušil dátum overenia, vyriešené 30.9.2026
