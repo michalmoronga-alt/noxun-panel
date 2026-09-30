@@ -189,7 +189,7 @@ eq(M.MD_CLIENT_SCHEMA, 11, 'klient hlasi schemu 11 (product_url)');
     SENT.length = 0;
     M.mdSaveSheet();
     eq(SENT.length, 0, 'zly odkaz sa neposiela: ' + bad);
-    eq(el('status').textContent, 'Odkaz musí začínať http:// alebo https:// (bez medzier a úvodzoviek).');
+    eq(el('status').textContent, 'Odkaz nie je platná webová adresa — musí začínať http:// alebo https:// a nesmie mať medzery, úvodzovky, diakritiku ani znaky ako | { } ^.');
     eq(el('mdSheetForm').style.display, '', 'formular ostava otvoreny');
   });
   eq(M.mdProductUrlLocalError(''), null, 'prazdne = zmazanie, nie chyba');
@@ -268,6 +268,53 @@ eq(M.MD_CLIENT_SCHEMA, 11, 'klient hlasi schemu 11 (product_url)');
   M.mdSaveSheet();
   eq(last('update_sheet').row_rev, 'r25b', 'znovuotvorenie po duplicite drzi baseline pokusu');
   eq(last('update_sheet').allow_duplicate_code, true);
+})();
+
+// --- predrecenzia P3: parita klienta so serverom nad spolocnou tabulkou --------
+(function(){
+  const table = require(path.join(__dirname, '..', 'fixtures', 'ceny_m1_product_urls.json')).rows;
+  ok(table.length >= 40, 'tabulka je netrivialna');
+  ok(table.some(r => r[1]) && table.some(r => !r[1]), 'tabulka ma platne aj neplatne vstupy');
+  table.forEach(function(row){
+    eq(M.mdProductUrlLocalError(row[0]) === null, row[1], 'parita so serverom: ' + JSON.stringify(row[0]));
+  });
+})();
+
+// --- predrecenzia P3: serverove odmietnutie odkazu upravu nezahodi ------------
+(function(){
+  M.mdSetCatalog(catalog([S25L, S18D, UNI], [E08, E10D]));
+  M.mdOpenSheetForm('S25');
+  el('ms_price').value = '55';
+  el('ms_code').value = 'NOVY-KOD';
+  el('ms_product_url').value = 'https://ok.example/p';
+  SENT.length = 0;
+  M.mdSaveSheet();
+  eq(SENT.length, 1, 'odoslane');
+  el('mdSheetForm').style.display = 'none';        // klient formular po odoslani zatvara
+  el('ms_price').value = ''; el('ms_code').value = ''; el('ms_product_url').value = '';
+  FOCUSED = null;
+  M.MD.formRejected('sheet');
+  eq(el('mdSheetForm').style.display, '', 'formular je znovu otvoreny');
+  eq(el('ms_price').value, '55', 'rozpisana cena sa nestratila');
+  eq(el('ms_code').value, 'NOVY-KOD', 'ani kod');
+  eq(el('ms_product_url').value, 'https://ok.example/p', 'ani odkaz');
+  eq(FOCUSED, 'ms_product_url', 'kurzor v poli odkazu');
+  SENT.length = 0;
+  M.mdSaveSheet();
+  eq(last('update_sheet').row_rev, 'r25b', 'baseline pokusu ostava');
+  // ABS
+  M.mdOpenEdgeForm('E08');
+  el('me_price').value = '3.3';
+  el('me_product_url').value = 'https://ok.example/abs';
+  M.mdSaveEdge();
+  el('mdEdgeForm').style.display = 'none'; el('me_price').value = '';
+  M.MD.formRejected('edge');
+  eq(el('mdEdgeForm').style.display, '');
+  eq(el('me_price').value, '3.3');
+  // cudzi druh (posledny pokus bol ABS) formular dosky neotvori
+  el('mdSheetForm').style.display = 'none';
+  M.MD.formRejected('sheet');
+  eq(el('mdSheetForm').style.display, 'none', 'odpoved na iny formular sa ignoruje');
 })();
 
 // --- read-only katalog: jantarova ikona povie, ze upravy su vypnute ------------

@@ -66,7 +66,7 @@ module Noxun
       FORM_STRIP_KEYS = %w[price_checked_at price_check_method product_link price_check
                            row_rev label row_label row_key image_file].freeze
       PRODUCT_URL_TEXT_MSG = 'Odkaz musí byť text.'
-      PRODUCT_URL_BAD_MSG = 'Odkaz musí začínať http:// alebo https:// (bez medzier a úvodzoviek).'
+      PRODUCT_URL_BAD_MSG = 'Odkaz nie je platná webová adresa — musí začínať http:// alebo https:// a nesmie mať medzery, úvodzovky, diakritiku ani znaky ako | { } ^.'
       PRODUCT_URL_DEMOS_MSG = 'Položka je viazaná na Demos — ručný odkaz zadáš až po vymazaní Demos URL.'
 
       class << self
@@ -1809,7 +1809,7 @@ module Noxun
             rec.delete('price_checked_at')
           end
           if (perr = apply_product_url!(rec, data, existing))
-            return [:error, perr]
+            return [:product_error, perr]
           end
           # 2B-1: edit zdroja drzi zdielane polia duplakov v synchre (format/
           # grain/farba) v JEDNOM atomickom zapise. Zamok je reentrantny —
@@ -1863,6 +1863,13 @@ module Noxun
           when :code_conflict
             set_status(msg, true)
             js("MD.flagDuplicateCode(#{kind.to_json})")
+          when :product_error
+            # Predrecenzia P3: klient formular po odoslani zatvara — keby jeho
+            # kontrola bola niekde volnejsia nez server, odmietnuty odkaz by
+            # zahodil celu upravu (aj cenu, kod). Formular sa preto otvori
+            # nanovo s rozpisanymi hodnotami a kurzorom v poli odkazu.
+            js("MD.formRejected(#{kind.to_json})")
+            set_status(msg, true)
           when :schema
             set_status('Katalóg je v novom formáte — obnov Štúdio (Obnoviť) a potom ulož.', true)
             push_catalog
@@ -1994,7 +2001,7 @@ module Noxun
             rec.delete('price_checked_at') if invalidate
           end
           if (perr = apply_product_url!(rec, data, existing))
-            return [:error, perr]
+            return [:product_error, perr]
           end
           return [:error, 'Uloženie katalógu zlyhalo.'] unless Materials.upsert_edge(rec)
           [:ok, "ABS #{id} upravená."]

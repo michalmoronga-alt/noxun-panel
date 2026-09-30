@@ -3421,7 +3421,11 @@ by vrátil cenu aj Demos väzbu do stavu z otvorenia; prázdny baseline = konfli
 `MD.formConflict(kind, id)` (klient formulár otvorí nanovo s čerstvými údajmi a novým baseline) a status. Pred merge sa strhnú server-owned polia
 a ozdoby payloadu (`FORM_STRIP_KEYS`: `price_checked_at`, `price_check_method`, `product_link`, `price_check`, `row_rev`, `label`, `row_label`,
 `row_key`, `image_file`). Kľúč `product_url` (`apply_product_url!`): nie text / neplatný = celý save odmietnutý, prázdny = zmazanie, chýbajúci = bez
-zmeny; pri **výslednej** Demos URL sa uložený odkaz nesmie zmeniť ani zmazať (odložený, O8). Odpovede skladá `form_save_reply` až **po** uvoľnení
+zmeny; pri **výslednej** Demos URL sa uložený odkaz nesmie zmeniť ani zmazať (odložený, O8). Odmietnutý odkaz (`:product_error`) pošle
+`MD.formRejected(kind)` — klient formulár po odoslaní zatvára, takže ho otvorí nanovo s **rozpísanými** hodnotami (`mdReopenFromAttempt`, baseline
+pokusu) a kurzorom v poli odkazu; úprava ceny či kódu sa tak nestratí ani vtedy, keby klientska kontrola pustila niečo, čo server odmietne.
+Klientska kontrola `mdProductUrlLocalError` zrkadlí pravidlá `URI.parse` (RFC 3986 parser Ruby) a paritu drží spoločná tabuľka
+`tests/fixtures/ceny_m1_product_urls.json` (Ruby aj Node test). Odpovede skladá `form_save_reply` až **po** uvoľnení
 zámku. **`mat_product_open`** (R7, v `SECTION_ACTIONS`) otvorí `UI.openURL` len pre čerstvý „ručný" záznam s platným odkazom (URL od klienta sa
 neprijíma), inak status + `push_catalog`; nič nezapisuje. **Payload** (`full_catalog_payload`) nesie `product_link` (bool) **len** pri ručných
 záznamoch (`product_link_extra!`), `row_rev` zo surového záznamu pred ozdobou. **Klient** (`proj_materials.js`): pevný slot troch ikon

@@ -1582,11 +1582,27 @@
   }
   // Klientske zrkadlo `Materials.sanitize_product_url` (formular ostava
   // otvoreny s hlaskou — vzor mdDemosUrlLocalError). Server ostava autorita.
+  // Predrecenzia P3: zrkadli PRAVIDLA `URI.parse` (RFC 3986 parser Ruby) pre
+  // http/https s hostom — userinfo, host (reg-name / IP literal), port,
+  // segmenty cesty, query (`[^#]*`) a fragment po znakoch; mimo tlacitelneho
+  // ASCII nic (diakritika, riadiace znaky). Paritu drzi spolocna tabulka
+  // `tests/fixtures/ceny_m1_product_urls.json` (Ruby aj Node test). Keby sa
+  // predsa v niecom rozisli, server formular otvori nanovo (`MD.formRejected`)
+  // — uprava sa nestrati.
+  var MD_PRODUCT_URL_RE = new RegExp('^https?://' +
+    '(?:(?:%[0-9A-Fa-f]{2}|[!$&-.0-;=A-Z_a-z~])*@)?' +
+    '(\\[(?:[0-9A-Fa-f:.]+|v[0-9A-Fa-f]+\\.[!$&-.0-;=A-Z_a-z~]+)\\]|(?:%[0-9A-Fa-f]{2}|[!$&-.0-9;=A-Z_a-z~])*)' +
+    '(?::[0-9]*)?' +
+    '(?:/(?:%[0-9A-Fa-f]{2}|[!$&-.0-;=@-Z_a-z~])*)*' +
+    '(?:\\?[^#]*)?' +
+    '(?:#(?:%[0-9A-Fa-f]{2}|[!$&-.0-;=@-Z_a-z~/?])*)?$', 'i');
+  var MD_PRODUCT_URL_MSG = 'Odkaz nie je platná webová adresa — musí začínať http:// alebo https:// a nesmie mať medzery, úvodzovky, diakritiku ani znaky ako | { } ^.';
   function mdProductUrlLocalError(v){
     var s = String(v == null ? '' : v).trim();
     if (!s) return null;
-    if (/[\s"'<>\\]/.test(s) || !/^https?:\/\/[^\/?#]+/i.test(s))
-      return 'Odkaz musí začínať http:// alebo https:// (bez medzier a úvodzoviek).';
+    if (/[^\x21-\x7e]/.test(s) || /["'<>\\]/.test(s)) return MD_PRODUCT_URL_MSG;
+    var m = s.match(MD_PRODUCT_URL_RE);
+    if (!m || !m[1]) return MD_PRODUCT_URL_MSG;
     return null;
   }
   // C3: prichod z jantarovej ikony — kurzor do pola odkazu + kratke
@@ -2911,6 +2927,14 @@
     // CENY-M1a (R6b): polozka sa medzitym zmenila (baseline formulara nesedi).
     // Server UZ poslal cerstvy katalog — formular sa otvori nanovo s cerstvymi
     // udajmi a novym baseline; rozpisane hodnoty sa NEZAPISALI.
+    // Predrecenzia P3: server odmietol ODKAZ (klient ho pustil) — formular sa
+    // otvori nanovo s ROZPISANYMI hodnotami (vzor flagDuplicateCode, baseline
+    // pokusu ostava) a kurzor ide do pola odkazu. Nic sa nezapisalo.
+    formRejected: function(kind){
+      if (!mdLastAttempt || mdLastAttempt.kind !== kind) return;
+      mdReopenFromAttempt();
+      mdProductFocus(kind === 'edge' ? 'me' : 'ms', { focus: 'product_url' });
+    },
     formConflict: function(kind, id){
       var list = kind === 'edge' ? MD_CATALOG.edges : MD_CATALOG.sheets;
       var key = kind === 'edge' ? 'abs_id' : 'material_id';
