@@ -1668,8 +1668,9 @@ module Noxun
         end
 
         # --- D-05: sprava katalogu (Codex audit davky 2 zapracovany) ----------
-        # Zapis je single-writer kompromis (atomicky rename + .bak; bez locku medzi
-        # SketchUp procesmi — vedome akceptovane, katalog edituje jeden pouzivatel).
+        # Povodne single-writer kompromis (atomicky rename + .bak, bez locku medzi
+        # SketchUp procesmi); od CENY-M1a bezi formular variantu cely pod
+        # medziprocesovym `with_catalog_lock` (nizsie, R6c).
 
         # --- CENY-M1a: formular variantu (ceruzka) — R6 / R6b / R6c ----------
         #
