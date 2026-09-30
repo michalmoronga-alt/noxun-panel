@@ -34,6 +34,9 @@ priečinok bloku v [archiv/bloky/ROHOVA/](archiv/bloky/ROHOVA/).)*
 *(Blok **2 · KONTROLA + VÝROBA** je hotový — **uzáver v0.16.0, 29.9.2026** (položky od v0.9.22 po v0.15.4, 4.–29.9.2026): D-94 (#361), D-112 + D-113 (#287), D-121 (#324/#325), D-122 (#343) a **Nárezový
 plán primitívny** — štart PR #417, dávky PR #418 → #421 + uzáver PR #422 (NP-1 · NP-2 · NP-3 · NP-4); plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md),
 výsledok a smoke checklist v [archiv/NAREZ_ZAVER_2026-09-29.md](archiv/NAREZ_ZAVER_2026-09-29.md), priečinok bloku v [archiv/bloky/NAREZ/](archiv/bloky/NAREZ/).)*
+*(Blok **CENY · overenie cien materiálov a ABS** (zvyšok V1-03, V1 bod 6, v bloku 4) je hotový — **v0.16.0 → v0.17.0, 29.–30.9.2026**, štart PR #425, dávky PR #426 → #428
++ uzáver PR #429 (CENY-M1a · CENY-M1b · CENY-M2); plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), výsledok a smoke checklist
+v [archiv/CENY_ZAVER_2026-09-30.md](archiv/CENY_ZAVER_2026-09-30.md), priečinok bloku v [archiv/bloky/CENY/](archiv/bloky/CENY/).)*
 
 
 ### 1b · STABILIZAČNÁ REVÍZIA (dlhy fázy ŠTÚDIO — pred blokom KOVANIE)
@@ -190,7 +193,7 @@ príslušného bloku z konceptov nižšie (koncept je podklad, nie zadanie — R
 | 05 shared library + updater | D-52 SPRACOVANÉ do package (#255); D-48 sync = PO V1 zásobník |
 | 06 render M-R | pôvodný M-R FOTO nahradilo M-R VZHĽAD, implementované v #353–#359; plný blok v [archíve etáp](archiv/ROADMAP_hotove_etapy.md). Po V1 ostáva pixla a zdieľanie knižnice D-48 |
 | 07 konštrukcia V1 | podklad pre package(y) pri štarte bloku 4 (V1-01 komín · V1-07 čelá cenovo · balík V0.4.8); patrí sem aj výklop=rola flap — týmto PRESUNUTÝ z 1b/F do okruhu bloku 4 (jeden domov) |
-| 08 ponuka/dokumenty/ceny | V1 časť = zvyšok V1-03 v bloku 4; DOCX/PDF rodina dokumentov PO V1 zásobník |
+| 08 ponuka/dokumenty/ceny | V1 časť = zvyšok V1-03 v bloku 4 — **hotové** blokom CENY (v0.17.0, 30.9.2026); DOCX/PDF rodina dokumentov PO V1 zásobník |
 | 09 + 09A GHOST | SPRACOVANÉ do záväzného package (#254 + #257) |
 
 
@@ -220,18 +223,11 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 - ✅ **D-124 · Predvoľby projektu v Materiáloch** — default rozbalené, ručne zbaliteľné; štyri skupiny Korpus / Čelá / Chrbát / Zásuvky vedľa seba, náhľady **115 × 115 px**
   (schválený mockup mínus 20 %), celý názov variantu a údaje pod vzorkou; v úzkom okne dva stĺpce. Spoločný picker, potvrdenie/zrušenie a serverový kontrakt zachované.
   **PR #344, v0.10.3.** „Materiál per rola dielca" ostáva v zásobníku Po V1. Podklad: `zdroje/next_sessions/D124_OUTSIDE_IN_2026-09-10.md`.
-- **Ceny — zvyšok V1-03 → blok CENY (štart 29.9.2026, Michal: „poďme na ceny materiálov a ABS" — posledný kódový bod V1):** ručné overenie cien **materiálov/ABS**
-  bez Demos väzby a **jeden** odkaz na produkt (C7 nahradilo pôvodné „viac URL na položke"). Priečinok bloku [zdroje/bloky/CENY/](zdroje/bloky/CENY/) — rozhodnutia
-  [ROZHODNUTIA_MICHALA_2026-09-29.md](zdroje/bloky/CENY/ROZHODNUTIA_MICHALA_2026-09-29.md) (C1–C11), schválený mockup
-  [MOCKUP_CENY_2026-09-30.html](zdroje/bloky/CENY/MOCKUP_CENY_2026-09-30.html) (O1–O9 podľa návrhu, 30.9.). Štart bloku PR #425. Dávky (každá s auditom návrhu — mení formát katalógu;
-  rez M1 → **M1a / M1b** prijal orchestrátor 30.9. podľa package [PACKAGE_CENY_M1.md](zdroje/bloky/CENY/PACKAGE_CENY_M1.md) s auditom
-  [AUDIT_CENY_M1_2026-09-30.md](zdroje/bloky/CENY/AUDIT_CENY_M1_2026-09-30.md) a delta auditom [AUDIT2_CENY_M1_2026-09-30.md](zdroje/bloky/CENY/AUDIT2_CENY_M1_2026-09-30.md)):
-  - ✅ **CENY-M1a** · odkaz na produkt pri doske/ABS bez Demosu v dátach katalógu (SCHEMA 11) a v Štúdiu → Materiály — **PR #426, v0.16.1**.
-  - ✅ **CENY-M1b** · ručné overenie ceny (doska za platňu / ABS za bm, SCHEMA 12), zneplatnenie, prednosť Demosu, D-148 — **PR #427, v0.16.2**.
-  - ✅ **CENY-M2** · Rozpočet: vek ručne overených cien, „N cien na kontrolu", odkaz a „Overiť cenu" v sekcii Materiál a ABS hrany; materiál bez formátu
-    (sklo aj bežná doska; nie UNI ani duplák bez väzby) podľa skutočných m² dielcov namiesto fiktívnej platne (C12 + C14) — **PR #428, v0.16.3**
-    (package [PACKAGE_CENY_M2.md](zdroje/bloky/CENY/PACKAGE_CENY_M2.md), audit [AUDIT_CENY_M2_2026-09-30.md](zdroje/bloky/CENY/AUDIT_CENY_M2_2026-09-30.md)).
-- **Poradie pred uzáverom V1 (Michal 29.–30.9.2026):** blok **CENY** (CENY-M1a → CENY-M1b → CENY-M2) → **R-13** (čítať `std` na entite, ORANGE „dielec z inej verzie
+- ✅ **Ceny — zvyšok V1-03 → blok CENY** (overenie cien materiálov a ABS, posledný kódový bod V1) — **hotové, uzáver v0.17.0 (30.9.2026)**: jeden odkaz na produkt
+  a ručné overenie ceny dosky/ABS bez Demosu v Štúdiu aj v Rozpočte, materiál bez formátu v Rozpočte podľa skutočných m² (C12 + C14). Štart PR #425, dávky
+  CENY-M1a #426 · CENY-M1b #427 · CENY-M2 #428 + uzáver PR #429; plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), výsledok
+  a smoke checklist v [archiv/CENY_ZAVER_2026-09-30.md](archiv/CENY_ZAVER_2026-09-30.md), priečinok bloku v [archiv/bloky/CENY/](archiv/bloky/CENY/).
+- **Poradie pred uzáverom V1 (Michal 29.–30.9.2026; blok CENY je hotový — v0.17.0):** **R-13** (čítať `std` na entite, ORANGE „dielec z inej verzie
   štandardu") → **R-37** (ochrana nastavení dodávateľa pred tichým prepísaním seedom) → **R-35** (dve okná SketchUpu si neprepíšu pravidlá kovania
   a rozmerové rady) — plné znenia a verdikty v [AUDIT_REGISTER.md](AUDIT_REGISTER.md) (sekcia „Stav po previerke 29.9.2026"). **Test na kompletnej
   reálnej zákazke až po V1** (Michal 29.9.: teraz nemá vhodnú zákazku); po dobehnutí týchto bodov Michal určí ďalší postup.

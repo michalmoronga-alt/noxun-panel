@@ -48,8 +48,9 @@ Na otázku **„prečo je to takto?"** sa nečíta nič z hora — na to je [arc
   (nie v `_dev/` ani v chate) — je počas bloku **autoritou**. Po uzávere bloku sa **celý priečinok
   fyzicky presúva** do `archiv/bloky/<BLOK>/` s kontrolou odkazov (prvý presunutý:
   [archiv/bloky/KONSTRUKCIA/](archiv/bloky/KONSTRUKCIA/), uzáver bloku 7 27.9.2026; ďalší
-  [archiv/bloky/ROHOVA/](archiv/bloky/ROHOVA/), uzáver bloku 8 28.9.2026, a
-  [archiv/bloky/NAREZ/](archiv/bloky/NAREZ/), uzáver bloku 2 29.9.2026). Staršie mockupy
+  [archiv/bloky/ROHOVA/](archiv/bloky/ROHOVA/), uzáver bloku 8 28.9.2026,
+  [archiv/bloky/NAREZ/](archiv/bloky/NAREZ/), uzáver bloku 2 29.9.2026, a
+  [archiv/bloky/CENY/](archiv/bloky/CENY/), uzáver bloku CENY 30.9.2026). Staršie mockupy
   v `zdroje/ui20/` sa nepresúvajú.
 - **[archiv/](archiv/)** — história a uzavreté rozhodnutia: [KRONIKA.md](archiv/KRONIKA.md)
   (záznam každej dávky), [ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md) (plné

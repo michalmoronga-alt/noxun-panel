@@ -2,7 +2,7 @@
 
 > **Produktové rozhodnutia bloku** — čo a ako má plugin robiť z pohľadu stolára. **Technické požiadavky** (polia, verzie dát, brány
 > staršieho pluginu, testy…) sa zapisujú do **package každej dávky** a prejdú jej auditom návrhu.
-> Pôvodná debata: [../../next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md](../../next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md) §0 (historický vstup)
+> Pôvodná debata: [../../../zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md](../../../zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md) §0 (historický vstup)
 > a hotový vzor pre katalógové kovanie **CENY-KOV** (PR #345/#346, v0.10.4–v0.10.5; plný text v
 > [../../../archiv/ROADMAP_hotove_etapy.md](../../../archiv/ROADMAP_hotove_etapy.md), sekcia „CENY-KOV"). **Kde sa s nimi rozchádzajú, platia rozhodnutia tohto súboru.**
 > Ďalšie súbory priečinka: fakty z kódu [FAKTY_Z_KODU_2026-09-29.md](FAKTY_Z_KODU_2026-09-29.md) · mockup na schválenie

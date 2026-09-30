@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # CENY-M2 [STAV] — vek rucnych cien dosiek a ABS v Rozpocte (server).
-# Package: SYSTEM/zdroje/bloky/CENY/PACKAGE_CENY_M2.md (§6.2, §7 bod 2).
+# Package: SYSTEM/archiv/bloky/CENY/PACKAGE_CENY_M2.md (§6.2, §7 bod 2).
 #
 # Co sa tu dokazuje:
 #   R9   `freshness_item` pre dosku/ABS bez Demosu berie stav z M1b
