@@ -83,8 +83,8 @@ encoding guard čistý; kód sa mení len číslom verzie a cestou v hlavičkác
 
 ## Otvorené body
 
-- **Michalov smoke** podľa checklistu nižšie — čaká. Nálezy do dočasnej skupiny „CENY — smoke po uzávere" v [DOGFOODING.md](../DOGFOODING.md) ako opravy
-  v0.17.x. **Poistka:** R-13 (ďalší bod pred V1) sa začína až po smoke PASS alebo Michalovom „ideme ďalej".
+- ~~**Michalov smoke** podľa checklistu nižšie~~ — **PASS 30.9.2026** (Michal, bez nálezov; pozri Smoke checklist). R-13 → R-37 → R-35 sú od 30.9.
+  po V1 (PR #430); ďalšie pokračovanie určí Michal.
 - **Q2 rozhodnutá (C14, 30.9.2026):** aj bežná doska bez formátu podľa skutočnej plochy dielcov (bez odpadu); UNI a duplák bez väzby na odhade platní.
 - **Q1 bez odpovede:** porez a montáž pri skle na mieru — **bez zmeny** (bezpečnejšia vratná voľba; alternatíva „sklo bez porezu" mení jeden riadok R5).
 - **Kandidáti na D-čísla** (nálezy mimo scope z packages, rozhoduje Michal): **M1** F3 tri takmer rovnaké sanitizéry odkazu · F4 kovanie pri napojení na Demos
@@ -94,6 +94,10 @@ encoding guard čistý; kód sa mení len číslom verzie a cestou v hlavičkác
 - **Test na kompletnej reálnej zákazke** je akceptačný test **po V1** (C10/C13).
 
 ## Smoke checklist bloku (v poradí práce)
+
+**Smoke PASS — Michal 30.9.2026, bez nálezov** („smoke pass"). Výsledok sa zaznamenal ako celok, nie po bodoch. Dočasná skupina „CENY — smoke po
+uzávere" v [DOGFOODING.md](../DOGFOODING.md) zanikla; ďalšie postrehy k funkciám bloku sa zapisujú ako **nové D-čísla podľa bloku** (nie ako opravy
+v0.17.x). Otvorené body vyššie (Q1, kandidáti na D-čísla, test na reálnej zákazke po V1) nie sú súčasť smoke a ostávajú. Checklist nižšie ostáva ako záznam.
 
 Zlúčené zo sekcií „Smoke checklist pre Michala" package M1 (§10, body M1a 1–5 a M1b 6–14) a M2 (§10, body 1–10) — bez duplicít, **bod 4 M2 opravený podľa
 C14** (bežná doska bez formátu sa už počíta podľa m²). Pri každom bode je dávka, z ktorej pochádza.

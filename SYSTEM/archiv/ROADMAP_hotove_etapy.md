@@ -15,7 +15,7 @@ návrhu (Codex; M1: 1 BLOCKER + delta audit, M2: 1 BLOCKER — všetko prijaté)
 (in-SU nebol bránou — nič nezapisuje do modelu). Výsledok, dávky, overenie, priznané limity a zlúčený smoke checklist:
 [CENY_ZAVER_2026-09-30.md](CENY_ZAVER_2026-09-30.md). Priečinok bloku (rozhodnutia Michala C1–C14, schválený mockup, packages M1 a M2 so surovými auditmi,
 fakty z kódu) je od uzáveru v [bloky/CENY/](bloky/CENY/). Kompatibilita: katalóg materiálov v schéme 11/12 (starší plugin ho len číta), `BUDGET_STD` sa
-nemení — **starší plugin na druhom PC ocení materiál bez formátu po starom**; aktualizovať obe PC. **Smoke čaká** (Michal). **Otvorené:** Q1 porez a montáž
+nemení — **starší plugin na druhom PC ocení materiál bez formátu po starom**; aktualizovať obe PC. **Smoke PASS 30.9.2026** (Michal, bez nálezov). **Otvorené:** Q1 porez a montáž
 pri skle (bez odpovede — bez zmeny); nálezy mimo scope F1–F6 z packages sú kandidáti na D-čísla.
 
 ### Pôvodný plný text bloku pri uzávere (PLAN, blok 4 · V1 DOTIAHNUTIE)

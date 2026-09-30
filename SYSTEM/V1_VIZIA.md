@@ -13,7 +13,7 @@ v PLANe prázdny**; V1 je hotové, keď je odškrtnuté všetko. Stav dopĺňaj�
 1. [x] **Návrh:** vloženie skriniek na klik (GHOST, **hotové** v0.9.0) · prisunutie a kópia po vlastnej osi (NÁSTROJE-1, **hotové** v0.9.25) · dosky vkladané a kreslené
    prichytením na skrinky (GHOST-D1/D2, **hotové** v0.9.27 / v0.9.28) · šablóny s kovaním = opakované typy na 1 klik (KOV-I, **hotové** v bloku KOVANIE) ·
    V1 rozsah bodu je prázdny: **test na kompletnej reálnej zákazke je akceptačný test PO V1** (Michal 29.–30.9.2026 — teraz nemá vhodnú zákazku;
-   ďalší postup po smoke bloku CENY určí Michal; hardening R-13 → R-37 → R-35 je od 30.9. v PLAN „Po V1 — zásobník"), nie podmienka uzáveru V1. *(Zostavy, segmenty, sektory a viazané diely = PO V1, rozhodnutie 4.9.2026.)*
+   smoke bloku CENY **PASS 30.9.2026**, ďalší postup určí Michal; hardening R-13 → R-37 → R-35 je od 30.9. v PLAN „Po V1 — zásobník"), nie podmienka uzáveru V1. *(Zostavy, segmenty, sektory a viazané diely = PO V1, rozhodnutie 4.9.2026.)*
 2. [x] **Konštrukcia (rozhodnuté 6.9.2026):** **K1 odsadenia** — komín vzadu (dno a strop kratšie, chrbát na ich zadnej hrane) a strop zapustený vpredu, jedna nastaviteľná hodnota
    per skrinka (**hotové** v0.13.2) · **K2 chrbát z výstuh** (dve lišty medzi bokmi, výška parameter; **hotové** v0.13.3) · **K3 rohová skrinka** dolná, slepá s CR lištou, prepínač L/P (nízka priorita, posledná) ·
    výstuhy v interiéri (hotové, D-80), sokel/nohy podľa výšky (hotové, D-79). *(Rohové spoje per strana, poldrážka, „bez dielca", čelo ako cenová položka V1-07 = mimo V1.)*
@@ -35,7 +35,7 @@ v PLANe prázdny**; V1 je hotové, keď je odškrtnuté všetko. Stav dopĺňaj�
 6. [x] **Výstupy:** VEPO CSV, kusovník, nákup kovania, rozpočet s cenami, XLSX cenová ponuka *(hotové — dávky E + fáza ŠTÚDIO)* · **zvyšok V1-03 (rozhodnuté 6.9.2026):**
    manuálne 1-klik overenie ceny (katalógové kovanie **hotové** — CENY-KOV v0.10.4–v0.10.5; **materiály/ABS hotové** — blok CENY, v0.16.1–v0.16.3, uzáver
    **v0.17.0**, PR #425–#428: odkaz na produkt a ručné overenie ceny dosky/ABS bez Demosu v Štúdiu aj v Rozpočte, materiál bez formátu v Rozpočte podľa
-   skutočných m² — [výsledok a smoke](archiv/CENY_ZAVER_2026-09-30.md); Michalov smoke čaká) + ~~viac URL na položke~~ → jeden odkaz (C7, 29.9.2026; „na faktúru" vyradené)
+   skutočných m² — [výsledok a smoke](archiv/CENY_ZAVER_2026-09-30.md); Michalov smoke **PASS 30.9.2026**) + ~~viac URL na položke~~ → jeden odkaz (C7, 29.9.2026; „na faktúru" vyradené)
    · **D-94** nákup s pôvodom (**hotové** v0.12.1, PR #361) · **nárezový plán primitívny** (horná hranica počtu platní podľa zvoleného rozloženia namiesto odhadu z m²; objednáva človek — **hotové** v0.15.1–v0.15.4, blok 2
    uzavretý v0.16.0, PR #418–#421: sekcia Nárezový plán, prerez/orez/prídavok dupláku, Kontrola s orezom, voliteľné ceny podľa plánu —
    [výsledok a smoke](archiv/NAREZ_ZAVER_2026-09-29.md); Michalov smoke **PASS 29.9.2026**; porovnanie s reálnou objednávkou VEPO po V1) ·

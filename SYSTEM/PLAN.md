@@ -36,7 +36,7 @@ plán primitívny** — štart PR #417, dávky PR #418 → #421 + uzáver PR #42
 výsledok a smoke checklist v [archiv/NAREZ_ZAVER_2026-09-29.md](archiv/NAREZ_ZAVER_2026-09-29.md), priečinok bloku v [archiv/bloky/NAREZ/](archiv/bloky/NAREZ/).)*
 *(Blok **CENY · overenie cien materiálov a ABS** (zvyšok V1-03, V1 bod 6, v bloku 4) je hotový — **v0.16.0 → v0.17.0, 29.–30.9.2026**, štart PR #425, dávky PR #426 → #428
 + uzáver PR #429 (CENY-M1a · CENY-M1b · CENY-M2); plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), výsledok a smoke checklist
-v [archiv/CENY_ZAVER_2026-09-30.md](archiv/CENY_ZAVER_2026-09-30.md), priečinok bloku v [archiv/bloky/CENY/](archiv/bloky/CENY/).)*
+v [archiv/CENY_ZAVER_2026-09-30.md](archiv/CENY_ZAVER_2026-09-30.md), priečinok bloku v [archiv/bloky/CENY/](archiv/bloky/CENY/); Michalov smoke **PASS 30.9.2026** (bez nálezov).)*
 
 
 ### 1b · STABILIZAČNÁ REVÍZIA (dlhy fázy ŠTÚDIO — pred blokom KOVANIE)
@@ -227,8 +227,9 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   a ručné overenie ceny dosky/ABS bez Demosu v Štúdiu aj v Rozpočte, materiál bez formátu v Rozpočte podľa skutočných m² (C12 + C14). Štart PR #425, dávky
   CENY-M1a #426 · CENY-M1b #427 · CENY-M2 #428 + uzáver PR #429; plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), výsledok
   a smoke checklist v [archiv/CENY_ZAVER_2026-09-30.md](archiv/CENY_ZAVER_2026-09-30.md), priečinok bloku v [archiv/bloky/CENY/](archiv/bloky/CENY/).
+  **Smoke PASS 30.9.2026** (Michal, bez nálezov).
 - **V1 rozsah bloku 4 je prázdny (Michal 30.9.2026 ráno):** hardeningové body **R-13 → R-37 → R-35** sú **po V1** (zásobník nižšie, poradie ostáva);
-  **test na kompletnej reálnej zákazke** je akceptačný test po V1. Ďalšie pokračovanie po smoke bloku CENY určí Michal.
+  **test na kompletnej reálnej zákazke** je akceptačný test po V1. Smoke bloku CENY **PASS 30.9.2026**; ďalšie pokračovanie určí Michal.
   **CENY-KOV-A/B je hotové** (10.9.2026, PR #345/#346, v0.10.4–v0.10.5): jeden produktový odkaz a ručné potvrdenie katalógového kovania; plný schválený rozsah v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).
   Pôvodná debata: [zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md). Prepínač „na faktúru“ je vyradený (existuje s DPH / bez DPH); DOCX/PDF ponuka a rodina dokumentov sú mimo V1.
 - ✅ **D-128 · Ručná výška dreveného boxu zásuvky (Quadro)** — tretia os zámku (`box_height`) popri NL a výškovom variante Atiry: chip „box 360" s malým číselným poľom
