@@ -45,6 +45,11 @@ Autorita pre zaradenie položiek. Plné znenia a dôkazy: [TRIEDENIE_krizovy_aud
 
 **Spolu:** 35 Teraz · 29 Po V1 · 11 Vyradiť (75 položiek). **Odchýlky od odporúčania orchestrátora:** B-10 Teraz → **Po V1** · D-03 Teraz → **Po V1** · D-11 Po V1 → **Teraz** · E-02 Po V1 → **Vyradiť** · E-04 Po V1 → **Vyradiť** · E-06 Po V1 → **Vyradiť** · E-09 Po V1 → **Vyradiť** · G-01 Teraz → **Po V1** · G-03 Po V1 → **Vyradiť** · G-09 Po V1 → **Vyradiť** · G-10 Po V1 → **Vyradiť**.
 
+**Dôvody odchýlok a vyradení (doplnok po review PR #432):** Michal pri triedení k odchýlkam ani k vyradeniu E-02, E-04, E-06, E-09, G-03, G-09, G-10
+poznámku neuviedol (stĺpec prázdny) — dôvodom je **jeho rozhodnutie pri triedení 1.10.2026**; orchestrátor dôvody nedomýšľa. **Vyradené** znamená
+„v pláne sa nerieši", nie trvalý zákaz: položka sa vráti len novým postrehom Michala (DOGFOODING). G-11 a G-12 Michal výslovne potvrdil „nerieši sa"
+(odpovede nižšie). Pôvodné zdôvodnenie každej položky (čo a prečo) ostáva na triediacej stránke a v surových výstupoch.
+
 ### TERAZ — blok HARDENING (35)
 
 | ID | Oblasť | Položka | Zdroj | Poznámka Michala |
@@ -148,3 +153,5 @@ Autorita pre zaradenie položiek. Plné znenia a dôkazy: [TRIEDENIE_krizovy_aud
   dáta reálnych zákaziek).
 - **Bez viazania na noci:** každý beh spracuje sekvenčne, koľko stihne, a pokračuje ďalší (Michal: „nefixovať na časové obdobie").
 - **Mockup schvaľuje Michal** pred packages dávok H6 (priestor v Inspectore) a H7 (názov zákazky); mockupy sa pripravia počas H1–H5.
+- **H7 doplnená o R-38** (orchestrátor po review PR #432): presun nastavení exportu do jadra (C-07) ide až s ochranou poškodeného súboru nastavení
+  pred tichým prepisom zo zálohy — inak by presun zachoval cestu k strate názvov zákaziek. Michal to potvrdí spolu s mockupom H7.

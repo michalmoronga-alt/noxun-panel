@@ -1,5 +1,9 @@
 # Krížový audit V1 — A4 · Claude Code subagent, Claude Opus 5.5 („nový agent", test zaúčania S6)
 
+> **Poznámka orchestrátora (review PR #432):** audítor celé prečítal ≈ 0,5 MB; zvyšok povinného čítania (≈ 1 MB) len **zmeral a prehľadal Grepom**.
+> Veľkosti v kB/MB sú **zmerané** (`wc -c`). Podiel „užitočných 3–4 %" a vety typu „po celom povinnom čítaní" sú preto **neoverený odhad**, nie výsledok
+> merania — pre B-01 (dávka H1) platia len zmerané veľkosti a nájdené miesta (súbor:riadok). Surový text nižšie je ponechaný bez zmeny.
+
 Rozsah: celé som prečítal ≈ 0,5 MB. Išlo o `CLAUDE.md`, `.claude/agents/implementator.md`, STAV, PLAN, DOGFOODING, README (SYSTEM), `docs/ARCHITEKTURA.md`, `docs/UI_DIZAJN.md`, VEPO_KONTRAKT, SKETCHUP_PRAVIDLA, podklad a úvod AUDIT_REGISTRA. K tomu som prečítal dotknuté odseky v `construction.md`, `outputs.md`, `model-a-identita.md`, `materials.md`, `ui-lifecycle.md` a v STANDARD §3, §4, §8 a §11. Zvyšok povinného čítania má ≈ 1 MB (celé `ui-lifecycle.md`, `hardware.md`, STANDARD §6–§7). Ten som zmeral cez `wc -c` a prehľadal Grepom. Worktree `orch-v1audit` je na `6d59edef` (= `main` 4da1c3b5 + podklad). Repo som len čítal.
 
 Postup: pre dve vymyslené dávky som išiel doslova podľa tabuľky „Povinné čítanie podľa typu práce" (`CLAUDE.md:12–23`, „platia VŠETKY" `:25`):

@@ -20,7 +20,7 @@
 - **DOCS — štart bloku 9 · HARDENING PO V1: krížový audit V1 a triedenie (1.10.2026, PR #432, len dokumentácia; verzia pluginu sa nemení).** Michal 30.9. zadal ako
   posledný krok V1 krížový audit všetkými providermi (refaktor a upratanie s ohľadom na rozširovanie, nápady po V1, UI/UX drobnosti). Matica 7 kariet (Antigravity
   vyradený): Codex `gpt-6-astra` a Grok `grok-4.7` kód podľa scenárov S1–S5, Codex `gpt-5.6-sol` dokumenty, Claude Opus „nový agent" (test zaúčania: podľa tabuľky
-  čítania ~1 MB pred malou UI dávkou, ~1,5 MB pred novým typom skrinky, užitočných 3–4 %), Claude Opus „stolár + UX" nad 38 screenshotmi (vykreslené headless
+  čítania ~1 MB pred malou UI dávkou, ~1,5 MB pred novým typom skrinky — zmerané; podiel užitočného textu 3–4 % je neoverený odhad, audítor ~1 MB len zmeral a prehľadal), Claude Opus „stolár + UX" nad 38 screenshotmi (vykreslené headless
   Chrome z nahratých Ruby→JS dát pluginu — obrazovka PC bola zamknutá), dvaja Claude rešeršéri (trh; SketchUp Ruby API 2024–2026: Michal aj Lucia majú 26.0.429,
   2026.2 volá zatváranie okien aj pri ukončení SketchUpu — pasca #1117). Zlúčené do 75 položiek; sondou v kóde overené: Kusovník sčítava zlomky platní naprieč
   materiálmi, Nákup kovania ukazuje surové kódy kategórií, pravidlo závesov na stenu platí len pre typ `upper`. Michal roztriedil na interaktívnej stránke:

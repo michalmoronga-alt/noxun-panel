@@ -394,6 +394,8 @@ zahodí, `save_merge_18_36` ho ignoruje) a **chýba mu aj degraded guard** z R-1
 prepísať novšie nastavenia obsahom odvodeným od staršej zálohy. Zámok (1b-6c) má, integritnú bránu nie.
 **Návrh:** rovnaká brána ako pre ostatných 5 (`JsonFileStore.degraded?` pod zámkom tesne pred zápisom) + **vlastný UI kontrakt** —
 tri cesty musia najprv začať výsledok zápisu vôbec čítať a mať kam ho povedať. Samostatná dávka. **Odhad: S.**
+**Zaradenie (1.10.2026):** blok 9 · HARDENING, dávka **H7** — ochrana ide pred presun nastavení exportu do jadra (C-07); po presune dávka H7
+aktualizuje cestu súboru v tomto zázname.
 
 ## Os UI VZORY a drobné dlhy
 
