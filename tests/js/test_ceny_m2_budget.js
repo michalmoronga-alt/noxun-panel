@@ -149,7 +149,10 @@ const PC_FRESH = { kind: 'sheet', id: 'S25', label: 'H1180 DTDL 25 mm', manual_c
   const chipD = B.budOfferChipHtml({ id: 'stale', text: 'x' }, demosOld, 1.23);
   ok(chipD.includes('title="Staré ceny sa obnovujú v Rozpočte tlačidlom „Prepočítať ceny&quot; — ponuka'), 'Demos tooltip ostava');
   // R6
-  ok(B.BUD_PLAN_TIP.includes('Materiál bez formátu platne sa počíta podľa skutočnej plochy dielcov — plán ho nemení.'), 'BUD_PLAN_TIP');
+  // Review #428 P2: veta sľubuje plochu LEN materiálu mimo bežných dosiek (R1, `area_priced_type?`).
+  ok(B.BUD_PLAN_TIP.includes('\nSklo, zrkadlo a iný materiál bez formátu platne, ktorý nie je bežná doska, sa počíta podľa ' +
+     'skutočnej plochy dielcov — plán ho nemení. Bežná doska bez formátu ostáva na odhade platní.'), 'BUD_PLAN_TIP');
+  ok(B.BUD_PLAN_TIP.indexOf('\nMateriál bez formátu platne sa počíta') < 0, 'žiadny sľub plochy pre každý materiál bez formátu');
 })();
 
 // --- proj_materials.js: klik z Rozpoctu (R15, R18) -----------------------------------
