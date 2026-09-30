@@ -3010,8 +3010,11 @@ module NoxunSuRunner
       ok('katalog: chranena predvolba sa neda zmazat',
          !e::Materials.sheet('K009_PW_DTDL_18').nil?)
       # Codex GH #39: hrubka ABS pri edite nemenna (jednotkove ID nesmie zacat znamenat 2mm)
+      # CENY-M1a (R6b): formular nesie baseline riadku z otvorenia — bez neho by
+      # save skoncil konfliktom a guard hrubky by sa vobec neoveril.
       e::MaterialsDialog.handle_save_edge({ 'abs_id' => k_abs10, 'decor' => SYNC_DECOR_K,
                                             'thickness' => '2.0', 'price_per_bm' => '1',
+                                            'row_rev' => e::Materials.record_rev(e::Materials.edge(k_abs10)),
                                             'catalog_schema' => cs11 }.to_json)
       abs10 = e::Materials.edge(k_abs10)
       ok('katalog: zmena hrubky existujucej ABS odmietnuta (ostava 1.0)',
