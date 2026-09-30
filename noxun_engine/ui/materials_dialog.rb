@@ -51,6 +51,7 @@ module Noxun
         patch_sheet patch_edge
         delete_preflight restore_pre_schema2
         open_demos_url open_search_url mat_product_open
+        mat_manual_prepare mat_manual_open mat_manual_confirm
         demos_lookup demos_manual_url demos_apply demos_cancel
         demos_name_search demos_family demos_family_create demos_family_cancel
         replace_uni_preview replace_uni_apply
@@ -64,10 +65,18 @@ module Noxun
       # (sonda S8/T20); ozdoby by normalize zahodil aj tak, strhavaju sa
       # vyslovne, aby zapis nikdy nezavisel od whitelistu normalizacie.
       FORM_STRIP_KEYS = %w[price_checked_at price_check_method product_link price_check
-                           row_rev label row_label row_key image_file].freeze
+                           price_display row_rev label row_label row_key image_file].freeze
       PRODUCT_URL_TEXT_MSG = 'Odkaz musí byť text.'
       PRODUCT_URL_BAD_MSG = 'Odkaz nie je platná webová adresa — musí začínať http:// alebo https:// a nesmie mať medzery, úvodzovky, diakritiku ani znaky ako | { } ^.'
       PRODUCT_URL_DEMOS_MSG = 'Položka je viazaná na Demos — ručný odkaz zadáš až po vymazaní Demos URL.'
+      # CENY-M1b (R22, R13b): vety po ulozeni, ktore zrusilo overenie ceny.
+      MANUAL_CLEARED_MSG = 'Uložené — ručné overenie ceny sa zrušilo, položka ide na kontrolu.'
+      DEMOS_STAMP_CLEARED_MSG = 'Uložené — dátum overenia z Demosu sa zrušil, cenu obnoví Prepočítať ceny.'
+      # CENY-M1b (R15): echo poziadavky formulara „Overiť cenu" (klient podla
+      # neho pozna, ci odpoved patri jeho modalu).
+      MANUAL_ECHO_KEYS = %w[kind id token section model_guid].freeze
+      MANUAL_OPEN_FAILED_MSG = 'Obchod sa nepodarilo otvoriť — cenu si over inak a potvrď.'
+      MANUAL_CHANGED_MSG = 'Položka sa medzitým zmenila — skontroluj aktuálne údaje.'
 
       class << self
         # Vykona akciu katalogu v mene SEKCIE `mat`. `sink` je proc, ktory
@@ -105,6 +114,12 @@ module Noxun
           when 'open_demos_url'          then handle_open_demos_url(payload)
           when 'open_search_url'         then handle_open_search_url(payload)
           when 'mat_product_open'        then handle_product_open(payload)
+          # CENY-M1b (R15): rucne overenie ceny — vlastny formular a tokeny,
+          # MIMO Demos session (odchod zo sekcie ho nerusi; odoslane
+          # potvrdenie dobehne na serveri).
+          when 'mat_manual_prepare'      then handle_manual_prepare(payload)
+          when 'mat_manual_open'         then handle_manual_open(payload)
+          when 'mat_manual_confirm'      then handle_manual_confirm(payload)
           # ŠT-2b: Demos toky. Su ASYNCHRONNE — dispatch len STARTUJE beh
           # a hned sa vracia; emity dobiehaju z `UI.start_timer` uz BEZ sinku,
           # takze `js` ich posle do Studia (jedine zive UI katalogu).
@@ -198,9 +213,13 @@ module Noxun
         end
 
         def catalog_payload
+          days = manual_stale_days
           {
             materials: Panel.materials_payload,               # katalog dosiek pre selecty
-            catalog: full_catalog_payload,                    # D-05: plne zaznamy pre spravu
+            catalog: full_catalog_payload(days),              # D-05: plne zaznamy pre spravu
+            # CENY-M1b (R8): prah veku rucne overenej ceny (Nastavenia
+            # dodavatela, ten isty ako pri Demose) — klient stav nepocita.
+            stale_days: days,
             protected_ids: Materials::PROTECTED_SHEET_IDS,
             catalog_rev: Materials.catalog_revision,          # D-41: baseline guard formularov
             # 2A-1 (audit F10): SCHEMA katalogu. Klient ju vracia v KAZDEJ mutacii
@@ -283,10 +302,11 @@ module Noxun
         # D-42 PR C: row_rev = odtlacok SUROVEHO zaznamu (bez labelu) — baseline
         # inline patchu per riadok. Pocita sa PRED merge labelu (server porovnava
         # proti zaznamu v katalogu, nie proti payloadovej ozdobe).
-        def full_catalog_payload
+        def full_catalog_payload(stale_days = manual_stale_days)
           cat = Materials.load
           ctx = Panel.label_ctx # 2A-4b: kolizie cisla dekoru raz pre cely payload
           fam = Panel.row_fam_ctx(ctx) # PICKER-2: kolizie dekorovych menoviek
+          now = Time.now.utc
           {
             'sheets' => cat['sheets'].map { |s|
               # PICKER-2: `row_label`/`row_key` su TIE ISTE, ake dostava panel
@@ -303,14 +323,35 @@ module Noxun
                 extra['image_file'] = local
               end
               product_link_extra!(extra, s)
+              manual_price_extra!(extra, s, stale_days, now)
               s.merge(extra)
             },
             'edges' => cat['edges'].map { |a|
               extra = { 'label' => Panel.abs_label(a, ctx), 'row_rev' => Materials.record_rev(a) }
               product_link_extra!(extra, a)
+              manual_price_extra!(extra, a, stale_days, now)
               a.merge(extra)
             }
           }
+        end
+
+        # CENY-M1b (R8, R11a): `price_display` (zobrazene hodnoty ceny —
+        # klient ich len formatuje) na KAZDOM riadku a `price_check` (stav
+        # rucneho overenia, `Materials.manual_price_state`) LEN pri rucnom
+        # zazname. `row_rev` je uz spocitany zo suroveho zaznamu.
+        def manual_price_extra!(extra, rec, stale_days, now)
+          extra['price_display'] = Materials.price_display(rec)
+          state = Materials.manual_price_state(rec, stale_days: stale_days, now: now)
+          extra['price_check'] = state if state
+          extra
+        end
+
+        # CENY-M1b (R8): prah veku ceny z Nastaveni dodavatela — fail-soft 30.
+        def manual_stale_days
+          days = SupplierSettings.scalar(SupplierSettings.active, 'stale_days').to_i
+          days.positive? ? days : 30
+        rescue StandardError
+          30
         end
 
         # CENY-M1a (R8): `product_link` (platny odkaz?) nesie LEN „rucny"
@@ -339,8 +380,15 @@ module Noxun
           )
           case status
           when :ok
-            after_catalog_change
-            set_status('Uložené.')
+            if extra.nil?
+              # CENY-M1b (R12): echo zobrazenej €/m2 — nic sa nezapisalo;
+              # bunka sa len vrati na zobrazenu hodnotu servera.
+              push_catalog
+              set_status('Cena sa nezmenila.')
+            else
+              after_catalog_change
+              set_status(extra['manual_cleared'] ? MANUAL_CLEARED_MSG : 'Uložené.')
+            end
           when :conflict
             set_status('Riadok medzitým zmenil niekto iný — hodnoty sa obnovili, uprav znova.', true)
             push_catalog
@@ -772,6 +820,169 @@ module Noxun
 
           set_status('Odkaz sa medzitým zmenil alebo chýba — katalóg sa obnovil.', true)
           push_catalog
+        end
+
+        # --- CENY-M1b (R15): formular „Overiť cenu" --------------------------
+        # Tri akcie, vzor CENY-KOV-B (`HardwareCatalogDialog.handle_manual_*`):
+        # prepare a open NIC nezapisuju, confirm zapisuje VYHRADNE cez
+        # `Materials.confirm_manual_price` (jeden zamok, `row_rev` riadku).
+        # Odpoved nesie echo `kind, id, token, section, model_guid` — klient
+        # podla neho pozna, ci patri jeho modalu (neskora odpoved nesmie
+        # vlastnit cudzi modal). Tok NEPOUZIVA Demos session.
+
+        def handle_manual_prepare(payload)
+          data = JSON.parse(payload.to_s)
+          js("MD.manualReady(#{JSON.generate(manual_snapshot(data))})")
+        rescue StandardError => e
+          Engine.log_error(e, 'MaterialsDialog.manual_prepare')
+          echo = (data || {}).select { |k, _| MANUAL_ECHO_KEYS.include?(k) }
+          js("MD.manualReady(#{JSON.generate(echo.merge('item' => nil, 'reason' => 'Položku sa nepodarilo načítať.'))})")
+        end
+
+        # Otvorenie obchodu: LEN cerstvy rucny zaznam s platnym odkazom a TOU
+        # ISTOU reviziou, aku ukazuje formular (zmeneny zaznam nesmie otvorit
+        # iny produkt vedla starej ceny). URL od klienta sa neprijima. Ked
+        # `UI.openURL` vrati false, odpoved je stale `ok` s upozornenim —
+        # prehliadac je len pomoc, potvrdenie neblokuje (mockup B1).
+        def handle_manual_open(payload)
+          data = JSON.parse(payload.to_s)
+          snap = manual_snapshot(data)
+          item = snap['item']
+          unless item && !snap['read_only'] && snap['has_url'] && snap['row_rev'] == data['row_rev'].to_s
+            return manual_result(data, :conflict, MANUAL_CHANGED_MSG, nil, phase: 'open', snap: snap)
+          end
+          opened = begin
+            UI.openURL(Materials.sanitize_product_url(item['product_url'])) != false
+          rescue StandardError => e
+            Engine.log_error(e, 'MaterialsDialog.manual_open (openURL)')
+            false
+          end
+          manual_result(data, :ok, opened ? '' : MANUAL_OPEN_FAILED_MSG, nil,
+                        phase: 'open', snap: snap, extra: { 'opened' => opened })
+        rescue StandardError => e
+          Engine.log_error(e, 'MaterialsDialog.manual_open')
+          manual_result(data || {}, :error, 'Overenie sa nepodarilo pripraviť — otvor ho znova.', nil, phase: 'open')
+        end
+
+        def handle_manual_confirm(payload)
+          data = JSON.parse(payload.to_s)
+          # Stary klient (CEF cache) formular nema; schema aj tak strazi.
+          unless Materials.schema_write_allowed?(data['catalog_schema'])
+            push_catalog
+            return manual_result(data, :schema, 'Katalóg je v novom formáte — obnov Štúdio (Obnoviť) a potom ulož.')
+          end
+          # D10: katalog je globalny, ale formular patri dokumentu, v ktorom sa
+          # otvoril (M2 ho bude volat z Rozpoctu zakazky).
+          unless manual_model_current?(data)
+            return manual_result(data, :stale_model, 'Model sa medzitým prepol — otvor overenie znova.')
+          end
+          status, info, field = Materials.confirm_manual_price(
+            data['kind'].to_s, data['id'].to_s, price: data['price'], basis: data['basis'],
+            row_rev: data['row_rev'].to_s
+          )
+          if status == :ok
+            after_catalog_change
+            msg = manual_confirmed_msg(data['kind'].to_s, data['basis'].to_s, info)
+            set_status(msg)
+            return manual_result(data, :ok, msg)
+          end
+          push_catalog if %i[conflict not_found catalog_read_only].include?(status)
+          manual_result(data, status, info.to_s.empty? ? 'Cenu sa nepodarilo potvrdiť.' : info, field)
+        rescue StandardError => e
+          Engine.log_error(e, 'MaterialsDialog.manual_confirm')
+          manual_result(data || {}, :error, 'Cenu sa nepodarilo uložiť. Skús to znova.')
+        end
+
+        # Cerstvy snimok polozky pre formular (nic nezapisuje). `item` = kopia
+        # zaznamu s `label`, `price_display` a pri rucnom zazname `price_check`;
+        # nil pri cudzom modeli alebo chybajucej polozke.
+        def manual_snapshot(data)
+          result = data.select { |k, _| MANUAL_ECHO_KEYS.include?(k) }
+          days = manual_stale_days
+          current = manual_model_current?(data)
+          rec = current ? manual_record(data['kind'].to_s, data['id'].to_s) : nil
+          item = nil
+          if rec
+            item = rec.merge('label' => manual_label(data['kind'].to_s, rec))
+            manual_price_extra!(item, rec, days, Time.now.utc)
+          end
+          reason = Materials.catalog_read_only? ? Materials.catalog_read_only_message : nil
+          reason ||= 'Model sa medzitým prepol — otvor overenie znova.' unless current
+          has_url = !!(rec && Materials.manual_product_record?(rec) && Materials.sanitize_product_url(rec['product_url']))
+          result.merge('item' => item, 'row_rev' => rec && Materials.record_rev(rec), 'has_url' => has_url,
+                       'read_only' => Materials.catalog_read_only?, 'reason' => reason, 'stale_days' => days)
+        end
+
+        def manual_record(kind, id)
+          JsonFileStore.invalidate(Materials.path)
+          case kind
+          when 'sheet' then Materials.sheet(id)
+          when 'edge' then Materials.edge(id)
+          end
+        end
+
+        def manual_label(kind, rec)
+          ctx = Panel.label_ctx
+          kind == 'edge' ? Panel.abs_label(rec, ctx) : Panel.sheet_label(rec, ctx)
+        rescue StandardError
+          rec['decor'].to_s
+        end
+
+        def manual_model_current?(data)
+          model = Sketchup.active_model
+          !!(model && !data['model_guid'].to_s.empty? && !DocKey.foreign?(data['model_guid'], model))
+        rescue StandardError
+          false
+        end
+
+        def manual_result(data, status, msg, field = nil, phase: 'submit', snap: nil, extra: {})
+          snap ||= begin
+            manual_snapshot(data)
+          rescue StandardError
+            data.select { |k, _| MANUAL_ECHO_KEYS.include?(k) }.merge('item' => nil, 'read_only' => true)
+          end
+          errors = if status == :ok then []
+                   elsif field == 'price' then [{ 'field' => 'price', 'msg' => msg.to_s }]
+                   else [{ 'msg' => msg.to_s }]
+                   end
+          out = snap.merge('ok' => status == :ok, 'status' => status.to_s, 'phase' => phase,
+                           'msg' => msg.to_s, 'errors' => errors).merge(extra)
+          js("MD.manualResult(#{JSON.generate(out)})")
+        end
+
+        # R20: „Cena potvrdená k 30.9.2026: 179,90 € za platňu = 31,04 €/m²."
+        # (+ „bez zmeny ceny — len dátum", ked potvrdenie cenu nezmenilo).
+        def manual_confirmed_msg(kind, basis, info)
+          rec = info['rec'] || {}
+          day = manual_day_label(rec['price_checked_at'])
+          body = if kind == 'edge'
+                   "#{manual_money(rec['price_per_bm'], exact: true)} €/bm"
+                 else
+                   m2 = "#{manual_money(Materials.display_m2(rec['price_per_m2']))} €/m²"
+                   plate = info['plate'] ? "#{manual_money(info['plate'])} € za platňu" : nil
+                   if basis == 'plate' && plate then "#{plate} = #{m2}"
+                   elsif plate then "#{m2} = #{plate}"
+                   else m2
+                   end
+                 end
+          same = info['unchanged'] ? ' (bez zmeny ceny — len dátum)' : ''
+          "Cena potvrdená k #{day}: #{body}#{same}."
+        end
+
+        def manual_day_label(iso)
+          m = iso.to_s.match(/\A(\d{4})-(\d{2})-(\d{2})/)
+          m ? "#{m[3].to_i}.#{m[2].to_i}.#{m[1]}" : 'dnešku'
+        end
+
+        # Suma s desatinnou ciarkou: 2 desatinne; `exact` (€/bm) necha jemnejsiu
+        # hodnotu tak, ako je ulozena (0,125 — €/bm sa nezaokruhluje).
+        def manual_money(value, exact: false)
+          return '—' unless value.is_a?(Numeric) && value.finite?
+          cents = Materials.cents_of(value)
+          if exact && cents && Rational(cents, 100) != Rational(value.to_s)
+            return value.to_s.tr('.', ',')
+          end
+          format('%.2f', (cents || 0) / 100.0).tr('.', ',')
         end
 
         # D-74: otvorenie ZHODY naseptavaca — URL pochadza zo serverovej sitemap
@@ -1664,6 +1875,12 @@ module Noxun
                 end
           skipped = Array(info['skipped'])
           msg += " Preskočené (už existujú): #{skipped.join(', ')}." unless skipped.empty?
+          # CENY-M1b (R22): editor zmenou ceny, kodu, dodavatela alebo formatu
+          # zrusil rucne overenie — polozky idu na kontrolu.
+          cleared = Array(info['manual_cleared'])
+          unless cleared.empty?
+            msg += " Ručné overenie ceny sa zrušilo (#{cleared.size}×) — položky idú na kontrolu."
+          end
           msg
         end
 
@@ -1793,6 +2010,13 @@ module Noxun
           # D-44 (GH P2): edit s prazdnymi polami formatu = vedome VYMAZANIE.
           rec.delete('sheet_size') if data['clear_sheet_size']
           rec.delete('clear_sheet_size')
+          # CENY-M1b (R12, R21): pole Cena ukazuje zobrazenu €/m2 servera (2
+          # desatinne). Jej echo cenu NEMENI — ostava presna ulozena hodnota
+          # (bez toho by nedotknuty formular zmenil 179,90 € za platnu na
+          # 179,91 € a zrusil overenie — sonda S10).
+          if data.key?('price_per_m2') && Materials.sheet_price_echo?(data['price_per_m2'], existing['price_per_m2'])
+            rec['price_per_m2'] = existing['price_per_m2']
+          end
           # M-A3e D-71: rucna vazba na dodavatela — cerstvy sanitize (zly host/
           # tvar = save ODMIETNUTY), prazdne pole = vedome zmazanie vazby; zmena
           # alebo zmazanie rusi price_checked_at (cena uz nie je overena).
@@ -1811,11 +2035,41 @@ module Noxun
           if (perr = apply_product_url!(rec, data, existing))
             return [:product_error, perr]
           end
+          note = form_price_check_note!(existing, rec)
           # 2B-1: edit zdroja drzi zdielane polia duplakov v synchre (format/
           # grain/farba) v JEDNOM atomickom zapise. Zamok je reentrantny —
           # upsert berie ten isty, ktory drzime.
           return [:error, 'Uloženie katalógu zlyhalo.'] unless Materials.upsert_sheet_with_duplak_sync(rec)
-          [:ok, "Materiál #{id} upravený."]
+          [:ok, note || "Materiál #{id} upravený."]
+        end
+
+        # CENY-M1b: overenie ceny vo formulari variantu (mutuje `rec`, vrati
+        # vetu statusu alebo nil). R13 — rucne overena polozka: zmena ceny
+        # (po echu), kodu, dodavatela, odkazu, formatu, dekoru u dodavatela
+        # alebo nova Demos vazba zrusi metodu aj datum. R13b (D-148) — polozka
+        # S Demos vazbou, ktoru formular nemeni: zmena ceny, kodu, dodavatela
+        # alebo formatu zrusi datum overenia z Demosu (to iste, co robi bunka
+        # a editor „Upraviť…"), „Prepočítať ceny" ju potom overi znova.
+        def form_price_check_note!(existing, rec)
+          return MANUAL_CLEARED_MSG if Materials.reconcile_manual_check!(existing, rec)
+          return DEMOS_STAMP_CLEARED_MSG if demos_stamp_edit!(existing, rec)
+          nil
+        end
+
+        # R13b (D-148): datum z Demosu pri rucne prepisanej hodnote. Vazba sa
+        # nemeni = zaznam aj vysledok ju maju a datum ZOSTAL (zmenu adresy uz
+        # vyriesil `manual_demos_url` — datum je vtedy prec).
+        def demos_stamp_edit!(existing, rec)
+          return false if existing['demos_url'].to_s.strip.empty? || rec['demos_url'].to_s.strip.empty?
+          return false if rec['price_checked_at'].to_s.strip.empty?
+          price_key = existing.key?('abs_id') ? 'price_per_bm' : 'price_per_m2'
+          changed = Materials.normalize_price(rec[price_key]) != Materials.normalize_price(existing[price_key]) ||
+                    %w[code supplier].any? { |k| rec[k].to_s.strip != existing[k].to_s.strip } ||
+                    (!existing.key?('abs_id') &&
+                     Materials.normalize_pair(rec['sheet_size']) != Materials.normalize_pair(existing['sheet_size']))
+          return false unless changed
+          rec.delete('price_checked_at')
+          true
         end
 
         # R6: strhnutie server-owned poli a ozdob payloadu (mutuje `data`).
@@ -2003,8 +2257,11 @@ module Noxun
           if (perr = apply_product_url!(rec, data, existing))
             return [:product_error, perr]
           end
+          # CENY-M1b (R13, R13b): ta ista autorita ako doska (ABS echo nema —
+          # €/bm sa nezaokruhluje ani v zobrazeni).
+          note = form_price_check_note!(existing, rec)
           return [:error, 'Uloženie katalógu zlyhalo.'] unless Materials.upsert_edge(rec)
-          [:ok, "ABS #{id} upravená."]
+          [:ok, note || "ABS #{id} upravená."]
         end
 
         def handle_delete_edge(payload)

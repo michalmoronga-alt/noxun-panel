@@ -1187,6 +1187,7 @@ module Noxun
         created = { 'sheets' => [], 'edges' => [] }
         updated = []
         skipped = []
+        manual_cleared = [] # CENY-M1b (R22): riadky, ktorym zapis zrusil rucne overenie
         [['sheets', sheets_out, 'material_id'], ['edges', edges_out, 'abs_id']].each do |(listk, rows, idk)|
           kind = listk == 'edges' ? :edge : :sheet
           rows.each do |item|
@@ -1198,6 +1199,7 @@ module Noxun
               next if idx.nil? || data[listk][idx] == rec # riadok sa nemeni
               data[listk][idx] = rec
               updated << rec[idk]
+              manual_cleared << rec[idk] if item['manual_cleared']
               # (review #2) Duplak deriva format/grain/farbu zo ZDROJA. Keby sa
               # dorovnal az niekedy inokedy, editor by rozbil parovanie: zdroj
               # 2800x2070, duplak stale 4100x600 — a odhad platni by ucotoval
@@ -1225,10 +1227,12 @@ module Noxun
         end
         # (10) JEDEN write_unlocked na cely formular.
         return [:write_failed, { 'message' => 'Zápis katalógu zlyhal.' }] unless write_unlocked(data)
-        [:ok, { 'group_id' => gid,
-                'created' => created['sheets'] + created['edges'],
-                'updated' => updated, 'skipped' => skipped,
-                'changed' => created['sheets'].size + created['edges'].size + updated.size }]
+        info = { 'group_id' => gid,
+                 'created' => created['sheets'] + created['edges'],
+                 'updated' => updated, 'skipped' => skipped,
+                 'changed' => created['sheets'].size + created['edges'].size + updated.size }
+        info['manual_cleared'] = manual_cleared unless manual_cleared.empty?
+        [:ok, info]
       end
 
       # --- ŠT-2c 2c-2b: CREATE — „Pridať ručne" TYM ISTYM formularom ----------
@@ -1648,6 +1652,12 @@ module Noxun
         existing = Array(data['sheets']).find { |r| r['material_id'] == id }
         return nil unless existing # gate uz overila; poistka pre priame volania
         patch = row.reject { |k, _| %w[material_id row_rev].include?(k) }
+        # CENY-M1b (R12, R21): stlpec €/m2 editora ukazuje zobrazenu hodnotu
+        # servera (2 desatinne) — nedotknuta bunka posiela jej echo, ktore
+        # cenu NEMENI (presna ulozena €/m2 ostava, overenie sa nerusi).
+        if patch.key?('price_per_m2') && sheet_price_echo?(patch['price_per_m2'], existing['price_per_m2'])
+          patch.delete('price_per_m2')
+        end
         # (6) duplak deriva vsetko zo zdroja, UNI nema nakupne polia.
         if (dup_err = duplak_edit_error(existing))
           errors << sd_err(tag, nil, dup_err)
@@ -1714,13 +1724,17 @@ module Noxun
         # Review #3: rovnako KOD a DODAVATEL — datum hovori „cena TOHTO kodu
         # u TOHTO dodavatela bola vtedy overena"; po ich zmene sa vztahuje na
         # nieco ine (zrkadlo `patch_record`).
+        # CENY-M1b (R13, O6): rucne overenie rusi aj FORMAT platne (overena
+        # bola cena za platnu toho formatu) — jedna autorita, PRED datumom
+        # Demosu nizsie.
+        cleared = reconcile_manual_check!(existing, merged)
         merged.delete('price_checked_at') if sd_stamp_killed?(patch, existing, 'price_per_m2')
         rec = normalize_sheet(merged)
         if rec.nil?
           errors << sd_err(tag, nil, 'Záznam sa nedá uložiť.')
           return nil
         end
-        { 'op' => 'update', 'rec' => rec }
+        { 'op' => 'update', 'rec' => rec, 'manual_cleared' => cleared }
       end
 
       # (7) NOVY riadok (bez ID) = novy variant s PLNYMI create guardmi.
@@ -1897,14 +1911,16 @@ module Noxun
           bad = true
         end
         return nil if bad
-        # (9) rovnaky kontrakt ako pri doske (cena, kod aj dodavatel)
+        # (9) rovnaky kontrakt ako pri doske (cena, kod aj dodavatel);
+        # CENY-M1b (R13): rucne overenie tou istou autoritou ako doska.
+        cleared = reconcile_manual_check!(existing, merged)
         merged.delete('price_checked_at') if sd_stamp_killed?(patch, existing, 'price_per_bm')
         rec = normalize_edge(merged)
         if rec.nil?
           errors << sd_err(tag, nil, 'Pásku sa nepodarilo uložiť.')
           return nil
         end
-        { 'op' => 'update', 'rec' => rec }
+        { 'op' => 'update', 'rec' => rec, 'manual_cleared' => cleared }
       end
 
       def save_decor_new_edge(row, tag, plan, structures, taken, seen_new, errors)

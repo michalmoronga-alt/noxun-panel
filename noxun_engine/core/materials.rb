@@ -26,6 +26,7 @@ require 'json'
 require 'fileutils'
 require 'digest'
 require 'uri' # CENY-M1a: sanitize_product_url (vlastny require, nie tranzitivny)
+require 'time' # CENY-M1b: manual_price_state (Time.iso8601) — vlastny require
 
 module Noxun
   module Engine
@@ -87,9 +88,17 @@ module Noxun
       # preto ho marker posiela do read-only. Marker nikdy neklesa — po zmazani
       # posledneho odkazu ostava 11 (vedome, STANDARD 7.1).
       SCHEMA_PRODUCT_URL = 11
+      # CENY-M1b: rucne overenie ceny (`price_check_method: 'manual'` +
+      # existujuci `price_checked_at` v novom vyzname „datum rucneho
+      # potvrdenia") na doske aj ABS BEZ Demos vazby. Marker 12 LAZY prvym
+      # zapisom zaznamu s klucom metody. Starsi klient (M1a, schema 11) by
+      # metodu normalize whitelistom ticho zahodil a nepoznal by pravidla jej
+      # zneplatnenia (bunkou by prepisal cenu a nechal „overene") — preto ho
+      # marker posiela do read-only. Marker nikdy neklesa.
+      SCHEMA_MANUAL_CHECK = 12
       # Najnovsia schema, ktorej tvar tato verzia pluginu POZNA (write guard +
       # assess). Bump VYHRADNE spolu s kodom, ktory nove polia nesie.
-      SCHEMA_CURRENT = SCHEMA_PRODUCT_URL
+      SCHEMA_CURRENT = SCHEMA_MANUAL_CHECK
       # M-C: povolene hodnoty hranovej upravy PD (registrovy zoznam
       # pd_edge_subtypes je zdroj; konstanta = rychly enum guard pri zapise).
       PD_EDGE_SUBTYPES = %w[postforming abs].freeze
@@ -393,6 +402,11 @@ module Noxun
             if need < SCHEMA_PRODUCT_URL && !r['product_url'].to_s.strip.empty?
               need = SCHEMA_PRODUCT_URL
             end
+            # CENY-M1b: kluc metody rucneho overenia = marker 12 (kluc, nie
+            # hodnota — normalize ho nesie LEN ako 'manual').
+            if need < SCHEMA_MANUAL_CHECK && r.key?('price_check_method')
+              need = SCHEMA_MANUAL_CHECK
+            end
             if need < SCHEMA_DEMOS &&
                (!r['demos_url'].to_s.empty? || !r['price_checked_at'].to_s.empty?)
               need = SCHEMA_DEMOS
@@ -667,8 +681,175 @@ module Noxun
         put_product_fields(out, a) # CENY-M1a: az PO uni/duplak — rozhoduje o nich
         put_pd_edge_fields(out, a)
         put_supplier_decor_fields(out, a)
+        put_price_check_fields(out, a) # CENY-M1b: az po demos/uni/duplak — rozhoduje o nich
         put_appearance_field(out, a)
         out
+      end
+
+      # CENY-M1b (R9, SCHEMA 12): metoda rucneho overenia ceny sa NESIE
+      # merge-safe (nazov, farba, vzhlad, premenovanie ju nezahodia), ale LEN
+      # ako hodnota 'manual' a LEN pri zazname, kde dava zmysel: neprazdny
+      # `price_checked_at`, bez Demos vazby, nie UNI, nie duplak. Ina hodnota
+      # sa zahodi. POISTKA O8: 'manual' spolu s neprazdnou `demos_url` zahodi
+      # metodu AJ datum — rucny datum sa nikdy nesmie tvarit ako datum
+      # z Demosu (Demos cesty to riesia vyslovne, R14). Volat AZ PO
+      # `put_demos_fields`, `put_uni_fields` a `put_duplak_fields`.
+      def put_price_check_fields(out, a)
+        method = (a['price_check_method'] || a[:price_check_method]).to_s.strip
+        return out unless method == 'manual'
+        unless out['demos_url'].to_s.strip.empty?
+          out.delete('price_checked_at')
+          return out
+        end
+        return out if uni?(out) || duplak?(out) || out['price_checked_at'].to_s.strip.empty?
+        out['price_check_method'] = 'manual'
+        out
+      end
+
+      # CENY-M1b (R10): JEDINA autorita stavu rucneho overenia ceny (M2 ju
+      # prevezme do Rozpoctu). `nil` pri Demos vazbe, UNI a duplaku (tam rucne
+      # overenie nema zmysel). Inak {'state' => 'fresh'|'stale'|'never',
+      # 'checked_at', 'age_days'}. Platne overenie = metoda 'manual' + datum,
+      # ktory sa da precitat a nie je v buducnosti + cena (€/m2 resp. €/bm)
+      # konecne cislo >= 0. Odkaz na produkt sa NEVYZADUJE (O9 — sklenar bez
+      # e-shopu; vedoma odchylka od kovania). Vek = 24 h `floor` (vzor
+      # `Budget.manual_hardware_freshness`), `age >= stale_days` = na kontrolu.
+      def manual_price_state(rec, stale_days:, now:)
+        return nil unless manual_product_record?(rec)
+        never = { 'state' => 'never', 'checked_at' => nil, 'age_days' => nil }
+        return never unless rec['price_check_method'] == 'manual'
+        stamp = begin
+          Time.iso8601(rec['price_checked_at'].to_s.strip).utc
+        rescue ArgumentError, TypeError
+          nil
+        end
+        ref = now.is_a?(Time) ? now.utc : Time.now.utc
+        return never if stamp.nil? || stamp > ref
+        price = rec[rec.key?('abs_id') ? 'price_per_bm' : 'price_per_m2']
+        return never unless price.is_a?(Numeric) && price.real? && price.finite? && price >= 0
+        age = ((ref - stamp) / 86_400.0).floor
+        days = stale_days.to_i.positive? ? stale_days.to_i : 30
+        { 'state' => (age >= days ? 'stale' : 'fresh'),
+          'checked_at' => rec['price_checked_at'].to_s.strip, 'age_days' => age }
+      end
+
+      # CENY-M1b (R11a): JEDNA zaokruhlovacia funkcia zobrazenej €/m2 — bunka,
+      # formular variantu, editor „Upraviť…", prefill aj porovnanie „bez zmeny"
+      # ju beru zo servera (`price_display`). Desiatkovo half-up z kratkej
+      # reprezentacie cisla (31.005 -> 31.01; Rational, nie binarny
+      # `Float#round`). -> cele centy (Integer) alebo nil (cena nie je zadana).
+      def display_m2_cents(stored)
+        cents_of(stored)
+      end
+
+      # Cislo -> cele centy desiatkovo half-up z kratkej reprezentacie (D3:
+      # cena za platnu sa na centy zaokruhli PRED delenim plochou). nil pre
+      # necislo / nekonecno.
+      def cents_of(num)
+        return nil unless num.is_a?(Numeric) && num.real? && num.finite?
+        (Rational(num.to_s) * 100).round(half: :up)
+      rescue ArgumentError, TypeError, FloatDomainError
+        nil
+      end
+
+      def display_m2(stored)
+        cents = display_m2_cents(stored)
+        cents.nil? ? nil : cents / 100.0
+      end
+
+      # CENY-M1b (R11a): vstup (text z formulara / bunky alebo cislo) v CELYCH
+      # centoch, alebo nil. Vstup jemnejsi nez cent (31,038) NIE JE zobrazena
+      # hodnota — nil, takze sa nikdy nevyhodnoti ako „bez zmeny".
+      def input_cents(raw)
+        s = raw.is_a?(Numeric) ? raw.to_s : raw.to_s.strip.tr(',', '.')
+        return nil if s.empty?
+        c = Rational(s) * 100
+        c.denominator == 1 ? c.to_i : nil
+      rescue ArgumentError, TypeError, FloatDomainError, ZeroDivisionError
+        nil
+      end
+
+      # CENY-M1b (R12): „echo" zobrazenej €/m2 DOSKY — vstup je presne ta
+      # hodnota, ktoru server ukazal (celociselne porovnanie v centoch voci
+      # `display_m2_cents(ulozena)`), takze ho nikto neprepisal a ulozena
+      # presna hodnota ostava. NIE interval (audit BLOCKER: 31,00 nie je echo
+      # ulozenych 31,005, ktore sa zobrazuju ako 31,01). ABS echo nema.
+      def sheet_price_echo?(raw, stored)
+        shown = display_m2_cents(stored)
+        return false if shown.nil?
+        input_cents(raw) == shown
+      end
+
+      # CENY-M1b (O3/O7): plocha platne z PLATNEHO katalogoveho formatu (dve
+      # cisla v SHEET_SIZE_RANGE) — ten isty vzorec ako `Budget.exact_sheet_m2`
+      # (sonda S13). Bez platneho formatu nil (odhad 2800 x 2070 z Rozpoctu sa
+      # tu NEPOUZIVA — delta audit: cena „za platnu" sa slubuje len pri formate).
+      def plate_area(rec)
+        size = rec.is_a?(Hash) ? normalize_pair(rec['sheet_size']) : nil
+        return nil unless size && size.all? { |n| SHEET_SIZE_RANGE.cover?(n) }
+        size[0] * size[1] / 1_000_000.0
+      end
+
+      # CENY-M1b (R11a): hodnoty, ktore server ZOBRAZUJE (klient ich len
+      # formatuje, sam nezaokruhluje). Doska: `plate` = presne cena platne,
+      # ktoru ukaze Rozpocet (`Budget.price_per_plate` — ta ista funkcia, nie
+      # kopia vzorca; nil bez platneho formatu), `m2` = `display_m2`, `area` =
+      # plocha platne. ABS: `bm` = ulozena hodnota bez zaokruhlenia.
+      def price_display(rec)
+        return {} unless rec.is_a?(Hash)
+        if rec.key?('abs_id')
+          bm = rec['price_per_bm']
+          return { 'bm' => (bm.is_a?(Numeric) && bm.finite? ? bm : nil) }
+        end
+        price = rec['price_per_m2']
+        area = plate_area(rec)
+        plate = nil
+        if area && price.is_a?(Numeric) && price.finite? && defined?(Budget)
+          plate = Budget.price_per_plate(price, nil, normalize_pair(rec['sheet_size']))
+        end
+        { 'plate' => plate, 'm2' => display_m2(price), 'area' => area }
+      end
+
+      # CENY-M1b (O7, D3): cena za platnu (uz na centy) -> €/m2 NEZAOKRUHLENE,
+      # aby Rozpocet ukazal za platnu presne zadanu sumu (sonda S12: 280 070
+      # kombinacii, 0 chyb). nil bez platneho formatu.
+      def plate_to_m2(plate, rec)
+        area = plate_area(rec)
+        return nil if area.nil? || plate.nil?
+        plate / area
+      end
+
+      # CENY-M1b (R13, O6): JEDINA funkcia zneplatnenia rucneho overenia ceny.
+      # Mutuje `rec` (vysledny zaznam PRED normalize) a vrati true, ked
+      # overenie zrusila — volajuci podla toho povie vetu R22. Plati, ked
+      # `existing` bol rucne overeny, `rec` nenesie NOVE potvrdenie (iny
+      # neprazdny datum) a zmenilo sa niektore overene pole — cena (po echu
+      # R12), kod, dodavatel, odkaz na produkt, pri doske format platne
+      # (pridanie, zmena aj zmazanie), dekor u dodavatela (D5) — alebo `rec`
+      # dostal Demos vazbu (O8). Zmaze metodu AJ datum. Datum, ktory uz zmazala
+      # ina pravidlova cesta (napr. zmena Demos URL), nie je nove potvrdenie.
+      # Volat na KAZDEJ ceste, ktora prepisuje existujuci zaznam a moze tieto
+      # polia zmenit (bunka, formular variantu, editor „Upraviť…"); Demos
+      # apply riesi prednost Demosu vyslovne (R14).
+      def reconcile_manual_check!(existing, rec)
+        return false unless existing.is_a?(Hash) && rec.is_a?(Hash)
+        return false unless existing['price_check_method'] == 'manual'
+        stamp = rec['price_checked_at'].to_s
+        return false if !stamp.empty? && stamp != existing['price_checked_at'].to_s
+        return false unless !rec['demos_url'].to_s.strip.empty? || manual_check_changed?(existing, rec)
+        rec.delete('price_check_method')
+        rec.delete('price_checked_at')
+        true
+      end
+
+      # O6: zmenilo sa niektore overene pole? (cista funkcia, vid vyssie)
+      def manual_check_changed?(existing, rec)
+        price_key = existing.key?('abs_id') ? 'price_per_bm' : 'price_per_m2'
+        return true if normalize_price(rec[price_key]) != normalize_price(existing[price_key])
+        return true if %w[code supplier supplier_decor].any? { |k| rec[k].to_s.strip != existing[k].to_s.strip }
+        return true if sanitize_product_url(rec['product_url']) != sanitize_product_url(existing['product_url'])
+        return false if existing.key?('abs_id')
+        normalize_pair(rec['sheet_size']) != normalize_pair(existing['sheet_size'])
       end
 
       # CENY-M1a (SCHEMA 11): odkaz na produkt sa NESIE merge-safe (bunka,
@@ -928,6 +1109,7 @@ module Noxun
         # sa NIKDY nepocita ako zhoda). Uklada sa LEN ked je true; false/prazdne
         # kluc ODSTRANI (merge-safe, ziadne nil kluce v JSON).
         out['universal'] = true if flag_true?(a['universal'] || a[:universal])
+        put_price_check_fields(out, a) # CENY-M1b (R9): az po demos poliach
         put_appearance_field(out, a)
         out
       end

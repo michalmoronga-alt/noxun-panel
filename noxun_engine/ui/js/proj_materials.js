@@ -37,9 +37,10 @@
   // V0.6 M-C hranova uprava PD (pd_edge_subtype — schema 8); D-98 dekor u
   // dodavatela (supplier_decor — schema 9) => konstanta je 9. MR-1A vzhlad
   // (appearance — schema 10). CENY-M1a odkaz na produkt (product_url —
-  // schema 11) => konstanta je 11; stary klient (CEF cache) bez pola by ho
-  // formularom ticho zahodil, preto ho server odmietne.
-  var MD_CLIENT_SCHEMA = 11;
+  // schema 11); stary klient (CEF cache) bez pola by ho formularom ticho
+  // zahodil, preto ho server odmietne. CENY-M1b rucne overenie ceny
+  // (price_check_method — schema 12) => konstanta je 12.
+  var MD_CLIENT_SCHEMA = 12;
   // 2B-2 (F10 zrkadlo registra): typy s formatom v identite — batch/formular
   // format VYZADUJU. Server je autorita (format_in_identity?), toto je UX.
   // D-73: + KOMPAKT (sirok vela ako PD — format je identita variantu).
@@ -809,12 +810,16 @@
         if (s.source_material_id){
           h += mdDuplakRow(s, dim);
         } else {
+          // CENY-M1b (R21, O7): bunka €/m² ukazuje ZOBRAZENU hodnotu servera
+          // (2 desatinne, s bodkou) — nedotknuta bunka nic neposle, echo
+          // server nepovazuje za zmenu (R12).
           h += mdVariantRow('sheet', s.material_id, s.row_rev, dim,
-            s.code, s.price_per_m2, s.supplier, s.label,
+            s.code, mdM2Shown(s, '.'), s.supplier, s.label,
             'mdOpenSheetForm(\'' + mdEsc(s.material_id) + '\')',
             prot ? null : 'mdDeleteSheet(\'' + mdEsc(s.material_id) + '\')', prot,
             mdSlotHtml(mdDuplakBtn(s),
-                       mdDemosBtn('sheet', s.material_id, s) || mdProductBtn('sheet', s.material_id, s), ''));
+                       mdDemosBtn('sheet', s.material_id, s) || mdProductBtn('sheet', s.material_id, s),
+                       mdCheckBtn('sheet', s.material_id, s)));
         }
       });
     }
@@ -827,7 +832,8 @@
           'mdOpenEdgeForm(\'' + mdEsc(a.abs_id) + '\')',
           'mdDeleteEdge(\'' + mdEsc(a.abs_id) + '\')', false,
           mdSlotHtml(mdUniBtn(a),
-                     mdDemosBtn('edge', a.abs_id, a) || mdProductBtn('edge', a.abs_id, a), ''));
+                     mdDemosBtn('edge', a.abs_id, a) || mdProductBtn('edge', a.abs_id, a),
+                     mdCheckBtn('edge', a.abs_id, a)));
       });
     }
     return h;
@@ -1049,7 +1055,9 @@
              type: String(s.type || ''), thickness: mdEditNum(s.thickness),
              sheet_size: (s.sheet_size && s.sheet_size.length === 2)
                ? mdEditNum(s.sheet_size[0]) + '×' + mdEditNum(s.sheet_size[1]) : '',
-             code: String(s.code || ''), price_per_m2: mdEditNum(s.price_per_m2) };
+             // CENY-M1b (R21): zobrazena €/m² servera (2 desatinne, ciarka) —
+             // nedotknuta bunka posiela jej echo, server cenu nemeni (R12).
+             code: String(s.code || ''), price_per_m2: mdM2Shown(s, ',') };
   }
 
   function mdEditEdgeRow(a){
@@ -1402,7 +1410,9 @@
     mdEl('ms_thick_hint').style.display = s ? '' : 'none';
     mdEl('ms_grain').value = s ? (s.grain || 'none') : 'length';
     // D-42: cena rozlisuje nezadana (prazdne) vs 0 — nil/undefined => prazdny input.
-    mdEl('ms_price').value = mdPriceVal(s && s.price_per_m2);
+    // CENY-M1b (R21): zobrazena €/m² servera (2 desatinne) — nedotknute pole
+    // cenu nezmeni ani o cent (server R12 ho vyhodnoti ako echo).
+    mdEl('ms_price').value = s ? mdM2Shown(s, '.') : '';
     mdEl('ms_code').value = s ? (s.code || '') : '';
     mdEl('ms_supplier').value = s ? (s.supplier || '') : '';
     // D-98: alias cisla dekoru u dodavatela (nie identita — editovatelny vzdy).
@@ -1493,7 +1503,9 @@
     if (row) row.style.display = (rec && rec.uni === true) ? 'none' : '';
     var hint = mdEl(prefix + '_demos_hint');
     if (!hint) return;
-    var when = (rec && !rec.uni) ? mdDateLabel(rec.price_checked_at) : '';
+    // CENY-M1b: datum pri polozke BEZ Demosu je rucne overenie — hovori o nom
+    // veta pod odkazom na produkt (R22), nie hint Demos adresy.
+    var when = (rec && !rec.uni && rec.demos_url) ? mdDateLabel(rec.price_checked_at) : '';
     if (when){
       hint.textContent = 'Cena overená ' + when + ' — zmena alebo zmazanie adresy dátum zruší.';
       hint.style.display = '';
@@ -1524,9 +1536,14 @@
   // odkaz ostava odlozeny — po zruseni vazby sa vrati.
   var MD_PRODUCT_HINT = 'Otvorí sa vo webovom prehliadači.';
   var MD_PRODUCT_LOCK_HINT = 'Položka je viazaná na Demos — odkaz aj cenu spravuje Demos (pole Demos URL nižšie). Ručný odkaz zadáš až po vymazaní Demos URL.';
-  function mdProductLockState(demosUrl, saved){
+  // CENY-M1b (R22): `manualText` = veta o rucnom overeni ceny (mdManualFormText),
+  // ktora sa pri odomknutom poli prida za zakladny hint.
+  function mdProductLockState(demosUrl, saved, manualText){
     var locked = String(demosUrl == null ? '' : demosUrl).trim() !== '';
-    if (!locked) return { locked: false, hint: MD_PRODUCT_HINT, placeholder: 'https://…' };
+    if (!locked){
+      return { locked: false, placeholder: 'https://…',
+               hint: MD_PRODUCT_HINT + (manualText ? ' ' + manualText : '') };
+    }
     var keep = String(saved == null ? '' : saved).trim() !== '';
     return { locked: true, placeholder: '— viazané na Demos',
              hint: MD_PRODUCT_LOCK_HINT + (keep ? ' Uložený ručný odkaz sa po zrušení väzby vráti.' : '') };
@@ -1538,6 +1555,7 @@
     if (!inp) return;
     var saved = rec ? String(rec.product_url || '') : '';
     inp.setAttribute('data-saved', saved);
+    inp.setAttribute('data-manual', mdManualFormText(prefix === 'me' ? 'edge' : 'sheet', rec));
     inp.removeAttribute('data-typed');
     inp.readOnly = false;
     inp.value = saved;
@@ -1556,7 +1574,7 @@
     if (!inp) return;
     var demos = mdEl(prefix + '_demos_url');
     var saved = inp.getAttribute('data-saved') || '';
-    var st = mdProductLockState(demos ? demos.value : '', saved);
+    var st = mdProductLockState(demos ? demos.value : '', saved, inp.getAttribute('data-manual') || '');
     if (st.locked && !inp.readOnly){
       inp.setAttribute('data-typed', inp.value);
       inp.value = '';
@@ -1617,6 +1635,456 @@
       row.classList.add('mdflash');
       setTimeout(function(){ row.classList.remove('mdflash'); }, 1600);
     }
+  }
+
+  // ===================== CENY-M1b: rucne overenie ceny =====================
+  // Doska a ABS BEZ Demos vazby: ikona „Overiť cenu" (pozicia 3 slotu, R19)
+  // a formular „Overiť cenu ručne" (R20, NXModal — vzor `hwManualOpen`).
+  // Cisla ZOBRAZUJE server (`price_display`: cena platne presne ako
+  // Rozpocet, €/m² na 2 desatinne, €/bm presne) — klient ich len formatuje,
+  // sam nezaokruhluje (R11a). Stav overenia (fresh/stale/never, vek) pocita
+  // server (`price_check`); klient z neho len sklada text (O5).
+
+  // Suma s ciarkou na 2 desatinne (hodnota uz prisla zaokruhlena zo servera,
+  // alebo je to zivy nahlad rozpisaneho cisla).
+  function mdMoney(v){
+    var n = Number(v);
+    return isFinite(n) ? n.toFixed(2).replace('.', ',') : '';
+  }
+  // €/bm presne tak, ako je ulozena (0,125 ostava 0,125; 0,9 = 0,90).
+  function mdExactMoney(v){
+    var n = Number(v);
+    if (!isFinite(n)) return '';
+    return Math.round(n * 100) / 100 === n ? mdMoney(n) : String(n).replace('.', ',');
+  }
+  // R21: zobrazena €/m² dosky (bunka s bodkou, editor s ciarkou). Bez
+  // `price_display` (stary echo) povodna hodnota, bez ceny prazdne.
+  function mdM2Shown(s, sep){
+    var pd = s && s.price_display;
+    if (pd && pd.m2 !== null && pd.m2 !== undefined){
+      var t = Number(pd.m2).toFixed(2);
+      return sep === ',' ? t.replace('.', ',') : t;
+    }
+    var v = s ? s.price_per_m2 : null;
+    if (v === null || v === undefined || v === '') return '';
+    return sep === ',' ? mdEditNum(v) : String(v);
+  }
+  function mdAgeText(age){
+    var n = parseInt(age, 10);
+    if (!(n >= 0)) return '';
+    if (n === 0) return 'dnes';
+    if (n === 1) return 'pred 1 dňom';
+    return 'pred ' + n + ' dňami';
+  }
+  function mdManualKind(rec){ return rec && rec.abs_id !== undefined ? 'edge' : 'sheet'; }
+  function mdHasPrice(rec){
+    var v = rec ? rec[mdManualKind(rec) === 'edge' ? 'price_per_bm' : 'price_per_m2'] : null;
+    return v !== null && v !== undefined && v !== '';
+  }
+  // O5: tooltip ikony overenia (cista funkcia, Node test).
+  function mdManualTip(rec){
+    var pc = (rec && rec.price_check) || { state: 'never' };
+    var day = mdDateLabel(pc.checked_at);
+    var line;
+    if (pc.state === 'fresh') line = 'Cena ručne overená ' + day + ' (' + mdAgeText(pc.age_days) + ')';
+    else if (pc.state === 'stale') line = 'Ručne overená ' + day + ' — ' + mdAgeText(pc.age_days) + ', na kontrolu';
+    else if (mdHasPrice(rec)) line = 'Cena nebola nikdy ručne overená — na kontrolu';
+    else line = 'Cena chýba a nebola nikdy overená — na kontrolu';
+    return line + '\n' + (rec && rec.product_link === true
+      ? 'Overiť cenu — otvorí obchod a formulár'
+      : 'Overiť cenu — bez odkazu otvorí len formulár');
+  }
+  // R19: ikona „Overiť cenu" LEN pri rucnom zazname (server posiela
+  // `price_check` len bez Demos vazby, nie UNI, nie duplak). Jantarova =
+  // na kontrolu (nikdy / stara), siva = cerstvo overena.
+  function mdCheckBtn(kind, id, rec){
+    if (!rec || rec.demos_url || !rec.price_check || typeof rec.price_check !== 'object') return '';
+    var pending = rec.price_check.state !== 'fresh';
+    // Read-only katalog: akcia je vypnuta cez aria-disabled (UI_DIZAJN, vzor
+    // D-78 — nikdy HTML disabled); klik povie dovod (mdManualRequest).
+    var tip = mdManualTip(rec) + (MD_RO ? '\nKatalóg je len na čítanie — úpravy sú vypnuté.' : '');
+    return '<button type="button" class="mduni mdchk' + (pending ? ' is-pending' : '') + '"' +
+      ' title="' + mdEsc(tip) + '"' +
+      ' aria-label="' + mdEsc('Overiť cenu · ' + mdShortName(kind, rec)) + '"' + (MD_RO ? ' aria-disabled="true"' : '') +
+      ' onclick="mdManualRequest(\'' + kind + '\', \'' + mdEsc(id) + '\', this)">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-clipboard-check"/></svg></button>';
+  }
+  // R22: veta o rucnom overeni pod odkazom vo formulari variantu.
+  function mdManualFormText(kind, rec){
+    if (!rec || rec.demos_url || rec.uni === true || rec.source_material_id) return '';
+    var pc = rec.price_check;
+    if (pc && pc.checked_at && (pc.state === 'fresh' || pc.state === 'stale')){
+      return 'Cena ručne overená ' + mdDateLabel(pc.checked_at) + ' — zmena ' +
+        (kind === 'edge' ? 'odkazu, ceny, kódu alebo dodávateľa' : 'odkazu, ceny, kódu, dodávateľa alebo formátu') +
+        ' overenie zruší.';
+    }
+    return 'Cena zatiaľ nebola ručne overená.';
+  }
+
+  // --- formular „Overiť cenu ručne" (R20 / R20b) ---------------------------
+  var MD_MANUAL_NOLINK = 'Bez odkazu — obchod sa neotvorí; cenu si over u dodávateľa (telefón, e-mail, ponuka).';
+  var MD_MANUAL_PRICE_MSG = 'Vlož nezápornú cenu s DPH; prázdna cena sa nedá potvrdiť.';
+  var MD_MANUAL_PLATE_MSG = 'Cena za platňu sa bez formátu nedá prepočítať na €/m² — prepni na „za m²“ alebo doplň formát.';
+  var MD_MANUAL_WAIT_MSG = 'Počkaj na otvorenie produktu a skontroluj cenu.';
+  var MD_MANUAL_OPEN_FAILED = 'Obchod sa nepodarilo otvoriť — cenu si over inak a potvrď.';
+  var MD_MANUAL_SEQ = 0;
+  var MD_MANUAL_PENDING = null;
+  var MD_MANUAL = null;
+
+  // Cislo z pola (ciarka aj bodka). Prazdne = null, necislo/zaporne = NaN.
+  function mdManualParse(text){
+    var s = String(text == null ? '' : text).trim();
+    if (!s) return null;
+    if (!/^\d+(?:[.,]\d+)?$/.test(s)) return NaN;
+    return parseFloat(s.replace(',', '.'));
+  }
+  // Formát platne „2800 × 2070" (alebo '').
+  function mdManualFmt(item){
+    var sz = item && item.sheet_size;
+    return sz && sz.length === 2 ? fmtNum(sz[0]) + ' × ' + fmtNum(sz[1]) : '';
+  }
+  // Text pola pre rezim PRESNE zo servera (R20b — prepnutie bez pisania
+  // cenu nemeni; nikdy spatny prepocet zobrazeneho textu).
+  function mdManualShown(item, mode){
+    var pd = (item && item.price_display) || {};
+    var v = mode === 'plate' ? pd.plate : mode === 'm2' ? pd.m2 : pd.bm;
+    if (v === null || v === undefined) return '';
+    return mode === 'bm' ? mdExactMoney(v) : mdMoney(v);
+  }
+  // Pociatocny stav formulara: doska za platnu, ked katalog formát pozna;
+  // bez formatu za m² (O3); ABS za bm. `src` = to, co pouzivatel NAPISAL
+  // (rezim + text) — presna hodnota zameru, oddelena od zobrazeneho textu.
+  function mdManualInit(kind, item){
+    var pd = (item && item.price_display) || {};
+    var mode = kind === 'edge' ? 'bm' : (pd.area ? 'plate' : 'm2');
+    return { mode: mode, text: mdManualShown(item, mode), touched: false, src: null };
+  }
+  // Pisanie do pola: napisany text je novy zdroj zameru (R20b).
+  function mdManualTyped(st, text){
+    var t = String(text == null ? '' : text);
+    return { mode: st.mode, text: t, touched: true, src: { mode: st.mode, text: t } };
+  }
+  // R20b: prepnutie jednotky. Nedotknute pole = text zvoleneho rezimu PRESNE
+  // zo servera (nikdy spatny prepocet zobrazeneho textu) — potvrdenie =
+  // bitovo ta ista cena, len datum. Po pisani sa ukaze prepocet NAPISANEHO
+  // cisla; navrat do rezimu, v ktorom sa pisalo, vrati presne napisany text.
+  function mdManualSwitch(item, st, mode){
+    if (!st || st.mode === mode) return st;
+    if (!st.touched || !st.src) return { mode: mode, text: mdManualShown(item, mode), touched: false, src: null };
+    if (st.src.mode === mode) return { mode: mode, text: st.src.text, touched: true, src: st.src };
+    var v = mdManualParse(st.src.text);
+    var area = ((item && item.price_display) || {}).area;
+    if (v === null || isNaN(v) || !area) return { mode: mode, text: st.src.text, touched: true, src: st.src };
+    return { mode: mode, text: mdMoney(mode === 'm2' ? v / area : v * area), touched: true, src: st.src };
+  }
+  // Co sa odosle: nedotknute pole = zobrazeny rezim a text servera; po pisani
+  // PRESNE napisane cislo v jeho rezime (zamer, nie prepocitany zobrazeny text).
+  function mdManualValue(st){
+    if (st && st.touched && st.src) return { basis: st.src.mode, price: st.src.text };
+    return { basis: st ? st.mode : '', price: st ? st.text : '' };
+  }
+  // Zivy prepocet vedla pola (cista funkcia).
+  function mdManualCalc(item, mode, text){
+    if (mode === 'bm') return { t: '', warn: false };
+    var area = ((item && item.price_display) || {}).area;
+    var fmt = mdManualFmt(item);
+    var v = mdManualParse(text);
+    if (mode === 'plate'){
+      if (!area) return { t: 'Na prepočet treba formát platne — doplň ho v úprave variantu (ceruzka), alebo zadaj cenu za m².', warn: true };
+      if (v === null || isNaN(v)) return { t: '→ … €/m² (' + fmt + ')', warn: false };
+      return { t: '→ ' + mdMoney(v / area) + ' €/m² (' + fmt + ')', warn: false };
+    }
+    if (!area) return { t: 'bez prepočtu — formát nie je v katalógu', warn: true };
+    if (v === null || isNaN(v)) return { t: '= … € za platňu (' + fmt + ')', warn: false };
+    return { t: '= ' + mdMoney(v * area) + ' € za platňu (' + fmt + ')', warn: false };
+  }
+  // „Oproti katalógu" (cista funkcia). Porovnava so ZOBRAZENOU hodnotou
+  // servera; rozhodnutie „bez zmeny" robi aj tak server (R11a).
+  function mdManualDiff(item, mode, text){
+    var pd = (item && item.price_display) || {};
+    var cat = mode === 'plate' ? pd.plate : mode === 'm2' ? pd.m2 : pd.bm;
+    var unit = mode === 'plate' ? ' € za platňu' : mode === 'm2' ? ' €/m²' : ' €/bm';
+    if (cat === null || cat === undefined) return { t: 'v katalógu zatiaľ bez ceny', cls: 'muted' };
+    var shown = (mode === 'bm' ? mdExactMoney(cat) : mdMoney(cat)) + unit;
+    var v = mdManualParse(text);
+    if (v === null || isNaN(v)) return { t: 'v katalógu ' + shown, cls: 'muted' };
+    var same = mode === 'bm' ? v === Number(cat) : Math.round(v * 100) === Math.round(Number(cat) * 100);
+    if (same) return { t: 'bez zmeny (' + shown + ') — stačí potvrdiť', cls: 'same' };
+    var d = v - Number(cat);
+    var sign = d > 0 ? '+' : '−';
+    var pct = Number(cat) > 0 ? ' (' + sign + (Math.abs(d) / Number(cat) * 100).toFixed(1).replace('.', ',') + ' %)' : '';
+    return { t: sign + mdMoney(Math.abs(d)) + ' €' + pct + ' oproti katalógu (' + shown + ')', cls: 'chg' };
+  }
+  // Poznamka pod formularom (O4 nula, posledne potvrdenie).
+  function mdManualNote(item, text){
+    var pc = item && item.price_check;
+    var prev = pc && pc.checked_at && (pc.state === 'fresh' || pc.state === 'stale')
+      ? 'Posledné ručné potvrdenie: ' + mdDateLabel(pc.checked_at) + '.'
+      : 'Cena zatiaľ nebola ručne potvrdená.';
+    var zero = mdManualParse(text) === 0 ? ' 0 € — materiál sa do rozpočtu započíta nulou (napr. ho dodá zákazník).' : '';
+    return prev + ' Potvrdená cena platí v celom katalógu.' + zero;
+  }
+  // Klientska kontrola pred odoslanim (server je autorita).
+  function mdManualCheck(item, basis, text){
+    var v = mdManualParse(text);
+    if (v === null || isNaN(v) || v < 0) return { field: 'price', msg: MD_MANUAL_PRICE_MSG };
+    if (basis === 'plate' && !(((item && item.price_display) || {}).area)) return { msg: MD_MANUAL_PLATE_MSG };
+    return null;
+  }
+  // Payload potvrdenia — datum ani metodu klient NIKDY neposiela.
+  function mdManualPayload(f, val){
+    return { kind: f.kind, id: f.id, row_rev: f.rowRev, price: String(val && val.price != null ? val.price : '').trim(),
+             basis: val && val.basis ? val.basis : f.st.mode, token: f.submitToken,
+             section: f.section, model_guid: f.model_guid, catalog_schema: MD_CLIENT_SCHEMA };
+  }
+  // Podtitul: „H1180 DTDL 25 mm · Dub Halifax" / „ABS H1180 43/0,8 · Dub Halifax".
+  function mdManualSub(kind, item){
+    if (!item) return '';
+    var head = kind === 'edge'
+      ? 'ABS ' + String(item.decor || '') + ' ' + edgeChipLabel(item).replace(/\./g, ',')
+      : String(item.decor || '') + ' ' + String(item.type || '') + ' ' + fmtNum(item.thickness) + ' mm';
+    return head + (item.decor_name ? ' · ' + item.decor_name : '');
+  }
+  // „Položka" (text, udaje sa tu nemenia — na to je ceruzka).
+  function mdManualInfo(kind, item){
+    var code = 'kód ' + (item && item.code ? item.code : '—');
+    if (kind === 'edge'){
+      var th = String(fmtNum(item.thickness)).replace('.', ',');
+      var w = (item.width === null || item.width === undefined) ? '' : fmtNum(item.width) + ' × ';
+      return 'ABS ' + w + th + ' mm · ' + code;
+    }
+    var pd = (item && item.price_display) || {};
+    return code + ' · ' + (pd.area ? 'formát ' + mdManualFmt(item) + ' mm (' +
+      String(Math.round(pd.area * 1000) / 1000).replace('.', ',') + ' m²)' : 'formát nie je v katalógu');
+  }
+  function mdManualBodyHtml(f){
+    var item = f.item, st = f.st, kind = f.kind;
+    var h = '<div class="mdm-warn" role="status">' + mdEsc(f.warn || '') + '</div>';
+    h += '<div class="mrow"><label>Položka</label><span class="mdm-text">' + mdEsc(mdManualInfo(kind, item)) + '</span></div>';
+    if (kind !== 'edge'){
+      h += '<div class="mrow"><label>Cenu zadávam</label><div class="bseg mdm-seg" role="group" aria-label="Jednotka ceny">' +
+        '<button type="button" data-mdm-mode="plate"' + (st.mode === 'plate' ? ' class="on" aria-pressed="true"' : ' aria-pressed="false"') + '>za platňu</button>' +
+        '<button type="button" data-mdm-mode="m2"' + (st.mode === 'm2' ? ' class="on" aria-pressed="true"' : ' aria-pressed="false"') + '>za m²</button></div></div>';
+    }
+    var lbl = st.mode === 'plate' ? 'Cena za platňu' : st.mode === 'm2' ? 'Cena za m²' : 'Cena s DPH';
+    var unit = st.mode === 'plate' ? '€ s DPH' : st.mode === 'm2' ? '€ s DPH / m²' : '€ s DPH / bm';
+    var c = mdManualCalc(item, st.mode, st.text);
+    h += '<div class="mrow"><label for="nxm_price">' + lbl + '</label>' +
+      '<input id="nxm_price" data-nxm="price" type="text" class="mshort" value="' + mdEsc(st.text) + '" placeholder="nezadaná" autocomplete="off">' +
+      '<span class="munit">' + unit + '</span>' +
+      '<span class="mdm-calc' + (c.warn ? ' warn' : '') + '">' + mdEsc(c.t) + '</span></div>';
+    var d = mdManualDiff(item, st.mode, st.text);
+    h += '<div class="mrow"><label>Oproti katalógu</label><span class="mdm-diff ' + d.cls + '">' + mdEsc(d.t) + '</span></div>';
+    h += '<div class="hint mdm-note">' + mdEsc(mdManualNote(item, st.text)) + '</div>';
+    return h;
+  }
+  // Zivy prepocet BEZ prekreslenia pola (fokus a kurzor ostavaju).
+  function mdManualLive(f, box){
+    if (!box || !box.querySelector) return;
+    var c = mdManualCalc(f.item, f.st.mode, f.st.text);
+    var d = mdManualDiff(f.item, f.st.mode, f.st.text);
+    var ce = box.querySelector('.mdm-calc');
+    if (ce){ ce.textContent = c.t; ce.className = 'mdm-calc' + (c.warn ? ' warn' : ''); }
+    var de = box.querySelector('.mdm-diff');
+    if (de){ de.textContent = d.t; de.className = 'mdm-diff ' + d.cls; }
+    var ne = box.querySelector('.mdm-note');
+    if (ne) ne.textContent = mdManualNote(f.item, f.st.text);
+  }
+  function mdManualRender(f, box){
+    if (!box) return;
+    box.innerHTML = mdManualBodyHtml(f);
+    if (box._mdmBound) return;
+    box._mdmBound = true;
+    box.addEventListener('input', function(ev){
+      var t = ev && ev.target;
+      if (!t || t.getAttribute('data-nxm') !== 'price' || MD_MANUAL !== f) return;
+      f.st = mdManualTyped(f.st, t.value);
+      mdManualLive(f, box);
+    });
+    box.addEventListener('click', function(ev){
+      var b = ev && ev.target && ev.target.closest ? ev.target.closest('[data-mdm-mode]') : null;
+      if (!b || MD_MANUAL !== f) return;
+      var nx = mdModal();
+      if (nx && nx.isBusy && nx.isBusy()) return;
+      mdManualReadDom(f, box);
+      f.st = mdManualSwitch(f.item, f.st, b.getAttribute('data-mdm-mode'));
+      mdManualRender(f, box);
+      var inp = box.querySelector('#nxm_price');
+      if (inp){ try { inp.focus(); } catch (e) { /* CEF bez fokusu */ } }
+    });
+  }
+  // Pole sa cita z DOM (pisanie bez udalosti input nesmie zmiznut).
+  function mdManualReadDom(f, box){
+    var inp = box && box.querySelector ? box.querySelector('#nxm_price') : null;
+    if (inp && String(inp.value) !== f.st.text) f.st = mdManualTyped(f.st, inp.value);
+    return mdManualValue(f.st);
+  }
+  function mdManualWarn(f, msg){
+    f.warn = msg || '';
+    var nx = mdModal();
+    var box = nx && nx.customBox ? nx.customBox('price') : null;
+    var w = box && box.querySelector ? box.querySelector('.mdm-warn') : null;
+    if (w) w.textContent = f.warn;
+  }
+
+  function mdManualCtx(){
+    return { section: typeof studioSec === 'undefined' ? '' : String(studioSec),
+             model_guid: String(MD_MODEL_GUID || '') };
+  }
+  function mdManualSend(name, payload){
+    if (window.sketchup && sketchup[name]) sketchup[name](JSON.stringify(payload));
+  }
+  // Klik na ikonu: najprv cerstvy snimok zo servera (prepare nic nezapisuje).
+  function mdManualRequest(kind, id, trigger){
+    MD_MANUAL_PENDING = null;
+    var nx = mdModal();
+    if (!nx || nx.isOpen()) return;
+    if (MD_RO){ MD.setStatus('Katalóg je len na čítanie — úpravy sú vypnuté.', true); return; }
+    var ctx = mdManualCtx();
+    if (!ctx.model_guid || ctx.section !== 'mat') return;
+    var token = 'mat-manual-' + (++MD_MANUAL_SEQ);
+    MD_MANUAL_PENDING = { kind: kind, id: String(id), token: token, section: ctx.section,
+      model_guid: ctx.model_guid, trigger: trigger || null, modalGeneration: nx.generation() };
+    mdManualSend('mat_manual_prepare', { kind: kind, id: String(id), token: token,
+      section: ctx.section, model_guid: ctx.model_guid });
+  }
+  function mdManualOwns(f){
+    var nx = mdModal();
+    return !!(f && MD_MANUAL === f && nx && nx.isOpen() && nx.generation() === f.generation);
+  }
+  // Zatvorenie (odchod zo sekcie, zmena dokumentu). Uz odoslane potvrdenie
+  // na serveri dobehne — jeho neskora odpoved smie obnovit katalog, ale
+  // nesmie vlastnit cudzi modal (vzor `hwManualClose`).
+  function mdManualClose(){
+    MD_MANUAL_PENDING = null;
+    var f = MD_MANUAL;
+    if (mdManualOwns(f)){
+      var nx = mdModal();
+      nx.setBusy(false);
+      nx.close();
+    }
+    MD_MANUAL = null;
+  }
+  // R23: volane zo studio.js na tych istych miestach ako hwProductContextChanged.
+  function mdManualContextChanged(section, guid){
+    var s = String(section || ''), g = String(guid || '');
+    var p = MD_MANUAL_PENDING;
+    if (p && (p.section !== s || p.model_guid !== g)) MD_MANUAL_PENDING = null;
+    var f = MD_MANUAL;
+    if (f && (f.section !== s || f.model_guid !== g)) mdManualClose();
+  }
+  function mdManualReady(r){
+    var p = MD_MANUAL_PENDING;
+    if (!p || !r || r.token !== p.token || r.kind !== p.kind || r.id !== p.id ||
+        r.section !== p.section || r.model_guid !== p.model_guid) return;
+    MD_MANUAL_PENDING = null;
+    var ctx = mdManualCtx();
+    var nx = mdModal();
+    if (!nx || ctx.section !== p.section || ctx.model_guid !== p.model_guid ||
+        nx.isOpen() || nx.generation() !== p.modalGeneration) return;
+    if (!r.item){ MD.setStatus(r.reason || 'Položka sa už v katalógu nenašla.', true); return; }
+    if (r.read_only){ MD.setStatus('Katalóg je len na čítanie — úpravy sú vypnuté.', true); return; }
+    if (r.item.demos_url){ MD.setStatus('Položka je viazaná na Demos — cenu obnovuje Demos.', true); return; }
+    if (r.item.uni === true || r.item.source_material_id){
+      MD.setStatus('Táto položka sa ručne neoveruje (UNI / duplák).', true); return;
+    }
+    mdManualOpen(r, p, '');
+  }
+  function mdManualOpen(snap, origin, message){
+    var nx = mdModal();
+    if (!nx) return;
+    if (nx.busyLocked && nx.busyLocked()) return;
+    if (nx.isOpen() && !mdManualOwns(MD_MANUAL)) return;
+    var item = snap.item;
+    var f = { kind: origin.kind, id: origin.id, rowRev: String(snap.row_rev || ''),
+      token: 'mat-manual-form-' + (++MD_MANUAL_SEQ), section: origin.section,
+      model_guid: origin.model_guid, trigger: origin.trigger || null, item: item,
+      hasUrl: snap.has_url === true, browserPending: snap.has_url === true,
+      sent: false, submitToken: '', warn: message || '', st: mdManualInit(origin.kind, item) };
+    nx.open({ title: 'Overiť cenu ručne', sub: mdManualSub(f.kind, item), size: 'md',
+      trigger: f.trigger, memoryKey: null, busyLock: true, initialFocus: 'price',
+      okLabel: 'Potvrdiť cenu k dnešku',
+      fields: [
+        { type: 'group', label: String(item.supplier || 'Dodávateľ neuvedený'),
+          hint: f.hasUrl ? String(item.product_url || '') : MD_MANUAL_NOLINK },
+        { type: 'custom', key: 'price',
+          render: function(box){ mdManualRender(f, box); },
+          read: function(box){ return mdManualReadDom(f, box); } }
+      ],
+      onSubmit: function(v){ mdManualSubmit(f, v); },
+      onClose: function(){ if (MD_MANUAL === f) MD_MANUAL = null; }
+    });
+    f.generation = nx.generation();
+    MD_MANUAL = f;
+    if (!f.hasUrl) return; // O9: bez odkazu sa prehliadac neotvara, potvrdit sa da hned
+    // Az po 20 ms fokuse NXModal — po otvoreni externeho prehliadaca uz
+    // ziadny oneskoreny focus() tejto karty nebezi (vzor hwManualOpen).
+    setTimeout(function(){
+      if (!mdManualOwns(f)) return;
+      var ctx = mdManualCtx();
+      if (ctx.section !== f.section || ctx.model_guid !== f.model_guid) return;
+      mdManualSend('mat_manual_open', { kind: f.kind, id: f.id, row_rev: f.rowRev, token: f.token,
+        section: f.section, model_guid: f.model_guid });
+    }, 25);
+  }
+  function mdManualSubmit(f, v){
+    if (!mdManualOwns(f)) return;
+    var nx = mdModal();
+    var ctx = mdManualCtx();
+    if (ctx.section !== f.section || ctx.model_guid !== f.model_guid){ mdManualClose(); return; }
+    if (f.browserPending){
+      nx.setBusy(false);
+      nx.showErrors([{ msg: MD_MANUAL_WAIT_MSG }]);
+      return;
+    }
+    var val = (v && v.price && typeof v.price === 'object') ? v.price : mdManualValue(f.st);
+    var err = mdManualCheck(f.item, val.basis, val.price);
+    if (err){
+      nx.setBusy(false);
+      nx.showErrors([err]);
+      return;
+    }
+    f.sent = true;
+    f.submitToken = 'mat-manual-save-' + (++MD_MANUAL_SEQ);
+    mdManualSend('mat_manual_confirm', mdManualPayload(f, val));
+  }
+  function mdManualResult(r){
+    var f = MD_MANUAL;
+    if (!r || !mdManualOwns(f) || r.kind !== f.kind || r.id !== f.id ||
+        r.model_guid !== f.model_guid || r.section !== f.section) return;
+    var nx = mdModal();
+    if (r.phase === 'open'){
+      if (!f.browserPending || f.sent || r.token !== f.token) return;
+      if (r.ok){
+        // Ack len hovori, ze sa pokus o otvorenie vratil — cenu nepotvrdzuje.
+        // Neuspesne otvorenie potvrdenie NEBLOKUJE (mockup B1).
+        f.browserPending = false;
+        nx.clearErrors();
+        if (r.opened === false) mdManualWarn(f, r.msg || MD_MANUAL_OPEN_FAILED);
+        return;
+      }
+      mdManualClose();
+      MD.setStatus(r.msg || 'Overenie už nie je platné — otvor ho znova.', true);
+      return;
+    }
+    if (!f.sent || r.token !== f.submitToken) return;
+    nx.setBusy(false);
+    f.sent = false;
+    f.submitToken = '';
+    if (r.ok){ mdManualClose(); MD.setStatus(r.msg || 'Cena potvrdená.'); return; }
+    if (r.read_only || !r.item || r.item.demos_url || r.status === 'stale_model' ||
+        r.status === 'schema' || r.status === 'not_found'){
+      mdManualClose();
+      MD.setStatus(r.msg || 'Overenie už nie je platné — otvor ho znova.', true);
+      return;
+    }
+    if (r.status === 'conflict'){
+      // Novy formular s aktualnou cenou a reviziou; povodna cena sa sama
+      // nikdy neposle znova (vzor hwManualResult).
+      mdManualOpen(r, f, r.msg);
+      return;
+    }
+    nx.showErrors(r.errors && r.errors.length ? r.errors : [{ msg: r.msg || 'Cenu sa nepodarilo potvrdiť.' }]);
   }
 
   function mdOpenEdgeForm(id, opts){
@@ -2920,6 +3388,10 @@
     // D-42 (audit FIX 13): echo po zapise do katalogu — bez scanu modelu,
     // modelovy kontext (predvolby/pouzite/guid) ostava.
     setCatalog: function(data){ mdApplyCatalog(data); },
+    // CENY-M1b (R15): odpovede formulara „Overiť cenu" (echo tokenu, sekcie
+    // a dokumentu — cudzia alebo neskora odpoved sa zahodi).
+    manualReady: function(r){ mdManualReady(r); },
+    manualResult: function(r){ mdManualResult(r); },
     setStatus: function(msg, err){ var e = mdEl('status'); e.textContent = msg; e.className = err ? 'err' : 'ok'; },
     // D-42 (audit FIX 8): server odmietol duplicitny kod — znovu otvor formular
     // s rozpisanymi hodnotami a nastav potvrdenie na druhe Ulozit.
@@ -3271,6 +3743,8 @@
     // po odchode ostal visiet nad Kusovnikom. Zatvorenie hodnoty NEZAHADZUJE —
     // pamat kostry ich podrzi do najblizsieho otvorenia.
     mdEditClose();
+    // CENY-M1b (R23): formular „Overiť cenu" aj cakajuci prepare/open.
+    mdManualClose();
     if (typeof mddClose === 'function') mddClose();
     if (typeof nxdaClose === 'function') nxdaClose();
   }
@@ -3470,6 +3944,20 @@
       mdSaveSheet: mdSaveSheet, mdSaveEdge: mdSaveEdge, mdReopenFromAttempt: mdReopenFromAttempt,
       mdApplyCatalog: mdApplyCatalog,
       MD_CLIENT_SCHEMA: MD_CLIENT_SCHEMA,
+      // CENY-M1b — rucne overenie ceny (tests/js/test_ceny_m1_manual.js):
+      // ciste funkcie textov, prepoctu a payloadu + tok formulara
+      mdMoney: mdMoney, mdExactMoney: mdExactMoney, mdM2Shown: mdM2Shown, mdAgeText: mdAgeText,
+      mdManualTip: mdManualTip, mdCheckBtn: mdCheckBtn, mdManualFormText: mdManualFormText,
+      mdManualParse: mdManualParse, mdManualShown: mdManualShown, mdManualInit: mdManualInit,
+      mdManualSwitch: mdManualSwitch, mdManualTyped: mdManualTyped, mdManualValue: mdManualValue,
+      mdManualCalc: mdManualCalc, mdManualDiff: mdManualDiff,
+      mdManualNote: mdManualNote, mdManualCheck: mdManualCheck, mdManualPayload: mdManualPayload,
+      mdManualSub: mdManualSub, mdManualInfo: mdManualInfo,
+      mdManualRequest: mdManualRequest, mdManualClose: mdManualClose,
+      mdManualContextChanged: mdManualContextChanged,
+      manualState: function(){ return MD_MANUAL ? { kind: MD_MANUAL.kind, id: MD_MANUAL.id, st: MD_MANUAL.st,
+        browserPending: MD_MANUAL.browserPending, warn: MD_MANUAL.warn, rowRev: MD_MANUAL.rowRev } : null; },
+      setModelGuidForTest: function(g){ MD_MODEL_GUID = g; },
       // D-97 — upozornenie na neznamy typ dosky (ciste, bez DOM)
       mdUnknownTypeWarning: mdUnknownTypeWarning,
       // M-B2 — „Nahradit UNI…" (ciste funkcie bez DOM)
