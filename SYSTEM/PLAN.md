@@ -226,7 +226,7 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   [MOCKUP_CENY_2026-09-30.html](zdroje/bloky/CENY/MOCKUP_CENY_2026-09-30.html) (O1–O9 podľa návrhu, 30.9.). Štart bloku PR #425. Dávky (každá s auditom návrhu — mení formát katalógu;
   rez M1 → **M1a / M1b** prijal orchestrátor 30.9. podľa package [PACKAGE_CENY_M1.md](zdroje/bloky/CENY/PACKAGE_CENY_M1.md) s auditom
   [AUDIT_CENY_M1_2026-09-30.md](zdroje/bloky/CENY/AUDIT_CENY_M1_2026-09-30.md)):
-  - ✅ **CENY-M1a** · odkaz na produkt pri doske/ABS bez Demosu v dátach katalógu (SCHEMA 11) a v Štúdiu → Materiály — **PR #?, v0.16.1**.
+  - ✅ **CENY-M1a** · odkaz na produkt pri doske/ABS bez Demosu v dátach katalógu (SCHEMA 11) a v Štúdiu → Materiály — **PR #426, v0.16.1**.
   - **CENY-M1b** · ručné overenie ceny (doska za platňu / ABS za bm, SCHEMA 12), zneplatnenie, prednosť Demosu, D-148 (požiadavky [B] toho istého package).
   - **CENY-M2** · Rozpočet: vek ručne overených cien, „N cien na kontrolu", odkaz a „Overiť cenu" v sekcii Materiál a ABS hrany; materiál bez formátu
     podľa skutočných m² dielcov namiesto fiktívnej platne (C12).

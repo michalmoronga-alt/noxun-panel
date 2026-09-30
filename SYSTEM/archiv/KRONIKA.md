@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **CENY-M1a — odkaz na produkt pri doske a ABS bez Demosu (30.9.2026, PR #?, v0.16.0 → v0.16.1).** Prvá kódová dávka bloku CENY podľa package
+- **CENY-M1a — odkaz na produkt pri doske a ABS bez Demosu (30.9.2026, PR #426, v0.16.0 → v0.16.1).** Prvá kódová dávka bloku CENY podľa package
   [PACKAGE_CENY_M1.md](../zdroje/bloky/CENY/PACKAGE_CENY_M1.md) (požiadavky **[A]**; audit návrhu Codex gpt-6-astra
   [AUDIT_CENY_M1_2026-09-30.md](../zdroje/bloky/CENY/AUDIT_CENY_M1_2026-09-30.md): 1 BLOCKER [B] + 2× FIX-IN-M1a + 1 FIX-IN-M1b; orchestrátor prijal
   rez **M1a → M1b → M2**). **Pre používateľa:** v Štúdiu → Materiály má doska a ABS bez Demosu ikonu **„Otvoriť produkt"** (sivá otvorí obchod a nič

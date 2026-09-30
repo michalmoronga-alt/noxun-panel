@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.16.1 · 30.9.2026 — BLOK CENY BEŽÍ, dávka CENY-M1a** (odkaz na produkt, PR #?). **Štúdio → Materiály:** doska a ABS páska **bez Demosu** má v riadku
+**v0.16.1 · 30.9.2026 — BLOK CENY BEŽÍ, dávka CENY-M1a** (odkaz na produkt, PR #426). **Štúdio → Materiály:** doska a ABS páska **bez Demosu** má v riadku
 ikonu **„Otvoriť produkt"** — sivá otvorí obchod v prehliadači (nič nezapisuje), **jantárová** = odkaz chýba a klik otvorí úpravu (ceruzku) s kurzorom
 v novom poli **„Odkaz na produkt"**; pri Demos väzbe je pole zamknuté (odkaz ostáva odložený). Ikony majú v riadku **pevné miesto**; Rozpočet sa nemení (CENY-M2).
 Pod tým **blok 2 · KONTROLA + VÝROBA** (v0.16.0, smoke **PASS 29.9.**, PR #423), **blok 8 · K3 ROHOVÁ** (v0.15.0, smoke PASS 28.9.), **blok 7 · K1+K2** (v0.14.0).
@@ -27,7 +27,7 @@ v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a
 **Aktualizovať obe PC (aj Luciino) na 0.16.1 pred prvým uložením odkazu — starší plugin katalóg materiálov potom len číta** (rohovú nepozná, šablóny STD 7 len
 číta, rozpočet `BUDGET_STD` 3 needituje; katalóg je na každom PC zvlášť — riziko pri prenose `materials.json` alebo pri staršom SketchUpe na tom istom PC).
 
-**Testy (CENY-M1a, PR #?):** **4866 headless · 143 JS sád** zelené; mutácie M1–M8 + M22 a 6 mutácií opráv z predrecenzie zabité; in-SU nie je brána (package §8).
+**Testy (CENY-M1a, PR #426):** **4866 headless · 143 JS sád** zelené; mutácie M1–M8 + M22 a 6 mutácií opráv z predrecenzie zabité; in-SU nie je brána (package §8).
 **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 
 ## Robí sa
@@ -45,7 +45,7 @@ zamknuté. **Test na reálnej zákazke po V1.** Nálezy z výroby a cien majú p
 
 ## Posledné uzávery
 
-- **CENY-M1a · odkaz na produkt** (**v0.16.1**, 30.9.2026, PR #?) — ikona a pole odkazu, pevný slot ikon, katalóg v schéme 11 ([archiv/KRONIKA.md](archiv/KRONIKA.md)).
+- **CENY-M1a · odkaz na produkt** (**v0.16.1**, 30.9.2026, PR #426) — ikona a pole odkazu, pevný slot ikon, katalóg v schéme 11 ([archiv/KRONIKA.md](archiv/KRONIKA.md)).
 - **BLOK 2 · KONTROLA + VÝROBA UZAVRETÝ** (**v0.16.0**, 29.9.2026; nárezový plán: štart #417, PR #418–#421 + uzáver PR #422; **smoke PASS 29.9.**, PR #423).
   Nárezový plán v Štúdiu, nastavenia prerezu/orezu/prídavku, Kontrola s orezom, ceny podľa plánu; priečinok bloku v [archiv/bloky/NAREZ/](archiv/bloky/NAREZ/).
   [Výsledok, dávky a checklist](archiv/NAREZ_ZAVER_2026-09-29.md).
