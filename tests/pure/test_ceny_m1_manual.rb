@@ -404,6 +404,21 @@ NxTest.test('CENY-M1b (O7): potvrdenie za platnu cez JsonFileStore okruh — pla
   end
 end
 
+NxTest.test('CENY-M1b (review #427): fixtura parity prepoctu formulara zodpoveda aktualnemu serveru') do
+  require File.join(NxTest::ROOT, 'tests', 'fixtures', 'ceny_m1b_parity', 'generate.rb')
+  fx = JSON.parse(File.read(File.join(NxTest::ROOT, 'tests', 'fixtures', 'ceny_m1b_parity', 'cases.json'), encoding: 'UTF-8'))
+  NxTest.assert_equal(CenyM1bParity::FORMATS, fx['formats'], 'formaty fixtury = generator')
+  NxTest.assert_equal(CenyM1bParity.inputs.size * CenyM1bParity::FORMATS.size, fx['rows'].size,
+                      'fixtura pokryva celu mriezku generatora (spusti generate.rb)')
+  bad = fx['rows'].reject do |(fi, text, m2, plate)|
+    CenyM1bParity.expected(text, fx['formats'][fi]) == [m2, plate]
+  end
+  NxTest.assert_equal([], bad.first(5), "#{bad.size} riadkov fixtury nesedi so serverom — spusti generate.rb")
+  # priklady z review: server 2,01 € na 2 m² -> 1,01 €/m²; 1,005 €/m² na 1 m² -> 1,01 € za platnu
+  NxTest.assert_equal(%w[1,01 4,02], CenyM1bParity.expected('2,01', [2000.0, 1000.0]))
+  NxTest.assert_equal('1,01', CenyM1bParity.expected('1,005', [1000.0, 1000.0])[1])
+end
+
 # --- R12: echo zobrazenej €/m2 ------------------------------------------------------
 
 NxTest.test('CENY-M1b (R12): bunka — echo zobrazenej €/m2 nic nezapise a overenie ostava; ABS echo nema') do

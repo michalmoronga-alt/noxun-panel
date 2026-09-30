@@ -3455,8 +3455,11 @@ vráti `error` s tokenom (modal sa odomkne). Tok **nepoužíva** Demos session �
 v tooltipe a klik ukáže status „Katalóg je len na čítanie — úpravy sú vypnuté." bez odoslania — vzor UI_DIZAJN D-78, nikdy HTML `disabled`),
 „Oproti katalógu" rozhoduje tým istým pravidlom ako server (`mdDecCents` — desiatkovo half-up zo stringu, €/m² presne v centoch),
 hint Demos dátumu vo formulári variantu menuje aj zmenu ceny, kódu, dodávateľa, dekoru u dodávateľa a formátu (D-148, pri ABS bez
-posledných dvoch), veta R22 pri doske rovnako vrátane dekoru u dodávateľa (zoznam polí `manual_check_changed?`), prepočet platňa → m² v náhľade
-aj pri prepnutí jednotky najprv zaokrúhli platňu na centy ako server (`mdPlateAmount`, D3),
+posledných dvoch), veta R22 pri doske rovnako vrátane dekoru u dodávateľa (zoznam polí `manual_check_changed?`), prepočet v náhľade
+aj pri prepnutí jednotky počíta tými istými pravidlami ako server — platňa → €/m²: platňa na centy (`mdPlateAmount`, D3) / plocha
+a zobrazenie desiatkovo half-up z najkratšieho zápisu čísla (`mdHalfUpText` = `display_m2`); €/m² → platňa: zrkadlo Ruby `Float#round(2)`
+(`mdRubyRound2` = `Budget.price_per_plate`); paritu drží fixtúra `tests/fixtures/ceny_m1b_parity/` (generátor zo serverových funkcií,
+Ruby sada overí zhodu so serverom, JS sada 100 % zhodu klienta),
 bunka €/m², pole Cena formulára variantu a stĺpec editora ukazujú `price_display.m2` na 2 desatinné (`mdM2Shown`), hint pod odkazom nesie vetu
 R22 (`mdManualFormText`), Demos hint dátumu sa ukazuje len pri Demos väzbe. **Formulár „Overiť cenu ručne"** (NXModal, `busyLock`, `memoryKey:
 null`, vlastné pole `custom` `price`): skupina dodávateľ + odkaz / veta O9, „Položka" (kód, formát, plocha), prepínač **za platňu | za m²**

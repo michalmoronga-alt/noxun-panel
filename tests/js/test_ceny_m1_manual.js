@@ -217,6 +217,35 @@ eq(M.MD_CLIENT_SCHEMA, 12, 'klient hlasi schemu 12 (price_check_method)');
   eq(M.mdManualInfo('edge', E08), 'ABS 43 × 0,8 mm · kód ABS-08');
 })();
 
+// --- Review #427: parita prepoctu so SERVEROM nad spolocnou fixturou ----------
+// (tests/fixtures/ceny_m1b_parity — ocakavania pocitaju serverove funkcie
+// `manual_price_value` + `display_m2` a `Budget.price_per_plate`; Ruby sada
+// overuje, ze fixtura sedi s aktualnym serverom). Musi sediet na 100 %.
+(function(){
+  const fx = require(path.join(__dirname, '..', 'fixtures', 'ceny_m1b_parity', 'cases.json'));
+  let bad = [];
+  fx.rows.forEach(function(r){
+    const fmt = fx.formats[r[0]];
+    const area = fmt[0] * fmt[1] / 1000000;   // ten isty vzorec ako server (plate_area)
+    const item = { sheet_size: fmt, price_display: { plate: null, m2: null, area: area } };
+    const fmtTxt = M.mdManualCalc(item, 'plate', '1').t.replace(/^.*\(/, '(');
+    const c1 = M.mdManualCalc(item, 'plate', r[1]).t;
+    const c2 = M.mdManualCalc(item, 'm2', r[1]).t;
+    const s1 = M.mdManualSwitch(item, M.mdManualTyped({ mode: 'plate', text: '', touched: false, src: null }, r[1]), 'm2').text;
+    const s2 = M.mdManualSwitch(item, M.mdManualTyped({ mode: 'm2', text: '', touched: false, src: null }, r[1]), 'plate').text;
+    if (c1 !== '→ ' + r[2] + ' €/m² ' + fmtTxt || s1 !== r[2] ||
+        c2 !== '= ' + r[3] + ' € za platňu ' + fmtTxt || s2 !== r[3]) bad.push([fmt.join('x'), r[1], r[2], r[3], c1, c2, s1, s2]);
+  });
+  n++;
+  assert.deepStrictEqual(bad.slice(0, 5), [], 'parita so serverom (' + bad.length + ' z ' + fx.rows.length + ' nesedi)');
+  ok(fx.rows.length > 7000, 'fixtura pokryva mriezku');
+  // priklady z review: 2,01 € na 2 m² -> 1,01 €/m²; 1,005 €/m² na 1 m² -> 1,01 € za platnu
+  const two = { sheet_size: [2000, 1000], price_display: { area: 2 } };
+  eq(M.mdManualCalc(two, 'plate', '2,01').t, '→ 1,01 €/m² (2000 × 1000)');
+  const one = { sheet_size: [1000, 1000], price_display: { area: 1 } };
+  eq(M.mdManualCalc(one, 'm2', '1,005').t, '= 1,01 € za platňu (1000 × 1000)');
+})();
+
 // --- R20b: prepnutie jednotky (M24) ----------------------------------------------
 (function(){
   let st = M.mdManualInit('sheet', S25);

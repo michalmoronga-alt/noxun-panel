@@ -1782,8 +1782,9 @@
     var v = mdManualParse(st.src.text);
     var area = ((item && item.price_display) || {}).area;
     if (v === null || isNaN(v) || !area) return { mode: mode, text: st.src.text, touched: true, src: st.src };
-    // platna -> m²: najprv to iste zaokruhlenie na centy ako server (D3)
-    return { mode: mode, text: mdMoney(mode === 'm2' ? mdPlateAmount(st.src.text) / area : v * area),
+    // platna -> m² aj m² -> platna TYMI ISTYMI pravidlami ako server
+    // (mdPlateToM2Text / mdM2ToPlateText, parita s fixturou)
+    return { mode: mode, text: mode === 'm2' ? mdPlateToM2Text(st.src.text, area) : mdM2ToPlateText(v, area),
              touched: true, src: st.src };
   }
   // Cena za platnu tak, ako ju uvidi server: na centy desiatkovo half-up
@@ -1792,6 +1793,30 @@
     var dc = mdDecCents(text);
     return dc ? dc.cents / 100 : mdManualParse(text);
   }
+  // Cislo -> text na 2 desatinne DESIATKOVO half-up z najkratsieho zapisu
+  // cisla (JS `String(n)` = Ruby `Float#to_s`) — zrkadlo `Materials.display_m2`
+  // (Rational(to_s) half-up), nie binarne toFixed (review #427: 2,01 € na
+  // 2 m² = 1,005 €/m² server zobrazi 1,01, toFixed 1,00).
+  function mdHalfUpText(n){
+    if (!isFinite(n)) return '';
+    var s = String(Math.abs(n));
+    if (/e/i.test(s)) s = Math.abs(n).toFixed(12);
+    var dc = mdDecCents(s);
+    if (!dc) return mdMoney(n);
+    return (n < 0 ? '-' : '') + mdMoney(dc.cents / 100);
+  }
+  // Zrkadlo Ruby `Float#round(2)` (round_half_up v numeric.c), ktore pouziva
+  // `Budget.price_per_plate` — (m² × plocha).round(2); oprava o jeden krok,
+  // ked binarny sucin lezi tesne pod polovicou (1,005 × 1 -> 1,01).
+  function mdRubyRound2(x){
+    var s = 100, f = Math.round(x * s);
+    if (x > 0 && (f + 0.5) / s <= x) f += 1;
+    return f / s;
+  }
+  // platna -> €/m²: ako `manual_price_value` + `display_m2` (D3, O7).
+  function mdPlateToM2Text(text, area){ return mdHalfUpText(mdPlateAmount(text) / area); }
+  // €/m² -> platna: ako Rozpocet (`Budget.price_per_plate`).
+  function mdM2ToPlateText(v, area){ return mdMoney(mdRubyRound2(v * area)); }
   // Co sa odosle: nedotknute pole = zobrazeny rezim a text servera; po pisani
   // PRESNE napisane cislo v jeho rezime (zamer, nie prepocitany zobrazeny text).
   function mdManualValue(st){
@@ -1807,11 +1832,11 @@
     if (mode === 'plate'){
       if (!area) return { t: 'Na prepočet treba formát platne — doplň ho v úprave variantu (ceruzka), alebo zadaj cenu za m².', warn: true };
       if (v === null || isNaN(v)) return { t: '→ … €/m² (' + fmt + ')', warn: false };
-      return { t: '→ ' + mdMoney(mdPlateAmount(text) / area) + ' €/m² (' + fmt + ')', warn: false };
+      return { t: '→ ' + mdPlateToM2Text(text, area) + ' €/m² (' + fmt + ')', warn: false };
     }
     if (!area) return { t: 'bez prepočtu — formát nie je v katalógu', warn: true };
     if (v === null || isNaN(v)) return { t: '= … € za platňu (' + fmt + ')', warn: false };
-    return { t: '= ' + mdMoney(v * area) + ' € za platňu (' + fmt + ')', warn: false };
+    return { t: '= ' + mdM2ToPlateText(v, area) + ' € za platňu (' + fmt + ')', warn: false };
   }
   // Vstup (text) -> cele centy DESIATKOVO half-up zo stringu (zrkadlo
   // `Materials.cents_of` / `input_cents` servera — nie binarne Math.round,
@@ -3986,6 +4011,8 @@
       mdManualParse: mdManualParse, mdManualShown: mdManualShown, mdManualInit: mdManualInit,
       mdManualSwitch: mdManualSwitch, mdManualTyped: mdManualTyped, mdManualValue: mdManualValue,
       mdManualCalc: mdManualCalc, mdManualDiff: mdManualDiff, mdDecCents: mdDecCents, mdPlateAmount: mdPlateAmount,
+      mdHalfUpText: mdHalfUpText, mdRubyRound2: mdRubyRound2, mdPlateToM2Text: mdPlateToM2Text,
+      mdM2ToPlateText: mdM2ToPlateText,
       mdManualNote: mdManualNote, mdManualCheck: mdManualCheck, mdManualPayload: mdManualPayload,
       mdManualSub: mdManualSub, mdManualInfo: mdManualInfo,
       mdManualRequest: mdManualRequest, mdManualClose: mdManualClose,
