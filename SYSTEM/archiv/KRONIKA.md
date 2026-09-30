@@ -17,6 +17,24 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **CENY-M2 — Rozpočet: ručné ceny dosiek a ABS + sklo bez formátu podľa m² (30.9.2026, PR #?, v0.16.2 → v0.16.3).** Posledná kódová dávka bloku CENY
+  podľa package [PACKAGE_CENY_M2.md](../zdroje/bloky/CENY/PACKAGE_CENY_M2.md) (audit Codex gpt-6-astra
+  [AUDIT_CENY_M2_2026-09-30.md](../zdroje/bloky/CENY/AUDIT_CENY_M2_2026-09-30.md): BLOCKER — testy a golden zosúladené s obmedzeným R1, NP-4 golden sa
+  nemení; FIX-2 `manual_hardware` len kovanie + `manual_pending` jedným priechodom; FIX-3 typ cez `Materials.type_registry_entry`; NOTE-4 dve PC).
+  **Pre používateľa:** v Rozpočte → Materiál a ABS hrany má doska a páska bez Demosu v stĺpci „Overená" stav („ručne 18.9." sivé · „ručne 45 dní" /
+  „neoverená" jantárové), ktorý je zároveň tlačidlom **„Overiť cenu"** — ten istý formulár ako v Štúdiu, ale ostáva sa v Rozpočte (bez odkazu len
+  formulár, O9). Čip **„N cien na kontrolu"** a „Skontrolovať ceny" počítajú aj ručné materiály a pásky; UNI a duplák z neho vypadli (dnes tam stáli
+  ako „ručná položka"). Zoznam má pri ručnej položke ikonu odkazu a „Overiť cenu" (veta „over v katalógu ručne" zanikla), pred názvom materiálu aj pásky
+  je ikona odkazu (Demos · obchod · jantárová = doplniť odkaz → Materiály s kurzorom v poli odkazu). **Materiál bez formátu, ktorého typ nie je v registri
+  typov (sklo), sa počíta podľa skutočných m² dielcov** (sklo 0,9 m² à 41,50 €: **240,53 → 37,35 €**; MJ „m²", množstvo na 2 desatinné bez dvojitého
+  zaokrúhlenia, min 0,01; cena = €/m² zo Štúdia); v ponuke taký riadok môže klesnúť pod prah 150 € do zostavy. **Bežná doska bez formátu ostáva na
+  odhade platní** (bezpečnejšia vratná voľba orchestrátora, kým Michal neodpovie na Q2; vetva „všetky typy" = jedna funkcia `area_priced_type?`);
+  **porez a montáž bez zmeny** (Q1). Karta Nárezového plánu: „v rozpočte 0,90 m² podľa plochy". `BUDGET_STD` sa nemení — **starší plugin na druhom PC
+  sklo ocení po starom** (povinná veta v STAV). **Testy:** 4910 headless (nové `test_ceny_m2_area.rb`, `test_ceny_m2_stale.rb`, `test_ceny_m2_golden.rb`
+  — golden B = odtlačok zákazky so sklom spred M2, zmena len na vymenovaných cestách; NP-4 golden **bez pregenerovania**, len normalizácia aditívnych
+  kľúčov a bloku `stale`) · 145 JS sád (nová `test_ceny_m2_budget.js` s parity textov O5; `test_budget_ui.js`, `test_ceny_kov_budget_manual.js`,
+  `test_np3_sekcia.js` vedome upravené) · **28 mutácií (M1–M24) zabitých**; in-SU nie je brána (package §8). Pre Luciu: aktualizovať obe PC pred porovnávaním ponúk.
+
 - **CENY-M1b — ručné overenie ceny dosky a ABS bez Demosu (30.9.2026, PR #427, v0.16.1 → v0.16.2).** Druhá kódová dávka bloku CENY podľa package
   [PACKAGE_CENY_M1.md](../zdroje/bloky/CENY/PACKAGE_CENY_M1.md) (požiadavky **[B]**; audit Codex gpt-6-astra — BLOCKER R11a „bez zmeny = presná zhoda
   so zobrazenou hodnotou, nie interval ±0,005" a FIX R20b; delta audit Codex gpt-5.6-sol

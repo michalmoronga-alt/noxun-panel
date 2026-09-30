@@ -106,6 +106,14 @@ NxTest.test('CENY-M2 (R1): sklo bez formatu = area; DTDL bez formatu, UNI, dupla
   NxTest.assert(on['poznamka'].include?('formát chýba — cena z odhadu'), 'dnesna veta NP-4')
   uni = c.mat(p, 'UNI')
   NxTest.assert_equal(['PLATŇA', nil], uni.values_at('mj', 'qty_basis'), 'UNI bez formatu ostava odhadom')
+  # UNI s typom MIMO registra (napr. pracovne „sklo") — chrani ho priznak UNI, nie typ.
+  uni_glass = c::SHEETS.merge('UNI' => c::SHEETS['UNI'].merge('type' => 'SKLO'))
+  ug = c.mat(c.pay([c.r('UNI', 700.0, 500.0, 2)], sheets: uni_glass, layout: false), 'UNI')
+  NxTest.assert_equal(['PLATŇA', nil], ug.values_at('mj', 'qty_basis'), 'UNI mimo registra typov ostava odhadom')
+  uni_flag = c::SHEETS.merge('UNI' => c::SHEETS['UNI'].merge('type' => 'SKLO').reject { |k, _| k == 'uni' })
+  est_uni = c::E::SheetEstimate.estimate([c.r('UNI', 700.0, 500.0, 2)], sheet_sizes: {}, uni_ids: { 'UNI' => true })
+  row = c::B.materials_section(est_uni, uni_flag)['rows'].first
+  NxTest.assert_equal('PLATŇA', row['mj'], 'priznak UNI z odhadu (bez zaznamu uni) tiez chrani')
   # Neviazany duplakovy zaznam (vlastna skupina odhadu) bez formatu.
   dup_rows = [c.r('DUP', 600.0, 500.0, 1)]
   dup_sheets = c::SHEETS.merge('DUP' => c::SHEETS['DUP'].reject { |k, _| k == 'sheet_size' })

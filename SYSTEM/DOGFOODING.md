@@ -37,12 +37,8 @@ Smoke bloku 2 **PASS 29.9.2026** (bez chýb); nové postrehy k týmto funkciám 
 
 ## V1 DOTIAHNUTIE
 
-- **Vedome odložené z dávky E — ceny (V1 rozsah)** (6.8., nič z toho neblokuje prácu so zákazkou) — **manuálne overenie ceny materiálov/ABS** BEZ väzby na Demos a ~~viac URL na položke~~ → **jeden odkaz** (C7, blok CENY 29.9.2026)
-  (zvyšok V1-03; dnes ich „Prepočítať ceny" preskočí) · ~~prepínač „na faktúru" (×1,2)~~ — **vyradené 6.9.2026** (Michal: existuje prepínač s DPH / bez DPH); zvyšok rozhodnutý v `zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md`.
-  **Katalógové kovanie je hotové (10.9., CENY-KOV-A/B, PR #345/#346):** jeden produktový odkaz, preklik a ručné potvrdenie ceny k dnešku v katalógu/Rozpočte. Materiály/ABS sú naďalej otvorené (viac URL nahradil jeden odkaz — C7).
-  *(Piaty kus tej istej odkladovej sady — EN DANIELI textový export — je v skupine KONTROLA + VÝROBA; DOCX/PDF generátor a rodina dokumentov sú od 26.8. v skupine Po V1 — zásobník.)*
-  *Stav: **blok CENY beží** (štart 29.9.2026, posledný kódový bod V1) — **jeden odkaz na produkt hotový v CENY-M1a** (v0.16.1, PR #426), **ručné overenie
-  ceny v Štúdiu → Materiály hotové v CENY-M1b** (v0.16.2, PR #427); Rozpočet (vek ručných cien, „na kontrolu") ostáva na CENY-M2 — priečinok [zdroje/bloky/CENY/](zdroje/bloky/CENY/).*
+*(Skupina je prázdna — **ceny materiálov/ABS (zvyšok V1-03) vyriešené 30.9.2026** blokom CENY (CENY-M1a/M1b/M2, v0.16.1–v0.16.3), plný text v
+[archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md); EN DANIELI textový export aj DOCX/PDF sú v skupine Po V1 — zásobník.)*
 
 ## INFRA
 

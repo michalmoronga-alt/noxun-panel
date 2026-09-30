@@ -6,11 +6,11 @@
 
 ## Stav
 
-**v0.16.2 · 30.9.2026 — BLOK CENY BEŽÍ, dávka CENY-M1b** (ručné overenie ceny, PR #427). **Štúdio → Materiály:** doska a ABS páska **bez Demosu** má
-okrem ikony odkazu (M1a, #426) ikonu **„Overiť cenu"** (sivá = čerstvo overená, jantárová = na kontrolu; dátum a vek v tooltipe). Klik otvorí obchod
-(ak je odkaz) a formulár — doska **za platňu** s prepočtom na €/m² (sklo bez formátu za m²), ABS za bm; **„Potvrdiť cenu k dnešku"** zapíše dátum, nezmenená
-cena ostane presne tá istá. Zmena ceny, kódu, dodávateľa, odkazu, dekoru u dodávateľa alebo formátu overenie zruší; Demos má prednosť. €/m² sa ukazuje na 2 desatinné. Rozpočet sa nemení (CENY-M2).
-Pod tým **blok 2 · KONTROLA + VÝROBA** (v0.16.0, smoke **PASS 29.9.**, PR #423), **blok 8 · K3 ROHOVÁ** (v0.15.0, smoke PASS 28.9.), **blok 7 · K1+K2** (v0.14.0).
+**v0.16.3 · 30.9.2026 — BLOK CENY, posledná dávka CENY-M2** (Rozpočet, PR #?). **Rozpočet → Materiál a ABS hrany:** doska a páska **bez Demosu** má
+v stĺpci „Overená" stav („ručne 18.9." sivé · „ručne 45 dní" / „neoverená" jantárové), ktorý je zároveň tlačidlom **„Overiť cenu"** (formulár z M1b, ostáva
+sa v Rozpočte). Čip **„N cien na kontrolu"** a „Skontrolovať ceny" počítajú aj ručné materiály (UNI a duplák nie), pred názvom je ikona odkazu (Demos · obchod ·
+jantárová = doplniť odkaz). **Sklo a iný materiál bez formátu mimo bežných dosiek sa v Rozpočte počíta podľa m²** (skutočná plocha dielcov × cena za m²);
+**bežná doska bez formátu ako doteraz** (odhad platní — otázka Q2 na Michala otvorená); porez a montáž bez zmeny. Pod tým **blok 2 · KONTROLA + VÝROBA** (v0.16.0, smoke **PASS 29.9.**, PR #423), **blok 8 · K3 ROHOVÁ** (v0.15.0, smoke PASS 28.9.), **blok 7 · K1+K2** (v0.14.0).
 Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 so **štrnástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · **Nárezový plán** · Materiály · Kovanie · Spotrebiče · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine. Neaktívna položka navigácie už nie je žiadna.
 
@@ -25,29 +25,29 @@ ostáva ručné overenie cien materiálov/ABS (blok CENY); **test na kompletnej 
 v **seede 6** — starší plugin zákazku neprestaví ani nevyexportuje (rohovú by sklopil na dolnú). **Dáta rozpočtu sú od NP-4 v `BUDGET_STD` 3** (prvá úprava rozpočtu
 v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a zastaví oba cenové exporty). **Nastavenia dodávateľa sú od NP-2 vo verzii súboru 2** (v0.15.1 a starší pri uložení nové polia zahodí).
 **Katalóg materiálov je po prvom uloženom odkaze v schéme 11 a po prvom ručnom overení ceny v schéme 12** — starší plugin ho ďalej číta (aj Rozpočet), ale nezapíše doň.
-**Aktualizovať obe PC (aj Luciino) na 0.16.2 pred prvým ručným overením — starší plugin katalóg materiálov potom len číta** (rohovú nepozná, šablóny STD 7 len
-číta, rozpočet `BUDGET_STD` 3 needituje; katalóg je na každom PC zvlášť — riziko pri prenose `materials.json` alebo pri staršom SketchUpe na tom istom PC).
+**Aktualizuj plugin na oboch PC pred porovnávaním alebo posielaním ponúk — starší plugin počíta sklo bez formátu po starom.** (0.16.3 aj na Luciino PC; `BUDGET_STD` M2 nemení.)
 
-**Testy (CENY-M1b, PR #427):** **4893 headless · 144 JS sád** zelené; mutácie M9–M21, M23, M24 zabité; in-SU nie je brána (package §8).
+**Testy (CENY-M2, PR #?):** **4910 headless · 145 JS sád** zelené; 28 mutácií (M1–M24) zabitých; in-SU nie je brána (package §8).
 **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 
 ## Robí sa
 
 **Blok CENY** (posledný kódový bod V1, [PLAN.md](PLAN.md) blok 4; priečinok [zdroje/bloky/CENY/](zdroje/bloky/CENY/) — rozhodnutia, mockup, package M1 s auditom):
-**CENY-M1a** (odkaz, v0.16.1) → **CENY-M1b** (ručné overenie ceny, v0.16.2, D-148) → **CENY-M2** (Rozpočet). Poradie pred V1: **CENY → R-13 → R-37 → R-35**
+**CENY-M1a** (odkaz, v0.16.1) → **CENY-M1b** (ručné overenie ceny, v0.16.2, D-148) → **CENY-M2** (Rozpočet, v0.16.3) — všetky kódové dávky hotové,
+nasleduje **uzáver bloku** (`release/ceny`, v0.17.0). Poradie pred V1: **CENY → R-13 → R-37 → R-35**
 (**R-13 rozhodnuté 29.9.: čítať** — ORANGE „dielec z inej verzie štandardu"). Pri prvej rohovej v dielni ostáva overiť záves Sensys na výstuhe závesov.
 **Čakajú na smoke:** **D-132** (#367), **D-133** (#368), **D-134** (#369). **D-141**, **D-142**, **D-145**, **D-146** a **D-147** sú v zásobníku.
 
 ## Ďalší krok
 
-**CENY-M2** (Rozpočet: vek ručne overených cien, „na kontrolu", materiál bez formátu podľa m²) z čerstvého `main` po mergi M1b. Smoke M1a + M1b
-(package §10, body 1–14): najprv **aktualizovať plugin na oboch PC**, potom odkaz (jantárová ikona → pole odkazu), „Overiť cenu" pri doske za platňu
-(Rozpočet ukáže presne zadanú sumu), sklo za m², 0 €, zrušenie overenia bunkou, Demos prednosť a D-148. **Test na reálnej zákazke po V1.**
+**Uzáver bloku CENY** (`release/ceny`, v0.17.0) hneď po mergi M2, potom **smoke celého bloku** (M1 §10 body 1–14 + M2 §10 body 1–10): najprv
+**aktualizovať plugin na oboch PC**, potom odkaz a „Overiť cenu" v Materiáloch, v Rozpočte sklo v m² (porez a montáž bez zmeny), stĺpec „Overená",
+čip „na kontrolu" a „Skontrolovať ceny". **Q2 (doska bez formátu) a Q1 (porez skla)** čakajú na Michala. **Test na reálnej zákazke po V1.**
 
 ## Posledné uzávery
 
-- **CENY-M1b · ručné overenie ceny** (**v0.16.2**, 30.9.2026, PR #427) — ikona a formulár „Overiť cenu", zneplatnenie, Demos prednosť, D-148, schéma 12.
-- **CENY-M1a · odkaz na produkt** (**v0.16.1**, 30.9.2026, PR #426) — ikona a pole odkazu, pevný slot ikon, katalóg v schéme 11 ([archiv/KRONIKA.md](archiv/KRONIKA.md)).
+- **CENY-M2 · Rozpočet** (**v0.16.3**, 30.9.2026, PR #?) — vek ručných cien, „Overiť cenu" a ikona odkazu v Rozpočte, sklo bez formátu podľa m².
+- **CENY-M1b · ručné overenie ceny** (**v0.16.2**, PR #427) a **CENY-M1a · odkaz na produkt** (**v0.16.1**, PR #426) — [archiv/KRONIKA.md](archiv/KRONIKA.md).
 - **BLOK 2 · KONTROLA + VÝROBA UZAVRETÝ** (**v0.16.0**, 29.9.2026; nárezový plán: štart #417, PR #418–#421 + uzáver PR #422; **smoke PASS 29.9.**, PR #423).
   Nárezový plán v Štúdiu, nastavenia prerezu/orezu/prídavku, Kontrola s orezom, ceny podľa plánu; priečinok bloku v [archiv/bloky/NAREZ/](archiv/bloky/NAREZ/).
   [Výsledok, dávky a checklist](archiv/NAREZ_ZAVER_2026-09-29.md).
