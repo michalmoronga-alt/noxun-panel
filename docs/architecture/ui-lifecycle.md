@@ -3451,7 +3451,10 @@ status „Cena potvrdená k 30.9.2026: 179,90 € za platňu = 31,04 €/m²." (
 vráti `error` s tokenom (modal sa odomkne). Tok **nepoužíva** Demos session — odchod zo sekcie ho na serveri neruší. **Payload**
 (`full_catalog_payload(stale_days)`) nesie na každom riadku `price_display` a pri ručnom zázname `price_check` (`manual_price_extra!`),
 `catalog_payload` kľúč `stale_days` (Nastavenia dodávateľa, fail-soft 30). **Klient** (`proj_materials.js`): ikona **„Overiť cenu"**
-`mdCheckBtn` na 3. pozícii slotu (sivá = čerstvá, jantárová `is-pending` = nikdy/stará; tooltip `mdManualTip` podľa O5; read-only `disabled`),
+`mdCheckBtn` na 3. pozícii slotu (sivá = čerstvá, jantárová `is-pending` = nikdy/stará; tooltip `mdManualTip` podľa O5; read-only katalóg = `aria-disabled="true"`, dôvod
+v tooltipe a klik ukáže status „Katalóg je len na čítanie — úpravy sú vypnuté." bez odoslania — vzor UI_DIZAJN D-78, nikdy HTML `disabled`),
+„Oproti katalógu" rozhoduje tým istým pravidlom ako server (`mdDecCents` — desiatkovo half-up zo stringu, €/m² presne v centoch),
+hint Demos dátumu vo formulári variantu menuje aj zmenu ceny, kódu, dodávateľa a formátu (D-148),
 bunka €/m², pole Cena formulára variantu a stĺpec editora ukazujú `price_display.m2` na 2 desatinné (`mdM2Shown`), hint pod odkazom nesie vetu
 R22 (`mdManualFormText`), Demos hint dátumu sa ukazuje len pri Demos väzbe. **Formulár „Overiť cenu ručne"** (NXModal, `busyLock`, `memoryKey:
 null`, vlastné pole `custom` `price`): skupina dodávateľ + odkaz / veta O9, „Položka" (kód, formát, plocha), prepínač **za platňu | za m²**

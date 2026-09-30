@@ -1507,7 +1507,10 @@
     // veta pod odkazom na produkt (R22), nie hint Demos adresy.
     var when = (rec && !rec.uni && rec.demos_url) ? mdDateLabel(rec.price_checked_at) : '';
     if (when){
-      hint.textContent = 'Cena overená ' + when + ' — zmena alebo zmazanie adresy dátum zruší.';
+      // CENY-M1b (D-148): datum zrusi aj zmena ceny, kodu, dodavatela (a pri
+      // doske formatu) — veta hovori vsetko, co server naozaj robi.
+      hint.textContent = 'Cena overená ' + when + ' — zmena alebo zmazanie adresy, zmena ' +
+        (prefix === 'me' ? 'ceny, kódu alebo dodávateľa' : 'ceny, kódu, dodávateľa alebo formátu') + ' dátum zruší.';
       hint.style.display = '';
     } else {
       hint.textContent = '';
@@ -1798,8 +1801,22 @@
     if (v === null || isNaN(v)) return { t: '= … € za platňu (' + fmt + ')', warn: false };
     return { t: '= ' + mdMoney(v * area) + ' € za platňu (' + fmt + ')', warn: false };
   }
+  // Vstup (text) -> cele centy DESIATKOVO half-up zo stringu (zrkadlo
+  // `Materials.cents_of` / `input_cents` servera — nie binarne Math.round,
+  // ktore by 1,005 zaokruhlilo na 1,00). `exact` = vstup nemal jemnejsiu
+  // presnost nez cent. null = necislo.
+  function mdDecCents(text){
+    var m = String(text == null ? '' : text).trim().match(/^(\d+)(?:[.,](\d+))?$/);
+    if (!m) return null;
+    var frac = (m[2] || '') + '00';
+    var rest = frac.slice(2);
+    var cents = parseInt(m[1], 10) * 100 + parseInt(frac.slice(0, 2), 10);
+    return { cents: cents + (rest.charAt(0) >= '5' ? 1 : 0), exact: /^0*$/.test(rest) };
+  }
   // „Oproti katalógu" (cista funkcia). Porovnava so ZOBRAZENOU hodnotou
-  // servera; rozhodnutie „bez zmeny" robi aj tak server (R11a).
+  // servera TYM ISTYM pravidlom ako server (R11a): platna = vstup na centy
+  // half-up (D3), €/m² = presne v centoch (jemnejsi vstup je zmena), €/bm
+  // presne. Rozhodnutie „bez zmeny" robi aj tak server.
   function mdManualDiff(item, mode, text){
     var pd = (item && item.price_display) || {};
     var cat = mode === 'plate' ? pd.plate : mode === 'm2' ? pd.m2 : pd.bm;
@@ -1808,12 +1825,18 @@
     var shown = (mode === 'bm' ? mdExactMoney(cat) : mdMoney(cat)) + unit;
     var v = mdManualParse(text);
     if (v === null || isNaN(v)) return { t: 'v katalógu ' + shown, cls: 'muted' };
-    var same = mode === 'bm' ? v === Number(cat) : Math.round(v * 100) === Math.round(Number(cat) * 100);
+    var dc = mdDecCents(text);
+    var catCents = Math.round(Number(cat) * 100); // hodnota zo servera je uz na centy
+    var byCents = mode === 'plate' || (mode === 'm2' && dc && dc.exact);
+    var same = mode === 'bm' ? v === Number(cat) : (byCents && dc.cents === catCents);
     if (same) return { t: 'bez zmeny (' + shown + ') — stačí potvrdiť', cls: 'same' };
-    var d = v - Number(cat);
+    var d = byCents ? (dc.cents - catCents) / 100 : v - Number(cat);
     var sign = d > 0 ? '+' : '−';
     var pct = Number(cat) > 0 ? ' (' + sign + (Math.abs(d) / Number(cat) * 100).toFixed(1).replace('.', ',') + ' %)' : '';
-    return { t: sign + mdMoney(Math.abs(d)) + ' €' + pct + ' oproti katalógu (' + shown + ')', cls: 'chg' };
+    // Rozdiel jemnejsi nez cent (€/bm, €/m² zadana na tisiciny) sa ukaze
+    // presne — „−0,00 €" by klamalo, ze sa nic nemeni.
+    var amt = byCents ? mdMoney(Math.abs(d)) : mdExactMoney(Math.round(Math.abs(d) * 1e6) / 1e6);
+    return { t: sign + amt + ' €' + pct + ' oproti katalógu (' + shown + ')', cls: 'chg' };
   }
   // Poznamka pod formularom (O4 nula, posledne potvrdenie).
   function mdManualNote(item, text){
@@ -3950,7 +3973,7 @@
       mdManualTip: mdManualTip, mdCheckBtn: mdCheckBtn, mdManualFormText: mdManualFormText,
       mdManualParse: mdManualParse, mdManualShown: mdManualShown, mdManualInit: mdManualInit,
       mdManualSwitch: mdManualSwitch, mdManualTyped: mdManualTyped, mdManualValue: mdManualValue,
-      mdManualCalc: mdManualCalc, mdManualDiff: mdManualDiff,
+      mdManualCalc: mdManualCalc, mdManualDiff: mdManualDiff, mdDecCents: mdDecCents,
       mdManualNote: mdManualNote, mdManualCheck: mdManualCheck, mdManualPayload: mdManualPayload,
       mdManualSub: mdManualSub, mdManualInfo: mdManualInfo,
       mdManualRequest: mdManualRequest, mdManualClose: mdManualClose,

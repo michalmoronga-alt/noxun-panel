@@ -154,6 +154,15 @@ eq(M.MD_CLIENT_SCHEMA, 12, 'klient hlasi schemu 12 (price_check_method)');
   eq(DOC.getElementById('ms_product_hint').textContent, 'Otvorí sa vo webovom prehliadači. Cena zatiaľ nebola ručne overená.');
   M.mdOpenSheetForm('S18');
   ok(DOC.getElementById('ms_product_hint').textContent.indexOf('Položka je viazaná na Demos') === 0, 'Demos: zamok, nie veta R22');
+  // Predrecenzia P3 (D-148): hint Demos datumu hovori vsetko, co ho zrusi
+  eq(DOC.getElementById('ms_demos_hint').textContent,
+     'Cena overená 1.9.2026 — zmena alebo zmazanie adresy, zmena ceny, kódu, dodávateľa alebo formátu dátum zruší.');
+  M.mdSetCatalog(catalog([S25, GLASS, S18D], [E08, Object.assign({}, E08, { abs_id: 'E10', price_check: undefined,
+    price_check_method: undefined, demos_url: 'https://www.demos-trade.sk/abs', price_checked_at: '2026-09-02T10:00:00Z' })]));
+  M.mdOpenEdgeForm('E10');
+  eq(DOC.getElementById('me_demos_hint').textContent,
+     'Cena overená 2.9.2026 — zmena alebo zmazanie adresy, zmena ceny, kódu alebo dodávateľa dátum zruší.', 'ABS bez formatu');
+  M.mdSetCatalog(catalog([S25, GLASS, S18D], [E08]));
   eq(M.mdManualFormText('sheet', null), '', 'novy zaznam bez vety');
 })();
 
@@ -170,7 +179,21 @@ eq(M.MD_CLIENT_SCHEMA, 12, 'klient hlasi schemu 12 (price_check_method)');
   eq(M.mdManualDiff(S25, 'plate', '179,90'), { t: 'bez zmeny (179,90 € za platňu) — stačí potvrdiť', cls: 'same' });
   eq(M.mdManualDiff(S25, 'plate', '182,20'), { t: '+2,30 € (+1,3 %) oproti katalógu (179,90 € za platňu)', cls: 'chg' });
   eq(M.mdManualDiff(S25, 'plate', '170').t, '−9,90 € (−5,5 %) oproti katalógu (179,90 € za platňu)');
+  // Predrecenzia P3: nahlad rozhoduje TYM ISTYM pravidlom ako server —
+  // desiatkovo half-up zo stringu, nie binarne Math.round (1,005 -> 1,01).
+  eq(M.mdDecCents('1,005'), { cents: 101, exact: false });
+  eq(M.mdDecCents('179,90'), { cents: 17990, exact: true });
+  eq(M.mdDecCents('2,675'), { cents: 268, exact: false });
+  eq(M.mdDecCents('31.0400'), { cents: 3104, exact: true });
+  eq(M.mdDecCents('abc'), null);
+  const P101 = { price_display: { plate: 1.01, m2: 1.01, area: 1 }, sheet_size: [1000, 1000] };
+  eq(M.mdManualDiff(P101, 'plate', '1,005').cls, 'same', 'platna 1,005 = 1,01 na centy (server D3) — bez zmeny');
+  eq(M.mdManualDiff(P101, 'plate', '1,004').t, '−0,01 € (−1,0 %) oproti katalógu (1,01 € za platňu)');
+  eq(M.mdManualDiff(P101, 'm2', '1,005').cls, 'chg', '€/m² jemnejsia nez cent = zmena (server input_cents)');
+  eq(M.mdManualDiff(P101, 'm2', '1,010').cls, 'same', 'nuly za centom nevadia');
+  eq(M.mdManualDiff(S25, 'm2', '31,038').t.indexOf('−0,002 €'), 0, 'rozdiel jemnejsi nez cent sa ukaze presne');
   eq(M.mdManualDiff(E08, 'bm', '0,13').cls, 'chg', 'ABS 0,125 vs 0,13 = zmena');
+  eq(M.mdManualDiff(E08, 'bm', '0,13').t.indexOf('+0,005 €'), 0);
   eq(M.mdManualDiff(E08, 'bm', '0,125').cls, 'same');
   eq(M.mdManualDiff({ price_display: { plate: null, m2: null, area: 5.796 } }, 'plate', '1').t, 'v katalógu zatiaľ bez ceny');
   eq(M.mdManualNote(S25, '179,90'), 'Posledné ručné potvrdenie: 18.9.2026. Potvrdená cena platí v celom katalógu.');
