@@ -4,7 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
-- **V1-03 zvyšok — ceny materiálov/ABS (CENY-M1a/M1b/M2)** (bez D-čísla) — doska a ABS bez Demosu majú jeden odkaz na produkt, ručné overenie ceny v Štúdiu → Materiály aj z Rozpočtu (vek „ručne 18.9." / „na kontrolu", čip „N cien na kontrolu"); sklo bez formátu sa v Rozpočte počíta podľa m² — 30.9.2026, PR #426 + #427 + #428, v0.16.1–v0.16.3
+- **V1-03 zvyšok — ceny materiálov/ABS (CENY-M1a/M1b/M2)** (bez D-čísla) — doska a ABS bez Demosu majú jeden odkaz na produkt, ručné overenie ceny v Štúdiu → Materiály aj z Rozpočtu (vek „ručne 18.9." / „na kontrolu", čip „N cien na kontrolu"); materiál bez formátu (sklo aj doska) sa v Rozpočte počíta podľa m² — 30.9.2026, PR #426 + #427 + #428, v0.16.1–v0.16.3
 - **D-148** — Formulár ceruzky pri Demos položke ruší dátum overenia pri zmene ceny, kódu, dodávateľa alebo formátu (ako bunka a editor „Upraviť…"); ručne prepísaná Demos cena už neostáva „overená" a „Prepočítať ceny" ju overí znova — 30.9.2026, PR #427, v0.16.2
 - **D-144** — Vložený chrbát a chrbát v drážke pri stropu „Dve výstuhy" na výšku končí pod výstuhami — v modeli aj do nárezu (dolná 720 / sokel 100 / výstuhy 100 → 564 × 502, do nárezu 600 × 538); skrinky postavené pred opravou sú zastarané (Kontrola RED, výrobné exporty stoja, hromadná prestavba) — 27.9.2026, PR #402, v0.13.2
 - **D-143** — Chrbát v drážke ide do nárezu, VEPO aj ceny v plnom rozmere skrinky (horná 600 × 720 → 600 × 720, model ďalej 564 × 684); karta dielca „Do nárezu"; olepený chrbát v drážke, poškodený údaj aj zastarané skrinky (schéma < 19) zastavia všetky štyri výrobné exporty; hromadná prestavba z Kontroly — 27.9.2026, PR #401, v0.13.1
@@ -149,8 +149,8 @@ preklik a ručné potvrdenie ceny k dnešku v katalógu/Rozpočte. *(Piaty kus t
   sklo bez formátu za m², ABS za bm), „Potvrdiť cenu k dnešku", zneplatnenie pri zmene overených polí, prednosť Demosu, D-148; katalóg SCHEMA 12.
 - **CENY-M2** (PR #428, v0.16.3) — **Rozpočet:** stĺpec „Overená" pri doske/ABS bez Demosu ukazuje stav („ručne 18.9." / „ručne 45 dní" / „neoverená")
   a je zároveň tlačidlom „Overiť cenu" (formulár M1b ostáva v Rozpočte); čip „N cien na kontrolu" a „Skontrolovať ceny" počítajú aj ručné materiály
-  (UNI a duplák nie); ikona odkazu pred názvom materiálu a pásky; **materiál bez formátu mimo registra typov (sklo) sa počíta podľa skutočných m²
-  dielcov** (C12) — bežná doska bez formátu ostáva na odhade platní (otázka Q2 na Michala otvorená), porez a montáž bez zmeny (Q1).
+  (UNI a duplák nie); ikona odkazu pred názvom materiálu a pásky; **materiál bez formátu — sklo aj bežná doska — sa počíta podľa skutočných m²
+  dielcov bez odpadu** (C12 + C14, Michal 30.9.2026; UNI a duplák ostávajú na odhade platní), porez a montáž bez zmeny (Q1).
   Package [../zdroje/bloky/CENY/PACKAGE_CENY_M2.md](../zdroje/bloky/CENY/PACKAGE_CENY_M2.md), audit [../zdroje/bloky/CENY/AUDIT_CENY_M2_2026-09-30.md](../zdroje/bloky/CENY/AUDIT_CENY_M2_2026-09-30.md).
 
 ### D-148 — Formulár ceruzky pri Demos položke nerušil dátum overenia, vyriešené 30.9.2026

@@ -3,10 +3,10 @@
 # Package: SYSTEM/zdroje/bloky/CENY/PACKAGE_CENY_M2.md (§6.1, §7 bod 1).
 #
 # Co sa tu dokazuje:
-#   R1  „podla plochy" ide LEN material bez platneho formatu, ktoreho TYP nie je
-#       v registri typov (sklo); bezna doska bez formatu (DTDL…), UNI, duplak,
+#   R1a „podla plochy" ide KAZDY material bez platneho formatu — sklo aj bezna
+#       doska (Michal 30.9.2026, C14: Q2 „ano, aj bezna doska"); UNI, duplak,
 #       chybajuci zaznam a akykolvek kladny format (aj 300 × 200) ostavaju na
-#       dnesnom odhade platni. Typ sa normalizuje registrom (`dtdl`, " DTDL ").
+#       odhade platni. Typ uz nerozhoduje (`area_priced_type?` = true).
 #   R2  mnozstvo = nezaokruhlena plocha na 2 desatinne (bez dvojiteho
 #       zaokruhlenia), vratane duplakov x nasobok, min. 0,01 m².
 #   R3  cena za MJ = `Materials.display_m2`, sucet = mnozstvo x cena na cent.
@@ -89,21 +89,25 @@ end
 
 # --- R1: kto ide podla plochy -------------------------------------------------------
 
-NxTest.test('CENY-M2 (R1): sklo bez formatu = area; DTDL bez formatu, UNI, duplak, chybajuci zaznam a kazdy format = dnesny odhad') do
+NxTest.test('CENY-M2 (R1a): sklo aj DTDL bez formatu = area; UNI, duplak, chybajuci zaznam a kazdy format = odhad platni') do
   c = CenyM2Area
   p = c.pay
   sk = c.mat(p, 'SK4')
   NxTest.assert_equal(['M2', 'area'], sk.values_at('mj', 'qty_basis'), 'sklo bez formatu ide podla plochy')
   nof = c.mat(p, 'NOF')
   g = c.group(c.rows, 'NOF')
-  NxTest.assert_equal(['PLATŇA', c::B.plates_of(g), (31.2 * 5.796).round(2), true, nil],
-                      nof.values_at('mj', 'mnozstvo', 'cena_mj', 'estimated', 'qty_basis'),
-                      'DTDL bez formatu ostava platnou (R1, Q2 otvorena)')
-  NxTest.assert(nof['poznamka'].include?('formát platne nie je v katalógu — odhad podľa 2800×2070'), 'dnesna poznamka')
-  NxTest.assert(nof['poznamka'].include?('plán: orientačne 1 platňa'), 'DTDL bez formatu ma vetu planu NP-3 ako dnes')
+  NxTest.assert_equal(['M2', 1.05, 31.2, 32.76, false, 'area', c::B.plates_of(g)],
+                      nof.values_at('mj', 'mnozstvo', 'cena_mj', 'spolu', 'estimated', 'qty_basis', 'estimate_qty'),
+                      'DTDL bez formatu ide podla plochy (R1a, C14): 1,05 m² × 31,20 = 32,76 € (predtym 180,84)')
+  NxTest.assert_equal(c::B::AREA_NOTE, nof['poznamka'], 'poznamka „(bez odpadu)", bez vety planu')
   on = c.mat(c.pay(c.rows, { 'plan_prices' => true }), 'NOF')
-  NxTest.assert_equal(['PLATŇA', 'estimate'], on.values_at('mj', 'qty_source'), 'zapnuty prepinac: dnesny odhad')
-  NxTest.assert(on['poznamka'].include?('formát chýba — cena z odhadu'), 'dnesna veta NP-4')
+  NxTest.assert_equal(['M2', nil, 32.76], on.values_at('mj', 'qty_source', 'spolu'), 'zapnuty prepinac: ostava podla plochy')
+  NxTest.refute(on['poznamka'].include?('cena z odhadu'), 'bez vety NP-4')
+  %w[MDF HDF PD ZASTENA KOMPAKT].each do |t|
+    sh = c::SHEETS.merge('NOF' => c::SHEETS['NOF'].merge('type' => t))
+    row = c.mat(c.pay([c.r('NOF', 700.0, 500.0, 3)], sheets: sh, layout: false), 'NOF')
+    NxTest.assert_equal(%w[M2 area], row.values_at('mj', 'qty_basis'), "#{t} bez formatu ide podla plochy")
+  end
   uni = c.mat(p, 'UNI')
   NxTest.assert_equal(['PLATŇA', nil], uni.values_at('mj', 'qty_basis'), 'UNI bez formatu ostava odhadom')
   # UNI s typom MIMO registra (napr. pracovne „sklo") — chrani ho priznak UNI, nie typ.
@@ -127,21 +131,15 @@ NxTest.test('CENY-M2 (R1): sklo bez formatu = area; DTDL bez formatu, UNI, dupla
   NxTest.assert_equal('PLATŇA', c.mat(p, 'H18')['mj'], 'platny format ostava platnou')
 end
 
-NxTest.test('CENY-M2 (R1): typ sa pyta registra s normalizaciou — dtdl/" DTDL "/Dtdl\\t = platna, SKLO/sklo/Zrkadlo/prazdny = area') do
+NxTest.test('CENY-M2 (R1a): typ nerozhoduje — DTDL/dtdl/" DTDL "/MDF/.../SKLO/Zástena/prazdny = podla plochy') do
   b = CenyM2Area::B
-  %W[DTDL dtdl #{' DTDL '} Dtdl\t MDF hdf PD ZASTENA KOMPAKT].each do |t|
-    NxTest.refute(b.area_priced_type?('type' => t), "#{t.inspect} je v registri (ostava platnou)")
+  %W[DTDL dtdl #{' DTDL '} Dtdl\t MDF hdf PD ZASTENA KOMPAKT SKLO sklo Zrkadlo Zástena].push('', nil).each do |t|
+    NxTest.assert(b.area_priced_type?('type' => t), "#{t.inspect}: kazdy typ bez formatu ide podla plochy (C14)")
   end
-  ['SKLO', 'sklo', 'Zrkadlo', '', nil].each do |t|
-    NxTest.assert(b.area_priced_type?('type' => t), "#{t.inspect} je mimo registra (podla plochy)")
-  end
-  NxTest.assert(b.area_priced_type?({}), 'chybajuci typ = mimo registra')
-  # Vedomy stav (§9, F6): `identity_norm` diakritiku nezlucuje.
-  NxTest.assert(b.area_priced_type?('type' => 'Zástena'), 'Zástena s diakritikou je mimo registra (F6)')
-  # Poistka: normalizovany typ dosky bez formatu ostava platnou aj v Rozpocte.
+  NxTest.assert(b.area_priced_type?({}), 'chybajuci typ tiez')
   sheets = CenyM2Area::SHEETS.merge('NOF' => CenyM2Area::SHEETS['NOF'].merge('type' => ' dtdl '))
   p = CenyM2Area.pay([CenyM2Area.r('NOF', 700.0, 500.0, 3)], sheets: sheets, layout: false)
-  NxTest.assert_equal('PLATŇA', CenyM2Area.mat(p, 'NOF')['mj'], '" dtdl " bez formatu ostava platnou')
+  NxTest.assert_equal('M2', CenyM2Area.mat(p, 'NOF')['mj'], '" dtdl " bez formatu ide podla plochy')
 end
 
 # --- R2 / R3: mnozstvo a cena ----------------------------------------------------------
@@ -195,13 +193,20 @@ end
 
 NxTest.test('CENY-M2 (R5): porez a montaz dnesne cisla aj poznamky (vypnuty aj zapnuty prepinac)') do
   c = CenyM2Area
-  # Referencia = TA ISTA geometria, sklo ako doska z registra (dnesna vetva platni).
-  as_board = c::SHEETS.merge('SK4' => c::SHEETS['SK4'].merge('type' => 'DTDL'))
+  b = c::B
+  # Referencia = TA ISTA zakazka vetvou pred M2 (fiktivna platna) — `area_priced?` docasne vypnute.
+  orig = b.method(:area_priced?)
+  pre = lambda do |state|
+    b.define_singleton_method(:area_priced?) { |*_a| false }
+    c.pay(c.rows, state)
+  ensure
+    b.define_singleton_method(:area_priced?, orig)
+  end
   [{}, { 'plan_prices' => true }].each do |state|
     now = c.pay(c.rows, state)
-    ref = c.pay(c.rows, state, sheets: as_board)
-    NxTest.assert_equal('area', c.mat(now, 'SK4')['qty_basis'])
-    NxTest.assert_equal('PLATŇA', c.mat(ref, 'SK4')['mj'])
+    ref = pre.call(state)
+    NxTest.assert_equal(%w[area area], [c.mat(now, 'SK4')['qty_basis'], c.mat(now, 'NOF')['qty_basis']])
+    NxTest.assert_equal(%w[PLATŇA PLATŇA], [c.mat(ref, 'SK4')['mj'], c.mat(ref, 'NOF')['mj']], 'referencia = platne')
     %w[porez montaz].each do |k|
       NxTest.assert_equal(c.svc(ref, k).values_at('mnozstvo', 'poznamka', 'spolu'),
                           c.svc(now, k).values_at('mnozstvo', 'poznamka', 'spolu'), "#{k} #{state.inspect}")
@@ -217,7 +222,8 @@ NxTest.test('CENY-M2 (R6/R7): plan_export_note area riadok nevymenuje; karta pla
   on = c.pay(c.rows, { 'plan_prices' => true })
   note = pc.plan_export_note(on)
   NxTest.refute(note.include?('Číre'), 'sklo nie je v zozname „z odhadu"')
-  NxTest.assert(note.include?('K001'), 'DTDL bez formatu ostava v zozname „z odhadu"')
+  NxTest.refute(note.include?('K001'), 'DTDL bez formatu (R1a) nie je v zozname „z odhadu"')
+  NxTest.assert(note.include?('UNI'), 'UNI ostava v zozname „z odhadu"')
   rws = c.rows
   [{}, { 'plan_prices' => true }].each do |state|
     p = c.pay(rws, state)
@@ -225,7 +231,9 @@ NxTest.test('CENY-M2 (R6/R7): plan_export_note area riadok nevymenuje; karta pla
     sk = sl['materials'].find { |m| m['id'] == 'SK4' }
     NxTest.assert_equal([0.9, 'area'], sk.values_at('budget_qty', 'budget_src'), "karta skla #{state.inspect}")
     nof = sl['materials'].find { |m| m['id'] == 'NOF' }
-    NxTest.refute(nof['budget_src'] == 'area', 'DTDL bez formatu nie je area')
+    NxTest.assert_equal([1.05, 'area'], nof.values_at('budget_qty', 'budget_src'), 'DTDL bez formatu (R1a): karta v m²')
+    uni = sl['materials'].find { |m| m['id'] == 'UNI' }
+    NxTest.refute(uni['budget_src'] == 'area', 'UNI nie je area')
   end
 end
 

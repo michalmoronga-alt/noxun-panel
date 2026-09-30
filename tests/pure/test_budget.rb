@@ -153,11 +153,13 @@ NxTest.test('budget: duplak sa preleje do ZDROJOVEHO materialu (cena na nakupny 
   NxTest.assert_close(23.0, r['m2'], 0.01, '20 m2 vlastnych + 3 m2 duplakov (uz x2)')
 end
 
-NxTest.test('budget: chybajuci format platne = fallback + priznak estimated (audit 3)') do
+NxTest.test('budget: chybajuci format platne = skutocna plocha dielcov (CENY-M2 R1a, C14), bez ceny nikdy 0') do
   p = NxBudget.compute
   r = NxBudget.row(p, 'materials', 'material:BEZCENY')
-  NxTest.assert_equal(true, r['estimated'])
-  NxTest.assert(r['poznamka'].include?('2800×2070'), "poznamka ma priznat fallback: #{r['poznamka']}")
+  # Do CENY-M2 fallback 2800 × 2070 + `estimated`; od R1a (Michal 30.9.2026) aj bezna doska
+  # bez formatu ide podla plochy (M2, bez odpadu) — cislo sa netvari ako platna.
+  NxTest.assert_equal(['M2', 'area', false], r.values_at('mj', 'qty_basis', 'estimated'))
+  NxTest.assert(r['poznamka'].include?('počíta sa skutočná plocha dielcov (bez odpadu)'), "poznamka: #{r['poznamka']}")
   NxTest.assert(r['price_missing'], 'material bez ceny = riadok bez ceny')
   NxTest.assert(r['spolu'].nil?, 'nezadana cena NIKDY nie je 0')
 end

@@ -3206,9 +3206,8 @@ zákazku, **„Po Späť klikni na Obnoviť"**) — tlačidlo tooltipu má vlast
 Späť), ovládač je v `BUD_STD_OFF`. **Značka zdroja množstva** `budQtyTagHtml` — `.qtag.plan` „podľa plánu" (tlmená) / `.qtag.est` „z odhadu" (jantárová, tokeny
 `--nx-warn*`) pred číslom v bunke Množstvo — sa kreslí **len pri riadku s `qty_source`**, teda len pri zapnutom prepínači; tooltip (`title`) je serverový `qty_tip`.
 **Späť (audit F5):** životný cyklus Štúdia sa nemení — Undo okno len označí ako neaktuálne (jantárové „Obnoviť"), checkbox a ceny sa vrátia až po „Obnoviť";
-in-SU `st1c_plan_prices` overuje stav modelu aj marker po Späť. Od CENY-M2 `BUD_PLAN_TIP` dopĺňa vetu „Sklo, zrkadlo a iný materiál bez formátu platne, ktorý
-nie je bežná doska, sa počíta podľa skutočnej plochy dielcov — plán ho nemení. Bežná doska bez formátu ostáva na odhade platní." (review #428 P2 —
-sľub plochy len v rozsahu `Budget.area_priced_type?`).
+in-SU `st1c_plan_prices` overuje stav modelu aj marker po Späť. Od CENY-M2 `BUD_PLAN_TIP` dopĺňa vetu „Materiál bez formátu platne (sklo aj doska; okrem UNI
+a dupláku) sa počíta podľa skutočnej plochy dielcov bez odpadu — plán ho nemení." (rozsah `Budget.area_priced?` po rozhodnutí C14).
 
 #### RUČNÉ CENY DOSIEK A ABS · MATERIÁL PODĽA PLOCHY (CENY-M2, v0.16.3, mockup D)
 
@@ -3350,7 +3349,7 @@ v `localStorage` `nx_np_closed` s try/catch), malé platne a detail platne v tom
 menej platní skráti index). Jediné, čo si odvodzuje, je **upozornenie na poslednú platňu (O2)**: aspoň 2 platne a posledná pod 20 % alebo najviac 2 dielce.
 **Od NP-4 (predrecenzia P2)** hovorí karta „v rozpočte N" číslom **hotového rozpočtu** toho istého pushu (`budget_qty` + `budget_src`, `npBudgetNote`: „v rozpočte 5 podľa
 plánu" / „… z odhadu"; bez zdroja — vypnutý prepínač — „v rozpočte dnes N"), takže karta a Rozpočet nikdy neukážu dve rôzne čísla. **Od CENY-M2** zdroj
-`area` (materiál bez formátu mimo registra typov, Rozpočet ho počíta v m²) = „v rozpočte 0,90 m² podľa plochy" — m² sa nikdy netvária ako počet platní.
+`area` (materiál bez formátu okrem UNI a dupláku, Rozpočet ho počíta v m²) = „v rozpočte 0,90 m² podľa plochy" — m² sa nikdy netvária ako počet platní.
 **SVG platne je téma-bezpečné:** farby sú výhradne CSS triedy `.np-*` s tokenmi `--nx-*` v `studio.html` (šrafy sú `<pattern>` s triedou v skrytom `<svg>` okna); jediná
 dátová farba je vzorka dekoru (`rgbHex`) v HTML štvorčeku mimo SVG (guard F12).
 

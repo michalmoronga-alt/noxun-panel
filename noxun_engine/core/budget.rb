@@ -23,11 +23,11 @@
 #    zo znamych cien a totals.complete o tom hovori nahlas.
 # 4) CHYBAJUCI FORMAT PLATNE = odhad bezi na fallbacku 2800x2070, riadok nesie
 #    'estimated' + poznamku (audit 3) — cislo sa nikdy netvari isto.
-#    CENY-M2 (C12, R1): VYNIMKA je material, ktoreho TYP NIE JE v registri
-#    typov (sklo na mieru) — ten sa pocita podla SKUTOCNEJ plochy dielcov
-#    (`mj: M2`, `qty_basis: 'area'`). Bezna doska bez formatu (typ v registri)
-#    ostava na odhade platni — o tom rozhoduje JEDINA funkcia
-#    `area_priced_type?` (vetva R1a „vsetky typy" = zmena len v nej).
+#    CENY-M2 (C12, R1a — Michal 30.9.2026, C14): material bez platneho
+#    formatu (sklo aj bezna doska; nie UNI, nie duplak) sa pocita podla
+#    SKUTOCNEJ plochy dielcov bez odpadu (`mj: M2`, `qty_basis: 'area'`).
+#    Fallback 2800x2070 s 'estimated' ostava len pre UNI a chybajuci zaznam;
+#    podmienka typu zije v JEDINEJ funkcii `area_priced_type?`.
 # 5) ZAOKRUHLUJE SA KONECNA BRUTTO SUMA (firma je neplatca DPH, katalogove
 #    ceny su konecne) na `rounding_step` nahor; `total_novat` je LEN
 #    informativny prepocet /1,23 (audit 8).
@@ -285,22 +285,22 @@ module Noxun
       # R1: kto ide „podla plochy". Jedina pravda o platnom formate je
       # `SheetEstimate.sheet_size_for` (priznak `fallback` odhadu — ten isty cita
       # plan aj Kontrola). Zaznam v katalogu musi existovat, nie UNI, nie duplak
-      # a TYP mimo registra typov (`area_priced_type?`).
+      # (typ rozhoduje `area_priced_type?` — od R1a kazdy).
       def area_priced?(group, rec)
         group.is_a?(Hash) && group['fallback'] == true && rec.is_a?(Hash) && !rec.empty? &&
           group['uni'] != true && !Materials.uni?(rec) && !Materials.duplak?(rec) &&
           area_priced_type?(rec)
       end
 
-      # R1 (rozhodnutie orchestratora 30.9., Q2 otvorena): podla plochy LEN typ,
-      # ktory NIE JE v registri typov (sklo, zrkadlo…); bezna doska bez formatu
-      # (DTDL, MDF, HDF, PD, ZASTENA, KOMPAKT) ostava na odhade platni. Register
-      # sa pyta cez `Materials.type_registry_entry` — jeho normalizacia (trim,
-      # zlucenie medzier, velke pismena), NIE hole `TYPE_REGISTRY.key?` (audit
-      # FIX-3: `dtdl` by inak zlacnel). JEDINE miesto podmienky typu — vetva R1a
-      # („vsetky typy") zmeni len toto telo na `true`.
-      def area_priced_type?(rec)
-        Materials.type_registry_entry(rec.is_a?(Hash) ? rec['type'] : nil).nil?
+      # R1a (Michal 30.9.2026, rozhodnutie C14 — Q2 „áno, aj bezna doska"):
+      # podla skutocnej plochy ide material bez platneho formatu KAZDEHO typu —
+      # sklo aj bezna doska (DTDL, MDF, HDF, PD, ZASTENA, KOMPAKT). UNI a duplak
+      # chrani `area_priced?` vyssie. Funkcia ostava JEDINYM miestom podmienky
+      # typu (keby sa rozhodnutie vratilo na obmedzeny R1: telo =
+      # `Materials.type_registry_entry(rec['type']).nil?` — normalizacia
+      # registra, nie hole `TYPE_REGISTRY.key?`, audit FIX-3).
+      def area_priced_type?(_rec)
+        true
       end
 
       AREA_NOTE = 'formát platne nie je v katalógu — počíta sa skutočná plocha dielcov (bez odpadu)'

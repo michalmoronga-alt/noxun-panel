@@ -229,7 +229,7 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   - ✅ **CENY-M1a** · odkaz na produkt pri doske/ABS bez Demosu v dátach katalógu (SCHEMA 11) a v Štúdiu → Materiály — **PR #426, v0.16.1**.
   - ✅ **CENY-M1b** · ručné overenie ceny (doska za platňu / ABS za bm, SCHEMA 12), zneplatnenie, prednosť Demosu, D-148 — **PR #427, v0.16.2**.
   - ✅ **CENY-M2** · Rozpočet: vek ručne overených cien, „N cien na kontrolu", odkaz a „Overiť cenu" v sekcii Materiál a ABS hrany; materiál bez formátu
-    mimo registra typov (sklo) podľa skutočných m² dielcov namiesto fiktívnej platne (C12; bežná doska bez formátu ako doteraz — Q2 otvorená) — **PR #428, v0.16.3**
+    (sklo aj bežná doska; nie UNI, nie duplák) podľa skutočných m² dielcov namiesto fiktívnej platne (C12 + C14) — **PR #428, v0.16.3**
     (package [PACKAGE_CENY_M2.md](zdroje/bloky/CENY/PACKAGE_CENY_M2.md), audit [AUDIT_CENY_M2_2026-09-30.md](zdroje/bloky/CENY/AUDIT_CENY_M2_2026-09-30.md)).
 - **Poradie pred uzáverom V1 (Michal 29.–30.9.2026):** blok **CENY** (CENY-M1a → CENY-M1b → CENY-M2) → **R-13** (čítať `std` na entite, ORANGE „dielec z inej verzie
   štandardu") → **R-37** (ochrana nastavení dodávateľa pred tichým prepísaním seedom) → **R-35** (dve okná SketchUpu si neprepíšu pravidlá kovania

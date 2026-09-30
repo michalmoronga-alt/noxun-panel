@@ -344,7 +344,12 @@ NxTest.test('NP-4 rozpocet: zapnuty prepinac nad zmiesanou zakazkou — mnozstvo
   NxTest.assert(h18['poznamka'].end_with?('plán: 5 platní (horná hranica) · cena podľa plánu'), h18['poznamka'])
   NxTest.assert_close(5 * h18['cena_mj'], h18['spolu'], 0.005, 'suma = platne z planu x cena za platnu')
   NxTest.assert_equal('plan', f.mat_row(on, 'PD')['qty_source'])
-  { 'W18' => 'plán neúplný — cena z odhadu', 'NOF' => 'formát chýba — cena z odhadu',
+  # CENY-M2 (R1a, C14): NOF (DTDL bez formatu) je riadok podla plochy — na plan sa nepyta.
+  nof = f.mat_row(on, 'NOF')
+  NxTest.assert_equal(['area', 'M2', nil], nof.values_at('qty_basis', 'mj', 'qty_source'), 'NOF podla plochy, bez NP-4')
+  NxTest.refute(nof['poznamka'].include?('cena z odhadu'), nof['poznamka'])
+  NxTest.assert_equal(f.mat_row(off, 'NOF')['spolu'], nof['spolu'], 'NOF: prepinac cenu nemeni')
+  { 'W18' => 'plán neúplný — cena z odhadu',
     'UNI' => 'materiál neurčený — cena z odhadu', 'W36' => 'duplák bez väzby — cena z odhadu' }.each do |mid, note|
     r = f.mat_row(on, mid)
     o = f.mat_row(off, mid)
@@ -364,7 +369,9 @@ NxTest.test('NP-4 sluzby (O6): porez = suma Materiálu (z planu), montaz = suma 
   mats_on = on['sections'].find { |s| s['key'] == 'materials' }['rows']
   porez = f.row_of(on, 'services', 'service:porez')
   montaz = f.row_of(on, 'services', 'service:montaz')
-  NxTest.assert_equal(mats_on.sum { |r| r['mnozstvo'] }, porez['mnozstvo'], 'porez ide za Materiálom')
+  # CENY-M2 (R5): riadok podla plochy (NOF) prispieva do porezu odhadom platni.
+  NxTest.assert_equal(mats_on.sum { |r| (r['qty_basis'] == 'area' ? r['estimate_qty'] : r['mnozstvo']).to_i },
+                      porez['mnozstvo'], 'porez ide za Materiálom')
   NxTest.assert_equal(f.row_of(off, 'services', 'service:porez')['mnozstvo'] + 1, porez['mnozstvo'], 'H18 +1 platna')
   NxTest.assert_equal(f.row_of(off, 'services', 'service:montaz')['mnozstvo'], montaz['mnozstvo'], 'montaz sa NEMENI')
   NxTest.assert_equal('platne z Materiálu (2 podľa plánu, 4 z odhadu)', porez['poznamka'])
@@ -536,7 +543,8 @@ NxTest.test('NP-4 F4: plan pri exporte zlyhal -> subor ma odhad, status to povie
     %i[do_budget_xlsx do_cp_xlsx].each do |method|
       msg, pushes, events = f.run_export(method, failed, dir)
       NxTest.assert(msg.to_s.include?('uložen'), "#{method}: export prebehol: #{msg}")
-      NxTest.assert(msg.include?(' · z odhadu (nie podľa plánu): H1181 DTDL 18 mm, K001 DTDL 18 mm, Dub PD 38 mm a 3 ďalšie'),
+      # CENY-M2 (R1a): NOF (K001, bez formatu) ide podla plochy — v zozname „z odhadu" uz nie je.
+      NxTest.assert(msg.include?(' · z odhadu (nie podľa plánu): H1181 DTDL 18 mm, Dub PD 38 mm, UNI DTDL 18 mm a 2 ďalšie'),
                     "#{method}: #{msg}")
       NxTest.assert_equal(1, pushes, "#{method}: okno sa obnovi")
       NxTest.assert_equal(%i[repush status], events.last(2), "#{method}: push PRED statusom")

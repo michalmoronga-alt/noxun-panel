@@ -25,6 +25,7 @@
 | C11 | Mockup | **schválený** ([MOCKUP_CENY_2026-09-30.html](MOCKUP_CENY_2026-09-30.html)): **O1–O9 podľa návrhu** (odporúčania v kartách mockupu — umiestnenie ikon, „na kontrolu" vrátane položky bez ceny, sklo bez formátu za m², 0 € platná, texty stavu, čo overenie zruší, presná cena za platňu, prednosť Demosu, overenie aj bez odkazu); Michal: „moc sedí, môžeš pokračovať" = blok schválený | 30.9. |
 | C12 | Materiál bez formátu v Rozpočte (O10) | **áno, v tomto bloku (CENY-M2):** materiál bez formátu (sklo na mieru) sa v Rozpočte počíta podľa **skutočných m² dielcov** × overená cena za m², nie ako fiktívna platňa 2800 × 2070 (Codex #425 P1) | 30.9. |
 | C13 | V1 bod „Návrh" | **odškrtnutý** — test na kompletnej reálnej zákazke je **akceptačný test po V1** (C10), nie podmienka uzáveru V1 (Codex #425 P2: inak by sa V1 nedalo uzavrieť) | 30.9. |
+| C14 | Q2 · bežná doska bez formátu (package CENY-M2 §13) | **áno, podľa skutočnej plochy dielcov** (bez odpadu) — aj DTDL, MDF, HDF, PD, ZASTENA, KOMPAKT bez formátu v katalógu, nielen sklo; UNI a duplák ostávajú na odhade platní (vetva R1a package CENY-M2). **Q1** (porez a montáž pri skle) bez odpovede — porez a montáž **bez zmeny** | 30.9. |
 
 *Rozhodnutie orchestrátora (nie produktové, 30.9.2026):* dávka **CENY-M1 sa reže na M1a (odkaz na produkt) → M1b (ručné overenie)** podľa vzoru CENY-KOV-A/B —
 odhad ~940 riadkov kódu; M2 (Rozpočet) ostáva. Package a audit M1 pribudnú do priečinka s dávkou M1a.

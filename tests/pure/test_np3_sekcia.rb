@@ -218,13 +218,21 @@ NxTest.test('NP-3 rozpocet: poznamka nesie tu istu vetu ako karta; mnozstvo, cen
   ma = a['sections'].find { |s| s['key'] == 'materials' }['rows']
   mb = b['sections'].find { |s| s['key'] == 'materials' }['rows']
   mb.each_with_index do |r, i|
+    # CENY-M2 (R1a, C14): material bez formatu (NOF) je riadok podla plochy — veta planu
+    # sa k nemu nepripaja (cena nezavisi od platni, D6); poznamka je rovnaka s planom aj bez.
+    if r['qty_basis'] == 'area'
+      NxTest.assert_equal(ma[i]['poznamka'], r['poznamka'], "#{r['material_id']}: bez vety planu")
+      next
+    end
     note = f::SL.budget_note(lay, r['material_id'], f::SHEETS)
     NxTest.assert_equal("#{ma[i]['poznamka']} · #{note}", r['poznamka'], r['material_id'])
     card = f::SL.count_phrase(f.mat(lay, r['material_id']))['text']
     NxTest.assert_equal("plán: #{card}", note, 'poznamka = veta karty')
   end
   NxTest.assert(mb.find { |r| r['material_id'] == 'W18' }['poznamka'].include?('celkový počet neznámy'))
-  NxTest.assert(mb.find { |r| r['material_id'] == 'NOF' }['poznamka'].include?('orientačne'))
+  nof = mb.find { |r| r['material_id'] == 'NOF' }
+  NxTest.assert_equal('area', nof['qty_basis'], 'NOF (DTDL bez formatu) ide podla plochy (R1a)')
+  NxTest.refute(nof['poznamka'].include?('orientačne'), 'riadok podla plochy nema vetu planu')
 end
 
 NxTest.test('NP-3 XLSX: rozpoctovy harok sa lisi LEN textom poznamky v nazve; ponuka je bajtovo rovnaka') do

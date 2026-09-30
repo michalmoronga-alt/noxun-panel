@@ -554,7 +554,7 @@ podľa plánu): A, B, C a 2 ďalšie" — `more_word`: 1 ďalší · 2–4 ďal�
 push by status inak prekryl). Pri vypnutom prepínači sa status ani počet pushov nemení. **Jedna pravda s kartou plánu (predrecenzia P2):**
 `sheet_layout_payload(plan, bom, smap, estimate, budget)` dostane z pushu **hotový rozpočet** a každá karta nesie `budget_qty` + `budget_src` z jeho riadku
 Materiálu („v rozpočte 5 podľa plánu" / „… z odhadu"); `est_budget` ostáva odhadom z m² (súčet v súhrne). Bez rozpočtu (legacy volanie) = odhad.
-**CENY-M2:** riadok Rozpočtu s `qty_basis: 'area'` (materiál bez formátu mimo registra typov) dá karte `budget_src: 'area'` a `budget_qty` v m²
+**CENY-M2:** riadok Rozpočtu s `qty_basis: 'area'` (materiál bez formátu okrem UNI a dupláku) dá karte `budget_src: 'area'` a `budget_qty` v m²
 („v rozpočte 0,90 m² podľa plochy") — inak by m² karta ukázala ako počet platní.
 
 **`replace_uni`** (skratka „Nahradiť UNI…" → `MaterialsDialog.request_replace_uni`) a **zdieľané telá prepínačov** `edge_check_guard` (dostupnosť Overlay API + `identity_guard`) ·
@@ -892,20 +892,20 @@ krížový audit C10) majú dva súčty:** porez = Σ `mnozstvo` Materiálu (ide
 poznámky „platne z Materiálu (N podľa plánu, M z odhadu)" a „… · z odhadu". `Budget.check` nový nález nemá (O11 — nespôsobilý materiál nie je chyba, export
 sa nezastaví). Cenová ponuka číta hotový payload: mení sa len **suma** materiálu (môže preklopiť návrh cez prah 150 €), počty ani vety plánu do nej nejdú.
 
-**Materiál bez formátu podľa skutočnej plochy (CENY-M2, v0.16.3, C12).** `area_priced?(g, rec)` = fallback formátu odhadu (`SheetEstimate.sheet_size_for`
+**Materiál bez formátu podľa skutočnej plochy (CENY-M2, v0.16.3, C12 + C14).** `area_priced?(g, rec)` = fallback formátu odhadu (`SheetEstimate.sheet_size_for`
 — jediná pravda o platnom formáte; akákoľvek kladná dvojica, aj ručne zapísaných 300 × 200, je formát a počíta sa po platniach) ∧ záznam v katalógu
-existuje ∧ nie UNI ∧ nie duplák ∧ **`area_priced_type?(rec)`** = `Materials.type_registry_entry(rec['type']).nil?` (normalizácia registra — `dtdl`
-aj `" DTDL "` sú v registri; **diakritiku nezlučuje**, „Zástena" je mimo registra — vedomý stav, nález F6). Taký riadok (`area_row`) má `mj: 'M2'`,
+existuje ∧ nie UNI ∧ nie duplák ∧ **`area_priced_type?(rec)`** — od rozhodnutia Michala **C14 (30.9.2026, vetva R1a) vracia `true` pre každý typ**, sklo
+aj bežnú dosku (DTDL, MDF, HDF, PD, ZASTENA, KOMPAKT). Funkcia ostáva **jediným miestom** podmienky typu (návrat k obmedzenému R1 by bolo telo
+`Materials.type_registry_entry(rec['type']).nil?` — normalizácia registra, nie holé `TYPE_REGISTRY.key?`). Taký riadok (`area_row`) má `mj: 'M2'`,
 `mnozstvo` = `m2_exact` na 2 desatinné (min 0,01), `cena_mj` = `Materials.display_m2(€/m²)` (tá istá €/m² ako bunka Štúdia), `spolu` = množstvo × cena
 na cent (`base_row`), `qty_basis: 'area'`, **`estimate_qty` vždy** (odhad platní), `estimated: false`, `m2`, surová `price_per_m2`, `material_id`,
 `cp_nazov` a kľúč `material:<mid>` bez zmeny (nesie `cp_overrides`). Poznámka „formát platne nie je v katalógu — počíta sa skutočná plocha dielcov (bez
 odpadu)" (+ veta duplákov) — **bez** vety plánu NP-3 a bez NP-4 (`price_basis` sa pre riadok nevolá, `plan_export_note` ho nevymenuje). **Služby sa
-nemenia (D5):** porez = Σ (`estimate_qty` pri area riadku, inak `mnozstvo`), montáž už číta `estimate_qty`. **Bežná doska bez formátu** (typ v registri)
-ide dnešnou vetvou platní — rozhodnutie orchestrátora do Michalovej odpovede na Q2; vetva „všetky typy" (R1a) = zmena **jedinej** funkcie
-`area_priced_type?` (+ pregenerovanie NP-4 golden). XLSX číta riadok 1:1, cenová ponuka mení len sumu (môže klesnúť pod prah 150 € a zo samostatných
-riadkov vypadnúť, ručné zaradenie platí). `BUDGET_STD` sa nemení (žiadny nový kľúč zákazky) — starší plugin tú istú zákazku ocení po starom (STANDARD §11.3).
-Zlaté testy: `tests/pure/test_np4_golden.rb` (fixtúry bez zmeny, len normalizácia aditívnych kľúčov a bloku `stale`) a `tests/pure/test_ceny_m2_golden.rb`
-(odtlačok zákazky so sklom spred M2, zmena len na vymenovaných cestách).
+nemenia (D5, Q1):** porez = Σ (`estimate_qty` pri area riadku, inak `mnozstvo`), montáž už číta `estimate_qty`. Odhad platní 2800 × 2070 s `estimated`
+ostáva len pre UNI a chýbajúci záznam. XLSX číta riadok 1:1 (poznámka „(bez odpadu)" v názve), cenová ponuka mení len sumu (môže klesnúť pod prah 150 €
+a zo samostatných riadkov vypadnúť, ručné zaradenie platí). `BUDGET_STD` sa nemení (žiadny nový kľúč zákazky) — starší plugin tú istú zákazku ocení po starom
+(STANDARD §11.3). Zlaté testy: `tests/pure/test_np4_golden.rb` (fixtúry **pregenerované** po C14 — NOF 180,84 → 32,76 €, SPOLU 3394 → 3246 €) a
+`tests/pure/test_ceny_m2_golden.rb` (odtlačok zákazky so sklom a doskou bez formátu spred M2, zmena len na vymenovaných cestách).
 
 **Kompatibilita dát cestuje v payloade (1d/R-14).** `normalize_state` prijíma aj kľúč `std` (stav markera `budget_std` zo `BudgetStore.std_state`) a `compute` z neho skladá `payload['budget_std'] = { state, blocked, reason }`.
 Je to **jediná cesta**, ktorou sa o nekompatibilných dátach dozvie ktokoľvek ďalej: banner sekcie Rozpočet aj Cenová ponuka (`ui/js/budget.js`) a brána oboch cenových exportov (`ProductionCore.budget_std_block`) čítajú TENTO kľúč — nikto sa nepýta modelu druhýkrát a nikto si stav neodvodzuje sám.

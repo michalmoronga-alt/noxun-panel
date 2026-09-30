@@ -12,6 +12,12 @@
 #
 # Prepisuje `*.json` v tomto priecinku. Regenerovat sa smie IBA vtedy, ked je
 # zmena vystupu VEDOMA a zdovodnena v PR — inak je rozdiel NALEZ, nie sum.
+#
+# PREGENEROVANE RAZ: CENY-M2 (v0.16.3, PR #428) po rozhodnuti Michala C14
+# (Q2: aj bezna doska bez formatu podla skutocnej plochy, vetva R1a) — NOF
+# (DTDL bez formatu, 1,05 m² à 31,20 €) 180,84 → 32,76 €, `mix_*` SPOLU
+# 3394 → 3246 €; porez a montaz bez zmeny. Ozvena `plan_prices` (NP-4) sa do
+# odtlacku nezapisuje — test ju overuje zvlast.
 require_relative '../../helper'
 
 require 'json'
@@ -24,6 +30,7 @@ module NxNp4GoldenGen
   def run
     NxNp4Golden::CASES.each do |name, kase|
       snap = NxNp4Golden.roundtrip(NxNp4Golden.snapshot(kase))
+      snap['payload'].delete('plan_prices')
       File.write(File.join(DIR, "#{name}.json"), JSON.pretty_generate(snap) + "\n")
     end
     puts "OK: #{NxNp4Golden::CASES.length} golden suborov v #{DIR}"

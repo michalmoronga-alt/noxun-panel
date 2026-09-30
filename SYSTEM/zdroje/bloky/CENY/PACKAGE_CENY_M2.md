@@ -1,5 +1,10 @@
 # PACKAGE CENY-M2 · Rozpočet — vek ručných cien, odkaz a „Overiť cenu", materiál bez formátu podľa skutočných m² (C12)
 
+> **PLATÍ (30.9.2026, počas PR #428): Q2 rozhodnutá — Michal C14 „áno, aj bežná doska podľa skutočnej plochy dielcov (bez odpadu)" → platí vetva
+> R1a** (`Budget.area_priced_type?` = každý typ; UNI a duplák ostávajú na odhade), NP-4 golden pregenerovaný (NOF 180,84 → 32,76 €, SPOLU 3394 → 3246 €),
+> golden B podľa S22/E4 (NOF → 47,74 €, SPOLU → 2070 €). **Q1 bez odpovede — porez a montáž bez zmeny.** Text nižšie opisuje pôvodný stav s obmedzeným R1
+> tam, kde to R1a výslovne nemení; pri rozpore platí tento rámček a [ROZHODNUTIA_MICHALA_2026-09-29.md](ROZHODNUTIA_MICHALA_2026-09-29.md) (C14).
+
 > **Autorita:** rozhodnutia Michala C1–C13 (`SYSTEM/zdroje/bloky/CENY/ROZHODNUTIA_MICHALA_2026-09-29.md` — **C6** Rozpočet ukazuje vek ručných cien a počíta ich
 > „na kontrolu", UNI a duplák bez akcií · **C11** mockup schválený, O1–O9 podľa návrhu · **C12** materiál bez formátu v Rozpočte podľa skutočných m² dielcov),
 > schválený mockup `MOCKUP_CENY_2026-09-30.html` — **obrazovka D** (D1–D4 + „Na vedomie") a karty **O1, O2, O5, O9, O10** (odporúčanie = schválené znenie),
@@ -409,7 +414,7 @@ uzávere" v DOGFOODING (dočasná). **Poistka:** nový blok (R-13) až po Michal
 - **Q1 · Porez a montáž pri skle na mieru.** Dnes Rozpočet pri skle bez formátu účtuje aj **porez 1 platne** a **montáž 5,8 m²** (fiktívna platňa). C12 rieši len
   cenu materiálu. **Návrh (predvolené v M2): nemeniť** — porez aj montáž ostanú, ako sú. Alternatíva: sklo bez porezu (reže ho sklenár), montáž ostáva. Ak Michal
   zvolí alternatívu, mení sa jeden riadok (R5) a golden B.
-- **Q2 · Doska bez formátu.** C12 doslovne platí pre **každý** materiál bez formátu — aj DTD/MDF, ktorej v katalógu formát len chýba; tá sa potom počíta podľa
+- **Q2 · Doska bez formátu — ROZHODNUTÉ 30.9.2026 (C14): „áno, všetky typy" → vetva R1a implementovaná v PR #428.** C12 doslovne platí pre **každý** materiál bez formátu — aj DTD/MDF, ktorej v katalógu formát len chýba; tá sa potom počíta podľa
   plochy dielcov **bez odpadu** (napr. 1,05 m² DTD: 180,84 € → 32,76 €). **Predvolené v M2 do Michalovej odpovede (orchestrátor 30.9.): alternatíva nižšie** —
   nemení dnešné ceny bežnej dosky (podhodnotenie bez odpadu je horšie ako dnešný opatrný odhad). Pôvodný návrh autora: „áno, všetky" (C12 doslovne).
   Alternatíva: podľa plochy len materiál, ktorý nie je bežná doska (typy mimo DTDL/MDF/HDF/PD/KOMPAKT/ZÁSTENA — napr. sklo); bežná doska bez formátu ostane na

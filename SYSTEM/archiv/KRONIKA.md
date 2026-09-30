@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **CENY-M2 — Rozpočet: ručné ceny dosiek a ABS + sklo bez formátu podľa m² (30.9.2026, PR #428, v0.16.2 → v0.16.3).** Posledná kódová dávka bloku CENY
+- **CENY-M2 — Rozpočet: ručné ceny dosiek a ABS + materiál bez formátu podľa m² (30.9.2026, PR #428, v0.16.2 → v0.16.3).** Posledná kódová dávka bloku CENY
   podľa package [PACKAGE_CENY_M2.md](../zdroje/bloky/CENY/PACKAGE_CENY_M2.md) (audit Codex gpt-6-astra
   [AUDIT_CENY_M2_2026-09-30.md](../zdroje/bloky/CENY/AUDIT_CENY_M2_2026-09-30.md): BLOCKER — testy a golden zosúladené s obmedzeným R1, NP-4 golden sa
   nemení; FIX-2 `manual_hardware` len kovanie + `manual_pending` jedným priechodom; FIX-3 typ cez `Materials.type_registry_entry`; NOTE-4 dve PC).
@@ -27,13 +27,19 @@
   ako „ručná položka"). Zoznam má pri ručnej položke ikonu odkazu a „Overiť cenu" (veta „over v katalógu ručne" zanikla), pred názvom materiálu aj pásky
   je ikona odkazu (Demos · obchod · jantárová = doplniť odkaz → Materiály s kurzorom v poli odkazu). **Materiál bez formátu, ktorého typ nie je v registri
   typov (sklo), sa počíta podľa skutočných m² dielcov** (sklo 0,9 m² à 41,50 €: **240,53 → 37,35 €**; MJ „m²", množstvo na 2 desatinné bez dvojitého
-  zaokrúhlenia, min 0,01; cena = €/m² zo Štúdia); v ponuke taký riadok môže klesnúť pod prah 150 € do zostavy. **Bežná doska bez formátu ostáva na
-  odhade platní** (bezpečnejšia vratná voľba orchestrátora, kým Michal neodpovie na Q2; vetva „všetky typy" = jedna funkcia `area_priced_type?`);
-  **porez a montáž bez zmeny** (Q1). Karta Nárezového plánu: „v rozpočte 0,90 m² podľa plochy". `BUDGET_STD` sa nemení — **starší plugin na druhom PC
-  sklo ocení po starom** (povinná veta v STAV). **Testy:** 4910 headless (nové `test_ceny_m2_area.rb`, `test_ceny_m2_stale.rb`, `test_ceny_m2_golden.rb`
-  — golden B = odtlačok zákazky so sklom spred M2, zmena len na vymenovaných cestách; NP-4 golden **bez pregenerovania**, len normalizácia aditívnych
-  kľúčov a bloku `stale`) · 145 JS sád (nová `test_ceny_m2_budget.js` s parity textov O5; `test_budget_ui.js`, `test_ceny_kov_budget_manual.js`,
-  `test_np3_sekcia.js` vedome upravené) · **28 mutácií (M1–M24) zabitých**; in-SU nie je brána (package §8). Pre Luciu: aktualizovať obe PC pred porovnávaním ponúk.
+  zaokrúhlenia, min 0,01; cena = €/m² zo Štúdia); v ponuke taký riadok môže klesnúť pod prah 150 € do zostavy. **Q2 počas PR:** implementácia najprv
+  nechala bežnú dosku bez formátu na odhade platní (bezpečnejšia vratná voľba); **Michal 30.9. ráno rozhodol C14 — „áno, aj bežná doska podľa skutočnej
+  plochy dielcov (bez odpadu)"** → vetva **R1a** (`area_priced_type?` = každý typ; UNI a duplák ostávajú na odhade). Zmenené čísla: NP-4 golden
+  (`mix_file`/`mix_blocked`/`mix_seed_fallback`) — DTD bez formátu NOF 1,05 m² à 31,20 €: **180,84 → 32,76 €**, medzisúčet Materiálu 1647,29 → 1499,21,
+  zaokrúhlenie 0,71 → 0,79, **SPOLU 3394 → 3246 €** (fixtúry pregenerované); golden B — NOF s duplákom 1,53 m²: **180,84 → 47,74 €**, medzisúčet
+  889,91 → 553,63, **SPOLU 2407 → 2070 €**; porez a montáž nikde bez zmeny. **Porez a montáž bez zmeny** (Q1, bez odpovede). Karta Nárezového plánu:
+  „v rozpočte 0,90 m² podľa plochy". `BUDGET_STD` sa nemení — **starší plugin na druhom PC sklo aj dosku bez formátu ocení po starom** (povinná veta
+  v STAV). **Testy:** 4910 headless (nové `test_ceny_m2_area.rb`, `test_ceny_m2_stale.rb`, `test_ceny_m2_golden.rb` — golden B = odtlačok zákazky so
+  sklom a doskou bez formátu spred M2, zmena len na vymenovaných cestách; NP-4 golden **pregenerovaný po C14**; `test_budget.rb`, `test_np3_sekcia.rb`,
+  `test_np4_ceny.rb` vedome upravené) · 145 JS sád (nová `test_ceny_m2_budget.js` s parity textov O5; `test_budget_ui.js`, `test_ceny_kov_budget_manual.js`,
+  `test_np3_sekcia.js` vedome upravené) · **mutácie M1–M25 zabité** (M21R = návrat k obmedzenému R1, M25 = plocha aj pre duplák); in-SU nie je brána
+  (package §8). **Review:** predrecenzia 1× P3 (test ochranných vetiev klikov), GH Codex kolo 1 1× P2 (tooltip „ceny podľa plánu" sľuboval viac, než
+  kód robil — `fcaccf21`, po C14 znenie pre všetky materiály bez formátu okrem UNI a dupláku). Pre Luciu: aktualizovať obe PC pred porovnávaním ponúk.
 
 - **CENY-M1b — ručné overenie ceny dosky a ABS bez Demosu (30.9.2026, PR #427, v0.16.1 → v0.16.2).** Druhá kódová dávka bloku CENY podľa package
   [PACKAGE_CENY_M1.md](../zdroje/bloky/CENY/PACKAGE_CENY_M1.md) (požiadavky **[B]**; audit Codex gpt-6-astra — BLOCKER R11a „bez zmeny = presná zhoda

@@ -18,15 +18,15 @@
 # SPUSTA SA RUCNE (test generator NEVOLA — inak by charakterizacia „dokazovala"
 # samu seba):  C:/Ruby32-x64/bin/ruby.exe tests/fixtures/np4_golden/generate.rb
 #
-# CENY-M2 (v0.16.3, zlaty test A): fixtury sa NEPREGENEROVALI. M2 pridalo do
-# riadkov Materialu/ABS aditivne kluce `product_link`, `demos_link`,
-# `price_check` a zmenilo blok `stale` (stav rucnych cien dosiek a ABS z M1b,
-# UNI a duplak mimo scanu, nove pocty `manual_materials`/`manual_pending`).
-# Preto sa pred porovnanim tie kluce z cerstveho vypoctu odstrania a `stale`
-# sa overi ZVLAST proti vymenovanym ocakavaniam. VSETKO ostatne — sumy, riadky
-# vratane NOF (DTDL bez formatu = typ v registri, ostava 1 platna 180,84 €),
-# poznamky, Kontrola, nahlad ponuky a oba XLSX — sa zhoduje bajtovo: dokaz,
-# ze zakazky bez skla a bezna doska bez formatu sa cenou nezmenili.
+# CENY-M2 (v0.16.3, PR #428): fixtury sa VEDOME PREGENEROVALI po rozhodnuti
+# Michala C14 (Q2 — aj bezna doska bez formatu podla skutocnej plochy, R1a).
+# Zmena proti odtlacku spred M2 bola LEN: riadok NOF (DTDL bez formatu, 1,05 m²
+# à 31,20 €) 1 platna 180,84 € → 1,05 m² 32,76 € (bez vety planu), medzisucet
+# Materialu 1647,29 → 1499,21, zaokruhlenie 0,71 → 0,79, SPOLU 3394 → 3246 €,
+# ponuka (NOF klesne pod prah do zostavy) a bunky XLSX tychto riadkov; porez
+# a montaz bez zmeny. Aditivne kluce M2 (`product_link`, `demos_link`,
+# `price_check`, blok `stale`) su v odtlacku; `stale` sa navyse overuje proti
+# vymenovanym ocakavaniam (UNI a duplak W36 mimo scanu).
 require_relative '../helper' unless defined?(NxTest)
 
 require 'json'
@@ -124,17 +124,6 @@ module NxNp4Golden
     JSON.parse(File.read(File.join(FIXTURES, "#{name}.json"), encoding: 'UTF-8'))
   end
 
-  # CENY-M2: aditivne kluce riadkov (stav rucnej ceny a podklad ikony odkazu).
-  M2_ROW_KEYS = %w[product_link demos_link price_check].freeze
-
-  # Odstrani z payloadu aditivne kluce CENY-M2 a vrati vybrany blok `stale`.
-  def split_m2!(payload)
-    Array(payload['sections']).each do |s|
-      Array(s['rows']).each { |r| M2_ROW_KEYS.each { |k| r.delete(k) } }
-    end
-    payload.delete('stale')
-  end
-
   # Ocakavany `stale` po CENY-M2: UNI a neviazany duplak W36 vypadli, rucne
   # dosky H18/NOF/PD/W18 su `manual` (nikdy neoverene) s `manual_check`.
   def expect_m2_stale(stale)
@@ -151,13 +140,15 @@ end
 NxNp4Golden::CASES.each do |name, kase|
   NxTest.test("NP-4 golden: #{name} — vypnuty prepinac (aj chybajuci kluc) = cisla, riadky aj oba XLSX ako pred NP-4") do
     gold = NxNp4Golden.load(name)
-    gold['payload'].delete('stale') # CENY-M2: stale sa overuje zvlast (hlavicka)
     [{}, { 'plan_prices' => false }].each do |state|
       fresh = NxNp4Golden.roundtrip(NxNp4Golden.snapshot(kase, state))
       echo = fresh['payload'].delete('plan_prices')
       NxTest.assert(echo.nil? || echo == false, "stav #{state.inspect}: ozvena prepinaca je false (#{echo.inspect})")
-      NxNp4Golden.expect_m2_stale(NxNp4Golden.split_m2!(fresh['payload']))
-      NxTest.assert_equal(gold, fresh, "stav #{state.inspect}: odtlacok sa zhoduje s mainom pred NP-4")
+      NxNp4Golden.expect_m2_stale(fresh['payload']['stale'])
+      nof = fresh['payload']['sections'][0]['rows'].find { |r| r['material_id'] == 'NOF' }
+      NxTest.assert_equal(['M2', 1.05, 31.2, 32.76], nof.values_at('mj', 'mnozstvo', 'cena_mj', 'spolu'), 'NOF podla plochy (C14)')
+      NxTest.assert_equal(3246.0, fresh['payload']['totals']['total'], 'SPOLU 3394 → 3246 € (C14)')
+      NxTest.assert_equal(gold, fresh, "stav #{state.inspect}: odtlacok sa zhoduje s fixturou (CENY-M2, C14)")
     end
   end
 end

@@ -694,8 +694,8 @@
     'a riadok povie prečo.\nPorez ide za počtom platní v Materiáli, montáž ostáva z odhadu. VEPO účtuje ' +
     'celé tabule podľa vlastného rezania — jeho počet sa môže líšiť.\nPlatí len pre túto zákazku, ' +
     'predvolene vypnuté — otvorenie staršej zákazky ceny nezmení. Po Späť klikni na Obnoviť.\n' +
-    'Sklo, zrkadlo a iný materiál bez formátu platne, ktorý nie je bežná doska, sa počíta podľa skutočnej ' +
-    'plochy dielcov — plán ho nemení. Bežná doska bez formátu ostáva na odhade platní.';
+    'Materiál bez formátu platne (sklo aj doska; okrem UNI a dupláku) sa počíta podľa skutočnej plochy ' +
+    'dielcov bez odpadu — plán ho nemení.';
 
   function budSectionHtml(sec, b, d){
     var open = budSectionOpen(sec.key);
