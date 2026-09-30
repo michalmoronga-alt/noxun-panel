@@ -50,13 +50,24 @@ module Noxun
         save_decor
         patch_sheet patch_edge
         delete_preflight restore_pre_schema2
-        open_demos_url open_search_url
+        open_demos_url open_search_url mat_product_open
         demos_lookup demos_manual_url demos_apply demos_cancel
         demos_name_search demos_family demos_family_create demos_family_cancel
         replace_uni_preview replace_uni_apply
         appearance_prepare appearance_pick appearance_edit appearance_save
         appearance_reset appearance_apply appearance_close
       ].freeze
+
+      FORM_CONFLICT_MSG = 'Položka sa medzitým zmenila — formulár sa otvoril s aktuálnymi údajmi.'
+      # R6: server-owned polia a ozdoby payloadu katalogu. Klient ich nesmie
+      # podsunut — datum overenia ceny by inak islo podvrhnut formularom
+      # (sonda S8/T20); ozdoby by normalize zahodil aj tak, strhavaju sa
+      # vyslovne, aby zapis nikdy nezavisel od whitelistu normalizacie.
+      FORM_STRIP_KEYS = %w[price_checked_at price_check_method product_link price_check
+                           row_rev label row_label row_key image_file].freeze
+      PRODUCT_URL_TEXT_MSG = 'Odkaz musí byť text.'
+      PRODUCT_URL_BAD_MSG = 'Odkaz nie je platná webová adresa — musí začínať http:// alebo https:// a nesmie mať medzery, úvodzovky, diakritiku ani znaky ako | { } ^.'
+      PRODUCT_URL_DEMOS_MSG = 'Položka je viazaná na Demos — ručný odkaz zadáš až po vymazaní Demos URL.'
 
       class << self
         # Vykona akciu katalogu v mene SEKCIE `mat`. `sink` je proc, ktory
@@ -93,6 +104,7 @@ module Noxun
           when 'restore_pre_schema2'     then handle_restore_backup(payload)
           when 'open_demos_url'          then handle_open_demos_url(payload)
           when 'open_search_url'         then handle_open_search_url(payload)
+          when 'mat_product_open'        then handle_product_open(payload)
           # ŠT-2b: Demos toky. Su ASYNCHRONNE — dispatch len STARTUJE beh
           # a hned sa vracia; emity dobiehaju z `UI.start_timer` uz BEZ sinku,
           # takze `js` ich posle do Studia (jedine zive UI katalogu).
@@ -290,12 +302,25 @@ module Noxun
               if !s['image_url'].to_s.empty? && (local = DemosImageCache.local_for(s['image_url']))
                 extra['image_file'] = local
               end
+              product_link_extra!(extra, s)
               s.merge(extra)
             },
             'edges' => cat['edges'].map { |a|
-              a.merge('label' => Panel.abs_label(a, ctx), 'row_rev' => Materials.record_rev(a))
+              extra = { 'label' => Panel.abs_label(a, ctx), 'row_rev' => Materials.record_rev(a) }
+              product_link_extra!(extra, a)
+              a.merge(extra)
             }
           }
+        end
+
+        # CENY-M1a (R8): `product_link` (platny odkaz?) nesie LEN „rucny"
+        # zaznam — bez Demos vazby, nie UNI, nie duplak. Chybajuci kluc = riadok
+        # ikonu odkazu nema (Demos ikona / nic). `row_rev` sa pocita zo SUROVEHO
+        # zaznamu PRED touto ozdobou (volajuci ho ma v `extra` uz spocitany).
+        def product_link_extra!(extra, rec)
+          return extra unless Materials.manual_product_record?(rec)
+          extra['product_link'] = !Materials.sanitize_product_url(rec['product_url']).nil?
+          extra
         end
 
         # D-42 PR C (audit BLOCKER 1): inline patch bunky. Konflikt riadku =
@@ -725,6 +750,28 @@ module Noxun
           url = Materials.demos_open_target(kind, data['id'].to_s)
           return set_status('Záznam nemá platnú väzbu na Demos.', true) unless url
           UI.openURL(url)
+        end
+
+        # CENY-M1a (R7): otvorenie odkazu na produkt pri doske/ABS BEZ Demosu.
+        # Klient posiela LEN kind+id (URL od klienta sa neprijima — vzor D-60);
+        # zaznam sa cita cerstvo z disku a odkaz prechadza cerstvym sanitize.
+        # Otvara sa len „rucny" zaznam (bez Demos vazby, nie UNI, nie duplak) —
+        # Demos riadky ostavaju na `open_demos_url`. NIC NEZAPISUJE (ani v
+        # read-only katalogu nie je dovod otvorenie odmietnut).
+        def handle_product_open(payload)
+          data = JSON.parse(payload.to_s)
+          kind = data['kind'].to_s
+          id = data['id'].to_s
+          JsonFileStore.invalidate(Materials.path)
+          rec = case kind
+                when 'sheet' then Materials.sheet(id)
+                when 'edge' then Materials.edge(id)
+                end
+          url = Materials.manual_product_record?(rec) ? Materials.sanitize_product_url(rec['product_url']) : nil
+          return UI.openURL(url) if url
+
+          set_status('Odkaz sa medzitým zmenil alebo chýba — katalóg sa obnovil.', true)
+          push_catalog
         end
 
         # D-74: otvorenie ZHODY naseptavaca — URL pochadza zo serverovej sitemap
@@ -1621,78 +1668,110 @@ module Noxun
         end
 
         # --- D-05: sprava katalogu (Codex audit davky 2 zapracovany) ----------
-        # Zapis je single-writer kompromis (atomicky rename + .bak; bez locku medzi
-        # SketchUp procesmi — vedome akceptovane, katalog edituje jeden pouzivatel).
+        # Povodne single-writer kompromis (atomicky rename + .bak, bez locku medzi
+        # SketchUp procesmi); od CENY-M1a bezi formular variantu cely pod
+        # medziprocesovym `with_catalog_lock` (nizsie, R6c).
 
+        # --- CENY-M1a: formular variantu (ceruzka) — R6 / R6b / R6c ----------
+        #
         # Formularovy save je od zaniku create cesty VYHRADNE EDIT existujuceho
         # zaznamu. Create (akcia add_sheet) ZANIKOL: z UI bol nedosiahnutelny
         # (formular sa otvara len s id; novy dekor/variant = batch v3) a payload
         # formulara nenesie group_id, takze nad SCHEMA >= 2 by zapis skoncil na
         # write_unlocked completeness guarde len s generickym "Ulozenie zlyhalo".
+        #
+        # R6c (audit FIX-M1a-3): kontrola schemy aj revizie, nacitanie zaznamu,
+        # merge, pravidla odkazu a ZAPIS bezia pod JEDNYM `with_catalog_lock`
+        # (vzor `Materials.save_decor`). Do v0.16.0 sa revizia kontrolovala a
+        # zaznam citalo MIMO zamku a zamok bral az upsert — druha instancia
+        # SketchUpu tak medzi kontrolou a zapisom stihla ulozit, co prvá prepisala.
+        # R6b (audit FIX-M1a-2): baseline je `row_rev` RIADKU z okamihu
+        # otvorenia formulara (klient ho drzi, katalogove echo ho neomladi).
+        # Globalny `catalog_rev` sa tu uz neporovnava — omladzuje ho kazde echo,
+        # takze stary formular s cerstvym `catalog_rev` presiel a vratil cenu aj
+        # Demos vazbu do stavu z otvorenia.
+
         def handle_save_sheet(payload)
           data = JSON.parse(payload.to_s)
-          return unless catalog_write_ok?(data)
+          # Rychle odmietnutie stareho klienta PRED zamkom (rozhodnutie plati
+          # az pod zamkom — viz save_sheet_locked).
+          return unless schema_ok?(data)
+          status, msg = Materials.with_catalog_lock { save_sheet_locked(data) }
+          form_save_reply(status, msg, 'sheet', data['material_id'])
+        rescue StandardError => e
+          Engine.log_error(e, 'MaterialsDialog.handle_save_sheet')
+          set_status('Uloženie katalógu zlyhalo.', true)
+        end
+
+        # Telo transakcie formulara dosky — bezi VYHRADNE pod zamkom katalogu.
+        # -> [:ok | :error | :conflict | :schema | :catalog_read_only |
+        #     :code_conflict, sprava]
+        def save_sheet_locked(data)
+          JsonFileStore.invalidate(Materials.path)
+          return [:catalog_read_only, Materials.catalog_read_only_message] if Materials.catalog_read_only?
+          return [:schema, nil] unless Materials.schema_write_allowed?(data['catalog_schema'])
+          id = data['material_id'].to_s
+          existing = Materials.sheet(id)
+          unless existing
+            return [:error, 'Materiál sa nenašiel — nový záznam sa pridáva cez „+ variant" alebo „Pridať materiál ručne".']
+          end
+          # R6b/R6c: baseline RIADKU nad cerstvym diskom. Prazdny = klient bez
+          # baseline (stary CEF) — fail-closed, formular sa otvori nanovo.
+          base = data['row_rev'].to_s
+          return [:conflict, nil] if base.empty? || base != Materials.record_rev(existing)
+          form_strip!(data)
           # 2B-1 (audit F4): duplak vznika VYHRADNE cez create_duplak (vlastne
           # validacie zdroja) — podvrhnute source_* polia v beznom save sa
           # zahadzuju, inak by vytvorili "duplak" bez kompatibilnych guardov.
           data.delete('source_material_id')
           data.delete('source_multiplier')
           ok, err = Materials.validate_sheet_attrs(data)
-          return set_status(err, true) unless ok
+          return [:error, err] unless ok
           # 2B-2 (GH #95 P2): rub vyzaduje skupinovu schemu — v legacy katalogu
           # (hold/nerozhodnutelna migracia) by zapis so SCHEMA 4 targetom padol
           # na group_id kontrole s generickou hlaskou. Jasne NIE s navodom.
           if !data['back_decor'].to_s.strip.empty? &&
              Materials.catalog_schema < Materials::SCHEMA_GROUPS
-            return set_status('Rub zásteny vyžaduje katalóg po migrácii na skupiny (2A) — dokonči migráciu, potom rub doplň.', true)
+            return [:error, 'Rub zásteny vyžaduje katalóg po migrácii na skupiny (2A) — dokonči migráciu, potom rub doplň.']
           end
           th = data['thickness'].to_s.tr(',', '.').to_f
-
-          id = data['material_id'].to_s
-          existing = Materials.sheet(id)
-          unless existing
-            return set_status('Materiál sa nenašiel — nový záznam sa pridáva cez „+ variant" alebo „Pridať materiál ručne".', true)
-          end
           # GH #103 P2: UNI formularovy edit nesmie obist inline patch guard —
-          # nakupne polia (kod/dodavatel/cena) sa pri UNI odmietaju aj tu.
+          # nakupne polia (kod/dodavatel/cena/odkaz) sa pri UNI odmietaju aj tu.
           if (uni_err = Materials.uni_edit_error(existing, data))
-            return set_status(uni_err, true)
+            return [:error, uni_err]
           end
           # 2B-1: duplak nema editovatelne polia — vsetko derivuje zo zdroja.
           if (dup_err = Materials.duplak_edit_error(existing))
-            return set_status(dup_err, true)
+            return [:error, dup_err]
           end
           # Hrubka existujuceho variantu je NEMENNA (hrubka definuje variant;
           # zatvorene projekty sa neskontroluju — zmena by im rozbila rebuild).
           if (existing['thickness'].to_f - th).abs > 0.01
-            return set_status('Hrúbka definuje variant — pre inú hrúbku pridaj nový materiál.', true)
+            return [:error, 'Hrúbka definuje variant — pre inú hrúbku pridaj nový materiál.']
           end
           # D-41 (audit FIX 12): dekor je identita skupiny a riadi vazbu na ABS —
           # pri edite je NEMENNY; premenovanie celej skupiny je samostatna akcia.
           if data.key?('decor') && data['decor'].to_s.strip != existing['decor'].to_s
-            return set_status('Dekor je identita skupiny — premenuj celú skupinu (Premenovať dekor), nie jeden záznam.', true)
+            return [:error, 'Dekor je identita skupiny — premenuj celú skupinu (Premenovať dekor), nie jeden záznam.']
           end
           # D-42 (audit BLOCKER 3): typ je sucast variant identity — pri edite je
-          # NEMENNY (zrkadlo hrubky/dekoru). Iny typ = novy variant. Duplicitna
-          # kontrola uz NESTACI — zmena typu sa vobec nepripusti.
+          # NEMENNY (zrkadlo hrubky/dekoru). Iny typ = novy variant.
           if data.key?('type') && data['type'].to_s.strip.upcase != existing['type'].to_s.strip.upcase
-            return set_status('Typ dosky definuje variant — pre iný typ pridaj nový materiál.', true)
+            return [:error, 'Typ dosky definuje variant — pre iný typ pridaj nový materiál.']
           end
           # D-42 (audit FIX 7): vyrobca je vlastnost DEKORU (skupiny) — jednotlivy
           # variant ho nemeni; zmena celej skupiny je samostatna akcia.
           if data.key?('manufacturer') && data['manufacturer'].to_s.strip != existing['manufacturer'].to_s.strip
-            return set_status('Výrobca je vlastnosť dekoru — zmeň ho pre celú skupinu, nie jeden záznam.', true)
+            return [:error, 'Výrobca je vlastnosť dekoru — zmeň ho pre celú skupinu, nie jeden záznam.']
           end
           # 2A-1 (standard 7.1): v SCHEMA 2 je identita variantu pri edite
           # NEMENNA aj v novych poliach — struktura, kotva skupiny a pri type
-          # PD aj FORMAT platne. Iny format = novy variant (F800 PD 38 4100x600
-          # a 4100x920 su dve rozne dosky), nie prepis existujuceho.
+          # PD aj FORMAT platne.
           if (err = Materials.identity_edit_error(data, existing))
-            return set_status(err, true)
+            return [:error, err]
           end
           # 2B-2 (F11): first-fill MENI identitu (prazdne -> hodnota) — nova
-          # identita nesmie narazit na existujuci variant (dup check, ktory
-          # pri bezych editoch nebezi, lebo identita je nemenna).
+          # identita nesmie narazit na existujuci variant.
           candidate = existing.merge(data)
           if Materials.catalog_schema >= Materials::SCHEMA_GROUPS &&
              (dup = Materials.find_sheet_variant(candidate['decor'], candidate['type'], th,
@@ -1702,60 +1781,116 @@ module Noxun
                                                  back_decor: candidate['back_decor'],
                                                  back_structure: candidate['back_structure'])) &&
              dup['material_id'] != id
-            return set_status("Doplnená identita koliduje s existujúcim variantom (#{dup['material_id']}).", true)
+            return [:error, "Doplnená identita koliduje s existujúcim variantom (#{dup['material_id']})."]
           end
-
           # D-42 (audit FIX 8): duplicitny kod v ramci dosiek a rovnakeho dodavatela
           # sa nezapise potichu — vyzaduje potvrdenie (allow_duplicate_code).
-          conflict = maybe_code_conflict(data, 'sheet', id)
-          return conflict if conflict
-
-          # D-19 (Codex F5): payload sa MERGUJE s existujucim zaznamom — klient,
-          # ktory nove pole (napr. sheet_size) neposle, ho nesmie ticho resetnut
-          # na default cez normalize_sheet.
+          if (msg = code_conflict_msg(data, 'sheet', id))
+            return [:code_conflict, msg]
+          end
+          # D-19 (Codex F5): payload sa MERGUJE s existujucim zaznamom.
           rec = existing.merge(data).merge('material_id' => id, 'thickness' => th)
-          # D-44 (GH P2): edit s prazdnymi polami formatu = vedome VYMAZANIE —
-          # bez explicitneho flagu by merge stary sheet_size ticho podrzal a stav
-          # "bez overeneho formatu" by sa pri existujucom zazname nedal dosiahnut.
+          # D-44 (GH P2): edit s prazdnymi polami formatu = vedome VYMAZANIE.
           rec.delete('sheet_size') if data['clear_sheet_size']
           rec.delete('clear_sheet_size')
           # M-A3e D-71: rucna vazba na dodavatela — cerstvy sanitize (zly host/
           # tvar = save ODMIETNUTY), prazdne pole = vedome zmazanie vazby; zmena
           # alebo zmazanie rusi price_checked_at (cena uz nie je overena).
           if data.key?('demos_url')
-            st, val, invalidate = Materials.manual_demos_url(data['demos_url'],
-                                                             existing['demos_url'])
-            return set_status(val, true) if st == :invalid
+            st, val, invalidate = Materials.manual_demos_url(data['demos_url'], existing['demos_url'])
+            return [:error, val] if st == :invalid
             val ? rec['demos_url'] = val : rec.delete('demos_url')
             rec.delete('price_checked_at') if invalidate
           end
           # D-98 (audit B2): zmena ALEBO vymazanie dekoru u dodavatela rusi datum
-          # overenia ceny rovnako ako zmena adresy — cena, kod aj URL ostavaju,
-          # ale uz nie su overene voci tomu, co dodavatel vedie pod novym cislom.
+          # overenia ceny rovnako ako zmena adresy.
           if data.key?('supplier_decor') &&
              data['supplier_decor'].to_s.strip != existing['supplier_decor'].to_s.strip
             rec.delete('price_checked_at')
           end
+          if (perr = apply_product_url!(rec, data, existing))
+            return [:product_error, perr]
+          end
           # 2B-1: edit zdroja drzi zdielane polia duplakov v synchre (format/
-          # grain/farba) v JEDNOM atomickom zapise.
-          saved = Materials.upsert_sheet_with_duplak_sync(rec)
-          return set_status('Uloženie katalógu zlyhalo.', true) unless saved
-          after_catalog_change
-          set_status("Materiál #{id} upravený.")
+          # grain/farba) v JEDNOM atomickom zapise. Zamok je reentrantny —
+          # upsert berie ten isty, ktory drzime.
+          return [:error, 'Uloženie katalógu zlyhalo.'] unless Materials.upsert_sheet_with_duplak_sync(rec)
+          [:ok, "Materiál #{id} upravený."]
+        end
+
+        # R6: strhnutie server-owned poli a ozdob payloadu (mutuje `data`).
+        def form_strip!(data)
+          FORM_STRIP_KEYS.each { |k| data.delete(k) }
+          data
+        end
+
+        # R6 + O8/C4: odkaz na produkt z formulara. Chybajuci kluc = bez zmeny
+        # (merge). Nie String = chyba; prazdny = vedome zmazanie; neprazdny musi
+        # prejst `Materials.sanitize_product_url`, inak sa odmietne CELY save.
+        # Pri Demos vazbe (VYSLEDNA demos_url — z payloadu po sanitize, inak
+        # ulozena) sa ulozeny odkaz nesmie zmenit ani zmazat: ostava odlozeny
+        # a vrati sa po zruseni vazby. V jednom ulozeni sa da Demos URL vymazat
+        # a odkaz vlozit. Vrati hlasku chyby alebo nil (mutuje `rec`).
+        def apply_product_url!(rec, data, existing)
+          return nil unless data.key?('product_url')
+          raw = data['product_url']
+          return PRODUCT_URL_TEXT_MSG unless raw.is_a?(String)
+          clean = nil
+          unless raw.strip.empty?
+            clean = Materials.sanitize_product_url(raw)
+            return PRODUCT_URL_BAD_MSG unless clean
+          end
+          if !rec['demos_url'].to_s.strip.empty? && clean.to_s != existing['product_url'].to_s
+            return PRODUCT_URL_DEMOS_MSG
+          end
+          clean ? rec['product_url'] = clean : rec.delete('product_url')
+          nil
+        end
+
+        # Odpoved formulara variantu (dosky aj ABS). Vsetko UI ide AZ PO
+        # uvolneni zamku katalogu (echo znovu cita katalog).
+        def form_save_reply(status, msg, kind, id)
+          case status
+          when :ok
+            after_catalog_change
+            set_status(msg)
+          when :conflict
+            # R6b: cerstvy katalog NAJPRV (klient z neho znovu otvori formular),
+            # potom znovuotvorenie — rozpisane hodnoty sa nezapisali.
+            push_catalog
+            js("MD.formConflict(#{kind.to_json}, #{id.to_s.to_json})")
+            set_status(FORM_CONFLICT_MSG, true)
+          when :code_conflict
+            set_status(msg, true)
+            js("MD.flagDuplicateCode(#{kind.to_json})")
+          when :product_error
+            # Predrecenzia P3: klient formular po odoslani zatvara — keby jeho
+            # kontrola bola niekde volnejsia nez server, odmietnuty odkaz by
+            # zahodil celu upravu (aj cenu, kod). Formular sa preto otvori
+            # nanovo s rozpisanymi hodnotami a kurzorom v poli odkazu.
+            js("MD.formRejected(#{kind.to_json})")
+            set_status(msg, true)
+          when :schema
+            set_status('Katalóg je v novom formáte — obnov Štúdio (Obnoviť) a potom ulož.', true)
+            push_catalog
+          when :catalog_read_only
+            set_status(msg.to_s, true)
+            push_catalog
+          else
+            set_status(msg.to_s.empty? ? 'Uloženie katalógu zlyhalo.' : msg, true)
+          end
         end
 
         # D-42 (audit FIX 8): ak payload nesie kod a existuje kolizia (rovnaky kod
         # + dodavatel v tom istom druhu) a klient nepotvrdil allow_duplicate_code,
         # vrati status-hlasku (a NEuklada). Inak nil (pokracuj). JS warning sa da
         # obist, autorita je server.
-        def maybe_code_conflict(data, kind, self_id)
+        def code_conflict_msg(data, kind, self_id)
           code = data['code'].to_s.strip
           return nil if code.empty? || data['allow_duplicate_code']
           hits = Materials.code_conflicts(code, data['supplier'], kind, self_id)
           return nil if hits.empty?
-          set_status("Kód „#{code}“ už používa #{hits.size}× (#{hits.first(3).join(', ')}…). Ulož znova pre potvrdenie duplicity.", true)
-          js("MD.flagDuplicateCode(#{kind.to_json})")
-          'CONFLICT'
+          "Kód „#{code}“ už používa #{hits.size}× (#{hits.first(3).join(', ')}…). Ulož znova pre potvrdenie duplicity."
         end
 
         def handle_delete_sheet(payload)
@@ -1805,35 +1940,49 @@ module Noxun
         # EDIT existujucej pasky — create (akcia add_edge) zanikol spolu s
         # add_sheet (rovnaky dovod: z UI nedosiahnutelny, payload bez group_id
         # by nad SCHEMA >= 2 padol na write guarde; nove pasky = batch v3).
+        # CENY-M1a: ten isty transakcny kontrakt ako doska (R6/R6b/R6c).
         def handle_save_edge(payload)
           data = JSON.parse(payload.to_s)
-          return unless catalog_write_ok?(data)
-          ok, err = Materials.validate_edge_attrs(data)
-          return set_status(err, true) unless ok
-          th = data['thickness'].to_s.tr(',', '.').to_f
+          return unless schema_ok?(data)
+          status, msg = Materials.with_catalog_lock { save_edge_locked(data) }
+          form_save_reply(status, msg, 'edge', data['abs_id'])
+        rescue StandardError => e
+          Engine.log_error(e, 'MaterialsDialog.handle_save_edge')
+          set_status('Uloženie katalógu zlyhalo.', true)
+        end
+
+        # Telo transakcie formulara ABS pasky — bezi VYHRADNE pod zamkom.
+        def save_edge_locked(data)
+          JsonFileStore.invalidate(Materials.path)
+          return [:catalog_read_only, Materials.catalog_read_only_message] if Materials.catalog_read_only?
+          return [:schema, nil] unless Materials.schema_write_allowed?(data['catalog_schema'])
           id = data['abs_id'].to_s
           existing = Materials.edge(id)
           unless existing
-            return set_status('ABS páska sa nenašla — nová páska sa pridáva cez „+ variant" (dávka dekoru).', true)
+            return [:error, 'ABS páska sa nenašla — nová páska sa pridáva cez „+ variant" (dávka dekoru).']
           end
+          base = data['row_rev'].to_s
+          return [:conflict, nil] if base.empty? || base != Materials.record_rev(existing)
+          form_strip!(data)
+          ok, err = Materials.validate_edge_attrs(data)
+          return [:error, err] unless ok
+          th = data['thickness'].to_s.tr(',', '.').to_f
           # Hrubka ABS je pri edite NEMENNA (zrkadlo sheet guardu, Codex GH #39):
-          # ID nesie hrubku (_10/_20) a dielce ju drzia len cez ID — zmena by ich
-          # potichu prepla na inu hranu a ID by klamalo.
+          # ID nesie hrubku (_10/_20) a dielce ju drzia len cez ID.
           if (existing['thickness'].to_f - th).abs > 0.01
-            return set_status('Hrúbka definuje ABS variant — pre inú hrúbku pridaj novú pásku.', true)
+            return [:error, 'Hrúbka definuje ABS variant — pre inú hrúbku pridaj novú pásku.']
           end
           # D-41 (audit FIX 12): dekor nemenny pri edite (identita skupiny).
           if data.key?('decor') && data['decor'].to_s.strip != existing['decor'].to_s
-            return set_status('Dekor je identita skupiny — premenuj celú skupinu (Premenovať dekor), nie jeden záznam.', true)
+            return [:error, 'Dekor je identita skupiny — premenuj celú skupinu (Premenovať dekor), nie jeden záznam.']
           end
           # 2A-1: struktura/skupina su v SCHEMA 2 identita — pri edite nemenne.
           if (err = Materials.identity_edit_error(data, existing))
-            return set_status(err, true)
+            return [:error, err]
           end
           # D-41 (audit FIX 12+13): sirka je sucast variant identity — pri edite
-          # NEMENNA a payload ju nesmie ani ticho zmazat (stary CEF klient bez
-          # pola width): MERGE s existujucim zaznamom (vzor sheet D-19) + sirka
-          # sa VZDY berie z existujuceho zaznamu.
+          # NEMENNA a payload ju nesmie ani ticho zmazat: MERGE s existujucim
+          # zaznamom + sirka sa VZDY berie z existujuceho zaznamu.
           rec = existing.merge(data).merge('abs_id' => id, 'thickness' => th)
           if existing.key?('width')
             rec['width'] = existing['width']
@@ -1841,19 +1990,21 @@ module Noxun
             rec.delete('width')
           end
           # D-42 (audit FIX 8): duplicitny kod ABS (rovnaky dodavatel) -> potvrdenie.
-          conflict = maybe_code_conflict(data, 'edge', id)
-          return conflict if conflict
+          if (msg = code_conflict_msg(data, 'edge', id))
+            return [:code_conflict, msg]
+          end
           # M-A3e D-71: rucna vazba pasky — rovnaky kontrakt ako doska.
           if data.key?('demos_url')
-            st, val, invalidate = Materials.manual_demos_url(data['demos_url'],
-                                                             existing['demos_url'])
-            return set_status(val, true) if st == :invalid
+            st, val, invalidate = Materials.manual_demos_url(data['demos_url'], existing['demos_url'])
+            return [:error, val] if st == :invalid
             val ? rec['demos_url'] = val : rec.delete('demos_url')
             rec.delete('price_checked_at') if invalidate
           end
-          return set_status('Uloženie katalógu zlyhalo.', true) unless Materials.upsert_edge(rec)
-          after_catalog_change
-          set_status("ABS #{id} upravená.")
+          if (perr = apply_product_url!(rec, data, existing))
+            return [:product_error, perr]
+          end
+          return [:error, 'Uloženie katalógu zlyhalo.'] unless Materials.upsert_edge(rec)
+          [:ok, "ABS #{id} upravená."]
         end
 
         def handle_delete_edge(payload)

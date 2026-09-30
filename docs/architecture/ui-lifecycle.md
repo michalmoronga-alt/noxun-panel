@@ -3413,6 +3413,27 @@ doska, ktorú neprijme žiadny systém, sa neuloží vôbec; doska, ktorú nepri
 `MD.confirmDefault` (ten istý pending kontrakt ako D-46, iná veta). **Vkladanie** má vlastný preflight `MaterialsDialog.drawer_material_issue`, ktorý `Panel.handle_insert`
 volá **pred** `prepare_insert` a ghostom — nekompatibilný materiál zásuviek vklad odmietne hláškou, nie „úspechom" a RED po kliku. Detail v [materials.md](materials.md).
 
+**CENY-M1a (v0.16.1) — odkaz na produkt a formulár variantu pod jedným zámkom.** **Formulár variantu (ceruzka)** — `handle_save_sheet`/`handle_save_edge`
+robia pred zámkom len rýchle `schema_ok?`; **kontrola schémy aj revízie, načítanie záznamu, merge, pravidlá odkazu a zápis** bežia v
+`save_sheet_locked`/`save_edge_locked` pod **jedným** `Materials.with_catalog_lock` (R6c, vzor `save_decor`; upsert berie ten istý reentrantný
+zámok). Baseline je **`row_rev` riadku z otvorenia formulára** (R6b), nie globálny `catalog_rev` — ten omladzuje každé echo, takže starý formulár
+by vrátil cenu aj Demos väzbu do stavu z otvorenia; prázdny baseline = konflikt (fail-closed). Konflikt pošle **najprv** `push_catalog`, potom
+`MD.formConflict(kind, id)` (klient formulár otvorí nanovo s čerstvými údajmi a novým baseline) a status. Pred merge sa strhnú server-owned polia
+a ozdoby payloadu (`FORM_STRIP_KEYS`: `price_checked_at`, `price_check_method`, `product_link`, `price_check`, `row_rev`, `label`, `row_label`,
+`row_key`, `image_file`). Kľúč `product_url` (`apply_product_url!`): nie text / neplatný = celý save odmietnutý, prázdny = zmazanie, chýbajúci = bez
+zmeny; pri **výslednej** Demos URL sa uložený odkaz nesmie zmeniť ani zmazať (odložený, O8). Odmietnutý odkaz (`:product_error`) pošle
+`MD.formRejected(kind)` — klient formulár po odoslaní zatvára, takže ho otvorí nanovo s **rozpísanými** hodnotami (`mdReopenFromAttempt`, baseline
+pokusu) a kurzorom v poli odkazu; úprava ceny či kódu sa tak nestratí ani vtedy, keby klientska kontrola pustila niečo, čo server odmietne.
+Klientska kontrola `mdProductUrlLocalError` zrkadlí pravidlá `URI.parse` (RFC 3986 parser Ruby) a paritu drží spoločná tabuľka
+`tests/fixtures/ceny_m1_product_urls.json` (Ruby aj Node test). Odpovede skladá `form_save_reply` až **po** uvoľnení
+zámku. **`mat_product_open`** (R7, v `SECTION_ACTIONS`) otvorí `UI.openURL` len pre čerstvý „ručný" záznam s platným odkazom (URL od klienta sa
+neprijíma), inak status + `push_catalog`; nič nezapisuje. **Payload** (`full_catalog_payload`) nesie `product_link` (bool) **len** pri ručných
+záznamoch (`product_link_extra!`), `row_rev` zo surového záznamu pred ozdobou. **Klient** (`proj_materials.js`): pevný slot troch ikon
+`mdSlotHtml` v riadku aj hlavičke (duplák/univerzálna · Demos alebo odkaz · overenie — M1b), ikona `mdProductBtn` (sivá = otvorí serverom,
+jantárová = formulár s kurzorom v poli odkazu a krátkym zvýraznením riadku), pole „Odkaz na produkt" so **živým zámkom** podľa poľa Demos URL
+(`mdProductLockSync`; odomknutie vráti rozpísaný text alebo odložený odkaz), posiela sa len z editovateľného poľa; `mdEditing.rev` echo
+**neomladí** a `mdReopenFromAttempt` ho zachová (druhé uloženie pri duplicite kódu nesie baseline prvého). `MD_CLIENT_SCHEMA = 11`.
+
 **`materials_dialog.rb` — od ŠT-2b už NIE JE OKNO** (ostal serverový modul; obsah je sekcia `mat` Štúdia, popis je tu kvôli histórii): katalóg = mriežka dlaždíc podľa výrobcu + pás
 „Použité v projekte" — jediné echo je `push_catalog` BEZ scanu modelu; hľadanie názov/výrobca/kód/dodávateľ; klik na dlaždicu → detail dekoru s editovateľnými bunkami
 kód/cena/dodávateľ — patch protokol s `row_rev`, dirty bunka si baseline drží aj cez refresh, re-render neprepíše aktívny input, prázdna bunka pole VYMAŽE; batch „Nový dekor" cez

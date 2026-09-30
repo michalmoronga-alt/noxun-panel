@@ -146,10 +146,12 @@ module Noxun
       # D-98 (audit F5): ani `supplier_decor` — duplak sa NEKUPUJE, takze
       # dodavatelov alias dekoru nema komu sluzit; zdedeny by navyse tvrdil,
       # ze duplak ma vlastnu produktovu stranku u dodavatela.
+      # CENY-M1a (sonda S4): ani `product_url` — odkaz na produkt patri
+      # KUPOVANEJ zdrojovej doske; duplak by inak tvrdil vlastny obchod.
       def duplak_record_from(source, mult)
         rec = source.reject do |k, _|
           %w[material_id code supplier price_per_m2 supplier_decor
-             uni uni_role demos_url price_checked_at].include?(k)
+             uni uni_role demos_url price_checked_at product_url].include?(k)
         end
         rec['thickness'] = (source['thickness'].to_f * mult).round(2)
         rec['source_material_id'] = source['material_id'].to_s
@@ -1082,7 +1084,9 @@ module Noxun
         if patch.is_a?(Hash)
           # M-A3e D-71: demos_url je nakupne pole — UNI vazbu na dodavatela nema.
           # D-98: alias dekoru u dodavatela patri do tej istej triedy.
-          touched = %w[code supplier price_per_m2 price_per_bm demos_url supplier_decor].any? do |k|
+          # CENY-M1a (sonda S5): odkaz na produkt tiez — UNI nema obchod.
+          touched = %w[code supplier price_per_m2 price_per_bm demos_url supplier_decor
+                       product_url].any? do |k|
             patch.key?(k) && !patch[k].to_s.strip.empty?
           end
           return nil unless touched

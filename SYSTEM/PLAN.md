@@ -223,12 +223,14 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 - **Ceny — zvyšok V1-03 → blok CENY (štart 29.9.2026, Michal: „poďme na ceny materiálov a ABS" — posledný kódový bod V1):** ručné overenie cien **materiálov/ABS**
   bez Demos väzby a **jeden** odkaz na produkt (C7 nahradilo pôvodné „viac URL na položke"). Priečinok bloku [zdroje/bloky/CENY/](zdroje/bloky/CENY/) — rozhodnutia
   [ROZHODNUTIA_MICHALA_2026-09-29.md](zdroje/bloky/CENY/ROZHODNUTIA_MICHALA_2026-09-29.md) (C1–C11), schválený mockup
-  [MOCKUP_CENY_2026-09-30.html](zdroje/bloky/CENY/MOCKUP_CENY_2026-09-30.html) (O1–O9 podľa návrhu, 30.9.). Štart bloku PR #425. Dávky (každá s auditom návrhu — mení formát katalógu):
-  - **CENY-M1a** · odkaz na produkt pri doske/ABS bez Demosu v dátach katalógu a v Štúdiu → Materiály (package M1 pribudne v priečinku bloku).
-  - **CENY-M1b** · ručné overenie ceny (doska za platňu / ABS za bm), zneplatnenie, prednosť Demosu, D-148.
+  [MOCKUP_CENY_2026-09-30.html](zdroje/bloky/CENY/MOCKUP_CENY_2026-09-30.html) (O1–O9 podľa návrhu, 30.9.). Štart bloku PR #425. Dávky (každá s auditom návrhu — mení formát katalógu;
+  rez M1 → **M1a / M1b** prijal orchestrátor 30.9. podľa package [PACKAGE_CENY_M1.md](zdroje/bloky/CENY/PACKAGE_CENY_M1.md) s auditom
+  [AUDIT_CENY_M1_2026-09-30.md](zdroje/bloky/CENY/AUDIT_CENY_M1_2026-09-30.md)):
+  - ✅ **CENY-M1a** · odkaz na produkt pri doske/ABS bez Demosu v dátach katalógu (SCHEMA 11) a v Štúdiu → Materiály — **PR #426, v0.16.1**.
+  - **CENY-M1b** · ručné overenie ceny (doska za platňu / ABS za bm, SCHEMA 12), zneplatnenie, prednosť Demosu, D-148 (požiadavky [B] toho istého package).
   - **CENY-M2** · Rozpočet: vek ručne overených cien, „N cien na kontrolu", odkaz a „Overiť cenu" v sekcii Materiál a ABS hrany; materiál bez formátu
     podľa skutočných m² dielcov namiesto fiktívnej platne (C12).
-- **Poradie pred uzáverom V1 (Michal 29.–30.9.2026):** blok **CENY** (CENY-M1 → CENY-M2) → **R-13** (čítať `std` na entite, ORANGE „dielec z inej verzie
+- **Poradie pred uzáverom V1 (Michal 29.–30.9.2026):** blok **CENY** (CENY-M1a → CENY-M1b → CENY-M2) → **R-13** (čítať `std` na entite, ORANGE „dielec z inej verzie
   štandardu") → **R-37** (ochrana nastavení dodávateľa pred tichým prepísaním seedom) → **R-35** (dve okná SketchUpu si neprepíšu pravidlá kovania
   a rozmerové rady) — plné znenia a verdikty v [AUDIT_REGISTER.md](AUDIT_REGISTER.md) (sekcia „Stav po previerke 29.9.2026"). **Test na kompletnej
   reálnej zákazke až po V1** (Michal 29.9.: teraz nemá vhodnú zákazku); po dobehnutí týchto bodov Michal určí ďalší postup.

@@ -17,6 +17,25 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **CENY-M1a — odkaz na produkt pri doske a ABS bez Demosu (30.9.2026, PR #426, v0.16.0 → v0.16.1).** Prvá kódová dávka bloku CENY podľa package
+  [PACKAGE_CENY_M1.md](../zdroje/bloky/CENY/PACKAGE_CENY_M1.md) (požiadavky **[A]**; audit návrhu Codex gpt-6-astra
+  [AUDIT_CENY_M1_2026-09-30.md](../zdroje/bloky/CENY/AUDIT_CENY_M1_2026-09-30.md): 1 BLOCKER [B] + 2× FIX-IN-M1a + 1 FIX-IN-M1b; orchestrátor prijal
+  rez **M1a → M1b → M2**). **Pre používateľa:** v Štúdiu → Materiály má doska a ABS bez Demosu ikonu **„Otvoriť produkt"** (sivá otvorí obchod a nič
+  nezapíše; jantárová = odkaz chýba → ceruzka s kurzorom v novom poli **„Odkaz na produkt"** nad Demos URL), pri Demos väzbe je pole zamknuté a ručný odkaz
+  ostáva odložený; ikony majú v riadku **pevné miesto** (tri pozície, hlavička rovnako), takže stĺpce sú pod sebou. **Dáta:** `product_url` (http/https),
+  **SCHEMA 11** lazy podľa obsahu a nikdy neklesá; oprava pasce S2 (riadok vzhľadu by marker znížil podľa poradia záznamov); UNI ani duplák odkaz
+  nemajú; Demos väzba odkaz nemaže. **Z auditu (FIX-M1a):** formulár variantu drží `row_rev` **z otvorenia** (echo ho neomladí, konflikt ho otvorí nanovo
+  s čerstvými údajmi — R6b) a kontrola schémy aj revízie, načítanie, merge a zápis bežia **pod jedným zámkom** katalógu (R6c; do v0.16.0 sa revízia
+  kontrolovala mimo zámku a porovnávala sa globálna `catalog_rev`, ktorú každé echo omladilo). Formulár strháva od klienta server-owned polia — dátum
+  overenia ceny sa dal dovtedy podvrhnúť (sonda S8/T20). Nová akcia `mat_product_open` (URL len zo servera), payload `product_link`. **Rozpočet, XLSX, ponuka
+  ani VEPO sa nemenia.** **Predrecenzia (1× P2 + 2× P3, opravené):** headless testy odpovedí formulára (duplicitný kód → `MD.flagDuplicateCode`,
+  katalóg len na čítanie, schéma znova pod zámkom) · klientska kontrola odkazu zrkadlí `URI.parse` so spoločnou tabuľkou platnosti
+  (`tests/fixtures/ceny_m1_product_urls.json`) a odmietnutý odkaz formulár **otvorí nanovo s rozpísanými hodnotami** (`MD.formRejected`) — hláška
+  menuje skutočný dôvod (odchýlka od znenia R6 v package) · STAV vrátil konkrétne dôsledky pre starší plugin. **Testy:** 4866 headless (nová
+  `test_ceny_m1_links.rb`) · 143 JS sád (nová `test_ceny_m1_links.js`; tri sady s literálom schémy 10 → 11) · mutácie **M1–M8 + M22 (Ruby aj JS)
+  a 6 mutácií opráv z predrecenzie zabité**; in-SU nie je brána (package §8 — nové zápisy idú len do globálneho katalógu, žiadna operácia
+  ani geometria). **Pre Luciu:** aktualizovať obe PC pred prvým uložením odkazu — starší plugin katalóg so schémou 11 len číta.
+
 - **DOCS — štart bloku CENY · overenie cien materiálov a ABS (29.–30.9.2026, PR #425, len dokumentácia; verzia pluginu sa nemení).** Michal 29.9. večer pri
   otázke „čo ešte pred V1" vybral **posledný kódový bod V1** — ručné overenie cien dosiek a ABS bez Demos väzby (zvyšok V1-03). Fakty z kódu a reálnych dát:
   zo 76 nákupných záznamov je bez Demosu len 5 (2× DTDL, zástena, sklo, 1 ABS; 3 bez ceny) a v Rozpočte sú dnes prakticky neviditeľné. Rozhodnutia
