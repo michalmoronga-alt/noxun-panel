@@ -7,15 +7,6 @@
 > **Postrehy Michala sa píšu HNEĎ**, hocikedy a na hociktorú tému — zaradenie robí agent (plné pravidlo: [PLAN.md](PLAN.md), sekcia „Pravidlo pre postrehy").
 > **Kde je zvyšok:** história zápisníka (priebežné stavy, 2A migračná mapa, hardening a sedenia V0.5, priebeh seedu, zodpovedané otázky) → [archiv/DOGFOODING_historia.md](archiv/DOGFOODING_historia.md) · odpočet merača D-25 → [zdroje/MERAC_D25_odpocet_2026-08.md](zdroje/MERAC_D25_odpocet_2026-08.md) · história dávok → [archiv/KRONIKA.md](archiv/KRONIKA.md).
 
-## UI dlhy — k bloku 1b (STABILIZAČNÁ REVÍZIA)
-
-*(Blok **1 · UI 2.0** je od v0.8.0 hotový a jeho plný text žije v
-[archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md). Postrehy nižšie sa v ňom
-nevyriešili, takže od 26.8.2026 visia na bloku **1b · STABILIZAČNÁ REVÍZIA**, odrážka **F**
-v [PLAN.md](PLAN.md) — **D-51 uzavreté 6.9.2026** (archív); **D-27** je vyriešené dávkou F/D-27 (v0.8.13)
-a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9.16). Skupina je prázdna.)*
-
-
 ## KONTROLA + VÝROBA
 
 *(Skupina je prázdna a **blok 2 je uzavretý vo v0.16.0 (29.9.2026)** — D-94, D-112, D-113, D-121 a D-122 majú plné texty v
@@ -34,18 +25,6 @@ Smoke bloku 2 **PASS 29.9.2026** (bez chýb); nové postrehy k týmto funkciám 
   = asercia predpokladá `SelectionTool`, ale `GhostTool.start` používa `push_tool`, takže po upratovaní sa vráti NÁSTROJ AKTÍVNY PRED scenárom (`ghost_tool.rb` ~r. 122) — keď beh
   štartuje s Tape Measure, `SelectionTool` sa neobjaví nikdy (poll by len časoval). *Stav: OTVORENÉ — návrh (Codex #318): v setupe sekcie si zapamätať aktívny nástroj a tvrdiť návrat
   PRÁVE NEHO, alebo pred štartom explicitne zvoliť Výber (`select_tool(nil)`); pri opakovaní hlásiť ID nástroja navrchu.*
-
-## V1 DOTIAHNUTIE
-
-*(Skupina je prázdna — **ceny materiálov/ABS (zvyšok V1-03) vyriešené 30.9.2026** blokom CENY (CENY-M1a/M1b/M2, v0.16.1–v0.16.3; **blok uzavretý
-vo v0.17.0**), plný text v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md), výsledok a smoke checklist v
-[archiv/CENY_ZAVER_2026-09-30.md](archiv/CENY_ZAVER_2026-09-30.md); EN DANIELI textový export aj DOCX/PDF sú v skupine Po V1 — zásobník.
-Smoke bloku CENY **PASS 30.9.2026** (bez nálezov); nové postrehy k týmto funkciám idú do skupiny podľa bloku.)*
-
-## INFRA
-
-*(Skupina je prázdna — **D-52 uzavreté 3.9.2026** (v0.9.14), plný text v
-[archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md); **D-48** je mimo V1, v skupine Po V1 — zásobník.)*
 
 ## Po V1 — zásobník
 

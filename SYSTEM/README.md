@@ -12,9 +12,13 @@
 1. [STAV.md](STAV.md) — **kde projekt je dnes** (verzia, čo funguje, čo sa robí, ďalší krok).
 2. [PLAN.md](PLAN.md) — **čo sa ide robiť** (bloky prác, zásobník, trvalé pravidlá).
 3. [DOGFOODING.md](DOGFOODING.md) — plné znenia **otvorených** postrehov (D-čísla) k bloku.
-4. Podľa témy zásahu: STANDARD · VEPO_KONTRAKT · POJMY (tabuľka nižšie).
+4. Podľa témy zásahu: STANDARD · VEPO_KONTRAKT · POJMY (tabuľka nižšie) — pri súbore nad ~50 kB len dotknutú kapitolu
+   (Grep podľa nadpisu `§` alebo mena modulu); **rozpočet povinného čítania jednej dávky je orientačne ≤ 150 kB** (pravidlo v [../CLAUDE.md](../CLAUDE.md)).
+5. **Podobná funkcia už bola?** Priečinok jej bloku `archiv/bloky/<BLOK>/` (`ROZHODNUTIA_*`, `FAKTY_Z_KODU_*`, `PACKAGE_*`) a záver
+   `archiv/<BLOK>_ZAVER_*` — napr. [archiv/bloky/ROHOVA/](archiv/bloky/ROHOVA/) pre nový typ skrinky.
 
-Na otázku **„prečo je to takto?"** sa nečíta nič z hora — na to je [archiv/KRONIKA.md](archiv/KRONIKA.md).
+Na otázku **„prečo je to takto?"** sa nečíta nič z hora: najprv **priečinok bloku** (bod 5), potom [archiv/KRONIKA.md](archiv/KRONIKA.md)
+a [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md) — **len Grepom** podľa ID dávky alebo D-čísla (oba súbory majú stovky kB, celé sa nečítajú).
 
 ## Živé dokumenty — jedna rola na súbor
 
@@ -23,7 +27,7 @@ Na otázku **„prečo je to takto?"** sa nečíta nič z hora — na to je [arc
 | [STAV.md](STAV.md) | dnešok: verzia, hotové, rozrobené, ďalší krok | história (tá je v KRONIKE) |
 | [PLAN.md](PLAN.md) | budúcnosť: bloky prác, zásobník, trvalé pravidlá | záznam hotových blokov |
 | [DOGFOODING.md](DOGFOODING.md) | **otvorené** postrehy z praxe, plné znenie | zoznam vyriešeného |
-| [AUDIT_REGISTER.md](AUDIT_REGISTER.md) | zásobník nálezov auditu 1c pre blok 1d (R-čísla, priority, poradie) | plán blokov ani história auditu |
+| [AUDIT_REGISTER.md](AUDIT_REGISTER.md) | zásobník nálezov auditu 1c (R-čísla, verdikty, poradie; pôvodne pre blok 1d) | plán blokov ani história auditu |
 | [STANDARD.md](STANDARD.md) | záväzný dátový kontrakt (dictionary, roly, mm Float) | návod na UI |
 | [VEPO_KONTRAKT.md](VEPO_KONTRAKT.md) | formát výstupu do VEPO | ostatné výstupy |
 | [POJMY.md](POJMY.md) | glosár + trvalé fakty stolárskej domény | plán ani stav |
@@ -80,6 +84,8 @@ Na otázku **„prečo je to takto?"** sa nečíta nič z hora — na to je [arc
   obsahový riadok hneď pod H1** — nie kdekoľvek v súbore.
 - **STAV je krátky** (max 80 riadkov a 12 kB) a má stabilnú kostru piatich sekcií.
   Nahradený text ide odsekom navrch „Záznamy dávok" v `archiv/KRONIKA.md`.
+- **PLAN je krátky** (max 280 riadkov a 40 kB, od dávky H1 1.10.2026) — keď strop nestačí, v PLAN
+  ostal hotový blok alebo zadanie dávky, ktoré patrí do priečinka bloku.
 - **Žiadny riadok nad 400 znakov** v živých docs — jeden odsek na jednom obrom riadku
   znamená nečitateľný diff a nemožné review. (Archív a zdroje sa nestrážia.)
   Platí na **všetky** živé dokumenty vrátane [STANDARD.md](STANDARD.md) a [POJMY.md](POJMY.md).
@@ -97,5 +103,6 @@ Na otázku **„prečo je to takto?"** sa nečíta nič z hora — na to je [arc
   zadania, briefy, smoke checklist).
 - **Každá dávka, ktorá zvyšuje VERSION, aktualizuje docs** podľa **checklistu uzáveru
   dávky** v [../CLAUDE.md](../CLAUDE.md) vrátane **prepisu STAV** — nie „niekedy neskôr",
-  ale v tej istej dávke. **Dokumentačné PR** majú krátky checklist: KRONIKA áno, STAV
-  a VERSION nie.
+  ale v tej istej dávke. **Dokumentačné PR** majú krátky checklist: KRONIKA áno, VERSION nie;
+  STAV len vtedy, keď PR mení stav bloku alebo poradie prác — vtedy prepíše sekcie „Robí sa"
+  a „Ďalší krok" (verzia v sekcii „Stav" sa nemení; od 1.10.2026, B-08).

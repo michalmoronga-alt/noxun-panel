@@ -58,7 +58,7 @@ zásuvkové bloky na novom štandarde · CNC/výkresy · plná automatika niche�
 - **Nastav raz, používaj navždy:** šablóny (s kovaním), sety, predvoľby projektu, rady (nohy/bočnice/výklopy) — systém vyberá z radu, override na výnimky.
 - **Snapshot na entite = autorita** (štandard 8.3); katalógy sú živé, projekt je reprodukovateľný z .skp.
 - **Ceny = pohyblivá cache s dátumom overenia** — nikdy „zamrznuté ticho" (detail v [archiv/V1_VIZIA_priebeh_2026-08.md](archiv/V1_VIZIA_priebeh_2026-08.md), kap. 5).
-- **Vertikálny priestor panela vzácny**; žiadne emoji v UI, Lucide ikony, tokeny --nx-*.
+- **Vertikálny priestor panela vzácny** (autorita [../docs/UI_DIZAJN.md](../docs/UI_DIZAJN.md) §1); žiadne emoji v UI, Lucide ikony, tokeny --nx-*.
 - **V1 je uzavretý balík** (Michal 6.9.2026): po uzávere obaja používajú naplno a ďalej sa doručujú update packy (postrehy Lucie a Michala, bloky po V1) cez updater a zdieľané knižnice.
 
 ## Kde je zvyšok

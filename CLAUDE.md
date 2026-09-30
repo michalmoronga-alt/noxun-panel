@@ -9,20 +9,20 @@ GitHub: https://github.com/michalmoronga-alt/noxun-panel
 
 | Ideš robiť… | Pred prácou POVINNE prečítaj |
 |---|---|
-| **novú dávku · plánovanie · zadanie** | [SYSTEM/STAV.md](SYSTEM/STAV.md) (kde projekt je) → [SYSTEM/PLAN.md](SYSTEM/PLAN.md) (blok, do ktorého dávka patrí) → skupinu toho bloku v [SYSTEM/DOGFOODING.md](SYSTEM/DOGFOODING.md) (plné znenia **otvorených** D-čísel) → zadanie dávky v priečinku bloku `SYSTEM/zdroje/bloky/<BLOK>/`. Keď nevieš, ktorý dokument je autorita na čo: [SYSTEM/README.md](SYSTEM/README.md) |
-| **zmenu Ruby kódu — core / modules** | rozcestník [docs/ARCHITEKTURA.md](docs/ARCHITEKTURA.md) → odseky **dotknutých modulov** v `docs/architecture/` (nájdeš ich Grepom podľa mena súboru) + dotknuté § [SYSTEM/STANDARD.md](SYSTEM/STANDARD.md) |
-| **buildery · observery · undo · geometriu** | [docs/architecture/construction.md](docs/architecture/construction.md) (`construction`, `cabinet_builder`, `board_builder`, `zone_tree`, `scale_observer`) + [docs/SKETCHUP_PRAVIDLA.md](docs/SKETCHUP_PRAVIDLA.md) + STANDARD §3, §4, §9. **In-SU test je tu brána mergu** (spúšťače a runner: sekcia **Testovanie**) — headless sada geometriu ani undo neoverí |
-| **UI — panel, HTML, JS, CSS, satelitné okná** | [docs/UI_DIZAJN.md](docs/UI_DIZAJN.md) (pri KAŽDEJ UI práci) + [docs/architecture/ui-lifecycle.md](docs/architecture/ui-lifecycle.md) + **cache-bust pravidlo** nižšie (`?v=` = presne VERSION) + trvalé pravidlo **„vertikálny priestor panela je vzácny"** ([SYSTEM/PLAN.md](SYSTEM/PLAN.md), sekcia Trvalé UI/UX pravidlo) |
-| **materiály · ABS · katalóg · Demos** | [docs/architecture/materials.md](docs/architecture/materials.md) — `materials`, `materials_*` split, `materials_migration`, `materials_health`, `abs_rules`, `demos/` + [SYSTEM/STANDARD.md](SYSTEM/STANDARD.md) **§7 Materiály a ABS** |
-| **kovanie — pravidlá, sety, katalóg** | [docs/architecture/hardware.md](docs/architecture/hardware.md) — `hardware_rules`, `hardware_catalog`, `hardware_sets` + [SYSTEM/STANDARD.md](SYSTEM/STANDARD.md) **§6 Kovanie** |
-| **výstupy — VEPO, kusovník, nákup, CSV/XLSX** | [SYSTEM/VEPO_KONTRAKT.md](SYSTEM/VEPO_KONTRAKT.md) + [docs/architecture/outputs.md](docs/architecture/outputs.md) (`validation`, `production_core`) + [docs/architecture/model-a-identita.md](docs/architecture/model-a-identita.md) (`build_plan`, `part_keys`) + STANDARD §8 a §11 |
-| **bugfix · diagnostiku · „prečo to padá"** | mapa „Kam sa pozrieť" v [SYSTEM/STAV.md](SYSTEM/STAV.md) → odsek dotknutého modulu v `docs/architecture/` (cez rozcestník [docs/ARCHITEKTURA.md](docs/ARCHITEKTURA.md)) → pri otázke **„prečo je to takto?"** [SYSTEM/archiv/KRONIKA.md](SYSTEM/archiv/KRONIKA.md) a [SYSTEM/archiv/DOGFOODING_vyriesene.md](SYSTEM/archiv/DOGFOODING_vyriesene.md) |
+| **novú dávku · plánovanie · zadanie** | [SYSTEM/STAV.md](SYSTEM/STAV.md) (kde projekt je) → [SYSTEM/PLAN.md](SYSTEM/PLAN.md) (blok, do ktorého dávka patrí) → skupinu toho bloku v [SYSTEM/DOGFOODING.md](SYSTEM/DOGFOODING.md) (plné znenia **otvorených** D-čísel) → zadanie dávky v priečinku bloku `SYSTEM/zdroje/bloky/<BLOK>/`. **Podobná funkcia už bola** → priečinok jej bloku `SYSTEM/archiv/bloky/<BLOK>/` (`ROZHODNUTIA_*`, `FAKTY_Z_KODU_*`, `PACKAGE_*`) a záver `SYSTEM/archiv/<BLOK>_ZAVER_*`. Keď nevieš, ktorý dokument je autorita na čo: [SYSTEM/README.md](SYSTEM/README.md) |
+| **zmenu Ruby kódu — core / modules** | rozcestník [docs/ARCHITEKTURA.md](docs/ARCHITEKTURA.md) → odseky **dotknutých modulov** v `docs/architecture/` (Grep `^### <súbor>`; súbory mapy majú 47–540 kB, celé sa nečítajú) + dotknuté § [SYSTEM/STANDARD.md](SYSTEM/STANDARD.md) (Grep `^## <číslo>.` / `^### <číslo>`; celý má 170 kB) |
+| **buildery · observery · undo · geometriu** | odseky `construction`, `cabinet_builder`, `board_builder`, `zone_tree`, `scale_observer` v [docs/architecture/construction.md](docs/architecture/construction.md) (Grep `^### <modul>`; celý má 174 kB) + [docs/SKETCHUP_PRAVIDLA.md](docs/SKETCHUP_PRAVIDLA.md) + STANDARD §3, §4, §9. **In-SU test je tu brána mergu** (spúšťače a runner: sekcia **Testovanie**) — headless sada geometriu ani undo neoverí |
+| **UI — Inspector, Štúdio, HTML, JS, CSS** | [docs/UI_DIZAJN.md](docs/UI_DIZAJN.md) **§1–§3** (norma, pri KAŽDEJ UI práci; pri ikone či komponente aj dotknutý §4 / §5.x) + **odsek dotknutej sekcie Štúdia alebo kontextu Inspectora** v [docs/architecture/ui-lifecycle.md](docs/architecture/ui-lifecycle.md) (Grep podľa nadpisu, napr. `^### Sekcia ROZPOČET`, `^### Kontext Čelá`; celý má 540 kB) + pri zmene stĺpcov alebo sekcií Štúdia **záväzný kontrakt Kusovníka** [SYSTEM/zdroje/ui20/UI20_KONTRAKT.md](SYSTEM/zdroje/ui20/UI20_KONTRAKT.md) (Š2 stĺpce) + **cache-bust pravidlo** nižšie (`?v=` = presne VERSION) + trvalé pravidlo **„vertikálny priestor panela je vzácny"** (autorita UI_DIZAJN §1) |
+| **materiály · ABS · katalóg · Demos** | odseky `materials`, `materials_*` split, `materials_migration`, `materials_health`, `abs_rules`, `demos/` v [docs/architecture/materials.md](docs/architecture/materials.md) (Grep `^### <modul>`; celý má 72 kB) + [SYSTEM/STANDARD.md](SYSTEM/STANDARD.md) **§7 Materiály a ABS** |
+| **kovanie — pravidlá, sety, katalóg** | odseky `hardware_rules`, `hardware_catalog`, `hardware_sets` v [docs/architecture/hardware.md](docs/architecture/hardware.md) (Grep `^### <modul>`; celý má 208 kB) + [SYSTEM/STANDARD.md](SYSTEM/STANDARD.md) **§6 Kovanie** (42 kB — dotknuté §6.x) |
+| **výstupy — VEPO, kusovník, nákup, CSV/XLSX** | [SYSTEM/VEPO_KONTRAKT.md](SYSTEM/VEPO_KONTRAKT.md) + odseky `validation`, `production_core` a dotknutého výstupu v [docs/architecture/outputs.md](docs/architecture/outputs.md) (Grep `^### <modul>`; celý má 163 kB) + odseky `build_plan`, `part_keys` v [docs/architecture/model-a-identita.md](docs/architecture/model-a-identita.md) + STANDARD §8 a §11 |
+| **bugfix · diagnostiku · „prečo to padá"** | mapa „Kam sa pozrieť" v [SYSTEM/STAV.md](SYSTEM/STAV.md) → odsek dotknutého modulu v `docs/architecture/` (cez rozcestník [docs/ARCHITEKTURA.md](docs/ARCHITEKTURA.md)) → pri otázke **„prečo je to takto?"** najprv priečinok bloku (`SYSTEM/archiv/bloky/<BLOK>/`, `SYSTEM/archiv/<BLOK>_ZAVER_*`), potom [SYSTEM/archiv/KRONIKA.md](SYSTEM/archiv/KRONIKA.md) a [SYSTEM/archiv/DOGFOODING_vyriesene.md](SYSTEM/archiv/DOGFOODING_vyriesene.md) **len Grepom** podľa ID dávky alebo D-čísla (stovky kB, celé sa nečítajú) |
 | **testy — novú sadu alebo úpravu** | sekcia **Testovanie** nižšie + vzory v `tests/pure/`, `tests/js/`, `tests/sketchup/` (nová sada = štruktúra najbližšej existujúcej, nie vlastný formát) |
-| **code review · audit návrhu** | [SYSTEM/STANDARD.md](SYSTEM/STANDARD.md) (kontrakt, proti ktorému sa posudzuje) + odseky dotknutých modulov v `docs/architecture/` + skill `codex-audit` |
+| **code review · audit návrhu** | dotknuté § [SYSTEM/STANDARD.md](SYSTEM/STANDARD.md) (kontrakt, proti ktorému sa posudzuje; Grep podľa nadpisu) + odseky dotknutých modulov v `docs/architecture/` + skill `codex-audit` |
 | **dynamické komponenty (DC)** | [docs/DC_PRAVIDLA.md](docs/DC_PRAVIDLA.md) — vždy a bez výnimky (draho zaplatené pasce) |
 | **workflow · pravidlá práce · skilly** | [SYSTEM/WORKFLOW.md](SYSTEM/WORKFLOW.md) (roly a ich obsadenie, diagramy blok · dávka · review, brány, hranice) + záznam „prečo" [WORKFLOW_ROZHODNUTIA_2026-09-26.md](SYSTEM/zdroje/next_sessions/WORKFLOW_ROZHODNUTIA_2026-09-26.md) |
 
-Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Architektúra sa udržiava priebežne:** dávka, ktorá mení modul, prepíše JEHO odsek v príslušnom súbore `docs/architecture/` — nikdy nepridáva text na koniec súboru. Nový modul = nový odsek v správnom súbore **a** nový riadok v tabuľke rozcestníka [docs/ARCHITEKTURA.md](docs/ARCHITEKTURA.md) (guard test to stráži).
+Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa nečíta celý** — len kapitola alebo odsek, ktorý riadok menuje (Grep podľa nadpisu alebo mena modulu). **Rozpočet čítania:** povinné čítanie jednej dávky je orientačne **≤ 150 kB**; keď by bolo viac, orchestrátor dá do briefu výťah alebo presné kotvy. **Architektúra sa udržiava priebežne:** dávka, ktorá mení modul, prepíše JEHO odsek v príslušnom súbore `docs/architecture/` — nikdy nepridáva text na koniec súboru. Nový modul = nový odsek v správnom súbore **a** nový riadok v tabuľke rozcestníka [docs/ARCHITEKTURA.md](docs/ARCHITEKTURA.md) (guard test to stráži).
 
 ## Roly a modely
 
@@ -56,7 +56,15 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Architektúra sa udr
   alebo oprava mení koncept** (dátový kontrakt, tok, návrh riešenia) → PR bol zle narezaný — **zavrieť a rozdeliť**, nie iterovať; platí
   aj vtedy, keď to nájde slepá delta. Detail a precedensy: skill `codex-po-pr`.
 - **Výrobná/cenová dávka (jediná definícia):** dávka, ktorá mení **rozmery alebo počty dielov, hrany, kusovník, VEPO, nákupné zoznamy,
-  kovanie alebo ceny**.
+  kovanie alebo ceny**. **Hranice s príkladmi (od 1.10.2026):**
+  - výrobná/cenová **áno:** zmena vzorca, rozmeru, počtu, hrany; zmena zoskupenia riadkov kusovníka (`row_key`) alebo obsahu či stĺpcov exportu (VEPO,
+    CSV/XLSX kusovníka, nákup, ponuka); zmena ceny, sadzby alebo **čísla, podľa ktorého sa v okne objednáva či cenotvorí** (množstvo, počet platní, cena
+    položky) — aj keď sa výpočet nemení a mení sa len to, čo okno ukazuje;
+  - výrobná/cenová **nie:** nový **čítací** stĺpec alebo popis v okne bez zmeny `row_key`, zoskupenia a exportov (precedens `rows_with_roles`); preklad
+    nadpisov a popiskov bez zmeny čísel a CSV; farba, ikona, rozloženie;
+  - **nový ovládací prvok v UI** (hranica predrecenzie nižšie) **áno:** nové tlačidlo, prepínač, pole, rozbaľovačka alebo položka menu, ktorá niečo
+    **spúšťa alebo zapisuje** (model, súbor, nastavenia, katalóg); **nie:** ďalšia voľba v existujúcom zozname s rovnakým správaním ako susedné (napr.
+    ďalší stĺpec v menu „Stĺpce"), presun existujúceho tlačidla alebo jeho zmena na ikonu bez zmeny akcie.
 - **Audit návrhu PRED implementáciou (skill `codex-audit`, risk-based od 12.8.):** povinný **LEN** pre dávky meniace **dátový kontrakt,
   schému, migráciu, observer/undo lifecycle** alebo pridávajúce **nový modul** — rozhoduje OBSAH zásahu, nie žáner dávky (aj „fix"
   observera je audit-povinný). **Zmena schémy = každé zvýšenie `CONFIG_SCHEMA`, BuildPlan `SCHEMA` alebo STD.** Ostatné fix, docs a UI
@@ -66,7 +74,7 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Architektúra sa udr
   zápisu do modelu a výsledok zapíše do package — postup: skill `codex-audit`, krok 0.
 - **Slepá predrecenzia PRED PR (skill `predrecenzia`):** **povinná** pri dávke **audit-povinnej** (tá istá trieda ako `codex-audit`),
   **výrobnej/cenovej** a **aj pri bežnej dávke nad 300 zmenených riadkov kódu pluginu** (bez testov a dokumentácie) **alebo s novým
-  ovládacím prvkom v UI**; pri docs-only nie. Slepý recenzent dostane len zadanie a `git diff main...HEAD`; jeho P1/P2 sa opravia ešte
+  ovládacím prvkom v UI** (príklady hraníc pri definícii výrobnej/cenovej dávky vyššie); pri docs-only nie. Slepý recenzent dostane len zadanie a `git diff main...HEAD`; jeho P1/P2 sa opravia ešte
   pred PR a výsledok ide do PR popisu (sekcia „Predrecenzia"). Nenahrádza `codex-audit` ani `codex-po-pr`.
 - **Rešerš a krížový audit (poradie podľa praxe):** pri bloku **debata s Michalom → koncept → outside-in rešerš + krížový audit bloku
   RAZ, pred packages** (rešeršéri a audítor s rovnakým zadaním) → reconcile orchestrátora (nálezy ALREADY EXISTS / SIMPLER NATIVE PATH
@@ -130,14 +138,17 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Architektúra sa udr
 
 - `VERSION` žije na 2 miestach: `noxun_engine.rb` (autorita) + `noxun_engine/main.rb` (fallback) — synchro stráži guard test.
 - **Každý PR meniaci kód pluginu = bump patch** (0.5.0 → 0.5.1); **minor = výhradne uzáver bloku z `SYSTEM/PLAN.md`** (0.5.x → 0.6.0).
-- **Každé zvýšenie VERSION = prepis `SYSTEM/STAV.md`** (aj pri malom fixe); dokumentačné PR STAV nemenia.
+- **Každé zvýšenie VERSION = prepis `SYSTEM/STAV.md`** (aj pri malom fixe). **Dokumentačné PR, ktoré mení stav bloku alebo poradie prác**
+  (štart či uzáver bloku, smoke PASS, Michalovo rozhodnutie o poradí), **prepíše v STAV sekcie „Robí sa" a „Ďalší krok"** — verzia v sekcii „Stav"
+  sa nemení a nahradený text stačí zhrnúť v zázname dávky v KRONIKE (od 1.10.2026); ostatné dokumentačné PR STAV nemenia.
 - **Cache-bust:** každý `?v=` v `ui/*.html` = presne VERSION (stráži guard test; CEF cachuje css/js). Zmena css/js ⇒ bump verzie ⇒ prepísať všetky `?v=`.
 - **Checklist uzáveru kódovej dávky:** bump VERSION (2×) + `?v=` → testy zelené → **odsek dotknutého modulu v `docs/architecture/<súbor>.md`
   aktualizovaný na mieste** → vyriešené D-čísla do `SYSTEM/archiv/DOGFOODING_vyriesene.md` (**plný text + PR do sekcie „Vyriešené (plné
   texty)" a jeden riadok navrch INDEXU v tom istom súbore**; `SYSTEM/DOGFOODING.md` drží **len otvorené** postrehy) → **prepíš
   `SYSTEM/STAV.md` + APPEND odsek navrch „Záznamy dávok" v `SYSTEM/archiv/KRONIKA.md`** → v `SYSTEM/PLAN.md` ostáva riadok dávky v bloku
   **s ✅ a číslom PR** (presúva sa až s uzáverom bloku).
-- **Checklist dokumentačného PR:** odsek navrch „Záznamy dávok" v KRONIKE **áno**; STAV, VERSION ani `?v=` **nie**.
+- **Checklist dokumentačného PR:** odsek navrch „Záznamy dávok" v KRONIKE **áno**; v STAV **len „Robí sa" a „Ďalší krok"**, keď PR mení stav
+  bloku alebo poradie prác; VERSION ani `?v=` **nie**.
 - **Číslo PR** (všade, kde ho dávka píše — PLAN, KRONIKA, STAV, `DOGFOODING_vyriesene`): pred `gh pr create` sa píše `PR #?`; hneď po
   vytvorení PR ho doplní samostatný commit, ktorý mení len číslo. Ten **pred mergom skontroluje orchestrátor** (pri čistom kole 1 inak
   žiadna delta nebeží; keď delta beží, patrí do nej).

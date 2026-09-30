@@ -213,7 +213,8 @@ neopakuje a PR uvedie, na ktorej hlave bežal; zmena Ruby spúšťača = beh zno
 **Číslo PR** je všade, kde ho dávka píše (PLAN, KRONIKA, STAV, `DOGFOODING_vyriesene`), do otvorenia PR `PR #?`; hneď po `gh pr create`
 ho doplní samostatný commit, ktorý mení len číslo — ten pred mergom skontroluje orchestrátor (pri čistom kole 1 inak žiadna delta nebeží).
 **Dokumentačné PR** (bez kódu pluginu) idú skrátene: vetva `docs/…` → odsek v KRONIKE → headless testy (guardy dokumentácie) → kvóta →
-PR → číslo PR → review → merge. Verzia, `?v=`, STAV ani predrecenzia sa pri nich nerobia.
+PR → číslo PR → review → merge. Verzia, `?v=` ani predrecenzia sa pri nich nerobia; STAV len vtedy, keď PR mení stav bloku alebo poradie
+prác — vtedy prepíše sekcie „Robí sa" a „Ďalší krok" (verzia ostáva).
 
 ## 5 · Review po PR
 
@@ -300,7 +301,7 @@ Všetko, čo musí platiť, aby práca pokračovala. „Kto" = kto bránu uzatv�
 | kvóta | štart okna; pred auditom, implementačným subagentom, predrecenziou, `gh pr create` a `@codex review` | skript `usage` → orchestrátor | CLAUDE.md · Kvóty a štart okna · skill `usage` |
 | testy zelené | vždy headless + každá JS sada zvlášť | CI + orchestrátor | CLAUDE.md · Testovanie |
 | test v SketchUpe zelený | buildery, observery, undo a operácie, geometria, akcie panela zapisujúce do modelu; na finálnej hlave znova len pri zmene Ruby spúšťača po poslednom behu (PR uvedie hlavu behu) | runner → orchestrátor | CLAUDE.md · Testovanie |
-| docs a verzia na mieste | kódová dávka: celý checklist; dokumentačné PR: len KRONIKA | orchestrátor + guard testy | CLAUDE.md · Verzia a uzáver dávky |
+| docs a verzia na mieste | kódová dávka: celý checklist; dokumentačné PR: KRONIKA + pri zmene stavu bloku alebo poradia prác STAV „Robí sa" a „Ďalší krok" | orchestrátor + guard testy | CLAUDE.md · Verzia a uzáver dávky |
 | predrecenzia bez P1/P2 | audit-povinné a výrobné/cenové dávky; bežná dávka nad 300 riadkov kódu pluginu alebo s novým prvkom UI | slepý recenzent → orchestrátor | skill `predrecenzia` |
 | review kolo uzavreté | pred mergom, pre aktuálnu hlavu vetvy | review PR alebo náhradná brána → orchestrátor | skill `codex-po-pr` |
 | CI zelené | pred mergom, na aktuálnej hlave | GitHub Actions | skill `codex-po-pr` |
@@ -312,9 +313,9 @@ Všetko, čo musí platiť, aby práca pokračovala. „Kto" = kto bránu uzatv�
 
 | # | Hranica | Pravidlo | Kde |
 |---|---|---|---|
-| 1 | predrecenzia pri bežnej dávke | nad 300 zmenených riadkov kódu pluginu (bez testov a dokumentácie) alebo nový ovládací prvok v UI | CLAUDE.md · skill `predrecenzia` |
+| 1 | predrecenzia pri bežnej dávke | nad 300 zmenených riadkov kódu pluginu (bez testov a dokumentácie) alebo nový ovládací prvok v UI (príklady hraníc v CLAUDE.md) | CLAUDE.md · skill `predrecenzia` |
 | 2 | kvóta pred implementačným subagentom | Claude session nad 80 % → nový implementačný subagent sa nespúšťa, počká sa na reset | CLAUDE.md · skill `usage` |
-| 3 | výrobná/cenová dávka | mení rozmery alebo počty dielov, hrany, kusovník, VEPO, nákupné zoznamy, kovanie alebo ceny (jediná definícia) | CLAUDE.md · Git workflow |
+| 3 | výrobná/cenová dávka | mení rozmery alebo počty dielov, hrany, kusovník, VEPO, nákupné zoznamy, kovanie alebo ceny (jediná definícia; príklady hraníc tamtiež) | CLAUDE.md · Git workflow |
 | 4 | `-CloseWhenDone` | agent ho používa vždy; bez neho len Michalovo ručné spustenie | CLAUDE.md · Testovanie |
 | 5 | report | vždy, keď autonómny beh skončí alebo sa zastaví, najneskôr večer | CLAUDE.md · Autonómne bloky |
 | 6 | kvóta a prvé kolo Codexu | kontrola pred `gh pr create`; Codex zostatok pod 10 % → PR ako draft (Codex ho nerecenzuje); bežná dávka → náhradná brána, audit-povinná alebo výrobná/cenová → rozhodne Michal | CLAUDE.md · Kvóty · skill `codex-po-pr` |

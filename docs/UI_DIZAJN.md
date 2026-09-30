@@ -10,8 +10,11 @@ dokument opisuje **prečo** a **ako** — tabuľka tokenov nižšie je zrkadlom 
 
 ## 1. Princípy
 
-- **Vertikálny priestor je vzácny** (trvalé pravidlo Michala). Pred každým novým
-  riadkom/poľom zváž umiestnenie do existujúceho radu, rohu náhľadu alebo ikony.
+- **Vertikálny priestor panela je vzácny** (trvalé pravidlo Michala 20.7.2026, platí pre všetku prácu
+  na paneli; **toto je jeho autorita** — CLAUDE.md, PLAN, ARCHITEKTURA a V1_VIZIA naň len odkazujú).
+  Pred umiestnením každého nového tlačidla/poľa/funkcie sa POVINNE zamyslieť, či sa nedá umiestniť
+  inak a rozumnejšie (do existujúceho radu, do rohu náhľadu, ako ikona, kontextovo) — rast do výšky
+  len v krajných prípadoch. Inak panel skončí ako scrollovanie cez 20 tlačidiel a 30 sekcií.
 - **Žiadne emoji v UI chrome.** Ovládacie prvky (tlačidlá, zámky, akcie) používajú
   ikony zo spritu `icons.js`. Emoji/unicode glyfy sa v ovládaní nepoužívajú.
 - **Farba nesie význam.** Zelená = primárna akcia, **teal (firemná NOXUN) = výber/

@@ -101,7 +101,7 @@
 - **Logická obálka korpusu** — **nominálny** obrys skrinky z configu (`šírka × hĺbka × výška`), nie skutočné bounds v modeli. Prisúvanie, umiestňovanie
   novej skrinky a stred otáčania merajú **ju**, takže presahujúce čelo, proxy kovania ani telo spotrebiča doraz neposúvajú (a výsledok nezávisí od toho,
   ktoré tagy má kto zapnuté).
-- **Šablóna vs TYP vs parameter** — tri úrovne konfigurácie — hranica definovaná v [PLAN.md](PLAN.md) (sekcia „Hranica: TYP vs. ŠABLÓNA vs. PARAMETER")
+- **Šablóna vs TYP vs parameter** — tri úrovne konfigurácie — hranica definovaná v [STANDARD.md](STANDARD.md) §4.2 (odsek „Hranica: TYP vs. ŠABLÓNA vs. PARAMETER")
 - **Komín vzadu** (`back_setback`, KON-A · K1) — o koľko sú **dno a strop (aj zadná výstuha) vzadu kratšie ako bok**; chrbát sa posunie dopredu na ich zadné
   hrany a za ním vznikne vzduchový kanál (bežne ~50 mm, M1). Skrinka drží zadanú **celkovú hĺbku**, boky majú plnú hĺbku. Naložený chrbát aj chrbát v drážke
   pri komíne sedia **medzi bokmi** na zadných hranách dna a stropu (drážka len v bokoch, M2). Najmenší nenulový komín: naložený = hrúbka chrbta, v drážke =

@@ -14,6 +14,14 @@ NX_STAV_SECTIONS = ['## Stav', '## Robí sa', '## Ďalší krok',
 # nedal precitat (presne stav pred davkou "Docs cleanup B", 26.8.2026).
 NX_STAV_MAX_BYTES = 12 * 1024
 
+# Davka H1 (blok 9 · HARDENING, 1.10.2026, krizovy audit V1 B-04): PLAN.md narastol na
+# 116 kB / 721 riadkov, z toho ~86 % tvorili hotove bloky, ktore sa nikdy formalne
+# neuzavreli — a PLAN je povinne citanie kazdej novej davky. Strop = ~2x velkosti
+# ziveho PLANu po uprataní (zaokruhlene): prestane stacit az vtedy, ked sa hotovy blok
+# zabudne presunut do archiv/ROADMAP_hotove_etapy.md, nie pri beznom raste bloku.
+NX_PLAN_MAX_LINES = 280
+NX_PLAN_MAX_BYTES = 40 * 1024
+
 # Davka "Docs cleanup B" (26.8.2026): SYSTEM/ ma vrstvy — zive docs (nizsie), zdroje/
 # (nezavazne koncepty, necitaju sa automaticky) a archiv/ (historia, append-only).
 # Mapu autorit drzi SYSTEM/README.md.
@@ -57,6 +65,16 @@ NxTest.test('docs: SYSTEM/STAV.md ma najviac 12 kB') do
   NxTest.assert(size <= NX_STAV_MAX_BYTES,
                 "STAV.md ma #{size} B (limit #{NX_STAV_MAX_BYTES}) — starsie uzavery zloz do " \
                 'jedneho riadku s odkazom na archiv/KRONIKA.md, nahradeny text patri do KRONIKY')
+end
+
+NxTest.test('docs: SYSTEM/PLAN.md ma strop riadkov a kB (hotove bloky patria do archivu)') do
+  path = File.join(NxTest::ROOT, 'SYSTEM', 'PLAN.md')
+  lines = File.readlines(path, encoding: 'UTF-8').length
+  size = File.size(path)
+  NxTest.assert(lines <= NX_PLAN_MAX_LINES && size <= NX_PLAN_MAX_BYTES,
+                "PLAN.md ma #{lines} riadkov a #{size} B (limit #{NX_PLAN_MAX_LINES} riadkov / " \
+                "#{NX_PLAN_MAX_BYTES} B) — hotovy blok alebo hotovu cast presun plnym textom do " \
+                'SYSTEM/archiv/ROADMAP_hotove_etapy.md; zadania davok patria do priecinka bloku')
 end
 
 NxTest.test('docs: zive SYSTEM/*.md nemaju riadok nad 400 znakov') do

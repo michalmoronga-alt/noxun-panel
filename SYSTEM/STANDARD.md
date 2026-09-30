@@ -439,6 +439,16 @@ vnútorná hĺbka ≥ 80 (výstuha závesov pred chrbtom). **Typ** existujúcej 
 Jeho `height` je **výška linky**, nie výška korpusu; spodná hrana čela žije vo vlastnom poli `dw_front_bottom` a do `floor_height` **nikdy netečie**.
 Výplň medzi horným okrajom čela a líniou linky sa **negeneruje** — rieši ju človek nízkym korpusom (od 80 mm, S1-E0) alebo doskou.
 
+**Hranica: TYP vs. ŠABLÓNA vs. PARAMETER (rozhodnuté 15.7.2026; autorita je tu od 1.10.2026 — predtým koniec PLAN.md).**
+Tri úrovne — odpoveď na otázku „kedy nový typ korpusu":
+1. **TYP (builder)** = iná **topológia**: iná množina dielcov a vzťahov, iné zóny, parametre ktoré inde nedávajú zmysel. Vlastný generovací kód. → dolná, horná, slot umývačky,
+   **rohová** (`corner_blind` od v0.14.1 — slepá dolná s rohovou zostavou a CR lištami pred čelnou rovinou, blok 8); neskôr vysoká/potravinová veža.
+2. **ŠABLÓNA (template, čisté dáta)** = pomenovaná sada nastavení TYPU — žiadny nový kód. → **drezová** (= dolná + výstuhy na výšku), **varná** (= dolná + výstuhy −20 mm),
+   klasik, zásuvková… Používateľ si tvorí vlastné (Blum „My Library" princíp).
+3. **PARAMETER** = individuálna hodnota konkrétnej skrinky.
+
+Pravidlo: kým sa dá vec vyjadriť hodnotou/variantom existujúceho dielca → parameter/šablóna. Nový typ až keď sa mení topológia.
+
 ### 4.3 Geometriu generuje Ruby (regenerate pattern)
 
 **Rozhodnuté a prakticky overené (analýza `02`, 3 živé experimenty cez SkAgent).** Korpus = `funkcia(konfigurácia) → geometria`. Konfigurácia žije v `NOXUN/config` (mm, JSON). Pri zmene plugin v **jednej Undo operácii** zmaže vnútro a deterministicky postaví nanovo. **Žiadne DC vzorce v novom systéme.** Dva režimy životného cyklu — parametrický a odpojený — sú v sekcii 9.

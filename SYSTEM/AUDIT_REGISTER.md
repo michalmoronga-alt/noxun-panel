@@ -1,13 +1,13 @@
 # AUDIT REGISTER — zliaty výstup bloku 1c (29. 8. 2026)
 
-> **Autorita zásobníka pre blok 1d.** Vznikol zliatím a dedupom troch nezávislých auditov nad `main` v0.8.13 (`dc2d53f`):
+> **Autorita zásobníka nálezov auditu 1c** (pôvodne pre blok 1d, ktorý je od 1.10.2026 v archíve). Vznikol zliatím a dedupom troch nezávislých auditov nad `main` v0.8.13 (`dc2d53f`):
 > **[E]** externý Codex ([zdroje/AUDIT_2026-08_externy_codex.md](zdroje/AUDIT_2026-08_externy_codex.md), spúšťal Michal) ·
 > **[F]** Fable prechod (osi 1/3/4 — observery, production_core, identita; interné overenie s dôkazmi) ·
 > **[S]** slepý subagent (osi 2/5/6 — sety, perzistencia, UI vzory) — plus kandidáti zo sweepu
 > ([zdroje/SWEEP_2026-08_kandidati.md](zdroje/SWEEP_2026-08_kandidati.md), značky A/B/C) a 4 protinázory Codex review #250
 > (dispozície v threadoch PR #250). Podklad a pravidlá auditu: [zdroje/AUDIT_2026-08_podklad.md](zdroje/AUDIT_2026-08_podklad.md).
 >
-> **Údržba:** položky sa vybavujú dávkami bloku 1d ([PLAN.md](PLAN.md)) — vyriešená položka dostane riadok „✅ dávka/PR"
+> **Údržba:** položky sa vybavujú dávkami blokov v [PLAN.md](PLAN.md) (pôvodne blok 1d; od 1.10.2026 blok 9 · HARDENING, inak zásobník Po V1) — vyriešená položka dostane riadok „✅ dávka/PR"
 > a pri uzávere bloku sa presunie do sekcie „Vyriešené" na konci. Pravidlo 1d: rieši sa LEN výrobné riziko alebo
 > ponechaný V1 rozsah; dávka bez menovanej funkcie/dlhu sa nerobí. Čísla riadkov = stav k `dc2d53f`
 > (kód sa odvtedy hýbe — pri práci sa orientuj podľa MIEN metód; nové položky citujú mená, nie čísla).

@@ -101,5 +101,5 @@ DC pasce [DC_PRAVIDLA.md](DC_PRAVIDLA.md) · UI dizajn [UI_DIZAJN.md](UI_DIZAJN.
 - Zásahy do modelu z dialógov vždy cez guardy (baseline/typ/hrúbka) — HTML disabled nie je ochrana.
 - Autorita výrobného záznamu = snapshot na entite (štandard 8.3).
 
-**Trvalé UI pravidlo (Michal 20.7.2026): VERTIKÁLNY priestor panela je vzácny** — plné znenie je
-v [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md), sekcia „Ostatné".
+**Trvalé UI pravidlo (Michal 20.7.2026): VERTIKÁLNY priestor panela je vzácny** — plné znenie a autorita je
+[UI_DIZAJN.md](UI_DIZAJN.md) §1 Princípy (ostatné miesta naň len odkazujú).
