@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.16.3 · 30.9.2026 — BLOK CENY, posledná dávka CENY-M2** (Rozpočet, PR #?). **Rozpočet → Materiál a ABS hrany:** doska a páska **bez Demosu** má
+**v0.16.3 · 30.9.2026 — BLOK CENY, posledná dávka CENY-M2** (Rozpočet, PR #428). **Rozpočet → Materiál a ABS hrany:** doska a páska **bez Demosu** má
 v stĺpci „Overená" stav („ručne 18.9." sivé · „ručne 45 dní" / „neoverená" jantárové), ktorý je zároveň tlačidlom **„Overiť cenu"** (formulár z M1b, ostáva
 sa v Rozpočte). Čip **„N cien na kontrolu"** a „Skontrolovať ceny" počítajú aj ručné materiály (UNI a duplák nie), pred názvom je ikona odkazu (Demos · obchod ·
 jantárová = doplniť odkaz). **Sklo a iný materiál bez formátu mimo bežných dosiek sa v Rozpočte počíta podľa m²** (skutočná plocha dielcov × cena za m²);
@@ -27,7 +27,7 @@ v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a
 **Katalóg materiálov je po prvom uloženom odkaze v schéme 11 a po prvom ručnom overení ceny v schéme 12** — starší plugin ho ďalej číta (aj Rozpočet), ale nezapíše doň.
 **Aktualizuj plugin na oboch PC pred porovnávaním alebo posielaním ponúk — starší plugin počíta sklo bez formátu po starom.** (0.16.3 aj na Luciino PC; `BUDGET_STD` M2 nemení.)
 
-**Testy (CENY-M2, PR #?):** **4910 headless · 145 JS sád** zelené; 28 mutácií (M1–M24) zabitých; in-SU nie je brána (package §8).
+**Testy (CENY-M2, PR #428):** **4910 headless · 145 JS sád** zelené; 28 mutácií (M1–M24) zabitých; in-SU nie je brána (package §8).
 **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 
 ## Robí sa
@@ -46,7 +46,7 @@ nasleduje **uzáver bloku** (`release/ceny`, v0.17.0). Poradie pred V1: **CENY �
 
 ## Posledné uzávery
 
-- **CENY-M2 · Rozpočet** (**v0.16.3**, 30.9.2026, PR #?) — vek ručných cien, „Overiť cenu" a ikona odkazu v Rozpočte, sklo bez formátu podľa m².
+- **CENY-M2 · Rozpočet** (**v0.16.3**, 30.9.2026, PR #428) — vek ručných cien, „Overiť cenu" a ikona odkazu v Rozpočte, sklo bez formátu podľa m².
 - **CENY-M1b · ručné overenie ceny** (**v0.16.2**, PR #427) a **CENY-M1a · odkaz na produkt** (**v0.16.1**, PR #426) — [archiv/KRONIKA.md](archiv/KRONIKA.md).
 - **BLOK 2 · KONTROLA + VÝROBA UZAVRETÝ** (**v0.16.0**, 29.9.2026; nárezový plán: štart #417, PR #418–#421 + uzáver PR #422; **smoke PASS 29.9.**, PR #423).
   Nárezový plán v Štúdiu, nastavenia prerezu/orezu/prídavku, Kontrola s orezom, ceny podľa plánu; priečinok bloku v [archiv/bloky/NAREZ/](archiv/bloky/NAREZ/).

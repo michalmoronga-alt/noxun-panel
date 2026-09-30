@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **CENY-M2 — Rozpočet: ručné ceny dosiek a ABS + sklo bez formátu podľa m² (30.9.2026, PR #?, v0.16.2 → v0.16.3).** Posledná kódová dávka bloku CENY
+- **CENY-M2 — Rozpočet: ručné ceny dosiek a ABS + sklo bez formátu podľa m² (30.9.2026, PR #428, v0.16.2 → v0.16.3).** Posledná kódová dávka bloku CENY
   podľa package [PACKAGE_CENY_M2.md](../zdroje/bloky/CENY/PACKAGE_CENY_M2.md) (audit Codex gpt-6-astra
   [AUDIT_CENY_M2_2026-09-30.md](../zdroje/bloky/CENY/AUDIT_CENY_M2_2026-09-30.md): BLOCKER — testy a golden zosúladené s obmedzeným R1, NP-4 golden sa
   nemení; FIX-2 `manual_hardware` len kovanie + `manual_pending` jedným priechodom; FIX-3 typ cez `Materials.type_registry_entry`; NOTE-4 dve PC).
