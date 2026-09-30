@@ -1,0 +1,2037 @@
+{
+  "payload": {
+    "mode": "standard",
+    "mode_label": "Štandard",
+    "currency": "EUR",
+    "vat_divisor": 1.23,
+    "sections": [
+      {
+        "key": "materials",
+        "name": "Materiál",
+        "rows": [
+          {
+            "key": "material:H18",
+            "nazov": "H1180 DTDL 18 mm",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "PLATŇA",
+            "mnozstvo": 2,
+            "cena_mj": 144.32,
+            "spolu": 288.64,
+            "spolu_auto": 288.64,
+            "poznamka": "8,96 m² · formát 2800×2070 mm",
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "material_id": "H18",
+            "m2": 8.96,
+            "price_per_m2": 24.9,
+            "estimated": false
+          },
+          {
+            "key": "material:H25",
+            "nazov": "H1180 DTDL 25 mm",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "PLATŇA",
+            "mnozstvo": 1,
+            "cena_mj": 179.9,
+            "spolu": 179.9,
+            "spolu_auto": 179.9,
+            "poznamka": "0,8 m² · formát 2800×2070 mm",
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "material_id": "H25",
+            "m2": 0.8,
+            "price_per_m2": 31.03864734299517,
+            "estimated": false
+          },
+          {
+            "key": "material:NOF",
+            "nazov": "K001 DTDL 18 mm",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "PLATŇA",
+            "mnozstvo": 1,
+            "cena_mj": 180.84,
+            "spolu": 180.84,
+            "spolu_auto": 180.84,
+            "poznamka": "1,53 m² · formát 2800×2070 mm · formát platne nie je v katalógu — odhad podľa 2800×2070 · vrátane 1 ks duplákov (0,48 m²)",
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "material_id": "NOF",
+            "m2": 1.53,
+            "price_per_m2": 31.2,
+            "estimated": true
+          },
+          {
+            "key": "material:NOP",
+            "nazov": "Zrkadlo SKLO 4 mm",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "PLATŇA",
+            "mnozstvo": 1,
+            "cena_mj": null,
+            "spolu": null,
+            "spolu_auto": null,
+            "poznamka": "0,12 m² · formát 2800×2070 mm · formát platne nie je v katalógu — odhad podľa 2800×2070",
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": true,
+            "material_id": "NOP",
+            "m2": 0.12,
+            "price_per_m2": null,
+            "estimated": true
+          },
+          {
+            "key": "material:SK4",
+            "nazov": "Číre SKLO 4 mm",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "PLATŇA",
+            "mnozstvo": 1,
+            "cena_mj": 240.53,
+            "spolu": 240.53,
+            "spolu_auto": 240.53,
+            "poznamka": "0,9 m² · formát 2800×2070 mm · formát platne nie je v katalógu — odhad podľa 2800×2070",
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "material_id": "SK4",
+            "m2": 0.9,
+            "price_per_m2": 41.5,
+            "estimated": true
+          },
+          {
+            "key": "material:UNI",
+            "nazov": "UNI DTDL 18 mm",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "PLATŇA",
+            "mnozstvo": 1,
+            "cena_mj": null,
+            "spolu": null,
+            "spolu_auto": null,
+            "poznamka": "0,7 m² · formát 2800×2070 mm · formát platne nie je v katalógu — odhad podľa 2800×2070 · materiál neurčený (UNI) — počet platní je orientačný",
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": true,
+            "material_id": "UNI",
+            "m2": 0.7,
+            "price_per_m2": null,
+            "estimated": true,
+            "uni": true
+          }
+        ],
+        "subtotal": 889.91,
+        "unknown_count": 2,
+        "complete": false,
+        "counts_in_total": true
+      },
+      {
+        "key": "abs",
+        "name": "ABS hrany",
+        "rows": [
+          {
+            "key": "abs:E23",
+            "nazov": "ABS H1180 23×1 mm",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "BM",
+            "mnozstvo": 44.0,
+            "cena_mj": 0.62,
+            "spolu": 27.28,
+            "spolu_auto": 27.28,
+            "poznamka": "40 bm + rezerva 10 %",
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "abs_id": "E23",
+            "bm": 40.0,
+            "reserve_pct": 10.0
+          },
+          {
+            "key": "abs:E43",
+            "nazov": "ABS H1180 43×0,8 mm",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "BM",
+            "mnozstvo": 8.8,
+            "cena_mj": 0.39,
+            "spolu": 3.43,
+            "spolu_auto": 3.43,
+            "poznamka": "8 bm + rezerva 10 %",
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "abs_id": "E43",
+            "bm": 8.0,
+            "reserve_pct": 10.0
+          }
+        ],
+        "subtotal": 30.71,
+        "unknown_count": 0,
+        "complete": true,
+        "counts_in_total": true
+      },
+      {
+        "key": "hardware",
+        "name": "Kovanie",
+        "rows": [
+
+        ],
+        "subtotal": 0,
+        "unknown_count": 0,
+        "complete": true,
+        "counts_in_total": true
+      },
+      {
+        "key": "services",
+        "name": "Služby",
+        "rows": [
+          {
+            "key": "service:olep",
+            "nazov": "Olepovanie ABS hrán",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "BM",
+            "mnozstvo": 52.8,
+            "cena_mj": 0.9,
+            "spolu": 47.52,
+            "spolu_auto": 47.52,
+            "poznamka": "bm vrátane rezervy",
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false
+          },
+          {
+            "key": "service:porez",
+            "nazov": "Porez platní",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "PLATŇA",
+            "mnozstvo": 7,
+            "cena_mj": 17.0,
+            "spolu": 119.0,
+            "spolu_auto": 119.0,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false
+          },
+          {
+            "key": "service:duplaky",
+            "nazov": "Lepenie duplákov",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "KS",
+            "mnozstvo": 1,
+            "cena_mj": 50.0,
+            "spolu": 50.0,
+            "spolu_auto": 50.0,
+            "poznamka": "1 ks zlepených dielcov",
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false
+          },
+          {
+            "key": "service:pd_opracovanie",
+            "nazov": "Opracovanie pracovnej dosky",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "FIX",
+            "mnozstvo": 0,
+            "cena_mj": 100.0,
+            "spolu": 0.0,
+            "spolu_auto": 0.0,
+            "poznamka": "zákazka neobsahuje pracovnú dosku",
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false
+          },
+          {
+            "key": "service:montaz",
+            "nazov": "Montáž",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "M2",
+            "mnozstvo": 40.6,
+            "cena_mj": 15.0,
+            "spolu": 609.0,
+            "spolu_auto": 609.0,
+            "poznamka": "7 platní × 5,8 m²",
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false
+          }
+        ],
+        "subtotal": 825.52,
+        "unknown_count": 0,
+        "complete": true,
+        "counts_in_total": true
+      },
+      {
+        "key": "standard_rows",
+        "name": "Štandardné riadky",
+        "rows": [
+          {
+            "key": "std:doprava_zakaznik",
+            "nazov": "Doprava k zákazníkovi",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "FIX",
+            "mnozstvo": 1.0,
+            "cena_mj": 60.0,
+            "spolu": 60.0,
+            "spolu_auto": 60.0,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "kind": "fixed",
+            "multiplier": 1.0,
+            "rate": 60.0
+          },
+          {
+            "key": "std:doprava_vseobecna",
+            "nazov": "Doprava všeobecná",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "FIX",
+            "mnozstvo": 1.0,
+            "cena_mj": 100.0,
+            "spolu": 100.0,
+            "spolu_auto": 100.0,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "kind": "fixed",
+            "multiplier": 1.0,
+            "rate": 100.0
+          },
+          {
+            "key": "std:balne",
+            "nazov": "Balné",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "FIX",
+            "mnozstvo": 1.0,
+            "cena_mj": 100.0,
+            "spolu": 100.0,
+            "spolu_auto": 100.0,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "kind": "fixed",
+            "multiplier": 1.0,
+            "rate": 100.0
+          },
+          {
+            "key": "std:ostatne",
+            "nazov": "Ostatné náklady",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "FIX",
+            "mnozstvo": 1.0,
+            "cena_mj": 100.0,
+            "spolu": 100.0,
+            "spolu_auto": 100.0,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "kind": "fixed",
+            "multiplier": 1.0,
+            "rate": 100.0
+          },
+          {
+            "key": "std:material_montaz",
+            "nazov": "Materiál na montáž",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "FIX",
+            "mnozstvo": 1.0,
+            "cena_mj": 100.0,
+            "spolu": 100.0,
+            "spolu_auto": 100.0,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "kind": "fixed",
+            "multiplier": 1.0,
+            "rate": 100.0
+          },
+          {
+            "key": "std:vizualizacia",
+            "nazov": "Vizualizácia + návrh",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "M2",
+            "mnozstvo": null,
+            "cena_mj": 15.0,
+            "spolu": null,
+            "spolu_auto": null,
+            "poznamka": "chýbajú m² z meračky",
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": true,
+            "kind": "per_m2",
+            "multiplier": 1.0,
+            "rate": 15.0,
+            "missing_m2": true
+          },
+          {
+            "key": "std:odvody",
+            "nazov": "Odvody",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "FIX",
+            "mnozstvo": 1.0,
+            "cena_mj": 100.0,
+            "spolu": 100.0,
+            "spolu_auto": 100.0,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "kind": "fixed",
+            "multiplier": 1.0,
+            "rate": 100.0
+          },
+          {
+            "key": "std:zameranie",
+            "nazov": "Zameranie",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "FIX",
+            "mnozstvo": 1.0,
+            "cena_mj": 100.0,
+            "spolu": 100.0,
+            "spolu_auto": 100.0,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "kind": "fixed",
+            "multiplier": 1.0,
+            "rate": 100.0
+          }
+        ],
+        "subtotal": 660.0,
+        "unknown_count": 1,
+        "complete": false,
+        "counts_in_total": true
+      },
+      {
+        "key": "custom",
+        "name": "Vlastné položky",
+        "rows": [
+
+        ],
+        "subtotal": 0,
+        "unknown_count": 0,
+        "complete": true,
+        "counts_in_total": true
+      },
+      {
+        "key": "appliances",
+        "name": "Spotrebiče a vybavenie",
+        "rows": [
+
+        ],
+        "subtotal": 0,
+        "unknown_count": 0,
+        "complete": true,
+        "counts_in_total": false,
+        "included": false
+      },
+      {
+        "key": "rounding",
+        "name": "Zaokrúhlenie ponuky",
+        "rows": [
+          {
+            "key": "rounding",
+            "nazov": "Zaokrúhlenie ponuky",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "FIX",
+            "mnozstvo": 1,
+            "cena_mj": 0.86,
+            "spolu": 0.86,
+            "spolu_auto": 0.86,
+            "poznamka": "na 1 € nahor",
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false
+          }
+        ],
+        "subtotal": 0.86,
+        "unknown_count": 0,
+        "complete": true,
+        "counts_in_total": true
+      }
+    ],
+    "totals": {
+      "raw_total": 2406.14,
+      "rounding": 0.86,
+      "rounding_step": 1.0,
+      "total": 2407.0,
+      "total_novat": 1956.91,
+      "unknown_count": 3,
+      "unknown_count_in_total": 3,
+      "complete": false,
+      "appliances_included": false,
+      "appliances_subtotal": 0.0,
+      "subtotals": {
+        "materials": 889.91,
+        "abs": 30.71,
+        "hardware": 0,
+        "services": 825.52,
+        "standard_rows": 660.0,
+        "custom": 0,
+        "appliances": 0,
+        "rounding": 0.86
+      }
+    },
+    "stale": {
+      "stale_days": 30,
+      "items": [
+        {
+          "kind": "sheet",
+          "id": "H18",
+          "label": "H1180 DTDL 18 mm",
+          "state": "stale",
+          "checked_at": "2026-08-21T12:00:00Z",
+          "age_days": 40,
+          "demos_url": "https://www.demos-trade.sk/p/h1180"
+        },
+        {
+          "kind": "edge",
+          "id": "E43",
+          "label": "ABS H1180 43×0,8 mm",
+          "state": "manual",
+          "checked_at": null,
+          "age_days": null,
+          "demos_url": null
+        },
+        {
+          "kind": "sheet",
+          "id": "H25",
+          "label": "H1180 DTDL 25 mm",
+          "state": "manual",
+          "checked_at": null,
+          "age_days": null,
+          "demos_url": null
+        },
+        {
+          "kind": "sheet",
+          "id": "NOF",
+          "label": "K001 DTDL 18 mm",
+          "state": "manual",
+          "checked_at": null,
+          "age_days": null,
+          "demos_url": null
+        },
+        {
+          "kind": "sheet",
+          "id": "NOP",
+          "label": "Zrkadlo SKLO 4 mm",
+          "state": "manual",
+          "checked_at": null,
+          "age_days": null,
+          "demos_url": null
+        },
+        {
+          "kind": "sheet",
+          "id": "SK4",
+          "label": "Číre SKLO 4 mm",
+          "state": "manual",
+          "checked_at": null,
+          "age_days": null,
+          "demos_url": null
+        },
+        {
+          "kind": "sheet",
+          "id": "UNI",
+          "label": "UNI DTDL 18 mm",
+          "state": "manual",
+          "checked_at": null,
+          "age_days": null,
+          "demos_url": null
+        }
+      ],
+      "counts": {
+        "stale": 1,
+        "unverified": 0,
+        "manual": 6,
+        "fresh": 1,
+        "manual_hardware": 0,
+        "attention": 1
+      }
+    },
+    "settings": {
+      "supplier_id": "default",
+      "supplier_name": "Noxun",
+      "rounding_step": 1.0,
+      "abs_reserve_pct": 10.0,
+      "stale_days": 30,
+      "montaz_m2_per_plate": 5.8,
+      "cp_highlight_threshold": 150.0
+    },
+    "viz_m2": null,
+    "appliances_included": false,
+    "plan_prices": false,
+    "appliance_types": [
+      {
+        "code": "fridge",
+        "label": "Chladnička"
+      },
+      {
+        "code": "oven",
+        "label": "Rúra"
+      },
+      {
+        "code": "microwave",
+        "label": "Mikrovlnka"
+      },
+      {
+        "code": "dishwasher",
+        "label": "Umývačka"
+      },
+      {
+        "code": "hob",
+        "label": "Varná doska"
+      },
+      {
+        "code": "sink",
+        "label": "Drez"
+      },
+      {
+        "code": "hood",
+        "label": "Digestor"
+      },
+      {
+        "code": "other",
+        "label": "Iné"
+      }
+    ],
+    "budget_std": {
+      "state": "current",
+      "blocked": false,
+      "reason": ""
+    },
+    "budget_check": [
+      {
+        "severity": "orange",
+        "category": "budget",
+        "stable_key": "budget|section:materials|incomplete",
+        "section": "materials",
+        "row_key": null,
+        "message": "Materiál: 2 riadky bez ceny — medzisúčet je neúplný."
+      },
+      {
+        "severity": "orange",
+        "category": "budget",
+        "stable_key": "budget|std:vizualizacia|missing_m2",
+        "section": "standard_rows",
+        "row_key": "std:vizualizacia",
+        "message": "Riadok „Vizualizácia + návrh“ nemá zadané m² — suma sa nedá vypočítať."
+      },
+      {
+        "severity": "orange",
+        "category": "budget",
+        "stable_key": "budget|section:standard_rows|incomplete",
+        "section": "standard_rows",
+        "row_key": null,
+        "message": "Štandardné riadky: 1 riadok bez ceny — medzisúčet je neúplný."
+      }
+    ],
+    "cp_preview": {
+      "rows": [
+        {
+          "key": "cp:assembly",
+          "polozka": "Nábytková zostava – plošný a doplnkový materiál",
+          "cena": 348.09,
+          "mnozstvo": 1,
+          "mj": "set",
+          "kind": "assembly"
+        },
+        {
+          "key": "cp:item:material:H18",
+          "polozka": "H1180 DTDL 18 mm",
+          "cena": 288.64,
+          "mnozstvo": 1,
+          "mj": "set",
+          "kind": "item",
+          "source_key": "material:H18",
+          "suggested": true
+        },
+        {
+          "key": "cp:item:material:SK4",
+          "polozka": "Číre SKLO 4 mm",
+          "cena": 240.53,
+          "mnozstvo": 1,
+          "mj": "set",
+          "kind": "item",
+          "source_key": "material:SK4",
+          "suggested": true
+        },
+        {
+          "key": "cp:item:material:NOF",
+          "polozka": "K001 DTDL 18 mm",
+          "cena": 180.84,
+          "mnozstvo": 1,
+          "mj": "set",
+          "kind": "item",
+          "source_key": "material:NOF",
+          "suggested": true
+        },
+        {
+          "key": "cp:item:material:H25",
+          "polozka": "H1180 DTDL 25 mm",
+          "cena": 179.9,
+          "mnozstvo": 1,
+          "mj": "set",
+          "kind": "item",
+          "source_key": "material:H25",
+          "suggested": true
+        },
+        {
+          "key": "cp:zameranie",
+          "polozka": "Zameranie",
+          "cena": 0.0,
+          "mnozstvo": 1,
+          "mj": "set",
+          "kind": "fixed"
+        },
+        {
+          "key": "cp:vizualizacie",
+          "polozka": "Vizualizácie a príprava dokumentácie",
+          "cena": 0.0,
+          "mnozstvo": 1,
+          "mj": "set",
+          "kind": "fixed"
+        },
+        {
+          "key": "cp:montaz",
+          "polozka": "Montáž a výroba",
+          "cena": 609.0,
+          "mnozstvo": 1,
+          "mj": "set",
+          "kind": "fixed"
+        },
+        {
+          "key": "cp:rezia",
+          "polozka": "Prípravné a prevádzkové náklady a kompletačné položky",
+          "cena": 400.0,
+          "mnozstvo": 1,
+          "mj": "set",
+          "kind": "fixed"
+        },
+        {
+          "key": "cp:doprava",
+          "polozka": "Doprava",
+          "cena": 160.0,
+          "mnozstvo": 1,
+          "mj": "závoz",
+          "kind": "fixed"
+        }
+      ],
+      "total": 2407.0,
+      "total_label": "SPOLU",
+      "budget_total": 2407.0,
+      "diff": 0.0,
+      "consistent": true,
+      "assembly": 348.09,
+      "assembly_negative": false,
+      "unknown_count": 3,
+      "complete": false,
+      "threshold": 150.0,
+      "candidates": [
+        {
+          "source_key": "material:H18",
+          "section": "materials",
+          "label": "H1180 DTDL 18 mm",
+          "amount": 288.64,
+          "mnozstvo": 1,
+          "mj": "set",
+          "state": "samostatne",
+          "suggested": true,
+          "overridden": false
+        },
+        {
+          "source_key": "material:SK4",
+          "section": "materials",
+          "label": "Číre SKLO 4 mm",
+          "amount": 240.53,
+          "mnozstvo": 1,
+          "mj": "set",
+          "state": "samostatne",
+          "suggested": true,
+          "overridden": false
+        },
+        {
+          "source_key": "material:NOF",
+          "section": "materials",
+          "label": "K001 DTDL 18 mm",
+          "amount": 180.84,
+          "mnozstvo": 1,
+          "mj": "set",
+          "state": "samostatne",
+          "suggested": true,
+          "overridden": false
+        },
+        {
+          "source_key": "material:H25",
+          "section": "materials",
+          "label": "H1180 DTDL 25 mm",
+          "amount": 179.9,
+          "mnozstvo": 1,
+          "mj": "set",
+          "state": "samostatne",
+          "suggested": true,
+          "overridden": false
+        }
+      ],
+      "separate_count": 4,
+      "rezia_text": "Táto položka zahŕňa všetky nevyhnutné náklady súvisiace s realizáciou interiéru, vrátane prípravných prác, spotrebného a pomocného materiálu, logistiky, konzultácií, poradenstva, administratívnych prác a ostatných prevádzkových výdavkov potrebných na zabezpečenie kvalitnej a bezproblémovej realizácie projektu."
+    }
+  },
+  "budget_xlsx": {
+    "name": "Cenová ponuka",
+    "cols": [
+      {
+        "min": 1,
+        "max": 1,
+        "width": 2.5
+      },
+      {
+        "min": 2,
+        "max": 2,
+        "width": 52.0
+      },
+      {
+        "min": 3,
+        "max": 3,
+        "width": 14.0
+      },
+      {
+        "min": 4,
+        "max": 4,
+        "width": 9.0
+      },
+      {
+        "min": 5,
+        "max": 5,
+        "width": 10.0
+      },
+      {
+        "min": 6,
+        "max": 6,
+        "width": 16.0
+      },
+      {
+        "min": 7,
+        "max": 7,
+        "width": 14.0
+      }
+    ],
+    "merges": [
+      "B1:G1"
+    ],
+    "rows": [
+      [
+        null,
+        {
+          "v": "Rozpočet GoldenB - AKT. 30.9. 2026",
+          "s": 1,
+          "n": false
+        }
+      ],
+      [
+        null,
+        {
+          "v": "MATERIÁL",
+          "s": 2,
+          "n": false
+        },
+        {
+          "v": "KÓD",
+          "s": 2,
+          "n": false
+        },
+        {
+          "v": "MJ",
+          "s": 2,
+          "n": false
+        },
+        {
+          "v": "POČET",
+          "s": 2,
+          "n": false
+        },
+        {
+          "v": "CENA za 1 MJ (€)",
+          "s": 2,
+          "n": false
+        },
+        {
+          "v": "SPOLU (€)",
+          "s": 2,
+          "n": false
+        }
+      ],
+      [
+        null,
+        {
+          "v": "MATERIÁL",
+          "s": 6,
+          "n": false
+        }
+      ],
+      [
+        null,
+        {
+          "v": "H1180 DTDL 18 mm · 8,96 m² · formát 2800×2070 mm",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "PLATŇA",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 2.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 144.32,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 288.64,
+          "s": 3,
+          "n": true
+        }
+      ],
+      [
+        null,
+        {
+          "v": "H1180 DTDL 25 mm · 0,8 m² · formát 2800×2070 mm",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "PLATŇA",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 1.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 179.9,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 179.9,
+          "s": 3,
+          "n": true
+        }
+      ],
+      [
+        null,
+        {
+          "v": "K001 DTDL 18 mm · 1,53 m² · formát 2800×2070 mm · formát platne nie je v katalógu — odhad podľa 2800×2070 · vrátane 1 ks duplákov (0,48 m²)",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "PLATŇA",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 1.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 180.84,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 180.84,
+          "s": 3,
+          "n": true
+        }
+      ],
+      [
+        null,
+        {
+          "v": "Zrkadlo SKLO 4 mm · 0,12 m² · formát 2800×2070 mm · formát platne nie je v katalógu — odhad podľa 2800×2070",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "PLATŇA",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 1.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": "nezadaná",
+          "s": 0,
+          "n": false
+        },
+        null
+      ],
+      [
+        null,
+        {
+          "v": "Číre SKLO 4 mm · 0,9 m² · formát 2800×2070 mm · formát platne nie je v katalógu — odhad podľa 2800×2070",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "PLATŇA",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 1.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 240.53,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 240.53,
+          "s": 3,
+          "n": true
+        }
+      ],
+      [
+        null,
+        {
+          "v": "UNI DTDL 18 mm · 0,7 m² · formát 2800×2070 mm · formát platne nie je v katalógu — odhad podľa 2800×2070 · materiál neurčený (UNI) — počet platní je orientačný",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "PLATŇA",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 1.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": "nezadaná",
+          "s": 0,
+          "n": false
+        },
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null,
+        null,
+        {
+          "v": "Medzisúčet Materiál (€):",
+          "s": 5,
+          "n": false
+        },
+        {
+          "v": 889.91,
+          "s": 4,
+          "n": true
+        }
+      ],
+      [
+        null,
+        {
+          "v": "ABS HRANY",
+          "s": 6,
+          "n": false
+        }
+      ],
+      [
+        null,
+        {
+          "v": "ABS H1180 23×1 mm · 40 bm + rezerva 10 %",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "BM",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 44.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 0.62,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 27.28,
+          "s": 3,
+          "n": true
+        }
+      ],
+      [
+        null,
+        {
+          "v": "ABS H1180 43×0,8 mm · 8 bm + rezerva 10 %",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "BM",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 8.8,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 0.39,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 3.43,
+          "s": 3,
+          "n": true
+        }
+      ],
+      [
+        null,
+        null,
+        null,
+        null,
+        null,
+        {
+          "v": "Medzisúčet ABS hrany (€):",
+          "s": 5,
+          "n": false
+        },
+        {
+          "v": 30.71,
+          "s": 4,
+          "n": true
+        }
+      ],
+      [
+        null,
+        {
+          "v": "SLUŽBY",
+          "s": 6,
+          "n": false
+        }
+      ],
+      [
+        null,
+        {
+          "v": "Olepovanie ABS hrán · bm vrátane rezervy",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "BM",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 52.8,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 0.9,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 47.52,
+          "s": 3,
+          "n": true
+        }
+      ],
+      [
+        null,
+        {
+          "v": "Porez platní",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "PLATŇA",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 7.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 17.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 119.0,
+          "s": 3,
+          "n": true
+        }
+      ],
+      [
+        null,
+        {
+          "v": "Lepenie duplákov · 1 ks zlepených dielcov",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "KS",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 1.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 50.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 50.0,
+          "s": 3,
+          "n": true
+        }
+      ],
+      [
+        null,
+        {
+          "v": "Opracovanie pracovnej dosky · zákazka neobsahuje pracovnú dosku",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "FIX",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 0.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 100.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 0.0,
+          "s": 3,
+          "n": true
+        }
+      ],
+      [
+        null,
+        {
+          "v": "Montáž · 7 platní × 5,8 m²",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "M2",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 40.6,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 15.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 609.0,
+          "s": 3,
+          "n": true
+        }
+      ],
+      [
+        null,
+        null,
+        null,
+        null,
+        null,
+        {
+          "v": "Medzisúčet Služby (€):",
+          "s": 5,
+          "n": false
+        },
+        {
+          "v": 825.52,
+          "s": 4,
+          "n": true
+        }
+      ],
+      [
+        null,
+        {
+          "v": "ŠTANDARDNÉ RIADKY",
+          "s": 6,
+          "n": false
+        }
+      ],
+      [
+        null,
+        {
+          "v": "Doprava k zákazníkovi",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "FIX",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 1.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 60.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 60.0,
+          "s": 3,
+          "n": true
+        }
+      ],
+      [
+        null,
+        {
+          "v": "Doprava všeobecná",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "FIX",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 1.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 100.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 100.0,
+          "s": 3,
+          "n": true
+        }
+      ],
+      [
+        null,
+        {
+          "v": "Balné",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "FIX",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 1.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 100.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 100.0,
+          "s": 3,
+          "n": true
+        }
+      ],
+      [
+        null,
+        {
+          "v": "Ostatné náklady",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "FIX",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 1.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 100.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 100.0,
+          "s": 3,
+          "n": true
+        }
+      ],
+      [
+        null,
+        {
+          "v": "Materiál na montáž",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "FIX",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 1.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 100.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 100.0,
+          "s": 3,
+          "n": true
+        }
+      ],
+      [
+        null,
+        {
+          "v": "Vizualizácia + návrh · chýbajú m² z meračky",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "M2",
+          "s": 0,
+          "n": false
+        },
+        null,
+        {
+          "v": 15.0,
+          "s": 3,
+          "n": true
+        },
+        null
+      ],
+      [
+        null,
+        {
+          "v": "Odvody",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "FIX",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 1.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 100.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 100.0,
+          "s": 3,
+          "n": true
+        }
+      ],
+      [
+        null,
+        {
+          "v": "Zameranie",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "FIX",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 1.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 100.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 100.0,
+          "s": 3,
+          "n": true
+        }
+      ],
+      [
+        null,
+        null,
+        null,
+        null,
+        null,
+        {
+          "v": "Medzisúčet Štandardné riadky (€):",
+          "s": 5,
+          "n": false
+        },
+        {
+          "v": 660.0,
+          "s": 4,
+          "n": true
+        }
+      ],
+      [
+        null,
+        {
+          "v": "Zaokrúhlenie ponuky · na 1 € nahor",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": "FIX",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 1.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 0.86,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 0.86,
+          "s": 3,
+          "n": true
+        }
+      ],
+      [
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null,
+        null,
+        {
+          "v": "SPOLU CELKOM (€):",
+          "s": 5,
+          "n": false
+        },
+        {
+          "v": 2407.0,
+          "s": 4,
+          "n": true
+        }
+      ],
+      [
+        null,
+        {
+          "v": "Pozor: 3 riadkov bez ceny sa do súčtu nezapočítalo — doplň ceny v tabe Rozpočet.",
+          "s": 5,
+          "n": false
+        }
+      ]
+    ]
+  },
+  "cp_price_sheet": {
+    "name": "Cenová ponuka",
+    "cols": [
+      {
+        "min": 1,
+        "max": 1,
+        "width": 52.0
+      },
+      {
+        "min": 2,
+        "max": 2,
+        "width": 14.0
+      },
+      {
+        "min": 3,
+        "max": 3,
+        "width": 11.0
+      },
+      {
+        "min": 4,
+        "max": 4,
+        "width": 9.0
+      }
+    ],
+    "merges": [
+      "A1:D1"
+    ],
+    "rows": [
+      [
+        {
+          "v": "CENOVÁ PONUKA GoldenB - AKT. 30.9.2026",
+          "s": 1,
+          "n": false
+        }
+      ],
+      [
+        {
+          "v": "POLOŽKA",
+          "s": 2,
+          "n": false
+        },
+        {
+          "v": "CENA (€)",
+          "s": 2,
+          "n": false
+        },
+        {
+          "v": "MNOŽSTVO",
+          "s": 2,
+          "n": false
+        },
+        {
+          "v": "MJ",
+          "s": 2,
+          "n": false
+        }
+      ],
+      [
+        {
+          "v": "Nábytková zostava – plošný a doplnkový materiál",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 348.09,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 1.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": "set",
+          "s": 0,
+          "n": false
+        }
+      ],
+      [
+        {
+          "v": "H1180 DTDL 18 mm",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 288.64,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 1.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": "set",
+          "s": 0,
+          "n": false
+        }
+      ],
+      [
+        {
+          "v": "Číre SKLO 4 mm",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 240.53,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 1.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": "set",
+          "s": 0,
+          "n": false
+        }
+      ],
+      [
+        {
+          "v": "K001 DTDL 18 mm",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 180.84,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 1.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": "set",
+          "s": 0,
+          "n": false
+        }
+      ],
+      [
+        {
+          "v": "H1180 DTDL 25 mm",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 179.9,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 1.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": "set",
+          "s": 0,
+          "n": false
+        }
+      ],
+      [
+        {
+          "v": "Zameranie",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 0.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 1.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": "set",
+          "s": 0,
+          "n": false
+        }
+      ],
+      [
+        {
+          "v": "Vizualizácie a príprava dokumentácie",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 0.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 1.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": "set",
+          "s": 0,
+          "n": false
+        }
+      ],
+      [
+        {
+          "v": "Montáž a výroba",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 609.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 1.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": "set",
+          "s": 0,
+          "n": false
+        }
+      ],
+      [
+        {
+          "v": "Prípravné a prevádzkové náklady a kompletačné položky",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 400.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 1.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": "set",
+          "s": 0,
+          "n": false
+        }
+      ],
+      [
+        {
+          "v": "Doprava",
+          "s": 0,
+          "n": false
+        },
+        {
+          "v": 160.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": 1.0,
+          "s": 3,
+          "n": true
+        },
+        {
+          "v": "závoz",
+          "s": 0,
+          "n": false
+        }
+      ],
+      [
+        {
+          "v": "SPOLU",
+          "s": 5,
+          "n": false
+        },
+        {
+          "v": 2407.0,
+          "s": 4,
+          "n": true
+        }
+      ],
+      [
+
+      ],
+      [
+        {
+          "v": "Prípravné a prevádzkové náklady a kompletačné položky",
+          "s": 5,
+          "n": false
+        }
+      ],
+      [
+        {
+          "v": "Táto položka zahŕňa všetky nevyhnutné náklady súvisiace s realizáciou interiéru, vrátane prípravných prác, spotrebného a pomocného materiálu, logistiky, konzultácií, poradenstva, administratívnych prác a ostatných prevádzkových výdavkov potrebných na zabezpečenie kvalitnej a bezproblémovej realizácie projektu.",
+          "s": 0,
+          "n": false
+        }
+      ]
+    ]
+  }
+}
