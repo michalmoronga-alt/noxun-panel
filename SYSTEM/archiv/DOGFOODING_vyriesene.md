@@ -4,7 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
-- **D-148** — Formulár ceruzky pri Demos položke ruší dátum overenia pri zmene ceny, kódu, dodávateľa alebo formátu (ako bunka a editor „Upraviť…"); ručne prepísaná Demos cena už neostáva „overená" a „Prepočítať ceny" ju overí znova — 30.9.2026, PR #?, v0.16.2
+- **D-148** — Formulár ceruzky pri Demos položke ruší dátum overenia pri zmene ceny, kódu, dodávateľa alebo formátu (ako bunka a editor „Upraviť…"); ručne prepísaná Demos cena už neostáva „overená" a „Prepočítať ceny" ju overí znova — 30.9.2026, PR #427, v0.16.2
 - **D-144** — Vložený chrbát a chrbát v drážke pri stropu „Dve výstuhy" na výšku končí pod výstuhami — v modeli aj do nárezu (dolná 720 / sokel 100 / výstuhy 100 → 564 × 502, do nárezu 600 × 538); skrinky postavené pred opravou sú zastarané (Kontrola RED, výrobné exporty stoja, hromadná prestavba) — 27.9.2026, PR #402, v0.13.2
 - **D-143** — Chrbát v drážke ide do nárezu, VEPO aj ceny v plnom rozmere skrinky (horná 600 × 720 → 600 × 720, model ďalej 564 × 684); karta dielca „Do nárezu"; olepený chrbát v drážke, poškodený údaj aj zastarané skrinky (schéma < 19) zastavia všetky štyri výrobné exporty; hromadná prestavba z Kontroly — 27.9.2026, PR #401, v0.13.1
 - **D-140** — Výška osadenia chladničky v skrinke: čip „osadenie N mm" v riadku Spotrebič otvorí malé okienko s číslom (od hornej plochy dna, napr. vrch police); box niky aj pásma dverí sa posunú a Kontrola výšky aj delenia čiel počíta od zdvihnutého dna — 24.9.2026, PR #389, v0.12.20
@@ -135,7 +135,7 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ### D-148 — Formulár ceruzky pri Demos položke nerušil dátum overenia, vyriešené 30.9.2026
 
-**Výsledok: PR #?, v0.16.2, blok CENY dávka CENY-M1b (požiadavka R13b package CENY-M1).** Pôvodné znenie (sonda pred auditom package CENY-M1,
+**Výsledok: PR #427, v0.16.2, blok CENY dávka CENY-M1b (požiadavka R13b package CENY-M1).** Pôvodné znenie (sonda pred auditom package CENY-M1,
 S9/T9h a T9j, nález F1 — 30.9.2026): formulár ceruzky pri **Demos** položke **nerušil dátum overenia** (`price_checked_at`) pri zmene **ceny, kódu,
 dodávateľa ani formátu** — ručne prepísaná Demos cena tak ostávala „overená" a Rozpočet ju bral ako čerstvú, hoci ju nikto neporovnal so stránkou
 Demosu. Bunka aj editor „Upraviť…" dátum pri zmene ceny, kódu a dodávateľa rušili už predtým; formulár ho rušil len pri zmene Demos URL

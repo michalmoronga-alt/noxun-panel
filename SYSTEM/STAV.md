@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.16.2 · 30.9.2026 — BLOK CENY BEŽÍ, dávka CENY-M1b** (ručné overenie ceny, PR #?). **Štúdio → Materiály:** doska a ABS páska **bez Demosu** má
+**v0.16.2 · 30.9.2026 — BLOK CENY BEŽÍ, dávka CENY-M1b** (ručné overenie ceny, PR #427). **Štúdio → Materiály:** doska a ABS páska **bez Demosu** má
 okrem ikony odkazu (M1a, #426) ikonu **„Overiť cenu"** (sivá = čerstvo overená, jantárová = na kontrolu; dátum a vek v tooltipe). Klik otvorí obchod
 (ak je odkaz) a formulár — doska **za platňu** s prepočtom na €/m² (sklo bez formátu za m²), ABS za bm; **„Potvrdiť cenu k dnešku"** zapíše dátum, nezmenená
 cena ostane presne tá istá. Zmena ceny, kódu, dodávateľa, odkazu alebo formátu overenie zruší; Demos má prednosť. €/m² sa ukazuje na 2 desatinné. Rozpočet sa nemení (CENY-M2).
@@ -28,7 +28,7 @@ v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a
 **Aktualizovať obe PC (aj Luciino) na 0.16.2 pred prvým ručným overením — starší plugin katalóg materiálov potom len číta** (rohovú nepozná, šablóny STD 7 len
 číta, rozpočet `BUDGET_STD` 3 needituje; katalóg je na každom PC zvlášť — riziko pri prenose `materials.json` alebo pri staršom SketchUpe na tom istom PC).
 
-**Testy (CENY-M1b, PR #?):** **4893 headless · 144 JS sád** zelené; mutácie M9–M21, M23, M24 zabité; in-SU nie je brána (package §8).
+**Testy (CENY-M1b, PR #427):** **4893 headless · 144 JS sád** zelené; mutácie M9–M21, M23, M24 zabité; in-SU nie je brána (package §8).
 **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 
 ## Robí sa
@@ -46,7 +46,7 @@ v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a
 
 ## Posledné uzávery
 
-- **CENY-M1b · ručné overenie ceny** (**v0.16.2**, 30.9.2026, PR #?) — ikona a formulár „Overiť cenu", zneplatnenie, Demos prednosť, D-148, schéma 12.
+- **CENY-M1b · ručné overenie ceny** (**v0.16.2**, 30.9.2026, PR #427) — ikona a formulár „Overiť cenu", zneplatnenie, Demos prednosť, D-148, schéma 12.
 - **CENY-M1a · odkaz na produkt** (**v0.16.1**, 30.9.2026, PR #426) — ikona a pole odkazu, pevný slot ikon, katalóg v schéme 11 ([archiv/KRONIKA.md](archiv/KRONIKA.md)).
 - **BLOK 2 · KONTROLA + VÝROBA UZAVRETÝ** (**v0.16.0**, 29.9.2026; nárezový plán: štart #417, PR #418–#421 + uzáver PR #422; **smoke PASS 29.9.**, PR #423).
   Nárezový plán v Štúdiu, nastavenia prerezu/orezu/prídavku, Kontrola s orezom, ceny podľa plánu; priečinok bloku v [archiv/bloky/NAREZ/](archiv/bloky/NAREZ/).

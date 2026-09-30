@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **CENY-M1b — ručné overenie ceny dosky a ABS bez Demosu (30.9.2026, PR #?, v0.16.1 → v0.16.2).** Druhá kódová dávka bloku CENY podľa package
+- **CENY-M1b — ručné overenie ceny dosky a ABS bez Demosu (30.9.2026, PR #427, v0.16.1 → v0.16.2).** Druhá kódová dávka bloku CENY podľa package
   [PACKAGE_CENY_M1.md](../zdroje/bloky/CENY/PACKAGE_CENY_M1.md) (požiadavky **[B]**; audit Codex gpt-6-astra — BLOCKER R11a „bez zmeny = presná zhoda
   so zobrazenou hodnotou, nie interval ±0,005" a FIX R20b; delta audit Codex gpt-5.6-sol
   [AUDIT2_CENY_M1_2026-09-30.md](../zdroje/bloky/CENY/AUDIT2_CENY_M1_2026-09-30.md) — celočíselné centy len pre platňu a €/m², €/bm presne,
