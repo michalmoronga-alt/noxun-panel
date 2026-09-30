@@ -243,6 +243,28 @@ function click(html){ dispatch(btn(html), 'click'); }
   eq(GOTO, [], 'read-only sa neprepina');
 })();
 
+// Predrecenzia P3: ochranne vetvy `mdBudgetAction` — cudzi druh, prazdne id
+// a neznamy zdroj sa NEODOSLU a nic neprepnu (ani formular, ani sekciu).
+(function(){
+  reset();
+  [
+    '<button type="button" data-action="mat-link" data-src="product" data-kind="hardware" data-id="K1">x</button>',
+    '<button type="button" data-action="mat-link" data-src="product" data-kind="" data-id="S25">x</button>',
+    '<button type="button" data-action="mat-link" data-src="product" data-kind="sheet" data-id="">x</button>',
+    '<button type="button" data-action="mat-link" data-src="product" data-kind="sheet">x</button>',
+    '<button type="button" data-action="mat-link" data-src="iny" data-kind="sheet" data-id="S25">x</button>',
+    '<button type="button" data-action="mat-link" data-kind="sheet" data-id="S25">x</button>',
+    '<button type="button" data-action="mat-manual-check" data-kind="edgeX" data-id="E43">x</button>',
+    '<button type="button" data-action="mat-manual-check" data-kind="sheet" data-id="">x</button>',
+    '<button type="button" data-action="mat-iny" data-kind="sheet" data-id="S25">x</button>'
+  ].forEach(function(html){
+    click(html);
+    eq(SENT, [], 'nic sa neodoslalo: ' + html);
+    eq(GOTO, [], 'sekcia sa neprepla: ' + html);
+    ok(!NXModal.isOpen(), 'formular sa neotvoril: ' + html);
+  });
+})();
+
 // R18: „Overiť cenu" z Rozpoctu
 function snap(req, item, more){
   return Object.assign({}, req, { item: item, row_rev: item.row_rev, has_url: item.product_link === true,
