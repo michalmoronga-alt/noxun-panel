@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **DOCS — R-13 → R-37 → R-35 po V1 (30.9.2026, PR #?, len dokumentácia; verzia pluginu sa nemení).** Michal 30.9. ráno po uzávere bloku CENY
+- **DOCS — R-13 → R-37 → R-35 po V1 (30.9.2026, PR #430, len dokumentácia; verzia pluginu sa nemení).** Michal 30.9. ráno po uzávere bloku CENY
   (v0.17.0, všetkých 7 bodov [V1_VIZIA.md](../V1_VIZIA.md) odškrtnutých) rozhodol: hardeningové body z registra auditu **R-13 → R-37 → R-35 zapísať ako po V1**
   (poradie ostáva). Presunuté v [PLAN.md](../PLAN.md) z bloku 4 do „Po V1 — zásobník", v [AUDIT_REGISTER.md](../AUDIT_REGISTER.md) (tabuľka „Stav po previerke
   29.9.2026" a riadky pri R-37/R-35) a vo V1_VIZIA bod 6. **STAV pri najbližšej kódovej dávke:** veta „pred V1 R-13 → R-37 → R-35" → po V1; dokumentačné
