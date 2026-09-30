@@ -19,13 +19,14 @@
 
 **Kritérium „pred V1"** (pravidlo bloku 1d, spresnené pri previerke): výrobné alebo cenové riziko · **tichá strata uložených dát používateľa pri bežnej
 práci** · pri **poškodenom súbore** len tichá strata, ktorá **mení výrobné alebo cenové čísla** (rozmery, počty, ceny, sadzby, prerez/orez) · blokovanie
-V1 rozsahu. Hlásená strata neuložených hodnôt, hygiena, texty, refaktor a veci len pre macOS = po V1. **O zaradení pred V1 rozhoduje Michal.**
+V1 rozsahu. Hlásená strata neuložených hodnôt, hygiena, texty, refaktor a veci len pre macOS = po V1. **O zaradení pred V1 rozhoduje Michal** —
+30.9.2026 ráno zaradil R-13, R-37 a R-35 **po V1** (pred V1 z registra neostáva nič).
 
 | R | Verdikt | Pred/po V1 | Veľk. | Funkčný dopad |
 |---|---|---|---|---|
-| R-37 | platí, zúžené na `supplier_settings` | **PRED V1 — Michal 30.9.2026** | S | poškodený, ale platný súbor nastavení dodávateľa sa ticho nahradí predvolenými sadzbami a prerezom/orezom a zničí dobrú zálohu |
-| R-35 | platí | **PRED V1 — Michal 30.9.2026** (tichá strata pri dvoch oknách SketchUpu) | S/M | prvá zmena globálnych pravidiel kovania alebo rozmerových radov sa pri dvoch otvorených oknách ticho stratí |
-| R-13 | platí | **PRED V1 — rozhodnutie Michala 29.9.** | S | dielec z inej verzie štandardu Kontrola neoznačí |
+| R-37 | platí, zúžené na `supplier_settings` | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** (prvá v poradí po R-13) | S | poškodený, ale platný súbor nastavení dodávateľa sa ticho nahradí predvolenými sadzbami a prerezom/orezom a zničí dobrú zálohu |
+| R-35 | platí | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** (tichá strata pri dvoch oknách SketchUpu; po R-37) | S/M | prvá zmena globálnych pravidiel kovania alebo rozmerových radov sa pri dvoch otvorených oknách ticho stratí |
+| R-13 | platí | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** (čítať — rozhodnuté 29.9.; prvá v poradí) | S | dielec z inej verzie štandardu Kontrola neoznačí |
 | R-38 | platí | hraničné (len pri poškodenom súbore; stratí názvy zákaziek a prepínač zlúčenia 18/36 vo VEPO exporte — mení pomenovanie a členenie výstupu, nie rozmery, počty ani ceny) | S | poškodený súbor VEPO nastavení (názvy zákaziek, zlúčenie 18/36) sa môže ticho prepísať staršou zálohou |
 | R-18 | platí | po V1 (hlásená strata neuložených hodnôt — ⋯ editor sa zavrie ako uložený, zlyhaný zápis ohlási červený status) | S | pri súbehu úpravy bunky a ⋯ editora v Rozpočte sa rozpísané hodnoty môžu stratiť |
 | R-16 | platí | hraničné (XLSX má kód a dodávateľa) | M | dva rovnaké dekory od dvoch výrobcov majú v rozpočte rovnaký názov riadku |
@@ -330,7 +331,7 @@ SEED, `merge_seed` označí dokument za zmenený a `load` ho AUTO-ZAPÍŠE — a
 prepisovať seedom — má sa priznať ako poškodený, vzor `assess_library_doc`); alternatíva je nezapisovať `.bak` pri zápise, ktorý
 vznikol iba z normalizácie. Samostatná dávka. **Odhad: S/M.**
 **Previerka 29.9.: PLATÍ, zúžené — odporúčanie PRED V1** (tichá strata dát pri poškodenom súbore, ktorá mení ceny aj prerez/orez).
-**ROZHODNUTÉ (Michal 30.9.2026): PRED V1** — samostatná dávka po R-13 (poradie: [PLAN.md](PLAN.md), blok 4 „Poradie pred uzáverom V1"). Týka sa hlavne
+**ROZHODNUTÉ (Michal 30.9.2026): ~~PRED V1~~ → PO V1 (30.9. ráno)** — samostatná dávka po R-13 (poradie: [PLAN.md](PLAN.md), „Po V1 — zásobník"). Týka sa hlavne
 `supplier_settings` (prázdny `{}`/`[]` → seed → auto-zápis); `abs_rules`, `hardware_rules` a `dim_series` pri načítaní nezapisujú.
 
 ## Os VÝSTUPY — production_core · rozpočet · ponuka (pred D-95/KONTROLA+VÝROBA)
@@ -492,7 +493,7 @@ pred preplietaním so seed-merge cestou), ale dve súbežne otvorené okná sa n
 sekcie → klient ju posiela späť → porovnanie POD zámkom → `:conflict` a načítanie formulára nanovo. Pri rozmerových
 radoch je alternatíva zápis PO KĽÚČOCH (rad je nezávislý per rozmer), ktorý revíziu nepotrebuje. **Odhad: S/M.**
 **Previerka 29.9.: PLATÍ — PRED V1** podľa kritéria (tichá strata uložených dát; pravidlá kovania menia nákup).
-**ROZHODNUTÉ (Michal 30.9.2026): PRED V1** — samostatná dávka po R-37 (poradie: [PLAN.md](PLAN.md), blok 4 „Poradie pred uzáverom V1").
+**ROZHODNUTÉ (Michal 30.9.2026): ~~PRED V1~~ → PO V1 (30.9. ráno)** — samostatná dávka po R-37 (poradie: [PLAN.md](PLAN.md), „Po V1 — zásobník").
 
 ### R-36 · P3 (macOS) · core · `core/scale_observer.rb` — `onEraseEntity` · `notify_erase`
 Zvyšok po R-01: pri `onEraseEntity` je entita **už neplatná**, takže jej dokument sa nedá zistiť. Taká požiadavka ide

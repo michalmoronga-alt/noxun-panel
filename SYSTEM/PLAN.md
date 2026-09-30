@@ -227,10 +227,8 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   a ručné overenie ceny dosky/ABS bez Demosu v Štúdiu aj v Rozpočte, materiál bez formátu v Rozpočte podľa skutočných m² (C12 + C14). Štart PR #425, dávky
   CENY-M1a #426 · CENY-M1b #427 · CENY-M2 #428 + uzáver PR #429; plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), výsledok
   a smoke checklist v [archiv/CENY_ZAVER_2026-09-30.md](archiv/CENY_ZAVER_2026-09-30.md), priečinok bloku v [archiv/bloky/CENY/](archiv/bloky/CENY/).
-- **Poradie pred uzáverom V1 (Michal 29.–30.9.2026; blok CENY je hotový — v0.17.0):** **R-13** (čítať `std` na entite, ORANGE „dielec z inej verzie
-  štandardu") → **R-37** (ochrana nastavení dodávateľa pred tichým prepísaním seedom) → **R-35** (dve okná SketchUpu si neprepíšu pravidlá kovania
-  a rozmerové rady) — plné znenia a verdikty v [AUDIT_REGISTER.md](AUDIT_REGISTER.md) (sekcia „Stav po previerke 29.9.2026"). **Test na kompletnej
-  reálnej zákazke až po V1** (Michal 29.9.: teraz nemá vhodnú zákazku); po dobehnutí týchto bodov Michal určí ďalší postup.
+- **V1 rozsah bloku 4 je prázdny (Michal 30.9.2026 ráno):** hardeningové body **R-13 → R-37 → R-35** sú **po V1** (zásobník nižšie, poradie ostáva);
+  **test na kompletnej reálnej zákazke** je akceptačný test po V1. Ďalšie pokračovanie po smoke bloku CENY určí Michal.
   **CENY-KOV-A/B je hotové** (10.9.2026, PR #345/#346, v0.10.4–v0.10.5): jeden produktový odkaz a ručné potvrdenie katalógového kovania; plný schválený rozsah v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).
   Pôvodná debata: [zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md). Prepínač „na faktúru“ je vyradený (existuje s DPH / bez DPH); DOCX/PDF ponuka a rodina dokumentov sú mimo V1.
 - ✅ **D-128 · Ručná výška dreveného boxu zásuvky (Quadro)** — tretia os zámku (`box_height`) popri NL a výškovom variante Atiry: chip „box 360" s malým číselným poľom
@@ -632,6 +630,11 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 - ~~**D-20 · Quick actions — bezpečný move plugin**~~ — **✅ VYRIEŠENÁ 4.9.2026** package **NÁSTROJE-1** (T1a PR #293 v0.9.24 + T1b PR #294 v0.9.25); plný text v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md).
 
 ## Po V1 — zásobník (nezaradené, nestratiť)
+
+- **Hardening z registra auditu — R-13 → R-37 → R-35** (Michal 30.9.2026: „zapíš ako post V1"; pôvodne zaradené pred V1 29.–30.9.) — **R-13** čítať `std`
+  na entite (ORANGE „dielec z inej verzie štandardu", rozhodnuté 29.9.) → **R-37** ochrana nastavení dodávateľa pred tichým prepísaním seedom → **R-35** dve
+  okná SketchUpu si neprepíšu pravidlá kovania a rozmerové rady; plné znenia a verdikty v [AUDIT_REGISTER.md](AUDIT_REGISTER.md) (sekcia „Stav po previerke
+  29.9.2026").
 
 - **Runner testov v SketchUpe po teste sám vráti pôvodnú verziu pluginu** (workflow N4, 26.9.2026) — `scripts\run_su_tests.ps1` dnes nechá nasadenú
   rozpracovanú vetvu; dovtedy platí pravidlo „po každom mergi nainštalovať main" (CLAUDE.md, Verzia a uzáver).

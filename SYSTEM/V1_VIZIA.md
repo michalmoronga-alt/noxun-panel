@@ -40,8 +40,8 @@ v PLANe prázdny**; V1 je hotové, keď je odškrtnuté všetko. Stav dopĺňaj�
    uzavretý v0.16.0, PR #418–#421: sekcia Nárezový plán, prerez/orez/prídavok dupláku, Kontrola s orezom, voliteľné ceny podľa plánu —
    [výsledok a smoke](archiv/NAREZ_ZAVER_2026-09-29.md); Michalov smoke **PASS 29.9.2026**; porovnanie s reálnou objednávkou VEPO po V1) ·
    **D-121** názvy dielcov do 20 znakov (**hotové** v0.9.45–v0.9.46, PR #324/#325). *(D-95 odškrtávanie diel po diele = preč natrvalo, stráž kolízií a EN DANIELI = mimo V1.)*
-   **V1 rozsah bodu je po bloku CENY (30.9.2026) prázdny.** Pred uzáverom V1 ostávajú v PLAN (blok 4) hardeningové body R-13 → R-37 → R-35 — nie sú
-   rozsahom Výstupov; porovnanie nárezového plánu s objednávkou VEPO a test na reálnej zákazke sú akceptačné testy po V1.
+   **V1 rozsah bodu je po bloku CENY (30.9.2026) prázdny.** Hardeningové body R-13 → R-37 → R-35 sú **po V1** (Michal 30.9.2026, PLAN — Po V1 zásobník);
+   porovnanie nárezového plánu s objednávkou VEPO a test na reálnej zákazke sú akceptačné testy po V1.
 7. [x] **Dvaja používatelia:** Michal aj **Lucia** (testuje od 6.9.2026) — updater D-52 (**hotové**) · **M-R VZHĽAD** (rozhodnuté 6.9.2026, nahrádza „Demos fotku": ručné textúry
    z knižnice, mierka + PBR v editore SketchUpu, „Uložiť vzhľad" do `.skm`, orientácia podľa smeru dekoru, aj ABS hrany a dosky; **hotové** v0.12.0) · zrozumiteľné UI *(Inspector + Štúdio hotové,
    D-51 uzavreté)* · D-122 Kontrola zoskupí UNI (**hotové**, PR #343) · D-124 predvoľby projektu rozbalené (**hotové**, PR #344). *(Zdieľanie knižníc D-48 = prvá funkcia PO V1, viď Mimo V1.)*

@@ -17,6 +17,12 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **DOCS — R-13 → R-37 → R-35 po V1 (30.9.2026, PR #?, len dokumentácia; verzia pluginu sa nemení).** Michal 30.9. ráno po uzávere bloku CENY
+  (v0.17.0, všetkých 7 bodov [V1_VIZIA.md](../V1_VIZIA.md) odškrtnutých) rozhodol: hardeningové body z registra auditu **R-13 → R-37 → R-35 zapísať ako po V1**
+  (poradie ostáva). Presunuté v [PLAN.md](../PLAN.md) z bloku 4 do „Po V1 — zásobník", v [AUDIT_REGISTER.md](../AUDIT_REGISTER.md) (tabuľka „Stav po previerke
+  29.9.2026" a riadky pri R-37/R-35) a vo V1_VIZIA bod 6. **STAV pri najbližšej kódovej dávke:** veta „pred V1 R-13 → R-37 → R-35" → po V1; dokumentačné
+  PR STAV nemení. Ďalšie pokračovanie po smoke bloku CENY určí Michal.
+
 - **BLOK CENY · OVERENIE CIEN MATERIÁLOV A ABS UZAVRETÝ (30.9.2026, v0.16.3 → v0.17.0, uzáver PR #429, variant B).** Zvyšok V1-03 (V1 bod 6 · Výstupy),
   posledný kódový bod V1 — Michal spustil 29.9. večer; štart **#425** (rozhodnutia C1–C13, schválený mockup O1–O9 + O10 z review, fakty z kódu) a tri dávky
   30.9.: **CENY-M1a** #426 (odkaz na produkt, katalóg SCHEMA 11) · **CENY-M1b** #427 (ručné overenie ceny, SCHEMA 12, D-148) · **CENY-M2** #428 (Rozpočet,
