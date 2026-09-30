@@ -486,6 +486,19 @@
   .hw-manual-check { vertical-align: middle; white-space: nowrap; }
   .hw-manual-check.is-pending { color: var(--nx-warn-fg); background: var(--nx-warn-bg); }
   .bmanual-checked { margin-left: 4px; color: var(--nx-ink-faint); font-size: 10px; white-space: nowrap; }
+  /* CENY-M2 (mockup D, O1/O5): stĺpec „Overená" pri doske/ABS bez Demosu =
+     stav A ZÁROVEŇ tlačidlo „Overiť cenu"; jantár = na kontrolu. */
+  .bver { display: inline-flex; align-items: center; gap: 4px; background: none; border: 0;
+          padding: 1px 5px; border-radius: 6px; font: inherit; font-size: 11px; font-weight: 400;
+          color: var(--nx-ink-muted); cursor: pointer; white-space: nowrap; }
+  .bver .ic { width: 13px; height: 13px; }
+  .bver:hover { background: var(--nx-surface-sunken); color: var(--nx-ink); }
+  .bver.is-pending { color: var(--nx-warn-fg); background: var(--nx-warn-bg);
+                     border: 1px solid var(--nx-warnchip-border); }
+  .bver.is-pending:hover { background: var(--nx-warn-bg-soft); }
+  .btab tr.bmiss .bver.is-pending { background: var(--nx-surface); }
+  .blist .hw-manual-check.is-pending { background: var(--nx-surface); }
+  .btab .bmatlink { width: 20px; height: 20px; flex-basis: 20px; }
 
   /* UI-01: je to primarna AKCIA („pridaj riadok"), preto ZELENA (--nx-action) —
      nie vyberova rodina. Vyberove tokeny by sa v teme Lucia prefarbili na ruzovo

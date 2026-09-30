@@ -22,9 +22,12 @@ module Noxun
       # volitelne material_source = duplak vazba zo snapshotu, D-43).
       # sheet_sizes: {material_id => [dlzka, sirka] mm} zo snapshotu katalogu.
       # Vrati pole per NAKUPNY material (sorted podla material_id — poradie
-      # vstupu nehra rolu, kontraktovy test N10): {material_id, m2, quantity,
-      # sheet_size, sheet_m2, count_min, count_max, fallback} + pri duplak
-      # prispevkoch doubled_m2/doubled_quantity.
+      # vstupu nehra rolu, kontraktovy test N10): {material_id, m2, m2_exact,
+      # quantity, sheet_size, sheet_m2, count_min, count_max, fallback} + pri
+      # duplak prispevkoch doubled_m2/doubled_quantity.
+      # CENY-M2 (R2): `m2` je PREZENTACNA hodnota (3 desatinne); `m2_exact` je
+      # ta ista suma NEZAOKRUHLENA — Rozpocet z nej pocita mnozstvo materialu
+      # „podla plochy" (bez dvojiteho zaokruhlenia 0,9345 -> 0,935 -> 0,94).
       #
       # 2B-1 KONTRAKT duplaku (audit NOTE 13 — na tejto sematike stoji montazna
       # kalkulacia davky E): riadok s material_source sa NIKDY neobjavi ako
@@ -64,7 +67,7 @@ module Noxun
           size, fallback = sheet_size_for(sheet_sizes[mid])
           sheet_m2 = size[0] * size[1] / 1_000_000.0
           out = {
-            'material_id' => mid, 'm2' => g['m2'].round(3), 'quantity' => g['quantity'],
+            'material_id' => mid, 'm2' => g['m2'].round(3), 'm2_exact' => g['m2'], 'quantity' => g['quantity'],
             'sheet_size' => size, 'sheet_m2' => sheet_m2.round(3),
             'count_min' => ceil_tenth(g['m2'] * kmin / sheet_m2),
             'count_max' => ceil_tenth(g['m2'] * kmax / sheet_m2),

@@ -114,11 +114,18 @@
     return forms[2];
   }
 
+  // CENY-M2 (R20): „na kontrolu" sa rozhoduje podla `manual_pending` — VSETKY
+  // nevyriesene rucne ceny (kovanie, dosky, ABS; jeden priechod na serveri).
+  function budManualPending(stale){
+    var c = (stale && stale.counts) || {};
+    return Number(c.manual_pending || 0);
+  }
+
   function budStaleLabel(stale){
     var s = stale || {};
     var c = s.counts || {};
-    if (Number(c.manual_hardware || 0) > 0){
-      var pending = Number(c.attention || c.manual_hardware);
+    if (budManualPending(s) > 0){
+      var pending = Number(c.attention || c.manual_pending);
       return pending + ' ' + budPluralSk(pending, ['cena na kontrolu', 'ceny na kontrolu', 'cien na kontrolu']);
     }
     var n = Number(c.stale || 0);
@@ -471,7 +478,7 @@
   function budPriceBtnHtml(b, running){
     var stale = budStaleLabel(b && b.stale);
     var warn = !!stale && !running;
-    var manualOnly = Number(b && b.stale && b.stale.counts && b.stale.counts.manual_hardware || 0) > 0 && !budPrTargets(b).length;
+    var manualOnly = budManualPending(b && b.stale) > 0 && !budPrTargets(b).length;
     var hint = manualOnly ? 'Otvorí zoznam položiek na ručné overenie ceny' :
       'Stiahne aktuálne ceny všetkých položiek zákazky viazaných na Demos (medzi položkami je 3 s pauza — pravidlo Demosu)';
     return '<button type="button" class="ghostbtn' + (warn ? ' bstalebtn' : '') + '"' +
@@ -520,8 +527,9 @@
 
   // E-c: VIAZANÝ riadok (má demos_url) dostane mini akciu „obnoviť túto" —
   // ide TOU ISTOU cestou ako hromadný prepočet, len s jednou položkou.
-  // Riadok BEZ väzby sa nefetchuje NIKDY (server ho ani nedostane) — len
-  // povie, čo s ním: over cenu v katalógu ručne.
+  // Riadok BEZ väzby sa nefetchuje NIKDY (server ho ani nedostane).
+  // CENY-M2 (R21, D2): doska/ABS bez Demosu má ikonu odkazu a „Overiť cenu"
+  // (formulár M1b ostáva v Rozpočte), Demos položka ikonu a obnovenie.
   function budStaleActionHtml(it){
     var i = it || {};
     if (i.kind === 'hardware' && i.id){
@@ -530,8 +538,119 @@
       // Aj Demos riadok v zozname upozorneni ma bezny preklik produktu.
       return link + budDemosRefreshHtml(i);
     }
-    if (!i.demos_url) return ' <span class="bprwhy">· bez Demos väzby — over v katalógu ručne</span>';
-    return budDemosRefreshHtml(i);
+    if ((i.kind === 'sheet' || i.kind === 'edge') && i.id){
+      var mlink = budMatLinkHtml(budStaleLinkRow(i), i.kind);
+      if (i.manual_check) return ' ' + mlink + budMatListCheckHtml(i);
+      if (i.demos_url) return ' ' + mlink + budDemosRefreshHtml(i);
+    }
+    return i.demos_url ? budDemosRefreshHtml(i) : '';
+  }
+
+  // Polozka zoznamu -> tvar riadku pre `budMatLinkHtml` (ta ista kresba ikony).
+  function budStaleLinkRow(i){
+    var r = { nazov: i.label };
+    if (i.demos_url) r.demos_link = true;
+    else if (typeof i.product_link === 'boolean') r.product_link = i.product_link;
+    r[i.kind === 'edge' ? 'abs_id' : 'material_id'] = i.id;
+    return r;
+  }
+
+  // R21: „Overiť cenu" v zozname (s textom — vzor kovania `budManualCheckHtml`).
+  function budMatListCheckHtml(i){
+    var pending = i.state !== 'fresh';
+    return ' <button type="button" class="bact hw-manual-check' + (pending ? ' is-pending' : '') + '"' +
+      ' data-action="mat-manual-check" data-kind="' + bEsc(i.kind) + '" data-id="' + bEsc(i.id) + '"' +
+      ' title="' + bEsc(budMatTip(i)) + '" aria-label="' + bEsc('Overiť cenu · ' + (i.label || i.id)) + '">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-clipboard-check"/></svg> Overiť cenu</button>';
+  }
+
+  // --- CENY-M2: ručné ceny dosiek a ABS v Rozpočte (mockup D) -------------
+
+  // R14 (D4, O1): ikona odkazu PRED názvom materiálu/pásky. Demos = otvorí
+  // Demos, ručný s odkazom = obchod, jantárová = odkaz chýba (klik prepne do
+  // Materiálov a otvorí úpravu s kurzorom v poli odkazu). UNI, duplák a
+  // chýbajúci záznam ikonu nemajú. Klik obsluhuje `proj_materials.js`
+  // (vlastník akcií materiálov) — URL od klienta nikdy nechodí.
+  function budMatLinkHtml(r, kind){
+    if (!r) return '';
+    var id = kind === 'edge' ? r.abs_id : r.material_id;
+    if (id == null || id === '') return '';
+    var src, tip, aria, missing = false;
+    var name = String(r.nazov || id);
+    if (r.demos_link === true){
+      src = 'demos'; tip = 'Otvoriť produkt (Demos)'; aria = 'Otvoriť produkt · ' + name;
+    } else if (r.product_link === true){
+      src = 'product'; tip = 'Otvoriť produkt v prehliadači'; aria = 'Otvoriť produkt · ' + name;
+    } else if (r.product_link === false){
+      src = 'missing'; missing = true;
+      tip = 'Chýba odkaz — doplniť odkaz na produkt'; aria = 'Doplniť odkaz na produkt · ' + name;
+    } else {
+      return '';
+    }
+    return '<button type="button" class="hw-product-link bmatlink' + (missing ? ' is-missing' : '') + '"' +
+      ' data-action="mat-link" data-src="' + src + '" data-kind="' + bEsc(kind) + '" data-id="' + bEsc(id) + '"' +
+      ' title="' + bEsc(tip) + '" aria-label="' + bEsc(aria) + '">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-external-link"/></svg></button>';
+  }
+
+  // Deň + mesiac z dátumovej časti ISO reťazca („2026-09-18T…" -> „18.9.").
+  function budDayMonth(iso){
+    var m = String(iso == null ? '' : iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? parseInt(m[3], 10) + '.' + parseInt(m[2], 10) + '.' : '';
+  }
+  function budDateFull(iso){
+    var m = String(iso == null ? '' : iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? parseInt(m[3], 10) + '.' + parseInt(m[2], 10) + '.' + m[1] : '';
+  }
+  // Vek „pred N dňami" (kópia `mdAgeText` — parity test R17).
+  function budAgeText(age){
+    var n = parseInt(age, 10);
+    if (!(n >= 0)) return '';
+    if (n === 0) return 'dnes';
+    if (n === 1) return 'pred 1 dňom';
+    return 'pred ' + n + ' dňami';
+  }
+
+  // R16 (O5): text stavu v stĺpci „Overená".
+  function budMatStateText(pc){
+    var p = pc || {};
+    if (p.state === 'fresh') return 'ručne ' + budDayMonth(p.checked_at);
+    if (p.state === 'stale'){
+      var n = Number(p.age_days) || 0;
+      return 'ručne ' + n + ' ' + budPluralSk(n, ['deň', 'dni', 'dní']);
+    }
+    return 'neoverená';
+  }
+
+  // R17 (O5): tooltip — KÓPIA textov `mdManualTip` (proj_materials.js);
+  // zhodu stráži parity test nad tou istou maticou stavov.
+  function budMatTip(pc){
+    var p = pc || {};
+    var line;
+    if (p.state === 'fresh') line = 'Cena ručne overená ' + budDateFull(p.checked_at) + ' (' + budAgeText(p.age_days) + ')';
+    else if (p.state === 'stale') line = 'Ručne overená ' + budDateFull(p.checked_at) + ' — ' + budAgeText(p.age_days) + ', na kontrolu';
+    else if (p.price_missing === true) line = 'Cena chýba a nebola nikdy overená — na kontrolu';
+    else line = 'Cena nebola nikdy ručne overená — na kontrolu';
+    return line + '\n' + (p.product_link === true
+      ? 'Overiť cenu — otvorí obchod a formulár'
+      : 'Overiť cenu — bez odkazu otvorí len formulár');
+  }
+
+  // R16 (D3, O1): stav ručnej ceny = zároveň tlačidlo „Overiť cenu".
+  function budMatCheckHtml(r){
+    var pc = r && r.price_check;
+    if (!pc || !pc.kind || pc.id == null) return '';
+    var txt = budMatStateText(pc);
+    return '<button type="button" class="bver' + (pc.state === 'fresh' ? '' : ' is-pending') + '"' +
+      ' data-action="mat-manual-check" data-kind="' + bEsc(pc.kind) + '" data-id="' + bEsc(pc.id) + '"' +
+      ' title="' + bEsc(budMatTip(pc)) + '"' +
+      ' aria-label="' + bEsc('Overiť cenu · ' + (r.nazov || pc.label || pc.id) + ' · ' + txt) + '">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-clipboard-check"/></svg> ' + bEsc(txt) + '</button>';
+  }
+
+  // Stĺpec „Overená": ručný záznam -> R16, inak dnešná bunka (Demos, UNI).
+  function budMatFreshHtml(r, id, kind, b){
+    return (r && r.price_check) ? budMatCheckHtml(r) : budFreshCell(id, kind, b);
   }
 
   function budDemosRefreshHtml(i){
@@ -574,7 +693,8 @@
     'materiáli s úplným plánom a formátom platne z katalógu. Ostatné ostávajú na odhade z m² ' +
     'a riadok povie prečo.\nPorez ide za počtom platní v Materiáli, montáž ostáva z odhadu. VEPO účtuje ' +
     'celé tabule podľa vlastného rezania — jeho počet sa môže líšiť.\nPlatí len pre túto zákazku, ' +
-    'predvolene vypnuté — otvorenie staršej zákazky ceny nezmení. Po Späť klikni na Obnoviť.';
+    'predvolene vypnuté — otvorenie staršej zákazky ceny nezmení. Po Späť klikni na Obnoviť.\n' +
+    'Materiál bez formátu platne sa počíta podľa skutočnej plochy dielcov — plán ho nemení.';
 
   function budSectionHtml(sec, b, d){
     var open = budSectionOpen(sec.key);
@@ -680,13 +800,17 @@
     return n ? ' <span class="bfnt">· ' + bEsc(n) + '</span>' : '';
   }
 
+  // CENY-M2 (R19, O10): riadok „podľa plochy" (`qty_basis: 'area'`) má
+  // množstvo v m² na 2 desatinné, MJ zobrazenú „m²" (dáta ostávajú `M2`)
+  // a „€ / MJ" je už cena za m² — bez zátvorky „(…/m²)".
   function budMaterialRow(r, b, d){
-    var fresh = budFreshCell(r.material_id, 'sheet', b);
-    var perM2 = (r.price_per_m2 != null)
+    var fresh = budMatFreshHtml(r, r.material_id, 'sheet', b);
+    var area = r.qty_basis === 'area';
+    var perM2 = (!area && r.price_per_m2 != null)
       ? ' <span class="bfnt">(' + bEsc(budFmtEur(budDisplay(r.price_per_m2, BUD_VAT, d))) + '/m²)</span>' : '';
-    return '<tr' + budRowClass(r) + '><td>' + bEsc(r.nazov) + budNoteHtml(r) + '</td>' +
-      '<td class="bnum">' + budQtyTagHtml(r) + bEsc(budFmtNum(r.mnozstvo, 0)) + '</td>' +
-      '<td class="bnum">' + bEsc(r.mj) + '</td>' +
+    return '<tr' + budRowClass(r) + '><td>' + budMatLinkHtml(r, 'sheet') + bEsc(r.nazov) + budNoteHtml(r) + '</td>' +
+      '<td class="bnum">' + budQtyTagHtml(r) + bEsc(budFmtNum(r.mnozstvo, area ? 2 : 0)) + '</td>' +
+      '<td class="bnum">' + bEsc(area ? 'm²' : r.mj) + '</td>' +
       '<td class="bnum">' + (r.price_missing ? '<span class="bmisslbl">chýba cena</span>'
         : bEsc(budSub(r.cena_mj, d)) + perM2) + '</td>' +
       '<td class="bnum">' + fresh + '</td>' +
@@ -720,11 +844,11 @@
   }
 
   function budSimpleRow(r, b, d){
-    return '<tr' + budRowClass(r) + '><td>' + bEsc(r.nazov) + budNoteHtml(r) + '</td>' +
+    return '<tr' + budRowClass(r) + '><td>' + budMatLinkHtml(r, 'edge') + bEsc(r.nazov) + budNoteHtml(r) + '</td>' +
       '<td class="bnum">' + bEsc(budFmtNum(r.mnozstvo, 1)) + '</td>' +
       '<td class="bnum">' + bEsc(r.mj) + '</td>' +
       budPriceCell(r, d) +
-      '<td class="bnum">' + budFreshCell(r.abs_id, 'edge', b) + '</td>' +
+      '<td class="bnum">' + budMatFreshHtml(r, r.abs_id, 'edge', b) + '</td>' +
       '<td class="bnum">' + bEsc(budSub(r.spolu, d)) + '</td></tr>';
   }
 
@@ -1256,9 +1380,12 @@
   //   · upozornenia -> Kontrola (to isté miesto ako z Rozpočtu — jeden zoznam).
   function budOfferChipHtml(c, b, d){
     if (c.id === 'stale'){
+      // CENY-M2 (R22): pri ručných cenách na kontrolu povie aj „Overiť cenu".
+      var tip = budManualPending(b && b.stale) > 0
+        ? 'Ceny na kontrolu skontroluješ v Rozpočte — Demos ceny tlačidlom „Prepočítať ceny", ručné cez „Overiť cenu".'
+        : 'Staré ceny sa obnovujú v Rozpočte tlačidlom „Prepočítať ceny" — ponuka by inak išla zákazníkovi z neaktuálnych cien.';
       return '<button type="button" class="bchip" data-bud="to_budget" data-bkey="ostale"' +
-        ' title="Staré ceny sa obnovujú v Rozpočte tlačidlom „Prepočítať ceny" —' +
-        ' ponuka by inak išla zákazníkovi z neaktuálnych cien.">' +
+        ' title="' + bEsc(tip) + '">' +
         '<svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> ' + bEsc(c.text) + '</button>';
     }
     if (c.id === 'appl'){
@@ -1593,7 +1720,7 @@
     }
     if (!targets.length){
       var budget = budBudget();
-      if (Number(budget && budget.stale && budget.stale.counts && budget.stale.counts.manual_hardware || 0) > 0){
+      if (budManualPending(budget && budget.stale) > 0){
         BUD_STALE_OPEN = true;
         budRerender();
         NX.setStatus('Vyber položku a klikni na Overiť cenu. Ručné odkazy sa automaticky nesťahujú.', false);
@@ -2360,6 +2487,12 @@
       budPrDiffText: budPrDiffText, budPrProgressText: budPrProgressText,
       budPrProgressHtml: budPrProgressHtml, budPrReportHtml: budPrReportHtml,
       budPrTitle: budPrTitle, budStaleActionHtml: budStaleActionHtml,
+      // CENY-M2 (tests/js/test_ceny_m2_budget.js): ručné ceny dosiek a ABS,
+      // riadok „podľa plochy", ikona odkazu a „Overiť cenu" — čisté funkcie.
+      budManualPending: budManualPending, budMatLinkHtml: budMatLinkHtml,
+      budMatCheckHtml: budMatCheckHtml, budMatTip: budMatTip, budMatStateText: budMatStateText,
+      budMaterialRow: budMaterialRow, budSimpleRow: budSimpleRow, budPrStart: budPrStart,
+      BUD_PLAN_TIP: BUD_PLAN_TIP,
       // ŠT-2d: ⋯ editor riadku na D-15 kostre (tests/js/test_st2d_kde.js).
       // `budMoreFields`/`budMoreAttrs` su CISTE; `budOpenMore` potrebuje DOM
       // a exportuje sa ZAMERNE — kontrakty „bez pamate konceptu",

@@ -277,6 +277,10 @@ card = NP.npBodyHtml(sl([mat({ est_budget: 2, budget_qty: 2, budget_src: 'estima
 ok(card.indexOf('(v rozpočte 2 z odhadu)') >= 0, 'nespôsobilý materiál: z odhadu');
 card = NP.npBodyHtml(sl([mat({ est_budget: 2, budget_qty: 2, budget_src: null })]), { closed: {} });
 ok(card.indexOf('(v rozpočte dnes 2)') >= 0, 'vypnutý prepínač: dnešná veta');
+// CENY-M2 (R7): materiál „podľa plochy" má v rozpočte m², nie platne.
+card = NP.npBodyHtml(sl([mat({ est_budget: 1, budget_qty: 0.9, budget_src: 'area' })]), { closed: {} });
+ok(card.indexOf('(v rozpočte 0,90 m² podľa plochy)') >= 0, 'area: m² na 2 desatinné s čiarkou');
+ok(card.indexOf('v rozpočte dnes') < 0 && card.indexOf('v rozpočte 0.9') < 0, 'area: m² sa netvária ako počet platní');
 ok(card.indexOf('nie sú zapnuté ceny podľa plánu') >= 0 && card.indexOf('toľko platní dnes počíta rozpočet') < 0,
    'tooltip súhrnu netvrdí, že rozpočet vždy počíta z odhadu');
 
