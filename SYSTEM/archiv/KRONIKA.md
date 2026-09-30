@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **DOCS — štart bloku 9 · HARDENING PO V1: krížový audit V1 a triedenie (1.10.2026, PR #?, len dokumentácia; verzia pluginu sa nemení).** Michal 30.9. zadal ako
+- **DOCS — štart bloku 9 · HARDENING PO V1: krížový audit V1 a triedenie (1.10.2026, PR #432, len dokumentácia; verzia pluginu sa nemení).** Michal 30.9. zadal ako
   posledný krok V1 krížový audit všetkými providermi (refaktor a upratanie s ohľadom na rozširovanie, nápady po V1, UI/UX drobnosti). Matica 7 kariet (Antigravity
   vyradený): Codex `gpt-6-astra` a Grok `grok-4.7` kód podľa scenárov S1–S5, Codex `gpt-5.6-sol` dokumenty, Claude Opus „nový agent" (test zaúčania: podľa tabuľky
   čítania ~1 MB pred malou UI dávkou, ~1,5 MB pred novým typom skrinky, užitočných 3–4 %), Claude Opus „stolár + UX" nad 38 screenshotmi (vykreslené headless
