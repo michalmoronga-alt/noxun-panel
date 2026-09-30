@@ -9,7 +9,7 @@
 **v0.16.2 · 30.9.2026 — BLOK CENY BEŽÍ, dávka CENY-M1b** (ručné overenie ceny, PR #427). **Štúdio → Materiály:** doska a ABS páska **bez Demosu** má
 okrem ikony odkazu (M1a, #426) ikonu **„Overiť cenu"** (sivá = čerstvo overená, jantárová = na kontrolu; dátum a vek v tooltipe). Klik otvorí obchod
 (ak je odkaz) a formulár — doska **za platňu** s prepočtom na €/m² (sklo bez formátu za m²), ABS za bm; **„Potvrdiť cenu k dnešku"** zapíše dátum, nezmenená
-cena ostane presne tá istá. Zmena ceny, kódu, dodávateľa, odkazu alebo formátu overenie zruší; Demos má prednosť. €/m² sa ukazuje na 2 desatinné. Rozpočet sa nemení (CENY-M2).
+cena ostane presne tá istá. Zmena ceny, kódu, dodávateľa, odkazu, dekoru u dodávateľa alebo formátu overenie zruší; Demos má prednosť. €/m² sa ukazuje na 2 desatinné. Rozpočet sa nemení (CENY-M2).
 Pod tým **blok 2 · KONTROLA + VÝROBA** (v0.16.0, smoke **PASS 29.9.**, PR #423), **blok 8 · K3 ROHOVÁ** (v0.15.0, smoke PASS 28.9.), **blok 7 · K1+K2** (v0.14.0).
 Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 so **štrnástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · **Nárezový plán** · Materiály · Kovanie · Spotrebiče · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine. Neaktívna položka navigácie už nie je žiadna.

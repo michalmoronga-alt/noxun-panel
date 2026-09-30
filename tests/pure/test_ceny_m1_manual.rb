@@ -362,6 +362,11 @@ NxTest.test('CENY-M1b (R11a): hranice pol centa x formaty — zobrazena hodnota 
   st, info, = CenyM1b.confirm('sheet', ids[:s25], '1,00', 'plate')
   NxTest.assert_equal([:ok, false], [st, info['unchanged']])
   NxTest.assert_equal(1.0, b.price_per_plate(m.sheet(ids[:s25])['price_per_m2'], nil, [1000.0, 1000.0]))
+  # Review #427: platna 1,005 € sa pred delenim zaokruhli na 1,01 € (D3) —
+  # to iste ukazuje nahlad klienta (test_ceny_m1_manual.js, mdPlateAmount)
+  st, info, = CenyM1b.confirm('sheet', ids[:s25], '1,005', 'plate')
+  NxTest.assert_equal([:ok, false], [st, info['unchanged']])
+  NxTest.assert_equal(1.01, m.sheet(ids[:s25])['price_per_m2'])
 end
 
 NxTest.test('CENY-M1b (O7): mriezka 14 formatov x 0,00–200,00 € po centoch — Rozpocet ukaze presne zadanu platnu') do

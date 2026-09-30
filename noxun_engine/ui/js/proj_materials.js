@@ -1510,7 +1510,8 @@
       // CENY-M1b (D-148): datum zrusi aj zmena ceny, kodu, dodavatela (a pri
       // doske formatu) — veta hovori vsetko, co server naozaj robi.
       hint.textContent = 'Cena overená ' + when + ' — zmena alebo zmazanie adresy, zmena ' +
-        (prefix === 'me' ? 'ceny, kódu alebo dodávateľa' : 'ceny, kódu, dodávateľa alebo formátu') + ' dátum zruší.';
+        (prefix === 'me' ? 'ceny, kódu alebo dodávateľa'
+                         : 'ceny, kódu, dodávateľa, dekoru u dodávateľa alebo formátu') + ' dátum zruší.';
       hint.style.display = '';
     } else {
       hint.textContent = '';
@@ -1718,7 +1719,10 @@
     var pc = rec.price_check;
     if (pc && pc.checked_at && (pc.state === 'fresh' || pc.state === 'stale')){
       return 'Cena ručne overená ' + mdDateLabel(pc.checked_at) + ' — zmena ' +
-        (kind === 'edge' ? 'odkazu, ceny, kódu alebo dodávateľa' : 'odkazu, ceny, kódu, dodávateľa alebo formátu') +
+        // doska: server ruší overenie aj pri zmene dekoru u dodávateľa (D5,
+        // `manual_check_changed?`); ABS to pole nemá
+        (kind === 'edge' ? 'odkazu, ceny, kódu alebo dodávateľa'
+                         : 'odkazu, ceny, kódu, dodávateľa, dekoru u dodávateľa alebo formátu') +
         ' overenie zruší.';
     }
     return 'Cena zatiaľ nebola ručne overená.';
@@ -1778,7 +1782,15 @@
     var v = mdManualParse(st.src.text);
     var area = ((item && item.price_display) || {}).area;
     if (v === null || isNaN(v) || !area) return { mode: mode, text: st.src.text, touched: true, src: st.src };
-    return { mode: mode, text: mdMoney(mode === 'm2' ? v / area : v * area), touched: true, src: st.src };
+    // platna -> m²: najprv to iste zaokruhlenie na centy ako server (D3)
+    return { mode: mode, text: mdMoney(mode === 'm2' ? mdPlateAmount(st.src.text) / area : v * area),
+             touched: true, src: st.src };
+  }
+  // Cena za platnu tak, ako ju uvidi server: na centy desiatkovo half-up
+  // (D3, `Materials.cents_of`) — az potom sa deli plochou (review #427).
+  function mdPlateAmount(text){
+    var dc = mdDecCents(text);
+    return dc ? dc.cents / 100 : mdManualParse(text);
   }
   // Co sa odosle: nedotknute pole = zobrazeny rezim a text servera; po pisani
   // PRESNE napisane cislo v jeho rezime (zamer, nie prepocitany zobrazeny text).
@@ -1795,7 +1807,7 @@
     if (mode === 'plate'){
       if (!area) return { t: 'Na prepočet treba formát platne — doplň ho v úprave variantu (ceruzka), alebo zadaj cenu za m².', warn: true };
       if (v === null || isNaN(v)) return { t: '→ … €/m² (' + fmt + ')', warn: false };
-      return { t: '→ ' + mdMoney(v / area) + ' €/m² (' + fmt + ')', warn: false };
+      return { t: '→ ' + mdMoney(mdPlateAmount(text) / area) + ' €/m² (' + fmt + ')', warn: false };
     }
     if (!area) return { t: 'bez prepočtu — formát nie je v katalógu', warn: true };
     if (v === null || isNaN(v)) return { t: '= … € za platňu (' + fmt + ')', warn: false };
@@ -3973,7 +3985,7 @@
       mdManualTip: mdManualTip, mdCheckBtn: mdCheckBtn, mdManualFormText: mdManualFormText,
       mdManualParse: mdManualParse, mdManualShown: mdManualShown, mdManualInit: mdManualInit,
       mdManualSwitch: mdManualSwitch, mdManualTyped: mdManualTyped, mdManualValue: mdManualValue,
-      mdManualCalc: mdManualCalc, mdManualDiff: mdManualDiff, mdDecCents: mdDecCents,
+      mdManualCalc: mdManualCalc, mdManualDiff: mdManualDiff, mdDecCents: mdDecCents, mdPlateAmount: mdPlateAmount,
       mdManualNote: mdManualNote, mdManualCheck: mdManualCheck, mdManualPayload: mdManualPayload,
       mdManualSub: mdManualSub, mdManualInfo: mdManualInfo,
       mdManualRequest: mdManualRequest, mdManualClose: mdManualClose,

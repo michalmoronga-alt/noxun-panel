@@ -145,7 +145,7 @@ eq(M.MD_CLIENT_SCHEMA, 12, 'klient hlasi schemu 12 (price_check_method)');
   M.mdOpenSheetForm('S25');
   eq(DOC.getElementById('ms_price').value, '31.04', 'pole Cena formulara variantu na 2 desatinne');
   eq(DOC.getElementById('ms_product_hint').textContent,
-     'Otvorí sa vo webovom prehliadači. Cena ručne overená 18.9.2026 — zmena odkazu, ceny, kódu, dodávateľa alebo formátu overenie zruší.');
+     'Otvorí sa vo webovom prehliadači. Cena ručne overená 18.9.2026 — zmena odkazu, ceny, kódu, dodávateľa, dekoru u dodávateľa alebo formátu overenie zruší.');
   eq(DOC.getElementById('ms_demos_hint').style.display, 'none', 'rucny datum sa neukazuje ako datum Demosu');
   M.mdOpenEdgeForm('E08');
   eq(DOC.getElementById('me_product_hint').textContent,
@@ -156,7 +156,7 @@ eq(M.MD_CLIENT_SCHEMA, 12, 'klient hlasi schemu 12 (price_check_method)');
   ok(DOC.getElementById('ms_product_hint').textContent.indexOf('Položka je viazaná na Demos') === 0, 'Demos: zamok, nie veta R22');
   // Predrecenzia P3 (D-148): hint Demos datumu hovori vsetko, co ho zrusi
   eq(DOC.getElementById('ms_demos_hint').textContent,
-     'Cena overená 1.9.2026 — zmena alebo zmazanie adresy, zmena ceny, kódu, dodávateľa alebo formátu dátum zruší.');
+     'Cena overená 1.9.2026 — zmena alebo zmazanie adresy, zmena ceny, kódu, dodávateľa, dekoru u dodávateľa alebo formátu dátum zruší.');
   M.mdSetCatalog(catalog([S25, GLASS, S18D], [E08, Object.assign({}, E08, { abs_id: 'E10', price_check: undefined,
     price_check_method: undefined, demos_url: 'https://www.demos-trade.sk/abs', price_checked_at: '2026-09-02T10:00:00Z' })]));
   M.mdOpenEdgeForm('E10');
@@ -191,6 +191,13 @@ eq(M.MD_CLIENT_SCHEMA, 12, 'klient hlasi schemu 12 (price_check_method)');
   eq(M.mdManualDiff(P101, 'plate', '1,004').t, '−0,01 € (−1,0 %) oproti katalógu (1,01 € za platňu)');
   eq(M.mdManualDiff(P101, 'm2', '1,005').cls, 'chg', '€/m² jemnejsia nez cent = zmena (server input_cents)');
   eq(M.mdManualDiff(P101, 'm2', '1,010').cls, 'same', 'nuly za centom nevadia');
+  // Review #427 P2: prepocet platna -> m² najprv zaokruhli platnu na centy
+  // ako server (1,005 € -> 1,01 € -> 1,01 €/m²), v nahlade aj pri prepnuti.
+  eq(M.mdPlateAmount('1,005'), 1.01);
+  eq(M.mdManualCalc(P101, 'plate', '1,005').t, '→ 1,01 €/m² (1000 × 1000)', 'nahlad = server');
+  let st5 = M.mdManualSwitch(P101, M.mdManualTyped(M.mdManualInit('sheet', P101), '1,005'), 'm2');
+  eq(st5.text, '1,01', 'prepnutie po napisani 1,005 ukaze €/m² ako server');
+  eq(M.mdManualValue(st5), { basis: 'plate', price: '1,005' }, 'odosle sa zamer, server ho zaokruhli rovnako');
   eq(M.mdManualDiff(S25, 'm2', '31,038').t.indexOf('−0,002 €'), 0, 'rozdiel jemnejsi nez cent sa ukaze presne');
   eq(M.mdManualDiff(E08, 'bm', '0,13').cls, 'chg', 'ABS 0,125 vs 0,13 = zmena');
   eq(M.mdManualDiff(E08, 'bm', '0,13').t.indexOf('+0,005 €'), 0);
