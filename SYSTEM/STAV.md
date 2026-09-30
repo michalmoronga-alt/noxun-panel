@@ -8,8 +8,7 @@
 
 **v0.16.1 · 30.9.2026 — BLOK CENY BEŽÍ, dávka CENY-M1a** (odkaz na produkt, PR #?). **Štúdio → Materiály:** doska a ABS páska **bez Demosu** má v riadku
 ikonu **„Otvoriť produkt"** — sivá otvorí obchod v prehliadači (nič nezapisuje), **jantárová** = odkaz chýba a klik otvorí úpravu (ceruzku) s kurzorom
-v novom poli **„Odkaz na produkt"**; pri Demos väzbe je pole zamknuté (odkaz ostáva odložený). Ikony majú v riadku **pevné miesto** — stĺpce Kód / cena /
-Dodávateľ sú pod sebou aj v riadkoch s Demosom. Rozpočet sa nemení (príde v CENY-M2). Katalóg materiálov je po prvom uložení odkazu v **schéme 11**.
+v novom poli **„Odkaz na produkt"**; pri Demos väzbe je pole zamknuté (odkaz ostáva odložený). Ikony majú v riadku **pevné miesto**; Rozpočet sa nemení (CENY-M2).
 Pod tým **blok 2 · KONTROLA + VÝROBA** (v0.16.0, smoke **PASS 29.9.**, PR #423), **blok 8 · K3 ROHOVÁ** (v0.15.0, smoke PASS 28.9.), **blok 7 · K1+K2** (v0.14.0).
 Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 so **štrnástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · **Nárezový plán** · Materiály · Kovanie · Spotrebiče · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine. Neaktívna položka navigácie už nie je žiadna.
@@ -22,9 +21,11 @@ ostáva ručné overenie cien materiálov/ABS (blok CENY); **test na kompletnej 
 (v0.9.0) · **blok KOVANIE** (v0.10.0) · **blok M-R VZHĽAD** (v0.12.0) · **blok SPOTREBIČE S1** (v0.13.0) · **blok KONŠTRUKCIA K1+K2** (v0.14.0) · **blok K3 ROHOVÁ**
 (v0.15.0) · **blok 2 KONTROLA + VÝROBA** (v0.16.0) — plné texty v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).
 **Kompatibilita:** skrinka je v **schéme 22** (typ `corner_blind`), **doska v schéme 2**, **šablóny v STD 7**, výrobný plán v **schéme 7**, ABS pravidlá
-v **seede 6**, **katalóg materiálov v schéme 11** (po prvom uloženom odkaze) — starší plugin zákazku neprestaví ani nevyexportuje. **Dáta rozpočtu sú v `BUDGET_STD` 3**,
-**nastavenia dodávateľa vo verzii súboru 2**. **Aktualizovať obe PC (aj Luciino) na 0.16.1 pred prvým uložením odkazu — starší plugin katalóg materiálov
-potom len číta** (katalóg je na každom PC zvlášť; riziko pri prenose `materials.json` alebo pri inom SketchUpe so starším pluginom na tom istom PC).
+v **seede 6** — starší plugin zákazku neprestaví ani nevyexportuje (rohovú by sklopil na dolnú). **Dáta rozpočtu sú od NP-4 v `BUDGET_STD` 3** (prvá úprava rozpočtu
+v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a zastaví oba cenové exporty). **Nastavenia dodávateľa sú od NP-2 vo verzii súboru 2** (v0.15.1 a starší pri uložení nové polia zahodí).
+**Katalóg materiálov je po prvom uloženom odkaze v schéme 11** — v0.16.0 a starší ho ďalej číta (aj Rozpočet), ale nezapíše doň (Materiály len na čítanie).
+**Aktualizovať obe PC (aj Luciino) na 0.16.1 pred prvým uložením odkazu — starší plugin katalóg materiálov potom len číta** (rohovú nepozná, šablóny STD 7 len
+číta, rozpočet `BUDGET_STD` 3 needituje; katalóg je na každom PC zvlášť — riziko pri prenose `materials.json` alebo pri staršom SketchUpe na tom istom PC).
 
 **Testy (CENY-M1a, PR #?):** **4861 headless · 143 JS sád** zelené; mutácie M1–M8 + M22 zabité; in-SU nie je brána (package §8).
 **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
@@ -44,8 +45,7 @@ zamknuté. **Test na reálnej zákazke po V1.** Nálezy z výroby a cien majú p
 
 ## Posledné uzávery
 
-- **CENY-M1a · odkaz na produkt** (**v0.16.1**, 30.9.2026, PR #?) — ikona „Otvoriť produkt" a pole odkazu vo formulári variantu, pevný slot ikon, katalóg
-  v schéme 11, formulár variantu kontroluje a zapisuje pod jedným zámkom. Priebeh v [archiv/KRONIKA.md](archiv/KRONIKA.md).
+- **CENY-M1a · odkaz na produkt** (**v0.16.1**, 30.9.2026, PR #?) — ikona a pole odkazu, pevný slot ikon, katalóg v schéme 11 ([archiv/KRONIKA.md](archiv/KRONIKA.md)).
 - **BLOK 2 · KONTROLA + VÝROBA UZAVRETÝ** (**v0.16.0**, 29.9.2026; nárezový plán: štart #417, PR #418–#421 + uzáver PR #422; **smoke PASS 29.9.**, PR #423).
   Nárezový plán v Štúdiu, nastavenia prerezu/orezu/prídavku, Kontrola s orezom, ceny podľa plánu; priečinok bloku v [archiv/bloky/NAREZ/](archiv/bloky/NAREZ/).
   [Výsledok, dávky a checklist](archiv/NAREZ_ZAVER_2026-09-29.md).
