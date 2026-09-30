@@ -143,7 +143,7 @@ v `zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md`. **Katalógové kovanie
 preklik a ručné potvrdenie ceny k dnešku v katalógu/Rozpočte. *(Piaty kus tej istej odkladovej sady — EN DANIELI textový export — je v skupine KONTROLA
 + VÝROBA; DOCX/PDF generátor a rodina dokumentov sú od 26.8. v skupine Po V1 — zásobník.)*
 
-**Riešenie — blok CENY** (štart 29.9.2026, PR #425; rozhodnutia C1–C13 a schválený mockup v [../zdroje/bloky/CENY/](../zdroje/bloky/CENY/)):
+**Riešenie — blok CENY** (štart 29.9.2026, PR #425; rozhodnutia C1–C13 a schválený mockup v [bloky/CENY/](bloky/CENY/)):
 - **CENY-M1a** (PR #426, v0.16.1) — **jeden odkaz na produkt** pri doske a ABS bez Demosu (pole „Odkaz na produkt", ikona „Otvoriť produkt"; katalóg SCHEMA 11).
 - **CENY-M1b** (PR #427, v0.16.2) — **ručné overenie ceny** v Štúdiu → Materiály: formulár „Overiť cenu ručne" (doska za platňu s prepočtom na €/m²,
   sklo bez formátu za m², ABS za bm), „Potvrdiť cenu k dnešku", zneplatnenie pri zmene overených polí, prednosť Demosu, D-148; katalóg SCHEMA 12.
@@ -151,7 +151,7 @@ preklik a ručné potvrdenie ceny k dnešku v katalógu/Rozpočte. *(Piaty kus t
   a je zároveň tlačidlom „Overiť cenu" (formulár M1b ostáva v Rozpočte); čip „N cien na kontrolu" a „Skontrolovať ceny" počítajú aj ručné materiály
   (UNI a duplák nie); ikona odkazu pred názvom materiálu a pásky; **materiál bez formátu — sklo aj bežná doska — sa počíta podľa skutočných m²
   dielcov bez odpadu** (C12 + C14, Michal 30.9.2026; duplák v ploche zdrojovej dosky, UNI a duplák bez väzby na odhade platní), porez a montáž bez zmeny (Q1).
-  Package [../zdroje/bloky/CENY/PACKAGE_CENY_M2.md](../zdroje/bloky/CENY/PACKAGE_CENY_M2.md), audit [../zdroje/bloky/CENY/AUDIT_CENY_M2_2026-09-30.md](../zdroje/bloky/CENY/AUDIT_CENY_M2_2026-09-30.md).
+  Package [bloky/CENY/PACKAGE_CENY_M2.md](bloky/CENY/PACKAGE_CENY_M2.md), audit [bloky/CENY/AUDIT_CENY_M2_2026-09-30.md](bloky/CENY/AUDIT_CENY_M2_2026-09-30.md).
 
 ### D-148 — Formulár ceruzky pri Demos položke nerušil dátum overenia, vyriešené 30.9.2026
 

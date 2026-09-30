@@ -37,8 +37,16 @@ Smoke bloku 2 **PASS 29.9.2026** (bez chýb); nové postrehy k týmto funkciám 
 
 ## V1 DOTIAHNUTIE
 
-*(Skupina je prázdna — **ceny materiálov/ABS (zvyšok V1-03) vyriešené 30.9.2026** blokom CENY (CENY-M1a/M1b/M2, v0.16.1–v0.16.3), plný text v
-[archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md); EN DANIELI textový export aj DOCX/PDF sú v skupine Po V1 — zásobník.)*
+*(Skupina je prázdna — **ceny materiálov/ABS (zvyšok V1-03) vyriešené 30.9.2026** blokom CENY (CENY-M1a/M1b/M2, v0.16.1–v0.16.3; **blok uzavretý
+vo v0.17.0**), plný text v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md), výsledok a smoke checklist v
+[archiv/CENY_ZAVER_2026-09-30.md](archiv/CENY_ZAVER_2026-09-30.md); EN DANIELI textový export aj DOCX/PDF sú v skupine Po V1 — zásobník.)*
+
+## CENY — smoke po uzávere bloku (v0.17.0, opravy v0.17.x)
+
+*(Blok CENY je uzavretý vo v0.17.0 (30.9.2026) bez otvorených D-čísel. Michalov smoke ide podľa checklistu
+v [archiv/CENY_ZAVER_2026-09-30.md](archiv/CENY_ZAVER_2026-09-30.md) — nové nálezy sa zapíšu sem a opravia ako v0.17.x. **Pred prvým uložením odkazu,
+ručným overením ceny alebo posielaním ponúk aktualizovať obe PC** (Michal aj Lucia — katalóg schémy 11/12, materiál bez formátu podľa m²). Smoke má overiť
+aj **dosku bez formátu a sklo v Rozpočte** (podľa m², porez a montáž bez zmeny). Skupina je dočasná a zanikne s posledným nálezom.)*
 
 ## INFRA
 

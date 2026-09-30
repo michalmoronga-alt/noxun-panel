@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # CENY-M2 [C12] — material bez formatu podla SKUTOCNEJ plochy dielcov.
-# Package: SYSTEM/zdroje/bloky/CENY/PACKAGE_CENY_M2.md (§6.1, §7 bod 1).
+# Package: SYSTEM/archiv/bloky/CENY/PACKAGE_CENY_M2.md (§6.1, §7 bod 1).
 #
 # Co sa tu dokazuje:
 #   R1a „podla plochy" ide KAZDY material bez platneho formatu — sklo aj bezna

@@ -32,12 +32,16 @@ v PLANe prázdny**; V1 je hotové, keď je odškrtnuté všetko. Stav dopĺňaj�
    „spotrebičová" upozorní bez spotrebiča · „dodáva zákazník". Predúloha listov hotová 19.9., cross audit ×3 a mockup schválené 20.9.; plný blok v [archíve](archiv/ROADMAP_hotove_etapy.md).
    Zo smoke (21.–24.9.): výška čela slotu sa dopočíta z linky, soklu a medzery hore (výplň nad umývačkou = samostatný nízky korpus) a chladnička má výšku osadenia.
    *(Delené čelo umývačky, kontrola výšky/hmotnosti čela, police podľa niky, vetranie, digestorový korpus, telá rúry/mikra/dosky/digestora = mimo V1.)*
-6. [ ] **Výstupy:** VEPO CSV, kusovník, nákup kovania, rozpočet s cenami, XLSX cenová ponuka *(hotové — dávky E + fáza ŠTÚDIO)* · **zvyšok V1-03 (rozhodnuté 6.9.2026):**
-   manuálne 1-klik overenie ceny (katalógové kovanie **hotové** — CENY-KOV v0.10.4–v0.10.5; **ostávajú materiály/ABS** — blok CENY) + ~~viac URL na položke~~ → jeden odkaz (C7, 29.9.2026; „na faktúru" vyradené)
+6. [x] **Výstupy:** VEPO CSV, kusovník, nákup kovania, rozpočet s cenami, XLSX cenová ponuka *(hotové — dávky E + fáza ŠTÚDIO)* · **zvyšok V1-03 (rozhodnuté 6.9.2026):**
+   manuálne 1-klik overenie ceny (katalógové kovanie **hotové** — CENY-KOV v0.10.4–v0.10.5; **materiály/ABS hotové** — blok CENY, v0.16.1–v0.16.3, uzáver
+   **v0.17.0**, PR #425–#428: odkaz na produkt a ručné overenie ceny dosky/ABS bez Demosu v Štúdiu aj v Rozpočte, materiál bez formátu v Rozpočte podľa
+   skutočných m² — [výsledok a smoke](archiv/CENY_ZAVER_2026-09-30.md); Michalov smoke čaká) + ~~viac URL na položke~~ → jeden odkaz (C7, 29.9.2026; „na faktúru" vyradené)
    · **D-94** nákup s pôvodom (**hotové** v0.12.1, PR #361) · **nárezový plán primitívny** (horná hranica počtu platní podľa zvoleného rozloženia namiesto odhadu z m²; objednáva človek — **hotové** v0.15.1–v0.15.4, blok 2
    uzavretý v0.16.0, PR #418–#421: sekcia Nárezový plán, prerez/orez/prídavok dupláku, Kontrola s orezom, voliteľné ceny podľa plánu —
    [výsledok a smoke](archiv/NAREZ_ZAVER_2026-09-29.md); Michalov smoke **PASS 29.9.2026**; porovnanie s reálnou objednávkou VEPO po V1) ·
    **D-121** názvy dielcov do 20 znakov (**hotové** v0.9.45–v0.9.46, PR #324/#325). *(D-95 odškrtávanie diel po diele = preč natrvalo, stráž kolízií a EN DANIELI = mimo V1.)*
+   **V1 rozsah bodu je po bloku CENY (30.9.2026) prázdny.** Pred uzáverom V1 ostávajú v PLAN (blok 4) hardeningové body R-13 → R-37 → R-35 — nie sú
+   rozsahom Výstupov; porovnanie nárezového plánu s objednávkou VEPO a test na reálnej zákazke sú akceptačné testy po V1.
 7. [x] **Dvaja používatelia:** Michal aj **Lucia** (testuje od 6.9.2026) — updater D-52 (**hotové**) · **M-R VZHĽAD** (rozhodnuté 6.9.2026, nahrádza „Demos fotku": ručné textúry
    z knižnice, mierka + PBR v editore SketchUpu, „Uložiť vzhľad" do `.skm`, orientácia podľa smeru dekoru, aj ABS hrany a dosky; **hotové** v0.12.0) · zrozumiteľné UI *(Inspector + Štúdio hotové,
    D-51 uzavreté)* · D-122 Kontrola zoskupí UNI (**hotové**, PR #343) · D-124 predvoľby projektu rozbalené (**hotové**, PR #344). *(Zdieľanie knižníc D-48 = prvá funkcia PO V1, viď Mimo V1.)*

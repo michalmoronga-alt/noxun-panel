@@ -2,6 +2,42 @@
 
 > **ARCHÍV (založené 24.7.2026 pri uzávere V0.5).** Kompaktné riadky hotových etáp drží [KRONIKA.md](KRONIKA.md) (časová os) — tu sú plné pôvodné texty (história rozhodnutí, rozsahov a PR). Otvorené záväzky z týchto textov sú od 11.8.2026 zaradené do blokov [../PLAN.md](../PLAN.md) — tento súbor je čisto referenčný.
 
+## CENY — overenie cien materiálov a ABS — UZAVRETÝ (30.9.2026, v0.17.0; štart PR #425, dávky PR #426–#428 + uzáver PR #?)
+
+**Zvyšok V1-03 (V1 bod 6 · Výstupy), posledný kódový bod V1** — Michal ho spustil 29.9. večer. Doska a ABS páska **bez väzby na Demos** majú rovnaký vzor
+ako katalógové kovanie (CENY-KOV, 10.9.): **jeden odkaz na produkt** (C7 nahradilo pôvodné „viac URL na položke") a **ručné overenie ceny** v Štúdiu →
+Materiály aj z Rozpočtu (doska **za platňu** s prepočtom na €/m², sklo bez formátu za m², ABS za bm; „Potvrdiť cenu k dnešku" nezmení nedotknutú cenu
+ani o cent; zmena overených polí overenie zruší; Demos má prednosť). Rozpočet ukazuje **vek ručne overených cien** a počíta ich medzi **„N cien na
+kontrolu"**; **materiál bez formátu** (sklo aj bežná doska — C12 + C14; nie UNI ani duplák bez väzby) sa počíta podľa **skutočných m² dielcov** namiesto
+fiktívnej platne 2800 × 2070. Dávky: štart #425 (rozhodnutia C1–C13, schválený mockup O1–O10, fakty z kódu) · **CENY-M1a** #426 (v0.16.1, odkaz, katalóg
+SCHEMA 11) · **CENY-M1b** #427 (v0.16.2, ručné overenie, SCHEMA 12, D-148) · **CENY-M2** #428 (v0.16.3, Rozpočet, C14). Každá kódová dávka mala audit
+návrhu (Codex; M1: 1 BLOCKER + delta audit, M2: 1 BLOCKER — všetko prijaté) a slepú predrecenziu; pri poslednej dávke 4910 headless · 145 JS sád
+(in-SU nebol bránou — nič nezapisuje do modelu). Výsledok, dávky, overenie, priznané limity a zlúčený smoke checklist:
+[CENY_ZAVER_2026-09-30.md](CENY_ZAVER_2026-09-30.md). Priečinok bloku (rozhodnutia Michala C1–C14, schválený mockup, packages M1 a M2 so surovými auditmi,
+fakty z kódu) je od uzáveru v [bloky/CENY/](bloky/CENY/). Kompatibilita: katalóg materiálov v schéme 11/12 (starší plugin ho len číta), `BUDGET_STD` sa
+nemení — **starší plugin na druhom PC ocení materiál bez formátu po starom**; aktualizovať obe PC. **Smoke čaká** (Michal). **Otvorené:** Q1 porez a montáž
+pri skle (bez odpovede — bez zmeny); nálezy mimo scope F1–F6 z packages sú kandidáti na D-čísla.
+
+### Pôvodný plný text bloku pri uzávere (PLAN, blok 4 · V1 DOTIAHNUTIE)
+
+- **Ceny — zvyšok V1-03 → blok CENY (štart 29.9.2026, Michal: „poďme na ceny materiálov a ABS" — posledný kódový bod V1):** ručné overenie cien **materiálov/ABS**
+  bez Demos väzby a **jeden** odkaz na produkt (C7 nahradilo pôvodné „viac URL na položke"). Priečinok bloku [bloky/CENY/](bloky/CENY/) — rozhodnutia
+  [ROZHODNUTIA_MICHALA_2026-09-29.md](bloky/CENY/ROZHODNUTIA_MICHALA_2026-09-29.md) (C1–C11), schválený mockup
+  [MOCKUP_CENY_2026-09-30.html](bloky/CENY/MOCKUP_CENY_2026-09-30.html) (O1–O9 podľa návrhu, 30.9.). Štart bloku PR #425. Dávky (každá s auditom návrhu — mení formát katalógu;
+  rez M1 → **M1a / M1b** prijal orchestrátor 30.9. podľa package [PACKAGE_CENY_M1.md](bloky/CENY/PACKAGE_CENY_M1.md) s auditom
+  [AUDIT_CENY_M1_2026-09-30.md](bloky/CENY/AUDIT_CENY_M1_2026-09-30.md) a delta auditom [AUDIT2_CENY_M1_2026-09-30.md](bloky/CENY/AUDIT2_CENY_M1_2026-09-30.md)):
+  - ✅ **CENY-M1a** · odkaz na produkt pri doske/ABS bez Demosu v dátach katalógu (SCHEMA 11) a v Štúdiu → Materiály — **PR #426, v0.16.1**.
+  - ✅ **CENY-M1b** · ručné overenie ceny (doska za platňu / ABS za bm, SCHEMA 12), zneplatnenie, prednosť Demosu, D-148 — **PR #427, v0.16.2**.
+  - ✅ **CENY-M2** · Rozpočet: vek ručne overených cien, „N cien na kontrolu", odkaz a „Overiť cenu" v sekcii Materiál a ABS hrany; materiál bez formátu
+    (sklo aj bežná doska; nie UNI ani duplák bez väzby) podľa skutočných m² dielcov namiesto fiktívnej platne (C12 + C14) — **PR #428, v0.16.3**
+    (package [PACKAGE_CENY_M2.md](bloky/CENY/PACKAGE_CENY_M2.md), audit [AUDIT_CENY_M2_2026-09-30.md](bloky/CENY/AUDIT_CENY_M2_2026-09-30.md)).
+  - ✅ **Uzáver bloku CENY** *(PR #?, v0.17.0 — docs a verzia)* — blok do archívu, priečinok bloku do `archiv/bloky/CENY/`, V1_VIZIA (bod 6 Výstupy
+    odškrtnutý), README, DOGFOODING (dočasná skupina smoke), STAV, KRONIKA; výsledok a smoke checklist v [CENY_ZAVER_2026-09-30.md](CENY_ZAVER_2026-09-30.md).
+- **Poradie pred uzáverom V1 (Michal 29.–30.9.2026):** blok **CENY** (CENY-M1a → CENY-M1b → CENY-M2) → **R-13** (čítať `std` na entite, ORANGE „dielec z inej verzie
+  štandardu") → **R-37** (ochrana nastavení dodávateľa pred tichým prepísaním seedom) → **R-35** (dve okná SketchUpu si neprepíšu pravidlá kovania
+  a rozmerové rady) — plné znenia a verdikty v [../AUDIT_REGISTER.md](../AUDIT_REGISTER.md) (sekcia „Stav po previerke 29.9.2026"). *(Pri uzávere CENY
+  ostáva v PLAN bez bloku CENY: R-13 → R-37 → R-35.)*
+
 ## BLOK 2 · KONTROLA + VÝROBA — UZAVRETÝ (29.9.2026, v0.16.0; Nárezový plán: štart PR #417, dávky PR #418–#421 + uzáver PR #422)
 
 **Krížová kontrola zákazky pred výrobou a výrobné výstupy** — **D-94** nákup s pôvodom (#361, v0.12.1) · **D-112** zmenená ABS v stĺpci `poznamka` VEPO

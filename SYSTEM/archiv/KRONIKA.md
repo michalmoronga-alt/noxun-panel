@@ -17,9 +17,28 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **BLOK CENY · OVERENIE CIEN MATERIÁLOV A ABS UZAVRETÝ (30.9.2026, v0.16.3 → v0.17.0, uzáver PR #?, variant B).** Zvyšok V1-03 (V1 bod 6 · Výstupy),
+  posledný kódový bod V1 — Michal spustil 29.9. večer; štart **#425** (rozhodnutia C1–C13, schválený mockup O1–O9 + O10 z review, fakty z kódu) a tri dávky
+  30.9.: **CENY-M1a** #426 (odkaz na produkt, katalóg SCHEMA 11) · **CENY-M1b** #427 (ručné overenie ceny, SCHEMA 12, D-148) · **CENY-M2** #428 (Rozpočet,
+  materiál bez formátu podľa m² — C14 počas PR). **Review bloku:** štart #425 Codex kolo 1 3× P1 + 5× P2, kolo 2 4× P2 → interná delta · M1a predrecenzia
+  1× P2 + 2× P3, Codex kolo 1 bez nálezov · M1b predrecenzia PR OK (3× P3), kolo 1 2× P2 → `a705e1dd`, slepá delta 1× P2 + 1× P3 → `7bb0dd51` (parita
+  náhľadu so serverom 7680 riadkov) · M2 predrecenzia PR OK (1× P3), kolo 1 1× P2 → `fcaccf21`, po C14 plné kolo 2 bez nálezov, delta 2× P3 → `552732e4`.
+  Audity návrhu (Codex): M1 Astra 1 BLOCKER + 3 FIX, delta audit Sol 1 BLOCKER dotiahnutý + 1 FIX · M2 Astra 1 BLOCKER + 2 FIX + 1 NOTE — všetko zapracované.
+  Uzáver mení len dokumentáciu a verziu: blok plným textom do [ROADMAP_hotove_etapy.md](ROADMAP_hotove_etapy.md), **celý priečinok bloku**
+  `zdroje/bloky/CENY/` → [bloky/CENY/](bloky/CENY/) (`git mv`; opravené odkazy v PLAN, STAV, v tejto KRONIKE (záznamy #425–#428), v
+  [DOGFOODING_vyriesene.md](DOGFOODING_vyriesene.md) a v hlavičkách testov `test_ceny_m2_area.rb` a `test_ceny_m2_stale.rb`; vnútri priečinka odkaz
+  ROZHODNUTIA_MICHALA na debatu 6.9. prepísaný na `../../../zdroje/next_sessions/…` — odkazy auditov na kód `../../../../` ostávajú platné, priečinok je
+  v rovnakej hĺbke; žiadny test nečíta súbor z priečinka bloku). Textové zmienky ciest v packages a mockupe sa nemenia — historický podklad. Výsledok, dávky,
+  overenie, priznané limity, otvorené body (Q1 bez odpovede, F-nálezy ako kandidáti) a **zlúčený smoke checklist** (M1 §10 + M2 §10, bod o doske bez
+  formátu opravený podľa C14) v [CENY_ZAVER_2026-09-30.md](CENY_ZAVER_2026-09-30.md); **V1_VIZIA bod 6 Výstupy odškrtnutý** (V1 rozsah bodu je prázdny —
+  všetkých sedem bodov V1 je odškrtnutých; pred uzáverom V1 ostáva R-13 → R-37 → R-35), PLAN (poznámka o hotovom bloku, poradie pred V1 bez CENY), README
+  (koreň aj SYSTEM), DOGFOODING (V1 DOTIAHNUTIE + dočasná skupina „CENY — smoke po uzávere"), STAV. Pri uzávere **4910 headless · 145 JS sád** zelené;
+  in-SU netreba (kód len číslom verzie). **Pre Luciu:** aktualizovať obe PC na 0.17.0 pred prvým uložením odkazu, ručným overením alebo posielaním ponúk.
+  **Smoke čaká** — poistka: R-13 až po smoke PASS alebo „ideme ďalej".
+
 - **CENY-M2 — Rozpočet: ručné ceny dosiek a ABS + materiál bez formátu podľa m² (30.9.2026, PR #428, v0.16.2 → v0.16.3).** Posledná kódová dávka bloku CENY
-  podľa package [PACKAGE_CENY_M2.md](../zdroje/bloky/CENY/PACKAGE_CENY_M2.md) (audit Codex gpt-6-astra
-  [AUDIT_CENY_M2_2026-09-30.md](../zdroje/bloky/CENY/AUDIT_CENY_M2_2026-09-30.md): BLOCKER — testy a golden zosúladené s obmedzeným R1, NP-4 golden sa
+  podľa package [PACKAGE_CENY_M2.md](bloky/CENY/PACKAGE_CENY_M2.md) (audit Codex gpt-6-astra
+  [AUDIT_CENY_M2_2026-09-30.md](bloky/CENY/AUDIT_CENY_M2_2026-09-30.md): BLOCKER — testy a golden zosúladené s obmedzeným R1, NP-4 golden sa
   nemení; FIX-2 `manual_hardware` len kovanie + `manual_pending` jedným priechodom; FIX-3 typ cez `Materials.type_registry_entry`; NOTE-4 dve PC).
   **Pre používateľa:** v Rozpočte → Materiál a ABS hrany má doska a páska bez Demosu v stĺpci „Overená" stav („ručne 18.9." sivé · „ručne 45 dní" /
   „neoverená" jantárové), ktorý je zároveň tlačidlom **„Overiť cenu"** — ten istý formulár ako v Štúdiu, ale ostáva sa v Rozpočte (bez odkazu len
@@ -42,9 +61,9 @@
   kód robil — `fcaccf21`, po C14 znenie pre všetky materiály bez formátu okrem UNI a dupláku bez väzby; delta P3 spresnila duplák). Pre Luciu: aktualizovať obe PC pred porovnávaním ponúk.
 
 - **CENY-M1b — ručné overenie ceny dosky a ABS bez Demosu (30.9.2026, PR #427, v0.16.1 → v0.16.2).** Druhá kódová dávka bloku CENY podľa package
-  [PACKAGE_CENY_M1.md](../zdroje/bloky/CENY/PACKAGE_CENY_M1.md) (požiadavky **[B]**; audit Codex gpt-6-astra — BLOCKER R11a „bez zmeny = presná zhoda
+  [PACKAGE_CENY_M1.md](bloky/CENY/PACKAGE_CENY_M1.md) (požiadavky **[B]**; audit Codex gpt-6-astra — BLOCKER R11a „bez zmeny = presná zhoda
   so zobrazenou hodnotou, nie interval ±0,005" a FIX R20b; delta audit Codex gpt-5.6-sol
-  [AUDIT2_CENY_M1_2026-09-30.md](../zdroje/bloky/CENY/AUDIT2_CENY_M1_2026-09-30.md) — celočíselné centy len pre platňu a €/m², €/bm presne,
+  [AUDIT2_CENY_M1_2026-09-30.md](bloky/CENY/AUDIT2_CENY_M1_2026-09-30.md) — celočíselné centy len pre platňu a €/m², €/bm presne,
   `price_display.plate = nil` bez formátu). **Pre používateľa:** v Štúdiu → Materiály má doska a ABS bez Demosu na 3. mieste slotu ikonu **„Overiť
   cenu"** (sivá = čerstvo overená, jantárová = nikdy alebo staršia než prah z Nastavení dodávateľa; tooltip s dátumom a vekom). Klik otvorí obchod
   (ak je odkaz — neúspech otvorenia potvrdenie **neblokuje**) a formulár **„Overiť cenu ručne"**: doska **za platňu** s živým prepočtom na €/m²
@@ -64,8 +83,8 @@
   prvým ručným overením — starší plugin katalóg so schémou 12 len číta.
 
 - **CENY-M1a — odkaz na produkt pri doske a ABS bez Demosu (30.9.2026, PR #426, v0.16.0 → v0.16.1).** Prvá kódová dávka bloku CENY podľa package
-  [PACKAGE_CENY_M1.md](../zdroje/bloky/CENY/PACKAGE_CENY_M1.md) (požiadavky **[A]**; audit návrhu Codex gpt-6-astra
-  [AUDIT_CENY_M1_2026-09-30.md](../zdroje/bloky/CENY/AUDIT_CENY_M1_2026-09-30.md): 1 BLOCKER [B] + 2× FIX-IN-M1a + 1 FIX-IN-M1b; orchestrátor prijal
+  [PACKAGE_CENY_M1.md](bloky/CENY/PACKAGE_CENY_M1.md) (požiadavky **[A]**; audit návrhu Codex gpt-6-astra
+  [AUDIT_CENY_M1_2026-09-30.md](bloky/CENY/AUDIT_CENY_M1_2026-09-30.md): 1 BLOCKER [B] + 2× FIX-IN-M1a + 1 FIX-IN-M1b; orchestrátor prijal
   rez **M1a → M1b → M2**). **Pre používateľa:** v Štúdiu → Materiály má doska a ABS bez Demosu ikonu **„Otvoriť produkt"** (sivá otvorí obchod a nič
   nezapíše; jantárová = odkaz chýba → ceruzka s kurzorom v novom poli **„Odkaz na produkt"** nad Demos URL), pri Demos väzbe je pole zamknuté a ručný odkaz
   ostáva odložený; ikony majú v riadku **pevné miesto** (tri pozície, hlavička rovnako), takže stĺpce sú pod sebou. **Dáta:** `product_url` (http/https),
@@ -85,7 +104,7 @@
 - **DOCS — štart bloku CENY · overenie cien materiálov a ABS (29.–30.9.2026, PR #425, len dokumentácia; verzia pluginu sa nemení).** Michal 29.9. večer pri
   otázke „čo ešte pred V1" vybral **posledný kódový bod V1** — ručné overenie cien dosiek a ABS bez Demos väzby (zvyšok V1-03). Fakty z kódu a reálnych dát:
   zo 76 nákupných záznamov je bez Demosu len 5 (2× DTDL, zástena, sklo, 1 ABS; 3 bez ceny) a v Rozpočte sú dnes prakticky neviditeľné. Rozhodnutia
-  **C1–C11** ([zdroje/bloky/CENY/ROZHODNUTIA_MICHALA_2026-09-29.md](../zdroje/bloky/CENY/ROZHODNUTIA_MICHALA_2026-09-29.md)): vzor ako kovanie (CENY-KOV), **jeden odkaz** (C7 mení
+  **C1–C11** ([bloky/CENY/ROZHODNUTIA_MICHALA_2026-09-29.md](bloky/CENY/ROZHODNUTIA_MICHALA_2026-09-29.md)): vzor ako kovanie (CENY-KOV), **jeden odkaz** (C7 mení
   pôvodné C2 „zoznam odkazov"), doska **za platňu** s prepočtom na €/m², bez novej outside-in rešerše (vzor aj rešerš z CENY-KOV), povinný Codex audit
   každej dávky; **mockup schválený 30.9.** (O1–O9 podľa návrhu — „moc sedí"). Zároveň **poradie pred V1** v [PLAN.md](../PLAN.md), blok 4: CENY → R-13 →
   R-37 → R-35 (R-37 a R-35 Michal zaradil 30.9.); **test na reálnej zákazke = akceptačný test po V1** — bod „Návrh" vo [V1_VIZIA.md](../V1_VIZIA.md)
