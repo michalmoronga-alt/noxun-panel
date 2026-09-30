@@ -220,7 +220,18 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 - ✅ **D-124 · Predvoľby projektu v Materiáloch** — default rozbalené, ručne zbaliteľné; štyri skupiny Korpus / Čelá / Chrbát / Zásuvky vedľa seba, náhľady **115 × 115 px**
   (schválený mockup mínus 20 %), celý názov variantu a údaje pod vzorkou; v úzkom okne dva stĺpce. Spoločný picker, potvrdenie/zrušenie a serverový kontrakt zachované.
   **PR #344, v0.10.3.** „Materiál per rola dielca" ostáva v zásobníku Po V1. Podklad: `zdroje/next_sessions/D124_OUTSIDE_IN_2026-09-10.md`.
-- **Ceny — zvyšok V1-03:** ručné overenie cien **materiálov/ABS** bez Demos väzby a viac URL na položke ostávajú v zásobníku; vytiahnuť podľa reálnej praxe.
+- **Ceny — zvyšok V1-03 → blok CENY (štart 29.9.2026, Michal: „poďme na ceny materiálov a ABS" — posledný kódový bod V1):** ručné overenie cien **materiálov/ABS**
+  bez Demos väzby a **jeden** odkaz na produkt (C7 nahradilo pôvodné „viac URL na položke"). Priečinok bloku [zdroje/bloky/CENY/](zdroje/bloky/CENY/) — rozhodnutia
+  [ROZHODNUTIA_MICHALA_2026-09-29.md](zdroje/bloky/CENY/ROZHODNUTIA_MICHALA_2026-09-29.md) (C1–C11), schválený mockup
+  [MOCKUP_CENY_2026-09-30.html](zdroje/bloky/CENY/MOCKUP_CENY_2026-09-30.html) (O1–O9 podľa návrhu, 30.9.). Štart bloku PR #425. Dávky (každá s auditom návrhu — mení formát katalógu):
+  - **CENY-M1a** · odkaz na produkt pri doske/ABS bez Demosu v dátach katalógu a v Štúdiu → Materiály (package M1 pribudne v priečinku bloku).
+  - **CENY-M1b** · ručné overenie ceny (doska za platňu / ABS za bm), zneplatnenie, prednosť Demosu, D-148.
+  - **CENY-M2** · Rozpočet: vek ručne overených cien, „N cien na kontrolu", odkaz a „Overiť cenu" v sekcii Materiál a ABS hrany; materiál bez formátu
+    podľa skutočných m² dielcov namiesto fiktívnej platne (C12).
+- **Poradie pred uzáverom V1 (Michal 29.–30.9.2026):** blok **CENY** (CENY-M1 → CENY-M2) → **R-13** (čítať `std` na entite, ORANGE „dielec z inej verzie
+  štandardu") → **R-37** (ochrana nastavení dodávateľa pred tichým prepísaním seedom) → **R-35** (dve okná SketchUpu si neprepíšu pravidlá kovania
+  a rozmerové rady) — plné znenia a verdikty v [AUDIT_REGISTER.md](AUDIT_REGISTER.md) (sekcia „Stav po previerke 29.9.2026"). **Test na kompletnej
+  reálnej zákazke až po V1** (Michal 29.9.: teraz nemá vhodnú zákazku); po dobehnutí týchto bodov Michal určí ďalší postup.
   **CENY-KOV-A/B je hotové** (10.9.2026, PR #345/#346, v0.10.4–v0.10.5): jeden produktový odkaz a ručné potvrdenie katalógového kovania; plný schválený rozsah v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).
   Pôvodná debata: [zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md). Prepínač „na faktúru“ je vyradený (existuje s DPH / bez DPH); DOCX/PDF ponuka a rodina dokumentov sú mimo V1.
 - ✅ **D-128 · Ručná výška dreveného boxu zásuvky (Quadro)** — tretia os zámku (`box_height`) popri NL a výškovom variante Atiry: chip „box 360" s malým číselným poľom
@@ -259,7 +270,8 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   [výsledok a smoke](archiv/KONSTRUKCIA_ZAVER_2026-09-27.md); **K3 je hotová v bloku 8 · K3 ROHOVÁ SKRINKA (v0.15.0, 28.9.2026)** —
   [výsledok a smoke](archiv/ROHOVA_ZAVER_2026-09-28.md). V1 rozsah Konštrukcie je tým prázdny.
 - **V1.0 zostavy — V1 rozsah PO ROZHODNUTÍ 4.9.2026:** prisunutie a kopírovanie korpusov po vlastnej osi (snaper + mower logika → draft NÁSTROJE-1) · dosky (pracovná doska, pilaster,
-  soklová lišta, krycí panel) vkladané a kreslené prichytením na rohy skriniek (drafty GHOST-D1/D2) · test na kompletnej reálnej zákazke. **PO V1** (rozhodnutie 4.9., koncept 02):
+  soklová lišta, krycí panel) vkladané a kreslené prichytením na rohy skriniek (drafty GHOST-D1/D2) · ~~test na kompletnej reálnej zákazke~~ → **akceptačný test
+  po V1** (Michal 29.–30.9.2026, rozhodnutia CENY C10/C13). **PO V1** (rozhodnutie 4.9., koncept 02):
   segmentová automatika — soklová lišta v celku pre segment, obklady a krycie prvky segmentu vrátane pilastra (priznaný vs. skrytý) ako generované diely, pracovné a horné krycie dosky
   na označený segment, migrácia a oprava starých modelov, plné segmenty s `attachment` dátovým kontraktom, automatické krycie dosky a PD cez segment — v zásobníku.
   **Rozhodnutie 4.9.2026 (Michal, debata V1 bod 1B):** viazané diely a sektory (koncept 02) idú **PO V1** — „radšej raz a poriadne, než teraz kúskovať". Praktickú potrebu zostáv pokryjú v V1

@@ -1,0 +1,1589 @@
+<!DOCTYPE html>
+<html lang="sk" data-nx-theme="noxun">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Noxun Engine — mockup CENY · overenie cien materiálov a ABS</title>
+<!--
+  Blok CENY — ručné overenie cien dosiek a ABS bez väzby na Demos. SCHVÁLENÉ Michalom 30.9.2026: O1–O9 podľa návrhu (C11).
+  Podklad: SYSTEM/zdroje/bloky/CENY/ROZHODNUTIA_MICHALA_2026-09-29.md (C1–C10; záväzné C6–C9, C7 mení C2),
+           SYSTEM/zdroje/bloky/CENY/FAKTY_Z_KODU_2026-09-29.md (dnešný stav, reálne počty: 5 položiek bez Demosu, 3 bez ceny).
+  Vzhľad = Štúdio v0.16.0:
+    ui/studio.html        — navigácia, lišta sekcie, formulár variantu (mdSheetForm / mdEdgeForm, pole „Demos URL"),
+                            CSS Rozpočtu (.bsum, .bchip, .blist, .btab, .bold-price) a CENY-KOV (.hw-product-link, .hw-manual-check)
+    ui/css/panel.css      — :root (tokeny), riadky variantov (.mdvrow, .mdcell, .mduni, .mddm), detail skupiny (.mdcard .mdet,
+                            .mdstsec, .mda-trigger), „Kde sa používa" (.mdwrow), kostra modalu (.nxmcard, .mhead, .mbody, .mfoot, .mrow)
+    ui/js/proj_materials.js — mdDetailHtml, mdSectionRows, mdVariantRow, mdDemosBtn, mdDuplakRow, mdDuplakBtn, mdUniBtn,
+                            mdDemosField, mdOpenSheetForm, mdOpenEdgeForm, matToolsHtml
+    ui/js/hw_catalog.js   — vzor CENY-KOV: ikona „Otvoriť produkt" (i-external-link, jantárová is-missing → úprava s fokusom
+                            na odkaze), hwManualOpen (NXModal „Overiť cenu ručne", „Potvrdiť cenu k dnešku", cena s DPH za MJ,
+                            predchádzajúce overenie), pole „Odkaz na produkt" v editore (pri Demos väzbe zamknuté)
+    ui/js/budget.js       — budMaterialRow, budSimpleRow, budFreshCell, budStaleLabel, budPriceBtnHtml, budStaleListHtml,
+                            budStaleActionHtml („bez Demos väzby — over v katalógu ručne"), budHardwareLink, budManualCheckHtml
+    ui/js/nx_modal.js     — modalHtml (hlavička, skupina, riadky, poznámka, pätka Zrušiť + zelené potvrdenie)
+    core/budget.rb        — stale_scan / freshness_item (dnes materiál bez Demosu = napevno „manual", dátum sa ignoruje)
+  Forma stránky = SYSTEM/archiv/bloky/NAREZ/MOCKUP_NAREZ_2026-09-28.html (lišta, prepínač témy, piny, body O…, výrezy okien).
+  Tokeny --nx-* = kópia :root z panel.css + prepisy témy Lucia z win_fit.js. --mk-* = LEN anotácie mockupu.
+  --mat-* = farby dekorov z katalógu (dáta materiálu) — nie sú to UI tokeny.
+  Čísla a texty sú ukážkové; pravidlá (polia, verzie dát, zneplatnenie) určia packages CENY-M1 a CENY-M2 s vlastným auditom.
+-->
+<style>
+  :root{
+    --nx-bg:#f4f5f7; --nx-surface:#fff; --nx-surface-sunken:#eceff1; --nx-surface-readonly:#f4f6f8;
+    --nx-surface-preview:#fafcff; --nx-surface-th:#f5f7f8; --nx-part-bg:#f2fafb;
+    --nx-ink:#263238; --nx-ink-title:#1b3a4b; --nx-ink-strong:#37474f; --nx-ink-label:#455a64;
+    --nx-ink-muted:#607d8b; --nx-ink-soft:#78909c; --nx-ink-faint:#90a4ae;
+    --nx-border:#cfd8dc; --nx-border-strong:#b0bec5; --nx-border-soft:#eceff1;
+    --nx-action:#2e7d32; --nx-action-hover:#1b5e20; --nx-on-accent:#fff;
+    --nx-select:#107787; --nx-select-strong:#0B5661; --nx-select-accent:#0e6b7a;
+    --nx-select-bg:#e0f2f4; --nx-select-bg-soft:#f0f9fa; --nx-select-bg-hover:#d6eef1; --nx-part-border:#7fc4cf;
+    --nx-ok-bg:#e8f5e9; --nx-ok-fg:#1b5e20; --nx-ok-border:#c8e6c9;
+    --nx-err-bg:#fdecea; --nx-err-fg:#b71c1c; --nx-err-border:#f5c6cb;
+    --nx-danger:#c62828; --nx-danger-bg:#fbe9e7; --nx-danger-border:#ffccbc;
+    --nx-danger-line:#e53935; --nx-danger-bg-soft:#fff5f5;
+    --nx-warn:#ffb74d; --nx-warn-bg:#fff8ef; --nx-warn-bg-soft:#fff3e0; --nx-warn-fg:#e65100;
+    --nx-warnchip-fg:#b26a00; --nx-warnchip-border:#ffcc80;
+    --nx-warnrow-fg:#7a5000; --nx-warnrow-border:#ffe0b2;
+    --nx-modalwarn-fg:#8d5a00; --nx-wbadge-fg:#4e2e00;
+    --nx-ghost-hover:#e0e4e7; --nx-logo:#78909c;
+    --nx-state-red:#d32f2f; --nx-state-orange:#f9a825; --nx-state-green:#388e3c;
+    --nx-scrim:rgba(38,50,56,.45); --nx-modal-shadow:rgba(0,0,0,.25);
+    /* LEN anotácie mockupu (nie sú to tokeny pluginu) — tie isté ako v mockupe NÁREZOVÝ PLÁN */
+    --mk-page:#e6e9ec; --mk-bar:#2b3a42; --mk-bar-ink:#dfe7ec; --mk-bar-sub:#8ea3ae;
+    --mk-win-border:#b6c0c6; --mk-win-head:#dfe4e7; --mk-win-dot:#bcc6cc; --mk-shadow:rgba(20,30,45,.16);
+    --mk-bg:#fffdf3; --mk-border:#d8cfa8; --mk-ink:#6b5d1f; --mk-ink-strong:#5b4f18;
+    --mk-pin:#f6d860; --mk-pin-border:#c9a83a; --mk-pin-ink:#4a3f10; --mk-row:#fffbe6;
+    /* LEN ilustrácia prehliadača (stránka obchodu mimo pluginu) */
+    --mk-web:#fbfcfd; --mk-web-bar:#e3e7ea; --mk-web-ink:#33434b; --mk-web-sub:#7b8a92;
+    /* DÁTA: farby dekorov z katalógu (vzorka materiálu) */
+    --mat-h1180:#a57e55; --mat-glass:#d5e5e9; --mat-uni:#a9a9b2;
+  }
+  /* Téma Lucia — prepisuje VÝHRADNE výberovú rodinu (win_fit.js NX_THEME_TOKENS.lucia) */
+  :root[data-nx-theme="lucia"]{
+    --nx-select:#c2185b; --nx-select-strong:#880e4f; --nx-select-accent:#ad1457; --nx-select-bg:#fce4ec;
+    --nx-select-bg-soft:#fdf1f5; --nx-select-bg-hover:#fce4ec; --nx-part-border:#f48fb1; --nx-part-bg:#fff5f9;
+  }
+  *{box-sizing:border-box}
+  html{overflow-x:clip}
+  html,body{margin:0}
+  body{font-family:"Segoe UI",Tahoma,sans-serif;font-size:13px;color:var(--nx-ink);background:var(--mk-page);padding:0 0 70px}
+  button,input,select{font-family:inherit;font-size:inherit}
+  .ic{width:15px;height:15px;flex:0 0 auto;vertical-align:middle;fill:none;stroke:currentColor;
+      stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+  .nw{white-space:nowrap}
+
+  /* ===== stránka mockupu ===== */
+  .mockbar{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;padding:8px 16px;background:var(--mk-bar);color:var(--mk-bar-ink)}
+  .mockbar .mb-title{font-weight:600;font-size:13px}
+  .mockbar .mb-ver{font-size:11px;color:var(--mk-bar-sub)}
+  .mockbar .mb-sp{flex:1}
+  .mockbar .mb-ctl{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--mk-bar-sub)}
+  .mockbar .mb-ctl button{font-size:11px;padding:2px 9px;border-radius:6px;border:1px solid var(--mk-bar-sub);background:transparent;
+                          color:var(--mk-bar-ink);cursor:pointer}
+  .mockbar .mb-ctl button.on{background:var(--mk-bar-ink);color:var(--mk-bar)}
+  .mockbar label{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--mk-bar-ink);cursor:pointer}
+  .notestrip{display:flex;align-items:flex-start;gap:8px;padding:6px 16px;font-size:11.5px;line-height:1.45;
+             background:var(--nx-warn-bg-soft);color:var(--nx-warnchip-fg);border-bottom:1px solid var(--nx-warnchip-border)}
+  .notestrip .ic{margin-top:1px}
+  .page{max-width:1540px;margin:0 auto;padding:0 16px}
+  .pending{margin:14px auto 0;max-width:1180px;padding:10px 14px;border:2px dashed var(--nx-warn);border-radius:8px;
+           background:var(--nx-warn-bg);color:var(--nx-warnrow-fg);font-weight:600;font-size:14px;line-height:1.45}
+  .intro{margin:16px auto 0;max-width:1180px;background:var(--nx-surface);border:1px solid var(--nx-border);border-radius:8px;
+         padding:12px 16px;line-height:1.5}
+  .intro h1{font-size:16px;margin:0 0 4px;color:var(--nx-ink-title)}
+  .stat{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:1px 8px;border-radius:9px;
+        background:var(--nx-warn-bg-soft);color:var(--nx-warnchip-fg);border:1px solid var(--nx-warnchip-border);vertical-align:2px;margin-left:6px}
+  .intro p{margin:6px 0}
+  .intro ul{margin:6px 0 0;padding-left:18px}
+  .intro li{margin:2px 0}
+  .intro .src{font-size:11.5px;color:var(--nx-ink-soft)}
+  .intro .legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:8px;font-size:11.5px;color:var(--nx-ink-muted)}
+  .intro .legend span{display:inline-flex;align-items:center;gap:6px}
+  .intro .dec{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:6px 0 2px;font-size:12px}
+  .intro .dec b{color:var(--nx-ink-strong)}
+  .sh{margin:34px auto 0;display:flex;align-items:baseline;gap:6px 10px;flex-wrap:wrap;justify-content:center;text-align:center}
+  .sh h2{margin:0;font-size:16px;color:var(--nx-ink-title)}
+  .sh .shl{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:22px;padding:0 7px;border-radius:6px;
+           background:var(--mk-bar);color:var(--nx-on-accent);font-size:12px;font-weight:700}
+  .sh .shsub{flex-basis:100%;font-size:12px;color:var(--nx-ink-muted)}
+  .sh .shsub>span{display:inline-block;max-width:980px}
+  .stagewrap{padding:12px 0 0;display:flex;gap:18px;justify-content:center;align-items:flex-start;flex-wrap:wrap}
+  .stage{min-width:0;max-width:100%}
+  .winscroll{max-width:calc(100% + 48px);overflow-x:auto;padding:4px 24px 36px;margin:0 -24px -20px}
+  .side{width:380px;max-width:100%;flex:0 1 380px;min-width:0}
+  .side.wide{width:560px;flex-basis:560px}
+  .win{background:var(--nx-surface);border:1px solid var(--mk-win-border);border-radius:9px;box-shadow:0 12px 34px var(--mk-shadow);overflow:hidden}
+  .winhead{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--mk-win-head);border-bottom:1px solid var(--nx-border);
+           font-size:12px;font-weight:600;color:var(--nx-ink-strong)}
+  .winhead .wdots{display:flex;gap:4px}
+  .winhead .wdots i{width:9px;height:9px;border-radius:50%;background:var(--mk-win-dot);display:block}
+  .winhead .wsub{font-weight:400;color:var(--nx-ink-muted)}
+  .winhead .wsize{margin-left:auto;font-weight:400;font-size:11px;color:var(--nx-ink-faint);white-space:nowrap}
+  .wincap{font-size:11.5px;color:var(--nx-ink-muted);margin:0 0 6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .wincap b{color:var(--nx-ink-strong)}
+  .mocknote{background:var(--mk-bg);border:1px dashed var(--mk-border);border-radius:8px;padding:10px 13px;font-size:12px;
+            color:var(--mk-ink);line-height:1.55;margin-bottom:12px}
+  .mocknote b{color:var(--mk-ink-strong)}
+  .mocknote h4{margin:0 0 4px;font-size:12.5px;color:var(--mk-ink-strong)}
+  .mocknote ol{margin:4px 0 0;padding-left:0;list-style:none}
+  .mocknote li{margin:5px 0;padding-left:32px;position:relative}
+  .mocknote ul.dots{margin:6px 0 0;padding-left:0;list-style:none}
+  .mocknote ul.dots li{padding-left:14px}
+  .mocknote ul.dots li::before{content:'';position:absolute;left:3px;top:8px;width:5px;height:5px;border-radius:50%;background:var(--mk-border)}
+  .npin{position:absolute;left:0;top:1px;min-width:26px;height:16px;padding:0 4px;border-radius:8px;background:var(--mk-pin);
+        color:var(--mk-pin-ink);border:1px solid var(--mk-pin-border);font:700 9.5px/14px "Segoe UI",sans-serif;text-align:center}
+  /* štítky O… = body SCHVÁLENÉ 30.9.2026 (C11; pôvodne „návrh — potvrdí Michal") — jantárové; žlté čísla = zmena oproti dnešnému pluginu */
+  .oref,.otag{display:inline-block;height:16px;padding:0 6px;border-radius:8px;background:var(--nx-warn-bg-soft);color:var(--nx-warnchip-fg);
+        border:1px solid var(--nx-warnchip-border);font:700 9px/14px "Segoe UI",sans-serif;white-space:nowrap;vertical-align:1px;
+        text-decoration:none;letter-spacing:0;text-transform:none;font-style:normal;margin:0 3px;flex:0 0 auto}
+  .oref:hover,.otag:hover{background:var(--nx-warn-bg);border-color:var(--nx-warn)}
+  .mpin{display:inline-block;min-width:18px;height:16px;padding:0 4px;border-radius:8px;background:var(--mk-pin);color:var(--mk-pin-ink);
+        border:1px solid var(--mk-pin-border);font:700 9px/14px "Segoe UI",sans-serif;text-align:center;letter-spacing:0;text-transform:none;
+        vertical-align:1px;box-shadow:0 1px 2px rgba(0,0,0,.16);font-style:normal;margin:0 4px;flex:0 0 auto}
+  body.nopins .mpin, body.nopins .otag{display:none}
+  .mkhl{background:var(--mk-row);outline:1px dashed var(--mk-border);outline-offset:1px;border-radius:6px}
+  body.nopins .mkhl{background:none;outline:none}
+  .flash{animation:flash 1.6s ease}
+  @keyframes flash{0%,40%{box-shadow:0 0 0 3px var(--nx-warn)}100%{box-shadow:0 0 0 0 transparent}}
+
+  /* ===== schválené body O1–O10 (hlavička mockupu) ===== */
+  .ohead{max-width:1180px;margin:18px auto 0}
+  .ohead h2{font-size:15px;margin:0;color:var(--nx-ink-title)}
+  .ohead .osub{font-size:12px;color:var(--nx-ink-muted);margin:2px 0 8px}
+  .ogrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:10px}
+  .obox{border:1.5px dashed var(--nx-warn);background:var(--nx-surface);border-radius:8px;padding:8px 11px 9px;font-size:12px;line-height:1.48}
+  .obox:target{box-shadow:0 0 0 3px var(--nx-warnchip-border)}
+  .obox .oh{display:flex;align-items:baseline;gap:4px 8px;flex-wrap:wrap;margin:0 0 3px}
+  .obox .oh b{font-size:12.5px;color:var(--nx-ink-title)}
+  .obox .otagi{display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:9px;background:var(--nx-warn-bg-soft);
+               color:var(--nx-warnchip-fg);border:1px solid var(--nx-warnchip-border);white-space:nowrap}
+  .obox dl{display:grid;grid-template-columns:78px minmax(0,1fr);gap:3px 8px;margin:3px 0 0}
+  .obox dt{color:var(--nx-warnrow-fg);font-weight:600}
+  .obox dt.rec{color:var(--nx-ok-fg)}
+  .obox dd{margin:0}
+  .obox dd.rec{background:var(--nx-ok-bg);border:1px solid var(--nx-ok-border);border-radius:6px;padding:2px 6px}
+  .obox .where{font-size:11px;color:var(--nx-ink-soft);margin-top:4px}
+  .obox .where a{color:var(--nx-select);text-decoration:none;font-weight:600}
+  .obox .where a:hover{text-decoration:underline}
+  .obox .oalt{margin-top:4px;font-size:11px;color:var(--nx-ink-muted)}
+  .fyi{max-width:1180px;margin:30px auto 0;background:var(--nx-surface);border:1px solid var(--nx-border);border-left:4px solid var(--nx-ink-faint);
+       border-radius:8px;padding:10px 16px 12px 14px;line-height:1.5;font-size:12.5px}
+  .fyi h3{margin:0 0 4px;font-size:13.5px;color:var(--nx-ink-title)}
+  .fyi ul{margin:0;padding-left:18px}
+  .fyi li{margin:4px 0}
+
+  /* ===== prepínač ukážky (LEN mockup) ===== */
+  .mkswitch{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 8px;font-size:11.5px;color:var(--mk-ink)}
+  .mkswitch button{font-size:11.5px;padding:3px 10px;border-radius:6px;border:1px dashed var(--mk-border);background:var(--mk-bg);
+                   color:var(--mk-ink-strong);cursor:pointer}
+  .mkswitch button.on{background:var(--mk-pin);border-style:solid;border-color:var(--mk-pin-border);color:var(--mk-pin-ink);font-weight:600}
+
+  /* ===== ilustrácia prehliadača (stránka obchodu mimo pluginu) ===== */
+  .mkweb{width:300px;max-width:100%;border:1px dashed var(--mk-border);border-radius:9px;background:var(--mk-web);overflow:hidden;
+         box-shadow:0 8px 24px var(--mk-shadow)}
+  .mkwebbar{display:flex;align-items:center;gap:5px;padding:6px 9px;background:var(--mk-web-bar);font-size:11px;color:var(--mk-web-sub)}
+  .mkwebbar i{width:8px;height:8px;border-radius:50%;background:var(--mk-win-dot);display:block}
+  .mkwebbar .mkurl{margin-left:6px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:var(--mk-web);
+                   border-radius:6px;padding:2px 7px;color:var(--mk-web-ink)}
+  .mkwebbody{padding:12px 13px 13px;color:var(--mk-web-ink);font-size:12px;line-height:1.45}
+  .mkwebh{font-weight:700;font-size:13px}
+  .mkwebs{color:var(--mk-web-sub);font-size:11px;margin:2px 0 8px}
+  .mkwebp{font-size:20px;font-weight:700}
+  .mkwebp small{font-size:11px;font-weight:400;color:var(--mk-web-sub)}
+  .mkwebn{margin-top:10px;font-size:10.5px;color:var(--mk-ink);border-top:1px dashed var(--mk-border);padding-top:6px}
+  .mkwebcap{font-size:11px;color:var(--nx-ink-muted);margin:0 0 5px}
+
+  /* =====================================================================
+     ŠTÚDIO — zrkadlo ui/studio.html + panel.css (scope .stu)
+     ===================================================================== */
+  .stu{font-size:13px;color:var(--nx-ink);background:var(--nx-bg)}
+  .stu button{padding:7px 8px;border:0;border-radius:6px;cursor:pointer;font:inherit;font-size:12px;font-weight:600}
+  .stu .primary{background:var(--nx-action);color:var(--nx-on-accent)}
+  .stu .primary:hover{background:var(--nx-action-hover)}
+  .stu .ghostbtn{background:var(--nx-surface-sunken);color:var(--nx-ink-strong);border:1px solid var(--nx-border)}
+  .stu .ghostbtn:hover{background:var(--nx-ghost-hover)}
+  .stu.full{display:flex;flex-direction:column;width:1060px;height:640px}
+  .stu .studio{flex:1;display:flex;min-height:0}
+  .stu .snav{flex:0 0 208px;background:var(--nx-bg);border-right:1px solid var(--nx-border);padding:8px 6px;overflow:auto}
+  .stu .sgrp{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--nx-ink-faint);padding:9px 8px 3px}
+  .stu .sgrp:first-child{padding-top:2px}
+  .stu .navitem{display:flex;width:100%;align-items:center;gap:8px;padding:6px 8px;margin:1px 0;border:0;border-radius:6px;background:none;
+                font-size:12.5px;font-weight:400;color:var(--nx-ink-strong);text-align:left}
+  .stu .navitem:hover{background:var(--nx-select-bg-soft)}
+  .stu .navitem.on{background:var(--nx-select-bg);color:var(--nx-select);font-weight:600;box-shadow:inset 3px 0 0 var(--nx-select)}
+  .stu .navitem .ic{width:15px;height:15px;color:var(--nx-ink-muted);flex:0 0 15px}
+  .stu .navitem.on .ic{color:var(--nx-select)}
+  .stu .navitem span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .stu .navfoot{margin-top:10px;padding-top:6px;border-top:1px solid var(--nx-border-soft)}
+  .stu .nbadge{display:inline-flex;gap:3px;align-items:center;flex:0 0 auto}
+  .stu .nbadge i{font-style:normal;font-size:10px;font-weight:700;border-radius:9px;padding:0 5px;line-height:15px}
+  .stu .nbadge i.o{background:var(--nx-warn-bg-soft);color:var(--nx-wbadge-fg);border:1px solid var(--nx-warnchip-border)}
+  .stu .sbody{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--nx-surface)}
+  .stu.part{width:852px}
+  .stu.half{width:520px}
+  .stu .sechead{display:flex;align-items:baseline;gap:8px;padding:9px 12px;border-bottom:1px solid var(--nx-border);background:var(--nx-bg)}
+  .stu .sechead h2{font-size:14px;margin:0;color:var(--nx-ink-title);font-weight:700}
+  .stu .sechead .sechint{font-size:11px;color:var(--nx-ink-soft);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .stu .sechead .secmodel{margin-left:auto;font-size:11px;color:var(--nx-ink-faint);white-space:nowrap}
+  .stu .sectools{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--nx-border-soft);flex-wrap:wrap;position:relative}
+  .stu .sectools .spacer{flex:1}
+  .stu .sectools .primary,.stu .sectools .ghostbtn{display:inline-flex;align-items:center;gap:5px;padding:6px 10px}
+  .stu .sectools .primary{padding:6px 12px}
+  .stu .sectools .ic{width:14px;height:14px}
+  .stu .sectools .ghostbtn.bstalebtn{border-color:var(--nx-warnchip-border);background:var(--nx-warn-bg);color:var(--nx-warn-fg)}
+  .stu .sectools .ghostbtn.bstalebtn:hover{background:var(--nx-warn-bg-soft)}
+  .stu .sectools select{padding:5px 6px;border:1px solid var(--nx-border-strong);border-radius:6px;font-size:12px;background:var(--nx-surface)}
+  .stu .searchbox{display:flex;align-items:center;gap:6px;border:1px solid var(--nx-border-strong);border-radius:6px;padding:4px 8px;
+                  background:var(--nx-surface);min-width:150px}
+  .stu .searchbox input{border:0;outline:0;font:inherit;font-size:12px;flex:1;background:transparent;min-width:0}
+  .stu .searchbox .ic{width:14px;height:14px;color:var(--nx-ink-faint)}
+  .stu .secscroll{flex:1;overflow:auto;padding:10px 12px 20px;min-height:0}
+  .stu.full .secscroll{padding-bottom:40px}
+  .stu .status{font-size:11px;padding:7px 12px;background:var(--nx-surface-sunken);color:var(--nx-ink-label);border-top:1px solid var(--nx-border);
+               min-height:30px;line-height:1.35}
+  .stu .status.ok{background:var(--nx-ok-bg);color:var(--nx-ok-fg);border-top-color:var(--nx-ok-border)}
+  .stu .status.warn{background:var(--nx-warn-bg);color:var(--nx-warnrow-fg);border-top-color:var(--nx-warnchip-border)}
+  .stu .spacer{flex:1}
+  /* tooltip „?" (.nxtip, D-130a) */
+  .nxtip{position:relative;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:18px;height:18px;padding:0!important;
+         border:0;border-radius:50%;background:none;color:var(--nx-ink-faint);cursor:help;vertical-align:middle}
+  .nxtip:hover,.nxtip:focus{color:var(--nx-select);outline:none}
+  .nxtip .ic{width:13px;height:13px}
+  .nxtip::after{content:attr(data-tip);display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:130;width:270px;max-width:70vw;
+                padding:7px 9px;border-radius:6px;background:var(--nx-ink);color:var(--nx-surface);font-size:11px;font-weight:400;line-height:1.45;
+                white-space:pre-line;text-align:left;box-shadow:0 6px 18px var(--nx-modal-shadow);text-transform:none;letter-spacing:0}
+  .nxtip:hover::after,.nxtip:focus::after{display:block}
+  /* tooltip ikon v riadku — v plugine bežný `title`, tu okamžitý, aby bolo vidno text stavu */
+  .mktip{position:relative}
+  .mktip:hover::after,.mktip:focus-visible::after{content:attr(data-tip);position:absolute;top:calc(100% + 6px);right:0;z-index:140;width:max-content;
+                max-width:270px;padding:6px 8px;border-radius:6px;background:var(--nx-ink);color:var(--nx-surface);font-size:11px;font-weight:400;
+                line-height:1.4;white-space:pre-line;text-align:left;box-shadow:0 6px 18px var(--nx-modal-shadow);pointer-events:none;
+                text-transform:none;letter-spacing:0}
+
+  /* ===== Materiály — zrkadlo panel.css (detail dekorovej skupiny) ===== */
+  .stu fieldset{border:1px solid var(--nx-border);border-radius:6px;margin:0 0 10px;padding:8px 10px 10px;background:var(--nx-surface)}
+  .stu legend{font-weight:600;font-size:12px;color:var(--nx-ink-strong);padding:0 4px}
+  .stu details.mddef{border:1px solid var(--nx-border);border-radius:6px;margin:0 0 10px;background:var(--nx-surface)}
+  .stu details.mddef>summary{font-weight:600;font-size:12px;color:var(--nx-ink-strong);padding:8px 10px;cursor:pointer;list-style:none;user-select:none}
+  .stu details.mddef>summary::-webkit-details-marker{display:none}
+  .stu details.mddef>summary::before{content:'';display:inline-block;width:6px;height:6px;margin-right:8px;border-right:2px solid var(--nx-ink-faint);
+      border-bottom:2px solid var(--nx-ink-faint);transform:rotate(-45deg);position:relative;top:-2px}
+  .stu details.mddef .mddefbody{padding:0 10px 10px;font-size:11.5px;color:var(--nx-ink-muted)}
+  .stu .tplrow{display:flex;align-items:center;gap:6px;margin:4px 0}
+  .stu .tplrow .tpln{flex:1;font-size:12.5px;color:var(--nx-ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .stu .tplt{color:var(--nx-ink-faint);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em}
+  .stu .tplrow .tplbtn{flex:0 0 auto;padding:3px 10px;font-size:11.5px}
+  .stu .tplrow .tplbtn .ic{width:14px;height:14px}
+  .stu .mdcard{border:1px solid var(--nx-border-soft);border-radius:6px;padding:4px 8px;margin:6px 0;background:var(--nx-surface)}
+  .stu .mdcard .mdhead{margin:2px 0}
+  .stu .mdsw{flex:0 0 26px;width:26px;height:26px;border-radius:6px;border:1px solid var(--nx-border-strong);display:inline-block}
+  .stu .mdsw-lg{flex:0 0 34px;width:34px;height:34px;border-radius:6px}
+  .stu .mdunib{flex:0 0 auto;font-size:10px;font-weight:700;letter-spacing:.4px;color:var(--nx-select);border:1px solid var(--nx-select);
+               border-radius:3px;padding:0 4px;line-height:14px}
+  .stu .mdet .mdsec{margin:10px 2px 4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--nx-ink-muted)}
+  .stu .mdvhead{display:flex;align-items:center;gap:8px;padding:0 6px;min-width:430px;
+                font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--nx-ink-faint)}
+  .stu .mdvhead .mdvact{flex:0 0 58px}
+  .stu .mdvrow{display:flex;align-items:center;gap:8px;padding:3px 6px;border-top:1px solid var(--nx-border-soft);min-width:430px}
+  .stu .mdvrow:hover{background:var(--nx-select-bg-soft)}
+  .stu .mdvdim{flex:0 0 92px;font-size:12.5px;font-weight:600;color:var(--nx-ink-strong)}
+  .stu .mdvdim small{display:block;font-weight:400;font-size:10px;color:var(--nx-ink-faint);line-height:1.1}
+  .stu .mdvi{flex:1 1 0;min-width:0;font-size:12px;color:var(--nx-ink-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .stu .mdvdup{display:inline-flex;align-items:center;gap:5px;color:var(--nx-ink-faint);font-style:italic}
+  .stu .mdvdup .ic{width:13px;height:13px;flex:0 0 auto}
+  .stu .mdvp{flex:0 0 84px;text-align:right;color:var(--nx-ink)}
+  .stu .mdvrow .mdcell{flex:1 1 0;min-width:0;padding:3px 5px;font-size:12px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--nx-ink)}
+  .stu .mdvrow .mdcell:hover{border-color:var(--nx-border-soft);background:var(--nx-surface)}
+  .stu .mdvrow .mdcell:focus{border-color:var(--nx-border-strong);background:var(--nx-surface);outline:none}
+  .stu .mdvrow .mdcell.mdvp{flex:0 0 84px;text-align:right}
+  .stu .mdvrow .mdcell::placeholder{color:var(--nx-ink-faint)}
+  .stu .mdvact{flex:0 0 58px;display:inline-flex;gap:4px;justify-content:flex-end}
+  .stu .mdvact .tplbtn{padding:3px 6px}
+  .stu .mduni{flex:0 0 26px;width:26px;padding:3px 0;display:inline-flex;align-items:center;justify-content:center;background:var(--nx-surface-sunken);
+              color:var(--nx-ink-faint);border:1px solid var(--nx-border);border-radius:6px;cursor:pointer}
+  .stu .mduni.on{background:var(--nx-select-bg);color:var(--nx-select-strong);border-color:var(--nx-select-accent)}
+  .stu .mduni .ic{width:14px;height:14px}
+  .stu .mddm{color:var(--nx-select-accent)}
+  /* NOVÉ (návrh O1): pevné miesto pre ikony produktu — duplák/univerzálna · odkaz · overenie */
+  .stu .mkslot{flex:0 0 86px;display:inline-flex;gap:4px;justify-content:flex-end;align-items:center;border-radius:6px}
+  .stu .mkgap{flex:0 0 26px;width:26px;height:1px;display:inline-block}
+  .stu .mdprod{color:var(--nx-ink-soft)}
+  .stu .mdprod:hover,.stu .mdchk:hover{background:var(--nx-ghost-hover);color:var(--nx-ink)}
+  .stu .mdprod.is-missing,.stu .mdchk.is-pending{color:var(--nx-warn-fg);background:var(--nx-warn-bg);border-color:var(--nx-warnchip-border)}
+  .stu .mdprod.is-missing:hover,.stu .mdchk.is-pending:hover{background:var(--nx-warn-bg-soft)}
+  .stu .mdchk{color:var(--nx-ink-soft)}
+  .stu .mdstsec{display:flex;align-items:center;gap:6px;margin:12px 2px 0;font-size:11.5px;font-weight:700;color:var(--nx-select)}
+  .stu .mdstsec::after{content:'';flex:1;border-top:1px solid var(--nx-border-soft)}
+  .stu .mda-heading{flex-wrap:wrap;gap:8px}
+  .stu .mda-trigger{display:inline-flex;align-items:center;gap:6px;padding:4px 7px;font-size:11.5px}
+  .stu .mda-trigger .ic{width:13px;height:13px}
+  .stu .mda-mini{display:inline-block;width:15px;height:15px;border:1px solid var(--nx-border-strong);border-radius:3px}
+  .stu .mda-heading-hint{color:var(--nx-ink-muted);font-size:10.5px;font-weight:normal}
+  .stu .mdwhead{margin-top:14px}
+  .stu .mdwrow{display:flex;align-items:center;gap:8px;padding:3px 6px;border-top:1px solid var(--nx-border-soft)}
+  .stu .mdwrow:hover{background:var(--nx-select-bg-soft)}
+  .stu .mdwn{flex:1 1 0;min-width:0;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .stu .mdwr{color:var(--nx-ink-muted)}
+  .stu .mdwq{flex:0 0 84px;text-align:right;font-size:12px;color:var(--nx-ink-muted)}
+  .stu .mdwact{flex:0 0 32px;display:inline-flex;justify-content:flex-end}
+  .stu .mdweye{width:26px;padding:3px 0;display:inline-flex;align-items:center;justify-content:center;background:var(--nx-surface-sunken);
+               color:var(--nx-ink-muted);border:1px solid var(--nx-border);border-radius:6px}
+  .stu .mdweye .ic{width:14px;height:14px}
+  .stu .muted{color:var(--nx-ink-faint);font-size:11px;padding:4px 0}
+
+  /* ===== formulár variantu (ceruzka) — zrkadlo panel.css `.row` ===== */
+  .stu .mdform{padding:0 2px}
+  .stu .mdform .row{display:flex;align-items:center;margin:5px 0}
+  .stu .mdform .row label{flex:0 0 128px;color:var(--nx-ink-label)}
+  .stu .mdform .row input,.stu .mdform .row select{flex:1;padding:4px 6px;border:1px solid var(--nx-border-strong);border-radius:6px;font-size:13px;
+      min-width:0;background:var(--nx-surface);color:var(--nx-ink)}
+  .stu .mdform .row input:disabled,.stu .mdform .row select:disabled{background:var(--nx-surface-sunken);color:var(--nx-ink-faint);border-color:var(--nx-surface-sunken)}
+  .stu .mdform .row input[readonly]{background:var(--nx-surface-readonly);color:var(--nx-ink-soft);border-style:dashed}
+  .stu .mdform .row input.bad{border-color:var(--nx-danger-line);background:var(--nx-danger-bg-soft)}
+  .stu .mdform .row .unit{flex:0 0 26px;text-align:right;color:var(--nx-ink-faint);font-size:11px;padding-left:4px}
+  .stu .mdform .row input.sheetdim{flex:1 1 0;min-width:0}
+  .stu .mdform .row .sheetx{flex:0 0 auto;color:var(--nx-ink-faint);padding:0 2px}
+  .stu .mdform .hint{font-size:10.5px;color:var(--nx-ink-faint);margin:2px 0 6px}
+  .stu .mdform .hint.bad{color:var(--nx-danger)}
+  .stu .mdform .btnrow{display:flex;gap:6px;margin-top:6px}
+  .stu .mdform .btnrow button{flex:1}
+  .stu .mdform .newrow{border-radius:6px;padding:1px 3px;margin-left:-3px;margin-right:-3px}
+  .stu .mkabove{font-size:11px;color:var(--nx-ink-faint);padding:4px 2px 6px;border-bottom:1px dashed var(--nx-border);margin-bottom:6px}
+
+  /* ===== kostra modalu D-15 — zrkadlo panel.css (.nxmcard) ===== */
+  .mkmstage{position:relative;padding:26px 16px 30px;min-height:430px;display:flex;justify-content:center;align-items:flex-start;background:var(--nx-surface)}
+  .mkmbg{position:absolute;inset:0;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+  .mkmbg i{display:block;height:22px;border-radius:6px;background:var(--nx-surface-sunken)}
+  .mkmbg i:nth-child(2n){width:78%}
+  .mkmbg i:nth-child(3n){width:64%}
+  .mkmscrim{position:absolute;inset:0;background:var(--nx-scrim)}
+  .nxmcard{position:relative;background:var(--nx-surface);border:1px solid var(--nx-border);border-radius:9px;box-shadow:0 18px 50px var(--nx-modal-shadow);
+           width:560px;max-width:100%;display:flex;flex-direction:column}
+  .mhead{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--nx-border)}
+  .mhead h3{margin:0;font-size:13.5px;color:var(--nx-ink-title)}
+  .mhead .msub{font-size:11px;color:var(--nx-ink-soft);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mhead .mx{margin-left:auto;border:0;background:none;color:var(--nx-ink-faint);cursor:pointer;padding:3px!important;line-height:1}
+  .mhead .mx:hover{color:var(--nx-danger)}
+  .mbody{padding:10px 14px}
+  .mbody .hint{font-size:11px;color:var(--nx-ink-faint);line-height:1.45;margin-top:8px}
+  .mfoot{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--nx-border);background:var(--nx-bg);border-radius:0 0 9px 9px}
+  .mfoot .spacer{flex:1}
+  .mfoot .primary{display:inline-flex;align-items:center;gap:5px}
+  .mfoot .primary .ic{width:14px;height:14px}
+  .mrow{display:flex;align-items:center;gap:8px;margin:6px 0;flex-wrap:wrap}
+  .mrow>label{flex:0 0 118px;font-size:12px;color:var(--nx-ink-label)}
+  .mrow input{flex:1;min-width:0;padding:5px 7px;font:inherit;font-size:12.5px;border:1px solid var(--nx-border-strong);border-radius:6px;
+              background:var(--nx-surface);color:var(--nx-ink)}
+  .mrow input.mshort{flex:0 0 96px;text-align:right;font-variant-numeric:tabular-nums}
+  .mrow input.bad{border-color:var(--nx-danger-line);background:var(--nx-danger-bg-soft)}
+  .mrow .munit{font-size:11px;color:var(--nx-ink-faint)}
+  .mrow .mtext{flex:1;min-width:0;font-size:12px;color:var(--nx-ink-strong)}
+  .mrow .mtext.muted2{color:var(--nx-ink-muted)}
+  .mrow .mtext.chg{color:var(--nx-warn-fg);font-weight:600}
+  .mrow .mtext.same{color:var(--nx-ok-fg);font-weight:600}
+  .mrow .mcalc{font-size:12px;font-weight:600;color:var(--nx-ink-strong);font-variant-numeric:tabular-nums}
+  .mrow .mcalc.warn{color:var(--nx-warn-fg);font-weight:400}
+  .merr{flex:0 0 100%;font-size:11px;color:var(--nx-danger);padding:2px 0 0;margin-left:126px}
+  .merr:empty,.merrtop:empty{display:none}
+  .merrtop{margin:0 0 8px;padding:5px 8px;font-size:11.5px;color:var(--nx-danger);background:var(--nx-danger-bg-soft);border:1px solid var(--nx-danger-border);border-radius:6px}
+  .mgroup{display:flex;align-items:baseline;gap:8px;margin:2px 0 4px;flex-wrap:wrap}
+  .mgroup h4{margin:0;font-size:12px;letter-spacing:.3px;text-transform:uppercase;color:var(--nx-ink-soft)}
+  .mgroup span{font-size:11px;color:var(--nx-ink-faint);overflow-wrap:anywhere}
+  .mgroup span.nolink{color:var(--nx-warn-fg)}
+  .mkmstage .bseg{display:flex;border:1px solid var(--nx-border-strong);border-radius:6px;overflow:hidden;font-size:11.5px;flex:0 0 auto}
+  .mkmstage .bseg button{border:0;background:var(--nx-surface);padding:5px 10px;border-radius:0;color:var(--nx-ink-label);font-size:11.5px;font-weight:400;min-width:46px;cursor:pointer}
+  .mkmstage .bseg button+button{border-left:1px solid var(--nx-border-soft)}
+  .mkmstage .bseg button.on{background:var(--nx-select);color:var(--nx-on-accent);font-weight:600}
+
+  /* ===== Rozpočet — zrkadlo studio.html (ŠT-1c, SMOKE 22.8., CENY-KOV) ===== */
+  .stu .bseg{display:flex;border:1px solid var(--nx-border-strong);border-radius:6px;overflow:hidden;font-size:11.5px;flex:0 0 auto}
+  .stu .bseg button{border:0;background:var(--nx-surface);padding:5px 10px;border-radius:0;color:var(--nx-ink-label);font-size:11.5px;font-weight:400;min-width:46px}
+  .stu .bseg button+button{border-left:1px solid var(--nx-border-soft)}
+  .stu .bseg button.on{background:var(--nx-select);color:var(--nx-on-accent);font-weight:600}
+  .stu .bsum{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--nx-surface);border:1px solid var(--nx-border);border-radius:8px;
+             padding:10px 14px;margin:0 0 10px}
+  .stu .blbl{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--nx-ink-muted)}
+  .stu .btotal{font-size:24px;font-weight:700;color:var(--nx-ink-title);font-variant-numeric:tabular-nums}
+  .stu .btotal small{font-size:12px;font-weight:400;color:var(--nx-ink-muted)}
+  .stu .bwarns{margin-left:auto;display:flex;flex-direction:column;gap:5px;align-items:flex-end}
+  .stu .bchip{display:inline-flex;align-items:center;gap:6px;background:var(--nx-warn-bg);border:1px solid var(--nx-warnchip-border);color:var(--nx-warn-fg);
+              border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:400;cursor:pointer;text-align:left}
+  .stu .bchip .ic{width:12px;height:12px;transition:transform .12s}
+  .stu .bchip.open .ic.chevr{transform:rotate(90deg)}
+  .stu .blist{background:var(--nx-warn-bg);border:1px solid var(--nx-warnchip-border);border-radius:8px;padding:6px 12px;font-size:11.5px;
+              color:var(--nx-warnrow-fg);margin:0 0 10px}
+  .stu .blist>div{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:2px 0}
+  .stu .blist>div>span:first-child{flex:1;min-width:0}
+  .stu .blist .bage{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .stu .blist .bacts2{display:inline-flex;align-items:center;gap:2px;flex:0 0 160px;justify-content:flex-end}
+  .stu .bprwhy{color:var(--nx-warn-fg);text-align:right}
+  .stu details.bsec{background:var(--nx-surface);border:1px solid var(--nx-border);border-radius:8px;margin:0 0 8px;overflow:hidden}
+  .stu details.bsec>summary{display:flex;align-items:center;gap:9px;padding:7px 12px;flex-wrap:wrap;font-weight:400;cursor:pointer;list-style:none;user-select:none}
+  .stu details.bsec>summary::-webkit-details-marker{display:none}
+  .stu details.bsec>summary::before{content:'';display:inline-block;width:6px;height:6px;border-right:2px solid var(--nx-ink-faint);
+      border-bottom:2px solid var(--nx-ink-faint);transform:rotate(-45deg);transition:transform .12s;position:relative;top:-1px}
+  .stu details.bsec[open]>summary::before{transform:rotate(45deg);top:-2px}
+  .stu details.bsec>summary h3{margin:0;font-size:11.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--nx-ink-strong);font-weight:600}
+  .stu details.bsec:has(> summary .nxtip:hover){overflow:visible}
+  .stu .bcnt{font-size:11px;color:var(--nx-ink-faint)}
+  .stu .bsubt{margin-left:auto;font-weight:700;font-variant-numeric:tabular-nums;color:var(--nx-ink-title);font-size:13px}
+  .stu .bappl{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--nx-ink-label);cursor:pointer}
+  .stu .bappl input{accent-color:var(--nx-select);margin:0}
+  .stu .btab{width:100%;border-collapse:collapse;font-size:12px}
+  .stu .btab th{background:var(--nx-surface-th);color:var(--nx-ink-label);font-weight:600;text-align:left;font-size:10.5px;padding:4px 12px;
+                border-top:1px solid var(--nx-border-soft);border-bottom:1px solid var(--nx-border)}
+  .stu .btab td{padding:3px 10px;border-bottom:1px solid var(--nx-border-soft);vertical-align:middle}
+  .stu .btab tr:last-child td{border-bottom:0}
+  .stu .btab th.bnum,.stu .btab td.bnum{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .stu .bfnt{color:var(--nx-ink-faint);font-size:11px}
+  .stu .btab tr.bmiss td{background:var(--nx-warn-bg)}
+  .stu .bmisslbl{color:var(--nx-warn-fg);font-size:11px}
+  .stu .bold-price{color:var(--nx-warn-fg);background:var(--nx-warn-bg);border-radius:6px;padding:0 5px}
+  .stu .bact{background:none;border:0;padding:0 3px;cursor:pointer;color:var(--nx-select);line-height:1;vertical-align:-0.15em;font-weight:400}
+  .stu .bact:hover{color:var(--nx-select-strong)}
+  .stu .bact .ic{width:14px;height:14px}
+  .stu .hw-product-link{display:inline-flex;align-items:center;justify-content:center;flex:0 0 24px;width:24px;height:24px;margin-right:4px;padding:0;
+      border:0;border-radius:6px;background:none;color:var(--nx-ink-soft);vertical-align:middle;cursor:pointer}
+  .stu .hw-product-link .ic{width:15px;height:15px}
+  .stu .hw-product-link:hover{background:var(--nx-surface-sunken);color:var(--nx-ink)}
+  .stu .hw-product-link.is-missing{color:var(--nx-warn-fg);background:var(--nx-warn-bg)}
+  .stu .hw-product-link.is-missing:hover{background:var(--nx-warn-bg-soft)}
+  .stu .hw-manual-check{vertical-align:middle;white-space:nowrap;padding:2px 5px;border-radius:6px}
+  .stu .hw-manual-check.is-pending{color:var(--nx-warn-fg);background:var(--nx-warn-bg)}
+  .stu .blist .hw-manual-check.is-pending{background:var(--nx-surface)}
+  /* NOVÉ (návrh O1, O5): stĺpec „Overená" pri položke bez Demosu = stav A ZÁROVEŇ tlačidlo „Overiť cenu" */
+  .stu .bver{display:inline-flex;align-items:center;gap:4px;background:none;border:0;padding:1px 5px;border-radius:6px;font-size:11px;
+             font-weight:400;color:var(--nx-ink-muted);cursor:pointer;white-space:nowrap}
+  .stu .bver .ic{width:13px;height:13px}
+  .stu .bver:hover{background:var(--nx-surface-sunken);color:var(--nx-ink)}
+  .stu .bver.is-pending{color:var(--nx-warn-fg);background:var(--nx-warn-bg);border:1px solid var(--nx-warnchip-border)}
+  .stu .bver.is-pending:hover{background:var(--nx-warn-bg-soft)}
+  .stu .btab tr.bmiss .bver.is-pending{background:var(--nx-surface)}
+  /* LEN mockup: riadok, ktorý sa oproti dnešku mení (položka bez Demosu) — žltý prúžok vľavo */
+  .stu .btab tr.chg td:first-child{box-shadow:inset 3px 0 0 var(--mk-pin)}
+  body.nopins .stu .btab tr.chg td:first-child{box-shadow:none}
+  .stu .bnote{font-size:10.5px;color:var(--nx-ink-faint);padding:2px 12px 8px;line-height:1.45}
+
+  @media (max-width:760px){
+    .sh{justify-content:flex-start;text-align:left}
+    .ogrid{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <!-- sprite = výrez z ui/js/icons.js (Lucide 24×24, stroke 2) -->
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></symbol>
+    <symbol id="i-clipboard-check" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></symbol>
+    <symbol id="i-cart" viewBox="0 0 24 24"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></symbol>
+    <symbol id="i-euro" viewBox="0 0 24 24"><path d="M4 10h12"/><path d="M4 14h9"/><path d="M19 6a7.7 7.7 0 0 0-5.2-2A7.9 7.9 0 0 0 6 12c0 4.4 3.5 8 7.8 8 2 0 3.8-.8 5.2-2"/></symbol>
+    <symbol id="i-file-text" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v5h5"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol>
+    <symbol id="i-scissors" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></symbol>
+    <symbol id="i-hammer" viewBox="0 0 24 24"><path d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5"/></symbol>
+    <symbol id="i-appliance" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M5 10h14"/><path d="M15 5v2"/><path d="M15 13v3"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></symbol>
+    <symbol id="i-truck" viewBox="0 0 24 24"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M14 9h4l4 4v4a1 1 0 0 1-1 1h-1"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+    <symbol id="i-panel-left" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></symbol>
+    <symbol id="i-refresh-cw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+    <symbol id="i-help-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-cloud-download" viewBox="0 0 24 24"><path d="M12 13v8l-4-4"/><path d="m12 21 4-4"/><path d="M4.393 15.269A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.436 8.284"/></symbol>
+    <symbol id="i-external-link" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></symbol>
+  </defs>
+</svg>
+
+<div class="mockbar">
+  <span class="mb-title">Noxun Engine — mockup CENY (overenie cien materiálov a ABS)</span>
+  <span class="mb-ver">Štúdio → Materiály · formulár „Overiť cenu" · úprava odkazu · Rozpočet · SCHVÁLENÉ 30.9.2026 (O1–O9 podľa návrhu) · klikateľné</span>
+  <span class="mb-sp"></span>
+  <span class="mb-ctl">téma okna: <button type="button" data-theme="noxun" class="on">NOXUN</button><button type="button" data-theme="lucia">Lucia</button></span>
+  <span class="mb-ctl"><button type="button" data-reset="1" title="Vráti ukážkové dáta do pôvodného stavu">pôvodné dáta</button></span>
+  <label><input type="checkbox" id="pinTog" checked> štítky a rámčeky</label>
+</div>
+<div class="notestrip">
+  <svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>
+  <span>Mockup, nie živý plugin. Klikaj: ikonu odkazu a ikonu overenia v riadkoch (A aj D) — otvoria formulár B / B2 alebo úpravu C. Vo formulári prepíš cenu (prepočet na €/m² beží pri písaní) a daj <b>Potvrdiť cenu k dnešku</b> — zmení sa stav v A aj v D. Skús aj prepísať cenu priamo v bunke €/m² v A (O6). <b>Jantárové štítky O… = body schválené 30.9.2026</b> (zoznam hneď nižšie), žlté = zmena oproti dnešnému pluginu.</span>
+</div>
+
+<main class="page">
+
+<div class="pending" role="note">SCHVÁLENÉ Michalom 30.9.2026 — platí: body O1–O9 podľa návrhu (odporúčania v kartách nižšie), rozhodnutie C11. Rozhodnutia C6–C9 z 29.9.2026 sú zapracované.</div>
+
+<section class="intro" aria-labelledby="introH">
+  <h1 id="introH">Čo mockup ukazuje <span class="stat">schválené 30.9.2026 · O1–O9 podľa návrhu</span></h1>
+  <p>Pri <b>doske a ABS páske bez väzby na Demos</b> pribudne to, čo už má katalógové kovanie: <b>jeden odkaz na produkt</b> (ikona „Otvoriť produkt") a akcia <b>„Overiť cenu"</b> — otvorí sa obchod a vedľa formulár; „Potvrdiť cenu k dnešku" uloží cenu a dnešný dátum. <b>Samotný klik na odkaz nič nezapisuje.</b> Rozpočet tieto položky začne <b>ukazovať</b> — vek ručne overenej ceny v stĺpci „Overená" a počet medzi cenami „na kontrolu". Dnes sú v ňom prakticky neviditeľné (majú napevno „ručná", dátum sa ignoruje).</p>
+  <div class="dec">
+    <b>Rozhodnuté</b><span><b>C6</b> rovnaký vzor ako kovanie v Štúdiu → Materiály aj v Rozpočte; UNI a duplák bez akcií; položky s Demos väzbou sa nemenia · <b>C7</b> jeden odkaz na položku (iný obchod = prepísať odkaz) · <b>C8</b> doska: cena sa zadáva <b>za platňu</b>, plugin ju prepočíta na €/m² podľa formátu a ukáže obe; ABS za bežný meter · <b>C9</b> dávky CENY-M1 (dáta + Štúdio → Materiály) → CENY-M2 (Rozpočet), každá s auditom návrhu</span>
+    <b>Schválené 30.9.</b><span>O1–O9 podľa návrhu (C11) a O10 (C12) nižšie — umiestnenie ikon, kedy je cena „na kontrolu", sklo bez formátu, nula, texty, čo overenie zruší, presnosť prepočtu, neskoršia Demos väzba a overenie bez odkazu</span>
+  </div>
+  <ul>
+    <li><a href="#secA"><b>A</b></a> · Štúdio → Materiály → detail skupiny H1180 — okno v skutočnej veľkosti (1060 × 640): doska s Demosom, DTDL a zástena bez Demosu, duplák, ABS</li>
+    <li><a href="#secA2"><b>A2</b></a> · Detail skupín Sklo (bez odkazu, bez ceny, bez formátu) a Korpus UNI (bez akcií)</li>
+    <li><a href="#secB"><b>B</b></a> · Formulár „Overiť cenu" — doska (cena za platňu → €/m²) a <a href="#secB2"><b>B2</b></a> ABS (€/bm), vedľa ilustrácia otvoreného obchodu</li>
+    <li><a href="#secC"><b>C</b></a> · Úprava odkazu — nové pole „Odkaz na produkt" vo formulári variantu; pri Demos väzbe zamknuté</li>
+    <li><a href="#secD"><b>D</b></a> · Rozpočet → Materiál a ABS hrany, čip „N cien na kontrolu" a otvorený zoznam</li>
+  </ul>
+  <div class="legend">
+    <span><i class="mpin" style="margin:0">A1</i> zmena oproti dnešnému pluginu (opis vedľa okna)</span>
+    <span><i class="otag" style="margin:0">O1</i> schválený bod (odkaz na zoznam nižšie)</span>
+  </div>
+  <p class="src">Dáta sú vymyslené, ale kopírujú tvoj katalóg z 29.9.: bez Demosu je len 5 nákupných položiek (2× DTDL, zástena, sklo, 1 ABS 0,8 mm), z toho 3 bez ceny. Dnešný dátum mockupu je 30.9.2026, prah veku ceny 30 dní (Nastavenia dodávateľa). Adresy obchodov sú vymyslené (example.sk). Čísla počíta mockup rovnakou aritmetikou ako Rozpočet (cena za platňu = €/m² × plocha platne, zaokrúhlené na centy), preto A, B a D sedia — nie je to zadanie; pravidlá určia packages s auditom.</p>
+</section>
+
+<section class="ohead" aria-labelledby="oH">
+  <h2 id="oH">Schválené body O1–O10</h2>
+  <div class="osub">Každý bod: otázka, <b>schválené znenie</b> (zelené — Michal 30.9.2026: O1–O9 podľa návrhu, O10 súhlas), prečo a alternatíva. Zmena po schválení sa zapíše do mockupu (rámček „platí") aj do rozhodnutí bloku.</div>
+  <div class="ogrid" id="ogrid"></div>
+</section>
+
+<!-- ============================ A · ŠTÚDIO → MATERIÁLY ============================ -->
+<div class="sh" id="secA"><span class="shl">A</span><h2>Štúdio → Materiály → detail skupiny</h2>
+  <span class="shsub"><span>Okno Štúdia v skutočnej veľkosti obsahu (1060 × 640 px). Predvoľby projektu sú zbalené (pamätá si to okno). Prejdi myšou nad ikony vpravo v riadkoch — tooltip povie stav ceny. Klik na ikonu odkazu alebo overenia otvorí B / C.</span></span></div>
+<div class="stagewrap">
+  <div class="stage">
+    <div class="winscroll">
+      <div class="win" style="width:1062px">
+        <div class="winhead"><span class="wdots"><i></i><i></i><i></i></span> Noxun Engine — Štúdio <span class="wsub">· zákazka KUCHYNA_vzor</span><span class="wsize">obsah 1060 × 640</span></div>
+        <div class="stu full">
+          <div class="studio">
+            <nav class="snav" id="aNav" aria-label="Sekcie Štúdia"></nav>
+            <div class="sbody">
+              <div class="sechead" id="aHead"></div>
+              <div class="sectools" id="aTools"></div>
+              <div class="secscroll" id="aBody"></div>
+            </div>
+          </div>
+          <div class="status" id="aStatus" role="status">Pripravené.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="side">
+    <div class="mocknote">
+      <h4>A · Čo pribudne v detaile skupiny</h4>
+      <ol>
+        <li><span class="npin">A1</span><b>Ikona „Otvoriť produkt"</b> pri doske a ABS bez Demosu — tá istá kresba ako Demos, ale sivá; <b>jantárová, keď odkaz chýba</b> (klik otvorí úpravu s kurzorom v poli odkazu — C). Klik na existujúci odkaz len otvorí obchod, <b>nič nezapisuje</b>. <a class="oref" href="#O1">O1</a></li>
+        <li><span class="npin">A2</span><b>Ikona „Overiť cenu"</b> (tabuľka s fajkou, ako v Rozpočte pri kovaní) — otvorí obchod a formulár B / B2. <b>Farba = stav:</b> sivá = čerstvo overená, jantárová = na kontrolu (nikdy neoverená alebo staršia ako 30 dní). Dátum a vek v tooltipe. <a class="oref" href="#O2">O2</a> <a class="oref" href="#O5">O5</a></li>
+        <li><span class="npin">A3</span><b>Pevné miesto pre ikony</b> (duplák / univerzálna · odkaz · overenie) — stĺpce Kód, €/m² a Dodávateľ sú v riadkoch s Demosom aj bez neho pod sebou. Dnes sa posúvajú podľa toho, koľko ikon riadok má. <a class="oref" href="#O1">O1</a></li>
+        <li><span class="npin">A4</span><b>Bunka €/m² ostáva editovateľná.</b> Prepísanie ceny tu zruší ručné overenie — ikona zožltne a položka ide na kontrolu. Skús prepísať 31.04 pri DTDL 25. Cena sa ukazuje zaokrúhlená na 2 desatinné. <a class="oref" href="#O6">O6</a> <a class="oref" href="#O7">O7</a></li>
+      </ol>
+      <ul class="dots">
+        <li><b>Nepribudol ani jeden riadok</b> — obe ikony sú v existujúcom riadku variantu, stav je v tooltipe (vertikálny priestor).</li>
+        <li><b>Demos riadky bez zmeny:</b> tyrkysová ikona otvára Demos, dátum overenia je v tooltipe, cenu obnovuje ikona v hlavičke skupiny alebo „Prepočítať ceny" v Rozpočte.</li>
+        <li><b>Duplák</b> nemá ceny ani akcie (oceňuje sa zdrojovou doskou), <b>UNI</b> tiež nie — výrez A2.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ A2 · SKLO + UNI ============================ -->
+<div class="sh" id="secA2"><span class="shl">A2</span><h2>Detail skupín Sklo a Korpus UNI</h2>
+  <span class="shsub"><span>Výrez tela sekcie Materiály, dve iné skupiny. Sklo nemá odkaz, cenu ani formát (reže sa na mieru) — obe ikony sú jantárové. UNI je pracovný materiál bez nákupných polí — bez akcií.</span></span></div>
+<div class="stagewrap">
+  <div class="stage">
+    <div class="winscroll">
+      <div class="win" style="width:854px">
+        <div class="winhead"><span class="wdots"><i></i><i></i><i></i></span> Noxun Engine — Štúdio <span class="wsub">· výrez: telo sekcie Materiály — dve skupiny</span><span class="wsize">852 px (obsah 828)</span></div>
+        <div class="stu part">
+          <div class="sbody">
+            <div class="secscroll" id="a2Body"></div>
+          </div>
+          <div class="status" id="a2Status" role="status">Pripravené.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="side">
+    <div class="mocknote">
+      <h4>A2 · Sklo a UNI</h4>
+      <ol>
+        <li><span class="npin">A5</span><b>Sklo bez odkazu:</b> jantárová ikona odkazu → úprava s kurzorom v poli odkazu (C). Ikona overenia otvorí formulár aj bez odkazu — len bez obchodu (sklenár často e-shop nemá). <a class="oref" href="#O9">O9</a></li>
+        <li><span class="npin">A6</span><b>Bez formátu</b> — vo formulári sa cena zadá rovno za m². <a class="oref" href="#O3">O3</a></li>
+        <li><span class="npin">A7</span><b>UNI</b> ostáva bez odkazu aj overenia (C6) — nemá nákupnú cenu, nahrádza sa reálnym dekorom.</li>
+      </ol>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ B · FORMULÁR — DOSKA ============================ -->
+<div class="sh" id="secB"><span class="shl">B</span><h2>Formulár „Overiť cenu" — doska</h2>
+  <span class="shsub"><span>Klik na „Overiť cenu" otvorí obchod v prehliadači (vpravo ilustrácia) a v okne tento formulár — tá istá kostra ako pri kovaní. Cenu zadávaš <b>za platňu</b> (C8), plugin ju hneď prepočíta na €/m². Prepínačom nad oknom (len mockup) si pozri tri prípady.</span></span></div>
+<div class="stagewrap">
+  <div class="stage">
+    <div class="mkswitch" id="bSwitch"></div>
+    <div class="winscroll">
+      <div class="win" style="width:854px">
+        <div class="winhead"><span class="wdots"><i></i><i></i><i></i></span> Noxun Engine — Štúdio <span class="wsub">· formulár nad sekciou (Materiály alebo Rozpočet — ostáva v sekcii, odkiaľ si prišiel)</span><span class="wsize">852 px</span></div>
+        <div class="stu part">
+          <div class="mkmstage">
+            <div class="mkmbg" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="mkmscrim" aria-hidden="true"></div>
+            <div class="nxmcard" id="bCard" role="dialog" aria-modal="true" aria-label="Overiť cenu ručne"></div>
+          </div>
+          <div class="status" id="bStatus" role="status">Pripravené.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="side">
+    <div class="mkwebcap">Prehliadač — otvorí sa zároveň s formulárom (ilustrácia)</div>
+    <div id="bWeb" style="margin-bottom:12px"></div>
+    <div class="mocknote">
+      <h4>B · Formulár pre dosku</h4>
+      <ol>
+        <li><span class="npin">B1</span><b>Otvorí sa formulár a popri ňom obchod</b>, ak má položka odkaz (otvorenie prehliadača je len pomoc — keď odkaz chýba alebo sa prehliadač neotvorí, „Potvrdiť" funguje aj tak, O9). Esc, krížik aj „Zrušiť" = nič sa nezapíše.</li>
+        <li><span class="npin">B2</span><b>Hlavička:</b> dodávateľ a odkaz, pod ňou položka ako text — kód, formát a plocha platne. Údaje sa tu nemenia (na to je ceruzka, C).</li>
+        <li><span class="npin">B3</span><b>Cena za platňu s DPH</b> — vedľa hneď prepočet na €/m² a formát, z ktorého sa počíta. Pri skle bez formátu sa zadáva za m². <a class="oref" href="#O3">O3</a> <a class="oref" href="#O7">O7</a></li>
+        <li><span class="npin">B4</span><b>Oproti katalógu:</b> „bez zmeny — stačí potvrdiť", alebo rozdiel v € a %. Pole je predvyplnené cenou z katalógu, takže keď cena sedí, stačí jeden klik — <b>a keď cenu neprepíšeš, potvrdenie ju nezmení ani o cent</b> (zapíše sa len dátum, C1).</li>
+        <li><span class="npin">B5</span><b>„Potvrdiť cenu k dnešku"</b> uloží cenu a dnešný dátum. Poznámka dole povie posledné ručné potvrdenie. Prázdne pole potvrdiť nejde; 0 € áno (O4). <a class="oref" href="#O4">O4</a></li>
+      </ol>
+      <ul class="dots">
+        <li>Potvrdená cena platí v <b>celom katalógu</b> — Rozpočet každej zákazky ju prepočíta (zákazka cenu nenesie, číta katalóg živo).</li>
+        <li>V plugine sa formulár po potvrdení zatvorí; tu ostáva otvorený, aby bolo vidno výsledok (A a D sa prepočítajú).</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ B2 · FORMULÁR — ABS ============================ -->
+<div class="sh" id="secB2"><span class="shl">B2</span><h2>Ten istý formulár pre ABS pásku</h2>
+  <span class="shsub"><span>Páska sa oceňuje za bežný meter (C8) — žiadny prepočet. Ukážka: páska 43/0,8 bez ceny — vpíš cenu a potvrď; v D zmizne jantárový riadok „chýba cena" aj jedno upozornenie.</span></span></div>
+<div class="stagewrap">
+  <div class="stage">
+    <div class="winscroll">
+      <div class="win" style="width:854px">
+        <div class="winhead"><span class="wdots"><i></i><i></i><i></i></span> Noxun Engine — Štúdio <span class="wsub">· formulár nad sekciou</span><span class="wsize">852 px</span></div>
+        <div class="stu part">
+          <div class="mkmstage" style="min-height:330px">
+            <div class="mkmbg" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="mkmscrim" aria-hidden="true"></div>
+            <div class="nxmcard" id="b2Card" role="dialog" aria-modal="true" aria-label="Overiť cenu ručne"></div>
+          </div>
+          <div class="status" id="b2Status" role="status">Pripravené.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="side">
+    <div class="mkwebcap">Prehliadač (ilustrácia)</div>
+    <div id="b2Web" style="margin-bottom:12px"></div>
+    <div class="mocknote">
+      <h4>B2 · Formulár pre ABS</h4>
+      <ol>
+        <li><span class="npin">B6</span><b>Cena s DPH za bm</b> — ako pri kovaní cena za MJ. Pole je prázdne, lebo páska cenu ešte nemá; poznámka povie „zatiaľ nebola ručne potvrdená".</li>
+      </ol>
+      <ul class="dots">
+        <li>Obchody predávajú pásky často po rolkách — prepočet z rolky vo V1 nie je (C8: bm). Nápad je v časti „Na vedomie".</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ C · ÚPRAVA ODKAZU ============================ -->
+<div class="sh" id="secC"><span class="shl">C</span><h2>Úprava odkazu — formulár variantu (ceruzka)</h2>
+  <span class="shsub"><span>Výrez tela sekcie Materiály: formulár, ktorý otvára ceruzka v riadku variantu (rozbalí sa pod detailom skupiny). <b>C1</b> položka bez Demosu (prepína sa klikom na ceruzku alebo jantárovú ikonu v A / A2 / D), <b>C2</b> doska s Demos väzbou — ručný odkaz sa nedá zadať.</span></span></div>
+<div class="stagewrap">
+  <div class="stage">
+    <div class="wincap"><b>C1</b> <span id="c1Cap">bez Demosu</span><i class="mpin">C3</i></div>
+    <div class="winscroll">
+      <div class="win" style="width:522px">
+        <div class="winhead"><span class="wdots"><i></i><i></i><i></i></span> Štúdio <span class="wsub">· výrez: Materiály → formulár variantu</span></div>
+        <div class="stu half">
+          <div class="sbody"><div class="secscroll" id="c1Body"></div></div>
+          <div class="status" id="c1Status" role="status">Pripravené.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="stage">
+    <div class="wincap"><b>C2</b> s Demos väzbou (H1180 DTDL 18)</div>
+    <div class="winscroll">
+      <div class="win" style="width:522px">
+        <div class="winhead"><span class="wdots"><i></i><i></i><i></i></span> Štúdio <span class="wsub">· výrez: Materiály → formulár variantu</span></div>
+        <div class="stu half">
+          <div class="sbody"><div class="secscroll" id="c2Body"></div></div>
+          <div class="status" id="c2Status" role="status">Pripravené.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="side">
+    <div class="mocknote">
+      <h4>C · Pole „Odkaz na produkt"</h4>
+      <ol>
+        <li><span class="npin">C1</span><b>Nový riadok „Odkaz na produkt"</b> vo formulári dosky aj ABS, hneď nad „Demos URL" (to ostáva len pre Demos väzbu). Iný obchod = prepíš odkaz (C7). Adresa musí začínať http:// alebo https://.</li>
+        <li><span class="npin">C2</span><b>Veta pod poľom</b> povie, kedy bola cena ručne overená a čo overenie zruší. <a class="oref" href="#O6">O6</a></li>
+        <li><span class="npin">C3</span><b>Príchod z jantárovej ikony:</b> formulár sa otvorí s kurzorom v poli odkazu (zvýraznené) — ako pri kovaní.</li>
+        <li><span class="npin">C4</span><b>Pri Demos väzbe je pole zamknuté</b> s vysvetlením — odkaz aj cenu spravuje Demos. Ručný odkaz zadáš až po vymazaní Demos URL. <a class="oref" href="#O8">O8</a></li>
+      </ol>
+      <ul class="dots">
+        <li>Editor „Upraviť…" (celý dekor naraz) pole odkazu <b>nedostane</b> — riadky dosiek by sa zlomili; zmena ceny v ňom však overenie zruší rovnako. <a class="oref" href="#O6">O6</a></li>
+        <li>Formulár sa otvára len na požiadanie, riadok navyše v ňom neprekáža bežnej práci s katalógom.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ D · ROZPOČET ============================ -->
+<div class="sh" id="secD"><span class="shl">D</span><h2>Rozpočet → Materiál a ABS hrany</h2>
+  <span class="shsub"><span>Výrez sekcie Rozpočet tej istej zákazky. Čip „cien na kontrolu" je rozbalený. Kovanie, služby a štandardné riadky sú zbalené — nemenia sa. Žltý podklad = oproti dnešku nové.</span></span></div>
+<div class="stagewrap">
+  <div class="stage">
+    <div class="winscroll">
+      <div class="win" style="width:854px">
+        <div class="winhead"><span class="wdots"><i></i><i></i><i></i></span> Noxun Engine — Štúdio <span class="wsub">· výrez: sekcia Rozpočet</span><span class="wsize">852 px (obsah 828)</span></div>
+        <div class="stu part">
+          <div class="sbody">
+            <div class="sechead" id="dHead"></div>
+            <div class="sectools" id="dTools"></div>
+            <div class="secscroll" id="dBody"></div>
+          </div>
+          <div class="status" id="dStatus" role="status">Pripravené.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="side">
+    <div class="mocknote">
+      <h4>D · Čo sa mení v Rozpočte</h4>
+      <ol>
+        <li><span class="npin">D1</span><b>Čip „N cien na kontrolu"</b> počíta aj materiály a pásky bez Demosu (nikdy neoverené alebo staršie ako 30 dní). Dnes ich nepočíta vôbec. <a class="oref" href="#O2">O2</a></li>
+        <li><span class="npin">D2</span><b>Zoznam cien na kontrolu:</b> položka bez Demosu má odkaz a „Overiť cenu" namiesto dnešnej vety „bez Demos väzby — over v katalógu ručne". Demos položky majú obnovenie ako dnes.</li>
+        <li><span class="npin">D3</span><b>Stĺpec „Overená"</b> rozlišuje: <i>ručne 18.9.</i> (sivé) · <i>ručne 45 dní</i> (jantár) · <i>neoverená</i> (jantár) · Demos <i>38 dní</i> (ako dnes). Pri položke bez Demosu je to zároveň tlačidlo „Overiť cenu". <a class="oref" href="#O5">O5</a> <a class="oref" href="#O1">O1</a></li>
+        <li><span class="npin">D4</span><b>Ikona odkazu pred názvom</b> materiálu a pásky (pri kovaní je pred kódom); jantárová, keď odkaz chýba. Návrh: aj pri Demos materiáloch (otvorí Demos). <a class="oref" href="#O1">O1</a></li>
+      </ol>
+      <ul class="dots">
+        <li><b>„Prepočítať ceny"</b> ostáva pre Demos (jantárové pri starých Demos cenách). Ručné ceny sa nikdy nesťahujú — keď ostanú na kontrolu už len ručné, tlačidlo sa volá „Skontrolovať ceny" a otvorí zoznam (dnešné správanie pri kovaní).</li>
+        <li>Cena v „€ / MJ" je za platňu (ako dnes) a €/m² v zátvorke — to isté, čo sa zadáva vo formulári (C8).</li>
+        <li>Chýbajúca cena ostáva jantárovým riadkom „chýba cena" a nálezom v Kontrole — „Overiť cenu" je cesta, ako ju doplniť.</li>
+      </ul>
+      <ul class="dots" id="dDiff"></ul>
+    </div>
+  </div>
+</div>
+
+<section class="fyi">
+  <h3>Na vedomie — teraz nerozhoduješ</h3>
+  <ul>
+    <li><b>Demos položky sa nemenia (C6):</b> ikona v Štúdiu otvára Demos, dátum je v tooltipe, cenu obnovuje „Aktualizovať z Demosu" v skupine alebo „Prepočítať ceny" v Rozpočte. Všetkých 53 starých cien v tvojom katalógu je na Demose — tie rieši prepočet, nie ručné overenie.</li>
+    <li><b>Nemení sa:</b> VEPO, Kusovník, Nákup kovania, Cenová ponuka (len suma, ak sa zmení cena), kovanie v katalógu aj v Rozpočte. Zákazka nenesie cenu ani dátum materiálu — overená cena sa prejaví vo všetkých zákazkách naraz.</li>
+    <li><b>Staršia verzia pluginu:</b> katalóg materiálov je jeden súbor na počítači. Ak ho prenášaš na druhý počítač, staršia verzia ho po prvom uložení odkazu alebo overenia otvorí len na čítanie — pred prvým použitím treba aktualizovať oba počítače (ako pri predošlých zmenách katalógu).</li>
+    <li><b>Dávky (C9):</b> CENY-M1 — odkaz a ručné overenie v katalógu, Štúdio → Materiály (A, A2, B, B2, C) · CENY-M2 — Rozpočet (D). Technické požiadavky (polia, verzia katalógu, testy) budú v packages s auditom návrhu.</li>
+    <li><b>Nápad (nie je v bloku):</b> jedno pole „Odkaz na produkt" namiesto dvoch — keď doň vložíš adresu z demos-trade.sk, stane sa z nej Demos väzba, inak ručný odkaz. Ušetrí riadok a otázku „kam to patrí". Zadanie bloku drží polia oddelene.</li>
+    <li><b>Nápad (nie je v bloku):</b> ABS po rolkách — „cena za rolku ÷ dĺžka rolky" priamo vo formulári B2. Dnes (C8) sa zadáva za bm.</li>
+    <li><b>Mimo bloku:</b> viac odkazov na položku (C7 ich zrušilo), porovnanie obchodov, automatické sťahovanie cien mimo Demosu, história cien, upozornenie na dlaždici skupiny v katalógu.</li>
+  </ul>
+</section>
+
+</main>
+
+<script>
+(function(){
+  'use strict';
+  function $(id){ return document.getElementById(id); }
+  function each(sel, fn){ Array.prototype.forEach.call(document.querySelectorAll(sel), fn); }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]; }); }
+  function ico(n, cls){ return '<svg class="ic' + (cls ? ' ' + cls : '') + '" aria-hidden="true"><use href="#i-' + n + '"/></svg>'; }
+  function pin(t){ return '<i class="mpin">' + t + '</i>'; }
+  function otag(o){ return '<a class="otag" href="#' + o + '">' + o + '</a>'; }
+  function pl(n, one, few, many){ var a = Math.abs(n); return a === 1 ? one : (a >= 2 && a <= 4 ? few : many); }
+  function r2(v){ return Math.round(v * 100) / 100; }
+  function num2(v){ return Number(v).toFixed(2).replace('.', ','); }
+  // server `Budget.fmt` / klient fmtNum: celé číslo bez desatín, inak nanajvýš 2 desatinné s čiarkou
+  function nf(v){ var r = r2(Number(v)); return (r === Math.round(r) ? String(Math.round(r)) : String(r)).replace('.', ','); }
+  // bunka ceny v Štúdiu = dnešný String(value) (bodka); O7: zobrazenie zaokrúhlené na 2 desatinné
+  function cellNum(v){ return (v === null || v === undefined) ? '' : String(r2(v)); }
+  function eur(v){
+    if (v === null || v === undefined || isNaN(v)) return '—';
+    var s = Math.abs(v).toFixed(2).split('.');
+    return (v < 0 ? '−' : '') + s[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ',' + s[1] + ' €';
+  }
+  function parseNum(t){
+    var s = String(t == null ? '' : t).trim().replace(/\s/g, '').replace(',', '.');
+    if (!s) return null;
+    return /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : NaN;
+  }
+
+  // ---------------- čas ----------------
+  var TODAY = '2026-09-30';
+  var PRAH = 30;
+  function t0(iso){ var p = iso.split('-'); return Date.UTC(+p[0], +p[1] - 1, +p[2]); }
+  function ageOf(iso){ return Math.round((t0(TODAY) - t0(iso)) / 864e5); }
+  function dmy(iso){ var p = iso.split('-'); return (+p[2]) + '.' + (+p[1]) + '.' + p[0]; }
+  function dmS(iso){ var p = iso.split('-'); return (+p[2]) + '.' + (+p[1]) + '.'; }
+  function dni(n){ return n + ' ' + pl(n, 'deň', 'dni', 'dní'); }
+  function dnami(n){ return n === 1 ? '1 dňom' : n + ' dňami'; }
+  var MODEL = 'zákazka: KUCHYNA_vzor · v0.16.0';
+
+  // ---------------- dáta (katalóg + použitie v zákazke) ----------------
+  var GROUPS = {
+    H1180: { decor:'H1180', name:'Dub Halifax prírodný', man:'Egger', st:'ST37', col:'var(--mat-h1180)',
+             where:[['CAB-001', 'boky, dno, vrch, police', 8], ['CAB-003', 'dvierka, čelá', 3], ['BRD-002', 'zástena', 1]],
+             wedge:[['23/1', 24]] },
+    SKLO:  { decor:'Číre', name:'sklo float', man:'', st:'', col:'var(--mat-glass)',
+             where:[['CAB-005', 'police', 2]], wedge:[] },
+    UNI:   { decor:'Korpus', name:'UNI', man:'', st:'', col:'var(--mat-uni)', uni:true,
+             where:[['CAB-006', 'boky, dno, vrch, police', 5]], wedge:[] }
+  };
+  var A_PLATE = 2.8 * 2.07; // 5,796 m²
+  // price = €/m² (doska) alebo €/bm (ABS) presne tak, ako ju drží katalóg; demos = väzba na Demos
+  // checked = dátum overenia z Demosu; mchecked = dátum ručného overenia (NOVÉ); link = ručný odkaz (NOVÉ)
+  // shop = cena v obchode (len pre ilustráciu prehliadača); b* = riadok rozpočtu tejto zákazky
+  var BASE = [
+    { id:'s18', kind:'sheet', grp:'H1180', type:'DTDL', th:18, fmt:[2800, 2070], code:'310418', price:24.9, sup:'Demos',
+      demos:true, checked:'2026-09-12', demosUrl:'https://www.demos-trade.sk/…/h1180-st37-18',
+      blabel:'H1180 DTDL 18 mm', bqty:4, bm2:19.6, bplan:'plán: 4 platne (horná hranica)' },
+    { id:'s25', kind:'sheet', grp:'H1180', type:'DTDL', th:25, fmt:[2800, 2070], code:'H1180-25', price:179.9 / A_PLATE, sup:'Drevocentrum',
+      link:'https://drevocentrum.example.sk/h1180-st37-25', mchecked:'2026-09-18', shop:179.9,
+      shopTitle:'Egger H1180 ST37 Dub Halifax prírodný — DTD 25 mm', blabel:'H1180 DTDL 25 mm', bqty:1, bm2:2.4 },
+    { id:'d36', kind:'sheet', grp:'H1180', type:'DTDL', th:36, fmt:[2800, 2070], dup:'H1180_ST37_DTDL_18', mult:2 },
+    { id:'z10', kind:'sheet', grp:'H1180', type:'ZASTENA', th:10, fmt:[4100, 640], code:'ZH1180-10', price:41.5, sup:'Drevocentrum',
+      link:'https://drevocentrum.example.sk/zastena-h1180-10', mchecked:'2026-08-16', shop:112.9,
+      shopTitle:'Zástena H1180 ST37 Dub Halifax prírodný — 10 mm', blabel:'H1180 ZASTENA 10 mm', bqty:1, bm2:1.9 },
+    { id:'e23', kind:'edge', grp:'H1180', w:23, th:1, code:'410231', price:0.62, sup:'Demos', demos:true, checked:'2026-09-12',
+      demosUrl:'https://www.demos-trade.sk/…/abs-h1180-23x1', blabel:'ABS H1180 23×1 mm', bqty:46.5 },
+    { id:'e43', kind:'edge', grp:'H1180', w:43, th:0.8, code:'', price:null, sup:'Drevocentrum',
+      link:'https://drevocentrum.example.sk/abs-h1180-43x0-8', shop:0.39,
+      shopTitle:'Hrana ABS H1180 ST37 43 × 0,8 mm', blabel:'ABS H1180 43×0,8 mm', bqty:8.4 },
+    { id:'sk4', kind:'sheet', grp:'SKLO', type:'SKLO', th:4, fmt:null, code:'', price:null, sup:'Sklenárstvo Kováč',
+      blabel:'Číre SKLO 4 mm', bqty:1, bm2:0.9 },
+    { id:'u18', kind:'sheet', grp:'UNI', type:'DTDL', th:18, fmt:[2800, 2070], code:'', price:null, sup:'', uni:true,
+      blabel:'Korpus UNI DTDL 18 mm', bqty:1, bm2:4.1 },
+    // len v Rozpočte (iné skupiny katalógu)
+    { id:'w18', kind:'sheet', grp:'W1000', type:'DTDL', th:18, fmt:[2800, 2070], code:'310900', price:21.4, sup:'Demos', demos:true,
+      checked:'2026-09-20', blabel:'W1000 DTDL 18 mm', bqty:3, bm2:14.2, bplan:'plán: 3 platne (horná hranica)' },
+    { id:'hdf', kind:'sheet', grp:'HDF', type:'HDF', th:3, fmt:[2800, 2070], code:'330103', price:4.2, sup:'Demos', demos:true,
+      checked:'2026-08-23', blabel:'Biela HDF 3 mm', bqty:2, bm2:7.8 },
+    { id:'ew', kind:'edge', grp:'W1000', w:23, th:1, code:'410902', price:0.48, sup:'Demos', demos:true, checked:'2026-08-23',
+      blabel:'ABS W1000 23×1 mm', bqty:38.2 }
+  ];
+  var ITEMS = [];
+  function reset(){ ITEMS = BASE.map(function(o){ var c = {}; for (var k in o) c[k] = o[k]; return c; }); }
+  function byId(id){ for (var i = 0; i < ITEMS.length; i++) if (ITEMS[i].id === id) return ITEMS[i]; return null; }
+  function area(it){ return it.fmt ? it.fmt[0] * it.fmt[1] / 1e6 : null; }
+  // Rozpočet: konverzia €/m² → € za platňu (bez formátu len UNI odhad 2800 × 2070); materiál bez formátu ide cez lineTotal podľa m² (O10)
+  function perPlate(it){ if (it.price == null) return null; return r2(it.price * (area(it) || A_PLATE)); }
+  function manual(it){ return !it.demos && !it.uni && !it.dup; }
+  function state(it){
+    if (it.uni || it.dup) return 'none';
+    if (it.demos){ if (!it.checked) return 'd-unver'; return ageOf(it.checked) >= PRAH ? 'd-stale' : 'd-fresh'; }
+    if (!it.mchecked || it.price == null) return 'm-never';
+    return ageOf(it.mchecked) >= PRAH ? 'm-stale' : 'm-fresh';
+  }
+  function pending(it){ var s = state(it); return s === 'm-never' || s === 'm-stale'; }
+  function linkHost(u){ return String(u || '').replace(/^https?:\/\//, ''); }
+  function shortName(it){ return it.kind === 'edge' ? 'ABS ' + it.w + '/' + nf(it.th) : it.type + ' ' + it.th; }
+  function fmtTxt(it){ return it.fmt ? it.fmt[0] + ' × ' + it.fmt[1] : ''; }
+  // texty stavu (návrh O5)
+  function checkTip(it){
+    var s = state(it);
+    if (s === 'm-fresh') return 'Cena ručne overená ' + dmy(it.mchecked) + ' (pred ' + dnami(ageOf(it.mchecked)) + ')\nOveriť cenu — otvorí obchod a formulár';
+    if (s === 'm-stale') return 'Ručne overená ' + dmy(it.mchecked) + ' — pred ' + dnami(ageOf(it.mchecked)) + ', na kontrolu\nOveriť cenu — otvorí obchod a formulár';
+    return (it.price == null ? 'Cena chýba a nebola nikdy overená — na kontrolu' : 'Cena nebola nikdy ručne overená — na kontrolu') +
+           '\nOveriť cenu — ' + (it.link ? 'otvorí obchod a formulár' : 'bez odkazu otvorí len formulár (O9)');
+  }
+  function linkTip(it){ return it.link ? 'Otvoriť produkt v prehliadači\n' + linkHost(it.link) : 'Chýba odkaz — doplniť odkaz na produkt'; }
+
+  // ---------------- Štúdio: navigácia ----------------
+  var NAV = [
+    { grp:'ZÁKAZKA', items:[
+      { id:'bom', ic:'list', t:'Kusovník' }, { id:'ctrl', ic:'clipboard-check', t:'Kontrola', badge:true },
+      { id:'buy', ic:'cart', t:'Nákup kovania' }, { id:'budget', ic:'euro', t:'Rozpočet' },
+      { id:'offer', ic:'file-text', t:'Cenová ponuka' }, { id:'cut', ic:'scissors', t:'Nárezový plán' } ] },
+    { grp:'KATALÓGY', items:[
+      { id:'mat', ic:'layers', t:'Materiály' }, { id:'hw', ic:'hammer', t:'Kovanie' }, { id:'appl', ic:'appliance', t:'Spotrebiče' },
+      { id:'rules', ic:'settings', t:'Pravidlá' }, { id:'tpl', ic:'star', t:'Šablóny' } ] },
+    { grp:'NASTAVENIA', items:[
+      { id:'sup', ic:'truck', t:'Dodávateľ / Demos' }, { id:'bset', ic:'euro', t:'Nastavenia rozpočtu' }, { id:'about', ic:'info', t:'O plugine' } ] }
+  ];
+  function missingCount(){ return ITEMS.filter(function(it){ return it.bqty != null && it.price == null; }).length; }
+  function navHtml(active){
+    var h = '';
+    NAV.forEach(function(g){
+      h += '<div class="sgrp">' + g.grp + '</div>';
+      g.items.forEach(function(it){
+        var on = it.id === active;
+        h += '<button type="button" class="navitem' + (on ? ' on' : '') + '" title="' + esc(on ? it.t : it.t + ' (v mockupe sa neprepína)') + '"' +
+             (it.id === 'budget' ? ' data-go="secD"' : '') + '>' + ico(it.ic) + '<span>' + esc(it.t) + '</span>' +
+             (it.badge ? '<span class="nbadge"><i class="o">' + (missingCount() + 3) + '</i></span>' : '') + '</button>';
+      });
+    });
+    return h + '<div class="navfoot"><button type="button" class="navitem" title="Zbaliť navigáciu na ikony">' + ico('panel-left') + '<span>Zbaliť na ikony</span></button></div>';
+  }
+
+  // ---------------- A · detail skupiny ----------------
+  function demosBtn(it){
+    var t = 'Prepojené s Demosom' + (it.checked ? ' · cena overená ' + dmy(it.checked) : '') + ' — otvoriť u dodávateľa';
+    return '<button type="button" class="mduni mddm mktip" data-act="demos" data-id="' + it.id + '" data-tip="' + esc(t) + '" aria-label="Otvoriť u dodávateľa">' + ico('external-link') + '</button>';
+  }
+  function linkBtn(it){
+    return '<button type="button" class="mduni mdprod mktip' + (it.link ? '' : ' is-missing') + '" data-act="link" data-id="' + it.id + '"' +
+           ' data-tip="' + esc(linkTip(it)) + '" aria-label="' + esc((it.link ? 'Otvoriť produkt' : 'Doplniť odkaz na produkt') + ' · ' + shortName(it)) + '">' + ico('external-link') + '</button>';
+  }
+  function checkBtn(it){
+    return '<button type="button" class="mduni mdchk mktip' + (pending(it) ? ' is-pending' : '') + '" data-act="check" data-id="' + it.id + '"' +
+           ' data-tip="' + esc(checkTip(it)) + '" aria-label="' + esc('Overiť cenu · ' + shortName(it)) + '">' + ico('clipboard-check') + '</button>';
+  }
+  function gap(){ return '<i class="mkgap"></i>'; }
+  function slot(it){
+    var a = '', b = '', c = '';
+    if (it.kind === 'sheet' && (it.type === 'DTDL' || it.type === 'MDF'))
+      a = '<button type="button" class="mduni mktip" data-tip="Vytvoriť duplák (' + (it.th * 2) + ' mm lepené z 2× tejto dosky)" aria-label="Vytvoriť duplák">' + ico('layers') + '</button>';
+    if (it.kind === 'edge')
+      a = '<button type="button" class="mduni mktip' + (it.universal ? ' on' : '') + '" aria-pressed="' + (it.universal ? 'true' : 'false') + '" data-tip="Univerzálna páska — pasuje na každú štruktúru" aria-label="Univerzálna páska">' + ico('globe') + '</button>';
+    if (it.demos) b = demosBtn(it);
+    else if (manual(it)){ b = linkBtn(it); c = checkBtn(it); }
+    return '<span class="mkslot' + (manual(it) ? ' mkhl' : '') + '">' + (a || gap()) + (b || gap()) + (c || gap()) + '</span>';
+  }
+  function cell(it, f, val, cls, ph){
+    return '<input class="mdcell' + (cls ? ' ' + cls : '') + '" type="text" value="' + esc(val) + '" placeholder="' + esc(ph) + '"' +
+           ' data-cell="' + f + '" data-id="' + it.id + '" aria-label="' + esc(ph) + '">';
+  }
+  function actCell(it, withEdit){
+    return '<span class="mdvact">' +
+      (withEdit ? '<button type="button" class="ghostbtn tplbtn" title="Ďalšie vlastnosti (farba, formát…)" aria-label="Ďalšie vlastnosti" data-act="edit" data-id="' + it.id + '">' + ico('pencil') + '</button>' : '') +
+      '<button type="button" class="ghostbtn tpldel" title="Zmazať" aria-label="Zmazať" data-noop="1">' + ico('x') + '</button></span>';
+  }
+  function rowHtml(it){
+    if (it.dup){
+      return '<div class="mdvrow"><span class="mdvdim">' + esc(it.type + ' ' + it.th) + '<small>' + esc(it.fmt[0] + '×' + it.fmt[1]) + '</small></span>' +
+        '<span class="mdvi mdvdup" title="Duplák: lepí sa z ' + it.mult + '× zdrojovej dosky — nakupuje a oceňuje sa zdroj">' + ico('layers') +
+        ' lepené ' + it.mult + '× z ' + esc(it.dup) + '</span>' + actCell(it, false) + '</div>';
+    }
+    var dim = it.kind === 'sheet'
+      ? esc(it.type + ' ' + it.th) + (it.fmt ? '<small>' + esc(it.fmt[0] + '×' + it.fmt[1]) + '</small>' : '')
+      : esc(it.w + '/' + String(it.th));
+    return '<div class="mdvrow" data-row="' + it.id + '"><span class="mdvdim">' + dim + '</span>' +
+      cell(it, 'code', it.code, '', 'kód') + cell(it, 'price', cellNum(it.price), 'mdvp', '—') + cell(it, 'sup', it.sup, '', 'dodávateľ') +
+      slot(it) + actCell(it, true) + '</div>';
+  }
+  // o = piny mockupu v hlavičke stĺpcov {dim, price, sup, slot:[…]}
+  function vhead(unit, o){
+    o = o || {};
+    return '<div class="mdvhead"><span class="mdvdim">' + (o.dim ? pin(o.dim) : '') + '</span><span class="mdvi">Kód</span><span class="mdvi mdvp">' + unit +
+      (o.price ? pin(o.price) : '') + '</span><span class="mdvi">Dodávateľ' + (o.sup ? pin(o.sup) : '') + '</span><span class="mkslot">' +
+      (o.slot || []).map(pin).join('') + '</span><span class="mdvact"></span></div>';
+  }
+  function groupCard(gk, pins){
+    var g = GROUPS[gk];
+    var its = ITEMS.filter(function(it){ return it.grp === gk; });
+    var sheets = its.filter(function(it){ return it.kind === 'sheet'; }), edges = its.filter(function(it){ return it.kind === 'edge'; });
+    var h = '<div class="mdcard mdet">';
+    h += '<div class="tplrow mdhead"><button type="button" class="ghostbtn tplbtn" title="Späť na katalóg" aria-label="Späť na katalóg" data-noop="1">' + ico('arrow-left') + '</button>' +
+      '<i class="mdsw mdsw-lg" style="background:' + g.col + '"></i>' +
+      '<span class="tpln"><b>' + esc(g.decor + ' ' + g.name) + '</b>' + (g.man ? ' <span class="tplt">' + esc(g.man) + '</span>' : '') +
+      (g.uni ? ' <span class="mdunib">UNI</span>' : '') + '</span>' +
+      (g.uni ? '<button type="button" class="primary tplbtn" title="Nahradiť UNI reálnym dekorom v celom projekte" data-noop="1">Nahradiť UNI…</button>'
+             : '<button type="button" class="ghostbtn tplbtn" title="Upraviť celý dekor — kód, názov, výrobca, farba, dosky aj ABS" data-noop="1">Upraviť…</button>') +
+      '<button type="button" class="ghostbtn tplbtn" data-noop="1">+ variant</button><button type="button" class="ghostbtn tplbtn" data-noop="1">Výrobca</button>' +
+      '<button type="button" class="ghostbtn tplbtn" data-noop="1">Názov</button><button type="button" class="ghostbtn tplbtn" data-noop="1">Premenovať</button>' +
+      '<button type="button" class="ghostbtn tplbtn" title="Aktualizovať kódy a ceny z Demosu" aria-label="Aktualizovať z Demosu" data-noop="1">' + ico('refresh-cw') + '</button></div>';
+    if (!g.uni){
+      h += '<div class="mdstsec mda-heading"><span>' + esc(g.st || 'Bez štruktúry') + '</span>' +
+        '<button type="button" class="ghostbtn mda-trigger" data-noop="1" title="Spoločný vzhľad povrchu — všetky hrúbky dosiek aj ABS"><span class="mda-mini" style="background:' + g.col + '"></span><span>Vzhľad</span>' + ico('chevron-down') + '</button>' +
+        '<span class="mda-heading-hint">' + (sheets.length && edges.length ? 'dosky aj ABS' : sheets.length ? 'dosky' : 'ABS') + '</span></div>';
+    }
+    if (sheets.length){
+      h += '<div class="mdsec">Dosky</div>' + vhead('€/m²', pins);
+      sheets.forEach(function(it){ h += rowHtml(it); });
+    }
+    if (edges.length){
+      h += '<div class="mdsec">ABS pásky</div>' + vhead('€/bm', null);
+      edges.forEach(function(it){ h += rowHtml(it); });
+    }
+    h += '<div class="mdsec mdwhead">Kde sa používa</div>';
+    g.where.forEach(function(w){
+      h += '<div class="mdwrow"><span class="mdwn"><b>' + esc(w[0]) + '</b> <span class="mdwr">· ' + esc(w[1]) + '</span></span><span class="mdwq">' +
+        w[2] + ' ' + pl(w[2], 'dielec', 'dielce', 'dielcov') + '</span><span class="mdwact"><button type="button" class="mdweye" title="Označiť v modeli" aria-label="Označiť v modeli" data-noop="1">' + ico('eye') + '</button></span></div>';
+    });
+    g.wedge.forEach(function(w){
+      h += '<div class="mdwrow"><span class="mdwn">Páska <b>' + esc(w[0]) + '</b></span><span class="mdwq">' + w[1] + ' dielcov</span><span class="mdwact"><button type="button" class="mdweye" title="Označiť dielce s touto páskou" aria-label="Označiť dielce s touto páskou" data-noop="1">' + ico('eye') + '</button></span></div>';
+    });
+    return h + '</div>';
+  }
+  function renderA(){
+    $('aNav').innerHTML = navHtml('mat');
+    $('aHead').innerHTML = '<h2>Materiály</h2><span class="sechint">katalóg dekorov je spoločný pre všetky zákazky · predvoľby projektu platia pre túto</span><span class="secmodel">' + esc(MODEL) + '</span>';
+    $('aTools').innerHTML = '<button type="button" class="primary" data-noop="1" title="Pridať dekor z Demosu">' + ico('cloud-download') + ' Pridať z Demosu</button>' +
+      '<button type="button" class="ghostbtn" data-noop="1" title="Pridať materiál ručne (bez Demosu)">' + ico('plus') + ' Pridať ručne</button>' +
+      '<div class="searchbox">' + ico('search') + '<input type="text" placeholder="Hľadať dekor, výrobcu alebo kód" aria-label="Hľadať"></div>' +
+      '<select title="Zoskupenie dlaždíc" aria-label="Zoskupenie dlaždíc"><option>Podľa výrobcu</option><option>A–Z</option></select>' +
+      '<span class="spacer"></span><button type="button" class="ghostbtn" data-noop="1" title="Prepočítať počty „Použité v projekte" z aktuálneho modelu">' + ico('refresh-cw') + ' Obnoviť</button>';
+    $('aBody').innerHTML = '<details class="mddef"><summary>Predvoľby projektu (korpus · čelá · chrbát · zásuvky)</summary><div class="mddefbody">V mockupe zbalené — nemenia sa.</div></details>' +
+      '<fieldset><legend>Katalóg podľa dekorov</legend>' + groupCard('H1180', { price:'A4', sup:'A3', slot:['A1', 'A2'] }) + '</fieldset>';
+  }
+  function renderA2(){
+    $('a2Body').innerHTML = '<fieldset><legend>Katalóg podľa dekorov</legend>' + groupCard('SKLO', { dim:'A6', slot:['A5'] }) +
+      '<div class="muted" style="padding:6px 2px 2px">… a iná skupina (v plugine vždy jeden detail naraz):</div>' + groupCard('UNI', { slot:['A7'] }) + '</fieldset>';
+  }
+
+  // ---------------- B / B2 · formulár „Overiť cenu" ----------------
+  var BF = null, B2F = null;
+  function openForm(it){
+    var f = { id:it.id, err:'', note:'' };
+    if (it.kind === 'sheet'){
+      f.mode = it.fmt ? 'plate' : 'm2';
+      f.val = it.price == null ? '' : num2(f.mode === 'plate' ? r2(it.price * area(it)) : it.price);
+      f.orig = f.val; f.origMode = f.mode;
+    } else {
+      f.mode = 'bm';
+      f.val = it.price == null ? '' : num2(it.price);
+      f.orig = f.val; f.origMode = f.mode;
+    }
+    return f;
+  }
+  function catPlate(it){ return it.price == null || !it.fmt ? null : r2(it.price * area(it)); }
+  function calcTxt(it, f){
+    var v = parseNum(f.val);
+    if (f.mode === 'plate'){
+      if (!it.fmt) return { t:'Na prepočet treba formát platne — doplň ho v úprave variantu (ceruzka), alebo zadaj cenu za m².', warn:true };
+      if (v === null || isNaN(v)) return { t:'→ … €/m² (' + fmtTxt(it) + ')' };
+      return { t:'→ ' + num2(v / area(it)) + ' €/m² (' + fmtTxt(it) + ')' };
+    }
+    if (f.mode === 'm2'){
+      if (!it.fmt) return { t:'bez prepočtu — formát nie je v katalógu (sklo na mieru)', warn:true };
+      if (v === null || isNaN(v)) return { t:'= … € za platňu (' + fmtTxt(it) + ')' };
+      return { t:'= ' + num2(r2(v * area(it))) + ' € za platňu (' + fmtTxt(it) + ')' };
+    }
+    return { t:'' };
+  }
+  function diffTxt(it, f){
+    var v = parseNum(f.val);
+    var cat, unit;
+    if (f.mode === 'plate'){ cat = catPlate(it); unit = ' € za platňu'; }
+    else { cat = it.price == null ? null : r2(it.price); unit = f.mode === 'm2' ? ' €/m²' : ' €/bm'; }
+    if (cat === null) return { t:'v katalógu zatiaľ bez ceny', cls:'muted2' };
+    if (v === null || isNaN(v)) return { t:'v katalógu ' + num2(cat) + unit, cls:'muted2' };
+    var d = r2(v - cat);
+    if (Math.abs(d) < 0.005) return { t:'bez zmeny (' + num2(cat) + unit + ') — stačí potvrdiť', cls:'same' };
+    var p = cat > 0 ? ' (' + (d > 0 ? '+' : '−') + nf(Math.abs(d / cat * 100)) + ' %)' : '';
+    return { t:(d > 0 ? '+' : '−') + num2(Math.abs(d)) + ' €' + p + ' oproti katalógu (' + num2(cat) + unit + ')', cls:'chg' };
+  }
+  function lastNote(it, f){
+    var prev = it.mchecked ? 'Posledné ručné potvrdenie: ' + dmy(it.mchecked) + '.' : 'Cena zatiaľ nebola ručne potvrdená.';
+    var zero = parseNum(f.val) === 0 ? ' 0 € — materiál sa do rozpočtu započíta nulou (napr. ho dodá zákazník).' : '';
+    return prev + ' Potvrdená cena platí v celom katalógu.' + zero;
+  }
+  function formHtml(it, f, key){
+    var g = GROUPS[it.grp] || { decor:it.grp, name:'' };
+    var sub = (it.kind === 'edge' ? 'ABS ' + g.decor + ' ' + it.w + '/' + nf(it.th) : g.decor + ' ' + it.type + ' ' + it.th + ' mm') + ' · ' + g.name;
+    var h = '<div class="mhead"><h3>Overiť cenu ručne</h3>' + (key === 'b' ? pin('B1') : pin('B6')) + '<span class="msub">' + esc(sub) + '</span>' +
+      '<button type="button" class="mx" data-f="' + key + '" data-fa="cancel" title="Zavrieť (Esc)" aria-label="Zavrieť">' + ico('x') + '</button></div>';
+    h += '<div class="mbody"><div class="merrtop" role="status">' + esc(f.errTop || '') + '</div>';
+    h += '<div class="mgroup"><h4>' + esc(it.sup || 'Dodávateľ neuvedený') + '</h4>' +
+      (it.link ? '<span>' + esc(it.link) + '</span>' : '<span class="nolink">Bez odkazu — obchod sa neotvorí; cenu si over u dodávateľa (telefón, e-mail, ponuka).</span>' + otag('O9')) +
+      (key === 'b' ? pin('B2') : '') + '</div>';
+    var info = it.kind === 'edge'
+      ? 'ABS ' + it.w + ' × ' + nf(it.th) + ' mm · kód ' + (it.code || '—')
+      : 'kód ' + (it.code || '—') + ' · ' + (it.fmt ? 'formát ' + fmtTxt(it) + ' mm (' + nf(area(it)) + ' m²)' : 'formát nie je v katalógu');
+    h += '<div class="mrow"><label>Položka</label><span class="mtext">' + esc(info) + '</span></div>';
+    if (it.kind === 'sheet'){
+      h += '<div class="mrow"><label>Cenu zadávam</label><div class="bseg" role="group" aria-label="Jednotka ceny">' +
+        '<button type="button" class="' + (f.mode === 'plate' ? 'on' : '') + '" data-f="' + key + '" data-fa="mode" data-v="plate">za platňu</button>' +
+        '<button type="button" class="' + (f.mode === 'm2' ? 'on' : '') + '" data-f="' + key + '" data-fa="mode" data-v="m2">za m²</button></div>' + otag('O3') + '</div>';
+    }
+    var lbl = f.mode === 'plate' ? 'Cena za platňu' : f.mode === 'm2' ? 'Cena za m²' : 'Cena s DPH';
+    var unit = f.mode === 'plate' ? '€ s DPH' : f.mode === 'm2' ? '€ s DPH / m²' : '€ s DPH / bm';
+    var c = calcTxt(it, f);
+    h += '<div class="mrow"><label for="' + key + 'Price">' + lbl + '</label><input id="' + key + 'Price" type="text" class="mshort' + (f.err ? ' bad' : '') + '"' +
+      ' data-price="' + key + '" value="' + esc(f.val) + '" placeholder="nezadaná" aria-invalid="' + (f.err ? 'true' : 'false') + '">' +
+      '<span class="munit">' + unit + '</span><span class="mcalc' + (c.warn ? ' warn' : '') + '" id="' + key + 'Calc">' + esc(c.t) + '</span>' +
+      (key === 'b' ? pin('B3') : '') + '<div class="merr" id="' + key + 'Err">' + esc(f.err) + '</div></div>';
+    var d = diffTxt(it, f);
+    h += '<div class="mrow"><label>Oproti katalógu</label><span class="mtext ' + d.cls + '" id="' + key + 'Diff">' + esc(d.t) + '</span>' + (key === 'b' ? pin('B4') : '') + '</div>';
+    h += '<div class="hint" id="' + key + 'Note">' + esc(lastNote(it, f)) + '</div></div>';
+    h += '<div class="mfoot"><span class="spacer"></span><button type="button" class="ghostbtn" data-f="' + key + '" data-fa="cancel">Zrušiť</button>' +
+      '<button type="button" class="primary" data-f="' + key + '" data-fa="ok">' + ico('check') + ' Potvrdiť cenu k dnešku</button>' + (key === 'b' ? pin('B5') : '') + '</div>';
+    return h;
+  }
+  function webHtml(it){
+    if (!it.link){
+      return '<div class="mkweb"><div class="mkwebbar"><i></i><i></i><i></i><span class="mkurl">—</span></div><div class="mkwebbody">' +
+        '<div class="mkwebh">Prehliadač sa neotvorí</div><div class="mkwebs">položka nemá odkaz na produkt</div>' +
+        '<div class="mkwebn">Návrh O9: formulár sa otvorí aj tak — cenu povie sklenár telefonicky, e-mailom alebo v ponuke. Jantárová ikona odkazu ďalej pripomína, že odkaz chýba.</div></div></div>';
+    }
+    var unit = it.kind === 'edge' ? 's DPH / bm' : 's DPH / ks';
+    return '<div class="mkweb"><div class="mkwebbar"><i></i><i></i><i></i><span class="mkurl">' + esc(linkHost(it.link)) + '</span></div><div class="mkwebbody">' +
+      '<div class="mkwebh">' + esc(it.shopTitle || '') + '</div><div class="mkwebs">' + esc(it.kind === 'edge' ? 'hrana · rolka 100 m' : 'formát ' + fmtTxt(it) + ' mm · skladom') + '</div>' +
+      '<div class="mkwebp">' + esc(num2(it.shop)) + ' € <small>' + unit + '</small></div>' +
+      '<div class="mkwebn">Ilustrácia stránky obchodu. Plugin z nej nič nečíta — cenu porovnáš a potvrdíš, alebo prepíšeš ty.</div></div></div>';
+  }
+  var B_CHOICES = [['s25', 'DTDL 25 — cena sedí'], ['z10', 'Zástena 10 — cena sa zmenila'], ['sk4', 'Sklo 4 — bez formátu, bez odkazu']];
+  function renderB(){
+    var it = byId(BF.id);
+    $('bSwitch').innerHTML = '<span>Ukážka pre:</span>' + B_CHOICES.map(function(c){
+      return '<button type="button" class="' + (BF.id === c[0] ? 'on' : '') + '" data-bsel="' + c[0] + '">' + esc(c[1]) + '</button>';
+    }).join('');
+    $('bCard').innerHTML = formHtml(it, BF, 'b');
+    $('bWeb').innerHTML = webHtml(it);
+  }
+  function renderB2(){
+    var it = byId(B2F.id);
+    $('b2Card').innerHTML = formHtml(it, B2F, 'b2');
+    $('b2Web').innerHTML = webHtml(it);
+  }
+  function liveUpdate(key){
+    var f = key === 'b' ? BF : B2F, it = byId(f.id);
+    var c = calcTxt(it, f), d = diffTxt(it, f);
+    var ce = $(key + 'Calc'), de = $(key + 'Diff'), ne = $(key + 'Note');
+    if (ce){ ce.textContent = c.t; ce.className = 'mcalc' + (c.warn ? ' warn' : ''); }
+    if (de){ de.textContent = d.t; de.className = 'mtext ' + d.cls; }
+    if (ne) ne.textContent = lastNote(it, f);
+  }
+  function confirmForm(key){
+    var f = key === 'b' ? BF : B2F, it = byId(f.id);
+    var st = key === 'b' ? 'bStatus' : 'b2Status';
+    var v = parseNum(f.val);
+    f.err = ''; f.errTop = '';
+    if (v === null || isNaN(v) || v < 0){
+      f.err = 'Vlož nezápornú cenu s DPH; prázdna cena sa nedá potvrdiť.';
+      rerender(); status(st, 'Nezapísané — oprav cenu a potvrď znova.', 'warn'); return;
+    }
+    if (f.mode === 'plate' && !it.fmt){
+      f.errTop = 'Cena za platňu sa bez formátu nedá prepočítať na €/m² — prepni na „za m²" alebo doplň formát.';
+      rerender(); status(st, 'Nezapísané — chýba formát platne.', 'warn'); return;
+    }
+    var before = it.price;
+    // C1: pole nedotknuté (tá istá hodnota v tom istom režime) = cena sa nemení ani o cent, zapíše sa len dátum
+    var untouched = before != null && f.val === f.orig && f.mode === f.origMode;
+    it.price = untouched ? before : (f.mode === 'plate' ? v / area(it) : v);
+    it.mchecked = TODAY;
+    var msg = 'Cena potvrdená k ' + dmy(TODAY) + ': ' +
+      (f.mode === 'plate' ? num2(v) + ' € za platňu = ' + num2(it.price) + ' €/m²' : num2(v) + (f.mode === 'm2' ? ' €/m²' : ' €/bm')) +
+      (before != null && Math.abs(r2(before) - r2(it.price)) < 0.005 ? ' (bez zmeny ceny — len dátum)' : '') +
+      '. Platí v celom katalógu; v plugine sa formulár teraz zatvorí. A aj D sa prepočítali.';
+    var fresh = openForm(it); fresh.id = it.id;
+    if (key === 'b') BF = fresh; else B2F = fresh;
+    rerender();
+    status(st, msg, 'ok');
+    status('aStatus', 'Katalóg zmenený zo formulára — ' + shortName(it) + ' ručne overená ' + dmy(TODAY) + '.', 'ok');
+    status('dStatus', 'Rozpočet prepočítaný — ' + it.blabel + ' ručne overená ' + dmy(TODAY) + '.', 'ok');
+  }
+
+  // ---------------- C · formulár variantu ----------------
+  var CSEL = { id:'s25', focus:false };
+  function frow(label, inner, unit, extra){ return '<div class="row' + (extra || '') + '"><label>' + label + '</label>' + inner + '<span class="unit">' + (unit || '') + '</span></div>'; }
+  function inp(val, attrs){ return '<input type="text" value="' + esc(val) + '"' + (attrs || '') + '>'; }
+  function sheetForm(it, key){
+    var g = GROUPS[it.grp] || { decor:it.grp, man:'' };
+    var h = '<div class="mkabove">… detail skupiny ' + esc(g.decor) + ' (riadky variantov) je nad formulárom …</div><div class="mdform">';
+    h += frow('Dekor', inp(g.decor, ' disabled')) + '<div class="hint">Dekor je identita skupiny — premení sa tlačidlom Premenovať na karte dekoru.</div>';
+    h += frow('Typ *', inp(it.type)) + frow('Hrúbka *', inp(String(it.th), ' disabled'), 'mm') + '<div class="hint">Hrúbka definuje variant — pre inú hrúbku pridaj nový materiál.</div>';
+    h += frow('Smer dekoru', '<select><option>Po dĺžke</option><option>Po šírke</option><option>Bez smeru</option></select>');
+    h += frow('Cena', inp(cellNum(it.price), ' placeholder="nezadaná" data-cf="' + key + ':price"'), '€/m²');
+    h += frow('Kód', inp(it.code, ' placeholder="dodávateľský kód" data-cf="' + key + ':code"')) + frow('Dodávateľ', inp(it.sup, ' placeholder="napr. Demos" data-cf="' + key + ':sup"'));
+    if (it.type !== 'ZASTENA') h += frow('Dekor u dodávateľa', inp('', ' placeholder="napr. F8001"')) + '<div class="hint">Len ak dodávateľ používa iné číslo dekoru — napr. Egger kompakt F8001 pre dekor F800.</div>';
+    h += linkRows(it, key);
+    h += frow('Rodina', inp('', ' placeholder="voliteľné"')) + frow('Výrobca', inp(g.man || '', ' disabled placeholder="voliteľné"')) +
+      '<div class="hint">Výrobca je vlastnosť dekoru — mení sa pre celú skupinu (tlačidlo Výrobca na karte).</div>';
+    h += '<div class="row"><label>Formát platne</label><input type="text" class="sheetdim" value="' + (it.fmt ? it.fmt[0] : '') + '" placeholder="2800" data-cf="' + key + ':fl"><span class="sheetx">×</span>' +
+      '<input type="text" class="sheetdim" value="' + (it.fmt ? it.fmt[1] : '') + '" placeholder="2070" data-cf="' + key + ':fw"><span class="unit">mm</span></div>';
+    if (it.type === 'ZASTENA'){
+      h += '<div class="row"><label>Rubový dekor</label><input type="text" class="sheetdim" value="W1000" readonly><input type="text" class="sheetdim" value="ST9" readonly><span class="unit"></span></div>' +
+        '<div class="hint">Zástena máva každú stranu iný dekor (líce/rub). Rub je identita variantu — po vyplnení sa nemení.</div>';
+    }
+    h += '<div class="btnrow"><button type="button" class="primary" data-c="' + key + '" data-ca="save">Uložiť</button><button type="button" class="ghostbtn" data-c="' + key + '" data-ca="cancel">Zrušiť</button></div></div>';
+    return h;
+  }
+  function edgeForm(it, key){
+    var g = GROUPS[it.grp] || { decor:it.grp };
+    var h = '<div class="mkabove">… detail skupiny ' + esc(g.decor) + ' (riadky variantov) je nad formulárom …</div><div class="mdform">';
+    h += frow('Dekor', inp(g.decor, ' disabled')) + '<div class="hint">Dekor je identita skupiny — premení sa tlačidlom Premenovať na karte dekoru.</div>';
+    h += frow('Šírka', inp(String(it.w), ' disabled placeholder="—"'), 'mm');
+    h += frow('Hrúbka *', '<select disabled><option>' + nf(it.th) + '</option></select>', 'mm');
+    h += frow('Cena', inp(cellNum(it.price), ' placeholder="nezadaná" data-cf="' + key + ':price"'), '€/bm');
+    h += frow('Kód', inp(it.code, ' placeholder="dodávateľský kód" data-cf="' + key + ':code"')) + frow('Dodávateľ', inp(it.sup, ' placeholder="napr. Demos" data-cf="' + key + ':sup"'));
+    h += linkRows(it, key);
+    h += '<div class="btnrow"><button type="button" class="primary" data-c="' + key + '" data-ca="save">Uložiť</button><button type="button" class="ghostbtn" data-c="' + key + '" data-ca="cancel">Zrušiť</button></div></div>';
+    return h;
+  }
+  function linkRows(it, key){
+    var h;
+    if (it.demos){
+      h = '<div class="row newrow mkhl"><label>Odkaz na produkt' + pin('C4') + '</label><input type="text" readonly value="" placeholder="— viazané na Demos" aria-label="Odkaz na produkt"><span class="unit"></span></div>' +
+        '<div class="hint">Položka je viazaná na Demos — odkaz aj cenu spravuje Demos (pole Demos URL nižšie). Ručný odkaz zadáš až po vymazaní Demos URL.</div>';
+      h += frow('Demos URL', inp(it.demosUrl || '', ' placeholder="https://www.demos-trade.sk/…"')) +
+        (it.checked ? '<div class="hint">Cena overená ' + dmy(it.checked) + ' — zmena alebo zmazanie adresy dátum zruší.</div>' : '');
+      return h;
+    }
+    var when = it.mchecked ? 'Cena ručne overená ' + dmy(it.mchecked) + ' — zmena odkazu, ceny, kódu, dodávateľa alebo formátu overenie zruší.'
+                           : 'Cena zatiaľ nebola ručne overená.';
+    h = '<div class="row newrow mkhl"><label>Odkaz na produkt' + pin('C1') + '</label><input type="text" id="' + key + 'Link" value="' + esc(it.link || '') + '"' +
+      ' placeholder="https://…" data-cf="' + key + ':link" aria-label="Odkaz na produkt"><span class="unit"></span></div>' +
+      '<div class="hint" id="' + key + 'LinkHint">Otvorí sa vo webovom prehliadači. ' + esc(when) + pin('C2') + '</div>';
+    h += frow('Demos URL', inp('', ' placeholder="https://www.demos-trade.sk/…"'));
+    return h;
+  }
+  function renderC(){
+    var it = byId(CSEL.id);
+    var g = GROUPS[it.grp] || { decor:it.grp };
+    $('c1Cap').textContent = 'bez Demosu — ' + (it.kind === 'edge' ? 'ABS ' + g.decor + ' ' + it.w + '/' + nf(it.th) : g.decor + ' ' + it.type + ' ' + it.th) + (CSEL.focus ? ' (príchod z jantárovej ikony)' : '');
+    $('c1Body').innerHTML = it.kind === 'edge' ? edgeForm(it, 'c1') : sheetForm(it, 'c1');
+    $('c2Body').innerHTML = sheetForm(byId('s18'), 'c2');
+    if (CSEL.focus){
+      var li = $('c1Link');
+      if (li){
+        var row = li.closest('.row'); row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash');
+        setTimeout(function(){ try { li.focus({ preventScroll:true }); } catch (e){ li.focus(); } }, 450);
+      }
+      CSEL.focus = false;
+    }
+  }
+  function saveC(key){
+    if (key === 'c2'){ status('c2Status', 'Uložené (v mockupe bez zmeny) — Demos položka: odkaz ani ručné overenie sa tu nemenia.', 'ok'); return; }
+    var it = byId(CSEL.id);
+    var link = (document.querySelector('[data-cf="c1:link"]') || {}).value || '';
+    link = link.trim();
+    if (link && !/^https?:\/\/[^\s"']+$/i.test(link)){
+      var li = $('c1Link'); if (li) li.classList.add('bad');
+      var hi = $('c1LinkHint'); if (hi){ hi.textContent = 'Odkaz musí začínať http:// alebo https:// (bez medzier a úvodzoviek).'; hi.classList.add('bad'); }
+      status('c1Status', 'Neuložené — oprav odkaz.', 'warn'); return;
+    }
+    var pe = document.querySelector('[data-cf="c1:price"]');
+    var pv = pe ? parseNum(pe.value) : null;
+    var changed = [];
+    if ((it.link || '') !== link){ it.link = link || null; changed.push('odkaz'); }
+    if (pe && pe.value.trim() !== cellNum(it.price)){
+      if (pv === null){ it.price = null; changed.push('cena'); }
+      else if (!isNaN(pv) && pv >= 0){ it.price = pv; changed.push('cena'); }
+    }
+    var ce = document.querySelector('[data-cf="c1:code"]'), se = document.querySelector('[data-cf="c1:sup"]');
+    if (ce && ce.value.trim() !== String(it.code || '').trim()){ it.code = ce.value.trim(); changed.push('kód'); }
+    if (se && se.value.trim() !== String(it.sup || '').trim()){ it.sup = se.value.trim(); changed.push('dodávateľ'); }
+    if (it.kind === 'sheet'){
+      var fl = parseNum((document.querySelector('[data-cf="c1:fl"]') || {}).value), fw = parseNum((document.querySelector('[data-cf="c1:fw"]') || {}).value);
+      var nfmt = (fl > 0 && fw > 0) ? [fl, fw] : null;
+      if (String(nfmt) !== String(it.fmt || null)){ it.fmt = nfmt; changed.push('formát'); }
+    }
+    var killed = changed.length && it.mchecked;
+    if (killed) it.mchecked = null;
+    rerender();
+    status('c1Status', changed.length
+      ? 'Uložené: ' + changed.join(', ') + (killed ? ' — ručné overenie ceny sa zrušilo, položka ide na kontrolu (O6).' : '.')
+      : 'Uložené — nič sa nezmenilo.', 'ok');
+  }
+
+  // ---------------- D · Rozpočet ----------------
+  var STALE_OPEN = true;
+  var OTHER = [['Kovanie', '14 položiek', 612.4], ['Služby', '5 položiek', 486.3], ['Štandardné riadky', '3 položky · režim €€', 1150], ['Vlastné položky', 'len táto zákazka', 0]];
+  var BMAT = ['s18', 's25', 'z10', 'w18', 'hdf', 'sk4', 'u18'], BABS = ['e23', 'e43', 'ew'];
+  function staleItems(){
+    var out = BMAT.concat(BABS).map(byId).filter(function(it){ var s = state(it); return s === 'd-stale' || s === 'm-stale' || s === 'm-never'; });
+    out.sort(function(a, b){
+      var aa = a.demos ? ageOf(a.checked) : (a.mchecked ? ageOf(a.mchecked) : -1);
+      var bb = b.demos ? ageOf(b.checked) : (b.mchecked ? ageOf(b.mchecked) : -1);
+      return (bb - aa) || (a.kind < b.kind ? 1 : a.kind > b.kind ? -1 : 0) || (a.id < b.id ? -1 : 1);
+    });
+    return out;
+  }
+  function staleLabel(){
+    var all = staleItems();
+    var man = all.filter(function(it){ return !it.demos; }).length;
+    if (man > 0) return all.length + ' ' + pl(all.length, 'cena na kontrolu', 'ceny na kontrolu', 'cien na kontrolu');
+    if (all.length) return all.length + ' ' + pl(all.length, 'cena staršia', 'ceny staršie', 'cien starších') + ' ako ' + PRAH + ' dní';
+    return null;
+  }
+  function bLink(it){
+    if (it.uni) return '';
+    if (it.demos){
+      return '<button type="button" class="hw-product-link mktip" data-act="demos" data-id="' + it.id + '" data-tip="Otvoriť produkt (Demos) — návrh O1" aria-label="Otvoriť produkt · ' + esc(it.blabel) + '">' + ico('external-link') + '</button>';
+    }
+    return '<button type="button" class="hw-product-link mktip' + (it.link ? '' : ' is-missing') + '" data-act="link" data-id="' + it.id + '"' +
+      ' data-tip="' + esc(it.link ? 'Otvoriť produkt\n' + linkHost(it.link) : 'Chýba odkaz — doplniť odkaz produktu') + '" aria-label="' + esc((it.link ? 'Otvoriť produkt' : 'Chýba odkaz') + ' · ' + it.blabel) + '">' + ico('external-link') + '</button>';
+  }
+  function freshCell(it){
+    var s = state(it);
+    if (s === 'd-stale') return '<span class="bold-price" title="Cena je staršia než prah v Nastaveniach">' + ageOf(it.checked) + ' dní</span>';
+    if (s === 'd-unver') return '<span class="bfnt" title="Cena nebola nikdy overená">?</span>';
+    if (s === 'd-fresh' || s === 'none') return '<span class="bfnt">—</span>';
+    var txt = s === 'm-fresh' ? 'ručne ' + dmS(it.mchecked) : s === 'm-stale' ? 'ručne ' + ageOf(it.mchecked) + ' dní' : 'neoverená';
+    return '<button type="button" class="bver mktip' + (s === 'm-fresh' ? '' : ' is-pending') + '" data-act="check" data-id="' + it.id + '"' +
+      ' data-tip="' + esc(checkTip(it)) + '" aria-label="' + esc('Overiť cenu · ' + it.blabel + ' · ' + txt) + '">' + ico('clipboard-check') + ' ' + esc(txt) + '</button>';
+  }
+  function matRow(it){
+    var pp = perPlate(it), miss = it.price == null;
+    var notes = [nf(it.bm2) + ' m²'];
+    if (it.fmt) notes.push('formát ' + it.fmt[0] + '×' + it.fmt[1]);
+    else notes.push('formát platne nie je v katalógu — odhad podľa 2800×2070 (UNI)');
+    if (it.uni) notes.push('materiál neurčený (UNI) — počet platní je orientačný');
+    if (it.bplan) notes.push(it.bplan);
+    var chg = manual(it) ? ' chg' : '';
+    if (!it.fmt && !it.uni){
+      // O10 / C12: materiál bez formátu = skutočné m² dielcov × cena za m² (nie fiktívna platňa 2800 × 2070)
+      return '<tr class="' + (miss ? 'bmiss' : '') + chg + '"><td>' + bLink(it) + esc(it.blabel) + ' <span class="bfnt">· formát nie je v katalógu — počíta sa skutočná plocha (O10)</span>' + '</td>' +
+        '<td class="bnum">' + nf(it.bm2) + '</td><td class="bnum">m²</td>' +
+        '<td class="bnum">' + (miss ? '<span class="bmisslbl">chýba cena</span>' : esc(eur(r2(it.price)))) + '</td>' +
+        '<td class="bnum">' + freshCell(it) + '</td><td class="bnum">' + esc(miss ? '—' : eur(lineTotal(it))) + '</td></tr>';
+    }
+    return '<tr class="' + (miss ? 'bmiss' : '') + chg + '"><td>' + bLink(it) + esc(it.blabel) + ' <span class="bfnt">· ' + esc(notes.join(' · ')) + '</span></td>' +
+      '<td class="bnum">' + it.bqty + '</td><td class="bnum">PLATŇA</td>' +
+      '<td class="bnum">' + (miss ? '<span class="bmisslbl">chýba cena</span>' : esc(eur(pp)) + ' <span class="bfnt">(' + esc(eur(r2(it.price))) + '/m²)</span>') + '</td>' +
+      '<td class="bnum">' + freshCell(it) + '</td><td class="bnum">' + esc(miss ? '—' : eur(lineTotal(it))) + '</td></tr>';
+  }
+  function absRow(it){
+    var miss = it.price == null;
+    return '<tr class="' + (miss ? 'bmiss' : '') + (manual(it) ? ' chg' : '') + '"><td>' + bLink(it) + esc(it.blabel) + '</td>' +
+      '<td class="bnum">' + nf(it.bqty) + '</td><td class="bnum">BM</td>' +
+      '<td class="bnum">' + (miss ? '<span class="bmisslbl">chýba cena</span>' : esc(eur(r2(it.price)))) + '</td>' +
+      '<td class="bnum">' + freshCell(it) + '</td><td class="bnum">' + esc(miss ? '—' : eur(r2(it.price * it.bqty))) + '</td></tr>';
+  }
+  // Medzisúčet riadku — tá istá logika ako matRow: bez formátu (a nie UNI) = cena za m² × skutočná plocha (O10 / C12)
+  function lineTotal(it){ if (it.price == null) return 0; if (!it.fmt && !it.uni) return r2(it.price * it.bm2); var p = perPlate(it); return p == null ? 0 : r2(p * it.bqty); }
+  function matSub(){ return BMAT.map(byId).reduce(function(s, it){ return s + lineTotal(it); }, 0); }
+  function absSub(){ return BABS.map(byId).reduce(function(s, it){ return s + (it.price == null ? 0 : r2(it.price * it.bqty)); }, 0); }
+  function listActions(it){
+    if (it.demos){
+      return '<span class="bacts2">' + bLink(it) + ' <button type="button" class="bact" data-bud="refresh_one" data-id="' + it.id + '" title="Obnoviť cenu tejto položky z Demosu" aria-label="Obnoviť túto cenu">' + ico('refresh-cw') + '</button></span>';
+    }
+    return '<span class="bacts2 mkhl">' + bLink(it) + ' <button type="button" class="bact hw-manual-check' + (pending(it) ? ' is-pending' : '') + '" data-act="check" data-id="' + it.id + '"' +
+      ' title="' + esc(checkTip(it)) + '" aria-label="' + esc('Overiť cenu · ' + it.blabel) + '">' + ico('clipboard-check') + ' Overiť cenu</button></span>';
+  }
+  function renderD(){
+    var label = staleLabel();
+    var demosStale = staleItems().some(function(it){ return it.demos; });
+    $('dHead').innerHTML = '<h2>Rozpočet</h2><span class="sechint">rozpočet zákazky · ceny kovania sú spoločné pre všetky zákazky</span><span class="secmodel">' + esc(MODEL) + '</span>';
+    var manualOnly = !!label && !demosStale;
+    $('dTools').innerHTML = '<div class="bseg" role="group" aria-label="Zobrazenie DPH"><button type="button" class="on" data-noop="1">s DPH</button><button type="button" data-noop="1">bez DPH</button></div>' +
+      '<div class="bseg" role="group" aria-label="Cenový režim zákazky"><button type="button" data-noop="1">€</button><button type="button" class="on" data-noop="1">€€</button><button type="button" data-noop="1">€€€</button></div>' +
+      '<button type="button" class="ghostbtn' + (label ? ' bstalebtn' : '') + '" data-bud="pr" data-manual="' + (manualOnly ? 1 : 0) + '" title="' + esc((label ? label + ' — ' : '') +
+        (manualOnly ? 'Otvorí zoznam položiek na ručné overenie ceny' : 'Stiahne aktuálne ceny všetkých položiek zákazky viazaných na Demos (medzi položkami je 3 s pauza — pravidlo Demosu)')) + '">' +
+        ico(manualOnly ? 'clipboard-check' : 'refresh-cw') + ' ' + (manualOnly ? 'Skontrolovať ceny' : 'Prepočítať ceny') + '</button>' +
+      '<button type="button" class="ghostbtn" data-noop="1" title="Prepočítať rozpočet z aktuálneho modelu">' + ico('refresh-cw') + ' Obnoviť</button>' +
+      '<span class="spacer"></span><button type="button" class="primary" data-noop="1" title="Interný rozpočet v presnom formáte tvojich hárkov">' + ico('download') + ' XLSX rozpočet</button>' +
+      '<button type="button" class="ghostbtn" data-noop="1" title="Sadzby, režimy a prahy — globálne nastavenie, platí pre každú zákazku">' + ico('settings') + ' Nastavenia</button>';
+    var ms = matSub(), as = absSub(), other = OTHER.reduce(function(s, o){ return s + o[2]; }, 0);
+    var miss = missingCount();
+    var h = '<div class="bsum"><div><div class="blbl">Spolu za zákazku</div><div class="btotal">' + esc(eur(r2(ms + as + other))) + ' <small>s DPH · režim €€</small></div></div><div class="bwarns">';
+    if (label) h += '<button type="button" class="bchip' + (STALE_OPEN ? ' open' : '') + '" data-bud="stale">' + ico('chevron-right', 'chevr') + ' ' + esc(label) + '</button>';
+    if (miss) h += '<button type="button" class="bchip" data-noop="1" title="Ten istý nález ako v Kontrole — klik prejde na jeho zoznam">' + ico('alert') + ' ' + miss + ' ' + pl(miss, 'upozornenie rozpočtu', 'upozornenia rozpočtu', 'upozornení rozpočtu') + '</button>';
+    h += '</div></div>';
+    if (label && STALE_OPEN){
+      h += '<div class="blist">';
+      var d2 = false;
+      staleItems().forEach(function(it){
+        var s = state(it);
+        var age = s === 'd-stale' ? 'overené pred ' + dnami(ageOf(it.checked))
+                : s === 'm-stale' ? 'ručne overené pred ' + dnami(ageOf(it.mchecked)) : 'vyžaduje ručné overenie';
+        var p = '';
+        if (!it.demos && !d2){ p = pin('D2'); d2 = true; }
+        h += '<div><span>' + esc(it.blabel) + p + '</span><span class="bage">' + esc(age) + '</span>' + listActions(it) + '</div>';
+      });
+      h += '</div>';
+    }
+    h += '<details class="bsec" open><summary><h3>Materiál</h3><span class="bcnt">' + BMAT.length + ' položiek</span>' +
+      '<label class="bappl" onclick="event.stopPropagation()"><input type="checkbox"> ceny podľa plánu</label>' +
+      '<button type="button" class="nxtip" aria-label="Pomoc" data-tip="Zapnuté: počet platní berie rozpočet z nárezového plánu (horná hranica). V mockupe vypnuté — nemení sa." onclick="event.stopPropagation();event.preventDefault()">' + ico('help-circle') + '</button>' +
+      pin('D1') + pin('D3') + pin('D4') + '<span class="bsubt">' + esc(eur(r2(ms))) + '</span></summary>' +
+      '<table class="btab"><thead><tr><th>Materiál</th><th class="bnum">Množstvo</th><th class="bnum">MJ</th><th class="bnum">€ / MJ</th><th class="bnum">Overená</th><th class="bnum">Medzisúčet</th></tr></thead><tbody>' +
+      BMAT.map(function(id){ return matRow(byId(id)); }).join('') + '</tbody></table></details>';
+    h += '<details class="bsec" open><summary><h3>ABS hrany</h3><span class="bcnt">' + BABS.length + ' položky</span><span class="bsubt">' + esc(eur(r2(as))) + '</span></summary>' +
+      '<table class="btab"><thead><tr><th>Páska</th><th class="bnum">Dĺžka s rezervou</th><th class="bnum">MJ</th><th class="bnum">€ / bm</th><th class="bnum">Overená</th><th class="bnum">Medzisúčet</th></tr></thead><tbody>' +
+      BABS.map(function(id){ return absRow(byId(id)); }).join('') + '</tbody></table></details>';
+    OTHER.forEach(function(o){
+      h += '<details class="bsec"><summary><h3>' + esc(o[0]) + '</h3><span class="bcnt">' + esc(o[1]) + '</span><span class="bsubt">' + esc(eur(o[2])) + '</span></summary><div class="bnote">V mockupe zbalené — bez zmeny.</div></details>';
+    });
+    $('dBody').innerHTML = h;
+    $('dDiff').innerHTML = '<li><b>Dnes</b> by v zozname bolo pri skle, zástene a páske 43/0,8 len „ručná položka · bez Demos väzby — over v katalógu ručne" — a to iba keď čip existuje kvôli Demos cenám. Čip by hovoril „2 ceny staršie ako 30 dní".</li>';
+  }
+
+  // ---------------- body O1–O9 ----------------
+  var OQ = [
+    { id:'O1', t:'Kde sú ikony odkazu a overenia', w:[['A', 'secA'], ['D', 'secD']],
+      q:'Kam v riadku dať „Otvoriť produkt" a „Overiť cenu", aby nepribudol riadok?',
+      n:'Štúdio → Materiály: dve malé ikony v existujúcom riadku variantu, na mieste, kde dnes sedí ikona Demosu (vpravo pred ceruzkou), s pevným miestom, aby stĺpce ceny nelietali. Rozpočet: ikona odkazu pred názvom materiálu (ako pri kovaní pred kódom), overenie priamo v stĺpci „Overená" — stav a tlačidlo sú jedno. V zozname cien na kontrolu odkaz + „Overiť cenu" s textom (ako kovanie). Doplnok nad rámec C6: ikonu odkazu v Rozpočte dostanú aj Demos materiály (otvorí Demos) — pri kovaní ju majú obe.',
+      why:'Nepribudne ani jeden riadok. Rovnaké ikony a farby ako pri kovaní, takže sa nič nové neučíš.',
+      alt:'akcia len vo formulári ceruzky (menej viditeľná) · rozbaľovací detail riadku ako v katalógu kovania (+1 riadok na položku) · v Rozpočte ikona v bunke € / MJ ako pri kovaní · Demos materiály v Rozpočte bez ikony.' },
+    { id:'O2', t:'Kedy je cena „na kontrolu" a čo položka bez ceny', w:[['D', 'secD'], ['A', 'secA']],
+      q:'Kedy sa ručná cena ozve a ako sa ukáže položka, ktorá cenu nemá vôbec?',
+      n:'Na kontrolu je, keď cenu nikto ručne nepotvrdil, alebo je potvrdenie staršie ako prah z Nastavení dodávateľa (dnes 30 dní — ten istý ako pri Demose). Položka bez ceny je tiež na kontrolu („Overiť cenu" je cesta, ako cenu doplniť); jantárový riadok „chýba cena" a nález v Kontrole ostávajú ako dnes. Čip „N cien na kontrolu" ich počíta spolu so starými Demos cenami.',
+      why:'Jeden prah, jedno miesto. Rozpočet ukáže na kontrolu len položky použité v otvorenej zákazke; stav každej položky katalógu vidíš v Štúdiu → Materiály (jantárová ikona overenia). Po prvom potvrdení sa položka ozve až po 30 dňoch.',
+      alt:'vlastný, dlhší prah pre ručné ceny (napr. 90 dní — sklo a zástena sa menia zriedka) · položku bez ceny nerátať (hlási ju už Kontrola).' },
+    { id:'O3', t:'Sklo a iné dosky bez formátu', w:[['B', 'secB'], ['A2', 'secA2']],
+      q:'Cena sa zadáva za platňu (C8) — čo, keď katalóg formát nepozná (sklo na mieru)?',
+      n:'Formulár má prepínač „za platňu / za m²". Keď katalóg formát pozná, predvolené je „za platňu" s prepočtom na €/m²; keď formát chýba, predvolené je „za m²" a nič sa neprepočítava. Pri „za platňu" bez formátu formulár povie, že treba doplniť formát (ceruzka). V Rozpočte sa taký materiál počíta podľa skutočných m² (O10).',
+      why:'Sklenár aj obchod pri skle na mieru dávajú cenu za m². Vymyslený formát (2800 × 2070) by cenu pokazil. Zástena formát má vždy (je súčasť jej identity), tá ide za platňu.',
+      alt:'bez prepínača — bez formátu vždy za m², s formátom vždy za platňu · formulár si formát vypýta a uloží ho do katalógu.' },
+    { id:'O4', t:'Je 0 € platná cena?', w:[['B', 'secB']],
+      q:'Dá sa potvrdiť cena 0 €?',
+      n:'Áno, ako pri kovaní — 0 znamená „materiál sa neúčtuje" (napr. sklo dodá zákazník). Pod poľom sa pri 0 ukáže veta „0 € — materiál sa do rozpočtu započíta nulou". Prázdne pole potvrdiť nejde.',
+      why:'Jednotné pravidlo s kovaním; materiál od zákazníka sa tak dá zapísať bez obchádzky.',
+      alt:'0 odmietnuť (materiál od zákazníka riešiť vlastnou položkou v Rozpočte).' },
+    { id:'O5', t:'Texty stavu', w:[['A', 'secA'], ['D', 'secD']],
+      q:'Aké slová a kde — tooltip v Štúdiu, stĺpec „Overená", zoznam?',
+      n:'Štúdio (len tooltip ikony overenia): „Cena ručne overená 18.9.2026 (pred 12 dňami)" · „Ručne overená 16.8.2026 — pred 45 dňami, na kontrolu" · „Cena nebola nikdy ručne overená — na kontrolu". Rozpočet, stĺpec „Overená": čerstvá „ručne 18.9." (sivá), stará „ručne 45 dní" (jantár), nikdy „neoverená" (jantár); Demos ostáva „—" / „38 dní" / „?". Zoznam: „ručne overené pred 45 dňami" · „vyžaduje ručné overenie" (texty kovania).',
+      why:'Pri čerstvej cene sa dátum dá porovnať s faktúrou, pri starej je dôležitejší vek. Slovo „ručne" odlíši od Demosu.',
+      alt:'všade vek („ručne 12 dní") · v Štúdiu aj malý text vedľa ikony (výška sa nezmení, ale zúži sa stĺpec Dodávateľ).' },
+    { id:'O6', t:'Čo ručné overenie zruší', w:[['A', 'secA'], ['C', 'secC']],
+      q:'Prepísanie ceny v bunke €/m² (dnes editovateľná), v „Upraviť…" alebo cez ceruzku — čo s overením?',
+      n:'Zmena ceny kdekoľvek mimo formulára „Overiť cenu" ručné overenie zruší a položka ide na kontrolu. To isté zmena odkazu, kódu, dodávateľa a pri doske aj formátu platne (overená bola cena za platňu toho formátu). Názov, farba, smer dekoru nie.',
+      why:'Dnes to isté robí dátum z Demosu (zmena ceny, kódu alebo dodávateľa ho zruší) aj kovanie (cena, MJ, odkaz, dodávateľ). Cena bez pohľadu do obchodu nesmie vyzerať overene.',
+      alt:'prepísanie ceny v bunke = zároveň overenie k dnešku (rýchlejšie, ale „overené" potom neznamená „pozrel som do obchodu").' },
+    { id:'O7', t:'Presnosť prepočtu z platne na m²', w:[['B', 'secB'], ['A', 'secA']],
+      q:'Katalóg drží €/m² — ako zaručiť, že Rozpočet ukáže presne zadanú cenu za platňu?',
+      n:'Keď zadáš 179,90 € za platňu, Rozpočet ukáže za platňu presne 179,90 €; v Štúdiu (bunka aj formulár) sa €/m² ukazuje zaokrúhlené na 2 desatinné (31,04). Ako to katalóg uloží, rozhodne package CENY-M1 s auditom návrhu — mockup predpisuje len výsledok.',
+      why:'Pri zaokrúhlení na centy by z 179,90 € vyšlo späť 179,91 € (31,04 × 5,796 m²) — a v Rozpočte by „nesedela" cena, ktorú si práve potvrdil. Dnes bunka ukazuje číslo tak, ako je uložené, takže bez zaokrúhlenia by v nej svietilo 31.038654…',
+      alt:'zaokrúhliť €/m² na centy a rozdiel 1–2 centy na platni tolerovať.' },
+    { id:'O8', t:'Položka neskôr dostane Demos väzbu', w:[['C', 'secC']],
+      q:'Čo s ručným odkazom a overením, keď položku napojíš na Demos (ručne alebo automaticky pri „Aktualizovať z Demosu")?',
+      n:'Demos má prednosť: ikona otvára Demos, cenu obnovuje „Prepočítať ceny", ručné overenie zanikne. Ručný odkaz sa nezmaže — ostane odložený a vráti sa, keď väzbu na Demos zrušíš.',
+      why:'Jedna položka = jedna cesta k cene. Ručný odkaz býva prácne nájdený, škoda ho zahodiť. Kovanie má rovnakú prednosť (najprv Demos, potom vlastný odkaz).',
+      alt:'ručný odkaz pri napojení na Demos zmazať.' },
+    { id:'O9', t:'Overiť cenu bez odkazu (sklenár bez e-shopu)', w:[['A2', 'secA2'], ['B', 'secB']],
+      q:'Pri kovaní sa bez odkazu overiť nedá (klik vedie na doplnenie odkazu). Platí to aj pre sklo a zástenu od miestneho dodávateľa?',
+      n:'Jantárová ikona odkazu vedie na doplnenie odkazu ako pri kovaní. Ikona „Overiť cenu" však otvorí formulár aj bez odkazu — len bez prehliadača, s vetou „Bez odkazu — cenu si over u dodávateľa (telefón, e-mail, ponuka)".',
+      why:'Sklenár či miestny dodávateľ zásten často e-shop nemá; bez výnimky by sa jeho cena nedala potvrdiť vôbec a položka by svietila na kontrolu navždy.',
+      alt:'presne ako kovanie — bez odkazu sa overiť nedá, klik vedie na doplnenie odkazu.' },
+    { id:'O10', t:'Materiál bez formátu v Rozpočte (sklo na mieru)', w:[['D', 'secD'], ['A2', 'secA2']],
+      q:'Rozpočet dnes počíta každý materiál na platne a pri chýbajúcom formáte dosadí fiktívnu platňu 2800 × 2070 (5,8 m²) — čo so sklom na mieru?',
+      n:'Materiál bez formátu sa v Rozpočte počíta podľa skutočných m² dielcov (MJ „m²") × overená cena za m², nie ako fiktívna platňa. Robí sa v dávke CENY-M2 (Michal 30.9.2026 — C12).',
+      why:'Sklo s plochou 0,9 m² by sa inak nacenilo ako celá 5,8 m² platňa — zhruba 6× drahšie. Overená cena za m² má zmysel, len keď ju Rozpočet násobí skutočnou plochou.',
+      alt:'nechať fiktívnu platňu a riešiť po V1.' }
+  ];
+  function renderO(){
+    $('ogrid').innerHTML = OQ.map(function(q){
+      return '<div class="obox" id="' + q.id + '"><div class="oh"><span class="otagi">schválené 30.9. · ' + q.id + '</span><b>' + esc(q.t) + '</b></div>' +
+        '<dl><dt>Otázka</dt><dd>' + esc(q.q) + '</dd><dt class="rec">Odporúčam</dt><dd class="rec">' + esc(q.n) + '</dd><dt>Prečo</dt><dd>' + esc(q.why) + '</dd></dl>' +
+        '<div class="oalt"><b>Inak:</b> ' + esc(q.alt) + '</div>' +
+        '<div class="where">kde v mockupe: ' + q.w.map(function(x){ return '<a href="#' + x[1] + '">' + x[0] + '</a>'; }).join(' · ') + '</div></div>';
+    }).join('');
+  }
+
+  // ---------------- udalosti ----------------
+  function status(id, txt, kind){ var s = $(id); if (!s) return; s.className = 'status' + (kind ? ' ' + kind : ''); s.textContent = txt; }
+  function statusFor(el){ var w = el.closest('.win'); var s = w && w.querySelector('.status'); return s ? s.id : 'aStatus'; }
+  function goTo(id){ var t = $(id); if (t) t.scrollIntoView({ behavior:'smooth', block:'start' }); }
+  function rerender(){ renderA(); renderA2(); renderB(); renderB2(); renderC(); renderD(); }
+  function openCheck(it, src){
+    if (it.kind === 'edge'){
+      B2F = openForm(it); renderB2();
+      status('b2Status', it.link ? 'Obchod sa otvoril v prehliadači (ilustrácia vpravo) — skontroluj cenu a potvrď.' : 'Položka nemá odkaz — obchod sa neotvorí (O9).', it.link ? 'ok' : 'warn');
+      goTo('secB2');
+    } else {
+      BF = openForm(it); renderB();
+      status('bStatus', it.link ? 'Obchod sa otvoril v prehliadači (ilustrácia vpravo) — skontroluj cenu a potvrď.' : 'Položka nemá odkaz — obchod sa neotvorí; cenu si over u dodávateľa a potvrď (O9).', it.link ? 'ok' : 'warn');
+      goTo('secB');
+    }
+    if (src) status(src, 'Overiť cenu: ' + it.blabel + ' — formulár ' + (it.kind === 'edge' ? 'B2' : 'B') + '.', '');
+  }
+  function openEdit(it, focus, src){
+    if (it.demos){ status(src, 'Demos položka — jej formulár je v C2 (odkaz zamknutý).', ''); goTo('secC'); return; }
+    CSEL = { id:it.id, focus:!!focus }; renderC();
+    status('c1Status', focus ? 'Odkaz chýba — vlož adresu produktu a ulož. Klik na odkaz potom otvorí obchod.' : 'Formulár variantu otvorený.', focus ? 'warn' : '');
+    goTo('secC');
+  }
+  document.addEventListener('click', function(ev){
+    var t = ev.target.closest('button, a');
+    if (!t) return;
+    var src = statusFor(t);
+    if (t.hasAttribute('data-act')){
+      var it = byId(t.getAttribute('data-id')), act = t.getAttribute('data-act');
+      if (act === 'demos'){ status(src, 'Otvorené u dodávateľa (Demos) v prehliadači — nič sa nezapísalo.', 'ok'); return; }
+      if (act === 'link'){
+        if (it.link) status(src, 'Otvorené v prehliadači: ' + linkHost(it.link) + ' — klik na odkaz nič nezapisuje.', 'ok');
+        else { status(src, 'Chýba odkaz — otvára sa úprava s kurzorom v poli odkazu (C).', 'warn'); openEdit(it, true, src); }
+        return;
+      }
+      if (act === 'check'){ openCheck(it, src); return; }
+      if (act === 'edit'){ openEdit(it, false, src); return; }
+    }
+    if (t.hasAttribute('data-bsel')){ BF = openForm(byId(t.getAttribute('data-bsel'))); renderB(); status('bStatus', 'Pripravené.', ''); return; }
+    if (t.hasAttribute('data-fa')){
+      var key = t.getAttribute('data-f'), fa = t.getAttribute('data-fa'), f = key === 'b' ? BF : B2F;
+      var sid = key === 'b' ? 'bStatus' : 'b2Status';
+      if (fa === 'cancel'){ var fi = byId(f.id); var nf2 = openForm(fi); if (key === 'b') BF = nf2; else B2F = nf2; rerender(); status(sid, 'Zatvorené bez zápisu — cena ani dátum sa nezmenili (v plugine sa formulár zavrie).', ''); return; }
+      if (fa === 'ok'){ confirmForm(key); return; }
+      if (fa === 'mode'){
+        var itm = byId(f.id), nv = t.getAttribute('data-v'), cur = parseNum(f.val);
+        if (nv !== f.mode){
+          if (cur !== null && !isNaN(cur) && itm.fmt) f.val = num2(nv === 'plate' ? r2(cur * area(itm)) : cur / area(itm));
+          f.mode = nv; f.err = ''; f.errTop = '';
+        }
+        rerender(); return;
+      }
+    }
+    if (t.hasAttribute('data-ca')){
+      var ck = t.getAttribute('data-c');
+      if (t.getAttribute('data-ca') === 'save') saveC(ck);
+      else { rerender(); status(ck === 'c1' ? 'c1Status' : 'c2Status', 'Zrušené — formulár sa zbalí, nič sa neuložilo.', ''); }
+      return;
+    }
+    if (t.hasAttribute('data-bud')){
+      var b = t.getAttribute('data-bud');
+      if (b === 'stale'){ STALE_OPEN = !STALE_OPEN; renderD(); return; }
+      if (b === 'refresh_one'){ status('dStatus', 'Demos: obnovenie tejto ceny (v mockupe bez zmeny) — tá istá cesta ako Prepočítať ceny.', ''); return; }
+      if (b === 'pr' && t.getAttribute('data-manual') === '1'){ STALE_OPEN = true; renderD(); status('dStatus', 'Na kontrolu ostali len ručné ceny — zoznam je otvorený; Demos sa nesťahuje.', ''); return; }
+      if (b === 'pr'){ status('dStatus', 'Prepočet stiahne len ceny viazané na Demos. Ručné položky sa nesťahujú — ostávajú v zozname na kontrolu. V mockupe sa nič nesťahuje.', ''); return; }
+    }
+    if (t.hasAttribute('data-go')){ goTo(t.getAttribute('data-go')); return; }
+    if (t.hasAttribute('data-reset')){ reset(); BF = openForm(byId('s25')); B2F = openForm(byId('e43')); CSEL = { id:'s25', focus:false }; STALE_OPEN = true; rerender();
+      ['aStatus', 'a2Status', 'bStatus', 'b2Status', 'c1Status', 'c2Status', 'dStatus'].forEach(function(s){ status(s, 'Pripravené — pôvodné dáta.', ''); }); return; }
+    if (t.hasAttribute('data-theme')){
+      var th = t.getAttribute('data-theme');
+      document.documentElement.setAttribute('data-nx-theme', th);
+      each('[data-theme]', function(x){ x.classList.toggle('on', x.getAttribute('data-theme') === th); });
+      return;
+    }
+    if (t.hasAttribute('data-noop')){ status(src, 'V mockupe sa neprepína — bez zmeny oproti dnešku.', ''); }
+  });
+  // vstup ceny vo formulári — živý prepočet bez prekreslenia poľa
+  document.addEventListener('input', function(ev){
+    var el = ev.target;
+    if (el && el.hasAttribute && el.hasAttribute('data-price')){
+      var key = el.getAttribute('data-price'), f = key === 'b' ? BF : B2F;
+      f.val = el.value;
+      if (f.err){ f.err = ''; el.classList.remove('bad'); var e = $(key + 'Err'); if (e) e.textContent = ''; }
+      liveUpdate(key);
+    }
+  });
+  document.addEventListener('keydown', function(ev){
+    var el = ev.target;
+    if (!el || !el.hasAttribute) return;
+    if (ev.key === 'Enter' && el.hasAttribute('data-price')){ ev.preventDefault(); confirmForm(el.getAttribute('data-price')); return; }
+    if (ev.key === 'Enter' && el.classList.contains('mdcell')){ ev.preventDefault(); el.blur(); }
+  });
+  // bunka v detaile skupiny (A, A2) — zápis na `change` (blur/Enter), ako mdCellFlush
+  document.addEventListener('change', function(ev){
+    var el = ev.target;
+    if (!el || !el.classList || !el.classList.contains('mdcell')) return;
+    var it = byId(el.getAttribute('data-id')), f = el.getAttribute('data-cell'), src = statusFor(el);
+    var v = el.value.trim(), killed = false;
+    if (f === 'price'){
+      var p = parseNum(v);
+      if (p !== null && (isNaN(p) || p < 0)){ status(src, 'Cena musí byť číslo (alebo prázdna) a nesmie byť záporná.', 'warn'); el.value = cellNum(it.price); return; }
+      it.price = p;
+    } else if (f === 'code') it.code = v;
+    else if (f === 'sup') it.sup = v;
+    if (it.demos && it.checked){ it.checked = null; killed = 'Demos'; }
+    if (manual(it) && it.mchecked){ it.mchecked = null; killed = 'ručné'; }
+    rerender();
+    status(src, killed === 'ručné' ? 'Uložené — ručné overenie ceny sa zrušilo, položka ide na kontrolu (návrh O6). Ikona overenia zožltla, v D pribudla do zoznamu.'
+                : killed === 'Demos' ? 'Uložené — dátum overenia z Demosu sa zrušil (tak to funguje už dnes).' : 'Uložené.', killed ? 'warn' : 'ok');
+  });
+  $('pinTog').addEventListener('change', function(){ document.body.classList.toggle('nopins', !this.checked); });
+
+  // ---------------- štart ----------------
+  reset();
+  BF = openForm(byId('s25'));
+  B2F = openForm(byId('e43'));
+  renderO();
+  rerender();
+})();
+</script>
+</body>
+</html>
