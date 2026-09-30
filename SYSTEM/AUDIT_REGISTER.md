@@ -27,7 +27,7 @@ V1 rozsahu. Hlásená strata neuložených hodnôt, hygiena, texty, refaktor a v
 | R-37 | platí, zúžené na `supplier_settings` | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** (prvá v poradí po R-13) | S | poškodený, ale platný súbor nastavení dodávateľa sa ticho nahradí predvolenými sadzbami a prerezom/orezom a zničí dobrú zálohu |
 | R-35 | platí | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** (tichá strata pri dvoch oknách SketchUpu; po R-37) | S/M | prvá zmena globálnych pravidiel kovania alebo rozmerových radov sa pri dvoch otvorených oknách ticho stratí |
 | R-13 | platí | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** (čítať — rozhodnuté 29.9.; prvá v poradí) | S | dielec z inej verzie štandardu Kontrola neoznačí |
-| R-38 | platí | hraničné (len pri poškodenom súbore; stratí názvy zákaziek a prepínač zlúčenia 18/36 vo VEPO exporte — mení pomenovanie a členenie výstupu, nie rozmery, počty ani ceny) | S | poškodený súbor VEPO nastavení (názvy zákaziek, zlúčenie 18/36) sa môže ticho prepísať staršou zálohou |
+| R-38 | platí | hraničné (len pri poškodenom súbore; stratí názvy zákaziek a prepínač zlúčenia 18/36 vo VEPO exporte — mení pomenovanie a členenie výstupu, nie rozmery, počty ani ceny) | S | poškodený súbor VEPO nastavení (názvy zákaziek, zlúčenie 18/36) sa môže ticho prepísať staršou zálohou — **zaradenie: blok 9 · H7** (návrh orchestrátora 1.10.2026 — potvrdí Michal s mockupom H7) |
 | R-18 | platí | po V1 (hlásená strata neuložených hodnôt — ⋯ editor sa zavrie ako uložený, zlyhaný zápis ohlási červený status) | S | pri súbehu úpravy bunky a ⋯ editora v Rozpočte sa rozpísané hodnoty môžu stratiť |
 | R-16 | platí | hraničné (XLSX má kód a dodávateľa) | M | dva rovnaké dekory od dvoch výrobcov majú v rozpočte rovnaký názov riadku |
 | R-25 | čiastočne (PR #350) | po V1 | S | pri vybranej doske s chybným rozmerom klik na riadok Štúdia rozpísanú zmenu zahodí |
@@ -393,7 +393,9 @@ ostatných päť: **dôvod zlyhania zápisu sa nesurfaceuje nikde** (`update_vep
 zahodí, `save_merge_18_36` ho ignoruje) a **chýba mu aj degraded guard** z R-11 — poškodený primár s platnou `.bak` teda stále vie
 prepísať novšie nastavenia obsahom odvodeným od staršej zálohy. Zámok (1b-6c) má, integritnú bránu nie.
 **Návrh:** rovnaká brána ako pre ostatných 5 (`JsonFileStore.degraded?` pod zámkom tesne pred zápisom) + **vlastný UI kontrakt** —
-tri cesty musia najprv začať výsledok zápisu vôbec čítať a mať kam ho povedať. Samostatná dávka. **Odhad: S.**
+tri cesty musia najprv začať výsledok zápisu vôbec čítať a mať kam ho povedať. Pôvodne navrhnutá ako samostatná dávka. **Odhad: S.**
+**Zaradenie (1.10.2026, návrh orchestrátora — potvrdí Michal s mockupom H7):** blok 9 · HARDENING, dávka **H7** — ochrana ide pred presun nastavení
+exportu do jadra (C-07); po presune dávka H7 aktualizuje cestu súboru v tomto zázname.
 
 ## Os UI VZORY a drobné dlhy
 
