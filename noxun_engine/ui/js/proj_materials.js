@@ -35,8 +35,11 @@
   // staremu oknu zapis odmietol (nove polia by ticho zahodilo). Pri katalogu,
   // ktory je este SCHEMA 1 (nerozhodnutelna migracia), server batch 3 odmietne.
   // V0.6 M-C hranova uprava PD (pd_edge_subtype — schema 8); D-98 dekor u
-  // dodavatela (supplier_decor — schema 9) => konstanta je 9.
-  var MD_CLIENT_SCHEMA = 10;
+  // dodavatela (supplier_decor — schema 9) => konstanta je 9. MR-1A vzhlad
+  // (appearance — schema 10). CENY-M1a odkaz na produkt (product_url —
+  // schema 11) => konstanta je 11; stary klient (CEF cache) bez pola by ho
+  // formularom ticho zahodil, preto ho server odmietne.
+  var MD_CLIENT_SCHEMA = 11;
   // 2B-2 (F10 zrkadlo registra): typy s formatom v identite — batch/formular
   // format VYZADUJU. Server je autorita (format_in_identity?), toto je UX.
   // D-73: + KOMPAKT (sirok vela ako PD — format je identita variantu).
@@ -745,11 +748,58 @@
   }
 
   // Riadky jednej strukturnej sekcie: blok Dosky + blok ABS (len nepradzne).
+  // CENY-M1a (R16, O1/A3): PEVNY slot troch ikon v riadku variantu —
+  // 1 = duplak (DTDL/MDF) / univerzalna (ABS) · 2 = Demos ALEBO odkaz na
+  // produkt · 3 = overenie ceny (M1b). Prazdna pozicia je `.mdgap` rovnakej
+  // sirky a hlavicka ma ten isty slot, takze stlpce Kod / cena / Dodavatel
+  // su pod sebou v riadkoch s Demosom aj bez neho (cista funkcia, Node test).
+  function mdSlotHtml(a, b, c){
+    var gap = '<i class="mdgap"></i>';
+    return '<span class="mdslot">' + (a || gap) + (b || gap) + (c || gap) + '</span>';
+  }
+  // Kratke meno variantu do aria-label („DTDL 25" / „ABS 43/0,8").
+  function mdShortName(kind, rec){
+    if (!rec) return '';
+    return kind === 'edge' ? 'ABS ' + edgeChipLabel(rec).replace(/\./g, ',') : sheetChipLabel(rec);
+  }
+  // Host odkazu do tooltipu (bez schemy, prihlasenia, portu a cesty).
+  function mdUrlHost(u){
+    var m = String(u == null ? '' : u).match(/^https?:\/\/(?:[^\/?#@]*@)?([^\/?#:]+)/i);
+    return m ? m[1] : '';
+  }
+  // R17: ikona „Otvoriť produkt" — LEN pri „rucnom" zazname (server posiela
+  // `product_link` len bez Demos vazby, nie UNI, nie duplak). Siva = odkaz
+  // je (klik ho otvori serverom, nic nezapisuje), jantarova = chyba (klik
+  // otvori formular variantu s kurzorom v poli odkazu, C3).
+  function mdProductBtn(kind, id, rec){
+    if (!rec || rec.demos_url || typeof rec.product_link !== 'boolean') return '';
+    var has = rec.product_link === true;
+    var tip = has ? 'Otvoriť produkt v prehliadači\n' + mdUrlHost(rec.product_url)
+                  : 'Chýba odkaz — doplniť odkaz na produkt';
+    var label = (has ? 'Otvoriť produkt' : 'Doplniť odkaz na produkt') + ' · ' + mdShortName(kind, rec);
+    return '<button type="button" class="mduni mdprod' + (has ? '' : ' is-missing') + '" title="' + mdEsc(tip) + '"' +
+      ' aria-label="' + mdEsc(label) + '"' +
+      ' onclick="mdProductClick(\'' + kind + '\', \'' + mdEsc(id) + '\', ' + (has ? 'true' : 'false') + ')">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-external-link"/></svg></button>';
+  }
+  // Klik na ikonu odkazu. URL posiela VYHRADNE server (klient len kind+id —
+  // vzor mdDemosOpen); chybajuci odkaz otvori formular s fokusom (C3). V
+  // read-only katalogu formular povie, ze upravy su vypnute.
+  function mdProductClick(kind, id, has){
+    if (has){
+      if (window.sketchup && sketchup.mat_product_open)
+        sketchup.mat_product_open(JSON.stringify({ kind: kind, id: id }));
+      return;
+    }
+    if (kind === 'edge') mdOpenEdgeForm(id, { focus: 'product_url' });
+    else mdOpenSheetForm(id, { focus: 'product_url' });
+  }
+
   function mdSectionRows(sec){
     var h = '';
     if (sec.sheets.length){
       h += '<div class="mdsec">Dosky</div>';
-      h += '<div class="mdvhead"><span class="mdvdim"></span><span class="mdvi">Kód</span><span class="mdvi mdvp">€/m²</span><span class="mdvi">Dodávateľ</span><span class="mdvact"></span></div>';
+      h += '<div class="mdvhead"><span class="mdvdim"></span><span class="mdvi">Kód</span><span class="mdvi mdvp">€/m²</span><span class="mdvi">Dodávateľ</span>' + mdSlotHtml() + '<span class="mdvact"></span></div>';
       sec.sheets.forEach(function(s){
         var prot = MD_PROTECTED.indexOf(s.material_id) >= 0;
         var dl = sheetDimLabel(s);
@@ -763,19 +813,21 @@
             s.code, s.price_per_m2, s.supplier, s.label,
             'mdOpenSheetForm(\'' + mdEsc(s.material_id) + '\')',
             prot ? null : 'mdDeleteSheet(\'' + mdEsc(s.material_id) + '\')', prot,
-            mdDuplakBtn(s) + mdDemosBtn('sheet', s.material_id, s));
+            mdSlotHtml(mdDuplakBtn(s),
+                       mdDemosBtn('sheet', s.material_id, s) || mdProductBtn('sheet', s.material_id, s), ''));
         }
       });
     }
     if (sec.edges.length){
       h += '<div class="mdsec">ABS pásky</div>';
-      h += '<div class="mdvhead"><span class="mdvdim"></span><span class="mdvi">Kód</span><span class="mdvi mdvp">€/bm</span><span class="mdvi">Dodávateľ</span><span class="mdvact"></span></div>';
+      h += '<div class="mdvhead"><span class="mdvdim"></span><span class="mdvi">Kód</span><span class="mdvi mdvp">€/bm</span><span class="mdvi">Dodávateľ</span>' + mdSlotHtml() + '<span class="mdvact"></span></div>';
       sec.edges.forEach(function(a){
         h += mdVariantRow('edge', a.abs_id, a.row_rev, mdEsc(edgeChipLabel(a)),
           a.code, a.price_per_bm, a.supplier, a.label,
           'mdOpenEdgeForm(\'' + mdEsc(a.abs_id) + '\')',
           'mdDeleteEdge(\'' + mdEsc(a.abs_id) + '\')', false,
-          mdUniBtn(a) + mdDemosBtn('edge', a.abs_id, a));
+          mdSlotHtml(mdUniBtn(a),
+                     mdDemosBtn('edge', a.abs_id, a) || mdProductBtn('edge', a.abs_id, a), ''));
       });
     }
     return h;
@@ -844,8 +896,9 @@
       ' data-kind="' + kind + '" data-id="' + mdEsc(id) + '" data-field="' + field + '" data-rev="' + mdEsc(rev || '') + '"' +
       ' data-orig="' + mdEsc(v) + '" onblur="mdCellFlush(this)" onkeydown="mdCellKey(event, this)">';
   }
-  // dimHtml je UZ escapovane (moze niest <small> formatu dosky); extra = dalsi
-  // ovladaci prvok pred akciami (universal toggle ABS).
+  // dimHtml je UZ escapovane (moze niest <small> formatu dosky); extra = pevny
+  // slot ikon pred akciami (CENY-M1a `mdSlotHtml` — duplak/univerzalna,
+  // Demos/odkaz, overenie).
   function mdVariantRow(kind, id, rev, dimHtml, code, price, supplier, title, editCall, delCall, prot, extra){
     var priceField = kind === 'edge' ? 'price_per_bm' : 'price_per_m2';
     var dis = MD_RO ? ' disabled' : '';
@@ -1328,11 +1381,17 @@
   }
 
   // --- formulare (create: id=null; edit: id zaznamu) ---
-  function mdOpenSheetForm(id){
+  // CENY-M1a (R6b, audit FIX-M1a-2): formular drzi `row_rev` riadku Z OKAMIHU
+  // OTVORENIA (`mdEditing.rev`). Katalogove echo (`mdSetCatalog` — globalny
+  // MD_REV) ho NEOMLADI: stary formular s cerstvou reviziou by inak vratil
+  // cenu aj Demos vazbu do stavu z otvorenia. Server pri nezhode vrati
+  // konflikt a `MD.formConflict` formular otvori nanovo s cerstvymi udajmi.
+  // `opts.focus === 'product_url'` = prichod z jantarovej ikony (C3).
+  function mdOpenSheetForm(id, opts){
     if (MD_RO){ MD.setStatus('Katalóg je len na čítanie — úpravy sú vypnuté.', true); return; }
     mdCloseForms();
     var s = id ? MD_CATALOG.sheets.find(function(x){ return x.material_id === id; }) : null;
-    mdEditing = { kind: 'sheet', id: id };
+    mdEditing = { kind: 'sheet', id: id, rev: s ? String(s.row_rev || '') : '' };
     mdEl('ms_decor').value = s ? (s.decor || '') : '';
     // D-41: dekor = identita skupiny — pri edite nemenny (server guard + disabled)
     mdEl('ms_decor').disabled = !!s;
@@ -1350,6 +1409,7 @@
     if (mdEl('ms_supplier_decor')) mdEl('ms_supplier_decor').value = s ? (s.supplier_decor || '') : '';
     // M-A3e (D-71): rucna vazba na Demos — prefill + hint s datumom overenia.
     mdDemosField('ms', s);
+    mdProductField('ms', s); // CENY-M1a (R18): AZ PO Demos poli — zamok cita jeho hodnotu
     mdEl('ms_family').value = s ? (s.family || '') : '';
     mdEl('ms_manufacturer').value = s ? (s.manufacturer || '') : '';
     // D-42: vyrobca je group-level — pri edite disabled + hint (mrekt cez kartu).
@@ -1376,6 +1436,7 @@
     if (mdEl('ms_pd_edge')) mdEl('ms_pd_edge').value = s ? (s.pd_edge_subtype || '') : '';
     mdSheetTypeChanged();
     mdEl('mdSheetForm').style.display = '';
+    mdProductFocus('ms', opts);
   }
   // M-C: PD rozpoznanie pre formular (zrkadlo registra; server je autorita).
   function mdPdType(type){
@@ -1456,11 +1517,98 @@
     }
     return null;
   }
-  function mdOpenEdgeForm(id){
+
+  // --- CENY-M1a (R18): pole „Odkaz na produkt" vo formulari variantu -------
+  // Hint podla stavu (cista funkcia, Node test). Pri NEPRAZDNOM poli Demos URL
+  // je odkaz ZAMKNUTY (O8/C4): cenu aj odkaz spravuje Demos a ulozeny rucny
+  // odkaz ostava odlozeny — po zruseni vazby sa vrati.
+  var MD_PRODUCT_HINT = 'Otvorí sa vo webovom prehliadači.';
+  var MD_PRODUCT_LOCK_HINT = 'Položka je viazaná na Demos — odkaz aj cenu spravuje Demos (pole Demos URL nižšie). Ručný odkaz zadáš až po vymazaní Demos URL.';
+  function mdProductLockState(demosUrl, saved){
+    var locked = String(demosUrl == null ? '' : demosUrl).trim() !== '';
+    if (!locked) return { locked: false, hint: MD_PRODUCT_HINT, placeholder: 'https://…' };
+    var keep = String(saved == null ? '' : saved).trim() !== '';
+    return { locked: true, placeholder: '— viazané na Demos',
+             hint: MD_PRODUCT_LOCK_HINT + (keep ? ' Uložený ručný odkaz sa po zrušení väzby vráti.' : '') };
+  }
+  // Prefill pri otvoreni formulara (prefix 'ms'/'me'). UNI pole nedostane
+  // (vzor mdDemosField — server by odkaz aj tak odmietol).
+  function mdProductField(prefix, rec){
+    var inp = mdEl(prefix + '_product_url');
+    if (!inp) return;
+    var saved = rec ? String(rec.product_url || '') : '';
+    inp.setAttribute('data-saved', saved);
+    inp.removeAttribute('data-typed');
+    inp.readOnly = false;
+    inp.value = saved;
+    var uni = !!(rec && rec.uni === true);
+    var row = inp.closest ? inp.closest('.row') : null;
+    if (row){ row.style.display = uni ? 'none' : ''; if (row.classList) row.classList.remove('mdflash'); }
+    var hint = mdEl(prefix + '_product_hint');
+    if (hint) hint.style.display = uni ? 'none' : '';
+    mdProductLockSync(prefix);
+  }
+  // ZIVY zamok podla pola Demos URL (oninput). Pri zamknuti sa rozpisany text
+  // odlozi a pri odomknuti vrati (inak ulozeny odlozeny odkaz) — v jednom
+  // ulozeni sa tak da Demos URL vymazat a odkaz vlozit.
+  function mdProductLockSync(prefix){
+    var inp = mdEl(prefix + '_product_url');
+    if (!inp) return;
+    var demos = mdEl(prefix + '_demos_url');
+    var saved = inp.getAttribute('data-saved') || '';
+    var st = mdProductLockState(demos ? demos.value : '', saved);
+    if (st.locked && !inp.readOnly){
+      inp.setAttribute('data-typed', inp.value);
+      inp.value = '';
+      inp.readOnly = true;
+    } else if (!st.locked && inp.readOnly){
+      var typed = inp.getAttribute('data-typed');
+      inp.readOnly = false;
+      inp.value = typed !== null && typed !== undefined ? typed : saved;
+      inp.removeAttribute('data-typed');
+    }
+    inp.placeholder = st.placeholder;
+    var hint = mdEl(prefix + '_product_hint');
+    if (hint) hint.textContent = st.hint;
+  }
+  // Odkaz sa posiela LEN z editovatelneho pola (zamknute pri Demos, skryte
+  // pri UNI) — inak `undefined` a server kluc nechape ako zmenu (merge).
+  function mdProductPayloadValue(prefix){
+    var inp = mdEl(prefix + '_product_url');
+    if (!inp || inp.readOnly) return undefined;
+    var row = inp.closest ? inp.closest('.row') : null;
+    if (row && row.style && row.style.display === 'none') return undefined;
+    return inp.value;
+  }
+  // Klientske zrkadlo `Materials.sanitize_product_url` (formular ostava
+  // otvoreny s hlaskou — vzor mdDemosUrlLocalError). Server ostava autorita.
+  function mdProductUrlLocalError(v){
+    var s = String(v == null ? '' : v).trim();
+    if (!s) return null;
+    if (/[\s"'<>\\]/.test(s) || !/^https?:\/\/[^\/?#]+/i.test(s))
+      return 'Odkaz musí začínať http:// alebo https:// (bez medzier a úvodzoviek).';
+    return null;
+  }
+  // C3: prichod z jantarovej ikony — kurzor do pola odkazu + kratke
+  // zvyraznenie jeho riadku.
+  function mdProductFocus(prefix, opts){
+    if (!opts || opts.focus !== 'product_url') return;
+    var inp = mdEl(prefix + '_product_url');
+    if (!inp || inp.readOnly) return;
+    try { inp.focus(); if (inp.select) inp.select(); } catch (e) { /* CEF bez fokusu */ }
+    var row = inp.closest ? inp.closest('.row') : null;
+    if (row && row.classList){
+      row.classList.add('mdflash');
+      setTimeout(function(){ row.classList.remove('mdflash'); }, 1600);
+    }
+  }
+
+  function mdOpenEdgeForm(id, opts){
     if (MD_RO){ MD.setStatus('Katalóg je len na čítanie — úpravy sú vypnuté.', true); return; }
     mdCloseForms();
     var a = id ? MD_CATALOG.edges.find(function(x){ return x.abs_id === id; }) : null;
-    mdEditing = { kind: 'edge', id: id };
+    // CENY-M1a (R6b): baseline riadku z okamihu otvorenia (vzor dosky).
+    mdEditing = { kind: 'edge', id: id, rev: a ? String(a.row_rev || '') : '' };
     mdEl('me_decor').value = a ? (a.decor || '') : '';
     mdEl('me_decor').disabled = !!a; // D-41: dekor pri edite nemenny
     mdEl('me_decor_hint').style.display = a ? '' : 'none';
@@ -1474,7 +1622,9 @@
     mdEl('me_supplier').value = a ? (a.supplier || '') : '';
     // M-A3e (D-71): rucna vazba na Demos — prefill + hint s datumom overenia.
     mdDemosField('me', a);
+    mdProductField('me', a); // CENY-M1a (R18)
     mdEl('mdEdgeForm').style.display = '';
+    mdProductFocus('me', opts);
   }
   // D-41: batch "Novy dekor" / "+ variant" (decor predvyplneny a zamknuty —
   // doplna sa DO skupiny; server preskoci existujuce varianty).
@@ -2148,6 +2298,7 @@
     var payload = {
       material_id: mdEditing && mdEditing.id ? mdEditing.id : null,
       catalog_rev: MD_REV, catalog_schema: MD_CLIENT_SCHEMA,
+      row_rev: mdEditing.rev || '', // CENY-M1a (R6b): baseline z OTVORENIA, nie z echa
       decor: mdEl('ms_decor').value,
       type: mdEl('ms_type').value,
       thickness: mdEl('ms_thickness').value,
@@ -2183,6 +2334,14 @@
     // odmietne tiez, ale az po zavreti a prepis by prepadol.
     var due = mdDemosUrlLocalError(payload.demos_url);
     if (due){ MD.setStatus(due, true); return; }
+    // CENY-M1a (R18): odkaz na produkt LEN z editovatelneho pola; zly tvar
+    // formular nezatvara (vzor Demos URL).
+    var purl = mdProductPayloadValue('ms');
+    if (purl !== undefined){
+      var pue = mdProductUrlLocalError(purl);
+      if (pue){ MD.setStatus(pue, true); return; }
+      payload.product_url = purl;
+    }
     var sl = mdSheetDim(mdEl('ms_sheet_l').value);
     var sw = mdSheetDim(mdEl('ms_sheet_w').value);
     if ((sl === null) !== (sw === null) || (sl !== null && (isNaN(sl) || isNaN(sw)))){
@@ -2206,6 +2365,7 @@
     var payload = {
       abs_id: mdEditing && mdEditing.id ? mdEditing.id : null,
       catalog_rev: MD_REV, catalog_schema: MD_CLIENT_SCHEMA,
+      row_rev: mdEditing.rev || '', // CENY-M1a (R6b): baseline z OTVORENIA
       decor: mdEl('me_decor').value,
       width: mdEl('me_width').value,   // D-41: prazdna = univerzalna paska bez sirky
       thickness: mdEl('me_thickness').value,
@@ -2218,6 +2378,12 @@
     // M-A3e (audit FIX 4): zla adresa nezatvara formular (vzor mdSaveSheet).
     var due = mdDemosUrlLocalError(payload.demos_url);
     if (due){ MD.setStatus(due, true); return; }
+    var purl = mdProductPayloadValue('me'); // CENY-M1a (R18)
+    if (purl !== undefined){
+      var pue = mdProductUrlLocalError(purl);
+      if (pue){ MD.setStatus(pue, true); return; }
+      payload.product_url = purl;
+    }
     mdLastAttempt = { kind: 'edge', payload: payload };
     if (window.sketchup && sketchup.update_edge) sketchup.update_edge(JSON.stringify(payload));
     mdCloseForms();
@@ -2243,6 +2409,7 @@
       mdEl('ms_sheet_l').value = p.sheet_size ? p.sheet_size[0] : '';
       mdEl('ms_sheet_w').value = p.sheet_size ? p.sheet_size[1] : '';
       mdEl('ms_demos_url').value = p.demos_url || ''; // M-A3e (audit FIX 2)
+      mdReopenProduct('ms', p); // CENY-M1a: odkaz + zivy zamok podla Demos URL
       if (mdEl('ms_pd_edge')) mdEl('ms_pd_edge').value = p.pd_edge_subtype || ''; // M-C
       if (mdEl('ms_supplier_decor')) mdEl('ms_supplier_decor').value = p.supplier_decor || ''; // D-98
       mdSheetTypeChanged(); // typ z payloadu prekreslil polia — obnov viditelnost/varovanie
@@ -2253,7 +2420,23 @@
       mdEl('me_width').value = (p.width === null || p.width === undefined) ? '' : p.width;
       mdEl('me_thickness').value = p.thickness || '1.0';
       mdEl('me_demos_url').value = p.demos_url || ''; // M-A3e (audit FIX 2)
+      mdReopenProduct('me', p);
     }
+    // CENY-M1a (R6b): druhe ulozenie (potvrdenie duplicity) nesie TEN ISTY
+    // baseline ako prve — nic sa nezapisalo, echo ho nesmie omladit.
+    if (mdEditing) mdEditing.rev = p.row_rev || '';
+  }
+  // Obnova pola odkazu z odmietnuteho pokusu: rozpisany text ostava, zamok
+  // sa vyhodnoti nanovo podla obnovenej Demos URL.
+  function mdReopenProduct(prefix, p){
+    var inp = mdEl(prefix + '_product_url');
+    if (!inp) return;
+    if (p.product_url !== undefined){
+      inp.readOnly = false;
+      inp.removeAttribute('data-typed');
+      inp.value = p.product_url;
+    }
+    mdProductLockSync(prefix);
   }
   // V0.6 M-A2 (Halifax lekcia / audit F9): mazanie ide VZDY cez serverovy
   // preflight — modal ukaze presne CO sa maze (kod, cena, pouzitie v modeli)
@@ -2725,6 +2908,16 @@
     // D-42 (audit FIX 8): server odmietol duplicitny kod — znovu otvor formular
     // s rozpisanymi hodnotami a nastav potvrdenie na druhe Ulozit.
     flagDuplicateCode: function(kind){ mdReopenFromAttempt(); mdDupAllow = kind; },
+    // CENY-M1a (R6b): polozka sa medzitym zmenila (baseline formulara nesedi).
+    // Server UZ poslal cerstvy katalog — formular sa otvori nanovo s cerstvymi
+    // udajmi a novym baseline; rozpisane hodnoty sa NEZAPISALI.
+    formConflict: function(kind, id){
+      var list = kind === 'edge' ? MD_CATALOG.edges : MD_CATALOG.sheets;
+      var key = kind === 'edge' ? 'abs_id' : 'material_id';
+      var fresh = (list || []).find(function(x){ return x[key] === id; });
+      if (!fresh) return; // zaznam medzitym zmizol — nie je co otvorit
+      if (kind === 'edge') mdOpenEdgeForm(id); else mdOpenSheetForm(id);
+    },
     // D-42 PR C: duplicitny kod z inline bunky — bunka OSTAVA rozpisana (server
     // neposlal refresh), dalsi flush tej istej bunky posle potvrdenie.
     flagDuplicatePatch: function(kind, id){ mdPatchDup = { kind: kind, id: id }; },
@@ -3243,6 +3436,16 @@
       mdExtraFmtChips: mdExtraFmtChips,
       // M-A3e — rucna vazba (D-71): klientske zrkadlo serverovej validacie
       mdDemosUrlLocalError: mdDemosUrlLocalError,
+      // CENY-M1a — odkaz na produkt (tests/js/test_ceny_m1_links.js): slot,
+      // ikona, pole formulara so zivym zamkom a baseline formulara
+      mdSlotHtml: mdSlotHtml, mdShortName: mdShortName, mdUrlHost: mdUrlHost,
+      mdProductBtn: mdProductBtn, mdProductClick: mdProductClick,
+      mdProductLockState: mdProductLockState, mdProductField: mdProductField,
+      mdProductLockSync: mdProductLockSync, mdProductUrlLocalError: mdProductUrlLocalError,
+      mdOpenSheetForm: mdOpenSheetForm, mdOpenEdgeForm: mdOpenEdgeForm,
+      mdSaveSheet: mdSaveSheet, mdSaveEdge: mdSaveEdge, mdReopenFromAttempt: mdReopenFromAttempt,
+      mdApplyCatalog: mdApplyCatalog,
+      MD_CLIENT_SCHEMA: MD_CLIENT_SCHEMA,
       // D-97 — upozornenie na neznamy typ dosky (ciste, bez DOM)
       mdUnknownTypeWarning: mdUnknownTypeWarning,
       // M-B2 — „Nahradit UNI…" (ciste funkcie bez DOM)

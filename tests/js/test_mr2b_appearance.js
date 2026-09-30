@@ -74,7 +74,7 @@ let before = count('appearance_prepare'); dispatch(surface(), 'click'); eq(count
 // Žiadne zápisy pred ready; presná korelácia a vlastná podporovaná schéma.
 req = request();
 eq(Object.keys(req).sort(), ['anchor_id', 'catalog_schema', 'kind', 'model_guid', 'request_token', 'section'].sort());
-eq(req.catalog_schema, 10); eq(req.kind, 'sheet'); eq(req.anchor_id, 'S18');
+eq(req.catalog_schema, 11); eq(req.kind, 'sheet'); eq(req.anchor_id, 'S18');
 ok(NXEsc.FOREIGN_MODAL_IDS.includes('mdAppearanceRoot')); eq(NXEsc.blockedBy(), 'mdAppearanceRoot');
 click('mdaPick'); eq(count('appearance_pick'), 0, 'prepare ešte nepovolí akciu');
 for (const [key, value] of [['request_token', 'old'], ['model_guid', 'other'], ['section', 'bom'], ['anchor_id', 'S36'], ['kind', 'edge']]){
@@ -139,7 +139,7 @@ open(); before = count('set_decor_color');
 node('mdaColor').value = '#abcdef'; dispatch(node('mdaColor'), 'input'); eq(count('set_decor_color'), before);
 dispatch(node('mdaColor'), 'change');
 const color = last('set_decor_color');
-eq(color.color, '#abcdef'); eq(color.group_id, 'G'); eq(color.catalog_schema, 10);
+eq(color.color, '#abcdef'); eq(color.group_id, 'G'); eq(color.catalog_schema, 11);
 eq(color.appearance_context.anchor_id, 'S18'); ok(color.appearance_context.session_token); ok(A.isBusy());
 const rgbRows = structuredClone(base); rgbRows.sheets[0].color = [171, 205, 239];
 M.MD.setCatalog(catalog({ catalog_rev: 'r2' }, rgbRows));

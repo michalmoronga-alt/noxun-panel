@@ -25,6 +25,7 @@
 require 'json'
 require 'fileutils'
 require 'digest'
+require 'uri' # CENY-M1a: sanitize_product_url (vlastny require, nie tranzitivny)
 
 module Noxun
   module Engine
@@ -79,9 +80,16 @@ module Noxun
       SCHEMA_SUPPLIER_DECOR = 9
       # MR-1A: volitelny spolocny vzhlad dosiek/ABS, lazy podla obsahu.
       SCHEMA_APPEARANCE = 10
+      # CENY-M1a: odkaz na produkt (`product_url`, http/https) na doske aj ABS
+      # BEZ Demos vazby — jeden odkaz na polozku (C7), klik ho len otvori.
+      # Marker 11 LAZY prvym zapisom zaznamu s NEPRAZDNYM odkazom (vzor duplak/
+      # demos/uni): starsi klient by pole normalize whitelistom ticho zahodil,
+      # preto ho marker posiela do read-only. Marker nikdy neklesa — po zmazani
+      # posledneho odkazu ostava 11 (vedome, STANDARD 7.1).
+      SCHEMA_PRODUCT_URL = 11
       # Najnovsia schema, ktorej tvar tato verzia pluginu POZNA (write guard +
       # assess). Bump VYHRADNE spolu s kodom, ktory nove polia nesie.
-      SCHEMA_CURRENT = SCHEMA_APPEARANCE
+      SCHEMA_CURRENT = SCHEMA_PRODUCT_URL
       # M-C: povolene hodnoty hranovej upravy PD (registrovy zoznam
       # pd_edge_subtypes je zdroj; konstanta = rychly enum guard pri zapise).
       PD_EDGE_SUBTYPES = %w[postforming abs].freeze
@@ -376,7 +384,15 @@ module Noxun
           next unless list.is_a?(Array)
           list.each do |r|
             next unless r.is_a?(Hash)
-            need = SCHEMA_APPEARANCE if r.key?('appearance')
+            # CENY-M1a (sonda S2): podmienka `need <` je POVINNA — bez nej by
+            # neskorsi zaznam so vzhladom znizil marker, ktory uz zdvihol
+            # vyssi obsah (vysledok by zavisel od poradia zaznamov).
+            need = SCHEMA_APPEARANCE if need < SCHEMA_APPEARANCE && r.key?('appearance')
+            # CENY-M1a: odkaz na produkt = marker 11 (len NEPRAZDNY — zmazany
+            # odkaz marker nezdviha; ze neklesa, drzi target_schema_fresh).
+            if need < SCHEMA_PRODUCT_URL && !r['product_url'].to_s.strip.empty?
+              need = SCHEMA_PRODUCT_URL
+            end
             if need < SCHEMA_DEMOS &&
                (!r['demos_url'].to_s.empty? || !r['price_checked_at'].to_s.empty?)
               need = SCHEMA_DEMOS
@@ -648,10 +664,50 @@ module Noxun
         put_demos_fields(out, a)
         put_image_fields(out, a)
         put_uni_fields(out, a)
+        put_product_fields(out, a) # CENY-M1a: az PO uni/duplak — rozhoduje o nich
         put_pd_edge_fields(out, a)
         put_supplier_decor_fields(out, a)
         put_appearance_field(out, a)
         out
+      end
+
+      # CENY-M1a (SCHEMA 11): odkaz na produkt sa NESIE merge-safe (bunka,
+      # editor, Demos apply, premenovanie, vzhlad ho nezahodia). Normalizacia
+      # prepusti VYHRADNE hodnotu, ktoru prijme `sanitize_product_url`; neplatna
+      # sa ticho zahodi (poistka — hlasku dava formular). UNI (pracovny
+      # material) ani duplak (nekupuje sa) pole nikdy nedostanu. Volat AZ PO
+      # `put_uni_fields`/`put_duplak_fields` (doska) resp. `put_demos_fields`
+      # (ABS). Demos vazba odkaz NEMAZE — ostava odlozeny (O8, STANDARD 7.1).
+      def put_product_fields(out, a)
+        return out if out['uni'] == true || out.key?('source_material_id')
+        clean = sanitize_product_url(a['product_url'] || a[:product_url])
+        out['product_url'] = clean if clean
+        out
+      end
+
+      # CENY-M1a: JEDINA autorita platnosti odkazu na produkt materialu.
+      # Rovnake pravidla ako `HardwareCatalog.sanitize_product_url` (parity
+      # test), ale LOKALNA kopia — normalizacia nesmie zavisiet od poradia
+      # nacitania ineho modulu. http aj https (D1), bez medzier, uvodzoviek,
+      # <>\, s neprazdnym hostom. Vrati kanonicky String alebo nil.
+      def sanitize_product_url(raw)
+        return nil unless raw.is_a?(String)
+        s = raw.strip
+        return nil if s.empty? || s.match?(/[\s"'<>\\]/)
+        uri = begin
+          URI.parse(s)
+        rescue URI::InvalidURIError
+          nil
+        end
+        return nil unless uri.is_a?(URI::HTTP) && !uri.host.to_s.strip.empty?
+        uri.to_s
+      end
+
+      # CENY-M1a: „rucny" zaznam = polozka, pri ktorej odkaz na produkt dava
+      # zmysel (bez Demos vazby, nie UNI, nie duplak). Jedina autorita pre
+      # payload (`product_link`) aj otvorenie odkazu.
+      def manual_product_record?(rec)
+        rec.is_a?(Hash) && rec['demos_url'].to_s.strip.empty? && !uni?(rec) && !duplak?(rec)
       end
 
       # D-98 (SCHEMA 9): "dekor u dodavatela" = alias cisla dekoru, pod ktorym
@@ -866,6 +922,7 @@ module Noxun
         put_opt(out, 'supplier', a['supplier'] || a[:supplier]) # D-42 preferovany dodavatel
         put_schema2_fields(out, a)
         put_demos_fields(out, a) # V0.6 B-2a: cenova cache aj na ABS paskach
+        put_product_fields(out, a) # CENY-M1a: odkaz na produkt (odlozeny aj pri Demos)
         # 2A-1: 'universal' = VEDOMY priznak "paska pasuje na vsetku strukturu"
         # (standard 7.5 — jedina cesta pre pasky bez struktury; prazdna struktura
         # sa NIKDY nepocita ako zhoda). Uklada sa LEN ked je true; false/prazdne

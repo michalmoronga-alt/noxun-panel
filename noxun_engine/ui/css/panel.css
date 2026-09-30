@@ -1929,10 +1929,11 @@
      scrolluje TABULKA, nie cela stranka; riadky maju min-width. */
   .mdet { overflow-x: auto; }
   .mdet .mdsec { margin: 10px 2px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--nx-ink-muted); }
-  .mdvhead { display: flex; align-items: center; gap: 8px; padding: 0 6px; min-width: 430px;
+  /* CENY-M1a: min-width +70 px — pevny slot ikon (86 px) je v kazdom riadku. */
+  .mdvhead { display: flex; align-items: center; gap: 8px; padding: 0 6px; min-width: 500px;
              font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--nx-ink-faint); }
   .mdvhead .mdvact { flex: 0 0 58px; }
-  .mdvrow { display: flex; align-items: center; gap: 8px; padding: 3px 6px; border-top: 1px solid var(--nx-border-soft); min-width: 430px; }
+  .mdvrow { display: flex; align-items: center; gap: 8px; padding: 3px 6px; border-top: 1px solid var(--nx-border-soft); min-width: 500px; }
   .mdvrow:hover { background: var(--nx-select-bg-soft); }
   .mdvdim { flex: 0 0 92px; font-size: 12.5px; font-weight: 600; color: var(--nx-ink-strong); }
   /* 2A-4b: format platne dosky ako druhy riadok bunky rozmeru (stlpec ostava uzky) */
@@ -2033,6 +2034,21 @@
   .mduni .ic { width: 14px; height: 14px; }
   /* M-A3b (D-60): vazba na Demos v riadku variantu — akcent, klik otvara stranku */
   .mddm { color: var(--nx-select-accent); }
+  /* CENY-M1a (O1, A3): PEVNY slot troch ikon medzi Dodavatelom a akciami —
+     1 duplak / univerzalna · 2 Demos ALEBO odkaz na produkt · 3 overenie ceny
+     (M1b). Prazdna pozicia je .mdgap rovnakej sirky, hlavicka ma ten isty
+     slot, takze stlpce Kod / cena / Dodavatel su pod sebou vo vsetkych
+     riadkoch. Riadok nepribudne (vertikalny priestor). */
+  .mdslot { flex: 0 0 86px; display: inline-flex; gap: 4px; justify-content: flex-end; align-items: center; }
+  .mdgap { flex: 0 0 26px; width: 26px; height: 1px; display: inline-block; }
+  /* Odkaz na produkt pri polozke BEZ Demosu: ta ista kresba ako Demos, ale
+     siva; chybajuci odkaz svieti jantarovo (vzor .hw-product-link.is-missing). */
+  .mdprod { color: var(--nx-ink-soft); }
+  .mdprod:hover { background: var(--nx-ghost-hover); color: var(--nx-ink); }
+  .mdprod.is-missing { color: var(--nx-warn-fg); background: var(--nx-warn-bg); border-color: var(--nx-warnchip-border); }
+  .mdprod.is-missing:hover { background: var(--nx-warn-bg-soft); }
+  /* C3: prichod z jantarovej ikony — kratke zvyraznenie pola odkazu vo formulari */
+  .row.mdflash { background: var(--nx-warn-bg-soft); border-radius: 6px; transition: background .6s; }
   /* ŠT-2d: „Kde sa používa" v detaile dekoru — vlastnik · roly · pocet + oko.
      Ten isty riadkovy jazyk ako varianty (mdvrow), len bez editovatelnych buniek. */
   .mdwhead { margin-top: 14px; }

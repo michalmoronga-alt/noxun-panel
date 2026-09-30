@@ -267,7 +267,8 @@ NxTest.test('mr1a: poskodeny alebo novsi descriptor a novsia schema neprepise an
     end
     data = NxMR1A.raw
     data['sheets'][0].delete('appearance')
-    data['schema'] = 11
+    # CENY-M1a: „novsia schema" = vyssia nez SCHEMA_CURRENT (11 je od M1a znama).
+    data['schema'] = NxMR1A::M::SCHEMA_CURRENT + 1
     NxMR1A.raw_write(data)
     NxTest.refute(NxMR1A::M.write(data.merge('schema' => 9)))
   end
