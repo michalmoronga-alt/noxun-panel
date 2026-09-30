@@ -1,0 +1,18 @@
+# Audit návrhu CENY-M1 (Codex gpt-6-astra, 30.9.2026, task-munbmzcl-8pvftk) — surový výstup
+
+> Spracovanie nálezov: package `PACKAGE_CENY_M1.md`, hlavička a požiadavky R6b, R6c, R11a, R12, R20b (BLOCKER + 2× FIX-IN-M1a + 1× FIX-IN-M1b — všetky zapracované).
+
+1. **BLOCKER — R11/R12 zamieňajú toleranciu za nezmenenú cenu.**  
+   [PACKAGE_CENY_M1.md:174](PACKAGE_CENY_M1.md) (r. 174 pred zapracovaním) povoľuje zachovať uloženú cenu pri rozdiele `≤ 0,005 + 1e-9`. Sonda nad skutočným [budget.rb:270](../../../../noxun_engine/core/budget.rb) (r. 270) ukázala: uložené **1,005 €/m²**, formát **1000 × 1000**, používateľ prepíše cenu platne na **1,00 €** → R11 vráti `unchanged`, ale Rozpočet naďalej účtuje **1,01 €**. R12 obdobne prijme **31,00** ako echo uložených **31,005**, hoci zaokrúhlené zobrazenie je **31,01**. Tým ignoruje skutočnú zmenu a ponechá overenie. V M1b treba porovnávať vstup s **jednou presne definovanou zobrazenou hodnotou**, nie so symetrickým intervalom. Testovať treba aj existujúce ceny na hranici pol centa; mriežka nových cien delených plochou tento problém nepokrýva.
+
+2. **FIX-IN-M1a — Otvorený formulár variantu dostane novú revíziu ku starým hodnotám.**  
+   [proj_materials.js:1335](../../../../noxun_engine/ui/js/proj_materials.js) (r. 1335) uchováva pri otvorení iba druh a ID. Katalógové echo prepíše globálny `MD_REV` ([riadok 2641](../../../../noxun_engine/ui/js/proj_materials.js) (r. 2641)), ale rozpracovaný formulár zachová. Uloženie potom odošle jeho starú cenu, Demos URL a po M1a aj produktový odkaz s **aktuálnou** revíziou ([riadok 2150](../../../../noxun_engine/ui/js/proj_materials.js) (r. 2150)). Scenár: otvorená ceruzka → Demos apply alebo iná zmena → echo → uloženie samotného odkazu. Formulár môže vrátiť cenu a väzbu do starého stavu bez konfliktu. R23 chráni nový overovací modal, nie túto cestu. Formulár musí držať vlastný baseline z otvorenia; echo ho nesmie automaticky omladiť. Doplniť test pre dosku aj ABS.
+
+3. **FIX-IN-M1a — Serverová kontrola formulára a jeho zápis netvoria jednu transakciu.**  
+   [materials_dialog.rb:1634](../../../../noxun_engine/ui/materials_dialog.rb) (r. 1634) kontroluje revíziu a následne načíta existujúci záznam **mimo zámku**. Až [materials_catalog.rb:225](../../../../noxun_engine/core/materials_catalog.rb) (r. 225) získa zámok; čerstvý záznam však nenahradí už pripravené atribúty ani znovu neoverí baseline. ABS má rovnakú medzeru cez `upsert_edge`. Druhá inštancia SketchUpu tak môže medzi kontrolou a zápisom uložiť nový odkaz či potvrdenú cenu, ktoré prvá následne prepíše. Oprava bodu 2 sama nestačí. Kontrolu schémy/revízie, načítanie, merge, R12/R13 aj zápis treba vykonať pod jedným zámkom, podľa existujúceho [materials_decor.rb:1107](../../../../noxun_engine/core/materials_decor.rb) (r. 1107). Test musí vložiť konkurenčný zápis práve medzi dnešnú kontrolu a získanie zámku.
+
+4. **FIX-IN-M1b — Prepínač jednotiek nemá určené zachovanie presnej rozpracovanej ceny.**  
+   [PACKAGE_CENY_M1.md:252](PACKAGE_CENY_M1.md) (r. 252 pred zapracovaním) predpisuje zaokrúhlené predvyplnenie a prepočet rozpísaného čísla pri prepnutí, ale neurčuje oddelenie presnej hodnoty od zobrazovaného textu. Pri prepočítavaní zobrazovaných hodnôt sonda reprodukovala **179,90 €/platňa → 31,04 €/m² → 179,91 €/platňa** pre 2800 × 2070. R11 už rozdiel nepovažuje za echo, takže samotné prepnutie tam a späť môže zmeniť globálnu cenu bez jej prepísania — proti C8. Doplniť presnú internú hodnotu a pravidlo, že samotná zmena jednotky cenu nemení; testovať opakované prepínanie bez písania aj po vedomom zadaní novej ceny.
+
+
+

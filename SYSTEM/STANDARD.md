@@ -1054,6 +1054,22 @@ odlišný stav od explicitnej `0.0`. Hromadné vytváranie cenu neukladá (dopln
 v katalógu); nečíselný vstup sa odmieta (nikdy tichá 0 z `to_f`). Cenová ponuka
 má na nezadané ceny upozorniť, nie ich rátať ako nulu.
 
+**Odkaz na produkt a ručné overenie ceny (CENY-M1, SCHEMA 11/12) — časť A, odkaz (CENY-M1a, v0.16.1):**
+doska aj ABS páska **bez väzby na Demos** nesie voliteľný **`product_url`** — **jeden** odkaz na
+produkt v obchode (iný obchod = prepísať odkaz). Platný je len **http/https** s neprázdnym hostom,
+bez medzier, úvodzoviek a `<>\` (jediná autorita `Materials.sanitize_product_url`); normalizácia
+neplatnú hodnotu zahodí, formulár ju odmietne s hláškou a nezapíše nič. **UNI ani duplák** odkaz
+nemajú (duplák ho zo zdroja nezdedí — kupuje sa zdroj). **Demos má prednosť:** pri Demos väzbe sa
+ručný odkaz **nemaže**, ostáva **odložený** (formulár ho nezmení ani nezmaže) a po zrušení väzby je
+znova aktívny; Demos URL vymazať a odkaz vložiť sa dá jedným uložením. Klik na odkaz ho **len otvorí**
+— server číta záznam čerstvo z disku, URL od klienta neprijíma a **nič nezapisuje**; uloženie odkazu
+**nie je overenie ceny**. Dátum overenia `price_checked_at` je **server-owned** — formulár variantu ho
+od klienta strháva (rovnako ako ozdoby payloadu). Marker **11 sa dvíha lazy** prvým zápisom katalógu
+s neprázdnym odkazom a **nikdy neklesá** (po zmazaní posledného odkazu ostáva 11); starší plugin
+katalóg s markerom 11 **len číta** (zápis odmietne, inak by odkaz ticho zahodil). Časť B —
+**ručné overenie ceny** (`price_check_method: 'manual'`, SCHEMA 12, doska za platňu / ABS za bm,
+zneplatnenie) — prinesie dávka CENY-M1b.
+
 **Duplák (D-43, dávka 2B-1 — SCHEMA 3):** variant dosky „zdvojený zo zdroja"
 (36 = 2× zlepená 18). Vlastné vstupy sú **výhradne** `source_material_id`
 (doska TEJ ISTEJ skupiny, sama nesmie byť duplák — žiadne reťazenie) a

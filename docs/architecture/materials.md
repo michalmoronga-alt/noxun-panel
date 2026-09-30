@@ -16,6 +16,17 @@ katalóg materiálov a dedenie projekt→skrinka→dielec (projektové defaulty 
 Výber živého pôvodného vzhľadu, aktuálnej knižničnej revízie alebo čistej RGB farby je spoločný v tomto helperi. `AppearanceError` sa nesmie zmeniť
 na tichý úspech farebnej stavby; caller abortuje svoju modelovú operáciu. Výrobné ID, dedenie materiálov ani pravidlá ABS sa nemenia.
 
+#### CENY-M1a — odkaz na produkt (SCHEMA 11, v0.16.1)
+
+`SCHEMA_PRODUCT_URL = 11` = `SCHEMA_CURRENT`. **`required_schema_for`** zdvihne 11 za **neprázdny** `product_url` (doska aj ABS); riadok vzhľadu má
+odteraz podmienku `need < SCHEMA_APPEARANCE` — bez nej by neskorší záznam so vzhľadom marker **znížil** a výsledok závisel od poradia záznamov
+(pasca S2, test všetkých permutácií). **`put_product_fields`** beží v `normalize_sheet` **až po** `put_uni_fields`/`put_duplak_fields`
+a v `normalize_edge` po `put_demos_fields`: uloží len výstup **`sanitize_product_url`** (http/https, host, bez medzier/úvodzoviek/`<>\` —
+lokálna kópia pravidiel `HardwareCatalog.sanitize_product_url` s parity testom; normalize nesmie závisieť od poradia načítania modulov), UNI
+ani duplák pole nedostanú a Demos väzba ho **nemaže** (odložený odkaz, O8). Pole tak prežije každú merge-safe cestu (bunka, editor „Upraviť…",
+Demos apply, názov/výrobca/premenovanie, vzhľad, `sync_duplaks_in!`). **`manual_product_record?`** (bez `demos_url`, nie UNI, nie duplák) je
+jediná autorita „ručného" záznamu pre payload aj otvorenie odkazu. Ručné overenie ceny (SCHEMA 12) je CENY-M1b.
+
 #### KOV-C2a — 4. materiálový kanál `:drawer` (v0.9.30)
 
 `PROJECT_KEYS` má štvrtý kľúč **`default_drawer_material_id`** = materiál DIELCOV ZÁSUVIEK (dno · chrbát · boky boxu · vnútorné čelo). Fallback je **UNI 16 mm**
@@ -177,6 +188,12 @@ vedomý kontrakt).
 ### materials_catalog.rb
 
 Zo splitu `materials_*`: CRUD+batch.
+
+**CENY-M1a (v0.16.1) — whitelisty odkazu na produkt.** `duplak_record_from` odkaz **nezdedí** (reject zoznam — odkaz patrí kupovanej
+zdrojovej doske), `uni_edit_error` ho počíta medzi nákupné polia (UNI s neprázdnym odkazom = odmietnutie). `PATCHABLE` a
+`SAVE_DECOR_*_KEYS` sa **nemenili** — bunka ani editor „Upraviť…" odkaz nemenia a server-owned polia neprijmú (test ich pripína); jediná
+zapisovacia cesta odkazu je formulár variantu (`MaterialsDialog.save_sheet_locked`/`save_edge_locked`, [ui-lifecycle.md](ui-lifecycle.md)).
+Demos cesty (`demos_patch_for`, `apply_demos_batch`, zakladanie z Demosu) odkaz nikdy nezapisujú ani nemažú.
 
 **MR-1A (v0.11.1):** legacy `upsert_sheet`, `upsert_edge` a `upsert_sheet_with_duplak_sync` preberajú serverový appearance z čerstvého riadka pod zámkom pred normalizáciou. Klient ho nesmie podsunúť ani obnoviť jeho staršiu verziu. `sync_duplaks_in!` prenáša aj appearance, vrátane neprítomnosti a explicitného návratu ku farbe; centrálny backstop chráni aj ostatné CRUD cesty.
 
@@ -394,8 +411,8 @@ jednotlivej otázke**. Na úrovni relácie by dve rýchle „Ukázať dopad" (ci
 
 Kontrakt, ktorý zdieľajú `materials.rb` aj celý split `materials_*` vyššie.
 
-**SCHEMA: 2 skupiny = povinný baseline po cutoveri; markery 3 duplák · 4 zástena · 5 demos polia · 6 image_url · 7 UNI · 8 PD hranová úprava + protiťahová zástena · 9 supplier_decor · 10 appearance = LAZY podľa
-OBSAHU** (`SCHEMA_CURRENT` v materials.rb). Demos väzba na zázname: `demos_url` + `price_checked_at` (cena = pohyblivá cache; `manual_demos_url` sanitize + kanonické porovnanie —
+**SCHEMA: 2 skupiny = povinný baseline po cutoveri; markery 3 duplák · 4 zástena · 5 demos polia · 6 image_url · 7 UNI · 8 PD hranová úprava + protiťahová zástena · 9 supplier_decor · 10 appearance ·
+11 product_url (CENY-M1a) = LAZY podľa OBSAHU** (`SCHEMA_CURRENT` v materials.rb; marker nikdy neklesá — ani po zmazaní posledného odkazu). Demos väzba na zázname: `demos_url` + `price_checked_at` (cena = pohyblivá cache; `manual_demos_url` sanitize + kanonické porovnanie —
 D-71).
 
 **UNI (SCHEMA 7, M-B1):** 5 rolí Korpus·Čelo·Dekor2·HDF·Doska; hrúbka záznamu je len default roly — pri stavbe dielca sa NEviaže (hrúbku určuje DIELEC; identita záznamu v katalógu
