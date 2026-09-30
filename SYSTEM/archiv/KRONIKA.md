@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **BLOK CENY · OVERENIE CIEN MATERIÁLOV A ABS UZAVRETÝ (30.9.2026, v0.16.3 → v0.17.0, uzáver PR #?, variant B).** Zvyšok V1-03 (V1 bod 6 · Výstupy),
+- **BLOK CENY · OVERENIE CIEN MATERIÁLOV A ABS UZAVRETÝ (30.9.2026, v0.16.3 → v0.17.0, uzáver PR #429, variant B).** Zvyšok V1-03 (V1 bod 6 · Výstupy),
   posledný kódový bod V1 — Michal spustil 29.9. večer; štart **#425** (rozhodnutia C1–C13, schválený mockup O1–O9 + O10 z review, fakty z kódu) a tri dávky
   30.9.: **CENY-M1a** #426 (odkaz na produkt, katalóg SCHEMA 11) · **CENY-M1b** #427 (ručné overenie ceny, SCHEMA 12, D-148) · **CENY-M2** #428 (Rozpočet,
   materiál bez formátu podľa m² — C14 počas PR). **Review bloku:** štart #425 Codex kolo 1 3× P1 + 5× P2, kolo 2 4× P2 → interná delta · M1a predrecenzia

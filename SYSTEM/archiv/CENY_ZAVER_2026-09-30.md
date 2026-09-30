@@ -35,7 +35,7 @@ packages M1 a M2 so surovými auditmi návrhu) v [bloky/CENY/](bloky/CENY/). Kat
 | CENY-M1a · odkaz | #426 | 0.16.1 | `product_url` pri doske/ABS bez Demosu, katalóg SCHEMA 11, formulár variantu pod jedným zámkom s `row_rev` z otvorenia |
 | CENY-M1b · ručné overenie | #427 | 0.16.2 | formulár „Overiť cenu ručne", `confirm_manual_price`, zneplatnenie, prednosť Demosu, SCHEMA 12, D-148 |
 | CENY-M2 · Rozpočet | #428 | 0.16.3 | vek ručných cien, „na kontrolu", „Overiť cenu" a ikona odkazu v Rozpočte, materiál bez formátu podľa m² (C14) |
-| Uzáver | #? | 0.17.0 | dokumentácia a verzia, priečinok bloku do archívu |
+| Uzáver | #429 | 0.17.0 | dokumentácia a verzia, priečinok bloku do archívu |
 
 ## Overenie
 

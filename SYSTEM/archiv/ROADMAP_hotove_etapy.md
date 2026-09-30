@@ -2,7 +2,7 @@
 
 > **ARCHÍV (založené 24.7.2026 pri uzávere V0.5).** Kompaktné riadky hotových etáp drží [KRONIKA.md](KRONIKA.md) (časová os) — tu sú plné pôvodné texty (história rozhodnutí, rozsahov a PR). Otvorené záväzky z týchto textov sú od 11.8.2026 zaradené do blokov [../PLAN.md](../PLAN.md) — tento súbor je čisto referenčný.
 
-## CENY — overenie cien materiálov a ABS — UZAVRETÝ (30.9.2026, v0.17.0; štart PR #425, dávky PR #426–#428 + uzáver PR #?)
+## CENY — overenie cien materiálov a ABS — UZAVRETÝ (30.9.2026, v0.17.0; štart PR #425, dávky PR #426–#428 + uzáver PR #429)
 
 **Zvyšok V1-03 (V1 bod 6 · Výstupy), posledný kódový bod V1** — Michal ho spustil 29.9. večer. Doska a ABS páska **bez väzby na Demos** majú rovnaký vzor
 ako katalógové kovanie (CENY-KOV, 10.9.): **jeden odkaz na produkt** (C7 nahradilo pôvodné „viac URL na položke") a **ručné overenie ceny** v Štúdiu →
@@ -31,7 +31,7 @@ pri skle (bez odpovede — bez zmeny); nálezy mimo scope F1–F6 z packages sú
   - ✅ **CENY-M2** · Rozpočet: vek ručne overených cien, „N cien na kontrolu", odkaz a „Overiť cenu" v sekcii Materiál a ABS hrany; materiál bez formátu
     (sklo aj bežná doska; nie UNI ani duplák bez väzby) podľa skutočných m² dielcov namiesto fiktívnej platne (C12 + C14) — **PR #428, v0.16.3**
     (package [PACKAGE_CENY_M2.md](bloky/CENY/PACKAGE_CENY_M2.md), audit [AUDIT_CENY_M2_2026-09-30.md](bloky/CENY/AUDIT_CENY_M2_2026-09-30.md)).
-  - ✅ **Uzáver bloku CENY** *(PR #?, v0.17.0 — docs a verzia)* — blok do archívu, priečinok bloku do `archiv/bloky/CENY/`, V1_VIZIA (bod 6 Výstupy
+  - ✅ **Uzáver bloku CENY** *(PR #429, v0.17.0 — docs a verzia)* — blok do archívu, priečinok bloku do `archiv/bloky/CENY/`, V1_VIZIA (bod 6 Výstupy
     odškrtnutý), README, DOGFOODING (dočasná skupina smoke), STAV, KRONIKA; výsledok a smoke checklist v [CENY_ZAVER_2026-09-30.md](CENY_ZAVER_2026-09-30.md).
 - **Poradie pred uzáverom V1 (Michal 29.–30.9.2026):** blok **CENY** (CENY-M1a → CENY-M1b → CENY-M2) → **R-13** (čítať `std` na entite, ORANGE „dielec z inej verzie
   štandardu") → **R-37** (ochrana nastavení dodávateľa pred tichým prepísaním seedom) → **R-35** (dve okná SketchUpu si neprepíšu pravidlá kovania

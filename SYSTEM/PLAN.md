@@ -35,7 +35,7 @@ priečinok bloku v [archiv/bloky/ROHOVA/](archiv/bloky/ROHOVA/).)*
 plán primitívny** — štart PR #417, dávky PR #418 → #421 + uzáver PR #422 (NP-1 · NP-2 · NP-3 · NP-4); plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md),
 výsledok a smoke checklist v [archiv/NAREZ_ZAVER_2026-09-29.md](archiv/NAREZ_ZAVER_2026-09-29.md), priečinok bloku v [archiv/bloky/NAREZ/](archiv/bloky/NAREZ/).)*
 *(Blok **CENY · overenie cien materiálov a ABS** (zvyšok V1-03, V1 bod 6, v bloku 4) je hotový — **v0.16.0 → v0.17.0, 29.–30.9.2026**, štart PR #425, dávky PR #426 → #428
-+ uzáver PR #? (CENY-M1a · CENY-M1b · CENY-M2); plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), výsledok a smoke checklist
++ uzáver PR #429 (CENY-M1a · CENY-M1b · CENY-M2); plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), výsledok a smoke checklist
 v [archiv/CENY_ZAVER_2026-09-30.md](archiv/CENY_ZAVER_2026-09-30.md), priečinok bloku v [archiv/bloky/CENY/](archiv/bloky/CENY/).)*
 
 
@@ -225,7 +225,7 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   **PR #344, v0.10.3.** „Materiál per rola dielca" ostáva v zásobníku Po V1. Podklad: `zdroje/next_sessions/D124_OUTSIDE_IN_2026-09-10.md`.
 - ✅ **Ceny — zvyšok V1-03 → blok CENY** (overenie cien materiálov a ABS, posledný kódový bod V1) — **hotové, uzáver v0.17.0 (30.9.2026)**: jeden odkaz na produkt
   a ručné overenie ceny dosky/ABS bez Demosu v Štúdiu aj v Rozpočte, materiál bez formátu v Rozpočte podľa skutočných m² (C12 + C14). Štart PR #425, dávky
-  CENY-M1a #426 · CENY-M1b #427 · CENY-M2 #428 + uzáver PR #?; plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), výsledok
+  CENY-M1a #426 · CENY-M1b #427 · CENY-M2 #428 + uzáver PR #429; plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), výsledok
   a smoke checklist v [archiv/CENY_ZAVER_2026-09-30.md](archiv/CENY_ZAVER_2026-09-30.md), priečinok bloku v [archiv/bloky/CENY/](archiv/bloky/CENY/).
 - **Poradie pred uzáverom V1 (Michal 29.–30.9.2026; blok CENY je hotový — v0.17.0):** **R-13** (čítať `std` na entite, ORANGE „dielec z inej verzie
   štandardu") → **R-37** (ochrana nastavení dodávateľa pred tichým prepísaním seedom) → **R-35** (dve okná SketchUpu si neprepíšu pravidlá kovania

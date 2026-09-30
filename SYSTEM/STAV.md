@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.17.0 · 30.9.2026 — BLOK CENY UZAVRETÝ** (overenie cien materiálov a ABS, posledný kódový bod V1; štart #425, PR #426–#428 + uzáver PR #?; **smoke čaká**).
+**v0.17.0 · 30.9.2026 — BLOK CENY UZAVRETÝ** (overenie cien materiálov a ABS, posledný kódový bod V1; štart #425, PR #426–#428 + uzáver PR #429; **smoke čaká**).
 Doska a ABS páska **bez Demosu** majú **jeden odkaz na produkt** a **ručné overenie ceny** v Štúdiu → Materiály aj v Rozpočte (doska za platňu s prepočtom
 na €/m², sklo bez formátu za m², ABS za bm; „Potvrdiť cenu k dnešku" nedotknutú cenu nezmení ani o cent; zmena overených polí overenie zruší; Demos má prednosť;
 D-148). Rozpočet ukazuje vek ručných cien („ručne 18.9." / „neoverená") a počíta ich medzi **„N cien na kontrolu"**; **materiál bez formátu — sklo aj bežná
@@ -29,7 +29,7 @@ v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a
 **Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin
 počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
 
-**Testy (uzáver CENY, PR #?):** **4910 headless · 145 JS sád** zelené; in-SU netreba (kód len číslom verzie; posledné kódové dávky bloku in-SU bránu nemali, package §8).
+**Testy (uzáver CENY, PR #429):** **4910 headless · 145 JS sád** zelené; in-SU netreba (kód len číslom verzie; posledné kódové dávky bloku in-SU bránu nemali, package §8).
 **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 
 ## Robí sa
@@ -47,7 +47,7 @@ Najprv **aktualizovať plugin na oboch PC**, potom **smoke bloku CENY**: odkaz a
 
 ## Posledné uzávery
 
-- **BLOK CENY UZAVRETÝ** (**v0.17.0**, 30.9.2026; štart #425, CENY-M1a #426 v0.16.1 · CENY-M1b #427 v0.16.2 · CENY-M2 #428 v0.16.3 + uzáver PR #?).
+- **BLOK CENY UZAVRETÝ** (**v0.17.0**, 30.9.2026; štart #425, CENY-M1a #426 v0.16.1 · CENY-M1b #427 v0.16.2 · CENY-M2 #428 v0.16.3 + uzáver PR #429).
   Odkaz a ručné overenie ceny dosky/ABS bez Demosu, Rozpočet s vekom ručných cien, materiál bez formátu podľa m²; priečinok bloku v [archiv/bloky/CENY/](archiv/bloky/CENY/).
   [Výsledok, dávky a checklist](archiv/CENY_ZAVER_2026-09-30.md).
 - **BLOK 2 · KONTROLA + VÝROBA UZAVRETÝ** (**v0.16.0**, 29.9.2026; nárezový plán: štart #417, PR #418–#421 + uzáver PR #422; **smoke PASS 29.9.**, PR #423).
