@@ -331,7 +331,9 @@ NxTest.test('CENY-M1a (R6): formular dosky — platny, neplatny, nie text, prazd
     before = CenyM1.bytes
     out = CenyM1.call('update_sheet', CenyM1.sheet_form(ids[:s25], 'product_url' => bad, 'code' => 'ZMENA'))
     NxTest.refute(out.include?('ECHO'), bad)
-    NxTest.assert_equal(['Odkaz musí začínať http:// alebo https:// (bez medzier a úvodzoviek).', true],
+    NxTest.assert(out.include?('MD.formRejected("sheet")'),
+                  "predrecenzia P3: odmietnuty odkaz formular otvori nanovo s rozpisanymi hodnotami (#{bad})")
+    NxTest.assert_equal(['Odkaz nie je platná webová adresa — musí začínať http:// alebo https:// a nesmie mať medzery, úvodzovky, diakritiku ani znaky ako | { } ^.', true],
                         CenyM1.status_of(out), bad)
     NxTest.assert_equal(before, CenyM1.bytes, "neplatny odkaz = NIC sa nezapise (#{bad})")
   end
@@ -589,6 +591,125 @@ NxTest.test('CENY-M1a (R8): product_link len pri rucnych zaznamoch, row_rev zo s
   NxTest.refute(row.call('sheets', 'material_id', uni['material_id']).key?('product_link'), 'UNI bez ikony')
   dup = m.sheets.find { |s| s['source_material_id'] == ids[:s25] }
   NxTest.refute(row.call('sheets', 'material_id', dup['material_id']).key?('product_link'), 'duplak bez ikony')
+end
+
+# --- predrecenzia: odpovede formulara variantu (P2) a parita odkazu (P3) --------
+
+NxTest.test('CENY-M1a (predrecenzia P3): server a klient maju tu istu tabulku platnosti odkazu') do
+  path = File.join(NxTest::ROOT, 'tests', 'fixtures', 'ceny_m1_product_urls.json')
+  rows = JSON.parse(File.read(path, encoding: 'UTF-8'))['rows']
+  NxTest.assert(rows.length >= 40)
+  rows.each do |raw, valid|
+    NxTest.assert_equal(valid, !CenyM1::M.sanitize_product_url(raw).nil?, "server: #{raw.inspect}")
+  end
+end
+
+NxTest.test('CENY-M1a (predrecenzia P3): odmietnuty odkaz ABS tiez formular otvori nanovo, nic nezapise') do
+  CenyM1.headless!
+  ids = CenyM1.seed!
+  before = CenyM1.bytes
+  out = CenyM1.call('update_edge', CenyM1.edge_form(ids[:e08], 'product_url' => 'https://obchod.sk/dvierka|biela',
+                                                               'price_per_bm' => '9.9'))
+  NxTest.assert(out.include?('MD.formRejected("edge")'), out.inspect)
+  NxTest.assert_equal(CenyM1::D::PRODUCT_URL_BAD_MSG, CenyM1.status_of(out)[0])
+  NxTest.assert(out.index('MD.formRejected("edge")') < out.index { |x| x.start_with?('MD.setStatus(') },
+                'znovuotvorenie PRED hlaskou (hlaska ostava viditelna)')
+  NxTest.assert_equal(before, CenyM1.bytes)
+  # Demos zamok (pretek — klient zamknute pole neposiela) ide tou istou cestou
+  out = CenyM1.call('update_edge', CenyM1.edge_form(ids[:e10], 'product_url' => 'https://iny.example/abs'))
+  NxTest.assert(out.include?('MD.formRejected("edge")'), out.inspect)
+end
+
+NxTest.test('CENY-M1a (predrecenzia P2): duplicitny kod — formular posle hlasku a MD.flagDuplicateCode, potvrdenie ulozi') do
+  CenyM1.headless!
+  ids = CenyM1.seed!
+  m = CenyM1::M
+  before = CenyM1.bytes
+  out = CenyM1.call('update_sheet', CenyM1.sheet_form(ids[:s18], 'code' => '310418', 'supplier' => 'Drevocentrum',
+                                                                 'product_url' => 'https://odlozeny.example/p'))
+  NxTest.refute(out.include?('ECHO'))
+  NxTest.assert(out.include?('MD.flagDuplicateCode("sheet")'), out.inspect)
+  msg, err = CenyM1.status_of(out)
+  NxTest.assert(err)
+  NxTest.assert(msg.include?('Kód „310418“ už používa 1×') && msg.include?(ids[:s25]) &&
+                msg.include?('Ulož znova pre potvrdenie duplicity.'), msg)
+  NxTest.assert_equal(before, CenyM1.bytes, 'bez potvrdenia sa nic nezapise')
+  out = CenyM1.call('update_sheet', CenyM1.sheet_form(ids[:s18], 'code' => '310418', 'supplier' => 'Drevocentrum',
+                                                                 'product_url' => 'https://odlozeny.example/p',
+                                                                 'allow_duplicate_code' => true))
+  NxTest.assert(out.include?('ECHO'), out.inspect)
+  NxTest.assert_equal('310418', m.sheet(ids[:s18])['code'])
+  # ABS
+  before = CenyM1.bytes
+  out = CenyM1.call('update_edge', CenyM1.edge_form(ids[:e10], 'code' => 'ABS-08'))
+  NxTest.assert(out.include?('MD.flagDuplicateCode("edge")'), out.inspect)
+  NxTest.assert(CenyM1.status_of(out)[0].include?('Kód „ABS-08“ už používa 1×'))
+  NxTest.assert_equal(before, CenyM1.bytes)
+end
+
+NxTest.test('CENY-M1a (predrecenzia P2): katalog len na citanie — formular povie dovod a obnovi katalog, nic nezapise') do
+  CenyM1.headless!
+  ids = CenyM1.seed!
+  m = CenyM1::M
+  before = CenyM1.bytes
+  begin
+    m.instance_variable_set(:@catalog_state, :read_only)
+    m.instance_variable_set(:@catalog_state_reason, 'testovaci dovod')
+    [['update_sheet', CenyM1.sheet_form(ids[:s25], 'product_url' => CenyM1::SHOP)],
+     ['update_edge', CenyM1.edge_form(ids[:e08], 'product_url' => CenyM1::SHOP)]].each do |action, form|
+      out = CenyM1.call(action, form)
+      NxTest.refute(out.include?('ECHO'), action)
+      NxTest.assert_equal([m.catalog_read_only_message, true], CenyM1.status_of(out), action)
+      NxTest.assert(m.catalog_read_only_message.include?('testovaci dovod'))
+      NxTest.assert(out.any? { |x| x.start_with?('MD.setCatalog(') }, "#{action}: UI sa vrati podla servera")
+      NxTest.assert_equal(before, CenyM1.bytes, action)
+    end
+  ensure
+    m.reset_catalog_state!
+  end
+end
+
+NxTest.test('CENY-M1a (predrecenzia P2): schema sa overuje znova POD zamkom — novsi marker medzitym = odmietnutie') do
+  CenyM1.headless!
+  ids = CenyM1.seed!
+  m = CenyM1::M
+  original = CenyM1.bytes
+  [['update_sheet', 'sheets', 'material_id', ids[:s25], CenyM1.sheet_form(ids[:s25], 'product_url' => CenyM1::SHOP)],
+   ['update_edge', 'edges', 'abs_id', ids[:e08], CenyM1.edge_form(ids[:e08], 'product_url' => CenyM1::SHOP)]]
+    .each do |action, _listk, _idk, id, form|
+    File.binwrite(m.path, original)
+    CenyM1::S.invalidate(m.path)
+    orig = m.method(:with_catalog_lock)
+    injected = nil
+    # Pred-zamkova kontrola `schema_ok?` presla (marker 11); novsi plugin v inej
+    # instancii zdvihne marker PRESNE pred ziskanim zamku.
+    m.define_singleton_method(:with_catalog_lock) do |&blk|
+      unless injected
+        data = JSON.parse(File.binread(m.path))
+        data['schema'] = m::SCHEMA_CURRENT + 1
+        File.binwrite(m.path, JSON.generate(data))
+        CenyM1::S.invalidate(m.path)
+        injected = File.binread(m.path)
+      end
+      orig.call(&blk)
+    end
+    begin
+      out = CenyM1.call(action, form)
+    ensure
+      m.define_singleton_method(:with_catalog_lock, orig)
+    end
+    NxTest.assert(injected, 'novsi marker sa vlozil')
+    NxTest.refute(out.include?('ECHO'), action)
+    NxTest.assert_equal(['Katalóg je v novom formáte — obnov Štúdio (Obnoviť) a potom ulož.', true],
+                        CenyM1.status_of(out), action)
+    NxTest.assert(out.any? { |x| x.start_with?('MD.setCatalog(') }, action)
+    NxTest.assert_equal(injected, CenyM1.bytes, "#{action}: po vlozeni sa uz nic nezapisalo")
+    NxTest.refute(JSON.parse(CenyM1.bytes)[action == 'update_edge' ? 'edges' : 'sheets']
+                    .find { |r| r[action == 'update_edge' ? 'abs_id' : 'material_id'] == id }.key?('product_url'))
+  end
+ensure
+  File.binwrite(m.path, original) if original
+  CenyM1::S.invalidate(m.path) if m
 end
 
 # --- S15: starsi plugin -----------------------------------------------------------

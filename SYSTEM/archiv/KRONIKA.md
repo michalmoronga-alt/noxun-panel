@@ -28,8 +28,12 @@
   s čerstvými údajmi — R6b) a kontrola schémy aj revízie, načítanie, merge a zápis bežia **pod jedným zámkom** katalógu (R6c; do v0.16.0 sa revízia
   kontrolovala mimo zámku a porovnávala sa globálna `catalog_rev`, ktorú každé echo omladilo). Formulár strháva od klienta server-owned polia — dátum
   overenia ceny sa dal dovtedy podvrhnúť (sonda S8/T20). Nová akcia `mat_product_open` (URL len zo servera), payload `product_link`. **Rozpočet, XLSX, ponuka
-  ani VEPO sa nemenia.** **Testy:** 4861 headless (nová `test_ceny_m1_links.rb`) · 143 JS sád (nová `test_ceny_m1_links.js`; tri sady s literálom schémy
-  10 → 11) · mutácie **M1–M8 + M22 (Ruby aj JS) zabité**; in-SU nie je brána (package §8 — nové zápisy idú len do globálneho katalógu, žiadna operácia
+  ani VEPO sa nemenia.** **Predrecenzia (1× P2 + 2× P3, opravené):** headless testy odpovedí formulára (duplicitný kód → `MD.flagDuplicateCode`,
+  katalóg len na čítanie, schéma znova pod zámkom) · klientska kontrola odkazu zrkadlí `URI.parse` so spoločnou tabuľkou platnosti
+  (`tests/fixtures/ceny_m1_product_urls.json`) a odmietnutý odkaz formulár **otvorí nanovo s rozpísanými hodnotami** (`MD.formRejected`) — hláška
+  menuje skutočný dôvod (odchýlka od znenia R6 v package) · STAV vrátil konkrétne dôsledky pre starší plugin. **Testy:** 4866 headless (nová
+  `test_ceny_m1_links.rb`) · 143 JS sád (nová `test_ceny_m1_links.js`; tri sady s literálom schémy 10 → 11) · mutácie **M1–M8 + M22 (Ruby aj JS)
+  a 6 mutácií opráv z predrecenzie zabité**; in-SU nie je brána (package §8 — nové zápisy idú len do globálneho katalógu, žiadna operácia
   ani geometria). **Pre Luciu:** aktualizovať obe PC pred prvým uložením odkazu — starší plugin katalóg so schémou 11 len číta.
 
 - **DOCS — štart bloku CENY · overenie cien materiálov a ABS (29.–30.9.2026, PR #425, len dokumentácia; verzia pluginu sa nemení).** Michal 29.9. večer pri

@@ -27,7 +27,7 @@ v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a
 **Aktualizovať obe PC (aj Luciino) na 0.16.1 pred prvým uložením odkazu — starší plugin katalóg materiálov potom len číta** (rohovú nepozná, šablóny STD 7 len
 číta, rozpočet `BUDGET_STD` 3 needituje; katalóg je na každom PC zvlášť — riziko pri prenose `materials.json` alebo pri staršom SketchUpe na tom istom PC).
 
-**Testy (CENY-M1a, PR #?):** **4861 headless · 143 JS sád** zelené; mutácie M1–M8 + M22 zabité; in-SU nie je brána (package §8).
+**Testy (CENY-M1a, PR #?):** **4866 headless · 143 JS sád** zelené; mutácie M1–M8 + M22 a 6 mutácií opráv z predrecenzie zabité; in-SU nie je brána (package §8).
 **M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
 
 ## Robí sa
