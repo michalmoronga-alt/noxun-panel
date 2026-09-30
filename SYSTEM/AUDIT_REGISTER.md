@@ -299,7 +299,8 @@ nerozlišuje legacy/current/newer/invalid. **Rozhodnutie Michala:** doplniť č�
 štandardu" vo Validation), alebo pole zo štandardu vypustiť — stav „píšem, nečítam" je najhoršia možnosť.
 [E:R-07 + S-10] **Návrh:** podľa rozhodnutia; ORANGE variant **S**.
 **ROZHODNUTÉ (Michal 29.9.2026): ČÍTAŤ** — Kontrola dostane ORANGE nález „dielec z inej verzie štandardu" (variant S); pole zo štandardu
-sa nevypúšťa. Robí sa **pred uzáverom V1** ako samostatná dávka (pred D-48 zdieľaním knižníc, ktoré zvýši miešanie verzií medzi dvoma PC).
+sa nevypúšťa. Samostatná dávka ~~pred uzáverom V1~~ → **PO V1** (Michal 30.9.2026 ráno; prvá v poradí R-13 → R-37 → R-35, PLAN „Po V1 — zásobník"),
+ideálne pred D-48 zdieľaním knižníc, ktoré zvýši miešanie verzií medzi dvoma PC.
 Previerka 29.9.: stav platí — `std` sa píše na 9 miestach (`cabinet_builder`, `board_builder`, `zones`), nečíta nikde; miesta zápisu
 a návrh čítania v previerke, sekcia 3.
 
