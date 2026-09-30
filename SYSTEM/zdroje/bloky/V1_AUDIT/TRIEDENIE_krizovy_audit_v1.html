@@ -1,0 +1,396 @@
+<meta charset="utf-8">
+<title>Krížový audit V1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: jeden stĺpec kariet ako „štítky dielcov“ zoskupené podľa oblasti; hore lepkavý súhrn rozhodnutí. Farby = tokeny pluginu Noxun (teal výber, bridlicové neutrály). */
+:root{
+  --bg:#f4f5f7; --surface:#ffffff; --sunken:#eceff1; --ink:#263238; --ink-strong:#1b3a4b; --muted:#607d8b; --faint:#90a4ae;
+  --border:#cfd8dc; --border-soft:#e3e8eb;
+  --accent:#107787; --accent-strong:#0b5661; --accent-bg:#e0f2f4; --on-accent:#ffffff;
+  --po:#546e7a; --po-bg:#eceff1;
+  --out:#c62828; --out-bg:#fbe9e7;
+  --warn:#9a5b00; --warn-bg:#fff3e0; --warn-border:#ffcc80;
+  --ok:#2e7d32;
+  --font-body:"IBM Plex Sans",system-ui,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11171a; --surface:#1a2226; --sunken:#222c31; --ink:#e3eaed; --ink-strong:#f1f6f8; --muted:#93a7b0; --faint:#6f848d;
+  --border:#2f3c42; --border-soft:#263137;
+  --accent:#4fb6c4; --accent-strong:#7fd0da; --accent-bg:#173338; --on-accent:#0d1d20;
+  --po:#9fb3bd; --po-bg:#263137;
+  --out:#ef7a74; --out-bg:#3a1d1b;
+  --warn:#f0b35a; --warn-bg:#33260f; --warn-border:#6b4a14;
+  --ok:#6cc070; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#11171a; --surface:#1a2226; --sunken:#222c31; --ink:#e3eaed; --ink-strong:#f1f6f8; --muted:#93a7b0; --faint:#6f848d;
+  --border:#2f3c42; --border-soft:#263137;
+  --accent:#4fb6c4; --accent-strong:#7fd0da; --accent-bg:#173338; --on-accent:#0d1d20;
+  --po:#9fb3bd; --po-bg:#263137;
+  --out:#ef7a74; --out-bg:#3a1d1b;
+  --warn:#f0b35a; --warn-bg:#33260f; --warn-border:#6b4a14;
+  --ok:#6cc070; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.5}
+.wrap{max-width:860px;margin:0 auto;padding-inline:16px;padding-block:20px 64px;display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{text-wrap:balance;margin:0;color:var(--ink-strong)}
+h1{font-size:1.6rem;font-weight:700;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:.9rem;margin-top:2px}
+.intro{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:grid;gap:8px;font-size:.93rem}
+.intro p{margin:0;max-width:68ch}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.88rem;color:var(--muted)}
+.legend b{color:var(--ink)}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:10px 8px;border-bottom:1px solid var(--border-soft);display:grid;gap:8px}
+.prog{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;font-size:.9rem;font-variant-numeric:tabular-nums}
+.prog .done{font-weight:600;color:var(--ink-strong)}
+.pill{display:inline-flex;align-items:center;gap:5px}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.dot.teraz{background:var(--accent)} .dot.po{background:var(--po)} .dot.vyradit{background:var(--out)}
+.meter{height:6px;border-radius:3px;background:var(--sunken);display:flex;overflow:hidden}
+.meter span{height:100%}
+.meter .teraz{background:var(--accent)} .meter .po{background:var(--po)} .meter .vyradit{background:var(--out)}
+.filters{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:inherit;font-size:.84rem;border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:999px;padding:3px 11px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent-bg);border-color:var(--accent);color:var(--accent-strong);font-weight:600}
+.chip:focus-visible,.seg button:focus-visible,.btn:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.save{font-size:.8rem;color:var(--muted)}
+.save.err{color:var(--out)}
+section.grp{display:grid;gap:10px}
+.ghead{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:6px 12px;padding-top:10px}
+.ghead h2{font-size:1.12rem}
+.ghead p{margin:2px 0 0;color:var(--muted);font-size:.88rem;max-width:62ch}
+.btn{font:inherit;font-size:.84rem;border:1px solid var(--accent);color:var(--accent-strong);background:transparent;border-radius:7px;padding:5px 10px;cursor:pointer;white-space:nowrap}
+.btn:disabled{border-color:var(--border);color:var(--faint);cursor:default}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:grid;gap:7px;min-width:0}
+.card.is-teraz{border-color:var(--accent)} .card.is-vyradit{opacity:.72}
+.ctop{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.id{font-family:var(--font-mono);font-size:.78rem;color:var(--muted);letter-spacing:.02em}
+.tag{font-size:.74rem;border-radius:5px;padding:1px 7px;background:var(--sunken);color:var(--muted)}
+.tag.votes{background:var(--accent-bg);color:var(--accent-strong);font-weight:600}
+.tag.risk{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-border)}
+.tag.q{background:var(--warn-bg);color:var(--warn)}
+.card h3{font-size:1rem;font-weight:600;line-height:1.35}
+.card p{margin:0;max-width:72ch;overflow-wrap:anywhere}
+.card .why{color:var(--muted);font-size:.92rem}
+.card .why b{color:var(--ink);font-weight:600}
+.src{font-family:var(--font-mono);font-size:.74rem;color:var(--faint);overflow-wrap:anywhere}
+.act{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-top:2px}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.seg button{font:inherit;font-size:.88rem;border:0;background:var(--surface);color:var(--ink);padding:6px 13px;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.seg button+button{border-left:1px solid var(--border)}
+.seg button .rec{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.5}
+.seg button[aria-pressed="true"][data-v="teraz"]{background:var(--accent);color:var(--on-accent)}
+.seg button[aria-pressed="true"][data-v="po"]{background:var(--po);color:var(--surface)}
+.seg button[aria-pressed="true"][data-v="vyradit"]{background:var(--out);color:var(--surface)}
+.recnote{font-size:.8rem;color:var(--muted)}
+.notebtn{font:inherit;font-size:.82rem;background:none;border:0;color:var(--accent-strong);cursor:pointer;padding:2px 0}
+textarea{font:inherit;font-size:.9rem;width:100%;min-height:56px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--ink);padding:7px 9px;resize:vertical}
+.foot{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding-top:8px;border-top:1px solid var(--border-soft)}
+.foot .btn{background:var(--accent);color:var(--on-accent)}
+.empty{color:var(--muted);font-size:.9rem;padding:8px 0}
+@media (max-width:520px){ .seg button{padding:7px 10px} h1{font-size:1.35rem} }
+@media (prefers-reduced-motion: no-preference){ .card{transition:border-color .15s, opacity .15s} }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Krížový audit V1</h1>
+    <div class="sub">Noxun Engine v0.17.0 · 1. 10. 2026 · 7 audítorov: Codex astra, Codex sol, Grok, Claude ×2, rešeršéri ×2</div>
+  </header>
+
+  <div class="intro">
+    <p>Pri každej položke vyber, kam patrí. <b>Teraz</b> = blok HARDENING pred funkciami po V1 (pár dní; R-13 → R-37 → R-35 v ňom už sú). <b>Po V1</b> = zásobník. <b>Vyradiť</b> = zapíšem s dôvodom a nevraciame sa.</p>
+    <p>Bodka v tlačidle ukazuje moje odporúčanie. Ak s ním súhlasíš, stačí v skupine „Potvrdiť odporúčania“. Opätovný klik voľbu zruší.</p>
+    <p>Moje „Teraz“ po zlúčení do dávok: ~14 dávok (2 dokumentačné, 4 UI, 5 kódových, 3 malé) + R-13, R-37, R-35 — zhruba 3 dni autonómneho behu. Ak to chceš kratšie, najväčšie sú C-06 (exporty) a B-02 (dokumentácia okien).</p>
+    <div class="legend"><span><b>2–3 audítori</b> = našli nezávisle viacerí</span><span><b>citlivé</b> = dotýka sa výrobných alebo cenových čísel, robí sa len s dôkazom rovnakého výstupu</span></div>
+  </div>
+
+  <div class="bar" id="bar">
+    <div class="prog" id="prog"></div>
+    <div class="meter" id="meter" aria-hidden="true"></div>
+    <div class="filters" id="filters" role="group" aria-label="Filter"></div>
+    <div class="save" id="save" role="status">Načítavam uložené rozhodnutia…</div>
+  </div>
+
+  <main id="list"></main>
+
+  <div class="foot">
+    <button class="btn" id="copy" type="button">Skopírovať súhrn</button>
+    <span class="save" id="copyMsg"></span>
+  </div>
+  <textarea id="copyArea" aria-label="Súhrn rozhodnutí" hidden readonly></textarea>
+</div>
+
+<script>
+const ITEMS = [
+{id:"A-01",g:"A",t:"Kusovník sčítava platne rôznych materiálov",w:"Súčtový riadok Kusovníka píše „odhad 2,2 – 2,4 platní“, ale sú to zlomky troch rôznych materiálov dokopy. Nárezový plán pre tú istú kuchyňu hovorí 3 (+1) platne, Rozpočet 4.",p:"Kto by objednával podľa Kusovníka, objedná o 1–2 platne menej. Návrh: číslo zmazať a nahradiť odkazom „platne → Nárezový plán“.",src:"CU-05 · overené v kóde",v:1,e:"mala",r:"teraz"},
+ {id:"A-02",g:"A",t:"Cenová ponuka: stĺpec „Cena“ sa číta ako cena za kus",w:"V tabuľke ponuky je súčet riadku pred množstvom — „Atira 171,56 € · 4 · set“ vyzerá ako 171,56 € za set (v skutočnosti 42,89 €). Nulové položky svietia „0,00 €“ a v okne je vývojársky rámik „PO V1 — vedomý placeholder“.",p:"Poradie Položka · Množstvo · MJ · Spolu, nulová služba = „v cene“, rámik preč. Len okno Štúdia; XLSX ponuky ostáva (tá zmena by bola po V1).",src:"CU-08",v:1,e:"mala",r:"teraz"},
+ {id:"A-03",g:"A",t:"Kontrola: zelená „0 skriniek bez nálezu“ a nepravdivá veta",w:"Oranžové číslo počíta nálezy, zelené skrinky — „0 skriniek bez nálezu“ pôsobí ako „všetko je zle“, hoci ide o jeden pracovný materiál chrbta. Lišta navyše píše „v modeli nie je nič nakreslené“, aj keď je zapnutý smer otvárania.",p:"„0 zo 7 skriniek bez nálezu“, „10 nálezov v 5 riadkoch“ a veta o prázdnom modeli len keď sú vypnuté všetky kresby.",src:"CU-09 · GR-19",v:2,e:"mala",r:"teraz"},
+ {id:"A-04",g:"A",t:"Nákup kovania hovorí jazykom databázy",w:"Skupiny majú nadpisy ZAVESY, SPOJOVACI_MATERIAL a parametre „use_type door, nominal_length 470“. Stĺpec Kde opakuje „CAB-003×1, CAB-003×1“. Slovenské názvy kategórií pritom v plugine už sú.",p:"Stolár prečíta objednávku kovania bez prekladania v hlave: „Závesy“, „NL 470 · čelo 150“, „CAB-003 ×2“. CSV kovania sa nemení.",src:"CU-01 · overené v kóde",v:1,e:"mala",r:"teraz"},
+ {id:"A-05",g:"A",t:"Názov zákazky je schovaný v Kusovníku",w:"Priečinok VEPO, rozpočet aj ponuka sa pomenujú podľa poľa „PROJEKT“ v lište Kusovníka (predvolene „projekt“). Hlavička Štúdia pritom ukazuje názov súboru.",p:"Jeden „Názov zákazky“ v hlavičke Štúdia, kým je predvolený, jantárová bodka pri exportoch. Uložená hodnota ostáva tá istá.",src:"CU-07 · GR-20",v:2,e:"stredna",r:"teraz"},
+ {id:"A-06",g:"A",t:"Chyba v logu po otvorení nového súboru",w:"Pri príprave auditu: po „Nový súbor“ a otvorení Štúdia plugin zapíše do logu chybu kontroly smeru otvárania (zabudnutá kresba zo starého modelu).",p:"Malá oprava, aby log nehlásil falošné chyby — pri hľadaní skutočných problémov prekáža.",src:"orchestrátor (sonda 1.10.)",v:1,e:"mala",r:"teraz"},
+ {id:"A-07",g:"A",t:"Nastavenia rozpočtu neukazujú platnú sadzbu",w:"Prázdna bunka režimu (€ / €€ / €€€) znamená „platí základ“, ale neukáže aký. Význam symbolov je len v tooltipe, Rozpočet pritom píše „režim Štandard“.",p:"V prázdnej bunke sivé zdedené číslo, hlavičky „€ nízky · €€ štandard · €€€ vysoký“. Výpočet sa nemení.",src:"CU-15",v:1,e:"mala",r:"teraz"},
+
+ {id:"B-01",g:"B",t:"Povinné čítanie po kapitolách, nie celé obrie súbory",w:"Podľa dnešnej tabuľky čítania musí agent pred malou UI úpravou prečítať ~1 MB textu, pred novým typom skrinky ~1,5 MB. Užitočné sú z toho 3–4 %.",p:"Tabuľka bude ukazovať na konkrétne kapitoly, pribudne strop čítania na dávku a odkaz na záväzný kontrakt Kusovníka a na priečinok podobného hotového bloku. Každá ďalšia dávka lacnejšia a s plnším kontextom na kód.",src:"CN-01 · CS-02 · CN-07 · CN-12",v:2,e:"mala",r:"teraz"},
+ {id:"B-02",g:"B",t:"Dokumentácia okien (529 kB): aktuálny stav oddeliť od histórie",w:"Dokument o UI oknách je z veľkej časti kronika dávok a zaniknutých okien. Kusovník, Materiály, Kovanie a Pravidlá nemajú vlastnú kapitolu.",p:"Krátky aktuálny opis pre každú sekciu Štúdia a kontext Inspectora, história do archívu. Agent nebude hľadať neexistujúce okná.",src:"CS-01 · CS-07 · CN-08",v:3,e:"stredna",r:"teraz"},
+ {id:"B-03",g:"B",t:"Strážca, aby dokumenty znova nenapuchli",w:"Test dnes stráži veľkosť len pri STAV.md. Architektúra a plán môžu rásť bez obmedzenia.",p:"Limit veľkosti a zákaz histórie mimo vyhradenej časti. Patrí do tej istej dávky ako B-02, inak sa o pol roka vrátime k 500 kB.",src:"CS-04",v:1,e:"mala",r:"teraz"},
+ {id:"B-04",g:"B",t:"PLAN.md: 86 % tvoria hotové bloky",w:"Plán má 111 kB, živá časť je ~15 kB. Bloky 1b, 1d, 1e a hotové časti 4 a 6 sa nikdy formálne neuzavreli; zásobník má duplicity (horná rohová 2×, D-48 3×). Trvalé pravidlá (TYP vs ŠABLÓNA, vertikálny priestor) sú na konci súboru alebo na piatich miestach.",p:"Hotové do archívu, duplicity preč, každé trvalé pravidlo na jednom mieste. Strop veľkosti ako pri STAV.",src:"CN-06 · CN-10",v:1,e:"mala",r:"teraz"},
+ {id:"B-05",g:"B",t:"UI_DIZAJN a architektúra: zastarané a protirečivé vety",w:"Deväť viet klame (napr. „typy = dolná, horná, umývačka“ bez rohovej, „hmotnosť príde vo fáze 3“, „semafor sa nikde nepoužíva“, BuildPlan schéma 7 vs „ostáva 5“). UI_DIZAJN mieša normu s denníkom dávok.",p:"Jedna upratovacia dávka: norma komponentov zvlášť, história do archívu, rozpory opravené. Do checklistu uzáveru bod „skontroluj tvrdenia o zoznamoch, ktoré dávka mení“.",src:"CS-06 · CN-09",v:2,e:"stredna",r:"teraz"},
+ {id:"B-06",g:"B",t:"Mapa „kde sa plugin rozširuje“ + skrytá pasca závesov",w:"Pre nový typ skrinky, novú rolu dielca, stĺpec Kusovníka či sekciu Štúdia neexistuje v živých dokumentoch zoznam miest, ktoré treba zmeniť (je len v archíve rohovej). Pravidlo závesov na stenu platí len pre typ „horná“ — budúca horná rohová by bez úpravy nemala závesné kovanie v nákupe ani v cene.",p:"Jedna kapitola „Rozširovacie body“ s názvami registrov a pravidiel viazaných na typ + test, ktorý overí, že registre v kóde sedia. Chráni prvú funkciu po V1 pred tichou chybou v nákupe.",src:"CN-02 · CN-03",v:1,e:"mala",r:"teraz"},
+ {id:"B-07",g:"B",t:"Jedna tabuľka verzií dát",w:"Čísla schém (skrinka 22, výrobný plán 7, ABS 6, šablóny 7, rozpočet 3, katalóg 12…) sú rozhádzané v piatich dokumentoch a zoznam zmien je neúplný. Od nich pritom závisí, či dávka potrebuje audit.",p:"Jedna tabuľka „čo · kde · aktuálna hodnota · kedy zvýšiť“, strážená testom proti kódu. Potrebné aj pre zdieľané knižnice (D-48).",src:"CN-04",v:1,e:"mala",r:"teraz"},
+ {id:"B-08",g:"B",t:"STAV.md zastará po každom dokumentačnom PR",w:"Vstupný bod STAV dnes píše „smoke CENY čaká“ a „R-13… pred V1“, hoci PLAN hovorí opak. Príčina: pravidlo „dokumentačné PR STAV nemenia“.",p:"Návrh pravidla: dokumentačné PR, ktoré mení stav bloku alebo poradie, prepíše sekcie „Robí sa“ a „Ďalší krok“ (verzia sa nemení). Rozhoduješ ty — je to zmena workflowu.",src:"CN-05",v:1,e:"mala",r:"teraz",q:"Mením pravidlo workflowu — súhlasíš?"},
+ {id:"B-09",g:"B",t:"Hranica „výrobná dávka“ a „nový ovládač“ s príkladmi",w:"Pri bežnom rozšírení (napr. nový čítací stĺpec v Kusovníku) agent nevie, či je to výrobná dávka a či treba predrecenziu — pritom od toho závisí počet kôl review.",p:"K definíciám v CLAUDE.md 3–4 príklady hraníc. Dve vety, rozhoduješ ty.",src:"CN-11",v:1,e:"mala",r:"teraz",q:"Mením pravidlo workflowu — súhlasíš?"},
+ {id:"B-10",g:"B",t:"Strážca zhody modelov agentov",w:"Model a úsilie agentov sú v tabuľke rolí aj v definíciách agentov; test overí len platnosť hodnôt, nie zhodu.",p:"Pri zmene modelu nezostane jedna strana stará — drahá úloha nepobeží na inom modeli, než si určil.",src:"CS-05",v:1,e:"mala",r:"teraz"},
+ {id:"B-11",g:"B",t:"Workflow pravidlá na jednom mieste, kratší CLAUDE.md",w:"To isté pravidlo (audit, predrecenzia, kvóty, 3 kolá) je v CLAUDE.md, vo WORKFLOW aj v skilloch. CLAUDE.md sa načíta každému subagentovi a ~40 % z neho sa týka len orchestrátora.",p:"Menej miest na zastaranie a ~5 k tokenov menej pre každého subagenta. Je to väčšia zmena pravidiel — patrí do samostatnej workflow debaty.",src:"CS-03 · CN-14",v:2,e:"stredna",r:"po"},
+ {id:"B-12",g:"B",t:"Skill Codex auditu bez rýchlo starnúcich faktov",w:"Skill obsahuje konkrétne verzie CLI, staré cesty a dátumy opráv PATH.",p:"Kontrolu prostredia presunúť do skriptu, skill nechať ako postup.",src:"CS-08",v:1,e:"mala",r:"po"},
+ {id:"B-13",g:"B",t:"Testy v SketchUpe: jeden súbor s 1,5 MB",w:"Runner testov v SketchUpe je jeden súbor s 28 000 riadkami a 114 sekciami; nový test sa dopisuje doň.",p:"Rozdeliť po blokoch — spolu s položkou zásobníka „runner po teste vráti pôvodnú verziu“, aby sa do brány mergu siahalo raz.",src:"CN-13",v:1,e:"stredna",r:"po"},
+
+ {id:"C-01",g:"C",t:"Typy skriniek na jednom mieste",w:"Nový typ skrinky treba dnes prihlásiť na ~10 miestach v 6 súboroch ešte pred geometriou (rohová sa dotkla 22 súborov). Vlastnosti ako „visí“, „má nohy“, „je roh“ sú rozhádzané v podmienkach podľa mena typu; zabudnuté miesto typ sklopí na dolnú.",p:"Jeden zoznam typov a ich vlastností, z ktorého čerpá Inspector, vkladanie aj šablóny. Horná rohová či vysoká veža = oveľa menšia a bezpečnejšia dávka. Dnešné štyri typy musia dať bajtovo rovnaký VEPO a kusovník.",src:"CX-01 · GR-01 · CN-02",v:3,e:"stredna",r:"teraz",risk:true},
+ {id:"C-02",g:"C",t:"Sekcie Štúdia na jednom mieste",w:"Nová sekcia sa zapisuje na 5 miestach v 3 súboroch a prechod medzi sekciami je naprogramovaný dvakrát (klik a odkaz z Inspectora).",p:"Jeden zoznam sekcií a jedna cesta prepínania. Ďalšia sekcia (napr. výkresy, etikety) bude jednoduchšia a bez zabudnutých vetiev.",src:"CX-04 · CX-05 · GR-06",v:2,e:"stredna",r:"teraz"},
+ {id:"C-03",g:"C",t:"Dáta kovania von z 6 600-riadkového súboru",w:"Predvolené sety, produkty a mapovania kovania sú v tom istom obrom súbore ako nákupná logika a zámky. Nová značka zásuviek by sa pridávala medzi výpočty.",p:"Čistý presun tabuliek do vlastných súborov, pravidlo „nedotknutý seed prepíš, upravený nechaj“ ostáva. Knižnica setov aj nákup musia vyjsť rovnako.",src:"CX-03 · GR-07",v:2,e:"stredna",r:"teraz",risk:true},
+ {id:"C-04",g:"C",t:"Súpis knižníc pred zdieľaním medzi PC",w:"Pred zdieľanými knižnicami (D-48, prvá funkcia po V1) nikde nie je zoznam, čo je knižnica: súbor, zámok, prílohy (vzhľady, náhľady šablón), či sa zdieľa alebo je len pre tento PC. Šablóny si priečinok určujú inak než ostatné.",p:"Jeden súpis bez kopírovania dát — D-48 potom stavia na hotovom zozname a nič sa nezabudne preniesť.",src:"GR-03 · CX (k D-48)",v:2,e:"stredna",r:"teraz"},
+ {id:"C-05",g:"C",t:"Slovenské mená rolí dielcov v jednej tabuľke",w:"Zobrazovacie mená rolí žijú v súbore okna, výrobné mená v stavbe; nový dielec treba pomenovať na viacerých miestach.",p:"Jedna tabuľka mien na zobrazenie. Výrobné mená do VEPO (bez diakritiky) sa nemenia.",src:"GR-04",v:1,e:"mala",r:"teraz"},
+ {id:"C-06",g:"C",t:"Spoločná príprava štyroch exportov",w:"VEPO, CSV kovania, rozpočet a ponuka opakujú ten istý úvod kontrol (aktuálnosť, červené polia, nastavenia, schéma, chrbát) — jadro výstupov má 3 800 riadkov v UI vrstve (známe R-15).",p:"Prvý malý rez: jedna spoločná príprava, každý export si ponechá svoje brány. Nový výstup (výkresy, etikety, CNC) nedostane ďalšiu kópiu. Len s bajtovou zhodou VEPO, CSV, rozpočtu a ponuky — preto ako posledná dávka bloku.",src:"CX (k R-15) · GR (k R-15)",v:2,e:"velka",r:"teraz",risk:true},
+ {id:"C-07",g:"C",t:"Nastavenia exportu (názvy zákaziek) do jadra",w:"Súbor nastavení VEPO drží aj mapu názvov zákaziek a posledný priečinok, z ktorých čerpajú všetky exporty; žije v UI vrstve.",p:"Presunúť spolu s R-37 (ochrana nastavení), bez zmeny tvaru súboru.",src:"GR (k R-38)",v:1,e:"mala",r:"teraz"},
+ {id:"C-08",g:"C",t:"Zásuvky: výška podľa receptu, nie podľa mena „Atira“",w:"Výšková logika zásuviek sa pýta „volá sa systém atira?“ namiesto „má recept výškové varianty?“. Tretí systém (Antaro, TANDEM) by musel prejsť 4+ súbory.",p:"Audítori sa nezhodli: Grok teraz úzky rez, Codex až s prvým novým systémom. Odporúčam až s ním — dotýka sa výšok, zámkov a nákupu.",src:"GR-02 · CX-02",v:2,e:"velka",r:"po",risk:true},
+ {id:"C-09",g:"C",t:"Stĺpce Kusovníka ako jedna špecifikácia",w:"Grok navrhuje popis stĺpca na jednom mieste; Codex zistil, že zoznam stĺpcov a spoločné kreslenie už existujú.",p:"Samotné pridanie stĺpca veľký refaktor neodôvodňuje — odporúčam vyradiť.",src:"GR-05 vs CX",v:1,e:"stredna",r:"vyradit"},
+
+ {id:"D-01",g:"D",t:"Inspector: uvoľniť ~200 px výšky",w:"V každom kontexte je natrvalo ~125 px pomocných textov a opakovaný pás „Skrinka 800 × 864 × 520 … upravíš v Korpuse“; dole dve tlačidlá na celú šírku, „Pripravené.“ a verzia (~110 px).",p:"Nápovedy do jedného „?“, pás preč (klik na rozmery v lište otvorí Korpus), Vložiť kópiu a Uložiť šablónu ako ikony v hlavičke. Priamo tvoje pravidlo o vertikálnom priestore.",src:"CU-04 · CU-11 · GR-22 · CS-10",v:3,e:"stredna",r:"teraz"},
+ {id:"D-02",g:"D",t:"Čitateľné kóty v náhľade",w:"Písmo kót a popisov čiel je v milimetroch modelu: pri 800 mm skrinke ~6–8 px, pri vysokej skrinke ~3 px. Jednotka „mm“ je len pri šírke.",p:"Stála veľkosť písma na obrazovke (aspoň 10–11 px) a jednotný zápis jednotiek.",src:"CU-02",v:1,e:"stredna",r:"teraz"},
+ {id:"D-03",g:"D",t:"Klávesové skratky cez menu",w:"SketchUp priradí skratku len položke menu. V menu Noxun Engine chýbajú najčastejšie činnosti a sú tam staré názvy zaniknutých okien; panel sa v toolbare volá „Inspector“, v menu „Panel“.",p:"Doplniť Kusovník, Kontrola, Rozpočet, Ponuka, VEPO export, Vložiť kópiu, Uložiť šablónu a prepínače kresby. Potom si nastavíš napr. F6 = Kusovník.",src:"CU-03",v:1,e:"mala",r:"teraz"},
+ {id:"D-04",g:"D",t:"Jednotný zápis čísel a jednotiek",w:"„37,26 BM“, „4,00 PLATŇA“, „0,00 FIX“ vedľa „5,8 m²“; kusy s desatinnými; medzisúčty bez €; raz bodka („DTDL 18.6“), inde čiarka.",p:"Jeden formátovač pre všetky sekcie: čiarka, celé kusy, peniaze vždy s € a dvomi desatinnými. XLSX má vlastný a nemení sa.",src:"CU-06 · R-24",v:1,e:"stredna",r:"teraz"},
+ {id:"D-05",g:"D",t:"Zbalená sekcia povie, čo skrýva",w:"Zbalené sektory píšu „3 skupiny · všetko zbalené“; súhrn čiel je šifra „F206 ST9 Piet… · 3 · 2/2/2/2“.",p:"Súhrn z obsahu: „strop 2 výstuhy · chrbát v drážke“, „7 položiek · 3 sety“, „medzera 3 · okraje 2“.",src:"CU-10",v:1,e:"mala",r:"teraz"},
+ {id:"D-06",g:"D",t:"„Obnoviť zálohu“ hneď vedľa „Obnoviť“",w:"V Materiáloch stojí núdzové vrátenie celého katalógu pred migráciou tesne pri bežnom obnovení. Obnova sa navyše v každej sekcii volá inak.",p:"Núdzovú akciu presunúť do O plugine alebo menu „⋯“, bežnú obnovu všade „Obnoviť“ s rovnakou ikonou.",src:"CU-12",v:1,e:"mala",r:"teraz"},
+ {id:"D-07",g:"D",t:"Texty bez vývojárskeho žargónu a VEĽKÝCH písmen",w:"V okne sú slová „legacy“, „seed“, „ghost“, „poradie určuje server“ a zdôrazňovanie veľkými písmenami (SAMÉ, LEN, GLOBÁLNE). Verzia raz „V0.17.0“, inde „v0.17.0“.",p:"Jedna textová dávka so slovníkom náhrad (seed → „dodané s pluginom“, ghost → „obrysy zón“), zdôraznenie tučným.",src:"CU-13",v:1,e:"mala",r:"teraz"},
+ {id:"D-08",g:"D",t:"Rozbaľovačky, hľadanie a stĺpce Kusovníka",w:"Niektoré rozbaľovačky majú systémový vzhľad a výber nôh v Inspectore pretečie okraj; texty v hľadaní sú orezané; stĺpce Dĺžka/Šírka v Kusovníku skáču medzi materiálmi. Mazacie „×“ namiesto ikony.",p:"Jednotný štýl rozbaľovačiek, krátke „Hľadať…“, rovnaké šírky stĺpcov, ikony podľa dizajnu. Pred opravou overiť v SketchUpe (fotky sú z Chrome).",src:"CU-14 · CS-09 · CS-11",v:2,e:"mala",r:"teraz"},
+ {id:"D-09",g:"D",t:"Rozpočet a Nastavenia rozpočtu majú rovnakú ikonu",w:"Pri zbalenej navigácii Štúdia vyzerajú obe položky rovnako (€).",p:"Nastaveniam dať ozubené koleso, ktoré okno už používa.",src:"GR-23",v:1,e:"mala",r:"teraz"},
+ {id:"D-10",g:"D",t:"Automatické fotenie okien po zmene UI",w:"Pri audite vznikol prehrávač, ktorý z dát pluginu vykreslí Inspector aj všetkých 14 sekcií Štúdia a nafotí ich bez SketchUpu, aj pri zamknutom PC.",p:"Z neho malý nástroj pre agentov: po každej UI dávke nafotiť sekcie a priložiť k PR. Uvidíš zmenu bez spúšťania SketchUpu a UI dávky bloku sa dajú overiť hneď.",src:"orchestrátor",v:1,e:"mala",r:"teraz"},
+ {id:"D-11",g:"D",t:"ABS „0,8 dookola“ namiesto štyroch hrán",w:"Stĺpec ABS pri dvierkach opakuje „L1:0,8 · L2:0,8 · W1:0,8 · W2:0,8“ na každom riadku.",p:"Pri zhodných hranách jedna značka, plný zápis v titulku. Dáta aj VEPO ostávajú po hranách.",src:"GR-21",v:1,e:"mala",r:"po"},
+
+ {id:"E-01",g:"E",t:"Snímka odovzdanej zákazky a „čo sa zmenilo od objednávky“",w:"Pri odoslaní VEPO alebo ponuky uložiť snímku (dielce, kovanie, suma). Neskôr Kontrola povie „dve čelá sa zmenili po objednávke“ a Ponuka „+120 € oproti odoslanej verzii“; voliteľne stavy Návrh → Ponuka → Objednané → Vyrobené.",p:"Najsilnejší nápad auditu — navrhli ho štyria audítori nezávisle. Chráni reálne objednávky pred odrezaním starej verzie.",src:"CX-06 · GR-12 · CU-16 · RT-01 (Cabinet Vision: sledovanie revízií)",v:4,e:"velka",r:"po",risk:true},
+ {id:"E-02",g:"E",t:"„Čo keby“ variant ceny pre zákazníka",w:"„Koľko by to stálo v dube alebo s Blumom?“ — v Rozpočte zameniť dekor čiel či systém zásuviek len vo výpočte a ukázať rozdiel, bez prestavby modelu.",p:"Rýchlejšie ponuky a predaj vyššieho variantu.",src:"CU-17 · RT-03 (Mozaik „What If“, Cabinet Vision)",v:2,e:"velka",r:"po",risk:true},
+ {id:"E-03",g:"E",t:"Rad skriniek naraz a vloženie vedľa suseda",w:"Zadať počet a smer a vložiť rad rovnakých skriniek; pri vkladaní vedľa suseda prevziať jeho výšku, hĺbku a materiál (s potvrdením).",p:"Menej klikania pri kuchynskej linke.",src:"GR-08 · GR-09",v:1,e:"stredna",r:"po"},
+ {id:"E-04",g:"E",t:"Zrkadlová ľavá/pravá skrinka",w:"Drezová vľavo a vpravo sa dnes kreslí znova; zrkadlenie má len rohová. Mení olep, teda aj VEPO.",p:"Rýchlejší návrh symetrických zostáv.",src:"GR-10",v:1,e:"stredna",r:"po",risk:true},
+ {id:"E-05",g:"E",t:"Názov skrinky v Kusovníku",w:"Stĺpec Skrinka ukazuje len „CAB-002 ×1“; názov z karty skrinky sa tam nedostane.",p:"Dielňa pozná skrinku bez skákania do modelu. Len zobrazenie, do VEPO nejde.",src:"GR-11",v:1,e:"mala",r:"po"},
+ {id:"E-06",g:"E",t:"Kontrola susedných skriniek v rade",w:"Dve dolné skrinky vedľa seba s inou výškou alebo hĺbkou — pracovná doska na ne nesadne. Kontrola to dnes nevidí.",p:"Nový nález Kontroly nad číslami, ktoré už máme. Nie je to stráž kolízií.",src:"GR-13",v:1,e:"stredna",r:"po"},
+ {id:"E-07",g:"E",t:"Hmotnosť a logistický súhrn zákazky",w:"Karta skrinky hmotnosť ukazuje, Štúdio nie. Súhrn „najťažšia skrinka 48 kg · najdlhší dielec 2 780 mm · spolu ≈ 420 kg“.",p:"Odpoveď na „pôjdu dvaja montéri, vojde to do dodávky“.",src:"GR-14 · RT-15",v:2,e:"mala",r:"po"},
+ {id:"E-08",g:"E",t:"Kusovník v poradí po stene",w:"Dielce sú zoskupené podľa materiálu (pre pílu). Montáž ide zľava doprava po stene.",p:"Druhý pohľad pre montáž, VEPO sa nemení.",src:"GR-15",v:1,e:"stredna",r:"po"},
+ {id:"E-09",g:"E",t:"Sklad zvyškov platní",w:"Pri malej zákazke je využitie platne 34–52 %. Nárezový plán by zvyšok nad istý rozmer ponúkol do skladu a pri ďalšej zákazke v tom istom dekore ho navrhol.",p:"Šetrí drahé dekory čiel. Navrhli dvaja audítori.",src:"GR-16 · CU-19",v:2,e:"velka",r:"po",risk:true},
+ {id:"E-10",g:"E",t:"Z dielca skok na platňu",w:"Z riadku Kusovníka otvoriť v Nárezovom pláne platňu a dielec na nej zvýrazniť.",p:"Rýchlejšie hľadanie v dielni.",src:"GR-17",v:1,e:"mala",r:"po"},
+ {id:"E-11",g:"E",t:"Zoznam rozpracovaných zákaziek na PC",w:"Kde je súbor, kedy bol otvorený, či Kontrola svieti červeno.",p:"Prehľad bez hľadania po disku.",src:"GR-18",v:1,e:"stredna",r:"po"},
+ {id:"E-12",g:"E",t:"Zákaznícky názov položky v ponuke",w:"Ponuka ukazuje katalógové názvy („K-InnoTech Atira … SiSy“, „W1100 DTDL 18 mm“ bez „Alpská biela“).",p:"Voliteľné pole „názov pre zákazníka“ v katalógu. Zároveň podklad pre DOCX ponuku.",src:"CU-18",v:1,e:"stredna",r:"po"},
+ {id:"E-13",g:"E",t:"Odhad hodín dielne",w:"Z počtu rezov, bm olepu, kovania a m² montáže odhad hodín podľa nastaviteľných normočasov.",p:"Plánovanie kapacity a kontrola, či sadzby pokrývajú prácu. Do ceny nevstupuje.",src:"CU-20 · RT-07 (Cabinet Vision: práca na dielec)",v:2,e:"stredna",r:"po"},
+{id:"F-01",g:"F",t:"Pripraviť plugin na SketchUp 2026.2 (pád pri zatváraní)",w:"Máš SketchUp 26.0.429 (prvé vydanie 2026). Od verzie 2026.2 SketchUp pri ukončení zavolá zatváranie okien — náš panel vtedy ukončuje nástroj vkladania, čo je známa príčina pádu (otvorená chyba SketchUpu #1117). Zároveň 2026.2 zastaví načítanie pluginu pri prvej chybe v ľubovoľnom súbore (menu a toolbar by chýbali).",p:"Pred aktualizáciou: rozpoznať ukončovanie SketchUpu a vtedy nič neupratovať, načítanie súborov obaliť jednou hláškou. Pol dňa; overiť v SketchUpe 2026.2.",src:"RA-02",v:1,e:"mala",r:"teraz"},
+ {id:"F-02",g:"F",t:"Minimálna verzia SketchUp 2026 a upratanie starých poistiek",w:"Pravidlá tvrdia „SketchUp 2024+ (CEF 112)“, reálne bežíš na 2026 (CEF 137). V kóde je 10 poistiek pre staršie verzie, ktoré sa už nikdy nespustia; plugin pri štarte verziu nekontroluje.",p:"Zapísať minimum 2026, pri staršom SketchUpe jedna zrozumiteľná hláška, mŕtve poistky preč. Treba potvrdiť verziu u Lucie.",src:"RA-05",v:1,e:"mala",r:"teraz",q:"Akú verziu SketchUpu má Lucia?"},
+ {id:"F-03",g:"F",t:"Štyri prekrytia v modeli majú štyri kópie toho istého kódu",w:"Kontrola hrán, smer kresby, smer otvárania a hrana pod kurzorom majú každé vlastnú kópiu zapínania a vypínania. Stav vypnutia v natívnom paneli SketchUpu zisťujeme oneskorene — lišta Kontroly môže chvíľu tvrdiť „zapnuté“.",p:"Spoločný základ a natívne zapnutie/vypnutie. Ďalšie prekrytie (napr. kolízie) by bolo o ~150 riadkov menšie. Zasahuje do životného cyklu, preto samostatná auditovaná dávka.",src:"RA-01",v:1,e:"stredna",r:"po"},
+ {id:"F-04",g:"F",t:"Náhľad šablóny bez skrývania modelu",w:"Známy D-107 (izolácia pred fotením) je vedený ako náročný. SketchUp má pritom natívne fotenie samotnej skrinky (definície) bez skrývania zvyšku modelu a bez kroku Späť.",p:"Najprv krátka sonda (veľkosť a kvalita obrázka). Ak prejde, D-107 je malá dávka.",src:"A7 k D-107",v:1,e:"mala",r:"po"},
+ {id:"F-05",g:"F",t:"Okná Štúdia a Inspectora skryť namiesto zatvorenia",w:"Od SketchUpu 2026.1 sa dá okno skryť so zachovaným stavom. Dnes pri zatvorení zahodíme všetko a pri otvorení posielame celé katalógy znova.",p:"Rýchlejšie opätovné otvorenie, menej kódu pri každej novej sekcii. Až po aktualizácii SketchUpu na 2026.1+.",src:"RA-04",v:1,e:"stredna",r:"po"},
+ {id:"F-06",g:"F",t:"Hláška pri zamietnutej zmene mierky skrinky",w:"Keď používateľ skrinku zmení nástrojom Mierka mimo povolený rozsah, plugin zmenu zruší spôsobom, ktorý SketchUp oficiálne neodporúča — a preto sa hláška nikdy nezobrazí.",p:"Opraviť podľa oficiálneho vzoru, aby hláška prišla. Dotýka sa kroku Späť a rozmerov — samostatná auditovaná dávka.",src:"RA-08",v:1,e:"stredna",r:"po",risk:true},
+ {id:"F-07",g:"F",t:"Poistka, keď SketchUp prestane hlásiť zmenu výberu",w:"Inspector počúva len na udalosť „zmenil sa výber“. Už raz nás to pálilo (D-40) a v SketchUpe je otvorená ďalšia chyba (#1116), pri ktorej udalosť prestane chodiť.",p:"Samoliečba: po každom kroku porovnať výber a v prípade rozdielu panel dorovnať. Riešiť, ak sa „visiaci panel“ objaví znova.",src:"RA-07",v:1,e:"mala",r:"po"},
+ {id:"F-08",g:"F",t:"Výkresy cez LayOut",w:"LayOut má od 2023–2026 nové možnosti (kóty so smerom, export strán, atribúty). Kótovaný PDF list na skrinku by sa dal skladať z hotového API.",p:"Prieskum pri štarte bloku „výkresy“. Treba overiť licenciu LayOutu u teba a Lucie.",src:"RA-10",v:1,e:"velka",r:"po"},
+ {id:"F-09",g:"F",t:"Drobnosti API (kvádre, viditeľnosť, časovač)",w:"Kváder dielca je napísaný 4× ručne; viditeľnosť entity zisťujeme 3× po svojom, hoci SketchUp 2026 má opravenú natívnu funkciu; jeden časovač sa zbytočne zastavuje (SketchUp to spája s pádmi).",p:"Robiť pri najbližšom zásahu do týchto súborov, nie samostatne.",src:"RA-03 · RA-06 · RA-09",v:1,e:"stredna",r:"po"},
+ {id:"F-10",g:"F",t:"Natívne prisúvanie (Snap) a kópia materiálu",w:"SketchUp 2025 má vlastné body prisúvania pre nástroj Presunúť, 2026.2 kópiu materiálu.",p:"Bez sondy nesplnia podmienky a dnešné riešenia fungujú — odporúčam vyradiť.",src:"RA-11 · RA-12",v:1,e:"stredna",r:"vyradit"},
+{id:"G-01",g:"G",t:"Porovnať recepty zásuviek s tabuľkami výrobcu",w:"Hettich a Blum dávajú k zásuvkám tabuľky a konfigurátory s reznými rozmermi dna a zadnej steny. Uložené ako vzorky by ich test porovnal s naším výpočtom Atira a Quadro — a neskôr s Antarom (Blum).",p:"Nezávislá poistka pre reálne objednávky zásuviek, kód sa nemení, len testovacie dáta. Pre Antaro/TANDEM hotové vzorky vopred.",q:"Máš prístup ku konfigurátoru Hettich alebo Blum, alebo stačia tabuľky z katalógu?",src:"RT-05 (Blum konfigurátor, katalóg Hettich Atira)",v:1,e:"mala",r:"teraz"},
+ {id:"G-02",g:"G",t:"Karta zákazky: klient, číslo ponuky, platnosť, stav",w:"Malá karta v hlavičke Štúdia namiesto „zákazka: Bez názvu“ — klient, adresa, číslo ponuky (napr. 2026-014), platnosť, termín, stav a poznámka. Hodnoty idú do ponuky a názvov exportov.",p:"Predpoklad pre DOCX/PDF ponuku a sledovanie objednávky (E-01). Nadväzuje na A-05.",src:"RT-04 (Mozaik, Cabinet Vision)",v:1,e:"stredna",r:"po"},
+ {id:"G-03",g:"G",t:"Export po častiach (etapy objednávky)",w:"Objednať korpusy hneď a čelá až po výbere dekoru, alebo doobjednať jednu skrinku: pri exporte vybrať označené skrinky · len korpusy · len čelá · pomenovanú etapu.",p:"Menej ručného vyrezávania z VEPO. Mení rozsah výrobného exportu, robiť spolu s E-01.",src:"RT-02 (Mozaik)",v:1,e:"stredna",r:"po",risk:true},
+ {id:"G-04",g:"G",t:"Prehľad skriniek ako štvrtý pohľad Kusovníka",w:"Vedľa Dielce | Platne | ABS pohľad Skrinky: riadok na skrinku s rozmermi, materiálmi, počtom dielcov, hmotnosťou a nálezmi Kontroly; klik ju označí v modeli.",p:"Pri 254 dielcoch je hneď jasné, ktorá skrinka je ktorá. Obsahuje aj E-05 (názov skrinky).",src:"RT-06 (OpenCutList Outliner) · GR-11",v:2,e:"stredna",r:"po"},
+ {id:"G-05",g:"G",t:"Exportovať všetko do jedného datovaného priečinka",w:"Jedno tlačidlo spustí VEPO, CSV kovania, rozpočet a ponuku do priečinka „zákazka\2026-10-01_1432“ a ukáže súhrn. Pri prvej tvrdej bráne sa zastaví a povie ktorej.",p:"Namiesto štyroch tlačidiel v štyroch sekciách; datovaný priečinok je zároveň záznam, čo odišlo.",src:"RT-13 (Cabinet Vision)",v:1,e:"mala",r:"po"},
+ {id:"G-06",g:"G",t:"Poznámka ku skrinke vo výstupoch",w:"Krátke pole na skrinke („zmerať na mieste“, „dodá zákazník“) viditeľné v Kusovníku, Kontrole a exportoch pre dielňu.",p:"Dôležité veci neostanú v hlave alebo na papieri.",src:"RT-12 (Mozaik)",v:1,e:"mala",r:"po"},
+ {id:"G-07",g:"G",t:"Pravý klik na skrinku v modeli",w:"Kontextové menu SketchUpu: Otvoriť v Inspectore · Zobraziť v Kusovníku · Označiť rovnaké · Vložiť kópiu. Len čítanie a označovanie.",p:"Funkcie tam, kam človek prirodzene siaha. Dopĺňa D-03 (skratky).",src:"RT-14",v:1,e:"mala",r:"po"},
+ {id:"G-08",g:"G",t:"Štetec dekoru",w:"Nástroj ako vedro s farbou pre materiály Noxun: vyberieš dekor a klikom ho priradíš skrinke, dielcu alebo čelu; pipeta dekor prevezme.",p:"Rýchle úpravy dekoru bez chodenia do panela. Mení materiál, teda kusovník a cenu — cez existujúcu cestu a test v SketchUpe.",src:"RT-11 (OpenCutList Smart Paint)",v:1,e:"stredna",r:"po",risk:true},
+ {id:"G-09",g:"G",t:"Obrázky pre zákazníka jedným klikom",w:"Uložené pohľady zákazky (linka, pôdorys, detail) sa vyexportujú ako PNG do priečinka zákazky pre ponuku.",p:"Rýchlejšie vkladanie obrázkov do ponuky — ak to Lucia dnes robí dlho.",src:"RT-08 (Mozaik, SketchList)",v:1,e:"stredna",r:"po"},
+ {id:"G-10",g:"G",t:"„Vyplniť úsek steny“",w:"Zadáš dĺžku steny a plugin navrhne kombináciu šírok zo šablón plus výplňový panel.",p:"Prvý krok k zostavám bez plného konceptu.",src:"A6 k zostavám (ArchiWood, Cabinet Vision)",v:1,e:"velka",r:"po"},
+ {id:"G-11",g:"G",t:"Ponuka do Pohody (XML)",w:"Pohoda oficiálne vie importovať ponuku ako doklad — Lucia by ju neprepisovala do fakturácie.",p:"Má zmysel len ak Pohodu používate.",q:"Kam prepisujete ponuku po odoslaní — Pohoda?",src:"RT-09",v:1,e:"stredna",r:"vyradit"},
+ {id:"G-12",g:"G",t:"Nákup kovania rovno do košíka Démos24Plus",w:"Ak by e-shop Demosu vedel import košíka zo súboru, CSV kovania by stačilo upraviť a objednávka by sa skladala jedným klikom.",p:"Import som oficiálne nenašiel — otázka na obchodného zástupcu.",q:"Vie Démos24Plus import košíka zo súboru?",src:"RT-10",v:1,e:"mala",r:"vyradit"}
+];
+const GROUPS = [
+ {id:"A",short:"Zavádzajúce údaje",title:"Zavádzajúce údaje v okne",desc:"Čísla a texty, ktoré môžu zmiasť pri objednávke alebo ponuke. Nič sa neprepočítava."},
+ {id:"D",short:"UI drobnosti",title:"UI drobnosti",desc:"Priestor v paneli, čitateľnosť a jednotný jazyk. Nič sa nepočíta."},
+ {id:"C",short:"Kód",title:"Kód: príprava na rozšírenia",desc:"Švy pre nový typ skrinky, sekciu Štúdia, kovanie a zdieľané knižnice. VEPO, kusovník a rozpočet musia vyjsť bajtovo rovnako."},
+ {id:"B",short:"Dokumenty",title:"Dokumenty a pravidlá pre agentov",desc:"Lacnejšia a spoľahlivejšia práca agentov. Kód pluginu sa nemení."},
+ {id:"F",short:"SketchUp",title:"SketchUp: aktualizácie a natívne možnosti",desc:"Z rešerše Ruby API 2024–2026. Tvoja verzia je 26.0.429 (prvé vydanie 2026)."},
+ {id:"E",short:"Nápady",title:"Nápady po V1",desc:"Nové funkcie z pohľadu dielne a audítorov kódu. Do zásobníka, poradie určíš neskôr."},
+ {id:"G",short:"Z trhu",title:"Čo majú iné nábytkárske programy",desc:"Z rešerše konkurencie a SketchUp pluginov, overené 1. 10. 2026."}
+];
+const LABEL = {teraz:"Teraz", po:"Po V1", vyradit:"Vyradiť"};
+const EFFORT = {mala:"náročnosť malá", stredna:"náročnosť stredná", velka:"náročnosť veľká"};
+const LS_KEY = "v1audit-rozhodnutia";
+
+const state = {};          // id -> {volba, poznamka, cas}
+const chains = {};         // id -> Promise (jeden zápis naraz na dokument)
+const els = {};            // id -> {card, buttons, note, noteBtn}
+let db = null, mode = "loading", filter = "all", onlyOpen = false;
+
+function h(tag, attrs, ...kids){
+  const e = document.createElement(tag);
+  for (const k in (attrs||{})){
+    if (k === "class") e.className = attrs[k];
+    else if (k === "text") e.textContent = attrs[k];
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), attrs[k]);
+    else e.setAttribute(k, attrs[k]);
+  }
+  kids.flat().forEach(c => c != null && e.append(c.nodeType ? c : document.createTextNode(c)));
+  return e;
+}
+
+function saveLocal(){ try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch(e){} }
+function loadLocal(){ try { Object.assign(state, JSON.parse(localStorage.getItem(LS_KEY) || "{}")); } catch(e){} }
+
+function setSave(text, err){ const s = document.getElementById("save"); s.textContent = text; s.classList.toggle("err", !!err); }
+
+function write(id, patch){
+  const cur = Object.assign({volba:null, poznamka:""}, state[id]);
+  const next = Object.assign(cur, patch, {cas: Date.now()});
+  state[id] = next;
+  updateCard(id); updateSummary();
+  if (!db){ saveLocal(); return Promise.resolve(); }
+  setSave("Ukladám…");
+  chains[id] = (chains[id] || Promise.resolve()).then(() => db.collection("rozhodnutia").doc(id).set(next))
+    .then(() => setSave("Uložené — rozhodnutia vidím aj ja."))
+    .catch(e => { saveLocal(); setSave("Uloženie zlyhalo (" + (e && e.code || "chyba") + "). Voľba ostala v tomto prehliadači — na konci použi Skopírovať súhrn.", true); });
+  return chains[id];
+}
+
+function buildCard(it){
+  const top = h("div", {class:"ctop"},
+    h("span", {class:"id", text: it.id}),
+    it.v >= 2 ? h("span", {class:"tag votes", text: it.v + " audítori"}) : null,
+    h("span", {class:"tag", text: EFFORT[it.e] || ""}),
+    it.risk ? h("span", {class:"tag risk", text:"citlivé: výroba / ceny"}) : null,
+    it.q ? h("span", {class:"tag q", text:"otázka pre teba"}) : null
+  );
+  const buttons = {};
+  const seg = h("div", {class:"seg", role:"group", "aria-label":"Zaradenie " + it.id});
+  ["teraz","po","vyradit"].forEach(v => {
+    const b = h("button", {type:"button", "data-v": v, "aria-pressed":"false",
+      onclick: () => write(it.id, {volba: (state[it.id] && state[it.id].volba === v) ? null : v})},
+      LABEL[v], it.r === v ? h("span", {class:"rec", title:"odporúčam", "aria-label":"odporúčam"}) : null);
+    buttons[v] = b; seg.append(b);
+  });
+  const note = h("textarea", {id:"note-" + it.id, "aria-label":"Poznámka k " + it.id, placeholder:"Poznámka pre mňa (nepovinné)"});
+  note.hidden = true;
+  let t = null;
+  note.addEventListener("input", () => { clearTimeout(t); t = setTimeout(() => write(it.id, {poznamka: note.value}), 700); });
+  note.addEventListener("blur", () => { clearTimeout(t); if ((state[it.id]||{}).poznamka !== note.value) write(it.id, {poznamka: note.value}); });
+  const noteBtn = h("button", {class:"notebtn", type:"button", onclick: () => { note.hidden = false; noteBtn.hidden = true; note.focus(); }}, "+ poznámka");
+  const card = h("article", {class:"card", id:"item-" + it.id},
+    top,
+    h("h3", {text: it.t}),
+    h("p", {text: it.w}),
+    h("p", {class:"why"}, h("b", {text:"Prínos: "}), it.p),
+    it.q ? h("p", {class:"why"}, h("b", {text:"Otázka: "}), it.q) : null,
+    h("div", {class:"src", text:"Zdroj: " + it.src}),
+    h("div", {class:"act"}, seg, h("span", {class:"recnote", text:"odporúčam: " + LABEL[it.r]}), noteBtn),
+    note
+  );
+  els[it.id] = {card, buttons, note, noteBtn};
+  return card;
+}
+
+function updateCard(id){
+  const e = els[id]; if (!e) return;
+  const s = state[id] || {};
+  ["teraz","po","vyradit"].forEach(v => e.buttons[v].setAttribute("aria-pressed", s.volba === v ? "true" : "false"));
+  e.card.classList.toggle("is-teraz", s.volba === "teraz");
+  e.card.classList.toggle("is-vyradit", s.volba === "vyradit");
+  if (s.poznamka && document.activeElement !== e.note){ e.note.value = s.poznamka; e.note.hidden = false; e.noteBtn.hidden = true; }
+  applyVisibility(id);
+}
+
+function applyVisibility(id){
+  const it = ITEMS.find(x => x.id === id); const e = els[id];
+  const decided = !!(state[id] && state[id].volba);
+  e.card.hidden = (filter !== "all" && it.g !== filter) || (onlyOpen && decided);
+}
+
+function updateSummary(){
+  const n = ITEMS.length; const c = {teraz:0, po:0, vyradit:0};
+  ITEMS.forEach(it => { const v = state[it.id] && state[it.id].volba; if (c[v] != null) c[v]++; });
+  const done = c.teraz + c.po + c.vyradit;
+  const prog = document.getElementById("prog"); prog.textContent = "";
+  prog.append(h("span", {class:"done", text:"Rozhodnuté " + done + " z " + n}),
+    ...["teraz","po","vyradit"].map(v => h("span", {class:"pill"}, h("span", {class:"dot " + v}), LABEL[v] + " " + c[v])));
+  const m = document.getElementById("meter"); m.textContent = "";
+  ["teraz","po","vyradit"].forEach(v => { const s = h("span", {class:v}); s.style.width = (100 * c[v] / n) + "%"; m.append(s); });
+  GROUPS.forEach(g => {
+    const b = document.getElementById("bulk-" + g.id); if (!b) return;
+    const open = ITEMS.filter(it => it.g === g.id && !(state[it.id] && state[it.id].volba)).length;
+    b.disabled = open === 0;
+    b.textContent = open ? "Potvrdiť odporúčania (" + open + ")" : "Všetko rozhodnuté";
+  });
+  GROUPS.forEach(g => {
+    const sec = document.getElementById("grp-" + g.id); if (!sec) return;
+    const anyVisible = ITEMS.some(it => it.g === g.id && !els[it.id].card.hidden);
+    sec.hidden = !anyVisible;
+  });
+}
+
+async function bulk(gid){
+  const open = ITEMS.filter(it => it.g === gid && !(state[it.id] && state[it.id].volba));
+  for (const it of open){ await write(it.id, {volba: it.r}); }
+}
+
+function buildFilters(){
+  const f = document.getElementById("filters");
+  const mk = (id, label) => h("button", {class:"chip", type:"button", "aria-pressed": String(filter === id), "data-f": id,
+    onclick: () => { filter = id; f.querySelectorAll("[data-f]").forEach(x => x.setAttribute("aria-pressed", String(x.dataset.f === filter))); refreshAll(); }}, label);
+  f.append(mk("all", "Všetko"), ...GROUPS.map(g => mk(g.id, g.short)));
+  const open = h("button", {class:"chip", type:"button", "aria-pressed":"false",
+    onclick: () => { onlyOpen = !onlyOpen; open.setAttribute("aria-pressed", String(onlyOpen)); refreshAll(); }}, "Len nerozhodnuté");
+  f.append(open);
+}
+
+function refreshAll(){ ITEMS.forEach(it => applyVisibility(it.id)); updateSummary(); }
+
+function buildList(){
+  const list = document.getElementById("list");
+  GROUPS.forEach(g => {
+    const items = ITEMS.filter(it => it.g === g.id); if (!items.length) return;
+    const sec = h("section", {class:"grp", id:"grp-" + g.id},
+      h("div", {class:"ghead"},
+        h("div", {}, h("h2", {text: g.title}), h("p", {text: g.desc})),
+        h("button", {class:"btn", type:"button", id:"bulk-" + g.id, onclick: () => bulk(g.id)}, "Potvrdiť odporúčania")),
+      ...items.map(buildCard));
+    list.append(sec);
+  });
+}
+
+function summaryText(){
+  const lines = ["Krížový audit V1 — rozhodnutia"];
+  ["teraz","po","vyradit",null].forEach(v => {
+    const its = ITEMS.filter(it => ((state[it.id] && state[it.id].volba) || null) === v);
+    if (!its.length) return;
+    lines.push("", (v ? LABEL[v] : "Nerozhodnuté") + " (" + its.length + "):");
+    its.forEach(it => { const n = state[it.id] && state[it.id].poznamka; lines.push("- " + it.id + " " + it.t + (n ? " — " + n : "")); });
+  });
+  return lines.join("\n");
+}
+
+document.getElementById("copy").addEventListener("click", () => {
+  const txt = summaryText(); const msg = document.getElementById("copyMsg");
+  const area = document.getElementById("copyArea");
+  const fallback = () => { area.hidden = false; area.value = txt; area.focus(); area.select(); msg.textContent = "Text je označený — skopíruj ho."; };
+  try {
+    navigator.clipboard.writeText(txt).then(() => { msg.textContent = "Skopírované."; }, fallback);
+  } catch(e){ fallback(); }
+});
+
+async function start(){
+  buildFilters(); buildList();
+  loadLocal(); ITEMS.forEach(it => updateCard(it.id)); updateSummary();
+  try { db = window.claude && window.claude.use ? await window.claude.use("db") : null; } catch(e){ db = null; }
+  if (!db){ setSave("Ukladanie do artefaktu tu nie je dostupné — voľby ostávajú v tomto prehliadači. Na konci použi Skopírovať súhrn a pošli mi ho."); return; }
+  setSave("Pripojené — rozhodnutia sa ukladajú a vidím ich aj ja.");
+  db.collection("rozhodnutia").onSnapshot(snap => {
+    const seen = new Set();
+    snap.docs.forEach(d => { seen.add(d.id); const data = d.data(); if (data) state[d.id] = Object.assign({}, data); });
+    ITEMS.forEach(it => { if (!seen.has(it.id) && state[it.id] && !chains[it.id]) delete state[it.id]; });
+    ITEMS.forEach(it => updateCard(it.id)); updateSummary();
+  }, err => setSave("Spojenie s úložiskom sa prerušilo (" + (err && err.code || "chyba") + "). Obnov stránku.", true));
+}
+start();
+</script>
