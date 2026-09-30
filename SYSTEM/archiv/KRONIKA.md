@@ -17,6 +17,13 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **DOCS — smoke bloku CENY PASS (30.9.2026, PR #?, len dokumentácia; verzia pluginu sa nemení).** Michal 30.9. prešiel smoke bloku CENY podľa checklistu
+  v [CENY_ZAVER_2026-09-30.md](CENY_ZAVER_2026-09-30.md): **„smoke pass"** — výsledok zapísaný ako celok, nie po bodoch, **bez nálezov**. Dočasná skupina
+  „CENY — smoke po uzávere bloku" v [DOGFOODING.md](../DOGFOODING.md) **zanikla** (vzor PR #423). Záver bloku, súhrn v [ROADMAP_hotove_etapy.md](ROADMAP_hotove_etapy.md),
+  bod 6 (aj zmienka v bode 1) vo [V1_VIZIA.md](../V1_VIZIA.md) a riadok hotového bloku v [PLAN.md](../PLAN.md) už nečakajú na smoke; otvorené ostáva Q1
+  (porez a montáž pri skle), kandidáti na D-čísla F1–F6 a test na kompletnej reálnej zákazke po V1. Archivované packages bloku sa nemenia. **STAV pri
+  najbližšej kódovej dávke:** smoke CENY PASS; R-13 → R-37 → R-35 po V1 (PR #430) — dokumentačné PR STAV nemení.
+
 - **DOCS — R-13 → R-37 → R-35 po V1 (30.9.2026, PR #430, len dokumentácia; verzia pluginu sa nemení).** Michal 30.9. ráno po uzávere bloku CENY
   (v0.17.0, všetkých 7 bodov [V1_VIZIA.md](../V1_VIZIA.md) odškrtnutých) rozhodol: hardeningové body z registra auditu **R-13 → R-37 → R-35 zapísať ako po V1**
   (poradie ostáva). Presunuté v [PLAN.md](../PLAN.md) z bloku 4 do „Po V1 — zásobník", v [AUDIT_REGISTER.md](../AUDIT_REGISTER.md) (tabuľka „Stav po previerke
