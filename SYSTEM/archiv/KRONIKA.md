@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H5b · UI_DIZAJN ako norma + zastarané vety (1.10.2026, PR #440, dokumentačné PR — plugin, VERSION ani `?v=` sa nemenia; blok 9 · HARDENING PO V1, položky
+- **H5b · UI_DIZAJN ako norma + zastarané vety (1.10.2026, PR #440, v0.17.5 — dokumentácia a komentáre v kóde pluginu, bez zmeny správania; blok 9 · HARDENING PO V1, položky
   triedenia B-05 a zvyšok B-03, krížový audit CS-06, CN-08, CN-09; brief [BRIEF_H5.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H5.md)) — dávka H5 hotová.**
   `docs/UI_DIZAJN.md` miešal normu s denníkom dávok (21 riadkov s historickými značkami — verzie, `PR B1`, `review #249`, zaniknuté okná a premostenia).
   **Presun, nie mazanie:** plné pôvodné znenie je v [UI_DIZAJN_dennik_do_v0.17.md](UI_DIZAJN_dennik_do_v0.17.md) (kontrola množiny riadkov: 199 zmenených
@@ -34,7 +34,11 @@
   `#prodBody`); checkbox „Zobraziť obrysy zón v modeli". **CLAUDE.md:** checklist uzáveru kódovej dávky má bod „Grepom prehľadaj tvrdenia o zoznamoch, ktoré dávka
   mení". **Strážca** v `tests/pure/test_docs_navigacia.rb` (reportovací beh nad starým znením: 21 značiek, 8 chýbajúcich ikon; po upratanom 0 a 0): strop
   UI_DIZAJN 160 kB (~1,3×), zákaz historických značiek mimo „História" (ten istý mechanizmus ako H5a), inventár §4 = každý kľúč `icons.js`; UI_DIZAJN pribudol
-  do kontroly relatívnych odkazov. **Testy:** 4988 headless · 149 JS sád zelené + encoding guard.
+  do kontroly relatívnych odkazov. **Review kolo 1 (4× P2):** guard inventára číta všetky generované `<symbol id="i-…">` (aj samostatný `LOGO`) + negatívny test;
+  komentáre v kóde pluginu zladené s normou — semafor v `panel.css` („len Kontrola", nie „rezervované"), potvrdené rozhodnutia rohovej (O1, O2, O6, O8, R10)
+  v `vepo_export.rb`, `construction.rb`, `cabinet_builder.rb` a `outputs.md`, Rozpočet nie je „jediná sekcia zapisujúca do modelu" (UI_DIZAJN §5.16,
+  `studio.js`, `studio_dialog.rb`) — **len komentáre, bez zmeny správania, v0.17.5** (VERSION + `?v=`). **Testy:** 4989 headless · 149 JS sád zelené + encoding guard;
+  in-SU netreba (len komentáre).
 - **H5a · mapa okien bez histórie (1.10.2026, PR #439, dokumentačné PR — plugin, VERSION ani `?v=` sa nemenia; blok 9 · HARDENING PO V1, položky triedenia
   B-02 a časť B-03; brief [BRIEF_H5.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H5.md); briefy H1–H5 a H8–H10 sú od tohto PR v priečinku bloku `briefy/`).** `docs/architecture/ui-lifecycle.md` (551 kB, 4 193 riadkov, 246 riadkov s historickými
   značkami) bol súčasne kontrakt aj kronika — agent nevedel, ktorá veta ešte platí. **Presun, nie mazanie:** celé pôvodné znenie ide do

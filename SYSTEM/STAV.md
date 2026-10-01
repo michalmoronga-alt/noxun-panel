@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.17.4 · 1.10.2026 — blok 9 HARDENING; dávka H5 hotová** (len dokumentácia: H5a PR #439 mapa okien bez histórie · H5b PR #440 UI_DIZAJN ako norma bez denníka, opravené zastarané vety; strážcovia rastu).
+**v0.17.5 · 1.10.2026 — blok 9 HARDENING; dávka H5 hotová** (dokumentácia: H5a PR #439 mapa okien bez histórie · H5b PR #440 UI_DIZAJN ako norma bez denníka, opravené zastarané vety, strážcovia rastu; v0.17.5 = len komentáre v kóde pluginu, správanie bez zmeny).
 Posledná kódová dávka **H4b** (PR #438): **texty a vzhľad** — núdzové „Vrátiť katalóg pred migráciou…" už nestojí vedľa „Obnoviť" (ponuka „⋯" v Materiáloch), „Obnoviť" znamená všade to isté, iný význam je „Vrátiť…";
 texty bez „ghost/seed/legacy/server" a bez kričania, verzia „v0.17.x"; jednotné rozbaľovačky, krátke „Hľadať…", stĺpce Kusovníka pod sebou, mazanie ikonou ×, Nastavenia rozpočtu s ikonou posuvníkov. **Dáta, čísla, XLSX, CSV a VEPO bez zmeny.**
 Pod tým **H4a** (v0.17.3, PR #437): čísla v Štúdiu všade rovnako, nič sa neskrýva. Pod tým **H3b** (v0.17.2, PR #436): bez falošnej chyby „invalid overlay" v Ruby konzole po **Súbor → Nový**. Pod tým **H3a** (v0.17.1, PR #435): Štúdio bez zavádzajúcich údajov (Kusovník, ponuka, Kontrola, Nákup, sadzby) — **čísla, CSV, XLSX a VEPO bez zmeny**.
@@ -29,7 +29,7 @@ v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a
 **Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin
 počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
 
-**Testy (H4b, PR #438):** **4979 headless · 149 JS sád** zelené + encoding guard; in-SU sa nespúšťal (JS/CSS a zobrazovacie texty; posledný beh H3b: 3284 PASS / 0 FAIL).
+**Testy (H5b, PR #440):** **4989 headless · 149 JS sád** zelené + encoding guard; in-SU sa nespúšťal (len dokumentácia a komentáre v kóde; posledný beh H3b: 3284 PASS / 0 FAIL).
 
 ## Robí sa
 
