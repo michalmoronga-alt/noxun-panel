@@ -671,12 +671,29 @@ module Noxun
         Engine.log_error(e, 'DirectionCheck.notify_state_changed')
       end
 
+      # H3b/A-06: overlay, ktory SketchUp UZ ZNEPLATNIL, sa odstranit neda
+      # (`remove` hodi „invalid overlay") — len sa zabudne (referencie zahodil
+      # `disable!`). Sonda 1.10.2026: Windows File/New vycisti dokument aj jeho
+      # prekrytia, ale Ruby objekt modelu OSTAVA TEN ISTY (`equal?`, `valid?`
+      # true), takze `on_model_changed` overlay nevypne a chyba vyskocila az
+      # pri dalsom zapnuti (obnova pri otvoreni Studia). Rozlisuje `valid?`,
+      # nie plosny rescue ani text vynimky: platny overlay v platnom dokumente
+      # sa odstranuje ako doteraz a jeho chyba ide do logu.
       def remove_overlay(model, overlay)
         return unless overlay && model && model.respond_to?(:overlays)
+        return if stale_overlay?(model, overlay)
 
         model.overlays.remove(overlay)
       rescue StandardError => e
         Engine.log_error(e, 'DirectionCheck.remove_overlay')
+      end
+
+      # Dokument zatvoreny alebo overlay zneplatneny SketchUpom. Vynimka
+      # samotneho `valid?` NIE JE „zneplatnene" — ide do logu cez volajuceho.
+      def stale_overlay?(model, overlay)
+        return true if model.respond_to?(:valid?) && !model.valid?
+
+        overlay.respond_to?(:valid?) && !overlay.valid?
       end
 
       # Poistka po reloade pluginu: overlay s NASIM id uz moze byt v modeli

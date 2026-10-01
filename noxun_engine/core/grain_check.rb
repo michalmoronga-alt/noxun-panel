@@ -402,11 +402,22 @@ module Noxun
         Engine.log_error(e, 'GrainCheck.notify_state_changed')
       end
 
+      # H3b/A-06: zneplatneny overlay sa len zabudne (Windows File/New ho
+      # vycisti, model ostava ten isty objekt) — plne zdovodnenie je pri
+      # `DirectionCheck.remove_overlay`. Ziva chyba ide do logu ako doteraz.
       def remove_overlay(model, overlay)
         return unless overlay && model && model.respond_to?(:overlays)
+        return if stale_overlay?(model, overlay)
+
         model.overlays.remove(overlay)
       rescue StandardError => e
         Engine.log_error(e, 'GrainCheck.remove_overlay')
+      end
+
+      def stale_overlay?(model, overlay)
+        return true if model.respond_to?(:valid?) && !model.valid?
+
+        overlay.respond_to?(:valid?) && !overlay.valid?
       end
 
       # Poistka po reloade pluginu: overlay s NASIM id uz moze byt v modeli
