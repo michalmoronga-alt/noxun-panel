@@ -17,6 +17,9 @@ dokument opisuje **prečo** a **ako** — tabuľka tokenov nižšie je zrkadlom 
   len v krajných prípadoch. Inak panel skončí ako scrollovanie cez 20 tlačidiel a 30 sekcií.
 - **Žiadne emoji v UI chrome.** Ovládacie prvky (tlačidlá, zámky, akcie) používajú
   ikony zo spritu `icons.js`. Emoji/unicode glyfy sa v ovládaní nepoužívajú.
+  **Mazanie riadku je ikona `x`** s `aria-label` a `title`, ktoré povedia, ČO sa
+  odoberá („Odobrať pásmo", „Odstrániť hmotnostné pásmo") — nikdy písmeno „×"/„✕"
+  (H4 · D-08: sety kovania a Pravidlá to ešte mali).
 - **Farba nesie význam.** Zelená = primárna akcia, **teal (firemná NOXUN) = výber/
   aktívny stav**, červená = chyba/mazanie, jantár = upozornenie/override. Významy
   sa nemiešajú.
@@ -33,7 +36,21 @@ dokument opisuje **prečo** a **ako** — tabuľka tokenov nižšie je zrkadlom 
   údaj, ktorý má existujúci cieľ, je `<button>` a otvorí ho **rovno na správnom
   mieste** (deep-link). Údaj bez cieľa ostáva textom — predstierať preklik do
   nikam je horšie než nekliknuteľný riadok. Nedostupná akcia sa hlási cez
-  `aria-disabled` s vysvetlením, **nikdy** HTML `disabled` (vzor D-78).
+  `aria-disabled` s vysvetlením, **nikdy** HTML `disabled` (vzor D-78). Stráž
+  dvojitého odoslania potom stojí na `aria-disabled` — delegovaný klik pri ňom
+  **nič neodošle** (H4 · CS-11: „Zapísať vybrané" v Aktualizovať z Demosu).
+- **Jedno slovo = jedna akcia** (H4 · D-06). Bežné načítanie nanovo je všade
+  **„Obnoviť" + `refresh-cw`**; akcia s iným významom (vrátiť vyradený záznam,
+  vrátiť predvoľby, vrátiť katalóg pred migráciou) je **„Vrátiť…" + `rotate-ccw`**.
+  Núdzová akcia nestojí vedľa bežnej — ide do ponuky **„⋯"** (`more-horizontal`,
+  overlay pod spúšťačom, Escape zavrie len ju), ktorá sa bez položiek nekreslí.
+- **Texty bez žargónu a bez kričania** (H4 · D-07). V okne nie je „ghost" (→
+  „obrysy zón" / „vkladaná skrinka"), „seed" (→ „dodaný s pluginom"), „legacy"
+  (→ „staršie čelá"), „server"/„engine" (→ „plugin" alebo bez dovetku).
+  Zdôraznenie je **tučné** (`<b>`) v HTML texte, v `title`, statuse a
+  `textContent` len malé písmená — nie VEĽKÉ. Kódy a názvy (ABS, UNI, VEPO, XLSX,
+  DPH, SPOLU) ostávajú. Verzia sa píše **„v0.17.x"** (malé „v") všade.
+  Pole hľadania má krátky hint **„Hľadať…"**; rozsah povie `title` a `aria-label`.
 - **Zamknuté ⇔ vypísané.** Pri rozmerových poliach s automatikou (výšky čiel,
   „Prvá zóna") drží **vypísaná hodnota**, prázdne pole je AUTO. Samostatný zámok
   vedel byť zapnutý nad prázdnym poľom a nerobil nič — dve pravdy o tom istom.
@@ -295,7 +312,13 @@ tlačidla — D-105), `link`, `search`, `arrow-left`, `trash`,
 `cloud-download` (Pridať z Demosu; aj badge väzby na dlaždici — D-56),
 `external-link` (Otvoriť u dodávateľa — riadok variantu, D-60),
 `arrow-left-right` (Nahradiť UNI… — riadok KONTROLY v Štúdiu, D-83),
-`more-horizontal` (⋯ ďalšie údaje riadku rozpočtu — kód/adresa/poznámka, E-b),
+`more-horizontal` (⋯ ďalšie údaje riadku rozpočtu — kód/adresa/poznámka, E-b;
+od H4 · D-06 aj spúšťač ponuky „⋯" lišty Materiálov — núdzové vrátenie katalógu),
+`sliders-horizontal` (H4 · D-09 — Nastavenia rozpočtu: navigácia Štúdia, tlačidlo
+„Nastavenia" v lište Rozpočtu a akcia nálezu Kontroly; Lucide `sliders-horizontal`.
+Koleso `settings` ostáva Pravidlám ako v Inspectore a `euro` Rozpočtu — v zbalenej
+navigácii sa tak žiadne dve položky nezlievajú; guard `test_h4b_texty_vzhlad.rb`
+stráži jedinečnosť ikon navigácie),
 `download` (⬇ export súboru — XLSX rozpočet, E-b),
 `profile` (vlastný symbol — úchytkový profil v riadku čela, D-90),
 `wrench` (Kovanie — katalóg kovania), `logo`,

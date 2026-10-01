@@ -17,6 +17,22 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H4b · texty a vzhľad (1.10.2026, PR #?, v0.17.4, blok 9 · HARDENING PO V1, položky triedenia HARDENING D-06 · D-07 · D-08 · D-09 — nie D-čísla
+  DOGFOODINGU; package [PACKAGE_H4.md](../zdroje/bloky/HARDENING/PACKAGE_H4.md) časť H4b, zladenie §5.1).** **D-06:** núdzové „Obnoviť zálohu" stálo v lište
+  Materiálov hneď vedľa bežného „Obnoviť" — teraz je to položka **„Vrátiť katalóg pred migráciou…" v ponuke „⋯"** za „Obnoviť" (Q1 bez odpovede → predvolený
+  variant A); „⋯" sa bez zálohy nekreslí, ponuka je overlay, Escape zavrie len ju (`mdMoreOpen` v `nx_esc.js` FLYOUT_FLAGS), výber otvorí ten istý modal
+  („Vrátiť katalóg"). Nastavenia rozpočtu „Načítať nanovo" → **„Obnoviť" + `refresh-cw`**; iný význam → **„Vrátiť…"** (vyradený spotrebič, predvoľby setov,
+  položka kovania v Inspectore). **D-07:** slovník náhrad (ghost → obrysy zón / vkladaná skrinka, seed → dodaný s pluginom, legacy → staršie čelá, server/engine →
+  plugin alebo bez dovetku, ORANGE → oranžové), zdôraznenie tučným alebo malým namiesto VEĽKÝCH písmen, verzia „v0.17.x"; Ruby len 5 zobrazovacích reťazcov
+  (popisok tagu „Zóny (obrysy)", statusy). **D-08:** základné `select` v `panel.css` (obe okná), výber nôh bez pevných 150 px (fotka: už nepresahuje okraj
+  Inspectora), krátke „Hľadať…" + rozsah v `title`/`aria-label`, tabuľka Dielce s pevným rozložením a triedami `c-<kľúč>` (stĺpce pod sebou vo všetkých
+  skupinách), mazanie ikonou `x` (sety, Pravidlá), „Zapísať vybrané" cez `aria-disabled` + dôvod (CS-11; stráž dvojitého zápisu ostáva). **D-09:** Nastavenia
+  rozpočtu ikonou `sliders-horizontal` (Q2 → variant A), Pravidlá s kolesom; vedomá odchýlka od mockupu. **Testy:** nové `test_h4b_texty_vzhlad.js` (ponuka,
+  klávesnica, Escape, výber cez existujúce potvrdenie, stráž dvojitého zápisu end-to-end, jedinečné ikony; 7 mutácií — všetky zhodí) a `.rb` guard (žargón
+  a kričanie v reťazcoch UI, verzia, glyfy, `disabled`, CSS, ikony, Ruby len texty); pripnuté texty v 13 sadách (len znenie); headless **4977 · 149 JS sád**
+  zelené + encoding guard; in-SU nie. **Vzhľad v CEF neoverený** (MCP SketchUpu nebežal; fotky `ui_foto.ps1 -Shoot` sú Chrome) — overí smoke bod 7.
+  Predrecenzia povinná (nový ovládací prvok), výsledok v PR popise.
+
 - **H4a · jednotný zápis čísel a jednotiek + ABS „dookola" (1.10.2026, PR #437, v0.17.3, blok 9 · HARDENING PO V1, položky triedenia HARDENING D-04
   a D-11 — nie D-čísla DOGFOODINGU; package [PACKAGE_H4.md](../zdroje/bloky/HARDENING/PACKAGE_H4.md) časť H4a).** Okno Štúdio malo 9 vlastných formátovačov,
   dva s desatinnou bodkou, a niektoré hodnotu skrývali (hrúbka 18,6 ako „19", bm 70,94 ako „70,9", 2,4 balenia ako „2", MJ „PLATŇA"/„FIX" surovo). Teraz

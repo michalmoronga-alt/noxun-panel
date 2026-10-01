@@ -2457,6 +2457,17 @@ katalógu (`m`, `par`, `sada`…) prekladá `nxfHwUnitCode` (zrkadlo `Budget::HW
 neznáma ostáva surovo. Tú istú cestu (`nxfMoney`) majú okno mazania materiálu („Cena: 12,50 €/m²") a ceny v „Pridať z Demosu". Test:
 `tests/js/test_h4a_format.js` (exporty `partsTable`/`sheetsTable`/`absTable` + `setStForTest` len pre render nad fixtúrou).
 
+**Texty a vzhľad okna (H4b · D-06–D-09, triedenie HARDENING).** **Navigácia:** ikony položiek sú **jedinečné** — Nastavenia rozpočtu `bset` majú
+`sliders-horizontal` (posuvníky; do H4b `euro` ako Rozpočet, v zbalenej navigácii sa zlievali), Pravidlá si nechávajú koleso `settings` (zhoda s Inspectorom).
+Je to **vedomá odchýlka od mockupu Štúdia** (`bset: euro`, `SYSTEM/zdroje/ui20/mockup_studio.html`; rozhodnutie D-09 z 1.10.2026, Q2 variant A); tú istú ikonu nesie
+tlačidlo „Nastavenia" v lište Rozpočtu aj akcia nálezu Kontroly (`layout_settings`). **Tabuľka Dielce** (`partsTable`) má triedu `parts` a každá bunka aj hlavička
+triedu `c-<kľúč>` (`colCls`) — `studio.html` z nich robí **pevné rozloženie** (`table-layout: fixed`) so spoločnými šírkami (Dĺžka/Šírka 64 px, Hr. 52, ks 44, ABS 190,
+Smer dekoru 96, Rola 120, Skrinka 28 %, Dielec zvyšok), takže stĺpce sú pod sebou vo všetkých skupinách materiálu; textové bunky sa **zalamujú** (nič sa neoreže).
+Pohľady Platne a ABS a kontrakt Š2 (voliteľné stĺpce) sa nemenia. **Hľadanie** (Kusovník, Materiály, Kovanie, Spotrebiče ×2) má krátky hint „Hľadať…", rozsah
+nesie `title` + `aria-label`. **Texty** bez vývojárskeho žargónu a VEĽKÝCH písmen (slovník a pravidlo: `docs/UI_DIZAJN.md` §1); guard
+`tests/pure/test_h4b_texty_vzhlad.rb` ich hľadá v **reťazcoch** UI (JS literály, HTML mimo komentárov), nie v komentároch. Test správania:
+`tests/js/test_h4b_texty_vzhlad.js`.
+
 **Súčtový riadok NEUKAZUJE súčet platní (H3a, A-01).** `totals.plates_min/max` sčítava server cez **všetky** položky odhadu (všetky materiály aj nákup pre
 dupláky) — platne rôznych dekorov sa spolu objednať nedajú, takže číslo zvádzalo k chybnej objednávke. Súčtový riadok pohľadu **Dielce** aj **Platne** má namiesto
 neho preklik **„Nárezový plán"** (`cutLinkHtml`: `<button class="linkbtn" data-nav="cut">` s ikonou `scissors`, vzhľad odkazu `.studio .totrow .linkbtn`) — ide
@@ -2561,10 +2572,19 @@ klik pred pushom nepošle nič (inak by z jednej voľby vznikli dva kroky Späť
 
 **Modály sekcie žijú v kotve `#matModalRoot` MIMO `#secbody`** (vzor `#nxModalRoot`).
 
-**Lišta je čistá funkcia `matToolsHtml(state)`** — `[Pridať z Demosu] · [Pridať ručne] · [hľadanie] · [zoskupenie] · ⟶ · [Obnoviť zálohu] · [Obnoviť]`; **primárnym tlačidlom je od
+**Lišta je čistá funkcia `matToolsHtml(state)`** — `[Pridať z Demosu] · [Pridať ručne] · [hľadanie] · [zoskupenie] · ⟶ · [Obnoviť] · [⋯]`; **primárnym tlačidlom je od
 ŠT-2b zase „Pridať z Demosu"** (ŠT-2a mu rolu dočasne odobrala, lebo vtedy len premosťoval do okna — najvýraznejšie tlačidlo novej sekcie nesmie viesť preč); hľadanie a zoskupenie
 si preto držia hodnotu **aj v premennej** (`MD_Q`/`MD_MODE`), lebo lištu prekresľuje každý push. Bannery (read-only katalóg · nepoužiteľné ABS · cutover) sú **prvé riadky obsahu**,
 obsah podtitulu `#mdline` prevzal hint sekcie.
+
+**Ponuka „⋯" (H4 · D-06, triedenie HARDENING; Q1 variant A).** Núdzové **„Vrátiť katalóg pred migráciou…"** (do H4b samostatné „Obnoviť zálohu" HNEĎ vedľa
+bežného „Obnoviť" — pomylili sa) je jediná položka ponuky `mdMoreHtml(open)` za „Obnoviť". Kreslí sa pri tej istej podmienke ako dovtedy (`backup && !ro`), **bez položky
+sa „⋯" nekreslí vôbec** (D-78). Ponuka je overlay pod spúšťačom (`.mdmore`/`.mdmoremenu` v `studio.html`), otvorenosť je čisto klientska (`mdMoreOpen`, nikam sa
+neukladá; lištu prekreslí `matRenderTools`). Klik na „⋯" ju prepína a presunie fokus na položku; zatvára ju klik mimo obalu, Tab, odchod zo sekcie
+(`matCloseModals`) a **Escape** — ten zavrie LEN ponuku, vráti fokus na „⋯" a udalosť spotrebuje; `mdMoreOpen` je v `nx_esc.js` medzi **FLYOUT_FLAGS**, takže reťaz
+modalov, kým je ponuka hore, nerobí nič. Výber položky **najprv ponuku zavrie** a až potom otvorí **ten istý** potvrdzovací modal `mdRestoreModal` („Vrátiť katalóg
+pred migráciou" / „Vrátiť katalóg") → `restore_pre_schema2` — nový zápis nevznikol, len cesta k nemu. V núdzovom (read-only) režime nesie akciu naďalej banner nad
+zoznamom (text „Vrátiť katalóg pred migráciou…").
 
 **KANÁL je zámerne delený:** katalógové echo `push_mat_catalog` → `NX.setMatCatalog` (vzor `push_vepo_bar`) prepíše **len katalóg**, negeneruje prepočet a **NEDVÍHA generáciu** —
 oprava ceny nemení `rows`/`refs`, takže rozkliknutý riadok Kusovníka ani rozrobený export inej sekcie po nej nesmie zastarať (audit #4); plný `push_state` nesie **modelový kontext
@@ -3308,8 +3328,9 @@ jeho rozbaľovací zoznam nálezov zanikol — bola to druhá kópia zoznamu, kt
 
 **Chip preto počíta VŠETKY rozpočtové nálezy, nie „zvyšok"** (review #2): kým mal vlastný zoznam, spotrebičové upozornenie sa z počtu odpočítavalo, lebo malo vyššie vlastný chip —
 odkedy klik vedie do Kontroly, musí ukazovať presne to číslo, ktoré tam používateľ uvidí (chip spotrebičov ostáva ako **špecifická skratka** na ich sekciu rozpočtu; `counts` a
-`Validation.with_budget` sa nemenia). Opačným smerom: nález kategórie `budget` v Kontrole prepne na Rozpočet a otvorí `budget_section` nálezu) · **⚙ ostáva** ako kontextová skratka
-k sadzbám (#20), hoci to isté okno otvára aj položka navigácie.
+`Validation.with_budget` sa nemenia). Opačným smerom: nález kategórie `budget` v Kontrole prepne na Rozpočet a otvorí `budget_section` nálezu) · **„Nastavenia" ostáva** ako kontextová
+skratka k sadzbám (#20), hoci to isté okno otvára aj položka navigácie; od H4 · D-09 nesie ikonu **posuvníkov** (`sliders-horizontal`, tá istá ako položka `bset`
+v navigácii) namiesto kolesa, ktoré patrí Pravidlám.
 
 **PR B2 dokončil dve odložené veci:** inline drafty vlastnej položky a spotrebiča nahradil **D-15 modal** (nižšie) a náhľad cenovej ponuky sa presunul do **vlastnej sekcie** — v
 tele Rozpočtu po ňom ostal len **tenký preklik** `budCpLinkHtml` (suma ponuky + stav + šípka), takže druhá kópia tabuľky, ktorá by sa časom rozišla, neexistuje. S ňou odišiel z
@@ -3877,7 +3898,8 @@ zanikli. Vstupný bod menu „Nastavenia rozpočtu" ostáva ako zaužívaná skr
 **„O plugine" (`ui/js/about.js`) je JEDEN OBSAH s DVOMA VSTUPMI** (kontrakt Š19): markup stavia zdieľaný builder `nxAboutHtml(info)`, ktorý načítava panel.html aj studio.html —
 koliesko Inspectora má už len prázdneho hostiteľa `#cfgAbout` a plní ho `NX.init` (`nxAboutFill`), sekcia `about` ho plní z payloadu.
 
-Dáta (verzia + priečinok nastavení) dáva VÝHRADNE server — do ŠT-4a stála cesta `%APPDATA%\NOXUN\Engine` v HTML natvrdo. Kópia markupu by sa pri prvej úprave rozišla a používateľ
+Dáta (verzia + priečinok nastavení) dáva VÝHRADNE server — do ŠT-4a stála cesta `%APPDATA%\NOXUN\Engine` v HTML natvrdo. Verzia sa píše **„v0.17.x"**
+(malé „v", H4 · D-07) — tak isto pätička Inspectora (`bridge.js` `verline`), stav updatera aj jeho potvrdenie. Kópia markupu by sa pri prvej úprave rozišla a používateľ
 by videl dva rôzne „O plugine". Tri pravidlá `.aboutrow`/`.aboutlogo`/`.aboutname` sa preto v `css/panel.css` **odscopovali z `.nx-inspector`** — v Štúdiu (root bez tej triedy) by
 sa obsah inak rozsypal.
 
