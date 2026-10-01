@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H3a · zavádzajúce údaje v okne Štúdia (1.10.2026, PR #?, v0.17.1, blok 9 · HARDENING PO V1, položky A-01 · A-02 · A-03 · A-04 · A-07 z triedenia;
+- **H3a · zavádzajúce údaje v okne Štúdia (1.10.2026, PR #435, v0.17.1, blok 9 · HARDENING PO V1, položky A-01 · A-02 · A-03 · A-04 · A-07 z triedenia;
   package [PACKAGE_H3.md](../zdroje/bloky/HARDENING/PACKAGE_H3.md), rez H3a → H3b potvrdil orchestrátor).** Mení sa LEN to, čo okno ukazuje — čísla, CSV
   kovania, XLSX ponuky, VEPO a Rozpočet ostali (zlaté testy `np4_golden`, `kovh_golden`, `np1_vepo`, `kova_golden`, `ceny_m2_golden` bez pregenerovania;
   prvý commit vetvy = charakterizácia `test_h3_charakterizacia.rb` nad mainom). **A-01** Kusovník: súčtový riadok (Dielce aj Platne) už nepíše „odhad

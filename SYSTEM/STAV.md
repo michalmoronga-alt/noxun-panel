@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.17.1 · 1.10.2026 — blok 9 HARDENING, dávka H3a** (PR #?): okno Štúdia prestalo ukazovať zavádzajúce údaje — Kusovník bez súčtu platní cez materiály (preklik
+**v0.17.1 · 1.10.2026 — blok 9 HARDENING, dávka H3a** (PR #435): okno Štúdia prestalo ukazovať zavádzajúce údaje — Kusovník bez súčtu platní cez materiály (preklik
 do Nárezového plánu), Cenová ponuka ako faktúra (Množstvo · MJ · Spolu, „v cene" pri Zameraní a Vizualizáciách, bez rámika DOCX/PDF), Kontrola „0 zo 7 skriniek" a „10 nálezov
 v 5 riadkoch", Nákup kovania po slovensky, sivá platná sadzba v Nastaveniach rozpočtu. **Čísla, CSV kovania, XLSX ponuky a VEPO bez zmeny** (zlaté testy bez pregenerovania).
 Pod tým **BLOK CENY UZAVRETÝ** (v0.17.0, 30.9.; štart #425, PR #426–#429; **smoke PASS 30.9.**, PR #431). Doska a ABS páska **bez Demosu** majú **jeden odkaz na produkt** a **ručné overenie ceny** v Štúdiu → Materiály aj v Rozpočte (doska za platňu s prepočtom
@@ -30,13 +30,13 @@ v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a
 **Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin
 počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
 
-**Testy (H3a, PR #?):** **4947 headless · 147 JS sád** zelené + encoding guard; in-SU nie je brána (zobrazenie, PACKAGE_H3 §8).
+**Testy (H3a, PR #435):** **4947 headless · 147 JS sád** zelené + encoding guard; in-SU nie je brána (zobrazenie, PACKAGE_H3 §8).
 
 ## Robí sa
 
 **Blok 9 · HARDENING PO V1** (štart 1.10.2026, PR #432): krížový audit V1 sedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**;
 17 dávok **H1…H17** sekvenčne podľa tabuľky v [PLAN.md](PLAN.md), **bez zmeny výrobných a cenových čísel**; priečinok bloku [zdroje/bloky/HARDENING/](zdroje/bloky/HARDENING/).
-Hotové **H1** PR #433 · **H2** (fotenie okien) PR #434 · **H3a** (zavádzajúce údaje v okne) PR #?; nasleduje **H3b** (falošná chyba v Ruby konzole po novom súbore).
+Hotové **H1** PR #433 · **H2** (fotenie okien) PR #434 · **H3a** (zavádzajúce údaje v okne) PR #435; nasleduje **H3b** (falošná chyba v Ruby konzole po novom súbore).
 **H6 a H7 čakajú na schválený mockup** (R-38 v H7 potvrdí Michal) · **Q1** (porez a montáž pri skle) bez odpovede · pri prvej rohovej v dielni overiť záves Sensys · **na smoke čakajú** D-132 (#367), D-133 (#368), D-134 (#369).
 
 ## Ďalší krok

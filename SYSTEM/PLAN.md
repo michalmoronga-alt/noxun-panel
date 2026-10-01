@@ -37,7 +37,7 @@ predrecenzia, in-SU) sa určí pri package podľa CLAUDE.md; stĺpec je predpokl
 |---|---|---|
 | ✅ H1 · pravidlá čítania pre agentov (kapitoly namiesto celých súborov, PLAN bez hotových blokov, STAV po docs PR, hranice triedy dávky) — **PR #433** | B-01 · B-04 · B-08 · B-09 | dokumentácia |
 | ✅ H2 · fotenie okien pre UI PR (prehrávač dát pluginu + fotky Inspectora a sekcií Štúdia) — **PR #434** | D-10 | nástroj, plugin sa nemení |
-| ✅ H3a · zavádzajúce údaje v okne (platne v Kusovníku → preklik do Nárezového plánu, tabuľka ponuky, semafor Kontroly, Nákup po slovensky, sadzby) — package [PACKAGE_H3.md](zdroje/bloky/HARDENING/PACKAGE_H3.md) — **PR #?** | A-01 · A-02 · A-03 · A-04 · A-07 | kód · výrobná/cenová (zobrazenie) |
+| ✅ H3a · zavádzajúce údaje v okne (platne v Kusovníku → preklik do Nárezového plánu, tabuľka ponuky, semafor Kontroly, Nákup po slovensky, sadzby) — package [PACKAGE_H3.md](zdroje/bloky/HARDENING/PACKAGE_H3.md) — **PR #435** | A-01 · A-02 · A-03 · A-04 · A-07 | kód · výrobná/cenová (zobrazenie) |
 | H3b · log po otvorení nového súboru (vypnutie prekrytia zatvoreného dokumentu bez falošnej chyby) — package [PACKAGE_H3.md](zdroje/bloky/HARDENING/PACKAGE_H3.md) §6.6 | A-06 | kód · in-SU (audit len pri zmene toku) |
 | H4 · jazyk, čísla a vzhľad (formát čísel a jednotiek, Obnoviť, texty, rozbaľovačky a stĺpce, ikona, ABS „dookola") | D-04 · D-06 · D-07 · D-08 · D-09 · D-11 | kód UI |
 | H5 · dokumentácia okien a UI dizajnu (aktuálny stav oddelený od histórie, strážca rastu, zastarané vety) | B-02 · B-03 · B-05 | dokumentácia |
