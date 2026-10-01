@@ -37,6 +37,12 @@
   // (vzor `rdSrcLine`). Formulara pravidiel kovania sa nedotykaju.
   var RD_ABS = null;
   var RD_OVR = null;
+  // H12c: VETA ROZSAHU pravidiel viazanych na typ skrinky `{ rule_id => veta }`
+  // („na hornú skrinku") — sklada ju server (`type_scope`, RulesDialog). Patri
+  // pravidlam, ktorymi bol formular NAPLNENY (`rdSetState`), a „Načítať
+  // globálne" posiela svoju (`RD.setTypeScope`). Okno ziadnu mapu typov nema.
+  var RD_TYPE_SCOPE = {};
+  function rdScopeMap(m){ return (m && typeof m === 'object' && !Array.isArray(m)) ? m : {}; }
   // Review #220 P1: „formular je vykresleny a jeho hodnoty ziju v DOM".
   // Kym plati, prekreslit ho smie UZ LEN zmena pravidiel NA MODELI — nie
   // pripojenie tela pri navrate do sekcie. Rucne hodnoty (`.rqty`, `.bmax`,
@@ -286,15 +292,17 @@
   }
   if (typeof window !== 'undefined') window.rdWidthHint = rdWidthHint;
 
-  function rdRoleDesc(r){
+  // `scope` = mapa viet rozsahu podla typu (predvolene `RD_TYPE_SCOPE` zo servera).
+  function rdRoleDesc(r, scope){
     // GH #126 P2: popis podla SKUTOCNYCH filtrov pravidla — cabinet pravidlo
     // moze cielit podla podopretia (nohy) ALEBO typu korpusu (Bystrica).
     var ap = (r.applies_to || {}); var role = ap.role || '';
     if (role === 'cabinet'){
-      var kinds = ap.cabinet_type || [];
-      var hasU = kinds.indexOf('upper') >= 0, hasL = kinds.indexOf('lower') >= 0;
-      if (hasU && !hasL) return 'na hornú skrinku';
-      if (hasL && !hasU) return 'na spodnú skrinku';
+      // H12c: veta podla TYPU skrinky prichadza hotova zo servera (kluc =
+      // `rule_id` ako ho server cita); pravidlo bez nej pokracuje dalej.
+      var sc = rdScopeMap(scope === undefined ? RD_TYPE_SCOPE : scope);
+      var rid = String(r.rule_id == null ? '' : r.rule_id);
+      if (Object.prototype.hasOwnProperty.call(sc, rid) && sc[rid]) return String(sc[rid]);
       // KOV-G1b: prah výšky sokla (príchyt sokla existuje až od 55 mm) —
       // bez neho by dve pravidlá na skrinku na nohách vyzerali rovnako.
       var fmin = ap.floor_height_min;
@@ -353,6 +361,13 @@
     setGlobalRev: function(rev){
       if (typeof rev === 'string' && rev !== '') RD_GLOBAL_REV = rev;
     },
+    // H12c: „Načítať globálne" — vety rozsahu pre PRAVE nacitany global (ta
+    // ista mapa ako `type_scope` plneho pushu). Prepise len popisy riadkov,
+    // rozpisane hodnoty formulara sa nedotkne.
+    setTypeScope: function(map){
+      RD_TYPE_SCOPE = rdScopeMap(map);
+      rdRefreshRoleDesc();
+    },
     setStatus: function(msg, err){
       var e = rdEl('status');
       if (!e) return;
@@ -398,7 +413,21 @@
     if (RD_GLOBAL_REV === null || d.source === 'global'){
       RD_GLOBAL_REV = typeof d.global_rev === 'string' ? d.global_rev : '';
     }
+    // H12c: vety rozsahu patria pravidlam, ktorymi sa formular PRAVE naplnil
+    // (nie `rdSetExtra` — lacne echo nad globalom vo formulari by ich prepisalo).
+    RD_TYPE_SCOPE = rdScopeMap(d.type_scope);
     rdSetExtra(d);
+  }
+  // Popisy riadkov pravidiel po novej mape viet (bez prekreslenia formulara).
+  function rdRefreshRoleDesc(){
+    var box = rdEl('rulesBox');
+    if (!box || !box.querySelectorAll) return;
+    var rows = box.querySelectorAll('.rrule');
+    for (var i = 0; i < rows.length; i++){
+      var r = RD_RULES[parseInt(rows[i].getAttribute('data-i'), 10)];
+      var span = rows[i].querySelector ? rows[i].querySelector('.rid') : null;
+      if (r && span) span.textContent = rdRoleDesc(r);
+    }
   }
 
   // ŠT-3b-2a: read-only casti sa nasadzuju ZVLAST od formulara — chodia
@@ -1438,7 +1467,9 @@
                        // jedine tym, ze sa pozrieme, CO odchadza na server.
                        rdSaveRules: rdSaveRules,
                        // H10a/R-35: pin revízie globálu (getter — test BLOCKER 1).
-                       rdGlobalRev: rdGlobalRev };
+                       rdGlobalRev: rdGlobalRev,
+                       // H12c: prijimace viet rozsahu (plny push aj „Načítať globálne").
+                       RD: RD, rdTypeScope: function(){ return RD_TYPE_SCOPE; } };
   }
   // ŠT-3b-1: `sketchup.ready('')` tu ZANIKLO. V okne „Pravidlá kovania" bol
   // tento subor POSLEDNY a jeho `ready` znamenal „HTML je nacitane"; okno

@@ -271,16 +271,20 @@ NxTest.test('ROH-B1 (audit NOTE 6): preflight oznacenej rohovej — strana ULOZE
                       'iny typ ctx nema')
 end
 
-NxTest.test('ROH-B1: JS zrkadla — rozsahy, predvolby `dflt`, `only`, corner_th2 v payloade a predvolbach') do
+NxTest.test('ROH-B1: JS zrkadla — rozsahy, predvolby `dflt`, `onlyIf`, corner_th2 v payloade a predvolbach') do
   form = NxRohB1.src('noxun_engine', 'ui', 'js', 'form.js')
   NxRohB1::CB::CORNER_RANGES.each do |k, (lo, hi)|
     NxTest.assert(form.include?("#{k}:[#{lo.round},#{hi.round}]"), "LIMITS #{k} = CORNER_RANGES")
   end
   core = NxRohB1.src('noxun_engine', 'ui', 'js', 'core.js')
+  # H12c (T4): „len pri rohovej" = predikat registra (`onlyIf:'corner'` ->
+  # `NXTypes.corner`, typ s rohovou zostavou), nie meno typu v JS.
   %i[corner_door_w corner_cr1 corner_cr2].each do |k|
-    NxTest.assert(core.include?("{ id:'#{k}', kind:'num', dflt:#{NxRohB1::CB::CORNER_DEFAULTS[k].round}, only:'corner_blind' }"),
+    NxTest.assert(core.include?("{ id:'#{k}', kind:'num', dflt:#{NxRohB1::CB::CORNER_DEFAULTS[k].round}, onlyIf:'corner' }"),
                   "CONSTRUCTION_FIELDS #{k}: dflt = CORNER_DEFAULTS, only = rohova")
   end
+  NxTest.assert(NxRohB1.src('noxun_engine', 'ui', 'js', 'form.js').include?('if (f.onlyIf && !NXTypes[f.onlyIf](out.type)) return;'),
+                'zber posle pole len pri type, ktory predikat splna')
   pay = NxRohB1.src('noxun_engine', 'ui', 'panel', 'payloads.rb')
   NxTest.assert(pay.include?("params['corner_th2'] = corner_th2_payload(entity_model(cab), params) if Construction.corner?(cfg)"),
                 'payload oznacenej: corner_th2 LEN pri rohovej')

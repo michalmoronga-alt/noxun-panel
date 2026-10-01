@@ -14,6 +14,9 @@
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
+// H12c: vlastnosti typu (slot bez korpusu, bez zon, vlastne rozsahy) su
+// register servera — v CEF ho plni `NX.init`.
+require('./nx_types_fixture.js');
 
 const JS = path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js');
 
@@ -51,8 +54,12 @@ eq(NXShell.ctxLockedBy('zony'), '', 'navrat na dolnu skrinku zamok pusti');
 // ============ 2) VKLADACIA KARTA ============================================
 const NXInsert = require(path.join(JS, 'insert_state.js'));
 // ROH-A1: + rohová (zoznam povolených typov; tlačidlo pridá ROH-A2).
-eq(NXInsert.INSERT_TYPES, ['lower', 'upper', 'dishwasher', 'corner_blind', 'board'],
+// H12c (T4): zoznam uz nie je konstanta zo zdroja, ale REGISTER zo servera
+// + doska — parita so zmluvnou fixturou (a dnesne poradie typov).
+eq(NXInsert.insertTypes(), ['lower', 'upper', 'dishwasher', 'corner_blind', 'board'],
    'vkladacia karta pozna vsetky typy objektu');
+eq(NXInsert.insertTypes(), require('./nx_types_fixture.js').registry().map(r => r.id).concat(['board']),
+   'typy vkladania = register servera + doska');
 eq(NXInsert.setInsertType('dishwasher'), true, 'prepnutie na Umývačku');
 eq(NXInsert.insertType(), 'dishwasher', 'stav drzi novy typ');
 eq(NXInsert.state.kind, 'cabinet', 'slot je KORPUSOVY druh, nie doska');
@@ -132,8 +139,10 @@ global.hwAxHtml = require(path.join(JS, 'hardware.js')).hwAxHtml;
 const FM = require(path.join(JS, 'form.js'));
 
 // ============ 4) LIMITY PER TYP (ciste jadro) ===============================
-eq(FM.TYPE_LIMITS.dishwasher.width, [300, 1200], 'slot ma vlastny rozsah sirky');
-eq(FM.TYPE_LIMITS.dishwasher.height, [500, 1200], 'a vlastny rozsah vysky linky');
+// H12c (T4): rozsahy typu su `limits` registra servera (`TYPE_LIMITS` zanikol).
+eq(NXTypes.get('dishwasher').limits.width, [300, 1200], 'slot ma vlastny rozsah sirky');
+eq(NXTypes.get('dishwasher').limits.height, [500, 1200], 'a vlastny rozsah vysky linky');
+eq(FM.TYPE_LIMITS, undefined, 'JS uz nema vlastnu mapu rozsahov typu');
 eq(FM.LIMITS.dw_body_height, [700, 1000], 'telo V');
 eq(FM.LIMITS.dw_front_bottom, [0, 300], 'sokel slotu');
 eq(FM.LIMITS.dw_front_height, undefined, 'D-139: vyska cela uz nie je pole s rozsahom (odvodi sa)');
@@ -337,7 +346,9 @@ setType('lower');
 // ============ 8) PR #381 — CODEX KOLO 1 (P2) ================================
 
 // --- P2 #3: hlavicka Inspectora pozna slot ---------------------------------
-eq(C.NX_TYPE_LABEL.dishwasher, 'Umývačka', 'mapa typ -> popisok pozna slot');
+// H12c (T4): popisok je `label` registra servera (JS mapa NX_TYPE_LABEL zanikla).
+eq(NXTypes.label('dishwasher'), 'Umývačka', 'register typov pozna popisok slotu');
+eq(C.NX_TYPE_LABEL, undefined, 'JS uz nema vlastnu mapu typ -> popisok');
 eq(C.nxCabInfo({ type: 'dishwasher' }).type, 'Umývačka', 'badge nad slotom uz nehlasi „Dolná"');
 eq(C.nxCabInfo({ type: 'lower' }).type, 'Dolná', 'dolna ostava dolna');
 eq(C.nxCabInfo({ type: 'nieco' }).type, 'Dolná', 'neznamy typ padne na dolnu (ako doteraz)');

@@ -2646,8 +2646,8 @@ module Noxun
             rec['construction'] = TemplateStore.construction_summary(t['config'])
             rec['vent_note'] = TemplateStore.ventilation_note(t['config'])
             # H12b (R2.6): SLOVO TYPU korpusovej sablony zo servera (Inspector
-            # aj Studio — `tile_row` ho preberie z tej istej funkcie). JS ho do
-            # H12c nečíta; doska kluc nedostane.
+            # aj Studio — `tile_row` ho preberie z tej istej funkcie). Studio
+            # ho od H12c zobrazi na dlazdici (`tplTypeWord`); doska kluc nedostane.
             word = template_type_word(t)
             rec['type_word'] = word if word
             rec = rec.merge('preview_rev' => TemplatePreviews.rev_for(t['kind'], t['name'])) if previews

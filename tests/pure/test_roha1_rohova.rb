@@ -918,20 +918,26 @@ NxTest.test('ROH-A1 (G9): ScaleWatch.clamp_corner_width — klamp + nemodalna ve
   NxTest.assert_equal(584.0, sw.clamp_corner_width(pr, 300.0, 'CAB-010')[0], 'dvere vpravo tiez')
 end
 
-NxTest.test('ROH-A1: JS registre typu a roli (zdroj) — CAB_TYPES, NX_TYPE_LABEL, TYPE_LIMITS, sablony, karta, pravidla') do
+NxTest.test('ROH-A1: JS registre typu a roli (zdroj) — register typov zo servera, sablony, karta, pravidla') do
   js = ->(f) { NxRohA1.src('noxun_engine', 'ui', 'js', f) }
-  NxTest.assert(js.call('core.js').include?("corner_blind: 'Rohová'"), 'NX_TYPE_LABEL')
-  # ROH-B1 (O2 + P3-2): pevne JS minimum 584 zaniklo — minimum pocita krizova
+  # H12c (T4): JS zoznamy typu (NX_TYPE_LABEL, TYPE_LIMITS, TPL_TYPE_WORDS)
+  # zanikli — hlavicka, rozsahy aj slovo typu prichadzaju z registra servera.
+  ct = Noxun::Engine::CabinetTypes
+  NxTest.refute(js.call('core.js').include?('NX_TYPE_LABEL'), 'NX_TYPE_LABEL zanikol')
+  NxTest.assert_equal('Rohová', ct.prop('corner_blind', :label), 'hlavicka = label registra')
+  NxTest.assert(js.call('bridge.js').include?('NXTypes.set(data.cabinet_types);'), 'JS register plni NX.init')
+  # ROH-B1 (O2 + P3-2): pevne minimum 584 zaniklo — minimum pocita krizova
   # kontrola (`nxCornerMinWidth`, parita v test_rohb1_strana.rb / _ovladace.js).
-  NxTest.refute(js.call('form.js').match?(/corner_blind:\s*\{\s*width:/), 'TYPE_LIMITS rohovej bez pevneho minima')
-  NxTest.assert(js.call('templates.js').include?("corner_blind: 'rohová'"), 'TPL_TYPE_WORDS')
+  NxTest.assert(ct.prop('corner_blind', :limits).nil?, 'rohova bez vlastnych rozsahov (ziadne pevne minimum)')
+  NxTest.refute(js.call('templates.js').include?('TPL_TYPE_WORDS'), 'Studio bez mapy slov typu (type_word zo servera)')
   NxTest.assert_equal('rohová', Noxun::Engine::Panel::TEMPLATE_TYPE_WORDS['corner_blind'])
   core = js.call('core.js')
   block = core[/var\s+CONSTRUCTION_FIELDS\s*=\s*\[(.*?)\];/m, 1].to_s
-  # ROH-B1: dverova cast a CR su polia (len pri rohovej — `only`), strana nie.
+  # ROH-B1: dverova cast a CR su polia (len pri rohovej — `onlyIf:'corner'` =
+  # predikat registra `NXTypes.corner`, H12c), strana nie.
   NxTest.refute(block.include?("id:'corner_side'"), 'strana nie je pole (prepinac so samostatnou akciou)')
   %w[corner_door_w corner_cr1 corner_cr2].each do |k|
-    NxTest.assert(block.match?(/id:'#{k}', kind:'num', dflt:\d+, only:'corner_blind'/), "#{k} len pri rohovej (C6)")
+    NxTest.assert(block.match?(/id:'#{k}', kind:'num', dflt:\d+, onlyIf:'corner'/), "#{k} len pri rohovej (C6)")
   end
   NxTest.assert(js.call('part_card.js').include?("pc.role === 'cr_front'"), 'isFront pozna CR')
   NxTest.assert_equal(Noxun::Engine::CabinetBuilder::CORNER_DEFAULTS,

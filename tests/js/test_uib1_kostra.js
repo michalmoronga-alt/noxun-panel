@@ -16,6 +16,8 @@
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
+// H12c: rail sa pyta registra typov (Zóny pri slote) — v CEF ho plni `NX.init`.
+require('./nx_types_fixture.js');
 const NXShell = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'shell.js'));
 
 let n = 0;

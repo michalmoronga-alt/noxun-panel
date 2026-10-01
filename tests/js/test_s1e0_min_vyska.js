@@ -57,6 +57,8 @@ const ctx = {
   val: id => (selects[id] !== undefined ? selects[id] : fields[id]),
   numv: num, setNum: (id, v) => { fields[id] = String(v); }, setOut: () => {}, onField: () => {},
   evalDim, isExprStr, getType: () => cabType,
+  // H12c: vlastnosti typu (visi, ma korpus) su register servera (v CEF `NX.init`).
+  NXTypes: require('./nx_types_fixture.js').NXTypes,
   nxInteriorZ: core.nxInteriorZ, nxRailGeom: core.nxRailGeom, nxCarcassDepth: core.nxCarcassDepth,
   NX_MIN_INTERIOR_H: core.NX_MIN_INTERIOR_H,
   document: { activeElement: null }, setTimeout: () => 0, clearTimeout: () => {}, console

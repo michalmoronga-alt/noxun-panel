@@ -22,21 +22,20 @@
       identity: '',     // identita vyberu (retazec na porovnanie)
       ctx: 'korpus',    // viewContext (platny len pri mode === 'cab')
       label: '',        // popis docasnej polozky raily (dielec/doska)
-      // S1-E: TYP oznaceneho korpusu ('lower' | 'upper' | 'dishwasher').
-      // Rozhoduje, ktore kontexty maju zmysel — slot umyvacky zony NEMA.
+      // S1-E: TYP oznaceneho korpusu (surovy z payloadu; vlastnosti cita
+      // `NXTypes`). Rozhoduje, ktore kontexty maju zmysel — slot umyvacky zony
+      // NEMA. Bootstrap pred `NX.init` = `NXTypes.FALLBACK` (dolna).
       cabType: 'lower'
     };
 
-    // S1-E: kontexty, ktore dany typ korpusu NEMA (dovod ide do bubliny raily).
-    var NX_CTX_LOCK = {
-      dishwasher: { zony: 'slot umývačky zóny nemá' }
-    };
-
-    // CISTA otazka: ma tento typ korpusu tento kontext? -> '' (ma) alebo DOVOD.
+    // CISTA otazka: ma tento typ korpusu tento kontext? -> '' (ma) alebo DOVOD
+    // (ide do bubliny raily). H12c: typ bez vnutra (`zones: none` z registra
+    // servera — slot umyvacky) nema Zony; dovod je jeho `zones_reason`.
     function ctxLockedBy(ctx, type){
       var t = (type === undefined ? state.cabType : type);
-      var m = NX_CTX_LOCK[String(t)];
-      return (m && m[String(ctx)]) || '';
+      if (String(ctx) !== 'zony') return '';
+      var p = NXTypes.get(t);
+      return (p.zones === 'none' && p.zones_reason) ? String(p.zones_reason) : '';
     }
 
     function normCtx(c){ return CONTEXTS.indexOf(c) >= 0 ? c : 'korpus'; }
@@ -94,7 +93,7 @@
 
     // S1-E: typ oznaceneho korpusu. Nastavuje ho `NX.loadSelected` z payloadu;
     // mimo oznaceneho korpusu ostava posledna hodnota (nikto sa jej nepyta).
-    function setCabType(t){ state.cabType = String(t == null ? 'lower' : t); }
+    function setCabType(t){ state.cabType = String(t == null ? NXTypes.FALLBACK : t); }
     function cabType(){ return state.cabType; }
 
     // Rozlozenie identity na dokument a objekt — vstup identity guardov
@@ -583,7 +582,7 @@
                 plinth_visible: !(fh && fh.style.display === 'none') };
     // ROH-B2 (O12): strana dveri (prepinac riadku rohovej) a dverova cast
     // (pole riadku) — len pri rohovej, inak kluc nie je a meta je dnesna.
-    if (typeof getType === 'function' && getType() === 'corner_blind' && typeof nxCornerSide === 'function')
+    if (typeof getType === 'function' && NXTypes.corner(getType()) && typeof nxCornerSide === 'function')
       out.corner = { side: nxCornerSide(), door: numv('corner_door_w') };
     return out;
   }

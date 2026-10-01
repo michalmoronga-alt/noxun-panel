@@ -71,8 +71,8 @@ module Noxun
       GLOBAL_UNREADABLE_AFTER_TEXT = 'Globálne predvoľby sa nepodarilo prečítať, neprepísali sa.'
 
       # H12b (package H12 R2.6): VETA ROZSAHU pravidla viazaneho na TYP SKRINKY
-      # (`applies_to.cabinet_type`) — server ju sklada, `rules.js` ju do H12c
-      # pocita sam (`rdRoleDesc`, dnes doslovne tieto dve vety). Su to VETY
+      # (`applies_to.cabinet_type`) — sklada ju VYHRADNE server, `rules.js` ju
+      # od H12c len zobrazi (`rdRoleDesc` cez mapu `type_scope`). Su to VETY
       # v akuzative so slovom „spodnú" (terminologia F3, rozhodne Michal v H13),
       # nie vlastnosti typu — preto nie su v registri `CabinetTypes`. Veta plati,
       # ked filter pravidla obsahuje PRAVE JEDEN z tychto typov (zrkadlo JS:
@@ -177,7 +177,7 @@ module Noxun
                       'overrides' => overrides_payload(collected),
                       # H12b (R2.6): hotova veta rozsahu pravidiel viazanych na
                       # typ skrinky, `{ rule_id => veta }` (len pravidla, ktore ju
-                      # maju). Aditivny kluc — `rules.js` ho do H12c nečíta.
+                      # maju). `rules.js` z neho od H12c cita vetu (`RD_TYPE_SCOPE`).
                       'type_scope' => type_scope_map(rules) }
           @baseline_guid  = guid
           @baseline_rules = rules
@@ -572,9 +572,9 @@ module Noxun
 
         # H12b (predrecenzia P3): veta rozsahu pravidiel viazanych na typ pre
         # PRAVE NACITANY global — ta ista mapa ako `type_scope` plneho pushu,
-        # vypocitana nad globalnymi pravidlami (inak by H12c po „Načítať
-        # globálne" ukazala vetu stareho formulara). Guard pre DOM bez prijimaca
-        # (`RD.setTypeScope` pribudne v H12c).
+        # vypocitana nad globalnymi pravidlami (inak by okno po „Načítať
+        # globálne" ukazalo vetu stareho formulara). Prijimac `RD.setTypeScope`
+        # (rules.js, H12c); guard pre DOM bez neho (stare okno pocas aktualizacie).
         def type_scope_script(map)
           "if (window.RD && RD.setTypeScope) RD.setTypeScope(#{map.to_json});"
         end

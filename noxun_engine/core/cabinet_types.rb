@@ -26,9 +26,9 @@
 module Noxun
   module Engine
     module CabinetTypes
-      # Texty zamku typu sablony a dovodu „nema zony" su DOSLOVNE z JS
-      # (`form.js` TPL_TYPE_LOCK, `shell.js` NX_CTX_LOCK) — H12c ich tam
-      # nahradi tymto registrom (`client_payload`).
+      # Texty zamku typu sablony a dovodu „nema zony" su DOSLOVNE prevzate
+      # z niekdajsich JS tabuliek (`form.js` TPL_TYPE_LOCK, `shell.js`
+      # NX_CTX_LOCK) — od H12c ich JS cita LEN odtialto (`client_payload`).
       DW_LOCK = {
         title: 'Typ určuje sám slot umývačky — prepnúť sa nedá.',
         tip: 'Typ určuje sám slot umývačky — nemá korpus, takže sa na dolnú ani hornú skrinku prepnúť nedá.'
@@ -147,7 +147,7 @@ module Noxun
         IDS.select { |id| REGISTRY[id][key] == value }
       end
 
-      # Kontrakt pre JS (H12b ho posle v `NX.init`, H12c z neho cita): pole
+      # Kontrakt pre JS (`NX.init` -> `NXTypes` v core.js, H12b/H12c): pole
       # hashov v poradi `IDS`, kluce ako STRINGY (tie iste mena ako `KEYS`),
       # hodnoty len JSON typy — ziadne symboly ani lambdy. Fixtura
       # `tests/fixtures/h12_cabinet_types.json` je jeho zmluva.

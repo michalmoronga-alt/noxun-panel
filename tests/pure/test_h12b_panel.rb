@@ -222,8 +222,13 @@ if NxTest.headless?
     got = JSON.parse(line[/RD\.setTypeScope\((\{.*?\})\);/, 1].to_s)
     NxTest.assert_equal({ 'zavesenie-hornej-skrinky' => 'na hornú skrinku', 'len-v-globale' => 'na spodnú skrinku' }, got,
                         'mapa nad globalnymi pravidlami (aj pravidlo, ktore projekt nema)')
+    # H12c (T4): rules.js vety uz neskladá — prevzal ich zo servera (mapa
+    # `type_scope`, `RD.setTypeScope`). Doslovnu zhodu s povodnym JS strazi
+    # golden `tests/fixtures/h12_golden/js.json` (Studio) a parita fixtury
+    # `type_scope.json` s `type_scope_map` (test_h12c_js.rb).
     js = NxH12b.src('noxun_engine', 'ui', 'js', 'rules.js')
-    NxTest.assert(js.include?("return 'na hornú skrinku';") && js.include?("return 'na spodnú skrinku';"),
-                  'vety su doslovne tie, ktore dnes sklada rules.js (H12c ich prevezme)')
+    NxTest.refute(js.include?("return 'na hornú skrinku';") || js.include?("return 'na spodnú skrinku';"),
+                  'okno vety rozsahu podla typu nesklada (len server)')
+    NxTest.assert(js.include?('setTypeScope: function(map){'), 'prijimac „Načítať globálne" existuje')
   end
 end

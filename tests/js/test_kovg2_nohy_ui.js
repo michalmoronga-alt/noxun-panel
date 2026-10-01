@@ -35,6 +35,8 @@
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
+// H12c: typy (nohy len typ na podlahe) su register servera — v CEF ho plni `NX.init`.
+require('./nx_types_fixture.js');
 
 let n = 0;
 function ok(c, msg){ n++; assert.ok(c, msg); }

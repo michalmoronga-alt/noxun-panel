@@ -4,6 +4,8 @@
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
+// H12c: typy korpusu su register servera — v CEF ho plni `NX.init`.
+require('./nx_types_fixture.js');
 const vm = require('node:vm');
 const dom = require('./minidom.js');
 const UI = path.join(__dirname, '..', '..', 'noxun_engine', 'ui');
@@ -38,7 +40,8 @@ global.NXInsert = require(path.join(UI, 'js', 'insert_state.js'));
 const ctx = vm.createContext({ module: { exports: {} }, window: window, document: document,
   el: el, val: val, setVal: setVal, getType: getType, esc: esc, mmLabel: mmLabel,
   selectedCabId: selectedCabId, nxModelGuid: nxModelGuid, tplNameSuggestion: tplNameSuggestion,
-  TEMPLATES: TEMPLATES, NX: NX, NXInsert: NXInsert, localStorage: localStorage, sketchup: sketchup });
+  TEMPLATES: TEMPLATES, NX: NX, NXInsert: NXInsert, localStorage: localStorage, sketchup: sketchup,
+  NXTypes: global.NXTypes });
 vm.runInContext(fs.readFileSync(path.join(UI, 'js', 'form.js'), 'utf8'), ctx);
 // Vedlajsie formularove cesty maju svoje sady; tu izolujeme hranicu ulozenia.
 ctx.validateFields = global.validateFields;

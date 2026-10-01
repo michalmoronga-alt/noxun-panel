@@ -4,9 +4,10 @@
   function collectConstruction(){
     var out = { type: getType() };
     CONSTRUCTION_FIELDS.forEach(function(f){
-      // ROH-B1: pole typu (`only`) ide LEN pri tom type — pri inom ani kluc
-      // (krizovy audit C6: chybajuci ovladac nesmie ist ako prazdna hodnota).
-      if (f.only && f.only !== out.type) return;
+      // ROH-B1: pole typu (`onlyIf` = predikat registra, H12c) ide LEN pri
+      // type, ktory ho ma — pri inom ani kluc (krizovy audit C6: chybajuci
+      // ovladac nesmie ist ako prazdna hodnota).
+      if (f.onlyIf && !NXTypes[f.onlyIf](out.type)) return;
       if (f.kind === 'num'){
         var raw = val(f.id);
         if (raw === null || String(raw).trim() === ''){ out[f.id] = ''; return; }
@@ -183,7 +184,7 @@
   // najmensiu sirku pocita krizova kontrola `cabinetCornerError` z poli
   // rohovej, ucinnej hrubky CR 2 a hrubky korpusu (zrkadlo
   // `Construction.min_valid_width`).
-  var TYPE_LIMITS = { dishwasher: { width:[300,1200], height:[500,1200] } };
+  // H12c: vlastne rozsahy posiela register (`limits` typu — dnes len slot).
   // PR #381 (Codex kolo 1, P2): polia, ktore existuju LEN pri slote. Su v DOM
   // aj pri dolnej a hornej skrinke (len skryte), takze bez tohto filtra by
   // hodnota, ktoru tam nechal predchadzajuci slot, CERVENELA a zablokovala by
@@ -202,13 +203,14 @@
   // Cez `el` (nie `val` z core.js) — Node sady nacitavaju form.js aj bez core.js.
   function backRailsActive(){
     var bm = el('back_mode');
-    return cabTypeNow() !== 'dishwasher' && !!bm && bm.value === 'rails';
+    return NXTypes.carcass(cabTypeNow()) && !!bm && bm.value === 'rails';
   }
   // Typ korpusu BEZPECNE: `getType` zije v core.js a Node testy tohto suboru
   // ho nemusia mat nacitany (rovnaky vzor ako `typeof nxLegs… === 'function'`).
-  function cabTypeNow(){ return (typeof getType === 'function') ? getType() : 'lower'; }
+  // Register `NXTypes` (core.js) Node sady typov nasadzuju z fixtury.
+  function cabTypeNow(){ return (typeof getType === 'function') ? getType() : NXTypes.FALLBACK; }
   function limitFor(id){
-    var t = TYPE_LIMITS[cabTypeNow()];
+    var t = NXTypes.get(cabTypeNow()).limits;
     return (t && t[id]) || LIMITS[id];
   }
   // D-22: okraje cel maju dynamicky limit podla zamku (Fronts::EDGE_LIMIT_UNLOCKED);
@@ -242,10 +244,10 @@
     // S1-E: slot vnutro NEMA — krizova kontrola vysky proti soklu a hrubkam
     // sa ho netyka. D-139: jeho vyska linky vsak URCUJE CELO (linka − sokel
     // − medzera hore) a to ma rozsah — ta ista funkcia a vety ako na serveri.
-    if (cabTypeNow() === 'dishwasher') return slotFrontError(evalDim(he.value));
+    if (!NXTypes.carcass(cabTypeNow())) return slotFrontError(evalDim(he.value));
     var h = evalDim(he.value);
     if (isNaN(h)) return ''; // nezmysel uz oznacil hlavny cyklus
-    var sokel = (getType() === 'upper') ? 0 : cabFieldOrDefault('floor_height');
+    var sokel = NXTypes.hangs(getType()) ? 0 : cabFieldOrDefault('floor_height');
     var hrubka = cabFieldOrDefault('thickness');
     // Bez predvolieb zo servera sa NEHADA — radsej ziadna hlaska nez falosna.
     if (isNaN(sokel) || isNaN(hrubka)) return '';
@@ -270,7 +272,7 @@
   function markHeightError(message){
     // D-139: pri slote je druhym polom SOKEL slotu (`dw_front_bottom`) —
     // podstavec korpusu slot nema.
-    var ids = (cabTypeNow() === 'dishwasher') ? ['height', 'dw_front_bottom'] : ['height', 'floor_height'];
+    var ids = NXTypes.carcass(cabTypeNow()) ? ['height', 'floor_height'] : ['height', 'dw_front_bottom'];
     ids.forEach(function(id){
       var e = el(id); if (!e) return;
       if (message){ e.classList.add('bad'); e.title = message; } else { e.title = ''; }
@@ -289,7 +291,7 @@
   // NEPLATI pri chrbte z list — ich pravidlo (2H + 20 <= vnutro) plati aj bez
   // komina.
   function cabinetCheckCarcass(){
-    if (cabTypeNow() === 'dishwasher' || typeof nxSetbackError !== 'function') return null;
+    if (!NXTypes.carcass(cabTypeNow()) || typeof nxSetbackError !== 'function') return null;
     // X = Y = 0 (alebo pole chyba) -> ziadne nove pravidlo; nic sa necita.
     var xs = el('back_setback'), ys = el('top_front_setback'), hs = el('back_rail_height');
     var rails = backRailsActive();
@@ -299,7 +301,7 @@
     if (ae && (ae === xs || ae === ys || (rails && ae === hs)) && isExprStr(ae.value)) return null;
     var xv = (xs && xs.value !== '') ? evalDim(xs.value) : 0, yv = (ys && ys.value !== '') ? evalDim(ys.value) : 0;
     if (!(xv > 0) && !(yv > 0) && !rails) return null;
-    var h = cabFieldOrDefault('height'), sokel = (getType() === 'upper') ? 0 : cabFieldOrDefault('floor_height');
+    var h = cabFieldOrDefault('height'), sokel = NXTypes.hangs(getType()) ? 0 : cabFieldOrDefault('floor_height');
     var hr = cabFieldOrDefault('thickness'), d = cabFieldOrDefault('depth');
     // Bez predvolieb zo servera sa NEHADA (vzor cabinetHeightError).
     if (isNaN(h) || isNaN(sokel) || isNaN(hr) || isNaN(d)) return null;
@@ -382,8 +384,9 @@
   function validateFields(skipFrontDraft){
     var ok = true;
     var ae = document.activeElement;
-    var slotNow = (cabTypeNow() === 'dishwasher');
-    var cornerNow = (cabTypeNow() === 'corner_blind');
+    // H12c: polia slotu patria typu bez korpusu, polia rohovej typu s rohovou zostavou.
+    var slotNow = !NXTypes.carcass(cabTypeNow());
+    var cornerNow = NXTypes.corner(cabTypeNow());
     var railsNow = backRailsActive();
     for (var id in LIMITS){
       var e = el(id); if (!e) continue;
@@ -464,7 +467,7 @@
   // (`onCornerSide`). Do apply payloadu strana nejde nikdy.
   var cornerDraft = null;
   function nxCornerDraftOf(src){
-    if (!src || src.type !== 'corner_blind') return null;
+    if (!src || !NXTypes.corner(src.type)) return null;
     var out = {};
     if (src.corner_side === 'left' || src.corner_side === 'right') out.corner_side = src.corner_side;
     var th = parseFloat(src.corner_th2);
@@ -472,23 +475,29 @@
     return out;
   }
   function nxSetCornerDraft(src){ cornerDraft = nxCornerDraftOf(src); nxCornerRowSync(); }
+  // Predvolby typu S ROHOVOU ZOSTAVOU (H12c: id z registra, nie meno v kode);
+  // pred `NX.init` ich niet — `{}`.
+  function nxCornerDefaults(){
+    var id = NXTypes.ids().filter(NXTypes.corner)[0];
+    return (id && typeof DEFAULTS === 'object' && DEFAULTS && DEFAULTS[id]) || {};
+  }
   // Strana, ktoru riadok UKAZUJE (a vkladanie posle) — bez registra predvolba
   // typu, inak `left` (zrkadlo `norm_corner`).
   function nxCornerSide(){
     if (cornerDraft && cornerDraft.corner_side) return cornerDraft.corner_side;
-    var d = (typeof DEFAULTS === 'object' && DEFAULTS && DEFAULTS.corner_blind) || {};
+    var d = nxCornerDefaults();
     return d.corner_side === 'right' ? 'right' : 'left';
   }
   // ROH-B2 (O10): strana dveri pre KARTU CIEL a suhrn riadku („pánty pri
   // rohu / pri boku") — len pri rohovej, inak null (karta ostatnych typov sa
   // nemeni).
   function nxCornerCardSide(){
-    return cabTypeNow() === 'corner_blind' ? nxCornerSide() : null;
+    return NXTypes.corner(cabTypeNow()) ? nxCornerSide() : null;
   }
   // Ucinna hrubka CR 2 pre minimum sirky: payload/predvolby -> 18 (placeholder).
   function nxCornerTh2(){
     if (cornerDraft && cornerDraft.corner_th2) return cornerDraft.corner_th2;
-    var d = (typeof DEFAULTS === 'object' && DEFAULTS && DEFAULTS.corner_blind) || {};
+    var d = nxCornerDefaults();
     var th = parseFloat(d.corner_th2);
     return (isFinite(th) && th > 0) ? th : 18;
   }
@@ -556,7 +565,7 @@
   // Klik na uz zvolenu stranu nerobi nic (ziadny prazdny krok Spat).
   function onCornerSide(side){
     if (side !== 'left' && side !== 'right') return;
-    if (cabTypeNow() !== 'corner_blind') return;
+    if (!NXTypes.corner(cabTypeNow())) return;
     if (side === nxCornerSide()) return;
     if (typeof selectedCabId !== 'undefined' && selectedCabId){
       if (cornerSwitch){ NX.setStatus(CORNER_SWITCH_BUSY, true); return; }
@@ -623,14 +632,14 @@
     var t = getType();
     var out = { width: c.width === '' ? d.width : c.width,
       height: c.height === '' ? d.height : c.height,
-      floor_height: (t === 'upper' || t === 'dishwasher') ? 0 : (c.floor_height === '' ? d.floor_height : c.floor_height),
+      floor_height: !NXTypes.onFloor(t) ? 0 : (c.floor_height === '' ? d.floor_height : c.floor_height),
       fronts: collectFronts(), model_guid: nxDocGuid(), cabinet_id: selectedCabId || '',
       insert_session: frontDraftSession };
     // S1-E: preflight potrebuje TYP a virtualny otvor slotu — bez nich by
     // overoval celo proti VYSKE LINKY a presah nad linku (ktory je v poriadku)
     // by zahlasil ako chybu.
     out.type = t;
-    if (t === 'dishwasher'){
+    if (!NXTypes.carcass(t)){
       // D-139: vysku cela preflight ODVODI zo sokla, vysky linky a medzery hore.
       out.dw_front_bottom = c.dw_front_bottom === '' ? d.dw_front_bottom : c.dw_front_bottom;
     }
@@ -638,7 +647,7 @@
     // prepinaca (pri oznacenej ju server berie z ulozeneho configu), dverova
     // cast je ZIVE pole (prazdne = predvolba typu) — jej zmena zmeni
     // signaturu, takze preflight a nahlad sa prepocitaju.
-    if (t === 'corner_blind'){
+    if (NXTypes.corner(t)){
       out.corner_side = nxCornerSide();
       out.corner_door_w = c.corner_door_w === '' ? d.corner_door_w : c.corner_door_w;
       // Audit B1 FIX 4: server z tychto poli vrati UCINNE hrubky (`corner_ctx`)
@@ -710,7 +719,7 @@
     updateFrontDirBadges(); updateFrontPlaceholders();
     refreshFrontCards(); renderPreview();
     // ROH-B2: „Šírka dverí" a odhad „≈ Dielcov" pri vkladani z tej istej kresby.
-    if (cabTypeNow() === 'corner_blind'){
+    if (NXTypes.corner(cabTypeNow())){
       nxCornerInfoSync();
       if (!selectedCabId && typeof NXInsert !== 'undefined' && NXInsert.state &&
           NXInsert.state.kind !== 'board' && typeof nxDraftStats === 'function') setInsertCabInfo();
@@ -720,7 +729,7 @@
   }
   // -> true, ked sa ucinna hrubka CR 2 alebo korpusu zmenila.
   function nxAdoptCornerCtx(ctx){
-    if (!ctx || typeof ctx !== 'object' || cabTypeNow() !== 'corner_blind') return false;
+    if (!ctx || typeof ctx !== 'object' || !NXTypes.corner(cabTypeNow())) return false;
     var th2 = parseFloat(ctx.th2), t = parseFloat(ctx.t);
     cornerDraft = cornerDraft || {};
     var before = JSON.stringify([cornerDraft.corner_th2, cornerDraft.corner_t]);
@@ -977,7 +986,7 @@
   function setInsertCabInfo(){
     // S1-E: slot vyrába VŽDY jeden dielec (čelo) — korpusový odhad by mu
     // spočítal boky, dno a strop, ktoré nikdy nevzniknú.
-    if (cabTypeNow() === 'dishwasher'){
+    if (!NXTypes.carcass(cabTypeNow())){
       setOut('inf_parts', '≈ 1');
       setOut('inf_area', '—');
       setOut('inf_weight', '—');
@@ -1018,25 +1027,28 @@
   var SLOT_HIDDEN_GAPS = ['fr_gap', 'fr_gap_bottom'];
   var SLOT_HIDDEN_ROWS = ['thicknessRow', 'infAvWidth', 'infIntDepth', 'infAvHeight', 'infArea'];
 
+  // H12c: vsetko podla VLASTNOSTI typu z registra (`t` smie byt aj surovy
+  // neznamy typ z payloadu — `NXTypes` ho cita ako dolnu).
   function applyVisibility(t){
-    var slot = (t === 'dishwasher');
-    if (slot) nxFillSlotFields();
-    el('plinthGroup').style.display = (t === 'upper' || slot) ? 'none' : '';
+    var slot = !NXTypes.carcass(t);
+    if (slot) nxFillSlotFields(t);
+    // Sokel a nohy LEN typ na podlahe (horna visi, slot ma podporu `none`).
+    el('plinthGroup').style.display = NXTypes.onFloor(t) ? '' : 'none';
     // D-11: vyska sokla v Zakladnych, horna ju nema. S1-E: slot ju nema tiez —
     // jeho „sokel" je spodna hrana CELA (`dw_front_bottom`), nie vyska korpusu.
-    el('fhRow').style.display = (t === 'upper' || slot) ? 'none' : '';
+    el('fhRow').style.display = NXTypes.onFloor(t) ? '' : 'none';
     // ROH-B1 (O3 B1 / O4 A1): riadok rohovej LEN pri rohovej — oznacenej aj
     // vo vkladacej karte (jeden riadok v #basicCard). Pri inom type skryty
-    // a jeho polia sa neposielaju (`only` v `CONSTRUCTION_FIELDS`).
+    // a jeho polia sa neposielaju (`onlyIf` v `CONSTRUCTION_FIELDS`).
     var crow = el('cornerRow');
-    if (crow) crow.hidden = (t !== 'corner_blind');
+    if (crow) crow.hidden = !NXTypes.corner(t);
     nxCornerRowSync();
     // ROH-B2 (package bod 3): rohova delenie zon NEPOZNA (server ho odmieta od
     // A1 — `CORNER_ZONES_MSG`), preto sa skupina „Delenie zóny" pri nej vobec
-    // nezobrazi; strom aj pocet polic ostavaju.
+    // nezobrazi; strom aj pocet polic ostavaju (`zones: shelves_only`).
     var zsplit = (typeof document !== 'undefined' && document.querySelector)
       ? document.querySelector('details[data-key="zsplit"]') : null;
-    if (zsplit) zsplit.hidden = (t === 'corner_blind');
+    if (zsplit) zsplit.hidden = NXTypes.has(t, 'zones', 'shelves_only');
     nxCornerInfoSync();
     SLOT_ONLY_ROWS.forEach(function(id){ var n = el(id); if (n) n.hidden = !slot; });
     SLOT_HIDDEN_ROWS.forEach(function(id){ var n = el(id); if (n) n.style.display = slot ? 'none' : ''; });
@@ -1051,20 +1063,23 @@
     // KOV-G2 (D-111): riadok Noh ide s riadkom Sokel — horna skrinka nohy nema.
     // Vo VKLADANI si zaroven vypyta cerstvy nahlad (typ sa prave zmenil).
     // S1-E: slot nohy ani sokel NEMA (podpora `none`), preto rovnako skryty.
-    if (typeof nxLegsApplyVisibility === 'function') nxLegsApplyVisibility(slot ? 'upper' : t);
+    // H12c: dostava SKUTOCNY typ a pyta sa `onFloor` (uz nie „slot ako horna").
+    if (typeof nxLegsApplyVisibility === 'function') nxLegsApplyVisibility(t);
     toggleRecess(); toggleTwoRails(); toggleBackTh(); // D-31: pokryva vyber korpusu, defaulty aj sablonu
   }
 
   // PR #381 (Codex kolo 1, P2): prazdne alebo neplatne pole SLOTU dostane
-  // PREDVOLBU TYPU zo servera (`DEFAULTS.dishwasher` = `DISHWASHER_DEFAULTS`).
+  // PREDVOLBU TYPU zo servera (`DEFAULTS[typ slotu]` = `DISHWASHER_DEFAULTS`;
+  // H12c: typ je parameter, predvolene aktualny — ziadne meno typu v kode).
   // Bez toho by po prepnuti typu ostalo pole prazdne alebo so starou hodnotou
   // inej skrinky — a Ruby `normalize` by si aj tak dosadilo svoj default,
   // takze panel by ukazoval nieco ine, nez sa naozaj postavi.
   // Bezi z `applyVisibility`, teda PO `writeConstruction` na VSETKYCH troch
   // cestach (oznaceny slot · sablona vo vkladacej karte · defaulty typu);
   // `writeConstruction` samo v `core.js` o type nic nevie.
-  function nxFillSlotFields(){
-    var d = (typeof DEFAULTS === 'object' && DEFAULTS) ? (DEFAULTS.dishwasher || {}) : {};
+  function nxFillSlotFields(t){
+    var tid = NXTypes.norm(t === undefined ? cabTypeNow() : t);
+    var d = (typeof DEFAULTS === 'object' && DEFAULTS) ? (DEFAULTS[tid] || {}) : {};
     for (var id in SLOT_FIELDS){
       if (!Object.prototype.hasOwnProperty.call(SLOT_FIELDS, id)) continue;
       var e = el(id); if (!e) continue;
@@ -1127,7 +1142,7 @@
   }
   function updateBackMaterialNote(bm){
     var n = el('cabBackNote'); if (!n) return;
-    var txt = (cabTypeNow() === 'dishwasher') ? '' : backMaterialNote(bm);
+    var txt = NXTypes.carcass(cabTypeNow()) ? backMaterialNote(bm) : '';
     n.textContent = txt;
     n.hidden = !txt;
   }
@@ -1135,14 +1150,14 @@
   // riadok sa skryje, HODNOTA sa pamata (vzor `backThRow`). Slot riadok nema.
   function toggleTopSetback(){
     var r = el('topSetbackRow'); if (!r) return;
-    r.style.display = (val('top_mode') === 'none' || cabTypeNow() === 'dishwasher') ? 'none' : '';
+    r.style.display = (val('top_mode') === 'none' || !NXTypes.carcass(cabTypeNow())) ? 'none' : '';
     updateSetbackMeta();
   }
   // KON-A · K1 (A4): „Komín vzadu" plati pre KAZDY rezim chrbta (pevne miesto
   // pod Konstrukciou). Tooltip povie minimum a volny kanal podla rezimu.
   function toggleBackSetback(){
     var r = el('backSetbackRow'); if (!r) return;
-    r.style.display = (cabTypeNow() === 'dishwasher') ? 'none' : '';
+    r.style.display = NXTypes.carcass(cabTypeNow()) ? '' : 'none';
     var tip = el('backSetbackTip');
     if (tip) tip.setAttribute('data-tip', backSetbackTipText(currentCarcass()));
     updateSetbackMeta();
@@ -1167,7 +1182,7 @@
   // (vzor meta skupin Čelá). Text skladaju ciste funkcie `setbackMetaTexts`.
   function setbackMetaTexts(c){
     var y = nxNum(c.top_front_setback, 0), x = nxNum(c.back_setback, 0);
-    var slot = c.type === 'dishwasher';
+    var slot = !NXTypes.carcass(c.type);
     // KON-B · K2 (A7): „z líšt 100 · komín 50" — vyska len pri listach.
     var back = [];
     // Predrecenzia P3: cislo len ked je platne (20–300) — orezanu hodnotu, ktoru
@@ -1645,7 +1660,7 @@
   var SLOT_NO_LOCK = { thickness: 1, floor_height: 1 };
   function applyInsertLockValues(scope){
     var flat = NXInsert.locksFlat(scope);
-    var slot = (scope !== 'board' && cabTypeNow() === 'dishwasher');
+    var slot = (scope !== 'board' && !NXTypes.carcass(cabTypeNow()));
     for (var f in flat){
       if (!Object.prototype.hasOwnProperty.call(flat, f)) continue;
       if (slot && SLOT_NO_LOCK[f]) continue;
@@ -1787,23 +1802,23 @@
   // slote typ nemení bez ohľadu na payload).
   // ROH-A2: ROHOVÁ je zamknutá rovnako (server typ jej šablóny nepreklopí —
   // `apply_template_type!`): „uložené ako dolná" by stratilo rohovú zostavu.
-  // Veta bubliny je per typ; text je TU, HTML nesie len predvolbu slotu.
-  var TPL_TYPE_LOCK = {
-    dishwasher: { title: 'Typ určuje sám slot umývačky — prepnúť sa nedá.',
-                  tip: 'Typ určuje sám slot umývačky — nemá korpus, takže sa na dolnú ani hornú skrinku prepnúť nedá.' },
-    corner_blind: { title: 'Typ určuje rohová skrinka — prepnúť sa nedá.',
-                    tip: 'Rohová skrinka nesie rohovú zostavu (blenda, výstuhy, CR lišty) — šablóna z nej je vždy rohová, na dolnú ani hornú sa prepnúť nedá.' }
-  };
+  // Veta bubliny je per typ — H12c: `template_lock` {title, tip} typu so
+  // zamknutym typom sablony (`template_type: locked`) z registra servera;
+  // HTML nesie len predvolbu slotu.
+  function nxTplTypeLock(t){
+    var p = NXTypes.get(t);
+    return (p.template_type === 'locked' && p.template_lock) ? p.template_lock : null;
+  }
   function nxSyncTplSaveType(t){
     var sel = el('tplSaveType');
     if (!sel) return;
-    var lock = Object.prototype.hasOwnProperty.call(TPL_TYPE_LOCK, t) ? TPL_TYPE_LOCK[t] : null;
+    var lock = nxTplTypeLock(t);
     // Zamknuté typy sa ponúkajú LEN nad sebou — nad dolnou skrinkou by voľba
-    // „Rohová" či „Umývačka" nič nespravila (server whitelist `lower|upper`).
+    // „Rohová" či „Umývačka" nič nespravila (server whitelist = prepínateľné typy).
     var opts = sel.options || [];
     for (var i = 0; i < opts.length; i++){
       var ov = opts[i].value;
-      if (Object.prototype.hasOwnProperty.call(TPL_TYPE_LOCK, ov)) opts[i].hidden = (ov !== t);
+      if (NXTypes.known(ov) && nxTplTypeLock(ov)) opts[i].hidden = (ov !== t);
     }
     setVal('tplSaveType', t);
     sel.disabled = !!lock;
@@ -1826,8 +1841,10 @@
     return Array.prototype.slice.call(box.querySelectorAll('input[data-tplexp]'));
   }
   // Zrkadlo očakávaní do modalu + zámok pri slote (očakáva umývačku vždy).
+  // H12c: „slot" = typ, ktorý je sám vlastníkom spotrebiča (`appliance_owner`).
+  function nxTplSlotOwner(t){ return NXTypes.has(t, 'appliance_owner', 'slot'); }
   function nxSyncTplSaveExpects(t){
-    var slot = (t === 'dishwasher');
+    var slot = nxTplSlotOwner(t);
     // `typeof` guard je rovnaký vzor ako pri `tplNameSuggestion`: globál žije
     // v core.js a izolovaná sada (Node) ho nemusí mať.
     var have = (typeof cabApplianceExpects !== 'undefined' && Array.isArray(cabApplianceExpects))
@@ -1844,7 +1861,7 @@
   // Zoznam pre payload. Slot ho NEPOSIELA — server si umývačku vynúti sám
   // a prázdny zoznam z vypnutých checkboxov by vyzeral ako „nič neočakáva".
   function nxTplSaveExpectsValue(t){
-    if (t === 'dishwasher') return null;
+    if (nxTplSlotOwner(t)) return null;
 
     return nxTplExpectBoxes().filter(function(i){ return i.checked; })
       .map(function(i){ return i.getAttribute('data-tplexp'); });
@@ -2029,7 +2046,7 @@
   // pomenuje a nakresli ikonou sklopu. Vynimka zije LEN tu: pas „pridať čelo"
   // sa kresli raz a cachuje (`renderFrontAddTypes`), takze typove ikony a
   // popisy musia ostat nezavisle od toho, co je prave oznacene (Codex #387 P2).
-  function nxSlotDoor(t){ return t === 'blind' && cabTypeNow() === 'dishwasher'; }
+  function nxSlotDoor(t){ return t === 'blind' && NXTypes.has(cabTypeNow(), 'fronts', 'slot_fixed'); }
   function frontRowIcon(t){ return nxSlotDoor(t) ? 'front-fall' : frontTypeIcon(t); }
   function frontRowLabel(t){ return nxSlotDoor(t) ? 'Dvere umývačky' : frontTypeLabel(t); }
   function frontTypeTile(t){ return FRONT_TYPE_TILE[t] || 'Čelo'; }
@@ -2428,7 +2445,7 @@
     var m = frontCardModel(item, frontSlotsOf(row.dataset.frontId),
                            frontDrawerOf(row.dataset.frontId),
                            frontLiftOf(row.dataset.frontId),
-                           { slot: cabTypeNow() === 'dishwasher', corner: nxCornerCardSide() });
+                           { slot: NXTypes.has(cabTypeNow(), 'fronts', 'slot_fixed'), corner: nxCornerCardSide() });
     // Tab, ktory NEEXISTUJE (blenda, „bez čela" kovanie nemaju), sa ticho
     // vrati na „Čelo" — stav panela nesmie ukazat prazdno.
     var has = m.tabs.some(function(t){ return t.key === openFrontCardTab; });
@@ -2926,7 +2943,7 @@
   // by nemal kam viest (N13) — mockup A ho tam nema. Kym server nepovie, „—".
   function nxCornerInfoSync(){
     var row = el('infCornerDoor'); if (!row) return;
-    var show = cabTypeNow() === 'corner_blind' && (typeof selectedCabId !== 'undefined') && !!selectedCabId;
+    var show = NXTypes.corner(cabTypeNow()) && (typeof selectedCabId !== 'undefined') && !!selectedCabId;
     row.hidden = !show;
     if (!show) return;
     var cp = (typeof cornerPreview !== 'undefined' && cornerPreview) ? cornerPreview : null;
@@ -2962,9 +2979,10 @@
   // `aria-disabled` s dovodom (vzor D-78), vyska je AUTO na citanie (riadok je
   // vzdy `auto` — celá výška dverovej časti).
   var FRONT_CORNER_DEL_TIP = 'Rohová skrinka má v dverovej časti jedny dvierka — zmazať sa nedajú';
+  // H12c: pravidlo ciel typu z registra (`fronts`: `slot_fixed` / `corner_one_door`).
   function nxSlotFrontsLock(){
-    var slot = (cabTypeNow() === 'dishwasher');
-    var corner = (cabTypeNow() === 'corner_blind');
+    var slot = NXTypes.has(cabTypeNow(), 'fronts', 'slot_fixed');
+    var corner = NXTypes.has(cabTypeNow(), 'fronts', 'corner_one_door');
     var box = el('frontAddTypes');
     var addRow = (box && box.closest) ? box.closest('.addrow') : null;
     if (addRow) addRow.style.display = slot ? 'none' : '';
@@ -3226,7 +3244,8 @@
                        // `limitFor` je CISTE jadro (zrkadlo Ruby rozsahov),
                        // `applyVisibility` a `nxSlotFrontsLock` sa overuju nad
                        // mini-DOM (rovnaky vzor ako karta cela).
-                       LIMITS: LIMITS, TYPE_LIMITS: TYPE_LIMITS, limitFor: limitFor,
+                       // H12c: rozsahy typu su `limits` registra (`TYPE_LIMITS` zanikol).
+                       LIMITS: LIMITS, limitFor: limitFor,
                        SLOT_FIELDS: SLOT_FIELDS, validateFields: validateFields,
                        nxFillSlotFields: nxFillSlotFields,
                        applyVisibility: applyVisibility, nxSlotFrontsLock: nxSlotFrontsLock,

@@ -290,6 +290,9 @@
       nxNativeFlushDone(token, 'nothing');
     },
     init: function(data){
+      // H12c: REGISTER TYPOV ako PRVY — vsetko nizsie (predvolby, vyber,
+      // vkladacia karta) sa uz pyta vlastnosti typu (`NXTypes`, core.js).
+      NXTypes.set(data.cabinet_types);
       DEFAULTS = data.defaults || { lower: {}, upper: {} };
       TEMPLATES = data.templates || [];
       MATERIALS = data.materials || { sheets: [], edges: [] };
@@ -327,9 +330,10 @@
       // „Zobraziť zóny (ghost)" — samostatne pole `zones_visible` tym zaniklo.
       if (typeof nxApplyTags === 'function') nxApplyTags(data.tags);
       // V0.4.7c: uz oznacena DOSKA pri otvoreni panela (selected_kind z Ruby)
-      if (data.selected_kind === 'board' && data.selected){ setType('lower'); setDefaults('lower'); currentZoneTree = defaultTree(); renderTemplateTiles(true); NX.loadBoard(data.selected); }
+      var t0 = NXTypes.FALLBACK;
+      if (data.selected_kind === 'board' && data.selected){ setType(t0); setDefaults(t0); currentZoneTree = defaultTree(); renderTemplateTiles(true); NX.loadBoard(data.selected); }
       else if (data.selected){ NX.loadSelected(data.selected); }
-      else { setType('lower'); setDefaults('lower'); currentZoneTree = defaultTree(); renderTemplateTiles(true); NX.clearSelected(); onField(); }
+      else { setType(t0); setDefaults(t0); currentZoneTree = defaultTree(); renderTemplateTiles(true); NX.clearSelected(); onField(); }
     },
     // UI-C1b: nova kniznica = PRESTAVBA dlazdic (force) — po vlozeni zo sablony
     // posiela server push_templates s cerstvym `used_seq`, takze sa poradie
@@ -671,7 +675,8 @@
       // V0.4.7c: odchod z kontextu dosky — zrus cakajuce board edity + kartu
       cancelBoardEdits();
       renderBoardCard(null);
-      var t = c.type || 'lower';
+      // Surovy typ (aj neznamy z novsieho pluginu) — vlastnosti cita `NXTypes`.
+      var t = c.type || NXTypes.FALLBACK;
       // S1-E: kostra Inspectora potrebuje TYP skrinky — rail podla neho zhasina
       // kontexty, ktore typ nema (slot umyvacky zony NEMA). Ide to PRED
       // `applyVisibility`, aby uz prve prekreslenie raily bolo spravne.

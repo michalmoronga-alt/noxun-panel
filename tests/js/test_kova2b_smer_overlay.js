@@ -24,6 +24,8 @@ const FIX = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'fixtures', 'k
 // D-115: spolocna tabulka TVAROV (jednotkovy stvorec) — cita ju Ruby aj JS.
 const SHP = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'fixtures', 'front_symbol_shapes.json'), 'utf8'));
 const C = require(path.join(JS, 'core.js'));
+// H12c: pravidlo ciel slotu (`fronts: slot_fixed`) je register servera (v CEF `NX.init`).
+require('./nx_types_fixture.js');
 
 // ============ 1) SYMBOLY = spolocna tabulka fixtur s RUBY ====================
 

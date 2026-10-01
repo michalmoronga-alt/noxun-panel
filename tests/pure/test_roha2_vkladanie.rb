@@ -161,8 +161,11 @@ NxTest.test('ROH-A2: vkladanie — DEFAULTS rohovej zo servera, JS polia rohovej
                 'preflight dostane zivu dverovu cast')
   actions = NxRohA2.src('noxun_engine', 'ui', 'js', 'actions.js')
   NxTest.refute(actions.include?('cornerDraft'), 'insert payload register nečíta priamo')
-  NxTest.assert(actions.include?("if (p.type === 'corner_blind' && typeof nxCornerSide === 'function') p.corner_side = nxCornerSide();"),
+  # H12c (T4): „len pri rohovej" = typ s rohovou zostavou z registra (`NXTypes.corner`).
+  NxTest.assert(actions.include?("if (NXTypes.corner(p.type) && typeof nxCornerSide === 'function') p.corner_side = nxCornerSide();"),
                 'ROH-B1: vklad nesie zvolenu stranu LEN pri rohovej')
+  NxTest.assert_equal(['corner_blind'], Noxun::Engine::CabinetTypes.ids_where(:assembly, 'corner_blind'),
+                      'rohovu zostavu ma dnes len rohova')
 end
 
 # ============================================================================
@@ -191,14 +194,24 @@ NxTest.test('ROH-A2: modal „Uložiť ako šablónu" pozna rohovu a zamyka ju (
   sel = html[%r{<select id="tplSaveType">(.*?)</select>}m, 1].to_s
   NxTest.assert(sel.include?('<option value="corner_blind">Rohová</option>'), 'volba Rohová')
   form = NxRohA2.src('noxun_engine', 'ui', 'js', 'form.js')
-  block = form[/var TPL_TYPE_LOCK = \{(.*?)\n  \};/m, 1].to_s
-  NxTest.assert(block.include?('dishwasher:') && block.include?('corner_blind:'), 'zamok typu slot + rohova')
+  # H12c (T4): zamok typu sablony a jeho vety su v registri servera
+  # (`template_type: locked` + `template_lock`), JS tabulka TPL_TYPE_LOCK zanikla.
+  NxTest.refute(form.include?('TPL_TYPE_LOCK'), 'JS tabulka zamkov zanikla')
+  NxTest.assert(form.include?("return (p.template_type === 'locked' && p.template_lock) ? p.template_lock : null;"),
+                'zamok cita register')
+  ct = Noxun::Engine::CabinetTypes
+  NxTest.assert_equal(%w[dishwasher corner_blind], ct.ids_where(:template_type, 'locked'), 'zamok typu slot + rohova')
+  NxTest.assert(ct.prop('corner_blind', :template_lock)[:tip].include?('rohovú zostavu'), 'veta bubliny rohovej')
   NxTest.assert_equal('', Noxun::Engine::Panel.apply_template_type!({ 'type' => 'corner_blind' }, 'lower'),
                       'server typ rohovej sablony nepreklopi')
 end
 
 NxTest.test('ROH-A2: nahlad noh vo vkladani plati aj pre rohovu') do
   hw = NxRohA2.src('noxun_engine', 'ui', 'js', 'hardware.js')
-  NxTest.assert(hw.include?("var LEGS_INSERT_TYPES = ['lower', 'corner_blind'];"), 'rohova ma nohy ako dolna')
+  # H12c (T4): „ma nohy" = znamy typ na podlahe (`on_floor` registra), nie JS zoznam.
+  NxTest.assert(hw.include?('function nxLegsTypeHasLegs(t){ return NXTypes.known(t) && NXTypes.onFloor(t); }'),
+                'rohova ma nohy ako dolna')
+  NxTest.assert_equal(%w[lower corner_blind], Noxun::Engine::CabinetTypes.ids_where(:on_floor, true),
+                      'na podlahe stoja dolna a rohova')
   NxTest.refute(hw.include?("if (getType() !== 'lower') return false;"), 'odpoved rohovej sa nezahadzuje')
 end
