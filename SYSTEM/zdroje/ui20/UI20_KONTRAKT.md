@@ -436,6 +436,9 @@ poradie presunov satelitov schválené (nižšie) · deep-linky `NX.studioOpen` 
 **KUSOVNÍK (Š1–Š6):**
 - **Š1** skupiny podľa materiálu — zbaliteľné hlavičky (vzorka dekoru, hrúbka, medzisúčet ks·m²)
   + súčtový riadok celku (dielcov · m² · materiálov · ABS bm · odhad platní).
+  **Revízia 1.10.2026 (H3a, A-01 — triedenie krížového auditu V1, Michal):** súčtový riadok **odhad platní NEUKAZUJE**
+  (súčet cez rôzne materiály sa objednať nedá) — namiesto neho preklik do Nárezového plánu; odhad po materiáloch ostáva
+  v stĺpci pohľadu Platne.
 - **Š2** voliteľné stĺpce (prepínač v rohu lišty; default Dielec·Skrinka·Dĺžka·Šírka·Hr.·ks·ABS,
   voliteľné Smer dekoru·Rola·Poznámka; voľba per počítač).
 - **Š3** hover akcie riadku: **LEN oko** (označ v modeli — robí aj klik na riadok) **a ceruzka**
@@ -489,6 +492,8 @@ je odložený do bloku KOVANIE.
 - **Š14** = **SAMOSTATNÁ sekcia** (dnes zbaliteľný náhľad vnútri Rozpočtu): položky rečou
   zákazníka, per-položka prepínač „samostatne", zaokrúhlenie, export „Cenová ponuka (zákazník)"
   v lište; **DOCX/PDF generátor = priznaný wireframe placeholder** (po V1, vedome odložené z E).
+  **Revízia 1.10.2026 (H3a, A-02):** rámik placeholdera z okna zanikol (generátor ostáva v zásobníku Po V1); tabuľka
+  položiek v okne = Položka · Množstvo · MJ · Spolu, nulové fixné služby „v cene" (XLSX ponuky bez zmeny).
 - **Š15** zásada „**upravuj pri zdroji**": odvodené sekcie rozpočtu majú preklik namiesto
   editácie (Materiál → Kusovník, Kovanie → Nákup); chýbajúca cena v ponuke = jantárový chip
   s preklikom do Rozpočtu (ponuka sa nikdy potichu nepodhodnotí).

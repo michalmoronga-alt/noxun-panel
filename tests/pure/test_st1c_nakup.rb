@@ -120,7 +120,8 @@ NxTest.test('ŠT-1c: `label`/`params_label` sklada JADRO, nie okno (audit #3)') 
   NxTest.assert(core.respond_to?(:hardware_labeled), 'ProductionCore.hardware_labeled existuje')
   NxTest.assert(S1C_STUDIO_RB.include?('hardware: ProductionCore.hardware_labeled(bom)'),
                 'payload Studia cita zdielane obohatenie')
-  NxTest.assert(S1C_STUDIO_RB.include?('hardware_sets: hw_exp'),
+  # H3a (A-04): nakupny zoznam ide cez NEMUTUJUCU kopiu so SK popiskom kategorie.
+  NxTest.assert(S1C_STUDIO_RB.include?('hardware_sets: ProductionCore.hardware_sets_labeled(hw_exp)'),
                 'a nesie aj nakupny zoznam zo setov')
   # Vlastne obohatenie v okne by bolo druha pravda o tom, ako sa polozka vola.
   NxTest.refute(S1C_STUDIO_RB.include?('HardwareRules.label_for'),

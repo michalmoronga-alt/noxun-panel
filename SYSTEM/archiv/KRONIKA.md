@@ -17,6 +17,22 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H3a · zavádzajúce údaje v okne Štúdia (1.10.2026, PR #435, v0.17.1, blok 9 · HARDENING PO V1, položky A-01 · A-02 · A-03 · A-04 · A-07 z triedenia;
+  package [PACKAGE_H3.md](../zdroje/bloky/HARDENING/PACKAGE_H3.md), rez H3a → H3b potvrdil orchestrátor).** Mení sa LEN to, čo okno ukazuje — čísla, CSV
+  kovania, XLSX ponuky, VEPO a Rozpočet ostali (zlaté testy `np4_golden`, `kovh_golden`, `np1_vepo`, `kova_golden`, `ceny_m2_golden` bez pregenerovania;
+  prvý commit vetvy = charakterizácia `test_h3_charakterizacia.rb` nad mainom). **A-01** Kusovník: súčtový riadok (Dielce aj Platne) už nepíše „odhad
+  X – Y platní" sčítaný cez všetky materiály — namiesto neho preklik **Nárezový plán** (existujúca cesta `data-nav`); `totals.plates_*` ostávajú v payloade
+  (odstránenie pri H14). **A-02** Cenová ponuka v okne: Položka · Množstvo · MJ · **Spolu** (suma riadku), „v cene" len pri fixnej nule (Zameranie,
+  Vizualizácie) — „dodáva zákazník" ostáva 0,00 €, neznáma cena „—"; rámik „DOCX/PDF po V1" zanikol aj s CSS; poznámka priznáva, že XLSX má 0 €.
+  **A-03** Kontrola: zelený chip „0 zo 7 skriniek bez nálezu" (`counts.cabinets` už bol v payloade, predložka z/zo čistou `skZo`), oranžový „10 nálezov
+  v 5 riadkoch" — počet riadkov počíta klient zo **zdieľaného predikátu UNI skupiny** (vedomá zobrazovacia výnimka k Š8, parita testom s `ctrlListHtml`);
+  veta „Vypnuté — v modeli nie je nič nakreslené." len keď sú vypnuté všetky tri kresby. **A-04** Nákup kovania: `ProductionCore.hardware_sets_labeled`
+  (nemutujúca kópia `hw_exp`, `category_label`, SK typ nemapovaných), `HardwareSets.params_text` (nové pole — `params_label` ide do CSV a Kontroly a nemení
+  sa), zlúčený stĺpec „Kde" zo servera (`where`; studio.js ďalej nesčítava). **A-07** Nastavenia rozpočtu: payload `effective` (= `rate`/`row_rate`,
+  aj seed pri chýbajúcom základe) → sivé číslo (placeholder, nie hodnota) v prázdnej bunke režimu, hlavičky v poradí `modes` „Základ · € nízky · €€ štandard ·
+  €€€ vysoký", nápoveda. Testy: **4947 headless · 147 JS sád** + encoding guard; nové `test_h3_zobrazenie` (rb + js), vedomé úpravy `test_st1c_nakup`
+  (fixtúra s kódom kategórie), `test_st1c_ponuka`, `test_st1a_studio`; **mutácie M1–M18 všetky zabité**. In-SU nie je brána (zobrazenie). Fotky okien
+  `ui_foto.ps1 -Record` (nová nahrávka 0.17.1). STAV pred dávkou: v0.17.0 · BLOK CENY uzavretý (smoke PASS 30.9.), Robí sa H1/H2, Ďalší krok H2 → H3.
 - **NÁSTROJ — H2 · fotenie okien pre UI dávky (1.10.2026, PR #434, blok 9 · HARDENING PO V1, položka D-10 z triedenia; plugin sa nemení, verzia
   ostáva 0.17.0).** Z prototypu krížového auditu (prehrávanie nahratých Ruby→JS skriptov v prehliadači) je udržiavaný nástroj
   `scripts\ui_foto.ps1` + `scripts\ui_foto\` (`record.rb` nahrávka, `nx_stub.js` prehrávač, `serve.py` lokálny server len na 127.0.0.1,

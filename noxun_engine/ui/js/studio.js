@@ -367,7 +367,16 @@
   // Š8: klikatelny semafor. RED a ORANGE su FILTRE (druhy klik zrusi), GREEN je
   // informacny — niet co filtrovat. Chybajuce zelene cislo (starsi payload) sa
   // priznane ukaze ako „—"; nikdy sa nedopocitava v prehliadaci.
-  function semaforHtml(counts, filter){
+  //
+  // H3a (A-03): zelený chip má MENOVATEĽ („0 zo 7 skriniek bez nálezu" —
+  // `counts.cabinets`, už je v payloade) a oranžový povie, v koľkých RIADKOCH
+  // zoznamu nálezy sú („10 nálezov v 5 riadkoch") — D-122 zlučuje UNI nálezy
+  // do jednej skupiny, takže 10 nálezov a 5 riadkov pod chipom pôsobilo ako chyba.
+  // Tretí argument `list` (serverový zoznam) je voliteľný; bez neho sa počet
+  // riadkov nepíše. Počet RIADKOV je jediné číslo semaforu, ktoré počíta klient:
+  // je to ZOBRAZOVACÍ údaj (koľko riadkov tento zoznam nakreslí), nie údaj o dátach
+  // — vedomá výnimka k Š8 (ui-lifecycle.md, Sekcia KONTROLA).
+  function semaforHtml(counts, filter, list){
     var c = counts || {};
     var chip = function(sev, n, t, hint){
       return '<button type="button" class="schip s-' + sev + (filter === sev ? ' on' : '') +
@@ -375,15 +384,69 @@
         (filter === sev ? 'true' : 'false') + '"><span class="dot"></span><span>' +
         '<span class="n">' + num(n) + '</span> <span class="t">' + esc(t) + '</span></span></button>';
     };
+    var green = greenChipParts(c);
     return '<div class="semafor">' +
       chip('red', c.red || 0, 'blokuje výrobu',
            'Klik zúži zoznam na červené nálezy — druhý klik filter zruší.') +
-      chip('orange', c.orange || 0, 'skontroluj pred objednávkou',
+      chip('orange', c.orange || 0, orangeChipText(c.orange || 0, list),
            'Klik zúži zoznam na oranžové nálezy — druhý klik filter zruší.') +
-      '<div class="schip s-green" title="Skrinky, ktoré v zozname nálezov nefigurujú — počíta ich server.">' +
-      '<span class="dot"></span><span><span class="n">' +
-      (c.clean == null ? '—' : num(c.clean)) +
-      '</span> <span class="t">skriniek bez nálezu</span></span></div></div>';
+      '<div class="schip s-green" title="Skrinky, ktoré v zozname nálezov nefigurujú — z celkového ' +
+      'počtu skriniek v modeli (počíta server).">' +
+      '<span class="dot"></span><span><span class="n">' + green[0] +
+      '</span> <span class="t">' + esc(green[1]) + '</span></span></div></div>';
+  }
+
+  // H3a (A-03): [číslo, text] zeleného chipu. Čísla sú VÝHRADNE zo servera
+  // (`clean`, `cabinets`) — klient nič neodpočítava.
+  function greenChipParts(c){
+    if (c.clean == null) return ['—', 'skriniek bez nálezu'];
+    if (c.cabinets == null) return [num(c.clean), 'skriniek bez nálezu'];
+    var cab = Number(c.cabinets);
+    if (cab === 0) return ['0', 'skriniek v modeli'];
+    return [num(c.clean), skZo(cab) + ' ' + num(cab) + ' ' + (cab === 1 ? 'skrinky' : 'skriniek') + ' bez nálezu'];
+  }
+
+  // H3a (A-03): predložka pred číslovkou — „zo" keď sa číslovka vyslovuje na
+  // s/z/š/ž (štyri, šesť, sedem, štrnásť, šestnásť, sedemnásť, štyridsať…,
+  // sto…), inak „z". Od 1000 vždy „z" (priznaný limit — zákazka toľko skriniek nemá).
+  function skZo(n){
+    var v = Math.floor(Math.abs(Number(n)));
+    if (!isFinite(v) || v < 1 || v >= 1000) return 'z';
+    if (v >= 100){
+      var hundreds = Math.floor(v / 100);
+      return (hundreds === 1 || hundreds === 4 || hundreds === 6 || hundreds === 7) ? 'zo' : 'z';
+    }
+    if (v >= 20){
+      var tens = Math.floor(v / 10);
+      return (tens === 4 || tens === 6 || tens === 7) ? 'zo' : 'z';
+    }
+    if (v >= 10) return (v === 14 || v === 16 || v === 17) ? 'zo' : 'z';
+    return (v === 4 || v === 6 || v === 7) ? 'zo' : 'z';
+  }
+
+  // H3a (A-03): text oranžového chipu — „10 nálezov v 5 riadkoch · skontroluj
+  // pred objednávkou". Počet riadkov len keď je známy a menší než počet nálezov.
+  function orangeChipText(n, list){
+    var v = Math.abs(Number(n) || 0);
+    var t = v === 1 ? 'nález' : (v >= 2 && v <= 4 ? 'nálezy' : 'nálezov');
+    var m = list ? ctrlOrangeRowCount(list) : null;
+    if (m != null && m < v) t += ' v ' + m + ' ' + (m === 1 ? 'riadku' : 'riadkoch');
+    return t + ' · skontroluj pred objednávkou';
+  }
+
+  // D-122: nález, ktorý zoznam zlúči do skupiny „Nenahradené UNI materiály".
+  // JEDEN predikát pre `ctrlListHtml` aj počítadlo riadkov chipu (parita testom).
+  function ctrlUniGrouped(it){
+    return !!it && it.category === 'uni_material' && it.severity === 'orange';
+  }
+
+  // H3a (A-03): koľko ORANŽOVÝCH riadkov zoznam nakreslí bez filtra — nálezy
+  // mimo UNI skupiny + 1 riadok skupiny, ak v nej je aspoň jeden nález. Filtrom
+  // a dĺžkou poľa (žiadne sčítavanie — guard ŠT-1a).
+  function ctrlOrangeRowCount(list){
+    var orange = (list || []).filter(function(it){ return !!it && it.severity === 'orange'; });
+    var single = orange.filter(function(it){ return !ctrlUniGrouped(it); });
+    return single.length + (single.length < orange.length ? 1 : 0);
   }
 
   // Š8: filter LEN skryva — poradie ani obsah zoznamu sa nemeni (urcuje ich
@@ -400,12 +463,10 @@
   // D-122: jedna zobrazovacia skupina na mieste prvého UNI nálezu.
   // Deti držia pôvodné indexy aj serverové texty; counts ani validáciu nemeníme.
   function ctrlListHtml(rows, uniOpen){
-    var uni = rows.filter(function(pair){
-      return pair[0].category === 'uni_material' && pair[0].severity === 'orange';
-    });
+    var uni = rows.filter(function(pair){ return ctrlUniGrouped(pair[0]); });
     var h = '', grouped = false;
     rows.forEach(function(pair){
-      if (pair[0].category !== 'uni_material' || pair[0].severity !== 'orange'){
+      if (!ctrlUniGrouped(pair[0])){
         h += ctrlRowHtml(pair[0], pair[1]);
         return;
       }
@@ -506,8 +567,11 @@
   // PRESUN 1:1 z `js/production.js` (tab Kovanie okna Výroba zanikol). Š7
   // ZAKAZUJE redizajn — obsah, poradie stĺpcov aj texty ostávajú, mení sa
   // jedine to, že CSV export je v LIŠTE SEKCIE namiesto hlavičky tabuľky.
-  // Dáta sú VÝHRADNE zo servera (`hardware_sets` = HardwareSets.expand,
-  // `hardware` = generika obohatená v ProductionCore) — JS len renderuje.
+  // H3a (A-04) potom zmenila TEXTY okna (slovenské kategórie, ľudské
+  // parametre, zlúčený stĺpec „Kde") — stĺpce, poradie aj čísla ostali.
+  // Dáta sú VÝHRADNE zo servera (`hardware_sets` = HardwareSets.expand
+  // s popiskami z ProductionCore.hardware_sets_labeled, `hardware` = generika
+  // obohatená v ProductionCore) — JS len renderuje.
 
   // V0.6 D1b: cena — nil/undefined = „nezadaná" (—), NIKDY 0 (audit N11).
   function price(v){ return (v == null || isNaN(v)) ? '—' : num(v, 2) + ' €'; }
@@ -704,7 +768,10 @@
         h += '<table class="bomtab hwtab"><thead><tr><th>Kód</th><th>Názov</th><th>ks</th><th>MJ</th><th>€ s DPH</th><th>Spolu</th></tr></thead><tbody>';
         var cat = null;
         rows.forEach(function(r){
-          var c = r.missing ? 'MIMO KATALÓGU' : (r.category || '—');
+          // H3a (A-04): SK popisok kategórie skladá SERVER (`category_label`,
+          // ProductionCore.hardware_sets_labeled); starý payload bez neho ukáže
+          // kód ako doteraz. CSV kovania ostáva s kódom (ide dodávateľovi).
+          var c = r.missing ? 'Mimo katalógu' : (r.category_label || r.category || '—');
           if (c !== cat){ cat = c; h += '<tr class="hwcat"><td colspan="6">' + esc(c) + '</td></tr>'; }
           // KOV-H2: chip „ručná" + rozklik pôvodu. Voľná položka kód NEMÁ —
           // v stĺpci Kód je pomlčka, nie prázdno (prázdna bunka vyzerá ako chyba).
@@ -750,8 +817,10 @@
           // KOV-C2c: položka, ktorá ZASTAVUJE exporty (dielce zásuvky sú už
           // narezané na konkrétnu NL), je červená — nie jantárová „nenacenené".
           // Rozhoduje SERVEROVÝ príznak `blocks_export`, nie enum dôvodu v JS.
+          // H3a (A-04): slovenský typ (`label`) skladá server; surový typ
+          // ostáva fallbackom starého payloadu.
           h += '<tr class="hwmiss' + (hwRowStops(u) ? ' hwstop' : '') + '">'
-             + '<td>' + esc(u.generic_type) + '</td>'
+             + '<td>' + esc(u.label || u.generic_type) + '</td>'
              + '<td title="' + esc(hwMissWhereTitle(u)) + '">' + esc(hwMissWhere(u)) + '</td>'
              + '<td>' + num(u.quantity) + '</td><td>' + esc(reason) + '</td></tr>';
         });
@@ -765,15 +834,25 @@
     }
     h += '<table class="bomtab hwtab"><thead><tr><th>Typ</th><th>Parametre</th><th>ks</th><th>Kde</th></tr></thead><tbody>';
     list.forEach(function(g, i){
-      // D-90: 'params_label' je SERVEROVY text („rez 597 mm") — ked ho polozka
-      // ma, zobrazi sa NAMIESTO surovych key/value (JS nic neformatuje).
-      var params = g.params_label
-        ? esc(g.params_label)
-        : (Object.keys(g.params || {}).map(function(k){ return esc(k) + ' ' + esc(g.params[k]); }).join(', ') || '—');
-      // D-93: pri ručne zamknutej dĺžke nesie riadok serverový popis
-      // („ručne prepísaná dĺžka (automat: 470 mm)") ako tooltip.
-      var kde = (g.breakdown || []).map(function(b){
-        var t = esc(b.owner_id) + '×' + b.quantity + (b.source === 'manual' ? ' (ručne)' : '');
+      // H3a (A-04): ľudský text parametrov („NL 470 mm · výška čela 150 mm")
+      // skladá SERVER (`params_text`, HardwareSets.params_text). Fallbacky pre
+      // starý payload: D-90 'params_label' („rez 597 mm"), potom surové key/value.
+      var params = g.params_text
+        ? esc(g.params_text)
+        : (g.params_label
+          ? esc(g.params_label)
+          : (Object.keys(g.params || {}).map(function(k){ return esc(k) + ' ' + esc(g.params[k]); }).join(', ') || '—'));
+      // H3a (A-04): stĺpec „Kde" je ZLÚČENÝ pôvod zo servera (`where`: dve
+      // zásuvky tej istej skrinky = „CAB-003 ×2") — klient nesčítava (guard
+      // ŠT-1a). Starý payload ide cez `breakdown` ako doteraz, len so zápisom
+      // „ ×" ako Kusovník. D-93: pri ručne zamknutej dĺžke nesie riadok
+      // serverový popis („ručne prepísaná dĺžka (automat: 470 mm)") ako tooltip.
+      var src = Array.isArray(g.where) ? g.where : (g.breakdown || []).map(function(b){
+        return { owner_id: b.owner_id, quantity: b.quantity, manual: b.source === 'manual',
+                 manual_note: b.manual_note };
+      });
+      var kde = src.map(function(b){
+        var t = esc(b.owner_id) + ' ×' + esc(b.quantity) + (b.manual ? ' (ručne)' : '');
         return b.manual_note ? '<span title="' + esc(b.manual_note) + '">' + t + '</span>' : t;
       }).join(', ');
       // V0.6 C-2 (audit F11): slovensky label zo SERVERA (fallback surovy typ)
@@ -806,7 +885,22 @@
       ' aria-expanded="' + (menuOpen ? 'true' : 'false') + '" aria-haspopup="true"' +
       ' aria-label="Nastavenie zvýraznenia hrán" title="Nastavenie — ktoré stavy hrán sa zvýraznia"></button>' +
       edgeCheckMenuHtml(st, menuOpen) + '</span>' + grainBtnHtml(grain) + directionBtnHtml(direction) +
-      '<span class="ecinfo">' + edgeCheckText(st) + grainInfoHtml(grain) + directionInfoHtml(direction) + '</span>';
+      '<span class="ecinfo">' + edgeCheckInfoText(st, grain, direction) + '</span>';
+  }
+
+  // H3a (A-03): JEDEN text lišty z častí zapnutých prepínačov, spojených „ · "
+  // BEZ úvodného oddeľovača. Veta „Vypnuté — v modeli nie je nič nakreslené."
+  // platí LEN keď nie je zapnuté nič z troch — predtým ju lišta písala vždy pri
+  // vypnutých hranách, aj keď smer otvárania práve kreslil šípky. Vypnutý
+  // prepínač mlčí (o vypnutom stave hovorí samotné tlačidlo).
+  function edgeCheckInfoText(st, grain, direction){
+    var parts = [];
+    if (st && st.active === true) parts.push(edgeCheckText(st));
+    var g = grainCheckText(grain);
+    if (g) parts.push('<span class="gcinfo">' + g + '</span>');
+    var d = directionCheckText(direction);
+    if (d) parts.push('<span class="dcinfo">' + d + '</span>');
+    return parts.length ? parts.join(' · ') : edgeCheckText(null);
   }
 
   // Rozbaľovacie okno = ZDIELANY komponent (js/edge_menu.js). Okno mu len
@@ -857,13 +951,6 @@
       ' Model sa nemení, kreslí sa nad ním.">' + ico('grain') + 'Smer kresby</button>';
   }
 
-  // Dovetá k textu lišty. Vypnutý prepínač mlčí (o vypnutom stave už hovorí
-  // samotné tlačidlo) — inak by lišta niesla dve „vypnuté" vety vedľa seba.
-  function grainInfoHtml(g){
-    var t = grainCheckText(g);
-    return t ? ' · <span class="gcinfo">' + t + '</span>' : '';
-  }
-
   function grainCheckText(g){
     if (!g || !g.available || !g.active) return '';
     var parts = ecNum(g.parts);
@@ -890,12 +977,6 @@
       ' data-dc="toggle" aria-pressed="' + (on ? 'true' : 'false') + '"' +
       ' title="Nakreslí na čelá symboly otvárania — šípka na voľnú hranu, ∧ výklop, ∨ sklop, X blenda.' +
       ' Model sa nemení, kreslí sa nad ním.">' + ico('direction') + 'Smer otvárania</button>';
-  }
-
-  // Doveta k textu lišty. Vypnutý prepínač mlčí (rovnaký dôvod ako pri kresbe).
-  function directionInfoHtml(d){
-    var t = directionCheckText(d);
-    return t ? ' · <span class="dcinfo">' + t + '</span>' : '';
   }
 
   function directionCheckText(d){
@@ -1512,7 +1593,7 @@
   function ctrlSection(){
     var all = ST.control || [];
     var rows = ctrlRows(all, ctrlFilter);
-    var h = semaforHtml(ST.counts, ctrlFilter);
+    var h = semaforHtml(ST.counts, ctrlFilter, all);
     if (ctrlFilter !== 'all'){
       h += '<div class="hint ctrlfilter">Filter: len ' +
         (ctrlFilter === 'red' ? 'červené' : 'oranžové') +
@@ -1587,6 +1668,19 @@
 
   // Sucty su SERVEROVE cisla (`totals`) — JS ich len vypise. Pri filtri sa
   // namiesto nich ukaze POCITADLO filtra (to je pocet riadkov, nie suma).
+  //
+  // H3a (A-01): suctovy riadok uz NEPISE „odhad X – Y platní". Ten sucet isiel
+  // cez VSETKY materialy (aj nakup pre duplaky) a platne roznych dekorov sa
+  // spolu objednat nedaju — stolar by podla neho objednal zle. Namiesto neho
+  // preklik do Nárezového plánu (pocita po materialoch). `totals.plates_*`
+  // v payloade OSTAVAJU (nevyuzite, odstranenie pri H14 — PACKAGE_H3 §12 D2).
+  var CUT_LINK_TIP = 'Koľko platní objednať, počíta Nárezový plán po materiáloch — ' +
+    'súčet cez rôzne materiály sa objednať nedá.';
+  function cutLinkHtml(){
+    return '<button type="button" class="linkbtn" data-nav="cut" title="' + esc(CUT_LINK_TIP) + '">' +
+      ico('scissors') + 'Nárezový plán</button>';
+  }
+
   function totalRow(g){
     var t = ST.totals || {};
     var left = bomQ
@@ -1594,8 +1688,8 @@
       : 'Spolu <b>' + num(t.parts) + ' dielcov</b> · <b>' + num(t.m2, 2) + ' m²</b> · ' +
         num(t.materials) + ' materiálov';
     return '<div class="totrow"><span>' + left + '</span><span class="spacer"></span>' +
-      '<span class="tmuted">ABS spolu ' + num(t.bm, 1) + ' bm · odhad ' +
-      num(t.plates_min, 1) + ' – ' + num(t.plates_max, 1) + ' platní</span></div>';
+      '<span class="tmuted">ABS spolu ' + num(t.bm, 1) + ' bm · platne na objednávku: </span>' +
+      cutLinkHtml() + '</div>';
   }
 
   // ------------------------------------------------------- pohlad PLATNE
@@ -1603,8 +1697,8 @@
   // 2B-1 / D-43 DUPLAK: material, ktoreho plocha vznikla LEN z duplakovych
   // dielcov, NIE JE v `sheets` (nema vlastne vyrobne dielce), ale JE
   // v `sheet_estimate` — lebo sa reálne nakupuje. Keby tabulka isla iba cez
-  // `sheets`, ten nakup by z nej zmizol a suctovy riadok (ktory rata cez VSETKY
-  // polozky odhadu) by s nou nesedel. Preto sa zoznam sklada z OBOCH zdrojov.
+  // `sheets`, ten nakup by z nej zmizol (a s nim jeho odhad platni v stlpci).
+  // Preto sa zoznam sklada z OBOCH zdrojov.
   function sheetRows(sheets, estimate, rows){
     var est = {};
     (estimate || []).forEach(function(e){ est[e.material_id] = e; });
@@ -1678,10 +1772,12 @@
     h += '</tbody></table>';
     if (!list.length) h += '<div class="muted" style="padding:14px 4px">Filtru nezodpovedá žiadny materiál.</div>';
     var t = ST.totals || {};
-    h += '<div class="totrow" style="margin-top:10px"><span>Spolu <b>odhad ' +
-      num(t.plates_min, 1) + ' – ' + num(t.plates_max, 1) + ' platní</b> · ' + num(t.m2, 2) +
-      ' m² dielcov</span><span class="spacer"></span>' +
-      '<span class="tmuted">orientačný rozsah (prerez 10–25 %), NIE nárezový plán</span></div>' +
+    // H3a (A-01): ani tu žiadny súčet platní cez materiály — stĺpec „Odhad
+    // platní" po materiáloch ostáva, objednávka ide z Nárezového plánu.
+    h += '<div class="totrow" style="margin-top:10px"><span>Spolu <b>' + num(t.m2, 2) +
+      ' m² dielcov</b></span><span class="spacer"></span>' +
+      '<span class="tmuted">odhad v stĺpci je orientačný (prerez 10–25 %) · platne na objednávku: </span>' +
+      cutLinkHtml() + '</div>' +
       '<div class="hint">Duplák sa lepí zo zdrojových platní — jeho plocha sa počíta do nákupu ' +
       'zdroja. Nákupné bm ABS s rezervou a ceny sú v sekcii Rozpočet.</div>';
     return h;
@@ -2182,6 +2278,11 @@
       semaforHtml: semaforHtml, ctrlRows: ctrlRows, ctrlRowHtml: ctrlRowHtml,
       ctrlListHtml: ctrlListHtml,
       ctrlActionsHtml: ctrlActionsHtml, navBadgeHtml: navBadgeHtml,
+      // H3a (tests/js/test_h3_zobrazenie.js): menovateľ, predložka z/zo,
+      // počet riadkov oranžového chipu, veta lišty, preklik do Nárezového plánu.
+      skZo: skZo, greenChipParts: greenChipParts, orangeChipText: orangeChipText,
+      ctrlUniGrouped: ctrlUniGrouped, ctrlOrangeRowCount: ctrlOrangeRowCount,
+      edgeCheckInfoText: edgeCheckInfoText, cutLinkHtml: cutLinkHtml,
       // S1-B2: ktoré počty visia pri ktorej položke navigácie.
       navCounts: navCounts,
       // ŠT-1c PR A sekcia Nákup kovania (Š7) + D-93 znamienko ručného zásahu

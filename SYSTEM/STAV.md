@@ -6,13 +6,14 @@
 
 ## Stav
 
-**v0.17.0 · 30.9.2026 — BLOK CENY UZAVRETÝ** (overenie cien materiálov a ABS, posledný kódový bod V1; štart #425, PR #426–#428 + uzáver PR #429; **smoke PASS 30.9.**, PR #431).
-Doska a ABS páska **bez Demosu** majú **jeden odkaz na produkt** a **ručné overenie ceny** v Štúdiu → Materiály aj v Rozpočte (doska za platňu s prepočtom
+**v0.17.1 · 1.10.2026 — blok 9 HARDENING, dávka H3a** (PR #435): okno Štúdia prestalo ukazovať zavádzajúce údaje — Kusovník bez súčtu platní cez materiály (preklik
+do Nárezového plánu), Cenová ponuka ako faktúra (Množstvo · MJ · Spolu, „v cene" pri Zameraní a Vizualizáciách, bez rámika DOCX/PDF), Kontrola „0 zo 7 skriniek" a „10 nálezov
+v 5 riadkoch", Nákup kovania po slovensky, sivá platná sadzba v Nastaveniach rozpočtu. **Čísla, CSV kovania, XLSX ponuky a VEPO bez zmeny** (zlaté testy bez pregenerovania).
+Pod tým **BLOK CENY UZAVRETÝ** (v0.17.0, 30.9.; štart #425, PR #426–#429; **smoke PASS 30.9.**, PR #431). Doska a ABS páska **bez Demosu** majú **jeden odkaz na produkt** a **ručné overenie ceny** v Štúdiu → Materiály aj v Rozpočte (doska za platňu s prepočtom
 na €/m², sklo bez formátu za m², ABS za bm; „Potvrdiť cenu k dnešku" nedotknutú cenu nezmení ani o cent; zmena overených polí overenie zruší; Demos má prednosť;
 D-148). Rozpočet ukazuje vek ručných cien („ručne 18.9." / „neoverená") a počíta ich medzi **„N cien na kontrolu"**; **materiál bez formátu — sklo aj bežná
 doska (C14) — sa počíta podľa skutočných m² dielcov** bez odpadu (UNI a duplák bez väzby na odhade platní; porez a montáž bez zmeny, Q1).
-Pod tým **blok 2 · KONTROLA + VÝROBA** (v0.16.0, smoke **PASS 29.9.**), **blok 8 · K3 ROHOVÁ** (v0.15.0, smoke PASS 28.9.), **blok 7 · K1+K2** (v0.14.0).
-Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+Pod tým **blok 2 · KONTROLA + VÝROBA** (v0.16.0, smoke **PASS 29.9.**), **blok 8 · K3 ROHOVÁ** (v0.15.0, smoke PASS 28.9.), **blok 7 · K1+K2** (v0.14.0). Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 so **štrnástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · **Nárezový plán** · Materiály · Kovanie · Spotrebiče · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine. Neaktívna položka navigácie už nie je žiadna.
 
 Etapa **V0.6 (katalógy a ceny) je obsahovo splnená**. **Od 20.8. sa z pluginu objednávajú REÁLNE zákazky** — zákazka KLINIKA (254 dielcov) je postavená čisto z pluginu; nálezy z výroby a chyby v cenách majú **najvyššiu prioritu** ([PLAN.md](PLAN.md)).
@@ -29,21 +30,20 @@ v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a
 **Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin
 počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
 
-**Testy (uzáver CENY, PR #429):** **4910 headless · 145 JS sád** zelené; in-SU netreba (kód len číslom verzie; posledné kódové dávky bloku in-SU bránu nemali, package §8).
-**M-R:** 3983 · 114 · 2606 ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md)).
+**Testy (H3a, PR #435):** **4947 headless · 147 JS sád** zelené + encoding guard; in-SU nie je brána (zobrazenie, PACKAGE_H3 §8).
 
 ## Robí sa
 
 **Blok 9 · HARDENING PO V1** (štart 1.10.2026, PR #432): krížový audit V1 sedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**;
 17 dávok **H1…H17** sekvenčne podľa tabuľky v [PLAN.md](PLAN.md), **bez zmeny výrobných a cenových čísel**; priečinok bloku [zdroje/bloky/HARDENING/](zdroje/bloky/HARDENING/).
-**H1** (pravidlá čítania, PLAN bez hotových blokov, STAV po docs PR, hranice triedy dávky) — PR #433. **H6 a H7 čakajú na schválený mockup** (R-38 v H7 potvrdí Michal).
-**Q1** (porez a montáž pri skle) bez odpovede · pri prvej rohovej v dielni overiť záves Sensys · **na smoke čakajú** D-132 (#367), D-133 (#368), D-134 (#369).
+Hotové **H1** PR #433 · **H2** (fotenie okien) PR #434 · **H3a** (zavádzajúce údaje v okne) PR #435; nasleduje **H3b** (falošná chyba v Ruby konzole po novom súbore).
+**H6 a H7 čakajú na schválený mockup** (R-38 v H7 potvrdí Michal) · **Q1** (porez a montáž pri skle) bez odpovede · pri prvej rohovej v dielni overiť záves Sensys · **na smoke čakajú** D-132 (#367), D-133 (#368), D-134 (#369).
 
 ## Ďalší krok
 
-Pokračovať blokom 9 v poradí tabuľky: **H2** (fotenie okien pre UI PR) → H3 → H4 → H5; medzitým mockupy **H6** a **H7** na schválenie Michalom. Potom **R-13 → R-37
-→ R-35** ako **H8–H10** (**R-13 rozhodnuté 29.9.: čítať** — ORANGE „dielec z inej verzie štandardu") a refaktory H11–H17; uzáver bloku = minor verzia + smoke.
-Ak druhé PC ešte nemá 0.17.0, aktualizovať (Kompatibilita vyššie). **Test na reálnej zákazke po V1.**
+Pokračovať blokom 9 v poradí tabuľky: **H3b** (log po novom súbore, najprv in-SU sonda) → H4 → H5; medzitým mockupy **H6** a **H7** na schválenie Michalom. Potom **R-13 → R-37
+→ R-35** ako **H8–H10** (**R-13 rozhodnuté 29.9.: čítať** — ORANGE „dielec z inej verzie štandardu") a refaktory H11–H17; uzáver bloku = minor verzia + smoke
+(smoke H3a: 6 bodov v [PACKAGE_H3.md](zdroje/bloky/HARDENING/PACKAGE_H3.md) §10). Ak druhé PC ešte nemá 0.17.0, aktualizovať (Kompatibilita vyššie). **Test na reálnej zákazke po V1.**
 
 ## Posledné uzávery
 

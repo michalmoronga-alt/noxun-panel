@@ -87,15 +87,15 @@ NxTest.test('ŠT-1c B2: nahlad CP sa PRESUNUL — v tele Rozpoctu ostal len prek
                 'sekcia ma vlastnu cestu k cerstvym cislam (ponuka zo starych rozmerov = chyba)')
 end
 
-NxTest.test('ŠT-1c B2 (Š14): ponuka nesie per-riadok „samostatne" aj priznany placeholder') do
+NxTest.test('ŠT-1c B2 (Š14): ponuka nesie per-riadok „samostatne" (H3a: bez ramika DOCX/PDF)') do
   NxTest.assert(S1C2_BUDGET_JS.include?("data-bud=\"cp_sep\""),
                 'per-riadok prepinac „samostatne" existuje')
   # Je to TA ISTA mutacia, aku mala sipka v nahlade — 1 zmena = 1 krok Spat.
   NxTest.assert(S1C2_BUDGET_JS.include?("budSend('cp_group', { source_key: t.getAttribute('data-source'),"),
                 'a posiela `cp_group` (ziadna nova serverova cesta)')
-  NxTest.assert(S1C2_BUDGET_JS.include?('function budOfferWireHtml'),
-                'DOCX/PDF je PRIZNANY wireframe (D-78: ziadne mrtve tlacidlo bez dovodu)')
-  NxTest.assert(S1C2_BUDGET_JS.include?('po V1 — vedomý placeholder'), 'a povie, ze pride po V1')
+  # H3a (A-02): ramik „po V1" zanikol aj s CSS — DOCX/PDF ostava v zasobniku Po V1.
+  NxTest.refute(S1C2_BUDGET_JS.include?('function budOfferWireHtml'), 'ramik DOCX/PDF v okne uz nie je')
+  NxTest.refute(S1C2_BUDGET_JS.include?('vedomý placeholder'), 'ani jeho text')
   # Š15: chybajuca cena sa doplna PRI ZDROJI — v Rozpocte, nie v ponuke.
   NxTest.assert(S1C2_BUDGET_JS.include?("data-bud=\"to_budget\""),
                 'jantarovy guard podhodnotenej ponuky VEDIE do Rozpoctu')

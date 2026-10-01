@@ -110,34 +110,70 @@
   // základom (SupplierSettings.rate) — keby sekcia ukazovala len základ, úprava
   // by sa navonok „neprejavila" (pd_opracovanie má režimy už v seede).
   function ssRenderRates(t){
-    ssHeadRow(t, ['Položka', 'Sadzba', '€', '€€', '€€€', '']);
+    ssHeadRow(t, ssModeHeads());
     (SS_STATE.rate_keys || []).forEach(function(key){
       var meta = (SS_STATE.rate_labels || {})[key] || [key, ''];
       var tr = document.createElement('tr');
       tr.appendChild(ssMk('td', null, meta[0]));
       ssCell(tr, 'n', ssInput('rate:' + key, (SS_STATE.supplier.rates || {})[key]));
-      ssModeCells(tr, key);
+      ssModeCells(tr, key, ssEffective('rates', key));
       ssCell(tr, 'u', ssMk('span', null, meta[1]));
       t.appendChild(tr);
     });
   }
 
   function ssRenderRows(t){
-    ssHeadRow(t, ['Položka', 'Sadzba', '€', '€€', '€€€', '']);
+    ssHeadRow(t, ssModeHeads());
     (SS_STATE.standard_rows || []).forEach(function(r){
       var tr = document.createElement('tr');
       tr.appendChild(ssMk('td', null, r.name));
       ssCell(tr, 'n', ssInput('row:' + r.key, r.rate));
-      ssModeCells(tr, r.key);
+      ssModeCells(tr, r.key, ssEffective('rows', r.key));
       ssCell(tr, 'u', ssMk('span', null, r.kind === 'per_m2' ? '€/m²' : '€ fix'));
       t.appendChild(tr);
     });
   }
 
-  function ssModeCells(tr, key){
+  // H3a (A-07): hlavičky režimov idú v PORADÍ `SS_STATE.modes` — rovnako ako
+  // bunky (predtým boli natvrdo „€ · €€ · €€€" a bunky išli podľa `modes`:
+  // dva zdroje poradia). Symbol = ten istý ako segment Rozpočtu, slovo =
+  // `mode_labels` s malým písmenom → „€ nízky · €€ štandard · €€€ vysoký".
+  // „Sadzba" → „Základ": režimové stĺpce sú sadzby tiež.
+  var SS_MODE_SYM = { nizky: '€', standard: '€€', vysoky: '€€€' };
+  function ssModeHeads(){
+    var labels = (SS_STATE && SS_STATE.mode_labels) || {};
+    var heads = ['Položka', 'Základ'];
+    ((SS_STATE && SS_STATE.modes) || []).forEach(function(mode){
+      var lbl = String(labels[mode] || mode);
+      lbl = lbl.charAt(0).toLowerCase() + lbl.slice(1);
+      heads.push(SS_MODE_SYM[mode] ? SS_MODE_SYM[mode] + ' ' + lbl : lbl);
+    });
+    heads.push('');
+    return heads;
+  }
+
+  // H3a (A-07): platné sadzby riadku podľa režimu zo SERVERA (`effective`,
+  // SupplierSettings.rate / row_rate). Bez nich (starý payload) sivé číslo nie je.
+  function ssEffective(kind, key){
+    var e = (SS_STATE && SS_STATE.effective) ? SS_STATE.effective[kind] : null;
+    return (e && e[key]) ? e[key] : null;
+  }
+
+  // H3a (A-07): PRÁZDNA bunka režimu ukáže sivo sadzbu, ktorá naozaj platí
+  // (`placeholder`, nie hodnota — uloženie ju nepošle). Číslo je serverové:
+  // pri chýbajúcom základe v súbore počíta Rozpočet so seedom, hoci bunka
+  // Základ je prázdna — z bunky by sivé číslo klamalo. Pri rozpísanom Základe
+  // ukazuje platnú sadzbu až do Uložiť (nápoveda to priznáva).
+  function ssModeCells(tr, key, eff){
     var mv = (SS_STATE.supplier.mode_values || {})[key] || {};
     (SS_STATE.modes || []).forEach(function(mode){
-      ssCell(tr, 'n', ssInput('mode:' + key + ':' + mode, mv[mode]));
+      var inp = ssInput('mode:' + key + ':' + mode, mv[mode]);
+      var shown = eff ? ssNumText(eff[mode]) : '';
+      if ((mv[mode] === null || mv[mode] === undefined) && shown !== ''){
+        inp.setAttribute('placeholder', shown);
+        inp.setAttribute('title', 'Prázdne — platí základ (' + shown + ')');
+      }
+      ssCell(tr, 'n', inp);
     });
   }
 
@@ -268,7 +304,9 @@
       ' · globálne pre všetky zákazky · v' + SS_STATE.version));
     ssRenderRates(ssFieldset(box, 'Sadzby služieb',
       'Automatické služby — množstvo počíta engine z dát zákazky (bm olepu, počet platní, kusy ' +
-      'duplákov, m² montáže). Stĺpce € / €€ / €€€ sú režimové hodnoty: prázdne = použije sa základná sadzba.'));
+      'duplákov, m² montáže). Stĺpce € nízky · €€ štandard · €€€ vysoký sú sadzby pre cenový režim zákazky; ' +
+      'v prázdnej bunke platí základ — ukazuje ho sivé číslo. Sivé číslo ukazuje uložený základ — ' +
+      'po zmene Základu sa obnoví až po Uložiť.'));
     ssRenderRows(ssFieldset(box, 'Štandardné riadky — sadzby per režim',
       'Fixné koncové položky ponuky. Násobok (koeficient veľkosti zákazky) sa nastavuje priamo ' +
       'v riadku rozpočtu — tu žije len sadzba.'));

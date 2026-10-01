@@ -687,6 +687,13 @@ existujúca** dĺžka radu (inak najdlhšia) — rad 260–350 by inak hlásil f
 (`sets_payload['class_options']`) a vlastný nemá — druhý zoznam v JS by sa pri prvom pribudnutom type rozišiel s doménovou pravdou. `USE_TYPE_SK` (2./4. pád do vety servera)
 je iná vrstva a zostáva oddelene. Neznáma hodnota (obsah novšej verzie) sa **neprekladá** — vypíše sa tak, ako prišla.
 
+**`params_text(params)` (H3a, A-04, v slovníku parametrov vedľa `param_label`)** skladá z tých istých slovníkov ľudský text parametrov generiky pre okno Nákup
+kovania: časti v pevnom poradí `PARAMS_TEXT_ORDER` spojené „ · " — `use_type`/`drawer_construction` cez `class_label` s malým písmenom (`other` sa vynechá),
+`opening_mode` („klasické otváranie", „Tip-On"), `lift_system`, „NL 470 mm", „výška čela 150 mm"/„výška sokla 100 mm" (`param_label` + `fmt_mm` bez zaokrúhlenia),
+`cut_length_mm` = `HardwareRules.params_label` („rez 597 mm"; `profile` sa nevypisuje), výklop („stabilizačné tyče 2", „s predĺžením tyče", „mechanizmus …",
+„ramená …" — návrh, na reálnej zákazke neoverený) a **neznámy kľúč** idiomom `param_label` na konci podľa abecedy (nič sa nestratí); prázdny výsledok `nil`.
+`PARAM_OPTIONS` sa zámerne **nerozširuje** (je to aj ponuka editora pásiem) a `HardwareRules.params_label` sa nemení — ten ide do CSV kovania a Kontroly.
+
 **Marker `std` má ŠESŤ hodnôt a je LAZY podľa obsahu.** `1` = len legacy tvary · `2` = pásma člena alebo selector v mapovaní (GH #131) · **`3` = set s KTORÝMKOĽVEK kľúčom mimo
 `LEGACY_SET_KEYS`** (každé klasifikačné pole aj `active` samostatne) **alebo mapovanie s triednym kľúčom `class:`**. Čisto legacy obsah ostáva na svojom pôvodnom std, takže
 spätná čitateľnosť sa zbytočne neblokuje; obsah so `std: 3` je pre starší plugin `:read_only` (knižnica) a `:invalid` (snapshot) — NIKDY čiastočné čítanie. Ďalšie hodnoty

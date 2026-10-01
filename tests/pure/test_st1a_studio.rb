@@ -1092,7 +1092,8 @@ NxTest.test('ŠT-1c: `price()` odisiel z okna Vyroba do Studia (sekcia Nakup)') 
   # takze helper — a s nim CELY nakupny zoznam — zije v studio.js.
   NxTest.assert(ST1B_STUDIO_JS.include?('function price(v)'), 'helper zije v Studiu')
   NxTest.assert(ST1B_STUDIO_JS.include?('price(r.price_eur_vat)'), 'a naozaj sa pouziva')
-  NxTest.assert(ST1B_STUDIO_RB.include?('hardware_sets: hw_exp'),
+  # H3a (A-04): cez nemutujucu kopiu so SK popiskom kategorie.
+  NxTest.assert(ST1B_STUDIO_RB.include?('hardware_sets: ProductionCore.hardware_sets_labeled(hw_exp)'),
                 'nakupny zoznam dostava Studio (sekcia Nakup kovania)')
 end
 
