@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H3b · falošná chyba v Ruby konzole po novom súbore (1.10.2026, PR #?, v0.17.2, blok 9 · HARDENING PO V1, položka A-06; package
+- **H3b · falošná chyba v Ruby konzole po novom súbore (1.10.2026, PR #436, v0.17.2, blok 9 · HARDENING PO V1, položka A-06; package
   [PACKAGE_H3.md](../zdroje/bloky/HARDENING/PACKAGE_H3.md) §6.6).** **Sonda R-A06-0** (SketchUp 2026, kópia ENGINEtests.skp, slučka `-RubyStartup`): Windows
   **Súbor → Nový** vyčistí dokument aj jeho prekrytia, ale **Ruby objekt modelu ostáva ten istý** (`equal?` a `Model#valid?` true) — `on_model_changed` overlay
   pre zhodný objekt nevypne a modul drží overlay so `Overlay#valid?` false. Chyba sa preto nezapíše pri `file_new`, ale až **pri otvorení Štúdia** (`restore!` →

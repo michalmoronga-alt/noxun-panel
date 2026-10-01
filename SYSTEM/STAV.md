@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.17.2 · 1.10.2026 — blok 9 HARDENING, dávka H3b** (PR #?): po **Súbor → Nový** a otvorení Štúdia už Ruby konzola nehlási falošnú chybu „invalid overlay"
+**v0.17.2 · 1.10.2026 — blok 9 HARDENING, dávka H3b** (PR #436): po **Súbor → Nový** a otvorení Štúdia už Ruby konzola nehlási falošnú chybu „invalid overlay"
 (Smer otvárania, hrany, Smer kresby) — prekrytie zneplatnené SketchUpom sa len zabudne a kresba sa zapne nanovo; chyba živého dokumentu sa zapisuje ďalej.
 Pod tým **H3a** (v0.17.1, PR #435): Štúdio bez zavádzajúcich údajov (Kusovník, ponuka, Kontrola, Nákup, sadzby) — **čísla, CSV, XLSX a VEPO bez zmeny**.
 Pod tým **BLOK CENY UZAVRETÝ** (v0.17.0, 30.9.; štart #425, PR #426–#429; **smoke PASS 30.9.**, PR #431). Doska a ABS páska **bez Demosu** majú **jeden odkaz na produkt** a **ručné overenie ceny** v Štúdiu → Materiály aj v Rozpočte (doska za platňu s prepočtom
@@ -30,13 +30,13 @@ v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a
 **Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin
 počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
 
-**Testy (H3b, PR #?):** **4969 headless · 147 JS sád** zelené + encoding guard; **in-SU 3284 PASS / 0 FAIL** (brána — prekrytia po novom súbore).
+**Testy (H3b, PR #436):** **4969 headless · 147 JS sád** zelené + encoding guard; **in-SU 3284 PASS / 0 FAIL** (brána — prekrytia po novom súbore).
 
 ## Robí sa
 
 **Blok 9 · HARDENING PO V1** (štart 1.10.2026, PR #432): krížový audit V1 sedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**;
 17 dávok **H1…H17** sekvenčne podľa tabuľky v [PLAN.md](PLAN.md), **bez zmeny výrobných a cenových čísel**; priečinok bloku [zdroje/bloky/HARDENING/](zdroje/bloky/HARDENING/).
-Hotové **H1** PR #433 · **H2** (fotenie okien) PR #434 · **H3a** (zavádzajúce údaje v okne) PR #435 · **H3b** (falošná chyba v Ruby konzole po novom súbore) PR #?; nasleduje **H4**.
+Hotové **H1** PR #433 · **H2** (fotenie okien) PR #434 · **H3a** (zavádzajúce údaje v okne) PR #435 · **H3b** (falošná chyba v Ruby konzole po novom súbore) PR #436; nasleduje **H4**.
 **H6 a H7 čakajú na schválený mockup** (R-38 v H7 potvrdí Michal) · **Q1** (porez a montáž pri skle) bez odpovede · pri prvej rohovej v dielni overiť záves Sensys · **na smoke čakajú** D-132 (#367), D-133 (#368), D-134 (#369).
 
 ## Ďalší krok
