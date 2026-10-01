@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H4a · jednotný zápis čísel a jednotiek + ABS „dookola" (1.10.2026, PR #?, v0.17.3, blok 9 · HARDENING PO V1, položky triedenia HARDENING D-04
+- **H4a · jednotný zápis čísel a jednotiek + ABS „dookola" (1.10.2026, PR #437, v0.17.3, blok 9 · HARDENING PO V1, položky triedenia HARDENING D-04
   a D-11 — nie D-čísla DOGFOODINGU; package [PACKAGE_H4.md](../zdroje/bloky/HARDENING/PACKAGE_H4.md) časť H4a).** Okno Štúdio malo 9 vlastných formátovačov,
   dva s desatinnou bodkou, a niektoré hodnotu skrývali (hrúbka 18,6 ako „19", bm 70,94 ako „70,9", 2,4 balenia ako „2", MJ „PLATŇA"/„FIX" surovo). Teraz
   **jeden formátovač `nxf*` v `studio.js`** (`nxfMoney` = dvojča `budFmtEur`, `nxfMoneyIn` pre peňažné polia, `nxfQty`/`nxfUnit` podľa kódu MJ so skloňovaním
