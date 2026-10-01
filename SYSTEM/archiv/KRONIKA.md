@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H14a · register sekcií Štúdia a zoznamy z registra (1.10.2026, PR #?, v0.17.14, blok 9 · HARDENING PO V1, triedenie C-02 časť 1 — CX-05;
+- **H14a · register sekcií Štúdia a zoznamy z registra (1.10.2026, PR #450, v0.17.14, blok 9 · HARDENING PO V1, triedenie C-02 časť 1 — CX-05;
   package [PACKAGE_H14.md](../zdroje/bloky/HARDENING/PACKAGE_H14.md) + audit [AUDIT_H14_raw.md](../zdroje/bloky/HARDENING/AUDIT_H14_raw.md), §15 A2 A4 A5).**
   Sekcia Štúdia sa prihlasovala na 13 miestach v 4 súboroch (zoznam 3×, `NAV`, `SEC_META`, `REFRESH_STATUS`, `SS_SECTIONS`, dve cesty prechodu, kotvy).
   Nový modul `ui/js/studio_sections.js` (`NXStudioSections`: `ids` · `has` · `get` · `groups` · `inModule` · `fn` · `REFRESH_DEFAULT`, riadky zmrazené)
