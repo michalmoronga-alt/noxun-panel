@@ -15,7 +15,10 @@
 4. Podľa témy zásahu: STANDARD · VEPO_KONTRAKT · POJMY (tabuľka nižšie) — pri súbore nad ~50 kB len dotknutú kapitolu
    (Grep podľa nadpisu `§` alebo mena modulu); **rozpočet povinného čítania jednej dávky je orientačne ≤ 150 kB** (pravidlo v [../CLAUDE.md](../CLAUDE.md)).
 5. **Podobná funkcia už bola?** Priečinok jej bloku `archiv/bloky/<BLOK>/` (`ROZHODNUTIA_*`, `FAKTY_Z_KODU_*`, `PACKAGE_*`) a záver
-   `archiv/<BLOK>_ZAVER_*` — napr. [archiv/bloky/ROHOVA/](archiv/bloky/ROHOVA/) pre nový typ skrinky.
+   `archiv/<BLOK>_ZAVER_*` — napr. [archiv/bloky/ROHOVA/](archiv/bloky/ROHOVA/) pre nový typ skrinky. Bloky spred tejto konvencie
+   (napr. KOVANIE, GHOST, UI 2.0, M-R) priečinok nemajú: plný text je v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md),
+   priebeh v KRONIKE (Grep podľa ID dávky) a staršie podklady v [zdroje/next_sessions/](zdroje/next_sessions/) (`KOVANIE_*`, `GHOST_*`, `MR_*`…)
+   a [zdroje/ui20/](zdroje/ui20/).
 
 Na otázku **„prečo je to takto?"** sa nečíta nič z hora: najprv **priečinok bloku** (bod 5), potom [archiv/KRONIKA.md](archiv/KRONIKA.md)
 a [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md) — **len Grepom** podľa ID dávky alebo D-čísla (oba súbory majú stovky kB, celé sa nečítajú).
