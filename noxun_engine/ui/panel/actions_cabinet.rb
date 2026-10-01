@@ -25,9 +25,9 @@ module Noxun
 
       # S1-E: SK nazov typu skrinky v 1. pade (hlasky Studia aj panela). Jedna
       # tabulka — tri opisane ternary by sa casom rozisli a slot by v jednej
-      # hlaske ostal „dolna".
-      TEMPLATE_TYPE_WORDS = { 'lower' => 'dolná', 'upper' => 'horná',
-                              'dishwasher' => 'umývačka', 'corner_blind' => 'rohová' }.freeze
+      # hlaske ostal „dolna". H12b: ODVODENA z registra (`word`, poradie `IDS`);
+      # novy typ ju dostane s riadkom registra.
+      TEMPLATE_TYPE_WORDS = CabinetTypes::IDS.to_h { |id| [id, CabinetTypes.get(id)[:word]] }.freeze
 
       # ROH-A1: vety ochran rohovej. Typ sa nemeni ziadnou cestou; STRANU meni
       # od ROH-B1 len prepinac v riadku rohovej (apply, sablona na existujucu
@@ -58,7 +58,10 @@ module Noxun
           # z ktoreho stavia `Construction.build_plan`. Bez toho by slot
           # umyvacky overoval celo proti VYSKE LINKY a legitimny presah cela
           # nad linku by zahlasil ako chybu, ktora chybou nie je.
-          slot = data['type'].to_s == 'dishwasher'
+          # H12b: „slot" = typ BEZ KORPUSU (`builder`), rozsahy = vlastne
+          # `limits` typu z registra (inak korpusove 200–3000).
+          slot = !CabinetTypes.carcass?(data['type'])
+          limits = CabinetTypes.prop(data['type'], :limits)
           dims = %w[width height floor_height].map do |key|
             v = data[key]
             unless v.is_a?(Numeric) && v.to_f.finite?
@@ -67,8 +70,8 @@ module Noxun
             v.to_f
           end
           dims[2] = 0.0 if slot # slot sokel v zmysle korpusu NEMA
-          wr = slot ? CabinetBuilder::DW_WIDTH_RANGE : [200.0, 3000.0]
-          hr = slot ? CabinetBuilder::DW_HEIGHT_RANGE : [200.0, 3000.0]
+          wr = limits ? limits[:width] : [200.0, 3000.0]
+          hr = limits ? limits[:height] : [200.0, 3000.0]
           unless (wr[0]..wr[1]).cover?(dims[0]) && (hr[0]..hr[1]).cover?(dims[1]) &&
                  (0.0..500.0).cover?(dims[2])
             raise 'Rozmery skrinky sú mimo povoleného rozsahu.'
@@ -123,12 +126,13 @@ module Noxun
         # Zdroj poli rohovej pre preflight, alebo nil (nie je rohova). Oznacena
         # skrinka = jej ULOZENY config; vkladanie = payload (A2 posiela stranu
         # a dverovu cast z predvolieb alebo zo sablony — v DOM nie su).
+        # H12b: „rohova" = typ s rohovou zostavou (`CabinetTypes.corner?`).
         def corner_preflight_src(data, stored)
           if stored.is_a?(Hash)
-            return stored['type'].to_s == Construction::CORNER_TYPE ? stored : nil
+            return CabinetTypes.corner?(stored['type']) ? stored : nil
           end
 
-          data['type'].to_s == Construction::CORNER_TYPE ? data : nil
+          CabinetTypes.corner?(data['type']) ? data : nil
         end
 
         # cfg pre `Construction.front_opening` z rozmerov preflightu (dims =
@@ -141,7 +145,7 @@ module Noxun
           cfg = { type: data['type'].to_s, width: dims[0], height: dims[1], floor_height: dims[2] }
           return cfg unless corner
 
-          cfg.merge(type: Construction::CORNER_TYPE, corner_side: corner['corner_side'],
+          cfg.merge(type: corner['type'].to_s, corner_side: corner['corner_side'],
                     corner_door_w: preflight_door_w(data, corner))
         end
 
@@ -173,7 +177,7 @@ module Noxun
         # ta ista ucinna, z ktorej panel pocita minimum sirky (`ctx['t']`).
         def corner_preview_params(data, stored, corner, ctx)
           base = stored.is_a?(Hash) ? CabinetBuilder.config_to_params(stored) : {}
-          p = base.merge('type' => Construction::CORNER_TYPE, 'width' => data['width'],
+          p = base.merge('type' => corner['type'].to_s, 'width' => data['width'],
                          'height' => data['height'], 'floor_height' => data['floor_height'],
                          'thickness' => ctx['t'], 'corner_side' => corner['corner_side'],
                          'fronts' => data['fronts'])
@@ -224,7 +228,8 @@ module Noxun
           r = CabinetBuilder::DW_RANGES[:dw_front_bottom]
           raise 'Sokel slotu je mimo povoleného rozsahu.' unless (r[0]..r[1]).cover?(z0.to_f)
 
-          Construction.front_opening({ type: 'dishwasher', width: width, height: height,
+          # H12b: typ je ten z payloadu (volajuci ho uz rozpoznal ako slot).
+          Construction.front_opening({ type: data['type'].to_s, width: width, height: height,
                                        dw_front_bottom: z0.to_f })
         end
 
@@ -281,7 +286,7 @@ module Noxun
             params = CabinetBuilder.config_to_params(stored)
             t = live ? live.to_f : params['thickness'].to_f
           else
-            params = { 'type' => Construction::CORNER_TYPE, 'thickness' => live }
+            params = { 'type' => data['type'].to_s, 'thickness' => live } # rohova (guard vyssie)
             %w[material_id front_material_id].each do |k|
               v = data[k]
               params[k] = v if v.is_a?(String) && !v.strip.empty?
@@ -482,8 +487,9 @@ module Noxun
         # remap ABS overridov ostava: slot MA celo a jeho material sa meni.
         # Hrubku cela validuje dalej ta ista brana ako pri kazdom inom cele
         # (`CabinetBuilder.validate_material_thickness!` v `resolve_part`).
+        # H12b: typ BEZ KORPUSU (`builder`) — telo ani chrbat nema.
         def slot_params?(params)
-          params.is_a?(Hash) && params['type'].to_s == 'dishwasher'
+          params.is_a?(Hash) && !CabinetTypes.carcass?(params['type'])
         end
 
         def material_preflight(params, model, old_eff: nil)
@@ -760,7 +766,9 @@ module Noxun
           cfg = tpl && tpl['config']
           return params unless cfg.is_a?(Hash)
 
-          params['type'] = cfg['type'] if cfg['type'].to_s == 'dishwasher'
+          # H12b: typ BEZ KORPUSU si typ zo sablony berie vzdy (slot sa zo
+          # sablony nevlozi ako korpus); polia slotu ako doteraz pri kazdom type.
+          params['type'] = cfg['type'] unless CabinetTypes.carcass?(cfg['type'])
           CabinetBuilder::DW_KEYS.each do |k|
             key = k.to_s
             next unless cfg.key?(key)
@@ -772,7 +780,7 @@ module Noxun
           # ich neposiela, takze bez tohto by sablona „vpravo / 600 / 120 / 90"
           # skoncila na predvolbach „vlavo / 450 / 80 / 80". Rozsahy a strana
           # sa zvaliduju v `normalize` (`norm_corner`) ako pri kazdom vstupe.
-          if cfg['type'].to_s == CabinetBuilder::CORNER_TYPE
+          if CabinetTypes.corner?(cfg['type'])
             params['type'] = cfg['type']
             CabinetBuilder::CORNER_KEYS.each do |k|
               key = k.to_s
@@ -803,7 +811,7 @@ module Noxun
 
           tpl = TemplateStore.find(*tpl_ref)
           cfg = tpl && tpl['config']
-          return nil unless cfg.is_a?(Hash) && cfg['type'].to_s == CabinetBuilder::CORNER_TYPE
+          return nil unless cfg.is_a?(Hash) && CabinetTypes.corner?(cfg['type'])
 
           corner_template_fronts_error(cfg)
         end
@@ -1081,8 +1089,9 @@ module Noxun
         # jeho vyska berie — D-139: je odvodena, ziadne pole ju nemeni).
         SLOT_FRONTS_MSG = 'Slot umývačky má jedno pevné čelo — jeho výška sa dopočíta z výšky linky, soklu a medzery hore.'
 
+        # H12b: pravidlo ciel typu z registra (`fronts`), nie meno typu.
         def slot_fronts_refusal(params, incoming)
-          return nil unless params['type'].to_s == 'dishwasher'
+          return nil unless CabinetTypes.prop(params['type'], :fronts) == 'slot_fixed'
           return nil if incoming.nil?
 
           cfg = Fronts.normalize_config(incoming)
@@ -1100,7 +1109,7 @@ module Noxun
         # smer, profil, medzery v rozsahu, material a kovanie povolene ostavaju.
         # `params` = ULOZENY stav skrinky (typ a strana su z neho).
         def corner_fronts_refusal(params, incoming)
-          return nil unless params['type'].to_s == Construction::CORNER_TYPE
+          return nil unless CabinetTypes.prop(params['type'], :fronts) == 'corner_one_door'
           return nil if incoming.nil?
 
           cfg = Fronts.normalize_config(incoming)
@@ -1117,14 +1126,17 @@ module Noxun
         # existujucej rohovej sa v A1 odmietaju — poistka servera (panel typ
         # po oprave registrov posiela spravne, stranu neposiela vobec). Strana
         # sa porovnava NORMALIZOVANA (neznama hodnota = `left`, vzor normalize).
+        # H12b (R2.4): IDENTITA typu ostava surova (`want` ≠ `have`), zamok je
+        # vlastnost registra `type_locked` aspon jedneho z nich; stranu ma typ
+        # s rohovou zostavou (`corner?`).
         def corner_change_refusal(params, data)
           have = params['type'].to_s
-          corner = Construction::CORNER_TYPE
           if data.key?('type')
             want = data['type'].to_s
-            return CORNER_TYPE_MSG if want != have && (want == corner || have == corner)
+            locked = CabinetTypes.prop(want, :type_locked) || CabinetTypes.prop(have, :type_locked)
+            return CORNER_TYPE_MSG if want != have && locked
           end
-          return nil unless have == corner && data.key?('corner_side')
+          return nil unless CabinetTypes.corner?(have) && data.key?('corner_side')
 
           side = data['corner_side'].to_s
           side = 'left' unless CabinetBuilder::CORNER_SIDES.include?(side)
@@ -1168,7 +1180,7 @@ module Noxun
 
           cid = Store.get(cab, 'cabinet_id').to_s
           params = existing_params(cab)
-          unless params['type'].to_s == Construction::CORNER_TYPE
+          unless CabinetTypes.corner?(params['type'])
             set_status('Stranu dverí má len rohová skrinka.', true)
             return push_selected(model)
           end

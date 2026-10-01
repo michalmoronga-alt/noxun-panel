@@ -142,7 +142,10 @@ end
 NxTest.test('ROH-A2: vkladanie — DEFAULTS rohovej zo servera, JS polia rohovej do payloadu neposiela') do
   sync = NxRohA2.src('noxun_engine', 'ui', 'panel', 'sync.rb')
   # ROH-B1: predvolby = CORNER_DEFAULTS + ucinna hrubka CR 2 (`corner_insert_defaults`).
-  NxTest.assert(sync.include?('corner_blind: corner_insert_defaults(model)'), 'DEFAULTS.corner_blind')
+  # H12b: `init_defaults` — rohova cez `corner_insert_defaults` (kluc `corner_blind` z `DEFAULTS_BY_TYPE`).
+  NxTest.assert(sync.include?('defaults: init_defaults(model)') &&
+                sync.include?('CabinetTypes.corner?(id) ? corner_insert_defaults(model) : d'), 'DEFAULTS.corner_blind')
+  NxTest.assert_equal('corner_blind', NxRohA2::CB::DEFAULTS_BY_TYPE.keys.find { |id| Noxun::Engine::CabinetTypes.corner?(id) })
   d = NxRohA2::CB::CORNER_DEFAULTS
   NxTest.assert_equal(['left', 450.0, 80.0, 80.0, 1100.0],
                       [d[:corner_side], d[:corner_door_w], d[:corner_cr1], d[:corner_cr2], d[:width]])

@@ -22485,6 +22485,149 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # ===== H12b (C-01): AKCIE PANELA NAD STYRMI TYPMI ===============================
+  # Package H12 §8 bod 3. Panel Ruby sa po H12b pyta registra `CabinetTypes`
+  # (nie mena typu) — tu sa overi, ze AKCIE, ktore zapisuju do modelu, robia
+  # pri kazdom type to iste a kazda je JEDEN krok Spat:
+  #   (a) apply zmeny sirky na dolnej, hornej, slote a rohovej (typ ostane),
+  #   (b) sablona rovnakeho typu sa pouzije, ineho typu odmietne (0 krokov),
+  #       ulozenie sablony zo slotu a rohovej typ nezmeni (zamok),
+  #   (c) prepinac strany rohovej (a odmietnutie na dolnej),
+  #   (d) ghost vklad hornej visi na Z = 1400.
+  H12B_TPL = '__SU_TEST_H12B__'
+
+  def h12b_select(model, inst)
+    model.selection.clear
+    model.selection.add(inst)
+  end
+
+  def h12b_cfg(inst)
+    cfg = e::Store.config(inst) || {}
+    cfg.reject { |k, _| k == 'engine_version' }
+  end
+
+  def run_h12b(model)
+    cleanup(model)
+    e::TemplateStore.delete('cabinet', H12B_TPL) if e::TemplateStore.find('cabinet', H12B_TPL)
+    door = h12_door
+    specs = [['lower', { 'type' => 'lower', 'fronts' => door }, 650.0],
+             ['upper', { 'type' => 'upper', 'fronts' => door }, 650.0],
+             ['dishwasher', { 'type' => 'dishwasher' }, 450.0],
+             ['corner_blind', { 'type' => 'corner_blind' }, 1150.0]]
+    cabs = {}
+    specs.each_with_index do |(t, params, _w), i|
+      cabs[t] = e::CabinetBuilder.build(model, params,
+                                        transform: Geom::Transformation.translation(e::Units.point(i * 1500.0, 0, 0)))
+    end
+    ok("H12b: postavene 4 typy (#{cabs.map { |t, c| "#{t}=#{c ? e::Store.config(c)['type'] : 'nil'}" }.join(', ')})",
+       cabs.all? { |t, c| c && e::Store.config(c)['type'] == t })
+
+    # (a) APPLY ZMENY SIRKY — typ ostane, 1 krok Spat
+    specs.each do |t, _params, w|
+      cab = cabs[t]
+      next unless cab
+
+      cid = e::Store.get(cab, 'cabinet_id').to_s
+      before = h12b_cfg(cab)
+      h12b_select(model, cab)
+      e::Panel.handle_apply(pg(model, 'cabinet_id' => cid, 'width' => w))
+      after = h12b_cfg(cab)
+      ok("H12b (a) #{t}: apply sirky #{w} zmenil config a typ ostal (#{after['width']}, #{after['type']})",
+         after != before && after['type'] == t && (after['width'].to_f - w).abs <= TOL)
+      Sketchup.undo
+      ok("H12b (a) #{t}: 1 Spat vratil config (sirka #{h12b_cfg(cab)['width']})", h12b_cfg(cab) == before)
+    end
+
+    # (b) SABLONY — ulozenie (zamok typu slotu a rohovej), pouzitie rovnakeho
+    #     typu, odmietnutie ineho typu bez kroku Spat
+    { 'dishwasher' => 'upper', 'corner_blind' => 'lower' }.each do |t, want|
+      cab = cabs[t]
+      next unless cab
+
+      name = "#{H12B_TPL}#{t}"
+      e::TemplateStore.delete('cabinet', name) if e::TemplateStore.find('cabinet', name)
+      h12b_select(model, cab)
+      e::Panel.handle_save_template_as(pg(model, 'cabinet_id' => e::Store.get(cab, 'cabinet_id').to_s,
+                                              'name' => name, 'type' => want))
+      rec = e::TemplateStore.find('cabinet', name)
+      ok("H12b (b) #{t}: ulozenie sablony s typom #{want} typ NEZMENILO (#{rec && rec['config']['type']})",
+         rec && rec['config']['type'] == t)
+      word = rec && e::Panel.template_list(kind: 'cabinet').find { |r| r['name'] == name }
+      ok("H12b (b) #{t}: zaznam kniznice nesie slovo typu (#{word && word['type_word'].inspect})",
+         word && word['type_word'] == e::CabinetTypes.get(t)[:word])
+      e::TemplateStore.delete('cabinet', name) if rec
+    end
+
+    low = cabs['lower']
+    up = cabs['upper']
+    if low && up
+      h12b_select(model, low)
+      e::Panel.handle_save_template_as(pg(model, 'cabinet_id' => e::Store.get(low, 'cabinet_id').to_s,
+                                              'name' => H12B_TPL, 'type' => 'lower'))
+      ok('H12b (b): sablona z dolnej ulozena', !e::TemplateStore.find('cabinet', H12B_TPL).nil?)
+      low2 = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 800.0, 'fronts' => door },
+                                     transform: Geom::Transformation.translation(e::Units.point(7000.0, 0, 0)))
+      b2 = h12b_cfg(low2)
+      h12b_select(model, low2)
+      e::TemplatesDialog.handle_apply({ 'template' => H12B_TPL }.to_json)
+      a2 = h12b_cfg(low2)
+      ok("H12b (b): sablona dolnej na DOLNU sa pouzila (sirka #{b2['width']} -> #{a2['width']})",
+         a2 != b2 && a2['type'] == 'lower' && (a2['width'].to_f - 600.0).abs <= TOL)
+      Sketchup.undo
+      ok('H12b (b): pouzitie sablony = 1 krok Spat', h12b_cfg(low2) == b2)
+      ub = h12b_cfg(up)
+      h12b_select(model, up)
+      e::TemplatesDialog.handle_apply({ 'template' => H12B_TPL }.to_json)
+      ok('H12b (b): sablona dolnej na HORNU odmietnuta (config netknuty)', h12b_cfg(up) == ub)
+      Sketchup.undo
+      ok('H12b (b): odmietnutie nepridalo krok — 1 Spat vratil posledny realny krok (vklad druhej dolnej)',
+         !low2.valid? && h12b_cfg(up) == ub)
+      e::TemplateStore.delete('cabinet', H12B_TPL)
+    end
+
+    # (c) PREPINAC STRANY ROHOVEJ
+    cor = cabs['corner_blind']
+    if cor && low
+      cid = e::Store.get(cor, 'cabinet_id').to_s
+      before = h12b_cfg(cor)
+      h12b_select(model, cor)
+      e::Panel.handle_corner_side(pg(model, 'cabinet_id' => cid, 'corner_side' => 'right'))
+      ok("H12b (c): strana rohovej vpravo (#{h12b_cfg(cor)['corner_side']})", h12b_cfg(cor)['corner_side'] == 'right')
+      Sketchup.undo
+      ok("H12b (c): 1 Spat vratil stranu (#{h12b_cfg(cor)['corner_side']})", h12b_cfg(cor) == before)
+      lb = h12b_cfg(low)
+      h12b_select(model, low)
+      e::Panel.handle_corner_side(pg(model, 'cabinet_id' => e::Store.get(low, 'cabinet_id').to_s,
+                                           'corner_side' => 'right'))
+      ok('H12b (c): prepinac strany na DOLNEJ odmietnuty (config netknuty)', h12b_cfg(low) == lb)
+    end
+
+    # (d) GHOST VKLAD HORNEJ visi na Z = 1400
+    n = cabinets(model).length
+    ins = ghost_place!(model, GHOST_PARAMS.merge('type' => 'upper', 'depth' => 320.0), [9000.0, 200.0])
+    ghost_teardown!(model)
+    z = ins ? ghost_origin_mm(ins)[2] : nil
+    ok("H12b (d): ghost vklad hornej visi na Z = 1400 (#{z && z.round(1)})",
+       ins && (z - 1400.0).abs <= TOL && e::Store.config(ins)['type'] == 'upper')
+    if ins
+      Sketchup.undo
+      ok('H12b (d): vklad = 1 krok Spat', !ins.valid? && cabinets(model).length == n)
+    end
+    cleanup(model)
+  rescue StandardError => ex
+    log_line("FAIL: run_h12b: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    ghost_teardown!(model)
+    cleanup(model)
+  ensure
+    begin
+      %W[#{H12B_TPL} #{H12B_TPL}dishwasher #{H12B_TPL}corner_blind].each do |nm|
+        e::TemplateStore.delete('cabinet', nm) if e::TemplateStore.find('cabinet', nm)
+      end
+    rescue StandardError
+      nil
+    end
+  end
+
   # ===== H11b (F-02): MINIMUM SKETCHUP 2026 =====================================
   # Sonda P2 z PACKAGE_H11 (B5) + N6: na ZIVOM SketchUpe 2026 sa zapise verzia,
   # overi sa vyklad ciselneho `version_number` (major = cislo / 100_000_000) proti
@@ -28476,6 +28619,7 @@ module NoxunSuRunner
     # ŠT-1c PR B3: okno Vyroba zaniklo — generacny token ma uz len Studio.
     e::StudioDialog.instance_variable_set(:@generation, 0) if defined?(e::StudioDialog)
     run_h12(model)           # H12/C-01: golden vystupov 4 typov (VEPO bez riadku Verzia:, kusovnik, nakup + purchase_csv, rozpocet, Kontrola, dielce) — PRVY, pred zasahmi inych scenarov do katalogov
+    run_h12b(model)          # H12b/C-01: akcie panela nad 4 typmi z registra — apply sirky, sablona rovnakeho/ineho typu, zamok typu sablony slotu a rohovej, slovo typu v kniznici, strana rohovej, ghost hornej Z 1400; kazda 1 krok Spat
     run_sync(model)
     run_sync_back(model)     # davka Chrbat: D-37 hlbka, D-31 none, D-38 pevny 18
     run_sync_rails(model)    # H3/D-80: vnutro pod vystuhami (odsadenie, upright, chrbat, odmietnutie)

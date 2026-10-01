@@ -167,8 +167,10 @@ NxTest.test('ŠT-3c-1 (N27): sekcia vyber NESLEDUJE — verdikt dava SERVER pri 
   # Review #225: vyber sa cita PRIAMO a musi byt PRAVE JEDEN (detail v sade nizsie).
   NxTest.assert(apply.include?('Panel.selected_cabinets(model)'), 'vyber sa hlada CERSTVO pri kliku')
   NxTest.assert(apply.include?('Označ v modeli práve jednu'), 'a chybajuci vyber sa POVIE')
-  NxTest.assert(apply.include?('tpl_type != cab_type'), 'typovy guard je SERVEROVY')
-  NxTest.assert(apply.index('tpl_type != cab_type') < apply.index('rebuild_many'),
+  # H12b (A2): guard je cista funkcia `template_type_refusal` (obojsmerna
+  # matica v `test_h12b_panel.rb`), volana z handlera.
+  NxTest.assert(apply.include?('template_type_refusal('), 'typovy guard je SERVEROVY')
+  NxTest.assert(apply.index('template_type_refusal(') < apply.index('rebuild_many'),
                 'a stoji PRED prestavbou')
   NxTest.refute(apply.include?('push_state'), 'okenny `push_state` zanikol')
   js = ST3C_TPL_JS_CODE
@@ -296,9 +298,11 @@ NxTest.test('1b-4 (B3): payload sekcie je OREZANY na tvar dlazdice') do
     pay = e::TemplatesDialog.tpl_payload
     NxTest.assert_equal(%w[cabinet board], pay.keys, 'payload nesie PRESNE dva druhy')
     row = pay['cabinet'].first
-    NxTest.assert_equal(%w[name preview_rev config hardware appliance_expects construction vent_note], row.keys,
+    NxTest.assert_equal(%w[name preview_rev config hardware appliance_expects construction vent_note type_word], row.keys,
                         'KOV-I: dlazdica dostava aj odvodeny lahky suhrn kovania, ' \
-                        'S1-C: + ocakavany spotrebic, KON-D: + suhrn konstrukcie a veta o vetrani')
+                        'S1-C: + ocakavany spotrebic, KON-D: + suhrn konstrukcie a veta o vetrani, ' \
+                        'H12b: + slovo typu zo servera')
+    NxTest.assert_equal('dolná', row['type_word'])
     NxTest.assert_equal({ 'has' => false, 'text' => '' }, row['construction'], 'bez komina = ziadny riadok')
     NxTest.assert_equal('', row['vent_note'], 'bez chladnicky = ziadna veta')
     NxTest.assert_equal({ 'has' => true, 'labels' => ['Závesy: SET-1'] }, row['hardware'])

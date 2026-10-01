@@ -91,7 +91,8 @@ module Noxun
           return [nil, APPL_MSG_STALE] if !echo.empty? && echo != cid
 
           cfg = Store.config(cab) || {}
-          slot = cfg['type'].to_s == 'dishwasher'
+          # H12b: druh vlastnika spotrebica je vlastnost typu (`appliance_owner`).
+          slot = CabinetTypes.prop(cfg['type'], :appliance_owner) == ApplianceBinding::KIND_SLOT
           [{ 'kind' => slot ? ApplianceBinding::KIND_SLOT : ApplianceBinding::KIND_CABINET,
              'id' => cid, 'pid' => cab.persistent_id }, nil]
         end
@@ -226,7 +227,10 @@ module Noxun
 
           cfg = Store.config(cab) || {}
           id = Store.get(cab, 'cabinet_id').to_s
-          return [nil, nil, nil, APPL_MSG_MOUNT_GONE] if cfg['type'].to_s == 'dishwasher'
+          # H12b: vlastnik druhu slot montaz (vstavany spotrebic v nike) nema.
+          if CabinetTypes.prop(cfg['type'], :appliance_owner) == ApplianceBinding::KIND_SLOT
+            return [nil, nil, nil, APPL_MSG_MOUNT_GONE]
+          end
           return [nil, nil, nil, APPL_MSG_STALE] if id.empty? || data['cabinet_id'].to_s != id
           return [nil, nil, nil, APPL_MSG_STALE] unless appliance_pid_matches?(cab, data['pid'])
           kind = ApplianceBinding::KIND_CABINET
@@ -328,8 +332,8 @@ module Noxun
 
         def appliance_expects_cabinet(model, cab, data)
           cfg = Store.config(cab) || {}
-          kind = cfg['type'].to_s == 'dishwasher' ? ApplianceBinding::KIND_SLOT
-                                                  : ApplianceBinding::KIND_CABINET
+          slot = CabinetTypes.prop(cfg['type'], :appliance_owner) == ApplianceBinding::KIND_SLOT # H12b
+          kind = slot ? ApplianceBinding::KIND_SLOT : ApplianceBinding::KIND_CABINET
           appliance_expects_entity(model, cab, kind, Store.get(cab, 'cabinet_id').to_s,
                                    data['cabinet_id'], data)
         end

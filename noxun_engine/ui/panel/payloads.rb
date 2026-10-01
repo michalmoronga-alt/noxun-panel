@@ -183,7 +183,8 @@ module Noxun
           # ocakavania). Polozky zakazky sa citaju RAZ a sluzia obom klucom —
           # riadku aj vystupom slotu (telo z priradeneho modelu).
           appl_items = appliance_items(entity_model(cab))
-          slot = cfg['type'].to_s == 'dishwasher'
+          # H12b: druh vlastnika spotrebica = vlastnost typu (`appliance_owner`).
+          slot = CabinetTypes.prop(cfg['type'], :appliance_owner) == 'slot'
           params['appliance_rows'] = appliance_rows(slot ? 'slot' : 'cabinet', cfg, appl_items,
                                                     (slot ? nil : appliance_interior(cfg)),
                                                     owner_id: params['cabinet_id'].to_s)
@@ -696,7 +697,8 @@ module Noxun
         # (nastavena vyska tela vs vyska linky) — Inspector a semafor nesmu
         # tvrdit dve rozne veci (Astra S1-E FIX E11).
         def slot_payload(cfg, items = nil)
-          return nil unless cfg.is_a?(Hash) && cfg['type'].to_s == 'dishwasher'
+          # H12b: stlpec ma typ BEZ KORPUSU (`builder` slotu), nie meno typu.
+          return nil unless cfg.is_a?(Hash) && !CabinetTypes.carcass?(cfg['type'])
 
           # S1-B2: telo je z PRIRADENEHO modelu, ak nejaky je — a rozhoduje
           # o tom JEDNA funkcia pre model aj pre cisla (`Construction.dw_body_dims`).
@@ -2474,14 +2476,14 @@ module Noxun
           # ROH-A1: polia ROHOVEJ vyslovne vsetky styri (strana, dverova cast,
           # CR 1, CR 2) — bez nich by sa z rohovej sablony vlozila rohova na
           # predvolbach. Pri inom type sa nezapisuju (golden sablony sa nehnu).
-          if cfg['type'].to_s == CabinetBuilder::CORNER_TYPE
+          if CabinetTypes.corner?(cfg['type'])
             CabinetBuilder::CORNER_KEYS.each { |k| tc[k.to_s] = cfg[k.to_s] if cfg.key?(k.to_s) }
           end
           # KON-A · K1 (Codex FIX 7): komin a zapustenie sablona zapisuje
           # VYSLOVNE, aj 0 — pri pouziti na inu skrinku tak nova sablona 0
           # prepise na 0 a len STARA sablona (kluc chyba) necha hodnotu ciela
-          # (`TemplatesDialog.merge_template`). Slot ich nema.
-          unless cfg['type'].to_s == 'dishwasher'
+          # (`TemplatesDialog.merge_template`). Slot ich nema (typ bez korpusu).
+          if CabinetTypes.carcass?(cfg['type'])
             CabinetBuilder::SETBACK_KEYS.each { |k| tc[k.to_s] = CabinetBuilder.norm_setback(cfg[k.to_s]) }
             # KON-B · K2: vysku list chrbta tiez VYSLOVNE, aj predvolbu 100 —
             # stara sablona (kluc chyba) necha pri pouziti H CIELA.
@@ -2643,12 +2645,27 @@ module Noxun
             # Inspectora nedostane. Odvodene udaje, do kniznice sa nezapisuju.
             rec['construction'] = TemplateStore.construction_summary(t['config'])
             rec['vent_note'] = TemplateStore.ventilation_note(t['config'])
+            # H12b (R2.6): SLOVO TYPU korpusovej sablony zo servera (Inspector
+            # aj Studio — `tile_row` ho preberie z tej istej funkcie). JS ho do
+            # H12c nečíta; doska kluc nedostane.
+            word = template_type_word(t)
+            rec['type_word'] = word if word
             rec = rec.merge('preview_rev' => TemplatePreviews.rev_for(t['kind'], t['name'])) if previews
             out << rec
           end
         rescue StandardError => e
           Engine.log_error(e, 'template_list')
           []
+        end
+
+        # H12b (R2.6): slovo typu (`word` z registra, neznamy a chybajuci typ =
+        # dolna) pre zaznam KORPUSOVEJ sablony, inak nil. Jedina funkcia —
+        # volaju ju obe cesty pushu kniznice (`template_list`, `tile_row`).
+        def template_type_word(rec)
+          return nil unless rec.is_a?(Hash) && rec['kind'] == 'cabinet'
+
+          cfg = rec['config'].is_a?(Hash) ? rec['config'] : {}
+          CabinetTypes.prop(cfg['type'], :word)
         end
 
         def suggest_template_name(cab, _data)

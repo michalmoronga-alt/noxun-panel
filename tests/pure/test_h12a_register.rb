@@ -47,9 +47,10 @@ module NxH12a
     INPUTS.select(&blk)
   end
 
-  # T3a: vetvenie podla MENA typu v Ruby jadre. Rozsah H12a = `core/`
-  # a `modules/` (panel `ui/` pribudne v H12b). Register sam je vynimka.
-  SCAN_DIRS = %w[core modules].freeze
+  # T3a: vetvenie podla MENA typu v Ruby. Rozsah H12a = `core/` a `modules/`,
+  # H12b pridala `ui/` (panel, sablony, Studio — len `.rb`; JS je H12c).
+  # Register sam je vynimka.
+  SCAN_DIRS = %w[core modules ui].freeze
   NAME = '(?:lower|upper|dishwasher|corner_blind)'
   # Formy vetvenia (predrecenzia H12a P3: aj symboly, `eql?`, pole s
   # `include?`, `when` s viacerymi hodnotami a mapa `{ 'upper' => … }[t]`).
@@ -81,7 +82,13 @@ module NxH12a
     ['core/cabinet_builder.rb', 'type: CORNER_TYPE, width: 1100.0', 'predvolby rohovej (DEFAULTS_BY_TYPE)'],
     ['core/cabinet_builder.rb', 'CORNER_TYPE => CORNER_DEFAULTS', 'mapa DEFAULTS_BY_TYPE (paritny guard)'],
     ['core/cabinet_builder.rb', 'CORNER_TYPE => CORNER_KEYS', 'mapa EXTRA_KEYS_BY_TYPE (paritny guard)'],
-    ['core/hardware_rules.rb', "'cabinet_type' => %w[upper]", 'seed pravidla zavesov — strazi ho guard CN-03']
+    ['core/hardware_rules.rb', "'cabinet_type' => %w[upper]", 'seed pravidla zavesov — strazi ho guard CN-03'],
+    # H12b (ui/):
+    ['ui/appliance_dialog.rb', "'dishwasher' => 'Nábytkové čelo (evidencia)'", 'popis KATEGORIE spotrebica v okne Spotrebice'],
+    ['ui/appliance_dialog.rb', "'dishwasher' => {", 'polia formulara KATEGORIE spotrebica'],
+    ['ui/appliance_dialog.rb', 'JOB_CHECKED = %w[fridge oven microwave dishwasher]', 'kategorie spotrebicov kontrolovane v zakazke'],
+    ['ui/rules_dialog.rb', "TYPE_SCOPE_PHRASES = { 'upper' => 'na hornú skrinku'",
+     'VETY rozsahu pravidla (akuzativ, terminologia F3) zrkadlo rules.js — nie vlastnost typu']
   ].freeze
 
   def code_part(line)
@@ -193,7 +200,7 @@ end
 
 # --- T3 · guardy --------------------------------------------------------------
 
-NxTest.test('H12a T3a: v Ruby jadre nie je nove vetvenie podla MENA typu (len vlastnosti registra)') do
+NxTest.test('H12a/H12b T3a: v Ruby (core, modules, ui) nie je nove vetvenie podla MENA typu (len vlastnosti registra)') do
   hits = NxH12a.branch_hits
   NxTest.assert(hits.empty?,
                 "vetvenie podla mena typu mimo registra (pridaj vlastnost do CabinetTypes::REGISTRY, alebo " \

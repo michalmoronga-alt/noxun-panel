@@ -70,6 +70,16 @@ module Noxun
                          'ak ju chceš prepísať, klikni Uložiť znova.'
       GLOBAL_UNREADABLE_AFTER_TEXT = 'Globálne predvoľby sa nepodarilo prečítať, neprepísali sa.'
 
+      # H12b (package H12 R2.6): VETA ROZSAHU pravidla viazaneho na TYP SKRINKY
+      # (`applies_to.cabinet_type`) — server ju sklada, `rules.js` ju do H12c
+      # pocita sam (`rdRoleDesc`, dnes doslovne tieto dve vety). Su to VETY
+      # v akuzative so slovom „spodnú" (terminologia F3, rozhodne Michal v H13),
+      # nie vlastnosti typu — preto nie su v registri `CabinetTypes`. Veta plati,
+      # ked filter pravidla obsahuje PRAVE JEDEN z tychto typov (zrkadlo JS:
+      # horna bez dolnej / dolna bez hornej); inak klient pokracuje dalsimi
+      # filtrami (sokel, podstavec, „na každú skrinku").
+      TYPE_SCOPE_PHRASES = { 'upper' => 'na hornú skrinku', 'lower' => 'na spodnú skrinku' }.freeze
+
       # Strop zoznamu rucnych zasahov (F15). „Použiť na podobné" vie vyrobit
       # desiatky riadkov naraz — nekonecny zoznam by zo sekcie spravil vypis.
       MAX_OVERRIDE_ROWS = 40
@@ -164,7 +174,11 @@ module Noxun
                       # (read-only prehlad) a jantarove riadky rucnych zasahov. Texty
                       # sklada SERVER (jedna autorita nazvov), klient nic neprekladá.
                       'abs' => abs_payload,
-                      'overrides' => overrides_payload(collected) }
+                      'overrides' => overrides_payload(collected),
+                      # H12b (R2.6): hotova veta rozsahu pravidiel viazanych na
+                      # typ skrinky, `{ rule_id => veta }` (len pravidla, ktore ju
+                      # maju). Aditivny kluc — `rules.js` ho do H12c nečíta.
+                      'type_scope' => type_scope_map(rules) }
           @baseline_guid  = guid
           @baseline_rules = rules
           @baseline_rev   = rev
@@ -177,6 +191,25 @@ module Noxun
           # BASELINE sa pritom NEMENI (viz komentar vyssie).
           Engine.log_error(e, 'RulesDialog.rules_payload')
           nil
+        end
+
+        # H12b (R2.6): veta rozsahu pravidla podla typu skrinky alebo nil —
+        # dnesna logika `rdRoleDesc` (rules.js) pre rolu `cabinet`: filter
+        # `cabinet_type` obsahuje PRAVE JEDEN typ z `TYPE_SCOPE_PHRASES`.
+        def type_scope_desc(rule)
+          ap = rule.is_a?(Hash) ? rule['applies_to'] : nil
+          return nil unless ap.is_a?(Hash) && ap['role'].to_s == 'cabinet'
+
+          kinds = Array(ap['cabinet_type']).map(&:to_s)
+          hits = TYPE_SCOPE_PHRASES.keys.select { |t| kinds.include?(t) }
+          hits.length == 1 ? TYPE_SCOPE_PHRASES[hits.first] : nil
+        end
+
+        def type_scope_map(rules)
+          Array(rules).each_with_object({}) do |r, out|
+            desc = type_scope_desc(r)
+            out[r['rule_id'].to_s] = desc if desc
+          end
         end
 
         # ================ ŠT-3b-2a: ABS podla roly + rucne zasahy ==============

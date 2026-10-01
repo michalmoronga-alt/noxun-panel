@@ -131,6 +131,15 @@ module Noxun
         # `tplDims` vynechava padnute hodnoty).
         def tile_row(rec)
           cfg = rec['config'].is_a?(Hash) ? rec['config'] : {}
+          row = tile_row_base(rec, cfg)
+          # H12b (R2.6): slovo typu korpusovej dlazdice zo servera (doska bez
+          # kluca) — ta ista funkcia ako vkladacia karta (`Panel.template_list`).
+          word = Panel.template_type_word(rec)
+          row['type_word'] = word if word
+          row
+        end
+
+        def tile_row_base(rec, cfg)
           { 'name' => rec['name'].to_s,
             'preview_rev' => rec['preview_rev'],
             'config' => TILE_CONFIG_KEYS.each_with_object({}) do |k, out|
@@ -416,11 +425,8 @@ module Noxun
           # Typovy guard aj TU, nie len v HTML disabled (Codex PR #29): sekcia
           # vyber NESLEDUJE (audit N27 — ziadny observer), takze verdikt musi
           # dat server pri kliku.
-          cab_type = (Store.config(cab) || {})['type'] || 'lower'
-          tpl_type = (tpl['config'] || {})['type'] || 'lower'
-          if tpl_type != cab_type
-            return set_status("Šablóna je pre iný typ (#{Panel::TEMPLATE_TYPE_WORDS[tpl_type] || 'dolná'}) " \
-                              'než označená skrinka — nepoužitá.', true)
+          if (type_msg = template_type_refusal(Store.config(cab) || {}, tpl['config'] || {}))
+            return set_status(type_msg, true)
           end
           # ROH-A1 (krizovy audit C5 + R6): rohova sablona INEJ STRANY sa na
           # existujucu rohovu nepouzije (overridy hran by po zrkadleni ukazovali
@@ -535,11 +541,31 @@ module Noxun
           note.empty? ? nil : { note: note }
         end
 
+        # H12b (audit H12 A2): TYPOVY GUARD pouzitia sablony — veta odmietnutia,
+        # inak nil. Cista funkcia (headless test, obojsmerna matica). Porovnava
+        # IDENTITU typov (`template_type_id`), NIE normalizovany typ: sablona
+        # s `type: ''` sa na dolnu NEPOUZIJE (a naopak), hoci oba sa citaju ako
+        # dolna — tak to bolo vzdy. Slovo typu vo vete je oddelena NORMALIZACIA
+        # (`CabinetTypes.prop … :word` — neznamy a prazdny typ = „dolná").
+        def template_type_refusal(cab_cfg, tpl_cfg)
+          tpl_type = template_type_id(tpl_cfg)
+          return nil if tpl_type == template_type_id(cab_cfg)
+
+          "Šablóna je pre iný typ (#{CabinetTypes.prop(tpl_type, :word)}) než označená skrinka — nepoužitá."
+        end
+
+        # Identita typu pre typovy guard: CHYBAJUCI kluc (nil) = `FALLBACK`,
+        # vsetko ostatne (aj `''` a neznamy typ) ostava surove. NIE
+        # `CabinetTypes.id_or_default` (to by `''` zlialo s dolnou).
+        def template_type_id(cfg)
+          (cfg.is_a?(Hash) ? cfg['type'] : nil) || CabinetTypes::FALLBACK
+        end
+
         # ROH-A1: veta odmietnutia pouzitia sablony na ROHOVU skrinku, inak nil.
         # Cista funkcia (headless test) — `cab_cfg` = ulozeny config ciela.
         def corner_template_apply_refusal(cab_cfg, tpl_cfg)
-          return nil unless cab_cfg['type'].to_s == CabinetBuilder::CORNER_TYPE
-          return nil unless tpl_cfg['type'].to_s == CabinetBuilder::CORNER_TYPE
+          return nil unless CabinetTypes.corner?(cab_cfg['type'])
+          return nil unless CabinetTypes.corner?(tpl_cfg['type'])
 
           if tpl_cfg.key?('corner_side') &&
              Construction.corner_side(tpl_cfg) != Construction.corner_side(cab_cfg)
