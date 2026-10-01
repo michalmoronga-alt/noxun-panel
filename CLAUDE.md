@@ -139,16 +139,17 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa
 - `VERSION` žije na 2 miestach: `noxun_engine.rb` (autorita) + `noxun_engine/main.rb` (fallback) — synchro stráži guard test.
 - **Každý PR meniaci kód pluginu = bump patch** (0.5.0 → 0.5.1); **minor = výhradne uzáver bloku z `SYSTEM/PLAN.md`** (0.5.x → 0.6.0).
 - **Každé zvýšenie VERSION = prepis `SYSTEM/STAV.md`** (aj pri malom fixe). **Dokumentačné PR, ktoré mení stav bloku alebo poradie prác**
-  (štart či uzáver bloku, smoke PASS, Michalovo rozhodnutie o poradí), **prepíše v STAV sekcie „Robí sa" a „Ďalší krok"** — verzia v sekcii „Stav"
-  sa nemení a nahradený text stačí zhrnúť v zázname dávky v KRONIKE (od 1.10.2026); ostatné dokumentačné PR STAV nemenia.
+  (štart či uzáver bloku, smoke PASS, Michalovo rozhodnutie o poradí), **prepíše v STAV sekcie „Robí sa" a „Ďalší krok"** a v sekcii „Stav"
+  smie aktualizovať **faktický stav bloku či smoke** (napr. „smoke čaká" → „smoke PASS") — **verzia a čísla testov sa nemenia**; nahradený text stačí
+  zhrnúť v zázname dávky v KRONIKE (od 1.10.2026); ostatné dokumentačné PR STAV nemenia.
 - **Cache-bust:** každý `?v=` v `ui/*.html` = presne VERSION (stráži guard test; CEF cachuje css/js). Zmena css/js ⇒ bump verzie ⇒ prepísať všetky `?v=`.
 - **Checklist uzáveru kódovej dávky:** bump VERSION (2×) + `?v=` → testy zelené → **odsek dotknutého modulu v `docs/architecture/<súbor>.md`
   aktualizovaný na mieste** → vyriešené D-čísla do `SYSTEM/archiv/DOGFOODING_vyriesene.md` (**plný text + PR do sekcie „Vyriešené (plné
   texty)" a jeden riadok navrch INDEXU v tom istom súbore**; `SYSTEM/DOGFOODING.md` drží **len otvorené** postrehy) → **prepíš
   `SYSTEM/STAV.md` + APPEND odsek navrch „Záznamy dávok" v `SYSTEM/archiv/KRONIKA.md`** → v `SYSTEM/PLAN.md` ostáva riadok dávky v bloku
   **s ✅ a číslom PR** (presúva sa až s uzáverom bloku).
-- **Checklist dokumentačného PR:** odsek navrch „Záznamy dávok" v KRONIKE **áno**; v STAV **len „Robí sa" a „Ďalší krok"**, keď PR mení stav
-  bloku alebo poradie prác; VERSION ani `?v=` **nie**.
+- **Checklist dokumentačného PR:** odsek navrch „Záznamy dávok" v KRONIKE **áno**; v STAV **len „Robí sa", „Ďalší krok" a faktický stav
+  bloku či smoke v sekcii „Stav"**, keď PR mení stav bloku alebo poradie prác (verzia a čísla testov nie); VERSION ani `?v=` **nie**.
 - **Číslo PR** (všade, kde ho dávka píše — PLAN, KRONIKA, STAV, `DOGFOODING_vyriesene`): pred `gh pr create` sa píše `PR #?`; hneď po
   vytvorení PR ho doplní samostatný commit, ktorý mení len číslo. Ten **pred mergom skontroluje orchestrátor** (pri čistom kole 1 inak
   žiadna delta nebeží; keď delta beží, patrí do nej).

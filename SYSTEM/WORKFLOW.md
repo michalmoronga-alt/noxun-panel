@@ -214,7 +214,7 @@ neopakuje a PR uvedie, na ktorej hlave bežal; zmena Ruby spúšťača = beh zno
 ho doplní samostatný commit, ktorý mení len číslo — ten pred mergom skontroluje orchestrátor (pri čistom kole 1 inak žiadna delta nebeží).
 **Dokumentačné PR** (bez kódu pluginu) idú skrátene: vetva `docs/…` → odsek v KRONIKE → headless testy (guardy dokumentácie) → kvóta →
 PR → číslo PR → review → merge. Verzia, `?v=` ani predrecenzia sa pri nich nerobia; STAV len vtedy, keď PR mení stav bloku alebo poradie
-prác — vtedy prepíše sekcie „Robí sa" a „Ďalší krok" (verzia ostáva).
+prác — vtedy prepíše sekcie „Robí sa" a „Ďalší krok" a v „Stav" smie aktualizovať faktický stav bloku či smoke (verzia a čísla testov ostávajú).
 
 ## 5 · Review po PR
 
@@ -301,7 +301,7 @@ Všetko, čo musí platiť, aby práca pokračovala. „Kto" = kto bránu uzatv�
 | kvóta | štart okna; pred auditom, implementačným subagentom, predrecenziou, `gh pr create` a `@codex review` | skript `usage` → orchestrátor | CLAUDE.md · Kvóty a štart okna · skill `usage` |
 | testy zelené | vždy headless + každá JS sada zvlášť | CI + orchestrátor | CLAUDE.md · Testovanie |
 | test v SketchUpe zelený | buildery, observery, undo a operácie, geometria, akcie panela zapisujúce do modelu; na finálnej hlave znova len pri zmene Ruby spúšťača po poslednom behu (PR uvedie hlavu behu) | runner → orchestrátor | CLAUDE.md · Testovanie |
-| docs a verzia na mieste | kódová dávka: celý checklist; dokumentačné PR: KRONIKA + pri zmene stavu bloku alebo poradia prác STAV „Robí sa" a „Ďalší krok" | orchestrátor + guard testy | CLAUDE.md · Verzia a uzáver dávky |
+| docs a verzia na mieste | kódová dávka: celý checklist; dokumentačné PR: KRONIKA + pri zmene stavu bloku alebo poradia prác STAV „Robí sa", „Ďalší krok" a faktický stav bloku či smoke (bez verzie a čísel testov) | orchestrátor + guard testy | CLAUDE.md · Verzia a uzáver dávky |
 | predrecenzia bez P1/P2 | audit-povinné a výrobné/cenové dávky; bežná dávka nad 300 riadkov kódu pluginu alebo s novým prvkom UI | slepý recenzent → orchestrátor | skill `predrecenzia` |
 | review kolo uzavreté | pred mergom, pre aktuálnu hlavu vetvy | review PR alebo náhradná brána → orchestrátor | skill `codex-po-pr` |
 | CI zelené | pred mergom, na aktuálnej hlave | GitHub Actions | skill `codex-po-pr` |

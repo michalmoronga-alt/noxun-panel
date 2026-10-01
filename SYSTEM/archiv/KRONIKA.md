@@ -32,7 +32,8 @@
   PLAN a V1_VIZIA len odkazujú); „Hranica TYP vs. ŠABLÓNA vs. PARAMETER" → [STANDARD.md](../STANDARD.md) §4.2 (POJMY a PLAN len odkaz); „Pravidlo pre postrehy"
   ostáva v PLAN (je to pravidlo plánovania). V [DOGFOODING.md](../DOGFOODING.md) zanikli prázdne skupiny archivovaných blokov (1b, V1 DOTIAHNUTIE, INFRA);
   hlavička [AUDIT_REGISTER.md](../AUDIT_REGISTER.md) už nehovorí o bloku 1d ako o živom. **B-08 (súhlas Michala):** dokumentačné PR, ktoré mení stav bloku
-  alebo poradie prác, prepíše v STAV „Robí sa" a „Ďalší krok" (verzia ostáva; nahradený text stačí zhrnúť tu) — CLAUDE.md, hlavička STAV, README, WORKFLOW
+  alebo poradie prác, prepíše v STAV „Robí sa" a „Ďalší krok" a v sekcii „Stav" smie aktualizovať faktický stav bloku či smoke
+  (spresnenie orchestrátora po review #433; verzia a čísla testov ostávajú; nahradený text stačí zhrnúť tu) — CLAUDE.md, hlavička STAV, README, WORKFLOW
   a typ agenta implementátora. Hneď aplikované: **nahradené** „Robí sa: smoke bloku CENY" a „Ďalší krok: aktualizovať, smoke CENY, potom pred V1 R-13 → R-37 →
   R-35" → **blok 9 beží (H1…H17, H6/H7 čakajú na mockup), R-13/R-37/R-35 = H8–H10**; v sekcii Stav opravené „smoke čaká" → smoke PASS 30.9. (PR #431) a veta
   „pred uzáverom V1 ostávajú R-13 → R-37 → R-35 (blok 4)" → V1 hotové, H8–H10; verzia v0.17.0 bez zmeny. **B-09 (súhlas Michala s príkladmi):** k definícii
