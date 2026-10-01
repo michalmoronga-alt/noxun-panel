@@ -359,8 +359,12 @@ a atribúty na `<body>`; `innerHTML` re-render kostry je zakázaný (listenery, 
   (kľúč `zony`, `nxApplyTags`). Testy `tests/pure/test_d27_tagy.rb`, `tests/js/test_d27_tagy.js`, in-SU `run_d27`; modul `tags.rb` v [construction.md](construction.md).
 - **Koliesko** otvára modal `#cfgModal` (Vzhľad = téma · Rozmerové rady = editor `DimSeries` · O plugine = logo + verzia) — zámerne nie piaty kontext (nastavenia
   počítača nepatria do stavového stroja a musia ísť aj bez výberu). Rady chodia v `push_init` (`ui_settings`) a malým pushom `NX.setUiSettings` (mení len
-  ponuky a stav prepínača). **Téma v tomto payloade nie je a nesmie pribudnúť** (`nxSyncThemeButtons` len presvieti tlačidlá). Testy
-  `tests/js/test_uib3_korpus.js`, `tests/pure/test_uib3_rady.rb`.
+  ponuky a stav prepínača). **Téma v tomto payloade nie je a nesmie pribudnúť** (`nxSyncThemeButtons` len presvieti tlačidlá). **Dve okná (H10b/R-35):** editor
+  pripne rady, ktoré ukázal, do `NXDIM_BASE` (kópia) **len** v `nxFillSeriesEditor` (otvorenie kolieska a odpoveď `refill_editor`); push témy ani init pin nemenia.
+  „Uložiť rady" posiela cez čistú `NXDim.changes(texts, base)` len rady, ktorých normalizovaná podoba sa líši od pinu, a ku každému pôvodnú hodnotu (`{series, base}`;
+  rad bez pinu ide s `base: null` → server `:stale_client`); bez zmeny server nevolá, polia zjednotí z pinu a status povie „Rozmerové rady sa nezmenili.". „Predvolené"
+  mení len polia. Výsledok uloženia ukazuje aj riadok `#serStatus` priamo v sekcii (`nxSeriesStatus`; plní ho `series_status` z odpovede, otvorenie kolieska ho skryje,
+  push témy ho nemení). Testy `tests/js/test_uib3_korpus.js`, `tests/js/test_h10b_rady.js`, `tests/pure/test_uib3_rady.rb`, `tests/pure/test_h10b_rady.rb`.
 
 **Sektory:**
 - `<details data-key="s1…s4">`, zbalenie v `localStorage`. Viditeľnosť S2/S3 rozhoduje čistá **`NXShell.sectorVis(mode, ctx)`** — Základné a Materiály patria
@@ -1227,8 +1231,12 @@ idú cez `foreign_document?`.
 
 Doména panela: **nastavenia počítača z kolieska raily** (`%APPDATA%`, nie zákazky) — do modelu sa nezapisuje a žiadna cesta neotvára operáciu. `handle_set_ui_theme`
 (whitelist v Ruby `Engine.normalize_ui_theme`; odpoveď nejde zvlášť — `apply_ui_theme` rozošle tému všetkým oknám; zlyhanie zápisu sa nehlási ako úspech) a
-`handle_set_dim_series` (normalizáciu robí výhradne `DimSeries`; `refill_editor` prepíše pole editora uloženou podobou; poškodený primár s platnou `.bak` sa hlási
-ako odmietnutie brány). Nastavenia chodia aj v `push_init` (`ui_settings`). UI: odsek „Inspector — kostra" (koliesko).
+`handle_set_dim_series` — od H10b/R-35 `DimSeries.update!(data['series'], data['base'])` (len zmenené rady + pôvodné hodnoty; normalizáciu robí výhradne `DimSeries`).
+`push_ui_settings(refill_editor: true, series_status:)` ide pri **každom** výsledku (editor ukáže uložený stav a znova pripne pôvodné hodnoty;
+`series_status` = tá istá veta pre riadok `#serStatus` v sekcii modalu, ktorý `#status` prekrýva), veta cez `case`: `:ok` „Rozmerové rady
+uložené." / bez zmeny „…sa nezmenili." · `:conflict` červené „Rozmerové rady (Šírky) medzitým zmenilo iné okno SketchUpu — nič sa neuložilo. Editor ukazuje aktuálne uložené
+rady, zmenu zadaj znova." (rozpis sa stratí) · `:stale_client` červené „Okno je z predošlej verzie pluginu…" · `:blocked` dôvod brány `DimSeries.write_block_reason` ·
+`:write_failed` „…(disk/práva)". Panel `DimSeries.set(` nevolá. Nastavenia chodia aj v `push_init` (`ui_settings`). UI: odsek „Inspector — kostra" (koliesko).
 
 ### actions_templates.rb
 

@@ -88,6 +88,31 @@
     function formatList(list){
       return (list || []).join(', ');
     }
+    function sameList(a, b){
+      if (!a || !b || a.length !== b.length) return false;
+      for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+      return true;
+    }
+    // H10b/R-35: co z editora naozaj ODCHADZA. `texts` = text poli editora,
+    // `base` = rady pripnute pri naplneni editora (NXDIM_BASE). Zmeneny je rad,
+    // ktoreho normalizovana podoba sa lisi od pripnutej — server dostane LEN
+    // tieto rady (`series`, text ako ho pouzivatel napisal — normalizuje
+    // server) a ku kazdemu povodnu hodnotu (`base`). Rad bez pripnutej
+    // hodnoty ide s `base: null` — server ho odmietne (fail-closed), nikdy
+    // ho nezapise naslepo.
+    function changes(texts, base){
+      var b = base || {};
+      var out = { series: {}, base: {}, keys: [] };
+      KEYS.forEach(function(k){
+        var raw = parseText(texts ? texts[k] : '');
+        var was = normalizeList(b[k]);
+        if (was !== null && sameList(normalizeList(raw), was)) return;
+        out.series[k] = raw;
+        out.base[k] = was;
+        out.keys.push(k);
+      });
+      return out;
+    }
     // HTML mini-ponuky pri poli. Hodnoty su CISLA po normalizacii — do markupu
     // nejde ziadny pouzivatelsky retazec.
     function menuHtml(key, inputId){
@@ -107,6 +132,7 @@
       KEYS: KEYS, DEFAULTS: DEFAULTS, MAX_VALUES: MAX_VALUES,
       normalizeList: normalizeList, normalize: normalize,
       parseText: parseText, formatList: formatList, menuHtml: menuHtml,
+      changes: changes,
       get: function(key){ return (series()[key] || []).slice(); },
       all: function(){ return series(); },
       set: function(raw){ state.series = normalize(raw); return state.series; }
@@ -214,24 +240,55 @@
       sketchup.nx_set_ui_theme(JSON.stringify({ theme: name }));
   }
 
+  // H10b/R-35: PIN povodnych hodnot — rady, ktore editor UKAZAL. Pripina sa
+  // LEN tu (otvorenie kolieska a odpoved na vlastne ulozenie `refill_editor`);
+  // push temy ani init ho NEMENI: rozpisany editor sa porovnava s tym, co
+  // pouzivatel videl, nie s tym, co medzitym zapisalo ine okno. Kopia, nie
+  // referencia na stav NXDim (ten prepise kazdy push).
+  var NXDIM_BASE = null;
   function nxFillSeriesEditor(){
-    var all = NXDim.all();
+    NXDIM_BASE = NXDim.normalize(NXDim.all());
     NXDim.KEYS.forEach(function(k){
       var inp = el('ser_' + k);
-      if (inp) inp.value = NXDim.formatList(all[k]);
+      if (inp) inp.value = NXDim.formatList(NXDIM_BASE[k]);
     });
+  }
+
+  // H10b (predrecenzia P3): stavova veta ulozenia radov PRIAMO v sekcii modalu
+  // — tmave prekrytie modalu zakryva `#status` panela, takze bez nej by
+  // pouzivatel nevidel, preco sa mu rozpisany text prepisal. `s` = { text, error };
+  // prazdne = riadok sa skryje (nezabera miesto).
+  function nxSeriesStatus(s){
+    var n = el('serStatus'); if (!n) return;
+    var text = (s && s.text) ? String(s.text) : '';
+    n.textContent = text;
+    n.className = text ? (s.error ? 'err' : 'ok') : '';
+    n.hidden = !text;
   }
 
   // Ulozenie radov. Server normalizuje (cisla, rozsah, duplicity, poradie) a
   // vrati, co naozaj ulozil — az tym sa prekreslia ponuky pri poliach.
+  // H10b: odchadzaju LEN zmenene rady s povodnymi hodnotami (NXDim.changes) —
+  // rozne rady z dvoch okien sa zlucia, ten isty rad skonci konfliktom.
   function saveDimSeries(){
-    var out = {};
+    var texts = {};
     NXDim.KEYS.forEach(function(k){
       var inp = el('ser_' + k);
-      out[k] = NXDim.parseText(inp ? inp.value : '');
+      texts[k] = inp ? inp.value : '';
     });
+    var c = NXDim.changes(texts, NXDIM_BASE);
+    if (!c.keys.length){
+      // nic sa nezmenilo — bez volania servera; polia z pinu (zjednoti zapis)
+      NXDim.KEYS.forEach(function(k){
+        var inp = el('ser_' + k);
+        if (inp) inp.value = NXDim.formatList(NXDIM_BASE[k]);
+      });
+      nxSeriesStatus({ text: 'Rozmerové rady sa nezmenili.', error: false });
+      if (window.NX && NX.setStatus) NX.setStatus('Rozmerové rady sa nezmenili.');
+      return;
+    }
     if (window.sketchup && sketchup.nx_set_dim_series)
-      sketchup.nx_set_dim_series(JSON.stringify({ series: out }));
+      sketchup.nx_set_dim_series(JSON.stringify({ series: c.series, base: c.base }));
   }
 
   // Predvolene rady — len do POLI editora (ulozi ich az „Uložiť rady").
@@ -254,6 +311,7 @@
     if (!m) return;
     nxDimCloseMenus();
     nxFillSeriesEditor();
+    nxSeriesStatus(null); // veta z minuleho ulozenia k novemu otvoreniu nepatri
     nxSyncThemeButtons();
     if (section){
       var target = el('cfg_' + section);
@@ -306,4 +364,6 @@
     nxDimRenderMenus();
     nxSyncThemeButtons();
     if (d.refill_editor) nxFillSeriesEditor();
+    // H10b: vetu vysledku nesie LEN odpoved na ulozenie radov (spolu s refill)
+    if (d.series_status) nxSeriesStatus(d.series_status);
   }

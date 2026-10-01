@@ -186,7 +186,7 @@ module NxR11PanelStub
       orig = {}
       STUBBED.each { |m| orig[m] = panel.method(m) if panel.respond_to?(m) }
       panel.define_singleton_method(:parse) { |payload| JSON.parse(payload.to_s) }
-      panel.define_singleton_method(:push_ui_settings) { |refill_editor: false| refill_editor }
+      panel.define_singleton_method(:push_ui_settings) { |refill_editor: false, **_rest| refill_editor }
       panel.define_singleton_method(:set_status) do |msg, error = false|
         NxR11PanelStub.last_status = [msg, error]
       end

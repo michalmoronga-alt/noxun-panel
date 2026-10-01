@@ -273,9 +273,21 @@ Chýbajúci aj poškodený súbor = predvolená sada (nikdy výnimka); **zlyhani
 nestal (to isté platí pre `Engine.set_ui_theme`). Modul o modeli nevie — rad je len **ponuka**, zápis hodnoty ide existujúcou cestou poľa v paneli.
 
 **1d/R-08:** `set` beží pod tým istým zdieľaným sidecar zámkom ako ostatné katalógy priečinka (`Materials.with_catalog_lock`, `materials.lock` — mechanika v
-[hardware.md](hardware.md), odsek `hardware_sets.rb`); nezískaný zámok skončí ako `nil`, teda ako každé iné zlyhanie zápisu. **Priznaný zvyšok:** rad je ÚPLNÁ NÁHRADA — panel
-posiela celý objekt a súbor nemá revíziu, takže dve otvorené okná sa nad ním stále prebíjajú „posledný vyhráva". Zámok ich zápisy len SERIALIZUJE; revízia + konfliktová vetva sú
-UI kontrakt a register ich vedie ako **R-35**.
+[hardware.md](hardware.md), odsek `hardware_sets.rb`); nezískaný zámok skončí ako `nil`, teda ako každé iné zlyhanie zápisu. `set` je **interné API** (testy, `update!`) —
+úplná náhrada bez pôvodných hodnôt; panel ho nevolá (guard `test_h10b_rady.rb`).
+
+**H10b/R-35 — zápis z panela po kľúčoch s pôvodnou hodnotou kľúča:** `update!(changes, base)` → `[status, rady, kľúče]`, `status` ∈ `:ok | :conflict | :stale_client |
+:blocked | :write_failed` (vyhodnocovať `case`, `:conflict` je pravdivý). Panel drží rady od otvorenia, preto celková revízia súboru by hlásila konflikt pri každej zmene iného
+radu a zápis po kľúčoch bez pôvodnej hodnoty by ďalej ticho strácal zmenu toho istého radu. Pod zámkom v poradí: brána degradovaného súboru (`:blocked`, aj bez `base`) →
+`changes`/`base` nie Hash alebo menený rad nemá v `base` pole (`:stale_client` — okno zo staršieho pluginu, fail-closed) → `JsonFileStore.reload!` + `read_current` (na rozdiel od
+`get` **nezhltne I/O chybu** — predvolená sada by inak prepísala súbor; poškodený primár bez zálohy a chýbajúci súbor = predvolená sada) → menené rady s `normalize_list(base[k])
+!= current[k]` **a zároveň** výsledkom iným než súbor = `[:conflict, aktuálne, tie_rady]` a **nezapíše sa nič** (ani nekonfliktné rady; obe okná
+na **rovnakú** hodnotu konflikt nie sú — predrecenzia P3) → `merged = normalize(current.merge(zmenené ∩ KEYS))`; bez rozdielu `[:ok,
+current, []]` bez zápisu, inak `set(merged)` (jediný zápis modulu, zámok reentrantný). Rôzne rady z dvoch okien sa tak zlúčia, ten istý rad skončí hláškou. `LABELS` = mená radov
+do hlášky (zrkadlo `#ser_<kľúč>`). **Hranice (R2.7):** zlúčenie platí pre dnešných 5 normalizovaných kľúčov (`KEYS`); `[]` je platná hodnota (zlúči sa a zapíše), chýbajúci či
+neplatný kľúč v súbore sa číta ako predvolený, neznámy kľúč od klienta sa ignoruje a neznámy kľúč v súbore `set` pri zápise **zahodí** (zapíše `std: 1`) — **ochrana novšieho
+formátu radov neexistuje** (dnešné obmedzenie; budúci kľúč = vlastná dávka s bránou `std`). **Prevádzková podmienka:** chráni len okná s H10b — okno spustené pred aktualizáciou
+zapisuje postaru, preto po aktualizácii zavrieť **všetky** okná SketchUpu na PC. Testy `tests/pure/test_h10b_rady.rb`, `tests/js/test_h10b_rady.js`.
 
 **1d/R-11:** `set` má hneď po zámku bránu degradovaného súboru (`degraded_write_blocked?`) — poškodený primár s platnou `.bak` sa číta zo ZÁLOHY, takže zápis by rady prepísal
 STARŠÍM obsahom. Odmietnutie končí ako každé iné zlyhanie (`nil`; dvojica `[nil, dôvod]` by rozbila volajúcich a `[false, dôvod]` by bola v Ruby pravdivá), ale KONKRÉTNY dôvod si
