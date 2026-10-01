@@ -599,6 +599,12 @@ Výroba).
 `params_label` — „rez 597 mm", D-90; obohatenie zmizlo z `push_state` okna Výroba, aby dva klienty nemohli mať dve pravdy o tom, ako sa položka volá) a **telo `do_hw_csv`**
 (nákupný CSV zoznam; rovnaký tvar ako `do_export` — `generation:`/`status:`/`repush:` — takže okno je nad ním len obal).
 
+**H3a (A-04) rozšírila obohatenie pre okno — aditívne, do CSV ani snapshotu nič nejde.** `hardware_labeled` navyše dáva `params_text` (ľudské parametre,
+`HardwareSets.params_text`; `params_label` ostáva pre CSV „rozmer" a vety Kontroly) a `where` — `hardware_where(breakdown)` zoskupí pôvod podľa (vlastník,
+ručný zásah, `manual_note`) v poradí prvého výskytu so sčítanými kusmi (`breakdown` s `owner_pid` ostáva pre klik-select). Nová `hardware_sets_labeled(exp)`
+vracia **kópiu** nákupného zoznamu so SK `category_label` a `label` nemapovaných (`nil` pri ne-Hash, chýbajúce kľúče nedopĺňa); **vstup nemutuje** — ten istý
+`hw_exp` číta plán, Rozpočet, Kontrola aj spotrebiče a `do_hw_csv` si nákup počíta nanovo, takže CSV kovania je bajtovo rovnaké (`tests/pure/test_h3_zobrazenie.rb`).
+
 **VEDOMÁ ZMENA (audit #15):** CSV kovania dostalo **generačný guard**, ktorý predtým nemalo — je to nákupný dokument a nesmie vzniknúť z okna so zastaranými dátami (ostatné tri
 exporty ho majú odjakživa); odmietnutie nie je tiché, okno sa obnoví a povie to.
 

@@ -2442,8 +2442,14 @@ payload cez `NXShell.studioOpenLink`) → `open_studio` → `StudioDialog::SECTI
 `@pending_section` a **spotrebuje ju najbližší `push_state`** (jednorazovo — inak by každý refresh vrátil používateľa tam, odkiaľ medzitým odišiel); `anchor` (ID skrinky z N13
 „Materiál") **predvyplní hľadanie Š6** a spotrebuje sa spolu so sekciou, takže používateľovo vymazanie filtra prežije refresh.
 
-**Server je autorita čísel aj textov:** medzisúčty skupín idú z `sheets`, súčtový riadok z `totals` (vrátane rozsahu odhadu platní), popisky z `materials_meta` — **JS neprepočítava
-žiadnu sumu**. Klient si pamätá výhradne zobrazovacie veci TOHTO počítača (`localStorage`: voliteľné stĺpce `nx_bom_cols`, zbalené skupiny `nx_bom_groups`, zbalená navigácia
+**Server je autorita čísel aj textov:** medzisúčty skupín idú z `sheets`, súčtový riadok z `totals`, popisky z `materials_meta` — **JS neprepočítava žiadnu sumu**.
+
+**Súčtový riadok NEUKAZUJE súčet platní (H3a, A-01).** `totals.plates_min/max` sčítava server cez **všetky** položky odhadu (všetky materiály aj nákup pre
+dupláky) — platne rôznych dekorov sa spolu objednať nedajú, takže číslo zvádzalo k chybnej objednávke. Súčtový riadok pohľadu **Dielce** aj **Platne** má namiesto
+neho preklik **„Nárezový plán"** (`cutLinkHtml`: `<button class="linkbtn" data-nav="cut">` s ikonou `scissors`, vzhľad odkazu `.studio .totrow .linkbtn`) — ide
+**existujúcou** cestou `data-nav` → `onNav` → `studioGoSection('cut')`, žiadny nový listener ani server. Stĺpec „Odhad platní" po materiáloch v pohľade Platne
+ostáva (orientačný, prerez 10–25 %). **`plates_min/max` v payloade OSTALI nevyužité** (payload bajtovo rovnaký, test ŠT-1a ich pripína) — znova ich nezobrazovať;
+odstránenie pri H14 (sekcie Štúdia na jednom mieste). Guard: `studio.js` ich nesmie čítať (`tests/js/test_h3_zobrazenie.js`). Klient si pamätá výhradne zobrazovacie veci TOHTO počítača (`localStorage`: voliteľné stĺpce `nx_bom_cols`, zbalené skupiny `nx_bom_groups`, zbalená navigácia
 `nx_studio_nav`) — nikdy model.
 
 **Editovateľný názov projektu a checkbox „18+36 spolu" žijú v lište Kusovníka** (`studio_set_vepo_opts` → zápis do `%APPDATA%`).
@@ -2468,7 +2474,7 @@ nechá tak; hodnotu inputu pritom nasadí **len keď v ňom používateľ práve
 rozísť s tým, čo platí pre exporty.
 
 Pohľad **Platne** skladá riadky z **oboch** zdrojov — `sheets` (materiály s vlastnými výrobnými dielcami) **aj** `sheet_estimate` (2B-1/D-43: duplák, ktorého plocha vznikla len z
-lepených dielcov, vlastné dielce nemá, ale **reálne sa nakupuje**) — inak by ten nákup z tabuľky zmizol a súčtový riadok, ktorý ráta cez všetky položky odhadu, by s ňou nesedel.
+lepených dielcov, vlastné dielce nemá, ale **reálne sa nakupuje**) — inak by ten nákup z tabuľky zmizol aj s jeho odhadom platní v stĺpci.
 
 **Vedomé odchýlky ŠT-1a:** stĺpec „Poznámka" **neexistuje** (v Ruby preň nie je zdroj) · exporty **XLSX/CSV kusovníka boli viditeľné `aria-disabled`** s dôvodom — **SMOKE 22.8. ich
 z lišty ODSTRÁNILA** (verdikt Michal): D-78 platí na sľub, ktorý príde hneď, tieto dva viseli neaktívne celý blok ŠT-1 a v okne pôsobili ako rozbité tlačidlá; vrátia sa **s reálnym
@@ -2883,6 +2889,15 @@ nálezu".
 
 **Všetky tri čísla sú serverové** — `Validation.counts` dostalo od tejto dávky **zelené číslo** (`cabinets`/`clean` = počet korpusov mínus vlastníci s nálezom).
 
+**H3a (A-03) — menovateľ a počet riadkov.** Zelený chip píše **„0 zo 7 skriniek bez nálezu"**: menovateľ je `counts.cabinets` (v payloade bol už od ŠT-1b, payload sa
+nemenil), predložku z/zo dáva čistá `skZo(n)` (zo pred 4, 6, 7, 14, 16, 17, desiatkami 4/6/7 a stovkami 1/4/6/7; od 1000 vždy „z"), `cabinets === 0` = „0 skriniek
+v modeli", `clean` null = „—" a payload bez `cabinets` = dnešný tvar (`greenChipParts`). Oranžový chip píše **„10 nálezov v 5 riadkoch · skontroluj pred
+objednávkou"** — D-122 zlučuje UNI nálezy do jedného riadku, takže 10 nálezov nad piatimi riadkami pôsobilo ako chyba. **Počet riadkov je JEDINÉ číslo semaforu,
+ktoré počíta klient — vedomá výnimka k „všetky čísla sú serverové"**: nie je to údaj o dátach, ale koľko riadkov TENTO zoznam nakreslí (zlučovanie D-122 žije len
+v klientovi). Počíta ho `ctrlOrangeRowCount` (oranžové mimo UNI skupiny + 1 za skupinu) zo **zdieľaného predikátu** `ctrlUniGrouped`, ktorý používa aj
+`ctrlListHtml` — parita je pod testom; filtrom a dĺžkou poľa, nie sčítavaním (guard ŠT-1a). `semaforHtml(counts, filter, list)` má zoznam ako voliteľný tretí
+argument — bez neho a pri počte riadkov ≥ počtu nálezov sa „v M riadkoch" nepíše.
+
 **Menovateľ je skutočný počet skriniek zo zberu (`collected[:cabinets]`)**, nie dĺžka zoznamu ID z `placements`: `Bom.add_placement` záznam vynecháva (prázdne ID, degenerované
 rozmery) a rovnaké ID zbiera raz, takže poškodená skrinka či dve kópie s tým istým ID by počet skriniek **ticho zmenšili** (nález review #2). Množina ID z `placements` slúži len na
 rozhodnutie „ktoré ID patrí skrinke"; bez nej sa zelené číslo nepočíta vôbec a tvar `counts` sa **nemení** (legacy volania sú nedotknuté), `with_budget` ho prenáša ďalej, lebo
@@ -2919,7 +2934,9 @@ kovanie) vymenuje v statuse. Klient drží zámok `ctrlRebuildBusy` proti dvojkl
 **Š10 lišta sekcie** nesie od KOV-A2b TRI prepínače: „Zvýrazniť hrany" ako tlačidlo s **rohovým trojuholníkom** (klik na telo prepína, klik na roh otvára 3-stavové nastavenie —
 zdieľaný `edge_menu.js`, od ŠT-1c PR B3 **druhá (a posledná) inštancia**, poloha cez `.ecmenu-studio`), „Smer kresby" (K2/D-87) a **„Smer otvárania"** (KOV-A2b, `dcBtn`/`data-dc`,
 `directionBtnHtml` + `directionCheckText` — obyčajné tlačidlá, nemajú čo nastavovať). Zostáva pri tom **JEDEN riadok a jeden text lišty** (vertikálny priestor je vzácny; stráži
-test). Rozbaľovacie okno hrán zatvára **klik mimo aj Escape** (vzor `bindEdgeMenu` v raile) a otvorenie zavrie kópiu v raile (`edge_menu_open` → `Engine.close_edge_menu(:studio)`;
+test). **Text lišty skladá `edgeCheckInfoText` (H3a, A-03)** z častí ZAPNUTÝCH prepínačov — hrany `edgeCheckText`, kresba `.gcinfo`, smer otvárania `.dcinfo` —
+spojených „ · " **bez úvodného oddeľovača**; veta „Vypnuté — v modeli nie je nič nakreslené." platí **len keď nie je zapnuté nič z troch** (predtým ju lišta písala
+pri každých vypnutých hranách, aj keď smer otvárania práve kreslil šípky). `edgeCheckText` sa nemenil (D-104). Rozbaľovacie okno hrán zatvára **klik mimo aj Escape** (vzor `bindEdgeMenu` v raile) a otvorenie zavrie kópiu v raile (`edge_menu_open` → `Engine.close_edge_menu(:studio)`;
 tretia inštancia — okno Výroba — zanikla v ŠT-1c PR B3, takže sú už len dve).
 
 **Š11 badge**: navigačná položka Kontrola nesie živé RED/ORANGE počty **z tých istých `counts`** ako semafor (čistá zákazka badge nekreslí). Payload sekcie chodí **v tom istom
@@ -2959,6 +2976,16 @@ presun tabu Kovanie z okna Výroba — a na rozdiel od ostatných sekcií **bez 
 vznikla preto, aby okno Výroba mohlo zaniknúť — čo sa v PR B3 aj stalo. Obsah je znak po znaku ten istý — **nákupný zoznam zo setov** (kategórie ako medzihlavičky, riadok mimo
 katalógu jantárovo, súčet „len známe ceny" s priznaným počtom nezadaných), **zoznam „Bez kódov"** (dôvod `reason_sk` aj rozmer `params_label` skladá server) a **generika podľa
 pravidiel** s klik-selectom vlastníka.
+
+**H3a (A-04) — okno hovorí po slovensky; stĺpce, poradie, čísla aj CSV ostali.** Nadpis skupiny je SK popisok kategórie („Závesy", nie `ZAVESY`) a položka mimo
+katalógu „Mimo katalógu" (jeden štýl nadpisov). Popisky skladá **jadro** — `ProductionCore.hardware_sets_labeled(hw_exp)` vracia **novú kópiu** s
+`category_label` (`HardwareCatalog.category_label`, pri `missing` nie) a slovenským typom nemapovanej položky `label` (`HardwareRules.label_for`); **vstup
+`hw_exp` sa nemutuje** (číta ho plán, Rozpočet, Kontrola aj spotrebiče v tom istom pushi) a CSV kovania (`do_hw_csv`) si nákup počíta nanovo s kódom kategórie,
+takže je bajtovo rovnaké (test nad prípadmi `kovh_golden`). Generika: stĺpec Parametre číta serverové `params_text` („NL 470 mm · výška čela 150 mm",
+„dvierka · klasické otváranie" — `HardwareSets.params_text`), fallback `params_label` a surové key/value pre starý payload; stĺpec **„Kde" je zlúčený pôvod
+zo servera** (`where`: dve zásuvky tej istej skrinky = „CAB-003 ×2", ručná položka sa nikdy nezleje s pravidlovou, tooltip `manual_note`), starý payload ide cez
+`breakdown` so zápisom „ ×" ako Kusovník. `breakdown` (`owner_pid`) ostáva pre klik-select. Zlučuje server, lebo `studio.js` nesmie sčítavať (guard ŠT-1a).
+Okno a CSV preto hovoria vedome inak (Závesy vs `ZAVESY`) — CSV ide dodávateľovi; zjednotenie by bolo samostatné rozhodnutie.
 
 Presunulo sa **všetko naraz**: render (`buySection` v `studio.js`), pomocníci `price`/`hwManualMark`, CSS `.hwsec`/`.hwbanner`/`.hwcat`/`.hwmiss`/`.hwsum` (z inline štýlov
 `production.html` do `studio.html`, pevné hexy prepísané na `--nx-*` tokeny — okno má dve témy) aj payload polia `hardware` a `hardware_sets`, ktoré okno Výroba **prestalo
@@ -3311,7 +3338,14 @@ znamenal druhú kópiu formátovania a druhý kanál na server.
 **suma ponuky** s priznaným režimom DPH a poznámkou „z Rozpočtu" · **položky rečou zákazníka** (`budCpTableHtml`) s **per-riadok prepínačom „samostatne"** — tou istou mutáciou, akú
 predtým posielala šípka v náhľade (1 zmena = 1 krok Späť), len rečou používateľa namiesto ikony · zbalený zoznam **„Zlúčené v zostave"** · riadok **zaokrúhlenia** · **jantárový
 guard** „Suma ponuky je podhodnotená — X riadkov rozpočtu nemá cenu" s preklikom **do Rozpočtu** (Š15 „upravuj pri zdroji" — ponuka sa needituje, chýbajúca cena sa dopĺňa tam, kde
-vznikla) · **priznaný wireframe „Dokument ponuky (DOCX/PDF)"** (Š14: generátor je vedome až po V1, D-78 zakazuje mŕtve tlačidlo bez dôvodu).
+vznikla).
+
+**H3a (A-02) — tabuľka sa číta ako faktúra.** Stĺpce `budCpTableHtml`: **Položka · Množstvo · MJ · Spolu · V ponuke** — „Spolu" je SUMA riadku (`cena` =
+`spolu` rozpočtu; „Atira 4 · set · 171,56 €" je za štyri kusy, tooltip to hovorí), SPOLU stojí vo 4. stĺpci. Bunku sumy skladá `budCpAmountHtml`: **„v cene"** (tlmené
+`bfnt`) **len** pri `kind: 'fixed'` s nulou (Zameranie, Vizualizácie — náklad je rozpustený v zostave); `kind: 'info'` (spotrebič „dodáva zákazník") ostáva **0,00 €**,
+lebo nejde o našu službu „v cene"; `assembly` s nulou 0,00 €; neznáma cena (`null`/nečíslo) „—" (STANDARD §11.3). **XLSX ponuky sa NEMENÍ** (skladá ho Ruby
+`CpExport.price_sheet`; poradie aj 0 € pri Zameraní ostávajú — zmena XLSX je po V1) a poznámka pod tabuľkou rozdiel priznáva. **Rámik „Dokument ponuky (DOCX/PDF) —
+po V1" (priznaný wireframe Š14) zanikol** aj s CSS `.bwire` — generátor ostáva v zásobníku Po V1 a trvalá plocha v okne mu netreba.
 
 V lište sekcie je **„Cenová ponuka (zákazník)"** (presun z lišty Rozpočtu — tlačidlo si nechalo meno z mockupu, presťahovalo sa len k dokumentu, ktorý vyrába) a **„Obnoviť"**
 (zdieľaný `#refreshBtn`; ponuka zo starých rozmerov by išla zákazníkovi).
@@ -3789,6 +3823,14 @@ ostali staré, takže by hláška o „prepočítanom rozpočte" klamala ďalej.
 **JEDEN payload nesie všetky tri sekcie** (`sup`/`bset`/`about`) — sú to tri pohľady na ten istý malý dokument a model nepotrebujú (globálne, ako šablóny).
 
 **`bset`** je presun formulára 1:1.
+
+**H3a (A-07) — prázdna bunka režimu ukazuje platnú sadzbu.** Payload nesie aditívne `effective` (`effective_rates`: `{rates: {kľúč: {režim: …}}, rows: {kľúč
+riadku: {režim: …}}}` = presne `SupplierSettings.rate` / `row_rate`, ktorými počíta Rozpočet; iba čítanie, revízia ani súbor sa nemenia). Klient
+(`ssModeCells`) dá **prázdnej** uloženej bunke režimu `placeholder` (sivé číslo, `::placeholder` = `--nx-ink-muted`) a tooltip „Prázdne — platí základ (17)";
+hodnota poľa ostáva `''`, takže uloženie ju nepošle. Číslo musí byť **serverové**, nie z bunky Základ: pri chýbajúcom základe v súbore `rate` padá na **seed**
+(porez 17), hoci bunka Základ je prázdna. Pri rozpísanom Základe ukazuje sivé číslo uloženú platnú sadzbu až do Uložiť (nápoveda to priznáva). Hlavičky oboch
+tabuliek skladá `ssModeHeads` **v poradí `SS_STATE.modes`** (rovnako ako bunky — predtým dva zdroje poradia): „Položka · Základ · € nízky · €€ štandard · €€€
+vysoký" (symbol rovnaký ako segment Rozpočtu, slovo z `mode_labels` s malým písmenom).
 
 **`sup` (Dodávateľ / Demos) vedome NEMÁ ani jedno editovateľné pole:** väzba na Demos žiadne nastavenia nemá (verejný cenník — žiadne prihlásenie, žiadne cenové pásmo, žiadna DPH:
 firma je neplatca a katalógové ceny sú konečné), odstup dotazov je KONŠTANTA slušného správania (`DemosClient::CRAWL_DELAY_S`) a väzba je vlastnosť konkrétneho dekoru/kovania.
