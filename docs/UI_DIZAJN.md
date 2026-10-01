@@ -1539,9 +1539,11 @@ v `HtmlDialog.new` sú **vonkajšie** — obsah + rámik okna (Windows ≈ 16 px
   ten istý kód znamená pri každej role inú fyzickú hranu. Fyzickú stranu
   ukazuje karta dielca v Inspectore, ktorá ju zároveň kreslí.
 
-### 5.16 E-b: Rozpočet — jediná sekcia Štúdia, ktorá mení model
-Jediná sekcia, ktorá model **mení** (dáta rozpočtu v `NOXUN` dict na
-modeli). Vzory:
+### 5.16 E-b: Rozpočet — inline edit dát rozpočtu
+Sekcia, v ktorej sa **priamo v tabuľke** edituje zákazka — dáta rozpočtu v `NOXUN` dict na
+modeli (1 zmena = 1 krok Späť). Do modelu zapisujú aj iné sekcie Štúdia (Materiály, Kovanie,
+Pravidlá, Šablóny — operáciou alebo prestavbou skriniek, s rovnakými nárokmi na krok Späť,
+serverové guardy a in-SU test); vzory nižšie sú špecifické pre inline edit rozpočtu:
 - **Sekcie = `<details>`** s medzisúčtom v hlavičke; stav rozbalenia prežije
   prekreslenie (payload chodí po každom zápise).
 - **Inline edit** (Lucia §11): číselné polia sa zapisujú až na `change`
