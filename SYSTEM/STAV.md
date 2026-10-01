@@ -6,7 +6,8 @@
 
 ## Stav
 
-**v0.17.4 · 1.10.2026 — blok 9 HARDENING, dávka H4b** (PR #438): **texty a vzhľad** — núdzové „Vrátiť katalóg pred migráciou…" už nestojí vedľa „Obnoviť" (ponuka „⋯" v Materiáloch), „Obnoviť" znamená všade to isté, iný význam je „Vrátiť…";
+**v0.17.4 · 1.10.2026 — blok 9 HARDENING; posledná hotová dávka H5a** (PR #439, len dokumentácia: mapa okien bez histórie, strážca rastu; ďalej H5b).
+Posledná kódová dávka **H4b** (PR #438): **texty a vzhľad** — núdzové „Vrátiť katalóg pred migráciou…" už nestojí vedľa „Obnoviť" (ponuka „⋯" v Materiáloch), „Obnoviť" znamená všade to isté, iný význam je „Vrátiť…";
 texty bez „ghost/seed/legacy/server" a bez kričania, verzia „v0.17.x"; jednotné rozbaľovačky, krátke „Hľadať…", stĺpce Kusovníka pod sebou, mazanie ikonou ×, Nastavenia rozpočtu s ikonou posuvníkov. **Dáta, čísla, XLSX, CSV a VEPO bez zmeny.**
 Pod tým **H4a** (v0.17.3, PR #437): čísla v Štúdiu všade rovnako, nič sa neskrýva. Pod tým **H3b** (v0.17.2, PR #436): bez falošnej chyby „invalid overlay" v Ruby konzole po **Súbor → Nový**. Pod tým **H3a** (v0.17.1, PR #435): Štúdio bez zavádzajúcich údajov (Kusovník, ponuka, Kontrola, Nákup, sadzby) — **čísla, CSV, XLSX a VEPO bez zmeny**.
 Pod tým **BLOK CENY UZAVRETÝ** (v0.17.0, 30.9.; štart #425, PR #426–#429; **smoke PASS 30.9.**, PR #431): doska a ABS páska **bez Demosu** majú **odkaz na produkt** a **ručné overenie ceny** (Materiály aj Rozpočet; D-148), Rozpočet ukazuje vek ručných cien
