@@ -74,7 +74,37 @@ NX_ARCH_MAX_BYTES = {
 # mapy este upratane nie su — pribudnu sem, ked ich niektora davka uprace.
 NX_ARCH_HISTORY_FILES = %w[ui-lifecycle.md].freeze
 NX_ARCH_HISTORY_HEADING = '## História'
-NX_ARCH_HISTORY_RE = /PR #\d|review #\d|Codex #\d|audit #\d|GH #\d|ZANIKL|\bv\d+\.\d+\.\d+\b/.freeze
+# Znacky sa hladaju BEZ OHLADU na velkost pismen a s toleranciou Markdownu a medzier
+# (`Review #226`, `V0.4.7`, `PR **#438**`, `PR  #438` su v repe bezne zapisy) — riadok sa
+# pred porovnanim normalizuje (`nx_arch_history_norm`: bez `*` a spatnych apostrofov,
+# medzery zlucene). ZANIKL ostava VERZALKAMI: male „zaniklo" je bezne slovo opisu.
+NX_ARCH_HISTORY_RE = /\b(?:PR|review|Codex|audit|GH)\s*#\s*\d|\bv\d+\.\d+\.\d+\b/i.freeze
+NX_ARCH_HISTORY_CAPS_RE = /ZANIKL/.freeze
+
+def nx_arch_history_norm(line)
+  line.gsub(/[*`]/, '').gsub(/\s+/, ' ')
+end
+
+def nx_arch_history_marker(line)
+  norm = nx_arch_history_norm(line)
+  norm[NX_ARCH_HISTORY_RE] || norm[NX_ARCH_HISTORY_CAPS_RE]
+end
+
+# Problemy upratanych suborov mapy nad riadkami (cista funkcia — testuje sa aj nad
+# syntetickymi vstupmi): chybajuca sekcia Historia, AKYKOLVEK nadpis za nou (aj `###` —
+# inak by sa zivy odsek pripojeny za historiu vyhol zakazu znaciek) a znacky pred nou.
+def nx_arch_history_problems(name, lines)
+  hist = lines.index(NX_ARCH_HISTORY_HEADING)
+  return ["#{name}: chyba vyhradena sekcia '#{NX_ARCH_HISTORY_HEADING}'"] unless hist
+
+  later = lines[(hist + 1)..].to_a.select { |l| l.match?(/\A\#{1,6}\s/) }
+  problems = later.map { |l| "#{name}: za sekciou '#{NX_ARCH_HISTORY_HEADING}' je nadpis '#{l}' (musi byt posledna)" }
+  lines[0...hist].each_with_index do |l, i|
+    m = nx_arch_history_marker(l)
+    problems << "#{name}:#{i + 1} znacka '#{m}'" if m
+  end
+  problems
+end
 
 NxTest.test('docs: SYSTEM/STAV.md existuje a ma najviac 80 riadkov') do
   path = File.join(NxTest::ROOT, 'SYSTEM', 'STAV.md')
@@ -243,10 +273,16 @@ NxTest.test('docs: ARCHITEKTURA.md a docs/architecture/*.md nemaju riadok nad 40
 end
 
 NxTest.test('docs: kazdy subor docs/architecture/ ma strop velkosti (historia patri do archivu)') do
-  missing = NX_ARCH_FILES.reject { |n| NX_ARCH_MAX_BYTES.key?(n) }
+  # Inventar ADRESARA, nie len zoznam NX_ARCH_FILES: novy subor mapy bez stropu = pad.
+  present = Dir.glob(File.join(NxTest::ROOT, 'docs', 'architecture', '*.md')).map { |p| File.basename(p) }.sort
+  NxTest.assert(present.length >= NX_ARCH_FILES.length, "nenasiel som subory mapy (#{present.length}) — zla cesta?")
+  missing = (present | NX_ARCH_FILES).reject { |n| NX_ARCH_MAX_BYTES.key?(n) }
   NxTest.assert(missing.empty?, "subory mapy bez stropu velkosti: #{missing.join(' · ')} — dopln NX_ARCH_MAX_BYTES")
   over = NX_ARCH_MAX_BYTES.filter_map do |name, max|
-    size = File.size(File.join(NxTest::ROOT, 'docs', 'architecture', name))
+    path = File.join(NxTest::ROOT, 'docs', 'architecture', name)
+    next "#{name} chyba (strop bez suboru — odstran ho z NX_ARCH_MAX_BYTES)" unless File.exist?(path)
+
+    size = File.size(path)
     "#{name} #{size} B (strop #{max} B)" if size > max
   end
   NxTest.assert(over.empty?,
@@ -257,17 +293,30 @@ end
 NxTest.test('docs: upratane subory mapy nemaju historicke znacky mimo sekcie Historia') do
   NX_ARCH_HISTORY_FILES.each do |name|
     lines = File.readlines(File.join(NxTest::ROOT, 'docs', 'architecture', name), encoding: 'UTF-8').map(&:rstrip)
-    hist = lines.index(NX_ARCH_HISTORY_HEADING)
-    NxTest.assert(hist, "#{name} nema vyhradenu sekciu '#{NX_ARCH_HISTORY_HEADING}' — jedine miesto pre historicke znacky")
-    later = lines[(hist + 1)..].to_a.select { |l| l.start_with?('## ') }
-    NxTest.assert(later.empty?,
-                  "#{name}: sekcia '#{NX_ARCH_HISTORY_HEADING}' musi byt posledna (za nou: #{later.join(' · ')})")
-    offenders = lines[0...hist].each_with_index.select { |l, _| l.match?(NX_ARCH_HISTORY_RE) }
-                               .map { |l, i| "#{name}:#{i + 1} #{l[NX_ARCH_HISTORY_RE]}" }
-    NxTest.assert(offenders.empty?,
-                  "Historicke znacky mimo sekcie Historia: #{offenders.first(10).join(' · ')} — cislo PR, kolo review, " \
-                  "verzia ani 'ZANIKLO' do ziveho odseku nepatria (KRONIKA, archiv, alebo sekcia '#{NX_ARCH_HISTORY_HEADING}')")
+    problems = nx_arch_history_problems(name, lines)
+    NxTest.assert(problems.empty?,
+                  "Historicke znacky mimo sekcie Historia: #{problems.first(10).join(' · ')} — cislo PR, kolo review, " \
+                  "verzia ani 'ZANIKLO' do ziveho odseku nepatria (KRONIKA, archiv, alebo sekcia '#{NX_ARCH_HISTORY_HEADING}' " \
+                  'na konci suboru, za ktorou uz ziadny nadpis nie je)')
   end
+end
+
+# Negativne pripady guardu nad syntetickymi riadkami — guard nesmie mlcat pri zapisoch,
+# ktore v repe bezne existuju, a nesmie hlasit bezny opis (falosny poplach).
+NxTest.test('docs: guard historickych znaciek chyta varianty zapisu a nadpis za Historiou') do
+  ok = ['# Mapa', '', '### Sekcia X', 'zaniklo v sekcii, verzia v0.17.x, Š8–Š11, audit B1 FIX 5', '',
+        NX_ARCH_HISTORY_HEADING, 'Výroba ZANIKLO v ŠT-1c PR #212 (review #2)']
+  NxTest.assert(nx_arch_history_problems('t.md', ok).empty?,
+                "falosny poplach: #{nx_arch_history_problems('t.md', ok).join(' · ')}")
+  ['Review #226', 'V0.4.7', 'PR **#438**', 'PR  #438', '`PR #12`', 'codex #3', 'GH #138', 'AUDIT #9', 'okno ZANIKLO'].each do |bad|
+    lines = ['# Mapa', "text #{bad} text", NX_ARCH_HISTORY_HEADING]
+    NxTest.refute(nx_arch_history_problems('t.md', lines).empty?, "guard nezachytil znacku '#{bad}'")
+  end
+  %w[## ### ####].each do |lvl|
+    lines = ['# Mapa', NX_ARCH_HISTORY_HEADING, 'veta', "#{lvl} foo.rb", 'zivy odsek PR #1']
+    NxTest.refute(nx_arch_history_problems('t.md', lines).empty?, "nadpis '#{lvl}' za Historiou presiel")
+  end
+  NxTest.refute(nx_arch_history_problems('t.md', ['# Mapa', 'bez historie']).empty?, 'chybajuca sekcia Historia presla')
 end
 
 # Zaniknuty subor nesmie mat ZIVY modulovy nadpis (CS-07): nadpis `### <subor>.rb|js|html|css`
