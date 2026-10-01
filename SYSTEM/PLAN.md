@@ -2,7 +2,7 @@
 
 > Roadmapa **bez histórie**: bloky v poradí, každý s cieľom a zaradenými položkami. Blok NEMÁ číslo verzie vopred — **dostane ho pri štarte** (minor bump = výhradne uzáver bloku).
 > **Evidencia (od 26.9.2026):** hotová dávka **ostáva v bloku ako riadok s ✅ a číslom PR** (pred `gh pr create` `PR #?`, číslo doplní samostatný commit hneď po vytvorení PR);
-> odsek o nej ide do [archiv/KRONIKA.md](archiv/KRONIKA.md) a [STAV.md](STAV.md) sa prepíše pri zvýšení VERSION, pri dokumentačnom PR, ktoré mení stav bloku alebo poradie prác, len „Robí sa", „Ďalší krok" a faktický stav bloku či smoke v „Stav".
+> odsek o nej ide do [archiv/KRONIKA.md](archiv/KRONIKA.md) a [STAV.md](STAV.md) sa prepíše pri zvýšení VERSION, pri dokumentačnom PR, ktoré mení stav bloku, smoke alebo poradie prác, sa v ňom aktualizuje faktický stav v „Stav" (verzia a čísla testov sa nemenia) a prepíšu „Robí sa" a „Ďalší krok".
 > Blok sa presúva plným textom do [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md) až s **uzáverom bloku** (fajka patrí do riadku, nikdy do nadpisu — stráži guard).
 > Plné znenie otvorených postrehov žije v [DOGFOODING.md](DOGFOODING.md) **v skupinách podľa týchto blokov** — tu je len číslo, názov a jedna veta; skupina „smoke po uzávere" je dočasná a zanikne s posledným nálezom.
 > **Priečinok bloku** (debata, mockup, packages, briefy, smoke checklist) je od štartu bloku v `SYSTEM/zdroje/bloky/<BLOK>/` — nie v `_dev/` ani v chate; blok tu naň odkazuje

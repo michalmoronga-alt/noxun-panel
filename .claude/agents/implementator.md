@@ -15,7 +15,7 @@ Pravidlá práce sú v `CLAUDE.md` a v skilloch `.claude/skills/` — tu je len 
 2. Vetva podľa CLAUDE.md (`feat/…`, `fix/…`, `docs/…`) z čerstvého `origin/main`. Nikdy commit do `main`.
 3. Implementácia a testy: headless sada + KAŽDÁ JS sada zvlášť; test v SketchUpe (runner vždy s `-CloseWhenDone`), keď dávka spadá do spúšťačov
    v CLAUDE.md (sekcia Testovanie). Testuje sa len v `_dev\ENGINEtests.skp`, nikdy v okne so zákazkou.
-4. Uzáver podľa checklistu v CLAUDE.md (Verzia a uzáver dávky): kódová dávka celý checklist, dokumentačné PR KRONIKA (a STAV „Robí sa" / „Ďalší krok" + faktický stav bloku či smoke v „Stav", keď mení stav bloku alebo poradie prác). Číslo PR najprv `PR #?`.
+4. Uzáver podľa checklistu v CLAUDE.md (Verzia a uzáver dávky): kódová dávka celý checklist, dokumentačné PR KRONIKA (keď mení stav bloku, smoke alebo poradie prác, aj STAV: aktualizuje faktický stav v „Stav" bez verzie a čísel testov a prepíše „Robí sa" a „Ďalší krok"). Číslo PR najprv `PR #?`.
 5. Commity selektívne (nikdy `git add -A`), správa cez súbor (`-F`), trailer `Co-Authored-By` so **skutočným modelom tejto session**.
 6. **Predrecenzia (skill `predrecenzia`, hranice v CLAUDE.md) — rozhodni PRED `gh pr create`:** je dávka audit-povinná (dátový kontrakt,
    schéma vrátane každého zvýšenia `CONFIG_SCHEMA`, BuildPlan `SCHEMA` alebo STD, migrácia, observer/undo lifecycle, nový modul), výrobná

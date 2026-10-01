@@ -19,8 +19,10 @@
 
 - **DOCS — H1 · pravidlá čítania pre agentov (1.10.2026, PR #433, blok 9 · HARDENING PO V1, len dokumentácia; verzia pluginu sa nemení).** Položky krížového
   auditu **B-01, B-04, B-08, B-09**. **B-01:** tabuľka „Povinné čítanie" v [CLAUDE.md](../../CLAUDE.md) pri každom súbore nad ~50 kB menuje kapitolu alebo odsek
-  a ako ho nájsť Grepom (riadok UI: UI_DIZAJN §1–§3 + odsek dotknutej sekcie Štúdia alebo kontextu Inspectora v `ui-lifecycle.md` + záväzný kontrakt Kusovníka
-  `UI20_KONTRAKT.md` Š2 pri zmene stĺpcov či sekcií Štúdia); „podobná funkcia už bola" → priečinok bloku v `archiv/bloky/` a `archiv/<BLOK>_ZAVER_*`; „prečo" →
+  a ako ho nájsť Grepom (riadok UI: UI_DIZAJN §1–§3 + odsek dotknutej UI sekcie alebo modulu v `ui-lifecycle.md` — po review #433 všeobecne, s príkladmi
+  sekcia Štúdia, kontext Inspectora, satelitné okná, D-15 modal, paleta a téma, veľkosť okna — + záväzný kontrakt Kusovníka `UI20_KONTRAKT.md` Š2 pri zmene
+  stĺpcov či sekcií Štúdia); „podobná funkcia už bola" → priečinok bloku v `archiv/bloky/` a `archiv/<BLOK>_ZAVER_*`, pre bloky spred tejto konvencie
+  (KOVANIE, GHOST, UI 2.0, M-R) ROADMAP_hotove_etapy, KRONIKA Grepom a `zdroje/next_sessions/` či `zdroje/ui20/` (review #433); „prečo" →
   najprv priečinok bloku, KRONIKA a DOGFOODING_vyriesene len Grepom; nová veta o **rozpočte čítania ≤ 150 kB na dávku**; zosúladené poradie čítania
   v [README.md](../README.md). `ui-lifecycle.md` a UI_DIZAJN sa nereštrukturalizovali (dávka H5). **B-04:** z [PLAN.md](../PLAN.md) išli plným textom do
   [ROADMAP_hotove_etapy.md](ROADMAP_hotove_etapy.md) (záznam „Formálny uzáver starých blokov PLANu") bloky **1b, 1d, 1e, 4 · V1 DOTIAHNUTIE a 6 · INFRA**,
@@ -32,13 +34,15 @@
   PLAN a V1_VIZIA len odkazujú); „Hranica TYP vs. ŠABLÓNA vs. PARAMETER" → [STANDARD.md](../STANDARD.md) §4.2 (POJMY a PLAN len odkaz); „Pravidlo pre postrehy"
   ostáva v PLAN (je to pravidlo plánovania). V [DOGFOODING.md](../DOGFOODING.md) zanikli prázdne skupiny archivovaných blokov (1b, V1 DOTIAHNUTIE, INFRA);
   hlavička [AUDIT_REGISTER.md](../AUDIT_REGISTER.md) už nehovorí o bloku 1d ako o živom a vyriešené položky (P0, R-01–R-04, R-07, R-08, R-11, R-12,
-  R-14, R-34, R-41) prešli pri uzávere 1d plným textom do sekcie „Vyriešené" toho istého súboru (review #433); čiastočne vyriešené R-06, R-19 a R-23 ostali v osiach. **B-08 (súhlas Michala):** dokumentačné PR, ktoré mení stav bloku
-  alebo poradie prác, prepíše v STAV „Robí sa" a „Ďalší krok" a v sekcii „Stav" smie aktualizovať faktický stav bloku či smoke
-  (spresnenie orchestrátora po review #433; verzia a čísla testov ostávajú; nahradený text stačí zhrnúť tu) — CLAUDE.md, hlavička STAV, README, WORKFLOW
+  R-14, R-34, R-41) prešli pri uzávere 1d plným textom do sekcie „Vyriešené" toho istého súboru (review #433); čiastočne vyriešené R-06, R-19 a R-23 ostali v osiach. **B-08 (súhlas Michala):** dokumentačné PR, ktoré mení stav bloku,
+  smoke alebo poradie prác, aktualizuje faktický stav v sekcii „Stav" (spresnenie orchestrátora po review #433; verzia a čísla testov sa nemenia)
+  a prepíše v STAV „Robí sa" a „Ďalší krok" (nahradený text stačí zhrnúť tu) — CLAUDE.md, hlavička STAV, README, WORKFLOW
   a typ agenta implementátora. Hneď aplikované: **nahradené** „Robí sa: smoke bloku CENY" a „Ďalší krok: aktualizovať, smoke CENY, potom pred V1 R-13 → R-37 →
   R-35" → **blok 9 beží (H1…H17, H6/H7 čakajú na mockup), R-13/R-37/R-35 = H8–H10**; v sekcii Stav opravené „smoke čaká" → smoke PASS 30.9. (PR #431) a veta
   „pred uzáverom V1 ostávajú R-13 → R-37 → R-35 (blok 4)" → V1 hotové, H8–H10; verzia v0.17.0 bez zmeny. **B-09 (súhlas Michala s príkladmi):** k definícii
-  výrobnej/cenovej dávky a k hranici „nový ovládací prvok v UI" pribudli v CLAUDE.md príklady áno/nie (znenie je návrh orchestrátora, Michal ho môže upraviť);
+  výrobnej/cenovej dávky a k hranici „nový ovládací prvok v UI" pribudli v CLAUDE.md príklady áno/nie (znenie je návrh orchestrátora, Michal ho môže upraviť;
+  po review #433 je výnimka „nie" zúžená na popisné stĺpce, ktorých hodnoty sa nepoužívajú na výrobu, objednávanie ani cenu — číslo na objednávanie
+  či cenu je „áno" vždy, aj v novom čítacom stĺpci);
   WORKFLOW a skill `predrecenzia` len odkazujú.
 
 - **DOCS — štart bloku 9 · HARDENING PO V1: krížový audit V1 a triedenie (1.10.2026, PR #432, len dokumentácia; verzia pluginu sa nemení).** Michal 30.9. zadal ako

@@ -2,7 +2,7 @@
 
 > **Vstupný bod každého sedenia.** Prečítaj tento súbor ako prvý, potom [PLAN.md](PLAN.md). Mapa autorít celého priečinka: [README.md](README.md).
 > **Údržba:** STAV sa **PREPÍŠE pri každom zvýšení VERSION** (aj pri malom fixe; nikdy sa nedopĺňa na koniec) — nahradený text ide odsekom navrch „Záznamy dávok" v [archiv/KRONIKA.md](archiv/KRONIKA.md).
-> Dokumentačné PR, ktoré mení stav bloku alebo poradie prác, prepíše „Robí sa", „Ďalší krok" a faktický stav bloku či smoke v „Stav" (verzia a čísla testov ostávajú; od 1.10.2026); ostatné ho nemenia. Testy: **jeden riadok posledného behu** — čísla starších behov patria do PR a KRONIKY. Drž ho krátky: **max 80 riadkov a 12 kB** (stráži guard test).
+> Dokumentačné PR, ktoré mení stav bloku, smoke alebo poradie prác, aktualizuje faktický stav v „Stav" (verzia a čísla testov sa nemenia) a prepíše „Robí sa" a „Ďalší krok" (od 1.10.2026); ostatné ho nemenia. Testy: **jeden riadok posledného behu** — čísla starších behov patria do PR a KRONIKY. Drž ho krátky: **max 80 riadkov a 12 kB** (stráži guard test).
 
 ## Stav
 

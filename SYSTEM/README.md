@@ -107,6 +107,6 @@ a [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md) — **len Gre
 - **Každá dávka, ktorá zvyšuje VERSION, aktualizuje docs** podľa **checklistu uzáveru
   dávky** v [../CLAUDE.md](../CLAUDE.md) vrátane **prepisu STAV** — nie „niekedy neskôr",
   ale v tej istej dávke. **Dokumentačné PR** majú krátky checklist: KRONIKA áno, VERSION nie;
-  STAV len vtedy, keď PR mení stav bloku alebo poradie prác — vtedy prepíše sekcie „Robí sa"
-  a „Ďalší krok" a v sekcii „Stav" smie aktualizovať faktický stav bloku či smoke (verzia
-  a čísla testov sa nemenia; od 1.10.2026, B-08).
+  STAV len vtedy, keď PR mení stav bloku, smoke alebo poradie prác — vtedy aktualizuje faktický
+  stav v sekcii „Stav" (verzia a čísla testov sa nemenia) a prepíše sekcie „Robí sa"
+  a „Ďalší krok" (od 1.10.2026, B-08).
