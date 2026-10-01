@@ -87,7 +87,7 @@ DC pasce [DC_PRAVIDLA.md](DC_PRAVIDLA.md) · UI dizajn [UI_DIZAJN.md](UI_DIZAJN.
 | `panel.rb` (Inspector — centrálne callbacky) + `panel.css` + `ui/js/*.js` | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |
 | domény panela (`ui/panel/*.rb`): `payloads.rb` · `resolvers.rb` · `selection.rb` · `sync.rb` · `actions_appliance.rb` · `actions_board.rb` · `actions_cabinet.rb` · `actions_hardware.rb` · `actions_materials.rb` · `actions_parts.rb` · `actions_settings.rb` · `actions_templates.rb` · `actions_usage.rb` · `actions_zones.rb` | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |
 | `studio_dialog.rb` + `ui/studio.html` + `ui/js/studio.js` (okno ŠTÚDIO a jeho sekcie) | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |
-| zdieľané JS komponenty (`nx_combo.js` · `nx_modal.js` · `edge_menu.js` · `win_fit.js`), téma, toolbar, lifecycle okien | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |
+| zdieľané JS komponenty (`nx_combo.js` · `nx_modal.js` · `edge_menu.js` · `win_fit.js` · `studio_sections.js` — register sekcií Štúdia), téma, toolbar, lifecycle okien | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |
 | `production_core.rb` (`ui/production_core.rb`) — čisté jadro výstupov zákazky | [architecture/outputs.md](architecture/outputs.md) |
 | moduly bez vlastného okna: `materials_dialog.rb` · `hardware_catalog_dialog.rb` · `appliance_dialog.rb` · `rules_dialog.rb` · `templates_dialog.rb` · `supplier_settings_dialog.rb` | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |
 | `materials_appearance_dialog.rb` · `ui/js/md_appearance.js` (spoločné ovládanie vzhľadu dosiek a ABS v Štúdiu) | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |

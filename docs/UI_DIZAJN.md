@@ -312,7 +312,8 @@ requirom). Pravidlá:
   **hlavička 24 px**, toolbar 19 px, „O plugine" 28 px. Zhodu kriviek aj veľkosť
   v hlavičke stráži guard test `tests/pure/test_ui02_toolbar.rb`.
 
-**Navigácia Štúdia** (každá položka má inú ikonu — guard `tests/pure/test_h4b_texty_vzhlad.rb`):
+**Navigácia Štúdia** (ikonu položky čítaj z registra sekcií `ui/js/studio_sections.js`, kľúč `ic`; každá položka má inú ikonu
+a každá je v tomto zozname — guardy `tests/pure/test_h4b_texty_vzhlad.rb` a `tests/pure/test_h14a_register.rb`):
 `list` (Kusovník) · `clipboard-check` (Kontrola; aj stav „Overiť cenu" v Rozpočte, §5.16) · `cart` (Nákup kovania) ·
 `euro` (Rozpočet) · `file-text` (Cenová ponuka; aj príloha PDF spotrebiča) · `scissors` (Nárezový plán) ·
 `layers` (Materiály) · `hammer` (Kovanie) · `appliance` (Spotrebiče) · `settings` (Pravidlá) · `star` (Šablóny) ·
