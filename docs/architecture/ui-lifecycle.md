@@ -2444,6 +2444,17 @@ payload cez `NXShell.studioOpenLink`) → `open_studio` → `StudioDialog::SECTI
 
 **Server je autorita čísel aj textov:** medzisúčty skupín idú z `sheets`, súčtový riadok z `totals`, popisky z `materials_meta` — **JS neprepočítava žiadnu sumu**.
 
+**Zápis čísel a jednotiek celého okna (H4a · D-04, triedenie HARDENING)** žije TU — blok `nxf*` pri `num` (`nxfMoney`, `nxfMoneyIn`, `nxfQty`,
+`nxfUnit`, `nxfQtyUnit`, `nxfMm`, `nxfDim`, `nxfDec`; pravidlá a tabuľka: `docs/UI_DIZAJN.md` „Zápis čísel a jednotiek"). Funkcie sú globály súboru
+(sekcie `budget.js`, `proj_materials.js`, `hw_catalog.js`, `demos_diff.js`, `rules.js` sa načítavajú ZA ním, vzor `refreshBtnHtml`), v Node ich
+dostanú requirom; bez neho (izolovaný test, parse chyba) kreslí každá sekcia **núdzový zápis s čiarkou, ktorý nič neskryje**. Mení sa len zápis —
+payload, XLSX, CSV ani VEPO nie. **Kusovník:** dĺžka a šírka celé mm (`nxfDim` = VEPO `rounded_dims`), **hrúbka skutočná** (`nxfMm`: 18,6, nie „19";
+obchodnú 18/36 nesie VEPO) v hlavičke skupiny, stĺpci „Hr." (`cellNumText`) aj pohľade Platne; pohľad ABS hrúbka „0,8 mm" / „1 mm" a bm na 2 desatinné
+(aj súčtový riadok „ABS spolu"). **Bunka ABS (D-11):** `absCompact` vráti **„0,8 dookola"**, keď všetky štyri kódy L1 L2 W1 W2 nesú **tú istú pásku**
+(rovnaké ID) so známou hrúbkou (`absAround`); dve rôzne pásky rovnakej hrúbky ostávajú plným kompaktom. Titulok `absFull` (plné L1–W2 s menom pásky) sa
+nemení. **Nákup kovania:** ceny cez `nxfMoney` (tisíce, „−"), množstvá cez `nxfQty` — necelé (kovanie v metroch) sa už neskryje. Test:
+`tests/js/test_h4a_format.js` (exporty `partsTable`/`sheetsTable`/`absTable` + `setStForTest` len pre render nad fixtúrou).
+
 **Súčtový riadok NEUKAZUJE súčet platní (H3a, A-01).** `totals.plates_min/max` sčítava server cez **všetky** položky odhadu (všetky materiály aj nákup pre
 dupláky) — platne rôznych dekorov sa spolu objednať nedajú, takže číslo zvádzalo k chybnej objednávke. Súčtový riadok pohľadu **Dielce** aj **Platne** má namiesto
 neho preklik **„Nárezový plán"** (`cutLinkHtml`: `<button class="linkbtn" data-nav="cut">` s ikonou `scissors`, vzhľad odkazu `.studio .totrow .linkbtn`) — ide
@@ -3205,6 +3216,15 @@ Kontroly.
 
 Počas behu prepočtu je tlačidlo `disabled` a jantár sa nekreslí: dve signalizácie naraz by si protirečili) a **telo** (`budDrawBody` — veľký súčet, jantárové chipy, zbaliteľné
 sekcie); `budRerender()` kreslí oboje naraz, lebo DPH aj režim menia aj lištu.
+
+**Zápis množstiev a jednotiek (H4a · D-04, triedenie HARDENING).** Riadky kreslia množstvo a MJ cez formátovač okna (`budQty`/`budUnit`/`budMoneyIn`
+→ `nxfQty`/`nxfUnit`/`nxfMoneyIn` zo `studio.js`, nájdené `budNxf`): Materiál „5 · platňa", ABS „70,94 · bm", Kovanie „2,4 · bal", Služby
+„37,26 bm × 1,10 €" / „4 platne × 17,00 €" / „0 paušálov × 100,00 €", Cenová ponuka množstvo cez `nxfQty` (server ho posiela celé). **Kódy MJ
+v payloade, serverová `poznamka` („4 platní × 5,8 m²") aj XLSX sa NEMENIA** — XLSX píše `r['mj']` a poznámku zo servera. **Peňažné polia**
+(medzisúčet Služieb a Štandardných riadkov, cena vlastnej položky a spotrebiča, pole „Cena" v modale spotrebiča) majú hodnotu `nxfMoneyIn`
+(„68,00", „40,987" — bez tisícov a €) a za poľom tlmené „€" (`BUD_EUR_AFTER`); polia počtu a násobku sa nemenia. Okružnú cestu
+`budParse(nxfMoneyIn(x)) === x` stráži test; iný zápis v poli sám nič nezapíše (`change` vzniká len pri úprave). `budFmtEur` ostáva
+(dvojča `nxfMoney`, zhoda testom) — sekcia musí fungovať aj bez `studio.js` (núdzový zápis kódov MJ s čiarkou).
 
 **Obnova fokusu má JEDNO miesto na prekreslenie** (review PR #198 #5): `budDraw*` len kreslí, `budRerender` robí jeden `budCaptureFocus` na začiatku a jeden `budRestoreFocus` na
 konci — kým mala každá polovica vlastnú dvojicu, jedno prekreslenie ju spravilo dvakrát a druhý `capture` už mohol snímať `<body>`. Súbor sa načítava **AŽ ZA `studio.js`** (stráži

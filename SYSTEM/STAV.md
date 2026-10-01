@@ -6,9 +6,9 @@
 
 ## Stav
 
-**v0.17.2 · 1.10.2026 — blok 9 HARDENING, dávka H3b** (PR #436): po **Súbor → Nový** a otvorení Štúdia už Ruby konzola nehlási falošnú chybu „invalid overlay"
-(Smer otvárania, hrany, Smer kresby) — prekrytie zneplatnené SketchUpom sa len zabudne a kresba sa zapne nanovo; chyba živého dokumentu sa zapisuje ďalej.
-Pod tým **H3a** (v0.17.1, PR #435): Štúdio bez zavádzajúcich údajov (Kusovník, ponuka, Kontrola, Nákup, sadzby) — **čísla, CSV, XLSX a VEPO bez zmeny**.
+**v0.17.3 · 1.10.2026 — blok 9 HARDENING, dávka H4a** (PR #?): Štúdio píše čísla **všade rovnako** — čiarka, celé kusy bez „,00", peniaze s €, jednotky malým („4 platne × 17,00 €", „37,26 bm")
+a **nič neskrýva** (hrúbka 18,6 nie „19", bm 70,94 nie „70,9"); peňažné polia „68,00 €"; Kusovník „0,8 dookola". **Hodnoty, XLSX, CSV a VEPO bez zmeny.**
+Pod tým **H3b** (v0.17.2, PR #436): bez falošnej chyby „invalid overlay" v Ruby konzole po **Súbor → Nový**. Pod tým **H3a** (v0.17.1, PR #435): Štúdio bez zavádzajúcich údajov (Kusovník, ponuka, Kontrola, Nákup, sadzby) — **čísla, CSV, XLSX a VEPO bez zmeny**.
 Pod tým **BLOK CENY UZAVRETÝ** (v0.17.0, 30.9.; štart #425, PR #426–#429; **smoke PASS 30.9.**, PR #431). Doska a ABS páska **bez Demosu** majú **jeden odkaz na produkt** a **ručné overenie ceny** v Štúdiu → Materiály aj v Rozpočte (doska za platňu s prepočtom
 na €/m², sklo bez formátu za m², ABS za bm; „Potvrdiť cenu k dnešku" nedotknutú cenu nezmení ani o cent; zmena overených polí overenie zruší; Demos má prednosť;
 D-148). Rozpočet ukazuje vek ručných cien („ručne 18.9." / „neoverená") a počíta ich medzi **„N cien na kontrolu"**; **materiál bez formátu — sklo aj bežná
@@ -30,20 +30,20 @@ v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a
 **Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin
 počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
 
-**Testy (H3b, PR #436):** **4969 headless · 147 JS sád** zelené + encoding guard; **in-SU 3284 PASS / 0 FAIL** (brána — prekrytia po novom súbore).
+**Testy (H4a, PR #?):** **4969 headless · 148 JS sád** zelené + encoding guard; in-SU sa nespúšťal (len JS/CSS; posledný beh H3b: 3284 PASS / 0 FAIL).
 
 ## Robí sa
 
 **Blok 9 · HARDENING PO V1** (štart 1.10.2026, PR #432): krížový audit V1 sedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**;
 17 dávok **H1…H17** sekvenčne podľa tabuľky v [PLAN.md](PLAN.md), **bez zmeny výrobných a cenových čísel**; priečinok bloku [zdroje/bloky/HARDENING/](zdroje/bloky/HARDENING/).
-Hotové **H1** PR #433 · **H2** (fotenie okien) PR #434 · **H3a** (zavádzajúce údaje v okne) PR #435 · **H3b** (falošná chyba v Ruby konzole po novom súbore) PR #436; nasleduje **H4**.
+Hotové **H1** PR #433 · **H2** (fotenie okien) PR #434 · **H3a** (zavádzajúce údaje v okne) PR #435 · **H3b** (falošná chyba v Ruby konzole po novom súbore) PR #436 · **H4a** (zápis čísel) PR #?; nasleduje **H4b**.
 **H6 a H7 čakajú na schválený mockup** (R-38 v H7 potvrdí Michal) · **Q1** (porez a montáž pri skle) bez odpovede · pri prvej rohovej v dielni overiť záves Sensys · **na smoke čakajú** D-132 (#367), D-133 (#368), D-134 (#369).
 
 ## Ďalší krok
 
-Pokračovať blokom 9 v poradí tabuľky: **H4** → H5; medzitým mockupy **H6** a **H7** na schválenie Michalom. Potom **R-13 → R-37
+Pokračovať blokom 9 v poradí tabuľky: **H4b** → H5; medzitým mockupy **H6** a **H7** na schválenie Michalom. Potom **R-13 → R-37
 → R-35** ako **H8–H10** (**R-13 rozhodnuté 29.9.: čítať** — ORANGE „dielec z inej verzie štandardu") a refaktory H11–H17; uzáver bloku = minor verzia + smoke
-(smoke H3a + H3b: 7 bodov v [PACKAGE_H3.md](zdroje/bloky/HARDENING/PACKAGE_H3.md) §10). Ak druhé PC ešte nemá 0.17.0, aktualizovať (Kompatibilita vyššie). **Test na reálnej zákazke po V1.**
+(smoke H3a + H3b: 7 bodov v [PACKAGE_H3.md](zdroje/bloky/HARDENING/PACKAGE_H3.md) §10; H4a: body 1–4 v [PACKAGE_H4.md](zdroje/bloky/HARDENING/PACKAGE_H4.md) §10). Ak druhé PC ešte nemá 0.17.0, aktualizovať (Kompatibilita vyššie). **Test na reálnej zákazke po V1.**
 
 ## Posledné uzávery
 
