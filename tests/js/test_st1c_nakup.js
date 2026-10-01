@@ -4,7 +4,7 @@
 // tato sada strazi hlavne to, co by sa pri „presune" najlahsie stratilo:
 //   1. KATEGORIE — riadok kategorie sa kresli LEN pri ZMENE kategorie (inak by
 //      mal kazdy riadok vlastnu hlavicku) a polozka mimo katalogu ma vlastnu
-//      kategoriu „MIMO KATALÓGU".
+//      kategoriu „Mimo katalógu" (H3a: SK popisok kategorie sklada server).
 //   2. JANTAROVE (nekompletne) riadky — `missing` polozka aj zoznam „Bez kodov"
 //      musia niest triedu `.hwmiss`; bez nej by sa nenacenene kovanie stratilo
 //      medzi beznymi riadkami a objednalo by sa nekompletne.
@@ -30,15 +30,18 @@ function eq(actual, expected, msg){
 }
 function ok(cond, msg){ n++; assert.ok(cond, msg); }
 
-// Payload zo servera (HardwareSets.expand + ProductionCore.hardware_labeled).
+// Payload zo servera (HardwareSets.expand + ProductionCore.hardware_sets_labeled
+// a hardware_labeled). H3a: realny tvar — `category` je KOD, `category_label`
+// SK popisok (fixtura predtym niesla „Závesy" priamo v `category`, preto
+// surovy kod v nadpise nikto nevidel).
 const HS = {
   state_status: 'ok',
   rows: [
-    { code: '9071193', name_sk: 'Záves Sensys 110°', category: 'Závesy', quantity: 4,
+    { code: '9071193', name_sk: 'Záves Sensys 110°', category: 'ZAVESY', category_label: 'Závesy', quantity: 4,
       unit: 'ks', price_eur_vat: 3.5, subtotal_eur_vat: 14 },
-    { code: '9071194', name_sk: 'Podložka Sensys', category: 'Závesy', quantity: 4,
+    { code: '9071194', name_sk: 'Podložka Sensys', category: 'ZAVESY', category_label: 'Závesy', quantity: 4,
       unit: 'ks', price_eur_vat: null, subtotal_eur_vat: null },
-    { code: '357783', name_sk: 'Atira zásuvka 620', category: 'Výsuvy', quantity: 2,
+    { code: '357783', name_sk: 'Atira zásuvka 620', category: 'VYSUVY', category_label: 'Výsuvy', quantity: 2,
       unit: 'sada', price_eur_vat: 21.4, subtotal_eur_vat: 42.8,
       manual_note: 'ručne prepísaný počet: 2 ks (automat: 3 ks)' },
     { code: 'XX-404', missing: true, quantity: 1, unit: 'ks' }
@@ -85,8 +88,10 @@ ok(mark.indexOf('title="ručne prepísaný počet: 2 ks"') >= 0, 'tooltip je ser
 // --- 3) kategorie sa kreslia LEN pri zmene -----------------------------------
 const H = S.buySection(HS, HW);
 eq((H.match(/class="hwcat"/g) || []).length, 3,
-   'tri kategorie (Závesy · Výsuvy · MIMO KATALÓGU), nie riadok na kazdu polozku');
-ok(H.indexOf('MIMO KATALÓGU') >= 0, 'polozka mimo katalogu ma vlastnu kategoriu');
+   'tri kategorie (Závesy · Výsuvy · Mimo katalógu), nie riadok na kazdu polozku');
+ok(H.indexOf('Mimo katalógu') >= 0, 'polozka mimo katalogu ma vlastnu kategoriu');
+ok(H.indexOf('MIMO KATALÓGU') < 0, 'H3a: okno pise nadpis skupiny jednym stylom (CSV ostava velkymi)');
+ok(H.indexOf('>Závesy<') >= 0 && H.indexOf('ZAVESY') < 0, 'H3a: nadpis = SK popisok, nie surovy kod');
 ok(H.indexOf('nie je v katalógu kovania') >= 0, 'a v nazve to prizna');
 
 // --- 4) jantarove (nekompletne) riadky ---------------------------------------
@@ -115,7 +120,7 @@ ok(H.indexOf('<tr class="hwgen" data-i="0">') >= 0,
 ok(H.indexOf('<tr class="hwgen" data-i="1">') >= 0, 'a to kazdy');
 ok(H.indexOf('rez 597 mm') >= 0, 'params_label zo servera sa ukaze NAMIESTO surovych key/value');
 ok(H.indexOf('angle 110') >= 0, 'bez params_label sa vypisu surove parametre');
-ok(H.indexOf('CAB-2×2 (ručne)') >= 0, 'rucny povod vlastnika je priznany');
+ok(H.indexOf('CAB-2 ×2 (ručne)') >= 0, 'rucny povod vlastnika je priznany (H3a: zapis „ ×" ako Kusovnik)');
 ok(H.indexOf('title="ručne prepísaná dĺžka (automat: 470 mm)"') >= 0,
    'a serverovy popis je v tooltipe');
 

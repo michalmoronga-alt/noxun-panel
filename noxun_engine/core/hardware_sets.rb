@@ -1069,6 +1069,75 @@ module Noxun
         opt ? opt['by'] : "podľa: #{param_label(key)}"
       end
 
+      # H3a (A-04): LUDSKY text parametrov generiky pre okno Nakup kovania
+      # („NL 470 mm · výška čela 150 mm", „dvierka · klasické otváranie").
+      # NOVE pole vedla `HardwareRules.params_label` — to ide do CSV kovania
+      # (stlpec „rozmer") a do viet Kontroly, preto sa NEMENI. Slovnik je ten
+      # isty ako editor pasiem a nahlad setu (`class_label`, `param_label`,
+      # `fmt_mm`); `PARAM_OPTIONS` sa NEROZSIRUJE (je to aj ponuka editora).
+      # Casti v PEVNOM poradi (`PARAMS_TEXT_ORDER`), neznamy kluc na konci
+      # podla abecedy — nic sa nestrati. Prazdny vysledok = nil.
+      PARAMS_TEXT_ORDER = %w[use_type opening_mode drawer_construction lift_system nominal_length
+                             front_height height cut_length_mm profile rod_count rod_extension
+                             lift_class arm_class].freeze
+      OPENING_MODE_TEXT = { 'classic' => 'klasické otváranie', 'tipon' => 'Tip-On' }.freeze
+
+      def params_text(params)
+        return nil unless params.is_a?(Hash)
+
+        h = params.each_with_object({}) { |(k, v), o| o[k.to_s] = v }
+        parts = PARAMS_TEXT_ORDER.map { |k| params_text_part(k, h[k], h) }
+        (h.keys - PARAMS_TEXT_ORDER).sort.each do |k|
+          parts << "#{param_label(k)} #{h[k]}" unless params_text_blank?(h[k])
+        end
+        parts = parts.compact
+        parts.empty? ? nil : parts.join(' · ')
+      end
+
+      def params_text_part(key, value, all)
+        return nil if params_text_blank?(value)
+
+        v = value.to_s
+        case key
+        when 'use_type', 'drawer_construction'
+          return nil if v == 'other'
+
+          lbl = class_label(key, v)
+          lbl == v ? v : lower_first(lbl)
+        when 'opening_mode'
+          return nil if v == 'other'
+
+          OPENING_MODE_TEXT[v] || v
+        when 'lift_system' then class_label(key, v)
+        when 'nominal_length' then "NL #{params_text_mm(value)} mm"
+        when 'front_height', 'height' then "#{param_label(key)} #{params_text_mm(value)} mm"
+        when 'cut_length_mm' then HardwareRules.params_label(all)
+        when 'profile' then nil
+        when 'rod_count' then "stabilizačné tyče #{params_text_mm(value)}"
+        when 'rod_extension' then value == false || params_text_mm(value) == '0' ? nil : 's predĺžením tyče'
+        when 'lift_class' then "mechanizmus #{v}"
+        when 'arm_class' then "ramená #{v}"
+        end
+      end
+
+      def params_text_blank?(value)
+        value.nil? || value.to_s.strip.empty?
+      end
+
+      # Cislo cez `fmt_mm` (bez zaokruhlenia, SK ciarka); necislo sa vypise tak,
+      # ako prislo — nikdy sa nevymysli nula.
+      def params_text_mm(value)
+        return fmt_mm(value) if value.is_a?(Numeric) && value.to_f.finite?
+
+        f = Float(value.to_s.strip.tr(',', '.'), exception: false)
+        f && f.finite? ? fmt_mm(f) : value.to_s
+      end
+
+      def lower_first(text)
+        s = text.to_s
+        s.empty? ? s : s[0].downcase + s[1..]
+      end
+
       # --- globalna kniznica (%APPDATA%) --------------------------------------
 
       def dir

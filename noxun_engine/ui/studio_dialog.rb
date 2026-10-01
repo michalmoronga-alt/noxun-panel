@@ -1643,7 +1643,9 @@ module Noxun
             # zije v jadre, nie v okne). Zoznam sa POCITA UZ VYSSIE (`hw_exp`)
             # kvoli ORANGE nalezom Kontroly — ziadny druhy vypocet.
             hardware: ProductionCore.hardware_labeled(bom),
-            hardware_sets: hw_exp,
+            # H3a (A-04): kopia so SK popiskom kategorie a typu nemapovanych —
+            # `hw_exp` sa nemutuje (cita ho plan, Rozpocet aj Kontrola).
+            hardware_sets: ProductionCore.hardware_sets_labeled(hw_exp),
             summary: bom[:summary],
             sheet_estimate: estimate,
             # Š1 sucty: KAZDE cislo suctoveho riadku pocita SERVER — JS si

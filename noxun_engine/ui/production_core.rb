@@ -1018,14 +1018,72 @@ module Noxun
       #                    nebolo v zozname vidiet, aky rozmer objednat).
       # Obohatenie zije TU, aby ho okno, ktore zoznam kresli, nemuselo skladat
       # samo — inak by sa dva klienty mohli rozist v tom, ako sa polozka vola.
+      #
+      # H3a (A-04) pridala dva ADITIVNE texty pre okno (do CSV ani snapshotu
+      # nejdu): `params_text` — ludske parametre („NL 470 mm · výška čela
+      # 150 mm", `HardwareSets.params_text`; `params_label` sa NEMENI, cita ho
+      # CSV aj Kontrola) a `where` — ZLUCENY povod pre stlpec „Kde" (dve
+      # zasuvky tej istej skrinky = „CAB-003 ×2", nie dva zaznamy). Zlucuje
+      # SERVER (studio.js nesmie scitavat — guard ŠT-1a); `breakdown` ostava
+      # nedotknuty, lebo z neho ide klik-select (`owner_pid`).
       def hardware_labeled(bom)
         list = bom.is_a?(Hash) ? (bom[:hardware] || bom['hardware']) : bom
         Array(list).map do |g|
           next g unless g.is_a?(Hash)
 
+          params = g['params'] || g[:params]
           g.merge('label' => HardwareRules.label_for(g['generic_type'] || g[:generic_type]),
-                  'params_label' => HardwareRules.params_label(g['params'] || g[:params]))
+                  'params_label' => HardwareRules.params_label(params),
+                  'params_text' => HardwareSets.params_text(params),
+                  'where' => hardware_where(g['breakdown'] || g[:breakdown]))
         end
+      end
+
+      # H3a (A-04): povod generiky zoskupeny podla (vlastnik, rucny zasah,
+      # popis zasahu) v poradi PRVEHO vyskytu, kusy scitane. Rucna polozka sa
+      # NIKDY nezleje s pravidlovou tej istej skrinky (iny vyznam) a dva rucne
+      # zasahy s inym popisom ostavaju oddelene (tooltip by klamal).
+      def hardware_where(breakdown)
+        groups = {}
+        Array(breakdown).each do |b|
+          next unless b.is_a?(Hash)
+
+          manual = (b['source'] || b[:source]).to_s == 'manual'
+          note = b['manual_note'] || b[:manual_note]
+          note = nil if note.to_s.empty?
+          owner = (b['owner_id'] || b[:owner_id]).to_s
+          key = [owner, manual, note]
+          e = groups[key] ||= { 'owner_id' => owner, 'quantity' => 0, 'manual' => manual,
+                                'manual_note' => note }
+          e['quantity'] += (b['quantity'] || b[:quantity]).to_i
+        end
+        groups.values
+      end
+
+      # H3a (A-04): NAKUPNY ZOZNAM zo setov pre okno Studia so SK popiskom
+      # kategorie (`category_label` — „Závesy" namiesto `ZAVESY`) a slovenskym
+      # typom nemapovanej polozky (`label`). Vracia NOVU kopiu — vstup `hw_exp`
+      # sa NEMUTUJE: ten isty objekt cita plan, Rozpocet, Kontrola aj
+      # spotrebice a CSV kovania (`do_hw_csv`) si nakup pocita nanovo s kodom
+      # kategorie, takze CSV ostava bajtovo rovnake. Polozka mimo katalogu
+      # (`missing`) popisok nedostane — okno pise „Mimo katalógu".
+      def hardware_sets_labeled(exp)
+        return nil unless exp.is_a?(Hash)
+
+        rows = Array(exp['rows']).map do |r|
+          next r unless r.is_a?(Hash) && !r['missing']
+
+          r.merge('category_label' => HardwareCatalog.category_label(r['category']))
+        end
+        unmapped = Array(exp['unmapped']).map do |u|
+          next u unless u.is_a?(Hash)
+
+          u.merge('label' => HardwareRules.label_for(u['generic_type']))
+        end
+        out = exp.dup
+        out['rows'] = rows if exp.key?('rows')
+        out['unmapped'] = unmapped if exp.key?('unmapped')
+        out
       end
 
       # 1b-3 (review P2-1): VAROVANIE O DUPLICITNEJ IDENTITE do statusu exportov,

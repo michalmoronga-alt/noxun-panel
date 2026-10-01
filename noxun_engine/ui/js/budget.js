@@ -1366,10 +1366,9 @@
     h += budCpMergedHtml(cp, d);
     h += budOfferRoundingHtml(b, d);
     h += '<div class="bnote">Zákaznícky pohľad na ten istý rozpočet — suma sa nikdy nelíši. ' +
-      'Zameranie a Vizualizácie sú v ponuke vždy 0 € (náklad je rozpustený v zostave). ' +
+      'Zameranie a Vizualizácie sú v ponuke vždy „v cene" (náklad je rozpustený v zostave; v XLSX ponuky majú 0 €). ' +
       'Významné položky vieš dať samostatne, ostatné sa zlúčia do nábytkovej zostavy ' +
       '(hranica je ' + bEsc(budFmtEur(cp.threshold)) + '). Export je vždy s DPH (ceny sú konečné).</div>';
-    h += budOfferWireHtml();
     return h;
   }
 
@@ -1422,31 +1421,43 @@
     return budRoundingHtml(sec, b, d);
   }
 
-  // Priznany WIREFRAME (Š14): generator dokumentu je vedome odlozeny za V1 —
-  // sekcia s nim pocita, ale nesmie predstierat, ze uz existuje (D-78: ziadne
-  // mrtve tlacidlo bez dovodu).
-  function budOfferWireHtml(){
-    return '<div class="bwire"><span class="wtag">po V1 — vedomý placeholder</span>' +
-      '<h3>Dokument ponuky (DOCX / PDF)</h3>' +
-      '<p>Šablóna s logom, platnosťou, poznámkou a vizualizáciami. Plný generátor je vedome ' +
-      'odložený (PLAN, blok V1) — dnes je výstupom XLSX z lišty hore.</p></div>';
-  }
-
+  // H3a (A-02): okno ponuky sa číta zľava doprava ako faktúra — Množstvo · MJ ·
+  // Spolu. Stĺpec „Spolu" je SUMA riadku (`cena` = `spolu` rozpočtu), nie cena
+  // za kus: pri „Atira 4 set" je to 171,56 € za štyri. XLSX ponuky skladá Ruby
+  // (`CpExport.price_sheet`) a NEMENÍ sa — poradie aj 0 € pri Zameraní ostávajú
+  // (zmena XLSX = po V1); poznámka pod tabuľkou rozdiel priznáva.
+  // Rámik „Dokument ponuky (DOCX/PDF) — po V1" zanikol: generátor je v zásobníku
+  // Po V1 a plocha v okne mu netreba.
   function budCpTableHtml(cp, d){
     var rows = cp.rows || [];
     if (!rows.length) return '<div class="muted" style="padding:6px 12px">Zatiaľ prázdne.</div>';
-    var h = '<table class="btab flat"><thead><tr><th>Položka</th><th class="bnum">Cena</th>' +
-      '<th class="bnum">Množstvo</th><th class="bnum">MJ</th><th>V ponuke</th></tr></thead><tbody>';
+    var h = '<table class="btab flat"><thead><tr><th>Položka</th>' +
+      '<th class="bnum">Množstvo</th><th class="bnum">MJ</th>' +
+      '<th class="bnum" title="Suma za celý riadok, nie cena za kus">Spolu</th>' +
+      '<th>V ponuke</th></tr></thead><tbody>';
     rows.forEach(function(r){
       h += '<tr class="' + (r.kind === 'assembly' ? 'bcpasm' : '') + '"><td>' + bEsc(r.polozka) + '</td>' +
-        '<td class="bnum">' + bEsc(budSub(r.cena, d)) + '</td>' +
         '<td class="bnum">' + bEsc(budFmtNum(r.mnozstvo, 0)) + '</td>' +
         '<td class="bnum">' + bEsc(r.mj) + '</td>' +
+        '<td class="bnum">' + budCpAmountHtml(r, d) + '</td>' +
         '<td>' + budCpSepHtml(r.source_key, true) + '</td></tr>';
     });
-    h += '<tr class="bcptotal"><td>' + bEsc(cp.total_label || 'SPOLU') + '</td>' +
-      '<td class="bnum">' + bEsc(budSub(cp.total, d)) + '</td><td></td><td></td><td></td></tr>';
+    h += '<tr class="bcptotal"><td>' + bEsc(cp.total_label || 'SPOLU') + '</td><td></td><td></td>' +
+      '<td class="bnum">' + bEsc(budSub(cp.total, d)) + '</td><td></td></tr>';
     return h + '</tbody></table>';
+  }
+
+  // H3a (A-02): suma riadku ponuky. „v cene" LEN pri FIXNEJ službe s nulou
+  // (Zameranie, Vizualizácie — náklad je rozpustený v zostave). Spotrebič, ktorý
+  // dodáva zákazník (`kind: 'info'`), ostáva 0,00 € — nie je to naša služba
+  // „v cene" a slovo by klamalo. Neznáma cena (`null`/nečíslo) je „—"
+  // (STANDARD §11.3: nikdy 0 ani „v cene" — `budFmtEur` to už robí).
+  function budCpAmountHtml(r, d){
+    var c = (r && r.cena !== null && r.cena !== undefined && r.cena !== '') ? Number(r.cena) : NaN;
+    if (r && r.kind === 'fixed' && isFinite(c) && Math.abs(c) < 0.005){
+      return '<span class="bfnt">v cene</span>';
+    }
+    return bEsc(budSub(r ? r.cena : null, d));
   }
 
   // Š14: per-riadok prepinac „samostatne". Je to TA ISTA mutacia `cp_group`,
@@ -2480,7 +2491,7 @@
       budOfferToolsHtml: budOfferToolsHtml, budOfferGuardHtml: budOfferGuardHtml,
       budCpTableHtml: budCpTableHtml, budCpMergedHtml: budCpMergedHtml,
       budCpSepHtml: budCpSepHtml, budCpLinkHtml: budCpLinkHtml,
-      budOfferWireHtml: budOfferWireHtml, budDraftFields: budDraftFields,
+      budCpAmountHtml: budCpAmountHtml, budDraftFields: budDraftFields,
       budOfferChipHtml: budOfferChipHtml, budDraftMemory: budDraftMemory,
       // E-c „Prepočítať ceny"
       budPrTargets: budPrTargets, budPrEta: budPrEta, budPrConfirmText: budPrConfirmText,

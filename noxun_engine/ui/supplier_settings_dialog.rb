@@ -143,6 +143,7 @@ module Noxun
             'rate_keys' => SupplierSettings::RATE_KEYS,
             'rate_labels' => RATE_LABELS,
             'standard_rows' => SupplierSettings.standard_rows(sup),
+            'effective' => effective_rates(sup),
             'path' => SupplierSettings.path,
             'demos' => demos_info,
             'about' => about_info
@@ -155,6 +156,25 @@ module Noxun
         rescue StandardError => e
           Engine.log_error(e, 'SupplierSettingsDialog.settings_payload')
           nil
+        end
+
+        # H3a (A-07): PLATNA sadzba kazdej bunky rezimu — presne to, s cim
+        # pocita Rozpocet (`SupplierSettings.rate` / `row_rate`). Prazdna bunka
+        # rezimu ukaze toto cislo sivo (placeholder). Musi prist zo SERVERA, nie
+        # z bunky Zaklad: `rate` pri chybajucom zaklade v subore padne na SEED
+        # (porez 17), hoci bunka Zaklad je prazdna. Iba citanie — revizia ani
+        # subor sa nemenia.
+        def effective_rates(sup)
+          modes = SupplierSettings::MODES
+          rates = SupplierSettings::RATE_KEYS.each_with_object({}) do |key, h|
+            h[key] = modes.each_with_object({}) { |m, o| o[m] = SupplierSettings.rate(sup, key, m) }
+          end
+          rows = SupplierSettings.standard_rows(sup).each_with_object({}) do |row, h|
+            next unless row.is_a?(Hash) && row['key']
+
+            h[row['key']] = modes.each_with_object({}) { |m, o| o[m] = SupplierSettings.row_rate(sup, row, m) }
+          end
+          { 'rates' => rates, 'rows' => rows }
         end
 
         # NP-2: rozsahy skalarov pre klienta {kluc => [min, max]} — JEDNA

@@ -8,7 +8,7 @@
 //
 // Co to chyta (a ziadna ina sada to nechyti):
 //   1. sekcia `offer` sa naozaj vykresli z REALNEHO tvaru payloadu — lista aj
-//      telo (skupiny, per-riadok „samostatne", jantarovy guard, placeholder),
+//      telo (skupiny, per-riadok „samostatne", jantarovy guard; H3a: bez ramika DOCX/PDF),
 //   2. ZIVOTNY CYKLUS D-15 modalu: otvorenie s fokusom v prvom poli, zatvorenie
 //      Escapom aj klikom vedla, navrat fokusu na spustac,
 //   3. KONTRAKT #9: Escape Studia (ecMenu) sa NESMIE spustit, kym zije modal —
@@ -188,8 +188,9 @@ ok(body.indexOf('data-bud="cp_sep" data-source="material:PD1"') > -1,
    'per-riadok prepinac „samostatne" (Š14)');
 ok(body.indexOf('Zaokrúhlenie ponuky') > -1, 'riadok zaokruhlenia');
 ok(body.indexOf('Zlúčené v zostave (1)') > -1, 'zbaleny zoznam zlucenych polozek');
-ok(body.indexOf('po V1 — vedomý placeholder') > -1 && body.indexOf('DOCX / PDF') > -1,
-   'DOCX/PDF je PRIZNANY wireframe, nie mrtve tlacidlo');
+// H3a (A-02): ramik „po V1 — vedomý placeholder" zanikol (DOCX/PDF je v zasobniku Po V1).
+ok(body.indexOf('vedomý placeholder') < 0 && body.indexOf('bwire') < 0 && body.indexOf('DOCX / PDF') < 0,
+   'ramik DOCX/PDF v okne ponuky uz nie je');
 ok(body.indexOf('CP = Rozpočet') > -1, 'zeleny pas: ponuka sedi s rozpoctom');
 
 // --- 2) jantarovy guard s preklikom do Rozpoctu (Š15) ------------------------
