@@ -727,6 +727,8 @@ brána existuje preto, že odmietnuť ho **raz pri uložení** je lacnejšie ne�
 **Zdroje pravidiel a reprodukovateľnosť:** rebuild číta výhradne **projektový snapshot** pravidiel (`NOXUN` dict na modeli, kľúč `hardware_rules`) —
 stavba je reprodukovateľná zo samotného .skp (iné PC, zmeny globálu, kópie skriniek) a undo vracia pravidlá aj geometriu naraz.
 Globálna knižnica `%APPDATA%\NOXUN\Engine\hardware_rules.json` je len default pre nové projekty (so seed-merge novej verzie seedov podľa `rule_id`).
+Zápis knižnice z okna (H10a/R-35) nesie **revíziu obsahu**, ktorú okno videlo: keď ju medzitým zmenilo iné okno SketchUpu, nič sa neprepíše a okno to povie
+(revízia sa počíta z pravidiel, do súboru sa neukladá — formát ani `std` sa nemenia).
 
 **Položka kovania v pláne** (BuildPlan schema 5 — KOV-G1a pridala generický typ `plinth_clip`; string kľúče kvôli JSON round-trip): `owner_part_key` (nil = korpus; inak musí existovať v parts), `generic_type` (slovník),
 `quantity` (1–999), `rule_id`, `variant_id` (nil vo fáze 1), `production_class: "counted"`, `manufactured: true`, `params` (napr. výška nohy, NL výsuvu),

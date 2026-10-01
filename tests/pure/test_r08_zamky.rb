@@ -17,11 +17,12 @@
 #   * zlyhany zamok NIKDY nehlasi uspech a NIKDY nezmeni kniznicu na seed;
 #   * zamok naozaj serializuje DVA OS PROCESY (nie len monkeypatch).
 #
-# PRIZNANY ZVYSOK (audit 1d #3/#6): globalne pravidla kovania a rozmerove
-# rady su UPLNA NAHRADA obsahu bez revizie — zamok ich zapisy serializuje,
-# ale dve sucasne otvorene okna sa nad nimi stale prebijaju „posledny
-# vyhrava". Register to vedie ako samostatnu polozku (R-35); tieto testy
-# preto pri nich NETVRDIA, ze cudzia hodnota prezila.
+# PRIZNANY ZVYSOK (audit 1d #3/#6, register R-35): `HardwareRules.write`
+# a `DimSeries.set` su UPLNA NAHRADA obsahu bez revizie — zamok ich zapisy
+# serializuje, nic viac; tieto testy preto pri nich NETVRDIA, ze cudzia
+# hodnota prezila. Okno Pravidla od H10a zapisuje globalne pravidla cez
+# `save_library!` s reviziou obsahu (testy `test_h10a_globalne_pravidla.rb`,
+# guard „revizia AZ POD zamkom" tam); rozmerove rady rieši H10b.
 require_relative '../helper' unless defined?(NxTest)
 require 'fileutils'
 

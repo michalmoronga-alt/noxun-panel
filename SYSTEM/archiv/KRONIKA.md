@@ -17,6 +17,22 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H10a · dve okná SketchUpu a globálne pravidlá kovania (1.10.2026, PR #?, v0.17.8, blok 9 · HARDENING PO V1, register R-35 — časť pravidlá; package
+  [PACKAGE_H10.md](../zdroje/bloky/HARDENING/PACKAGE_H10.md), audit návrhu 1 BLOCKER · 3 FIX · 3 NOTE [AUDIT_H10_raw.md](../zdroje/bloky/HARDENING/AUDIT_H10_raw.md)
+  + delta 7/7 RESOLVED [AUDIT_H10_delta_raw.md](../zdroje/bloky/HARDENING/AUDIT_H10_delta_raw.md); rez H10a → H10b).**
+  „Aj ako globálnu predvoľbu" bola úplná náhrada `hardware_rules.json` bez revízie — dve okná sa prebíjali „posledný vyhráva" a projekt bez snapshotu dopadol podľa
+  sekundovej cache (raz zahodený formulár, raz tichý prepis cudzieho globálu, F8). Teraz **obsahová revízia** (`rules_rev`, nie SHA bajtov — seed-merge mení bajty):
+  `HardwareRules.library_check` (`:ok/:blocked/:unreadable`, mapuje bránu **`write_gate` z H9** — krok 0 overil signatúru `[state, reason]`, `write_gate_reason` z package
+  odpadol), `library_revision` (payload) a `save_library!` (pod zámkom nad čerstvým súborom: nečitateľné → brána → konflikt → `write`; `[status, rev]`). Okno:
+  `global_rev` v payloade, `baseline_valid?` → **`baseline_state`** (`:inherits_global` rozhodne čerstvá predkontrola — FIX 2), **predkontrola** pred prestavbou
+  (H-READ/H-OLD/H-UNK/H-INH/H-PRE = nič sa neuloží, žiadna operácia ani echo, pin obnovený len pri konflikte — FIX 3), globál **po** prestavbe cez `save_library!`
+  vyhodnotený `case` (H-RACE — FIX 4). Klient: pin `RD_GLOBAL_REV` sa posúva **len** pri prvom naplnení, pri zdroji `global` a na `RD.setGlobalRev` (BLOCKER 1).
+  **Q1 bez odpovede** → vratná voľba z package (konflikt = neuloží sa nič, ani projekt). Prevádzková podmienka: po aktualizácii zavrieť všetky okná SketchUpu na PC.
+  Kód pluginu +315 / −35 riadkov s komentármi (bez `?v=`). **Charakterizácia** C1 (commit `9cbac8b4`, zelená na main): jedno okno = bajtovo rovnaký súbor, aj cez
+  `save_library!`; golden kovania bez pregenerovania. **Testy:** 5063 headless · 150 JS sád + encoding guard; nové `test_h10a_globalne_pravidla.rb` (23 testov)
+  a `test_h10a_pin.js` (23 kontrol); `test_st3b_rules.rb` a R-37 T15 prevzaté na `baseline_state`/`global_rev`; **mutácie 14/14 zabité** (M1–M14 package).
+  **In-SU (brána):** 3324 / 0 na hlave `c830688a` — `run_h10a` v izolovanom sandboxe (H-PRE bez kroku Späť, vedomé prepísanie, H-RACE + jeden Späť vráti snapshot aj
+  kovanie, živé pravidlá bajtovo nedotknuté). STAV pred dávkou: v0.17.7 · H9 hotová · Robí sa H6/H7 (mockupy), nasleduje H10 · Ďalší krok H10.
 - **H9 · súbor nastavení zlého tvaru = poškodený (1.10.2026, PR #442, v0.17.7, blok 9 · HARDENING PO V1, register R-37; package
   [PACKAGE_H9.md](../zdroje/bloky/HARDENING/PACKAGE_H9.md), audit návrhu 0 BLOCKER · 3 FIX · 1 NOTE [AUDIT_H9_raw.md](../zdroje/bloky/HARDENING/AUDIT_H9_raw.md)
   + delta 4/4 RESOLVED · 2 FIX · 1 NOTE [AUDIT_H9_delta_raw.md](../zdroje/bloky/HARDENING/AUDIT_H9_delta_raw.md)).**
