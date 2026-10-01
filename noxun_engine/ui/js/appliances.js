@@ -209,7 +209,7 @@
     var job = view === 'job';
     return '<div class="bomviews">' +
       '<button type="button" class="bomvw' + (job ? ' on' : '') + '" data-ap="view" data-v="job"' +
-      ' title="Spotrebiče TEJTO zákazky — kde patria a čo hovorí kontrola">V zákazke</button>' +
+      ' title="Spotrebiče tejto zákazky — kde patria a čo hovorí kontrola">V zákazke</button>' +
       '<button type="button" class="bomvw' + (job ? '' : ' on') + '" data-ap="view" data-v="cat"' +
       ' title="Katalóg modelov tohto počítača">Katalóg</button></div>';
   }
@@ -223,7 +223,7 @@
          (st.writable ? '' : ' aria-disabled="true"') +
          ' title="Nový model do katalógu tohto počítača">' + apIco('plus') + ' Nový spotrebič</button>';
     h += '<div class="searchbox">' + apIco('search') +
-         '<input type="text" id="apQ" placeholder="Hľadať model, výrobcu…" value="' +
+         '<input type="text" id="apQ" placeholder="Hľadať…" title="Hľadať model alebo výrobcu" aria-label="Hľadať model alebo výrobcu" value="' +
          apEsc(st.query) + '"></div>';
     h += '<label class="apdel"><input type="checkbox" id="apDel"' +
          (st.deleted ? ' checked' : '') + '> vyradené</label>';
@@ -243,7 +243,7 @@
          ' title="Vyber model z katalógu a priraď mu vlastníka">' +
          apIco('plus') + ' Pridať do zákazky</button>';
     h += '<div class="searchbox">' + apIco('search') +
-         '<input type="text" id="apJobQ" placeholder="Hľadať model, skrinku…" value="' +
+         '<input type="text" id="apJobQ" placeholder="Hľadať…" title="Hľadať model alebo skrinku" aria-label="Hľadať model alebo skrinku" value="' +
          apEsc(st.jobQuery) + '"></div>';
     h += '<select id="apJobCat" title="Kategória"><option value="">Všetky kategórie</option>';
     (job.categories || []).forEach(function(c){
@@ -257,12 +257,14 @@
     return h;
   }
 
-  // „9 modelov (9 seed)" — jednotné/množné číslo je vec jazyka, nie výpočtu.
+  // „9 modelov (9 dodaných s pluginom)" — jednotné/množné číslo je vec jazyka,
+  // nie výpočtu. H4 · D-07: „seed" bol vývojársky žargón (záznam dodaný s pluginom).
   function apCountLabel(total, seed){
     var n = Number(total || 0);
     var word = n === 1 ? 'model' : (n >= 2 && n <= 4 ? 'modely' : 'modelov');
     var s = Number(seed || 0);
-    return n + ' ' + word + (s > 0 ? ' (' + s + ' seed)' : '');
+    var sw = s === 1 ? 'dodaný' : (s >= 2 && s <= 4 ? 'dodané' : 'dodaných');
+    return n + ' ' + word + (s > 0 ? ' (' + s + ' ' + sw + ' s pluginom)' : '');
   }
 
   // Lišta sa NEPREKRESĽUJE, kým používateľ píše do hľadania: odpoveď servera
@@ -419,7 +421,7 @@
     var card = c;
     var h = '<div class="apcard"><div class="apchead"><h3>' + apEsc(card.name) + '</h3>' +
       '<span class="man">' + apEsc([card.manufacturer, card.category_label].filter(Boolean).join(' · ')) +
-      '</span>' + (card.seed ? '<span class="apbadge">seed</span>' : '') +
+      '</span>' + (card.seed ? '<span class="apbadge" title="Dodaný s pluginom">z pluginu</span>' : '') +
       (card.deleted ? '<span class="apbadge tomb">vyradený</span>' : '') +
       '<span class="acts">' +
       // S1-B2 (R2): druhé vstupné miesto TOHO ISTÉHO modalu — s modelom už
@@ -433,7 +435,7 @@
            apIco('pencil') + ' Upraviť</button>';
       h += card.deleted
         ? '<button type="button" class="ghostbtn" data-ap="restore" title="Vrátiť záznam do katalógu">' +
-          apIco('rotate-ccw') + ' Obnoviť</button>'
+          apIco('rotate-ccw') + ' Vrátiť</button>'
         : '<button type="button" class="ghostbtn danger" data-ap="del"' +
           ' title="Vyradiť z katalógu — prílohy ostávajú" aria-label="Vyradiť">' + apIco('trash') + '</button>';
     }
@@ -541,7 +543,7 @@
 
   function apJobHtml(job){
     if (!job){
-      return '<div class="apempty">Zákazka sa ešte nenačítala — otvor Štúdio znova alebo daj „Obnoviť".</div>';
+      return '<div class="apempty">Zákazka sa ešte nenačítala — otvor Štúdio znova.</div>';
     }
     var rows = apJobRows(job, AP_JOB_Q, AP_JOB_CAT);
     var h = '<table class="bomtab apjob"><thead><tr><th>Kategória</th><th>Model</th>' +
@@ -740,7 +742,7 @@
       title: 'Vyradiť spotrebič',
       sub: 'Model „' + card.name + '" vyradiť z katalógu?',
       note: 'Záznam ostáva v súbore ako vyradený (zobrazí ho prepínač „vyradené") a jeho prílohy ' +
-            'sa NEMAŽÚ — zákazky, ktoré model použili, na ne odkazujú. Obnoviť sa dá kedykoľvek.',
+            'sa nemažú — zákazky, ktoré model použili, na ne odkazujú. Vrátiť sa dá kedykoľvek.',
       okLabel: 'Vyradiť',
       danger: true,
       fields: [],
@@ -1014,7 +1016,7 @@
     var card = AP_CARD;
     if (!card){ AP.setStatus('Vyber model v strome vľavo.', true); return false; }
     if (card.deleted){
-      AP.setStatus('Vyradený model sa do zákazky nepriraďuje — najprv ho obnov.', true);
+      AP.setStatus('Vyradený model sa do zákazky nepriraďuje — najprv ho vráť do katalógu.', true);
       return false;
     }
     var title = apCardTitle(card);

@@ -108,7 +108,7 @@ function grain(extra){
   const on = NXShell.grainRail(grain());
   eq(on.on, true, 'zapnuty stav prisvieti ikonu raily');
   eq(on.available, true, 'dostupnost je zo servera');
-  ok(on.tip.indexOf('ZAPNUTÁ') >= 0, 'bublina povie, ze je kontrola zapnuta');
+  ok(on.tip.indexOf('je zapnutá') >= 0, 'bublina povie, ze je kontrola zapnuta');
   ok(on.tip.indexOf('12 dielcov s kresbou') >= 0, 'a nesie ZIVE cislo zo servera');
 
   const off = NXShell.grainRail(grain({ active: false, parts: null }));

@@ -474,7 +474,7 @@
       '<button type="button" class="' + (BUD_VAT ? 'on' : '') + '" data-bud="vat" data-v="1"' +
       ' data-bkey="vat:1" title="Ceny s DPH — katalógové ceny sú konečné">s DPH</button>' +
       '<button type="button" class="' + (BUD_VAT ? '' : 'on') + '" data-bud="vat" data-v="0"' +
-      ' data-bkey="vat:0" title="Len ZOBRAZENIE bez DPH — rozpočet sa počíta v brutto">bez DPH</button>' +
+      ' data-bkey="vat:0" title="Len zobrazenie bez DPH — rozpočet sa počíta v brutto">bez DPH</button>' +
       '</div>' + budModeSegHtml(b) +
       budPriceBtnHtml(b, running) +
       // Prestavba skrinky z Inspectora sem sama nedorazi — bez „Obnoviť" by sa
@@ -491,7 +491,7 @@
       '<svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> XLSX rozpočet</button>' +
       '<button type="button" class="ghostbtn" data-bud="settings" data-bkey="settings"' +
       ' title="Sadzby, režimy a prahy — globálne nastavenie, platí pre každú zákazku">' +
-      '<svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg> Nastavenia</button>';
+      '<svg class="ic" aria-hidden="true"><use href="#i-sliders-horizontal"/></svg> Nastavenia</button>';
     return h;
   }
 
@@ -526,7 +526,7 @@
     if (c.id === 'appl'){
       var amt = bEsc(budFmtEur(budDisplay(c.amount, BUD_VAT, d)));
       var txt = c.included ? ('Spotrebiče (' + amt + ') sú započítané v SPOLU')
-                           : ('Spotrebiče (' + amt + ') NIE SÚ v súčte — platia sa osobitne?');
+                           : ('Spotrebiče (' + amt + ') <b>nie sú</b> v súčte — platia sa osobitne?');
       return '<button type="button" class="bchip" data-bud="goto" data-section="appliances"' +
              ' title="Prejdi na sekciu Spotrebiče">' + txt + '</button>';
     }
@@ -697,13 +697,13 @@
   // --- sekcie --------------------------------------------------------------
 
   var BUD_SECTION_NOTE = {
-    services: 'Riadky vznikajú SAMÉ z dát zákazky. Prečiarknutý = automatický výpočet, ✎ = ručný prepis. ' +
-              'Sadzby žijú v ⚙ Nastaveniach; nulový riadok ostáva ako kontrola.',
-    standard_rows: 'Násobok = tvoj koeficient veľkosti zákazky. Sadzby per REŽIM (€ / €€ / €€€ hore) — ' +
+    services: 'Riadky vznikajú samy z dát zákazky. Prečiarknutý = automatický výpočet, ✎ = ručný prepis. ' +
+              'Sadzby žijú v Nastaveniach rozpočtu; nulový riadok ostáva ako kontrola.',
+    standard_rows: 'Násobok = tvoj koeficient veľkosti zákazky. Sadzby podľa režimu (€ / €€ / €€€ hore) — ' +
                    'režim predvyplní, všetko sa dá prepísať.',
     custom: 'Popis + cena stačia (kód, URL a poznámka cez ⋯). Riadok bez ceny sa nezapočíta a svieti ' +
-            'v upozornení hore aj v KONTROLE. Ukladá sa do zákazky (.skp).',
-    appliances: 'Sekcia je POSLEDNÁ a do súčtu vstupuje LEN so zapnutým „sčítať do rozpočtu" — spotrebiče ' +
+            'v upozornení hore aj v sekcii Kontrola. Ukladá sa do zákazky (.skp).',
+    appliances: 'Sekcia je posledná a do súčtu vstupuje len so zapnutým „sčítať do rozpočtu" — spotrebiče ' +
                 'často nie sú v ponuke alebo sa platia osobitne. Vyplnené a nezapočítané = oranžové ' +
                 'upozornenie hore (nikdy neblokuje).'
   };
@@ -1179,7 +1179,7 @@
 
   var BUD_DRAFT_META = {
     custom: { title: 'Pridať položku rozpočtu', sub: 'len táto zákazka · uloží sa do .skp',
-              note: 'Riadok bez ceny sa nezapočíta a svieti v upozornení hore aj v KONTROLE. ' +
+              note: 'Riadok bez ceny sa nezapočíta a svieti v upozornení hore aj v sekcii Kontrola. ' +
                     'Kód, adresu a poznámku doplníš potom cez ⋯ v riadku.' },
     appliance: { title: 'Pridať spotrebič', sub: 'sekcia Spotrebiče · do súčtu vstupuje len so „sčítať do rozpočtu"',
                  note: 'Spotrebiče sa často platia osobitne — preto má sekcia vlastný prepínač ' +
@@ -1422,7 +1422,7 @@
     if (c.id === 'appl'){
       var amt = bEsc(budFmtEur(budDisplay(c.amount, BUD_VAT, d)));
       var txt = c.included ? ('Spotrebiče (' + amt + ') sú započítané v SPOLU')
-                           : ('Spotrebiče (' + amt + ') NIE SÚ v súčte — platia sa osobitne?');
+                           : ('Spotrebiče (' + amt + ') <b>nie sú</b> v súčte — platia sa osobitne?');
       return '<button type="button" class="bchip" data-bud="to_budget" data-section="appliances"' +
         ' data-bkey="oappl" title="Prejdi na sekciu Spotrebiče v Rozpočte">' + txt + '</button>';
     }
@@ -2240,7 +2240,7 @@
   // Čisté: text prvého (zastavujúceho) kliku.
   function budConfirmText(n, what){
     return n + ' ' + budPluralSk(n, ['riadok', 'riadky', 'riadkov']) + ' nemá cenu — ' +
-      (what === 'cp' ? 'suma ponuky' : 'suma rozpočtu') + ' bude PODHODNOTENÁ. ' +
+      (what === 'cp' ? 'suma ponuky' : 'suma rozpočtu') + ' bude podhodnotená. ' +
       'Doplň ceny v Rozpočte, alebo klikni na export ešte raz a exportuj aj tak.';
   }
 

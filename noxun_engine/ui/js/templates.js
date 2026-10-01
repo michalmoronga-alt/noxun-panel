@@ -312,7 +312,7 @@
                          'Žiadne korpusové šablóny — ulož označenú skrinku v Inspectore (sektor Šablóna).');
     h += tplGroupHtml('Doskové šablóny', TPL_DATA.board, 'board',
                       'Žiadne doskové šablóny.');
-    h += '<div class="hint">Šablóny sú spoločné pre všetky zákazky. NOVÚ šablónu ukladáš ' +
+    h += '<div class="hint">Šablóny sú spoločné pre všetky zákazky. <b>Novú</b> šablónu ukladáš ' +
       'v Inspectore z označenej skrinky; tu ich spravuješ. Premenovať a zmazať sa dá každá; ' +
       'použiť a odfotiť sa dá len korpusová (fotka dosky by bola fotka ničoho).</div>';
     return h;
@@ -447,9 +447,9 @@
 
   function tplDeleteNote(kind){
     return kind === 'board'
-      ? 'Doskové šablóny sa neobnovujú — knižnica ich sama nedoplní, takže zmazaná sa už NIKDY nevráti. ' +
+      ? 'Doskové šablóny sa neobnovujú — knižnica ich sama nedoplní, takže zmazaná sa už nikdy nevráti. ' +
         'Skrinky ani dosky v projektoch sa tým nemenia.'
-      : 'Knižnica je spoločná pre všetky zákazky. Skrinky, ktoré zo šablóny vznikli, sa tým NEMENIA.';
+      : 'Knižnica je spoločná pre všetky zákazky. Skrinky, ktoré zo šablóny vznikli, sa tým nemenia.';
   }
 
   // Premenovanie (ŠT-3c-2). Modal má JEDINÉ pole — predvyplnené súčasným
@@ -506,9 +506,9 @@
   // platí to isté ako pri mazaní: knižnica pôvodné meno sama nedoplní.
   function tplRenameNote(kind){
     return kind === 'board'
-      ? 'Doskové šablóny sa neobnovujú — pôvodné meno sa už NIKDY nevráti. ' +
+      ? 'Doskové šablóny sa neobnovujú — pôvodné meno sa už nikdy nevráti. ' +
         'Skrinky ani dosky v projektoch sa tým nemenia.'
-      : 'Mení sa len meno v knižnici. Skrinky, ktoré zo šablóny vznikli, sa tým NEMENIA.';
+      : 'Mení sa len meno v knižnici. Skrinky, ktoré zo šablóny vznikli, sa tým nemenia.';
   }
 
   if (typeof window !== 'undefined'){

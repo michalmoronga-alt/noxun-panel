@@ -33,7 +33,7 @@
     // GHOST-D2: kreslenie má inú nápovedu — kotva je pevná (počiatok), zato
     // pribudlo meracie pole a Shift.
     drawing: 'klik určí počiatok · ťahaj dĺžku a šírku · číslo + Enter · prázdny Enter = hodnota karty · ' +
-      'Shift drží smer · ←/→ a ↑/↓ len PRED prvým klikom · Esc zruší'
+      'Shift drží smer · ←/→ a ↑/↓ len pred prvým klikom · Esc zruší'
   };
   // GHOST-D2: názvy fáz kreslenia. Zrkadlo `GhostTool::DRAW_PHASES` — server
   // posiela `phase_label`, toto je len fallback pre starší payload.
@@ -205,7 +205,7 @@
       wrap.className = state.z_mode === 'free' ? 'gblock dim' : 'gblock';
       wrap.setAttribute('title', state.z_mode === 'free'
         ? 'Výška zámku (mm) — použije sa, keď stlačíš ↓'
-        : 'Výška, na ktorej ghost sedí (mm)');
+        : 'Výška, na ktorej vkladaná skrinka sedí (mm)');
     }
     // KOV-G2 (D-111): SEGMENT NÔH. Stojí PRED nápovedou a kreslí sa LEN vtedy,
     // keď push kľúč naozaj nesie (starší server ho neposiela — vtedy segment

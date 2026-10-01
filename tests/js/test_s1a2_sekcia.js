@@ -163,7 +163,10 @@ A.apSetTree(tree());
   ok(!h.includes('Obnoviť'), 'žiadne „Obnoviť" — katalóg nie je z modelu');
 }
 eq(A.apCountLabel(1, 0), '1 model', 'jednotné číslo');
-eq(A.apCountLabel(5, 5), '5 modelov (5 seed)', 'množné číslo a počet seed záznamov');
+eq(A.apCountLabel(5, 5), '5 modelov (5 dodaných s pluginom)', 'množné číslo a počet seed záznamov');
+// H4 · D-07: „seed" je žargón — počet dodaných s pluginom sa skloňuje podľa SVOJHO čísla.
+eq(A.apCountLabel(3, 1), '3 modely (1 dodaný s pluginom)', 'jeden dodaný s pluginom');
+eq(A.apCountLabel(9, 3), '9 modelov (3 dodané s pluginom)', 'dva až štyri dodané s pluginom');
 
 // Read-only katalóg: zápisy sa vypnú a dôvod je nad stromom.
 A.apSetTree(tree({ writable: false, state: 'degraded',

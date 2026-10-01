@@ -150,7 +150,7 @@ function updEl(attrs, value){
   const newer = Object.assign({}, base, { state: 'newer', available: '0.9.11' });
   ok(A.nxUpdaterEnabled(newer) === true, 'NOVŠIA verzia = tlačidlo aktívne');
   ok(html(newer).indexOf('aria-disabled') < 0, 'a v markupe nie je aria-disabled');
-  ok(A.nxUpdaterText(newer).indexOf('V0.9.11') > -1, 'stavový riadok menuje dostupnú verziu');
+  ok(A.nxUpdaterText(newer).indexOf('v0.9.11') > -1, 'stavový riadok menuje dostupnú verziu');
 
   const same = Object.assign({}, base, { state: 'same', available: '0.9.10' });
   ok(A.nxUpdaterEnabled(same) === false, 'ROVNAKÁ verzia = tlačidlo neaktívne');
@@ -496,9 +496,9 @@ function updEl(attrs, value){
   fireClick(on);
   eq(SENT.length, 0, 'samotný klik ešte nič nemení');
   ok(opened && opened.okLabel === 'Aktualizovať', 'otvorí sa D-15 potvrdenie');
-  ok(opened.note.indexOf('ZATVORIA OBE OKNÁ') > -1, 'a hovorí, že sa zatvoria OBE okná');
-  ok(opened.note.indexOf('REŠTARTUJ') > -1, 'aj že po dokončení treba reštart');
-  ok(opened.sub.indexOf('X:/dist') > -1 && opened.sub.indexOf('V0.9.11') > -1,
+  ok(opened.note.indexOf('zatvoria obe okná') > -1, 'a hovorí, že sa zatvoria OBE okná'); // H4 · D-07: bez VEĽKÝCH písmen
+  ok(opened.note.indexOf('reštartuj SketchUp') > -1, 'aj že po dokončení treba reštart');
+  ok(opened.sub.indexOf('X:/dist') > -1 && opened.sub.indexOf('v0.9.11') > -1,
      'potvrdenie menuje priečinok aj verziu');
   opened.onSubmit({});
   eq(SENT.map(function(x){ return x[0]; }), ['updater_apply'], 'až potvrdenie spustí aktualizáciu');
@@ -518,7 +518,7 @@ function updEl(attrs, value){
                  available: '0.9.11' });
   eq(ELS.secbody.innerHTML, 'TELO SEKCIE',
      'výsledok checku telo sekcie NEPREKRESĽUJE (kurzor v poli cesty by prišiel o obsah)');
-  ok(ELS.updState.textContent.indexOf('V0.9.11') > -1, 'ale stavový riadok je čerstvý');
+  ok(ELS.updState.textContent.indexOf('v0.9.11') > -1, 'ale stavový riadok je čerstvý');
   eq(ELS.updBtn.getAttribute('aria-disabled'), null, 'a tlačidlo sa odomklo');
 
   T.SS.updater({ enabled: true, state: 'same', source_dir: 'X:/dist', current: '0.9.10',

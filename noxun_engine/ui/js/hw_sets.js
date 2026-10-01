@@ -39,6 +39,18 @@
     if (text != null) n.textContent = text;
     return n;
   }
+  // H4 · D-08 (triedenie HARDENING): mazacie tlacidlo = ikona `x` zo spritu,
+  // nie glyf „×" (UI_DIZAJN §1 — ziadne glyfy v ovladani). `aria-label`
+  // a `title` povedia, CO sa odobera (ikona bez textu by citacke nic nepovedala).
+  // Markup ikony je KONSTANTA — ziadne data cez innerHTML.
+  function hwsDelBtn(cls, label){
+    var b = hwsMk('button', cls, null);
+    b.setAttribute('type', 'button');
+    b.setAttribute('aria-label', label);
+    b.title = label;
+    b.innerHTML = '<svg class="ic" aria-hidden="true"><use href="#i-x"/></svg>';
+    return b;
+  }
   function hwsSend(name, payload){
     if (window.sketchup && sketchup[name]) sketchup[name](JSON.stringify(payload));
   }
@@ -966,11 +978,9 @@
     lbl.setAttribute('data-hws-m', i);
     lbl.setAttribute('data-hws-field', 'label');
     top.appendChild(lbl);
-    var del = hwsMk('button', 'ghostbtn mset-del', '×');
-    del.setAttribute('type', 'button');
+    var del = hwsDelBtn('ghostbtn mset-del', 'Odobrať člena');
     del.setAttribute('data-action', 'hws-m-del');
     del.setAttribute('data-hws-m', i);
-    del.title = 'Odobrať člena';
     top.appendChild(del);
     row.appendChild(top);
     // KOV-E2: „Počet z parametra" je DRUHÝ riadok hlavičky, nie štvrtá otázka
@@ -1034,8 +1044,7 @@
         code.setAttribute('data-hws-m', i); code.setAttribute('data-hws-s', j);
         code.setAttribute('data-hws-field', 'code');
         sr.appendChild(code);
-        var del = hwsMk('button', 'ghostbtn hwsbtn', '×');
-        del.setAttribute('type', 'button');
+        var del = hwsDelBtn('ghostbtn hwsbtn', 'Odobrať dĺžku');
         del.setAttribute('data-action', 'hws-s-del');
         del.setAttribute('data-hws-m', i); del.setAttribute('data-hws-s', j);
         sr.appendChild(del);
@@ -1062,7 +1071,7 @@
       addb.setAttribute('data-hws-m', i);
       box.appendChild(addb);
       box.appendChild(hwsMk('div', 'hint',
-        'Hodnota mimo pásiem = ORANGE „doplň pásmo" — nikdy sa neberie najbližšie pásmo.'));
+        'Hodnota mimo pásiem = oranžové upozornenie „doplň pásmo" — nikdy sa neberie najbližšie pásmo.'));
       return box;
     }
     if (m.is_param){
@@ -1097,8 +1106,7 @@
         cc.setAttribute('data-hws-m', i); cc.setAttribute('data-hws-c', j);
         cc.setAttribute('data-hws-field', 'code');
         cr.appendChild(cc);
-        var cd = hwsMk('button', 'ghostbtn hwsbtn', '×');
-        cd.setAttribute('type', 'button');
+        var cd = hwsDelBtn('ghostbtn hwsbtn', 'Odobrať triedu');
         cd.setAttribute('data-action', 'hws-c-del');
         cd.setAttribute('data-hws-m', i); cd.setAttribute('data-hws-c', j);
         cr.appendChild(cd);
@@ -1110,7 +1118,7 @@
       addc.setAttribute('data-hws-m', i);
       box.appendChild(addc);
       box.appendChild(hwsMk('div', 'hint',
-        'Trieda, ktorá tu nie je, znamená člen BEZ kódu — výklop potom blokuje nákup ' +
+        'Trieda, ktorá tu nie je, znamená člen bez kódu — výklop potom blokuje nákup ' +
         '(nikdy sa neberie najbližší kód).'));
       return box;
     }
@@ -1651,7 +1659,7 @@
       inp.type = 'text'; inp.className = 'hwsed-band';
       inp.value = hwsNum(hwsSampleShown('nominal_length', st));
       inp.setAttribute('data-hws-sample', 'nominal_length');
-      inp.title = 'Prázdne = podporovanú dĺžku vyberie server podľa radu.';
+      inp.title = 'Prázdne = podporovanú dĺžku vyberie plugin podľa radu.';
       row.appendChild(inp);
       row.appendChild(hwsMk('span', 'hwsed-mlbl', 'mm'));
       box.appendChild(row);
@@ -1777,7 +1785,7 @@
     }
     hwsBandAttrs(val, o, o.valueField);
     r.appendChild(val);
-    var del = hwsMk('button', 'ghostbtn hwsbtn', '×');
+    var del = hwsDelBtn('ghostbtn hwsbtn', 'Odobrať pásmo');
     del.setAttribute('data-action', o.delAction);
     hwsBandAttrs(del, o, null);
     r.appendChild(del);
@@ -1818,7 +1826,7 @@
     if (proj.status === 'invalid'){
       var ban = hwsMk('div', 'hwbanner',
         'Predvoľby setov v tomto projekte sú poškodené — súpis kovania sa nemapuje. ');
-      var rb = hwsMk('button', 'ghostbtn', 'Obnoviť z globálnych predvolieb');
+      var rb = hwsMk('button', 'ghostbtn', 'Vrátiť na globálne predvoľby');
       rb.setAttribute('data-action', 'hws-reset-proj');
       if (libBlocked) rb.disabled = true;
       ban.appendChild(rb);
@@ -2022,7 +2030,7 @@
     sel.setAttribute('data-hws-gt', gt);
     sel.setAttribute('data-hws-key', key);
     var byParam = !!edit || hwsIsSelector(value);
-    var none = hwsMk('option', null, '— bez setu (ORANGE)');
+    var none = hwsMk('option', null, '— bez setu (oranžové)');
     none.value = '';
     none.selected = !byParam && !value;
     sel.appendChild(none);
@@ -2077,7 +2085,7 @@
     cancel.setAttribute('data-hws-key', key);
     box.appendChild(cancel);
     box.appendChild(hwsMk('div', 'hint',
-      'Hodnota mimo pásiem = ORANGE „doplň pásmo" — nikdy sa neberie najbližšie pásmo. Pásma sa nesmú prekrývať (aj dotyk je prekryv).'));
+      'Hodnota mimo pásiem = oranžové upozornenie „doplň pásmo" — nikdy sa neberie najbližšie pásmo. Pásma sa nesmú prekrývať (aj dotyk je prekryv).'));
     return box;
   }
 

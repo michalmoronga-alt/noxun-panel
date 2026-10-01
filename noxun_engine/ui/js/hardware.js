@@ -115,9 +115,9 @@
                  noun: 'Dĺžka výsuvu', suffix: '' }];
   // Ponuka sa kresli az od DVOCH hodnot — jedna volba nie je vyber.
   var HW_AX_OPTS_MIN = 2;
-  var HW_AX_NOVAL = 'Server pre túto os nemá hodnotu, ktorú by sa dalo zamknúť.';
+  var HW_AX_NOVAL = 'Pre túto os nie je hodnota, ktorú by sa dalo zamknúť.';
   var HW_AX_NOMODAL = 'Potvrdzovacie okno sa nedá otvoriť — náhrada sa neodoslala.';
-  var HW_AX_FIX_NOTE = 'Náhrada ostáva ZAMKNUTÁ (automat ju nezmení). Zámok druhej osi sa ' +
+  var HW_AX_FIX_NOTE = 'Náhrada ostáva zamknutá (automat ju nezmení). Zámok druhej osi sa ' +
                        'nemení a znova sa overí.';
   var HW_AX_BLOCKED = 'Dĺžka výsuvu sa ponúkne, až keď vyriešiš výšku.';
   var HW_AX_BADNUM = 'Neplatná výška boxu — zadaj číslo v mm.';
@@ -638,9 +638,9 @@
     } else if (ov.orphan_kind === 'dormant'){
       // D-132: TA ISTA serverova cesta ako `invalid` (`reset: true`) — zaznam
       // moze niest viac osi naraz a po zmene receptu nema co z neho zostat.
-      btn = '<button class="ghostbtn hwbtn" title="Zrušiť dormantný zámok (recept ho už nepoužíva)" onclick="onHwOrphanReset(this)">'+NXIcons.svg('rotate-ccw')+' zrušiť</button>';
+      btn = '<button class="ghostbtn hwbtn" title="Zrušiť zámok, ktorý recept už nepoužíva" onclick="onHwOrphanReset(this)">'+NXIcons.svg('rotate-ccw')+' zrušiť</button>';
     } else {
-      btn = '<button class="ghostbtn hwbtn" title="Obnoviť (platí pravidlo)" onclick="onHwEnable(this)">'+NXIcons.svg('rotate-ccw')+' obnoviť</button>';
+      btn = '<button class="ghostbtn hwbtn" title="Vrátiť položku — platí pravidlo" onclick="onHwEnable(this)">'+NXIcons.svg('rotate-ccw')+' vrátiť</button>';
     }
     var row = '<div class="hwrow hwoff" data-owner="'+esc(ov.owner_part_key||'')+'" data-type="'+esc(ov.generic_type||'')+'" data-rule="'+esc(ov.rule_id||'')+'" data-part="'+esc(ov.part_key||'')+'" data-cab="'+esc(cabId||'')+'">'
       // D-132: zatvoreny zamok zo sprite — riadok sa na prvy pohlad lisi od

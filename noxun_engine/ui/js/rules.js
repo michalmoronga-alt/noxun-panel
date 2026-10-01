@@ -152,12 +152,14 @@
   }
   function rdLiftMxTitle(row){
     return (row && row.max_exclusive === true)
-      ? 'Horná hranica do pásma NEPATRÍ (spojité pásmo — hodnota už patrí ďalšiemu).'
+      ? 'Horná hranica do pásma nepatrí (spojité pásmo — hodnota už patrí ďalšiemu).'
       : 'Horná hranica do pásma patrí.';
   }
+  // H4 · D-08: mazanie = ikona `x` zo spritu, nie glyf „✕" (UI_DIZAJN §1).
+  function rdDelIco(){ return '<svg class="ic" aria-hidden="true"><use href="#i-x"/></svg>'; }
   function rdLiftDel(action, title){
     return '<button class="ghostbtn bdel" title="' + rdEsc(title) + '" onclick="' + action +
-      '(this)">✕</button>';
+      '(this)" aria-label="' + rdEsc(title) + '">' + rdDelIco() + '</button>';
   }
 
   // HTML editora. ČISTÁ funkcia (Node test) — stav otvorenia chodí z modulu.
@@ -169,7 +171,7 @@
       '<div class="rgbody">' +
       '<div class="rrow"><label>Rezerva na úchytku</label>' +
       rdLiftNumInput('lallow', r && r.handle_allowance_kg,
-                     'Pripočíta sa k hmotnosti čela pri OBOCH systémoch (Blum ráta s úchytkou).') +
+                     'Pripočíta sa k hmotnosti čela pri oboch systémoch (Blum ráta s úchytkou).') +
       '<span class="unit">kg</span></div>' +
       '<div class="rrow"><label>Druhá tyč od šírky</label>' +
       rdLiftNumInput('lrod', r && r.rod_double_from_kb_mm,
@@ -232,7 +234,7 @@
     // vôbec prejavila. To isté hovorí aj tlačidlo lišty („Uložiť a prestavať
     // skrinky") — dve vety o tom istom kroku si protirečiť nesmú.
     return h + '<div class="hint">Prázdne pole = kritérium sa nepoužije. Pásma sa nemusia písať ' +
-      'v poradí — server ich zoradí sám. Uloženie prestaví všetky skrinky, ' +
+      'v poradí — zoradia sa samy. Uloženie prestaví všetky skrinky, ' +
       'takže nové hodnoty platia hneď.</div></div></details>';
   }
 
@@ -607,7 +609,7 @@
         '"><span class="unit">kg</span><span class="arrow">→</span>' +
         '<input class="wqty rnum" type="number" min="1" max="999" step="1" value="' +
         rdEsc(rdNumAttr(b && b.quantity)) + '"><span class="unit">ks</span>' +
-        '<button class="ghostbtn bdel" title="Odstrániť hmotnostné pásmo" onclick="rdDelWeight(this)">✕</button></div>';
+        '<button class="ghostbtn bdel" title="Odstrániť hmotnostné pásmo" aria-label="Odstrániť hmotnostné pásmo" onclick="rdDelWeight(this)">' + rdDelIco() + '</button></div>';
     });
     return h + '</div><div class="btnrow"><button class="ghostbtn" onclick="rdAddWeight(this)">' +
       '+ hmotnostné pásmo</button></div>' +
@@ -676,7 +678,7 @@
                 + (last ? '<label>všetko nad</label><span class="bmaxfill"></span>'
                         : '<label>do</label><input class="bmax rnum" type="number" min="1" step="1" value="'+rdEsc(b.max)+'"><span class="unit">mm</span>')
                 + '<span class="arrow">→</span><input class="bqty rnum" type="number" min="1" max="999" step="1" value="'+rdEsc(b.quantity)+'"><span class="unit">ks</span>'
-                + (last ? '<span class="bdel"></span>' : '<button class="ghostbtn bdel" title="Odstrániť pásmo" onclick="rdDelBand(this)">✕</button>')
+                + (last ? '<span class="bdel"></span>' : '<button class="ghostbtn bdel" title="Odstrániť pásmo" aria-label="Odstrániť pásmo" onclick="rdDelBand(this)">' + rdDelIco() + '</button>')
                 + '</div>';
         });
         html += '<div class="btnrow"><button class="ghostbtn" onclick="rdAddBand(this)">+ pásmo</button></div>';
@@ -1226,7 +1228,7 @@
     var h = '<button type="button" class="primary" id="rdSaveBtn" onclick="rdSaveRules()"' +
       ' title="Uloží pravidlá do projektu a prestaví všetky skrinky — 1 krok Späť">' +
       ico('check') + ' Uložiť a prestavať skrinky</button>' +
-      '<label class="rdchk" title="Zapíše pravidlá aj do globálnych predvolieb — platia pre NOVÉ projekty">' +
+      '<label class="rdchk" title="Zapíše pravidlá aj do globálnych predvolieb — platia pre nové projekty">' +
       '<input type="checkbox" id="alsoGlobal"' + (s.also_global ? ' checked' : '') +
       '> aj ako globálnu predvoľbu</label>' +
       '<button type="button" class="ghostbtn" id="rdLoadBtn" onclick="rdLoadGlobal()"' +

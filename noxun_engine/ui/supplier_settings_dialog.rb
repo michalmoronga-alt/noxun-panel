@@ -248,7 +248,7 @@ module Noxun
           # vseobecne „skús to znova" clovek nema kam kliknut.
           refresh_and_report('Nastavenia načítané nanovo zo súboru.',
                              'Nastavenia sa načítali zo súboru, ale okno sa nepodarilo obnoviť — ' \
-                             'hodnoty na obrazovke môžu byť staré. Klikni na Načítať nanovo.')
+                             'hodnoty na obrazovke môžu byť staré. Klikni na Obnoviť v lište sekcie.')
         end
 
         # Odmietnutie ZASTARANEHO formulara (revizia nesedi).
@@ -268,7 +268,7 @@ module Noxun
                              'Skontroluj hodnoty a ulož znova.',
                              'Nastavenia sa medzitým zmenili, takže sa NIČ neuložilo — ' \
                              'a formulár sa nepodarilo načítať nanovo. Klikni na ' \
-                             '„Načítať nanovo" a hodnoty zadaj znova.',
+                             '„Obnoviť" v lište sekcie a hodnoty zadaj znova.',
                              ok_error: true)
         end
 
@@ -303,9 +303,11 @@ module Noxun
           # `SS.saved()` uz rozpis zahodil, takze na obrazovke ostanu STARE
           # cisla — „Rozpočet je prepočítaný." by nad nimi bolo klamstvo.
           # Hlaska smie menovat LEN tlacidlo, ktore v sekcii NAOZAJ je (review
-          # #238 P2-1): lista `bset` ma „Načítať nanovo" a „Uložiť" — „Obnoviť"
-          # zije v sekcii Rozpocet. Bez tej navigacie by clovek siahol po
-          # „Načítať nanovo", ktore rozpisane hodnoty ZAHADZUJE.
+          # #238 P2-1): prepocet Rozpoctu robi „Obnoviť" SEKCIE Rozpocet, preto
+          # hlaska menuje aj sekciu. Od H4 · D-06 sa aj tlacidlo listy `bset`
+          # (predtym „Načítať nanovo") vola „Obnoviť" — to vsak nacita LEN subor
+          # nastaveni a rozpisane hodnoty ZAHADZUJE; bez mena sekcie by clovek
+          # siahol po nom.
           refresh_and_report('Nastavenia uložené. Rozpočet je prepočítaný.',
                              'Nastavenia sú ULOŽENÉ, ale rozpočet sa NEPREPOČÍTAL — ' \
                              'čísla Rozpočtu môžu byť staré. Otvor sekciu Rozpočet ' \

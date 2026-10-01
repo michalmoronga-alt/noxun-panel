@@ -468,7 +468,7 @@ NxTest.test('ŠT-4a (dlh 1b-A): ZLYHANY prepocet sa PRIZNA — „uložené áno
   end
   NxTest.refute(got.any? { |x| x.include?('formulár je načítaný nanovo') },
                 'ani odmietnutie netvrdi nacitanie, ktore sa nepodarilo')
-  NxTest.assert(got.any? { |x| x.include?('NIČ neuložilo') && x.include?('Načítať nanovo') },
+  NxTest.assert(got.any? { |x| x.include?('NIČ neuložilo') && x.include?('„Obnoviť') && x.include?('v lište sekcie a hodnoty zadaj znova') }, # H4 · D-06: bolo „Načítať nanovo"
                 'namiesto toho povie, ze sa nic neulozilo a kde je cesta von')
 ensure
   if NxTest.headless?
@@ -562,7 +562,7 @@ NxTest.test('ŠT-4a (review #227 P2): ZLYHANY payload sa PRIZNA, nie zamlci') do
   NxTest.assert(failed_branch.include?('ss-reload'),
                 'ale „Načítať nanovo\" OSTAVA — jedina cesta von z prechodnej chyby disku; \
                  hlaska v tele na nu odkazuje (review #227 kolo 2)')
-  NxTest.assert(body.include?('Načítať nanovo'),
+  NxTest.assert(body.include?('<b>Obnoviť</b> v lište sekcie'), # H4 · D-06: bolo „Načítať nanovo"
                 'a hlaska menuje TLACIDLO, ktore sekcia naozaj ma')
 end
 

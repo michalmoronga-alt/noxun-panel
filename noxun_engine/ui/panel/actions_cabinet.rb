@@ -832,7 +832,7 @@ module Noxun
         def handle_ghost_lock_z(payload)
           model = Sketchup.active_model
           data = parse(payload)
-          return if foreign_document?(data, model, 'Výška ghostu sa nezmenila')
+          return if foreign_document?(data, model, 'Výška vkladanej skrinky sa nezmenila')
 
           s = GhostTool.session
           return GhostTool.push_state(nil) unless s && s.active?
@@ -862,7 +862,7 @@ module Noxun
           rescue StandardError
             nil
           end
-          set_status("Zámok výšky #{GhostTool.fmt_mm(s.lock_plane_z)} mm — ghost sadne na túto výšku.")
+          set_status("Zámok výšky #{GhostTool.fmt_mm(s.lock_plane_z)} mm — vkladaná skrinka sadne na túto výšku.")
         end
 
         # GHOST: sprievodny zapis kovania zo sablony (H2/D-76). Bezi VNUTRI

@@ -370,9 +370,9 @@ const BRD = { name: 'Pracovná doska', kind: 'board', preview_rev: null,
   eq([p.kind, p.template], ['cabinet', 'Klasik dolná'], 'so ZDROJOM aj menom');
 
   // Doskové: text musí povedať, že sa už nikdy nevráti.
-  ok(T.tplDeleteNote('board').indexOf('NIKDY') > -1,
+  ok(T.tplDeleteNote('board').indexOf('už nikdy nevráti') > -1,
      'dosková šablóna sa neobnoví — knižnica ju sama nedoplní');
-  ok(T.tplDeleteNote('cabinet').indexOf('NEMENIA') > -1,
+  ok(T.tplDeleteNote('cabinet').indexOf('sa tým nemenia') > -1,
      'korpusová: skrinky, ktoré z nej vznikli, sa mazaním nemenia');
   ok(T.tplDeleteSub('board').indexOf('Doskovú') > -1, 'a podtitul menuje druh');
   delete global.window.NXModal;
@@ -430,9 +430,9 @@ const BRD = { name: 'Pracovná doska', kind: 'board', preview_rev: null,
   ok(open === false, 'okno je preč');
 
   // Doskové: v poznámke musí stáť, že pôvodné meno sa nevráti (markerový seed).
-  ok(T.tplRenameNote('board').indexOf('NIKDY') > -1,
+  ok(T.tplRenameNote('board').indexOf('už nikdy nevráti') > -1,
      'dosková šablóna: pôvodné meno knižnica sama nedoplní');
-  ok(T.tplRenameNote('cabinet').indexOf('NEMENIA') > -1,
+  ok(T.tplRenameNote('cabinet').indexOf('sa tým nemenia') > -1,
      'korpusová: skrinky, ktoré z nej vznikli, sa premenovaním nemenia');
   ok(T.tplRenameSub('board').indexOf('Doskovú') > -1, 'a podtitul menuje druh');
 

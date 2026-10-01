@@ -98,6 +98,7 @@ function reset(){
   delete W.nxTagMenuOpen;
   W.ecMenuOpen = false;
   W.vepoMenuOpen = false;
+  W.mdMoreOpen = false;
 }
 
 // ============ 1) ESCAPE ZATVARA KAZDY ZO SIESTICH MODALOV ===================
@@ -290,11 +291,29 @@ NXEsc.OWN.forEach(function(layer){
      layer.fn + ' existuje ako top-level funkcia (retaz ju vola menom)');
 });
 
-const STUDIO_JS = fs.readFileSync(path.join(JS, 'studio.js'), 'utf8');
+// H4 · D-06: priznak ponuky „⋯" Materialov zije v proj_materials.js — kazdy
+// priznak ma PRAVE JEDEN zdrojovy subor a tam musi byt top-level `var`.
+const FLAG_FILE = { ecMenuOpen: 'studio.js', vepoMenuOpen: 'studio.js', mdMoreOpen: 'proj_materials.js' };
 NXEsc.FLYOUT_FLAGS.forEach(function(flag){
-  ok(STUDIO_JS.indexOf('var ' + flag) > -1,
-     flag + ' je top-level priznak studio.js (retaz ho cita cez window)');
+  ok(!!FLAG_FILE[flag], flag + ': zdrojovy subor priznaku je znamy');
+  const src = fs.readFileSync(path.join(JS, FLAG_FILE[flag]), 'utf8');
+  ok(new RegExp('^  var ' + flag + ' = false;', 'm').test(src),
+     flag + ' je top-level priznak ' + FLAG_FILE[flag] + ' (retaz ho cita cez window)');
 });
+ok(NXEsc.FLYOUT_FLAGS.indexOf('mdMoreOpen') > -1,
+   'H4 · D-06: ponuka „⋯" Materialov je v retazi ako flyout (Escape ju neprebije)');
+// Otvorena ponuka „⋯" (ziadny nas modal) = retaz NEROBI NIC a udalost pusti
+// jej vlastnikovi; otvoreny modal je nad nou a Escape patri jemu.
+reset();
+W.mdMoreOpen = true;
+eq(NXEsc.blockedBy(), 'mdMoreOpen', 'blockedBy() menuje ponuku „⋯" Materialov');
+(function(){
+  const r = esc();
+  ok(!r.consumed && r.after === 1, 'pri otvorenej ponuke „⋯" retaz Escape nespotrebuje (patri ponuke)');
+})();
+open('mdRestoreModal');
+eq(NXEsc.blockedBy(), null, 'nas modal nad ponukou: flyout uz neblokuje');
+reset();
 
 // Porovnava sa poloha SKRIPT TAGOV, nie zmienok — mena suborov su aj v komentaroch.
 function tagAt(html, file){ return html.indexOf('src="js/' + file + '.js'); }
