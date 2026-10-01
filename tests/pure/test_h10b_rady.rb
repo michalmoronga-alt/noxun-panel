@@ -77,10 +77,13 @@ module NxH10b
     NxTest.skip!('handler panela sa testuje headless (v SketchUpe je Panel zivy)') unless NxTest.headless?
     panel = E::Panel
     orig = {}
-    log = { status: nil, refill: [] }
+    log = { status: nil, refill: [], series: [] }
     PANEL_STUBS.each { |m| orig[m] = panel.method(m) if panel.respond_to?(m) }
     panel.define_singleton_method(:parse) { |payload| JSON.parse(payload.to_s) }
-    panel.define_singleton_method(:push_ui_settings) { |refill_editor: false| log[:refill] << refill_editor }
+    panel.define_singleton_method(:push_ui_settings) do |refill_editor: false, series_status: nil|
+      log[:refill] << refill_editor
+      log[:series] << series_status
+    end
     panel.define_singleton_method(:set_status) { |msg, error = false| log[:status] = [msg, error] }
     yield panel, log
   ensure
@@ -163,6 +166,20 @@ NxTest.test('H10b B1: TEN ISTY rad = konflikt a NEZAPISE SA NIC (ani nekonfliktn
     NxTest.assert_equal(['sokel'], keys, 'konfliktny je LEN rad, ktory zmenilo ine okno')
     NxTest.assert_equal([80, 100], current['sokel'], 'vrati sa AKTUALNY ulozeny stav')
     NxTest.assert_equal(before, r.bytes, 'subor bajtovo nezmeneny — ani hlbky sa nezapisali')
+  end
+end
+
+NxTest.test('H10b B1: obe okna zmenia TEN ISTY rad na ROVNAKU hodnotu = ziadny konflikt (predrecenzia P3)') do
+  r = NxH10b
+  r.with_file do
+    seen = r::DIM.get
+    r::DIM.update!({ 'sokel' => [80, 100] }, { 'sokel' => seen['sokel'] })
+    status, series, keys = r::DIM.update!({ 'sokel' => ['100', 80], 'hlbka' => [600] },
+                                          { 'sokel' => seen['sokel'], 'hlbka' => seen['hlbka'] })
+    NxTest.assert_equal(:ok, status, 'zhodny vysledok oboch okien nie je konflikt')
+    NxTest.assert_equal(['hlbka'], keys, 'sokel sa nezmenil, hlbky sa ulozili')
+    NxTest.assert_equal([80, 100], series['sokel'])
+    NxTest.assert_equal([600], series['hlbka'], 'ostatny zmeneny rad sa NEZAHODIL')
   end
 end
 
@@ -374,6 +391,13 @@ NxTest.test('H10b B3: handler — kazda vetva ma svoju hlasku a VZDY prekresli e
       NxTest.assert_equal(['Okno je z predošlej verzie pluginu — rozmerové rady sa neuložili. ' \
                            'Zavri a otvor panel znova.', true], log[:status], ':stale_client')
       NxTest.assert_equal([true] * 4, log[:refill], 'editor sa prekreslil po KAZDOM vysledku')
+      # Predrecenzia P3: modal prekryva `#status` — ta ista veta ide aj do
+      # riadku v sekcii Rozmerove rady (s rovnakou farbou).
+      NxTest.assert_equal(4, log[:series].length, 'veta pre modal ide pri KAZDOM vysledku')
+      conflict = log[:series][2]
+      NxTest.assert_equal(true, conflict['error'], 'konflikt je v modale cerveny')
+      NxTest.assert(conflict['text'].start_with?('Rozmerové rady (Šírky) medzitým zmenilo'), 'a hovori to iste ako status')
+      NxTest.assert_equal({ 'text' => 'Rozmerové rady uložené.', 'error' => false }, log[:series][0])
     end
   end
 end
@@ -400,6 +424,8 @@ NxTest.test('H10b B3: handler — brana a zlyhanie zapisu') do
         r.save(panel, { 'sirka' => [400] }, { 'sirka' => r::DIM::DEFAULTS['sirka'] })
         NxTest.assert_equal(['Rozmerové rady sa nepodarilo uložiť (disk/práva).', true], log[:status])
         NxTest.assert_equal([true], log[:refill])
+        NxTest.assert_equal([{ 'text' => 'Rozmerové rady sa nepodarilo uložiť (disk/práva).', 'error' => true }],
+                            log[:series], 'chyba zapisu je vidno aj v modale')
       end
     ensure
       r::DIM.define_singleton_method(:update!, orig)
@@ -414,8 +440,10 @@ NxTest.test('H10b B3 guard: panel zapisuje LEN cez `update!` a vyhodnocuje `case
   h = r.body('ui/panel/actions_settings.rb', 'handle_set_dim_series', 8)
   NxTest.assert(h.include?("DimSeries.update!(data['series'], data['base'])"), 'zapis po klucoch s povodnymi hodnotami')
   NxTest.assert(h.include?('case status'), 'vysledok sa vyhodnocuje cez case (:conflict je pravdivy)')
-  NxTest.assert(h.index('push_ui_settings(refill_editor: true)').to_i < h.index('case status').to_i,
-                'editor sa prekresli pri kazdom vysledku (pred vetvami)')
+  push = h.index('push_ui_settings(refill_editor: true, series_status:')
+  NxTest.assert(push, 'editor sa prekresli a modal dostane vetu vysledku')
+  NxTest.assert(h.index('case status').to_i < push, 'push ide az ZA vyhodnotenim — pri kazdom vysledku, nie vo vetve')
+  NxTest.refute(h[/when :ok.*?\n\s*when/m].to_s.include?('push_ui_settings'), 'push nie je schovany vo vetve uspechu')
 end
 
 NxTest.test('H10b guard: `update!` — brana, starsi klient a cerstve citanie AZ POD zamkom, zapis cez `set`') do

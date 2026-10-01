@@ -126,7 +126,8 @@ module Noxun
       # drzi stary stav). Preto: klient posle LEN zmenene rady (`changes`)
       # a ku kazdemu hodnotu, ktoru pri otvoreni editora videl (`base`).
       #   * rozne rady z dvoch okien sa ZLUCIA (cudzi rad ostane),
-      #   * ten isty rad zmeneny inde = `:conflict` a NEZAPISE SA NIC (ani
+      #   * ten isty rad zmeneny inde na INU hodnotu = `:conflict` (zhodny
+      #     vysledok oboch okien konflikt nie je) a NEZAPISE SA NIC (ani
       #     nekonfliktne rady z tej istej poziadavky — editor sa prekresli
       #     ulozenym stavom a pouzivatel zmenu zada znova).
       #
@@ -162,7 +163,13 @@ module Noxun
 
           JsonFileStore.reload!(path)
           current = read_current
-          conflicts = keys.select { |k| normalize_list(base[k]) != current[k] }
+          # Konflikt = rad sa medzitym zmenil (povodna hodnota != subor) A nase
+          # zmena by ho prepisala INYM obsahom. Obe okna na rovnaku hodnotu
+          # nie su konflikt (predrecenzia P3) — inak by sa zbytocne zahodili
+          # aj ostatne zmenene rady poziadavky.
+          conflicts = keys.select do |k|
+            normalize_list(base[k]) != current[k] && normalize_list(changes[k]) != current[k]
+          end
           next [:conflict, current, conflicts] unless conflicts.empty?
 
           merged = normalize(current.merge(changes.slice(*keys)))

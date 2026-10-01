@@ -676,7 +676,9 @@ sú to nastavenia počítača, musia byť dostupné aj vtedy, keď nie je označ
 a stavový stroj kontextov (platných len nad korpusom) sa ich nesmie týkať. Tri
 sekcie podľa kontraktu: **Vzhľad** (téma) · **Rozmerové rady** (editor — hodnoty
 oddelené čiarkou, čistenie a poradie robí server) · **O plugine** (logo +
-verzia z Ruby).
+verzia z Ruby). Modal prekrýva `#status` panela, preto výsledok uloženia radov
+(aj konflikt s iným oknom) ukazuje **stavová veta priamo v sekcii** (`#serStatus`,
+vzhľad a tokeny ako `#status`; prázdna je skrytá a nezaberá riadok — H10b).
 
 ### 5.4 Vkladacia karta — typ, dlaždice šablón (UI-C1b), umiestnenie dosky (UI-C1c)
 

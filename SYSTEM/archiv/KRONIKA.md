@@ -26,11 +26,12 @@
   rady) → konflikt toho istého radu (nič sa nezapíše, ani nekonfliktné rady) → zlúčenie a zápis cez `set` (jediný zápis modulu). Panel: `update!` + `case`, editor sa
   prekreslí pri každom výsledku; klient pripne `NXDIM_BASE` len v `nxFillSeriesEditor` a cez čistú `NXDim.changes` posiela len zmenené rady s pôvodnými hodnotami.
   Hranice R2.7 (5 dnešných radov, novší formát nechránený) v odseku `dim_series.rb`; F1 (komentár o seed-merge) a F4 (prázdny odsek `actions_settings.rb`) opravené.
-  **Q2 bez odpovede** → vratná voľba z package (rôzne rady sa zlúčia bez hlášky, ten istý rad = hláška, zmenu treba zadať znova). Kód pluginu +166 / −23 riadkov
-  s komentármi (bez `?v=`). **Charakterizácia** C2 (commit `e841d6db`, zelená na main): jedno okno = bajtovo rovnaký súbor, aj cez `update!`. **Testy:** 5083 headless ·
-  151 JS sád + encoding guard; nové `test_h10b_rady.rb` (18 testov) a `test_h10b_rady.js` (42 kontrol); R-08 guard „revízia AŽ POD zámkom" rozšírený o `update!`;
-  **mutácie 11/11 zabité** (M15–M20 package + bez `reload!`, refill len pri úspechu, brána po staršom klientovi, čítanie cez `get`). In-SU nie je brána (model sa
-  nemení). STAV pred dávkou: v0.17.8 · H10a hotová · Robí sa H6/H7 (mockupy), nasleduje H10b · Ďalší krok H10b.
+  **Q2 bez odpovede** → vratná voľba z package (rôzne rady sa zlúčia bez hlášky, ten istý rad = hláška, zmenu treba zadať znova). Kód pluginu +212 / −31 riadkov
+  s komentármi (bez `?v=`). **Charakterizácia** C2 (commit `e841d6db`, zelená na main): jedno okno = bajtovo rovnaký súbor, aj cez `update!`. **Testy:** 5084 headless ·
+  151 JS sád + encoding guard; nové `test_h10b_rady.rb` (19 testov) a `test_h10b_rady.js` (51 kontrol); R-08 guard „revízia AŽ POD zámkom" rozšírený o `update!`;
+  **mutácie 15/15 zabité** (M15–M20 package + bez `reload!`, refill len pri úspechu, brána po staršom klientovi, čítanie cez `get`, 4 po predrecenzii).
+  **Predrecenzia:** 0× P1, 0× P2, 2× P3 — hláška konfliktu bola len v `#status` pod prekrytím modalu (teraz aj riadok `#serStatus` priamo v sekcii Rozmerové rady)
+  a obe okná so zhodnou hodnotou toho istého radu dávali zbytočný konflikt (teraz zhoda = OK); verdikt PR OK. In-SU nie je brána (model sa nemení). STAV pred dávkou: v0.17.8 · H10a hotová · Robí sa H6/H7 (mockupy), nasleduje H10b · Ďalší krok H10b.
 - **H10a · dve okná SketchUpu a globálne pravidlá kovania (1.10.2026, PR #443, v0.17.8, blok 9 · HARDENING PO V1, register R-35 — časť pravidlá; package
   [PACKAGE_H10.md](../zdroje/bloky/HARDENING/PACKAGE_H10.md), audit návrhu 1 BLOCKER · 3 FIX · 3 NOTE [AUDIT_H10_raw.md](../zdroje/bloky/HARDENING/AUDIT_H10_raw.md)
   + delta 7/7 RESOLVED [AUDIT_H10_delta_raw.md](../zdroje/bloky/HARDENING/AUDIT_H10_delta_raw.md); rez H10a → H10b).**

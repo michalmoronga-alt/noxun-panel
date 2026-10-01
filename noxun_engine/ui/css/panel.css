@@ -605,6 +605,11 @@
   #status { font-size: 11px; padding: 7px 9px; border-radius: 6px; background: var(--nx-surface-sunken); color: var(--nx-ink-label); border: 1px solid var(--nx-border); min-height: 16px; line-height: 1.35; margin-top: 8px; }
   #status.err { background: var(--nx-err-bg); color: var(--nx-err-fg); border-color: var(--nx-err-border); }
   #status.ok  { background: var(--nx-ok-bg); color: var(--nx-ok-fg); border-color: var(--nx-ok-border); }
+  /* H10b: stavova veta ulozenia radov PRIAMO v modale kolieska (modal prekryva
+     #status panela). Vzhlad ako #status; prazdna je `hidden` (nezabera riadok). */
+  #serStatus { font-size: 11px; padding: 7px 9px; border-radius: 6px; background: var(--nx-surface-sunken); color: var(--nx-ink-label); border: 1px solid var(--nx-border); line-height: 1.35; margin-top: 8px; }
+  #serStatus.err { background: var(--nx-err-bg); color: var(--nx-err-fg); border-color: var(--nx-err-border); }
+  #serStatus.ok  { background: var(--nx-ok-bg); color: var(--nx-ok-fg); border-color: var(--nx-ok-border); }
   /* V0.3 Materialy */
   .matrow { display: flex; align-items: center; margin: 5px 0; }
   .matrow label { flex: 0 0 118px; color: var(--nx-ink-label); font-size: 12px; }

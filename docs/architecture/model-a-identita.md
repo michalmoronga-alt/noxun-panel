@@ -281,7 +281,8 @@ nestal (to isté platí pre `Engine.set_ui_theme`). Modul o modeli nevie — rad
 radu a zápis po kľúčoch bez pôvodnej hodnoty by ďalej ticho strácal zmenu toho istého radu. Pod zámkom v poradí: brána degradovaného súboru (`:blocked`, aj bez `base`) →
 `changes`/`base` nie Hash alebo menený rad nemá v `base` pole (`:stale_client` — okno zo staršieho pluginu, fail-closed) → `JsonFileStore.reload!` + `read_current` (na rozdiel od
 `get` **nezhltne I/O chybu** — predvolená sada by inak prepísala súbor; poškodený primár bez zálohy a chýbajúci súbor = predvolená sada) → menené rady s `normalize_list(base[k])
-!= current[k]` = `[:conflict, aktuálne, tie_rady]` a **nezapíše sa nič** (ani nekonfliktné rady) → `merged = normalize(current.merge(zmenené ∩ KEYS))`; bez rozdielu `[:ok,
+!= current[k]` **a zároveň** výsledkom iným než súbor = `[:conflict, aktuálne, tie_rady]` a **nezapíše sa nič** (ani nekonfliktné rady; obe okná
+na **rovnakú** hodnotu konflikt nie sú — predrecenzia P3) → `merged = normalize(current.merge(zmenené ∩ KEYS))`; bez rozdielu `[:ok,
 current, []]` bez zápisu, inak `set(merged)` (jediný zápis modulu, zámok reentrantný). Rôzne rady z dvoch okien sa tak zlúčia, ten istý rad skončí hláškou. `LABELS` = mená radov
 do hlášky (zrkadlo `#ser_<kľúč>`). **Hranice (R2.7):** zlúčenie platí pre dnešných 5 normalizovaných kľúčov (`KEYS`); `[]` je platná hodnota (zlúči sa a zapíše), chýbajúci či
 neplatný kľúč v súbore sa číta ako predvolený, neznámy kľúč od klienta sa ignoruje a neznámy kľúč v súbore `set` pri zápise **zahodí** (zapíše `std: 1`) — **ochrana novšieho

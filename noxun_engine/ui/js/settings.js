@@ -254,6 +254,18 @@
     });
   }
 
+  // H10b (predrecenzia P3): stavova veta ulozenia radov PRIAMO v sekcii modalu
+  // — tmave prekrytie modalu zakryva `#status` panela, takze bez nej by
+  // pouzivatel nevidel, preco sa mu rozpisany text prepisal. `s` = { text, error };
+  // prazdne = riadok sa skryje (nezabera miesto).
+  function nxSeriesStatus(s){
+    var n = el('serStatus'); if (!n) return;
+    var text = (s && s.text) ? String(s.text) : '';
+    n.textContent = text;
+    n.className = text ? (s.error ? 'err' : 'ok') : '';
+    n.hidden = !text;
+  }
+
   // Ulozenie radov. Server normalizuje (cisla, rozsah, duplicity, poradie) a
   // vrati, co naozaj ulozil — az tym sa prekreslia ponuky pri poliach.
   // H10b: odchadzaju LEN zmenene rady s povodnymi hodnotami (NXDim.changes) —
@@ -271,6 +283,7 @@
         var inp = el('ser_' + k);
         if (inp) inp.value = NXDim.formatList(NXDIM_BASE[k]);
       });
+      nxSeriesStatus({ text: 'Rozmerové rady sa nezmenili.', error: false });
       if (window.NX && NX.setStatus) NX.setStatus('Rozmerové rady sa nezmenili.');
       return;
     }
@@ -298,6 +311,7 @@
     if (!m) return;
     nxDimCloseMenus();
     nxFillSeriesEditor();
+    nxSeriesStatus(null); // veta z minuleho ulozenia k novemu otvoreniu nepatri
     nxSyncThemeButtons();
     if (section){
       var target = el('cfg_' + section);
@@ -350,4 +364,6 @@
     nxDimRenderMenus();
     nxSyncThemeButtons();
     if (d.refill_editor) nxFillSeriesEditor();
+    // H10b: vetu vysledku nesie LEN odpoved na ulozenie radov (spolu s refill)
+    if (d.series_status) nxSeriesStatus(d.series_status);
   }

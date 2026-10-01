@@ -68,6 +68,7 @@ function sandbox(){
   const inputs = {};
   NXDim.KEYS.forEach(function(k){ inputs['ser_' + k] = { value: '' }; });
   inputs.cfgModal = { style: {}, querySelector: function(){ return null; }, addEventListener: function(){} };
+  inputs.serStatus = { textContent: '', className: '', hidden: true };
   const sent = [], status = [];
   const ctx = {
     el: function(id){ return inputs[id] || null; },
@@ -114,6 +115,18 @@ function sandbox(){
   eq(s.ctx.NXDIM_BASE, S1, 'refill_editor pripne aktualne ulozene rady');
   eq(s.inputs.ser_sirka.value, '400, 600, 700', 'a editor ich ukazuje');
 
+  // predrecenzia P3: veta konfliktu je vidno PRIAMO v modale (prekryva #status)
+  const conflictMsg = 'Rozmerové rady (Šírky) medzitým zmenilo iné okno SketchUpu — nič sa neuložilo.';
+  s.ctx.nxApplyUiSettings({ dim_series: S1, refill_editor: true, series_status: { text: conflictMsg, error: true } });
+  eq(s.inputs.serStatus.textContent, conflictMsg, 'konflikt sa ukaze v sekcii Rozmerove rady');
+  eq([s.inputs.serStatus.hidden, s.inputs.serStatus.className], [false, 'err'], 'viditelne a cervene');
+  s.ctx.nxApplyUiSettings({ dim_series: S1 });               // push temy
+  eq(s.inputs.serStatus.textContent, conflictMsg, 'push temy vetu nezmaze');
+  s.ctx.nxApplyUiSettings({ dim_series: S1, refill_editor: true, series_status: { text: 'Rozmerové rady uložené.', error: false } });
+  eq([s.inputs.serStatus.textContent, s.inputs.serStatus.className], ['Rozmerové rady uložené.', 'ok'], 'uspech je zeleny');
+  s.ctx.openInspectorSettings('series');
+  eq([s.inputs.serStatus.hidden, s.inputs.serStatus.textContent], [true, ''], 'nove otvorenie kolieska vetu skryje');
+
   // zmena INEHO radu -> odchadza len on, s povodnou hodnotou z noveho pinu
   s.inputs.ser_hlbka.value = '300 600';
   s.ctx.saveDimSeries();
@@ -129,6 +142,8 @@ function sandbox(){
   s.ctx.saveDimSeries();
   eq(s.sent.length, 0, 'bez skutocnej zmeny sa server NEVOLA');
   eq(s.status, [['Rozmerové rady sa nezmenili.', false]], 'status to povie');
+  eq([s.inputs.serStatus.hidden, s.inputs.serStatus.textContent], [false, 'Rozmerové rady sa nezmenili.'],
+     'aj priamo v modale');
   eq(s.inputs.ser_sirka.value, NXDim.formatList(D.sirka), 'polia sa zjednotia z pinu');
 
   s.ctx.resetDimSeriesFields();
@@ -157,5 +172,13 @@ ok(/NXDIM_BASE = NXDim\.normalize\(NXDim\.all\(\)\);/.test(SRC.slice(SRC.indexOf
 ok((SRC.match(/^\s*NXDIM_BASE = /gm) || []).length === 1, 'pin sa nastavuje na JEDINOM mieste (okrem deklaracie)');
 ok(SRC.indexOf('sketchup.nx_set_dim_series(JSON.stringify({ series: c.series, base: c.base }))') > 0,
    'payload nesie zmenene rady aj povodne hodnoty');
+(function(){
+  const html = fs.readFileSync(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'panel.html'), 'utf8');
+  const sec = html.slice(html.indexOf('<details id="cfg_series"'), html.indexOf('<details id="cfg_about"'));
+  ok(/<div id="serStatus" role="status" hidden><\/div>/.test(sec), 'riadok vety je v sekcii Rozmerove rady, prazdny skryty');
+  ok(sec.indexOf('serStatus') < sec.indexOf('saveDimSeries()'), 'nad tlacidlom Ulozit rady');
+  const css = fs.readFileSync(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'css', 'panel.css'), 'utf8');
+  ok(/#serStatus\.err \{[^}]*var\(--nx-err-fg\)/.test(css), 'chybova veta pouziva existujuce tokeny chyby');
+})();
 
 console.log(`test_h10b_rady.js: OK (${n} kontrol)`);
