@@ -79,7 +79,9 @@ NX_ARCH_HISTORY_HEADING = '## História'
 # pred porovnanim normalizuje (`nx_arch_history_norm`: bez `*` a spatnych apostrofov,
 # medzery zlucene). ZANIKL ostava VERZALKAMI: male „zaniklo" je bezne slovo opisu.
 NX_ARCH_HISTORY_RE = /\b(?:PR|review|Codex|audit|GH)\s*#\s*\d|\bv\d+\.\d+\.\d+\b/i.freeze
-NX_ARCH_HISTORY_CAPS_RE = /ZANIKL/.freeze
+# Pismenove oznacenia PR z fazy STUDIO (`PR A`, `PR B1`, `ŠT-1c PR B3`) su v repe bezna
+# forma — chytaju sa tiez, ale LEN verzalkami (male „pr a" by bol falosny poplach).
+NX_ARCH_HISTORY_CAPS_RE = /ZANIKL|\bPR\s+[A-Z]\d{0,2}\b/.freeze
 
 def nx_arch_history_norm(line)
   line.gsub(/[*`]/, '').gsub(/\s+/, ' ')
@@ -304,11 +306,12 @@ end
 # Negativne pripady guardu nad syntetickymi riadkami — guard nesmie mlcat pri zapisoch,
 # ktore v repe bezne existuju, a nesmie hlasit bezny opis (falosny poplach).
 NxTest.test('docs: guard historickych znaciek chyta varianty zapisu a nadpis za Historiou') do
-  ok = ['# Mapa', '', '### Sekcia X', 'zaniklo v sekcii, verzia v0.17.x, Š8–Š11, audit B1 FIX 5', '',
+  ok = ['# Mapa', '', '### Sekcia X', 'zaniklo v sekcii, verzia v0.17.x, Š8–Š11, audit B1 FIX 5, čísla PR, kolá review', '',
         NX_ARCH_HISTORY_HEADING, 'Výroba ZANIKLO v ŠT-1c PR #212 (review #2)']
   NxTest.assert(nx_arch_history_problems('t.md', ok).empty?,
                 "falosny poplach: #{nx_arch_history_problems('t.md', ok).join(' · ')}")
-  ['Review #226', 'V0.4.7', 'PR **#438**', 'PR  #438', '`PR #12`', 'codex #3', 'GH #138', 'AUDIT #9', 'okno ZANIKLO'].each do |bad|
+  ['Review #226', 'V0.4.7', 'PR **#438**', 'PR  #438', '`PR #12`', 'codex #3', 'GH #138', 'AUDIT #9', 'okno ZANIKLO',
+   'PR A', 'v ŠT-1c PR B1', 'PR B3', '**PR B2**'].each do |bad|
     lines = ['# Mapa', "text #{bad} text", NX_ARCH_HISTORY_HEADING]
     NxTest.refute(nx_arch_history_problems('t.md', lines).empty?, "guard nezachytil znacku '#{bad}'")
   end
