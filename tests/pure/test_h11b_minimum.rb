@@ -33,7 +33,9 @@ require 'open3'
 
 module NxH11b
   LOADER_SRC = File.binread(File.join(NxTest::ROOT, 'noxun_engine.rb'))
-  LOADER_TEXT = LOADER_SRC.dup.force_encoding(Encoding::UTF_8)
+  # Staticke strazcovia hladaju `\n    end\n` — na Windows checkoute s autocrlf
+  # ma loader CRLF, preto sa konce riadkov pred hladanim normalizuju na LF.
+  LOADER_TEXT = LOADER_SRC.dup.force_encoding(Encoding::UTF_8).gsub("\r\n", "\n")
   VERSION = LOADER_TEXT[/^\s*VERSION\s*=\s*'([^']+)'/, 1]
 
   module_function
@@ -229,7 +231,7 @@ NxTest.test('H11b: kontrola minima zije MIMO module Boot a bezi PRED recovery') 
   recover_at = src.index('Noxun::Engine::Boot.recover!(')
   NxTest.assert(check_at && recover_at && check_at < recover_at, 'kontrola minima musi bezat PRED recovery')
   # Instalator a loader hovoria o tom istom minime.
-  ps1 = File.binread(File.join(NxTest::ROOT, 'INSTALL_noxun_engine.ps1')).force_encoding(Encoding::UTF_8)
+  ps1 = File.binread(File.join(NxTest::ROOT, 'INSTALL_noxun_engine.ps1')).force_encoding(Encoding::UTF_8).gsub("\r\n", "\n")
   NxTest.assert(ps1 =~ /^\$MinSketchupYear = 2026$/, 'instalator a loader maju rozne minimum')
 end
 
