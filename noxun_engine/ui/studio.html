@@ -1335,7 +1335,7 @@
      do režimu sekcie (a ako poistka Node testov, ktoré ho nenastavujú).
      MUSÍ byť AŽ ZA studio.js aj budget.js — obaľuje `NX.setStudio` (rovnaký
      dôvod ako rozpočet) a lištu/telo sekcie kreslí cez `matRenderTools`
-     a `matRenderBody`, ktoré studio.js volá cez `typeof`. Poradie stráži
+     a `matRenderBody` — studio.js ich volá cez riadok `mat` registra sekcií. Poradie stráži
      guard test (tests/pure/test_st2a_mat.rb). -->
 <script>window.NX_MAT_SECTION = true;</script>
 <!-- ŠT-2b: Demos toky sekcie. `demos_diff.js` (modal „Aktualizovať z Demosu")
@@ -1356,7 +1356,7 @@
      sa do režimu sekcie (a ako marker poradia skriptov pre guard test).
      MUSÍ byť AŽ ZA studio.js, budget.js aj proj_materials.js — obaľuje
      `NX.setStudio` (rovnaký dôvod ako rozpočet a materiály) a lištu/telo sekcie
-     kreslí cez `hwRenderTools`/`hwRenderBody`, ktoré studio.js volá cez `typeof`.
+     kreslí cez `hwRenderTools`/`hwRenderBody` (studio.js ich volá cez riadok `hw` registra).
      `hw_sets.js` musí byť PRED `hw_catalog.js` — detail setu a blok „Predvoľby
      projektu" volajú jeho funkcie. Poradie stráži guard test
      (tests/pure/test_st3a_hw.rb). -->
@@ -1365,8 +1365,8 @@
 <script src="js/hw_catalog.js?v=0.17.15"></script>
 <!-- S1-A2: sekcia SPOTREBIČE (`appl`). MUSÍ byť AŽ ZA studio.js — obaľuje jeho
      `NX.setStudio` (rovnaký dôvod ako rozpočet, materiály a kovanie) a lištu/telo
-     sekcie kreslí cez `apRenderTools`/`apRenderBody`, ktoré studio.js volá cez
-     `typeof`. Prijímače `NX.applTree`/`NX.applCard`/`NX.applResult` pridáva DO
+     sekcie kreslí cez `apRenderTools`/`apRenderBody` (studio.js ich volá cez riadok
+     `appl` registra). Prijímače `NX.applTree`/`NX.applCard`/`NX.applResult` pridáva DO
      `window.NX` (studio.js ho priraďuje CELÝ), takže v opačnom poradí by zmizli.
      Poradie stráži guard test (tests/pure/test_s1a2_sekcia.rb). -->
 <script src="js/appliances.js?v=0.17.15"></script>
@@ -1374,7 +1374,7 @@
      tento súbor beží už len TU. MUSÍ byť AŽ ZA studio.js (obaľuje jeho
      `NX.setStudio` — rovnaký dôvod ako rozpočet, materiály a kovanie)
      a lištu/telo sekcie kreslí cez `rulesRenderTools`/`rulesRenderBody`,
-     ktoré studio.js volá cez `typeof`. Poradie stráži guard test
+     ktoré studio.js volá cez riadok `rules` registra. Poradie stráži guard test
      (tests/pure/test_st3b_rules.rb). -->
 <script src="js/rules.js?v=0.17.15"></script>
 <!-- ŠT-3c-1: sekcia Šablóny (Š18). Načítava sa AŽ ZA studio.js — obaľuje
@@ -1389,7 +1389,7 @@
      ZA studio.js: obaľuje jeho NX.setStudio, rovnako ako všetky predošlé sekcie. -->
 <script src="js/studio_settings.js?v=0.17.15"></script>
 <!-- NP-3: sekcia NÁREZOVÝ PLÁN (`cut`, mockup A + B). Načítava sa AŽ ZA
-     studio.js — ten volá jej lištu a telo cez `typeof npRenderTools /
-     npRenderBody` a ona číta jeho `ST`, `refreshBtnHtml` a `rgbHex`.
+     studio.js — ten volá jej lištu a telo cez riadok `cut` registra (`npRenderTools`
+     / `npRenderBody`) a ona číta jeho `ST`, `refreshBtnHtml` a `rgbHex`.
      `NX.setStudio` NEOBAĽUJE (nemá rozpísaný formulár ani lazy kanál). -->
 <script src="js/sheet_layout.js?v=0.17.15"></script>

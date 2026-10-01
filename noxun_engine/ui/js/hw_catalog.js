@@ -1932,7 +1932,8 @@
     // odchod zo sekcie zatvara — nie je co dorovnavat.
   }
 
-  // Odchod zo sekcie `hw` (vola `studioGoSection` v studio.js PRED prepnutim).
+  // Odchod zo sekcie `hw` — odchodovy hacik riadka `hw` v registri; vola ho
+  // `studioSwitchSection` v studio.js PRED prepnutim (klik aj deep-link).
   // Poradie je zavazne (lekcia ŠT-2b): NAJPRV sa ohlasi SERVERU (ten zrusi
   // beziace overenie ceny / nahlad a napise preco), az potom sa lokalne
   // zatvoria modaly.
