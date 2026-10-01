@@ -1,0 +1,875 @@
+{
+  "params": {
+    "type": "corner_blind"
+  },
+  "normalize": {
+    "type": "corner_blind",
+    "width": 1100.0,
+    "height": 720.0,
+    "depth": 510.0,
+    "thickness": 18.0,
+    "floor_height": 100.0,
+    "bottom_mode": "under_sides",
+    "top_mode": "full",
+    "back_mode": "overlay",
+    "back_thickness": 3.0,
+    "plinth_mode": "none",
+    "plinth_recess": 40.0,
+    "rail_depth": 100.0,
+    "rails_orientation": "flat",
+    "rails_top_offset": 0.0,
+    "back_setback": 0.0,
+    "top_front_setback": 0.0,
+    "back_rail_height": 100.0,
+    "zone_tree": {
+      "id": "Z1",
+      "generation": 0,
+      "split": null,
+      "shelves": 0,
+      "children": [
+
+      ]
+    },
+    "fronts": {
+      "split_axis": "height",
+      "gap": 3.0,
+      "gap_top": 2.0,
+      "gap_bottom": 2.0,
+      "gap_left": 2.0,
+      "gap_right": 2.0,
+      "edge_limit_off": false,
+      "items": [
+        {
+          "id": "F1",
+          "type": "door",
+          "mode": "auto",
+          "height": null,
+          "locked": false,
+          "wings": "1",
+          "profile": "none",
+          "direction": "right"
+        }
+      ]
+    },
+    "material_id": null,
+    "front_material_id": null,
+    "back_material_id": null,
+    "drawer_material_id": null,
+    "part_overrides": {
+    },
+    "hardware_overrides": [
+
+    ],
+    "hardware_sets": {
+    },
+    "hardware_manual": [
+
+    ],
+    "part_key_schema": 0,
+    "appliance_refs": null,
+    "appliance_expects": null,
+    "name": null,
+    "corner_side": "left",
+    "corner_door_w": 450.0,
+    "corner_cr1": 80.0,
+    "corner_cr2": 80.0
+  },
+  "plan": {
+    "schema": 7,
+    "parts": [
+      {
+        "suffix": "SIDE-L",
+        "part_key": "cabinet/side:left",
+        "role": "side_left",
+        "name": "Bok lavy",
+        "material": "korpus",
+        "box": [
+          18.0,
+          507.0,
+          602.0
+        ],
+        "origin": [
+          0,
+          0,
+          118.0
+        ],
+        "prod": {
+          "length": 602.0,
+          "width": 507.0,
+          "thickness": 18.0
+        },
+        "axes": {
+          "length": 2,
+          "width": 1,
+          "thickness": 0
+        }
+      },
+      {
+        "suffix": "SIDE-R",
+        "part_key": "cabinet/side:right",
+        "role": "side_right",
+        "name": "Bok pravy",
+        "material": "korpus",
+        "box": [
+          18.0,
+          507.0,
+          602.0
+        ],
+        "origin": [
+          1082.0,
+          0,
+          118.0
+        ],
+        "prod": {
+          "length": 602.0,
+          "width": 507.0,
+          "thickness": 18.0
+        },
+        "axes": {
+          "length": 2,
+          "width": 1,
+          "thickness": 0
+        }
+      },
+      {
+        "suffix": "BOTTOM",
+        "part_key": "cabinet/bottom",
+        "role": "bottom",
+        "name": "Dno",
+        "material": "korpus",
+        "box": [
+          1100.0,
+          507.0,
+          18.0
+        ],
+        "origin": [
+          0,
+          0,
+          100.0
+        ],
+        "prod": {
+          "length": 1100.0,
+          "width": 507.0,
+          "thickness": 18.0
+        },
+        "axes": {
+          "length": 0,
+          "width": 1,
+          "thickness": 2
+        }
+      },
+      {
+        "suffix": "TOP",
+        "part_key": "cabinet/top",
+        "role": "top",
+        "name": "Vrch",
+        "material": "korpus",
+        "box": [
+          1064.0,
+          507.0,
+          18.0
+        ],
+        "origin": [
+          18.0,
+          0,
+          702.0
+        ],
+        "prod": {
+          "length": 1064.0,
+          "width": 507.0,
+          "thickness": 18.0
+        },
+        "axes": {
+          "length": 0,
+          "width": 1,
+          "thickness": 2
+        }
+      },
+      {
+        "suffix": "BACK",
+        "part_key": "cabinet/back",
+        "role": "back",
+        "name": "Chrbat",
+        "material": "korpus",
+        "box": [
+          1100.0,
+          3.0,
+          620.0
+        ],
+        "origin": [
+          0,
+          507.0,
+          100.0
+        ],
+        "prod": {
+          "length": 1100.0,
+          "width": 620.0,
+          "thickness": 3.0
+        },
+        "axes": {
+          "length": 0,
+          "width": 2,
+          "thickness": 1
+        },
+        "back_mode": "overlay"
+      },
+      {
+        "suffix": "CORNER-PANEL",
+        "part_key": "cabinet/corner_panel",
+        "role": "corner_blind_panel",
+        "name": "Blenda rohova",
+        "material": "korpus",
+        "box": [
+          632.0,
+          18.0,
+          584.0
+        ],
+        "origin": [
+          450.0,
+          0.0,
+          118.0
+        ],
+        "prod": {
+          "length": 584.0,
+          "width": 632.0,
+          "thickness": 18.0
+        },
+        "axes": {
+          "length": 2,
+          "width": 0,
+          "thickness": 1
+        }
+      },
+      {
+        "suffix": "HINGE-RAIL",
+        "part_key": "cabinet/hinge_rail",
+        "role": "hinge_rail",
+        "name": "Vystuha zavesov",
+        "material": "korpus",
+        "box": [
+          18.0,
+          80.0,
+          584.0
+        ],
+        "origin": [
+          432.0,
+          0.0,
+          118.0
+        ],
+        "prod": {
+          "length": 584.0,
+          "width": 80.0,
+          "thickness": 18.0
+        },
+        "axes": {
+          "length": 2,
+          "width": 1,
+          "thickness": 0
+        }
+      },
+      {
+        "suffix": "CR-1",
+        "part_key": "cabinet/cr:1",
+        "role": "cr_front",
+        "name": "CR lista 1",
+        "material": "front",
+        "box": [
+          78.0,
+          18.0,
+          616.0
+        ],
+        "origin": [
+          452.0,
+          -18.0,
+          102.0
+        ],
+        "prod": {
+          "length": 616.0,
+          "width": 78.0,
+          "thickness": 18.0
+        },
+        "axes": {
+          "length": 2,
+          "width": 0,
+          "thickness": 1
+        }
+      },
+      {
+        "suffix": "CR-2",
+        "part_key": "cabinet/cr:2",
+        "role": "cr_side",
+        "name": "CR lista 2",
+        "material": "front",
+        "box": [
+          18.0,
+          96.0,
+          616.0
+        ],
+        "origin": [
+          530.0,
+          -96.0,
+          102.0
+        ],
+        "prod": {
+          "length": 616.0,
+          "width": 96.0,
+          "thickness": 18.0
+        },
+        "axes": {
+          "length": 2,
+          "width": 1,
+          "thickness": 0
+        }
+      },
+      {
+        "suffix": "CORNER-RAIL",
+        "part_key": "cabinet/corner_rail",
+        "role": "corner_rail",
+        "name": "Vystuha rohova",
+        "material": "korpus",
+        "box": [
+          18.0,
+          98.0,
+          620.0
+        ],
+        "origin": [
+          548.0,
+          -98.0,
+          100.0
+        ],
+        "prod": {
+          "length": 620.0,
+          "width": 98.0,
+          "thickness": 18.0
+        },
+        "axes": {
+          "length": 2,
+          "width": 1,
+          "thickness": 0
+        }
+      },
+      {
+        "suffix": "DOOR-1",
+        "part_key": "front:F1/wing:single",
+        "role": "front_door",
+        "name": "Dvierka 1",
+        "material": "front",
+        "box": [
+          446.0,
+          18.0,
+          616.0
+        ],
+        "origin": [
+          2.0,
+          -18.0,
+          102.0
+        ],
+        "prod": {
+          "length": 616.0,
+          "width": 446.0,
+          "thickness": 18.0
+        },
+        "axes": {
+          "length": 2,
+          "width": 0,
+          "thickness": 1
+        },
+        "profile": "none"
+      }
+    ],
+    "hardware": [
+      {
+        "owner_part_key": null,
+        "generic_type": "leg",
+        "quantity": 6,
+        "rule_id": "nohy-zakladne",
+        "variant_id": null,
+        "production_class": "counted",
+        "manufactured": true,
+        "params": {
+          "height": 100.0
+        },
+        "source": "rule",
+        "rule_quantity": 6
+      },
+      {
+        "owner_part_key": null,
+        "generic_type": "plinth_clip",
+        "quantity": 2,
+        "rule_id": "prichyt-sokla",
+        "variant_id": null,
+        "production_class": "counted",
+        "manufactured": true,
+        "params": {
+        },
+        "source": "rule",
+        "rule_quantity": 2
+      },
+      {
+        "owner_part_key": "front:F1/wing:single",
+        "generic_type": "hinge",
+        "quantity": 2,
+        "rule_id": "zavesy-podla-vysky",
+        "variant_id": null,
+        "production_class": "counted",
+        "manufactured": true,
+        "params": {
+          "use_type": "door",
+          "opening_mode": "classic"
+        },
+        "source": "rule",
+        "rule_quantity": 2
+      }
+    ],
+    "warnings": [
+      {
+        "code": "hinge_weight_unknown",
+        "severity": "info",
+        "message": "Dvierka „Dvierka 1“: hmotnosť dvierok nie je známa — počet závesov je len podľa výšky.",
+        "part_key": "front:F1/wing:single",
+        "data": {
+          "rule_id": "zavesy-podla-vysky"
+        }
+      }
+    ],
+    "zones": [
+      {
+        "id": "CAB-001-Z1",
+        "stable_id": "Z1",
+        "parent": null,
+        "label": "Celé vnútro",
+        "position": [
+          18.0,
+          0.0,
+          118.0
+        ],
+        "width": 1064.0,
+        "height": 584.0,
+        "depth": 507.0,
+        "split": null,
+        "shelves": 0,
+        "leaf": true
+      }
+    ],
+    "zone_tree": {
+      "id": "Z1",
+      "generation": 0,
+      "split": null,
+      "shelves": 0,
+      "children": [
+
+      ]
+    },
+    "front_items": [
+      {
+        "id": "F1",
+        "type": "door",
+        "mode": "auto",
+        "height": 616.0,
+        "locked": false,
+        "wings": "1",
+        "wings_n": 1,
+        "profile": "none",
+        "z": 102.0,
+        "direction": "right"
+      }
+    ],
+    "available": {
+      "width": 1064.0,
+      "height": 584.0,
+      "depth": 507.0
+    },
+    "wings": 1,
+    "interior": {
+      "z_lo": 118.0,
+      "z_hi": 702.0,
+      "avail_h": 584.0,
+      "back_front_y": 507.0,
+      "back_thickness": 3.0
+    },
+    "references": [
+
+    ],
+    "zone_bounds": {
+      "CAB-001-Z1": {
+        "x0": 18.0,
+        "x1": 1082.0,
+        "y0": 0.0,
+        "y1": 507.0,
+        "z0": 118.0,
+        "z1": 702.0
+      }
+    },
+    "front_bounds": {
+      "F1": {
+        "z0": 102.0,
+        "z1": 718.0,
+        "height": 616.0
+      }
+    },
+    "drawer_conflicts": [
+
+    ],
+    "drawer_writes": [
+
+    ],
+    "drawer_override_writes": [
+
+    ],
+    "hardware_conflicts": [
+
+    ]
+  },
+  "config": {
+    "config_schema": 22,
+    "rules_seed_version": 7,
+    "part_key_schema": 1,
+    "plan_schema": 7,
+    "warnings": [
+      {
+        "code": "hinge_weight_unknown",
+        "severity": "info",
+        "message": "Dvierka „Dvierka 1“: hmotnosť dvierok nie je známa — počet závesov je len podľa výšky.",
+        "part_key": "front:F1/wing:single",
+        "data": {
+          "rule_id": "zavesy-podla-vysky"
+        }
+      }
+    ],
+    "hardware": [
+      {
+        "owner_part_key": null,
+        "generic_type": "leg",
+        "quantity": 6,
+        "rule_id": "nohy-zakladne",
+        "variant_id": null,
+        "production_class": "counted",
+        "manufactured": true,
+        "params": {
+          "height": 100.0
+        },
+        "source": "rule",
+        "rule_quantity": 6
+      },
+      {
+        "owner_part_key": null,
+        "generic_type": "plinth_clip",
+        "quantity": 2,
+        "rule_id": "prichyt-sokla",
+        "variant_id": null,
+        "production_class": "counted",
+        "manufactured": true,
+        "params": {
+        },
+        "source": "rule",
+        "rule_quantity": 2
+      },
+      {
+        "owner_part_key": "front:F1/wing:single",
+        "generic_type": "hinge",
+        "quantity": 2,
+        "rule_id": "zavesy-podla-vysky",
+        "variant_id": null,
+        "production_class": "counted",
+        "manufactured": true,
+        "params": {
+          "use_type": "door",
+          "opening_mode": "classic"
+        },
+        "source": "rule",
+        "rule_quantity": 2
+      }
+    ],
+    "drawer_conflicts": [
+
+    ],
+    "hardware_conflicts": [
+
+    ],
+    "type": "corner_blind",
+    "name": null,
+    "construction_preset": "noxun-corner-blind",
+    "mode": "parametric",
+    "width": 1100.0,
+    "height": 720.0,
+    "depth": 510.0,
+    "thickness": 18.0,
+    "floor_height": 100.0,
+    "bottom_mode": "under_sides",
+    "top_mode": "full",
+    "back_mode": "overlay",
+    "back_thickness": 3.0,
+    "plinth_mode": "none",
+    "plinth_recess": 40.0,
+    "rail_depth": 100.0,
+    "rails_orientation": "flat",
+    "rails_top_offset": 0.0,
+    "sides": {
+      "thickness": 18.0,
+      "construction": "sides_wrap"
+    },
+    "bottom": {
+      "mode": "under_sides",
+      "thickness": 18.0
+    },
+    "top": {
+      "mode": "full",
+      "thickness": 18.0,
+      "rail_depth": 100.0,
+      "orientation": "flat",
+      "top_offset": 0.0
+    },
+    "back": {
+      "mode": "overlay",
+      "thickness": 3.0
+    },
+    "support": {
+      "type": "legs",
+      "height": 100.0
+    },
+    "material_id": null,
+    "front_material_id": null,
+    "back_material_id": null,
+    "drawer_material_id": null,
+    "part_overrides": {
+    },
+    "hardware_overrides": [
+
+    ],
+    "hardware_sets": {
+    },
+    "hardware_manual": [
+
+    ],
+    "available_width": 1064.0,
+    "available_height": 584.0,
+    "available_depth": 507.0,
+    "front_plane": 0.0,
+    "wings": 1,
+    "zone_tree": {
+      "id": "Z1",
+      "generation": 0,
+      "split": null,
+      "shelves": 0,
+      "children": [
+
+      ]
+    },
+    "zones": [
+      {
+        "id": "CAB-001-Z1",
+        "stable_id": "Z1",
+        "parent": null,
+        "label": "Celé vnútro",
+        "position": [
+          18.0,
+          0.0,
+          118.0
+        ],
+        "width": 1064.0,
+        "height": 584.0,
+        "depth": 507.0,
+        "split": null,
+        "shelves": 0,
+        "leaf": true
+      }
+    ],
+    "fronts": {
+      "split_axis": "height",
+      "gap": 3.0,
+      "gap_top": 2.0,
+      "gap_bottom": 2.0,
+      "gap_left": 2.0,
+      "gap_right": 2.0,
+      "edge_limit_off": false,
+      "items": [
+        {
+          "id": "F1",
+          "type": "door",
+          "mode": "auto",
+          "height": null,
+          "locked": false,
+          "wings": "1",
+          "profile": "none",
+          "direction": "right"
+        }
+      ]
+    },
+    "front_items": [
+      {
+        "id": "F1",
+        "type": "door",
+        "mode": "auto",
+        "height": 616.0,
+        "locked": false,
+        "wings": "1",
+        "wings_n": 1,
+        "profile": "none",
+        "z": 102.0,
+        "direction": "right"
+      }
+    ],
+    "corner_side": "left",
+    "corner_door_w": 450.0,
+    "corner_cr1": 80.0,
+    "corner_cr2": 80.0
+  },
+  "config_roundtrip": {
+    "type": "corner_blind",
+    "width": 1100.0,
+    "height": 720.0,
+    "depth": 510.0,
+    "thickness": 18.0,
+    "floor_height": 100.0,
+    "bottom_mode": "under_sides",
+    "top_mode": "full",
+    "back_mode": "overlay",
+    "back_thickness": 3.0,
+    "plinth_mode": "none",
+    "plinth_recess": 40.0,
+    "rail_depth": 100.0,
+    "rails_orientation": "flat",
+    "rails_top_offset": 0.0,
+    "back_setback": 0.0,
+    "top_front_setback": 0.0,
+    "back_rail_height": 100.0,
+    "zone_tree": {
+      "id": "Z1",
+      "generation": 0,
+      "split": null,
+      "shelves": 0,
+      "children": [
+
+      ]
+    },
+    "fronts": {
+      "split_axis": "height",
+      "gap": 3.0,
+      "gap_top": 2.0,
+      "gap_bottom": 2.0,
+      "gap_left": 2.0,
+      "gap_right": 2.0,
+      "edge_limit_off": false,
+      "items": [
+        {
+          "id": "F1",
+          "type": "door",
+          "mode": "auto",
+          "height": null,
+          "locked": false,
+          "wings": "1",
+          "profile": "none",
+          "direction": "right"
+        }
+      ]
+    },
+    "material_id": null,
+    "front_material_id": null,
+    "back_material_id": null,
+    "drawer_material_id": null,
+    "part_overrides": {
+    },
+    "hardware_overrides": [
+
+    ],
+    "hardware_sets": {
+    },
+    "hardware_manual": [
+
+    ],
+    "part_key_schema": 1,
+    "appliance_refs": null,
+    "appliance_expects": null,
+    "name": null,
+    "corner_side": "left",
+    "corner_door_w": 450.0,
+    "corner_cr1": 80.0,
+    "corner_cr2": 80.0
+  },
+  "support_type": "legs",
+  "hw_ctx": {
+    "width": 1100.0,
+    "height": 720.0,
+    "depth": 510.0,
+    "floor_height": 100.0,
+    "kh": 620.0,
+    "kb": 1100.0,
+    "support": "legs",
+    "cabinet_type": "corner_blind"
+  },
+  "front_opening": {
+    "x0": 0.0,
+    "w": 450.0,
+    "z0": 100.0,
+    "h": 620.0
+  },
+  "min_valid": {
+    "height": 147.0,
+    "depth": 150.0,
+    "width": 584.0
+  },
+  "names": {
+    "default": "Rohová skrinka 1100",
+    "display": "Rohová skrinka 1100",
+    "template_id": "corner-blind-18",
+    "preset": "noxun-corner-blind"
+  },
+  "home_z": 0.0,
+  "appliance_context": {
+    "interior": {
+      "width": 1064.0,
+      "height": 584.0,
+      "depth": 507.0
+    },
+    "z_lo": 118.0,
+    "gap": 3.0,
+    "single_zone": true,
+    "fronts_pair": {
+      "applicable": false,
+      "reason": "delenie sa netýka: 1 čelá"
+    }
+  },
+  "owner_kind": "cabinet",
+  "slot_record": null,
+  "entity_kind": "cabinet",
+  "tpl_expects": {
+    "has": false,
+    "codes": [
+
+    ],
+    "text": ""
+  },
+  "tpl_construction": {
+    "has": false,
+    "text": ""
+  },
+  "direction_blind": "cross",
+  "scale": {
+    "min": {
+      "width": 200.0,
+      "height": 80.0,
+      "depth": 150.0
+    },
+    "depth": [
+      150.0,
+      null
+    ],
+    "height": 147.0,
+    "corner_width": [
+      584.0,
+      "Šírka rohovej skrinky CAB-001 je pri tejto rohovej zostave najmenej 584 mm — nastavená na 584."
+    ]
+  },
+  "ghost": {
+    "type_key": "corner_blind",
+    "corner": true,
+    "lock_z": 0.0,
+    "memory_lock_z": {
+      "corner_blind": 0.0
+    }
+  },
+  "corner_thicknesses": {
+    "cabinet/cr:1": 18.0,
+    "cabinet/cr:2": 18.0
+  }
+}

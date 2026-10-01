@@ -1,0 +1,478 @@
+{
+  "params": {
+    "type": "dishwasher"
+  },
+  "normalize": {
+    "type": "dishwasher",
+    "width": 600.0,
+    "height": 880.0,
+    "depth": 560.0,
+    "thickness": 18.0,
+    "floor_height": 0.0,
+    "bottom_mode": "under_sides",
+    "top_mode": "full",
+    "back_mode": "none",
+    "back_thickness": 3.0,
+    "plinth_mode": "none",
+    "plinth_recess": 40.0,
+    "rail_depth": 100.0,
+    "rails_orientation": "flat",
+    "rails_top_offset": 0.0,
+    "back_setback": 0.0,
+    "top_front_setback": 0.0,
+    "back_rail_height": 100.0,
+    "zone_tree": {
+      "id": "Z1",
+      "generation": 0,
+      "split": null,
+      "shelves": 0,
+      "children": [
+
+      ]
+    },
+    "fronts": {
+      "split_axis": "height",
+      "gap": 0.0,
+      "gap_top": 2.0,
+      "gap_bottom": 0.0,
+      "gap_left": 2.0,
+      "gap_right": 2.0,
+      "edge_limit_off": false,
+      "items": [
+        {
+          "id": "F1",
+          "type": "blind",
+          "mode": "fixed",
+          "height": 778.0,
+          "locked": true,
+          "wings": 1,
+          "profile": "none"
+        }
+      ]
+    },
+    "material_id": null,
+    "front_material_id": null,
+    "back_material_id": null,
+    "drawer_material_id": null,
+    "part_overrides": {
+    },
+    "hardware_overrides": [
+
+    ],
+    "hardware_sets": {
+    },
+    "hardware_manual": [
+
+    ],
+    "part_key_schema": 0,
+    "appliance_refs": null,
+    "appliance_expects": null,
+    "name": null,
+    "dw_class": 600,
+    "dw_body_height": 820.0,
+    "dw_front_bottom": 100.0,
+    "dw_front_height": 778.0
+  },
+  "plan": {
+    "schema": 7,
+    "parts": [
+      {
+        "suffix": "BLIND-1",
+        "part_key": "front:F1/blind",
+        "role": "false_front",
+        "name": "Dv myčka",
+        "material": "front",
+        "box": [
+          596.0,
+          18.0,
+          778.0
+        ],
+        "origin": [
+          2.0,
+          -18.0,
+          100.0
+        ],
+        "prod": {
+          "length": 778.0,
+          "width": 596.0,
+          "thickness": 18.0
+        },
+        "axes": {
+          "length": 2,
+          "width": 0,
+          "thickness": 1
+        },
+        "profile": "none"
+      }
+    ],
+    "references": [
+      {
+        "ref_key": "ref:appliance_body",
+        "role": "appliance_body",
+        "kind": "reference",
+        "box": [
+          598.0,
+          555.0,
+          820.0
+        ],
+        "origin": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "production_class": "reference",
+        "manufactured": false,
+        "source": "generic",
+        "dw_class": 600,
+        "label": "Umývačka 60 — telo (generické)"
+      }
+    ],
+    "hardware": [
+
+    ],
+    "warnings": [
+
+    ],
+    "zones": [
+
+    ],
+    "zone_tree": {
+      "id": "Z1",
+      "generation": 0,
+      "split": null,
+      "shelves": 0,
+      "children": [
+
+      ]
+    },
+    "front_items": [
+      {
+        "id": "F1",
+        "type": "blind",
+        "mode": "fixed",
+        "height": 778.0,
+        "locked": true,
+        "wings": 1,
+        "wings_n": 1,
+        "profile": "none",
+        "z": 100.0,
+        "label": "dv myčka"
+      }
+    ],
+    "available": {
+      "width": 600.0,
+      "height": 880.0,
+      "depth": 560.0
+    },
+    "wings": 0,
+    "interior": {
+      "z_lo": 0.0,
+      "z_hi": 880.0,
+      "avail_h": 880.0,
+      "back_front_y": 560.0,
+      "back_thickness": 0.0
+    },
+    "zone_bounds": {
+    },
+    "front_bounds": {
+      "F1": {
+        "z0": 100.0,
+        "z1": 878.0,
+        "height": 778.0
+      }
+    },
+    "drawer_conflicts": [
+
+    ],
+    "drawer_writes": [
+
+    ],
+    "drawer_override_writes": [
+
+    ],
+    "hardware_conflicts": [
+
+    ]
+  },
+  "config": {
+    "config_schema": 22,
+    "rules_seed_version": 7,
+    "part_key_schema": 1,
+    "plan_schema": 7,
+    "warnings": [
+
+    ],
+    "hardware": [
+
+    ],
+    "drawer_conflicts": [
+
+    ],
+    "hardware_conflicts": [
+
+    ],
+    "type": "dishwasher",
+    "name": null,
+    "construction_preset": "noxun-dishwasher",
+    "mode": "parametric",
+    "width": 600.0,
+    "height": 880.0,
+    "depth": 560.0,
+    "thickness": 18.0,
+    "floor_height": 0.0,
+    "bottom_mode": "under_sides",
+    "top_mode": "full",
+    "back_mode": "none",
+    "back_thickness": 3.0,
+    "plinth_mode": "none",
+    "plinth_recess": 40.0,
+    "rail_depth": 100.0,
+    "rails_orientation": "flat",
+    "rails_top_offset": 0.0,
+    "sides": {
+      "thickness": 18.0,
+      "construction": "sides_wrap"
+    },
+    "bottom": {
+      "mode": "under_sides",
+      "thickness": 18.0
+    },
+    "top": {
+      "mode": "full",
+      "thickness": 18.0,
+      "rail_depth": 100.0,
+      "orientation": "flat",
+      "top_offset": 0.0
+    },
+    "back": {
+      "mode": "none",
+      "thickness": 3.0
+    },
+    "support": {
+      "type": "none",
+      "height": 0.0
+    },
+    "material_id": null,
+    "front_material_id": null,
+    "back_material_id": null,
+    "drawer_material_id": null,
+    "part_overrides": {
+    },
+    "hardware_overrides": [
+
+    ],
+    "hardware_sets": {
+    },
+    "hardware_manual": [
+
+    ],
+    "available_width": 600.0,
+    "available_height": 880.0,
+    "available_depth": 560.0,
+    "front_plane": 0.0,
+    "wings": 0,
+    "zone_tree": {
+      "id": "Z1",
+      "generation": 0,
+      "split": null,
+      "shelves": 0,
+      "children": [
+
+      ]
+    },
+    "zones": [
+
+    ],
+    "fronts": {
+      "split_axis": "height",
+      "gap": 0.0,
+      "gap_top": 2.0,
+      "gap_bottom": 0.0,
+      "gap_left": 2.0,
+      "gap_right": 2.0,
+      "edge_limit_off": false,
+      "items": [
+        {
+          "id": "F1",
+          "type": "blind",
+          "mode": "fixed",
+          "height": 778.0,
+          "locked": true,
+          "wings": 1,
+          "profile": "none"
+        }
+      ]
+    },
+    "front_items": [
+      {
+        "id": "F1",
+        "type": "blind",
+        "mode": "fixed",
+        "height": 778.0,
+        "locked": true,
+        "wings": 1,
+        "wings_n": 1,
+        "profile": "none",
+        "z": 100.0,
+        "label": "dv myčka"
+      }
+    ],
+    "dw_class": 600,
+    "dw_body_height": 820.0,
+    "dw_front_bottom": 100.0,
+    "dw_front_height": 778.0
+  },
+  "config_roundtrip": {
+    "type": "dishwasher",
+    "width": 600.0,
+    "height": 880.0,
+    "depth": 560.0,
+    "thickness": 18.0,
+    "floor_height": 0.0,
+    "bottom_mode": "under_sides",
+    "top_mode": "full",
+    "back_mode": "none",
+    "back_thickness": 3.0,
+    "plinth_mode": "none",
+    "plinth_recess": 40.0,
+    "rail_depth": 100.0,
+    "rails_orientation": "flat",
+    "rails_top_offset": 0.0,
+    "back_setback": 0.0,
+    "top_front_setback": 0.0,
+    "back_rail_height": 100.0,
+    "zone_tree": {
+      "id": "Z1",
+      "generation": 0,
+      "split": null,
+      "shelves": 0,
+      "children": [
+
+      ]
+    },
+    "fronts": {
+      "split_axis": "height",
+      "gap": 0.0,
+      "gap_top": 2.0,
+      "gap_bottom": 0.0,
+      "gap_left": 2.0,
+      "gap_right": 2.0,
+      "edge_limit_off": false,
+      "items": [
+        {
+          "id": "F1",
+          "type": "blind",
+          "mode": "fixed",
+          "height": 778.0,
+          "locked": true,
+          "wings": 1,
+          "profile": "none"
+        }
+      ]
+    },
+    "material_id": null,
+    "front_material_id": null,
+    "back_material_id": null,
+    "drawer_material_id": null,
+    "part_overrides": {
+    },
+    "hardware_overrides": [
+
+    ],
+    "hardware_sets": {
+    },
+    "hardware_manual": [
+
+    ],
+    "part_key_schema": 1,
+    "appliance_refs": null,
+    "appliance_expects": null,
+    "name": null,
+    "dw_class": 600,
+    "dw_body_height": 820.0,
+    "dw_front_bottom": 100.0,
+    "dw_front_height": 778.0
+  },
+  "support_type": "none",
+  "hw_ctx": {
+    "width": 600.0,
+    "height": 880.0,
+    "depth": 560.0,
+    "floor_height": 0.0,
+    "kh": 880.0,
+    "kb": 600.0,
+    "support": "none",
+    "cabinet_type": "dishwasher"
+  },
+  "front_opening": {
+    "x0": 0.0,
+    "w": 600.0,
+    "z0": 100.0,
+    "h": 780.0
+  },
+  "min_valid": {
+    "height": 500.0,
+    "depth": 0.0,
+    "width": 200.0
+  },
+  "names": {
+    "default": "Umývačka 60 (slot)",
+    "display": "Umývačka 60 (slot)",
+    "template_id": "dishwasher-slot-18",
+    "preset": "noxun-dishwasher"
+  },
+  "home_z": 0.0,
+  "appliance_context": {
+  },
+  "owner_kind": "slot",
+  "slot_record": {
+    "owner_id": "CAB-001",
+    "owner_pid": 1,
+    "width": 600.0,
+    "height": 880.0,
+    "dw_class": 600,
+    "dw_body_height": 820.0,
+    "body_width": 598.0,
+    "body_source": "generic",
+    "class_label": "60"
+  },
+  "entity_kind": "slot",
+  "tpl_expects": {
+    "has": true,
+    "codes": [
+      "dishwasher"
+    ],
+    "text": "očakáva umývačku"
+  },
+  "tpl_construction": {
+    "has": false,
+    "text": ""
+  },
+  "direction_blind": "down",
+  "scale": {
+    "min": {
+      "width": 300.0,
+      "height": 500.0,
+      "depth": 150.0
+    },
+    "depth": [
+      100.0,
+      null
+    ],
+    "height": 500.0,
+    "corner_width": [
+      300.0,
+      null
+    ]
+  },
+  "ghost": {
+    "type_key": "dishwasher",
+    "corner": false,
+    "lock_z": 0.0,
+    "memory_lock_z": {
+      "dishwasher": 0.0
+    }
+  },
+  "corner_thicknesses": {
+  }
+}
