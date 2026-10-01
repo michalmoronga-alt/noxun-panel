@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H14b · jedna cesta prepnutia sekcie, kotvy a kreslenie sekcie z registra (1.10.2026, PR #?, v0.17.15, blok 9 · HARDENING PO V1, triedenie C-02
+- **H14b · jedna cesta prepnutia sekcie, kotvy a kreslenie sekcie z registra (1.10.2026, PR #451, v0.17.15, blok 9 · HARDENING PO V1, triedenie C-02
   časť 2 — CX-04 + GR-06 klient; package [PACKAGE_H14.md](../zdroje/bloky/HARDENING/PACKAGE_H14.md) §15 A1 A3).**
   Klik v navigácii a deep-link prepínali sekciu dvoma kópiami tých istých háčikov a `renderTools`/`renderBody` mali po 11 vetiev podľa id. Teraz
   **`studioSwitchSection(id, guid)`** je jediná cesta prechodu (whitelist registrom → kontext dokumentu → `closeSectionMenus` → `leave` → `studioSec` →
