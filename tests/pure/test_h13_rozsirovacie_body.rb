@@ -5,21 +5,25 @@
 # CO PLATI:
 #   * `docs/architecture/rozsirovacie-body.md`: kazdy riadok tabulky, ktory
 #     zacina cestou v spatnych apostrofoch, menuje EXISTUJUCI subor a KAZDE meno
-#     z druheho stlpca v nom je (cele slovo; meno s `::`/`.`/`#` po castiach,
-#     meno s medzerou alebo pomlckou ako doslovny text) — premenovany alebo
-#     zruseny register zhodi test, nie agenta o pol roka;
+#     z druheho stlpca v nom je: hole meno ako cele slovo; `Modul::CLEN` alebo
+#     `Modul.metoda` ako DEKLARACIA (`KONST =`, `def`, `module`) v tele svojho
+#     modulu, subor bez toho modulu ho musi obsahovat doslovne; v Ruby subore
+#     s viacerymi modulmi musi byt meno kvalifikovane; meno s medzerou alebo
+#     pomlckou ako doslovny text. Scenare 1 a 4 musia menovat povinne mena
+#     (`NX_H13_REQUIRED`). Premenovany alebo zruseny register zhodi test;
 #   * pasca zavesov CN-03: kazdy VISIACI typ registra (`hang_z > 0`) je v
 #     `applies_to.cabinet_type` seed pravidla zavesov, alebo vo vynimkach s
 #     dovodom; pravidlo zavesov neplati na typ, ktory nevisi (presunute sem
 #     z H12a T3c a rozsirene o vynimky);
 #   * `SYSTEM/STANDARD.md` §13: hodnota kazdeho riadku = konstanta v kode a
-#     KAZDA ciselna konstanta verzie v `noxun_engine/` je v tabulke (kroky
-#     historie `SCHEMA_*` modulu so `SCHEMA_CURRENT` su vynimka, test overi,
-#     ze `SCHEMA_CURRENT` ukazuje na najvyssi krok).
+#     KAZDA ciselna konstanta verzie v `noxun_engine/` je v tabulke, aj nemenne
+#     kroky historie `SCHEMA_*` (13.3) presnou hodnotou; kroky v module su
+#     jedinecne a `SCHEMA_CURRENT` ukazuje na najvyssi; hodnota sa hlada v tele
+#     modulu; STAV neopakuje cisla verzii dat (len spravanie + odkaz na 13).
 #
-# Vsetky tri guardy su CISTE funkcie nad textom/datami — negativne testy nizsie
-# ich spustaju nad umyselne pokazenymi kopiami (zly subor, chybajuce meno,
-# visiaci typ bez zavesov, stara hodnota, chybajuca konstanta).
+# Guardy su CISTE funkcie nad textom/datami — negativne testy nizsie ich spustaju
+# nad SYNTETICKYMI zdrojmi (zly subor, chybajuce alebo nedeklarovane meno, visiaci
+# typ bez zavesov, stara hodnota, chybajuca konstanta, zmeneny krok historie).
 require_relative '../helper' unless defined?(NxTest)
 
 NX_H13_MAP = File.join('docs', 'architecture', 'rozsirovacie-body.md')
