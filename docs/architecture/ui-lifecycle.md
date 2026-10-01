@@ -1026,8 +1026,9 @@ Doména panela: rozlíšenie virtuálnych materiálov (`resolve_virtual_material
 
 ### selection.rb
 
-Doména panela: observery výberu a transakcií, kamera a serverové cesty zmeny výberu (`handle_select_parts`, `handle_select_part`, `handle_select_hw_owner`,
-`handle_camera_focus`, `handle_clear_selection`). Kontrakty: odseky „Observery panela", „Kontext Kovanie", „Náhľad", „Karta dielca".
+Doména panela: observery výberu a transakcií, kamera a serverové cesty zmeny výberu (`handle_select_parts`, `handle_select_hw_owner`, `handle_camera_focus`,
+`handle_clear_selection`; „Označiť v modeli" karty dielca `handle_select_part` žije v `actions_parts.rb`). Kontrakty: odseky „Observery panela", „Kontext Kovanie",
+„Náhľad", „Karta dielca".
 
 ### sync.rb
 
@@ -1331,8 +1332,9 @@ Testy okna: `tests/pure/test_st1a_studio.rb`, `tests/js/test_st1a_studio.js`, in
 ### Sekcia KUSOVNÍK v Štúdiu (Š1–Š6)
 
 **Čo robí:** zoznam všetkých výrobných dielcov zákazky v troch pohľadoch **Dielce · Platne · ABS**, hľadanie (aj zúženie na skrinku z Inspectora), voliteľné
-stĺpce, klik na riadok označí dielce v modeli, VEPO export a názov projektu. **Dáta:** `push_state` → payload `bom` z `ProductionCore` (`rows`, `refs`, `sheets`,
-`sheet_estimate`, `totals`, `materials_meta`, `vepo`) — kontrakt výstupov a VEPO: [outputs.md](outputs.md), [../../SYSTEM/VEPO_KONTRAKT.md](../../SYSTEM/VEPO_KONTRAKT.md);
+stĺpce, klik na riadok označí dielce v modeli, VEPO export a názov projektu. **Dáta:** `push_state` posiela kľúče kusovníka na najvyššej
+úrovni payloadu (`studio_dialog.rb`, zber `Bom` + `ProductionCore`): `rows` (`ProductionCore.rows_with_roles`; každý riadok nesie pole `refs` na entity
+v modeli), `sheets`, `edging` (pohľad ABS), `summary`, `sheet_estimate`, `totals`, `materials_meta`, `edges_meta`, `vepo`; klient ich drží v `ST` (`ST.rows` …) — kontrakt výstupov a VEPO: [outputs.md](outputs.md), [../../SYSTEM/VEPO_KONTRAKT.md](../../SYSTEM/VEPO_KONTRAKT.md);
 stĺpce: `UI20_KONTRAKT.md` Š2. **JS:** `studio.js` — `partsTable` / `sheetsTable` / `absTable`, `COLS` + `cellValue` + `activeCols`, `bomToolsHtml(vepo, st)`,
 `vepoBtnHtml`/`vepoMenuHtml`, `cutLinkHtml`, `absCompact`/`absFull`.
 
@@ -1416,6 +1418,9 @@ z `ProductionCore` (expanzia setov [hardware.md](hardware.md), výstupy [outputs
   Kontrola, spotrebiče). CSV kovania (`do_hw_csv`) počíta nákup nanovo s kódom kategórie a je bajtovo rovnaké (test `kovh_golden`). Generika: stĺpec Parametre
   zo serverového `params_text` (fallback `params_label`), stĺpec **„Kde" = zlúčený pôvod zo servera** (`where`, „CAB-003 ×2", ručná sa nezleje s pravidlovou,
   tooltip `manual_note`); `breakdown` (`owner_pid`) ostáva pre klik-select. **Klient nesčítava.**
+- **Zápis:** ceny cez `nxfMoney`, množstvá cez `nxfQty` (necelé množstvo kovania v metroch sa neskryje). Jednotku katalógu (`m`, `par`, `sada`…) prekladá
+  `nxfHwUnitCode` (`studio.js`, mapa `NXF_HW_UNIT`) — **JS zrkadlo `Budget::HW_UNIT_LABELS`** (`core/budget.rb`), aby Nákup písal jednotku ako Rozpočet („bm",
+  „pár", „set"); neznáma jednotka ostáva surová (Ruby jadro ju počíta ako `KS`). Zhodu máp stráži paritný test `tests/pure/test_hw_unit_zrkadlo.rb`.
 - Tabuľky preberajú `.bomtab` Štúdia s markerom **`.hwtab`** (ruka a hover len na `tr.hwgen`). Riadok generiky je `tr.hwgen` — žiadny `<tr>` nesmie niesť triedu, ktorej
   `panel.css` dáva flex/grid (guard `tests/pure/test_tr_flex_kolizia.rb`).
 - **Chip „ručná" a pôvod:** riadok s ručnými kusmi (`adhoc_quantity > 0`) alebo voľná položka nesie chip „ručná" (voľná má v Kóde pomlčku). Klik na riadok rozbalí
@@ -1503,8 +1508,9 @@ v Štúdiu" a jeho podnadpisy.
 dokument Ruby `CpExport.price_sheet`). **JS:** ten istý `budget.js` (`budOfferHtml`, `budOfferToolsHtml`, `budCpTableHtml`, `budCpAmountHtml`) — jeden formát a jeden
 kanál.
 
-- Tabuľka: **Položka · Množstvo · MJ · Spolu · V ponuke** („Spolu" = suma riadku). Bunka sumy `budCpAmountHtml`: „v cene" len pri `kind: 'fixed'` s nulou, `info`
-  (dodáva zákazník) a `assembly` s nulou 0,00 €, neznáma cena „—". XLSX ponuky sa týmto nemení (poznámka pod tabuľkou rozdiel prizná).
+- Tabuľka: **Položka · Množstvo · MJ · Spolu · V ponuke** („Spolu" = suma riadku). Bunka sumy `budCpAmountHtml`: **„v cene" výhradne pri `kind: 'fixed'`
+  s nulou** (Zameranie, Vizualizácie — náklad je rozpustený v zostave). Riadok `info` (spotrebič, ktorý dodáva zákazník) aj `assembly` s nulou ukazujú **0,00 €**;
+  neznáma cena „—". XLSX ponuky sa týmto nemení (poznámka pod tabuľkou rozdiel prizná).
 - **Ponuka sa needituje** — chýbajúca cena sa dopĺňa v Rozpočte (jantárový guard „Suma ponuky je podhodnotená…" s preklikom). Celý varovný pás `budWarnChips(b)` je
   aj tu (tie isté čísla; ciele: staré ceny a spotrebiče → Rozpočet, upozornenia → Kontrola).
 - Zoznam „Zlúčené v zostave" je v `BUD_OPEN` pod `cp_merged` (otvorený prežije prekreslenie). Prepínač DPH sa nezdvojuje; riadok zaokrúhlenia je jedno serverové číslo
@@ -1568,11 +1574,12 @@ celý serverový label sa zalamuje; jedna `mdConfirmBar` pod mriežkou. `mdRende
 (fallback `MD_SHEETS`; volajú ho `mdRenderAll`, `mdSetProjectSelect`, `onProjMaterial`); obrázok len z `image_file` servera cez `mdImageSrc`; UNI nesie text
 „Pracovný materiál UNI". Potvrdzovanie, `model_guid` guard, dedenie a Undo idú pôvodnými cestami (1 predvoľba = 1 krok Späť).
 
-**Kresba čiel** (riadok pod predvoľbami, jediné miesto sekcie, ktoré **mení model** — hromadná akcia nad čelami, ktoré v zákazke sú teraz): select (Podľa materiálu /
+**Kresba čiel** (riadok pod predvoľbami — **hromadná akcia, ktorá prestavia model**, nie predvoľba; platí pre čelá, ktoré v zákazke sú teraz): select (Podľa materiálu /
 Pozdĺžna / Priečna) + `md_front_grain_apply` → `fronts_grain_all` `{gen, model_guid, grain}`. Vlastný `cb(dlg, …)` a **flush handshake ako exporty**:
 `handle_fronts_grain_all` → `NX.studioRelayFrontsGrain` → flush → `studio_do_fronts_grain` → `StudioDialog.do_fronts_grain_all` → `MaterialsDialog.fronts_grain_all`
 (červené pole zastaví). Stav riadku a počet počíta server (`mat.front_grain` `{count, cabinets, by, skipped}`); chýbajúci = „stav sa nepodarilo zistiť" + `disabled`.
-**Zámok tlačidla:** klik → `Prestavujem…` + `disabled`, odomkne ho až nový push (každá serverová vetva posiela `repush`).
+**Zámok tlačidla:** klik → `Prestavujem…` + `disabled`, odomkne ho až **nový plný push** (každá serverová vetva vrátane odmietnutia a `rescue` posiela `repush`);
+**katalógové echo zámok nepustí** a druhý klik pred pushom nepošle nič — inak by z jednej voľby vznikli dva kroky Späť.
 
 **Ručné založenie dekoru** („Pridať ručne") otvára D-69 editor v režime `create` (`mdCreateOpen` → `mdCreateFields`/`mdCreatePayload`, `memoryKey: 'mat:create'`);
 stĺpce repeaterov sú jedna definícia `mdSheetCols`/`mdEdgeCols`, prázdny formulár má navyše **Štruktúra** a **Smer dekoru**. Úspech zatvorí modal, zahodí pamäť
@@ -1613,8 +1620,9 @@ vzhľad). `handle_save_sheet`/`handle_save_edge` sú **edit-only** (nové dekory
   (`studio_js` → `StudioDialog.mat_js`). Na tom stojí Demos: `dispatch` beh len naštartuje, emity dobiehajú z `UI.start_timer` bez sinku.
 - **`after_catalog_change` má jednu cestu:** jeden `catalog_payload` → `StudioDialog.push_mat_catalog`, plus `Panel.push_materials`, `EdgeCheck.invalidate!` a plný payload
   Štúdia s `bump: false`.
-- **Dve cesty menia model** (projektová predvoľba, „Nahradiť UNI…") — obe volajú `refresh_studio_after_model_write` (plný push so zdvihom) **až za
-  `Panel.push_selected`**.
+- **Štyri cesty menia model** a všetky obnovujú najprv Inspector (`Panel.push_selected`) a až potom plný push Štúdia so zdvihom generácie: projektová predvoľba
+  a „Nahradiť UNI…" (`refresh_studio_after_model_write`), aplikovanie vzhľadu (`materials_appearance_dialog.rb` `appearance_refresh_model` →
+  `refresh_studio_after_model_write`) a Kresba čiel (`fronts_grain_all` — `rebuild_many`, potom `repush` Štúdia, ktorý odomkne tlačidlo).
 - **Životný cyklus** hlási Štúdio: `on_ui_closed` (session bump + zahodenie odloženej požiadavky), `cancel_demos_on_leave` (odchod zo sekcie počas behu) a
   `on_model_changed` zo `scale_observer`; `@demos_running` stráži, aby hláška o zrušení prišla len keď naozaj niečo bežalo.
 - **Predvoľby projektu** (`TARGETS`: telo, čelá, chrbát a `default_drawer_material_id`): preflight zásuviek **per systém** (čísla z receptu) — doska, ktorú neprijme
@@ -1931,7 +1939,7 @@ dotazov je konštanta `DemosClient::CRAWL_DELAY_S` a väzba je vlastnosť konkr�
 
 **Čo robí:** globálne nastavenia aktívneho dodávateľa (`%APPDATA%\NOXUN\Engine\supplier_settings.json`) — sadzby služieb, režimové hodnoty €/€€/€€€, štandardné
 koncové riadky, prah veku cien, krok zaokrúhlenia, **prerez píly, orez okraja platne a prídavok dupláku** (parametre nárezového plánu a Kontroly). Do zákazky sa
-**nemrazia**. Vstupy: položka navigácie, ⚙ v lište Rozpočtu (čisté `studioGoSection('bset')`), chip nárezového plánu, nález Kontroly `layout_settings`, menu „Nastavenia
+**nemrazia**. Vstupy: položka navigácie, tlačidlo „Nastavenia" s ikonou posuvníkov (`sliders-horizontal`) v lište Rozpočtu (čisté `studioGoSection('bset')`), chip nárezového plánu, nález Kontroly `layout_settings`, menu „Nastavenia
 rozpočtu" → `StudioDialog.show(open_section: 'bset')`. **Server:** `SupplierSettingsDialog` (`ss_save`, `ss_reload`); validácia serverová
 (`SupplierSettings.patch_active!`, all-or-nothing). **JS:** `ui/js/studio_settings.js` (`ssRenderBody`, `ssApplyState`, `ssModeCells`, `ssModeHeads`, `ssFieldBad`,
 `ssRangeError`).
@@ -2012,10 +2020,13 @@ príprava → **`abort_prepared!`** (uprace len vlastný staging). `apply!` = ob
   nad degradovaným súborom odmietnutý; zlyhanie vracia `nil`.
 - **Recovery po páde žije v loaderi** (`Noxun::Engine::Boot`, len `File`/`FileUtils`, pred registráciou extensionu; guard `tests/pure/test_d52a_updater.rb`).
   **Strom na disku musí zodpovedať práve vykonávanému loaderu:** stojí `.new` → vráti starú generáciu · `.old` a VERSION `.rb` ≠ strom → rollback stromu · `.old`
-  a VERSION sedí → dokončí upratanie (rozhoduje obsah VERSION; nečitateľná = rollback). Nesúlad po oprave = plugin sa v tomto okne nenačíta. **Marker sa maže
+  a VERSION sedí → dokončí upratanie (rozhoduje obsah VERSION; nečitateľná = rollback). **Recovery nikdy nemaže živý `.rb`** — starú verziu loadera vracia
+  atomickým prepisom (`File.rename` cez existujúci cieľ: `restore_loader!`, `finish_leftovers!`), takže `Plugins` nie sú ani na okamih bez bootovateľného loadera.
+  Nesúlad po oprave = plugin sa v tomto okne nenačíta. **Marker sa maže
   overene** (`clear_marker`; prežitý marker = `cleanup_pending` / `:marker_stuck`; `marker_note` dopĺňa vetu do `Refused` správ). **Boot stavy:** `:idle`, `:done`
   → registrácia; `:busy` (čaká max ~5 s), `:restart`, `:lease_failed`, `:marker_stuck`, `:error` → bez registrácie s natívnou hláškou. Porovnanie generácie beží
-  aj na `:idle`; zámok sa berie pri každom boote.
+  aj na `:idle` (cudzí proces mohol aktualizáciu medzitým dokončiť a upratať), ale blokuje **len dokázaný nesúlad** — keď sa verzia stromu zistiť nedá (chýbajúci
+  alebo nečitateľný `main.rb`), plugin sa načíta normálne a problém ohlási samotný `Sketchup.require`. Zámok sa berie pri každom boote.
 
 **UI vrstva — sekcia „O plugine"** (server `supplier_settings_dialog.rb`, klient `about.js` + `studio_settings.js`):
 - **Kontrola verzie je explicitná akcia** (nie súčasť payloadu): spúšťa ju vstup do sekcie (`studioGoSection('about')` aj deep-link → `ssOnAboutEnter()`) a uloženie
