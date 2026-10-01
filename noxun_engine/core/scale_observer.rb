@@ -26,9 +26,15 @@ module Noxun
       # korpusovymi hranicami, a zaroven nema zmysel pustat 200 mm „umyvacku".
       # Su to TIE ISTE cisla ako spodne hranice v `CabinetBuilder::DW_WIDTH_RANGE`
       # / `DW_HEIGHT_RANGE` (Astra S1-E BLOCKER E1: jedna hranica na oboch
-      # miestach); zhodu strazi guard test `tests/pure/test_s1e_slot.rb`.
-      MIN_BY_TYPE = { 'dishwasher' => { 'width' => 300.0, 'height' => 500.0,
-                                        'depth' => 150.0 } }.freeze
+      # miestach). H12a: odvodene z `limits` registra `CabinetTypes` (spodne
+      # hranice; hlbka nema vlastny limit = `MIN['depth']`) — zhodu strazi
+      # `tests/pure/test_s1e_slot.rb` a golden H12.
+      MIN_BY_TYPE = CabinetTypes::IDS.each_with_object({}) do |id, out|
+        lim = CabinetTypes.get(id)[:limits]
+        next unless lim
+
+        out[id] = { 'width' => lim[:width][0], 'height' => lim[:height][0], 'depth' => MIN['depth'] }.freeze
+      end.freeze
       # NASTROJE-1: strop iteracii bariery `flush_pending!`. Pokoj observera
       # nastava spravidla v 1-2 iteraciach (follow-up po dedupe); vyssie cislo
       # by uz znamenalo, ze si observer sam sebe planuje pracu donekonecna.
@@ -587,7 +593,7 @@ module Noxun
           # odvodene celo (sokel + medzera hore + 300 .. + 1200). Hranice sa
           # beru BEZ `normalize` ulozeneho configu — stary slot moze byt pod
           # novym pravidlom neplatny a absorpcia by padla aj pri platnom cieli.
-          return clamp_slot_height(params, val, cid) if params['type'].to_s == 'dishwasher'
+          return clamp_slot_height(params, val, cid) unless CabinetTypes.carcass?(params['type'])
 
           floor = Construction.min_valid_height(CabinetBuilder.normalize(params),
                                                 part_thicknesses: part_thicknesses)
@@ -605,7 +611,7 @@ module Noxun
         # dedi aj minimum vnutra pri komine). -> [hlbka, hlaska | nil]; hlaska
         # len ked hlbku zdvihla KONSTRUKCIA (nie holé typove minimum).
         def clamp_depth(params, val, cid, part_thicknesses = nil)
-          return [val, nil] if params['type'].to_s == 'dishwasher'
+          return [val, nil] unless CabinetTypes.carcass?(params['type'])
 
           norm = CabinetBuilder.normalize(params)
           floor = Construction.min_valid_depth(norm, part_thicknesses: part_thicknesses)
@@ -654,7 +660,7 @@ module Noxun
 
         def clamp_slot_height(params, val, cid)
           lo, hi = CabinetBuilder.slot_height_bounds(params)
-          lo = [lo, min_for('height', 'dishwasher')].max
+          lo = [lo, min_for('height', params['type'])].max
           return val if val.between?(lo, hi)
 
           to = val < lo ? lo : hi

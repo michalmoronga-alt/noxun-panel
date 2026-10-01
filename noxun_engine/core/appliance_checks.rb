@@ -75,7 +75,7 @@ module Noxun
         return {} unless cfg.is_a?(Hash) && defined?(Construction)
         # Slot umyvacky vnutro NEMA (a doska je dielec) — kontext by tvrdil
         # rozmery, ktore neexistuju.
-        return {} if cfg['type'].to_s == 'dishwasher'
+        return {} unless CabinetTypes.carcass?(cfg['type'])
 
         sym = cfg.transform_keys(&:to_sym)
         dims = Construction.interior_dims(sym)

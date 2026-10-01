@@ -175,7 +175,7 @@ module Noxun
       # UMYVACKY a otvaraju sa NADOL — kresli sa preto sklop „Λ", nie plne X.
       # O slote rozhoduje TYP SKRINKY (`cab_type`), nie celo samo.
       def type_symbol(type, cab_type = nil)
-        return SYM_DOWN if type.to_s == 'blind' && cab_type.to_s == 'dishwasher'
+        return SYM_DOWN if type.to_s == 'blind' && CabinetTypes.prop(cab_type, :fronts) == 'slot_fixed'
 
         case type.to_s
         when 'lift' then SYM_UP

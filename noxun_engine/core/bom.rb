@@ -354,7 +354,7 @@ module Noxun
         oid = id.to_s
         return owners if oid.empty? || owners.key?(oid) || !cfg.is_a?(Hash)
 
-        k = kind || (cfg['type'].to_s == 'dishwasher' ? 'slot' : 'cabinet')
+        k = kind || CabinetTypes.prop(cfg['type'], :appliance_owner) # H12a: 'slot' | 'cabinet'
         refs = cfg['appliance_refs'].is_a?(Array) ? cfg['appliance_refs'].select { |r| r.is_a?(Hash) } : []
         expects = cfg['appliance_expects'].is_a?(Array) ? cfg['appliance_expects'].map(&:to_s) : []
         owners[oid] = { 'kind' => k, 'id' => oid, 'pid' => pid, 'refs' => refs,
@@ -565,7 +565,7 @@ module Noxun
       # v slote stoji 448 z katalogu, hlasil by „nezmesti sa" nad telom, ktore
       # tam nie je.
       def appliance_slot_record(owner_id, owner_pid, ccfg)
-        return nil unless ccfg.is_a?(Hash) && ccfg['type'].to_s == 'dishwasher'
+        return nil unless ccfg.is_a?(Hash) && CabinetTypes.prop(ccfg['type'], :appliance_owner) == 'slot'
 
         cls = ccfg['dw_class'].to_i
         body = defined?(Construction) ? Construction.dw_body_dims(ccfg) : nil

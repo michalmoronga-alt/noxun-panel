@@ -1,0 +1,109 @@
+[
+  {
+    "id": "lower",
+    "label": "Dolná",
+    "word": "dolná",
+    "auto_name": "Spodná skrinka %{w}",
+    "auto_name_typed": false,
+    "preset": "noxun-lower-18",
+    "template_id": "base-lower-18",
+    "builder": "carcass",
+    "hang_z": 0.0,
+    "on_floor": true,
+    "limits": null,
+    "appliance_owner": "cabinet",
+    "fronts": "free",
+    "front_opening": "full",
+    "zones": "tree",
+    "zones_reason": null,
+    "template_type": "switchable",
+    "template_lock": null,
+    "type_locked": false,
+    "assembly": null,
+    "ui_order": 1
+  },
+  {
+    "id": "upper",
+    "label": "Horná",
+    "word": "horná",
+    "auto_name": "Horná skrinka %{w}",
+    "auto_name_typed": false,
+    "preset": "noxun-upper-18",
+    "template_id": "base-upper-18",
+    "builder": "carcass",
+    "hang_z": 1400.0,
+    "on_floor": false,
+    "limits": null,
+    "appliance_owner": "cabinet",
+    "fronts": "free",
+    "front_opening": "full",
+    "zones": "tree",
+    "zones_reason": null,
+    "template_type": "switchable",
+    "template_lock": null,
+    "type_locked": false,
+    "assembly": null,
+    "ui_order": 2
+  },
+  {
+    "id": "dishwasher",
+    "label": "Umývačka",
+    "word": "umývačka",
+    "auto_name": "Umývačka %{dw} (slot)",
+    "auto_name_typed": false,
+    "preset": "noxun-dishwasher",
+    "template_id": "dishwasher-slot-18",
+    "builder": "appliance_slot",
+    "hang_z": 0.0,
+    "on_floor": false,
+    "limits": {
+      "width": [
+        300.0,
+        1200.0
+      ],
+      "height": [
+        500.0,
+        1200.0
+      ]
+    },
+    "appliance_owner": "slot",
+    "fronts": "slot_fixed",
+    "front_opening": "slot",
+    "zones": "none",
+    "zones_reason": "slot umývačky zóny nemá",
+    "template_type": "locked",
+    "template_lock": {
+      "title": "Typ určuje sám slot umývačky — prepnúť sa nedá.",
+      "tip": "Typ určuje sám slot umývačky — nemá korpus, takže sa na dolnú ani hornú skrinku prepnúť nedá."
+    },
+    "type_locked": false,
+    "assembly": null,
+    "ui_order": 4
+  },
+  {
+    "id": "corner_blind",
+    "label": "Rohová",
+    "word": "rohová",
+    "auto_name": "Rohová skrinka %{w}",
+    "auto_name_typed": true,
+    "preset": "noxun-corner-blind",
+    "template_id": "corner-blind-18",
+    "builder": "carcass",
+    "hang_z": 0.0,
+    "on_floor": true,
+    "limits": null,
+    "appliance_owner": "cabinet",
+    "fronts": "corner_one_door",
+    "front_opening": "corner_door",
+    "zones": "shelves_only",
+    "zones_reason": null,
+    "template_type": "locked",
+    "template_lock": {
+      "title": "Typ určuje rohová skrinka — prepnúť sa nedá.",
+      "tip": "Rohová skrinka nesie rohovú zostavu (blenda, výstuhy, CR lišty) — šablóna z nej je vždy rohová, na dolnú ani hornú sa prepnúť nedá."
+    },
+    "type_locked": true,
+    "assembly": "corner_blind",
+    "ui_order": 3
+  }
+]

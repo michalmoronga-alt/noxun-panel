@@ -58,7 +58,7 @@ module Noxun
       # CR 1, CR 2 a rohova vystuha (`Construction.corner_parts`). Cela su
       # VZDY jeden riadok dvierok s jednym kridlom (`corner_fronts!`) — tu je
       # len informativna predvolba pre panel (A2), invariant drzi `normalize`.
-      CORNER_TYPE = 'corner_blind'
+      CORNER_TYPE = CabinetTypes::CORNER # H12a: alias registra (testy a cudzi kod)
       CORNER_DEFAULTS = LOWER_DEFAULTS.merge(
         type: CORNER_TYPE, width: 1100.0,
         fronts: { 'items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'auto',
@@ -66,9 +66,10 @@ module Noxun
         corner_side: 'left', corner_door_w: 450.0, corner_cr1: 80.0, corner_cr2: 80.0
       ).freeze
 
-      # JEDINY zoznam typov korpusu. Kazde miesto, ktore sa pyta „aky typ",
-      # sa pyta TOHTO zoznamu (guard testy ho porovnavaju s JS zrkadlom).
-      TYPES = %w[lower upper dishwasher corner_blind].freeze
+      # H12a: zoznam typov je REGISTER `CabinetTypes` (core/cabinet_types.rb);
+      # `TYPES` ostava ako alias (guard testy ho porovnavaju s JS zrkadlom).
+      # Miesta sa nepytaju mena typu, ale jeho VLASTNOSTI (`CabinetTypes.*?`).
+      TYPES = CabinetTypes::IDS
 
       # ROH-A1: UZAVRETE polia rohovej (vzor `DW_KEYS`) — JEDEN zoznam pre
       # `normalize`, `cabinet_config`, `config_to_params`, sablony aj panelovy
@@ -124,8 +125,20 @@ module Noxun
       # Sirka a vyska slotu maju VLASTNE (sirsie) hranice nez korpus: slot
       # nema vnutro, takze `MIN[:width]` 200 by ho zbytocne zvazoval, a
       # naopak nema zmysel pustat 3000 mm „umyvacku".
-      DW_WIDTH_RANGE  = [300.0, 1200.0].freeze
-      DW_HEIGHT_RANGE = [500.0, 1200.0].freeze
+      # H12a: hodnoty su `limits` slotu v registri (jedna hranica pre
+      # `normalize`, absorpciu scale aj panel).
+      DW_WIDTH_RANGE  = CabinetTypes.get('dishwasher')[:limits][:width]
+      DW_HEIGHT_RANGE = CabinetTypes.get('dishwasher')[:limits][:height]
+
+      # H12a (R1.5): predvolby a VLASTNE polia typu — JEDNA mapa namiesto
+      # `case`/`if` po subore. Kluce = `CabinetTypes::IDS` (resp. podmnozina);
+      # novy typ bez predvolieb zhodi paritny guard (test_h12a_register.rb).
+      # `EXTRA_KEYS_BY_TYPE`: polia zapisane do configu LEN pri svojom type.
+      DEFAULTS_BY_TYPE = {
+        'lower' => LOWER_DEFAULTS, 'upper' => UPPER_DEFAULTS,
+        'dishwasher' => DISHWASHER_DEFAULTS, CORNER_TYPE => CORNER_DEFAULTS
+      }.freeze
+      EXTRA_KEYS_BY_TYPE = { 'dishwasher' => DW_KEYS, CORNER_TYPE => CORNER_KEYS }.freeze
 
       # D-100: nazov skrinky. Zhoda s tymto vzorom = nazov POVAZUJEME za
       # nenastaveny (automaticky sa dopocitava zo sucasnych parametrov) — tak
@@ -143,7 +156,7 @@ module Noxun
       NAME_MAX_LEN = 80 # JS zrkadlo: CAB_NAME_MAX v ui/js/core.js
 
       GAP_BETWEEN_CABS = 50.0    # medzera medzi korpusmi pri vkladani vedla seba
-      UPPER_HANG_Z     = 1400.0  # vyska zavesenia hornej skrinky (Z pri vlozeni)
+      UPPER_HANG_Z     = CabinetTypes.get('upper')[:hang_z] # H12a: `hang_z` hornej z registra (Z pri vlozeni)
 
       # K1 / D-108: per-dielec SMER DEKORU ako vstup. Povolene hodnoty OVERRIDU
       # su LEN 'length'/'width' — „bez smeru" sa nenastavuje, to je vlastnost
@@ -624,8 +637,7 @@ module Noxun
         # Opakovane volatelna — druhe „Vloz" je novy snapshot.
         def prepare_insert(model, params)
           cfg = deep_copy_cfg(normalize(params), freeze_result: true)
-          home_z = cfg[:type] == 'upper' ? UPPER_HANG_Z : 0.0
-          InsertPlan.new(model, cfg, home_z)
+          InsertPlan.new(model, cfg, CabinetTypes.prop(cfg[:type], :hang_z))
         end
 
         # R-03 FAZA 2: JEDINE miesto, kde vklad meni model. Poradie krokov je
@@ -1662,7 +1674,7 @@ module Noxun
         # ho netoleruje. Zamerne: CR lista zo 4 mm skla nedava zmysel.
         # -> { 'cabinet/cr:1' => mm, 'cabinet/cr:2' => mm } alebo {}.
         def corner_thicknesses(cfg, eff)
-          return {} unless cfg.is_a?(Hash) && raw(cfg, :type).to_s == CORNER_TYPE
+          return {} unless cfg.is_a?(Hash) && CabinetTypes.corner?(raw(cfg, :type))
 
           ov_all = raw(cfg, :part_overrides)
           overrides = ov_all.is_a?(Hash) ? ov_all : {}
@@ -3035,18 +3047,17 @@ module Noxun
             fronts: cfg[:fronts],
             front_items: cfg[:front_items]
           }
-          # S1-E: polia slotu sa zapisuju LEN pri type `dishwasher` — dolna a
-          # horna skrinka ostavaju BAJTOVO rovnake ako pred S1-E (golden
-          # fixtury zakaziek sa nesmu pohnut).
-          DW_KEYS.each { |k| out[k] = cfg[k] } if cfg[:type] == 'dishwasher'
-          # ROH-A1: polia rohovej LEN pri `corner_blind` a VZDY vsetky styri
-          # (vzor slotu) — dolna, horna a slot ostavaju bajtovo rovnake.
-          CORNER_KEYS.each { |k| out[k] = cfg[k] } if cfg[:type] == CORNER_TYPE
+          # S1-E / ROH-A1: polia typu (slot `DW_KEYS`, rohova `CORNER_KEYS`)
+          # sa zapisuju LEN pri svojom type a VZDY vsetky — ostatne typy ostavaju
+          # BAJTOVO rovnake (golden fixtury zakaziek sa nesmu pohnut). H12a:
+          # jedna mapa `EXTRA_KEYS_BY_TYPE` (surovy typ; neznamy = ziadne polia).
+          EXTRA_KEYS_BY_TYPE.fetch(cfg[:type], []).each { |k| out[k] = cfg[k] }
           # KON-A · K1: komin a zapustenie sa zapisuju LEN ked su > 0 (vzor
           # S1-E „zapisovat len ked treba") — config existujucich skriniek sa
           # prestavbou NEMENI a golden fixtury ostavaju bajtovo rovnake.
-          # Vnorene odvodene objekty `top`/`back` ostavaju bez zmeny.
-          unless cfg[:type] == 'dishwasher'
+          # Vnorene odvodene objekty `top`/`back` ostavaju bez zmeny. Slot
+          # (typ bez korpusu) ich nema.
+          if CabinetTypes.carcass?(cfg[:type])
             SETBACK_KEYS.each do |k|
               v = norm_setback(cfg[k])
               out[k] = v if v.positive?
@@ -3065,14 +3076,9 @@ module Noxun
         end
 
         # S1-E: konstrukcny preset podla typu (udaj pre cloveka aj pre buduce
-        # migracie — JEDEN `case`, nie tri ternary rozsypane po subore).
+        # migracie). H12a: hodnota `preset` registra (neznamy typ = dolna).
         def construction_preset_for(type)
-          case type
-          when 'upper' then 'noxun-upper-18'
-          when 'dishwasher' then 'noxun-dishwasher'
-          when CORNER_TYPE then 'noxun-corner-blind'
-          else 'noxun-lower-18'
-          end
+          CabinetTypes.prop(type, :preset)
         end
 
         # Typ podopretia urcuje Construction.support_type (1 zdroj pravdy — citaju ho
@@ -3120,7 +3126,9 @@ module Noxun
           s = nfc(value.to_s.gsub(/\s+/, ' ').strip)
           return true unless (AUTO_NAME_RE =~ s).nil?
 
-          type.to_s == CORNER_TYPE && !(CORNER_AUTO_NAME_RE =~ s).nil?
+          # H12a: auto nazov viazany na typ (`auto_name_typed`) ma dnes len
+          # rohova — jej vzor je `CORNER_AUTO_NAME_RE`.
+          CabinetTypes.prop(type, :auto_name_typed) == true && !(CORNER_AUTO_NAME_RE =~ s).nil?
         end
 
         # Rozlozena diakritika (macOS/kopirovanie z webu) by vzor minula.
@@ -3133,15 +3141,12 @@ module Noxun
         def default_name(cfg)
           w = (cfg.is_a?(Hash) ? raw(cfg, :width) : nil).to_f.round
           type = (cfg.is_a?(Hash) ? raw(cfg, :type) : nil).to_s
-          case type
-          when 'upper' then "Horná skrinka #{w}"
-          # S1-E: slot sa menuje podla TRIEDY (60/45), nie podla sirky —
-          # „Umývačka 590" by pri uzsom slote klamala o tom, co tam stoji.
-          when 'dishwasher' then "Umývačka #{dw_class_label(cfg)} (slot)"
-          # ROH-A1: nazov sleduje sirku (vzor `AUTO_NAME_RE`).
-          when CORNER_TYPE then "Rohová skrinka #{w}"
-          else "Spodná skrinka #{w}"
-          end
+          # H12a: vzor `auto_name` registra. `%{w}` = zaokruhlena sirka,
+          # `%{dw}` = TRIEDA slotu (60/45) — „Umývačka 590" by pri uzsom slote
+          # klamala o tom, co tam stoji (S1-E).
+          tpl = CabinetTypes.prop(type, :auto_name)
+          tpl = tpl.sub('%{dw}') { dw_class_label(cfg).to_s } if tpl.include?('%{dw}')
+          tpl.sub('%{w}', w.to_s)
         end
 
         # Popisok triedy slotu do nazvu a hlasok (600 -> „60").
@@ -3151,12 +3156,7 @@ module Noxun
         end
 
         def template_id_for(type)
-          case type
-          when 'upper' then 'base-upper-18'
-          when 'dishwasher' then 'dishwasher-slot-18'
-          when CORNER_TYPE then 'corner-blind-18'
-          else 'base-lower-18'
-          end
+          CabinetTypes.prop(type, :template_id)
         end
 
         # KOV-E1b (Codex #333 kolo 1 P1): `seed_version` = seed pravidiel, s
@@ -3193,36 +3193,36 @@ module Noxun
         # --- normalizacia parametrov ---------------------------------------
 
         def defaults_for(type)
-          case type
-          when 'upper' then UPPER_DEFAULTS
-          when 'dishwasher' then DISHWASHER_DEFAULTS
-          when CORNER_TYPE then CORNER_DEFAULTS
-          else LOWER_DEFAULTS
-          end
+          DEFAULTS_BY_TYPE[CabinetTypes.norm(type)]
         end
 
+        # H12a: vetvy `normalize` sa pytaju VLASTNOSTI registra — `slot` =
+        # typ bez korpusu (vlastne polia, limity a pevne celo), `on_floor?` =
+        # nohy/sokel podla configu, `corner?` = rohova zostava.
         def normalize(params)
           p = params || {}
           type = norm_type(p)
           d = defaults_for(type)
-          slot = type == 'dishwasher'
+          slot = !CabinetTypes.carcass?(type)
+          lim = CabinetTypes.prop(type, :limits)
+          floor = CabinetTypes.on_floor?(type)
           fronts_cfg = Fronts.normalize_config(raw(p, :fronts))
           # D-139: vyska cela slotu je ODVODENA z vysky linky, soklu a medzery
           # hore — vyska slotu sa preto normalizuje PRED polami slotu a ich
           # vysledok riadi jedine pevne celo (`slot_fronts!`).
-          slot_h = slot ? clampf(fetchf(p, :height, d[:height]), *DW_HEIGHT_RANGE) : nil
+          slot_h = slot ? clampf(fetchf(p, :height, d[:height]), *lim[:height]) : nil
           dw = slot ? norm_dishwasher(p, d, slot_h, fronts_cfg['gap_top']) : {}
           fronts_cfg = slot_fronts!(fronts_cfg, dw) if slot
           # ROH-A1: polia rohovej + INVARIANT jedneho riadku dvierok s jednym
           # kridlom (R6) a predvoleny smer pantov pri rohu (R7). Konstrukcia
           # (sokel, podpora, chrbat) ide dalej presne ako pri dolnej.
-          corner = type == CORNER_TYPE
+          corner = CabinetTypes.corner?(type)
           cn = corner ? norm_corner(p, d) : {}
           fronts_cfg = corner_fronts!(fronts_cfg, cn[:corner_side]) if corner
           out = {
             type: type,
-            width:  slot ? clampf(fetchf(p, :width, d[:width]), *DW_WIDTH_RANGE)
-                         : clampf(fetchf(p, :width,  d[:width]),  MIN[:width],  3000.0),
+            width:  lim ? clampf(fetchf(p, :width, d[:width]), *lim[:width])
+                        : clampf(fetchf(p, :width,  d[:width]),  MIN[:width],  3000.0),
             height: slot ? slot_h
                          : clampf(fetchf(p, :height, d[:height]), MIN[:height], 3000.0),
             depth:  clampf(fetchf(p, :depth,  d[:depth]),  MIN[:depth],  2000.0),
@@ -3230,14 +3230,14 @@ module Noxun
             # S1-E (Codex #376 kolo 1 P1): slot ma podporu `none` — jeho sokel
             # je spodna hrana CELA (`dw_front_bottom`) a do `floor_height`
             # NIKDY netecie, inak by pravidla vydali nohy a prichyty sokla.
-            floor_height: (type == 'upper' || slot) ? 0.0 : clampf(fetchf(p, :floor_height, d[:floor_height]), 0.0, 500.0),
+            floor_height: floor ? clampf(fetchf(p, :floor_height, d[:floor_height]), 0.0, 500.0) : 0.0,
             bottom_mode: enum_val(p, :bottom_mode, %w[between_sides under_sides], d[:bottom_mode]),
             top_mode:    enum_val(p, :top_mode,    %w[full two_rails none],       d[:top_mode]),
             # D-31: + none · KON-B · K2: + rails (chrbat z dvoch list)
             back_mode:   enum_val(p, :back_mode,   %w[overlay inset groove rails none], d[:back_mode]),
             # hrubka chrbta ako Float mm (3 HDF / 18 pevny / ine); clamp 1..50
             back_thickness: clampf(fetchf(p, :back_thickness, d[:back_thickness]), 1.0, 50.0),
-            plinth_mode: (type == 'upper' || slot) ? 'none' : enum_val(p, :plinth_mode, %w[none front], d[:plinth_mode]),
+            plinth_mode: floor ? enum_val(p, :plinth_mode, %w[none front], d[:plinth_mode]) : 'none',
             plinth_recess: clampf(fetchf(p, :plinth_recess, d[:plinth_recess]), 0.0, 300.0),
             # two_rails parametre (uplatnia sa len pri top_mode == 'two_rails')
             rail_depth: clampf(fetchf(p, :rail_depth, d[:rail_depth]), 20.0, 400.0),
@@ -4225,7 +4225,7 @@ module Noxun
         # stare configy (bez zone_tree, fronts ako string, shelves top-level).
         def config_to_params(cfg)
           params = {
-            'type' => cfg['type'] || 'lower',
+            'type' => cfg['type'] || CabinetTypes::FALLBACK,
             'width' => cfg['width'], 'height' => cfg['height'], 'depth' => cfg['depth'],
             'thickness' => cfg['thickness'], 'floor_height' => cfg['floor_height'],
             'bottom_mode' => cfg['bottom_mode'] || legacy_bottom(cfg),
@@ -4345,9 +4345,10 @@ module Noxun
           (cfg['back'] && cfg['back']['mode']) || 'overlay'
         end
 
-        # Stary V0.1 korpus mal vzdy predny sokel (support.type='plinth'); horny ziadny.
+        # Stary V0.1 korpus mal vzdy predny sokel (support.type='plinth'); horny
+        # (visiaci — H12a `hangs?`) ziadny.
         def legacy_plinth(cfg)
-          return 'none' if (cfg['type'] || 'lower') == 'upper'
+          return 'none' if CabinetTypes.hangs?(cfg['type'])
           sup = cfg['support']
           sup && sup['type'] == 'plinth' ? 'front' : (cfg['floor_height'].to_f > 0 ? 'front' : 'none')
         end
@@ -4363,10 +4364,9 @@ module Noxun
         # S1-E: UZAVRETY slovnik typov. Neznamy typ (aj z NOVSIEHO pluginu) sa
         # sklapa na `lower` — to je dnesne spravanie a zamerne sa nemeni:
         # skrinku z novsej verzie zastavi dopredny guard `newer_config?` EST
-        # PRED normalizaciou, takze sa sem nedostane.
+        # PRED normalizaciou, takze sa sem nedostane. H12a: `CabinetTypes.norm`.
         def norm_type(p)
-          v = raw(p, :type).to_s
-          TYPES.include?(v) ? v : 'lower'
+          CabinetTypes.norm(raw(p, :type).to_s)
         end
 
         def enum_val(p, key, allowed, default)

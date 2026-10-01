@@ -1250,7 +1250,7 @@ module Noxun
 
         # ROH-B2 (O12): vkladana skrinka je ROHOVA (typ zo zmrazeneho planu).
         def corner?
-          cabinet? && @type_key == 'corner_blind'
+          cabinet? && CabinetTypes.corner?(@type_key)
         end
 
         # Strana dveri zo ZMRAZENEHO planu — jedina autorita `Construction.corner_side`.
@@ -1603,7 +1603,7 @@ module Noxun
           # Locknuta vyska je per TYP skrinky. Default sa NEDUPLIKUJE — berie
           # sa z planu (`home_z`: dolna 0, horna UPPER_HANG_Z = 1400).
           t = Calc.cfg_str(@plan.config, :type)
-          @type_key = t.empty? ? 'lower' : t
+          @type_key = CabinetTypes.id_or_default(t) # kluc pamate = IDENTITA (neznamy typ ostava)
           store = (@memory[:lock_z] ||= {})
           store[@type_key] = @plan.home_z.to_f unless store.key?(@type_key)
           @lock_z = store[@type_key].to_f

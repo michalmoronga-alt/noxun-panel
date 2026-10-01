@@ -444,7 +444,7 @@ module Noxun
           next false unless Store.get(inst, kind.to_s == KIND_BOARD ? 'id' : 'cabinet_id').to_s == id.to_s
           next true if kind.to_s == KIND_BOARD
 
-          slot = cabinet_type(inst) == 'dishwasher'
+          slot = slot_owner?(inst)
           kind.to_s == KIND_SLOT ? slot : !slot
         end
       end
@@ -452,6 +452,12 @@ module Noxun
       def cabinet_type(inst)
         cfg = Store.config(inst)
         cfg.is_a?(Hash) ? cfg['type'].to_s : ''
+      end
+
+      # H12a: je skrinka VLASTNIK SPOTREBICA druhu slot? (`appliance_owner`
+      # registra — dnes slot umyvacky; neznamy typ = skrinka).
+      def slot_owner?(inst)
+        CabinetTypes.prop(cabinet_type(inst), :appliance_owner) == KIND_SLOT
       end
 
       # D-134: skrinka s ODPOJENYM dielcom sa neprestavuje (prestavba by
@@ -557,7 +563,7 @@ module Noxun
       def entity_kind(inst)
         return KIND_BOARD if Store.kind(inst).to_s == 'board'
 
-        cabinet_type(inst) == 'dishwasher' ? KIND_SLOT : KIND_CABINET
+        slot_owner?(inst) ? KIND_SLOT : KIND_CABINET
       end
 
       # Nesie TATO entita vazbu na TUTO polozku? (Tenky most nad `ref_matches?`.)
@@ -833,7 +839,7 @@ module Noxun
           next if detached[id].to_i.positive?
           next if newer?(KIND_CABINET, inst)
 
-          slot = cabinet_type(inst) == 'dishwasher'
+          slot = slot_owner?(inst)
           (slot ? slots : cabinets) << option(slot ? KIND_SLOT : KIND_CABINET, id, inst)
         end
         boards = Array(scan['boards']).filter_map do |inst|

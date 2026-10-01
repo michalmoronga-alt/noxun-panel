@@ -117,8 +117,9 @@ module Noxun
         # S1-E: slot umyvacky nie je korpus — nema boky, dno, strop, chrbat ani
         # zony, takze cela dnesna vetva (interior, ZoneTree, recepty zasuviek)
         # sa ho netyka. Vlastna vetva je ciste oddelenie, nie `if` v kazdom kroku.
-        return appliance_slot_plan(cfg, cabinet_id, hardware_rules: hardware_rules, materials: materials) if
-          cfg[:type] == 'dishwasher'
+        # H12a: vetvu vybera `builder` registra (typ bez korpusu = slot).
+        return appliance_slot_plan(cfg, cabinet_id, hardware_rules: hardware_rules, materials: materials) unless
+          CabinetTypes.carcass?(cfg[:type])
 
         w = cfg[:width]; h = cfg[:height]; t = cfg[:thickness]
 
@@ -547,7 +548,7 @@ module Noxun
       # — bez toho by panel pri slote overoval cela proti VYSKE LINKY a
       # presahujuce celo by ohlasil ako chybu, ktorá chybou nie je.
       def front_opening(cfg)
-        if cfg[:type] == 'dishwasher'
+        if CabinetTypes.prop(cfg[:type], :front_opening) == 'slot'
           # D-139: otvor ide od soklu PO LINKU; celo v nom konci o medzeru
           # hore (`fronts.gap_top`) nizsie — jeho vyska je odvodena.
           return { x0: 0.0, w: cfg[:width].to_f, z0: cfg[:dw_front_bottom].to_f,
@@ -578,7 +579,7 @@ module Noxun
       #   ROHU (`gap_right` pri dverach vlavo, `gap_left` pri dverach vpravo),
       #   th1/th2 = UCINNA hrubka CR 1/CR 2 (`part_thicknesses`, builder ju
       #   vyriesi z celoveho kanala PRED planom — `CabinetBuilder.corner_thicknesses`).
-      CORNER_TYPE = 'corner_blind'
+      CORNER_TYPE = CabinetTypes::CORNER # H12a: alias registra (do H12a druha kopia, S14)
       # Roly CR list (celovy material, tolerancia hrubky ciel).
       CR_ROLES = %w[cr_front cr_side].freeze
       # Vsetky roly rohovej zostavy (guard testy ich porovnavaju so zoznamami).
@@ -611,8 +612,10 @@ module Noxun
       CORNER_FRONTS_MSG = 'Rohová skrinka má v dverovej časti jedny dvierka (jedno krídlo na celú výšku).'
       CORNER_ZONES_MSG  = 'Rohová skrinka má vnútri len police cez celú šírku (bez priečok).'
 
+      # Rohova zostava? Cita symbol aj string kluc (normalizovany aj ulozeny
+      # config). H12a: vlastnost `assembly` registra.
       def corner?(cfg)
-        cfg.is_a?(Hash) && (cfg[:type] || cfg['type']).to_s == CORNER_TYPE
+        cfg.is_a?(Hash) && CabinetTypes.corner?(cfg[:type] || cfg['type'])
       end
 
       # Strana DVEROVEJ casti. Cita normalizovany cfg (symbol) aj ulozeny
@@ -1422,9 +1425,9 @@ module Noxun
       # Jeho „sokel" (`dw_front_bottom`) je spodna hrana CELA, nie vyska
       # korpusu nad podlahou — do `floor_height` nikdy netecie a pravidla
       # kovania tak na slot nevydaju ani nohu, ani prichyt sokla.
+      # H12a: „nestoji na podlahe" = `on_floor` registra (horna aj slot).
       def support_type(cfg)
-        return 'none' if cfg[:type] == 'upper' || cfg[:type] == 'dishwasher' ||
-                         cfg[:floor_height].to_f <= 0
+        return 'none' if !CabinetTypes.on_floor?(cfg[:type]) || cfg[:floor_height].to_f <= 0
         cfg[:plinth_mode] == 'front' ? 'plinth' : 'legs'
       end
 
@@ -1454,7 +1457,9 @@ module Noxun
           'kb' => cfg[:width].to_f,
           'support' => support_type(cfg),
           # D1: predikat pravidiel podla typu korpusu (upper/lower) — support
-          # 'none' nerozlisuje hornu od spodnej bez noh (GH #125 P2).
+          # 'none' nerozlisuje hornu od spodnej bez noh (GH #125 P2). H12a:
+          # ZAMERNE surovy identifikator (pravidla porovnavaju IDENTITU typu);
+          # seed zavesov drzi `['upper']` = visiace typy registra (guard CN-03).
           'cabinet_type' => cfg[:type].to_s
         }
       end
@@ -1511,7 +1516,7 @@ module Noxun
 
       def setback_value(cfg, key)
         return 0.0 unless cfg.is_a?(Hash)
-        return 0.0 if cfg[:type] == 'dishwasher'
+        return 0.0 unless CabinetTypes.carcass?(cfg[:type])
 
         v = cfg[key]
         return 0.0 unless v.is_a?(Numeric)
@@ -1587,7 +1592,7 @@ module Noxun
       BACK_MATERIAL_UNUSED_MODES = %w[none rails].freeze
 
       def back_rails?(cfg)
-        cfg.is_a?(Hash) && cfg[:type] != 'dishwasher' && cfg[:back_mode] == 'rails'
+        cfg.is_a?(Hash) && CabinetTypes.carcass?(cfg[:type]) && cfg[:back_mode] == 'rails'
       end
 
       # Pouzije rezim chrbta material chrbta? (nie pri „Bez chrbta" a pri listach)
@@ -1672,7 +1677,7 @@ module Noxun
         # S1-E: slot vnutro nema. D-139: spodnu hranicu vysky linky urcuje
         # odvodene celo (sokel + medzera hore + 300) — ta ista funkcia ako
         # v absorpcii scale, bez `normalize` (Astra B2 FIX 5).
-        return CabinetBuilder.slot_height_bounds(cfg)[0] if cfg[:type] == 'dishwasher'
+        return CabinetBuilder.slot_height_bounds(cfg)[0] unless CabinetTypes.carcass?(cfg[:type])
 
         rules = hardware_rules || HardwareRules.load
         # NUTNA (nie postacujuca) podmienka: strop vnutra nikdy nelezi vyssie
@@ -1727,7 +1732,7 @@ module Noxun
       MAX_DEPTH = 2000.0
 
       def min_valid_depth(cfg, hardware_rules: nil, part_thicknesses: nil)
-        return 0.0 if cfg[:type] == 'dishwasher'
+        return 0.0 unless CabinetTypes.carcass?(cfg[:type])
 
         rules = hardware_rules || HardwareRules.load
         lo = defined?(CabinetBuilder) ? CabinetBuilder::MIN[:depth] : 150.0

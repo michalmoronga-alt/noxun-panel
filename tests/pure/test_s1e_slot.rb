@@ -104,14 +104,29 @@ module NxS1E
     [m[1].to_f, m[2].to_f]
   end
 
-  # `ScaleWatch::MIN_BY_TYPE` sa cita zo ZDROJA — `core/scale_observer.rb`
-  # sa v helperi NENACITAVA (potrebuje zive SketchUp API); rovnaky vzor ako
-  # `NxS1E0.observer_min`.
+  # `ScaleWatch` minima slotu — H12a (T4): od registra `CabinetTypes` je
+  # `MIN_BY_TYPE` ODVODENY, preto sa uz necita zo zdroja, ale PARITOU:
+  # `core/scale_observer.rb` sa nacita so stubom observerov (vzor
+  # `test_roha1_rohova.rb`) a pyta sa `min_for` — ta ista funkcia, ktorou
+  # absorpcia scale naozaj klampuje (silnejsie nez regex nad zdrojom).
   def observer_slot_min
-    src_txt = src('noxun_engine', 'core', 'scale_observer.rb')
-    line = src_txt[/MIN_BY_TYPE\s*=\s*\{\s*'dishwasher'\s*=>\s*\{(.*?)\}/m, 1].to_s
-    NxTest.assert(!line.empty?, 'v scale_observer.rb sa nenasla MIN_BY_TYPE dishwasher')
-    line.scan(/'(\w+)'\s*=>\s*(-?[\d.]+)/).to_h { |key, value| [key, value.to_f] }
+    load_scale_watch!
+    sw = Noxun::Engine::ScaleWatch
+    NxTest.assert(sw::MIN_BY_TYPE.key?('dishwasher'), 'ScaleWatch::MIN_BY_TYPE nema slot umyvacky')
+    %w[width height depth].to_h { |k| [k, sw.min_for(k, 'dishwasher')] }
+  end
+
+  def load_scale_watch!
+    return if defined?(Noxun::Engine::ScaleWatch)
+
+    su = Module.new
+    %w[EntityObserver EntitiesObserver AppObserver].each { |c| su.const_set(c, Class.new) }
+    Object.const_set(:Sketchup, su)
+    begin
+      require File.join(NxTest::ROOT, 'noxun_engine', 'core', 'scale_observer')
+    ensure
+      Object.send(:remove_const, :Sketchup)
+    end
   end
 end
 
