@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H9 · súbor nastavení zlého tvaru = poškodený (1.10.2026, PR #?, v0.17.7, blok 9 · HARDENING PO V1, register R-37; package
+- **H9 · súbor nastavení zlého tvaru = poškodený (1.10.2026, PR #442, v0.17.7, blok 9 · HARDENING PO V1, register R-37; package
   [PACKAGE_H9.md](../zdroje/bloky/HARDENING/PACKAGE_H9.md), audit návrhu 0 BLOCKER · 3 FIX · 1 NOTE [AUDIT_H9_raw.md](../zdroje/bloky/HARDENING/AUDIT_H9_raw.md)
   + delta 4/4 RESOLVED · 2 FIX · 1 NOTE [AUDIT_H9_delta_raw.md](../zdroje/bloky/HARDENING/AUDIT_H9_delta_raw.md)).**
   Súbor, ktorý sa dá prečítať, ale nemá tvar (`[]`, `{}`, prázdni dodávatelia, prázdne pravidlá bez `seed_version`), sa predtým ticho nahradil seedom (porez 17 €, orez

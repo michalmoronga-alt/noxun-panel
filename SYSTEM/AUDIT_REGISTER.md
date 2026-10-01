@@ -24,7 +24,7 @@ V1 rozsahu. Hlásená strata neuložených hodnôt, hygiena, texty, refaktor a v
 
 | R | Verdikt | Pred/po V1 | Veľk. | Funkčný dopad |
 |---|---|---|---|---|
-| R-37 | ✅ dávkou H9 (PR #?, v0.17.7) | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** | S | ~~súbor nastavení zlého tvaru sa ticho nahradí predvolenými a zničí dobrú zálohu~~ — záloha, inak predvolené (dodávateľ s bannerom; ABS a kovanie len log — Q1) a bez zápisu; rozsah v sekcii R-37 |
+| R-37 | ✅ dávkou H9 (PR #442, v0.17.7) | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** | S | ~~súbor nastavení zlého tvaru sa ticho nahradí predvolenými a zničí dobrú zálohu~~ — záloha, inak predvolené (dodávateľ s bannerom; ABS a kovanie len log — Q1) a bez zápisu; rozsah v sekcii R-37 |
 | R-35 | platí | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** (tichá strata pri dvoch oknách SketchUpu; po R-37) | S/M | prvá zmena globálnych pravidiel kovania alebo rozmerových radov sa pri dvoch otvorených oknách ticho stratí |
 | R-13 | ✅ dávkou H8 (PR #441, v0.17.6) | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** (čítať — rozhodnuté 29.9.; prvá v poradí) | S | ~~dielec z inej verzie štandardu Kontrola neoznačí~~ — Kontrola ho hlási ORANGE `std_version` |
 | R-38 | platí | hraničné (len pri poškodenom súbore; stratí názvy zákaziek a prepínač zlúčenia 18/36 vo VEPO exporte — mení pomenovanie a členenie výstupu, nie rozmery, počty ani ceny) | S | poškodený súbor VEPO nastavení (názvy zákaziek, zlúčenie 18/36) sa môže ticho prepísať staršou zálohou — **zaradenie: blok 9 · H7** (návrh orchestrátora 1.10.2026 — potvrdí Michal s mockupom H7) |
@@ -108,7 +108,7 @@ vznikol iba z normalizácie. Samostatná dávka. **Odhad: S/M.**
 `supplier_settings` (prázdny `{}`/`[]` → seed → auto-zápis); ~~`abs_rules`, `hardware_rules` a `dim_series` pri načítaní nezapisujú~~ — **oprava (sonda H9 S8,
 1.10.2026):** `abs_rules` s `{"rules":{}}` a `hardware_rules` s `{"rules":[]}` **bez `seed_version`** zapisovali už pri načítaní a zálohu ničili; pri koreňovo zlom tvare
 (`[]`, `{}`, `rules` zlého typu) ticho počítali so seedom a uloženie z okna zálohu zničilo. Pri načítaní nezapisuje len `dim_series`.
-**✅ dávkou H9 (PR #?, v0.17.7, blok 9 · HARDENING PO V1)** — **chránené:** nastavenia dodávateľa, pravidlá ABS hrán, globálne pravidlá kovania. Súbor, ktorý
+**✅ dávkou H9 (PR #442, v0.17.7, blok 9 · HARDENING PO V1)** — **chránené:** nastavenia dodávateľa, pravidlá ABS hrán, globálne pravidlá kovania. Súbor, ktorý
 sa parsuje, ale nemá očakávaný tvar (predikát nad kontajnermi), je **poškodený**: s dobrou zálohou sa číta **záloha** a zápisy sú vypnuté (dodávateľ banner
 `degraded`; ABS a kovanie odmietnutie zápisu s dôvodom); bez nej predvolené a bez zápisu pri načítaní — dodávateľ **s priznaním** (banner `fallback`,
 Kontrola ORANGE), **ABS a kovanie len záznamom v logu** (v UI ani Kontrole nič — otvorená otázka Q1); prvé vedomé uloženie súbor opraví; dobrá

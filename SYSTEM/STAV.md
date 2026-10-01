@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.17.7 · 1.10.2026 — blok 9 HARDENING; dávka H9 hotová** (PR #?): **R-37 hotové — poškodený súbor nastavení už nezničí dobrú zálohu ani sa ticho neprepíše.** Keď súbor nastavení dodávateľa, pravidiel ABS hrán alebo globálnych pravidiel kovania ide prečítať, ale nemá správny tvar (napr. `[]`), plugin počíta **s poslednou dobrou zálohou**
+**v0.17.7 · 1.10.2026 — blok 9 HARDENING; dávka H9 hotová** (PR #442): **R-37 hotové — poškodený súbor nastavení už nezničí dobrú zálohu ani sa ticho neprepíše.** Keď súbor nastavení dodávateľa, pravidiel ABS hrán alebo globálnych pravidiel kovania ide prečítať, ale nemá správny tvar (napr. `[]`), plugin počíta **s poslednou dobrou zálohou**
 a zápisy vypne (pri dodávateľovi červený banner „poškodené — číta sa záloha"); bez zálohy predvolené bez zápisu (dodávateľ s bannerom, ABS a kovanie len log — Q1) a súbor opraví až vedomé uloženie. **Dobrá záloha sa nikdy nezmaže. Pri zdravom súbore sa nemení nič** — rozpočet, plán, hrany ani nákup kovania.
 Pod tým **H8** (v0.17.6, PR #441): Kontrola hlási kus z inej verzie štandardu jedným oranžovým riadkom, čísla bez zmeny. Pod tým **H5** (v0.17.5, PR #439–#440: dokumentácia okien a UI_DIZAJN ako norma) a **H4b** (v0.17.4, PR #438): texty a vzhľad („Obnoviť" vs. „Vrátiť…", bez žargónu, jednotné rozbaľovačky) — **dáta a čísla bez zmeny.**
 Pod tým **H4a** (v0.17.3, PR #437): čísla v Štúdiu všade rovnako, nič sa neskrýva. Pod tým **H3b** (v0.17.2, PR #436): bez falošnej chyby „invalid overlay" v Ruby konzole po **Súbor → Nový**. Pod tým **H3a** (v0.17.1, PR #435): Štúdio bez zavádzajúcich údajov (Kusovník, ponuka, Kontrola, Nákup, sadzby) — **čísla, CSV, XLSX a VEPO bez zmeny**.
@@ -27,14 +27,14 @@ v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a
 **Ochranu pred poškodeným súborom nastavení (H9) má len 0.17.7+ — aktualizovať obe PC** (formát súborov sa nemení). **Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin
 počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
 
-**Testy (H9, PR #?):** **5040 headless · 149 JS sád** zelené + encoding guard; in-SU nie je brána (H9 nemení buildery ani okno — posledný beh 3302 / 0 pri H8).
+**Testy (H9, PR #442):** **5040 headless · 149 JS sád** zelené + encoding guard; in-SU nie je brána (H9 nemení buildery ani okno — posledný beh 3302 / 0 pri H8).
 
 ## Robí sa
 
 **Blok 9 · HARDENING PO V1** (štart 1.10.2026, PR #432): krížový audit V1 sedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**;
 17 dávok **H1…H17** sekvenčne podľa tabuľky v [PLAN.md](PLAN.md), **bez zmeny výrobných a cenových čísel**; priečinok bloku [zdroje/bloky/HARDENING/](zdroje/bloky/HARDENING/).
 Hotové **H1–H5** (PR #433–#440: pravidlá čítania, fotenie okien, zavádzajúce údaje, log po novom súbore, čísla, texty a vzhľad, mapa okien, UI_DIZAJN),
-**H8** (kus z inej verzie štandardu, R-13) PR #441 a **H9** (súbor nastavení zlého tvaru, R-37) PR #?; **H6/H7** čakajú na mockupy, nasleduje **H10**.
+**H8** (kus z inej verzie štandardu, R-13) PR #441 a **H9** (súbor nastavení zlého tvaru, R-37) PR #442; **H6/H7** čakajú na mockupy, nasleduje **H10**.
 **Otázky bez odpovede, platí návrh:** H9 Q1/Q2 (pri čítaní zo zálohy bez nálezu v Kontrole, bez tlačidla „Obnoviť zo zálohy") · H8 Q1/Q2 (veta o značke verzie, bez tlačidla) · H4b Q1/Q2 (vrátenie katalógu v ponuke „⋯" Materiálov, ikona posuvníkov pre Nastavenia rozpočtu).
 **H6 a H7 čakajú na schválený mockup** (R-38 v H7 potvrdí Michal) · **Q1** (porez a montáž pri skle) bez odpovede · pri prvej rohovej v dielni overiť záves Sensys · **na smoke čakajú** D-132 (#367), D-133 (#368), D-134 (#369).
 
