@@ -198,6 +198,14 @@
       : (MAT_STUDIO && typeof MAT_STUDIO.nxfMm === 'function' ? MAT_STUDIO.nxfMm : null);
     return f ? f(parseFloat(v)) : fmtNum(v).replace('.', ',');
   }
+  // Suma s € (`nxfMoney`) — tá istá cesta; bez formátovača čiarka a 2 desatinné.
+  function mdMoneyEur(v){
+    var f = (typeof window !== 'undefined' && window && typeof window.nxfMoney === 'function') ? window.nxfMoney
+      : (MAT_STUDIO && typeof MAT_STUDIO.nxfMoney === 'function' ? MAT_STUDIO.nxfMoney : null);
+    if (f) return f(v);
+    var n = parseFloat(v);
+    return isNaN(n) ? String(v) : (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' €';
+  }
   function sheetChipLabel(s){ return (s.type ? s.type + ' ' : '') + mdMm(s.thickness); }
   function edgeChipLabel(a){
     return (a.width === null || a.width === undefined) ? mdMm(a.thickness) + ' mm' : mdMm(a.width) + '/' + mdMm(a.thickness);
@@ -3051,7 +3059,8 @@
   function mdDeleteSummary(p){
     var lines = [];
     if (p.code) lines.push('Kód: ' + p.code + (p.supplier ? ' (' + p.supplier + ')' : ''));
-    if (p.price != null && p.price !== '') lines.push('Cena: ' + p.price + (p.kind === 'edge' ? ' €/bm' : ' €/m²'));
+    // H4 · D-04: cena cez formátovač okna („12,50 €/m²"), nie surové „12.5".
+    if (p.price != null && p.price !== '') lines.push('Cena: ' + mdMoneyEur(p.price) + (p.kind === 'edge' ? '/bm' : '/m²'));
     if (p.demos_url) lines.push('Má uloženú väzbu na Demos — po zmazaní sa stratí.');
     var warn = null, block = null;
     if (p.used_count > 0){

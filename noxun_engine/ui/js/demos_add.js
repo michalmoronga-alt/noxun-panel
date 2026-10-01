@@ -87,10 +87,16 @@ function nxdaEdgeOnly(items, checks){
 }
 
 // Cena položky rodiny do riadku ("118,42 € / ks" | "—").
+// H4 · D-04 (triedenie HARDENING): suma = formátovač okna Štúdio `nxfMoney`
+// (studio.js, načítaný skôr; v Node require) — tisíce ako v Rozpočte. Bez neho
+// (izolovaný test) dnešný zápis s čiarkou.
+var NXDA_STUDIO = (typeof module !== 'undefined' && module.exports) ? require('./studio.js') : null;
 function nxdaPriceLabel(priceVat, unit){
   var v = parseFloat(priceVat);
   if (isNaN(v)) return '—';
-  var txt = (Math.round(v * 100) / 100).toFixed(2).replace('.', ',') + ' €';
+  var f = (typeof window !== 'undefined' && window && typeof window.nxfMoney === 'function') ? window.nxfMoney
+    : (NXDA_STUDIO && typeof NXDA_STUDIO.nxfMoney === 'function' ? NXDA_STUDIO.nxfMoney : null);
+  var txt = f ? f(v) : (Math.round(v * 100) / 100).toFixed(2).replace('.', ',') + ' €';
   return unit ? txt + ' / ' + unit : txt;
 }
 

@@ -2452,7 +2452,9 @@ payload, XLSX, CSV ani VEPO nie. **Kusovník:** dĺžka a šírka celé mm (`nxf
 obchodnú 18/36 nesie VEPO) v hlavičke skupiny, stĺpci „Hr." (`cellNumText`) aj pohľade Platne; pohľad ABS hrúbka „0,8 mm" / „1 mm" a bm na 2 desatinné
 (aj súčtový riadok „ABS spolu"). **Bunka ABS (D-11):** `absCompact` vráti **„0,8 dookola"**, keď všetky štyri kódy L1 L2 W1 W2 nesú **tú istú pásku**
 (rovnaké ID) so známou hrúbkou (`absAround`); dve rôzne pásky rovnakej hrúbky ostávajú plným kompaktom. Titulok `absFull` (plné L1–W2 s menom pásky) sa
-nemení. **Nákup kovania:** ceny cez `nxfMoney` (tisíce, „−"), množstvá cez `nxfQty` — necelé (kovanie v metroch) sa už neskryje. Test:
+nemení. **Nákup kovania:** ceny cez `nxfMoney` (tisíce, „−"), množstvá cez `nxfQty` — necelé (kovanie v metroch) sa už neskryje; jednotku
+katalógu (`m`, `par`, `sada`…) prekladá `nxfHwUnitCode` (zrkadlo `Budget::HW_UNIT_LABELS`) + `nxfUnit` na „bm", „pár", „set" ako v Rozpočte,
+neznáma ostáva surovo. Tú istú cestu (`nxfMoney`) majú okno mazania materiálu („Cena: 12,50 €/m²") a ceny v „Pridať z Demosu". Test:
 `tests/js/test_h4a_format.js` (exporty `partsTable`/`sheetsTable`/`absTable` + `setStForTest` len pre render nad fixtúrou).
 
 **Súčtový riadok NEUKAZUJE súčet platní (H3a, A-01).** `totals.plates_min/max` sčítava server cez **všetky** položky odhadu (všetky materiály aj nákup pre

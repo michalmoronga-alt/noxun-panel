@@ -102,7 +102,7 @@ const sum = md.mdDeleteSummary({ kind: 'sheet', code: '275848', supplier: 'Demos
   price: 18.99, demos_url: 'https://www.demos-trade.sk/x/', used: [], used_count: 0,
   protected: false, duplak_deps: [] });
 ok(sum.lines.some(function(l){ return l.indexOf('275848') >= 0 && l.indexOf('Demos') >= 0; }), 'kod + dodavatel v rozpise');
-ok(sum.lines.some(function(l){ return l.indexOf('18.99') >= 0 && l.indexOf('€/m²') >= 0; }), 'cena s jednotkou sheet');
+ok(sum.lines.some(function(l){ return l.indexOf('18,99 €/m²') >= 0; }), 'cena s jednotkou sheet (H4 · D-04: ciarka cez nxfMoney)');
 ok(sum.lines.some(function(l){ return l.indexOf('Demos') >= 0 && l.indexOf('väzbu') >= 0; }), 'upozornenie na URL vazbu');
 eq([sum.warn, sum.block], [null, null], 'bez pouzitia/ochran ziadne warny');
 

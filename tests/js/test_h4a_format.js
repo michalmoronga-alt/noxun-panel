@@ -27,8 +27,8 @@ const B = require(path.join(JS, 'budget.js'));
 const C = require(path.join(JS, 'core.js'));
 const M = require(path.join(JS, 'proj_materials.js'));
 
-const NB = ' ';   // nezalomiteľná medzera (tisíce)
-const MINUS = '−';
+const NB = '\u00A0';   // nezalomiteľná medzera (tisíce)
+const MINUS = '\u2212';
 
 // Viditeľný text HTML reťazca (bez značiek a atribútov) — vzor textContent.
 function visible(html){
@@ -241,6 +241,37 @@ const budgetPayload = { stale: { items: [] } };
   eq(S.absCompact({ edges: {} }, meta), '—', 'bez ABS');
   eq(S.absFull(all('E1'), meta), 'L1 — ABS Biela 0,8 · L2 — ABS Biela 0,8 · W1 — ABS Biela 0,8 · W2 — ABS Biela 0,8',
      'titulok ostáva plný L1–W2 s menom pásky');
+})();
+
+// --- predrecenzia P3: okno mazania materiálu, MJ v Nákupe, cena v „Pridať z Demosu" -
+(function(){
+  const del = M.mdDeleteSummary({ kind: 'sheet', price: 12.5, used: [], used_count: 0, protected: false, duplak_deps: [] });
+  ok(del.lines.indexOf('Cena: 12,50 €/m²') >= 0, 'mazanie dosky: „Cena: 12,50 €/m²" (' + del.lines.join(' | ') + ')');
+  const delE = M.mdDeleteSummary({ kind: 'edge', price: 1234.5, used: [], used_count: 0, protected: false, duplak_deps: [] });
+  ok(delE.lines.indexOf('Cena: 1' + NB + '234,50 €/bm') >= 0, 'mazanie pásky: tisíce + €/bm');
+
+  eq(S.nxfHwUnitCode('m'), 'BM', 'katalóg „m" = bm (zrkadlo Budget::HW_UNIT_LABELS)');
+  eq(S.nxfHwUnitCode('par'), 'PÁR', 'katalóg „par" = pár');
+  eq(S.nxfHwUnitCode('sada'), 'SET', 'katalóg „sada" = set');
+  eq(S.nxfHwUnitCode('balenie'), 'BAL', 'katalóg „balenie" = bal');
+  eq(S.nxfHwUnitCode('xyz'), null, 'neznáma jednotka = null');
+  const buy = S.buySection({ state_status: 'ok', rows: [
+    { code: 'L1', name_sk: 'Lišta', category: 'X', category_label: 'Lišty', quantity: 2.4, unit: 'm',
+      price_eur_vat: 1234.5, subtotal_eur_vat: 2962.8 },
+    { code: 'P1', name_sk: 'Pánt', category: 'X', category_label: 'Lišty', quantity: 3, unit: 'par',
+      price_eur_vat: 2, subtotal_eur_vat: 6 },
+    { code: 'Z1', name_sk: 'Iné', category: 'X', category_label: 'Lišty', quantity: 1, unit: 'xyz',
+      price_eur_vat: 1, subtotal_eur_vat: 1 }
+  ], unmapped: [], summary: { total_eur_vat: 2969.8, unknown_prices: 0 } }, []);
+  ok(buy.includes('<b>2,40</b>') && buy.includes('<td>bm</td>'), 'Nákup: „m" z katalógu = 2,40 bm (ako Rozpočet)');
+  ok(buy.includes('<b>3</b>') && buy.includes('<td>pár</td>'), 'Nákup: „par" = pár');
+  ok(buy.includes('<td>xyz</td>'), 'Nákup: neznáma jednotka surovo');
+  ok(buy.includes('1' + NB + '234,50 €'), 'Nákup: cena s tisícami');
+  ok(!/<td>(m|par)<\/td>/.test(buy), 'Nákup: žiadny surový kód „m"/„par"');
+
+  const A = require(path.join(JS, 'demos_add.js'));
+  eq(A.nxdaPriceLabel(1234.5, 'ks'), '1' + NB + '234,50 € / ks', 'Pridať z Demosu: tisíce cez nxfMoney');
+  eq(A.nxdaPriceLabel(118.42, 'ks'), '118,42 € / ks', 'Pridať z Demosu: bežná cena bez zmeny');
 })();
 
 console.log('test_h4a_format: ' + n + ' asercii OK');

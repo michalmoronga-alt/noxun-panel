@@ -226,7 +226,8 @@
     var neg = f < 0;
     var parts = Math.abs(f).toFixed(2).split('.');
     // Oddeľovač tisícov = NEZALOMITEĽNÁ medzera — LEN pri peniazoch.
-    var whole = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    // Escape sekvencia, nie neviditeľný znak v zdrojáku (vzor `budFmtEur`).
+    var whole = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
     return (neg ? '−' : '') + whole + ',' + parts[1] + ' €';
   }
 
@@ -267,6 +268,16 @@
   }
 
   function nxfQtyUnit(v, mj){ return nxfQty(v, mj) + ' ' + nxfUnit(mj, v); }
+
+  // Jednotka KATALÓGU kovania (`ks`, `m`, `par`…) → kód MJ — ZRKADLO
+  // `Budget::HW_UNIT_LABELS` (core/budget.rb), aby Nákup kovania písal jednotku
+  // rovnako ako Rozpočet („bm", „pár"). Neznáma jednotka → null (vypíše sa surovo).
+  var NXF_HW_UNIT = { 'ks': 'KS', 'set': 'SET', 'sada': 'SET', 'par': 'PÁR', 'pár': 'PÁR',
+                      'bal': 'BAL', 'balenie': 'BAL', 'm': 'BM', 'bm': 'BM' };
+  function nxfHwUnitCode(u){
+    var k = String(u == null ? '' : u).trim().toLowerCase();
+    return Object.prototype.hasOwnProperty.call(NXF_HW_UNIT, k) ? NXF_HW_UNIT[k] : null;
+  }
 
   // Milimetre (hrúbky, mm v texte): max 2 desatinné bez koncových núl — zrkadlo
   // Inspectora `mmLabel` a Ruby `Materials.fmt_mm`.
@@ -885,14 +896,15 @@
           // payload riadky preusporiada a index by otvoril cudzí riadok.
           var rk = hwRowKey(r);
           var open = buyOpen[rk] === true;
+          var hwu = nxfHwUnitCode(r.unit);   // H4 · D-04: MJ ako v Rozpočte
           var cls = 'hwbuyrow' + (r.missing ? ' hwmiss' : '') + (open ? ' on' : '');
           h += '<tr class="' + cls + '" data-buy="' + esc(rk) + '"'
              + ' title="Klik ukáže pôvod — z ktorých skriniek, setov a ručných položiek riadok vznikol">'
              + '<td>' + esc(r.code || '—') + '</td>'
              + '<td>' + esc(r.missing ? 'nie je v katalógu kovania' : (r.name_sk || ''))
              + (man ? ' <span class="hwchip">ručná</span>' : '') + '</td>'
-             + '<td><b>' + nxfQty(r.quantity, r.unit) + '</b>' + hwManualMark(r.manual_note) + '</td>'
-             + '<td>' + esc(r.unit || '—') + '</td>'
+             + '<td><b>' + nxfQty(r.quantity, hwu || r.unit) + '</b>' + hwManualMark(r.manual_note) + '</td>'
+             + '<td>' + esc(hwu ? nxfUnit(hwu) : (r.unit || '—')) + '</td>'
              + '<td>' + price(r.price_eur_vat) + '</td><td>' + price(r.subtotal_eur_vat) + '</td></tr>';
           if (open) h += hwSourcesHtml(r);
         });
@@ -2388,7 +2400,7 @@
       // (budget.js, proj_materials.js, hw_catalog.js, demos_diff.js, rules.js)
       // si ho v Node berú requirom TOHTO súboru.
       nxfMoney: nxfMoney, nxfMoneyIn: nxfMoneyIn, nxfQty: nxfQty, nxfUnit: nxfUnit,
-      nxfQtyUnit: nxfQtyUnit, nxfMm: nxfMm, nxfDim: nxfDim, nxfDec: nxfDec,
+      nxfQtyUnit: nxfQtyUnit, nxfMm: nxfMm, nxfDim: nxfDim, nxfDec: nxfDec, nxfHwUnitCode: nxfHwUnitCode,
       // render pohľadov Kusovníka nad fixtúrou (stav ide cez `setStForTest`)
       partsTable: partsTable, sheetsTable: sheetsTable, absTable: absTable,
       cellNumText: cellNumText,
