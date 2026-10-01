@@ -186,7 +186,7 @@ module Noxun
           return false
         end
         begin
-          ov.enabled = true if ov.respond_to?(:enabled=)
+          ov.enabled = true # setter od SketchUpu 2023.0, minimum pluginu 2026
         rescue StandardError => e
           Engine.log_error(e, 'HoverEdge.ensure_overlay enabled=')
         end

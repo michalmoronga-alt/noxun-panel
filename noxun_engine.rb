@@ -6,7 +6,7 @@ require 'extensions.rb'
 
 module Noxun
   module Engine
-    VERSION = '0.17.9'
+    VERSION = '0.17.10'
 
     class << self
       # Drzime kvoli UI::Notification (potrebuje registrovany extension objekt).
@@ -341,30 +341,133 @@ module Noxun
         tv == Noxun::Engine::VERSION
       end
 
-      def self.announce(status)
-        msg = case status
-              when :busy then BUSY_MESSAGE
-              when :restart then RESTART_MESSAGE
-              when :lease_failed then LEASE_MESSAGE
-              when :marker_stuck then MARKER_MESSAGE
-              else BROKEN_MESSAGE
-              end
+      # `message` podava vlastny text stavu, ktory nevznikol v recovery
+      # (H11b `:unsupported` — text sklada `SketchupMinimum` aj s verziou).
+      def self.announce(status, message = nil)
+        msg = message || message_for(status)
         puts "[NOXUN::Engine] #{msg}"
         ::UI.messagebox(msg) if defined?(::UI) && ::UI.respond_to?(:messagebox)
       rescue StandardError
         nil
       end
+
+      def self.message_for(status)
+        case status
+        when :busy then BUSY_MESSAGE
+        when :restart then RESTART_MESSAGE
+        when :lease_failed then LEASE_MESSAGE
+        when :marker_stuck then MARKER_MESSAGE
+        else BROKEN_MESSAGE
+        end
+      end
     end
   end
 end
 
-# Stav recovery rozhoduje, ci sa plugin vobec smie nacitat. `:busy` (cudzia
+# --- H11b (F-02): MINIMUM SKETCHUP 2026 ----------------------------------------
+# Plugin sa vyvija a testuje len v SketchUpe 2026 (Ruby 3.2, CEF 137) — starsi
+# SketchUp dostane JEDNU hlasku a plugin sa v nom NENACITA: ziadna recovery,
+# ziadny zamok ani lease, ziadna registracia (na disku sa nic nezmeni).
+#
+# Kontrola zije MIMO `module Boot` (ta nesmie volat SketchUp API — guard
+# `test_d52a_updater.rb`) a bezi PRED recovery: nepodporovany SketchUp nesmie
+# siahnut na strom ani na zamok, ktory moze prave drzat aktualizacia v okne
+# podporovaneho SketchUpu.
+#
+# FAIL-OPEN: ked sa verzia zistit neda (chyba metoda, vynimka, nezmysel),
+# plugin sa NACITA ako doteraz a do konzoly ide riadok — nevedomost nesmie
+# vypnut plugin v novom SketchUpe (rovnaky princip ako `generation_matches?`).
+#
+# Zdroj verzie (delta audit H11, N6): oficialne ciselne `Sketchup.version_number`
+# vo formate `XXYZZZZZZZ` (major = cislo / 100_000_000; 26.0.429 -> 2600000429).
+# Retazec `Sketchup.version` ("26.0.429") je len ZALOHA, ked ciselne API zlyha
+# alebo vrati 0 — a zaroven KONTROLA: ked su oba zdroje citatelne a ich major
+# sa NEZHODUJE (iny format cisla v buducej verzii), je to „verziu sa nepodarilo
+# zistit" => fail-open. Zly vyklad formatu tak nikdy nevypne plugin v SketchUpe,
+# ktory sam o sebe hovori, ze je dost novy.
+module Noxun
+  module Engine
+    MIN_SKETCHUP_MAJOR = 26
+
+    module SketchupMinimum
+      # Vysledok kontroly pri starte — cita ho koniec tohto suboru (a testy).
+      class << self
+        attr_accessor :result
+      end
+
+      UNKNOWN_LOG = '[NOXUN::Engine] verziu SketchUpu sa nepodarilo zistit — plugin sa nacita bez kontroly minima'
+
+      # => { supported: true/false, major: Integer/nil, label: String }
+      def self.check(app = (defined?(::Sketchup) ? ::Sketchup : nil))
+        label = version_label(app)
+        num = major_from_number(app)
+        str = major_from_string(label)
+        major = if num && str && num != str
+                  nil # zdroje si odporuju — format nepoznat, fail-open
+                else
+                  num || str
+                end
+        if major.nil?
+          puts UNKNOWN_LOG
+          return { supported: true, major: nil, label: label }
+        end
+        { supported: major >= MIN_SKETCHUP_MAJOR, major: major, label: label }
+      rescue StandardError, ScriptError => e
+        puts "#{UNKNOWN_LOG} (#{e.class}: #{e.message})"
+        { supported: true, major: nil, label: '' }
+      end
+
+      def self.major_from_number(app)
+        return nil unless app && app.respond_to?(:version_number)
+
+        n = Integer(app.version_number)
+        major = n / 100_000_000
+        major > 0 ? major : nil
+      rescue StandardError
+        nil
+      end
+
+      def self.major_from_string(label)
+        m = label.to_s[/\A\s*(\d+)\./, 1]
+        major = m.to_i
+        major > 0 ? major : nil
+      end
+
+      def self.version_label(app)
+        return '' unless app && app.respond_to?(:version)
+
+        app.version.to_s
+      rescue StandardError
+        ''
+      end
+
+      def self.message(result)
+        major = result[:major].to_i
+        year = major > 0 && major < 100 ? (2000 + major).to_s : '?'
+        "Noxun Engine potrebuje SketchUp #{2000 + MIN_SKETCHUP_MAJOR} alebo novší. Tento SketchUp je " \
+          "verzia #{year} (#{result[:label]}) — plugin sa v ňom zámerne nenačítal. " \
+          "Otvor SketchUp #{2000 + MIN_SKETCHUP_MAJOR}."
+      end
+    end
+  end
+end
+
+# Stav rozhoduje, ci sa plugin vobec smie nacitat. `:unsupported` (SketchUp
+# starsi ako minimum — vyhodnotene PRED recovery), `:busy` (cudzia
 # aktualizacia bezi), `:restart` (strom nesedi s tymto loaderom) a `:error`
 # (opravu sa nepodarilo dokoncit) NAcitanie zastavia — inak by SketchUp bezal
 # nad zmiesanou generaciou.
-Noxun::Engine::Boot.status = Noxun::Engine::Boot.recover!(File.dirname(File.expand_path(__FILE__)))
+Noxun::Engine::SketchupMinimum.result = Noxun::Engine::SketchupMinimum.check
+Noxun::Engine::Boot.status =
+  if Noxun::Engine::SketchupMinimum.result[:supported]
+    Noxun::Engine::Boot.recover!(File.dirname(File.expand_path(__FILE__)))
+  else
+    :unsupported
+  end
 
-if %i[busy restart error lease_failed marker_stuck].include?(Noxun::Engine::Boot.status)
+if Noxun::Engine::Boot.status == :unsupported
+  Noxun::Engine::Boot.announce(:unsupported, Noxun::Engine::SketchupMinimum.message(Noxun::Engine::SketchupMinimum.result))
+elsif %i[busy restart error lease_failed marker_stuck].include?(Noxun::Engine::Boot.status)
   Noxun::Engine::Boot.announce(Noxun::Engine::Boot.status)
 else
   module Noxun

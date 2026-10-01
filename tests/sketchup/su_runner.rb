@@ -22358,6 +22358,77 @@ module NoxunSuRunner
     end
   end
 
+  # ===== H11b (F-02): MINIMUM SKETCHUP 2026 =====================================
+  # Sonda P2 z PACKAGE_H11 (B5) + N6: na ZIVOM SketchUpe 2026 sa zapise verzia,
+  # overi sa vyklad ciselneho `version_number` (major = cislo / 100_000_000) proti
+  # retazcu a ze kontrola minima z loadera plugin pusti. Potom styri prekrytia
+  # (hrany, kresba, smer otvarania, hrana pod kurzorom) bez verzijnych poistiek:
+  # kazdy objekt v `model.overlays` ma `overlay_id` aj `enabled?` a zapnutie aj
+  # vypnutie vsetkych styroch funguje.
+  def run_h11b(model)
+    ver = Sketchup.version.to_s
+    num = Sketchup.version_number
+    info("H11b: Sketchup.version = #{ver}, Sketchup.version_number = #{num}")
+    str_major = ver[/\A(\d+)\./, 1].to_i
+    ok("H11b N6: version_number / 100_000_000 = major z retazca (#{num.to_i / 100_000_000} vs #{str_major})",
+       str_major > 0 && num.to_i / 100_000_000 == str_major)
+    res = e::SketchupMinimum.check
+    ok("H11b: kontrola minima na tomto SketchUpe pusti plugin (#{res.inspect})",
+       res[:supported] == true && res[:major] == str_major && res[:major] >= e::MIN_SKETCHUP_MAJOR)
+    ok("H11b: stav bootu nie je :unsupported (#{e::Boot.status.inspect})", e::Boot.status != :unsupported)
+
+    mods = { 'EdgeCheck' => e::EdgeCheck, 'GrainCheck' => e::GrainCheck,
+             'DirectionCheck' => e::DirectionCheck }
+    unless mods.values.all? { |m| m.available?(model) }
+      ok('H11b: Overlay API je v SketchUpe 2026 dostupne', false)
+      return
+    end
+    mods.each do |name, mod|
+      mod.disable! if mod.instance_variable_get(:@overlay)
+      st = mod.enable!(model)
+      ok("H11b #{name}: zapnutie bez poistiek kresli (active)", st['active'] == true && mod.active?(model))
+    end
+    ok('H11b HoverEdge: overlay hrany sa zaregistroval', e::HoverEdge.ensure_overlay(model) == true)
+    list = model.overlays.to_a
+    ok("H11b: vsetky prekrytia v modeli maju overlay_id aj enabled? (#{list.length} ks)",
+       !list.empty? && list.all? { |o| o.respond_to?(:overlay_id) && o.respond_to?(:enabled?) })
+    ours = list.select do |o|
+      [e::EdgeCheck::OVERLAY_ID, e::GrainCheck::OVERLAY_ID, e::DirectionCheck::OVERLAY_ID].include?(o.overlay_id.to_s)
+    end
+    ok("H11b: tri prekrytia kontrol su zaregistrovane a zapnute (#{ours.length})",
+       ours.length == 3 && ours.all? { |o| o.enabled? == true })
+    # Druhe zapnutie ide cez `drop_registered` (filter podla `overlay_id` bez poistky).
+    mods.each do |name, mod|
+      st = mod.enable!(model)
+      ok("H11b #{name}: opatovne zapnutie (drop_registered) necha prave jedno prekrytie",
+         st['active'] == true &&
+           model.overlays.to_a.count { |o| o.overlay_id.to_s == mod::OVERLAY_ID } == 1)
+    end
+    mods.each do |name, mod|
+      mod.disable!
+      ok("H11b #{name}: vypnutie prekrytie z modelu odstranilo",
+         mod.active?(model) == false && model.overlays.to_a.none? { |o| o.overlay_id.to_s == mod::OVERLAY_ID })
+    end
+    e::HoverEdge.release
+    ok('H11b HoverEdge: uvolnenie odstranilo overlay hrany',
+       model.overlays.to_a.none? { |o| o.overlay_id.to_s == e::HoverEdge::OVERLAY_ID })
+  rescue StandardError => ex
+    log_line("FAIL: H11b vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  ensure
+    Array(mods && mods.values).each do |m|
+      begin
+        m.disable! if m.instance_variable_get(:@overlay)
+      rescue StandardError
+        nil
+      end
+    end
+    begin
+      e::HoverEdge.release
+    rescue StandardError
+      nil
+    end
+  end
+
   # Vykon: postavi ~40 skriniek so 6 celami (≈250 dielcov) a zmeria ZAPNUTIE
   # (sken celej zakazky) + prvy prepocet payloadu. Cielom je < 300 ms; ked
   # sa cislo zhorsi, sken sa musi optimalizovat.
@@ -28355,6 +28426,7 @@ module NoxunSuRunner
     run_kovb3(model)          # KOV-B3: editor setu — zivy nahlad NIC nezapisuje (ani krok Spat), ulozenie setu bez kroku Spat, DVE OKNA nad tym istym setom = konflikt s hlaskou (nie tichy prepis) + vedoma obnova, legacy set „nezaradeny" a nakup nezmeneny, neaktivny sa uz nenuka
     run_kova2b(model)        # KOV-A2b: smer otvarania v modeli — lifecycle overlayu, symbol na spravnom kridle a prednej ploche, prestavba/Spat, dup-ID per instancia, vykon
     run_h3b(model)           # H3b/A-06: overlay zneplatneny ako po File/New — opatovne zapnutie bez chyby v logu (smer otvarania, hrany, kresba), zivy dokument sa vypina ako doteraz
+    run_h11b(model)          # H11b/F-02: verzia SketchUpu (version_number vs. retazec), kontrola minima pusti 2026, styri prekrytia bez verzijnych poistiek (overlay_id + enabled?, zapnutie/opatovne zapnutie/vypnutie)
     run_tools1(model)        # NASTROJE-1 (T1a): Mower + Snaper v baliku enginu (kopia cez sev, rotacie/Z ako 1 krok Spat, odmietnutia bez operacie, bariera observera, Snaper a viditelnost)
     run_tools1b(model)       # NASTROJE-1 (T1b): boot migracia starych instalacii — docasny Plugins strom (styri ciele, marker per cesta, druhy beh = no-op) + dokaz, ze boot hook upratal ZIVU instalaciu
     run_kovc2b(model)        # KOV-C2b: zasuvky z receptu — dielce v modeli 1:1 s planom, JEDNA polozka vysuvu, prestavba (ina hlbka/vyska = ina NL/variant, ziadna duplicita, part_overrides prezijú), 1 krok Spat, kopia a sablona nesu pripnuty recept, plytka skrinka = ziadne dielce + RED + export zastaveny s PRAZDNYM priecinkom
