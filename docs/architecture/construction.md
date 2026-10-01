@@ -16,7 +16,8 @@ Plánovač, buildery, strom zón, modulové výpočty (police, čelá), kontrakt
 **vlastnosti**; jadro (`cabinet_builder`, `construction`, `scale_observer`, `appliance_binding`, `appliance_checks`, `bom`, `direction_check`, `templates`,
 `ghost_tool`) sa pýta **vlastnosti, nie mena typu** — pravidlo „**jedna vlastnosť na miesto**", nová podmienka dáva presne tú istú množinu typov ako stará
 (matica 7 vstupov `lower upper dishwasher corner_blind tall nil ''` v `test_h12a_register.rb` a golden `test_h12_golden.rb`). Čistý modul bez IO a SketchUpu;
-načíta sa hneď za `build_plan` — **pred** `construction`, `hardware_rules` aj `cabinet_builder`, ktoré z neho berú aliasy pri načítaní (guard poradia v `main.rb`).
+načíta sa hneď za `build_plan` — **pred** `construction` (`CORNER_TYPE`), `scale_observer` (`MIN_BY_TYPE`) a `cabinet_builder` (`TYPES`, `CORNER_TYPE`,
+`UPPER_HANG_Z`, `DW_*_RANGE`), ktoré z neho berú aliasy už pri načítaní (guard poradia v `main.rb`; `hardware_rules` register nepoužíva).
 
 - **`REGISTRY`** (zmrazený `id => props`, poradie `IDS` = `lower upper dishwasher corner_blind`), kľúče každého typu (`KEYS`, invariant T1): `id` · `label`
   (Dolná/Horná/Umývačka/Rohová) · `word` (= `label` malým, slovo do viet) · `auto_name` (`Spodná skrinka %{w}`, `Horná skrinka %{w}`, `Umývačka %{dw} (slot)`,
@@ -285,6 +286,7 @@ alebo vyhľadávania náhrad podľa podobného mena. Čistenie nepoužívaných 
 !carcass?`, šírku/výšku slotu klampuje `limits`, `floor_height`/`plinth_mode` vynúti pri `!on_floor?`, rohovú pri `corner?`; `cabinet_config` zapisuje polia typu
 z `EXTRA_KEYS_BY_TYPE.fetch(type, [])` (poradie kľúčov bez zmeny) a komín/lišty pri `carcass?`; `legacy_plinth` = `hangs?`; `config_to_params` nechýbajúci typ
 dopĺňa `CabinetTypes::FALLBACK`. **Bajty plánu, configu a výstupov sa nemenia** (golden `test_h12_golden.rb` + in-SU `run_h12`).
+
 **ROH-A1 · K3 (v0.14.1, `CONFIG_SCHEMA` 22) — TYP `corner_blind`.** `TYPES` = `lower upper dishwasher corner_blind` (od H12a alias registra; JS zrkadlá `CAB_TYPES`/`INSERT_TYPES`),
 `CORNER_DEFAULTS` = `LOWER_DEFAULTS` + šírka 1100 + informatívny jeden riadok dvierok + polia rohovej. **Polia `CORNER_KEYS`** (`corner_side`, `corner_door_w`,
 `corner_cr1`, `corner_cr2`) idú jedným zoznamom cez `normalize` (`norm_corner`: strana enum `CORNER_SIDES`, rozmery **prísne** cez `SETBACK_NUM_RE` — nečíslo /

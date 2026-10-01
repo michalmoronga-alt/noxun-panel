@@ -32,8 +32,9 @@
   rozpočet, Kontrola) zachytený na nezmenenom kóde do `insu.json` a po refaktore **bajtovo rovnaký**. Guardy `test_h12a_register.rb`: invarianty a `client_payload`
   (fixtúra `h12_cabinet_types.json` — kontrakt pre H12b/c), matica predikátov, **žiadne nové vetvenie podľa mena v `core/` a `modules/`** (allowlist s dôvodom),
   `DEFAULTS_BY_TYPE` = `IDS`, **CN-03** (visiace typy = `cabinet_type` seedu závesov) a poradie načítania. T4: `test_s1e_slot.rb` číta minimá scale paritou
-  (`ScaleWatch.min_for`) namiesto regexu nad zdrojom. **Mutácie M1–M5, M7–M14, M17–M19 (16/16) zabité.** **Testy:** 5121 headless (lokálne 1 známy pád
-  `test_h11b_minimum` len pri CRLF checkoute) · 151 JS sád · encoding guard; in-SU **3343 / 0** na `f5dd4a44`. Predrecenzia povinná (nový modul, výrobná, > 300 riadkov).
+  (`ScaleWatch.min_for`) namiesto regexu nad zdrojom. **Mutácie 16/16 zabité:** M1–M5 a M7–M14 podľa package §7 T5 (M6, M15, M16 sú JS/H12d)
+  + tri navyše M17 (`support_type` cez `hangs?`), M18 (`legacy_plinth` cez `on_floor?`), M19 (nové `== 'upper'` v `bom.rb`). **Testy:** 5122 headless · 151 JS sád · encoding guard
+  (nesúvisiaca oprava: `test_h11b_minimum` normalizuje konce riadkov — padal lokálne na CRLF checkoute); in-SU **3343 / 0** na `f5dd4a44`. Predrecenzia povinná (nový modul, výrobná, > 300 riadkov).
   STAV pred dávkou: v0.17.10 · H11b hotová · Robí sa H6/H7 (mockupy), H11a · Ďalší krok H11a, potom H12–H17.
 
 - **H11b · minimum SketchUp 2026 (1.10.2026, PR #445, v0.17.10, blok 9 · HARDENING PO V1, triedenie F-02; package

@@ -452,7 +452,7 @@ Sketchup.require 'noxun_engine/core/ids'
 Sketchup.require 'noxun_engine/core/store'
 Sketchup.require 'noxun_engine/core/part_keys' # stabilna identita dielcov pre override a buduce vystupy
 Sketchup.require 'noxun_engine/core/build_plan' # zavazny kontrakt planu (validator, warnings, hardware)
-Sketchup.require 'noxun_engine/core/cabinet_types' # H12a: register typov skrinky (pred construction, hardware_rules a cabinet_builder — beru z neho aliasy)
+Sketchup.require 'noxun_engine/core/cabinet_types' # H12a: register typov skrinky (pred construction, scale_observer a cabinet_builder — pri nacitani z neho beru CORNER_TYPE, MIN_BY_TYPE, TYPES a dalsie aliasy)
 Sketchup.require 'noxun_engine/core/part_faces' # D-88: kontrakt hrana -> plocha kvadra (pred vsetkymi tvorcami deskriptorov)
 Sketchup.require 'noxun_engine/core/json_file_store' # cache + bezpecny atomicky zapis JSON katalogov
 Sketchup.require 'noxun_engine/core/dim_series'  # UI-B3 (N6): rozmerove rady panela (%APPDATA%, nastavenie pocitaca)

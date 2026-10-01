@@ -20,8 +20,9 @@
 # neznamy ostava).
 #
 # CISTY modul: ziadne IO, ziadny SketchUp. Nacitava sa hned za `build_plan`
-# (pred `construction`, `hardware_rules` aj `cabinet_builder` — tie z neho
-# berú aliasy pri nacitani; poradie strazi guard).
+# (pred `construction` — `CORNER_TYPE`, `scale_observer` — `MIN_BY_TYPE`
+# a `cabinet_builder` — `TYPES`, `CORNER_TYPE`, `UPPER_HANG_Z`, `DW_*_RANGE`;
+# tie z neho beru aliasy uz pri nacitani; poradie strazi guard).
 module Noxun
   module Engine
     module CabinetTypes

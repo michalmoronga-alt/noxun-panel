@@ -20,7 +20,11 @@
 # 'upper'` · M5 `norm` neznamy ponecha · M7 `limits` slotu 200 · M8 `corner_blind
 # zones tree` · M9 `dishwasher template_type switchable` · M10 `type_locked false`
 # pri rohovej · M11 `appliance_owner cabinet` pri slote · M12 `fronts free` pri
-# slote · M13 `corner_blind hang_z 1400` bez seedu · M14 poradie `EXTRA_KEYS`.
+# slote · M13 `corner_blind hang_z 1400` bez seedu · M14 poradie `EXTRA_KEYS`
+# (package §7 T5; M6, M15, M16 su JS/H12d — mimo H12a). Navyse nad package:
+# M17 `support_type` cez `hangs?` namiesto `on_floor?` · M18 `legacy_plinth`
+# cez `on_floor?` namiesto `hangs?` · M19 nove `== 'upper'` v `bom.rb`.
+# Spolu 16 mutacii, kazda zhodi aspon jeden test (golden alebo tento subor).
 require_relative '../helper' unless defined?(NxTest)
 require 'json'
 
@@ -47,12 +51,17 @@ module NxH12a
   # a `modules/` (panel `ui/` pribudne v H12b). Register sam je vynimka.
   SCAN_DIRS = %w[core modules].freeze
   NAME = '(?:lower|upper|dishwasher|corner_blind)'
+  # Formy vetvenia (predrecenzia H12a P3: aj symboly, `eql?`, pole s
+  # `include?`, `when` s viacerymi hodnotami a mapa `{ 'upper' => … }[t]`).
   BRANCH_RES = [
-    /(?:==|!=)\s*['"]#{NAME}['"]/,
-    /['"]#{NAME}['"]\s*(?:==|!=)/,
-    /\bwhen\s+['"]#{NAME}['"]/,
+    /(?:==|!=|===)\s*(?:['"]|:)#{NAME}\b/,
+    /['"]#{NAME}['"]\s*(?:==|!=|===)/,
+    /\bwhen\b[^\n]*(?:['"]|:)#{NAME}\b/,
     /%w\[[^\]]*\b#{NAME}\b[^\]]*\]/,
-    /include\?\(\s*['"]#{NAME}['"]\s*\)/,
+    /\[[^\]]*['"]#{NAME}['"][^\]]*\]\s*\.\s*include\?/,
+    /include\?\(\s*(?:['"]|:)#{NAME}\b/,
+    /\.eql\?\(\s*(?:['"]|:)#{NAME}\b/,
+    /['"]#{NAME}['"]\s*=>/,
     /\|\|\s*['"]#{NAME}['"]/,
     /\bCORNER_TYPE\b/
   ].freeze
@@ -60,7 +69,12 @@ module NxH12a
   # LEN s dovodom — inak patri vlastnost do registra.
   ALLOW = [
     ['core/appliance_binding.rb', 'SLOT_EXPECTS = %w[dishwasher]', 'kategoria SPOTREBICA (umyvacka), nie typ skrinky'],
+    ['core/appliance_binding.rb', "'dishwasher' => [KIND_SLOT]", 'OWNER_MATRIX: kategoria spotrebica -> vlastnik'],
     ['core/appliance_catalog.rb', 'CATEGORIES = %w[', 'kategorie spotrebicov katalogu'],
+    ['core/appliance_catalog.rb', "'dishwasher' =>", 'popisky a polia KATEGORIE spotrebica'],
+    ['core/cabinet_builder.rb', "'lower' => LOWER_DEFAULTS, 'upper' => UPPER_DEFAULTS", 'mapa DEFAULTS_BY_TYPE (paritny guard)'],
+    ['core/cabinet_builder.rb', "'dishwasher' => DISHWASHER_DEFAULTS", 'mapa DEFAULTS_BY_TYPE (paritny guard)'],
+    ['core/cabinet_builder.rb', "EXTRA_KEYS_BY_TYPE = { 'dishwasher' => DW_KEYS", 'mapa EXTRA_KEYS_BY_TYPE (paritny guard)'],
     ['core/construction.rb', "r['category'].to_s == 'dishwasher'", 'kategoria spotrebica vo vazbe slotu'],
     ['core/construction.rb', 'CORNER_TYPE = CabinetTypes::CORNER', 'alias registra'],
     ['core/cabinet_builder.rb', 'CORNER_TYPE = CabinetTypes::CORNER', 'alias registra'],
@@ -75,6 +89,11 @@ module NxH12a
     return '' if s.start_with?('#')
 
     line.sub(/\s#\s.*\z/, '')
+  end
+
+  def branch?(line)
+    code = code_part(line)
+    BRANCH_RES.any? { |re| code.match?(re) }
   end
 
   def branch_hits
@@ -179,6 +198,36 @@ NxTest.test('H12a T3a: v Ruby jadre nie je nove vetvenie podla MENA typu (len vl
   NxTest.assert(hits.empty?,
                 "vetvenie podla mena typu mimo registra (pridaj vlastnost do CabinetTypes::REGISTRY, alebo " \
                 "riadok do ALLOW s dovodom): #{hits.first(5).join(' | ')}")
+end
+
+NxTest.test('H12a T3a: guard chyti kazdu formu vetvenia podla mena a nehlasi falosne poplachy') do
+  caught = [
+    "return 'none' if cfg[:type] == 'upper'",
+    "slot = type != \"dishwasher\"",
+    "'corner_blind' == t",
+    "x if t == :upper",
+    "when 'upper' then 1",
+    "when 'lower', 'dishwasher' then 2",
+    'when :corner_blind',
+    "%w[lower upper].include?(t)",
+    "['upper', 'dishwasher'].include?(t)",
+    "LIST.include?('upper')",
+    "t.eql?('dishwasher')",
+    "z = { 'upper' => 1400.0 }[t]",
+    "t = cfg['type'] || 'lower'",
+    'CORNER_TYPE == t'
+  ]
+  caught.each { |l| NxTest.assert(NxH12a.branch?(l), "guard nechytil: #{l}") }
+  clean = [
+    "# komentar: == 'upper' sa tu len spomina",
+    "tpl('Umyvacka', { 'type' => 'dishwasher', 'width' => 600.0 })",
+    'CabinetTypes.hangs?(cfg[:type])',
+    "when 'lift' then SYM_UP",
+    "x = :lower_bound",
+    "label = 'Horná skrinka'",
+    "r = cfg[:type] # pozri == 'upper' v komentari"
+  ]
+  clean.each { |l| NxTest.refute(NxH12a.branch?(l), "falosny poplach: #{l}") }
 end
 
 NxTest.test('H12a T3a: allowlist guardu nie je mrtvy (kazda vynimka ma svoj riadok)') do
