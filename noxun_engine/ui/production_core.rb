@@ -1656,7 +1656,7 @@ module Noxun
         miss = unpriced_count(budget)
         return [] unless miss.positive?
 
-        ["#{miss} riadkov rozpočtu nemá cenu — suma je PODHODNOTENÁ (položky v dokumente sú, v cene nie)"]
+        ["#{miss} riadkov rozpočtu nemá cenu — suma je podhodnotená (položky v dokumente sú, v cene nie)"]
       end
 
       # Klient nie je ochrana: `confirm_unpriced` sa ZO SERVERA overuje pri

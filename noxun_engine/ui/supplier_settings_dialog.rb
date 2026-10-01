@@ -266,7 +266,7 @@ module Noxun
           # nanovo"), takze sa vetvi rovnako ako potvrdzujuca (dlh 1b-A).
           refresh_and_report('Nastavenia sa medzitým zmenili — formulár je načítaný nanovo. ' \
                              'Skontroluj hodnoty a ulož znova.',
-                             'Nastavenia sa medzitým zmenili, takže sa NIČ neuložilo — ' \
+                             'Nastavenia sa medzitým zmenili, takže sa nič neuložilo — ' \
                              'a formulár sa nepodarilo načítať nanovo. Klikni na ' \
                              '„Obnoviť" v lište sekcie a hodnoty zadaj znova.',
                              ok_error: true)
@@ -309,7 +309,7 @@ module Noxun
           # nastaveni a rozpisane hodnoty ZAHADZUJE; bez mena sekcie by clovek
           # siahol po nom.
           refresh_and_report('Nastavenia uložené. Rozpočet je prepočítaný.',
-                             'Nastavenia sú ULOŽENÉ, ale rozpočet sa NEPREPOČÍTAL — ' \
+                             'Nastavenia sú uložené, ale rozpočet sa neprepočítal — ' \
                              'čísla Rozpočtu môžu byť staré. Otvor sekciu Rozpočet ' \
                              'a klikni na Obnoviť.')
         end

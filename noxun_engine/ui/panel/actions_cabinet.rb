@@ -706,7 +706,7 @@ module Noxun
           # Stara session konci PRED vznikom novej (druhe „Vlozit" = novy
           # snapshot); `GhostTool.start` to robi ako prvy krok.
           s = GhostTool.start(model, plan, hardware: hw, template_ref: tpl_ref, note: note, keep_point: keep_point)
-          return set_status('Ghost vkladanie sa nepodarilo spustiť — skús to znova.', true) if s.nil?
+          return set_status('Vkladanie sa nepodarilo spustiť — skús to znova.', true) if s.nil?
 
           # Poznamku preflightov (D-45 prevzata hrubka, materialove noty)
           # vypisuje AZ `ghost_after_commit` — pri stlaceni „Vlozit" sa este

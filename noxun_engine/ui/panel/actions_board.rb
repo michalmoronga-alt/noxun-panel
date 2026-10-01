@@ -68,7 +68,7 @@ module Noxun
           # karta ju nastavuje pri kazdej materializacii, aj zo sablony.
           if GhostTool.start(model, plan, template_ref: tpl_ref, subject: :board,
                                           orientation: plan.orientation).nil?
-            return set_status('Ghost vkladanie sa nepodarilo spustiť — skús to znova.', true)
+            return set_status('Vkladanie sa nepodarilo spustiť — skús to znova.', true)
           end
           set_status('Doska visí na kurzore — klikni, kam ju položiť. ' \
                      'Šípky ←/→ otáčajú, ↑/↓ menia umiestnenie, Alt prepína kotvu, Esc zruší.')
@@ -118,7 +118,7 @@ module Noxun
           end
           set_status("#{draw_locks_note(locks)}Klikni počiatok dosky · potom ťahaj dĺžku a šírku " \
                      '(číslo + Enter, prázdny Enter = hodnota karty) · ←/→ a ↑/↓ menia smer a ' \
-                     'umiestnenie PRED prvým klikom · Esc zruší.')
+                     'umiestnenie pred prvým klikom · Esc zruší.')
         end
 
         # Zamky do statusu — pouzivatel musi vediet, ze sa faza preskoci.

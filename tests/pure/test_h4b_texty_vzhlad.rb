@@ -176,6 +176,55 @@ NxTest.test('H4b · D-09: ikony navigacie jedinecne, sliders-horizontal v spritu
   NxTest.assert(sec4.include?('`sliders-horizontal`'), 'inventar UI_DIZAJN §4 pozna sliders-horizontal')
 end
 
+# Predrecenzia P3: stavove hlasky z Ruby (status okna, nalezy Kontroly) su tiez
+# UI texty. Rozsah = retazce v hovore `set_status(`, `warn_item(`, `err_item(`,
+# `ok_item(`, `refresh_and_report(` a v riadkoch s `message_sk` (vratane
+# pokracovacich riadkov viacriadkoveho hovoru). Interpolacia `#{...}` sa
+# vyhodi (je to kod, nie text); katalogove a logovacie texty sa neskenuju.
+module NxH4bRuby
+  TRIG = /set_status\(|warn_item\(|err_item\(|ok_item\(|refresh_and_report\(|message_sk/.freeze
+  CAPS_OK = %w[ABS UNI VEPO NOXUN XLSX CSV DPH SPOLU MAX].freeze
+
+  def self.status_strings
+    out = []
+    Dir[File.join(NxH4b::ROOT, '**', '*.rb')].sort.each do |f|
+      lines = File.readlines(f, encoding: 'UTF-8')
+      lines.each_with_index do |ln, i|
+        next if ln.strip.start_with?('#') || ln !~ TRIG
+
+        j = i
+        loop do
+          l = lines[j].to_s
+          break if j > i && l.strip.start_with?('#')
+
+          l.scan(/'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)"/).each do |a, b|
+            s = (a || b).gsub(/#\{[^}]*\}/, ' ')
+            out << ["#{f.sub("#{NxH4b::ROOT}/", '')}:#{j + 1}", s] if s =~ /\p{Ll}/
+          end
+          break unless l.rstrip.end_with?('\\', ',', '(', '+') && j < i + 5
+
+          j += 1
+        end
+      end
+    end
+    out
+  end
+end
+
+NxTest.test('H4b (predrecenzia P3): stavove hlasky z Ruby bez zargonu a VELKYCH pismen') do
+  strs = NxH4bRuby.status_strings
+  NxTest.assert(strs.size > 200, "sken nasiel stavove hlasky (#{strs.size})")
+  NxTest.assert(strs.any? { |_w, s| s.include?('vkladaná skrinka sadne na túto výšku') }, 'sken vidi aj viacriadkove hovory')
+  strs.each do |where, s|
+    NxTest.refute(s.match?(/\bghost\w*|\bseed\b|\blegacy\b|\bserver\w*/i), "#{where}: zargon v hlaske „#{s[0, 80]}“")
+    NxTest.refute(s.include?('Načítať nanovo'), "#{where}: „Načítať nanovo“ je od H4b „Obnoviť“")
+    loud = s.scan(/(?<![\p{L}\d_-])(\p{Lu}{3,})(?![\p{L}\d_-])/).flatten - NxH4bRuby::CAPS_OK
+    NxTest.assert(loud.empty?, "#{where}: kričí #{loud.inspect} v „#{s[0, 80]}“")
+  end
+  NxTest.refute(NxH4b.src('core/supplier_settings.rb').include?('Načítať nanovo'),
+                'veta nečitateľného súboru nastavení radí „Obnoviť“')
+end
+
 NxTest.test('H4b: Ruby zmeny su LEN zobrazovacie texty') do
   NxTest.assert(NxH4b.src('core/tags.rb').include?("'label' => 'Zóny (obrysy)'"), 'popisok tagu')
   NxTest.assert(NxH4b.src('core/tags.rb').include?("'key' => 'zony'"), 'KLUC tagu sa nemeni (identita v modeli)')
