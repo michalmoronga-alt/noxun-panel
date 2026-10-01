@@ -36,7 +36,11 @@
   (panel 14, štúdio 27), inštancia skončila sama s kódom 0; `-Shoot` 29 PNG (19 okien + obrázok modelu, 0 s problémom); `-Shoot` nad nahrávkou
   prototypu aj test chyby (zmazaná značka + rozbitý skript → 2 karty CHYBA s červeným pásom). Dokumentácia: [CLAUDE.md](../../CLAUDE.md) sekcia
   Testovanie odsek „Fotenie okien (UI dávky)" + veta v riadku UI tabuľky povinného čítania; odsek v `docs/architecture/` nevznikol (testovacie
-  nástroje tam nemajú kapitolu — hlavička skriptu je autorita).
+  nástroje tam nemajú kapitolu — hlavička skriptu je autorita). **Review #434 (kolo 1, 4× P2):** každé zlyhanie nahrávky po koncovom markeri
+  SketchUp zavrie (aj zlyhaný `load` v boot.rb); predvolená nahrávka pre `-Shoot` je len tá s markerom úspechu `NAHRAVKA_OK.txt` (zapisuje sa až
+  po validácii; výber a `-Only` sú v `scripts\ui_foto\lib.ps1`, testované cez pwsh); prehrávač posiela report aj po ustálení (6 s) a pri každej
+  neskorej chybe prekreslí pás (rozpočet virtuálneho času Chrome 9,5 s); výstup `shots_<čas>_<PID>` pre súbežné behy. Po oprave headless 4920 PASS / 0 FAIL, 146 JS sád,
+  `-Shoot` nad overenou nahrávkou 29 PNG bez problému, neskorá chyba (časovač 2 s) → karta CHYBA s pásom.
 
 - **DOCS — H1 · pravidlá čítania pre agentov (1.10.2026, PR #433, blok 9 · HARDENING PO V1, len dokumentácia; verzia pluginu sa nemení).** Položky krížového
   auditu **B-01, B-04, B-08, B-09**. **B-01:** tabuľka „Povinné čítanie" v [CLAUDE.md](../../CLAUDE.md) pri každom súbore nad ~50 kB menuje kapitolu alebo odsek

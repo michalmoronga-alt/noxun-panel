@@ -11,7 +11,7 @@
 #                        do repa), spusti lokalny server (python, len 127.0.0.1) a headless
 #                        Chrome (fallback Edge) -> PNG: Inspector 486x850, Studio 1280x800,
 #                        k tomu verzia "_long" na celu vysku obsahu + index.html
-#                        kontaktny harok. Vystup %TEMP%\noxun_ui_foto\shots_<cas>\.
+#                        kontaktny harok. Vystup %TEMP%\noxun_ui_foto\shots_<cas>_<PID>\.
 #   -Record              NOVA nahravka v SketchUpe overenou sluckou runnera
 #                        (SketchUp.exe -RubyStartup boot.rb <KOPIA _dev\ENGINEtests.skp>):
 #                        deploy pluginu z tohto checkoutu, ukazkova kuchyna zo sablon,
@@ -48,6 +48,10 @@ $tool = Join-Path $PSScriptRoot 'ui_foto'
 $fotoRoot = Join-Path $env:TEMP 'noxun_ui_foto'
 New-Item -ItemType Directory -Force -Path $fotoRoot | Out-Null
 $utf8 = New-Object System.Text.UTF8Encoding($false)
+. (Join-Path $tool 'lib.ps1')  # Find-NxLatestRec, Select-NxShots, Set-NxRecOk
+# Fotka sa robi na konci virtualneho casu Chrome; prehravac posiela finalny report po
+# SETTLE_MS (6000 ms, nx_stub.js) od prehrania - rozpocet musi byt s rezervou dlhsi.
+$NxVirtualBudgetMs = 9500
 
 function Get-NxVersion {
   $t = [System.IO.File]::ReadAllText((Join-Path $repo 'noxun_engine.rb'), $utf8)
@@ -218,6 +222,9 @@ rescue ScriptError, StandardError => ex
   rescue StandardError
     nil
   end
+  # Codex #434 P2: po markeri skript uvolni zamok - instancia nesmie ostat visiet.
+  # Model sa nezmenil (record.rb sa ani nenacital), quit sa teda nepyta.
+  UI.start_timer(2.0, false) { Sketchup.quit }
 end
 '@
     $bootText = $bootText.Replace('__APPDATA__', (ConvertTo-RubySq $appdata)).Replace('__REC__', (ConvertTo-RubySq $recDir))
@@ -259,6 +266,8 @@ end
       Write-Host "VYSLEDOK NAHRAVKY: $failed FAIL - nahravka nie je pouzitelna."
       return $res
     }
+    # Marker uspechu AZ PO validacii - len taka nahravka moze byt predvolena pre -Shoot.
+    Set-NxRecOk $recDir ('OK {0} PID={1}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $PID)
     Write-Host ('VYSLEDOK NAHRAVKY: OK -> ' + $recDir)
     $res.code = 0
     $res.rec = $recDir
@@ -284,33 +293,12 @@ function Find-NxBrowser {
   return ''
 }
 
-function Find-NxLatestRec {
-  $d = Get-ChildItem $fotoRoot -Directory -Filter 'rec_*' -ErrorAction SilentlyContinue |
-    Where-Object { Test-Path (Join-Path $_.FullName 'index.json') } |
-    Sort-Object LastWriteTime -Descending | Select-Object -First 1
-  if ($d) { return $d.FullName }
-  return ''
-}
-
 function Get-NxFreePort {
   $l = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, 0)
   $l.Start()
   $port = $l.LocalEndpoint.Port
   $l.Stop()
   return $port
-}
-
-# -Only: ciarkou/medzerou oddelene id alebo vzory (studio_*). Prazdne = vsetko.
-function Select-NxShots($shots, [string]$only) {
-  $pats = @($only -split '[,;\s]+' | Where-Object { $_ })
-  if ($pats.Count -eq 0) { return @($shots) }
-  $sel = @($shots | Where-Object { $id = $_.id; @($pats | Where-Object { $id -like $_ }).Count -gt 0 })
-  foreach ($p in $pats) {
-    if (@($shots | Where-Object { $_.id -like $p }).Count -eq 0) {
-      throw ("-Only: '" + $p + "' nezodpoveda ziadnej fotke. Platne id: " + (($shots | ForEach-Object { $_.id }) -join ', '))
-    }
-  }
-  return $sel
 }
 
 function Stop-NxBrowserTree([string]$profileDir) {
@@ -322,9 +310,9 @@ function Stop-NxBrowserTree([string]$profileDir) {
 }
 
 function Invoke-NxShoot([string]$recDir) {
-  if (-not $recDir) { $recDir = Find-NxLatestRec }
+  if (-not $recDir) { $recDir = Find-NxLatestRec $fotoRoot }
   if (-not $recDir -or -not (Test-Path $recDir)) {
-    Write-Host 'CHYBA: ziadna nahravka - spusti najprv: scripts\ui_foto.ps1 -Record (alebo zadaj -Rec <priecinok>).'
+    Write-Host 'CHYBA: ziadna USPESNA nahravka - spusti najprv: scripts\ui_foto.ps1 -Record (alebo zadaj -Rec <priecinok>).'
     return 1
   }
   $recDir = (Resolve-Path $recDir).Path
@@ -336,13 +324,13 @@ function Invoke-NxShoot([string]$recDir) {
 
   $cfg = Read-NxJson (Join-Path $tool 'shots.json')
   $allShots = @($cfg.shots)
-  try { $shots = Select-NxShots $allShots $Only } catch { Write-Host ('CHYBA: ' + $_.Exception.Message); return 1 }
+  try { $shots = @(Select-NxShots $allShots $Only) } catch { Write-Host ('CHYBA: ' + $_.Exception.Message); return 1 }
 
   Clear-NxOld 'site_*' 1
   Clear-NxOld 'chrome_*' 1
   Clear-NxOld 'shots_*' 14
   $stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
-  $outDir = Join-Path $fotoRoot ('shots_' + $stamp)
+  $outDir = Join-Path $fotoRoot ('shots_{0}_{1}' -f $stamp, $PID)
   $site = Join-Path $fotoRoot ('site_{0}_{1}' -f $stamp, $PID)
   $prof = Join-Path $fotoRoot ('chrome_{0}_{1}' -f $stamp, $PID)
   $reports = Join-Path $site '_reports'
@@ -418,7 +406,15 @@ function Invoke-NxShoot([string]$recDir) {
       $status = 'ok'
       if (-not $ok) { $status = 'err'; $errs += 'Chrome nevytvoril fotku.' }
       if (-not $rep) { if ($status -eq 'ok') { $status = 'none' } }
-      elseif (@($rep.errors).Count -gt 0) { $status = 'err'; $errs += @($rep.errors | ForEach-Object { [string]$_ }) }
+      else {
+        if (@($rep.errors).Count -gt 0) { $status = 'err'; $errs += @($rep.errors | ForEach-Object { [string]$_ }) }
+        # Report sa posiela aj po ustaleni (SETTLE_MS v nx_stub.js) a pri kazdej neskorej
+        # chybe. Ked prisiel LEN stav po prehrani, stranka nedobehla do ustalenia pred
+        # fotkou - jej obsah (a pripadne neskore chyby) nie je overeny (Codex #434 P2).
+        if (@('settled', 'late') -notcontains [string]$rep.stage) {
+          $status = 'err'; $errs += ('prehravac nedobehol do ustalenia pred fotkou (stav: ' + [string]$rep.stage + ')')
+        }
+      }
       $long = $null
       if ($ok -and $rep -and ([int]$rep.height -gt ($h + 24))) {
         $lh = [Math]::Min([int]$rep.height + 16, 12000)
@@ -467,7 +463,7 @@ function Invoke-NxChrome([string]$browser, [string]$prof, [string]$url, [int]$w,
   if (Test-Path $png) { Remove-Item $png -Force -Confirm:$false }
   $a = @('--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--no-default-browser-check',
          '--disable-extensions', '--disable-sync', '--mute-audio', "--user-data-dir=`"$prof`"",
-         "--window-size=$w,$h", '--virtual-time-budget=8000', "--screenshot=`"$png`"", "`"$url`"")
+         "--window-size=$w,$h", ('--virtual-time-budget={0}' -f $NxVirtualBudgetMs), "--screenshot=`"$png`"", "`"$url`"")
   $p = Start-Process -FilePath $browser -ArgumentList $a -PassThru -WindowStyle Hidden
   if (-not $p.WaitForExit(90000)) {
     Stop-NxBrowserTree $prof

@@ -107,7 +107,22 @@ module NoxunUiFoto
       UI.start_timer(3.0, false) { run_step(steps, 0) }
     rescue StandardError => ex
       bad("start: #{ex.class}: #{ex.message}")
+      end_and_close
+    end
+
+    # Koncovy marker + samozatvorenie VZDY spolu (Codex #434 P2): po markeri ui_foto.ps1
+    # zmaze sentinel a uvolni deploy.lock — instancia, ktora by po chybe ostala zit,
+    # by uz dalsiemu deployu nebranila. Pouziva ju kazda cesta, ktora marker pise.
+    def end_and_close
       line(MARKER)
+      return if @closing
+
+      @closing = true
+      begin
+        UI.start_timer(2.0, false) { close_and_quit }
+      rescue StandardError
+        quit_now
+      end
     end
 
     def run_step(steps, idx)
@@ -276,11 +291,10 @@ module NoxunUiFoto
         bad('nahravka nema ziadny skript Inspectora') if n_panel.zero?
         bad('nahravka nema ziadny skript Studia') if n_studio.zero?
       end
-      line(MARKER)
-      UI.start_timer(2.0, false) { close_and_quit }
+      end_and_close
     rescue StandardError => ex
       bad("finish: #{ex.class}: #{ex.message}")
-      line(MARKER)
+      end_and_close
     end
 
     # --- samozatvorenie (vzor -CloseWhenDone v scripts/run_su_tests.ps1) ---
@@ -311,6 +325,8 @@ module NoxunUiFoto
           nil
         end
       end
+      Sketchup.quit
+    rescue StandardError
       Sketchup.quit
     end
   end

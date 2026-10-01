@@ -44,4 +44,30 @@ eq(r.files, ['0002_studio.js', '0003_studio.js'], 'zoradene podla cisla, cudzie 
 eq(select(list, 'studio_bom', 'panel').files.every(f => f.endsWith('_panel.js')), true, 'kind panel v studiovej sekcii');
 eq(select(null, 'studio_bom', 'studio'), { files: [], found: false, marks: [] }, 'null zoznam');
 
+// Report a pas (Codex #434 P2): chyba z odlozeneho callbacku PO prehrani sa musi dostat
+// do reportu aj do pasu vo fotke — nie ostat v starom „ok" reporte.
+const { makeReporter, SETTLE_MS } = require(path.join(__dirname, '..', '..', 'scripts', 'ui_foto', 'nx_stub.js'));
+const posts = [];
+const banners = [];
+const rep = makeReporter({ shot: 'studio_cut', height: 0 }, { post: p => posts.push(p), banner: e => banners.push(e) });
+rep.add('chyba pocas prehravania sa len zbiera');
+eq(posts.length, 0, 'pred prehranim sa nic neposiela');
+rep.errors.length = 0; // ciste prehranie
+rep.replayed(800);
+eq(posts.map(p => [p.stage, p.errors.length]), [['replay', 0]], 'ciste prehranie: report bez chyb, bez pasu');
+eq(banners.length, 0, 'ciste prehranie: ziadny pas');
+rep.add('JS chyba: neskory timer 500 ms');
+eq(posts[posts.length - 1].stage, 'late', 'neskora chyba: novy report');
+eq(posts[posts.length - 1].errors, ['JS chyba: neskory timer 500 ms'], 'neskora chyba je v reporte');
+eq(banners[banners.length - 1], ['JS chyba: neskory timer 500 ms'], 'neskora chyba prekresli pas vo fotke');
+const fin = rep.settled(1400);
+eq([fin.stage, fin.height, fin.errors.length], ['settled', 1400, 1], 'ustalenie: vyska prepocitana, chyba ostava');
+rep.add('JS chyba: este neskor (viacsekundovy casovac)');
+eq([posts[posts.length - 1].stage, posts[posts.length - 1].errors.length], ['late', 2], 'chyba po ustaleni tiez prepise report');
+eq(SETTLE_MS >= 3000, true, 'ustalenie pokryva viacsekundove casovace UI');
+// rozpocet virtualneho casu Chrome (ui_foto.ps1) musi byt dlhsi nez ustalenie
+const ps = fs.readFileSync(path.join(__dirname, '..', '..', 'scripts', 'ui_foto.ps1'), 'utf8');
+const budget = Number((/\$NxVirtualBudgetMs = (\d+)/.exec(ps) || [])[1]);
+eq(budget > SETTLE_MS + 2000, true, `virtual-time-budget ${budget} > SETTLE_MS ${SETTLE_MS} + rezerva`);
+
 console.log(`test_ui_foto_stub: ${n} OK`);

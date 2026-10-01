@@ -196,7 +196,7 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa
   aj pri zamknutej obrazovke) + verzie na celú výšku + kontaktný hárok `index.html`. **Každá UI dávka:** po zmene JS/CSS/HTML `-Shoot`
   (predvolený, nad poslednou nahrávkou); po zmene **tvaru dát z Ruby** (payload okna) `-Record` — nová nahrávka v SketchUpe overenou
   slučkou runnera nad kópiou ENGINEtests.skp, zdieľa jeho zámok (`exit 2` = iný beh beží), inštancia sa zavrie sama — a hneď fotí.
-  `-Only studio_cut,panel_cela` = podmnožina. Fotky idú do `%TEMP%\noxun_ui_foto\shots_<čas>\` → **report orchestrátorovi → Michal; do gitu
+  `-Only studio_cut,panel_cela` = podmnožina. Fotky idú do `%TEMP%\noxun_ui_foto\shots_<čas>_<PID>\` → **report orchestrátorovi → Michal; do gitu
   nie**. **Hranice:** statický stav (bez modálov, hoveru a rozbalených ponúk), Chrome nie CEF (písmo a rozbaľovačky sa môžu líšiť), svetlá
   téma; fotka s červeným pásom = prehranie nahrávky v novom UI zlyhalo (karta v hárku CHYBA) — nová nahrávka alebo oprava UI, nie tichá fotka.
 - **Lokálne hooky (od 24.7., `.claude/settings.json`):** PostToolUse po každom Edit/Write spustí `.claude/hooks/post_edit_check.ps1` — kontrola editovaného súboru: `ruby -c` syntax (.rb) + encoding guard (.rb/.js/.html/.css/.md/.ps1: BOM, UTF-8, mojibake, C0/C1/NUL, cyrilické homoglyfy, charset) — **jediná implementácia `scripts/encoding_guard.rb`**, ktorú volá aj CI test `tests/pure/test_encoding_guard.rb` nad celým repom (pravidlá sa menia len tam; ručne `ruby scripts/encoding_guard.rb --repo`). Je to rýchla spätná väzba (edit už je zapísaný — pri hláške chybu HNEĎ oprav); vynucovanie ostáva na CI.
