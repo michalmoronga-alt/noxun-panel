@@ -1,0 +1,28 @@
+{
+  "_info": "Zoznam fotiek pre scripts/ui_foto.ps1 -Shoot. upto = znacka nahravky (scripts/ui_foto/record.rb), kind = okno, ctx = kontext Inspectora. Sekcie Studia musia presne zodpovedat StudioDialog::SECTIONS (strazi tests/pure/test_ui_foto.rb).",
+  "sizes": {
+    "panel": { "page": "panel.html", "width": 486, "height": 850 },
+    "studio": { "page": "studio.html", "width": 1280, "height": 800 }
+  },
+  "shots": [
+    { "id": "panel_bez_vyberu", "kind": "panel", "upto": "panel_open", "label": "Inspector · bez výberu (vkladanie)" },
+    { "id": "panel_korpus", "kind": "panel", "upto": "panel_select_cab1", "ctx": "korpus", "label": "Inspector · Korpus" },
+    { "id": "panel_zony", "kind": "panel", "upto": "panel_select_cab1", "ctx": "zony", "label": "Inspector · Zóny" },
+    { "id": "panel_cela", "kind": "panel", "upto": "panel_select_cab1", "ctx": "cela", "label": "Inspector · Čelá" },
+    { "id": "panel_kovanie", "kind": "panel", "upto": "panel_select_cab1", "ctx": "kovanie", "label": "Inspector · Kovanie" },
+    { "id": "studio_bom", "kind": "studio", "upto": "studio_bom", "label": "Štúdio · Kusovník" },
+    { "id": "studio_ctrl", "kind": "studio", "upto": "studio_ctrl", "label": "Štúdio · Kontrola" },
+    { "id": "studio_buy", "kind": "studio", "upto": "studio_buy", "label": "Štúdio · Nákup kovania" },
+    { "id": "studio_budget", "kind": "studio", "upto": "studio_budget", "label": "Štúdio · Rozpočet" },
+    { "id": "studio_offer", "kind": "studio", "upto": "studio_offer", "label": "Štúdio · Cenová ponuka" },
+    { "id": "studio_cut", "kind": "studio", "upto": "studio_cut", "label": "Štúdio · Nárezový plán" },
+    { "id": "studio_mat", "kind": "studio", "upto": "studio_mat", "label": "Štúdio · Materiály" },
+    { "id": "studio_hw", "kind": "studio", "upto": "studio_hw", "label": "Štúdio · Kovanie" },
+    { "id": "studio_appl", "kind": "studio", "upto": "studio_appl", "label": "Štúdio · Spotrebiče" },
+    { "id": "studio_rules", "kind": "studio", "upto": "studio_rules", "label": "Štúdio · Pravidlá" },
+    { "id": "studio_tpl", "kind": "studio", "upto": "studio_tpl", "label": "Štúdio · Šablóny" },
+    { "id": "studio_sup", "kind": "studio", "upto": "studio_sup", "label": "Štúdio · Dodávateľ / Demos" },
+    { "id": "studio_bset", "kind": "studio", "upto": "studio_bset", "label": "Štúdio · Nastavenia rozpočtu" },
+    { "id": "studio_about", "kind": "studio", "upto": "studio_about", "label": "Štúdio · O plugine" }
+  ]
+}
