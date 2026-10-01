@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H13 · mapa rozširovacích bodov + jedna tabuľka verzií dát (1.10.2026, PR #?, dokumentácia + guard testy, plugin bez zmeny, blok 9 · HARDENING PO V1,
+- **H13 · mapa rozširovacích bodov + jedna tabuľka verzií dát (1.10.2026, PR #449, dokumentácia + guard testy, plugin bez zmeny, blok 9 · HARDENING PO V1,
   triedenie B-06 · B-07; krížový audit CN-02, CN-03, CN-04; brief [BRIEF_H13.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H13.md)).**
   Zoznam miest pre nový typ skrinky žil len v archíve rohovej (s číslami riadkov k v0.14.0) a v package H12, čísla schém v piatich dokumentoch.
   Nový súbor mapy [rozsirovacie-body.md](../../docs/architecture/rozsirovacie-body.md) (riadok v rozcestníku, strop 20 kB, sekcia História ako
