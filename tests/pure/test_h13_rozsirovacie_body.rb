@@ -482,6 +482,34 @@ NxTest.test('H13 B-07: guard tabulky verzii chyti staru hodnotu, chybajucu konst
   NxTest.assert_equal([], nx_h13_version_problems(sec, ref, {}), 'odkaz na necislo (pole) nie je verzia')
 end
 
+# Review #449 P2: STAV nesmie drzat AKTUALNE cisla verzii dat (zastarali by pri
+# bumpe s testami zelenymi) — len spravanie starsieho pluginu a odkaz na §13.
+# Chyta sa slovo verzie dat (schema, STD, seed, verzia suboru, meno konstanty
+# z §13) a za nim do troch znakov cislo; verzie pluginu (`v0.15.4`, `0.17.0+`)
+# a pocty (PR, testy) sa nechytaju.
+def nx_h13_stav_version_numbers(text, consts)
+  names = consts.map { |c| Regexp.escape(c.split('::').last) }.uniq
+  re = /(?:\bsch[ée]m[aeuy]\b|\bSTD\b|\bseed(?:e|u)?\b|\bverzi[ia] s[úu]boru\b|(?<![\w])(?:#{names.join('|')})(?![\w]))[`*\s]{0,4}\d+/i
+  text.lines.each_with_index.filter_map { |l, i| "STAV:#{i + 1} #{l[re]}" if l.match?(re) }
+end
+
+NxTest.test('H13 B-07: STAV neopakuje aktualne cisla verzii dat (len spravanie + odkaz na §13)') do
+  rows, = nx_h13_version_rows(nx_h13_section13(nx_h13_src(NX_H13_STANDARD)))
+  consts = rows.map { |r| r[1] }
+  hits = nx_h13_stav_version_numbers(nx_h13_src(File.join('SYSTEM', 'STAV.md')), consts)
+  NxTest.assert(hits.empty?, "STAV opakuje cisla verzii dat: #{hits.join(' · ')} — cislo patri len do SYSTEM/STANDARD.md §13, " \
+                             'STAV povie, co starsi plugin urobi, a odkaze na §13')
+  # Negativne: povodne zapisy z odseku Kompatibilita musia padnut, verzie pluginu a pocty nie.
+  ['skrinka je v **schéme 22** (typ)', 'doska v schéme 2', '**šablóny v STD 7**', 'ABS pravidlá v **seede 6**',
+   'Dáta rozpočtu sú v `BUDGET_STD` 3', 'nastavenia vo verzii súboru 2', 'CONFIG_SCHEMA 23'].each do |bad|
+    NxTest.refute(nx_h13_stav_version_numbers("x #{bad} y\n", consts).empty?, "STAV guard nezachytil '#{bad}'")
+  end
+  ['po prvej úprave vo v0.15.4+ ho v0.15.3 a starší', '**5139 headless · 153 JS sád**', 'PR #433–#440',
+   '(`BUDGET_STD` blok CENY nemení)', 'plugin 0.17.10+ na SketchUpe 2026'].each do |ok|
+    NxTest.assert(nx_h13_stav_version_numbers("x #{ok} y\n", consts).empty?, "falosny poplach STAV guardu: '#{ok}'")
+  end
+end
+
 # STAV „Kompatibilita" a §2.5 na tabulku len odkazuju — jedno miesto s cislami.
 NxTest.test('H13 B-07: STAV a mapa odkazuju na STANDARD §13') do
   NxTest.assert(nx_h13_src(File.join('SYSTEM', 'STAV.md')).include?('STANDARD.md#13'), 'STAV „Kompatibilita" neodkazuje na STANDARD §13')
