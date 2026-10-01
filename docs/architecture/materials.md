@@ -580,6 +580,14 @@ preto hneď po zámku `degraded_write_blocked?` a odmietnutie vracia `false`; d�
 editor, takže hláška ide zatiaľ len do Ruby konzoly — a **iba pri ZMENE stavu**, lebo self-heal sa o zápis pokúsi pri každom načítaní pravidiel. Kontrakt `JsonFileStore.degraded?`
 (priamo z disku, I/O chyby vyletia) je v [model-a-identita.md](model-a-identita.md). Testy: `tests/pure/test_r11_degradovana_zaloha.rb`.
 
+**Súbor zlého tvaru = poškodený (H9/R-37, R12).** Predikát `doc_shape_ok?`: Hash a `rules` je Hash, **prázdny len so `seed_version`** (vedome prázdne pravidlá zapísal
+plugin — pečiatka od 18.7.2026); súbor s `std > STD` sa neposudzuje (doprednú bránu `std` modul nemá — správanie novšieho súboru sa nemení, register N1). `read_rules`
+číta cez `JsonFileStore.read_valid` → zlý tvar (`[]`, `{}`, `{"rules":{}}` bez `seed_version`, `rules` zlého typu) + `.bak` dobrého tvaru = pravidlá **zo zálohy**, pri
+načítaní sa nič nezapíše a `write` (brána `degraded?` s predikátom) zápis odmietne, `.bak` ostane nedotknutá; **bez dobrej zálohy** = `SEED_RULES` v pamäti **bez zápisu**
+(predtým prázdne `rules` bez `seed_version` self-heal zapísal hneď pri načítaní a zálohu zničil) a prvé vedomé uloženie súbor opraví. `InvalidShape` sa chytá **v `read_rules`**
+(nie v rescue `rules`, ktoré beží na horúcej ceste generovania dielcov) a zaloguje sa **raz za zmenu stavu**. Výnimka predikátu (`ShapeCheckError`) = zápis `false`.
+Pri zdravom súbore sa hrany nemenia (charakterizácia VEPO s hranami nad vlastným súborom `tests/fixtures/h9_golden/`). Testy: `tests/pure/test_r37_tvar_suborov.rb`.
+
 ### demos/ — Demos konektor (core/demos/*.rb)
 
 Demos konektor (V0.6 dávky B + M-A). Jednotlivé moduly konektora majú vlastné odseky nižšie.

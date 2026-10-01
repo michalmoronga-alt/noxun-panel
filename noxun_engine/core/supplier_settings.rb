@@ -235,7 +235,14 @@ module Noxun
         origin = doc_std_unsupported?(merged) ? :newer_file : :file
         [merged, origin]
       rescue StandardError => e
-        Engine.log_error(e, 'SupplierSettings.load') if defined?(Engine)
+        # H9/R8: zly tvar bez zalohy sa loguje RAZ za zmenu stavu (`load` bezi
+        # pri kazdom vypocte rozpoctu); ostatne chyby ako doteraz.
+        if e.is_a?(JsonFileStore::InvalidShape)
+          Engine.log("supplier settings: #{e.message} — pocita sa s predvolenymi") if !@shape_logged && defined?(Engine)
+          @shape_logged = true
+        elsif defined?(Engine)
+          Engine.log_error(e, 'SupplierSettings.load')
+        end
         [seed_doc, read_failure_origin(e)]
       end
 
@@ -258,11 +265,35 @@ module Noxun
       # seed-merge nezapisuje — zapis by neplatnu hodnotu nahradil predvolenou
       # a dokaz „nastavenia su poskodene" (Kontrola, cena podla planu) by
       # potichu zmizol. Opravi ho az vedome ulozenie v sekcii Nastavenia.
+      # H9 (R6): plati pre KAZDY opraveny skalar ktorehokolvek dodavatela.
+      # H9/R-37: cita sa s OCAKAVANYM TVAROM (`read_valid`) — subor zleho tvaru
+      # ide na dobru zalohu, inak `InvalidShape` (= `:seed_fallback`, nic sa
+      # pri nacitani nezapise).
       def read_doc
-        raw = JsonFileStore.read(path, copy: true)
+        raw = JsonFileStore.read_valid(path, shape: shape_check, copy: true)
+        @shape_logged = false
         doc, changed = merge_seed(normalize(raw))
-        repaired = Array(doc['suppliers']).any? { |s| !layout_repaired(s).empty? }
+        repaired = Array(doc['suppliers']).any? { |s| !Array(s[REPAIRED_KEY]).empty? }
         [doc, changed && !doc_std_unsupported?(raw) && !repaired]
+      end
+
+      # H9/R-37 (R2): ocakavany tvar suboru — LEN kontajnery, ktore zapisuje
+      # kazda verzia (cisla posudzuje normalizacia/NP-4). Novsi format posudzuje
+      # NP-2, nie tento predikat. `standard_rows: []` je legitimny (seed-merge).
+      def doc_shape_ok?(doc)
+        return false unless doc.is_a?(Hash)
+        return true if doc_std_unsupported?(doc)
+
+        sups = doc['suppliers']
+        sups.is_a?(Array) && !sups.empty? && sups.all? do |s|
+          s.is_a?(Hash) && s['rates'].is_a?(Hash) && !s['rates'].empty? &&
+            (!s.key?('standard_rows') || s['standard_rows'].is_a?(Array)) &&
+            (!s.key?('mode_values') || s['mode_values'].is_a?(Hash))
+        end
+      end
+
+      def shape_check
+        method(:doc_shape_ok?)
       end
 
       # R-08 (audit 1d #2/#10): seed-merge je READ-MODIFY-WRITE. Pod zamkom sa
@@ -311,7 +342,7 @@ module Noxun
       # Chyba pri zisteni degradacie = „nevieme" -> povod ostava (zapisova
       # brana si ho aj tak overi sama pod zamkom a fail-closed).
       def degraded_now?
-        JsonFileStore.degraded?(path)
+        JsonFileStore.degraded?(path, shape: shape_check)
       rescue StandardError
         false
       end
@@ -409,7 +440,7 @@ module Noxun
           next false if degraded_write_blocked?
           next false if newer_write_blocked?
 
-          JsonFileStore.write(path, normalize(doc).merge('std' => STD))
+          JsonFileStore.write(path, normalize(doc).merge('std' => STD), shape_check)
         end
       rescue StandardError => e
         Engine.log_error(e, 'SupplierSettings.write') if defined?(Engine)
@@ -429,7 +460,7 @@ module Noxun
       def degraded_write_blocked?
         prev = @write_block_reason
         @write_block_reason = ''
-        return false unless JsonFileStore.degraded?(path)
+        return false unless JsonFileStore.degraded?(path, shape: shape_check)
 
         @write_block_reason = degraded_reason
         # Log LEN pri ZMENE stavu — seed-merge sa o zapis pokusa pri kazdom

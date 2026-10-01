@@ -240,14 +240,39 @@ module Noxun
 
       # CISTE citanie + normalizacia + seed-merge BEZ zapisu ->
       # [surova hodnota zo suboru, zlucene pravidla, changed].
+      # H9/R-37: subor ZLEHO TVARU sa cita zo zalohy dobreho tvaru; bez nej
+      # seed BEZ zapisu (`changed` false) a jeden riadok logu za zmenu stavu
+      # (tu, nie v rescue `rules` — horuca cesta generovania dielcov).
       def read_rules
-        data = JsonFileStore.read(path, copy: false)
+        data = begin
+          JsonFileStore.read_valid(path, shape: shape_check, copy: false)
+        rescue JsonFileStore::InvalidShape => e
+          Engine.log("abs rules: #{e.message} — pocita sa so seedom") if !@shape_logged && defined?(Engine)
+          @shape_logged = true
+          return [deep_copy(SEED_RULES), nil, false]
+        end
+        @shape_logged = false
         value = data['rules']
         return [deep_copy(SEED_RULES), nil, false] unless value.is_a?(Hash)
 
         normalized = normalize_rules(value)
         merged, seed_stale = merge_seed_roles(normalized, data['seed_version'].to_i, value)
         [value, merged, (merged != value || seed_stale)]
+      end
+
+      # H9/R-37 (R12): ocakavany tvar — `rules` je Hash; PRAZDNY len so
+      # `seed_version` (vedome prazdne pravidla zapisal plugin, peciatka od
+      # 18.7.2026). Subor z novsieho pluginu (`std` > STD) sa neposudzuje.
+      def doc_shape_ok?(doc)
+        return false unless doc.is_a?(Hash)
+        return true if doc['std'].to_i > STD
+
+        r = doc['rules']
+        r.is_a?(Hash) && (!r.empty? || doc.key?('seed_version'))
+      end
+
+      def shape_check
+        method(:doc_shape_ok?)
       end
 
       # R-08 (audit 1d #2/#10): normalizacia aj seed-merge su READ-MODIFY-WRITE.
@@ -329,7 +354,7 @@ module Noxun
       def degraded_write_blocked?
         prev = @write_block_reason
         @write_block_reason = ''
-        return false unless JsonFileStore.degraded?(path)
+        return false unless JsonFileStore.degraded?(path, shape: shape_check)
 
         @write_block_reason = "Pravidlá ABS sú poškodené — číta sa záloha, zápisy sú vypnuté " \
                               "(oprav alebo zmaž súbor #{path})"
@@ -348,7 +373,7 @@ module Noxun
           # zalohou a poskodenim by zmizlo.
           next false if degraded_write_blocked?
 
-          JsonFileStore.write(path, { 'std' => STD, 'seed_version' => SEED_VERSION, 'rules' => rules })
+          JsonFileStore.write(path, { 'std' => STD, 'seed_version' => SEED_VERSION, 'rules' => rules }, shape_check)
         end
       rescue StandardError => e
         Engine.log_error(e, 'AbsRules.write') if defined?(Engine)

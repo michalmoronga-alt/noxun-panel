@@ -1722,6 +1722,12 @@ Sadzby služieb, cenové režimy, štandardné koncové riadky a **skaláre výp
 - **Verzia súboru `std` = 2 (od NP-2) a dopredná brána** (vzor §6 KOV-F1 a §11.3 R-14): **každý zápis pečiatkuje aktuálnu verziu**; súbor
   s **vyššou** verziou (uložil ho novší plugin) sa **číta**, ale **nezapisuje** — ani doplnenie seedu; uloženie odmietne veta „aktualizuj
   plugin" a sekcia Nastavenia to ukáže bannerom hneď po otvorení (rovnako poškodený súbor, ktorý sa číta zo zálohy — R-11).
+- **Súbor zlého tvaru = poškodený (H9/R-37):** súbor, ktorý sa dá prečítať, ale nemá tvar nastavení (napr. `[]`, `{}`, prázdny zoznam
+  dodávateľov, dodávateľ bez sadzieb), sa **nikdy ticho nenahradí predvolenými hodnotami**: s dobrou zálohou sa počíta **so zálohou**
+  a zápisy sú vypnuté (banner „poškodené — číta sa záloha"), bez nej platia predvolené hodnoty **s priznaním** (banner, Kontrola)
+  a súbor opraví až vedomé uloženie; posledná dobrá záloha sa nikdy neprepíše. **Zdravý súbor sa nemení.** To isté platí pre globálne
+  pravidlá ABS hrán a kovania (§6, §7 — pravidlá zo zálohy, zápis odmietnutý; bez zálohy predvolené bez zápisu, **priznané len záznamom
+  v logu** — upozornenie v Kontrole je otvorená otázka).
 - **Priznaný limit:** verzie **pred NP-2 (v0.15.1 a staršie)** bránu nemajú — keď na tom istom `%APPDATA%` (dve verzie SketchUpu, downgrade)
   uložia nastavenia, nové polia zahodia a verziu 2 nechajú; novší plugin potom doplní predvolené 5 / 10 / 10 mm bez varovania.
 
