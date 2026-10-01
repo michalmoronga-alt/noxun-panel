@@ -17,6 +17,20 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H10b · dve okná SketchUpu a rozmerové rady (1.10.2026, PR #?, v0.17.9, blok 9 · HARDENING PO V1, register R-35 — časť rady, R-35 tým uzavreté; package
+  [PACKAGE_H10.md](../zdroje/bloky/HARDENING/PACKAGE_H10.md) časť R2, audit návrhu spoločný s H10a).**
+  „Uložiť rady" v koliesku Inspectora posielalo všetkých 5 radov tak, ako ich panel dostal pri otvorení — úplná náhrada `dim_series.json`, dve okná sa prebíjali
+  „posledný vyhráva" (sonda P2: 700 v Šírkach z okna A zaniklo, keď B zmenilo len Hĺbky). Teraz **zápis po kľúčoch s pôvodnou hodnotou kľúča**:
+  `DimSeries.update!(changes, base)` → `[status, rady, kľúče]` pod zámkom v poradí brána degradovaného súboru → starší klient (`:stale_client`, chýba `base`) →
+  `reload!` + čerstvé čítanie (`read_current` nezhltne I/O chybu — oproti package `current = get` sprísnené, aby nečitateľný súbor nespadol na predvolby a neprepísal
+  rady) → konflikt toho istého radu (nič sa nezapíše, ani nekonfliktné rady) → zlúčenie a zápis cez `set` (jediný zápis modulu). Panel: `update!` + `case`, editor sa
+  prekreslí pri každom výsledku; klient pripne `NXDIM_BASE` len v `nxFillSeriesEditor` a cez čistú `NXDim.changes` posiela len zmenené rady s pôvodnými hodnotami.
+  Hranice R2.7 (5 dnešných radov, novší formát nechránený) v odseku `dim_series.rb`; F1 (komentár o seed-merge) a F4 (prázdny odsek `actions_settings.rb`) opravené.
+  **Q2 bez odpovede** → vratná voľba z package (rôzne rady sa zlúčia bez hlášky, ten istý rad = hláška, zmenu treba zadať znova). Kód pluginu +166 / −23 riadkov
+  s komentármi (bez `?v=`). **Charakterizácia** C2 (commit `e841d6db`, zelená na main): jedno okno = bajtovo rovnaký súbor, aj cez `update!`. **Testy:** 5083 headless ·
+  151 JS sád + encoding guard; nové `test_h10b_rady.rb` (18 testov) a `test_h10b_rady.js` (42 kontrol); R-08 guard „revízia AŽ POD zámkom" rozšírený o `update!`;
+  **mutácie 11/11 zabité** (M15–M20 package + bez `reload!`, refill len pri úspechu, brána po staršom klientovi, čítanie cez `get`). In-SU nie je brána (model sa
+  nemení). STAV pred dávkou: v0.17.8 · H10a hotová · Robí sa H6/H7 (mockupy), nasleduje H10b · Ďalší krok H10b.
 - **H10a · dve okná SketchUpu a globálne pravidlá kovania (1.10.2026, PR #443, v0.17.8, blok 9 · HARDENING PO V1, register R-35 — časť pravidlá; package
   [PACKAGE_H10.md](../zdroje/bloky/HARDENING/PACKAGE_H10.md), audit návrhu 1 BLOCKER · 3 FIX · 3 NOTE [AUDIT_H10_raw.md](../zdroje/bloky/HARDENING/AUDIT_H10_raw.md)
   + delta 7/7 RESOLVED [AUDIT_H10_delta_raw.md](../zdroje/bloky/HARDENING/AUDIT_H10_delta_raw.md); rez H10a → H10b).**

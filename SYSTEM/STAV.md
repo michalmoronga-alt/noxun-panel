@@ -6,17 +6,16 @@
 
 ## Stav
 
-**v0.17.8 · 1.10.2026 — blok 9 HARDENING; dávka H10a hotová** (PR #443): **R-35 pre pravidlá kovania — dve okná SketchUpu sa pri globálnych predvoľbách pravidiel kovania už neprebíjajú.** Keď v jednom okne uložíš „aj ako globálnu predvoľbu" (alebo zákazku, ktorá ešte nemá vlastné pravidlá)
-a globálne predvoľby medzitým zmenilo iné okno, **neuloží sa nič**, tvoje úpravy ostanú vo formulári a červená hláška povie prečo; druhé Uložiť ich vedome prepíše. **Pri jednom okne sa nemení nič** (súbor bajtovo rovnako, čísla bez zmeny). Rozmerové rady dorieši **H10b**.
-Pod tým **H9** (v0.17.7, PR #442): poškodený súbor nastavení nezničí dobrú zálohu · **H8** (v0.17.6, PR #441): kus z inej verzie štandardu = oranžový riadok. Pod tým **H5** (v0.17.5, PR #439–#440: dokumentácia okien a UI_DIZAJN ako norma) a **H4b** (v0.17.4, PR #438): texty a vzhľad („Obnoviť" vs. „Vrátiť…", bez žargónu, jednotné rozbaľovačky) — **dáta a čísla bez zmeny.**
-Pod tým **H4a** (v0.17.3, PR #437): čísla v Štúdiu všade rovnako, nič sa neskrýva. Pod tým **H3b** (v0.17.2, PR #436): bez falošnej chyby „invalid overlay" v Ruby konzole po **Súbor → Nový**. Pod tým **H3a** (v0.17.1, PR #435): Štúdio bez zavádzajúcich údajov (Kusovník, ponuka, Kontrola, Nákup, sadzby) — **čísla, CSV, XLSX a VEPO bez zmeny**.
+**v0.17.9 · 1.10.2026 — blok 9 HARDENING; dávka H10b hotová** (PR #?): **R-35 uzavreté — dve okná SketchUpu sa neprebíjajú ani pri rozmerových radoch** (koliesko Inspectora). Keď v dvoch oknách zmeníš **rôzne** rady (napr. Šírky a Hĺbky),
+uložia sa obe zmeny; keď ten **istý** rad medzitým zmenilo iné okno, **neuloží sa nič**, červená hláška povie ktorý rad a editor ukáže aktuálne uložené rady (zmenu zadáš znova). **Pri jednom okne sa nemení nič** (súbor bajtovo rovnako).
+Pod tým **H10a** (v0.17.8, PR #443): to isté pre globálne pravidlá kovania · **H9** (v0.17.7, PR #442): poškodený súbor nastavení nezničí dobrú zálohu · **H8** (v0.17.6, PR #441): kus z inej verzie štandardu = oranžový riadok
+· **H5/H4b/H4a** (v0.17.3–v0.17.5, PR #437–#440): mapa okien, texty, vzhľad, čísla v Štúdiu všade rovnako · **H3a/H3b** (v0.17.1–v0.17.2, PR #435–#436): bez zavádzajúcich údajov a falošnej chyby po **Súbor → Nový** — **čísla a exporty bez zmeny**.
 Pod tým **BLOK CENY UZAVRETÝ** (v0.17.0, 30.9.; štart #425, PR #426–#429; **smoke PASS 30.9.**, PR #431): doska a ABS páska **bez Demosu** majú **odkaz na produkt** a **ručné overenie ceny** (Materiály aj Rozpočet; D-148), Rozpočet ukazuje vek ručných cien
 a **„N cien na kontrolu"**; **materiál bez formátu — sklo aj bežná doska (C14) — sa počíta podľa skutočných m² dielcov** bez odpadu (porez a montáž bez zmeny, Q1).
-Pod tým **blok 2 · KONTROLA + VÝROBA** (v0.16.0, smoke **PASS 29.9.**), **blok 8 · K3 ROHOVÁ** (v0.15.0, smoke PASS 28.9.), **blok 7 · K1+K2** (v0.14.0). Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
-so **štrnástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · **Nárezový plán** · Materiály · Kovanie · Spotrebiče · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine. Neaktívna položka navigácie už nie je žiadna.
+Pod tým **blok 2 · KONTROLA + VÝROBA** (v0.16.0, smoke **PASS 29.9.**), **blok 8 · K3 ROHOVÁ** (v0.15.0, smoke PASS 28.9.), **blok 7 · K1+K2** (v0.14.0). Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka, **štrnásť živých sekcií**).
 
 Etapa **V0.6 (katalógy a ceny) je obsahovo splnená**. **Od 20.8. sa z pluginu objednávajú REÁLNE zákazky** — zákazka KLINIKA (254 dielcov) je postavená čisto z pluginu; nálezy z výroby a chyby v cenách majú **najvyššiu prioritu** ([PLAN.md](PLAN.md)).
-**Všetkých sedem bodov V1 je odškrtnutých** ([V1_VIZIA.md](V1_VIZIA.md); Výstupy blokom CENY 30.9.) — **V1 je hotové**. Hardeningové body **R-13 (✅ H8) → R-37 (✅ H9) → R-35** sú dávky **H8–H10 bloku 9** ([PLAN.md](PLAN.md)); **test na kompletnej reálnej zákazke je akceptačný test po V1** (C13).
+**Všetkých sedem bodov V1 je odškrtnutých** ([V1_VIZIA.md](V1_VIZIA.md); Výstupy blokom CENY 30.9.) — **V1 je hotové**. Hardeningové body **R-13 (✅ H8) → R-37 (✅ H9) → R-35 (✅ H10a/H10b)** sú dávky **H8–H10 bloku 9** ([PLAN.md](PLAN.md)); **test na kompletnej reálnej zákazke je akceptačný test po V1** (C13).
 
 **Hotové veľké celky:** INSPECTOR REWORK (UI-A…UI-D) · **fáza ŠTÚDIO** (ŠT-1a…ŠT-4b, PR #192–#228) — **zaniklo šesť okien** · **blok KRESBA** · **blok GHOST VKLADANIE** (v0.9.0) · **blok KOVANIE** (v0.10.0)
 · **blok M-R VZHĽAD** (v0.12.0) · **blok SPOTREBIČE S1** (v0.13.0) · **blok KONŠTRUKCIA K1+K2** (v0.14.0) · **blok K3 ROHOVÁ** (v0.15.0) · **blok 2 KONTROLA + VÝROBA** (v0.16.0) · **blok CENY** (v0.17.0) — plné texty v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).
@@ -24,26 +23,27 @@ Etapa **V0.6 (katalógy a ceny) je obsahovo splnená**. **Od 20.8. sa z pluginu 
 v **seede 6** — starší plugin zákazku neprestaví ani nevyexportuje (rohovú by sklopil na dolnú). **Dáta rozpočtu sú od NP-4 v `BUDGET_STD` 3** (prvá úprava rozpočtu
 v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a zastaví oba cenové exporty). **Nastavenia dodávateľa sú od NP-2 vo verzii súboru 2** (v0.15.1 a starší pri uložení nové polia zahodí).
 **Katalóg materiálov je po prvom uloženom odkaze v schéme 11 a po prvom ručnom overení ceny v schéme 12** — starší plugin ho ďalej číta (aj Rozpočet), ale nezapíše doň.
-**Ochranu pred poškodeným súborom nastavení (H9) má len 0.17.7+, ochranu dvoch okien (H10a) len 0.17.8+ — aktualizovať obe PC a po aktualizácii zavrieť všetky okná SketchUpu** (staré okno zapisuje bez revízie; formát súborov sa nemení). **Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin
-počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
+**Ochranu pred poškodeným súborom nastavení (H9) má len 0.17.7+, ochranu dvoch okien 0.17.8+ (pravidlá) a 0.17.9+ (rady) — aktualizovať obe PC a potom zavrieť všetky okná SketchUpu** (staré okno zapisuje bez ochrany).
+**Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
 
-**Testy (H10a, PR #443):** **5065 headless · 150 JS sád** zelené + encoding guard; in-SU (brána) **3324 / 0** na hlave `c830688a` (scenár `run_h10a` v izolovanom sandboxe).
+**Testy (H10b, PR #?):** **5083 headless · 151 JS sád** zelené + encoding guard; in-SU nie je brána (dávka nezapisuje do modelu) — posledný in-SU beh H10a **3324 / 0** na `c830688a`.
 
 ## Robí sa
 
 **Blok 9 · HARDENING PO V1** (štart 1.10.2026, PR #432): krížový audit V1 sedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**;
 17 dávok **H1…H17** sekvenčne podľa tabuľky v [PLAN.md](PLAN.md), **bez zmeny výrobných a cenových čísel**; priečinok bloku [zdroje/bloky/HARDENING/](zdroje/bloky/HARDENING/).
-Hotové **H1–H5** (PR #433–#440: pravidlá čítania, fotenie okien, zavádzajúce údaje, log po novom súbore, čísla, texty a vzhľad, mapa okien, UI_DIZAJN),
-**H8** (kus z inej verzie štandardu, R-13) PR #441, **H9** (súbor nastavení zlého tvaru, R-37) PR #442 a **H10a** (dve okná, pravidlá kovania, R-35) PR #443; **H6/H7** čakajú na mockupy, nasleduje **H10b**.
-**Otázky bez odpovede, platí návrh:** H10a Q1 (pri cudzej zmene globálu sa neuloží nič, ani projekt) · H9 Q1/Q2 (pri čítaní zo zálohy bez nálezu v Kontrole, bez tlačidla „Obnoviť zo zálohy") · H8 Q1/Q2 (veta o značke verzie, bez tlačidla) · H4b Q1/Q2 (vrátenie katalógu v ponuke „⋯" Materiálov, ikona posuvníkov pre Nastavenia rozpočtu).
+Hotové **H1–H5** (PR #433–#440) a **H8–H10b** (R-13, R-37, R-35 — PR #441–#443 a #?); **H6/H7** čakajú na mockupy.
+**Otázky bez odpovede, platí návrh:** H10b Q2 (rôzne rady sa zlúčia bez hlášky, ten istý rad = hláška a zmenu treba zadať znova) · H10a Q1 (pri cudzej zmene globálu sa neuloží nič, ani projekt)
+· H9 Q1/Q2 (pri čítaní zo zálohy bez nálezu v Kontrole, bez tlačidla „Obnoviť zo zálohy") · H8 Q1/Q2 (veta o značke verzie, bez tlačidla) · H4b Q1/Q2 (vrátenie katalógu v ponuke „⋯" Materiálov, ikona posuvníkov pre Nastavenia rozpočtu).
 **H6 a H7 čakajú na schválený mockup** (R-38 v H7 potvrdí Michal) · **Q1** (porez a montáž pri skle) bez odpovede · pri prvej rohovej v dielni overiť záves Sensys · **na smoke čakajú** D-132 (#367), D-133 (#368), D-134 (#369).
 
 ## Ďalší krok
 
-Pokračovať blokom 9: **H10b** (R-35 zvyšok — rozmerové rady po kľúčoch); **H6** a **H7** čakajú na schválenie mockupov Michalom; potom refaktory H11–H17; uzáver bloku = minor verzia + smoke
+Pokračovať blokom 9: **H6** a **H7** čakajú na schválenie mockupov Michalom; potom refaktory H11–H17; uzáver bloku = minor verzia + smoke
 (smoke H3a + H3b: 7 bodov v [PACKAGE_H3.md](zdroje/bloky/HARDENING/PACKAGE_H3.md) §10; H4a + H4b: body 1–11 v [PACKAGE_H4.md](zdroje/bloky/HARDENING/PACKAGE_H4.md) §10; vzhľad rozbaľovačiek a výberu nôh v SketchUpe overí smoke bod 7;
 H8: 4 body v [PACKAGE_H8.md](zdroje/bloky/HARDENING/PACKAGE_H8.md) §10 — reálna zákazka bez nového riadku a s rovnakými číslami;
-H9: 5 bodov v [PACKAGE_H9.md](zdroje/bloky/HARDENING/PACKAGE_H9.md) §10 — rovnaké čísla rozpočtu, hrán a nákupu, ochrana naživo voliteľne; H10a: body 1–3 a 6 v [PACKAGE_H10.md](zdroje/bloky/HARDENING/PACKAGE_H10.md) §10 — dve okná, testovacie modely, `hardware_rules.json` zálohovať). Ak druhé PC ešte nemá 0.17.0, aktualizovať (Kompatibilita vyššie). **Test na reálnej zákazke po V1.**
+H9: 5 bodov v [PACKAGE_H9.md](zdroje/bloky/HARDENING/PACKAGE_H9.md) §10 — rovnaké čísla rozpočtu, hrán a nákupu, ochrana naživo voliteľne;
+H10a + H10b: body 1–6 v [PACKAGE_H10.md](zdroje/bloky/HARDENING/PACKAGE_H10.md) §10 — dve okná, testovacie modely, `hardware_rules.json` a `dim_series.json` zálohovať). Ak druhé PC ešte nemá 0.17.0, aktualizovať (Kompatibilita vyššie). **Test na reálnej zákazke po V1.**
 
 ## Posledné uzávery
 

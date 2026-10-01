@@ -46,7 +46,7 @@ predrecenzia, in-SU) sa určí pri package podľa CLAUDE.md; stĺpec je predpokl
 | H7 · názov zákazky na jednom mieste + nastavenia exportu v jadre — **pred presunom ochrana R-38** (poškodený súbor nastavení exportu sa nesmie ticho prepísať zálohou; výsledok zápisu sa ukáže; R-38 = návrh — potvrdí Michal s mockupom H7) | A-05 · C-07 · R-38 | kód · mockup · audit |
 | ✅ H8 · dielec z inej verzie štandardu (ORANGE `std_version` v Kontrole, čísla bez zmeny) — package [PACKAGE_H8.md](zdroje/bloky/HARDENING/PACKAGE_H8.md) — **PR #441** | R-13 | kód · audit · in-SU |
 | ✅ H9 · ochrana nastavení dodávateľa, pravidiel ABS a kovania pred seedom (súbor zlého tvaru = poškodený; zdravý bez zmeny) — package [PACKAGE_H9.md](zdroje/bloky/HARDENING/PACKAGE_H9.md) — **PR #442** | R-37 | kód · audit |
-| H10 · dve okná SketchUpu neprepíšu pravidlá kovania a rady — package [PACKAGE_H10.md](zdroje/bloky/HARDENING/PACKAGE_H10.md), rez: **✅ H10a · pravidlá kovania (revízia obsahu, predkontrola, pin globálu; Q1 predvolená vratná voľba) — PR #443** · H10b · rozmerové rady (po kľúčoch) | R-35 | kód · audit · in-SU (H10a) |
+| H10 · dve okná SketchUpu neprepíšu pravidlá kovania a rady — package [PACKAGE_H10.md](zdroje/bloky/HARDENING/PACKAGE_H10.md), rez: **✅ H10a · pravidlá kovania (revízia obsahu, predkontrola, pin globálu; Q1 predvolená vratná voľba) — PR #443** · **✅ H10b · rozmerové rady (po kľúčoch s pôvodnou hodnotou kľúča; Q2 predvolená vratná voľba) — PR #?** | R-35 | kód · audit · in-SU (H10a) |
 | H11 · SketchUp 2026.2 (ukončenie bez pádu, načítanie súborov) + minimum SketchUp 2026 | F-01 · F-02 | kód · audit · in-SU |
 | H12 · typy skriniek na jednom mieste + mená rolí | C-01 · C-05 | kód · audit · in-SU · výrobná |
 | H13 · mapa rozširovacích bodov (vrátane pravidiel viazaných na typ) + tabuľka verzií dát | B-06 · B-07 | dokumentácia + guard testy (po H12) |
@@ -76,8 +76,8 @@ predrecenzia, in-SU) sa určí pri package podľa CLAUDE.md; stĺpec je predpokl
   z dielca na platňu, E-11 rozpracované zákazky, E-12 zákaznícky názov položky, E-13 odhad hodín dielne, G-06 poznámka ku skrinke, G-07 pravý klik na skrinku,
   G-08 štetec dekoru.
 - **Akceptačný test V1 na kompletnej reálnej zákazke** (Michal 29.–30.9.2026, rozhodnutia CENY C10/C13) — po V1; pôvodne riadok „V1.0 zostavy" bloku 4 (archív).
-- **Otvorené R-čísla registra auditu 1c** — autorita a verdikty: [AUDIT_REGISTER.md](AUDIT_REGISTER.md), sekcia „Stav po previerke 29.9.2026". R-13, R-37 a R-35 sú v bloku 9
-  (H8–H10), R-38 v H7 (návrh), prvý rez R-15 v H17; ostatné platné položky sú po V1 (R-05 = D-109 nižšie). Pravidlo pre dávky z registra: **Pravidlá plánovania dávok** nižšie.
+- **Otvorené R-čísla registra auditu 1c** — autorita a verdikty: [AUDIT_REGISTER.md](AUDIT_REGISTER.md), sekcia „Stav po previerke 29.9.2026". R-13, R-37 a R-35 uzavrel blok 9
+  (H8–H10, ✅), R-38 v H7 (návrh), prvý rez R-15 v H17; ostatné platné položky sú po V1 (R-05 = D-109 nižšie). Pravidlo pre dávky z registra: **Pravidlá plánovania dávok** nižšie.
 - **D-48 · Zdieľaná knižnica pre 2 PC (Michal + Lucia)** (mimo V1 od 26.8.2026) — **prvá funkcia po V1** (rozhodnuté 6.9.2026) v tvare Odoslať / Aktualizovať s verziami per katalóg, konflikt ručne,
   koreň `H:\Môj disk\NoxunENGINE data`, odhad 3 PR; patrí k nej aj zdieľanie `.skm`. Rozhodnutia
   [zdroje/next_sessions/V1_DEBATA_2026-09-06_LUCIA_KNIZNICE.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_LUCIA_KNIZNICE.md), mechanizmus `zdroje/next_sessions/SYNC_KNIZNICE_NAVRH_2026-09-06.md`
