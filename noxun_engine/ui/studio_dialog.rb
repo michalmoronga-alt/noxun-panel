@@ -74,7 +74,7 @@ module Noxun
       # (od NP-3 aj Narezovy plan — neaktivna polozka uz neexistuje).
       # Predtym postupne zanikli: `mat` (ŠT-2a/2b) · `hw` (ŠT-3a) · `rules`
       # (ŠT-3b-1) · `tpl` (ŠT-3c-1) · `PRODUCTION_BRIDGES` (ŠT-1c PR B3).
-      # Klientska strana (`bridge:` v NAV, `bridgeTo`, `.nbridge`, callback
+      # Klientska strana (`bridge:` v polozke navigacie, `bridgeTo`, `.nbridge`, callback
       # `studio_bridge`) zanikla V TEJ ISTEJ davke — most bez oboch koncov by
       # bol mrtvy kod, ktory prezije prve „to sa este zide".
 

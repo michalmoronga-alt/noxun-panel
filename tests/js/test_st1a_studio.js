@@ -216,14 +216,18 @@ R.groups().forEach(function(g){
 const BOM_ITEM = S.navItem('bom');
 ok(BOM_ITEM && !BOM_ITEM.bridge && !BOM_ITEM.disabled, 'Kusovník je ZIVA sekcia tohto okna');
 
-// Kazda polozka navigacie je bud sekcia, alebo premostenie, alebo ma dovod.
-// Polozka bez jedneho z troch by bola tichy mrtvy klik.
-R.groups().forEach(function(g){
-  g.items.forEach(function(it){
-    ok(R.has(it.id) || it.bridge || it.disabled,
-       `polozka navigacie „${it.t}" musi byt sekcia, premostenie alebo mat dovod`);
-    ok(!!it.ic, `polozka „${it.t}" ma ikonu (zbalena navigacia ukazuje LEN ikony)`);
-  });
+// Kazda sekcia kontraktu (NEZAVISLA fixtura h14, zhodna so StudioDialog::SECTIONS)
+// ma v navigacii ZIVU polozku s ikonou. Polozka bez nej by bola tichy mrtvy klik.
+// H14a (predrecenzia P3): ide sa z fixtury, nie z registra — inak by kontrola
+// overovala register sam sebou.
+const FIX_IDS = require(path.join(__dirname, '..', 'fixtures', 'h14_studio_sections.json')).sections
+  .map(function(s){ return s.id; });
+eq(FIX_IDS.length, 14, 'fixtura kontraktu nesie 14 sekcii');
+FIX_IDS.forEach(function(id){
+  const it = S.navItem(id);
+  ok(it && it.id === id && !it.bridge && !it.disabled,
+     `sekcia „${id}" ma v navigacii zivu polozku (nie premostenie, nie neaktivnu)`);
+  ok(it && !!it.ic, `polozka „${id}" ma ikonu (zbalena navigacia ukazuje LEN ikony)`);
 });
 
 // --- 8b) pohlad PLATNE: duplak (2B-1 / D-43) --------------------------------
