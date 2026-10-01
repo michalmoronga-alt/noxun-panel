@@ -64,8 +64,10 @@
     --nx-mark-bg:#fff3b0;
     /* prekrytia */
     --nx-scrim:rgba(38,50,56,0.45); --nx-modal-shadow:rgba(0,0,0,0.25);
-    /* ===== SEMAFOR — REZERVOVANE (B6). NIKDE sa nepouzivaju; vyhradene pre stavovy
-       semafor (paralelna davka). Vyznamy sa NESMU miesat s ABS ani stavmi OK/CHYBA. ===== */
+    /* ===== SEMAFOR (B6) — LEN sekcia Kontrola v Studiu: cipy zavaznosti `.schip`
+       a bodky riadkov `.ctrlrow` (studio.html). Inde sa nepouzivaju — upozornenie
+       mimo Kontroly je jantarove (--nx-warn*). Vyznamy sa NESMU miesat s ABS ani
+       stavmi OK/CHYBA (docs/UI_DIZAJN.md §2). ===== */
     --nx-state-red:#d32f2f; --nx-state-orange:#f9a825; --nx-state-green:#388e3c;
     /* ===== D-29 sticky hlavicka + ikony ===== */
     --nx-logo:#78909c;             /* firemne logo — tlmene */
@@ -824,7 +826,7 @@
   .hwbuy { font-size: 11px; color: var(--nx-ink-muted); margin: 1px 0 0 2px;
            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* nekompletny nakup (chyba set/kod/pasmo) = jantarove UPOZORNENIE;
-     semaforove --nx-state-* su rezervovane a nesmu sa sem miesat */
+     semaforove --nx-state-* patria len Kontrole a nesmu sa sem miesat */
   .hwbuy.hwbuy-warn { color: var(--nx-warnchip-fg); }
   /* KOV-D2b: CHIPY OSI ZAMKU (vyska, NL). TEN ISTY markup kresli riadok vysuvu
      v sekcii Kovanie aj riadok zasuvky v karte cela — obal `.hwax` nesie
@@ -939,7 +941,7 @@
                           white-space: nowrap; }
   /* Chip pri nazve. „ručná" je NEUTRALNY stitok (nie je to chyba), „bez
      vlastníka" a „chýba v katalógu" su JANTAROVE stavy — semaforove
-     --nx-state-* su rezervovane pre Kontrolu a sem sa miesat nesmu. */
+     --nx-state-* patria len Kontrole a sem sa miesat nesmu. */
   .hwchip { font-size: 9.5px; font-weight: 600; line-height: 1.6; padding: 0 5px;
             border-radius: 9px; white-space: nowrap; color: var(--nx-ink-muted);
             background: var(--nx-surface-sunken); border: 1px solid var(--nx-border); }
