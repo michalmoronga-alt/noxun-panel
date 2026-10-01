@@ -36,7 +36,7 @@ predrecenzia, in-SU) sa určí pri package podľa CLAUDE.md; stĺpec je predpokl
 | Dávka | Položky (ID z triedenia) | Predpokladaná trieda |
 |---|---|---|
 | ✅ H1 · pravidlá čítania pre agentov (kapitoly namiesto celých súborov, PLAN bez hotových blokov, STAV po docs PR, hranice triedy dávky) — **PR #433** | B-01 · B-04 · B-08 · B-09 | dokumentácia |
-| H2 · fotenie okien pre UI PR (prehrávač dát pluginu + fotky Inspectora a sekcií Štúdia) | D-10 | nástroj, plugin sa nemení |
+| ✅ H2 · fotenie okien pre UI PR (prehrávač dát pluginu + fotky Inspectora a sekcií Štúdia) — **PR #434** | D-10 | nástroj, plugin sa nemení |
 | H3 · zavádzajúce údaje v okne (platne v Kusovníku, tabuľka ponuky, semafor Kontroly, Nákup po slovensky, log po novom súbore, sadzby) | A-01 · A-02 · A-03 · A-04 · A-06 · A-07 | kód · výrobná/cenová (zobrazenie) |
 | H4 · jazyk, čísla a vzhľad (formát čísel a jednotiek, Obnoviť, texty, rozbaľovačky a stĺpce, ikona, ABS „dookola") | D-04 · D-06 · D-07 · D-08 · D-09 · D-11 | kód UI |
 | H5 · dokumentácia okien a UI dizajnu (aktuálny stav oddelený od histórie, strážca rastu, zastarané vety) | B-02 · B-03 · B-05 | dokumentácia |

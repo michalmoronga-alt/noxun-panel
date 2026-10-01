@@ -17,6 +17,31 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **NÁSTROJ — H2 · fotenie okien pre UI dávky (1.10.2026, PR #434, blok 9 · HARDENING PO V1, položka D-10 z triedenia; plugin sa nemení, verzia
+  ostáva 0.17.0).** Z prototypu krížového auditu (prehrávanie nahratých Ruby→JS skriptov v prehliadači) je udržiavaný nástroj
+  `scripts\ui_foto.ps1` + `scripts\ui_foto\` (`record.rb` nahrávka, `nx_stub.js` prehrávač, `serve.py` lokálny server len na 127.0.0.1,
+  `shots.json` zoznam fotiek, `sheet.html` kontaktný hárok). **`-Shoot`** (predvolený) skopíruje aktuálne `noxun_engine/ui` do dočasnej stránky
+  v %TEMP%, vloží prehrávač (nikdy do repa), headless Chrome (záloha Edge) nafotí Inspector 486×850 (bez výberu + Korpus, Zóny, Čelá, Kovanie)
+  a 14 sekcií Štúdia 1280×800, k tomu verziu na **celú výšku obsahu** (prehrávač zmeria vnútorné posuvné oblasti) a `index.html` hárok s hranicami.
+  **`-Record`** spraví novú nahrávku overenou slučkou runnera (`-RubyStartup` + kópia ENGINEtests.skp, **zdieľaný `deploy.lock` + sentinel**
+  `last_run.txt`, inštancia sa po koncovom markeri sama uloží a zavrie, proces sa nezabíja): ukážková kuchyňa zo šablón (4 dolné + 3 horné,
+  W1100 / F206), zápis `execute_script` Inspectora a Štúdia surovými bajtmi (`File.binwrite`, nie `to_json` — diakritika), značky pre každú
+  sekciu `StudioDialog::SECTIONS`, obrázok modelu. Katalógy: predvolene **kópia** reálneho `%APPDATA%\NOXUN\Engine` v izolovanom priečinku
+  (reálne súbory sa nezapisujú; bez stavu aktualizácie, témy a lockov), `-FactoryData` = čistý seed. Chyba prehrávania (JS chyba po zmene UI,
+  chýbajúca značka) dá do fotky **červený pás** a v hárku kartu CHYBA, exit 1 — nikdy tichá prázdna fotka. **Testy:** nový `test_ui_foto.rb`
+  (stub nie je v `noxun_engine/ui`, `<meta charset>` na mieste vloženia, fotky Štúdia = `SECTIONS` v poradí, značky Inspectora z `record.rb`,
+  kontexty z `shell.js`, surové bajty, ASCII .ps1 a zdieľaný zámok s runnerom) a `test_ui_foto_stub.js` (výber súborov do `upto` nad fixtúrou
+  zoznamu mien `tests/fixtures/ui_foto/index.json`); headless 4917 PASS / 0 FAIL, 146 JS sád zelených, encoding guard čistý. **Dôkaz:**
+  `-Record` v SketchUpe 2026 2× (prvý beh odhalil iné mená šablón v reálnej knižnici → opravené kandidáty), druhý beh: 58 súborov nahrávky
+  (panel 14, štúdio 27), inštancia skončila sama s kódom 0; `-Shoot` 29 PNG (19 okien + obrázok modelu, 0 s problémom); `-Shoot` nad nahrávkou
+  prototypu aj test chyby (zmazaná značka + rozbitý skript → 2 karty CHYBA s červeným pásom). Dokumentácia: [CLAUDE.md](../../CLAUDE.md) sekcia
+  Testovanie odsek „Fotenie okien (UI dávky)" + veta v riadku UI tabuľky povinného čítania; odsek v `docs/architecture/` nevznikol (testovacie
+  nástroje tam nemajú kapitolu — hlavička skriptu je autorita). **Review #434 (kolo 1, 4× P2):** každé zlyhanie nahrávky po koncovom markeri
+  SketchUp zavrie (aj zlyhaný `load` v boot.rb); predvolená nahrávka pre `-Shoot` je len tá s markerom úspechu `NAHRAVKA_OK.txt` (zapisuje sa až
+  po validácii; výber a `-Only` sú v `scripts\ui_foto\lib.ps1`, testované cez pwsh); prehrávač posiela report aj po ustálení (6 s) a pri každej
+  neskorej chybe prekreslí pás (rozpočet virtuálneho času Chrome 9,5 s); výstup `shots_<čas>_<PID>` pre súbežné behy. Po oprave headless 4920 PASS / 0 FAIL, 146 JS sád,
+  `-Shoot` nad overenou nahrávkou 29 PNG bez problému, neskorá chyba (časovač 2 s) → karta CHYBA s pásom.
+
 - **DOCS — H1 · pravidlá čítania pre agentov (1.10.2026, PR #433, blok 9 · HARDENING PO V1, len dokumentácia; verzia pluginu sa nemení).** Položky krížového
   auditu **B-01, B-04, B-08, B-09**. **B-01:** tabuľka „Povinné čítanie" v [CLAUDE.md](../../CLAUDE.md) pri každom súbore nad ~50 kB menuje kapitolu alebo odsek
   a ako ho nájsť Grepom (riadok UI: UI_DIZAJN §1–§3 + odsek dotknutej UI sekcie alebo modulu v `ui-lifecycle.md` — po review #433 všeobecne, s príkladmi

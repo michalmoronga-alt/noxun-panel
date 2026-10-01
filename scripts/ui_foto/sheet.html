@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fotky okien Noxun</title>
+<!-- Kontaktny harok scripts/ui_foto.ps1 -Shoot. Skript doplni DATA (JSON) — nic ine sa nemeni. -->
+<style>
+  :root { --bg:#f4f5f7; --card:#fff; --ink:#1d2329; --mute:#5d6873; --line:#d9dee3; --ok:#1f7a3a; --err:#b3261e; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 "Segoe UI", Arial, sans-serif; }
+  header { padding: 16px 20px 8px; }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  .meta { color: var(--mute); font-size: 13px; }
+  .limits { margin: 10px 20px; padding: 10px 14px; background: #fff8e5; border: 1px solid #ecd9a3; border-radius: 6px; font-size: 13px; }
+  .limits b { color: var(--warn); }
+  .limits ul { margin: 4px 0 0 18px; padding: 0; }
+  .sum { margin: 0 20px 6px; font-weight: 600; }
+  .sum.err { color: var(--err); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; padding: 8px 20px 24px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
+  .card.err { border: 2px solid var(--err); }
+  .thumb { display: block; height: 220px; background: #e9ecef; overflow: hidden; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+  .card .t { padding: 8px 10px 2px; font-weight: 600; }
+  .card .s { padding: 0 10px 8px; font-size: 12px; color: var(--mute); }
+  .card .s a { color: inherit; }
+  .badge { display: inline-block; padding: 0 6px; border-radius: 9px; font-size: 11px; font-weight: 700; color: #fff; background: var(--ok); margin-right: 6px; }
+  .badge.err { background: var(--err); }
+  .badge.none { background: var(--warn); }
+  .errs { margin: 0 10px 10px; padding: 6px 8px; background: #fdecea; color: var(--err); font-size: 12px; border-radius: 4px; white-space: pre-wrap; word-break: break-word; }
+  @media (max-width: 600px) { .grid { grid-template-columns: 1fr; padding: 8px 12px 20px; } header, .limits, .sum { margin-left: 12px; margin-right: 12px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Fotky okien Noxun Engine</h1>
+  <div class="meta" id="meta"></div>
+</header>
+<div class="limits">
+  <b>Hranice fotiek</b> (nie sú to snímky SketchUpu, ale prehranie nahratých dát pluginu v prehliadači):
+  <ul>
+    <li>statický stav po otvorení — bez modálnych okien, hoveru a rozbalených ponúk,</li>
+    <li>Chrome, nie CEF SketchUpu — písmo a rozbaľovačky sa môžu mierne líšiť,</li>
+    <li>svetlá téma,</li>
+    <li>nahrávka zastará, keď dávka mení tvar dát z Ruby — vtedy <code>-Record</code> znova (zmeny JS/CSS/HTML stačí <code>-Shoot</code>),</li>
+    <li>fotka s červeným pásom = prehranie nahrávky v aktuálnom UI zlyhalo (JS chyba) — nie je to obraz okna.</li>
+  </ul>
+</div>
+<div class="sum" id="sum"></div>
+<div class="grid" id="grid"></div>
+<script>
+const DATA = __NX_SHEET_DATA__;
+(function () {
+  function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+  const m = DATA.meta || {};
+  document.getElementById('meta').textContent =
+    'UI: ' + (m.ui || '?') + ' · nahrávka: ' + (m.rec_version || '?') + ' (' + (m.rec_time || '?') + ') · nafotené ' + (m.shot_time || '?') +
+    ' · prehliadač: ' + (m.browser || '?');
+  const items = DATA.items || [];
+  const bad = items.filter(i => i.status !== 'ok').length;
+  const sum = document.getElementById('sum');
+  sum.textContent = items.length + ' fotiek' + (bad ? ' · ' + bad + ' s problémom (červený rámik)' : ' · všetky prehrané bez chyby');
+  if (bad) sum.classList.add('err');
+  const grid = document.getElementById('grid');
+  items.forEach(function (it) {
+    const card = el('div', 'card' + (it.status === 'ok' ? '' : ' err'));
+    const a = el('a', 'thumb'); a.href = it.file; a.target = '_blank';
+    const img = el('img'); img.src = it.file; img.alt = it.label; img.loading = 'lazy'; a.appendChild(img);
+    card.appendChild(a);
+    card.appendChild(el('div', 't', it.label));
+    const s = el('div', 's');
+    const b = el('span', 'badge' + (it.status === 'ok' ? '' : (it.status === 'none' ? ' none' : ' err')),
+      it.status === 'ok' ? 'OK' : (it.status === 'none' ? 'BEZ REPORTU' : 'CHYBA'));
+    s.appendChild(b);
+    s.appendChild(document.createTextNode(it.id + ' · ' + it.size + ' '));
+    if (it.long) { const l = el('a', null, '· celá výška'); l.href = it.long; l.target = '_blank'; s.appendChild(l); }
+    card.appendChild(s);
+    if (it.status === 'none') card.appendChild(el('div', 'errs', 'Prehrávač neposlal report — stub sa v stránke nespustil alebo Chrome nedobehol.'));
+    if (it.errors && it.errors.length) card.appendChild(el('div', 'errs', it.errors.slice(0, 6).join('\n')));
+    grid.appendChild(card);
+  });
+})();
+</script>
+</body>
+</html>
