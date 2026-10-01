@@ -405,7 +405,8 @@ module Noxun
 
         # --- ŠT-1c PR B1: sekcia ROZPOCET -----------------------------------
         #
-        # JEDINA sekcia, ktora ZAPISUJE do modelu (1 mutacia = 1 krok Spat).
+        # Inline edit DAT ROZPOCTU v modeli (1 mutacia = 1 krok Spat). Do modelu
+        # zapisuju aj Materialy, Kovanie, Pravidla a Sablony (UI_DIZAJN §5.16).
         # Vsetky tela su v `ProductionCore` — okno odovzdava LEN svoj generacny
         # token, svoj status, svoje echo a SVOJ REFRESH.
         #

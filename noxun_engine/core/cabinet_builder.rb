@@ -52,7 +52,7 @@ module Noxun
 
       # ROH-A1 · K3: DOLNA SLEPA ROHOVA SKRINKA. Konstrukcia (hlbka, dno,
       # strop, chrbat, sokel, nohy) je PRESNE ako dolna (DC mal dve nadnoze
-      # a pevny vlozeny chrbat — potvrdi Michal v mockupe; zmena predvolieb
+      # a pevny vlozeny chrbat — potvrdil Michal: mockup O1, R10; zmena predvolieb
       # nemeni kontrakt). Navyse rohova zostava na prednej rovine: dvere
       # v DVEROVEJ CASTI, blenda korpusova cez slepu cast, vystuha zavesov,
       # CR 1, CR 2 a rohova vystuha (`Construction.corner_parts`). Cela su
@@ -77,7 +77,7 @@ module Noxun
       # Strana DVEROVEJ casti spredu; roh je na opacnej strane. Ina hodnota ->
       # `left` (uzavrety slovnik, vzor `DW_CLASSES`).
       CORNER_SIDES = %w[left right].freeze
-      # Rozsahy (mm) — NAVRH, potvrdi Michal v mockupe ROH-B (zmena rozsahu =
+      # Rozsahy (mm) — potvrdil Michal: mockup O2, R10 28.9. (zmena rozsahu =
       # len clamp, kontrakt sa nemeni). CR pod ~50 by narazila uchytka
       # susedneho radu (krizovy audit G6).
       CORNER_RANGES = {

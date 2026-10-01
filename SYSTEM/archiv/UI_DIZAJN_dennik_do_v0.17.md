@@ -1,17 +1,22 @@
+# Archív — UI dizajn (`UI_DIZAJN.md`) v plnom znení do v0.17.4
+
+> **Archív, nie autorita.** Toto je plné znenie `docs/UI_DIZAJN.md` k 1.10.2026 (v0.17.4, stav po dávke H5a) pred jeho rozdelením na normu
+> a denník v dávke **H5b** (blok 9 · HARDENING PO V1, triedenie B-05, krížový audit CS-06 a CN-08/CN-09). Aktuálna norma žije v
+> [../../docs/UI_DIZAJN.md](../../docs/UI_DIZAJN.md) — **keď sa tieto dva texty rozchádzajú, platí živý dokument.**
+> Obsahuje priebeh dávok (ktorá dávka čo zaviedla, čísla verzií a PR, kolá review), zaniknuté okná a premostenia a dôvody pravidiel v pôvodnom
+> znení. Text sa nedopĺňa ani neopravuje — obsahuje aj vety, ktoré H5b opravila ako zastarané (napr. „semaforové tokeny sa nikde nepoužívajú",
+> „výklop zatiaľ NEvyberateľný", „inventár je úplný k v0.7.28", štýly kostry D-15 v `studio.html`). Čítať **len Grepom** podľa nadpisu — nadpisy sú
+> zhodné s pôvodným súborom.
+
+---
+
 # Noxun Engine — UI dizajn (ľahký design system)
 
-Norma vzhľadu a správania dvoch okien pluginu — **Inspector** (`panel.html`) a **Štúdio** (`studio.html`).
-Cieľ: jeden vizuálny jazyk, žiadne natvrdo písané farby, žiadne emoji v UI chrome.
+Referencia pre vzhľad panela Inspector a satelitných okien. Cieľ: jeden vizuálny
+jazyk, žiadne natvrdo písané farby, žiadne emoji v UI chrome.
 
 Zdroj pravdy pre farby je `noxun_engine/ui/css/panel.css` (blok `:root`). Tento
 dokument opisuje **prečo** a **ako** — tabuľka tokenov nižšie je zrkadlom `:root`.
-
-**Ako sa číta:** pri KAŽDEJ UI práci §1–§3 (princípy, tokeny, typografia); pri ikone §4, pri komponente dotknutý §5.x.
-Kde komponent žije v kóde a odkiaľ berie dáta, opisuje [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) (Grep podľa nadpisu).
-**Údržba:** dávka prepíše dotknutý odsek **na mieste** a opisuje pravidlo, nie priebeh prác. Ktorá dávka čo zaviedla, čísla verzií,
-PR a kôl review patria do [../SYSTEM/archiv/KRONIKA.md](../SYSTEM/archiv/KRONIKA.md); jediné miesto pre historické značky v tomto súbore
-je sekcia „História" na konci. Strop veľkosti aj zákaz značiek stráži `tests/pure/test_docs_navigacia.rb`. Čísla § sa nemenia —
-odkazujú na ne kód, testy a CLAUDE.md.
 
 ---
 
@@ -26,7 +31,7 @@ odkazujú na ne kód, testy a CLAUDE.md.
   ikony zo spritu `icons.js`. Emoji/unicode glyfy sa v ovládaní nepoužívajú.
   **Mazanie riadku je ikona `x`** s `aria-label` a `title`, ktoré povedia, ČO sa
   odoberá („Odobrať pásmo", „Odstrániť hmotnostné pásmo") — nikdy písmeno „×"/„✕"
-  (H4 · D-08).
+  (H4 · D-08: sety kovania a Pravidlá to ešte mali).
 - **Farba nesie význam.** Zelená = primárna akcia, **teal (firemná NOXUN) = výber/
   aktívny stav**, červená = chyba/mazanie, jantár = upozornenie/override. Významy
   sa nemiešajú.
@@ -39,7 +44,7 @@ odkazujú na ne kód, testy a CLAUDE.md.
   nekomponentové — farebné štvorčeky 2–3 px, pill 12 px / 99 px, 50 % kruhy.
 - **Výstup nikdy nevyzerá ako vstup.** Dopočítaný údaj je **text** (`.inforow`),
   nie readonly pole — inak sa doň používateľ márne pokúša písať.
-- **Klikateľné je len to, čo niekam vedie** (N13). Informačný
+- **Klikateľné je len to, čo niekam vedie** (N13, dotiahnuté v UI-D3). Informačný
   údaj, ktorý má existujúci cieľ, je `<button>` a otvorí ho **rovno na správnom
   mieste** (deep-link). Údaj bez cieľa ostáva textom — predstierať preklik do
   nikam je horšie než nekliknuteľný riadok. Nedostupná akcia sa hlási cez
@@ -60,7 +65,7 @@ odkazujú na ne kód, testy a CLAUDE.md.
   Pole hľadania má krátky hint **„Hľadať…"**; rozsah povie `title` a `aria-label`.
 - **Zamknuté ⇔ vypísané.** Pri rozmerových poliach s automatikou (výšky čiel,
   „Prvá zóna") drží **vypísaná hodnota**, prázdne pole je AUTO. Samostatný zámok
-  by vedel byť zapnutý nad prázdnym poľom a nerobil by nič — dve pravdy o tom istom.
+  vedel byť zapnutý nad prázdnym poľom a nerobil nič — dve pravdy o tom istom.
   Návrat na automat robí **chip AUTO**, ktorý sa ukazuje len pri vypísanej
   hodnote.
 - **Jedna voľba z N je segmentový prepínač** (`.segrow`), nie rada rádií ani
@@ -73,7 +78,7 @@ odkazujú na ne kód, testy a CLAUDE.md.
   warnpanel, `.miniopts` rozmerových radov, nastavenie zvýraznenia hrán):
   vertikálny priestor sa nesmie meniť tým, že si niečo otvoríš.
 - **Pomocný text = tooltip, stavová veta ostáva viditeľná** (D-130a). Vysvetlenie
-  „ako to funguje" nesmie trvale zaberať riadok — ide do `.nxtip` (§5.7).
+  „ako to funguje" nesmie trvale zaberať riadok — ide do `.nxtip` (§5.x nižšie).
   **Stavová veta je niečo iné:** červený dôvod, jantárové odporúčanie, „bez
   klasifikácie" či návrhová hláška D-120 hovoria o TOMTO čele TERAZ a musia byť
   vidieť bez hľadania. `.hint` sa v novom UI **nepridáva**.
@@ -102,7 +107,7 @@ natvrdo hex. Nedefinovaný token = zahodená vlastnosť (skontroluj preklepy).
 | Token | Hex | Použitie |
 |---|---|---|
 | `--nx-ink` | `#263238` | základný text |
-| `--nx-ink-title` | `#1b3a4b` | `h1`, nadpis sekcie Štúdia, titulok modalu, výrazné čísla a súčty (Štúdio) |
+| `--nx-ink-title` | `#1b3a4b` | `h1` (satelitné okná) |
 | `--nx-ink-strong` | `#37474f` | nadpisy, legendy |
 | `--nx-ink-label` | `#455a64` | labely polí |
 | `--nx-ink-muted` | `#607d8b` | sekundárny text |
@@ -130,8 +135,8 @@ natvrdo hex. Nedefinovaný token = zahodená vlastnosť (skontroluj preklepy).
 | `--nx-select-bg-hover` | `#d6eef1` | hover riadku čela |
 | `--nx-part-border` | `#7fc4cf` | rámik karty dielca |
 
-> **Osem tokenov vyššie + `--nx-part-bg` = „výberová rodina"** (UI-01, rozhodnutie
-> O1 z 15.8.2026 — firemný teal loga a webu). Je to jediná
+> **Osem tokenov vyššie + `--nx-part-bg` = „výberová rodina"** (od UI-01, rozhodnutie
+> O1 z 15.8.2026 — firemný teal loga a webu; predošlá modrá skončila). Je to jediná
 > rodina, ktorú smie prepnúť **téma** (sekcia 2.1). Primárna akcia zostáva zelená (O2).
 > Kreslené farby 2D náhľadu (`ui/js/preview.js`) sú **zrkadlom** týchto tokenov — SVG
 > atribúty nevedia čítať `var()`, takže zmena tokenu znamená zmenu aj tam.
@@ -212,18 +217,16 @@ natvrdo hex. Nedefinovaný token = zahodená vlastnosť (skontroluj preklepy).
 > preto, že ich potrebujú aj pravidlá mimo hlavičky (fokus nesmie skončiť pod
 > sticky lištou, obsah nesmie zaliezť pod rail). Téma sa ich netýka.
 
-### Semafor — stavy nálezov Kontroly (len tam)
-| Token | Hex | Použitie |
+### Semafor — REZERVOVANÉ (nepoužívať)
+| Token | Hex | Poznámka |
 |---|---|---|
-| `--nx-state-red` | `#d32f2f` | nález RED — bodka čipu závažnosti a riadku nálezu |
-| `--nx-state-orange` | `#f9a825` | nález ORANGE — bodka čipu závažnosti a riadku nálezu |
-| `--nx-state-green` | `#388e3c` | čip skriniek bez nálezu |
+| `--nx-state-red` | `#d32f2f` | vyhradené pre stavový semafor |
+| `--nx-state-orange` | `#f9a825` | vyhradené pre stavový semafor |
+| `--nx-state-green` | `#388e3c` | vyhradené pre stavový semafor |
 
-> Semaforové tokeny nesie **výhradne sekcia Kontrola v Štúdiu** — čipy závažnosti
-> `.schip` a bodky riadkov `.ctrlrow` (`studio.html`). Inde sa nepoužívajú:
-> upozornenie mimo Kontroly je jantárové (`--nx-warn*` / `--nx-warnchip-*`), nie
-> semafor. Ich významy sa **nesmú miešať** s ABS farbami ani so stavmi OK/chyba,
-> ktoré majú vlastné tokeny.
+> Semaforové tokeny sú **len zadefinované**. Nikde sa nepoužívajú — sú rezervou pre
+> stavový semafor (paralelná dávka). Ich významy sa **nesmú miešať** s ABS farbami
+> ani so stavmi OK/chyba, ktoré majú vlastné tokeny.
 
 ---
 
@@ -297,7 +300,6 @@ requirom). Pravidlá:
 
 - Zdroj: `noxun_engine/ui/js/icons.js` — inline SVG sprite, štýl **Lucide**
   (24×24, stroke-2, `currentColor`), licencie ISC + MIT (viď `THIRD_PARTY_NOTICES.md`).
-  Načítavajú ho obe okná (Inspector aj Štúdio) — nové ovládacie prvky používajú sprite, nie glyfy.
 - Vloženie: `<svg class="ic" aria-hidden="true"><use href="#i-NÁZOV"/></svg>`
   alebo `NXIcons.svg('názov')` do reťazca. Farbu a hrúbku dáva trieda `.ic`
   (stroke = `currentColor`), takže ikona dedí farbu textu tlačidla.
@@ -312,21 +314,13 @@ requirom). Pravidlá:
   **hlavička 24 px**, toolbar 19 px, „O plugine" 28 px. Zhodu kriviek aj veľkosť
   v hlavičke stráži guard test `tests/pure/test_ui02_toolbar.rb`.
 
-**Navigácia Štúdia** (každá položka má inú ikonu — guard `tests/pure/test_h4b_texty_vzhlad.rb`):
-`list` (Kusovník) · `clipboard-check` (Kontrola; aj stav „Overiť cenu" v Rozpočte, §5.16) · `cart` (Nákup kovania) ·
-`euro` (Rozpočet) · `file-text` (Cenová ponuka; aj príloha PDF spotrebiča) · `scissors` (Nárezový plán) ·
-`layers` (Materiály) · `hammer` (Kovanie) · `appliance` (Spotrebiče) · `settings` (Pravidlá) · `star` (Šablóny) ·
-`truck` (Dodávateľ / Demos) · `sliders-horizontal` (Nastavenia rozpočtu) · `info` (O plugine);
-`panel-left` zbalí navigáciu na ikony.
-
-Ostatný set: `maximize` (fit), `alert`, `lock` / `lock-open`, `eye` / `eye-off`,
-`copy`, `factory` (hlavička skupiny podľa výrobcu v Materiáloch), `settings`, `star`, `rotate-ccw` („Vrátiť…", §1), `x`, `plus`,
-`check`, `chevron-right` (disclosure), `chevron-down` (rozbalenie — rozmerový
-rad, combobox, ponuka stĺpcov), `link`, `search`, `arrow-left`, `arrow-right`
-(preklik „Otvoriť v Kovaní" z karty čela), `trash`, `help-circle` (tooltip `.nxtip`, §5.7),
+Aktuálny set: `maximize` (fit), `alert`, `lock` / `lock-open`, `eye` / `eye-off`,
+`copy`, `factory` (Výroba), `settings`, `star`, `rotate-ccw` (reset), `x`, `plus`,
+`check`, `chevron-right` (disclosure), `chevron-down` (pravá polovica split
+tlačidla — D-105), `link`, `search`, `arrow-left`, `trash`,
 `pencil`, `box` (tab Korpus), `layout-grid` (tab Zóny), `columns-2` (tab Čelá),
 `layers` (Materiály), `globe` (universal ABS), `info` (banner),
-`refresh-cw` („Obnoviť" všade, §1; aj Aktualizovať z Demosu — detail dekoru),
+`refresh-cw` (Aktualizovať z Demosu — detail dekoru),
 `cloud-download` (Pridať z Demosu; aj badge väzby na dlaždici — D-56),
 `external-link` (Otvoriť u dodávateľa — riadok variantu, D-60),
 `arrow-left-right` (Nahradiť UNI… — riadok KONTROLY v Štúdiu, D-83),
@@ -335,20 +329,21 @@ od H4 · D-06 aj spúšťač ponuky „⋯" lišty Materiálov — núdzové vr�
 `sliders-horizontal` (H4 · D-09 — Nastavenia rozpočtu: navigácia Štúdia, tlačidlo
 „Nastavenia" v lište Rozpočtu a akcia nálezu Kontroly; Lucide `sliders-horizontal`.
 Koleso `settings` ostáva Pravidlám ako v Inspectore a `euro` Rozpočtu — v zbalenej
-navigácii sa tak žiadne dve položky nezlievajú),
+navigácii sa tak žiadne dve položky nezlievajú; guard `test_h4b_texty_vzhlad.rb`
+stráži jedinečnosť ikon navigácie),
 `download` (⬇ export súboru — XLSX rozpočet, E-b),
 `profile` (vlastný symbol — úchytkový profil v riadku čela, D-90),
-`wrench` (tlačidlo „Katalóg" v skupine Kovanie Inspectora; značka kovania šablóny — KOV-I), `logo`,
+`wrench` (Kovanie — katalóg kovania), `logo`,
 `cabinet` / `front` / `hammer` / `shell` / `slab` (UI-B1 — rail Inspectora:
 Korpus · Čelá · Kovanie · ABS kontrola · dočasný dielec/doska),
 `camera` (UI-B2 — kamera v spodnom páse náhľadu),
 `arr-h` / `arr-v` / `arr-d` / `plinth` (UI-B3 — rozmery v sektore Základné),
 `p-top` / `p-bottom` / `p-side` / `p-back` / `brace` (UI-B3 — ikony skupín
-Nastavení; `brace` čaká na skupinu Výstuhy),
+Nastavení; `brace` čaká na skupinu Výstuhy z bloku UI-C),
 `palette` (UI-B3 — sekcia Vzhľad v koliesku),
 `cab-low` / `cab-high` (UI-C1b — typ vkladaného objektu: skrinka na sokli vs.
-zavesená; typ „Doska" používa existujúci `slab`),
-`cab-corner` (typ vkladaného objektu **Rohová**, presne podľa
+zavesená; tretí typ „Doska" používa existujúci `slab`),
+`cab-corner` (typ vkladaného objektu **Rohová**; od ROH-B2 presne podľa
 schváleného mockupu, O4: ako „Dolná" skrinka **na sokli**, vľavo dvere
 s úchytkou pri voľnej hrane, vpravo **prekrížená slepá časť** — prekríženie
 = blenda, ten istý jazyk ako `front-blind`; kreslí predvoľbu „dvere vľavo",
@@ -365,7 +360,8 @@ s existujúcim `columns-2` tvoria štvoricu „2/3 stĺpce · 2/3 riadky“),
 `front-lift` / `front-fall` / `front-blind` (KOV-A2a — **typegrid karty čela**:
 výklop = panel dole + prerušovaná šípka nahor, sklop = panel hore + šípka nadol,
 blenda = prekrížený panel. Tá istá mapa `FRONT_TYPE_ICON` kreslí ikonu v riadku
-aj dlaždicu v karte, takže sa nemôžu rozísť),
+aj dlaždicu v karte, takže sa nemôžu rozísť; do KOV-A1 mali tieto typy dočasný
+fallback `front`),
 `dir-left` / `dir-right` / `dir-unset` (KOV-A2a — **smer otvárania** v segmente
 karty: smer = **strana pántov**, takže šípka ukazuje na VOĽNÚ hranu (`dir-left`
 = pánty vľavo = hrot vpravo); „neurčené“ je prerušovaný kruh s otáznikom — je to
@@ -380,8 +376,8 @@ rovnako ako v `core/grain_check.rb`. **Jedna kresba pre obe miesta** — rail
 Inspectora aj prepínač „Smer kresby" v lište sekcie Kontrola v Štúdiu),
 `appliance` (S1-A2 — sekcia SPOTREBIČE v navigácii Štúdia; Lucide
 `refrigerator`: obrys s vodorovnou deliacou čiarou a dvoma úchytkami.
-Kategóriové riadky **stromu katalógu** ikonu nemajú — majú text; nesie ju
-**stĺpec Kategória v pohľade „V zákazke“** a **riadok „Spotrebič“
+Kategóriové riadky **stromu katalógu** ikonu nemajú — majú text; od S1-B2 ju
+nesie **stĺpec Kategória v pohľade „V zákazke“** a **riadok „Spotrebič“
 v Inspectore**, keď kus spotrebič len očakáva (viazaný riadok má `check`,
 nesediaci `alert` — ikona hovorí stav, nie druh)),
 `unlink` (S1-B2 — „odpojiť spotrebič od vlastníka“ v pohľade „V zákazke“ aj
@@ -397,11 +393,169 @@ existujúci `file-text`, takže druh prílohy je vidieť aj bez fotky),
 pravidlo ako `dir-left`/`dir-right` v karte. **Jedna kresba pre obe miesta** —
 rail Inspectora aj prepínač „Smer otvárania" v lište sekcie Kontrola).
 
-> **Inventár je úplný:** zoznamy vyššie obsahujú každý kľúč spritu `icons.js` (a `logo`) — stráži to guard
-> `tests/pure/test_docs_navigacia.rb`, takže nová ikona bez riadku tu neprejde. Nová ikona sa pridáva **len keď
-> pre ňu neexistuje významovo správna existujúca** — oko warnpanelu je ten istý `eye` ako „Označiť v modeli"
-> v karte dielca (rovnaký význam = rovnaká kresba) a rohový trojuholník flyoutu (§5.11) je CSS znamienko, nie
-> symbol zo spritu.
+> **Inventár je úplný k v0.7.28** (blok UI-D uzavretý, `grain` doplnený dávkou
+> „Kontrola kresby v raile"; dávka „ABS 3-stav v raile" **žiadnu ikonu
+> nepridala** — rohový trojuholník je CSS znamienko, nie symbol zo spritu, a
+> `shell` ostáva): zoznam vyššie zodpovedá kľúčom v `icons.js` 1:1. Nová ikona sa pridáva **len keď pre ňu neexistuje
+> významovo správna existujúca** — UI-D3 napríklad nepridalo žiadnu, oko
+> warnpanelu je ten istý `eye` ako „Označiť v modeli" v karte dielca (rovnaký
+> význam = rovnaká kresba).
+
+> Okno **Štúdio** načítava `icons.js` (okno Výroba ho malo od v0.5.44, kým
+> v ŠT-1c PR B3 nezaniklo) — nové
+> ovládacie prvky v ňom používajú sprite, nie glyfy.
+
+### E-b: Rozpočet (od ŠT-1c PR B1 sekcia Štúdia)
+Jediná sekcia, ktorá model **mení** (dáta rozpočtu v `NOXUN` dict na
+modeli). Vzory:
+- **Sekcie = `<details>`** s medzisúčtom v hlavičke; stav rozbalenia prežije
+  prekreslenie (payload chodí po každom zápise).
+- **Inline edit** (Lucia §11): číselné polia sa zapisujú až na `change`
+  (blur/Enter), nie pri každom stlačení klávesy; fokus aj rozpísaná hodnota sa
+  cez prekreslenie obnovia.
+- **Nulové riadky ostávajú viditeľné** (rozpočet je zároveň kontrolný zoznam);
+  chýbajúca cena je jantárový riadok so štítkom, NIKDY nula.
+- **Veľké tlačidlo plnej šírky** (`.baddbig`) na pridanie ručného riadku —
+  jediné miesto, kde sa vedome porušuje šetrenie vertikálnym priestorom
+  (sekcia inak nemá viditeľný vstupný bod).
+- **Prepínače** (`.bseg`): s DPH / bez DPH je len zobrazenie (localStorage),
+  režim €/€€/€€€ je zápis do zákazky; tooltipy nesú názvy režimov.
+- **Checkbox v hlavičke sekcie** (`label.bappl` v `<summary>` so `stopPropagation`):
+  „sčítať do rozpočtu" (Spotrebiče) a od NP-4 „ceny podľa plánu" (Materiál, s `.nxtip`).
+- **Značka zdroja čísla** (`.qtag`, NP-4) — malý badge (9 px rádius) pred číslom v bunke:
+  `.plan` tlmená (sunken + ink-muted), `.est` jantárová (`--nx-warn-bg-soft`/`--nx-warnchip-*`);
+  kreslí sa len keď ju server pošle (zapnutý prepínač).
+- **Ikona odkazu pred názvom** (CENY-M2, mockup D4) — materiál a páska majú pred názvom tú istú
+  kresbu ako kovanie (`.hw-product-link`, v tabuľke `.bmatlink` 20 px): sivá = otvorí Demos alebo
+  obchod, jantárová `is-missing` = odkaz chýba (klik vedie na doplnenie). Riadok nepribúda.
+- **Stav = tlačidlo** (`.bver`, CENY-M2, O1/O5) — v stĺpci „Overená" pri položke bez Demosu je stav
+  ručnej ceny zároveň akciou „Overiť cenu": malé textové tlačidlo s ikonou `#i-clipboard-check`,
+  sivé pri čerstvom overení, jantárové `is-pending` (`--nx-warn-bg` + `--nx-warnchip-border`) pri
+  „na kontrolu"; v jantárovom riadku bez ceny má pozadie `--nx-surface`. Text krátky („ručne 18.9.",
+  „ručne 45 dní", „neoverená"), plné znenie v `title`, `aria-label` nesie akciu, názov aj stav.
+
+### D-47 / D-91: hlavička panela — UZAVRETÉ dávkou UI-B1
+Dvojradová hlavička s tromi režimovými tabmi a satelitnými akciami
+(Materiály · Výroba · Kovanie) **zanikla**. Kontexty prevzal **rail** (sekcia
+5.1), Štúdio má v raile vlastnú ikonu, **Materiály projektu** žijú v sektore
+Materiály a **Katalóg kovania** v skupine Kovanie. Hlavička je jednoradová:
+logo · ID · názov s ceruzkou · ⚠ chip. Tým je odpovedané aj D-91 „finálny domov
+satelitných okien" — je ním Štúdio (rail), nie hlavička panela.
+
+### D-92: nákup pod položkou kovania (`.hwitem` / `.hwbuy`)
+Položka sekcie Kovanie je **obal `.hwitem`** = pôvodný `.hwrow` (počet, výber
+setu, akcie) + **jeden** sekundárny riadok `.hwbuy` drobným písmom:
+`Atira biela H176 → 357783 · K-Atira zásuvka 620/50kg`. Riadok je jednoriadkový
+s ellipsis, plný text nesie `title`. Nekompletný nákup (chýba set, kód alebo
+pásmo) dostane `.hwbuy-warn` = **jantárové upozornenie** (`--nx-warnchip-fg`);
+semaforové `--nx-state-*` sa sem **nemiešajú**. Obsah riadku skladá výhradne
+server (`HardwareSets.explain` + `PartKeys.human_label`) — JS nerozhoduje, čo
+sa kupuje, ani neprekladá dôvody.
+
+### D-102: vyriešená ABS páska v karte dielca a dosky
+Rozbaľovačka hrany nesmie skončiť pri „(podľa pravidla)" — voľba nesie **výsledok**
+(`(podľa pravidla — 500 SM Biela 23/1 mm)`, `(podľa pravidla — bez ABS)`,
+`(podľa pravidla — nelepí sa)`). Karta Dosky nemá vrstvu overridov, preto sa u nej
+mení voľba „Bez ABS" na **„Bez ABS (nelepí sa)"** pri nelepiteľnom materiáli.
+V 2D náhľade dostal každý farebný pás **`<title>` tooltip** s plným textom a do
+**existujúceho** popisku strany pribudla skratka (`Predná · 23/1`) — **žiadny nový
+riadok**. Text skladá **výhradne server** (`Panel.edge_rule_results` /
+`edge_view_hints`), JS ho len escapuje a vkladá; pri lokálnom prekreslení po zmene
+materiálu sa serverový text vedome NEPOUŽIJE (patrí starému materiálu) a ukáže sa
+neutrálne „(podľa pravidla)". Farby pásov ostávajú na ABS tokenoch `--nx-abs-*`
+(semaforové `--nx-state-*` sa sem nemiešajú).
+
+### D-105: tlačidlo „Zvýrazniť hrany" s rohom (Štúdio → KONTROLA)
+
+> **Od v0.7.28 je rozbaľovacie okno ZDIEĽANÝ komponent** (`ui/js/edge_menu.js` +
+> štýly `.ecmenu`/`.ecopt`/`.ecsw*` v `panel.css`): to isté nastavenie otvára aj
+> **rohový trojuholník pri ABS kontrole v raile Inspectora** (§5.11). Pravidlá
+> nižšie platia pre obe miesta; líšia sa len polohou okna a menom handlera.
+> Nová kópia markupu ani druhý stav vzniknúť nesmie.
+Jeden vizuálny celok, dve polovice: **ľavá** = zapnúť/vypnúť (zapnutý stav je
+zjavný — pozadie `--nx-select` + ikona `eye-off`; je to **zapnutý stav**, nie
+akcia, preto výberová a nie zelená), **pravá** (užšia,
+`chevron-down`) = rozbaľovacie okno s nastavením. Vzory:
+- **Okno je overlay** (`position: absolute` pod tlačidlom), **nie nový riadok**
+  layoutu — vertikálny priestor sa nemení ani keď je otvorené.
+- **Lišta žije MIMO scrollovacieho `#prodBody`** (`overflow: auto` by overlay
+  orezal — pri „kontrola bez nálezov" je box nízky a z okna by ostal prúžok).
+  Mimo tabu Kontrola je jej `div` prázdny a skrytý, takže nič nezaberá.
+- Riadok stavu = checkbox + **farebný štvorček** (`--nx-edge-*`, presne farba
+  plôšky v modeli) + názov + **živý počet zo servera**. Počet je pravdivý aj pre
+  vypnutý stav — inak by sa používateľ nemal podľa čoho rozhodnúť.
+- **Podriadený prepínač** (`.ecsub`, odsadený) patrí výhradne jednému nadradenému
+  riadku; jeho väzbu hovorí odsadenie, nie text.
+- Klient si drží **len** to, či je okno otvorené. Stav prepínačov, počty aj
+  zapnutosť sú zo servera; klik posiela iba `kľúč + boolean` (whitelist a striktný
+  boolean rozhoduje Ruby — HTML `disabled` nie je ochrana).
+- Prázdny výber pri zapnutom „len vybrané" sa **povie nahlas** („označ skrinky
+  v modeli"), nikdy sa ticho nezobrazí všetko.
+
+### D-85 / UI-03: zdieľaný combobox materiálov a ABS (`.nxcombo`)
+
+Každý výber materiálu alebo ABS pásky v paneli je **jeden a ten istý komponent**
+(`ui/js/nx_combo.js`) — nie päť kópií. Vzhľad je prevzatý 1:1 z mockupu
+`SYSTEM/zdroje/ui20/mockup_inspector_c.html`.
+
+**Anatómia:** `.nxcombo` (obal) → `.cbtrigger` (tlačidlo so **štvorčekom farby**,
+popisom a `chevron-down`) → `.cbpop` (popup: `.cbsearch` s ikonou `search` a
+inputom · `.cblist` so `.cbsec` hlavičkami a `.cbopt` riadkami · `.cbfoot`
+s `.kbd` nápovedou). Zvýraznenie zhody je `<mark>` s vlastným tokenom
+`--nx-mark-bg` (nie je to stav ani výber — je to „toto si napísal").
+
+**Záväzné pravidlá komponentu:**
+
+- **Natívny `<select>` sa NENAHRÁDZA, len obaľuje.** Ostáva v DOM (skrytý,
+  `tabindex="-1"`) a je naďalej **jediným zdrojom pravdy**: možnosti sa čítajú
+  z jeho `<option>`/`<optgroup>`, výber zapíše `value` a vystrelí `change`.
+  Vďaka tomu platí všetka existujúca logika bez duplikátu (hrúbkové filtre D-45,
+  ABS skupiny D-36, texty „(podľa pravidla — …)" D-102, dupláky D-49, `disabled`
+  „(nekompatibilné)") a **prežívajú všetky guardy** na `change` ceste
+  (E-03 hrúbka, D-86 smer dekoru, D-41 modal chýbajúcej pásky, identity guardy).
+  Nový výber materiálu = pridať `data-nx-combo="decor"|"abs"` na `<select>`,
+  nič viac.
+- **Skrýva ATRIBÚT, nie trieda** (`.nxcombo > select[data-nx-combo]`): panel
+  selectom prepisuje `className` (`ovr`), trieda by zmizla. Override `ovr` sa
+  z selectu **zrkadlí** na trigger.
+- **Popup je `position: fixed` nad `body`** — žiadny predok s `overflow: auto`
+  ho neoreže (poučenie D-67 FIX 7 a D-105). Otvára sa **doľava** (pravá hrana
+  lícuje s triggerom), šírka `max(trigger, 270 px)`, pri málo mieste dole sa
+  preklopí nahor. Scroll **mimo** popupu ho zavrie, scroll v zozname nie.
+- **Výber `mousedown`-om** (D-67 FIX 4 — `blur` by popup zavrel skôr, než klik
+  dopadne); `<datalist>` v CEF nefunguje vôbec.
+- **Poradie sekcií je kontrakt:** fixné voľby (dediť / podľa pravidla / Bez ABS,
+  bez hlavičky) → **Použité v projekte** → **Naposledy použité** → zvyšok
+  katalógu členený podľa `<optgroup>`. Položka sa objaví **práve raz**; aby sa
+  členenie D-36 nestratilo, nesie riadok meno svojej skupiny ako podtitul.
+- **Dáta si komponent nedrží.** „Použité v projekte" je odvodený zoznam ID zo
+  servera; keďže sa mení pri každom zápise materiálu, ale **číta sa len pri
+  otvorení ponuky**, combobox si ho pri otvorení **vypýta** (`nx_used_ids` →
+  `NX.setUsedIds` → prekreslenie otvoreného zoznamu). Farbu štvorčeka dáva panel
+  resolverom (`nxComboColorOf` v `core.js`: dekor z katalógu — pozor, katalógová
+  farba je pole `[r,g,b]`, nie CSS reťazec; ABS **podľa hrúbky** — rovnaká
+  legenda ako `.absleg`); do `style` prejde len hex. „Naposledy použité" je
+  `localStorage` **tohto počítača** (`nx_recent_decor` / `nx_recent_abs`, max 5,
+  len ID) — nikdy nie model ani `%APPDATA%`; fixné voľby sa nepamätajú.
+- **Sync zvonka popup ZAVRIE.** Serverový push (iná skrinka, nový katalóg),
+  prestavba `<option>`ov aj odchod z okna zatvárajú otvorenú ponuku — drží
+  položky z času otvorenia, takže by klik potvrdil voľbu starého kontextu do
+  nového. Natívna rozbaľovačka sa pri prestavbe správa rovnako.
+- **Klávesnica:** ↑↓ (preskakujú `disabled`), Enter potvrdí, Esc zavrie a vráti
+  fokus na trigger, Tab zavrie. Pri otvorení stojí kurzor na **aktuálnej hodnote**
+  (Enter nič nezmení omylom), pri písaní skočí na prvú zhodu.
+- Filter je **necitlivý na diakritiku** oboma smermi (`modra` nájde „modrá“,
+  `modrá` tiež) a hľadá aj v ID (nesie kód dekoru).
+- Vedomá výnimka z rádiusu 6: `.sw` štvorčeky a `.kbd` klávesy majú **3 px**
+  (nie sú to komponentové rámy — rovnaká trieda ako farebné štvorčeky legiend).
+
+> Okno **Materiály** má vlastný suggest (D-67) nad textovými poľami a komponent
+> zámerne **nepreberá** — sú to rôzne veci (voľný text vs. výber z katalógu).
+> Projektové predvoľby žijú tiež tam, nie v paneli.
+
+**D-124 — predvoľby materiálov v Štúdiu (v0.10.3):** rozbalený, ručne zbaliteľný blok so štyrmi skupinami vedľa seba; v úzkom okne dva stĺpce. Vzorka **115 × 115 px** (8 px rádius),
+pod ňou pôvodný picker a údaje o variante. Celý serverový label sa zalamuje bez skrátenia, aby nezmizlo rozlíšenie formátu/rubu; duplicitný malý swatch triggera sa skryje iba v tomto
+bloku. UNI má označenie pracovného materiálu namiesto hrúbky. Zbalenie prežije refresh; potvrdzovacia lišta je jedna pod celou mriežkou. Všetky CSS úpravy sú ohraničené na blok.
 
 ### 4.1 SketchUp toolbar (UI-02)
 
@@ -453,7 +607,7 @@ sektoroch**. Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html
   klik na ikonu prepína zvýraznenie, klik na pravý dolný roh otvorí **3-stavové
   nastavenie**, to isté, aké má Štúdio (vzor §5.11); pod ňou **Kontrola
   kresby** — obyčajný toggle bez šípky, nie je čo nastavovať; a pod ňou
-  **Viditeľnosť tagov** (D-27) — ikona `eye`, ktorá **otvára okno**
+  **Viditeľnosť tagov** (D-27, v0.8.13) — ikona `eye`, ktorá **otvára okno**
   so zoznamom NOXUN tagov modelu: §5.13) → dole **koliesko**
   (Nastavenia Inspectora) a **Štúdio**. Aktívny kontext je teal, funkčné ikony sú
   tlmené a rozsvietia sa až po zapnutí. **Funkčný prepínač, ktorý má druhý domov
@@ -500,8 +654,8 @@ sektoroch**. Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html
 - **Scroll je dokumentový** (nie vnútorný panel) — sticky hlavička,
   `scroll-padding-top` a `window.scrollTo` logika warn zoznamu ostávajú.
 - **CSS je scopnuté pod `.nx-inspector`** (koreňová trieda na `<html>`, lebo
-  `body.className` prepisuje `setUiMode`). `panel.css` zdieľa aj Štúdio —
-  to o raile ani sektoroch nesmie vedieť.
+  `body.className` prepisuje `setUiMode`). `panel.css` zdieľajú satelitné okná —
+  tie o raile ani sektoroch nesmú vedieť.
 
 ### 5.2 Náhľad — kontextové projekcie a spodný pás (UI-B2)
 
@@ -515,7 +669,7 @@ Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`projSvg`)
 | **Zóny** | zónová schéma (klikateľné zóny, ťahateľné priečky) + kóty šírok stĺpcov |
 | **Čelá** | predný pohľad čiel + kóty výšok riadkov vpravo, medzery pri ľavom okraji, celková šírka dole |
 | **Kovanie** | korpus s **pozíciami kovania**: záves = krúžok s krížikom na závesovej hrane · **výsuv = koľajnica „L" pri OBOCH bokoch + telo šuflíka** (nižšie) · nohy = obdĺžniky dole; pod projekciou súhrn všetkých položiek |
-| **Dielec** | hrany s ABS farbami (`#partSvg`) |
+| **Dielec** | hrany s ABS farbami (`#partSvg`, nezmenené) |
 
 Zásady kreslenia:
 
@@ -553,7 +707,7 @@ Zásady kreslenia:
   a Kovanie majú dielce korpusu tlmené, Zóny zostavu nekreslia (blenda by
   zakryla vnútro); vkladanie ju kreslí, kým je vrstva Čelá zapnutá.
 - **Výsuv sa kreslí tak, ako ho vidno spredu** (schválené Michalom 20.8. nad mini
-  náhľadom): pri **oboch** bokoch **koľajnica ako
+  náhľadom — nahradilo pás naprieč čelom): pri **oboch** bokoch **koľajnica ako
   „L" profil** (zvislá nožička na **vnútornom líci boku** + vodorovná pätka smerom
   dovnútra, na úrovni, na ktorej výsuv sedí) a medzi nimi **telo šuflíka** —
   obdĺžnik odsadený **za** pätkami koľajníc, s jemnou teal výplňou ako ostatné
@@ -579,8 +733,9 @@ Zásady kreslenia:
   výhradne `part_card`) — inde je chip **neaktívny s vysvetlením**, nie ticho
   mŕtvy. Rovnako je neaktívny každý chip, ktorý nemá čo kresliť.
 - **Vpravo nástroje:** **kamera** (zarovná pohľad SketchUpu na označenú skrinku
-  — čelný pohľad + doramovanie) a **fit** (reset zoomu). Náhľad má **jedno miesto
-  ovládania** a plocha SVG ostáva čistá pre pan/zoom/ťah priečky.
+  — čelný pohľad + doramovanie) a **fit** (reset zoomu). Fit sa sem presunul
+  z rohového overlayu — náhľad má **jedno miesto ovládania** a plocha SVG
+  ostáva čistá pre pan/zoom/ťah priečky.
 - **Stav chipov je per kontext** a žije v pamäti okna: **nová identita výberu ho
   resetuje**, echo push ho nemení (tá istá zásada ako `viewContext` z UI-B1).
 - Chipy sú `<button>` s `aria-disabled` (nie HTML `disabled`) — ostávajú
@@ -588,7 +743,7 @@ Zásady kreslenia:
 
 > **Chipy vrstiev NIE SÚ tagy modelu:** prepínajú vrstvy **náhľadu** (kreslenia
 > v paneli). Viditeľnosť tagov v MODELI rieši **D-27** — okno tagov v raile
-> (§5.13); sú to dve rôzne veci a nesmú sa zlievať.
+> (sekcia 5.1, v0.8.13); sú to dve rôzne veci a nesmú sa zlievať.
 
 ### 5.3 Základné — dva stĺpce, rozmerové rady a koliesko (UI-B3)
 
@@ -600,12 +755,9 @@ Sektor **Základné** je rozdelený na **vstupy vľavo a dopočítané údaje vp
   každý s ikonou zo spritu. Pole je úzke a hodnota zarovnaná doprava —
   rozmer je číslo, nie veta (UX-03).
 - **Vpravo informačný stĺpec** (`.infocol`) — **výstupy nikdy nevyzerajú ako
-  vstupy**. Dopočítaný údaj je **text**, nie
+  vstupy** (trvalá zásada z kôl 15.8.). Dopočítaný údaj je **text**, nie
   readonly pole: Vnút. šírka · Vnút. hĺbka · Úložná výška · Dielcov · Materiál
-  m² · Hmotnosť (výrobné dielce skrinky: „12,4 kg"; „≈ 12,4 kg" s tooltipom, keď
-  časť dielcov nemá hustotu a ráta sa ťažšou náhradnou; „—" bez dát — formát
-  `nxCabWeight` v `core.js`, dáta `Panel.cabinet_stats`). Riadok Hmotnosť nie je
-  klikateľný (nemá kam viesť).
+  m² · Hmotnosť („—" s vysvetlením, že príde s kovaním fáza 3).
 - **Klikateľné je len to, čo niekam vedie (N13)** — „Dielcov" označí výrobné
   dielce skrinky v modeli, „Materiál" povie, kam údaj patrí (Štúdio → Kusovník).
   Bez označenej skrinky sú riadky `aria-disabled` s vysvetlením (vzor D-78),
@@ -628,7 +780,7 @@ Sektor **Základné** je rozdelený na **vstupy vľavo a dopočítané údaje vp
   a exporty Štúdia).
 - **Skupiny v Nastaveniach majú ikony** (N3b) — ikona ukazuje **dielec, o ktorom
   skupina hovorí** (Strop · Dno · Boky · Chrbát) a rozsvieti sa s otvorenou
-  skupinou. Ten istý vzor majú skupiny ostatných kontextov (Čelá §5.7).
+  skupinou. Ostatné kontexty ikony dostanú s blokom UI-C.
 - **Typ korpusu je badge v hlavičke** (readonly): typ sa nastavuje **výhradne
   šablónou alebo vkladaním**, preto mini-modal „Uložiť ako šablónu" nesie
   **Názov + Typ** — je to jediné miesto, kde sa typ šablóny volí.
@@ -685,8 +837,8 @@ Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html`
 (`insTypeRow` / `sectInsertTpl` / `.segrow` / `.tpltiles`).
 
 - **Typ objektu = segmentové tlačidlá v JEDNOM rade** (`.segrow`): Dolná · Horná ·
-  Rohová · Umývačka · Doska. Je to jedna voľba z viacerých, nie dve nezávislé
-  otázky (preto nie rádiá). Aktívne tlačidlo nesie
+  Rohová · Umývačka · Doska (S1-E pridal Umývačku, ROH-A2 Rohovú). Rádiá zanikli —
+  je to jedna voľba z viacerých, nie dve nezávislé otázky. Aktívne tlačidlo nesie
   **výberovú rodinu** (teal), nie zelenú: je to *stav*, nie akcia. Ikona ukazuje,
   **čo a kde objekt je** (`cab-low` na sokli · `cab-high` zavesená · `cab-corner`
   rohová s dverami v dverovej časti · `appliance` slot umývačky · `slab` doska).
@@ -723,11 +875,11 @@ Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html`
   z označenej skrinky" (doplnenie fotiek starým šablónam) sa **nedá** dať na
   dlaždicu panela: dlaždice sú viditeľné výhradne vtedy, keď **nie je označené
   nič**, takže by kamera nikdy nenašla skrinku a bola by to trvalo mŕtva ikona
-  (opak zásady „klikateľné je len to, čo niekam vedie"). Žije preto v sekcii
-  **Šablóny** Štúdia, kde výber v modeli a zoznam šablón existujú súčasne — presne tak,
-  ako tam funguje „Použiť na označený".
+  (opak zásady „klikateľné je len to, čo niekam vedie"). Žije preto v okne
+  **Šablóny**, kde výber v modeli a zoznam šablón existujú súčasne — presne tak,
+  ako tam už funguje „Použiť na označený".
 - **Primárna akcia je posledná** — zelené „Vložiť" stojí až za rozmermi *aj* za
-  materiálom (rovnaký dôvod, prečo tam stojí „Vložiť dosku").
+  materiálom (rovnaký dôvod, prečo tam už stálo „Vložiť dosku").
 - **Doska má DVE akcie v JEDNOM riadku (GHOST-D2, 5.9.2026):** „Vložiť dosku"
   (doska visí na kurzore, klik ju položí) a **„Nakresliť"** (dva ťahy na rozmer:
   klik = počiatok → ťah dĺžky → ťah šírky; číslo + Enter funguje v oboch fázach).
@@ -821,10 +973,9 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Zones`).
   hlášky, nie prázdna plocha.
 - **Sticky hlavička (Inspector):** jednoradová, zostáva pri scrollovaní
   (`position: sticky`, `z-index` pod modalom 60): logo + ID + názov s ceruzkou
-  + ⚠ chip. Režimové taby ani tlačidlá ďalších okien v nej nie sú — kontexty
-  nesie rail (§5.1), Štúdio je v raile, Materiály projektu žijú v sektore
-  Materiály a Katalóg kovania v skupine Kovanie (D-91: domovom výstupov a katalógov
-  je Štúdio, nie hlavička panela).
+  + ⚠ chip. Režimové taby aj satelitné tlačidlá (Materiály·Výroba·Kovanie)
+  **zanikli v UI-B1** — kontexty prevzal rail, Štúdio je v raile, Materiály
+  projektu žijú v sektore Materiály a Katalóg kovania v skupine Kovanie.
   `scroll-padding-top` = výška hlavičky, aby fokusované pole neskončilo pod ňou.
 - **Pätička:** v normálnom toku na konci obsahu — `Noxun Engine V<verzia>`.
   Verzia príde z Ruby (`Engine::VERSION`), nikdy sa nedopĺňa prípona cache-bustu.
@@ -838,14 +989,14 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Zones`).
   prehliadača — na špecificite nezáleží. Každá trieda s vlastným `display`, ktorej
   prvky sa prepínajú cez `el.hidden`, preto potrebuje aj `.nx-inspector .trieda[hidden]
   { display: none; }` (špecificita aspoň taká istá, neskôr v súbore). Bez toho sa
-  „skrytý" prvok ukazuje ďalej (skutočný prípad: každý korpus ukazoval štyri polia
-  a päť výstupov slotu umývačky a pri každej šablóne pomocníka „?" k typu slotu). Stráži to
+  „skrytý" prvok ukazuje ďalej: od v0.12.12 videl každý korpus štyri polia a päť
+  výstupov slotu umývačky a pri každej šablóne pomocníka „?" k typu slotu. Stráži to
   guard `tests/pure/test_hidden_css_guard.rb` nad všetkými prvkami, ktoré sú skryté
   už v `panel.html` / `studio.html`.
 - **Warn chip → warnpanel (N5, UI-D3):** klik na ⚠ chip otvorí **overlay** pod
   hlavičkou — `position: absolute` **vnútri sticky `<header>`**, nie riadok
-  layoutu. Blokový zoznam by otvorením posunul celý obsah
-  nadol a musel by si pomáhať skokom na začiatok stránky; overlay nerobí ani jedno
+  layoutu. Blokový zoznam (pôvodné riešenie D-29) otvorením posunul celý obsah
+  nadol a musel si pomáhať skokom na začiatok stránky; overlay nerobí ani jedno
   a drží sa pri chipe aj po odscrollovaní. **Každý riadok má oko** — označí
   v modeli to, o čom nález hovorí (dielec, alebo celú skrinku, keď nález patrí
   korpusovej úrovni). Dole **jedna cesta von**: „Otvoriť v Štúdiu → Kontrola".
@@ -866,9 +1017,10 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Zones`).
   allowlistu (`USAGE_KEYS`), inak sa počítajú pod generickým kľúčom.
 - **Deep-link namiesto „nájdi si to sám" (UI-D3):** informačný údaj, ktorý na
   niečo ukazuje, otvára cieľ **rovno na správnom mieste** — ⚠ panel na sekcii
-  KONTROLA, „Materiál" na sekcii Kusovník. Cieľom je vždy **ŠTÚDIO**; filter na
-  jednu skrinku: ID skrinky ide ako kotva, ktorá predvyplní hľadanie sekcie, a status
-  to povie nahlas aj s tým, ako sa zúženie zruší.
+  KONTROLA, „Materiál" na sekcii Kusovník. Od ŠT-1c je cieľom vždy **ŠTÚDIO**
+  (okno Výroba zaniklo) a sľub „filter na jednu skrinku" sa splnil — ID skrinky
+  ide ako kotva, ktorá predvyplní hľadanie sekcie, a status to povie nahlas aj
+  s tým, ako sa zúženie zruší.
 - **Veľkosť okna pri otvorení (D-77):** žiadne okno sa nesmie otvoriť odseknuté.
   `width`/`height` v `HtmlDialog.new` platia len pri PRVOM otvorení (potom
   rozhoduje veľkosť zapamätaná pod `preferences_key`), preto každé okno deklaruje
@@ -877,8 +1029,7 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Zones`).
   nahor po deklarované minimum, nadol po dostupnú plochu obrazovky (okno
   zapamätané z väčšieho monitora je inak orezané rovnako). **Plocha má prednosť
   pred minimom**; medzi minimom a plochou sa veľkosti okna nikto nedotkne, takže
-  vedome zväčšené okno ostáva. Nové okno = nové `NX_FIT_MIN` (bez neho fit nebeží);
-  rozmery okien: §5.14.
+  vedome zväčšené okno ostáva. Nové okno = nové `NX_FIT_MIN` (bez neho fit nebeží).
 
 ### 5.7 Čelá — riadky, AUTO chip, Úchytky (UI-C3, rework D-130a + D-130b)
 
@@ -894,9 +1045,9 @@ staršia `mockup_inspector_c.html` (`s4Fronts`) pre zvyšok kontextu.
   farbu (medzera = jantár), ju nosí aj v schéme. **Pasca:** absolútne umiestnené
   polia v `.row` musia prebiť `.row input { flex: 1 }` — selektor potrebuje
   štyri triedy (`.nx-inspector .row .gapdiag input.gd`).
-- **Okraje (ČELÁ-A / D-119)** patria celej skrinke a sú **schémou**: hore/dole/vľavo/vpravo na hranách obrysu, medzera medzi čelami v strede.
-- **Kontext má DVE skupiny v záväznom poradí:** **Čelá** · **Spoločné
-  pre skrinku** (úchytka má jediné miesto v karte čela,
+- **Okraje (ČELÁ-A / D-119)** patria celej skrinke a od D-130b sú **schémou**: hore/dole/vľavo/vpravo na hranách obrysu, medzera medzi čelami v strede.
+- **Kontext má od D-130b DVE skupiny v záväznom poradí:** **Čelá** · **Spoločné
+  pre skrinku** (`fhandles` aj `fgaps` zanikli — úchytka má jediné miesto nižšie,
   medzery sú v druhej skupine spolu s materiálom čiel). Ikony skupín (N3b)
   ukazujú, o čom skupina hovorí (`front` · `cabinet`). Do druhej skupiny patrí
   všetko, čo platí **naraz pre všetky čelá** — to je kritérium pre budúce
@@ -911,8 +1062,8 @@ staršia `mockup_inspector_c.html` (`s4Fronts`) pre zvyšok kontextu.
   v mriežke nájsť miesto; nemá kde „pritlačiť" susedov (stráži guard test).
 - **SÚHRN POD NÁZVOM je jeden tlmený riadok** („1 krídlo (auto) · smer? · bez
   úchytky · Sensys klasik · 2 ks →"): stav **všetkých** čiel vidno bez
-  otvárania kariet. Zlučuje badge „smer?", indikátor profilu a riadok kovania —
-  tri drobné signály rozsypané po riadku sa čítajú horšie než jedna veta.
+  otvárania kariet. Zlúčil badge „smer?", indikátor profilu a riadok kovania —
+  tri drobné signály rozsypané po riadku sa čítali horšie než jedna veta.
   Klik na súhrn otvorí kartu na tabe **Čelo**, klik na koncovku kovania rovno
   na tabe **Kovanie**; sú to **dva súrodenecké ovládače**, nie ovládač vnorený
   v ovládači (tlačidlo v tlačidle sa nedá fokusovať).
@@ -935,9 +1086,9 @@ staršia `mockup_inspector_c.html` (`s4Fronts`) pre zvyšok kontextu.
   toggluje na klik kdekoľvek v `<summary>`, takže každé tlačidlo v hlavičke
   volá `preventDefault()` **aj** `stopPropagation()`.
 - **Riadok začína ikonou typu (N27).** Ikona odpovedá na „čo to je" skôr, než
-  sa oko dostane k textu — a stojí **vnútri tlačidla názvu typu**
-  (`.ftname`), ktoré otvára kartu čela. Typ sa vyberá
-  **piktogramom v karte** (typegrid), nie rozbaľovacím zoznamom. Tlačidlo vyzerá ako TEXT (rám až na hover
+  sa oko dostane k textu — a od **KOV-A2a** stojí **vnútri tlačidla názvu typu**
+  (`.ftname`), ktoré otvára kartu čela. Rozbaľovačka typu zanikla: typ sa vyberá
+  **piktogramom v karte**, nie zoznamom. Tlačidlo vyzerá ako TEXT (rám až na hover
   a fokus) — v rade už sú tri tlačidlá a štvrtý rám by z riadku spravil lištu
   ovládačov.
 - **Karta čela je TRETÍ riadok stĺpca, nie samostatný blok (KOV-A2a).** Otvorí sa
@@ -951,7 +1102,7 @@ staršia `mockup_inspector_c.html` (`s4Fronts`) pre zvyšok kontextu.
   (`--nx-warnchip-*`), nie červené: červená patrí nálezu v Kontrole (Štúdio), tu ide
   o otvorenú otázku. **Nič sa nepredvolí** — legacy čelo má segment bez zvýraznenia
   a pod ním vetu, čo platí, kým to nikto neurčí.
-- **Riadok sa NEZALAMUJE** (smoke test 20.8., mriežka D-130a). Zalamovací
+- **Riadok sa NEZALAMUJE** (smoke test 20.8., mriežka od D-130a). Zalamovací
   rad vyzeral bezpečne, kým bola výška prázdna — vypísaná hodnota k nemu
   pridala „mm" aj chip AUTO a krížik ✗ spadol o riadok nižšie. Rozpočet šírky
   pri **470 px** stráži guard test, nie oko. **Do rozpočtu patrí aj to, čo sa
@@ -962,14 +1113,14 @@ staršia `mockup_inspector_c.html` (`s4Fronts`) pre zvyšok kontextu.
   (`--nx-border-soft`) sa platí **presunutím** existujúceho odstupu z `margin`
   do `padding`, nie jeho pripočítaním. Predel patrí pod **celú položku** — pri
   čele teda až pod kartu, ktorá k nemu patrí.
-- **Pri výške nie je samostatný zámok: zamknuté ⇔ vypísané.** Vypísaná hodnota drží,
-  prázdne pole je AUTO. Samostatný checkbox by vedel byť zapnutý aj nad prázdnym
-  poľom a nerobil by nič — dve pravdy o tom istom. Návrat na automat robí **chip
+- **Zámok pri výške ZANIKOL: zamknuté ⇔ vypísané.** Vypísaná hodnota drží,
+  prázdne pole je AUTO. Samostatný checkbox vedel byť zapnutý aj nad prázdnym
+  poľom a nerobil nič — dve pravdy o tom istom. Návrat na automat robí **chip
   AUTO**, ktorý sa (spolu s jednotkou „mm") ukazuje **len pri vypísanej
   hodnote**: prázdnemu poľu niet čo vracať a jednotka by patrila k ničomu.
   Pevná výška je aj **vidno** (tučnejšia hodnota, `.hbox.fixed`) — zámok
-  nesmie zmiznúť tým, že nemá vlastnú ikonu. Rovnaké pravidlo má pole
-  „Prvá zóna" (§5.5). Chip je **tlačidlo**, teda fokusovateľné aj z klávesnice.
+  nesmie zmiznúť tým, že prestal mať vlastnú ikonu. Rovnaké pravidlo má pole
+  „Prvá zóna" z UI-C2. Chip je **tlačidlo**, teda fokusovateľné aj z klávesnice.
 - **Hodnota je zarovnaná doprava** — rozmer je číslo, nie veta (UX-03).
   Jednotka stojí **v boxe pri hodnote**, nie v hlavičke stĺpca.
 - **Rozmerový rad je ponuka, nie ďalšie pole** (N25, rovnaký vzor ako pri
@@ -984,16 +1135,16 @@ staršia `mockup_inspector_c.html` (`s4Fronts`) pre zvyšok kontextu.
   (D-78). Obsah skladajú existujúce zdroje — badge z plánu a nákupný set
   z D-92; panel nič nedopočítava.
 - **D-84 reč stolára:** „+ pridaj dvere" (krídlové) a „+ pridaj čelo"
-  (zásuvkové). Samostatné odoberacie tlačidlo nie je — mazanie je krížikom pri
-  konkrétnom riadku (jednoznačné, ktorý mizne) a v rade ostáva miesto.
+  (zásuvkové). Odoberacie tlačidlo **zaniklo** — mazanie ostáva krížikom pri
+  konkrétnom riadku (jednoznačné, ktorý mizne) a v rade sa uvoľní miesto.
 - **Materiál čiel stojí aj v zozname.** Sektor Materiály patrí kontextu Korpus
   a tu je skrytý — bez druhého ovládača by sa dekor menil inde, než sa čelá
   kreslia. Je to **ten istý údaj v dvoch ovládačoch**, nie nové dáta; synchro
   drží každá cesta, ktorá siaha na materiál čiel.
 - **D-129 / D-130a Úchytka má JEDINÉ MIESTO STAVU — kartu čela** (jeden riadok:
-  Profil + Hrana vedľa seba). Samostatná skupina „Úchytky" nie je: bola by druhým stavom
-  tých istých dvoch polí a používateľ by nevedel, ktoré z dvoch miest platí.
-  Indikátor v riadku nie je — profil hovorí **súhrn slovom** („UKW-7
+  Profil + Hrana vedľa seba). Skupina „Úchytky" **zanikla**: bola druhým stavom
+  tých istých dvoch polí a používateľ nevedel, ktoré z dvoch miest platí.
+  Indikátor v riadku tiež zanikol — profil hovorí **súhrn slovom** („UKW-7
   hore"), čo je zrozumiteľnejšie než ikona so stavom v `title`.
   **Hromadná zmena je AKCIA, nie druhý stav:** popover „všetkým" v hlavičke
   (Rozsah · Profil · Hrana · „Použiť na N"). Selecty v ňom **nič nezapisujú** —
@@ -1002,16 +1153,15 @@ staršia `mockup_inspector_c.html` (`s4Fronts`) pre zvyšok kontextu.
   zhodu, ktorá neplatí (vzor „podľa parametra" zo sekcie Kovanie). Ponuka hrán
   je **prienik** hrán platných pre celý rozsah; bočné hrany sa nastavia v karte
   alebo zúžením rozsahu.
-- **Výklop je plnohodnotný typ čela** (dlaždica `front-lift` v typegride karty).
-  Karta má segment **„Systém" (HK top | HL top)** — AVENTOS sa volí tu; predvoľbu
-  `hk_top` server typu `lift` materializuje, takže karta ukazuje to, čo sa uloží.
-  Sklop (`fall`) systém nemá. Kovanie výklopu vzniká z pravidiel (Pravidlá → Výklopy
-  AVENTOS) a tab Kovanie ukáže vyriešený výklop zo servera (`front_lift`), pri konflikte
-  s červenou stavovou vetou. Tok dát: `docs/architecture/ui-lifecycle.md`, Kontext Čelá.
+- **Výklop je v ponuke typov, ale zatiaľ NEvyberateľný** — s upozornením
+  „AVENTOS ručne, automatika fáza 3". Vedomá odchýlka: rola `flap` potrebuje
+  vlastnú cestu cez builder, ABS a kusovník, čo je samostatná dávka.
+  Poctivejšie je povedať, že sa s ním ráta, než ho zamlčať (rovnaký vzor ako
+  rezervovaný slot „Vnútro" v Zónach).
 - **N26 medzery jantárovo:** pri kurzore v niektorom poli schémy **alebo pri
   hoveri nad schémou** sa medzery v projekcii Čelá podfarbia. Je to **len
   zvýraznenie** — pásy vznikajú z toho istého rozkladu, ktorým sa už kótuje.
-  Zvýraznenie nie je viazané na **otvorenú skupinu**: schéma žije v skupine, ktorá
+  D-130b zrušil väzbu na **otvorenú skupinu**: schéma žije v skupine, ktorá
   býva otvorená, takže by medzery svietili stále a zvýraznenie by prestalo
   niečo znamenať. **Vzor:** zvýraznenie viazať na prácu (fokus/hover), nie na
   stav rozbalenia.
@@ -1054,14 +1204,15 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Part`,
 - **Poradie karty je kontrakt:** Základné · Materiál · hrany · **rad akcií
   dole**. Rozmery dielca sú **VÝSTUP** — počíta ich korpus — preto sú to
   informačné riadky v tej istej mriežke ako Základné korpusu, **nikdy polia**
-  („výstup nikdy nevyzerá ako vstup"). Základné sú **jeden** riadok navyše
-  (dva a dva údaje), nie tri.
-- **Smer dekoru je VSTUP** (K1 / D-108): per-dielec override
-  (`part_overrides['grain_direction']`, enum `length`/`width`) sa zapisuje
-  do snapshotu dielca. Je to **segment troch volieb**
+  („výstup nikdy nevyzerá ako vstup"). Karta narástla o **jeden** riadok
+  (dva a dva údaje), nie o tri.
+- **Smer dekoru je VSTUP** (K1 / D-108, v0.7.23). Pôvodná odchýlka UI-D1
+  („smer je len informácia") **skončila** — per-dielec override existuje
+  (`part_overrides['grain_direction']`, enum `length`/`width`), prešiel
+  auditom a zapisuje sa do snapshotu dielca. Je to **segment troch volieb**
   `Podľa materiálu · Pozdĺžna · Priečna` v riadkovom tvare „popisok +
   ovládač" (trieda `.pcgrain`, rovnaká mriežka ako `Materiál`), takže karta
-  nemá samostatný riadok navyše. Pravidlá:
+  nenarástla o samostatný riadok. Pravidlá:
   - **dedený stav ukazuje VÝSLEDOK** („Podľa materiálu — pozdĺžna"), nikdy
     prázdne slovo „dedí" — nevidieť, ako kresba ide, bol presne slepý bod
     výrobného incidentu 19.8.2026;
@@ -1139,8 +1290,8 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Hw`).
   nie vedľa neho**. Stav rozkliku neprežíva čerstvý payload: preusporiadané
   riadky by ukázali pôvod cudzieho riadku.
 - **Rovnaké položky sa zbalia pod JEDEN súhrn** (smoke test 20.8.). Podperky
-  políc majú nad sebou súhrn **„Podperky políc — 5 políc: 20 ks"** s rozklikom
-  (nie riadok na každú policu, hoci hovoria to isté). Zásady:
+  políc mali riadok na každú policu, hoci hovoria to isté — teraz je nad nimi
+  súhrn **„Podperky políc — 5 políc: 20 ks"** s rozklikom. Zásady:
   **editovateľnosť sa nesmie stratiť** (pod rozklikom sú pôvodné riadky, počet
   per polica sa mení ďalej) · **zbalené je default** a stav rozkliku je vec
   **počítača** (`localStorage`, vzor sektorov) · **neštandard musí byť vidieť aj
@@ -1151,12 +1302,12 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Hw`).
   **jedna položka sa nezbaľuje** (rozklik nad jediným riadkom je klik navyše
   bez zisku) · dáta sa nemenia, je to **zoskupenie zobrazenia**.
 
-### 5.11 Flyout roh — druhá akcia na ikonovom tlačidle
+### 5.11 Flyout roh — druhá akcia na ikonovom tlačidle (v0.7.28)
 
 Keď má ikonové tlačidlo (rail, toolbar) okrem svojej hlavnej akcie aj
 **nastavenie**, nesie ho **rohový flyout** — vzor prevzatý z nástrojov
 SketchUpu a Photoshopu, teda z prostredia, v ktorom stolár denne pracuje.
-Typický výskyt: **ABS kontrola v raile** (toggle + 3-stavové nastavenie kontroly
+Prvý výskyt: **ABS kontrola v raile** (toggle + 3-stavové nastavenie kontroly
 hrán). Pravidlá vzoru:
 
 - **Znamienko je malý PLNÝ trojuholník** v pravom dolnom rohu ikony (6 px, CSS
@@ -1170,7 +1321,7 @@ hrán). Pravidlá vzoru:
   neplatné HTML a `span` s `role="button"` sa nedá aktivovať klávesnicou
   (rovnaká lekcia ako krížik dočasnej položky). Klik na roh sa tak k hlavnej
   akcii **vôbec nedostane** — netreba naň spoliehať `stopPropagation`.
-- **Hlavná akcia sa nemení.** Klik na ikonu robí presne to, čo robí bez rohu.
+- **Hlavná akcia sa nemení.** Klik na ikonu robí presne to, čo robil predtým.
 - **Dva rôzne `aria-label`** („ABS kontrola hrán" vs. „Nastavenie ABS kontroly")
   + `aria-haspopup`/`aria-expanded` na rohu — čítačka musí vedieť, že sú to dve
   akcie. Roh má **vlastnú bublinu** `.railtip` (rail nepoužíva natívny `title`).
@@ -1196,7 +1347,7 @@ hrán). Pravidlá vzoru:
   obsah. Každé okno nesie hlavičku `.mgrp` s tým, čo nastavuje.
 - **Ak to isté nastavenie žije aj inde, je to JEDEN komponent, nie kópia.**
   Markup kreslí zdieľaný modul (`ui/js/edge_menu.js`), štýly sú v zdieľanom
-  `panel.css` (nescopnuté pod `.nx-inspector` — Štúdio o raile nevie) a stav
+  `panel.css` (nescopnuté pod `.nx-inspector` — satelit o raile nevie) a stav
   aj počty nesie výhradne server, ktorý po každom zápise pošle čerstvý stav
   **všetkým oknám**. Dve kópie toho istého okna nesmú stáť na obrazovke naraz:
   otvorenie na jednom mieste ostatné zavrie.
@@ -1216,19 +1367,155 @@ hrán). Pravidlá vzoru:
   samostatný `.cornerzone` v pravom dolnom rohu a text tlačidla má o toľko
   väčší pravý padding, aby sa naň roh nepoložil. **Spúšťač je tvarom per okno,
   samotné okno nastavenia je zdieľaný komponent** — líši sa iba polohovacou
-  triedou (`.ecmenu-rail` vs. `.ecmenu-studio`). Split tlačidlo s chevronom sa
-  pre nastavenie nepoužíva — jeden vzor, nie dva.
+  triedou (`.ecmenu-rail` vs. `.ecmenu-studio`). Split tlačidlo s chevronom
+  (pôvodná podoba v okne Výroba) tým **zaniklo** — jeden vzor, nie dva.
+
+### 5.13 Viditeľnosť tagov modelu v raile (D-27, v0.8.13)
+
+Rýchle „zobraz/skry" SketchUp **tagov modelu** priamo z panela — Čelá · Chrbát ·
+Korpus · Vnútro · Kovanie · Dosky · Zóny (obrysy; do H4b „Zóny (ghost)") — aby sa nemuselo preklikávať
+do natívneho okna Tags. **Nie sú to chipy vrstiev náhľadu z UI-B2** (§5.2): tie
+prepínajú, čo panel *kreslí*, toto mení, čo je vidieť *v modeli*.
+
+- **Miesto: rail, funkčná sekcia, pod „Kontrolou kresby".** Je to **jedna ikona
+  v už existujúcom ľavom stĺpci** a zoznam je **overlay** vedľa nej — v obsahu
+  panela nepribudol ani jeden riadok (trvalé pravidlo „vertikálny priestor je
+  vzácny"). Alternatívy padli: nový rad v sektore Náhľad by stál riadok navyše
+  a rozšíriť chipy vrstiev by zlialo dva rôzne významy do jedného ovládača.
+- **Celé tlačidlo otvára okno** — nemá vlastnú hlavnú akciu, takže **nemá rohový
+  trojuholník** (§5.11) a `aria-haspopup`/`aria-expanded` nesie samo. Obal je
+  vlastný `.railmenu`, nie `.railfly`.
+- **Stav ikony hovorí „nevidíš všetko":** kým je všetko viditeľné, ikona je
+  tlmená `eye`; keď je čokoľvek skryté, rozsvieti sa (`.on`) a prepne na
+  `eye-off`, bublina povie **koľko z koľkých**. Obe ikony sú už v sprite —
+  dávka nepridala žiadnu novú kresbu.
+- **Ponúkajú sa LEN tagy, ktoré v modeli sú** (D-78 — mŕtve tlačidlo je horšie
+  než žiadne). Prázdny zoznam sa **prizná vetou** („vzniknú s prvou skrinkou
+  alebo doskou"), nie prázdnym oknom — a **tlačidlo sa preto nezosedne ani
+  v prázdnom modeli**: zamknuté by to vysvetlenie schovalo do bubliny
+  (review #249). Neaktívne je len to, čo naozaj nemá čo robiť.
+- **Skrytý priečinok tagov sa prizná.** Tag môže byť zapnutý a napriek tomu
+  neviditeľný, keď je skrytý jeho priečinok — riadok vtedy nesie jantárovú
+  poznámku „priečinok skrytý". Priečinok sa **nikdy nezapína automaticky**
+  (môže obsahovať cudzie tagy).
+- **Jeden stav, dva ovládače.** Checkbox „Zobraziť zóny (ghost) v modeli"
+  hovorí o tom istom tagu (`Noxun/Zóny`), preto ide **tou istou serverovou
+  cestou** a nasadzuje ho **ten istý push** — panel si nedrží vlastnú kópiu ani
+  jedného (vzor „materiál čiel v dvoch ovládačoch", §5.7).
+- **Je to zápis do modelu, nie overlay.** Na rozdiel od ABS kontroly a kontroly
+  kresby (kreslia NAD modelom, žiadny krok Späť — D-103/D-104/D-105) sa
+  viditeľnosť tagu **ukladá do .skp**: jeden klik = **jeden krok Späť**. Klik,
+  ktorý nič nezmení (už platná hodnota, odmietnutý guard), operáciu **vôbec
+  neotvorí** — prázdny krok Späť je horší než žiadny.
+- **Skrytie aktívneho tagu sa prizná.** SketchUp aktívny tag skryť nenechá a
+  prepne kreslenie sám; robíme to preto **vedome, v tej istej operácii** a
+  status to povie („Kreslenie prepnuté na Untagged").
+- **Zatvára klik mimo a Escape**, fokus sa vracia na tlačidlo (vzor warnpanelu
+  a rohového nastavenia ABS). Vlastný kľúč merača: `rail:tagy`.
+- **Nad railom nikdy nestoja dve okná naraz.** Otvorenie okna tagov zhasne
+  rohové nastavenie ABS a naopak — klik na spúšťač **zastavuje bublanie**
+  (inak by ho document listener v tom istom kliku zavrel), takže druhé okno
+  sa musí zavrieť **výslovne**; spoliehať sa na „klik mimo" tu nestačí
+  (review #249).
+- **Prekreslenie otvoreného okna nesmie zhodiť fokus.** Server po každom
+  prepnutí pošle čerstvý stav a okno sa prekreslí celé (`outerHTML`), takže
+  klávesnicový používateľ by po každom prepnutí z ponuky vypadol. Riadok preto
+  nesie `data-tagkey` a fokus sa po prekreslení vráti na ten istý checkbox
+  (review #249). Platí pre každý overlay, ktorý sa prekresľuje zo servera.
+- **Známe obmedzenie (priznané):** tag skrytý priamo v natívnom okne Tags sa
+  v paneli prejaví až pri najbližšom pushi (otvorenie panela, zmena výberu,
+  Späť/Znova) — `LayersObserver` dávka vedome nepridáva.
+
+### D-51: štandard rozmerov okien (UI-B1)
+
+**Jedna pravda je OBSAHOVÝ viewport** (`NX_FIT_MIN` v HTML). Rozmery
+v `HtmlDialog.new` sú **vonkajšie** — obsah + rámik okna (Windows ≈ 16 px šírka,
+≈ 40 px výška). Preto sa vždy zapisuje trojica **`NX_FIT_MIN` → `width`/`height`
+→ `min_width`/`min_height`** a musí si zodpovedať (stráži guard test
+`tests/pure/test_uib1_kostra.rb`).
+
+| Okno | Obsah (`NX_FIT_MIN`) | `width` × `height` | `min_width` × `min_height` |
+|---|---|---|---|
+| **Inspector** (`panel.html`) | 470 × 810 | 486 × 850 | 486 × 600 |
+| **Štúdio** (`studio.html`) | 1060 × 640 | 1076 × 680 | 1076 × 520 |
+| ostatné satelity | podľa deklarácie v HTML | — | — |
+
+> Riadok **Materiály (`proj_materials.html`)** z tabuľky **vypadol v ŠT-2b** —
+> okno zaniklo, katalóg je sekcia `mat` v Štúdiu a rozmery mu diktuje jeho
+> riadok vyššie.
+
+> **470 px Inspectora** je obsah = rail 44 px + karta. Hodnota je záväzná pre
+> celý blok UI 2.0 — mockup, sektory aj šírky polí sa navrhujú na ňu.
+> **1060 px Štúdia** je navigácia 208 px + tabuľka Kusovníka so 7 stĺpcami
+> a stĺpcom hover akcií; v užšom okne končí pravá časť riadku mimo. Výška 640
+> nechá pod lištou sekcie vidieť aspoň dve skupiny materiálu naraz.
+> **ŠT-1c PR B1 hodnotu preverila na najširšej tabuľke rozpočtu** (Spotrebiče:
+> typ · názov · dodávateľ · cena · stĺpec akcií · medzisúčet, teda editovateľné
+> bunky aj akcie vpravo): telo sekcie má pri 1060 px ≈ 828 px, čo je viac než
+> šírka, na ktorej tá istá tabuľka žila v (dnes zaniknutom) okne Výroba
+> (obsah 640 px) aj než
+> minimum mockupu (`#stageStudio` 900 px vrátane navigácie). **Hodnota sa preto
+> NEMENÍ** — zdvihnúť ju kvôli sekcii, ktorá sa zmestí, by len zbytočne
+> zväčšilo okno na malých obrazovkách.
+> Satelitné okná dostanú svoje riadky tabuľky, keď ich prevezme Štúdio.
+
+### Vzory okna Štúdio (ŠT-1a)
+
+- **Trieda zo zdieľaného `panel.css` nesmie ísť na `<tr>`** (v0.7.58, PR #217).
+  Holý selektor `.trieda { display: flex; }` platí pre KAŽDÝ element — na
+  tabuľkovom riadku zruší `table-row` layout, bunky sa stanú flex položkami
+  a stĺpce sa rozídu s hlavičkou (presne to postihlo `tr.hwrow` v Nákupe
+  kovania; riadok generiky sa preto volá `tr.hwgen`). Riadkom tabuliek dávaj
+  vlastné triedy okna, alebo flex selektor v zdieľanom CSS zúž na
+  `div.trieda`. Stráži `tests/pure/test_tr_flex_kolizia.rb`.
+- **Nemigrovaná položka navigácie NIE JE `disabled` — je to PREMOSTENIE.**
+  Klik otvorí okno, kde obsah dnes naozaj je, a tooltip prizná v ktorej dávke
+  sa presunie sem. `aria-disabled` (vzor D-78) dostane len to, čo **nikde
+  neexistuje** — v ŠT-1a jediný Nárezový plán („fáza 2"). Rozdiel je vecný:
+  premostenie vedie tam, kam ukazuje; disabled hovorí, prečo zatiaľ nikam.
+  **Od NP-3 (v0.15.3) nie je v navigácii Štúdia ani premostenie, ani
+  neaktívna položka** — Nárezový plán ožil; pravidlo platí pre budúcu položku.
+- **Nárezový plán (NP-3) kreslí SVG TRIEDAMI, nie atribútmi.** Na rozdiel od
+  2D náhľadu Inspectora (farby sú zrkadlom tokenov v atribútoch) má SVG platní
+  farby výhradne v CSS triedach `.np-*` s `var(--nx-*)` v `studio.html` —
+  sleduje tak obe témy bez druhej kópie hodnôt; šrafy sú `<pattern>` s triedou.
+  Jediná dátová farba je vzorka dekoru v HTML štvorčeku (mimo SVG). Karty
+  materiálov sú zbaliteľné (pamäť tohto počítača), predvolene otvorená prvá
+  a každá s problémom; zbalená karta SVG nevytvára (vertikálny priestor aj DOM).
+- **Neexistujúci export je viditeľné `aria-disabled` tlačidlo s dôvodom —
+  ale LEN keď ten dôvod má dátum.** Michal porovnáva panel 1:1 s mockupom,
+  takže chýbajúci ovládač vyzerá ako chyba implementácie a priznaný ovládač
+  ako plán — to platí ďalej. **Pravidlo sa revíziou 22.8.2026 (smoke test,
+  verdikt Michal) ZÚŽILO:** priznaný `aria-disabled` platí na sľub, ktorý
+  príde **najbližšou dávkou**; ovládač, ktorý visí neaktívne **celý blok**,
+  sa **skryje** a vráti sa až s funkciou. Sivé tlačidlo prestane po pár dňoch
+  čítať ako plán a začne čítať ako rozbitý ovládač — a používateľ, ktorý naň
+  klikne trikrát, prestane veriť aj tým aktívnym. Prvý prípad: XLSX/CSV
+  kusovníka viseli neaktívne celý blok ŠT-1 a v SMOKE dávke z lišty odišli
+  (kontrakt `SYSTEM/zdroje/ui20/UI20_KONTRAKT.md`, **Š5 revízia 22.8.**).
+  `aria-disabled` teda **nie je** náhrada za chýbajúcu funkciu, ale za
+  **funkciu, ktorá je na ceste**.
+- **Výstup sa nikdy netvári ako vstup.** Údaj, ktorý sa edituje inde, je
+  v ostatných oknách TEXT (názov projektu: input v Štúdiu → Kusovník,
+  text v lište Kusovníka v Štúdiu).
+- **Voľba zobrazenia je vec POČÍTAČA, nie zákazky.** Voliteľné stĺpce,
+  zbalené skupiny a zbalená navigácia žijú v `localStorage` (nikdy v `.skp`
+  a nikdy v `%APPDATA%` — nie je to nastavenie pluginu, len tohto okna).
+- **Kódy hrán `L1/L2/W1/W2` sa v tabuľkách neprekladajú** na „predná/zadná" —
+  ten istý kód znamená pri každej role inú fyzickú hranu. Fyzickú stranu
+  ukazuje karta dielca v Inspectore, ktorá ju zároveň kreslí.
 
 ### 5.12 D-15 — zdieľaná kostra modalov „pridávačiek" (`ui/js/nx_modal.js`)
 
 Schválený vzor kontraktu UI 2.0 (`SYSTEM/zdroje/ui20/UI20_KONTRAKT.md`, sekcia
 „D-15 pridávačky ako modal"). **Každé okno typu „pridaj niečo" je TÁ ISTÁ
-kostra, len s inými poľami** — nikdy vlastný formulár; nová inštancia sa napája
-bez kopírovania. Kostra unesie aj **dlhší** formulár (D-69 editor materiálu):
-nadpisy sekcií, opakovateľné riadky, zaškrtávatká, farbu, širšiu kartu a **pamäť
-rozpísaných hodnôt priamo v komponente**.
-Oba vstupy D-69 — editor existujúceho dekoru aj **„Pridať ručne"** (`mat:create`) —
-idú z **tej istej špecifikácie**: stĺpce repeaterov sú JEDNA definícia pre oba vstupy
+kostra, len s inými poľami** — nikdy vlastný formulár. Prvá kódová inštancia
+prišla s ŠT-1c PR B2 (drafty rozpočtu); ďalšie sa napájajú bez kopírovania.
+ŠT-2c PR 2c-1 kostru rozšírila o to, čo potrebuje **dlhší** formulár (D-69
+editor materiálu): nadpisy sekcií, opakovateľné riadky, zaškrtávatká, farbu,
+širšiu kartu a **pamäť rozpísaných hodnôt priamo v komponente**.
+ŠT-2c PR 2c-2b napojila **druhý vstup D-69 — „Pridať ručne"** (`mat:create`) na
+**tú istú špecifikáciu**: stĺpce repeaterov sú JEDNA definícia pre oba vstupy
 (`mdSheetCols`/`mdEdgeCols` v `proj_materials.js`), líšia sa len hodnoty
 (prázdne vs. z katalógu) a dve skupinové polia, ktoré existujúca skupina už má
 — **štruktúra** a **smer dekoru**. Dva zoznamy polí by znamenali dva formuláre,
@@ -1251,12 +1538,12 @@ Scrim je `.nxscrim` (`--nx-scrim`), karta `.nxmcard`. **Pozor:** mockup kreslí
 kartu ako `.nxmodal`, lenže `panel.css` toto meno už používa pre SCRIM starších
 modalov — preto `.nxmcard`.
 
-**Kde žijú štýly kostry:** v zdieľanom `panel.css` — kostru načítavajú **obe okná**
-(Štúdio aj Inspector, napr. modal ručnej položky kovania). Dve kópie tých istých
-tried by boli dva modalové svety, ktoré sa časom rozídu. V `studio.html` z kostry
-neostáva nič.
+**Kde žijú štýly kostry:** v `<style>` bloku `studio.html`, lebo Štúdio je
+**jediné okno, ktoré komponent načítava**. Keď ho začne používať druhé okno,
+štýly sa presunú do `panel.css` (a `--nx-z-scrim`/`--nx-z-suggest` s nimi) —
+dovtedy by tam boli mŕtvym kódom pre všetkých ostatných.
 
-**Šírka karty** (`size`): `sm` = 420 px (**predvolená**; `small` je jej
+**Šírka karty** (`size`, ŠT-2c): `sm` = 420 px (**predvolená**; `small` je jej
 alias a starý prepínač `small: false` = `md` naďalej platí) · `md` = 560 px ·
 `wide` = 640 px. `wide` je pre formuláre s opakovateľnými riadkami — riadok
 dosky nesie kód · hrúbku · formát · cenu naraz a na užšej karte sa stĺpce
@@ -1281,7 +1568,7 @@ variantu od nového; riadok pridaný tlačidlom ich nemá. **Identita variantu s
 nikdy neodvodzuje od kódu, ktorý používateľ práve prepisuje.** Ploché polia
 ostávajú reťazcami — drafty rozpočtu na tom stoja.
 
-**Stĺpce riadku** (`cols[]`, D-69 editor dekoru):
+**Stĺpce riadku** (`cols[]`, doplnené ŠT-2c PR 2c-2a pre D-69 editor dekoru):
 
 | kľúč | Čo robí |
 |---|---|
@@ -1338,9 +1625,9 @@ prvky **nevyhadzuje**) a klik napíše **dôvod** do `.mrnote` — pravidlo D-78
   fronte a odišiel s čerstvou generáciou, ktorú server **prijme**. Výsledok by
   bola tá istá položka dvakrát a dva kroky Späť.
 - **`busyLock: true` (KOV-D3b) — kým odoslanie beží, okno sa NEDÁ zavrieť.**
-  Zámok odoslania sám nestačí: Esc, scrim, krížik aj „Zrušiť" by ostali aktívne
-  a zatvorenie by vyčistilo len stav **volajúceho** — asynchrónna mutácia na
-  serveri by bežala ďalej, jej výsledok by sa zahodil a „zrušená" akcia by model aj tak
+  Zámok odoslania sám nestačí: Esc, scrim, krížik aj „Zrušiť" ostávali aktívne
+  a zatvorenie vyčistilo len stav **volajúceho** — asynchrónna mutácia na
+  serveri bežala ďalej, jej výsledok sa zahodil a „zrušená" akcia model aj tak
   zmenila (a nechala krok Späť). Príznak je **opt-in a aditívny**: bez neho sa
   správanie kostry nemení. Dať ho smie **len** modal, ktorého volajúci
   odpovedá v **každej** vetve **vrátane výnimky** — inak by sa okno pri zlyhaní
@@ -1348,7 +1635,7 @@ prvky **nevyhadzuje**) a klik napíše **dôvod** do `.mrnote` — pravidlo D-78
   (náhrada zamknutej osi D2b, prechod na novú verziu receptu D3b).
 - **rozpísané hodnoty prežijú zatvorenie.** Esc ani klik vedľa nesmú byť tichá
   strata — hodnoty sa pamätajú a nasledujúce otvorenie ich predvyplní; zmaže
-  ich až úspešný zápis. **Pamäť drží komponent**, nie volajúci:
+  ich až úspešný zápis. **Pamäť drží komponent** (od ŠT-2c), nie volajúci:
   je to súčasť kontraktu D-15, takže ju každá ďalšia pridávačka dostane
   rovnakú. Volajúci povie iba `memoryKey` a pri úspechu ju zahodí
   (`setBusy(false, {clear:true})` alebo `clearMemory(key)` — kostra sama
@@ -1394,8 +1681,8 @@ rozbaľovacie nastavenie hrán) sa rieši **dvoma poistkami naraz**:
 Bez toho by jedno stlačenie Escape zavrelo **oboje** a používateľ by prišiel
 o nastavenie, ktorého sa ani nedotkol.
 
-**Prekryvné ovládače vnútri modalu** (našepkávač `#mdSgBox` v materiáloch)
-majú **opačné** pravidlo než okno za modalom:
+**Prekryvné ovládače vnútri modalu** (našepkávač `#mdSgBox` v materiáloch;
+ŠT-2c, audit #10/#11) majú **opačné** pravidlo než okno za modalom:
 
 1. **Escape patrí najprv im.** Ich listener visí na **inpute**, kým modal počúva
    na `document` — stačí teda obyčajný `ev.stopPropagation()` a bublanie sa
@@ -1409,307 +1696,17 @@ majú **opačné** pravidlo než okno za modalom:
    ďalšom `input` do poľa, nie až po opustení a novom kliknutí doň — inak by
    jedno Escape pole „vyplo" na celú editáciu.
 3. **Vrstvenie sa odvodzuje z jednej definície.** Pri `.nxscrim` v
-   `panel.css` žijú `--nx-z-scrim` a `--nx-z-suggest`; našepkávač číta
-   `var(--nx-z-suggest, 80)`. Vlastné číslo by pri prvej zmene
+   `studio.html` žijú `--nx-z-scrim` a `--nx-z-suggest`; `panel.css` číta
+   `var(--nx-z-suggest, 80)`. Vlastné číslo v `panel.css` by pri prvej zmene
    scrimu poslalo dropdown **pod** modal — viditeľný, ale neklikateľný.
-
-### 5.13 Viditeľnosť tagov modelu v raile (D-27)
-
-Rýchle „zobraz/skry" SketchUp **tagov modelu** priamo z panela — Čelá · Chrbát ·
-Korpus · Vnútro · Kovanie · Dosky · Zóny (obrysy) — aby sa nemuselo preklikávať
-do natívneho okna Tags. **Nie sú to chipy vrstiev náhľadu z UI-B2** (§5.2): tie
-prepínajú, čo panel *kreslí*, toto mení, čo je vidieť *v modeli*.
-
-- **Miesto: rail, funkčná sekcia, pod „Kontrolou kresby".** Je to **jedna ikona
-  v už existujúcom ľavom stĺpci** a zoznam je **overlay** vedľa nej — v obsahu
-  panela nepribudol ani jeden riadok (trvalé pravidlo „vertikálny priestor je
-  vzácny"). Alternatívy padli: nový rad v sektore Náhľad by stál riadok navyše
-  a rozšíriť chipy vrstiev by zlialo dva rôzne významy do jedného ovládača.
-- **Celé tlačidlo otvára okno** — nemá vlastnú hlavnú akciu, takže **nemá rohový
-  trojuholník** (§5.11) a `aria-haspopup`/`aria-expanded` nesie samo. Obal je
-  vlastný `.railmenu`, nie `.railfly`.
-- **Stav ikony hovorí „nevidíš všetko":** kým je všetko viditeľné, ikona je
-  tlmená `eye`; keď je čokoľvek skryté, rozsvieti sa (`.on`) a prepne na
-  `eye-off`, bublina povie **koľko z koľkých**. Obe ikony sú v sprite —
-  vzor nepotrebuje novú kresbu.
-- **Ponúkajú sa LEN tagy, ktoré v modeli sú** (D-78 — mŕtve tlačidlo je horšie
-  než žiadne). Prázdny zoznam sa **prizná vetou** („vzniknú s prvou skrinkou
-  alebo doskou"), nie prázdnym oknom — a **tlačidlo sa preto nezosedne ani
-  v prázdnom modeli**: zamknuté by to vysvetlenie schovalo do bubliny.
-  Neaktívne je len to, čo naozaj nemá čo robiť.
-- **Skrytý priečinok tagov sa prizná.** Tag môže byť zapnutý a napriek tomu
-  neviditeľný, keď je skrytý jeho priečinok — riadok vtedy nesie jantárovú
-  poznámku „priečinok skrytý". Priečinok sa **nikdy nezapína automaticky**
-  (môže obsahovať cudzie tagy).
-- **Jeden stav, dva ovládače.** Checkbox „Zobraziť obrysy zón v modeli"
-  hovorí o tom istom tagu (`Noxun/Zóny`), preto ide **tou istou serverovou
-  cestou** a nasadzuje ho **ten istý push** — panel si nedrží vlastnú kópiu ani
-  jedného (vzor „materiál čiel v dvoch ovládačoch", §5.7).
-- **Je to zápis do modelu, nie overlay.** Na rozdiel od ABS kontroly a kontroly
-  kresby (kreslia NAD modelom, žiadny krok Späť — D-103/D-104/D-105) sa
-  viditeľnosť tagu **ukladá do .skp**: jeden klik = **jeden krok Späť**. Klik,
-  ktorý nič nezmení (už platná hodnota, odmietnutý guard), operáciu **vôbec
-  neotvorí** — prázdny krok Späť je horší než žiadny.
-- **Skrytie aktívneho tagu sa prizná.** SketchUp aktívny tag skryť nenechá a
-  prepne kreslenie sám; robíme to preto **vedome, v tej istej operácii** a
-  status to povie („Kreslenie prepnuté na Untagged").
-- **Zatvára klik mimo a Escape**, fokus sa vracia na tlačidlo (vzor warnpanelu
-  a rohového nastavenia ABS). Vlastný kľúč merača: `rail:tagy`.
-- **Nad railom nikdy nestoja dve okná naraz.** Otvorenie okna tagov zhasne
-  rohové nastavenie ABS a naopak — klik na spúšťač **zastavuje bublanie**
-  (inak by ho document listener v tom istom kliku zavrel), takže druhé okno
-  sa musí zavrieť **výslovne**; spoliehať sa na „klik mimo" tu nestačí.
-- **Prekreslenie otvoreného okna nesmie zhodiť fokus.** Server po každom
-  prepnutí pošle čerstvý stav a okno sa prekreslí celé (`outerHTML`), takže
-  klávesnicový používateľ by po každom prepnutí z ponuky vypadol. Riadok preto
-  nesie `data-tagkey` a fokus sa po prekreslení vráti na ten istý checkbox.
-  Platí pre každý overlay, ktorý sa prekresľuje zo servera.
-- **Známe obmedzenie (priznané):** tag skrytý priamo v natívnom okne Tags sa
-  v paneli prejaví až pri najbližšom pushi (otvorenie panela, zmena výberu,
-  Späť/Znova) — `LayersObserver` sa vedome nepridáva.
-
-### 5.14 D-51: štandard rozmerov okien (UI-B1)
-
-**Jedna pravda je OBSAHOVÝ viewport** (`NX_FIT_MIN` v HTML). Rozmery
-v `HtmlDialog.new` sú **vonkajšie** — obsah + rámik okna (Windows ≈ 16 px šírka,
-≈ 40 px výška). Preto sa vždy zapisuje trojica **`NX_FIT_MIN` → `width`/`height`
-→ `min_width`/`min_height`** a musí si zodpovedať (stráži guard test
-`tests/pure/test_uib1_kostra.rb`).
-
-| Okno | Obsah (`NX_FIT_MIN`) | `width` × `height` | `min_width` × `min_height` |
-|---|---|---|---|
-| **Inspector** (`panel.html`) | 470 × 810 | 486 × 850 | 486 × 600 |
-| **Štúdio** (`studio.html`) | 1060 × 640 | 1076 × 680 | 1076 × 520 |
-
-> Malý Z-dialog nástrojov (`tools/mower.rb`) má pevnú veľkosť 280 × 110 bez zmeny
-> veľkosti a bez fitu. Nové okno so zmeniteľnou veľkosťou dostane vlastný riadok
-> tabuľky a vlastné `NX_FIT_MIN` (§5.6, D-77).
-
-> **470 px Inspectora** je obsah = rail 44 px + karta. Hodnota je záväzná pre
-> celé UI 2.0 — mockup, sektory aj šírky polí sa navrhujú na ňu.
-> **1060 px Štúdia** je navigácia 208 px + tabuľka Kusovníka so 7 stĺpcami
-> a stĺpcom hover akcií; v užšom okne končí pravá časť riadku mimo. Výška 640
-> nechá pod lištou sekcie vidieť aspoň dve skupiny materiálu naraz.
-> Hodnota je overená aj na **najširšej tabuľke rozpočtu** (Spotrebiče:
-> typ · názov · dodávateľ · cena · stĺpec akcií · medzisúčet, teda editovateľné
-> bunky aj akcie vpravo): telo sekcie má pri 1060 px ≈ 828 px, čo je viac než
-> minimum mockupu (`#stageStudio` 900 px vrátane navigácie). **Hodnota sa preto
-> NEMENÍ** — zdvihnúť ju kvôli sekcii, ktorá sa zmestí, by len zbytočne
-> zväčšilo okno na malých obrazovkách.
-
-### 5.15 Vzory okna Štúdio (ŠT-1a)
-
-- **Trieda zo zdieľaného `panel.css` nesmie ísť na `<tr>`.** Holý selektor
-  `.trieda { display: flex; }` platí pre KAŽDÝ element — na
-  tabuľkovom riadku zruší `table-row` layout, bunky sa stanú flex položkami
-  a stĺpce sa rozídu s hlavičkou (presne to postihlo `tr.hwrow` v Nákupe
-  kovania; riadok generiky sa preto volá `tr.hwgen`). Riadkom tabuliek dávaj
-  vlastné triedy okna, alebo flex selektor v zdieľanom CSS zúž na
-  `div.trieda`. Stráži `tests/pure/test_tr_flex_kolizia.rb`.
-- **Každá položka navigácie je živá sekcia** — navigácia Štúdia nemá premostenia
-  do iných okien ani neaktívne položky. Budúca položka, ktorá by prišla skôr než
-  jej obsah, je `aria-disabled` s dôvodom v tooltipe (vzor D-78; vetva v kreslení
-  navigácie na to ostáva) — nikdy HTML `disabled`.
-- **Nárezový plán (NP-3) kreslí SVG TRIEDAMI, nie atribútmi.** Na rozdiel od
-  2D náhľadu Inspectora (farby sú zrkadlom tokenov v atribútoch) má SVG platní
-  farby výhradne v CSS triedach `.np-*` s `var(--nx-*)` v `studio.html` —
-  sleduje tak obe témy bez druhej kópie hodnôt; šrafy sú `<pattern>` s triedou.
-  Jediná dátová farba je vzorka dekoru v HTML štvorčeku (mimo SVG). Karty
-  materiálov sú zbaliteľné (pamäť tohto počítača), predvolene otvorená prvá
-  a každá s problémom; zbalená karta SVG nevytvára (vertikálny priestor aj DOM).
-- **Neexistujúci export je viditeľné `aria-disabled` tlačidlo s dôvodom —
-  ale LEN keď ten dôvod má dátum.** Michal porovnáva panel 1:1 s mockupom,
-  takže chýbajúci ovládač vyzerá ako chyba implementácie a priznaný ovládač
-  ako plán. Pravidlo je **zúžené** (smoke test 22.8.2026, verdikt Michal):
-  priznaný `aria-disabled` platí na sľub, ktorý
-  príde **najbližšou dávkou**; ovládač, ktorý by visel neaktívne **celý blok**,
-  sa **skryje** a vráti sa až s funkciou. Sivé tlačidlo prestane po pár dňoch
-  čítať ako plán a začne čítať ako rozbitý ovládač — a používateľ, ktorý naň
-  klikne trikrát, prestane veriť aj tým aktívnym (kontrakt
-  `SYSTEM/zdroje/ui20/UI20_KONTRAKT.md`, **Š5 revízia 22.8.**).
-  `aria-disabled` teda **nie je** náhrada za chýbajúcu funkciu, ale za
-  **funkciu, ktorá je na ceste**.
-- **Výstup sa nikdy netvári ako vstup.** Údaj, ktorý sa edituje inde, je
-  v ostatných miestach TEXT (názov projektu: input v Štúdiu → Kusovník,
-  text v lište Kusovníka v Štúdiu).
-- **Voľba zobrazenia je vec POČÍTAČA, nie zákazky.** Voliteľné stĺpce,
-  zbalené skupiny a zbalená navigácia žijú v `localStorage` (nikdy v `.skp`
-  a nikdy v `%APPDATA%` — nie je to nastavenie pluginu, len tohto okna).
-- **Kódy hrán `L1/L2/W1/W2` sa v tabuľkách neprekladajú** na „predná/zadná" —
-  ten istý kód znamená pri každej role inú fyzickú hranu. Fyzickú stranu
-  ukazuje karta dielca v Inspectore, ktorá ju zároveň kreslí.
-
-### 5.16 E-b: Rozpočet — inline edit dát rozpočtu
-Sekcia, v ktorej sa **priamo v tabuľke** edituje zákazka — dáta rozpočtu v `NOXUN` dict na
-modeli (1 zmena = 1 krok Späť). Do modelu zapisujú aj iné sekcie Štúdia (Materiály, Kovanie,
-Pravidlá, Šablóny — operáciou alebo prestavbou skriniek, s rovnakými nárokmi na krok Späť,
-serverové guardy a in-SU test); vzory nižšie sú špecifické pre inline edit rozpočtu:
-- **Sekcie = `<details>`** s medzisúčtom v hlavičke; stav rozbalenia prežije
-  prekreslenie (payload chodí po každom zápise).
-- **Inline edit** (Lucia §11): číselné polia sa zapisujú až na `change`
-  (blur/Enter), nie pri každom stlačení klávesy; fokus aj rozpísaná hodnota sa
-  cez prekreslenie obnovia.
-- **Nulové riadky ostávajú viditeľné** (rozpočet je zároveň kontrolný zoznam);
-  chýbajúca cena je jantárový riadok so štítkom, NIKDY nula.
-- **Veľké tlačidlo plnej šírky** (`.baddbig`) na pridanie ručného riadku —
-  jediné miesto, kde sa vedome porušuje šetrenie vertikálnym priestorom
-  (sekcia inak nemá viditeľný vstupný bod).
-- **Prepínače** (`.bseg`): s DPH / bez DPH je len zobrazenie (localStorage),
-  režim €/€€/€€€ je zápis do zákazky; tooltipy nesú názvy režimov.
-- **Checkbox v hlavičke sekcie** (`label.bappl` v `<summary>` so `stopPropagation`):
-  „sčítať do rozpočtu" (Spotrebiče) a od NP-4 „ceny podľa plánu" (Materiál, s `.nxtip`).
-- **Značka zdroja čísla** (`.qtag`, NP-4) — malý badge (9 px rádius) pred číslom v bunke:
-  `.plan` tlmená (sunken + ink-muted), `.est` jantárová (`--nx-warn-bg-soft`/`--nx-warnchip-*`);
-  kreslí sa len keď ju server pošle (zapnutý prepínač).
-- **Ikona odkazu pred názvom** (CENY-M2, mockup D4) — materiál a páska majú pred názvom tú istú
-  kresbu ako kovanie (`.hw-product-link`, v tabuľke `.bmatlink` 20 px): sivá = otvorí Demos alebo
-  obchod, jantárová `is-missing` = odkaz chýba (klik vedie na doplnenie). Riadok nepribúda.
-- **Stav = tlačidlo** (`.bver`, CENY-M2, O1/O5) — v stĺpci „Overená" pri položke bez Demosu je stav
-  ručnej ceny zároveň akciou „Overiť cenu": malé textové tlačidlo s ikonou `#i-clipboard-check`,
-  sivé pri čerstvom overení, jantárové `is-pending` (`--nx-warn-bg` + `--nx-warnchip-border`) pri
-  „na kontrolu"; v jantárovom riadku bez ceny má pozadie `--nx-surface`. Text krátky („ručne 18.9.",
-  „ručne 45 dní", „neoverená"), plné znenie v `title`, `aria-label` nesie akciu, názov aj stav.
-
-### 5.17 D-92: nákup pod položkou kovania (`.hwitem` / `.hwbuy`)
-Položka sekcie Kovanie je **obal `.hwitem`** = `.hwrow` (počet, výber
-setu, akcie) + **jeden** sekundárny riadok `.hwbuy` drobným písmom:
-`Atira biela H176 → 357783 · K-Atira zásuvka 620/50kg`. Riadok je jednoriadkový
-s ellipsis, plný text nesie `title`. Nekompletný nákup (chýba set, kód alebo
-pásmo) dostane `.hwbuy-warn` = **jantárové upozornenie** (`--nx-warnchip-fg`);
-semaforové `--nx-state-*` sa sem **nemiešajú**. Obsah riadku skladá výhradne
-server (`HardwareSets.explain` + `PartKeys.human_label`) — JS nerozhoduje, čo
-sa kupuje, ani neprekladá dôvody.
-
-### 5.18 D-102: vyriešená ABS páska v karte dielca a dosky
-Rozbaľovačka hrany nesmie skončiť pri „(podľa pravidla)" — voľba nesie **výsledok**
-(`(podľa pravidla — 500 SM Biela 23/1 mm)`, `(podľa pravidla — bez ABS)`,
-`(podľa pravidla — nelepí sa)`). Karta Dosky nemá vrstvu overridov, preto sa u nej
-mení voľba „Bez ABS" na **„Bez ABS (nelepí sa)"** pri nelepiteľnom materiáli.
-V 2D náhľade má každý farebný pás **`<title>` tooltip** s plným textom a
-**existujúci** popisok strany nesie skratku (`Predná · 23/1`) — **žiadny nový
-riadok**. Text skladá **výhradne server** (`Panel.edge_rule_results` /
-`edge_view_hints`), JS ho len escapuje a vkladá; pri lokálnom prekreslení po zmene
-materiálu sa serverový text vedome NEPOUŽIJE (patrí starému materiálu) a ukáže sa
-neutrálne „(podľa pravidla)". Farby pásov ostávajú na ABS tokenoch `--nx-abs-*`
-(semaforové `--nx-state-*` sa sem nemiešajú).
-
-### 5.19 D-105: tlačidlo „Zvýrazniť hrany" s rohom (Štúdio → KONTROLA)
-
-> Rozbaľovacie okno je **ZDIEĽANÝ komponent** (`ui/js/edge_menu.js` +
-> štýly `.ecmenu`/`.ecopt`/`.ecsw*` v `panel.css`): to isté nastavenie otvára aj
-> **rohový trojuholník pri ABS kontrole v raile Inspectora** (§5.11). Pravidlá
-> nižšie platia pre obe miesta; líšia sa len polohou okna a menom handlera.
-> Nová kópia markupu ani druhý stav vzniknúť nesmie.
-
-Tlačidlo je **rohový flyout** (§5.11): **klik na telo** zapína/vypína zvýraznenie
-(zapnutý stav je zjavný — pozadie `--nx-select` + ikona `eye-off`; je to
-**zapnutý stav**, nie akcia, preto výberová a nie zelená), **klik na pravý dolný
-roh** (`.cornerzone`) otvorí rozbaľovacie okno s nastavením. Vzory:
-- **Okno je overlay** (`position: absolute` pod tlačidlom), **nie nový riadok**
-  layoutu — vertikálny priestor sa nemení ani keď je otvorené.
-- **Lišta sekcie (`#sectools`) žije MIMO scrollovacieho tela sekcie** (`#secbody`,
-  `overflow: auto` by overlay orezal — pri „kontrola bez nálezov" je telo nízke
-  a z okna by ostal prúžok).
-- Riadok stavu = checkbox + **farebný štvorček** (`--nx-edge-*`, presne farba
-  plôšky v modeli) + názov + **živý počet zo servera**. Počet je pravdivý aj pre
-  vypnutý stav — inak by sa používateľ nemal podľa čoho rozhodnúť.
-- **Podriadený prepínač** (`.ecsub`, odsadený) patrí výhradne jednému nadradenému
-  riadku; jeho väzbu hovorí odsadenie, nie text.
-- Klient si drží **len** to, či je okno otvorené. Stav prepínačov, počty aj
-  zapnutosť sú zo servera; klik posiela iba `kľúč + boolean` (whitelist a striktný
-  boolean rozhoduje Ruby — HTML `disabled` nie je ochrana).
-- Prázdny výber pri zapnutom „len vybrané" sa **povie nahlas** („označ skrinky
-  v modeli"), nikdy sa ticho nezobrazí všetko.
-
-### 5.20 D-85 / UI-03: zdieľaný combobox materiálov a ABS (`.nxcombo`)
-
-Každý výber materiálu alebo ABS pásky v paneli je **jeden a ten istý komponent**
-(`ui/js/nx_combo.js`) — nie päť kópií. Vzhľad je prevzatý 1:1 z mockupu
-`SYSTEM/zdroje/ui20/mockup_inspector_c.html`.
-
-**Anatómia:** `.nxcombo` (obal) → `.cbtrigger` (tlačidlo so **štvorčekom farby**,
-popisom a `chevron-down`) → `.cbpop` (popup: `.cbsearch` s ikonou `search` a
-inputom · `.cblist` so `.cbsec` hlavičkami a `.cbopt` riadkami · `.cbfoot`
-s `.kbd` nápovedou). Zvýraznenie zhody je `<mark>` s vlastným tokenom
-`--nx-mark-bg` (nie je to stav ani výber — je to „toto si napísal").
-
-**Záväzné pravidlá komponentu:**
-
-- **Natívny `<select>` sa NENAHRÁDZA, len obaľuje.** Ostáva v DOM (skrytý,
-  `tabindex="-1"`) a je naďalej **jediným zdrojom pravdy**: možnosti sa čítajú
-  z jeho `<option>`/`<optgroup>`, výber zapíše `value` a vystrelí `change`.
-  Vďaka tomu platí všetka existujúca logika bez duplikátu (hrúbkové filtre D-45,
-  ABS skupiny D-36, texty „(podľa pravidla — …)" D-102, dupláky D-49, `disabled`
-  „(nekompatibilné)") a **prežívajú všetky guardy** na `change` ceste
-  (E-03 hrúbka, D-86 smer dekoru, D-41 modal chýbajúcej pásky, identity guardy).
-  Nový výber materiálu = pridať `data-nx-combo="decor"|"abs"` na `<select>`,
-  nič viac.
-- **Skrýva ATRIBÚT, nie trieda** (`.nxcombo > select[data-nx-combo]`): panel
-  selectom prepisuje `className` (`ovr`), trieda by zmizla. Override `ovr` sa
-  z selectu **zrkadlí** na trigger.
-- **Popup je `position: fixed` nad `body`** — žiadny predok s `overflow: auto`
-  ho neoreže (poučenie D-67 FIX 7 a D-105). Otvára sa **doľava** (pravá hrana
-  lícuje s triggerom), šírka `max(trigger, 270 px)`, pri málo mieste dole sa
-  preklopí nahor. Scroll **mimo** popupu ho zavrie, scroll v zozname nie.
-- **Výber `mousedown`-om** (D-67 FIX 4 — `blur` by popup zavrel skôr, než klik
-  dopadne); `<datalist>` v CEF nefunguje vôbec.
-- **Poradie sekcií je kontrakt:** fixné voľby (dediť / podľa pravidla / Bez ABS,
-  bez hlavičky) → **Použité v projekte** → **Naposledy použité** → zvyšok
-  katalógu členený podľa `<optgroup>`. Položka sa objaví **práve raz**; aby sa
-  členenie D-36 nestratilo, nesie riadok meno svojej skupiny ako podtitul.
-- **Dáta si komponent nedrží.** „Použité v projekte" je odvodený zoznam ID zo
-  servera; keďže sa mení pri každom zápise materiálu, ale **číta sa len pri
-  otvorení ponuky**, combobox si ho pri otvorení **vypýta** (`nx_used_ids` →
-  `NX.setUsedIds` → prekreslenie otvoreného zoznamu). Farbu štvorčeka dáva panel
-  resolverom (`nxComboColorOf` v `core.js`: dekor z katalógu — pozor, katalógová
-  farba je pole `[r,g,b]`, nie CSS reťazec; ABS **podľa hrúbky** — rovnaká
-  legenda ako `.absleg`); do `style` prejde len hex. „Naposledy použité" je
-  `localStorage` **tohto počítača** (`nx_recent_decor` / `nx_recent_abs`, max 5,
-  len ID) — nikdy nie model ani `%APPDATA%`; fixné voľby sa nepamätajú.
-- **Sync zvonka popup ZAVRIE.** Serverový push (iná skrinka, nový katalóg),
-  prestavba `<option>`ov aj odchod z okna zatvárajú otvorenú ponuku — drží
-  položky z času otvorenia, takže by klik potvrdil voľbu starého kontextu do
-  nového. Natívna rozbaľovačka sa pri prestavbe správa rovnako.
-- **Klávesnica:** ↑↓ (preskakujú `disabled`), Enter potvrdí, Esc zavrie a vráti
-  fokus na trigger, Tab zavrie. Pri otvorení stojí kurzor na **aktuálnej hodnote**
-  (Enter nič nezmení omylom), pri písaní skočí na prvú zhodu.
-- Filter je **necitlivý na diakritiku** oboma smermi (`modra` nájde „modrá“,
-  `modrá` tiež) a hľadá aj v ID (nesie kód dekoru).
-- Vedomá výnimka z rádiusu 6: `.sw` štvorčeky a `.kbd` klávesy majú **3 px**
-  (nie sú to komponentové rámy — rovnaká trieda ako farebné štvorčeky legiend).
-
-> Sekcia **Materiály** v Štúdiu má vlastný suggest (D-67) nad textovými poľami a komponent
-> zámerne **nepreberá** — sú to rôzne veci (voľný text vs. výber z katalógu).
-> Projektové predvoľby žijú tiež tam, nie v paneli (§5.21).
-
-### 5.21 D-124: predvoľby materiálov v Štúdiu
-
-Rozbalený, ručne zbaliteľný blok so štyrmi skupinami vedľa seba; v úzkom okne dva stĺpce. Vzorka **115 × 115 px** (8 px rádius),
-pod ňou pôvodný picker a údaje o variante. Celý serverový label sa zalamuje bez skrátenia, aby nezmizlo rozlíšenie formátu/rubu; duplicitný malý swatch triggera sa skryje iba v tomto
-bloku. UNI má označenie pracovného materiálu namiesto hrúbky. Zbalenie prežije refresh; potvrdzovacia lišta je jedna pod celou mriežkou. Všetky CSS úpravy sú ohraničené na blok.
 
 ---
 
 ## 6. Cache-busting
 
-CEF cachuje externé CSS/JS. Konvencia: `?v=` suffix = **presne verzia
+CEF cachuje externé CSS/JS. Konvencia od v0.5.0: `?v=` suffix = **presne verzia
 pluginu** (VERSION z loadera) na VŠETKÝCH css/js odkazoch vo VŠETKÝCH ui/*.html —
 stráži to guard test v `tests/pure/test_guards.rb`. Zmena css/js po vydaní teda
 znamená: bump patch VERSION (noxun_engine.rb + main.rb) a prepísať všetky `?v=`
 na novú hodnotu (viď pravidlo verzie v CLAUDE.md). Verzia v pätičke ide z Ruby
 a s cache-bustom sa nikdy needituje ručne zvlášť.
-
----
-
-## História
-
-Vyhradená sekcia — jediné miesto súboru, kde smú stáť historické značky (čísla verzií a PR, kolá review, zaniknuté okná).
-**Plné pôvodné znenie tohto dokumentu do v0.17.4** (ktorá dávka čo zaviedla, premostenia a satelitné okná, dôvody pravidiel v pôvodnom znení)
-je v archíve [../SYSTEM/archiv/UI_DIZAJN_dennik_do_v0.17.md](../SYSTEM/archiv/UI_DIZAJN_dennik_do_v0.17.md); priebeh dávok je v
-[../SYSTEM/archiv/KRONIKA.md](../SYSTEM/archiv/KRONIKA.md). Zaniknuté okná (Výroba, Materiály projektu, Katalóg kovania, Pravidlá kovania, Šablóny,
-Nastavenia dodávateľa) a ich dnešné sekcie Štúdia: [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md), sekcia „História".
-
-- **Hlavička panela (D-47 / D-91):** dvojradová hlavička s tromi režimovými tabmi a satelitnými akciami (Materiály · Výroba · Kovanie) ZANIKLA
-  v UI-B1 — dnešná jednoradová hlavička je v §5.6.
-- **Presunuté nadpisy (dávka H5b, 1.10.2026):** odseky E-b, D-92, D-102, D-105, D-85 / UI-03 a D-124 stáli pôvodne v §4 Ikony — dnes sú
-  §5.16–§5.21; „D-51: štandard rozmerov okien" je §5.14 a „Vzory okna Štúdio" §5.15; §5.12 (D-15) stojí pred §5.13. Čísla §5.1–§5.13 sa nezmenili.

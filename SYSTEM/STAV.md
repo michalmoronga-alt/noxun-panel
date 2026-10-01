@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.17.4 · 1.10.2026 — blok 9 HARDENING; posledná hotová dávka H5a** (PR #439, len dokumentácia: mapa okien bez histórie, strážca rastu; ďalej H5b).
+**v0.17.5 · 1.10.2026 — blok 9 HARDENING; dávka H5 hotová** (dokumentácia: H5a PR #439 mapa okien bez histórie · H5b PR #440 UI_DIZAJN ako norma bez denníka, opravené zastarané vety, strážcovia rastu; v0.17.5 = len komentáre v kóde pluginu, správanie bez zmeny).
 Posledná kódová dávka **H4b** (PR #438): **texty a vzhľad** — núdzové „Vrátiť katalóg pred migráciou…" už nestojí vedľa „Obnoviť" (ponuka „⋯" v Materiáloch), „Obnoviť" znamená všade to isté, iný význam je „Vrátiť…";
 texty bez „ghost/seed/legacy/server" a bez kričania, verzia „v0.17.x"; jednotné rozbaľovačky, krátke „Hľadať…", stĺpce Kusovníka pod sebou, mazanie ikonou ×, Nastavenia rozpočtu s ikonou posuvníkov. **Dáta, čísla, XLSX, CSV a VEPO bez zmeny.**
 Pod tým **H4a** (v0.17.3, PR #437): čísla v Štúdiu všade rovnako, nič sa neskrýva. Pod tým **H3b** (v0.17.2, PR #436): bez falošnej chyby „invalid overlay" v Ruby konzole po **Súbor → Nový**. Pod tým **H3a** (v0.17.1, PR #435): Štúdio bez zavádzajúcich údajov (Kusovník, ponuka, Kontrola, Nákup, sadzby) — **čísla, CSV, XLSX a VEPO bez zmeny**.
@@ -29,19 +29,19 @@ v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a
 **Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin
 počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
 
-**Testy (H4b, PR #438):** **4979 headless · 149 JS sád** zelené + encoding guard; in-SU sa nespúšťal (JS/CSS a zobrazovacie texty; posledný beh H3b: 3284 PASS / 0 FAIL).
+**Testy (H5b, PR #440):** **4989 headless · 149 JS sád** zelené + encoding guard; in-SU sa nespúšťal (len dokumentácia a komentáre v kóde; posledný beh H3b: 3284 PASS / 0 FAIL).
 
 ## Robí sa
 
 **Blok 9 · HARDENING PO V1** (štart 1.10.2026, PR #432): krížový audit V1 sedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**;
 17 dávok **H1…H17** sekvenčne podľa tabuľky v [PLAN.md](PLAN.md), **bez zmeny výrobných a cenových čísel**; priečinok bloku [zdroje/bloky/HARDENING/](zdroje/bloky/HARDENING/).
-Hotové **H1** PR #433 · **H2** (fotenie okien) PR #434 · **H3a** (zavádzajúce údaje v okne) PR #435 · **H3b** (falošná chyba v Ruby konzole po novom súbore) PR #436 · **H4a** (zápis čísel) PR #437 · **H4b** (texty a vzhľad) PR #438 · **H5a** (mapa okien bez histórie, strážca rastu dokumentov) PR #439; nasleduje **H5b**.
+Hotové **H1** PR #433 · **H2** (fotenie okien) PR #434 · **H3a** (zavádzajúce údaje v okne) PR #435 · **H3b** (falošná chyba v Ruby konzole po novom súbore) PR #436 · **H4a** (zápis čísel) PR #437 · **H4b** (texty a vzhľad) PR #438 · **H5a** (mapa okien bez histórie, strážca rastu dokumentov) PR #439 · **H5b** (UI_DIZAJN ako norma, zastarané vety) PR #440; nasledujú **H6/H7** (mockupy).
 **H4b — Michalove otázky Q1/Q2 bez odpovede, platí predvolená vratná voľba:** vrátenie katalógu v ponuke „⋯" Materiálov (nie v O plugine) a ikona posuvníkov pre Nastavenia rozpočtu.
 **H6 a H7 čakajú na schválený mockup** (R-38 v H7 potvrdí Michal) · **Q1** (porez a montáž pri skle) bez odpovede · pri prvej rohovej v dielni overiť záves Sensys · **na smoke čakajú** D-132 (#367), D-133 (#368), D-134 (#369).
 
 ## Ďalší krok
 
-Pokračovať blokom 9 v poradí tabuľky: **H5b** (UI_DIZAJN — norma oddelená od denníka, zastarané vety); medzitým mockupy **H6** a **H7** na schválenie Michalom. Potom **R-13 → R-37
+Pokračovať blokom 9 v poradí tabuľky: **H6** a **H7** — čakajú na schválenie mockupov Michalom (poradie, ak schválenie nepríde, určí orchestrátor alebo Michal). Potom **R-13 → R-37
 → R-35** ako **H8–H10** (**R-13 rozhodnuté 29.9.: čítať** — ORANGE „dielec z inej verzie štandardu") a refaktory H11–H17; uzáver bloku = minor verzia + smoke
 (smoke H3a + H3b: 7 bodov v [PACKAGE_H3.md](zdroje/bloky/HARDENING/PACKAGE_H3.md) §10; H4a + H4b: body 1–11 v [PACKAGE_H4.md](zdroje/bloky/HARDENING/PACKAGE_H4.md) §10; vzhľad rozbaľovačiek a výberu nôh v SketchUpe overí smoke bod 7). Ak druhé PC ešte nemá 0.17.0, aktualizovať (Kompatibilita vyššie). **Test na reálnej zákazke po V1.**
 

@@ -423,7 +423,7 @@ rohová, rohové vybavenie (LeMans, karusel) a atypické (L, šikmé) korpusy s�
 **presne ako dolná** (predvoľby `CORNER_DEFAULTS` = dolná + šírka 1100 + jeden riadok dvierok); navyše štyri polia configu, **zapisované len pri rohovej a vždy
 všetky**: `corner_side` (`left` | `right` — strana **dverovej časti** spredu, roh je oproti; iné → `left`), `corner_door_w` (mm 250–800, predvolene 450 — dverová
 časť od vonkajšej plochy boku po os medzery dvere ↔ CR 1), `corner_cr1` a `corner_cr2` (mm 50–250, predvolene 80). Rozmery sa čítajú **prísne** (nečíslo =
-predvoľba poľa, nie 0) a klampujú; rozsahy sú návrh (potvrdí Michal v mockupe ROH-B). Zostava (dvere vľavo; dvere vpravo = zrkadlo `x' = W − x − box[0]`, korpus
+predvoľba poľa, nie 0) a klampujú; rozsahy potvrdil Michal (mockup rohovej O2, rozhodnutie R10 bloku ROHOVÁ, 28.9.2026). Zostava (dvere vľavo; dvere vpravo = zrkadlo `x' = W − x − box[0]`, korpus
 sa nemení): **blenda korpusová** `[W − t − D, t, z_hi − z_lo]` @ `[D, 0, z_lo]` · **výstuha závesov** `[t, 80, z_hi − z_lo]` @ `[D − t, 0, z_lo]` · **CR 1**
 `[c1 − gC, th1, hf]` @ `[D + gC, −th1, zf0]` · **CR 2** `[th2, c2 − gC + th1, hf]` @ `[D + c1, −(c2 − gC + th1), zf0]` · **rohová výstuha** `[t, c2 + th1, h − s]`
 @ `[D + c1 + th2, −(c2 + th1), s]`, kde `gC` = medzera dverí pri rohu, `th1/th2` = **účinná hrúbka** CR z čelového kanála (override dielca → čelový materiál →

@@ -52,7 +52,7 @@ Platí LEN pre VEPO CSV a LOG — **kusovník Štúdia ostáva s plnými názvam
   `Sokel predny`→`Sokel` · `Priecka zvisla`→`Priecka Z` · `Priecka vodorovna`→`Priecka V` · `Dvierka N lave/prave`→`Dv<N> L`/`Dv<N> P` · `Dvierka N kridlo i/n`→`Dv<N> k<i>` ·
   `Dvierka N`→`Dv<N>` · `Zasuvkove celo N`→`Zas celo N` · `Lista chrbta`→`Chrb HD` (KON-B, 27.9.2026: obe lišty chrbta z líšt nesú spoločný názov —
   jeden riadok, 2 ks, páska na jednej dlhej hrane `—`; s výstuhami rovnakého rozmeru a materiálu sa zlúčia do `Vyst PZ/Chrb HD s12`, 4 ks) ·
-  **rohová skrinka (ROH-A1, 28.9.2026 — návrh, potvrdí Michal):** `Blenda rohova`→`Blenda roh` · `Vystuha zavesov`→`Vyst zav` · `Vystuha rohova`→`Vyst roh` ·
+  **rohová skrinka (ROH-A1, 28.9.2026 — potvrdil Michal: mockup O6, rozhodnutie R10 bloku ROHOVÁ):** `Blenda rohova`→`Blenda roh` · `Vystuha zavesov`→`Vyst zav` · `Vystuha rohova`→`Vyst roh` ·
   `CR lista 1`→`CR 1` · `CR lista 2`→`CR 2` (CR 1 a CR 2 rovnakého rozmeru a materiálu sú jeden riadok → zlúčený token `CR 1 2`). `Dno`, `Vrch`, `Chrbat`, `Polica N`, `Blenda N`, `Výklop N`, `Sklop N`, `Dv myčka` (čelo slotu umývačky, D-138) a názvy samostatných dosiek (voľný text) sa nemenia.
 - **Vyrábané dielce zásuvky (D-121a, 8.9.2026):** `Dno zasuvky N`→`Zas dno N` · `Chrbat zasuvky N`→`Zas chrb N` · `Vnutorne celo zasuvky N`→`Zas predok N` ·
   `Bok boxu lavy/pravy N`→`Zas bok L/P N`; dvojica bokov jednej zásuvky v riadku → `Zas bok LP N`. `N` je **číslo čela** — to isté, aké nesie `Zasuvkove celo N`.

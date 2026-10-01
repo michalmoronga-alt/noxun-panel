@@ -17,6 +17,28 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H5b · UI_DIZAJN ako norma + zastarané vety (1.10.2026, PR #440, v0.17.5 — dokumentácia a komentáre v kóde pluginu, bez zmeny správania; blok 9 · HARDENING PO V1, položky
+  triedenia B-05 a zvyšok B-03, krížový audit CS-06, CN-08, CN-09; brief [BRIEF_H5.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H5.md)) — dávka H5 hotová.**
+  `docs/UI_DIZAJN.md` miešal normu s denníkom dávok (21 riadkov s historickými značkami — verzie, `PR B1`, `review #249`, zaniknuté okná a premostenia).
+  **Presun, nie mazanie:** plné pôvodné znenie je v [UI_DIZAJN_dennik_do_v0.17.md](UI_DIZAJN_dennik_do_v0.17.md) (kontrola množiny riadkov: 199 zmenených
+  alebo presunutých riadkov, 0 chýba v archíve). Živá norma: §1–§3 bez zmeny pravidiel, **§4 len ikony** (inventár doplnený o 8 chýbajúcich kľúčov spritu
+  a ikony navigácie Štúdia; veta „úplný k v0.7.28" nahradená guardom), **odseky E-b, D-92, D-102, D-105, D-85 / UI-03 a D-124 presunuté pod §5** (§5.16–§5.21),
+  D-51 = §5.14, „Vzory okna Štúdio" = §5.15, §5.12 pred §5.13; čísla §1–§5.13 a nadpisy, na ktoré ukazujú kód, testy a CLAUDE.md, ostali; sekcia „História" na
+  konci. Veľkosť (LF) 119,3 → 120,7 kB — dokument bol prevažne norma, pribudol inventár ikon. **Opravené rozpory (CN-09, každý overený v kóde):**
+  `construction.md` `TYPES` so `corner_blind`; hmotnosť v Základných ukazuje kg (UI_DIZAJN §5.3, UI20_KONTRAKT poznámka); semaforové tokeny nesie sekcia
+  Kontrola (§2); výklop je vyberateľný typ čela so systémom HK/HL (§5.7); inventár ikon; história BuildPlan `SCHEMA` v `model-a-identita.md` vzostupne
+  2→3…6→7 a „ostáva 5" v minulom čase (aj dve vety v `construction.md`); skratky VEPO a rozsahy rohovej potvrdil Michal (mockup O2/O6, R10) — VEPO_KONTRAKT
+  a STANDARD bez „návrh, potvrdí Michal"; „Architektúra (v0.5.32)" a „satelity" v ARCHITEKTURA a CLAUDE.md; hmotnosť z geometrie (po stavbe) vs. hrúbka
+  z katalógu (plán) vysvetlené v `outputs.md` aj `materials.md`. **Navyše nájdené a opravené pri overovaní:** štýly kostry D-15 žijú v `panel.css` (načítavajú ich
+  obe okná), nie v `studio.html`; „Zvýrazniť hrany" je rohový flyout, nie split tlačidlo s chevronom; lišta Kontroly je `#sectools` mimo `#secbody` (nie
+  `#prodBody`); checkbox „Zobraziť obrysy zón v modeli". **CLAUDE.md:** checklist uzáveru kódovej dávky má bod „Grepom prehľadaj tvrdenia o zoznamoch, ktoré dávka
+  mení". **Strážca** v `tests/pure/test_docs_navigacia.rb` (reportovací beh nad starým znením: 21 značiek, 8 chýbajúcich ikon; po upratanom 0 a 0): strop
+  UI_DIZAJN 160 kB (~1,3×), zákaz historických značiek mimo „História" (ten istý mechanizmus ako H5a), inventár §4 = každý kľúč `icons.js`; UI_DIZAJN pribudol
+  do kontroly relatívnych odkazov. **Review kolo 1 (4× P2):** guard inventára číta všetky generované `<symbol id="i-…">` (aj samostatný `LOGO`) + negatívny test;
+  komentáre v kóde pluginu zladené s normou — semafor v `panel.css` („len Kontrola", nie „rezervované"), potvrdené rozhodnutia rohovej (O1, O2, O6, O8, R10)
+  v `vepo_export.rb`, `construction.rb`, `cabinet_builder.rb` a `outputs.md`, Rozpočet nie je „jediná sekcia zapisujúca do modelu" (UI_DIZAJN §5.16,
+  `studio.js`, `studio_dialog.rb`) — **len komentáre, bez zmeny správania, v0.17.5** (VERSION + `?v=`). **Testy:** 4989 headless · 149 JS sád zelené + encoding guard;
+  in-SU netreba (len komentáre).
 - **H5a · mapa okien bez histórie (1.10.2026, PR #439, dokumentačné PR — plugin, VERSION ani `?v=` sa nemenia; blok 9 · HARDENING PO V1, položky triedenia
   B-02 a časť B-03; brief [BRIEF_H5.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H5.md); briefy H1–H5 a H8–H10 sú od tohto PR v priečinku bloku `briefy/`).** `docs/architecture/ui-lifecycle.md` (551 kB, 4 193 riadkov, 246 riadkov s historickými
   značkami) bol súčasne kontrakt aj kronika — agent nevedel, ktorá veta ešte platí. **Presun, nie mazanie:** celé pôvodné znenie ide do

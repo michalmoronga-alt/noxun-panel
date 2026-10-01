@@ -30,7 +30,7 @@ Serverové moduly sekcií Štúdia nesú historické mená `*_dialog.rb` — vla
 
 ### Dizajn
 
-Tokeny `--nx-*` (farby VÝHRADNE cez tokeny; `--nx-state-*` rezervované pre semafor, nemiešať s ABS/status významami) · `ui/js/icons.js` inline SVG sprite
+Tokeny `--nx-*` (farby VÝHRADNE cez tokeny; `--nx-state-*` len semafor sekcie Kontrola, nemiešať s ABS/status významami) · `ui/js/icons.js` inline SVG sprite
 (Lucide subset + vlastné + firemné logo `#i-logo`; licencie v THIRD_PARTY_NOTICES.md) · **žiadne emoji v UI chrome — vždy sprite ikony** ·
 **komponentový rádius 6 px** · pravidlá: `docs/UI_DIZAJN.md` — **čítať pri KAŽDEJ UI práci**.
 

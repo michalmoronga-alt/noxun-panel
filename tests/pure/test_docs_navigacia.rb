@@ -74,6 +74,16 @@ NX_ARCH_MAX_BYTES = {
 # mapy este upratane nie su — pribudnu sem, ked ich niektora davka uprace.
 NX_ARCH_HISTORY_FILES = %w[ui-lifecycle.md].freeze
 NX_ARCH_HISTORY_HEADING = '## História'
+
+# Davka H5b (blok 9 · HARDENING, 1.10.2026, krizovy audit V1 B-05/B-03, CS-06, CN-08/CN-09):
+# docs/UI_DIZAJN.md je NORMA (tokeny, typografia, ikony, komponentove vzory) a povinne citanie
+# KAZDEJ UI davky — mal v sebe aj dennik davok (verzie, PR, kola review, zaniknute okna) a
+# zastarane vety (semafor „nikde sa nepouziva", inventar ikon „uplny k v0.7.28"). Dennik sa
+# presunul plnym textom do SYSTEM/archiv/UI_DIZAJN_dennik_do_v0.17.md. Ten isty mechanizmus ako
+# H5a: strop velkosti ~1,3x po upratani (dnes ~121 kB na disku s CRLF), historicke znacky len
+# v sekcii „## História" na konci a k tomu inventar ikon §4 = kazdy kluc spritu icons.js.
+NX_UI_DIZAJN = File.join('docs', 'UI_DIZAJN.md')
+NX_UI_DIZAJN_MAX_BYTES = 160 * 1024
 # Znacky sa hladaju BEZ OHLADU na velkost pismen a s toleranciou Markdownu a medzier
 # (`Review #226`, `V0.4.7`, `PR **#438**`, `PR  #438` su v repe bezne zapisy) — riadok sa
 # pred porovnanim normalizuje (`nx_arch_history_norm`: bez `*` a spatnych apostrofov,
@@ -340,6 +350,72 @@ NxTest.test('docs: modulove nadpisy v docs/architecture/ menuju existujuce subor
                 "'#{NX_ARCH_HISTORY_HEADING}' ako veta s odkazom do archivu, nie ako zivy odsek")
 end
 
+NxTest.test('docs: UI_DIZAJN.md ma strop velkosti (norma, dennik davok patri do archivu)') do
+  path = File.join(NxTest::ROOT, NX_UI_DIZAJN)
+  size = File.size(path)
+  NxTest.assert(size <= NX_UI_DIZAJN_MAX_BYTES,
+                "UI_DIZAJN.md ma #{size} B (strop #{NX_UI_DIZAJN_MAX_BYTES} B) — norma opisuje pravidlo, nie priebeh prac; " \
+                'ktora davka co zaviedla patri do SYSTEM/archiv/KRONIKA.md')
+end
+
+NxTest.test('docs: UI_DIZAJN.md nema historicke znacky mimo sekcie Historia') do
+  lines = File.readlines(File.join(NxTest::ROOT, NX_UI_DIZAJN), encoding: 'UTF-8').map(&:rstrip)
+  problems = nx_arch_history_problems('UI_DIZAJN.md', lines)
+  NxTest.assert(problems.empty?,
+                "Historicke znacky mimo sekcie Historia: #{problems.first(10).join(' · ')} — cislo PR, kolo review, " \
+                "verzia ani 'ZANIKLO' do normy nepatria (KRONIKA, archiv, alebo sekcia '#{NX_ARCH_HISTORY_HEADING}' na konci)")
+end
+
+# CN-09 bod 5: veta „inventar je uplny" klamala, lebo ikony pribudali bez riadku v §4.
+# Teraz je to kontrola: KAZDY symbol, ktory sprite vygeneruje (`<symbol id="i-…">`), stoji v §4
+# ako `kluc`. Symboly vznikaju dvoma cestami (Codex #440 P2): sluckou nad objektom `LUCIDE`
+# (dynamicke `'<symbol id="i-' + id`) a samostatnymi literalmi (`LOGO` = `<symbol id="i-logo"`).
+# Guard berie obe; dynamicka cesta mimo slucky LUCIDE (druha mapa symbolov) je pad — inak by
+# jej symboly presli bez kontroly.
+def nx_sprite_symbol_ids(src)
+  lucide = src[/var LUCIDE = \{(.*?)\n  \};/m, 1].to_s.scan(/^    '([a-z0-9-]+)':/).flatten
+  literal = src.scan(/<symbol id="i-([a-z0-9-]+)"/).flatten
+  dynamic = src.scan(/'<symbol id="i-' \+/).length
+  [(lucide + literal).uniq, dynamic]
+end
+
+def nx_icon_inventory_missing(ids, doc)
+  sec4 = doc[/^## 4\. Ikony.*?(?=^## 5\.)/m].to_s
+  return nil if sec4.empty?
+
+  ids.reject { |i| sec4.include?("`#{i}`") }
+end
+
+NxTest.test('docs: inventar ikon UI_DIZAJN §4 obsahuje kazdy symbol spritu icons.js') do
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'icons.js'), encoding: 'UTF-8')
+  ids, dynamic = nx_sprite_symbol_ids(src)
+  NxTest.assert(ids.length > 50, "nenasiel som symboly spritu (#{ids.length}) — zmenil sa tvar icons.js?")
+  NxTest.assert(ids.include?('logo'), 'samostatne generovany symbol `logo` (LOGO) guard nevidi')
+  NxTest.assert_equal(1, dynamic,
+                      'icons.js sklada <symbol id="i-…"> dynamicky inde nez v slucke nad LUCIDE — rozsir nx_sprite_symbol_ids')
+  missing = nx_icon_inventory_missing(ids, File.read(File.join(NxTest::ROOT, NX_UI_DIZAJN), encoding: 'UTF-8'))
+  NxTest.assert(!missing.nil?, 'UI_DIZAJN.md nema sekciu ## 4. Ikony pred ## 5.')
+  NxTest.assert(missing.empty?,
+                "Ikony zo spritu bez riadku v inventari UI_DIZAJN §4: #{missing.join(' · ')} — dopln ich s popisom, kde sa kreslia")
+end
+
+# Negativne pripady nad syntetickym spritom: samostatny literal (vzor LOGO) aj kluc LUCIDE
+# musia byt videne a chybajuci riadok v §4 musi byt nahlaseny.
+NxTest.test('docs: guard inventara ikon vidi samostatne symboly a hlasi chybajuci riadok') do
+  src = "  var LUCIDE = {\n    'aa': '<path/>',\n    'bb-c': '<path/>'\n  };\n" \
+        "  var LOGO = '<symbol id=\"i-logo\" viewBox=\"0 0 1 1\">' + '</symbol>';\n" \
+        "  var X = '<symbol id=\"i-extra\">';\n  s += '<symbol id=\"i-' + id + '\">';\n"
+  ids, dynamic = nx_sprite_symbol_ids(src)
+  NxTest.assert_equal(%w[aa bb-c logo extra], ids)
+  NxTest.assert_equal(1, dynamic)
+  doc = "## 4. Ikony\n`aa` · `bb-c` · `extra`\n## 5. Vzory\n`logo`\n"
+  NxTest.assert_equal(['logo'], nx_icon_inventory_missing(ids, doc), 'logo mimo §4 musi chybat')
+  NxTest.assert_equal([], nx_icon_inventory_missing(ids, doc.sub('`extra`', '`extra` · `logo`')))
+  NxTest.assert(nx_icon_inventory_missing(ids, "## 5. Vzory\n").nil?, 'chybajuca §4 musi byt nahlasena')
+  _, dyn2 = nx_sprite_symbol_ids(src + "  t += '<symbol id=\"i-' + k;\n")
+  NxTest.assert_equal(2, dyn2, 'druha dynamicka cesta musi byt zachytena')
+end
+
 # Mapa nesmie zaostat za kodom. Zmienka v proze NESTACI — genericke meno (napr.
 # core/report.rb) by sa nahodne trafilo do vety a modul by prekizol bez dokumentacie.
 # Kontroluju sa TRI veci: vlastny nadpis v mape, riadok v tabulke routra a
@@ -444,7 +520,7 @@ end
 NxTest.test('docs: relativne odkazy v navigacnych suboroch ukazuju na existujuce subory') do
   broken = []
   names = %w[CLAUDE.md docs/ARCHITEKTURA.md SYSTEM/README.md SYSTEM/STAV.md SYSTEM/PLAN.md
-             SYSTEM/DOGFOODING.md SYSTEM/V1_VIZIA.md SYSTEM/WORKFLOW.md] +
+             SYSTEM/DOGFOODING.md SYSTEM/V1_VIZIA.md SYSTEM/WORKFLOW.md docs/UI_DIZAJN.md] +
           NX_ARCH_FILES.map { |n| "docs/architecture/#{n}" }
   names.each do |name|
     path = File.join(NxTest::ROOT, name)

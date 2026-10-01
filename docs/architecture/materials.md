@@ -483,6 +483,8 @@ dvojnásobne ťažký kus). Číslo sa **nikde nepíše ako literál** — čít
 
 **Hrúbka do hmotnosti** ide z **katalógového záznamu**, nie z deskriptora: `CabinetBuilder.part_materials` posiela plánu vedľa hustoty aj `thickness` a `uni`, lebo čelo má
 v pláne len placeholder 18 mm (skutočnú hrúbku mu dá materializácia až po pláne) a **UNI hrúbku dielca neprepisuje** (M-B1). Detail rozhodovania: [construction.md](construction.md).
+Platí to pre **plán** (pred stavbou). **Po stavbe** (riadok Hmotnosť v Inspectore, `Panel.cabinet_stats` → `Bom.weight_totals`) sa hmotnosť číta zo snapshotu dielca —
+rozmery hotovej geometrie, nie rozmer do nárezu ([outputs.md](outputs.md), `bom.rb`).
 
 **D-72:** protiťahová zástena — `zastena_decor_parts` + `zastena_counterbalance?` gate (single len s „protitah" markerom), záznam s príznakom `single_sided` (first-fill rubu
 zakázaný; párová stránka sa s ním nezhoduje).

@@ -98,8 +98,9 @@
       // ŠT-1c PR A (Š7): Nákup kovania je od tejto dávky SEKCIA — presun tabu
       // Kovanie zo zaniknutého okna Výroba 1:1, bez redizajnu (ten príde s blokom KOVANIE).
       { id: 'buy',    ic: 'cart',            t: 'Nákup kovania' },
-      // ŠT-1c PR B1 (Š12): Rozpočet je od tejto dávky SEKCIA — JEDINÁ, ktorá
-      // zapisuje do modelu (1 zmena = 1 krok Späť).
+      // ŠT-1c PR B1 (Š12): Rozpočet je od tejto dávky SEKCIA — inline edit
+      // dát rozpočtu v modeli (1 zmena = 1 krok Späť). Do modelu zapisujú aj
+      // Materiály, Kovanie, Pravidlá a Šablóny (docs/UI_DIZAJN.md §5.16).
       { id: 'budget', ic: 'euro',            t: 'Rozpočet' },
       // ŠT-1c PR B2 (Š14–Š15): Cenová ponuka je od tejto dávky VLASTNÁ sekcia
       // — zákaznícka projekcia toho istého rozpočtu (suma sa nikdy nelíši).

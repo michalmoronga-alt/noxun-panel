@@ -13,7 +13,7 @@
 > Odsek popisuje **kontrakt a pasce** modulu, nie priebeh prác — história dávok patrí do
 > [../SYSTEM/archiv/KRONIKA.md](../SYSTEM/archiv/KRONIKA.md).
 
-## Architektúra (v0.5.32)
+## Reťaz načítania
 
 Reťaz: `noxun_engine.rb` (loader, autorita VERSION) → `noxun_engine\main.rb` (requires, menu, **toolbar**, logger) → core → modules → ui.
 
@@ -78,7 +78,7 @@ DC pasce [DC_PRAVIDLA.md](DC_PRAVIDLA.md) · UI dizajn [UI_DIZAJN.md](UI_DIZAJN.
 | `mower` (rotácie, Z, kópia cez šev enginu, Z-dialog) · `snaper` (prisunutie na doraz, viditeľnosť) | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |
 | `legacy_cleanup` (boot migrácia — odstránenie starých inštalácií Mower/Snaper, marker per Plugins) | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |
 
-### UI — Inspector + satelity (`noxun_engine/ui/`, V0.4.5+)
+### UI — Inspector + Štúdio (`noxun_engine/ui/`)
 
 | Modul / oblasť | Odsek žije v |
 |---|---|

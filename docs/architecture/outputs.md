@@ -635,7 +635,9 @@ Zber modelu a agregácia riadkov kusovníka (`Bom.collect`, `Bom.compute`, `Bom.
 platný `cut_size` snapshotu (Hash, konečné kladné čísla ≥ geometrii − `BuildPlan::CUT_TOL`) = **rozmer do nárezu** a záznam navyše nesie `geo_length`/`geo_width` + `cut_size: true`;
 chýbajúce pole = geometria (overlay, staré zákazky); poškodené = geometria + `cut_invalid`. Tým jediným krokom idú do nárezu **kusovník (agregácia aj stĺpce), kontrola
 formátu platne, VEPO, plocha pre rozpočet a ponuku** (`SheetEstimate` číta riadky BOM) — a `cut_size` sa uplatní **pred** otočením podľa dekoru (`VepoExport.oriented`).
-Tú istú `cut_dims` volá plocha skrinky v Inspectore (`Panel.cabinet_stats`) a karta dielca; **hmotnosť ostáva z geometrie** (`weight_totals` dostáva surové snapshoty).
+Tú istú `cut_dims` volá plocha skrinky v Inspectore (`Panel.cabinet_stats`) a karta dielca; **hmotnosť ostáva z geometrie** (`weight_totals` dostáva surové snapshoty — odrezok sa neváži).
+Je to čítanie **po stavbe** (rozmery hotového dielca zo snapshotu, nie rozmer do nárezu). V **pláne** pred materializáciou ide hrúbka do hmotnosti z katalógového
+záznamu, nie z deskriptora ([materials.md](materials.md), KOV-W) — obe vety platia, každá v inom kroku.
 Zber popri tom skladá aditívny kľúč **`cut_issues`** (`compute()` ho ignoruje): `cut_issues_for(cfg, rec, standalone:)` na každom výrobnom zázname (vnorenom, doske aj
 samostatnom dielci) a `back_stale_issue` na skrinke. Kódy a register brány `CUT_BLOCKERS` (poradie = poradie viet): `cut_size_invalid` · `back_groove_edged` (značka
 `groove` + účinná hrana ABS) · `back_groove_incomplete` (značka `groove`, bez ABS, bez `cut_size`) · `back_groove_stale` (skrinka `groove` pod
@@ -1069,7 +1071,7 @@ z disku, I/O chyby vyletia ako neúspešný zápis) je v [model-a-identita.md](m
 
 ### vepo_export.rb
 
-**ROH-A1 · K3 — skratky rohovej zostavy (návrh, potvrdí Michal):** `SHORT_NAMES` dostali presné názvy z buildera (`Construction::CORNER_NAMES`) —
+**ROH-A1 · K3 — skratky rohovej zostavy (potvrdil Michal 28.9.: mockup O6, rozhodnutie R10 bloku ROHOVÁ):** `SHORT_NAMES` dostali presné názvy z buildera (`Construction::CORNER_NAMES`) —
 `Blenda rohova` → `Blenda roh`, `Vystuha zavesov` → `Vyst zav`, `Vystuha rohova` → `Vyst roh`, `CR lista 1` → `CR 1`, `CR lista 2` → `CR 2`; CR 1 a CR 2 rovnakého
 rozmeru a materiálu sú jeden riadok kusovníka (agregácia nenesie rolu, C11) a zlúčený token `CR 1 2`. Smer dekoru CR je ako pri dverách (dĺžka = výška).
 
