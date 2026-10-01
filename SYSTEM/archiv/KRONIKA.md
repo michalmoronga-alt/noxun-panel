@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H11b · minimum SketchUp 2026 (1.10.2026, PR #?, v0.17.10, blok 9 · HARDENING PO V1, triedenie F-02; package
+- **H11b · minimum SketchUp 2026 (1.10.2026, PR #445, v0.17.10, blok 9 · HARDENING PO V1, triedenie F-02; package
   [PACKAGE_H11.md](../zdroje/bloky/HARDENING/PACKAGE_H11.md) časť I, audit návrhu 2 BLOCKER · 5 FIX · 2 NOTE [AUDIT_H11_raw.md](../zdroje/bloky/HARDENING/AUDIT_H11_raw.md)
   + delta [AUDIT_H11_delta_raw.md](../zdroje/bloky/HARDENING/AUDIT_H11_delta_raw.md) — rez H11b → H11a (príprava na 2026.2) → H11c (overenie na 2026.2)).**
   Loader dodnes verziu SketchUpu nekontroloval (sonda S14: 24.0 aj 26.0 sa zaregistrovali). Teraz `SketchupMinimum.check` (mimo `module Boot`, `MIN_SKETCHUP_MAJOR = 26`)
