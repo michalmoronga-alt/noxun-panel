@@ -22501,6 +22501,22 @@ module NoxunSuRunner
     model.selection.add(inst)
   end
 
+  # Hlasky stavoveho riadku (`set_status`) modulu pocas bloku — odmietnutie
+  # musi povedat DOVOD, nie len nechat config netknuty (predrecenzia H12b P3).
+  # Povodna metoda sa vola dalej (okno dostane to iste) a po bloku sa vrati.
+  def h12b_statuses(mod)
+    got = []
+    orig = mod.method(:set_status)
+    mod.define_singleton_method(:set_status) do |msg, err = false|
+      got << msg.to_s
+      orig.call(msg, err)
+    end
+    yield
+    got
+  ensure
+    mod.define_singleton_method(:set_status, orig) if orig
+  end
+
   def h12b_cfg(inst)
     cfg = e::Store.config(inst) || {}
     cfg.reject { |k, _| k == 'engine_version' }
@@ -22577,8 +22593,10 @@ module NoxunSuRunner
       ok('H12b (b): pouzitie sablony = 1 krok Spat', h12b_cfg(low2) == b2)
       ub = h12b_cfg(up)
       h12b_select(model, up)
-      e::TemplatesDialog.handle_apply({ 'template' => H12B_TPL }.to_json)
-      ok('H12b (b): sablona dolnej na HORNU odmietnuta (config netknuty)', h12b_cfg(up) == ub)
+      msgs = h12b_statuses(e::TemplatesDialog) { e::TemplatesDialog.handle_apply({ 'template' => H12B_TPL }.to_json) }
+      want = 'Šablóna je pre iný typ (dolná) než označená skrinka — nepoužitá.'
+      ok("H12b (b): sablona dolnej na HORNU odmietnuta s dovodom (#{msgs.inspect}), config netknuty",
+         h12b_cfg(up) == ub && msgs == [want])
       Sketchup.undo
       ok('H12b (b): odmietnutie nepridalo krok — 1 Spat vratil posledny realny krok (vklad druhej dolnej)',
          !low2.valid? && h12b_cfg(up) == ub)
@@ -22597,9 +22615,12 @@ module NoxunSuRunner
       ok("H12b (c): 1 Spat vratil stranu (#{h12b_cfg(cor)['corner_side']})", h12b_cfg(cor) == before)
       lb = h12b_cfg(low)
       h12b_select(model, low)
-      e::Panel.handle_corner_side(pg(model, 'cabinet_id' => e::Store.get(low, 'cabinet_id').to_s,
-                                           'corner_side' => 'right'))
-      ok('H12b (c): prepinac strany na DOLNEJ odmietnuty (config netknuty)', h12b_cfg(low) == lb)
+      msgs = h12b_statuses(e::Panel) do
+        e::Panel.handle_corner_side(pg(model, 'cabinet_id' => e::Store.get(low, 'cabinet_id').to_s,
+                                             'corner_side' => 'right'))
+      end
+      ok("H12b (c): prepinac strany na DOLNEJ odmietnuty s dovodom (#{msgs.inspect}), config netknuty",
+         h12b_cfg(low) == lb && msgs == ['Stranu dverí má len rohová skrinka.'])
     end
 
     # (d) GHOST VKLAD HORNEJ visi na Z = 1400

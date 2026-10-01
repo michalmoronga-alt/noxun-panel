@@ -26,7 +26,10 @@
 #   v inom poradi · B6 `TEMPLATE_TYPE_WORDS` z `label` · B7 `template_type_word`
 #   aj pre dosku · B8 `type_scope_desc` cez `hits.any?` · B9 nove
 #   `== 'dishwasher'` v `actions_appliance.rb` · B10 `corner_change_refusal`
-#   zamok cez `!carcass?` · B11 `apply_template_type!` `have` cez `id_or_default`.
+#   zamok cez `!carcass?` · B11 `apply_template_type!` `have` cez `id_or_default` ·
+#   B12 rozsah sirky preflightu bez `limits` slotu (zachyti az test rozsahov
+#   preflightu nizsie) · B13 `template_config_from` komin a listy cez `on_floor?`
+#   namiesto `carcass?`. Spolu 13 mutacii.
 require_relative '../helper' unless defined?(NxTest)
 require 'json'
 
@@ -198,6 +201,27 @@ if NxTest.headless?
     NxTest.assert_equal({ 'zavesenie-hornej-skrinky' => 'na hornú skrinku' }, map, 'seed: len pravidlo zavesov')
     body = NxH12b.src('noxun_engine', 'ui', 'rules_dialog.rb')
     NxTest.assert(body.include?("'type_scope' => type_scope_map(rules)"), 'rules_payload nesie type_scope')
+    # „Načítať globálne" (push_global) nesie tu istu mapu nad GLOBALNYMI pravidlami.
+    hr = Noxun::Engine::HardwareRules
+    lib = seed.map { |r| JSON.parse(JSON.generate(r)) }
+    lib << { 'rule_id' => 'len-v-globale', 'applies_to' => { 'role' => 'cabinet', 'cabinet_type' => ['lower'] } }
+    sent = []
+    saved = { hr => [:load, hr.method(:load)], rd => [:js, rd.method(:js)] }
+    st = rd.method(:set_status)
+    hr.define_singleton_method(:load) { |*_a| lib }
+    rd.define_singleton_method(:js) { |s| sent << s }
+    rd.define_singleton_method(:set_status) { |*_a| nil }
+    begin
+      rd.push_global
+    ensure
+      saved.each { |obj, (name, m)| obj.define_singleton_method(name, m) }
+      rd.define_singleton_method(:set_status, st)
+    end
+    line = sent.find { |s| s.start_with?('RD.setRules(') }.to_s
+    NxTest.assert(line.include?('if (window.RD && RD.setTypeScope) RD.setTypeScope('), 'push_global posiela type_scope (guard DOM)')
+    got = JSON.parse(line[/RD\.setTypeScope\((\{.*?\})\);/, 1].to_s)
+    NxTest.assert_equal({ 'zavesenie-hornej-skrinky' => 'na hornú skrinku', 'len-v-globale' => 'na spodnú skrinku' }, got,
+                        'mapa nad globalnymi pravidlami (aj pravidlo, ktore projekt nema)')
     js = NxH12b.src('noxun_engine', 'ui', 'js', 'rules.js')
     NxTest.assert(js.include?("return 'na hornú skrinku';") && js.include?("return 'na spodnú skrinku';"),
                   'vety su doslovne tie, ktore dnes sklada rules.js (H12c ich prevezme)')

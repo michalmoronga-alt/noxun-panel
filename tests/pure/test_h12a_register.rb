@@ -52,6 +52,7 @@ module NxH12a
   # Register sam je vynimka.
   SCAN_DIRS = %w[core modules ui].freeze
   NAME = '(?:lower|upper|dishwasher|corner_blind)'
+  REG_ID = '(?:CabinetTypes::(?:CORNER|FALLBACK)\b|CabinetTypes::IDS\s*\[)'
   # Formy vetvenia (predrecenzia H12a P3: aj symboly, `eql?`, pole s
   # `include?`, `when` s viacerymi hodnotami a mapa `{ 'upper' => … }[t]`).
   BRANCH_RES = [
@@ -64,7 +65,15 @@ module NxH12a
     /\.eql\?\(\s*(?:['"]|:)#{NAME}\b/,
     /['"]#{NAME}['"]\s*=>/,
     /\|\|\s*['"]#{NAME}['"]/,
-    /\bCORNER_TYPE\b/
+    /\bCORNER_TYPE\b/,
+    # H12b (predrecenzia P3): porovnanie s ID-KONSTANTOU registra mimo registra
+    # je to iste vetvenie podla mena (`== CabinetTypes::CORNER`). Predvolba
+    # (`|| CabinetTypes::FALLBACK`) a clenstvo (`IDS.include?`) vetvenim nie su.
+    /(?:==|!=|===)\s*#{REG_ID}/,
+    /CabinetTypes::(?:CORNER|FALLBACK)\b\s*(?:==|!=|===)/,
+    /CabinetTypes::IDS\s*\[[^\]]*\]\s*(?:==|!=|===)/,
+    /\bwhen\b[^\n]*#{REG_ID}/,
+    /(?:\.eql\?|include\?)\(\s*#{REG_ID}/
   ].freeze
   # Povolene riadky = [subor, podretazec riadka, DOVOD]. Novy riadok sem patri
   # LEN s dovodom — inak patri vlastnost do registra.
@@ -222,7 +231,13 @@ NxTest.test('H12a T3a: guard chyti kazdu formu vetvenia podla mena a nehlasi fal
     "t.eql?('dishwasher')",
     "z = { 'upper' => 1400.0 }[t]",
     "t = cfg['type'] || 'lower'",
-    'CORNER_TYPE == t'
+    'CORNER_TYPE == t',
+    "return x if cfg['type'].to_s == CabinetTypes::CORNER",
+    'CabinetTypes::FALLBACK != have',
+    't == CabinetTypes::IDS[1]',
+    'when CabinetTypes::CORNER then 1',
+    't.eql?(CabinetTypes::FALLBACK)',
+    '[a].include?(CabinetTypes::CORNER)'
   ]
   caught.each { |l| NxTest.assert(NxH12a.branch?(l), "guard nechytil: #{l}") }
   clean = [
@@ -232,7 +247,11 @@ NxTest.test('H12a T3a: guard chyti kazdu formu vetvenia podla mena a nehlasi fal
     "when 'lift' then SYM_UP",
     "x = :lower_bound",
     "label = 'Horná skrinka'",
-    "r = cfg[:type] # pozri == 'upper' v komentari"
+    "r = cfg[:type] # pozri == 'upper' v komentari",
+    "'type' => cfg['type'] || CabinetTypes::FALLBACK,",
+    'CORNER_TYPE_ALIAS = CabinetTypes::CORNER',
+    'TYPES = CabinetTypes::IDS',
+    'return nil unless CabinetTypes::IDS.include?(t)'
   ]
   clean.each { |l| NxTest.refute(NxH12a.branch?(l), "falosny poplach: #{l}") }
 end

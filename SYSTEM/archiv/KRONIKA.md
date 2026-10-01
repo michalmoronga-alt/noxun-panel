@@ -27,7 +27,7 @@
   identita (`template_type_id`: chýbajúci = dolná, `''` a neznámy ostávajú; **nie** `id_or_default`), slovo vety oddelená normalizácia. **Aditívne kľúče (JS ich
   do H12c nečíta):** `cabinet_types` v `NX.init` (= `client_payload`), `type_word` v záznamoch korpusových šablón (vkladacia karta aj Štúdio cez jednu funkciu
   `Panel.template_type_word`), `type_scope` `{ rule_id => veta }` v payloade Pravidiel kovania („na hornú/spodnú skrinku", vety v `RulesDialog::TYPE_SCOPE_PHRASES`
-  — akuzatív a „spodnú" nie sú vlastnosť typu; `push_global` kľúč neposiela). **Prvý commit = golden panela pred zásahom** (`542c6f04`, `panel.json` cez
+  — akuzatív a „spodnú" nie sú vlastnosť typu; „Načítať globálne" pošle tú istú mapu nad globálnymi pravidlami cez `RD.setTypeScope` s guardom DOM). **Prvý commit = golden panela pred zásahom** (`542c6f04`, `panel.json` cez
   `generate.rb panel`; fixtúry H12a nedotknuté): 7 vstupov × preflight (vklad aj označená), polia a odmietnutia šablón, čelá slotu/rohovej, strana rohovej,
   očakávania, delenie zóny, vlastník spotrebiča, `slot_payload`, kresba rohovej, `template_config_from`, predvoľby a **obojsmerná matica typového guardu**.
   Guard T3a skenuje aj `ui/` (allowlist: kategórie spotrebičov v `appliance_dialog`, vety rozsahu pravidiel). T4 prepis 6 testov zo zdroja (`test_roha1_rohova`,

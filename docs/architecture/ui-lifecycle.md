@@ -1928,8 +1928,8 @@ v `scale_observer` (sekciu obslúži plný push Štúdia; `rules_payload` dostan
 - **Veta rozsahu pravidla viazaného na typ skrinky (H12b, R2.6):** `rules_payload` nesie aditívny kľúč **`type_scope`** = `{ rule_id => veta }` (`type_scope_map`)
   — „na hornú skrinku" / „na spodnú skrinku", keď filter `applies_to.cabinet_type` pravidla s rolou `cabinet` obsahuje **práve jeden** z typov
   `TYPE_SCOPE_PHRASES` (zrkadlo dnešného `rdRoleDesc` v `rules.js`; inak kľúč pravidlo nemá a klient pokračuje ďalšími filtrami). Vety sú akuzatív so slovom
-  „spodnú" (terminológia F3), preto nie sú v registri typov. `rules.js` kľúč do H12c nečíta; `push_global` (Načítať globálne) ho neposiela — pravidlo z globálu,
-  ktoré projekt nemá, dostane vetu až s ďalším plným pushom.
+  „spodnú" (terminológia F3), preto nie sú v registri typov. `push_global` (Načítať globálne) pošle v tom istom skripte tú istú mapu nad **globálnymi**
+  pravidlami (`type_scope_script` → `RD.setTypeScope`, guard pre DOM bez prijímača). `rules.js` kľúč ani prijímač do H12c nemá.
 - **`ui/js/rules.js`** je prefixovaný `rd*`/`RD_*` (globály `el`/`esc` by kolidovali so `studio.js`); prijímače `RD.init`/`RD.setRules`/`RD.setStatus` si mená ponechali.
 
 Plné znenie: archív, „rules_dialog.rb".

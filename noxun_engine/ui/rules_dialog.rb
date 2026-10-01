@@ -565,8 +565,18 @@ module Noxun
         # `RD.setRules` sa nemeni a pin sa nastavuje len cez `RD.setGlobalRev`.
         def push_global
           lib = HardwareRules.load
-          js("RD.setRules(#{lib.to_json}, 'global'); #{global_rev_script(HardwareRules.rules_rev(lib))}")
+          js("RD.setRules(#{lib.to_json}, 'global'); #{global_rev_script(HardwareRules.rules_rev(lib))} " \
+             "#{type_scope_script(type_scope_map(lib))}")
           set_status('Načítané globálne predvoľby — platia až po Uložiť.')
+        end
+
+        # H12b (predrecenzia P3): veta rozsahu pravidiel viazanych na typ pre
+        # PRAVE NACITANY global — ta ista mapa ako `type_scope` plneho pushu,
+        # vypocitana nad globalnymi pravidlami (inak by H12c po „Načítať
+        # globálne" ukazala vetu stareho formulara). Guard pre DOM bez prijimaca
+        # (`RD.setTypeScope` pribudne v H12c).
+        def type_scope_script(map)
+          "if (window.RD && RD.setTypeScope) RD.setTypeScope(#{map.to_json});"
         end
 
         # Pokyn klientovi „globál, ktory odteraz poznas, ma tuto reviziu".
