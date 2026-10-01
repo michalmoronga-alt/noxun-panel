@@ -46,7 +46,8 @@ module Noxun
         # sirku; invariant drzi aj `Construction.validate!` (sablona ho neobide).
         def split_refusal(ctx)
           cfg = Store.config(ctx[:cab]) || {}
-          return Construction::CORNER_ZONES_MSG if cfg['type'].to_s == Construction::CORNER_TYPE
+          # H12b: vnutro typu z registra (`zones`) — rohova ma len police.
+          return Construction::CORNER_ZONES_MSG if CabinetTypes.prop(cfg['type'], :zones) == 'shelves_only'
 
           node = zone_node(ctx)
           return 'Zóna sa nerozdelila — obnov panel (zóna sa v skrinke nenašla).' if node.nil?

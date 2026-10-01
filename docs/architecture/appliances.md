@@ -236,7 +236,8 @@ jedno Späť by vrátilo len jednu z nich a zákazka by ostala v stave, ktorý v
 (položka tvrdí, že rúra je v CAB-3, a skrinka o nej nevie).
 **Druh vlastníka** skrinky (`slot` | `cabinet`) je od H12a vlastnosť `appliance_owner` registra
 [`CabinetTypes`](construction.md#cabinet_typesrb) (`slot_owner?` tu, `Bom.note_appliance_owner`, `appliance_slot_record` a implicitné očakávanie šablóny slotu
-v `TemplateStore`); neznámy typ = skrinka. Kategória spotrebiča `dishwasher` v `OWNER_MATRIX` a `SLOT_EXPECTS` je iný pojem (kategória, nie typ skrinky).
+v `TemplateStore`; od H12b aj panel — cieľ väzby, montáž a očakávania v `actions_appliance`, očakávania šablóny v `actions_templates`, riadky spotrebiča
+v `payloads`); neznámy typ = skrinka. Kategória spotrebiča `dishwasher` v `OWNER_MATRIX` a `SLOT_EXPECTS` je iný pojem (kategória, nie typ skrinky).
 
 - **Jedna operácia, jedno Späť.** `apply!(model, model_guid:, op:, item_id:, attrs:, catalog_id:, owner:)` má
   **práve jednu** `start_operation` (SketchUp nemá vnorené operácie — `start_operation` v otvorenej operácii ju

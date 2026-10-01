@@ -37,16 +37,12 @@ module Noxun
             # Do ŠT-4a stala cesta natvrdo v HTML — teraz ju dava server, takze sa
             # nemoze rozist so skutocnostou (a je to TA ISTA veta v oboch vstupoch).
             appdata_dir: about_dir,
-            defaults: {
-              lower: CabinetBuilder::LOWER_DEFAULTS,
-              upper: CabinetBuilder::UPPER_DEFAULTS,
-              # S1-E: predvolby SLOTU UMYVACKY (vkladacia karta aj krizova
-              # validacia v paneli citaju TIE ISTE cisla ako builder).
-              dishwasher: CabinetBuilder::DISHWASHER_DEFAULTS,
-              # ROH-A1: predvolby ROHOVEJ (vkladacia karta). ROH-B1: navyse
-              # ucinna hrubka CR 2 (`corner_th2`) pre najmensiu sirku v paneli.
-              corner_blind: corner_insert_defaults(model)
-            },
+            # H12b (R2.6): REGISTER TYPOV SKRINKY pre klienta
+            # (`CabinetTypes.client_payload` — kontrakt, fixtura
+            # `tests/fixtures/h12_cabinet_types.json`). Aditivny kluc: JS ho do
+            # H12c nečíta; potom z neho skladá zoznamy, názvy a predikáty typu.
+            cabinet_types: CabinetTypes.client_payload,
+            defaults: init_defaults(model),
             # D-27: viditelnost NOXUN tagov v modeli — JEDEN stav pre okno
             # tagov v raile aj pre checkbox „Zobraziť zóny (ghost)". Samostatne
             # pole `zones_visible` tym zaniklo (dva zdroje jednej pravdy).
@@ -86,6 +82,18 @@ module Noxun
             model_guid: model_guid(model)
           }
           js("NX.init(#{data.to_json})")
+        end
+
+        # Predvolby typov pre vkladaciu kartu a krizovu validaciu panela — TIE
+        # ISTE cisla ako builder (`DEFAULTS_BY_TYPE`, poradie klucov = `IDS`).
+        # S1-E: slot umyvacky. ROH-A1: rohova + ROH-B1 ucinna hrubka CR 2
+        # (`corner_th2`) pre najmensiu sirku v paneli (`corner_insert_defaults`).
+        # H12b: jedna mapa namiesto styroch riadkov — novy typ ju dostane
+        # s riadkom `DEFAULTS_BY_TYPE` (guard v `test_h12a_register.rb`).
+        def init_defaults(model)
+          CabinetBuilder::DEFAULTS_BY_TYPE.each_with_object({}) do |(id, d), out|
+            out[id] = CabinetTypes.corner?(id) ? corner_insert_defaults(model) : d
+          end
         end
 
         # ŠT-4a: priecinok, v ktorom ziju nastavenia POCITACA — jedina veta

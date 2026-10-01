@@ -411,9 +411,13 @@ NxTest.test('S1-E0 (Codex #375 P2): panel berie PRAZDNY sokel ako predvolbu typu
   NxTest.assert_close(0.0, NxS1E0.cb::UPPER_DEFAULTS[:floor_height], 0.01,
                       'horna skrinka sokel nema')
   sync = NxS1E0.src('noxun_engine', 'ui', 'panel', 'sync.rb')
-  NxTest.assert(sync.include?('lower: CabinetBuilder::LOWER_DEFAULTS'),
+  # H12b: predvolby idu z JEDNEJ mapy buildera (`DEFAULTS_BY_TYPE` cez
+  # `init_defaults`) — dolna a horna su TIE ISTE objekty ako `*_DEFAULTS`.
+  NxTest.assert(sync.include?('defaults: init_defaults(model)') &&
+                sync.include?('CabinetBuilder::DEFAULTS_BY_TYPE.each_with_object'),
                 'server posiela do panela PRIAMO svoje predvolby (ziadna druha tabulka)')
-  NxTest.assert(sync.include?('upper: CabinetBuilder::UPPER_DEFAULTS'))
+  NxTest.assert(NxS1E0.cb::DEFAULTS_BY_TYPE['lower'].equal?(NxS1E0.cb::LOWER_DEFAULTS) &&
+                NxS1E0.cb::DEFAULTS_BY_TYPE['upper'].equal?(NxS1E0.cb::UPPER_DEFAULTS))
   js = NxS1E0.form_js
   NxTest.assert(js.include?("cabFieldOrDefault('floor_height')"),
                 'krizova kontrola cita sokel cez predvolbu, nie cez `|| 0`')

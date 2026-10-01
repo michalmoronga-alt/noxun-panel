@@ -937,5 +937,9 @@ NxTest.test('ROH-A1: JS registre typu a roli (zdroj) — CAB_TYPES, NX_TYPE_LABE
   NxTest.assert_equal(Noxun::Engine::CabinetBuilder::CORNER_DEFAULTS,
                       Noxun::Engine::CabinetBuilder.defaults_for('corner_blind'))
   sync = NxRohA1.src('noxun_engine', 'ui', 'panel', 'sync.rb')
-  NxTest.assert(sync.include?('corner_blind: corner_insert_defaults(model)'), 'DEFAULTS pre JS (ROH-B1: + corner_th2)')
+  # H12b: predvolby skladá `init_defaults` z `DEFAULTS_BY_TYPE`; rohova (typ
+  # s rohovou zostavou) ide cez `corner_insert_defaults` (+ corner_th2).
+  NxTest.assert(sync.include?('defaults: init_defaults(model)') &&
+                sync.include?('CabinetTypes.corner?(id) ? corner_insert_defaults(model) : d'),
+                'DEFAULTS pre JS (ROH-B1: + corner_th2)')
 end

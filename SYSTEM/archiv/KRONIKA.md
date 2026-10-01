@@ -17,6 +17,26 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H12b · panel Ruby z registra typov + payload pre klienta (1.10.2026, PR #447, v0.17.12, blok 9 · HARDENING PO V1, triedenie C-01; package
+  [PACKAGE_H12.md](../zdroje/bloky/HARDENING/PACKAGE_H12.md) časť H12b, §15 A2 a A6).**
+  Panel Ruby (`ui/panel/actions_cabinet`, `actions_templates`, `actions_zones`, `actions_appliance`, `payloads`, `sync`) a `templates_dialog.rb` sa už nepýtajú
+  mena typu (`== 'dishwasher'`, `== CORNER_TYPE`, `%w[lower upper]`), ale vlastností registra `CabinetTypes`: slot = `!carcass?` (preflight, telo/chrbát,
+  `slot_payload`, typ zo šablóny), rozsahy preflightu = `limits`, rohová = `corner?`, čelá = `fronts`, vnútro = `zones`, vlastník spotrebiča = `appliance_owner`,
+  zámok typu šablóny = `template_type`, zmena typu = identita surová + `type_locked`. `TEMPLATE_TYPE_WORDS`/`LABELS` a whitelist prepínania sú odvodené;
+  predvoľby `NX.init` = `Panel.init_defaults` (`DEFAULTS_BY_TYPE`). **A2:** typový guard použitia šablóny je čistá `TemplatesDialog.template_type_refusal` —
+  identita (`template_type_id`: chýbajúci = dolná, `''` a neznámy ostávajú; **nie** `id_or_default`), slovo vety oddelená normalizácia. **Aditívne kľúče (JS ich
+  do H12c nečíta):** `cabinet_types` v `NX.init` (= `client_payload`), `type_word` v záznamoch korpusových šablón (vkladacia karta aj Štúdio cez jednu funkciu
+  `Panel.template_type_word`), `type_scope` `{ rule_id => veta }` v payloade Pravidiel kovania („na hornú/spodnú skrinku", vety v `RulesDialog::TYPE_SCOPE_PHRASES`
+  — akuzatív a „spodnú" nie sú vlastnosť typu; „Načítať globálne" pošle tú istú mapu nad globálnymi pravidlami cez `RD.setTypeScope` s guardom DOM). **Prvý commit = golden panela pred zásahom** (`542c6f04`, `panel.json` cez
+  `generate.rb panel`; fixtúry H12a nedotknuté): 7 vstupov × preflight (vklad aj označená), polia a odmietnutia šablón, čelá slotu/rohovej, strana rohovej,
+  očakávania, delenie zóny, vlastník spotrebiča, `slot_payload`, kresba rohovej, `template_config_from`, predvoľby a **obojsmerná matica typového guardu**.
+  Guard T3a skenuje aj `ui/` (allowlist: kategórie spotrebičov v `appliance_dialog`, vety rozsahu pravidiel). T4 prepis 6 testov zo zdroja (`test_roha1_rohova`,
+  `test_roha2_vkladanie`, `test_s1e0_min_vyska`, `test_st3c_tpl` ×2, `test_uib3_rady`). **Mutácie 13/13 zabité** (B1–B13, zoznam v `test_h12b_panel.rb`;
+  B12 — rozsah slotu — zachytil až nový test rozsahov preflightu). In-SU `run_h12b`: apply šírky na 4 typoch, šablóna rovnakého/iného typu, zámok typu šablóny
+  slotu a rohovej, `type_word` v knižnici, strana rohovej, ghost hornej Z 1400 — každá 1 krok Späť. **Testy:** 5131 headless · 151 JS sád · encoding guard;
+  in-SU **3366 / 0** na `778a37eb` aj po predrecenzii na `ddb82b8c` (golden `run_h12` bajtovo rovnaký). Predrecenzia: 0× P1/P2, 5× P3 opravené v `ddb82b8c` (`type_scope` aj v „Načítať globálne", guard porovnania s ID-konštantami registra, dôvod odmietnutí v `run_h12b`, zoznam mutácií, fotky A6 v PR).
+  STAV pred dávkou: v0.17.11 · H12a hotová · Robí sa H6/H7 (mockupy), H11a · Ďalší krok H12b, H12c, H12d.
+
 - **H12a · register typov skrinky + jadro (1.10.2026, PR #446, v0.17.11, blok 9 · HARDENING PO V1, triedenie C-01; package
   [PACKAGE_H12.md](../zdroje/bloky/HARDENING/PACKAGE_H12.md) — §15 audit návrhu 0 BLOCKER · 6 FIX [AUDIT_H12_raw.md](../zdroje/bloky/HARDENING/AUDIT_H12_raw.md);
   rez H12a → H12b panel Ruby → H12c JS → H12d mená rolí).**

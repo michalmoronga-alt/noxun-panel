@@ -155,7 +155,10 @@ NxTest.test('UI-B3: sablona sa neulozi z CUDZIEHO dokumentu ani s cudzim typom')
   NxTest.assert(body.include?(%q<DocKey.foreign?(data['model_guid'], model)>),
                 'chyba PRISNY guard dokumentu')
   # Typ je jedina vec, ktoru modal nastavuje — whitelist patri na server.
-  NxTest.assert(src.include?("%w[lower upper].include?(want)"), 'typ sablony musi prejst whitelistom')
+  # H12b: whitelist = typy `template_type switchable` z registra (dolna, horna).
+  NxTest.assert(src.include?('TEMPLATE_SWITCH_TYPES.include?(want)') &&
+                src.include?("CabinetTypes.ids_where(:template_type, 'switchable')"), 'typ sablony musi prejst whitelistom')
+  NxTest.assert_equal(%w[lower upper], Noxun::Engine::CabinetTypes.ids_where(:template_type, 'switchable'))
 end
 
 NxTest.test('UI-B3 guard: vyber dielcov je citanie + vyber pod suspend guardom') do

@@ -1,0 +1,1595 @@
+{
+  "template_type_words": {
+    "lower": "dolná",
+    "upper": "horná",
+    "dishwasher": "umývačka",
+    "corner_blind": "rohová"
+  },
+  "init_defaults": {
+    "lower": {
+      "type": "lower",
+      "width": 600.0,
+      "height": 720.0,
+      "depth": 510.0,
+      "thickness": 18.0,
+      "floor_height": 100.0,
+      "shelves": 0,
+      "fronts": "none",
+      "bottom_mode": "under_sides",
+      "top_mode": "full",
+      "back_mode": "overlay",
+      "back_thickness": 3.0,
+      "plinth_mode": "none",
+      "plinth_recess": 40.0,
+      "rail_depth": 100.0,
+      "rails_orientation": "flat",
+      "rails_top_offset": 0.0,
+      "back_rail_height": 100.0
+    },
+    "upper": {
+      "type": "upper",
+      "width": 600.0,
+      "height": 720.0,
+      "depth": 320.0,
+      "thickness": 18.0,
+      "floor_height": 0.0,
+      "shelves": 0,
+      "fronts": "none",
+      "bottom_mode": "between_sides",
+      "top_mode": "full",
+      "back_mode": "groove",
+      "back_thickness": 3.0,
+      "plinth_mode": "none",
+      "plinth_recess": 40.0,
+      "rail_depth": 100.0,
+      "rails_orientation": "flat",
+      "rails_top_offset": 0.0,
+      "back_rail_height": 100.0
+    },
+    "dishwasher": {
+      "type": "dishwasher",
+      "width": 600.0,
+      "height": 880.0,
+      "depth": 560.0,
+      "thickness": 18.0,
+      "floor_height": 0.0,
+      "shelves": 0,
+      "fronts": "none",
+      "bottom_mode": "under_sides",
+      "top_mode": "full",
+      "back_mode": "none",
+      "back_thickness": 3.0,
+      "plinth_mode": "none",
+      "plinth_recess": 40.0,
+      "rail_depth": 100.0,
+      "rails_orientation": "flat",
+      "rails_top_offset": 0.0,
+      "dw_class": 600,
+      "dw_body_height": 820.0,
+      "dw_front_bottom": 100.0
+    },
+    "corner_blind": {
+      "stub": "corner_insert_defaults"
+    }
+  },
+  "rows": {
+    "\"lower\"": {
+      "slot_params": false,
+      "corner_src_insert": false,
+      "corner_src_stored": false,
+      "opening_cfg": {
+        "type": "lower",
+        "width": 900.0,
+        "height": 720.0,
+        "floor_height": 100.0
+      },
+      "preflight_insert": {
+        "insert_session": 1,
+        "revision": 1,
+        "opening": {
+          "x0": 0.0,
+          "w": 900.0,
+          "z0": 100.0,
+          "h": 620.0
+        },
+        "valid": true,
+        "items": [
+          {
+            "id": "F1",
+            "type": "door",
+            "mode": "auto",
+            "height": 614.0,
+            "locked": false,
+            "wings": "1",
+            "wings_n": 1,
+            "profile": "none",
+            "z": 103.0,
+            "profile_edges": [
+
+            ]
+          }
+        ],
+        "errors": [
+
+        ],
+        "slots": {
+          "F1": {
+            "wings_n": 1,
+            "slots": [
+              {
+                "wing": "single",
+                "part_key": "front:F1/wing:single",
+                "state": null
+              }
+            ]
+          }
+        }
+      },
+      "preflight_stored": {
+        "insert_session": 1,
+        "revision": 1,
+        "opening": {
+          "x0": 0.0,
+          "w": 900.0,
+          "z0": 100.0,
+          "h": 620.0
+        },
+        "valid": true,
+        "items": [
+          {
+            "id": "F1",
+            "type": "door",
+            "mode": "auto",
+            "height": 614.0,
+            "locked": false,
+            "wings": "1",
+            "wings_n": 1,
+            "profile": "none",
+            "z": 103.0,
+            "profile_edges": [
+
+            ]
+          }
+        ],
+        "errors": [
+
+        ],
+        "slots": {
+          "F1": {
+            "wings_n": 1,
+            "slots": [
+              {
+                "wing": "single",
+                "part_key": "front:F1/wing:single",
+                "state": null
+              }
+            ]
+          }
+        }
+      },
+      "slot_fronts_refusal": null,
+      "corner_fronts_refusal": null,
+      "template_slot_fields": {
+        "type": "lower",
+        "width": 600.0,
+        "dw_class": 600,
+        "dw_body_height": 820.0,
+        "dw_front_bottom": 100.0,
+        "appliance_expects": [
+          "oven"
+        ]
+      },
+      "corner_template_refusal": null,
+      "template_expects": [
+        null,
+        {
+          "type": "lower",
+          "appliance_expects": [
+            "oven"
+          ]
+        }
+      ],
+      "split_refusal": null,
+      "appliance": {
+        "cabinet_target": [
+          {
+            "kind": "cabinet",
+            "id": "CAB-001",
+            "pid": 4242
+          },
+          null
+        ],
+        "mount_msg": "Výber sa medzitým zmenil — panel sa obnovil, skús znova.",
+        "expects_kind": "cabinet"
+      },
+      "slot_payload": null,
+      "corner_preview": null,
+      "template_config_from": {
+        "config_schema": 22,
+        "type": "lower",
+        "width": 600.0,
+        "height": 720.0,
+        "depth": 510.0,
+        "thickness": 18.0,
+        "floor_height": 100.0,
+        "bottom_mode": "under_sides",
+        "top_mode": "full",
+        "back_mode": "overlay",
+        "back_thickness": 3.0,
+        "plinth_mode": "none",
+        "plinth_recess": 40.0,
+        "rail_depth": 100.0,
+        "rails_orientation": "flat",
+        "rails_top_offset": 0.0,
+        "zone_tree": {
+          "id": "Z1",
+          "generation": 0,
+          "split": null,
+          "shelves": 0,
+          "children": [
+
+          ]
+        },
+        "fronts": {
+          "split_axis": "height",
+          "gap": 3.0,
+          "gap_top": 2.0,
+          "gap_bottom": 2.0,
+          "gap_left": 2.0,
+          "gap_right": 2.0,
+          "edge_limit_off": false,
+          "items": [
+            {
+              "id": "F1",
+              "type": "door",
+              "mode": "auto",
+              "height": null,
+              "locked": false,
+              "wings": "1",
+              "profile": "none"
+            }
+          ]
+        },
+        "dw_class": 600,
+        "dw_body_height": 820.0,
+        "dw_front_bottom": 100.0,
+        "back_setback": 0.0,
+        "top_front_setback": 0.0,
+        "back_rail_height": 100.0,
+        "hardware_manual": [
+
+        ]
+      },
+      "corner_side": "Stranu dverí má len rohová skrinka.",
+      "tpl_dialog_corner_refusal": {
+        "\"lower\"": null,
+        "\"upper\"": null,
+        "\"dishwasher\"": null,
+        "\"corner_blind\"": null,
+        "\"tall\"": null,
+        "nil": null,
+        "\"\"": null
+      },
+      "tpl_dialog_apply": {
+        "\"lower\"": "PRESLO TYPOVOU VETVOU",
+        "\"upper\"": "Šablóna je pre iný typ (horná) než označená skrinka — nepoužitá.",
+        "\"dishwasher\"": "Šablóna je pre iný typ (umývačka) než označená skrinka — nepoužitá.",
+        "\"corner_blind\"": "Šablóna je pre iný typ (rohová) než označená skrinka — nepoužitá.",
+        "\"tall\"": "Šablóna je pre iný typ (dolná) než označená skrinka — nepoužitá.",
+        "nil": "PRESLO TYPOVOU VETVOU",
+        "\"\"": "Šablóna je pre iný typ (dolná) než označená skrinka — nepoužitá."
+      }
+    },
+    "\"upper\"": {
+      "slot_params": false,
+      "corner_src_insert": false,
+      "corner_src_stored": false,
+      "opening_cfg": {
+        "type": "upper",
+        "width": 900.0,
+        "height": 720.0,
+        "floor_height": 100.0
+      },
+      "preflight_insert": {
+        "insert_session": 1,
+        "revision": 1,
+        "opening": {
+          "x0": 0.0,
+          "w": 900.0,
+          "z0": 100.0,
+          "h": 620.0
+        },
+        "valid": true,
+        "items": [
+          {
+            "id": "F1",
+            "type": "door",
+            "mode": "auto",
+            "height": 614.0,
+            "locked": false,
+            "wings": "1",
+            "wings_n": 1,
+            "profile": "none",
+            "z": 103.0,
+            "profile_edges": [
+
+            ]
+          }
+        ],
+        "errors": [
+
+        ],
+        "slots": {
+          "F1": {
+            "wings_n": 1,
+            "slots": [
+              {
+                "wing": "single",
+                "part_key": "front:F1/wing:single",
+                "state": null
+              }
+            ]
+          }
+        }
+      },
+      "preflight_stored": {
+        "insert_session": 1,
+        "revision": 1,
+        "opening": {
+          "x0": 0.0,
+          "w": 900.0,
+          "z0": 100.0,
+          "h": 620.0
+        },
+        "valid": true,
+        "items": [
+          {
+            "id": "F1",
+            "type": "door",
+            "mode": "auto",
+            "height": 614.0,
+            "locked": false,
+            "wings": "1",
+            "wings_n": 1,
+            "profile": "none",
+            "z": 103.0,
+            "profile_edges": [
+
+            ]
+          }
+        ],
+        "errors": [
+
+        ],
+        "slots": {
+          "F1": {
+            "wings_n": 1,
+            "slots": [
+              {
+                "wing": "single",
+                "part_key": "front:F1/wing:single",
+                "state": null
+              }
+            ]
+          }
+        }
+      },
+      "slot_fronts_refusal": null,
+      "corner_fronts_refusal": null,
+      "template_slot_fields": {
+        "type": "lower",
+        "width": 600.0,
+        "dw_class": 600,
+        "dw_body_height": 820.0,
+        "dw_front_bottom": 100.0,
+        "appliance_expects": [
+          "oven"
+        ]
+      },
+      "corner_template_refusal": null,
+      "template_expects": [
+        null,
+        {
+          "type": "upper",
+          "appliance_expects": [
+            "oven"
+          ]
+        }
+      ],
+      "split_refusal": null,
+      "appliance": {
+        "cabinet_target": [
+          {
+            "kind": "cabinet",
+            "id": "CAB-001",
+            "pid": 4242
+          },
+          null
+        ],
+        "mount_msg": "Výber sa medzitým zmenil — panel sa obnovil, skús znova.",
+        "expects_kind": "cabinet"
+      },
+      "slot_payload": null,
+      "corner_preview": null,
+      "template_config_from": {
+        "config_schema": 22,
+        "type": "upper",
+        "width": 600.0,
+        "height": 720.0,
+        "depth": 510.0,
+        "thickness": 18.0,
+        "floor_height": 100.0,
+        "bottom_mode": "under_sides",
+        "top_mode": "full",
+        "back_mode": "overlay",
+        "back_thickness": 3.0,
+        "plinth_mode": "none",
+        "plinth_recess": 40.0,
+        "rail_depth": 100.0,
+        "rails_orientation": "flat",
+        "rails_top_offset": 0.0,
+        "zone_tree": {
+          "id": "Z1",
+          "generation": 0,
+          "split": null,
+          "shelves": 0,
+          "children": [
+
+          ]
+        },
+        "fronts": {
+          "split_axis": "height",
+          "gap": 3.0,
+          "gap_top": 2.0,
+          "gap_bottom": 2.0,
+          "gap_left": 2.0,
+          "gap_right": 2.0,
+          "edge_limit_off": false,
+          "items": [
+            {
+              "id": "F1",
+              "type": "door",
+              "mode": "auto",
+              "height": null,
+              "locked": false,
+              "wings": "1",
+              "profile": "none"
+            }
+          ]
+        },
+        "dw_class": 600,
+        "dw_body_height": 820.0,
+        "dw_front_bottom": 100.0,
+        "back_setback": 0.0,
+        "top_front_setback": 0.0,
+        "back_rail_height": 100.0,
+        "hardware_manual": [
+
+        ]
+      },
+      "corner_side": "Stranu dverí má len rohová skrinka.",
+      "tpl_dialog_corner_refusal": {
+        "\"lower\"": null,
+        "\"upper\"": null,
+        "\"dishwasher\"": null,
+        "\"corner_blind\"": null,
+        "\"tall\"": null,
+        "nil": null,
+        "\"\"": null
+      },
+      "tpl_dialog_apply": {
+        "\"lower\"": "Šablóna je pre iný typ (dolná) než označená skrinka — nepoužitá.",
+        "\"upper\"": "PRESLO TYPOVOU VETVOU",
+        "\"dishwasher\"": "Šablóna je pre iný typ (umývačka) než označená skrinka — nepoužitá.",
+        "\"corner_blind\"": "Šablóna je pre iný typ (rohová) než označená skrinka — nepoužitá.",
+        "\"tall\"": "Šablóna je pre iný typ (dolná) než označená skrinka — nepoužitá.",
+        "nil": "Šablóna je pre iný typ (dolná) než označená skrinka — nepoužitá.",
+        "\"\"": "Šablóna je pre iný typ (dolná) než označená skrinka — nepoužitá."
+      }
+    },
+    "\"dishwasher\"": {
+      "slot_params": true,
+      "corner_src_insert": false,
+      "corner_src_stored": false,
+      "opening_cfg": {
+        "type": "dishwasher",
+        "width": 900.0,
+        "height": 720.0,
+        "floor_height": 100.0
+      },
+      "preflight_insert": {
+        "insert_session": 1,
+        "revision": 1,
+        "opening": {
+          "x0": 0.0,
+          "w": 900.0,
+          "z0": 100.0,
+          "h": 620.0
+        },
+        "valid": true,
+        "items": [
+          {
+            "id": "F1",
+            "type": "blind",
+            "mode": "fixed",
+            "height": 617.0,
+            "locked": true,
+            "wings": 1,
+            "wings_n": 1,
+            "profile": "none",
+            "z": 100.0,
+            "profile_edges": [
+
+            ]
+          }
+        ],
+        "errors": [
+
+        ],
+        "slots": {
+          "F1": {
+            "wings_n": 1,
+            "slots": [
+
+            ]
+          }
+        }
+      },
+      "preflight_stored": {
+        "insert_session": 1,
+        "revision": 1,
+        "opening": {
+          "x0": 0.0,
+          "w": 900.0,
+          "z0": 100.0,
+          "h": 620.0
+        },
+        "valid": true,
+        "items": [
+          {
+            "id": "F1",
+            "type": "blind",
+            "mode": "fixed",
+            "height": 617.0,
+            "locked": true,
+            "wings": 1,
+            "wings_n": 1,
+            "profile": "none",
+            "z": 100.0,
+            "profile_edges": [
+
+            ]
+          }
+        ],
+        "errors": [
+
+        ],
+        "slots": {
+          "F1": {
+            "wings_n": 1,
+            "slots": [
+
+            ]
+          }
+        }
+      },
+      "slot_fronts_refusal": "Slot umývačky má jedno pevné čelo — jeho výška sa dopočíta z výšky linky, soklu a medzery hore.",
+      "corner_fronts_refusal": null,
+      "template_slot_fields": {
+        "type": "dishwasher",
+        "width": 600.0,
+        "dw_class": 600,
+        "dw_body_height": 820.0,
+        "dw_front_bottom": 100.0,
+        "appliance_expects": [
+          "oven"
+        ]
+      },
+      "corner_template_refusal": null,
+      "template_expects": [
+        null,
+        {
+          "type": "dishwasher",
+          "appliance_expects": [
+            "dishwasher"
+          ]
+        }
+      ],
+      "split_refusal": null,
+      "appliance": {
+        "cabinet_target": [
+          {
+            "kind": "slot",
+            "id": "CAB-001",
+            "pid": 4242
+          },
+          null
+        ],
+        "mount_msg": "Chladnička už v tejto skrinke nie je priradená — panel sa obnovil.",
+        "expects_kind": "slot"
+      },
+      "slot_payload": {
+        "body": "598 × 820 × 555",
+        "body_note": "generické 60",
+        "body_source": "generic",
+        "body_range": "",
+        "front_height": "0",
+        "front_after": "618",
+        "front_text": "0 · po prestavbe 618",
+        "gap_top": "2",
+        "gap_text": "2 · schéma medzier",
+        "under_ok": false,
+        "under_text": "720 < 820",
+        "class_state": "unknown",
+        "class_text": "60 · bez modelu"
+      },
+      "corner_preview": null,
+      "template_config_from": {
+        "config_schema": 22,
+        "type": "dishwasher",
+        "width": 600.0,
+        "height": 720.0,
+        "depth": 510.0,
+        "thickness": 18.0,
+        "floor_height": 100.0,
+        "bottom_mode": "under_sides",
+        "top_mode": "full",
+        "back_mode": "overlay",
+        "back_thickness": 3.0,
+        "plinth_mode": "none",
+        "plinth_recess": 40.0,
+        "rail_depth": 100.0,
+        "rails_orientation": "flat",
+        "rails_top_offset": 0.0,
+        "zone_tree": {
+          "id": "Z1",
+          "generation": 0,
+          "split": null,
+          "shelves": 0,
+          "children": [
+
+          ]
+        },
+        "fronts": {
+          "split_axis": "height",
+          "gap": 3.0,
+          "gap_top": 2.0,
+          "gap_bottom": 2.0,
+          "gap_left": 2.0,
+          "gap_right": 2.0,
+          "edge_limit_off": false,
+          "items": [
+            {
+              "id": "F1",
+              "type": "door",
+              "mode": "auto",
+              "height": null,
+              "locked": false,
+              "wings": "1",
+              "profile": "none"
+            }
+          ]
+        },
+        "dw_class": 600,
+        "dw_body_height": 820.0,
+        "dw_front_bottom": 100.0,
+        "hardware_manual": [
+
+        ]
+      },
+      "corner_side": "Stranu dverí má len rohová skrinka.",
+      "tpl_dialog_corner_refusal": {
+        "\"lower\"": null,
+        "\"upper\"": null,
+        "\"dishwasher\"": null,
+        "\"corner_blind\"": null,
+        "\"tall\"": null,
+        "nil": null,
+        "\"\"": null
+      },
+      "tpl_dialog_apply": {
+        "\"lower\"": "Šablóna je pre iný typ (dolná) než označená skrinka — nepoužitá.",
+        "\"upper\"": "Šablóna je pre iný typ (horná) než označená skrinka — nepoužitá.",
+        "\"dishwasher\"": "PRESLO TYPOVOU VETVOU",
+        "\"corner_blind\"": "Šablóna je pre iný typ (rohová) než označená skrinka — nepoužitá.",
+        "\"tall\"": "Šablóna je pre iný typ (dolná) než označená skrinka — nepoužitá.",
+        "nil": "Šablóna je pre iný typ (dolná) než označená skrinka — nepoužitá.",
+        "\"\"": "Šablóna je pre iný typ (dolná) než označená skrinka — nepoužitá."
+      }
+    },
+    "\"corner_blind\"": {
+      "slot_params": false,
+      "corner_src_insert": true,
+      "corner_src_stored": true,
+      "opening_cfg": {
+        "type": "corner_blind",
+        "width": 900.0,
+        "height": 720.0,
+        "floor_height": 100.0,
+        "corner_side": "right",
+        "corner_door_w": 500.0
+      },
+      "preflight_insert": {
+        "insert_session": 1,
+        "revision": 1,
+        "opening": {
+          "x0": 400.0,
+          "w": 500.0,
+          "z0": 100.0,
+          "h": 620.0
+        },
+        "valid": true,
+        "items": [
+          {
+            "id": "F1",
+            "type": "door",
+            "mode": "auto",
+            "height": 614.0,
+            "locked": false,
+            "wings": "1",
+            "wings_n": 1,
+            "profile": "none",
+            "z": 103.0,
+            "profile_edges": [
+
+            ]
+          }
+        ],
+        "errors": [
+
+        ],
+        "slots": {
+          "F1": {
+            "wings_n": 1,
+            "slots": [
+              {
+                "wing": "single",
+                "part_key": "front:F1/wing:single",
+                "state": null
+              }
+            ]
+          }
+        }
+      },
+      "preflight_stored": {
+        "insert_session": 1,
+        "revision": 1,
+        "opening": {
+          "x0": 400.0,
+          "w": 500.0,
+          "z0": 100.0,
+          "h": 620.0
+        },
+        "valid": true,
+        "items": [
+          {
+            "id": "F1",
+            "type": "door",
+            "mode": "auto",
+            "height": 614.0,
+            "locked": false,
+            "wings": "1",
+            "wings_n": 1,
+            "profile": "none",
+            "z": 103.0,
+            "profile_edges": [
+
+            ]
+          }
+        ],
+        "errors": [
+
+        ],
+        "slots": {
+          "F1": {
+            "wings_n": 1,
+            "slots": [
+              {
+                "wing": "single",
+                "part_key": "front:F1/wing:single",
+                "state": null
+              }
+            ]
+          }
+        }
+      },
+      "slot_fronts_refusal": null,
+      "corner_fronts_refusal": "Rohová skrinka má v dverovej časti jedny dvierka (jedno krídlo na celú výšku).",
+      "template_slot_fields": {
+        "type": "corner_blind",
+        "width": 600.0,
+        "dw_class": 600,
+        "dw_body_height": 820.0,
+        "dw_front_bottom": 100.0,
+        "corner_side": "right",
+        "corner_door_w": 500.0,
+        "corner_cr1": 100.0,
+        "corner_cr2": 80.0,
+        "appliance_expects": [
+          "oven"
+        ]
+      },
+      "corner_template_refusal": "Šablóna rohovej: Rohová skrinka má v dverovej časti jedny dvierka (jedno krídlo na celú výšku).",
+      "template_expects": [
+        null,
+        {
+          "type": "corner_blind",
+          "appliance_expects": [
+            "oven"
+          ]
+        }
+      ],
+      "split_refusal": "Rohová skrinka má vnútri len police cez celú šírku (bez priečok).",
+      "appliance": {
+        "cabinet_target": [
+          {
+            "kind": "cabinet",
+            "id": "CAB-001",
+            "pid": 4242
+          },
+          null
+        ],
+        "mount_msg": "Výber sa medzitým zmenil — panel sa obnovil, skús znova.",
+        "expects_kind": "cabinet"
+      },
+      "slot_payload": null,
+      "corner_preview": {
+        "side": "right",
+        "fits": false,
+        "need": 654.0,
+        "door_w": 496.0,
+        "parts": [
+          {
+            "role": "corner_blind_panel",
+            "x0": 18.0,
+            "x1": 100.0,
+            "z0": 118.0,
+            "z1": 702.0,
+            "title": "Slepá časť — blenda korpusová 82 × 584 (materiál korpusu)"
+          },
+          {
+            "role": "corner_rail",
+            "x0": -36.0,
+            "x1": -18.0,
+            "z0": 100.0,
+            "z1": 720.0,
+            "title": "Rohová výstuha — kolmo na čelo, trčí 98 mm pred korpus; spredu len hrana 18 mm"
+          },
+          {
+            "role": "cr_front",
+            "x0": 0.0,
+            "x1": 98.0,
+            "z0": 102.0,
+            "z1": 718.0,
+            "title": "CR 1 — lišta v rovine dverí 98 × 616 (materiál čiel)"
+          },
+          {
+            "role": "cr_side",
+            "x0": -18.0,
+            "x1": 0.0,
+            "z0": 102.0,
+            "z1": 718.0,
+            "title": "CR 2 — kolmá lišta 96 mm do hĺbky; spredu len hrana 18 mm (materiál čiel)"
+          }
+        ],
+        "dims": [
+          {
+            "x0": 100.0,
+            "x1": 600.0,
+            "label": "500",
+            "title": "Dverová časť — od vonkajšej plochy boku po os škáry medzi dverami a CR 1"
+          },
+          {
+            "x0": 0.0,
+            "x1": 100.0,
+            "label": "100",
+            "title": "CR 1 — do šírky: od hranice dverovej časti po líce CR 2"
+          }
+        ],
+        "stats": {
+          "count": 5,
+          "area": 0.275
+        }
+      },
+      "template_config_from": {
+        "config_schema": 22,
+        "type": "corner_blind",
+        "width": 600.0,
+        "height": 720.0,
+        "depth": 510.0,
+        "thickness": 18.0,
+        "floor_height": 100.0,
+        "bottom_mode": "under_sides",
+        "top_mode": "full",
+        "back_mode": "overlay",
+        "back_thickness": 3.0,
+        "plinth_mode": "none",
+        "plinth_recess": 40.0,
+        "rail_depth": 100.0,
+        "rails_orientation": "flat",
+        "rails_top_offset": 0.0,
+        "zone_tree": {
+          "id": "Z1",
+          "generation": 0,
+          "split": null,
+          "shelves": 0,
+          "children": [
+
+          ]
+        },
+        "fronts": {
+          "split_axis": "height",
+          "gap": 3.0,
+          "gap_top": 2.0,
+          "gap_bottom": 2.0,
+          "gap_left": 2.0,
+          "gap_right": 2.0,
+          "edge_limit_off": false,
+          "items": [
+            {
+              "id": "F1",
+              "type": "door",
+              "mode": "auto",
+              "height": null,
+              "locked": false,
+              "wings": "1",
+              "profile": "none"
+            }
+          ]
+        },
+        "dw_class": 600,
+        "dw_body_height": 820.0,
+        "dw_front_bottom": 100.0,
+        "corner_side": "right",
+        "corner_door_w": 500.0,
+        "corner_cr1": 100.0,
+        "corner_cr2": 80.0,
+        "back_setback": 0.0,
+        "top_front_setback": 0.0,
+        "back_rail_height": 100.0,
+        "hardware_manual": [
+
+        ]
+      },
+      "corner_side": "PRESLO TYPOVOU VETVOU",
+      "tpl_dialog_corner_refusal": {
+        "\"lower\"": null,
+        "\"upper\"": null,
+        "\"dishwasher\"": null,
+        "\"corner_blind\"": "Šablóna rohovej: Rohová skrinka má v dverovej časti jedny dvierka (jedno krídlo na celú výšku).",
+        "\"tall\"": null,
+        "nil": null,
+        "\"\"": null
+      },
+      "tpl_dialog_apply": {
+        "\"lower\"": "Šablóna je pre iný typ (dolná) než označená skrinka — nepoužitá.",
+        "\"upper\"": "Šablóna je pre iný typ (horná) než označená skrinka — nepoužitá.",
+        "\"dishwasher\"": "Šablóna je pre iný typ (umývačka) než označená skrinka — nepoužitá.",
+        "\"corner_blind\"": "Šablóna rohovej: Rohová skrinka má v dverovej časti jedny dvierka (jedno krídlo na celú výšku). Nepoužitá, nič sa nezmenilo.",
+        "\"tall\"": "Šablóna je pre iný typ (dolná) než označená skrinka — nepoužitá.",
+        "nil": "Šablóna je pre iný typ (dolná) než označená skrinka — nepoužitá.",
+        "\"\"": "Šablóna je pre iný typ (dolná) než označená skrinka — nepoužitá."
+      }
+    },
+    "\"tall\"": {
+      "slot_params": false,
+      "corner_src_insert": false,
+      "corner_src_stored": false,
+      "opening_cfg": {
+        "type": "tall",
+        "width": 900.0,
+        "height": 720.0,
+        "floor_height": 100.0
+      },
+      "preflight_insert": {
+        "insert_session": 1,
+        "revision": 1,
+        "opening": {
+          "x0": 0.0,
+          "w": 900.0,
+          "z0": 100.0,
+          "h": 620.0
+        },
+        "valid": true,
+        "items": [
+          {
+            "id": "F1",
+            "type": "door",
+            "mode": "auto",
+            "height": 614.0,
+            "locked": false,
+            "wings": "1",
+            "wings_n": 1,
+            "profile": "none",
+            "z": 103.0,
+            "profile_edges": [
+
+            ]
+          }
+        ],
+        "errors": [
+
+        ],
+        "slots": {
+          "F1": {
+            "wings_n": 1,
+            "slots": [
+              {
+                "wing": "single",
+                "part_key": "front:F1/wing:single",
+                "state": null
+              }
+            ]
+          }
+        }
+      },
+      "preflight_stored": {
+        "insert_session": 1,
+        "revision": 1,
+        "opening": {
+          "x0": 0.0,
+          "w": 900.0,
+          "z0": 100.0,
+          "h": 620.0
+        },
+        "valid": true,
+        "items": [
+          {
+            "id": "F1",
+            "type": "door",
+            "mode": "auto",
+            "height": 614.0,
+            "locked": false,
+            "wings": "1",
+            "wings_n": 1,
+            "profile": "none",
+            "z": 103.0,
+            "profile_edges": [
+
+            ]
+          }
+        ],
+        "errors": [
+
+        ],
+        "slots": {
+          "F1": {
+            "wings_n": 1,
+            "slots": [
+              {
+                "wing": "single",
+                "part_key": "front:F1/wing:single",
+                "state": null
+              }
+            ]
+          }
+        }
+      },
+      "slot_fronts_refusal": null,
+      "corner_fronts_refusal": null,
+      "template_slot_fields": {
+        "type": "lower",
+        "width": 600.0,
+        "dw_class": 600,
+        "dw_body_height": 820.0,
+        "dw_front_bottom": 100.0,
+        "appliance_expects": [
+          "oven"
+        ]
+      },
+      "corner_template_refusal": null,
+      "template_expects": [
+        null,
+        {
+          "type": "tall",
+          "appliance_expects": [
+            "oven"
+          ]
+        }
+      ],
+      "split_refusal": null,
+      "appliance": {
+        "cabinet_target": [
+          {
+            "kind": "cabinet",
+            "id": "CAB-001",
+            "pid": 4242
+          },
+          null
+        ],
+        "mount_msg": "Výber sa medzitým zmenil — panel sa obnovil, skús znova.",
+        "expects_kind": "cabinet"
+      },
+      "slot_payload": null,
+      "corner_preview": null,
+      "template_config_from": {
+        "config_schema": 22,
+        "type": "tall",
+        "width": 600.0,
+        "height": 720.0,
+        "depth": 510.0,
+        "thickness": 18.0,
+        "floor_height": 100.0,
+        "bottom_mode": "under_sides",
+        "top_mode": "full",
+        "back_mode": "overlay",
+        "back_thickness": 3.0,
+        "plinth_mode": "none",
+        "plinth_recess": 40.0,
+        "rail_depth": 100.0,
+        "rails_orientation": "flat",
+        "rails_top_offset": 0.0,
+        "zone_tree": {
+          "id": "Z1",
+          "generation": 0,
+          "split": null,
+          "shelves": 0,
+          "children": [
+
+          ]
+        },
+        "fronts": {
+          "split_axis": "height",
+          "gap": 3.0,
+          "gap_top": 2.0,
+          "gap_bottom": 2.0,
+          "gap_left": 2.0,
+          "gap_right": 2.0,
+          "edge_limit_off": false,
+          "items": [
+            {
+              "id": "F1",
+              "type": "door",
+              "mode": "auto",
+              "height": null,
+              "locked": false,
+              "wings": "1",
+              "profile": "none"
+            }
+          ]
+        },
+        "dw_class": 600,
+        "dw_body_height": 820.0,
+        "dw_front_bottom": 100.0,
+        "back_setback": 0.0,
+        "top_front_setback": 0.0,
+        "back_rail_height": 100.0,
+        "hardware_manual": [
+
+        ]
+      },
+      "corner_side": "Stranu dverí má len rohová skrinka.",
+      "tpl_dialog_corner_refusal": {
+        "\"lower\"": null,
+        "\"upper\"": null,
+        "\"dishwasher\"": null,
+        "\"corner_blind\"": null,
+        "\"tall\"": null,
+        "nil": null,
+        "\"\"": null
+      },
+      "tpl_dialog_apply": {
+        "\"lower\"": "Šablóna je pre iný typ (dolná) než označená skrinka — nepoužitá.",
+        "\"upper\"": "Šablóna je pre iný typ (horná) než označená skrinka — nepoužitá.",
+        "\"dishwasher\"": "Šablóna je pre iný typ (umývačka) než označená skrinka — nepoužitá.",
+        "\"corner_blind\"": "Šablóna je pre iný typ (rohová) než označená skrinka — nepoužitá.",
+        "\"tall\"": "PRESLO TYPOVOU VETVOU",
+        "nil": "Šablóna je pre iný typ (dolná) než označená skrinka — nepoužitá.",
+        "\"\"": "Šablóna je pre iný typ (dolná) než označená skrinka — nepoužitá."
+      }
+    },
+    "nil": {
+      "slot_params": false,
+      "corner_src_insert": false,
+      "corner_src_stored": false,
+      "opening_cfg": {
+        "type": "",
+        "width": 900.0,
+        "height": 720.0,
+        "floor_height": 100.0
+      },
+      "preflight_insert": {
+        "insert_session": 1,
+        "revision": 1,
+        "opening": {
+          "x0": 0.0,
+          "w": 900.0,
+          "z0": 100.0,
+          "h": 620.0
+        },
+        "valid": true,
+        "items": [
+          {
+            "id": "F1",
+            "type": "door",
+            "mode": "auto",
+            "height": 614.0,
+            "locked": false,
+            "wings": "1",
+            "wings_n": 1,
+            "profile": "none",
+            "z": 103.0,
+            "profile_edges": [
+
+            ]
+          }
+        ],
+        "errors": [
+
+        ],
+        "slots": {
+          "F1": {
+            "wings_n": 1,
+            "slots": [
+              {
+                "wing": "single",
+                "part_key": "front:F1/wing:single",
+                "state": null
+              }
+            ]
+          }
+        }
+      },
+      "preflight_stored": {
+        "insert_session": 1,
+        "revision": 1,
+        "opening": {
+          "x0": 0.0,
+          "w": 900.0,
+          "z0": 100.0,
+          "h": 620.0
+        },
+        "valid": true,
+        "items": [
+          {
+            "id": "F1",
+            "type": "door",
+            "mode": "auto",
+            "height": 614.0,
+            "locked": false,
+            "wings": "1",
+            "wings_n": 1,
+            "profile": "none",
+            "z": 103.0,
+            "profile_edges": [
+
+            ]
+          }
+        ],
+        "errors": [
+
+        ],
+        "slots": {
+          "F1": {
+            "wings_n": 1,
+            "slots": [
+              {
+                "wing": "single",
+                "part_key": "front:F1/wing:single",
+                "state": null
+              }
+            ]
+          }
+        }
+      },
+      "slot_fronts_refusal": null,
+      "corner_fronts_refusal": null,
+      "template_slot_fields": {
+        "type": "lower",
+        "width": 600.0,
+        "dw_class": 600,
+        "dw_body_height": 820.0,
+        "dw_front_bottom": 100.0,
+        "appliance_expects": [
+          "oven"
+        ]
+      },
+      "corner_template_refusal": null,
+      "template_expects": [
+        null,
+        {
+          "appliance_expects": [
+            "oven"
+          ]
+        }
+      ],
+      "split_refusal": null,
+      "appliance": {
+        "cabinet_target": [
+          {
+            "kind": "cabinet",
+            "id": "CAB-001",
+            "pid": 4242
+          },
+          null
+        ],
+        "mount_msg": "Výber sa medzitým zmenil — panel sa obnovil, skús znova.",
+        "expects_kind": "cabinet"
+      },
+      "slot_payload": null,
+      "corner_preview": null,
+      "template_config_from": {
+        "config_schema": 22,
+        "type": null,
+        "width": 600.0,
+        "height": 720.0,
+        "depth": 510.0,
+        "thickness": 18.0,
+        "floor_height": 100.0,
+        "bottom_mode": "under_sides",
+        "top_mode": "full",
+        "back_mode": "overlay",
+        "back_thickness": 3.0,
+        "plinth_mode": "none",
+        "plinth_recess": 40.0,
+        "rail_depth": 100.0,
+        "rails_orientation": "flat",
+        "rails_top_offset": 0.0,
+        "zone_tree": {
+          "id": "Z1",
+          "generation": 0,
+          "split": null,
+          "shelves": 0,
+          "children": [
+
+          ]
+        },
+        "fronts": {
+          "split_axis": "height",
+          "gap": 3.0,
+          "gap_top": 2.0,
+          "gap_bottom": 2.0,
+          "gap_left": 2.0,
+          "gap_right": 2.0,
+          "edge_limit_off": false,
+          "items": [
+            {
+              "id": "F1",
+              "type": "door",
+              "mode": "auto",
+              "height": null,
+              "locked": false,
+              "wings": "1",
+              "profile": "none"
+            }
+          ]
+        },
+        "dw_class": 600,
+        "dw_body_height": 820.0,
+        "dw_front_bottom": 100.0,
+        "back_setback": 0.0,
+        "top_front_setback": 0.0,
+        "back_rail_height": 100.0,
+        "hardware_manual": [
+
+        ]
+      },
+      "corner_side": "Stranu dverí má len rohová skrinka.",
+      "tpl_dialog_corner_refusal": {
+        "\"lower\"": null,
+        "\"upper\"": null,
+        "\"dishwasher\"": null,
+        "\"corner_blind\"": null,
+        "\"tall\"": null,
+        "nil": null,
+        "\"\"": null
+      },
+      "tpl_dialog_apply": {
+        "\"lower\"": "PRESLO TYPOVOU VETVOU",
+        "\"upper\"": "Šablóna je pre iný typ (horná) než označená skrinka — nepoužitá.",
+        "\"dishwasher\"": "Šablóna je pre iný typ (umývačka) než označená skrinka — nepoužitá.",
+        "\"corner_blind\"": "Šablóna je pre iný typ (rohová) než označená skrinka — nepoužitá.",
+        "\"tall\"": "Šablóna je pre iný typ (dolná) než označená skrinka — nepoužitá.",
+        "nil": "PRESLO TYPOVOU VETVOU",
+        "\"\"": "Šablóna je pre iný typ (dolná) než označená skrinka — nepoužitá."
+      }
+    },
+    "\"\"": {
+      "slot_params": false,
+      "corner_src_insert": false,
+      "corner_src_stored": false,
+      "opening_cfg": {
+        "type": "",
+        "width": 900.0,
+        "height": 720.0,
+        "floor_height": 100.0
+      },
+      "preflight_insert": {
+        "insert_session": 1,
+        "revision": 1,
+        "opening": {
+          "x0": 0.0,
+          "w": 900.0,
+          "z0": 100.0,
+          "h": 620.0
+        },
+        "valid": true,
+        "items": [
+          {
+            "id": "F1",
+            "type": "door",
+            "mode": "auto",
+            "height": 614.0,
+            "locked": false,
+            "wings": "1",
+            "wings_n": 1,
+            "profile": "none",
+            "z": 103.0,
+            "profile_edges": [
+
+            ]
+          }
+        ],
+        "errors": [
+
+        ],
+        "slots": {
+          "F1": {
+            "wings_n": 1,
+            "slots": [
+              {
+                "wing": "single",
+                "part_key": "front:F1/wing:single",
+                "state": null
+              }
+            ]
+          }
+        }
+      },
+      "preflight_stored": {
+        "insert_session": 1,
+        "revision": 1,
+        "opening": {
+          "x0": 0.0,
+          "w": 900.0,
+          "z0": 100.0,
+          "h": 620.0
+        },
+        "valid": true,
+        "items": [
+          {
+            "id": "F1",
+            "type": "door",
+            "mode": "auto",
+            "height": 614.0,
+            "locked": false,
+            "wings": "1",
+            "wings_n": 1,
+            "profile": "none",
+            "z": 103.0,
+            "profile_edges": [
+
+            ]
+          }
+        ],
+        "errors": [
+
+        ],
+        "slots": {
+          "F1": {
+            "wings_n": 1,
+            "slots": [
+              {
+                "wing": "single",
+                "part_key": "front:F1/wing:single",
+                "state": null
+              }
+            ]
+          }
+        }
+      },
+      "slot_fronts_refusal": null,
+      "corner_fronts_refusal": null,
+      "template_slot_fields": {
+        "type": "lower",
+        "width": 600.0,
+        "dw_class": 600,
+        "dw_body_height": 820.0,
+        "dw_front_bottom": 100.0,
+        "appliance_expects": [
+          "oven"
+        ]
+      },
+      "corner_template_refusal": null,
+      "template_expects": [
+        null,
+        {
+          "type": "",
+          "appliance_expects": [
+            "oven"
+          ]
+        }
+      ],
+      "split_refusal": null,
+      "appliance": {
+        "cabinet_target": [
+          {
+            "kind": "cabinet",
+            "id": "CAB-001",
+            "pid": 4242
+          },
+          null
+        ],
+        "mount_msg": "Výber sa medzitým zmenil — panel sa obnovil, skús znova.",
+        "expects_kind": "cabinet"
+      },
+      "slot_payload": null,
+      "corner_preview": null,
+      "template_config_from": {
+        "config_schema": 22,
+        "type": "",
+        "width": 600.0,
+        "height": 720.0,
+        "depth": 510.0,
+        "thickness": 18.0,
+        "floor_height": 100.0,
+        "bottom_mode": "under_sides",
+        "top_mode": "full",
+        "back_mode": "overlay",
+        "back_thickness": 3.0,
+        "plinth_mode": "none",
+        "plinth_recess": 40.0,
+        "rail_depth": 100.0,
+        "rails_orientation": "flat",
+        "rails_top_offset": 0.0,
+        "zone_tree": {
+          "id": "Z1",
+          "generation": 0,
+          "split": null,
+          "shelves": 0,
+          "children": [
+
+          ]
+        },
+        "fronts": {
+          "split_axis": "height",
+          "gap": 3.0,
+          "gap_top": 2.0,
+          "gap_bottom": 2.0,
+          "gap_left": 2.0,
+          "gap_right": 2.0,
+          "edge_limit_off": false,
+          "items": [
+            {
+              "id": "F1",
+              "type": "door",
+              "mode": "auto",
+              "height": null,
+              "locked": false,
+              "wings": "1",
+              "profile": "none"
+            }
+          ]
+        },
+        "dw_class": 600,
+        "dw_body_height": 820.0,
+        "dw_front_bottom": 100.0,
+        "back_setback": 0.0,
+        "top_front_setback": 0.0,
+        "back_rail_height": 100.0,
+        "hardware_manual": [
+
+        ]
+      },
+      "corner_side": "Stranu dverí má len rohová skrinka.",
+      "tpl_dialog_corner_refusal": {
+        "\"lower\"": null,
+        "\"upper\"": null,
+        "\"dishwasher\"": null,
+        "\"corner_blind\"": null,
+        "\"tall\"": null,
+        "nil": null,
+        "\"\"": null
+      },
+      "tpl_dialog_apply": {
+        "\"lower\"": "Šablóna je pre iný typ (dolná) než označená skrinka — nepoužitá.",
+        "\"upper\"": "Šablóna je pre iný typ (horná) než označená skrinka — nepoužitá.",
+        "\"dishwasher\"": "Šablóna je pre iný typ (umývačka) než označená skrinka — nepoužitá.",
+        "\"corner_blind\"": "Šablóna je pre iný typ (rohová) než označená skrinka — nepoužitá.",
+        "\"tall\"": "Šablóna je pre iný typ (dolná) než označená skrinka — nepoužitá.",
+        "nil": "Šablóna je pre iný typ (dolná) než označená skrinka — nepoužitá.",
+        "\"\"": "PRESLO TYPOVOU VETVOU"
+      }
+    }
+  }
+}

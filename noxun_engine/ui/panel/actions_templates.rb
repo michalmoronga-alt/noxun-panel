@@ -217,19 +217,22 @@ module Noxun
         # nema boky ani vnutro, takze „ulozene ako HORNA" by zo sablony
         # vyrobilo korpus s uplne inou geometriou. Modal preto pri slote
         # ponuka typ READONLY a server to vynucuje: typ sa nemeni.
-        TEMPLATE_TYPE_LABELS = { 'upper' => 'HORNÁ', 'lower' => 'DOLNÁ',
-                                 'dishwasher' => 'UMÝVAČKA' }.freeze
+        # H12b: typy, medzi ktorymi sa sablona PREPINA (`template_type
+        # switchable` v registri), a ich slovo VELKYMI (`word.upcase`).
+        TEMPLATE_SWITCH_TYPES = CabinetTypes.ids_where(:template_type, 'switchable').freeze
+        TEMPLATE_TYPE_LABELS = TEMPLATE_SWITCH_TYPES.to_h { |id| [id, CabinetTypes.get(id)[:word].upcase] }.freeze
 
         # ROH-A1: ROHOVA ma typ sablony tiez ZAMKNUTY (skory navrat ako slot) —
         # „ulozene ako DOLNA" by zo sablony rohovej vyrobilo dolnu skrinku bez
         # rohovej zostavy. Zamok typu v modale je UI a pride s ROH-A2.
+        # H12b: zamok = `template_type locked` v registri (slot aj rohova);
+        # chybajuci typ = `FALLBACK` (prazdny retazec ostava — identita).
         def apply_template_type!(config, raw)
-          have = (config['type'] || 'lower').to_s
-          return '' if have == 'dishwasher'
-          return '' if have == CabinetBuilder::CORNER_TYPE
+          have = (config['type'] || CabinetTypes::FALLBACK).to_s
+          return '' if CabinetTypes.prop(have, :template_type) == 'locked'
 
           want = raw.to_s.strip.downcase
-          return '' unless %w[lower upper].include?(want)
+          return '' unless TEMPLATE_SWITCH_TYPES.include?(want)
 
           config['type'] = want
           return '' if want == have
@@ -251,8 +254,9 @@ module Noxun
         # (zachova sa to, co prinieslo `template_config_from`).
         # -> hlaska pri chybe, inak nil
         def apply_template_expects!(config, raw)
-          kind = config['type'].to_s == 'dishwasher' ? ApplianceBinding::KIND_SLOT
-                                                     : ApplianceBinding::KIND_CABINET
+          # H12b: druh vlastnika spotrebica je vlastnost typu (`appliance_owner`).
+          slot = CabinetTypes.prop(config['type'], :appliance_owner) == ApplianceBinding::KIND_SLOT
+          kind = slot ? ApplianceBinding::KIND_SLOT : ApplianceBinding::KIND_CABINET
           if kind == ApplianceBinding::KIND_SLOT
             config['appliance_expects'] = ApplianceBinding::SLOT_EXPECTS.dup
             return nil

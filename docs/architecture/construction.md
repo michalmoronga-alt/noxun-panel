@@ -12,10 +12,12 @@ Plánovač, buildery, strom zón, modulové výpočty (police, čelá), kontrakt
 
 ### cabinet_types.rb
 
-**Register typov skrinky (H12a, v0.17.11, C-01) — `Noxun::Engine::CabinetTypes`.** JEDINÉ miesto, ktoré vie, aké typy skrinky existujú a aké majú
-**vlastnosti**; jadro (`cabinet_builder`, `construction`, `scale_observer`, `appliance_binding`, `appliance_checks`, `bom`, `direction_check`, `templates`,
-`ghost_tool`) sa pýta **vlastnosti, nie mena typu** — pravidlo „**jedna vlastnosť na miesto**", nová podmienka dáva presne tú istú množinu typov ako stará
-(matica 7 vstupov `lower upper dishwasher corner_blind tall nil ''` v `test_h12a_register.rb` a golden `test_h12_golden.rb`). Čistý modul bez IO a SketchUpu;
+**Register typov skrinky (H12a, v0.17.11, C-01; panel H12b, v0.17.12) — `Noxun::Engine::CabinetTypes`.** JEDINÉ miesto, ktoré vie, aké typy skrinky existujú
+a aké majú **vlastnosti**; jadro (`cabinet_builder`, `construction`, `scale_observer`, `appliance_binding`, `appliance_checks`, `bom`, `direction_check`, `templates`,
+`ghost_tool`) aj **panel Ruby** (`ui/panel/actions_cabinet`, `actions_templates`, `actions_zones`, `actions_appliance`, `payloads`, `sync`, `templates_dialog` —
+[ui-lifecycle.md](ui-lifecycle.md), odseky `actions_cabinet.rb`, `actions_templates.rb`, `sync.rb`, `templates_dialog.rb`) sa pýtajú **vlastnosti, nie mena typu** — pravidlo „**jedna vlastnosť na miesto**",
+nová podmienka dáva presne tú istú množinu typov ako stará (matica 7 vstupov `lower upper dishwasher corner_blind tall nil ''` v `test_h12a_register.rb`,
+`test_h12b_panel.rb` a golden `test_h12_golden.rb`, `test_h12b_golden.rb`). Čistý modul bez IO a SketchUpu;
 načíta sa hneď za `build_plan` — **pred** `construction` (`CORNER_TYPE`), `scale_observer` (`MIN_BY_TYPE`) a `cabinet_builder` (`TYPES`, `CORNER_TYPE`,
 `UPPER_HANG_Z`, `DW_*_RANGE`), ktoré z neho berú aliasy už pri načítaní (guard poradia v `main.rb`; `hardware_rules` register nepoužíva).
 
@@ -33,17 +35,19 @@ načíta sa hneď za `build_plan` — **pred** `construction` (`CORNER_TYPE`), `
   `FALLBACK`, **neznámy ostáva** — kľúč pamäte ghostu; **nenahrádza** porovnanie identity šablón, kde `''` ostáva `''` — audit H12 A2) · `get` · `prop` ·
   `hangs?` · `on_floor?` · `carcass?` · `corner?` (`assembly`) · `ids_where(key, value)` · `client_payload`.
 - **Neznámy typ** (aj z novšieho pluginu) = **profil dolnej** cez `norm` (dnešné správanie; config z novšej verzie stopne dopredný guard `newer_config?` skôr).
-  **Miesta identity** si nechávajú surový reťazec: vstup pravidiel kovania `cabinet_hw_ctx['cabinet_type']`, porovnanie typu šablóny a skrinky (panel, H12b),
-  kľúč pamäte zamknutej výšky ghostu.
-- **`client_payload`** = kontrakt pre JS (H12b ho pošle v `NX.init`, H12c z neho číta): pole hashov v poradí `IDS`, **kľúče ako stringy s menami `KEYS`**,
-  hodnoty len JSON typy (`limits` → `{"width": [..], "height": [..]}`, `template_lock` → `{"title", "tip"}`); zmluva = `tests/fixtures/h12_cabinet_types.json`.
+  **Miesta identity** si nechávajú surový reťazec: vstup pravidiel kovania `cabinet_hw_ctx['cabinet_type']`, typový guard použitia šablóny
+  (`TemplatesDialog.template_type_id` — chýbajúci typ = dolná, `''` a neznámy ostávajú; H12b, A2), zmena typu z/na rohovú (`want ≠ have` surovo, zámok
+  = `type_locked`), kľúč pamäte zamknutej výšky ghostu.
+- **`client_payload`** = kontrakt pre JS (od H12b ho nesie `NX.init` pod kľúčom **`cabinet_types`**; H12c z neho začne čítať): pole hashov v poradí `IDS`,
+  **kľúče ako stringy s menami `KEYS`**, hodnoty len JSON typy (`limits` → `{"width": [..], "height": [..]}`, `template_lock` → `{"title", "tip"}`); zmluva =
+  `tests/fixtures/h12_cabinet_types.json`.
 - **Čo register NIE JE:** predvoľby (`*_DEFAULTS` → `CabinetBuilder::DEFAULTS_BY_TYPE`), polia typu (`DW_KEYS`, `CORNER_KEYS` → `EXTRA_KEYS_BY_TYPE`),
   `PARAM_KEYS` a kód typov (`appliance_slot_plan`, `corner_parts`, `slot_fronts!`, `corner_fronts!`…) ostávajú v builderi — register hovorí **ktorá** vetva, nie **ako**.
   Aliasy pre testy a cudzí kód: `CabinetBuilder::TYPES` (= `IDS`), `CabinetBuilder::CORNER_TYPE` a `Construction::CORNER_TYPE` (= `CORNER`, do H12a dve kópie),
   `CabinetBuilder::UPPER_HANG_Z`, `DW_WIDTH_RANGE`/`DW_HEIGHT_RANGE`, `ScaleWatch::MIN_BY_TYPE` (odvodené z `limits`).
-- **Guardy (`test_h12a_register.rb`):** v `core/` a `modules/` **žiadne nové vetvenie podľa mena typu** (`== 'upper'`, `when 'dishwasher'`, `%w[…upper…]`,
-  `|| 'lower'`, `CORNER_TYPE` mimo aliasov — allowlist podľa obsahu riadka s dôvodom: kategórie spotrebičov, seed závesov, mapy predvolieb; panel `ui/` pribudne
-  v H12b) · `DEFAULTS_BY_TYPE` = `IDS` · **CN-03** (visiace typy = `cabinet_type` seedu závesov, [hardware.md](hardware.md)) · poradie načítania. **Nový typ** =
+- **Guardy (`test_h12a_register.rb`):** v `core/`, `modules/` a od H12b aj `ui/` (len `.rb`; JS je H12c) **žiadne nové vetvenie podľa mena typu**
+  (`== 'upper'`, `when 'dishwasher'`, `%w[…upper…]`, `|| 'lower'`, `CORNER_TYPE` mimo aliasov — allowlist podľa obsahu riadka s dôvodom: kategórie
+  spotrebičov, seed závesov, mapy predvolieb, vety rozsahu pravidiel `RulesDialog::TYPE_SCOPE_PHRASES`) · `DEFAULTS_BY_TYPE` = `IDS` · **CN-03** (visiace typy = `cabinet_type` seedu závesov, [hardware.md](hardware.md)) · poradie načítania. **Nový typ** =
   riadok `REGISTRY` + `DEFAULTS_BY_TYPE` (+ `EXTRA_KEYS_BY_TYPE`, `PARAM_KEYS`) + kód buildera + HTML tlačidlo a `option` + seed šablóny + pri `hang_z > 0` seed
   závesov a `SEED_VERSION` + bump `CONFIG_SCHEMA` (mapa rozširovacích bodov: H13).
 
