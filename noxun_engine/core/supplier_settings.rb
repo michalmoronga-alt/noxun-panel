@@ -235,7 +235,14 @@ module Noxun
         origin = doc_std_unsupported?(merged) ? :newer_file : :file
         [merged, origin]
       rescue StandardError => e
-        Engine.log_error(e, 'SupplierSettings.load') if defined?(Engine)
+        # H9/R8: zly tvar bez zalohy sa loguje RAZ za zmenu stavu (`load` bezi
+        # pri kazdom vypocte rozpoctu); ostatne chyby ako doteraz.
+        if e.is_a?(JsonFileStore::InvalidShape)
+          Engine.log("supplier settings: #{e.message} — pocita sa s predvolenymi") if !@shape_logged && defined?(Engine)
+          @shape_logged = true
+        elsif defined?(Engine)
+          Engine.log_error(e, 'SupplierSettings.load')
+        end
         [seed_doc, read_failure_origin(e)]
       end
 
@@ -264,6 +271,7 @@ module Noxun
       # pri nacitani nezapise).
       def read_doc
         raw = JsonFileStore.read_valid(path, shape: shape_check, copy: true)
+        @shape_logged = false
         doc, changed = merge_seed(normalize(raw))
         repaired = Array(doc['suppliers']).any? { |s| !Array(s[REPAIRED_KEY]).empty? }
         [doc, changed && !doc_std_unsupported?(raw) && !repaired]

@@ -26,7 +26,8 @@
   do `ShapeCheckError < StandardError` (fail-closed — FIX 2), `json_state`/`degraded?` s tvarom, `write(path, payload, shape = nil)` **pozičný** (pasca Ruby 3 —
   prototyp s `shape:` zhodil 94 testov) chráni zálohu dobrého tvaru. **Dodávateľ** (predikát R2, matica R7: záloha + banner `degraded` · bez zálohy `fallback` bez zápisu
   pri načítaní · výnimka predikátu `unreadable`) + NP-4 brána auto-zápisu na **všetkých 8 skalárov** (R6). **ABS a kovanie** (FIX 3 — rozsah rozšírený): predikát
-  „prázdne len so `seed_version`", čítanie cez `read_valid`, bez zálohy seed **bez zápisu** a log raz za zmenu stavu; **`HardwareRules.write_gate → [state, reason]`**
+  „prázdne len so `seed_version`", čítanie cez `read_valid`, bez zálohy seed **bez zápisu**, priznaný len logom (zostatkové riziko — Q1); log raz za zmenu stavu
+  majú všetky tri súbory (dodávateľ doplnený po predrecenzii); **`HardwareRules.write_gate → [state, reason]`**
   (`:ok|:degraded|:newer`, čerstvo nad súbormi, výnimky propaguje) je jediná zápisová brána globálnych pravidiel kovania — autorita pre H10 (R15); `library_*` čítajú
   tým istým `library_doc`. Kód okna Pravidlá sa nemení — „aj ako globálnu" nad degradovaným súborom uloží projekt a prestavia, globál odmietne (T15). STANDARD §11.5,
   register R-37 ✅ + oprava vety „abs/hardware/dim pri načítaní nezapisujú" (platí len pre `dim_series`). **Charakterizácia pred zásahom** (commit `bdae4442`, golden
@@ -34,7 +35,8 @@
   a VEPO s hranami nad **vlastnými** zdravými súbormi (predpoklad „líši sa od seedu") — po zásahu bajtovo rovnaké. Kód pluginu: +123 / −47 riadkov (bez komentárov; ~30
   z pridaných sú úpravy existujúcich riadkov) — pod poistkou rezu H9a/H9b. Q1/Q2 bez odpovede (bez nálezu v Kontrole pri čítaní zo zálohy, bez tlačidla „Obnoviť
   zo zálohy") — vratná predvoľba. **Testy:** 5040 headless · 149 JS sád + encoding guard; nová `test_r37_tvar_suborov.rb` (36 testov); **mutácie 21/21 zabité**
-  (M1–M21 podľa package; M19 a M20 len štrukturálnym guardom T16). In-SU nie je brána (buildery, undo ani okno sa nemenia). STAV pred dávkou: v0.17.6 · H8 hotová ·
+  (M1–M21 podľa package; M19 a M20 len štrukturálnym guardom T16) + 5 mutácií logu (M22–M26) po predrecenzii. **Predrecenzia:** 0× P1, 0× P2, 2× P3
+  (presnosť tvrdenia o priznaní v registri a STAV, slabý test logu T14) — opravené, verdikt PR OK. In-SU nie je brána (buildery, undo ani okno sa nemenia). STAV pred dávkou: v0.17.6 · H8 hotová ·
   Robí sa H6/H7 (mockupy), nasleduje H9 · Ďalší krok H9 → H10.
 - **H8 · kus z inej verzie štandardu (1.10.2026, PR #441, v0.17.6, blok 9 · HARDENING PO V1, register R-13; package
   [PACKAGE_H8.md](../zdroje/bloky/HARDENING/PACKAGE_H8.md), audit návrhu 0 BLOCKER · 4 FIX · 3 NOTE [AUDIT_H8_raw.md](../zdroje/bloky/HARDENING/AUDIT_H8_raw.md)).**

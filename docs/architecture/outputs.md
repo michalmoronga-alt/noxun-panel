@@ -1067,7 +1067,7 @@ legitímny legacy tvar; súbor z novšieho pluginu posudzuje NP-2, nie predikát
 zdravý súbor → bez zmeny · zlý tvar + `.bak` dobrého tvaru → počíta sa **so zálohou**, `:backup`/banner `degraded`, nič sa nezapíše, „Uložiť" vypnuté, `.bak` nedotknutá ·
 zlý tvar bez dobrej zálohy → predvolené s priznaním (`:seed_fallback`, banner `fallback`, Kontrola ORANGE, plán „orientačne"), načítanie **nezapíše**, prvé vedomé
 uloženie súbor opraví · výnimka predikátu (`ShapeCheckError`) → `:unreadable` (Uložiť vypnuté) · nečitateľný JSON (R-11) a novší `std` bez zmeny. Obnova = zmazať
-poškodený primár (číta sa `.bak`, zápisy povolené). Testy: `tests/pure/test_r37_tvar_suborov.rb` (T0a/T0b charakterizácia so súborom, T1–T10).
+poškodený primár (číta sa `.bak`, zápisy povolené). Zlý tvar bez zálohy sa loguje raz za zmenu stavu (nie pri každom výpočte rozpočtu). Testy: `tests/pure/test_r37_tvar_suborov.rb` (T0a/T0b charakterizácia so súborom, T1–T10, T14).
 
 **Verzia súboru 2 a dopredná brána (NP-2, vzor `HardwareRules` KOV-F1).** `STD = 2`; **každý zápis pečiatkuje `std = STD`** (inak by súbor
 ostal navždy 1 a budúca brána by nemala čo porovnať). Súbor z **novšieho** pluginu (`doc_std_unsupported?` = `std > STD`) sa **číta** (známe

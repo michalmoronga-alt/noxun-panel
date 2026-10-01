@@ -426,10 +426,13 @@ module NxR37
   def capture_log
     logs = []
     orig = E.method(:log)
+    orig_err = E.method(:log_error)
     E.define_singleton_method(:log) { |msg| logs << msg.to_s }
+    E.define_singleton_method(:log_error) { |e, ctx = nil| logs << "#{ctx}: #{e.message}" }
     yield logs
   ensure
     E.define_singleton_method(:log, orig)
+    E.define_singleton_method(:log_error, orig_err)
   end
 
   def files(path)
@@ -781,17 +784,27 @@ end
 # T14 — log raz za zmenu stavu
 # --------------------------------------------------------------------------
 
-NxTest.test('R-37 T14: 100x AbsRules.rules nad zlym tvarom bez zalohy -> najviac jeden riadok logu') do
+NxTest.test('R-37 T14: 100x nacitanie nad zlym tvarom bez zalohy -> PRAVE jeden riadok logu za subor') do
   NxTest.skip!('sandbox testy bezia headless') unless NxTest.headless?
   r = NxR37
   r.with_sandbox do
     r.write_json(r::ABS.path, '[]')
+    r.write_json(r::HR.path, '[]')
+    r.write_json(r::SS.path, '[]')
     r.capture_log do |logs|
       100.times { r::ABS.rules }
-      NxTest.assert(logs.length <= 1, "logov #{logs.length}")
-      r.write_json(r::HR.path, '[]')
+      NxTest.assert_equal(1, logs.length, "ABS loguje prave raz (#{logs.inspect})")
       100.times { r::HR.load }
-      NxTest.assert(logs.length <= 2, "aj kovanie loguje raz (#{logs.length})")
+      NxTest.assert_equal(2, logs.length, "aj kovanie prave raz (#{logs.inspect})")
+      100.times { r::SS.active }
+      NxTest.assert_equal(3, logs.length, "aj dodavatel prave raz (#{logs.inspect})")
+      NxTest.assert(logs.all? { |l| l.include?('neocakavany tvar') }, logs.inspect)
+      # zdravy subor stav zhodi — nove poskodenie sa zaloguje znova
+      r.write_json(r::SS.path, r.own_supplier_doc)
+      r::SS.active
+      r.write_json(r::SS.path, '[]')
+      r::SS.active
+      NxTest.assert_equal(4, logs.length, "po oprave a novom poskodeni znova (#{logs.inspect})")
     end
   end
 end

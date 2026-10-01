@@ -1726,7 +1726,8 @@ Sadzby služieb, cenové režimy, štandardné koncové riadky a **skaláre výp
   dodávateľov, dodávateľ bez sadzieb), sa **nikdy ticho nenahradí predvolenými hodnotami**: s dobrou zálohou sa počíta **so zálohou**
   a zápisy sú vypnuté (banner „poškodené — číta sa záloha"), bez nej platia predvolené hodnoty **s priznaním** (banner, Kontrola)
   a súbor opraví až vedomé uloženie; posledná dobrá záloha sa nikdy neprepíše. **Zdravý súbor sa nemení.** To isté platí pre globálne
-  pravidlá ABS hrán a kovania (§6, §7 — pravidlá zo zálohy, zápis odmietnutý; bez zálohy predvolené bez zápisu).
+  pravidlá ABS hrán a kovania (§6, §7 — pravidlá zo zálohy, zápis odmietnutý; bez zálohy predvolené bez zápisu, **priznané len záznamom
+  v logu** — upozornenie v Kontrole je otvorená otázka).
 - **Priznaný limit:** verzie **pred NP-2 (v0.15.1 a staršie)** bránu nemajú — keď na tom istom `%APPDATA%` (dve verzie SketchUpu, downgrade)
   uložia nastavenia, nové polia zahodia a verziu 2 nechajú; novší plugin potom doplní predvolené 5 / 10 / 10 mm bez varovania.
 
