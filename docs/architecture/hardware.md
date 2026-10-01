@@ -314,6 +314,26 @@ obsahom. Odmietnutie je `false` (návratový tvar sa nemení — `[false, dôvod
 **`HardwareRules.write_block_reason`**: okno Pravidlá ho pri „aj ako globálna predvoľba" ukáže namiesto „globálny zápis zlyhal!". Mechanika a celý kontrakt `JsonFileStore.degraded?` sú v odseku
 `hardware_sets.rb` nižšie a v [model-a-identita.md](model-a-identita.md) (`json_file_store.rb`).
 
+**`write_gate` — JEDINÁ zápisová brána globálnej knižnice (H9/R-37, R15; autorita aj pre H10).** `HardwareRules.write_gate → [state, reason]`, `state` je `:ok` | `:degraded` |
+`:newer`, `reason` hotová veta (`''` pri `:ok`). Vyhodnocuje sa **vždy čerstvo nad SÚBORMI**: `JsonFileStore.reload!` → `:degraded` ⇔ `degraded?(path, shape: <predikát>)`
+(primár nečitateľný **alebo zlého tvaru** a `.bak` dobrého tvaru; veta „Globálne pravidlá kovania sú poškodené — číta sa záloha, zápisy sú vypnuté (oprav alebo zmaž súbor …)")
+→ inak `:newer` ⇔ `doc_std_unsupported?` **surového** primára (chyba čítania = nie novší; veta `std_block_reason('Globálna knižnica')`) → inak `:ok`. Poradie je záväzné;
+výnimky (I/O, `ShapeCheckError`) sa **nechytajú** — rozhoduje volajúci (`write` → `false`, H10 `library_check` → `:unreadable`); nezapisuje, neloguje a na model nesiaha.
+**Zakázané** je rozhodovať o zápise z prečítaného dokumentu — `read_rules` pri degradácii vracia obsah **zálohy** a degradáciu neprezradí. `write` pod `with_catalog_lock`
+rozhoduje **výhradne** cez `write_gate`: `degraded_write_blocked?` ≡ `write_gate.first == :degraded` a `newer_write_blocked?` ≡ `:newer` (mená ostávajú kvôli R-11 guardu,
+každá si bránu vyhodnotí sama; `@write_block_reason` a log pri zmene stavu ako doteraz). Predkontrola mimo zámku smie bránu volať len na čítanie — pred **zápisom** ju
+`write` vyhodnotí znova pod zámkom.
+
+**Súbor zlého tvaru = poškodený (H9/R-37, R13, R14).** Predikát `doc_shape_ok?`: Hash a `rules` je Array, **prázdne len so `seed_version`** (vymazanie všetkých pravidiel
+v okne je legitímne, pečiatka je od vzniku modulu); súbor z novšieho pluginu posudzuje KOV-F1, nie predikát. Globálnu knižnicu číta **jediný pomocník `library_doc`**
+(`JsonFileStore.read_valid`) — `read_rules` aj provenienčné otázky `library_std_unsupported?`, `library_doc_std`, `library_seed_version` (ich rescue fallbacky ostali), takže pri
+zlom primári všetky vidia **ten istý** dokument, s ktorým sa naozaj stavia. **Matica:** zdravý súbor (aj prázdne so `seed_version`) → bez zmeny · zlý tvar (`[]`, `{}`,
+`rules` zlého typu, prázdne bez `seed_version`) + dobrá `.bak` → pravidlá **zo zálohy**, pri načítaní nič nezapíše, zápis do globálneho súboru **odmietnutý**, `.bak` nedotknutá ·
+zlý tvar bez dobrej `.bak` → `SEED_RULES` v pamäti **bez zápisu** (log raz za zmenu stavu), prvé vedomé uloženie súbor opraví. **„Aj ako globálnu predvoľbu"** nad
+degradovaným súborom: `handle_save` najprv **ako doteraz** uloží snapshot do projektu a prestavia skrinky (jeden krok Späť) a až potom `write` globál odmietne — status
+„Pravidlá uložené do projektu — Globálne pravidlá kovania sú poškodené … — prestavaných N skriniek"; globálny primár aj `.bak` ostanú bajtovo nedotknuté (kód okna sa nemenil).
+Pri zdravom súbore sa nákup nemení (charakterizácia nákupného CSV nad vlastným súborom `tests/fixtures/h9_golden/`). Testy: `tests/pure/test_r37_tvar_suborov.rb` (T13–T16).
+
 **BASELINE guard formulára stojí na `model.guid`** (ŠT-3b-1; predtým `model.path`, ktorý dva NEULOŽENÉ modely nerozlíši — oba majú prázdny path) **+ zhoda aktuálnych pravidiel
 modelu s baseline** (chytí undo snapshotu aj súbežnú zmenu inou cestou); baseline sa obnovuje pri KAžDOM zostavení payloadu. Odmietnutý zápis NIC nezapíše; **od ŠT-3b-2c1 sa
 formulár načíta nanovo LACNÝM ECHOM sekcie** (`push_section_echo(force: true)`), nie plným `bump: false` pushom. *(Pôvodný dôvod — plný push deduplikoval ID kópií, takže odmietnutie

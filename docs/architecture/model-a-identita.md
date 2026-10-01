@@ -233,19 +233,31 @@ Spoločná perzistencia malých JSON katalógov v `%APPDATA%\NOXUN\Engine` (mate
 **atomicitu**, nie súbeh — medziprocesový zámok je nad ním (`Materials.with_catalog_lock`, sidecar `materials.lock`, 1d/R-08).
 
 - **Zápis** ide `tmp → fsync → `.bak` → rename`: nikdy neexistuje okno, v ktorom by bol cieľový súbor neúplný. `preserve_valid_backup` odloží PREDCHÁDZAJÚCI obsah do `.bak`, ale
-  **len keď sa parsuje** — poškodený primár nesmie prepísať poslednú dobrú zálohu.
+  **len keď sa parsuje** — poškodený primár nesmie prepísať poslednú dobrú zálohu. **H9/R-37:** `write(path, payload, shape = nil)` s predikátom tvaru rozširuje invariant aj na
+  primár, ktorý sa **parsuje, ale nemá tvar** — keď `.bak` tvar má, ostane nedotknutá; bez dobrej zálohy sa primár zálohuje ako doteraz. Tretí parameter je **POZIČNÝ, nikdy
+  kľúčový** (pasca Ruby 3: volajúci posielajú bezzátvorkový hash s reťazcovými kľúčmi a Ruby by ho pri existencii kwargs poslal do nich → `ArgumentError` → tichý neúspešný
+  zápis; prototyp s `shape:` zhodil 94 testov). Bez predikátu je správanie bajtovo rovnaké ako pred H9. `write` invaliduje cache primára **aj `.bak`**.
 - **Čítanie** má sekundovú cache (`CHECK_INTERVAL`) kľúčovanú expandovanou cestou; položka sa invaliduje podľa podpisu súboru (mtime + veľkosť) alebo ručne cez `reload!` /
   `invalidate`. Hodnota je **deep-frozen**, `read(copy: true)` vracia kópiu. Cudzí proces cache nezhodí — preto každá zapisovacia cesta číta pod zámkom NANOVO (`reload!`).
+  `read(path, fallback: false)` (H9) číta súbor **bez** ďalšej zálohy (vlastný kľúč cache) — tak sa číta `.bak`, aby sa nikdy nepoužila `.bak.bak`.
 - **`.bak` recovery:** `read_primary_or_backup` pri poškodenom primári prečíta zálohu, takže panel sa neotvorí prázdny.
-- **`degraded?(path)` (1d/R-11)** je odpoveď na tienistú stranu tej recovery: keď sa číta zo zálohy, najbližší zápis by primár prepísal obsahom odvodeným od **staršej** zálohy
-  a všetko medzi zálohou a poškodením by zmizlo. `degraded?` je pravda **práve vtedy**, keď primár EXISTUJE a NEPARSUJE sa a zároveň existuje parsovateľná `.bak`. Chýbajúci primár
-  s platnou zálohou degraded NIE JE (nič sa nestratilo — zhodne s `HardwareCatalog.assess!`) a poškodený primár BEZ zálohy tiež nie (niet z čoho čo stratiť; volajúci sa správajú
-  ako doteraz, prvý zápis súbor samoopraví). Dve vlastnosti sú **kontrakt**: (1) číta **priamo z disku**, mimo sekundovej cache — cachovaná hodnota spred poškodenia by bránu
-  otvorila presne v okamihu, keď má stáť; (2) **I/O chyby sa nerescue-ujú** (`false` znamená „smieš zapísať", a nedostupný súbor o zdraví primára nehovorí nič) — rescue je len
-  pre `JSON::ParserError` (poškodený obsah) a `Errno::ENOENT` (súbor nie je), zvyšok vyletí a skončí v rescue vetve volajúceho ako NEÚSPEŠNÝ zápis.
-- **Guard NEŽIJE tu.** `write` sa nemení; bránu volá **každý z piatich volajúcich na jednom mieste svojej zapisovacej cesty, POD zámkom** tesne pred zápisom (cachovaný stav nie je
-  dôkaz — lekcia R-07). Odkazy: `hardware_sets` / `hardware_rules` v [hardware.md](hardware.md), `abs_rules` v [materials.md](materials.md), `supplier_settings`
-  v [outputs.md](outputs.md), `dim_series` nižšie. Testy: `tests/pure/test_r11_degradovana_zaloha.rb`.
+- **Očakávaný tvar (H9/R-37, opt-in):** súbor, ktorý sa parsuje, ale nemá tvar volajúceho (`[]`, `{}`, `null`, zlý typ kontajnera), je **poškodený** — rovnaká trieda ako
+  nečitateľný JSON. Predikát dodáva volajúci (`doc_shape_ok?` v `supplier_settings`, `abs_rules`, `hardware_rules`; H7 prevezme pre `vepo_settings`). Primitíva:
+  `read_valid(path, shape:)` = primár dobrého tvaru → inak `.bak` dobrého tvaru (čítaná `fallback: false`) → inak **`InvalidShape < JSON::ParserError`** (volajúci ho berie ako
+  poškodený obsah bez zálohy: zapisovateľný fallback); nezapisuje ani neloguje. `shape_ok?` je **jediné** miesto, kde sa predikát volá: akúkoľvek jeho výnimku (aj `ParserError`,
+  `ENOENT`) zabalí do **`ShapeCheckError < StandardError`** — o súbore nehovorí nič, preto nie je `ParserError` ani `SystemCallError` a volajúci ho nesmie zameniť za poškodený
+  či chýbajúci súbor (fail-closed: dodávateľ `:unreadable`, zápisy `false`). `json_state(path, shape:)` a `degraded?(path, shape:)` volajú predikát **mimo** rescue bloku parsovania.
+- **`degraded?(path, shape: nil)` (1d/R-11)** je odpoveď na tienistú stranu tej recovery: keď sa číta zo zálohy, najbližší zápis by primár prepísal obsahom odvodeným od **staršej** zálohy
+  a všetko medzi zálohou a poškodením by zmizlo. `degraded?` je pravda **práve vtedy**, keď primár EXISTUJE a NEPARSUJE sa (s predikátom: alebo nemá tvar) a zároveň existuje
+  parsovateľná `.bak` (s predikátom: dobrého tvaru). Chýbajúci primár s platnou zálohou degraded NIE JE (nič sa nestratilo — zhodne s `HardwareCatalog.assess!`) a poškodený
+  primár BEZ zálohy tiež nie (niet z čoho čo stratiť; volajúci sa správajú ako doteraz, prvý zápis súbor samoopraví). Dve vlastnosti sú **kontrakt**: (1) číta **priamo z disku**,
+  mimo sekundovej cache — cachovaná hodnota spred poškodenia by bránu otvorila presne v okamihu, keď má stáť; (2) **I/O chyby sa nerescue-ujú** (`false` znamená „smieš
+  zapísať", a nedostupný súbor o zdraví primára nehovorí nič) — rescue je len pre `JSON::ParserError` (poškodený obsah) a `Errno::ENOENT` (súbor nie je), zvyšok vyletí
+  a skončí v rescue vetve volajúceho ako NEÚSPEŠNÝ zápis.
+- **Guard NEŽIJE tu.** Bránu volá **každý z piatich volajúcich na jednom mieste svojej zapisovacej cesty, POD zámkom** tesne pred zápisom (cachovaný stav nie je dôkaz — lekcia
+  R-07); globálne pravidlá kovania majú od H9 jedinú bránu `HardwareRules.write_gate`. Odkazy: `hardware_sets` / `hardware_rules` v [hardware.md](hardware.md), `abs_rules`
+  v [materials.md](materials.md), `supplier_settings` v [outputs.md](outputs.md), `dim_series` nižšie (tvarom chránený **nie je**). Testy: `tests/pure/test_r11_degradovana_zaloha.rb`,
+  `tests/pure/test_r37_tvar_suborov.rb`.
 - **Priznaný zvyšok (R-11):** TOCTOU okno voči zapisovateľom, ktorí `materials.lock` ignorujú (ručný editor, antivírus) — uzavrel by ho až CAS/podpis tesne pred `rename`; vedome
   sa nerieši.
 

@@ -1055,9 +1055,19 @@ z pôvodu **pred** `refine_origin`, lebo ten poškodený primár s **novšou** z
 **`repaired`** = kľúče prerezu, orezu alebo prídavku, ktoré v súbore **boli, ale neplatné** (nečíslo, mimo rozsahu): `normalize_supplier` ich nahradí predvolenými
 a pôvod ostane `:file` — preto ich zaznamená do odvodeného `repaired_scalars` (`REPAIRED_KEY`; **chýbajúci** kľúč aj `null` sem nepatria — doplnenie legacy
 súboru je dovolené). Príznak žije **len v pamäti**: `write` ho whitelistom zahodí, `revision` ho z platných hodnôt nikdy nezloží. **`read_doc` súbor s opraveným
-skalárom plánu seed-mergom nezapisuje** — zápis by neplatnú hodnotu nahradil predvolenou a dôkaz (Kontrola ORANGE `layout_settings|repaired`, cena z odhadu)
+skalárom (od H9/R6 **ktorýmkoľvek z 8 skalárov** ktoréhokoľvek dodávateľa, nielen plánu) seed-mergom nezapisuje** — zápis by neplatnú hodnotu nahradil predvolenou a dôkaz (Kontrola ORANGE `layout_settings|repaired`, cena z odhadu)
 by potichu zmizol; opraví ho až vedomé uloženie v sekcii Nastavenia — sekcia dostane `repaired_scalars` v dodávateľovi, poškodené pole zvýrazní (`.bad`
 + dôvod) a „Uložiť" ho zapíše **aj bez úpravy** (zobrazená predvolená hodnota), inak by hlásilo „Nič sa nezmenilo" (predrecenzia P3-3).
+
+**Súbor zlého tvaru = poškodený (H9/R-37).** Parsovateľný súbor bez tvaru nastavení (`[]`, `{}`, `null`, `suppliers` prázdne/zlého typu, dodávateľ bez neprázdnych
+`rates`, `standard_rows` nie pole, `mode_values` nie objekt) sa predtým **ticho** nahradil seedom (porez 17 €, orez 10 mm, stav `ok`) a auto-zápis zničil dobrú zálohu.
+Predikát `doc_shape_ok?` (R2) posudzuje **len kontajnery**, ktoré zapisuje každá verzia (čísla ostávajú na normalizácii a NP-4; `standard_rows: []` aj chýbajúce skaláre sú
+legitímny legacy tvar; súbor z novšieho pluginu posudzuje NP-2, nie predikát). `read_doc` číta cez `JsonFileStore.read_valid` a brány (`degraded_now?`,
+`degraded_write_blocked?`) aj `write` dostávajú ten istý predikát; `disk_std` a `newer_write_blocked?` ostávajú na **surovom** primári. **Matica (R7):**
+zdravý súbor → bez zmeny · zlý tvar + `.bak` dobrého tvaru → počíta sa **so zálohou**, `:backup`/banner `degraded`, nič sa nezapíše, „Uložiť" vypnuté, `.bak` nedotknutá ·
+zlý tvar bez dobrej zálohy → predvolené s priznaním (`:seed_fallback`, banner `fallback`, Kontrola ORANGE, plán „orientačne"), načítanie **nezapíše**, prvé vedomé
+uloženie súbor opraví · výnimka predikátu (`ShapeCheckError`) → `:unreadable` (Uložiť vypnuté) · nečitateľný JSON (R-11) a novší `std` bez zmeny. Obnova = zmazať
+poškodený primár (číta sa `.bak`, zápisy povolené). Testy: `tests/pure/test_r37_tvar_suborov.rb` (T0a/T0b charakterizácia so súborom, T1–T10).
 
 **Verzia súboru 2 a dopredná brána (NP-2, vzor `HardwareRules` KOV-F1).** `STD = 2`; **každý zápis pečiatkuje `std = STD`** (inak by súbor
 ostal navždy 1 a budúca brána by nemala čo porovnať). Súbor z **novšieho** pluginu (`doc_std_unsupported?` = `std > STD`) sa **číta** (známe

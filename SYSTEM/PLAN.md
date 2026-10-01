@@ -45,7 +45,7 @@ predrecenzia, in-SU) sa určí pri package podľa CLAUDE.md; stĺpec je predpokl
 | H6 · priestor v Inspectore (nápovedy, pás, spodné tlačidlá, kóty náhľadu, súhrny sektorov) | D-01 · D-02 · D-05 | kód UI · mockup |
 | H7 · názov zákazky na jednom mieste + nastavenia exportu v jadre — **pred presunom ochrana R-38** (poškodený súbor nastavení exportu sa nesmie ticho prepísať zálohou; výsledok zápisu sa ukáže; R-38 = návrh — potvrdí Michal s mockupom H7) | A-05 · C-07 · R-38 | kód · mockup · audit |
 | ✅ H8 · dielec z inej verzie štandardu (ORANGE `std_version` v Kontrole, čísla bez zmeny) — package [PACKAGE_H8.md](zdroje/bloky/HARDENING/PACKAGE_H8.md) — **PR #441** | R-13 | kód · audit · in-SU |
-| H9 · ochrana nastavení dodávateľa pred seedom | R-37 | kód · audit |
+| ✅ H9 · ochrana nastavení dodávateľa, pravidiel ABS a kovania pred seedom (súbor zlého tvaru = poškodený; zdravý bez zmeny) — package [PACKAGE_H9.md](zdroje/bloky/HARDENING/PACKAGE_H9.md) — **PR #?** | R-37 | kód · audit |
 | H10 · dve okná SketchUpu neprepíšu pravidlá kovania a rady | R-35 | kód · audit |
 | H11 · SketchUp 2026.2 (ukončenie bez pádu, načítanie súborov) + minimum SketchUp 2026 | F-01 · F-02 | kód · audit · in-SU |
 | H12 · typy skriniek na jednom mieste + mená rolí | C-01 · C-05 | kód · audit · in-SU · výrobná |
