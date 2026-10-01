@@ -25,7 +25,7 @@ V1 rozsahu. Hlásená strata neuložených hodnôt, hygiena, texty, refaktor a v
 | R | Verdikt | Pred/po V1 | Veľk. | Funkčný dopad |
 |---|---|---|---|---|
 | R-37 | ✅ dávkou H9 (PR #442, v0.17.7) | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** | S | ~~súbor nastavení zlého tvaru sa ticho nahradí predvolenými a zničí dobrú zálohu~~ — záloha, inak predvolené (dodávateľ s bannerom; ABS a kovanie len log — Q1) a bez zápisu; rozsah v sekcii R-37 |
-| R-35 | platí | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** (tichá strata pri dvoch oknách SketchUpu; po R-37) | S/M | prvá zmena globálnych pravidiel kovania alebo rozmerových radov sa pri dvoch otvorených oknách ticho stratí |
+| R-35 | **čiastočne ✅ (pravidlá kovania) dávkou H10a (PR #443, v0.17.8)**; rozmerové rady platí → H10b | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** (tichá strata pri dvoch oknách SketchUpu; po R-37) | S/M | ~~prvá zmena globálnych pravidiel kovania sa pri dvoch otvorených oknách ticho stratí~~ — druhé okno dostane hlášku a nič neprepíše; **rozmerové rady** sa ešte prebíjajú (H10b) |
 | R-13 | ✅ dávkou H8 (PR #441, v0.17.6) | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** (čítať — rozhodnuté 29.9.; prvá v poradí) | S | ~~dielec z inej verzie štandardu Kontrola neoznačí~~ — Kontrola ho hlási ORANGE `std_version` |
 | R-38 | platí | hraničné (len pri poškodenom súbore; stratí názvy zákaziek a prepínač zlúčenia 18/36 vo VEPO exporte — mení pomenovanie a členenie výstupu, nie rozmery, počty ani ceny) | S | poškodený súbor VEPO nastavení (názvy zákaziek, zlúčenie 18/36) sa môže ticho prepísať staršou zálohou — **zaradenie: blok 9 · H7** (návrh orchestrátora 1.10.2026 — potvrdí Michal s mockupom H7) |
 | R-18 | platí | po V1 (hlásená strata neuložených hodnôt — ⋯ editor sa zavrie ako uložený, zlyhaný zápis ohlási červený status) | S | pri súbehu úpravy bunky a ⋯ editora v Rozpočte sa rozpísané hodnoty môžu stratiť |
@@ -265,6 +265,12 @@ sekcie → klient ju posiela späť → porovnanie POD zámkom → `:conflict` a
 radoch je alternatíva zápis PO KĽÚČOCH (rad je nezávislý per rozmer), ktorý revíziu nepotrebuje. **Odhad: S/M.**
 **Previerka 29.9.: PLATÍ — PRED V1** podľa kritéria (tichá strata uložených dát; pravidlá kovania menia nákup).
 **ROZHODNUTÉ (Michal 30.9.2026): ~~PRED V1~~ → PO V1 (30.9. ráno)** — samostatná dávka po R-37 (poradie: [PLAN.md](PLAN.md), „Po V1 — zásobník").
+**Čiastočne ✅ — pravidlá kovania dávkou H10a (PR #443, v0.17.8, blok 9 · HARDENING PO V1).** Revízia je **obsahová** (`rules_rev`, nie SHA súboru — seed-merge mení
+bajty, nie obsah): okno ju dostane v payloade, pripne si ju len keď globál naozaj videlo a pri „aj ako globálnu" ju vracia; predkontrola pred prestavbou (konflikt =
+neuloží sa nič, úpravy ostanú vo formulári, druhé Uložiť = vedomé prepísanie) a porovnanie pod zámkom po prestavbe (H-RACE: projekt uložený, cudzí globál zachovaný).
+Platí aj pre projekt bez vlastných pravidiel, ktorý globál preberá. **Prevádzková podmienka:** po aktualizácii zavrieť všetky okná SketchUpu na PC (staré okno zapisuje
+bez revízie). Detail: [docs/architecture/hardware.md](../docs/architecture/hardware.md) (`hardware_rules.rb`, odsek H10a); package a audity
+`SYSTEM/zdroje/bloky/HARDENING/PACKAGE_H10.md`. **Zvyšok:** rozmerové rady (`dim_series.json`) — dávka **H10b** (zápis po kľúčoch s pôvodnou hodnotou kľúča).
 
 ### R-36 · P3 (macOS) · core · `core/scale_observer.rb` — `onEraseEntity` · `notify_erase`
 Zvyšok po R-01: pri `onEraseEntity` je entita **už neplatná**, takže jej dokument sa nedá zistiť. Taká požiadavka ide

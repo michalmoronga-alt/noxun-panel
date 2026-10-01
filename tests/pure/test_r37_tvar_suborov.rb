@@ -831,7 +831,7 @@ module NxR37Save
     panel = Noxun::Engine::Panel
     dk = Noxun::Engine::DocKey
     status = []
-    stubs = [[rd, :baseline_valid?, ->(_m) { true }], [rd, :set_status, ->(msg, _e = false) { status << msg }],
+    stubs = [[rd, :baseline_state, ->(_m) { :ok }], [rd, :set_status, ->(msg, _e = false) { status << msg }],
              [rd, :after_model_write, ->(_m) {}], [dk, :foreign?, ->(*_a, **_k) { false }],
              [panel, :job_cabinets_split, ->(_m) { [[], []] }], [panel, :detached_skipped_tail, ->(_s) { '' }]]
     orig = stubs.map do |obj, name, _|
@@ -874,7 +874,8 @@ NxTest.test('R-37 T15: „aj ako globálnu" nad degradovanym kovanim — projekt
       ops = []
       model = NxR37Save.model(ops)
       NxR37Save.with_dialog(model) do |rd, status|
-        rd.handle_save('rules' => rules, 'also_global' => true)
+        # H10a/R-35: novy DOM posiela VZDY reviziu globalu, ktory videl.
+        rd.handle_save('rules' => rules, 'also_global' => true, 'global_rev' => r::HR.library_revision)
         snap = JSON.parse(model.get_attribute(r::E::Store::DICT, r::HR::MODEL_KEY).to_s)
         NxTest.assert_equal(rules, snap['rules'], "#{bad.inspect}: snapshot projektu = nove pravidla")
         NxTest.assert_equal([[:start, 'NOXUN: pravidla kovania'], [:commit]], ops, 'jedna operacia')

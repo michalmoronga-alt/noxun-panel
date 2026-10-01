@@ -300,14 +300,41 @@ zo ŠT-2a) s uzavretým whitelistom `SECTION_ACTIONS` — po ŠT-3b-2b je v ňom
 rovnosť stráži headless sada aj in-SU runner).
 
 **Uloženie = zápis snapshotu + prestavba VŠETKÝCH korpusov v JEDNEJ operácii** (`rebuild_many` s blokom) — jeden krok Späť vráti pravidlá aj geometriu naraz; „aj ako globálnu
-predvoľbu" navýše zapíše `%APPDATA%` knižnicu (preferencia, NIE súčasť undo).
+predvoľbu" navýše zapíše `%APPDATA%` knižnicu (preferencia, NIE súčasť undo) — od H10a **s revíziou obsahu** (dve okná SketchUpu, nižšie).
 
 **Globálna knižnica pod medziprocesovým zámkom (1d/R-08).** `write` aj seed-merge v `load` bežia pod zdieľaným sidecar zámkom `materials.lock`
 (`Materials.with_catalog_lock` — mechanika a dôvody sú v odseku `hardware_sets.rb` nižšie), seed-merge navyše pod ním číta súbor NANOVO a merge prepočíta; `ensure_seeded` má
 dvojitý check. `dir` sa od tejto dávky pýta `Materials.dir` — kým si ho modul rátal sám, `test_dir_override` presmeroval zámok do sandboxu, ale zápis ostal v ŽIVOM `%APPDATA%`
-(izolovaný in-SketchUp test tak upravoval reálne pravidlá používateľa). **Priznaný zvyšok:** `write(rules)` je ÚPLNÁ NÁHRADA obsahu — okno posiela celé pole a globálna knižnica
-nemá revíziu, takže dve súbežne otvorené okná sa nad ňou stále prebíjajú „posledný vyhráva". Zámok ich zápisy serializuje, nič viac; doriešenie vedie
-[AUDIT_REGISTER.md](../../SYSTEM/AUDIT_REGISTER.md) ako **R-35**.
+(izolovaný in-SketchUp test tak upravoval reálne pravidlá používateľa). `write(rules)` ostáva ÚPLNÁ NÁHRADA obsahu **bez revízie**, ale je už len **interné API** (seed cesty
+`ensure_seeded`/`persist_seed_merge!`, testy) — okno Pravidlá od H10a/R-35 zapisuje cez `save_library!` (nižšie).
+
+**H10a/R-35 — dve okná SketchUpu a globálna knižnica (v0.17.8).** Kým okno zapisovalo `write` priamo, dve okná, ktoré si pravidlá načítali súčasne, sa prebíjali „posledný
+vyhráva" a zmena prvého zanikla bez slova. **Revízia je OBSAHOVÁ** — `rules_rev` prečítaných pravidiel, nie SHA bajtov (seed-merge pri `load` mení bajty, obsah nie); revízia
+sa počíta, NEUKLADÁ — formát súboru ani `std` sa nemenia. Jadro:
+- **`library_check(fresh: true) → { state:, rev:, reason: }`** bez zápisu (žiadne `ensure_seeded` ani seed-merge): `:ok` (revízia obsahu; poškodený primár **bez** zálohy
+  alebo chýbajúci súbor = revízia seedu, samooprava prvým zápisom ostáva) · `:blocked` (čitateľné, ale `write_gate` z H9 hlási `:degraded`/`:newer`; `reason` = presne veta
+  brány) · `:unreadable` (iná chyba čítania, `rev` nil). Brána je **jedna autorita** (`write_gate`), `library_check` ju len mapuje; `fresh` = `reload!` pred čítaním.
+  **`library_revision`** = tá istá revízia pre payload (smie ísť cez sekundovú cache; nečitateľné = `''`).
+- **`save_library!(rules, revision) → [status, rev]`**, `status` ∈ `:ok | :conflict | :blocked | :unreadable | :write_failed`. Všetko **pod `with_catalog_lock`** nad
+  čerstvým súborom: nečitateľné → brána (`note_block_reason`, prednosť pred konfliktom) → revízia prázdna/`nil` alebo iná = **`[:conflict, aktuálna]`, nič sa nezapíše** →
+  `write` (reentrantný zámok, jediné miesto zápisu ostáva). `rev` je neprázdny práve pri `:ok`/`:conflict`. Návrat je dvojica — volajúci rozhoduje cez `case`, nikdy pravdivosť.
+- **Okno** (`ui/rules_dialog.rb`): payload nesie `global_rev`; `baseline_valid?` sa rozdelil na **`baseline_state`** (`:document` · **`:inherits_global`** · `:changed` · `:ok`) —
+  projekt **bez snapshotu** naplnený globálom sa už NEPOROVNÁVA cez cachovaný `load` (výsledok závisel od sekundovej cache: raz deštruktívne echo, raz tichý prepis cudzej
+  zmeny — audit FIX 2), rozhodne ho čerstvá predkontrola. **Predkontrola** (`global_precheck`, za `rules_problems`, PRED prestavbou; beží pri „aj ako globálnu" alebo
+  `:inherits_global`) v poradí: nečitateľné (**H-READ**) → brána pri „aj ako globálnu" (projekt sa uloží, globál nie, veta brány) → chýba kľúč `global_rev` (starý DOM,
+  **H-OLD**) → prázdny pin (**H-UNK**) → iná revízia (**H-INH** pri prebratom globále, inak **H-PRE**). Pri H-* sa **nezapíše nič** (ani projekt), nevznikne operácia ani krok
+  Späť a echo sa NEPOSIELA (rozpísané hodnoty ostanú vo formulári); pri H-UNK/H-INH/H-PRE server pošle `RD.setGlobalRev(<aktuálna>)` → druhé Uložiť = vedomé prepísanie; pri
+  H-READ/H-OLD/bráne sa pin nemení a prepis sa neponúka. **Po prestavbe** (operácia zavretá) ide globál cez `save_library!` s revíziou z formulára: `:ok` → „+ globálna
+  predvoľba" + nový pin · `:conflict` (iné okno zapísalo medzi predkontrolou a zámkom) → červené **H-RACE** (projekt uložený, globál „NEPREPÍSALA"), pin = cudzia revízia ·
+  `:blocked` → veta `write_block_reason` · `:unreadable` → červené „…nepodarilo prečítať, neprepísali sa" · `:write_failed` → dnešné „(globálny zápis zlyhal!)". „Načítať
+  globálne" pošle spolu s pravidlami aj `RD.setGlobalRev` ich revízie. Pin na klientovi (`RD_GLOBAL_REV`) a jeho pravidlá: sekcia Pravidlá v [ui-lifecycle.md](ui-lifecycle.md).
+  Texty sú konštanty `GLOBAL_*_TEXT`; Q1 (Michal, do odpovede platí návrh — vratná voľba): pri konflikte sa neuloží nič.
+- **Hranice:** chráni zmenu, ktorá prišla **počas** otvoreného Štúdia; okno otvorené až **po** cudzej zmene ju pri vedomom „aj ako globálnu" prepíše (to nie je súbeh).
+  **Prevádzková podmienka:** chráni len procesy s H10a — okno SketchUpu spustené **pred** aktualizáciou zapisuje postaru bez revízie (zámok ho len zoradí), preto po
+  aktualizácii pluginu **zavrieť všetky okná SketchUpu na PC**. Iný PC (Lucia) má vlastné `%APPDATA%` — prenos `.skp` tento súbeh nevytvára.
+- **Testy:** `tests/pure/test_h10a_globalne_pravidla.rb` (C1 bajtovo, T-A1 jadro a parita brány, T-A2 riadky predkontroly, T-A3 projekt bez snapshotu pri oboch časovaniach
+  cache, T-A4 H-RACE, T-A5 štruktúra), `tests/js/test_h10a_pin.js` (T-A6, regresia BLOCKER 1), in-SU `run_h10a` (izolovaný sandbox: H-PRE bez kroku Späť, vedomé prepísanie,
+  H-RACE a jeden Späť vráti snapshot aj kovanie, živé pravidlá bajtovo nedotknuté).
 
 **Brána degradovaného súboru (1d/R-11, v0.9.2).** `write` má hneď po zámku `degraded_write_blocked?` — poškodený primár s platnou `.bak` sa číta zo ZÁLOHY, takže zápis by pravidlá prepísal STARŠÍM
 obsahom. Odmietnutie je `false` (návratový tvar sa nemení — `[false, dôvod]` by bolo v Ruby pravdivé a ternárky volajúcich by ohlásili úspech) a KONKRÉTNY dôvod si volajúci vezme z
@@ -330,12 +357,13 @@ v okne je legitímne, pečiatka je od vzniku modulu); súbor z novšieho pluginu
 zlom primári všetky vidia **ten istý** dokument, s ktorým sa naozaj stavia. **Matica:** zdravý súbor (aj prázdne so `seed_version`) → bez zmeny · zlý tvar (`[]`, `{}`,
 `rules` zlého typu, prázdne bez `seed_version`) + dobrá `.bak` → pravidlá **zo zálohy**, pri načítaní nič nezapíše, zápis do globálneho súboru **odmietnutý**, `.bak` nedotknutá ·
 zlý tvar bez dobrej `.bak` → `SEED_RULES` v pamäti **bez zápisu** (log raz za zmenu stavu), prvé vedomé uloženie súbor opraví. **„Aj ako globálnu predvoľbu"** nad
-degradovaným súborom: `handle_save` najprv **ako doteraz** uloží snapshot do projektu a prestavia skrinky (jeden krok Späť) a až potom `write` globál odmietne — status
-„Pravidlá uložené do projektu — Globálne pravidlá kovania sú poškodené … — prestavaných N skriniek"; globálny primár aj `.bak` ostanú bajtovo nedotknuté (kód okna sa nemenil).
+degradovaným súborom: od H10a to zistí už predkontrola (riadok brány) — `handle_save` uloží snapshot do projektu a prestavia skrinky (jeden krok Späť) a globál **nezapisuje**;
+status ostáva „Pravidlá uložené do projektu — Globálne pravidlá kovania sú poškodené … — prestavaných N skriniek"; globálny primár aj `.bak` ostanú bajtovo nedotknuté.
 Pri zdravom súbore sa nákup nemení (charakterizácia nákupného CSV nad vlastným súborom `tests/fixtures/h9_golden/`). Testy: `tests/pure/test_r37_tvar_suborov.rb` (T13–T16).
 
 **BASELINE guard formulára stojí na `model.guid`** (ŠT-3b-1; predtým `model.path`, ktorý dva NEULOŽENÉ modely nerozlíši — oba majú prázdny path) **+ zhoda aktuálnych pravidiel
-modelu s baseline** (chytí undo snapshotu aj súbežnú zmenu inou cestou); baseline sa obnovuje pri KAžDOM zostavení payloadu. Odmietnutý zápis NIC nezapíše; **od ŠT-3b-2c1 sa
+modelu s baseline** (chytí undo snapshotu aj súbežnú zmenu inou cestou); baseline sa obnovuje pri KAžDOM zostavení payloadu. Od H10a je to **`baseline_state`** a projekt bez
+snapshotu naplnený globálom (`:inherits_global`) z porovnania vypadol — rozhodne ho predkontrola globálnej revízie (odsek H10a vyššie). Odmietnutý zápis NIC nezapíše; **od ŠT-3b-2c1 sa
 formulár načíta nanovo LACNÝM ECHOM sekcie** (`push_section_echo(force: true)`), nie plným `bump: false` pushom. *(Pôvodný dôvod — plný push deduplikoval ID kópií, takže odmietnutie
 model ZMENILO — od 1b-3 už neplatí: zber je čisté čítanie. Echo ostáva, lebo je lacné a nezdvíha generáciu okna.)*
 
@@ -416,7 +444,7 @@ poradie kľúčov je náhodný dôsledok toho, odkiaľ záznam prišiel, a bez z
 citlivý na serializovaný tvar; baseline sa pýta prvý.
 
 **Prázdny odtlačok sa NETOLERUJE, keď server odtlačok už vydal** (review #224, Codex P2 — vedomá odchýlka od pôvodného zadania): premisa „baseline tú vetvu kryje" neplatí, lebo
-`@baseline_*` je stav MODULU, nie klienta — každý push ho posunie na aktuálny stav modelu, takže starší cachovaný DOM by cez `baseline_valid?` prešiel a prepísal novšie pravidlá
+`@baseline_*` je stav MODULU, nie klienta — každý push ho posunie na aktuálny stav modelu, takže starší cachovaný DOM by cez baseline guard (`baseline_state`) prešiel a prepísal novšie pravidlá
 svojím starým formulárom. Odmietnutie je pritom samoliečivé (echo nesie čerstvý odtlačok, druhý klik prejde); DOM z predošlej verzie prijímač echa nemá, preto mu hláška hovorí
 zavrieť a otvoriť Štúdio. Tolerancia ostáva len na stav, kým server žiadny odtlačok nevydal.
 
@@ -599,8 +627,8 @@ u knižnice setov (R-07/R-08/R-11) a katalógu (GH #99).
   Stav sa **NECACHUJE** (`state` ho vyhodnocuje pri každom použití), `state_code`/`state_reason` sú výsledok poslednej kontroly a log ide do konzoly len pri ZMENE stavu.
   Z `:read_only` súboru `load` vracia **PRÁZDNO a nikdy seed** — cudzie defaulty by prvý zápis zvečnil (lekcia R-07 P1-1).
 - **API je LEN create** (register R-35, audit #17 FIX 10): `create_manufacturer!` a `create_series!` → `[:ok | :exists | :invalid | :conflict | :write_failed, …]`. Rename a delete
-  vo V1 NEEXISTUJÚ — museli by prejsť všetky sety, položky, snapshoty v .skp aj šablóny a bez toho by za sebou nechali osirelé reťazce. „Úplná náhrada" obsahu (vzor pravidiel
-  kovania) sa tu vedome nezavádza: dve otvorené okná by si ju prebili.
+  vo V1 NEEXISTUJÚ — museli by prejsť všetky sety, položky, snapshoty v .skp aj šablóny a bez toho by za sebou nechali osirelé reťazce. „Úplná náhrada" obsahu bez revízie
+  (vzor pôvodného zápisu pravidiel kovania, ktorý H10a nahradil revíziou obsahu) sa tu vedome nezavádza: dve otvorené okná by si ju prebili.
 - **Zápis:** `with_catalog_lock` → `JsonFileStore.reload!` → **znovu posúdená brána nad čerstvým dokumentom** → prípadná revízia (`load_with_revision` dáva obsah aj odtlačok
   z JEDNÉHO stavu súboru) → atomický zápis. Do súboru zapisuje **jediné miesto** (`write`); zlyhaný `flock` je IOError a končí ako `:write_failed`, nikdy ako tichý úspech.
 - **Seed (`SEED_VERSION` 3, KOV-G1a):** Hettich · Blum · Grass · Strong · **Häfele** · **Tulip** · Ostatné a ich rady (Sensys, InnoTech Atira, Quadro, AvanTech YOU; **AXILO

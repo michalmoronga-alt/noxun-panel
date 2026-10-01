@@ -1859,6 +1859,14 @@ pushi** (malý JSON, bez západky). **JS:** `ui/js/rules.js` (`rdApplyState`, `r
 - Telo = jeden uzol zo `<template id="rulesBodyTpl">`. **Formulár prežije push:** `rdApplyState` porovnáva odtlačok `RD_SEED` a prekresľuje len keď sa pravidlá
   **na modeli** zmenili (uloženie, Späť, prepnutie dokumentu, odmietnutie); inak nasadí len meta riadok. „Načítať globálne" odtlačok **neobnovuje** (zmena formulára,
   ktorá ešte neplatí).
+- **Pin revízie GLOBÁLU `RD_GLOBAL_REV` (H10a/R-35)** — verzia globálnych predvolieb, ktorú okno naozaj VIDELO; žije mimo `RD_META` a mimo projektovej obnovy
+  formulára. **Posunie sa LEN:** (a) pri prvom naplnení sekcie (`null` → `global_rev` z payloadu, aj `''`, keď sa globál nedal prečítať), (b) pri naplnení, ktoré
+  zobrazuje globál (`source: 'global'`, `rdSetState` — aj vynútené echo), (c) na pokyn servera `RD.setGlobalRev(rev)` (Načítať globálne, obnova po H-PRE/H-INH/H-UNK/
+  H-RACE, vlastné úspešné uloženie globálu; prázdna revízia sa ignoruje). **Neposunie sa** pri projektovom `rdSetState` (uloženie len do projektu, Späť/Znova, prepnutie
+  dokumentu, Doplniť nové predvolené), pri pokojnom pushi (`rdApplyState` s nezmenenými pravidlami) ani pri `RD.setRules` — inak by okno potvrdilo cudzí globál, ktorý
+  nevidelo, a ďalšie „aj ako globálnu" by ho bez konfliktu prepísalo (audit BLOCKER 1). `rdSaveRules` posiela kľúč `global_rev` **vždy** (`''` pred prvým naplnením;
+  chýbajúci kľúč = pre server starý DOM, H-OLD). Getter pre Node testy `rdGlobalRev()`. Pri konflikte globálu server **neposiela echo** — rozpísané hodnoty ostanú vo
+  formulári; hlášky (`RulesDialog::GLOBAL_*_TEXT`) a tabuľka predkontroly: [hardware.md](hardware.md) (`hardware_rules.rb`, odsek H10a).
 - **Read-only bloky** (`abs` = ABS podľa roly, `overrides` = jantárové riadky ručných zásahov) majú vlastné uzly a `rdRenderExtra` pri **každom** pushi, mimo
   `rdRender`/`RD_SEED`; poradie skupín ABS nad kovaním.
 - **Uloženie** = modelový zápis (`HardwareRules.set_project_rules` v `CabinetBuilder.rebuild_many`, jedna undo operácia), potom `Panel.push_selected` →
@@ -1878,7 +1886,7 @@ pushi** (malý JSON, bez západky). **JS:** `ui/js/rules.js` (`rdApplyState`, `r
   pozná prah `applies_to.floor_height_min`. Editor prahu neexistuje.
 
 Testy: `tests/pure/test_st3b_rules.rb`, `tests/js/test_st3b_rules.js`, `tests/pure/test_kovf2_editor_zavesy.rb`, `tests/js/test_kovf2_editor_zavesy.js`,
-`tests/js/test_kovg1b_editor_nohy.js`, in-SU `run_st3b`. Plné znenie: archív, odsek okna Štúdio (pasáže ŠT-3b, D-118b, KOV-F2, KOV-G1b) a „rules_dialog.rb".
+`tests/js/test_kovg1b_editor_nohy.js`, `tests/pure/test_h10a_globalne_pravidla.rb`, `tests/js/test_h10a_pin.js`, in-SU `run_st3b` a `run_h10a`. Plné znenie: archív, odsek okna Štúdio (pasáže ŠT-3b, D-118b, KOV-F2, KOV-G1b) a „rules_dialog.rb".
 
 ### rules_dialog.rb
 
@@ -1891,6 +1899,10 @@ v `scale_observer` (sekciu obslúži plný push Štúdia; `rules_payload` dostan
   nedostane, ale **snapshot pravidiel sa zapíše aj tak** (`rebuild_many` otvára operáciu aj s prázdnym zoznamom); status ju vymenuje
   (`Panel.detached_skipped_tail`, `Ids::DETACHED_PART_REASON`). Päta sekcie hlási „skriniek zákazky" (`Panel.job_cabinets`); `cabinets(model)` ostáva len na čítanie.
 - **`RulesDialog.after_model_write`** (za operáciou prestavby) zneplatní aj memo nôh ghost pásika.
+- **Globálna revízia (H10a/R-35):** `rules_payload` nesie `global_rev` a `@baseline_source`; `handle_save` = `baseline_state` → identita → odtlačok projektu →
+  `rules_problems` → **`global_precheck`** (pri „aj ako globálnu" alebo projekte, ktorý preberá globál; konflikt = nič sa nezapíše, žiadna operácia, žiadne echo,
+  `RD.setGlobalRev`) → prestavba → globál cez `HardwareRules.save_library!` vyhodnotený `case`-om (H-RACE). `push_global` pošle `RD.setRules` + `RD.setGlobalRev`
+  v jednom skripte (`global_rev_script`, guard na starý DOM). Okno nevolá `HardwareRules.write(` (guard test). Detail: [hardware.md](hardware.md).
 - **`ui/js/rules.js`** je prefixovaný `rd*`/`RD_*` (globály `el`/`esc` by kolidovali so `studio.js`); prijímače `RD.init`/`RD.setRules`/`RD.setStatus` si mená ponechali.
 
 Plné znenie: archív, „rules_dialog.rb".
