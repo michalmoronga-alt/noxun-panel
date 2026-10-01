@@ -459,7 +459,8 @@ vlastné limity, názvy) žijú v **jednom registri** `CabinetTypes` (`core/cabi
 kód sa pýta vlastností, nie mena typu. **Neznámy typ sa číta ako dolná** (`norm` → `lower`); config z novšej verzie zastaví dopredný guard (`newer_config?`, §2.5)
 ešte pred normalizáciou. Uložený `type` v configu sa nemení (bez bumpu `CONFIG_SCHEMA`). **Identita typu** (porovnanie dvoch typov) normalizáciu
 nepoužíva: šablóna sa použije len na skrinku **rovnakého** typu, pričom chýbajúci typ = dolná, ale `''` a neznámy typ ostávajú samy sebou (H12b; šablóna
-s `type: ''` sa na dolnú nepoužije). Klient dostáva register v `NX.init` (`cabinet_types`, H12b).
+s `type: ''` sa na dolnú nepoužije). Klient dostáva register v `NX.init` (`cabinet_types`, H12b) a od H12c sa pýta **výhradne jeho vlastností** (`NXTypes` v `core.js`; JS nemá vlastný
+zoznam typov, slovo typu šablóny a vetu rozsahu pravidla skladá server).
 
 **Hranica: TYP vs. ŠABLÓNA vs. PARAMETER (rozhodnuté 15.7.2026; autorita je tu od 1.10.2026 — predtým koniec PLAN.md).**
 Tri úrovne — odpoveď na otázku „kedy nový typ korpusu":

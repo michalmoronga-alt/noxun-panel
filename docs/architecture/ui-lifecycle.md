@@ -334,7 +334,7 @@ a atribúty na `<body>`; `innerHTML` re-render kostry je zakázaný (listenery, 
 - **Identitu dokumentu nesie každý push** (`Panel.model_guid`) — ID (`CAB-001`, `BRD-001`) sú jedinečné len v rámci modelu. Hodnotou je token **`DocKey`**
   ([model-a-identita.md](model-a-identita.md)), nie `Model#guid` (mení sa pri každom uložení); identita sa mení len s objektom modelu. Tú istú identitu nesú
   asynchrónne callbacky panela (`clear_selection`, `nx_edge_toggle`, …) a server ich pri nezhode odmietne a len obnoví stav.
-- **Kontext, ktorý typ nemá** (`NX_CTX_LOCK`; dnes slot umývačky nemá Zóny): autoritou je **guard v `setCtx`** (klik, Enter, medzerník), `effectiveCtx()`
+- **Kontext, ktorý typ nemá** (`ctxLockedBy` — typ bez vnútra `zones: none` z registra `NXTypes`, dôvod = `zones_reason`; dnes slot umývačky nemá Zóny): autoritou je **guard v `setCtx`** (klik, Enter, medzerník), `effectiveCtx()`
   zakázaný kontext ticho zhodí na Korpus (pamäť ostáva) a tlačidlo dostane **dôvod** do bubliny aj `aria-label`.
 
 **Rail:**
@@ -412,19 +412,20 @@ byť v `bindExprFields` — guard `test_rohb1_ovladace.js`, výnimka `aprMountVa
   (`read_template_mapping` + `assess_set_defs`) a ide do `HardwareSets.state_with_template_sets` ako prospektívny stav. Override sa vo vkladaní neponúka.
   **Text je VÝSTUP** — do `collectAll()` ani vkladacieho payloadu sa nedostane (`test_kovg2_nohy_ui.js`, `test_insert_state.js`). **Odchod z riadku = skryť aj
   zneplatniť** (`nxLegsInsertReset` z `loadSelected`, `loadBoard`, `clearSelected`, `materializeInsertBoardCard` a prechod na hornú skrinku zdvihne generáciu);
-  odpoveď sa prijme len pri type s nohami (`LEGS_INSERT_TYPES` = `lower`, `corner_blind`). `NX.setHardwareSets` prekreslí vetu pri označenej skrinke a bez nej
+  odpoveď sa prijme len pri type s nohami (`nxLegsTypeHasLegs` = známy typ registra s `on_floor` — dnes `lower`, `corner_blind`; `nxLegsApplyVisibility(t)`
+  dostáva skutočný typ a skryje riadok pri `!onFloor`). `NX.setHardwareSets` prekreslí vetu pri označenej skrinke a bez nej
   volá `nxLegsInsertInvalidate` (mapovanie, definícia setu a názvy nie sú v kľúči).
 - **Krížová kontrola výšky** (`form.js` `cabinetHeightError` na konci `validateFields`): výška je **celková vrátane sokla**; `markHeightError` zočervená
   **dvojicu Výška + Podstavec** s dôvodom v `title`, apply sa zablokuje. Zrkadlo dvoch Ruby pravidiel cez zdieľanú `nxInteriorZ` (`core.js`): svetlé vnútro
   `<= MIN_AVAIL_H` (10 mm) a pri vrchu „dve výstuhy" `NX_MIN_INTERIOR_H` (20 mm) — zhodu stráži `tests/pure/test_s1e0_min_vyska.rb`. **Prázdne pole nie je nula:**
   `cabFieldOrDefault(id)` číta `DEFAULTS[getType()]` (= `CabinetBuilder::LOWER_DEFAULTS` / `UPPER_DEFAULTS` zo `sync.rb`); kým predvoľby neprišli, kontrola mlčí.
   JS sada `tests/js/test_s1e0_min_vyska.js`.
-- **Typ badge** v hlavičke je readonly (`nxCabInfo(c).type`; popisky typov v jedinej mape `NX_TYPE_LABEL`) — typ určuje šablóna/vkladanie. Mini-modal „Uložiť ako
+- **Typ badge** v hlavičke je readonly (`nxCabInfo(c).type` = `NXTypes.label` — `label` registra servera, neznámy typ = Dolná) — typ určuje šablóna/vkladanie. Mini-modal „Uložiť ako
   šablónu" nesie **Názov + Typ** (`handle_save_template_as`, whitelist) a drží identitu skrinky aj dokumentu (`tplModalGuid`); červené pole uloženie zastaví.
 
 **Rohová skrinka** (`#cornerRow` nad Nohami, slúži označenej aj vkladacej karte): **Dverová časť** · **CR 1 / CR 2** (`.crin`) · prepínač strany
 (`#cornerSideL`/`#cornerSideR`, `aria-pressed`) · `?`. Viditeľnosť rieši `applyVisibility`, stav prepínača `nxCornerRowSync` z registra `cornerDraft`. Polia idú
-bežnou cestou poľa (výrazy, validácia, debounce, `CONSTRUCTION_FIELDS` s `only`; `CORNER_FIELDS` sa validujú len pri rohovej).
+bežnou cestou poľa (výrazy, validácia, debounce, `CONSTRUCTION_FIELDS` s `onlyIf:'corner'`; `CORNER_FIELDS` sa validujú len pri type s rohovou zostavou).
 - **`cabinetCornerError`**: rozsah poľa (`CORNER_RANGES` 250–800 / 50–250) a **najmenšia šírka** `D + c1 + th2 + 2t` = presne `Construction.corner_fit_width`
   (`nxCornerMinWidth` / `nxCornerFitError`, tá istá veta ako server); pri nezmestení červená šírka, dverová časť a CR 1 (`nxCornerBoxesSync`), veta ide do
   `nxCabFieldError`. Hrúbky: th2 z payloadu (`corner_th2`) alebo `corner_ctx` preflightu, t pri vkladaní z `corner_ctx`, inak z poľa (`nxCornerT`).
@@ -444,12 +445,12 @@ doskou** (jantár pri ✗) · Trieda · Dielcov · Hmotnosť čela.
   `slot_front_info`); odvodená hodnota cez `CabinetBuilder.dw_front_eval`. „Pod doskou" = ten istý predikát ako Kontrola `dw_height_fit`.
 - Krížová kontrola pri slote vráti vetu `nxSlotFrontEval` (zrkadlo `dw_front_eval`, rozsah 300–1200) a `markHeightError` označí Výšku linky + Sokel slotu;
   schéma medzier slotu skryje „medzi" a „dole" (`SLOT_HIDDEN_GAPS`).
-- **Polia slotu sa validujú len v type `dishwasher`** (`SLOT_FIELDS` — skryté pole by inak blokovalo inú skrinku); pri prepnutí na slot `nxFillSlotFields` dosadí
-  do prázdneho/mimorozsahového poľa `DEFAULTS.dishwasher` (= `CabinetBuilder::DISHWASHER_DEFAULTS`), platnú hodnotu neprepíše; `applyInsertLockValues` pri slote
-  nedosadzuje zámok hrúbky ani sokla (`SLOT_NO_LOCK`).
+- **Polia slotu sa validujú len v type bez korpusu** (`!NXTypes.carcass`, dnes `dishwasher`; `SLOT_FIELDS` — skryté pole by inak blokovalo inú skrinku); pri
+  prepnutí na slot `nxFillSlotFields(t)` dosadí do prázdneho/mimorozsahového poľa `DEFAULTS[t]` (= `CabinetBuilder::DISHWASHER_DEFAULTS`), platnú hodnotu
+  neprepíše; `applyInsertLockValues` pri slote nedosadzuje zámok hrúbky ani sokla (`SLOT_NO_LOCK`).
 - **Viditeľnosť riadkov má jednu autoritu `applyVisibility(t)`** (`SLOT_ONLY_ROWS` / `SLOT_HIDDEN_ROWS`): slot nemá Sokel korpusu `#fhRow`, soklovú skupinu,
-  Hrúbku, vnútorné rozmery, Úložnú výšku, Materiál m², Nohy ani riadky komína a zapustenia. **Limity sú per typ** (`TYPE_LIMITS`: šírka 300–1200, výška linky
-  500–1200 = `CabinetBuilder::DW_WIDTH_RANGE`/`DW_HEIGHT_RANGE`); kontrola výšky proti soklu sa slotu netýka.
+  Hrúbku, vnútorné rozmery, Úložnú výšku, Materiál m², Nohy ani riadky komína a zapustenia. **Limity sú per typ** (`limits` registra servera,
+  `NXTypes.get(t).limits`: šírka 300–1200, výška linky 500–1200 = `CabinetBuilder::DW_WIDTH_RANGE`/`DW_HEIGHT_RANGE`); kontrola výšky proti soklu sa slotu netýka.
 
 **Nastavenia korpusu** (skupiny Strop · Dno & podstavec · Chrbát):
 - **Strop:** `#topSetbackRow` „Zapustenie vpredu" (`top_front_setback`) pod Konštrukciou; pri „Bez stropu" ho `toggleTopSetback` skryje a hodnota sa pamätá.
@@ -852,8 +853,9 @@ Plné znenie: archív, „Karta dielca (UI-D1, …)".
 ### Vkladacia karta — šablóny, typ a doska (UI-C1a/C1b/C1c; ui/panel/payloads.rb + ui/panel/actions_templates.rb + ui/js/insert_state.js · form.js · board_card.js)
 
 **Čo robí:** v režime vkladania (`Panel.show_insert`, nič nie je označené) vyberie typ objektu, šablónu a rozmery a vloží skrinku (ghost na kurzore) alebo dosku.
-Typy v jednom rade segmentových tlačidiel: **Dolná · Horná · Rohová · Umývačka · Doska** (`NXInsert.INSERT_TYPES` = zrkadlo `CabinetBuilder::TYPES` + `board`).
-**Autorita typu je čistý stav** `NXInsert.insertType()/setInsertType` (DOM je zrkadlo). Zmena typu korpusu zahodí korpusovú šablónu (ponuka je typovo filtrovaná),
+Typy v jednom rade segmentových tlačidiel: **Dolná · Horná · Rohová · Umývačka · Doska** (HTML statické, guard `test_h12c_js.rb` ho porovná s registrom —
+`label`, `ui_order`; typy vkladania = `NXInsert.insertTypes()` = `NXTypes.ids()` zo servera + `board`, skladá sa **pri volaní**, nie pri načítaní — A1).
+**Autorita typu je čistý stav** `NXInsert.insertType()/setInsertType` (DOM je zrkadlo; neznámy typ aj pred `NX.init` = dolná, `NXTypes.norm`). Zmena typu korpusu zahodí korpusovú šablónu (ponuka je typovo filtrovaná),
 prepnutie Korpus↔Doska výbery nezahadzuje (sklady `template`/`boardTemplate`).
 
 **Knižnica:** `Panel.template_list` posiela celú knižnicu; záznam nesie `kind` (`cabinet` | `board`), `used_seq` (`TemplateUsage.map`, do súboru šablón sa nezapisuje;
@@ -877,7 +879,8 @@ vklad odmietne** (`TemplateStore.find(*tpl_ref).nil?` pred stavbou); vklad bez r
 - **Preflighty tela a chrbta sa slotu netýkajú** (`Panel.slot_params?` — preskočia sa pred prvým čítaním materiálu, aj `insert_thickness_preflight`); remap ABS
   overridov ostáva a hrúbku čela stráži `CabinetBuilder.validate_material_thickness!`.
 
-**Rohová vo vkladaní:** karta sa materializuje z `DEFAULTS.corner_blind` (`corner_insert_defaults` s `corner_th2`) alebo zo šablóny; dverová časť a CR sú polia
+**Rohová vo vkladaní:** karta sa materializuje z predvolieb typu s rohovou zostavou (`nxCornerDefaults` = `DEFAULTS[id]` registra, `corner_insert_defaults`
+s `corner_th2`) alebo zo šablóny; dverová časť a CR sú polia
 `#cornerRow` (bežný zber), **strana** je stav registra `cornerDraft` (`nxSetCornerDraft`) a do payloadu ju výslovne pridá `insertCabinet` len pri rohovej. Prepnutie
 strany zrkadlí aj **návrh čiel** (`nxCornerMirrorFronts`: okraje vľavo ↔ vpravo, smer pántov, strana profilu; `unset` a chýbajúci kľúč ostávajú). Riadok Nohy
 platí aj pre rohovú. **Strana klávesom D počas ghostu:** ghost ohlási stranu (`NX.ghostCornerSide` → `nxGhostCornerSide`), prepne ju **tá istá `onCornerSide`**
@@ -886,7 +889,8 @@ platí aj pre rohovú. **Strana klávesom D počas ghostu:** ghost ohlási stran
 nesie `#gbCorner` (`corner_label`, `nxGhostCornerText`), nápoveda `NX_GHOST_HELP.corner`. Odhad pripočíta zostavu (`nxCornerStatsAdd` nad `corner_preview.stats`).
 
 **Modal „Uložiť ako šablónu"** (nad označenou skrinkou): Názov · Typ (`#tplSaveType`: Dolná/Horná + Umývačka a Rohová, ktoré sú **zamknuté** a ponúkajú sa len nad
-sebou — `TPL_TYPE_LOCK`; server prepína len `lower|upper`, `apply_template_type!` pri slote nerobí nič) · **Očakáva** (skupina checkboxov `#tplSaveExpects`
+sebou — `nxTplTypeLock` = `template_type: locked` + vety `template_lock` z registra; server prepína len prepínateľné typy, `apply_template_type!` pri slote nerobí
+nič) · **Očakáva** (pri type, ktorý je sám vlastníkom spotrebiča — `appliance_owner: slot`) (skupina checkboxov `#tplSaveExpects`
 `fridge · oven · microwave`; pri slote veta „Slot umývačky očakáva umývačku vždy" a `expects` sa neposiela; chýbajúci kľúč = očakávania sa nemenia). Predvyplní sa
 z `appliance_expects[]` skrinky (`cabApplianceExpects`), autoritou je modal. Validácia `Panel.apply_template_expects!` pred `TemplatePreviews.capture`
 aj `TemplateStore.upsert`. Uloženie čaká na flush (`nxCabinetAction`); zmena polí ruší odložené uloženie.
@@ -989,7 +993,8 @@ projekcie** uloženého configu a plánu — žiadny zápis. Kontrakt vkladacej 
   Od H12b: `slot_payload` len pri type bez korpusu (`!CabinetTypes.carcass?`), druh riadkov spotrebiča = `appliance_owner` typu, `template_config_from` polia
   rohovej pri `corner?` a komín/zapustenie/lišty pri `carcass?`.
 - **`template_list`** (vkladacia karta, `push_init`, `push_templates`; Štúdio cez `tile_row`) — od H12b každý záznam **korpusovej** šablóny nesie aditívny
-  **`type_word`** (`template_type_word(rec)` = `word` z registra, neznámy/prázdny/chýbajúci typ „dolná"; doska kľúč nemá). JS ho do H12c nečíta.
+  **`type_word`** (`template_type_word(rec)` = `word` z registra, neznámy/prázdny/chýbajúci typ „dolná"; doska kľúč nemá). Od H12c ho Štúdio zobrazí na dlaždici
+  (`tplTypeWord` — bez kľúča prázdne, okno typ samo neprekladá).
 - **`front_drawer`** (`front_drawer_payload`, len čelá, ktoré `Recipes.classified?` pozná ako zásuvku; do `front_slots` sa nezlučuje): položka výsuvu
   `source: 'recipe'` → `state: 'ok'` + `text` a `detail` (`Recipes.explain_stored(params, axes:)` z uložených parametrov a pripnutého receptu; nečitateľný recept =
   prázdny zoznam) · `drawer_conflicts` čela → `conflict` s vetou stavby · `config_schema < DRAWER_ACTIVATION_SCHEMA` → `stale` · inak `pending`; `sync` sa viaže na
@@ -1046,7 +1051,7 @@ rozpísaný formulár** — katalógové a stavové zmeny majú vlastné úzke k
 zmena výberu). `push_init` posiela predvoľby typov (`defaults` → JS `DEFAULTS`) cez **`init_defaults(model)`** = `CabinetBuilder::DEFAULTS_BY_TYPE` v poradí
 `IDS` (tie isté objekty ako `*_DEFAULTS`), typ s rohovou zostavou cez `corner_insert_defaults(model)` (+ `corner_th2`) — H12b, JSON bajtovo ako predtým (golden
 `panel.json`). **Od H12b nesie aj `cabinet_types`** = `CabinetTypes.client_payload` (register typov pre klienta, zmluva `tests/fixtures/h12_cabinet_types.json`);
-aditívny kľúč — JS ho do H12c nečíta.
+od H12c ho JS nasadí **prvým príkazom `NX.init`** do `NXTypes` (odsek CONSTRUCTION_FIELDS → JS register typu) — pred predvoľbami a výberom.
 
 **Deep-link kanály Kontroly** sú dva a len na čítanie: `push_focus_front(front_id)` otvorí kartu čela, `push_focus_hardware(target)` prisvieti riadok v Kovaní
 (adresa `owner_part_key` + `generic_type` + `rule_id` + `orphan`); server si nič nepamätá; zatvorený Inspector ani neúplná adresa nedostanú nič.
@@ -1927,9 +1932,12 @@ v `scale_observer` (sekciu obslúži plný push Štúdia; `rules_payload` dostan
   v jednom skripte (`global_rev_script`, guard na starý DOM). Okno nevolá `HardwareRules.write(` (guard test). Detail: [hardware.md](hardware.md).
 - **Veta rozsahu pravidla viazaného na typ skrinky (H12b, R2.6):** `rules_payload` nesie aditívny kľúč **`type_scope`** = `{ rule_id => veta }` (`type_scope_map`)
   — „na hornú skrinku" / „na spodnú skrinku", keď filter `applies_to.cabinet_type` pravidla s rolou `cabinet` obsahuje **práve jeden** z typov
-  `TYPE_SCOPE_PHRASES` (zrkadlo dnešného `rdRoleDesc` v `rules.js`; inak kľúč pravidlo nemá a klient pokračuje ďalšími filtrami). Vety sú akuzatív so slovom
+  `TYPE_SCOPE_PHRASES` (doslovne pôvodný `rdRoleDesc`; inak kľúč pravidlo nemá a klient pokračuje ďalšími filtrami). Vety sú akuzatív so slovom
   „spodnú" (terminológia F3), preto nie sú v registri typov. `push_global` (Načítať globálne) pošle v tom istom skripte tú istú mapu nad **globálnymi**
-  pravidlami (`type_scope_script` → `RD.setTypeScope`, guard pre DOM bez prijímača). `rules.js` kľúč ani prijímač do H12c nemá.
+  pravidlami (`type_scope_script` → `RD.setTypeScope`, guard pre DOM bez prijímača). **Klient (H12c):** `rdRoleDesc(r, scope)` vetu typu len zobrazí z mapy
+  `RD_TYPE_SCOPE` (kľúč `rule_id`), sám typ neprekladá; mapu nasadí **len naplnenie formulára** (`rdSetState` — `RD.init`, `setSection(force)`, zmena pravidiel
+  na modeli) a `RD.setTypeScope` (prepíše len popisy riadkov `.rid`, rozpísané hodnoty ostanú); lacné echo nad tými istými pravidlami (`rdSetExtra`) ju
+  **neprepíše** — formulár môže práve ukazovať načítaný globál.
 - **`ui/js/rules.js`** je prefixovaný `rd*`/`RD_*` (globály `el`/`esc` by kolidovali so `studio.js`); prijímače `RD.init`/`RD.setRules`/`RD.setStatus` si mená ponechali.
 
 Plné znenie: archív, „rules_dialog.rb".
@@ -1945,7 +1953,7 @@ tpl_capture · tpl_rename · tpl_preview`). **JS:** `ui/js/templates.js` (`TPL.i
 `push_library_echo` bez zdvihu): [model-a-identita.md](model-a-identita.md), odseky `templates.rb` a `template_previews.rb`.
 
 - Dlaždica nesie odvodené kľúče zo servera (`tile_row`): `{name, preview_rev, config, hardware, appliance_expects, construction, vent_note}` + pri korpusovej
-  šablóne **`type_word`** (slovo typu zo servera, H12b; doska kľúč nemá; `templates.js` ho do H12c nečíta) — poradie stráži `test_st3c_tpl.rb`; `TILE_CONFIG_KEYS` je orezaný (typ a tri rozmery). `templates.js` kreslí pri názve ikonu `wrench` s `aria-label` a súhrnom v `title` (aj
+  šablóne **`type_word`** (slovo typu zo servera, H12b; doska kľúč nemá; `templates.js` ho od H12c zobrazí cez `tplTypeWord` — vlastnú mapu slov nemá) — poradie stráži `test_st3c_tpl.rb`; `TILE_CONFIG_KEYS` je orezaný (typ a tri rozmery). `templates.js` kreslí pri názve ikonu `wrench` s `aria-label` a súhrnom v `title` (aj
   upozornenie na neprenosné zámky), riadok konštrukcie `.stplmeta.stplkon` len pri neprázdnom súhrne a vetu o vetraní do `title`. Nič z toho sa do
   `templates.json` nezapisuje. Popisky kategórií spotrebičov skladá server.
 - Vstupy: menu „Šablóny" → `StudioDialog.show(open_section: 'tpl')`, správa šablón vo vkladacej karte → `openStudio('tpl')`.
@@ -2125,15 +2133,25 @@ deklarované minimum a nadol po dostupnú plochu obrazovky.
 ### CONSTRUCTION_FIELDS
 
 Jediný zoznam polí konštrukcie = `CONSTRUCTION_FIELDS` v `core.js` ↔ `Panel::PARAM_KEYS` (nové pole na 1 + 1 mieste; navyše tri JS zoznamy mimo neho — odsek
-„Kontext Korpus", Nastavenia korpusu). Pole smie niesť `only: '<typ>'` — `collectConstruction` ho pošle **len** pri tom type (inak ani kľúč; parita payloadu
-`test_rohb1_ovladace.js`): tak idú `corner_door_w`/`corner_cr1`/`corner_cr2` (`dflt` = `CORNER_DEFAULTS`). Strana rohovej v zozname nie je (prepínač s vlastnou akciou).
-Položky nesú `dflt` (riedky config).
+„Kontext Korpus", Nastavenia korpusu). Pole smie niesť `onlyIf: '<predikát NXTypes>'` (H12c; dnes `'corner'`) — `collectConstruction` ho pošle **len** pri
+type, ktorý predikát splní (inak ani kľúč; parita payloadu `test_rohb1_ovladace.js`): tak idú `corner_door_w`/`corner_cr1`/`corner_cr2` (`dflt` = `CORNER_DEFAULTS`).
+Strana rohovej v zozname nie je (prepínač s vlastnou akciou). Položky nesú `dflt` (riedky config).
 
-**JS registre typu skrinky** (pri novom type sa menia všetky): `core.js` `CAB_TYPES` (bez typu by `setType` skrinku sklopil na dolnú) a `NX_TYPE_LABEL` ·
-`insert_state.js` `INSERT_TYPES`, `templateType`/`templatesForType` · `templates.js` `TPL_TYPE_WORDS` · `part_card.js` `roleLabel` a `isFront` · `rules.js`
-`rdRoleDesc` · `form.js` `TYPE_LIMITS`, `applyVisibility`, `TPL_TYPE_LOCK` · `hardware.js` `LEGS_INSERT_TYPES` · `sync.rb` `DEFAULTS.<typ>` · `NX_CTX_LOCK` (`shell.js`).
-Typy dnes: `lower` · `upper` · `dishwasher` · `corner_blind` (Ruby register `CabinetTypes` od H12a — `CabinetBuilder::TYPES` je jeho alias, [construction.md](construction.md#cabinet_typesrb);
-JS zoznamy z neho naplní H12c).
+**JS register typu skrinky `NXTypes` (`core.js`, H12c)** — JS **nemá vlastný zoznam ani porovnanie mena typu**; typy a ich vlastnosti dostáva od servera
+(`cabinet_types` = `CabinetTypes.client_payload`, [construction.md](construction.md#cabinet_typesrb)) **prvým príkazom `NX.init`** (`NXTypes.set`, pred
+predvoľbami a výberom — M15). API: `ids()` · `known(t)` · `norm(t)` (neznámy, chýbajúci a `''` = `FALLBACK` dolná — jediná konštanta typu) · `get(t)` · `has(t,
+kľúč, hodnota)` · `idsWhere` · `label` · `hangs` (visí, `hang_z > 0` — „len horná") · `onFloor` (stojí na podlahe — horná ani slot nie) · `carcass` (má korpus —
+slot nie) · `corner` (rohová zostava). **Jedna vlastnosť na miesto, presná množina** (package H12 §0.4/R2.1): sokel 0 v `currentCarcass` a krížovej kontrole =
+`hangs`, sokel návrhu čiel, kresba a riadky Sokel/Nohy = `!onFloor`, telo/chrbát/komín/lišty a polia slotu = `carcass`, rohová = `corner`, symbol a karta čiel =
+`fronts`, otvor čiel = `front_opening`, „Delenie zóny" = `zones: shelves_only`, rail Zóny = `zones: none` (+ `zones_reason`), zámok typu šablóny = `template_type`
++ `template_lock`, očakávania šablóny = `appliance_owner`, rozsahy = `limits`. **A1 (audit H12):** skripty Inspectora bežia pred `sketchup.ready()`, preto
+**žiadny odvodený zoznam sa neskladá pri načítaní** (`NXInsert.insertTypes()` sa pýta pri volaní); pred doručením registra platí **neutrálny profil = dolná**
+(žiadne bliknutie zlého UI). Neznámy surový typ z payloadu (`loadSelected`) sa číta ako dolná; identita (`NXShell.cabType`, `templateType` porovnanie) ostáva.
+Výnimky guardu `test_h12c_js.rb` (allowlist s dôvodom): bootstrap `DEFAULTS` pred `NX.init`, `FALLBACK` a hodnota zostavy v registri. Štúdio register nemá —
+slovo typu šablóny (`type_word`) a vetu rozsahu pravidla (`type_scope`) skladá server. HTML (tlačidlá typu, `<select>` modalu) ostáva **statické** (D5) a guard
+ho porovná s registrom (`label`, `ui_order`). Mimo registra typu: `part_card.js` `roleLabel`/`isFront` (mená a vlastnosti rolí — H12d/H13), `rdRoleDesc` roly.
+Sady: golden `test_h12_golden.js` (správanie pred/po bajtovo), `test_h12c_typy.js` (register, A1, M15, matica), Node sady plnia register z fixtúry
+(`tests/js/nx_types_fixture.js`). Typy dnes: `lower` · `upper` · `dishwasher` · `corner_blind`.
 
 ### Trvalé UI pravidlo (Michal 20.7.2026): VERTIKÁLNY priestor panela je vzácny
 
