@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **NÁSTROJ — H2 · fotenie okien pre UI dávky (1.10.2026, PR #?, blok 9 · HARDENING PO V1, položka D-10 z triedenia; plugin sa nemení, verzia
+- **NÁSTROJ — H2 · fotenie okien pre UI dávky (1.10.2026, PR #434, blok 9 · HARDENING PO V1, položka D-10 z triedenia; plugin sa nemení, verzia
   ostáva 0.17.0).** Z prototypu krížového auditu (prehrávanie nahratých Ruby→JS skriptov v prehliadači) je udržiavaný nástroj
   `scripts\ui_foto.ps1` + `scripts\ui_foto\` (`record.rb` nahrávka, `nx_stub.js` prehrávač, `serve.py` lokálny server len na 127.0.0.1,
   `shots.json` zoznam fotiek, `sheet.html` kontaktný hárok). **`-Shoot`** (predvolený) skopíruje aktuálne `noxun_engine/ui` do dočasnej stránky
