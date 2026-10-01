@@ -18,7 +18,7 @@
 ## Záznamy dávok (najnovšie hore)
 
 - **H5a · mapa okien bez histórie (1.10.2026, PR #439, dokumentačné PR — plugin, VERSION ani `?v=` sa nemenia; blok 9 · HARDENING PO V1, položky triedenia
-  B-02 a časť B-03; brief `BRIEF_H5.md` v scratchpade orchestrátora).** `docs/architecture/ui-lifecycle.md` (551 kB, 4 193 riadkov, 246 riadkov s historickými
+  B-02 a časť B-03; brief [BRIEF_H5.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H5.md); briefy H1–H5 a H8–H10 sú od tohto PR v priečinku bloku `briefy/`).** `docs/architecture/ui-lifecycle.md` (551 kB, 4 193 riadkov, 246 riadkov s historickými
   značkami) bol súčasne kontrakt aj kronika — agent nevedel, ktorá veta ešte platí. **Presun, nie mazanie:** celé pôvodné znenie ide do
   [UI_LIFECYCLE_historia_do_v0.17.md](UI_LIFECYCLE_historia_do_v0.17.md) (jediná zmena = relatívne odkazy prepočítané na archív; overenie `sort -u | comm`:
   0 stratených riadkov) a živá mapa je **prepísaná na aktuálny opis** (253 kB, 0 historických značiek mimo sekcie „História"): každá zo **14 sekcií Štúdia** má
