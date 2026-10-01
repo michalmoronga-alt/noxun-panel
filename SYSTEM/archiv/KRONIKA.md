@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H8 · kus z inej verzie štandardu (1.10.2026, PR #?, v0.17.6, blok 9 · HARDENING PO V1, register R-13; package
+- **H8 · kus z inej verzie štandardu (1.10.2026, PR #441, v0.17.6, blok 9 · HARDENING PO V1, register R-13; package
   [PACKAGE_H8.md](../zdroje/bloky/HARDENING/PACKAGE_H8.md), audit návrhu 0 BLOCKER · 4 FIX · 3 NOTE [AUDIT_H8_raw.md](../zdroje/bloky/HARDENING/AUDIT_H8_raw.md)).**
   Značka verzie štandardu `NOXUN/std` sa od v0.1.0 píše na 9 miestach, ale nikde nečítala (STANDARD §0 sľuboval „označí na revíziu"). Teraz: `Store.read_std`/`std_state_of`
   (5 stavov aktuálny · chýba · starší · novší · neplatný; prísne len `Integer >= 1`, sentinel, výnimka pri čítaní = neplatný bez pádu zberu) → `Bom.collect` aditívny kľúč

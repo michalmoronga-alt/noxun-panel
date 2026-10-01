@@ -26,7 +26,7 @@ V1 rozsahu. Hlásená strata neuložených hodnôt, hygiena, texty, refaktor a v
 |---|---|---|---|---|
 | R-37 | platí, zúžené na `supplier_settings` | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** (prvá v poradí po R-13) | S | poškodený, ale platný súbor nastavení dodávateľa sa ticho nahradí predvolenými sadzbami a prerezom/orezom a zničí dobrú zálohu |
 | R-35 | platí | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** (tichá strata pri dvoch oknách SketchUpu; po R-37) | S/M | prvá zmena globálnych pravidiel kovania alebo rozmerových radov sa pri dvoch otvorených oknách ticho stratí |
-| R-13 | ✅ dávkou H8 (PR #?, v0.17.6) | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** (čítať — rozhodnuté 29.9.; prvá v poradí) | S | ~~dielec z inej verzie štandardu Kontrola neoznačí~~ — Kontrola ho hlási ORANGE `std_version` |
+| R-13 | ✅ dávkou H8 (PR #441, v0.17.6) | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** (čítať — rozhodnuté 29.9.; prvá v poradí) | S | ~~dielec z inej verzie štandardu Kontrola neoznačí~~ — Kontrola ho hlási ORANGE `std_version` |
 | R-38 | platí | hraničné (len pri poškodenom súbore; stratí názvy zákaziek a prepínač zlúčenia 18/36 vo VEPO exporte — mení pomenovanie a členenie výstupu, nie rozmery, počty ani ceny) | S | poškodený súbor VEPO nastavení (názvy zákaziek, zlúčenie 18/36) sa môže ticho prepísať staršou zálohou — **zaradenie: blok 9 · H7** (návrh orchestrátora 1.10.2026 — potvrdí Michal s mockupom H7) |
 | R-18 | platí | po V1 (hlásená strata neuložených hodnôt — ⋯ editor sa zavrie ako uložený, zlyhaný zápis ohlási červený status) | S | pri súbehu úpravy bunky a ⋯ editora v Rozpočte sa rozpísané hodnoty môžu stratiť |
 | R-16 | platí | hraničné (XLSX má kód a dodávateľa) | M | dva rovnaké dekory od dvoch výrobcov majú v rozpočte rovnaký názov riadku |
@@ -90,7 +90,7 @@ sa nevypúšťa. Samostatná dávka ~~pred uzáverom V1~~ → **PO V1** (Michal 
 ideálne pred D-48 zdieľaním knižníc, ktoré zvýši miešanie verzií medzi dvoma PC.
 Previerka 29.9.: stav platí — `std` sa píše na 9 miestach (`cabinet_builder`, `board_builder`, `zones`), nečíta nikde; miesta zápisu
 a návrh čítania v previerke, sekcia 3.
-**✅ dávkou H8 (PR #?, v0.17.6, blok 9 · HARDENING PO V1)** — `Store.read_std`/`std_state` (5 stavov, prísne `Integer >= 1`, sentinel, bez výnimky),
+**✅ dávkou H8 (PR #441, v0.17.6, blok 9 · HARDENING PO V1)** — `Store.read_std`/`std_state` (5 stavov, prísne `Integer >= 1`, sentinel, bez výnimky),
 `Bom.collect` aditívny kľúč `std_issues` (jeden záznam na skrinku, dosku, samostatný dielec; RED `newer_config` má prednosť), ORANGE `std_version`
 v Kontrole bez brány a bez tlačidla, klik presne na kus. Čítanie a stavy: STANDARD §0 a §2.1 „Čítanie `std`". Kusovník, VEPO, nákup ani ceny sa nemenia.
 
