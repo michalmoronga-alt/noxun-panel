@@ -26,7 +26,7 @@ const ELS = {};
 function stubEl(id){
   const el = { id, style: {}, _attrs: {}, _focused: false, _html: '' };
   Object.defineProperty(el, 'innerHTML', {
-    get(){ return el._html; }, set(v){ el._html = String(v); }
+    get(){ return el._html; }, set(v){ el._html = String(v); el._sets = (el._sets || 0) + 1; }
   });
   el.setAttribute = function(k, v){ el._attrs[k] = String(v); };
   el.getAttribute = function(k){ return Object.prototype.hasOwnProperty.call(el._attrs, k) ? el._attrs[k] : null; };
@@ -38,6 +38,10 @@ const FOCUS = [];
   ELS[id] = stubEl(id);
 });
 ELS.mdRestoreModal.style.display = 'none';
+// Uzol otvorenej ponuky: zatvorenie ho ODSTRÁNI (nie prekreslenie lišty).
+const REMOVED = [];
+ELS.mdMoreMenu = stubEl('mdMoreMenu');
+ELS.mdMoreMenu.parentNode = { removeChild: function(n){ REMOVED.push(n.id); } };
 const LISTEN = {};
 global.window = { NX_MAT_SECTION: true };
 global.document = {
@@ -133,8 +137,24 @@ M.mdSetCatalog({ catalog_schema: 2, pre_schema2_backup: true, catalog: { sheets:
   // klik mimo zatvára
   M.mdMoreOnClick(target('toggle'));
   ok(M.mdMoreState() === true, 'znova otvorené');
+  // Predrecenzia P3: zatvorenie NEprekreslí lištu — innerHTML by zhodil fokus
+  // z poľa, do ktorého používateľ práve klikol (napr. hľadanie v tej istej lište).
+  const sets = ELS.sectools._sets;
+  REMOVED.length = 0;
+  FOCUS.length = 0;
   M.mdMoreOnClick(target(null));
   ok(M.mdMoreState() === false, 'klik mimo obalu ponuku zavrie');
+  eq(ELS.sectools._sets, sets, 'zatvorenie NEprekreslí lištu (fokus kliknutého poľa ostane)');
+  eq(REMOVED, ['mdMoreMenu'], 'len odstráni uzol ponuky');
+  eq(ELS.mdMoreBtn.getAttribute('aria-expanded'), 'false', 'a spúšťač povie aria-expanded=false');
+  eq(FOCUS, [], 'klik mimo fokus nepresúva');
+  // druhý klik na „⋯" zatvára tiež bez prekreslenia a fokus ostane na „⋯"
+  M.mdMoreOnClick(target('toggle'));
+  const sets2 = ELS.sectools._sets;
+  FOCUS.length = 0;
+  M.mdMoreOnClick(target('toggle'));
+  ok(M.mdMoreState() === false && ELS.sectools._sets === sets2, 'druhý klik na „⋯" zavrie bez prekreslenia');
+  eq(FOCUS, ['mdMoreBtn'], 'fokus ostane na „⋯"');
 
   // Tab zatvára (ponuka nesmie visieť za fokusom), udalosť ide ďalej
   M.mdMoreOnClick(target('toggle'));

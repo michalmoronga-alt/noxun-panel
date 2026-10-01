@@ -3955,20 +3955,27 @@
     matRenderTools(stale);
   }
   function mdMoreToggle(){
-    mdMoreOpen = !mdMoreOpen;
+    // Druhy klik na „⋯" = zatvorenie (bez prekreslenia, fokus ostava na „⋯").
+    if (mdMoreOpen){ mdMoreClose(true); return; }
+    mdMoreOpen = true;
     mdMoreRender();
     // Klavesnica: otvorenie presunie fokus na prvu polozku (vzor menu tlacidla),
     // inak by Enter na „⋯" nechal pouzivatela pred ponukou, ktoru nevidi citac.
-    if (mdMoreOpen){
-      var it = mdEl('mdRestoreItem');
-      if (it){ try { it.focus(); } catch (e) {} }
-    }
+    var it = mdEl('mdRestoreItem');
+    if (it){ try { it.focus(); } catch (e) {} }
   }
   // `focusBtn`: po Escape fokus patri spat na spustac (inak skonci v prazdne).
+  // Predrecenzia P3: zatvorenie lištu NEPREKRESLUJE (innerHTML by zhodil fokus
+  // z pola, do ktoreho pouzivatel prave klikol — napr. hladanie v tej istej
+  // liste). Len odstrani uzol ponuky a prepne aria-expanded; dalsi push kresli
+  // listu uz so zatvorenou ponukou (stav ide z `mdMoreOpen`).
   function mdMoreClose(focusBtn){
     if (!mdMoreOpen) return;
     mdMoreOpen = false;
-    mdMoreRender();
+    var menu = mdEl('mdMoreMenu');
+    if (menu && menu.parentNode) menu.parentNode.removeChild(menu);
+    var mb = mdEl('mdMoreBtn');
+    if (mb) mb.setAttribute('aria-expanded', 'false');
     if (focusBtn){
       var b = mdEl('mdMoreBtn');
       if (b){ try { b.focus(); } catch (e) {} }

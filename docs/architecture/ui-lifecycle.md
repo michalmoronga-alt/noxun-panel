@@ -2580,7 +2580,8 @@ obsah podtitulu `#mdline` prevzal hint sekcie.
 **Ponuka „⋯" (H4 · D-06, triedenie HARDENING; Q1 variant A).** Núdzové **„Vrátiť katalóg pred migráciou…"** (do H4b samostatné „Obnoviť zálohu" HNEĎ vedľa
 bežného „Obnoviť" — pomylili sa) je jediná položka ponuky `mdMoreHtml(open)` za „Obnoviť". Kreslí sa pri tej istej podmienke ako dovtedy (`backup && !ro`), **bez položky
 sa „⋯" nekreslí vôbec** (D-78). Ponuka je overlay pod spúšťačom (`.mdmore`/`.mdmoremenu` v `studio.html`), otvorenosť je čisto klientska (`mdMoreOpen`, nikam sa
-neukladá; lištu prekreslí `matRenderTools`). Klik na „⋯" ju prepína a presunie fokus na položku; zatvára ju klik mimo obalu, Tab, odchod zo sekcie
+neukladá). Otvorenie lištu prekreslí (`matRenderTools`), **zatvorenie nie** — len odstráni uzol ponuky a prepne `aria-expanded`, inak by
+`innerHTML` zhodil fokus z poľa, do ktorého používateľ práve klikol (predrecenzia P3). Klik na „⋯" ju prepína a presunie fokus na položku; zatvára ju klik mimo obalu, Tab, odchod zo sekcie
 (`matCloseModals`) a **Escape** — ten zavrie LEN ponuku, vráti fokus na „⋯" a udalosť spotrebuje; `mdMoreOpen` je v `nx_esc.js` medzi **FLYOUT_FLAGS**, takže reťaz
 modalov, kým je ponuka hore, nerobí nič. Výber položky **najprv ponuku zavrie** a až potom otvorí **ten istý** potvrdzovací modal `mdRestoreModal` („Vrátiť katalóg
 pred migráciou" / „Vrátiť katalóg") → `restore_pre_schema2` — nový zápis nevznikol, len cesta k nemu. V núdzovom (read-only) režime nesie akciu naďalej banner nad
