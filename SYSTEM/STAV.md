@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.17.4 · 1.10.2026 — blok 9 HARDENING; dávka H5 hotová** (len dokumentácia: H5a PR #439 mapa okien bez histórie · H5b PR #? UI_DIZAJN ako norma bez denníka, opravené zastarané vety; strážcovia rastu).
+**v0.17.4 · 1.10.2026 — blok 9 HARDENING; dávka H5 hotová** (len dokumentácia: H5a PR #439 mapa okien bez histórie · H5b PR #440 UI_DIZAJN ako norma bez denníka, opravené zastarané vety; strážcovia rastu).
 Posledná kódová dávka **H4b** (PR #438): **texty a vzhľad** — núdzové „Vrátiť katalóg pred migráciou…" už nestojí vedľa „Obnoviť" (ponuka „⋯" v Materiáloch), „Obnoviť" znamená všade to isté, iný význam je „Vrátiť…";
 texty bez „ghost/seed/legacy/server" a bez kričania, verzia „v0.17.x"; jednotné rozbaľovačky, krátke „Hľadať…", stĺpce Kusovníka pod sebou, mazanie ikonou ×, Nastavenia rozpočtu s ikonou posuvníkov. **Dáta, čísla, XLSX, CSV a VEPO bez zmeny.**
 Pod tým **H4a** (v0.17.3, PR #437): čísla v Štúdiu všade rovnako, nič sa neskrýva. Pod tým **H3b** (v0.17.2, PR #436): bez falošnej chyby „invalid overlay" v Ruby konzole po **Súbor → Nový**. Pod tým **H3a** (v0.17.1, PR #435): Štúdio bez zavádzajúcich údajov (Kusovník, ponuka, Kontrola, Nákup, sadzby) — **čísla, CSV, XLSX a VEPO bez zmeny**.
@@ -35,7 +35,7 @@ počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení,
 
 **Blok 9 · HARDENING PO V1** (štart 1.10.2026, PR #432): krížový audit V1 sedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**;
 17 dávok **H1…H17** sekvenčne podľa tabuľky v [PLAN.md](PLAN.md), **bez zmeny výrobných a cenových čísel**; priečinok bloku [zdroje/bloky/HARDENING/](zdroje/bloky/HARDENING/).
-Hotové **H1** PR #433 · **H2** (fotenie okien) PR #434 · **H3a** (zavádzajúce údaje v okne) PR #435 · **H3b** (falošná chyba v Ruby konzole po novom súbore) PR #436 · **H4a** (zápis čísel) PR #437 · **H4b** (texty a vzhľad) PR #438 · **H5a** (mapa okien bez histórie, strážca rastu dokumentov) PR #439 · **H5b** (UI_DIZAJN ako norma, zastarané vety) PR #?; nasledujú **H6/H7** (mockupy).
+Hotové **H1** PR #433 · **H2** (fotenie okien) PR #434 · **H3a** (zavádzajúce údaje v okne) PR #435 · **H3b** (falošná chyba v Ruby konzole po novom súbore) PR #436 · **H4a** (zápis čísel) PR #437 · **H4b** (texty a vzhľad) PR #438 · **H5a** (mapa okien bez histórie, strážca rastu dokumentov) PR #439 · **H5b** (UI_DIZAJN ako norma, zastarané vety) PR #440; nasledujú **H6/H7** (mockupy).
 **H4b — Michalove otázky Q1/Q2 bez odpovede, platí predvolená vratná voľba:** vrátenie katalógu v ponuke „⋯" Materiálov (nie v O plugine) a ikona posuvníkov pre Nastavenia rozpočtu.
 **H6 a H7 čakajú na schválený mockup** (R-38 v H7 potvrdí Michal) · **Q1** (porez a montáž pri skle) bez odpovede · pri prvej rohovej v dielni overiť záves Sensys · **na smoke čakajú** D-132 (#367), D-133 (#368), D-134 (#369).
 

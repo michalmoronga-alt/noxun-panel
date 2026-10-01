@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H5b · UI_DIZAJN ako norma + zastarané vety (1.10.2026, PR #?, dokumentačné PR — plugin, VERSION ani `?v=` sa nemenia; blok 9 · HARDENING PO V1, položky
+- **H5b · UI_DIZAJN ako norma + zastarané vety (1.10.2026, PR #440, dokumentačné PR — plugin, VERSION ani `?v=` sa nemenia; blok 9 · HARDENING PO V1, položky
   triedenia B-05 a zvyšok B-03, krížový audit CS-06, CN-08, CN-09; brief [BRIEF_H5.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H5.md)) — dávka H5 hotová.**
   `docs/UI_DIZAJN.md` miešal normu s denníkom dávok (21 riadkov s historickými značkami — verzie, `PR B1`, `review #249`, zaniknuté okná a premostenia).
   **Presun, nie mazanie:** plné pôvodné znenie je v [UI_DIZAJN_dennik_do_v0.17.md](UI_DIZAJN_dennik_do_v0.17.md) (kontrola množiny riadkov: 199 zmenených
