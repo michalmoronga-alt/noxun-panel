@@ -518,8 +518,18 @@ module Noxun
       # nerozumieme, by ticho zahodila; prvy zapis by stratu zvecnil.
       # TRETI PRVOK (`blocked`) je prave ten stav: obsah sa POUZIT smie, ale
       # ZVECNIT nie (Codex #329 kolo 2 P1).
+      #
+      # H9/R-37: subor ZLEHO TVARU sa cita zo zalohy dobreho tvaru; bez nej
+      # seed BEZ zapisu a jeden riadok logu za zmenu stavu.
       def read_rules
-        doc = JsonFileStore.read(path, copy: false)
+        doc = begin
+          library_doc
+        rescue JsonFileStore::InvalidShape => e
+          Engine.log("hardware rules: #{e.message} — pocita sa so seedom") if !@shape_logged && defined?(Engine)
+          @shape_logged = true
+          return [deep_copy(SEED_RULES), false, false]
+        end
+        @shape_logged = false
         rules = doc.is_a?(Hash) ? doc['rules'] : nil
         return [deep_copy(SEED_RULES), false, false] unless rules.is_a?(Array)
         return [normalize_rules(rules), false, true] if doc_std_unsupported?(doc)
@@ -532,9 +542,31 @@ module Noxun
       # Rovnaka otazka ako v `read_rules`, len bez nacitania pravidiel — pytaju
       # sa jej builder (ORANGE do stavby) a `ensure_project_rules!`.
       def library_std_unsupported?
-        doc_std_unsupported?(JsonFileStore.read(path, copy: false))
+        doc_std_unsupported?(library_doc)
       rescue StandardError
         false
+      end
+
+      # H9/R-37 (R13): JEDINE citanie globalnej kniznice — pravidla aj
+      # proveniencne otazky (`library_*`) vidia TEN ISTY dokument (pri zlom
+      # tvare zalohu dobreho tvaru, inak `InvalidShape`).
+      def library_doc
+        JsonFileStore.read_valid(path, shape: shape_check, copy: false)
+      end
+
+      # H9/R-37 (R13): ocakavany tvar — `rules` je Array; PRAZDNE len so
+      # `seed_version` (vymazanie vsetkych pravidiel v okne je legitimne,
+      # peciatka je od vzniku modulu). Novsi `std` posudzuje KOV-F1.
+      def doc_shape_ok?(doc)
+        return false unless doc.is_a?(Hash)
+        return true if doc_std_unsupported?(doc)
+
+        r = doc['rules']
+        r.is_a?(Array) && (!r.empty? || doc.key?('seed_version'))
+      end
+
+      def shape_check
+        method(:doc_shape_ok?)
       end
 
       # KOV-F1: je dokument (kniznica alebo projektovy snapshot) z NOVSEJ
@@ -687,7 +719,7 @@ module Noxun
           next false if newer_write_blocked?
 
           JsonFileStore.write(path, { 'std' => STD, 'seed_version' => SEED_VERSION,
-                                      'rules' => normalize_rules(rules) })
+                                      'rules' => normalize_rules(rules) }, shape_check)
         end
       rescue StandardError => e
         Engine.log_error(e, 'HardwareRules.write') if defined?(Engine)
@@ -703,45 +735,51 @@ module Noxun
         @write_block_reason.to_s
       end
 
-      # Brana sa vyhodnocuje POD ZAMKOM nad cerstvym stavom suboru (lekcia
-      # R-07 B2). I/O chyba z `degraded?` sa NEchyta — vyleti do rescue vetvy
-      # `write` a skonci ako neuspesny zapis.
-      def degraded_write_blocked?
-        prev = @write_block_reason
-        @write_block_reason = ''
-        return false unless JsonFileStore.degraded?(path)
-
-        @write_block_reason = 'Globálne pravidlá kovania sú poškodené — číta sa záloha, zápisy sú ' \
-                              "vypnuté (oprav alebo zmaž súbor #{path})"
-        # Log LEN pri ZMENE stavu — seed-merge sa o zapis pokusa pri kazdom
-        # nacitani, takze bezpodmienecny zapis by zaplavil Ruby konzolu.
-        if prev.to_s != @write_block_reason && defined?(Engine)
-          Engine.log("hardware rules: zapis odmietnuty — #{@write_block_reason}")
+      # H9/R-37 (R15): JEDINA zapisova brana globalnej kniznice pravidiel
+      # (autorita aj pre okno Pravidla a H10) -> [state, reason], state je
+      # :ok | :degraded | :newer. Vzdy CERSTVO nad SUBORMI (`reload!`), nikdy
+      # z precitaneho dokumentu — `read_rules` pri degradacii vracia obsah
+      # ZALOHY a degradaciu neprezradi. Poradie: degradovany (necitatelny
+      # alebo zleho tvaru primar + zaloha dobreho tvaru) -> novsi `std`
+      # suroveho primaru (chyba citania = nie novsi) -> :ok. Vynimky (I/O,
+      # `ShapeCheckError`) sa NECHYTAJU — rozhoduje volajuci (`write` -> false).
+      # Nezapisuje, neloguje, na model nesiaha. Mimo zamku ju smie volat len
+      # predkontrola; pred ZAPISOM ju vzdy znova vyhodnoti `write` pod zamkom.
+      def write_gate
+        JsonFileStore.reload!(path)
+        if JsonFileStore.degraded?(path, shape: shape_check)
+          return [:degraded, 'Globálne pravidlá kovania sú poškodené — číta sa záloha, zápisy sú ' \
+                             "vypnuté (oprav alebo zmaž súbor #{path})"]
         end
-        true
-      end
-
-      # KOV-F1: DRUHA zapisova brana — kniznica z NOVSIEHO pluginu. Vyhodnocuje
-      # sa POD ZAMKOM nad cerstvym stavom suboru (rovnako ako degradovany
-      # subor) a `@write_block_reason` LEN doplna: ked uz blokovala degradacia,
-      # sem sa vobec nedojde.
-      def newer_write_blocked?
-        # POSKODENY subor sem NEPATRI: `JsonFileStore.read` nad nim vyhodi
-        # ParserError a jeho vlastnu branu drzi `degraded_write_blocked?`
-        # (a bez zalohy sa dnes prvym zapisom SAMOOPRAVI — R-11). Neprecitatelny
-        # dokument teda NIE JE „z novsej verzie".
         doc = begin
           JsonFileStore.read(path, copy: false)
         rescue StandardError
           nil
         end
-        return false unless doc_std_unsupported?(doc)
+        return [:newer, std_block_reason('Globálna knižnica')] if doc_std_unsupported?(doc)
 
+        [:ok, '']
+      end
+
+      # Dve pomenovane brany `write` (R-11 guard) sa pytaju VYHRADNE
+      # `write_gate` — kazda si ju vyhodnoti sama (zapisova cesta nie je
+      # horuca). `@write_block_reason` a log LEN pri zmene stavu ako dnes.
+      def degraded_write_blocked?
         prev = @write_block_reason
-        @write_block_reason = std_block_reason('Globálna knižnica')
-        if prev.to_s != @write_block_reason && defined?(Engine)
-          Engine.log("hardware rules: zapis odmietnuty — #{@write_block_reason}")
-        end
+        @write_block_reason = ''
+        gate_blocked?(:degraded, prev)
+      end
+
+      def newer_write_blocked?
+        gate_blocked?(:newer, @write_block_reason)
+      end
+
+      def gate_blocked?(want, prev)
+        state, reason = write_gate
+        return false unless state == want
+
+        @write_block_reason = reason
+        Engine.log("hardware rules: zapis odmietnuty — #{reason}") if prev.to_s != reason && defined?(Engine)
         true
       end
 
@@ -898,7 +936,7 @@ module Noxun
       end
 
       def library_doc_std
-        doc_std(JsonFileStore.read(path, copy: false))
+        doc_std(library_doc)
       rescue StandardError
         nil
       end
@@ -928,7 +966,7 @@ module Noxun
       # NEMERGUJE (dopredna brana `std`), takze plati jej vlastna verzia.
       # Neprecitatelna kniznica = fallback `SEED_RULES`, teda nas seed.
       def library_seed_version
-        doc = JsonFileStore.read(path, copy: false)
+        doc = library_doc
         return SEED_VERSION unless doc.is_a?(Hash) && doc['rules'].is_a?(Array)
 
         v = doc['seed_version'].to_i
