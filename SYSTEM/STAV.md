@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.17.8 · 1.10.2026 — blok 9 HARDENING; dávka H10a hotová** (PR #?): **R-35 pre pravidlá kovania — dve okná SketchUpu sa pri globálnych predvoľbách pravidiel kovania už neprebíjajú.** Keď v jednom okne uložíš „aj ako globálnu predvoľbu" (alebo zákazku, ktorá ešte nemá vlastné pravidlá)
+**v0.17.8 · 1.10.2026 — blok 9 HARDENING; dávka H10a hotová** (PR #443): **R-35 pre pravidlá kovania — dve okná SketchUpu sa pri globálnych predvoľbách pravidiel kovania už neprebíjajú.** Keď v jednom okne uložíš „aj ako globálnu predvoľbu" (alebo zákazku, ktorá ešte nemá vlastné pravidlá)
 a globálne predvoľby medzitým zmenilo iné okno, **neuloží sa nič**, tvoje úpravy ostanú vo formulári a červená hláška povie prečo; druhé Uložiť ich vedome prepíše. **Pri jednom okne sa nemení nič** (súbor bajtovo rovnako, čísla bez zmeny). Rozmerové rady dorieši **H10b**.
 Pod tým **H9** (v0.17.7, PR #442): poškodený súbor nastavení nezničí dobrú zálohu · **H8** (v0.17.6, PR #441): kus z inej verzie štandardu = oranžový riadok. Pod tým **H5** (v0.17.5, PR #439–#440: dokumentácia okien a UI_DIZAJN ako norma) a **H4b** (v0.17.4, PR #438): texty a vzhľad („Obnoviť" vs. „Vrátiť…", bez žargónu, jednotné rozbaľovačky) — **dáta a čísla bez zmeny.**
 Pod tým **H4a** (v0.17.3, PR #437): čísla v Štúdiu všade rovnako, nič sa neskrýva. Pod tým **H3b** (v0.17.2, PR #436): bez falošnej chyby „invalid overlay" v Ruby konzole po **Súbor → Nový**. Pod tým **H3a** (v0.17.1, PR #435): Štúdio bez zavádzajúcich údajov (Kusovník, ponuka, Kontrola, Nákup, sadzby) — **čísla, CSV, XLSX a VEPO bez zmeny**.
@@ -27,14 +27,14 @@ v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a
 **Ochranu pred poškodeným súborom nastavení (H9) má len 0.17.7+, ochranu dvoch okien (H10a) len 0.17.8+ — aktualizovať obe PC a po aktualizácii zavrieť všetky okná SketchUpu** (staré okno zapisuje bez revízie; formát súborov sa nemení). **Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin
 počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
 
-**Testy (H10a, PR #?):** **5065 headless · 150 JS sád** zelené + encoding guard; in-SU (brána) **3324 / 0** na hlave `c830688a` (scenár `run_h10a` v izolovanom sandboxe).
+**Testy (H10a, PR #443):** **5065 headless · 150 JS sád** zelené + encoding guard; in-SU (brána) **3324 / 0** na hlave `c830688a` (scenár `run_h10a` v izolovanom sandboxe).
 
 ## Robí sa
 
 **Blok 9 · HARDENING PO V1** (štart 1.10.2026, PR #432): krížový audit V1 sedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**;
 17 dávok **H1…H17** sekvenčne podľa tabuľky v [PLAN.md](PLAN.md), **bez zmeny výrobných a cenových čísel**; priečinok bloku [zdroje/bloky/HARDENING/](zdroje/bloky/HARDENING/).
 Hotové **H1–H5** (PR #433–#440: pravidlá čítania, fotenie okien, zavádzajúce údaje, log po novom súbore, čísla, texty a vzhľad, mapa okien, UI_DIZAJN),
-**H8** (kus z inej verzie štandardu, R-13) PR #441, **H9** (súbor nastavení zlého tvaru, R-37) PR #442 a **H10a** (dve okná, pravidlá kovania, R-35) PR #?; **H6/H7** čakajú na mockupy, nasleduje **H10b**.
+**H8** (kus z inej verzie štandardu, R-13) PR #441, **H9** (súbor nastavení zlého tvaru, R-37) PR #442 a **H10a** (dve okná, pravidlá kovania, R-35) PR #443; **H6/H7** čakajú na mockupy, nasleduje **H10b**.
 **Otázky bez odpovede, platí návrh:** H10a Q1 (pri cudzej zmene globálu sa neuloží nič, ani projekt) · H9 Q1/Q2 (pri čítaní zo zálohy bez nálezu v Kontrole, bez tlačidla „Obnoviť zo zálohy") · H8 Q1/Q2 (veta o značke verzie, bez tlačidla) · H4b Q1/Q2 (vrátenie katalógu v ponuke „⋯" Materiálov, ikona posuvníkov pre Nastavenia rozpočtu).
 **H6 a H7 čakajú na schválený mockup** (R-38 v H7 potvrdí Michal) · **Q1** (porez a montáž pri skle) bez odpovede · pri prvej rohovej v dielni overiť záves Sensys · **na smoke čakajú** D-132 (#367), D-133 (#368), D-134 (#369).
 

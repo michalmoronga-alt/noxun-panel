@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H10a · dve okná SketchUpu a globálne pravidlá kovania (1.10.2026, PR #?, v0.17.8, blok 9 · HARDENING PO V1, register R-35 — časť pravidlá; package
+- **H10a · dve okná SketchUpu a globálne pravidlá kovania (1.10.2026, PR #443, v0.17.8, blok 9 · HARDENING PO V1, register R-35 — časť pravidlá; package
   [PACKAGE_H10.md](../zdroje/bloky/HARDENING/PACKAGE_H10.md), audit návrhu 1 BLOCKER · 3 FIX · 3 NOTE [AUDIT_H10_raw.md](../zdroje/bloky/HARDENING/AUDIT_H10_raw.md)
   + delta 7/7 RESOLVED [AUDIT_H10_delta_raw.md](../zdroje/bloky/HARDENING/AUDIT_H10_delta_raw.md); rez H10a → H10b).**
   „Aj ako globálnu predvoľbu" bola úplná náhrada `hardware_rules.json` bez revízie — dve okná sa prebíjali „posledný vyhráva" a projekt bez snapshotu dopadol podľa
