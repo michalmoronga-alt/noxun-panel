@@ -311,6 +311,8 @@ const LIST10 = [UNI(1), UNI(2), UNI(3), UNI(4), UNI(5), UNI(6),
   const hint = all.filter(function(x){ return x.className === 'sshint'; }).map(function(x){ return x.textContent; })[0];
   ok(hint.indexOf('Stĺpce € nízky · €€ štandard · €€€ vysoký sú sadzby pre cenový režim zákazky; ' +
      'v prázdnej bunke platí základ — ukazuje ho sivé číslo.') >= 0, 'nápoveda fieldsetu');
+  ok(hint.indexOf('Sivé číslo ukazuje uložený základ — po zmene Základu sa obnoví až po Uložiť.') >= 0,
+     'nápoveda priznáva, že sivé číslo je uložená sadzba (predrecenzia P3)');
 
   // starý payload bez `effective` — žiadne sivé číslo, žiadna chyba
   const OLD = JSON.parse(JSON.stringify(STATE));

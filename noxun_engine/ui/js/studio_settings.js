@@ -305,7 +305,8 @@
     ssRenderRates(ssFieldset(box, 'Sadzby služieb',
       'Automatické služby — množstvo počíta engine z dát zákazky (bm olepu, počet platní, kusy ' +
       'duplákov, m² montáže). Stĺpce € nízky · €€ štandard · €€€ vysoký sú sadzby pre cenový režim zákazky; ' +
-      'v prázdnej bunke platí základ — ukazuje ho sivé číslo.'));
+      'v prázdnej bunke platí základ — ukazuje ho sivé číslo. Sivé číslo ukazuje uložený základ — ' +
+      'po zmene Základu sa obnoví až po Uložiť.'));
     ssRenderRows(ssFieldset(box, 'Štandardné riadky — sadzby per režim',
       'Fixné koncové položky ponuky. Násobok (koeficient veľkosti zákazky) sa nastavuje priamo ' +
       'v riadku rozpočtu — tu žije len sadzba.'));
