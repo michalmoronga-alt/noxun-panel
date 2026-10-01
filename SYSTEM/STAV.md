@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.17.9 · 1.10.2026 — blok 9 HARDENING; dávka H10b hotová** (PR #?): **R-35 uzavreté — dve okná SketchUpu sa neprebíjajú ani pri rozmerových radoch** (koliesko Inspectora). Keď v dvoch oknách zmeníš **rôzne** rady (napr. Šírky a Hĺbky),
+**v0.17.9 · 1.10.2026 — blok 9 HARDENING; dávka H10b hotová** (PR #444): **R-35 uzavreté — dve okná SketchUpu sa neprebíjajú ani pri rozmerových radoch** (koliesko Inspectora). Keď v dvoch oknách zmeníš **rôzne** rady (napr. Šírky a Hĺbky),
 uložia sa obe zmeny; keď ten **istý** rad medzitým zmenilo iné okno, **neuloží sa nič**, červená hláška povie ktorý rad a editor ukáže aktuálne uložené rady (zmenu zadáš znova). **Pri jednom okne sa nemení nič** (súbor bajtovo rovnako).
 Pod tým **H10a** (v0.17.8, PR #443): to isté pre globálne pravidlá kovania · **H9** (v0.17.7, PR #442): poškodený súbor nastavení nezničí dobrú zálohu · **H8** (v0.17.6, PR #441): kus z inej verzie štandardu = oranžový riadok
 · **H5/H4b/H4a** (v0.17.3–v0.17.5, PR #437–#440): mapa okien, texty, vzhľad, čísla v Štúdiu všade rovnako · **H3a/H3b** (v0.17.1–v0.17.2, PR #435–#436): bez zavádzajúcich údajov a falošnej chyby po **Súbor → Nový** — **čísla a exporty bez zmeny**.
@@ -26,13 +26,13 @@ v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a
 **Ochranu pred poškodeným súborom nastavení (H9) má len 0.17.7+, ochranu dvoch okien 0.17.8+ (pravidlá) a 0.17.9+ (rady) — aktualizovať obe PC a potom zavrieť všetky okná SketchUpu** (staré okno zapisuje bez ochrany).
 **Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
 
-**Testy (H10b, PR #?):** **5084 headless · 151 JS sád** zelené + encoding guard; in-SU nie je brána (dávka nezapisuje do modelu) — posledný in-SU beh H10a **3324 / 0** na `c830688a`.
+**Testy (H10b, PR #444):** **5084 headless · 151 JS sád** zelené + encoding guard; in-SU nie je brána (dávka nezapisuje do modelu) — posledný in-SU beh H10a **3324 / 0** na `c830688a`.
 
 ## Robí sa
 
 **Blok 9 · HARDENING PO V1** (štart 1.10.2026, PR #432): krížový audit V1 sedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**;
 17 dávok **H1…H17** sekvenčne podľa tabuľky v [PLAN.md](PLAN.md), **bez zmeny výrobných a cenových čísel**; priečinok bloku [zdroje/bloky/HARDENING/](zdroje/bloky/HARDENING/).
-Hotové **H1–H5** (PR #433–#440) a **H8–H10b** (R-13, R-37, R-35 — PR #441–#443 a #?); **H6/H7** čakajú na mockupy.
+Hotové **H1–H5** (PR #433–#440) a **H8–H10b** (R-13, R-37, R-35 — PR #441–#443 a #444); **H6/H7** čakajú na mockupy.
 **Otázky bez odpovede, platí návrh:** H10b Q2 (rôzne rady sa zlúčia bez hlášky, ten istý rad = hláška a zmenu treba zadať znova) · H10a Q1 (pri cudzej zmene globálu sa neuloží nič, ani projekt)
 · H9 Q1/Q2 (pri čítaní zo zálohy bez nálezu v Kontrole, bez tlačidla „Obnoviť zo zálohy") · H8 Q1/Q2 (veta o značke verzie, bez tlačidla) · H4b Q1/Q2 (vrátenie katalógu v ponuke „⋯" Materiálov, ikona posuvníkov pre Nastavenia rozpočtu).
 **H6 a H7 čakajú na schválený mockup** (R-38 v H7 potvrdí Michal) · **Q1** (porez a montáž pri skle) bez odpovede · pri prvej rohovej v dielni overiť záves Sensys · **na smoke čakajú** D-132 (#367), D-133 (#368), D-134 (#369).

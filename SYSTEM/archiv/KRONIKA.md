@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H10b · dve okná SketchUpu a rozmerové rady (1.10.2026, PR #?, v0.17.9, blok 9 · HARDENING PO V1, register R-35 — časť rady, R-35 tým uzavreté; package
+- **H10b · dve okná SketchUpu a rozmerové rady (1.10.2026, PR #444, v0.17.9, blok 9 · HARDENING PO V1, register R-35 — časť rady, R-35 tým uzavreté; package
   [PACKAGE_H10.md](../zdroje/bloky/HARDENING/PACKAGE_H10.md) časť R2, audit návrhu spoločný s H10a).**
   „Uložiť rady" v koliesku Inspectora posielalo všetkých 5 radov tak, ako ich panel dostal pri otvorení — úplná náhrada `dim_series.json`, dve okná sa prebíjali
   „posledný vyhráva" (sonda P2: 700 v Šírkach z okna A zaniklo, keď B zmenilo len Hĺbky). Teraz **zápis po kľúčoch s pôvodnou hodnotou kľúča**:

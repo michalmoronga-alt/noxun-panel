@@ -25,7 +25,7 @@ V1 rozsahu. Hlásená strata neuložených hodnôt, hygiena, texty, refaktor a v
 | R | Verdikt | Pred/po V1 | Veľk. | Funkčný dopad |
 |---|---|---|---|---|
 | R-37 | ✅ dávkou H9 (PR #442, v0.17.7) | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** | S | ~~súbor nastavení zlého tvaru sa ticho nahradí predvolenými a zničí dobrú zálohu~~ — záloha, inak predvolené (dodávateľ s bannerom; ABS a kovanie len log — Q1) a bez zápisu; rozsah v sekcii R-37 |
-| R-35 | ✅ dávkami H10a (PR #443, v0.17.8 — pravidlá kovania) a H10b (PR #?, v0.17.9 — rozmerové rady) | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** (tichá strata pri dvoch oknách SketchUpu; po R-37) | S/M | ~~zmena pravidiel kovania a radov pri dvoch oknách ticho zanikne~~ — pravidlá: hláška, nič sa neprepíše; rady: rôzne sa zlúčia, ten istý = hláška |
+| R-35 | ✅ dávkami H10a (PR #443, v0.17.8 — pravidlá kovania) a H10b (PR #444, v0.17.9 — rozmerové rady) | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** (tichá strata pri dvoch oknách SketchUpu; po R-37) | S/M | ~~zmena pravidiel kovania a radov pri dvoch oknách ticho zanikne~~ — pravidlá: hláška, nič sa neprepíše; rady: rôzne sa zlúčia, ten istý = hláška |
 | R-13 | ✅ dávkou H8 (PR #441, v0.17.6) | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** (čítať — rozhodnuté 29.9.; prvá v poradí) | S | ~~dielec z inej verzie štandardu Kontrola neoznačí~~ — Kontrola ho hlási ORANGE `std_version` |
 | R-38 | platí | hraničné (len pri poškodenom súbore; stratí názvy zákaziek a prepínač zlúčenia 18/36 vo VEPO exporte — mení pomenovanie a členenie výstupu, nie rozmery, počty ani ceny) | S | poškodený súbor VEPO nastavení (názvy zákaziek, zlúčenie 18/36) sa môže ticho prepísať staršou zálohou — **zaradenie: blok 9 · H7** (návrh orchestrátora 1.10.2026 — potvrdí Michal s mockupom H7) |
 | R-18 | platí | po V1 (hlásená strata neuložených hodnôt — ⋯ editor sa zavrie ako uložený, zlyhaný zápis ohlási červený status) | S | pri súbehu úpravy bunky a ⋯ editora v Rozpočte sa rozpísané hodnoty môžu stratiť |
@@ -271,7 +271,7 @@ neuloží sa nič, úpravy ostanú vo formulári, druhé Uložiť = vedomé prep
 Platí aj pre projekt bez vlastných pravidiel, ktorý globál preberá. **Prevádzková podmienka:** po aktualizácii zavrieť všetky okná SketchUpu na PC (staré okno zapisuje
 bez revízie). Detail: [docs/architecture/hardware.md](../docs/architecture/hardware.md) (`hardware_rules.rb`, odsek H10a); package a audity
 `SYSTEM/zdroje/bloky/HARDENING/PACKAGE_H10.md`.
-**✅ Rozmerové rady dávkou H10b (PR #?, v0.17.9) — R-35 uzavreté.** Zápis **po kľúčoch s pôvodnou hodnotou kľúča** (`DimSeries.update!`): panel posiela len zmenené rady
+**✅ Rozmerové rady dávkou H10b (PR #444, v0.17.9) — R-35 uzavreté.** Zápis **po kľúčoch s pôvodnou hodnotou kľúča** (`DimSeries.update!`): panel posiela len zmenené rady
 a ku každému hodnotu, ktorú editor ukázal; rôzne rady z dvoch okien sa zlúčia, ten istý rad zmenený inde = červená hláška, **nezapíše sa nič** a editor ukáže uložený stav
 (rozpis sa stratí). Celková revízia sa zámerne nepoužila — panel drží rady od otvorenia, takže by hlásila konflikt pri každej zmene iného radu. **Hranice:** zlúčenie platí
 pre dnešných 5 radov; ochrana novšieho formátu súboru radov neexistuje (dnešné obmedzenie). Prevádzková podmienka rovnaká ako pri H10a. Detail:
