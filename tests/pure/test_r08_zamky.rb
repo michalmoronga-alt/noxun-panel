@@ -22,7 +22,9 @@
 # serializuje, nic viac; tieto testy preto pri nich NETVRDIA, ze cudzia
 # hodnota prezila. Okno Pravidla od H10a zapisuje globalne pravidla cez
 # `save_library!` s reviziou obsahu (testy `test_h10a_globalne_pravidla.rb`,
-# guard „revizia AZ POD zamkom" tam); rozmerove rady rieši H10b.
+# guard „revizia AZ POD zamkom" tam); panel zapisuje rozmerove rady od H10b
+# cez `DimSeries.update!` po klucoch s povodnou hodnotou kluca (testy
+# `test_h10b_rady.rb`, guard nizsie). `write`/`set` ostavaju interne.
 require_relative '../helper' unless defined?(NxTest)
 require 'fileutils'
 
@@ -460,7 +462,9 @@ NxTest.test('R-08 (mutacia): kontrola revizie je AZ POD zamkom, nie pred nim') d
   {
     ['core/hardware_sets.rb', 'save_set!'] => 'revision != self.revision',
     ['core/hardware_sets.rb', 'delete_set!'] => 'revision != self.revision',
-    ['core/hardware_sets.rb', 'set_global_mapping!'] => 'revision != self.revision'
+    ['core/hardware_sets.rb', 'set_global_mapping!'] => 'revision != self.revision',
+    # H10b/R-35: povodna hodnota kluca sa porovnava AZ POD zamkom
+    ['core/dim_series.rb', 'update!'] => 'normalize_list(base[k]) != current[k]'
   }.each do |(rel, meth), needle|
     door = r.body(rel, meth)
     NxTest.assert(!door.empty?, "#{rel}: telo `#{meth}` sa naslo")

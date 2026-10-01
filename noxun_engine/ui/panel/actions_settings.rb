@@ -32,24 +32,41 @@ module Noxun
         # Ulozenie rozmerovych radov z editora. Normalizaciu (cisla, rozsah,
         # duplicity, poradie, pocet) robi VYHRADNE DimSeries — panel posle, co
         # pouzivatel napisal, a spat dostane presne to, co sa ulozilo.
+        #
+        # H10b/R-35: panel posiela LEN zmenene rady (`series`) a ku kazdemu
+        # hodnotu, ktoru editor ukazal pri otvoreni (`base`). Dve okna SketchUpu
+        # sa tak pri ROZNYCH radoch zlucia; ten isty rad zmeneny inde = konflikt
+        # a nezapise sa nic (`DimSeries.update!`). Status vyhodnocuje `case`,
+        # nikdy pravdivost (`:conflict` je v Ruby pravdive).
         def handle_set_dim_series(payload)
           data = parse(payload)
-          stored = DimSeries.set(data['series'])
+          status, _series, keys = DimSeries.update!(data['series'], data['base'])
           # Codex #170 P2: `refill_editor` = prepis polia editora NORMALIZOVANOU
           # podobou. Bez neho by v otvorenom modale ostal text, ktory pouzivatel
           # napisal (neusporiadany, s duplicitami, s nezmyslami), hoci ulozilo sa
           # nieco ine — a status by pritom hlasil uspech. Priznak nesie LEN tato
-          # cesta, aby iny push (tema) rozpisany draft neprepisal.
+          # cesta, aby iny push (tema) rozpisany draft neprepisal. H10b: chodi
+          # pri KAZDOM vysledku — editor tym znova pripne povodne hodnoty
+          # (po konflikte ukaze aktualne ulozene rady, rozpis sa strati).
           push_ui_settings(refill_editor: true)
-          if stored.nil?
+          case status
+          when :ok
+            set_status(keys.empty? ? 'Rozmerové rady sa nezmenili.' : 'Rozmerové rady uložené.')
+          when :conflict
+            set_status("Rozmerové rady (#{DimSeries.labels(keys)}) medzitým zmenilo iné okno SketchUpu — " \
+                       'nič sa neuložilo. Editor ukazuje aktuálne uložené rady, zmenu zadaj znova.', true)
+          when :stale_client
+            set_status('Okno je z predošlej verzie pluginu — rozmerové rady sa neuložili. ' \
+                       'Zavri a otvor panel znova.', true)
+          when :blocked
             # 1d/R-11: poskodeny primar s platnou `.bak` = zapis ODMIETLA brana,
             # nie disk. Vseobecna hlaska „disk/prava" by pouzivatela poslala
             # hladat nespravnu pricinu — naprava je oprava/zmazanie suboru.
             reason = DimSeries.write_block_reason
-            return set_status(reason.empty? ? 'Rozmerové rady sa nepodarilo uložiť (disk/práva).' : reason, true)
+            set_status(reason.empty? ? 'Rozmerové rady sa nepodarilo uložiť (disk/práva).' : reason, true)
+          else
+            set_status('Rozmerové rady sa nepodarilo uložiť (disk/práva).', true)
           end
-
-          set_status('Rozmerové rady uložené.')
         end
 
         # Nastavenia pocitaca do panela (rady + tema). Chodia aj v push_init;
