@@ -3,7 +3,8 @@
     "H14 · kontrakt registra sekcii Studia (NXStudioSections) — NEZAVISLA fixtura.",
     "Vznikla v 1. commite H14a ZO STAREHO KODU (studio.js: NAV, SEC_META, REFRESH_STATUS pred zasahom) + rucne doplnene `module` a `data`.",
     "Nikdy ju nevyraba generator z testovaneho registra a test ju nezapisuje. Most Ruby<->JS: StudioDialog::SECTIONS == ids (aj poradie).",
-    "Kluce riadka: id · grp · ic (ikona) · t (nazov = nadpis) · hint (len tooltip navigacie) · badge (zdroj poctov) · head (napoveda hlavicky) · refresh (hlaska Obnovit) · module (subor, ktory sekciu kresli) · data (kluc payloadu NX.setStudio)."
+    "Kluce riadka: id · grp · ic (ikona) · t (nazov = nadpis) · hint (len tooltip navigacie) · badge (zdroj poctov) · head (napoveda hlavicky) · refresh (hlaska Obnovit) · module (subor, ktory sekciu kresli) · data (kluc payloadu NX.setStudio).",
+    "H14b doplnil RUCNE haciky zo stareho kodu (renderTools/renderBody, studioGoSection, kotvy v setStudio pred H14b): tools · body (mena funkcii lista/telo) · stale (lista dostane priznak neaktualnosti) · missing (nudzovy text tela) · leave / enter (odchod/vstup) · anchor { fn, phase before|after, miss } (len deep-link)."
   ],
   "groups": [
     {
@@ -28,7 +29,13 @@
       "t": "Kusovník",
       "head": "skupiny podľa materiálu · pohľady Dielce / Platne / ABS · živý zoznam",
       "module": "studio.js",
-      "data": "rows"
+      "data": "rows",
+      "tools": "bomRenderTools",
+      "body": "bomRenderBody",
+      "anchor": {
+        "fn": "bomOpenAnchor",
+        "phase": "before"
+      }
     },
     {
       "id": "ctrl",
@@ -39,7 +46,9 @@
       "head": "semafor filtruje zoznam · klik na nález ho označí v modeli · prepínače hrán a kresby",
       "refresh": "Prepočítavam kontrolu…",
       "module": "studio.js",
-      "data": "control"
+      "data": "control",
+      "tools": "ctrlRenderTools",
+      "body": "ctrlRenderBody"
     },
     {
       "id": "buy",
@@ -49,7 +58,9 @@
       "head": "nákupný zoznam zo setov · nekompletné položky jantárovo · CSV pre objednávku",
       "refresh": "Prepočítavam nákupný zoznam…",
       "module": "studio.js",
-      "data": "hardware_sets"
+      "data": "hardware_sets",
+      "tools": "buyRenderTools",
+      "body": "buyRenderBody"
     },
     {
       "id": "budget",
@@ -59,7 +70,15 @@
       "head": "rozpočet zákazky · ceny kovania sú spoločné pre všetky zákazky",
       "refresh": "Prepočítavam rozpočet…",
       "module": "budget.js",
-      "data": "budget"
+      "data": "budget",
+      "tools": "budRenderTools",
+      "body": "budRenderBody",
+      "missing": "Rozpočet sa nenačítal (js/budget.js).",
+      "anchor": {
+        "fn": "budOpenAnchor",
+        "phase": "after",
+        "miss": "Tento riadok už v rozpočte nie je — otvorený je celý Rozpočet."
+      }
     },
     {
       "id": "offer",
@@ -69,7 +88,10 @@
       "head": "zákaznícky pohľad na ten istý rozpočet · rečou zákazníka, bez interných kódov",
       "refresh": "Prepočítavam cenovú ponuku…",
       "module": "budget.js",
-      "data": "budget"
+      "data": "budget",
+      "tools": "budRenderOfferTools",
+      "body": "budRenderOfferBody",
+      "missing": "Cenová ponuka sa nenačítala (js/budget.js)."
     },
     {
       "id": "cut",
@@ -80,7 +102,11 @@
       "head": "koľko platní stačí pri tomto rozložení · podklad pre objednávku — reže VEPO",
       "refresh": "Prepočítavam nárezový plán…",
       "module": "sheet_layout.js",
-      "data": "sheet_layout"
+      "data": "sheet_layout",
+      "tools": "npRenderTools",
+      "body": "npRenderBody",
+      "stale": true,
+      "missing": "Nárezový plán sa nenačítal (js/sheet_layout.js)."
     },
     {
       "id": "mat",
@@ -90,7 +116,17 @@
       "head": "katalóg dekorov je spoločný pre všetky zákazky · predvoľby projektu platia pre túto",
       "refresh": "Prepočítavam použitie dekorov v projekte…",
       "module": "proj_materials.js",
-      "data": "mat"
+      "data": "mat",
+      "tools": "matRenderTools",
+      "body": "matRenderBody",
+      "stale": true,
+      "missing": "Materiály sa nenačítali (js/proj_materials.js).",
+      "leave": "matOnLeaveSection",
+      "anchor": {
+        "fn": "matOpenAnchor",
+        "phase": "before",
+        "miss": "Tento dekor už v katalógu nie je — otvorené v zozname materiálov."
+      }
     },
     {
       "id": "hw",
@@ -100,7 +136,12 @@
       "head": "katalóg položiek a sety sú spoločné pre všetky zákazky · predvoľby setov platia pre túto zákazku",
       "refresh": "Načítavam čerstvý katalóg kovania a sety…",
       "module": "hw_catalog.js",
-      "data": "hw"
+      "data": "hw",
+      "tools": "hwRenderTools",
+      "body": "hwRenderBody",
+      "stale": true,
+      "missing": "Kovanie sa nenačítalo (js/hw_catalog.js).",
+      "leave": "hwOnLeaveSection"
     },
     {
       "id": "appl",
@@ -110,7 +151,16 @@
       "badge": "appl",
       "head": "katalóg modelov je tohto počítača · rozmery z listov výrobcov · bez cien (tie patria Rozpočtu)",
       "module": "appliances.js",
-      "data": "appl"
+      "data": "appl",
+      "tools": "apRenderTools",
+      "body": "apRenderBody",
+      "missing": "Spotrebiče sa nenačítali (js/appliances.js).",
+      "leave": "apOnLeaveSection",
+      "anchor": {
+        "fn": "apOpenAnchor",
+        "phase": "after",
+        "miss": "Tento spotrebič už v zákazke nie je — otvorený je celý zoznam."
+      }
     },
     {
       "id": "rules",
@@ -120,7 +170,11 @@
       "head": "ABS podľa roly dielca (spoločné, len na čítanie) · kovanie podľa rozmerov — platí pre tento projekt",
       "refresh": "Načítavam pravidlá z aktuálneho modelu…",
       "module": "rules.js",
-      "data": "rules"
+      "data": "rules",
+      "tools": "rulesRenderTools",
+      "body": "rulesRenderBody",
+      "stale": true,
+      "missing": "Pravidlá sa nenačítali (js/rules.js)."
     },
     {
       "id": "tpl",
@@ -129,7 +183,11 @@
       "t": "Šablóny",
       "head": "knižnica je spoločná pre všetky zákazky · novú uložíš v Inspectore z označenej skrinky",
       "module": "templates.js",
-      "data": "tpl"
+      "data": "tpl",
+      "tools": "tplRenderTools",
+      "body": "tplRenderBody",
+      "stale": true,
+      "missing": "Šablóny sa nenačítali (js/templates.js)."
     },
     {
       "id": "sup",
@@ -138,7 +196,10 @@
       "t": "Dodávateľ / Demos",
       "head": "aktívny dodávateľ a stav väzby na Demos · väzba sa nastavuje pri konkrétnom dekore",
       "module": "studio_settings.js",
-      "data": "settings"
+      "data": "settings",
+      "tools": "ssRenderTools",
+      "body": "ssRenderBody",
+      "missing": "Nastavenia sa nenačítali (js/studio_settings.js)."
     },
     {
       "id": "bset",
@@ -147,7 +208,10 @@
       "t": "Nastavenia rozpočtu",
       "head": "sadzby, režimy a prahy · globálne pre všetky zákazky, do zákazky sa nemrazia",
       "module": "studio_settings.js",
-      "data": "settings"
+      "data": "settings",
+      "tools": "ssRenderTools",
+      "body": "ssRenderBody",
+      "missing": "Nastavenia sa nenačítali (js/studio_settings.js)."
     },
     {
       "id": "about",
@@ -156,7 +220,11 @@
       "t": "O plugine",
       "head": "to isté nájdeš v koliesku Inspectora",
       "module": "studio_settings.js",
-      "data": "settings"
+      "data": "settings",
+      "tools": "ssRenderTools",
+      "body": "ssRenderBody",
+      "missing": "Nastavenia sa nenačítali (js/studio_settings.js).",
+      "enter": "ssOnAboutEnter"
     }
   ]
 }

@@ -17,6 +17,21 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H14b · jedna cesta prepnutia sekcie, kotvy a kreslenie sekcie z registra (1.10.2026, PR #451, v0.17.15, blok 9 · HARDENING PO V1, triedenie C-02
+  časť 2 — CX-04 + GR-06 klient; package [PACKAGE_H14.md](../zdroje/bloky/HARDENING/PACKAGE_H14.md) §15 A1 A3).**
+  Klik v navigácii a deep-link prepínali sekciu dvoma kópiami tých istých háčikov a `renderTools`/`renderBody` mali po 11 vetiev podľa id. Teraz
+  **`studioSwitchSection(id, guid)`** je jediná cesta prechodu (whitelist registrom → kontext dokumentu → `closeSectionMenus` → `leave` → `studioSec` →
+  `enter`); `studioGoSection` kreslí **len po úspešnom prepnutí** (neznáme id = žiadny zápis do okna, A3); deep-link pridá kotvu z riadka (`anchor`
+  `{ fn, phase before|after, miss }` — `bom` a `mat` pred vykreslením, `budget` a `appl` po ňom) a kreslí vždy. Dispatch lišty a tela z riadka (`tools`,
+  `body`, `stale`, `missing`); Kusovník, Kontrola a Nákup sú pomenované háčiky `studio.js` s dnešným telom v tabuľke **`OWN_HOOKS`** (A1: v Node `require`
+  nie sú globálmi; chýbajúci vlastný háčik vyletí, nie prázdna lišta). Fixtúra kontraktu doplnená ručne zo starého kódu. Ozvena Kontroly ×4 a kontroly
+  vlastnej sekcie v moduloch ostávajú (D9). **Golden T0 bez regenerácie zelený.** Nové `test_h14b_prepnutie.js` (R5 f vm — háčik existuje pred špehmi
+  a definuje ho súbor `module`; R5 f CommonJS + T8 — lišta a telo `bom` ×3, `ctrl`, `buy` = golden G2; R1.2a; T2) a `test_h14b_prepnutie.rb` (guard R5 d).
+  **T4:** textové kontroly vetiev → riadok kontraktu + správanie (`test_st2a_mat.js`, `test_st3a_hw.rb`, `test_st2d_kde.rb`, `test_st1a_studio.rb`,
+  `test_st1b_kontrola.rb`, `test_st1c_nakup.rb`, `test_s1a2_sekcia.rb`, `test_st3b_rules.rb`, `test_d52b_updater_ui.rb`; `mirror_problems` číta jednu cestu).
+  **Mutácie (13, všetky zhodené):** M7–M13, M18–M21, M23 (M9 ako presun aj ako odstránenie). Q1 („Obnoviť" v Šablónach) nezmenené. STAV pred dávkou:
+  v0.17.14, H14a hotová, ďalší krok H14b. Testy: **5160 headless · 156 JS sád** zelené + encoding guard; in-SU netreba (Ruby len verzia).
+
 - **H14a · register sekcií Štúdia a zoznamy z registra (1.10.2026, PR #450, v0.17.14, blok 9 · HARDENING PO V1, triedenie C-02 časť 1 — CX-05;
   package [PACKAGE_H14.md](../zdroje/bloky/HARDENING/PACKAGE_H14.md) + audit [AUDIT_H14_raw.md](../zdroje/bloky/HARDENING/AUDIT_H14_raw.md), §15 A2 A4 A5).**
   Sekcia Štúdia sa prihlasovala na 13 miestach v 4 súboroch (zoznam 3×, `NAV`, `SEC_META`, `REFRESH_STATUS`, `SS_SECTIONS`, dve cesty prechodu, kotvy).

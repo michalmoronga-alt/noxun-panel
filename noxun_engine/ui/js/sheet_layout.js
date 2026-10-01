@@ -22,7 +22,7 @@
   //     `cut_*`, Codex C13).
   //
   // Súbor sa načítava AŽ ZA studio.js — lištu a telo sekcie volá studio.js cez
-  // `typeof npRenderTools / npRenderBody` (vzor ostatných sekcií).
+  // háčiky riadka `cut` v registri sekcií (`npRenderTools` / `npRenderBody`).
 
   var NP_STUDIO = (typeof module !== 'undefined' && module.exports) ? require('./studio.js') : null;
   var NP_CLOSED_KEY = 'nx_np_closed';

@@ -70,9 +70,11 @@ module NxH14Reg
     ss = src('noxun_engine', 'ui', 'js', 'studio_settings.js')
     out = []
     out << 'studio.js drzi vlastne STUDIO_SECTIONS' if st.include?('STUDIO_SECTIONS')
-    unless st.include?("require('./studio_sections.js')") && st.include?('SECREG.has(id)') &&
-           st.include?('SECREG.has(ST.open_section)')
-      out << 'studio.js nefiltruje navigaciu a deep-link registrom'
+    # H14b: navigacia aj deep-link idu JEDNOU funkciou prechodu, ktora filtruje registrom.
+    sw = st[/function studioSwitchSection\(id, guid\)\{.*?\n  \}/m].to_s
+    unless st.include?("require('./studio_sections.js')") && sw.include?('if (!SECREG.has(id)) return false;') &&
+           st.include?('studioSwitchSection(ST.open_section,') && st.include?('if (!studioSwitchSection(id,')
+      out << 'studio.js nefiltruje navigaciu a deep-link registrom (jedna cesta studioSwitchSection)'
     end
     out << 'shell.js drzi vlastne STUDIO_SECTIONS' if sh.include?('STUDIO_SECTIONS')
     out << 'shell.js nefiltruje deep-link registrom' unless sh.include?('SECREG.has(v)')

@@ -48,6 +48,7 @@
 #  14. (#278/2 P2) `updPaint()` sa pri pisani cesty nevola / ack ignoruje
 #      odoslanu hodnotu -> JS sada, bloky 4d a 4e.
 require_relative '../helper' unless defined?(NxTest)
+require_relative 'test_h14a_register' unless defined?(NxH14Reg) # H14: kontrakt sekcii Studia
 
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog') if NxTest.headless?
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'supplier_settings_dialog') if NxTest.headless?
@@ -1100,9 +1101,14 @@ NxTest.test('D-52b: updater prvky su LEN v studiovom vstupe „O plugine"') do
 end
 
 NxTest.test('D-52b: check spusta VSTUP do sekcie — OBA vstupy') do
-  # Navigacia aj deep-link: dve miesta v `studio.js`, obe volaju ten isty hook.
-  NxTest.assert_equal(2, D52B_STUDIO_JS.scan(/ssOnAboutEnter\(\)/).length,
-                      'hook je v OBOCH vstupoch do sekcie (navigacia + deep-link)')
+  # H14b: navigacia aj deep-link idu JEDNOU funkciou prechodu (`studioSwitchSection`),
+  # ktora vola vstupny hacik z riadku registra. Spravanie (prave jeden check pri
+  # vstupe kazdou cestou, ziadny pri opatovnom otvoreni) overuje
+  # tests/js/test_h14b_prepnutie.js a golden G3.
+  NxTest.assert_equal('ssOnAboutEnter', NxH14Reg.row('about')['enter'],
+                      'hook je vstupnym hacikom sekcie „O plugine" v registri (oba vstupy)')
+  NxTest.refute(D52B_STUDIO_JS.match?(/ssOnAboutEnter\(/),
+                'studio.js ho nevola natvrdo — len cez register (jedna cesta prechodu)')
   NxTest.assert(D52B_SETTINGS_JS.include?("updSend('updater_check'"), 'hook posiela explicitny check')
   enter = D52B_SETTINGS_JS[/function ssOnAboutEnter\(\).*?\n  \}/m].to_s
   NxTest.assert(enter.include?('UPD = null'), 'a stary vysledok patril inemu vstupu — zahadza sa')

@@ -21,7 +21,8 @@
   // prepisalo rozpisany formular Rozpoctu). Cita sa, nikdy nenastavuje.
   function studioActiveSection(){ return studioSec; }
   // LEN pre Node testy: nastavi aktivnu sekciu BEZ kreslenia okna (`render`
-  // potrebuje cely DOM). Produkcia prepina sekciu vyhradne `studioGoSection`.
+  // potrebuje cely DOM). Produkcia prepina sekciu vyhradne `studioSwitchSection`
+  // (klik cez `studioGoSection`, deep-link v `NX.setStudio`).
   function studioSetSectionForTest(id){ studioSec = id; }
   var bomView = 'parts';     // Š4: parts | sheets | abs
   var bomQ = '';             // Š6: text hladania
@@ -1082,11 +1083,9 @@
   // budget.js, ktory ho obaluje.
   var NXAPI = {
     setStudio: function(data){
-      // S1-B1: kotva RIADKU rozpočtu sa spotrebuje až po vykreslení sekcie
-      // (dôvod nižšie), preto musí prežiť blok deep-linku.
-      var budAnchor = null;
-      // S1-B2: to isté pre kotvu riadku v sekcii SPOTREBIČE.
-      var applAnchor = null;
+      // Kotva deep-linku s fázou „po vykreslení" (dotaz do DOM) sa spotrebuje
+      // až po prekreslení okna — musí prežiť blok deep-linku.
+      var lateAnchor = null;
       // CENY-KOV-A: produktovy preklik mohol zacat aj z Rozpoctu. Zmena
       // dokumentu zrusi jeho cakanie este PRED dosadenim cudzieho payloadu.
       if (typeof hwProductContextChanged === 'function' &&
@@ -1129,88 +1128,15 @@
       DIRECTION = (ST && ST.direction_check) ? ST.direction_check : null;
       var mdl = el('stModel');
       if (mdl) mdl.textContent = ST ? ('zákazka: ' + ST.model_title + ' · v' + ST.version) : '…';
-      // Deep-link sekcie sa posiela PRAVE RAZ; kotva s nou.
-      if (ST && ST.open_section && SECREG.has(ST.open_section)){
-        if (studioSec !== ST.open_section && typeof hwProductContextChanged === 'function'){
-          hwProductContextChanged(ST.open_section, ST.model_guid || '');
-        }
-        if (studioSec !== ST.open_section && typeof mdManualContextChanged === 'function'){
-          mdManualContextChanged(ST.open_section, ST.model_guid || '');
-        }
-        // Review #8: deep-link je PRESKOK do inej sekcie — otvorené rohové menu
-        // patrilo tej, z ktorej sme odišli. Bez vynulovania by sa `vepoMenuOpen`
-        // vrátilo pri najbližšom návrate do Kusovníka „samo otvorené".
-        closeSectionMenus();
-        // ŠT-2b: deep-link je DRUHA cesta preč zo sekcie (prvá je `onNav`) —
-        // modály Materiálov žijú mimo tela sekcie, takže by inak ostali visieť
-        // nad novou sekciou a Demos beh by dobehol do nikam.
-        if (studioSec === 'mat' && ST.open_section !== 'mat' &&
-            typeof matOnLeaveSection === 'function'){
-          matOnLeaveSection();
-        }
-        // ŠT-3a-1: to isté pre sekciu Kovanie (modal potvrdenia mazania žije
-        // mimo tela sekcie a na serveri môže bežať overenie ceny / náhľad).
-        if (studioSec === 'hw' && ST.open_section !== 'hw' &&
-            typeof hwOnLeaveSection === 'function'){
-          hwOnLeaveSection();
-        }
-        // S1-A2: to isté pre sekciu Spotrebiče (modal D-15 žije mimo tela
-        // sekcie a server si pamätá filter stromu).
-        if (studioSec === 'appl' && ST.open_section !== 'appl' &&
-            typeof apOnLeaveSection === 'function'){
-          apOnLeaveSection();
-        }
-        // D-52b: DEEP-LINK je jeden z DVOCH vstupov do sekcie „O plugine"
-        // (druhý je navigácia v `studioGoSection`) — a oba musia spustiť
-        // PRESNE JEDEN explicitný check verzie. Zo `settings_payload` check
-        // nechodí: plný push chodí pri každej zmene modelu a kontrola siaha na
-        // sieťový share (F5).
-        var wasAbout = (studioSec === 'about');
-        studioSec = ST.open_section;
-        if (studioSec === 'about' && !wasAbout && typeof ssOnAboutEnter === 'function'){
-          ssOnAboutEnter();
-        }
-        // Kotva predvyplna hladanie KUSOVNIKA (N13 posiela ID skrinky). Pri inej
-        // sekcii by potichu prestavila filter, ktory pouzivatel ani nevidí —
-        // preto sa aplikuje LEN so sekciou, do ktorej patri (review #7).
-        var a = (studioSec === 'bom') ? anchorFilter(ST) : null;
-        if (a) bomQ = a;
-        // ŠT-2d: sekcia Materiály spotrebuje kotvu INAK — nie ako text
-        // hľadania, ale ako OTVORENIE DETAILU dekoru (deep-link z karty dielca
-        // „klik na materiál"). Rovnako JEDNORAZOVO: server ju v ďalšom pushi
-        // už neposiela, takže návrat do dlaždíc prežije refresh.
-        // Review #3: neúspešné otvorenie NIE JE tichý no-op. Dekor sa mohol
-        // medzitým zmazať alebo premenovať a používateľ, ktorý klikol na
-        // materiál dielca, by inak skončil v zozname dlaždíc bez slova —
-        // vyzeralo by to ako pokazený preklik.
-        var ma = (studioSec === 'mat') ? anchorFilter(ST) : null;
-        if (ma && typeof matOpenAnchor === 'function' && !matOpenAnchor(ma)){
-          NXAPI.setStatus('Tento dekor už v katalógu nie je — otvorené v zozname materiálov.', true);
-        }
-        // S1-B1: sekcia Rozpočet spotrebuje kotvu ako ADRESU RIADKU (deep-link
-        // z Kontroly pri spotrebiči, ktorého vlastník zmizol — taký nález nemá
-        // v modeli čo označiť). Rovnako JEDNORAZOVO a rovnako nahlas: riadok,
-        // ktorý medzitým zanikol, nie je tichý no-op.
-        //
-        // ROZDIEL oproti kotvám vyššie (Codex #382 kolo 3): `bom` aj `mat`
-        // menia STAV, z ktorého `render()` kreslí, takže musia bežať PRED ním.
-        // Táto kotva je naopak DOTAZ DO DOM (doscrollovanie a prisvietenie
-        // riadku) — pred vykreslením sekcie by nenašla nič a jednorazová kotva
-        // by zanikla bez účinku. Aplikuje sa preto AŽ PO `render()`.
-        budAnchor = (studioSec === 'budget') ? anchorFilter(ST) : null;
-        // S1-B2: nález o spotrebiči vedie do sekcie SPOTREBIČE (`route: 'appl'`
-        // v `ProductionCore::ROUTE_SECTIONS`) — kotva prepne pohľad na
-        // „V zákazke" a riadok prisvieti. Rovnaký životný cyklus ako pri
-        // Rozpočte: AŽ PO `render()` (je to dotaz do DOM) a JEDNORAZOVO.
-        applAnchor = (studioSec === 'appl') ? anchorFilter(ST) : null;
+      // Deep-link sekcie sa posiela PRÁVE RAZ; kotva s ňou. Prepnutie ide TOU
+      // ISTOU cestou ako klik v navigácii (`studioSwitchSection`: kontext
+      // dokumentu, zhasnutie menu, odchod zo starej a vstup do novej sekcie) —
+      // navyše je len kotva, ktorá patrí VÝHRADNE deep-linku (klik ju nemá).
+      if (ST && studioSwitchSection(ST.open_section, ST.model_guid || '')){
+        lateAnchor = sectionAnchorBefore(ST);
       }
       render();
-      if (budAnchor && typeof budOpenAnchor === 'function' && !budOpenAnchor(budAnchor)){
-        NXAPI.setStatus('Tento riadok už v rozpočte nie je — otvorený je celý Rozpočet.', true);
-      }
-      if (applAnchor && typeof apOpenAnchor === 'function' && !apOpenAnchor(applAnchor)){
-        NXAPI.setStatus('Tento spotrebič už v zákazke nie je — otvorený je celý zoznam.', true);
-      }
+      if (lateAnchor) sectionAnchorOpen(lateAnchor.row, lateAnchor.a);
     },
     setStatus: function(msg, err){
       var e = el('status');
@@ -1322,113 +1248,58 @@
   }
 
   // Lista sekcie: primarna akcia vlavo, exporty vedla nej, hladanie a stlpce
-  // vpravo (kontrakt §3 — ziadna globalna lista exportov).
+  // vpravo (kontrakt §3 — ziadna globalna lista exportov). Kto ju kreslí, hovorí
+  // riadok registra (`tools`): sekčné moduly sa načítavajú AŽ ZA týmto súborom,
+  // preto sa háčik rozlišuje v čase volania; chýbajúci modul = prázdna lišta.
+  // `stale` = lište sa podáva jantárový príznak — `staleFlag` má jedinú
+  // autoritu, tu. Sekcie bez neho (Rozpočet, Ponuka a Spotrebiče — katalóg je
+  // per PC, „Obnoviť" zákazky tam nepatrí; Nastavenia) sa volajú bez argumentu.
   function renderTools(){
     var box = el('sectools');
     if (!box) return;
     if (!ST){ box.innerHTML = ''; return; }
-    // ŠT-1c PR B1: lišta sekcie Rozpočet (prepínače DPH a režimu, prepočet
-    // cien, obnovenie, exporty, ⚙) si kreslí js/budget.js — ten sa načítava
-    // AŽ ZA týmto súborom, preto sa volá cez `typeof`.
-    if (studioSec === 'budget'){
-      if (typeof budRenderTools === 'function') budRenderTools();
-      else box.innerHTML = '';
-      return;
-    }
-    // ŠT-1c PR B2 (Š14): lišta sekcie Cenová ponuka (XLSX ponuky + Obnoviť) —
-    // ten istý súbor, lebo ponuka je projekciou toho istého payloadu.
-    if (studioSec === 'offer'){
-      if (typeof budRenderOfferTools === 'function') budRenderOfferTools();
-      else box.innerHTML = '';
-      return;
-    }
-    // ŠT-2a: listu sekcie Materialy kresli `js/proj_materials.js` (nacitava sa
-    // AZ ZA tymto suborom, preto cez `typeof`). Jantarovy priznak mu podavame
-    // — `staleFlag` ma jedinu autoritu, tu.
-    if (studioSec === 'mat'){
-      if (typeof matRenderTools === 'function') matRenderTools(staleFlag);
-      else box.innerHTML = '';
-      return;
-    }
-    // ŠT-3a-1: to isté pre sekciu Kovanie — lištu kreslí `js/hw_catalog.js`
-    // (načítava sa AŽ ZA týmto súborom, preto cez `typeof`).
-    if (studioSec === 'hw'){
-      if (typeof hwRenderTools === 'function') hwRenderTools(staleFlag);
-      else box.innerHTML = '';
-      return;
-    }
-    // S1-A2: to isté pre sekciu Spotrebiče — lištu kreslí `js/appliances.js`.
-    // `staleFlag` sa jej NEPODÁVA: katalóg je per PC a s modelom nemá nič
-    // spoločné, takže „Obnoviť" (prepočet zákazky) sem nepatrí.
-    if (studioSec === 'appl'){
-      if (typeof apRenderTools === 'function') apRenderTools();
-      else box.innerHTML = '';
-      return;
-    }
-    // ŠT-3b-1: to isté pre sekciu Pravidlá — lištu kreslí `js/rules.js`.
-    if (studioSec === 'rules'){
-      if (typeof rulesRenderTools === 'function') rulesRenderTools(staleFlag);
-      else box.innerHTML = '';
-      return;
-    }
-    // ŠT-3c-1: a pre sekciu Šablóny `js/templates.js`.
-    if (studioSec === 'tpl'){
-      if (typeof tplRenderTools === 'function') tplRenderTools(staleFlag);
-      else box.innerHTML = '';
-      return;
-    }
-    // ŠT-4a: tri sekcie NASTAVENÍ kreslí `js/studio_settings.js`. Lištu má len
-    // `bset` (má čo ukladať) — `sup` a `about` sú čítanie, takže prázdna lišta
-    // je poctivejšia než tlačidlá, ktoré nič nerobia (D-78).
-    if (studioSec === 'sup' || studioSec === 'bset' || studioSec === 'about'){
-      if (typeof ssRenderTools === 'function') ssRenderTools();
-      else box.innerHTML = '';
-      return;
-    }
-    // NP-3: lištu Nárezového plánu (Obnoviť + chip parametrov, v detaile aj
-    // listovanie platní) kreslí `js/sheet_layout.js`. Jantárový príznak mu
-    // podávame — `staleFlag` má jedinú autoritu, tu.
-    if (studioSec === 'cut'){
-      if (typeof npRenderTools === 'function') npRenderTools(staleFlag);
-      else box.innerHTML = '';
-      return;
-    }
-    // Š10: lišta sekcie Kontrola nesie OBA prepínače (a nič iné — exporty
-    // kontrola nemá). Jeden riadok, žiadny nový blok: vertikálny priestor
-    // je vzácny a nastavenie hrán je overlay pod tlačidlom.
-    if (studioSec === 'ctrl'){
-      box.innerHTML = edgeCheckBarHtml(EDGE, ecMenuOpen, GRAIN, DIRECTION) +
-        '<span class="spacer"></span>' +
-        '<span class="sechint">Zoradené podľa závažnosti.</span>' +
-        // Review #7: Kontrola bola JEDINA sekcia BEZ „Obnoviť" — a pritom je to
-        // sekcia, kvoli ktorej sa clovek do okna vracia po oprave v Inspectore.
-        // Prestavba skrinky sem sama nedorazi, takze zoznam nalezov mohol
-        // ukazovat uz opravenu chybu (rovnaky dovod ako v Kusovniku a Nakupe).
-        // Zdielany `#refreshBtn` — jeden handler, jedna serverova cesta,
-        // a od tejto davky aj JEDEN markup (`refreshBtnHtml`).
-        refreshBtnHtml(staleFlag, 'Prepočítať kontrolu z aktuálneho modelu');
-      return;
-    }
-    // ŠT-1c PR A (Š7): lišta sekcie Nákup kovania. Export patrí SEKCII
-    // (kontrakt §3) — v okne Výroba visel v hlavičke tabuľky, tu je jediná
-    // vec v lište; hint nahrádza pôvodný riadok nad tabuľkou (vertikálny
-    // priestor je vzácny, preto NEIDE na vlastný riadok).
-    if (studioSec === 'buy'){
-      box.innerHTML = '<button type="button" class="ghostbtn" id="hwCsvBtn"' +
-        ' title="CSV nákupného zoznamu — počíta sa z čerstvého modelu">' +
-        ico('download') + ' CSV kovania</button>' +
-        // Review P3: sekcia musí mať vlastnú cestu k čerstvým číslam. Prestavba
-        // skrinky z Inspectora sem sama nedorazí, takže bez „Obnoviť" by sa dal
-        // objednávať nákupný zoznam zo starých počtov — a odísť po ne do
-        // Kusovníka je skrytá cesta (rovnaký dôvod ako v lište Kusovníka).
-        refreshBtnHtml(staleFlag, 'Prepočítať nákupný zoznam z aktuálneho modelu') +
-        '<span class="spacer"></span>' +
-        '<span class="sechint">Klik na riadok generiky označí vlastníka v modeli.</span>';
-      return;
-    }
+    var row = SECREG.get(studioSec);
+    var f = row ? sectionHook(row, row.tools) : null;
+    if (!f){ box.innerHTML = ''; return; }
+    if (row.stale) f(staleFlag);
+    else f();
+  }
+
+  // Lišta KUSOVNÍKA (pohľady, Projekt, hľadanie, VEPO, stĺpce, „Obnoviť").
+  function bomRenderTools(){
+    var box = el('sectools');
+    if (!box) return;
     box.innerHTML = bomToolsHtml(ST.vepo || {},
                                  { view: bomView, q: bomQ,
                                    cols: colMenuOpen, vepo: vepoMenuOpen, stale: staleFlag });
+  }
+
+  // Š10: lišta sekcie Kontrola nesie OBA prepínače (a nič iné — exporty
+  // kontrola nemá). Jeden riadok, žiadny nový blok: vertikálny priestor
+  // je vzácny a nastavenie hrán je overlay pod tlačidlom.
+  function ctrlRenderTools(){
+    var box = el('sectools');
+    if (!box) return;
+    box.innerHTML = edgeCheckBarHtml(EDGE, ecMenuOpen, GRAIN, DIRECTION) +
+      '<span class="spacer"></span>' +
+      '<span class="sechint">Zoradené podľa závažnosti.</span>' +
+      // Review #7: Kontrola potrebuje „Obnoviť" — prestavba skrinky z Inspectora
+      // sem sama nedorazí. Zdieľaný `#refreshBtn` (jeden handler, jeden markup).
+      refreshBtnHtml(staleFlag, 'Prepočítať kontrolu z aktuálneho modelu');
+  }
+
+  // ŠT-1c PR A (Š7): lišta sekcie Nákup kovania. Export patrí SEKCII
+  // (kontrakt §3); hint nahrádza riadok nad tabuľkou (vertikálny priestor je
+  // vzácny). „Obnoviť": bez neho by sa objednávalo zo starých počtov.
+  function buyRenderTools(){
+    var box = el('sectools');
+    if (!box) return;
+    box.innerHTML = '<button type="button" class="ghostbtn" id="hwCsvBtn"' +
+      ' title="CSV nákupného zoznamu — počíta sa z čerstvého modelu">' +
+      ico('download') + ' CSV kovania</button>' +
+      refreshBtnHtml(staleFlag, 'Prepočítať nákupný zoznam z aktuálneho modelu') +
+      '<span class="spacer"></span>' +
+      '<span class="sechint">Klik na riadok generiky označí vlastníka v modeli.</span>';
   }
 
   // LISTA sekcie KUSOVNIK — cista funkcia (testuje ju tests/js/test_st1a_studio.js).
@@ -1535,85 +1406,43 @@
     return h;
   }
 
+  // Telo sekcie: kto ho kreslí, hovorí riadok registra (`body`). Sekčné moduly
+  // si píšu do `#secbody` SAMY a render im ho NEPREPISUJE — v sekcii môže byť
+  // rozpísaný formulár (Materiály, Kovanie, Pravidlá, Nastavenia rozpočtu)
+  // alebo dlaždice, do ktorých dobiehajú náhľady (Šablóny, Spotrebiče), a plný
+  // push chodí pri každej zmene modelu. Chýbajúci modul = núdzový text `missing`.
   function renderBody(){
     var box = el('secbody');
     if (!box) return;
     if (!ST){ box.innerHTML = '<div class="muted">Načítavam…</div>'; return; }
-    // ŠT-1c PR B1: telo sekcie Rozpočet kreslí js/budget.js (píše si do
-    // `#secbody` samo — potrebuje okolo zápisu obnovu fokusu v rozpísaných
-    // políčkach).
-    if (studioSec === 'budget'){
-      if (typeof budRenderBody === 'function') budRenderBody();
-      else box.innerHTML = '<div class="muted">Rozpočet sa nenačítal (js/budget.js).</div>';
-      return;
-    }
-    if (studioSec === 'offer'){
-      if (typeof budRenderOfferBody === 'function') budRenderOfferBody();
-      else box.innerHTML = '<div class="muted">Cenová ponuka sa nenačítala (js/budget.js).</div>';
-      return;
-    }
-    // ŠT-2a (audit #2): telo sekcie Materialy si kresli `js/proj_materials.js`
-    // SAM a ZAMERNE ho tento render NEPREPISUJE — v sekcii moze byt rozpisany
-    // formular „Nový dekor" alebo rozpisana bunka ceny a `NX.setStudio` (napr.
-    // po prepocte kusovnika) ich nesmie zmazat.
-    if (studioSec === 'mat'){
-      if (typeof matRenderBody === 'function') matRenderBody();
-      else box.innerHTML = '<div class="muted">Materiály sa nenačítali (js/proj_materials.js).</div>';
-      return;
-    }
-    // ŠT-3a-1: telo sekcie Kovanie si kreslí `js/hw_catalog.js` z TOHO ISTÉHO
-    // dôvodu ako Materiály (audit #2): v sekcii môže byť rozpísaný formulár
-    // novej položky, rozpísaný editor setu alebo rozpísaná bunka ceny a
-    // `NX.setStudio` (napr. po prepočte kusovníka) ich nesmie zmazať.
-    if (studioSec === 'hw'){
-      if (typeof hwRenderBody === 'function') hwRenderBody();
-      else box.innerHTML = '<div class="muted">Kovanie sa nenačítalo (js/hw_catalog.js).</div>';
-      return;
-    }
-    // S1-A2: telo sekcie Spotrebiče si kreslí `js/appliances.js` SAM — dôvod
-    // je ten istý ako pri Šablónach: sekcia si po vykreslení PÝTA miniatúry
-    // príloh a odpovede nasadzuje do už vykreslenej karty.
-    if (studioSec === 'appl'){
-      if (typeof apRenderBody === 'function') apRenderBody();
-      else box.innerHTML = '<div class="muted">Spotrebiče sa nenačítali (js/appliances.js).</div>';
-      return;
-    }
-    // ŠT-3b-1: telo sekcie Pravidlá si kreslí `js/rules.js` SAM — v sekcii
-    // môže byť ROZPÍSANÝ formulár pravidiel a `NX.setStudio` ho nesmie zmazať.
-    if (studioSec === 'rules'){
-      if (typeof rulesRenderBody === 'function') rulesRenderBody();
-      else box.innerHTML = '<div class="muted">Pravidlá sa nenačítali (js/rules.js).</div>';
-      return;
-    }
-    // ŠT-3c-1: telo sekcie Šablóny kreslí `js/templates.js` — dôvod je iný než
-    // pri formulároch vyššie: sekcia si po vykreslení PÝTA PNG náhľady a
-    // odpovede nasadzuje do UŽ EXISTUJÚCICH dlaždíc (výmena uzla by odpojila
-    // cieľ kliku aj práve doručený obrázok).
-    if (studioSec === 'tpl'){
-      if (typeof tplRenderBody === 'function') tplRenderBody();
-      else box.innerHTML = '<div class="muted">Šablóny sa nenačítali (js/templates.js).</div>';
-      return;
-    }
-    // ŠT-4a: telo sekcií NASTAVENÍ si kreslí `js/studio_settings.js` SÁM — v `bset`
-    // môže byť ROZPÍSANÝ formulár sadzieb a `NX.setStudio` ho nesmie zmazať
-    // (plný push chodí pri každej zmene modelu, nielen pri otvorení sekcie).
-    if (studioSec === 'sup' || studioSec === 'bset' || studioSec === 'about'){
-      if (typeof ssRenderBody === 'function') ssRenderBody();
-      else box.innerHTML = '<div class="muted">Nastavenia sa nenačítali (js/studio_settings.js).</div>';
-      return;
-    }
-    // NP-3: telo Nárezového plánu (karty materiálov / detail platne).
-    if (studioSec === 'cut'){
-      if (typeof npRenderBody === 'function') npRenderBody();
-      else box.innerHTML = '<div class="muted">Nárezový plán sa nenačítal (js/sheet_layout.js).</div>';
-      return;
-    }
-    if (studioSec === 'ctrl') box.innerHTML = ctrlSection();
-    else if (studioSec === 'buy') box.innerHTML = buySection(ST.hardware_sets || null, ST.hardware || []);
-    else if (bomView === 'sheets') box.innerHTML = sheetsTable();
+    var row = SECREG.get(studioSec);
+    var f = row ? sectionHook(row, row.body) : null;
+    if (f){ f(); return; }
+    box.innerHTML = '<div class="muted">' + esc(row ? row.missing : '') + '</div>';
+  }
+
+  // Telo KUSOVNÍKA podľa pohľadu (Š4: Dielce · Platne · ABS).
+  function bomRenderBody(){
+    var box = el('secbody');
+    if (!box) return;
+    if (bomView === 'sheets') box.innerHTML = sheetsTable();
     else if (bomView === 'abs') box.innerHTML = absTable();
     else box.innerHTML = partsTable();
   }
+
+  function ctrlRenderBody(){
+    var box = el('secbody');
+    if (box) box.innerHTML = ctrlSection();
+  }
+
+  function buyRenderBody(){
+    var box = el('secbody');
+    if (box) box.innerHTML = buySection(ST.hardware_sets || null, ST.hardware || []);
+  }
+
+  // Kotva deep-linku z Inspectora (N13 „Materiál" posiela ID skrinky) = text
+  // hľadania Kusovníka. Mení stav, z ktorého sa kreslí — preto `before`.
+  function bomOpenAnchor(a){ bomQ = a; return true; }
 
   // Š6: pri pisani sa prekresluje LEN telo — inak by input stratil fokus.
   function renderBomBody(){ renderBody(); }
@@ -2065,42 +1894,86 @@
     studioGoSection(id);
   }
 
+  // Háčiky sekcií, ktoré kreslí TENTO súbor. V Node testoch (`require`) nie sú
+  // jeho funkcie globálmi, preto ich register nehľadá cez `globalThis`, ale tu.
+  var OWN_HOOKS = {
+    bomRenderTools: bomRenderTools, bomRenderBody: bomRenderBody, bomOpenAnchor: bomOpenAnchor,
+    ctrlRenderTools: ctrlRenderTools, ctrlRenderBody: ctrlRenderBody,
+    buyRenderTools: buyRenderTools, buyRenderBody: buyRenderBody
+  };
+  Object.freeze(OWN_HOOKS);
+
+  // Háčik sekcie podľa mena z registra, rozlíšený V ČASE VOLANIA (sekčné moduly
+  // sa načítavajú až za týmto súborom). Chýbajúci háčik INÉHO súboru = null
+  // (sekcia ukáže núdzový text — modul sa nenačítal). Chýbajúci VLASTNÝ háčik
+  // je chyba programu, nie prázdna lišta: vyletí a zachytí ju `errors.js`.
+  function sectionHook(row, name){
+    if (!name) return null;
+    if (Object.prototype.hasOwnProperty.call(OWN_HOOKS, name)) return OWN_HOOKS[name];
+    if (row.module === 'studio.js'){
+      throw new Error('Štúdio: sekcia ' + row.id + ' nemá vlastný háčik ' + name + ' (OWN_HOOKS v studio.js)');
+    }
+    return SECREG.fn(name);
+  }
+
+  // JEDINÁ cesta prepnutia sekcie — pre klik v navigácii, preklik z kódu
+  // (chip Rozpočtu, nález Kontroly) aj deep-link servera. Nekreslí; vráti false
+  // pri neznámom id (sekcia ostáva, okno sa neprekreslí). Poradie je záväzné:
+  //   1. kontext dokumentu (produktový preklik kovania, formulár „Overiť cenu"
+  //      materiálu) patrí sekcii — pri zmene sekcie sa zruší,
+  //   2. otvorené menu lišty patrí sekcii, z ktorej odchádzame (review #8),
+  //   3. odchod (`leave`): modály žijú MIMO tela sekcie a na serveri môže bežať
+  //      beh (Demos, overenie ceny, filter stromu) — inak by visel nad cudzou
+  //      sekciou; autoritou zrušenia je server, háčik je jeho ohlasovač,
+  //   4. vstup (`enter`): napr. „O plugine" spustí PRÁVE JEDEN check verzie
+  //      (D-52b) — opätovné otvorenie tej istej sekcie ho neopakuje.
+  function studioSwitchSection(id, guid){
+    if (!SECREG.has(id)) return false;
+    var from = studioSec;
+    if (id !== from && typeof hwProductContextChanged === 'function') hwProductContextChanged(id, guid);
+    if (id !== from && typeof mdManualContextChanged === 'function') mdManualContextChanged(id, guid);
+    closeSectionMenus();
+    var leaving = (id !== from) ? SECREG.get(from) : null;
+    var leave = leaving ? sectionHook(leaving, leaving.leave) : null;
+    if (leave) leave();
+    studioSec = id;
+    if (id !== from){
+      var entering = SECREG.get(id);
+      var enter = sectionHook(entering, entering.enter);
+      if (enter) enter();
+    }
+    return true;
+  }
+
   // Prepnutie sekcie z KÓDU (navigácia, chip súčtu v Rozpočte, nález Kontroly).
   // Musí byť globálna — volá ju aj js/budget.js, ktorý sa načítava za týmto
-  // súborom a vlastný stav sekcií nemá.
+  // súborom a vlastný stav sekcií nemá. Kreslí LEN po úspešnom prepnutí:
+  // neznáme id nič neprekreslí (render by vzal fokus z rozpísaného poľa).
   function studioGoSection(id){
-    if (!SECREG.has(id)) return;
-    if (id !== studioSec && typeof hwProductContextChanged === 'function'){
-      hwProductContextChanged(id, ST ? (ST.model_guid || '') : '');
-    }
-    if (id !== studioSec && typeof mdManualContextChanged === 'function'){
-      mdManualContextChanged(id, ST ? (ST.model_guid || '') : '');   // CENY-M1b (R23)
-    }
-    closeSectionMenus();   // review #8 — overlay patrí sekcii, z ktorej odchádzame
-    // ŠT-2b: sekcia Materiály má modály MIMO tela sekcie (`#matModalRoot`) a
-    // dlhé behy Demosu na serveri. Odchod z nej preto musí modály zavrieť
-    // a beh zrušiť — inak by modal ostal visieť nad Kusovníkom a sťahovanie
-    // by dobehlo do sekcie, ktorú už nikto nepozerá. Autoritou zrušenia je
-    // server (`mat_leave`), toto je jeho jediný ohlasovač.
-    if (studioSec === 'mat' && id !== 'mat' && typeof matOnLeaveSection === 'function'){
-      matOnLeaveSection();
-    }
-    // ŠT-3a-1: sekcia Kovanie má z rovnakých dôvodov vlastný odchodový hook.
-    if (studioSec === 'hw' && id !== 'hw' && typeof hwOnLeaveSection === 'function'){
-      hwOnLeaveSection();
-    }
-    // S1-A2: sekcia Spotrebiče má modal (D-15) MIMO tela sekcie a na serveri
-    // si pamätá filter stromu — odchod oboje zruší (`appl_leave`).
-    if (studioSec === 'appl' && id !== 'appl' && typeof apOnLeaveSection === 'function'){
-      apOnLeaveSection();
-    }
-    // D-52b: NAVIGÁCIA je druhý vstup do sekcie „O plugine" — vstupný hook je
-    // protipólom odchodových hookov vyššie a spúšťa PRESNE JEDEN check verzie
-    // (znova otvorená tá istá sekcia check neopakuje).
-    var wasAbout = (studioSec === 'about');
-    studioSec = id;
-    if (id === 'about' && !wasAbout && typeof ssOnAboutEnter === 'function') ssOnAboutEnter();
+    if (!studioSwitchSection(id, ST ? (ST.model_guid || '') : '')) return;
     render();
+  }
+
+  // Kotvy deep-linku (riadok registra `anchor`; klik v navigácii ich nikdy
+  // nemá). Kotva sa spotrebuje PRÁVE RAZ — server ju v ďalšom pushi neposiela.
+  // `before` sa aplikuje hneď (mení stav, z ktorého `render()` kreslí: text
+  // hľadania Kusovníka, detail dekoru); `after` je dotaz do DOM (doscrollovanie
+  // a prisvietenie riadku Rozpočtu či Spotrebičov) — pred vykreslením by nenašla
+  // nič, preto ju volajúci aplikuje až po `render()`.
+  function sectionAnchorBefore(st){
+    var row = SECREG.get(studioSec);
+    var a = (row && row.anchor) ? anchorFilter(st) : null;
+    if (!a) return null;
+    if (row.anchor.phase === 'after') return { row: row, a: a };
+    sectionAnchorOpen(row, a);
+    return null;
+  }
+
+  // Neúspešné otvorenie NIE JE tichý no-op: cieľ (dekor, riadok rozpočtu,
+  // spotrebič) mohol medzitým zaniknúť a preklik by vyzeral pokazený.
+  function sectionAnchorOpen(row, a){
+    var f = sectionHook(row, row.anchor.fn);
+    if (f && !f(a) && row.anchor.miss) NXAPI.setStatus(row.anchor.miss, true);
   }
   if (typeof window !== 'undefined') window.studioGoSection = studioGoSection;
 
@@ -2298,6 +2171,8 @@
       activeCols: activeCols, cellValue: cellValue, grainLabel: grainLabel,
       absCompact: absCompact, absFull: absFull, rgbHex: rgbHex,
       anchorFilter: anchorFilter, navItem: navItem,
+      // H14b (tests/js/test_h14b_prepnutie.js): vlastné háčiky sekcií tohto súboru.
+      OWN_HOOKS: OWN_HOOKS,
       nxModalOpen: nxModalOpen,
       // SMOKE 1A–1D: lista sekcie Kusovnik + rohove nastavenie VEPO.
       // Testy nastavuju stav cez `setBomState` (bomView/bomQ/menu) — inak by

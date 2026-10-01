@@ -1286,8 +1286,13 @@ z Inspectora (`StudioDialog.show(open_section:, anchor:)`).
 
 **Navigácia a sekcie:**
 - O sekcii rozhoduje **uzavretý whitelist v Ruby**, klient posiela iba kľúč. Poradie, skupiny, ikony, názvy, nápovedy, badge a hlášku „Obnoviť" berú navigácia,
-  hlavička aj filter z **registra `NXStudioSections`** (odsek `ui/js/studio_sections.js` nižšie) — vlastný zoznam sekcií nedrží žiadny iný súbor. Prepnutie sekcie
-  z kódu je `studioGoSection(id)` (globál na `window`); deep-link v `NX.setStudio` volá tie isté háčiky vlastnou kópiou (jednu cestu prinesie H14b).
+  hlavička aj filter z **registra `NXStudioSections`** (odsek `ui/js/studio_sections.js` nižšie) — vlastný zoznam sekcií nedrží žiadny iný súbor.
+  **Prepnutie sekcie má jednu cestu** `studioSwitchSection(id, guid)` pre klik aj deep-link: neznáme id = `false` (nič sa nestane); inak pri zmene sekcie
+  kontextové háčiky dokumentu (`hwProductContextChanged`, `mdManualContextChanged`) → zhasnutie menu lišty (`closeSectionMenus`) → `leave` opúšťanej sekcie →
+  `studioSec = id` → `enter` novej (napr. „O plugine" = práve jeden check verzie). Nekreslí: `studioGoSection(id)` (globál na `window` — navigácia, chip
+  Rozpočtu, nález Kontroly) kreslí `render()` **len po úspešnom prepnutí**; deep-link v `NX.setStudio` navyše aplikuje **kotvu** a kreslí vždy (plný payload).
+  **Lištu a telo** kreslí `renderTools` / `renderBody` z riadka registra (`tools`, `body`) — vetvu podľa id nemajú; Kusovník, Kontrolu a Nákup kreslí
+  `studio.js` sám pomenovanými háčikmi z vlastnej tabuľky `OWN_HOOKS`.
   Neaktívna položka navigácie dnes nie je; vetva `disabled` (`aria-disabled` s dôvodom) ostáva poistkou. Ikony položiek sú **jedinečné** (Nastavenia rozpočtu
   `sliders-horizontal` — vedomá odchýlka od mockupu, ten istý symbol nesie tlačidlo „Nastavenia" v Rozpočte a akcia nálezu Kontroly `layout_settings`; Pravidlá
   `settings`; Kovanie `hammer` ako rail Inspectora). Zbalená navigácia `nx_studio_nav` v `localStorage`.
@@ -1325,7 +1330,9 @@ a kontroluje len živú inštanciu okna — leave hook Rozpočtu neexistuje.
 
 **Deep-link** — kontraktové meno `NX.studioOpen(section, anchor)`, reálna funkcia panela `openStudio(section, anchor)` (`ui/js/actions.js`) → `open_studio` →
 `StudioDialog::SECTIONS` (klient filtruje registrom `NXStudioSections`). Sekcia sa odloží do `@pending_section` a **jednorazovo ju spotrebuje najbližší
-`push_state`**; `anchor` sa spotrebuje so sekciou (Kusovník: predvyplní hľadanie; Materiály: otvorí detail dekoru).
+`push_state`**; `anchor` sa spotrebuje so sekciou podľa jej riadka registra (`anchor`): Kusovník predvyplní hľadanie a Materiály otvoria detail dekoru **pred**
+vykreslením (menia stav, z ktorého sa kreslí), Rozpočet a Spotrebiče doscrollujú a prisvietia riadok **po** ňom (dotaz do DOM); neúspech = hláška `miss`.
+Prechod ide tou istou cestou ako klik (`studioSwitchSection`) — kotvu má len deep-link.
 
 **Zápis čísel a jednotiek celého okna** žije v `studio.js` — blok `nxf*` (`nxfMoney`, `nxfMoneyIn`, `nxfQty`, `nxfUnit`, `nxfQtyUnit`, `nxfMm`, `nxfDim`, `nxfDec`;
 pravidlá: `docs/UI_DIZAJN.md` „Zápis čísel a jednotiek"). Sú to globály súboru (sekčné skripty `budget.js`, `proj_materials.js`, `hw_catalog.js`, `demos_diff.js`,
@@ -1353,18 +1360,26 @@ Ruby test so `SECTIONS` — žiadny regex nad zdrojom druhej strany.
 `hint` (len doplnok tooltipu navigácie, dnes `cut`) · `badge` (`ctrl` = semafor zákazky `ST.counts`, `appl` = `ST.appl.job.counts`) · `head` (nápoveda
 hlavičky) · `refresh` (hláška počas „Obnoviť"; bez nej `REFRESH_DEFAULT` „Prepočítavam kusovník…" — Šablóny vedome, Q1 H14) · `module` (súbor, ktorý sekciu
 kreslí) · `data` (kľúč payloadu `NX.setStudio`; guard overí, že ho `push_state` skladá — skladanie payloadu ostáva v Ruby explicitné).
+**Háčiky (mená funkcií):** `tools` / `body` (lišta a telo; `stale: true` = lišta dostane príznak neaktuálnosti ako argument — `cut`, `mat`, `hw`, `rules`,
+`tpl`) · `missing` (núdzový text tela, keď sekčný modul chýba; lišta je vtedy prázdna) · `leave` (`mat`, `hw`, `appl` — modály mimo tela, beh na serveri) ·
+`enter` (`about` — check verzie) · `anchor` `{ fn, phase: 'before'|'after', miss }` (len deep-link: `bom`, `mat` pred vykreslením, `budget`, `appl` po ňom).
+**Rozlíšenie v čase volania:** háčiky sekcií s `module: 'studio.js'` (`bom`, `ctrl`, `buy`) z tabuľky `OWN_HOOKS` v `studio.js` (pri `require` v Node nie sú
+jeho funkcie globálmi) — chýbajúci vlastný háčik je **chyba programu** (vyletí, zachytí `errors.js`), nie prázdna lišta; ostatné cez `fn(meno)`.
 
 **API:** `ids()` · `has(id)` (len reťazec zo zoznamu — nie `null`, číslo ani `'__proto__'`) · `get(id)` (riadok alebo `null`) · `groups()` (`[{ grp, t, items }]`)
-· `inModule(file)` · `fn(meno)` (globálna funkcia **v čase volania**, len vlastná vlastnosť globálu — `let`/`const` ani zdedené meno nenájde; pre háčiky H14b)
+· `inModule(file)` · `fn(meno)` (globálna funkcia **v čase volania**, len vlastná vlastnosť globálu — `let`/`const` ani zdedené meno nenájde)
 · `REFRESH_DEFAULT`. Zoznamy sú vždy nové polia a konzumenti si ich pýtajú **až pri použití** (poučenie H12) — pri načítaní si berú len referenciu na objekt.
 
-**Kto číta:** `studio.js` (`renderNav`, `renderHead`, `navItem`, `navCounts` cez `badge`, `requestRefresh`, whitelist `studioGoSection` aj deep-linku),
+**Kto číta:** `studio.js` (`renderNav`, `renderHead`, `navItem`, `navCounts` cez `badge`, `requestRefresh`, `renderTools`/`renderBody`, jediná cesta prechodu
+`studioSwitchSection` — whitelist, `leave`/`enter` — a kotvy deep-linku),
 `shell.js` (`NXShell.studioSection` — filter „Otvoriť v Štúdiu", funguje hneď, nečaká na `NX.init`), `studio_settings.js` (`ssActive` =
 `inModule('studio_settings.js')`). **Poradie načítania:** `studio.html` za `icons.js` a **pred** `studio.js`, `panel.html` **pred** `shell.js`; inde sa nenačítava
 (guard). Keby chýbal, skripty sa načítajú a chyba sa prejaví až pri prvom použití (zachytí ju `errors.js`).
 
 **Ako pridať sekciu:** kontrolný zoznam [rozsirovacie-body.md](rozsirovacie-body.md) §4. Testy: `tests/js/test_h14a_register.js` (register = fixtúra, API),
-`tests/pure/test_h14a_register.rb` (parita R4, guardy R5: zoznam sekcií mimo registra, neznáme id vo volaní, poradie skriptov), golden
+`tests/pure/test_h14a_register.rb` (parita R4, guardy R5: zoznam sekcií mimo registra, neznáme id vo volaní, poradie skriptov),
+`tests/js/test_h14b_prepnutie.js` (háčiky existujú pred špehmi a patria súboru `module`, `OWN_HOOKS` v Node, kotvy len v deep-linku, neznáme id bez zápisu do okna),
+`tests/pure/test_h14b_prepnutie.rb` (guard: `studio.js` nevetví podľa id sekcie mimo ozveny Kontroly, háčiky iných súborov nevolá menom), golden
 `tests/js/test_h14_golden.js` + `tests/pure/test_h14_studio_sekcie.rb` (navigácia, prechody, kotvy, hlášky a payload bez zmeny).
 
 ### StudioModelWatch — indikátor neaktuálnosti okna („Obnoviť" zožltne)
@@ -1582,7 +1597,7 @@ s dôvodom, preklik na nastavenia prerezu. Vzhľad: mockup `SYSTEM/archiv/bloky/
   na 0,1 mm + `o` najväčší zvyšok, `unplaced`/`rejected`/`conflicts` s ľudským dôvodom `t` zo servera, `phrase` = `SheetLayout.count_phrase` (tá istá veta ide do
   Rozpočtu a XLSX). Globálny stav (`blocked`, `without_material`) = **banner nad kartami** aj pri prázdnom zozname. Chyba plánu = `{ok: false}` a veta v sekcii
   (rozpočet ani exporty nezhodí). Detail sa neťahá lenivo (celý push ~2000 dielcov ≈ 377 kB, `push_state` ≈ 105 ms).
-- **Klient kreslí, nepočíta:** `sheet_layout.js` (prefix `np`, volá ho `studio.js` cez `typeof npRenderTools / npRenderBody`, `NX.setStudio` neobaľuje) — predvolene
+- **Klient kreslí, nepočíta:** `sheet_layout.js` (prefix `np`, volá ho `studio.js` cez háčiky riadka `cut` v registri (`npRenderTools` / `npRenderBody`), `NX.setStudio` neobaľuje) — predvolene
   otvorená prvá karta a každá s problémom; **zbalená karta SVG nevytvára**; zbalenie v `localStorage` `nx_np_closed` (try/catch); detail = stav okna `npDetail`
   (pri novom pushi sa overí). Jediné odvodené je **upozornenie na poslednú platňu** (aspoň 2 platne a posledná pod 20 % alebo najviac 2 dielce).
 - Karta hovorí „v rozpočte N" **číslom hotového rozpočtu** toho istého pushu (`budget_qty` + `budget_src`, `npBudgetNote`); zdroj `area` = „v rozpočte 0,90 m² podľa
@@ -1653,7 +1668,7 @@ material_ids}], edges: {abs_id => {parts, objects}} } }`; roly skladá server (`
   tichý — status „Tento dekor už v katalógu nie je — otvorené v zozname materiálov."
 
 **Demos toky** (modály v `#matModalRoot`): **životnosť dlhého behu je viazaná na sekciu** — `demos_alive_proc(session)` sa pýta session tokenu a živého Štúdia;
-token zhasína zatvorenie okna (`MaterialsDialog.on_ui_closed`), prepnutie dokumentu a **odchod zo sekcie** (`studioGoSection` → `matOnLeaveSection` → `mat_leave` →
+token zhasína zatvorenie okna (`MaterialsDialog.on_ui_closed`), prepnutie dokumentu a **odchod zo sekcie** (klik aj deep-link → `studioSwitchSection` → háčik `leave` = `matOnLeaveSection` → `mat_leave` →
 `cancel_demos_on_leave`, hláška „Sťahovanie z Demosu zrušené…"). Poradie v `matOnLeaveSection`: **najprv `mat_leave` na server, potom lokálne zatvorenie modálov**.
 
 **„Nahradiť UNI…"** beží v jednom okne: nález Kontroly → `ProductionCore.replace_uni` → `MaterialsDialog.request_replace_uni` → `StudioDialog.show(open_section: 'mat')`;
@@ -2112,7 +2127,7 @@ príprava → **`abort_prepared!`** (uprace len vlastný staging). `apply!` = ob
   alebo nečitateľný `main.rb`), plugin sa načíta normálne a problém ohlási samotný `Sketchup.require`. Zámok sa berie pri každom boote.
 
 **UI vrstva — sekcia „O plugine"** (server `supplier_settings_dialog.rb`, klient `about.js` + `studio_settings.js`):
-- **Kontrola verzie je explicitná akcia** (nie súčasť payloadu): spúšťa ju vstup do sekcie (`studioGoSection('about')` aj deep-link → `ssOnAboutEnter()`) a uloženie
+- **Kontrola verzie je explicitná akcia** (nie súčasť payloadu): spúšťa ju vstup do sekcie (klik aj deep-link → `studioSwitchSection` → háčik `enter` riadka `about` = `ssOnAboutEnter()`) a uloženie
   cesty. Beží **vo vlákne s deadline** (vo vlákne len `Updater.check`; výsledok nasadzuje `UI.start_timer` každých 0,2 s, po 4 s „zdroj neodpovedal"); vlákno sa
   nezabíja. **Token = (cesta, inštancia Štúdia `StudioDialog.instance_token`, sekvencia)**; **jeden bežiaci dotaz na jednu cestu** (`updater_worker` — živý beh sa
   zdieľa, hotový zahadzuje).

@@ -287,12 +287,11 @@ NxTest.test('ŠT-3b-1: telo sekcie je SABLONA a lista je cista funkcia') do
   apply_js = ST3B_RULES_JS[/function rdApplyState\(r\)\{.*?\n  \}/m].to_s
   NxTest.assert(apply_js.include?('RD_NEEDS_RENDER = true;'),
                 'zmena pravidiel NA MODELI priznak zdvihne (dokresli sa aj po navrate)')
-  body_fn = ST3B_STUDIO_JS[/function renderBody\(\)\{.*?\n  \}/m].to_s
-  NxTest.assert(body_fn.include?("studioSec === 'rules'") && body_fn.include?('rulesRenderBody()'),
+  # H14b: dispatch z riadku registra (spravanie drzi golden G2).
+  row = NxH14Reg.row('rules')
+  NxTest.assert(row['module'] == 'rules.js' && row['body'] == 'rulesRenderBody',
                 'telo sekcie kresli VYHRADNE rulesRenderBody')
-  tools_fn = ST3B_STUDIO_JS[/function renderTools\(\)\{.*?\n  \}/m].to_s
-  NxTest.assert(tools_fn.include?("studioSec === 'rules'") &&
-                tools_fn.include?('rulesRenderTools(staleFlag)'),
+  NxTest.assert(row['tools'] == 'rulesRenderTools' && row['stale'] == true,
                 'a listu rulesRenderTools — s jantarovym priznakom zo `staleFlag`')
 end
 

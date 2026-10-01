@@ -1,10 +1,11 @@
-  // ===================== REGISTER SEKCIÍ ŠTÚDIA (H14a) =====================
+  // ===================== REGISTER SEKCIÍ ŠTÚDIA (H14a, H14b) =====================
   // Sekcia okna Štúdio sa prihlasuje NA JEDNOM MIESTE — riadkom tohto registra.
   // Z neho berú navigácia (skupina, ikona, názov, tooltip, badge), hlavička
   // sekcie (názov + nápoveda), hláška tlačidla „Obnoviť", filter deep-linku
-  // v Inspectore (`NXShell.studioSection`) aj zoznam sekcií Nastavení
-  // (`studio_settings.js`). Vlastný zoznam sekcií si nikto iný nedrží (guard
-  // `tests/pure/test_h14a_register.rb`).
+  // v Inspectore (`NXShell.studioSection`), zoznam sekcií Nastavení
+  // (`studio_settings.js`), kreslenie lišty a tela, prepnutie sekcie (odchod,
+  // vstup) aj kotvy deep-linku. Vlastný zoznam sekcií ani vetvu podľa id si
+  // nikto iný nedrží (guardy `tests/pure/test_h14a_register.rb`, `test_h14b_prepnutie.rb`).
   //
   // AUTORITA: serverový whitelist `StudioDialog::SECTIONS` (Ruby) rozhoduje,
   // ktorú sekciu smie okno otvoriť; tento register je PREZENTÁCIA a jeho poradie
@@ -20,6 +21,16 @@
   // `REFRESH_DEFAULT`) · `module` (súbor, ktorý sekciu kreslí) · `data` (kľúč
   // payloadu `NX.setStudio`, ktorý sekcii skladá `StudioDialog.push_state`).
   //
+  // Háčiky (H14b) sú MENÁ funkcií, ktoré `studio.js` rozlíši V ČASE VOLANIA —
+  // sekčné moduly sa načítavajú až za ním: `tools` / `body` (kreslenie lišty
+  // a tela; `stale: true` = lišta dostane príznak neaktuálnosti ako argument) ·
+  // `missing` (núdzový text tela, keď modul chýba) · `leave` / `enter` (odchod
+  // zo sekcie a vstup do nej — rovnako pri kliku aj pri deep-linku) · `anchor`
+  // (`{ fn, phase, miss }` — LEN deep-link: `before` = mení stav, z ktorého sa
+  // kreslí, preto pred vykreslením; `after` = dotaz do DOM, preto po ňom;
+  // `fn` vráti false → hláška `miss`). Háčiky sekcií, ktoré kreslí sám
+  // `studio.js`, si on drží vo vlastnej tabuľke (v Node testoch nie sú globály).
+  //
   // Čisté API bez DOM a bez závislostí. Konzumenti si smú vziať referenciu na
   // objekt registra, ale zoznamy (`ids()`, `groups()`, `inModule()`) si pýtajú
   // AŽ PRI POUŽITÍ — nikdy ich neodvodzujú pri načítaní skriptu (poučenie H12).
@@ -34,69 +45,86 @@
     var ROWS = [
       { id: 'bom', grp: 'job', ic: 'list', t: 'Kusovník',
         head: 'skupiny podľa materiálu · pohľady Dielce / Platne / ABS · živý zoznam',
-        module: 'studio.js', data: 'rows' },
+        module: 'studio.js', data: 'rows', tools: 'bomRenderTools', body: 'bomRenderBody',
+        anchor: { fn: 'bomOpenAnchor', phase: 'before' } },
       // Pri Kontrole visia živé počty RED/ORANGE z posledného pushu.
       { id: 'ctrl', grp: 'job', ic: 'clipboard-check', t: 'Kontrola', badge: 'ctrl',
         head: 'semafor filtruje zoznam · klik na nález ho označí v modeli · prepínače hrán a kresby',
         refresh: 'Prepočítavam kontrolu…',
-        module: 'studio.js', data: 'control' },
+        module: 'studio.js', data: 'control', tools: 'ctrlRenderTools', body: 'ctrlRenderBody' },
       { id: 'buy', grp: 'job', ic: 'cart', t: 'Nákup kovania',
         head: 'nákupný zoznam zo setov · nekompletné položky jantárovo · CSV pre objednávku',
         refresh: 'Prepočítavam nákupný zoznam…',
-        module: 'studio.js', data: 'hardware_sets' },
+        module: 'studio.js', data: 'hardware_sets', tools: 'buyRenderTools', body: 'buyRenderBody' },
       { id: 'budget', grp: 'job', ic: 'euro', t: 'Rozpočet',
         head: 'rozpočet zákazky · ceny kovania sú spoločné pre všetky zákazky',
         refresh: 'Prepočítavam rozpočet…',
-        module: 'budget.js', data: 'budget' },
+        module: 'budget.js', data: 'budget', tools: 'budRenderTools', body: 'budRenderBody',
+        missing: 'Rozpočet sa nenačítal (js/budget.js).',
+        // Kotva = adresa riadku; je to dotaz do DOM, preto až PO vykreslení.
+        anchor: { fn: 'budOpenAnchor', phase: 'after', miss: 'Tento riadok už v rozpočte nie je — otvorený je celý Rozpočet.' } },
       // Zákaznícka projekcia toho istého rozpočtu (suma sa nikdy nelíši).
       { id: 'offer', grp: 'job', ic: 'file-text', t: 'Cenová ponuka',
         head: 'zákaznícky pohľad na ten istý rozpočet · rečou zákazníka, bez interných kódov',
         refresh: 'Prepočítavam cenovú ponuku…',
-        module: 'budget.js', data: 'budget' },
+        module: 'budget.js', data: 'budget', tools: 'budRenderOfferTools', body: 'budRenderOfferBody',
+        missing: 'Cenová ponuka sa nenačítala (js/budget.js).' },
       // Plán je podklad pre objednávku, reže VEPO — preto „horná hranica".
       { id: 'cut', grp: 'job', ic: 'scissors', t: 'Nárezový plán',
         hint: 'koľko platní stačí pri tomto rozložení (horná hranica)',
         head: 'koľko platní stačí pri tomto rozložení · podklad pre objednávku — reže VEPO',
         refresh: 'Prepočítavam nárezový plán…',
-        module: 'sheet_layout.js', data: 'sheet_layout' },
+        module: 'sheet_layout.js', data: 'sheet_layout', tools: 'npRenderTools', body: 'npRenderBody', stale: true,
+        missing: 'Nárezový plán sa nenačítal (js/sheet_layout.js).' },
       // Katalóg je globálny a chodí echom — z modelu sa prepočítava len použitie.
       { id: 'mat', grp: 'catalogs', ic: 'layers', t: 'Materiály',
         head: 'katalóg dekorov je spoločný pre všetky zákazky · predvoľby projektu platia pre túto',
         refresh: 'Prepočítavam použitie dekorov v projekte…',
-        module: 'proj_materials.js', data: 'mat' },
+        module: 'proj_materials.js', data: 'mat', tools: 'matRenderTools', body: 'matRenderBody', stale: true,
+        missing: 'Materiály sa nenačítali (js/proj_materials.js).', leave: 'matOnLeaveSection',
+        anchor: { fn: 'matOpenAnchor', phase: 'before', miss: 'Tento dekor už v katalógu nie je — otvorené v zozname materiálov.' } },
       // „Obnoviť" si pýta čerstvý katalóg a sety z disku, z modelu nič.
       { id: 'hw', grp: 'catalogs', ic: 'hammer', t: 'Kovanie',
         head: 'katalóg položiek a sety sú spoločné pre všetky zákazky · predvoľby setov platia pre túto zákazku',
         refresh: 'Načítavam čerstvý katalóg kovania a sety…',
-        module: 'hw_catalog.js', data: 'hw' },
+        module: 'hw_catalog.js', data: 'hw', tools: 'hwRenderTools', body: 'hwRenderBody', stale: true,
+        missing: 'Kovanie sa nenačítalo (js/hw_catalog.js).', leave: 'hwOnLeaveSection' },
       // Badge = riadky pohľadu „V zákazke" na vybavenie (počty skladá server).
       { id: 'appl', grp: 'catalogs', ic: 'appliance', t: 'Spotrebiče', badge: 'appl',
         head: 'katalóg modelov je tohto počítača · rozmery z listov výrobcov · bez cien (tie patria Rozpočtu)',
-        module: 'appliances.js', data: 'appl' },
+        module: 'appliances.js', data: 'appl', tools: 'apRenderTools', body: 'apRenderBody',
+        missing: 'Spotrebiče sa nenačítali (js/appliances.js).', leave: 'apOnLeaveSection',
+        anchor: { fn: 'apOpenAnchor', phase: 'after', miss: 'Tento spotrebič už v zákazke nie je — otvorený je celý zoznam.' } },
       { id: 'rules', grp: 'catalogs', ic: 'settings', t: 'Pravidlá',
         head: 'ABS podľa roly dielca (spoločné, len na čítanie) · kovanie podľa rozmerov — platí pre tento projekt',
         refresh: 'Načítavam pravidlá z aktuálneho modelu…',
-        module: 'rules.js', data: 'rules' },
+        module: 'rules.js', data: 'rules', tools: 'rulesRenderTools', body: 'rulesRenderBody', stale: true,
+        missing: 'Pravidlá sa nenačítali (js/rules.js).' },
       // Bez vlastnej hlášky „Obnoviť" (predvolená) — vedomý stav, PACKAGE_H14 Q1.
       { id: 'tpl', grp: 'catalogs', ic: 'star', t: 'Šablóny',
         head: 'knižnica je spoločná pre všetky zákazky · novú uložíš v Inspectore z označenej skrinky',
-        module: 'templates.js', data: 'tpl' },
+        module: 'templates.js', data: 'tpl', tools: 'tplRenderTools', body: 'tplRenderBody', stale: true,
+        missing: 'Šablóny sa nenačítali (js/templates.js).' },
       { id: 'sup', grp: 'settings', ic: 'truck', t: 'Dodávateľ / Demos',
         head: 'aktívny dodávateľ a stav väzby na Demos · väzba sa nastavuje pri konkrétnom dekore',
-        module: 'studio_settings.js', data: 'settings' },
+        module: 'studio_settings.js', data: 'settings', tools: 'ssRenderTools', body: 'ssRenderBody',
+        missing: 'Nastavenia sa nenačítali (js/studio_settings.js).' },
       // H4 · D-09: vlastná ikona — s `euro` sa v zbalenej navigácii zlievala s Rozpočtom.
       { id: 'bset', grp: 'settings', ic: 'sliders-horizontal', t: 'Nastavenia rozpočtu',
         head: 'sadzby, režimy a prahy · globálne pre všetky zákazky, do zákazky sa nemrazia',
-        module: 'studio_settings.js', data: 'settings' },
+        module: 'studio_settings.js', data: 'settings', tools: 'ssRenderTools', body: 'ssRenderBody',
+        missing: 'Nastavenia sa nenačítali (js/studio_settings.js).' },
+      // D-52b: vstup do „O plugine" spustí práve jeden check verzie (klik aj deep-link).
       { id: 'about', grp: 'settings', ic: 'info', t: 'O plugine',
         head: 'to isté nájdeš v koliesku Inspectora',
-        module: 'studio_settings.js', data: 'settings' }
+        module: 'studio_settings.js', data: 'settings', tools: 'ssRenderTools', body: 'ssRenderBody',
+        missing: 'Nastavenia sa nenačítali (js/studio_settings.js).', enter: 'ssOnAboutEnter' }
     ];
 
     var REFRESH_DEFAULT = 'Prepočítavam kusovník…';
 
     GROUPS.forEach(function(g){ Object.freeze(g); });
-    ROWS.forEach(function(r){ Object.freeze(r); });
+    ROWS.forEach(function(r){ if (r.anchor) Object.freeze(r.anchor); Object.freeze(r); });
     Object.freeze(GROUPS);
     Object.freeze(ROWS);
 

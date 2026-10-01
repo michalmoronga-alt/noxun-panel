@@ -943,7 +943,9 @@ NxTest.test('SMOKE 22.8. (1A–1D): LISTA Kusovnika a rohove nastavenie VEPO —
 
   # Review #7: KAZDA sekcia ma vlastnu cestu k cerstvym cislam. Kontrola bola
   # posledna bez nej — a je to sekcia, kvoli ktorej sa clovek do okna vracia.
-  ctrl = ST1B_STUDIO_JS[/if \(studioSec === 'ctrl'\)\{.*?\n    \}/m].to_s
+  # H14b: lista Kontroly je pomenovany hacik riadku registra (`tools`).
+  NxTest.assert_equal('ctrlRenderTools', NxH14Reg.row('ctrl')['tools'], 'listu Kontroly kresli ctrlRenderTools')
+  ctrl = ST1B_STUDIO_JS[/function ctrlRenderTools\(\)\{.*?\n  \}/m].to_s
   # Od 22.8. kresli tlacidlo ZDIELANY helper `refreshBtnHtml` (jeden markup pre
   # vsetkych 5 mist) — sekcia si ho pyta aj s vlastnym tooltipom.
   NxTest.assert(ctrl.include?('refreshBtnHtml(staleFlag,'), 'lista Kontroly ma „Obnoviť"')
@@ -959,10 +961,13 @@ NxTest.test('SMOKE 22.8. (1A–1D): LISTA Kusovnika a rohove nastavenie VEPO —
   # Review #8: otvoreny overlay patri sekcii, z ktorej odchadzame.
   NxTest.assert(ST1B_STUDIO_JS.include?('function closeSectionMenus'),
                 'zhasnutie overlayov ma JEDNO miesto')
-  go = ST1B_STUDIO_JS[/function studioGoSection\(id\)\{.*?\n  \}/m].to_s
-  NxTest.assert(go.include?('closeSectionMenus();'), 'prepnutie sekcie ich zhasne')
-  NxTest.assert(ST1B_STUDIO_JS[/if \(ST && ST\.open_section.*?\n      \}/m].to_s
-                              .include?('closeSectionMenus();'),
+  # H14b: klik aj deep-link idu JEDNOU funkciou prechodu; ze menu zhasne PRED
+  # odchodovymi hacikmi (stav v okamihu volania), drzi golden G3.
+  sw = ST1B_STUDIO_JS[/function studioSwitchSection\(id, guid\)\{.*?\n  \}/m].to_s
+  NxTest.assert(sw.include?('closeSectionMenus();'), 'prepnutie sekcie ich zhasne')
+  NxTest.assert(ST1B_STUDIO_JS[/function studioGoSection\(id\)\{.*?\n  \}/m].to_s.include?('studioSwitchSection(id,'),
+                'klik v navigacii ide touto funkciou')
+  NxTest.assert(ST1B_STUDIO_JS.include?('if (ST && studioSwitchSection(ST.open_section,'),
                 'a deep-link zo servera tiez')
 
   # 1D: „Projekt" je VSTUP so stitkom, nie popisok medzi tlacidlami.

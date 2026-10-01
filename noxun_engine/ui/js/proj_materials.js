@@ -3848,7 +3848,8 @@
     if (!mdUniOpen(key)) MD.setStatus('UNI materiál sa medzitým zmenil.', true);
   }
 
-  // Odchod zo sekcie `mat` (vola `studioGoSection` v studio.js PRED prepnutim).
+  // Odchod zo sekcie `mat` — odchodovy hacik riadka `mat` v registri; vola ho
+  // `studioSwitchSection` v studio.js PRED prepnutim (klik aj deep-link).
   // Poradie je zavazne: NAJPRV sa ohlasi SERVERU (ten zrusi bezaci Demos fetch
   // a napise preco), az potom sa lokalne pozatvaraju modaly. Opacne poradie by
   // `nxdaClose` poslal `demos_family_cancel` skor, server by uz nemal co rusit

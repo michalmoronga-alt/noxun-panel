@@ -583,12 +583,13 @@ NxTest.test('ŠT-3a-2 (F6): `sketchup.ready` z hw_catalog.js ZANIKOL CELY') do
 end
 
 NxTest.test('ŠT-3a-1: odchod zo sekcie ma OBE cesty (navigacia aj deep-link)') do
-  NxTest.assert(ST3A_STUDIO_JS.include?("studioSec === 'hw' && id !== 'hw'"),
-                'studioGoSection ohlasi odchod zo sekcie Kovanie')
-  NxTest.assert(ST3A_STUDIO_JS.include?("studioSec === 'hw' && ST.open_section !== 'hw'"),
-                'a deep-link zo servera tiez')
-  NxTest.assert_equal(2, ST3A_STUDIO_JS.scan(/hwOnLeaveSection\(\)/).length,
-                      'obe cesty volaju TEN ISTY odchodovy hook')
+  # H14b: navigacia aj deep-link idu JEDNOU funkciou prechodu (`studioSwitchSection`),
+  # odchodovy hacik je v riadku registra. Spravanie oboch ciest drzi golden G3
+  # a tests/js/test_h14b_prepnutie.js.
+  NxTest.assert_equal('hwOnLeaveSection', NxH14Reg.row('hw')['leave'],
+                      'odchod zo sekcie Kovanie ma hacik v registri (obe cesty)')
+  NxTest.refute(ST3A_STUDIO_JS.match?(/hwOnLeaveSection\(/),
+                'studio.js ho nevola natvrdo — len cez register (jedna cesta prechodu)')
   NxTest.assert(ST3A_HW_JS.include?('sketchup.hw_leave'), 'a klient to hlasi SERVERU (ten beh rusi)')
   leave = ST3A_HW_JS[/function hwOnLeaveSection\(\)\{.*?\n  \}/m].to_s
   NxTest.assert(leave.index('hw_leave') < leave.index('hwCloseModals'),
@@ -600,11 +601,12 @@ NxTest.test('ŠT-3a-1: odchod zo sekcie ma OBE cesty (navigacia aj deep-link)') 
 end
 
 NxTest.test('ŠT-3a-1: telo aj listu sekcie kresli VYHRADNE hw_catalog.js') do
-  body_fn = ST3A_STUDIO_JS[/function renderBody\(\)\{.*?\n  \}/m].to_s
-  NxTest.assert(body_fn.include?("studioSec === 'hw'") && body_fn.include?('hwRenderBody()'),
+  # H14b: dispatch z riadku registra; ze studio.js telo neprepisuje a lista dostane
+  # `staleFlag`, overuje spravanim golden G2 (tests/js/test_h14_golden.js).
+  row = NxH14Reg.row('hw')
+  NxTest.assert(row['module'] == 'hw_catalog.js' && row['body'] == 'hwRenderBody',
                 'telo sekcie `hw` kresli hwRenderBody — studio.js si ho nekresli sam')
-  tools_fn = ST3A_STUDIO_JS[/function renderTools\(\)\{.*?\n  \}/m].to_s
-  NxTest.assert(tools_fn.include?("studioSec === 'hw'") && tools_fn.include?('hwRenderTools(staleFlag)'),
+  NxTest.assert(row['tools'] == 'hwRenderTools' && row['stale'] == true,
                 'a listu hwRenderTools — s jantarovym priznakom zo `staleFlag` (jedina autorita)')
   NxTest.assert(ST3A_HW_JS.include?('function hwRenderBody()'), 'telo je JEDEN klonovany uzol')
   NxTest.assert(ST3A_HW_JS.include?("HW_BODY.id = 'hwBody'"), 'a ma vlastnu identitu')
