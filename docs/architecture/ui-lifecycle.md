@@ -2461,8 +2461,12 @@ neznáma ostáva surovo. Tú istú cestu (`nxfMoney`) majú okno mazania materi�
 `sliders-horizontal` (posuvníky; do H4b `euro` ako Rozpočet, v zbalenej navigácii sa zlievali), Pravidlá si nechávajú koleso `settings` (zhoda s Inspectorom).
 Je to **vedomá odchýlka od mockupu Štúdia** (`bset: euro`, `SYSTEM/zdroje/ui20/mockup_studio.html`; rozhodnutie D-09 z 1.10.2026, Q2 variant A); tú istú ikonu nesie
 tlačidlo „Nastavenia" v lište Rozpočtu aj akcia nálezu Kontroly (`layout_settings`). **Tabuľka Dielce** (`partsTable`) má triedu `parts` a každá bunka aj hlavička
-triedu `c-<kľúč>` (`colCls`) — `studio.html` z nich robí **pevné rozloženie** (`table-layout: fixed`) so spoločnými šírkami (Dĺžka/Šírka 64 px, Hr. 52, ks 44, ABS 190,
-Smer dekoru 96, Rola 120, Skrinka 28 %, Dielec zvyšok), takže stĺpce sú pod sebou vo všetkých skupinách materiálu; textové bunky sa **zalamujú** (nič sa neoreže).
+triedu `c-<kľúč>` (`colCls`). **Pevné rozloženie platí len pri predvolených stĺpcoch:** `partsTableClass(cols)` pridá triedu `fixed`, keď sú zapnuté iba
+stĺpce, ktorým `studio.html` dáva šírku (`PARTS_FIXED_COLS` = Dielec, Skrinka, Dĺžka, Šírka, Hr., ks, ABS — aj keď niektoré z nich používateľ skryje).
+Pri `fixed` platí `table-layout: fixed` so spoločnými šírkami (Dĺžka/Šírka 64 px, Hr. 52, ks 44, ABS 190, akcie 56, **Skrinka 22 %**, Dielec zvyšok — pri
+najmenšom okne 1060 px, teda tabuľke ~826 px, ostane Dielcu ~174 px) a textové bunky sa **zalamujú** (`overflow-wrap: anywhere`, nič sa neoreže), takže
+stĺpce sú pod sebou vo všetkých skupinách materiálu. **Keď je zapnutý voliteľný stĺpec Smer dekoru alebo Rola, `fixed` sa NEpridá** a tabuľka má automatické
+rozloženie ako pred H4b (bez vynúteného zalamovania) — súčet pevných šírok by inak pri úzkom okne zjedol stĺpec Dielec na nulu (predrecenzia P2).
 Pohľady Platne a ABS a kontrakt Š2 (voliteľné stĺpce) sa nemenia. **Hľadanie** (Kusovník, Materiály, Kovanie, Spotrebiče ×2) má krátky hint „Hľadať…", rozsah
 nesie `title` + `aria-label`. **Texty** bez vývojárskeho žargónu a VEĽKÝCH písmen (slovník a pravidlo: `docs/UI_DIZAJN.md` §1); guard
 `tests/pure/test_h4b_texty_vzhlad.rb` ich hľadá v **reťazcoch** UI (JS literály, HTML mimo komentárov), nie v komentároch. Test správania:
