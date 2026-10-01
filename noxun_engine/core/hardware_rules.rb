@@ -703,13 +703,12 @@ module Noxun
         false
       end
 
-      # POZOR (R-08, priznany zvysok): toto je UPLNA NAHRADA obsahu suboru —
-      # okno Pravidla posiela CELE pole. Zamok zapisy SERIALIZUJE (a chrani
-      # ich pred prepletenim so seed-merge cestou), ale dve okna, ktore si
-      # pravidla nacitali sucasne, sa stale prebijaju „posledny vyhrava";
-      # globalna kniznica pravidiel nema reviziu. Register to vedie ako
-      # samostatnu polozku (R-35) — doriesi ju davka, ktora prinesie reviziu
-      # do payloadu sekcie a konfliktovu vetvu okna.
+      # UPLNA NAHRADA obsahu suboru BEZ revizie — INTERNE API (seed cesty
+      # `ensure_seeded`/`persist_seed_merge!`, testy). Okno Pravidla sem od
+      # H10a/R-35 NECHODI: zapisuje cez `save_library!`, ktora pred tymto
+      # zapisom pod tym istym zamkom porovna REVIZIU OBSAHU (dve okna sa uz
+      # neprebijaju „posledny vyhrava"). Zamok zapisy serializuje a chrani ich
+      # pred prepletenim so seed-merge cestou.
       #
       # 1d/R-11: pred zapisom bezi este brana DEGRADOVANEHO suboru (poskodeny
       # primar + platna `.bak`).
@@ -778,9 +777,105 @@ module Noxun
         state, reason = write_gate
         return false unless state == want
 
+        note_block_reason(reason, prev)
+        true
+      end
+
+      # `@write_block_reason` + jeden riadok logu LEN pri zmene stavu (spolocne
+      # pre `write` a `save_library!` — jedno znenie, jeden log).
+      def note_block_reason(reason, prev = @write_block_reason)
         @write_block_reason = reason
         Engine.log("hardware rules: zapis odmietnuty — #{reason}") if prev.to_s != reason && defined?(Engine)
-        true
+      end
+
+      # --- H10a/R-35: revizia GLOBALNEJ kniznice (dve okna SketchUpu) ---------
+      #
+      # Revizia je OBSAHOVA (`rules_rev` precitanych pravidiel), nie SHA bajtov:
+      # seed-merge pri `load` meni bajty suboru, ale obsah nie (sonda P4), takze
+      # by bajtova revizia hlasila konflikt za nic. Ta ista hodnota ide klientovi
+      # v payloade sekcie (`library_revision`) a ten ju pri ulozeni vracia.
+
+      # Rozliseny stav kniznice BEZ zapisu (ziadne `ensure_seeded` ani
+      # seed-merge) -> { state:, rev:, reason: }:
+      #   :ok         — citatelna a zapisovatelna; `rev` jej obsahu (poskodeny
+      #                 primar BEZ zalohy alebo chybajuci subor = `rev` seedu —
+      #                 samooprava prvym zapisom ostava);
+      #   :blocked    — citatelna, ale zapis zakazany (brana `write_gate`:
+      #                 degradovany subor alebo novsi `std`); `rev` z precitaneho
+      #                 obsahu, `reason` = presne veta brany;
+      #   :unreadable — ina chyba citania (prava, zdielanie, disk); `rev` nil.
+      # Brana je JEDNA autorita (`write_gate`, H9/R15) — tu sa len mapuje.
+      # `fresh: true` = najprv `reload!` (predkontrola, zapis pod zamkom).
+      def library_check(fresh: true)
+        JsonFileStore.reload!(path) if fresh
+        rev = library_content_rev
+        gate, reason = write_gate
+        return { state: :ok, rev: rev, reason: '' } if gate == :ok
+
+        { state: :blocked, rev: rev, reason: reason.to_s }
+      rescue StandardError => e
+        Engine.log_error(e, 'HardwareRules.library_check') if defined?(Engine)
+        { state: :unreadable, rev: nil, reason: '' }
+      end
+
+      # Revizia kniznice pre PAYLOAD sekcie (smie ist cez sekundovu cache —
+      # rozhoduje az cerstva predkontrola). Necitatelna kniznica = '' (klient
+      # potom pri ulozeni dostane „nevieme, ci ju niekto nezmenil").
+      def library_revision
+        library_content_rev
+      rescue StandardError
+        ''
+      end
+
+      # Obsahova revizia toho, co by vratil `load` — bez zapisu. Poskodeny
+      # primar bez zalohy / chybajuci subor = seed (presne ako `load_state`).
+      # Prazdny odtlacok (zlyhal vypocet) nie je revizia — vynimka.
+      def library_content_rev
+        rules = begin
+          read_rules.first
+        rescue JSON::ParserError, Errno::ENOENT
+          deep_copy(SEED_RULES)
+        end
+        rev = rules_rev(rules)
+        raise 'odtlacok kniznice pravidiel sa nepodarilo spocitat' if rev.empty?
+
+        rev
+      end
+
+      # ZAPIS z okna Pravidla (H10a/R-35) -> [status, rev]:
+      #   :ok           — zapisane; `rev` = nova revizia;
+      #   :conflict     — kniznicu medzitym zmenilo ine okno (alebo klient
+      #                   reviziu nema: prazdna/nil = konflikt, fail-closed);
+      #                   `rev` = AKTUALNA revizia na disku, NIC sa nezapise;
+      #   :blocked      — brana (degradovany / novsi `std`), dovod v
+      #                   `write_block_reason`; prednost pred konfliktom;
+      #   :unreadable   — kniznica sa neda precitat, nic sa nezapise;
+      #   :write_failed — zapis alebo zamok zlyhal.
+      # `rev` je neprazdny PRAVE pri :ok a :conflict. Vsetko AZ POD zamkom
+      # a nad CERSTVYM suborom (vzor `HardwareSets.save_set!`, R-08) — zapis
+      # ide cez `write` (jedine miesto zapisu suboru, zamok je reentrantny).
+      # Navrat je dvojica, nie pravdivostna hodnota (`[:conflict, x]` aj
+      # `:conflict` su v Ruby pravdive) — volajuci rozhoduje cez `case`.
+      def save_library!(rules, revision)
+        with_catalog_lock do
+          c = library_check(fresh: true)
+          next [:unreadable, nil] if c[:state] == :unreadable
+
+          if c[:state] == :blocked
+            note_block_reason(c[:reason])
+            next [:blocked, nil]
+          end
+          next [:conflict, c[:rev]] if revision.to_s.empty? || revision.to_s != c[:rev]
+
+          if write(rules)
+            [:ok, rules_rev(normalize_rules(rules))]
+          else
+            [:write_failed, nil]
+          end
+        end
+      rescue StandardError => e
+        Engine.log_error(e, 'HardwareRules.save_library!') if defined?(Engine)
+        [:write_failed, nil]
       end
 
       def reload!

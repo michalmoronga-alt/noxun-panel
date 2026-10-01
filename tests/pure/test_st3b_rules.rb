@@ -159,7 +159,7 @@ NxTest.test('ŠT-3b-1: baseline formulara stoji na identite dokumentu, NIE na `m
   # 1d/R-02b: identitou je token DocKey — Model#guid sa meni pri kazdom
   # ulozeni, takze Ctrl+S s otvorenym oknom Pravidiel zneplatnoval baseline.
   NxTest.assert(guid.include?('DocKey.key(model)'), 'identita dokumentu je token DocKey')
-  valid = ST3B_RULES_RB[/def baseline_valid\?\(model\).*?\n        end\n/m].to_s
+  valid = ST3B_RULES_RB[/def baseline_state\(model\).*?\n        end\n/m].to_s
   NxTest.assert(valid.include?('model_guid(model) != @baseline_guid'), 'guard porovnava guid')
   NxTest.assert(valid.include?('current == @baseline_rules'),
                 'a ZHODU aktualnych pravidiel s baseline (chyti undo aj subeznu zmenu)')
@@ -199,7 +199,7 @@ end
 
 NxTest.test('ŠT-3b-1: odmietnuty zapis NIC nezapise a formular sa nacita nanovo') do
   save = ST3B_RULES_RB[/def handle_save\(payload\).*?\n        end\n/m].to_s
-  head = save[/\A.*?baseline_valid\?\(model\).*?\n          end\n/m].to_s
+  head = save[/\A.*?baseline_state\(model\).*?\n          end\n/m].to_s
   # ŠT-3b-2c1: baseline vetva presla na LACNE ECHO sekcie — plny push okna ide
   # cez zber modelu a ten deduplikuje ID kopii, cize ODMIETNUTY zapis by model
   # ZMENIL (ten isty nalez ako P1 pri resete). `force: true` je tu podstatny:
@@ -210,7 +210,7 @@ NxTest.test('ŠT-3b-1: odmietnuty zapis NIC nezapise a formular sa nacita nanovo
   NxTest.refute(head.include?('refresh_studio'),
                 'ziadny plny push okna (jeho zber ZAPISUJE do modelu)')
   NxTest.assert(head.include?('return set_status'), 'a odmietnutie sa povie NAHLAS')
-  NxTest.assert(save.index('baseline_valid?(model)') < save.index('rebuild_many'),
+  NxTest.assert(save.index('baseline_state(model)') < save.index('rebuild_many'),
                 'guard je PRED prestavbou skriniek, nie za nou')
 end
 
@@ -1396,9 +1396,9 @@ end
 
 NxTest.test('ŠT-3b-2c2: rev je DRUHA vrstva popri baseline, nie jeho nahrada') do
   save = ST3B_RULES_RB[/def handle_save\(payload\).*?\n        end\n/m].to_s
-  NxTest.assert(save.include?('baseline_valid?(model)'), 'baseline guard OSTAVA')
+  NxTest.assert(save.include?('baseline_state(model)'), 'baseline guard OSTAVA')
   NxTest.assert(save.include?("rev = data['rules_rev'].to_s"), 'a rev je DALSI guard')
-  NxTest.assert(save.index('baseline_valid?(model)') < save.index("data['rules_rev']"),
+  NxTest.assert(save.index('baseline_state(model)') < save.index("data['rules_rev']"),
                 'baseline sa pyta prvy (je lacnejsi a chyti aj undo)')
   # Review #224 (Codex P2): PRAZDNY rev sa UZ NETOLERUJE, ked server odtlacok
   # vydal. Povodna premisa zadania („baseline tuto vetvu kryje") NEPLATI —
@@ -1418,7 +1418,7 @@ NxTest.test('ŠT-3b-2c2: rev je DRUHA vrstva popri baseline, nie jeho nahrada') 
                 'obe odmietnutia prekreslia formular ECHOM (bez dedupu, s omladenim odtlacku)')
   NxTest.assert(save.index("data['rules_rev']") < save.index('rebuild_many'),
                 'guard je PRED prestavbou skriniek')
-  valid = ST3B_RULES_RB[/def baseline_valid\?\(model\).*?\n        end\n/m].to_s
+  valid = ST3B_RULES_RB[/def baseline_state\(model\).*?\n        end\n/m].to_s
   NxTest.refute(valid.include?('rev'),
                 'baseline sa NEPREPISUJE revom — su to dve NEZAVISLE vrstvy')
 end

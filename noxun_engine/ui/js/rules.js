@@ -17,6 +17,16 @@
   // ci push zo servera ma formular prekreslit — viz `rdApplyState`.
   var RD_SEED = null;
   var RD_META = { version: '', source: '', cabinets: 0 };
+  // H10a/R-35: PIN revízie GLOBÁLNYCH predvolieb — verzia globálu, ktorú
+  // toto okno naozaj VIDELO. Žije MIMO `RD_META` a mimo projektovej obnovy
+  // formulára (audit BLOCKER 1): posunie sa LEN pri prvom naplnení sekcie,
+  // pri naplnení, ktoré ZOBRAZUJE globál (`source: 'global'`), a na pokyn
+  // servera `RD.setGlobalRev` (Načítať globálne, obnova po konflikte, vlastné
+  // úspešné uloženie globálu). Uloženie len do projektu, Späť/Znova, prepnutie
+  // dokumentu ani pokojný push ho NEPOSÚVAJÚ — inak by druhé okno potvrdilo
+  // cudzí globál, ktorý nikdy nevidelo, a prepísalo ho bez konfliktu.
+  // `null` = sekcia ešte nebola naplnená.
+  var RD_GLOBAL_REV = null;
   // ŠT-3b-2c2: ODTLAČOK pravidiel zo servera (`rules_rev`). Klient ho NIKDY
   // nepočíta — iba drží a pri uložení vracia. Vlastný výpočet by ani nemohol
   // sedieť: Ruby serializuje `900.0`, JS `900`, takže bajtové porovnanie by
@@ -338,6 +348,11 @@
       RD_NEEDS_RENDER = true;
       rdRender();
     },
+    // H10a/R-35: server hovorí „globál, ktorý odteraz poznáš, má túto
+    // revíziu". Prázdna revízia (server ju nepozná) pin NEMENÍ.
+    setGlobalRev: function(rev){
+      if (typeof rev === 'string' && rev !== '') RD_GLOBAL_REV = rev;
+    },
     setStatus: function(msg, err){
       var e = rdEl('status');
       if (!e) return;
@@ -377,6 +392,12 @@
     RD_META = { version: d.version || '', source: d.source || '',
                 cabinets: d.cabinets || 0, model_guid: d.model_guid || '',
                 rules_rev: d.rules_rev || '' };
+    // H10a/R-35: pin len pri PRVOM naplnení alebo keď formulár zobrazuje
+    // globál — projektová obnova (uloženie len do projektu, Späť, prepnutie
+    // dokumentu) ho nesmie posunúť (`RD_GLOBAL_REV`).
+    if (RD_GLOBAL_REV === null || d.source === 'global'){
+      RD_GLOBAL_REV = typeof d.global_rev === 'string' ? d.global_rev : '';
+    }
     rdSetExtra(d);
   }
 
@@ -1196,9 +1217,16 @@
                                            // ŠT-3b-2c2: odtlačok sa iba VRACIA
                                            // — je to ten, ktorý prišiel s dátami,
                                            // z ktorých je formulár naplnený.
-                                           rules_rev: RD_META.rules_rev || '' }));
+                                           rules_rev: RD_META.rules_rev || '',
+                                           // H10a/R-35: revízia globálu, ktorý
+                                           // okno VIDELO. Kľúč ide VŽDY (aj ''
+                                           // pred prvým naplnením) — jeho
+                                           // absencia znamená pre server starý DOM.
+                                           global_rev: RD_GLOBAL_REV === null ? '' : RD_GLOBAL_REV }));
     }
   }
+  // Node testy: pin sa inak prečítať nedá (žije v uzávere súboru).
+  function rdGlobalRev(){ return RD_GLOBAL_REV; }
   function rdLoadGlobal(){
     if (window.sketchup && sketchup.load_global) sketchup.load_global('');
   }
@@ -1408,7 +1436,9 @@
                        // ŠT-3b-2c2: ulozenie sa exportuje ZAMERNE — odtlacok
                        // („drzim ho, nepocitam, vraciam ho spat") sa da overit
                        // jedine tym, ze sa pozrieme, CO odchadza na server.
-                       rdSaveRules: rdSaveRules };
+                       rdSaveRules: rdSaveRules,
+                       // H10a/R-35: pin revízie globálu (getter — test BLOCKER 1).
+                       rdGlobalRev: rdGlobalRev };
   }
   // ŠT-3b-1: `sketchup.ready('')` tu ZANIKLO. V okne „Pravidlá kovania" bol
   // tento subor POSLEDNY a jeho `ready` znamenal „HTML je nacitane"; okno

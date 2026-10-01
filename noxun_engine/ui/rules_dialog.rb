@@ -47,6 +47,29 @@ module Noxun
                           drawer_bottom box_side drawer_back drawer_inner_front
                           corner_blind_panel hinge_rail corner_rail cr_front cr_side].freeze
 
+      # --- H10a/R-35: globalna revizia (dve okna SketchUpu) ---------------
+      #
+      # Texty sklada SERVER (jedna autorita). Q1 (Michal, do odpovede plati
+      # navrh): pri cudzej zmene globalu sa NEULOZI NIC, upravy ostanu vo
+      # formulari a druhe Ulozit je vedome prepisanie (pin sa obnovi).
+      GLOBAL_PRE_TEXT = 'Globálne predvoľby pravidiel medzitým zmenilo iné okno SketchUpu — nič sa neuložilo ' \
+                        '(projekt ani globálne). Tvoje úpravy ostali vo formulári. Ak chceš globálne predvoľby ' \
+                        'prepísať týmto formulárom, klikni Uložiť znova; inak odškrtni „aj ako globálnu ' \
+                        'predvoľbu" a ulož len do projektu.'
+      GLOBAL_INH_TEXT = 'Tento projekt ešte nemá vlastné pravidlá a preberá globálne predvoľby — tie medzitým ' \
+                        'zmenilo iné okno SketchUpu. Nič sa neuložilo, tvoje úpravy ostali vo formulári. Klikni ' \
+                        'Uložiť znova, ak ich chceš uložiť tak, ako sú (zmenu z druhého okna uvidíš cez Načítať globálne).'
+      GLOBAL_UNK_TEXT = 'Pri otvorení Štúdia sa globálne predvoľby nedali prečítať, takže nevieme, či ich medzitým ' \
+                        'niekto nezmenil — nič sa neuložilo. Tvoje úpravy ostali vo formulári; klikni Uložiť znova, ' \
+                        'ak chceš pokračovať.'
+      GLOBAL_READ_TEXT = 'Globálne predvoľby pravidiel sa nepodarilo prečítať (disk/práva) — nič sa neuložilo. ' \
+                         'Skús to znova; ak to pretrváva, skontroluj priečinok nastavení.'
+      GLOBAL_OLD_TEXT = 'Okno je z predošlej verzie pluginu (chýba mu údaj o verzii globálnych predvolieb) — ' \
+                        'nič sa neuložilo. Zavri a otvor Štúdio znova a ulož.'
+      GLOBAL_RACE_TEXT = 'Globálnu predvoľbu medzitým zmenilo iné okno SketchUpu, preto sa NEPREPÍSALA; ' \
+                         'ak ju chceš prepísať, klikni Uložiť znova.'
+      GLOBAL_UNREADABLE_AFTER_TEXT = 'Globálne predvoľby sa nepodarilo prečítať, neprepísali sa.'
+
       # Strop zoznamu rucnych zasahov (F15). „Použiť na podobné" vie vyrobit
       # desiatky riadkov naraz — nekonecny zoznam by zo sekcie spravil vypis.
       MAX_OVERRIDE_ROWS = 40
@@ -116,15 +139,22 @@ module Noxun
           rules = project || HardwareRules.load
           guid = model_guid(model)
           rev = HardwareRules.rules_rev(rules)
+          source = project ? 'project' : 'global'
           payload = { 'version' => Engine::VERSION,
                       'rules' => rules,
-                      'source' => project ? 'project' : 'global',
+                      'source' => source,
                       'model_guid' => guid,
                       # ŠT-3b-2c2: odtlacok pravidiel (vzor `HardwareCatalog.record_rev`).
                       # Pocita ho VYHRADNE server a LEN z `rules` — keby siel
                       # z celeho payloadu, zozltol by pri kazdom rucnom zasahu
                       # v Inspectore (menia sa `overrides`, nie pravidla).
                       'rules_rev' => rev,
+                      # H10a/R-35: revizia GLOBALNEJ kniznice (obsahova). Klient si
+                      # ju PRIPNE len ked globál naozaj zobrazil (`rules.js`,
+                      # `RD_GLOBAL_REV`) a vracia ju pri ulozeni. Pri zdroji
+                      # `global` je to odtlacok TYCH ISTYCH pravidiel, ktore formular
+                      # ukazuje (ziadne druhe citanie, ktore by sa mohlo rozist).
+                      'global_rev' => project ? HardwareRules.library_revision : rev,
                       # D-134 (slepe review P3-5): pata sekcie hovori o ZAKAZKE,
                       # nie o modeli — inak by tvrdila iné cislo nez status po
                       # ulozeni („prestavaných M skriniek"), lebo ten uz rata len
@@ -138,6 +168,8 @@ module Noxun
           @baseline_guid  = guid
           @baseline_rules = rules
           @baseline_rev   = rev
+          # H10a/R-35: odkial bol formular naplneny (`baseline_state`).
+          @baseline_source = source
           payload
         rescue StandardError => e
           # Zlyhanie sa NEZAMLCUJE: sekcia ostane bez dat a jedinou stopou
@@ -422,15 +454,28 @@ module Noxun
           model ? DocKey.key(model) : ''
         end
 
-        # Formular je platny len pre stav, z ktoreho bol naplneny: ZHODA
-        # DOKUMENTU (guid) + ZHODA aktualnych pravidiel modelu s baseline
-        # (chyti undo snapshotu aj subeznu zmenu z inej cesty). Pri nezhode sa
-        # nic nezapise a klient dostane cerstvy formular.
-        def baseline_valid?(model)
-          return false if model_guid(model) != @baseline_guid.to_s
+        # Formular je platny len pre stav, z ktoreho bol naplneny:
+        #   :document        — iny DOKUMENT (guid) nez ten, z ktoreho bol formular;
+        #   :inherits_global — projekt NEMA vlastne pravidla a formular bol
+        #                      naplneny GLOBALOM (H10a/R-35, audit FIX 2): obsah sa
+        #                      NEPOROVNAVA cez cachovany `load` — vysledok by
+        #                      zavisel od sekundovej cache (raz deštruktivne echo,
+        #                      raz tichy prepis cudzej zmeny). Rozhodne CERSTVA
+        #                      predkontrola globalnej revizie a rozpisane hodnoty
+        #                      pri konflikte OSTANU vo formulari;
+        #   :changed         — pravidla modelu sa od naplnenia zmenili (undo
+        #                      snapshotu, subezna zmena inou cestou);
+        #   :ok              — formular plati.
+        # Pri :document a :changed sa nic nezapise a klient dostane cerstvy
+        # formular (deštruktivne echo — rozpisane hodnoty nad cudzim stavom).
+        def baseline_state(model)
+          return :document if model_guid(model) != @baseline_guid.to_s
 
-          current = HardwareRules.project_rules(model) || HardwareRules.load
-          current == @baseline_rules
+          project = HardwareRules.project_rules(model)
+          return :inherits_global if project.nil? && @baseline_source.to_s == 'global'
+
+          current = project || HardwareRules.load
+          current == @baseline_rules ? :ok : :changed
         end
 
         # V0.6 D1b (audit F4): vedome doplnenie novych default pravidiel do
@@ -482,9 +527,19 @@ module Noxun
         # — sekciu obsluzi PLNY push Studia z toho isteho broadcastu
         # (`StudioDialog.on_model_changed` -> `rules_payload(model)`).
 
+        # H10a/R-35: formular teraz UKAZUJE globál — klient si pripne jeho
+        # reviziu (ten isty objekt, ktory dostal; jeden skript). Signatura
+        # `RD.setRules` sa nemeni a pin sa nastavuje len cez `RD.setGlobalRev`.
         def push_global
-          js("RD.setRules(#{HardwareRules.load.to_json}, 'global')")
+          lib = HardwareRules.load
+          js("RD.setRules(#{lib.to_json}, 'global'); #{global_rev_script(HardwareRules.rules_rev(lib))}")
           set_status('Načítané globálne predvoľby — platia až po Uložiť.')
+        end
+
+        # Pokyn klientovi „globál, ktory odteraz poznas, ma tuto reviziu".
+        # Guard pre DOM bez prijimaca; prazdnu reviziu klient aj tak ignoruje.
+        def global_rev_script(rev)
+          "if (window.RD && RD.setGlobalRev) RD.setGlobalRev(#{rev.to_s.to_json});"
         end
 
         # Stavovy riadok sekcie: prijimac `RD.setStatus` je v tom istom
@@ -541,7 +596,10 @@ module Noxun
         # Ulozi pravidla do projektu + prestavia vsetky korpusy (1 undo krok).
         def handle_save(payload)
           model = Sketchup.active_model
-          unless baseline_valid?(model)
+          bstate = baseline_state(model)
+          # H10a/R-35: `:inherits_global` sem NEPATRI — prebraty globál rozhodne
+          # az cerstva predkontrola nizsie a formular pri konflikte OSTANE.
+          unless %i[ok inherits_global].include?(bstate)
             # Formular sa nacita nanovo — ale LACNYM ECHOM sekcie, nie plnym
             # pushom okna (review #222 P1). Povodny dovod (plny push deduplikoval
             # ID kopii, takze ODMIETNUTY zapis model ZMENIL) od 1b-3 UZ NEPLATI —
@@ -631,6 +689,17 @@ module Noxun
           problems = HardwareRules.rules_problems(rules)
           return set_status("Pravidlá sa neuložili — #{problems_text(problems)}", true) unless problems.empty?
 
+          # H10a/R-35: PREDKONTROLA globalnej revizie — PRED prestavbou, takze
+          # konflikt nezapise nic (ani projekt), neprida krok Spat a rozpisane
+          # hodnoty OSTANU vo formulari (ziadne echo). `:stop` = uz povedala
+          # preco; inak vrati dovod brany, pre ktory sa globál PRESKOCI (alebo nil).
+          also_global = data['also_global'] ? true : false
+          gate_reason = nil
+          if also_global || bstate == :inherits_global
+            gate_reason = global_precheck(data, bstate == :inherits_global)
+            return if gate_reason == :stop
+          end
+
           # D-134: rozsah = ZAKAZKA (top-level). Preskocena skrinka (odpojeny
           # dielec) NEBLOKUJE zapis pravidiel — `rebuild_many` otvara operaciu
           # aj s PRAZDNYM zoznamom jobov, takze blok so `set_project_rules`
@@ -641,24 +710,80 @@ module Noxun
             raise 'Pravidlá sa nepodarilo uložiť do projektu.' unless HardwareRules.set_project_rules(model, rules)
           end
 
-          global_note = ''
-          if data['also_global']
-            # 1d/R-11: pri zlyhani sa pyta KONKRETNY dovod. Globalny subor
-            # pravidiel moze mat poskodeny primar s platnou `.bak` — vtedy
-            # zapis ODMIETNE brana (nie disk) a naprava je oprava/zmazanie
-            # JEDNEHO suboru. „Globalny zapis zlyhal!" by pouzivatela poslalo
-            # hladat problem s pravami.
-            global_note = if HardwareRules.write(rules)
-                            ' + globálna predvoľba'
-                          else
-                            reason = HardwareRules.write_block_reason
-                            reason.empty? ? ' (globálny zápis zlyhal!)' : " — #{reason}"
-                          end
+          note = ''
+          extra = nil
+          if also_global && gate_reason
+            # Riadok 2 predkontroly: brana (degradovany / novsi `std`) — projekt
+            # sa ulozil, globál nie, a povie sa presne preco (nie konflikt).
+            note = " — #{gate_reason}"
+          elsif also_global
+            # Projekt je ulozeny a operacia ZAVRETA — globál ide AZ TERAZ, pod
+            # zamkom a s reviziou z formulara (`save_library!`). Medzi
+            # predkontrolou a zamkom ho mohlo zmenit ine okno: vtedy sa
+            # NEPREPISE (H-RACE). Vyhodnotenie VZDY cez `case` — `[:conflict, x]`
+            # je v Ruby pravdive.
+            status, grev = HardwareRules.save_library!(rules, data['global_rev'].to_s)
+            case status
+            when :ok
+              note = ' + globálna predvoľba'
+              js(global_rev_script(grev))
+            when :conflict
+              js(global_rev_script(grev))
+              extra = GLOBAL_RACE_TEXT
+            when :blocked
+              # 1d/R-11: KONKRETNY dovod brany (poskodeny primar s platnou
+              # `.bak`, novsi `std`) — naprava je oprava JEDNEHO suboru.
+              reason = HardwareRules.write_block_reason
+              note = reason.empty? ? ' (globálny zápis zlyhal!)' : " — #{reason}"
+            when :unreadable
+              extra = GLOBAL_UNREADABLE_AFTER_TEXT
+            else
+              note = ' (globálny zápis zlyhal!)'
+            end
           end
           @rev_conflicts = 0 # uspech = seria konfliktov sa konci (druhe znenie sa resetuje)
-          set_status("Pravidlá uložené do projektu#{global_note} — prestavaných #{jobs.size} " \
-                     "skriniek#{Panel.detached_skipped_tail(skipped)}.")
+          msg = "Pravidlá uložené do projektu#{note} — prestavaných #{jobs.size} " \
+                "skriniek#{Panel.detached_skipped_tail(skipped)}."
+          set_status(extra ? "#{msg} #{extra}" : msg, extra ? true : false)
           after_model_write(model)
+        end
+
+        # PREDKONTROLA (tabulka R1.4 package H10). Bezi, ked sa ma zapisat
+        # globál (`also_global`) alebo ked projekt globál PREBERA (bez
+        # snapshotu, formular naplneny globalom). Poradie je fail-closed:
+        # necitatelne -> brana -> stary DOM -> neznamy zaklad -> konflikt.
+        # Vrati :stop (uz povedala preco, NIC sa nezapise, ziadna operacia,
+        # ziadne echo — formular ostava), dovod brany (projekt sa ulozi,
+        # globál nie) alebo nil (pokracuje sa).
+        def global_precheck(data, inherits)
+          c = HardwareRules.library_check(fresh: true)
+          # 1: brany sa nedaju vyhodnotit — bez obnovy pinu a bez ponuky prepisu.
+          if c[:state] == :unreadable
+            set_status(GLOBAL_READ_TEXT, true)
+            return :stop
+          end
+          # 2: brana pri vedomom „aj ako globálnu" (nie pri prebratom globale —
+          # tam je obsah citatelny a rozhoduje revizia nizsie).
+          return c[:reason] if c[:state] == :blocked && !inherits
+
+          # 3: stary DOM nad novym Ruby (kluc chyba uplne).
+          unless data.key?('global_rev')
+            set_status(GLOBAL_OLD_TEXT, true)
+            return :stop
+          end
+          pin = data['global_rev'].to_s
+          text = if pin.empty? then GLOBAL_UNK_TEXT                    # 4: neznamy zaklad
+                 elsif pin != c[:rev] then inherits ? GLOBAL_INH_TEXT : GLOBAL_PRE_TEXT # 5 / 6
+                 end
+          if text
+            # Druhe Ulozit = vedome prepisanie: klient odteraz pozna aktualny globál.
+            js(global_rev_script(c[:rev]))
+            set_status(text, true)
+            return :stop
+          end
+          # 7: zhoda. Pri prebratom globale nad branou sa projekt ulozi a globál
+          # (ak ho pouzivatel chcel) nie — s vetou brany.
+          c[:state] == :blocked ? c[:reason] : nil
         end
 
         # Strop hlasky (review #223 NOTE 1): pri desiatich pokazenych pravidlach

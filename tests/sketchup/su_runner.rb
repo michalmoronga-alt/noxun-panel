@@ -9059,6 +9059,194 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # --- H10a (R-35): dve okna SketchUpu a GLOBALNE pravidla kovania -----------
+  # Cely scenar je IZOLOVANY (`Materials.test_dir_override`) — zive pravidla
+  # v %APPDATA% sa nesmu zmenit (overene bajtovo na konci). „Druhe okno" zapise
+  # globál priamo na disk (tmp + rename), ako by to spravil iny proces.
+  # Overuje to, co headless nevie: realnu operaciu prestavby, krok Spat
+  # a pocet kovania na skrinke pri H-PRE, vedomom prepisani a H-RACE.
+  H10A_CAB = { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 560.0,
+               'zone_tree' => { 'id' => 'Z1', 'shelves' => 1, 'children' => [] } }.freeze
+
+  def h10a_foreign_write(doc)
+    path = e::HardwareRules.path
+    tmp = "#{path}.tmp-other"
+    File.binwrite(tmp, JSON.pretty_generate(doc))
+    File.rename(tmp, path)
+  end
+
+  def h10a_doc(rules)
+    { 'std' => e::HardwareRules::STD, 'seed_version' => e::HardwareRules::SEED_VERSION,
+      'rules' => e::HardwareRules.normalize_rules(rules) }
+  end
+
+  def h10a_toggled(rules, output)
+    e::HardwareRules.normalize_rules(rules).map do |r|
+      r['output'] == output ? r.merge('enabled' => r['enabled'] == false) : r
+    end
+  end
+
+  def h10a_global_revs(rec)
+    rec.flat_map { |s| s.scan(/RD\.setGlobalRev\(("[^"]*")\)/).map { |(j)| JSON.parse("[#{j}]").first } }
+  end
+
+  def h10a_status(rec)
+    line = rec.reverse.find { |x| x.start_with?('RD.setStatus(') }
+    m = line.to_s.match(/\ARD\.setStatus\((".*"), (true|false)\)\z/m)
+    m ? [JSON.parse("[#{m[1]}]").first, m[2] == 'true'] : ['', false]
+  end
+
+  def h10a_snap(model)
+    model.get_attribute(e::Store::DICT, e::HardwareRules::MODEL_KEY)
+  end
+
+  def h10a_save(rd, sink, rec, model, pay, rules, global_rev)
+    rec.clear
+    rd.dispatch('save_rules', { 'rules' => rules, 'also_global' => true, 'model_guid' => pay['model_guid'],
+                                'rules_rev' => pay['rules_rev'], 'global_rev' => global_rev }.to_json, sink)
+  end
+
+  def run_h10a(model)
+    return ok('H10a: povoleny testmodel', false) unless guard_model?(model)
+
+    cleanup(model)
+    hr = e::HardwareRules
+    rd = e::RulesDialog
+    live_path = hr.path
+    live_bytes = File.exist?(live_path) ? File.binread(live_path) : nil
+    saved_snap = h10a_snap(model)
+    # Stavba v sandboxe zapise aj projektove predvolby setov/materialov — vzor
+    # KOV-I: vsetky projektove kluce sa na konci vratia presne.
+    keys = [e::HardwareSets::MODEL_KEY, hr::MODEL_KEY] + e::Materials::PROJECT_KEYS
+    saved_values = keys.to_h { |key| [key, model.get_attribute(e::Store::DICT, key)] }
+    old_dir = e::Materials.test_dir_override
+    tmp = Dir.mktmpdir('noxun_h10a_')
+    markers = []
+    orig_save = hr.method(:save_library!)
+    rec = []
+    sink = ->(s) { rec << s.to_s }
+    begin
+      e::Materials.test_dir_override = tmp
+      kovb1_reset_caches!
+      isolated = hr.path.start_with?(tmp + File::SEPARATOR)
+      ok("H10a: globalne pravidla su v sandboxe (#{hr.path})", isolated)
+      raise 'H10a: bez izolacie sa scenar NESPUSTA' unless isolated
+
+      hr.write(hr::SEED_RULES)
+      kovi_model_values!(model, hr::MODEL_KEY => nil) # snapshot vznikne zo sandboxu
+      inst = e::CabinetBuilder.build(model, H10A_CAB.dup)
+      raise 'H10a: vlozenie skrinky' unless inst
+
+      target = st3b_pick_rule(model, inst)
+      raise 'H10a: skrinka nema `fixed` pravidlo, ktore nieco generuje' unless target
+
+      output = target['output'].to_s
+      base_hw = st3b_hw_count(inst, output)
+      edited = JSON.parse(JSON.generate(hr.project_rules(model)))
+      edited.each { |r| r['quantity'] = r['quantity'].to_i + 2 if r['rule_id'] == target['rule_id'] }
+
+      st3a_with_fake_studio(rec) do
+        # (1) payload sekcie nesie reviziu globalu
+        rec.clear
+        e::StudioDialog.send(:push_state)
+        pay = st3a_last_push(rec)['rules']
+        pin = pay['global_rev'].to_s
+        ok("H10a (1): payload nesie reviziu globalu (#{pin}) = revizia sandboxu",
+           !pin.empty? && pin == hr.library_check[:rev])
+
+        # (2) H-PRE: ine okno zmenilo globál -> NIC, ziadny krok Spat
+        foreign = h10a_doc(h10a_toggled(hr::SEED_RULES, 'hinge'))
+        h10a_foreign_write(foreign)
+        fbytes = File.binread(hr.path)
+        frev = hr.rules_rev(foreign['rules'])
+        snap0 = h10a_snap(model)
+        m1 = r03_marker(model, markers)
+        h10a_save(rd, sink, rec, model, pay, edited, pin)
+        msg, err = h10a_status(rec)
+        ok("H10a (2): H-PRE — cervena hlaska (#{msg[0, 70]})", err && msg == rd::GLOBAL_PRE_TEXT)
+        ok('H10a (2): snapshot projektu aj kovanie skrinky NEZMENENE',
+           h10a_snap(model) == snap0 && st3b_hw_count(inst, output) == base_hw)
+        ok('H10a (2): globál = cudzi (bajtovo)', File.binread(hr.path) == fbytes)
+        ok("H10a (2): klient dostal pin cudzej revizie (#{h10a_global_revs(rec).inspect})",
+           h10a_global_revs(rec) == [frev])
+        Sketchup.undo
+        ok('H10a (2): odmietnutie NEZALOZILO krok Spat (1x Spat vratil marker)', !m1.valid?)
+        ok('H10a (2): a snapshot sa Spat-om nepohol', h10a_snap(model) == snap0)
+
+        # (3) druhe Ulozit s obnovenym pinom = vedome prepisanie
+        h10a_save(rd, sink, rec, model, pay, edited, frev)
+        msg, err = h10a_status(rec)
+        new_hw = st3b_hw_count(inst, output)
+        ok("H10a (3): druhe ulozenie prebehlo (#{msg[0, 70]})", !err && msg.include?('+ globálna predvoľba'))
+        ok("H10a (3): projekt ulozeny a skrinka PRESTAVANA (#{base_hw} -> #{new_hw})",
+           h10a_snap(model) != snap0 && new_hw > base_hw)
+        ok('H10a (3): globál = formular', JSON.parse(File.binread(hr.path))['rules'] == hr.normalize_rules(edited))
+        gbytes3 = File.binread(hr.path)
+        Sketchup.undo
+        ok('H10a (3): 1x Spat vratil snapshot aj kovanie',
+           h10a_snap(model) == snap0 && st3b_hw_count(inst, output) == base_hw)
+        ok('H10a (3): globál Spat-om nezmeneny (preferencia, nie sucast modelu)', File.binread(hr.path) == gbytes3)
+
+        # (4) H-RACE: cudzi zapis PO prestavbe, tesne pred zamknutym zapisom globalu
+        rec.clear
+        e::StudioDialog.send(:push_state)
+        pay = st3a_last_push(rec)['rules']
+        foreign2 = h10a_doc(h10a_toggled(hr::SEED_RULES, 'leg'))
+        frev2 = hr.rules_rev(foreign2['rules'])
+        fired = false
+        runner = self
+        hr.define_singleton_method(:save_library!) do |rules, rev|
+          unless fired
+            fired = true
+            runner.h10a_foreign_write(foreign2)
+          end
+          orig_save.call(rules, rev)
+        end
+        h10a_save(rd, sink, rec, model, pay, edited, pay['global_rev'])
+        hr.define_singleton_method(:save_library!, orig_save)
+        msg, err = h10a_status(rec)
+        race_hw = st3b_hw_count(inst, output)
+        ok("H10a (4): H-RACE — cervena hlaska (#{msg[0, 90]})",
+           fired && err && msg.include?(rd::GLOBAL_RACE_TEXT) && msg.start_with?('Pravidlá uložené do projektu'))
+        ok('H10a (4): cudzi globál BAJTOVO zachovany', File.binread(hr.path) == JSON.pretty_generate(foreign2))
+        ok("H10a (4): projekt ulozeny a kovanie podla novych pravidiel (#{race_hw})",
+           JSON.parse(h10a_snap(model).to_s)['rules'] == hr.normalize_rules(edited) && race_hw == new_hw)
+        ok("H10a (4): klient dostal pin cudzej revizie (#{h10a_global_revs(rec).inspect})",
+           h10a_global_revs(rec) == [frev2])
+        ok('H10a (4): dalsi payload nesie tu istu reviziu globalu', rd.rules_payload(model)['global_rev'] == frev2)
+        Sketchup.undo
+        ok('H10a (4): JEDEN Spat vratil snapshot AJ kovanie',
+           h10a_snap(model) == snap0 && st3b_hw_count(inst, output) == base_hw)
+        ok('H10a (4): globál po Spat stale cudzi', File.binread(hr.path) == JSON.pretty_generate(foreign2))
+
+        # (5) jedno okno bez subehu — subor v dnesnom tvare
+        rec.clear
+        e::StudioDialog.send(:push_state)
+        pay = st3a_last_push(rec)['rules']
+        h10a_save(rd, sink, rec, model, pay, edited, pay['global_rev'])
+        ok('H10a (5): jedno okno — globál bajtovo {std, seed_version, normalize_rules(rules)}',
+           File.binread(hr.path) == JSON.pretty_generate(h10a_doc(edited)) && !h10a_status(rec).last)
+      end
+    rescue StandardError => ex
+      log_line("FAIL: H10a vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    ensure
+      begin
+        hr.define_singleton_method(:save_library!, orig_save)
+        r03_clear_markers(model, markers)
+        cleanup(model)
+        kovi_model_values!(model, saved_values)
+      ensure
+        e::Materials.test_dir_override = old_dir
+        kovb1_reset_caches!
+        FileUtils.remove_entry(tmp) if File.directory?(tmp)
+      end
+      ok('H10a cleanup: zive pravidla v %APPDATA% bajtovo nedotknute, cesta aj projektove kluce obnovene',
+         hr.path == live_path && (File.exist?(live_path) ? File.binread(live_path) : nil) == live_bytes &&
+         h10a_snap(model) == saved_snap &&
+         saved_values.all? { |key, value| model.get_attribute(e::Store::DICT, key) == value })
+    end
+  end
+
   # --- DOCKEY (1d/R-02b, review #267 P1-1 + delty P2-N1/P2-GLM/P2-1) --------
   # Identita dokumentu v REALNOM SketchUpe — to, co headless sada nad stubom
   # dokazat nevie:
@@ -28112,6 +28300,7 @@ module NoxunSuRunner
     run_r12(model)           # 1d/R-12: dopredny guard configu — marker, odmietnuta prestavba bez mutacie a bez kroku Spat, kopia/sablony, citanie dalej bezi
     run_r14(model)           # 1d/R-14: verzia formatu dat rozpoctu — marker v TEJ ISTEJ operacii (1x Spat vrati oboje), odmietnutie novsej zakazky bez zapisu a bez kroku Spat, citanie a priznak v payloade
     run_h8(model)            # H8/R-13: znacka verzie standardu — dielec so std 2 / doska bez std / samostatny dielec = jeden ORANGE na kus, klik presne na neho, kusovnik bajtovo rovnaky, zrusena operacia nic nenecha
+    run_h10a(model)          # H10a/R-35: dve okna a GLOBALNE pravidla kovania (izolovany sandbox) — H-PRE nic nezapise a neprida krok Spat, vedome prepisanie = 1 krok Spat (globál ostava), H-RACE po prestavbe: projekt ulozeny, cudzi globál bajtovo zachovany, 1 Spat vrati snapshot aj kovanie, zive pravidla nedotknute
     run_dockey(model)        # 1d/R-02b: identita dokumentu — `valid?` probe, rotacia pri onOpenModel nad RECYKLOVANYM objektom, onActivateModel nerotuje, fail-closed
     run_ghost(model)         # GHOST V1-04: vkladanie na klik — 0 mutacii pred klikom, zamok/free vyska, rotacia a kotvy, degenerovany luc, undo/prepnutie/druhe „Vlozit", sablona a peciatka
     run_d123(model)          # D-123: skrinka s nohami/soklom stoji na ploche aj bez zamku Z
