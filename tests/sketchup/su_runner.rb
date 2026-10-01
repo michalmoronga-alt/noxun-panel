@@ -8940,6 +8940,38 @@ module NoxunSuRunner
     Array(e::ProductionCore.control_payload(col)['items']).select { |i| i['category'] == e::Validation::CAT_STD_VERSION }
   end
 
+  # Krok 1b: VSETKY druhy kusov (skrinka, vnorene dielce, doska, samostatny
+  # dielec) cez skutocny subor — `save_copy` + `definitions.load` (vzor KON-0 h)
+  # a SKUTOCNY `Bom.collect` nad nacitanymi entitami. Doplna krok 1, ktoremu
+  # ulozeny ENGINEtests.skp moze niektory druh kusu nedat (napr. dosku).
+  def h8_saved_roundtrip(model, cab)
+    det = d134_detach(model, cab)
+    path = File.join(File.dirname(OUT), 'ENGINEtests_h8_saved.skp')
+    ok('H8 krok 1b: SKP save_copy', model.save_copy(path))
+    loaded = model.definitions.load(path)
+    view = Object.new
+    view.define_singleton_method(:entities) { loaded.entities }
+    view.define_singleton_method(:method_missing) { |name, *args, &blk| model.send(name, *args, &blk) }
+    view.define_singleton_method(:respond_to_missing?) { |name, priv = false| model.respond_to?(name, priv) }
+    cov, vals = h8_coverage(view)
+    issues = Array(e::Bom.collect(view)[:std_issues])
+    info("H8 krok 1b: pokrytie nacitaneho suboru — skrinky #{cov[:cabinets]}, dosky #{cov[:boards]}, " \
+         "vnorene vyrobne dielce #{cov[:nested]}, samostatne dielce #{cov[:standalone]}; znacky #{vals.sort.to_h.inspect}")
+    ok('H8 krok 1b: nacitany subor ma VSETKY druhy kusov (skrinka, vnorene dielce, doska, samostatny dielec)',
+       cov.values.all?(&:positive?))
+    ok("H8 krok 1b: po save/load su vsetky znacky Integer 1 a zber nehlasi nic (#{issues.length})",
+       vals.keys == ['1:Integer'] && issues.empty?)
+    if det&.valid?
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST H8 upratanie 1b', true)
+        det.erase!
+        model.commit_operation
+      end
+    end
+  rescue StandardError => ex
+    log_line("FAIL: H8 krok 1b vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
   def run_h8(model)
     cleanup(model)
     cab = e::CabinetBuilder.build(model, H8_CAB.dup)
@@ -8956,6 +8988,7 @@ module NoxunSuRunner
         e::Store.get(pi, 'production_class').to_s == 'sheet'
     end
     ok("H8: skrinka ma vyrobne dielce (#{parts.length})", parts.length >= 3)
+    h8_saved_roundtrip(model, cab)
 
     # 2) vnoreny dielec so znackou 2 -> JEDEN zaznam `newer` pre skrinku; Spat nic.
     r2 = h8_probe(model, 'std 2') do
