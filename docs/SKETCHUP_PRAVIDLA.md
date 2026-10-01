@@ -32,7 +32,7 @@ Destilát z „Výskumná správa pre kódera SketchUp pluginov" (deep research,
 - Unikátny `preferences_key`; **callbacky (`add_action_callback`) registrovať pred `show`**.
 - **Ruby → JS výhradne cez `to_json`** (`dialog.execute_script("app.update(#{data.to_json})")`), nikdy interpoláciou stringu.
 - V `add_action_callback` blokoch **nikdy `return`** — v Ruby bloku ukončí nadradenú metódu; použiť `next`.
-- Front-end cieliť na CEF (Chromium) najstaršej podporovanej verzie SketchUp — nie na „moderný browser". Žiadne CDN — všetko lokálne v jednom súbore/priečinku.
+- Front-end cieliť na CEF (Chromium) najstaršej podporovanej verzie SketchUp — dnes **CEF 137 (SketchUp 2026.0)**, nie na „moderný browser". Žiadne CDN — všetko lokálne v jednom súbore/priečinku.
 - `UI::Command` zdieľať medzi menu a toolbarom; po vytvorení toolbaru `toolbar.restore`.
 
 ## Sieť a systém
@@ -56,4 +56,4 @@ Destilát z „Výskumná správa pre kódera SketchUp pluginov" (deep research,
 
 - **rubocop-sketchup** (lint so SketchUp pravidlami), **ruby-api-stubs** (autocomplete), **TestUp 2** (Minitest v SketchUpe), **YARD** komentáre (`@param [Length] width`) — dôležité, kód číta ďalší AI agent.
 - Referenčné repá: `SketchUp/sketchup-ruby-api-tutorials`, `SketchUp/htmldialog-examples`, `SketchUp/sketchup-attribute-helper`.
-- Kompatibilita: cieľ SketchUp **2024+** (Ruby 3.2, CEF 112) — overovať pri každej novej API funkcii.
+- Kompatibilita: **minimum SketchUp 2026** (Ruby 3.2, CEF 137) — loader starší SketchUp odmietne jednou hláškou (`MIN_SKETCHUP_MAJOR` v `noxun_engine.rb`, inštalátor rovnako). API z 2023.0 a staršie sa volá priamo, bez `respond_to?` poistiek; **API z 2026.1/2026.2 len za `respond_to?`** (2026.0 ho nemá). Overovať pri každej novej API funkcii.

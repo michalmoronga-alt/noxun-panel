@@ -2044,7 +2044,11 @@ príprava → **`abort_prepared!`** (uprace len vlastný staging). `apply!` = ob
   atomickým prepisom (`File.rename` cez existujúci cieľ: `restore_loader!`, `finish_leftovers!`), takže `Plugins` nie sú ani na okamih bez bootovateľného loadera.
   Nesúlad po oprave = plugin sa v tomto okne nenačíta. **Marker sa maže
   overene** (`clear_marker`; prežitý marker = `cleanup_pending` / `:marker_stuck`; `marker_note` dopĺňa vetu do `Refused` správ). **Boot stavy:** `:idle`, `:done`
-  → registrácia; `:busy` (čaká max ~5 s), `:restart`, `:lease_failed`, `:marker_stuck`, `:error` → bez registrácie s natívnou hláškou. Porovnanie generácie beží
+  → registrácia; `:busy` (čaká max ~5 s), `:restart`, `:lease_failed`, `:marker_stuck`, `:error` → bez registrácie s natívnou hláškou. **`:unsupported`**
+  (H11b, F-02) = SketchUp starší ako 2026: **poradie je gate → recovery** — kontrola minima (`SketchupMinimum.check`, mimo `module Boot`, `MIN_SKETCHUP_MAJOR = 26`)
+  beží PRED `Boot.recover!`, takže nepodporovaný SketchUp nesiahne na zámok, lease ani strom; jedna hláška (`Boot.announce` s textom z `SketchupMinimum.message`)
+  a bez registrácie. Zdroj verzie je číselné `Sketchup.version_number` (major = číslo / 100 000 000), reťazec `Sketchup.version` je záloha a krížová kontrola;
+  **neznáma alebo rozporná verzia = fail-open** (plugin sa načíta, riadok v konzole). Inštalátor má to isté minimum (`$MinSketchupYear`, `-ResolveOnly` = len výpis cieľa). Porovnanie generácie beží
   aj na `:idle` (cudzí proces mohol aktualizáciu medzitým dokončiť a upratať), ale blokuje **len dokázaný nesúlad** — keď sa verzia stromu zistiť nedá (chýbajúci
   alebo nečitateľný `main.rb`), plugin sa načíta normálne a problém ohlási samotný `Sketchup.require`. Zámok sa berie pri každom boote.
 

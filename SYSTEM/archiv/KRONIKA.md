@@ -17,6 +17,21 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H11b · minimum SketchUp 2026 (1.10.2026, PR #?, v0.17.10, blok 9 · HARDENING PO V1, triedenie F-02; package
+  [PACKAGE_H11.md](../zdroje/bloky/HARDENING/PACKAGE_H11.md) časť I, audit návrhu 2 BLOCKER · 5 FIX · 2 NOTE [AUDIT_H11_raw.md](../zdroje/bloky/HARDENING/AUDIT_H11_raw.md)
+  + delta [AUDIT_H11_delta_raw.md](../zdroje/bloky/HARDENING/AUDIT_H11_delta_raw.md) — rez H11b → H11a (príprava na 2026.2) → H11c (overenie na 2026.2)).**
+  Loader dodnes verziu SketchUpu nekontroloval (sonda S14: 24.0 aj 26.0 sa zaregistrovali). Teraz `SketchupMinimum.check` (mimo `module Boot`, `MIN_SKETCHUP_MAJOR = 26`)
+  beží **pred** `Boot.recover!`: starší SketchUp = `:unsupported`, jedna hláška s verziou, **bez zámku, lease aj registrácie**. Zdroj podľa delta auditu N6 je číselné
+  `version_number` (major = číslo / 100 000 000 — **in-SU overené: 26.0.429 → 2600000429**), reťazec je záloha; **oproti package navyše:** keď sú oba zdroje čitateľné
+  a ich major sa nezhoduje, je to „verziu sa nepodarilo zistiť" → fail-open (zlý výklad formátu nesmie vypnúť plugin v SketchUpe, ktorý o sebe hovorí, že je dosť nový).
+  `Boot.announce` dostal voliteľný text (`message_for` vyčlenený). Prekrytia: 10 poistiek `respond_to?(:enabled?/:enabled=/:overlay_id)` z čias pred 2023.0 preč
+  (`available?` a `respond_to?(:overlays)` ostávajú ako šev headless sady). Inštalátor: `Resolve-NoxunDest` (vnorené `Join-Path`) — 2026 má prednosť, inak najnovší
+  ≥ 2026, inak chyba s vetou o minime; `-ResolveOnly` len vypíše cieľ (delta D4: ani `NOXUN_INSTALL_DEST` nevytvorí priečinok). `SKETCHUP_PRAVIDLA.md`: minimum 2026,
+  CEF 137, API z 2026.1/2026.2 len za `respond_to?`. **Q2 bez odpovede** → vratná predvoľba (starší SketchUp = nenačítať + hláška). **Testy:** 5092 headless · 151 JS
+  sád + encoding guard; nové `test_h11b_minimum.rb` (8 testov: loader v samostatnom procese pre 24/25/26.0/26.2/27 a 7 neznámych verzií, N6, statické strážce,
+  inštalátor cez PowerShell); **mutácie MB1–MB7 7/7 zabité**; in-SU **3340 / 0** na `16c03d3f` (SketchUp 26.0.429) — nová sekcia `run_h11b` (sonda P2: verzia, N6, štyri prekrytia
+  bez poistiek, opätovné zapnutie cez `drop_registered`, vypnutie). Predrecenzia nepovinná (bežná dávka, < 300 riadkov kódu pluginu, bez ovládacieho prvku).
+  STAV pred dávkou: v0.17.9 · H10b hotová · Robí sa H6/H7 (mockupy) · Ďalší krok H6/H7, potom H11–H17.
 - **H10b · dve okná SketchUpu a rozmerové rady (1.10.2026, PR #444, v0.17.9, blok 9 · HARDENING PO V1, register R-35 — časť rady, R-35 tým uzavreté; package
   [PACKAGE_H10.md](../zdroje/bloky/HARDENING/PACKAGE_H10.md) časť R2, audit návrhu spoločný s H10a).**
   „Uložiť rady" v koliesku Inspectora posielalo všetkých 5 radov tak, ako ich panel dostal pri otvorení — úplná náhrada `dim_series.json`, dve okná sa prebíjali
