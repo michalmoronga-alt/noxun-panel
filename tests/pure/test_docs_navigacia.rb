@@ -51,6 +51,63 @@ NX_ARCH_FILES = %w[
 # ktoru tato davka liecila). Plati na router aj na mapu; SYSTEM/ je mimo rozsah.
 NX_ARCH_MAX_LINE = 400
 
+# Davka H5a (blok 9 · HARDENING, 1.10.2026, krizovy audit V1 B-02/B-03, CS-04):
+# ui-lifecycle.md narastol na 551 kB, lebo kazda davka pridavala do odsekov
+# priebeh prac (cisla PR, kola review, zaniknute okna) — agent potom nevedel, ktora
+# zo stoviek historickych viet este plati. Historia sa presunula plnym textom do
+# SYSTEM/archiv/UI_LIFECYCLE_historia_do_v0.17.md a ziva mapa ma 253 kB.
+# STROP = ~1,3x velkosti po upratani (pri ostatnych suboroch ~1,3x dnesnej velkosti,
+# zaokruhlene na kB) — prestane stacit az vtedy, ked sa zive odseky zacnu znova
+# nafukovat historiou, nie pri beznom raste. Merane v bajtoch na disku (CRLF aj LF
+# checkout sa zmesti; hodnoty reportovacieho behu su v PR davky H5a).
+NX_ARCH_MAX_BYTES = {
+  'ui-lifecycle.md' => 330 * 1024,
+  'hardware.md' => 270 * 1024,
+  'construction.md' => 230 * 1024,
+  'outputs.md' => 215 * 1024,
+  'materials.md' => 95 * 1024,
+  'model-a-identita.md' => 90 * 1024,
+  'appliances.md' => 62 * 1024
+}.freeze
+# Historicke znacky smu v upratanych suboroch mapy stat LEN vo vyhradenej sekcii
+# „## História" na konci suboru (zaniknute okna, odkaz do archivu). Ostatne subory
+# mapy este upratane nie su — pribudnu sem, ked ich niektora davka uprace.
+NX_ARCH_HISTORY_FILES = %w[ui-lifecycle.md].freeze
+NX_ARCH_HISTORY_HEADING = '## História'
+# Znacky sa hladaju BEZ OHLADU na velkost pismen a s toleranciou Markdownu a medzier
+# (`Review #226`, `V0.4.7`, `PR **#438**`, `PR  #438` su v repe bezne zapisy) — riadok sa
+# pred porovnanim normalizuje (`nx_arch_history_norm`: bez `*` a spatnych apostrofov,
+# medzery zlucene). ZANIKL ostava VERZALKAMI: male „zaniklo" je bezne slovo opisu.
+NX_ARCH_HISTORY_RE = /\b(?:PR|review|Codex|audit|GH)\s*#\s*\d|\bv\d+\.\d+\.\d+\b/i.freeze
+# Pismenove oznacenia PR z fazy STUDIO (`PR A`, `PR B1`, `ŠT-1c PR B3`) su v repe bezna
+# forma — chytaju sa tiez, ale LEN verzalkami (male „pr a" by bol falosny poplach).
+NX_ARCH_HISTORY_CAPS_RE = /ZANIKL|\bPR\s+[A-Z]\d{0,2}\b/.freeze
+
+def nx_arch_history_norm(line)
+  line.gsub(/[*`]/, '').gsub(/\s+/, ' ')
+end
+
+def nx_arch_history_marker(line)
+  norm = nx_arch_history_norm(line)
+  norm[NX_ARCH_HISTORY_RE] || norm[NX_ARCH_HISTORY_CAPS_RE]
+end
+
+# Problemy upratanych suborov mapy nad riadkami (cista funkcia — testuje sa aj nad
+# syntetickymi vstupmi): chybajuca sekcia Historia, AKYKOLVEK nadpis za nou (aj `###` —
+# inak by sa zivy odsek pripojeny za historiu vyhol zakazu znaciek) a znacky pred nou.
+def nx_arch_history_problems(name, lines)
+  hist = lines.index(NX_ARCH_HISTORY_HEADING)
+  return ["#{name}: chyba vyhradena sekcia '#{NX_ARCH_HISTORY_HEADING}'"] unless hist
+
+  later = lines[(hist + 1)..].to_a.select { |l| l.match?(/\A\#{1,6}\s/) }
+  problems = later.map { |l| "#{name}: za sekciou '#{NX_ARCH_HISTORY_HEADING}' je nadpis '#{l}' (musi byt posledna)" }
+  lines[0...hist].each_with_index do |l, i|
+    m = nx_arch_history_marker(l)
+    problems << "#{name}:#{i + 1} znacka '#{m}'" if m
+  end
+  problems
+end
+
 NxTest.test('docs: SYSTEM/STAV.md existuje a ma najviac 80 riadkov') do
   path = File.join(NxTest::ROOT, 'SYSTEM', 'STAV.md')
   NxTest.assert(File.exist?(path), 'SYSTEM/STAV.md chyba — je to vstupny bod kazdeho sedenia')
@@ -215,6 +272,72 @@ NxTest.test('docs: ARCHITEKTURA.md a docs/architecture/*.md nemaju riadok nad 40
   NxTest.assert(offenders.empty?,
                 "Riadky nad #{NX_ARCH_MAX_LINE} znakov: #{offenders.join(', ')} — " \
                 'rozbi odsek na kratsie riadky (Markdown ich spoji do jedneho odseku)')
+end
+
+NxTest.test('docs: kazdy subor docs/architecture/ ma strop velkosti (historia patri do archivu)') do
+  # Inventar ADRESARA, nie len zoznam NX_ARCH_FILES: novy subor mapy bez stropu = pad.
+  present = Dir.glob(File.join(NxTest::ROOT, 'docs', 'architecture', '*.md')).map { |p| File.basename(p) }.sort
+  NxTest.assert(present.length >= NX_ARCH_FILES.length, "nenasiel som subory mapy (#{present.length}) — zla cesta?")
+  missing = (present | NX_ARCH_FILES).reject { |n| NX_ARCH_MAX_BYTES.key?(n) }
+  NxTest.assert(missing.empty?, "subory mapy bez stropu velkosti: #{missing.join(' · ')} — dopln NX_ARCH_MAX_BYTES")
+  over = NX_ARCH_MAX_BYTES.filter_map do |name, max|
+    path = File.join(NxTest::ROOT, 'docs', 'architecture', name)
+    next "#{name} chyba (strop bez suboru — odstran ho z NX_ARCH_MAX_BYTES)" unless File.exist?(path)
+
+    size = File.size(path)
+    "#{name} #{size} B (strop #{max} B)" if size > max
+  end
+  NxTest.assert(over.empty?,
+                "Subory mapy prekrocili strop: #{over.join(' · ')} — priebeh prac (PR, review, zaniknute " \
+                'riesenia) patri do SYSTEM/archiv/KRONIKA.md alebo do archivu suboru; odsek drzi len aktualny kontrakt')
+end
+
+NxTest.test('docs: upratane subory mapy nemaju historicke znacky mimo sekcie Historia') do
+  NX_ARCH_HISTORY_FILES.each do |name|
+    lines = File.readlines(File.join(NxTest::ROOT, 'docs', 'architecture', name), encoding: 'UTF-8').map(&:rstrip)
+    problems = nx_arch_history_problems(name, lines)
+    NxTest.assert(problems.empty?,
+                  "Historicke znacky mimo sekcie Historia: #{problems.first(10).join(' · ')} — cislo PR, kolo review, " \
+                  "verzia ani 'ZANIKLO' do ziveho odseku nepatria (KRONIKA, archiv, alebo sekcia '#{NX_ARCH_HISTORY_HEADING}' " \
+                  'na konci suboru, za ktorou uz ziadny nadpis nie je)')
+  end
+end
+
+# Negativne pripady guardu nad syntetickymi riadkami — guard nesmie mlcat pri zapisoch,
+# ktore v repe bezne existuju, a nesmie hlasit bezny opis (falosny poplach).
+NxTest.test('docs: guard historickych znaciek chyta varianty zapisu a nadpis za Historiou') do
+  ok = ['# Mapa', '', '### Sekcia X', 'zaniklo v sekcii, verzia v0.17.x, Š8–Š11, audit B1 FIX 5, čísla PR, kolá review', '',
+        NX_ARCH_HISTORY_HEADING, 'Výroba ZANIKLO v ŠT-1c PR #212 (review #2)']
+  NxTest.assert(nx_arch_history_problems('t.md', ok).empty?,
+                "falosny poplach: #{nx_arch_history_problems('t.md', ok).join(' · ')}")
+  ['Review #226', 'V0.4.7', 'PR **#438**', 'PR  #438', '`PR #12`', 'codex #3', 'GH #138', 'AUDIT #9', 'okno ZANIKLO',
+   'PR A', 'v ŠT-1c PR B1', 'PR B3', '**PR B2**'].each do |bad|
+    lines = ['# Mapa', "text #{bad} text", NX_ARCH_HISTORY_HEADING]
+    NxTest.refute(nx_arch_history_problems('t.md', lines).empty?, "guard nezachytil znacku '#{bad}'")
+  end
+  %w[## ### ####].each do |lvl|
+    lines = ['# Mapa', NX_ARCH_HISTORY_HEADING, 'veta', "#{lvl} foo.rb", 'zivy odsek PR #1']
+    NxTest.refute(nx_arch_history_problems('t.md', lines).empty?, "nadpis '#{lvl}' za Historiou presiel")
+  end
+  NxTest.refute(nx_arch_history_problems('t.md', ['# Mapa', 'bez historie']).empty?, 'chybajuca sekcia Historia presla')
+end
+
+# Zaniknuty subor nesmie mat ZIVY modulovy nadpis (CS-07): nadpis `### <subor>.rb|js|html|css`
+# v mape musi menovat subor, ktory v noxun_engine/ naozaj je. Zaniknute okna patria do
+# sekcie Historia ako veta, nie ako vlastny odsek, inak agent hlada neexistujucu cestu.
+NxTest.test('docs: modulove nadpisy v docs/architecture/ menuju existujuce subory') do
+  root = File.join(NxTest::ROOT, 'noxun_engine')
+  existing = Dir.glob(File.join(root, '**', '*.{rb,js,html,css}')).map { |p| File.basename(p) }.uniq
+  NxTest.assert(existing.length > 40, "nenasiel som subory pluginu (#{existing.length}) — zla cesta?")
+  dead = Dir.glob(File.join(NxTest::ROOT, 'docs', 'architecture', '*.md')).sort.flat_map do |f|
+    File.readlines(f, encoding: 'UTF-8').filter_map do |l|
+      m = l.match(/\A### (\S+\.(?:rb|js|html|css))(?:\s|\z)/)
+      "#{File.basename(f)}: #{m[1]}" if m && !existing.include?(File.basename(m[1]))
+    end
+  end
+  NxTest.assert(dead.empty?,
+                "Nadpisy suborov, ktore v kode nie su: #{dead.join(' · ')} — zaniknuty subor patri do sekcie " \
+                "'#{NX_ARCH_HISTORY_HEADING}' ako veta s odkazom do archivu, nie ako zivy odsek")
 end
 
 # Mapa nesmie zaostat za kodom. Zmienka v proze NESTACI — genericke meno (napr.

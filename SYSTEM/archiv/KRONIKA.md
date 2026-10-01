@@ -17,6 +17,25 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H5a · mapa okien bez histórie (1.10.2026, PR #439, dokumentačné PR — plugin, VERSION ani `?v=` sa nemenia; blok 9 · HARDENING PO V1, položky triedenia
+  B-02 a časť B-03; brief [BRIEF_H5.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H5.md); briefy H1–H5 a H8–H10 sú od tohto PR v priečinku bloku `briefy/`).** `docs/architecture/ui-lifecycle.md` (551 kB, 4 193 riadkov, 246 riadkov s historickými
+  značkami) bol súčasne kontrakt aj kronika — agent nevedel, ktorá veta ešte platí. **Presun, nie mazanie:** celé pôvodné znenie ide do
+  [UI_LIFECYCLE_historia_do_v0.17.md](UI_LIFECYCLE_historia_do_v0.17.md) (jediná zmena = relatívne odkazy prepočítané na archív; overenie `sort -u | comm`:
+  0 stratených riadkov) a živá mapa je **prepísaná na aktuálny opis** (253 kB, 0 historických značiek mimo sekcie „História"): každá zo **14 sekcií Štúdia** má
+  vlastný nadpis `### Sekcia <NÁZOV> v Štúdiu` (nové: Kusovník, Materiály, Kovanie, Pravidlá, Šablóny, Dodávateľ/Demos, Nastavenia rozpočtu, O plugine) s opisom čo
+  robí, odkiaľ berie dáta, JS funkcie a invarianty; kontexty Inspectora `### Kontext Korpus / Zóny / Čelá / Kovanie` („Obsah Korpusu" premenovaný); serverové
+  moduly `*_dialog.rb` stoja pri svojej sekcii; nadpisy podľa kôl review zanikli (ZÁMOK ODOSLANIA, GENERAČNÝ KONTRAKT, Varovný pás → text odsekov); zaniknuté okná
+  (Výroba, Materiály projektu, Katalóg kovania, Pravidlá, Šablóny, Nastavenia dodávateľa) sú tabuľka v sekcii **„História"** na konci, `### production_dialog.rb`
+  zanikol; doplnené stuby `actions_settings.rb`, `actions_usage.rb`, `usage_stats.rb` z kódu. Nadpisy, na ktoré ukazujú CLAUDE.md, testy a iné dokumenty, ostali
+  (`### Sekcia ROZPOČET`, `### Kontext Čelá`, `### Satelitné okná`, `### <súbor>_dialog.rb`, `### D-15 modal`, `### Paleta a téma`, `### Veľkosť okna pri otvorení`,
+  `### actions_appliance.rb` kotva). **Strážca rastu** v `tests/pure/test_docs_navigacia.rb` (najprv reportovací beh, potom tvrdá brána): strop veľkosti každého
+  súboru mapy ~1,3× (ui-lifecycle 330 kB, hardware 270, construction 230, outputs 215, materials 95, model-a-identita 90, appliances 62), zákaz značiek `PR #`,
+  `review #`, `Codex #`, `audit #`, `GH #`, `ZANIKL` a verzií `vX.Y.Z` mimo sekcie „História" v upratanom ui-lifecycle a nadpis `### <súbor>` musí menovať
+  existujúci súbor pluginu. **Review (kolá 1–2):** briefy bloku do repa (`briefy/`), guard pokrýva každý súbor adresára, žiadny nadpis za Históriou, značky
+  case-insensitive s toleranciou Markdownu a písmenových PR (`PR B3`); kontrola presnosti mapy voči kódu (8 opráv) + paritný test jednotiek kovania
+  `test_hw_unit_zrkadlo.rb`. Veľkosti v CLAUDE.md (540 → ~257 kB) **vyriešené pred mergom** (e0e3b71d). Ostatné súbory mapy majú značky ďalej (nie sú v zákaze).
+  **Testy:** 4985 headless (nové guardy dokumentov + 2 paritné testy jednotiek) · 149 JS sád zelené + encoding guard.
+
 - **H4b · texty a vzhľad (1.10.2026, PR #438, v0.17.4, blok 9 · HARDENING PO V1, položky triedenia HARDENING D-06 · D-07 · D-08 · D-09 — nie D-čísla
   DOGFOODINGU; package [PACKAGE_H4.md](../zdroje/bloky/HARDENING/PACKAGE_H4.md) časť H4b, zladenie §5.1).** **D-06:** núdzové „Obnoviť zálohu" stálo v lište
   Materiálov hneď vedľa bežného „Obnoviť" — teraz je to položka **„Vrátiť katalóg pred migráciou…" v ponuke „⋯"** za „Obnoviť" (Q1 bez odpovede → predvolený

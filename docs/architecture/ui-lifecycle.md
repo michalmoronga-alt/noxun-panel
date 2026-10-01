@@ -2,2002 +2,1022 @@
 
 > **Časť mapy modulov Noxun Engine.** Rozcestník a kľúčové invarianty sú
 > v [../ARCHITEKTURA.md](../ARCHITEKTURA.md).
-> **Údržba:** dávka, ktorá mení modul, prepíše **JEHO odsek na mieste** — nikdy append na koniec súboru.
-> Odsek popisuje **kontrakt a pasce** modulu, nie priebeh prác — história dávok patrí do
-> [../../SYSTEM/archiv/KRONIKA.md](../../SYSTEM/archiv/KRONIKA.md).
+> **Údržba:** dávka, ktorá mení sekciu, kontext alebo modul, prepíše **JEHO odsek na mieste** — nikdy append na koniec súboru.
+> Odsek opisuje **aktuálny kontrakt a pasce**, nie priebeh prác: čísla PR, kolá review, verzie a zaniknuté riešenia patria do
+> [../../SYSTEM/archiv/KRONIKA.md](../../SYSTEM/archiv/KRONIKA.md). Súbor má strop veľkosti a historické značky smú stáť len v sekcii
+> **„História"** na konci (stráži `tests/pure/test_docs_navigacia.rb`).
+> **Plné pôvodné znenie (pred upratovaním H5a)** — každá pasca s dôvodom, priebeh dávok, review kolá, zaniknuté okná — je v archíve
+> [../../SYSTEM/archiv/UI_LIFECYCLE_historia_do_v0.17.md](../../SYSTEM/archiv/UI_LIFECYCLE_historia_do_v0.17.md) pod **rovnomennými
+> alebo pôvodnými nadpismi** (odsek nižšie ho menuje). Číta sa len Grepom, keď treba „prečo je to takto".
 
-Dve okná pluginu (Inspector · Štúdio), ich kostra, kontexty, karty, sekcie, zdieľané JS komponenty a životný cyklus dialógov. Pri KAŽDEJ UI práci sa k tomuto súboru povinne číta
-[../UI_DIZAJN.md](../UI_DIZAJN.md).
+Dve okná pluginu — **Inspector** (`panel.html` + `panel.rb` + `ui/panel/*.rb`: čo je označené a čo s tým) a **Štúdio** (`studio.html` +
+`studio_dialog.rb`: celá zákazka v 14 sekciách) — ich kostra, kontexty, karty, sekcie, zdieľané JS komponenty a životný cyklus. Tretím
+HtmlDialogom je len malý **Z-dialog** nástrojov (`Tools::ZDialog` v `mower.rb`). Pri KAŽDEJ UI práci sa k tomuto súboru povinne číta
+[../UI_DIZAJN.md](../UI_DIZAJN.md) §1–§3.
+
+**Mapa súboru (Grep podľa nadpisu):** zdieľané komponenty (`### Paleta a téma`, `### Zdieľaný combobox`, `### D-15 modal`, `### Escape reťaz`) ·
+nástroje (`### tools.rb` …) · Inspector (`### Inspector — kostra`, `### Kontext Korpus`, `### Kontext Zóny`, `### Kontext Čelá`, `### Kontext Kovanie`,
+karty) · súbory Inspectora (`### panel.rb`, `### payloads.rb`, `### actions_*.rb`) · Štúdio (`### studio_dialog.rb`, `### Sekcia <NÁZOV> v Štúdiu`
+pre všetkých 14 sekcií + serverový modul sekcie `### <súbor>_dialog.rb`) · lifecycle okien (`### Veľkosť okna pri otvorení`, `### updater.rb`) ·
+`## História`.
 
 ## Vrstva UI a zdieľané komponenty
 
 ### Súbory UI vrstvy
 
-`panel.rb` (centrálne callbacky) + `ui/panel/*.rb` domény + `ui/js/*.js` moduly + `panel.css`.
+`panel.rb` (centrálne callbacky Inspectora) + `ui/panel/*.rb` domény + `studio_dialog.rb` (Štúdio) + `ui/js/*.js` moduly + zdieľaný `ui/css/panel.css`.
+Serverové moduly sekcií Štúdia nesú historické mená `*_dialog.rb` — vlastné okno už nemajú (sekcia „História").
 
 ### Dizajn
 
-tokeny `--nx-*` (farby VÝHRADNE cez tokeny; `--nx-state-*` rezervované pre semafor, nemiešať s ABS/status významami) · `ui/js/icons.js` inline SVG sprite (Lucide subset + vlastné +
-firemné logo `#i-logo`; licencie v THIRD_PARTY_NOTICES.md) · **žiadne emoji v UI chrome — vždy sprite ikony** · **komponentový rádius 6 px** · pravidlá: `docs/UI_DIZAJN.md` —
-**čítať pri KAŽDEJ UI práci**.
+Tokeny `--nx-*` (farby VÝHRADNE cez tokeny; `--nx-state-*` rezervované pre semafor, nemiešať s ABS/status významami) · `ui/js/icons.js` inline SVG sprite
+(Lucide subset + vlastné + firemné logo `#i-logo`; licencie v THIRD_PARTY_NOTICES.md) · **žiadne emoji v UI chrome — vždy sprite ikony** ·
+**komponentový rádius 6 px** · pravidlá: `docs/UI_DIZAJN.md` — **čítať pri KAŽDEJ UI práci**.
 
 ### Paleta a téma (UI-01)
 
-výber/aktívny stav nesie firemný **NOXUN teal** (`--nx-select…`, `--nx-part-border/bg` = **výberová rodina**); primárna akcia zostáva zelená. Kreslené farby 2D náhľadu
-(`preview.js`) sú **zrkadlom** týchto tokenov — SVG atribúty nevedia `var()`, takže zmena tokenu je zmena na dvoch miestach (rovnaký vzor ako `EdgeCheck::COLORS`).
+Výber/aktívny stav nesie firemný **NOXUN teal** (`--nx-select…`, `--nx-part-border/bg` = **výberová rodina**); primárna akcia zostáva zelená. Kreslené farby 2D
+náhľadu (`preview.js`) sú **zrkadlom** týchto tokenov — SVG atribúty nevedia `var()`, takže zmena tokenu je zmena na dvoch miestach (vzor `EdgeCheck::COLORS`).
 
-**Téma** (`noxun` | `lucia`) prepína **VÝHRADNE výberovú rodinu** — danger/warn/ok/ABS/edge/semafor sa ňou nikdy nemenia. Žije v `%APPDATA%\NOXUN\Engine\ui_theme.json` (**nikdy v
-.skp** — Michal a Lucia otvárajú tie isté zákazky), whitelist a fallback na `noxun` sú v Ruby (`Engine.normalize_ui_theme` / `get_ui_theme` / `set_ui_theme` v main.rb) a zrkadlovo
-v JS (`nxThemeName`). Do okna sa dostane rovnakou cestou ako fit: okno si ju po načítaní HTML vypýta (`sketchup.nx_theme()` v `ui/js/win_fit.js` — jediný skript načítaný VO
-VŠETKÝCH oknách; `execute_script` pred `show` nefunguje) a Ruby odpovie `nxThemeApply(<meno>)`. Callback registruje spoločný boot hook `Engine.register_dialog_fit` (historické
-meno, D-77), takže nové okno tému dostane automaticky. `nxThemeApply` pred nasadením ZHODÍ všetky témové prepisy (návrat na `:root` — inak by po prepnutí späť ostali zvyšky).
+**Téma** (`noxun` | `lucia`) prepína **VÝHRADNE výberovú rodinu** — danger/warn/ok/ABS/edge/semafor sa ňou nikdy nemenia. Žije v
+`%APPDATA%\NOXUN\Engine\ui_theme.json` (**nikdy v .skp** — Michal a Lucia otvárajú tie isté zákazky); whitelist a fallback na `noxun` sú v Ruby
+(`Engine.normalize_ui_theme` / `get_ui_theme` / `set_ui_theme` v main.rb) a zrkadlovo v JS (`nxThemeName`).
 
-**UI prepínač (UI-B3)** žije v koliesku raily: klik volá `nx_set_ui_theme` → `Engine.apply_ui_theme` = uloženie (`set_ui_theme`) + **`broadcast_ui_theme` do VŠETKÝCH otvorených
-okien** (register `Engine.register_dialog_theme`, teda každé okno cez `register_dialog_fit`). Zoznam okien sa **čistí pri každej registrácii aj pri každom rozoslaní**
-(`prune_theme_dialogs`) — referencia na zavretý dialóg (aj s jeho callback closure) sa nesmie držať; okno sa navyše **prihlási znova pri `nx_theme`** (medzi registráciou a `show`
-ešte nie je `visible?`, takže by ho čistenie mohlo vyhodiť). Bez rozoslania by panel zmenil farbu a satelity ostali na starej až do ďalšieho otvorenia. Panel si tému **nedrží ani
-nenasadzuje** — farby nasadzuje výhradne `nxThemeApply`, JS len číta `data-nx-theme` z koreňa, aby vedel, ktoré tlačidlo je aktívne.
+- **Do okna** ide cestou fitu: okno si ju po načítaní HTML vypýta (`sketchup.nx_theme()` v `ui/js/win_fit.js` — jediný skript načítaný VO VŠETKÝCH oknách;
+  `execute_script` pred `show` nefunguje) a Ruby odpovie `nxThemeApply(<meno>)`. Callback registruje spoločný boot hook `Engine.register_dialog_fit`,
+  takže nové okno tému dostane automaticky. `nxThemeApply` pred nasadením ZHODÍ všetky témové prepisy (návrat na `:root`).
+- **Prepínač** žije v koliesku raily: `nx_set_ui_theme` → `Engine.apply_ui_theme` = uloženie + **`broadcast_ui_theme` do VŠETKÝCH otvorených okien**
+  (register `Engine.register_dialog_theme`). Zoznam sa **čistí pri každej registrácii aj rozoslaní** (`prune_theme_dialogs` — zavretý dialóg ani jeho
+  closure sa nedrží) a okno sa **prihlási znova pri `nx_theme`** (pred `show` ešte nie je `visible?`).
+- Panel si tému **nedrží ani nenasadzuje** — farby nasadzuje výhradne `nxThemeApply`, JS len číta `data-nx-theme` z koreňa (aktívne tlačidlo).
 
 ### Zdieľaný combobox materiálov a ABS (D-85 / UI-03, ui/js/nx_combo.js)
 
-JEDEN komponent pre VŠETKY výbery dekoru a ABS pásky v paneli — telo/čelá/chrbát (`cab_*`), materiál dielca (`pcMaterial`) + 4 hrany, materiál dosky (`bc_material`) + 4 hrany,
-vkladací materiál (`ib_material`). Komponent `<select>` **NENAHRÁDZA — obaľuje ho**: pôvodný select ostáva v DOM (skrytý cez ATRIBÚT `data-nx-combo`, nie triedu — panel selectom
-prepisuje `className` pri override `ovr`) a je naďalej **jediným zdrojom pravdy**. Možnosti sa čítajú z jeho `<option>`/`<optgroup>`, takže **všetka existujúca logika platí bez
-duplikátu** (hrúbkové filtre D-45, ABS skupiny D-36/2A-3b, serverové texty „(podľa pravidla — …)" D-102, dupláky D-49, `disabled` „(nekompatibilné)"), a výber ide **presne tou
-istou cestou ako natívny klik** — `sel.value` + `dispatchEvent('change')`.
+**Čo robí:** JEDEN vyhľadávací výber dekoru a ABS pásky pre celý plugin — Inspector (telo/čelá/chrbát `cab_*`, materiál dielca `pcMaterial` + 4 hrany,
+materiál dosky `bc_material` + 4 hrany, vkladací `ib_material`) aj Štúdio (predvoľby projektu `md_body`/`md_front`/`md_back` v sekcii Materiály,
+`data-nx-combo="decor"`, pripája ich `scan` po každom `fillSelect`). Okno sekcie Materiály má na editáciu katalógu vlastný suggest (`#mdSgBox`).
 
-Preto **prežívajú nedotknuté všetky guardy na `change`**: E-03 hrúbka a D-86 smer dekoru vo vkladacej karte, D-41 modal chýbajúcej pásky, identity guardy `cabinet_id`/`board_id`.
-Jediná úprava guardov: „je pole obsluhované?" už neznamená len fokus selectu, ale `nxFieldBusy` = **fokus ALEBO otvorený popup** (`refreshInsertBoardMaterials`) — živý refresh
-katalógu nesmie prekresliť ponuku pod rukami píšuceho. Synchronizácia triggera má dva kanály: **`MutationObserver`** na `childList` selectu (panel prekresľuje `<option>`y bez
-akejkoľvek udalosti; callback beží až po dobehnutí bloku, takže vidí aj dosadenú `value`) a **explicitné `nxComboSync()`** na konci každého renderu karty (zmena samotnej
-`value`/`disabled` observer nespustí).
+**Kontrakt:**
+- `<select>` **NENAHRÁDZA — obaľuje ho**: select ostáva v DOM (skrytý ATRIBÚTOM `data-nx-combo`, nie triedou — panel prepisuje `className` pri override `ovr`)
+  a je **jediným zdrojom pravdy**. Možnosti sa čítajú z jeho `<option>`/`<optgroup>` (hrúbkové filtre D-45, ABS skupiny, serverové texty „(podľa pravidla — …)",
+  dupláky D-49, `disabled` „(nekompatibilné)" platia bez duplikátu) a výber ide **cestou natívneho kliku** — `sel.value` + `dispatchEvent('change')`. Preto
+  platia nezmenené všetky guardy na `change` (E-03 hrúbka a D-86 smer dekoru vo vkladacej karte, D-41 modal chýbajúcej pásky, identita `cabinet_id`/`board_id`,
+  potvrdzovacia lišta D-46 a `model_guid`).
+- **Programové vrátenie hodnoty** (pending) `change` nespúšťa → volá sa most **`NXCombo.sync(sel)`**, inak by trigger ukazoval neplatnú hodnotu.
+- „Je pole obsluhované?" = `nxFieldBusy` = **fokus ALEBO otvorený popup** — živý refresh katalógu (`refreshInsertBoardMaterials`) nesmie prekresliť ponuku
+  pod rukami. Synchronizácia triggera: **`MutationObserver`** na `childList` selectu + **explicitné `nxComboSync()`** na konci každého renderu karty
+  (zmena samotnej `value`/`disabled` observer nespustí).
+- **„Použité v projekte"** je odvodený zoznam ID zo servera (`Materials.used_material_ids` / `used_abs_ids` mínus zdroje globálnych šablón — čisté čítanie,
+  žiadny zápis). Panel: v `materials_payload.used_ids` a **na vyžiadanie pri otvorení ponuky** (`sketchup.nx_used_ids()` → `Panel.push_used_ids` →
+  `NX.setUsedIds`, vymení len zoznam). **Pull, nie push** — plný scan modelu do horúcej cesty `push_selected` nepatrí (guard test). Štúdio: hotový zoznam
+  `StudioDialog#mat_used_ids` → `mat.used_ids` z **už zozbieraného kusovníka** (`collected[:records]`, žiadny druhý prechod; dielec bez `owner_id` sa
+  nevyhadzuje — otázka je „je materiál v zákazke?").
+- Farbu štvorčeka dáva hostiteľ resolverom (`nxComboColorOf` — katalógová farba je pole `[r,g,b]` → `nxRgbHex`; ABS podľa hrúbky); do `style` ide len hex.
+  „Naposledy použité" = `localStorage` počítača (`nx_recent_decor`/`nx_recent_abs`, max 5, len ID).
+- **Sync zvonka** (serverový push cez `scan`, prestavba `<option>`ov, odchod z okna) otvorený popup **ZAVRIE** — inak by klik potvrdil voľbu starého kontextu.
+  Popup je `position: fixed` nad `body` (nič ho neoreže), výber `mousedown`-om (`blur` by ho zavrel skôr); `<datalist>` v CEF nefunguje.
+- **Šírka ponuky** = `nxComboPopWidth(fieldW, viewportW)`: obsahová šírka okna, strop čitateľnosti **620 px**, nikdy užšia než pole; položka nesie celý
+  názov aj v `title`.
+- **Perzistentné telo sekcie Štúdia:** odpojené pole `scan` nielen odregistruje, ale **rozbalí** (`detach` — tlačidlo preč, select späť na miesto obalu);
+  inak by návrat obalil ten istý select druhýkrát. Sekcia Materiály `scan` nespúšťa, kým je telo odpojené.
 
-Dáta si komponent nedrží: „Použité v projekte" je **odvodený zoznam ID zo servera** (`Materials.used_material_ids` / `used_abs_ids` mínus zdroje z globálnych šablón — čisté čítanie
-configov, ŽIADNA zmena schémy ani zápis do modelu). Chodí **dvoma kanálmi**: v `materials_payload.used_ids` (init + `push_materials`) a — pretože sa mení pri KAŽDOM zápise
-materiálu vrátane Späť/Znova a vkladania — **na vyžiadanie pri otvorení ponuky** (`sketchup.nx_used_ids()` → `Panel.push_used_ids` → `NX.setUsedIds`, ktoré vymení LEN zoznam a
-prekreslí už otvorený popup, žiadny render karty).
+**Riadok = dekor, hrúbka = čip.** Varianty toho istého dekoru a **typu dosky** sa zlučujú do jedného riadku s čipmi hrúbok (`18 | 36 | 36 duplák`):
+- **Hranicu rodiny určuje katalóg, nie klient:** server posiela **`row_key`** (`Materials.variant_family_key` = kanonická `record_group_key` · dekor · štruktúra ·
+  typ · prípona formátu a rubu; všetky zložky kanonické bez ohľadu na veľkosť písmen; UNI záznamy sa nezlučujú) a menovku **`row_label`**
+  (`Panel.sheet_row_label`). Dekor + typ nestačí — rovnaké číslo dekoru u dvoch výrobcov či formát v identite by dali dva nerozlíšiteľné čipy s cudzou cenou.
+  Bez `row_key` (starší payload) sa padá na dekor + typ; **čip nikdy nezmení typ**. Detail kľúča: [materials.md](materials.md).
+- **Rozdelené riadky sú pomenované rozdielne:** `Materials.row_label_disambiguated` nad `Materials.row_family_ctx` (raz na payload) pridá pri kolízii **typ**
+  a **hrúbku len keď ju riadok neukáže čipmi**; kontext počíta aj s **virtuálnymi duplákmi** (`virtual:` z tej istej autority ako `duplak_offers`). Pravidlo
+  žije v CORE — klient vidí len to, čo je v selecte.
+- Zoskupenie robí čistá `nxComboDecorRows(items, meta)`; metadáta variantu (`decor · type · thickness · duplak`) dodáva hostiteľ cez `setVariantResolver`
+  (Inspector `nxComboVariantOf` nad `sheetRecOf`, Štúdio nad `MD_SHEETS`); bez resolvera ponuka nezoskupuje. **ABS sa nezoskupuje.**
+- **Duplák má dva tvary:** virtuálna ponuka `duplak2:<zdroj>` a uložený záznam s bežným `material_id` rozpoznaný VÝHRADNE podľa `source_material_id` —
+  payload ho zrkadlí ako `duplak` a oba hostitelia čítajú `rec.duplak === true` (`MD_SHEETS` surové `source_material_id` nemá). Čip nesie aj hrúbku
+  („36 duplák" / „54 duplák"); hľadanie hľadá zhodu hrúbky najprv **medzi duplákmi**.
+- **Predvolená hrúbka je vec kontextu** (`data-nx-combo-ctx`: `body`/`front` → najtenšia konštrukčná podľa katalógu · `back` → 3 · `worktop` → 38; chýbajúca
+  = najtenšia konštrukčná) a **duplák sa nepredvolí NIKDY**. Prednosť pri kreslení riadku: **dotaz menujúci konkrétny variant (ID alebo label,
+  `nxComboVariantFromQuery`) → výslovný dotaz o hrúbke → kliknutý čip (`OPEN.chip`, prežije prekreslenie po písmene) → hodnota selectu → kontext**.
+- **Kontext radí aj riadky:** `nxComboSortByCtx` (stabilné radenie podľa `nxComboCtxRank`, beží pred delením na sekcie; sekcia „Naposledy použité" dostáva
+  `ctx` až v `nxComboSections`, čerstvosť je tie-breaker) a `nxComboFirstCtx(items, ctx, q)` = kurzor po dopísaní dotazu: **riadok s hrúbkou, ktorú dotaz
+  menuje → riadok podľa kontextu → prvý vyberateľný** (číslo dekoru hrúbku nemenuje). Bez kontextovej hrúbky sa poradie servera nemení. Nekontextové riadky
+  sa **nefiltrujú** (semafor varuje, neblokuje).
+- **Zlúčenie nič neschová:** `searchExtra` nesie hrúbky, slovo „duplák" a `value` aj `label` každého variantu; členstvo v skupinách „Použité v projekte" /
+  „Naposledy použité" cez **všetky** varianty (`nxComboRowIds`) a predvolenú hrúbku nemení. Klik na čip je **zúženie, nie výber** (`preventDefault` +
+  `stopPropagation`, ponuka ostáva otvorená, do selectu nič, prekreslí sa len riadok — `redrawRow`).
+- **Nedostupný variant je `aria-disabled`, nikdy `disabled`** (vzor D-78): klik dopíše dôvod pod čipy (`.cbchipmsg`, serverový label; `.cbopt { flex-wrap: wrap }`).
+  Klávesnica: **šípky vľavo/vpravo** (`moveChip`, fokus ostáva v hľadaní, na krajoch sa necyklí); nedostupný čip prvé stlačenie **zastaví a oznámi**
+  (`announceChip`, `role="status" aria-live="polite"`), druhé pokračuje.
+- **Výsledkom voľby je `material_id` konkrétneho variantu** — serverové cesty ani E-03 (hrúbku určuje reálny materiál) sa nemenia.
 
-**Pull, nie push:** zoznam sa číta pár desiatok krát za sedenie, kým `push_selected` beží pri každom kliku vo výbere — plný scan modelu (5 prechodov cez `definitions`) do tejto
-horúcej cesty nepatrí (stráži to guard test). Farbu štvorčeka dáva panel resolverom (`nxComboColorOf` — dekor z katalógu cez `nxRgbHex`, lebo katalógová farba je pole `[r,g,b]`,
-nie CSS reťazec; ABS podľa hrúbky), a do `style` prejde len hex (úzky whitelist). „Naposledy použité" je `localStorage` tohto počítača (`nx_recent_decor`/`nx_recent_abs`, max 5,
-len ID — nikdy model ani `%APPDATA%`).
+Testy: `tests/js/test_ui03_combobox.js`, `tests/pure/test_ui03_combobox.rb`, `tests/js/test_picker2_chips.js`, `tests/js/test_picker2_chips_dom.js`,
+`tests/js/test_picker3_kontext.js`, `tests/js/test_picker3_kontext_dom.js`, `tests/pure/test_picker2_used_ids.rb`, `tests/pure/test_picker3_rodina.rb`.
+Vzhľad: mockup `SYSTEM/zdroje/ui20/mockup_inspector_c.html` + `docs/UI_DIZAJN.md`. Plné znenie: archív, rovnomenný odsek.
 
-**Sync zvonka (serverový push cez `scan`, prestavba `<option>`ov, odchod z okna) otvorený popup ZAVRIE** — drží položky z času otvorenia, takže by klik potvrdil voľbu starého
-kontextu do nového (natívna rozbaľovačka sa pri prestavbe správa rovnako). Popup je `position: fixed` nad `body` (žiadny `overflow:auto` predok ho neoreže — D-67 FIX 7, D-105),
-výber `mousedown`-om (`blur` by ho zavrel skôr — D-67 FIX 4), `<datalist>` v CEF nefunguje vôbec. Čisté funkcie (normalizácia bez diakritiky, sekcie, filter, klávesnica, recents)
-testuje `tests/js/test_ui03_combobox.js`, serverový a inventúrny kontrakt `tests/pure/test_ui03_combobox.rb`. Vzhľad a správanie sú 1:1 mockup
-`SYSTEM/zdroje/ui20/mockup_inspector_c.html`; pravidlá v `docs/UI_DIZAJN.md`. Okno **Materiály** má vlastný suggest (D-67) a komponent zámerne nepreberá.
+### D-15 modal — zdieľaná kostra „pridávačiek" (ui/js/nx_modal.js)
 
-**PICKER-1 (25.8.):** komponent používajú aj **predvoľby projektu v sekcii Materiály** (`md_body`/`md_front`/`md_back` v `studio.html` majú `data-nx-combo="decor"`, `scan` ich
-pripája po každom `fillSelect`) — jeden vyhľadávač, jedna pravda; dovtedy to boli holé `<select>`y bez hľadania.
+**Čo robí:** JEDNA kostra všetkých okien typu „pridaj / uprav niečo" v oboch oknách (`window.NXModal` + `module.exports`): `mhead` (titulok + podtitul + ×) ·
+`mbody` (polia) · `mfoot` (Zrušiť + **zelené** potvrdenie). **Esc aj klik na scrim zatvárajú**, fokus ide do prvého poľa (alebo `initialFocus`) a pri zatvorení
+sa vracia na spúšťač. Inštancie sa líšia LEN poľami (`fields` = `{key, label, type, value, placeholder, options, …}`); šírky karty `size: 'sm'|'md'|'wide'`.
+Inštancie: drafty rozpočtu („Pridať položku", „Pridať spotrebič", `budDraftFields`), ⋯ editor riadku rozpočtu, D-69 editor materiálu, položka a set kovania
+v katalógu (`hw:item:new`, sety), ručná položka kovania v Inspectore. CSS žije v **zdieľanom `panel.css`** (karta `.nxmcard` — `.nxmodal` je v `panel.css`
+scrim starších modalov; z-vrstvy `--nx-z-scrim` / `--nx-z-suggest` pri `.nxscrim`) — `studio.html` kópiu mať nesmie. Kotva **`#nxModalRoot`** je v oboch
+oknách mimo prekresľovaných sektorov; `nx_modal.js` sa načítava **za** `nx_esc.js` a **pred** `core.js`/`hardware.js`/`studio.js` (stráži
+`tests/js/test_r23_escape.js`).
 
-**Kontrakt D-46 sa nemenil:** komponent posiela `change` rovnakou cestou ako natívny select, takže potvrdzovacia lišta aj `model_guid` guard bežia nezmenené; programové vrátenie
-hodnoty (pending) `change` **nespúšťa** a preto pribudol most **`NXCombo.sync(sel)`** — natívny select sa prekreslí sám, vyhľadávač má vlastný trigger a bez sync by ukazoval
-hodnotu, ktorá už neplatí.
+**Typy polí:** `text` · `select` (voliteľný tvrdý `disabled`, keď je zámok invariant — dôvod do `hint`) · `group` (nadpis sekcie formulára) · `checkbox` ·
+`color` · `rows` (repeater) · `lookup` (našepkávač nad serverovým zoznamom) · `custom` (vlastný uzol volajúceho). Ploché pole smie mať **`action:`**
+`{act, key, label, title}` = malé tlačidlo za vstupom (klik spracuje volajúci, `data-action`). **Pravidlo: nevratný zápis nesmie spúšťať `change`/blur —
+potrebuje explicitné tlačidlo** (klik na „Zrušiť" vyvolá najprv blur poľa).
 
-**Šírka ponuky je pravidlo, nie konštanta** (`nxComboPopWidth(fieldW, viewportW)`, čistá funkcia): ponuka je taká široká, ako je obsahová oblasť okna (viewport mínus okraje),
-orezaná **stropom čitateľnosti 620 px**, a **nikdy nie je užšia než pole** — v paneli (~470 px) tak prekryje celú šírku, v Štúdiu ide po strop. Dovtedajšie `max(šírka poľa, 270)`
-orezávalo dlhé názvy dekorov tak, že dve podobné varianty sa nedali rozlíšiť (Michal 25.8.). Položka nesie celý názov aj v `title` — v úzkom okne sa riadok môže orezať aj tak.
+**Kontrakt `values()`:** ploché polia sú **reťazce**, `checkbox` boolean, `rows` pole hashov (čítané **z DOM**, nie zo stavu), `lookup` **LEN `value`**
+zo skrytého poľa `nxm_<key>` (nikdy názov ani cena z obrazovky), `custom` to, čo vráti `read(host)` (bez `read` hodnotu nemá), `group` v hodnotách nie je.
+**Identita sa nikdy neodvodzuje od kódu, ktorý používateľ práve prepisuje** — existujúce riadky nesú skryté kľúče (`material_id`, `row_rev`).
+`focusables()` vylučuje `type="hidden"` a berie len `a[href]` (inline SVG `<use href>` by inak chytil Tab); `aria-disabled` prvky sa nevyhadzujú.
 
-**Životný cyklus nad PERZISTENTNÝM telom sekcie** (review #230 P2): odchod zo sekcie telo **odpojí** z dokumentu a návrat ho vráti aj s rozpísaným formulárom. `scan` preto odpojené
-pole nielen odregistruje, ale **rozbalí** (`detach` — tlačidlo preč, select späť na miesto obalu, obal preč, `tabindex`/`aria-hidden` zrušené); inak by v odpojenom strome ostal
-osirelý obal s tlačidlom a návrat by ten istý select obalil **druhýkrát** — používateľ by videl dva ovládače a s každým ďalším katalógovým echom o jeden viac. `detach` je aj
-**verejný most** pre hostiteľa. Sekcia Materiály navyše scan **nespúšťa, kým je telo odpojené** (vtedy je aj `mdRenderAll` no-op).
+**Životný cyklus:**
+- **`submit` modal NEZATVÁRA** — pošle hodnoty cez `onSubmit`, zatvára volajúci až po potvrdení servera (rozpočet: `NX.budgetResult(op, true)`);
+  odmietnutie nechá hodnoty na mieste. Prekreslenie sekcie po zápise modal nezhodí (kotva mimo `#secbody`).
+- **Zámok odoslania `OPEN.busy`:** prvý `submit` zamkne a zošedí potvrdzovacie tlačidlo, ďalšie sa zahadzujú; odomyká **výhradne volajúci**
+  `NXModal.setBusy(false)` v oboch vetvách výsledku (+ poistka v `budAfterPush`). Bez neho by dvojitý Enter poslal druhú mutáciu s čerstvou generáciou.
+- **`onClose`** je súčasť kontraktu: volá sa **až po skutočnom zatvorení** (`OPEN` je `null`), výnimka v ňom sa do kostry nepremietne. `open` najprv
+  zatvára predchádzajúci modal → **volajúci nastavuje svoj stav až ZA `NXModal.open`**.
+- **Fokus ostáva v karte** (Tab cyklí); **Escape modal spotrebuje** (`stopImmediatePropagation` — oba listenery visia na `document`); Escape handler Štúdia
+  je navyše podmienený `!nxModalOpen()`. Fázové okno prepočtu cien `#budPrModal` kostru **nepreberá** (životný cyklus riadi server, vo fáze `run` sa Escapom
+  zavrieť nesmie).
+- **Prekreslenie modalu** (závislý select, „+ Vytvoriť…", iná sada polí) = volajúci zavolá `open` znova s tým, čo už používateľ napísal
+  (`hwManualCtxSwitch`, `hwItemCtxSwitch`). Pritom: `onClose` musí vedieť, že ide o prekreslenie; podáva **`trigger:`** = pôvodný spúšťač (inak fokus
+  skončí na odpojenom uzle); **`baseFields`** (polia z prvého otvorenia) + **`skipMemory: true`** (pamäť sa nevlieva späť a pás „Predvyplnené…" sa
+  nerozsvieti, zápis do pamäte beží ďalej; „Začať odznova" kreslí z `baseFields`). `generation()` odlíši nový formulár aj po zatvorení — stará
+  produktová odpoveď neoživí editor.
 
-**PICKER-2 (25.8.) — RIADOK JE DEKOR, hrúbka je čip:** varianty toho istého dekoru a toho istého **typu dosky** sa zlučujú do jedného riadku a hrúbky visia na jeho konci ako čipy
-(`18 | 36 | duplák`).
+**Pamäť rozpísaných hodnôt** (drží komponent; `budDraftMemory(kind)` je len prístupový bod nad `NXModal.memory`):
+- `memoryKey` = **`<okno/doména>:<mode>[:<cieľ>]`** (`bud:custom`, `bud:appliance`, `mat:edit:H3303`); slot = všetko okrem posledného segmentu, keď sú
+  aspoň tri — `mat:edit:A` a `mat:edit:B` sa delia o slot a otvorenie iného dekoru starý koncept hneď zahodí (`dropForeign`).
+- Pamätá sa pri odoslaní aj zatvorení, **len polia odlišné od východiskových** (`defaultsOf`/`sameValue`; `custom` cez `sameJson`). Predvyplnenie je
+  **vidno** (pás `.mmemo` + „Začať odznova"). Maže **výhradne volajúci** po potvrdení servera (`setBusy(false, {clear:true})` alebo `clearMemory(key)`;
+  `clearMemory` dočasne zhasne zápis `memSkip`, prvý `input`/`change` ho zapáli). Volajúci podáva **východiskové** polia (predvypĺňa kostra).
+- `lookup`: rozpísaný dotaz bez výberu sa pamätá pod sufixom **`__q`** (do `values()` sa nedostane); obnovená prázdna hodnota vyčistí zobrazený text;
+  východiskový text má jednu definíciu `lookupInitialQuery`.
+- Editory **existujúcich** záznamov (⋯ editor riadku rozpočtu, úprava položky kovania) idú **bez `memoryKey`** — formulár sa vždy plní z čerstvého payloadu.
 
-**HRANICU URČUJE KATALÓG, NIE KLIENT** (review #231 P1): identitu variantovej rodiny skladá server (`Materials.variant_family_key` = skupina/výrobca · dekor · štruktúra · typ ·
-prípona formátu a rubu; UNI záznamy dostávajú unikátny kľúč, teda sa nezlučujú vôbec) a posiela ju v oboch payloadoch ako **`row_key`** spolu s dekorovou menovkou **`row_label`**
-(`Panel.sheet_row_label` — to isté, čo nesie `sheet_label` pred časťou „· TYP hrúbka mm", vrátane výrobcu pri kolízii). Skupinovú časť kľúča dáva **kanonická `record_group_key`**,
-nie holé `group_id`: hybridný katalóg môže mať záznamy bez `group_id` a kanonický kľúč vtedy padá na dvojicu výrobca + dekor — s holým `group_id` by Egger 5981 a Kronospan 5981
-skončili v jednej rodine (review #231 kolo 2). **Kanonické sú VŠETKY zložky kľúča, nielen skupinová** (PICKER-3): katalógový kontrakt porovnáva typ aj štruktúru bez ohľadu na
-veľkosť písmen, takže `DTDL`/`dtdl` a `ST9`/`st9` v surovom tvare dávali **dva riadky s rovnakou menovkou**. Detail kľúča žije v [materials.md](materials.md).
+**`lookup`:** kostra dostane `search(query, done)` a položky `{value, text, hint}`; **písanie po výbere výber zahadzuje**, **staršia odpoveď sa ignoruje**
+(`seq`), voliteľný `onPick(item)` ohlási výber (začiatok ďalšieho serverového kroku). Ponuka je vlastná vrstva (Escape zatvára najprv ju, šípky, Enter
+vyberá a formulár neodošle, orezanie „… ďalších N") a je **v toku dokumentu**, nie `position: fixed` (karta má vlastný scroll). Chyba servera sadá na pole
+hľadania `nxm_<key>_q`.
 
-Dekor + typ na hranicu **NESTAČÍ**: v SCHEMA 2 sa to isté číslo dekoru legálne opakuje u dvoch výrobcov, tá istá skupina má viac štruktúr a typy s formátom v identite (PD, zástena)
-sa líšia formátom alebo rubom — zlúčené by dali **dva čipy s rovnakou hrúbkou**, nerozlíšiteľné, s cudzou cenou aj povrchom (tá istá pasca, ktorej `sheet_label_suffix` predišiel v
-labeloch, GH #95 P1). Bez `row_key` (starší payload) sa padá na dekor + typ. HDF 3 mm ani kompakt teda nie sú „tenšia verzia" DTDL toho istého dekoru a **čip nikdy nezmení typ**.
+**`custom`:** kostra vykreslí hostiteľa `#nxmc_<key>` a zavolá `render(host, value)`; po `open`/`memReset` kreslí zo **špecifikácie**, `redrawCustom(key)` na
+žiadosť volajúceho z `read()`; `f.value` sa nikdy neprepisuje (volajúci podáva kópiu stavu, napr. `hwsCloneMembers`). Chyba servera `row = "<key>:<index>"`
+ide na uzol `data-nxm-row`; kliky vnútri patria delegácii volajúceho.
 
-**Rozdelené riadky musia byť aj POMENOVANÉ rozdielne** (review #231 kolo 2): ten istý dekor v DTDL 18/36 + HDF 3 + kompakte dá tri riadky, ktoré by s holou dekorovou menovkou mali
-identické meno — a jednovariantný riadok čipy vôbec nekreslí, takže by sa nedali odlíšiť. Rozhoduje o tom **`Materials.row_label_disambiguated`** nad kontextom
-`Materials.row_family_ctx` (postavený RAZ na payload, vzor `label_ctx`): pri kolízii dekorovej menovky pribudne **typ**, a **hrúbka len vtedy, keď ju riadok neukáže čipmi** (jediná
-v rodine) — pri viacerých by menovka klamala. Pravidlo žije v CORE, nie v okne: je to rozhodnutie nad celým katalógom (jeden záznam naň neodpovie) a klient ho spraviť **nemôže** —
-vidí vždy len to, čo je práve v selecte. **Kontext počíta aj s VIRTUÁLNYMI duplákmi** (PICKER-3, parameter `virtual:` — panel ich berie z tej istej autority ako `duplak_offers`):
-ponuka `duplak2:` v `Materials.sheets` nie je, takže rodina s jednou kúpenou hrúbkou platila za jednovariantnú a menovka tvrdila „… 18 mm" aj potom, čo riadok dostal čip
-„36 duplák" a po jeho výbere vložil 36. *(Zvažovaná alternatíva „potlač hrúbku vždy, keď riadok dostane čipy" padla: server nevie, ktoré varianty v konkrétnom selecte prežijú
-hrúbkové filtre D-45, takže by o tom musel rozhodovať klient orezávaním serverového textu.)*
+**Repeater `rows`:** pod-polia `cols`, tlačidlá `+`/`−` (pri `min` je `−` `aria-disabled` s dôvodom v `.mrnote`), vlastný prefix id `nxmr_`, duplicitný kľúč
+sa ohlási do konzoly, delegovaný klik **nemá catch-all vetvu**. Stĺpec smie byť `readonly` podľa riadku (`roWhen`, `roTitle`; nikdy `disabled`), bunky majú
+`aria-label`, hlavička nesie tú istú šírkovú triedu ako bunka (`colCls`; `mshort`/`mtiny`/`mcheckcol`).
+- **`rowKey`** páruje pamäť na čerstvé riadky a pamätá **výhradne editovateľné bunky**; server-owned `row_rev` z pamäte nikdy nevylezie (`trimRowsValue` +
+  `mergeRowsMemory`; riadok, ktorý v katalógu už nie je, sa zahodí).
+- **Pamäť je po bunkách:** odloží sa len bunka odlišná od východiskového riadku a k nej **`_base`** (proti čomu sa písalo); `_base` sa nikdy nekreslí ani
+  neodosiela (`readRows` číta len `data-nxm-col`).
+- **Kolízia bunky sa nerieši ticho:** zmenil ju používateľ aj katalóg → `_conflict`, trieda **`conf`** (nie `bad`), `title` + `aria-invalid`, pás **`.mrconf`**
+  s „Prevziať z katalógu" / „Ponechať moju" (`data-nxm-confcol`). **`submit` s nerozhodnutou kolíziou zápis nepustí** (`conflictCount()` > 0 → `.merrtop`).
+- **Východiskové riadky (`base`) sú vždy čerstvý katalóg** — „proti čomu sa písalo" žije v stave `OPEN.flags[pole][rowKey].wrote`; štítky riadku
+  (`flagsOfRows`/`applyFlags`, `_note`) žijú v `OPEN.flags`, nie v DOM, a `rowDel` volá `syncFlags(key)`.
+- API: `setRows(key, rows, {base})` (zotavenie z konfliktu; `ownSpecField` rozdvojí zdieľané polia), `baseRows(key)`, `conflicts()`,
+  `showErrors([{row, field, msg}])` / `clearErrors()` (`row = null` pod pole, `"<kľúč>:<index>"` pod `.mrline`, inak `.merrtop`; ďalšie volanie prepíše).
 
-Zoskupenie robí čistá `nxComboDecorRows(items, meta)`; metadáta variantu (`decor · type · thickness · duplak`) dodáva **hostiteľ** cez `setVariantResolver` — komponent žiadny
-katalóg nepozná, takže bez resolvera vyzerá ponuka presne ako pred PICKER-2 (Inspector: `nxComboVariantOf` nad `sheetRecOf`; Štúdio: nad `MD_SHEETS`; **ABS sa nezoskupuje** —
-hrúbka pásky je jej vlastnosť, nie variant dekoru).
+**Prekryvné ovládače vnútri karty** (`#mdSgBox`): Escape patrí najprv im (`ev.stopPropagation()` na inpute), scroll listener v **capture** fáze na `window`,
+písanie našepkávač vracia; vrstvenie z jednej definície (`var(--nx-z-suggest, 80)`).
 
-**DUPLÁK MÁ DVA TVARY a oba musia byť rozpoznané:** virtuálna ponuka `duplak2:<zdroj>` (ešte nie je v katalógu, pozná sa podľa tvaru ID) a **uložený záznam s bežným
-`material_id`**, ktorý sa pozná VÝHRADNE podľa `source_material_id` — payload ho preto zrkadlí ako `duplak` (panel) a **Príznak čítajú OBAJA hostitelia rovnako** (`rec.duplak ===
-true`): `MD_SHEETS` v Štúdiu je ZÚŽENÝ `Panel.materials_payload`, v ktorom surové `source_material_id` nie je — čítať duplák z neho znamenalo, že uložený duplák je v Štúdiu
-neviditeľný (review #231, kolá 1 a 3). Bez príznaku by vyzeral ako kúpená hrubá doska, nedal by sa nájsť hľadaním „duplák" a mohol by sa aj predvoliť. Čip duplákov nesie **aj
-hrúbku** („36 duplák" / „54 duplák") — rodina môže mať duplák ×2 aj ×3 a dva čipy so samotným slovom by boli nerozlíšiteľné (review #231 kolo 2). **A rovnako to musí čítať aj
-HĽADANIE** (PICKER-3): pri slovnom dotaze sa najprv hľadá zhoda hrúbky **medzi duplákmi** a až potom sa padá na prvý — inak „54 duplák" preselektovalo 36 mm (slovo sa čítalo skôr
-než číslo) a Enter vložil iný materiál za iné peniaze.
+**⋯ editor riadku rozpočtu** je inštancia tejto kostry (`budMoreFields`/`budMoreAttrs` + `budOpenMore`/`budCloseMore`; spotrebič má len adresu), mutácia
+`budget_mutate` → `custom_update`/`appliance_update`. **Korelácia odpovede:** tie isté operácie posiela aj inline editácia bunky, takže výsledok sa na modal
+vzťahuje len pri `BUD_MORE.sent` (`budMoreAwaiting`, vrátane `NXModal.isOpen()`); `BUD_MORE` čistí `budOpenMore` a `budAfterPush`, keď modal už nie je otvorený.
 
-**Predvolená hrúbka je vec KONTEXTU** (`data-nx-combo-ctx` na selecte: `body`/`front` → najtenšia konštrukčná podľa katalógu, nie natvrdo 18 · `back` → 3 · `worktop` → 38;
-chýbajúca kontextová hrúbka = najtenšia konštrukčná, **žiadne hádanie „najbližšej hrubšej"**), a **duplák sa nepredvolí NIKDY** — ani keď je v riadku najtenší, ani keď sedí na
-kontextovú hrúbku: je to zdvojená doska za dvojnásobok a vyberá sa **vedomým klikom na čip**. Poradie prednosti pri kreslení riadku: **dotaz menujúci konkrétny variant (jeho ID
-alebo label) → výslovný dotaz o hrúbke → kliknutý čip → hodnota, ktorú select nesie → kontext**.
-
-**PICKER-3 (E): KONTEXT RADÍ AJ RIADKY, nielen hrúbky vnútri riadku.** Dovtedy vedel vybrať hrúbku v rodine, ale nie uprednostniť riadok HDF 3 pred riadkom DTDL 18 toho istého
-dekoru — a `md_back` v Štúdiu je naplnený **všetkými** doskami, takže po napísaní dekoru vyhral DTDL a Enter vložil 18 mm chrbát. Dve časti, obe čisté funkcie: `nxComboSortByCtx`
-(**stabilné** radenie podľa `nxComboCtxRank` — riadok s kontextovou hrúbkou má rank 0, ostatné 1; beží **pred delením na sekcie**, takže sa uplatní vnútri každej z nich a členstvo
-v „Použité v projekte" sa nemení; **sekcia „Naposledy použité" dostáva `ctx` až do `nxComboSections`** — svoje poradie si prepisuje podľa čerstvosti, takže bez toho by v nej
-kontext ticho zanikol a hore by stála naposledy použitá DTDL 18. Čerstvosť je tam tie-breaker **medzi rovnocennými**, review #236 kolo 1) a `nxComboFirstCtx(items, ctx, q)` = kam sadne **kurzor** po dopísaní dotazu: **riadok s hrúbkou, ktorú dotaz MENUJE → riadok podľa kontextu →
-prvý vyberateľný**. Samotné radenie by nestačilo — sekcie „Použité v projekte" a „Naposledy použité" stoja NAD katalógom, takže bez kurzorového pravidla by Enter v poli pre chrbát
-vložil použitú DTDL 18. Prvý stupeň drží sľub PICKER-2 „výslovný dotaz > kontext" aj o poschodie vyššie a **pýta sa dát, nie tvaru dotazu**: číslo dekoru („K018", „H3303") hrúbku
-nemenuje, kým „18" so zhodným variantom áno; nedostupný variant riadok nevytiahne. Bez kontextovej hrúbky (`body`, `front`, ABS, chýbajúci atribút) sa **poradie servera nemení ani
-o riadok**. *(Zamietnuté: FILTROVAŤ nekontextové riadky — 18 mm chrbát je nezvyklý, nie zakázaný, a filter by legitímnu voľbu schoval; v tomto repe semafor varuje, nikdy
-neblokuje.)*
-
-Prvý stupeň (`nxComboVariantFromQuery`) pribudol v review kole 3: materiálové ID sú zámerne neprehľadné a pred zlúčením sa dal každý variant vybrať samostatne, takže dotaz „ZXQ"
-musí vložiť **práve ten** variant — nie predvolenú hrúbku rodiny; ID pritom môže obsahovať číslo patriace inej hrúbke, preto stojí **pred** hrúbkovým čítaním. Nejednoznačný dotaz
-(sedí na viac variantov, napr. samotný názov dekoru) nevyberá nič a rozhodne hrúbkové pravidlo. Dotaz je hore zámerne (review #231 P2): kto po kliku na 18 napíše „36", chce 36 —
-sľub „dotaz preselektuje to, čo Enter vloží" nesmie prestať platiť len preto, že predtým klikol na iný čip. Kliknutý čip sa pamätá pod kľúčom riadku (`OPEN.chip`), takže **prežije
-prekreslenie po každom písmene v hľadaní**, kým dotaz o hrúbke mlčí.
-
-**Zlúčenie nesmie nič schovať:** riadok nesie v `searchExtra` hrúbky, slovo „duplák" **a `value` aj `label` KAŽDÉHO variantu** — pred zlúčením sa hľadalo cez hodnotu každej
-položky, takže dotaz na neprehľadné ID („H3303_36") fungoval a po zlúčení by prestal (review #231 P2) (dotaz „36" riadok nájde **a rovno preselektuje čip 36**), a členstvo v
-skupinách „Použité v projekte"/„Naposledy použité" sa posudzuje cez **VŠETKY varianty** riadku (`nxComboRowIds`) — inak by projekt s 36 mm dekor v skupine nenašiel, hoci ho
-používa; zaradenie do skupiny pritom **predvolenú hrúbku nemení** (skupina je zaradenie, nie voľba za používateľa). Klik na čip je **zúženie výberu, nie výber**: `preventDefault` +
-`stopPropagation`, ponuka ostáva otvorená, do selectu sa nezapisuje nič a prekreslí sa iba ten jeden riadok (`redrawRow` — celý render by zahodil scroll aj rozpísaný dotaz).
-
-**Nedostupný variant je `aria-disabled`, nikdy natívne `disabled`** (vzor D-78): natívny atribút by čip vyhodil z klávesnice a klik by nemal čo povedať — takto sa ním nedá prepnúť,
-ale klik **dopíše dôvod** pod čipy (`.cbchipmsg`, text je serverový label varianta, napr. „(nekompatibilné)"; riadok ponuky sa preto zalamuje — `.cbopt { flex-wrap: wrap }` — inak
-by hláška sedela za čipmi a `overflow: hidden` popupu by ju orezal) a dôvod prežije prekreslenie po písmene rovnako ako vybraný čip.
-
-**Z klávesnice sa čipy ovládajú šípkami vľavo/vpravo** (`moveChip`): fokus zostáva v poli hľadania a `Tab` ponuku zatvára, takže bez toho by boli tlačidlá čipov pre klávesnicu
-nedosiahnuteľné (review #231 P2). Na krajoch sa **necyklí** — slepým stláčaním sa nedá skončiť na dupláku. **Nedostupný variant sa už NEPRESKAKUJE ticho** (PICKER-3 D): prvé
-stlačenie na ňom **zastane a dôvod oznámi** (`announceChip` — text je serverový label varianta, hláška je `role="status" aria-live="polite"`, takže ju čítačka prečíta bez presunu
-fokusu), druhé v tom istom smere pokračuje ďalej. Bez toho sa človek od klávesnice k vysvetleniu, ktoré myš dostane klikom, nedostal vôbec — a zastavenie bez pokračovania by bolo
-zaseknutie. Úspešné prepnutie čipu pamäť „už odznelo" vynuluje.
-
-**Výsledkom voľby je `material_id` KONKRÉTNEHO variantu** — čip je čisto klientske zúženie, `change` ide tou istou cestou ako natívny výber, takže serverové cesty ani kontrakt E-03
-(hrúbku určuje reálny materiál) sa nemenia. Tým **zaniklo vedomé obmedzenie PICKER-1**: skupina „Použité v projekte" je aj v Štúdiu — nemapuje sa nič, server posiela hotový zoznam
-ID (`StudioDialog#mat_used_ids` → `mat.used_ids`, tvar zhodný s panelovým `used_ids_payload`), takže hostiteľský hook je v oboch oknách ten istý jednoriadkový výber. Zdrojom je
-**UŽ zozbieraný kusovník** (`collected[:records]`, žiadny druhý prechod modelom — presne to, čo ŠT-2a raz odstránilo) a na rozdiel od `used_where` sa dielec **bez `owner_id`
-nevyhadzuje**: tam ide o klikateľného vlastníka, tu o otázku „je tento materiál v zákazke?".
-
-Testy: `tests/js/test_picker2_chips.js` (zoskupenie, defaulty, dotaz, skupiny), `tests/js/test_picker2_chips_dom.js` (čipy v otvorenej ponuke, klik, potvrdenie, klávesnica),
-`tests/js/test_picker3_kontext.js` (rank · stabilné radenie · kurzor · duplák podľa hrúbky), `tests/js/test_picker3_kontext_dom.js` (čo Enter naozaj vloží v poli pre chrbát),
-`tests/pure/test_picker2_used_ids.rb`, `tests/pure/test_picker3_rodina.rb`.
-
-### D-15 modal — zdieľaná kostra „pridávačiek" (ui/js/nx_modal.js, ŠT-1c PR B2)
-
-schválený vzor kontraktu UI 2.0 — JEDNA kostra pre všetky okná typu „pridaj niečo": `mhead` (titulok + podtitul + ×) · `mbody` (polia) · `mfoot` (Zrušiť + **zelené** potvrdenie);
-**Esc aj klik na scrim zatvárajú**, fokus ide do **prvého poľa** a pri zatvorení sa vracia **na spúšťač**. Komponent je vo vzore `edge_menu.js`: markup, texty aj správanie na
-jednom mieste, inštancie sa líšia LEN poľami (`fields` = deklaratívny zoznam `{key, label, type, value, placeholder, options}`), a je **globálny `window.NXModal`** +
-`module.exports` (testovateľný v Node).
-
-**CENY-KOV-A (v0.10.4):** voliteľné `initialFocus` pošle oba pokusy o fokus priamo do určeného poľa; oneskorený pokus patrí stále tomu istému modalu. `generation()` odlíši
-nový formulár aj po jeho zatvorení, aby stará produktová odpoveď neoživila editor. Textové pole rešpektuje `disabled`, napríklad pri URL spravovanej Demos väzbou.
-
-**ŠT-2c PR 2c-1 — príprava pre D-69 editor materiálu:** k `text`/`select` pribudli typy **`group`** (nadpis sekcie formulára — dlhý formulár bez predelov sa číta ako kopa políčok),
-**`checkbox`**, **`color`** (vzorka + text `#RRGGBB`) a **`rows`** (repeater: `cols` = pod-polia riadku, tlačidlá `+`/`−`), plus šírkové varianty karty `size: 'sm'|'md'|'wide'`
-(`small` je alias `sm`, starý `small: false` = `md`; šírky sedia pri `.nxmcard` v `studio.html`).
-
-**TVAR `values()` je kontrakt (audit ŠT-2c #14):** ploché polia ostávajú **reťazcami** (spätná kompatibilita draftov rozpočtu), `checkbox` je **boolean**, `rows` **pole hashov**,
-`group` v hodnotách **vôbec nie je**. `rows` čítajú hodnoty **z DOM** (nie z držaného stavu), lebo každé `+`/`−` kontajner prekresľuje — inak by pridanie riadku ticho zmazalo
-rozpísané riadky nad ním; existujúce riadky nesú **skryté kľúče** (`hidden`, typicky `material_id`/`row_rev`), podľa ktorých server odlíši úpravu variantu od nového, takže
-**identita sa nikdy neodvodzuje od kódu, ktorý používateľ práve prepisuje**. Do `focusables()` pribudlo vylúčenie `type="hidden"` a `[href]` sa zúžilo na `a[href]` — inline SVG
-ikona (`<use href="#i-…">`) ten selektor spĺňa a Tab by cyklil na kus ikony vnútri potvrdzovacieho tlačidla; `aria-disabled` prvky sa naopak **nevyhadzujú**.
-
-Kontajner repeatera má **vlastný prefix id `nxmr_`**, aby sa kľúč riadkov nezrazil s kľúčom plochého poľa, a duplicitný kľúč v specifikácii sa **ohlási do konzoly** (inak by sa
-hodnoty ticho prepisovali). Pri dosiahnutom `min` je tlačidlo **−** `aria-disabled` s **dôvodom** (D-78: klik ho napíše do `.mrnote`), nie tvrdý `disabled`, ktorý by ho vyhodil z
-klávesnice a mlčal. Delegovaný klik **nemá catch-all vetvu** (`else if (a === 'close')` + varovanie) — „všetko ostatné = zavri" znamenalo, že tlačidlo s preklepom v `data-nxm-act`
-zmazalo rozpísaný formulár.
-
-**PRVÁ inštancia sú drafty rozpočtu** — „Pridať položku" a „Pridať spotrebič" (`budDraftFields` je čistá funkcia, validácia ostáva **serverová**, klient stráži len povinné pole);
-ďalšie (D-69 editor materiálu, položka/set kovania) sa napoja bez kopírovania.
-
-**KOV-B2 pridala inštanciu `hw:item:new`** (nová položka katalógu kovania; úprava beží **bez `memoryKey`** — vzor D-69) a s ňou dve veci, ktoré sú vzorom pre ďalšie pridávačky:
-**(1) `lookup` má voliteľný `onPick(item)`** — kostra ním len ohlási, že používateľ niečo vybral. Sama pritom nerobí NIČ navyše (hodnota už v skrytom poli je); je to pre prípad,
-keď výber nie je koncom, ale **začiatkom ďalšieho serverového kroku** (v katalógu spustí načítanie produktovej stránky z Démosu). Výnimka volajúceho sa do kostry nepremietne.
-**(2) „Prekreslenie modalu" je vzor, nie výnimka:** sada polí sa za behu vymieňať nedá (závislý select, pole „+ Vytvoriť…"), takže volajúci zavolá `open` znova s tým, čo už
-používateľ napísal (`hwManualCtxSwitch` v paneli, `hwItemCtxSwitch` v Štúdiu). Pozor na TRI pasce: `open` najprv ZATVÁRA predchádzajúci modal, takže **`onClose` volajúceho musí
-vedieť, že ide o prekreslenie** (inak si zhodí vlastný stav — v katalógu to bol serverový proposal Démosu); pamäť konceptu treba pri takom prekreslení **zahodiť**
-(`clearMemory`), lebo by nad čerstvým serverovým návrhom vyhrala starými hodnotami; a **spúšťač treba PODAŤ** (nižšie), inak sa fokus po zatvorení vráti na odpojený uzol.
-
-**(3) `trigger:` v specifikácii (review #290 P2).** Kostra si spúšťač normálne berie z `document.activeElement` — pri PREKRESLENÍ je to ale pole práve zanikajúceho formulára,
-takže by fokus po zatvorení skončil na odpojenom uzle a klávesnicová cesta na `<body>`. Volajúci preto pri interných redrawoch podá **pôvodný** spúšťač (tlačidlo, ktoré okno
-otvorilo); pre ostatných volajúcich sa nemení nič — bez `trigger` platí staré správanie.
-
-**(3b) `disabled:` na `select` (review #290/2 P1).** Pri rozbaľovačke `aria-disabled` hodnotu neubráni — dá sa zmeniť ďalej. Keď je zámok invariant (v katalógu: klasifikácia
-nad nedostupnou taxonómiou), pole potrebuje **tvrdý `disabled`**; dôvod patrí na obrazovku (`hint`), nie do ticha.
-
-**(4) `action:` — akčné tlačidlo PRI POLI (review #290 P1).** Voliteľné `{ act, key, label, title }` na ploché pole vykreslí malé ghost tlačidlo za vstupom. Kostra o jeho význame
-nevie nič a klik jej delegáciou **neprejde** (`data-action`, nie `data-nxm-act`), takže ho spracuje volajúci. Vzniklo z konkrétnej chyby: zápis, ktorý sa **nedá vrátiť**
-(globálna taxonómia kovania — žiadny krok Späť, žiadny rename ani delete), visel na `change` textového poľa. Klik na „Zrušiť" pritom vyvolá **najprv blur poľa** a až potom svoj
-vlastný klik, takže zrušený formulár stihol zapísať. **Pravidlo, ktoré z toho platí všeobecne: nevratný zápis nesmie spúšťať `change`/blur — potrebuje explicitné tlačidlo.**
-
-**KONTRAKT (audit #9):** komponent spravuje **výhradne modaly, ktoré si ho vyžiadajú** — fázové okno prepočtu cien `#budPrModal` ho **nepreberá**, lebo jeho životný cyklus riadi
-server a vo fáze `run` sa Escapom zavrieť nesmie (beh by ostal visieť bez okna); a Escape handler Štúdia (`ecMenu`) je preto podmienený `!nxModalOpen()` — oba listenery visia na
-`document` a `stopPropagation` medzi nimi **nefunguje** (tá istá lekcia ako pri zatváraní `ecMenu` klikom mimo).
-
-**`onClose` JE SÚČASŤ KONTRAKTU (review #285 kolo 2, P2-G).** Volajúci si pri modali drží **vlastný stav** (čo odoslal, na čo čaká) a bez signálu o zatvorení mu ostane visieť aj
-po Escape, kliku na scrim, krížiku či „Zrušiť" — ďalšia akcia sa potom správa, akoby okno ešte žilo (ad-hoc kovanie takto hlásilo „okno sa zavrelo, nič sa neuložilo" po tom, čo ho
-používateľ zavrel sám). Volá sa **až po skutočnom zatvorení** (`OPEN` je už `null`), takže volajúci z neho smie bez rizika rekurzie čítať stav aj otvárať nové okno; výnimka
-v ňom sa **nikdy** nepremietne do kostry. Dôsledok pre volajúcich: stav sa nastavuje **až za** `NXModal.open`, lebo `open` najprv zatvára predchádzajúci modal a jeho `onClose` by
-čerstvý stav hneď vynuloval.
-
-**`submit` modal NEZATVÁRA** (audit #10): pošle hodnoty cez `onSubmit` a zatvorenie je rozhodnutie volajúceho — rozpočet ho zavrie **len** na `NX.budgetResult(op, true)`, takže
-odmietnutý zápis nechá používateľovi jeho hodnoty na mieste (opraviť číslo, nie písať formulár znova). Kotva `#nxModalRoot` žije **mimo `#secbody`**, takže prekreslenie sekcie po
-zápise modal nezhodí.
-
-#### ZÁMOK ODOSLANIA OPEN.busy (review #2)
-
-patrí do komponentu, nie do rozpočtu: `sketchup.*` je asynchrónne, takže bez neho by dvojitý Enter poslal druhú mutáciu do fronty klienta (`BUD_BUSY`/`BUD_QUEUE`), tá by odišla **s
-čerstvou generáciou** a server by ju **prijal** — položka dvakrát a dva kroky Späť. Rovnakú pascu by inak zdedila každá ďalšia pridávačka. Prvý `submit` zamkne a **zošedí
-potvrdzovacie tlačidlo** (bežiaci zápis musí byť vidno), ďalšie sa zahadzujú; odomyká **výhradne volajúci** cez `NXModal.setBusy(false)` v **oboch** vetvách výsledku (úspech
-zatvára, odmietnutie odomyká) — plus poistka v `budAfterPush`, keby Ruby callback spadol pred `budgetResult`.
-
-**FOKUS ZOSTÁVA V KARTE (review #7):** Tab z posledného prvku cyklí na prvý (a Shift+Tab naopak) — bez toho by skočil do tabuľky za modalom, ktorú používateľ práve nemôže ovládať.
-
-**Escape modal SPOTREBUJE** (`stopImmediatePropagation`, review #10): `stopPropagation` by nestačilo — oba listenery visia na tom istom uzle (`document`) a ten ich nezastaví;
-funguje to preto, že `nx_modal.js` sa načítava pred `studio.js` (stráži guard test), a podmienka `!nxModalOpen()` v Štúdiu ostáva ako druhá poistka pre opačné poradie.
-
-**Rozpísané hodnoty prežijú zatvorenie (review #3+#4, sklad presunutý v ŠT-2c #12):** pamäť drží **komponent**, nie volajúci — je to súčasť kontraktu D-15, takže ju každá ďalšia
-pridávačka dostane rovnakú (`BUD_DRAFT_VALUES` v `budget.js` zanikol, ostal len tenký prístupový bod `budDraftMemory(kind)` nad `NXModal.memory`). Kľúč `memoryKey` má konvenciu
-**`<okno/doména>:<mode>[:<cieľ>]`** (`bud:custom`, `bud:appliance`, `mat:edit:H3303`) a slot — to, čo sa navzájom prepisuje — je všetko okrem **posledného** segmentu, keď sú
-segmenty aspoň tri: `bud:custom` a `bud:appliance` sú preto nezávislé, kým `mat:edit:A` a `mat:edit:B` sa delia o jeden slot, takže otvorenie editora **iného** dekoru starú
-rozpísanú verziu zahodí **hneď** (`dropForeign`) a formulár je čistý — inak by sa hodnoty dekoru A predvyplnili do dekoru B a uložili do nesprávneho záznamu.
-
-Zapamätáva sa pri **odoslaní aj zatvorení**, ale **len polia, ktoré sa líšia od východiskových hodnôt** podanej specifikácie (`defaultsOf`/`sameValue`) — predvoľba `<select>`u ani
-„Počet = 1" nie sú nič, čo by používateľ rozpísal, takže otvoriť a zavrieť okno pamäť nezaloží.
-
-**Predvyplnenie z pamäte je VIDNO** (`fromMemory` → pás `.mmemo` „Predvyplnené z rozpísaného konceptu" + `memreset` „Začať odznova", ktorý vráti východiskové hodnoty a pamäť
-zahodí) — pohodlie nesmie byť pasca, inak by používateľ v editore materiálu uložil cenu písanú minule. Maže **výhradne volajúci** signálom „server potvrdil": `setBusy(false,
-{clear:true})` alebo `clearMemory(key)` — a `clearMemory` zároveň **dočasne** zhasína zápis (`memSkip`), inak by `close()` pamäť hneď zapísal späť; **prvý `input`/`change` v karte
-ho zapáli späť**, aby scenár „uložil som a píšem ďalšiu položku" nebol tichou stratou. Volajúci podáva polia **východiskové** (`budDraftFields(kind, null)`) — predvyplnenie robí
-kostra, inak by nemala proti čomu porovnávať default.
-
-**Pozor na mená tried:** mockup kreslí kartu ako `.nxmodal`, lenže `panel.css` toto meno už používa pre SCRIM starších modalov — karta sa preto volá **`.nxmcard`**,
-`mhead`/`mbody`/`mfoot`/`mrow` ostávajú doslovné.
-
-**KOV-H2 — kostru načítavajú OBE okná a jej CSS žije v `panel.css`.** Do KOV-H2 ju načítavalo len Štúdio a pravidlá ležali **inline v `studio.html`**; keď si ju vypýtal aj
-Inspector (modal ručnej položky kovania), presunuli sa **1:1 do zdieľaného `ui/css/panel.css`** — dve kópie tých istých tried sú dva modalové svety, ktoré sa časom rozídu. S nimi
-sa presunula aj **definícia z-vrstiev** (`--nx-z-scrim` / `--nx-z-suggest` pri `.nxscrim`), takže `#mdSgBox` číta premennú z toho istého súboru; guardy (`test_st1c_ponuka.rb`,
-`test_st2c_modal.rb`, `test_st2c_modal.js`) sa pýtajú na `panel.css` a navyše strážia, že `studio.html` kópiu **nemá**. `panel.html` dostal kotvu **`#nxModalRoot`** (mimo
-prekresľovaných sektorov, ako v Štúdiu) a `js/nx_modal.js` **za** `nx_esc.js` a **pred** `core.js`/`hardware.js` — poradie stráži `tests/js/test_r23_escape.js`.
-
-**Typ poľa `lookup` (KOV-H2)** — našepkávač nad zoznamom, ktorý drží **server**: textové pole + ponuka výsledkov. Kostra o obsahu nevie nič, dostane len `search(query, done)` od
-volajúceho a položky tvaru `{value, text, hint}` (`render`/`hint` sú voliteľné prepisy). **Tri veci sú kontrakt a preto žijú v kostre, nie u volajúceho:** (1) `values()` vracia
-**LEN `value`** zo skrytého poľa `nxm_<key>` — nikdy názov ani cenu z obrazovky (KOV-H1 FIX 12: klientovi sa verí len kód, inak by sa do zákazky dostala cena, ktorá už neplatí,
-a to potichu); (2) **písanie po výbere výber ZAHADZUJE** — bez toho by odišiel starý kód pod novým textom; (3) **staršia odpoveď sa ignoruje** (`seq`), lebo odpovede chodia
-asynchrónne a pomalšie kolo by prepísalo čerstvejšie výsledky. Ponuka je **vlastná vrstva**: Escape zatvára **ju** (druhé stlačenie až modal), šípky sa pohybujú po výsledkoch,
-Enter vyberie zvýraznenú položku a formulár **nikdy** neodošle; orezanie sa priznáva („… ďalších N"). Ponuka je v **toku dokumentu**, nie `position: fixed` — karta má vlastný
-scroll (`.mbody`) a plávajúca vrstva by ostala visieť nad cudzím riadkom (tá istá pasca ako `#mdSgBox`). Serverová chyba pri `lookup` sadá na pole **hľadania** (`nxm_<key>_q`),
-lebo červený okraj skrytého poľa nie je vidieť. Typ je **generický** — B2/B3 ho použijú pre kód člena setu.
-
-**Typ poľa `custom` (KOV-B3) — VLASTNÝ UZOL volajúceho vnútri karty.** Vznikol pre zoznam ČLENOV setu: člen nie je riadok s pevnými stĺpcami (`rows`), ale **strom** — podľa
-odpovede „Ako sa určí kód?" nesie buď jeden kód, alebo rad NL, alebo pásma parametra (a tie majú vlastný počet riadkov). Repeater to vyjadriť nevie a druhá modalová kostra
-v tom istom okne je presne to, čomu sa D-15 vyhýba. Kostra o obsahu nevie nič a robí **tri veci**: vykreslí prázdneho hostiteľa `#nxmc_<key>` a hneď po vložení karty do DOM
-zavolá `render(host, value)`; do `values()` vloží to, čo vráti `read(host)` — **pole bez `read` hodnotu NEMÁ** (čisto zobrazovací blok, napr. živý náhľad, sa neodosiela);
-a chybu servera adresovanú `row = "<key>:<index>"` doručí na uzol s `data-nxm-row` vnútri hostiteľa, teda **rovnakou konvenciou ako repeater**. Kliky vnútri hostiteľa kostra
-NESPRACÚVA (nemajú `data-nxm-act`) — patria delegácii volajúceho, presne ako pri `action:` tlačidle.
-
-**`baseFields` + `skipMemory` — aby pamäť prežila VNÚTORNÉ PREKRESLENIE (review #297 P2-1).** Kostra si východisko (`base`), voči ktorému počíta, či používateľ vôbec niečo
-rozpísal, brala z **práve podanej** špecifikácie. Pri prekreslení toho istého okna (závislý select, zmenená sada polí) sa tým východiskom stalo to, čo používateľ **už napísal** —
-`remember()` nemal voči čomu porovnávať, Escape neuložil NIC a „Nový set" sa otvoril prázdny: stratilo sa všetko spred poslednej zmeny selectu. Volajúci preto pri prekreslení
-podáva **`baseFields`** (polia z PRVÉHO otvorenia) a **`skipMemory: true`**: pamäť sa **nevlieva späť** (hodnoty na obrazovke sú čerstvejšie — a vliata pamäť by vrátila napr.
-radu, ktorú prekreslenie práve zahodilo, lebo už nepatrí vybranému výrobcovi) a pás „Predvyplnené z rozpísaného konceptu" sa **nerozsvieti** (používateľ pozerá na to, čo píše,
-nie na starý koncept). **Zápis do pamäte beží ďalej** — `memoryKey` ostáva, takže Escape po sérii prekreslení uloží celý koncept. Z `baseFields` kreslí aj **„Začať odznova"**,
-takže reset vracia ČISTÝ formulár, nie ten istý koncept. Obe polia sú **voliteľné**; bez nich sa kostra správa presne ako predtým.
-
-Dve veci sú v ňom **kontrakt, nie detail**: (1) **`renderCustomFields` po `open`/`memReset` kreslí zo ŠPECIFIKÁCIE** (tá nesie vliatu pamäť konceptu, resp. východiskové
-hodnoty), kým **`redrawCustom(key)` na žiadosť volajúceho kreslí z `read()`** — teda z toho, čo má volajúci práve teraz; opačne by pridanie riadku prepísalo rozpísaný riadok
-a „Začať odznova" by sa k volajúcemu nedostalo vôbec. (2) `f.value` sa pritom **nikdy neprepisuje**: pri prázdnej pamäti je `spec` TEN ISTÝ objekt ako `base`, takže zápis by
-zmazal aj východiskové hodnoty a pamäť by nemala proti čomu porovnávať. Preto volajúci podáva do `value` **kópiu** svojho stavu (`hwsCloneMembers`) — inak by sa živé pole
-porovnávalo samo so sebou a Escape by rozpísaný zoznam ticho zahodil. Do pamäte konceptu sa `custom` počíta cez **porovnanie celého tvaru** (`sameJson`), lebo plytké
-`sameValue` by zmenu vo vnorenom riadku nevidelo.
-
-**PAMÄŤ DRAFTU DRŽÍ AJ ROZPÍSANÝ DOTAZ (review #285 P2-E).** `values()` vracia len vybranú hodnotu, takže napísaný dotaz **bez výberu** by zatvorenie ticho zahodilo — a to je
-presne stav, v ktorom používateľ odchádza niečo overiť. Pamäť si ho preto drží pod prilepeným sufixom **`__q`**, ktorý sa do `values()` **nikdy** nedostane (`values` iteruje POLIA
-špecifikácie), takže kontrakt „lookup vracia len hodnotu" platí ďalej. Pri **úprave** bola pasca horšia: pamäť obnovila prázdnu skrytú hodnotu, ale `valueText` prekreslil pôvodnú
-položku, takže pole **vyzeralo vybraté** a submit až potom zlyhal — preto sa pri obnovenej prázdnej hodnote zobrazený text **vyčistí**. Východiskový text poľa má jednu definíciu
-(`lookupInitialQuery`): kreslí sa z nej markup a porovnáva sa proti nej pamäť, takže „nič som nepísal" pamäť nezakladá.
-
-**Prekryvné ovládače vnútri karty** (našepkávač `#mdSgBox` z `proj_materials.js`; audit ŠT-2c #10/#11) majú **opačné** pravidlo než okno za modalom: Escape patrí **najprv im** a
-stačí `ev.stopPropagation()` na inpute (dokumentový poslucháč modalu je na **inom** uzle — `stopImmediatePropagation` by zastavil len ďalších poslucháčov toho istého inputu a
-formulár by sa aj tak zavrel); scroll listener musí byť v **capture** fáze na `window`, lebo `scroll` z vnútorného kontajnera (`.mbody`) nebublá a `position: fixed` overlay by
-ostal visieť nad cudzím riadkom (capture tam bol už z D-67; ŠT-2c doplnila dôvod do komentára a behaviorálny test); písanie našepkávač naopak **vracia** — `input` ho obnoví aj po
-Escape, inak by jedno stlačenie pole „vyplo" na celú editáciu; a vrstvenie sa odvodzuje z **jednej** definície — `--nx-z-scrim`/`--nx-z-suggest` žijú pri `.nxscrim` v
-`studio.html`, `panel.css` číta `var(--nx-z-suggest, 80)` (vlastné číslo by pri prvej zmene scrimu poslalo dropdown pod modal: viditeľný, neklikateľný).
-
-**ŠT-2c PR 2c-2a** doplnila do repeatera tri veci, ktoré si vypýtal prvý reálny spotrebiteľ (D-69 editor dekoru): stĺpec smie byť **`readonly` podľa RIADKU** (`roWhen` = kľúč,
-ktorého prítomnosť riadok „zamkne“, `roTitle` = dôvod do tooltipu) — identitné pole existujúceho variantu sa needituje, ale ostáva **čitateľné a zamerateľné** (`readonly`, nikdy
-`disabled`, aby hodnota nezmizla z klávesnice ani z čítačky); bunky dostali **`aria-label`** (nadpis je nad stĺpcom, nie pri poli, takže bez neho čítačka hlási len „textové pole“);
-a **hlavička nesie TÚ ISTÚ šírkovú triedu ako bunka** (`colCls`, review 2c-1 #8 — inak nadpis „Cena“ visí nad polovicou tabuľky; triedy `mshort`/`mtiny`/`mcheckcol` sú v
-`studio.html` v scope `.mrline`/`.mrcols`).
-
-Riadky dostali **`rowKey`** (kľúč identity riadku) — pamäť rozpísaného formulára si podľa neho páruje hodnoty na ČERSTVÉ riadky a **zapamätá si výhradne editovateľné stĺpce**:
-server-owned skryté polia (`row_rev`) z pamäte nikdy nevyliezajú späť, inak by formulár odosielal zastaraný odtlačok a zápis by sa **už nikdy nepodaril** (`trimRowsValue` +
-`mergeRowsMemory`; riadok, ktorý v čerstvom katalógu nie je, sa z pamäte zahodí).
-
-**PAMÄŤ JE PO BUNKÁCH, NIE PO RIADKOCH (1b-7, sweep #9 — cenové P2).** Do 1b-7 stačila jedna zmenená bunka na to, aby si pamäť odložila **všetky** editovateľné stĺpce **všetkých**
-riadkov; pri ďalšom otvorení sa vliali do čerstvého katalógu a `row_rev` pritom ostal čerstvý — optimistický zámok teda prekážku nevidel a *Uložiť* **ticho vrátilo cenu, ktorú
-medzitým priniesla „Aktualizovať z Demosu"**. Reálny scenár: otvor editor → oprav jednu hodnotu → **Esc** → aktualizuj ceny → otvor ten istý dekor → Ulož. Dnes `trimRowsValue(f,
-rows, baseRows)` odloží **iba bunku, ktorá sa líši od východiskového riadku**, a ku každej pridá **`_base`** = hodnota, proti ktorej ju používateľ písal (`sameCell` porovnáva
-boolean aj reťazec); riadok bez zmeny sa nepamätá vôbec. `_base` sa nikdy nevykresľuje ani neodosiela — `readRows` číta výhradne uzly s `data-nxm-col`.
-
-**KOLÍZIA BUNKY sa nerieši ticho.** Keď `mergeRowsMemory` zistí, že tú istú bunku zmenil používateľ **aj** katalóg (`_base` ≠ čerstvá hodnota **a zároveň** výsledky sa naozaj líšia
-— zhodná hodnota na oboch stranách kolízia nie je), riadok dostane **`_conflict`** = `{stĺpec: hodnota v katalógu}`: bunka sa označí triedou **`conf`** (nie `bad` — tú `clearErrors`
-pri každom kole serverovej validácie zhasne), dostane `title` aj `aria-invalid` vo **všetkých** vetvách `rowCellHtml` a pod riadkom sa rozvinie pás **`.mrconf`** s dvojicou *tvoja ×
-v katalógu* a dvoma rozhodnutiami — **„Prevziať z katalógu"** / **„Ponechať moju"**. **`submit` s nerozhodnutou kolíziou zápis NEPUSTÍ** (`conflictCount()` > 0 → hláška do
-`.merrtop`, `onSubmit` sa nevolá, zámok sa nezapína). Rozhodovacie tlačidlá nesú **`data-nxm-confcol`**, nie `data-nxm-col` — `readRows` číta každý taký uzol v riadku a prázdna
-`value` tlačidla by hodnotu bunky vymazala.
-
-**VÝCHODISKOVÉ RIADKY (`base`) SÚ VŽDY ČERSTVÝ KATALÓG.** Prvá verzia opravy 1b-7 do nich pri kolízii ukladala starú hodnotu, aby kolízia prežila Esc — lenže z `base` kreslí aj
-„Začať odznova", takže reset nakreslil **starú hodnotu s čerstvým `row_rev`** a nasledujúci zápis prešiel cez oba zámky (P1 interného review kola 1). „Proti čomu používateľ písal"
-preto žije v **stave**: riadok ho nesie ako `_wrote` len do `flagsOfRows`, ktorý ho uloží do `OPEN.flags[pole][rowKey].wrote`, a `remember()` ho odtiaľ berie ako `_base`
-zapamätanej bunky. Vďaka tomu nerozhodnutá kolízia **prežije Esc**, rozhodnutie ju **zahodí** (odteraz sa písalo proti hodnote, ktorú používateľ videl — a tou je už `base`), do
-`base` sa **nikdy nič nezapisuje** a `memReset` z neho dostane presne to, čo je dnes v katalógu — vrátane riadkov, ktoré doniesol `setRows` po zotavení z konfliktu.
-
-**Štítky riadku žijú v STAVE `OPEN.flags`, nie v DOM** (`flagsOfRows`/`applyFlags`, kľúč = hodnota `rowKey`): kontajner sa pri každom `+`/`−` prekresľuje z `readRows`, ktorý číta
-len bunky — bez registra by jedno pridanie riadku zhaslo pás kolízie aj štítky `_note` a zápis by prešiel bez rozhodnutia. Stav sa preto musí **synchronizovať s obrazovkou**:
-`conflictCount()` počíta výhradne nad `readRows` a `rowDel` navyše volá `syncFlags(key)` — inak by zmazanie kolízneho riadku nechalo zámok zápisu visieť na bunke, ktorú už nemá
-kto rozhodnúť (P2 interného review; v zotavovacej ceste tam ani nie je „Začať odznova", takže jediným východiskom by bolo zavrieť okno).
-
-**`setRows(key, rows, {base})`** vymieňa obsah repeatera za behu (zotavenie z konfliktu) — pozor, `withMemory` vracia pri prázdnej pamäti TEN ISTÝ objekt, takže `spec` aj `base`
-zdieľajú polia; `ownSpecField` ich pred zápisom rozdvojí, inak by sa hodnoty používateľa prepísali východiskovými. Riadok smie niesť **`_note`** = štítok (nie hodnota — `readRows`
-ho nečíta), ktorým sa označí záznam zmenený ZVONKU. Volajúci si vie vypýtať **`baseRows(key)`** (proti čomu používateľ písal) a **`conflicts()`** (počet nerozhodnutých buniek).
-Pribudlo aj **`showErrors([{row, field, msg}])`/`clearErrors()`**: server validuje CELÝ formulár naraz a modal sa pri odmietnutí
-NEZATVÁRA, takže hláška musí pristáť pri tom poli, ktorého sa týka — `row = null` ide pod `.mrow` plochého poľa, `"<kľúč>:<index>"` pod príslušný `.mrline`, nezaraditeľná do
-zberného pásu `.merrtop` navrchu tela; každé ďalšie volanie predošlé chyby PREPÍŠE.
-
-**ŠT-2d — ⋯ EDITOR RIADKU ROZPOČTU je štvrtá inštancia (audit #22):** v ŠT-1c PR B2 ostal vedome bokom (bol jediný svojho druhu a kostra vtedy nevedela, čo potreboval); odkedy v
-okne žijú tri D-15 modaly, štvrtý vlastnoručný markup by znamenal **dva modalové svety v jednom okne** — iný Escape, iný fokus, iný scrim.
-`budModalHtml`/`budRenderModal`/`budModalSave` a vetvy `modal_save`/`modal_close` zanikli, ostali čisté `budMoreFields`/`budMoreAttrs` (spotrebič má **len adresu** — kód ani
-poznámku jeho záznam nenesie) + `budOpenMore`/`budCloseMore`.
-
-**Ide BEZ `memoryKey`:** pamäť rozpísaných hodnôt patrí *zakladaniu* (Escape nesmie zahodiť rozpísanú položku), pri editore existujúceho riadku by bola pascou — predvyplnila by
-hodnoty písané do iného riadku a uložili by sa do nesprávneho záznamu; formulár sa preto **vždy plní z čerstvého payloadu**. Mutácia ide **nezmenenou** cestou `budget_mutate` →
-`custom_update`/`appliance_update` (1 zmena = 1 krok Späť); zatvára ho až **potvrdenie servera** (`NX.budgetResult(op, true)`), odmietnutie modal necháva otvorený a len pustí
-zámok.
-
-**KORELÁCIA ODPOVEDE (review #1) — inak by modal zatváral CUDZÍ zápis:** `custom_update`/`appliance_update` posiela aj **inline editácia bunky** v tabuľke (blur ceny/popisu), takže
-`budgetResult` sa smie na modal vzťahovať len vtedy, keď odoslanie prišlo Z NEHO — `BUD_MORE.sent` sa zapne v `budMoreCommit`, vetva výsledku ho vyžaduje (`budMoreAwaiting`,
-vrátane `NXModal.isOpen()`) a po vybavení zhasne.
-
-**`BUD_MORE` sa čistí aj bez odpovede (review #2):** `NXModal.close()` sa rozpočtu neohlási, takže modal zavretý Escapom/klikom vedľa by nechal stav visieť — upratuje ho
-`budOpenMore` na začiatku a `budAfterPush` (čerstvý payload) vtedy, keď už modal nie je otvorený. Testy: `tests/pure/test_st1c_ponuka.rb`, `tests/pure/test_st2c_modal.rb`,
-`tests/js/test_st1c_ponuka.js`, `tests/js/test_st2c_modal.js`, `tests/js/test_st2c_editor.js`, `tests/js/test_st2d_kde.js` (mini-DOM je od 2c-2a zdieľaný v `tests/js/minidom.js`)
-(mini-DOM s naozajstným parsovaním HTML a bublaním udalostí — repeater ani Escape nasepkavača sa na stubovanom `querySelector` overiť nedajú).
+Testy: `tests/pure/test_st1c_ponuka.rb`, `tests/pure/test_st2c_modal.rb`, `tests/js/test_st1c_ponuka.js`, `tests/js/test_st2c_modal.js`,
+`tests/js/test_st2c_editor.js`, `tests/js/test_st2d_kde.js` (mini-DOM `tests/js/minidom.js`). Plné znenie: archív, „D-15 modal…" a „ZÁMOK ODOSLANIA OPEN.busy".
 
 ### Escape reťaz ručných modálov (R-23.1, ui/js/nx_esc.js)
 
-Modály **mimo** kostry D-15 Escape dlho nemali vôbec — kontrakt „Escape zatvára modál" pre šesť z nich neplatil (`absModal` v Inspectorovi; `mdRestoreModal`, `mdDeleteModal`,
-`mdUniModal`, `demosModal`, `hwDelModal` v Štúdiu; jedinou cestou von bola myš). Rieši to **JEDEN dokumentový handler s prioritným zoznamom vrstiev**, zdieľaný oboma oknami
-(`nx_esc.js` sa načítava v `panel.html` aj `studio.html`, vždy **pred** `nx_modal.js` a `studio.js` — stráži to `tests/js/test_r23_escape.js`). Šesť samostatných listenerov by bola
-tá istá pasca ako pri `ecMenu`: všetky visia na `document`, takže by jedno stlačenie zavrelo dve vrstvy a poradie by záviselo na poradí `<script>` tagov.
+**Čo robí:** Escape pre modály **mimo** kostry D-15 (`absModal` v Inspectore; `mdRestoreModal`, `mdDeleteModal`, `mdUniModal`, `demosModal`, `hwDelModal`
+v Štúdiu) — **JEDEN dokumentový handler s prioritným zoznamom vrstiev** pre obe okná (`nx_esc.js` v `panel.html` aj `studio.html`, vždy **pred**
+`nx_modal.js` a `studio.js` — stráži `tests/js/test_r23_escape.js`).
 
-**Pravidlo je „jedno stlačenie = najvyššia otvorená vrstva"** a cudzie vrstvy sú preto **v dvoch triedach** (review #273 kolo 1): **(a) skutočné modály** — kostra D-15 ·
-`nxdaModal`/`tplModal`/`simModal`/`cfgModal` s vlastným handlerom · **`budPrModal`**, ktorého sa Escape nesmie dotknúť ani vtedy, keď je pod ním niečo naše (audit #9) — sú
-celoplošné prekrytia, takže nad nami sú **vždy** a reťaz pri nich **nerobí nič**; **(b) flyouty a menu** — warnpanel, rohové menu ABS a tagov, `ecMenu`/`vepoMenu` Štúdia,
-combobox D-85 — žijú v stacking kontexte railu/lišty (z-index 55 a nižšie), kým `.nxmodal` je 60, takže **pod otvoreným modálom sú schované** a blokujú **len vtedy, keď žiadny
-náš modál otvorený nie je**. Bez toho rozdielu by cesta „rohové menu ABS → combobox → dekor bez použiteľnej pásky" nechala prvé Escape zavrieť **neviditeľnú** vrstvu a modál by
-si vyžiadal druhé stlačenie. Combobox je v (b) preto, že v žiadnom z tých šiestich modálov `select[data-nx-combo]` nie je (stráži to test) a `NXCombo.pick()` ponuku zatvára
-ešte pred `change`, ktorý `absModal` otvára — keby raz pribudol, patrí do (a) (`.cbpop` má z-index 120). Vlastnú vrstvu naopak reťaz **spotrebuje** (`stopImmediatePropagation`,
-vzor vyššie), inak by ju za ňou dostal ešte handler Štúdia; flyout pod modálom teda ostáva otvorený a zavrie ho až ďalšie stlačenie u jeho vlastníka.
-
-**Medzi vlastnými vrstvami rozhoduje DOKUMENTOVÉ PORADIE, nie poradie tabuľky `OWN`** (review #273 kolo 2): všetky `.nxmodal` majú z-index 60, takže navrchu kreslí prehliadač ten,
-ktorý je v HTML nižšie — a `topOpen()` preto vyberá **posledný otvorený uzol v dokumentovom poradí** (`compareDocumentPosition`, generické, žiadna logika per modál). Bez toho by
-scenár „preflight zmazania materiálu odoslaný → prepnutie sekcie na Kovanie → `hwDelModal` → oneskorená `MD.confirmDelete` otvorí `mdDeleteModal` pod ním" nechal Escape zavrieť
-**skrytý** materiálový modál a navonok by sa „nestalo nič". *(Že `MD.confirmDelete` po odchode zo sekcie modál vôbec znovu otvorí, je samostatná chyba toho toku — tá istá trieda
-ako oneskorená odpoveď „Nahradiť UNI…"; reťaz ju len prestáva zhoršovať, opravená nie je.)*
-
-**Escape = klik na „Zrušiť", nie `display:none`:** volá sa tá istá funkcia ako z tlačidla — `mddCancel` ruší bežiaci Demos fetch na serveri, `absModalChoose('cancel')` vracia
-pôvodnú hodnotu selectu, `mdUniClose` zahadzuje pending odtlačok. Preto dostal `hwDelModal` pomenované `hwDelClose()` (dovtedy vetva schovaná v delegácii klikov). Otvorenosť sa
-pozná genericky z `style.display !== 'none'` (`budPrModal` v DOM ani nie je, kým nebeží), takže reťaz nepotrebuje háčik v otváraní. **Vedomé obmedzenie:** fokus sa po Escape
-nikam nevracia — spúšťač týchto šiestich modálov nie je nikde uložený (rovnako ako dnes pri kliku na „Zrušiť"); a `nxdaModal` má Escape naďalej len pri fokuse v poli hľadania.
+- **Jedno stlačenie = najvyššia otvorená vrstva.** Cudzie vrstvy majú dve triedy: **(a) skutočné modály** (kostra D-15, `nxdaModal`/`tplModal`/`simModal`/
+  `cfgModal` s vlastným handlerom, `budPrModal`) — reťaz pri nich **nerobí nič**; **(b) flyouty a menu** (warnpanel, rohové menu ABS a tagov, `ecMenu`/`vepoMenu`,
+  combobox D-85; z-index ≤ 55, `.nxmodal` 60) blokujú **len keď žiadny náš modál otvorený nie je**. Combobox v žiadnom z tých šiestich modálov nie je (test);
+  keby pribudol, patrí do (a). Vlastnú vrstvu reťaz **spotrebuje** (`stopImmediatePropagation`).
+- Medzi vlastnými vrstvami rozhoduje **dokumentové poradie** (`topOpen()` = posledný otvorený uzol, `compareDocumentPosition`), nie poradie tabuľky `OWN`.
+- **Escape = klik na „Zrušiť"**, nie `display:none` (`mddCancel` ruší Demos fetch, `absModalChoose('cancel')` vráti hodnotu selectu, `mdUniClose`, `hwDelClose()`).
+  Otvorenosť sa pozná z `style.display !== 'none'`.
+- **Vedomé obmedzenie:** fokus sa po Escape nevracia (spúšťač sa nikde neukladá); `nxdaModal` má Escape len pri fokuse v poli hľadania. Oneskorená
+  `MD.confirmDelete`, ktorá otvorí modál po odchode zo sekcie, je samostatná otvorená chyba toku (reťaz ju len nezhoršuje).
 
 ### Observery panela
 
-(`ui/panel/selection.rb`) — panel počúva DVE veci: `SelObserver` (zmena výberu) a **`PanelModelObserver` (D-101: `onTransactionUndo`/`Redo`/`Abort`)**, lebo **Späť/Znova nevystrelí
-žiadny selection event** a Inspector inak visel na predošlom stave až do prekliku výberu. Lifecycle oboch je **atomický**: attach/detach v jednej dvojici (`attach_observer` s
-anti-double remove→add a rollbackom už pripojenej polovice pri zlyhaní; `detach_observer` s **vlastným chráneným krokom pre KAŽDÝ observer** — zlyhanie jedného remove nesmie
-preskočiť druhý ani predčasne vynulovať `@observer_model`). Callback transakcie je **tenký**: v observer kontexte sa nič nečíta ani nemení, len sa označí pending a naplánuje
-`UI.start_timer(0)` refresh (vzor `EdgeCheck.request_redraw`) — **viac rýchlych undo/redo za sebou = JEDEN push** najnovšieho stavu (coalescing).
+(`ui/panel/selection.rb`) — panel počúva **`SelObserver`** (zmena výberu) a **`PanelModelObserver`** (`onTransactionUndo`/`Redo`/`Abort`), lebo **Späť/Znova
+nevystrelí selection event**. Lifecycle oboch je **atomický**: `attach_observer` (anti-double remove→add, rollback už pripojenej polovice) a `detach_observer`
+(vlastný chránený krok pre KAŽDÝ observer — zlyhanie jedného nesmie preskočiť druhý ani predčasne vynulovať `@observer_model`).
 
-Guard „ten istý a zároveň aktívny dokument" sa overuje **dvakrát** (v callbacku aj tesne pred pushom — oneskorená udalosť zo starého dokumentu nesmie prepísať Inspector aktívneho);
-`@suspend_selection_sync` sa testuje až v timeri a udalosť **nezahadzuje** (refresh sa len odloží). Push je **VŽDY `dedup: false`** — dedup žiada `ScaleWatch.request_dedup` (zásah
-do modelu) a z observer cesty je zakázaný (lekcia D-103); refresh preto nepridáva žiadny undo krok.
-
-ČELÁ-B2: Undo/Redo označia `history: true`; coalescing podrží model do odloženého refreshu. Ten pred stavom výberu pošle `NX.historyRefresh(doc)`.
-Zhodný dokument zruší rozpracovaný návrh, timer aj naviazanú akciu; oneskorený preflight/ack už nemôže obnoviť hodnoty spred Undo. Abort vlastného apply túto značku nemá,
-lebo jeho odmietací ack zachová prípadný novší edit. Detach odstráni aj značku histórie; bežné echo apply naďalej chráni práve písané polia.
+- Callback transakcie je **tenký**: nič nečíta ani nemení, označí pending a naplánuje `UI.start_timer(0)` refresh — **viac undo/redo za sebou = JEDEN push** (coalescing).
+- Guard „ten istý a zároveň aktívny dokument" sa overuje **dvakrát** (v callbacku aj pred pushom); `@suspend_selection_sync` sa testuje až v timeri a udalosť
+  sa len odloží. Push je **VŽDY `dedup: false`** (dedup = zásah do modelu, z observer cesty zakázaný) — refresh nepridáva undo krok.
+- Undo/Redo označia `history: true`; odložený refresh pred stavom výberu pošle `NX.historyRefresh(doc)`: zhodný dokument zruší rozpracovaný návrh, timer
+  aj naviazanú akciu (oneskorený preflight/ack neobnoví hodnoty spred Undo). Abort vlastného apply značku nemá (jeho odmietací ack zachová novší edit).
+  Detach odstráni aj značku histórie.
 
 ### SketchUp toolbar (UI-02, žije v main.rb — NIE je vlastný modul)
 
-`Engine.install_toolbar` skladá toolbar „Noxun Engine" so 4 tlačidlami podľa kontraktu UI 2.0 (N4) — **logo** (prepínač Inspectora: `Panel.dialog_alive?` → `Panel.hide` /
-`Panel.show`) · **Štúdio** (`StudioDialog.show` — jediné okno výstupov zákazky) · **ABS kontrola hrán** (prepínač existujúceho `EdgeCheck.toggle`) · **Vložiť**
-(`Panel.show_insert`). Ikony sú **samostatné SVG** v `noxun_engine/ui/icons/` (`noxun_logo/studio/abs/insert.svg`) — sprite `icons.js` sem nesiaha a `currentColor` je tu zakázaný
-(mimo HTML by ikona bola čierna), preto majú pevnú `#37474f`.
+`Engine.install_toolbar` skladá toolbar „Noxun Engine" so 4 tlačidlami — **logo** (prepínač Inspectora: `Panel.dialog_alive?` → `Panel.hide` / `Panel.show`) ·
+**Štúdio** (`StudioDialog.show`) · **ABS kontrola hrán** (`EdgeCheck.toggle`) · **Vložiť** (`Panel.show_insert`). Ikony sú **samostatné SVG**
+v `noxun_engine/ui/icons/` s pevnou `#37474f` (`currentColor` mimo HTML = čierna). `noxun_logo.svg` a symbol `#i-logo` v `icons.js` nesú **tie isté krivky**,
+líšia sa len viewBoxom (toolbar ~12 % vnútorný okraj) a `currentColor`; zhodu kriviek a logo **24 px** v hlavičke stráži `tests/pure/test_ui02_toolbar.rb`.
 
-**Značka má dve podoby a JEDNU kresbu:** `noxun_logo.svg` (toolbar) a symbol `#i-logo` v sprite `icons.js` (hlavička panela + koliesko „O plugine") nesú **tie isté krivky**
-zrolovanej značky z originálneho SVG webu — líšia sa **len viewBoxom** (toolbarová ikona má navyše ~12 % vnútorný okraj, aby v tlačidle nelícovala s hranou; sprite ho nepotrebuje)
-a tým, že sprite kreslí `currentColor`. Zhodu kriviek aj veľkosť loga v hlavičke (**24 px** podľa kontraktu UI 2.0) stráži `tests/pure/test_ui02_toolbar.rb`.
-
-**Zapnutý stav nesie `set_validation_proc`** (`MF_CHECKED`, `MF_GRAYED` keď kontrola hrán v danom SketchUpe nie je) — proc beží pri každom prekreslení UI, takže je lacný a **nikdy
-nepustí výnimku von** (`Engine.toolbar_state`). Prepnutie ABS **NEROBÍ toolbar sám** — volá zdieľanú `Engine.toggle_edge_check` (UI-B1): tá zavolá `EdgeCheck.toggle` a novým stavom
-cez `Engine.broadcast_edge_check` obslúži **všetkých klientov naraz** — ŠTÚDIO (lišta sekcie Kontrola) aj rail Inspectora (`Panel.push_edge_check`). Tou istou metódou ide klik z
-panela (`nx_edge_toggle` → `Panel.handle_edge_toggle`) aj zo Štúdia (`do_edge_check`), takže sa cesty nemôžu rozísť; oba pushe sú defenzívne (`js` má vlastný guard).
-
-Po prepočte cache posiela stav obom oknám aj `EdgeCheck.notify_count_changed`; pri **prepnutí dokumentu** (`on_model_changed` → `disable!`) ho rozpošle
-`EdgeCheck.notify_state_changed` — bez toho by okná ďalej hlásili zapnuté zvýraznenie nad novým modelom a ďalší klik by ho zapol namiesto vypnutia.
-
-**Z toolbaru sa do modelu NEZAPISUJE** (lekcia D-103/D-105): žiadny `start_operation`, `Panel.show_insert` čistí výber pod `suspend_selection_sync` a panel obnovuje s `dedup:
-false`. Dvojitú registráciu pri reloade drží `@toolbar` memo (guard test `tests/pure/test_ui02_toolbar.rb`).
+- Zapnutý stav nesie **`set_validation_proc`** (`MF_CHECKED`, `MF_GRAYED` bez kontroly hrán) — lacný a **nikdy nepustí výnimku** (`Engine.toolbar_state`).
+- Prepnutie ABS ide cez zdieľanú **`Engine.toggle_edge_check`** → `EdgeCheck.toggle` → `Engine.broadcast_edge_check` obom oknám (lišta Kontroly v Štúdiu,
+  rail Inspectora `Panel.push_edge_check`); tou istou metódou ide klik z panela (`nx_edge_toggle` → `Panel.handle_edge_toggle`) aj zo Štúdia (`do_edge_check`).
+  Stav posiela obom oknám aj `EdgeCheck.notify_count_changed` a pri prepnutí dokumentu `EdgeCheck.notify_state_changed`.
+- **Z toolbaru sa do modelu NEZAPISUJE**: žiadny `start_operation`, `Panel.show_insert` čistí výber pod `suspend_selection_sync`, refresh `dedup: false`.
+  Dvojitú registráciu pri reloade drží `@toolbar` memo.
 
 ## Nástroje v modeli — toolbar „Noxun Nástroje" (`noxun_engine/tools/`)
 
 ### tools.rb
 
-**JEDINÝ registrátor** nástrojov (`Tools.install!(parent_menu)`) a ich **spoločná vrstva**. Toolbar je **zámerne druhý**: toolbar enginu má železné pravidlo „do modelu sa
-nezapisuje" (D-103/D-105), kým nástroje model **menia**. Poradie tlačidiel: −90° · +90° · 180° · Z = 0 · Z posun… · Kópia vľavo · Kópia vpravo · Prisunúť vľavo · Prisunúť vpravo;
-tie isté `UI::Command` objekty obsluhujú **toolbar aj submenu** Extensions → Noxun Engine → **Nástroje** (submenu sa podáva ako parameter — druhé `add_submenu('Noxun Engine')`
-by v SketchUpe vyrobilo druhé rovnomenné menu). Idempotenciu držia **`file_loaded?` guard + `@toolbar` memo**: legacy Mower staval toolbar pri každom `load` bez guardu a pridával
-ďalší rad tlačidiel. **Trojstav** je vyslovený (`get_last_state`): `TB_NEVER_SHOWN` → `show`, `TB_VISIBLE` → `restore`, `TB_HIDDEN` → nič (`Engine.install_toolbar` volá len
-`restore`). **Každý z 9 príkazov má D-52a restart latch** (`Engine.update_restart_pending?`) priamo v tele. Ikony sú sledované assety v `noxun_engine/ui/icons/tools/` (7 PNG
-Mowera v 16/24, 2 SVG Snapera).
+**JEDINÝ registrátor** nástrojov (`Tools.install!(parent_menu)`) a ich **spoločná vrstva**. Toolbar je zámerne **druhý** — toolbar enginu do modelu nezapisuje,
+nástroje model menia. Poradie: −90° · +90° · 180° · Z = 0 · Z posun… · Kópia vľavo · Kópia vpravo · Prisunúť vľavo · Prisunúť vpravo; tie isté `UI::Command`
+obsluhujú **toolbar aj submenu** Extensions → Noxun Engine → **Nástroje** (submenu sa podáva parametrom — druhé `add_submenu('Noxun Engine')` by vyrobilo druhé
+menu). Idempotencia: **`file_loaded?` guard + `@toolbar` memo**. Trojstav `get_last_state`: `TB_NEVER_SHOWN` → `show`, `TB_VISIBLE` → `restore`, `TB_HIDDEN` →
+nič. **Každý z 9 príkazov má restart latch aktualizácie** (`Engine.update_restart_pending?`). Ikony: `noxun_engine/ui/icons/tools/` (7 PNG Mowera, 2 SVG Snapera).
 
-Spoločná vrstva drží **poradie preflightov** (kontrakt): výber jednej inštancie/skupiny → `route` (edit kontext → vnorený → druh objektu) → `settle!` → `mutate`.
-**`Tools.settle!`** je dvojkrok: (1) `ScaleWatch.flush_pending!(model)` dovedie observer do pokoja, (2) až potom sa transformácia číta **znova** a musí byť rigidná
-(`CabinetBuilder.rigid_matrix?`) — inak nástroj odmietne (žiadny tichý neúspech). **`Tools.mutate`** je jediné miesto, kde nástroje menia model: nad NOXUN objektom beží celá
-operácia pod `ScaleWatch.guard`, v **tej istej operácii** sa presunú ghost zóny (`Zones.move_ghost`) a **až po úspešnom commite** sa volá `ScaleWatch.remember_transform` (pod
-guardom ho observer nedosiahne; bez toho by neskôr odmietnutá šikmá mierka obnovila polohu spred príkazu). Hlásenia sú **nemodálne** — status bar + `UI::Notification` nad
-objektom rozšírenia enginu (`Engine.extension`); modal z tlačidla toolbaru je zlé UX.
+**Poradie preflightov (kontrakt):** výber jednej inštancie/skupiny → `route` (edit kontext → vnorený → druh objektu) → `settle!` → `mutate`.
+- **`Tools.settle!`**: (1) `ScaleWatch.flush_pending!(model)` dovedie observer do pokoja, (2) transformácia sa číta **znova** a musí byť rigidná
+  (`CabinetBuilder.rigid_matrix?`) — inak nástroj odmietne.
+- **`Tools.mutate`** je jediné miesto, kde nástroje menia model: nad NOXUN objektom celá operácia pod `ScaleWatch.guard`, v tej istej operácii sa presunú ghost
+  zóny (`Zones.move_ghost`) a **až po úspešnom commite** `ScaleWatch.remember_transform`.
+- Hlásenia sú **nemodálne** — status bar + `UI::Notification` (`Engine.extension`).
 
 ### mower_calc.rb
 
-**Čisté jadro** Mowera (bez `UI::*` a `Sketchup::*`, mm Float, v zozname `tests/helper.rb`): znamienko a posun kópie po **lokálnej osi X**, `z_delta_mm`, `route` (`:edit_context`
-· `:nested` · `:cabinet` · `:board` · `:legacy`) a **prípona názvu kópie**. Prípona hľadá **najbližšiu voľnú** v celom modeli a je **VÝHRADNE PÍSMENOVÁ** (rozhodnutie 4.9.2026):
-`a`…`z`, po vyčerpaní `aa`…`zz`, ďalej `aaa`… — **bijektívna sústava so základom 26** (ako stĺpce v tabuľkovom procesore), takže **číslo sa v prípone neobjaví nikdy**. Základ sa
-odvodí zo zdroja **bez prípony, ktorú vyrobila kópia** — a to len v tvare **medzera + jedno alebo dve malé ASCII písmená** — takže reťaz ide „Skrinka a" → „Skrinka b", nie
-„Skrinka a a". **Číslo na konci názvu sa neodstráni nikdy:** ručný názov skrinky bežne končí šírkou, takže „Dolná 900" sa skopíruje ako „Dolná 900 a" (nie „Dolná a") a informácia
-sa nestratí; rovnako sa nedotkne veľkého písmena („Bok L" → „Bok L a") ani slova („Skrinka pod"). Základ sa oreže tak, aby prípona vždy prežila `sanitize_name` (`NAME_MAX_LEN` 80
-— guard test drží konštantu v synchro s `CabinetBuilder`).
+**Čisté jadro** Mowera (bez `UI::*`/`Sketchup::*`, mm Float, v zozname `tests/helper.rb`): znamienko a posun kópie po **lokálnej osi X**, `z_delta_mm`, `route`
+(`:edit_context` · `:nested` · `:cabinet` · `:board` · `:legacy`), `pending_decision` (token, lehota handshaku) a **prípona názvu kópie**: najbližšia voľná
+v celom modeli, **VÝHRADNE PÍSMENOVÁ** — `a`…`z`, `aa`…`zz`, `aaa`… (bijektívna sústava so základom 26, číslo sa v prípone neobjaví). Základ sa odvodí zo zdroja
+bez prípony kópie (len **medzera + jedno alebo dve malé ASCII písmená**): „Skrinka a" → „Skrinka b"; **číslo na konci názvu sa neodstráni nikdy** („Dolná 900" →
+„Dolná 900 a"), veľké písmeno ani slovo tiež nie. Základ sa oreže tak, aby prípona prežila `sanitize_name` (`NAME_MAX_LEN` 80, synchro s `CabinetBuilder`
+stráži guard).
 
 ### mower.rb
 
-**MR-1B2:** produktová kópia odovzdáva builderu živý `appearance_source: src`, aby zachovala pôvodný vzhľad aj pri novšej knižničnej revízii.
-Pending handshake drží pôvodný model aj source handle. Dokončenie vyžaduje ten istý aktívny model, platný pôvodný source a nezmenené CAB ID;
-rovnaké ID v inom dokumente ani náhradná inštancia po zmazaní sa nehľadajú. Konfigurácia sa stále číta až po úspešnom flushe.
+SketchUp vrstva Mowera + **Z-dialog**. Rotácie (pivot = stred obálky, **svetová Z**) a Z posun platia len v root kontexte (`transform_entities` interpretuje
+transformáciu globálne iba tam).
 
-SketchUp vrstva Mowera + **Z-dialog**. Rotácie (pivot = stred obálky, **svetová Z**) a Z posun sú prevzaté z legacy bez zmeny správania — platia však len v root kontexte
-(`transform_entities` interpretuje transformáciu globálne iba tam; outside-in packet). **Kópia NOXUN korpusu ide cestou „Vložiť kópiu"**: `Store.config` → `newer_config?` brána
-(R-12) → `config_to_params` → `rekey_hardware_manual` → `CabinetBuilder.build(model, params, transform: src.transformation * translation(Units.vector(±šírka, 0, 0)))` →
-`Panel.push_selected(model, dedup: false)`. Legacy `add_instance(ent.definition, tr)` vyrábal **kópiu bez identity** (Inspector ju nevidel, v kusovníku nebola, prestavba
-originálu ju menila) — to je pointa D-20. Krok je **šírka korpusu z configu**, nie bbox inštancie: čelo so záporným `gap_sides` alebo úchytka smie šírku presahovať, takže sľub
-„dotyk bbox" neplatí a susednosť sa meria na **obálkach korpusov**. Kópia **dosky je SCOPE OUT** (`BoardBuilder.build` polohu neprijíma — šev príde s GHOST-D1), nie-NOXUN
-objekty idú dnešnou legacy cestou (DC `lenx` / bounds, odhad osi z RotZ, `add_instance`).
+**Kópia NOXUN korpusu = cesta „Vložiť kópiu"**: `Store.config` → `newer_config?` brána (R-12) → `config_to_params` → `rekey_hardware_manual` →
+`CabinetBuilder.build(model, params, transform: src.transformation * translation(Units.vector(±šírka, 0, 0)), appearance_source: src)` →
+`Panel.push_selected(model, dedup: false)` — kópia má vlastnú identitu (Inspector, kusovník) a zachová vzhľad aj pri novšej knižničnej revízii. Krok je **šírka
+korpusu z configu**, nie bbox (čelo so záporným `gap_sides` či úchytka smú presahovať). Kópia **dosky** nie je podporovaná (`BoardBuilder.build` polohu
+neprijíma); nie-NOXUN objekty idú legacy cestou (DC `lenx` / bounds, `add_instance`).
 
-**Kópia z toolbaru má DVE poistky, ktoré kópia z panela nepotrebuje** (Codex #293 kolo 1) — klik na tlačidlo nástroja ide **mimo JS**, takže si obe musí vybaviť server sám:
+**Dve poistky kópie z toolbaru** (klik ide mimo JS):
+1. **Bežiaca ghost session sa ruší** (`GhostTool.cancel_session('kópia nástrojom')`, ako `Panel.handle_insert_copy`).
+2. **Handshake s Inspectorom pred čítaním configu** (auto-apply má 400 ms debounce): pri otvorenom paneli server drží čakajúcu kópiu pod tokenom
+   (`start_cabinet_copy`) a pošle `NX.flushForNative(token, {kind, dir})`. JS odpovedá v každej vetve: červené pole / rozpísaný výraz → `native_flush_done`
+   `'invalid'` (kópia sa odmietne) · nič na flush → `'nothing'` · rozpísané edity → `apply_all` s `native_op` a kópia beží v tom callbacku. **Smer je vždy zo
+   servera** (echo klienta je len korelačný kľúč; token čistí `manual_token`). Bez odpovede do **2 s** kópia odmietnutá „Inspector neodpovedal".
+   Pending handshake drží pôvodný model aj source handle; dokončenie vyžaduje ten istý aktívny model, platný source a nezmenené CAB ID. JS vetvy stráži
+   `tests/js/test_nastroje1_flush.js` (číta funkciu priamo zo `form.js`).
 
-1. **Bežiaca ghost session sa ruší** (`GhostTool.cancel_session('kópia nástrojom')`, presne ako `Panel.handle_insert_copy`). Iný spôsob vkladania = koniec životného cyklu session;
-   bez toho by ghost visiaci na kurzore ďalším klikom commitol **starý plán**.
-2. **Handshake s Inspectorom pred čítaním configu.** Auto-apply panela má **400 ms debounce**, takže rozpísaná zmena môže ešte visieť vo formulári a kópia by vznikla zo **starého**
-   configu. Keď je Inspector otvorený (`Panel.dialog_alive?`), server si drží **čakajúcu kópiu pod tokenom** (`start_cabinet_copy`) a pošle `NX.flushForNative(token, {kind, dir})`.
-   JS odpovedá **v každej vetve**: červené polia alebo rozpísaný výraz → `native_flush_done` s `'invalid'` (kópia sa **odmietne**) · niet čo flushnúť → `'nothing'` (server kopíruje
-   hneď) · rozpísané edity → `apply_all` s `native_op: {kind, dir, token}` a kópia beží **až v tom callbacku**, teda nad už zapísaným configom. **Smer kópie je vždy zo servera** —
-   echo klienta je iba korelačný kľúč (`resolve_native_op` ho ani nečíta; token čistí zdieľaná `manual_token`). Bez odpovede do **2 s** server kópiu odmietne hláškou „Inspector
-   neodpovedal" — **nikdy tichá kópia zo starého configu**. Čistá časť (token, rozhodovanie, lehota) je `MowerCalc.pending_decision`; JS vetvy stráži `tests/js/test_nastroje1_flush.js`,
-   ktorý funkciu číta **priamo zo `form.js`** (zrkadlo by od zdroja odbehlo).
-
-**`Tools::ZDialog`** (Z posun v mm) si necháva legacy vzhľad, ale má enginový lifecycle: callbacky **pred `show`**, unikátny `preferences_key`, `set_on_closed` → referencia
-`nil`, callback `applyZ` pod **`Engine.update_locked?(:tools_z)`** a účasť vo **VŠETKÝCH TROCH zoznamoch bariéry aktualizácie** — `SupplierSettingsDialog.close_plugin_dialogs`,
-`SupplierSettingsDialog.dialogs_closed?` a post-swap `Engine.close_all_dialogs` (guard test stráži všetky tri).
+**`Tools::ZDialog`** (Z posun v mm): callbacky **pred `show`**, unikátny `preferences_key`, `set_on_closed` → `nil`, `applyZ` pod
+`Engine.update_locked?(:tools_z)` a účasť vo **všetkých troch zoznamoch bariéry aktualizácie** (`SupplierSettingsDialog.close_plugin_dialogs`,
+`SupplierSettingsDialog.dialogs_closed?`, post-swap `Engine.close_all_dialogs`; guard test).
 
 ### snap_calc.rb
 
-**Čisté jadro** Snapera: AABB sweep nad odovzdanými obálkami v lokálnom ráme cieľa. Prekážka sa počíta, len keď sa jej rozsah kryje s cieľom v **hĺbke (Y) aj výške (Z)** — obyčajný
-dotyk nie je prekryv, takže podlaha ani už prisunutý sused bočný posun nebrzdia. **Kontajner NIE JE nikdy kandidát** (Codex #293 kolo 1): jeho obálka je **zjednotenie detí**, takže by
-miešala X jedného dieťaťa s Y/Z iného — dve skupiny, jedna blízko ale **mimo koridoru** (`y = 1000…1200`) a druhá ďaleko v koridore (`y = 0…600`), by dali medzeru podľa tej blízkej,
-ktorá skrinke vôbec nestojí v ceste. Kontajner je preto len **schránka na zostup** a gap počítajú až jeho **listy**, každý s vlastným testom koridoru. Obálka kontajnera slúži iba na
-**predvýber** (koridor + `reaches?` = „siaha až k vedúcemu okraju?") a tam je bezpečná, lebo je **nadmnožinou** detí — zamietnutie preto nikdy nevynechá dieťa, ktoré by sa do koridoru
-trafilo. Na **strope hĺbky (8)** platí obálka ako kandidát; môže byť únia, takže medzera vyjde nanajvýš **pesimisticky** (skrinka zastane skôr, nikdy nie v kolízii). `children` smie byť
-`Proc` — zostup je lenivý a forsuje sa až po prejdení oboch brán. Prahy: `TOUCH` 0,2 mm · `WARN` 10 m · `BLOCK` 20 m; `verdict` vracia `:none` · `:touching` · `:ok` · `:far` · `:too_far` a rozhoduje podľa **svetovej**
-vzdialenosti (pri škálovanej cudzej inštancii sa líši od lokálnej medzery).
+**Čisté jadro** Snapera: AABB sweep nad obálkami v lokálnom ráme cieľa. Prekážka sa počíta, len keď sa kryje s cieľom v **hĺbke (Y) aj výške (Z)** (dotyk nie je
+prekryv). **Kontajner nie je nikdy kandidát** — jeho obálka je zjednotenie detí; je len schránka na zostup (lenivý `children` `Proc`), gap počítajú **listy**,
+obálka kontajnera slúži len na predvýber (koridor + `reaches?`, nadmnožina). Na **strope hĺbky (8)** platí obálka ako kandidát (medzera nanajvýš pesimistická).
+Prahy: `TOUCH` 0,2 mm · `WARN` 10 m · `BLOCK` 20 m; `verdict` → `:none` · `:touching` · `:ok` · `:far` · `:too_far` podľa **svetovej** vzdialenosti.
 
 ### snaper.rb
 
-SketchUp vrstva Snapera — zbiera geometriu a rozhoduje **viditeľnosť**. Primárna cesta je `Model#drawing_element_visible?` (od SU 2020.0; pozná skryté tagy, **tag priečinky** aj
-nastavenia modelu), ale **pred SU 2026.0 hádže výnimku, keď je posledným prvkom cesty skupina/komponent** — a Snaper prechádza práve kontajnery. Volá sa preto **pod `rescue`**
-s fallbackom `hidden?` + `layer.visible?` + `Tags.folder_hidden?` **po celej ceste**; po prvej výnimke sa natívna cesta vypne **jednosmerným zámkom** (`@native_visibility`), aby
-každá prekážka neplatila cenu výnimky. **Obálka kontajnera sa odvodzuje rekurzívne z jeho VIDITEĽNÝCH listov** (plochy, hĺbka 8) — surové `definition.bounds` by nieslo aj skrytú
-geometriu a skrytý vnuk vo viditeľnej skupine by zastavil prisunutie skôr. Lacný predvýber používa `definition.bounds` ako **nadmnožinu** (kontajner mimo koridoru alebo celý za
-vedúcim okrajom sa nemusí prechádzať vôbec). **Tou istou traverzou sa počítajú aj bounds CIEĽA** — legacy bral surové `definition.bounds`, takže skrytý presahujúci potomok
-vybraného objektu posúval doraz.
-
-**S1-E (FIX E3) — NOXUN KORPUS sa meria LOGICKOU OBÁLKOU, nie geometriou.** Keď je cieľ **alebo prekážka** NOXUN skrinka s čitateľným configom, jej box dáva
-`CabinetBuilder.envelope` (nominálne `šírka × hĺbka × výška`) a traverza sa na ňu **vôbec nespustí**. Dôvod je slot umývačky: jeho čelo smie presahovať výšku
-linky a telo spotrebiča smie trčať do strany, takže skutočné bounds by zastavili prisunutie skôr, než sa skrinka dotkne. Vedľajší (žiadaný) dôsledok je, že
-výsledok **už nezávisí od toho, ktoré tagy má kto zapnuté** — vypnutý tag referencie doraz nemení. **Zmena správania:** do S1-E skracoval presahujúci *viditeľný*
-potomok cieľa doraz; odteraz je doraz vždy na nominálnej hrane. Viditeľnostná traverza ostáva plne v hre pre **cudziu geometriu** (skupiny, komponenty mimo NOXUN)
-na oboch stranách.
+SketchUp vrstva Snapera — zbiera geometriu a rozhoduje **viditeľnosť**: `Model#drawing_element_visible?` **pod `rescue`** (pred SU 2026.0 hádže výnimku pri
+kontajneri na konci cesty) s fallbackom `hidden?` + `layer.visible?` + `Tags.folder_hidden?` po celej ceste; po prvej výnimke sa natívna cesta vypne jednosmerným
+zámkom `@native_visibility`. Obálka cudzieho kontajnera = rekurzívne z **viditeľných** listov (hĺbka 8); predvýber cez `definition.bounds` ako nadmnožinu; tou
+istou traverzou aj bounds cieľa. **NOXUN korpus (cieľ aj prekážka) sa meria logickou obálkou** `CabinetBuilder.envelope` (nominálne š × h × v) — presahujúce
+čelo slotu umývačky ani telo spotrebiča doraz neskracujú a výsledok nezávisí od zapnutých tagov; traverza platí len pre cudziu geometriu.
 
 ### legacy_cleanup.rb
 
-**Boot migrácia starých inštalácií (T1b).** Mower a Snaper sú od NÁSTROJE-1 súčasťou balíka enginu, takže ich samostatné inštalácie musia z priečinka `Plugins` zmiznúť — inak
-SketchUp zaregistruje dva toolbary navyše. Migrácia odstráni **presne štyri ciele** (`noxun_mower_loader.rb` · `Noxun_Mower/` · `snaper.rb` · `snaper/`) v **odovzdanom** priečinku
-`Plugins` a beží z `main.rb` **PRED registráciou toolbarov**, vo vlastnom chránenom bloku (vzor `Materials.boot_cutover!`) — zlyhanie migrácie nikdy nezhodí menu, toolbar ani
-observer. **Prečo boot a nie updater:** pri aktualizácii (D-52) vykonáva swap ešte STARÝ kód v pamäti, takže nový `updater.rb` sa k slovu dostane až po reštarte; upratanie preto
-patrí na začiatok bootu NOVÉHO balíka. Modul je **čisté jadro** (žiadne `Sketchup.*`/`UI.*`, všetky cesty ako parametre, hlášky len konštanty) — o zobrazení rozhoduje tenký boot
-hook cez `message_for`. Boot volá **`boot!`**, nie `run!`: `boot!` si cestu markera vyberie z `path` a **zapamätá si ju spolu s výsledkom** (`boot_marker_path` / `boot_result`,
-read-only). Bez toho sa nedá spätne zistiť, kam sa naozaj písalo — `Materials.dir` sa dá presmerovať až PO boote (`test_dir_override`, sandbox APPDATA in-SU runnera), takže
-neskoršie `path` už môže ukazovať inam. Testy volajú `run!` priamo a tento záznam neprepíšu.
+**Boot migrácia starých inštalácií** Mowera a Snapera (sú súčasťou balíka enginu): odstráni **presne štyri ciele** (`noxun_mower_loader.rb` · `Noxun_Mower/` ·
+`snaper.rb` · `snaper/`) v odovzdanom priečinku `Plugins`; beží z `main.rb` **pred registráciou toolbarov** vo vlastnom chránenom bloku (zlyhanie nezhodí menu
+ani toolbar). Boot, nie updater — swap vykonáva ešte starý kód. **Čisté jadro** (cesty ako parametre, hlášky konštanty; zobrazenie cez `message_for`). Boot
+volá **`boot!`** (zapamätá `boot_marker_path` / `boot_result`), testy `run!`.
 
-**Zlyhanie nie je hotovo.** `FileUtils.rm_rf` chybu potlačí a vráti sa bez výnimky, preto má **každý cieľ postkontrolu existencie** a kľúč do markera sa zapíše **až po overenej
-neprítomnosti všetkých štyroch**. Zamknutý súbor (bežiaci SketchUp, antivírus, indexer) tak neskončí ticho označený za uprataný — výsledok nesie stav `failed` s cestami a migrácia
-sa zopakuje pri ďalšom boote. **Marker žije MIMO swapovaného stromu** (`%APPDATA%\NOXUN\Engine\legacy_cleanup.json`, `JsonFileStore` + `.bak`, zápis pod `Materials.with_catalog_lock`
-podľa R-08): v `Plugins` by ho aktualizácia zmazala spolu so stromom. Kľúčom je **normalizovaná cesta priečinka `Plugins`** (`Updater.normalize_path` + `downcase`) — jeden počítač
-môže mať viac verzií SketchUpu a každá inštalácia sa upratuje samostatne. Migrácia beží aj nad čistou inštaláciou (kľúč s prázdnym `removed`), takže sa priečinok neprehľadáva pri
-každom boote. **Vedomá odchýlka od R-11:** poškodený marker s platnou `.bak` zápisy NEZASTAVÍ — obsahom je len zoznam už uprataných ciest, jeho strata stojí nanajvýš jeden
-bezvýsledný prechod, kým zastavenie zápisov by migráciu nechalo bežať navždy.
-
-**Reštart je povinný:** po úspešnom mazaní ostávajú legacy toolbary v pamäti bežiaceho SketchUpu, preto hláška (log + status + `UI::Notification`, nikdy modal blokujúci boot)
-hovorí o reštarte. Je jednorazová sama od seba — po zapísaní kľúča končí ďalší boot stavom `skipped`. **Druhý kanál** je `INSTALL_noxun_engine.ps1`: maže tie isté štyri cesty s
-rovnakou postkontrolou, pri zlyhaní vypíše varovanie s cestami namiesto „HOTOVO" a končí **len** pokynom „Reštartuj SketchUp" (živý `load "noxun_engine.rb"` zanikol — v bežiacom
-procese držia `@loaded`/`file_loaded?` registráciu preskočenú, takže by toolbar nezaregistroval ani legacy toolbary neodstránil). Testy: `tests/pure/test_nastroje1b_legacy.rb` +
-in-SU sekcia `run_tools1b`.
+- **Zlyhanie nie je hotovo:** každý cieľ má postkontrolu existencie, kľúč do markera sa zapíše až po overenej neprítomnosti všetkých štyroch; inak stav `failed`
+  a opakovanie pri ďalšom boote.
+- **Marker mimo swapovaného stromu:** `%APPDATA%\NOXUN\Engine\legacy_cleanup.json` (`JsonFileStore` + `.bak`, zápis pod `Materials.with_catalog_lock`), kľúč =
+  normalizovaná cesta `Plugins` (`Updater.normalize_path` + `downcase`, každá inštalácia SketchUpu zvlášť). Vedomá odchýlka od R-11: poškodený marker s platnou
+  `.bak` zápisy nezastaví.
+- **Reštart je povinný** (legacy toolbary ostávajú v pamäti) — hláška log + status + `UI::Notification`, nikdy blokujúci modal. Druhý kanál je
+  `INSTALL_noxun_engine.ps1` (tie isté štyri cesty s postkontrolou, končí pokynom „Reštartuj SketchUp"). Testy: `tests/pure/test_nastroje1b_legacy.rb` +
+  in-SU `run_tools1b`.
 
 ## Inspector — kostra a kontexty
 
 ### Inspector — kostra (UI-B1, ui/js/shell.js)
 
-vľavo **rail** kontextov, vpravo jednoradová sticky hlavička (logo + identita + ⚠ chip) a obsah v **4 sektoroch** (`S1 Náhľad · S2 Základné · S3 Materiály · S4 Nastavenia`). Kostra
-v `panel.html` je **STATICKÁ** — prepínanie mení iba triedy a atribúty na `<body>`; `innerHTML` re-render kostry je zakázaný (zabil by listenery, otvorené comboboxy D-85, rozpísané
-hodnoty aj fokus) a stráži to guard test.
+**Čo to je:** vľavo **rail** kontextov (Korpus · Zóny · Čelá · Kovanie + prepínače kontrol a koliesko), vpravo jednoradová sticky hlavička (logo + identita +
+⚠ chip) a obsah v **4 sektoroch** `S1 Náhľad · S2 Základné · S3 Materiály · S4 Nastavenia`. Kostra v `panel.html` je **STATICKÁ** — prepínanie mení len triedy
+a atribúty na `<body>`; `innerHTML` re-render kostry je zakázaný (listenery, otvorené comboboxy, rozpísané hodnoty, fokus) a stráži to guard test.
 
-**Dva oddelené stavy** drží `NXShell`: `selectionMode` zo servera (`insert|cab|part|board` = dnešné body classes) a `viewContext` z UI (`korpus|zony|cela|kovanie`, platný LEN pri
-`cab`, zrkadlí sa do `data-view-ctx` na `<body>` — atribút, nie class, prežije prepis `body.className`).
+**Stav a identita:**
+- `NXShell` drží dva oddelené stavy: `selectionMode` zo servera (`insert|cab|part|board` = body classes) a `viewContext` z UI (`korpus|zony|cela|kovanie`, platný
+  len pri `cab`, zrkadlený do atribútu `data-view-ctx` na `<body>`), plus **typ označenej skrinky** (`setCabType` z `NX.loadSelected`).
+- **Identita výberu** (`<model_guid>|cab:<id>` / `…|part:<cab>/<role_key>` / `…|board:<id>` / `none`) sa odvodzuje v JEDINOM mieste `setUiMode(mode, sel)`.
+  **Nová identita ⇒ reset kontextu na Korpus** (aj vrstiev náhľadu `NXLayers.reset`); **echo push tej istej identity kontext ani zbalenia NEMENÍ**
+  (auto-apply, Späť/Znova, refresh katalógu). Dielec vynúti zónový náhľad; jednozónová skrinka auto-ukáže kartu Zóna.
+- **Identitu dokumentu nesie každý push** (`Panel.model_guid`) — ID (`CAB-001`, `BRD-001`) sú jedinečné len v rámci modelu. Hodnotou je token **`DocKey`**
+  ([model-a-identita.md](model-a-identita.md)), nie `Model#guid` (mení sa pri každom uložení); identita sa mení len s objektom modelu. Tú istú identitu nesú
+  asynchrónne callbacky panela (`clear_selection`, `nx_edge_toggle`, …) a server ich pri nezhode odmietne a len obnoví stav.
+- **Kontext, ktorý typ nemá** (`NX_CTX_LOCK`; dnes slot umývačky nemá Zóny): autoritou je **guard v `setCtx`** (klik, Enter, medzerník), `effectiveCtx()`
+  zakázaný kontext ticho zhodí na Korpus (pamäť ostáva) a tlačidlo dostane **dôvod** do bubliny aj `aria-label`.
 
-**Identita výberu** sa odvodzuje z payloadu (`<model_guid>|cab:<id>` / `…|part:<cab>/<role_key>` / `…|board:<id>` / `none`) v JEDINOM mieste zmeny režimu (`setUiMode(mode, sel)`).
+**Rail:**
+- Pri `part`/`board` ukáže **dočasnú položku** s krížikom a kontexty zosivejú (`aria-disabled`, guard v `setViewContext`). Krížik je samostatné `<button>` vedľa
+  ukazovateľa; dielec → `select_cabinet` → `handle_select_cabinet`, doska → `clear_selection` → `handle_clear_selection` (výber sa čistí pod
+  `suspend_selection_sync`, refresh `dedup: false`, žiadny undo krok). Krížik dosky **najprv flushne rozpísané edity** (`flushBoardEditsNow`) a nesie identitu
+  dosky (server overí, že je stále vybratá tá istá).
+- Popis kontextu a dôvod neaktívnosti idú do bubliny `.railtip` a `aria-label` (natívny `title` sa na raile nepoužíva).
+- **Prepínače kontrol** (rovnaký vzor, stav drží server — pull v `push_init`, push cez `NX.set…`): **ABS kontrola** `nx_edge_toggle` → `Engine.toggle_edge_check`
+  (`NX.setEdgeCheck`) · **Kontrola kresby** `railKresba` → `nx_grain_toggle` → `Engine.toggle_grain_check` (`NX.setGrainCheck`, `NXShell.grainRail`) ·
+  **Smer otvárania** `railSmer` → `nx_direction_toggle` → `Panel.handle_direction_toggle` → `Engine.toggle_direction_check` (`NX.setDirectionCheck`,
+  `NXShell.directionRail`). Detail kontrol: odseky `grain_check` / `direction_check` v [construction.md](construction.md).
+- **Flyout roh ABS** (`.railfly .railbtn::after` trojuholník + samostatné tlačidlo `#railAbsMore` cez pravý dolný kvadrant 17 × 16 px): klik na ikonu = toggle,
+  klik na roh = **3-stavové nastavenie — TO ISTÉ ako lišta sekcie Kontrola v Štúdiu** (markup zo zdieľaného `ui/js/edge_menu.js` `NXEdgeMenu.menuHtml`, štýly
+  v `panel.css`). Zápis `nx_edge_option` → `Panel.handle_edge_option` (whitelist kľúča, výslovný boolean, prísny guard dokumentu) → `Engine.set_edge_check_option`
+  (`%APPDATA%` + `broadcast_edge_check` obom oknám). Zatvára klik mimo a Escape (`bindEdgeMenu` v `boot.js`); **nikdy dve kópie naraz** (`Engine.close_edge_menu`).
+  Testy `tests/pure/test_abs_rail_3stav.rb`, `tests/js/test_abs_rail_3stav.js`, in-SU `run_d104`.
+- **Viditeľnosť tagov** (`railTagy` v obale `.railmenu`, nie `.railfly`): celé tlačidlo otvára okno so zoznamom NOXUN tagov (`#railTagsMenu`, čistý modul
+  `ui/js/tag_menu.js`). Zápis `nx_tag_visible` → `Panel.handle_tag_visible` (prísny guard, whitelist `Tags::KEYS`, výslovný boolean) → `Engine.set_tag_visible` →
+  `Tags.set_visible` (**jedna operácia = jeden krok Späť**) → `broadcast_tags`. Stav pull v `push_init` (`tags`) a push pri každom `push_selected`; `LayersObserver`
+  sa nepridáva (zmena v natívnom okne Tags sa prejaví pri ďalšom pushi). Checkbox „Zobraziť zóny (ghost)" (`#zonesChk`) je **druhý ovládač toho istého tagu**
+  (kľúč `zony`, `nxApplyTags`). Testy `tests/pure/test_d27_tagy.rb`, `tests/js/test_d27_tagy.js`, in-SU `run_d27`; modul `tags.rb` v [construction.md](construction.md).
+- **Koliesko** otvára modal `#cfgModal` (Vzhľad = téma · Rozmerové rady = editor `DimSeries` · O plugine = logo + verzia) — zámerne nie piaty kontext (nastavenia
+  počítača nepatria do stavového stroja a musia ísť aj bez výberu). Rady chodia v `push_init` (`ui_settings`) a malým pushom `NX.setUiSettings` (mení len
+  ponuky a stav prepínača). **Téma v tomto payloade nie je a nesmie pribudnúť** (`nxSyncThemeButtons` len presvieti tlačidlá). Testy
+  `tests/js/test_uib3_korpus.js`, `tests/pure/test_uib3_rady.rb`.
 
-**Identitu dokumentu nesie každý push** (`Panel.model_guid`) — ID sú jedinečné len v rámci modelu (`Ids.next_board_id` počíta v každom dokumente od začiatku), takže dva otvorené
-dokumenty bežne obsahujú `CAB-001` aj `BRD-001`; bez identity by prepnutie dokumentu vyzeralo ako echo push a panel by ostal v starom kontexte. Tú istú identitu nesú aj
-**asynchrónne callbacky panela** (`clear_selection`, `nx_edge_toggle`) a server ich pri nezhode odmietne a len obnoví stav: **nová identita ⇒ reset kontextu na Korpus**, **echo
-push tej istej identity kontext ani zbalenia NEMENÍ** (auto-apply, Späť/Znova, refresh po zmene katalógu). **Hodnotou poľa `model_guid` je od 1d/R-02b token `DocKey`**
-(kontrakt v [model-a-identita.md](model-a-identita.md)) — nie `Model#guid`, ktorý SketchUp mení pri KAŽDOM uložení: Ctrl+S do 400 ms po úprave poľa tak už nevyzerá ako prepnutie
-dokumentu (debounced edit prežije a `nxDropDocState` sa nespustí). Identita sa mení len s objektom modelu — uloženie, prvé uloženie ani Save As ju nerotujú.
-
-Pri `part`/`board` rail ukáže **dočasnú položku** s krížikom a kontexty **zosivejú** (guard v `setViewContext` + `aria-disabled`, vzor D-78 — HTML `disabled` sa nepoužíva); krížik
-pri dielci ide existujúcou cestou `select_cabinet` → `handle_select_cabinet`, pri doske novým `clear_selection` → `handle_clear_selection` (výber sa čistí pod
-`suspend_selection_sync` a refresh je `dedup: false` — vzor `Panel.show_insert`, žiadny zápis do modelu ani undo krok). Krížik dosky **najprv flushne rozpísané edity**
-(`flushBoardEditsNow` — 400 ms debounce; `NX.clearSelected` ich cez `cancelBoardEdits` inak ticho zahodí, rovnaký handshake ako majú relay cesty Štúdia) a **nesie identitu dosky**
-— callback HtmlDialogu je asynchrónny, takže server pred vyčistením overí, že je stále vybratá TÁ ISTÁ doska; inak výber nechá a panel len obnoví.
-
-Krížik je **samostatné `<button>` vedľa** ukazovateľa (tlačidlo v tlačidle je neplatné HTML a `span` s `role="button"` nejde aktivovať klávesnicou); popis kontextu aj dôvod jeho
-neaktívnosti idú do **vlastnej bubliny** `.railtip` a do `aria-label` — natívny `title` sa na raile zámerne nepoužíva (zdvojený tooltip). Akcie **z náhľadu** (klik na čelo, na
-hranu dielca/dosky, na zónu) najprv **rozbalia cestu k cieľu** (`nxRevealTarget` otvorí všetkých `<details>` predkov) — zbalený sektor by fokus zhltol a combobox by sa otváral z
-nulovej plochy.
-
-**Rail ABS kontroly** je funkčný prepínač (`nx_edge_toggle` → zdieľaná `Engine.toggle_edge_check`); stav si panel **nedrží** — pull v `push_init` (`edge_check`) a push cez
-`NX.setEdgeCheck`.
-
-**Od v0.7.28 má FLYOUT ROH** (kontrakt UI 2.0 „shell so stavom a šípkou", vedomá odchýlka UI-B1 tým zaniká): v pravom dolnom rohu ikony je malý **plný trojuholník** (pseudo-prvok
-`.railfly .railbtn::after`, 6 px — vzor flyoutu nástrojov SketchUp/Photoshop) a nad ním **samostatné tlačidlo `#railAbsMore`** pokrývajúce celý pravý dolný **kvadrant** (17 × 16 px
-— 6 px trojuholník by bol pre myš neterč; vnorené tlačidlo je neplatné HTML, preto sused v obale `.railfly`).
-
-Klik na ikonu = **toggle sa nemení**, klik na roh otvorí **3-stavové nastavenie** — a je to **TO ISTÉ nastavenie, aké má lišta sekcie Kontrola v Štúdiu**, nie druhá kópia: markup
-kreslí zdieľaný `ui/js/edge_menu.js` (`NXEdgeMenu.menuHtml`, líši sa len id uzla, trieda polohy `.ecmenu-rail` a meno handlera), štýly sú v **zdieľanom** `panel.css` (zámerne
-NEscopnuté pod `.nx-inspector` — satelitné okná o raile nevedia) a stav aj počty nesie výhradne server. Zápis ide `nx_edge_option` → `Panel.handle_edge_option` (whitelist kľúča +
-**výslovný boolean** + prísny guard dokumentu, hláška bez Overlay API) → **zdieľaná `Engine.set_edge_check_option`**, ktorá zapíše do `%APPDATA%` a **rozpošle nový stav obom
-oknám** (`broadcast_edge_check`) — preto sa zmena z railu okamžite prejaví v otvorenom Štúdiu aj naopak, vrátane živých počtov.
-
-Okno zatvára **klik mimo a Escape** (`bindEdgeMenu` v `boot.js`, vzor warnpanelu; fokus sa vracia na roh) a **nikdy nestoja dve kópie naraz** — otvorenie na jednom mieste zavrie to
-druhé (`nx_edge_menu_open` / `edge_menu_open` → `Engine.close_edge_menu(source)` → `NX.closeEdgeMenu`). Kľúč merača rohového kliku je vlastný (`rail:abs-nastavenie`). Testy:
-`tests/pure/test_abs_rail_3stav.rb`, `tests/js/test_abs_rail_3stav.js`, in-SketchUp sekcia `run_d104` (blok 9d).
-
-**Pod ňou stojí od v0.7.27 druhý funkčný prepínač „Kontrola kresby"** (`railKresba`, ikona `grain`, kľúč merača `rail:kresba`) — ten istý vzor s tou istou zdieľanou logikou, len
-pre smer kresby (`nx_grain_toggle` → `Engine.toggle_grain_check`, pull `grain_check`, push `NX.setGrainCheck`, prisvietenie z čistej `NXShell.grainRail`); detail je v odseku
-**grain_check**.
-
-**Pod ním stojí od KOV-A2b tretí funkčný prepínač „Smer otvárania"** (`railSmer`, ikona `direction`, kľúč merača `rail:smer`) — opäť ten istý vzor a tá istá zdieľaná logika, len
-pre smer otvárania čiel (`nx_direction_toggle` → `Panel.handle_direction_toggle` → `Engine.toggle_direction_check`, pull `direction_check`, push `NX.setDirectionCheck`,
-prisvietenie a bublina z čistej `NXShell.directionRail`); detail je v odseku **direction_check**.
-
-**Ďalšia funkčná položka je od v0.8.13 „Viditeľnosť tagov" (D-27)** — `railTagy` v obale `.railmenu`, ikona `eye`/`eye-off`, kľúč merača `rail:tagy`. **Nie je to toggle:** celé
-tlačidlo otvára **okno so zoznamom NOXUN tagov modelu** (`#railTagsMenu`, overlay pri raile — v obsahu panela nepribudol žiadny riadok), preto **nemá rohový trojuholník** a
-`aria-haspopup`/`aria-expanded` nesie samo; obal **nesmie** byť `.railfly` (ten kreslí `::after` trojuholník každému `.railbtn` v sebe). Markup kreslí čistý modul
-`ui/js/tag_menu.js` (`NXTagMenu.menuHtml` / `railState` / `togglePayload`) — **vlastný malý markup, nie zdieľaný `edge_menu.js`** (iné nastavenie; UI_DIZAJN §5.11: zdieľa sa zóna
-a správanie, obsah len keď je to to isté nastavenie).
-
-Cesta zápisu: `nx_tag_visible` → `Panel.handle_tag_visible` (**prísny guard dokumentu** + whitelist `Tags::KEYS` + **výslovný boolean**; odmietnutie nezapíše nič a len obnoví stav)
-→ zdieľaná `Engine.set_tag_visible` → `Tags.set_visible` (**jedna operácia = jeden krok Späť**, viditeľnosť tagu je zápis do .skp) → `broadcast_tags` → `Panel.push_tags`. Stav
-chodí **pull** v `push_init` (pole `tags`) a **pushom pri každom `push_selected`** — Späť/Znova (D-101), prepnutie dokumentu aj zmena výberu idú tou istou cestou, inak by ikona,
-okno aj checkbox ostali na opačnom stave než model. `LayersObserver` dávka **vedome nepridáva**: skrytie priamo v natívnom okne Tags sa prejaví až pri najbližšom pushi.
-
-**Jeden stav, dva ovládače:** checkbox „Zobraziť zóny (ghost) v modeli" (`#zonesChk`, sektor Náhľad) hovorí o tom istom tagu (`Noxun/Zóny`) — ide **tou istou** cestou s kľúčom
-`zony` a nasadzuje ho **ten istý** `nxApplyTags`. Preto zanikol callback `toggle_zones` (posielal holý reťazec bez identity dokumentu), handler `handle_toggle_zones`, pole
-`zones_visible` v `push_init` aj `Zones.set_visible`. Okno zatvára klik mimo a Escape (`bindTagMenu` v `boot.js`, vzor `bindEdgeMenu`). Detail modulu je v odseku **tags.rb**
-(`docs/architecture/construction.md`), UI vzor v `docs/UI_DIZAJN.md` §5.13. Testy: `tests/pure/test_d27_tagy.rb`, `tests/js/test_d27_tagy.js`, in-SketchUp sekcia `run_d27`.
-
-**Sektory sú `<details data-key="s1…s4">`** (zbalenie v `localStorage`, prežije echo aj zatvorenie panela); **viditeľnosť S2/S3 rozhoduje čistá funkcia `NXShell.sectorVis(mode,
-ctx)`** — Základné a Materiály sú vlastnosti SKRINKY a patria kontextu **Korpus** (+ vkladanie), v Zónach/Čelách/Kovaní ich nahrádza **tenký kontextový riadok `#ctxNote`** so
-súhrnom skrinky a preklikom cez `setViewContext('korpus')`; CSS pravidlá nad `#secBasic`/`#secMat` sú **zrkadlom** tejto funkcie (UI-B1 dala do CSS mapu len pre režim výberu a
-kontextovú časť ticho vynechala — odtiaľ regresia opravená v 0.7.8; guard v `tests/pure/test_uib1_kostra.rb` + matica v `tests/js/test_uib1_kostra.js`).
-
-Súhrn riadku skladá `NXShell.ctxNoteText` z rozmerov payloadu a popisu dekoru z katalógu (`sheetLabelOf`; prázdny `material_id` = „dekor dedí z projektu") — **žiadne nové serverové
-dáta**; riadok si nesie viditeľnosť inline (vzor `renderPartCard`), CSS ho v `part`/`board`/`insert` drží skrytý ako poistku; **skupiny S4 nesú `data-s4="<kontext>"`** a sú v rámci
-kontextu **EXKLUZÍVNE** (`NXShell.exclusiveClose`, kľúč `nxsec_s4.<ctx>.<key>`), výnimka `data-s4-solo` (strom zón) — sektory samotné sú nezávislé.
-
-**Lišta každého sektora nesie vpravo META SÚHRN** toho, čo je vnútri (S1 názov kreslenej projekcie · S2 „900 × 720 × 560 · sokel 100" · S3 popisy materiálov · S4 otvorená skupina
-menom, inak počet zbalených) — vidno ho rovnako zbalený aj rozbalený (vzor mockupu). Texty skladá **čistá funkcia `NXShell.sectorMeta`** (bez DOM, testovaná v
-`tests/js/test_uib_meta.js`), stav do nej číta `nxSectorMetaApply` **zo ŽIVÉHO panela** (polia S2, materiálové selecty S3, otvorený `<details>` v S4) — **žiadna cache textu**
-(hotový reťazec by po premenovaní dekoru ukazoval starý názov, lekcia Codex #171 P2) **a žiadne nové serverové dáta**.
-**Názov otvorenej skupiny (S4) berie `NXShell.groupTitle` LEN z priamych textových uzlov `<summary>`** — `textContent` celej hlavičky by od D-130a pribral aj `.gtools`, takže
-lišta hlásila „Čelá 3 čelá · 1 bez smeru všetkým" a „Spoločné pre skrinku dub Halifax · 3 · 2/2/0/0". Ikona je `<svg>`, meta `<span>` a akcie `<button>` — elementy vypadnú samy,
-skupiny bez `.gtools` dávajú presne to, čo dávali predtým. **Pravidlo pre nové hlavičky:** názov skupiny musí zostať priamym textom `<summary>`, nie zabalený v elemente.
-
-Obnovuje sa na troch miestach: `nxShellApply` (režim, kontext, každý push), **jeden delegovaný `input`/`change` listener** na ID polí a selectov (meta je len zobrazenie — do
-zapisovacích ciest `form.js`/`materials.js` nesiaha) a `toggle` v `bindDetails` (`toggle` nebublinkuje, delegácia ho nezachytí).
-
-**Scroll ostáva dokumentový** (rail je `position: fixed` ľavý stĺpec, hlavička sticky, `scroll-padding-top` a warnpanel je od UI-D3 **overlay v hlavičke**, takže `scrollTo` pri
-otvorení zaniklo). CSS kostry je scopnuté pod `.nx-inspector` na `<html>` — `panel.css` zdieľajú satelity. Pätička s verziou (z Ruby); fit žije od UI-B2 v spodnom páse náhľadu (nie
-ako rohový overlay); náhľady `#partSvg`/`#boardSvg` patria do S1, karty s poľami do S4. Čisté jadro testuje `tests/js/test_uib1_kostra.js`, kontrakt kostry
-`tests/pure/test_uib1_kostra.rb`, serverovú stranu sekcia `run_uib1` in-SketchUp runnera. Náhľad so zoom/pan/fit v `preview.js` (výška rastie s oknom panela, debounce prekreslenia
-500 ms). Karta zóny pod náhľadom; karta dielca s omrvinkou ‹CAB›; karta Doska v `board_card.js` s guardom oneskorených zápisov (echo board_id).
-
-**Vkladacia karta dosky (tiež `board_card.js`) drží rozpísané hodnoty proti živému refreshu katalógu** (`NX.setMaterials` → `refreshInsertBoardMaterials`): katalógová predvoľba sa
-do poľa zapíše len vtedy, keď na to má právo — hrúbka podľa `insertThicknessShouldWrite` (E-03: pri nezmenenom UNI materiáli drží draft), **smer dekoru podľa
-`insertGrainShouldWrite` (D-86: pri nezmenenom materiáli drží vedomú voľbu — príznak „používateľ siahol" z `onchange`, ktorý po dosadení predvoľby padá)**. Hrúbkový guard sa na
-smer použiť NEDÁ (pri rovnakom reálnom materiáli vracia `true`, lebo pole je zamknuté — smer sa však dá meniť pri každom materiáli).
-
-**Marker „pre ktorý materiál je pole zosynchronizované" je VLASTNÝ pre každé pole** a pri zápise potlačenom výhradne fokusom sa **neposúva** (`insertMatMarkAdvances` — Codex #163
-P2): inak by sa výmena materiálu počas fokusu stratila a ďalšie refreshe by ju tvárili ako „bez zmeny". Odložený zápis dokončí `onblur` selektu alebo ďalší refresh. Všetky funkcie
-sú čisté (krok smeru celý ako automat `insertGrainSync`) a testované (`tests/js/test_e03_board_insert.js`).
-
-**UI-C1b** vkladaciu kartu prekreslila (segmentové tlačidlá typu, dlaždice šablón, dvojstĺpcové rozmery dosky, projekcia `insert`) — detail je v odseku **„Vkladacia karta —
-šablóny, typ a doska“** nižšie.
-
-**S1-E — kontext, ktorý TYP korpusu NEMÁ.** `NXShell` drží popri režime aj **typ označenej skrinky** (`setCabType` z `NX.loadSelected`, hodnota z payloadu) a
-`NX_CTX_LOCK` menuje kontexty, ktoré daný typ nemá — dnes **slot umývačky nemá Zóny**. Autoritou je **guard v `setCtx`**, nie CSS ani `aria-disabled`:
-klik, Enter aj medzerník končia tam (vzor D-78). `effectiveCtx()` zapamätaný, ale zakázaný kontext **ticho zhodí na Korpus** (pamäť sa tým nemení — návrat na
-dolnú skrinku zámok pustí) a `nxShellApply` dá tlačidlu vlastný **dôvod** do bubliny raily aj do `aria-label` („Zóny — slot umývačky zóny nemá"), nie len sivú
-farbu. Čelá a Kovanie ostávajú pri slote **aktívne** (jedno čelo, úchytka).
+**Sektory:**
+- `<details data-key="s1…s4">`, zbalenie v `localStorage`. Viditeľnosť S2/S3 rozhoduje čistá **`NXShell.sectorVis(mode, ctx)`** — Základné a Materiály patria
+  kontextu **Korpus** (+ vkladanie); v Zónach/Čelách/Kovaní ich nahrádza riadok **`#ctxNote`** (`NXShell.ctxNoteText`, preklik na Korpus). CSS nad
+  `#secBasic`/`#secMat` je **zrkadlom** tejto funkcie (guard `tests/pure/test_uib1_kostra.rb` + matica `tests/js/test_uib1_kostra.js`).
+- Skupiny S4 nesú `data-s4="<kontext>"` a sú v rámci kontextu **exkluzívne** (`NXShell.exclusiveClose`, kľúč `nxsec_s4.<ctx>.<key>`), výnimka `data-s4-solo`.
+- **Lišta sektora nesie META súhrn** (`NXShell.sectorMeta`, čítaný živo z panela cez `nxSectorMetaApply` — žiadna cache textu, žiadne nové serverové dáta);
+  obnovuje ho `nxShellApply`, jeden delegovaný `input`/`change` listener a `toggle` v `bindDetails`. **Názov skupiny S4 berie `NXShell.groupTitle` len
+  z priamych textových uzlov `<summary>`** — pravidlo pre nové hlavičky: názov musí ostať priamym textom, nie v elemente.
+- Akcie **z náhľadu** najprv rozbalia cestu k cieľu (`nxRevealTarget`).
+- Scroll je dokumentový (rail `position: fixed`, hlavička sticky, warnpanel je overlay v hlavičke). CSS kostry je scopnuté pod `.nx-inspector` na `<html>`.
+  Pätička s verziou z Ruby. Testy: `tests/js/test_uib1_kostra.js`, `tests/pure/test_uib1_kostra.rb`, in-SU `run_uib1`.
 
 ### D-08 kontexty
 
-Korpus·Zóny·Čelá·Kovanie: režimové taby v hlavičke **nahradil rail** (UI-B1) a atribút `data-cab-tab` sa premenoval na `data-view-ctx`. Kontext prepína náhľad AJ viditeľné skupiny
-S4 cez CSS; v `preview.js` ostal už len prevod `cabTabPreview(ctx)` → režim náhľadu (`cab | zones | fronts | hw`). Kontext sa **nepamätá cez zmenu výberu** — nová identita ho
-vracia na Korpus (A1); dielec vynúti zónový náhľad; jednozónová skrinka auto-ukáže kartu Zóna (D-03).
+Korpus · Zóny · Čelá · Kovanie sú tlačidlá **railu** (atribút `data-view-ctx`). Kontext prepína náhľad AJ viditeľné skupiny S4 cez CSS; v `preview.js` je len
+prevod `cabTabPreview(ctx)` → režim náhľadu (`cab | zones | fronts | hw`). Kontext sa **nepamätá cez zmenu výberu** (nová identita → Korpus).
 
-### Obsah Korpusu — Základné v dvoch stĺpcoch + koliesko (UI-B3, ui/js/settings.js)
+### Kontext Korpus (UI-B3, ui/js/settings.js · form.js · core.js · bridge.js)
 
-sektor **Základné** je `.basicgrid` — **vľavo VSTUPY** (Šírka·Výška·Hĺbka·Sokel·Hrúbka; kompaktné riadky `.rowc` s ikonou zo spritu), **vpravo `.infocol` = dopočítané ÚDAJE ako
-TEXT** (Vnút. šírka · Vnút. hĺbka · Úložná výška · Dielcov · Materiál m² · Hmotnosť „—"). Zásada „**výstupy nikdy nevyzerajú ako vstupy**": tri readonly `<input>`y svetlých
-rozmerov sa stali `<b>` s **rovnakými ID** (`av_width`/`av_depth`/`av_height`) a zapisuje ich `setOut()` (textContent), nie `setVal()`.
+**Čo robí:** sektory **Základné** (rozmery a dopočítané údaje), **Materiály** (telo/čelá/chrbát) a **Nastavenia** (skupiny Strop · Dno & podstavec · Chrbát)
+označenej alebo vkladanej skrinky. Dáta: `cabinet_payload` (`payloads.rb`), zápis auto-apply cez `apply` (`actions_cabinet.rb`).
 
-**Polia si držia svoje ID aj svoju change cestu** (`oninput="onField()"`, zámky D-39, výrazy `expr.js`) — dávka do nich nesiahla.
+**Základné** je `.basicgrid` — **vľavo VSTUPY** (Šírka · Výška · Hĺbka · Sokel · Hrúbka; `.rowc` s ikonou), **vpravo `.infocol` = dopočítané ÚDAJE ako TEXT**
+(Vnút. šírka · Vnút. hĺbka · Úložná výška · Dielcov · Materiál m² · Hmotnosť). **Výstupy nikdy nevyzerajú ako vstupy** (`<b>` s ID `av_width`/`av_depth`/
+`av_height`, zapisuje `setOut()`). Polia držia ID aj change cestu (`oninput="onField()"`, zámky D-39, výrazy `expr.js`; každé číselné pole v `#basicCard` musí
+byť v `bindExprFields` — guard `test_rohb1_ovladace.js`, výnimka `aprMountVal`).
+- **Rozmerový rad** je len PONUKA (`.pbtn` → `.miniopts`, najviac jedna otvorená): voľba zapíše hodnotu a vystrelí pôvodný `input`. Žiadna nová zapisovacia
+  logika; **hrúbka rad nemá** (určuje ju materiál).
+- **Čísla informačného stĺpca počíta server**: `parts_count` + `parts_area_m2` + `weight_kg` / `weight_estimated_parts` / `weight_estimated_density` z
+  `Panel.cabinet_stats` (čisté čítanie snapshotov s filtrom ako `Bom.collect`; hmotnosť cez `Bom.weight_totals` — jeden vzorec pre plán aj Inspector), tranzientné.
+  **Hmotnosť** formátuje čistá **`nxCabWeight(c)`** (`core.js`): `12,4 kg` · `≈ 12,4 kg` s tooltipom o odhade · `—` bez dát; zapisuje `setCabInfo` v `bridge.js`
+  a `setCabInfo(null)` z `loadBoard`/`clearSelected`; vo vkladaní sa vynuluje; nie je klikateľná.
+- **Klikateľné sú len údaje, ktoré niekam vedú:** „Dielcov" → `nx_select_parts` → `Panel.handle_select_parts` (zmena výberu pod `suspend_selection_sync`, žiadny
+  undo krok, prísny guard `model_guid` + `cabinet_id`, **flush handshake ako „Vložiť kópiu"** — červené pole akciu zastaví) · „Materiál" → `openStudio('bom',
+  cabinet_id)` (Štúdio na Kusovníku, ID skrinky predvyplní hľadanie). Bez označenej skrinky `aria-disabled`.
+- **Riadok Nohy** (`#legsRow`, cez oba stĺpce, jeden riadok, dlhý názov orezaný s `title`): povie, aké nohy skrinka dostane. **Text skladá SERVER**
+  ([hardware.md § `legs_summary`](hardware.md)), `tone: 'warn'` = trieda `.warn`, `tone: 'none'` riadok skryje; viditeľnosť ide s riadkom Sokel
+  (`nxLegsApplyVisibility`). (a) **Označená skrinka:** `legs_summary` z `HardwareSets.legs_summary_from_purchase(params['hardware'])` + select setu nôh
+  (`hwCabOptionList` + `hwSetSelectHtml`, zápis existujúcou akciou `set_hardware_set`); `renderLegsRow` beží až za `renderHardware`. (b) **Vkladanie:** čítací
+  callback `insert_legs_preview` → `handle_insert_legs_preview` (žiadna operácia, žiadny zápis), odpoveď `NX.insertLegsPreview` s generáciou `gen`; payload
+  `INSERT_LEGS_KEYS` = `type · width · height · depth · floor_height · plinth_mode` + `INSERT_LEGS_HW_KEYS` = `hardware_sets · hardware_set_defs` šablóny
+  (zdroj `NXInsert.hardwarePayload()`), debounce 150 ms; jeden zdroj `nxLegsInsertDims()` plní payload aj kľúč `nxLegsInsertPeek`. Server: `CabinetBuilder.normalize`
+  + `Construction.cabinet_hw_ctx` + `HardwareRules.evaluate` + `Panel.item_purchase`; kovanie šablóny číta `insert_legs_template_hw` **tou istou bránou ako vklad**
+  (`read_template_mapping` + `assess_set_defs`) a ide do `HardwareSets.state_with_template_sets` ako prospektívny stav. Override sa vo vkladaní neponúka.
+  **Text je VÝSTUP** — do `collectAll()` ani vkladacieho payloadu sa nedostane (`test_kovg2_nohy_ui.js`, `test_insert_state.js`). **Odchod z riadku = skryť aj
+  zneplatniť** (`nxLegsInsertReset` z `loadSelected`, `loadBoard`, `clearSelected`, `materializeInsertBoardCard` a prechod na hornú skrinku zdvihne generáciu);
+  odpoveď sa prijme len pri type s nohami (`LEGS_INSERT_TYPES` = `lower`, `corner_blind`). `NX.setHardwareSets` prekreslí vetu pri označenej skrinke a bez nej
+  volá `nxLegsInsertInvalidate` (mapovanie, definícia setu a názvy nie sú v kľúči).
+- **Krížová kontrola výšky** (`form.js` `cabinetHeightError` na konci `validateFields`): výška je **celková vrátane sokla**; `markHeightError` zočervená
+  **dvojicu Výška + Podstavec** s dôvodom v `title`, apply sa zablokuje. Zrkadlo dvoch Ruby pravidiel cez zdieľanú `nxInteriorZ` (`core.js`): svetlé vnútro
+  `<= MIN_AVAIL_H` (10 mm) a pri vrchu „dve výstuhy" `NX_MIN_INTERIOR_H` (20 mm) — zhodu stráži `tests/pure/test_s1e0_min_vyska.rb`. **Prázdne pole nie je nula:**
+  `cabFieldOrDefault(id)` číta `DEFAULTS[getType()]` (= `CabinetBuilder::LOWER_DEFAULTS` / `UPPER_DEFAULTS` zo `sync.rb`); kým predvoľby neprišli, kontrola mlčí.
+  JS sada `tests/js/test_s1e0_min_vyska.js`.
+- **Typ badge** v hlavičke je readonly (`nxCabInfo(c).type`; popisky typov v jedinej mape `NX_TYPE_LABEL`) — typ určuje šablóna/vkladanie. Mini-modal „Uložiť ako
+  šablónu" nesie **Názov + Typ** (`handle_save_template_as`, whitelist) a drží identitu skrinky aj dokumentu (`tplModalGuid`); červené pole uloženie zastaví.
 
-**Rozmerový rad (N6)** je len PONUKA: šípka `.pbtn` otvorí `.miniopts` (naraz najviac jedna, klik mimo zatvára), voľba **zapíše hodnotu do poľa a vystrelí pôvodnú udalosť `input`**
-— ďalej beží presne to, čo pri písaní rukou (validácia, expr hint, debounce apply, synchronizácia zámkov).
+**Rohová skrinka** (`#cornerRow` nad Nohami, slúži označenej aj vkladacej karte): **Dverová časť** · **CR 1 / CR 2** (`.crin`) · prepínač strany
+(`#cornerSideL`/`#cornerSideR`, `aria-pressed`) · `?`. Viditeľnosť rieši `applyVisibility`, stav prepínača `nxCornerRowSync` z registra `cornerDraft`. Polia idú
+bežnou cestou poľa (výrazy, validácia, debounce, `CONSTRUCTION_FIELDS` s `only`; `CORNER_FIELDS` sa validujú len pri rohovej).
+- **`cabinetCornerError`**: rozsah poľa (`CORNER_RANGES` 250–800 / 50–250) a **najmenšia šírka** `D + c1 + th2 + 2t` = presne `Construction.corner_fit_width`
+  (`nxCornerMinWidth` / `nxCornerFitError`, tá istá veta ako server); pri nezmestení červená šírka, dverová časť a CR 1 (`nxCornerBoxesSync`), veta ide do
+  `nxCabFieldError`. Hrúbky: th2 z payloadu (`corner_th2`) alebo `corner_ctx` preflightu, t pri vkladaní z `corner_ctx`, inak z poľa (`nxCornerT`).
+- Výstup **„Šírka dverí"** (`#infCornerDoor`, len pri označenej rohovej; číslo `corner_preview.door_w` zo servera, „—" kým nepríde; klik `onInfoCornerDoor` → Čelá,
+  karta F1). Súhrn lišty nesie „dvere vľavo 450" (`nxMetaDims` → `corner`).
+- **Prepínač strany `onCornerSide`:** klik na zvolenú stranu nič nerobí. Označená rohová: najprv `nxCabinetAction` (dopíše rozpísané, červené pole zastaví; počas
+  debounce či odoslaného apply sa vykoná po potvrdenom apply), potom `sketchup.corner_side` s `switch_token` a **len** `{cabinet_id, corner_side, switch_token,
+  model_guid}`; novú stranu ukáže až push servera. Kým beží (`cornerSwitch`): skupiny Čelá zamknuté (`nxCornerSwitchLock` — `inert` + `aria-busy`), auto-apply
+  sa odkladá (natívna kópia dostane `invalid`), iné akcie čakajú, druhý klik nič nepošle. Koniec = korelovaná `NX.cornerSideResult` (cudzí token sa ignoruje;
+  pri `holdDraft` sa čelá, strana a otvor prevezmú zo servera a až potom ide odložený apply) alebo zmena identity (`nxFrontDraftReset`). Vkladanie: zmena
+  registra + zrkadlo návrhu čiel (odsek „Vkladacia karta").
 
-**Žiadna nová zapisovacia logika a žiadny callback do Ruby pri výbere hodnoty.** Hrúbka rad zámerne NEMÁ (určuje ju materiál — D-45). Čísla informačného stĺpca počíta **server**:
-`cabinet_payload` nesie `parts_count` + `parts_area_m2` z `Panel.cabinet_stats` — čisté čítanie snapshotov dielcov s **rovnakým filtrom ako `Bom.collect`** (`kind=part` +
-`manufactured` + `production_class=sheet`, takže proxy kovania sa do počtu nedostane); hodnoty sú **tranzientné** (do configu ani snapshotu sa neukladajú, žiadna zmena schémy).
+**Slot umývačky** (ten istý `.basicgrid`, iný obsah): vľavo Trieda (`dw_class` 600/450) · Šírka · **Výška linky** (`height`, `#lblHeight`) · Hĺbka · **Telo V**
+(`dw_body_height`) · **Sokel** (`dw_front_bottom`); vpravo výstupy Telo · **Čelo V** · **Medzera hore** (tlačidlo `onInfoDwGap` → Čelá, pole „hore") · **Pod
+doskou** (jantár pri ✗) · Trieda · Dielcov · Hmotnosť čela.
+- **Všetky čísla počíta server** (`Panel.slot_payload`), zapisuje `renderSlotInfo` v `bridge.js`. **Čelo V je stav poslednej stavby** (`dw_front_height`,
+  `slot_front_info`); odvodená hodnota cez `CabinetBuilder.dw_front_eval`. „Pod doskou" = ten istý predikát ako Kontrola `dw_height_fit`.
+- Krížová kontrola pri slote vráti vetu `nxSlotFrontEval` (zrkadlo `dw_front_eval`, rozsah 300–1200) a `markHeightError` označí Výšku linky + Sokel slotu;
+  schéma medzier slotu skryje „medzi" a „dole" (`SLOT_HIDDEN_GAPS`).
+- **Polia slotu sa validujú len v type `dishwasher`** (`SLOT_FIELDS` — skryté pole by inak blokovalo inú skrinku); pri prepnutí na slot `nxFillSlotFields` dosadí
+  do prázdneho/mimorozsahového poľa `DEFAULTS.dishwasher` (= `CabinetBuilder::DISHWASHER_DEFAULTS`), platnú hodnotu neprepíše; `applyInsertLockValues` pri slote
+  nedosadzuje zámok hrúbky ani sokla (`SLOT_NO_LOCK`).
+- **Viditeľnosť riadkov má jednu autoritu `applyVisibility(t)`** (`SLOT_ONLY_ROWS` / `SLOT_HIDDEN_ROWS`): slot nemá Sokel korpusu `#fhRow`, soklovú skupinu,
+  Hrúbku, vnútorné rozmery, Úložnú výšku, Materiál m², Nohy ani riadky komína a zapustenia. **Limity sú per typ** (`TYPE_LIMITS`: šírka 300–1200, výška linky
+  500–1200 = `CabinetBuilder::DW_WIDTH_RANGE`/`DW_HEIGHT_RANGE`); kontrola výšky proti soklu sa slotu netýka.
 
-**KOV-W / D-125 — riadok „Hmotnosť" (v0.9.47).** Ten istý kanál: `cabinet_stats` posiela navyše `weight_kg` + `weight_estimated_parts` + `weight_estimated_density`
-(`Bom.weight_totals` nad TÝMI ISTÝMI snapshotmi — panel nič nepočíta, jeden vzorec pre plán aj Inspector). Text aj tooltip skladá **čistá funkcia `nxCabWeight(c)`**
-(`core.js`, Node test): `12,4 kg` · `≈ 12,4 kg` s tooltipom „Hmotnosť je odhad — N dielcov bez hustoty; ráta sa <hustota> kg/m³ (ťažšia hodnota)" · `—`, keď skrinka nemá
-výrobné dielce alebo údaj chýba (radšej pomlčka než vymyslené číslo). Zapisuje ho **`setCabInfo` v `bridge.js`** — teda cesta OZNAČENEJ skrinky (`loadSelected`), a s ňou aj
-`setCabInfo(null)` z `loadBoard`/`clearSelected`: bez resetu by riadok držal hmotnosť predtým označenej skrinky (JS sada preto testuje celý tok payload → riadok, nie len
-formátovač). Riadok **nie je klikateľný** (nie je kam viesť) a vo VKLADANÍ sa **vynuluje** — odhad zo šablóny nemá (materiály sa riešia až pri vložení). Vertikálny priestor
-panela sa nemení: riadok existoval od UI 2.0 ako placeholder.
+**Nastavenia korpusu** (skupiny Strop · Dno & podstavec · Chrbát):
+- **Strop:** `#topSetbackRow` „Zapustenie vpredu" (`top_front_setback`) pod Konštrukciou; pri „Bez stropu" ho `toggleTopSetback` skryje a hodnota sa pamätá.
+- **Chrbát:** `#backSetbackRow` „Komín vzadu" (`back_setback`) má pevné miesto pre každý režim chrbta; tooltip `#backSetbackTip` skladá `backSetbackTipText`
+  (minimum podľa režimu a voľný kanál). Select `#back_mode`: Naložený · Vložený · V drážke · **Z líšt** (`rails`) · Bez chrbta. `#backRailRow` „Výška líšt"
+  (`back_rail_height`) sedí na mieste `#backThRow` (nikdy nie naraz; `toggleBackTh`, hodnoty sa pamätajú). **H sa validuje len pri aktívnych lištách**
+  (`RAIL_FIELDS` + `backRailsActive`) a skryté neplatné H `collectConstruction` neposiela. Veta pod materiálom chrbta `#cabBackNote` (`backMaterialNote`):
+  „(nepoužije sa — chrbát z líšt je z korpusu)" / „(nepoužije sa — bez chrbta)".
+- **Súhrn v zbalenej hlavičke** (`#topMeta`, `#backMeta`, `.ghdr` + `.gtools`) len pri nenulovej hodnote (`setbackMetaTexts`). Slot umývačky riadky skrýva.
+- **JS zrkadlá** (`core.js`): `nxBackSetback`/`nxTopFrontSetback` (0–300), `nxBackStop`, `nxSideDepth`, **`nxInteriorDepth`** (jediná JS autorita Vnút. hĺbky;
+  pri lištách `R − t`), `nxRailGeom`, `nxBackRails`, `nxBackRailHeight` (20–300, inak 100), `nxSetbackError` = `nxSetbacksOnlyError || nxBackRailsError` = tie isté
+  vety ako Ruby `Construction.setback_error` (fixtúry `tests/fixtures/kona_cases.json`, `konb_cases.json`). Validácia `cabinetSetbackError` / `cabinetCheckCarcass`
+  (neskončí pri X = Y = 0, keď sú lišty) zočervená pole komína/zapustenia či lišty (`markRailError`) a veta ide do stavového riadku.
+- **Tri JS zoznamy mimo `CONSTRUCTION_FIELDS`** musia niesť nové polia konštrukcie: most `currentCarcass`, `pvGeom` (cez `pvSetbackDepths` — hĺbky dielcov pre
+  odhad `nxDraftStats`) a `bindExprFields` (boot.js). **Riedky config:** položky `CONSTRUCTION_FIELDS` nesú `dflt` (0, lišty 100), takže skrinka bez kľúča pole
+  nastaví na predvoľbu — inak by apply ticho zapísal hodnotu predtým označenej skrinky. Testy `tests/js/test_kona_komin.js`, `tests/js/test_konb_listy.js`.
 
-**KOV-G2 — riadok „NOHY" (v0.9.60, D-111).** Pod rozmermi stojí **jeden** riadok `#legsRow`, ktorý povie, **aké nohy skrinka pri tejto výške sokla a šírke dostane** — dovtedy sa
-to dalo zistiť až v Nákupe (predvoľba setu podľa sokla žila schovaná v Predvoľbách projektu). Ide **cez oba stĺpce mriežky** (`grid-column: 1 / -1`): text kovania sa do úzkeho
-rozmerového stĺpca nezmestí a select setu potrebuje miesto vpravo. Žiadny nadpis navyše, žiadny druhý riadok — dlhý katalógový názov sa **oreže** (`text-overflow`) a celý ostáva
-v `title`. Viditeľnosť ide s riadkom **Sokel** (`applyVisibility` → `nxLegsApplyVisibility`: horná skrinka a doska riadok nemajú) a navyše zmizne pri `tone: 'none'` (skrinka bez
-podstavca) — vertikálny priestor je vzácny. **Text skladá SERVER** ([hardware.md § `legs_summary`](hardware.md)), panel z položiek nič neodvodzuje; `tone: 'warn'` len pridá triedu
-`.warn`.
-
-Riadok má **dve cesty a jeden vzhľad.** (a) **OZNAČENÁ skrinka:** `cabinet_payload` nesie `legs_summary` — a skladá ho `HardwareSets.legs_summary_from_purchase(params['hardware'])`,
-teda z **už rozpísaných** položiek (`purchase`), takže riadok a rozklik položky v Kovaní sa nemôžu rozísť a katalóg sa nečíta druhý raz. `loadSelected` volá `renderLegsRow` **až za**
-`renderHardware` (berie si z neho `HW_SET_OPTIONS`) a doplní **select setu nôh** = ten istý ovládač ako v Kovanie → Sety (`hwCabOptionList` + `hwSetSelectHtml`, zápis existujúcou
-akciou `set_hardware_set` — **žiadny nový zapisovací callback**), preto sa zmena na jednom mieste objaví aj na druhom (obe kreslí server push). (b) **VKLADANIE:** text chodí
-z čítacieho callbacku **`insert_legs_preview`** (`panel.rb` → `handle_insert_legs_preview`, vzor `hw_manual_search`): **žiadna operácia, žiadny zápis, žiadny krok Späť**, odpoveď
-kanálom `NX.insertLegsPreview` s **generáciou dotazu** (`gen`) — staršie kolo sa zahadzuje, inak by pomalšia odpoveď prepísala čerstvejšiu. Klient posiela **uzavretý** payload
-`INSERT_LEGS_KEYS` = `type` · `width` · `height` · `depth` · `floor_height` · `plinth_mode` (debounce 150 ms, a len keď sa niektorá z týchto hodnôt naozaj zmenila) a server z neho cez
-`CabinetBuilder.normalize` + `Construction.cabinet_hw_ctx` ([construction.md](construction.md)) + `HardwareRules.evaluate(cfg, [], ctx)` + `Panel.item_purchase` (tá istá funkcia ako
-v karte) postaví `legs_preview_summary`. **Override sa vo vkladaní neponúka** — set sa mení až na vloženej skrinke. Kým odpoveď nepríde (starší plugin bez callbacku), v riadku
-stojí „—". **PASS-THROUGH GUARD:** text je VÝSTUP — do `collectAll()` ani do vkladacieho payloadu sa nedostane nič z neho (`test_kovg2_nohy_ui.js`, `test_insert_state.js`).
-
-**ROH-B1 — RIADOK ROHOVEJ (`#cornerRow`, mockup B1 / A1).** Nad riadkom Nohy stojí pri rohovej **jeden** riadok cez oba stĺpce: **Dverová časť** · **CR** (CR 1 s ikonou
-šírky, CR 2 s ikonou hĺbky v rámikoch `.crin`) · **prepínač strany** (`#cornerSideL`/`#cornerSideR`, ikony `corner-l`/`corner-r`, `aria-pressed` + `.on`) · `?`. Ten istý
-riadok slúži **označenej rohovej aj vkladacej karte** (`#basicCard` je spoločný). Viditeľnosť rieši **jediná autorita** `applyVisibility` (`hidden` pri inom type),
-stav prepínača `nxCornerRowSync` z registra `cornerDraft` (`nxCornerSide`). Polia idú **bežnou cestou poľa** (`oninput="onField()"`, výrazy cez `bindExprFields` v `boot.js`
-— rozpísaný výraz „600+" nič neodošle, Enter/blur ho potvrdí; predrecenzia P2-1 —, validácia, debounce apply, zber cez `CONSTRUCTION_FIELDS` s `only`).
-Každé číselné pole v `#basicCard` musí byť v `bindExprFields` (guard v `test_rohb1_ovladace.js`; výnimka popover osadenia `aprMountVal`, ktorý zapisuje
-len tlačidlo); tým dostali výrazy aj polia slotu `dw_body_height` a `dw_front_bottom`. **Krížová kontrola `cabinetCornerError`** (v `validateFields`, len pri rohovej): veta k poľu mimo rozsahu
-(`LIMITS` = `CORNER_RANGES` 250–800 / 50–250, validujú sa len pri rohovej — `CORNER_FIELDS`, vzor `SLOT_FIELDS`) a **najmenšia šírka** `D + c1 + th2 + 2t` =
-presne `Construction.corner_fit_width` (`nxCornerMinWidth` / `nxCornerFitError` v `core.js`, tá istá veta ako server; audit B1 FIX 5 — celé mm sondy
-`min_valid_width` ostávajú len pre klamp Scale); pri nezmestení červená **šírka, dverová časť a CR 1** (rámik `.crin` cez `nxCornerBoxesSync`) a veta ide do
-`nxCabFieldError` (flush apply aj `insertCabinet` ju ukážu). Hrúbky: **th2** z payloadu (`corner_th2`) alebo z `corner_ctx` preflightu, **t** pri vkladaní
-z `corner_ctx` (hrúbka, ktorú použije vklad), inak z poľa (`nxCornerT`) — `nxAdoptCornerCtx` pri zmene prevalidovanie spustí (audit B1 FIX 4).
-**ROH-B2 (O12):** v pravom stĺpci je pri **označenej** rohovej výstup **„Šírka dverí"** (`#infCornerDoor`, `nxCornerInfoSync` volaný zo `setSelected` — `loadSelected`
-prevezme kresbu skôr, než zmení identitu, predrecenzia P3-3 — a z `applyVisibility` a odpovede preflightu; číslo `corner_preview.door_w` zo
-servera, „—" kým nepríde; vo vkladaní ani pri inom type riadok nie je, kontext Čelá by nemal kam viesť) a klik (`onInfoCornerDoor`) prepne kontext Čelá a otvorí
-kartu F1 (spodný riadok DOM). Súhrn v lište Základné (`NXShell.metaDims`) nesie pri rohovej aj **„dvere vľavo 450"** (`nxMetaDims` → `corner: {side, door}`,
-strana z registra, dverová časť z poľa; `onCornerSide` vo vkladaní meta obnoví sám — klik nie je `input` poľa).
-
-**Prepínač strany (`onCornerSide`, O5).** Klik na zvolenú stranu nič nerobí. **Označená rohová:** najprv `nxCabinetAction` (rozpísané polia sa dopíšu, červené
-pole akciu zastaví; klik počas debounce aj počas odoslaného apply sa vykoná až po **potvrdenom** apply), potom `sketchup.corner_side` s `switch_token` a **len**
-`{cabinet_id, corner_side, switch_token, model_guid}`; prepínač ukáže novú stranu až push servera. Kým beží (`cornerSwitch`), sú skupiny kontextu Čelá **zamknuté** (`nxCornerSwitchLock` — `inert` + `aria-busy`
-na `details[data-s4="cela"]`; čelá po odpovedi prevezme server, takže úprava počas prepínania by sa ticho stratila — predrecenzia P3-3), **auto-apply sa odkladá**
-(`flushCabinetEdits` — natívna kópia dostane `invalid`), iné akcie čakajú (`nxCabinetAction`) a druhý klik nič nepošle; koniec = korelovaná odpoveď
-`NX.cornerSideResult` (`nxCornerSideResult`: cudzí token sa ignoruje; keď push prepnutia prišiel počas rozpísanej zmeny — `holdDraft` —, **čelá, strana a otvor
-sa prevezmú zo servera** z pamätaného echa a až potom ide odložený apply, audit B1 FIX 1) alebo zmena identity (`nxFrontDraftReset`). **Vkladanie:** zmena registra
-+ zrkadlo návrhu čiel (odsek „Vkladacia karta").
-
-**Rozmery korpusu patria do payloadu aj do kľúča (Codex #339 kolo 2 N2).** Korpusové pravidlo `leg`/`plinth_clip` sa smie riadiť ktorýmkoľvek kľúčom kontextu
-(`HardwareRules::CONTEXT_KEYS` cez `input_value`), takže pásma podľa **výšky** alebo **hĺbky** sú legitímne — preto `height` a `depth` sú v `INSERT_LEGS_KEYS`. Bez nich by
-`CabinetBuilder.normalize` dosadila svoje **predvoľby**, kým vklad by to isté pravidlo vyhodnotil nad rozmermi, ktoré používateľ naozaj zadal — karta by sľubovala iný počet nôh.
-Jeden zdroj `nxLegsInsertDims()` plní payload **aj** kľúč `nxLegsInsertPeek`: čo sa posiela, musí byť aj v kľúči, inak by zmena výšky dotaz vôbec nespustila.
-
-**KOVANIE ŠABLÓNY ide s dotazom (Codex #339 kolo 1 N1).** Šablóna nesie mapovanie setov aj ich definície a vložená skrinka ich naozaj dostane, takže payload má **druhú, vlastnú**
-skupinu kľúčov `INSERT_LEGS_HW_KEYS` = `hardware_sets` · `hardware_set_defs` (zdroj je **ten istý** `NXInsert.hardwarePayload()`, ktorý ide do `insert_cabinet`; ad-hoc položky
-`HARDWARE_LIST_KEYS` nie — nohy ručne nevznikajú). Server ich **nepustí cez tolerantný `normalize`**: číta ich `insert_legs_template_hw` **tou istou bránou ako vklad**
-(`read_template_mapping` + `assess_set_defs`), takže nečitateľné kovanie — ktoré vklad odmietne hláškou — náhľad ticho ignoruje a ukáže predvoľbu projektu. Mapovanie potom ide do
-`cfg['hardware_sets']` (presne ako `handle_insert`), odkiaľ ho číta `cabinet_set_overrides` (pozná **oba** tvary kľúča — uložený config má string, `normalize` symbol), a definície
-idú do `HardwareSets.state_with_template_sets` ([hardware.md](hardware.md)) ako **prospektívny** stav. Súčasťou kľúča `nxLegsInsertPeek` je aj toto kovanie: dve šablóny s rovnakými
-rozmermi a iným setom nôh sú dva rôzne dotazy.
-
-**Odchod z riadku = SKRYŤ AJ ZNEPLATNIŤ.** `nxLegsInsertReset` (`loadSelected`, `loadBoard`, `clearSelected` a **`materializeInsertBoardCard`** — Codex #339 N2: prepnutie vkladania
-na Dosku predikát `nxLegsInsertMode` len umlčí, riadok samotný neschová nikto a v doskovej karte ostával visieť text skrinky) riadok schová, zabudne pamäť vstupov **a zdvihne
-generáciu** (`nxLegsInsertDrop`). To isté robí prechod na **hornú** skrinku vo `nxLegsApplyVisibility` (N3): bez zdvihnutia generácie by odpoveď na už neplatný dotaz riadok znova
-odkryla — natrvalo. Druhá poistka je v `nxLegsInsertResult`: odpoveď sa prijme len pri type s nohami — `nxLegsTypeHasLegs` (`LEGS_INSERT_TYPES` = `lower`
-a od ROH-A2 aj `corner_blind`, ktorá stojí na nohách ako dolná; horná a slot nie).
-
-**Ľahký push obnovuje OBE cesty.** `NX.setHardwareSets` (živý refresh po zmene v Štúdiu) pri **označenej** skrinke prekreslí vetu riadku (`legs_summary`, N4). **Bez označenej skrinky** riadok
-patrí náhľadu vkladania a `legs_summary` v pushi nechodí — dovtedy sa teda nedialo nič. Lenže práve ten push nesie zmenu **mapovania nôh, definície setu alebo názvov položiek**, a to sú
-vstupy náhľadu, ktoré v jeho kľúči **nie sú** (ten pozná len rozmery a kovanie šablóny). Vetva `else` preto volá **`nxLegsInsertInvalidate`** (Codex #339 kolo 2 N1): zahodí `legsLastKey`
-a vypýta si náhľad znova **tou istou cestou** (debounce + generácia). Mimo vkladania (označená skrinka, kontext dosky) sa nedeje nič — rozhoduje `nxLegsInsertMode`.
-
-**Klikateľné sú len tie údaje, ktoré niekam vedú (N13):** „Dielcov" → `nx_select_parts` → `Panel.handle_select_parts` = **čisté čítanie + zmena výberu** pod
-`suspend_selection_sync` a refresh `dedup: false` (vzor `ProductionCore.do_select`; **žiadny `start_operation`, žiadny krok Späť**), s prísnym guardom `model_guid` + `cabinet_id`
-(asynchrónny callback). Klik má **rovnaký flush handshake ako „Vložiť kópiu"** (Codex audit UI-B3): zmena výberu si vypýta push celej skrinky, ktorý prepíše formulár — rozpísaný
-edit (400 ms debounce) by sa bez flushu ticho stratil, a **červené pole akciu zastaví** (flush by ju aj tak neaplikoval).
-
-**„Materiál" od UI-D3 vedie do KUSOVNÍKA** — `openStudio('bom', cabinet_id)` otvorí ŠTÚDIO rovno na sekcii Kusovník a **ID skrinky ide ako kotva**, ktorá predvyplní hľadanie (sľub
-UI-D3 o filtri na jednu skrinku sa tým splnil; status to povie nahlas aj s tým, ako sa zúženie zruší). Bez označenej skrinky sú riadky `aria-disabled` (nie HTML `disabled` — vzor
-D-78).
-
-**Typ badge** v hlavičke je readonly (`nxCabInfo(c).type`, slovenské názvy typu žijú na jednom mieste) — typ sa nastavuje výhradne šablónou/vkladaním; mini-modal „Uložiť ako
-šablónu" preto nesie **Názov + Typ** a `handle_save_template_as` typ zapíše do `config['type']` uloženej šablóny (whitelist v Ruby; odlišnosť od skrinky povie status — rozmery a
-konštrukcia ostávajú z tejto skrinky). Modal drží identitu **skrinky AJ dokumentu** (`tplModalGuid`, prísny serverový guard) — ID skriniek sa naprieč dokumentmi opakujú, takže
-modal otvorený nad jedným modelom by po prepnutí uložil skrinku z iného; a **červené pole uloženie zastaví** (flush by edity neaplikoval a šablóna by vznikla zo starých hodnôt s
-hláškou o úspechu).
-
-**Koliesko raily** otvára **modal** `#cfgModal` (Vzhľad = prepínač témy · Rozmerové rady = editor `DimSeries` · O plugine = logo + verzia z Ruby) — vedome NIE piaty kontext raily:
-nastavenia počítača nepatria do stavového stroja `NXShell` („čo je označené × čo chce používateľ vidieť") a musia byť dostupné aj bez označeného objektu; „Upraviť rad…" v ponuke
-otvára ten istý modal rovno na sekcii Rady. Rady chodia do panela v `push_init` (`ui_settings`) a po zmene malým pushom `NX.setUiSettings` — ten mení **len ponuky a stav
-prepínača**, nikdy neprekresľuje kartu (vzor `NX.setUsedIds`).
-
-**Téma v tomto payloade NIE JE** (a nesmie pribudnúť): farby nasadzuje výhradne `nxThemeApply` kanálom `win_fit.js` a JS len číta `data-nx-theme` z koreňa — druhý kanál by znamenal
-dva zdroje pravdy o farbe okna; push po zmene témy tu slúži len na **presvietenie tlačidiel** (`nxSyncThemeButtons`). Čisté jadro (normalizácia radu zrkadliaca Ruby, texty stĺpca,
-kostra) testuje `tests/js/test_uib3_korpus.js`, serverovú stranu a perzistenciu `tests/pure/test_uib3_rady.rb`.
-
-**KRÍŽOVÁ KONTROLA VÝŠKY (S1-E0, v0.12.9, `form.js` `cabinetHeightError`).** Od odomknutia výšky na 80 mm nestačí, že pole prejde rozsahom `LIMITS` — **výška je CELKOVÁ vrátane
-sokla**, takže dolná skrinka 90 mm s predvoleným soklom 100 mm nemá žiadne vnútro a `Construction.validate!` prestavbu odmietne. Dovtedy to používateľ zistil až **výnimkou po
-apply**; po novom `validateFields` na konci (za hlavným cyklom, takže mu nič neprepíše `bad`) zavolá `cabinetHeightError` a `markHeightError` **zočervení DVOJICU polí Výška
-a Podstavec** — chyba je v ich kombinácii, nie v jednom čísle. Dôvod ide do `title` týchto polí (obe sú v HTML bez `title`, takže sa nič neprepisuje); **nový DOM ani CSS
-nepribudli** a stavový riadok „Skontroluj červené polia" už existuje v `actions.js`. Apply je zablokovaný rovnako ako pri rozmere mimo limitu.
-
-Kontrola je **zrkadlom dvoch Ruby pravidiel** a počíta ich **zdieľanou `nxInteriorZ`** (`core.js`) — tou istou, ktorá kreslí údaj „Úložná výška", takže druhá kópia vzorca
-nevzniká: (a) svetlé vnútro `<= MIN_AVAIL_H` (10 mm) = odmietnutie · (b) pri vrchu **„dve výstuhy"** musí pod nimi ostať `NX_MIN_INTERIOR_H` (20 mm, D-80). Čísla sú zrkadlom
-`Construction::MIN_AVAIL_H` a `MIN_INTERIOR_H`; zhodu stráži `tests/pure/test_s1e0_min_vyska.rb`.
-
-**Prázdne pole NIE JE nula (Codex #375 P2).** Ruby `normalize` za prázdne pole dosadí **predvoľbu typu** (dolná skrinka má sokel 100 mm), takže kontrola musí počítať s tým istým
-číslom — inak by výška 90 mm s prázdnym soklom prešla klientom a padla až na serveri. `cabFieldOrDefault(id)` preto číta prázdnu (aj nezmyselnú) hodnotu z **`DEFAULTS[getType()]`**,
-teda z payloadu, do ktorého `sync.rb` posiela **priamo `CabinetBuilder::LOWER_DEFAULTS` / `UPPER_DEFAULTS`** — druhý zdroj pravdy nevzniká. Kým predvoľby zo servera neprišli,
-kontrola **mlčí**: falošná červená pri štarte panela je horšia než chýbajúca. JS sada `tests/js/test_s1e0_min_vyska.js`.
-
-**S1-E — Základné SLOTU UMÝVAČKY.** Ten istý `.basicgrid`, iný obsah. **Vľavo šesť vstupov** (D-139 — „Čelo V" už vstup nie je): Trieda (`dw_class`, select 600/450) ·
-Šírka · **Výška linky** (pole `height` — popis nesie vlastný uzol `#lblHeight`, hint „mm · horná hrana susedov") · Hĺbka · **Telo V** (`dw_body_height`, hint
-s rozsahom) · **Sokel** (`dw_front_bottom`, „čelo od podlahy"). **Vpravo výstupy** (TEXT, `.infocol`): Telo (`598 × 820 × 555 · generické 60`) · **Čelo V**
-(`778`; pri starom slote pred prvou prestavbou `776 · po prestavbe 866`) · **Medzera hore** (`2 · schéma medzier` — tlačidlo `onInfoDwGap`: prepne na Čelá,
-rozbalí „Spoločné pre skrinku" a zameria pole „hore") · **Pod doskou** (`880 ≥ 820 ✓`, jantár pri ✗) · Trieda (`60 · bez modelu`) · Dielcov · **Hmotnosť čela**.
-**Všetky čísla počíta SERVER** (`Panel.slot_payload` v `cabinet_payload`), panel z nich nič neodvodzuje — zapisuje ich `renderSlotInfo` v `bridge.js`.
-**Čelo V je STAV POSLEDNEJ STAVBY** (uložené `dw_front_height`, `slot_front_info`) — čítanie nepredstiera prestavbu (Astra B2 FIX 2); odvodená hodnota ide
-cez tú istú `CabinetBuilder.dw_front_eval`. „Pod doskou" používa **ten istý predikát** ako Kontrola `dw_height_fit`, takže Inspector a semafor nikdy netvrdia dve rôzne veci.
-**D-139: krížová kontrola** `cabinetHeightError` pri slote vráti vetu `nxSlotFrontEval` (zrkadlo `dw_front_eval`, rozsah 300–1200, rada podľa strany) a
-`markHeightError` označí **Výšku linky + Sokel slotu**; schéma medzier slotu skryje polia „medzi" a „dole" (`SLOT_HIDDEN_GAPS`, atribút `hidden` + párové CSS).
-
-**Polia slotu sa validujú LEN v type, ktorému patria** (PR #381, Codex kolo 1 P2). `dw_body_height`/`dw_front_bottom` sú v DOM aj pri dolnej
-a hornej skrinke (len skryté), takže hodnota, ktorú tam nechal predchádzajúci slot, by **červenela a zablokovala vloženie úplne inej skrinky** — v poli, ktoré
-používateľ nevidí a nemá ako opraviť. `validateFields` ich preto preskočí, keď typ nie je `dishwasher` (zoznam `SLOT_FIELDS`). Opačným smerom: pri prepnutí **na**
-slot dosadí `nxFillSlotFields` (volané z `applyVisibility`, teda po každom `writeConstruction`) do prázdneho alebo mimorozsahového poľa **predvoľbu typu zo servera**
-(`DEFAULTS.dishwasher` = `CabinetBuilder::DISHWASHER_DEFAULTS`) — inak by panel ukazoval niečo iné, než čo si `normalize` aj tak dosadí. Platnú hodnotu používateľa
-neprepíše. Z rovnakého dôvodu `applyInsertLockValues` pri slote **nedosadzuje zámok hrúbky ani sokla** (`SLOT_NO_LOCK`): slot tie polia nemá, takže zamknutá hrúbka
-25 mm z predchádzajúcej skrinky by pristála v jeho payloade.
-
-**Viditeľnosť riadkov je JEDNA autorita — `applyVisibility(t)`** s dvoma menovitými zoznamami (`SLOT_ONLY_ROWS` / `SLOT_HIDDEN_ROWS`, obe exportované pre Node
-sadu). Slot **nemá**: riadok Sokel korpusu (`#fhRow` — jeho sokel je spodná hrana čela), soklovú skupinu, Hrúbku, Vnút. šírku/hĺbku, Úložnú výšku, Materiál m²
-ani riadok Nohy (podpora `none`). **Limity poľa sú per TYP** (`TYPE_LIMITS` v `form.js`): šírka 300–1200 a výška linky 500–1200 — zrkadlo
-`CabinetBuilder::DW_WIDTH_RANGE`/`DW_HEIGHT_RANGE`; krížová kontrola výšky proti soklu a hrúbkam (S1-E0) sa slotu **netýka**, lebo nemá vnútro.
-
-**Karta Čelá pri slote** schová „Pridať čelo", krížik aj chip AUTO a výšku dá **na čítanie** (`nxSlotFrontsLock`); riadok menuje čelo „Dvere umývačky" s ikonou
-sklopu (`frontRowLabel`/`frontRowIcon` — len riadok označenej skrinky; všeobecné `frontTypeLabel`/`frontTypeIcon` pre pás „pridať čelo" a dlaždice ostávajú
-nezávislé, Codex #387 P2) a karta čela nemá dlaždice typov (`frontCardModel(…, { slot: true })`, D-138) — vynucuje to však **server**
-(`Panel.slot_fronts_refusal`: payload s iným počtom, typom či režimom sa odmietne a config sa nedotkne; **výška sa neposudzuje** — je odvodená, D-139).
-**Preflight čiel** dostáva `type` + `dw_front_bottom` + výšku linky, počíta s **virtuálnym otvorom** (`Construction.front_opening`: od soklu po linku) a riadok
-čiel slotu pred `Fronts.preflight` **kanonizuje** tým istým `slot_fronts!` s výškou z `dw_front_eval` (`slot_preflight_fronts`) — stará výška z riadku klienta
-tak nedá falošné „nezmestí sa" a mimo rozsahu hovorí preflight tou istou vetou ako stavba.
-
-**Náhľad slotu má PODKLAD a DETAIL, nie vlastný celý náhľad** (PR #381, P2). `drawSlotBase` (telo so základňou **prerušovane** = referencia, línia linky) nahrádza
-`drawCarcass` v **každom** kontexte — slot korpus nemá, takže boky, dno a strop by boli vymyslené dielce. `drawSlotDetail` (čelo plne s **odvodenou výškou** —
-`pvSlot` ju berie z `nxSlotFrontEval`, kóty šírky, výšky linky, sokla a čela; D-139: jantárové pásmo „výplň" zaniklo) beží **len v kontexte Korpus a vo vkladaní**.
-Cesty bez čiel zo servera (čakanie na preflight, vkladanie) majú **slotovú projekciu** `nxSlotFrontItems` — jedno čelo na sokli s odvodenou výškou; všeobecný
-resolver by ho položil na z = 0 so starou výškou z riadku (Astra B2 FIX 4). Kontexty **Čelá** a **Kovanie** tak kreslia svoje
-štandardné projekcie (kóty výšok riadkov, značky kovania, hover) **nad** podkladom slotu — pôvodný jediný `drawSlot` ich `return`om prepísal a používateľ o ne prišiel.
-**Scéna** (`nxSlotExtent`, prikladá sa v každom kontexte) obsiahne aj **trčiace telo**: telo sa nikdy nedeformuje podľa slotu, takže pri úzkom slote presahuje do strán
-a pri prehnanej výške nad líniu — práve vtedy, keď Kontrola hlási `dw_body_fit`/`dw_height_fit`, by ho fit orezal a na náhľade by nebolo vidieť to, o čom semafor hovorí.
-Rozmery generického tela a základne sú v JS **zrkadlom** Ruby konštánt (`PV_DW_BODY`, `PV_DW_BASE_H`, `PV_DW_BASE_SIDE`) — náhľad ich potrebuje aj vo VKLADANÍ, kde
-žiadny serverový payload neexistuje; zhodu stráži guard test. **Hlavička Inspectora** má popisok typu v jedinej mape `NX_TYPE_LABEL` (`Dolná · Horná · Umývačka`).
-
-**Náhľad kontrolnej geometrie chladničky (S1-F, `preview.appliances[]`).** Karta skrinky nesie nový kľúč **`preview.appliances[]`** — **kolekciu adresovanú `item_id`**
-(FIX F10), lebo skrinka môže niesť viac chladničiek a každá má vlastný box, vlastné pásma a vlastné pásmo hrany. Tvar položky:
-`{item_id, label, box{x, z, w, h}, bands[{z0, z1, size}], split{state, lo, hi, edge, recommended, lo_mm, hi_mm, edge_mm} | nil, state}` — **všetko v mm a už
-v súradniciach korpusu** (z od podlahy), takže JS nič nescitáva. **Model bez údajov o dverách má `bands` prázdne** (Codex #384 kolo 1, P2): renderer v modeli
-vtedy nekreslí žiadnu čiaru, takže ani náhľad nesmie vyrobiť jedno „pásmo" cez celý box s popiskom, ktorý v modeli nikde nie je. Geometriu dáva **tá istá funkcia, z ktorej kreslí builder** (`Construction.appliance_niche_references`),
-a verdikt tá istá, z ktorej žije Kontrola — náhľad a model sa teda nemôžu rozísť. Kreslí `drawApplianceRefs` **len v kontexte Korpus**, ako poslednú vrstvu nad obrysom:
-box **prerušovane** (referencia, nie dielec) vo firemnej teal, pri `clash` v jantári, pásma dverí spotrebiča ako čiary s číslom listu a **pásmo prípustnej hrany**
-jantárovým prizvukom vľavo od boxu s číslami koncov a čiarou súčasnej hrany. Stav `na`, `unknown` aj `unsatisfiable` pásmo **nekreslí** (niet čo odporučiť).
-**Scéna** (`nxRefExtent` — zovšeobecnený `nxSlotExtent`) obsiahne telo slotu **aj** boxy niky vrátane záporného X (box širší než skrinka) a presahu nad korpus:
-box sa nikdy nedeformuje, takže práve vtedy, keď Kontrola hlási „nezmestí sa", by ho fit orezal. Globál `applPreview` plní `bridge.js` z toho istého pushu ako
-`appliance_rows`; chýbajúci kľúč (staršie okno) = prázdne pole, odchod z výberu ho **zahodí** — nikdy zvyšok po predchádzajúcej skrinke.
-
-**KON-A · K1 (v0.13.2) — Nastavenia korpusu: Komín vzadu a Zapustenie vpredu (schválený mockup A).** Sektor Nastavenia má v kontexte Korpus **tri skupiny**
-(Strop · Dno & podstavec · Chrbát) — skupina **Boky zanikla** (A2, nemala čo nastaviť). **Strop:** riadok `#topSetbackRow` „Zapustenie vpredu" (`top_front_setback`)
-hneď pod Konštrukciou; pri „Bez stropu" ho `toggleTopSetback` skryje, **hodnota sa pamätá** (vzor `backThRow`). **Chrbát:** riadok `#backSetbackRow` „Komín vzadu"
-(`back_setback`) má **pevné miesto** pod Konštrukciou pre každý režim chrbta (polia nelietajú, D-130); tooltip `#backSetbackTip` prepisuje `toggleBackSetback` čistou
-`backSetbackTipText` (minimum podľa režimu a **voľný kanál** — naložený/drážka `X − bt`, vložený `X`, bez chrbta sa kanál neukazuje). Šedá veta o celkovej hĺbke
-sa stala tooltipom pri Konštrukcii (A6, D-130a). **Súhrn v zbalenej hlavičke** (`#topMeta` „zap. 30", `#backMeta` „komín 50", `.ghdr` + `.gtools` ako Čelá) len pri
-nenulovej hodnote (`setbackMetaTexts`). Slot umývačky oba riadky skrýva. **JS zrkadlá** (core.js): `nxBackSetback`/`nxTopFrontSetback` (prísne číslo 0–300),
-`nxBackStop` (R), `nxSideDepth`, `nxInteriorDepth` (jediná JS autorita „Vnút. hĺbky" — `updateAvailable` už nemá vlastný vzorec), `nxRailGeom` s intervalom Y … R
-a `nxSetbackError` = tá istá veta ako Ruby `Construction.setback_error` (spoločná fixtúra `tests/fixtures/kona_cases.json`). Zrkadlo validácie
-`cabinetSetbackError` (form.js) po krížovej kontrole výšky zočervená pole komína/zapustenia s vetou v `title` a `nxCabFieldError` ju dá do stavového riadku namiesto
-všeobecného „Skontroluj červené polia". **Tri JS zoznamy mimo `CONSTRUCTION_FIELDS`** museli pribrať polia (audit FIX 2, FIX 3): DOM most **`currentCarcass`**
-(nesie aj `type`, `back_setback`, `top_front_setback`), **`pvGeom`** cez `pvSetbackDepths` (hĺbky dielcov pre odhad `nxDraftStats` — dno a strop do R, strop od Y,
-police a priečky podľa vnútra, užší naložený chrbát; pri X = Y = 0 sa kľúče nepridávajú a odhad ostáva dnešný) a **`bindExprFields`** (boot.js). **Riedky config**
-(Codex FIX 9): `CONSTRUCTION_FIELDS` nesú `dflt: 0`, takže skrinka bez kľúča pole nastaví na 0 — inak by ostal komín predtým označenej skrinky a apply by ho
-ticho zapísal inej. Bokorys v náhľade **nie** (M11, D-145). Testy: `tests/js/test_kona_komin.js` (integrácia formulár → most → výpočet nad skutočným core.js + form.js).
-
-**KON-B · K2 (v0.13.3) — Chrbát „Z líšt" a riadok „Výška líšt" (schválený mockup A3, A5, A7).** Select `#back_mode` má piatu voľbu **„Z líšt"** (`rails`) v poradí
-Naložený · Vložený · V drážke · Z líšt · Bez chrbta. Riadok `#backRailRow` „Výška líšt" (`back_rail_height`, mm, tooltip z mockupu) sedí **na mieste** `#backThRow`
-— nikdy nie sú naraz: `toggleBackTh` pri lištách skryje hrúbku a ukáže výšku, pri „Bez chrbta" skryje obe, pri slote riadok líšt nie je; **hodnoty sa pamätajú**.
-**H sa validuje LEN pri aktívnych lištách** (`RAIL_FIELDS` + `backRailsActive`, audit FIX 3 — `validateFields` inak validuje aj skryté polia a neviditeľné neplatné H
-by zablokovalo „Aplikuj"); skrytie riadku zruší červenú aj tooltip a `collectConstruction` skryté neplatné/prázdne H **neposiela** (server
-nechá uloženú hodnotu skrinky — nič sa ticho neoreže na 300). Pri H mimo 20–300 má prednosť veta rozsahu poľa („Výška líšt musí byť 20 až 300 mm.") a súhrn
-ukáže len „z líšt" bez orezaného čísla. Zrkadlo validácie: `cabinetCheckCarcass` (form.js) **neskončí** pri X = Y = 0, keď sú lišty
-(audit NOTE 4), veta komína/zapustenia (`nxSetbacksOnlyError`) ide na polia komína, veta líšt (`nxBackRailsError`, `2H + 20 ≤ vnútro`, tá istá ako Ruby) na pole
-„Výška líšt" (`markRailError`). **JS zrkadlá** (core.js): `nxBackRails`, `nxBackRailHeight` (prísne, 20–300, inak 100), `nxInteriorDepth` pri lištách `R − t`,
-`nxSetbackError` = `nxSetbacksOnlyError || nxBackRailsError` (fixtúra `tests/fixtures/konb_cases.json`). **Súhrn** `#backMeta` „z líšt 100 · komín 50" (výška len
-pri lištách). Tooltip komína: pri lištách bez minima a voľný kanál = `X`. **Veta pod materiálom chrbta** `#cabBackNote` v sekcii Materiály — „(nepoužije sa —
-chrbát z líšt je z korpusu)" pri lištách, „(nepoužije sa — bez chrbta)" pri „Bez chrbta", inak skrytá (`backMaterialNote`). Zoznamy mimo `CONSTRUCTION_FIELDS`
-(`{id:'back_rail_height', dflt:100}` — riedky config): `currentCarcass`, `pvGeom` → `pvSetbackDepths` (lišty doplní **pred** skorým návratom pri X = Y = 0: `innerD`
-= `R − t` pre police a priečky, `backRailH`), `bindExprFields`. Odhad `nxDraftStats` pri lištách = 2 × `(W − 2t) × H` z korpusu namiesto dosky chrbta.
-Testy: `tests/js/test_konb_listy.js`.
+Plné znenie: archív, „Obsah Korpusu — Základné v dvoch stĺpcoch + koliesko".
 
 ### Náhľad = kontextová projekcia + spodný pás (UI-B2, ui/js/preview.js)
 
-každý kontext kreslí **svoj** pohľad (výmena, nie vrstvenie) — **Korpus** čelný rez s kótami (Š dole, V vpravo, sokel/telo vľavo, hĺbka kótou na náznaku skosenia hornej plochy),
-**Zóny** zónová schéma + kóty šírok stĺpcov, **Čelá** predný pohľad + kóty výšok riadkov a medzier, **Kovanie** NOVÁ projekcia s pozíciami (záves = krúžok s krížikom na závesovej
-hrane · **výsuv = koľajnica „L" pri OBOCH bokoch + telo šuflíka medzi nimi** — schválené Michalom 20.8. nad mini náhľadom, nahradilo pás naprieč čelom; geometriu skladá čistá
-funkcia `nxSlideGeom` (pätka dovnútra, telo odsadené ZA pätkami, všetko pomer z výšky čela ⇒ pri viacerých zásuvkách nad sebou telá rastú s čelami); **ankerom sú VNÚTORNÉ LÍCA
-BOKOV `x = t … W−t`** — tie isté, aké kreslí `drawCarcass` — nie `fr_gap_sides`, lebo výsuv drží bok, nie čelo (Codex #184 P2: pri medzere 2 mm a hrúbke 18 by koľajnica ležala na
-doske boku, pri zápornom presahu čela až mimo korpusu); nezmyselná hrúbka (`2t ≥ W`) padá na celý korpus, nie na stratenú značku, kresbu vetva `slide_rail` v `hwMarkSvg` —
-koľajnica je ťah, preto má navyše **priehľadný široký duplikát `.hwhit`** ako hit-oblasť a hover CSS ho vynecháva (`path:not(.hwhit)`) · nohy = obdĺžniky v pásme sokla) + súhrn
-položiek pod ňou, **Dielec** hrany s ABS (`#partSvg`, nezmenené).
+**Čo robí:** sektor S1 — každý kontext kreslí **svoj** pohľad (výmena, nie vrstvenie): **Korpus** čelný rez s kótami (Š dole, V vpravo, sokel/telo vľavo,
+hĺbka kótou na náznaku skosenia) · **Zóny** zónová schéma + kóty šírok stĺpcov · **Čelá** predný pohľad + kóty výšok riadkov a medzier · **Kovanie** projekcia
+s pozíciami (záves = krúžok s krížikom na závesovej hrane · výsuv = koľajnica „L" pri OBOCH bokoch + telo šuflíka · nohy = obdĺžniky v pásme sokla) + súhrn
+položiek · **Dielec** hrany s ABS (`#partSvg`) · **vkladanie** projekcia `insert`. Zoom/pan/fit, výška rastie s oknom, debounce prekreslenia 500 ms.
 
-**UI-C1b pridala projekciu `insert`**: pri korpuse sa kreslí **šablóna tak, ako bude vložená** (čelný rez s kótami + čelá), pričom čelá sú **prepínateľná vrstva zapnutá defaultne**
-(`NXLayers.DEFAULT_ON`) — po zhasnutí vidno vnútro šablóny; server resolved čelá v tomto režime NEEXISTUJÚ (`frontItems` je `null` — pasca Codex FIX 11), preto ich dopočíta **čistý
-draft resolver** `nxFrontsResolve` (zrkadlo `Fronts.layout`: fixné výšky sa sčítajú, zvyšok sa delí medzi AUTO riadky, čelá idú odspodu). Pri **doske** kreslí
-`renderInsertBoardPreview` obdĺžnik so **šípkami smeru dekoru** (N10) z polí vkladacej karty a vlastnou scénou `pvBoardScene` (miesto na kóty vpravo a dole); všetky chipy vrstiev
-sú vtedy neaktívne s vysvetlením. Sektor Náhľad sa už pri vkladaní dosky **neskrýva**.
+**Žiadne nové dáta:** kreslí sa výhradne z payloadov panela — rozmery formulára, `front_items`, `config.hardware` (`hwItems` z toho istého pushu), strom zón;
+odvodenie robia čisté funkcie `nxHwMarks` / `nxSlideGeom` / `nxHwSummary` / `nxFrontDims` / `nxZoneSpans`. **Kovanie sa nečíta z geometrie** a značka je
+orientačná. Všetky vrstvy berú geometriu z **jedného** `pvGeom()`; `sceneSize` rezervuje miesto pre kóty každej projekcie.
 
-**Žiadne nové dáta:** kreslí sa výhradne z payloadov, ktoré panel už dostáva — rozmery formulára, `front_items`, **`config.hardware` (uložený do `hwItems` pri tom istom pushi,
-ktorý plní sekciu kovania)** a strom zón; odvodenie (pozícia značky z `owner_part_key` + `generic_type`, medzera ako rozdiel susedných čiel, dedup stĺpcov zón) sú **čisté funkcie**
-`nxHwMarks` / `nxSlideGeom` / `nxHwSummary` / `nxFrontDims` / `nxZoneSpans`. Kovanie sa ani tu **nečíta z geometrie** (invariant) a značka je **orientačná**.
-**Strana pántov (ROH-A2, krížový audit C8)** rozhoduje čistá `nxHingeSide(wkey, idx, n, entry)`: krajné krídla viackrídlových dvierok sú odvodené (`left`/`p1` vľavo,
-`right`/posledné vpravo — A1 kontrakt), jednokrídlové (`wing:single`) a stredné krídla čítajú **stav smeru zo slotu servera** (`front_slots[front_id]`, do `pvGeom`
-ako `g.slots` cez `pvHingeSlots`) cez `frontDirSymbol` z `core.js`. Zdrojom sú **uložené sloty označenej skrinky** (`frontSlotsSaved`, plní ich `nxAdoptCabinetDraft`
-z payloadu) — patria uloženému kovaniu `hwItems` a preflight ich nezhodí (`frontSlots` je počas preflightu `null` a pri neplatnom návrhu prázdne; predrecenzia P3);
-bez uložených slotov (vkladanie) sa berú sloty posledného preflightu — `left`/`right` = krúžok s krížikom na tej hrane, **neurčené** = značka `unknown` (prerušovaný jantárový kruh s „?"
-v strede krídla, `hwMarkSvg`), **legacy bez kľúča smeru = žiadna značka** (O1: strana sa nehádá). Do A2 sa jednokrídlové pánty kreslili vždy vľavo — oprava platí pre
-každý typ.
+- **Výsuv:** geometria `nxSlideGeom` (pätka dovnútra, telo za pätkami, pomer z výšky čela); **anker = vnútorné líca bokov `x = t … W−t`** (výsuv drží bok, nie
+  čelo; `2t ≥ W` padá na celý korpus); vetva `slide_rail` v `hwMarkSvg` má priehľadnú hit-oblasť `.hwhit` (hover CSS ju vynecháva).
+- **Strana pántov** = čistá `nxHingeSide(wkey, idx, n, entry)`: krajné krídla viackrídlových dvierok odvodené (`left`/`p1` vľavo, `right`/posledné vpravo),
+  jednokrídlové a stredné krídla čítajú **stav smeru zo slotu servera** (`front_slots`, `pvHingeSlots`, `frontDirSymbol`). Zdroj = **uložené sloty** označenej
+  skrinky (`frontSlotsSaved` z `nxAdoptCabinetDraft`), bez nich sloty posledného preflightu. **Neurčené** = značka `unknown` (jantárový kruh s „?"), **bez kľúča
+  smeru = žiadna značka** (strana sa nehádá).
+- **Projekcia `insert`:** šablóna tak, ako bude vložená; čelá sú vrstva zapnutá defaultne (`NXLayers.DEFAULT_ON`); serverové čelá vtedy nie sú (`frontItems` je
+  `null`), dopočíta ich čistý **`nxFrontsResolve`** (zrkadlo `Fronts.layout`). Doska: `renderInsertBoardPreview` so šípkami smeru dekoru a scénou `pvBoardScene`.
+- **Čelný otvor** (`{x0, w, z0, h}`) je **serverový** (`Construction.front_opening`): payload označenej skrinky nesie `front_opening` (`Panel.front_opening_payload`),
+  každá odpoveď preflightu `opening` pre aktuálnu revíziu; plnia globál `frontOpening` (`core.js`, mimo `holdDraft`), `nxFrontDraftReset` ho zahodí a reset bez
+  materializácie karty si ho vypýta znova (`nxInsertDraftResume`). `pvGeom` cez `nxFrontOpeningFor(type, W, op)` vloží `fx0`/`fw` a **všetci čitatelia šírky
+  čiel** merajú od otvoru. Iné typy než rohová dostanú vždy `{x0: 0, w: W}` (parita `tests/js/test_roha2_vkladanie.js`). Rohová bez známeho otvoru čelá nekreslí
+  (`frontsPending`). Dverová časť je živé pole — mení signatúru preflightu (`corner_door_w`).
+- **Kresba rohovej zostavy:** geometriu počíta server (`Panel.corner_preview_json` nad `Construction.corner_parts`), panel ju len kreslí — globál `cornerPreview`
+  z payloadu a z každého preflightu (`nxFrontDraftData` pri rohovej posiela `corner_cr1`/`corner_cr2`, `top_mode`/`rail_*`); `pvCornerPreview` ju vráti len pri
+  rohovej (parita `test_rohb2_nahlad.js`). `drawCornerAssembly`: blenda tlmená a šrafovaná (`pvCornerHatch`), výstuha a CR 2 ako 18 mm pásy, CR 1 čelový pás,
+  bublina servera v `<title>`, nezmestená zostava (`fits === false`) v červenej. Korpus kreslí zostavu aj dvere (`pointer-events="none"`) a kóty (`drawCornerDims`);
+  Čelá a Kovanie dielce korpusu tlmia; Zóny zostavu nekreslia.
+- **Slot umývačky:** `drawSlotBase` (telo so základňou prerušovane, línia linky) nahrádza `drawCarcass` v každom kontexte; `drawSlotDetail` (čelo s odvodenou
+  výškou z `nxSlotFrontEval`, kóty) len v Korpuse a vo vkladaní; cesty bez serverových čiel majú projekciu `nxSlotFrontItems`. Scéna `nxSlotExtent` obsiahne aj
+  trčiace telo. Rozmery generického tela sú zrkadlom Ruby (`PV_DW_BODY`, `PV_DW_BASE_H`, `PV_DW_BASE_SIDE`; guard test).
+- **Kontrolná geometria chladničky** (`preview.appliances[]`, kolekcia adresovaná `item_id`): `{item_id, label, box{x,z,w,h}, bands[…], split{…} | nil, state}` v mm
+  a súradniciach korpusu; geometria z `Construction.appliance_niche_references` (tá istá ako builder), verdikt z Kontroly. `drawApplianceRefs` len v Korpuse: box
+  prerušovane (teal, pri `clash` jantár), pásma dverí, pásmo prípustnej hrany; `na`/`unknown`/`unsatisfiable` pásmo nekreslí; model bez údajov o dverách má `bands`
+  prázdne. Scéna `nxRefExtent`. Globál `applPreview` plní `bridge.js`, chýbajúci kľúč = prázdne pole, odchod z výberu ho zahodí.
+- **Značka kovania má `data-owner`** (`owner_part_key`): klik → `nxHwMarkPick` v `hardware.js` (označí vlastníka a dotiahne jeho box v Kovaní).
 
-**ROH-A2 — čelný otvor.** Rohová má čelá len v **dverovej časti**. Otvor `{x0, w, z0, h}` je **serverový** (`Construction.front_opening`): payload označenej skrinky
-nesie `front_opening` uloženého stavu (`Panel.front_opening_payload`) a každá odpoveď preflightu čiel `opening` pre **aktuálnu revíziu** (živá šírka — pri dverách
-vpravo `x0 = W − D`); obe plnia globál `frontOpening` (`core.js`, z payloadu cez `nxAdoptCabinetDraft` len mimo rozpísaného návrhu `holdDraft`), ktorý
-`nxFrontDraftReset` pri zmene identity zahodí. Reset bez materializácie karty (**Späť/Znova** vo vkladaní — `NX.historyRefresh`, prázdny výber vkladanie →
-vkladanie — `NX.clearSelected`) si otvor vypýta znova cez `nxInsertDraftResume` (predrecenzia P2-1; pri označenej skrinke nič — otvor prinesie jej
-`loadSelected`). `pvGeom` z neho cez čistú
-`nxFrontOpeningFor(type, W, op)` vloží `fx0`/`fw` a **všetci čitatelia šírky čiel** (`frontsExtent`, `nxFrontsExtent`, `nxDraftStats`, `renderFrontsPreview`,
-`drawFrontDims`, `nxHwMarks`, `drawFrontsGhost`) merajú od otvoru. Ostatné typy dostanú vždy `{x0: 0, w: W}` a serverový otvor **ignorujú** — kresba dolnej, hornej aj
-slotu je pixel po pixeli rovnaká (parita v `tests/js/test_roha2_vkladanie.js`, jednorazovo aj proti `main`: 180 scén bez rozdielu). Rohová **bez známeho otvoru**
-(odpoveď preflightu po zmene identity ešte neprišla) čelá nekreslí vôbec (`frontsPending`) — dvere cez celú šírku by boli klamstvo. **ROH-B1:** dverová časť
-je živé pole — jej zmena mení signatúru preflightu (`nxFrontDraftData` posiela `corner_door_w` z poľa), takže otvor a náhľad sa prepočítajú aj pri označenej rohovej
-(server berie stranu z uloženého configu, dverovú časť zo živého formulára).
+**Spodný pás** (`.pvbar`, `renderPvBar`): **chipy vrstiev** Zóny·Čelá·Kovanie·Olep — chip kontextu je základ, ostatné sa prisvietia ako ghost (tlmené,
+`pointer-events: none`); Olep mimo kontextu Dielec a chip bez dát sú `aria-disabled` s vysvetlením. Stav per kontext v `NXLayers`, nová identita ho resetuje.
+Vpravo **kamera** a **fit**. Kamera = čisté čítanie: `nx_camera_focus` → `Panel.handle_camera_focus` (`view.camera.set` čelne + `view.zoom(entity)`; žiadny
+`start_operation`, výber sa nemení; prísny guard `model_guid` + `cabinet_id`). Chipy prepínajú vrstvy náhľadu, nie tagy modelu.
 
-**ROH-B2 — kresba rohovej zostavy (mockup C).** Geometriu dielcov zostavy **počíta server** (`Panel.corner_preview_json` nad `Construction.corner_parts`,
-odsek payloads.rb) a panel ju **len kreslí** — globál `cornerPreview` (`core.js`) plní payload označenej rohovej (`corner_preview`, uložený stav, cez
-`nxAdoptCabinetDraft`) a každá odpoveď preflightu (`corner_preview` pre živé polia — `nxFrontDraftData` pri rohovej posiela aj `corner_cr1`/`corner_cr2`
-a strop `top_mode`/`rail_*`, kresba blendy siaha po strop); `nxFrontDraftReset` ju zahodí ako otvor. `pvCornerPreview` ju vráti **len pri type Rohová**,
-takže ostatné typy kreslia pixel po pixeli to isté (parita v `test_rohb2_nahlad.js`, jednorazovo aj proti `main`: 180 scén bez rozdielu).
-`drawCornerAssembly` kreslí dielce v poradí servera — **blenda korpusová tlmená a šrafovaná** (vzor `pvCornerHatch`), rohová výstuha a CR 2 ako **18 mm pásy**
-(kolmo — spredu hrana), CR 1 ako čelový pás; každý dielec má bublinu servera (`<title>`) a klik nikam nevedie; **nezmestená zostava** (`fits === false`)
-má výstuhu a CR lišty v červenej chybného poľa. Projekcie: **Korpus** kreslí zostavu aj **dvere** (O12 — `renderFrontsPreview` obalené `pointer-events="none"`,
-klik na čelo patrí kontextu Čelá) a koty dverovej časti a CR 1 (`drawCornerDims`, z −26) so šírkou o riadok nižšie (`renderCabOutline(…, corner)`,
-z −62 — v rezerve `DIM_EXT`); **vkladanie** rovnako, keď je vrstva Čelá zapnutá (zhasnuté čelá odkrývajú vnútro, blenda by ho zakryla); **Čelá**
-a **Kovanie** majú dielce korpusu (blenda, výstuha) tlmené; **Zóny** zostavu nekreslia. Výstuha závesov je za dverami a v kresbe nie je.
+**Ťahanie priečky:** `pointerdown` + **pointer capture**, koniec na `pointerup`/`pointercancel`/strate fokusu cez jediné `endDivListeners`. **Magnet** 1/4 · 1/2 ·
+3/4 cez zdieľanú `nxZoneSnapCum` (tá istá geometria ako pole „Prvá zóna"), prah v pixeloch podľa zoomu, **Alt ho vypína** (rozhodne sa pred aplikáciou); ukladá
+sa mm Float 0,01 (`nxRound2`).
 
-**UI-C4 dala značke `data-owner`** (ten istý `owner_part_key`, ktorý už prišiel v payloade — žiadne nové dáta): klik ide na `nxHwMarkPick` v `hardware.js`, teda označí vlastníka v
-modeli a dotiahne jeho box v sekcii Kovanie; keď box neexistuje (sekcia ešte nemá dáta), ostáva pôvodné správanie z UI-B2 — popis položky v statuse. Geometriu berú všetky vrstvy z
-**jedného** `pvGeom()`, aby sa dve kresby nemohli rozísť; scéna (`sceneSize`) si pre každú projekciu rezervuje presne toľko miesta, koľko jej kóty potrebujú (drag priečok počíta
-cez `viewMapping`, takže rozšírenie scény ho nemení).
-
-**Spodný pás** (`.pvbar`, statická kostra v `panel.html`, obsah kreslí `renderPvBar`): vľavo **chipy vrstiev** Zóny·Čelá·Kovanie·Olep — chip kontextu je **základ** (nedá sa
-zhasnúť), ostatné sa dajú **prisvietiť ako ghost** (tlmené čiarkované linky, `pointer-events: none`, žiadne výplne ani kliky); **Olep** je mimo kontextu Dielec **neaktívny s
-vysvetlením** (hranové dáta nesie iba `part_card`) a rovnako je neaktívny každý chip bez dát — `aria-disabled`, nie HTML `disabled` (vzor D-78). Stav chipov je **per kontext v
-pamäti okna** (`NXLayers`) a **nová identita výberu ho resetuje** rovnakou cestou ako `viewContext` (`setUiMode` → `NXShell.track` → `NXLayers.reset`), echo push ho nemení. Vpravo
-**kamera (N7)** a **fit** — fit sa sem presunul z rohového overlayu (jedno miesto ovládania, čistá plocha SVG).
-
-**Kamera je čisté čítanie:** `nx_camera_focus` → `Panel.handle_camera_focus` (`ui/panel/selection.rb`) postaví čelný pohľad (`view.camera.set` — oko v −Y od stredu obálky, hore +Z)
-a doramuje `view.zoom(entity)`; kamera **nie sú dáta modelu**, takže ŽIADNY `start_operation`, žiadny zápis a **žiadny krok Späť** (lekcia D-103), a výber sa nemení. Guard je
-**prísny** ako pri `clear_selection` — payload nesie `model_guid` aj `cabinet_id` (callback HtmlDialogu je asynchrónny a ID skriniek sa naprieč dokumentmi opakujú); nezhoda = len
-hláška.
-
-**D-27 tým NIE JE uzavreté** — chipy prepínajú vrstvy náhľadu, nie tagy modelu. Čisté jadro testuje `tests/js/test_uib2_nahlad.js`, zdrojové guardy
-`tests/pure/test_uib2_nahlad.rb`, serverovú stranu sekcia `run_uib2` in-SketchUp runnera.
-
-**UI-C2 zmenila ťahanie priečky:** delegácia beží na `pointerdown` (bez `pointerId` sa nedá nastaviť **pointer capture**, a bez capture visiaci `mouseup` mimo okna nechal ťahanie
-zaseknuté aj s neuloženým stavom) a drag končí na `pointerup`/`pointercancel`/strate fokusu — vždy cez jediné `endDivListeners`.
-
-**Magnet (N20)** prilepí priečku na 1/4 · 1/2 · 3/4 cez **zdieľanú** `nxZoneSnapCum`, teda tú istú geometriu, akou počíta pole „Prvá zóna“ (poloha priečky a číslo v poli sa nemôžu
-rozísť); prah je **v pixeloch prepočítaných aktuálnym zoomom** (pri priblíženom pohľade musí ísť doladiť na desatiny mm) a **Alt ho vypína — rozhodne sa PRED aplikáciou**. Ukladá
-sa mm Float 0,01 (`nxRound2`), nie celé mm.
+Testy: `tests/js/test_uib2_nahlad.js`, `tests/pure/test_uib2_nahlad.rb`, in-SU `run_uib2`.
 
 ### Kontext Zóny (UI-C2, panel.html + ui/js/actions.js + ui/js/zone_tree.js)
 
-poradie skupín je záväzné — **Štruktúra zón NAVRCH** (`data-s4-solo`, teda mimo exkluzivity: strom sa nesmie zatvoriť pri otvorení inej skupiny), pod ňou **Delenie zóny · Police ·
-Vnútro**. Kostra je STATICKÁ (A4): JS píše len obsah `#zoneTree` / `#zoneFields` a stavy existujúcich uzlov.
+**Čo robí:** strom zón skrinky a úpravy listovej/delenej zóny. Poradie skupín je záväzné — **Štruktúra zón NAVRCH** (`data-s4-solo`, mimo exkluzivity), pod
+ňou **Delenie zóny · Police · Vnútro** (Vnútro je rezervovaný slot bez polí). Kostra je statická: JS píše len `#zoneTree` / `#zoneFields` a stavy uzlov.
+Serverová strana: `actions_zones.rb`.
 
-**Strom kreslí spojnice** vnorenými kontajnermi `.zkids` (odsadenie paddingom by čiaru nakresliť nevedelo; prázdny kontejner listu sa nezobrazuje); **úroveň nad `MAX_LEVELS` je
-NEklikateľný varovný riadok** (`.znode.deep`) — legacy strom sa nikdy neoreže, len sa prizná.
+- Strom kreslí spojnice vnorenými `.zkids`; **úroveň nad `MAX_LEVELS` je neklikateľný varovný riadok** (`.znode.deep`) — strom sa nikdy neoreže.
+- **Aktivita ovládačov je pravidlo:** dlaždice delenia (2/3 stĺpce · 2/3 riadky) a pilulky políc 0–6 sú aktívne **len na listovej zóne** (inak `aria-disabled`
+  s dôvodom), pole **„Prvá zóna" len na delenej** (skratka na pole 1: vyplnená hodnota pole zamkne, prázdna odomkne). To isté vynucuje server.
+- **Presná cesta nezmestiteľnú hodnotu odmietne** (`nxZoneExactCuts`) — zvyšok sa dorovná do posledného odomknutého poľa, presnosť 0,01 mm. Zlomkové presety
+  (`nxZoneFractionOptions`) z tej istej geometrie; nedosiahnuteľný zlomok sa neponúka.
+- **Draft režim vkladania má plnú paritu** (listovosť, hĺbka, strop políc sa kontrolujú lokálne; každá draftová vetva volá `nxDraftChanged()`).
+- **Všetky zónové callbacky idú cez `nxZonePayload`** (pridá `model_guid` + `cabinet_id`).
+- **Rohová skupinu „Delenie zóny" nemá** (`applyVisibility` pri `corner_blind` skryje `details[data-key="zsplit"]`; `body.mode-cab [data-s4][hidden]` v `panel.css`).
 
-**Aktivita ovládačov je pravidlo, nie kozmetika:** dlaždice delenia (2/3 stĺpce · 2/3 riadky) a pilulky políc 0–6 sú aktívne **LEN na listovej zóne** (na delenej sú viditeľné, ale
-`aria-disabled` s vysvetlením — vzor D-78; klik na ne povie dôvod, nemlčí), pole **„Prvá zóna“ naopak žije len na DELENEJ zóne** (edituje jej pole 1). To isté pravidlo vynucuje
-server (`ui/panel/actions_zones.rb`) — HTML `disabled` sa za ochranu stavu nepovažuje.
-
-**„Prvá zóna“ je skratka na pole 1** (B5: vyplnená hodnota pole ZAMKNE, prázdna odomkne — vzor Čelá „zamknuté ⇔ vypísané“); úplná cesta so zámkom KAŽDÉHO poľa ostáva v
-`#zoneFields` pod ňou.
-
-**Presná cesta (N21) nezmestiteľnú hodnotu ODMIETNE** (`nxZoneExactCuts`) — žiadne tiché zmenšenie; zvyšok sa deterministicky dorovná do POSLEDNÉHO odomknutého poľa a všetko sa
-ukladá s presnosťou 0,01 mm. Zlomkové presety (1/4 · 1/3 · 1/2) skladá `nxZoneFractionOptions` z tej istej zdieľanej geometrie a **nedosiahnuteľný zlomok sa neponúka**; ponuka je
-bežná `.miniopts` (otvorená je vždy najviac jedna, zatvára ju `nxDimCloseMenus`).
-
-**Draft režim vkladania má PLNÚ paritu** (F10): server tam neexistuje, takže listovosť, hĺbka aj strop políc sa kontrolujú lokálne **pred** vetvou draft/server a každá draftová
-vetva volá `nxDraftChanged()`.
-
-**Všetky zónové callbacky idú cez `nxZonePayload`** — jedno miesto, ktoré k requestu pridá `model_guid` + `cabinet_id`.
-
-**Vnútro je rezervovaný slot** (bez polí, po V1). Čisté jadro testuje `tests/js/test_uic2_zony.js`, serverový a kostrový kontrakt `tests/pure/test_uic2_zony.rb`, živý model sekcia
-`run_uic2` in-SketchUp runnera.
-
-**ROH-B2 — rohová skupinu „Delenie zóny" nemá.** Server delenie rohovej odmieta od ROH-A1, preto `applyVisibility` pri `corner_blind` skupinu
-`details[data-key="zsplit"]` skryje (`hidden`; pravidlo `body.mode-cab [data-s4][hidden]` v `panel.css` prebije kontextové `display: block`). Strom
-aj Police ostávajú.
+Testy: `tests/js/test_uic2_zony.js`, `tests/pure/test_uic2_zony.rb`, in-SU `run_uic2`.
 
 ### actions_zones.rb — zónové akcie servera
 
-všetky handlery (`split_zone` · `set_zone_shelves` · `clean_zone` · `set_zone_field` · `select_zone`) prechádzajú spoločným vstupom **`zone_ctx`**, ktorý **PRÍSNE** overí identitu
-dokumentu (`model_guid`) aj skrinky (`cabinet_id`) a **formát celého `zone_id`**. ID zón sa medzi dokumentmi opakujú (`CAB-001-Z1.2` je v každom projekte), takže oneskorený
-callback CEF by po prepnutí dokumentu prestaval cudzí model.
-
-**`Panel.zone_path` vracia pri poškodenom ID `nil`, NIE koreň** — dovtedajší fallback `[1]` znamenal, že preklep alebo orezaný reťazec poslal „Vyčistiť zónu“ na koreň a zmazal celé
-vnútro skrinky.
-
-**ROH-A1 — rohová delenie nepozná.** `split_refusal` pri skrinke typu `corner_blind` vráti `Construction::CORNER_ZONES_MSG` (obe osi `v` aj `h`) ešte pred
-kontrolou listu — priečka by v slepej časti narazila na blendu korpusovú. Police ostávajú; invariant drží aj `Construction.validate!` (šablóna ho neobíde).
-
-**`apply_zone_mod` vetví návratovú hodnotu mutácie**: `false` = strom sa nezmenil ⇒ chybový status a **žiadny rebuild** (predtým sa skrinka prestavala a status hlásil úspech), a
-volajúci hlási úspech až po úspešnej mutácii. Presnú príčinu odmietnutia skladá handler sám (`split_refusal`) — používateľ dostane „zóna je už delená, najprv Vyčistiť“ alebo „strom
-má najviac 3 úrovne“, nie „nepodarilo sa“. `handle_set_zone_field` pred zápisom volá `ZoneTree.validate_cuts` so **svetlým priestorom zóny z PLÁNU** (`zone_clear_span` — tá istá
-cesta, akou počíta builder, takže sa kontrola a stavba nemôžu rozísť; zlyhanie plánu = kontrola súčtu sa preskočí, ostatné pravidlá platia), a status presnej cesty číta z
-**`cuts[index]`**, nie z prázdneho `size` (predtým hlásil „auto“ aj pri presnom rozmere).
-
-**`zone_depth_note`** pridáva ORANGE varovanie k vloženiu (`handle_insert`) aj k aplikácii šablóny (`TemplatesDialog`), keď má strom viac než `MAX_LEVELS` úrovní — vloženie sa
-**povolí**, orezanie je zakázané.
+Handlery `split_zone` · `set_zone_shelves` · `clean_zone` · `set_zone_field` · `select_zone` idú cez spoločný vstup **`zone_ctx`**, ktorý **prísne** overí
+dokument (`model_guid`), skrinku (`cabinet_id`) a **formát celého `zone_id`** (ID zón sa medzi dokumentmi opakujú).
+- **`Panel.zone_path` vracia pri poškodenom ID `nil`, nie koreň** (inak by „Vyčistiť zónu" zmazalo celé vnútro).
+- **Rohová delenie nepozná:** `split_refusal` pri `corner_blind` vráti `Construction::CORNER_ZONES_MSG` (obe osi) ešte pred kontrolou listu; police ostávajú;
+  invariant drží aj `Construction.validate!`.
+- **`apply_zone_mod` vetví návratovú hodnotu mutácie:** `false` = strom sa nezmenil ⇒ chybový status a **žiadny rebuild**; úspech sa hlási až po úspešnej
+  mutácii. Presnú príčinu skladá `split_refusal` („zóna je už delená…", „strom má najviac 3 úrovne").
+- `handle_set_zone_field` pred zápisom volá `ZoneTree.validate_cuts` so **svetlým priestorom zóny z plánu** (`zone_clear_span` — cesta buildera; zlyhanie plánu =
+  kontrola súčtu sa preskočí); status presnej cesty číta z `cuts[index]`.
+- **`zone_depth_note`** pridá ORANGE varovanie k vloženiu (`handle_insert`) aj k aplikácii šablóny, keď má strom viac než `MAX_LEVELS` úrovní — vloženie sa
+  povolí, orezanie je zakázané.
 
 ### Kontext Čelá (UI-C3, panel.html + ui/js/form.js + ui/js/core.js + ui/js/settings.js + ui/js/preview.js)
 
-**ROH-B2 — Čelá rohovej (O10, mockup B · Čelá).** Rohová má v dverovej časti **jedny dvierka** (R6, server iný stav odmieta). `nxSlotFrontsLock` (spoločný so
-slotom) pri rohovej skryje popisok a rad „Pridať čelo" a na ich mieste ukáže vetu `#frontOneDoor` „Rohová skrinka má v dverovej časti jedny dvierka." (žiadny
-riadok navyše), krížik riadku nechá viditeľný s `aria-disabled` a dôvodom (`delFrontRow` ho ignoruje a vráti `false` — žiadny prázdny apply) a výšku dá na
-čítanie (AUTO). Karta čela dostane `opts.corner` = strana dverí (`nxCornerCardSide`): ostatné dlaždice typu majú `lock` (`aria-disabled` + bublina s dôvodom,
-`onFrontTile` ich ignoruje), krídla ponúkajú len 1 (2–4 zamknuté, `onFrontSeg` ich ignoruje) a smer sa volá **„Pánty": Pri boku / Pri rohu**
-(`frontCornerDirOptions` — hodnoty ostávajú `left`/`right`, ikona ukazuje skutočnú stranu; slovo dá `frontCornerHingeWord`: roh leží oproti dverovej časti,
-nie je to heuristika smeru — predvoľbu R7 dosadzuje výhradne server). Súhrn riadku povie „pánty pri rohu / pri boku" (`frontRowSummary(…, corner)`).
-Ostatné typy majú kartu aj súhrn bez zmeny.
+**Čo robí:** zoznam čiel označenej (alebo vkladanej) skrinky s kartou každého čela a spoločné nastavenia čiel skrinky. **Dve skupiny v záväznom poradí**
+(`test_uic3_cela.rb`): **Čelá** (`data-key="fronts"`) · **Spoločné pre skrinku** (`cabfront`: riadok **Materiál čiel** `cab_front_c` + schéma medzier
+`.gapdiag`). Dáta: `cabinet_payload` (`front_items`, `front_slots`, `front_drawer`, `front_lift`, `front_opening`), zápis `collectFronts` → `apply_all` (jeden krok
+Späť) po čítacom preflighte `front_preflight` (nižšie).
 
-**ČELÁ-C / D-114 (v0.11.0):** `renderFrontAddTypes` vytvorí jeden stabilný rad šiestich ikon z `FRONT_CARD_TYPES` a existujúcej mapy `FRONT_TYPE_ICON`.
-Každá volá `addFrontKind` s konkrétnym typom; nové dvierka aj prázdna nika používajú existujúce výrobce a výškový fokus. Rad sa pri echu neprestavia.
-Pri 470 px ostáva šesť ikon aj horný riadok čela bez zalomenia, karta zostáva otvorená najviac jedna. Súhrn Úchytiek zoskupuje podľa profilu **aj hrany**;
-neplatná hrana dostane výzvu a žiadny odhad. Indikátor popíše hranu a skrátenú os, jeho ovládače sú v karte alebo Úchytkách. Helpery sú krátke a bez prekonaných prísľubov.
+**Hlavičky skupín:** `#frontMeta` („3 čelá · 1 bez smeru"; počet z DOM, „bez smeru" výhradne zo `front_slots`) + akcia **„všetkým"**; `#cabfrontMeta` (dekor ·
+medzera · štyri okraje, `cabfrontMetaText`), zámok limitu presahov `#edgeLimitLock` (stav v ikone `lock`/`lock-open`, `title`, `aria-pressed`, `amber`) a ikona
+„Predvolené" `#frontGapsReset`. **Každé tlačidlo v `<summary>` musí `preventDefault()` aj `stopPropagation()`** (`nxTipStop`), inak klik skupinu zbalí.
 
-**ČELÁ-B1 (v0.10.7):** formulár prenáša prítomné `profile_edge` bez dopĺňania defaultu. Náhľad kreslí fyzické `profile_edges` uložených riadkov;
-top/bottom skracuje výšku, left/right šírku, `free` bez resolved hrán nič neodhaduje. Profil podporujú všetky fyzické typy. Ovládače hrán a korelovaný návrh doplnilo B2 (v0.10.8), kontrakt je nižšie v Úchytkách.
+**Materiál čiel** má v tomto kontexte druhý ovládač `cab_front_c` (sektor Materiály patrí Korpusu) — tá istá hodnota, synchro drží každá cesta, ktorá siaha na
+`cab_front`; zmena dekoru prekreslí meta (`setCabinetMaterials`/`clearCabinetMaterials` → `updateCabfrontMeta`).
 
-**D-130a (v0.12.7)** zúžila kontext na **dve skupiny**, **D-130b (v0.12.8)** ich pomenovala finálne: **Čelá** (`data-key="fronts"`) · **Spoločné pre skrinku** (`cabfront`) —
-poradie je kontrakt (`test_uic3_cela.rb`). `fhandles` zanikla (nižšie, Úchytky) a `fgaps` („Medzery a presahy") sa zlúčila do `cabfront`. Druhá skupina drží všetko, čo platí
-**naraz pre všetky čelá jednej skrinky**: riadok **Materiál čiel** (`cab_front_c`, prvý) a **schému medzier a okrajov** `.gapdiag` (nižšie, N26). V hlavičke sú meta
-`#cabfrontMeta` (dekor · medzera · štyri okraje — stav vidno aj pri zbalenej skupine; text skladá čistá `cabfrontMetaText` v `core.js`, `form.js` ho len kreslí), **ikona zámku
-limitu presahov** `#edgeLimitLock` (stav nesie ikona `lock`/`lock-open`, `title`, `aria-pressed` a trieda `amber` — textový label zanikol) a **ikona „Predvolené"**
-`#frontGapsReset`; tooltip `?` nahradil pomocný text. Každá z nich musí `preventDefault()` **aj** `stopPropagation()` (spoločný `nxTipStop`) — inak by klik skupinu zbalil.
-Riadok čela `.frow` je **CSS GRID so stálymi stĺpcami** `22px minmax(0,1fr) 112px 22px` a riadkami 1 = názov · 2 = súhrn · 3 = karta (stĺpce 2–4). Predtým to bol flex rad, takže
-poloha poľa výšky závisela od toho, **čo v riadku práve bolo** (chip AUTO, „mm", select krídel, ikona profilu) a polia „lietali" (D-130); pred SMOKE PACKOM 1 sa rad pri vypísanej
-výške dokonca zalomil. Deti sa kladú do mriežky **priamo** (obal `.fmain` zanikol), každé má pozíciu v CSS, nie v poradí; hľadajú sa **výhradne cez triedy**, takže obrátený render
-D-23, čítanie odspodu aj `closest('.frow')` platia bez zmeny. Mriežka nesie: `.fnum` (kanonická pozícia F1 dole — D-23, cez oba riadky) · **`.ftname`** (tlačidlo karty: ikona typu
-`.ftico` + názov `.ftl` s ellipsis + chevron `.fchev`) · **`.fsubwrap`** (súhrn `.fsub` + koncovka kovania `.fhwlink`) · **`.hbox`** (pole výšky) · `.fdel` (tlmený, červený až pri
-hoveri). `select.fw`, `.fprof` aj samostatný riadok `.fhw` **zanikli**.
+**Riadok čela `.frow`** je **CSS grid so stálymi stĺpcami** `22px minmax(0,1fr) 112px 22px`, riadky 1 = názov · 2 = súhrn · 3 = karta. Deti sa kladú do mriežky
+priamo a hľadajú **výhradne cez triedy** (obrátený render D-23 a `closest('.frow')` platia): `.fnum` (F1 dole) · `.ftname` (tlačidlo karty: `.ftico` + `.ftl` +
+`.fchev`) · `.fsubwrap` (súhrn `.fsub` + koncovka kovania `.fhwlink` — súrodenci, nie vnorené) · `.hbox` · `.fdel`. **Stredný stĺpec je jediný rastúci**;
+rozpočet pri 470 px stráži `tests/pure/test_smoke1_riadky.rb` (nový ovládač si musí nájsť miesto v mriežke). Medzi čelami hairline `.frow + .frow` bez nového
+vertikálneho priestoru.
+- **Súhrn `.fsub`** — „1 krídlo (auto) · smer? · bez úchytky · Sensys klasik · 2 ks →" — skladá čistá **`frontRowSummary(item, entry, hw, reg, drawer, corner)`**
+  (`core.js`, vracia pole častí), `form.js` kreslí (`updateFrontRowSummary`). **Počet krídel hovorí server** (`front_slots[fid].wings_n`; bez záznamu „auto").
+  **Smer** len z uloženej hodnoty a **len cez aktívne sloty** (`front_slots[fid].slots`) — dormantné `wing_directions` sa neťahajú; bez slotov rozhoduje skalárny
+  `direction` pri jednom krídle, a keď server `wings_n` nedodal, bez ohľadu na počet. Legacy čelo bez kľúča nedostane slovo ani badge. Obnovuje sa pri light pushi
+  aj plnom renderi pod `keepGaps` guardom.
+- Klik na súhrn = karta na tabe **Čelo**, klik na `.fhwlink` = karta na tabe **Kovanie**; bez naviazaného kovania je koncovka `hidden`.
+- **Pole výšky `.hbox`** = jeden box s konštantnou šírkou 112 px `[chip AUTO][hodnota][mm][šípka radu]`; chip `.fauto` je tlačidlo (`frontHeightAuto`) len pri
+  vypísanej hodnote, „mm" vždy, placeholder „≈ N" kurzívou, pevná hodnota tučná. **Zamknuté ⇔ vypísané** (`collectFronts` posiela `locked: hasH`); chip pole
+  vyprázdni pôvodnou udalosťou `input`. Výškový rad `vyska_cela` nesú riadky v atribútoch `data-dim-key` + `data-dim-input` (`nxDimFillRow`).
+- Živý náhľad výrazu `.exprhint` je **overlay** pod poľom (nie flex položka).
+- **Pridávanie:** rad šiestich ikon „Pridať: typ" (`renderFrontAddTypes` z `FRONT_CARD_TYPES` + `FRONT_TYPE_ICON`, popisok „Pridať čelo", `.addrow`) → `addFrontKind`;
+  rad sa pri echu neprestavia. Maže sa krížikom konkrétneho riadku.
+- **Tooltip `.nxtip`** (spoločný komponent): obsah v `data-tip`, hover aj fokus, šírka 250 px, `.r` zarovnaná vpravo. **Pomocný text = tooltip, stavová veta ostáva
+  viditeľná**; v kontexte Čelá je jediný `.hint` = `frontDraftMessage` (guard `test_d130a_zoznam_ciel.rb`).
 
-**SÚHRN RIADKU `.fsub` (D-130a R3).** Jeden tlmený riadok pod názvom — „1 krídlo (auto) · smer? · bez úchytky · Sensys klasik · 2 ks →" — takže stav **všetkých** čiel vidno bez
-otvárania kariet. Zlúčil tri veci, ktoré boli po riadku rozsypané: badge „smer?" (KOV-A2a, dovtedy v názve), indikátor profilu `.fprof` (D-90) a riadok kovania `.fhw` (UI-C3).
-Text skladá **čistá funkcia `frontRowSummary(item, entry, hw, reg, drawer)`** v `core.js` (vracia pole častí, nie reťazec — badge a jantárové „bez klasifikácie" potrebujú vlastný
-markup); `form.js` ho len kreslí (`updateFrontRowSummary`). **Žiadne nové dáta:** dataset riadku, `front_slots`, `front_drawer` a hotový text kovania (`frontHwBadge` +
-`frontHwBuy`). **Počet krídel hovorí SERVER** (`front_slots[fid].wings_n`) — AUTO dvierka nad 600 mm sú dve krídla a to vie len on; bez záznamu sa píše len „auto". **Smer** ide
-výhradne z uloženej hodnoty: legacy čelo (kľúč chýba) nedostane ani slovo, ani badge — badge „smer?" len pri `unset`. **Ráta sa LEN cez aktívne sloty** (`front_slots[fid].slots`,
-Codex #371): prechádzať všetky uložené `wing_directions` bolo zle, lebo po návrate zo 4 krídel na 2 ostáva `p2: unset` ako **dormantná** hodnota (A1: návrat nič nemaže) a riadok
-by navždy svietil „smer?" na otázku, ktorú nikto nekladie. Bez slotov rozhoduje skalárny `direction`, a to len pri **jednom** krídle — dvojkrídlo má smer odvodený; **ak server
-`wings_n` nedodal vôbec** (legacy echo, nové čelo pred prvým pushom), rozhoduje skalárny `direction` bez ohľadu na počet krídel (`core.js` ~r. 418). Obnovuje sa
-tam, kde sa dovtedy obnovovali badge (light push aj plný render), takže riadky sa pod `keepGaps` guardom **neprestavujú**.
+**Karta čela `.fcard`** = posledný potomok `.frow` (tretí riadok mriežky, priamo pod svojím riadkom), otvorená **najviac jedna**, drží sa cez **identitu čela**
+(`openFrontCardId`), bez hlavičky.
+- **Dva taby** (`frontCardModel` vracia `tabs`, `rows` = Čelo, `hwRows` = Kovanie; `openFrontCardTab`): **Čelo** = typegrid, krídla, smer, otváranie, konštrukcia,
+  zásuvka, úchytka · **Kovanie** = vyriešený set, chipy zámkov osí, technický detail, ponuka verzie receptu, „Otvoriť v Kovaní". Default Čelo pri otvorení inej
+  karty (aj deep-link `nxFocusFront`), `refreshFrontCards` tab **zachová**; prepnutie tabu nič nezapisuje; badge „smer?" sedí na tabe Čelo. **Červená stavová veta
+  stojí v oboch taboch**, jantárové odporúčanie a `locked_note` len v Kovaní. Tab Kovanie má každý fyzický typ vrátane blendy (chýba pri `none`); prázdny stav sa
+  neodvodzuje len z `hwRows` — poradie: text (`frontHwBadge` + `frontHwBuy`) → box vlastníka → „Bez kovania."
+- **Typegrid** = 6 dlaždíc (Dvierka · Zásuvka · Výklop · Sklop · Blenda · **Bez čela**; `FRONT_TYPE_TIP`); typ žije v `dataset.frontType`, ikonu typu prekladá
+  jediná mapa `FRONT_TYPE_ICON` (mení sa `href` v `<use>`). Kontextové riadky `.prow`: **Krídla** (auto · 1–4, len dvierka; hodnota v `dataset.frontWings`, legacy
+  bez kľúča = `auto`; `onFrontWings` → `frontExtraOnWings` → `refreshFrontCards` → `onField`) · **Smer** (Ľavé · Neurčené ⚠ · Pravé) pri slote `single` ·
+  **Krídlo 2/3** (2/4, 3/4) pre stredné krídla · **Otváranie** (Klasické · Tip-On) · **Konštrukcia** + **Zásuvka** · **Úchytka**. Výber **setu** v karte nie je
+  (patrí položke kovania). Klik na už nasadenú hodnotu sa zahodí (`aria-pressed`).
+- **Kde sa smer pýta, rozhoduje VÝHRADNE SERVER** (`front_slots` = `front_id → { wings_n, slots }` z `Fronts.direction_slots`): neprázdne `slots` → tie krídla ·
+  `slots == []` a `wings_n == 2` → veta o dvojkrídle · `slots == []` a `wings_n` null alebo chýbajúci kľúč → karta mlčí. `state` je len zdroj badge.
+- **„Neurčené" vzniká výhradne štyrmi akciami** cez čisté funkcie `frontExtraOnTypeChange` · `frontExtraOnWings` · `frontExtraOnSegrow` (vracajú nový objekt):
+  „Pridať: Dvierka" (`addFrontRow` pri `userAdd`), prepnutie dlaždice na dvierka bez uloženého smeru, klik na „Neurčené", prepnutie na 3/4 krídla (len chýbajúce
+  stredné krídla). Render ani echo nezapíšu nič, návrat nič nemaže (dormant). Literál `FRONT_DIR_UNSET` žije len v `core.js` (allowlist `test_kova1_cela.rb`).
+- **Pass-through:** `addFrontRow` odkladá `direction`, `wing_directions`, `opening_mode`, `drawer`, `lift` a `profile_edge` do `row.dataset.frontExtra` (len prítomné
+  kľúče) a `collectFronts` ich vráti **bez defaultu** (`frontExtraSet`, prázdny objekt dataset odstráni) — kľúč, ktorý config nemal, sa nesmie objaviť.
+- **Fokus prežije prekreslenie karty** (`card.innerHTML`): `frontCardFocusKey` / `frontCardFocusSelector` podľa logickej identity (`data-t`, `data-k`+`data-v`+`data-w`,
+  `data-tab`, `data-pc`), len keď fokus ležal v tej istej karte; `focus({ preventScroll: true })`.
+- **Otvorená karta patrí konkrétnej skrinke:** čistá `frontCardKeepOpen(prevCabId, nextCabId, openId)` volaná v `bridge.js` pred `renderFronts` (pri zmene dokumentu
+  predchodca `null`); doska, prázdny výber aj návrh vkladania kartu zatvárajú. Testy `tests/js/test_kova2a_karta.js`, `tests/pure/test_kova2a_karta.rb`.
+- **„Otvoriť v Kovaní"** prepne kontext a doskočí na box vlastníka (`hwBoxByGroup(hwFrontGroup(fid))` — kľúč skupiny skladá jedna funkcia, `.hwfocus`); keď box
+  neexistuje, tlačidlo ostáva `aria-disabled` s dôvodom a klik nerobí nič (`onFrontOpenHardware`); `openFrontHardware` overí box pred prepnutím kontextu.
 
-**Koncovka kovania `.fhwlink` je SÚRODENEC, nie vnorený prvok** (R3-f): druhý riadok mriežky je flex obal `.fsubwrap` s dvoma tlačidlami — `.fsub` rastie a oreže sa, `.fhwlink`
-má pevnú stopu. Tlačidlo v tlačidle je neplatné HTML, nedá sa fokusovať a ellipsis suseda by ho orezal. Klik na súhrn = toggle karty na tabe **Čelo**, klik na koncovku = karta
-rovno na tabe **Kovanie**; prepnutie kontextu robí až tlačidlo „Otvoriť v Kovaní" v tom tabe (N13). Bez naviazaného kovania je koncovka `hidden` (prázdne tlačidlo by bralo tab-stop).
+**Zásuvka v karte** (zdroj **výhradne server** — `front_drawer`, karta nič neodvodzuje):
+- `ok` → jeden read-only riadok („Atira · H70 · NL 470 · 30 kg · SiSy · recept v1") + rozbaliteľný „Technický detail" (vety receptu, „Balenie: <set>" a členovia
+  z jediného rozpisu `HardwareSets.explain`; **nosnosť v balení nie je** — vydáva ju len recept) + jantárový riadok pri odporúčaní synchronizácie · `conflict` →
+  **červená veta stavby namiesto hodnôt** · `stale` → červená „prestav skrinku" · `pending` / chýbajúci kľúč → mlčí. Ikonu `alert` nesie len červený a jantárový riadok.
+- Veta **„Zásuvka bez klasifikácie"** len keď chýbajú **všetky** klasifikačné polia (konštrukcia · variant · otváranie) **a** server o zásuvke nič nepovedal
+  (predikát panela = predikát servera `Recipes.recipe_key_for`).
+- **Chipy zámkov osí** (`H144 výška`, `NL 470`, pri Quadre `box 360`) — ten istý markup `hwAxHtml` ako sekcia Kovanie, riadok `kind: 'axes'` z čistej
+  `frontDrawerAxesRow`, **len keď server poslal stav osí (`axes`) aj identitu zápisu (`lock`)**. Chipy má aj konfliktná karta; vonkajšia červená veta sa potlačí,
+  keď ju doslovne opakuje os v konflikte (`frontDrawerAxesSay`). `locked_note` menuje zamknuté osi; `Recipes.explain_stored(params, axes:)` pri zámku netvrdí vzorec.
+  Kontrakt chipov a kliku: „Kontext Kovanie".
+- **Ponuka novej verzie receptu** `.dwup` (úplne naspodku, pod jantárovým odporúčaním) vzniká **výhradne z kľúča `upgrade`** (`frontDrawerUpgradeRow`; bez neho nič);
+  markup a klik v `hardware.js` (`hwUpHtml`, `data-ax`/`data-axc`). Klik pošle čítaciu otázku `drawer_upgrade_impact` s tokenom (`NX.hwUpgradeImpact`); pri odmietnutí
+  preflightu len veta do statusu, pri `ok: true` kostra D-15 „Prejsť na novú verziu receptu" s tabuľkou dopadu na toto čelo („teraz → po prechode", nezmenené
+  stlmené; `type: 'custom'` bez `read`). Potvrdenie `upgrade_drawer_recipe` s vlastným tokenom (`NX.hwUpgradeResult`), okno sa zatvára až po potvrdení a počas
+  odoslania je zamknuté aj proti zatvoreniu (`busyLock`). **Zápis smie presadiť len to, čo používateľ videl:** server k dopadu pribalí **odtlačok**
+  (`Digest::SHA256` nad identitou a celým dopadom), klient ho len vráti, server ho pred zápisom prepočíta; nezhoda **aj chýbajúci** odtlačok = odmietnutie „stav
+  skrinky sa medzitým zmenil — otvor náhľad znova" a panel sa prekreslí. Keď zmenu odhalí až `prepare`, hláška je tá istá s pripojeným dôvodom
+  (`upgrade_stale_reason`, len pri `from_preview`). Odmietnutie nezapíše nič; jediné `start_operation` je v `CabinetBuilder.rebuild` za oboma bránami.
+- Testy: `tests/pure/test_kovc2c_karta.rb`, `tests/js/test_kovc2c_karta.js`.
 
-**META V HLAVIČKE `#frontMeta`** („3 čelá · 1 bez smeru") a **akcia „všetkým"** stoja v `<summary>` (`.gtools`). Každé tlačidlo v hlavičke musí `preventDefault()` **aj**
-`stopPropagation()` — `<details>` toggluje na klik kdekoľvek v hlavičke, takže bez toho by klik skupinu zbalil. Počet číta z DOM, „bez smeru" **výhradne** zo `front_slots`.
+**Výklop v karte:** typ `lift` má segment **„Systém" (HK top | HL top)** a jeden read-only riadok vyriešeného výklopu s „Technickým detailom"; **sklop (`fall`)
+systém nemá**. Zápis cez dormant polia (`FRONT_EXTRA_KEYS` → `collectFronts` → `Fronts.normalize_items`); `frontExtraOnSegrow` prepisuje kópiu objektu `lift`.
+Jediná výnimka z pravidla „kľúč, ktorý config nemá, sa nevyrobí": prepnutie typu **na** výklop materializuje `hk_top` (to isté zapíše `Fronts.normalize_config`);
+uložená hodnota sa neprepisuje. Zdroj = server `front_lift` (`frontLiftRows`): `ok` → riadok + detail (+ jantár navyše pri ORANGE) · `conflict`/`stale` → červený
+inforow s vetou servera namiesto riadku · `incomplete` → červený inforow **nad** zhrnutím, ktoré ostáva · `pending` / chýbajúci kľúč → mlčí. Veta „Mechanizmus vyberá
+automat…" len keď server o výklope nič nepovedal. HL top + Tip-On sa nastaviť dá — karta to hneď povie červenou, bránu drží server. **Set výklopu** (aj tmavý) sa
+vyberá pri položke v kontexte Kovanie (triedny kľúč `HardwareSets.class_key_for`, `compat.owners['front:<id>/flap']`, owner kľúč
+`class:lift|<mode>|<system>@front:<id>/flap`). Testy `tests/pure/test_kove2_ui.rb`, `tests/js/test_kove2_karta.js`.
 
-**KOV-A2a: `select.ftype` ZANIKOL.** Typ sa vyberá **piktogramom v karte čela** a v riadku žije v `dataset.frontType` (vzor D-90 `profile` — `collectFronts` ho číta odtiaľ, takže
-editácia iného poľa ho nestratí). Mapa `FRONT_TYPE_ICON` ostáva jediným miestom prekladu typ→symbol a kreslí ikonu v riadku **aj** dlaždicu v karte; mení sa `href` v `<use>`, nie
-innerHTML (vzor `NXIcons.set`). Výklop, sklop a blenda majú od tejto dávky **vlastné sprite symboly** (`front-lift` / `front-fall` / `front-blind`), nie fallback `front`.
+**Rohová** má v dverovej časti **jedny dvierka** (server iný stav odmieta): `nxSlotFrontsLock` skryje „Pridať čelo" a ukáže vetu `#frontOneDoor`, krížik je
+`aria-disabled` s dôvodom (`delFrontRow` vráti `false`), výška na čítanie. Karta dostane `opts.corner` (`nxCornerCardSide`): iné dlaždice a krídla 2–4 zamknuté,
+smer sa volá **„Pánty": Pri boku / Pri rohu** (`frontCornerDirOptions`, hodnoty `left`/`right`, slovo `frontCornerHingeWord`; predvoľbu dosadzuje len server);
+súhrn „pánty pri rohu / pri boku". **Slot umývačky:** `nxSlotFrontsLock` schová „Pridať čelo", krížik aj chip AUTO, výška na čítanie, riadok „Dvere umývačky"
+(`frontRowLabel`/`frontRowIcon`), karta bez dlaždíc (`frontCardModel(…, { slot: true })`) — vynucuje server (`Panel.slot_fronts_refusal`; výška sa neposudzuje).
+Preflight slotu počíta s virtuálnym otvorom a riadok kanonizuje `slot_fronts!` s výškou z `dw_front_eval` (`slot_preflight_fronts`).
 
-**Stredný stĺpec je JEDINÝ rastúci** (`minmax(0,1fr)`) — názov aj súhrn sa v ňom orežú (plné znenie nesie `title`), všetko ostatné má šírku danú mriežkou. Rozpočet pri obsahu
-470 px stráži guard `tests/pure/test_smoke1_riadky.rb`: ráta sa zo `grid-template-columns`, takže nový ovládač si musí v mriežke nájsť miesto a nemá kde „pritlačiť" pole výšky.
+**Náhľad v kontexte Čelá:** popis typu má jedno miesto `PV_FRONT_TYPE_DESC` + `frontTypeDesc(type)` (fallback „dvierka" len pre neznámy typ). **Symboly otvárania**
+(`drawFrontSymbols`): prerušovaná čiara = pohyb, plná = dielec; farba `PV_SELECT_ACCENT`, „neurčené" jantárový kruh s „?". Tvar = **dve čiary z rohov strany
+pántov do stredu voľnej hrany** (per krídlo; krajné krídla odvodené, stredné podľa slotov; legacy čelo bez symbolu), výklop „V", sklop „Λ", zásuvka prerušované X,
+blenda plné X. **Geometria má jediný zdroj** `frontSymbolShape(sym)` v `core.js` (jednotkový štvorec, `FRONT_SYM_INSET = 0,05`) a tú istú tabuľku má Ruby overlay
+`DirectionCheck::SHAPES` — obe sa porovnávajú s `tests/fixtures/front_symbol_shapes.json`. Čo kresliť, rozhodujú `frontWingSymbols` · `frontDirSymbol` ·
+`frontTypeSymbol`; `preview.js` stav smeru neinterpretuje (guard). Popis čela má halo farbou výplne.
 
-**POLE VÝŠKY `.hbox` (D-130a R4)** je JEDEN box s **konštantnou** šírkou 112 px: `[chip AUTO][hodnota][mm][šípka výškového radu]`. Chip odoberá miesto **hodnote**, nie boxu,
-takže susedné stĺpce sa pri vypísanej výške nehýbu — presne to bola príčina „lietajúcich polí". Chip `.fauto` je **tlačidlo** (`frontHeightAuto`, fokusovateľné, `aria-label`) a
-ukazuje sa len pri vypísanej hodnote (`.hbox.fixed`); „mm" je **vždy** vidno — jednotka patrí k poľu, nie k hodnote, a jej miznutie hýbalo obsahom boxu. Placeholder „≈ N" je
-**kurzívou a tlmený** (outside-in packet 3: placeholder ako nositeľ stavu AUTO je známa pasca), pevná hodnota je **tučná**, a pravidlo vysvetľuje `title` boxu.
+Plné znenie: archív, „Kontext Čelá (UI-C3, …)".
 
-**Živý náhľad výrazu `.exprhint`** („= 450" pri `300+150`) je v riadku čela **overlay** (`position: absolute` pod poľom, `z-index` pod `.miniopts`, `pointer-events: none`) — ako
-flex položka pridal do radu ~34 px, na ktoré `nowrap` už nemá rezervu, takže by riadok pretiekol presne tak, ako predtým zalamoval (Codex #183 P2). Je to ten istý vzor ako
-`.miniopts` a warnpanel: *rozbaľovacie okno je overlay, nie nový riadok.* Medzi čelami je **hairline predel** `.frow + .frow` (`--nx-border-soft`) **bez nového vertikálneho
-priestoru** — pôvodné `margin: 4px 0` sa presunulo do `padding: 2px 0 1px` + 1 px linka; predel leží **pod celým čelom**, teda aj pod riadkom kovania.
+#### Úchytky a návrh čiel s potvrdením (D-96 / D-120; form.js, core.js, preview.js, bridge.js)
 
-**ZÁMOK PRI VÝŠKE ZANIKOL: zamknuté ⇔ vypísané** — `collectFronts` posiela `locked: hasH`, takže jediná pravda o zámku je to, čo používateľ vidí (rovnaké pravidlo ako pole „Prvá
-zóna" z UI-C2); chip AUTO pole vyprázdni a ohlási to **pôvodnou udalosťou `input`**, takže výrazy (`expr.js`), validácia aj debounce apply bežia nezmenene.
+**Úchytka má jediné miesto stavu — kartu čela:** riadok „Úchytka" = Profil + Hrana vedľa seba (`.phalf`; `onFrontCardProfile` / `onFrontCardEdge`). Hromadná
+zmena je **akcia** — popover „všetkým" `#frontBulkPop` (Rozsah · Profil · Hrana · veta · **„Použiť na N"**): selecty nič nezapisujú, zapisuje len „Použiť"
+(`onFrontBulkApply`, jeden `onField`, jeden krok Späť); hrana sa nasadí, len keď je platná pre celý rozsah (`frontProfileScopeEdges`). Popover stojí mimo `<summary>`
+ako dieťa `<details>` (trigger skupinu najprv otvorí), ukotvený `right: 6px`; zatvára klik mimo, Escape a „Použiť"; fokus sa vracia na tlačidlo len keď bol
+v popoveri; `aria-haspopup="dialog"` + `aria-expanded`. **Escape sa spotrebuje** (`preventDefault` + `stopImmediatePropagation`). **Poradie skriptov v `panel.html` je
+kontrakt:** `nx_esc.js` → `form.js` → `boot.js`.
+- Oba ovládače zapisujú `dataset.frontProfile`/`frontProfileEdge` a `collectFronts`; žiadny uložený hromadný default. `frontProfileCommon(items, scope, key)` vracia
+  zmiešaný stav, `frontProfileStateText` zoskupuje profil aj hranu. Formulár prenáša prítomné `profile_edge` bez dopĺňania defaultu; zmena hrany profil nezapne,
+  zmena profilu zachová platnú hranu; pri zmene typu na neaplikovateľnú hranu karta vyžiada inú (nezvolí top). `PROFILELESS_FRONT_TYPES` zrkadlí Ruby (len `none`).
+- Náhľad kreslí fyzické `profile_edges` (top/bottom skracuje výšku, left/right šírku, `free` bez resolved hrán nič neodhaduje; `nxProfilePanel`).
 
-**Výškový rad `vyska_cela`** existoval od UI-B3, ale nebol napojený — riadky vznikajú za behu, preto svoju mini-ponuku nesú v **atribútoch** (`data-dim-key` + `data-dim-input`) a
-plní ich `nxDimFillRow` (settings.js) **tou istou cestou** ako statické polia, takže úprava radu v koliesku sa premietne aj do už vykreslených riadkov.
+**Návrh a potvrdenie:** `front_preflight` je čistý callback Panelu nad aktuálnymi rozmermi a čelami — vráti resolved riadky, fyzické hrany, smerové sloty, otvor,
+kresbu rohovej aj chybu **bez zápisu, Undo a katalógov**. `nxFrontDraftAsk` koreluje dokument, `cabinet_id` alebo `insert_session`, revíziu a podpis formulára;
+staré odpovede návrh nepotvrdia. `nxFrontPreflightResult` aktualizuje sloty, kartu a náhľad; neurčený smer sa nikdy neodhadne.
+- **`nxCabinetAction`** spája preflight → `apply_all` → potvrdenie `front_apply_token` → jednu naviazanú akciu. Čakajúci/neplatný návrh blokuje aj exportné relaye,
+  úpravu cez Štúdio, šablónu a native flush; zlyhaný apply nepustí pokračovanie; novší edit zneplatní starú akciu.
+- Echo tej istej skrinky pri rozpísanom/in-flight stave neprepíše konštrukciu ani riadky; pri odmietnutí sa obnoví len bez novšieho editu. Zmena dokumentu, výberu
+  alebo vkladacej relácie návrh zahodí; reset zachytí odmietací callback naviazanej akcie a raz ho zavolá. Server pri zápise znovu počíta a v `ensure` vracia výsledok.
+- Výber zo Štúdia (`studioRelay` → `studio_do_select`) vráti `flush_blocked`; `ProductionCore.do_select` oznámi dôvod a výber nevykoná. Aplikovanie šablóny zo Štúdia
+  ide `StudioDialog.handle_tpl` → `NX.studioRelayTemplate` → tá istá bariéra → `studio_do_template` (server overí dokument a tú istú jednu vybranú skrinku; bez
+  otvoreného Inspectora priamy handler).
+- Odložené uloženie šablóny patrí konkrétnemu otvoreniu modalu — zatvorenie, nové otvorenie aj zmena názvu, typu či voľby kovania ho zrušia.
 
-**Naviazané kovanie** je od D-130a **koncovka súhrnu** (`.fhwlink`, vyššie) — samostatný riadok `.fhw` zanikol. Text skladajú tie isté dva **existujúce** zdroje (`frontHwBadge`
-z plánu + `frontHwBuy` = `purchase.set_name` z D-92). Prepnutie kontextu na Kovanie a doskok na **box vlastníka** robí tlačidlo „Otvoriť v Kovaní" v tabe Kovanie karty
-(`hwBoxByGroup(hwFrontGroup(fid))` — kľúč skupiny skladá JEDNA funkcia pre render aj pre skok, takže sa nemôžu rozísť; `.hwfocus` krátke zvýraznenie). Keď box vlastníka
-**neexistuje** (nové čelo pred echom), tlačidlo sa **neskrýva**: ostáva viditeľné s `aria-disabled` a dôvodom v `title` (D-78) — a **klik na neho nerobí nič** (guard
-`onFrontOpenHardware`, Codex #371). `openFrontHardware` navyše overí box vlastníka **pred** prepnutím kontextu: neúspešný skok kontext nemení, takže používateľ neskončí
-v Kovaní bez toho, na čo klikol.
+#### Schéma medzier a jantárové podfarbenie (N26, ČELÁ-A / D-119)
 
-**D-84 / D-114:** šesť ikon „Pridať: typ“ posiela typ do nového riadku; odoberacie tlačidlo aj `removeLastFront` zanikli. Maže sa krížikom konkrétneho riadku. D-130a pred rad
-pridala tlmený popisok „Pridať čelo" a hairline predel (`.addrow`).
-
-**TOOLTIP `.nxtip` (D-130a R8) — nový spoločný komponent.** Pomocný text už **nie je** `.hint` pod ovládačom (v každej karte bral riadok), ale bublina za ikonou `?`: obsah nesie
-`data-tip`, kreslí ho pseudo-element, otvára **hover aj fokus** (klávesnica), šírka 250 px, varianta `.r` je zarovnaná vpravo (inak by pri 470 px utiekla z panela). Natívny
-`title` nestačí — CEF ho ukazuje s oneskorením, nedá sa štýlovať a dlhý text zalamuje po svojom. **Pravidlo: pomocný text = tooltip, stavová veta ostáva viditeľná** (RED/ORANGE,
-„bez klasifikácie", D-120 `frontDraftMessage`). V kontexte Čelá zostal presne jeden `.hint` — a je to práve `frontDraftMessage` (stráži guard `test_d130a_zoznam_ciel.rb`).
-
-**Materiál čiel** má DRUHÝ ovládač (`cab_front_c`), lebo sektor Materiály patrí kontextu Korpus a tu je skrytý — tá istá hodnota, dva vstupné body, synchro drží
-každá cesta, ktorá siaha na `cab_front`. **D-130b** ho presunul z konca zoznamu čiel do skupiny **Spoločné pre skrinku** (prvý riadok, `.row` nie `.matrow`, aby popisky
-skupiny mali jeden stĺpec) — ID, `data-nx-combo`, `onCabinetMaterial` ani synchro v `materials.js` sa nezmenili, iba miesto v DOM. Zmena dekoru navyše prekresľuje meta
-hlavičky (`setCabinetMaterials`/`clearCabinetMaterials` volajú `updateCabfrontMeta`).
-
-**KARTA ČELA (KOV-A2a)** je `.fcard` — **posledný potomok `.frow`**, v mriežke D-130a **tretí riadok** cez stĺpce 2–4, teda leží **priamo pod svojím riadkom**; otvorená je **vždy
-najviac jedna** a drží sa cez **identitu čela** (`openFrontCardId`), nie cez index riadku — klik na segrow spustí apply a echo riadky prestaví, takže bez identity by karta pod
-rukou zmizla. *Vedomá odchýlka od mockupu*, kde je karta samostatný blok pod celým zoznamom: takto ostáva kontext pri riadku, ktorého sa týka, a v skupine nepribúda trvalý blok
-(vertikálny priestor je vzácny). Z toho istého dôvodu karta **nemá hlavičku** — F-číslo, typ aj výšku má riadok priamo nad ňou.
-
-**KARTA MÁ DVA TABY (D-130a R6):** **Čelo** (čo nastavujem — typegrid, krídla, smer, otváranie, konštrukcia, zásuvka, úchytka) a **Kovanie** (čo z toho vzišlo — vyriešený set,
-chipy zámkov osí, technický detail, ponuka verzie receptu, tlačidlo „Otvoriť v Kovaní"). `frontCardModel` vracia `tabs` (čistý VM), `rows` = tab Čelo a `hwRows` = tab Kovanie.
-Tab Kovanie má **každý fyzický typ vrátane blendy** (blenda s úchytkovým profilom kovanie dostáva z pravidla `uchytkovy-profil-blenda`) — chýba len pri `none`; bez položiek
-ukáže jednu tlmenú vetu „Bez kovania." **Prázdny stav sa NEODVODZUJE len z `hwRows`** (Codex #371): vyriešené riadky má len zásuvka a výklop, kým dvierka, sklop aj blenda
-s úchytkovým profilom kovanie **majú** — hovorí oň plán a nákup. Poradie je preto: text (`frontHwBadge` + `frontHwBuy`, ako read-only `.drow`) → existujúci box vlastníka
-→ až potom „Bez kovania." Stav tabu drží `openFrontCardTab`: default **Čelo** pri každom otvorení **inej** karty (vrátane deep-linku `nxFocusFront` — RED nález smeru vedie
-na otázku v tabe Čelo), ale `refreshFrontCards` (echo, ľahký push) ho
-**zachová** — inak by každý push hodil používateľa z Kovania späť (vzor obnovy fokusu D2b). Prepnutie tabu **nič nezapisuje** (žiadny `onField`, žiadny krok Späť) a identita
-tabu (`data-tab`) je súčasťou `frontCardFocusKey`, takže fokus prežije prekreslenie. Badge „smer?" sedí **na tabe Čelo**, takže otvorená otázka je vidieť aj z tabu Kovanie.
-**Červená stavová veta stojí v OBOCH taboch** — je to dôvod, prečo dielce nevzniknú: v Kovaní v plnom znení s chipmi, v Čele ako jeden `inforow err` **nad** segmentmi.
-Jantárové odporúčanie a `locked_note` sú poznámky k výsledku a ostávajú len v Kovaní. *Vedomá odchýlka od mockupu:* tab sa volá jednotne **„Kovanie"**, nie „Výsuv"/„Závesy"
-podľa typu — jedna mapa navyše bez úžitku.
-
-Obsah tabu **Čelo** skladá **čistý view-model `frontCardModel(item, entry, drawer, lift)`** (core.js): **typegrid** = 6 dlaždíc (Dvierka · Zásuvka · Výklop · Sklop · Blenda ·
-**Bez čela** — `none` je platný typ D-18, preto musí ostať voliteľný; popisky sú krátke, plný názov nesie `title`, blenda a `none` majú dlhší vysvetľujúci `FRONT_TYPE_TIP`) +
-**kontextové riadky `.prow`**: **„Krídla"** (auto · 1 · 2 · 3 · 4, len pri dvierkach — D-130a R5) · „Smer" (Ľavé · **Neurčené ⚠** · Pravé) pri slote `single` · „Krídlo 2/3"
-(resp. 2/4 a 3/4) **per stredné krídlo** pri slotoch `p2`/`p3` — *vedomé rozšírenie mockupu, variant a z BLOCKERA 2*; segment „Krídla" ich **nenahrádza**, počet je nastavenie
-a smer stredného krídla je otázka zo servera · „Otváranie" (Klasické · Tip-On) na pohyblivých typoch · „Konštrukcia" + „Zásuvka" pri zásuvkovom čele · **„Úchytka"** (R7, nižšie)
-· blenda a „Bez čela" majú len vetu, prečo ovládače nemajú. Výber **setu** patrí k **položke kovania**, nie ku klasifikácii čela, takže v karte nie je; od D-130a to už nehovoria
-ani hinty („Set výsuvu vyberieš…" / „Set závesov vyberieš…" **zanikli bez náhrady**) — povie to tab **Kovanie** a jeho tlačidlo „Otvoriť v Kovaní".
-
-**KRÍDLA ŽIJÚ V DATASETE (D-130a R5).** `select.fw` v riadku zanikol (rozbíjal mriežku a pri nedvierkach stál prázdny); hodnota žije v `dataset.frontWings` (vzor
-`dataset.frontType` z KOV-A2a) a `collectFronts` ju číta odtiaľ — **legacy riadok bez kľúča ide na `auto`**, presne to posielal aj select. Zápis ide cez `onFrontWings(row, value)`
-→ `frontExtraOnWings` → `refreshFrontCards` → `onField`; klik na už nasadenú hodnotu je no-op (žiadny prázdny krok Späť).
-
-**RIADOK VYRIEŠENEJ ZÁSUVKY (KOV-C2c).** Pod klasifikáciou stojí **jediný read-only riadok** — „Atira · H70 · NL 470 · 30 kg · SiSy · recept v1" (Quadro namiesto H-variantu
-menuje **výšku boxu**). Vertikálny priestor panela je vzácny, preto to **nie je blok**: vety receptu („potrebná svetlá výška od…", „rad 350–520 mm, potrebná svetlá hĺbka…")
-žijú v **rozbaliteľnom** `<details>` „Technický detail".
-
-**CHIPY ZÁMKOV OSÍ (KOV-D2b).** Pod riadkom stojí rad chipov — `H144 výška` a `NL 470` — a je to **ten istý markup** (`hwAxHtml` v `hardware.js`), aký kreslí sekcia Kovanie:
-karta si vlastnú verziu nekreslí, inak by sa obe miesta časom rozišli. Kreslí ich `frontCardHtml` z riadku `kind: 'axes'`, ktorý pridáva **čistá** `frontDrawerAxesRow` (`core.js`)
-— a **len keď server poslal OBOJE**: stav osí (`axes`) aj identitu zápisu (`lock`). Chipy bez identity by boli klikateľné do prázdna a `recipe:<id>` panel skladať nesmie.
-Chipy dostáva aj **konfliktná** karta (stav `conflict`) — práve z nej sa musí dať odomknúť, keď položka výsuvu fail-closed nevznikla; vtedy sa ale **vonkajšia červená veta
-potlačí, ak ju doslovne opakuje niektorá os v konflikte** (`frontDrawerAxesSay`, Codex #313 kolo 1 P2-2): pri `height_lock_invalid` / `nl_lock_invalid` je to ten istý uložený
-reťazec z `drawer_conflicts` a karta by ho vypísala dvakrát. Zhoda sa porovnáva **doslovne** — konflikt, o ktorom os nevie (prekážka, hrúbka, KD), ostáva jediným miestom, kde
-sa dôvod dá prečítať. Kontrakt chipov, kliku a náhrady je v odseku „Kontext Kovanie" nižšie. **Chipy „otváranie" a „nosnosť" z mockupu sa VEDOME nepridali** (vertikálny priestor — riadok zhrnutia ich už nesie; `UI20_KONTRAKT.md` §7).
-**D-128 pridala TRETÍ chip `box 360`** (drevený box Quadra) s malým číselným poľom vedľa — detail v odseku „Kontext Kovanie" nižšie; Atira ho nemá.
-Ručné zámky priznáva navyše veta `locked_note` pod riadkom — od D-128 **menuje práve zamknuté osi** („Ručne zamknuté: výška boxu · dĺžka výsuvu (Inspector → Kovanie).")
-namiesto pôvodnej vety o dĺžke výsuvu pri každom `locked: true`, a **rovnaký stav osí** používa `Recipes.explain_stored(params, axes:)`, aby veta Technického detailu pri
-aktívnom zámku netvrdila vzorec „svetlá výška zóny − vôľa".
-
-**PONUKA NOVEJ VERZIE RECEPTU (KOV-D3b).** Úplne naspodku karty — **až pod** jantárovým odporúčaním synchronizácie, lebo to je upozornenie na terajší stav, kým toto je
-príležitosť — stojí `.dwup`: jedna tlmená veta `inforow` („Dostupný recept v2 — &lt;release_note&gt;") a pod ňou **ghost** tlačidlo „Prejsť na v2…". Blok vzniká **výhradne**
-z kľúča `upgrade` v zázname (`frontDrawerUpgradeRow` v `core.js`); bez neho — čo je v produkcii **vždy**, lebo žiadna v2 neexistuje — karta nekreslí **nič** a vyzerá presne
-ako po D2b. Panel sa nikdy nepýta „je `to` novšie ako `from`?“: to je otázka registra receptov a odpovedá na ňu Ruby (`Recipes.upgrade?`). Markup aj klik žijú
-v `hardware.js` (`hwUpHtml`) pri ostatných zápisových cestách kovania — karta je renderer, nie druhé miesto, kde by sa skladal payload servera; tlačidlo nesie `data-ax`/`data-axc`,
-takže fokus prežije prekreslenie karty ľahkým pushom (vzor D2b P2-4).
-
-Klik **neotvára okno**: pošle **čítaciu** otázku `drawer_upgrade_impact` s korelačným tokenom a čaká na odpoveď kanálom `NX.hwUpgradeImpact`. Dôvod je vecný — preflight môže
-prechod odmietnuť (nesediaca hrúbka, zámok mimo nového radu, chýbajúci kit) a vtedy **nie je čo potvrdzovať**: používateľ dostane vetu servera do statusu a okno sa neotvorí
-vôbec. Pri `ok: true` sa otvorí **kostra D-15** („Prejsť na novú verziu receptu", `okLabel: 'Prejsť'`) s **tabuľkou dopadu na TOTO čelo** — výška · NL · rozmery každého
-dielca · objednávací kód, vždy v dvojici „teraz → po prechode", plus veta o zámkoch („prenesú sa bez zmeny hodnoty: NL 470"). Nezmenené riadky sú **stlmené**, aby oko našlo
-to, čo sa naozaj mení. Je to zobrazovací blok (`type: 'custom'` bez `read`), takže sa z neho nedá odoslať nič: zápis nesie **výhradne** `from`/`to`, ktoré prišli v payloade.
-Tabuľka **nie je textový diff konštánt** (Astra #20 F13) — verzia smie zmeniť prahy, rad NL, hrúbky aj ABS bez zmeny `constants`, takže sa ukazuje výsledok, nie recept.
-Potvrdenie ide na `upgrade_drawer_recipe` s vlastným tokenom a **okno sa nezatvára**, kým server zápis nepotvrdí (`NX.hwUpgradeResult`) — odmietnutie ho odomkne a hlášku
-ukáže **v ňom**. Sú to zámerne **dva kanály**, nie jeden zdieľaný s D2b: okno náhrady osi a okno prechodu sú dva rôzne modaly s vlastným stavom a jeden kanál by zavrel to
-nesprávne. Kým odoslanie beží, okno je **zamknuté aj proti zatvoreniu** (`busyLock`, nižšie).
-
-**ZÁPIS SMIE PRESADIŤ LEN TO, ČO POUŽÍVATEĽ VIDEL (`fingerprint`, Codex #315 kolo 1 P1).** Payload zápisu nesie iba refy a identitu, takže medzi „ukáž dopad" a „Prejsť" sa
-skrinka môže zmeniť (rozmery, materiály, mapovanie kovania, Späť/Redo) — `drawer_upgrade_prepare` by potom bežal nad **novým** stavom a zapísal **iný** dopad než ten
-potvrdený. `from` to nechytí: ten stráži len to, že sa nezmenil **pripnutý recept**. Server preto k dopadu pribalí **odtlačok** (`Digest::SHA256` nad identitou a **celým**
-dopadom — čo sa v dopade neprejaví, na potvrdení nezáleží; čo sa prejaví, odtlačok zmení), klient ho pri „Prejsť" **len vráti** (nič neskladá a nič si nedopočítava)
-a server ho **pred zápisom prepočíta tou istou funkciou**. Nezhoda **aj chýbajúci** odtlačok = odmietnutie „stav skrinky sa medzitým zmenil — otvor náhľad znova"
-(fail-closed: zápis smie prísť výhradne z potvrdeného náhľadu). Pri odmietnutí sa panel **prekreslí** (`push_selected`), takže ponuka aj karta ukazujú čerstvý stav a druhý
-pokus ide už nad novým náhľadom; modal ostáva otvorený s hláškou.
-
-**Keď zmenu odhalí až preflight, hláška je TÁ ISTÁ** (in-SU beh nad `615a92f`). Zmenený stav môže padnúť **skôr**, než sa k porovnaniu odtlačku vôbec príde: `prepare` nad
-novým stavom zlyhá (napr. zamknutá NL sa do menšej hĺbky nezmestí) a odtlačok, ktorý sa počíta **z dopadu**, vtedy neexistuje. Surový text preflightu by ale hovoril o stave,
-ktorý používateľ **nikdy nevidel**, a znel by ako chyba jeho zásuvky namiesto „medzitým sa niečo zmenilo". Preto: keď payload **nesie** odtlačok (`from_preview`), každé
-zlyhanie `prepare` sa prevedie na **tú istú** stale vetu a pôvodný dôvod sa **pripojí** za pomlčkou (`upgrade_stale_reason`). Bez odtlačku — teda mimo cesty z potvrdenia
-(testy, in-SU sekcia D3a) — sa dôvod **neprepisuje**. **Odmietnutie nezapíše nič a neotvorí operáciu:** jediné `start_operation` tejto cesty je v `CabinetBuilder.rebuild`
-za oboma bránami (stráži to headless test s počítadlom prestavieb).
-
-**KOV-D1b doplnil do TOHO ISTÉHO rozkliku „čo je v balení"** — za vety receptu pribudne „Balenie: &lt;názov setu&gt;", riadok každého člena („· K-sada 357696 — Súprava Atira 470
-biela (1 ks)") a pri probléme priznaný dôvod („Bez kódu: …"). Žiadny nový blok a **žiadny druhý explain**: zdrojom je **jediný existujúci rozpis** `HardwareSets.explain`, ten
-istý, z ktorého žije nákupný riadok D-92 aj súpis — panel a súpis sa rozísť nesmú. **NOSNOSŤ v balení nie je a byť nesmie**: vydáva ju výhradne recept (riadok „Nosnosť bunky"
-z `explain_stored`) a nákupná voľba setu ju nikdy nezvyšuje (Astra #20 F11). Bez kontextu (nedostupný stav setov) sa **nedopisuje nič**.
-
-Zdroj je **výhradne server**: `cabinet_payload` posiela `front_drawer` (nižšie, odsek `payloads.rb`) a karta z klasifikácie ani z `config.hardware` **nič neodvodzuje** — keby si
-text skladala sama, pri fail-closed zásuvke by tvrdila, že zásuvka existuje. Stavy: `ok` → riadok + detail (+ jantárový riadok pri odporúčaní synchronizácie) · `conflict` →
-**červená veta STAVBY namiesto hodnôt** (dve tvrdenia vedľa seba by si odporovali) · `stale` → červená veta „prestav skrinku" · `pending` a **chýbajúci kľúč** → karta mlčí.
-Ikonu (`alert` zo sprite, nikdy emoji) nesie len červený a jantárový riadok.
-
-Muted veta **„Zásuvka bez klasifikácie"** sa kreslí len vtedy, keď **chýbajú VŠETKY** klasifikačné polia (konštrukcia · variant · otváranie) **a** server o zásuvke nič nepovedal (Codex #306
-P2). Čelo, ktoré nesie už len otváranie, je pre server **klasifikované** (`Recipes.recipe_key_for` nedá `:legacy`) a vydá k nemu konflikt — pôvodná podmienka „construction aj variant sú
-null" preto ukázala vetu „bez klasifikácie" **nad** červeným dôvodom, teda dve tvrdenia naraz. Predikát panela musí byť ten istý ako predikát servera.
-
-Testy: `tests/pure/test_kovc2c_karta.rb`, `tests/js/test_kovc2c_karta.js`.
-
-**KOV-E2 — KARTA ČELA VÝKLOPU.** Riadok typu `lift` má v karte **segment „Systém" (HK top | HL top)** a pod ním **jeden read-only riadok vyriešeného výklopu** s rozklikom
-„Technický detail" — presne toľko a nič viac (vertikálny priestor je vzácny). **Sklop (`fall`) riadok systému NEMÁ** a mať nesmie: dostáva závesy ako dvierka, mechanizmus
-žiadny. Zápis systému ide **existujúcou cestou dormant polí** (`FRONT_EXTRA_KEYS` → `collectFronts` → `Fronts.normalize_items`, E1b) a `frontExtraOnSegrow` prepisuje **kópiu**
-vnoreného objektu `lift`, nie hodnotu v datasete riadku. Jediná výnimka zo železného pravidla A1 („kľúč, ktorý config nemá, sa nevyrobí") je **prepnutie typu NA výklop**:
-`frontExtraOnTypeChange` vtedy materializuje `hk_top` — nie je to hádanie, `Fronts.normalize_config` tú istú hodnotu pri uložení zapíše tak či tak, takže bez nej by segment
-stál bez zvýrazneného chipu nad riadkom, ktorý HK top **už má**. Uložená hodnota sa **neprepisuje** (dormant HL top prežije prechod na dvierka a späť).
-
-Zdroj riadku je **výhradne server**: `cabinet_payload` posiela **`front_lift`** (vlastný kľúč vedľa `front_drawer`, nižšie odsek `payloads.rb`) a `frontLiftRows` z neho len
-kreslí. Stavy: `ok` → riadok („AVENTOS HK top · 22K2300 · automat") + vety detailu **(+ jantárový riadok NAVIAC pri ORANGE — nikdy namiesto neho)** · `conflict` / `stale` →
-**červený inforow s vetou SERVERA, slovo za slovom** (tá istá, akú vydá Kontrola v Štúdiu z `hardware_conflicts`) **namiesto** riadku výklopu · **`incomplete`** (Codex #334
-kolo 2 P2) → **červený inforow NAD zhrnutím**, ktoré aj s rozklikom **ostáva**: položka vznikla, ale set ju nevie celú vydať, takže dôvod je stav riadku, nie poznámka
-pod ním (poradie je RED → zhrnutie → ORANGE) · `pending` a chýbajúci kľúč →
-karta mlčí. Muted veta **„Mechanizmus vyberá automat…"** sa kreslí **len keď server o výklope ešte nič nepovedal** — nad vyriešeným riadkom by bola druhá veta o tom istom.
-Ikonu (`alert` zo sprite) nesie **len** červený a jantárový riadok. Kombinácia **HL top + Tip-On** sa dá nastaviť ďalej (HTML `disabled` nie je ochrana) — karta o nej len
-**hneď** povie červenou vetou; bránu drží server.
-
-**Výber setu výklopu (vrátane tmavého) NIE JE v karte** — je pri položke v kontexte **Kovanie**, rovnako ako pri zásuvke (D1b), a beží **bez jedinej zmeny klienta**: položka
-`lift` nesie triedny kľúč (`HardwareSets.class_key_for`), takže `class_compat_payload` jej naplní `compat.owners['front:<id>/flap']` a existujúci picker (`hwOwnerOptionList`)
-vykreslí **len triedne kompatibilné** sety — biely aj tmavý, ktorý je poznať už z názvu („… (tmavá)"). Zápis ide existujúcou akciou `set_hardware_set` a `apply_cabinet_override`
-z nej skladá **owner triedny kľúč** `class:lift|<mode>|<system>@front:<id>/flap` (E1a); generický `lift` by sa na klasifikovanú položku **nikdy neuplatnil**. Jeden krok Späť,
-prestavba nie je nutná (expanzia číta mapovanie) a karta aj Nákup sa prekreslia ľahkým pushom.
-
-Testy: `tests/pure/test_kove2_ui.rb`, `tests/js/test_kove2_karta.js`.
-
-**KDE sa smer pýta, rozhoduje VÝHRADNE SERVER** — `cabinet_payload` posiela `front_slots` (`front_id → { wings_n, slots }` z `Fronts.direction_slots`) a panel z `wings`
-ani `wings_n` **nič neodvodzuje**: keby si to odvodil, dvojkrídlo by sa začalo pýtať na stranu pántov a 3/4-krídlové dvierka aj na krajné krídla (tie sú odvodené — A1 kontrakt).
-**`wings_n` chodí SPOLU so slotmi (Codex #281 P2-A)**, lebo prázdny zoznam slotov sám o sebe dvojkrídlo **neznamená** — dá ho aj veľmi starý `front_items` (pred D-07), kde server
-o počte krídel nevie nič. Preto: neprázdne `slots` → presne tie krídla, na ktoré sa smer pýta · `slots == []` **a `wings_n == 2`** → veta o dvojkrídle namiesto riadku ·
-`slots == []` a `wings_n` **null** → karta **mlčí** (ani riadok, ani veta; tvrdiť „Dvojkrídlo…" nad starým cache by bola lož) · **chýbajúci kľúč čela** (nový riadok pred prvým
-echom, návrh vkladania) → to isté mlčanie. `state` je len zdroj **badge „smer?"** — aktívnu voľbu čítajú riadky z položky, takže LEGACY čelo (kľúč v configu nie je) nemá
-zvýraznenú žiadnu voľbu a badge nedostane.
-
-**„Neurčené" vzniká VÝHRADNE štyrmi používateľskými akciami** a vždy cez jednu z troch čistých funkcií v `core.js` (`frontExtraOnTypeChange` · `frontExtraOnWings` ·
-`frontExtraOnSegrow`, každá vracia **nový** objekt): (a) „Pridať: Dvierka“ · (b) prepnutie dlaždice na dvierka, keď smer uložený nie je · (c) klik na „Neurčené" · (d) prepnutie na
-3/4 krídla — a to len pre **chýbajúce stredné** krídla. Render, echo ani editácia iného poľa nezapíšu nič; návrat na 1/2/auto ani prepnutie na iný typ **nič nemaže** (dormant).
-Literál stavu preto žije **len v `core.js`** (`FRONT_DIR_UNSET`) — `form.js` číta hodnotu z tlačidla, `preview.js` symbol; allowlist stráži `tests/pure/test_kova1_cela.rb`.
-
-Pravidlo (a) sa **týka aj ikony „Pridať: Dvierka“** (Codex #281 P1): nový riadok dvierok prejde tým istým výrobcom (`addFrontRow` pri `userAdd` volá
-`frontExtraOnTypeChange` s typom z datasetu), inak by každé nové čelo natrvalo obišlo RED nález, badge aj `?` v náhľade — Ruby by ho čítalo ako legacy. „Pridať: Zásuvka“
-(zásuvkové) nevyrobí nič, lebo o tom rozhoduje výrobca, nie volajúci.
-
-**Zápis ide POVODNOU cestou** — dlaždica aj segrow prepíšu `dataset.frontType` / `dataset.frontExtra` a zavolajú `onField()` → `collectFronts` → `apply_all`, teda **jeden krok
-Späť**; od D-120 pred zápisom návrh overí čítací preflight. Klik na **už nasadenú hodnotu** (typ aj segment) sa zahodí — žiadny prázdny rebuild a žiadny prázdny krok Späť; segment to pozná podľa
-`aria-pressed`, ktoré karta kreslí z view-modelu (Codex #281 P2-C).
-
-**Prekreslenie karty NEZHADZUJE FOKUS** (Codex #281 kolo 2). Karta sa prepisuje celá (`card.innerHTML`), takže tlačidlo, ktoré držalo fokus, zanikne a fokus by spadol na
-`<body>` — používateľ klávesnice by po každej zmene typu či segmentu tabovaním prechádzal celý Inspector znova. Render ostal celistvý; obnovuje sa **len fokus**, a to podľa
-**logickej identity** ovládača (`frontCardFocusKey` / `frontCardFocusSelector` v `core.js` — dlaždica `data-t`, segment `data-k`+`data-v`+`data-w`), nie podľa indexu detí.
-`refreshFrontCards` si identitu zapamätá **len keď fokus leží v tej istej karte** (`activeElement.closest('.fcard') === card`) a vráti ho cez `focus({ preventScroll: true })`
-s fallbackom — karta sa nemá pod rukou posunúť. Fokus mimo karty sa nedotkne ničoho.
-
-**Otvorená karta patrí KONKRÉTNEJ SKRINKE** (Codex #281 P2-B). `front_id` (F1) má každá skrinka v zákazke, takže samotné ID čela identitu karty neurčuje — bez brány by sa po
-prepnutí výberu otvorila karta cudzieho čela. Čistá `frontCardKeepOpen(prevCabId, nextCabId, openId)` rozhodne, či prežije; `bridge.js` ju volá **pred** `renderFronts` a pri zmene
-**dokumentu** posiela predchodcu ako `null` (ID skriniek sa naprieč dokumentmi opakujú — tá istá zásada ako pri `keepGaps`). Doska, prázdny výber aj návrh vkladania kartu
-zatvárajú. Testuje `tests/js/test_kova2a_karta.js` (vrátane celej cesty nad mini-DOM) a `tests/pure/test_kova2a_karta.rb`.
-
-**KOV-A1 pass-through:** `addFrontRow` odkladá `direction`, `wing_directions`, `opening_mode` a `drawer` do `row.dataset.frontExtra` (**len prítomné kľúče**) a `collectFronts` ich
-vracia späť **bez akéhokoľvek defaultu** — vzor D-90 `profile`, ale s tvrdým rozdielom: kľúč, ktorý config nemal, sa tu nesmie objaviť, inak by legacy zákazka dostala RED nález
-o neurčenom smere. KOV-A2a k nim pridala **zápis z karty** (`frontExtraSet`, prázdny objekt dataset **odstráni**) — pravidlo „žiadny default" platí nezmenené.
-
-**Popis typu v náhľade (Codex #280 P2-C):** `preview.js` má mapu **`PV_FRONT_TYPE_DESC`** + čistú `frontTypeDesc(type)` — jedno miesto, kde typ dostáva slovo
-(`dvierka · zásuvka · výklop · sklop · blenda`). Do KOV-A1 sa každé ne-zásuvkové a ne-`none` čelo popisovalo ako „dvierka", takže pri configu z API sa rozbaľovačka v riadku
-volala „Výklop" a náhľad vedľa nej tvrdil „dvierka". Fallback `'dvierka'` ostáva, ale **už len pre NEZNÁMY typ** (napr. z novšej verzie). Testuje `tests/js/test_uib2_nahlad.js`.
-
-**Symboly otvárania v projekcii Čelá (KOV-A2a → D-115, `drawFrontSymbols`).** Pravidlo je jedno: **prerušovaná čiara = pohyb, plná = dielec** (to isté hovoria sprite ikony
-typegridu). Kreslia sa vo výberovej farbe `PV_SELECT_ACCENT`, jediná výnimka je „neurčené" v jantári (`--nx-warn-fg`) — je to otvorená otázka, nie chyba stavby. **TVAR je od D-115
-stolárska konvencia** (Michal 3.9.): **dve čiary z ROHOV strany pántov do STREDU protiľahlej (voľnej) hrany**, cez celé krídlo — symbol tak nemá „veľkosť" ani posun k voľnej hrane,
-smer hovorí sám tvar. **Dvierka: symbol je PER KRÍDLO** — jednokrídlové podľa slotu servera, krajné krídla 2/3/4-krídlového čela **odvodené** (A1 kontrakt: p1 = pánty vľavo, posledné
-vpravo — nič sa neukladá), stredné opäť podľa slotov; dvojkrídlo tak dá `><`. **LEGACY čelo sa nekreslí vôbec** (žiadny fallback na stranu), „neurčené" ostáva **jantárový kruh + „?"**
-v strede krídla. Výklop = „V" z horných rohov, sklop = „Λ" z dolných; **zásuvka prerušované X**, blenda **plné X** (nehýbe sa) — dva rovnaké tvary, ktoré od seba odlišuje výhradne
-čiara. **Geometria má JEDINÝ zdroj:** `frontSymbolShape(sym)` v `core.js` vráti úsečky v **jednotkovom štvorci** (u po šírke, v po výške **zdola nahor**; rohy odsadené o
-`FRONT_SYM_INSET = 0,05`) + `dashed`; `drawFrontSymbols` už len premietne `u → x = x0 + u*w`, `v → zz = z + v*ph`. **Tú istú tabuľku má Ruby overlay** (`DirectionCheck::SHAPES`)
-a obe strany sa porovnávajú s fixtúrou `tests/fixtures/front_symbol_shapes.json` — do D-115 bolo overené len meno symbolu a kresby sa naozaj rozišli. Čo sa má nakresliť, rozhodujú
-**čisté funkcie v `core.js`** (`frontWingSymbols` · `frontDirSymbol` · `frontTypeSymbol`) nad `front_slots`; `preview.js` stav smeru vôbec neinterpretuje (stráži guard). V režime
-vkladania sloty neexistujú, takže sa kreslia iba odvodené krajné krídla. **Popis čela** (`fnum · typ · výška`) ostáva v strede panela a dostal **halo** farbou výplne panela (`col`,
-PV_* zrkadlo tokenu — žiadna nová farba), inak by ho X zásuvky/blendy preškrtlo. **Dlaždice typegridu ani ikona v riadku čela (`FRONT_TYPE_ICON`) sa nemenia.**
-
-### Úchytky = D-96 / D-120 (form.js, core.js, preview.js, bridge.js)
-
-**D-130a R7 / D-129: úchytka má JEDINÉ MIESTO STAVU — kartu čela.** Skupina `fhandles` („Úchytky") **zanikla**: bola druhým stavom tých istých dvoch polí a používateľ nevedel,
-ktoré z dvoch miest platí (hlásenie D-129). V karte je to **jeden riadok** „Úchytka" = popisok + `.phalf` (Profil + Hrana vedľa seba); dovtedy to boli dva riadky pod sebou, čo
-je pri 470 px zbytočná daň na jeden údaj. Handlery `onFrontCardProfile` / `onFrontCardEdge` ostávajú.
-
-**Hromadná zmena ostala ako AKCIA — popover „všetkým"** (`#frontBulkPop`) v hlavičke skupiny Čelá: Rozsah · Profil · Hrana · stavová veta · **„Použiť na N"**. **Selecty v ňom
-NIČ nezapisujú** — zapisuje až „Použiť" (`onFrontBulkApply`): jedna cesta, jeden `onField`, jeden krok Späť. Predtým zapisoval každý `change`, takže jedno rozhodnutie
-znamenalo dva kroky Späť a hrana sa nedala zvoliť vopred. Hrana sa nasadí, len keď je platná pre **celý** rozsah (`frontProfileScopeEdges` — bočné hrany majú dvierka a zásuvky
-rôzne), inak by server uložené „Hore" aj tak zhodil. Popover stojí **mimo `<summary>`** (súrodenec pred `.body`) — vnútri hlavičky by bol súčasťou klikateľnej plochy, ktorá
-skupinu zbaľuje — a je **dieťaťom `<details>`**, takže pri zbalenej skupine ho prehliadač nevykreslí: trigger skupinu **najprv otvorí** (`details.open = true`) a až potom
-ukáže popover. Ukotvený je `right: 6px` dovnútra panela (outside-in packet 2). Zatvára ho klik mimo, **Escape** a „Použiť"; fokus sa vracia na tlačidlo, **len keď bol
-v popoveri** (pri kliku mimo patrí tomu, na čo používateľ klikol). Tlačidlo nesie `aria-haspopup="dialog"` + `aria-expanded`. **Escape sa SPOTREBUJE**
-(`preventDefault` + `stopImmediatePropagation`, vzor `nx_esc.js` — Codex #371): všetky Escape listenery okna visia na `document` a `stopPropagation` medzi nimi nefunguje,
-takže bez toho by jedno stlačenie zavrelo popover **aj** flyout z `boot.js`. **Poradie skriptov v `panel.html` je kontrakt:** `nx_esc.js` (reťaz modalov) → `form.js`
-(popover) → `boot.js` (flyouty raily) — teda presne poradie vrstiev zhora nadol.
-
-Oba ovládače zapisujú rovnaké `dataset.frontProfile`/`frontProfileEdge`
-a `collectFronts`; žiadny uložený hromadný default. `frontProfileCommon(items, scope, key)` vracia nezávislý zmiešaný stav profilu/hrany. `frontProfileStateText` zoskupuje rovnaký profil aj hranu v poradí prvého výskytu. Rozsah ponúkne prienik platných
-hrán; samotná zmena hrany profil nezapne, zmena profilu zachová platnú hranu. `PROFILELESS_FRONT_TYPES` zrkadlí Ruby a obsahuje iba none. Návrat z none vyžaduje zapnutie.
-**Indikátor `.fprof` v riadku zanikol** — profil hovorí súhrn slovom („UKW-7 hore" / „bez úchytky"), teda zrozumiteľnejšie než ikona, ktorej stav sa dal prečítať len z `title`.
-
-**Návrh a potvrdenie (D-120, v0.10.8):** `front_preflight` je čistý callback Panelu nad aktuálnymi rozmermi/fronts, vracia resolved riadky, fyzické hrany, smerové sloty
-aj chybu bez zápisu/Undo/katalógov. `nxFrontDraftAsk` koreluje dokument, cabinet_id alebo insert_session, revíziu a podpis formulára. Zmena kontextu/staré odpovede
-pôvodný návrh nepotvrdia. `nxFrontPreflightResult` aktualizuje sloty, kartu a náhľad; neurčený smer sa nikdy neodhadne. `nxProfilePanel` kreslí resolved hrany,
-nevyriešený free nemá vymyslený pás. Pri zmene typu na neaplikovateľnú hranu karta vyžiada inú hranu, nezvolí top.
-
-`nxCabinetAction` spája preflight → apply_all → potvrdenie `front_apply_token` → jednu naviazanú akciu. Čakajúci/neplatný návrh blokuje aj exportné relaye,
-úpravu cez Štúdio, šablónu a native flush. Zlyhaný apply nepustí pokračovanie; novší edit zneplatní starú akciu. Echo tej istej skrinky pri rozpísanom/in-flight stave
-neprepíše konštrukciu ani riadky; uloží sa pri čakajúcom apply. Pri odmietnutí sa toto echo obnoví, iba ak používateľ medzitým neurobil novší edit.
-Zmena dokumentu/výberu/vkladacej relácie návrh zahodí. Server pri zápise znovu počíta a v ensure vracia úspech/neúspech apply.
-Reset pred zahodením naviazanej akcie zachytí jej odmietací callback a po vyčistení stavu ho raz zavolá; export ani aplikácia šablóny nezostanú bez odpovede.
-Aj výber zo Štúdia (`studioRelay` → `studio_do_select`) vráti `flush_blocked`; `ProductionCore.do_select` oznámi dôvod v pôvodnom okne a výber nevykoná.
-Klávesnicový fokus profil/hrana používa stabilný `data-pc` kľúč pri prekreslení karty.
-
-Odložené uloženie šablóny patrí konkrétnemu otvoreniu modalu. Zatvorenie, nové otvorenie aj zmena názvu, typu alebo voľby kovania ho zrušia;
-neskoré potvrdenie apply nesmie uložiť zrušenú či zmenenú šablónu. Nové uloženie vyžaduje nový klik.
-
-Aplikovanie šablóny zo Štúdia ide cez `StudioDialog.handle_tpl` → `NX.studioRelayTemplate` → tú istú bariéru → `studio_do_template`.
-Server pred pokračovaním overí dokument a presne tú istú jednu vybranú skrinku; odmietnutie vracia do sekcie Šablóny. Bez otvoreného Inspectora ostáva priamy handler.
-
-### N26 medzery jantárovo (preview.js)
-
-ČELÁ-A (D-119): štyri okraje. Formulár odosiela `gap_left`/`gap_right`; legacy `gap_sides` preberá len pre chýbajúcu stranu.
-Obe polia prechádzajú existujúcou validáciou, odomykaním limitu, resetom aj echo guardom `keepGaps`. `pvGeom` nesie `gapLeft`/`gapRight`; kresba čiel, kóty, ghost vrstva,
-fit vo vkladaní aj pri výbere, odhad plochy a značky kovania používajú oba okraje. Koľajnice výsuvov ostávajú na vnútorných lícach bokov korpusu.
-**D-130b: dva riadky polí nahradila SCHÉMA `.gapdiag`** — obrys korpusu (`.gd-box` s dvoma ilustračnými `.gd-front`) a **tých istých päť polí** `fr_gap*` absolútne umiestnených
-na hranách, ktorých sa týkajú (`fr_gap` v strede, jantárový). Mriežka `.front-gap-grid` zanikla. ID, `oninput="onField()"`, `LIMITS`, `attachExprField`, `keepGaps`,
-`resetFrontGaps` (3/2/2/2/2) aj serverové kľúče ostali nezmenené — zmenilo sa **len rozloženie**. Pozor na špecificitu: `.row input` nastavuje `flex: 1`, preto sa polia píšu
-`.nx-inspector .row .gapdiag input.gd` (štyri triedy) — samotné `.gd` by prehralo a schéma by sa roztiahla.
-
-od **D-130b** sa medzery v projekcii Čelá podfarbia jantárovo pri **kurzore v niektorom z piatich polí schémy** (`NX_GAP_FIELDS`, `focusin`/`focusout` v capture) **alebo pri
-hoveri nad `.gapdiag`** (`mouseover`/`mouseout` v capture, `relatedTarget` odfiltruje prechod medzi uzlami schémy). Väzba na **otvorenú skupinu** (`details[data-key="fgaps"].open`
-+ `toggle` listener) **zanikla**: schéma žije v skupine `cabfront`, kde je aj materiál čiel, takže skupina býva otvorená pri bežnej práci a medzery by svietili stále.
-Pásy vznikajú z **toho istého** `nxFrontDims`, ktorým sa už kótuje (žiadny nový výpočet, žiadne nové dáta); farby `PV_GAP_*` sú zrkadlom tokenov `--nx-warn-bg-soft` /
-`--nx-warn` / `--nx-warnchip-fg`.
+Štyri okraje: formulár odosiela `gap_left`/`gap_right` (legacy `gap_sides` len pre chýbajúcu stranu); validácia, odomykanie limitu, reset aj echo guard `keepGaps`
+platia pre oba. `pvGeom` nesie `gapLeft`/`gapRight` (kresba čiel, kóty, ghost, fit, odhad plochy, značky kovania); koľajnice výsuvov ostávajú na vnútorných lícach
+bokov. **Schéma `.gapdiag`** = obrys korpusu (`.gd-box`, dva `.gd-front`) a päť polí `fr_gap*` umiestnených na hranách (`fr_gap` v strede, jantárový); ID,
+`LIMITS`, `attachExprField`, `keepGaps`, `resetFrontGaps` (3/2/2/2/2) a serverové kľúče sú bežné. Špecificita: `.nx-inspector .row .gapdiag input.gd`.
+Medzery v projekcii Čelá sa podfarbia jantárovo pri **kurzore v poli schémy** (`NX_GAP_FIELDS`, `focusin`/`focusout` v capture) **alebo hoveri nad `.gapdiag`**
+(`mouseover`/`mouseout` v capture, `relatedTarget`); pásy z toho istého `nxFrontDims`, farby `PV_GAP_*` = zrkadlo tokenov `--nx-warn-*`.
 
 ### Kontext Kovanie (UI-C4, panel.html + ui/js/hardware.js + ui/panel/selection.rb)
 
-tri skupiny v **záväznom poradí** — **Položky z pravidiel** (`data-key="hwitems"`) · **Sety** (`hwsets`) · **Pravidlá** (`hwrules`); kostra je STATICKÁ, JS píše len obsah **dvoch**
-kontajnerov `#hwRows` a `#hwSetRows` (preto `refreshHardwareSets` obnovuje selecty v OBOCH — inak by novo pridaný set typu v skupine Sety ostal neviditeľný až do ďalšieho označenia
-skrinky). **KOV-G2 (v0.9.60): kontajnery sú TRI** — pribudol `#legsRow` v Základných (riadok Nôh, nižšie), ktorý nesie **ten istý** select pre typ `leg`; bez neho by držal starú
-ponuku setov. **Ľahký push nesie aj `legs_summary`** (Codex #339 kolo 1 N4): úprava setu nôh alebo názvu jeho katalógovej položky v súbežne otvorenom Štúdiu chodí práve
-`NX.setHardwareSets`, ktorý dovtedy obnovoval len `<select>`y a rozpísané riadky Kovania — **veta** riadku Nôh držala starú expanziu až do ďalšieho označenia skrinky. Kľúč skladá
-`HardwareSets.legs_summary_from_purchase` nad **už rozpísanými** položkami (tá istá projekcia ako v plnom pushi) a klient volá `renderLegsRow` **až za** `refreshHardwareSets`
-(berie si z neho ponuku setov). Chýbajúci kľúč (starší payload, žiadna označená skrinka) sa riadku **nedotkne** — vtedy patrí náhľadu vkladania.
+**Čo robí:** kovanie označenej skrinky — položky z pravidiel podľa vlastníka, ručne pridané položky, sety a pravidlá. Tri skupiny v **záväznom poradí**:
+**Položky z pravidiel** (`hwitems`) · **Sety** (`hwsets`) · **Pravidlá** (`hwrules`). Kostra je statická, JS píše obsah kontajnerov `#hwRows`, `#hwSetRows`
+a riadok Nôh `#legsRow` (Základné) — `refreshHardwareSets` obnovuje selecty vo **všetkých troch**. Dáta: `cabinet_payload` (`config.hardware`, `purchase`,
+`compat`, `hardware_manual_view`, `front_drawer` …); zápis existujúcimi akciami `set_hardware_override` / `set_hardware_set` (`actions_hardware.rb`) a `apply_all`.
+Detail domény: [hardware.md](hardware.md).
 
-**Položky sú BOXY PODĽA VLASTNÍKA** (`.hwbox`): „Skrinka" · box KAŽDÉHO čela · spoločný box „Vnútro skrinky" pre ostatných vlastníkov (podperky políc). Je to **len ZOBRAZENIE tých
-istých dát** — identita položky (`owner_part_key`, `generic_type`, `rule_id`), zápisové cesty (`set_hardware_override`, `set_hardware_set`), D-92 nákupný riadok aj D-93 zámok NL sú
-nedotknuté; `refreshHardwarePurchase` ďalej páruje riadky cez `.hwrow[data-owner…]`. Kľúč skupiny je **ODVODENÝ** z `owner_part_key` (`hwGroupKeyOf`: prázdny → `cab`,
-`front:<id>/…` → `front:<id>` (obe krídla = JEDEN box), inak `inside`) — žiadne nové serverové pole. Hlavička berie **PRVÚ časť** serverového `owner_label` („F2 · zásuvkové čelo" →
-„Čelo F2"), riadok v boxe **DRUHÚ** („zásuvkové čelo") — číslo čela sa tak nikdy neopakuje dvakrát pod sebou; vo „Vnútre" ostáva v riadku CELÝ popis, lebo hlavička ho nenesie.
+**Ľahký push `NX.setHardwareSets`** (zmena setov, mapovania alebo katalógu v Štúdiu — `HardwareCatalogDialog.push_items` → `Panel.push_hardware_sets`) obnoví ponuky
+setov, nákupné riadky (`refreshHardwarePurchase`), **ručné položky** (`manual_view` → `refreshHardwareManual`, len vlastný blok; `plan_parts_by_key` sa volá len
+keď ad-hoc položky sú), **`front_drawer`** (`refreshFrontDrawer` vymení záznam a prekreslí len otvorenú kartu; záznam nesie `axes` a `lock` —
+`Panel.front_drawer_refresh`; plán sa stavia len pri klasifikovanej zásuvke) a **`legs_summary`** (`renderLegsRow` až za `refreshHardwareSets`). Chýbajúci kľúč sa
+ničoho nedotkne; `{}` = „skrinka zásuvky nemá". Žiadny plný push, žiadny krok Späť.
 
-Poradie boxov: Skrinka → čelá **v poradí zoznamu čiel** (`frontItems`) → Vnútro; čelo mimo zoznamu (starý payload) sa nikdy nestratí. Meta v hlavičke je **počet** položiek (typy sú
-vypísané hneď pod ňou — opakovať ich by bola redundancia).
+**Položky sú boxy podľa vlastníka** (`.hwbox`): „Skrinka" · box každého čela (obe krídla = jeden box) · „Vnútro skrinky" (podperky políc a ostatní). Je to len
+**zobrazenie** — identita položky (`owner_part_key`, `generic_type`, `rule_id`) a zápisové cesty sa nemenia; `refreshHardwarePurchase` páruje cez
+`.hwrow[data-owner…]`. Kľúč skupiny je odvodený (`hwGroupKeyOf`: prázdny → `cab`, `front:<id>/…` → `front:<id>`, inak `inside`). Hlavička berie prvú časť
+`owner_label` („Čelo F2"), riadok druhú; poradie Skrinka → čelá podľa `frontItems` → Vnútro; meta = počet položiek.
+- **Hlavička je natívne `<button>` a súrodenec tela boxu** (ovládače v boxe k nej nedobublajú); box sa nezbaľuje. Trieda `.hwbox` (`.hwown` je popis vlastníka v riadku).
+- `.hwname` jednoriadkový s ellipsis a `title`; selecty `.hwsetsel`, `.hwnlsel` šírkou podľa obsahu v medziach; súčet stôp stráži `tests/pure/test_smoke1_riadky.rb`.
+- **Podperky políc** vo „Vnútre" sú od 2 políc (`HW_PINS_MIN`) zbalené pod súhrnný riadok (`<details class="hwgrp">`, stav v `localStorage` `nx_hw_shelfpins_open`);
+  pod ním pôvodné `.hwitem` riadky. Delia sa `items` aj `offs` (vypnutá polica prispeje 0 ks a zapne štítok **„upravené"** — jantár, nie semafor). Jadro
+  `hwShelfPinSummary`, `hwSplitShelfPins` (`tests/js/test_smoke1_ui.js`).
+- **Prisvietenie cieľa skoku** `hwFlash` (`hwfocus`, `HW_FLASH_MS` 1600 ms) svieti najviac na **jednom** uzle; cieľ z Kontroly = celá `.hwitem`, inak `.hwrow`, hľadaná
+  výhradne podľa serverovej adresy (`hwRowSelector`) a `hwRowKindOk` (nezhoda s `orphan` = zastaraný payload → nesvieti nič).
+- **Klik na hlavičku** → `nx_select_hw_owner` → `Panel.handle_select_hw_owner`: prázdne `part_keys` = celá skrinka, inak výrobné dielce s daným `part_key` v rozsahu
+  kusovníka (`manufactured_parts`). Čisté čítanie + zmena výberu pod `suspend_selection_sync`, žiadny undo krok, prísny guard; má **flush handshake** (rozpísaný edit
+  by po výbere prestavil skrinku a stratil vlastníka; neplatné pole akciu zastaví); **odmietnutý rozpísaný edit má prednosť** (`@last_apply_error` sa spotrebuje
+  a ukáže); čiastočný výsledok sa hlási ako upozornenie s pomenovaním chýbajúcich. **Vedomá odchýlka:** po výbere sa **nevolá `push_selected`** (panel by prepol
+  na kartu Dielec a box by zmizol); zosúladí ho najbližší bežný push. Tou istou cestou ide oko v riadku warnpanelu (`origin`).
+- **Box ↔ značka v náhľade:** trieda `hov` na oboch stranách nasadzuje jedna funkcia `hwPaintHover` (`bindHwOwnerHover` raz na `#hwRows`, `hwHoverByOwner` z náhľadu);
+  `renderPreview` sa počas hoveru nevolá a obe prestavby zvýraznenie zhasnú.
 
-**Hlavička je natívne `<button>` a SÚRODENEC tela boxu, nie jeho predok** — klik na select setu, zámok NL či pole počtu k nej nemá ako dobublať, takže žiadny budúci ovládač v boxe
-nemusí pamätať na `stopPropagation` (štrukturálne silnejšie než ho pridávať). Box sa **nezbaľuje** — na skrátenie panela stačí exkluzivita skupín S4.
+**Ručne pridané položky** (ad-hoc kovanie mimo setov, `config['hardware_manual']`): blok `.hwman` pod boxmi — nadpis „Ručne pridané" len keď položky sú, riadky vo
+vzore `.hwitem` + `.hwbuy` **bez** identitných atribútov `data-owner`/`data-type`/`data-rule`, posledné ghost tlačidlo „Pridať konkrétnu položku (mimo setov)";
+bez označenej skrinky blok nevzniká.
+- **Panel nepočíta nič:** `hardware_manual_view[]` (`Panel.hardware_manual_view`) nesie živý názov a cenu z katalógu (cena sa v configu neukladá), popis vlastníka
+  (`PartKeys.human_label`), `owner_missing` (jediná funkcia `Bom.manual_items_for`) a `catalog_missing`; chipy „ručná" · „bez vlastníka" · „chýba v katalógu"
+  (jantár). Ponuka „Patrí k" = `hardware_manual_owners[]` (celá skrinka + čelá a zónové dielce aktuálneho plánu; korpusové dielce a surový kľúč sa neponúkajú;
+  dvojznačný popis dostane prívesok zóny len v tejto ponuke). Oba kľúče sú len na čítanie — `collectAll` o nich nevie.
+- **Modal** = kostra D-15 (`hw:manual:add` / `hw:manual:edit:<id>`): Patrí k · Zdroj (Z katalógu / Voľná položka) · katalóg cez `lookup` (`hw_manual_search` — čítacia
+  cesta s `gen`; **neaktívne položky sa neponúkajú** — `drop_inactive` znižuje aj `total`, zápisová cesta ich ale ponecháva) · voľná Názov · MJ · Cena s DPH ·
+  Množstvo · Poznámka. Cena katalógovej položky sa needituje ani neposiela. Prepnutie Zdroja = prekreslenie modalu; hodnoty nesie **draft** `HW_MAN.draft`
+  (`hwManualMergeDraft` — nevykreslené kľúče sa neprepisujú), nevybraný dotaz sa číta z poľa hľadania; hodnoty neaktívneho zdroja sú len pre obrazovku
+  (`hwManualRecord`). MJ zrkadlia `HardwareCatalog::UNITS` (stráži `tests/pure/test_kovh2_payload.rb`).
+- **Zápis nemení kanál:** JS zostaví nový zoznam (add = prázdne `id`, prideľuje server; edit nahradí jednu; delete vynechá; nenájdené `id` → `null` a zápis sa zastaví)
+  a pošle ho `collectAll()` → `apply_all`; čakajúci debounce sa **ruší, nie flushuje** (jedna zmena = jeden krok Späť). Payload nesie `manual_op {kind, id, token}`
+  s **vlastným rastúcim tokenom** (server ho len vráti; uzavretý tvar, `MANUAL_TOKEN_MAX`) a `handle_apply_all` odpovedá `NX.hwManualResult(ok, msg, op)` **v každej
+  vetve**; pri odmietnutí až **po `push_selected`** (modal ostáva otvorený, `hwManual` drží uložený zoznam), úspech modal zatvorí (`setBusy(false, {clear: true})`).
+  Po výnimke prestavby rescue vetva pushne pred odpoveďou a výnimku ďalej `raise`-uje.
+- **Mazanie bez potvrdenia** (poistka = krok Späť); status menuje odstránenú položku (`manual_removed_label` z uloženého zoznamu) a hláška výsledku nesie aj varovania
+  prestavby (`warn_suffix` zdieľaný so `status_with_warnings`).
+- **Modal patrí jednej skrinke:** `hwManualDropIfForeign` (v `hardware.js`) ho zavrie pri zmene **identity** (iná skrinka, dokument, doska, prázdny výber) a zahodí
+  bežiace hľadanie; echo tej istej skrinky ho zavrieť nesmie.
+- Testy: `tests/js/test_kovh2_adhoc_ui.js`, `tests/pure/test_kovh2_payload.rb`, in-SU `run_kovh2`.
 
-**SMOKE PACK 1 pridal dve veci a ani jedna sa nedotkla dát:** (1) **`.hwname` je jednoriadkový s ellipsis** a plný popis nesie `title` — bez orezu dlhý label („Výsuv zásuvkové
-čelo") pretiekol a **prekryl** select dĺžky/setu pri default šírke 470 px; selecty (`.hwsetsel`, `.hwnlsel`) majú šírku **podľa obsahu v medziach** (`flex: 0 1 auto` + min/max,
-vzor UX-03) a súčet stôp riadku stráži `tests/pure/test_smoke1_riadky.rb`. (2) **Podperky políc sú v boxe „Vnútro skrinky" ZBALENÉ pod jeden súhrnný riadok** („Podperky políc — 5
-políc: 20 ks") — natívny `<details class="hwgrp">`, aby ho `nxRevealTarget` vedel otvoriť pri budúcom deep-linku; zbalené je default, stav rozkliku žije v **localStorage POČÍTAČA**
-(`nx_hw_shelfpins_open`, rovnaký dôvod ako sektory a téma).
+**Chipy zámkov osí** — jeden markup na dvoch miestach: `hwAxHtml(axes, ident)` kreslí `.hwax` (obal s identitou zápisu) + `.axchips` + pri konflikte `.axconf`; volá ho
+riadok položky výsuvu (`hwItemHtml`, medzi `.hwrow` a nákupom), riadok osiroteného zásahu (`hwOffHtml`, obalený do `.hwitem`) a karta čela.
+- **Stav je serverový enum** `auto` | `locked` | `conflict` (iné = `auto`): `locked` jantár so zatvoreným zámkom, `conflict` červená, `auto` neutrálny s otvoreným.
+- **Hodnota do zápisu ide vždy zo servera** (`data-val` = `axes[os].value`, hodnota z `options` alebo `proposal`), nikdy z textu chipu.
+- Klik na `auto` zamkne zobrazenú hodnotu; klik na `locked`/`conflict` pošle `value: null` = odomknutie **len tejto osi**. Iná hodnota z `<select class="axsel">` s
+  výhradne serverovými `options`; pri prázdnej ponuke (`blocked_by: 'height'`) select nie je a ide veta „najprv vyrieš výšku". **Os v `conflict` nemá ponuku.**
+- **Konflikt:** červený riadok s vetou servera (`axes[os].message`), cesty von **„Nahradiť za …"** (len pri `proposal`, cez kostru D-15 `okLabel: 'Nahradiť'`;
+  náhrada ostáva zamknutá) a **„Odomknúť"**.
+- Zápis existujúcou akciou `set_hardware_override` (`field` `height_variant` / `box_height` / `nominal_length`) cez `hwSend` → `nxDocPayload`; panel si stav osi
+  nepamätá. **Modal náhrady zatvára až potvrdenie servera:** `onSubmit` zamkne okno a pripne `ax_token` (`a<N>`), server vráti `NX.hwAxResult(ok, msg, token)`
+  v každej vetve `handle_set_hardware_override` (len keď token prišiel), `onHwAxResult` porovnáva token; odmietnutie okno odomkne a hlášku ukáže v ňom.
+- **Os `box` má pole, nie ponuku** (spojitý rozsah 58–360 mm): `hwAxNumHtml` = `<input class="axnum" data-axc="num">`; Enter alebo blur so **zmenenou** hodnotou
+  zapíše (`onHwAxNum`), prázdne/nezmenené nepošle nič (nikdy `value: null`); v `conflict` a pri neurčiteľnom rozsahu sa pole nekreslí. Platnosť určuje len server
+  (`Recipes.box_range`); klient overuje text prísne (`hwAxNum`: trim → čiarka → `^\d+(\.\d+)?$` → konečné a kladné). **Jedna editácia = jeden zápis:** po odoslaní
+  `data-sent` + `disabled` (neodomyká sa, echo kreslí nové pole); `onmousedown` na `.hwax` označí `data-skipblur`, aby klik na iný ovládač radu neposlal aj blur.
+- **Fokus prežije prekreslenie:** ovládače nesú `data-ax` + `data-axc` (`chip` · `sel` · `num` · `fix` · `unlock`), kľúč `a:<os>|<druh>` bez hodnoty.
+- Testy: `tests/js/test_kovd2b_ui.js`, `tests/pure/test_kovd2b_payload.rb`, in-SU `run_kovd2b`.
 
-Pod rozklikom sú **pôvodné `.hwitem` riadky**, takže počet per polica sa edituje ďalej a `refreshHardwarePurchase` ich nájde (páruje selektorom, nie indexom detí). Delí sa **oboje
-— `items` aj `offs`** (Codex #183 P2): vypnutá polica je stále polica, takže patrí pod ten istý rozklik a do počtu; do súhrnu prispieva **0 ks** a vždy zapína „upravené" (vypnutie
-je ručný zásah). Bez toho by pri piatich policiach s jednou vypnutou súhrn tvrdil „4 police" a piata by visela vedľa neho. Zoskupuje sa **len vo `inside`** a **až od 2 políc
-spolu** (`HW_PINS_MIN` — rozklik nad jediným riadkom je klik navyše bez zisku); ručne upravená polica rozsvieti v súhrne jantárový štítok **„upravené"** (odchýlka od pravidla, nie
-chyba — semaforové `--nx-state-*` sa sem nemiešajú). Čisté jadro (`hwShelfPinSummary`, `hwSplitShelfPins`, texty) testuje `tests/js/test_smoke1_ui.js`.
+**Riadok osiroteného zásahu** (`hwOffHtml`; `hwDisabledOffs` filtruje na `orphan`, `hwOffLabel`, `hwOffName` z `orphan_label`): `disabled` → „obnoviť"
+(`onHwEnable`) · `invalid` a `dormant` → „zrušiť" (`onHwOrphanReset`, `reset: true`) · `part_material` → „zrušiť" vlastnou akciou. Dormantný riadok nesie zámok
+a pod sebou serverovú poznámku `orphan_note` (`.axnote`; bez kľúča druhý riadok nie je) a chipy osí nedostáva. **Box zaniknutého vlastníka:** pri
+`orphan_owner_gone: true` a vlastnom `owner_label` („(už neexistuje) · …") prepne `hwBoxGone(g)` hlavičku na statický `div` bez oka a `onHwOwnerPick`.
 
-**KOV-D4 — PRISVIETENIE CIEĽA SKOKU.** `hwFlash` (trieda `hwfocus`, 1600 ms, `HW_FLASH_MS`) svieti od D4 **najviac na JEDNOM uzle**: ďalší skok predchádzajúce prisvietenie sníma
-**hneď**, nie až po jeho vlastnom časovači (dva svietiace riadky by nepovedali, ktorý je „ten môj"). Cieľom skoku z Kontroly je **celá `.hwitem`**, keď existuje (nesie aj chipy osí
-a nákupný riadok), inak samotný `.hwrow`. Riadok sa hľadá **výhradne podľa serverovej adresy** (`hwRowSelector`) a `hwRowKindOk` navyše overí, že trieda riadku sedí s `orphan` —
-osirotený záznam a živá položka nikdy nežijú súčasne, takže nezhoda znamená **zastaraný payload** a neprisvieti sa radšej nič.
+Testy kontextu: `tests/js/test_uic4_kovanie.js`, `tests/pure/test_uic4_kovanie.rb`, in-SU `run_uic4`. Plné znenie: archív, „Kontext Kovanie (UI-C4, …)".
 
-Trieda je `.hwbox` (nie `.hwown` z mockupu): `.hwown` už označuje popis vlastníka VNÚTRI riadku a dva významy jednej triedy by sa poprali. Klik na hlavičku má **flush handshake**
-ako „Dielcov" (`onInfoParts`), ale z iného dôvodu: nie kvôli prepísaniu formulára (táto cesta push nevyvolá), ale kvôli **výberu** — rozpísaný edit čaká 400 ms a keby timer dobehol
-až PO výbere, `handle_apply_all` by skrinku prestaval a `finish_cab` by reselectol celý korpus, takže by sa práve kliknutý vlastník ticho stratil; neplatné pole akciu **zastaví**.
+### Riadok „Spotrebič" v Inspectore (ui/js/appliance_row.js + ui/panel/payloads.rb)
 
-**KOV-H2 — RUČNE PRIDANÉ POLOŽKY (ad-hoc kovanie mimo setov).** Pod boxmi vlastníkov (a pred skupinou Sety) je blok `.hwman`: **nadpis „Ručne pridané" len keď položky sú**
-(prázdny nadpis nad tlačidlom by zabral riadok a nepovedal nič), pod ním riadok každej položky vo vzore D-92 (`.hwitem` + `.hwbuy`) a **posledné** ghost tlačidlo na celú šírku
-„Pridať konkrétnu položku (mimo setov)". Bez označenej skrinky blok nevzniká — kreslí sa **až za** vetvou `items === null`, ktorá sa vracia skôr. Riadok je iné dáta než položky
-z pravidiel (`config['hardware_manual']`, nie `config['hardware']`), preto **nemá identitné atribúty** `data-owner`/`data-type`/`data-rule` — `hwGroups` ani
-`refreshHardwarePurchase` ho hľadať nesmú.
+**Čo robí:** v Základných skrinky (a v karte dosky `#boardApplRows` — varná doska, drez) ukáže **jeden riadok cez oba stĺpce na každý viazaný spotrebič**, riadok
+„očakáva" pre nesplnené očakávanie (`appliance_expects[]`, slot umývačky vždy) a **posledný riadok voľby „očakáva"**. Vzor riadku Nôh — žiadny sektor ani nadpis.
+Blok sa skrýva len pri kuse mimo matice vlastníkov a pri slote (ten voľbu nemá); skrinka a doska majú riadok voľby aj bez očakávaní (inak by sa očakávanie bez
+šablóny nedalo zapnúť). Zápisy: `actions_appliance.rb` ([actions_appliance.rb](#actions_appliancerb)).
 
-**Panel nepočíta nič.** Riadky sa kreslia z payloadu `hardware_manual_view[]`, ktorý skladá server (`Panel.hardware_manual_view`): **živý názov a cena z katalógu** (cena
-katalógovej položky sa v configu NEUKLADÁ — KOV-H1 BLOCKER 2, takže panel ju nemá odkiaľ vziať), popis vlastníka z `PartKeys.human_label`, `owner_missing` (počíta ho **jediná
-existujúca** čistá funkcia `Bom.manual_items_for`, aby sa druhá kópia podmienky nerozišla s Kontrolou) a `catalog_missing`. Stavy sa **priznávajú chipmi**: „ručná" (vždy),
-„bez vlastníka" a „chýba v katalógu" (jantárové — sú to upozornenia, nie semaforové `--nx-state-*`). Ponuku „Patrí k" nesie `hardware_manual_owners[]` = celá skrinka + čelá
-a zónové dielce **aktuálneho plánu**; korpusové dielce sa **neponúkajú** vedome („uholník patrí k ľavému boku" nie je informácia, s ktorou by výroba alebo nákup vedeli niečo
-robiť) a **surový kľúč sa neponúka nikdy** (v ponuke by vyzeral ako názov a nepovedal by nič — tá istá zásada ako `hwGroupTitle`). **Dvojznačné popisky sa rozlíšia zónou**
-(review #285 P2-C): `zone:ZA/shelf:1` aj `zone:ZB/shelf:1` dajú „Polica 1", takže v ponuke by stáli dve identické voľby. Prívesok („Polica 1 · zóna Z1a") sa dopĺňa **len tam, kde
-je popis naozaj dvojznačný**, a **len v tejto ponuke** — `PartKeys.human_label` sa nemení, má iných čitateľov (riadky kovania, Kontrola, pôvod v Nákupe, hlášky). Zdrojom prívesku
-je **segment kľúča** (id zóny), nikdy vymyslený text. Oba kľúče sú **len na čítanie**: `collectAll`
-o nich nevie, takže sa **nikdy** nevracajú serveru — inak by sa cena z obrazovky dostala do configu. Plán sa pre oba stavia **raz** (`plan_parts_by_key` je celý `build_plan`).
+**Payload** `cabinet_payload.appliance_rows[]` / `board_payload.appliance_rows[]` skladá server (`Panel.appliance_rows`): `{state: 'bound'|'expected'|'expects',
+item_id, category, category_label, text, sub, tone: 'ok'|'warn'|'', link, placeholder, options[], all, all_note}`; viazaný riadok navyše **`check`** = verdikt
+(`{state, niche{state, axes, axis_texts, text}, door_split{state, edge, range, recommended, source, text}, text}`) a pri chladničke **`mount`**.
+- **Riadok voľby** nesie úplný aktuálny zoznam a `options[]` = matica druhu v kanonickom poradí ako **príkazy** `{value: 'add:<kód>'|'del:<kód>', code, op, text,
+  disabled}`; viazaná kategória `disabled` s dôvodom („− rúra (priradená — najprv odpoj)"). **Prvá voľba je neutrálny súhrn** (`placeholder`). **Klient posiela úplný
+  nový zoznam** (`aprExpectsNext(current, value)` nad `data-apr-expects`). **Dve poistky proti rýchlym voľbám:** po odoslaní sa ovládač zamkne (odomkne ho čerstvá
+  karta, ktorú server pošle aj pri odmietnutí) a snapshot `data-apr-expects` sa posunie optimisticky.
+- **Splnenú kategóriu určuje tá istá funkcia ako zber** (`ApplianceBinding.bound_categories`, obojsmerný dôkaz) — osirelý záznam či recyklované ID riadok „očakáva"
+  nepotlačia.
+- Kontext nesie **`pid`** (`data-apr-pid` z `cabinet_pid` / `board_pid`). **Kontext vlastníka drží DOM** (`data-apr-kind` / `data-apr-id`), nie globál.
+  **Popisky kategórií v JS nežijú** (text skladá server; Node sada nad zdrojom `appliance_row.js` a `templates.js`).
+- **Tón viazaného riadku** sa pýta na tie isté vstupy ako `Validation.check_appliance_bound` a na ten istý verdikt `ApplianceChecks.verdict` (test porovnáva oba smery
+  nad jednou fixtúrou): ORANGE len pri `clash`/`unsatisfiable`; pri chýbajúcom bloku niky má známy konflikt prednosť pred vetou „kontrola sa nedá urobiť". Vetu skladá
+  server do `sub`; **JS o nike ani delení nevie nič**. Filter ponuky a verdikt merajú tou istou toleranciou (`ApplianceChecks` `AXES`, `axis_fits?`, `AXIS_TOL` 0,5 mm).
+- **Ponuka modelov** = položky zákazky danej kategórie bez fyzického vlastníka, filtrované podľa niky vs vnútro skrinky len po osiach, ktoré kategória kontroluje (rúra
+  a mikrovlnka Š + H, chladnička Š/V/H); skrinka s viac zónami vypne výškový filter (riadok to prizná). **Filter nie je brána** (nesediaci model ostáva s dôvodom,
+  „— zobraziť všetky (N)"); **prvá voľba je neutrálna** („vyber model…").
+- **Zápis** `set_appliance_owner` → `ApplianceBinding.apply!` (jeden krok Späť). Viazaný riadok má „odpojiť" (ikona `unlink`), nie druhý `<select>` (výmena modelu patrí
+  do Štúdia — vedomá odchýlka od mockupu R9). **Ikona odkazu** → `openStudio('appl', 'appliance:<uuid>')`.
+- **Echo:** riadok sa neobnovuje ľahkým pushom; po zápise z Rozpočtu alebo z pohľadu „V zákazke" posiela server celú kartu (`budget_geometry_proc` so zdvihom
+  generácie pri prestavbe, `budget_card_proc` bez zdvihu pri väzbe na dosku). **Odchod z kontextu riadky zahodí** (`clearApplianceRows` aj s kontextom vlastníka).
+- **Výška osadenia chladničky:** čip „osadenie 150 mm" (`mount: {value, text}`) len pri **obojsmernej väzbe** (`appliance_mount_editable?` = ten istý dôkaz ako
+  serverový cieľ akcie); iná kategória, slot, doska, sirota ani jednostranný záznam čip nedostanú. Klik otvorí **statický** `#aprMountPop` za `#applRows` (prežije
+  prekreslenie), ktorý pri otvorení **zachytí** dokument, vlastníka (druh, ID, PID), `item_id` a pôvodnú hodnotu. Zapisuje **výhradne „Použiť"/Enter, nikdy blur**;
+  Escape (z ktoréhokoľvek prvku, spotrebuje sa), „Zrušiť" a klik mimo zrušia bez zápisu; neplatné či nezmenené číslo nič nepošle; fokus sa vracia na čip len keď
+  bol v popoveri. `aprMountSync` nechá popover žiť len nad tým istým dokumentom, kusom a riadkom; zatvára ho aj `clearApplianceRows` a `nxDropDocState`
+  (`aprMountClose`). CSS `.aprmountpop[hidden] { display: none }`.
 
-**Modal je D-15 kostra** (`hw:manual:add` / `hw:manual:edit:<id>`): *Patrí k* · *Zdroj* (Z katalógu / Voľná položka) · pri katalógu **`lookup`** so serverovým hľadaním
-(`hw_manual_search` — čítacia cesta, žiadny krok Späť, poradie skladá server, odpoveď nesie `gen`), pri voľnej *Názov · MJ · Cena s DPH* · *Množstvo* · *Poznámka*. Cena
-**katalógovej** položky sa needituje ani neposiela (mockup mal „Cena s DPH (snapshot)" — **vedomá odchýlka**, je to len informácia z katalógu). Prepnutie *Zdroja* mení sadu polí
-a kostra ich za behu nevymieňa, preto sa modal **otvorí znova s tým, čo už používateľ napísal**. Hodnoty nesie **draft modalu** (`HW_MAN.draft`), nie pamäť — pamäť porovnáva proti
-defaultom a hodnoty **druhého, práve nevykresleného** zdroja by nemala proti čomu merať. Draft preto **prežíva prekreslenie** (review #285 kolo 2, P2-F): pred prepnutím sa doň
-vlejú viditeľné hodnoty (`hwManualMergeDraft` — čistá funkcia; kľúče, ktoré práve vykreslené nie sú, sa **neprepisujú**) a po prekreslení sa vrátia, takže cesta *voľná → katalóg →
-voľná* už napísaný názov ani cenu nezahodí. **Nevybraný dotaz** katalógu sa číta z poľa hľadania, lebo vo `values()` nie je (kontrakt `lookup` vracia len kód). Hodnoty neaktívneho
-zdroja sú **výhradne pre obrazovku** — do `values()` ani do configu sa nedostanú, `hwManualRecord` číta len polia svojho zdroja. MJ sú **zrkadlom** serverovej `HardwareCatalog::UNITS` (nie payload — menia sa raz za rok; že sa nerozídu, stráži
-`tests/pure/test_kovh2_payload.rb`).
-
-**Zápis nemení kanál.** JS zostaví NOVÝ zoznam z `hwManual` (add = záznam s **prázdnym `id`**, prideľuje ho server; edit = nahradí práve jednu; delete = vynechá ju — a keď sa
-`id` v zozname **nenájde**, vráti `null` a zápis sa zastaví: tichý append by z úpravy spravil duplikát) a pošle ho existujúcim `collectAll()` → `apply_all`. Čakajúci debounce sa
-**ruší, nie flushuje** — rozpísaný edit ide v TOM ISTOM payloade, takže jedna zmena = jeden rebuild = **jeden krok Späť**; samostatný flush by znamenal dva. Payload navyše nesie
-**`manual_op {kind, id}`** a `handle_apply_all` naň odpovedá **`NX.hwManualResult(ok, msg, op)`** v **každej** vetve — aj v tých, ktoré zápis ticho zahadzujú (cudzí dokument,
-zrušený výber, nesediace echo, výnimka prestavby). Dôvod je kontrakt D-15: zámok odosielania odomyká **výhradne volajúci**, takže vetva bez odpovede by nechala modal zamknutý
-navždy. Pri **odmietnutí** ide signál **až po `push_selected`**: modal ostáva otvorený s hodnotami, ale `hwManual` už drží ULOŽENÝ zoznam (neúspešná zmena sa nesmie držať) —
-poradie je preto kontrakt, nie náhoda. Úspech modal **zatvorí** a zahodí pamäť draftu (`setBusy(false, {clear: true})`).
-
-**Mazanie ide bez potvrdzovacieho okna** — poistkou je jeden krok Späť (vzor „Vrátiť na pravidlo"); potvrdenie pri každom mazaní by bolo klik navyše pri každej oprave. Status
-**menuje**, čo sa odstránilo (`manual_removed_label` číta názov z **uloženého** zoznamu ešte pred preflightom — ten `params` už prepíše odoslaným zoznamom). **Hláška výsledku
-PREPÍŠE status prestavby** (klient ju posiela do `NX.setStatus`), takže nesie aj jeho **varovania** — inak by upozornenia z tej istej prestavby zmizli bez stopy (review #285
-kolo 2, P2-H). Prípona „· N upozornení" je **jedna funkcia** (`warn_suffix`), ktorú používa `status_with_warnings` aj `manual_ok_msg`: jeden zdroj textu, žiadne skladanie na
-klientovi.
-
-**NAŠEPKÁVAČ NEPONÚKA NEAKTÍVNE POLOŽKY (review #285 kolo 2, P2-I).** `HardwareCatalog.search_with_total` vracia neaktívny záznam pri **presnej zhode kódu** aj bez
-`include_inactive` — vedomý kontrakt katalógu (kto kód pozná, má právo ho tam nájsť). V našepkávači je to pasca: vykreslil by sa ako bežný výber a kto pozná starý kód, pridal by si
-do zákazky položku, ktorú katalóg vedie ako **už neobjednávanú**. Filter (`drop_inactive`) žije **výhradne v našepkávači** a `total` sa znižuje o to, čo zahodil (zásada „no silent
-caps" platí aj naopak). **Zápisová cesta sa nemení**: položka s neaktívnym kódom, ktorá v configu už je (legacy zákazka, šablóna), musí prestavbu prežiť — zahodiť ju by znamenalo
-ticho odobrať kus z objednávky.
-
-**MODAL PATRÍ JEDNEJ SKRINKE A ZMENU VÝBERU NEPREŽIJE (review #285 P1).** Držal rozpísaný zoznam, kým `loadSelected` pod ním vymenil `hwManual`/`hwManualView`/`hwManualOwners`
-aj `selectedCabId` — odoslanie starého formulára by potom postavilo zoznam z **novej** skrinky a opečiatkovalo ho **jej** identitou; položka by pristála na nesprávnej skrinke a pri
-zhode `id` by prepísala cudzí záznam. Rozhodnutie „je to iný výber?" žije v `hardware.js` (**`hwManualDropIfForeign`**), nie v `bridge.js` — modal patrí tomu súboru a podmienka sa
-nesmie rozísť s tým, čo modal drží. Zatvára sa **výhradne pri zmene IDENTITY**: iná skrinka, iný dokument, odchod na dosku, prázdny výber. **Echo tej istej skrinky (náš vlastný
-apply, na ktorý modal práve čaká) ho zavrieť NESMIE** — inak by zmizol skôr, než príde odpoveď, ktorá ho drží otvorený. Zatvorenie zároveň zahadzuje bežiace hľadanie, aby odpoveď
-spred zatvorenia nepristála v novom okne, a status povie, že sa **nič neuložilo**.
-
-**ODPOVEĎ SA KORELUJE TOKENOM, NIE DRUHOM OPERÁCIE (review #285 P2-A).** Všetky `add` majú prázdne `id`, takže pri pomalej prestavbe (používateľ medzitým zavrie modal a pošle ďalšiu
-operáciu toho istého druhu) sa odpoveď na A priradila k B — zavrela cudzí modal a zahodila jeho draft. Každé odoslanie má preto **vlastný rastúci token** v `manual_op`; server ho
-v `manual_op(data)` len **preberie do echa** a vráti, nikdy ho neinterpretuje. Tvar je uzavretý (String/Integer, dĺžka orezaná na `MANUAL_TOKEN_MAX`): payload je verejný kanál a do
-`execute_script` sa nesmie dostať cudzí objekt. Cudzí tvar aj chýbajúci token = **prázdny** token, teda odpoveď sa nepriradí žiadnemu modalu — bezpečnejšie než priradiť ju zle.
-
-**PO VÝNIMKE PRESTAVBY IDE RESYNC (review #285 P2-B).** Klient si `hwManual` prepisuje **optimisticky** už pred apply; keď `CabinetBuilder.rebuild` vyhodí výnimku, operácia sa zruší
-a uložená skrinka ostane nezmenená — bez `push_selected` by si panel držal **odmietnutý** zoznam a najbližšia nesúvisiaca zmena skrinky by ho poslala znova (duplicitné pridanie,
-alebo dodatočne uplatnené „neúspešné" mazanie). Rescue vetva preto pushne **pred** odpoveďou modalu a výnimku ďalej `raise`-uje pre `cb` wrapper.
-
-**ŽIVÝ REFRESH PO ZMENE KATALÓGU (review #285 P2-D).** `hardware_manual_view` sa plnil len pri `loadSelected`, takže úprava či zmazanie položky katalógu v súbežne otvorenom Štúdiu
-nechala v Inspectorovi **starú cenu** (alebo chýbajúci chip „chýba v katalógu") až do zmeny výberu — a to pri riadkoch, ktorých jediný zmysel je ukazovať živú cenu. Zmena katalógu
-už má svoj **ľahký** kanál (`HardwareCatalogDialog.push_items` → `Panel.push_hardware_sets` → `NX.setHardwareSets`), ktorý obnovuje ponuky setov a nákupné riadky D-92; nesie preto
-aj `manual_view` a JS ním prekreslí **len vlastný blok** (`refreshHardwareManual`). Žiadny plný push výberu, žiadny zdvih generácie okna, žiadny krok Späť. Blok je preto rozdelený
-na **obal a obsah** (vzor `rowsHtml`/`rowsInnerHtml` v kostre) a keď skrinka žiadne ad-hoc položky nemá, `plan_parts_by_key` sa **nevolá vôbec** — tento push chodí po každej zmene
-katalógu.
-
-**KOV-D1b — ten istý ľahký push nesie aj `front_drawer`** (Codex #310 kolo 1 P2-5). Rozklik „Technický detail" na karte zásuvky ukazuje **názov setu a kódy**, teda presne to,
-čo tento push mení (úspešné projektové/globálne mapovanie, zmena katalógu). Bez toho by riadok Kovania už ukazoval nový kit a detail vedľa starý, kým používateľ neprepne
-výber. Payload nesie **tú istú čítaciu projekciu** ako plný push (`front_drawer_payload` — uložené `params` + `HardwareSets.explain`), takže **žiadny prepočet receptu,
-žiadny zápis, žiadny krok Späť**. Na klientovi ho preberá `refreshFrontDrawer` (`form.js`): vymení záznam a prekreslí **len OTVORENÚ kartu** (`openFrontCardId`) — riadky
-čiel sa neprestavujú, rovnaká úspornosť ako `refreshHardwarePurchase`. Chýbajúci kľúč (starý payload) sa nedotkne ničoho; `{}` je legitímna hodnota „skrinka zásuvky nemá".
-**KOV-D2b: záznam nesie aj `axes` a `lock`** (`Panel.front_drawer_refresh`, `sync.rb`). `refreshFrontDrawer` vymieňa záznam **celý**, takže payload bez osí by z otvorenej karty
-chipy odstránil — a s nimi cestu, ako konfliktnú zásuvku odomknúť. Plán sa preto stavia **len keď skrinka klasifikovanú zásuvku naozaj má** (zákazka bez zásuviek má payload
-zhodný s D1b).
-
-**CHIPY ZÁMKOV OSÍ (KOV-D2b) — jeden markup, dve miesta.** `hwAxHtml(axes, ident)` kreslí `.hwax` (obal s identitou zápisu) + `.axchips` (chip za každú os, ktorú server poslal)
-+ pri konflikte `.axconf`. Volá ho **riadok položky výsuvu** (`hwItemHtml`, medzi `.hwrow` a nákupným riadkom — `refreshHardwarePurchase` prilepuje nákup na koniec `.hwitem`,
-takže toto poradie prežije aj ľahký push), **riadok osiroteného zásahu** (`hwOffHtml`, ktorý sa preto obalí do `.hwitem`) a **karta čela**. Vlastný obal namiesto `.hwrow` je
-zámer: karta čela žiadny `.hwrow` nemá.
-
-**RIADOK OSIROTENÉHO ZÁSAHU (`hwOffHtml`) — štyri druhy, texty zo servera.** `hwDisabledOffs` filtruje **na `orphan`** (server je autorita), `hwOffLabel` dá krátku príponu stavu
-a `hwOffName` názov (`orphan_label`, keď ho server poslal). Druhy: `disabled` → „obnoviť" (`onHwEnable`) · `invalid` a **`dormant`** (D-132) → „zrušiť" (`onHwOrphanReset`,
-`reset: true`) · `part_material` → „zrušiť" vlastnou akciou. **Dormantný** riadok navyše nesie zatvorený zámok zo sprite (`lock`) a **pod riadkom** serverovú poznámku
-`orphan_note` (`.axnote`, ten istý tlmený štýl ako poznámka chipu) — riadok sa preto obalí do `.hwitem` rovnako ako pri chipoch. Poznámku skladá **výhradne server**: veta
-„teraz je pripnutý *Atira SiSy v1*" stojí na tom, ktorý recept čelo má, a to JS vedieť nesmie. Bez kľúča `orphan_note` sa druhý riadok **nekreslí vôbec** (vertikálny priestor).
-Chipy osí dormantný riadok **nedostáva** (KOV-D4 bod 3) — server mu ich neposiela.
-
-**BOX ZANIKNUTÉHO VLASTNÍKA (D-132, review P3).** Keď zámok patril čelu, ktoré už v zákazke nie je, server pošle riadku **`orphan_owner_gone: true`** a vlastný `owner_label`
-„(už neexistuje) · pôvodné zásuvkové čelo" — `PartKeys.human_label` by inak tvrdil „F9 · zásuvkové čelo", hoci **`F#` je poradie v resolved čelách** a to čelo medzi nimi nie
-je. `hwBoxGone(g)` (box **bez** živých položiek, ktorého **všetky** osirotené riadky nesú ten príznak) prepne hlavičku na **statický `div`** — bez oka a bez
-`onHwOwnerPick`, lebo `nx_select_hw_owner` by hľadal dielec, ktorý v modeli neexistuje. Hlavička ostáva **súrodencom** `.hwboxb` v oboch podobách (invariant UI-C4).
-
-- **Stav je serverový enum** (`auto` | `locked` | `conflict`); čokoľvek iné sa kreslí ako `auto` (nikdy sa nedomýšľa stav, ktorý server nepovedal). `locked` = jantárová rodina
-  (`--nx-warn-*`, zatvorený zámok zo sprite), `conflict` = červená (`--nx-err-*`), `auto` = neutrálny chip s otvoreným zámkom. Žiadna nová farba, žiadne emoji.
-- **Hodnota do zápisu ide VŽDY zo servera**, nikdy z textu chipu: `data-val` nesie `axes[os].value` (resp. hodnotu z `options` alebo `proposal`). Text je popisok pre človeka
-  („NL 470,5" s desatinnou čiarkou), hodnota je číslo pre server — čítať ju z textu by znamenalo zamknúť inú dĺžku, než používateľ videl.
-- **Klik na `auto` chip zamkne práve zobrazenú hodnotu**, klik na `locked` alebo `conflict` chip pošle `value: null` = odomknutie **LEN tejto osi** (`reset: true` by zahodil
-  celý záznam a s ním platný druhý zámok). Iná hodnota sa vyberá z `<select class="axsel">` s **výhradne** serverovými `options`; pri prázdnej ponuke (`blocked_by: 'height'`)
-  sa select nekreslí vôbec a chip sprevádza tlmená veta „najprv vyrieš výšku".
-- **Os v `conflict` NEMÁ ponuku** (Codex #313 kolo 1 P2-3). Server `options` posiela aj vtedy, ale select vedľa červeného chipu by bol **druhá cesta k tej istej zmene, a to bez
-  potvrdenia**, ktoré vedľa neho vyžaduje tlačidlo „Nahradiť za …". Jediné cesty z konfliktu sú preto náhrada (D-15) a odomknutie.
-- **Konflikt** dostane červený riadok s **vetou zo servera** (`axes[os].message` — panel žiadnu vlastnú neskladá) a dve cesty von: **„Nahradiť za …"** len keď server dal
-  `proposal`, a **„Odomknúť"** vždy. Náhrada je jedno rozhodnutie, takže ide cez **kostru D-15** (`NXModal.open` bez polí, `okLabel: 'Nahradiť'`); bez kostry sa neodošle nič —
-  zmena zamknutej hodnoty bez potvrdenia je presne to, čomu sa dávka vyhýba. Po potvrdení sa zapíše `proposal` a náhrada **ostáva zamknutá**; druhý zámok server nemení.
-- **Zápis ide EXISTUJÚCOU akciou** `set_hardware_override` (`field` `height_variant` / **`box_height`** / `nominal_length`) cez `hwSend` → `nxDocPayload`, teda s guardom dokumentu aj skrinky.
-  Žiadny nový callback, žiadny druhý tvar payloadu. Po zápise príde plný push a chipy sa prekreslia z nového `axes` — panel si stav osi **nikdy nepamätá**.
-- **Modal náhrady zatvára AŽ potvrdenie servera** (Codex #313 kolo 1 P2-1; kontrakt D-15 „zápis okno nezatvára", GH #138 P2 / audit #10). `onSubmit` len **zamkne** okno
-  (`NXModal.setBusy(true)`) a pripne k odoslaniu **korelačný token** (`ax_token`, rastúci `a<N>`); server ho vracia v `NX.hwAxResult(ok, msg, token)` a `onHwAxResult` porovnáva
-  **jeho** — korelovať podľa druhu operácie nestačí, odpoveď na staršie odoslanie by zavrela okno, ktoré už čaká na niečo iné (lekcia KOV-H2, Codex #285 P2-A). Úspech okno
-  zatvorí, **odmietnutie ho odomkne a hlášku ukáže V ŇOM** — inak by používateľ pri zastaranom `proposal` (medzitým zmenený výber) videl len status pod prázdnou kartou.
-  Server odpovedá **v každej vetve** `handle_set_hardware_override` (`axis_fail` / `push_axis_result`) a **len keď token prišiel** — klik na chip žiadne okno nečaká.
-- **Os `box` má POLE, nie ponuku (D-128).** Výška dreveného boxu je **spojitý rozsah** (58–360 mm po desatinách), takže `<select>` by musel mať stovky položiek. `hwAxChipHtml`
-  preto pre `box` kreslí `hwAxNumHtml` — malé `<input class="axnum" data-axc="num">` (46 px, tokeny `.axsel`): prázdne s rozsahom v `placeholder` v stave `auto`, so zamknutou
-  hodnotou v stave `locked`. **Enter alebo blur so ZMENENOU hodnotou** zapíše (`onHwAxNum`); prázdne pole a nezmenená hodnota **neposielajú nič**, takže z tejto cesty
-  **nikdy nevznikne `value: null`** — odomknutie ostáva vedomým klikom na chip alebo na „Odomknúť". V stave `conflict` sa pole **nekreslí** (rovnako ako sa nekreslí ponuka)
-  a nekreslí sa ani pri **prázdnom alebo neurčiteľnom rozsahu** (`min`/`max` = `null`, veľmi nízka zóna) — zamknúť sa nedá nič a server by to aj tak odmietol.
-  `data-min`/`data-max` a HTML atribúty **nie sú ochrana**: o platnosti rozhoduje výhradne server (`Recipes.box_range`). Klient overuje **celý text prísne** (`hwAxNum`:
-  trim → desatinná čiarka → `^\d+(\.\d+)?$` → konečné a kladné) — `parseFloat` by z „1e309" spravil Infinity a z „300,5xx" číslo 300, teda iný rozmer boxu, než je na obrazovke.
-- **JEDNA editácia = JEDEN zápis (Codex #364 kolo 1 P2 + slepý Opus review).** Pole má **dva spúšťače** (Enter aj blur) a odpoveď servera prichádza až prekreslením panela,
-  takže bez zámku by „Enter a hneď klik vedľa" poslali tú istú hodnotu dvakrát = **dva `rebuild`, teda dva kroky Späť** za jednu editáciu. Po odoslaní sa pole označí
-  `data-sent` a **zamkne** (`disabled`); ručne sa **neodomyká** — echo servera kreslí markup nanovo a nové pole je čisté (vzor `HW_AX_MODAL.sent`). Druhý prípad je klik na
-  **iný ovládač toho istého radu**: prehliadač najprv pošle **blur** poľa a až potom klik, takže by sa zapísala hodnota z poľa **a** rozhodnutie chipu. `onmousedown` na obale
-  `.hwax` preto označí pole `data-skipblur` a blur z tejto cesty nič nepošle (Enter sa príznakom nedotkne; `oninput` ho čistí, aby po klik-bez-blur nevisel). Neplatný vstup
-  zámok **nenasadzuje** — používateľ musí mať šancu opraviť preklep.
-- **Fokus prežije prekreslenie karty** (Codex #313 kolo 1 P2-4). Každý ovládač chipov nesie okrem `data-ax` (os) aj **`data-axc`** (druh: `chip` · `sel` · **`num`** · `fix` · `unlock`);
-  `frontCardFocusKey` z dvojice skladá kľúč `a:<os>|<druh>` a `frontCardFocusSelector` z neho selektor. Hodnota (`data-val`) v kľúči **nie je** — po zamknutí sa mení, takže by
-  fokus nemal čo nájsť. Bez toho by fokus padol na dokument po každom pushi, teda po **každom** zamknutí — presne pri klávesovej práci so zámkom.
-
-Testy: `tests/js/test_kovd2b_ui.js` (chipy, klik, náhrada nad mini-DOM), `tests/pure/test_kovd2b_payload.rb`, in-SketchUp sekcia `run_kovd2b`.
-
-Testy ad-hoc položiek (KOV-H2): `tests/js/test_kovh2_adhoc_ui.js`, `tests/pure/test_kovh2_payload.rb`, in-SketchUp sekcia `run_kovh2`.
-
-**Klik na hlavičku → `nx_select_hw_owner` → `Panel.handle_select_hw_owner`** (`ui/panel/selection.rb`): prázdne `part_keys` = celá skrinka (`reselect`), inak `parts_by_keys` =
-výrobné dielce s daným `part_key` v **rovnakom rozsahu ako kusovník** (`manufactured_parts` — vnorené AJ odpojené). Je to **čisté čítanie + zmena výberu** pod
-`suspend_selection_sync`: žiadny `start_operation`, žiadny zápis, **žiadny krok Späť** (lekcia D-103), prísny guard `model_guid` + `cabinet_id` (asynchrónny callback), nenájdený
-kľúč sa **prizná hláškou** a výber nezhodí.
-
-**Odmietnutý rozpísaný edit má prednosť** (rovnaký guard ako `handle_select_parts`): keď je `@last_apply_error` nastavený, akcia sa nevykoná, príznak sa **spotrebuje** a používateľ
-dostane pôvodný dôvod — hlásiť nad ním úspech by prekrylo jedinú správu, ktorá hovorí pravdu o tom, prečo sa úprava nezapísala.
-
-**Čiastočný výsledok sa neodmieta, ale ani nezamlčí** (Codex #179 P2): box môže niesť VIAC kľúčov (obe krídla, všetky police vo „Vnútre") a ukázať dve krídla z troch je stále to,
-čo používateľ chcel — status sa preto pýta **označených dielcov** (`part_key` vybratých entít), nie žiadaných kľúčov, chýbajúce **pomenuje** a hlásenie sa označí ako upozornenie
-(zásada „nikdy netvrdiť zhodu, ktorá neplatí").
-
-**VEDOMÁ ODCHÝLKA — po výbere sa NEVOLÁ `push_selected`:** identita výberu je autoritou režimu panela, takže označený DIELEC by panel prepol na kartu Dielec a box, z ktorého sa
-práve klikalo, by zmizol pod rukami. Panel už zobrazuje TÚ ISTÚ skrinku (dielec je jej súčasť), takže sa nič nerozchádza vo veci — len rail nedostane dočasnú položku; vzor je
-`EdgeSelectionWatch`, ktorý na zmenu výberu tiež zámerne nepusha.
-
-**Najbližší bežný push** (Späť/Znova, zmena katalógu, ďalší klik v modeli) panel zosúladí a vtedy sa karta Dielec ukáže — je to prijatá cena za to, že sekcia počas práce nezmizne.
-
-**Obojsmerné prepojenie box ↔ značka** beží CSS triedou `hov` nad už vykresleným SVG **aj nad boxom** — obe strany nasadzuje **jedna** funkcia `hwPaintHover` (smery sa nemôžu
-rozísť; vzor `setFrontHover`/`clearFrontHover` z D-23), zapína ju delegácia `bindHwOwnerHover` (viazaná RAZ na statický `#hwRows`) a z druhej strany `hwHoverByOwner` z delegácie
-náhľadu — náhľad o konvencii boxov nevie a pýta sa jedného miesta pravdy. `renderPreview` sa počas hoveru NIKDY nevolá (lekcia D-23) a **obe prestavby** (`renderPreview` aj
-`renderHardware`) zvýraznenie zhasnú, lebo im zaniknú uzly, na ktorých visí. Čisté jadro (skladanie skupín, poradie, texty) testuje `tests/js/test_uic4_kovanie.js`, zdrojové a
-serverové invarianty `tests/pure/test_uic4_kovanie.rb`, živý model sekcia `run_uic4` in-SketchUp runnera (guardy identity, správne dielce, žiadna zmena modelu, žiadny undo krok).
-
-**UI-D3** tú istú cestu prebralo aj pre **oko v riadku warnpanelu** (pole `origin` mení iba podstatné mená v statusoch) — jedna cesta, jedny guardy.
+Plné znenie: archív, „Riadok „Spotrebič" v Inspectore".
 
 ### Karta dielca (UI-D1, panel.html + ui/js/part_card.js + ui/panel/actions_parts.rb)
 
-karta má poradie podľa kontraktu UI 2.0 — **Základné hore** (`#pcBasic`) · Materiál · hrany · **rad akcií dole**.
+**Čo robí:** pri označenom dielci skrinky ukáže jeho rozmery, materiál, smer dekoru a hrany a dovolí ich zmeniť. Poradie: **Základné hore** (`#pcBasic`) · Materiál ·
+hrany · **rad akcií dole** („Označiť v modeli", „Použiť na podobné…"). Dáta: `part_card` payload (`Panel.part_grain_payload`, `part_cut_payload`, hrany D-102),
+zápis `set_part_material` / `set_part_edge` / `set_part_edges_all` / `set_part_grain` (`actions_parts.rb`).
 
-**ŠT-2d — preklik na DEKOR:** vedľa výberu materiálu (dielca aj dosky, `#pcMatLink`/`#bcMatLink`, trieda `.matlink`) stojí ikona, ktorá otvorí Štúdio na sekcii Materiály **priamo
-na detaile toho dekoru** (`nxDecorLinkState` → `openStudio('mat', material_id)`; funkcia žije v `part_card.js` a `board_card.js` ju volá — jedna cesta, dva vstupné body). Ikona je
-**v existujúcom riadku** (pravidlo vertikálneho priestoru), pri dielci bez rozhodnutého materiálu je `aria-disabled` s dôvodom (D-78), a **ABS pásky sa neprelinkúvajú** — hrana má
-vlastný tok. Rozmery dielca sú **VÝSTUP** (počíta ich korpus), preto sú to informačné riadky `.inforow` v tej istej mriežke `.basicgrid`/`.infocol` ako Základné korpusu — nikdy
-polia („výstup nikdy nevyzerá ako vstup"); pôvodný jednoriadkový `#pcDim` zanikol.
-**D-143 (KON-0, v0.13.1) — riadok „Do nárezu":** pri dielci, ktorému server pošle platný `cut_size` (dnes chrbát v drážke), pribudne pod **Hrúbku** (pravý stĺpec má jeden
-riadok, ľavý dva — karta **nenarastie**, schválený mockup sekcia D) informačný riadok „Do nárezu 600 × 720 mm" s tooltipom „…zrezať do drážky v dielni". **Dĺžka/Šírka
-ostávajú rozmer MODELU** (564 × 684) a ich tooltip to vysvetlí. Všetky texty skladá server (`Panel.part_cut_payload`: `cut_text`, `cut_title`, `model_title`); poškodený
-údaj riadok nedostane. Texty „výrobne" segmentu Smer dekoru (`part_grain_payload`) počítajú od D-143 z rozmeru **do nárezu** (`Bom.cut_dims`, priečny dekor 720 × 600).
+- **Rozmery dielca sú VÝSTUP** — informačné riadky `.inforow` v mriežke `.basicgrid`/`.infocol` (nikdy polia). **„Do nárezu"** pod Hrúbkou len pri platnom
+  `cut_size` (napr. chrbát v drážke): Dĺžka/Šírka ostávajú rozmer modelu, texty skladá server (`Panel.part_cut_payload`: `cut_text`, `cut_title`, `model_title`).
+- **Preklik na dekor** (`#pcMatLink`/`#bcMatLink`, `.matlink`, v existujúcom riadku): `nxDecorLinkState` → `openStudio('mat', material_id)` (funkcia v `part_card.js`,
+  karta dosky ju volá); bez rozhodnutého materiálu `aria-disabled`; ABS pásky sa neprelinkúvajú.
+- **Smer dekoru je VSTUP** — segment `#pcGrainRow` (`.pcgrain`) `inherit | length | width`; zápis `set_part_grain` → `Panel.handle_set_part_grain` (enum guard
+  `CabinetBuilder::GRAIN_OVERRIDES`, guard dokumentu aj skrinky, jedna prestavba = jeden krok Späť). **Texty skladá server** (`Panel.part_grain_payload`): dedený
+  stav ukazuje výsledok („Podľa materiálu — pozdĺžna"), každá voľba nesie v tooltipe **výrobný rozmer** (počítaný z rozmeru do nárezu `Bom.cut_dims`).
+  **Autoritou zobrazeného výsledku je snapshot dielca** (`grain_effective` = `cfg['grain_direction']`), katalóg dáva len prospektívne `grain_pending`
+  (`CabinetBuilder.effective_grain`) — rozdiel karta povie hintom. Sentinel dedenia na drôte je **`__inherit__`** (`nxGrainWire`, zhodu zamyká test). Chýbajúce
+  `grain_options` segment zamknú a popisy vrátia na neutrálnu zálohu; materiál bez smeru segment zamkne (`aria-disabled` + hint) a klik odvedie na materiálový
+  combobox (`onPartInfoGrain` → `nxRevealTarget` + `NXCombo.open`). Ručný zásah je jantárový `.ovr`. Stav segmentu: čistá `nxGrainSegmentState`.
+- Po zmene katalógu `push_materials` pošle aj čerstvý payload karty (`push_part_card` → `NX.setPartCard`; čisté čítanie, bez označeného dielca nič).
+- **Hranový riadok** začína ikonou `#i-edge` so štyrmi rotáciami `data-rot`; uhol dáva **strana v 2D náhľade** (`pc.edge_sides` = `AbsRules.edge_sides`).
+- **„Hrúbka" klikateľná nie je** (určuje ju materiál korpusu).
 
-**`Smer dekoru` je od K1 (D-108, v0.7.23) VSTUP** — pôvodná vedomá odchýlka UI-D1 („smer je len informácia") tým skončila. Je to statický segment `#pcGrainRow` v riadkovom tvare
-„popisok + ovládač" (trieda `.pcgrain`, rovnaká mriežka ako `Materiál`, takže karta nenarástla o samostatný riadok) s tromi voľbami `inherit | length | width`; zápis ide vlastným
-callbackom `set_part_grain` → `Panel.handle_set_part_grain` (enum guard proti `CabinetBuilder::GRAIN_OVERRIDES`, guard dokumentu aj skrinky, **jedna prestavba = jeden krok Späť**,
-vzor D-35).
+**Zápisové guardy karty** (zápis do modelu aj do globálneho katalógu ABS ide až za nimi; odmietnutie nevyrobí krok Späť):
+- **Jedna brána `part_target_error(model, cab, params, rk, what)`**: **dokument** (`model_guid`), **cieľ zmeny** (vo výbere musí byť dielec s kľúčom karty — výber
+  presunutý na skrinku = odmietnutie, inak by sa prestavalo vnorené dvojča) a **odpojenosť**. Stojí za `existing_params` + `canonical_part_key`, pred
+  `virtual_duplak_probe`/`ensure_missing_abs`. Prázdny výber je odmietnutie; bulk olep má vlastnú tichú vetvu `if part.nil?` pre stale echo.
+- **Odpojenosť `detached_part_error`** (`nested_part?` — vnorený dielec má za rodiča definíciu skrinky) prechádzajú VŠETKY zápisové cesty: hrana
+  (`handle_set_part_edge`), bulk olep (`handle_set_part_edges_all`, odmietnutie hlási), materiál, smer dekoru aj zdroj „Použiť na podobné" (`similar_context`).
+  Hláška menuje čo sa nezmenilo a čo robiť. Dôvod: zápis by inak zmenil vnorené dvojča a do objednávky by išla páska, ktorú nikto nevidel.
+- **„Označiť v modeli"** (`nx_select_part` → `Panel.handle_select_part`): čisté čítanie + zmena výberu, prísny guard dokumentu aj skrinky, dielec podľa `part_key`.
 
-**Všetky texty skladá server** (`Panel.part_grain_payload`, vzor D-102): dedený stav ukazuje **VÝSLEDOK** („Podľa materiálu — pozdĺžna", nie prázdne „dedí") a každá voľba nesie v
-tooltipe **výrobný rozmer** (2000×250 vs 250×2000) — presne ten rozdiel, ktorý pri incidente 19.8.2026 vyšiel najavo až v objednávke.
+**„Použiť na podobné…"** (`#simModal`) prenáša **výhradne olep hrán**. **Definícia „podobný" žije len na serveri:** rovnaká **rola** + rovnaký **výsledný materiál**
+(`material_id` zo snapshotu) v rozsahu `cabinet` | `project` (`SIMILAR_SCOPES`), okrem zdroja; kandidáti z `regenerated_parts` (len vnorené dielce — tie, ktoré
+prestavba naozaj prekreslí). **„Celý projekt" = zákazka** (`Panel.job_cabinets`, top-level); skrinka s odpojeným dielcom sa v oboch rozsahoch **preskočí**
+a vymenuje (`similar_parts_map` vracia `[mapa, preskočené]`, vetu skladá `similar_skipped_text` → `#simSkipped`).
+- **Živý počet aj zápis idú jednou funkciou `similar_parts_map`**; JS posiela len `role_key + scope`, odpoveď `NX.setSimilarCount` prijme len posledný dopyt
+  (rastúci token `req`, vrátený aj z chybovej vetvy; chyba nesie požadovaný rozsah).
+- Zápis = **jedna operácia** `CabinetBuilder.rebuild_many` (jeden krok Späť naprieč skrinkami); prenáša sa záznam overridu (prázdny override vráti ciele na pravidlo),
+  `edge_warnings` cieľa sa zahodia, vo výbere ostáva zdrojový dielec (`focus_part`). Modal drží identitu z času otvorenia, zatvára sa pri inom dielci či odchode
+  z `mode-part`; pri tej istej identite sa počet vypýta znova. **Enter modal neodchytáva.**
 
-**Autoritou zobrazeného výsledku je SNAPSHOT dielca** (`grain_effective` = `cfg['grain_direction']`), nikdy živý katalóg: ten sa medzi prestavbami mení (materiál sa dá zmazať,
-`grain` prepísať, `.skp` otvoriť na stroji bez toho záznamu) a dopočet by tvrdil iný smer aj iný výrobný rozmer, než s akým dielec ide do VEPO. Katalóg dáva len **prospektívny**
-údaj `grain_pending` (čo by vyšlo pri najbližšej prestavbe, cez tú istú `CabinetBuilder.effective_grain`); keď sa rozíde so snapshotom, karta to **povie hintom**, nezamlčí.
+Testy: `tests/pure/test_uid1_dielec.rb`, `tests/js/test_uid1_dielec.js`, `tests/pure/test_abs_odpojeny_dielec.rb`, in-SU `run_uid1` a `run_k1`.
+Plné znenie: archív, „Karta dielca (UI-D1, …)".
 
-**Sentinel dedenia na drôte je `__inherit__`** (ten istý ako pri hranách) — segment používa UI token `inherit` a prekladá ho `nxGrainWire`; zhodu oboch strán zamyká test, lebo
-rozídenie by server odmietlo ako neznámy smer a override by aj s rotáciou vo VEPO ticho ostal.
+### Vkladacia karta — šablóny, typ a doska (UI-C1a/C1b/C1c; ui/panel/payloads.rb + ui/panel/actions_templates.rb + ui/js/insert_state.js · form.js · board_card.js)
 
-**Zápisová cesta má tri guardy a od v0.7.25 ich drží JEDNA spoločná brána `part_target_error(model, cab, params, rk, what)`** (`what` = predmet zmeny do hlášky): **dokument**
-(`model_guid` — ID skriniek sa naprieč dokumentmi opakujú), **cieľ zmeny** (vo výbere musí byť dielec a jeho kľúč musí sedieť s kľúčom karty — výber sa medzi klikom a callbackom
-mohol posunúť) a **odpojenosť**. Do v0.7.24 to bol grainový `grain_target_error` a ostatné cesty mali len odpojenostný guard; **Codex #186 (P1) ukázal, že delenie na „prísnu" a
-„voľnejšiu" cestu nedrží**: keď sa výber presunie z dielca na **skrinku**, `find_cabinet` ju nájde, ale `find_selected_part` vráti `nil` — a voľnejšia cesta by podľa starého
-`role_key` prestavala **vnorené dvojča**, teda presne tá škoda, ktorú mal guard zastaviť.
+**Čo robí:** v režime vkladania (`Panel.show_insert`, nič nie je označené) vyberie typ objektu, šablónu a rozmery a vloží skrinku (ghost na kurzore) alebo dosku.
+Typy v jednom rade segmentových tlačidiel: **Dolná · Horná · Rohová · Umývačka · Doska** (`NXInsert.INSERT_TYPES` = zrkadlo `CabinetBuilder::TYPES` + `board`).
+**Autorita typu je čistý stav** `NXInsert.insertType()/setInsertType` (DOM je zrkadlo). Zmena typu korpusu zahodí korpusovú šablónu (ponuka je typovo filtrovaná),
+prepnutie Korpus↔Doska výbery nezahadzuje (sklady `template`/`boardTemplate`).
 
-**Prázdny výber je preto ODMIETNUTIE, nie priepustná vetva** („o odpojenosti sa bez dielca nedá tvrdiť nič" bola nesprávna otázka — brána netvrdí o odpojenosti, ale o **cieli
-zmeny**). Brána stojí **až za** `existing_params` + `canonical_part_key` (potrebuje kanonický kľúč), ale **pred** akýmkoľvek zápisom aj pred
-`virtual_duplak_probe`/`ensure_missing_abs`. Bulk olep si necháva vlastnú **tichú** vetvu `if part.nil?` — tam ide o stale echo z prekliku, nie o akciu, ktorú by bolo čo hlásiť
-(odpojenosť však hlási nahlas, viď nižšie).
+**Knižnica:** `Panel.template_list` posiela celú knižnicu; záznam nesie `kind` (`cabinet` | `board`), `used_seq` (`TemplateUsage.map`, do súboru šablón sa nezapisuje;
+`usage: false` ho vynechá — sekcia Šablóny Štúdia), odvodené `hardware: {has, labels}` (`TemplateStore.hardware_tile_summary`), `construction: {has, text}`
+a `vent_note`. Filter podľa druhu robí klient (`NXInsert.templatesForType` / `templateGroups` nad `templateKind`; typ slotovej šablóny sa nesklápa na `lower`) aj server.
+- **Dlaždice** v `<details data-key="itpl">`: „Naposledy použité" (max 3 podľa `used_seq`) + „Všetky šablóny". **Mriežka sa prestavuje len pri zmene typu alebo
+  novej knižnici** (`renderTemplateTiles(force)`, `dataset.forType`); výber prepína len triedu `.on` (zahodený uzol by druhému kliku dvojkliku vzal cieľ). Klik
+  aj **dvojklik** chytá jedna delegácia na `#tplTiles`; dvojklik volá tú istú validovanú `insertCabinet()`/`insertBoard()` ako zelené tlačidlo.
+- Kresba dlaždice je schéma z configu (`nxTplGlyph`) bez farieb; dosková má badge hrúbky (`nxTplBadge`), kovanie ikonu `wrench` (`nxTplHardwareBadge`); tooltip
+  `nxTplTitle` = súhrn konštrukcie · kovanie („zámky sa neprenášajú") · vetranie · umiestnenie dosky. `setTplMeta` pri šablóne s kovaním použije `#tplHint`
+  (max 80 znakov, celé v `title`). **PNG náhľad a schéma zdieľajú box** `.tplpic` (38 px, `object-fit: cover`): `<img>` je v dlaždici od začiatku bez `src`
+  a len sa odkrýva (`.tplpic.has`, `onerror` triedu odoberie); pull `nxTplPreviewPlan`/`nxTplPreviewStore` — bez `preview_rev` sa nepýta, cache per revízia
+  vrátane zápornej odpovede.
 
-**ODPOJENOSŤ je od v0.7.24 spoločný guard `detached_part_error` a prechádzajú ním VŠETKY zápisové cesty karty** — ABS hrana (`handle_set_part_edge`), bulk olep
-(`handle_set_part_edges_all`), materiál dielca (`handle_set_part_material`), smer dekoru aj **zdroj** „Použiť na podobné" (`similar_context`, teda živý počet aj zápis). Dielec
-vytiahnutý na najvyššiu úroveň sa cez kartu meniť **nedá** a povie to nahlas: `find_cabinet` jeho vlastníka podľa `cabinet_id` nájde, takže bez guardu by prestavba zmenila **iný,
-vnorený** dielec toho istého `part_key`, kým vybraný odpojený by si držal svoj snapshot a do VEPO šiel po starom — pri hlásení o úspechu (tá istá lekcia ako `regenerated_parts` v
-UI-D1). Pri ABS to nie je kozmetika: z pluginu sa objednávajú reálne zákazky, takže tichý zápis na dvojča pošle do objednávky **pásku, ktorú nikto nevidel na obrazovke**.
+**Insert payload a pečiatka použitia:** payload nesie identitu šablóny (`template_kind` + `template_name`); `Panel.take_template_ref!` ju odstráni pred builderom
+a `stamp_template_used` po úspešnom vložení záznam znovu nájde, overí druh a opečiatkuje (samostatná operácia mimo `start_operation`, zlyhanie len log; potom
+`push_templates`). Pri korpuse ide pečiatka až po **kliku** ghostu a presne raz (`PlacementSession#stamp_once!`). **Deklarovaná šablóna, ktorá medzitým zmizla,
+vklad odmietne** (`TemplateStore.find(*tpl_ref).nil?` pred stavbou); vklad bez referencie ide ďalej.
+- **Autoritou slotových polí je uložený záznam šablóny**, nie CEF: `Panel.apply_template_slot_fields!` doplní chýbajúce `dw_*` (a polia rohovej) a prevezme
+  `appliance_expects[]`. Vložený slot nikdy nenesie väzbu na konkrétny spotrebič.
+- **Preflighty tela a chrbta sa slotu netýkajú** (`Panel.slot_params?` — preskočia sa pred prvým čítaním materiálu, aj `insert_thickness_preflight`); remap ABS
+  overridov ostáva a hrúbku čela stráži `CabinetBuilder.validate_material_thickness!`.
 
-Odpojenosť sa pozná podľa rodiča (`nested_part?` — vnorený dielec má za rodiča definíciu skrinky), hláška menuje **čo** sa nezmenilo aj **čo robiť** (vrátiť dielec do skrinky,
-alebo zmenu urobiť na dielci v nej), guard stojí **pred** akýmkoľvek zápisom do modelu **aj pred tvorbou ABS v globálnom katalógu** (ten je mimo undo) a jeho odmietnutie **nevyrobí
-žiadny krok Späť**. Vetva `part.nil?` v samotnom `detached_part_error` ostáva len ako **poistka** — chýbajúci výber odmieta každý volajúci sám (brána hláškou, bulk tichým
-zahodením), takže mlčky prejsť je bezpečné jedine vtedy, keď už niekto pred ňou povedal nie. Bulk olep pritom odmietnutie **hlási** (na rozdiel od tichého zahodenia stale echa) —
-používateľ práve klikol a musí vedieť, že sa neolepilo nič.
+**Rohová vo vkladaní:** karta sa materializuje z `DEFAULTS.corner_blind` (`corner_insert_defaults` s `corner_th2`) alebo zo šablóny; dverová časť a CR sú polia
+`#cornerRow` (bežný zber), **strana** je stav registra `cornerDraft` (`nxSetCornerDraft`) a do payloadu ju výslovne pridá `insertCabinet` len pri rohovej. Prepnutie
+strany zrkadlí aj **návrh čiel** (`nxCornerMirrorFronts`: okraje vľavo ↔ vpravo, smer pántov, strana profilu; `unset` a chýbajúci kľúč ostávajú). Riadok Nohy
+platí aj pre rohovú. **Strana klávesom D počas ghostu:** ghost ohlási stranu (`NX.ghostCornerSide` → `nxGhostCornerSide`), prepne ju **tá istá `onCornerSide`**
+(nová strana zo stavu karty `nxCornerSide`) a karta pošle ten istý payload ako „Vložiť" (`nxInsertPayload`) callbackom `ghost_corner_side` →
+`Panel.handle_ghost_corner_side` (ghost prevesí na nový plán s prevzatou polohou; označená skrinka, iný typ karty či červené pole kláves odmietnu). Pásik ghostu
+nesie `#gbCorner` (`corner_label`, `nxGhostCornerText`), nápoveda `NX_GHOST_HELP.corner`. Odhad pripočíta zostavu (`nxCornerStatsAdd` nad `corner_preview.stats`).
 
-Chýbajúce `grain_options` v payloade segment **zamknú a popisy vrátia na neutrálnu zálohu z kostry** — nikdy nenechajú tooltip s výrobným rozmerom predošlého dielca. Po zmene
-katalógu posiela `push_materials` **aj čerstvý payload karty** (`push_part_card` → `NX.setPartCard`): `NX.setMaterials` prekresľuje kartu z **cachovaného** payloadu, takže serverom
-skladané údaje (zámok, hint, výrobné rozmery, texty hrán D-102) by inak zamrzli až do ďalšieho prekliku výberu. Je to **čisté čítanie** (žiadna operácia, žiadny dedup, lekcia
-D-103) a bez označeného dielca **neposiela nič** — schovanie karty patrí výhradne `push_selected`. Ručný zásah je jantárový (`.ovr` — rovnaký jazyk ako `select.ovr`), materiál bez
-smeru segment **zamkne cez `aria-disabled`** (vzor D-78, nikdy HTML `disabled`) + hint, a klik v zamknutom stave nezapisuje, ale odvedie na materiálový combobox
-(`onPartInfoGrain`).
+**Modal „Uložiť ako šablónu"** (nad označenou skrinkou): Názov · Typ (`#tplSaveType`: Dolná/Horná + Umývačka a Rohová, ktoré sú **zamknuté** a ponúkajú sa len nad
+sebou — `TPL_TYPE_LOCK`; server prepína len `lower|upper`, `apply_template_type!` pri slote nerobí nič) · **Očakáva** (skupina checkboxov `#tplSaveExpects`
+`fridge · oven · microwave`; pri slote veta „Slot umývačky očakáva umývačku vždy" a `expects` sa neposiela; chýbajúci kľúč = očakávania sa nemenia). Predvyplní sa
+z `appliance_expects[]` skrinky (`cabApplianceExpects`), autoritou je modal. Validácia `Panel.apply_template_expects!` pred `TemplatePreviews.capture`
+aj `TemplateStore.upsert`. Uloženie čaká na flush (`nxCabinetAction`); zmena polí ruší odložené uloženie.
 
-Čistý stav segmentu počíta `nxGrainSegmentState` (Node testy); chýbajúci payload segment **zamkne** — radšej nič než náhodný stav.
+**Kovanie šablóny v insert stave — dva zoznamy kľúčov, ani jeden default:** `NXInsert.HARDWARE_KEYS` (`hardware_sets`, `hardware_set_defs` — mapy, `plainMap`)
+a `HARDWARE_LIST_KEYS` (`hardware_manual` — pole, `plainList`). Prázdne = `null` = kľúč sa **neposiela** (guard test); zmrazené definície bez mapovania sa nulujú,
+ad-hoc položky nie. `insertCabinet()` vymaže z payloadu `hardware_manual` pred priložením šablónových kľúčov (`collectAll()` nesie echo označenej skrinky).
+V korpusovej karte je ad-hoc kovanie pass-through: `bridge.js` odloží `hwManual` presne zo servera (`Array.isArray(...) ? ... : null` — **nikdy `|| []`**,
+inak by apply položky zmazal), `collectAll()` ho pošle len keď existuje, odchod z korpusu pamäť vyčistí.
 
-**Hranový riadok začína ikonou `#i-edge`** — JEDNA kresba a **štyri rotácie** cez `data-rot` (CSS, nie štyri ikony); uhol dáva **strana v 2D náhľade** (`pc.edge_sides` =
-`AbsRules.edge_sides`, jediný zdroj pravdy o orientácii dielca), takže ikona ukazuje presne tú hranu, ktorú náhľad nad zoznamom farebne kreslí — **vedomá odchýlka** od pevnej mapy
-„predná 0°·zadná 180°·ľavá 90°·pravá 270°" z mockupu, ktorá by pri ležiacich dielcoch aj výstuhách ukazovala inú stranu než náhľad (a pre roly s labelmi „Pozdĺžna/Priečna" by
-neexistovala). Hover hrany do modelu (D-89a) ostal nezmenený.
+**Doska vo vkladaní** (`board_card.js`):
+- Kontrakt hrúbky doskovej šablóny (`core/templates.rb board_tpl`) plní `applyBoardTemplate`: `material_id: nil` predvyplní UNI materiál roly „Doska"
+  (`uniBoardSheetId` nad `uni_role`) a **až potom** dosadí hrúbku šablóny. Autoritou hrúbky ostáva `BoardBuilder.insert_thickness_for` (pri reálnom materiáli
+  katalóg — karta to povie). Smer dekoru zo šablóny je vedomá voľba (príznak D-86).
+- **Rozpísané hodnoty proti živému refreshu katalógu** (`NX.setMaterials` → `refreshInsertBoardMaterials`): hrúbka sa zapíše len podľa
+  `insertThicknessShouldWrite` (pri nezmenenom UNI materiáli drží draft), smer dekoru podľa `insertGrainShouldWrite` (pri nezmenenom materiáli drží vedomú voľbu).
+  Marker „pre ktorý materiál je pole zosynchronizované" je **vlastný pre každé pole** a pri zápise potlačenom fokusom sa neposúva (`insertMatMarkAdvances`);
+  krok smeru je automat `insertGrainSync` (`tests/js/test_e03_board_insert.js`).
+- **Orientácia** (`Naležato · Nastojato · Na stenu`, `#insBoardOriRow` / `data-ins-ori`): autoritou je `NXInsert.boardOrientation()/setBoardOrientation`, nastavuje sa
+  **explicitne pri každej materializácii karty** (`materializeInsertBoardCard` pred `applyBoardTemplate`); payload nesie `orientation` vždy, server ju prepustí do
+  `BoardBuilder.norm_orientation`.
+- **Zámky D-39** majú rozsah: doska má vlastné `length`/`width` vo vlastnom úložisku a do Ruby nejdú (`Panel::INSERT_LOCK_FIELDS` je korpusový).
 
-**„Označiť v modeli"** (`nx_select_part` → `Panel.handle_select_part`) je **čisté čítanie + zmena výberu**: žiadny `start_operation`, žiadny zápis, **žiadny krok Späť** (lekcia
-D-103, vzor `handle_select_parts`/`handle_select_hw_owner`), prísny guard **dokumentu aj skrinky** a dielec sa hľadá podľa `part_key` (skrinka sa medzitým mohla prestavať).
+**Informačný stĺpec pri vkladaní** nesie **odhad** `nxDraftStats` (značka ≈; serverový `cabinet_stats` číta snapshoty vloženej skrinky); pri doske hrúbka
+a plocha. Zelené **Vložiť** je posledné v karte. Náhľad: projekcia `insert` (odsek Náhľad).
 
-**„Použiť na podobné…"** je mini-modal (`#simModal`, vzor D-14): prenáša **VÝHRADNE olep hrán** — materiál, rozmery ani smer dekoru sa nedotknú.
+Testy: `tests/js/test_insert_state.js`, `tests/js/test_uic1b_vkladanie.js`, `tests/js/test_uid2_nahlady.js`, `tests/js/test_uic1c_orientacia.js`,
+`tests/pure/test_uic1a_sablony.rb`, `tests/pure/test_uic1b_vkladanie.rb`, `tests/pure/test_uid2_nahlady.rb`, `tests/pure/test_uic1c_orientacia.rb`, in-SU `run_uid2`
+(kamera, `write_image`, žiadny undo krok) a `run_uic1c`. Plné znenie: archív, „Vkladacia karta — …", „UI-C1b", „UI-C1c".
 
-**Definícia „podobný" je záväzná a žije len na serveri:** rovnaká **rola** + rovnaký **výsledný materiál** (`material_id` zo snapshotu dielca) v zvolenom rozsahu (`cabinet` |
-`project`, whitelist `SIMILAR_SCOPES`), okrem zdroja; rovnaká rola je podmienka, nie kozmetika (kódy `L1/L2/W1/W2` znamenajú pri každej role inú fyzickú hranu —
-`AbsRules::EDGE_LABELS`), samostatné dosky do výberu nepatria. Kandidátov berie **`regenerated_parts`** = výhradne dielce **vnorené v definícii korpusu**, teda tie, ktoré prestavba
-naozaj prekreslí; `manufactured_parts` vracia navyše **odpojené** dielce (vytiahnuté na najvyššiu úroveň, viazané už len atribútom `cabinet_id`) a tie by `rebuild_many` nezmenil —
-počítať ich by znamenalo sľúbiť zmenu olepu, ktorú by výrobné dáta (kusovník, VEPO) nikdy nedostali (Codex #180 P1).
+### Karta označenej dosky (ui/js/board_card.js + ui/panel/actions_board.rb)
 
-**ZDROJ dostal rovnakú ochranu až v0.7.24** (`detached_part_error` v `similar_context`): olep zdroja sa číta podľa `part_key` z `params`, teda z overridu **vnoreného dvojčaťa** —
-hromadná zmena spustená nad odpojeným dielcom by po projekte rozniesla olep, ktorý používateľ na karte nikdy nevidel.
-
-**„Celý projekt" znamená ZÁKAZKA (D-134, v0.12.6).** Rozsah `project` berie `Panel.job_cabinets` (top-level), nie `all_cabinets` — vnorená skrinka v cudzom komponente
-sa teda nezapíše (menila by sa vo všetkých výskytoch zdieľanej definície) a skrinka s **odpojeným dielcom** sa **preskočí**: prestavba siaha len na vnorené dielce,
-takže odpojený dvojník by ostal so starým olepom a kusovník by niesol oboje. **Rovnaký filter platí aj pre rozsah „táto skrinka"** — `detached_part_error`
-v `similar_context` kryje len **označený** dielec, takže skrinka s **iným** vytiahnutým dielcom by inak vyrobila presne toho dvojníka; vypadne a vymenuje sa
-(prázdny výsledok s preskočenými preto nehovorí o „rovnakej role a materiáli" — to by klamalo o príčine). `similar_parts_map` vracia **dve** hodnoty `[mapa, preskočené]`, takže počet v modale
-aj zápis stoja na tom istom výsledku; vetu o preskočených skladá server (`similar_skipped_text`) a modal ju len zobrazí v `#simSkipped` — hint modalu preto hovorí
-„skrinky zákazky", nie „všetko v modeli".
-
-**Živý počet aj zápis idú JEDNOU funkciou `similar_parts_map`** — inak by modal sľúbil iný počet, než sa zapíše; JS posiela len `role_key + scope` (žiadny zoznam cieľov) a odpoveď
-chodí cez `NX.setSimilarCount`, ktorá prijme **len odpoveď na posledný odoslaný dopyt** — každý dopyt nesie rastúci **token `req`** a server ho vracia nezmenený (aj z chybovej
-vetvy); kontrola samotného rozsahu nestačila, lebo po prepnutí `cabinet → project → cabinet` alebo po znovuotvorení modalu nad iným dielcom má oneskorená odpoveď rovnaký rozsah a
-prepísala by stav nového cieľa (Codex #180 P2). Chybová odpoveď navyše nesie **požadovaný** rozsah — rozsah aj token sa čítajú pred akoukoľvek rizikovou prácou, inak by chyba pri
-„celom projekte" prišla označená ako `cabinet`, klient by ju zahodil a modal by navždy visel na „počítam".
-
-Zápis je **JEDNA operácia** cez `CabinetBuilder.rebuild_many` = **jeden krok Späť** aj naprieč skrinkami (vzor D-35, nikdy slučka rebuildov), prenáša sa **záznam overridu**
-(prázdny override zdroja teda ciele **vráti na pravidlo** — je to tiež rozhodnutie), `edge_warnings` cieľa sa zahodia (patria starým hranám) a po prestavbe ostáva vo výbere
-**zdrojový dielec** (`focus_part`). Modal si drží identitu z času otvorenia a zatvára sa pri prekreslení karty na iný dielec aj pri odchode z `mode-part`; pri prekreslení s **tou
-istou** identitou (Späť/Znova, zmena katalógu) sa počet **zhodí na „počítam" a vypýta znova** — inak by okno sľubovalo číslo, ktoré už neplatí (Codex #180 P2).
-
-**Enter modal neodchytáva** — nemá textové pole, takže Enter správne aktivuje to tlačidlo, na ktorom stojí fokus; globálny odchyt by Enter nad „Zrušiť" premenil na použitie
-hromadnej zmeny (Codex #180 P1). Guardy a texty testuje `tests/pure/test_uid1_dielec.rb`, čisté funkcie `tests/js/test_uid1_dielec.js`, živý zápis a undo sekcia `run_uid1`
-in-SketchUp runnera.
-
-**Odpojený dielec má vlastnú sadu `tests/pure/test_abs_odpojeny_dielec.rb`** (jedno miesto hlášky, brána pred zápisom na každej ceste, chýbajúci dielec vo výbere ako odmietnutie +
-správanie samotného guardu) a živý scenár v sekcii `run_k1`: vytiahnutý dielec označený → hrana, bulk, materiál aj „Použiť na podobné" odmietnuté, vnorené dvojča nezmenené, žiadny
-krok Späť; a **výber presunutý na skrinku** → hrana ani materiál neprejdú (v0.7.25).
-
-**UI-D3** k tomu pridalo preklik zo „Smeru dekoru" na materiálový combobox tej istej karty (`nxRevealTarget` + `NXCombo.open` — vzor kliku na hranu v náhľade).
-
-**Od K1 (D-108) je z neho len záchranná cesta zamknutého stavu:** smer je vstup, takže preklik už nie je hlavná akcia — spustí sa výhradne pri materiáli **bez** smeru, keď sa
-segment nedá použiť a kresba sa naozaj mení inde (klik vtedy nič nezapisuje).
-
-**„Hrúbka" klikateľná NIE JE** — určuje ju materiál KORPUSU a ten sa v režime dielca z panela otvoriť nedá (sektor Materiály patrí kontextu Korpus), takže by preklik nemal kam
-viesť.
-
-### Vkladacia karta — šablóny, typ a doska (UI-C1a dáta + UI-C1b UI; ui/panel/payloads.rb + ui/panel/actions_templates.rb + ui/js/insert_state.js · form.js · board_card.js)
-
-payload `Panel.template_list` posiela panelu **celú knižnicu** — každý záznam nesie `kind` (`cabinet` | `board`) a `used_seq` (poradové číslo posledného použitia, `nil` = nikdy;
-číslo dopĺňa `TemplateUsage.map`, do súboru šablón sa nikdy nezapisuje). Filter podľa druhu robí **klient aj server**: dlaždice panela (`NXInsert.templatesForType` /
-`templateGroups` nad čistou `templateKind`) aj správa šablón; **sekcia `tpl` Štúdia si od ŠT-3c-1 pýta OBA druhy** (`template_list(kind: 'cabinet')` + `kind: 'board'`, aby sa
-doskové dali aspoň zmazať) a druh vetví akcie: apply/odfotiť len `cabinet`, mazanie oba — serverové guardy nad `KINDS` ostávajú. **`usage:` (1b-4)** rozhoduje, či sa k záznamom
-dopočíta `used_seq`: default `true` (panel z neho skladá „Naposledy použité"), sekcia Štúdia si pýta `usage: false` — poradie nekreslí a `TemplateUsage.map` je ďalšie čítanie
-súboru v každom pushi okna.
-
-**Insert payload nesie identitu použitej šablóny** (`template_kind` + `template_name` — korpus aj doska): `Panel.take_template_ref!` ich z payloadu **odstráni ešte pred builderom**
-(do configu skrinky ani dosky nepatria) a `stamp_template_used` po úspešnom vložení záznam **znovu nájde**, overí druh a opečiatkuje — medzitým zmazaná alebo prepísaná šablóna =
-vloženie prebehlo, pečiatka sa ticho vynechá. Pečiatka je **samostatná operácia mimo `start_operation`** a jej zlyhanie nikdy nemení výsledok vkladania (len log); po nej ide
-`push_templates`, takže sa poradie „Naposledy použité“ prekreslí bez reštartu. **Pri korpuse ide pečiatka až po KLIKU** a presne raz (`PlacementSession#stamp_once!` — pozri
-„Vloženie skrinky = ghost na kurzore" nižšie); šablónový ref si medzitým drží session, nie payload.
-
-**S1-E — štvrtý typ objektu: Umývačka.** Segmentové tlačidlá sú od S1-E **štyri** (`Dolná · Horná · Umývačka · Doska`, ikona `appliance`);
-`NXInsert.INSERT_TYPES` je zrkadlom `CabinetBuilder::TYPES` + `board` a `templatesForType` filtruje ponuku šablón aj pre `dishwasher` (typ slotovej šablóny
-sa **nesklápa** na `lower`). Vkladacia karta zobrazuje tie isté polia ako Základné, takže payload nesie `dw_*` explicitne — **autoritou je však ULOŽENÝ ZÁZNAM
-šablóny**, nie CEF: `Panel.apply_template_slot_fields!` po `take_template_ref!` doplní chýbajúce `dw_*` a prevezme `appliance_expects[]` zo záznamu
-(Astra S1-E FIX E7). Vložený slot **nikdy** nenesie väzbu na konkrétny spotrebič — šablóna ju ani niesť nemôže. **„Uložiť ako šablónu" zo slotu** typ
-neprepína (`apply_template_type!` pri `dishwasher` nerobí nič) — slot sa na hornú skrinku prepnúť nedá. Modal to od PR #381 aj **ukazuje**: select `#tplSaveType`
-má tretiu voľbu **Umývačka** a pri slote je **zamknutý** (`disabled` + bublina „typ určuje sám slot"). Opačný smer je rovnako uzavretý — voľba `dishwasher` nad
-**dolnou** skrinkou sa ignoruje (whitelist ostáva `lower|upper`), lebo jej config nemá `dw_*`. Autoritou je server, HTML je zrkadlo.
-
-**ROH-A2 — piaty typ objektu: Rohová.** Rad typov je `Dolná · Horná · Rohová · Umývačka · Doska` (stále jeden rad, ikona `cab-corner`, `data-ins-type="corner_blind"`);
-stav, `aria-pressed`, filter šablón aj `applyVisibility` (rohová = ako dolná) idú cestami z A1 a UI-C1b. Karta sa materializuje z `DEFAULTS.corner_blind`
-(`CORNER_DEFAULTS` zo `sync.rb`, od ROH-B1 cez `corner_insert_defaults` s `corner_th2`) alebo zo šablóny. **ROH-B1:** dverová časť a CR sú polia **riadku rohovej**
-(`#cornerRow` v `#basicCard` — ten istý riadok ako pri označenej rohovej, O4 A1) a idú do insert payloadu bežným zberom; **strana** je stav prepínača v registri
-`cornerDraft` (`nxSetCornerDraft` z `materializeInsertCabCard` a z `loadSelected` cez `nxAdoptCabinetDraft`) a do insert payloadu ju **výslovne** pridá `insertCabinet`
-(`actions.js`) — **len pri rohovej**. Prepnutie strany vo vkladaní zrkadlí aj **návrh čiel** (`nxCornerMirrorFronts` v `core.js`: okraje vľavo ↔ vpravo, smer pántov
-a strana profilu; `unset` a chýbajúci kľúč ostávajú — audit B1 FIX 2: šablóna s asymetrickými okrajmi by inak mala okraj pri rohu 0 a pánty pri boku); ručné hrany nová
-skrinka nemá, takže sa nič iné nepremapúva. Šablóna, ktorej pole chýba, dostane predvoľbu (`dflt` v `CONSTRUCTION_FIELDS`); server dopĺňa chýbajúce polia zo záznamu
-šablóny (`apply_template_slot_fields!`). Riadok **Nohy** vo vkladacej karte platí
-aj pre rohovú (`nxLegsTypeHasLegs` v `hardware.js` = `lower` + `corner_blind`). Modal „Uložiť ako šablónu" má voľbu **Rohová** a pri rohovej je typ zamknutý
-s vlastnou bublinou (`TPL_TYPE_LOCK` vo `form.js`, vzor slotu); zamknuté typy (slot, rohová) sa v selecte ponúkajú **len nad sebou** — nad dolnou by voľba nič
-nespravila (server prepína len `lower|upper`).
-
-**ROH-B2 — strana dverí klávesom počas ghostu (O12) a odhad s rohovou zostavou.** Kláves **D** v nástroji ghostu rohovej (odsek `ghost_tool.rb` v
-[construction.md](construction.md)) len ohlási stranu, ktorú ghost práve nesie (`NX.ghostCornerSide(side)` → `nxGhostCornerSide` v `actions.js`). Stranu prepne
-**tá istá funkcia ako prepínač v riadku karty** (`onCornerSide` — register + zrkadlo návrhu čiel, audit B1 FIX 2); **nová strana sa počíta zo stavu karty**
-(`nxCornerSide`), nie z hlásenia ghostu — rýchle dvojité D tak skončí na pôvodnej strane (predrecenzia P3-2). Karta pošle **ten istý payload ako
-„Vložiť"** (`nxInsertPayload`, spoločný s `insertCabinet`) callbackom `ghost_corner_side` → `Panel.handle_ghost_corner_side` ghost prevesí na nový zmrazený plán
-s prevzatou polohou. Front-draft preflight sa nečaká (`validateFields(true)` — zrkadlo platnosť čiel nemení, guardy stavby bežia v commite); označená skrinka,
-iný typ karty alebo červené pole kláves odmietnu so stavovou vetou a nič neprepnú. Pásik ghostu nesie segment `#gbCorner` („dvere vľavo / vpravo" —
-`corner_label` zo servera, `nxGhostCornerText`) a nápoveda `NX_GHOST_HELP.corner` pozná D. Odhad **„≈ Dielcov / ≈ Materiál"** vkladanej rohovej pripočíta
-dielce zostavy zo servera (`nxCornerStatsAdd` nad `corner_preview.stats` — 5 dielcov a ich plocha; `setInsertCabInfo` beží aj po odpovedi preflightu).
-
-**S1-C — modal „Uložiť ako šablónu" (D-14) má pole „Očakáva".** NXModal multi-select nemá, preto je to **skupina checkboxov** v `panel.html` (`#tplSaveExpects`,
-`data-tplexp="<kód>"`) serializovaná ako Array; ponuka je **matica skrinky** (`fridge · oven · microwave`), pri **slote** sa riadok skryje a nahradí ho veta „Slot umývačky
-očakáva umývačku vždy" (`nxSyncTplSaveExpects`, zrkadlo `nxSyncTplSaveType`). Predvyplní sa z `appliance_expects[]` **označenej skrinky** (globál `cabApplianceExpects`
-z `cabinet_payload`), ale **autoritou je MODAL, nie config**: používateľ smie pri ukladaní povedať niečo iné („táto šablóna je na rúru", hoci v skrinke zatiaľ žiadna
-nestojí), takže prázdny zoznam znamená „táto šablóna nič neočakáva". Slot `expects` **neposiela vôbec** (server si umývačku vynúti sám — prázdny zoznam z vypnutých
-checkboxov by vyzeral ako „nič neočakáva"); **chýbajúci kľúč = starší klient, očakávania sa nemenia**. Zmena checkboxu ruší odložené uloženie rovnako ako názov a typ, takže
-uložiť sa dá až po flushnutí rozpísaných úprav skrinky (`nxCabinetAction`). Validáciu robí `Panel.apply_template_expects!` **pred `TemplatePreviews.capture` aj pred
-`TemplateStore.upsert`** — odmietnutá šablóna nesmie prepísať ani záznam, ani náhľad (Astra C9). Dlaždica sekcie `tpl` k tomu pridala **jeden riadok textu** zo servera
-(`tile_row.appliance_expects` = `{has, codes, text}`), žiadne nové ovládanie.
-
-**S1-C — deklarovaná šablóna, ktorá medzitým zmizla, vklad ODMIETNE** (Astra C11). Odkedy `dw_*` aj `appliance_expects[]` pochádzajú zo **uloženého záznamu** (E7), tichý vklad
-„bez šablóny" by postavil **inú** skrinku, než si používateľ vybral — a nikto by mu to nepovedal. Guard (`TemplateStore.find(*tpl_ref).nil?`) stojí **pred**
-`apply_template_slot_fields!` aj pred akoukoľvek stavbou; vedomý vklad **bez** referencie (payload ju nenesie) ide ďalej ako doteraz.
-
-**Preflighty TELA a CHRBTA sa slotu netýkajú** (PR #381, P2). `Panel.body_preflight` aj `back_preflight` by nad slotom bežali nad **zdedeným projektovým materiálom
-korpusu** a vloženie by odmietli chybou o hrúbke korpusu, ktorú používateľ v **skrytom** poli nemá ako opraviť; `insert_thickness_preflight` by ho navyše odmietol pre
-zámok hrúbky z predchádzajúcej skrinky. Oba sa preto preskočia (`Panel.slot_params?`), a to **pred prvým čítaním materiálu**. **Materiálový remap ABS overridov ostáva** —
-slot čelo má a jeho materiál sa mení. Hrúbku čela validuje ďalej **tá istá brána ako pri každom inom čele** (`CabinetBuilder.validate_material_thickness!`
-v `resolve_part`): katalógový materiál mimo rozsahu čiel prestavbu zastaví, nie ticho oreže.
-
-#### UI-C1b (vzhľad a správanie karty)
-
-typ vkladania je **jedna voľba** v segmentových tlačidlách (UI-C1b tri, od S1-E a ROH-A2 päť v jednom rade) — dvojica rádií `ikind`+`ctype` zanikla a **autorita je čistý stav**
-`NXInsert.insertType()/setInsertType` (DOM je len zrkadlo; `getType()` v `core.js` už rádiá nečíta). Zmena **typu korpusu** zahodí korpusovú šablónu (ponuka je typovo filtrovaná —
-D-32), prepnutie Korpus↔Doska výbery **nezahadzuje** (každý druh má vlastný sklad `template`/`boardTemplate`).
-
-Šablóny sú **dlaždicová mriežka** v zrolovateľnej sekcii (`<details data-key="itpl">`) s dvomi skupinami — „Naposledy použité“ (max 3 podľa `used_seq` desc, stabilný tie-break
-poradím knižnice) a „Všetky šablóny“; **mriežka sa prestavuje LEN pri zmene typu alebo novej knižnici** (`renderTemplateTiles(force)`, stráži to `dataset.forType`) — výber prepína
-iba triedu `.on` (Codex FIX 14 a pasca CEF: klik, ktorý zahodí uzol, by druhému kliku dvojkliku nenechal cieľ). Klik a **dvojklik (N17)** chytá **jedna delegácia** na `#tplTiles` a
-dvojklik volá **tú istú validovanú** `insertCabinet()`/`insertBoard()` ako zelené tlačidlo (žiadny `sketchup.*` z handlera dlaždice); klik na už vybranú dlaždicu je no-op, nie
-odznačenie.
-
-Kresba dlaždice je **schéma z configu** (`nxTplGlyph` — riadky čiel / krídla / police) a **nenesie ani jednu farbu** — obrys aj výplň dávajú tokeny v `panel.css`; dosková dlaždica
-má badge hrúbky. **KOV-I:** `Panel.template_list` dopĺňa odvodené `hardware: {has, labels}` z `TemplateStore.hardware_tile_summary`; údaj sa neukladá do knižnice.
-`nxTplHardwareBadge` kreslí existujúcu sprite ikonu `wrench` s `aria-label`, zatiaľ čo `nxTplBadge` zachováva textový kontrakt hrúbky. `nxTplTitle` dopĺňa súhrn
-uložených setov a ručných položiek s upozornením „zámky sa neprenášajú“. **KON-D:** `template_list` nesie aj odvodené `construction` (`{has, text}`,
-„komín vzadu 50") a `vent_note` (veta o vetraní pri šablóne s chladničkou) — **úprava `tile_row` sa do Inspectora nedostane**, preto ich pridáva priamo zoznam.
-`nxTplTitle` ich vypíše do tooltipu v poradí súhrn konštrukcie · kovanie · vetranie; dlaždica ani popisok nenarastú a klient nič neodvodzuje (`has: false` = nič). `setTplMeta` pri vybratej šablóne s kovaním použije existujúci `#tplHint` pre
-„Kovanie zo šablóny: …“ (najviac 80 znakov, celý text v `title`, jeden riadok). Bez kovania sa vráti pôvodná pomoc ku klikaniu; výška dlaždíc ani karty nerastie.
-
-**UI-D2 — PNG náhľad a schéma zdieľajú TEN ISTÝ box** (`.tplpic`, výška 38 px, `object-fit: cover` = orez, nie deformácia), takže **výška dlaždice sa nikdy nemení** (pravidlo
-„vertikálny priestor panela je vzácny“). `<img>` je v dlaždici **od začiatku bez `src`** a len sa odkrýva (`.tplpic.has`) — obrázok sa nikdy nevkladá ani neodstraňuje dodatočne,
-lebo výmena uzla by uprostred dvojkliku odpojila cieľ udalosti (tá istá pasca CEF ako FIX 14); `onerror` triedu odoberie, takže **zlyhané načítanie končí pri schéme, nikdy pri
-prázdnom boxe**. Pull rieši čisté jadro `nxTplPreviewPlan`/`nxTplPreviewStore` (Node testy): dlaždica bez `preview_rev` sa nepýta vôbec, cache je **per revízia** (prepis šablóny =
-nová `rev` = nový pull, starý obrázok sa už nikdy nenasadí) a **záporná odpoveď servera sa cachuje tiež**, inak by sa panel pýtal donekonečna.
-
-**Zámky D-39 dostali rozsah**: korpusové kľúče sú nezmenené, doska má **vlastné** `length`/`width` vo **vlastnom úložisku** (Codex FIX 12) a do Ruby **nikdy neidú** — serverový
-whitelist `Panel::INSERT_LOCK_FIELDS` je korpusový a zostáva ním, takže doskový zámok drží hodnotu len v UI pri prepnutí šablóny.
-
-**Kovanie šablóny má v insert stave DVA zoznamy kľúčov a ANI JEDEN default.** `NXInsert.HARDWARE_KEYS` (`hardware_sets`, `hardware_set_defs`) sú **mapy** a čítajú sa cez
-`plainMap`; **`HARDWARE_LIST_KEYS` (KOV-H1: `hardware_manual`)** je **pole** a má vlastný čítač `plainList` — `plainMap` vracia pre pole `null`, takže do prvého zoznamu patriť
-nemôže. Kontrakt oboch je rovnaký: prázdna mapa aj prázdne pole = `null` = kľúč sa **do insert payloadu neposiela** (vzor A1 pass-through, stráži to guard test). Rozdiel medzi
-nimi je jeden: zmrazené definície bez mapovania sa nulujú, ad-hoc položky sú na mapovaní **nezávislé** (nejdú cez sety), takže sa nenulujú. `insertCabinet()` navyše z payloadu
-**vymaže `hardware_manual` ešte pred priložením šablónových kľúčov**: `collectAll()` nesie echo OZNAČENEJ skrinky, takže bez toho by nová skrinka zdedila cudzie ručné položky.
-
-**Ad-hoc kovanie v korpusovej karte je v H1 čistý pass-through** (UI príde v KOV-H2): `bridge.js` si pri `loadSelected` odloží `hwManual` = presne to, čo poslal server
-(`Array.isArray(...) ? ... : null` — payload bez kľúča je `null`, **nikdy** prázdne pole), `collectAll()` ho pošle späť **len keď existuje** a odchod z korpusu (doska aj prázdny
-výber) pamäť vyčistí. `|| []` by z „o položkách neviem" spravilo „položky nie sú" a najbližší apply by ich zmazal — presne preto to guard test zakazuje.
-
-**Kontrakt hrúbky doskovej šablóny** (zapísaný v `core/templates.rb board_tpl`) plní `applyBoardTemplate`: šablóna s `material_id: nil` predvyplní **UNI materiál roly „Doska“**
-(`uniBoardSheetId` nad novým poľom payloadu `uni_role`) a **až potom** dosadí hrúbku šablóny — poradie je kontrakt, lebo `onInsertBoardMaterial` by draft prepísal katalógovým
-defaultom.
-
-**Žiadna nová autorita hrúbky nevznikla**: rozhoduje ďalej `BoardBuilder.insert_thickness_for` (pri reálnom materiáli hrúbku určuje katalóg — karta to povie nahlas namiesto tichého
-ignorovania). Smer dekoru zo šablóny sa značí ako **vedomá voľba** (D-86 príznak), takže ho živý refresh katalógu neprepíše. Informačný stĺpec Základných nesie pri vkladaní
-**odhad** (`nxDraftStats` — veľké plošné dielce z configu a stromu zón, značka ≈), lebo serverový dopočet `Panel.cabinet_stats` číta snapshoty už vloženej skrinky a builder sa
-kvôli informačnému riadku nespúšťa; pri doske sú v ňom hrúbka (zrkadlo poľa v Materiáloch) a plocha. Zelené **Vložiť** je posledné v karte (za rozmermi aj materiálom).
-
-Čisté jadro testuje `tests/js/test_insert_state.js` + `tests/js/test_uic1b_vkladanie.js` + `tests/js/test_uid2_nahlady.js`, zdrojové invarianty `tests/pure/test_uic1a_sablony.rb` +
-`tests/pure/test_uic1b_vkladanie.rb` + `tests/pure/test_uid2_nahlady.rb`; kameru, `write_image` a „žiadny undo krok“ overuje **iba** in-SketchUp sekcia `run_uid2`
-(`tests/sketchup/su_runner.rb`).
-
-#### UI-C1c (orientácia dosky v paneli)
-
-trojica segmentových tlačidiel (`Naležato · Nastojato · Na stenu`) stojí **dvakrát** — v karte vkladania (`#insBoardOriRow`, `data-ins-ori`) aj na karte označenej dosky
-(`#boardOriRow`, `data-bc-ori`); kostra je statická, JS len prepína triedu `.on` a `aria-pressed` (`syncOrientationSegments`), popisy nesú `aria-label` + `title` z HTML.
-
-**Vo vkladaní je autoritou čistý stav** `NXInsert.boardOrientation()/setBoardOrientation` (žiadne DOM pole) a **orientácia sa nastavuje EXPLICITNE pri KAŽDEJ materializácii karty**
-— `materializeInsertBoardCard` volá `setBoardOrientation(orientationOf(tp ? tp.config : null))` **pred** `applyBoardTemplate`, takže „Bez šablóny“ ani šablóna bez poľa nezdedia
-orientáciu predošlého draftu (Codex FIX 8); insert payload nesie `orientation` **vždy** a serverový whitelist `handle_insert_board` ju prepustí do `BoardBuilder.norm_orientation`
-(jediná autorita slovníka).
-
-**Na karte označenej dosky** ide klik vlastným callbackom `set_board_orientation` → `Panel.handle_set_board_orientation`: guard echo `board_id` ako ostatné doskové akcie,
-odmietnutie neznámej **požadovanej aj uloženej** hodnoty, no-op pri rovnakej hodnote (žiadny prázdny undo krok), inak **jedna prestavba s deltou transformácie = jeden krok Späť** +
-`ScaleWatch.remember_transform`. Pred odoslaním sa flushne čakajúci debounce ostatných polí (`flushBoardEditsNow` — callbacky sa vykonávajú v poradí odoslania). Payload karty
-(`Panel.board_payload`) nesie `orientation` + `orientation_label`; **neznámu hodnotu payload nepreklasifikuje** a karta vtedy nerozsvieti žiadny segment. Dosková **dlaždica
-šablóny** hovorí o umiestnení v **tooltipe** (`nxTplOrientationNote`/`nxTplTitle`) — badge ostáva hrúbka, aby dlaždica nenarástla o riadok.
-
-Testy: `tests/js/test_uic1c_orientacia.js`, `tests/pure/test_uic1c_orientacia.rb` a **in-SketchUp sekcia `run_uic1c`** (matice, svetové osi, normála dekoru, kotviace roviny, delta,
-scale/dedup, nedotknutý kusovník).
+Karta Doska pri označenej samostatnej doske: rozmery, materiál a hrany, orientácia. Všetky zápisy nesú echo `board_id` a idú cez guard dokumentu (odsek
+`actions_board.rb`). **Orientácia** (`#boardOriRow`, `data-bc-ori`; `syncOrientationSegments`) → `set_board_orientation` → `Panel.handle_set_board_orientation`:
+odmietne neznámu požadovanú aj uloženú hodnotu, rovnaká hodnota = no-op, inak jedna prestavba s deltou transformácie = jeden krok Späť +
+`ScaleWatch.remember_transform`; pred odoslaním `flushBoardEditsNow`. Payload `Panel.board_payload` nesie `orientation` + `orientation_label`; neznámu hodnotu
+nepreklasifikuje (žiadny segment nesvieti).
 
 ### Klikateľnosť a deep-linky (UI-D3, ui/js/bridge.js + shell.js + boot.js + ui/studio_dialog.rb)
 
-dotiahnutie zásady kontraktu „všetko informačné je klikateľné a vedie tam, kam ukazuje".
+Zásada kontraktu: **všetko informačné je klikateľné a vedie tam, kam ukazuje** (klikateľné údaje karty Korpus: odsek „Kontext Korpus").
 
-**(1) Warnpanel (N5):** ⚠ chip v hlavičke otvára **OVERLAY** `#warnList.warnpanel` — `position: absolute` **vnútri `<header class="nxhdr">`** (sticky predok = kotva). Predtým to
-bol blokový `.warnlist` pod hlavičkou, ktorý otvorením posunul celý obsah nadol (vertikálny priestor je vzácny) a musel si pomáhať `scrollTo(0,0)`; to zaniklo. Výška je
-**ohraničená viewportom** a scrolluje sa **len zoznam riadkov** (`.wrows`) — panel je mimo dokumentového toku, takže pri mnohých nálezoch by spodné riadky aj cesta von skončili pod
-okrajom okna a scroll dokumentu by ich nedotiahol (Codex #182 P2).
+**Warnpanel:** ⚠ chip v hlavičke otvára **overlay** `#warnList.warnpanel` (`position: absolute` vnútri sticky `<header class="nxhdr">`); výška ohraničená
+viewportom, scrolluje len `.wrows`. Viditeľnosť mení jedna funkcia `setWarnPanel` cez **triedu `.open`** (nie inline `display` — prebíjal by `display: flex`);
+zavretý stav je default v CSS. Zatváranie: `bindWarnPanel` v `boot.js` (klik mimo, Escape s fokusom na chip; klik v paneli a na chip zastaví bublanie). Merač
+D-25 (`usage.js`) počíta klik v **capture** fáze, inak by mu overlaye vypadli.
+- Riadky skladá čistá **`NXShell.warnRows`** z upozornení stavby (`cabinet_payload['warnings']`, kontrakt `code/severity/message/part_key/data`); upozornenie bez
+  textu sa zahodí, `part_key` sa nikdy neupravuje. Nález o **nepostavenom dielci** (`WARN_PART_NOT_BUILT` = `part_skipped_degenerate`, `shelf_skipped_shallow_zone`)
+  spadne na korpus — nový kód nepostaveného dielca patrí sem a do testu (rovnako drží `ui/production_core.rb`).
+- **Oko v riadku** ide existujúcou cestou `nx_select_hw_owner` s `origin: 'warn'` (`SELECT_OWNER_NOUNS`; neznámy pôvod = `hardware`) a s flush handshake.
 
-Riadky skladá **čistá funkcia `NXShell.warnRows`** z už prijatých upozornení stavby (BuildPlan kontrakt `code/severity/message/part_key/data` v `cabinet_payload['warnings']`) —
-**žiadne nové serverové dáta**; upozornenie bez textu sa zahodí (oko by sľúbilo skok a nepovedalo prečo) a `part_key` sa **nikdy neupravuje** (nesie `:` aj `/`).
+**Deep-link do Štúdia:** `openStudio(section, anchor)` → `NXShell.studioOpenLink(...)` → `open_studio` → `Panel.studio_link_of` → `StudioDialog.show(open_section:,
+anchor:)`. Panel posiela **iba meno**, autoritou whitelistu je Ruby (`StudioDialog::SECTIONS` ↔ zrkadlo `NXShell.STUDIO_SECTIONS`, guard test). Cieľ sa odloží
+(`@pending_section`/`@pending_anchor`) a **jednorazovo ho spotrebuje najbližší `push_state`** (polia `open_section`/`anchor` v `NX.setStudio`); kotva cestuje len so
+sekciou; bez deep-linku (rail, toolbar) je `nil` a sekcia sa nemení. Cesty: warnpanel → „Otvoriť v Štúdiu → Kontrola" (`openStudio('ctrl')`) · „Materiál"
+v info stĺpci → `bom` s kotvou ID skrinky · preklik na dekor → `mat` s `material_id`.
 
-**Nález o dielci, ktorý sa nikdy nepostavil, spadne na korpusovú úroveň** (`WARN_PART_NOT_BUILT` — `part_skipped_degenerate` z `construction.rb` **a `shelf_skipped_shallow_zone` zo
-`zone_tree.rb`**): plán taký dielec vyradí, ale kľúč si v upozornení ponechá — poslať ho na výber by bola akcia, ktorá **nemôže uspieť**, tak sa označí skrinka (Codex #182 P2).
-Zoznam je úzky a explicitný, nie heuristika; **druhý kód doplnil sweep review** — plytká zóna police nepostaví a panel na tom riadku končil hláškou „Dielec sa v modeli nenašiel",
-hoci serverová strana (`ui/production_core.rb`) obe kódy držala spolu už predtým. Nový kód nepostaveného dielca patrí **sem a do testu**.
+**Názov projektu** sa edituje na jedinom mieste — v lište Kusovníka v Štúdiu; JS ho neposiela do žiadneho exportu (autorita `ProductionCore.project_name`).
 
-**Oko v riadku ide EXISTUJÚCOU serverovou cestou `nx_select_hw_owner`** (prázdne kľúče = celá skrinka, inak `parts_by_keys`) — druhý handler s vlastnými guardmi by sa časom
-rozišiel; líšia sa len **podstatné mená v statusoch** (`SELECT_OWNER_NOUNS`, pole `origin` v payloade: `warn` → „Nález … panel ostáva pri skrinke", `hardware` → pôvodné znenie;
-neznámy/chýbajúci pôvod padá na `hardware`). Klik má **rovnaký flush handshake** ako „Dielcov" a box vlastníka (červené pole akciu zastaví). Zatváranie je **jedna delegácia**
-(`bindWarnPanel` v `boot.js`): klik mimo + Escape (fokus späť na chip), klik vnútri panela aj na samotný chip **zastavuje bublanie** — inak by sa panel v tom istom kliku otvoril a
-hneď zavrel.
-
-Kvôli tomu **merač D-25 počíta klik v CAPTURE fáze** (`usage.js`) — v bubble fáze by mu celý warnpanel (a každý budúci overlay so zatváraním klikom mimo) ticho vypadol z odpočtu,
-podľa ktorého sa rozhoduje o režimoch panela (Codex #182 P2). Viditeľnosť mení **jedna funkcia** `setWarnPanel`, takže `aria-expanded` na chipe hovorí pravdu bez ohľadu na to,
-ktorá cesta panel zavrela — a od sweep review prepína **triedu `.open`, nie inline `display`**: inline `display: block` prebíjalo `display: flex` z CSS, panel prestal byť stĺpcovým
-flexom, `.wrows` už nebola flex položka a `min-height: 0` nemalo čo obmedziť, takže **scroller vyššie bol mŕtvy** a dlhý zoznam sa aj tak neposúval.
-
-Zavretý stav je default v CSS (`display: none`), kostra v `panel.html` inline štýl **nenesie** a `setWarnPanel` prípadnú starú inline hodnotu (CEF cache) vyčistí; `warnPanelOpen`
-číta tú istú triedu, akou sa stav nastavuje.
-
-**(2) Deep-linky do okien (od ŠT-1a DVA ciele):** vzor je v oboch prípadoch rovnaký — panel posiela **iba meno**, autoritou whitelistu je **Ruby**, JS zoznam je jeho **zrkadlo**
-(zhodu stráži guard test), a cieľ sa **neposiela hneď**: okno po `show` ešte nemusí mať načítané HTML, takže `execute_script` by prišiel do prázdna. Odkladá sa a **spotrebuje ho
-najbližší `push_state`**, jednorazovo — bez vynulovania by každý ďalší refresh vrátil používateľa tam, odkiaľ medzitým odišiel.
-
-**(a) Okno ŠTÚDIO:** `openStudio(section, anchor)` posiela `NXShell.studioOpenLink(...)` → `open_studio` → `Panel.studio_link_of` → `StudioDialog.show(open_section:, anchor:)`;
-whitelist `StudioDialog::SECTIONS` ↔ `NXShell.STUDIO_SECTIONS`, odklad `@pending_section`/`@pending_anchor` → polia `open_section`/`anchor` v payloade `NX.setStudio`.
-
-**Kotva cestuje LEN so sekciou** (bez nej nemá kam sadnúť).
-
-**(b) Deep-link na TAB okna Výroba ZANIKOL (ŠT-1c PR B3):** `openProductionDialog` · `NXShell.studioLink`/`STUDIO_TABS` · `Panel.studio_tab_of` · `ProductionDialog::TABS` — všetko
-odišlo spolu s oknom (taby sa vysťahovali postupne: `rows`/`sheets`/`edging` v ŠT-1a, `control` v ŠT-1b, `hardware` v ŠT-1c PR A, `budget` v PR B1).
-
-**Deep-link zostal jeden — na SEKCIU Štúdia.** Bez neho (rail Štúdio, toolbar) je hodnota `nil` a sekcia sa **nemení**. Cesty: ⚠ warnpanel → „Otvoriť v Štúdiu → Kontrola" →
-**ŠTÚDIO, sekcia `ctrl`** (`openStudio('ctrl')`; do ŠT-1b viedol do okna Výroba na tab `control`) · **„Materiál" v info stĺpci → Štúdio, sekcia `bom`, kotva = ID skrinky** — tým sa
-**splnil sľub UI-D3**, že filter kusovníka na jednu skrinku príde so Štúdiom (status to povie nahlas aj s tým, ako sa zúženie zruší).
-
-**(3) Názov projektu (ŠT-1a):** klikateľný vstup existuje **na jedinom mieste** — v lište Kusovníka v Štúdiu; JS ho **neposiela do žiadneho exportu** (autoritou je
-`ProductionCore.project_name`). Kontrakt a zrkadlá testuje `tests/pure/test_uid3_klikatelnost.rb` + `tests/pure/test_st1a_studio.rb`, čisté funkcie
-`tests/js/test_uid3_klikatelnost.js` + `tests/js/test_st1a_studio.js`; **ŠT-1a in-SketchUp beh POTREBOVALA** (nová serverová cesta na zmenu výberu z nového okna — sekcia
-`run_st1a`).
+Testy: `tests/pure/test_uid3_klikatelnost.rb`, `tests/pure/test_st1a_studio.rb`, `tests/js/test_uid3_klikatelnost.js`, `tests/js/test_st1a_studio.js`, in-SU `run_st1a`.
 
 ### Výrazy v rozmerových poliach
 
 `expr.js` parser bez eval (`650-36` + Enter, živý náhľad `= 614`, šípky ±1/±10); surový výraz neopúšťa JS; auto-apply s identity guardom (snapshot cabinet/board id).
-Statické polia pripája `bindExprFields` (boot.js) menovitým zoznamom — **nové rozmerové pole doň musí pribudnúť** (KON-A: `back_setback`, `top_front_setback`; KON-B: `back_rail_height`), inak
-by debounce pri písaní `50-20` odoslal medzistav `50-2`.
+Statické polia pripája `bindExprFields` (boot.js) menovitým zoznamom — **nové rozmerové pole doň musí pribudnúť**, inak by debounce pri písaní `50-20` odoslal
+medzistav `50-2`.
 
 ### D-41 modal chýbajúcej ABS
 
-(`absModal` v paneli): zmena materiálu/bulk olep na dekor bez použiteľnej 1,0 pásky → „Vytvoriť a pokračovať / Bez ABS / Zrušiť". JS `absUsableExists` je len UX zrkadlo —
-**autorita je server** (flag `create_missing_abs`, kontroly PRED katalógovým zápisom); part callbacky nesú `cabinet_id` identity guard.
+(`absModal` v paneli): zmena materiálu/bulk olep na dekor bez použiteľnej 1,0 pásky → „Vytvoriť a pokračovať / Bez ABS / Zrušiť". JS `absUsableExists` je len UX
+zrkadlo — **autorita je server** (flag `create_missing_abs`, kontroly PRED katalógovým zápisom); part callbacky nesú `cabinet_id` identity guard.
 
 ## Súbory Inspectora — panel.rb + ui/panel/*.rb
 
-Register serverovej strany Inspectora. Kontrakty a pasce žijú v tematických odsekoch vyššie — tieto nadpisy sú rozcestník „ktorý súbor patrí ku ktorému odseku" a zároveň poistka,
-aby žiadny nový súbor nezostal mimo mapy (stráži guard test). `actions_zones.rb` má vlastný odsek vyššie („zónové akcie servera").
+Register serverovej strany Inspectora. Kontrakty kontextov a kariet sú v odsekoch vyššie — tieto nadpisy sú rozcestník „ktorý súbor patrí ku ktorému odseku"
+a poistka, aby žiadny nový súbor nezostal mimo mapy (guard test). `actions_zones.rb` má vlastný odsek pri Kontexte Zóny.
 
 ### panel.rb
 
-Centrálne callbacky Inspectora (`Panel.*`) — vstupný bod všetkých volaní `sketchup.*` z panela. Jednotlivé kontrakty sú v odsekoch kontextov a kariet vyššie.
+Centrálne callbacky Inspectora (`Panel.*`) — vstupný bod všetkých volaní `sketchup.*` z panela (`UI::HtmlDialog`, `STYLE_DIALOG`). Kontrakty sú v odsekoch kontextov
+a kariet; zápisové handlery idú cez guard dokumentu (`sync.rb`).
 
 ### payloads.rb
 
-Doména panela: skladanie payloadov pre klienta. Kontrakt vkladacej karty a knižnice šablón je v odseku „Vkladacia karta — šablóny, typ a doska".
+Doména panela: **skladanie payloadov pre klienta** (`cabinet_payload`, `board_payload`, `part_card`, `template_list`, `materials_payload`). Všetko sú **čisté
+projekcie** uloženého configu a plánu — žiadny zápis. Kontrakt vkladacej karty a knižnice: odsek „Vkladacia karta".
 
-**`front_slots` (KOV-A2a).** `cabinet_payload` posiela vedľa `front_items` aj mapu `front_id → { 'wings_n', 'slots' }`, ktorú skladá `front_slots_payload` z **jedinej** definície
-aplikovateľnosti smeru (`Fronts.direction_slots`, KOV-A1) nad **uloženým** `front_items`. Je to **čistá projekcia**: žiadny zápis, žiadny prepočet plánu a `state` prechádza
-**nezmenený** (nil = legacy — kľúč v configu nie je, `unset` = vedome neurčené, `left`/`right` = vyriešené). Tým je server **autoritou na otázku „kde sa smer pýta"**; panel si ju
-z počtu krídel neodvodzuje. **`wings_n` je súčasťou záznamu** (Codex #281 P2-A) a pri neznámom počte je `nil`: legacy záznam bez `wings_n` (pred D-07) tak dá `{ nil, [] }` —
-prázdne sloty **a priznané neznámo**, takže karta o ňom nepovie ani „pýtam sa", ani „je to dvojkrídlo". Od **ROH-A2** zo slotov kreslí aj náhľad Kovania stranu
-pántov (`nxHingeSide`).
+- **`front_slots`** (`front_slots_payload`): `front_id → { 'wings_n', 'slots' }` z jedinej definície aplikovateľnosti smeru `Fronts.direction_slots` nad uloženým
+  `front_items`; `state` prechádza nezmenený (nil = legacy, `unset` = vedome neurčené, `left`/`right`). **`wings_n` je súčasťou záznamu**, pri neznámom počte `nil`
+  (`{ nil, [] }` = priznané neznámo). Server je autoritou na „kde sa smer pýta"; zo slotov kreslí aj náhľad Kovania stranu pántov.
+- **`front_opening`** (`front_opening_payload` → `Construction.front_opening`, serializuje `opening_json` v `actions_cabinet.rb`): čelný otvor uloženého stavu
+  `{x0, w, z0, h}`; poškodený config = nulová šírka, výnimka = `nil`.
+- **`corner_th2`** (len pri rohovej): účinná hrúbka CR 2 (`corner_th2_payload` = `CabinetBuilder.aux_part_thicknesses` → override dielca → čelový kanál → 18).
+  Predvoľby vkladania `DEFAULTS.corner_blind` = `corner_insert_defaults(model)` (`CORNER_DEFAULTS` + `corner_th2`).
+- **`corner_preview`** (len pri rohovej; uložený stav `corner_preview_stored`, živé polia v odpovedi preflightu): čistá `corner_preview_json(params,
+  part_thicknesses)` = `CabinetBuilder.normalize` → `Construction.corner_parts` nad `interior_dims` (jediná autorita, parita s plánom `test_rohb2_nahlad.rb`
+  a modelom in-SU `run_rohb2`) → `parts` `{role, x0, x1, z0, z1, title}` (blenda, výstuha, CR 1, CR 2; výstuha závesov sa nekreslí), `dims`, `fits`/`need`
+  (`corner_fit_width`), `door_w` (otvor − okraje z `Fronts.resolve_layout`), `stats` (`count`/`area`). Iný typ aj chyba = `nil`.
+- **`slot_payload`, `cabinet_stats`, `legs_summary`, `appliance_rows`, `preview.appliances[]`** — odseky „Kontext Korpus", „Náhľad" a „Riadok Spotrebič".
+- **`front_drawer`** (`front_drawer_payload`, len čelá, ktoré `Recipes.classified?` pozná ako zásuvku; do `front_slots` sa nezlučuje): položka výsuvu
+  `source: 'recipe'` → `state: 'ok'` + `text` a `detail` (`Recipes.explain_stored(params, axes:)` z uložených parametrov a pripnutého receptu; nečitateľný recept =
+  prázdny zoznam) · `drawer_conflicts` čela → `conflict` s vetou stavby · `config_schema < DRAWER_ACTIVATION_SCHEMA` → `stale` · inak `pending`; `sync` sa viaže na
+  čelo cez `warnings[].data.front_id`; zlyhanie = `{}`. Vety „čo je v balení": `drawer_buy_lines` → `item_purchase` → `HardwareSets.explain` s kontextom
+  `drawer_buy_ctx` (raz na payload, lenivo) **zhodným s nákupným riadkom** (pri projekte bez snapshotu a nepoužiteľnej knižnici `blocked: true` ako
+  `decorate_hardware_purchase`). Kľúč **`upgrade`** (`attach_front_drawer_upgrade`) len keď existuje vydaná vyššia verzia pripnutého receptu (`active_ref == :known` ·
+  `latest_for` · `Recipes.upgrade?`) a len pri `state: 'ok'`; nesie `cabinet_id` a `front_id` (identitu skladá server); dopad sa tu nepočíta (samostatný callback).
+- **`axes` a `lock`** — `drawer_axes_index` jedným prechodom čiel dá `by_owner` (stav osí; `drawer_axes_map` je tenký obal) a `idents` (identita zápisu
+  `owner_part_key` · `slide` · `recipe:<id>`) — druhý prechod by znamenal druhé `Recipes.load`. Index sa počíta **pred** `front_drawer_payload` (aj vo
+  `front_drawer_refresh`). Osi visia na položke výsuvu (`attach_drawer_axes`, len `source: 'recipe'`), na riadku ručného zásahu (`attach_override_axes` — pri
+  konflikte položka nevznikne) a na `front_drawer[fid]` (`attach_front_drawer_axes`, `lock` = identita + `cabinet_id`). Os nesie `state` (`auto` | `locked` |
+  `conflict`), `value`, `options` (len hodnoty, ktoré sa dajú zamknúť a zmestia sa), pri konflikte `message` a `proposal`. **Os v `conflict` má vždy `message`**
+  (uložený dôvod len pri zhode kódu, inak `Recipes.height_lock_problem` / `nl_lock_problem`); návrh mení len opravovanú os, bez platnej náhrady `proposal: nil`.
+  **Quadro nemá kľúč `height`, Atira nemá `box`.** Os **`box`** = `{ state, value, min, max, message?, proposal? }` z jedinej `Recipes.box_range` (skutočná hrúbka dna);
+  `max` = automat = `proposal` pri konflikte; prázdny/neurčiteľný rozsah = `nil`. Pri konflikte výšky je ponuka NL prázdna (`blocked_by: 'height'`). Kontext sa
+  prepočítava z plánu (`CabinetBuilder.drawer_axis_contexts` → `Construction.drawer_contexts`) — tými istými číslami ako `Recipes.resolve`. **Osi dostane len
+  záznam pripnutého receptu** (`active_lock_rules`); dormantný zámok iného receptu ostáva v zozname bez chipov a `hardware_overrides_payload` (s tým istým indexom)
+  ho označí `orphan_kind: 'dormant'` s `orphan_label` a `orphan_note`.
+- **`front_lift`** (`front_lift_payload`, riadky typu `lift`; zrkadlo `front_drawer_payload`): uložený dôvod z `hardware_conflicts` vlastníka `front:<id>/flap`
+  s kódom z registra `BuildPlan::HW_CONFLICT_CODES` → `conflict` · položka `HardwareSets.lift_item?` → `ok` · jej absencia → `stale` **podľa `Bom.flap_stale_front?`**
+  (tá istá autorita ako RED `flap_stale`, vrátane výnimky pre úplnú ručnú zostavu `HardwareSets.manual_flap_assemblies`) · inak `pending`. ORANGE len z `warnings`
+  čela s kódom z `LIFT_WARN_CODES`. Text (`lift_row_text`) a detail (`lift_detail_lines`) výhradne z uložených dát; **štítok `lift_source_tag`** = `automat` len pri
+  chránenom seed pravidle (`HardwareRules.protected_lift_item?`), `ručne` pri `source: 'manual'`, inak žiadny; čísla, ktoré na položke nie sú, sa nedopočítavajú;
+  KH a KB tým istým vzorcom ako kontext pravidiel. Expanzia raz (`item_expansion` → `buy_lines`); záznam s `reason == lift_set_incomplete` → `state: 'incomplete'`
+  s vetou `Validation.lift_incomplete_sentence` (tá istá ako Kontrola). Nesie ho aj ľahký push.
+- **`hardware_set_options` a owner výbery:** typ z kľúča a „výber na úrovni vlastníka" cez jediné autority `HardwareSets.mapping_key_type` a `owner_scoped_key?`.
+  **Emituje sa len kľúč, ktorý resolver pre ten dielec naozaj číta** (owner triedny kľúč aktívnej triedy z `active_class_by_owner`, legacy `typ@owner` len pri
+  neklasifikovanej položke); poškodená hodnota príznakom `invalid`.
+- **`compat`** (ponuka pre klasifikovanú položku; `nil` = plochý zoznam setov): `cab` a `owners[owner_part_key]` s `class_key` · `class_label` · `scope_label` ·
+  `none_label` (odkiaľ hodnota prichádza bez vlastného výberu) · `options` (`HardwareSets.class_set_options`, len kompatibilné a aktívne) · `current` · `stored`
+  + `value_text` (uložená hodnota mimo ponuky — `disabled`). **`cab` len pri jednej nenulovej triede** v skrinke; **`cab: null` je výrok** (zmiešaná skrinka → riadok
+  skrinky sa nekreslí, rozhoduje `hwCabRowOff`; `hwCabOptionList` vráti `null`, Sety typ vynechajú s vetou „set sa vyberá pri konkrétnom čele", živý refresh riadok
+  odstráni `hwDropSetRow`). Kľúč sa v paneli neskladá — JS pošle `set_id` alebo `value` akciou `set_hardware_set` a kľúč zloží
+  `HardwareSets.apply_cabinet_override`; neznáme ID sa neodosiela. Testy `tests/pure/test_kovd1b_ui.rb`, `tests/js/test_kovd1b_ui.js`.
 
-**`front_opening` (ROH-A2).** `cabinet_payload` posiela čelný otvor **uloženého** stavu `{x0, w, z0, h}` — `front_opening_payload` poskladá z configu vstup
-`Construction.front_opening` (jediná autorita, tá istá ako plán a preflight) a serializuje ho `opening_json` (`actions_cabinet.rb`); poškodený config = otvor
-s nulovou šírkou, výnimka = `nil`. Náhľad z neho kreslí rohovú, kým nepríde preflight so živou šírkou; ostatné typy ho ignorujú.
-
-**`corner_th2` (ROH-B1).** Pri **rohovej** (len pri nej — parita payloadu ostatných typov) nesie `cabinet_payload` účinnú hrúbku CR 2 (`corner_th2_payload` =
-`CabinetBuilder.aux_part_thicknesses` → override dielca → čelový kanál → 18) — panel z nej počíta najmenšiu šírku. Predvoľby vkladania `DEFAULTS.corner_blind`
-skladá `corner_insert_defaults(model)` (`CORNER_DEFAULTS` + `corner_th2` z projektových predvolieb; konštanta buildera sa nemení).
-
-**`corner_preview` (ROH-B2, mockup C).** Pri **rohovej** (len pri nej) nesie `cabinet_payload` kresbu rohovej zostavy **uloženého** stavu (`corner_preview_stored`
-= `config_to_params` + `aux_part_thicknesses`) a odpoveď preflightu tú istú kresbu pre **živé polia** (`actions_cabinet.rb`). Skladá ju čistá
-`corner_preview_json(params, part_thicknesses)`: `CabinetBuilder.normalize` → `Construction.corner_parts` nad `interior_dims` (**jediná autorita — tá istá ako
-stavba**, parita s plánom na mm v `test_rohb2_nahlad.rb` a s modelom v in-SU `run_rohb2`) → `parts` v poradí kreslenia (blenda korpusová, rohová výstuha,
-CR 1, CR 2; `{role, x0, x1, z0, z1, title}` v mm od ľavého boku a od podlahy — výstuha závesov je za dverami a nekreslí sa), `dims` (dverová časť a CR 1,
-zrkadlené pri dverách vpravo), `fits`/`need` (`corner_fit_width`), `door_w` (otvor − oba okraje z `Fronts.resolve_layout`, neplatný návrh čiel = `nil`)
-a `stats` (`count`/`area` všetkých piatich dielcov pre odhad vkladania). Čítacie, bez zápisu; iný typ aj chyba = `nil`.
-
-**`axes` — stav osí zámku (KOV-D2a Astra #20 F7, tretia os D-128).** `drawer_axes_map` skladá pre každé klasifikované zásuvkové čelo mapu
-`owner_part_key → { height?: {...}, box?: {...}, nl: {...} }` a vešia ju **na obe strany**: na emitovanú položku výsuvu (`attach_drawer_axes`, len `source: 'recipe'`) **aj** na riadok
-ručného zásahu (`attach_override_axes`) — pri konflikte totiž položka fail-closed **nevznikne** a odomknúť sa musí dať aj tak. Každá os nesie
-`state` (`auto` | `locked` | `conflict`), `value`, `options` (hodnoty, ktoré sa **dajú** zamknúť: výšky receptu, ktoré sa zmestia do svetlej výšky; NL z radu **výslednej**
-výšky, ktoré sa zmestia do hĺbky), pri konflikte `message` a `proposal`. **Invariant: os so `state: 'conflict'` má vždy `message`** — uložený dôvod z `drawer_conflicts`
-sa použije len keď **sedí kód**, inak sa veta odvodí z receptu a kontextu tou istou funkciou, akou ju skladá resolver (`Recipes.height_lock_problem` / `nl_lock_problem`).
-Bez toho by zásuvka so **skorším** zlyhaním (prekážka, hrúbka, KD) **a** neplatným zámkom ukázala konflikt aj návrh bez jediného slova prečo — návrh náhrady **z receptu a geometrie**,
-nikdy z dostupných kódov. Návrh mení **len opravovanú os**: druhý zámok ostáva a znova sa overí, a keď pri ňom platná náhrada neexistuje, `proposal` je `nil`
-(D2b potvrdenie neponúkne). **Quadro nemá kľúč `height` vôbec** (nie `state: 'auto'`) — os, ktorá neexistuje, sa neponúka; miesto neho má **`box`** a **Atira zase nemá `box`**.
-
-**Os `box` (D-128) — SPOJITÝ rozsah, teda žiadne `options`.** `drawer_box_axis` dáva `{ state, value, min, max, message?, proposal? }`, kde `min`/`max` sú z **jedinej**
-funkcie `Recipes.box_range` (`ctx[:part_thicknesses]` — teda **skutočná** hrúbka dna: 16 vs 18 mm = min 58 vs 60). `max` je **automat**, preto je aj `proposal`om pri konflikte —
-nad automat sa zamknúť nedá. **Prázdny rozsah** (`min > max`, veľmi nízka zóna) aj neurčiteľný rozsah dávajú `min`/`max`/`proposal` = `nil`: JS vtedy nekreslí pole ani ponuku
-náhrady a server taký zápis odmietne (obe brány). Nový kľúč je `box`, **nie** `height` — Atira payload tak ostáva bajtovo zhodný a pravidlo „Quadro nemá `height`" platí ďalej.
-Pri konflikte **výšky** je ponuka NL prázdna
-a riadok to prizná (`blocked_by: 'height'`): rad NL je per výška, takže sa nemá z čoho počítať. Svetlú výšku ani hĺbku config **neukladá**, preto sa `ctx` prepočítava
-z plánu (`CabinetBuilder.drawer_axis_contexts` → `Construction.drawer_contexts`) — tými **istými** číslami, z ktorých počíta `Recipes.resolve`; druhý výpočet inde by sa
-časom rozišiel a ponuka by sľubovala hodnotu, ktorú resolver odmietne. Existujúce `nl` bloky D-93 a súhrnné `locked` ostávajú **nedotknuté** (payload je aditívny).
-
-**KOV-D2b — TRETIE miesto je karta čela.** Mapa vzniká v `drawer_axes_index`, ktorý jedným prechodom čiel dáva **dvoje**: `by_owner` (stav osí, kontrakt D2a — `drawer_axes_map`
-je odvtedy tenký obal nad ním, takže in-SketchUp `run_kovd2a` ani ostatní čitatelia sa nemenia) a `idents` (identita zápisu per čelo: `owner_part_key` · `generic_type` `slide` ·
-`rule_id` `recipe:<id>`). Dva prechody by znamenali **druhé `Recipes.load`** na každý push panela — to číta súbor a overuje odtlačok. `attach_front_drawer_axes` z indexu obohatí
-`front_drawer[fid]` o `axes` (**tú istú inštanciu**, žiadny druhý výpočet) a `lock` = identitu doplnenú o `cabinet_id` (guard F6 — klik z karty musí byť rovnako chránený ako klik
-v riadku). **D-128 posunula výpočet indexu PRED `front_drawer_payload`** (v `cabinet_payload` aj v `front_drawer_refresh`): riadok karty z neho skladá vetu `locked_note`
-(menuje práve zamknuté osi) a `Recipes.explain_stored(params, axes:)` (pri aktívnom zámku netvrdí vzorec). Je to stále **jeden** výpočet, len skôr. Panel si identitu skladať **nesmie**: `recipe:<id>` pozná len server, a z `front_id` odvodený kľúč by po zmene pripnutého receptu ukazoval na inú položku. Záznam bez
-osí (`stale`, čelo s nenačítateľným receptom) ostáva presne taký, aký bol v C2c.
-
-**KOV-D4 — osi dostane LEN záznam PRIPNUTÉHO receptu.** `attach_override_axes` berie od D4 celý `index` (nie len `by_owner`) a `active_lock_rules` z jeho `idents` prečíta
-`owner_part_key → rule_id` **pripnutého** receptu. **Dormantný zámok iného receptu** — zostal po zmene otvárania (`classic` ↔ `tipon` = iný recept) alebo po prechode zásuvka →
-dvierka → zásuvka — chipy **nedostane**: `Recipes.lock_value` ho aj tak nepoužije, ale chipy by ukazovali stav **aktuálneho** receptu, kým zápis by šiel na **cudzí** `rule_id`.
-Záznam v zozname **ostáva** (riadok osiroteného zásahu ho ukáže aj s „zrušiť"), len bez chipov. Je to **čítacia** zmena payloadu — jadro (resolver, normalizácia, schéma) sa
-nedotklo. **Od D-132** dostáva `hardware_overrides_payload` **ten istý index** (tretí, voliteľný argument), takže vie, ktorý recept je pripnutý a ktoré čelá existujú — a taký
-záznam označí ako **`orphan_kind: 'dormant'`** s hotovým `orphan_label` a `orphan_note`. Bez indexu (starší volajúci, test) je payload zhodný s tým spred D-132.
-
-**`front_drawer` (KOV-C2c).** Druhý — **vlastný** — kanál toho istého pushu: mapa `front_id → záznam riadku zásuvky` pre čelá, ktoré `Recipes.classified?` pozná ako zásuvku.
-Do `front_slots` sa **nezlučuje** zámerne: ten odpovedá výhradne na otázku „kde sa pýta smer". Záznam skladá `front_drawer_payload` **čítacím** spôsobom z uloženého configu —
-položka výsuvu `source: 'recipe'` (legacy `slide` sa za recept **nevydáva**) dá `state: 'ok'` + hotový `text` a `detail`; `drawer_conflicts` toho čela dá `state: 'conflict'`
-s vetou **stavby** (panel žiadnu vlastnú neskladá); `config_schema < DRAWER_ACTIVATION_SCHEMA` dá `state: 'stale'`; inak `pending`. `sync` sa viaže na **konkrétne čelo** cez
-`warnings[].data.front_id`, nie na skrinku. Vety detailu skladá `Recipes.explain_stored(params)` z uložených parametrov a **pripnutého** receptu (nie z prepočítanej geometrie);
-neznámy alebo nečitateľný recept vráti **prázdny zoznam** — karta radšej nekreslí nič, než by tvrdila číslo, ktoré nevie dokázať. Zlyhanie kdekoľvek tu vráti `{}`, takže
-karta čela nikdy nespadne kvôli riadku zásuvky. **KOV-D1b** pripája k detailu ešte vety „čo je v balení" (`drawer_buy_lines` → `item_purchase` → `HardwareSets.explain`);
-kontext (stav setov + mapa kód → položka katalógu) sa stavia **raz pre celý payload** (`drawer_buy_ctx`, lenivo — až pri prvej klasifikovanej zásuvke), nie per čelo, a keď
-chýba, detail ostáva presne taký, aký bol v C2c. **Kontext je ZHODNÝ s nákupným riadkom** (Codex #310 kolo 1 P2-1): pri projekte bez snapshotu a **nepoužiteľnej knižnici**
-(`status == :missing && library_read_only?`) sa override skrinky **neuplatní** a do `item_purchase` ide `blocked: true` — tá istá podmienka aj to isté správanie ako
-v `decorate_hardware_purchase`. Bez toho by rozklik uplatnil override na definíciu, ktorá by musela prísť práve z tej knižnice, a panel by o jednej položke hovoril niečo
-iné než súpis (lekcia R-06a). **KOV-D3b** pripája k záznamu ešte **`upgrade`** (`attach_front_drawer_upgrade`, mimo bloku osí — os zásuvka mať nemusí, ale ponuka je otázka
-o mape `recipe_refs`, nie o zámkoch). Kľúč vzniká **len** vtedy, keď pre pripnutý recept naozaj existuje **vydaná vyššia** verzia (`active_ref == :known` · `latest_for` ·
-`Recipes.upgrade?` — tie isté pravidlá, ktoré zápisovú cestu nakoniec pustia), a **len pri `state: 'ok'`**: tabuľka dopadu porovnáva terajší stav s cieľovým a konfliktná
-zásuvka žiadny terajší nemá — jej cesta von je dôvod konfliktu. V produkcii žiadna v2 neexistuje, takže sa kľúč **nikdy nepridá** a payload je zhodný s D3a (charakterizačný
-test). Otázka je **lacná** (register + `parse_id`); dopad na čelo sa tu **nepočíta** — ten stojí celý `build_plan` + expanziu setov a chodí až na klik, samostatným čítacím
-callbackom. Blok nesie aj `cabinet_id` a `front_id`: identitu zápisu skladá **server** (rovnaká zásada ako `lock` v D2b), panel ju z ničoho neodvodzuje. Ten istý blok pripája
-aj **ľahký push** (`front_drawer_refresh`) — inak by z otvorenej karty po zmene mapovania ponuka zmizla.
-
-**`front_lift` (KOV-E2).** Tretí — opäť **vlastný** — kanál toho istého pushu: mapa `front_id → záznam riadku výklopu` pre riadky čiel typu `lift` (sklop tu nemá čo hľadať).
-Skladá ho `front_lift_payload` **čítacím** spôsobom z uloženého configu a je to **zrkadlo `front_drawer_payload`** aj v stavoch: uložený dôvod z `hardware_conflicts` tohto
-vlastníka (`front:<id>/flap`), ktorého kód je v **jedinom registri** `BuildPlan::HW_CONFLICT_CODES`, dá `state: 'conflict'` s **vetou stavby** (cudzí kód — napr. zásuvkový —
-sa ignoruje, nosič je zdieľaný); položka `HardwareSets.lift_item?` dá `state: 'ok'`; jej absencia dá `stale` **podľa `Bom.flap_stale_front?`** — tej istej autority, akou vzniká
-RED `flap_stale`, nie druhej podmienky vedľa nej. Kritérium je **celé** (Codex #334 kolo 1 P2): obe proveniencie (`config_schema` aj `rules_seed_version`), chýbajúce
-kovanie podľa **smeru** čela **a výnimka pre úplnú ručnú zostavu** (`HardwareSets.manual_flap_assemblies`) — čelo s ručne zloženým mechanizmom je preto v karte pokojné
-presne tak, ako je pokojná Kontrola. Inak `pending`. ORANGE (`warn`) je **riadok navyše** a berie sa
-len z `warnings` s `part_key` tohto čela a kódom z `LIFT_WARN_CODES` (`lift_light_front`, `lift_override_ignored`); `hardware_rule_overlap` tu **zámerne nie je** — je to
-varovanie o pravidlách, vlastníka nenesie a v karte by nemalo kde pristáť.
-
-Text riadku (`lift_row_text`) aj vety detailu (`lift_detail_lines`) sú **výhradne z uložených dát**: systém, trieda mechanizmu, trieda ramien, otváranie, počet tyčí
-a predlžovací diel. **Štítok na konci riadku hovorí o ZDROJI položky** (`lift_source_tag`, Codex #334 kolo 1 P2): `automat` neznamená „vybral to plugin", ale „ručný zásah
-sa na tejto položke **neuplatní**" — a to platí len pre **chránené seed pravidlo** (`HardwareRules.protected_lift_item?`). Položka z vlastného výklopového pravidla
-override **prijíma** (`source: 'manual'`) a dostane štítok **`ručne`**; vlastné pravidlo bez zásahu nedostane štítok žiadny — mlčanie je presnejšie než ktorékoľvek
-z dvoch slov. **Číslo, ktoré na položke nie je (LF pri HK, hmotnosť pri HL), sa NEDOPOČÍTAVA** — druhý výpočet tej istej veličiny by sa s automatom časom rozišiel
-a obnoviť ho by znamenalo postaviť celý plán s katalógom materiálov na každý push. Keď automat na problém narazí, čísla sú **vo vete konfliktu** a tú karta ukáže doslovne.
-**KH a KB** idú z configu **tým istým vzorcom, aký používa kontext pravidiel** (`Construction`: `height − floor_height`, `width`) — karta nesmie ukázať iný rozmer, než podľa
-ktorého automat vyberal. Vety „čo je v balení" pridáva **tá istá** cesta (`HardwareSets.explain`) ako pri zásuvke, s **tým istým** kontextom `drawer_buy_ctx`; expanzia sa počíta **raz**
-(`item_expansion` → `buy_lines`), lebo karta výklopu z nej potrebuje **oboje** — vety rozkliku aj to, či expanzia **zlyhala**. **Zlyhanie expanzie je STAV karty, nie riadok
-v rozkliku** (Codex #334 kolo 2 P2): keď `explain` vydá záznam s `reason == lift_set_incomplete` (chýbajúce mapovanie, chýbajúci kód triedy, nevyriešený počet), karta dá
-`state: 'incomplete'` a `message`. Dovtedy vracala `ok` a problém priznala len vetou „Bez kódu: …" schovanou v „Technickom detaile", kým Kontrola vedľa hlásila RED
-a zastavovala nákup, rozpočet aj cenovú ponuku. **Znenie vety skladá `Validation.lift_incomplete_sentence` — tá istá metóda, akou vzniká nález Kontroly**, len bez lokátora
-skrinky (karta v tej skrinke stojí); dve znenia o jednej chybe existovať nesmú. Rozhoduje **surový záznam** `explain['unmapped']`, nie preložené `problems`: z preloženej
-vety sa závažnosť už prečítať nedá.
-Ten istý záznam nesie aj **ľahký push** (`sync.rb`, `NX.setHardwareSets`) — rozklik detailu ukazuje názov setu a kódy, teda presne to, čo výber tmavého setu mení.
-
-**`hardware_set_options` a owner výbery (KOV-D1a).** Typ kovania z kľúča override mapy aj rozpoznanie „výberu na úrovni vlastníka" idú cez **jediné autority**
-`HardwareSets.mapping_key_type` a `owner_scoped_key?` — nie cez `BuildPlan.parse_hardware_set_key`, ktorý pre `class:` kľúče vracia `nil`. Bez toho by karta čela pri
-owner **triednom** override (`class:slide|…@front:F1/panel`) ukázala prázdny select, hoci uložený výber existuje — a prvý klik vedľa by ho ticho prepísal. Payload sa inak
-**nemení**; ponuku a ovládanie prináša D1b.
-**Emituje sa LEN kľúč, ktorý resolver pre ten dielec naozaj číta** (Codex #308 kolo 2 P2): owner triedny kľúč zhodný s **aktívnou** triedou položky (`active_class_by_owner`
-z `config.hardware`), a legacy `typ@owner` iba tam, kde položka klasifikáciu nemá. Bez toho by po zmene otvárania či konštrukcie karta ukázala **dormantný** výber starej
-triedy ako vybraný a mazanie by cielilo na iný kľúč. Poškodená hodnota sa priznáva príznakom `invalid` — karta nesmie ukázať prázdny select ani hodnotu z nižšej úrovne.
-
-**KOV-D1b — `compat`: PONUKA pre klasifikovanú zásuvku.** K záznamu typu pribudol kľúč `compat` (`nil` = typ klasifikovanú položku nemá a karta kreslí pôvodný plochý zoznam
-setov). Nesie **hotový rozsah** pre celú skrinku (`cab`) a pre **každé čelo** (`owners[owner_part_key]`): `class_key` · `class_label` · `scope_label` („Set pre túto skrinku" /
-„Set pre toto čelo") · `none_label` (čo platí BEZ vlastného výberu — na čele priznáva, či hodnota prichádza zo **skrinky** alebo z **projektu**, poradie ako
-`resolve_set_id`) · `options` (`HardwareSets.class_set_options` — len kompatibilné, neaktívne nikdy) · `current` (ID uloženej voľby, keď je v ponuke) · `stored` + `value_text`
-(uložená hodnota **mimo** ponuky — zobrazí sa ako `disabled`, vybrať sa nedá; F10). **Skrinkový rozsah vzniká len pri JEDNEJ triede** — pri zmiešaných triedach by jeden kľúč
-platil len na časť položiek a `override_class_key` taký zápis odmieta, takže ho karta ani nesmie ponúkať. **Zmiešaná je aj skrinka, kde vedľa klasifikovanej zásuvky stojí
-LEGACY neklasifikovaný výsuv** (Codex #310 kolo 1 P2-2): `active_class_by_owner` má vtedy pri tom vlastníkovi `nil` a `compact` by ho zahodil — preto sa `cab` emituje len
-vtedy, keď je hodnôt práve jedna **a nie je `nil`**. Efektívna projektová hodnota sa číta pod **triednym** kľúčom, nikdy pod generickým (resolver ho pre takú položku
-nečíta). **Kľúč sa v paneli neskladá:** JS pošle existujúcou akciou `set_hardware_set` buď `set_id` (pevný set), alebo `value` (selektor rodiny), a kľúč z toho zloží
-`HardwareSets.apply_cabinet_override` (D1a). Neznáme ID sa **neodosiela** vôbec.
-
-**`cab: null` je VÝROK, nie chýbajúci údaj** (Codex #310 kolo 1 P2-3). Panel preto rozlišuje **neprítomný** `compat` (legacy/neklasifikovaná skrinka → pôvodný plochý zoznam
-setov) od prítomného s `cab: null` (zmiešaná skrinka → riadok skrinky sa **nekreslí vôbec**). Jediné miesto rozhodnutia je `hwCabRowOff`; `hwCabOptionList` vtedy vracia
-`null`, `renderHardware` typ zo skupiny **Sety vynechá** (a keď z nej nezostane nič, povie prečo: „set sa vyberá pri konkrétnom čele") a živý `refreshHardwareSets` taký
-riadok **odstráni** (`hwDropSetRow` — celý `.hwsetrow` aj s popiskom), namiesto aby doň doplnil zoznam, z ktorého by každá voľba skončila hláškou. Výber na konkrétnom čele
-beží ďalej. Testy: `tests/pure/test_kovd1b_ui.rb`, `tests/js/test_kovd1b_ui.js`.
+Plné znenie: archív, „payloads.rb".
 
 ### resolvers.rb
 
@@ -2006,2181 +1026,1066 @@ Doména panela: rozlíšenie virtuálnych materiálov (`resolve_virtual_material
 
 ### selection.rb
 
-Doména panela: observery výberu a transakcií, kamera a serverové cesty zmeny výberu. Kontrakty sú v odsekoch „Observery panela", „Kontext Kovanie (UI-C4…)" a „Náhľad = kontextová
-projekcia + spodný pás (UI-B2…)".
+Doména panela: observery výberu a transakcií, kamera a serverové cesty zmeny výberu (`handle_select_parts`, `handle_select_hw_owner`, `handle_camera_focus`,
+`handle_clear_selection`; „Označiť v modeli" karty dielca `handle_select_part` žije v `actions_parts.rb`). Kontrakty: odseky „Observery panela", „Kontext Kovanie",
+„Náhľad", „Karta dielca".
 
 ### sync.rb
 
-Doména panela: **všetky pushe Ruby → JS** (`push_init`, `push_selected`, `push_templates`, `push_materials`, `push_part_card`, `set_status`) + identita dokumentu (`model_guid`) a
-malé echo kanály funkčných prepínačov raily (`push_edge_check`, `push_grain_check`, `push_tags`). Zásada: **echo push nesmie prekresliť rozpísaný formulár** — preto majú
-katalógové a stavové zmeny vlastné úzke kanály namiesto `push_init`. Od v0.8.13 nesie **`push_selected` aj `push_tags(tags_state(model))`** (D-27): tou istou cestou beží
-Späť/Znova, prepnutie dokumentu aj zmena výberu, takže bez toho by okno tagov, ikona raily a checkbox ghost zón ostali na opačnom stave než model. Pole `zones_visible`
-v `push_init` tým zaniklo — zóny sú riadok v `tags`.
+Doména panela: **všetky pushe Ruby → JS** (`push_init`, `push_selected`, `push_templates`, `push_materials`, `push_part_card`, `push_hardware_sets`, `set_status`)
++ identita dokumentu (`model_guid`) a malé echo kanály prepínačov raily (`push_edge_check`, `push_grain_check`, `push_tags`). Zásada: **echo push nesmie prekresliť
+rozpísaný formulár** — katalógové a stavové zmeny majú vlastné úzke kanály. `push_selected` nesie aj `push_tags(tags_state(model))` (Späť/Znova, prepnutie dokumentu,
+zmena výberu). `push_init` posiela predvoľby typov (`defaults` → JS `DEFAULTS`: `CabinetBuilder::LOWER_DEFAULTS` / `UPPER_DEFAULTS` /
+`DISHWASHER_DEFAULTS` a `corner_insert_defaults(model)` pre rohovú).
 
-**Deep-link kanály Kontroly (KOV-A2b, KOV-D4)** sú dva a oba sú **len na čítanie**: `push_focus_front(front_id)` otvorí kartu čela a `push_focus_hardware(target)` prisvieti riadok
-v sekcii Kovanie. Posiela sa **jediný údaj / jedna adresa** (`owner_part_key` + `generic_type` + `rule_id` + `orphan`), server si o nich **nič nepamätá** a nič nezapisuje;
-zatvorený Inspector (`dialog_alive?`) ani neúplná adresa nedostanú nič.
+**Deep-link kanály Kontroly** sú dva a len na čítanie: `push_focus_front(front_id)` otvorí kartu čela, `push_focus_hardware(target)` prisvieti riadok v Kovaní
+(adresa `owner_part_key` + `generic_type` + `rule_id` + `orphan`); server si nič nepamätá; zatvorený Inspector ani neúplná adresa nedostanú nič.
 
-**GUARD IDENTITY DOKUMENTU — `foreign_document?(data, model, what)`** (R-02, v0.8.19). Jediný guard, ktorým prechádza **každý zápisový handler panela**. Panel je JEDEN pre všetky
-otvorené dokumenty a callback HtmlDialogu je asynchrónny, pritom ID objektov sú jedinečné LEN v rámci modelu (`CAB-001` aj `BRD-001` sú v každej zákazke) — echo `cabinet_id` /
-`board_id` teda prepnutie dokumentu **nezachytí** a oneskorený klik by prestaval rovnomennú skrinku v cudzej zákazke. Porovnanie je **prísne** (vzor `handle_tag_visible`,
-`zone_ctx`, `handle_set_part_grain`): prázdny guid nie je starší klient, je to okno bez dobehnutého `NX.init` a to nesmie zapisovať nikam. Nezhoda = **hláška** (`set_status` +
-`Engine.log`), nie tiché zahodenie — prepnutie dokumentu je zriedkavé a používateľ musí vedieť, že sa zmena neuložila. Klientskym protipólom je **`nxDocPayload(obj, guid)`** v
-`ui/js/shell.js`: jediné miesto, kde zápisový payload dostáva `model_guid` (obdoba `nxZonePayload`, ktorý navyše pridáva `cabinet_id`). Ten istý tvar payloadu posiela aj in-SU
-runner (helper `pg(model, hash)` v `tests/sketchup/su_runner.rb`).
+**Guard identity dokumentu `foreign_document?(data, model, what)`** — jediný guard, ktorým prechádza **každý zápisový handler panela** (porovnanie robí zdieľaný
+`DocKey.foreign?` v prísnom režime). Panel je jeden pre všetky dokumenty, callback je asynchrónny a ID sú jedinečné len v rámci modelu, takže echo
+`cabinet_id`/`board_id` prepnutie dokumentu nezachytí. Porovnanie je **prísne** (prázdny guid = okno bez dobehnutého `NX.init`, nezapisuje); nezhoda = **hláška**
+(`set_status` + `Engine.log`). Klientsky protipól **`nxDocPayload(obj, guid)`** v `shell.js` je jediné miesto, kde zápisový payload dostáva `model_guid`
+(`nxZonePayload` pridáva aj `cabinet_id`); in-SU runner posiela ten istý tvar (helper `pg(model, hash)`). Rozsah stráži `tests/pure/test_r02_doc_guard.rb`;
+`handle_set_part_grain` má vlastný, tvarom starší guard.
+- **Zachytená identita, nie identita pri odoslaní:** odložené cesty čítajú `nxDocGuid()` pri naplánovaní a podávajú ju druhým argumentom — auto-apply korpusu
+  (`form.js`, `guidSnapshot`) a polia karty dosky (`board_card.js`, `boardPending.guid`); karta dielca berie `partCard.model_guid`. Prázdny reťazec je platná
+  zachytená hodnota (helper sa vetví na `undefined`/`null`).
+- **Rozpracovaný stav pri prepnutí dokumentu — tri obrany:** (1) **`nxSetModelGuid` je jediný detektor zmeny dokumentu** a pri zmene spustí `nxDropDocState()`
+  (`cancelCabinetEdits` · `cancelBoardEdits` · `dropCabRename` + `closeCabRenameEditor` · `absModalCloseSilent` · `closeSaveTemplateModal` · `closeSimilarModal` ·
+  vynulovanie `cabEditsInFlight` · `blur` aktívneho prvku); echo tej istej identity nezahodí nič. **Každý nový pending buffer, editor alebo modal patrí do tohto
+  zoznamu** (vedome mimo: `insertLocksTimer`, `previewTimer`, draft vkladacej karty). (2) **Vlastná zachytená identita v každom bufferi** (`applyPendingGuid`,
+  `boardPending.guid` kľúčovaný dvojicou dokument+doska, `renameGuid`, `boardTarget()`/`partTarget()`, `tplModalGuid`, `simFor.guid`). (3) Serverový
+  `foreign_document?`.
+- **Poradie v pushi je kontrakt:** `nxSetModelGuid` je **prvý príkaz** `loadSelected`, `loadBoard`, `clearSelected` aj `init` (stoja na tom `keepGaps` a test „iná
+  doska"); volanie v `setUiMode` je poistka. Závierku `cabEditsInFlight` nuluje **výhradne `nxDropDocState`**, nie `cancelCabinetEdits` (beží aj v jednodokumentovom
+  flow).
 
-**Zachytená identita, nie identita pri odoslaní** (review #264 P1). `nxModelGuid` je mutovateľný globál, ktorý prepíše najbližší push zo servera. Cesty s **odloženým**
-odoslaním preto čítajú `nxDocGuid()` už pri **naplánovaní** editu a zachytenú hodnotu podávajú helperu druhým argumentom — bez toho by sa zápis odložený o 400 ms opečiatkoval
-NOVÝM dokumentom a guard by ho pustil presne tam, kam nemá. Týka sa to dvoch debounce ciest: **auto-apply korpusu** (`form.js`, `guidSnapshot` vedľa `cabSnapshot`) a **polí karty
-dosky** (`board_card.js`, `boardPending.guid`). Karta dielca berie identitu z **payloadu karty** (`partCard.model_guid`) — je to dokument, ktorý má používateľ na obrazovke.
-Okamžité cesty argument vynechajú (medzi klikom a odoslaním sa v jednovláknovom JS push vykonať nemôže). Prázdny reťazec je **platná** zachytená hodnota (server ju odmietne),
-preto sa helper vetví na `undefined`/`null`, nie na pravdivosť. **Rozsah guardu je 18 zápisových handlerov** — okrem korpusu, kovania a dosky aj `handle_set_cabinet_material`
-a tri cesty karty dielca (`material`, `edge`, `edges_all`); `handle_set_part_grain` má vlastný, tvarom starší guard z K1/D-108.
-
-**Rozpracovaný stav panela pri prepnutí dokumentu — tri obrany** (review #264 kolo 2). Zachytený guid sám nestačí: stav, ktorý drží dáta medzi akciou používateľa a volaním
-`sketchup.*`, prežije prepnutie dokumentu a pri odoslaní by dostal novú identitu.
-**(1) Centrálne zahodenie.** `nxSetModelGuid` je **jediný detektor zmeny dokumentu** na klientovi (každý push — `init`, `loadSelected`, `loadBoard`, `clearSelected` — ide cez
-neho). Pri skutočnej zmene hodnoty spustí `nxDropDocState()`, ktoré zahodí **všetok** rozpracovaný stav: `cancelCabinetEdits` · `cancelBoardEdits` · `dropCabRename` +
-`closeCabRenameEditor` · `absModalCloseSilent` · `closeSaveTemplateModal` · `closeSimilarModal`. **Echo push tej istej identity nezahodí nič** — rozpísaná práca musí prežiť
-(rovnaká zásada ako `NXShell.track`). Každý nový pending buffer, editor alebo modal patrí do tohto zoznamu; stráži ho `tests/pure/test_r02_doc_guard.rb`. Mimo zoznamu sú
-vedome `insertLocksTimer` (zámky žijú v pamäti Panel modulu, do modelu nezapisujú), `previewTimer` (lokálny re-render) a draft vkladacej karty (vklad pečiatkuje identitu až
-pri kliku).
-**(2) Vlastná zachytená identita v každom bufferi** — keby push zo servera neprišiel: `applyPendingGuid` (rozpísané edity formulára, používa ho aj **okamžitý** flush),
-`boardPending.guid` (batch karty dosky je kľúčovaný **dvojicou** dokument+doska — `BRD-001` je v každej zákazke, takže samotné id by zmiešalo edity dvoch dokumentov),
-`renameGuid` (inline premenovanie — `setIdbar` porovnáva len `cabinet_id`, takže editor prežije prepnutie na rovnomennú skrinku), `boardTarget()`/`partTarget()` (cieľ modalu
-chýbajúcej ABS: doska/dielec + dokument z času otvorenia — rozhodnutie je asynchrónne a karty sú mutovateľné globály), `tplModalGuid` a `simFor.guid` (staršie, už predtým
-správne).
-**(3) Serverový `foreign_document?`** — posledné slovo má vždy Ruby.
-**PORADIE V PUSHI je súčasť kontraktu** (review #264 kolo 3): centrálne zahodenie je užitočné len vtedy, keď beží PRED stavovými rozhodnutiami pushu. `nxSetModelGuid` je preto
-**prvý príkaz** `loadSelected` aj `loadBoard` (v `clearSelected` a `init` bol prvý už predtým), nie až vedľajší efekt `setUiMode` na konci. Dve rozhodnutia, ktoré na tom stoja:
-`keepGaps` v `loadSelected` (zachovanie rozpísaných riadkov čiel — `CAB-001` je v každej zákazke, takže identita dokumentu je aj priamou súčasťou podmienky) a test „iná doska"
-v `loadBoard` (zahadzuje pending batch podľa samotného `board_id`). Volanie `nxSetModelGuid` v `setUiMode` zostáva ako poistka — echo je v ňom lacný early return.
-Do `keepGaps` patrí aj závierka `cabEditsInFlight`, a tú nuluje **výhradne `nxDropDocState`**, nie `cancelCabinetEdits`: rušenie rozpísaných editov beží aj
-v **jednodokumentovom** flow (zastavený okamžitý flush pri červenom poli, rozpísaný výraz v poli) a zhodená závierka by tam nechala najbližšie echo zmazať práve pridané čelo
-aj rozpísané gap hodnoty. `nxDropDocState` navyše **zhodí fokus** (`document.activeElement.blur()` v `try/catch`) — CEF drží `activeElement` aj po strate fokusu okna, takže
-`bset` na karte dosky by pole s kurzorom preskočilo a nechalo v ňom hodnotu zo starej zákazky.
+Plné znenie: archív, „sync.rb".
 
 ### actions_appliance.rb
 
-**TRI akcie panela k spotrebičom:** `set_appliance_owner` (S1-B2 — väzba), `set_appliance_expects` (S1-C — očakávanie) a `set_appliance_mount` (D-140 — výška osadenia
-chladničky). Sú to **tri rôzne veci**: väzba mení položku zákazky aj geometriu, očakávanie je len vyhlásenie v configu a osadenie mení, **kde v skrinke kus stojí** (prestavba,
-ale bez zmeny položky zákazky), takže ani jedna z ďalších dvoch nemá čo robiť v transakčnom vstupe väzby.
+**Tri akcie panela k spotrebičom** — tri rôzne veci: `set_appliance_owner` (väzba — mení položku zákazky aj geometriu), `set_appliance_expects` (očakávanie — len
+vyhlásenie v configu) a `set_appliance_mount` (výška osadenia chladničky — prestavba bez zmeny položky zákazky). UI: odsek „Riadok Spotrebič v Inspectore".
 
-`set_appliance_owner` — priradenie modelu z riadku „Spotrebič" alebo jeho odpojenie, pre skrinku, slot umývačky aj dosku.
-Súbor pri väzbe **nezapisuje**: deleguje na `ApplianceBinding.apply!` (`move` / `unbind`), ktorý je jediným transakčným vstupom väzby (položka rozpočtu + `appliance_refs[]`
-vlastníka + prestavba = **jedna operácia, jeden krok Späť**). Rieši len to, čo panel vie a jadro nie: **ktorá entita je označená**.
+**`set_appliance_owner`** — priradenie modelu z riadku „Spotrebič" alebo odpojenie (skrinka, slot umývačky, doska). Súbor **nezapisuje**: deleguje na
+`ApplianceBinding.apply!` (`move` / `unbind`) — jediný transakčný vstup väzby (položka rozpočtu + `appliance_refs[]` vlastníka + prestavba = **jedna operácia, jeden
+krok Späť**). **Cieľ väzby skladá server z výberu, nie z payloadu:** klient posiela `item_id` a echo `cabinet_id` / `board_id`; druh (`cabinet` vs `slot`), ID aj
+`persistent_id` sa čítajú z označenej entity. Dokument overuje `foreign_document?` nahlas, nezhodné echo vráti „Výber sa medzitým zmenil" a obnoví kartu. Po úspechu
+`push_selected`; otvorené Štúdio sa dozvie cez transakčný observer (zožltne „Obnoviť").
 
-**Cieľ väzby skladá SERVER z výberu, nie z payloadu.** Klient posiela iba `item_id` (čo priradiť) a echo `cabinet_id` / `board_id` (nad čím bol riadok vykreslený, GH #127
-P2); druh (`cabinet` vs `slot` podľa `type` v configu), ID aj `persistent_id` sa čítajú z označenej entity. Starý DOM tak nemá ako poslať cudziu skrinku a recyklované ID
-nemá ako trafiť iný kus. Identitu **dokumentu** overuje `foreign_document?` nahlas (vzor R-02), nezhodné echo ID vráti „Výbor sa medzitým zmenil" a obnoví kartu.
-Po úspechu ide `push_selected` (čerstvá karta) a status menuje model aj vlastníka; otvorené Štúdio sa o zmene dozvie bežnou cestou — transakčný observer zožltne
-„Obnoviť" (`on_model_txn`), druhý push do cudzieho okna by bol druhý kanál k tým istým číslam.
+**`set_appliance_expects`** = **config-only zápis vo vlastnej operácii, jeden krok Späť, bez prestavby.** Payload: `expects[]` (úplný nový zoznam), echo
+`cabinet_id` / `board_id` a `pid` z času vykreslenia riadku. **Poradie guardov je kontrakt:**
+1. identita dokumentu (`foreign_document?`),
+2. **bariéra observera** (`ApplianceBinding.observer_idle?` → `ScaleWatch.flush_pending!` — dedup kópií môže práve meniť `cabinet_id`),
+3. **cieľ sa číta až potom** a overuje celý: druh + ID + `persistent_id`, jednoznačnosť, nie odpojený dielec, config ani novší, **ani starší** (marker sa config-only
+   zápisom neposúva → „najprv ju prestav…", [construction.md](construction.md) `write_config_keys!`); **prázdne echo ani chýbajúci `pid` sa netolerujú**,
+4. striktná validácia proti matici druhu (`ApplianceBinding.validate_expects` — [appliances.md](appliances.md)),
+5. **viazanú kategóriu odstrániť nedáš** (`appliance_expects_locked`) — len pre očakávania, ktoré na kuse naozaj sú (prienik viazané ∩ uložené mínus nový zoznam),
+6. nezmenený výsledok = **žiadna operácia** („Očakávanie sa nezmenilo").
 
-**`set_appliance_expects` (S1-C) je CONFIG-ONLY zápis vo VLASTNEJ operácii = jeden krok Späť, BEZ prestavby.** Payload nesie `expects[]` (**úplný** nový zoznam, nie
-„pridaj/odober"), echo `cabinet_id` / `board_id` a **`pid`** — oboje z času, kedy bol riadok vykreslený. **Poradie guardov je súčasťou kontraktu:**
+Zapisuje `CabinetBuilder.write_config_keys!` / `BoardBuilder.write_config_keys!` pod `CabinetBuilder.guarded` v jednej `start_operation` (výnimka = `abort`). Po
+úspechu `push_selected(dedup: false)` **a** `StudioDialog.refresh_if_open(bump: true)` (zmenili sa dáta Kontroly). **Každé odmietnutie posiela čerstvú kartu**
+(`appliance_expects_refused` → `push_selected(dedup: false)`, potom červený status) — klient ovládač po odoslaní zamkne a odomkne ho až nový payload.
 
-1. **identita dokumentu** (`foreign_document?`, R-02),
-2. **bariéra observera** (`ApplianceBinding.observer_idle?` → `ScaleWatch.flush_pending!`): dedup kópií a presun ghostov môže **práve teraz** meniť `cabinet_id`, takže bez
-   pokoja by sme zapisovali do configu, ktorý o pár milisekúnd neplatí — a transparentná reakcia observera by sa navyše prilepila na našu operáciu,
-3. **cieľ sa číta AŽ POTOM** (čerstvý výber, čerstvý config) a overuje sa **celý**: druh + ID + `persistent_id`, jednoznačnosť (dva živé kusy s tým istým ID = odmietnutie —
-   ID sa recyklujú), nie odpojený dielec, nie config z novšej verzie **a ani zo STARŠEJ** (marker sa config-only zápisom neposúva, takže kus pred migráciou sa odmietne
-   s vetou „najprv ju prestav (Aplikuj zmeny), potom nastav očakávanie" — [construction.md](construction.md), `write_config_keys!`). **Prázdne echo ani chýbajúci `pid`
-   sa tu netolerujú** (na rozdiel od `set_appliance_owner`): riadok ich kreslí vždy, takže ich absencia je presne ten starý DOM, proti ktorému guard stojí,
-4. **striktná validácia vstupu** proti matici druhu (`ApplianceBinding.validate_expects` — [appliances.md](appliances.md)),
-5. **„viazanú kategóriu odstrániť nedáš"** (`appliance_expects_locked` nad tým istým obojsmerným dôkazom) — zámok sa však týka **len očakávaní, ktoré na kuse
-   naozaj sú** (prienik `viazané ∩ uložené appliance_expects` mínus nový zoznam, Codex #385 kolo 2): väzba a očakávanie sú dve nezávislé veci, takže skrinka
-   s priradenou, ale nikdy neočakávanou rúrou musí vedieť pridať očakávanie mikrovlnky,
-6. **nezmenený výsledok = ŽIADNA operácia** (status „Očakávanie sa nezmenilo", žiadny prázdny krok Späť).
-
-Zapisuje `CabinetBuilder.write_config_keys!` / `BoardBuilder.write_config_keys!` pod `CabinetBuilder.guarded` v jednej `start_operation`; výnimka = `abort`.
-**Po úspechu (Astra C14)** ide `push_selected(dedup: false)` **a** `StudioDialog.refresh_if_open(bump: true)` — zmenili sa **dáta Kontroly**, takže ORANGE „spotrebič
-nevybraný" musí byť vidieť hneď, nie až pri najbližšom inom zápise. Undo/Redo ide existujúcou stale cestou observera.
-
-**KAŽDÉ odmietnutie posiela čerstvú kartu** (`appliance_expects_refused` → `push_selected(dedup: false)` a až potom červený status). Klient si totiž po odoslaní
-príkazu ovládač **zamkne** a odomkne ho až príchod nového payloadu — keby odmietnutie vrátilo len status, riadok by ostal zamknutý.
-
-**`set_appliance_mount` (D-140, v0.12.20) = PRESTAVBA vo VLASTNEJ operácii = jeden krok Späť.** Payload nesie `item_id`, echo `cabinet_id` + `pid`, novú hodnotu `value`
-a **pôvodnú hodnotu `prev`** — všetko zachytené pri **otvorení** popoveru, dokument ide cez `nxDocPayload(…, zachytený guid)` (Astra C BLOCKER 2). Poradie guardov:
-identita dokumentu → bariéra observera → **cieľ** (`appliance_mount_target`: označená skrinka, echo ID + PID, nie slot, jednoznačné ID, nie odpojený dielec, nie novší config,
-**práve jeden** záznam `fridge` s tým `item_id` a **živá položka zákazky, ktorej vlastník je táto skrinka** — obojsmerný dôkaz `ref_matches?`; Astra C FIX 5) → **hodnota**
-(`appliance_mount_value`: konečné číslo 0–2000 mm, zaokrúhlené na 0,1; inak veta a config sa nedotkne) → **echo pôvodnej hodnoty** (`|prev − aktuálne| < 0,05`, inak
-„Osadenie sa medzitým zmenilo" — starý príkaz neprepíše novšie osadenie ani neobnoví odpojený spotrebič) → **nezmenené po zaokrúhlení = žiadna operácia** (0,04 → 0).
-Zápis (`appliance_mount_write`): **`CabinetBuilder.ensure_root_context` PRED operáciou** (prestavba z otvoreného komponentu skrinky — `rebuild_in_operation` rám nezatvára;
-Astra C FIX 4) → `guarded` → `start_operation(APPL_MOUNT_OP)` → `write_appliance_refs!` s novým zoznamom (`appliance_mount_refs` mení **len** tento kus; 0 kľúč zmaže)
-→ `commit`; výnimka = `abort_safely` + čerstvá karta + „Osadenie sa nepodarilo uložiť". Po úspechu `push_selected` a `StudioDialog.refresh_if_open(bump: true)` — box
-niky, pásma aj Kontrola sa zmenili. Odmietnutia idú tou istou cestou `appliance_expects_refused` (čerstvá karta, potom status).
+**`set_appliance_mount`** = **prestavba vo vlastnej operácii, jeden krok Späť.** Payload: `item_id`, echo `cabinet_id` + `pid`, nová `value` a **pôvodná `prev`** — všetko
+zachytené pri otvorení popoveru, dokument cez `nxDocPayload(…, zachytený guid)`. Poradie: dokument → bariéra observera → **cieľ** (`appliance_mount_target`:
+označená skrinka, echo ID + PID, nie slot, jednoznačné ID, nie odpojený dielec, nie novší config, **práve jeden** záznam `fridge` s tým `item_id` a živá položka
+zákazky tejto skrinky — obojsmerný dôkaz `ref_matches?`) → **hodnota** (`appliance_mount_value`: konečné číslo 0–2000 mm, zaokrúhlené na 0,1) → **echo pôvodnej
+hodnoty** (`|prev − aktuálne| < 0,05`, inak „Osadenie sa medzitým zmenilo") → nezmenené po zaokrúhlení = žiadna operácia. Zápis `appliance_mount_write`:
+`CabinetBuilder.ensure_root_context` **pred** operáciou → `guarded` → `start_operation(APPL_MOUNT_OP)` → `write_appliance_refs!` (`appliance_mount_refs` mení len tento
+kus; 0 kľúč zmaže) → `commit`; výnimka = `abort_safely` + čerstvá karta. Po úspechu `push_selected` + `StudioDialog.refresh_if_open(bump: true)`; odmietnutia cestou
+`appliance_expects_refused`.
 
 ### actions_board.rb
 
-Doména panela: vloženie samostatnej dosky (`handle_insert_board`) a zápisové cesty jej karty (polia · materiál · ABS hrana · olep všetkých 4 · orientácia). Kontrakt karty je
-v odseku „UI-C1c (orientácia dosky v paneli)" a vo „Vkladacej karte". **Dve úrovne identity so zámerne rôznou hlasnosťou** (R-02): identitu **dokumentu** overuje spoločná brána
-`guarded_board` cez `foreign_document?` **nahlas** (zápis do cudzej zákazky by sa našiel až v objednávke), zatiaľ čo echo `board_id`, výber bez dosky a „v Inspectore vyhrala
-skrinka" sa ďalej zahadzujú **ticho** (len log) — používateľ už medzitým robí niečo iné a hláška by ho mýlila. `handle_insert_board` má guard vlastný.
+Doména panela: vloženie a kreslenie samostatnej dosky a zápisové cesty jej karty (polia · materiál · ABS hrana · olep všetkých 4 · orientácia). **Dve úrovne identity
+so zámerne rôznou hlasnosťou:** dokument overuje spoločná brána **`guarded_board`** cez `foreign_document?` **nahlas**; echo `board_id`, výber bez dosky a „v Inspectore
+vyhrala skrinka" sa zahadzujú **ticho** (log).
 
-**GHOST-D1: „Vložiť dosku" už NEVKLADÁ.** Synchrónna cesta cez `BoardBuilder.build` (`Placement.next_x`) tu zanikla — callback pripraví **zmrazený `BoardPlan`** a zavesí ghost na
-kurzor; doska vznikne až **klikom** (`GhostTool` → `BoardBuilder.commit_insert`). **Poradie je súčasťou kontraktu:** `foreign_document?` ako **úplne prvý** krok (oneskorený CEF
-callback zo starého Inspectora nesmie pripraviť plán nad novým modelom) → šablónový ref + **downgrade brána** (`newer_template_refusal` nad **uloženým RAW záznamom**, nie nad
-payloadom z CEF — v ňom marker nemusí byť; doskový záznam sa posudzuje proti `BoardBuilder::BOARD_CONFIG_SCHEMA`) → `prepare_insert` → session so `subject: :board` a orientáciou
-**z karty**. Vyššia schéma šablóny = odmietnutie **bez session a bez pečiatky**. Po úspešnom commite beží `ghost_after_commit_board` (výber, status s umiestnením,
-`push_selected`, `stamp_once!`).
-
-**GHOST-D2: „Nakresliť" je SAMOSTATNÝ serverom whitelistovaný callback `draw_board`.** `insert_board` (D1) ostáva pre vloženie **aj pre dvojklik doskovej šablóny** — HTML `disabled`
-ani názov tlačidla nie sú ochrana, preto má kreslenie vlastnú cestu. **Poradie je súčasťou kontraktu:** `foreign_document?` ako **úplne prvý** krok (oneskorený CEF callback zo starého
-Inspectora nesmie pripraviť `BoardPlan` nad novým modelom) → šablónový ref + downgrade brána nad **uloženým RAW** záznamom → **zámky fáz** → `prepare_insert` → session
-s `interaction: :drawing`. **Zámky** prídu ako **samostatné pole `locks`** = číselný snapshot `locksFlat('board')`; Ruby ich whitelistuje (`GhostTool::Calc.draw_locks`: len
-`length`/`width`, hodnota **Numeric**, mm Float validovaná proti `BoardBuilder::LIMITS`) **už pri štarte** — mimo limitu alebo nečíslo znamená, že sa session **vôbec nespustí**
-(status povie prečo). Zámky žijú len v session a do výrobného configu sa nikdy nedostanú; whitelist parametrov karty (`BOARD_INSERT_PARAM_KEYS`) je **jeden pre obe** vkladacie
-cesty, aby sa nemohli rozísť, a `locks` v ňom **nie sú**. Po úspešnom commite hlási `ghost_after_commit_board` pri kreslení aj **rozmery** (používateľ ich nikde nenapísal —
-vznikli z ťahov). Kontrakt fáz, geometrie a klávesov: [construction.md § ghost_tool.rb](construction.md).
-
-**Karta Dosky má DVE akcie v JEDNOM riadku** (rozhodnuté 5.9.2026, bez samostatného mockupu — vertikálny priestor panela nerastie): **„Vložiť dosku"** (D1 ghost) a **„Nakresliť"**
-(D2). Pri korpuse je „Nakresliť" skryté (`body:not([data-insert-kind="board"])`), pri doske sa riadok prepne na `display: flex` a obe tlačidlá si delia šírku. Obe idú **tou istou**
-validovanou cestou payloadu (`buildInsertBoardPayload`), kreslenie ju len rozšíri o `locks` (`buildDrawBoardPayload` — prijme **len konečné čísla**, takže súkromný tvar
-`{locked, value}`, Boolean ani text sa do Ruby nedostanú). Testy: `tests/js/test_ghost_d2_karta.js`.
-
-**Brána schémy stojí vo VSTUPNEJ bráne karty `guarded_board`, nie až pri prestavbe (Codex #298 P2).** Cesty karty totiž pred rebuildom menia **globálny katalóg** —
-`handle_set_board_material` cez `resolve_virtual_material` → `ensure_duplak_for` a cez `ensure_missing_abs` (to isté robí „olep všetkých 4"), a to sa už **nedá vrátiť**. Guard
-preto beží hneď za identitou dokumentu, kontextom a echom `board_id`: doska z novšej verzie odmietne **každú** zápisovú cestu karty (polia · materiál · ABS hrana · olep všetkých
-4 · orientácia) **ešte pred prvým zápisom kamkoľvek**, a to **nahlas** (rovnako ako guard dokumentu — zmena sa neuložila a používateľ to musí vedieť).
-
-**Karta je pritom READ-ONLY, nie „padá na hlášky" (STANDARD 8.3 bod 3).** `Panel.board_payload` primieša cez `board_newer_flag` aditívne **`newer_config` + `newer_config_note`**
-(text je **serverový** — klient si stav ani znenie neodvodzuje) a `applyBoardReadOnly` v `board_card.js` zamkne **všetky** ovládače karty (`disabled`, nie len `readOnly` — pri
-selectoch a tlačidlách je to jediný spôsob, ako ich naozaj umlčať) a ukáže upozornenie `#bcNewer` (tokeny `--nx-warn*`, bez emoji; riadok existuje **len** v tomto stave, takže
-bežná karta nerastie). Zámok beží **až na konci** `renderBoardCard`, aby prebil aj to, čo karta vyššie odomkla (hrúbka UNI dosky, comboboxy hrán, odkaz na dekor).
-Testy: `tests/js/test_ghost_d1_karta.js`.
+- **Brána schémy stojí vo vstupnej bráne `guarded_board`** (hneď za dokumentom, kontextom a echom `board_id`) — cesty karty pred rebuildom menia globálny katalóg
+  (`resolve_virtual_material` → `ensure_duplak_for`, `ensure_missing_abs`), čo sa nedá vrátiť; doska z novšej verzie odmietne **každú** zápisovú cestu nahlas.
+  **Karta je vtedy read-only:** `Panel.board_payload` primieša `board_newer_flag` (`newer_config` + serverová `newer_config_note`) a `applyBoardReadOnly`
+  (`board_card.js`, na konci `renderBoardCard`) zamkne všetky ovládače (`disabled`) a ukáže `#bcNewer`. Testy `tests/js/test_ghost_d1_karta.js`.
+- **„Vložiť dosku" nevkladá hneď:** `handle_insert_board` pripraví zmrazený `BoardPlan` a zavesí ghost; doska vznikne klikom (`GhostTool` →
+  `BoardBuilder.commit_insert`). **Poradie:** `foreign_document?` úplne prvý → šablónový ref + **downgrade brána** `newer_template_refusal` nad **uloženým RAW
+  záznamom** (proti `BoardBuilder::BOARD_CONFIG_SCHEMA`) → `prepare_insert` → session `subject: :board` s orientáciou z karty. Vyššia schéma = odmietnutie bez
+  session a pečiatky. Po commite `ghost_after_commit_board` (výber, status s umiestnením, `push_selected`, `stamp_once!`).
+- **„Nakresliť" = samostatný callback `draw_board`** (whitelistovaný serverom; `insert_board` ostáva pre vloženie a dvojklik doskovej šablóny). Poradie: dokument →
+  šablónový ref + downgrade brána → **zámky fáz** → `prepare_insert` → session `interaction: :drawing`. Zámky = pole `locks` (snapshot `locksFlat('board')`),
+  whitelist `GhostTool::Calc.draw_locks` (len `length`/`width`, Numeric, v `BoardBuilder::LIMITS`) **pri štarte** — inak sa session nespustí. Zámky žijú len v
+  session; whitelist parametrov karty `BOARD_INSERT_PARAM_KEYS` je jeden pre obe cesty a `locks` v ňom nie sú. Po commite hlási aj vzniknuté rozmery. Kontrakt fáz:
+  [construction.md § ghost_tool.rb](construction.md).
+- Karta má **dve akcie v jednom riadku** „Vložiť dosku" · „Nakresliť" (pri korpuse je „Nakresliť" skryté `body:not([data-insert-kind="board"])`); obe idú cestou
+  `buildInsertBoardPayload`, kreslenie pridá `locks` (`buildDrawBoardPayload` prijme len konečné čísla). Testy `tests/js/test_ghost_d2_karta.js`.
 
 ### actions_cabinet.rb
 
-**MR-1B2:** `handle_insert_copy` prenáša overenú zdrojovú skrinku samostatným `appearance_source:` do buildera. Kópia zachová živé materiály pôvodných
-dielcov a ABS, pričom má vlastnú identitu a definíciu. Vzhľadový zdroj sa nikdy nepridáva do params/configu ani klientského payloadu.
+Doména panela: vloženie skrinky (`handle_insert`, `handle_insert_copy`), premenovanie (`handle_rename_cabinet`), zápisy konštrukcie a čiel (`handle_apply`,
+`handle_apply_fronts`, `handle_apply_all` = auto-apply), čítací preflight čiel (`handle_front_preflight`), prepínač strany rohovej (`handle_corner_side`), prevesenie
+ghostu (`handle_ghost_corner_side`) a hromadná prestavba zastaraných chrbtov (`back_rebuild_stale` z Kontroly — plán a texty `ProductionCore.back_stale_*`, zápis
+`rebuild_many` = jedna operácia, výber skriniek až po `ScaleWatch.flush_pending!`). Materiálové preflighty (D-45: telo → chrbát → remap ABS) a zámky vkladacej karty:
+odseky „Kontext Korpus" a „Vkladacia karta". **Poradie guardov: identita dokumentu PRVÁ**, až potom echo `cabinet_id`.
 
-Doména panela: vloženie skrinky (`handle_insert`, `handle_insert_copy`), premenovanie (`handle_rename_cabinet`, D-100) a zápisy konštrukcie/čiel (`handle_apply`,
-`handle_apply_fronts`, `handle_apply_all` = auto-apply). Materiálové preflighty (D-45: telo → chrbát → remap ABS) a zámky vkladacej karty (D-39) sú v odsekoch „Obsah Korpusu"
-a „Vkladacia karta". **Poradie guardov (R-02): identita dokumentu PRVÁ**, až potom echo `cabinet_id` — `CAB-001` je v každej zákazke, takže echo prepnutý dokument nerozozná.
-**D-143 (KON-0): `back_rebuild_stale`** — hromadná prestavba skriniek so zastaraným chrbtom v drážke z Kontroly Štúdia (tok a guardy v sekcii KONTROLA nižšie; plán
-a texty sú čisté funkcie `ProductionCore.back_stale_*`, zápis `rebuild_many` = jedna operácia, výber zastaraných skriniek až po `ScaleWatch.flush_pending!`).
-
-**ROH-A1 · K3 — ochrany ROHOVEJ na serveri.** `PARAM_KEYS` pozná `corner_side`/`corner_door_w`/`corner_cr1`/`corner_cr2`; od **ROH-B1** JS posiela dverovú
-časť a CR **len pri rohovej** (`only` v `CONSTRUCTION_FIELDS` — pri inom type ani kľúč, krížový audit C6), stranu **nikdy**; `handle_apply` kopíruje len prítomné kľúče.
-**`corner_change_refusal(params, data)`** — zmena **typu** z/na rohovú a zmena **strany** existujúcej rohovej (normalizovanej) sa odmietne vetou `CORNER_TYPE_MSG` /
-`CORNER_SIDE_MSG` („Stranu dverí zmeň prepínačom v riadku rohovej.") **pred** prepisom params (0 krokov Späť, resync panela); volá ju `handle_apply` aj
-`handle_apply_all`, tú istú vetu vracia šablóna inej strany na existujúcu rohovú (`templates_dialog.rb`).
-
-**ROH-B1 — PREPÍNAČ STRANY `handle_corner_side` (callback `corner_side`, jediná cesta, ktorá stranu mení).** Poradie guardov: identita dokumentu (R-02) →
-označená skrinka s **povinným** echom `cabinet_id` (`corner_side_target`) → **bariéra observera** `ScaleWatch.flush_pending!` **pred čítaním východiskového configu**
-(audit B1 FIX 3 — oneskorená absorpcia Scale by sa prilepila k tejto operácii; neúspech = odmietnutie `CORNER_SIDE_BUSY_MSG`) → **po bariére znova** dokument a cieľ →
-typ rohová → platná strana. Rovnaká strana = nič (žiadny prázdny krok Späť). Zmena = **jedna** operácia `CabinetBuilder.rebuild(..., op_name: CORNER_SIDE_OP)` nad
-`CabinetBuilder.corner_mirror_params` ([construction.md](construction.md) — zrkadlo čiel a ručných hrán podľa osí) = **jeden krok Späť**; výnimka stavby operáciu
-zruší (`abort_safely`) a panel dostane resync. **Korelovaná odpoveď** (audit B1 FIX 1): payload nesie `switch_token`, server v `ensure` **každej** vetvy (aj tiché
-zahodenie a výnimka) pošle `NX.cornerSideResult({model_guid, cabinet_id, switch_token, ok})` **až po** pushi stavu. **`corner_fronts_refusal(params, incoming)`** — čelá rohovej musia ostať jeden riadok `door`/`auto`/jedno krídlo
-(`CabinetBuilder.corner_fronts_ok?`) a medzera pri rohu 1–20 (`corner_gap_ok?` — `gap_right` pri dverách vľavo, `gap_left` vpravo); `handle_apply_fronts`
-a `handle_apply_all` (vzor `slot_fronts_refusal`). Smer, úchytkový profil, medzery v rozsahu, materiál a kovanie povolené ostávajú. **Vloženie zo šablóny
-(audit A1 FIX 3):** `apply_template_slot_fields!` číta zo **záznamu** šablóny okrem polí slotu aj typ a polia rohovej (payload má prednosť, dopĺňa sa chýbajúce)
-a **`corner_template_refusal(tpl_ref)`** odmietne rohovú šablónu s porušeným invariantom čiel ešte **pred** ghostom (nie ticho oreže). **Preflight čiel (audit A1
-NOTE 5):** `front_preflight_result(data, stored)` počíta otvor pre **každý typ** cez `Construction.front_opening` (`preflight_opening_cfg`); pri rohovej so **stranou
-z uloženého configu** označenej skrinky (`handle_front_preflight` ho pošle), od **ROH-B1** s **dverovou časťou zo živého formulára** (`preflight_door_w` — konečné
-číslo v `CORNER_RANGES`, inak uložená; audit B1 NOTE 6) a so živou šírkou — pri dverách vpravo `x0 = W − D`. Odpoveď rohovej nesie navyše **`corner_ctx`
-`{th2, t}`** (`corner_preflight_ctx`, audit B1 FIX 4): pri označenej th2 z uloženého configu a t zo živého poľa, pri **vkladaní** hrúbku tak, ako ju upraví sám vklad
-(`insert_thickness_preflight` — prevzatie z materiálu tela, zámok) a th2 z čelového materiálu návrhu (`material_id`/`front_material_id` šablóny v dotaze);
-ostatné typy dostanú tie isté čísla ako predtým bez `opening`. **ROH-A2:** otvor ide aj do **odpovede** (`opening` `{x0, w, z0, h}` cez `opening_json`, pre každý typ
-vrátane slotu) a zapisuje sa do nej hneď po výpočte, takže ho nesie aj odmietnutie (medzera pri rohu mimo rozsahu); keď výnimka padne skôr (rozmer mimo rozsahu),
-kľúč chýba a panel drží posledný známy. Pri **vkladaní** (bez uloženého configu) berie `corner_preflight_src` stranu a dverovú časť z payloadu — panel ich posiela
-z predvolieb typu alebo zo šablóny. JS kresba z otvoru: odsek „Náhľad" vyššie. `TEMPLATE_TYPE_WORDS` pozná „rohová".
-**ROH-B2:** `handle_front_preflight` pridá rohovej aj **`corner_preview`** (kresba zostavy, odsek payloads.rb) — len keď preflight rozmery prijal (je `opening`)
-a sú účinné hrúbky (`corner_ctx`). Vstup skladá čistá `corner_preview_params(data, stored, corner, ctx)`: uložený config označenej (strana, materiály, overridy)
-alebo payload karty pri vkladaní + živé rozmery, hrúbka korpusu z `ctx['t']`, dverová časť, CR 1 a CR 2 cez **`preflight_corner_mm`** (tá istá funkcia ako otvor —
-`preflight_door_w` je jej obal: živé pole v rozsahu, inak zdroj — uložená hodnota označenej skrinky, pri **vkladaní** hodnota **orezaná do rozsahu** tým istým
-`CabinetBuilder.norm_corner_mm` ako stavba; predrecenzia P3-1: surová 900 by posunula otvor dverí inam než kresbu, ktorú oreže `normalize`) a živý strop
-(`CORNER_PREVIEW_LIVE_KEYS`). Otvor dverí aj kresba zostavy tak stoja **vždy na tom istom čísle**.
-**ROH-B2 — prevesenie ghostu klávesom strany (`handle_ghost_corner_side`, callback `ghost_corner_side`).** Poradie: identita dokumentu (R-02) → živá session
-**rohovej** v tomto dokumente → **`handle_insert(payload, keep_point: true)`** (tá istá cesta ako „Vložiť" — všetky preflighty, zmrazený plán; nová session prevezme
-polohu starej) → keď nová session nevznikla, **stará sa zruší** (karta už ukazuje novú stranu a ghost so starou by vložil inú skrinku) a status to povie. Nič
-nezapisuje (0 krokov Späť). `handle_insert` pri rohovej hlási stranu a klávesu D.
+- **Kópia** (`handle_insert_copy`) prenáša overenú zdrojovú skrinku samostatným `appearance_source:` do buildera (zachová živé materiály a ABS, vlastná identita
+  a definícia); vzhľadový zdroj sa nikdy nepridáva do params/configu ani payloadu. Ruší bežiacu ghost session hneď na začiatku.
+- **Rohová na serveri:** `PARAM_KEYS` pozná `corner_side`/`corner_door_w`/`corner_cr1`/`corner_cr2`; JS posiela dverovú časť a CR len pri rohovej (`only`
+  v `CONSTRUCTION_FIELDS`), stranu **nikdy**; `handle_apply` kopíruje len prítomné kľúče. **`corner_change_refusal(params, data)`** odmietne zmenu typu z/na rohovú a
+  zmenu strany (`CORNER_TYPE_MSG` / `CORNER_SIDE_MSG`) pred prepisom params (0 krokov Späť, resync) — v `handle_apply` aj `handle_apply_all` a pri šablóne inej strany.
+  **`corner_fronts_refusal(params, incoming)`**: čelá rohovej = jeden riadok `door`/`auto`/jedno krídlo (`CabinetBuilder.corner_fronts_ok?`) a medzera pri rohu 1–20
+  (`corner_gap_ok?`). **`corner_template_refusal(tpl_ref)`** odmietne rohovú šablónu s porušeným invariantom čiel pred ghostom.
+- **`handle_corner_side`** (callback `corner_side`, jediná cesta, ktorá stranu mení): dokument → označená skrinka s povinným echom `cabinet_id`
+  (`corner_side_target`) → **bariéra observera** `ScaleWatch.flush_pending!` pred čítaním configu (neúspech = `CORNER_SIDE_BUSY_MSG`) → po bariére znova dokument
+  a cieľ → typ rohová → platná strana. Rovnaká strana = nič; zmena = jedna operácia `CabinetBuilder.rebuild(..., op_name: CORNER_SIDE_OP)` nad
+  `CabinetBuilder.corner_mirror_params` ([construction.md](construction.md)); výnimka = `abort_safely` + resync. **Korelovaná odpoveď:** server v `ensure` každej
+  vetvy pošle `NX.cornerSideResult({model_guid, cabinet_id, switch_token, ok})` až po pushi stavu.
+- **Preflight čiel** (`front_preflight_result(data, stored)`): otvor pre každý typ cez `Construction.front_opening` (`preflight_opening_cfg`) — pri rohovej strana
+  z uloženého configu, dverová časť zo živého formulára (`preflight_door_w` / `preflight_corner_mm`: živé pole v `CORNER_RANGES`, inak uložená; pri vkladaní
+  orezaná `CabinetBuilder.norm_corner_mm`) a živá šírka. Odpoveď nesie `opening` (cez `opening_json`, zapísaný hneď po výpočte — nesie ho aj odmietnutie), pri
+  rohovej **`corner_ctx` `{th2, t}`** (`corner_preflight_ctx`; pri vkladaní hrúbka tak, ako ju upraví vklad) a **`corner_preview`** (len keď je `opening`
+  a `corner_ctx`; vstup `corner_preview_params`, živý strop `CORNER_PREVIEW_LIVE_KEYS`). Pri vkladaní berie `corner_preflight_src` stranu a dverovú časť z payloadu.
+  `TEMPLATE_TYPE_WORDS` pozná „rohová".
+- **`handle_ghost_corner_side`** (callback `ghost_corner_side`): dokument → živá session rohovej v tomto dokumente → `handle_insert(payload, keep_point: true)`
+  (tá istá cesta ako „Vložiť") → keď nová session nevznikla, stará sa zruší. Nič nezapisuje.
 
 #### Vloženie skrinky = ghost na kurzore (GHOST V1-04)
 
-**„Vložiť" už NEVKLADÁ.** `handle_insert` pripraví **zmrazený plán** (R-03 `CabinetBuilder.prepare_insert`) a zavesí ghost skrinky na kurzor; skrinka vznikne až **klikom
-v modeli**. **Poradie je súčasťou kontraktu:** doc guard (R-02) → šablónový ref → kovanie šablóny (`take_insert_hardware!`) → D-45/D-76 preflighty → materiál →
-`prepare_insert` → zrušenie prípadnej **starej** session → nová session + `push_tool` + status. **Preflighty bežia PRÁVE RAZ a Tool ich NEOPAKUJE** (Tool rieši polohu,
-nie výrobné pravidlá).
+**„Vložiť" nevkladá hneď:** `handle_insert` pripraví **zmrazený plán** (`CabinetBuilder.prepare_insert`) a zavesí ghost skrinky na kurzor; skrinka vznikne až klikom.
+**Poradie je kontrakt:** guard dokumentu → šablónový ref → kovanie šablóny (`take_insert_hardware!`) → preflighty D-45/D-76 → materiál → `prepare_insert` → zrušenie
+starej session → nová session + `push_tool` + status. **Preflighty bežia práve raz a Tool ich neopakuje.** Druhou obranou je guard v `commit_insert` (plán z iného
+dokumentu odmietne). Poznámku preflightov vypisuje až `ghost_after_commit`.
 
-Panel má voči `GhostTool` presne tri švy **vkladu** (`actions_cabinet.rb`; štvrtý — Ghost pásik — je informačný a je popísaný nižšie): **`ghost_freeze_hardware`** (sprievodný blok H2 vnútri operácie vloženia — výnimka ruší celú operáciu),
-**`ghost_insert_failed`** (commit padol na guardoch stavby — v modeli sa nič nezmenilo, hláška je tá istá vrátane výpisu aktívnych zámkov) a **`ghost_after_commit`**
-(výber novej CAB, status s varovaniami, `push_selected`, pečiatka šablóny cez `stamp_once!`) — všetko **existujúcimi cestami**, žiadny nový selection mechanizmus.
-**Ghost pásik (GHOST-FB4)** je štvrtý šev a **jediná** vec, ktorú Inspector počas ghostu ukazuje navyše: jeden riadok so **stavom bežiacej session** —
-piktogram štyroch kotiev s aktívnou, otočenie v stupňoch, režim výšky, **editovateľné pole zamknutej výšky v mm** a „i" ikona (sprite `#i-info`) s tooltipom ovládania.
-**Pozícia je zámerne mimo sektorov** (fix v0.8.25 z Michalovho živého testu): pásik stojí **samostatne medzi sektorom Náhľad a Základné**, teda mimo každého `<details>`
-aj mimo každého kontextovo skrývaného rodiča. Pôvodne bol vnútri sektora Materiály (pod „Vložiť korpus") a pri vložení **dvojklikom na šablónu** ho zbalený sektor
-schoval — používateľ o bežiacej session vedel len zo statusu. Odteraz je jediným vlastníkom jeho viditeľnosti **vlastný atribút `hidden`**; guard test
-(`tests/pure/test_ghost_vkladanie.rb`) stráži, že sa do žiadneho `<details>` nevráti.
-Kreslí ho `ui/js/ghost_bar.js` z pushu `Panel.push_ghost` → `NX.setGhost`; **panel si z neho nič neodvodzuje** — každý push stav celý prepíše. Pásik **nie je trvalou
-súčasťou panela** (vertikálny priestor je vzácny): štartuje `hidden` a `active = false` ho schová, čo chodí pri **každom** konci session (vloženie, Esc, prepnutie dokumentu,
-zavretie Inspectora). Pole výšky ide späť `cb 'ghost_lock_z'` → `handle_ghost_lock_z`: **guard identity dokumentu je prvý** (R-02, `nxDocPayload` + `foreign_document?` —
-hoci sa nezapisuje do modelu, mení stav session a panel inej zákazky do nej siahať nesmie), validácia beží **na oboch stranách rovnako** (mm Float, 0–3000) a **neplatný
-vstup nič nemení** — pole sa vráti na poslednú platnú hodnotu a status povie prečo. Ostatné položky pásika sú informačné (jediná cesta ich zmeny sú klávesy v modeli).
-Kontrakt pamäte nastavení a zamknutej výšky: [construction.md § ghost_tool.rb](construction.md).
+**Švy panela voči `GhostTool`:** `ghost_freeze_hardware` (sprievodný blok vnútri operácie vloženia — výnimka ruší celú operáciu) · `ghost_insert_failed` (commit padol
+na guardoch stavby, model nezmenený) · `ghost_after_commit` (výber novej CAB, status s varovaniami, `push_selected`, `stamp_once!`) · **Ghost pásik** (informačný).
 
-**Pásik pre DOSKU (GHOST-D1).** Push nesie navyše `subject` + `interaction` + `orientation` (+ popisok). Pri `subject: 'board'` sa **skryjú kabinetové ovládače výšky**
-(`gbMode`, `gbLockWrap`) a na ich mieste — **v tom istom riadku**, pásik nesmie narásť o riadok — stojí **umiestnenie** (`gbOri`); nápoveda „i" je dosková (↑/↓ menia
-umiestnenie, o zámku výšky ani slovo). Push **bez** `subject` (staršie payloady) sa naďalej správa ako skrinka. **`ghost_lock_z` sa pre dosku z JS nikdy neposiela** a server ho
-navyše odmieta kontrolou **subjektu session** (`unless s.cabinet?`) — HTML `disabled` ani skrytý ovládač nie sú ochrana. **Synchronizácia s kartou Dosky:** po ↑/↓ v modeli
-klient prestaví `NXInsert.boardOrientation` a prekreslí zrkadlo segmentov — **žiadna materializácia ani reset karty**, takže rozpísané rozmery, materiál aj šablóna prežijú
-a *ďalšia* session štartuje z tejto hodnoty. Testy: `tests/js/test_ghost_d1_pasik.js`.
+**Ghost pásik** (`ui/js/ghost_bar.js`, push `Panel.push_ghost` → `NX.setGhost`; každý push stav celý prepíše): jeden riadok **samostatne medzi sektorom Náhľad
+a Základné** — mimo každého `<details>` aj kontextovo skrývaného rodiča; viditeľnosť má jediného vlastníka, atribút `hidden` (guard
+`tests/pure/test_ghost_vkladanie.rb`). Štartuje `hidden`, `active = false` ho schová pri každom konci session.
+- **Skrinka:** piktogram štyroch kotiev, otočenie, režim výšky, **editovateľné pole zamknutej výšky** (→ `ghost_lock_z` → `handle_ghost_lock_z`: guard dokumentu prvý,
+  validácia mm Float 0–3000 na oboch stranách, neplatný vstup nič nemení) a „i" (`#i-info`). Segment **nôh** `gbLegs` (`legs_short` + `legs_tone`, len pre
+  subjekt `cabinet`, `'none'` sa neposiela; text skladá server `HardwareSets.legs_summary` cez `Panel.legs_preview_summary` s definíciami setov zo session
+  `s.hardware['defs']`). Hodnota sa počíta **lenivo raz za session** (`PlacementSession#legs_summary`, sentinel `:unset`) a memo zhadzuje
+  `GhostTool.invalidate_legs_summary!` z hookov `Panel.push_hardware_sets` a `RulesDialog.after_model_write`. Segment **strany dverí** `gbCorner` pri rohovej
+  (`corner_side` + `corner_label`).
+- **Doska** (`subject: 'board'`): kabinetové ovládače výšky (`gbMode`, `gbLockWrap`) skryté, v tom istom riadku **umiestnenie** `gbOri`; `ghost_lock_z` sa pre dosku
+  neposiela a server ho odmieta (`unless s.cabinet?`). Po ↑/↓ v modeli klient prestaví `NXInsert.boardOrientation` bez resetu karty.
+- **Kreslenie** (`interaction: 'drawing'`): namiesto kotiev fáza s hodnotou `gbPhase` (`phase` · `phase_label` · `phase_value` · `phase_locked`; neznáma hodnota „—").
+- Push bez `subject`/`interaction` sa správa ako umiestňovanie skrinky. Pásik nikdy nenarastie o riadok. Testy `tests/js/test_ghost_d1_pasik.js`,
+  `tests/js/test_ghost_d2_pasik.js`, `tests/js/test_kovg2_nohy_ui.js`, `tests/pure/test_kovg2_nohy_ui.rb`.
 
-**Pásik pri KRESLENÍ (GHOST-D2).** Push nesie navyše `phase` · `phase_label` · `phase_value` · `phase_locked`. Pri `interaction: 'drawing'` sa **skryje piktogram kotiev**
-(`gbAnchor` — počiatok je pevná kotva `fl_bottom` a ALT význam nemá) a na jeho mieste stojí **fáza s hodnotou** (`gbPhase`: „Počiatok" · „Dĺžka 2400 mm" · „Šírka 600 mm";
-zamknutá fáza to prizná — ťah sa preskočí, neznáma hodnota ukáže „—", nie klamlivú nulu). Pásik **nerastie o riadok** — mení sa len obsah toho istého. Nápoveda „i" je pre
-kreslenie vlastná (počiatok, ťahy, meracie pole, Shift; o ALT ani o zámku výšky ani slovo) a `ghost_lock_z` sa neposiela ani odtiaľto. Starší push bez `interaction` sa naďalej
-správa ako umiestňovanie. Testy: `tests/js/test_ghost_d2_pasik.js`.
+**Zmeny vo vkladacej karte sa do bežiacej session nepremietajú** (snapshot je zmrazený, status to prizná); druhé „Vložiť" starú session zruší a založí novú —
+výnimkou je kláves strany rohovej. **Konce životného cyklu session** (všetky = 0 mutácií, 0 krokov Späť): druhé „Vložiť" · zavretie Inspectora (`set_on_closed`) ·
+File > New / Open (`PanelAppObserver`, bezpodmienečne) · aktivácia iného dokumentu (`Panel.on_model_switched`) · `onCancel` · `deactivate` (prepnutie nástroja) ·
+`handle_insert_copy`; nová doskovú session ukončí starú cez `GhostTool.start`. Kontrakt nástroja: [construction.md § ghost_tool.rb](construction.md).
 
-**Segment NÔH v pásiku (KOV-G2, D-111).** Push nesie **aditívne** `legs_short` + `legs_tone` a pásik z nich kreslí segment `gbLegs` (pred nápovedou „i", **v tom istom riadku** —
-pásik nesmie narásť). Kľúče chodia **len pre subjekt `cabinet`**: `GhostTool.legs_summary_for(s)` sa pýta `s.cabinet?` a hodnotu `'none'` (horná skrinka, sokel 0) neposiela vôbec,
-takže doska ani kreslenie segment nikdy nedostanú. Starší push kľúč nenesie → segment sa **nekreslí** (rovnaký fallback ako `orientation_label`); klient si text **neskracuje ani
-neodvodzuje** — skladá ho server (`HardwareSets.legs_summary`, [hardware.md](hardware.md)) a `legs_tone: 'warn'` ho len zafarbí. Hodnota sa počíta **lenivo a RAZ za session**
-(`PlacementSession#legs_summary`, sentinel `:unset`): plán je zmrazený, kým `push_state` beží pri každej šípke, ALT-e aj zmene zámku výšky — a každý beh by inak siahol na
-pravidlá, sety aj katalóg. Výpočet ide cez `Panel.legs_preview_summary` (nižšie) a **definície setov zo šablóny podáva session sama** (`s.hardware['defs']` — zmrazia sa až
-v commite, Codex #339 N1), takže pásik a vkladacia karta hovoria to isté.
-
-**Memo NIE JE navždy (Codex #339 kolo 1 N5).** Zmrazený je **plán**, nie projekt: sety, mapovanie, pravidlá aj katalóg sa dajú v súbežne otvorenom Štúdiu zmeniť **práve počas**
-session — a platia pre `build_into` pri kliku, takže pásik by tesne pred ním sľúbil jeden set nôh a skrinka by vznikla s iným. Memo preto zhadzuje `GhostTool.invalidate_legs_summary!`
-z **tých istých hookov, ktoré o zmene už dnes hovoria panelu**: `Panel.push_hardware_sets` (sety, mapovanie, katalóg — obe satelitné cesty končia v ňom) a
-`RulesDialog.after_model_write` (pravidlá; **až za** operáciou prestavby). Odtlačok stavu sa zámerne **nepočíta pri každom pushi** — pásik sa prekresľuje pri každej šípke a digest
-katalógu je drahší než celý dôvod existencie mema. Zneplatnenie iba zahodí sentinel a hneď pošle `push_state`; hodnotu zloží až on. Testy: `tests/js/test_kovg2_nohy_ui.js`,
-`tests/pure/test_kovg2_nohy_ui.rb` (sekcia 10).
-
-**Segment STRANY DVERÍ (ROH-B2, O12).** Push ghostu **rohovej** nesie aditívne `corner_side` + `corner_label` („dvere vľavo") zo zmrazeného plánu a pásik
-z nich kreslí segment `gbCorner` v tom istom riadku (doska, kreslenie, iný typ ani starší push ho nedostanú); nápoveda „i" pozná klávesu D. Po klávese D sa
-session **nemení na mieste** — ghost sa prevesí na novú session so zrkadleným plánom z karty (`handle_ghost_corner_side`) a push príde od nej.
-
-Zmeny vo vkladacej karte sa do **bežiacej** session NEPREMIETAJÚ (snapshot je zmrazený; status to prizná) a **druhé „Vložiť" starú session zruší** a založí novú s čerstvým
-snapshotom — jedinou výnimkou je kláves strany rohovej (ROH-B2), ktorý kartu prepne a ghost prevesí s prevzatou polohou. **Poznámku preflightov** (D-45 prevzatá hrúbka, materiálové noty) vypisuje **až `ghost_after_commit`** — pri stlačení „Vložiť" sa ešte nič nestalo, takže hlásiť ju
-vtedy by bolo predčasné a po kliku by sa zopakovala druhý raz.
-
-**Konce životného cyklu session** (všetky = 0 mutácií modelu a 0 krokov Späť): druhé „Vložiť" · **zavretie Inspectora** (`set_on_closed`) · **File > New / Open**
-(`PanelAppObserver`, **bezpodmienečne** — pozri nižšie) · **aktivácia iného dokumentu** (`Panel.on_model_switched`, hneď pred guardom `@dialog`) · `onCancel` 0/1/2 ·
-`deactivate` (**prepnutie na iný nástroj chodí TADIALTO, nie cez `onCancel`** — session končí, viewport aj pásik sa vyčistia) · **iný spôsob vloženia**: `handle_insert_copy`
-ruší bežiacu session hneď na začiatku (kladie synchrónne, ghost by už nemal čo dokončiť). **GHOST-D1: `handle_insert_board` už session neruší zvlášť** — zakladá **vlastnú**
-(doskovú) a starú ukončí prvý krok `GhostTool.start` (jeden vlastník session). Inak sa **správanie oboch nemení**. Kontrakt nástroja, kotiev a transformu:
-[construction.md § ghost_tool.rb](construction.md).
-
-**Poradie guardov pri vklade (R-02):** identita **dokumentu** je prvá — pred šablónovým refom, preflightmi aj pred `CabinetBuilder.prepare_insert` (od GHOSTu je príprava plánu
-prvým krokom smerom k modelu; druhou obranou zostáva guard v `commit_insert`, ktorý plán z iného dokumentu odmietne). Auto-apply hlási nezhodu dokumentu **nahlas** (na rozdiel od
-tichého echa výberu): zmena, ktorú používateľ práve napísal, sa neuložila a bez hlášky by to zistil až v objednávke.
+Auto-apply hlási nezhodu dokumentu **nahlas** (na rozdiel od tichého echa výberu).
 
 ### actions_hardware.rb
 
-Doména panela: ručné zásahy do počtov kovania (`handle_set_hardware_override`, D-93 — zápis PO POLIACH `quantity` / `disabled` / `nominal_length` s merge záznamu identity)
-a výber setu na skrinke (`handle_set_hardware_set`, V0.6 D1b, H1b/D-81 aj per-dielec). Pravidlá a sety sú v [hardware.md](hardware.md), UI v odseku „Kontext Kovanie (UI-C4…)".
-Obe cesty overujú identitu **dokumentu** (`foreign_document?`, R-02) **pred** identitou rendrovanej skrinky (`cabinet_id`) a zápis vždy beží ako jeden rebuild = jeden krok Späť.
+Doména panela: ručné zásahy do kovania (`handle_set_hardware_override` — zápis po poliach s merge záznamu identity) a výber setu na skrinke či dielci
+(`handle_set_hardware_set`). Pravidlá a sety: [hardware.md](hardware.md); UI: „Kontext Kovanie". Obe cesty overujú dokument **pred** `cabinet_id` a zápis beží ako
+jeden rebuild = jeden krok Späť.
 
-**RECEPTOVÁ zapisovacia cesta zámkov osí (KOV-D2a Astra #20 F5, tretia os D-128).** `OVERRIDE_FIELDS` má od D-128 **päť** polí (`quantity` · `disabled` · `nominal_length` ·
-`height_variant` · **`box_height`**) a **musí sa zhodovať** s `CabinetBuilder::OVERRIDE_CONTENT_KEYS` (stráži guard test) — inak by panel uložil pole, ktoré normalizácia zahodí.
-Validácia hodnoty sa **rozdvojuje podľa `rule_id`**: projektové pravidlo ide ako dosiaľ cez `series_value?` (rad `fit_series` zo snapshotu), receptová položka
-(`rule_id recipe:<id>`) ide **úzkou serverovou vetvou** `recipe_lock_context` — *vlastník (čelo) → jeho **pripnutý** recept (`Recipes.active_ref` nad uloženými
-`recipe_refs`) → **výsledná výška** → rad tej výšky*. Výslednú výšku hľadá `recipe_result_height` v troch krokoch: **(1)** platný uložený **výškový zámok** (rad NL sa
-berie z výšky, ktorá naozaj platí; zámok v **konflikte** výsledná výška **nie je** — vtedy sa zápis dĺžky odmietne, poradie osí platí aj tu), **(2)** `params.height_variant`
-**emitovanej** položky `source: 'recipe'`, **(3)** **automatická** výška z čerstvého `ctx` (`drawer_axis_contexts` → `pick_height_variant`). Tretí krok je nutný, lebo
-fail-closed zásuvka (napr. NL zámok mimo radu po zmenšenej hĺbke) položku **nevydá** — bez neho server odmietal **vlastný** návrh náhrady NL vetou „najprv zamkni výšku"
-(Codex #312 kolo 1 P2). Svetlé rozmery sa čítajú **tou istou** cestou ako pre payload `axes`, takže ponuka a zápis stoja na jednom výpočte.
-D-93 `series_value?` hľadá výhradne projektové `fit_series`, takže zámok NL zásuvky sa dovtedy z panela uložiť **nedal**. Každý článok reťaze sa číta z **čerstvého
-serverového stavu** (uložený config skrinky), nikdy z payloadu: chip na obrazovke môže byť o generáciu starší než model. `rule_id`, ktorý nesedí s pripnutým receptom,
-sa **odmieta** („položka sa medzitým zmenila"), Quadro výškový zámok odmieta hláškou (systém výškové varianty nemá) a výška mimo `height_variants` receptu tiež.
-**`recipe_box_value` (D-128)** je tretia vetva tej istej reťaze: brány `lock_item?` + `recipe_rule?`, na **Atire odmietnutie** („tento systém má výškové varianty — použi výšku H"),
-tvar hodnoty **strict** (`Float(raw, exception: false)` + `finite?` + `> 0`, takže „Infinity" ani `1e309` neprejdú) a rozsah proti **čerstvému** `ctx` cez `Recipes.box_range`
-(hláška menuje `min–max` aj automat). Neurčiteľný kontext = **odmietnutie**, nikdy odhad („Rozmery zásuvky sa nepodarilo prečítať — výška boxu sa uložiť nedá."). Preto
-`recipe_lock_context` od D-128 číta `drawer_axis_ctx` pre **všetky** systémy, nie len pre Atiru — rozsah boxu stojí na svetlej výške **a** na hrúbke dna. Hodnota sa navyše
-**zaokrúhli na 0,1 mm** (a rozsah sa overuje až potom), aby panel ukazoval presne to, čo je uložené — detail a dôvod v [hardware.md](hardware.md).
-**Odomknutie osi** je `field` + `value: null`: `merge_override` zmaže **jedno** pole a druhý zámok tej istej identity prežije; záznam zaniká až prázdny. Reset **celého**
-záznamu (`reset: true`) ostáva pre `disabled`/`quantity` a pre osirotené zásahy.
-
-**ODPOVEĎ ČAKAJÚCEMU MODÁLU (KOV-D2b, Codex #313 kolo 1 P2-1).** Keď zápis prišiel z potvrdenia náhrady (kostra D-15), payload nesie **`ax_token`** — korelačný kľúč JEDNÉHO
-odoslania. Server ho **nevyrába ani neinterpretuje**, len ho vracia v `NX.hwAxResult(ok, msg, token)`; tvar je uzavretý (`axis_token`: len String/Integer, orezaný na
-`AXIS_TOKEN_MAX` — payload je verejný kanál a do `execute_script` sa nesmie dostať ľubovoľný objekt; vzor `manual_token`, KOV-H2). Odpoveď ide **v každej vetve** handlera
-(`axis_fail` pri odmietnutí, `push_axis_result(tok, true, '')` **až za** `push_selected`, keď je panel prekreslený) — vetva, ktorá skončí len statusom, by nechala okno
-zamknuté navždy. **Bez tokenu sa neposiela nič**: klik na chip žiadne okno nečaká.
-
-**UPGRADE RECEPTU — jedno čelo (KOV-D3a, v0.9.39).** `handle_upgrade_drawer_recipe` mení **presne jeden** záznam mapy `recipe_refs` **presne jedného** čela
-(payload `{cabinet_id, front_id, from, to}`; mapu klient nikdy neposiela — `SERVER_DRAWER_KEYS` platí ďalej, klient posiela len **očakávaný starý ref**). Server overí:
-čelo je klasifikovaná zásuvka · záznam mapy je `:known` a rovná sa `from` (`:missing` ani `:unknown` sa upgradom **neopravujú** — chýbajúci doplní stavba, poškodený je RED
-`drawer_recipe_unknown`) · cieľ je **vydaný** · `Recipes.upgrade?(from, to)` = rovnaký systém aj otváranie a **vyššia** verzia (žiadny downgrade).
-
-**UI A ČÍTACÍ DOPAD (KOV-D3b, v0.9.40).** Panel registruje **dva** callbacky: zápisový `upgrade_drawer_recipe` a **čítací** `drawer_upgrade_impact`. Zápisový odpovedá
-čakajúcemu oknu **v každej vetve** (`push_upgrade_result` → `NX.hwUpgradeResult`, token `up_token` sa číta **pred** prvým návratom — inak by okno ostalo zamknuté navždy;
-sanitizer tokenu je zdieľaný s D2b, `axis_token`), a to **až za** `push_selected`: okno sa smie zavrieť, keď je panel prekreslený. Čítací nespúšťa **žiadnu** operáciu,
-nezapisuje do modelu **nič** a nenechá **žiadny** krok Späť — len postaví cieľ nasucho a vráti čísla (`push_upgrade_impact` → `NX.hwUpgradeImpact`; `ok: false` + `reason`
-pri odmietnutí, vtedy sa potvrdenie neponúkne vôbec).
-
-Dopad skladá **server** a berie ho z **TOHO ISTÉHO** nasucho postaveného stavu, ktorý by sa aj zapísal: `drawer_upgrade_prepare` vracia **aditívne** aj `side` (cieľová položka
-výsuvu, dielce čela z plánu, objednávacie kódy z expanzie), `lock` (už **preadresovaný** záznam zámku) a identitu (`fid`, `owner`, `from`, `to`); zápisová cesta číta naďalej
-len `params` a `recipe`. Dielce sú kľúčované **`part_key`, nie rolou** (Codex #315 kolo 1 P2): Quadro vydáva `box_side` **dvakrát** (vľavo a vpravo) s tou istou rolou, takže
-mapa kľúčovaná rolou by jeden dielec prepísala a tabuľka by mala 4 riadky namiesto 5; `part_key` je zároveň stabilná identita naprieč verziami, takže sa obe strany porovnania
-párujú správne. Výšku emituje `drawer_upgrade_height`: Atira nesie **výškový variant** (`height_variant`, „H144"), Quadro ho **nemá vôbec** a nesie výšku boxu v mm
-(`box_height`) — presne ako riadok zhrnutia karty. Ktoré pole platí, hovorí server cez `kind` (`variant` / `box`) a JS podľa neho volí popisok aj jednotku; bez toho by
-Quadro ukázalo „Výška — → —" a zmenu výšky boxu **zamlčalo**. **Terajšiu** stranu stavia **ten istý** helper `drawer_dry_plan` nad **nezmenenými** parametrami skrinky — dve rôzne cesty by ukázali rozdiel, ktorý
-v skutočnosti spôsobil len iný spôsob výpočtu. Preto ani preflight, ani kit nemajú druhú implementáciu: `drawer_upgrade_preflight` vracia `[chyba, side]` a
-`drawer_upgrade_kit_problem` `[chyba, kódy]` — tá istá expanzia, ktorá rozhoduje o prijatí, dáva aj kódy do tabuľky.
-
-**PREČO PREFLIGHT, A NIE ROLLBACK (Astra #20 B3).** Konflikt receptu **nie je výnimka**: `build_plan` ho vráti ako dáta (`plan[:drawer_conflicts]`), `merge_final` ho uloží
-do configu a `rebuild` operáciu normálne **commitne** — zápis by teda „uspel" a zásuvka by ostala bez dielcov na novej verzii. Preto `drawer_upgrade_prepare` postaví cieľový
-stav **nasucho** a až potom sa čokoľvek zapíše. Preflight beží **tými istými funkciami ako stavba** (`CabinetBuilder.normalize` → `drawer_thicknesses` → `Construction.build_plan`
-→ `Recipes.resolve`) a **tou istou expanziou ako nákup** (`HardwareSets.expand` nad snapshotom projektu, inak globálnou knižnicou len na čítanie — vzor
-`ProductionCore.hardware_expansion`); žiadny druhý výpočet, takže ponuka a zápis sa nemôžu rozísť. Odmietne: nesediacu hrúbku, neplatný zámok po preadresovaní, `no_fit`,
-prekážku aj **chýbajúci kit** k výslednej výške/NL. Odmietnutie = **nezapíše sa nič**: v modeli ostáva stará verzia, pôvodné zámky aj geometria a **nevzniká krok Späť**.
-
-**PREADRESOVANIE ZÁMKOV.** `readdress_recipe_locks` prepíše `rule_id recipe:<v1>` → `recipe:<v2>` **so zachovanými hodnotami** (mení sa len to, ku ktorej položke zámok patrí
-— vzor `drawer_override_migration`). **Kolízna brána:** ak na cieľovom `rule_id` toho istého vlastníka už záznam leží a jeho obsah **nie je totožný** s preadresovaným
-(vrátane prípadu „zdroj neexistuje, dormantný cieľ áno"), upgrade sa **odmietne** — zlúčenie by ticho aktivovalo cudziu hodnotu. Dormantné zámky **iných** receptov
-(iné otváranie) sa nedotýkajú. Úspešný zápis je **jedna operácia** (`CabinetBuilder.rebuild`): nový ref v mape + preadresované zámky + prestavba = **jeden krok Späť**,
-Redo obnoví všetko súčasne. **`UPGRADE_LOCK_AXES`** (`height` → `height_variant`, **`box` → `box_height`** od D-128, `nl` → `nominal_length`) je zrkadlo osí payloadu:
-kľúče musia sedieť s osami `drawer_axes` a hodnoty musia byť poľami z `OVERRIDE_FIELDS` (stráži guard test) — inak by preflight zámok znovu neoveril a tabuľka dopadu
-by menovala inú os, než ktorá je zamknutá.
+- **`OVERRIDE_FIELDS`** (`quantity` · `disabled` · `nominal_length` · `height_variant` · `box_height`) sa **musí zhodovať** s `CabinetBuilder::OVERRIDE_CONTENT_KEYS`
+  (guard test).
+- **Receptová cesta zámkov osí:** validácia sa delí podľa `rule_id` — projektové pravidlo cez `series_value?` (rad `fit_series`), receptová položka
+  (`recipe:<id>`) cez `recipe_lock_context`: vlastník → **pripnutý** recept (`Recipes.active_ref` nad `recipe_refs`) → **výsledná výška** (`recipe_result_height`:
+  platný uložený výškový zámok · `params.height_variant` emitovanej položky · automatická výška z čerstvého `ctx`; zámok v konflikte výsledná výška nie je) → rad
+  tej výšky. Všetko z **čerstvého serverového stavu**, nikdy z payloadu; svetlé rozmery tou istou cestou ako payload `axes`. Nesediaci `rule_id`, Quadro výškový
+  zámok a výška mimo `height_variants` sa odmietajú.
+- **`recipe_box_value`**: na Atire odmietnutie, hodnota strict (`Float(raw, exception: false)` + `finite?` + `> 0`), zaokrúhlenie na 0,1 mm a až potom rozsah proti
+  čerstvému `ctx` cez `Recipes.box_range`; neurčiteľný kontext = odmietnutie. `recipe_lock_context` číta `drawer_axis_ctx` pre všetky systémy.
+- **Odomknutie osi** = `field` + `value: null` (`merge_override` zmaže jedno pole, druhý zámok prežije); `reset: true` ostáva pre `disabled`/`quantity` a osirotené zásahy.
+- **Odpoveď čakajúcemu modalu:** payload z potvrdenia náhrady nesie `ax_token`; server ho len vracia v `NX.hwAxResult(ok, msg, token)` (uzavretý tvar `axis_token`,
+  `AXIS_TOKEN_MAX`) **v každej vetve** (`axis_fail`; úspech `push_axis_result` až za `push_selected`); bez tokenu nič.
+- **Upgrade receptu jedného čela** — `handle_upgrade_drawer_recipe` mení presne jeden záznam `recipe_refs` jedného čela (payload `{cabinet_id, front_id, from, to}`;
+  mapu klient neposiela — `SERVER_DRAWER_KEYS`). Overí: klasifikovaná zásuvka · záznam `:known` a rovný `from` · cieľ vydaný · `Recipes.upgrade?(from, to)` (rovnaký
+  systém a otváranie, vyššia verzia). Callbacky: zápisový `upgrade_drawer_recipe` (odpoveď `push_upgrade_result` → `NX.hwUpgradeResult` v každej vetve, token
+  `up_token` čítaný pred prvým návratom, až za `push_selected`) a **čítací** `drawer_upgrade_impact` (žiadna operácia; `push_upgrade_impact` → `NX.hwUpgradeImpact`,
+  `ok: false` + `reason`).
+- **Preflight, nie rollback:** konflikt receptu nie je výnimka (`build_plan` ho vráti ako dáta a `rebuild` by commitol), preto `drawer_upgrade_prepare` postaví cieľ
+  **nasucho** tými istými funkciami ako stavba (`CabinetBuilder.normalize` → `drawer_thicknesses` → `Construction.build_plan` → `Recipes.resolve`) a tou istou
+  expanziou ako nákup (`HardwareSets.expand`); odmietne hrúbku, neplatný zámok po preadresovaní, `no_fit`, prekážku aj chýbajúci kit. Odmietnutie = nič sa nezapíše.
+  Dopad ide z toho istého stavu (`side`, `lock`, identita); terajšiu stranu stavia ten istý `drawer_dry_plan`; dielce kľúčované **`part_key`, nie rolou**; výšku
+  emituje `drawer_upgrade_height` s `kind` (`variant` / `box`). Odtlačok potvrdenia: odsek „Kontext Čelá".
+- **Preadresovanie zámkov** `readdress_recipe_locks` (`recipe:<v1>` → `recipe:<v2>` so zachovanými hodnotami) s **kolíznou bránou** (iný obsah na cieľovom
+  `rule_id` = odmietnutie); dormantné zámky iných receptov sa nedotýkajú. Zápis = jedna operácia `CabinetBuilder.rebuild` (ref + zámky + prestavba).
+  **`UPGRADE_LOCK_AXES`** (`height` → `height_variant`, `box` → `box_height`, `nl` → `nominal_length`) je zrkadlo osí payloadu a polí `OVERRIDE_FIELDS` (guard test).
 
 ### actions_materials.rb
 
-Doména panela: materiály **označenej skrinky** (`handle_set_cabinet_material` — override projektovej predvoľby pre telo/čelo/chrbát; materiál tela riadi hrúbku korpusu, D-45)
-a echo prepínače kontrol hrán a kresby (`handle_edge_toggle`, `handle_edge_option`, `handle_grain_toggle`). Projektové predvoľby tu **nežijú** — presunuli sa do Štúdia
-(sekcia Materiály). Kontrakt katalógu je v [materials.md](materials.md). Guard identity dokumentu (R-02) beží **pred** echom `cabinet_id`: zámena materiálu tela mení aj hrúbku,
-takže zápis do cudzej zákazky je tu obzvlášť drahý.
+Doména panela: materiály **označenej skrinky** (`handle_set_cabinet_material` — override projektovej predvoľby pre telo/čelo/chrbát; materiál tela riadi hrúbku
+korpusu, D-45) a echo prepínače kontrol hrán a kresby (`handle_edge_toggle`, `handle_edge_option`, `handle_grain_toggle`). Projektové predvoľby žijú v Štúdiu
+(sekcia Materiály). Katalóg: [materials.md](materials.md). Guard dokumentu beží **pred** echom `cabinet_id` (zámena materiálu tela mení aj hrúbku).
 
 ### actions_parts.rb
 
-Doména panela: zápisové cesty karty dielca. Kontrakt a všetky guardy (dokument · cieľ zmeny · odpojenosť) sú v odseku „Karta dielca (UI-D1…)". Poradie guardov je záväzné:
-**identita dokumentu je prvá** (R-02) — `part_target_error` hľadá cieľ v AKTÍVNOM dokumente, takže rovnomenný dielec v inej zákazke by mu prešiel. `handle_set_part_grain`
-má vlastný, tvarom starší guard (K1/D-108, `data['model_guid']` inline); ostatné tri zápisové cesty idú cez zdieľaný `foreign_document?`.
+Doména panela: zápisové cesty karty dielca. Kontrakt a guardy (dokument · cieľ zmeny · odpojenosť): odsek „Karta dielca". **Identita dokumentu je prvá**
+(`part_target_error` hľadá cieľ v aktívnom dokumente); `handle_set_part_grain` má vlastný, tvarom starší guard (`data['model_guid']` inline), ostatné tri cesty
+idú cez `foreign_document?`.
 
 ### actions_settings.rb
 
-_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+Doména panela: **nastavenia počítača z kolieska raily** (`%APPDATA%`, nie zákazky) — do modelu sa nezapisuje a žiadna cesta neotvára operáciu. `handle_set_ui_theme`
+(whitelist v Ruby `Engine.normalize_ui_theme`; odpoveď nejde zvlášť — `apply_ui_theme` rozošle tému všetkým oknám; zlyhanie zápisu sa nehlási ako úspech) a
+`handle_set_dim_series` (normalizáciu robí výhradne `DimSeries`; `refill_editor` prepíše pole editora uloženou podobou; poškodený primár s platnou `.bak` sa hlási
+ako odmietnutie brány). Nastavenia chodia aj v `push_init` (`ui_settings`). UI: odsek „Inspector — kostra" (koliesko).
 
 ### actions_templates.rb
 
-Doména panela: šablóny a ručné odfotenie náhľadu (`Panel.capture_preview_for`). Kontrakt je v odseku „Vkladacia karta — šablóny, typ a doska" a v
-[model-a-identita.md](model-a-identita.md), odsek `template_previews.rb`. Od v0.8.13 tu žije aj **`handle_tag_visible`** (D-27) — jediný handler viditeľnosti NOXUN tagov pre OBA
-ovládače (okno tagov v raile aj checkbox ghost zón); vystriedal `handle_toggle_zones`.
-
-**ROH-A1 — typ šablóny rohovej je zamknutý:** `apply_template_type!` pri `corner_blind` vráti skôr (ako pri slote) — „uložené ako DOLNÁ" by zo šablóny rohovej
-vyrobilo dolnú skrinku bez rohovej zostavy. Zámok v UI modalu je ROH-A2 (server je autorita už teraz). `template_config_from` (payloads) zapisuje pri rohovej
-**výslovne všetky štyri** polia rohovej.
-
-**KOV-I — mini-modal uloženia:** existujúci `#tplModal` ostáva ručným modalom. Checkbox „Uložiť aj kovanie (sety a ručné položky)“ má default zapnuté a pamäť
-`localStorage['noxun.tpl.with_hardware']` na tomto PC; pamätá sa aj zmena pred Zrušiť. `saveTemplateAs` posiela boolean `with_hardware`, chýbajúca voľba starého
-klienta znamená zapnuté. `handle_save_template_as` ju po existujúcich guardoch posunie do `template_config_from` aj `template_save_hardware_note`.
-Vypnuté = bez setov, definícií aj ručných položiek a bez kovaniovej kontroly/hlášky. Poškodený zdroj pri zapnutej voľbe = konštrukcia uložená bez všetkého kovania,
-jasná hláška s dôvodom. Nastavené materiály skrinky sa naďalej prenášajú, individuálne úpravy dielcov nie. **R12** neprenáša ručné zámky; hint to výslovne uvádza.
+Doména panela: šablóny a ručné odfotenie náhľadu (`Panel.capture_preview_for`). Kontrakt: odsek „Vkladacia karta" a [model-a-identita.md](model-a-identita.md)
+(`template_previews.rb`). Žije tu aj **`handle_tag_visible`** — jediný handler viditeľnosti NOXUN tagov pre oba ovládače (okno tagov v raile, checkbox ghost zón).
+- **Typ šablóny rohovej a slotu je zamknutý:** `apply_template_type!` pri `corner_blind` aj `dishwasher` vráti skôr; `template_config_from` (payloads) zapisuje pri
+  rohovej výslovne všetky štyri polia rohovej.
+- **Mini-modal uloženia** (`#tplModal`): checkbox „Uložiť aj kovanie (sety a ručné položky)" — default zapnutý, pamäť `localStorage['noxun.tpl.with_hardware']`;
+  `saveTemplateAs` posiela boolean `with_hardware` (chýbajúci = zapnuté), `handle_save_template_as` ho po guardoch posunie do `template_config_from`
+  a `template_save_hardware_note`. Vypnuté = bez setov, definícií a ručných položiek; poškodený zdroj pri zapnutej voľbe = konštrukcia bez kovania s jasnou hláškou.
+  Materiály skrinky sa prenášajú, individuálne úpravy dielcov a **ručné zámky nie** (hint to uvádza).
 
 ### actions_usage.rb
 
-_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+Doména panela: **merač používania panela** (D-25, callback `usage_flush` → `handle_usage_flush`; payload z `usage.js` `{"counts": {"kluc_prvku": n}}` bez hodnôt
+polí). Merač je **neviditeľný**: vlastný `begin/rescue` len s logom a nikdy `set_status` — chyba merača (ani pád loggera) nesmie rušiť prácu. Ukladanie: `usage_stats.rb`.
 
 ## Štúdio — okno a sekcie
 
-### studio_dialog.rb + ui/studio.html + ui/js/studio.js — okno ŠTÚDIO (ŠT-1a)
-
-cieľové JEDNO okno zákazky (kontrakt `SYSTEM/zdroje/ui20/UI20_KONTRAKT.md`, sekcia ŠTÚDIO KONCEPT) — ľavá navigácia, obsah sekcie vpravo.
-
-**Živých je ŠTRNÁSŤ sekcií** (`SECTIONS` = `bom ctrl buy budget offer cut mat hw appl rules tpl sup bset about`) — od NP-3 je sekciou KAŽDÁ položka navigácie (Nárezový plán
-`cut` ožil, S1-A2 pridala Spotrebiče `appl`): **KUSOVNÍK** (Š1–Š6, pohľady **Dielce · Platne · ABS**), od ŠT-1b **KONTROLA** (Š8–Š11), od ŠT-1c PR A **NÁKUP KOVANIA** (Š7 — presun tabu Kovanie 1:1), od ŠT-1c PR B1
-**ROZPOČET** (Š12–Š13) a od ŠT-1c PR B2 **CENOVÁ PONUKA** (Š14–Š15; každá má vlastný odsek nižšie); od ŠT-3c-1 **ŠABLÓNY** (`tpl`) a od **ŠT-4a NASTAVENIA** (`sup` · `bset` ·
-`about`, Š19 — posledná skupina navigácie) a od NP-3 **NÁREZOVÝ PLÁN** (`cut`, vlastný odsek nižšie).
-
-**PREMOSTENIA ZANIKLI CELE** (`WINDOW_BRIDGES`, `BRIDGE_STATUS`, `do_bridge`, `bridge_window`, klientske `bridge:`/`bridgeTo`/`.nbridge` aj callback `studio_bridge`): premostenie
-bol dočasný most do satelitu, ktorý ešte žil — ŠT-4a odstránila **posledný satelit**, takže niet kam premosťovať a most bez oboch koncov by bol mŕtvy kód, ktorý prežije prvé „to sa
-ešte zíde".
-
-**`PRODUCTION_BRIDGES` (premostenia do TABOV okna Výroba) v ŠT-1c PR B3 ZANIKLI úplne** — konštanta aj vetva `do_bridge`; všetkých päť obsahov je sekciami tohto okna, takže nie je
-kam premosťovať.
-
-**REFRESH INVARIANT — čo ide echom a čo plným pushom** (spresnené review #228; toto je záväzné miesto, nie kronika): rozhoduje **ČI SA MENIA ČÍSLA ZÁKAZKY**, nie to, či zápis
-smeruje do modelu.
-
-**Plný push so zdvihom generácie** ide vždy, keď zápis zmení kusovník, rozpočet alebo ponuku.
-
-**Uloženie pravidiel kovania je MODELOVÝ zápis:** `HardwareRules.set_project_rules(model, rules)` beží **vnútri** `CabinetBuilder.rebuild_many(op_name: 'NOXUN: pravidla kovania')`,
-takže pravidlá **aj prestavaná geometria sú JEDNA undo operácia** a rebuild potom číta **výhradne projektový snapshot** (`NOXUN` dict na modeli, kľúč `hardware_rules` — STANDARD
-§V0.4 „Zdroje pravidiel a reprodukovateľnosť"); `HardwareRules.write(rules)` do `%APPDATA%` je len **dodatočná globálna predvoľba pre ďalšie projekty** a jej zlyhanie mení iba
-hlášku. Klasifikovať pravidlá ako „externý zápis" by zviedlo budúcu prácu obísť reprodukovateľnosť alebo undo.
-
-**Uloženie sadzieb dodávateľa** je naopak naozaj zápis MIMO modelu (`%APPDATA%\NOXUN\Engine\supplier_settings.json`), a aj tak ide plným pushom s bumpom
-(`SupplierSettingsDialog#refresh_studio(bump: true)`) — mení sumy rozpočtu aj ponuky.
-
-**PLNÝ REFRESH BEZ ZDVIHU generácie (`bump: false`) + echo** patrí zápisu, ktorý čísla meniť MÔŽE, ale **nemení IDENTITU riadkov**: typicky **katalóg materiálov** —
-`MaterialsDialog.after_catalog_change` posiela `push_mat_catalog` (echo) **a k tomu** `StudioDialog.refresh_if_open(bump: false)`, lebo oprava ceny či formátu platne zmení sumy
-Rozpočtu/Ponuky aj odhad platní. Generácia sa nedvíha **nie preto, že sa čísla nemenia**, ale preto, že sa nemenia `rows`/`refs` (dielec drží svoje `material_id`) — rozkliknutý
-riadok Kusovníka ani rozrobený export inej sekcie preto nesmie zastarať len preto, že niekto opravil cenu.
-
-**Samotné echo sekcie BEZ plného pushu** patrí zápisu, ktorý čísla zákazky naozaj nemení (knižnica šablón `TPL.init`), a **odmietnutému zápisu** (nič sa nezmenilo —
-`push_section_echo`). Klasifikovať katalóg, pravidlá či nastavenia ako „lacné echo" by nechalo súčty projektu stáť na starých číslach.
-
-**VÝNIMKA v odmietacích vetvách:** keď dôvodom odmietnutia je **prepnutý dokument** (`model_guid` mismatch), ide **plný push** `refresh_studio(bump: false)` — cudzí dokument je
-cudzí pre VŠETKY sekcie okna, takže echo jednej by nechalo Kusovník, Kontrolu aj Rozpočet na dátach iného projektu.
-
-**ŽIVOTNOSŤ DLHÝCH BEHOV nie je jednotná** (spresnené review #228): Demos fetch katalógu (`HardwareCatalogDialog`, `MaterialsDialog`) zhasína zatvorenie okna, **prepnutie
-dokumentu** aj **odchod zo sekcie** (`hw_leave`/`mat_leave`), lebo výsledok patrí sekcii a dokumentu.
-
-**Prepočet cien (`price_refresh_alive_proc`) je ZÁMERNE iný**: prežíva prepnutie modelu (ceny idú do GLOBÁLNEHO katalógu, nie do zákazky) a kontroluje jedine to, že žije **tá istá
-inštancia okna Štúdio**; odchod zo sekcie Rozpočet ho **neruší** — taký leave hook neexistuje. Predpokladať pri ňom rovnakú hranicu ako pri Demose by znamenalo spoliehať sa na
-ochranu, ktorá tam nie je.
-
-**Klientske `goto`** (položka, ktorej obsah bol ČASŤOU inej sekcie) zaniklo v PR B2 spolu s náhľadom ponuky vnútri Rozpočtu — každá položka navigácie je odvtedy buď sekcia, alebo
-premostenie, alebo má dôvod. Prepnutie sekcie z kódu má **jedno miesto** `studioGoSection(id)` (globálne na `window`, lebo ho volá aj `budget.js`, ktorý sa načítava až za
-`studio.js`).
-
-**Neaktívna položka navigácie od NP-3 neexistuje** — posledná (Nárezový plán, „fáza 2") ožila. Vetva `disabled` v kreslení navigácie (`aria-disabled` s dôvodom, vzor D-78)
-ostáva ako poistka pre položku, ktorá by prišla skôr než jej obsah. O sekcii rozhoduje **uzavretý whitelist v Ruby**, klient posiela iba kľúč.
-
-**Čísla nesie zdieľané jadro `ProductionCore`** (do ŠT-1c PR B3 z neho čítalo aj okno Výroba); **kanál okna je vlastný** (audit #3): vlastný `@generation`, vlastný relay
-`NX.studioRelay`/`studioRelayExport` → `studio_do_select`/`studio_do_export` v `panel.rb`, s **identickým flush handshakom** (červené pole panela export zastaví). Cudzí push tak
-nemôže zhodiť guard druhého okna; nesúlad generácie končí **re-pushom a statusom**, nikdy ticho.
-
-**„Obnoviť" (`refresh_bom` → `do_refresh_bom`) hlášku VŽDY zhodí** — klient si pred volaním nastaví per-sekčné „Prepočítavam…" a o výsledku sa sám nemá ako dozvedieť (prepočet beží
-na serveri), takže po úspešnom `push_state` prichádza echo `„Prepočítané."` a pri výnimke chybová hláška + `log_error`. Kým to callback nerobil (holý `push_state`), „Prepočítavam…"
-v okne viselo aj po dobehnutom prepočte a vyzeralo to ako zamrznuté okno (SMOKE 22.8.). `rescue` je vedome aj napriek spoločnému `rescue` v `cb` — hláška nesmie ostať visieť ANI
-pri výnimke a chyba patrí do logu s menom tejto cesty.
-
-**Deep-link** — kontraktové meno je `NX.studioOpen(section, anchor)` (UI20_KONTRAKT §3), **reálna funkcia panela sa volá `openStudio(section, anchor)`** (`ui/js/actions.js`; skladá
-payload cez `NXShell.studioOpenLink`) → `open_studio` → `StudioDialog::SECTIONS` (JS zrkadlo `NXShell.STUDIO_SECTIONS`, zhodu stráži guard test): sekcia sa odkladá do
-`@pending_section` a **spotrebuje ju najbližší `push_state`** (jednorazovo — inak by každý refresh vrátil používateľa tam, odkiaľ medzitým odišiel); `anchor` (ID skrinky z N13
-„Materiál") **predvyplní hľadanie Š6** a spotrebuje sa spolu so sekciou, takže používateľovo vymazanie filtra prežije refresh.
-
-**Server je autorita čísel aj textov:** medzisúčty skupín idú z `sheets`, súčtový riadok z `totals`, popisky z `materials_meta` — **JS neprepočítava žiadnu sumu**.
-
-**Zápis čísel a jednotiek celého okna (H4a · D-04, triedenie HARDENING)** žije TU — blok `nxf*` pri `num` (`nxfMoney`, `nxfMoneyIn`, `nxfQty`,
-`nxfUnit`, `nxfQtyUnit`, `nxfMm`, `nxfDim`, `nxfDec`; pravidlá a tabuľka: `docs/UI_DIZAJN.md` „Zápis čísel a jednotiek"). Funkcie sú globály súboru
-(sekcie `budget.js`, `proj_materials.js`, `hw_catalog.js`, `demos_diff.js`, `rules.js` sa načítavajú ZA ním, vzor `refreshBtnHtml`), v Node ich
-dostanú requirom; bez neho (izolovaný test, parse chyba) kreslí každá sekcia **núdzový zápis s čiarkou, ktorý nič neskryje**. Mení sa len zápis —
-payload, XLSX, CSV ani VEPO nie. **Kusovník:** dĺžka a šírka celé mm (`nxfDim` = VEPO `rounded_dims`), **hrúbka skutočná** (`nxfMm`: 18,6, nie „19";
-obchodnú 18/36 nesie VEPO) v hlavičke skupiny, stĺpci „Hr." (`cellNumText`) aj pohľade Platne; pohľad ABS hrúbka „0,8 mm" / „1 mm" a bm na 2 desatinné
-(aj súčtový riadok „ABS spolu"). **Bunka ABS (D-11):** `absCompact` vráti **„0,8 dookola"**, keď všetky štyri kódy L1 L2 W1 W2 nesú **tú istú pásku**
-(rovnaké ID) so známou hrúbkou (`absAround`); dve rôzne pásky rovnakej hrúbky ostávajú plným kompaktom. Titulok `absFull` (plné L1–W2 s menom pásky) sa
-nemení. **Nákup kovania:** ceny cez `nxfMoney` (tisíce, „−"), množstvá cez `nxfQty` — necelé (kovanie v metroch) sa už neskryje; jednotku
-katalógu (`m`, `par`, `sada`…) prekladá `nxfHwUnitCode` (zrkadlo `Budget::HW_UNIT_LABELS`) + `nxfUnit` na „bm", „pár", „set" ako v Rozpočte,
-neznáma ostáva surovo. Tú istú cestu (`nxfMoney`) majú okno mazania materiálu („Cena: 12,50 €/m²") a ceny v „Pridať z Demosu". Test:
-`tests/js/test_h4a_format.js` (exporty `partsTable`/`sheetsTable`/`absTable` + `setStForTest` len pre render nad fixtúrou).
-
-**Texty a vzhľad okna (H4b · D-06–D-09, triedenie HARDENING).** **Navigácia:** ikony položiek sú **jedinečné** — Nastavenia rozpočtu `bset` majú
-`sliders-horizontal` (posuvníky; do H4b `euro` ako Rozpočet, v zbalenej navigácii sa zlievali), Pravidlá si nechávajú koleso `settings` (zhoda s Inspectorom).
-Je to **vedomá odchýlka od mockupu Štúdia** (`bset: euro`, `SYSTEM/zdroje/ui20/mockup_studio.html`; rozhodnutie D-09 z 1.10.2026, Q2 variant A); tú istú ikonu nesie
-tlačidlo „Nastavenia" v lište Rozpočtu aj akcia nálezu Kontroly (`layout_settings`). **Tabuľka Dielce** (`partsTable`) má triedu `parts` a každá bunka aj hlavička
-triedu `c-<kľúč>` (`colCls`). **Pevné rozloženie platí len pri predvolených stĺpcoch:** `partsTableClass(cols)` pridá triedu `fixed`, keď sú zapnuté iba
-stĺpce, ktorým `studio.html` dáva šírku (`PARTS_FIXED_COLS` = Dielec, Skrinka, Dĺžka, Šírka, Hr., ks, ABS — aj keď niektoré z nich používateľ skryje).
-Pri `fixed` platí `table-layout: fixed` so spoločnými šírkami (Dĺžka/Šírka 64 px, Hr. 52, ks 44, ABS 190, akcie 56, **Skrinka 22 %**, Dielec zvyšok — pri
-najmenšom okne 1060 px, teda tabuľke ~826 px, ostane Dielcu ~174 px) a textové bunky sa **zalamujú** (`overflow-wrap: anywhere`, nič sa neoreže), takže
-stĺpce sú pod sebou vo všetkých skupinách materiálu. **Keď je zapnutý voliteľný stĺpec Smer dekoru alebo Rola, `fixed` sa NEpridá** a tabuľka má automatické
-rozloženie ako pred H4b (bez vynúteného zalamovania) — súčet pevných šírok by inak pri úzkom okne zjedol stĺpec Dielec na nulu (predrecenzia P2).
-Pohľady Platne a ABS a kontrakt Š2 (voliteľné stĺpce) sa nemenia. **Hľadanie** (Kusovník, Materiály, Kovanie, Spotrebiče ×2) má krátky hint „Hľadať…", rozsah
-nesie `title` + `aria-label`. **Texty** bez vývojárskeho žargónu a VEĽKÝCH písmen (slovník a pravidlo: `docs/UI_DIZAJN.md` §1); guard
-`tests/pure/test_h4b_texty_vzhlad.rb` ich hľadá v **reťazcoch** UI (JS literály, HTML mimo komentárov), nie v komentároch. Test správania:
-`tests/js/test_h4b_texty_vzhlad.js`.
-
-**Súčtový riadok NEUKAZUJE súčet platní (H3a, A-01).** `totals.plates_min/max` sčítava server cez **všetky** položky odhadu (všetky materiály aj nákup pre
-dupláky) — platne rôznych dekorov sa spolu objednať nedajú, takže číslo zvádzalo k chybnej objednávke. Súčtový riadok pohľadu **Dielce** aj **Platne** má namiesto
-neho preklik **„Nárezový plán"** (`cutLinkHtml`: `<button class="linkbtn" data-nav="cut">` s ikonou `scissors`, vzhľad odkazu `.studio .totrow .linkbtn`) — ide
-**existujúcou** cestou `data-nav` → `onNav` → `studioGoSection('cut')`, žiadny nový listener ani server. Stĺpec „Odhad platní" po materiáloch v pohľade Platne
-ostáva (orientačný, prerez 10–25 %). **`plates_min/max` v payloade OSTALI nevyužité** (payload bajtovo rovnaký, test ŠT-1a ich pripína) — znova ich nezobrazovať;
-odstránenie pri H14 (sekcie Štúdia na jednom mieste). Guard: `studio.js` ich nesmie čítať (`tests/js/test_h3_zobrazenie.js`). Klient si pamätá výhradne zobrazovacie veci TOHTO počítača (`localStorage`: voliteľné stĺpce `nx_bom_cols`, zbalené skupiny `nx_bom_groups`, zbalená navigácia
-`nx_studio_nav`) — nikdy model.
-
-**Editovateľný názov projektu a checkbox „18+36 spolu" žijú v lište Kusovníka** (`studio_set_vepo_opts` → zápis do `%APPDATA%`).
-
-**Lišta Kusovníka je od SMOKE dávky (22.8.) čistá funkcia `bomToolsHtml(vepo, st)`** — stav (pohľad · hľadanie · otvorené menu) chodí ARGUMENTOM, rovnaký vzor ako zdieľaný
-`edge_menu.js`, takže sa dá testovať bez DOM.
-
-**Poradie:** `[Dielce · Platne · ABS] · [Projekt] · [hľadanie] · ⟶ · [VEPO export ▸roh] · [Stĺpce] · [Obnoviť]` — vľavo „čo pozerám", vpravo „čo s tým robím".
-
-**Checkbox „18+36 spolu" sa presťahoval z lišty do ROHOVÉHO NASTAVENIA tlačidla VEPO** (`vepoBtnHtml`/`vepoMenuHtml`, vzor „flyout roh" UI_DIZAJN §5.11): klik na telo exportuje,
-klik na `.cornerzone` v pravom dolnom rohu otvorí malé okno s jediným prepínačom.
-
-**Klikacia zóna je ZDIEĽANÁ** s railom Inspectora aj lištou Kontroly (`panel.css .cornerzone`), **obsah okna vlastný** — `edge_menu.js` kreslí 3-stavovú kontrolu hrán, tu je jeden
-checkbox, takže spoločný komponent by bol natiahnutý. Otvorenosť je čisto klientska (`vepoMenuOpen`, nikam sa neukladá), zatvára ju klik mimo `.vepofly` a Escape — obe v **JEDNOM**
-listeneri s `ecMenu` (dva listenery na `document` si `stopPropagation` neodovzdajú) a **až za** modalovou brankou (`nxModalOpen`). Hodnotu checkboxu nasadzuje echo `NX.setVepoBar`
-aj do OTVORENÉHO okna (uzol je v DOM vždy, skrýva ho trieda).
-
-**Pole „Projekt" má viditeľný štítok a vlastný rám** (`.prjbox .prjlbl`) — je to jediný vstup v lište plnej tlačidiel a pomenúva zákazku pre všetky exporty. Zápis **nerobí plný
-`push_state`**: ten zdvíha `@generation`, takže prvý klik alebo export hneď po editácii názvu (`change` tesne pred `click`) by zaručene spadol na „Dáta okna sa medzitým zmenili" —
-hoci kusovník sa nezmenil, zmenila sa **lišta**. Ide preto **cielené echo `push_vepo_bar` → `NX.setVepoBar`** (vzor `push_edge_check`), ktoré prepíše len obsah lišty a generáciu
-nechá tak; hodnotu inputu pritom nasadí **len keď v ňom používateľ práve nepíše**. Stav checkboxu sa nasadzuje z payloadu pri **KAŽDOM** pushi (audit #16), takže sa lišta nemôže
-rozísť s tým, čo platí pre exporty.
-
-Pohľad **Platne** skladá riadky z **oboch** zdrojov — `sheets` (materiály s vlastnými výrobnými dielcami) **aj** `sheet_estimate` (2B-1/D-43: duplák, ktorého plocha vznikla len z
-lepených dielcov, vlastné dielce nemá, ale **reálne sa nakupuje**) — inak by ten nákup z tabuľky zmizol aj s jeho odhadom platní v stĺpci.
-
-**Vedomé odchýlky ŠT-1a:** stĺpec „Poznámka" **neexistuje** (v Ruby preň nie je zdroj) · exporty **XLSX/CSV kusovníka boli viditeľné `aria-disabled`** s dôvodom — **SMOKE 22.8. ich
-z lišty ODSTRÁNILA** (verdikt Michal): D-78 platí na sľub, ktorý príde hneď, tieto dva viseli neaktívne celý blok ŠT-1 a v okne pôsobili ako rozbité tlačidlá; vrátia sa **s reálnym
-exportom** (vlastná dávka, kontrakt Š5 revízia 22.8.) · pohľad **ABS nemá stĺpce „bm s rezervou" a „€/bm"** — obe čísla patria do payloadu **rozpočtu** a teda do JEHO sekcie ABS
-(od ŠT-1c PR B1 je Rozpočet o jeden klik vedľa); dopočítať rezervu v klientovi je zakázané, takže sa to povie hintom pod tabuľkou.
-
-Kódy hrán `L1/L2/W1/W2` sa v stĺpci ABS **zámerne neprekladajú** na „predná/zadná" — ten istý kód znamená pri každej role inú fyzickú hranu (`part_faces`), takže pevný preklad by
-pri policiach a dnách klamal; fyzickú stranu kreslí karta dielca v Inspectore.
-
-**D-51:** obsah `1060 × 640` ⇒ `width/height 1076 × 680`, `min_width 1076`.
-
-**Tlačidlo „Obnoviť" má od 22.8. JEDEN markup pre všetkých päť miest** — zdieľaný helper `refreshBtnHtml(stale, tip, attrs)` v `studio.js` (Kusovník · Kontrola · Nákup ho volajú
-priamo, Rozpočet a Ponuka cez most `budRefreshBtnHtml` v `budget.js`, ktorý si ho v Node testoch berie `require`-om); päť kópií toho istého tlačidla by znamenalo päť miest, kde sa
-jantárový stav časom rozíde.
-
-**ŠT-2a — šiesta živá sekcia: MATERIÁLY (`mat`, prvá zo skupiny KATALÓGY).** Obsah je **presun 1:1** z okna „Materiály projektu": dlaždice dekorov podľa výrobcu + pás „Použité v
-projekte", detail dekoru s inline bunkami (patch protokol `row_rev` nezmenený), predvoľby projektu s `model_guid` guardom, batch „Nový dekor", duplák, universal toggle, delete
-preflight aj rollback predmigračnej zálohy.
-
-**ŠT-2c 2c-2b — batchové ZAKLADANIE dekoru z tejto sekcie ZANIKLO:** „Pridať ručne" otvára D-69 editor v režime `create` (`mdCreateOpen` → `mdCreateFields`/`mdCreatePayload`,
-`memoryKey: 'mat:create'` = vlastný slot, takže rozpísaný nový dekor a rozpísaná úprava iného sa neprepisujú), formulár s preset čipmi ostal **výhradne ako „+ variant"** do
-EXISTUJÚCEJ skupiny (`mdOpenDecorForm` bez kľúča už len povie, kde sa dekor zakladá) — je to cesta pre typy, ktorých identitu editor nepokrýva (zástena = rub, PD = hranová úprava)
-a pre skupiny s viacerými štruktúrami. S create vetvou zanikli aj **pole farby** (skupina tam vždy existuje a server jej farbu vnucuje) a **localStorage pamäť „poslednej použitej
-sady"** — dve pamäte rozpísaného dekoru (localStorage + `NXModal`) by znamenali dve verzie a žiadnu istotu, ktorá sa odošle.
-
-**Stĺpce repeaterov sú JEDNA definícia** (`mdSheetCols`/`mdEdgeCols`) pre oba vstupy D-69; prázdny formulár má navyše skupinové polia **Štruktúra** (klient ju vlieva do zakladaných
-riadkov — je to identita variantu a dopísať sa už nedá) a **Smer dekoru**. Úspešné založenie zatvorí modal, zahodí pamäť rozpisu a **otvorí detail nového dekoru** (ceny sa dopĺňajú
-tam). Odmietnutie `:stale` má v create **vlastnú hlášku** („Katalóg sa medzitým zmenil — skús uložiť znova.") a `mdEditRefresh` len omladí baseline: dorovnávať niet čo, v katalógu
-ešte žiadny náš riadok nie je — hláška editu by o tom klamala. Testy: `tests/js/test_st2c_create.js`.
-
-**ŠT-2b — okno ZANIKLO a sekcia prevzala VŠETKO.** `proj_materials.html`, HtmlDialog, `DLG_KEY`, položka menu aj panelové tlačidlo sú preč (menu „Materiály projektu" a tlačidlo
-panela vedú deep-linkom `openStudio('mat')`); `mat_open_window` aj `MAT_BRIDGE_STATUS` zanikli spolu s ním. Do sekcie sa presťahovali **Demos toky** (`demos_diff.js` =
-„Aktualizovať z Demosu", `demos_add.js` = „Pridať z Demosu"; ich modály sú v `#matModalRoot`) a **„Nahradiť UNI…"**.
-
-**Životnosť dlhého behu je viazaná na SEKCIU — vedomé rozhodnutie dávky (audit #5):** `demos_alive_proc(session)` sa pýta už len session tokenu a toho, či Štúdio žije; token
-zhasína **zatvorenie okna** (`MaterialsDialog.on_ui_closed` z `set_on_closed` — ABA guard), **prepnutie dokumentu** a **odchod zo sekcie** (`studioGoSection` → `matOnLeaveSection`
-→ `mat_leave` → `cancel_demos_on_leave`). Odchod počas sťahovania beh **zruší a povie to** („Sťahovanie z Demosu zrušené — opustil si sekciu Materiály."); alternatívy — nechať
-bežať na pozadí alebo pýtať potvrdenie pri každom prepnutí — sú horšie: modál by sa vrátil nad cudziu sekciu, resp. by otravoval.
-
-Poradie v `matOnLeaveSection` je záväzné: **najprv `mat_leave` na server, až potom lokálne zatvorenie modálov** — opačne by `nxdaClose` poslal `demos_family_cancel` skôr, server by
-už nemal čo rušiť a používateľ by sa nedozvedel, že mu sťahovanie skončilo.
-
-**„Nahradiť UNI…" beží v JEDNOM okne:** nález Kontroly → `ProductionCore.replace_uni` → `MaterialsDialog.request_replace_uni` → `StudioDialog.show(open_section: 'mat')`; požiadavka
-sa **odkladá** (`@pending_replace_uni`) a spúšťa ju buď `show` (keď okno už bežalo a hlásilo `ready`), alebo `ready` callback **až za prvým `push_state`** — klient potrebuje celý
-katalóg, aby k `uni_id` našiel dlaždicu. Je jednorazová a zomiera so zatvorením okna aj s prepnutím modelu.
-
-**Sekcia si kreslí telo SAMA** (`matRenderBody` v `ui/js/proj_materials.js`, vzor `budRenderBody`): telo je **JEDEN uzol naklonovaný raz zo `<template id="matBodyTpl">`**, ktorý
-pri prepnutí sekcie z `#secbody` len vypadne a pri návrate sa vráti — `NX.setStudio` ho **nikdy neprekresľuje**, takže rozpísaný formulár „+ variant" ani rozpísaná bunka ceny sa
-nestratia (audit #2; fokus a dirty baseline obnovuje `mdRenderAll`).
-
-**D-124 (v0.10.3): predvoľby projektu sú od prvého zobrazenia rozbalené** — `open` je iba v šablóne, takže ručné zbalenie drží perzistentný uzol aj cez refresh/návrat do sekcie.
-Štyri skupiny Korpus/Čelá/Chrbát/Zásuvky majú vzorky **115 × 115 px** (schválený mockup mínus 20 %), pod nimi pôvodný `NXCombo` a metadáta; úzke okno má dva stĺpce. Celý serverový
-label sa zalamuje bez orezania, aby ostal viditeľný výrobca pri kolízii aj rozlišujúci formát/rub. Spoločný picker sa nemení. Jedna `mdConfirmBar` pod mriežkou slúži korpusu aj zásuvkám.
-`mdRenderProjectPreview` odvodzuje obrázok/meta z aktuálnej hodnoty selectu a presného `material_id` v katalógu (fallback zúžený `MD_SHEETS`); nevytvára druhú pamäť vybraných ID.
-Volajú ho `mdRenderAll` po naplnení polí a scane, `mdSetProjectSelect` pri potvrdení/odmietnutí bez `change` aj používateľský `onProjMaterial`. Návrat selectu preto vráti aj vzorku.
-Obrázok ide existujúcim `mdImageSrc` len z `image_file` emitovaného serverom; chýbajúci/nečitateľný súbor nechá RGB, neznámy materiál nedostane náhodnú vzorku. **UNI nesie text
-„Pracovný materiál UNI“, nie katalógovú hrúbku**. Skutočné tlačidlo pickeru dostáva prístupné meno roly + celého vybraného labelu; dekoratívna vzorka má `aria-hidden`/prázdne alt.
-Potvrdzovanie, `model_guid`, serverové predvoľby, dedenie aj Undo používajú pôvodné cesty bez zmeny kontraktu.
-
-**D-131 (v0.12.3): riadok „Kresba čiel" pod predvoľbami** — jediné miesto sekcie, ktoré **mení model**. Nie je to predvoľba, ale hromadná AKCIA nad čelami, ktoré v zákazke sú TERAZ
-(projektová predvoľba smeru pre budúce skrinky sa vedome nezavádza — bola by to zmena kontraktu projektu; hint to hovorí a číslo v tlačidle sa po vložení novej skrinky zdvihne).
-Select (Podľa materiálu / Pozdĺžna / Priečna) + `md_front_grain_apply` posielajú `fronts_grain_all` s `{gen, model_guid, grain}`. Callback má **vlastný `cb(dlg, …)`** (nejde cez
-`mat_actions`, lebo telo nie je v `MaterialsDialog.dispatch`) a ide **flush handshakom ako exporty**: `handle_fronts_grain_all` → `NX.studioRelayFrontsGrain` v paneli → flush
-rozpísaných editov → `studio_do_fronts_grain` → `StudioDialog.do_fronts_grain_all` → `MaterialsDialog.fronts_grain_all`. Bez neho by hromadná prestavba bežala nad starým
-rozložením čiel a oneskorený apply Inspectora by dorobil čelá bez zvoleného smeru; červené pole panela akciu zastaví (`flush_blocked`). Stav riadku (`teraz: 8× priečna · 4× podľa
-materiálu` a počet v tlačidle) počíta SERVER a nesie ho `mat.front_grain` (`{count, cabinets, by, skipped}`) — klient si nič nedopočítava. **Zámok tlačidla:** klik ho prepne na
-`Prestavujem…` + `disabled` a odomkne ho až NOVÝ push — preto **každá** serverová vetva (vrátane odmietnutia a `rescue`) posiela `repush`; katalógové echo zámok nepustí a druhý
-klik pred pushom nepošle nič (inak by z jednej voľby vznikli dva kroky Späť). `front_grain` **chýbajúci/null** = „stav sa nepodarilo zistiť" + `disabled` (nikdy „Žiadne čelá");
-`count = 0` so `skipped` ukáže „2 skrinky preskočené — <dôvod>" a tlačidlo hlási „Žiadne dostupné čelá". Generácia okna chodí do sekcie druhým parametrom `matApplyState(m, gen)`
-(identita CELÉHO payloadu Štúdia, nie sekcie — vzor `budget.js`).
-
-**Modály sekcie žijú v kotve `#matModalRoot` MIMO `#secbody`** (vzor `#nxModalRoot`).
-
-**Lišta je čistá funkcia `matToolsHtml(state)`** — `[Pridať z Demosu] · [Pridať ručne] · [hľadanie] · [zoskupenie] · ⟶ · [Obnoviť] · [⋯]`; **primárnym tlačidlom je od
-ŠT-2b zase „Pridať z Demosu"** (ŠT-2a mu rolu dočasne odobrala, lebo vtedy len premosťoval do okna — najvýraznejšie tlačidlo novej sekcie nesmie viesť preč); hľadanie a zoskupenie
-si preto držia hodnotu **aj v premennej** (`MD_Q`/`MD_MODE`), lebo lištu prekresľuje každý push. Bannery (read-only katalóg · nepoužiteľné ABS · cutover) sú **prvé riadky obsahu**,
-obsah podtitulu `#mdline` prevzal hint sekcie.
-
-**Ponuka „⋯" (H4 · D-06, triedenie HARDENING; Q1 variant A).** Núdzové **„Vrátiť katalóg pred migráciou…"** (do H4b samostatné „Obnoviť zálohu" HNEĎ vedľa
-bežného „Obnoviť" — pomylili sa) je jediná položka ponuky `mdMoreHtml(open)` za „Obnoviť". Kreslí sa pri tej istej podmienke ako dovtedy (`backup && !ro`), **bez položky
-sa „⋯" nekreslí vôbec** (D-78). Ponuka je overlay pod spúšťačom (`.mdmore`/`.mdmoremenu` v `studio.html`), otvorenosť je čisto klientska (`mdMoreOpen`, nikam sa
-neukladá). Otvorenie lištu prekreslí (`matRenderTools`), **zatvorenie nie** — len odstráni uzol ponuky a prepne `aria-expanded`, inak by
-`innerHTML` zhodil fokus z poľa, do ktorého používateľ práve klikol (predrecenzia P3). Klik na „⋯" ju prepína a presunie fokus na položku; zatvára ju klik mimo obalu, Tab, odchod zo sekcie
-(`matCloseModals`) a **Escape** — ten zavrie LEN ponuku, vráti fokus na „⋯" a udalosť spotrebuje; `mdMoreOpen` je v `nx_esc.js` medzi **FLYOUT_FLAGS**, takže reťaz
-modalov, kým je ponuka hore, nerobí nič. Výber položky **najprv ponuku zavrie** a až potom otvorí **ten istý** potvrdzovací modal `mdRestoreModal` („Vrátiť katalóg
-pred migráciou" / „Vrátiť katalóg") → `restore_pre_schema2` — nový zápis nevznikol, len cesta k nemu. V núdzovom (read-only) režime nesie akciu naďalej banner nad
-zoznamom (text „Vrátiť katalóg pred migráciou…").
-
-**KANÁL je zámerne delený:** katalógové echo `push_mat_catalog` → `NX.setMatCatalog` (vzor `push_vepo_bar`) prepíše **len katalóg**, negeneruje prepočet a **NEDVÍHA generáciu** —
-oprava ceny nemení `rows`/`refs`, takže rozkliknutý riadok Kusovníka ani rozrobený export inej sekcie po nej nesmie zastarať (audit #4); plný `push_state` nesie **modelový kontext
-sekcie** (`mat`: predvoľby, počet skriniek, `model_guid`, `used`) a **celý katalóg len pri prvom pushi okna a po prepnutí dokumentu** (`@mat_full_pending`) — inak by sa `row_rev`
-každého záznamu počítal pri KAŽDOM prepočte kusovníka (audit #15).
-
-**`used` vzniká z UŽ zozbieraného `collected`** (`mat_used` + `Materials.decor_key_by_material_id`), nie druhým `Ids` skenom modelu ako v okne; počíta teda to, čo je naozaj vo
-výrobe — ten istý zdroj ako Kusovník.
-
-**Telo akcií katalógu ostáva v `MaterialsDialog`** (audit #21 — modul sa NEPREMENÚVA): Štúdio registruje **tie isté mená callbackov** a volá `MaterialsDialog.dispatch(name,
-payload, sink)`; whitelist je JEDINÝ (`MaterialsDialog::SECTION_ACTIONS`) a `sink` presmeruje odpoveď (`MD.*`) tomu, kto sa pýtal — okno má tie isté prijímače, lebo beží na tom
-istom `proj_materials.js`. Okno dostalo **`@ready`** (vzor MaterialsDialog, audit #8): `false` pri vzniku aj zatvorení, `true` v `ready` callbacku **pred prvým pushom** — a **`js`
-podľa neho reálne rozhoduje** (`return false unless @ready`): CEF `execute_script` poslaný pred načítaním HTML potichu zahodí, takže push pred `ready` sa priznane zahodí aj tu
-(`false` = „klient to nedostal", `do_refresh_bom` sa podľa toho rozhoduje). Bez toho by to bola mŕtva premenná, na ktorej má ŠT-2b postaviť odloženú požiadavku „Nahradiť UNI…".
-
-**Západka `@mat_full_pending` sa gasí len vtedy, keď katalóg v odoslanom payloade REÁLNE bol** — `mat_payload` má vlastný rescue (vracia `nil` + zápis do logu) a holé „odoslalo sa"
-by pri jeho zlyhaní nechalo sekciu navždy prázdnu a bez hlášky.
-
-**ŠT-2d — „KDE SA POUŽÍVA" (posledná dávka fázy ŠT-2):** detail dekoru dostal na koniec sekciu **„Kde sa používa"** (`mdWhereHtml`, schválený bod konceptu MATERIÁLY, mockup ju
-kreslí rovnako) — riadok na každého vlastníka (`CAB-004 · Bok ľavý · Dno · Polica` + počet dielcov) a riadok na každú **použitú pásku** rodiny, oboje s **okom**. Dáta sú **rozpis
-toho istého čísla, ktoré už nesie `used`**: `mat_used_where(collected)` beží v tom istom prechode zberom (žiadny druhý sken modelu, audit #15) a vracia `{ kľúč skupiny => { owners:
-[{owner_id, parts, roles, material_ids}], edges: {abs_id => {parts, objects}} } }`; **roly skladá SERVER** (`ProductionCore.role_label` — klient preklad enumu rol nemá) a páska sa
-ráta **za dielec, nie za hranu**.
-
-**Dve čísla, dve otázky (review #6):** `parts` = kusy do výroby, `objects` = koľko entít sa v modeli naozaj označí — doska s `quantity: 3` je 3 kusy, ale jeden objekt. Riadok ukáže
-jedno číslo, kým sa rovnajú, inak prizná obe (`3 ks · 1 objekt`) a tooltip oka hovorí **tým istým slovom ako stavový riadok** („označí 3 položky" ↔ „Vybraných N položiek v
-modeli.").
-
-**PICKER-2** k tomu pridalo tretí pohľad na ten istý zber — **`mat_used_ids(collected)`** (`mat.used_ids` = `{sheets, edges}`, holé ID bez počtov): to je otázka vyhľadávača
-predvolieb („je tento materiál v zákazke?"), nie rozpis vlastníkov, preto sa tu dielec **bez `owner_id` nevyhadzuje**. Tvar je zhodný s panelovým `used_ids_payload`, takže skupina
-„Použité v projekte" vyzerá v oboch oknách rovnako. Katalógový payload Štúdia (`MaterialsDialog.full_catalog_payload`) navyše nesie **`row_label` a `row_key` z TÝCH ISTÝCH dvoch
-metód, aké volá panel** (`Panel.sheet_row_label`, `Materials.variant_family_key`) — keby si každé okno skladalo hranicu zlučovania samo, ponuka by sa v Inspectore a v Štúdiu
-zlučovala inak a nikto by si toho nevšimol, kým by sa nevybral zlý materiál.
-
-Mapy `decor_key_by_*` stavia **`mat_payload` raz** a podáva ich počtom aj rozpisu (review #5) — dva nezávislé prechody katalógom pri každom pushi by sa navyše mohli rozísť. Kľúč
-skupiny pások dáva nová `Materials.decor_key_by_abs_id` (zrkadlo `decor_key_by_material_id` — vlastné odvodenie by mohlo ukázať na inú skupinu než pás „Použité v projekte").
-
-**Oko ide TOU ISTOU cestou ako klik v Kusovníku** (`nx_select` cez relay panela, generácia okna, žiadne `pids` z DOM): `ProductionCore.refs_for` dostalo vetvy **`material_key`** a
-**`abs_key`** (obe smú byť reťazec ALEBO pole — dekor mával viac hrúbkových variantov) s nepovinným zúžením `owner_id`.
-
-**Pozor na rozdiel „kľúč CHÝBA" vs „kľúč je PRÁZDNY" (review #4):** chýbajúci `owner_id` = *bez zúženia*, prázdna hodnota = *zúženie na vlastníka bez identity* — keby sa oboje
-bralo rovnako, riadok odpojeného dielca (bez `cabinet_id`) by ticho označil celý dekor. Taký riadok už zoznam ani nekreslí (`mat_used_where_owner` ho preskočí; v počtoch `used`
-dielec ostáva), serverová vetva je druhá poistka.
-
-**Adresa je `material_id`/`abs_id` a hľadá sa v BOM riadkoch, teda v EFEKTÍVNOM (snapshotovom) materiáli — nie v textových menovkách dekorov (`used_material_ids` a spol., audit
-#14):** dielec, ktorý materiál iba **dedí po korpuse**, nemá v `part_overrides` nič, takže menovková cesta by ho nenašla a v modeli by sa označila polovica skrinky bez jediného
-slova. Selekcia **nič nezapisuje** a nepridáva krok Späť (rovnaké pravidlo ako `parts_key`/`hw_key`).
-
-**Deep-link z karty dielca (nová funkcia, audit #9):** materiál v karte dielca aj dosky má **ikonu prekliku** (`.matlink`, `nxDecorLinkState`/`nxDecorLinkGo` v `part_card.js` —
-jedna funkcia, dva vstupné body) → `openStudio('mat', <material_id>)`.
-
-**Kotva sekcie `mat` sa spotrebuje INAK než kotva Kusovníka** — nie ako text hľadania, ale ako **otvorenie detailu dekoru** (`matOpenAnchor` → `mdAnchorGroupKey` preloží
-`material_id`/`abs_id`/kľúč skupiny na skupinu); jednorazovosť ostáva (server ju v ďalšom pushi neposiela, takže návrat do dlaždíc prežije refresh).
-
-**Neúspešné otvorenie NIE JE tichý no-op (review #3):** dekor sa mohol medzitým zmazať alebo premenovať, takže `matOpenAnchor` vracia `false` a Štúdio to povie statusom („Tento
-dekor už v katalógu nie je — otvorené v zozname materiálov.") — inak by preklik z Inspectora skončil v dlaždiciach bez slova a vyzeral by ako pokazené tlačidlo. Dielec **bez
-rozhodnutého materiálu** má tlačidlo `aria-disabled` s dôvodom (D-78), **ABS pásky karty sa NEPRELINKÚVAJÚ** (hrana má vlastný tok — D-41 modal, picker).
-
-Testy: `tests/pure/test_st1a_studio.rb`, `tests/pure/test_st2a_mat.rb`, `tests/pure/test_st2d_kde.rb`, `tests/js/test_st1a_studio.js`, `tests/js/test_st2a_mat.js`,
-`tests/js/test_st2d_kde.js`, in-SketchUp sekcie `run_st1a`, `run_st2b` (kanál sink/Štúdio, životnosť Demos behu, tok „Nahradiť UNI…", predvoľba = 1 krok Späť) a `run_st2d` (výber
-podľa materiálu vrátane **dedeného**, výber podľa ABS, zúženie na vlastníka, jednorazová kotva, ⋯ editor = 1 krok Späť).
-
-**ŠT-3a-1 — siedma živá sekcia: KOVANIE (`hw`, druhá zo skupiny KATALÓGY; ikona `hammer` — tá istá ako rail Inspectora, kontrakt „Ikony navigácie").** *(Odsek popísuje PRVÚ
-polovicu dávky — od ŠT-3a-2 už žiadne okno „Katalóg kovania" NEEXISTUJE; čo sa tým zmenilo, hovorí odsek nasledujúci za týmto.)* Obsah je **presun 1:1** z okna „Katalóg kovania"
-(Š16): pohľady **Položky · Sety** ako segment v lište sekcie, hľadanie + filter kategórie + prepínač „neaktívne" v lište, „Nová položka" ako primárna akcia.
-
-**Premostenie `hw` v navigácii ZANIKLO** (`WINDOW_BRIDGES` aj `BRIDGE_STATUS`); okno vtedy ešte žilo a otváralo ho premostenie Z VNÚTRA sekcie (`hw_open_window` +
-`HW_BRIDGE_STATUS`), lebo tri MODELOVÉ zápisy predvolieb setov projektu sa presúvali až v ŠT-3a-2 — **oboje už neexistuje** a menu „Katalóg kovania" aj tlačidlo panela vedú do
-sekcie.
-
-**Sekcia si kreslí lištu aj telo SAMA** (`hwRenderTools`/`hwRenderBody` v `ui/js/hw_catalog.js`, vzor `matRenderBody`): telo je **JEDEN uzol naklonovaný raz zo `<template
-id="hwBodyTpl">`**, ktorý `NX.setStudio` **nikdy neprekresľuje** — rozpísaný formulár novej položky ani rozpísaný editor setu tak push zo servera nezmaže; modál potvrdenia mazania
-žije v kotve `#hwModalRoot` MIMO `#secbody`. Stav lišty (pohľad · hľadanie · kategória · neaktívne) žije aj v premenných (`HW_VIEW`/`HW_Q`/`HW_CAT`/`HW_INACTIVE`, vzor
-`MD_Q`/`MD_MODE`), lebo lištu prekresľuje každý push; `hwToolsHtml(state)` je čistá funkcia a „Obnoviť" ide zdieľaným `refreshBtnHtml`.
-
-**`sketchup.ready` na konci `hw_catalog.js` bolo v ŠT-3a-1 iba POTLAČENÉ** príznakom `window.NX_HW_SECTION` (žijúce okno bolo bez neho prázdne) — **v ŠT-3a-2 zaniklo CELÉ** (vzor
-`proj_materials.js` po ŠT-2b); `ready` posiela `studio.js` z `window.onload` a príznak ostáva ako čítateľné prihlásenie sa do režimu sekcie. Priame väzby `addEventListener` na
-`#hwSearch`/`#hwCategory`/`#hwInactive`/`#hn_demos` sa zmenili na **delegáciu na `document`** — v sekcii tie uzly pri načítaní ešte neexistujú (lišta) alebo zanikajú pri každom
-prekreslení.
-
-**Payload sekcie `hw_payload(model)`:** `sets` chodia v KAŽDOM pushi (riadia nákupný zoznam sekcie Nákup), **celý katalóg len pri prvom pushi okna, po prepnutí dokumentu a po
-ručnom „Obnoviť"** (`@hw_full_pending` — inak by sa `row_rev` každej položky počítal pri každom prepočte kusovníka; západka padne LEN keď katalóg v odoslanom payloade REÁLNE bol).
-Ručné „Obnoviť" západku zdvíha zámerne: sekcia `hw` nemá z modelu čo prepočítať a bez toho by jej tlačidlo klamalo.
-
-**Kanál je delený rovnako ako pri Materiáloch:** katalógové echo `push_hw_catalog` → `NX.setHwCatalog` **negeneruje prepočet a NEDVÍHA generáciu**, plný `push_state` nesie modelový
-kontext. Telo akcií zostáva v `HardwareCatalogDialog` (`SECTION_ACTIONS` je JEDINÝ whitelist, `hw_sink` presmeruje odpoveď, `hw_js` je verejný most pre asynchrónne emity — vzor
-`mat_js`). Testy: `tests/pure/test_st3a_hw.rb`, `tests/js/test_st3a_hw.js` (in-SketchUp sekcia `run_st3a` pribudla až s ŠT-3a-2 — ŠT-3a-1 nemala ani jednu novú zapisovaciu cestu do
-modelu).
-
-**ŠT-3a-2 — sekcia `hw` je ÚPLNÁ a okno „Katalóg kovania" ZANIKLO.** Do sekcie pribudli tri **MODELOVÉ zápisy** (predvoľby setov projektu), takže blok „Predvoľby projektu" v
-pohľade Sety už **nie je read-only** — `HWS_PROJ_RO` aj premostenie `hw_open_window`/`HW_BRIDGE_STATUS` **zanikli**.
-
-**CENY-KOV-A (v0.10.4): ikona „Otvoriť produkt" je pri každej katalógovej položke kovania aj pri jej riadku v Rozpočte.** Pri uloženej URL iba otvorí externý prehliadač;
-chýbajúci odkaz sa ukáže jantárovo a otvorí existujúci editor konkrétneho kódu s fokusom na adrese. Formulár používa pôvodný draft, revíziu a token odpovede — nevzniká druhý
-editor položky. Preklik z Rozpočtu nesmie závisieť od toho, či je daný kód práve viditeľný v strome katalógu. Oneskorená odpoveď sa neprijme po odchode z pôvodnej sekcie,
-zmene dokumentu ani otvorení iného formulára. Demos väzba zostáva v pôvodnom overovacom toku; obyčajný preklik pri nej nezapisuje cenu ani dátum.
-
-**CENY-KOV-B (v0.10.5):** samostatné `hw-manual-check` z Katalógu aj Rozpočtu otvorí spoločný NXModal: kód/názov/dodávateľ, cena s DPH za pevnú MJ a predchádzajúce overenie.
-Po príprave formulára otvorí uložený produkt v externom prehliadači; spätný fokus sa nevynucuje. Potvrdenie čaká na úspešnú odpoveď serverového pokusu o otvorenie; tá sama nedokazuje načítanie webu ani kontrolu ceny.
-Chyba otvorenia formulár zavrie bez zápisu, stará odpoveď neodomkne nový formulár. Chýbajúci odkaz vedie do pôvodného editora URL. Výslovné potvrdenie k dnešku odošle cenu a revíziu, čas určí server.
-Počas submitu chráni modal existujúci `busyLock`; každé odmietnutie odomkne ovládanie. Výsledok patrí tokenu/formuláru/modelu, konflikt obnoví aktuálny záznam bez opätovného odoslania starej ceny.
-Ručné ceny majú vlastnú akciu aj v zozname upozornení, potvrdený riadok viditeľný dátum a pôvod. Ak zostali iba ručné kontroly, hlavné tlačidlo otvorí tento zoznam; Demos beh ostáva samostatný.
-
-**Po modelovom zápise ide `after_sets_change(model)` → `refresh_if_open(bump: true)` — a to STAČÍ:** predvoľba setu nemení GEOMETRIU, takže `Panel.push_selected` (dedup kópií) sa
-vedome NEVOLÁ; jantár „Obnoviť" po vlastnom prepočte NEZOŽLTNE, lebo `push_state` si `@pushed_epoch` ukladá AŽ po zbere a vlastnú transakciu tak pohltí.
-
-**`merge_seed` NO-OP nevolá `after_sets_change` VÔBEC** (ani `bump: false` push): nič sa nezmenilo, takže plný prepočet by bol zbytočný a zdvih generácie by zneplatnil rozkliknutý
-riadok Kusovníka po akcii, ktorá NIč neurobila — status stačí.
-
-**Po Ctrl+Z sekcia číslami zostarne a povie to jantárom** (`StudioModelWatch` → `markStale`); push-po-undo v Štúdiu neexistuje a nezavádza sa (precedens Rozpočtu) — pri zápise zo
-zastaraného UI platí „posledný vyhráva“, lebo snapshot predvolieb `revision` guard nemá. Vstupné body okna presmerované: menu „Katalóg kovania" a tlačidlo panela vedú
-`openStudio('hw')` / `StudioDialog.show(open_section: 'hw')`. Testy: `tests/pure/test_st3a_hw.rb`, `tests/js/test_st3a_hw.js`, in-SketchUp sekcia **`run_st3a`** (zápis predvoľby =
-1 krok Späť, NO-OP `merge_seed` bez pushu aj bez undo kroku, jantár po vlastnom zápise nezožltne, payload nesie novú hodnotu v `hw.sets`).
-
-**ŠT-3a-3 — render setov je ROZDELENÝ:** `HWSETS.setData` (iba dáta) vs. `HWSETS.render` (kreslenie); plný push volá `setData` a telo sekcie kreslí `hwRenderBody` hneď za ním, kým
-`HWSETS.init` (dáta + render) ostáva pre ECHO, po ktorom už žiadny render nepríde (`NX.setHwSets` po odmietnutom zápise). Predtým sa zoznam setov aj predvolieb kreslil pri KAžDOM
-pushi **dvakrát**. `hwsRenderSets`/`hwsRenderProj` navyše držia **snapshot fokusu** (vzor `mdhRender`) — v okne sa prekresľovalo len po zápise, v sekcii pri každom pushi, takže
-používateľovi mizol kurzor z rozpísaného editora setu; chýbajúci atribút je súčasťou identity (`:not([…])`), inak by sa fokus vrátil do rovnomenného poľa v inom riadku.
-*(Od KOV-B3 sa to týka už LEN editora pásiem výberu setu — editor setu je modal a žije v `#nxModalRoot` MIMO prekresľovaného tela sekcie.)*
-
-**Hodnoty rozpísaného formulára prežijú push** — `#hn_category` aj `#hn_unit` mali `keep` (`mdhRenderEnums` bežal pri každom pushi a bez neho by sa kategória aj MJ prepli na PRVÚ v
-zozname), a `MDH.created` čistí filter **aj v premenných** `HW_Q`/`HW_CAT`, nielen v uzloch lišty — inak by najbližší push nakreslil lištu so STARÝM filtrom nad NEFILTROVANÝM
-zoznamom. *(Od KOV-B2 tie dva selecty NEEXISTUJÚ — enumy kreslí modal a rozpísané hodnoty drží pamäť kostry D-15; čistenie filtra v premenných platí ďalej.)*
-
-**KOV-B2 (v0.9.23) — pohľad Položky je STROM a zakladanie je MODAL (D-110).** Telo sekcie je od tejto dávky **iba `#hwList`**: statický formulár `#hwNewForm` aj celá Démos vetva
-v ňom (`#hn_demos`, `#hwDemosHits`, `#hwDemosPreview`, `#hn_code`…`#hn_notes`) **ZANIKLI**. Žili DOLE POD zoznamom, takže pri katalógu s tromi stovkami kódov ich používateľ našiel
-až po odscrollovaní a rozpísanú položku mu prekryl zoznam.
-
-- **Strom kreslí `mdhRenderTree` z POSLEDNEJ odpovede servera** (`MDH.tree`): hlavička kategórie (`.hwgrphead`, chevron zo sprite + `total`, pri orezaní aj `shown`), pod ňou
-  `.hwsub` „Výrobca · Rada" a riadky `mdhRow` — **`mdhRow`/`mdhDetail` sa NEMENIA**, takže inline bunky, `row_rev` guard aj snímka fokusu (`keepFocus`) fungujú ako predtým;
-  rozpísaná bunka a otvorený detail prežijú prekreslenie stromu. Klik na hlavičku prepne `HW_EXPAND[key]` a **vypýta si nový strom** (obsah rozhoduje server), „Načítať ďalšie (N)"
-  zvýši `HW_MORE[leaf]` o `LEAF_PAGE`. Obe pamäte žijú v premenných sekcie (vzor `HW_Q`/`HW_CAT`), takže prežijú push aj odchod do inej sekcie.
-- **Plochý prijímač `MDH.results` ostáva** pre `hw_search` (verejný kontrakt katalógu) — `mdhRender` len rozhodne, ktorý tvar práve kreslí.
-- **Modal položky (D-15, `hw:item:new`)** otvára tlačidlo lišty „Nová položka" aj **„Upraviť"** v detaile riadku. Poradie polí je poradie dodávateľského listu:
-  **Démos → kód → názov → cena → MJ → kategória → výrobca → rada → poznámka**. Pri ÚPRAVE pole `kód` chýba (`item_code` je identita a v `PATCHABLE` nie je) — je v podtitule;
-  úprava **nemá pamäť** (vzor D-69) a posiela `patch` **len so zmenenými poľami** + `from: 'modal'`, `row_rev` ide SKRYTO v stave. Posielať všetko by pri každom uložení zmazalo
-  `price_checked_at` (server F5), aj keby sa ceny nikto nedotkol; prázdny patch modal zavrie s hláškou „Nič sa nezmenilo." namiesto serverového odmietnutia.
-- **Démos je PRVÉ pole modalu** (typ `lookup`): našepkávanie podľa názvu aj vložená URL vedú na SERVEROVÝ proposal (`pid`). Po `MDH.demosPreview` sa modal **prekreslí**
-  predvyplnený (kód/názov/cena/MJ z proposalu, kategória a **výrobca ako NÁVRH** z `manufacturer_guess`, rada nikdy) a rozpísané hodnoty používateľa sa čítajú z formulára, takže
-  sa nestratia. Prekreslenie **NIE JE zatvorenie** — `hwItemClosed` sa počas neho preskočí (`HW_REOPEN`), inak by `onClose` zahodil práve prijatý proposal a zápis by potichu
-  prepadol na ručnú cestu. Statická veta v `note` hovorí, že zmena kódu/názvu/ceny/MJ robí z položky **ručnú** (bez väzby a bez dátumu overenia) — a klient to aj vykoná: pošle
-  `hw_create` namiesto `hw_demos_create`.
-- **„+ Vytvoriť výrobcu/radu…"** je posledná voľba selectu. Voľba prekreslí modal s poľom na názov a **tlačidlom „Vytvoriť" pri ňom** (`action:` kostry); zápis spúšťa
-  **výhradne** ono alebo Enter v poli — **nikdy `change`/blur** (review #290 P1: klik na „Zrušiť" vyvolá blur skôr než svoj klik, takže zrušený formulár by založil výrobcu,
-  ktorého už nikto nezmaže). Zápis **položku pritom NEULOŽÍ** — dve veci naraz by boli tichý zápis. Server odpovie `MDH.taxonomy` s čerstvou taxonómiou a KANONICKÝM menom, modal
-  sa prekreslí s novou hodnotou vybranou; chyba sadne na pole `manufacturer_new`/`series_new`. Rada je **závislý select**: bez výrobcu sa vybrať ani založiť nedá a zmena výrobcu
-  zahodí radu, ktorá mu nepatrí (KOV-B1: rada patrí presne jednému). Aj tu platí **token** (review #290/2 P2): výsledok patriaci už zavretému oknu zoznam obnoví, ale
-  klasifikáciu v otvorenom okne **nevyberie** — je to hodnota, ktorá ide do objednávky. **Degradovaná taxonómia** (poškodený primár + platná `.bak`) sa *číta*, ale zapísať
-  sa do nej nedá; server to hlási samostatným `write_blocked` a modal vtedy skryje **iba „+ Vytvoriť…"** — výber existujúcich mien beží ďalej (review #290/3 P2).
-- **Zámok odoslania odomyká VOLAJÚCI v OBOCH vetvách** — signál servera `MDH.itemResult(ok, msg, errors, op, token)`: `true` zavrie modal a zahodí pamäť konceptu, `false` ho
-  nechá otvorený s hodnotami a chyby (`{field, msg}`) rozsype PRI POLIACH. **`token` je identita JEDNÉHO odoslania** (review #290 P2): klient ho generuje pri submite, server ho
-  echuje a klient prijme **len presnú zhodu** — zdieľaný príznak „niečo som poslal" nestačil, lebo odpoveď okna, ktoré používateľ medzitým zavrel, zavrela okno otvorené teraz
-  a zahodila jeho koncept. Inline oprava bunky v riadku (patch bez `from: 'modal'`) žiadny `itemResult` nedostane.
-- **Konflikt úpravy modal REBASUJE** (review #290 P2): server pri konflikte najprv pushne čerstvý katalóg a až potom odpovie, takže `MDH_ITEMS` má novú revíziu. Ak sa líši od
-  tej, ktorú modal drží (`hwItemStale`), okno sa **prekreslí z čerstvej položky** — nová baseline, serverové hodnoty v poliach, okno ostáva otvorené s hláškou. Bez toho by
-  každé ďalšie „Uložiť" posielalo ten istý zastaraný `row_rev` a konflikt by trval donekonečna, hoci hláška tvrdí, že hodnoty sa obnovili.
-- **Rebase je VÝHRADNE táto cesta** (review #290/2 P1). UI-only prekreslenia (`hwItemRedraw` — zmena výrobcu/rady, predvyplnenie z Démosu) menia len to, čo je na obrazovke:
-  **baseline aj revíziu si podržia z otvorenia modalu**. Keby si ich vzali z `MDH_ITEMS`, cudzia zmena, ktorá dorazila počas otvoreného editora, by sa stala novým „pôvodným
-  stavom" — patch by potom poslal **cudzie zmeny ako vlastné** a s revíziou, ktorá serverovou bránou prejde. Tichý prepis cudzej práce. Vedomú obnovu robí `hwItemRebase`.
-- **Nedostupná taxonómia ZAMYKÁ klasifikáciu** (review #290/2 P1). Katalóg môže byť zapisovateľný, kým je taxonómia read-only alebo sa vôbec nenačítala (server vtedy posiela
-  prázdny zoznam + príznak). `hwTaxLocked()` v tom stave selecty výrobca/rada **zamkne**, ukáže **uloženú hodnotu ako jedinú voľbu** a dôvod napíše k poľu; payload
-  `manufacturer` ani `series` **neobsahuje vôbec** (ani prázdne). Prázdna dvojica totiž `taxonomy_refusal` prejde, takže uloženie nesúvisiacej zmeny by ticho zmazalo výrobcu
-  aj radu už zaradenej položky.
-- **Zmena poľa Démos ZNEPLATNÍ hotový proposal** (review #290/2 P2) — patrí textu, ktorý ho vyhľadal. Bez toho by `hwDemosDirty` (polia sa predsa nezmenili!) pustil uloženie
-  s `pid` **starého** produktu, hoci v poli svieti nový. A kým sa nový náhľad nedokončí (`HW_DEMOS_WAIT`), **zápis sa nepustí** — hláška pri poli povie aj cestu von (počkať,
-  alebo pole vymazať). Príznak nastavuje **spoločný loader** `mdhDemosLoad`, takže blokuje **každý** zdroj náhľadu — vloženú URL aj výber zo šepkára (review #290/3 P2: cez
-  `onPick` sa dali uložiť hodnoty predchádzajúceho produktu ako ručná položka).
-- **Proposal zaniká, len keď ho zápis SPOTREBOVAL** (`usedProposal`, review #290/3 P2) — teda po potvrdenom `hw_demos_create`. Uložená úprava *cudzej* položky s ním nemá nič
-  spoločné a pripravený produkt po nej z „Nová položka" nezmizne.
-- **Editor ukazuje EFEKTÍVNU kategóriu** (`hwEffectiveCategory` — tá istá mapa ako `tree_category_of`, review #290/3 P2). Uložená hodnota mimo `CATEGORIES` v selecte možnosť
-  nemá, takže by prehliadač vybral prvú (`ZAVESY`) a uloženie nesúvisiacej zmeny by položku ticho preradilo medzi závesy. Baseline je preto `OSTATNE` a patch kategóriu pošle
-  len pri skutočnej zmene.
-- **Cena sa parsuje CELÁ** (`hwPriceKey`, review #290/3 P2): `parseFloat` berie číselnú predponu, takže „18.90abc" aj „18,90 €" mali ten istý kľúč ako 18.90 — úprava končila
-  „Nič sa nezmenilo" a proti proposalu to vyzeralo, že sa ceny nikto nedotkol. Neplatná hodnota je **štruktúrovaná chyba pri poli `price`**, nikdy tichý zápis.
-- **Náhľad z Démosu má KLIENTSKU generáciu** (review #290 P2): každá zmena poľa ju zvýši a odpoveď so starou sa **zahodí**. Server svoju generáciu dvíha len pri NOVOM náhľade,
-  takže scenár „vložím URL, potom pole prepíšem na text" by inak nechal dobiehajúcu odpoveď prepísať kód, názov, cenu, MJ, kategóriu aj výrobcu. **Vymazanie poľa** je výslovné
-  „už to nechcem": pošle `hw_demos_cancel` a proposal zahodí.
-- Odchod zo sekcie modal **zatvára** (`hwCloseModals`) — žije v `#nxModalRoot` MIMO `#secbody` a inak by visel nad cudzím obsahom; jeho `onClose` zruší nedokončený náhľad aj
-  naplánovaný dotaz. **Hotový proposal ale zatvorenie PREŽIJE** (review #290 P2) — kostra si pamätá len to, čo sa líši od východiskových hodnôt, a tie po predvyplnení držali
-  práve hodnoty proposalu, takže Escape by zmazal celý vyhľadaný produkt. „Nová položka" z neho formulár znovu predvyplní; zaniká až po ÚSPEŠNOM zápise alebo vymazaní poľa.
-
-Testy: `tests/pure/test_kovb2_katalog.rb`, `tests/js/test_kovb2_katalog.js` (minidom), in-SketchUp sekcia **`run_kovb2`**.
-
-**KOV-B3 (v0.9.26) — pohľad Sety sú DLAŽDICE a editor setu je MODAL (D-110, R-41).** Inline editor (`HWS_EDIT`, `hwsEditorNode`, akcia `hws-save`) **ZANIKOL** — žil priamo
-v tele sekcie, takže rozpísaný set musel prežívať každý push, a hlavne posielal pri uložení **čerstvú revíziu z posledného pushu** (R-41): keď druhé okno medzitým ten istý set
-zmenilo, staré polia odišli s NOVOU revíziou a serverový CAS ich pustil — tichý prepis cudzej práce. Editor je od tejto dávky **modal kostry D-15**, ktorý si revíziu **PRIPÍNA
-pri otvorení** (presne vzor `hwsPinRev` z editora pásiem) a spolu s ňou drží aj **základnú definíciu setu**; vnútorné prekreslenia (zmena klasifikácie, konflikt) ich **NIKDY
-neomladzujú** — inak by guard prešiel nad stavom, ktorý používateľ nikdy nevidel.
-
-- **Poradie polí je poradie mockupu `#mSet` 1 → 6 a je KONTEXTOVÉ:** použitie → otváranie → **konštrukcia LEN pri zásuvke** → výrobca → **rada závislá od výrobcu a VOLITEĽNÁ**
-  → názov, plus prepínač **Aktívny/Neaktívny** a zoznam členov. `generic_type` sa pýta **iba vtedy, keď ho server nemá z čoho odvodiť** (nezaradený set alebo použitie „Iné") —
-  pri zaradenom sete je autoritou vzťahu `USE_TYPE_GENERIC` a druhá otázka by dovolila uložiť dva protirečivé zápisy o tom istom sete. Zmena klasifikácie mení SADU polí, takže
-  sa modal **prekresľuje** (vzor `hwItemCtxSwitch`) — prekreslenie **nie je zatvorenie** (`HWS_REOPEN`).
-- **Klasifikácia sa posiela VŽDY CELÁ, aj prázdna.** `save_set!` merguje z uloženého setu, takže vynechať `drawer_construction` pri prepnutí zo zásuvky na dvierka by znamenalo
-  prevziať starú hodnotu a set by už nikdy neprešiel validáciou. Prázdna hodnota = **vedomé vymazanie**, úplná dvojica = ALL-OR-NOTHING zaradenie; legacy set sa preto dá otvoriť,
-  nechať nezaradený a uložiť.
-- **Auto-návrh názvu** (`Výrobca · Rada · popis klasifikácie`) sa prepočítava **len kým ho človek neprepísal** — po ručnom zásahu ho ďalšia zmena klasifikácie už neprepíše.
-- **Člen kladie DVE otázky:** „Ako sa určí kód?" (pevný · podľa NL · podľa pásma parametra) a „Koľko?" (`per: unit|owner`). Tri tlačidlá „+ člen / + rad / + pásma" nahradilo
-  **jedno „+ Pridať člena"**; prepnutie spôsobu **zahodí polia druhého** (XOR je dátový kontrakt člena — `code_by_height` neexistuje a nevzniká). **Dátový tvar člena sa
-  NEMENÍ.** Zoznam žije v poli `custom` kostry (vyššie), pásma a param selecty sú **presunuté**, nie skopírované (`hwsBandRow`/`hwsParamSelect` používa aj editor výberu setu).
-- **Živý náhľad expanzie** je pole `custom` bez `read` (nič neodosiela). Klient posiela `hws_preview` s **generáciou požiadavky aj IDENTITOU MODALU** (`token`) a odpoveď
-  s **cudzím tokenom** alebo so **staršou generáciou zahodí**. Generácia sama nestačí (review #297 P2-2): štartuje od nuly pri každom otvorení, takže oneskorená odpoveď už
-  zavretého okna by v novom ukázala **cudziu expanziu** a zdvihla počítadlo tak, že by sa vlastné odpovede zahadzovali, kým ho nedobehnú. Písanie je **debouncované (~300 ms)**,
-  „Počítam náhľad…" je v náhľade, **nie zámok tlačidla Uložiť** (náhľad nesmie brániť uloženiu). Text skladá SERVER.
-  **Štruktúrované chyby náhľadu pristanú PRI POLI** (review #297 P2-5) — náhľad validuje TEN ISTÝ draft ako zápis, takže chýbajúci kód člena či neúplná klasifikácia sa ukáže
-  hneď, nie až pri uložení; keď sa draft opraví, zhasnú. Počas bežiaceho zápisu má prednosť jeho hláška.
-  **Vzorové parametre nesú LEN to, čo zadal človek** (review #297 P2-4): prázdna „vzorová NL" necháva výber podporovanej dĺžky na SERVERI (`preview_nl`) — klient, ktorý by 470
-  posielal vždy, by pri rade s 260/300 hlásil falošný ORANGE „nemá kód pre NL 470". Pole preto ukazuje hodnotu, ktorú server **naozaj použil**, a vymazanie poľa rozhodovanie
-  vráti jemu.
-- **Výsledok zápisu je `HWSETS.setResult(ok, msg, errors, token, conflict)`** (vzor `MDH.itemResult`): úspech modal zavrie a zahodí pamäť konceptu, odmietnutie ho nechá otvorený
-  a chyby rozsype **PRI POLIACH** — chyba člena nesie `row` = index, takže pristane pri tom členovi. **Konflikt je vlastná vetva:** draft sa **nezahadzuje**, modal povie „Set
-  medzitým zmenil niekto iný" a ponúkne **explicitné tlačidlo „Obnoviť"**, ktoré až na druhý, vedomý klik nahradí polia čerstvým setom a **pripne novú revíziu** (bez toho by
-  konflikt trval donekonečna). Pri **NOVOM sete** vedie cesta von inak (review #297 P2-6): načítavať nie je čo (set ešte neexistuje), takže obnova **len prepne pripnutú revíziu
-  na čerstvú a rozpísaný set nechá celý** — inak bolo tlačidlo no-op a každé ďalšie „Uložiť" kolidovalo donekonečna. `token` platí ako v KOV-B2 — odpoveď zavretého okna nesmie
-  zavrieť okno otvorené teraz.
-- **„+ Vytvoriť výrobcu/radu…"** funguje ako v modale položky a ide **tou istou serverovou cestou** (`hw_tax_create_*`). Echo `emit_tax` preto posiela **DVA samostatné skripty**
-  — `MDH.taxonomy` aj `HWSETS.taxonomy`; každý príjemca si overí vlastný token (novú hodnotu vyberie len okno, ktoré o ňu žiadalo) a druhému sa aspoň obnoví zoznam. Zliať ich
-  do jedného skriptu by znamenalo, že výnimka v prvom zhodí druhý.
-- **Prechod na „— nezaradený —" maže CELÝ klasifikačný blok** (review #297 P2-3, `hwsApplyUseType`). Vymazať len konštrukciu nestačilo: payload odišiel s prázdnym `use_type`
-  a neprázdnym výrobcom, server ho odmietol (ALL-OR-NOTHING) a používateľ nemal ako zaradenie zrušiť. `generic_type` naopak **ostáva** — nezaradený set si ho nesie sám;
-  a pole, ktoré práve nie je na obrazovke, drží **draft** (inak by ho prekreslenie stratilo a select by ticho vybral prvú možnosť).
-- **Odchod zo sekcie zatvára AJ modal setu** (review #297 P2-7). Žije v zdieľanom `#nxModalRoot` mimo `#secbody`, ale čistiaca cesta sekcie (`hwCloseModals` v `hw_catalog.js`)
-  poznala len modal položky (`HW_ITEM`) — modal setu by tak visel nad cudzou sekciou Štúdia aj s naplánovaným náhľadom. Zatvorenie si riadi jeho **vlastník**:
-  `HWSETS.closeModal()` (jeho `onClose` zruší debounce náhľadu a rozpísané hodnoty si zapamätá).
-- **Pohľad Sety = DLAŽDICE:** názov · chipy klasifikácie (použitie · otváranie · konštrukcia · výrobca a rada stlmene) alebo chip **„nezaradený"** pre legacy set · chip
-  „neaktívny" · Upraviť a Zmazať (existujúce dvojklikové potvrdenie). Je to **kompaktný riadok**, nie karta na výšku (vertikálny priestor je vzácny). **Neaktívny set sa už
-  nenúka ako nový výber** — ponuku projektu filtruje server (`set_options`), globálnu tabuľku `hwsGlobalOptions`; **aktuálne použitý set v ponuke ostáva** a existujúce
-  mapovania, snapshoty ani nákup sa nemenia.
-
-Testy: `tests/pure/test_kovb3_nahlad.rb`, `tests/js/test_kovb3_modal.js` (minidom), rozšírený `tests/js/test_st2c_modal.js` (typ `custom`), in-SketchUp sekcia **`run_kovb3`**.
-
-**ŠT-3b-1 — ôsma živá sekcia: PRAVIDLÁ (`rules`, tretia zo skupiny KATALÓGY).** Presun formulára zaniknutého okna „Pravidlá kovania" (Š17, skupina „Kovanie podľa rozmerov"): akcie
-**Uložiť a prestavať skrinky · „aj ako globálnu predvoľbu" · Načítať globálne · Doplniť nové predvolené** sú v LIŠTE sekcie (`rulesToolsHtml` — čistá funkcia, stav chodí
-argumentom), telo je **JEDEN uzol naklonovaný raz zo `<template id="rulesBodyTpl">`**.
-
-**Formulár prežije push:** `rdApplyState` porovnáva odtlačok pravidiel (`RD_SEED`) a prekresľuje LEN vtedy, keď sa pravidlá NA MODELI naozaj zmenili (vlastné uloženie, Späť,
-prepnutie dokumentu, odmietnutý zápis) — inak sa nasadí len meta riadok (zdroj, počet skriniek). „Načítať globálne" odtlačok ZAMERNE NEobnovuje: je to zmena formulára, ktorá ešte
-NEPLATÍ, a najbližší push by ju inak potichu vrátil.
-
-**Payload chodí CELÝ pri každom pushi** (`rules_payload(model, collected)` — model AJ hotový zber ARGUMENTOM, lekcia F4; **žiadny druhý sken modelu**) — **žiadna západka
-`full_pending`**: pravidlá sú malý JSON (jednotky záznamov, žiadne `row_rev` per položku ako katalóg), takže druhý kanál by bol drahší než payload.
-
-**ŠT-3b-2a — read-only bloky sekcie** (`abs` = pravidlá ABS podľa roly, `overrides` = jantárové riadky ručných zásahov) majú **VLASTNÉ DOM uzly a vlastnú render funkciu
-`rdRenderExtra`, ktorá beží pri KAŽDOM pushi** (vzor `rdSrcLine`) — zámerne MIMO `rdRender`/`RD_SEED`: ručný zásah v Inspectore pravidlá NEMENÍ, takže odtlačok formulára je ten
-istý a riadok by sa inak objavil až po prepnutí sekcie; naopak rozpísaného formulára sa `rdRenderExtra` nesmie dotknúť. Poradie skupín je **ABS nad kovaním** (mockup), telo ostáva
-JEDEN uzol `#rulesBody`.
-
-**ŠT-3b-2b:** okno dostalo VEREJNÝ čítač `StudioDialog.generation` — zapisové akcie sekcie potrebujú ten istý guard, aký má klik v Kusovníku (klik zo zastaraného zoznamu sa nesmie
-vykonať); generáciu zdvíha naďalej VÝHRADNE `push_state`. Po zápise do modelu dostanú čerstvé čísla **obaja odberatelia** — `Panel.push_selected` (pravidlá menia kovanie v sekcii
-Kovanie Inspectora) a `refresh_if_open(bump: true)` (prestavba VŠETKÝCH korpusov mení kusovník, nákupný zoznam aj rozpočet), a to v TOMTO poradí (vzor
-`refresh_studio_after_model_write`). Testy: `tests/pure/test_st3b_rules.rb`, `tests/js/test_st3b_rules.js`, in-SketchUp sekcia **`run_st3b`**.
-
-**D-118b — riadok pravidla sa prizná, čím je.** Pravidlo `vysuvy-nl-podla-hlbky` beží od KOV-C2b už LEN na zásuvkových čelách BEZ systému zásuvky (čelo so systémom
-Atira/Quadro dostane kód z receptu), ale v zozname vyzeralo ako plnohodnotné pravidlo výsuvov. Riadok preto dostal vlastný titulok **„Výsuv — staré zákazky bez systému
-zásuvky"** (`rdRuleTitle`, iba pre tento `rule_id`) a jednovetový hint pod radom dĺžok. **`rdLabel` sa NEMENÍ** — je to spoločný slovník typov kovania so serverovou
-`HardwareRules.label_for` (guard test na zhodu) a tu ide o titulok RIADKU, nie o premenovanie typu `slide`. Pravidlo sa **nemaže**: starým zákazkám by ticho vypadli výsuvy
-z nákupu.
-
-**KOV-F2 (v0.9.51) — EDITOR door guardov pravidla `bands`.** Voliteľné kontroly dvierok z F1 (`width_plus {over, add}` · `width_warn_over` · `weight_bands [{max, quantity}]` ·
-`finite`) boli do F1 len **read-only veta** (`rdGuardHint`); od F2 sú **formulár** a veta zanikla — ten istý údaj nesmie byť na obrazovke dvakrát. Blok kreslí `rdGuardHtml`
-pri pravidle **`kind: 'bands'` s výstupom `hinge`** a pri **každom `bands`, ktoré už niektorý guard nesie** (inak by sa hodnota z cudzieho snapshotu nedala ani vidieť, ani
-opraviť); mená kľúčov drží `RD_GUARD_KEYS` ako **zrkadlo** serverových `HardwareRules::DOOR_GUARD_KEYS` (guard test na zhodu). **Vertikálny priestor:** je to `<details>`
-a je **zbalený** — súhrn v lište (`rdGuardSummary`, čistá funkcia) povie, čo skrýva („+1 nad 600 mm · varovanie nad 800 mm · 2 hmotnostné pásma · konečná tabuľka"), otvorený
-stav si pamätá `RD_GUARD_OPEN` **podľa `rule_id`** (nie indexu — pravidlá sa môžu preskupiť), takže pridanie hmotnostného pásma (= prekreslenie formulára) blok nezavrie.
-
-**Codex #330 (v0.9.52) — dve veci, ktoré blok robí sám.** (1) **Tvar zo snapshotu nesmie zhodiť sekciu:** `weight_bands` (a rovnako `bands` aj `series`) prechádza bránou
-`rdArr` (`Array.isArray(v) ? v : []`), takže hash, reťazec či číslo z cudzieho alebo pokazeného záznamu sa vykreslí ako **prázdna tabuľka s jantárovým hintom** („hmotnostné
-pásma sú v uložených dátach v nesprávnom tvare… uložením sa pokazený údaj odstráni", trieda `.rgbad`) a v zbalenej lište ako „hmotnostné pásma: neplatný tvar" (`rdWeightBroken`;
-reťazec má `.length`, takže bez toho by lišta hlásila pásma, ktoré neexistujú). Sekcia sa kreslí **jedným `innerHTML`**, takže bezpodmienečný `.forEach` nad takou hodnotou by
-zhodil CELÚ sekciu Pravidlá — teda aj jediné miesto, kde sa dá tá hodnota opraviť; takto ju **opraví uloženie** (zber píše len to, čo je vo formulári, a kľúč zmizne). Server
-robí ten istý krok zo svojej strany — `normalize_rules` mení ne-pole na `[]`, viď [hardware.md](hardware.md). (2) **Súhrn nesmie zaostať za formulárom:** pri **zbalení** bloku
-(`rdGuardToggle` → `rdGuardRefresh`) sa formulár preberie **tým istým zberom ako pri ukladaní** (`rdSyncFromForm`) a text lišty sa prepíše. Hodnoty polí totiž žijú len v DOM
-(do `RD_RULES` sa preberajú až pri „+ pásmo" / „✕" / Uložiť), takže bez tohto kroku by lišta po úprave ukazovala stav spred otvorenia. **Prekresliť sa nesmie** — `rdRender` by
-zahodil `<details>`, nad ktorým práve beží udalosť (a s ním zameranie), preto sa mení iba text `.rgsum`.
-
-**Zber (`rdCollectGuards`) NEPOSIELA tvar, ktorý by server ticho zahodil.** Kľúč, ktorý používateľ nevyplnil, sa **nezapíše** — a prázdne pole je zároveň jediný spôsob, ako
-kontrolu vypnúť (vzor „prázdne pole je AUTO"): nekladná alebo prázdna šírka = guard preč (rovnaký výsledok ako `normalize_width_plus!`), chýbajúci počet kusov = **1** (rovnaký
-clamp, aký má editor výškových pásiem), odškrtnutý prepínač = kľúč `finite` preč (nikdy `false`). **Výnimkou sú hmotnostné pásma:** riadok, ktorý používateľ vedome pridal, sa
-nezahadzuje — prázdne kilogramy idú ako `null` a uloženie sa **odmietne vetou** (klient hneď cez `rdValidate` → `rdWeightProblem`, server znova cez
-`HardwareRules.weight_bands_problem`, viď [hardware.md](hardware.md)); posledné zmazané pásmo kľúč odstráni. Pravidlo, na ktoré sa editor nekreslí, ostáva **nedotknuté** —
-`rdCollectRules` pracuje na kópii pôvodného pravidla, takže guard z cudzieho `fit_series` záznamu uloženie prežije. Testy: `tests/pure/test_kovf2_editor_zavesy.rb`,
-`tests/js/test_kovf2_editor_zavesy.js` (mini-DOM) + spoločná fixtúra parity.
-
-**KOV-G1b (v0.9.59) — pásma vedia povedať, PODĽA ČOHO merajú, a popis roly pozná prah sokla.** Tabuľka pásiem vyzerá pri každom pravidle rovnako („do X mm
-→ N ks"); kým boli pásma len závesové (výška čela), bolo to jedno, ale od G1b sú **korpusové pravidlá na ŠÍRKU** (nohy 4/6, príchyt sokla). Pod tabuľku
-preto pribudne **jednoriadkový hint „Pásma podľa šírky korpusu."** — a to LEN pri `kind: 'bands'` + `input: 'width'` + `applies_to.role == 'cabinet'`
-(`rdWidthHint`, čistá funkcia). Pri `height` sa **nič nemení** (výška je pri závesoch zaužívaná a vertikálny priestor panela je vzácny). `rdRoleDesc` pre
-cabinet pravidlo s **`applies_to.floor_height_min`** povie „na skrinku na nohách so soklom od 55 mm" (hodnota z pravidla, vypisuje sa tak, ako ju posiela
-server — vzor `rdLiftSummary`); pravidlo bez prahu má ďalej „na skrinku s podstavcom", takže dve korpusové pravidlá sa už nedajú zameniť. **Editor prahu
-NEEXISTUJE** (je to dátové rozhodnutie, nie nastavenie zákazky) — o to dôležitejšie je, že ho zber **nesmie stratiť**: `rdCollectRules` pracuje na kópii
-celého pravidla (`JSON.parse(JSON.stringify(src))`), takže `floor_height_min` prežije formulár aj uloženie. Bez neho by príchyt pribudol aj ku klzáku
-17 mm, kde žiadna soklová lišta nie je. Zápisová brána ani fixtúra parity sa **nemenia** (nové kritérium nepribudlo). Testy:
-`tests/js/test_kovg1b_editor_nohy.js` (mini-DOM), server v `tests/pure/test_kovg1b_nohy_pravidla.rb`.
-
-### StudioModelWatch — indikátor neaktuálnosti okna (22.8., „Obnoviť" zožltne)
-
-Štúdio čísla **neprepočítava samo** — kým sa nestlačí „Obnoviť", visia v ňom čísla z posledného prepočtu. Model sa medzitým mohol zmeniť (prestavba skrinky z Inspectora, posun,
-Späť/Znova) a okno vyzeralo **úplne rovnako**, takže sa dalo exportovať VEPO, objednávku aj cenovú ponuku zo starých čísel. Okno má preto **vlastný `Sketchup::ModelObserver`** (4
-hooky: commit · undo · redo · abort; trieda je pod guardom `defined?(Sketchup::ModelObserver)`, lebo headless testy súbor requirujú bez SketchUpu — vzor `edge_overlay.rb`).
-
-**`PanelModelObserver` ani `ScaleWatch` sa nedotkli**: prvý počuje LEN Späť/Znova/Abort, druhý vedome filtruje vlastné prestavby — ani jeden teda nevidí hlavný prípad.
-
-**Callback je prázdny** (pravidlá observerov + lekcia D-103): `@epoch += 1` a latch `UI.start_timer(0)` — žiadne čítanie ani zápis modelu, burst commitov = **jeden** `js` do okna
-(vzor `Panel.request_txn_refresh`).
-
-**Jadro riešenia je POROVNANIE EPOCH:** `push_state` si ukladá `@pushed_epoch = @epoch` **až na konci** (po `fresh_collect`, a len keď payload naozaj odošiel) — transakcie, ktoré
-spustil **sám prepočet okna**, sú tým už započítané a flush ich **pohltí sám**; žiadne volacie miesto nepotrebuje výnimku ani „suspend" prepínač. *(Od 1b-3 má prepočet okna už len
-JEDEN taký zdroj — zápis rozpočtu s `bump: false`. Druhým býval dedup kópií vo `fresh_collect`; ten zanikol, lebo čítanie do modelu nezapisuje, a in-SketchUp scenár `STALE (c)`
-odvtedy meria opak: „Obnoviť" nad modelom s duplikátmi model NEZMENÍ a tlačidlo aj tak nezožltne.)* Flush posiela `NX.markStale()` len pri
-`@epoch > @pushed_epoch`, so **živým oknom** a **dvojitým guardom dokumentu** (`txn_model_ok?` — overuje sa v callbacku aj znova v timeri, dokument sa môže prepnúť medzi udalosťou
-a timerom).
-
-**Lifecycle = presne život okna:** attach v `ensure_dialog` (anti-double `remove → add`, každý krok vlastný rescue — vzor `EdgeCheck.attach_observer`), detach v `set_on_closed`,
-prevesenie + nulovanie epochy pri prepnutí dokumentu (`on_model_changed`) — **epocha je per dokument**.
-
-**Žiadny `Engine` broadcast** (vedome): epocha má jedného vlastníka.
-
-**Klient** drží `staleFlag` (stav OKNA — nikam sa neukladá); `NX.markStale()` prekreslí **len lištu aktívnej sekcie** (tabuľka aj zoznam nálezov sú stále tie čísla, čo prišli
-naposledy), zhadzuje ho **výhradne plný payload** `setStudio` (pred `render()`) — echá (`setVepoBar`, `setEdgeCheck`, `setGrainCheck`, `budgetResult`) čísla nenesú, takže stav
-nezhadzujú. Jantár ide cez tokeny `--nx-warn*` (tá istá trieda vzhľadu ako jantárové „Prepočítať ceny"); **zelená vedome nie je** — významové farby ostávajú semaforu Kontroly.
-
-**PRIZNANÁ ŠÍRKA SIGNÁLU** (tooltip aj tento odsek): server nevie, či zmena naozaj hla kusovníkom — posun cudzieho objektu tick vyvolá tiež. Signál hovorí **„možno neaktuálne", nie
-„určite zmenené"**; radšej jantár navyše než export zo starých čísel.
-
-**Žiadny prepočet, žiadny zápis, žiadny krok Späť** — tick je čistý JS signál. Testy: `tests/pure/test_stale_obnovit.rb` (kontrakt observera, latch, epochy, lifecycle),
-`tests/js/test_stale_obnovit.js` (dva stavy tlačidla, echá, päť miest), **in-SketchUp sekcia `run_stale`** (dôkazová zásada D-101 — počítadlá vstupov aj odoslaných signálov: commit
-= 1 · burst 3 = 1 · vlastný tick prepočtu = 0 · zápis rozpočtu = 0 · Späť/Znova = 1 · cudzí dokument = 0 · po zatvorení okna 0 vstupov).
-
-### Sekcia KONTROLA v Štúdiu (ŠT-1b, Š8–Š11)
-
-presun tabu Kontrola z okna Výroba — **obsah sa presúva, nekopíruje** (tab aj s lištou prepínačov tam zanikol).
-
-**Š8 semafor** = tri chipy, z ktorých **červený a oranžový sú FILTRE** (druhý klik zruší, `ctrlFilter` je stav OKNA — nikam sa neukladá) a zelený je informačný „skriniek bez
-nálezu".
-
-**Všetky tri čísla sú serverové** — `Validation.counts` dostalo od tejto dávky **zelené číslo** (`cabinets`/`clean` = počet korpusov mínus vlastníci s nálezom).
-
-**H3a (A-03) — menovateľ a počet riadkov.** Zelený chip píše **„0 zo 7 skriniek bez nálezu"**: menovateľ je `counts.cabinets` (v payloade bol už od ŠT-1b, payload sa
-nemenil), predložku z/zo dáva čistá `skZo(n)` (zo pred 4, 6, 7, 14, 16, 17, desiatkami 4/6/7 a stovkami 1/4/6/7; od 1000 vždy „z"), `cabinets === 0` = „0 skriniek
-v modeli", `clean` null = „—" a payload bez `cabinets` = dnešný tvar (`greenChipParts`). Oranžový chip píše **„10 nálezov v 5 riadkoch · skontroluj pred
-objednávkou"** — D-122 zlučuje UNI nálezy do jedného riadku, takže 10 nálezov nad piatimi riadkami pôsobilo ako chyba. **Počet riadkov je JEDINÉ číslo semaforu,
-ktoré počíta klient — vedomá výnimka k „všetky čísla sú serverové"**: nie je to údaj o dátach, ale koľko riadkov TENTO zoznam nakreslí (zlučovanie D-122 žije len
-v klientovi). Počíta ho `ctrlOrangeRowCount` (oranžové mimo UNI skupiny + 1 za skupinu) zo **zdieľaného predikátu** `ctrlUniGrouped`, ktorý používa aj
-`ctrlListHtml` — parita je pod testom; filtrom a dĺžkou poľa, nie sčítavaním (guard ŠT-1a). `semaforHtml(counts, filter, list)` má zoznam ako voliteľný tretí
-argument — bez neho a pri počte riadkov ≥ počtu nálezov sa „v M riadkoch" nepíše.
-
-**Menovateľ je skutočný počet skriniek zo zberu (`collected[:cabinets]`)**, nie dĺžka zoznamu ID z `placements`: `Bom.add_placement` záznam vynecháva (prázdne ID, degenerované
-rozmery) a rovnaké ID zbiera raz, takže poškodená skrinka či dve kópie s tým istým ID by počet skriniek **ticho zmenšili** (nález review #2). Množina ID z `placements` slúži len na
-rozhodnutie „ktoré ID patrí skrinke"; bez nej sa zelené číslo nepočíta vôbec a tvar `counts` sa **nemení** (legacy volania sú nedotknuté), `with_budget` ho prenáša ďalej, lebo
-rozpočtový nález vlastníka nemá.
-
-**Prijatý limit (review #8):** nález „dva kusy na jednom mieste" nesie `owner_id` prvého vlastníka skupiny, takže zo skupiny „špiní" zelené číslo len jedna skrinka — rozpad na viac
-vlastníkov by zmenil `stable_key` (a s ním klik-select aj dedup), pričom nález aj tak vedie k oprave celej skupiny. Filter **LEN skrýva** — poradie ani dedup neurčuje klient, a
-index riadku ostáva indexom do **serverového** poľa, inak by klik pri zapnutom filtri adresoval iný nález.
-
-**D-122 (v0.10.2): ORANGE `uni_material` nálezy sú v jednej predvolene zbalenej skupine „Nenahradené UNI materiály“** s počtom dotknutých dielcov. `ctrlListHtml` ju vloží na miesto
-prvého UNI nálezu; deti používajú pôvodný `ctrlRowHtml` s indexom do serverového poľa. Ostatné nálezy ostávajú samostatné, prípadný RED sa do ORANGE skupiny nezaradí. Hlavička
-iba prepína zobrazenie (klávesnicové tlačidlo s `aria-expanded`, po prekreslení drží fokus); neoznačuje entitu. `ctrlUniOpen` prežije filter aj nový payload rovnakého dokumentu,
-ale zmenou `model_guid` alebo odstránením posledného UNI sa zruší. Deti sa skladajú zakaždým z čerstvého payloadu. **Semafor, badge, validácia, dedup aj exporty sa nemenia** —
-počty naďalej zahŕňajú jednotlivé nálezy aj v zbalenej skupine, čo pripomína hint. Regresie: `tests/js/test_d122_uni_skupina.js` (indexy, akcie, filtre, refresh, nový dokument).
-
-**Š9 riadok**: bodka závažnosti · text · miesto · akcie vpravo. Klik na riadok aj **oko** = `nx_select` s `problem_key` (stabilný kľúč, nie pids — po flushi editov by už neplatili;
-jadro je `ProductionCore.do_select`), **ceruzka** = to isté + `focus_inspector`. Tou istou cestou (a tým istým jadrom) idú aj ostatné klik-selecty okna — každý so svojou
-adresou: `parts_key` (Kusovník), `hw_key` (generika), `material_key`/`abs_key` („Kde sa používa"), `rule_ref` (Pravidlá) a **od D-94 `source_ref`** (zdroj v rozklikanom pôvode
-sekcie Nákup — `cabinet_id` + `owner_part_key`, vždy s `focus_inspector`).
-
-**NP-2:** ORANGE nález **`layout_settings`** („nastavenia prerezu a orezu sa nepodarilo načítať") nemá entitu v modeli — riadok ukazuje
-miesto „Nastavenia", akciu `data-act="bset"` (ikona `settings`, bez oka a ceruzky) a klik vedie klientsky do sekcie Nastavenia rozpočtu
-(`studioGoSection('bset')`, vzor rozpočtového nálezu).
-
-**Kontextová oprava je len tam, kde existuje:** UNI nález ponúka **„Nahradiť UNI…"** cez vlastný callback `replace_uni` → `MaterialsDialog.request_replace_uni` (**plne funkčný
-modal**, nie sľub), rozpočtový nález nemá entitu v modeli a **od ŠT-1c PR B1 vedie do SEKCIE Rozpočet toho istého okna** (`studioGoSection('budget')` + `budGoto(budget_section)` —
-server skladá adresu, klik zostáva v okne; premostenie do okna Výroba zaniklo spolu s ním). **D-143 (KON-0, v0.13.1):** RED „chrbát v drážke zo staršej verzie"
-(kategória `back_cut`, serverový príznak `fix: 'rebuild_stale'`) ponúka **„Prestaviť zastarané skrinky"** (`data-act="rebuild"`, ikona `refresh-cw`). Je to **ZÁPIS** do modelu,
-preto ide flush handshakom ako D-131: callback `back_rebuild_stale` → `StudioDialog.handle_back_rebuild_stale` → `NX.studioRelayBackRebuild` v paneli (flush rozpísanej zmeny,
-červené pole = `flush_blocked`) → `studio_do_back_rebuild` → **`Panel.back_rebuild_stale`** (zápisová cesta, brána 1b-3). Server overí `gen`, `flush_blocked`, `model_guid`
-(prísne) a pokoj observera, skrinky vyberie z **čerstvého zberu** (nie z DOM) a prestaví ich `rebuild_many` = **jeden krok Späť**; preskočené (odpojený dielec, neznáme
-kovanie) vymenuje v statuse. Klient drží zámok `ctrlRebuildBusy` proti dvojkliku, zhodí ho každý plný push (každá vetva servera končí `repush`).
-
-**Š10 lišta sekcie** nesie od KOV-A2b TRI prepínače: „Zvýrazniť hrany" ako tlačidlo s **rohovým trojuholníkom** (klik na telo prepína, klik na roh otvára 3-stavové nastavenie —
-zdieľaný `edge_menu.js`, od ŠT-1c PR B3 **druhá (a posledná) inštancia**, poloha cez `.ecmenu-studio`), „Smer kresby" (K2/D-87) a **„Smer otvárania"** (KOV-A2b, `dcBtn`/`data-dc`,
-`directionBtnHtml` + `directionCheckText` — obyčajné tlačidlá, nemajú čo nastavovať). Zostáva pri tom **JEDEN riadok a jeden text lišty** (vertikálny priestor je vzácny; stráži
-test). **Text lišty skladá `edgeCheckInfoText` (H3a, A-03)** z častí ZAPNUTÝCH prepínačov — hrany `edgeCheckText`, kresba `.gcinfo`, smer otvárania `.dcinfo` —
-spojených „ · " **bez úvodného oddeľovača**; veta „Vypnuté — v modeli nie je nič nakreslené." platí **len keď nie je zapnuté nič z troch** (predtým ju lišta písala
-pri každých vypnutých hranách, aj keď smer otvárania práve kreslil šípky). `edgeCheckText` sa nemenil (D-104). Rozbaľovacie okno hrán zatvára **klik mimo aj Escape** (vzor `bindEdgeMenu` v raile) a otvorenie zavrie kópiu v raile (`edge_menu_open` → `Engine.close_edge_menu(:studio)`;
-tretia inštancia — okno Výroba — zanikla v ŠT-1c PR B3, takže sú už len dve).
-
-**Š11 badge**: navigačná položka Kontrola nesie živé RED/ORANGE počty **z tých istých `counts`** ako semafor (čistá zákazka badge nekreslí). Payload sekcie chodí **v tom istom
-pushi ako Kusovník** (`control` · `counts` · `edge_check` · `grain_check` · `direction_check`) — prepnutie sekcie je čisto zobrazovacie a nesmie chodiť na server. Každý prepínač má
-navyše **lacné echo** (`push_edge_check` / `push_grain_check` / `push_direction_check`), ktorým sa po prepnutí odkiaľkoľvek prekreslí LEN lišta.
-
-**Deep-link Kontrola → karta čela (KOV-A2b):** ceruzka pri RED náleze „smer otvárania" vyberie v modeli **VLASTNÍKA (korpus)** a potom — a **len keď je Inspector otvorený** —
-pošle `NX.focusFront(front_id)`. `front_id` vytiahne zo `part_key` zdieľaný `PartKeys.front_id`; klient prepne kontext na **Čelá**, otvorí kartu práve toho čela
-(`openFrontCardId` + `refreshFrontCards`) a doscrolluje riadok. **Žiadny nový stav na serveri** a pri neznámom ID sa neotvorí nič (cudzia otvorená karta by klamala).
-
-**Prečo vlastník a nie dielec** (Codex #282 P2): karta čela žije v Inspectorovi LEN nad označenou **skrinkou**. Výber vnoreného dielca prepne panel do režimu „dielec", v ktorom
-`setViewContext('cela')` neprejde (`NXShell.ctxEnabled`) — deep-link by ticho zomrel a používateľ by videl kartu dielca. Rozhoduje **server** (výber je jeho autorita, klient si
-druhý krok nevymýšľa): čistá `ProductionCore.select_target_item` adresuje nález **tou istou položkou bez `part_key`**, takže sa použije presne tá vetva `pids_for_problem`, ktorá
-obsluhuje korpusové nálezy (`scoped_owner_instance` pri známom `owner_pid`, inak všeobecná podľa `owner_id`) — **žiadny druhý resolver**. Bez ceruzky (obyčajný klik na riadok)
-ostáva dnešné správanie: označí sa **dielec**. Status vety sú preto dve (`front_focus_status` hovorí o skrinke a otvorenej karte). Opačný smer (panel → Štúdio) existoval už predtým.
-
-**Deep-link Kontrola → riadok v Kovaní (KOV-D4):** nález, ktorý má v sekcii Kovanie **konkrétny riadok**, nesie od D4 jeho **adresu** v aditívnom kľúči `data`
-(`owner_part_key` + `generic_type` + `rule_id` + `orphan`). Adresu skladá **VALIDÁCIA** — `Validation.hw_target` — a `stable_key` sa ňou **nemení** (dedup aj klik-select ostávajú).
-Nesú ju: vypnuté kovanie (`hardware`, `orphan: true` — vypnutý zásah živú položku nemá), nenacenená položka (`hardware_unmapped`), chýbajúci kit (`drawer_kit`) a **kód mimo katalógu
-zo SETOVÉHO zdroja** (`hardware_code`; všetky tri `orphan: false`), plus **konflikt zásuvky** (`drawer`). **Ad-hoc zdroj `hardware_code` adresu nedostane** — ručné položky žijú
-vo vlastnom zozname bez identitných atribútov (KOV-H2), takže riadok, na ktorý by sa mierilo, neexistuje. **Konflikt zásuvky** ju dostane len pri kóde z
-`Recipes::OVERRIDE_CONFLICT_CODES` (`nl_lock_invalid` · `height_lock_invalid` · `drawer_override_invalid`) **a** keď má vlastník **práve JEDEN** zásah výsuvu: len pri týchto troch
-je nápravou naozaj riadok zásahu (ich veta ho už dnes menuje), pri ostatných kódoch by jeho reset konflikt **nevyriešil**. Pri viacerých zásahoch (dormantný zámok vedľa
-aktuálneho) server **nehádá** a nález ostáva bez adresy: prisvietiť ten druhý je horšie než neprisvietiť nič.
-
-`ProductionCore.do_select` adresu iba **prepošle** (`hw_focus_target` overí tvar) — vetva kovania ide **PRED** kartou čela (pri kovaní je cieľom riadok, nie karta) a beží cez nový
-kanál `Panel.push_focus_hardware` → `NX.focusHardware` → `nxFocusHardware` (hardware.js): prepne kontext na **Kovanie**, nájde riadok podľa adresy, rozbalí cestu, doscrolluje a
-**krátko prisvieti** (`hwFlash`). Výber v modeli je ten istý ako pri čele — **vlastník (korpus)**, lebo sekcia Kovanie tiež žije len nad označenou skrinkou. Neexistujúci riadok
-= nerobí sa NIC (kontext sa ani neprepne). **Aj deep-link na kartu čela** (`nxFocusFront`) od D4 riadok prisvieti — tou istou triedou `hwfocus`.
-
-**Vedomé odchýlky:** režim „diel po diele" (D-95) je mimo dávky (blok KONTROLA+VÝROBA). Testy: `tests/pure/test_st1b_kontrola.rb`, `tests/js/test_st1b_kontrola.js` (+ presunuté
-sady `test_d104`/`test_d105`/`test_k2`/`test_abs_rail_3stav`), in-SketchUp sekcia `run_st1b`; D4: `tests/pure/test_kovd4_ui.rb`, `tests/js/test_kovd4_ui.js`.
-
-### Sekcia NÁKUP KOVANIA v Štúdiu (ŠT-1c PR A, Š7)
-
-presun tabu Kovanie z okna Výroba — a na rozdiel od ostatných sekcií **bez akéhokoľvek redizajnu**: kontrakt Š7 ho zakazuje, nákupný zoznam sa prekreslí až s blokom KOVANIE. Sekcia
-vznikla preto, aby okno Výroba mohlo zaniknúť — čo sa v PR B3 aj stalo. Obsah je znak po znaku ten istý — **nákupný zoznam zo setov** (kategórie ako medzihlavičky, riadok mimo
-katalógu jantárovo, súčet „len známe ceny" s priznaným počtom nezadaných), **zoznam „Bez kódov"** (dôvod `reason_sk` aj rozmer `params_label` skladá server) a **generika podľa
-pravidiel** s klik-selectom vlastníka.
-
-**H3a (A-04) — okno hovorí po slovensky; stĺpce, poradie, čísla aj CSV ostali.** Nadpis skupiny je SK popisok kategórie („Závesy", nie `ZAVESY`) a položka mimo
-katalógu „Mimo katalógu" (jeden štýl nadpisov). Popisky skladá **jadro** — `ProductionCore.hardware_sets_labeled(hw_exp)` vracia **novú kópiu** s
-`category_label` (`HardwareCatalog.category_label`, pri `missing` nie) a slovenským typom nemapovanej položky `label` (`HardwareRules.label_for`); **vstup
-`hw_exp` sa nemutuje** (číta ho plán, Rozpočet, Kontrola aj spotrebiče v tom istom pushi) a CSV kovania (`do_hw_csv`) si nákup počíta nanovo s kódom kategórie,
-takže je bajtovo rovnaké (test nad prípadmi `kovh_golden`). Generika: stĺpec Parametre číta serverové `params_text` („NL 470 mm · výška čela 150 mm",
-„dvierka · klasické otváranie" — `HardwareSets.params_text`), fallback `params_label` a surové key/value pre starý payload; stĺpec **„Kde" je zlúčený pôvod
-zo servera** (`where`: dve zásuvky tej istej skrinky = „CAB-003 ×2", ručná položka sa nikdy nezleje s pravidlovou, tooltip `manual_note`), starý payload ide cez
-`breakdown` so zápisom „ ×" ako Kusovník. `breakdown` (`owner_pid`) ostáva pre klik-select. Zlučuje server, lebo `studio.js` nesmie sčítavať (guard ŠT-1a).
-Okno a CSV preto hovoria vedome inak (Závesy vs `ZAVESY`) — CSV ide dodávateľovi; zjednotenie by bolo samostatné rozhodnutie.
-
-Presunulo sa **všetko naraz**: render (`buySection` v `studio.js`), pomocníci `price`/`hwManualMark`, CSS `.hwsec`/`.hwbanner`/`.hwcat`/`.hwmiss`/`.hwsum` (z inline štýlov
-`production.html` do `studio.html`, pevné hexy prepísané na `--nx-*` tokeny — okno má dve témy) aj payload polia `hardware` a `hardware_sets`, ktoré okno Výroba **prestalo
-dostávať** (a v PR B3 zaniklo celé).
-
-**Odchýlky od „1:1", všetky vedomé:** CSV export nesedí v hlavičke tabuľky, ale v **lište sekcie** (kontrakt §3 — exporty patria sekcii) a je pri ňom **„Obnoviť"** (prestavba
-skrinky z Inspectora sem sama nedorazí — bez neho by sa nákupný zoznam dal exportovať zo starých počtov bez cesty k čerstvým); tabuľky preberajú `.bomtab` **Štúdia** (rovnaký
-vzhľad ako Kusovník vedľa nich), ale nesú marker **`.hwtab`**, ktorý vracia ruku a hover **výhradne riadku generiky `tr.hwgen`** — `.bomtab tbody tr` má v Štúdiu afordanciu kvôli
-Kusovníku, kým tu je klikateľný jediný typ riadku (pôvodné okno dávalo ruku tiež len `tr.bomrow`/`tr.hwrow`).
-
-**KOV-H2 + D-94 — chip „ručná" a ROZKLIK PÔVODU.** Nákupný riadok je **súčet**: ten istý kód môže prísť zo setu jednej skrinky aj z ručne pridanej položky inej — a z tabuľky to
-nebolo vidieť vôbec. Riadok, ktorého aspoň časť kusov je ručná (`adhoc_quantity > 0`) alebo je to voľná položka, nesie pri názve chip **„ručná"**; voľná položka má v stĺpci Kód
-**pomlčku** (prázdna bunka vyzerá ako chyba). **Klik na riadok** rozbalí pod ním sub-riadok **„Pôvod"**. Popis vlastníka skladá **server**: `ProductionCore.decorate_source_owners`
-doplní do každého zdroja `owner_label` z resolved čiel **tej** skrinky (zber nesie aditívny kľúč `cabinet_fronts`), lebo z generovaného id čela („front:Fmsi0wnix-1-3a3kxe") sa
-nedá prečítať, o ktoré čelo ide; `nil` = kovanie celej skrinky. Nákupný CSV, rozpočet ani ponuka pole nečítajú — **výstup zákazky sa nemení ani o znak**.
-
-**D-94 prepísala tri veci naraz.** (1) **Zdroje sú ZOSKUPENÉ PER SKRINKU** (`hwSourceGroups`, čistá funkcia): jeden riadok na skrinku vo tvare `CAB-3 · 6 ks: F1 · dvierka ľavé ·
-set zaves-klasik ×2 · F2 · … ×4`, poradie skupín = poradie prvého výskytu (server `finalize` triedi deterministicky). Plochý zoznam pri troch skrinkách a piatich čelách prestal
-byť čitateľný; stĺpec ani tu nepribudol (horizontálny priestor) a jeden riadok na skrinku šetrí ten vertikálny. `owner_part_key: null` sa priznáva slovami **„celá skrinka"**
-(predtým sa vlastník ticho vynechal) a `cabinet_id` sa do vety položky už nepíše — stojí v hlavičke skupiny. Zdroj bez `cabinet_id` má vlastnú tlmenú skupinu „—".
-(2) **Zdroje sú KLIKATEĽNÉ**: hlavička skupiny aj každá položka nesú `data-src-cab` (+ `data-src-key`) a klik ide existujúcou cestou `nx_select` — payload `source_ref`
-(`cabinet_id` + `owner_part_key`) plus `focus_inspector: true`, **nikdy pids z DOM**. Delegovaný klik spracúva `[data-src-cab]` **pred** `tr.hwbuyrow`, inak by klik na zdroj
-rozklik iba zbalil. Serverová strana je v `docs/architecture/outputs.md` (vetva `source_ref`). Skupina bez `cabinet_id` klikateľná nie je — nemá kam viesť. **Klik Inspector
-NEOTVÁRA, len zdvihne** (tá istá konvencia ako ceruzka Š3), takže tooltipy hovoria „…a zdvihne Inspector, ak je otvorený" a pri zavretom Inspectorovi to okno povie aj
-**statusom** („Inspector nie je otvorený.") — sľúbiť otvorenie a nespraviť nič je horšie než neponúknuť ho (Codex #361 P2).
-(3) **Pamäť rozkliku PREŽÍVA push.** Do D-94 sa `buyOpen` zahadzoval pri každom pushi, lebo bol kľúčovaný **indexom** riadku a preusporiadaný payload by otvoril cudzí riadok —
-prakticky to znamenalo, že rozklik zmizol po každom „Obnoviť". Kľúčom je teraz **identita riadku** (`free_key` pri voľnej položke, inak `code` malými písmenami — presne agregačný
-kľúč `add_row`, ktorý je case-insensitive), takže preusporiadanie prestalo byť problémom a pamäť sa maže **len pri zmene dokumentu** (`model_guid`, vzor `ctrlUniOpen`). Kľúč
-riadku, ktorý z payloadu zmizol, ostáva v mape bez účinku — nič sa preň nekreslí a čistiť ho netreba. Testy: `tests/js/test_d94_povod.js`, `tests/pure/test_d94_povod.rb`,
-in-SketchUp sekcia `run_d94`.
-
-**KOV-C2c — ZASTAVUJÚCI riadok „Bez kódov".** Sekcia vysvetľuje nemapované položky ako **nenacenené** (jantárovo) — lenže položka výsuvu **z receptu** bez kitu je niečo iné:
-dielce zásuvky sú už narezané na konkrétnu NL, takže bez kitu sa nedajú vyrobiť a zastavené sú **všetky** exporty vrátane VEPO. Taký riadok je preto **červený** (`tr.hwstop`)
-a nad tabuľkou stojí veta, koľkých zásuviek sa to týka a kam ísť po nápravu (Kontrola). Závažnosť určuje **server** aditívnym príznakom `blocks_export`
-(`HardwareSets.unmapped_entry`) — klient enum dôvodov nepozná a druhé miesto rozhodovania by sa časom rozišlo. Dôvod vo vete ostáva `reason_sk` skladaný z `base_reason`.
-
-**Veta počíta ZÁSUVKY, tabuľka RIADKY** (Codex #306 P2). Jedna zásuvka môže vydať viac nemapovaných záznamov — set s viacerými členmi bez kódu ich emituje **per člen** (`expand_members`),
-takže naivný `filter(...).length` by pri jednej zásuvke hlásil „2× zásuvka". `hwStopOwners` preto dedupuje podľa **identity zásuvky** (`cabinet_id` + `owner_part_key`) a `hwStopCount` vracia
-jej dĺžku; riadky tabuľky sa nededupujú — každý z nich je naozaj chýbajúci kód a každý treba doplniť.
-
-**KOV-D4 — `owner_label` v „Bez kódov".** Stĺpec „kde" ukazoval **surový `part_key`** („front:Fmsi0wnix-1-3a3kxe/panel"), z ktorého sa nedalo zistiť, o ktoré čelo ide. Popis skladá
-**server** — `ProductionCore.decorate_unmapped` použije **ten istý** `owner_label_for` (`PartKeys.human_label` nad `cabinet_fronts`) ako nákupné riadky KOV-H2, takže sa obe tabuľky
-jedného okna nemôžu rozísť. JS z kľúča **nič neodvodzuje** (`hwMissWhere` / `hwMissWhereTitle`): bez `owner_label` (starý payload) sa správa presne ako predtým, surový kľúč ostáva
-v `title` bunky. Pole je **ADITÍVNE a čítacie**: identita (`cabinet_id` + `owner_part_key`), dedup zásuviek, `blocks_export`, počet aj poradie riadkov sú nedotknuté a nákupný CSV
-má pevné stĺpce — je so `owner_label` aj bez neho **znak po znaku ten istý**.
-
-Riadok generiky sa v0.7.58 premenoval z `tr.hwrow` na `tr.hwgen`: `.hwrow` je v zdieľanom panel.css **flex riadok** kovania Inspectora/Katalógu a `<tr>` s `display: flex` strácal
-zarovnanie stĺpcov s hlavičkou (guard `tests/pure/test_tr_flex_kolizia.rb` stráži, že žiadny `<tr>` nenesie triedu, ktorej panel.css dáva flex/grid). Export ide **vlastným kanálom
-okna** — `hw_csv_export` → `handle_hw_csv` → `NX.studioRelayHwCsv` (flush handshake: červené pole panela export zastaví) → `studio_do_hw_csv` → `ProductionCore.do_hw_csv`; klik na
-riadok generiky ide **existujúcou cestou** `nx_select` s `hw_key` (`refs_for` nájde vlastníkov v čerstvom BOM). Navigačná položka `buy` prestala byť premostením. Testy:
-`tests/pure/test_st1c_nakup.rb`, `tests/js/test_st1c_nakup.js`, `tests/js/test_d93_nl_override.js` (presunutá sada znamienka ručného zásahu), in-SketchUp sekcia `run_st1c`.
-
-### Sekcia SPOTREBIČE v Štúdiu (S1-A2 katalóg + S1-B2 pohľad „V zákazke")
-
-**13. sekcia** (`appl`), v skupine KATALÓGY medzi Kovaním a Pravidlami — **dva pohľady**: katalóg modelov spotrebičov **tohto počítača** (`%APPDATA%`, tretí per-PC katalóg
-vedľa materiálov a kovania) a **V zákazke** = čo je v tejto zákazke a kde. Serverová strana: [appliance_dialog.rb](#appliance_dialogrb); klient `ui/js/appliances.js`
-(prefix `ap*` / `AP_*`, načítava sa **AŽ ZA** `studio.js`, lebo obaľuje jeho `NX.setStudio` a dopĺňa `window.NX` o `applTree`/`applCard`/`applResult` — v opačnom poradí by
-ich `window.NX = {…}` prepísalo; poradie stráži guard test). Ikona navigácie `appliance` (Lucide `refrigerator`). **Badge navigácie** (S1-B2) = `appl.job.counts` zo
-servera — koľko riadkov pohľadu „V zákazke" treba vybaviť (nevybraný model · zaniknutý vlastník · nález Kontroly); je to **počet RIADKOV, nie nálezov** (dva nálezy nad tým
-istým spotrebičom sú jedna vec, ktorú treba vybaviť). Klient si zo zoznamu nepočíta nič — `navCounts('appl')` len prečíta hotový blok, presne ako pri Kontrole.
-
-**Lišta katalógu:** segment `[V zákazke · Katalóg]` (vzor Kovania) · „Nový spotrebič" · hľadanie (debounce 200 ms) · prepínač „vyradené" · vpravo `sechint`
-„Katalóg je tohto počítača · bez cien · N modelov". **Lišta pohľadu „V zákazke":** segment · „Pridať do zákazky" · hľadanie · výber kategórie · vpravo súhrn zo servera.
-Obe hľadania sú **čisto klientske** (zužujú, čo už v okne je), preto sa lišta neprekresľuje, kým v nich používateľ píše. Žiadne „Obnoviť" — katalóg nie je z modelu, takže
-jantárový indikátor neaktuálnosti sem nepatrí (`staleFlag` sa sekcii vedome nepodáva).
-
-**Pohľad „V zákazke" (S1-B2, mockup R3–R5).** Tabuľka: Kategória · Model (+ odkiaľ je) · Vlastník (ID + popis) · Kontrola · Cena z Rozpočtu · akcie. Riadky, ich
-**PORADIE**, tóny, texty aj ceny skladá SERVER (`ApplianceDialog.job_view`) — JS kreslí presne to, čo dostal. Zdroje sú **už hotové výsledky toho istého pushu**:
-`Bom.collect[:appliances]` (stavy `bound|job|owner_missing|expected_missing`), payload ROZPOČTU (ceny, príznak „dodáva zákazník", poradie a popisky vlastníkov z
-`appliance_owners`) a KONTROLA (nálezy kategórie `appliance`); jediné vlastné čítanie sú **položky zákazky** (`BudgetStore.appliances`) kvôli odkazom na obchod a
-technický list zo snapshotu. **Žiadny druhý sken modelu.** Poradie: skrinky → dosky → sloty → „len zákazka", v rámci skupiny podľa ponuky vlastníkov (tá je už zoradená),
-potom podľa kategórie a názvu. Riadok **„nevybraný"** (`expected_missing`, mockup CAB-9) má akciu „vybrať…", riadok **„vlastník zmizol"** (`owner_missing`) akciu
-„Odpojiť". Stav `evidencia` dostanú kategórie, ku ktorým kontrola neexistuje (doska, drez, digestor, iné) — zelená by tvrdila, že sa niečo overilo.
-
-**ZÁPISY POHĽADU IDÚ KANÁLOM ROZPOČTU.** Väzba spotrebiča má jeden transakčný vstup (`ApplianceBinding.apply!`) a jednu cestu k nemu (`budget_mutate` →
-`ProductionCore.apply_budget_op`), takže sekcia **vlastnú zápisovú cestu nemá**: „Pridať do zákazky", editor položky, „Odpojiť" aj „Zmazať" volajú priamo funkcie
-`budget.js` (to isté okno, ten istý scope). Jediná akcia sekcie navyše je **`appl_job_select`** (oko = označ vlastníka v modeli + doramovanie) a tá je **čisté čítanie**.
-Dôsledok pre echo: po zápise príde bežný `push_state`, ktorý nesie **aj Rozpočet, aj `appl.job`** — obe sekcie sú tak čerstvé bez druhého kanála.
-
-**JEDEN MODAL, DVE VSTUPNÉ MIESTA** (R2): „Pridať do zákazky" v pohľade aj „Do zákazky" v karte katalógu otvárajú **ten istý** D-15 modal ako Rozpočet
-(`budOpenDraft('appliance', …)`) — z karty s predvyplneným modelom (`catalog_id`, názov, dodávateľ, kategória). Vyradený (tombstone) záznam tlačidlo nemá: zákazka si ho
-nepriradí (`snapshot_for` → `:deleted`). Ceruzka v riadku otvára **ten istý editor položky** ako ⋯ v Rozpočte (`budOpenApplEdit` → `budOpenMore(..., full: true)`), len
-s plnou sadou polí (názov, dodávateľ, cena navyše) — v pohľade nie je čo editovať inline. Odkaz a technický list otvára server (`appl_open_url` overí schému), takže
-v okne nie je jediný `href`, ktorý by mohol HtmlDialog prenavigovať preč zo Štúdia.
-
-**Deep-link z Kontroly.** Nález o spotrebiči má `data.route = 'appl'` a `ProductionCore::ROUTE_SECTIONS` ho od S1-B2 smeruje do **tejto** sekcie (v S1-B1 viedol do
-Rozpočtu). Kotva `appliance:<uuid>` prepne pohľad na „V zákazke" a riadok prisvieti; spotrebuje sa **raz** a aplikuje sa **AŽ PO `render()`** (je to dotaz do DOM, nie
-zmena stavu, z ktorého sa kreslí). Riadok, ktorý medzitým zanikol, nie je tichý no-op — okno to povie.
-
-**Telo:** strom po kategóriách vľavo (skupiny sa dajú zbaliť — stav okna, nikam sa neukladá), karta vpravo z blokov Telo · Nika · Čelo/dvere · Montáž — **len z tých,
-ktoré kategória má** (D-136, rovnaké ako formulár: doska a drez majú len blok výrezu, rúra, mikrovlnka a digestor nemajú Montáž) — plus Odkazy, Prílohy a Poznámka.
-Prázdny blok server neposiela; keby prišiel, klient ho nakreslí s **priznanou vetou** (mlčiaci prázdny rám vyzerá ako chyba). Prílohy sú dlaždice: obrázok kreslí miniatúru z lazy kanála (kým nedorazí, ikonu), PDF ikonu vždy, náhľad má **teal rám** a štítok; akcie „nastaviť ako
-náhľad" a „odobrať zo zoznamu" sa ukazujú pri hoveri (a pri fokuse — `:focus-within`, inak by boli neprístupné z klávesnice).
-
-**REFRESH INVARIANT.** Zmena katalógu = **echo sekcie** (`NX.applTree` + `NX.applCard`), **nikdy `push_state`** a **žiadne zdvihnutie generácie okna**: katalóg spotrebičov
-v tejto dávke nemení ani jedno číslo zákazky, takže rozkliknutý riadok Kusovníka ani rozrobený export nesmú po uložení modelu zastarať. (Po S1-B sa to prehodnotí — vtedy
-už katalóg do zákazky vstupuje.) Echo **kreslí len vtedy, keď je sekcia `appl` aktívna** (`studioActiveSection() === 'appl'`): `#secbody` a `#sectools` sú zdieľané uzly
-celého okna a echo do nich nesmie písať, kým je otvorená iná sekcia (review #225 P1). Keď sekcia otvorená nie je, stav sa iba uloží a vykreslí ho `renderBody` pri vstupe.
-
-**Kto čo vlastní.** Server: obsah, poradie, počty, texty, polia formulára. Klient: pohľad — vybraný záznam, text hľadania, prepínač „vyradené", zbalené skupiny a cache
-miniatúr. Je to pamäť **okna**: nikam sa neukladá a **nový dokument ju nezhadzuje** (katalóg nie je zákazka, takže `model_guid` sa jej netýka).
-
-**Modal Nový/Upraviť** je D-15 kostra (`NXModal`), `memoryKey` `appl:create` / `appl:edit:<id>`, šírka `wide`. Zápis **modal nezatvára** — zatvorí ho až
-`NX.applResult(true, …)` a odmietnutie nechá rozpísané hodnoty na mieste s chybou pri poli; `token` je identita jedného odoslania, takže výsledok formulára, ktorý
-používateľ medzitým zavrel, mu nezavrie ten nový (vzor `MDH.itemResult`). Kategória sa pri úprave **nedá zmeniť** (server patch s kategóriou odmieta) a pri novom zázname
-prepína **sadu polí**: kostra D-15 vlastný `onChange` nemá, takže sa počúva `change` na `nxm_category` a modal sa prekreslí s **prenesenými** hodnotami
-(`skipMemory: true` — na obrazovke sú čerstvejšie hodnoty než v pamäti konceptu). Mazanie je **D-15 danger** modal (nikdy `UI.messagebox` — natívny modal v callbacku
-HtmlDialogu blokuje celý kanál okna) a je to **tombstone**: vyradený záznam sa vráti tlačidlom „Obnoviť". Bez dostupnej kostry sa **nevyradí nič** (fail closed) — fallback
-„pošli to rovno" by z jedného kliknutia urobil tombstone bez potvrdenia, teda presne bez toho, čo je zmyslom toho kroku. Prekreslenie modalu pri zmene kategórie podáva
-**`baseFields`** (pôvodnú špecifikáciu otvorenia): kostra si inak berie baseline z práve podanej špecifikácie, takže by sa východiskom stalo to, čo používateľ napísal,
-a pamäť rozpísaného konceptu by na Escape neuložila nič.
-
-**Stav katalógu** (`:read_only` / `:degraded`) kreslí sekcia ako **banner nad stromom** s dôvodom zo servera a vypína zápisy (žiadne „Nový spotrebič", „Upraviť",
-„Vyradiť", „Pridať prílohu") — ponúkať tlačidlá, ktoré vždy skončia chybou, je horšie než ich schovať. Príznak `writable` chodí v **každom** payloade sekcie, aby sa UI
-nerozišlo s tým, čo server naozaj dovolí. Testy: `tests/pure/test_s1a2_sekcia.rb`, `tests/pure/test_s1b2_pohlad.rb`, `tests/js/test_s1a2_sekcia.js`,
-`tests/js/test_s1b2_pohlad.js`, in-SketchUp sekcie `run_s1a2` a `run_s1b2`.
-
-**Payload sekcie** (`push_state`, kľúč `appl`) = strom katalógu **plus** `job` (pohľad V zákazke). `job` chodí **len plným pushom** (patrí dokumentu), kým echo katalógu
-ho nenesie — klient si ho preto preberá podmienene (`if (p.job) AP_JOB = p.job`), inak by uloženie modelu do katalógu vyprázdnilo tabuľku, s ktorou nemá nič spoločné.
-Tvar `job`: `rows[]` (`{state, item_id, category, category_label, model, model_sub, owner{kind,id,pid}, owner_label, owner_desc, tone, status_text, status_title,
-price_text, customer_supplied, shop_url, sheet_url, actions{select,edit,remove,unbind,assign,shop,sheet}}`) · `total` · `warn` · `counts{red,orange,total}` · `summary` ·
-`subtotal_text` · `subtotal_included` · `categories`. Dve pravidlá, ktoré z tvaru vidieť nie je:
-
-- **`shop_url` je z POLOŽKY zákazky, snapshot katalógu je až fallback** (`url` je pole, ktoré používateľ edituje v Rozpočte aj v editore riadku). Inak by akcia „obchod“
-  otvárala starú katalógovú adresu aj po jej prepísaní a **ručná položka bez katalógu by akciu nemala vôbec**. `sheet_url` ostáva zo snapshotu — položka zákazky pole pre
-  technický list nemá a odvodzovať ho z `url` by bola druhá pravda.
-- **`actions.assign` („vybrať…“) je LEN vtedy, keď je vlastník riadku v serverovej ponuke vlastníkov.** Odpojený dielec a config z novšej verzie sa neponúkajú, takže modal
-  by spadol na „len zákazka“ a vyrobil nepriradenú položku; riadok namiesto akcie nesie **dôvod** v `model_sub`.
-
-**Akcia `appl_job_select` („oko“) má guard zastaraného pohľadu.** Rieši riadok proti **aktívnemu** dokumentu, takže klik z DOM spred prepnutia dokumentu alebo spred
-prepočtu okna by zhodou ID a PID mohol označiť cudziu skrinku. Klient preto posiela identitu **payloadu, z ktorého je tabuľka vykreslená** (`model_guid` + `gen`, drží ich
-`AP_JOB_DOC` z toho istého pushu) a server odmieta nezhodu tým istým párom guardov ako zápisové akcie sekcií (`DocKey.foreign?` + `StudioDialog.generation`). Prázdny údaj
-sa tu **netoleruje** — tabuľka chodí vždy aj s identitou, takže jej absencia je presne ten stav, proti ktorému guard stojí.
-
-### Riadok „Spotrebič" v Inspectore (S1-B2, ui/js/appliance_row.js + ui/panel/payloads.rb)
-
-**JEDEN riadok cez oba stĺpce Základných per VIAZANÝ spotrebič** (rúra + mikrovlnka v jednej skrinke sú dva riadky) **plus jeden riadok „očakáva"**, keď kus spotrebič
-očakáva a nemá ho (`appliance_expects[]`, slot umývačky vždy), **plus (S1-C) POSLEDNÝ riadok VOĽBY „očakáva"**. Vzor je riadok Nôh — žiadny nový sektor, žiadny nadpis.
-**Ten istý komponent kreslí karta dosky** (`#boardApplRows`, varná doska a drez), len s iným kontextom vlastníka.
-
-**S1-C VEDOMÁ REVÍZIA pravidla „prázdny zoznam riadok skryje".** Blok Spotrebiča sa od S1-C skrýva už len tam, kde sa nedá očakávať **nič**: pri kuse mimo matice vlastníkov
-(a slot voľbu nemá — očakáva umývačku vždy a server to vynucuje, takže ponuka „očakáva: —" by bola klamstvo). Skrinka a doska teda dostávajú **presne jeden** tlmený riadok
-voľby aj vtedy, keď nič neočakávajú. Bez viditeľnej voľby by sa očakávanie **bez šablóny nedalo zapnúť vôbec** — mockup R10 to hovorí priamo („Bez spotrebiča riadok ukáže
-len voľbu očakáva: —"), a schované ovládanie je horšie než jeden riadok (trvalé pravidlo „vertikálny priestor panela je vzácny" preto platí ďalej v tom, že je to **jeden**
-riadok bez semaforu, nie nový sektor).
-
-Payload `cabinet_payload.appliance_rows[]` / `board_payload.appliance_rows[]` skladá server (`Panel.appliance_rows`):
-`{state: 'bound'|'expected'|'expects', item_id, category, category_label, text, sub, tone: 'ok'|'warn'|'', link, placeholder, options[], all, all_note}`
-a od **S1-F** má viazaný riadok navyše **`check`** = celý verdikt (`{state, niche{state, axes, axis_texts, text}, door_split{state, edge, range, recommended, source, text}, text}`).
-
-- **Riadok VOĽBY (`state: 'expects'`) nesie ÚPLNY aktuálny zoznam** (`expects[]` z configu) a `options[]` = **matica** druhu v kanonickom poradí, každá voľba ako **príkaz**
-  `{value: 'add:<kód>'|'del:<kód>', code, op, text, disabled}`. Viazaná kategória má `disabled` **s dôvodom** v texte („− rúra (priradená — najprv odpoj)") — mŕtva voľba bez
-  vysvetlenia je horšia než jej absencia (D-78). **Prvá voľba `<select>`u je neutrálny SÚHRN** (`placeholder`, napr. „očakáva: rúra"), inak by samotné vykreslenie karty
-  zapísalo očakávanie a založilo krok Späť.
-- **Klient posiela ÚPLNY nový zoznam, nie zmenu** (Astra C13): `aprExpectsNext(current, value)` je čistá funkcia nad zoznamom z DOM (`data-apr-expects` na riadku) — pridanie je
-  únia, odobranie filter. Keby posielal len zmenenú kategóriu, pridanie mikrovlnky by ticho zmazalo **už splnené** očakávanie rúry (riadky „očakáva" nesú len **nesplnené**,
-  takže skladať z nich stav sa nedá).
-- **Dve rýchle voľby pred prekreslením majú DVE poistky** (Codex #385 kolo 1, P2). Zápis je asynchrónny, takže by sa obe počítali z toho istého zastaraného zoznamu
-  a druhá by prvú prepísala („pridaj rúru" + „pridaj mikrovlnku" = zostala by len mikrovlnka). Preto sa po odoslaní **ovládač zamkne** (`disabled`, odomkne ho až
-  čerstvá karta — a tú server posiela aj pri každom odmietnutí) **a lokálny snapshot `data-apr-expects` sa posunie optimisticky**, takže príkaz, ktorý sa napriek
-  zámku dostane cez (klávesnica, oneskorená udalosť), vychádza z aktuálneho zoznamu. Autoritou ostáva server: dostane úplný zoznam a porovná ho so stavom modelu.
-- **Kategóriu považuje za splnenú TÁ ISTÁ funkcia ako zber** (`ApplianceBinding.bound_categories` cez obojsmerný dôkaz; Codex #385 kolo 1, P2). Kým panel veril samotnej
-  `category` v `appliance_refs[]`, **osirelý záznam** (položku zmazalo druhé okno) alebo ref po **recyklovanom ID** riadok „očakáva" potlačil — a s ním aj výber modelu,
-  presne tam, kde Kontrola hlásila `appliance_missing` a priradiť **kázala**. Tá istá množina riadi aj `disabled` voľby „− kategória (priradená — najprv odpoj)".
-- **Kontext nesie aj `pid`** (`data-apr-pid`, z `cabinet_pid` / `board_pid` v payloade karty): `persistent_id` je jediný údaj, ktorý prežije recykláciu výrobného ID, takže ním
-  server overuje, že zápis mieri na TEN kus, nad ktorým bol riadok vykreslený. `clearApplianceRows` ho zahadzuje spolu s ostatným kontextom.
-- **Popisky kategórií v JS NEŽIJÚ** — text riadku aj text dlaždice šablóny skladá server (stráži to Node sada nad zdrojom `appliance_row.js` a `templates.js`).
-
-- **Tón viazaného riadku** sa pýta na **tie isté vstupy** ako `Validation.check_appliance_bound` (chýbajúce rozmery niky · trieda umývačky vs trieda slotu) a od S1-F
-  na **ten istý verdikt** (`ApplianceChecks.verdict`). Panel Kontrolu **nevolá** (potrebovala by celý zber modelu), preto to stráži test, ktorý porovnáva oba smery nad
-  jednou fixtúrou. ORANGE riadok vzniká **len** pri `clash`/`unsatisfiable` — presne tam, kde nález vyrobí aj Kontrola; „nevieme" a „nekontrolované" idú do podtextu
-  bez zmeny tónu. **Pri chýbajúcom bloku niky má ZNÁMY konflikt** (`clash`/`unsatisfiable` — napr. osadenie, ktoré zje celé vnútro) **prednosť** pred vetou
-  „kontrola sa nedá urobiť" (D-140, Codex #389 kolo 3, P2): riadok potom hovorí „chýbajú údaje niky · nezmestí sa: …" ako Kontrola; keď je konflikt z delenia
-  čiel, veta niky („chýbajú údaje niky — …") je už v texte verdiktu a neopakuje sa. Vetu skladá server do `sub` („Chladnička · nika ✓ — šírka, výška a hĺbka ✓ · hrana čiel 695 v 679–727 ✓"), **JS o nike ani o delení nevie nič**
-  (stráži to Node sada nad zdrojom `appliance_row.js`).
-- **Filter ponuky a verdikt merajú tou istou toleranciou** (Codex #384 kolo 1, P2): osi aj ich porovnanie žijú v `ApplianceChecks` (`AXES`, `axis_fits?`,
-  `AXIS_TOL` = 0,5 mm). Panel si tabuľku ani vzorec nekopíruje — kým mal vlastné, ponuka model odporučila a Kontrola ho vzápätí zhodila.
-- **Ponuka modelov** = položky zákazky danej kategórie **bez fyzického vlastníka**, filtrované podľa niky vs vnútro skrinky **len po osiach, ktoré kategória kontroluje**
-  (rúra a mikrovlnka Š + H, chladnička Š/V/H, ostatné bez filtra). Skrinka s **viac zónami** nemá jednoznačnú výšku vnútra, takže kategórii, ktorá výšku kontroluje
-  (chladnička), sa filter **vypne celý** a riadok to prizná vetou; šírka a hĺbka sú jednoznačné vždy, takže rúra o filter neprichádza. **Filter nie je brána**: model,
-  ktorý nesedí, v ponuke ostáva s dôvodom a za ním stojí disabled „— zobraziť všetky (N)". **Prvá voľba je vždy neutrálna** („vyber model…") — `<select>` bez vyslovenej
-  hodnoty vyberie prvú možnosť a jediné kliknutie do riadku by inak spotrebič naviazalo aj s prestavbou.
-- **Zápis** ide akciou `set_appliance_owner` → [actions_appliance.rb](#actions_appliancerb) → `ApplianceBinding.apply!` (`move` / `unbind`), teda **jeden krok Späť**.
-  Viazaný riadok má „odpojiť" (ikona `unlink`), nie druhý `<select>` — **vedomá odchýlka od mockupu R9**: výmena modelu nad už viazanou položkou je dve rozhodnutia
-  (odpoj + priraď) a patrí do Štúdia, kde je vidieť celá zákazka.
-- **Ikona odkazu** otvára Štúdio → Spotrebiče (`openStudio('appl', 'appliance:<uuid>')`) — tá istá adresa, akú používa nález Kontroly.
-- **Echo:** riadok sa **neobnovuje ľahkým pushom** (`setHardwareSets`); väzba mení aj ostatné výstupy karty (telo slotu, trieda, náhľad), takže po zápise z Rozpočtu
-  alebo z pohľadu „V zákazke" posiela server **celú čerstvú kartu**. Pri prestavbe to robí `budget_geometry_proc` (so zdvihom generácie), pri väzbe na **dosku** —
-  ktorá geometriu nemení — nový `budget_card_proc` (**bez** zdvihu generácie: žiadne číslo zákazky sa nezmenilo).
-- **Kontext vlastníka drží DOM**, nie globálna premenná (`data-apr-kind` / `data-apr-id` na kontajneri): panel môže mať vykreslenú kartu dosky aj karty skrinky a echo
-  katalógu materiálov prekresľuje kartu dosky aj vtedy, keď je označená skrinka — globál by sa dal prepísať pod rukami a zápis by odišiel na cudzieho vlastníka.
-- **Odchod z kontextu riadky ZAHODÍ** (`clearApplianceRows`): prázdny výber čistí oba kontajnery, prechod na dosku ten korpusový. Nestačí ich skryť — s kontajnerom
-  odchádza aj **kontext vlastníka** (`data-apr-*`), inak by vo vkladacom režime ostal visieť riadok cudzej skrinky so starými akciami.
-- **D-140: VÝŠKA OSADENIA chladničky = ČIP v riadku + STATICKÝ POPOVER.** Viazaný riadok chladničky v skrinke nesie `mount: {value, text}` („osadenie 150 mm")
-  **len pri obojsmernej väzbe** — `appliance_mount_editable?` robí **ten istý dôkaz** ako serverový cieľ akcie (živá položka patrí tejto skrinke, `ref_matches?`,
-  záznam s `item_id` práve raz; Codex #389 kolo 2, P2). Iná kategória, slot, doska, sirota ani **jednostranný záznam** (položku presunulo druhé okno) čip
-  nedostanú — ovládač, ktorý server vždy odmietne, by klamal; taký riadok sa dá len odpojiť. Riadok kreslí **tlačidlo-čip** pred „odpojiť" (žiadny nový riadok — vertikálny priestor), **nie pole**.
-  Klik otvorí **statický** `#aprMountPop` **za** `#applRows` (prekreslenie riadkov ho nezmaže, rozpísaná hodnota prežije echo prestavby — Astra C FIX 8), ktorý pri
-  otvorení **zachytí** dokument, vlastníka (druh, ID, PID), `item_id` a pôvodnú hodnotu. Zapisuje **výhradne** „Použiť"/Enter — **nikdy `blur`**: `nxSetModelGuid`
-  pri prepnutí dokumentu najprv prepíše identitu a až potom zhodí fokus, takže uloženie na blur by starú hodnotu poslalo s novým dokumentom (Astra C BLOCKER 2).
-  Escape, „Zrušiť" a klik mimo zrušia bez zápisu — **Escape z ktoréhokoľvek prvku** (aj po Tab na Pomoc/Použiť/Zrušiť) a **spotrebuje sa** (otvorený popover
-  je najvyššia vrstva Inspectora; modály obslúži skôr načítaný `nx_esc.js`; Codex #389 kolo 1, P2), Enter platí len v poli; neplatné číslo pole označí
-  a nič nepošle; nezmenená hodnota nič nepošle. Po Escape, „Zrušiť" a „Použiť" sa **fokus vráti na čip** toho kusu (hľadá sa v aktuálnom DOM podľa `data-id`),
-  ale len keď bol v popoveri — vzor `closeFrontBulk`; klik mimo ani upratovanie pri zmene kontextu fokus nepresúvajú (Codex #389 kolo 3, P2). Pri „Použiť"
-  so ZMENOU čip vzápätí nahradí prekreslenie z odpovede servera, takže fokus potom ostane na stránke (vedome — žiadny odložený návrat). Po každom vykreslení riadkov
-  `aprMountSync` popover nechá žiť **len** nad tým istým dokumentom, kusom (ID + PID) a riadkom, ktorý osadenie stále má — inak ho zavrie bez zápisu; zavrie ho aj
-  `clearApplianceRows` a centrálne `nxDropDocState` (`aprMountClose`, prvá obrana pri zmene dokumentu). CSS má vlastné `.aprmountpop[hidden] { display: none }` (poučenie D-137).
-
-### Sekcia ROZPOČET v Štúdiu (ŠT-1c PR B1, Š12–Š13)
-
-presun posledného tabu okna Výroba — a **JEDINÁ sekcia, ktorá zapisuje do modelu** (1 zmena = 1 krok Späť). Obsah je 1:1 (Š12), **kód nie**: render `js/budget.js` sa rozrezal na
-**lištu sekcie** (`budToolsHtml` — prepínače *s DPH/bez DPH* a režim *€ · €€ · €€€*, „Prepočítať ceny", „Obnoviť", XLSX rozpočtu a ⚙; **„Prepočítať ceny" kreslí `budPriceBtnHtml` a
-je JANTÁROVÉ, keď zákazka nesie staré ceny** — SMOKE 22.8.: rozpočet vyzeral rovnako s čerstvými aj s polročnými cenami, takže sa z neho dalo objednávať bez varovania. Je to
-**čistá projekcia poľa `stale`**, ktoré payload už nesie (ten istý zdroj ako jantárový chip pri súčte aj zoznam starých riadkov) — **žiaden nový výpočet, žiadne meranie veku v
-klientovi**; počet aj prah skladá `budStaleLabel` do tooltipu, farba ide cez `--nx-warn*` tokeny (`.bstalebtn`) a **zelená sa nepoužíva** — významové farby ostávajú semaforu
-Kontroly.
-
-Počas behu prepočtu je tlačidlo `disabled` a jantár sa nekreslí: dve signalizácie naraz by si protirečili) a **telo** (`budDrawBody` — veľký súčet, jantárové chipy, zbaliteľné
-sekcie); `budRerender()` kreslí oboje naraz, lebo DPH aj režim menia aj lištu.
-
-**Zápis množstiev a jednotiek (H4a · D-04, triedenie HARDENING).** Riadky kreslia množstvo a MJ cez formátovač okna (`budQty`/`budUnit`/`budMoneyIn`
-→ `nxfQty`/`nxfUnit`/`nxfMoneyIn` zo `studio.js`, nájdené `budNxf`): Materiál „5 · platňa", ABS „70,94 · bm", Kovanie „2,4 · bal", Služby
-„37,26 bm × 1,10 €" / „4 platne × 17,00 €" / „0 paušálov × 100,00 €", Cenová ponuka množstvo cez `nxfQty` (server ho posiela celé). **Kódy MJ
-v payloade, serverová `poznamka` („4 platní × 5,8 m²") aj XLSX sa NEMENIA** — XLSX píše `r['mj']` a poznámku zo servera. **Peňažné polia**
-(medzisúčet Služieb a Štandardných riadkov, cena vlastnej položky a spotrebiča, pole „Cena" v modale spotrebiča) majú hodnotu `nxfMoneyIn`
-(„68,00", „40,987" — bez tisícov a €) a za poľom tlmené „€" (`BUD_EUR_AFTER`); polia počtu a násobku sa nemenia. Okružnú cestu
-`budParse(nxfMoneyIn(x)) === x` stráži test; iný zápis v poli sám nič nezapíše (`change` vzniká len pri úprave). `budFmtEur` ostáva
-(dvojča `nxfMoney`, zhoda testom) — sekcia musí fungovať aj bez `studio.js` (núdzový zápis kódov MJ s čiarkou).
-
-**Obnova fokusu má JEDNO miesto na prekreslenie** (review PR #198 #5): `budDraw*` len kreslí, `budRerender` robí jeden `budCaptureFocus` na začiatku a jeden `budRestoreFocus` na
-konci — kým mala každá polovica vlastnú dvojicu, jedno prekreslenie ju spravilo dvakrát a druhý `capture` už mohol snímať `<body>`. Súbor sa načítava **AŽ ZA `studio.js`** (stráži
-guard test): `studio.js` priraďuje celé `window.NX = {…}`, takže v opačnom poradí by prepísal obal aj `budgetResult`/`priceRefresh` a rozpočet by po prvom zápise zamrzol. Prefixy
-`bud*`/`BUD_*` sú tam preto, že oba súbory bežia v JEDNOM globálnom scope (kolízia mena `renderBody` medzi `studio.js` a `budget.js`).
-
-#### NEKOMPATIBILNÉ DÁTA ROZPOČTU (1d/R-14, v0.9.4)
-
-zákazka z NOVŠIEHO pluginu (alebo s poškodeným markerom `budget_std`) sa **ďalej číta a zobrazuje**, ale jej čísla sú počítané z OREZANÉHO stavu. Payload preto nesie príznak
-`budget.budget_std` (`{ state, blocked, reason }`, skladá ho `Budget.std_payload`) a klient z neho robí tri veci — **v OBOCH sekciách, Rozpočet aj Cenová ponuka**:
-**(1) trvalý banner** `budStdBannerHtml` navrchu tela (nie status — ten by zmizol pri prvom prekreslení, a payload chodí po každom kliku; vzor bannerov R-07/R-11, trieda `.hwbanner`),
-**(2) vypnuté ovládače** — jeden prechod `budStdDisable(box)` po každom zo štyroch kreslení (telo + lišta, obe sekcie) nad `[data-bud]` uzlami podľa zoznamu `BUD_STD_OFF`
-(režim, prepis sumy, násobok, m², spotrebiče v súčte, od NP-4 „ceny podľa plánu", pridávačky, ⋯ editor, mazanie, inline polia, prepínač „samostatne" **a oba XLSX exporty**). Jeden prechod nad hotovým DOM je
-zámerne lacnejší než podmienka v pätnástich markup funkciách — a nedá sa zabudnúť pri pridaní ďalšieho ovládača (stačí ho zapísať do `BUD_STD_OFF`).
-**ZÁMERNE zapnuté ostávajú** prepínač DPH a „Obnoviť" (číre zobrazenie) a **„Prepočítať ceny"** — ten zapisuje do KATALÓGU cien, nie do zákazky, a jeho výsledok je správny bez ohľadu na verziu dát rozpočtu.
-**(3) poistka v odosielacej ceste** (`budSend`, `budXlsx`, `budCpExport`): klik zo zastaraného DOM sa NEPOŠLE a okno povie dôvod červeným statusom.
-Autorita je server v oboch smeroch — mutácie odmieta `BudgetStore.write!`, exporty `ProductionCore.budget_std_block`, a znenie hlášky má **jeden zdroj** (`BudgetStore.std_block_reason`), takže klient si žiadny text neskladá.
-Kanál odmietnutia je ten istý, aký má každý neúspešný zápis: `do_budget` → `NX.budgetResult(op, false)` → čerstvý payload → červený status („Nezapísané: …").
-
-#### CENY PODĽA PLÁNU (NP-4, v0.15.4, mockup C)
-
-Checkbox **„ceny podľa plánu"** v `<summary>` sekcie Materiál (`budSectionHtml`, vzor „sčítať do rozpočtu" pri Spotrebičoch — `label.bappl` so `stopPropagation`,
-inak by klik zbalil sekciu) + tooltip `.nxtip` s textom `BUD_PLAN_TIP` (čo robí, že VEPO účtuje celé tabule a jeho počet sa môže líšiť, porez/montáž, platí pre
-zákazku, **„Po Späť klikni na Obnoviť"**) — tlačidlo tooltipu má vlastné `stopPropagation` + `preventDefault` a `details.bsec` pri hover/fokuse tooltipu povolí
-`overflow: visible` (`:has`), aby ho sekcia neorezala. Stav berie z ozveny `budget.plan_prices`, zmena pošle mutáciu **`plan_prices {enabled}`** (1 zmena = 1 krok
-Späť), ovládač je v `BUD_STD_OFF`. **Značka zdroja množstva** `budQtyTagHtml` — `.qtag.plan` „podľa plánu" (tlmená) / `.qtag.est` „z odhadu" (jantárová, tokeny
-`--nx-warn*`) pred číslom v bunke Množstvo — sa kreslí **len pri riadku s `qty_source`**, teda len pri zapnutom prepínači; tooltip (`title`) je serverový `qty_tip`.
-**Späť (audit F5):** životný cyklus Štúdia sa nemení — Undo okno len označí ako neaktuálne (jantárové „Obnoviť"), checkbox a ceny sa vrátia až po „Obnoviť";
-in-SU `st1c_plan_prices` overuje stav modelu aj marker po Späť. Od CENY-M2 `BUD_PLAN_TIP` dopĺňa vetu „Materiál bez formátu platne (sklo aj doska) sa počíta
-podľa skutočnej plochy dielcov bez odpadu (duplák v ploche svojej zdrojovej dosky) — plán ho nemení. UNI a duplák bez väzby ostávajú na odhade
-platní." (rozsah `Budget.area_priced?` po rozhodnutí C14).
-
-#### RUČNÉ CENY DOSIEK A ABS · MATERIÁL PODĽA PLOCHY (CENY-M2, v0.16.3, mockup D)
-
-Všetko je **projekcia payloadu** — stav ručnej ceny, počty aj riadok v m² skladá server (`Budget`, [outputs.md](outputs.md)); klient nič nepočíta.
-**Ikona odkazu pred názvom** materiálu aj pásky (`budMatLinkHtml(r, kind)`, kresba `.hw-product-link` + `.bmatlink`, riadok nepribúda): `demos_link` → sivá
-`data-src="demos"`, `product_link === true` → sivá `data-src="product"`, `product_link === false` → jantárová `is-missing` `data-src="missing"`; UNI, duplák
-a chýbajúci záznam ikonu nemajú. **Stĺpec „Overená"** pri riadku s `price_check` = tlačidlo `.bver` (`budMatCheckHtml`): „ručne 18.9." (sivé) · „ručne
-45 dní" (jantár `is-pending`) · „neoverená" (jantár); tooltip `budMatTip` je **kópia** textov `mdManualTip` (O5) a zhodu stráži parity test v
-`tests/js/test_ceny_m2_budget.js`. Demos a UNI riadky majú dnešnú bunku `budFreshCell`. **Riadok podľa plochy** (`qty_basis: 'area'`): množstvo na
-2 desatinné, MJ zobrazená „m²" (dáta `M2`), „€ / MJ" bez zátvorky „(…/m²)". **Čip a hlavné tlačidlo** sa rozhodujú podľa `counts.manual_pending`
-(`budManualPending`): „N cien na kontrolu" a pri samých ručných cenách „Skontrolovať ceny", ktoré otvorí zoznam (`budPrStart`). **Zoznam** (`budStaleActionHtml`):
-doska/ABS s `manual_check` → ikona + „Overiť cenu" (`data-action="mat-manual-check"`), Demos položka → ikona + dnešné obnovenie; veta „bez Demos väzby — over
-v katalógu ručne" zanikla. **Obsluha klikov `mat-*` patrí `proj_materials.js`** (vlastník akcií materiálov; delegovaný listener, vzor `hw-*` v `hw_catalog.js`):
-`demos` → `open_demos_url`, `product` → `mat_product_open` (URL od klienta nikdy), `missing` → `mdProductFromBudget` (read-only a chýbajúci záznam = status;
-inak `matOpenAnchor` → `studioGoSection('mat')` → formulár variantu s kurzorom v poli odkazu — nič nezapisuje); „Overiť cenu" → `mdManualRequest` so
-**`section: 'budget'`** — formulár M1b ostáva v Rozpočte a jeho životný cyklus (odchod zo sekcie, iný dokument, cudzí token) je ten istý ako v Materiáloch.
-Po potvrdení server obnoví Štúdio (`after_catalog_change`), riadok zosivie a čip klesne. Tlačidlá `mat-*` **nie sú v `BUD_STD_OFF`** — zapisujú katalóg,
-nie zákazku (ako „Prepočítať ceny").
-
-#### GENERAČNÝ KONTRAKT (audit #1) — najdôležitejšia vec dávky
-
-budget-iniciovaný push ide `push_state(bump: false)` — payload je **plný** (Kontrola dostane čerstvé rozpočtové ORANGE), ale **generácia okna sa nedvíha**. Mutácia rozpočtu totiž
-nemení `rows`/`refs`, takže rozkliknutý riadok Kusovníka ani rozrobený export inej sekcie nesmie zastarať len preto, že niekto prepísal sumu. Ochranu proti **zastaranému zápisu**
-drží to, že KAŽDÁ iná zmena (model, katalóg, prepnutie dokumentu, refresh z iného okna) generáciu bumpne ako doteraz — a mutácia so starým `gen` sa odmietne. Prvý push generáciu
-zdvihne vždy (`gen 0` = „žiadne dáta"). Fronta zápisov (`BUD_BUSY`/`BUD_QUEUE`, GH #138 P2) sa preto uvoľňuje **VÝHRADNE v `NX.setStudio`** (audit #6) — malé echá
-`setVepoBar`/`setEdgeCheck`/`setGrainCheck` čerstvú `gen` nenesú a zápis odoslaný na ne by server odmietol ako zastaraný.
-
-**Identita čakajúceho zápisu (NP-4, audit B1 — staršia chyba všetkých mutácií rozpočtu).** Položka fronty bola len `[op, extra]` a identitu doplnila až pri odoslaní —
-a `budDocSwitched` frontu bez otvoreného modalu nerušil: zápis kliknutý v zákazke A preto po príchode payloadu B odišiel s `model_guid` aj `gen` zákazky B a server ho prijal.
-Odteraz **každá položka nesie `{op, extra, doc, gen}` z okamihu kliknutia** (`budSend` — pri modale identita modalu, inak `budModelGuid()`), odošle sa **s nimi** (nie
-s identitou nového payloadu), `budDocSwitched` pri **každej** zmene dokumentu vyhodí z fronty zápisy iného dokumentu (aj bez modalu) a `budAfterPush` cudzí zápis
-neodošle ani cez poistný timer. Push po mutácii rozpočtu generáciu nedvíha, takže bežný ďalší zápis s gen z kliknutia prejde; po zmene modelu či dokumentu ho server
-odmietne ako zastaraný (radšej „skús znova" než tichý zápis nad iným stavom). **Priznaný dôsledok (predrecenzia P3-4):** odmietne sa aj zápis v **tom
-istom** dokumente, ktorý čakal za mutáciou zdvíhajúcou generáciu (spotrebič s prestavbou skrinky) — je to bezpečný smer, používateľ klikne znova.
-Test: `tests/js/test_np4_ceny.js`.
-
-Poistný timer `BUD_BUSY_MS = 6 s` je len záchranná sieť: in-SketchUp meranie dáva push ~3 ms a celú mutáciu vrátane repushu ~4 ms.
-
-#### Kanály
-
-mutácia ide **priamo** (`budget_mutate` → `StudioDialog.do_budget` → `ProductionCore.do_budget`) — nie je to export a flush handshake by pri každom prepise sumy zbytočne prehnal
-rozpísané edity panela; **oba XLSX exporty** naopak handshake majú (`budget_xlsx`/`cp_xlsx` → `NX.studioRelayBudget`/`studioRelayCp` → `studio_do_budget_xlsx`/`studio_do_cp_xlsx` →
-jadro), lebo čísla hárku musia sedieť s modelom PO flushi.
-
-**Odchýlky od „1:1", všetky vedomé:** prepínače a exporty sú v **lište sekcie** (kontrakt §3), takže stĺpcový obal `.bswitch` a pätka `.bfoot` zanikli a v tele ostal veľký súčet s
-chipmi · pribudlo **„Obnoviť"** (prestavba skrinky z Inspectora sem sama nedorazí — rovnaký dôvod ako v Kusovníku a Nákupe) · **jantárový chip súčtu vedie do sekcie Kontrola** a
-jeho rozbaľovací zoznam nálezov zanikol — bola to druhá kópia zoznamu, ktorý od ŠT-1b žije o kúsok vedľa.
-
-**Chip preto počíta VŠETKY rozpočtové nálezy, nie „zvyšok"** (review #2): kým mal vlastný zoznam, spotrebičové upozornenie sa z počtu odpočítavalo, lebo malo vyššie vlastný chip —
-odkedy klik vedie do Kontroly, musí ukazovať presne to číslo, ktoré tam používateľ uvidí (chip spotrebičov ostáva ako **špecifická skratka** na ich sekciu rozpočtu; `counts` a
-`Validation.with_budget` sa nemenia). Opačným smerom: nález kategórie `budget` v Kontrole prepne na Rozpočet a otvorí `budget_section` nálezu) · **„Nastavenia" ostáva** ako kontextová
-skratka k sadzbám (#20), hoci to isté okno otvára aj položka navigácie; od H4 · D-09 nesie ikonu **posuvníkov** (`sliders-horizontal`, tá istá ako položka `bset`
-v navigácii) namiesto kolesa, ktoré patrí Pravidlám.
-
-**PR B2 dokončil dve odložené veci:** inline drafty vlastnej položky a spotrebiča nahradil **D-15 modal** (nižšie) a náhľad cenovej ponuky sa presunul do **vlastnej sekcie** — v
-tele Rozpočtu po ňom ostal len **tenký preklik** `budCpLinkHtml` (suma ponuky + stav + šípka), takže druhá kópia tabuľky, ktorá by sa časom rozišla, neexistuje. S ňou odišiel z
-lišty aj export „Cenová ponuka (zákazník)" — patrí sekcii, ktorá dokument vyrába (a lišta tým schudla o najdlhší popisok, review PR #198 #4). Testy:
-`tests/pure/test_st1c_rozpocet.rb`, `tests/js/test_budget_ui.js`, in-SketchUp sekcia `run_st1c` (13 operácií × „jeden krok Späť" vrátane NP-4 prepínača, gen a guid guardy, odmietnutý zápis nechá draft
-otvorený, dôkaz `bump: false` klikom v Kusovníku so starou generáciou, XLSX guardy bez dialógu, meranie #19).
-
-#### SPOTREBIČ Z KATALÓGU, VLASTNÍK A „DODÁVA ZÁKAZNÍK" (S1-B1, v0.12.13)
-
-Modal **„Pridať spotrebič"** má sedem polí v pevnom poradí — `catalog_id` (**`lookup`**, prvé pole, teda to, ktoré dostane fokus) · `typ` · `nazov` · `dodavatel` · `cena` ·
-`owner` (select) · `customer_supplied` (checkbox). Ten istý `⋯` editor riadku pribral **vlastníka a prepínač** (kód ani poznámku spotrebič nemá).
-
-- **Kategórie ani ponuka vlastníkov nie sú v klientovi.** `budApplTypes(b)` číta `budget.appliance_types` (kanonické kódy + SK popisky zo servera) a `budOwnerOptions(b, cat)`
-  skladá ponuku z `budget.appliance_owners` = `matrix` (kategória → povolené druhy) + `options` per druh + `job_label`. Klient ich **len spája**; keby si maticu vymyslel,
-  ponúkol by umývačku do bežnej skrinky a server by zápis odmietol až po kliknutí. Hodnota položky je `<druh>:<id>`, `budOwnerPayload` z nej robí `{kind, id, pid}` —
-  **PID ide z ponuky** a je **povinný**: server fyzický cieľ bez neho odmieta („zastaraná ponuka vlastníkov").
-- **„Len zákazka" je PRVÁ voľba a zároveň predvoľba nového záznamu.** `<select>` bez vyslovenej hodnoty vyberie prvú možnosť — a keby ňou bola skrinka, nový spotrebič by
-  sa **bez jediného kliknutia** viazal na prvý korpus v zozname (aj s prestavbou). `budDraftCommit` preto posiela `owner` **len keď je to fyzický kus**; nedotknuté pole
-  neposiela nič a server pri `create` bez vlastníka založí položku „len zákazka". Väzba na kus v modeli je **vedomé rozhodnutie**, nie náhoda poradia v ponuke.
-- **Zmena kategórie prekreslí ponuku vlastníkov** cez `budApplCtxSwitch` — kostra D-15 sadu polí za behu nevymieňa, takže sa modal otvorí znova s tým, čo už je vyplnené
-  (vzor `hwManualCtxSwitch` v Kovaní).
-- **Našepkávač** `sketchup.appl_lookup({q, gen})` → `StudioDialog.handle_appl_lookup` → `ProductionCore.appliance_lookup` (čistá funkcia, top 20) → `NX.applLookupResult`.
-  Je to **čítanie** — žiadna mutácia, žiadny krok Späť. Položka nesie `data` (výrobca, model, kategória) a **`onPick` z nich predvyplní polia** — nikdy sa neparsuje
-  zobrazený text. Staršia generácia odpovede sa zahadzuje.
-- **Klient neposiela snapshot ani kategóriu modelu** — posiela `catalog_id` ako odkaz a server si snapshot aj kategóriu vypýta z katalógu (Astra B14).
-- **Modal patrí DOKUMENTU** (Astra B4): pri otvorení sa zachytí `model_guid` a zápis ide **s ním**, nie s aktuálnym. Príchod payloadu iného dokumentu
-  (`budDocSwitched`) modal **zavrie**, zahodí frontu zápisov aj rozpracovaný dotaz našepkávača — inak by položka sadla do cudzej zákazky. Kontrola beží **pred**
-  uvoľnením fronty, takže čakajúci zápis sa už neodošle ani s novou generáciou.
-- **Zmena vlastníka je vlastná doménová akcia** `appliance_owner` (na serveri jedna operácia väzby), nie `appliance_update` — `budMoreCommit` ju rozlíši **dirty
-  flagom** (`budOwnerDirty`: porovnanie s baseline z otvorenia editora; prázdna hodnota nie je zmena). Úprava adresy ani príznaku o vlastníkovi nehovorí nič, takže
-  ho ani **nenesie** — server ho pri `appliance_update` odmieta. **Uložený vlastník, ktorý nie je v ponuke** (zanikol, je odpojený, je z novšej verzie), dostane
-  v selecte **výslovnú voľbu navrchu** („CAB-9 — nedostupný…", `budOwnerOptionsFor`): bez nej by prehliadač vybral prvú skrinku a uloženie kvôli úplne inej zmene by
-  sirotu **ticho presunulo**. Riadok tabuľky kreslí typ ako **text**, keď je zamknutý (model z katalógu alebo fyzický vlastník), priznáva vlastníka, štítok
-  „dodáva zákazník" a nesie **adresu `data-brow="appliance:<uuid>"`** pre deep-link z Kontroly.
-- **Generácia okna:** mutácia spotrebiča môže **prestavať skrinku** (zápis `appliance_refs[]` ide cez rebuild). `ProductionCore.do_budget` preto vracia aj
-  `geometry_changed` a Štúdio pri `true` pushne `bump: true` + čerstvú kartu Inspectora (`Panel.push_selected(dedup: false)` — čítacie okno si opravu identity kópií
-  nevyžiada, brána 1b-3). Cenové zmeny ostávajú pri dnešnom `bump: false`.
-
-Testy: `tests/js/test_s1b1_rozpocet.js` (77 kontrol) · `tests/pure/test_s1b1_vazba.rb` · in-SU `run_s1b1`.
-
-### Sekcia CENOVÁ PONUKA v Štúdiu (ŠT-1c PR B2, Š14–Š15)
-
-do PR B1 to bol zbaliteľný náhľad vnútri Rozpočtu (E-b2), od PR B2 je to **vlastná sekcia `offer`** — zákaznícka **projekcia** toho istého rozpočtu. Kreslí ju **ten istý
-`js/budget.js`** (`budOfferHtml` + `budOfferToolsHtml`) zámerne: dáta sú ten istý payload (`budget.cp_preview`), sumy ten istý formát a zápisy tá istá cesta — druhý súbor by
-znamenal druhú kópiu formátovania a druhý kanál na server.
-
-**Žiadny nový serverový kód:** payload aj mutácia `cp_group` existujú od E-b2, `do_cp_xlsx` od PR B1; pribudlo len `SECTIONS += offer` (+ obe JS zrkadlá). Obsah podľa mockupu:
-**suma ponuky** s priznaným režimom DPH a poznámkou „z Rozpočtu" · **položky rečou zákazníka** (`budCpTableHtml`) s **per-riadok prepínačom „samostatne"** — tou istou mutáciou, akú
-predtým posielala šípka v náhľade (1 zmena = 1 krok Späť), len rečou používateľa namiesto ikony · zbalený zoznam **„Zlúčené v zostave"** · riadok **zaokrúhlenia** · **jantárový
-guard** „Suma ponuky je podhodnotená — X riadkov rozpočtu nemá cenu" s preklikom **do Rozpočtu** (Š15 „upravuj pri zdroji" — ponuka sa needituje, chýbajúca cena sa dopĺňa tam, kde
-vznikla).
-
-**H3a (A-02) — tabuľka sa číta ako faktúra.** Stĺpce `budCpTableHtml`: **Položka · Množstvo · MJ · Spolu · V ponuke** — „Spolu" je SUMA riadku (`cena` =
-`spolu` rozpočtu; „Atira 4 · set · 171,56 €" je za štyri kusy, tooltip to hovorí), SPOLU stojí vo 4. stĺpci. Bunku sumy skladá `budCpAmountHtml`: **„v cene"** (tlmené
-`bfnt`) **len** pri `kind: 'fixed'` s nulou (Zameranie, Vizualizácie — náklad je rozpustený v zostave); `kind: 'info'` (spotrebič „dodáva zákazník") ostáva **0,00 €**,
-lebo nejde o našu službu „v cene"; `assembly` s nulou 0,00 €; neznáma cena (`null`/nečíslo) „—" (STANDARD §11.3). **XLSX ponuky sa NEMENÍ** (skladá ho Ruby
-`CpExport.price_sheet`; poradie aj 0 € pri Zameraní ostávajú — zmena XLSX je po V1) a poznámka pod tabuľkou rozdiel priznáva. **Rámik „Dokument ponuky (DOCX/PDF) —
-po V1" (priznaný wireframe Š14) zanikol** aj s CSS `.bwire` — generátor ostáva v zásobníku Po V1 a trvalá plocha v okne mu netreba.
-
-V lište sekcie je **„Cenová ponuka (zákazník)"** (presun z lišty Rozpočtu — tlačidlo si nechalo meno z mockupu, presťahovalo sa len k dokumentu, ktorý vyrába) a **„Obnoviť"**
-(zdieľaný `#refreshBtn`; ponuka zo starých rozmerov by išla zákazníkovi).
-
-#### Varovný pás patrí AJ sem (review #1)
-
-odkedy je export zákazníckeho dokumentu jedine v tejto sekcii, kreslí sa v nej celý `budWarnChips(b)` — staré ceny, spotrebiče aj rozpočtové upozornenia. Sú to **tie isté čísla**
-ako v Rozpočte (jedno miesto, jeden výpočet); mení sa **len cieľ kliku**, lebo v ponuke sa needituje nič: staré ceny → Rozpočet (tam je „Prepočítať ceny"), spotrebiče → Rozpočet
-rovno na ich sekciu (`data-section` + `budGoto`), upozornenia → Kontrola. Od CENY-M2 tooltip čipu pri ručných cenách na kontrolu (`manual_pending`) povie aj
-„ručné cez „Overiť cenu"". Bez toho by sa dala ponuka poslať zákazníkovi z neaktuálnych cien bez jediného slova. Zoznam **„Zlúčené v
-zostave"** je v `BUD_OPEN` pod kľúčom `cp_merged` (review #8) — štandardne zbalený, ale po otvorení prežije prekreslenie, inak by sa po každom prepnutí „samostatne" sám zabalil a
-fokus (`data-bkey="sep:…"`) by spadol na `<body>` práve tam, kde sa kliká najviac.
-
-**Vedomé odchýlky:** prepínač DPH sa **nezdvojil** — ponuka je projekcia rozpočtu a dve miesta na prepínanie toho istého čísla by ukazovali dva stavy; v akom režime sa suma
-zobrazuje, priznáva `<small>` pri nej. Riadok zaokrúhlenia stojí **v oboch sekciách** — je to JEDNO serverové číslo v dvoch úlohách (v Rozpočte vysvetľuje, ako sa súčet stal
-konečnou sumou; v Ponuke je to riadok dokumentu), nie dve pravdy. Testy: `tests/pure/test_st1c_ponuka.rb`, `tests/js/test_st1c_ponuka.js`, in-SketchUp sekcia `run_st1c`
-(`st1c_offer`).
-
-### Sekcia NÁREZOVÝ PLÁN v Štúdiu (NP-3, blok 2 · v0.15.3, ui/js/sheet_layout.js)
-
-posledná neaktívna položka navigácie („fáza 2") ožila — **id ostáva `cut`** (Codex C13), `SECTIONS` a obe JS zrkadlá ju majú za Cenovou ponukou. Vzhľad a texty sú
-schválený mockup `SYSTEM/archiv/bloky/NAREZ/MOCKUP_NAREZ_2026-09-28.html` (A prehľad, B detail platne); package `PACKAGE_NP3_SEKCIA.md` v tom istom priečinku.
-
-**Dáta: jeden výpočet na push.** `push_state` spočíta plán RAZ (`ProductionCore.layout_for` z toho istého `collected`, `bom`, `smap` a expanzie kovania — žiadny druhý sken)
-a ten istý plán odovzdá rozpočtu (`budget_payload(…, layout)` → veta v poznámke riadku materiálu) aj sekcii (`sheet_layout_payload` → kľúč `sheet_layout`). Kompaktný tvar:
-mená riadkov raz v `rows` (`k` natívny kľúč riadku kusovníka, `c` obdĺžniky, pri dupláku `q` hotové kusy, `m` vrstvy a hotový rozmer `fl × fw`), platne `p: [[riadok, x, y]]`
-na 0,1 mm + `o` najväčší zvyšok, `unplaced`/`rejected`/`conflicts` s **ľudským dôvodom `t` zo servera**, `phrase` = veta o počte (`SheetLayout.count_phrase` — tá istá ide do
-Rozpočtu a XLSX). Globálny stav (`blocked`, `without_material`) nepatrí karte — sekcia ho ukáže **bannerom nad kartami** aj pri prázdnom zozname (audit B4). Chyba plánu =
-`{ok: false}` a veta v sekcii; rozpočet ani exporty to nezhodí (F7). Meranie (F9): ~2000 dielcov = celý JSON pushu ≈ 377 kB (z toho plán ≈ 118 kB),
-`push_state` ≈ 105 ms, výpočet plánu + JSON ≈ 35 ms, render ≈ 3 ms
-(`tests/pure/test_np3_sekcia.rb`, `tests/js/test_np3_sekcia.js`) — lazy PULL detailu preto nie je (audit F6).
-
-**Klient kreslí, nepočíta.** `sheet_layout.js` (globálne mená s prefixom `np`, volá ho `studio.js` cez `typeof npRenderTools / npRenderBody`, `NX.setStudio` neobaľuje)
-kreslí súhrn, karty (predvolene otvorená prvá a každá s problémom — neúplný plán, upozornenie, nezaradené; ostatné zbalené, **zbalená karta SVG vôbec nevytvára**, voľba
-v `localStorage` `nx_np_closed` s try/catch), malé platne a detail platne v tom istom okne (stav okna `npDetail`, pri novom pushi sa overí — zmiznutý materiál vráti prehľad,
-menej platní skráti index). Jediné, čo si odvodzuje, je **upozornenie na poslednú platňu (O2)**: aspoň 2 platne a posledná pod 20 % alebo najviac 2 dielce.
-**Od NP-4 (predrecenzia P2)** hovorí karta „v rozpočte N" číslom **hotového rozpočtu** toho istého pushu (`budget_qty` + `budget_src`, `npBudgetNote`: „v rozpočte 5 podľa
-plánu" / „… z odhadu"; bez zdroja — vypnutý prepínač — „v rozpočte dnes N"), takže karta a Rozpočet nikdy neukážu dve rôzne čísla. **Od CENY-M2** zdroj
-`area` (materiál bez formátu okrem UNI a dupláku bez väzby, Rozpočet ho počíta v m²) = „v rozpočte 0,90 m² podľa plochy" — m² sa nikdy netvária ako počet platní.
-**SVG platne je téma-bezpečné:** farby sú výhradne CSS triedy `.np-*` s tokenmi `--nx-*` v `studio.html` (šrafy sú `<pattern>` s triedou v skrytom `<svg>` okna); jediná
-dátová farba je vzorka dekoru (`rgbHex`) v HTML štvorčeku mimo SVG (guard F12).
-
-**Lišta:** „Obnoviť" (zdieľaný `refreshBtnHtml`, šieste miesto) + chip „prerez · orez · duplák" z `params` (desatinná čiarka) → preklik do Nastavení rozpočtu (`studioGoSection('bset')`);
-pri predvolených hodnotách (`source` `seed_fallback`/`unreadable`) je chip jantárový s vetou. Detail: „Prehľad" + listovanie platní.
-
-**Oko = výber, nie zápis.** `nx_select` s `parts_key` = **natívny kľúč riadku** (pole `Bom.row_key`, nikdy pids) + `origin: 'cut'`, ide existujúcou cestou `refs_for` (všetky
-rovnaké kusy riadku, O3) a relay cez panel; `origin` len vyberie vetu statusu (`cut_select_status`). In-SU test netreba — sekcia nič nezapisuje.
-
-### JEDEN push kanál nad modelom (uzavretá nota ŠT-1a, audit #15)
-
-kým žilo okno Výroba aj Štúdio, ten istý zber modelu (`fresh_collect` + `Bom.compute` + katalógy) bežal pri každom refreshi **dvakrát** — raz pre každé okno. Bolo to vedome
-akceptované ako dočasný stav a **ŠT-1c PR B3 ho zrušila zánikom okna Výroba**: pipeline beží raz. Zdieľaná cache (musela by vedieť, kedy je zber zastaraný — undo, dedup tik, zmena
-katalógu) tým prestala byť naliehavá; ostáva ako kandidát na optimalizáciu, nie ako záplata dvojitého behu.
-
-**Dôsledok pre nové sekcie (ŠT-3b-2a):** čokoľvek nové, čo potrebuje dáta z modelu, sa priveze v `Bom.collect` (aditívny kľúč — `manual_overrides`) a do payloadu sekcie ide **z už
-hotového `collected`**; druhý sken modelu kvôli jednej sekcii je zakázaný.
-
-## Okná — lifecycle a zaniknuté satelity
-
-### Satelitné okná
-
-od **ŠT-4a sú DVE** (Inspector · Štúdio) — **SATELITY ZANIKLI VŠETKY** a je to konečný stav: každý ďalší nárast tohto čísla znamená NOVÉ okno, teda rozhodnutie, nie vedľajší účinok
-dávky (stráži guard test, ktorý kontroluje aj MENÁ oboch). Obe idú spoločným boot hookom `Engine.register_dialog_fit` (téma UI-01 + dorovnanie veľkosti D-77) — stráži to guard
-test.
-
-**Zoznam sa od tejto dávky ZMENŠUJE:** `studio_dialog.rb` (vyššie) je ich cieľový nástupca a satelit zaniká vždy až vtedy, keď je jeho obsah plne v Štúdiu (poradie: ŠT-1b Kontrola
-· ŠT-1c Rozpočet+Nákup ⇒ **okno Výroba ZANIKLO v ŠT-1c PR B3** · ŠT-2 Materiály · ŠT-3 Kovanie/Pravidlá/Šablóny · **ŠT-4a Nastavenia — POSLEDNÝ satelit**). Kým satelit žil,
-otváralo ho **premostenie v navigácii Štúdia** (uzavretý whitelist `WINDOW_BRIDGES`); s posledným satelitom zanikla aj celá tá mašinéria.
-
-**KAŽDÉ okno, ktoré ukazuje čísla zákazky, musí byť vo VŠETKÝCH refresh cestách** (`scale_observer` prepnutie modelu · `materials_dialog` zápis katalógu ·
-`supplier_settings_dialog` sadzby (od ŠT-4a to nie je okno, ale SEKCIA — cesta `refresh_studio` → `StudioDialog.refresh_if_open(bump: true)` je tá istá, len beží zvnútra) ·
-`hardware_catalog_dialog` sety a položky (od ŠT-3a-1 `push_items`/`after_sets_change` obsluhujú OBA ciele — okno aj sekciu `hw`) · `price_refresh_after_proc` v `studio_dialog.rb`
-po prepočte cien) — okno, ktoré v niektorej chýba, zamrzne na starých číslach a používateľ to zistí až na objednávke (stráži guard test).
-
-Jednotlivé žijúce okná (každé má vlastný odsek nižšie):
-
-### production_dialog.rb — okno Výroba (ZANIKLO v ŠT-1c PR B3)
-
-**Okno Výroba (`production_dialog.rb` + `production.html` + `js/production.js`) ZANIKLO v ŠT-1c PR B3** — jeho päť obsahov (Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová
-ponuka) sú sekcie Štúdia, telá akcií žijú v `production_core.rb` a všetky vstupné body (položka menu, päť relayov panela, `productionRelay*`, deep-link na tab, vetvy v broadcastoch
-aj v refresh cestách) sú preč. Osirotený `preferences_key` `'NoxunEngineProduction'` v registri používateľa ostáva — je to zapamätaná veľkosť okna, ktoré už neexistuje, a SketchUp
-ho nikdy nepoužije (dôvod v `SYSTEM/archiv/KRONIKA.md`).
-
-### materials_appearance_dialog.rb + ui/js/md_appearance.js
-
-**MR-2B — jeden Vzhľad pri povrchu dekorovej skupiny v Materiáloch.** Dosky aj ABS všetkých hrúbok používajú ten istý vstup;
-prázdna štruktúra a skupina obsahujúca iba ABS majú vlastný vstup tiež. UNI zostáva pracovnou farbou. Okno je kompaktný overlay pri tlačidle,
-jeho kotva žije mimo prekresľovaného tela sekcie. Obsahuje náhľad, katalógovú farbu a štyri explicitné akcie; nevzniká ďalší HtmlDialog.
-Pomocný text pred priradením obrázka upozorňuje na vodorovnú kresbu drevodekoru; orientácia obrázka sa automaticky nezisťuje ani nemení.
-
-Ruby časť patrí existujúcemu `MaterialsDialog` a používa jeho allowlist/dispatch. Jedna session zachytí model, `DocKey`, inštanciu Štúdia,
-kotvu, fresh scope/baseline a presný zdroj. Prepare iba číta: nedopĺňa materiál, nenačítava SKM, neotvára operáciu ani nemení výber.
-Náhľad živého materiálu môže vzniknúť v súkromnom dočasnom adresári; odpoveď nesie obrázok, nikdy klientom určenú cestu.
-Chýbajúci súbor má pravdivú hlášku. Žiadny automatický výber staršej revízie; nový obrázok alebo návrat k farbe zostávajú dostupné.
-
-**Každé Priradiť textúru / Upraviť v SketchUpe vytvára nový pracovný materiál.** Celý pôvodný natívny obsah prenesie SKM,
-príprava a Apply prebehnú v jednej operácii. Starý pracovný materiál sa neprepisuje, mohol ho medzitým použiť cudzí alebo zamknutý dielec.
-Výmena obrázka na už textúrovanom zdroji zachová jeho fyzickú šírku aj výšku cez natívne priradenie obrázka s rozmermi.
-Edit až po commite vyberie pripravený materiál a otvorí natívny panel Materiály; kartu Upraviť prepne používateľ. Pomocná geometria nevzniká.
-
-Uložiť používa zachytený zdroj, nie neskorší `materials.current`. Najprv publikuje knižnicu a okamžite prejde na nový descriptor;
-potom samostatné Apply priradí publikovanú revíziu modelu. Chyba Apply nemení úspech publikácie: okno ponúkne opakovanie tej istej revízie,
-bez ďalšieho SKM a bez návratu k starému pracovnému zdroju. Existujúce lokálne úpravy živého materiálu publikovanej revízie ostávajú platné.
-Reset po publikácii color ihneď zabudne starý natívny zdroj, aj pri chybe Apply. Knižničný zápis nie je modelové Späť.
-
-Plošná farba ide existujúcou skupinovou cestou `mdColorSave` → `set_decor_color`, bez SKM alebo ďalšieho Uložiť.
-Voliteľný `appearance_context` pridáva overenie vlastníctva a konečnú korelovanú odpoveď aj pri odmietnutí/chybe; katalógové echo samo neodomyká okno.
-Baseline vzhľadu neobsahuje RGB, preto vlastná zmena farby ani plný refresh rovnakého dokumentu session nerušia.
-
-Každá odpoveď nesie token otvorenia, session, konkrétnej akcie a dokumentu/sekcie/kotvy. Klient preverí vlastníctvo pred odomknutím.
-Busy zamyká akcie, farbu, krížik, scrim aj Escape; násilný odchod zo sekcie alebo zmena dokumentu vlastníctvo napriek tomu zneplatní.
-Overlay je cudzou vrstvou pre `NXEsc` a otvoreným modalom pre Štúdio, takže Escape nezasiahne obsah pod ním. Fokus sa vracia na aktuálny trigger.
-Katalógový render mení DOM uzol tlačidla, preto vlastníctvo patrí logickému cieľu. Server ruší session pri close/model/Studio/leave,
-aj keď Demos práve nebeží. Transakčná epocha ani vlastné exportné aborty nie sú identitou session.
+### studio_dialog.rb + ui/studio.html + ui/js/studio.js — okno ŠTÚDIO
+
+**Čo to je:** jedno okno celej zákazky (kontrakt `SYSTEM/zdroje/ui20/UI20_KONTRAKT.md`, sekcia ŠTÚDIO KONCEPT; vizuálna referencia
+`SYSTEM/zdroje/ui20/mockup_studio.html`) — ľavá navigácia, obsah sekcie vpravo. **Štrnásť živých sekcií** (`SECTIONS` = `bom ctrl buy budget offer cut mat hw appl
+rules tpl sup bset about`): Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Nárezový plán (skupina výstupy) · Materiály · Kovanie · Spotrebiče ·
+Pravidlá · Šablóny (katalógy) · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine (nastavenia). Každá sekcia má odsek **`### Sekcia <NÁZOV> v Štúdiu`** nižšie.
+Okno je `UI::HtmlDialog` (`STYLE_DIALOG`); obsah `1060 × 640` ⇒ `width/height 1076 × 680`, `min_width 1076`. Vstupy: toolbar „Štúdio", menu, deep-linky
+z Inspectora (`StudioDialog.show(open_section:, anchor:)`).
+
+**Navigácia a sekcie:**
+- O sekcii rozhoduje **uzavretý whitelist v Ruby**, klient posiela iba kľúč. Prepnutie sekcie z kódu má jedno miesto `studioGoSection(id)` (globál na `window`).
+  Neaktívna položka navigácie dnes nie je; vetva `disabled` (`aria-disabled` s dôvodom) ostáva poistkou. Ikony položiek sú **jedinečné** (Nastavenia rozpočtu
+  `sliders-horizontal` — vedomá odchýlka od mockupu, ten istý symbol nesie tlačidlo „Nastavenia" v Rozpočte a akcia nálezu Kontroly `layout_settings`; Pravidlá
+  `settings`; Kovanie `hammer` ako rail Inspectora). Zbalená navigácia `nx_studio_nav` v `localStorage`.
+- Sekcie s formulármi (Materiály, Kovanie, Pravidlá, Rozpočet, Spotrebiče…) majú **perzistentné telo** — jeden uzol naklonovaný raz zo `<template>`, ktorý pri
+  odchode zo sekcie z `#secbody` vypadne a pri návrate sa vráti; `NX.setStudio` ho neprekresľuje (rozpísané hodnoty prežijú push). Modály sekcií žijú v kotvách
+  **mimo `#secbody`** (`#nxModalRoot`, `#matModalRoot`, `#hwModalRoot`).
+- **Okno má `@ready`**: `false` pri vzniku a zatvorení, `true` v `ready` callbacku pred prvým pushom; `js` podľa neho rozhoduje (`return false unless @ready`) —
+  CEF `execute_script` pred načítaním HTML zahodí.
+
+**Čísla a kanál okna:** čísla nesie zdieľané jadro **`ProductionCore`** ([outputs.md](outputs.md)); **server je autorita čísel aj textov** — medzisúčty zo
+`sheets`, súčtový riadok z `totals`, popisky z `materials_meta`; **JS neprepočítava žiadnu sumu**. Kanál okna je vlastný: `@generation`, relay
+`NX.studioRelay`/`studioRelayExport` → `studio_do_select`/`studio_do_export` v `panel.rb` s **flush handshakom** (červené pole panela export zastaví;
+`flush_blocked`). Nesúlad generácie = re-push + status, nikdy ticho. Verejný čítač `StudioDialog.generation` používajú zápisové akcie sekcií (klik zo zastaraného
+zoznamu sa nevykoná); generáciu zdvíha výhradne `push_state`.
+
+**REFRESH INVARIANT (záväzné miesto) — rozhoduje, či sa menia čísla zákazky:**
+- **Plný push so zdvihom generácie** — zápis mení kusovník, rozpočet alebo ponuku. Patria sem aj **uloženie pravidiel kovania** (modelový zápis:
+  `HardwareRules.set_project_rules` beží vnútri `CabinetBuilder.rebuild_many(op_name: 'NOXUN: pravidla kovania')` = jedna undo operácia; rebuild číta projektový
+  snapshot `hardware_rules`; `HardwareRules.write` do `%APPDATA%` je len globálna predvoľba) a **sadzby dodávateľa** (`supplier_settings.json`, mimo modelu, ale menia
+  sumy → `SupplierSettingsDialog#refresh_studio(bump: true)`).
+- **Plný refresh bez zdvihu (`bump: false`) + echo** — zápis môže meniť čísla, ale nie identitu riadkov: **katalóg materiálov** (`MaterialsDialog.after_catalog_change`
+  → `push_mat_catalog` + `StudioDialog.refresh_if_open(bump: false)`); rozkliknutý riadok ani rozrobený export nesmú zastarať kvôli oprave ceny.
+- **Samotné echo sekcie** — zápis nemení čísla zákazky (knižnica šablón `TPL.init`) a **odmietnutý zápis** (`push_section_echo`). **Výnimka:** odmietnutie pre
+  **prepnutý dokument** (`model_guid` mismatch) ide plným pushom `refresh_studio(bump: false)`.
+- Po zápise do modelu dostanú čerstvé čísla obaja odberatelia v poradí `Panel.push_selected` → `refresh_if_open(bump: true)` (vzor
+  `refresh_studio_after_model_write`).
+
+**Životnosť dlhých behov nie je jednotná:** Demos fetch katalógu (`HardwareCatalogDialog`, `MaterialsDialog`) zhasína zatvorenie okna, prepnutie dokumentu aj
+**odchod zo sekcie** (`hw_leave`/`mat_leave`); **prepočet cien** (`price_refresh_alive_proc`) zámerne prežíva prepnutie modelu (ceny idú do globálneho katalógu)
+a kontroluje len živú inštanciu okna — leave hook Rozpočtu neexistuje.
+
+**„Obnoviť"** (`refresh_bom` → `do_refresh_bom`) hlášku **vždy zhodí**: po úspešnom `push_state` echo „Prepočítané.", pri výnimke chybová hláška + `log_error`
+(vlastný `rescue`). Tlačidlo má **jeden markup pre všetky miesta** — `refreshBtnHtml(stale, tip, attrs)` v `studio.js` (Rozpočet a Ponuka cez most
+`budRefreshBtnHtml`). Jantárový stav: odsek `StudioModelWatch`.
+
+**Deep-link** — kontraktové meno `NX.studioOpen(section, anchor)`, reálna funkcia panela `openStudio(section, anchor)` (`ui/js/actions.js`) → `open_studio` →
+`StudioDialog::SECTIONS` (JS zrkadlo `NXShell.STUDIO_SECTIONS`, guard test). Sekcia sa odloží do `@pending_section` a **jednorazovo ju spotrebuje najbližší
+`push_state`**; `anchor` sa spotrebuje so sekciou (Kusovník: predvyplní hľadanie; Materiály: otvorí detail dekoru).
+
+**Zápis čísel a jednotiek celého okna** žije v `studio.js` — blok `nxf*` (`nxfMoney`, `nxfMoneyIn`, `nxfQty`, `nxfUnit`, `nxfQtyUnit`, `nxfMm`, `nxfDim`, `nxfDec`;
+pravidlá: `docs/UI_DIZAJN.md` „Zápis čísel a jednotiek"). Sú to globály súboru (sekčné skripty `budget.js`, `proj_materials.js`, `hw_catalog.js`, `demos_diff.js`,
+`rules.js` sa načítavajú za ním), v Node cez `require`; bez neho kreslí každá sekcia núdzový zápis s čiarkou, ktorý nič neskryje. Mení sa len zápis — payload,
+XLSX, CSV ani VEPO nie. Test `tests/js/test_h4a_format.js`.
+
+**Texty:** bez vývojárskeho žargónu a VEĽKÝCH písmen (slovník `docs/UI_DIZAJN.md` §1); guard `tests/pure/test_h4b_texty_vzhlad.rb` ich hľadá v reťazcoch UI, nie
+v komentároch; správanie `tests/js/test_h4b_texty_vzhlad.js`. **Hľadanie** (Kusovník, Materiály, Kovanie, Spotrebiče ×2) má krátky hint „Hľadať…", rozsah nesie
+`title` + `aria-label`.
+
+**Rohové nastavenie tlačidiel** (zóna `.cornerzone` zdieľaná s railom Inspectora a lištou Kontroly, obsah okna vlastný): zatvára klik mimo a Escape — **v jednom
+listeneri** s `ecMenu`/`vepoMenu` a až za modalovou brankou `nxModalOpen`.
+
+Testy okna: `tests/pure/test_st1a_studio.rb`, `tests/js/test_st1a_studio.js`, in-SU `run_st1a`. Plné znenie (vrátane zaniknutých premostení a okien): archív,
+„studio_dialog.rb + ui/studio.html + ui/js/studio.js — okno ŠTÚDIO (ŠT-1a)".
+
+### StudioModelWatch — indikátor neaktuálnosti okna („Obnoviť" zožltne)
+
+Štúdio čísla **neprepočítava samo** — po zmene modelu (prestavba z Inspectora, posun, Späť/Znova) tlačidlo „Obnoviť" **zožltne**, aby sa neexportovalo zo starých
+čísel. Okno má **vlastný `Sketchup::ModelObserver`** (commit · undo · redo · abort; trieda pod guardom `defined?(Sketchup::ModelObserver)`).
+`PanelModelObserver` ani `ScaleWatch` sa na to nepoužívajú (prvý počuje len Späť/Znova/Abort, druhý filtruje vlastné prestavby).
+- **Callback je prázdny:** `@epoch += 1` a latch `UI.start_timer(0)` — žiadne čítanie ani zápis modelu; burst commitov = jeden `js`.
+- **Porovnanie epoch:** `push_state` si ukladá `@pushed_epoch = @epoch` **až na konci** (po `fresh_collect`, keď payload odišiel) — transakcie spustené samotným
+  prepočtom (zápis rozpočtu s `bump: false`) sa tým pohltia. Flush posiela `NX.markStale()` len pri `@epoch > @pushed_epoch`, so živým oknom a **dvojitým guardom
+  dokumentu** (`txn_model_ok?` v callbacku aj v timeri).
+- **Lifecycle = život okna:** attach v `ensure_dialog` (anti-double `remove → add`, vlastný rescue), detach v `set_on_closed`, prevesenie a nulovanie epochy pri
+  prepnutí dokumentu (`on_model_changed`) — epocha je per dokument. Žiadny `Engine` broadcast.
+- **Klient** drží `staleFlag` (stav okna); `NX.markStale()` prekreslí len lištu aktívnej sekcie, zhadzuje ho **výhradne plný payload** `setStudio` (echá nie).
+  Jantár cez `--nx-warn*`. Signál znamená „možno neaktuálne" (aj posun cudzieho objektu ho vyvolá).
+- Žiadny prepočet, zápis ani krok Späť. Testy `tests/pure/test_stale_obnovit.rb`, `tests/js/test_stale_obnovit.js`, in-SU `run_stale` (commit = 1 · burst 3 = 1 ·
+  vlastný tick prepočtu = 0 · zápis rozpočtu = 0 · Späť/Znova = 1 · cudzí dokument = 0 · po zatvorení okna 0).
+
+### Sekcia KUSOVNÍK v Štúdiu (Š1–Š6)
+
+**Čo robí:** zoznam všetkých výrobných dielcov zákazky v troch pohľadoch **Dielce · Platne · ABS**, hľadanie (aj zúženie na skrinku z Inspectora), voliteľné
+stĺpce, klik na riadok označí dielce v modeli, VEPO export a názov projektu. **Dáta:** `push_state` posiela kľúče kusovníka na najvyššej
+úrovni payloadu (`studio_dialog.rb`, zber `Bom` + `ProductionCore`): `rows` (`ProductionCore.rows_with_roles`; každý riadok nesie pole `refs` na entity
+v modeli), `sheets`, `edging` (pohľad ABS), `summary`, `sheet_estimate`, `totals`, `materials_meta`, `edges_meta`, `vepo`; klient ich drží v `ST` (`ST.rows` …) — kontrakt výstupov a VEPO: [outputs.md](outputs.md), [../../SYSTEM/VEPO_KONTRAKT.md](../../SYSTEM/VEPO_KONTRAKT.md);
+stĺpce: `UI20_KONTRAKT.md` Š2. **JS:** `studio.js` — `partsTable` / `sheetsTable` / `absTable`, `COLS` + `cellValue` + `activeCols`, `bomToolsHtml(vepo, st)`,
+`vepoBtnHtml`/`vepoMenuHtml`, `cutLinkHtml`, `absCompact`/`absFull`.
+
+- **Lišta** = čistá funkcia `bomToolsHtml(vepo, st)` (stav argumentom): `[Dielce · Platne · ABS] · [Projekt] · [hľadanie] · ⟶ · [VEPO export ▸roh] · [Stĺpce] ·
+  [Obnoviť]`. **Pole „Projekt"** (`.prjbox .prjlbl`) je jediné editovateľné miesto názvu projektu; zápis `studio_set_vepo_opts` → `%APPDATA%` a **cielené echo**
+  `push_vepo_bar` → `NX.setVepoBar` (nedvíha generáciu — inak by klik hneď po editácii názvu spadol na „Dáta okna sa medzitým zmenili"); hodnotu inputu nasadí len
+  keď v ňom používateľ nepíše; stav checkboxu sa nasadzuje pri **každom** pushi. Exporty názov z JS neberú (autorita `ProductionCore.project_name`).
+- **Rohové nastavenie VEPO** (`.cornerzone` v pravom dolnom rohu tlačidla, `.vepofly`): jediný prepínač **„18+36 spolu"**; otvorenosť čisto klientska
+  (`vepoMenuOpen`); hodnotu nasadzuje echo `NX.setVepoBar` aj do otvoreného okna.
+- **Stĺpce:** voliteľné stĺpce v `localStorage` `nx_bom_cols`, zbalené skupiny `nx_bom_groups` (len zobrazovacie veci počítača). Tabuľka Dielce má triedu `parts`,
+  bunky a hlavičky `c-<kľúč>` (`colCls`). **Pevné rozloženie len pri predvolených stĺpcoch:** `partsTableClass(cols)` pridá `fixed`, keď sú zapnuté len stĺpce
+  z `PARTS_FIXED_COLS` (Dielec, Skrinka, Dĺžka, Šírka, Hr., ks, ABS) — šírky Dĺžka/Šírka 64 px, Hr. 52, ks 44, ABS 190, akcie 56, Skrinka 22 %, Dielec zvyšok,
+  textové bunky sa zalamujú (`overflow-wrap: anywhere`). So zapnutým Smerom dekoru alebo Rolou `fixed` nie je (automatické rozloženie).
+- **Zápis čísel:** dĺžka a šírka celé mm (`nxfDim` = VEPO `rounded_dims`), **hrúbka skutočná** (`nxfMm`: 18,6; obchodnú 18/36 nesie VEPO) v hlavičke skupiny,
+  stĺpci „Hr." (`cellNumText`) aj pohľade Platne; ABS hrúbka „0,8 mm" / „1 mm", bm na 2 desatinné. **Bunka ABS:** `absCompact` vráti „0,8 dookola", keď všetky štyri
+  kódy nesú tú istú pásku so známou hrúbkou (`absAround`), inak plný kompakt; titulok `absFull`. Kódy `L1/L2/W1/W2` sa **zámerne neprekladajú** na strany (pri každej
+  role iná fyzická hrana — kreslí ju karta dielca).
+- **Súčtový riadok neukazuje súčet platní** (sčítaval by platne rôznych dekorov) — pohľady Dielce aj Platne majú preklik **„Nárezový plán"** (`cutLinkHtml`,
+  `data-nav="cut"` → `studioGoSection('cut')`). `totals.plates_min/max` v payloade ostali nevyužité a `studio.js` ich čítať nesmie (`tests/js/test_h3_zobrazenie.js`).
+  Stĺpec „Odhad platní" po materiáloch v pohľade Platne ostáva (orientačný).
+- **Pohľad Platne** skladá riadky zo `sheets` **aj** `sheet_estimate` (duplák len z lepených dielcov sa reálne nakupuje). **Pohľad ABS** nemá „bm s rezervou" ani
+  „€/bm" (patria Rozpočtu; dopočet rezervy v klientovi je zakázaný — hovorí to hint).
+- **Kotva z Inspectora** (ID skrinky) predvyplní hľadanie; vymazanie filtra prežije refresh. **Klik na riadok** → `studio_do_select` cez relay panela (generácia
+  okna, flush handshake) — výber nič nezapisuje.
+- **Vedomé odchýlky:** stĺpec „Poznámka" neexistuje (nie je zdroj); exporty XLSX/CSV kusovníka v lište nie sú, kým nebudú reálne (kontrakt Š5).
+
+Testy: `tests/pure/test_st1a_studio.rb`, `tests/js/test_st1a_studio.js`, `tests/js/test_h4a_format.js`, `tests/js/test_h3_zobrazenie.js`, in-SU `run_st1a`.
+
+### Sekcia KONTROLA v Štúdiu (Š8–Š11)
+
+**Čo robí:** semafor nálezov zákazky (RED/ORANGE/zelená), zoznam nálezov s klikom do modelu a kontextovými opravami, prepínače kontrol (hrany, kresba, smer
+otvárania). **Dáta:** v tom istom pushi ako Kusovník (`control` · `counts` · `edge_check` · `grain_check` · `direction_check`) — prepnutie sekcie na server nechodí;
+každý prepínač má lacné echo (`push_edge_check` / `push_grain_check` / `push_direction_check`), ktoré prekreslí len lištu. Nálezy skladá `Validation`
+([outputs.md](outputs.md)). **JS:** `studio.js` — `semaforHtml(counts, filter, list)`, `ctrlListHtml`, `ctrlRowHtml`, `greenChipParts`, `ctrlOrangeRowCount`,
+`edgeCheckInfoText`.
+
+- **Š8 semafor:** tri chipy — červený a oranžový sú **filtre** (`ctrlFilter`, stav okna; filter len skrýva — index riadku ostáva indexom do serverového poľa), zelený
+  „N zo M skriniek bez nálezu" je informačný. **Čísla sú serverové** (`Validation.counts`: `cabinets`/`clean`; menovateľ = skutočný počet skriniek zo zberu
+  `collected[:cabinets]`, nie dĺžka `placements`). Predložku dáva `skZo(n)`; `cabinets === 0` = „0 skriniek v modeli", `clean` null = „—". Oranžový chip: „10 nálezov
+  v 5 riadkoch · skontroluj pred objednávkou" — **počet riadkov je jediné číslo, ktoré počíta klient** (vedomá výnimka: je to údaj o zozname, nie o dátach;
+  `ctrlOrangeRowCount` zo zdieľaného predikátu `ctrlUniGrouped`, parita pod testom). Prijatý limit: nález „dva kusy na jednom mieste" nesie `owner_id` prvého
+  vlastníka skupiny.
+- **Skupina „Nenahradené UNI materiály"** (ORANGE `uni_material`, predvolene zbalená, s počtom dielcov): `ctrlListHtml` ju vloží na miesto prvého UNI nálezu, deti
+  `ctrlRowHtml` s indexom do serverového poľa; hlavička len prepína (`aria-expanded`, drží fokus); `ctrlUniOpen` prežije filter aj payload toho istého dokumentu.
+  Semafor, badge, validácia, dedup ani exporty sa nemenia. Testy `tests/js/test_d122_uni_skupina.js`.
+- **Š9 riadok:** bodka závažnosti · text · miesto · akcie. Klik a **oko** = `nx_select` s `problem_key` (stabilný kľúč, nie pids; jadro `ProductionCore.do_select`),
+  **ceruzka** = to isté + `focus_inspector`. Rovnaké jadro majú všetky klik-selecty okna, každý s vlastnou adresou: `parts_key` (Kusovník), `hw_key` (generika),
+  `material_key`/`abs_key` („Kde sa používa"), `rule_ref` (Pravidlá), `source_ref` (pôvod v Nákupe).
+- **Kontextové opravy len tam, kde existujú:** UNI nález → **„Nahradiť UNI…"** (`replace_uni` → `MaterialsDialog.request_replace_uni`); rozpočtový nález → sekcia
+  Rozpočet (`studioGoSection('budget')` + `budGoto(budget_section)`); ORANGE `layout_settings` → sekcia Nastavenia rozpočtu (`data-act="bset"`, bez oka a ceruzky);
+  RED „chrbát v drážke zo staršej verzie" (`back_cut`, `fix: 'rebuild_stale'`) → **„Prestaviť zastarané skrinky"** (`data-act="rebuild"`) — **zápis do modelu
+  s flush handshakom**: `back_rebuild_stale` → `StudioDialog.handle_back_rebuild_stale` → `NX.studioRelayBackRebuild` → `studio_do_back_rebuild` →
+  `Panel.back_rebuild_stale`; server overí `gen`, `flush_blocked`, `model_guid` a pokoj observera, skrinky vyberie z čerstvého zberu a prestaví `rebuild_many` (jeden
+  krok Späť), preskočené vymenuje; klient drží `ctrlRebuildBusy`, zhodí ho každý plný push (každá vetva končí `repush`).
+- **Š10 lišta:** **jeden riadok** s tromi prepínačmi — „Zvýrazniť hrany" s rohovým nastavením (zdieľaný `edge_menu.js`, `.ecmenu-studio`; otvorenie zavrie kópiu
+  v raile — `edge_menu_open` → `Engine.close_edge_menu(:studio)`; zatvára klik mimo a Escape), „Smer kresby", „Smer otvárania" (`dcBtn`/`data-dc`,
+  `directionBtnHtml` + `directionCheckText`). Text lišty skladá `edgeCheckInfoText` z častí **zapnutých** prepínačov (`edgeCheckText`, `.gcinfo`, `.dcinfo`) spojených
+  „ · "; veta „Vypnuté — v modeli nie je nič nakreslené." len keď nie je zapnuté nič.
+- **Š11 badge:** položka navigácie nesie živé RED/ORANGE počty z tých istých `counts` (čistá zákazka badge nekreslí).
+- **Deep-link → karta čela:** ceruzka pri RED náleze smeru otvárania vyberie **vlastníka (korpus)** a len pri otvorenom Inspectore pošle `NX.focusFront(front_id)`
+  (`PartKeys.front_id`); klient prepne na Čelá, otvorí kartu a doscrolluje; neznáme ID = nič. Rozhoduje server: `ProductionCore.select_target_item` adresuje nález
+  bez `part_key` (vetva `pids_for_problem` pre korpusové nálezy); obyčajný klik označí dielec (`front_focus_status`).
+- **Deep-link → riadok v Kovaní:** nález s konkrétnym riadkom nesie adresu v `data` (`owner_part_key` + `generic_type` + `rule_id` + `orphan`) zo
+  **`Validation.hw_target`** (`stable_key` sa nemení): vypnuté kovanie (`orphan: true`), `hardware_unmapped`, `drawer_kit`, `hardware_code` zo setového zdroja
+  (ad-hoc nie) a konflikt zásuvky len pri kóde z `Recipes::OVERRIDE_CONFLICT_CODES` a **práve jednom** zásahu výsuvu. `ProductionCore.do_select` adresu prepošle
+  (`hw_focus_target`, vetva kovania pred kartou čela) → `Panel.push_focus_hardware` → `NX.focusHardware` → `nxFocusHardware` (kontext Kovanie, riadok, `hwFlash`);
+  neexistujúci riadok = nič. Výber = vlastník (korpus).
+
+Testy: `tests/pure/test_st1b_kontrola.rb`, `tests/js/test_st1b_kontrola.js` (+ `test_d104`/`test_d105`/`test_k2`/`test_abs_rail_3stav`), `tests/pure/test_kovd4_ui.rb`,
+`tests/js/test_kovd4_ui.js`, in-SU `run_st1b`. Komentár v `studio.js` odkazuje na tento odsek (výnimka počtu riadkov). Plné znenie: archív, „Sekcia KONTROLA v Štúdiu".
+
+### Sekcia NÁKUP KOVANIA v Štúdiu (Š7)
+
+**Čo robí:** nákupný zoznam kovania zákazky zo setov (kategórie ako medzihlavičky, riadok mimo katalógu jantárovo, súčet „len známe ceny" s počtom nezadaných),
+zoznam **„Bez kódov"** a **generika podľa pravidiel** s klikom na vlastníka; CSV export a „Obnoviť" v lište. **Dáta:** payload `hardware` a `hardware_sets`
+z `ProductionCore` (expanzia setov [hardware.md](hardware.md), výstupy [outputs.md](outputs.md)). **JS:** `studio.js` — `buySection`, `price`, `hwManualMark`,
+`hwSourceGroups`, `hwStopOwners`/`hwStopCount`, `hwMissWhere`/`hwMissWhereTitle`; CSS `.hwsec`/`.hwbanner`/`.hwcat`/`.hwmiss`/`.hwsum` v `studio.html` (tokeny).
+
+- **Okno hovorí po slovensky, CSV nie:** popisky skladá jadro `ProductionCore.hardware_sets_labeled(hw_exp)` — **nová kópia** s `category_label`
+  (`HardwareCatalog.category_label`) a slovenským `label` nemapovanej položky (`HardwareRules.label_for`); vstup `hw_exp` sa nemutuje (čítajú ho plán, Rozpočet,
+  Kontrola, spotrebiče). CSV kovania (`do_hw_csv`) počíta nákup nanovo s kódom kategórie a je bajtovo rovnaké (test `kovh_golden`). Generika: stĺpec Parametre
+  zo serverového `params_text` (fallback `params_label`), stĺpec **„Kde" = zlúčený pôvod zo servera** (`where`, „CAB-003 ×2", ručná sa nezleje s pravidlovou,
+  tooltip `manual_note`); `breakdown` (`owner_pid`) ostáva pre klik-select. **Klient nesčítava.**
+- **Zápis:** ceny cez `nxfMoney`, množstvá cez `nxfQty` (necelé množstvo kovania v metroch sa neskryje). Jednotku katalógu (`m`, `par`, `sada`…) prekladá
+  `nxfHwUnitCode` (`studio.js`, mapa `NXF_HW_UNIT`) — **JS zrkadlo `Budget::HW_UNIT_LABELS`** (`core/budget.rb`), aby Nákup písal jednotku ako Rozpočet („bm",
+  „pár", „set"); neznáma jednotka ostáva surová (Ruby jadro ju počíta ako `KS`). Zhodu máp stráži paritný test `tests/pure/test_hw_unit_zrkadlo.rb`.
+- Tabuľky preberajú `.bomtab` Štúdia s markerom **`.hwtab`** (ruka a hover len na `tr.hwgen`). Riadok generiky je `tr.hwgen` — žiadny `<tr>` nesmie niesť triedu, ktorej
+  `panel.css` dáva flex/grid (guard `tests/pure/test_tr_flex_kolizia.rb`).
+- **Chip „ručná" a pôvod:** riadok s ručnými kusmi (`adhoc_quantity > 0`) alebo voľná položka nesie chip „ručná" (voľná má v Kóde pomlčku). Klik na riadok rozbalí
+  **„Pôvod"** — zdroje **zoskupené per skrinku** (`hwSourceGroups`: „CAB-3 · 6 ks: F1 · dvierka ľavé · set … ×2 · …", poradie prvého výskytu, `owner_part_key: null`
+  = „celá skrinka", zdroj bez `cabinet_id` v tlmenej skupine „—"). `owner_label` dopĺňa server (`ProductionCore.decorate_source_owners` z `cabinet_fronts`).
+  **Zdroje sú klikateľné** (`data-src-cab` + `data-src-key` → `nx_select` so `source_ref` + `focus_inspector: true`; delegácia spracuje `[data-src-cab]` pred
+  `tr.hwbuyrow`); klik Inspector neotvára, len zdvihne — pri zavretom to povie status. **Pamäť rozkliku prežíva push** (kľúč = identita riadku: `free_key` alebo
+  `code` malými písmenami), maže sa len pri zmene dokumentu.
+- **„Bez kódov":** položka výsuvu z receptu bez kitu je **zastavujúca** (`tr.hwstop`, červená) s vetou nad tabuľkou o počte zásuviek a odkazom na Kontrolu;
+  závažnosť určuje server príznakom `blocks_export` (`HardwareSets.unmapped_entry`). **Veta počíta zásuvky, tabuľka riadky** (`hwStopOwners` dedupuje podľa
+  `cabinet_id` + `owner_part_key`). Stĺpec „kde" ukazuje serverový `owner_label` (`ProductionCore.decorate_unmapped` → `owner_label_for`), surový kľúč ostáva
+  v `title`; pole je aditívne a CSV sa nemení.
+- **Export** vlastným kanálom okna: `hw_csv_export` → `handle_hw_csv` → `NX.studioRelayHwCsv` (flush handshake) → `studio_do_hw_csv` → `ProductionCore.do_hw_csv`.
+  Klik na generiku → `nx_select` s `hw_key`.
+
+Testy: `tests/pure/test_st1c_nakup.rb`, `tests/js/test_st1c_nakup.js`, `tests/js/test_d93_nl_override.js`, `tests/js/test_d94_povod.js`, `tests/pure/test_d94_povod.rb`,
+in-SU `run_st1c` a `run_d94`. Plné znenie: archív, „Sekcia NÁKUP KOVANIA v Štúdiu".
+
+### Sekcia ROZPOČET v Štúdiu (Š12–Š13)
+
+**Čo robí:** rozpočet zákazky po sekciách (Materiál, ABS, Kovanie, Služby, Spotrebiče, vlastné položky…), režim *€ · €€ · €€€*, DPH, prepočet cien, ručné overenie cien
+dosiek a ABS, spotrebiče s vlastníkom, XLSX rozpočtu. **Jediná sekcia, ktorá cez rozpočet zapisuje do modelu** (1 zmena = 1 krok Späť). **Dáta:** payload `budget`
+z `ProductionCore` / `Budget` ([outputs.md](outputs.md)); mutácie `budget_mutate` → `StudioDialog.do_budget` → `ProductionCore.do_budget`. **JS:** `ui/js/budget.js`
+(prefix `bud*`/`BUD_*`, načítava sa **až za `studio.js`** — `studio.js` priraďuje celé `window.NX`; guard test).
+
+**Lišta a telo:** `budToolsHtml` (prepínače *s DPH/bez DPH* a režim, „Prepočítať ceny", „Obnoviť", XLSX rozpočtu, „Nastavenia" s ikonou `sliders-horizontal`
+ako položka `bset`) a `budDrawBody` (veľký súčet, jantárové chipy, zbaliteľné sekcie); `budRerender()` kreslí oboje a fokus obnovuje **raz** (`budCaptureFocus` na
+začiatku, `budRestoreFocus` na konci).
+- **„Prepočítať ceny"** (`budPriceBtnHtml`) je **jantárové, keď zákazka nesie staré ceny** — čistá projekcia poľa `stale` (`budStaleLabel` do tooltipu, `.bstalebtn`,
+  `--nx-warn*`, nikdy zelená); počas behu `disabled` bez jantáru. Fázové okno prepočtu `#budPrModal` riadi server (vo fáze `run` sa Escapom nezatvára). Pri samých
+  ručných cenách hlavné tlačidlo „Skontrolovať ceny" otvorí zoznam (`budPrStart`); čip „N cien na kontrolu" podľa `counts.manual_pending` (`budManualPending`).
+- **Jantárový chip súčtu** počíta **všetky** rozpočtové nálezy a vedie do sekcie Kontrola (chip spotrebičov je skratka na ich sekciu); nález kategórie `budget`
+  v Kontrole otvorí `budget_section`. Preklik na ponuku `budCpLinkHtml` (suma + stav + šípka).
+- **Zápis množstiev:** `budQty`/`budUnit`/`budMoneyIn` → `nxfQty`/`nxfUnit`/`nxfMoneyIn` (`budNxf`); kódy MJ v payloade, serverová `poznamka` aj XLSX sa nemenia.
+  Peňažné polia majú hodnotu `nxfMoneyIn` a za poľom „€" (`BUD_EUR_AFTER`); `budParse(nxfMoneyIn(x)) === x` stráži test; `budFmtEur` = dvojča `nxfMoney`.
+- **Kanály:** mutácia ide **priamo** (bez flush handshake); **oba XLSX exporty** handshake majú (`budget_xlsx`/`cp_xlsx` → `NX.studioRelayBudget`/`studioRelayCp` →
+  `studio_do_budget_xlsx`/`studio_do_cp_xlsx`).
+- **Generačný kontrakt:** push po mutácii rozpočtu = `push_state(bump: false)` (plný payload, generácia sa nedvíha — `rows`/`refs` sa nemenia); každá iná zmena
+  generáciu zdvihne a mutácia so starým `gen` sa odmietne; prvý push zdvihne vždy. Fronta zápisov `BUD_BUSY`/`BUD_QUEUE` sa uvoľňuje **výhradne v `NX.setStudio`**
+  (echá `gen` nenesú); poistný timer `BUD_BUSY_MS` 6 s. **Položka fronty nesie `{op, extra, doc, gen}` z okamihu kliknutia** (`budSend`), odošle sa s nimi;
+  `budDocSwitched` pri každej zmene dokumentu vyhodí zápisy iného dokumentu a `budAfterPush` cudzí zápis neodošle (dôsledok: odmietne sa aj zápis, ktorý čakal za
+  mutáciou zdvíhajúcou generáciu — používateľ klikne znova). Mutácia spotrebiča s prestavbou vracia `geometry_changed` → push `bump: true` + čerstvá karta
+  Inspectora (`Panel.push_selected(dedup: false)`).
+- **Modály** = kostra D-15: „Pridať položku", „Pridať spotrebič" (`budDraftFields`), ⋯ editor riadku (bez `memoryKey`; korelácia `BUD_MORE.sent`) — odsek „D-15
+  modal".
+
+**Nekompatibilné dáta rozpočtu** (zákazka z novšieho pluginu alebo poškodený marker `budget_std`): payload nesie `budget.budget_std` (`{ state, blocked, reason }`,
+`Budget.std_payload`) a klient **v Rozpočte aj Ponuke** (1) kreslí trvalý banner `budStdBannerHtml`, (2) jedným prechodom `budStdDisable(box)` po každom kreslení
+vypne ovládače zo zoznamu **`BUD_STD_OFF`** (nový ovládač, ktorý zapisuje zákazku, patrí doň), (3) poistka v `budSend`, `budXlsx`, `budCpExport`. Zapnuté ostávajú
+DPH, „Obnoviť", „Prepočítať ceny" a tlačidlá `mat-*` (zapisujú katalóg, nie zákazku). Autorita je server (`BudgetStore.write!`, `ProductionCore.budget_std_block`),
+text má jeden zdroj `BudgetStore.std_block_reason`; odmietnutie kanálom `NX.budgetResult(op, false)`.
+
+**Ceny podľa plánu:** checkbox „ceny podľa plánu" v `<summary>` sekcie Materiál (`label.bappl` so `stopPropagation`) + tooltip `BUD_PLAN_TIP` (`.nxtip`; `details.bsec`
+povolí `overflow: visible` cez `:has`); stav z `budget.plan_prices`, mutácia `plan_prices {enabled}`, ovládač v `BUD_STD_OFF`. Značka zdroja množstva
+`budQtyTagHtml` (`.qtag.plan` / `.qtag.est`, tooltip serverový `qty_tip`) len pri riadku s `qty_source`. Po Späť sa checkbox a ceny vrátia až po „Obnoviť"
+(in-SU `st1c_plan_prices`). Materiál bez formátu (sklo aj doska) sa počíta podľa plochy (`Budget.area_priced?`).
+
+**Ručné ceny dosiek a ABS · materiál podľa plochy** (všetko projekcia payloadu): ikona odkazu pred názvom (`budMatLinkHtml(r, kind)`, `.hw-product-link` + `.bmatlink`:
+`demos` / `product` sivá, `missing` jantárová; UNI, duplák a chýbajúci záznam ikonu nemajú) · stĺpec **„Overená"** (`budMatCheckHtml` → tlačidlo `.bver` „ručne 18.9."
+/ „ručne 45 dní" / „neoverená"; tooltip `budMatTip` = kópia `mdManualTip`, parity test `tests/js/test_ceny_m2_budget.js`) · riadok podľa plochy (`qty_basis: 'area'`,
+MJ „m²") · zoznam starých cien (`budStaleActionHtml`: „Overiť cenu" `data-action="mat-manual-check"` alebo obnovenie z Demosu). **Kliky `mat-*` obsluhuje
+`proj_materials.js`**: `demos` → `open_demos_url`, `product` → `mat_product_open` (URL nikdy od klienta), `missing` → `mdProductFromBudget` (formulár variantu
+v Materiáloch s kurzorom v poli odkazu), „Overiť cenu" → `mdManualRequest` so `section: 'budget'` (formulár ostáva v Rozpočte s rovnakým životným cyklom).
+Ikona produktu kovania a `hw-manual-check`: odsek „Sekcia KOVANIE".
+
+**Spotrebič v rozpočte:** modal „Pridať spotrebič" — `catalog_id` (`lookup`, prvé pole) · `typ` · `nazov` · `dodavatel` · `cena` · `owner` · `customer_supplied`;
+⋯ editor má vlastníka a prepínač (kód ani poznámku nie).
+- **Kategórie ani ponuka vlastníkov nie sú v klientovi:** `budApplTypes(b)` z `budget.appliance_types`, `budOwnerOptions(b, cat)` z `budget.appliance_owners`
+  (`matrix` + `options` + `job_label`); hodnota `<druh>:<id>` → `budOwnerPayload` `{kind, id, pid}` — **PID je povinný**.
+- **„Len zákazka" je prvá voľba a predvoľba** — `budDraftCommit` posiela `owner` len pri fyzickom kuse. Zmena kategórie prekreslí ponuku (`budApplCtxSwitch`).
+- Našepkávač `sketchup.appl_lookup({q, gen})` → `StudioDialog.handle_appl_lookup` → `ProductionCore.appliance_lookup` (top 20) → `NX.applLookupResult` (čítanie;
+  `onPick` predvyplní polia z `data`, stará generácia sa zahodí). Klient neposiela snapshot ani kategóriu modelu — len `catalog_id`.
+- **Modal patrí dokumentu** (zachytený `model_guid`; `budDocSwitched` ho zavrie a zahodí frontu aj dotaz). **Zmena vlastníka** = vlastná akcia `appliance_owner`
+  (`budMoreCommit` podľa `budOwnerDirty`); `appliance_update` vlastníka nenesie. Uložený vlastník mimo ponuky dostane výslovnú voľbu navrchu (`budOwnerOptionsFor`).
+  Riadok nesie adresu `data-brow="appliance:<uuid>"` pre deep-link.
+
+Testy: `tests/pure/test_st1c_rozpocet.rb`, `tests/js/test_budget_ui.js`, `tests/js/test_np4_ceny.js`, `tests/js/test_ceny_m2_budget.js`, `tests/js/test_s1b1_rozpocet.js`,
+`tests/pure/test_s1b1_vazba.rb`, in-SU `run_st1c` (operácie × jeden krok Späť, gen a guid guardy, XLSX guardy) a `run_s1b1`. Plné znenie: archív, „Sekcia ROZPOČET
+v Štúdiu" a jeho podnadpisy.
+
+### Sekcia CENOVÁ PONUKA v Štúdiu (Š14–Š15)
+
+**Čo robí:** zákaznícka **projekcia** toho istého rozpočtu — suma ponuky (s priznaným režimom DPH), položky rečou zákazníka, zlúčené v zostave, zaokrúhlenie, XLSX
+„Cenová ponuka (zákazník)". **Dáta:** `budget.cp_preview`; mutácia `cp_group` (per-riadok prepínač „samostatne", 1 zmena = 1 krok Späť); export `do_cp_xlsx` (vlastný
+dokument Ruby `CpExport.price_sheet`). **JS:** ten istý `budget.js` (`budOfferHtml`, `budOfferToolsHtml`, `budCpTableHtml`, `budCpAmountHtml`) — jeden formát a jeden
+kanál.
+
+- Tabuľka: **Položka · Množstvo · MJ · Spolu · V ponuke** („Spolu" = suma riadku). Bunka sumy `budCpAmountHtml`: **„v cene" výhradne pri `kind: 'fixed'`
+  s nulou** (Zameranie, Vizualizácie — náklad je rozpustený v zostave). Riadok `info` (spotrebič, ktorý dodáva zákazník) aj `assembly` s nulou ukazujú **0,00 €**;
+  neznáma cena „—". XLSX ponuky sa týmto nemení (poznámka pod tabuľkou rozdiel prizná).
+- **Ponuka sa needituje** — chýbajúca cena sa dopĺňa v Rozpočte (jantárový guard „Suma ponuky je podhodnotená…" s preklikom). Celý varovný pás `budWarnChips(b)` je
+  aj tu (tie isté čísla; ciele: staré ceny a spotrebiče → Rozpočet, upozornenia → Kontrola).
+- Zoznam „Zlúčené v zostave" je v `BUD_OPEN` pod `cp_merged` (otvorený prežije prekreslenie). Prepínač DPH sa nezdvojuje; riadok zaokrúhlenia je jedno serverové číslo
+  v oboch sekciách. Lišta: „Cenová ponuka (zákazník)" + „Obnoviť". Platí aj banner a vypnutie pri nekompatibilných dátach (odsek Rozpočet).
+
+Testy: `tests/pure/test_st1c_ponuka.rb`, `tests/js/test_st1c_ponuka.js`, in-SU `run_st1c` (`st1c_offer`).
+
+### Sekcia NÁREZOVÝ PLÁN v Štúdiu (`cut`, ui/js/sheet_layout.js)
+
+**Čo robí:** plán rozkroja platní po materiáloch — súhrn, karty materiálov s malými platňami, detail platne v tom istom okne, nezaradené a odmietnuté dielce
+s dôvodom, preklik na nastavenia prerezu. Vzhľad: mockup `SYSTEM/archiv/bloky/NAREZ/MOCKUP_NAREZ_2026-09-28.html`. **Dáta:** `push_state` spočíta plán **raz**
+(`ProductionCore.layout_for` z toho istého `collected`, `bom`, `smap` a expanzie kovania) a ten istý plán dostane Rozpočet (`budget_payload(…, layout)`) aj sekcia
+(`sheet_layout_payload` → `sheet_layout`). Výpočet: [outputs.md](outputs.md) (`sheet_layout`).
+- **Kompaktný tvar:** mená riadkov raz v `rows` (`k` natívny kľúč riadku kusovníka, `c` obdĺžniky, pri dupláku `q` a `m` + `fl × fw`), platne `p: [[riadok, x, y]]`
+  na 0,1 mm + `o` najväčší zvyšok, `unplaced`/`rejected`/`conflicts` s ľudským dôvodom `t` zo servera, `phrase` = `SheetLayout.count_phrase` (tá istá veta ide do
+  Rozpočtu a XLSX). Globálny stav (`blocked`, `without_material`) = **banner nad kartami** aj pri prázdnom zozname. Chyba plánu = `{ok: false}` a veta v sekcii
+  (rozpočet ani exporty nezhodí). Detail sa neťahá lenivo (celý push ~2000 dielcov ≈ 377 kB, `push_state` ≈ 105 ms).
+- **Klient kreslí, nepočíta:** `sheet_layout.js` (prefix `np`, volá ho `studio.js` cez `typeof npRenderTools / npRenderBody`, `NX.setStudio` neobaľuje) — predvolene
+  otvorená prvá karta a každá s problémom; **zbalená karta SVG nevytvára**; zbalenie v `localStorage` `nx_np_closed` (try/catch); detail = stav okna `npDetail`
+  (pri novom pushi sa overí). Jediné odvodené je **upozornenie na poslednú platňu** (aspoň 2 platne a posledná pod 20 % alebo najviac 2 dielce).
+- Karta hovorí „v rozpočte N" **číslom hotového rozpočtu** toho istého pushu (`budget_qty` + `budget_src`, `npBudgetNote`); zdroj `area` = „v rozpočte 0,90 m² podľa
+  plochy".
+- **SVG je téma-bezpečné:** farby len CSS triedy `.np-*` s tokenmi v `studio.html` (šrafy ako `<pattern>` v skrytom `<svg>`); jediná dátová farba je vzorka dekoru
+  v HTML štvorčeku mimo SVG.
+- **Lišta:** „Obnoviť" + chip „prerez · orez · duplák" z `params` → `studioGoSection('bset')`; pri predvolených hodnotách (`seed_fallback`/`unreadable`) jantárový.
+- **Oko = výber, nie zápis:** `nx_select` s `parts_key` = natívny kľúč riadku (`Bom.row_key`) + `origin: 'cut'` (`refs_for`, relay panela; `cut_select_status`).
+
+Testy: `tests/pure/test_np3_sekcia.rb`, `tests/js/test_np3_sekcia.js`.
+
+### Jeden push kanál nad modelom
+
+Zber modelu (`fresh_collect` + `Bom.compute` + katalógy) beží pri refreshi Štúdia **raz** a všetky sekcie berú dáta z neho. **Pravidlo pre nové sekcie:** čokoľvek
+nové, čo potrebuje dáta z modelu, sa priveze v `Bom.collect` (aditívny kľúč, napr. `manual_overrides`, `cabinet_fronts`) a do payloadu sekcie ide **z už hotového
+`collected`** — druhý sken modelu kvôli jednej sekcii je zakázaný. Zdieľaná cache zberu ostáva kandidátom na optimalizáciu.
+
+### Sekcia MATERIÁLY v Štúdiu (`mat`)
+
+**Čo robí:** katalóg dosiek a ABS pások (dlaždice dekorov podľa výrobcu + pás „Použité v projekte", detail dekoru s inline bunkami, „Kde sa používa"), predvoľby
+materiálov projektu (Korpus · Čelá · Chrbát · Zásuvky), hromadná kresba čiel, pridanie z Demosu, ručné založenie dekoru, duplák, UNI prepínač, mazanie a vrátenie
+katalógu. **Server:** telo akcií ostáva v **`MaterialsDialog`** (odsek `materials_dialog.rb`), Štúdio registruje tie isté mená callbackov a volá
+`MaterialsDialog.dispatch(name, payload, sink)` — whitelist je jediný (`MaterialsDialog::SECTION_ACTIONS`), `sink` presmeruje odpoveď (`MD.*`). **JS:**
+`ui/js/proj_materials.js` (`matRenderBody`, `mdRenderAll`, `matToolsHtml`, `mdWhereHtml`), `demos_diff.js` („Aktualizovať z Demosu"), `demos_add.js` („Pridať
+z Demosu"), `md_appearance.js` (vzhľad). Vstupy: menu „Materiály projektu", tlačidlo panela a preklik dekoru → `openStudio('mat'[, id])`.
+
+**Telo a kanál:**
+- Telo kreslí sekcia sama — **jeden uzol zo `<template id="matBodyTpl">`**, `NX.setStudio` ho neprekresľuje (rozpísaný „+ variant" ani bunka ceny sa nestratia;
+  fokus a dirty baseline obnovuje `mdRenderAll`). Modály v `#matModalRoot` mimo `#secbody`. Sekcia `scan` comboboxov nespúšťa, kým je telo odpojené.
+- **Lišta** = čistá `matToolsHtml(state)`: `[Pridať z Demosu] · [Pridať ručne] · [hľadanie] · [zoskupenie] · ⟶ · [Obnoviť] · [⋯]`; primárne je „Pridať z Demosu";
+  hľadanie a zoskupenie drží aj premenná (`MD_Q`/`MD_MODE`). Bannery (read-only katalóg · nepoužiteľné ABS · cutover) sú prvé riadky obsahu.
+- **Ponuka „⋯"** (`mdMoreHtml(open)`, `.mdmore`/`.mdmoremenu`) nesie núdzové **„Vrátiť katalóg pred migráciou…"** — len pri `backup && !ro`, bez položky sa „⋯"
+  nekreslí. Otvorenie lištu prekreslí, zatvorenie nie (len odstráni uzol a prepne `aria-expanded`). Zatvára klik mimo, Tab, odchod zo sekcie (`matCloseModals`)
+  a Escape (zavrie len ponuku, vráti fokus na „⋯"; `mdMoreOpen` je medzi `FLYOUT_FLAGS` v `nx_esc.js`). Výber najprv ponuku zavrie a otvorí potvrdzovací
+  `mdRestoreModal` → `restore_pre_schema2`. V read-only režime nesie akciu banner.
+- **Kanál je delený:** katalógové echo `push_mat_catalog` → `NX.setMatCatalog` prepíše **len katalóg**, nepočíta a **nedvíha generáciu**; plný `push_state` nesie
+  modelový kontext sekcie (`mat`: predvoľby, počet skriniek, `model_guid`, `used`, `used_ids`, `front_grain`) a **celý katalóg len pri prvom pushi okna a po
+  prepnutí dokumentu** (`@mat_full_pending` — gasí sa len keď katalóg v odoslanom payloade naozaj bol; `mat_payload` má vlastný rescue).
+- Generácia okna chodí do sekcie druhým parametrom `matApplyState(m, gen)`.
+
+**Predvoľby projektu:** rozbalené od prvého zobrazenia (`open` len v šablóne); štyri skupiny so vzorkami 115 × 115 px a `NXCombo` (`md_body`/`md_front`/`md_back`);
+celý serverový label sa zalamuje; jedna `mdConfirmBar` pod mriežkou. `mdRenderProjectPreview` odvodzuje obrázok/meta z hodnoty selectu a presného `material_id`
+(fallback `MD_SHEETS`; volajú ho `mdRenderAll`, `mdSetProjectSelect`, `onProjMaterial`); obrázok len z `image_file` servera cez `mdImageSrc`; UNI nesie text
+„Pracovný materiál UNI". Potvrdzovanie, `model_guid` guard, dedenie a Undo idú pôvodnými cestami (1 predvoľba = 1 krok Späť).
+
+**Kresba čiel** (riadok pod predvoľbami — **hromadná akcia, ktorá prestavia model**, nie predvoľba; platí pre čelá, ktoré v zákazke sú teraz): select (Podľa materiálu /
+Pozdĺžna / Priečna) + `md_front_grain_apply` → `fronts_grain_all` `{gen, model_guid, grain}`. Vlastný `cb(dlg, …)` a **flush handshake ako exporty**:
+`handle_fronts_grain_all` → `NX.studioRelayFrontsGrain` → flush → `studio_do_fronts_grain` → `StudioDialog.do_fronts_grain_all` → `MaterialsDialog.fronts_grain_all`
+(červené pole zastaví). Stav riadku a počet počíta server (`mat.front_grain` `{count, cabinets, by, skipped}`); chýbajúci = „stav sa nepodarilo zistiť" + `disabled`.
+**Zámok tlačidla:** klik → `Prestavujem…` + `disabled`, odomkne ho až **nový plný push** (každá serverová vetva vrátane odmietnutia a `rescue` posiela `repush`);
+**katalógové echo zámok nepustí** a druhý klik pred pushom nepošle nič — inak by z jednej voľby vznikli dva kroky Späť.
+
+**Ručné založenie dekoru** („Pridať ručne") otvára D-69 editor v režime `create` (`mdCreateOpen` → `mdCreateFields`/`mdCreatePayload`, `memoryKey: 'mat:create'`);
+stĺpce repeaterov sú jedna definícia `mdSheetCols`/`mdEdgeCols`, prázdny formulár má navyše **Štruktúra** a **Smer dekoru**. Úspech zatvorí modal, zahodí pamäť
+a otvorí detail nového dekoru; odmietnutie `:stale` má vlastnú hlášku a `mdEditRefresh` len omladí baseline. Formulár s preset čipmi je **len „+ variant"**
+do existujúcej skupiny (typy mimo identity editora — zástena, PD — a skupiny s viacerými štruktúrami). Testy `tests/js/test_st2c_create.js`.
+
+**„Kde sa používa"** (koniec detailu dekoru, `mdWhereHtml`): riadok na vlastníka (`CAB-004 · Bok ľavý · Dno · Polica` + počet) a na každú použitú pásku, oboje
+s okom. Dáta = rozpis toho istého zberu: `mat_used_where(collected)` (bez druhého skenu) → `{ kľúč skupiny => { owners: [{owner_id, parts, roles,
+material_ids}], edges: {abs_id => {parts, objects}} } }`; roly skladá server (`ProductionCore.role_label`), páska sa ráta za dielec. **`parts` = kusy do výroby,
+`objects` = entity v modeli** — pri rozdiele riadok ukáže obe. `used` = `mat_used` + `Materials.decor_key_by_material_id` z toho istého `collected`;
+`used_ids` = `mat_used_ids(collected)` (`{sheets, edges}`, dielec bez `owner_id` sa nevyhadzuje). Mapy `decor_key_by_*` stavia `mat_payload` raz
+(`Materials.decor_key_by_abs_id` pre pásky). Katalógový payload (`MaterialsDialog.full_catalog_payload`) nesie `row_label` a `row_key` z tých istých metód ako panel.
+- **Oko** ide cestou kliku v Kusovníku (`nx_select` cez relay, generácia, žiadne `pids` z DOM): `ProductionCore.refs_for` vetvy `material_key` a `abs_key` (reťazec
+  alebo pole) s nepovinným zúžením `owner_id`. **Chýbajúci `owner_id` = bez zúženia, prázdny = vlastník bez identity** (riadok odpojeného dielca sa nekreslí —
+  `mat_used_where_owner`). Adresa sa hľadá v BOM riadkoch, teda v **efektívnom** materiáli (aj dedený). Nič nezapisuje.
+- **Kotva sekcie** (`openStudio('mat', id)`) otvorí detail dekoru (`matOpenAnchor` → `mdAnchorGroupKey` preloží `material_id`/`abs_id`/kľúč skupiny); neúspech nie je
+  tichý — status „Tento dekor už v katalógu nie je — otvorené v zozname materiálov."
+
+**Demos toky** (modály v `#matModalRoot`): **životnosť dlhého behu je viazaná na sekciu** — `demos_alive_proc(session)` sa pýta session tokenu a živého Štúdia;
+token zhasína zatvorenie okna (`MaterialsDialog.on_ui_closed`), prepnutie dokumentu a **odchod zo sekcie** (`studioGoSection` → `matOnLeaveSection` → `mat_leave` →
+`cancel_demos_on_leave`, hláška „Sťahovanie z Demosu zrušené…"). Poradie v `matOnLeaveSection`: **najprv `mat_leave` na server, potom lokálne zatvorenie modálov**.
+
+**„Nahradiť UNI…"** beží v jednom okne: nález Kontroly → `ProductionCore.replace_uni` → `MaterialsDialog.request_replace_uni` → `StudioDialog.show(open_section: 'mat')`;
+požiadavka sa odloží (`@pending_replace_uni`) a spustí ju `show` (okno už `ready`) alebo `ready` callback až za prvým `push_state`; jednorazová, zomiera so zatvorením
+okna aj prepnutím modelu.
+
+Testy: `tests/pure/test_st2a_mat.rb`, `tests/pure/test_st2d_kde.rb`, `tests/js/test_st2a_mat.js`, `tests/js/test_st2d_kde.js`, in-SU `run_st2b` a `run_st2d`.
+Plné znenie: archív, odsek okna Štúdio (pasáže ŠT-2a…ŠT-2d) a „materials_dialog.rb".
 
 ### materials_dialog.rb
 
-**KOV-C2b (v0.9.31) — 4. materiálový kanál v predvoľbách projektu.** `TARGETS` má štvrtý kľúč `default_drawer_material_id` a Štúdio jeden riadok „Zásuvky" vedľa
-Korpus/Čelá/Chrbát (žiadny nový blok — vertikálny priestor je vzácny). Preflight je **per systém zásuvky** (Atira 16, Quadro V6 16/18 — čísla z receptu, nie z UI):
-doska, ktorú neprijme žiadny systém, sa neuloží vôbec; doska, ktorú neprijme systém reálne použitý v zákazke, sa uloží až po potvrdení v **existujúcej** lište
-`MD.confirmDefault` (ten istý pending kontrakt ako D-46, iná veta). **Vkladanie** má vlastný preflight `MaterialsDialog.drawer_material_issue`, ktorý `Panel.handle_insert`
-volá **pred** `prepare_insert` a ghostom — nekompatibilný materiál zásuviek vklad odmietne hláškou, nie „úspechom" a RED po kliku. Detail v [materials.md](materials.md).
+**Serverová autorita katalógu materiálov pre sekciu `mat` Štúdia** (vlastné okno už nemá — sekcia „História"; modul sa nepremenúva). Štúdio preposiela akcie cez
+`dispatch(name, payload, sink)` — uzavretý whitelist **`SECTION_ACTIONS`** (katalógové bunky a formuláre, Demos toky `demos_lookup`/`demos_manual_url`/`demos_apply`/
+`demos_cancel`/`demos_name_search`/`demos_family*`, `open_search_url`, `replace_uni_preview`/`replace_uni_apply`, `save_decor`, `mat_product_open`, `mat_manual_*`,
+vzhľad). `handle_save_sheet`/`handle_save_edge` sú **edit-only** (nové dekory a varianty idú editorom D-69 alebo „+ variant"). Doména: [materials.md](materials.md).
 
-**CENY-M1a (v0.16.1) — odkaz na produkt a formulár variantu pod jedným zámkom.** **Formulár variantu (ceruzka)** — `handle_save_sheet`/`handle_save_edge`
-robia pred zámkom len rýchle `schema_ok?`; **kontrola schémy aj revízie, načítanie záznamu, merge, pravidlá odkazu a zápis** bežia v
-`save_sheet_locked`/`save_edge_locked` pod **jedným** `Materials.with_catalog_lock` (R6c, vzor `save_decor`; upsert berie ten istý reentrantný
-zámok). Baseline je **`row_rev` riadku z otvorenia formulára** (R6b), nie globálny `catalog_rev` — ten omladzuje každé echo, takže starý formulár
-by vrátil cenu aj Demos väzbu do stavu z otvorenia; prázdny baseline = konflikt (fail-closed). Konflikt pošle **najprv** `push_catalog`, potom
-`MD.formConflict(kind, id)` (klient formulár otvorí nanovo s čerstvými údajmi a novým baseline) a status. Pred merge sa strhnú server-owned polia
-a ozdoby payloadu (`FORM_STRIP_KEYS`: `price_checked_at`, `price_check_method`, `product_link`, `price_check`, `price_display`, `row_rev`, `label`,
-`row_label`, `row_key`, `image_file`). Kľúč `product_url` (`apply_product_url!`): nie text / neplatný = celý save odmietnutý, prázdny = zmazanie, chýbajúci = bez
-zmeny; pri **výslednej** Demos URL sa uložený odkaz nesmie zmeniť ani zmazať (odložený, O8). Odmietnutý odkaz (`:product_error`) pošle
-`MD.formRejected(kind)` — klient formulár po odoslaní zatvára, takže ho otvorí nanovo s **rozpísanými** hodnotami (`mdReopenFromAttempt`, baseline
-pokusu) a kurzorom v poli odkazu; úprava ceny či kódu sa tak nestratí ani vtedy, keby klientska kontrola pustila niečo, čo server odmietne.
-Klientska kontrola `mdProductUrlLocalError` zrkadlí pravidlá `URI.parse` (RFC 3986 parser Ruby) a paritu drží spoločná tabuľka
-`tests/fixtures/ceny_m1_product_urls.json` (Ruby aj Node test). Odpovede skladá `form_save_reply` až **po** uvoľnení
-zámku. **`mat_product_open`** (R7, v `SECTION_ACTIONS`) otvorí `UI.openURL` len pre čerstvý „ručný" záznam s platným odkazom (URL od klienta sa
-neprijíma), inak status + `push_catalog`; nič nezapisuje. **Payload** (`full_catalog_payload`) nesie `product_link` (bool) **len** pri ručných
-záznamoch (`product_link_extra!`), `row_rev` zo surového záznamu pred ozdobou. **Klient** (`proj_materials.js`): pevný slot troch ikon
-`mdSlotHtml` v riadku aj hlavičke (duplák/univerzálna · Demos alebo odkaz · overenie — M1b), ikona `mdProductBtn` (sivá = otvorí serverom,
-jantárová = formulár s kurzorom v poli odkazu a krátkym zvýraznením riadku), pole „Odkaz na produkt" so **živým zámkom** podľa poľa Demos URL
-(`mdProductLockSync`; odomknutie vráti rozpísaný text alebo odložený odkaz), posiela sa len z editovateľného poľa; `mdEditing.rev` echo
-**neomladí** a `mdReopenFromAttempt` ho zachová (druhé uloženie pri duplicite kódu nesie baseline prvého).
+- **Adresát odpovede:** `with_client(sink)` presmeruje `js` na volajúceho **na čas jedného synchrónneho volania** (`ensure` povinné); mimo neho ide všetko do Štúdia
+  (`studio_js` → `StudioDialog.mat_js`). Na tom stojí Demos: `dispatch` beh len naštartuje, emity dobiehajú z `UI.start_timer` bez sinku.
+- **`after_catalog_change` má jednu cestu:** jeden `catalog_payload` → `StudioDialog.push_mat_catalog`, plus `Panel.push_materials`, `EdgeCheck.invalidate!` a plný payload
+  Štúdia s `bump: false`.
+- **Štyri cesty menia model** a všetky obnovujú najprv Inspector (`Panel.push_selected`) a až potom plný push Štúdia so zdvihom generácie: projektová predvoľba
+  a „Nahradiť UNI…" (`refresh_studio_after_model_write`), aplikovanie vzhľadu (`materials_appearance_dialog.rb` `appearance_refresh_model` →
+  `refresh_studio_after_model_write`) a Kresba čiel (`fronts_grain_all` — `rebuild_many`, potom `repush` Štúdia, ktorý odomkne tlačidlo).
+- **Životný cyklus** hlási Štúdio: `on_ui_closed` (session bump + zahodenie odloženej požiadavky), `cancel_demos_on_leave` (odchod zo sekcie počas behu) a
+  `on_model_changed` zo `scale_observer`; `@demos_running` stráži, aby hláška o zrušení prišla len keď naozaj niečo bežalo.
+- **Predvoľby projektu** (`TARGETS`: telo, čelá, chrbát a `default_drawer_material_id`): preflight zásuviek **per systém** (čísla z receptu) — doska, ktorú neprijme
+  žiadny systém, sa neuloží; doska, ktorú neprijme systém použitý v zákazke, až po potvrdení v lište `MD.confirmDefault` (pending kontrakt D-46). Vkladanie má vlastný
+  preflight `MaterialsDialog.drawer_material_issue` (volá `Panel.handle_insert` pred `prepare_insert`).
+- **`save_decor`** = jedna akcia na celý formulár „Upraviť…" detailu dekoru. Handler si guardy **zámerne nerobí** — celý kontrakt vrátane `base_rev` a `row_rev` každého
+  riadku beží pod zámkom v `Materials.save_decor`. Odpovede: `MD.editSaved` (zavri + zahoď pamäť) · `MD.editErrors` (chyby k poliam, okno ostáva) · `MD.editBlocked`
+  (odomkni, riadky sa dorovnajú z čerstvého katalógu; pri kolízii vlastná hláška) · `MD.editDuplicateCode` (druhé „Uložiť" potvrdí duplicitu kódu).
+  **`mdEditRefresh` prelieva len bunky, ktorých sa používateľ dotkol:** porovnanie s `NXModal.baseRows(key)` (`mdSameCell`) — netknutá bunka dostane čerstvú hodnotu,
+  zmenená si nechá používateľovu, zmenená oboma ide do modalu ako kolízia (`_conflict` + `_wrote`); `setRows` dostáva ako `base` čerstvé riadky. Test
+  `tests/js/test_1b7_kolizia_buniek.js`.
+- **Formulár variantu (ceruzka)** — `handle_save_sheet`/`handle_save_edge` robia pred zámkom len `schema_ok?`; kontrola schémy a revízie, načítanie, merge, pravidlá
+  odkazu a zápis bežia v `save_sheet_locked`/`save_edge_locked` pod **jedným** `Materials.with_catalog_lock`. Baseline = **`row_rev` riadku z otvorenia** (prázdny =
+  konflikt). Konflikt pošle najprv `push_catalog`, potom `MD.formConflict(kind, id)` a status. Pred merge sa strhnú server-owned polia (`FORM_STRIP_KEYS`:
+  `price_checked_at`, `price_check_method`, `product_link`, `price_check`, `price_display`, `row_rev`, `label`, `row_label`, `row_key`, `image_file`).
+  **`product_url`** (`apply_product_url!`): nie text / neplatný = celý save odmietnutý, prázdny = zmazanie, chýbajúci = bez zmeny; pri výslednej Demos URL sa uložený
+  odkaz nemení. Odmietnutý odkaz → `MD.formRejected(kind)` (klient otvorí formulár s rozpísanými hodnotami — `mdReopenFromAttempt` — a kurzorom v poli odkazu).
+  Klientska `mdProductUrlLocalError` zrkadlí `URI.parse` (fixtúra `tests/fixtures/ceny_m1_product_urls.json`, Ruby aj Node). Odpovede skladá `form_save_reply` až po
+  uvoľnení zámku. Pod tým istým zámkom: echo zobrazenej €/m² (`Materials.sheet_price_echo?`), `form_price_check_note!` = `reconcile_manual_check!` (zmena ceny, kódu,
+  dodávateľa, odkazu, formátu, dekoru u dodávateľa či nová Demos URL zruší ručné overenie — `MANUAL_CLEARED_MSG`) alebo `demos_stamp_edit!` (zmena pri Demos väzbe
+  zruší dátum z Demosu — `DEMOS_STAMP_CLEARED_MSG`). Bunka (`handle_patch`) povie vetu z `manual_cleared`; echo bez zápisu = „Cena sa nezmenila.".
+- **`mat_product_open`** otvorí `UI.openURL` len pre čerstvý ručný záznam s platným odkazom (URL od klienta sa neprijíma), inak status + `push_catalog`.
+- **„Overiť cenu"** (`mat_manual_prepare` → `MD.manualReady(snapshot)` — echo `kind, id, token, section, model_guid` + čerstvý `item`, nič nezapisuje, cudzí model =
+  `item: nil` · `mat_manual_open` → `UI.openURL` len pri tej istej `row_rev`, neúspech otvorenia = stále `ok` s `opened: false` a vetou (neblokuje) ·
+  `mat_manual_confirm` → schéma, model (`DocKey.foreign?` → `stale_model`), `Materials.confirm_manual_price`; `:ok` → `after_catalog_change` + status s cenou a dátumom).
+  Odpoveď `MD.manualResult` (`phase`, `ok`, `status`, `msg`, `errors`, snímok; výnimka vráti `error` s tokenom). Tok nepoužíva Demos session. Sekcia v echu je `mat`
+  alebo `budget`.
+- **Payload** `full_catalog_payload(stale_days)`: `row_rev` zo surového záznamu, `row_label`/`row_key` z tých istých metód ako panel, `product_link` (len ručné záznamy,
+  `product_link_extra!`), `price_display` na každom riadku, `price_check` pri ručnom (`manual_price_extra!`); `catalog_payload` nesie `stale_days` (fail-soft 30).
 
-**CENY-M1b (v0.16.2) — ručné overenie ceny.** Tá istá transakcia formulára variantu (R6c) navyše pod zámkom: **echo** zobrazenej €/m²
-(`Materials.sheet_price_echo?` — pole Cena sa predvypĺňa zobrazenou hodnotou, nedotknuté cenu nemení), **`form_price_check_note!`** = R13
-`reconcile_manual_check!` (ručne overená položka: cena, kód, dodávateľ, odkaz, formát, dekor u dodávateľa, nová Demos URL → overenie zrušené,
-status `MANUAL_CLEARED_MSG` „Uložené — ručné overenie ceny sa zrušilo, položka ide na kontrolu.") alebo R13b `demos_stamp_edit!` (D-148: položka
-**s** Demos väzbou, ktorú formulár nemení — zmena ceny, kódu, dodávateľa, formátu zruší dátum z Demosu, status `DEMOS_STAMP_CLEARED_MSG`).
-Bunka (`handle_patch`) povie vetu R22 z `manual_cleared`, echo bez zápisu = `push_catalog` + „Cena sa nezmenila."; editor (`save_decor_status`)
-pripojí počet zrušených overení. **Akcie formulára „Overiť cenu"** (R15, `SECTION_ACTIONS`, predpona `mat_`): `mat_manual_prepare` →
-`MD.manualReady(snapshot)` (echo `kind, id, token, section, model_guid` + čerstvý `item` s `label`, `price_display`, `price_check`, `row_rev`,
-`has_url`, `read_only`, `reason`, `stale_days`; nič nezapisuje; cudzí model = `item: nil`); `mat_manual_open` → `UI.openURL` len pre čerstvý
-ručný záznam s platným odkazom a **tou istou** `row_rev` (inak `conflict`); `openURL == false` alebo výnimka = **stále `ok`** s `opened: false`
-a vetou „Obchod sa nepodarilo otvoriť — cenu si over inak a potvrď." (**neblokuje** — mockup B1); `mat_manual_confirm` → schema brána (starý
-klient `schema`), model brána (`DocKey.foreign?` → `stale_model`, D10), `Materials.confirm_manual_price`; `:ok` → `after_catalog_change` +
-status „Cena potvrdená k 30.9.2026: 179,90 € za platňu = 31,04 €/m²." (+ „(bez zmeny ceny — len dátum)"), `conflict`/`not_found`/read-only →
-`push_catalog`; odpoveď `MD.manualResult` nesie `phase`, `ok`, `status`, `msg`, `errors` (pole `price` pri poli) a čerstvý snímok; výnimka
-vráti `error` s tokenom (modal sa odomkne). Tok **nepoužíva** Demos session — odchod zo sekcie ho na serveri neruší. **Payload**
-(`full_catalog_payload(stale_days)`) nesie na každom riadku `price_display` a pri ručnom zázname `price_check` (`manual_price_extra!`),
-`catalog_payload` kľúč `stale_days` (Nastavenia dodávateľa, fail-soft 30). **Klient** (`proj_materials.js`): ikona **„Overiť cenu"**
-`mdCheckBtn` na 3. pozícii slotu (sivá = čerstvá, jantárová `is-pending` = nikdy/stará; tooltip `mdManualTip` podľa O5; read-only katalóg = `aria-disabled="true"`, dôvod
-v tooltipe a klik ukáže status „Katalóg je len na čítanie — úpravy sú vypnuté." bez odoslania — vzor UI_DIZAJN D-78, nikdy HTML `disabled`),
-„Oproti katalógu" rozhoduje tým istým pravidlom ako server (`mdDecCents` — desiatkovo half-up zo stringu, €/m² presne v centoch),
-hint Demos dátumu vo formulári variantu menuje aj zmenu ceny, kódu, dodávateľa, dekoru u dodávateľa a formátu (D-148, pri ABS bez
-posledných dvoch), veta R22 pri doske rovnako vrátane dekoru u dodávateľa (zoznam polí `manual_check_changed?`), prepočet v náhľade
-aj pri prepnutí jednotky počíta tými istými pravidlami ako server — platňa → €/m²: platňa na centy (`mdPlateAmount`, D3) / plocha
-a zobrazenie desiatkovo half-up z najkratšieho zápisu čísla (`mdHalfUpText` = `display_m2`); €/m² → platňa: zrkadlo Ruby `Float#round(2)`
-(`mdRubyRound2` = `Budget.price_per_plate`); paritu drží fixtúra `tests/fixtures/ceny_m1b_parity/` (generátor zo serverových funkcií,
-Ruby sada overí zhodu so serverom, JS sada 100 % zhodu klienta),
-bunka €/m², pole Cena formulára variantu a stĺpec editora ukazujú `price_display.m2` na 2 desatinné (`mdM2Shown`), hint pod odkazom nesie vetu
-R22 (`mdManualFormText`), Demos hint dátumu sa ukazuje len pri Demos väzbe. **Formulár „Overiť cenu ručne"** (NXModal, `busyLock`, `memoryKey:
-null`, vlastné pole `custom` `price`): skupina dodávateľ + odkaz / veta O9, „Položka" (kód, formát, plocha), prepínač **za platňu | za m²**
-(predvolené za platňu pri formáte, O3), pole ceny s jednotkou, živý prepočet (`mdManualCalc`), „Oproti katalógu" (`mdManualDiff`), poznámka
-(`mdManualNote`, veta O4 pri 0 €) a pás upozornenia. **R20b:** stav `{mode, text, touched, src}` — prepnutie bez písania dá text zvoleného
-režimu **presne** zo `price_display` (nikdy spätný prepočet), takže potvrdenie pošle zobrazenú hodnotu a server ju vyhodnotí ako bez zmeny;
-po písaní sa ukáže prepočet a odošle sa **napísané číslo v jeho režime** (`mdManualValue`). S odkazom 25 ms po otvorení `mat_manual_open`;
-potvrdenie čaká na odpoveď o pokuse (`browserPending`, chyba „Počkaj na otvorenie produktu…"), neúspech potvrdenie neblokuje; bez odkazu (O9)
-sa prehliadač neotvára. Odpovede s cudzím tokenom, sekciou alebo dokumentom sa zahodia; `conflict` otvorí nový formulár s čerstvými
-údajmi (pôvodná cena sa sama neposiela), `ok` zatvorí a povie status servera. Životný cyklus: `matCloseModals` → `mdManualClose`
-(zatvorí formulár aj čakajúci prepare/open), `studio.js` volá `mdManualContextChanged` na tých istých miestach ako `hwProductContextChanged`;
-katalógové echo formulár nezatvára. `MD_CLIENT_SCHEMA = 12`. **Od CENY-M2** sa formulár pýta aj zo sekcie **`budget`** (`mdManualRequest` pustí `mat`
-aj `budget`, vzor `hwManualRequest`; server sekciu len ozvenou vracia) a ostáva v nej; klik z Rozpočtu (`mat-link`, `mat-manual-check`) obsluhuje
-delegovaný listener `mdBudgetAction` a chýbajúci odkaz `mdProductFromBudget` (sekcia Rozpočet vyššie).
+**Klient** (`proj_materials.js`) — slot troch ikon `mdSlotHtml` (duplák/univerzálna · Demos alebo odkaz · overenie): `mdProductBtn` (sivá = otvorí server, jantárová =
+formulár s kurzorom v poli odkazu), `mdCheckBtn` (sivá = čerstvá, jantárová `is-pending`; read-only katalóg `aria-disabled` s dôvodom, nikdy `disabled`), tooltip
+`mdManualTip`. Pole „Odkaz na produkt" má živý zámok podľa poľa Demos URL (`mdProductLockSync`); `mdEditing.rev` echo neomladí. **Formulár „Overiť cenu ručne"**
+(NXModal, `busyLock`, bez pamäte, pole `custom` `price`): dodávateľ + odkaz, položka, prepínač **za platňu | za m²**, pole ceny, živý prepočet (`mdManualCalc`),
+„Oproti katalógu" (`mdManualDiff`, `mdDecCents` — tým istým pravidlom ako server), poznámka (`mdManualNote`). Stav `{mode, text, touched, src}`: prepnutie bez písania
+dá text zvoleného režimu presne zo `price_display`, po písaní ide napísané číslo v jeho režime (`mdManualValue`). Prepočty zrkadlia server (`mdPlateAmount`,
+`mdHalfUpText` = `display_m2`, `mdRubyRound2` = `Budget.price_per_plate`; parita `tests/fixtures/ceny_m1b_parity/`); €/m² na 2 desatinné (`mdM2Shown`). S odkazom
+sa 25 ms po otvorení volá `mat_manual_open`, potvrdenie čaká na odpoveď (`browserPending`). Odpovede s cudzím tokenom, sekciou alebo dokumentom sa zahodia; `conflict`
+otvorí nový formulár. Životný cyklus: `matCloseModals` → `mdManualClose`; `studio.js` volá `mdManualContextChanged`. `MD_CLIENT_SCHEMA = 12`. `mdManualRequest`
+pustí sekcie `mat` aj `budget`.
 
-**`materials_dialog.rb` — od ŠT-2b už NIE JE OKNO** (ostal serverový modul; obsah je sekcia `mat` Štúdia, popis je tu kvôli histórii): katalóg = mriežka dlaždíc podľa výrobcu + pás
-„Použité v projekte" — jediné echo je `push_catalog` BEZ scanu modelu; hľadanie názov/výrobca/kód/dodávateľ; klik na dlaždicu → detail dekoru s editovateľnými bunkami
-kód/cena/dodávateľ — patch protokol s `row_rev`, dirty bunka si baseline drží aj cez refresh, re-render neprepíše aktívny input, prázdna bunka pole VYMAŽE; batch „Nový dekor" cez
-preset-čipy + zapamätaná posledná sada (localStorage len UX); predvoľby projektu v `<details>` s `model_guid` guardom; guard hrúbok/typu; živý sync `NX.setMaterials` bez resetu
-formulára.
+Plné znenie: archív, „materials_dialog.rb".
 
-**ŠT-2b — OKNO ZANIKLO, MODUL ŽIJE (audit #21 — NEPREMENÚVA sa):** `proj_materials.html`, `UI::HtmlDialog`, `DLG_KEY`, `ensure_dialog`, `register_callbacks` aj `dialog_js` sú preč;
-ostala **jediná serverová autorita katalógu**.
+### materials_appearance_dialog.rb + ui/js/md_appearance.js
 
-Sekcia posiela tie isté payloady pod tými istými menami a Štúdio ich preposiela cez `dispatch(name, payload, sink)` — uzavretý whitelist `SECTION_ACTIONS` (ŠT-2b doňho pribudli
-**Demos toky** `demos_lookup`/`demos_manual_url`/`demos_apply`/`demos_cancel`/`demos_name_search`/`demos_family*`, `open_search_url` a
-**`replace_uni_preview`/`replace_uni_apply`**; **`add_sheet`/`add_edge` ZANIKLI** — create cesta formulára bola z UI nedosiahnuteľná (formulár sa otvára výhradne s id existujúceho
-záznamu, nové dekory/varianty idú batchom v3) a jej payload nenesie `group_id`, takže nad SCHEMA ≥ 2 by zápis skončil na `write_unlocked` completeness guarde len s generickým
-„Uloženie zlyhalo"; `handle_save_sheet`/`handle_save_edge` sú preto **edit-only** a chýbajúci záznam vracia hlášku s návodom na batch), telá handlerov ostávajú tu; **ŠT-2c 2c-2a
-pribudlo `save_decor`** — JEDNA akcia na CELÝ formulár „Upraviť…“ detailu dekoru.
+**Vzhľad dekorovej skupiny v sekcii Materiály** — jeden vstup pri povrchu skupiny pre dosky aj ABS všetkých hrúbok (aj prázdna štruktúra a skupina len s ABS);
+UNI zostáva pracovnou farbou. Okno je **kompaktný overlay pri tlačidle** (kotva mimo prekresľovaného tela sekcie; nie ďalší HtmlDialog): náhľad, katalógová farba
+a štyri explicitné akcie. Pomocný text pred priradením obrázka upozorní na vodorovnú kresbu; orientácia obrázka sa nemení.
 
-Handler si guardy **zámerne nerobí**: `catalog_write_ok?` by brány (read-only, schéma, baseline) vyhodnotil MIMO zámku a medzi kontrolou a zápisom by sa katalóg stihol zmeniť —
-celý kontrakt vrátane `base_rev` a `row_rev` každého riadku beží POD zámkom v `Materials.save_decor`. Odpoveď má tri prijímače podľa toho, čo má modal urobiť s rozpísaným
-formulárom: `MD.editSaved` (zavri + zahoď pamäť), `MD.editErrors` (chyby k poliam, okno OSTÁVA), `MD.editBlocked` (odomkni, hodnoty ostávajú **a riadky sa dorovnajú z čerstvého
-katalógu** — baseline omladne, riadky zmenené zvonku dostanú štítok, takže „ulož znova“ je splniteľné; bez toho by konflikt nemal cestu von) + `MD.editDuplicateCode` (druhé
-„Uložiť“ potvrdí duplicitu kódu)).
+- Ruby časť patrí `MaterialsDialog` (jeho allowlist/dispatch). **Session** zachytí model, `DocKey`, inštanciu Štúdia, kotvu, fresh scope/baseline a presný zdroj.
+  **Prepare iba číta** (nedopĺňa materiál, nenačítava SKM, neotvára operáciu, nemení výber); náhľad živého materiálu môže vzniknúť v súkromnom dočasnom adresári
+  a odpoveď nesie obrázok, nikdy klientom určenú cestu. Chýbajúci súbor má pravdivú hlášku.
+- **Každé „Priradiť textúru" / „Upraviť v SketchUpe" vytvára nový pracovný materiál** (SKM prenesie pôvodný natívny obsah, príprava a Apply v jednej operácii; starý sa
+  neprepisuje). Výmena obrázka na textúrovanom zdroji zachová fyzickú šírku aj výšku. Edit po commite vyberie materiál a otvorí natívny panel Materiály.
+- **Uložiť** používa zachytený zdroj (nie `materials.current`): najprv publikuje knižnicu a prejde na nový descriptor, potom samostatné Apply priradí revíziu modelu;
+  chyba Apply nemení úspech publikácie (ponúkne opakovanie tej istej revízie). Reset po publikácii color zabudne starý natívny zdroj. Knižničný zápis nie je modelové Späť.
+- Plošná farba ide skupinovou cestou `mdColorSave` → `set_decor_color`; voliteľný `appearance_context` pridá overenie vlastníctva a korelovanú odpoveď aj pri
+  odmietnutí. Baseline vzhľadu RGB neobsahuje (vlastná zmena farby session neruší).
+- **Každá odpoveď nesie token** otvorenia, session, akcie a dokumentu/sekcie/kotvy; klient preverí vlastníctvo pred odomknutím. Busy zamyká akcie, farbu, krížik, scrim
+  aj Escape; odchod zo sekcie alebo zmena dokumentu vlastníctvo zneplatní. Overlay je pre `NXEsc` cudzia vrstva a pre Štúdio otvorený modal; fokus sa vracia na
+  aktuálny trigger (vlastníctvo patrí logickému cieľu, nie DOM uzlu). Server ruší session pri close/model/Studio/leave.
 
-**`mdEditRefresh` prelieva LEN bunky, ktorých sa používateľ dotkol (1b-7, sweep #8 — cenové P2).** Do 1b-7 kopírovalo zotavenie z konfliktu do čerstvého katalógového riadku
-**všetky** editovateľné stĺpce starého formulára — aj tie, ktoré používateľ nikdy nepísal. Riadok si pritom nesie **čerstvý `row_rev`** (`row_rev` je v `hidden`, nie v `cols`)
-a `mdEditBase.rev` omladne, takže ďalšie *Uložiť* prešlo cez **oba** zámky a **ticho vrátilo cenu/kód/formát, ktorý medzitým prišiel zvonku** — štítok „zmenené mimo editora"
-síce svietil, ale čerstvú hodnotu neukázal. Dnes sa každá bunka porovná s **`NXModal.baseRows(key)`** (východisko, proti ktorému používateľ písal, `mdSameCell`): netknutá bunka
-dostane **čerstvú** hodnotu, zmenená si nechá používateľovu, a bunka zmenená **oboma** (a naozaj na inú hodnotu) ide do modalu ako **kolízia** (`_conflict` + `_wrote`) — pás *tvoja × v katalógu* s rozhodnutím a
-zablokovaným zápisom. `setRows` dostáva ako `base` **čerstvé katalógové riadky** — stará hodnota ide výhradne do stavu modalu (`_wrote`), lebo z `base` kreslí „Začať odznova"
-a stará hodnota s čerstvým `row_rev` by prebehla cez oba zámky (P1 interného review). `editBlocked` má pre kolíziu **vlastnú hlášku**, ktorá pýta rozhodnutie namiesto „ulož
-znova". Testy: `tests/js/test_1b7_kolizia_buniek.js`.
+### Sekcia KOVANIE v Štúdiu (`hw`)
 
-**Adresát odpovede:** `with_client(sink)` presmeruje `js` na volajúceho **na čas jedného synchrónneho volania** (`ensure` je povinné — visiaci sink by zdedila nasledujúca, aj
-asynchrónna odpoveď); **mimo neho ide všetko do Štúdia** (`studio_js` → `StudioDialog.mat_js`, tenký verejný most, lebo kanálové `js` Štúdia je private). Práve na tom stojí Demos:
-`dispatch` beh len **naštartuje** a vráti sa, emity dobiehajú z `UI.start_timer` už bez sinku.
+**Čo robí:** katalóg kovania — pohľady **Položky** (strom kategórií) a **Sety** (dlaždice), hľadanie, filter kategórie, prepínač „neaktívne", „Nová položka",
+predvoľby setov projektu, overenie cien a otvorenie produktu. **Server:** telo akcií v **`HardwareCatalogDialog`** (odsek `hardware_catalog_dialog.rb`;
+`SECTION_ACTIONS` je jediný whitelist, `hw_sink` presmeruje odpoveď, `hw_js` je most pre asynchrónne emity). **JS:** `ui/js/hw_catalog.js` (`hwRenderTools`,
+`hwRenderBody`, `hwToolsHtml(state)`, `mdhRenderTree`, `mdhRow`, `mdhDetail`, modal položky), `HWSETS` (sety a ich editor). Vstupy: menu „Katalóg kovania"
+a tlačidlo panela → `openStudio('hw')` / `StudioDialog.show(open_section: 'hw')`. Doména: [hardware.md](hardware.md) (`hardware_catalog.rb`, `hardware_sets.rb`).
 
-**`after_catalog_change` má JEDNU cestu** — jeden `catalog_payload` (druhý by znamenal druhý `Materials.load` a druhý výpočet `row_rev`) ide `StudioDialog.push_mat_catalog`-om do
-sekcie, plus `Panel.push_materials`, `EdgeCheck.invalidate!` a plný payload Štúdia s **`bump: false`** (katalógový zápis nemení model, takže pending klik ostáva platný).
+**Telo a kanál:** telo = jeden uzol zo `<template id="hwBodyTpl">` (iba `#hwList`), modál mazania v `#hwModalRoot`; stav lišty aj v premenných
+`HW_VIEW`/`HW_Q`/`HW_CAT`/`HW_INACTIVE`. `ready` posiela `studio.js` z `window.onload` (`window.NX_HW_SECTION` je prihlásenie do režimu sekcie); väzby na uzly lišty
+sú **delegácia na `document`**. **Payload `hw_payload(model)`:** `sets` v každom pushi (riadia Nákup), **celý katalóg len pri prvom pushi, po prepnutí dokumentu
+a po ručnom „Obnoviť"** (`@hw_full_pending`, gasí sa len keď katalóg naozaj odišiel). Katalógové echo `push_hw_catalog` → `NX.setHwCatalog` nepočíta a nedvíha
+generáciu.
 
-**`push_state` / `state_payload` / `push_state_both` ZANIKLI** spolu s druhým UI — a s nimi aj **druhý sken modelu** `Materials.model_decor_usage`, ktorý okno robilo pri každom
-plnom pushi: modelový kontext sekcie (predvoľby, počty, `used`) nesie `StudioDialog#mat_payload` z už zozbieraného kusovníka (review ŠT-2a #4).
+**Predvoľby setov projektu** (pohľad Sety) sú **modelový zápis**: po ňom `after_sets_change(model)` → `refresh_if_open(bump: true)` — a to stačí (`Panel.push_selected`
+sa nevolá, geometria sa nemení; jantár „Obnoviť" po vlastnom zápise nezožltne). **`merge_seed` NO-OP nevolá `after_sets_change` vôbec.** Po Ctrl+Z sekcia
+zostarne jantárom (push-po-undo neexistuje; snapshot predvolieb nemá `revision` guard — posledný vyhráva). Render setov je rozdelený: `HWSETS.setData` (plný push,
+kreslí `hwRenderBody`) vs. `HWSETS.init` (echo po odmietnutom zápise `NX.setHwSets`); `hwsRenderSets`/`hwsRenderProj` držia snapshot fokusu (chýbajúci atribút je
+súčasť identity `:not([…])`). Testy `tests/pure/test_st3a_hw.rb`, `tests/js/test_st3a_hw.js`, in-SU `run_st3a`.
 
-**Dve cesty menia MODEL** (projektová predvoľba, apply „Nahradiť UNI…") — obe volajú `refresh_studio_after_model_write` (plný push **so zdvihom** generácie) zámerne **až za
-`Panel.push_selected`**: dedup identity kópií, ktorý si panel vyžiada u observera, je oneskorený a jantárové „Obnoviť" by inak zožltlo hneď po prepočte.
+**Pohľad Položky = strom** (`mdhRenderTree` z poslednej odpovede servera `MDH.tree`): hlavička kategórie `.hwgrphead` (+ `total`/`shown`), `.hwsub` „Výrobca · Rada",
+riadky `mdhRow` (inline bunky, `row_rev` guard, `keepFocus`). Klik na hlavičku prepne `HW_EXPAND[key]` a vypýta nový strom; „Načítať ďalšie (N)" zvýši `HW_MORE[leaf]`
+o `LEAF_PAGE`. Plochý prijímač `MDH.results` ostáva pre `hw_search`. Filter čistí `MDH.created` aj v premenných.
 
-**Životný cyklus** už nehlási vlastný `set_on_closed`, ale Štúdio: `on_ui_closed` (zatvorené okno — session bump + zahodenie odloženej požiadavky), `cancel_demos_on_leave` (odchod
-zo sekcie počas behu — session bump + status) a `on_model_changed` zo `scale_observer` (prepnutý dokument), pričom `@demos_running` stráži, aby sa hláška o zrušení objavila len
-vtedy, keď naozaj niečo bežalo).
+**Modal položky** (D-15, `hw:item:new`; „Nová položka" aj „Upraviť"): poradie **Démos → kód → názov → cena → MJ → kategória → výrobca → rada → poznámka**.
+- Úprava: kód chýba (identita, je v podtitule), **bez pamäte**, posiela `patch` **len so zmenenými poľami** + `from: 'modal'` (inak by zmazal `price_checked_at`),
+  `row_rev` skryto v stave; prázdny patch = „Nič sa nezmenilo.".
+- **Démos** (`lookup`): náhľad vedie na **serverový proposal** (`pid`); po `MDH.demosPreview` sa modal prekreslí predvyplnený (výrobca len ako návrh z
+  `manufacturer_guess`, rada nikdy) — prekreslenie nie je zatvorenie (`HW_REOPEN`). Zmena kódu/názvu/ceny/MJ robí z položky ručnú (`hw_create` namiesto
+  `hw_demos_create`). Zmena poľa Démos **zneplatní proposal**; kým nový náhľad nedobehne (`HW_DEMOS_WAIT`, nastavuje spoločný `mdhDemosLoad`), zápis sa nepustí.
+  Náhľad má **klientsku generáciu** (stará odpoveď sa zahodí), vymazanie poľa pošle `hw_demos_cancel`. Proposal zaniká len keď ho zápis spotreboval
+  (`usedProposal`) alebo po vymazaní poľa — Escape ho nezmaže.
+- **„+ Vytvoriť výrobcu/radu…"** (posledná voľba selectu) → pole s tlačidlom **„Vytvoriť"** (`action:` kostry); zápis len tlačidlom alebo Enterom, **nikdy
+  `change`/blur**, a položku pritom neuloží. Server odpovie `MDH.taxonomy` s kanonickým menom (token — výsledok zavretého okna nevyberie hodnotu v otvorenom).
+  Rada je závislý select (bez výrobcu nie; zmena výrobcu zahodí cudziu radu). **Degradovaná taxonómia** (`write_blocked`) skryje len „+ Vytvoriť…". **Nedostupná
+  taxonómia zamyká klasifikáciu** (`hwTaxLocked()` — uložená hodnota ako jediná voľba, payload `manufacturer`/`series` vôbec neobsahuje).
+- **Výsledok** `MDH.itemResult(ok, msg, errors, op, token)` — prijme sa len presná zhoda tokenu; `true` zavrie a zahodí koncept, `false` nechá otvorené s chybami pri
+  poliach. **Konflikt rebasuje** (`hwItemStale` → prekreslenie z čerstvej položky); **rebase je výhradne táto cesta** — UI prekreslenia (`hwItemRedraw`) držia
+  baseline a revíziu z otvorenia, vedomú obnovu robí `hwItemRebase`.
+- Editor ukazuje **efektívnu kategóriu** (`hwEffectiveCategory`, mapa `tree_category_of`); cena sa parsuje celá (`hwPriceKey`, neplatná = chyba pri `price`).
+- Odchod zo sekcie modal zatvára (`hwCloseModals` — aj modal setu cez `HWSETS.closeModal()`).
+- Testy `tests/pure/test_kovb2_katalog.rb`, `tests/js/test_kovb2_katalog.js`, in-SU `run_kovb2`.
 
-### templates_dialog.rb
+**Pohľad Sety = dlaždice** (kompaktný riadok): názov · chipy klasifikácie alebo „nezaradený" · „neaktívny" · Upraviť · Zmazať (dvojklikové potvrdenie). Neaktívny
+set sa neponúka ako nový výber (server `set_options`, globálna tabuľka `hwsGlobalOptions`), použitý ostáva. **Editor setu = modal D-15**, ktorý si **pripína
+revíziu a základnú definíciu pri otvorení** (`hwsPinRev`; vnútorné prekreslenia ich neomladzujú).
+- Polia kontextovo: použitie → otváranie → konštrukcia (len zásuvka) → výrobca → rada (závislá, voliteľná) → názov + Aktívny/Neaktívny + členovia; `generic_type`
+  len keď ho server nemá z čoho odvodiť (`USE_TYPE_GENERIC`). Zmena klasifikácie prekreslí modal (`HWS_REOPEN`). **Klasifikácia sa posiela vždy celá**; prechod na
+  „— nezaradený —" maže celý klasifikačný blok (`hwsApplyUseType`), `generic_type` ostáva. Auto-návrh názvu len kým ho človek neprepísal.
+- **Člen**: „Ako sa určí kód?" (pevný · podľa NL · podľa pásma parametra) a „Koľko?" (`per: unit|owner`), jedno „+ Pridať člena"; prepnutie spôsobu zahodí polia
+  druhého (XOR). Zoznam je pole `custom`; `hwsBandRow`/`hwsParamSelect` zdieľa editor výberu setu.
+- **Živý náhľad expanzie** (pole `custom` bez `read`): `hws_preview` s generáciou a **tokenom modalu** (cudzí token/stará generácia = zahodiť), debounce ~300 ms,
+  nezamyká Uložiť; štruktúrované chyby pri poliach; vzorové parametre len to, čo zadal človek (prázdna NL = server `preview_nl`).
+- **Výsledok** `HWSETS.setResult(ok, msg, errors, token, conflict)`; konflikt draft nezahodí a ponúkne „Obnoviť" (pri novom sete len prepne pripnutú revíziu).
+  „+ Vytvoriť výrobcu/radu…" tou istou cestou `hw_tax_create_*`; `emit_tax` posiela dva samostatné skripty (`MDH.taxonomy`, `HWSETS.taxonomy`).
+- Testy `tests/pure/test_kovb3_nahlad.rb`, `tests/js/test_kovb3_modal.js`, `tests/js/test_st2c_modal.js`, in-SU `run_kovb3`.
 
-**ROH-A1 — šablóna na ROHOVÚ skrinku:** `corner_template_apply_refusal(cab_cfg, tpl_cfg)` (čistá) odmietne šablónu **inej strany** (overridy hrán by po zrkadlení
-ukazovali na opačnú hranu — prepínač strany s premapovaním prinesie ROH-B, krížový audit C5) aj šablónu s porušeným invariantom čiel; rovnaká strana prejde.
-`merge_template`: chýbajúci kľúč rohovej v šablóne = zachovaj hodnotu **cieľa** (vzor komína).
+**Odkaz na produkt a ručné overenie ceny:** ikona „Otvoriť produkt" pri každej položke aj pri jej riadku v Rozpočte — s URL otvorí externý prehliadač, bez nej
+jantár a editor kódu s fokusom na adrese (pôvodný draft, revízia a token; oneskorená odpoveď sa po odchode zo sekcie, zmene dokumentu či inom formulári
+neprijme; Demos väzba nezapisuje cenu ani dátum). **`hw-manual-check`** (Katalóg aj Rozpočet) otvorí spoločný NXModal (kód/názov/dodávateľ, cena s DPH za MJ,
+predchádzajúce overenie) a po príprave otvorí produkt; potvrdenie čaká na úspešnú odpoveď pokusu o otvorenie; výslovné potvrdenie k dnešku pošle cenu a revíziu,
+čas určí server; `busyLock`, odmietnutie odomkne, konflikt obnoví záznam bez opätovného odoslania.
 
-**`templates_dialog.rb` — od ŠT-3c-1 už NIE JE OKNO** (ostal serverový modul; obsah je sekcia `tpl` Štúdia — popis nižšie v odseku `templates`;
-história okna: **UI-C1a: okno spravuje VÝHRADNE korpusové šablóny** — payload je `Panel.template_list(kind: 'cabinet', previews: true)` a `find`/`upsert`/`delete`/`set_preview`
-majú vlastný `kind` guard, HTML nie je ochrana, takže doskovú šablónu sa odtiaľ nedá použiť, vymazať ani odfotiť.
-
-**KOV-I:** `tile_row` nesie `{name, preview_rev, config, hardware}`. `config` ostáva orezaný na typ a tri rozmery, `hardware` je len odvodené `{has, labels}`
-z tej istej funkcie ako v Inspectore; celé definície setov do Štúdia nechodia. `templates.js` kreslí pri názve ikonu `wrench` s `aria-label` a súhrn v `title`
-vrátane upozornenia na neprenosné zámky. Existujúce aplikačné a kompatibilitné brány zostávajú autoritou vloženia/použitia.
-
-**S1-C + KON-D — ďalšie odvodené kľúče dlaždice:** `appliance_expects` (`{has, codes, text}`, riadok „očakáva chladničku"), **`construction`** (`{has, text}`
-z `TemplateStore.construction_summary` — „komín vzadu 50 · zap. 30 · z líšt 100" z **účinných** hodnôt) a **`vent_note`** (`TemplateStore.ventilation_note` —
-veta o vetraní pri šablóne, ktorá očakáva chladničku, inak `''`). Poradie kľúčov riadku je `name · preview_rev · config · hardware · appliance_expects ·
-construction · vent_note` (stráži `test_st3c_tpl.rb`). `TILE_CONFIG_KEYS` ostáva orezaný — komín ani lišty v ňom nie sú, súhrn skladá server. `templates.js`
-kreslí riadok `.stplmeta.stplkon` **len pri neprázdnom súhrne** (medzi rozmermi a očakávaním, mockup E2 — ostatné dlaždice sa nemenia) a vetu o vetraní
-pridá do `title` dlaždice za súhrn kovania. Nič z toho sa do `templates.json` nezapisuje.
-
-**R-12 (v0.9.3) — `handle_apply` odmietne šablónu z NOVŠEJ verzie.** Guard prestavby chráni cieľovú skrinku, nie zdroj: config šablóny by sa do cieľa zlial už orezaný
-(`merge_template` + `normalize` sú uzavreté whitelisty) a rebuild by to nemal ako zbadať. Kontroluje sa preto **RAW config uloženého záznamu**
-(`CabinetBuilder.newer_config?`) **pred** merge aj pred `rebuild_many`; hláška ide z jediného zdroja `CabinetBuilder.newer_config_message`. Tú istú kontrolu má **vklad
-zo šablóny** v paneli (`Panel.newer_template_refusal` — záznam sa načíta zo skladu, lebo cez CEF chodia len známe polia) a obe stratové ne-rebuild cesty panela
-(„Vložiť kópiu", „Uložiť ako šablónu"). Detail kontraktu: [construction.md](construction.md), odsek `cabinet_builder.rb`.
-
-**SMOKE PACK 1:** riadok má tretie tlačidlo **„Odfotiť" / „Prefotiť"** (podľa `preview_rev`) — pridá k šablóne náhľad z **práve jednej označenej** skrinky bez toho, aby prepísalo
-jej dáta; je **vždy aktívne** (vzor D-78 — dôvod, prečo to teraz nejde, povie server v statuse), text namiesto ikony preto, že toto okno sprite `icons.js` nenačítava).
-
-### appliance_dialog.rb
-
-**Serverová autorita sekcie `appl` (S1-A2) — modul BEZ okna od prvého riadku.** Žiadny `DLG_KEY`, žiadny `HtmlDialog`, žiadna položka menu: jediné UI katalógu spotrebičov je
-sekcia Štúdia. Vstup je uzavretý whitelist `SECTION_ACTIONS` (`appl_tree` · `appl_card` · `appl_create` · `appl_patch` · `appl_delete` · `appl_restore` · `appl_attach` ·
-`appl_thumbnail` · `appl_remove_attachment` · `appl_open_url` · `appl_open_attachment` · `appl_leave`) + `dispatch(name, payload, sink)` + `with_client(sink)` s povinným
-`ensure` (visiaci sink by zdedila nasledujúca odpoveď a poslala ju do cudzieho kanála). **`ready` v whiteliste NIE JE** — Štúdio registruje callbacky pod tými istými menami,
-takže by prepísal jeho vlastný a okno by prestalo dostať prvý push; prvotný stav sekcie nesie `push_state` pod kľúčom `appl`.
-
-**Modul je JEDINÝ vstup do `ApplianceCatalog`** a sám žiadne pravidlá katalógu neduplikuje — validácia, `rev` guard, prílohy aj seed žijú výhradne v
-[appliances.md](appliances.md). Tu žije len to, čo je UI: zloženie stromu a karty, texty polí, preklad statusov na hlášky a chyby pri poli modalu.
-
-**Payloady.** `tree_payload` skladá **celé zoskupenie aj poradie** (kategórie v poradí `CATEGORIES`, položky cez `ApplianceCatalog.sort_records`, `total` per kategória,
-skupina **Vyradené** na konci len s prepínačom `include_deleted`), podtitul riadku (`summary_line` — nika / výrez / trieda + `seed`/`ručný`) a zobrazovaný názov
-(`title` = výrobca + model). Klient kreslí presne to, čo dostal. `gen` je generácia dotazu klienta a server ju **iba echuje** — hľadanie je debounced, takže pomalšie kolo
-nesmie prepísať čerstvejší strom. `card_payload` nesie bloky (`body` · `niche` · `front` · `install`) — **len neprázdne podľa `ROWS`**, teda presne tie, z ktorých
-`form_fields` skladá formulár (D-136) — s riadkami `{label, value, unit, derived}`, kde **`value: null`
-znamená „list to nekótuje"** (klient kreslí „—" kurzívou) a `derived` dokresľuje „(odvodené)"; ďalej odkazy, prílohy a `fields` (predvyplnený formulár).
-
-**Jedna tabuľka riadkov, dve použitia.** `ROWS[kategória][blok]` je **jediný** zoznam polí: karta z neho skladá riadky (`Š × V × H` je jeden riadok z troch čísel), formulár
-z neho generuje jeden vstup na pole (`form_fields` + popisky `FIELD_LABELS` po blokoch). Karta a modal sa tak nemôžu rozísť. Riadok nesie svoj blok (`spec[2]`), lebo niektoré
-polia patria vizuálne inam než dátovo — výška tela umývačky je rozsah, takže v dátach žije v `install`, ale číta sa pri tele. **Doska a drez majú `body` aj `niche`
-prázdne** (D-136, mockup „vonkajší rozmer · výrez · montáž"): ich vonkajší rozmer, výrez a montážna hĺbka / hĺbka vane sú v `front` a niku nemajú. Hodnoty tela, ktoré
-už v zázname sú, **ostávajú** (patch katalógu ich zlučuje) — len sa nekreslia.
-
-**Kľúč poľa modalu = cesta, ktorú vracia katalóg v chybe** (`dims.niche.width_min`), takže „preklad chýb na kľúče modalu" je **identita** a `NXModal.showErrors` posadí hlášku
-k poľu bez prekladovej tabuľky, ktorá by pri pridaní poľa ticho zaostala. Formulár pre **všetky** kategórie (`form_payload`) chodí LEN na vyžiadanie (`appl_tree` s
-`form: true`) — klient si ho vypýta raz za okno; v každom pushi by to boli kilobajty navyše pri každom prepočte kusovníka (lekcia západiek `mat`/`hw`).
-
-**Formulár dostáva BEZSTRATOVÚ hodnotu, karta zaokrúhlenú** (`fmt_input` vs `fmt_mm`). Karta ukazuje jedno desatinné miesto, ale predvyplnenie modalu musí vrátiť presne to,
-čo je v katalógu: pri `19,55` by inak formulár ponúkol `19,6` a prvé uloženie — hoci len opravy názvu — by to zaokrúhlenie **zapísalo**. Klient to poisťuje z druhej strany:
-`appl_patch` nesie **len polia zmenené oproti baseline otvorenia** (`apChangedFields`), takže sa nedotknuté rozmery vôbec neposielajú a prázdny patch sa ani neodosiela.
-
-**Odpoveď modalu `NX.applResult(ok, msg, errors, op, token, info)`** má **šiesty, aditívny argument**: pri `:conflict` nesie **čerstvú `rev`** záznamu. Bez nej by modal ostal
-na zámku z času otvorenia a každé ďalšie „Uložiť" by narazilo na ten istý konflikt — z formulára by sa nedalo dostať inak než zahodením práce. Zámok obnovuje aj samotné
-**echo karty** (zápis z druhej inštancie pod otvoreným modalom). **Výnimka v tokenizovanej akcii** (`TOKEN_ACTIONS` = `appl_create` · `appl_patch`) posiela `applResult`
-**tiež** — inak by `NXModal` ostal `setBusy(true)` navždy a formulár by sa nedal ani odoslať, ani uložiť; stavová hláška sama na to nestačí.
-
-**Lazy miniatúry.** `data:` URI chodí len pre prílohy druhu `image`/`thumbnail`, len na vyžiadanie karty (`thumbs: true`) a len pre tie, ktoré klient **ešte nemá** (`have`);
-naraz najviac `THUMB_BATCH` (6). Primárna cesta je `Sketchup::ImageRep` — obrázok sa zmenší na `THUMB_MAX_PX` (96 px), uloží ako dočasné PNG, prečíta a zmaže, takže fotka
-z mobilu preletí mostom ako pár kB. Keď `ImageRep` nie je (headless testy) alebo formát nepozná (webp, poškodený súbor), pošle sa **pôvodný** súbor, ale len pod
-`THUMB_MAX_BYTES` (256 kB) a so správnymi magic bytes; inak `null` — a to je **platná odpoveď** „náhľad nebude", ktorú si klient zacachuje (záporná cache, vzor
-`TPL_PNG`). Cache je kľúčovaná **id prílohy**, ktoré je nemenné a nikdy sa nerecykluje, takže zastarať nemôže. **Reťaz dávok pokračuje sama**: o miniatúry si klient pýta po
-**každom** vykreslení tela (nielen po príchode karty), takže karta s viac než šiestimi obrázkami dostane aj zvyšok — a po odchode zo sekcie sa poistka „posledné kolo nič
-neprinieslo" resetuje, aby sa raz zaseknuté dlaždice pri návrate dopýtali znova.
-
-**`appl_open_url` overuje schému na SERVERI** (`URI::HTTP` + neprázdny host). Katalóg síce do `shop_urls`/`sheet_urls` pustí len http/https, ale adresa sem chodí z klienta
-a `UI.openURL` nad `file:` alebo `javascript:` by bol úplne iný druh akcie, než na aký používateľ klikol. Klient preto nemá v karte žiadny `href` — otvára server.
-
-**`appl_attach` volá `UI.openpanel` PRIAMO v callbacku** (tá istá cesta ako `MaterialsDialog.appearance_pick_image` — overené, že HtmlDialog nezamrzne), filter
-`Listy a obrázky|*.pdf;*.jpg;*.jpeg;*.png;*.webp||`, jeden súbor naraz. `nil` (zrušené) **nie je chyba**: nič sa nezapíše a okno to povie vetou „Nič sa nepriložilo.".
-Druh sa odvodí z prípony (`pdf` → `sheet`, inak `image`); na náhľad sa obrázok prepína až v karte (`appl_thumbnail`).
-
-**Stav pohľadu drží server v tom tvare, v akom ho klient poslal** (`@view_query`, `@view_deleted`, `@view_gen`) — echo po zápise musí rešpektovať rozpísané hľadanie, inak by
-sa strom pred používateľom „roztiahol". `appl_leave` ho **zabudne**: najbližší plný push by inak nakreslil strom zúžený filtrom, ktorý používateľ už dávno nevidí. To isté
-robí **`on_ui_closed`**, ktoré volá `StudioDialog` pri zatvorení okna (vzor `HardwareCatalogDialog`): nová inštancia Štúdia začína s `gen` 0, takže server nesmie držať
-generáciu z minulého sedenia — klient by jeho odpoveď zahodil ako staršiu a hľadanie aj formulár by „nereagovali". Klient to poisťuje zrkadlovo: **preberá najvyššiu videnú
-generáciu** (`AP_GEN = max(AP_GEN, gen)`), lebo strom mu chodí aj pushom, ktorý si nevyžiadal.
+Plné znenie: archív, odsek okna Štúdio (pasáže ŠT-3a, KOV-B2, KOV-B3, CENY-KOV) a „hardware_catalog_dialog.rb".
 
 ### hardware_catalog_dialog.rb
 
-**ŠT-3a-1 — `hardware_catalog_dialog.rb` OKNO vtedy ešte ŽILO, ale prestalo byť jediným UI** *(od ŠT-3a-2 už NIE JE OKNO — ostal serverový modul; popis je tu kvôli histórii a čo sa
-zmenilo, hovorí odsek nižšie)*: obsah (položky + sety) prevzala sekcia `hw` Štúdia a modul dostal druhý vstup — uzavretý whitelist `SECTION_ACTIONS` + `dispatch(name, payload,
-sink)` + `with_client(sink)` (`ensure` je povinné — visiaci sink by zdedila nasledujúca, aj asynchrónna odpoveď). Telá handlerov sa NEPRESÚVALI a modul sa NEPREMENOVÁVA (vzor audit
-#21 zo ŠT-2a).
+**Serverová autorita katalógu kovania pre sekciu `hw` Štúdia** (vlastné okno už nemá — sekcia „História"; modul sa nepremenúva). Vstup: uzavretý whitelist
+**`SECTION_ACTIONS`** + `dispatch(name, payload, sink)` + `with_client(sink)` (`ensure` povinné); **`ready` vo whiteliste zámerne nie je** (prepísal by callback Štúdia —
+prvotný stav nesie `push_state` pod kľúčom `hw`). `js` bez sinku padá na `studio_js`; `hw_js` je verejný most pre asynchrónne emity. Doména: [hardware.md](hardware.md).
 
-**`ready` v whiteliste ZÁMERNE NIE JE:** Štúdio registruje callbacky pod tými istými menami, takže by prepísal jeho vlastný `ready` a okno by prestalo dostať prvý push — prvotný
-stav sekcie preto nesie `push_state` pod kľúčom `hw`.
+- **Asynchrónne behy** (cena z Demosu, náhľad produktu) si adresáta pamätajú (`run_target` = **session token** `@section_session` zachytený pri štarte behu) — token
+  zhasína zatvorenie Štúdia (`on_ui_closed`), prepnutie dokumentu (`on_model_changed` zo `scale_observer` — vetva ostáva, lebo musí zneplatniť bežiaci beh) a odchod zo
+  sekcie (`cancel_runs_on_leave` z `hw_leave`, so statusom). Príznak bežiaceho behu nesie **identitu behu** (`mark_running` vydá `run_id`, `clear_running(target, id)`
+  zhasne len pri zhode); výslovné `hw_demos_cancel` gasí bez identity. Generačné počítadlá `@gen` (cena) a `@demos_gen` (náhľad).
+- **Refresh:** `after_sets_change` → `StudioDialog.refresh_if_open(bump: !model.nil?)` (knižničný zápis bez zdvihu, modelový zápis predvolieb so zdvihom);
+  `push_items(refresh_studio: true)` = echo sekcie + plný push Štúdia `bump: false` (ceny vstupujú do Rozpočtu) + `Panel.push_hardware_sets`; jediný volajúci
+  s `refresh_studio: false` je `price_refresh_after_proc`. `sets_payload(model)` berie model argumentom.
+- **Odmietnutý zápis setov** (`:conflict`, `:not_found`, neznáme zlyhanie; aj odmietnutý `reset_project`) ide na **`resync_sets`** (`StudioDialog.push_hw_sets` →
+  `NX.setHwSets`, jeden `sets_payload`, bez zdvihu generácie a bez plného pushu); úspešný zápis setov ide plným `push_state` (mení aj nákup).
+- **Undo kontrakt modelových zápisov predvolieb projektu** (`hws_map_project`, `hws_merge_seed`, `hws_reset_project`): jedna cesta zatvorenia operácie
+  `abort_open_operation` — handler drží `op[:open]` a `rescue` ruší výhradne operáciu, ktorú otvoril a nezavrel.
+- **Mapovanie podľa triedy v predvoľbách projektu:** `sets_payload` nesie `class_rows = { project: [...], global: [...] }` — hotové riadky pre všetky
+  `HardwareSets::CLASS_MAPPING_KEYS` (popisok, `options` z `class_set_options`, `current`, `stored` + `value_text`, `unset_label`/`none_label`/`none_value`/`none_send`).
+  JS ich kreslí do tabuľky `.hwsmap` za generické typy. **Dve prázdne voľby:** `''` = „nenastavené" (kľúč sa zmaže; pri závese sa dedí legacy `hinge`) a sentinel
+  `none_value` = „vedome bez setu" (pri zásuvke RED `drawer_kit_missing`); vybranú rozhoduje `hwsMapClassSelectedId`. Zápis existujúcimi `handle_map_project`/
+  `handle_map_global` s poľom **`mapping_key`** (typ cez `HardwareSets.mapping_key_type`, validácia `class_key_value_problem`). Editor pásiem pre triedne riadky nie je.
 
-**V whiteliste NIE SÚ ani tri MODELOVÉ zápisy** (`hws_map_project`, `hws_merge_seed`, `hws_reset_project`): v pohľade Sety sa blok „Predvoľby projektu" zobrazí READ-ONLY
-(`HWS_PROJ_RO` v `hw_sets.js`, hodnota je vypísaná — výstup nikdy nevyzerá ako vstup) a zapisovacie ovládanie nahrádza premostenie **„Upraviť v okne Katalóg kovania…"**
-(`hw_open_window` → `HW_BRIDGE_STATUS`, vzor `MAT_BRIDGE_STATUS`; D-78 — tlačidlo nie je mŕtve, vedie tam, kde obsah naozaj je, a status prizná dávku ŠT-3a-2, ktorá ho presunie).
+Plné znenie: archív, „hardware_catalog_dialog.rb".
 
-**Adresát odpovede:** `with_client(sink)` na čas jedného synchrónneho volania, mimo neho vtedy OKNO (`win_js`, dnes už `studio_js`); **asynchrónny beh si adresáta pamätá sam**
-(`run_target`) — pre okno platil pôvodný okno-guard (`@dialog.equal?(dlg) && visible?`, dnes zanikol), pre sekciu SESSION TOKEN `@section_session`, ktorý zhasína zatvorenie Štúdia
-(`on_ui_closed`), prepnutie dokumentu (`on_model_changed`) a ODCHOD zo sekcie (`cancel_runs_on_leave` z `hw_leave`; odchod počas behu ho zruší a **povie to statusom** — obe cesty
-preč zo sekcie, klik v navigácii aj deep-link, volajú ten istý hook). Generačné počítadlá `@gen` (cena) a `@demos_gen` (náhľad) boli vtedy SPOLOČNÉ pre okno aj sekciu vedome —
-server drží JEDEN cenový návrh per kód a JEDEN proposal store, takže dva súbežné behy by si aj tak siahali na to isté (od ŠT-3a-2 je klient už len jeden).
+### Sekcia SPOTREBIČE v Štúdiu (`appl`)
 
-**OPRAVA nálezu auditu:** `after_sets_change` volalo `StudioDialog.on_model_changed(model)` — to je vetva PREPNUTIA DOKUMENTU (prevesí observer, zdvihne `@mat_full_pending`); dnes
-ide `StudioDialog.refresh_if_open(bump: !model.nil?)` — knižničný zápis bez zdvihu generácie, modelový zápis predvolieb projektu so zdvihom.
+**Čo robí:** dva pohľady — **Katalóg** modelov spotrebičov **tohto počítača** (`%APPDATA%`, tretí per-PC katalóg vedľa materiálov a kovania; bez cien) a **V zákazke**
+(čo je v tejto zákazke a kde). **Server:** `ApplianceDialog` (odsek `appliance_dialog.rb`); doména [appliances.md](appliances.md). **JS:** `ui/js/appliances.js`
+(prefix `ap*` / `AP_*`) — načítava sa **až za** `studio.js` (obaľuje `NX.setStudio` a dopĺňa `window.NX` o `applTree`/`applCard`/`applResult`; poradie stráži guard
+test). Ikona `appliance`.
 
-**ŠT-3a-2 z tejto cesty odstránila aj `push_sets`** — sekcia dostáva sety plným pushom, panel `Panel.push_hardware_sets` ostáva. `push_items(refresh_studio: true)` posielal okno +
-echo sekcie + plný push Štúdia `bump: false` (vetva okna od ŠT-3a-2 zanikla) (ceny kovania vstupujú do ROZPOČTU, identita riadkov sa nemení); jediný volajúci s `refresh_studio:
-false` je `price_refresh_after_proc`, ktorý `push_state` robí sám.
+- **Badge navigácie** = `appl.job.counts` zo servera — počet **riadkov** pohľadu „V zákazke", ktoré treba vybaviť (nevybraný model · zaniknutý vlastník · nález
+  Kontroly); `navCounts('appl')` len číta hotový blok.
+- **Lišty:** Katalóg `[V zákazke · Katalóg]` · „Nový spotrebič" · hľadanie (debounce 200 ms) · „vyradené" · `sechint`; V zákazke: segment · „Pridať do zákazky" ·
+  hľadanie · kategória · súhrn zo servera. Hľadania sú čisto klientske (lišta sa počas písania neprekresľuje). **Žiadne „Obnoviť"** a žiadny `staleFlag`.
 
-**Zotavovacia obnova setov (review P1 #1):** `hws_save_set`/`hws_delete_set` sú v `SECTION_ACTIONS`, takže odmietnutý zápis (`:conflict`, `:not_found`, neznáme zlyhanie) musí
-obnoviť OBE UI — vlastná cesta `resync_sets` (okno `win_js` + sekcia `StudioDialog.push_hw_sets` → `NX.setHwSets`, jeden `sets_payload`, **bez** zdvihu generácie a **bez** plného
-pushu — nič sa nezapísalo). Bez toho by hláška tvrdila „obnovené", ale sekcia by držala starú `revision` a zacyklila sa v konfliktoch. `push_sets` ostal cestou po ÚSPEŠNOM zápise
-(okno; sekcia dostáva sety plným `push_state`, lebo menia aj nákupný zoznam).
+**Pohľad „V zákazke":** tabuľka Kategória · Model · Vlastník · Kontrola · Cena z Rozpočtu · akcie. Riadky, **poradie**, tóny, texty aj ceny skladá server
+(`ApplianceDialog.job_view`) z hotových výsledkov toho istého pushu: `Bom.collect[:appliances]` (stavy `bound|job|owner_missing|expected_missing`), payload Rozpočtu
+(ceny, „dodáva zákazník", `appliance_owners`) a Kontroly (kategória `appliance`); vlastné čítanie len položiek zákazky (`BudgetStore.appliances`). Žiadny druhý sken.
+Poradie: skrinky → dosky → sloty → „len zákazka". „Nevybraný" má akciu „vybrať…", „vlastník zmizol" „Odpojiť"; kategórie bez kontroly majú stav `evidencia`.
+- **Zápisy idú kanálom Rozpočtu** (`budget_mutate` → `ProductionCore.apply_budget_op` → `ApplianceBinding.apply!`): sekcia vlastnú zápisovú cestu nemá — „Pridať do
+  zákazky", editor, „Odpojiť" a „Zmazať" volajú funkcie `budget.js`. **Jeden modal, dve vstupné miesta:** „Pridať do zákazky" aj „Do zákazky" v karte katalógu
+  otvárajú D-15 modal Rozpočtu (`budOpenDraft('appliance', …)`, z karty predvyplnený `catalog_id`); vyradený záznam tlačidlo nemá. Ceruzka = editor položky
+  Rozpočtu (`budOpenApplEdit` → `budOpenMore(..., full: true)`). Odkaz a technický list otvára server (`appl_open_url`), v okne nie je `href`.
+- **Oko** = `appl_job_select` (čisté čítanie, označí vlastníka a doramuje) s **guardom zastaraného pohľadu**: klient posiela identitu payloadu tabuľky
+  (`model_guid` + `gen` z `AP_JOB_DOC`), server odmieta nezhodu (`DocKey.foreign?` + `StudioDialog.generation`); prázdny údaj sa netoleruje.
+- Po zápise príde bežný `push_state` s Rozpočtom aj `appl.job`. **`job` chodí len plným pushom** (klient `if (p.job) AP_JOB = p.job`). Tvar `job`: `rows[]`
+  (`{state, item_id, category, category_label, model, model_sub, owner{kind,id,pid}, owner_label, owner_desc, tone, status_text, status_title, price_text,
+  customer_supplied, shop_url, sheet_url, actions{select,edit,remove,unbind,assign,shop,sheet}}`) · `total` · `warn` · `counts{red,orange,total}` · `summary` ·
+  `subtotal_text` · `subtotal_included` · `categories`. **`shop_url` je z položky zákazky** (snapshot katalógu až fallback), `sheet_url` zo snapshotu.
+  **`actions.assign` len keď je vlastník v serverovej ponuke vlastníkov** (inak dôvod v `model_sub`).
+- **Deep-link z Kontroly:** nález s `data.route = 'appl'` (`ProductionCore::ROUTE_SECTIONS`); kotva `appliance:<uuid>` prepne na „V zákazke" a riadok prisvieti —
+  spotrebuje sa raz a aplikuje **až po `render()`**; zaniknutý riadok okno prizná.
 
-**Príznak bežiaceho behu sekcie zhasína aj vtedy, keď výsledok nemá komu prísť** (review P2 #3 + kolo 2): príznak nesie **identitu behu** — `mark_running` vydá monotónne `run_id` a
-`clear_running(target, id)` zhasne **len pri jeho zhode**, takže prekonaný beh nezhasne príznak živého a beh zabitý konkurenčnou generáciou sa uprace tiež; výslovné
-`hw_demos_cancel` gasí zámerne bez identity (ruší to, čo v sekcii práve beží). Bez toho by odchod zo sekcie vypísal falošné „Zrušené: …" po behu, ktorý dávno skončil.
+**Katalóg:** strom po kategóriách (zbalenie = stav okna) a karta z blokov Telo · Nika · Čelo/dvere · Montáž — **len tých, ktoré kategória má** — plus Odkazy, Prílohy,
+Poznámka; prázdny blok s priznanou vetou. Prílohy = dlaždice (miniatúra z lazy kanála, PDF ikona, náhľad s teal rámom; akcie pri hoveri aj `:focus-within`).
+- **Refresh:** zmena katalógu = **echo sekcie** (`NX.applTree` + `NX.applCard`), nikdy `push_state` a bez zdvihu generácie; echo **kreslí len pri aktívnej sekcii**
+  (`studioActiveSection() === 'appl'` — `#secbody`/`#sectools` sú zdieľané), inak sa stav len uloží.
+- **Kto čo vlastní:** server obsah, poradie, počty, texty, polia formulára; klient pohľad (vybraný záznam, hľadanie, „vyradené", zbalené skupiny, cache miniatúr) —
+  pamäť okna, nový dokument ju nezhadzuje.
+- **Modal Nový/Upraviť** = kostra D-15 (`appl:create` / `appl:edit:<id>`, `wide`); zápis modal nezatvára, zatvorí `NX.applResult(true, …)` s tokenom. Kategória sa
+  pri úprave meniť nedá; pri novom zázname zmena `nxm_category` prekreslí modal s prenesenými hodnotami (`skipMemory: true`, `baseFields`). **Mazanie** = D-15 danger
+  modal (nikdy `UI.messagebox`), tombstone vrátiteľný „Obnoviť"; bez kostry sa nevyradí nič (fail closed).
+- **Stav katalógu** (`:read_only` / `:degraded`) = banner nad stromom a vypnuté zápisy; príznak `writable` chodí v každom payloade sekcie.
 
-**ŠT-3a-2 — `hardware_catalog_dialog.rb` už NIE JE OKNO** (ostal serverový modul; obsah je sekcia `hw` Štúdia): `hardware_catalog.html`, `UI::HtmlDialog`, `DLG_KEY`,
-`ensure_dialog`, `show`, `register_callbacks`, `win_js` aj okno-guardy asynchrónnych behov sú PREČ. `run_target` nesie už len **session token** zachytený pri ŠTARTE behu (ABA),
-identitu behu drzí `run_id` v `mark_running`/`clear_running`. `push_sets` (win-only echo) **zanikol a všetkých päť** jeho volaní v zotavovacích vetvách modelových handlerov prešlo
-na `resync_sets` — odmietnutý zápis musí obnoviť UI, ktoré oň požiadalo, a to je už len sekcia. `js` bez sinku padá na `studio_js`.
+Testy: `tests/pure/test_s1a2_sekcia.rb`, `tests/pure/test_s1b2_pohlad.rb`, `tests/js/test_s1a2_sekcia.js`, `tests/js/test_s1b2_pohlad.js`, in-SU `run_s1a2`
+a `run_s1b2`. Plné znenie: archív, „Sekcia SPOTREBIČE v Štúdiu".
 
-**Vetva `HardwareCatalogDialog.on_model_changed` v `scale_observer` OSTÁVA** (precedens `MaterialsDialog`) — telo už nerobí refresh UI (ten robí Štúdio plným pushom), ale MUSÍ
-zneplatniť bežiaci serverový beh: bez toho by výsledok sťahovania z Demosu dobehol do NOVÉHO dokumentu s dátami starého. `sets_payload(model)` berie model ARGUMENTOM (pri prepnutí
-dokumentu by inak sekcia dostala predvoľby starého dokumentu vedľa kusovníka nového). Osirotený `preferences_key` `noxun_engine_hw_catalog_v1` v registri používateľa ostáva — je to
-zapamätaná veľkosť okna, ktoré už neexistuje, a SketchUp ho nikdy nepoužije (precedens `NoxunEngineProduction`).
+### appliance_dialog.rb
 
-**ŠT-3a-3 — undo kontrakt modelových zápisov má JEDNU cestu zatvorenia operácie** (`abort_open_operation`): všetky tri handlery si držia príznak `op[:open]` a `rescue` ruší
-**výhradne operáciu, ktorú handler otvoril a ešte nezavrel**. Bez toho nechala výnimka medzi `start_operation` a `commit_operation` operáciu OTVORENÚ (ďalší zápis by sa do nej
-pribalil a jeden krok Späť by vrátil OBA), a bezpodmienečný `abort_operation` v `handle_merge_seed` mohol naopak zrušiť zápis, ktorý už bol commitnutý.
+**Serverová autorita sekcie `appl` — modul bez okna** (žiadny `DLG_KEY`, HtmlDialog ani položka menu). Vstup: uzavretý whitelist `SECTION_ACTIONS` (`appl_tree` ·
+`appl_card` · `appl_create` · `appl_patch` · `appl_delete` · `appl_restore` · `appl_attach` · `appl_thumbnail` · `appl_remove_attachment` · `appl_open_url` ·
+`appl_open_attachment` · `appl_leave`, a `appl_job_select`) + `dispatch(name, payload, sink)` + `with_client(sink)` s povinným `ensure`; **`ready` vo whiteliste nie je**.
+Je **jediným vstupom do `ApplianceCatalog`** a pravidlá katalógu neduplikuje (validácia, `rev` guard, prílohy, seed: [appliances.md](appliances.md)) — žije tu len UI:
+zloženie stromu a karty, texty polí, preklad statusov, chyby pri poli. Pohľad „V zákazke" skladá `job_view` (odsek sekcie).
 
-**Odmietnutý `reset_project` ide na `resync_sets`**, nie na plný push — nič sa nezapísalo.
+- **`tree_payload`** skladá celé zoskupenie aj poradie (kategórie v poradí `CATEGORIES`, `ApplianceCatalog.sort_records`, `total`, skupina **Vyradené** len pri
+  `include_deleted`), podtitul `summary_line` a `title`. `gen` dotazu klienta server len echuje.
+- **`card_payload`** nesie bloky (`body` · `niche` · `front` · `install`) **len neprázdne podľa `ROWS`** s riadkami `{label, value, unit, derived}` (`value: null` = list
+  to nekótuje → „—"), odkazy, prílohy a `fields`. **`ROWS[kategória][blok]` je jediný zoznam polí** — z neho karta aj formulár (`form_fields` + `FIELD_LABELS`); doska
+  a drez majú `body` aj `niche` prázdne (hodnoty v zázname ostávajú, len sa nekreslia).
+- **Kľúč poľa modalu = cesta chyby katalógu** (`dims.niche.width_min`) — `NXModal.showErrors` posadí hlášku bez prekladovej tabuľky. Formulár pre všetky kategórie
+  (`form_payload`) chodí len na vyžiadanie (`appl_tree` s `form: true`).
+- **Formulár dostáva bezstratovú hodnotu, karta zaokrúhlenú** (`fmt_input` vs `fmt_mm`); `appl_patch` nesie len polia zmenené oproti baseline (`apChangedFields`),
+  prázdny patch sa neodošle.
+- **`NX.applResult(ok, msg, errors, op, token, info)`** — pri `:conflict` nesie `info` čerstvú `rev`; výnimka v tokenizovanej akcii (`TOKEN_ACTIONS` = `appl_create` ·
+  `appl_patch`) posiela `applResult` tiež (inak by modal ostal zamknutý). Zámok obnovuje aj echo karty.
+- **Lazy miniatúry:** `data:` URI len pre prílohy `image`/`thumbnail`, len na vyžiadanie (`thumbs: true`) a len chýbajúce (`have`), najviac `THUMB_BATCH` (6). Primárne
+  `Sketchup::ImageRep` (zmenšenie na `THUMB_MAX_PX` 96 px cez dočasné PNG), inak pôvodný súbor pod `THUMB_MAX_BYTES` (256 kB) so správnymi magic bytes, inak `null`
+  (platná odpoveď, klient ju cachuje). Cache podľa nemenného id prílohy; klient sa pýta po každom vykreslení tela.
+- **`appl_open_url` overuje schému na serveri** (`URI::HTTP` + host); v karte nie je `href`. **`appl_attach`** volá `UI.openpanel` priamo v callbacku (filter PDF
+  a obrázkov, jeden súbor; `nil` = „Nič sa nepriložilo."); druh z prípony (`pdf` → `sheet`, inak `image`).
+- **Stav pohľadu drží server v tvare od klienta** (`@view_query`, `@view_deleted`, `@view_gen`); `appl_leave` aj `on_ui_closed` ho zabudnú. Klient preberá najvyššiu
+  videnú generáciu (`AP_GEN = max(AP_GEN, gen)`).
 
-**KOV-D1b — MAPOVANIE PODĽA TRIEDY v Predvoľbách projektu.** Zásuvka sa nemapuje podľa generického typu `slide` (resolver ho pre klasifikovanú položku nečíta), ale podľa
-**triedneho kľúča**. `sets_payload` preto nesie `class_rows = { project: [...], global: [...] }` — **hotové riadky** pre všetky `HardwareSets::CLASS_MAPPING_KEYS`
-(= kľúče `MAPPING_ADDITIONS`, jediný zoznam): popisok, `options` (`class_set_options` — len kompatibilné, neaktívne nikdy), `current`, `stored` + `value_text` (uložená hodnota
-mimo ponuky = `disabled`, F10) a `none_label` **„— vedome bez setu (RED — zásuvka bez kitu)"** (nenamapovaná klasifikovaná zásuvka je fail-closed RED `drawer_kit_missing`, nie
-ORANGE ako ostatné kovanie). JS ich kreslí do **tej istej tabuľky** `.hwsmap` za generické typy — žiadny nový blok ani nadpis (vertikálny priestor je vzácny) — a nefiltruje ani
-neprekladá nič. **Riadok má DVE prázdne voľby (KOV-F1, Codex #329):** `unset_label` s hodnotou `''` = „nenastavené" (kľúč sa z mapovania **zmaže**; pri závese sa potom dedí
-legacy `hinge`, takže nákup závesy MÁ) a `none_label` s hodnotou `none_value` = „vedome bez setu" (uloží sa **sentinel**). Ktorá je vybraná, rozhoduje jediná čistá funkcia
-`hwsMapClassSelectedId`; hodnotu sentinelu posiela server v `none_send` — panel doménovú hodnotu nikdy neskladá sám. Riadok bez `none_value` (staršie payloady, napr. karta
-skrinky) kreslí len prvú voľbu so svojím pôvodným popisom. Zápis ide **existujúcimi** handlermi `handle_map_project`/`handle_map_global`: payload nesie nové pole **`mapping_key`** (starý tvar `generic_type` ostáva
-funkčný), typ pre kontrolu setov číta `HardwareSets.mapping_key_type` a triedu proti hodnote validuje `class_key_value_problem` v `set_*_mapping!`. Editor pásiem sa pre triedne
-riadky **neponúka** — hodnotou je vždy celá voľba z ponuky (pevný set alebo rodina), takže sa nedá zostaviť selektor, ktorý by triede nesedel.
+Plné znenie: archív, „appliance_dialog.rb".
+
+### Sekcia PRAVIDLÁ v Štúdiu (`rules`)
+
+**Čo robí:** editor pravidiel kovania projektu („Kovanie podľa rozmerov", Š17) + read-only bloky ABS pravidiel podľa roly a ručných zásahov. Akcie v lište
+(`rulesToolsHtml`, čistá funkcia): **Uložiť a prestavať skrinky · „aj ako globálnu predvoľbu" · Načítať globálne · Doplniť nové predvolené**. **Server:**
+`RulesDialog` (odsek `rules_dialog.rb`), payload `rules_payload(model, collected)` — model aj hotový zber argumentom, žiadny druhý sken; **chodí celý pri každom
+pushi** (malý JSON, bez západky). **JS:** `ui/js/rules.js` (`rdApplyState`, `rdRender`, `rdRenderExtra`, `rdCollectRules`, `rdGuardHtml`). Doména:
+[hardware.md](hardware.md) (`hardware_rules.rb`).
+
+- Telo = jeden uzol zo `<template id="rulesBodyTpl">`. **Formulár prežije push:** `rdApplyState` porovnáva odtlačok `RD_SEED` a prekresľuje len keď sa pravidlá
+  **na modeli** zmenili (uloženie, Späť, prepnutie dokumentu, odmietnutie); inak nasadí len meta riadok. „Načítať globálne" odtlačok **neobnovuje** (zmena formulára,
+  ktorá ešte neplatí).
+- **Read-only bloky** (`abs` = ABS podľa roly, `overrides` = jantárové riadky ručných zásahov) majú vlastné uzly a `rdRenderExtra` pri **každom** pushi, mimo
+  `rdRender`/`RD_SEED`; poradie skupín ABS nad kovaním.
+- **Uloženie** = modelový zápis (`HardwareRules.set_project_rules` v `CabinetBuilder.rebuild_many`, jedna undo operácia), potom `Panel.push_selected` →
+  `refresh_if_open(bump: true)`; zápisové akcie majú guard generácie `StudioDialog.generation`.
+- Riadok pravidla `vysuvy-nl-podla-hlbky` má titulok **„Výsuv — staré zákazky bez systému zásuvky"** (`rdRuleTitle`) a hint; `rdLabel` je spoločný slovník typov so
+  serverovou `HardwareRules.label_for` (guard test). Pravidlo sa nemaže.
+- **Editor door guardov** pravidla `bands` (`rdGuardHtml`, zbalený `<details>` so súhrnom `rdGuardSummary`, otvorenosť `RD_GUARD_OPEN` podľa `rule_id`): `width_plus
+  {over, add}` · `width_warn_over` · `weight_bands [{max, quantity}]` · `finite`; kreslí sa pri `kind: 'bands'` s výstupom `hinge` a pri každom `bands`, ktoré guard
+  už nesie. `RD_GUARD_KEYS` = zrkadlo `HardwareRules::DOOR_GUARD_KEYS` (guard test).
+- **Tvar zo snapshotu nesmie zhodiť sekciu:** `weight_bands`, `bands` aj `series` prechádzajú bránou `rdArr`; zlý tvar = prázdna tabuľka s jantárovým hintom (`.rgbad`)
+  a v lište „neplatný tvar" (`rdWeightBroken`); opraví ho uloženie. Pri zbalení bloku `rdGuardToggle` → `rdGuardRefresh` prevezme formulár zberom `rdSyncFromForm`
+  a prepíše len text `.rgsum` (bez `rdRender`).
+- **Zber `rdCollectGuards` neposiela tvar, ktorý by server ticho zahodil:** nevyplnený kľúč sa nezapíše (prázdna šírka = guard preč, chýbajúci počet = 1,
+  odškrtnuté `finite` = kľúč preč); vedome pridané hmotnostné pásmo s prázdnymi kg ide ako `null` a uloženie sa odmietne (`rdValidate` → `rdWeightProblem`, server
+  `HardwareRules.weight_bands_problem`). `rdCollectRules` pracuje na **kópii celého pravidla** — neznáme kľúče (aj `floor_height_min`) prežijú.
+- Pásma korpusového pravidla na šírku majú hint **„Pásma podľa šírky korpusu."** (`rdWidthHint`, len `bands` + `input: 'width'` + rola `cabinet`); `rdRoleDesc`
+  pozná prah `applies_to.floor_height_min`. Editor prahu neexistuje.
+
+Testy: `tests/pure/test_st3b_rules.rb`, `tests/js/test_st3b_rules.js`, `tests/pure/test_kovf2_editor_zavesy.rb`, `tests/js/test_kovf2_editor_zavesy.js`,
+`tests/js/test_kovg1b_editor_nohy.js`, in-SU `run_st3b`. Plné znenie: archív, odsek okna Štúdio (pasáže ŠT-3b, D-118b, KOV-F2, KOV-G1b) a „rules_dialog.rb".
 
 ### rules_dialog.rb
 
-**`rules_dialog.rb` — od ŠT-3b-1 už NIE JE OKNO** (ostal serverový modul; obsah je sekcia `rules` Štúdia, popis ďalej v odseku `hardware_rules`).
+**Serverová autorita sekcie `rules` Štúdia** (vlastné okno už nemá — sekcia „História"); `js` bez sinku padá na `studio_js`. Vstupy: menu „Pravidlá kovania" →
+`StudioDialog.show(open_section: 'rules')`, tlačidlo panela → `openStudio('rules')`. Modul nemá asynchrónny beh, preto nemá ani vetvu `on_model_changed`
+v `scale_observer` (sekciu obslúži plný push Štúdia; `rules_payload` dostane podaný model). Doména: [hardware.md](hardware.md) (`hardware_rules.rb`).
 
-**Rozsah hromadného zápisu = ZÁKAZKA (D-134, v0.12.6).** Uloženie pravidiel (`handle_save`) aj „Doplniť nové predvoľby" (`handle_merge_seed`) berú skrinky zo
-spoločného helpera `Panel.job_cabinets_split` (top-level `model.entities` cez `Ids.top_level_scan`) — nie z `cabinets(model)`, ktorý chodí globálne cez
-`model.definitions` a našiel by aj korpus **vnorený** v cudzom komponente: ten vo výstupoch zákazky nie je a prestavba by ho zmenila vo všetkých výskytoch zdieľanej
-definície. Skrinka s **odpojeným dielcom** sa do `rebuild_many` nedostane, ale **snapshot pravidiel sa zapíše aj tak** (zákazka nesmie ostať bez pravidiel kvôli jednej
-vytiahnutej doske) — `rebuild_many` otvára operáciu aj s prázdnym zoznamom, takže zápis nikdy nekončí mimo operácie. Status ju **vymenuje**
-(`Panel.detached_skipped_tail`, veta z `Ids::DETACHED_PART_REASON`). `cabinets(model)` ostáva len pre **čítanie**: počet „skriniek v modeli" v päte sekcie a resolver
-jednej skrinky podľa `cabinet_id`. Pätu sekcie hlási **`Panel.job_cabinets`** — popisok je „skriniek zákazky", aby neprotirečil statusu „prestavaných M skriniek".
+- **Rozsah hromadného zápisu = zákazka:** `handle_save` aj „Doplniť nové predvoľby" (`handle_merge_seed`) berú skrinky zo `Panel.job_cabinets_split` (top-level cez
+  `Ids.top_level_scan`), nie z `cabinets(model)` (ten by našiel aj korpus vnorený v cudzom komponente). Skrinka s **odpojeným dielcom** sa do `rebuild_many`
+  nedostane, ale **snapshot pravidiel sa zapíše aj tak** (`rebuild_many` otvára operáciu aj s prázdnym zoznamom); status ju vymenuje
+  (`Panel.detached_skipped_tail`, `Ids::DETACHED_PART_REASON`). Päta sekcie hlási „skriniek zákazky" (`Panel.job_cabinets`); `cabinets(model)` ostáva len na čítanie.
+- **`RulesDialog.after_model_write`** (za operáciou prestavby) zneplatní aj memo nôh ghost pásika.
+- **`ui/js/rules.js`** je prefixovaný `rd*`/`RD_*` (globály `el`/`esc` by kolidovali so `studio.js`); prijímače `RD.init`/`RD.setRules`/`RD.setStatus` si mená ponechali.
 
-**ŠT-3b-1 — `rules_dialog.rb` už NIE JE OKNO** (ostal serverový modul; obsah je sekcia `rules` Štúdia): `rules.html`, `UI::HtmlDialog`, `DLG_KEY`, `ensure_dialog`, `show`,
-`register_callbacks` aj `push_state` sú PREČ; `js` bez sinku padá na `studio_js`.
+Plné znenie: archív, „rules_dialog.rb".
 
-**Vetva `RulesDialog.on_model_changed` v `scale_observer` ZANIKLA** — a to je rozdiel oproti `MaterialsDialog`/`HardwareCatalogDialog`, ktorých vetvy ostali: tento modul nemá
-**žiadny asynchrónny beh**, takže po prepnutí dokumentu nie je čo rušiť — sekciu obslúži plný push Štúdia z toho istého broadcastu (`rules_payload` dostane PODANÝ model). Vstupné
-body: menu „Pravidlá kovania" → `StudioDialog.show(open_section: 'rules')`, tlačidlo panela → `openStudio('rules')`; `open_rules` (panel.rb) aj `openRulesDialog` (hardware.js) sú
-preč. Osirotený `preferences_key` `noxun_engine_rules` v registri používateľa ostáva — zapamätaná veľkosť okna, ktoré už neexistuje (precedens `NoxunEngineProduction` a
-`noxun_engine_hw_catalog_v1`).
+### Sekcia ŠABLÓNY v Štúdiu (`tpl`)
 
-**`ui/js/rules.js` sa NEDAL presunúť 1:1** — definoval globálne `el` a `esc`, teda PRESNE tie, ktoré má `studio.js`; v spoločnom okne by si prepísali cudziu funkciu a padlo by
-niečo úplne iné než pravidlá. Celý súbor je preto prefixovaný `rd*`/`RD_*` (vzor `bud*`, `mdh*`), PRIJÍMAČE `RD.init`/`RD.setRules`/`RD.setStatus` si mená PONECHALI (jedna pravda o
-mene kanála) a `sketchup.ready` z neho zaniklo.
+**Čo robí:** správa knižnice šablón (Š18) — dlaždice korpusových aj doskových šablón s náhľadom, súhrnom kovania, konštrukcie a očakávaných spotrebičov; akcie
+**Použiť** (na označenú skrinku), **Odfotiť/Prefotiť** náhľad, **Premenovať** a **Zmazať** (D-15 danger modal). Doskové šablóny sa dajú len premenovať a zmazať
+(apply/odfotiť sa im nezobrazujú). **Ukladanie novej šablóny je len v Inspectore** (mini-modal „Uložiť ako šablónu"). Tlačidlá sú vždy aktívne a verdikt (nič
+neoznačené, iný typ, viac označených) dáva server pri kliku. **Server:** `TemplatesDialog` (odsek `templates_dialog.rb`; `SECTION_ACTIONS = tpl_apply · tpl_delete ·
+tpl_capture · tpl_rename · tpl_preview`). **JS:** `ui/js/templates.js` (`TPL.init`). **Kontrakt knižnice, premenovania, náhľadov a kanálov** (vrátane stavového echa
+`TPL.init`, ktoré kreslí len pri `studioActiveSection() === 'tpl'`, vlastného PNG kanála a refreshu `apply` = plný push `bump: true` vs. zmena knižnice = echo
+`push_library_echo` bez zdvihu): [model-a-identita.md](model-a-identita.md), odseky `templates.rb` a `template_previews.rb`.
+
+- Dlaždica nesie odvodené kľúče zo servera (`tile_row`): `{name, preview_rev, config, hardware, appliance_expects, construction, vent_note}` — poradie stráži
+  `test_st3c_tpl.rb`; `TILE_CONFIG_KEYS` je orezaný (typ a tri rozmery). `templates.js` kreslí pri názve ikonu `wrench` s `aria-label` a súhrnom v `title` (aj
+  upozornenie na neprenosné zámky), riadok konštrukcie `.stplmeta.stplkon` len pri neprázdnom súhrne a vetu o vetraní do `title`. Nič z toho sa do
+  `templates.json` nezapisuje. Popisky kategórií spotrebičov skladá server.
+- Vstupy: menu „Šablóny" → `StudioDialog.show(open_section: 'tpl')`, správa šablón vo vkladacej karte → `openStudio('tpl')`.
+
+Testy: `tests/pure/test_st3c_tpl.rb` (+ sady v [model-a-identita.md](model-a-identita.md)).
+
+### templates_dialog.rb
+
+**Serverová autorita sekcie `tpl` Štúdia** (vlastné okno už nemá — sekcia „História"; modul sa nepremenúva). `find`/`upsert`/`delete`/`set_preview` majú vlastný `kind`
+guard (`KINDS = cabinet | board`); apply a odfotenie len pre `cabinet`.
+- **`handle_apply` odmietne šablónu z novšej verzie:** kontroluje sa **RAW config uloženého záznamu** (`CabinetBuilder.newer_config?`) pred merge aj `rebuild_many`;
+  hláška z jediného zdroja `CabinetBuilder.newer_config_message`. Tú istú kontrolu má vklad zo šablóny (`Panel.newer_template_refusal`) a „Vložiť kópiu" / „Uložiť ako
+  šablónu". Detail: [construction.md](construction.md), odsek `cabinet_builder.rb`.
+- **Šablóna na rohovú skrinku:** `corner_template_apply_refusal(cab_cfg, tpl_cfg)` (čistá) odmietne šablónu inej strany aj šablónu s porušeným invariantom čiel;
+  `merge_template` — chýbajúci kľúč rohovej v šablóne = zachovaj hodnotu cieľa.
+- **`tile_row`** skladá odvodené kľúče dlaždice z tých istých funkcií ako Inspector (`TemplateStore.hardware_tile_summary`, `construction_summary` z účinných hodnôt,
+  `ventilation_note`); celé definície setov do Štúdia nechodia.
+- Odfotenie: `tpl_capture` → `TemplatesDialog.handle_capture` → `Panel.capture_preview_for(kind, name)` (z práve jednej označenej skrinky, dáta šablóny sa nemenia).
+
+Plné znenie: archív, „templates_dialog.rb".
+
+### Sekcia DODÁVATEĽ / DEMOS v Štúdiu (`sup`)
+
+**Čo robí:** ukazuje **stav väzby na dodávateľa Demos** a vedie tam, kde väzba naozaj žije (deep-linky `studioGoSection` do Materiálov a Rozpočtu). **Vedome nemá
+ani jedno editovateľné pole** — väzba nastavenia nemá (verejný cenník bez prihlásenia, cenového pásma a DPH — firma je neplatca, katalógové ceny sú konečné), odstup
+dotazov je konštanta `DemosClient::CRAWL_DELAY_S` a väzba je vlastnosť konkrétneho dekoru či kovania (vedomá odchýlka od wireframu mockupu). **Server:**
+`SupplierSettingsDialog` (odsek `supplier_settings_dialog.rb`) — jeden payload pre sekcie `sup` · `bset` · `about`. **JS:** `ui/js/studio_settings.js`.
+
+### Sekcia NASTAVENIA ROZPOČTU v Štúdiu (`bset`)
+
+**Čo robí:** globálne nastavenia aktívneho dodávateľa (`%APPDATA%\NOXUN\Engine\supplier_settings.json`) — sadzby služieb, režimové hodnoty €/€€/€€€, štandardné
+koncové riadky, prah veku cien, krok zaokrúhlenia, **prerez píly, orez okraja platne a prídavok dupláku** (parametre nárezového plánu a Kontroly). Do zákazky sa
+**nemrazia**. Vstupy: položka navigácie, tlačidlo „Nastavenia" s ikonou posuvníkov (`sliders-horizontal`) v lište Rozpočtu (čisté `studioGoSection('bset')`), chip nárezového plánu, nález Kontroly `layout_settings`, menu „Nastavenia
+rozpočtu" → `StudioDialog.show(open_section: 'bset')`. **Server:** `SupplierSettingsDialog` (`ss_save`, `ss_reload`); validácia serverová
+(`SupplierSettings.patch_active!`, all-or-nothing). **JS:** `ui/js/studio_settings.js` (`ssRenderBody`, `ssApplyState`, `ssModeCells`, `ssModeHeads`, `ssFieldBad`,
+`ssRangeError`).
+
+- **Skalárne polia** (`SS_SCALARS` = `[kľúč, popis, jednotka, tooltip?]`, zhodu kľúčov so `SCALAR_DEFAULTS` stráži Ruby guard) majú `inputmode="decimal"` a tooltip
+  `.nxtip.inl` (`data-tip`; `.studio .nxtip` v `studio.html`, `white-space: pre-line`). **Klientska kontrola rozsahu** z `scalar_ranges` (`SupplierSettings::SCALAR_RANGES`
+  + dni): pole mimo rozsahu zčervená (`.bad`), „Uložiť" povie dôvod; autoritou je server.
+- **Stav súboru** `settings_state` (`ok | degraded | newer | fallback | unreadable` + veta) = banner hneď po otvorení; pri `SS_WRITE_BLOCK_STATES` (`newer`/`degraded`/
+  `unreadable`) červený `hwbanner-stop` „Uloženie je vypnuté." a „Uložiť" `aria-disabled` s dôvodom (tlmený vzhľad bez hoveru); `fallback` jantárový bez vypnutia
+  zápisu.
+- **Prázdna bunka režimu ukazuje platnú sadzbu:** payload nesie `effective` (`{rates, rows}` = presne `SupplierSettings.rate` / `row_rate`); `ssModeCells` dá prázdnej
+  bunke `placeholder` a tooltip „Prázdne — platí základ (17)", hodnota ostáva `''`. Hlavičky `ssModeHeads` v poradí `SS_STATE.modes` („Položka · Základ · € nízky ·
+  €€ štandard · €€€ vysoký").
+- Kontrakt revízie, pinu a prepočtu: odsek `supplier_settings_dialog.rb`. Testy `tests/js/test_np2_nastavenia.js`.
 
 ### supplier_settings_dialog.rb
 
-**`supplier_settings_dialog.rb` — od ŠT-4a už NIE JE OKNO** (ostal serverový modul; obsah sú TRI sekcie Štúdia):
-`supplier_settings.html`, `js/supplier_settings.js`, `UI::HtmlDialog`, `DLG_KEY`, `ensure_dialog`, `show`, `register_callbacks` aj `push_state` sú PREČ a modul sa **NEPREMENÚVA**
-(audit #21).
+**Serverová autorita troch sekcií Štúdia — `sup`, `bset` a `about`** (vlastné okno už nemá — sekcia „História"; modul sa nepremenúva). Uzavretý whitelist
+**`SECTION_ACTIONS = ss_save · ss_reload · updater_check · updater_set_dir · updater_apply`** (prefixované mená — `save`/`reload`/`ready` by kolidovali s callbackmi
+okna). **Jeden payload nesie všetky tri sekcie** (globálne, model nepotrebujú); `settings: nil` je signál chyby (nie „nič nové").
 
-**Čo edituje:** GLOBÁLNE nastavenia aktívneho dodávateľa (`%APPDATA%\NOXUN\Engine\supplier_settings.json`) — sadzby služieb, režimové hodnoty €/€€/€€€, štandardné koncové riadky,
-prah veku cien, krok zaokrúhlenia a od NP-2 **prerez píly, orez okraja platne a prídavok dupláku** (parametre nárezového plánu a Kontroly); do zákazky sa **nemrazia** (rozpočet je pohyblivý obraz cien).
+- **Optimistický zámok:** payload nesie `revision` aktívneho dodávateľa, uloženie ju vracia, nezhoda = odmietnutie + načítanie nanovo. **Klient posiela revíziu
+  pripnutú na stav, nad ktorým sa začalo písať** (`SS_BASE_REV`): pin sa berie **pri fokuse poľa** (`focusin` — fokus zmrazí zobrazený obsah), push ho neprepisuje;
+  uvoľní ho `SS.saved()` (potvrdenie, odmietnutie, reload) a **prekreslenie tela z čerstvého stavu, keď pin nikto nevyužil**. Miesto uvoľnenia je jediné — v
+  `ssRenderBody` tesne pred `box.innerHTML = ''`, za strážou `ssTyping()`, s podmienkou `!ssDirty()` (prekreslenie nastáva aj bez pushu — odchod a návrat do sekcie).
+- **Klient:** rozpísané hodnoty prežijú plný push a zanikajú výhradne na `SS.saved()`; telo sa neprekresľuje, kým používateľ píše; kreslí sa len do práve otvorenej
+  sekcie (`#secbody`/`#sectools` sú zdieľané); `settings: nil` = chybový stav (formulár skrytý, uložiť sa nedá, „Obnoviť" ostáva). Rozlišuje sa prítomnosť kľúča.
+- **Odmietnutie rozpísané hodnoty zahadzuje** (`SS.saved()` pred `refresh_studio`); baseline sa obnovuje až pri úspešnom zostavení payloadu.
+- **Po úspešnom zápise sa Štúdio prepočíta so zdvihom generácie** (sadzby sú vstup rozpočtu). **Hláška sa vetví podľa výsledku prepočtu** (`refresh_and_report`):
+  `refresh_studio` vracia boolean „klient to naozaj dostal" — pri `false` červená veta „Nastavenia sú ULOŽENÉ, ale rozpočet sa NEPREPOČÍTAL… klikni na Obnoviť";
+  rovnako odmietacia vetva aj `handle_reload`.
+- Tri akcie `updater_*` patria sekcii `about` (odsek `updater.rb`, UI vrstva).
 
-**NP-2 — tri nové polia, tooltip, kontrola rozsahu a banner stavu súboru (mockup D).** Riadky „Prerez píly (hrúbka kotúča)" · „Orez okraja
-platne" · „Prídavok dupláku na stranu" (mm) stoja vo fieldsete **Výpočet a upozornenia** medzi „m² na platňu" a „Zaokrúhlenie" (`SS_SCALARS`
-= `[kľúč, popis, jednotka, tooltip?]`; zhodu kľúčov so serverovým `SCALAR_DEFAULTS` stráži Ruby guard). Každé pole má `inputmode="decimal"`
-(čiarka aj bodka). **Tooltip „?"** je tlačidlo `.nxtip.inl` s textom v `data-tip` (vzhľad Inspectora — Štúdio dostalo vlastné pravidlá
-`.studio .nxtip` v `studio.html`, `white-space: pre-line` kvôli odsekom); prerez priznáva, že ho zatiaľ použije len nárezový plán.
-**Klientska kontrola rozsahu:** payload nesie `scalar_ranges` (`{kľúč: [min, max]}` zo `SupplierSettings::SCALAR_RANGES` + dni) — pole mimo
-rozsahu **zčervená** (`.bad` pri písaní aj po pushi rozpísanej hodnoty, `ssFieldBad`) a „Uložiť" povie dôvod ľudsky („Prerez píly (hrúbka
-kotúča): hodnota mimo rozsahu 0–10 mm", `ssRangeError`); server ostáva autoritou. **Stav súboru:** payload nesie `settings_state`
-(`ok | degraded | newer | fallback | unreadable` + veta) — sekcia ukáže **banner hneď po otvorení** (`hwbanner`; pri `newer`/`degraded`/
-`unreadable` — zoznam `SS_WRITE_BLOCK_STATES` — červený `hwbanner-stop` s „Uloženie je vypnuté.") a „Uložiť" dostane `aria-disabled` s dôvodom
-v `title` (nikdy HTML `disabled`, D-78; klik povie dôvod v statuse, na server nič nejde) a **tlmený vzhľad bez hoveru** (`.sectools
-.primary[aria-disabled="true"]` v `studio.html`, tokeny `--nx-surface-sunken`/`--nx-ink-faint` — Codex #419 kolo 2). Degradovaný súbor sa tak
-prizná už pri otvorení, nie až chybou pri uložení. `fallback` (súbor chýba alebo je poškodený bez zálohy) má jantárový banner a **zápis
-nevypína** — prvý zápis súbor opraví a revízia chráni pred prepisom cudzej zmeny; `unreadable` (práva, zdieľanie, disk) zápis vypína, lebo
-by zlyhal tiež. Texty po uložení
-sa nemenia; Kontrola sa po uložení prepočíta tou istou cestou `refresh_studio`. Testy: `tests/js/test_np2_nastavenia.js`.
+Plné znenie: archív, „supplier_settings_dialog.rb".
 
-**Uzavretý whitelist `SECTION_ACTIONS = ss_save · ss_reload · updater_check · updater_set_dir · updater_apply`** — mená sú prefixované zámerne: `save`/`reload`/`ready` sú príliš
-všeobecné na to, aby žili v JEDNOM priestore callbackov okna vedľa akcií ostatných sekcií (`ready` by dokonca prepísal vlastný callback Štúdia). Tri `updater_*` akcie pribudli
-v D-52b — sú to akcie sekcie `about`, ktorej serverovou autoritou je tento modul (telo je nižšie, „updater.rb — UI vrstva").
+### Sekcia O PLUGINE v Štúdiu (`about`)
 
-**Baseline revízia prežila presun** (optimistický zámok): payload nesie `revision` aktívneho dodávateľa, uloženie ju vracia a nezhoda = odmietnutie + načítanie nanovo — nikdy tichý
-prepis cudzej zmeny.
-
-**Klient posiela revíziu PRIPNUTÚ na stav, nad ktorým sa začalo písať** (`SS_BASE_REV`, review #227 P1): plný push chodí pri každej zmene modelu a `SS_STATE.revision` s ním
-omladne, takže bez pinu by zámok prešiel a cudzia zmena (druhá inštancia, ručný zásah do súboru) by zmizla bez slova.
-
-**Pin sa berie UŽ PRI FOKUSE poľa** (`focusin`), nie pri prvom písmene (review #227 kolo 2): fokus ZMRAZÍ zobrazený obsah (telo sa neprekresľuje), takže push, ktorý medzitým
-dorazí, vymení `SS_STATE` pod starými hodnotami — pripnutie až pri prvom písmene by teda pripútalo NOVÚ revíziu k STARÉMU obsahu a zápis by prešiel. Push pin **neprepisuje**;
-uvoľní ho `SS.saved()` (potvrdenie, odmietnutie, reload) — **a tiež prekreslenie tela z čerstvého stavu, keď pin NIKTO NEVYUŽIL** (review #227 kolo 3, dorovnané dávkou 1b-1): keď nie je
-nič rozpísané, obsah sa prekreslí z čerstvého stavu, takže držať starú revíziu by znamenalo **falošný konflikt** nad hodnotami, ktoré používateľ vidí — a zahodenú prácu
-(`SS.saved()` rozpis pri odmietnutí zahadzuje). Kontrakt kola 2 tým ostáva nedotknutý: **pod kurzorom je obsah zmrazený a pin sa drží**, takže cudziu zmenu nemožno ticho prepísať.
-
-**Uvoľňuje sa v `ssRenderBody`, nie v `ssApplyState`** (oprava dlhu 1b-A, blok 1b odrážka A — dnes v archíve `SYSTEM/archiv/ROADMAP_hotove_etapy.md`): pin patrí k OBSAHU NA OBRAZOVKE, a ten sa prekresľuje aj **bez nového pushu** —
-odchod zo sekcie a návrat cez `studioGoSection` → `render` → `renderBody`. Kým kontrola žila v ceste pushu, prežil zastaraný pin práve túto cestu (fokus nezmeneného poľa → cudzia
-zmena a push, prekreslenie potlačené → odchod a návrat) a sekcia potom ukazovala čerstvé hodnoty, ale ukladala proti starej revízii: **falošný konflikt a stratená editácia**.
-Miesto uvoľnenia je **jedno jediné** — riadok tesne pred `box.innerHTML = ''`, teda za strážou `ssTyping()`; podmienka je preto len `!ssDirty()`. Je to zámerné: posun uvoľnenia
-PRED tú stráž (predtým sémanticky ekvivalentná mutácia, ktorú držal len tvarový guard) dnes zhodí behaviorálny test „pod kurzorom pin ostáva".
-
-**Odmietnutie rozpísané hodnoty ZAHADZUJE** (`SS.saved()` pred `refresh_studio` — presne ako to robilo okno): bez toho by prežili push, prekryli čerstvé čísla a druhý klik by ich
-ticho prepísal, hoci hláška hovorí „formulár je načítaný nanovo" — hláška a správanie sa musia zhodovať; baseline sa obnovuje **až pri úspešnom zostavení payloadu** (lekcia
-ŠT-3b-2c2 B4 — inak by sa server a klient rozišli a každé ďalšie uloženie by sa navždy odmietalo).
-
-**Validácia je serverová** (`SupplierSettings.patch_active!`, all-or-nothing).
-
-**Po úspešnom zápise sa Štúdio PREPOČÍTA** so zdvihom generácie — sadzby sú **vstup** rozpočtu, nie jeho mutácia; in-SU dôkaz je zmena súčtu automatických služieb, nie prítomnosť
-volania.
-
-**Hláška sa VETVÍ podľa výsledku prepočtu** (`refresh_and_report`, oprava dlhu 1b-A): zápis do súboru a obnova obrazovky sú DVE veci. Plný push môže zlyhať (výnimka pri
-zostavovaní payloadu, `execute_script` do okna, ktoré ešte neohlásilo `ready`) a keďže `SS.saved()` už rozpis zahodil, na obrazovke vtedy ostanú STARÉ čísla — „Rozpočet je
-prepočítaný." by nad nimi bolo klamstvo. Zlyhanie preto povie pravdu („Nastavenia sú ULOŽENÉ, ale rozpočet sa NEPREPOČÍTAL… klikni na Obnoviť") a je červené. To isté platí pre
-**odmietaciu** vetvu (tvrdí „formulár je načítaný nanovo") aj pre **`handle_reload`**. `refresh_studio` preto vracia BOOLEAN „klient to naozaj dostal" — nedostupné `StudioDialog`,
-zavreté okno aj zachytená výnimka sú `false`. *Zamietnutá alternatíva: samostatné echo nastavení po zápise — potrebovalo by nový klientsky prijímač a čísla rozpočtu by aj tak
-ostali staré, takže by hláška o „prepočítanom rozpočte" klamala ďalej.*
-
-**JEDEN payload nesie všetky tri sekcie** (`sup`/`bset`/`about`) — sú to tri pohľady na ten istý malý dokument a model nepotrebujú (globálne, ako šablóny).
-
-**`bset`** je presun formulára 1:1.
-
-**H3a (A-07) — prázdna bunka režimu ukazuje platnú sadzbu.** Payload nesie aditívne `effective` (`effective_rates`: `{rates: {kľúč: {režim: …}}, rows: {kľúč
-riadku: {režim: …}}}` = presne `SupplierSettings.rate` / `row_rate`, ktorými počíta Rozpočet; iba čítanie, revízia ani súbor sa nemenia). Klient
-(`ssModeCells`) dá **prázdnej** uloženej bunke režimu `placeholder` (sivé číslo, `::placeholder` = `--nx-ink-muted`) a tooltip „Prázdne — platí základ (17)";
-hodnota poľa ostáva `''`, takže uloženie ju nepošle. Číslo musí byť **serverové**, nie z bunky Základ: pri chýbajúcom základe v súbore `rate` padá na **seed**
-(porez 17), hoci bunka Základ je prázdna. Pri rozpísanom Základe ukazuje sivé číslo uloženú platnú sadzbu až do Uložiť (nápoveda to priznáva). Hlavičky oboch
-tabuliek skladá `ssModeHeads` **v poradí `SS_STATE.modes`** (rovnako ako bunky — predtým dva zdroje poradia): „Položka · Základ · € nízky · €€ štandard · €€€
-vysoký" (symbol rovnaký ako segment Rozpočtu, slovo z `mode_labels` s malým písmenom).
-
-**`sup` (Dodávateľ / Demos) vedome NEMÁ ani jedno editovateľné pole:** väzba na Demos žiadne nastavenia nemá (verejný cenník — žiadne prihlásenie, žiadne cenové pásmo, žiadna DPH:
-firma je neplatca a katalógové ceny sú konečné), odstup dotazov je KONŠTANTA slušného správania (`DemosClient::CRAWL_DELAY_S`) a väzba je vlastnosť konkrétneho dekoru/kovania.
-Sekcia preto ukazuje STAV a **vedie** tam, kde väzba naozaj žije (deep-linky `studioGoSection` do Materiálov a Rozpočtu) — vymyslené polia by sľubovali nastavenia, ktoré
-neexistujú; **vedomá odchýlka od wireframu mockupu**, ktorý kreslí cenové pásmo aj DPH.
-
-**Klient (`ui/js/studio_settings.js`) sa proti oknu zmenil v troch veciach:** (1) rozpísané hodnoty **prežijú plný push** a zanikajú výhradne na potvrdenie servera `SS.saved()` — v
-okne push chodil len pri otvorení a po uložení, v Štúdiu chodí pri každej zmene modelu, takže pôvodné „init = reset formulára" by ticho zahodilo rozpísané sadzby; (2) telo sa
-**neprekresľuje, kým používateľ píše** do jeho poľa; (3) kreslí sa LEN do práve otvorenej sekcie (`#secbody`/`#sectools` sú zdieľané uzly — lekcia review #225 P1); (4) **`settings:
-nil` je SIGNÁL, nie „nič nové"** (review #227 P2): keď server payload nevie zostaviť (chyba disku), sekcia prejde do chybového stavu, formulár skryje a povie to — formulár, ktorý
-vyzerá aktuálne a aktuálny nie je, je horší než hláška; nad neznámym stavom sa navyše nedá **uložiť**, ale **„Obnoviť" v lište OSTÁVA** (do H4b „Načítať nanovo") (review #227 kolo 2) — je to jediná
-cesta, ako sa z prechodnej chyby disku zotaviť bez zatvorenia Štúdia, a hláška v tele na ňu odkazuje menom.
-
-Rozlišuje sa PRÍTOMNOSŤ kľúča `settings`, nie pravdivosť hodnoty.
-
-**⚙ v lište Rozpočtu** už neotvára okno: je to čisté klientske `studioGoSection('bset')` a serverová cesta `ProductionCore.open_budget_settings` aj callback `budget_settings`
-zanikli. Vstupný bod menu „Nastavenia rozpočtu" ostáva ako zaužívaná skratka, ale vedie na `StudioDialog.show(open_section: 'bset')`. Osirotený `preferences_key`
-`noxun_engine_supplier_settings` v registri používateľa ostáva (precedens `NoxunEngineProduction`, `noxun_engine_hw_catalog_v1`, `noxun_engine_rules`, `noxun_engine_templates`).
+**Čo robí:** logo, verzia a priečinok nastavení + **aktualizácia pluginu jedným klikom** (cesta k distribučnému priečinku, kontrola verzie, „Aktualizovať"). **Server:**
+`SupplierSettingsDialog` (`updater_check`, `updater_set_dir`, `updater_apply`) nad jadrom `updater.rb`. **JS:** `ui/js/about.js` (markup), `ui/js/studio_settings.js`
+(stav a akcie), hooky v `studio.js`. Kontrakt UI vrstvy updatera: odsek `updater.rb` nižšie.
 
 ### ui/js/about.js — „O plugine"
 
-**„O plugine" (`ui/js/about.js`) je JEDEN OBSAH s DVOMA VSTUPMI** (kontrakt Š19): markup stavia zdieľaný builder `nxAboutHtml(info)`, ktorý načítava panel.html aj studio.html —
-koliesko Inspectora má už len prázdneho hostiteľa `#cfgAbout` a plní ho `NX.init` (`nxAboutFill`), sekcia `about` ho plní z payloadu.
-
-Dáta (verzia + priečinok nastavení) dáva VÝHRADNE server — do ŠT-4a stála cesta `%APPDATA%\NOXUN\Engine` v HTML natvrdo. Verzia sa píše **„v0.17.x"**
-(malé „v", H4 · D-07) — tak isto pätička Inspectora (`bridge.js` `verline`), stav updatera aj jeho potvrdenie. Kópia markupu by sa pri prvej úprave rozišla a používateľ
-by videl dva rôzne „O plugine". Tri pravidlá `.aboutrow`/`.aboutlogo`/`.aboutname` sa preto v `css/panel.css` **odscopovali z `.nx-inspector`** — v Štúdiu (root bez tej triedy) by
-sa obsah inak rozsypal.
-
-**D-52b: JEDEN OBSAH, ale updater LEN v jednom vstupe.** Builder má od D-52b druhý argument — stav updatera; `nxAboutHtml(info, updater)` pripojí blok `nxUpdaterHtml(updater)`
-**iba keď ho volajúci podá**. Podáva ho jedine sekcia `about` Štúdia (`nxAboutFill(host, about, updMerged())`); koliesko Inspectora volá builder ako doteraz (`nxAboutFill('cfgAbout',
-info)`) a updater v ňom neexistuje. Je to **vedomá odchýlka od zapísaného „sup/about sú čítanie"**, ktorú si vyžiadalo zadanie D-52 („aktualizovať jedným klikom zo sekcie
-O plugine"): sekcia má odteraz jediné zapisovateľné pole mimo `bset` (cestu k distribučnému priečinku) a tlačidlo, ktoré prepíše súbory pluginu. Do rozklikávacieho kolieska
-Inspectora to nepatrí — a mŕtve tlačidlo v druhom vstupe by bolo D-78.
-
-**Vedomá odchýlka od wireframu mockupu:** licencie tretích strán a diagnostika (`Debug.report`) sa **nepridávajú** — v koliesku dnes nie sú, takže by to nebolo zrkadlo, ale nový
-obsah v oboch vstupoch (patrí do vlastnej dávky).
+**Jeden obsah, dva vstupy** (kontrakt Š19): markup stavia zdieľaný builder `nxAboutHtml(info, updater)` načítaný v `panel.html` aj `studio.html` — koliesko Inspectora
+má hostiteľa `#cfgAbout` (plní ho `NX.init` → `nxAboutFill('cfgAbout', info)`), sekcia `about` ho plní z payloadu (`nxAboutFill(host, about, updMerged())`). Blok
+updatera `nxUpdaterHtml(updater)` sa pripojí **len v sekcii Štúdia** (jediné zapisovateľné miesto mimo `bset`; v koliesku by bolo mŕtve tlačidlo). Dáta (verzia
+a priečinok nastavení) dáva výhradne server; verzia sa píše **„v0.17.x"** (malé „v" — aj pätička Inspectora `bridge.js` `verline` a stav updatera). Pravidlá
+`.aboutrow`/`.aboutlogo`/`.aboutname` v `css/panel.css` nie sú scopnuté pod `.nx-inspector`. Licencie a diagnostika sa tu nepridávajú (vedomá odchýlka od mockupu).
 
 ### updater.rb — aktualizácia pluginu jedným klikom (D-52a jadro · D-52b1 kontrola · D-52b2 aplikovanie)
 
-**Vstupný bod je sekcia „O plugine" v Štúdiu; tu je najprv opísané ČISTÉ JADRO, ktoré tam sedí pod tlačidlom, a na konci UI vrstva nad ním.** Modul je headless: pri načítaní
-nesiaha na `Sketchup.*` ani `UI.*` a **všetky cesty prijíma ako parametre** (`Engine.plugin_dir` / `find_support_file` patria UI vrstve). Vďaka tomu beží celá sada nad TEMP
-sandboxom a nikdy nad živým `Plugins`.
+**Čisté jadro** (pri načítaní nesiaha na `Sketchup.*` ani `UI.*`, všetky cesty ako parametre; testy nad TEMP sandboxom). **Balík = kópia repa** (`noxun_engine.rb` +
+strom `noxun_engine/`), **jednotka atomicity je celý balík** (nový strom so starým loaderom je zakázaný stav). **Rozloženie v `Plugins`:** `noxun_engine.new/` +
+`noxun_engine.rb.new` (staging) · `noxun_engine.old/` + `noxun_engine.rb.old` · `noxun_engine.update.json` (marker) · `noxun_engine.update.lock` ·
+`noxun_engine.leases/<pid>.lease`.
 
-**Formát balíka = kópia repa:** `noxun_engine.rb` + strom `noxun_engine/`. **Jednotka atomicity je CELÝ BALIK** — loader a strom sú jedna generácia. *Nový strom so starým loaderom
-je zakázaný stav*: `main.rb` drží VERSION len ako fallback, takže by plugin hlásil starú verziu nad novým kódom.
+**Dve fázy:** **`prepare!`** (kanonické hranice → zámok → marker → manifest zo zdroja → staging **kópiou** do `.new` → validácia proti manifestu byte-for-byte →
+rozhodnutie o verzii) je **worker-safe** a živej generácie sa nedotýka, vracia **tiket**; **`commit!`** (len renamey + latch) beží v hlavnom vlákne. Medzi fázami drží
+exkluzivitu **marker** a rozhoduje **nonce** (náhodná identita prípravy v markeri aj tikete); nezhoda = odmietnutie bez dotyku cudzích artefaktov. Nedokončená
+príprava → **`abort_prepared!`** (uprace len vlastný staging). `apply!` = obal `prepare!` + `commit!` (testy).
+- **Swap:** (3) `noxun_engine` → `.old` → (4) `.new` → `noxun_engine` → (5a) záloha loadera **kópiou** `.rb` → `.rb.old` (bokový súbor + `fsync`) → (5b) jediný
+  atomický `File.rename('.rb.new', '.rb')` (`noxun_engine.rb` existuje v každom okamihu) → (6) `.old` sa maže po úspechu (zlyhanie = úspech s poznámkou).
+  **Bod commitu = úspešný rename loadera** → hneď `Engine.restart_required!`.
+- **Jedno pravidlo po kroku 3:** buď (A) plný rollback overený na disku, bez latchu, alebo (B) latch + zachované `.new`, `.old` a marker pre boot recovery — každá
+  chybová cesta končí v `abort_after_move!` (guard test: za krokom 3 žiadny iný `raise Refused`). Pri zlyhanom rollbacku sa nič nemaže a hláška rozlíši „reštartuj"
+  vs. „spusti INSTALL". `.old` maže len `discard_previous!` a len keď stojí živý strom aj loader.
+- **VERSION sa číta zo staged stromu** (loader krížovo s `main.rb`, porovnanie číselne po segmentoch; chýbajúca, neplatná aj duplicitná definícia = chyba; pred
+  commitom celý sken `assert_single_version!`). **Downgrade je zakázaný** (`:newer | :same | :older`, `:older` = odmietnutie).
+- **Kanonické hranice:** cieľ `Engine.plugin_dir` + súrodenecký loader; odmieta sa zdroj == cieľ, vnorenie, prípona `.new`/`.old`, symlink/junction/reparse point a únik
+  relatívnej cesty z manifestu. Koncové lomítko sa nestrihá pri koreňoch (`/`, `X:/`, `//server/share`).
+- **Zámok a lease:** vlastný `noxun_engine.update.lock` (`flock`, `LOCK_NB` — nikdy čakanie). Každá inštancia zapíše lease **už v loaderi na začiatku bootu pod
+  zámkom**; lease nesie `{std, pid, exe, started_at}` a `live_leases` overí cez `tasklist /FI "PID eq N" /FO CSV /NH`, že PID patrí SketchUpu s tým istým image name
+  (výstup binárne, kontrola exit statusu; „mŕtvy" len odpoveď bez CSV riadkov). Kontrola dvakrát (vstup a tesne pred swapom). **Fail-closed:** boot bez zapísaného
+  lease vráti `:lease_failed` a plugin sa nenačíta; nezistiteľný stav lease = `Refused`.
+- **Restart latch:** (1) `Engine.update_restart_pending?` odmietne všetky vstupné body (toolbar, `Panel.show`, `Panel.show_insert`, `StudioDialog.show`) natívnou
+  hláškou; (2) generické `cb` wrappery (`Panel.cb`, `StudioDialog.cb`) volajú `Engine.update_locked?(:panel/:studio)` — hláška raz za okno. Latch je jednosmerný.
+- **Nastavenie cesty:** `updater_settings.json` v `%APPDATA%\NOXUN\Engine` (`{std, source_dir}`, `JsonFileStore` + `.bak`), zápis pod `Materials.with_catalog_lock`,
+  nad degradovaným súborom odmietnutý; zlyhanie vracia `nil`.
+- **Recovery po páde žije v loaderi** (`Noxun::Engine::Boot`, len `File`/`FileUtils`, pred registráciou extensionu; guard `tests/pure/test_d52a_updater.rb`).
+  **Strom na disku musí zodpovedať práve vykonávanému loaderu:** stojí `.new` → vráti starú generáciu · `.old` a VERSION `.rb` ≠ strom → rollback stromu · `.old`
+  a VERSION sedí → dokončí upratanie (rozhoduje obsah VERSION; nečitateľná = rollback). **Recovery nikdy nemaže živý `.rb`** — starú verziu loadera vracia
+  atomickým prepisom (`File.rename` cez existujúci cieľ: `restore_loader!`, `finish_leftovers!`), takže `Plugins` nie sú ani na okamih bez bootovateľného loadera.
+  Nesúlad po oprave = plugin sa v tomto okne nenačíta. **Marker sa maže
+  overene** (`clear_marker`; prežitý marker = `cleanup_pending` / `:marker_stuck`; `marker_note` dopĺňa vetu do `Refused` správ). **Boot stavy:** `:idle`, `:done`
+  → registrácia; `:busy` (čaká max ~5 s), `:restart`, `:lease_failed`, `:marker_stuck`, `:error` → bez registrácie s natívnou hláškou. Porovnanie generácie beží
+  aj na `:idle` (cudzí proces mohol aktualizáciu medzitým dokončiť a upratať), ale blokuje **len dokázaný nesúlad** — keď sa verzia stromu zistiť nedá (chýbajúci
+  alebo nečitateľný `main.rb`), plugin sa načíta normálne a problém ohlási samotný `Sketchup.require`. Zámok sa berie pri každom boote.
 
-**Rozloženie v `Plugins`** (všetko súrodenci stromu): `noxun_engine.new/` + `noxun_engine.rb.new` (staging) · `noxun_engine.old/` + `noxun_engine.rb.old` (predchádzajúca
-generácia) · `noxun_engine.update.json` (transakčný marker) · `noxun_engine.update.lock` (zámok) · `noxun_engine.leases/<pid>.lease`.
+**UI vrstva — sekcia „O plugine"** (server `supplier_settings_dialog.rb`, klient `about.js` + `studio_settings.js`):
+- **Kontrola verzie je explicitná akcia** (nie súčasť payloadu): spúšťa ju vstup do sekcie (`studioGoSection('about')` aj deep-link → `ssOnAboutEnter()`) a uloženie
+  cesty. Beží **vo vlákne s deadline** (vo vlákne len `Updater.check`; výsledok nasadzuje `UI.start_timer` každých 0,2 s, po 4 s „zdroj neodpovedal"); vlákno sa
+  nezabíja. **Token = (cesta, inštancia Štúdia `StudioDialog.instance_token`, sekvencia)**; **jeden bežiaci dotaz na jednu cestu** (`updater_worker` — živý beh sa
+  zdieľa, hotový zahadzuje).
+- **Aplikuje sa len to, čo bolo skontrolované:** server pri úspešnom doručení zapíše `{dir, token, state, dlg}`, klient pri klike vracia `checked_path` + `check_token`;
+  `apply!` len keď stav je `newer`, cesta = uložená, okno to isté a hodnoty sedia; doklad sa **spotrebuje**. Doklad viaže aj verziu (porovnanie s `ticket['to']`
+  po `prepare!`, nezhoda = `abort_prepared!`). Klient zahodí výsledok, keď push prinesie inú `about.updater.source_dir`.
+- **Pole cesty** má vlastný namespace `data-updater-edit` (nie `data-ss`); rozpísaná cesta prežije push (`UPD_DIRTY`), zaniká na `SS.updater({saved:true})` len keď je
+  v poli stále odoslaná hodnota (`UPD_SENT`); rozpísaná cesta **zamyká tlačidlo okamžite** (`updPaint()`); `updSyncField` dorovná pole na cestu zo servera, keď nie
+  je nič rozpísané. Stav `newer` / `same` / `older` / `checking` / `error` — tlačidlo vždy `aria-disabled`, nikdy `disabled`.
+- **Bariéra pred swapom je jediná cesta k aplikovaniu:** klik → D-15 potvrdenie (bez `nx_modal.js` sa nespustí) → `Panel.hide` + `StudioDialog.hide` → timer čaká na
+  **`dialog_closed?`** oboch (dobehnutý `set_on_closed`, nie viditeľnosť; limit 3 s, potom zrušenie) → **`Updater.prepare!` vo vlákne** (`UPDATER_STAGE_S` 60 s) →
+  **druhá bariéra** `commit_when_closed` → `Updater.commit!` v hlavnom vlákne. **Single-flight:** `@updater_apply_inflight` pred zatvorením okien, spotrebovaný doklad,
+  odložené čakanie overí `Engine.restart_required?`. **Počas behu sa okná neotvárajú** (`Engine.update_in_progress?` vo všetkých troch vstupoch); príznak uvoľňuje
+  jediné miesto `updater_done!`. Zlyhané upratanie prípravy prizná `abort_note`. Ďalšie účastníky bariéry: `Tools::ZDialog` (odsek `mower.rb`).
+- **Výsledok ide výhradne natívne** (`UI.messagebox`; guard zakazuje v `updater_run_apply` `set_status`, `push_updater` aj `js(`); neúspech sa vetví podľa latchu
+  (`updater_failure_text`). Testovacie seamy `SupplierSettingsDialog.test_clock / test_spawn / test_schedule / test_notify` (v produkcii `nil`).
+- **Hranice:** žiadny auto-check na pozadí, auto-reload, downgrade, podpisovanie balíka ani sync knižníc.
 
-**`apply!` má od D-52b DVE FÁZY** (Codex #278 kolo 2): `prepare!` a `commit!`. Dôvod je prevádzkový: manifest a **kopírovanie celého balíka** zo (sieťového) zdroja trvá, a kým to
-bežalo v jednom volaní, robila to UI vrstva v hlavnom vlákne — visiaci UNC share tak zamrazil SketchUp na desiatky sekúnd. **`prepare!`** (kanonické hranice → zámok → marker →
-manifest → staging → validácia → rozhodnutie o verzii) je preto **worker-safe** — nesiaha na `Sketchup.*` ani `UI.*` a **živej generácie sa nedotýka**, mení výhradne `.new` — a
-vracia **tiket**. **`commit!`** (len renamey v `Plugins` + latch) beží v hlavnom vlákne. Medzi fázami sa **zámok pustí** a mutuálnu exkluzivitu drží **marker**: každý iný proces
-(aj druhý pokus) sa o neho zastaví, a `commit!` trvá na tom, že marker na disku je **náš**. Rozhoduje **nonce** — náhodná identita konkrétnej prípravy zapísaná do markera aj do
-tiketu; pid, `started_at` a obe verzie sú len doplnková kontrola. Samy o sebe nestačia: `started_at` má sekundové rozlíšenie, takže dve prípravy v tej istej sekunde nad tými istými
-verziami by boli nerozoznateľné a oneskorený `commit!` prvého tiketu by nasadil balík toho druhého. Pri nezhode `commit!` odmietne a cudzích artefaktov sa nedotkne.
-Kto `prepare!` nedokončí commitom, musí zavolať **`abort_prepared!`** (UI to robí po deadline aj pri nezhode verzie); ten upratuje takisto len vlastný staging. `apply!` ostáva
-ako obal `prepare!` + `commit!` — používa ho headless sada aj in-SU sekcia.
+Plné znenie: archív, „updater.rb — …" a „UI vrstva — sekcia „O plugine" v Štúdiu".
 
-**Postup (obe fázy dokopy):** kanonické hranice → zámok → *(marker existuje ⇒ odmietnuť)* → *(žije iná inštancia ⇒ odmietnuť)* → **manifest zo zdroja** (relatívna cesta → SHA1 + veľkosť) →
-**staging KÓPIOU** do `.new` (nie rename — sieťový share vie streamovať useknutý súbor) → **validácia staged stromu proti manifestu byte-for-byte** → *(**opakovaná** kontrola
-lease — staging trvá a medzitým mohla nabehnúť ďalšia inštancia)* → **(3)** `noxun_engine` → `.old` → **(4)** `.new` → `noxun_engine` → **(5a)** záloha loadera **kópiou** `.rb` → `.rb.old`,
-**(5b)** jediný atomický `File.rename('.rb.new', '.rb')` → **(6)** `.old` sa maže až po úspechu. Každý krok má definovaný rollback; zlyhanie ktoréhokoľvek vracia **celý** swap. Zlyhanie mazania `.old` je **úspech
-s poznámkou** (zvyšok uprace najbližší boot). Swap zároveň prirodzene **zrkadlí** — osirené súbory zaniknú s `.old`.
+## Okná — lifecycle
 
-**JEDNO PRAVIDLO PRE CELÝ SWAP.** Od okamihu, keď **uspeje prvý rename kroku 3** (`noxun_engine` → `.old`), platí buď **(A)** plný rollback **overený na disku** — živý strom aj
-loader späť, artefakty upratané, marker zmazaný, **žiadny latch** — alebo **(B)** **latch + zachované `.new`, `.old` a marker** a chyba s presným stavom, ktorý dorovná boot
-recovery. **Tretia možnosť neexistuje.** Preto každá chybová cesta za krokom 3 (zlyhaný rename kroku 4, **zlyhaný zápis markera**, zlyhaný rename loadera) končí v jedinom mieste,
-`abort_after_move!`; guard test nad zdrojom trvá na tom, že sa tam za krokom 3 `raise Refused` nepíše nikde inde. Latch sa pri **úspešnom** rollbacku zámerne **nezapína**: na disku
-je presne to, čo tam bolo pred pokusom, nič sa nikam nenačítalo a zbytočný latch by zamkol plugin po chybe, ktorá ho nepoznačila.
+### Satelitné okná
 
-**Loader sa vymieňa tak, aby `noxun_engine.rb` existoval v KAŽDOM okamihu.** Záloha je **kópia** (`.rb` ostáva na mieste, zapisuje sa cez bokový súbor + `fsync`, až potom
-premenovanie na `.rb.old`), a samotná výmena je **jediný atomický `File.rename('.rb.new', '.rb')`** — na Windows `MoveFileExW` s `MOVEFILE_REPLACE_EXISTING`, na POSIXe `rename(2)`,
-oba prepíšu existujúci cieľ. Pôvodné poradie (rename `.rb` → `.rb.old`, potom `.rb.new` → `.rb`) nechávalo medzi krokmi okamih **bez loadera**: pád v ňom by znamenal, že SketchUp
-nemá čo spustiť, recovery (ktorá žije práve v loaderi) by nikdy nenabehla a plugin by ostal mŕtvy až do reinštalu. Keď zlyhá krok (5b), starý `.rb` je nedotknutý a platí pravidlo
-(A)/(B) po kroku 3. Recovery v loaderi rovnako **nikdy nemaže živý `.rb`** — starú verziu vracia atomickým prepisom.
-
-**Bod commitu = úspešný rename loadera.** Od tej chvíle leží v `Plugins` nová generácia a v pamäti beží starý Ruby, takže `Engine.restart_required!` sa volá **okamžite po ňom** —
-pred zápisom markera aj pred upratovaním. Výnimka v upratovaní preto nikdy nenechá okná odomknuté a **nerobí z úspešnej aktualizácie neúspech**: skončí ako poznámka vo výsledku
-(zvyšok dorovná najbližší boot).
-
-**Keď zlyhá aj rollback**, `.old`, `.new` **ani marker sa nemažú** — sú to jediné stopy, z ktorých vie boot recovery zložiť kompletnú generáciu; latch sa zapne aj tu. Hláška
-rozlišuje dva prípady: loader na disku je (⇒ „reštartuj SketchUp, dorovná sa pri štarte") a loader chýba (⇒ „spusti INSTALL" — recovery žije v loaderi, bez neho nemá čo bežať).
-
-**`.old` sa maže na jedinom mieste — `discard_previous!` — a len keď na svojom mieste stojí živý strom AJ loader.** Je to posledná kompletná kópia pluginu: bez tohto guardu by
-opakovaný pokus o aktualizáciu po zlyhanom kroku 4 (keď živý strom chýba) zmazal jediný strom, ktorý na disku ostal.
-
-**Prečo sa VERSION číta zo STAGED stromu (F8):** zdroj sa mohol medzi manifestom a swapom zmeniť. Autorita je `noxun_engine.rb` v `.new`, krížovo overená proti `main.rb` v `.new`, a
-rozhodnutie „novšia" sa prepočíta z nej tesne pred krokom 3. Porovnanie verzií je **číselné po segmentoch** (`0.9.9 < 0.10.0`); chýbajúca, neplatná aj **duplicitná** definícia
-VERSION je chyba, nie „nejaká hodnota". **Dve úrovne čítania:** lacná hlavička (4 kB) stačí na *kontrolu* verzie, ale **pred commitom** sa staged loader aj `main.rb` skenujú
-**celé** (`assert_single_version!`) — druhá definícia môže ležať až za hlavičkou a v Ruby by prvú prebila, takže by sa nasadil balík s inou verziou, než akou sa rozhodovalo.
-
-**Downgrade je vo V1 ZAKÁZANÝ (B4):** trojstav `:newer | :same | :older` ostáva ako informácia, ale `:older` končí odmietnutím s dôvodom („staršiu verziu nainštaluj ručne cez
-INSTALL"). Samotné VERSION nehovorí nič o tom, či staršia verzia ešte rozumie dátam, ktoré novšia už zapísala (schéma katalógov, marker configu) — na návrat by bol potrebný
-capability marker balíka.
-
-**Kanonické hranice (F9):** cieľ je `Engine.plugin_dir` + **súrodenecký** loader. Odmieta sa zdroj == cieľ, zdroj vnútri cieľa, cieľ vnútri zdroja, priečinok s príponou `.new`/`.old`,
-**symlink/junction/reparse point** (`File.realpath` ≠ zapísaná cesta) a relatívna cesta z manifestu, ktorá by unikla zo staging rootu.
-
-**Zámok a lease (B3):** aktualizácia má **vlastný** `noxun_engine.update.lock` (`flock`, `LOCK_NB` — nezískaný zámok je pre `apply!` okamžité odmietnutie, **nikdy čakanie**), nie
-`materials.lock`: kopírovanie stoviek súborov zo share je dlhá operácia a katalógový zámok by ju držal celý ten čas. Každá živá inštancia si zapíše `noxun_engine.leases/<pid>.lease`
-**už v loaderi, na začiatku bootu a pod tým istým zámkom** — nie až na konci `main.rb`, kde by ju bežiaci `apply!` nemusel stihnúť uvidieť. Swap sa odmietne, kým žije **iný** PID
-(na Windows sa overuje cez `tasklist /FO CSV`, inde cez `Process.kill(0, pid)`), mŕtve lease sa upracú. Kontrola beží **dvakrát**: pri vstupe do `apply!` a **znova pod zámkom tesne
-pred swapom** (staging trvá a medzitým mohla nabehnúť ďalšia inštancia).
-
-**Lease nesie identitu procesu, nie len PID.** Zapisuje sa `{std, pid, exe, started_at}` a `live_leases` overí cez `tasklist /FI "PID eq N" /FO CSV /NH`, že PID **stále** patrí
-procesu s tým istým image name **a** že je to inštancia SketchUpu (`sketchup` v mene, case-insensitive). Bez toho by po zatvorení SketchUpu ostala stopa, OS by to číslo pridelil
-inému programu a `chrome.exe` s recyklovaným PID by navždy blokoval aktualizáciu hláškou „zavri ostatné okná SketchUpu". Mimo Windows sa image name zistiť nedá — tam rozhoduje
-samotná živosť procesu (produkcia beží výhradne na Windows, headless CI na Linuxe). Výstup `tasklist` sa parsuje **binárne** (na slovenskom Windows chodí v konzolovej kódovej stránke, nie v UTF-8) a **kontroluje sa jeho exit status**: zlyhaný dotaz vracia prázdny
-výstup, ktorý by sa bez tejto kontroly prečítal ako „PID nežije" — a zmazal by stopu **živej** inštancie. Za „mŕtvy PID" sa preto berie výhradne odpoveď bez CSV riadkov (informačná
-hláška, ktorej znenie je lokalizované, takže sa naň nespoliehame); prázdny alebo inak vyzerajúci výstup je `Refused`.
-
-**Cesty:** koncové lomítko sa strihá len tam, kde nejde o **koreň** — `/`, `X:/` a `//server/share` ostávajú nedotknuté (`chomp('/')` by z nich spravil prázdnu cestu, „aktuálny
-priečinok na disku X" a UNC koreň bez zdieľania; všetky tri sa môžu objaviť ako cieľ na sieťovej inštalácii).
-
-**Lease je fail-closed na oboch stranách.** Boot, ktorý si lease nedokáže zapísať (priečinok `noxun_engine.leases` je obyčajný súbor, chýbajú práva), vráti `:lease_failed`
-a **plugin sa nenačíta** — inštancia, ktorú nikto nevidí, je horšia než inštancia, ktorá nebeží. A `live_leases` pri nezistiteľnom stave (priečinok chýba, je to súbor, nedá sa
-prečítať) **nevracia ticho prázdny zoznam**, ale vyhodí `Refused`, takže `apply!` odmietne. Neistota pri overovaní PID sa rovnako **nevydáva za „mŕtvy"** — swap radšej neprebehne.
-
-**Restart latch (B2) — dve úrovne.** Po úspešnom commite beží v pamäti STARÝ Ruby kód nad NOVÝMI súbormi.
-**(1) Otváranie:** `Engine.update_restart_pending?` odmietne **všetky** vstupné body — toolbar príkazy (`main.rb`), `Panel.show`, `Panel.show_insert`, `StudioDialog.show` — natívnou
-hláškou „Noxun Engine bol aktualizovaný — reštartuj SketchUp." (`UI.messagebox`, nikdy cez CEF: okno by načítalo nové HTML/JS proti starým callbackom).
-**(2) Už otvorené okno:** guard v `show` chráni len otváranie, takže **oba generické `cb` wrappery** (`Panel.cb`, `StudioDialog.cb`) volajú `Engine.update_locked?(:panel/:studio)`
-hneď na začiatku callbacku — okno, ktoré bežalo v čase commitu, by inak starými handlermi mutovalo model nad novým balíkom a reload stránky by spároval nové HTML so starými
-callbackmi. Hláška ide **raz za okno**, nie pri každom callbacku (panel ich posiela desiatky za sekundu; rad modálov by SketchUp zablokoval). Po commite ešte `Engine.close_all_dialogs`
-best-effort zavrie Inspector aj Štúdio — **úplná bariéra (zavrieť okná PRED swapom a počkať na `set_on_closed`) je scope D-52b (F10)**. Latch je jednosmerný; zháša ho jedine reštart.
-
-**Nastavenie cesty k balíku (F11):** vlastný malý `updater_settings.json` v `%APPDATA%\NOXUN\Engine` (`{std, source_dir}`) cez `JsonFileStore` (+ `.bak`) — **nie** `SupplierSettings`
-(nepatrí pod jeho revízny zámok). Zápis beží pod `Materials.with_catalog_lock` (R-08) a nad **degradovaným** súborom sa odmieta (R-11, vzor `dim_series.rb`): čítanie zo zálohy +
-zápis by cestu prepísali starším obsahom. Zlyhaný zápis vracia `nil`, nikdy tichý fallback.
-
-**RECOVERY PO PÁDE ŽIJE V LOADERI `noxun_engine.rb`, NIE V MODULE (B1).** Pri páde medzi krokmi 3 a 5 môže strom **chýbať**, takže kód, ktorý ho opraví, sa z neho nesmie načítavať.
-Loader má preto malú sebestačnú sekciu `Noxun::Engine::Boot` (len `File`/`FileUtils`), ktorá beží **pred** registráciou extensionu; keď nie je čo robiť, je to päť `File.exist?`
-a koniec. Modul recovery **neduplikuje**; pri štarte aktualizácie iba odmietne bežať, keď marker existuje. Guard test `tests/pure/test_d52a_updater.rb` stráži, že logika ostáva
-v loaderi a že VERSION kontrakt loadera je nedotknutý.
-
-**Železné pravidlo recovery: strom na disku musí zodpovedať loaderu, ktorý sa PRÁVE VYKONÁVA.** Recovery beží *zvnútra* loadera, ktorý SketchUp už načítal, takže „dokončiť
-dopredu" (nasadiť nový loader a pokračovať starým kódom nad novým stromom) je zakázané — bola by to presne tá kombinácia, ktorej celý swap predchádza. Rozhoduje stav disku, marker
-je len sprievodka:
-
-| na disku | znamená | recovery urobí |
-|---|---|---|
-| stojí `noxun_engine.new` | krok 4 neprebehol | vráti **starú** generáciu (uprace `.new`, prípadne vráti `.old`) |
-| `.old` ostal a **VERSION v `.rb` ≠ VERSION v strome** | na disku je ešte **starý** loader | **rollback stromu** na `.old` — nikdy nie dokončenie dopredu |
-| `.old` ostal a **VERSION v `.rb` = VERSION v strome** | na disku je už **nový** loader | dokončí upratanie predchádzajúcej generácie |
-
-O generácii loadera rozhoduje **obsah (VERSION), nie prítomnosť `.rb.new`**: odkedy je záloha kópiou, `.rb` existuje vždy, takže prítomnosť súborov by stav nerozlíšila. Nečitateľná
-verzia sa berie ako „nesedí" — rollback je bezpečnejší než dokončenie dopredu.
-
-Rename v rámci jedného priečinka je atomický, takže medzistav neexistuje. Po oprave sa ešte porovná `Engine::VERSION` (verzia práve vykonávaného loadera) s `VERSION` v strome —
-**nesúlad znamená, že sa plugin v tomto okne zámerne nenačíta**. Mazanie zvyškov je kozmetika a beží „naticho": jeho zlyhanie nesmie zhodiť štrukturálnu opravu.
-
-**Marker sa maže OVERENE.** `FileUtils.rm_f` chybu potlačí, takže „zmazané" sa nedalo odlíšiť od „ostalo ležať" — a marker, ktorý prežije, je trvalá brzda: každý ďalší `apply!` sa
-o neho zastaví hláškou o nedokončenej transakcii. `clear_marker` preto vracia výsledok overený na disku. Keď marker prežije po úspešnom commite, `apply!` vráti `state`
-`cleanup_pending` (aktualizácia prebehla, latch zapnutý, poznámka menuje súbor); v loaderi je to stav `:marker_stuck` a **plugin sa nenačíta** s hláškou, ktorá súbor pomenuje.
-**A od D-52b to isté platí aj pre ODMIETACIE a ROLLBACKOVÉ cesty** (P3 z delta-verifikácie #277): tam sa návratová hodnota zahadzovala, takže o zvyšnutom markeri sa človek
-dozvedel až z nasledujúceho pokusu — a úplne inou hláškou. `marker_note` preto pripája vetu o `noxun_engine.update.json` do každej `Refused` správy, ktorá vznikla na ceste
-mažúcej marker (zlyhaný staging, zlyhaný rename kroku 3, úspešný rollback v `abort_after_move!`).
-
-**Boot vracia stav a ten rozhoduje, či sa plugin vôbec načíta:** `:idle` (nič sa nedialo) a `:done` (dorovnané, strom sedí) → extension sa registruje; `:busy` (**zámok drží iná
-inštancia, ktorá práve aktualizuje** — boot naň krátko počká, max ~5 s), `:restart` (strom nezodpovedá tomuto loaderu), `:lease_failed` (nedá sa zapísať stopa procesu), `:marker_stuck` (nedá sa zmazať
-marker) a `:error` (opravu sa nepodarilo dokončiť) → **extension sa NEregistruje** a používateľ dostane natívnu hlášku.
-
-**Porovnanie generácie beží VŽDY — aj na ceste `:idle`.** Je to presne stav po čakaní na zámok: cudzí proces medzitým aktualizáciu **dokončil a upratal**, takže na disku niet čo
-opravovať (`pending?` je false), ale náš loader v pamäti je starý a strom na disku nový. Bez tejto kontroly by sa starý loader zaregistroval nad cudzou generáciou. Blokuje sa len
-**dokázaný** nesúlad: keď sa verzia stromu zistiť nedá (chýbajúci alebo nečitateľný `main.rb`), plugin sa načíta normálne a o probléme povie samotný `Sketchup.require`.
-
-**Zámok sa pritom berie VŽDY, aj keď na disku nie sú žiadne artefakty.** `apply!` ho drží už od chvíle, keď len počíta manifest zdroja — teda dávno pred vznikom prvého `.new`
-súboru. Boot, ktorý by sa v tom okne pozrel iba na artefakty, by nič nenašiel, načítal strom a updater by mu ho o pár sekúnd vymenil pod rukami. Bežný štart je tak jeden `flock`,
-zápis lease a päť `File.exist?` — zanedbateľná réžia.
-
-#### UI vrstva — sekcia „O plugine" v Štúdiu (D-52b1 kontrola, D-52b2 aplikovanie)
-
-**Server je `supplier_settings_dialog.rb`** (autorita sekcie `about`), klient je `ui/js/about.js` (markup) + `ui/js/studio_settings.js` (stav a akcie) + dva vstupné hooky
-v `ui/js/studio.js`. Nový modul nevznikol zámerne: UI stojí nad hotovým kontraktom jadra a druhý server sekcie `about` by sa s prvým časom rozišiel.
-
-**Kontrola verzie je EXPLICITNÁ akcia, nie súčasť payloadu (F5).** `settings_payload` chodí pri KAŽDEJ zmene modelu — keby v ňom bol check, každý posun skrinky by siahol na
-sieťový share. Payload preto nesie len to, čo sa dá zistiť bez dotyku zdroja (`about.updater` = uložená cesta, bežiaca verzia, stav latchu) a samotný check posiela **vstup do
-sekcie**: `studioGoSection('about')` (navigácia) a vetva `ST.open_section` v `NX.setStudio` (deep-link) volajú ten istý hook `ssOnAboutEnter()`. Znova otvorená tá istá sekcia check
-neopakuje; odchod a návrat áno.
-
-**Check beží vo VLÁKNE s deadline (F6) a jeho výsledok nasadzuje TIMER.** Vo vlákne je LEN súborové I/O (`Updater.check`) — žiadne `Sketchup.*`, `UI.*` ani zápis do stavu okna;
-guard test nad zdrojom to stráži. Hlavné vlákno sa nikdy nečaká: `UI.start_timer` sa každých 0,2 s spýta, či je hotovo, a po 4 s ohlási „zdroj neodpovedal (cesta) — je pripojený?".
-**Vlákno sa pri deadline zámerne NEZABÍJA** (`Thread#kill` nad čítaním z odpojeného sieťového disku je nespoľahlivý) — jeho neskorá odpoveď zomrie na tokene.
-
-**TOKEN = (cesta, inštancia Štúdia, sekvencia).** Zahodí sa odpoveď prekonaného dotazu (medzitým prišiel novší), odpoveď o INOM priečinku (cesta sa medzitým uložila inak — inak by
-sekcia ukázala verziu úplne iného miesta) aj odpoveď patriaca ZANIKNUTEJ inštancii okna (`StudioDialog.instance_token` = `object_id` živého dialógu). Asynchrónna odpoveď už nemá
-sink (`with_client` žije presne jeden synchrónny callback) a ide kanálom okna — vzor asynchrónnych emitov Demosu.
-
-**JEDEN BEŽIACI DOTAZ NA JEDNU CESTU** (`updater_worker`, Codex #278 P2). Vlákno sa po deadline nezabíja, takže bez evidencie by každý návrat do sekcie pridal ďalšie zablokované
-vlákno na tú istú mŕtvu cestu a tie by sa hromadili až do reštartu SketchUpu. **Živý (visiaci) beh sa preto zdieľa** — nový dotaz na tú istú cestu sa naň len prihlási s vlastným
-tokenom. **Hotový beh sa naopak zahadzuje**: jeho výsledok je z iného okamihu a share sa medzitým mohol vrátiť, takže ďalšia kontrola musí zdroj prečítať nanovo. Iná cesta = vlastný
-beh.
-
-**APLIKUJE SA LEN TO, ČO BOLO SKONTROLOVANÉ** (Codex #278 P1). `updater_settings.json` je súbor počítača — uložiť doň môže aj druhá inštancia SketchUpu alebo človek ručne. Bez
-dôkazu by stačilo, aby sa cesta medzi kontrolou a klikom zmenila: potvrdenie by menovalo priečinok A a nasadilo by sa B. Server si preto pri každom **úspešnom** doručení výsledku
-zapíše `{dir, token, state, dlg}`, posiela `token` klientovi a ten ho pri klike vracia v `checked_path` + `check_token`. `apply!` sa spustí len keď sedí **všetko**: zapísaný stav je
-`newer`, jeho cesta = práve uložená cesta, inštancia okna je tá istá a klientove hodnoty sa zhodujú so zápisom. Inak odmietnutie („cesta sa medzitým zmenila — skontroluj znova").
-Klientská strana to zrkadlí: keď plný push prinesie inú `about.updater.source_dir`, než akej patrí živý výsledok, výsledok sa **zahodí** (tlačidlo zamkne) a v otvorenej sekcii sa
-rovno spustí nová kontrola.
-
-**Cesta má vlastný namespace `data-updater-edit` (F7), nie `data-ss`.** Dôvod je vecný: `data-ss` nesie revíznu mechaniku dodávateľa (`SS_DIRTY`, pripnutá `SS_BASE_REV`, optimistický
-zámok), a cesta pod ňu nepatrí — nemá revíziu a neukladá sa cez `ss_save`. Vetva v `input` listeneri končí `return` ešte pred celou tou mechanikou. Zdieľané je jedno: **rozpísaná
-cesta PREŽIJE plný push** (`UPD_DIRTY` vyhráva nad payloadom) a zaniká výhradne na potvrdenie servera (`SS.updater({saved:true})`, vzor `SS.saved()`); vtedy sa do poľa zapíše
-**normalizovaný** tvar, ktorý je naozaj uložený. Ukladá sa Enterom aj mini-tlačidlom a uloženie rovno spustí nový check (v novom priečinku je iná verzia).
-
-**Rozpísaná cesta zamyká tlačidlo OKAMŽITE.** Kontrola patrí **uloženej** ceste, takže kým je v poli niečo iné, klik by aktualizoval z iného priečinka, než aký má človek pred
-očami. Každý `input` preto volá `updPaint()` — telo sekcie sa počas písania neprekresľuje, takže bez toho by tlačidlo ostalo aktívne — a stav hovorí „cesta nie je uložená".
-
-**Potvrdenie uloženia patrí TOMU, ČO SA ODOSLALO** (Codex #278 kolo 2, P2). Klient si pamätá odoslanú hodnotu (`UPD_SENT`) a `saved: true` zahodí rozpis a nasadí normalizovanú
-cestu **len keď je v poli stále ona**. Bez toho platilo: Enter uloží A, používateľ píše B, dorazí ack na A — a rozrobené B by zmizlo.
-
-**POLE IDE ZA ULOŽENOU CESTOU.** `SS.updater` prekresľuje len stavový riadok a tlačidlo (telo sa počas písania nesmie prepísať) — lenže cesta sa môže zmeniť **zvonku** (druhá
-inštancia, ručný zásah do `updater_settings.json`) a prísť aj bez plného payloadu. `updSyncField` preto nastaví `#updDir` na cestu zo servera vždy, keď nie je nič rozpísané; bez
-toho by sekcia hlásila kontrolu priečinka B, v poli by stálo A — a „Uložiť" by B prepísalo späť na A. **Rozpísaná cesta má prednosť vždy**: tá sa nechá a stavový riadok **menuje
-uloženú** („Uložená je „B""), takže je zrejmé, čoho sa kontrola týka.
-
-**Stavový riadok sa obnovuje CIELENE.** `updPaint()` prepíše len `#updState` a `#updBtn` — telo sekcie sa neprekresľuje, lebo používateľ môže mať kurzor v poli cesty. Trojstav
-jadra plus dva prevádzkové stavy: `newer` = tlačidlo aktívne · `same` = `aria-disabled` „máš aktuálnu verziu" · `older` = `aria-disabled` „staršiu verziu nainštaluj ručne cez
-INSTALL" (B4) · `checking` a `error` (hláška nesie **cestu aj dôvod**). Vždy `aria-disabled`, **nikdy HTML `disabled`** (D-78) — tlačidlo ostáva zamerateľné a klik naň povie dôvod.
-
-**BARIÉRA PRED SWAPOM (F10) je jediná cesta k `apply!`.** Klik → D-15 potvrdenie („zatvoria sa OBE okná, po dokončení reštartuj SketchUp"; bez `nx_modal.js` sa aktualizácia
-**nespustí** — „potvrdenie sa nedalo zobraziť, tak sme to spravili" je pri prepise súborov neprípustné) → `Panel.hide` + `StudioDialog.hide` → **timer čaká, kým `dialog_closed?`
-oboch modulov nevráti `true`** → až potom `Updater.apply!`. Čaká sa na `dialog_closed?` (`@dialog.nil?`, teda dobehnutý `set_on_closed`), **nie** na `dialog_alive?`: to hovorí
-o VIDITEĽNOSTI, kým CEF ešte môže držať otvorené súbory z `ui/` a rename priečinka by na Windows zlyhal. Limit sú 3 s; po ňom sa aktualizácia **zruší** natívnou hláškou („na disku
-sa nič nezmenilo"). Guard test nad zdrojom trvá na tom, že `handle_updater_apply` nevolá `updater_run_apply` priamo.
-
-**PRÍPRAVA BALÍKA BEŽÍ VO VLÁKNE, COMMIT V HLAVNOM** (Codex #278 kolo 2, P1). Bariéra bola len prvá polovica: za ňou nasledovalo `Updater.apply!`, ktoré v tom istom timer
-callbacku počítalo manifest a kopírovalo stovky súborov zo share. UI vrstva preto volá **`Updater.prepare!` vo vlákne** s vlastným deadline (`UPDATER_STAGE_S`, 60 s) a polluje
-výsledok; **`Updater.commit!`** spúšťa až hlavné vlákno. Po deadline sa beh **zruší natívnou hláškou** („Zdroj nedostupný — aktualizácia ZRUŠENÁ, na disku sa nič nezmenilo") a
-vlákno sa — rovnako ako pri kontrole — opúšťa, nezabíja; živá generácia je nedotknutá a prípadný `.new` s markerom upratá boot recovery.
-
-**SINGLE-FLIGHT** (Codex #278 kolo 2, P1). Dva rýchle kliky (alebo dve odoslania toho istého potvrdenia) by naplánovali **dve bariéry** a druhá by po commite prvej bežala nad už
-vymenenými súbormi. Bránia tomu tri veci naraz: príznak `@updater_apply_inflight` sa zapína **pred** zatvorením okien; **doklad o kontrole sa pri prijatí SPOTREBUJE** (token je
-jednorazový, takže druhé odoslanie nemá čím prejsť); a **každé odložené čakanie bariéry si pred vlastným behom overí `Engine.restart_required?`** — keď medzitým niekto commitol,
-zruší sa bez zásahu a bez hlášky (výsledok už oznámil ten prvý beh). Príznak sa uvoľňuje na každom konci: úspech, odmietnutie, deadline prípravy aj limit bariéry.
-
-**Doklad o kontrole viaže aj VERZIU.** Balík na share sa môže vymeniť aj **medzi potvrdením a stagingom**, takže samotná zhoda cesty nestačí: záznam nesie `available` z kontroly
-a po `prepare!` sa porovná s verziou **staged** loadera (`ticket['to']`). Nezhoda = `abort_prepared!` a hláška „Balík sa medzitým zmenil (X → Y) — NIČ sa nenainštalovalo".
-
-**POČAS BEHU SA OKNÁ NEOTVÁRAJÚ** (Codex #278 kolo 3, P1). Restart latch zapína až **commit**, kým príprava balíka zo share trvá desiatky sekúnd — a v tom okne by si používateľ
-stihol otvoriť Inspector z toolbaru, takže by commit bežal s CEF držiacim súbory z `ui/`. Preto má UI vrstva príznak `updater_apply_inflight?`, ktorý číta
-`Engine.update_in_progress?`, a **všetky tri vstupné body** (`Panel.show`, `Panel.show_insert`, `StudioDialog.show`) ho kontrolujú hneď vedľa latchu a odmietnu natívnou hláškou.
-Príznak sa uvoľňuje na **jedinom mieste** — `updater_done!` (bez textu je to tichý koniec, s textom natívny výsledok) — takže zabudnutý reset nemôže okná zamknúť natrvalo.
-
-**DRUHÁ BARIÉRA TESNE PRED `commit!`.** Bariéra pred prípravou nestačí: medzi ňou a commitom prebehlo dlhé kopírovanie. `commit_when_closed` preto stav okien overí **znova**,
-prípadné okno zavrie a počká (rovnaký 3 s limit); keď sa nezavrie, aktualizácia sa **zruší** — `abort_prepared!` upratá pripravený balík a hláška povie, že sa na disku nič
-nezmenilo.
-
-**Keď zlyhá aj upratanie prípravy** (Codex #278 kolo 3, P2), hláška to **prizná a povie, čo s tým**: pripravený `.new` a marker sú brzda, o ktorú sa ďalší pokus zastaví celkom
-inou hláškou. `abort_note` preto pri neúspešnom `abort_prepared!` dopĺňa „reštartuj SketchUp (pri štarte sa dorovná), alebo v Plugins zmaž `noxun_engine.update.json`
-a `noxun_engine.new`".
-
-**Výsledok ide VÝHRADNE natívne (`UI.messagebox`)** — úspech („Aktualizované na X — reštartuj SketchUp", plus poznámka z jadra, ak nejaká je), odmietnutie s presným dôvodom
-z `Refused` aj neočakávaná výnimka. Do CEF sa poslať nedá: okná sú v tom bode zavreté a po úspešnom swape by nové HTML bežalo proti starým callbackom. Guard test nad zdrojom
-zakazuje v `updater_run_apply` `set_status`, `push_updater` aj `js(`.
-
-**Neúspech sa VETVÍ podľa restart latchu** (`updater_failure_text`, Codex #278 P2): „plugin ostal nezmenený" nie je pravda vždy. `abort_after_move!` má dve vetvy — po **úspešnom**
-rollbacku je na disku presne to, čo tam bolo (a latch sa zámerne nezapína), ale po **zlyhanom** rollbacku ostávajú `.new`/`.old` aj marker, latch sa zapne a generáciu dorovná až
-boot recovery. Latch je jediný príznak, ktorý jadro v tom druhom prípade spoľahlivo zapína, takže rozhoduje on: so zapnutým latchom hláška hovorí „AKTUALIZÁCIA JE NEÚPLNÁ —
-REŠTARTUJ SketchUp, plugin sa pri štarte dorovná". Presný dôvod z jadra ostáva v oboch vetvách.
-
-**Testovacie seamy.** Asynchrónny check a bariéra stoja na troch veciach z prostredia — hodinách, vlákne a timeri (+ natívnej hláške). `SupplierSettingsDialog.test_clock /
-test_spawn / test_schedule / test_notify` ich v headless sade nahradia (vzor `Materials.test_dir_override`), takže token, deadline aj bariéra sa overia bez SketchUpu a bez čakania
-v reálnom čase. V produkcii sú `nil`.
-
-**Vedomé hranice D-52b:** žiadny auto-check na pozadí (kontrola je vždy vstup do sekcie alebo uloženie cesty — nedostupný share sa preto „opraví" odchodom a návratom do sekcie),
-žiadny auto-reload, žiadny downgrade, žiadne podpisovanie balíka, žiadny G-Disk sync knižníc (D-48).
+**Plugin má dve okná — Inspector a Štúdio** (plus malý Z-dialog nástrojov); samostatné satelitné okná už nie sú (ich zoznam a zánik: sekcia „História"). Ďalšie okno
+je **rozhodnutie, nie vedľajší účinok dávky** — guard test kontroluje počet aj mená. Obe okná idú spoločným boot hookom `Engine.register_dialog_fit` (téma + dorovnanie
+veľkosti; guard test). **Každé okno, ktoré ukazuje čísla zákazky, musí byť vo všetkých refresh cestách** — prepnutie modelu (`scale_observer`), zápis katalógu
+materiálov (`materials_dialog`), sadzby (`supplier_settings_dialog` → `refresh_studio` → `StudioDialog.refresh_if_open(bump: true)`), sety a položky kovania
+(`hardware_catalog_dialog` `push_items`/`after_sets_change`), prepočet cien (`price_refresh_after_proc` v `studio_dialog.rb`) — inak zamrzne na starých číslach
+(guard test). Serverové moduly sekcií Štúdia s menom `*_dialog.rb` sú opísané pri svojich sekciách vyššie.
 
 ### Veľkosť okna pri otvorení (D-77)
 
-`width`/`height` v `HtmlDialog.new` platia **len pri prvom otvorení** — potom rozhoduje veľkosť zapamätaná pod `preferences_key`, a `min_width`/`min_height` bránia iba ručnému
-zmenšovaniu. Okno, ktoré raz ostalo malé, sa preto otváralo odseknuté donekonečna. Každé okno má v HTML deklarované **obsahové minimum** `window.NX_FIT_MIN` a `ui/js/win_fit.js` po
-načítaní zmeria viewport; keď je menší, pošle `nx_fit` a `Engine.register_dialog_fit` (main.rb — od UI-01 spoločný boot hook okna, registruje aj `nx_theme`) okno cez `set_size`
-dorovná. Dorovnáva sa **oboma smermi**: **nahor po deklarované minimum** a **nadol po dostupnú plochu obrazovky** — okno zapamätané z väčšieho monitora (alebo po znížení
-rozlíšenia/DPI cez remote desktop) je inak orezané obrazovkou, čo je tá istá choroba (Codex #164 P2).
-
-**Plocha má prednosť pred minimom** (nikdy nad ňu — na malej ploche je stropom plocha, aj keď je menšia než minimum); **medzi minimom a plochou sa nesiaha na nič** (veľkosť okna v
-tomto pásme je vedomá voľba používateľa) a fit beží **len raz pri načítaní**, nie pri zmene obsahu (okno by pod rukami skákalo). Keď plocha nie je známa, okno sa smie len zväčšiť.
-Rámik okna sa dopočíta z rozdielu outer/inner, aby sa fit pri ďalšom otvorení neopakoval. JS je len merač — hodnoty mimo 240…2600 px Ruby zahodí. Čisté jadro je testované
-(`tests/js/test_d77_okno_fit.js`).
-
-**D-51 (UI-B1):** jedna pravda je **obsahový** viewport v `NX_FIT_MIN`; rozmery `HtmlDialog.new` sú **vonkajšie** (obsah + rámik okna) a musia mu zodpovedať — pre Inspector obsah
-**470 × 810** ⇒ `width/height 486 × 850`, `min_width 486`. Trojica je zapísaná v `docs/UI_DIZAJN.md` (tabuľka D-51) a stráži ju `tests/pure/test_uib1_kostra.rb`.
+`width`/`height` v `HtmlDialog.new` platia **len pri prvom otvorení** — potom rozhoduje veľkosť zapamätaná pod `preferences_key`; `min_width`/`min_height` bránia len
+ručnému zmenšovaniu. Každé okno preto deklaruje v HTML **obsahové minimum** `window.NX_FIT_MIN` a `ui/js/win_fit.js` po načítaní zmeria viewport; keď nesedí, pošle
+`nx_fit` a `Engine.register_dialog_fit` (main.rb — spoločný boot hook okna, registruje aj `nx_theme`) okno cez `set_size` dorovná **oboma smermi**: nahor po
+deklarované minimum a nadol po dostupnú plochu obrazovky.
+- **Plocha má prednosť pred minimom**; medzi minimom a plochou sa nesiaha na nič (vedomá voľba používateľa); fit beží **len raz pri načítaní**; keď plocha nie je známa,
+  okno sa smie len zväčšiť. Rámik sa dopočíta z rozdielu outer/inner. JS je len merač — hodnoty mimo 240…2600 px Ruby zahodí. Test `tests/js/test_d77_okno_fit.js`.
+- **D-51:** jedna pravda je obsahový viewport v `NX_FIT_MIN`; rozmery `HtmlDialog.new` sú vonkajšie (obsah + rámik) — Inspector obsah **470 × 810** ⇒ `width/height
+  486 × 850`, `min_width 486`; Štúdio obsah **1060 × 640** ⇒ `1076 × 680`, `min_width 1076`. Tabuľka D-51 je v `docs/UI_DIZAJN.md`, stráži
+  `tests/pure/test_uib1_kostra.rb`.
 
 ## Ostatné
 
 ### CONSTRUCTION_FIELDS
 
-Jediný zoznam polí = `CONSTRUCTION_FIELDS` v core.js ↔ `Panel::PARAM_KEYS` (nové pole na 1+1 mieste). **ROH-B1:** pole smie niesť `only: '<typ>'` —
-`collectConstruction` ho pošle **len** pri tom type (pri inom ani kľúč; parita payloadu stráži `test_rohb1_ovladace.js` doslovným zoznamom kľúčov). Tak idú
-`corner_door_w`/`corner_cr1`/`corner_cr2` (`dflt` = `CORNER_DEFAULTS`); **strana** v zozname nie je — je to prepínač so samostatnou akciou.
+Jediný zoznam polí konštrukcie = `CONSTRUCTION_FIELDS` v `core.js` ↔ `Panel::PARAM_KEYS` (nové pole na 1 + 1 mieste; navyše tri JS zoznamy mimo neho — odsek
+„Kontext Korpus", Nastavenia korpusu). Pole smie niesť `only: '<typ>'` — `collectConstruction` ho pošle **len** pri tom type (inak ani kľúč; parita payloadu
+`test_rohb1_ovladace.js`): tak idú `corner_door_w`/`corner_cr1`/`corner_cr2` (`dflt` = `CORNER_DEFAULTS`). Strana rohovej v zozname nie je (prepínač s vlastnou akciou).
+Položky nesú `dflt` (riedky config).
 
-**ROH-A1 — JS registre typu a rolí (bez nového ovládača).** `core.js` `CAB_TYPES` += `corner_blind` (krížový audit G1: `setType` by inak označenú rohovú sklopil na
-dolnú a každý zápis by ju poslal späť ako `lower`) a `NX_TYPE_LABEL` „Rohová" · pevné JS minimum šírky 584 (`TYPE_LIMITS.corner_blind`) **zaniklo v ROH-B1**
-(krížová kontrola `cabinetCornerError` nižšie) · `insert_state.js` `INSERT_TYPES` a `templateType`/`templatesForType` (rohová šablóna nepadne
-do „dolnej") · `templates.js` „rohová" · `part_card.js` `roleLabel` pre päť rolí a `isFront` pre CR (čelové materiály aktívne) · `rules.js` `rdRoleDesc` · `sync.rb`
-`DEFAULTS.corner_blind`. Tlačidlo „Rohová", náhľad (dvere a pánty v dverovej časti), náhľad nôh a zámok typu v modale šablóny prinieslo **ROH-A2** (odseky
-„Náhľad" a „Vkladacia karta"); ovládače strany, dverovej časti a CR priniesol **ROH-B1** (odsek „Riadok rohovej" v Obsahu Korpusu); kresbu rohovej
-zostavy, Čelá rohovej, skrytie delenia zón, „Šírku dverí", súhrn strany, kláves D pri vkladaní a ikonu z mockupu **ROH-B2** (odseky „Náhľad", „Kontext Čelá",
-„Kontext Zóny", „Riadok rohovej", „Vkladacia karta" a „actions_cabinet.rb").
+**JS registre typu skrinky** (pri novom type sa menia všetky): `core.js` `CAB_TYPES` (bez typu by `setType` skrinku sklopil na dolnú) a `NX_TYPE_LABEL` ·
+`insert_state.js` `INSERT_TYPES`, `templateType`/`templatesForType` · `templates.js` `TPL_TYPE_WORDS` · `part_card.js` `roleLabel` a `isFront` · `rules.js`
+`rdRoleDesc` · `form.js` `TYPE_LIMITS`, `applyVisibility`, `TPL_TYPE_LOCK` · `hardware.js` `LEGS_INSERT_TYPES` · `sync.rb` `DEFAULTS.<typ>` · `NX_CTX_LOCK` (`shell.js`).
+Typy dnes: `lower` · `upper` · `dishwasher` · `corner_blind` (Ruby `CabinetBuilder::TYPES`, [construction.md](construction.md)).
 
 ### Trvalé UI pravidlo (Michal 20.7.2026): VERTIKÁLNY priestor panela je vzácny
 
@@ -4188,6 +2093,31 @@ Plné znenie a autorita: [../UI_DIZAJN.md](../UI_DIZAJN.md) §1 Princípy (tu le
 
 ### usage_stats.rb
 
-_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+**Merač používania panela (D-25)** — lokálne počítadlá interakcií s prvkami Inspectora (podklad pre budúci režim Jednoduchý/Rozšírený). Ukladá **výhradne
+identifikátory prvkov a počty** (žiadne hodnoty polí ani názvy projektov) do `%APPDATA%\NOXUN\Engine\usage_stats.json` (`JsonFileStore`, `.bak`; SCHEMA 1:
+`first_seen`, `last_seen`, `counts`). `record(counts)` nikdy nevyhadzuje; `merge` sčíta dávky a zachová neznáme polia, súbor s novšou schémou sa neprepisuje;
+`sanitize_counts` ticho zahodí vadné hodnoty; read-modify-write chráni `flock` na **sidecar** zámku (dve inštancie SketchUpu). Klient `ui/js/usage.js` počíta
+kliky v capture fáze a posiela dávku `usage_flush` (handler `actions_usage.rb`).
 
-Merač D-25 (počítanie klikov v UI, `ui/js/usage.js`) — zmienky sú v odseku o klikateľnosti a deep-linkoch a v odseku `templates.rb`.
+## História
+
+Vyhradená sekcia — jediné miesto súboru, kde smú stáť historické značky (čísla PR, kolá review, zaniknuté okná). **Plné pôvodné znenie tejto mapy do v0.17.4**
+(priebeh dávok ŠT-1…ŠT-4, UI-A…UI-D, KOV-*, ROH-*, S1-*, NP-*, CENY-*, H3a–H4b, dôvody každej pasce a nálezy review) je v archíve
+[../../SYSTEM/archiv/UI_LIFECYCLE_historia_do_v0.17.md](../../SYSTEM/archiv/UI_LIFECYCLE_historia_do_v0.17.md); priebeh dávok je v
+[../../SYSTEM/archiv/KRONIKA.md](../../SYSTEM/archiv/KRONIKA.md).
+
+**Zaniknuté okná** (fáza ŠTÚDIO, ŠT-1c…ŠT-4a — obsah každého je dnes sekciou Štúdia, serverový modul ostal pod pôvodným menom a nepremenúva sa):
+
+| Zaniknuté okno | Súbory, ktoré zanikli | Dnes |
+|---|---|---|
+| Výroba (ZANIKLO v ŠT-1c PR B3) | `production_dialog.rb`, `production.html`, `js/production.js`, premostenia `PRODUCTION_BRIDGES`, deep-link na tab | sekcie Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka; jadro `production_core.rb` ([outputs.md](outputs.md)) |
+| Materiály projektu (ŠT-2b) | `proj_materials.html`, `DLG_KEY`, `mat_open_window`, `MAT_BRIDGE_STATUS` | sekcia Materiály, modul `materials_dialog.rb` |
+| Katalóg kovania (ŠT-3a-2) | `hardware_catalog.html`, `hw_open_window`, `HW_BRIDGE_STATUS`, `win_js`, `push_sets` | sekcia Kovanie, modul `hardware_catalog_dialog.rb` |
+| Pravidlá kovania (ŠT-3b-1) | `rules.html`, `open_rules`, `openRulesDialog` | sekcia Pravidlá, modul `rules_dialog.rb` |
+| Šablóny (ŠT-3c-1) | `templates.html`, `js/templates_dialog.js`, `open_templates`, `openTemplatesDialog` | sekcia Šablóny, modul `templates_dialog.rb` |
+| Nastavenia dodávateľa (ŠT-4a) | `supplier_settings.html`, `js/supplier_settings.js`, `ProductionCore.open_budget_settings` | sekcie Dodávateľ/Demos · Nastavenia rozpočtu · O plugine, modul `supplier_settings_dialog.rb` |
+
+Spolu s posledným satelitom zanikli **premostenia** v navigácii Štúdia (`WINDOW_BRIDGES`, `BRIDGE_STATUS`, `do_bridge`, `bridge_window`, `studio_bridge`) aj klientske
+`goto`. V registri používateľa ostávajú osirotené `preferences_key` zaniknutých okien (`NoxunEngineProduction`, `noxun_engine_hw_catalog_v1`, `noxun_engine_rules`,
+`noxun_engine_templates`, `noxun_engine_supplier_settings`) — zapamätané veľkosti, ktoré SketchUp už nikdy nepoužije. Modul `appliance_dialog.rb` okno nemal nikdy.
+
