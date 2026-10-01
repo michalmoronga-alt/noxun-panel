@@ -47,7 +47,9 @@ predrecenzia, in-SU) sa určí pri package podľa CLAUDE.md; stĺpec je predpokl
 | ✅ H8 · dielec z inej verzie štandardu (ORANGE `std_version` v Kontrole, čísla bez zmeny) — package [PACKAGE_H8.md](zdroje/bloky/HARDENING/PACKAGE_H8.md) — **PR #441** | R-13 | kód · audit · in-SU |
 | ✅ H9 · ochrana nastavení dodávateľa, pravidiel ABS a kovania pred seedom (súbor zlého tvaru = poškodený; zdravý bez zmeny) — package [PACKAGE_H9.md](zdroje/bloky/HARDENING/PACKAGE_H9.md) — **PR #442** | R-37 | kód · audit |
 | H10 · dve okná SketchUpu neprepíšu pravidlá kovania a rady — package [PACKAGE_H10.md](zdroje/bloky/HARDENING/PACKAGE_H10.md), rez: **✅ H10a · pravidlá kovania (revízia obsahu, predkontrola, pin globálu; Q1 predvolená vratná voľba) — PR #443** · **✅ H10b · rozmerové rady (po kľúčoch s pôvodnou hodnotou kľúča; Q2 predvolená vratná voľba) — PR #444** | R-35 | kód · audit · in-SU (H10a) |
-| H11 · SketchUp 2026.2 (ukončenie bez pádu, načítanie súborov) + minimum SketchUp 2026 | F-01 · F-02 | kód · audit · in-SU |
+| ✅ H11b · minimum SketchUp 2026 (starší SketchUp = jedna hláška a plugin sa nenačíta; mŕtve poistky prekrytí preč; inštalátor odmietne SketchUp < 2026) — package [PACKAGE_H11.md](zdroje/bloky/HARDENING/PACKAGE_H11.md) časť I — **PR #445** (Q2 predvolená vratná voľba) | F-02 | kód |
+| H11a · príprava na SketchUp 2026.2 (ukončenie bez volania SketchUpu z hookov okien, načítanie súborov s jednou hláškou) — package [PACKAGE_H11.md](zdroje/bloky/HARDENING/PACKAGE_H11.md) časť II; **pád #1117 neodstraňuje** | F-01 | kód · audit · in-SU · quit test |
+| H11c · overenie F-01 na SketchUpe 2026.2 (quit test + smoke) — uzáver F-01; kód len ak vyjde poradie B (záložný návrh Z1) — package [PACKAGE_H11.md](zdroje/bloky/HARDENING/PACKAGE_H11.md) „H11c“ | F-01 | overenie po aktualizácii na 2026.2 |
 | H12 · typy skriniek na jednom mieste + mená rolí | C-01 · C-05 | kód · audit · in-SU · výrobná |
 | H13 · mapa rozširovacích bodov (vrátane pravidiel viazaných na typ) + tabuľka verzií dát | B-06 · B-07 | dokumentácia + guard testy (po H12) |
 | H14 · sekcie Štúdia na jednom mieste | C-02 | kód |

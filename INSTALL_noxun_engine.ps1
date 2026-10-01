@@ -1,8 +1,76 @@
 # Noxun Engine installer — skopiruje plugin do SketchUp 2026 Plugins zlozky
 # a odstrani stare samostatne instalacie Mower/Snaper (NASTROJE-1 T1b).
 # Bezpecne pre opakovane spustenie: prepise len kodove subory pluginu.
+#
+# -ResolveOnly (H11b): len vypise zvoleny ciel (`NOXUN_DEST=<cesta>`) a skonci
+# — exit 0 = ciel najdeny, exit 1 = chyba. NIC nekopiruje a NIC nevytvara (ani
+# priecinok z NOXUN_INSTALL_DEST); sluzi testu vyberu ciela (test_h11b_minimum).
+param([switch]$ResolveOnly)
 
 $ErrorActionPreference = 'Stop'
+
+# Minimum pluginu (H11b, F-02) — v synchro s `MIN_SKETCHUP_MAJOR` v loaderi.
+$MinSketchupYear = 2026
+$MinSketchupText = 'Noxun Engine potrebuje SketchUp 2026 alebo novsi.'
+
+# Vyber ciela. Pravidla:
+#   1. NOXUN_INSTALL_DEST je VYHRADNE testovacia poistka (NASTROJE-1 T1b): dovoli
+#      spustit skript nad DOCASNOU kopiou Plugins stromu a overit upratanie
+#      legacy ciest bez toho, aby sa siahlo na zivu instalaciu. Rocnik sa pri nej
+#      NEKONTROLUJE. V beznom behu premenna nastavena NIE JE.
+#   2. Existuje `SketchUp 2026` -> 2026 (vedome prednost, aj ked existuje novsi
+#      rocnik — plugin je vyvijany a testovany v 2026; H11 N10).
+#   3. Inak najnovsi `SketchUp YYYY` s YYYY >= 2026 (starsi SketchUp plugin
+#      odmietne — loader by sa v nom aj tak nenacital).
+#   4. Inak chyba.
+# Cesty sa skladaju VNORENYM Join-Path bez spatnych lomiek, aby funkcia bezala
+# aj v `pwsh` na Linuxe (CI test vyberu ciela).
+function Resolve-NoxunDest {
+  if ($env:NOXUN_INSTALL_DEST) {
+    return @{ Path = $env:NOXUN_INSTALL_DEST; Override = $true; Error = $null }
+  }
+  if (-not $env:APPDATA) {
+    return @{ Path = $null; Override = $false; Error = 'CHYBA: premenna APPDATA nie je nastavena.' }
+  }
+  $suRoot = Join-Path $env:APPDATA 'SketchUp'
+  $preferred = Join-Path (Join-Path (Join-Path $suRoot 'SketchUp 2026') 'SketchUp') 'Plugins'
+  if (Test-Path -LiteralPath $preferred) {
+    return @{ Path = $preferred; Override = $false; Error = $null }
+  }
+  $found = @()
+  if (Test-Path -LiteralPath $suRoot) {
+    $found = @(Get-ChildItem -LiteralPath $suRoot -Directory |
+      Where-Object { $_.Name -match '^SketchUp \d{4}$' } |
+      Where-Object { Test-Path -LiteralPath (Join-Path (Join-Path $_.FullName 'SketchUp') 'Plugins') } |
+      Sort-Object Name -Descending)
+  }
+  $supported = @($found | Where-Object { [int]($_.Name.Substring(9)) -ge $MinSketchupYear })
+  if ($supported.Count -gt 0) {
+    $path = Join-Path (Join-Path $supported[0].FullName 'SketchUp') 'Plugins'
+    return @{ Path = $path; Override = $false; Error = $null }
+  }
+  if ($found.Count -gt 0) {
+    $names = ($found | ForEach-Object { $_.Name }) -join ', '
+    return @{ Path = $null; Override = $false;
+              Error = ('CHYBA: ' + $MinSketchupText + ' Nasiel sa len: ' + $names + '.') }
+  }
+  return @{ Path = $null; Override = $false;
+            Error = ('CHYBA: Nenasla sa SketchUp Plugins zlozka v APPDATA. ' + $MinSketchupText) }
+}
+
+$resolved = Resolve-NoxunDest
+if ($resolved.Error) {
+  Write-Host $resolved.Error -ForegroundColor Red
+  exit 1
+}
+$dest = $resolved.Path
+
+if ($ResolveOnly) {
+  # Ziadne vedlajsie ucinky (delta audit H11, D4): len vypis a koniec.
+  if ($resolved.Override) { Write-Host 'NOXUN_DEST_OVERRIDE=1' }
+  Write-Host ('NOXUN_DEST=' + $dest)
+  exit 0
+}
 
 $src     = $PSScriptRoot
 $loader  = Join-Path $src 'noxun_engine.rb'
@@ -13,36 +81,11 @@ if (-not (Test-Path $loader) -or -not (Test-Path $plugdir)) {
   exit 1
 }
 
-# Ciel: SketchUp 2026 Plugins (podla zadania). Ak chyba, skus najnovsiu verziu.
-#
-# NOXUN_INSTALL_DEST je VYHRADNE testovacia poistka (NASTROJE-1 T1b): dovoli
-# spustit skript nad DOCASNOU kopiou Plugins stromu a overit upratanie legacy
-# ciest bez toho, aby sa siahlo na zivu instalaciu. V beznom behu premenna
-# nastavena NIE JE a ciel ostava realny Plugins priecinok.
-$suRoot = Join-Path $env:APPDATA 'SketchUp'
-$dest   = Join-Path $suRoot 'SketchUp 2026\SketchUp\Plugins'
-
-if ($env:NOXUN_INSTALL_DEST) {
-  $dest = $env:NOXUN_INSTALL_DEST
+if ($resolved.Override) {
   if (-not (Test-Path -LiteralPath $dest)) {
     New-Item -ItemType Directory -Path $dest -Force | Out-Null
   }
   Write-Host ('POZOR: ciel prepisany cez NOXUN_INSTALL_DEST (testovaci rezim): ' + $dest) -ForegroundColor Yellow
-}
-elseif (-not (Test-Path $dest)) {
-  $fallback = @()
-  if (Test-Path $suRoot) {
-    $fallback = Get-ChildItem $suRoot -Directory |
-      Where-Object { $_.Name -match '^SketchUp \d{4}$' } |
-      Sort-Object Name -Descending |
-      ForEach-Object { Join-Path $_.FullName 'SketchUp\Plugins' } |
-      Where-Object { Test-Path $_ }
-  }
-  if ($fallback.Count -eq 0) {
-    Write-Host 'CHYBA: Nenasla sa SketchUp Plugins zlozka v APPDATA.' -ForegroundColor Red
-    exit 1
-  }
-  $dest = $fallback[0]
 }
 
 Write-Host ''

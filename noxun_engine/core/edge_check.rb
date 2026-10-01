@@ -450,7 +450,9 @@ module Noxun
       def overlay_live?(model)
         return false if @overlay.nil?
         return false unless registered?(model)
-        !@overlay.respond_to?(:enabled?) || @overlay.enabled? == true
+        # H11b: `Overlay#enabled?` je od SketchUpu 2023.0; minimum pluginu je 2026
+        # (loader), takze poistka `respond_to?` uz nema co chranit.
+        @overlay.enabled? == true
       rescue StandardError
         false
       end
@@ -511,9 +513,9 @@ module Noxun
         @options = settings # cerstve prepinace z %APPDATA% pri kazdom zapnuti
         # Overlay si stav „zapnuty" pamata SketchUp (panel Overlays v Utilities).
         # Ked ho pouzivatel niekedy vypol, nasa registracia by sama nekreslila —
-        # preto ho zapneme, ak to API dovoli (starsie verzie setter nemaju).
+        # preto ho zapneme (setter je od SketchUpu 2023.0, minimum pluginu 2026).
         begin
-          ov.enabled = true if ov.respond_to?(:enabled=)
+          ov.enabled = true
         rescue StandardError => e
           Engine.log_error(e, 'EdgeCheck.enable! overlay.enabled=')
         end
@@ -597,10 +599,11 @@ module Noxun
 
       # Poistka po reloade pluginu: overlay s NASIM id uz moze byt v modeli
       # zaregistrovany (stara instancia z predosleho behu) — `add` by inak zlyhal.
+      # `OverlaysManager` drzi len `Sketchup::Overlay` s `overlay_id` (2023.0+).
       def drop_registered(model)
         return unless model.respond_to?(:overlays)
         model.overlays.to_a.each do |o|
-          next unless o.respond_to?(:overlay_id) && o.overlay_id.to_s == OVERLAY_ID
+          next unless o.overlay_id.to_s == OVERLAY_ID
           model.overlays.remove(o)
         end
       rescue StandardError => e

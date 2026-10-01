@@ -285,7 +285,8 @@ module Noxun
       def overlay_live?(model)
         return false if @overlay.nil?
         return false unless registered?(model)
-        !@overlay.respond_to?(:enabled?) || @overlay.enabled? == true
+        # H11b: `Overlay#enabled?` je od SketchUpu 2023.0, minimum pluginu 2026.
+        @overlay.enabled? == true
       rescue StandardError
         false
       end
@@ -341,7 +342,7 @@ module Noxun
         @overlay = ov
         @model = model
         begin
-          ov.enabled = true if ov.respond_to?(:enabled=)
+          ov.enabled = true # setter od SketchUpu 2023.0, minimum pluginu 2026
         rescue StandardError => e
           Engine.log_error(e, 'GrainCheck.enable! overlay.enabled=')
         end
@@ -422,10 +423,11 @@ module Noxun
 
       # Poistka po reloade pluginu: overlay s NASIM id uz moze byt v modeli
       # zaregistrovany (stara instancia z predosleho behu) — `add` by zlyhal.
+      # `OverlaysManager` drzi len `Sketchup::Overlay` s `overlay_id` (2023.0+).
       def drop_registered(model)
         return unless model.respond_to?(:overlays)
         model.overlays.to_a.each do |o|
-          next unless o.respond_to?(:overlay_id) && o.overlay_id.to_s == OVERLAY_ID
+          next unless o.overlay_id.to_s == OVERLAY_ID
           model.overlays.remove(o)
         end
       rescue StandardError => e

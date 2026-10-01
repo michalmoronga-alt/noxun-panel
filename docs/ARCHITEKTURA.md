@@ -15,7 +15,7 @@
 
 ## Reťaz načítania
 
-Reťaz: `noxun_engine.rb` (loader, autorita VERSION) → `noxun_engine\main.rb` (requires, menu, **toolbar**, logger) → core → modules → ui.
+Reťaz: `noxun_engine.rb` (loader, autorita VERSION; **minimum SketchUp 2026** — starší SketchUp dostane jednu hlášku a plugin sa nenačíta, ešte pred recovery aktualizácie) → `noxun_engine\main.rb` (requires, menu, **toolbar**, logger) → core → modules → ui.
 
 ## Kde čo nájdeš
 

@@ -1022,7 +1022,9 @@ a `cr_front` `AXES_FRONT`, `hinge_rail`, `corner_rail` a `cr_side` `AXES_UPRIGHT
 ### edge_check.rb
 
 **D-104/D-105 kontrola hrán:** zvýraznenie stavu olepu priamo v modeli cez `Sketchup::Overlay` (SU 2023+, celý `edge_overlay.rb` pod guardom) — **žiadna operácia, žiadny undo krok,
-nič v .skp**, sken je read-only (žiadny dedup tik).
+nič v .skp**, sken je read-only (žiadny dedup tik). **Bez verzijných poistiek** (H11b): minimum pluginu je SketchUp 2026 (loader), takže `enabled?`, `enabled=`
+a filter `overlay_id` v `drop_registered` sa volajú priamo (všetky tri sú v API od 2023.0) — rovnako v `grain_check.rb`, `direction_check.rb` a `hover_edge.rb`; guard
+dostupnosti (`available?`, `respond_to?(:overlays)`) ostáva ako šev headless sady.
 
 **TRI STAVY** (`classify_edges`): `missing` (pravidlo žiada + páska chýba — vrátane vedome zrušeného olepu) · `extra` (pravidlo nežiada + páska chýba) · `taped` (páska je).
 
@@ -1174,7 +1176,7 @@ cez `model.edit_transform * ent.transformation` (vnorený dielec po dvojkliku do
 `EdgeCheck::OUT_MM` (0,5), aby bol hover vidno aj nad zapnutou kontrolou olepu; farba `COLOR` je **výber** (`--nx-select`), zámerne NIE `EdgeCheck::COLORS` (tie hovoria o stave
 olepu a nesmú sa miešať).
 
-Životný cyklus: `show(model, code)` registruje overlay pri prvom rozsvietení, `hide` len zhasne (overlay ostáva — add/remove pri každom pohybe myšou je zbytočná práca), `release`
+Životný cyklus: `show(model, code)` registruje overlay pri prvom rozsvietení (`ensure_overlay` ho zapína priamo `enabled = true`, bez verzijnej poistky — minimum 2026), `hide` len zhasne (overlay ostáva — add/remove pri každom pohybe myšou je zbytočná práca), `release`
 odpojí (zatvorenie panela `set_on_closed`, prepnutie dokumentu `Panel.on_model_switched`). Callback `nx_hover_edge` (`ui/panel/actions_parts.rb`) má **prísny guard dokumentu** ako
 `nx_edge_toggle` a **nepíše status** (hover je pohyb myšou, nie akcia). JS strana (`part_card.js`) posiela **len ZMENU** kódu hrany — inak by každý `mouseover` bežal cez most do
 Ruby.
