@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H12c · JS Inspectora a Štúdia číta typy skriniek zo servera (1.10.2026, PR #?, v0.17.13, blok 9 · HARDENING PO V1, triedenie C-01; package
+- **H12c · JS Inspectora a Štúdia číta typy skriniek zo servera (1.10.2026, PR #448, v0.17.13, blok 9 · HARDENING PO V1, triedenie C-01; package
   [PACKAGE_H12.md](../zdroje/bloky/HARDENING/PACKAGE_H12.md) časť H12c, §15 A1 a A6).**
   JS mal 8 vlastných zoznamov typu a ~60 porovnaní mena (`CAB_TYPES`, `INSERT_TYPES`, `NX_TYPE_LABEL`, `TYPE_LIMITS`, `LEGS_INSERT_TYPES`, `NX_CTX_LOCK`,
   `TPL_TYPE_LOCK`, `TPL_TYPE_WORDS`, `t === 'upper'`…). Nový register **`NXTypes`** v `core.js` nasadí **prvý príkaz `NX.init`** z `cabinet_types`
