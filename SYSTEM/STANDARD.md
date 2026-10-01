@@ -233,6 +233,7 @@ meria výšku niky (vnútro − osadenie) aj hranu delenia čiel. Je to vlastnos
 - **Dopredný guard:** uložené číslo **vyššie** než `CONFIG_SCHEMA` odmieta **PRESTAVBU** (a odvodené objekty: kópia skrinky, uloženie ako šablóna). Čítanie, výber, kusovník, VEPO ani exporty sa neblokujú — model z novšej verzie sa ďalej číta.
 - **Šablóna nesie ten istý marker** (`template_config_from`) — jej config je rovnako uzavretý whitelist, takže staršia verzia šablónu z novšej odmietne použiť aj vložiť.
 - **Disciplína bumpu:** číslo sa zvýši pri **každom rozšírení whitelistu configu o pole, ktorého tichá strata by poškodila výrobu** (nové konštrukčné pole, nový typ čela, nová rola). Čisto odvodené alebo kozmetické pole bump nevyžaduje. `plan_schema` (tvar tranzientného plánu) ani `part_key_schema` (kľúče dielcov) kompatibilitu configu **nevyjadrujú** a nenahrádzajú ho.
+  Aktuálne čísla všetkých verzií dát a kedy ich zvýšiť: **§13**.
 - **Čísla sa prideľujú SEKVENČNE podľa poradia mergov, nie podľa poradia návrhov** (audit #17 FIX 5): dve dávky rozpracované naraz si nesmú nárokovať to isté číslo. Bump patrí do dávky, ktorá pole reálne zavádza, a jeho dôvod sa zapisuje do komentára `HISTORIA` pri konštante.
 - **Bump chráni SPÄTNE** (staršia verzia novší config odmietne). Keď dávka prináša aj obsah, ktorý sa dá do modelu zapísať zvonku (napr. definície setov zo šablóny), potrebuje **navyše DOPREDNÚ bránu**, ktorá taký obsah odmietne PRED zápisom — `4 = KOV-B1` je presne tento prípad (`HardwareSets.assess_set_defs`).
 - **`5 = KOV-C2b` (v0.9.31): zásuvky z receptu.** Config nesie `drawer.system`, `drawer.recipe_refs` (pripnutá verzia receptu per kombinácia systém|otváranie),
@@ -1758,3 +1759,86 @@ Zámerne nerozhodnuté — overia sa na prototype/V1 v SketchUpe (SkAgent), nie 
 
 Vŕtacie pozície a CNC rastre kovania • optimalizácia nárezu (viac heuristík, hľadanie poradia, otáčanie dielcov) — primitívny nárezový plán **je** vo V1 (§11.4) • automatické výkresy • cloud • horná rohová, rohové vybavenie (LeMans, karusel) a atypické korpusy (L, šikmé) — dolná slepá rohová je vo V1 (§4.2) • šikmé/zakrivené dielce • kompletný kuchynský CAD.
 K týmto sa systém dostane, až keď jadro (štandard → referenčný korpus → childy → kovania → výstupy) stojí a je overené.
+
+## 13. Schémy a verzie dát (jedna tabuľka)
+
+**JEDINÉ miesto s aktuálnymi číslami verzií dát** — ostatné dokumenty (STAV „Kompatibilita", odseky modulov) na túto sekciu len odkazujú.
+Tabuľky stráži `tests/pure/test_h13_rozsirovacie_body.rb`: hodnota v stĺpci **Hodnota** sa musí rovnať konštante v kóde a **každá** číselná
+konštanta verzie v `noxun_engine/` (meno obsahuje `SCHEMA`, `STD`, `SEED` alebo `VERSION`) musí byť v niektorej tabuľke. Výnimka: kroky
+histórie `SCHEMA_*` v module, ktorý má `SCHEMA_CURRENT` (katalóg materiálov a kovania) — test overí, že `SCHEMA_CURRENT` ukazuje na najvyšší krok.
+
+**Zmena schémy (CLAUDE.md, audit návrhu):** každé zvýšenie `CONFIG_SCHEMA`, BuildPlan `SCHEMA` alebo akéhokoľvek `STD` — v tabuľke stĺpec
+„Schéma" = **áno**. Seed (`SEED_VERSION`, `SEED_SET_VERSION`) schéma nie je, ale mení predvolené kovanie, ABS alebo ceny, takže taká dávka
+je spravidla **výrobná/cenová** (predrecenzia). Čísla sa prideľujú **sekvenčne podľa poradia mergov**; dôvod bumpu patrí do komentára
+`HISTORIA` pri konštante. **História zmien sa tu neprepisuje** — dôvody jednotlivých čísel sú v komentári pri konštante, pri configu skrinky
+v §2.5, pri ABS seede v §7.5 a v [archiv/KRONIKA.md](archiv/KRONIKA.md) (Grep podľa mena konštanty).
+
+### 13.1 Aktuálne verzie
+
+**V modeli (cestuje so zákazkou v .skp):**
+
+| Čo | Kde | Hodnota | Kedy zvýšiť | Schéma |
+|---|---|---|---|---|
+| config skrinky | `noxun_engine/core/cabinet_builder.rb` · `CabinetBuilder::CONFIG_SCHEMA` | **22** | nové pole, typ alebo hodnota configu, ktorej tichá strata v staršom plugine zmení výrobu (§2.5) | áno |
+| config dosky | `noxun_engine/core/board_builder.rb` · `BoardBuilder::BOARD_CONFIG_SCHEMA` | **2** | nové pole configu dosky, ktoré by starší plugin whitelistom zahodil | áno |
+| výrobný plán | `noxun_engine/core/build_plan.rb` · `BuildPlan::SCHEMA` | **7** | nová rola alebo pole dielca v pláne (§2.4) | áno |
+| kľúče dielcov | `noxun_engine/core/part_keys.rb` · `PartKeys::SCHEMA` | **1** | zmena tvaru `part_key` (identita dielca pre override a kovanie) | áno |
+| dictionary `NOXUN` | `noxun_engine/core/store.rb` · `Store::STD` | **1** | zmena štandardu entity (§2.1); kus z inej verzie = ORANGE `std_version` | áno |
+| dáta rozpočtu | `noxun_engine/core/budget_store.rb` · `BudgetStore::BUDGET_STD` | **3** | kľúč dát rozpočtu, ktorý by starší plugin ignoroval alebo orezal (marker zapíše prvá úprava rozpočtu) | áno |
+
+**Súbory na počítači (`%APPDATA%\NOXUN\Engine\`):**
+
+| Čo | Kde | Hodnota | Kedy zvýšiť | Schéma |
+|---|---|---|---|---|
+| knižnica šablón | `noxun_engine/core/templates.rb` · `TemplateStore::STD` | **7** | nový tvar záznamu alebo seed šablóny pre existujúce knižnice (migrácia `migrate!` cez `old_std < N`) | áno |
+| použitie šablón | `noxun_engine/core/templates.rb` · `TemplateUsage::STD` | **1** | formát `template_usage.json` | áno |
+| katalóg materiálov — obálka | `noxun_engine/core/materials.rb` · `Materials::STD` | **1** | formát obálky `materials.json` | áno |
+| katalóg materiálov — schéma | `noxun_engine/core/materials.rb` · `Materials::SCHEMA_CURRENT` | **12** | nové pole položky (marker lazy podľa obsahu, §7.1); nový krok = nová konštanta `SCHEMA_*` a `SCHEMA_CURRENT` na ňu | áno |
+| pravidlá ABS — formát | `noxun_engine/core/abs_rules.rb` · `AbsRules::STD` | **1** | formát `abs_rules.json` | áno |
+| pravidlá ABS — seed | `noxun_engine/core/abs_rules.rb` · `AbsRules::SEED_VERSION` | **6** | nová rola s predvolenými hranami (§7.5) — bez bumpu sa na existujúcich PC postaví bez pásky | nie (seed) |
+| pravidlá kovania — formát | `noxun_engine/core/hardware_rules.rb` · `HardwareRules::STD` | **3** | nový `kind` alebo kľúč filtra, ktorý by starší plugin uplatnil zle (dopredná brána) | áno |
+| pravidlá kovania — seed | `noxun_engine/core/hardware_rules.rb` · `HardwareRules::SEED_VERSION` | **7** | nové alebo zmenené seed pravidlo — aj nový visiaci typ skrinky (pasca CN-03) | nie (seed) |
+| katalóg kovania — schéma | `noxun_engine/core/hardware_catalog.rb` · `HardwareCatalog::SCHEMA_CURRENT` | **4** | nové pole položky (marker lazy podľa obsahu, vzor materiálov) | áno |
+| katalóg kovania — seed | `noxun_engine/core/hardware_catalog.rb` · `HardwareCatalog::SEED_SET_VERSION` | **6** | nové alebo opravené seed kódy (patch len nedotknutých riadkov) | nie (seed) |
+| taxonómia kovania — schéma | `noxun_engine/core/hardware_taxonomy.rb` · `HardwareTaxonomy::SCHEMA_CURRENT` | **1** | formát výrobcov a radov | áno |
+| taxonómia kovania — seed | `noxun_engine/core/hardware_taxonomy.rb` · `HardwareTaxonomy::SEED_VERSION` | **3** | nový výrobca alebo rad v seede | nie (seed) |
+| sety kovania — formát | `noxun_engine/core/hardware_sets.rb` · `HardwareSets::STD` | **1** | základ; nový tvar setu dostane vlastný marker podľa obsahu (§13.2) | áno |
+| sety kovania — seed | `noxun_engine/core/hardware_sets.rb` · `HardwareSets::SEED_VERSION` | **8** | nový alebo zmenený seed set (starý tvar do `LEGACY_SEED_SHAPES`) | nie (seed) |
+| katalóg spotrebičov — formát | `noxun_engine/core/appliance_catalog.rb` · `ApplianceCatalog::STD` | **1** | formát `appliances.json` | áno |
+| katalóg spotrebičov — seed | `noxun_engine/core/appliance_catalog.rb` · `ApplianceCatalog::SEED_VERSION` | **1** | nové seed spotrebiče | nie (seed) |
+| nastavenia dodávateľa — formát | `noxun_engine/core/supplier_settings.rb` · `SupplierSettings::STD` | **2** | nový skalár alebo kľúč, ktorý by starší plugin pri uložení zahodil (§11.5) | áno |
+| nastavenia dodávateľa — seed | `noxun_engine/core/supplier_settings.rb` · `SupplierSettings::SEED_VERSION` | **1** | nové riadky alebo sadzby v seede | nie (seed) |
+| rozmerové rady | `noxun_engine/core/dim_series.rb` · `DimSeries::STD` | **1** | formát `dim_series.json` | áno |
+| štatistika použitia | `noxun_engine/core/usage_stats.rb` · `UsageStats::SCHEMA` | **1** | formát `usage_stats.json` | áno |
+| nastavenia aktualizácií | `noxun_engine/core/updater.rb` · `Updater::STD` | **1** | formát `updater_settings.json` | áno |
+| prepínač kontroly hrán | `noxun_engine/core/edge_check.rb` · `EdgeCheck::SETTINGS_STD` | **1** | formát súboru prepínača | áno |
+| prepínač kontroly kresby | `noxun_engine/core/grain_check.rb` · `GrainCheck::SETTINGS_STD` | **1** | formát súboru prepínača | áno |
+| prepínač smeru otvárania | `noxun_engine/core/direction_check.rb` · `DirectionCheck::SETTINGS_STD` | **1** | formát súboru prepínača | áno |
+| téma okien | `noxun_engine/main.rb` · `Engine::UI_THEME_STD` | **1** | formát `ui_theme.json` | áno |
+| upratanie starých nástrojov | `noxun_engine/tools/legacy_cleanup.rb` · `LegacyCleanup::STD` | **1** | formát značky `legacy_cleanup.json` | áno |
+
+### 13.2 Pevné prahy a značky obsahu (nezvyšujú sa)
+
+Prah = schéma alebo seed, **od ktorej** stavba vie novú vec; skrinka či snapshot pod ňou je zastaraný (Kontrola to prizná). Pri budúcich
+bumpoch sa **nehýbe** — preto je to vlastná konštanta. Značka obsahu setov sa zapisuje len vtedy, keď obsah nový tvar naozaj nesie;
+nový tvar = nová konštanta a riadok v `STD_SUPPORTED`.
+
+| Čo | Kde | Hodnota | Význam |
+|---|---|---|---|
+| zásuvky z receptu | `noxun_engine/core/cabinet_builder.rb` · `CabinetBuilder::DRAWER_ACTIVATION_SCHEMA` | **5** | od tejto schémy stavba emituje dielce zásuviek |
+| závesy podľa tabuľky | `noxun_engine/core/cabinet_builder.rb` · `CabinetBuilder::HINGE_ACTIVATION_SCHEMA` | **9** | uložené závesy sú spočítané podľa NOXUN tabuľky (`hinge_stale`) |
+| výklopy a sklopy | `noxun_engine/core/cabinet_builder.rb` · `CabinetBuilder::LIFT_ACTIVATION_SCHEMA` | **11** | stavba pozná pravidlá výklopov (`flap_stale`) |
+| chrbát v drážke do nárezu | `noxun_engine/core/cabinet_builder.rb` · `CabinetBuilder::BACK_CUT_ACTIVATION_SCHEMA` | **19** | snapshot chrbta nesie `cut_size` |
+| chrbát pod výstuhami | `noxun_engine/core/cabinet_builder.rb` · `CabinetBuilder::BACK_RAIL_ACTIVATION_SCHEMA` | **20** | chrbát pri výstuhách na výšku končí pod nimi |
+| tabuľka závesov v pravidlách | `noxun_engine/core/hardware_rules.rb` · `HardwareRules::HINGE_TABLE_STD` | **2** | seed pravidlo závesov nesie door guardy |
+| výklopy v seede | `noxun_engine/core/hardware_rules.rb` · `HardwareRules::LIFT_SEED_VERSION` | **5** | pravidlá vedia vydať kovanie výklopu a sklopu |
+| nohy podľa šírky | `noxun_engine/core/hardware_rules.rb` · `HardwareRules::LEG_WIDTH_SEED_VERSION` | **6** | nohy podľa šírky a príchyt sokla |
+| sety — pásma člena | `noxun_engine/core/hardware_sets.rb` · `HardwareSets::STD_PARAM_FORMS` | **2** | člen setu s pásmami alebo selektorom |
+| sety — triedny kľúč | `noxun_engine/core/hardware_sets.rb` · `HardwareSets::STD_CLASSIFIED` | **3** | set s triednym kľúčom |
+| sety — výškový variant | `noxun_engine/core/hardware_sets.rb` · `HardwareSets::STD_HEIGHT_VARIANT` | **4** | set s výškovým variantom |
+| sety — preskočenie kódu | `noxun_engine/core/hardware_sets.rb` · `HardwareSets::STD_SKIP_CODE` | **5** | člen so sentinelom „bez kódu" |
+| sety — výklopové tvary | `noxun_engine/core/hardware_sets.rb` · `HardwareSets::STD_LIFT_FORMS` | **6** | tvary členov výklopu (najvyšší marker setov) |
+
+**Mimo tabuliek (nie sú číselné verzie dát):** verzia pluginu `VERSION` (pravidlá v CLAUDE.md, v configu ako `engine_version`), prah podľa verzie
+pluginu `CabinetBuilder::FRONT_VALIDATION_VERSION` a textové identifikátory formátu `HardwareCatalog::STD` / `HardwareTaxonomy::STD`. Config
+skrinky nesie čísla ako proveniencia stavby: `config_schema`, `plan_schema`, `part_key_schema`, `rules_seed_version`.

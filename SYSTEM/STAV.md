@@ -20,7 +20,7 @@ Etapa **V0.6 (katalógy a ceny) je obsahovo splnená**. **Od 20.8. sa z pluginu 
 
 **Hotové veľké celky:** INSPECTOR REWORK (UI-A…UI-D) · **fáza ŠTÚDIO** (ŠT-1a…ŠT-4b, PR #192–#228) — **zaniklo šesť okien** · **blok KRESBA** · **blok GHOST VKLADANIE** (v0.9.0) · **blok KOVANIE** (v0.10.0)
 · **blok M-R VZHĽAD** (v0.12.0) · **blok SPOTREBIČE S1** (v0.13.0) · **blok KONŠTRUKCIA K1+K2** (v0.14.0) · **blok K3 ROHOVÁ** (v0.15.0) · **blok 2 KONTROLA + VÝROBA** (v0.16.0) · **blok CENY** (v0.17.0) — plné texty v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).
-**Kompatibilita:** skrinka je v **schéme 22** (typ `corner_blind`), **doska v schéme 2**, **šablóny v STD 7**, výrobný plán v **schéme 7**, ABS pravidlá
+**Kompatibilita** (všetky verzie dát: [STANDARD §13](STANDARD.md#13-schémy-a-verzie-dát-jedna-tabuľka))**:** skrinka je v **schéme 22** (typ `corner_blind`), **doska v schéme 2**, **šablóny v STD 7**, výrobný plán v **schéme 7**, ABS pravidlá
 v **seede 6** — starší plugin zákazku neprestaví ani nevyexportuje (rohovú by sklopil na dolnú). **Dáta rozpočtu sú od NP-4 v `BUDGET_STD` 3** (prvá úprava rozpočtu
 v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a zastaví oba cenové exporty). **Nastavenia dodávateľa sú od NP-2 vo verzii súboru 2** (v0.15.1 a starší pri uložení nové polia zahodí).
 **Katalóg materiálov je po prvom uloženom odkaze v schéme 11 a po prvom ručnom overení ceny v schéme 12** — starší plugin ho ďalej číta (aj Rozpočet), ale nezapíše doň.
@@ -32,14 +32,14 @@ v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a
 ## Robí sa
 
 **Blok 9 · HARDENING PO V1** (štart 1.10.2026, PR #432): krížový audit V1 sedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**; 17 dávok **H1…H17** sekvenčne podľa tabuľky v [PLAN.md](PLAN.md), **bez zmeny výrobných a cenových čísel**; priečinok bloku [zdroje/bloky/HARDENING/](zdroje/bloky/HARDENING/).
-Hotové **H1–H5** (PR #433–#440), **H8–H10b** (R-13, R-37, R-35 — PR #441–#444), **H11b** (minimum 2026, PR #445), **H12a** (register typov, PR #446), **H12b** (panel z registra, PR #447) a **H12c** (okná zo servera, PR #448); **H6/H7** čakajú na mockupy; **H11a** (príprava na 2026.2) čaká na Q1, **H11c** na aktualizáciu na 2026.2.
+Hotové **H1–H5** (PR #433–#440), **H8–H10b** (R-13, R-37, R-35 — PR #441–#444), **H11b** (minimum 2026, PR #445), **H12a** (register typov, PR #446), **H12b** (panel z registra, PR #447), **H12c** (okná zo servera, PR #448) a **H13** (mapa rozširovacích bodov + tabuľka verzií dát, PR #?); **H6/H7** čakajú na mockupy; **H11a** (príprava na 2026.2) čaká na Q1, **H11c** na aktualizáciu na 2026.2.
 **Otázky bez odpovede, platí návrh:** H12 Q1 (karta dielca ako Kusovník — až H12d) · H11 Q2 (starší SketchUp = nenačíta sa, jedna hláška) · H11 Q1 (chyba súboru = vypnúť plugin, H11a) · H11 Q3 (kedy 2026.2) · H10b Q2 (rôzne rady sa zlúčia bez hlášky, ten istý rad = hláška) · H10a Q1 (cudzí globál = neuloží sa nič)
 · H9 Q1/Q2 (pri čítaní zo zálohy bez nálezu v Kontrole, bez tlačidla „Obnoviť zo zálohy") · H8 Q1/Q2 (veta o značke verzie, bez tlačidla) · H4b Q1/Q2 (vrátenie katalógu v ponuke „⋯" Materiálov, ikona posuvníkov pre Nastavenia rozpočtu).
 **H6 a H7 čakajú na schválený mockup** (R-38 v H7 potvrdí Michal) · **Q1** (porez a montáž pri skle) bez odpovede · pri prvej rohovej v dielni overiť záves Sensys · **na smoke čakajú** D-132 (#367), D-133 (#368), D-134 (#369).
 
 ## Ďalší krok
 
-Pokračovať blokom 9: **H12d** (mená rolí, Q1); **H11a** (príprava na 2026.2); **H6** a **H7** čakajú na schválenie mockupov Michalom; potom H13–H17; uzáver bloku = minor verzia + smoke
+Pokračovať blokom 9: **H12d** (mená rolí, Q1); **H11a** (príprava na 2026.2); **H6** a **H7** čakajú na schválenie mockupov Michalom; potom H14–H17 (H12d prepíše riadky mien rolí v mape rozširovacích bodov); uzáver bloku = minor verzia + smoke
 (smoke H3a + H3b: 7 bodov v [PACKAGE_H3.md](zdroje/bloky/HARDENING/PACKAGE_H3.md) §10; H4a + H4b: body 1–11 v [PACKAGE_H4.md](zdroje/bloky/HARDENING/PACKAGE_H4.md) §10; vzhľad rozbaľovačiek a výberu nôh v SketchUpe overí smoke bod 7;
 H8: 4 body v [PACKAGE_H8.md](zdroje/bloky/HARDENING/PACKAGE_H8.md) §10 — reálna zákazka bez nového riadku a s rovnakými číslami; H9: 5 bodov v [PACKAGE_H9.md](zdroje/bloky/HARDENING/PACKAGE_H9.md) §10 — rovnaké čísla rozpočtu, hrán a nákupu, ochrana naživo voliteľne;
 H10a + H10b: body 1–6 v [PACKAGE_H10.md](zdroje/bloky/HARDENING/PACKAGE_H10.md) §10 — dve okná, testovacie modely, `hardware_rules.json` a `dim_series.json` zálohovať;

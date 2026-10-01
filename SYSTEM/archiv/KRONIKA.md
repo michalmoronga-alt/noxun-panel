@@ -17,6 +17,24 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H13 · mapa rozširovacích bodov + jedna tabuľka verzií dát (1.10.2026, PR #?, dokumentácia + guard testy, plugin bez zmeny, blok 9 · HARDENING PO V1,
+  triedenie B-06 · B-07; krížový audit CN-02, CN-03, CN-04; brief [BRIEF_H13.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H13.md)).**
+  Zoznam miest pre nový typ skrinky žil len v archíve rohovej (s číslami riadkov k v0.14.0) a v package H12, čísla schém v piatich dokumentoch.
+  Nový súbor mapy [rozsirovacie-body.md](../../docs/architecture/rozsirovacie-body.md) (riadok v rozcestníku, strop 20 kB, sekcia História ako
+  ui-lifecycle) má päť scenárov — nový typ skrinky, nová rola dielca, nový stĺpec Kusovníka (trieda podľa hraníc B-09), nová sekcia Štúdia, nové
+  pravidlo kovania viazané na typ — s menami súborov a registrov (nie riadkov) a s testami, ktoré ich strážia. Po H12 ostáva mimo registra typov:
+  predvoľby a polia, kód buildera, statické HTML, seed šablóny, vety `TYPE_SCOPE_PHRASES`, `OWNER_MATRIX`, seed kovania a slovo „Spodná" v auto názve.
+  **Pasca závesov CN-03** je v scenári 1 ako výslovné upozornenie; guard (T3c z `test_h12a_register.rb` presunutý a rozšírený) vyžaduje, aby každý
+  visiaci typ registra bol v `cabinet_type` pravidla `zavesenie-hornej-skrinky` alebo vo výnimkách s dôvodom a aby pravidlo neplatilo na typ, ktorý
+  nevisí. **STANDARD §13** = jediná tabuľka verzií dát (32 aktuálnych + 13 pevných prahov a značiek obsahu; stĺpec „Schéma" podľa CLAUDE.md, seed
+  = výrobná dávka); STAV „Kompatibilita", §2.5, mapa a odseky `cabinet_types`/`hardware_rules` na ňu len odkazujú, história ostáva v komentároch
+  `HISTORIA`, §2.5, §7.5 a tu. Nový `tests/pure/test_h13_rozsirovacie_body.rb`: každý riadok mapy = existujúci súbor a mená v ňom, hodnoty §13 =
+  konštanty v kóde, **každá** číselná konštanta verzie v `noxun_engine/` je v tabuľke (kroky `SCHEMA_*` modulu so `SCHEMA_CURRENT` sú výnimka —
+  `SCHEMA_CURRENT` musí ukazovať na najvyšší krok), pasca závesov; všetky tri guardy majú negatívne testy a mutácie nad kópiou reálnych dát (schéma 23
+  bez tabuľky, nová konštanta, krok materiálov bez `SCHEMA_CURRENT`, premenovaný register v mape aj v kóde, visiaci typ bez seedu) padajú.
+  CLAUDE.md sa nemení (odkaz na §13 doplní orchestrátor alebo Michal). H12d musí prepísať riadky mien rolí v scenári 2 (inak guard mapy padne).
+  Testy: **5146 headless · 153 JS sád** zelené + encoding guard; in-SU netreba (plugin bez zmeny).
+
 - **H12c · JS Inspectora a Štúdia číta typy skriniek zo servera (1.10.2026, PR #448, v0.17.13, blok 9 · HARDENING PO V1, triedenie C-01; package
   [PACKAGE_H12.md](../zdroje/bloky/HARDENING/PACKAGE_H12.md) časť H12c, §15 A1 a A6).**
   JS mal 8 vlastných zoznamov typu a ~60 porovnaní mena (`CAB_TYPES`, `INSERT_TYPES`, `NX_TYPE_LABEL`, `TYPE_LIMITS`, `LEGS_INSERT_TYPES`, `NX_CTX_LOCK`,
