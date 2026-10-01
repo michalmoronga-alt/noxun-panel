@@ -31,8 +31,10 @@
   `### actions_appliance.rb` kotva). **Strážca rastu** v `tests/pure/test_docs_navigacia.rb` (najprv reportovací beh, potom tvrdá brána): strop veľkosti každého
   súboru mapy ~1,3× (ui-lifecycle 330 kB, hardware 270, construction 230, outputs 215, materials 95, model-a-identita 90, appliances 62), zákaz značiek `PR #`,
   `review #`, `Codex #`, `audit #`, `GH #`, `ZANIKL` a verzií `vX.Y.Z` mimo sekcie „História" v upratanom ui-lifecycle a nadpis `### <súbor>` musí menovať
-  existujúci súbor pluginu. **Testy:** 4982 headless (+3 nové guardy) · 149 JS sád zelené + encoding guard. **Otvorené pre H5b / orchestrátora:** CLAUDE.md
-  (riadky „zmenu Ruby kódu" a „UI") ešte uvádza „celý má 540 kB" / „47–540 kB" — dnes 253 kB; ostatné súbory mapy majú značky ďalej (nie sú v zákaze).
+  existujúci súbor pluginu. **Review (kolá 1–2):** briefy bloku do repa (`briefy/`), guard pokrýva každý súbor adresára, žiadny nadpis za Históriou, značky
+  case-insensitive s toleranciou Markdownu a písmenových PR (`PR B3`); kontrola presnosti mapy voči kódu (8 opráv) + paritný test jednotiek kovania
+  `test_hw_unit_zrkadlo.rb`. Veľkosti v CLAUDE.md (540 → ~257 kB) **vyriešené pred mergom** (e0e3b71d). Ostatné súbory mapy majú značky ďalej (nie sú v zákaze).
+  **Testy:** 4985 headless (nové guardy dokumentov + 2 paritné testy jednotiek) · 149 JS sád zelené + encoding guard.
 
 - **H4b · texty a vzhľad (1.10.2026, PR #438, v0.17.4, blok 9 · HARDENING PO V1, položky triedenia HARDENING D-06 · D-07 · D-08 · D-09 — nie D-čísla
   DOGFOODINGU; package [PACKAGE_H4.md](../zdroje/bloky/HARDENING/PACKAGE_H4.md) časť H4b, zladenie §5.1).** **D-06:** núdzové „Obnoviť zálohu" stálo v lište
