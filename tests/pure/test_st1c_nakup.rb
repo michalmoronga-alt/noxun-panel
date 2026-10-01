@@ -101,7 +101,9 @@ NxTest.test('ŠT-1c (review P3): sekcia Nakup nesľubuje klik tam, kde sa nic ne
 end
 
 NxTest.test('ŠT-1c (review P3): sekcia Nakup ma vlastnu cestu k cerstvym cislam') do
-  tools = S1C_STUDIO_JS[/if \(studioSec === 'buy'\)\{.*?\n    \}/m].to_s
+  # H14b: lista Nakupu je pomenovany hacik riadku registra (`tools`).
+  NxTest.assert_equal('buyRenderTools', NxH14Reg.row('buy')['tools'], 'listu Nakupu kresli buyRenderTools')
+  tools = S1C_STUDIO_JS[/function buyRenderTools\(\)\{.*?\n  \}/m].to_s
   NxTest.refute(tools.empty?, 'lista sekcie sa nasla')
   NxTest.assert(tools.include?('id="hwCsvBtn"'), 'export je v liste sekcie (kontrakt §3)')
   # Markup je od 22.8. ZDIELANY (`refreshBtnHtml` v studio.js) — tlacidlo aj

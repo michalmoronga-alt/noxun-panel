@@ -81,12 +81,15 @@ NxTest.test('S1-A2: sekcia ma hlavicku (SEC_META) a vlastnu vetvu listy aj tela'
   # H14a: hlavicka sekcie = `head` riadku registra (SEC_META zaniklo).
   meta = NxH14Reg.row('appl')['head'].to_s
   NxTest.assert(meta.include?('tohto počítača'), 'hint hovori, ze katalog je vec POCITACA')
-  NxTest.assert(S1A2_STUDIO_JS.include?("if (studioSec === 'appl'){"),
-                'lista aj telo maju vlastnu vetvu')
-  NxTest.assert(S1A2_STUDIO_JS.include?('apRenderTools'), 'listu kresli appliances.js')
-  NxTest.assert(S1A2_STUDIO_JS.include?('apRenderBody'), 'telo tiez')
-  NxTest.assert(S1A2_STUDIO_JS.include?('apOnLeaveSection'),
-                'odchod zo sekcie ma hook (modal zije mimo tela sekcie)')
+  # H14b: listu, telo a odchod sekcie urcuje riadok registra (dispatch bez vetiev
+  # podla id); spravanie overuje golden G2/G3 (tests/js/test_h14_golden.js).
+  row = NxH14Reg.row('appl')
+  NxTest.assert_equal('appliances.js', row['module'], 'sekciu kresli appliances.js')
+  NxTest.assert_equal('apRenderTools', row['tools'], 'listu kresli appliances.js')
+  NxTest.assert_equal('apRenderBody', row['body'], 'telo tiez')
+  NxTest.refute(row['stale'], 'lista NEDOSTAVA jantar „Obnoviť" zakazky (katalog je per PC)')
+  NxTest.assert_equal('apOnLeaveSection', row['leave'],
+                      'odchod zo sekcie ma hook (modal zije mimo tela sekcie)')
 end
 
 # --- 2) whitelist akcii sekcie ----------------------------------------------

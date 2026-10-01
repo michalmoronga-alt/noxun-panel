@@ -22,6 +22,7 @@
 #   6. Kotva sekcie `mat` je JEDNORAZOVA — inak by sa detail dekoru otvaral
 #      po kazdom refreshi znova, aj ked medzitym pouzivatel odisiel.
 require_relative '../helper' unless defined?(NxTest)
+require_relative 'test_h14a_register' unless defined?(NxH14Reg) # H14: kontrakt sekcii Studia
 
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core') if NxTest.headless?
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog') if NxTest.headless?
@@ -298,10 +299,15 @@ NxTest.test('ŠT-2d: kotva sa spotrebuje PRAVE RAZ (deep-link z karty dielca)') 
 end
 
 NxTest.test('ŠT-2d: sekcia `mat` spotrebuje kotvu ako OTVORENIE DETAILU, nie ako filter') do
-  NxTest.assert(ST2D_STUDIO_JS.include?("(studioSec === 'mat') ? anchorFilter(ST) : null"),
-                'kotva sa aplikuje LEN so sekciou, do ktorej patri')
-  NxTest.assert(ST2D_STUDIO_JS.include?("matOpenAnchor(ma)"),
-                'a sekcia `mat` ju preklada na detail dekoru')
-  NxTest.assert(ST2D_STUDIO_JS.include?("var a = (studioSec === 'bom') ? anchorFilter(ST) : null"),
-                'kotva Kusovnika (N13 = ID skrinky) ostava nedotknuta')
+  # H14b: kotva je v riadku registra cielovej sekcie (`anchor`) — deep-link
+  # pouzije LEN kotvu sekcie, do ktorej prave preskocil. Spravanie (komu sa kotva
+  # doruci, pred/po vykresleni, hlaska pri neuspechu) drzi golden G4.
+  mat = NxH14Reg.row('mat')['anchor'] || {}
+  NxTest.assert_equal('matOpenAnchor', mat['fn'], 'a sekcia `mat` ju preklada na detail dekoru')
+  NxTest.assert_equal('before', mat['phase'], 'pred vykreslenim — meni stav, z ktoreho sa kresli')
+  NxTest.assert(mat['miss'].to_s.include?('v katalógu nie je'), 'neuspech nie je tichy no-op')
+  NxTest.assert_equal('bomOpenAnchor', (NxH14Reg.row('bom')['anchor'] || {})['fn'],
+                      'kotva Kusovnika (N13 = ID skrinky) ostava textom hladania')
+  NxTest.assert(ST2D_STUDIO_JS.include?('function bomOpenAnchor(a){ bomQ = a; return true; }'),
+                'a Kusovnik ju prijme ako text hladania (vzdy uspech)')
 end

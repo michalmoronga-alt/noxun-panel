@@ -66,7 +66,8 @@ NxTest.test('ŠT-1b: tab `control` okna Vyroba (a s ŠT-1c cele okno) je PREC') 
                 'a s nim aj skladanie deep-linku na tab')
   # ŠT-1c PR B3: obsah, ktory okno kreslilo, zije v sekciach Studia.
   NxTest.assert(S1B_STUDIO_JS.include?('function ctrlSection'), 'Kontrola je sekcia Studia')
-  NxTest.assert(S1B_STUDIO_JS.include?("studioSec === 'budget'"), 'a Rozpocet tiez')
+  # H14b: sekcia = riadok registra (kreslenie z neho, ziadna vetva podla id).
+  NxTest.assert_equal('budget.js', NxH14Reg.row('budget')['module'], 'a Rozpocet tiez (kresli ho budget.js)')
 end
 
 # --- 2) JEDNO cislo kontroly (audit #2) --------------------------------------

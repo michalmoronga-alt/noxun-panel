@@ -276,13 +276,19 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   // ŠT-2b: okno Materialy ZANIKLO — jeho HTML uz neexistuje.
   ok(!fs.existsSync(path.join(JS, '..', 'proj_materials.html')),
      'proj_materials.html je zmazany (dve UI nad jednym katalogom by sa rozisli)');
-  const sjs = fs.readFileSync(path.join(JS, 'studio.js'), 'utf8');
-  const bodyFn = sjs.match(/function renderBody\(\)\{[\s\S]*?\n  \}/)[0];
-  ok(/studioSec === 'mat'/.test(bodyFn) && /matRenderBody\(\)/.test(bodyFn),
-     'audit #2: telo sekcie `mat` kresli VYHRADNE matRenderBody — studio.js si ho nekresli sam');
-  const toolsFn = sjs.match(/function renderTools\(\)\{[\s\S]*?\n  \}/)[0];
-  ok(/studioSec === 'mat'/.test(toolsFn) && /matRenderTools\(staleFlag\)/.test(toolsFn),
-     'a listu matRenderTools — s jantarovym priznakom zo `staleFlag` (jedina autorita)');
+  // H14b: dispatch lista/telo ide z registra — overuje sa SPRAVANIE v okne
+  // (h14_harness: skripty studio.html v jednom `vm`, spehy haciakov), nie text.
+  const H14 = require('./h14_harness.js');
+  const W = H14.ready();
+  W.ctx.studioGoSection('mat');
+  eq(W.LOG.filter(function(c){ return /^mat/.test(c); }).map(function(c){ return c.split(' @')[0]; }),
+     ['matRenderTools(false)', 'matRenderBody()'],
+     'audit #2: listu aj telo sekcie `mat` kresli proj_materials.js (s priznakom zo `staleFlag`)');
+  eq(H14.writes(W).secbody, 0, 'audit #2: studio.js telo Materialov SAM NEPREPISUJE (rozpisany formular prezije)');
+  H14.resetCounters(W);
+  W.ctx.NX.markStale();
+  eq(W.LOG.map(function(c){ return c.split(' @')[0]; }), ['matRenderTools(true)'],
+     'jantarovy priznak ide liste ako argument (`staleFlag` = jedina autorita)');
   const studio = fs.readFileSync(path.join(JS, '..', 'studio.html'), 'utf8');
   ok(studio.indexOf('js/studio.js') < studio.indexOf('js/proj_materials.js'),
      'proj_materials.js sa nacitava AZ ZA studio.js (obaluje jeho NX.setStudio)');
@@ -308,12 +314,19 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   // Preč zo sekcie sa dá DVOMA cestami — klik v navigacii (`studioGoSection`)
   // a DEEP-LINK zo servera (`open_section` v payloade). Obe musia modaly
   // zavriet, inak visia nad novou sekciou.
-  ok(/studioSec === 'mat' && id !== 'mat'/.test(sjs),
-     'studioGoSection ohlasi odchod zo sekcie Materialy');
-  ok(/studioSec === 'mat' && ST\.open_section !== 'mat'/.test(sjs),
-     'a deep-link zo servera tiez');
-  eq((sjs.match(/matOnLeaveSection\(\)/g) || []).length, 2,
-     'obe cesty volaju TEN ISTY odchodovy hook');
+  // H14b: obe cesty idu JEDNOU funkciou prechodu (`studioSwitchSection`) —
+  // overuje sa spravanie oboch, nie pocet vyskytov v zdroji.
+  [['nav', function(){ W.ctx.studioGoSection('bom'); }],
+   ['deep-link', function(){ W.ctx.NX.setStudio(H14.payload({ open_section: 'bom' })); }]].forEach(function(c){
+    H14.goQuiet(W, 'mat');
+    c[1]();
+    eq(W.LOG.filter(function(x){ return /^matOnLeaveSection/.test(x); }).length, 1,
+       c[0] + ': odchod zo sekcie Materialy zavola matOnLeaveSection PRAVE RAZ');
+    H14.goQuiet(W, 'bom');
+    c[1]();
+    eq(W.LOG.filter(function(x){ return /^matOnLeaveSection/.test(x); }).length, 0,
+       c[0] + ': prechod mimo Materialov odchodovy hook nevola');
+  });
   ok(/sketchup\.mat_leave/.test(src), 'a klient to hlasi SERVERU (ten beh rusi)');
   const leave = src.match(/function matOnLeaveSection\(\)\{[\s\S]*?\n  \}/)[0];
   ok(leave.indexOf('mat_leave') < leave.indexOf('matCloseModals'),
