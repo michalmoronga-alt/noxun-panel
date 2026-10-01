@@ -454,6 +454,11 @@ vnútorná hĺbka ≥ 80 (výstuha závesov pred chrbtom). **Typ** existujúcej 
 Jeho `height` je **výška linky**, nie výška korpusu; spodná hrana čela žije vo vlastnom poli `dw_front_bottom` a do `floor_height` **nikdy netečie**.
 Výplň medzi horným okrajom čela a líniou linky sa **negeneruje** — rieši ju človek nízkym korpusom (od 80 mm, S1-E0) alebo doskou.
 
+**Register typov (H12a, v0.17.11).** Typy a ich vlastnosti (visí, stojí na podlahe, má korpus, vlastník spotrebiča, rohová zostava, zamknutý typ šablóny,
+vlastné limity, názvy) žijú v **jednom registri** `CabinetTypes` (`core/cabinet_types.rb`, [construction.md](../docs/architecture/construction.md#cabinet_typesrb));
+kód sa pýta vlastností, nie mena typu. **Neznámy typ sa číta ako dolná** (`norm` → `lower`); config z novšej verzie zastaví dopredný guard (`newer_config?`, §2.5)
+ešte pred normalizáciou. Uložený `type` v configu sa nemení (bez bumpu `CONFIG_SCHEMA`).
+
 **Hranica: TYP vs. ŠABLÓNA vs. PARAMETER (rozhodnuté 15.7.2026; autorita je tu od 1.10.2026 — predtým koniec PLAN.md).**
 Tri úrovne — odpoveď na otázku „kedy nový typ korpusu":
 1. **TYP (builder)** = iná **topológia**: iná množina dielcov a vzťahov, iné zóny, parametre ktoré inde nedávajú zmysel. Vlastný generovací kód. → dolná, horná, slot umývačky,

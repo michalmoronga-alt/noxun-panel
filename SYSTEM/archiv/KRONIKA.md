@@ -17,6 +17,25 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H12a · register typov skrinky + jadro (1.10.2026, PR #?, v0.17.11, blok 9 · HARDENING PO V1, triedenie C-01; package
+  [PACKAGE_H12.md](../zdroje/bloky/HARDENING/PACKAGE_H12.md) — §15 audit návrhu 0 BLOCKER · 6 FIX [AUDIT_H12_raw.md](../zdroje/bloky/HARDENING/AUDIT_H12_raw.md);
+  rez H12a → H12b panel Ruby → H12c JS → H12d mená rolí).**
+  Typ skrinky sa dodnes rozhodoval ~75 vetvami podľa mena (`== 'upper'`, `when 'dishwasher'`) v 17 súboroch; nový modul `core/cabinet_types.rb`
+  (`CabinetTypes`) drží typy a ich **vlastnosti** (§0.4: `hang_z` „visí" a `on_floor` „stojí" ako dve zámerne odlišné množiny, `builder`, `limits`,
+  `appliance_owner`, `fronts`, `front_opening`, `zones`, `template_type`, `type_locked`, `assembly`, názvy, preset, `template_id`) a jadro (`cabinet_builder`,
+  `construction`, `scale_observer`, `appliance_binding`, `appliance_checks`, `bom`, `direction_check`, `templates`, `ghost_tool`) sa pýta vlastností. Aliasy
+  `TYPES`, oba `CORNER_TYPE` (dve kópie zanikli — F2), `UPPER_HANG_Z`, `DW_*_RANGE`, `MIN_BY_TYPE` (odvodené); `DEFAULTS_BY_TYPE` a `EXTRA_KEYS_BY_TYPE`
+  namiesto `case`. Neznámy typ = profil dolnej (`norm`); identita ostáva surová (`cabinet_hw_ctx['cabinet_type']`, kľúč pamäte ghostu cez `id_or_default`).
+  **Prvý commit = golden pred zásahom** (`8feb1d1c`): `test_h12_golden.rb` — 17 prípadov (plán, config bez `engine_version`, podpora, minimá, názvy, `home_z`,
+  nika, vlastník, súhrny šablóny, klampy scale, ghost) + matica 7 vstupov (`lower upper dishwasher corner_blind tall nil ''`) nad každým miestom jadra aj panela;
+  in-SU `run_h12` (6 skriniek: dielce, config, kusovník, **VEPO CSV aj LOG bez riadku `Verzia:`**, expanzia nákupu + **`purchase_csv`** s 10 riadkami setov,
+  rozpočet, Kontrola) zachytený na nezmenenom kóde do `insu.json` a po refaktore **bajtovo rovnaký**. Guardy `test_h12a_register.rb`: invarianty a `client_payload`
+  (fixtúra `h12_cabinet_types.json` — kontrakt pre H12b/c), matica predikátov, **žiadne nové vetvenie podľa mena v `core/` a `modules/`** (allowlist s dôvodom),
+  `DEFAULTS_BY_TYPE` = `IDS`, **CN-03** (visiace typy = `cabinet_type` seedu závesov) a poradie načítania. T4: `test_s1e_slot.rb` číta minimá scale paritou
+  (`ScaleWatch.min_for`) namiesto regexu nad zdrojom. **Mutácie M1–M5, M7–M14, M17–M19 (16/16) zabité.** **Testy:** 5121 headless (lokálne 1 známy pád
+  `test_h11b_minimum` len pri CRLF checkoute) · 151 JS sád · encoding guard; in-SU **3343 / 0** na `f5dd4a44`. Predrecenzia povinná (nový modul, výrobná, > 300 riadkov).
+  STAV pred dávkou: v0.17.10 · H11b hotová · Robí sa H6/H7 (mockupy), H11a · Ďalší krok H11a, potom H12–H17.
+
 - **H11b · minimum SketchUp 2026 (1.10.2026, PR #445, v0.17.10, blok 9 · HARDENING PO V1, triedenie F-02; package
   [PACKAGE_H11.md](../zdroje/bloky/HARDENING/PACKAGE_H11.md) časť I, audit návrhu 2 BLOCKER · 5 FIX · 2 NOTE [AUDIT_H11_raw.md](../zdroje/bloky/HARDENING/AUDIT_H11_raw.md)
   + delta [AUDIT_H11_delta_raw.md](../zdroje/bloky/HARDENING/AUDIT_H11_delta_raw.md) — rez H11b → H11a (príprava na 2026.2) → H11c (overenie na 2026.2)).**

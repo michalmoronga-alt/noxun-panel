@@ -6,9 +6,10 @@
 
 ## Stav
 
-**v0.17.10 · 1.10.2026 — blok 9 HARDENING; dávka H11b hotová** (PR #445): **minimum je SketchUp 2026.** V staršom SketchUpe (2025, 2024…) dostaneš **jednu hlášku** a plugin sa v ňom
-**nenačíta** (na disku sa nič nezmení); v SketchUpe 2026 sa nemení nič. Inštalátor staršiemu SketchUpu plugin neskopíruje. **Príprava na 2026.2 (H11a) a jej overenie (H11c) nasledujú.**
-Pod tým **H10b/H10a** (v0.17.9/v0.17.8, PR #444/#443): dve okná SketchUpu sa neprebíjajú pri radoch ani pravidlách kovania · **H9** (v0.17.7, PR #442): poškodený súbor nastavení nezničí dobrú zálohu · **H8** (v0.17.6, PR #441): kus z inej verzie štandardu = oranžový riadok
+**v0.17.11 · 1.10.2026 — blok 9 HARDENING; dávka H12a hotová** (PR #?): **typy skriniek (dolná, horná, rohová, umývačka) a ich vlastnosti sú v jednom registri**
+v jadre pluginu — príprava na ďalšie typy po V1. **Pre teba sa nemení nič:** plán, kusovník, VEPO, nákup, rozpočet aj Kontrola štyroch typov sú **bajtovo rovnaké**
+(odtlačok spred zásahu v SketchUpe aj bez neho). Panel (H12b), Inspector a Štúdio (H12c) a názvy rolí v karte dielca (H12d) nasledujú.
+Pod tým **H11b** (v0.17.10, PR #445): minimum SketchUp 2026 · **H10b/H10a** (v0.17.9/v0.17.8, PR #444/#443): dve okná SketchUpu sa neprebíjajú pri radoch ani pravidlách kovania · **H9** (v0.17.7, PR #442): poškodený súbor nastavení nezničí dobrú zálohu · **H8** (v0.17.6, PR #441): kus z inej verzie štandardu = oranžový riadok
 · **H5/H4b/H4a** (v0.17.3–v0.17.5, PR #437–#440): mapa okien, texty, vzhľad, čísla v Štúdiu všade rovnako · **H3a/H3b** (v0.17.1–v0.17.2, PR #435–#436): bez zavádzajúcich údajov a falošnej chyby po **Súbor → Nový** — **čísla a exporty bez zmeny**.
 Pod tým **BLOK CENY UZAVRETÝ** (v0.17.0, 30.9.; štart #425, PR #426–#429; **smoke PASS 30.9.**, PR #431): doska a ABS páska **bez Demosu** majú **odkaz na produkt** a **ručné overenie ceny** (Materiály aj Rozpočet; D-148), Rozpočet ukazuje vek ručných cien
 a **„N cien na kontrolu"**; **materiál bez formátu — sklo aj bežná doska (C14) — sa počíta podľa skutočných m² dielcov** bez odpadu (porez a montáž bez zmeny, Q1).
@@ -26,24 +27,23 @@ v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a
 **Plugin beží len v SketchUpe 2026+** (0.17.10+; obe PC majú 2026). **Ochranu pred poškodeným súborom nastavení (H9) má len 0.17.7+, ochranu dvoch okien 0.17.8+ (pravidlá) a 0.17.9+ (rady) — aktualizovať obe PC a potom zavrieť všetky okná SketchUpu** (staré okno zapisuje bez ochrany).
 **Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
 
-**Testy (H11b, PR #445):** **5092 headless · 151 JS sád** zelené + encoding guard; in-SU **3340 / 0** na `16c03d3f` (SketchUp 26.0.429, sonda P2 a N6 v sekcii `run_h11b`).
+**Testy (H12a, PR #?):** **5121 headless · 151 JS sád** zelené + encoding guard; in-SU **3343 / 0** na `f5dd4a44` (SketchUp 2026, golden `run_h12` bajtovo rovnaký).
 
 ## Robí sa
 
-**Blok 9 · HARDENING PO V1** (štart 1.10.2026, PR #432): krížový audit V1 sedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**;
-17 dávok **H1…H17** sekvenčne podľa tabuľky v [PLAN.md](PLAN.md), **bez zmeny výrobných a cenových čísel**; priečinok bloku [zdroje/bloky/HARDENING/](zdroje/bloky/HARDENING/).
-Hotové **H1–H5** (PR #433–#440), **H8–H10b** (R-13, R-37, R-35 — PR #441–#444) a **H11b** (minimum 2026, PR #445); **H6/H7** čakajú na mockupy; **H11a** (príprava na 2026.2) čaká na Q1, **H11c** na aktualizáciu na 2026.2.
-**Otázky bez odpovede, platí návrh:** H11 Q2 (starší SketchUp = plugin sa nenačíta, jedna hláška) · H11 Q1 (chyba súboru = vypnúť celý plugin, platí pre H11a) · H11 Q3 (kedy 2026.2) · H10b Q2 (rôzne rady sa zlúčia bez hlášky, ten istý rad = hláška a zmenu treba zadať znova) · H10a Q1 (pri cudzej zmene globálu sa neuloží nič, ani projekt)
+**Blok 9 · HARDENING PO V1** (štart 1.10.2026, PR #432): krížový audit V1 sedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**; 17 dávok **H1…H17** sekvenčne podľa tabuľky v [PLAN.md](PLAN.md), **bez zmeny výrobných a cenových čísel**; priečinok bloku [zdroje/bloky/HARDENING/](zdroje/bloky/HARDENING/).
+Hotové **H1–H5** (PR #433–#440), **H8–H10b** (R-13, R-37, R-35 — PR #441–#444), **H11b** (minimum 2026, PR #445) a **H12a** (register typov, PR #?); **H6/H7** čakajú na mockupy; **H11a** (príprava na 2026.2) čaká na Q1, **H11c** na aktualizáciu na 2026.2.
+**Otázky bez odpovede, platí návrh:** H12 Q1 (karta dielca ako Kusovník — až H12d) · H11 Q2 (starší SketchUp = nenačíta sa, jedna hláška) · H11 Q1 (chyba súboru = vypnúť plugin, H11a) · H11 Q3 (kedy 2026.2) · H10b Q2 (rôzne rady sa zlúčia bez hlášky, ten istý rad = hláška) · H10a Q1 (cudzí globál = neuloží sa nič)
 · H9 Q1/Q2 (pri čítaní zo zálohy bez nálezu v Kontrole, bez tlačidla „Obnoviť zo zálohy") · H8 Q1/Q2 (veta o značke verzie, bez tlačidla) · H4b Q1/Q2 (vrátenie katalógu v ponuke „⋯" Materiálov, ikona posuvníkov pre Nastavenia rozpočtu).
 **H6 a H7 čakajú na schválený mockup** (R-38 v H7 potvrdí Michal) · **Q1** (porez a montáž pri skle) bez odpovede · pri prvej rohovej v dielni overiť záves Sensys · **na smoke čakajú** D-132 (#367), D-133 (#368), D-134 (#369).
 
 ## Ďalší krok
 
-Pokračovať blokom 9: **H11a** (príprava na 2026.2); **H6** a **H7** čakajú na schválenie mockupov Michalom; potom refaktory H12–H17; uzáver bloku = minor verzia + smoke
+Pokračovať blokom 9: **H12b** (panel Ruby + payload registra), **H12c** (JS z dát servera), **H12d** (mená rolí); **H11a** (príprava na 2026.2); **H6** a **H7** čakajú na schválenie mockupov Michalom; potom H13–H17; uzáver bloku = minor verzia + smoke
 (smoke H3a + H3b: 7 bodov v [PACKAGE_H3.md](zdroje/bloky/HARDENING/PACKAGE_H3.md) §10; H4a + H4b: body 1–11 v [PACKAGE_H4.md](zdroje/bloky/HARDENING/PACKAGE_H4.md) §10; vzhľad rozbaľovačiek a výberu nôh v SketchUpe overí smoke bod 7;
 H8: 4 body v [PACKAGE_H8.md](zdroje/bloky/HARDENING/PACKAGE_H8.md) §10 — reálna zákazka bez nového riadku a s rovnakými číslami; H9: 5 bodov v [PACKAGE_H9.md](zdroje/bloky/HARDENING/PACKAGE_H9.md) §10 — rovnaké čísla rozpočtu, hrán a nákupu, ochrana naživo voliteľne;
 H10a + H10b: body 1–6 v [PACKAGE_H10.md](zdroje/bloky/HARDENING/PACKAGE_H10.md) §10 — dve okná, testovacie modely, `hardware_rules.json` a `dim_series.json` zálohovať;
-H11b: 3 body v [PACKAGE_H11.md](zdroje/bloky/HARDENING/PACKAGE_H11.md) §B7). Ak druhé PC ešte nemá 0.17.0, aktualizovať (Kompatibilita vyššie). **Test na reálnej zákazke po V1.**
+H11b: 3 body v [PACKAGE_H11.md](zdroje/bloky/HARDENING/PACKAGE_H11.md) §B7; H12: 6 bodov v [PACKAGE_H12.md](zdroje/bloky/HARDENING/PACKAGE_H12.md) §10 — po H12c, bod 6 po H12d). Ak druhé PC ešte nemá 0.17.0, aktualizovať (Kompatibilita vyššie). **Test na reálnej zákazke po V1.**
 
 ## Posledné uzávery
 
