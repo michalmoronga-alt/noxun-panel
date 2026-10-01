@@ -70,19 +70,51 @@ def nx_h13_map_rows(lines)
   end
 end
 
-# Meno ako identifikator (aj `Modul::KONST`, `Modul.metoda`, `metoda!`) sa hlada
-# po castiach ako cele slovo; ostatne (pomlcka, medzera) doslovne.
-NX_H13_IDENT = /\A[A-Za-z_]\w*[?!]?(?:(?:::|\.|#)[A-Za-z_]\w*[?!]?)*\z/.freeze
+# Meno ako identifikator (aj `Modul::KONST`, `Modul.metoda`, `metoda!`); ostatne
+# (pomlcka, medzera) sa hladaju doslovne.
+NX_H13_IDENT = /\A[A-Za-z_]\w*[?!]?(?:(?:::|\.)[A-Za-z_]\w*[?!]?)*\z/.freeze
+# Obalove moduly pluginu — nerozlisuju register (kazdy subor ich ma).
+NX_H13_WRAPPERS = %w[Noxun Engine].freeze
 
+def nx_h13_word?(word, src)
+  src.match?(/(?<![\w])#{Regexp.escape(word)}(?![\w?!])/)
+end
+
+# Moduly a triedy, ktore subor deklaruje (bez obalovych).
+def nx_h13_modules(src)
+  src.scan(/^\s*(?:module|class)\s+([A-Z]\w*)/).flatten.uniq - NX_H13_WRAPPERS
+end
+
+# Telo modulu `mod` v Ruby zdroji: od riadku `module mod` po prvy `end`
+# s ROVNAKYM odsadenim (kod pluginu je dosledne odsadeny). nil = subor ho nema.
+def nx_h13_scope(src, mod)
+  lines = src.lines
+  start = lines.index { |l| l.match?(/^\s*(?:module|class)\s+#{Regexp.escape(mod)}\b/) }
+  return nil if start.nil?
+
+  indent = lines[start][/\A\s*/]
+  stop = ((start + 1)...lines.length).find { |i| lines[i].match?(/\A#{indent}end\b/) }
+  lines[start..(stop || -1)].join
+end
+
+# Kvalifikovane meno (`Modul::CLEN`, `Modul.metoda`) sa overuje v ROZSAHU
+# modulu — clen rovnakeho mena v inom module toho isteho suboru nestaci
+# (review #449: `TemplateStore::STD` vs `TemplateUsage::STD`). Subor, ktory
+# modul nedeklaruje (test, JS), musi obsahovat cely zapis doslovne.
 def nx_h13_name_in?(name, src)
   return src.include?(name) unless name.match?(NX_H13_IDENT)
 
-  name.split(/::|\.|#/).all? do |seg|
-    src.match?(/(?<![\w])#{Regexp.escape(seg)}(?![\w])/)
-  end
+  segs = name.split(/::|\./)
+  return nx_h13_word?(segs[0], src) if segs.length == 1
+
+  scope = nx_h13_scope(src, segs[-2])
+  return src.include?(name) if scope.nil?
+
+  nx_h13_word?(segs[-1], scope)
 end
 
-# Problemy mapy: cesta neexistuje, riadok bez mien, meno v subore nie je.
+# Problemy mapy: cesta neexistuje, riadok bez mien, meno v subore nie je,
+# holé meno clena v Ruby subore s viacerymi modulmi (nejednoznacne).
 # `reader` vrati obsah suboru alebo nil (negativne testy ho podvrhnu).
 def nx_h13_map_problems(rows, reader)
   rows.each_with_object([]) do |(section, path, names), out|
@@ -92,7 +124,27 @@ def nx_h13_map_problems(rows, reader)
       next
     end
     out << "#{section}: riadok #{path} nemenuje ziadne meno" if names.empty?
-    names.each { |n| out << "#{section}: #{path} nema `#{n}`" unless nx_h13_name_in?(n, src) }
+    mods = path.end_with?('.rb') ? nx_h13_modules(src) : []
+    names.each do |n|
+      out << "#{section}: #{path} nema `#{n}`" unless nx_h13_name_in?(n, src)
+      next unless mods.length > 1 && n.match?(NX_H13_IDENT) && !n.match?(/::|\./) && !mods.include?(n)
+
+      out << "#{section}: #{path} ma moduly #{mods.join('/')} — meno `#{n}` kvalifikuj (`Modul::#{n}`)"
+    end
+  end
+end
+
+# Mena, ktore scenar MUSI menovat (nie su len nahodou v nejakom riadku):
+# pasca zavesov a skutocne miesta vykreslenia sekcie Studia (review #449).
+NX_H13_REQUIRED = {
+  '## 1 · Nový typ skrinky' => %w[zavesenie-hornej-skrinky CabinetTypes::REGISTRY NX_H13_HANG_EXCEPTIONS],
+  '## 4 · Nová sekcia Štúdia' => %w[StudioDialog::SECTIONS SEC_META renderHead renderTools renderBody ssRenderBody]
+}.freeze
+
+def nx_h13_required_missing(rows)
+  NX_H13_REQUIRED.flat_map do |sec, names|
+    have = rows.select { |r| r[0] == sec }.flat_map { |r| r[2] }
+    (names - have).map { |n| "#{sec}: chyba `#{n}`" }
   end
 end
 
@@ -114,6 +166,8 @@ NxTest.test('H13 B-06: mapa rozsirovacich bodov ma vsetkych 5 scenarov a v kazdo
     n = rows.count { |r| r[0] == h }
     NxTest.assert(n >= 4, "scenar '#{h}' ma len #{n} strazenych riadkov (subor + mena)")
   end
+  missing_names = nx_h13_required_missing(rows)
+  NxTest.assert(missing_names.empty?, "mapa vynechala povinne mena: #{missing_names.join(' · ')}")
 end
 
 NxTest.test('H13 B-06: kazdy register menovany v mape v kode existuje (subor + mena)') do
@@ -143,6 +197,27 @@ NxTest.test('H13 B-06: guard mapy chyti zly subor, chybajuce meno a prazdny riad
     NxTest.refute(probs.empty?, "guard mapy nezachytil: #{why}")
   end
   NxTest.refute(nx_h13_name_in?('KONST', 'KONSTANTA = 1'), 'cast slova nie je cele slovo')
+end
+
+# Review #449 P2: kvalifikovane meno sa overuje v rozsahu SVOJHO modulu.
+NxTest.test('H13 B-06: Modul::CLEN plati len v rozsahu modulu; hole meno v subore s viacerymi modulmi neprejde') do
+  two = "module Noxun\n  module Engine\n    module TemplateStore\n      STD = 7\n      def migrate!; end\n    end\n" \
+        "    module TemplateUsage\n      STD = 1\n    end\n  end\nend\n"
+  NxTest.assert(nx_h13_name_in?('TemplateStore::STD', two))
+  NxTest.assert(nx_h13_name_in?('TemplateStore.migrate!', two))
+  NxTest.assert(nx_h13_name_in?('TemplateUsage::STD', two))
+  gone = two.sub("      STD = 7\n", '')
+  NxTest.refute(nx_h13_name_in?('TemplateStore::STD', gone), 'zmazane TemplateStore::STD preslo vdaka TemplateUsage::STD')
+  NxTest.refute(nx_h13_name_in?('TemplateUsage.migrate!', two), 'metoda ineho modulu presla')
+  NxTest.assert(nx_h13_name_in?('BuildPlan::ROLES', 'x = e::BuildPlan::ROLES'), 'nedeklarovany modul = doslovny odkaz')
+  NxTest.refute(nx_h13_name_in?('BuildPlan::ROLES', 'BuildPlan; ROLES'), 'nedeklarovany modul po castiach nestaci')
+  reader = ->(p) { { 'x/t.rb' => two, 'x/g.rb' => gone }[p] }
+  doc = ['## 1 · X', '| Súbor | Mená | Čo |', '|---|---|---|']
+  NxTest.assert_equal([], nx_h13_map_problems(nx_h13_map_rows(doc + ['| `x/t.rb` | `TemplateStore::STD` · `TemplateUsage` | a |']), reader))
+  NxTest.refute(nx_h13_map_problems(nx_h13_map_rows(doc + ['| `x/g.rb` | `TemplateStore::STD` | a |']), reader).empty?)
+  NxTest.refute(nx_h13_map_problems(nx_h13_map_rows(doc + ['| `x/t.rb` | `STD` | a |']), reader).empty?, 'hole STD v subore s 2 modulmi preslo')
+  rows = [['## 4 · Nová sekcia Štúdia', 'x', %w[StudioDialog::SECTIONS SEC_META renderHead renderTools ssRenderBody]]]
+  NxTest.assert(nx_h13_required_missing(rows).include?('## 4 · Nová sekcia Štúdia: chyba `renderBody`'), 'chybajuci renderBody presiel')
 end
 
 # --- CN-03: pasca zavesov ------------------------------------------------------

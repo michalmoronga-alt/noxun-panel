@@ -6,7 +6,9 @@
 > nová sekcia Štúdia a nové pravidlo kovania viazané na typ. Detail každého miesta je v odseku jeho modulu (Grep `^### <súbor>`).
 > **Ako sa číta:** tabuľky menujú **súbor a mená** (konštanta, modul, funkcia) — nikdy čísla riadkov. Riadok tabuľky, ktorý začína
 > cestou v spätných apostrofoch, stráži `tests/pure/test_h13_rozsirovacie_body.rb`: súbor musí existovať a každé meno z druhého
-> stĺpca v ňom musí byť. Premenovanie alebo zrušenie registra bez úpravy tejto kapitoly test zhodí.
+> stĺpca v ňom musí byť. Meno `Modul::ČLEN` alebo `Modul.metóda` sa hľadá **v rozsahu toho modulu** (súbor, ktorý modul nedeklaruje,
+> ho musí obsahovať doslovne) a v súbore s viacerými modulmi musí byť meno kvalifikované. Premenovanie alebo zrušenie registra bez
+> úpravy tejto kapitoly test zhodí.
 > **Údržba:** dávka, ktorá presunie alebo premenuje register z tejto kapitoly, opraví **jej riadok na mieste**. Priebeh prác sem
 > nepatrí (KRONIKA). Čísla verzií dát (schémy, seedy, STD) a kedy ich zvýšiť: jediná tabuľka v
 > [../../SYSTEM/STANDARD.md](../../SYSTEM/STANDARD.md) §13.
@@ -30,14 +32,14 @@ na dolnú a prestavbou vyrobil inú skrinku bez hlášky), pri nových rolách a
 | Súbor | Mená | Čo tam urobiť |
 |---|---|---|
 | `noxun_engine/core/cabinet_types.rb` | `CabinetTypes::REGISTRY` · `KEYS` · `IDS` · `FALLBACK` · `client_payload` | riadok typu so všetkými vlastnosťami (`hang_z`, `on_floor`, `builder`, `fronts`, `zones`, `ui_order`…) |
-| `noxun_engine/core/cabinet_builder.rb` | `DEFAULTS_BY_TYPE` · `EXTRA_KEYS_BY_TYPE` · `normalize` · `cabinet_config` · `CONFIG_SCHEMA` | predvoľby `*_DEFAULTS`, vlastné polia typu, whitelist configu, bump schémy |
+| `noxun_engine/core/cabinet_builder.rb` | `CabinetBuilder::DEFAULTS_BY_TYPE` · `CabinetBuilder::EXTRA_KEYS_BY_TYPE` · `CabinetBuilder.normalize` · `CabinetBuilder.cabinet_config` · `CabinetBuilder::CONFIG_SCHEMA` | predvoľby `*_DEFAULTS`, vlastné polia typu, whitelist configu, bump schémy |
 | `noxun_engine/core/construction.rb` | `Construction.build_plan` · `appliance_slot_plan` · `corner_parts` · `cabinet_hw_ctx` | kód topológie (nový `builder` alebo zostava); kontext pravidiel kovania nesie surový typ |
 | `noxun_engine/ui/panel/actions_cabinet.rb` | `PARAM_KEYS` · `TEMPLATE_TYPE_WORDS` | nové polia z panela (whitelist); slovo typu je odvodené z registra |
 | `noxun_engine/ui/panel/sync.rb` | `DEFAULTS_BY_TYPE` · `corner_insert_defaults` | predvoľby do JS idú z buildera (typ s vlastným výpočtom ako rohová) |
 | `noxun_engine/ui/panel.html` | `data-ins-type` · `tplSaveType` | tlačidlo vkladacej karty a `option` modalu „Uložiť ako šablónu" (statické, guard ich porovná s registrom) |
 | `noxun_engine/ui/js/core.js` | `NXTypes` · `CONSTRUCTION_FIELDS` · `onlyIf` | JS register netreba meniť; pole konštrukcie len pre nový typ = `onlyIf` predikát |
 | `noxun_engine/ui/js/form.js` | `SLOT_FIELDS` · `CORNER_FIELDS` · `applyVisibility` | vlastné polia typu vo formulári (validácia len pri svojom type) |
-| `noxun_engine/core/templates.rb` | `TemplateStore` · `build_predefined` · `migrate!` · `missing_slot_seed` · `STD` | seed šablóny; existujúcej knižnici ju doplní len migrácia pri bumpe `TemplateStore::STD` |
+| `noxun_engine/core/templates.rb` | `TemplateStore::STD` · `TemplateStore.build_predefined` · `TemplateStore.migrate!` · `TemplateStore.missing_slot_seed` | seed šablóny; existujúcej knižnici ju doplní len migrácia pri bumpe `TemplateStore::STD` |
 | `noxun_engine/core/appliance_binding.rb` | `OWNER_MATRIX` | len ak typ vlastní spotrebič (`appliance_owner`) |
 | `noxun_engine/ui/rules_dialog.rb` | `TYPE_SCOPE_PHRASES` · `type_scope_desc` | veta rozsahu pravidla („na hornú skrinku") pozná len hornú a dolnú — pravidlo s novým typom vetu nedostane |
 
@@ -76,14 +78,14 @@ hrany novej roly — inak sa na existujúcich PC postaví **bez pásky**). Dávk
 | `noxun_engine/core/construction.rb` | `FRONT_MATERIAL_ROLES` · `CORNER_NAMES` | kde dielec vzniká a jeho výrobný názov; čelo = materiálový kanál čiel |
 | `noxun_engine/core/abs_rules.rb` | `EDGE_LABELS` · `SEED_RULES` · `SEED_VERSION` · `STANDING_ROLES` | mená hrán a predvolené ABS novej roly (bump seedu) |
 | `noxun_engine/core/part_faces.rb` | `ROLE_AXES` · `STANDING_ROLES` | osi dielca (dĺžka/šírka, smer dekoru) |
-| `noxun_engine/core/cabinet_builder.rb` | `PART_TAGS` · `DRAWER_ROLES` | tag vrstvy a príslušnosť k zásuvke |
+| `noxun_engine/core/cabinet_builder.rb` | `CabinetBuilder::PART_TAGS` · `CabinetBuilder::DRAWER_ROLES` | tag vrstvy a príslušnosť k zásuvke |
 | `noxun_engine/core/validation.rb` | `FRONT_ROLES` | Kontrola čiel |
 | `noxun_engine/core/hardware_rules.rb` | `FRONT_ROLES` | ktoré čelá nesú kovanie |
-| `noxun_engine/core/cp_export.rb` | `FRONT_ROLES` | cenová ponuka — čo je čelo |
+| `noxun_engine/core/cp_export.rb` | `CpExport::FRONT_ROLES` | cenová ponuka — čo je čelo |
 | `noxun_engine/core/vepo_export.rb` | `VepoExport::SHORT_NAMES` · `NAME_PAIRS` | skratka výrobného názvu pre VEPO (kľúč = presný reťazec buildera) |
 | `noxun_engine/core/part_keys.rb` | `ZONE_PART_LABELS` · `DRAWER_PART_LABELS` | mená dielcov zóny a zásuvky v Kovaní a Kontrole |
 | `noxun_engine/ui/production_core.rb` | `ROLE_LABELS` · `role_label` | zobrazovacie meno (stĺpec Rola v Kusovníku — autorita mien) |
-| `noxun_engine/core/drawer_recipes.rb` | `Recipes` · `role_label` | iný gramatický tvar do viet hlášok zásuviek |
+| `noxun_engine/core/drawer_recipes.rb` | `Recipes.role_label` | iný gramatický tvar do viet hlášok zásuviek |
 | `noxun_engine/ui/rules_dialog.rb` | `ABS_ROLE_ORDER` | poradie rolí v prehľade ABS sekcie Pravidlá |
 | `noxun_engine/ui/panel/payloads.rb` | `BOARD_ROLE_LABELS` · `MANUAL_OWNER_PREFIXES` · `CORNER_PREVIEW_ROLES` | karta dosky, ručné zásahy, kresba rohovej |
 | `noxun_engine/ui/js/part_card.js` | `roleLabel` · `isFront` | JS kópia mien a „je čelo" v karte dielca (mená zjednotí H12d) |
@@ -109,15 +111,19 @@ XLSX a CSV kusovníka dnes **neexistujú** (UI20_KONTRAKT Š5) — stĺpec sa do
 
 ## 4 · Nová sekcia Štúdia
 
-Autorita zoznamu sekcií je Ruby whitelist; JS má zrkadlá (zjednotí ich dávka H14). Nová sekcia potrebuje ikonu v inventári
-UI_DIZAJN §4, fotku v `scripts/ui_foto/shots.json` a `?v=` = VERSION pri novom skripte.
+Autorita zoznamu sekcií je Ruby whitelist; JS má zrkadlá (zjednotí ich dávka H14). Samotné id v zoznamoch sekciu len sprístupní na
+výber — **vykreslí ju až vlastná vetva**: bez riadku `SEC_META` ukáže hlavička „—" a bez vetvy v `renderBody` spadne telo do tabuliek
+Kusovníka. Sekcia skupiny Nastavenia ide navyše cez pevné vetvy `sup`/`bset`/`about` v `renderTools` aj `renderBody` (a vlastné vetvy
+v `studio_settings.js`). Nová sekcia potrebuje ikonu v inventári UI_DIZAJN §4, fotku v `scripts/ui_foto/shots.json` a `?v=` = VERSION
+pri novom skripte.
 
 | Súbor | Mená | Čo tam urobiť |
 |---|---|---|
-| `noxun_engine/ui/studio_dialog.rb` | `StudioDialog::SECTIONS` · `push_state` | id sekcie (autorita) a jej dáta v pushi okna |
+| `noxun_engine/ui/studio_dialog.rb` | `StudioDialog::SECTIONS` · `StudioDialog.push_state` | id sekcie (autorita) a jej dáta v pushi okna |
 | `noxun_engine/ui/js/studio.js` | `STUDIO_SECTIONS` · `NAV` · `studioGoSection` | zrkadlo zoznamu, položka navigácie (skupina, ikona, text) |
+| `noxun_engine/ui/js/studio.js` | `SEC_META` · `renderHead` · `renderTools` · `renderBody` | nadpis a nápoveda sekcie, vetva lišty a vetva tela (renderer sekcie, napr. `budRenderBody`, `ssRenderBody`) |
 | `noxun_engine/ui/js/shell.js` | `STUDIO_SECTIONS` | druhé zrkadlo (otváranie sekcie z Inspectora) |
-| `noxun_engine/ui/js/studio_settings.js` | `SS_SECTIONS` | len sekcia skupiny Nastavenia |
+| `noxun_engine/ui/js/studio_settings.js` | `SS_SECTIONS` · `ssRenderBody` · `ssRenderTools` · `ssToolsHtml` | len sekcia skupiny Nastavenia: zoznam a vetvy tela a lišty (`sec === 'bset'` …) |
 | `noxun_engine/ui/production_core.rb` | `ROUTE_SECTIONS` | len ak nález Kontroly vedie do sekcie |
 | `noxun_engine/ui/studio.html` | `studio.js` | nový skript sekcie s `?v=` |
 | `scripts/ui_foto/shots.json` | `studio_bom` | fotka sekcie pre UI PR |
