@@ -80,7 +80,7 @@ module Noxun
         # KON-B · K2 (M6): obe listy chrbta nesu spolocny nazov z buildera
         # (`Construction::BACK_RAIL_NAME`) — jeden riadok, 2 ks, „Chrb HD".
         'Lista chrbta'       => 'Chrb HD',
-        # ROH-A1 · K3 (NAVRH — potvrdi Michal): rohova zostava. CR 1 a CR 2
+        # ROH-A1 · K3 (potvrdil Michal 28.9.: mockup O6, R10): rohova zostava. CR 1 a CR 2
         # pri zhodnom rozmere v jednom riadku = „CR 1 2" (cisla na konci
         # tokenu sa zlucuju, D-121b).
         'Blenda rohova'      => 'Blenda roh',

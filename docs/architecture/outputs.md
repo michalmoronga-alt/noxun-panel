@@ -1071,7 +1071,7 @@ z disku, I/O chyby vyletia ako neúspešný zápis) je v [model-a-identita.md](m
 
 ### vepo_export.rb
 
-**ROH-A1 · K3 — skratky rohovej zostavy (návrh, potvrdí Michal):** `SHORT_NAMES` dostali presné názvy z buildera (`Construction::CORNER_NAMES`) —
+**ROH-A1 · K3 — skratky rohovej zostavy (potvrdil Michal 28.9.: mockup O6, rozhodnutie R10 bloku ROHOVÁ):** `SHORT_NAMES` dostali presné názvy z buildera (`Construction::CORNER_NAMES`) —
 `Blenda rohova` → `Blenda roh`, `Vystuha zavesov` → `Vyst zav`, `Vystuha rohova` → `Vyst roh`, `CR lista 1` → `CR 1`, `CR lista 2` → `CR 2`; CR 1 a CR 2 rovnakého
 rozmeru a materiálu sú jeden riadok kusovníka (agregácia nenesie rolu, C11) a zlúčený token `CR 1 2`. Smer dekoru CR je ako pri dverách (dĺžka = výška).
 

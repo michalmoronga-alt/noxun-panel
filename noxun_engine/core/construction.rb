@@ -601,7 +601,7 @@ module Noxun
       # Medzera dveri pri rohu (krizovy audit C3): zaporna by dvere prekryla
       # s CR 1, velka by rozbila zostavu.
       CORNER_GAP_RANGE = [1.0, 20.0].freeze
-      # Nazvy dielcov v builderi (ASCII ako ostatne; NAVRH — potvrdi Michal).
+      # Nazvy dielcov v builderi (ASCII ako ostatne; potvrdil Michal 28.9. — mockup O6, R10).
       CORNER_NAMES = {
         'corner_blind_panel' => 'Blenda rohova', 'hinge_rail' => 'Vystuha zavesov',
         'corner_rail' => 'Vystuha rohova', 'cr_front' => 'CR lista 1', 'cr_side' => 'CR lista 2'
@@ -718,7 +718,7 @@ module Noxun
           box: box, origin: origin, prod: prod, axes: axes }
       end
 
-      # ORANGE (NAVRH — potvrdi Michal): polica rohovej ide ako v DC cez
+      # ORANGE (potvrdil Michal — mockup O8, R10; smoke 28.9.): polica rohovej ide ako v DC cez
       # celu sirku a pretina vystuhu zavesov. Kusovnik a VEPO ostavaju
       # obdlznik; vyrez robi dielna. JEDEN warning na skrinku (nie na policu).
       def corner_shelf_warning(cfg, shelves, warnings)
