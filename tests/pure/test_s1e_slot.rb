@@ -94,7 +94,7 @@ module NxS1E
     @form_js ||= src('noxun_engine', 'ui', 'js', 'form.js')
   end
 
-  # Dvojica [min, max] z JS zoznamu LIMITS / TYPE_LIMITS (suroví text — guard
+  # Dvojica [min, max] z JS zoznamu LIMITS (surový text — guard
   # ma padnut aj vtedy, ked by JS sada nebezala).
   def js_limit(block_re, id)
     block = form_js[block_re, 1].to_s
@@ -181,10 +181,14 @@ NxTest.test('S1-E E1: hranice sirky a vysky su NA JEDNOM mieste (Ruby, scale, JS
   NxTest.assert_close(NxS1E.cb::DW_HEIGHT_RANGE[0], omin['height'], 0.01,
                       'a tu istu hranicu vysky')
 
-  jw = NxS1E.js_limit(/var\s+TYPE_LIMITS\s*=\s*\{\s*dishwasher:\s*\{(.*?)\}\s*\};/m, 'width')
-  jh = NxS1E.js_limit(/var\s+TYPE_LIMITS\s*=\s*\{\s*dishwasher:\s*\{(.*?)\}\s*\};/m, 'height')
-  NxTest.assert_equal(NxS1E.cb::DW_WIDTH_RANGE, jw, 'panel ma ten isty rozsah sirky')
-  NxTest.assert_equal(NxS1E.cb::DW_HEIGHT_RANGE, jh, 'a ten isty rozsah vysky')
+  # H12c (T4): panel uz nema JS kopiu rozsahov (`TYPE_LIMITS` zanikol) — cita
+  # `limits` z registra, ktory mu posiela server (`client_payload` v `NX.init`).
+  lim = Noxun::Engine::CabinetTypes.client_payload.find { |r| r['id'] == 'dishwasher' }['limits']
+  NxTest.assert_equal(NxS1E.cb::DW_WIDTH_RANGE, lim['width'], 'panel ma ten isty rozsah sirky')
+  NxTest.assert_equal(NxS1E.cb::DW_HEIGHT_RANGE, lim['height'], 'a ten isty rozsah vysky')
+  form = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'form.js'), encoding: 'UTF-8')
+  NxTest.refute(form.match?(/var\s+TYPE_LIMITS\b|TYPE_LIMITS\s*:/), 'ziadna JS kopia rozsahov typu')
+  NxTest.assert(form.include?('var t = NXTypes.get(cabTypeNow()).limits;'), 'limitFor cita register')
 end
 
 NxTest.test('S1-E R1: rozsahy poli slotu su zrkadlom v Ruby aj v JS') do
@@ -624,16 +628,21 @@ end
 # ---------------------------------------------------------------------------
 
 NxTest.test('S1-E: JS pozna PRESNE tie iste typy ako Ruby') do
+  # H12c (T4): JS uz nema vlastne zoznamy (CAB_TYPES, INSERT_TYPES) — typy
+  # dostava od servera v `NX.init` (`cabinet_types` = `client_payload`, poradie
+  # = `TYPES`) a vkladacia karta k nim prida dosku. Parita = jeden zdroj.
+  ids = Noxun::Engine::CabinetTypes.client_payload.map { |r| r['id'] }
+  NxTest.assert_equal(NxS1E.cb::TYPES, ids, 'payload pre JS nesie TYPES v poradi')
   core = NxS1E.src('noxun_engine', 'ui', 'js', 'core.js')
-  m = core[/var\s+CAB_TYPES\s*=\s*\[(.*?)\];/m, 1].to_s
-  js_types = m.scan(/'([a-z_]+)'/).flatten
-  NxTest.assert_equal(NxS1E.cb::TYPES, js_types, 'core.js ma zrkadlo TYPES')
-
+  NxTest.refute(core.include?('CAB_TYPES'), 'core.js nema vlastny zoznam typov')
+  sync = NxS1E.src('noxun_engine', 'ui', 'panel', 'sync.rb')
+  NxTest.assert(sync.include?('cabinet_types: CabinetTypes.client_payload'), 'push_init posiela register')
+  NxTest.assert(NxS1E.src('noxun_engine', 'ui', 'js', 'bridge.js').include?('NXTypes.set(data.cabinet_types);'),
+                'NX.init ho nasadi')
   ins = NxS1E.src('noxun_engine', 'ui', 'js', 'insert_state.js')
-  mi = ins[/var\s+INSERT_TYPES\s*=\s*\[(.*?)\];/m, 1].to_s
-  ins_types = mi.scan(/'([a-z_]+)'/).flatten
-  NxTest.assert_equal(NxS1E.cb::TYPES + ['board'], ins_types,
-                      'vkladacia karta ponuka vsetky typy + dosku')
+  NxTest.refute(ins.include?('INSERT_TYPES'), 'vkladacia karta nema vlastny zoznam')
+  NxTest.assert(ins.include?('function insertTypes(){ return NXTypes.ids().concat([BOARD]); }'),
+                'vkladacia karta ponuka vsetky typy registra + dosku')
 end
 
 NxTest.test('S1-E: panel prijme polia slotu (PARAM_KEYS) a posiela ich (CONSTRUCTION_FIELDS)') do
@@ -684,9 +693,12 @@ NxTest.test('S1-E (P2 #2): modal „Uložiť ako šablónu" pozna slot a server 
   # JS zamok je LEN zrkadlo — existuje a nastavuje `disabled`.
   js = NxS1E.src('noxun_engine', 'ui', 'js', 'form.js')
   fn = js[/function nxSyncTplSaveType\(t\)\{.*?\n  \}/m].to_s
-  # ROH-A2: zamok je tabulka TPL_TYPE_LOCK (slot + rohova), select sa zamyka podla nej.
+  # ROH-A2: zamok (slot + rohova), select sa zamyka podla neho. H12c (T4):
+  # zamok aj jeho vety su v registri servera (`template_type: locked`).
   NxTest.assert(fn.include?('sel.disabled = !!lock'), 'modal typ pri slote ZAMKNE')
-  NxTest.assert(js[/var TPL_TYPE_LOCK = \{(.*?)\n  \};/m, 1].to_s.include?('dishwasher:'), 'slot je v tabulke zamknutych typov')
+  NxTest.assert(fn.include?('var lock = nxTplTypeLock(t);'), 'zamok cita register')
+  NxTest.assert_equal('locked', Noxun::Engine::CabinetTypes.prop('dishwasher', :template_type),
+                      'slot je v registri zamknuty typ')
 end
 
 NxTest.test('S1-E (P2 #6): preflighty TELA a CHRBTA sa slotu netykaju') do

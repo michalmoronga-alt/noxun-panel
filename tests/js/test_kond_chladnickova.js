@@ -33,18 +33,19 @@ function tileNode(markup, selector){
 
 const VENT = 'Vetracie otvory v sokli a hore rieši stolár podľa montážneho listu spotrebiča.';
 const HW = 'Kovanie: Závesy: Klasik — zámky sa neprenášajú';
-// Tvar zo servera (tile_row aj template_list nesú tie isté odvodené kľúče).
-const fridge = { name: 'Chladničková', kind: 'cabinet',
+// Tvar zo servera (tile_row aj template_list nesú tie isté odvodené kľúče;
+// H12b/H12c: aj slovo typu `type_word` — okno ho už samo neskladá).
+const fridge = { name: 'Chladničková', kind: 'cabinet', type_word: 'dolná',
   config: { type: 'lower', width: 600, height: 2100, depth: 560 },
   hardware: { has: false, labels: [] },
   appliance_expects: { has: true, codes: ['fridge'], text: 'očakáva chladničku' },
   construction: { has: true, text: 'komín vzadu 50' }, vent_note: VENT };
-const plain = { name: 'Dolna klasik', kind: 'cabinet', config: { type: 'lower', width: 600, height: 720, depth: 510 },
+const plain = { name: 'Dolna klasik', kind: 'cabinet', type_word: 'dolná', config: { type: 'lower', width: 600, height: 720, depth: 510 },
   hardware: { has: false, labels: [] }, appliance_expects: { has: false, codes: [], text: '' },
   construction: { has: false, text: '' }, vent_note: '' };
 const withHw = Object.assign({}, fridge, { name: 'Chladničková s kovaním',
   hardware: { has: true, labels: ['Závesy: Klasik'] } });
-const legacy = { name: 'Stará', kind: 'cabinet', config: { type: 'lower', width: 600 } };
+const legacy = { name: 'Stará', kind: 'cabinet', type_word: 'dolná', config: { type: 'lower', width: 600 } };
 
 // ============ 1) ŠTÚDIO — riadok súhrnu a tooltip ============================
 const t1 = tileNode(studio.tplTileHtml(fridge, 'cabinet', 0), '.stpltile');

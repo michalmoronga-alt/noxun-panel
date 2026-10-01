@@ -18,6 +18,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
+// H12c: typ bez korpusu (slot) listy nema — vlastnost registra servera.
+const TYPES = require('./nx_types_fixture.js');
 
 const ROOT = path.join(__dirname, '..', '..');
 const DIR = path.join(ROOT, 'noxun_engine', 'ui', 'js');
@@ -96,6 +98,8 @@ vm.createContext(ctx);
 ['expr.js', 'core.js', 'form.js', 'preview.js'].forEach(function(f){
   vm.runInContext(fs.readFileSync(path.join(DIR, f), 'utf8'), ctx, { filename: f });
 });
+// H12c: register typov zo servera (v CEF ho plni `NX.init`).
+TYPES.fill(ctx);
 vm.runInContext("DEFAULTS.lower = { width: 600, height: 720, depth: 510, thickness: 18, floor_height: 100, back_rail_height: 100 };" +
                 "DEFAULTS.upper = { width: 600, height: 720, depth: 320, thickness: 18, floor_height: 0, back_rail_height: 100 };" +
                 "DEFAULTS.dishwasher = { width: 600, height: 880, depth: 560, thickness: 18, floor_height: 0 };", ctx);

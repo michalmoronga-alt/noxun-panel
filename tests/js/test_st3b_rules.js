@@ -137,8 +137,12 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   eq(R.rdLabel('hinge'), 'Závesy', 'typ kovania sa píše po slovensky');
   eq(R.rdLabel('wall_hanger'), 'Zavesenie na stenu', 'aj ten najnovší');
   eq(R.rdLabel('nieco_nove'), 'nieco_nove', 'neznámy typ sa NEZAMLČÍ — ukáže sa surový');
-  eq(R.rdRoleDesc({ applies_to: { role: 'cabinet', cabinet_type: ['upper'] } }),
+  // H12c (T4): vetu podľa TYPU korpusu skladá server (`type_scope` = pole po
+  // riadkoch, RulesDialog) — okno žiadnu mapu typov nemá; bez vety ide pravidlo ďalej.
+  eq(R.rdRoleDesc({ rule_id: 'z', applies_to: { role: 'cabinet', cabinet_type: ['upper'] } }, 'na hornú skrinku'),
      'na hornú skrinku', 'cabinet pravidlo vie cieliť podľa typu korpusu');
+  eq(R.rdRoleDesc({ rule_id: 'z', applies_to: { role: 'cabinet', cabinet_type: ['upper'] } }, null),
+     'na každú skrinku', 'bez vety servera klient typ sám nepreloží');
   eq(R.rdRoleDesc({ applies_to: { role: 'cabinet', support: ['plinth'] } }),
      'na skrinku s podstavcom', 'alebo podľa podopretia (nohy)');
   eq(R.rdRoleDesc({ applies_to: { role: 'front_door' } }), 'na každé krídlo dvierok',

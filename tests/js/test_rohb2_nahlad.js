@@ -41,7 +41,12 @@ let n = 0;
 function plain(v){ return (v && typeof v === 'object') ? JSON.parse(JSON.stringify(v)) : v; }
 function eq(actual, expected, msg){ n++; assert.deepStrictEqual(plain(actual), plain(expected), msg); }
 function ok(cond, msg){ n++; assert.ok(cond, msg); }
-function load(ctx, file){ vm.runInContext(fs.readFileSync(path.join(JS, file), 'utf8'), ctx, { filename: file }); }
+// H12c: po core.js dostane kontext register typov zo servera (v CEF `NX.init`).
+const TYPES = require('./nx_types_fixture.js');
+function load(ctx, file){
+  vm.runInContext(fs.readFileSync(path.join(JS, file), 'utf8'), ctx, { filename: file });
+  if (file === 'core.js') TYPES.fill(ctx);
+}
 function get(ctx, expr){ return vm.runInContext(expr, ctx); }
 
 // Kresba servera (`Panel.corner_preview_json`) pre 1100 × 720, sokel 100,

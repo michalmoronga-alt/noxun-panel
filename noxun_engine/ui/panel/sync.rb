@@ -39,8 +39,9 @@ module Noxun
             appdata_dir: about_dir,
             # H12b (R2.6): REGISTER TYPOV SKRINKY pre klienta
             # (`CabinetTypes.client_payload` — kontrakt, fixtura
-            # `tests/fixtures/h12_cabinet_types.json`). Aditivny kluc: JS ho do
-            # H12c nečíta; potom z neho skladá zoznamy, názvy a predikáty typu.
+            # `tests/fixtures/h12_cabinet_types.json`). JS ho nasadí PRVÝM
+            # riadkom `NX.init` (`NXTypes`, H12c) — z neho skladá zoznamy,
+            # názvy a predikáty typu.
             cabinet_types: CabinetTypes.client_payload,
             defaults: init_defaults(model),
             # D-27: viditelnost NOXUN tagov v modeli — JEDEN stav pre okno

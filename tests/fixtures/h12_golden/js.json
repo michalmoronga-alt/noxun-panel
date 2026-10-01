@@ -1,0 +1,2315 @@
+{
+ "inputs": [
+  "lower",
+  "upper",
+  "dishwasher",
+  "corner_blind",
+  "tall",
+  "(chyba)",
+  "('')"
+ ],
+ "insert": {
+  "lower": {
+   "forType": [
+    "Dolna",
+    "Bez typu",
+    "Vysoka",
+    "Prazdny typ"
+   ],
+   "templateType": "lower",
+   "insertType": "lower",
+   "payload": {
+    "type": "lower",
+    "corner_side": null,
+    "floor_height": 100,
+    "keys": [
+     "dw_class",
+     "dw_body_height",
+     "dw_front_bottom"
+    ]
+   },
+   "legs": {
+    "key": "lower|600|720|510|100|none|{}",
+    "gen": 1
+   },
+   "common": {
+    "getType": "lower",
+    "cabInfoType": "Dolná",
+    "carcass": {
+     "floor_height": 100,
+     "type": "lower"
+    },
+    "limits": [
+     [
+      200,
+      3000
+     ],
+     [
+      80,
+      3000
+     ],
+     [
+      150,
+      2000
+     ]
+    ],
+    "construction": [
+     "dw_class",
+     "dw_body_height",
+     "dw_front_bottom"
+    ],
+    "symbolBlindCur": "cross",
+    "rowLabelBlind": "Blenda",
+    "rowIconBlind": "front-blind",
+    "cornerSide": "left",
+    "cornerCardSide": null,
+    "pvSlot": false,
+    "floorH": 100,
+    "opening": {
+     "x0": 0,
+     "w": 600
+    },
+    "metaDims": {
+     "w": 600,
+     "h": 720,
+     "d": 510,
+     "plinth": 100,
+     "plinth_visible": true
+    },
+    "tplModal": {
+     "value": "lower",
+     "disabled": false,
+     "title": "",
+     "hiddenOptions": [
+      "corner_blind",
+      "dishwasher"
+     ],
+     "tipHidden": true,
+     "tip": null,
+     "expectsRowHidden": false,
+     "expectsSlotHidden": true,
+     "expectsValue": []
+    },
+    "validation": {
+     "ok": true,
+     "bad": []
+    },
+    "markHeight": [
+     "height",
+     "floor_height"
+    ],
+    "draft": {
+     "width": 600,
+     "height": 720,
+     "floor_height": 100,
+     "fronts": {
+      "split_axis": "height",
+      "gap": 3,
+      "gap_top": 2,
+      "gap_bottom": 2,
+      "gap_left": 2,
+      "gap_right": 2,
+      "edge_limit_off": false,
+      "items": []
+     },
+     "model_guid": "g",
+     "cabinet_id": "",
+     "type": "lower"
+    },
+    "rows": {
+     "display": {
+      "plinthGroup": "",
+      "fhRow": "",
+      "thicknessRow": "",
+      "infAvWidth": "",
+      "infIntDepth": "",
+      "infAvHeight": "",
+      "infArea": "",
+      "topSetbackRow": "",
+      "backSetbackRow": ""
+     },
+     "hidden": {
+      "cornerRow": true,
+      "dwClassRow": true,
+      "dwBodyRow": true,
+      "dwFrontBottomRow": true,
+      "infDwBody": true,
+      "infDwFront": true,
+      "infDwGap": true,
+      "infDwUnder": true,
+      "infDwClass": true,
+      "fr_gap": false,
+      "fr_gap_bottom": false,
+      "infCornerDoor": true,
+      "legsRow": true,
+      "frontAddTypes": false,
+      "frontOneDoor": true,
+      "cabBackNote": true,
+      "qs:details[data-key=\"zsplit\"]": false
+     },
+     "text": {
+      "lblHeight": "Výška",
+      "cabBackNote": "",
+      "inf_parts": "≈ 5",
+      "inf_area": "≈ 1,6 m²",
+      "inf_weight": "—"
+     }
+    }
+   }
+  },
+  "upper": {
+   "forType": [
+    "Horna"
+   ],
+   "templateType": "upper",
+   "insertType": "upper",
+   "payload": {
+    "type": "upper",
+    "corner_side": null,
+    "floor_height": 0,
+    "keys": [
+     "dw_class",
+     "dw_body_height",
+     "dw_front_bottom"
+    ]
+   },
+   "legs": {
+    "key": "lower|600|720|510|100|none|{}",
+    "gen": 2
+   },
+   "common": {
+    "getType": "upper",
+    "cabInfoType": "Horná",
+    "carcass": {
+     "floor_height": 0,
+     "type": "upper"
+    },
+    "limits": [
+     [
+      200,
+      3000
+     ],
+     [
+      80,
+      3000
+     ],
+     [
+      150,
+      2000
+     ]
+    ],
+    "construction": [
+     "dw_class",
+     "dw_body_height",
+     "dw_front_bottom"
+    ],
+    "symbolBlindCur": "cross",
+    "rowLabelBlind": "Blenda",
+    "rowIconBlind": "front-blind",
+    "cornerSide": "left",
+    "cornerCardSide": null,
+    "pvSlot": false,
+    "floorH": 0,
+    "opening": {
+     "x0": 0,
+     "w": 600
+    },
+    "metaDims": {
+     "w": 600,
+     "h": 720,
+     "d": 320,
+     "plinth": 0,
+     "plinth_visible": false
+    },
+    "tplModal": {
+     "value": "upper",
+     "disabled": false,
+     "title": "",
+     "hiddenOptions": [
+      "corner_blind",
+      "dishwasher"
+     ],
+     "tipHidden": true,
+     "tip": null,
+     "expectsRowHidden": false,
+     "expectsSlotHidden": true,
+     "expectsValue": []
+    },
+    "validation": {
+     "ok": true,
+     "bad": []
+    },
+    "markHeight": [
+     "height",
+     "floor_height"
+    ],
+    "draft": {
+     "width": 600,
+     "height": 720,
+     "floor_height": 0,
+     "fronts": {
+      "split_axis": "height",
+      "gap": 3,
+      "gap_top": 2,
+      "gap_bottom": 2,
+      "gap_left": 2,
+      "gap_right": 2,
+      "edge_limit_off": false,
+      "items": []
+     },
+     "model_guid": "g",
+     "cabinet_id": "",
+     "type": "upper"
+    },
+    "rows": {
+     "display": {
+      "plinthGroup": "none",
+      "fhRow": "none",
+      "thicknessRow": "",
+      "infAvWidth": "",
+      "infIntDepth": "",
+      "infAvHeight": "",
+      "infArea": "",
+      "topSetbackRow": "",
+      "backSetbackRow": ""
+     },
+     "hidden": {
+      "cornerRow": true,
+      "dwClassRow": true,
+      "dwBodyRow": true,
+      "dwFrontBottomRow": true,
+      "infDwBody": true,
+      "infDwFront": true,
+      "infDwGap": true,
+      "infDwUnder": true,
+      "infDwClass": true,
+      "fr_gap": false,
+      "fr_gap_bottom": false,
+      "infCornerDoor": true,
+      "legsRow": true,
+      "frontAddTypes": false,
+      "frontOneDoor": true,
+      "cabBackNote": true,
+      "qs:details[data-key=\"zsplit\"]": false
+     },
+     "text": {
+      "lblHeight": "Výška",
+      "cabBackNote": "",
+      "inf_parts": "≈ 5",
+      "inf_area": "≈ 1,25 m²",
+      "inf_weight": "—"
+     }
+    }
+   }
+  },
+  "dishwasher": {
+   "forType": [
+    "Umyvacka 60"
+   ],
+   "templateType": "dishwasher",
+   "insertType": "dishwasher",
+   "payload": {
+    "type": "dishwasher",
+    "corner_side": null,
+    "floor_height": 0,
+    "keys": [
+     "dw_class",
+     "dw_body_height",
+     "dw_front_bottom"
+    ]
+   },
+   "legs": {
+    "key": "lower|600|720|510|100|none|{}",
+    "gen": 2
+   },
+   "common": {
+    "getType": "dishwasher",
+    "cabInfoType": "Umývačka",
+    "carcass": {
+     "floor_height": 0,
+     "type": "dishwasher"
+    },
+    "limits": [
+     [
+      300,
+      1200
+     ],
+     [
+      500,
+      1200
+     ],
+     [
+      150,
+      2000
+     ]
+    ],
+    "construction": [
+     "dw_class",
+     "dw_body_height",
+     "dw_front_bottom"
+    ],
+    "symbolBlindCur": "down",
+    "rowLabelBlind": "Dvere umývačky",
+    "rowIconBlind": "front-fall",
+    "cornerSide": "left",
+    "cornerCardSide": null,
+    "pvSlot": true,
+    "floorH": 0,
+    "opening": {
+     "x0": 0,
+     "w": 600
+    },
+    "metaDims": {
+     "w": 600,
+     "h": 880,
+     "d": 560,
+     "plinth": 0,
+     "plinth_visible": false
+    },
+    "tplModal": {
+     "value": "dishwasher",
+     "disabled": true,
+     "title": "Typ určuje sám slot umývačky — prepnúť sa nedá.",
+     "hiddenOptions": [
+      "corner_blind"
+     ],
+     "tipHidden": false,
+     "tip": "Typ určuje sám slot umývačky — nemá korpus, takže sa na dolnú ani hornú skrinku prepnúť nedá.",
+     "expectsRowHidden": true,
+     "expectsSlotHidden": false,
+     "expectsValue": null
+    },
+    "validation": {
+     "ok": false,
+     "bad": [
+      "width",
+      "dw_body_height",
+      "dw_front_bottom"
+     ]
+    },
+    "markHeight": [
+     "height",
+     "dw_front_bottom"
+    ],
+    "draft": {
+     "width": 600,
+     "height": 880,
+     "floor_height": 0,
+     "fronts": {
+      "split_axis": "height",
+      "gap": 3,
+      "gap_top": 2,
+      "gap_bottom": 2,
+      "gap_left": 2,
+      "gap_right": 2,
+      "edge_limit_off": false,
+      "items": []
+     },
+     "model_guid": "g",
+     "cabinet_id": "",
+     "type": "dishwasher",
+     "dw_front_bottom": 100
+    },
+    "rows": {
+     "display": {
+      "plinthGroup": "none",
+      "fhRow": "none",
+      "thicknessRow": "none",
+      "infAvWidth": "none",
+      "infIntDepth": "none",
+      "infAvHeight": "none",
+      "infArea": "none",
+      "topSetbackRow": "none",
+      "backSetbackRow": "none"
+     },
+     "hidden": {
+      "cornerRow": true,
+      "dwClassRow": false,
+      "dwBodyRow": false,
+      "dwFrontBottomRow": false,
+      "infDwBody": false,
+      "infDwFront": false,
+      "infDwGap": false,
+      "infDwUnder": false,
+      "infDwClass": false,
+      "fr_gap": true,
+      "fr_gap_bottom": true,
+      "infCornerDoor": true,
+      "legsRow": true,
+      "frontAddTypes": false,
+      "frontOneDoor": true,
+      "cabBackNote": true,
+      "qs:details[data-key=\"zsplit\"]": false
+     },
+     "text": {
+      "lblHeight": "Výška linky",
+      "cabBackNote": "",
+      "inf_parts": "≈ 1",
+      "inf_area": "—",
+      "inf_weight": "—"
+     }
+    }
+   }
+  },
+  "corner_blind": {
+   "forType": [
+    "Rohova"
+   ],
+   "templateType": "corner_blind",
+   "insertType": "corner_blind",
+   "payload": {
+    "type": "corner_blind",
+    "corner_side": "left",
+    "floor_height": 100,
+    "keys": [
+     "dw_class",
+     "dw_body_height",
+     "dw_front_bottom",
+     "corner_door_w",
+     "corner_cr1",
+     "corner_cr2",
+     "corner_side"
+    ]
+   },
+   "legs": {
+    "key": "corner_blind|1100|720|510|100|none|{}",
+    "gen": 1
+   },
+   "common": {
+    "getType": "corner_blind",
+    "cabInfoType": "Rohová",
+    "carcass": {
+     "floor_height": 100,
+     "type": "corner_blind"
+    },
+    "limits": [
+     [
+      200,
+      3000
+     ],
+     [
+      80,
+      3000
+     ],
+     [
+      150,
+      2000
+     ]
+    ],
+    "construction": [
+     "dw_class",
+     "dw_body_height",
+     "dw_front_bottom",
+     "corner_door_w",
+     "corner_cr1",
+     "corner_cr2"
+    ],
+    "symbolBlindCur": "cross",
+    "rowLabelBlind": "Blenda",
+    "rowIconBlind": "front-blind",
+    "cornerSide": "left",
+    "cornerCardSide": "left",
+    "pvSlot": false,
+    "floorH": 100,
+    "opening": null,
+    "metaDims": {
+     "w": 1100,
+     "h": 720,
+     "d": 510,
+     "plinth": 100,
+     "plinth_visible": true,
+     "corner": {
+      "side": "left",
+      "door": 450
+     }
+    },
+    "tplModal": {
+     "value": "corner_blind",
+     "disabled": true,
+     "title": "Typ určuje rohová skrinka — prepnúť sa nedá.",
+     "hiddenOptions": [
+      "dishwasher"
+     ],
+     "tipHidden": false,
+     "tip": "Rohová skrinka nesie rohovú zostavu (blenda, výstuhy, CR lišty) — šablóna z nej je vždy rohová, na dolnú ani hornú sa prepnúť nedá.",
+     "expectsRowHidden": false,
+     "expectsSlotHidden": true,
+     "expectsValue": []
+    },
+    "validation": {
+     "ok": false,
+     "bad": [
+      "corner_door_w",
+      "corner_cr1",
+      "corner_cr2"
+     ]
+    },
+    "markHeight": [
+     "height",
+     "floor_height"
+    ],
+    "draft": {
+     "width": 1100,
+     "height": 720,
+     "floor_height": 100,
+     "fronts": {
+      "split_axis": "height",
+      "gap": 3,
+      "gap_top": 2,
+      "gap_bottom": 2,
+      "gap_left": 2,
+      "gap_right": 2,
+      "edge_limit_off": false,
+      "items": []
+     },
+     "model_guid": "g",
+     "cabinet_id": "",
+     "type": "corner_blind",
+     "corner_side": "left",
+     "corner_door_w": 450,
+     "thickness": 18,
+     "corner_cr1": 80,
+     "corner_cr2": 80,
+     "top_mode": "full",
+     "rail_depth": 100,
+     "rails_orientation": "flat",
+     "rails_top_offset": 0
+    },
+    "rows": {
+     "display": {
+      "plinthGroup": "",
+      "fhRow": "",
+      "thicknessRow": "",
+      "infAvWidth": "",
+      "infIntDepth": "",
+      "infAvHeight": "",
+      "infArea": "",
+      "topSetbackRow": "",
+      "backSetbackRow": ""
+     },
+     "hidden": {
+      "cornerRow": false,
+      "dwClassRow": true,
+      "dwBodyRow": true,
+      "dwFrontBottomRow": true,
+      "infDwBody": true,
+      "infDwFront": true,
+      "infDwGap": true,
+      "infDwUnder": true,
+      "infDwClass": true,
+      "fr_gap": false,
+      "fr_gap_bottom": false,
+      "infCornerDoor": true,
+      "legsRow": true,
+      "frontAddTypes": true,
+      "frontOneDoor": false,
+      "cabBackNote": true,
+      "qs:details[data-key=\"zsplit\"]": true
+     },
+     "text": {
+      "lblHeight": "Výška",
+      "cabBackNote": "",
+      "inf_parts": "≈ 5",
+      "inf_area": "≈ 2,42 m²",
+      "inf_weight": "—"
+     }
+    }
+   }
+  },
+  "tall": {
+   "forType": [
+    "Dolna",
+    "Bez typu",
+    "Vysoka",
+    "Prazdny typ"
+   ],
+   "templateType": "lower",
+   "insertType": "lower",
+   "payload": {
+    "type": "lower",
+    "corner_side": null,
+    "floor_height": 100,
+    "keys": [
+     "dw_class",
+     "dw_body_height",
+     "dw_front_bottom"
+    ]
+   },
+   "legs": {
+    "key": "lower|600|720|510|100|none|{}",
+    "gen": 1
+   },
+   "common": {
+    "getType": "lower",
+    "cabInfoType": "Dolná",
+    "carcass": {
+     "floor_height": 100,
+     "type": "lower"
+    },
+    "limits": [
+     [
+      200,
+      3000
+     ],
+     [
+      80,
+      3000
+     ],
+     [
+      150,
+      2000
+     ]
+    ],
+    "construction": [
+     "dw_class",
+     "dw_body_height",
+     "dw_front_bottom"
+    ],
+    "symbolBlindCur": "cross",
+    "rowLabelBlind": "Blenda",
+    "rowIconBlind": "front-blind",
+    "cornerSide": "left",
+    "cornerCardSide": null,
+    "pvSlot": false,
+    "floorH": 100,
+    "opening": {
+     "x0": 0,
+     "w": 600
+    },
+    "metaDims": {
+     "w": 600,
+     "h": 720,
+     "d": 510,
+     "plinth": 100,
+     "plinth_visible": true
+    },
+    "tplModal": {
+     "value": "lower",
+     "disabled": false,
+     "title": "",
+     "hiddenOptions": [
+      "corner_blind",
+      "dishwasher"
+     ],
+     "tipHidden": true,
+     "tip": null,
+     "expectsRowHidden": false,
+     "expectsSlotHidden": true,
+     "expectsValue": []
+    },
+    "validation": {
+     "ok": true,
+     "bad": []
+    },
+    "markHeight": [
+     "height",
+     "floor_height"
+    ],
+    "draft": {
+     "width": 600,
+     "height": 720,
+     "floor_height": 100,
+     "fronts": {
+      "split_axis": "height",
+      "gap": 3,
+      "gap_top": 2,
+      "gap_bottom": 2,
+      "gap_left": 2,
+      "gap_right": 2,
+      "edge_limit_off": false,
+      "items": []
+     },
+     "model_guid": "g",
+     "cabinet_id": "",
+     "type": "lower"
+    },
+    "rows": {
+     "display": {
+      "plinthGroup": "",
+      "fhRow": "",
+      "thicknessRow": "",
+      "infAvWidth": "",
+      "infIntDepth": "",
+      "infAvHeight": "",
+      "infArea": "",
+      "topSetbackRow": "",
+      "backSetbackRow": ""
+     },
+     "hidden": {
+      "cornerRow": true,
+      "dwClassRow": true,
+      "dwBodyRow": true,
+      "dwFrontBottomRow": true,
+      "infDwBody": true,
+      "infDwFront": true,
+      "infDwGap": true,
+      "infDwUnder": true,
+      "infDwClass": true,
+      "fr_gap": false,
+      "fr_gap_bottom": false,
+      "infCornerDoor": true,
+      "legsRow": true,
+      "frontAddTypes": false,
+      "frontOneDoor": true,
+      "cabBackNote": true,
+      "qs:details[data-key=\"zsplit\"]": false
+     },
+     "text": {
+      "lblHeight": "Výška",
+      "cabBackNote": "",
+      "inf_parts": "≈ 5",
+      "inf_area": "≈ 1,6 m²",
+      "inf_weight": "—"
+     }
+    }
+   }
+  },
+  "(chyba)": {
+   "forType": [
+    "Dolna",
+    "Bez typu",
+    "Vysoka",
+    "Prazdny typ"
+   ],
+   "templateType": "lower",
+   "insertType": "lower",
+   "payload": {
+    "type": "lower",
+    "corner_side": null,
+    "floor_height": 100,
+    "keys": [
+     "dw_class",
+     "dw_body_height",
+     "dw_front_bottom"
+    ]
+   },
+   "legs": {
+    "key": "lower|600|720|510|100|none|{}",
+    "gen": 1
+   },
+   "common": {
+    "getType": "lower",
+    "cabInfoType": "Dolná",
+    "carcass": {
+     "floor_height": 100,
+     "type": "lower"
+    },
+    "limits": [
+     [
+      200,
+      3000
+     ],
+     [
+      80,
+      3000
+     ],
+     [
+      150,
+      2000
+     ]
+    ],
+    "construction": [
+     "dw_class",
+     "dw_body_height",
+     "dw_front_bottom"
+    ],
+    "symbolBlindCur": "cross",
+    "rowLabelBlind": "Blenda",
+    "rowIconBlind": "front-blind",
+    "cornerSide": "left",
+    "cornerCardSide": null,
+    "pvSlot": false,
+    "floorH": 100,
+    "opening": {
+     "x0": 0,
+     "w": 600
+    },
+    "metaDims": {
+     "w": 600,
+     "h": 720,
+     "d": 510,
+     "plinth": 100,
+     "plinth_visible": true
+    },
+    "tplModal": {
+     "value": "lower",
+     "disabled": false,
+     "title": "",
+     "hiddenOptions": [
+      "corner_blind",
+      "dishwasher"
+     ],
+     "tipHidden": true,
+     "tip": null,
+     "expectsRowHidden": false,
+     "expectsSlotHidden": true,
+     "expectsValue": []
+    },
+    "validation": {
+     "ok": true,
+     "bad": []
+    },
+    "markHeight": [
+     "height",
+     "floor_height"
+    ],
+    "draft": {
+     "width": 600,
+     "height": 720,
+     "floor_height": 100,
+     "fronts": {
+      "split_axis": "height",
+      "gap": 3,
+      "gap_top": 2,
+      "gap_bottom": 2,
+      "gap_left": 2,
+      "gap_right": 2,
+      "edge_limit_off": false,
+      "items": []
+     },
+     "model_guid": "g",
+     "cabinet_id": "",
+     "type": "lower"
+    },
+    "rows": {
+     "display": {
+      "plinthGroup": "",
+      "fhRow": "",
+      "thicknessRow": "",
+      "infAvWidth": "",
+      "infIntDepth": "",
+      "infAvHeight": "",
+      "infArea": "",
+      "topSetbackRow": "",
+      "backSetbackRow": ""
+     },
+     "hidden": {
+      "cornerRow": true,
+      "dwClassRow": true,
+      "dwBodyRow": true,
+      "dwFrontBottomRow": true,
+      "infDwBody": true,
+      "infDwFront": true,
+      "infDwGap": true,
+      "infDwUnder": true,
+      "infDwClass": true,
+      "fr_gap": false,
+      "fr_gap_bottom": false,
+      "infCornerDoor": true,
+      "legsRow": true,
+      "frontAddTypes": false,
+      "frontOneDoor": true,
+      "cabBackNote": true,
+      "qs:details[data-key=\"zsplit\"]": false
+     },
+     "text": {
+      "lblHeight": "Výška",
+      "cabBackNote": "",
+      "inf_parts": "≈ 5",
+      "inf_area": "≈ 1,6 m²",
+      "inf_weight": "—"
+     }
+    }
+   }
+  },
+  "('')": {
+   "forType": [
+    "Dolna",
+    "Bez typu",
+    "Vysoka",
+    "Prazdny typ"
+   ],
+   "templateType": "lower",
+   "insertType": "lower",
+   "payload": {
+    "type": "lower",
+    "corner_side": null,
+    "floor_height": 100,
+    "keys": [
+     "dw_class",
+     "dw_body_height",
+     "dw_front_bottom"
+    ]
+   },
+   "legs": {
+    "key": "lower|600|720|510|100|none|{}",
+    "gen": 1
+   },
+   "common": {
+    "getType": "lower",
+    "cabInfoType": "Dolná",
+    "carcass": {
+     "floor_height": 100,
+     "type": "lower"
+    },
+    "limits": [
+     [
+      200,
+      3000
+     ],
+     [
+      80,
+      3000
+     ],
+     [
+      150,
+      2000
+     ]
+    ],
+    "construction": [
+     "dw_class",
+     "dw_body_height",
+     "dw_front_bottom"
+    ],
+    "symbolBlindCur": "cross",
+    "rowLabelBlind": "Blenda",
+    "rowIconBlind": "front-blind",
+    "cornerSide": "left",
+    "cornerCardSide": null,
+    "pvSlot": false,
+    "floorH": 100,
+    "opening": {
+     "x0": 0,
+     "w": 600
+    },
+    "metaDims": {
+     "w": 600,
+     "h": 720,
+     "d": 510,
+     "plinth": 100,
+     "plinth_visible": true
+    },
+    "tplModal": {
+     "value": "lower",
+     "disabled": false,
+     "title": "",
+     "hiddenOptions": [
+      "corner_blind",
+      "dishwasher"
+     ],
+     "tipHidden": true,
+     "tip": null,
+     "expectsRowHidden": false,
+     "expectsSlotHidden": true,
+     "expectsValue": []
+    },
+    "validation": {
+     "ok": true,
+     "bad": []
+    },
+    "markHeight": [
+     "height",
+     "floor_height"
+    ],
+    "draft": {
+     "width": 600,
+     "height": 720,
+     "floor_height": 100,
+     "fronts": {
+      "split_axis": "height",
+      "gap": 3,
+      "gap_top": 2,
+      "gap_bottom": 2,
+      "gap_left": 2,
+      "gap_right": 2,
+      "edge_limit_off": false,
+      "items": []
+     },
+     "model_guid": "g",
+     "cabinet_id": "",
+     "type": "lower"
+    },
+    "rows": {
+     "display": {
+      "plinthGroup": "",
+      "fhRow": "",
+      "thicknessRow": "",
+      "infAvWidth": "",
+      "infIntDepth": "",
+      "infAvHeight": "",
+      "infArea": "",
+      "topSetbackRow": "",
+      "backSetbackRow": ""
+     },
+     "hidden": {
+      "cornerRow": true,
+      "dwClassRow": true,
+      "dwBodyRow": true,
+      "dwFrontBottomRow": true,
+      "infDwBody": true,
+      "infDwFront": true,
+      "infDwGap": true,
+      "infDwUnder": true,
+      "infDwClass": true,
+      "fr_gap": false,
+      "fr_gap_bottom": false,
+      "infCornerDoor": true,
+      "legsRow": true,
+      "frontAddTypes": false,
+      "frontOneDoor": true,
+      "cabBackNote": true,
+      "qs:details[data-key=\"zsplit\"]": false
+     },
+     "text": {
+      "lblHeight": "Výška",
+      "cabBackNote": "",
+      "inf_parts": "≈ 5",
+      "inf_area": "≈ 1,6 m²",
+      "inf_weight": "—"
+     }
+    }
+   }
+  }
+ },
+ "selected": {
+  "lower": {
+   "shellType": "lower",
+   "ctxLock": [
+    "",
+    "",
+    "",
+    ""
+   ],
+   "fronts": {
+    "addTypesHidden": false,
+    "oneDoorHidden": true
+   },
+   "common": {
+    "getType": "lower",
+    "cabInfoType": "Dolná",
+    "carcass": {
+     "floor_height": 100,
+     "type": "lower"
+    },
+    "limits": [
+     [
+      200,
+      3000
+     ],
+     [
+      80,
+      3000
+     ],
+     [
+      150,
+      2000
+     ]
+    ],
+    "construction": [
+     "dw_class",
+     "dw_body_height",
+     "dw_front_bottom"
+    ],
+    "symbolBlindCur": "cross",
+    "rowLabelBlind": "Blenda",
+    "rowIconBlind": "front-blind",
+    "cornerSide": "left",
+    "cornerCardSide": null,
+    "pvSlot": false,
+    "floorH": 100,
+    "opening": {
+     "x0": 0,
+     "w": 600
+    },
+    "metaDims": {
+     "w": 600,
+     "h": 720,
+     "d": 510,
+     "plinth": 100,
+     "plinth_visible": true
+    },
+    "tplModal": {
+     "value": "lower",
+     "disabled": false,
+     "title": "",
+     "hiddenOptions": [
+      "corner_blind",
+      "dishwasher"
+     ],
+     "tipHidden": true,
+     "tip": null,
+     "expectsRowHidden": false,
+     "expectsSlotHidden": true,
+     "expectsValue": []
+    },
+    "validation": {
+     "ok": true,
+     "bad": []
+    },
+    "markHeight": [
+     "height",
+     "floor_height"
+    ],
+    "draft": {
+     "width": 600,
+     "height": 720,
+     "floor_height": 100,
+     "fronts": {
+      "split_axis": "height",
+      "gap": 3,
+      "gap_top": 2,
+      "gap_bottom": 2,
+      "gap_left": 2,
+      "gap_right": 2,
+      "edge_limit_off": false,
+      "items": []
+     },
+     "model_guid": "g",
+     "cabinet_id": "CAB-0",
+     "type": "lower"
+    },
+    "rows": {
+     "display": {
+      "plinthGroup": "",
+      "fhRow": "",
+      "thicknessRow": "",
+      "infAvWidth": "",
+      "infIntDepth": "",
+      "infAvHeight": "",
+      "infArea": "",
+      "topSetbackRow": "",
+      "backSetbackRow": ""
+     },
+     "hidden": {
+      "cornerRow": true,
+      "dwClassRow": true,
+      "dwBodyRow": true,
+      "dwFrontBottomRow": true,
+      "infDwBody": true,
+      "infDwFront": true,
+      "infDwGap": true,
+      "infDwUnder": true,
+      "infDwClass": true,
+      "fr_gap": false,
+      "fr_gap_bottom": false,
+      "infCornerDoor": true,
+      "legsRow": true,
+      "frontAddTypes": false,
+      "frontOneDoor": true,
+      "cabBackNote": true,
+      "qs:details[data-key=\"zsplit\"]": false
+     },
+     "text": {
+      "lblHeight": "Výška",
+      "cabBackNote": "",
+      "inf_parts": "6",
+      "inf_area": "1,5 m²",
+      "inf_weight": "—"
+     }
+    }
+   }
+  },
+  "upper": {
+   "shellType": "upper",
+   "ctxLock": [
+    "",
+    "",
+    "",
+    ""
+   ],
+   "fronts": {
+    "addTypesHidden": false,
+    "oneDoorHidden": true
+   },
+   "common": {
+    "getType": "upper",
+    "cabInfoType": "Horná",
+    "carcass": {
+     "floor_height": 0,
+     "type": "upper"
+    },
+    "limits": [
+     [
+      200,
+      3000
+     ],
+     [
+      80,
+      3000
+     ],
+     [
+      150,
+      2000
+     ]
+    ],
+    "construction": [
+     "dw_class",
+     "dw_body_height",
+     "dw_front_bottom"
+    ],
+    "symbolBlindCur": "cross",
+    "rowLabelBlind": "Blenda",
+    "rowIconBlind": "front-blind",
+    "cornerSide": "left",
+    "cornerCardSide": null,
+    "pvSlot": false,
+    "floorH": 0,
+    "opening": {
+     "x0": 0,
+     "w": 600
+    },
+    "metaDims": {
+     "w": 600,
+     "h": 720,
+     "d": 320,
+     "plinth": 0,
+     "plinth_visible": false
+    },
+    "tplModal": {
+     "value": "upper",
+     "disabled": false,
+     "title": "",
+     "hiddenOptions": [
+      "corner_blind",
+      "dishwasher"
+     ],
+     "tipHidden": true,
+     "tip": null,
+     "expectsRowHidden": false,
+     "expectsSlotHidden": true,
+     "expectsValue": []
+    },
+    "validation": {
+     "ok": true,
+     "bad": []
+    },
+    "markHeight": [
+     "height",
+     "floor_height"
+    ],
+    "draft": {
+     "width": 600,
+     "height": 720,
+     "floor_height": 0,
+     "fronts": {
+      "split_axis": "height",
+      "gap": 3,
+      "gap_top": 2,
+      "gap_bottom": 2,
+      "gap_left": 2,
+      "gap_right": 2,
+      "edge_limit_off": false,
+      "items": []
+     },
+     "model_guid": "g",
+     "cabinet_id": "CAB-1",
+     "type": "upper"
+    },
+    "rows": {
+     "display": {
+      "plinthGroup": "none",
+      "fhRow": "none",
+      "thicknessRow": "",
+      "infAvWidth": "",
+      "infIntDepth": "",
+      "infAvHeight": "",
+      "infArea": "",
+      "topSetbackRow": "",
+      "backSetbackRow": ""
+     },
+     "hidden": {
+      "cornerRow": true,
+      "dwClassRow": true,
+      "dwBodyRow": true,
+      "dwFrontBottomRow": true,
+      "infDwBody": true,
+      "infDwFront": true,
+      "infDwGap": true,
+      "infDwUnder": true,
+      "infDwClass": true,
+      "fr_gap": false,
+      "fr_gap_bottom": false,
+      "infCornerDoor": true,
+      "legsRow": true,
+      "frontAddTypes": false,
+      "frontOneDoor": true,
+      "cabBackNote": true,
+      "qs:details[data-key=\"zsplit\"]": false
+     },
+     "text": {
+      "lblHeight": "Výška",
+      "cabBackNote": "",
+      "inf_parts": "6",
+      "inf_area": "1,5 m²",
+      "inf_weight": "—"
+     }
+    }
+   }
+  },
+  "dishwasher": {
+   "shellType": "dishwasher",
+   "ctxLock": [
+    "",
+    "slot umývačky zóny nemá",
+    "",
+    ""
+   ],
+   "fronts": {
+    "addTypesHidden": false,
+    "oneDoorHidden": true
+   },
+   "common": {
+    "getType": "dishwasher",
+    "cabInfoType": "Umývačka",
+    "carcass": {
+     "floor_height": 0,
+     "type": "dishwasher"
+    },
+    "limits": [
+     [
+      300,
+      1200
+     ],
+     [
+      500,
+      1200
+     ],
+     [
+      150,
+      2000
+     ]
+    ],
+    "construction": [
+     "dw_class",
+     "dw_body_height",
+     "dw_front_bottom"
+    ],
+    "symbolBlindCur": "down",
+    "rowLabelBlind": "Dvere umývačky",
+    "rowIconBlind": "front-fall",
+    "cornerSide": "left",
+    "cornerCardSide": null,
+    "pvSlot": true,
+    "floorH": 0,
+    "opening": {
+     "x0": 0,
+     "w": 600
+    },
+    "metaDims": {
+     "w": 600,
+     "h": 880,
+     "d": 560,
+     "plinth": 0,
+     "plinth_visible": false
+    },
+    "tplModal": {
+     "value": "dishwasher",
+     "disabled": true,
+     "title": "Typ určuje sám slot umývačky — prepnúť sa nedá.",
+     "hiddenOptions": [
+      "corner_blind"
+     ],
+     "tipHidden": false,
+     "tip": "Typ určuje sám slot umývačky — nemá korpus, takže sa na dolnú ani hornú skrinku prepnúť nedá.",
+     "expectsRowHidden": true,
+     "expectsSlotHidden": false,
+     "expectsValue": null
+    },
+    "validation": {
+     "ok": false,
+     "bad": [
+      "width",
+      "dw_body_height",
+      "dw_front_bottom"
+     ]
+    },
+    "markHeight": [
+     "height",
+     "dw_front_bottom"
+    ],
+    "draft": {
+     "width": 600,
+     "height": 880,
+     "floor_height": 0,
+     "fronts": {
+      "split_axis": "height",
+      "gap": 3,
+      "gap_top": 2,
+      "gap_bottom": 2,
+      "gap_left": 2,
+      "gap_right": 2,
+      "edge_limit_off": false,
+      "items": []
+     },
+     "model_guid": "g",
+     "cabinet_id": "CAB-2",
+     "type": "dishwasher",
+     "dw_front_bottom": 100
+    },
+    "rows": {
+     "display": {
+      "plinthGroup": "none",
+      "fhRow": "none",
+      "thicknessRow": "none",
+      "infAvWidth": "none",
+      "infIntDepth": "none",
+      "infAvHeight": "none",
+      "infArea": "none",
+      "topSetbackRow": "none",
+      "backSetbackRow": "none"
+     },
+     "hidden": {
+      "cornerRow": true,
+      "dwClassRow": false,
+      "dwBodyRow": false,
+      "dwFrontBottomRow": false,
+      "infDwBody": false,
+      "infDwFront": false,
+      "infDwGap": false,
+      "infDwUnder": false,
+      "infDwClass": false,
+      "fr_gap": true,
+      "fr_gap_bottom": true,
+      "infCornerDoor": true,
+      "legsRow": true,
+      "frontAddTypes": false,
+      "frontOneDoor": true,
+      "cabBackNote": true,
+      "qs:details[data-key=\"zsplit\"]": false
+     },
+     "text": {
+      "lblHeight": "Výška linky",
+      "cabBackNote": "",
+      "inf_parts": "6",
+      "inf_area": "1,5 m²",
+      "inf_weight": "—"
+     }
+    }
+   }
+  },
+  "corner_blind": {
+   "shellType": "corner_blind",
+   "ctxLock": [
+    "",
+    "",
+    "",
+    ""
+   ],
+   "fronts": {
+    "addTypesHidden": true,
+    "oneDoorHidden": false
+   },
+   "common": {
+    "getType": "corner_blind",
+    "cabInfoType": "Rohová",
+    "carcass": {
+     "floor_height": 100,
+     "type": "corner_blind"
+    },
+    "limits": [
+     [
+      200,
+      3000
+     ],
+     [
+      80,
+      3000
+     ],
+     [
+      150,
+      2000
+     ]
+    ],
+    "construction": [
+     "dw_class",
+     "dw_body_height",
+     "dw_front_bottom",
+     "corner_door_w",
+     "corner_cr1",
+     "corner_cr2"
+    ],
+    "symbolBlindCur": "cross",
+    "rowLabelBlind": "Blenda",
+    "rowIconBlind": "front-blind",
+    "cornerSide": "right",
+    "cornerCardSide": "right",
+    "pvSlot": false,
+    "floorH": 100,
+    "opening": null,
+    "metaDims": {
+     "w": 1100,
+     "h": 720,
+     "d": 510,
+     "plinth": 100,
+     "plinth_visible": true,
+     "corner": {
+      "side": "right",
+      "door": 450
+     }
+    },
+    "tplModal": {
+     "value": "corner_blind",
+     "disabled": true,
+     "title": "Typ určuje rohová skrinka — prepnúť sa nedá.",
+     "hiddenOptions": [
+      "dishwasher"
+     ],
+     "tipHidden": false,
+     "tip": "Rohová skrinka nesie rohovú zostavu (blenda, výstuhy, CR lišty) — šablóna z nej je vždy rohová, na dolnú ani hornú sa prepnúť nedá.",
+     "expectsRowHidden": false,
+     "expectsSlotHidden": true,
+     "expectsValue": []
+    },
+    "validation": {
+     "ok": false,
+     "bad": [
+      "corner_door_w",
+      "corner_cr1",
+      "corner_cr2"
+     ]
+    },
+    "markHeight": [
+     "height",
+     "floor_height"
+    ],
+    "draft": {
+     "width": 1100,
+     "height": 720,
+     "floor_height": 100,
+     "fronts": {
+      "split_axis": "height",
+      "gap": 3,
+      "gap_top": 2,
+      "gap_bottom": 2,
+      "gap_left": 2,
+      "gap_right": 2,
+      "edge_limit_off": false,
+      "items": []
+     },
+     "model_guid": "g",
+     "cabinet_id": "CAB-3",
+     "type": "corner_blind",
+     "corner_side": "right",
+     "corner_door_w": 450,
+     "thickness": 18,
+     "corner_cr1": 80,
+     "corner_cr2": 80,
+     "top_mode": "full",
+     "rail_depth": 100,
+     "rails_orientation": "flat",
+     "rails_top_offset": 0
+    },
+    "rows": {
+     "display": {
+      "plinthGroup": "",
+      "fhRow": "",
+      "thicknessRow": "",
+      "infAvWidth": "",
+      "infIntDepth": "",
+      "infAvHeight": "",
+      "infArea": "",
+      "topSetbackRow": "",
+      "backSetbackRow": ""
+     },
+     "hidden": {
+      "cornerRow": false,
+      "dwClassRow": true,
+      "dwBodyRow": true,
+      "dwFrontBottomRow": true,
+      "infDwBody": true,
+      "infDwFront": true,
+      "infDwGap": true,
+      "infDwUnder": true,
+      "infDwClass": true,
+      "fr_gap": false,
+      "fr_gap_bottom": false,
+      "infCornerDoor": false,
+      "legsRow": true,
+      "frontAddTypes": true,
+      "frontOneDoor": false,
+      "cabBackNote": true,
+      "qs:details[data-key=\"zsplit\"]": true
+     },
+     "text": {
+      "lblHeight": "Výška",
+      "cabBackNote": "",
+      "inf_parts": "6",
+      "inf_area": "1,5 m²",
+      "inf_weight": "—"
+     }
+    }
+   }
+  },
+  "tall": {
+   "shellType": "tall",
+   "ctxLock": [
+    "",
+    "",
+    "",
+    ""
+   ],
+   "fronts": {
+    "addTypesHidden": false,
+    "oneDoorHidden": true
+   },
+   "common": {
+    "getType": "lower",
+    "cabInfoType": "Dolná",
+    "carcass": {
+     "floor_height": 100,
+     "type": "lower"
+    },
+    "limits": [
+     [
+      200,
+      3000
+     ],
+     [
+      80,
+      3000
+     ],
+     [
+      150,
+      2000
+     ]
+    ],
+    "construction": [
+     "dw_class",
+     "dw_body_height",
+     "dw_front_bottom"
+    ],
+    "symbolBlindCur": "cross",
+    "rowLabelBlind": "Blenda",
+    "rowIconBlind": "front-blind",
+    "cornerSide": "left",
+    "cornerCardSide": null,
+    "pvSlot": false,
+    "floorH": 100,
+    "opening": {
+     "x0": 0,
+     "w": 600
+    },
+    "metaDims": {
+     "w": 600,
+     "h": 720,
+     "d": 510,
+     "plinth": 100,
+     "plinth_visible": true
+    },
+    "tplModal": {
+     "value": "lower",
+     "disabled": false,
+     "title": "",
+     "hiddenOptions": [
+      "corner_blind",
+      "dishwasher"
+     ],
+     "tipHidden": true,
+     "tip": null,
+     "expectsRowHidden": false,
+     "expectsSlotHidden": true,
+     "expectsValue": []
+    },
+    "validation": {
+     "ok": true,
+     "bad": []
+    },
+    "markHeight": [
+     "height",
+     "floor_height"
+    ],
+    "draft": {
+     "width": 600,
+     "height": 720,
+     "floor_height": 100,
+     "fronts": {
+      "split_axis": "height",
+      "gap": 3,
+      "gap_top": 2,
+      "gap_bottom": 2,
+      "gap_left": 2,
+      "gap_right": 2,
+      "edge_limit_off": false,
+      "items": []
+     },
+     "model_guid": "g",
+     "cabinet_id": "CAB-4",
+     "type": "lower"
+    },
+    "rows": {
+     "display": {
+      "plinthGroup": "",
+      "fhRow": "",
+      "thicknessRow": "",
+      "infAvWidth": "",
+      "infIntDepth": "",
+      "infAvHeight": "",
+      "infArea": "",
+      "topSetbackRow": "",
+      "backSetbackRow": ""
+     },
+     "hidden": {
+      "cornerRow": true,
+      "dwClassRow": true,
+      "dwBodyRow": true,
+      "dwFrontBottomRow": true,
+      "infDwBody": true,
+      "infDwFront": true,
+      "infDwGap": true,
+      "infDwUnder": true,
+      "infDwClass": true,
+      "fr_gap": false,
+      "fr_gap_bottom": false,
+      "infCornerDoor": true,
+      "legsRow": true,
+      "frontAddTypes": false,
+      "frontOneDoor": true,
+      "cabBackNote": true,
+      "qs:details[data-key=\"zsplit\"]": false
+     },
+     "text": {
+      "lblHeight": "Výška",
+      "cabBackNote": "",
+      "inf_parts": "6",
+      "inf_area": "1,5 m²",
+      "inf_weight": "—"
+     }
+    }
+   }
+  },
+  "(chyba)": {
+   "shellType": "lower",
+   "ctxLock": [
+    "",
+    "",
+    "",
+    ""
+   ],
+   "fronts": {
+    "addTypesHidden": false,
+    "oneDoorHidden": true
+   },
+   "common": {
+    "getType": "lower",
+    "cabInfoType": "Dolná",
+    "carcass": {
+     "floor_height": 100,
+     "type": "lower"
+    },
+    "limits": [
+     [
+      200,
+      3000
+     ],
+     [
+      80,
+      3000
+     ],
+     [
+      150,
+      2000
+     ]
+    ],
+    "construction": [
+     "dw_class",
+     "dw_body_height",
+     "dw_front_bottom"
+    ],
+    "symbolBlindCur": "cross",
+    "rowLabelBlind": "Blenda",
+    "rowIconBlind": "front-blind",
+    "cornerSide": "left",
+    "cornerCardSide": null,
+    "pvSlot": false,
+    "floorH": 100,
+    "opening": {
+     "x0": 0,
+     "w": 600
+    },
+    "metaDims": {
+     "w": 600,
+     "h": 720,
+     "d": 510,
+     "plinth": 100,
+     "plinth_visible": true
+    },
+    "tplModal": {
+     "value": "lower",
+     "disabled": false,
+     "title": "",
+     "hiddenOptions": [
+      "corner_blind",
+      "dishwasher"
+     ],
+     "tipHidden": true,
+     "tip": null,
+     "expectsRowHidden": false,
+     "expectsSlotHidden": true,
+     "expectsValue": []
+    },
+    "validation": {
+     "ok": true,
+     "bad": []
+    },
+    "markHeight": [
+     "height",
+     "floor_height"
+    ],
+    "draft": {
+     "width": 600,
+     "height": 720,
+     "floor_height": 100,
+     "fronts": {
+      "split_axis": "height",
+      "gap": 3,
+      "gap_top": 2,
+      "gap_bottom": 2,
+      "gap_left": 2,
+      "gap_right": 2,
+      "edge_limit_off": false,
+      "items": []
+     },
+     "model_guid": "g",
+     "cabinet_id": "CAB-5",
+     "type": "lower"
+    },
+    "rows": {
+     "display": {
+      "plinthGroup": "",
+      "fhRow": "",
+      "thicknessRow": "",
+      "infAvWidth": "",
+      "infIntDepth": "",
+      "infAvHeight": "",
+      "infArea": "",
+      "topSetbackRow": "",
+      "backSetbackRow": ""
+     },
+     "hidden": {
+      "cornerRow": true,
+      "dwClassRow": true,
+      "dwBodyRow": true,
+      "dwFrontBottomRow": true,
+      "infDwBody": true,
+      "infDwFront": true,
+      "infDwGap": true,
+      "infDwUnder": true,
+      "infDwClass": true,
+      "fr_gap": false,
+      "fr_gap_bottom": false,
+      "infCornerDoor": true,
+      "legsRow": true,
+      "frontAddTypes": false,
+      "frontOneDoor": true,
+      "cabBackNote": true,
+      "qs:details[data-key=\"zsplit\"]": false
+     },
+     "text": {
+      "lblHeight": "Výška",
+      "cabBackNote": "",
+      "inf_parts": "6",
+      "inf_area": "1,5 m²",
+      "inf_weight": "—"
+     }
+    }
+   }
+  },
+  "('')": {
+   "shellType": "lower",
+   "ctxLock": [
+    "",
+    "",
+    "",
+    ""
+   ],
+   "fronts": {
+    "addTypesHidden": false,
+    "oneDoorHidden": true
+   },
+   "common": {
+    "getType": "lower",
+    "cabInfoType": "Dolná",
+    "carcass": {
+     "floor_height": 100,
+     "type": "lower"
+    },
+    "limits": [
+     [
+      200,
+      3000
+     ],
+     [
+      80,
+      3000
+     ],
+     [
+      150,
+      2000
+     ]
+    ],
+    "construction": [
+     "dw_class",
+     "dw_body_height",
+     "dw_front_bottom"
+    ],
+    "symbolBlindCur": "cross",
+    "rowLabelBlind": "Blenda",
+    "rowIconBlind": "front-blind",
+    "cornerSide": "left",
+    "cornerCardSide": null,
+    "pvSlot": false,
+    "floorH": 100,
+    "opening": {
+     "x0": 0,
+     "w": 600
+    },
+    "metaDims": {
+     "w": 600,
+     "h": 720,
+     "d": 510,
+     "plinth": 100,
+     "plinth_visible": true
+    },
+    "tplModal": {
+     "value": "lower",
+     "disabled": false,
+     "title": "",
+     "hiddenOptions": [
+      "corner_blind",
+      "dishwasher"
+     ],
+     "tipHidden": true,
+     "tip": null,
+     "expectsRowHidden": false,
+     "expectsSlotHidden": true,
+     "expectsValue": []
+    },
+    "validation": {
+     "ok": true,
+     "bad": []
+    },
+    "markHeight": [
+     "height",
+     "floor_height"
+    ],
+    "draft": {
+     "width": 600,
+     "height": 720,
+     "floor_height": 100,
+     "fronts": {
+      "split_axis": "height",
+      "gap": 3,
+      "gap_top": 2,
+      "gap_bottom": 2,
+      "gap_left": 2,
+      "gap_right": 2,
+      "edge_limit_off": false,
+      "items": []
+     },
+     "model_guid": "g",
+     "cabinet_id": "CAB-6",
+     "type": "lower"
+    },
+    "rows": {
+     "display": {
+      "plinthGroup": "",
+      "fhRow": "",
+      "thicknessRow": "",
+      "infAvWidth": "",
+      "infIntDepth": "",
+      "infAvHeight": "",
+      "infArea": "",
+      "topSetbackRow": "",
+      "backSetbackRow": ""
+     },
+     "hidden": {
+      "cornerRow": true,
+      "dwClassRow": true,
+      "dwBodyRow": true,
+      "dwFrontBottomRow": true,
+      "infDwBody": true,
+      "infDwFront": true,
+      "infDwGap": true,
+      "infDwUnder": true,
+      "infDwClass": true,
+      "fr_gap": false,
+      "fr_gap_bottom": false,
+      "infCornerDoor": true,
+      "legsRow": true,
+      "frontAddTypes": false,
+      "frontOneDoor": true,
+      "cabBackNote": true,
+      "qs:details[data-key=\"zsplit\"]": false
+     },
+     "text": {
+      "lblHeight": "Výška",
+      "cabBackNote": "",
+      "inf_parts": "6",
+      "inf_area": "1,5 m²",
+      "inf_weight": "—"
+     }
+    }
+   }
+  }
+ },
+ "pure": {
+  "lower": {
+   "symbolBlind": "cross",
+   "symbolLift": "up",
+   "cabInfo": "Dolná",
+   "setback": 50,
+   "rails": true,
+   "meta": {
+    "top": "zap. 30",
+    "back": "z líšt 100 · komín 50"
+   },
+   "cornerDraft": null,
+   "opening": {
+    "x0": 0,
+    "w": 600
+   },
+   "ctxLock": [
+    "",
+    "",
+    "",
+    ""
+   ],
+   "legs": true,
+   "expects": [],
+   "templateType": "lower"
+  },
+  "upper": {
+   "symbolBlind": "cross",
+   "symbolLift": "up",
+   "cabInfo": "Horná",
+   "setback": 50,
+   "rails": true,
+   "meta": {
+    "top": "zap. 30",
+    "back": "z líšt 100 · komín 50"
+   },
+   "cornerDraft": null,
+   "opening": {
+    "x0": 0,
+    "w": 600
+   },
+   "ctxLock": [
+    "",
+    "",
+    "",
+    ""
+   ],
+   "legs": false,
+   "expects": [],
+   "templateType": "upper"
+  },
+  "dishwasher": {
+   "symbolBlind": "down",
+   "symbolLift": "up",
+   "cabInfo": "Umývačka",
+   "setback": 0,
+   "rails": false,
+   "meta": {
+    "top": "",
+    "back": ""
+   },
+   "cornerDraft": null,
+   "opening": {
+    "x0": 0,
+    "w": 600
+   },
+   "ctxLock": [
+    "",
+    "slot umývačky zóny nemá",
+    "",
+    ""
+   ],
+   "legs": false,
+   "expects": null,
+   "templateType": "dishwasher"
+  },
+  "corner_blind": {
+   "symbolBlind": "cross",
+   "symbolLift": "up",
+   "cabInfo": "Rohová",
+   "setback": 50,
+   "rails": true,
+   "meta": {
+    "top": "zap. 30",
+    "back": "z líšt 100 · komín 50"
+   },
+   "cornerDraft": {
+    "corner_side": "right",
+    "corner_th2": 19
+   },
+   "opening": {
+    "x0": 10,
+    "w": 400
+   },
+   "ctxLock": [
+    "",
+    "",
+    "",
+    ""
+   ],
+   "legs": true,
+   "expects": [],
+   "templateType": "corner_blind"
+  },
+  "tall": {
+   "symbolBlind": "cross",
+   "symbolLift": "up",
+   "cabInfo": "Dolná",
+   "setback": 50,
+   "rails": true,
+   "meta": {
+    "top": "zap. 30",
+    "back": "z líšt 100 · komín 50"
+   },
+   "cornerDraft": null,
+   "opening": {
+    "x0": 0,
+    "w": 600
+   },
+   "ctxLock": [
+    "",
+    "",
+    "",
+    ""
+   ],
+   "legs": false,
+   "expects": [],
+   "templateType": "lower"
+  },
+  "(chyba)": {
+   "symbolBlind": "cross",
+   "symbolLift": "up",
+   "cabInfo": "Dolná",
+   "setback": 50,
+   "rails": true,
+   "meta": {
+    "top": "zap. 30",
+    "back": "z líšt 100 · komín 50"
+   },
+   "cornerDraft": null,
+   "opening": {
+    "x0": 0,
+    "w": 600
+   },
+   "ctxLock": [
+    "",
+    "",
+    "",
+    ""
+   ],
+   "legs": false,
+   "expects": [],
+   "templateType": "lower"
+  },
+  "('')": {
+   "symbolBlind": "cross",
+   "symbolLift": "up",
+   "cabInfo": "Dolná",
+   "setback": 50,
+   "rails": true,
+   "meta": {
+    "top": "zap. 30",
+    "back": "z líšt 100 · komín 50"
+   },
+   "cornerDraft": null,
+   "opening": {
+    "x0": 0,
+    "w": 600
+   },
+   "ctxLock": [
+    "",
+    "",
+    "",
+    ""
+   ],
+   "legs": false,
+   "expects": [],
+   "templateType": "lower"
+  }
+ },
+ "studio": {
+  "rules": [
+   [
+    "horna",
+    "na hornú skrinku"
+   ],
+   [
+    "dolna",
+    "na spodnú skrinku"
+   ],
+   [
+    "horna-a-slot",
+    "na hornú skrinku"
+   ],
+   [
+    "obe",
+    "na každú skrinku"
+   ],
+   [
+    "len-slot",
+    "na každú skrinku"
+   ],
+   [
+    "rohova",
+    "na každú skrinku"
+   ],
+   [
+    "prazdny-zoznam",
+    "na každú skrinku"
+   ],
+   [
+    "sokel",
+    "na skrinku na nohách so soklom od 55 mm"
+   ],
+   [
+    "podstavec",
+    "na skrinku s podstavcom"
+   ],
+   [
+    "kazda",
+    "na každú skrinku"
+   ],
+   [
+    "dvierka-horna",
+    "na každé krídlo dvierok"
+   ],
+   [
+    "polica",
+    "na každú policu"
+   ],
+   [
+    "zavesenie-hornej-skrinky",
+    "na hornú skrinku"
+   ]
+  ],
+  "tiles": [
+   [
+    "lower",
+    "dolná"
+   ],
+   [
+    "upper",
+    "horná"
+   ],
+   [
+    "dishwasher",
+    "umývačka"
+   ],
+   [
+    "corner_blind",
+    "rohová"
+   ],
+   [
+    "tall",
+    "dolná"
+   ],
+   [
+    "(chyba)",
+    "dolná"
+   ],
+   [
+    "('')",
+    "dolná"
+   ],
+   [
+    "board",
+    "doska"
+   ]
+  ]
+ }
+}

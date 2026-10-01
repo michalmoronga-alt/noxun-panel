@@ -92,8 +92,9 @@
   // (parita v tests/js/test_roha2_vkladanie.js). null = rohova, ktorej otvor
   // este nepozname (prvy preflight bezi) — cela sa vtedy NEKRESLIA, lebo
   // dvere cez celu sirku by boli klamstvo.
+  // H12c: „otvor = dverova cast" je vlastnost typu (`front_opening` registra).
   function nxFrontOpeningFor(type, W, op){
-    if (type !== 'corner_blind') return { x0: 0, w: W };
+    if (!NXTypes.has(type, 'front_opening', 'corner_door')) return { x0: 0, w: W };
     if (!op || typeof op !== 'object') return null;
     var x0 = nxNumOr(op.x0, NaN), w = nxNumOr(op.w, NaN);
     if (isNaN(x0) || !(w > 0)) return null;
@@ -103,7 +104,7 @@
   // kresli volajuci (kazdy si ju cita po svojom — `|| 600` vs `|| 0`), takze
   // ostatne typy dostanu presne jeho dnesne cislo.
   function pvFrontOpening(W){
-    var t = (typeof getType === 'function') ? getType() : 'lower';
+    var t = (typeof getType === 'function') ? getType() : NXTypes.FALLBACK;
     return nxFrontOpeningFor(t, W, (typeof frontOpening !== 'undefined') ? frontOpening : null);
   }
   // ROH-A2 (predrecenzia P3): zdroj slotov smeru pre znacky zavesov.
@@ -382,7 +383,7 @@
   // S1-E: udaje SLOTU z formulara (vklad aj oznaceny slot idu tou istou
   // cestou ako zvysok nahladu — `numv`). nil = nie je to slot.
   function pvSlot(){
-    if (typeof getType !== 'function' || getType() !== 'dishwasher') return null;
+    if (typeof getType !== 'function' || NXTypes.carcass(getType())) return null;
     var cls = parseInt(val('dw_class'), 10);
     var b = PV_DW_BODY[cls] || PV_DW_BODY[600];
     var fb = numv('dw_front_bottom') || 0;
@@ -422,7 +423,7 @@
   // rohovej a kazda odpoved preflightu so zivymi polami); panel NIC nepocita,
   // len kresli obdlzniky a koty. Iny typ = null, teda jeho kresba sa nemeni.
   function pvCornerPreview(){
-    if (typeof getType !== 'function' || getType() !== 'corner_blind') return null;
+    if (typeof getType !== 'function' || !NXTypes.corner(getType())) return null;
     var cp = (typeof cornerPreview !== 'undefined') ? cornerPreview : null;
     return (cp && typeof cp === 'object' && Array.isArray(cp.parts)) ? cp : null;
   }
@@ -488,8 +489,7 @@
   // jednej otázky by stará hodnota po prepnutí typu posunula kresbu čiel.
   function nxCabFloorHeight(){
     if (typeof getType !== 'function') return numv('floor_height') || 0;
-    var t = getType();
-    return (t === 'upper' || t === 'dishwasher') ? 0 : (numv('floor_height') || 0);
+    return NXTypes.onFloor(getType()) ? (numv('floor_height') || 0) : 0;
   }
 
   function pvGeom(){
@@ -691,7 +691,8 @@
     // je len prazdny kanonicky strom, takze bez tejto otazky by chip „Zóny"
     // ostal aktivny a ghost vrstva by nad slotom kreslila FANTOMOVE zony
     // (pred opravou #5 ich skryl `return`, teraz by sa naozaj nakreslili).
-    // Je to ta ista pravda, akou rail zhasina kontext Zóny (`NX_CTX_LOCK`).
+    // Je to ta ista pravda, akou rail zhasina kontext Zóny (`NXShell.ctxLockedBy`
+    // — typ bez vnutra `zones: none` z registra).
     return { zony: !!currentZoneTree && !pvSlot(),
              // Vo vkladani su cela DRAFT z karty (server ich este nema).
              cela: (previewMode === 'insert') ? pvInsertFronts().length > 0

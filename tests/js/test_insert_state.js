@@ -8,6 +8,8 @@
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
+// H12c: typy korpusu su register servera (v CEF ho plni `NX.init`).
+require('./nx_types_fixture.js');
 const ins = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'insert_state.js'));
 
 let n = 0;

@@ -33,17 +33,18 @@
     // UI-C1b: typ vkladaneho objektu = JEDNA volba z troch segmentovych
     // tlacidiel (Dolna · Horna · Doska). Nahradila dvojicu radiov kind+ctype;
     // stav je tu, nie v DOM (kostra panela sa neprekresluje).
-    // S1-E: pribudol SLOT UMYVACKY. Zrkadlo Ruby `CabinetBuilder::TYPES`
-    // + 'board' (doska nie je typ korpusu, ale je to volba vkladacej karty) —
-    // zhodu strazi guard test `tests/pure/test_s1e_slot.rb`.
-    // ROH-A1: + rohová (zoznam povolených typov; tlačidlo „Rohová" pridá A2).
-    var INSERT_TYPES = ['lower', 'upper', 'dishwasher', 'corner_blind', 'board'];
+    // H12c: typy korpusu su REGISTER SERVERA (`NXTypes`, core.js) + 'board'
+    // (doska nie je typ korpusu, ale je to volba vkladacej karty). A1 (audit
+    // H12): zoznam sa NESKLADA pri nacitani — tento subor bezi pred
+    // `sketchup.ready()`, teda pred dorucenim registra; pyta sa pri volani.
+    var BOARD = 'board';
+    function insertTypes(){ return NXTypes.ids().concat([BOARD]); }
     // UI-C1c: umiestnenie vkladanej dosky (zrkadlo Ruby BoardBuilder::ORIENTATIONS).
     // Je to stav vkladania, NIE vyrobny udaj — do zamkov ani do materialov nepatri.
     var BOARD_ORIENTATIONS = ['leziaca', 'stojaca', 'na_stenu'];
     var DEFAULT_ORIENTATION = 'leziaca';
     var state = {
-      type: 'lower',  // typ KORPUSU (lower|upper) — drzi sa aj kym je zvolena Doska
+      type: 'lower',  // typ KORPUSU (bootstrap = NXTypes.FALLBACK) — drzi sa aj kym je zvolena Doska
       kind: 'cabinet',// co sa vklada: 'cabinet' | 'board'
       template: '',   // nazov zvolenej KORPUSOVEJ sablony ('' = defaulty typu)
       boardTemplate: '', // nazov zvolenej DOSKOVEJ sablony ('' = predvolene rozmery karty)
@@ -74,16 +75,17 @@
     }
 
     // --- typ vkladaneho objektu (UI-C1b) -------------------------------------
-    // Jedna hodnota pre segmentove tlacidla: 'lower' | 'upper' | 'board'.
+    // Jedna hodnota pre segmentove tlacidla: typ korpusu z registra | 'board'.
     function insertType(){ return state.kind === 'board' ? 'board' : state.type; }
     // Prepnutie typu. Vracia true = stav sa naozaj zmenil (volajuci prekresli).
     // Zmena TYPU KORPUSU zahadzuje vyber korpusovej sablony (ponuka je typovo
     // filtrovana — D-32); prepnutie Korpus<->Doska vybery NEZAHADZUJE, kazdy
     // druh si drzi svoj (navrat na Dolnu ukaze presne to, co bolo).
     function setInsertType(t){
-      var next = (INSERT_TYPES.indexOf(t) >= 0) ? t : 'lower';
+      // Neznamy typ (aj pred `NX.init`) = dolna (`NXTypes.norm`).
+      var next = (t === BOARD) ? BOARD : NXTypes.norm(t);
       if (next === insertType()) return false;
-      if (next === 'board'){
+      if (next === BOARD){
         state.kind = 'board';
         return true;
       }
@@ -254,19 +256,16 @@
       return (list || []).filter(function(tp){ return templateKind(tp) === want; });
     }
     // Typ korpusovej sablony (legacy zaznam bez `type` je dolna skrinka).
-    // S1-E: `dishwasher` je tretia platna hodnota.
     // ROH-A1: rohová šablóna NESMIE padnúť do „dolnej" (vložila by sa ako
-    // dolná bez rohovej zostavy).
+    // dolná bez rohovej zostavy). H12c: znamy typ = register servera, inak dolna.
     function templateType(tp){
-      var t = tp && tp.config && tp.config.type;
-      if (t === 'upper' || t === 'dishwasher' || t === 'corner_blind') return t;
-      return 'lower';
+      return NXTypes.norm(tp && tp.config && tp.config.type);
     }
     // UI-C1b: ponuka pre ZVOLENY typ vkladania. 'board' = doskove sablony,
-    // 'lower'/'upper' = korpusove sablony toho typu.
+    // inak korpusove sablony toho typu (neznamy typ = dolna).
     function templatesForType(list, type){
-      if (type === 'board') return templatesOfKind(list, 'board');
-      var want = (type === 'upper' || type === 'dishwasher' || type === 'corner_blind') ? type : 'lower';
+      if (type === BOARD) return templatesOfKind(list, BOARD);
+      var want = NXTypes.norm(type);
       return templatesOfKind(list, 'cabinet').filter(function(tp){ return templateType(tp) === want; });
     }
     // Poradove cislo posledneho pouzitia (UI-C1a: `used_seq` z template_usage.json;
@@ -323,7 +322,7 @@
       HARDWARE_LIST_KEYS: HARDWARE_LIST_KEYS,
       LOCK_FIELDS: LOCK_FIELDS,
       BOARD_LOCK_FIELDS: BOARD_LOCK_FIELDS,
-      INSERT_TYPES: INSERT_TYPES,
+      insertTypes: insertTypes,
       BOARD_ORIENTATIONS: BOARD_ORIENTATIONS,
       DEFAULT_ORIENTATION: DEFAULT_ORIENTATION,
       orientationOf: orientationOf,

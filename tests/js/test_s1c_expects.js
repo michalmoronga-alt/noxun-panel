@@ -251,10 +251,16 @@ function pickRow(extra){
 
   // SLOT: checkboxy sa zamknú a payload ich NEPOSIELA.
   const sync = form.slice(form.indexOf('function nxSyncTplSaveExpects'));
-  ok(sync.indexOf("t === 'dishwasher'") > 0, 'slot sa rozpozná');
+  // H12c (T4): slot = typ, ktorý je SÁM vlastníkom spotrebiča (`appliance_owner:
+  // slot` z registra servera) — nie meno typu v kóde. Správanie stráži aj golden.
+  ok(sync.indexOf('var slot = nxTplSlotOwner(t)') > 0, 'slot sa rozpozná');
+  ok(form.indexOf("function nxTplSlotOwner(t){ return NXTypes.has(t, 'appliance_owner', 'slot'); }") > 0,
+     'otázka na vlastníka spotrebiča z registra');
+  eq(require('./nx_types_fixture.js').NXTypes.idsWhere('appliance_owner', 'slot'), ['dishwasher'],
+     'vlastníkom spotrebiča je dnes len slot umývačky');
   ok(sync.indexOf('inp.disabled = slot') > 0, 'a voľby sa zamknú');
   const value = form.slice(form.indexOf('function nxTplSaveExpectsValue'));
-  ok(value.indexOf("if (t === 'dishwasher') return null") > 0,
+  ok(value.indexOf('if (nxTplSlotOwner(t)) return null') > 0,
      'slot `expects` NEPOSIELA — prázdny zoznam by vyzeral ako „nič neočakáva"');
 
   // Uloženie: flush rozpísaných úprav ide PRED odoslaním (inak stará hodnota).

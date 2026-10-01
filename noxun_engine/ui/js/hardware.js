@@ -2373,7 +2373,8 @@
     legsTimer = null;
     if (!nxLegsInsertMode()) return false;
     // S1-E: slot nohy NEMÁ (podpora `none`) — rovnako ako horná skrinka.
-    if (getType() === 'upper' || getType() === 'dishwasher') return nxLegsHideRow();
+    // H12c: nohy len typ na podlahe (`onFloor` registra).
+    if (!NXTypes.onFloor(getType())) return nxLegsHideRow();
     var body = nxLegsInsertPayload();
     // Kym server odpovie, riadok drzi miesto s pomlckou — a ked odpoved
     // nepride vobec (starsi plugin bez callbacku), ostane pri nej.
@@ -2465,14 +2466,16 @@
   // ROH-A2: typy, pri ktorych vkladacia karta nohy UKAZUJE (dolna a rohova —
   // obe stoja na sokli/nohach). JEDINA otazka pre odpoved servera; ze horna
   // a slot riadok skryvaju, riesi `nxLegsInsertSend` a `nxLegsApplyVisibility`.
-  var LEGS_INSERT_TYPES = ['lower', 'corner_blind'];
-  function nxLegsTypeHasLegs(t){ return LEGS_INSERT_TYPES.indexOf(t) >= 0; }
+  // H12c: ZNAMY typ registra, ktory stoji na podlahe (`onFloor`); neznamy
+  // retazec nie je typ (dnesna mnozina — clenstvo, nie profil dolnej).
+  function nxLegsTypeHasLegs(t){ return NXTypes.known(t) && NXTypes.onFloor(t); }
 
-  // Viditelnost podla typu — presne ako `#fhRow` (horna skrinka nohy nema).
-  // Pri prechode na hornu skrinku sa uz nic nedopytuje a dotaz V LETE sa
-  // zneplatni (N3) — inak by ho neskora odpoved riadok znova ukazala.
+  // Viditelnost podla typu — presne ako `#fhRow` (horna skrinka ani slot nohy
+  // nemaju; H12c: dostava skutocny typ a pyta sa `onFloor`). Pri prechode na
+  // taky typ sa uz nic nedopytuje a dotaz V LETE sa zneplatni (N3) — inak by
+  // ho neskora odpoved riadok znova ukazala.
   function nxLegsApplyVisibility(t){
-    if (t === 'upper'){ nxLegsInsertDrop(); return nxLegsHideRow(); }
+    if (!NXTypes.onFloor(t)){ nxLegsInsertDrop(); return nxLegsHideRow(); }
     if (nxLegsInsertMode()) return nxLegsInsertAsk();
     return true;
   }

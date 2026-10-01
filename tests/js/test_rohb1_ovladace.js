@@ -66,6 +66,7 @@ function mkCtx(){
   ['core.js', 'expr.js', 'insert_state.js', 'form.js'].forEach(function(f){
     vm.runInContext(fs.readFileSync(path.join(JS, f), 'utf8'), ctx, { filename: f });
   });
+  require('./nx_types_fixture.js').fill(ctx); // H12c: register typov (v CEF `NX.init`)
   ctx.__node = node;
   ctx.__status = [];
   ctx.NX = { setStatus(m, bad){ ctx.__status.push([m, !!bad]); } };

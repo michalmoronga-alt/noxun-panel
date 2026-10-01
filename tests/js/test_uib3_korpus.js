@@ -18,6 +18,8 @@ const ROOT = path.join(__dirname, '..', '..');
 const UI = path.join(ROOT, 'noxun_engine', 'ui');
 const NXDim = require(path.join(UI, 'js', 'settings.js'));
 const { nxCabInfo, NX_TYPE_LABEL } = require(path.join(UI, 'js', 'core.js'));
+// H12c: nazov typu (hlavicka) je `label` registra servera (v CEF ho plni `NX.init`).
+const TYPES = require('./nx_types_fixture.js');
 
 const SETTINGS_SRC = fs.readFileSync(path.join(UI, 'js', 'settings.js'), 'utf8');
 const PANEL_HTML = fs.readFileSync(path.join(UI, 'panel.html'), 'utf8');
@@ -161,7 +163,10 @@ eq(nxCabInfo({}), { parts: '—', area: '—', type: 'Dolná' },
 eq(nxCabInfo(null), { parts: '—', area: '—', type: 'Dolná' }, 'bez skrinky su same pomlcky');
 eq(nxCabInfo({ parts_count: 0, parts_area_m2: 0 }), { parts: '—', area: '—', type: 'Dolná' },
    'nula nie je udaj — skrinka bez dielcov ukaze pomlcku');
-eq(NX_TYPE_LABEL.upper, 'Horná', 'slovensky nazov typu zije na JEDNOM mieste');
+// H12c (T4): nazov typu zije na JEDNOM mieste — v registri servera (`label`),
+// JS mapa NX_TYPE_LABEL zanikla.
+eq(NX_TYPE_LABEL, undefined, 'JS nema vlastnu mapu typ -> popisok');
+eq(TYPES.registry().find(r => r.id === 'upper').label, 'Horná', 'slovensky nazov typu je label registra');
 
 // --- 7) kostra panela: vstupy ostali vstupmi, vystupy su text -----------------
 

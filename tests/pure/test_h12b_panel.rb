@@ -197,11 +197,20 @@ if NxTest.headless?
     NxTest.assert(rd.type_scope_desc(rule.call('front_door', ['upper'])).nil?, 'len rola cabinet')
     NxTest.assert(rd.type_scope_desc('applies_to' => nil).nil?)
     seed = Noxun::Engine::HardwareRules::SEED_RULES
-    map = rd.type_scope_map(seed)
-    NxTest.assert_equal({ 'zavesenie-hornej-skrinky' => 'na hornú skrinku' }, map, 'seed: len pravidlo zavesov')
+    # H12c (predrecenzia P3): pole PO RIADKOCH pravidiel (nie mapa podla rule_id).
+    list = rd.type_scope_list(seed)
+    NxTest.assert_equal(seed.length, list.length, 'jedna polozka na riadok pravidla')
+    hits = seed.each_index.select { |i| list[i] }
+    NxTest.assert_equal(['zavesenie-hornej-skrinky'], hits.map { |i| seed[i]['rule_id'] }, 'seed: len pravidlo zavesov')
+    NxTest.assert_equal('na hornú skrinku', list[hits.first])
+    # Dva riadky s ROVNAKYM rule_id a inym typom (a riadok bez id) = kazdy svoju vetu.
+    dup = [rule.call('cabinet', ['upper']).merge('rule_id' => 'x'), rule.call('cabinet', ['lower']).merge('rule_id' => 'x'),
+           { 'applies_to' => { 'role' => 'cabinet', 'cabinet_type' => ['upper'] } }, rule.call('cabinet', [])]
+    NxTest.assert_equal(['na hornú skrinku', 'na spodnú skrinku', 'na hornú skrinku', nil], rd.type_scope_list(dup),
+                        'duplicitne/chybajuce rule_id nezmiesa vety riadkov')
     body = NxH12b.src('noxun_engine', 'ui', 'rules_dialog.rb')
-    NxTest.assert(body.include?("'type_scope' => type_scope_map(rules)"), 'rules_payload nesie type_scope')
-    # „Načítať globálne" (push_global) nesie tu istu mapu nad GLOBALNYMI pravidlami.
+    NxTest.assert(body.include?("'type_scope' => type_scope_list(rules)"), 'rules_payload nesie type_scope')
+    # „Načítať globálne" (push_global) nesie to iste pole nad GLOBALNYMI pravidlami.
     hr = Noxun::Engine::HardwareRules
     lib = seed.map { |r| JSON.parse(JSON.generate(r)) }
     lib << { 'rule_id' => 'len-v-globale', 'applies_to' => { 'role' => 'cabinet', 'cabinet_type' => ['lower'] } }
@@ -219,11 +228,16 @@ if NxTest.headless?
     end
     line = sent.find { |s| s.start_with?('RD.setRules(') }.to_s
     NxTest.assert(line.include?('if (window.RD && RD.setTypeScope) RD.setTypeScope('), 'push_global posiela type_scope (guard DOM)')
-    got = JSON.parse(line[/RD\.setTypeScope\((\{.*?\})\);/, 1].to_s)
-    NxTest.assert_equal({ 'zavesenie-hornej-skrinky' => 'na hornú skrinku', 'len-v-globale' => 'na spodnú skrinku' }, got,
-                        'mapa nad globalnymi pravidlami (aj pravidlo, ktore projekt nema)')
+    got = JSON.parse(line[/RD\.setTypeScope\((\[.*?\])\);/, 1].to_s)
+    NxTest.assert_equal(rd.type_scope_list(lib), got, 'pole nad globalnymi pravidlami v poradi RD.setRules')
+    NxTest.assert_equal('na spodnú skrinku', got.last, 'aj pravidlo, ktore projekt nema')
+    # H12c (T4): rules.js vety uz neskladá — prevzal ich zo servera (pole
+    # `type_scope`, `RD.setTypeScope`). Doslovnu zhodu s povodnym JS strazi
+    # golden `tests/fixtures/h12_golden/js.json` (Studio) a parita fixtury
+    # `type_scope.json` s `type_scope_list` (test_h12c_js.rb).
     js = NxH12b.src('noxun_engine', 'ui', 'js', 'rules.js')
-    NxTest.assert(js.include?("return 'na hornú skrinku';") && js.include?("return 'na spodnú skrinku';"),
-                  'vety su doslovne tie, ktore dnes sklada rules.js (H12c ich prevezme)')
+    NxTest.refute(js.include?("return 'na hornú skrinku';") || js.include?("return 'na spodnú skrinku';"),
+                  'okno vety rozsahu podla typu nesklada (len server)')
+    NxTest.assert(js.include?('setTypeScope: function(list){'), 'prijimac „Načítať globálne" existuje')
   end
 end

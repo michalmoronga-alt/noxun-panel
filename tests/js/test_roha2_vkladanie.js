@@ -51,7 +51,12 @@ function mkCtx(ids){
   vm.createContext(ctx);
   return ctx;
 }
-function load(ctx, file){ vm.runInContext(fs.readFileSync(path.join(JS, file), 'utf8'), ctx, { filename: file }); }
+// H12c: po core.js dostane kontext register typov zo servera (v CEF `NX.init`).
+const TYPES = require('./nx_types_fixture.js');
+function load(ctx, file){
+  vm.runInContext(fs.readFileSync(path.join(JS, file), 'utf8'), ctx, { filename: file });
+  if (file === 'core.js') TYPES.fill(ctx);
+}
 function get(ctx, expr){ return vm.runInContext(expr, ctx); }
 
 // ============ 1) TYP „Rohová" VO VKLADACEJ KARTE =============================
@@ -329,6 +334,7 @@ const CORNER_ITEM = [{ id: 'F1', type: 'door', mode: 'auto', z: 150, height: 707
 // ============ 6) NAHLAD NOH PRE ROHOVU =======================================
 {
   const ctx = mkCtx();
+  ctx.NXTypes = TYPES.NXTypes; // H12c: register typov (bez core.js v tomto kontexte)
   load(ctx, 'hardware.js');
   let TYPE = 'corner_blind';
   ctx.getType = () => TYPE;

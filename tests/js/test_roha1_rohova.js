@@ -38,6 +38,9 @@ function load(ctx, file){ vm.runInContext(fs.readFileSync(path.join(JS, file), '
 const ctx = mkCtx();
 load(ctx, 'core.js');
 load(ctx, 'form.js');
+// H12c: typy su register servera — v CEF ho plni `NX.init`.
+const TYPES = require('./nx_types_fixture.js');
+TYPES.fill(ctx);
 ctx.syncInsertTypeButtons = function(){};
 ctx.setType('corner_blind');
 eq(ctx.getType(), 'corner_blind', 'setType drzi rohovu (G1)');
@@ -46,29 +49,33 @@ eq(ctx.getType(), 'lower', 'neznamy typ dalej padne na dolnu');
 ctx.setType('corner_blind');
 
 // ============ 2) registre =====================================================
+// H12c (T4): JS zoznamy typu (CAB_TYPES, INSERT_TYPES, NX_TYPE_LABEL,
+// TYPE_LIMITS, TPL_TYPE_WORDS) zanikli — vsetko je register servera.
 const core = require(path.join(JS, 'core.js'));
-eq(core.NX_TYPE_LABEL.corner_blind, 'Rohová', 'hlavicka Inspectora');
+eq(core.NX_TYPE_LABEL, undefined, 'JS mapa popiskov zanikla');
+eq(core.NXTypes.label('corner_blind'), 'Rohová', 'hlavicka Inspectora (label registra)');
 eq(core.nxCabInfo({ type: 'corner_blind' }).type, 'Rohová', 'badge nad rohovou nehlasi „Dolná"');
-const cabTypes = vm.runInContext('CAB_TYPES', ctx);
-eq(Array.from(cabTypes), ['lower', 'upper', 'dishwasher', 'corner_blind'], 'CAB_TYPES = Ruby TYPES');
+eq(vm.runInContext('typeof CAB_TYPES', ctx), 'undefined', 'CAB_TYPES zanikol');
+eq(Array.from(vm.runInContext('NXTypes.ids()', ctx)), ['lower', 'upper', 'dishwasher', 'corner_blind'],
+   'register v JS = Ruby CabinetTypes::IDS (zmluvna fixtura)');
 const NXInsert = require(path.join(JS, 'insert_state.js'));
-eq(NXInsert.INSERT_TYPES, ['lower', 'upper', 'dishwasher', 'corner_blind', 'board'], 'INSERT_TYPES');
+eq(NXInsert.insertTypes(), ['lower', 'upper', 'dishwasher', 'corner_blind', 'board'], 'typy vkladania = register + doska');
 eq(NXInsert.templateType({ config: { type: 'corner_blind' } }), 'corner_blind', 'rohova sablona nie je „dolna"');
 const LIB = [{ name: 'Rohova 1100', kind: 'cabinet', config: { type: 'corner_blind' } },
              { name: 'Dolna klasik', kind: 'cabinet', config: { type: 'lower' } }];
 eq(NXInsert.templatesForType(LIB, 'corner_blind').map(t => t.name), ['Rohova 1100'], 'filter rohovych sablon');
 eq(NXInsert.templatesForType(LIB, 'lower').map(t => t.name), ['Dolna klasik'], 'dolna ponuka rohovu nevidi');
-const limits = vm.runInContext('TYPE_LIMITS', ctx);
 // ROH-B1 (O2 + P3-2): pevne minimum 584 zaniklo — najmensiu sirku pocita
 // krizova kontrola z poli rohovej a ucinnych hrubok (test_rohb1_ovladace.js).
-ok(!limits.corner_blind, 'TYPE_LIMITS rohovej uz nema pevne minimum (ROH-B1)');
+eq(vm.runInContext("NXTypes.get('corner_blind').limits", ctx), null, 'rohova nema vlastne rozsahy (ROH-B1)');
 eq(Array.from(vm.runInContext("limitFor('width')", ctx)), [200, 3000], 'limit sirky pri rohovej = korpus (minimum riesi kontrola)');
 eq(ctx.nxCornerMinWidth(450, 80, 18, 18), 584, 'minimum predvolieb 450 + 80 + 18 + 2 x 18');
 ctx.setType('lower');
 eq(Array.from(vm.runInContext("limitFor('width')", ctx)), [200, 3000], 'dolna ma dalej 200');
 ctx.setType('corner_blind');
 const tplSrc = fs.readFileSync(path.join(JS, 'templates.js'), 'utf8');
-ok(tplSrc.indexOf("corner_blind: 'rohová'") >= 0, 'TPL_TYPE_WORDS pozna rohovu');
+ok(tplSrc.indexOf('TPL_TYPE_WORDS') < 0, 'Studio nema vlastnu mapu slov typu (H12c: `type_word` zo servera)');
+eq(TYPES.registry().find(r => r.id === 'corner_blind').word, 'rohová', 'slovo rohovej je v registri');
 
 // ============ 3) collectConstruction: polia rohovej od ROH-B1, strana nikdy =====
 const FIELDS = { width: '1100', height: '862', depth: '510', thickness: '18', floor_height: '150',
@@ -86,7 +93,8 @@ eq([out.corner_door_w, out.corner_cr1, out.corner_cr2], [600, 120, 90], 'ROH-B1:
 const ids = core.CONSTRUCTION_FIELDS.map(f => f.id);
 ok(ids.indexOf('corner_side') < 0, 'CONSTRUCTION_FIELDS nema stranu (prepinac, nie pole)');
 ['corner_door_w', 'corner_cr1', 'corner_cr2'].forEach(function(k){
-  eq(core.CONSTRUCTION_FIELDS.find(f => f.id === k).only, 'corner_blind', `${k} len pri rohovej (C6)`);
+  // H12c (T4): `onlyIf` = predikat registra (typ s rohovou zostavou), nie meno typu.
+  eq(core.CONSTRUCTION_FIELDS.find(f => f.id === k).onlyIf, 'corner', `${k} len pri rohovej (C6)`);
 });
 
 // ============ 4) karta dielca a pravidla ======================================

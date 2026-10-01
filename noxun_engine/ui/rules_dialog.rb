@@ -71,8 +71,8 @@ module Noxun
       GLOBAL_UNREADABLE_AFTER_TEXT = 'Globálne predvoľby sa nepodarilo prečítať, neprepísali sa.'
 
       # H12b (package H12 R2.6): VETA ROZSAHU pravidla viazaneho na TYP SKRINKY
-      # (`applies_to.cabinet_type`) — server ju sklada, `rules.js` ju do H12c
-      # pocita sam (`rdRoleDesc`, dnes doslovne tieto dve vety). Su to VETY
+      # (`applies_to.cabinet_type`) — sklada ju VYHRADNE server, `rules.js` ju
+      # od H12c len zobrazi (pole `type_scope` po riadkoch). Su to VETY
       # v akuzative so slovom „spodnú" (terminologia F3, rozhodne Michal v H13),
       # nie vlastnosti typu — preto nie su v registri `CabinetTypes`. Veta plati,
       # ked filter pravidla obsahuje PRAVE JEDEN z tychto typov (zrkadlo JS:
@@ -176,9 +176,9 @@ module Noxun
                       'abs' => abs_payload,
                       'overrides' => overrides_payload(collected),
                       # H12b (R2.6): hotova veta rozsahu pravidiel viazanych na
-                      # typ skrinky, `{ rule_id => veta }` (len pravidla, ktore ju
-                      # maju). Aditivny kluc — `rules.js` ho do H12c nečíta.
-                      'type_scope' => type_scope_map(rules) }
+                      # typ skrinky — od H12c pole po riadkoch `rules` (veta | nil).
+                      # `rules.js` z neho cita vetu riadku (`RD_TYPE_SCOPE`).
+                      'type_scope' => type_scope_list(rules) }
           @baseline_guid  = guid
           @baseline_rules = rules
           @baseline_rev   = rev
@@ -205,11 +205,12 @@ module Noxun
           hits.length == 1 ? TYPE_SCOPE_PHRASES[hits.first] : nil
         end
 
-        def type_scope_map(rules)
-          Array(rules).each_with_object({}) do |r, out|
-            desc = type_scope_desc(r)
-            out[r['rule_id'].to_s] = desc if desc
-          end
+        # H12c (predrecenzia P3): vety PODLA POZICIE riadku — pole rovnako dlhe
+        # ako `rules`, ktore ide v tom istom payloade (nil = pravidlo vetu nema).
+        # Kluc `rule_id` by pri duplicitnom alebo chybajucom id dal zlu vetu;
+        # klient zachovava poradie riadkov (`rdCollectRules` po `.rrule`).
+        def type_scope_list(rules)
+          Array(rules).map { |r| type_scope_desc(r) }
         end
 
         # ================ ŠT-3b-2a: ABS podla roly + rucne zasahy ==============
@@ -566,17 +567,17 @@ module Noxun
         def push_global
           lib = HardwareRules.load
           js("RD.setRules(#{lib.to_json}, 'global'); #{global_rev_script(HardwareRules.rules_rev(lib))} " \
-             "#{type_scope_script(type_scope_map(lib))}")
+             "#{type_scope_script(type_scope_list(lib))}")
           set_status('Načítané globálne predvoľby — platia až po Uložiť.')
         end
 
         # H12b (predrecenzia P3): veta rozsahu pravidiel viazanych na typ pre
-        # PRAVE NACITANY global — ta ista mapa ako `type_scope` plneho pushu,
-        # vypocitana nad globalnymi pravidlami (inak by H12c po „Načítať
-        # globálne" ukazala vetu stareho formulara). Guard pre DOM bez prijimaca
-        # (`RD.setTypeScope` pribudne v H12c).
-        def type_scope_script(map)
-          "if (window.RD && RD.setTypeScope) RD.setTypeScope(#{map.to_json});"
+        # PRAVE NACITANY global — to iste pole po riadkoch ako `type_scope` plneho
+        # pushu, vypocitane nad globalnymi pravidlami v poradi `RD.setRules`
+        # (inak by okno po „Načítať globálne" ukazalo vetu stareho formulara).
+        # Prijimac `RD.setTypeScope` (rules.js, H12c); guard pre DOM bez neho.
+        def type_scope_script(list)
+          "if (window.RD && RD.setTypeScope) RD.setTypeScope(#{list.to_json});"
         end
 
         # Pokyn klientovi „globál, ktory odteraz poznas, ma tuto reviziu".

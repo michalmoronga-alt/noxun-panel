@@ -38,14 +38,15 @@ načíta sa hneď za `build_plan` — **pred** `construction` (`CORNER_TYPE`), `
   **Miesta identity** si nechávajú surový reťazec: vstup pravidiel kovania `cabinet_hw_ctx['cabinet_type']`, typový guard použitia šablóny
   (`TemplatesDialog.template_type_id` — chýbajúci typ = dolná, `''` a neznámy ostávajú; H12b, A2), zmena typu z/na rohovú (`want ≠ have` surovo, zámok
   = `type_locked`), kľúč pamäte zamknutej výšky ghostu.
-- **`client_payload`** = kontrakt pre JS (od H12b ho nesie `NX.init` pod kľúčom **`cabinet_types`**; H12c z neho začne čítať): pole hashov v poradí `IDS`,
+- **`client_payload`** = kontrakt pre JS (od H12b ho nesie `NX.init` pod kľúčom **`cabinet_types`**; od H12c ho JS nasadí prvým príkazom `NX.init` do
+  registra **`NXTypes`** v `core.js` a pýta sa výhradne jeho vlastností — [ui-lifecycle.md](ui-lifecycle.md), odsek CONSTRUCTION_FIELDS → JS register typu): pole hashov v poradí `IDS`,
   **kľúče ako stringy s menami `KEYS`**, hodnoty len JSON typy (`limits` → `{"width": [..], "height": [..]}`, `template_lock` → `{"title", "tip"}`); zmluva =
-  `tests/fixtures/h12_cabinet_types.json`.
+  `tests/fixtures/h12_cabinet_types.json` (z nej plnia register aj JS sady — `tests/js/nx_types_fixture.js`).
 - **Čo register NIE JE:** predvoľby (`*_DEFAULTS` → `CabinetBuilder::DEFAULTS_BY_TYPE`), polia typu (`DW_KEYS`, `CORNER_KEYS` → `EXTRA_KEYS_BY_TYPE`),
   `PARAM_KEYS` a kód typov (`appliance_slot_plan`, `corner_parts`, `slot_fronts!`, `corner_fronts!`…) ostávajú v builderi — register hovorí **ktorá** vetva, nie **ako**.
   Aliasy pre testy a cudzí kód: `CabinetBuilder::TYPES` (= `IDS`), `CabinetBuilder::CORNER_TYPE` a `Construction::CORNER_TYPE` (= `CORNER`, do H12a dve kópie),
   `CabinetBuilder::UPPER_HANG_Z`, `DW_WIDTH_RANGE`/`DW_HEIGHT_RANGE`, `ScaleWatch::MIN_BY_TYPE` (odvodené z `limits`).
-- **Guardy (`test_h12a_register.rb`):** v `core/`, `modules/` a od H12b aj `ui/` (len `.rb`; JS je H12c) **žiadne nové vetvenie podľa mena typu**
+- **Guardy (`test_h12a_register.rb`; JS `test_h12c_js.rb`):** v `core/`, `modules/`, od H12b aj `ui/` (`.rb`) a od H12c aj `ui/js/*.js` **žiadne nové vetvenie podľa mena typu**
   (`== 'upper'`, `when 'dishwasher'`, `%w[…upper…]`, `|| 'lower'`, `CORNER_TYPE` mimo aliasov — allowlist podľa obsahu riadka s dôvodom: kategórie
   spotrebičov, seed závesov, mapy predvolieb, vety rozsahu pravidiel `RulesDialog::TYPE_SCOPE_PHRASES`) · `DEFAULTS_BY_TYPE` = `IDS` · **CN-03** (visiace typy = `cabinet_type` seedu závesov, [hardware.md](hardware.md)) · poradie načítania. **Nový typ** =
   riadok `REGISTRY` + `DEFAULTS_BY_TYPE` (+ `EXTRA_KEYS_BY_TYPE`, `PARAM_KEYS`) + kód buildera + HTML tlačidlo a `option` + seed šablóny + pri `hang_z > 0` seed
@@ -291,7 +292,7 @@ alebo vyhľadávania náhrad podľa podobného mena. Čistenie nepoužívaných 
 z `EXTRA_KEYS_BY_TYPE.fetch(type, [])` (poradie kľúčov bez zmeny) a komín/lišty pri `carcass?`; `legacy_plinth` = `hangs?`; `config_to_params` nechýbajúci typ
 dopĺňa `CabinetTypes::FALLBACK`. **Bajty plánu, configu a výstupov sa nemenia** (golden `test_h12_golden.rb` + in-SU `run_h12`).
 
-**ROH-A1 · K3 (v0.14.1, `CONFIG_SCHEMA` 22) — TYP `corner_blind`.** `TYPES` = `lower upper dishwasher corner_blind` (od H12a alias registra; JS zrkadlá `CAB_TYPES`/`INSERT_TYPES`),
+**ROH-A1 · K3 (v0.14.1, `CONFIG_SCHEMA` 22) — TYP `corner_blind`.** `TYPES` = `lower upper dishwasher corner_blind` (od H12a alias registra; JS ho od H12c dostáva zo servera — `NXTypes`),
 `CORNER_DEFAULTS` = `LOWER_DEFAULTS` + šírka 1100 + informatívny jeden riadok dvierok + polia rohovej. **Polia `CORNER_KEYS`** (`corner_side`, `corner_door_w`,
 `corner_cr1`, `corner_cr2`) idú jedným zoznamom cez `normalize` (`norm_corner`: strana enum `CORNER_SIDES`, rozmery **prísne** cez `SETBACK_NUM_RE` — nečíslo /
 nekonečno = predvoľba poľa — a klamp `CORNER_RANGES` 250–800 / 50–250), `cabinet_config` (**len pri rohovej, vždy všetky štyri**), `config_to_params` (18 volaní —
@@ -590,7 +591,7 @@ meria `async S6`).
 **SLOT UMÝVAČKY (S1-E, typ `dishwasher`) — štvrtá vetva buildera vedľa dolnej, hornej a dosky.** Slot **nie je korpus**: nemá boky, dno, strop, chrbát ani zóny.
 Vyrába **jediný dielec — ČELO** (cez modul čiel ako jeden pevný item typu `blind`, teda rola `false_front`) a **telo spotrebiča kreslí ako REFERENCIU**, nie ako dielec.
 Zoznam typov je od H12a **register `CabinetTypes`** (odsek [cabinet_types.rb](#cabinet_typesrb); `TYPES` = alias `IDS`, `lower upper dishwasher corner_blind`)
-a JS ho zatiaľ zrkadlí v `core.js` (`CAB_TYPES`) aj v `insert_state.js` (`INSERT_TYPES` + `board`; zo servera ich naplní H12c); zhodu stráži guard test.
+a JS ho od H12c **dostáva zo servera** (`cabinet_types` v `NX.init` → `NXTypes`; vkladanie = `NXTypes.ids()` + `board`) — vlastný zoznam typov JS nemá.
 Vetvy slotu sa pýtajú vlastností (`carcass?`, `limits`, `appliance_owner`, `fronts`, `front_opening`), nie mena `dishwasher`.
 
 **Polia slotu** (`DW_KEYS`, uzavretý whitelist uložených polí): `dw_class` (600 | 450), `dw_body_height`, `dw_front_bottom` = spodná hrana **čela** od podlahy,
@@ -598,7 +599,8 @@ Vetvy slotu sa pýtajú vlastností (`carcass?`, `limits`, `appliance_owner`, `f
 medzera hore `fronts.gap_top`, platné 300–1200, mimo = výnimka so SK vetou s radou podľa strany) a ukladá sa len ako stav poslednej stavby. Predvoľby slotu sú
 **880 / 100** (čelo 778). `height` je **výška linky** (horná hrana slotu; výplň nad umývačkou = samostatný nízky korpus a slot po jej spodok), nie výška korpusu.
 **Rozsahy žijú na jednom mieste** a majú tri zrkadlá: `DW_RANGES` + `DW_WIDTH_RANGE`
-(300–1200) + `DW_HEIGHT_RANGE` (500–1200) v Ruby, `ScaleWatch::MIN_BY_TYPE` v absorpcii scale a `LIMITS`/`TYPE_LIMITS` v `ui/js/form.js`. **Šírka sa NEKLAMPUJE na triedu**
+(300–1200) + `DW_HEIGHT_RANGE` (500–1200) v Ruby, `ScaleWatch::MIN_BY_TYPE` v absorpcii scale a v `ui/js/form.js` `LIMITS` (polia slotu) + `limits` typu z registra
+servera (`NXTypes.get(t).limits`, H12c — šírka a výška linky). **Šírka sa NEKLAMPUJE na triedu**
 (Astra S1-E, BLOCKER E1): užší slot sa postaví a nedostatočnú šírku hlási Kontrola ORANGE `dw_body_fit` — semafor varuje, nikdy neblokuje prestavbu.
 
 **Podpora `none` je invariant** (Codex #376 kolo 1 P1): `floor_height` slotu je **vždy 0** a `dw_front_bottom` doň **nikdy netečie**; `plinth_mode` je `none`. Bez toho by

@@ -66,9 +66,10 @@
   }
   function tplArg(v){ return tplEsc(JSON.stringify(String(v == null ? '' : v))); }
   function tplIco(n){ return '<svg class="ic" aria-hidden="true"><use href="#i-' + n + '"/></svg>'; }
-  // S1-E: tretí typ. Zrkadlo Ruby `Panel::TEMPLATE_TYPE_WORDS`.
-  var TPL_TYPE_WORDS = { upper: 'horná', lower: 'dolná', dishwasher: 'umývačka', corner_blind: 'rohová' };
-  function tplTypeLabel(t){ return TPL_TYPE_WORDS[t] || 'dolná'; }
+  // H12c: SLOVO TYPU korpusovej šablóny posiela server v zázname (`type_word`
+  // = `word` z registra typov, neznámy a chýbajúci typ = dolná —
+  // `Panel.template_type_word`). Okno žiadnu mapu typov nemá.
+  function tplTypeWord(tp){ return String((tp && tp.type_word) || ''); }
   // Kľúč cache náhľadov. Oddeľovač NESMIE byť znak, ktorý sa môže objaviť
   // v mene šablóny — a už vôbec nie NUL bajt: ten spraví z celého súboru
   // BINÁRNY (git ho prestane diffovať a review ho nevidí — review #225 P1).
@@ -229,7 +230,6 @@
   function tplTileHtml(tp, kind, idx){
     var cfg = tp.config || {};
     var isCab = kind === 'cabinet';
-    var type = cfg.type || 'lower';
     var dims = tplDims(cfg);
     var hw = tp.hardware && tp.hardware.has === true
       ? 'Kovanie: ' + (tp.hardware.labels || []).join(' · ') + ' — zámky sa neprenášajú' : '';
@@ -250,7 +250,7 @@
       '<span class="stplph">' + (tp.preview_rev ? '' : 'schéma') + '</span></div>' +
       '<b class="stplname">' + (hw ? '<i class="tplhw" role="img" aria-label="' + tplEsc(hw) + '">' +
       tplIco('wrench') + '</i>' : '') + '<span>' + tplEsc(tp.name) + '</span></b>' +
-      '<span class="stplmeta">' + tplEsc(isCab ? tplTypeLabel(type) : 'doska') +
+      '<span class="stplmeta">' + tplEsc(isCab ? tplTypeWord(tp) : 'doska') +
       (dims ? ' · ' + tplEsc(dims) : '') + '</span>' +
       (kon ? '<span class="stplmeta stplkon">' + tplEsc(kon) + '</span>' : '') +
       // S1-C: OČAKÁVANIA šablóny — jeden riadok TEXTU zo servera, žiadne nové

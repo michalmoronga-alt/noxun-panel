@@ -1,0 +1,24 @@
+{
+ "rules": [
+  { "rule_id": "horna", "applies_to": { "role": "cabinet", "cabinet_type": ["upper"] } },
+  { "rule_id": "dolna", "applies_to": { "role": "cabinet", "cabinet_type": ["lower"] } },
+  { "rule_id": "horna-a-slot", "applies_to": { "role": "cabinet", "cabinet_type": ["upper", "dishwasher"] } },
+  { "rule_id": "obe", "applies_to": { "role": "cabinet", "cabinet_type": ["upper", "lower"] } },
+  { "rule_id": "len-slot", "applies_to": { "role": "cabinet", "cabinet_type": ["dishwasher"] } },
+  { "rule_id": "rohova", "applies_to": { "role": "cabinet", "cabinet_type": ["corner_blind"] } },
+  { "rule_id": "prazdny-zoznam", "applies_to": { "role": "cabinet", "cabinet_type": [] } },
+  { "rule_id": "sokel", "applies_to": { "role": "cabinet", "floor_height_min": 55 } },
+  { "rule_id": "podstavec", "applies_to": { "role": "cabinet", "support": ["legs"] } },
+  { "rule_id": "kazda", "applies_to": { "role": "cabinet" } },
+  { "rule_id": "dvierka-horna", "applies_to": { "role": "front_door", "cabinet_type": ["upper"] } },
+  { "rule_id": "polica", "applies_to": { "role": "shelf" } },
+  { "rule_id": "zavesenie-hornej-skrinky", "applies_to": { "role": "cabinet", "cabinet_type": ["upper"] } }
+ ],
+ "type_scope": [
+  "na hornú skrinku",
+  "na spodnú skrinku",
+  "na hornú skrinku",
+  null, null, null, null, null, null, null, null, null,
+  "na hornú skrinku"
+ ]
+}

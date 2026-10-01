@@ -404,7 +404,7 @@
     // ROH-B1 (O4 A1): STRANA DVERI rohovej zvolena vo vkladacej karte. Nie je
     // to pole formulara (apply ju nikdy neposiela), preto ide sem vyslovne —
     // a LEN pri rohovej (dolna, horna ani slot kluc nedostanu).
-    if (p.type === 'corner_blind' && typeof nxCornerSide === 'function') p.corner_side = nxCornerSide();
+    if (NXTypes.corner(p.type) && typeof nxCornerSide === 'function') p.corner_side = nxCornerSide();
     // D-33/F6: materialy zo sablony idu do insert payloadu EXPLICITNE (drzi ich
     // insert stav, nie disabled selecty). Vedome MIMO PARAM_KEYS/CONSTRUCTION_FIELDS:
     // PARAM_KEYS je zaroven apply whitelist a materialy maju vlastny kanal
@@ -446,7 +446,7 @@
   // na tej istej strane. `side` (strana ghostu) je len informacia.
   // -> true = ziadost odisla.
   function nxGhostCornerSide(side){
-    if ((typeof selectedCabId !== 'undefined' && selectedCabId) || cabTypeNow() !== 'corner_blind'){
+    if ((typeof selectedCabId !== 'undefined' && selectedCabId) || !NXTypes.corner(cabTypeNow())){
       NX.setStatus('Klávesa D prepína stranu dverí len pri vkladaní rohovej z karty — zmeň ju prepínačom v riadku rohovej.', true);
       return false;
     }
