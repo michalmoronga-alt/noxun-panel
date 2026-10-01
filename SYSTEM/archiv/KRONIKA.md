@@ -31,7 +31,8 @@
   Trvalé pravidlá majú jednu autoritu: „vertikálny priestor panela je vzácny" → [UI_DIZAJN.md](../../docs/UI_DIZAJN.md) §1 (CLAUDE.md, ARCHITEKTURA, ui-lifecycle,
   PLAN a V1_VIZIA len odkazujú); „Hranica TYP vs. ŠABLÓNA vs. PARAMETER" → [STANDARD.md](../STANDARD.md) §4.2 (POJMY a PLAN len odkaz); „Pravidlo pre postrehy"
   ostáva v PLAN (je to pravidlo plánovania). V [DOGFOODING.md](../DOGFOODING.md) zanikli prázdne skupiny archivovaných blokov (1b, V1 DOTIAHNUTIE, INFRA);
-  hlavička [AUDIT_REGISTER.md](../AUDIT_REGISTER.md) už nehovorí o bloku 1d ako o živom. **B-08 (súhlas Michala):** dokumentačné PR, ktoré mení stav bloku
+  hlavička [AUDIT_REGISTER.md](../AUDIT_REGISTER.md) už nehovorí o bloku 1d ako o živom a vyriešené položky (P0, R-01–R-04, R-07, R-08, R-11, R-12,
+  R-14, R-34, R-41) prešli pri uzávere 1d plným textom do sekcie „Vyriešené" toho istého súboru (review #433); čiastočne vyriešené R-06, R-19 a R-23 ostali v osiach. **B-08 (súhlas Michala):** dokumentačné PR, ktoré mení stav bloku
   alebo poradie prác, prepíše v STAV „Robí sa" a „Ďalší krok" a v sekcii „Stav" smie aktualizovať faktický stav bloku či smoke
   (spresnenie orchestrátora po review #433; verzia a čísla testov ostávajú; nahradený text stačí zhrnúť tu) — CLAUDE.md, hlavička STAV, README, WORKFLOW
   a typ agenta implementátora. Hneď aplikované: **nahradené** „Robí sa: smoke bloku CENY" a „Ďalší krok: aktualizovať, smoke CENY, potom pred V1 R-13 → R-37 →
