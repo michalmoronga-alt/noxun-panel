@@ -1059,7 +1059,9 @@ GL polia); `extents` berie všetky tri stavy z celej cache.
 invaliduje pohľad. Rozsah = top-level ako `Bom.collect`; prechod modelom `each_part` je **zdieľaný** — číta ho aj `grain_check` (K2), aby „čo je výrobný dielec" žilo na jednom
 mieste.
 
-**ŽIVOTNÝ CYKLUS OVERLAYA — VEDOMÁ ZMENA ŠT-1b:** overlay sa vypína **už len pri prepnutí modelu** (`EngineAppObserver`) a keď ho používateľ vypne. Zatvorenie okna zvýraznenie
+**ŽIVOTNÝ CYKLUS OVERLAYA — VEDOMÁ ZMENA ŠT-1b:** overlay sa vypína **už len pri prepnutí modelu** (`EngineAppObserver`) a keď ho používateľ vypne. Overlay, ktorý
+SketchUp zneplatnil (Windows Súbor → Nový — model ostáva ten istý objekt), `remove_overlay` neodstraňuje, len zabudne (stráž `stale_overlay?`, H3b; plné zdôvodnenie
+v odseku `direction_check.rb`). Zatvorenie okna zvýraznenie
 **NEVYPÍNA** (vedomá zmena ŠT-1b) — trvalým vstupným bodom prepínača je rail Inspectora, takže zatvorenie Štúdia by inak zhaslo zvýraznenie zapnuté úplne inde. Kontrakt „vypneš a
 nič v modeli neostane" drží ďalej: stav žije v `%APPDATA%`, v `.skp` neostáva **nikdy nič** a vypnúť sa dá z railu aj zo sekcie Kontrola. Štúdio z rovnakého dôvodu žiadne
 `disable!` pri zatvorení **nepridáva** (trvalý vstupný bod je rail).
@@ -1092,7 +1094,8 @@ zobrazuje — od ŠT-1b je to ŠTÚDIO** (`StudioDialog.show`, ešte PRED prvým
 `restore_grain_check` okna Výroba spolu s oknom).
 
 **Zatvorenie okna kresbu NEVYPÍNA** (vedomá zmena ŠT-1b — rovnaký dôvod ako pri zvýraznení hrán): Štúdio `disable!` nepridáva. Prepnutie dokumentu overlay vypne
-(`EngineAppObserver` → `on_model_changed`). Server je jediná autorita čísel — JS (`grainBtnHtml`/`grainCheckText`) len zobrazuje; guardy relayu (`gen` + `model_guid`) sú
+(`EngineAppObserver` → `on_model_changed`); overlay zneplatnený SketchUpom (Windows Súbor → Nový) sa pri ďalšom zapnutí len zabudne — stráž `stale_overlay?` v `remove_overlay`
+(H3b, zdôvodnenie v odseku `direction_check.rb`). Server je jediná autorita čísel — JS (`grainBtnHtml`/`grainCheckText`) len zobrazuje; guardy relayu (`gen` + `model_guid`) sú
 **zdieľané** s kontrolou hrán (`edge_check_guard`).
 
 **VSTUPNÉ BODY sú od ŠT-1b prepínač v lište sekcie Kontrola (ŠTÚDIO) a tlačidlo „Kontrola kresby" v raile Inspectora — a majú JEDEN zdroj stavu** (presné zrkadlo ABS kontroly z
@@ -1149,6 +1152,16 @@ Prepína sa výhradne cez `Engine.toggle_direction_check` a nový stav rozpošle
 (`notify_count_changed`) a vypnutie pri prepnutí dokumentu (`notify_state_changed` z `EngineAppObserver`) — stráži test. Texty skladá SERVER (`ProductionCore.direction_check_status`); JS
 (`NXShell.directionRail`, `directionBtnHtml`/`directionCheckText`) len zobrazuje čísla. Ikona `#i-direction` je **spoločná pre rail aj Štúdio**. Testy: `tests/pure/test_kova2b_smer_overlay.rb`,
 `tests/js/test_kova2b_smer_overlay.js`, in-SketchUp sekcia `run_kova2b`.
+
+**ZNEPLATNENÝ OVERLAY SA LEN ZABUDNE (H3b/A-06, v0.17.2) — spoločné pre `direction_check`, `edge_check` a `grain_check`.** Sonda v SketchUpe 2026 (1.10.2026): **Windows
+Súbor → Nový** vyčistí dokument aj jeho prekrytia, ale **Ruby objekt modelu ostáva TEN ISTÝ** (`equal?` aj `Model#valid?` = true). `on_model_changed` preto overlay pre
+„ten istý" model nevypne a modul drží overlay, ktorý SketchUp už zneplatnil (`Overlay#valid?` = false); najbližšie zapnutie (obnova pri otvorení Štúdia `restore!` →
+`enable!` → `disable!`, alebo klik) ho odstraňovalo cez `remove` a Ruby konzola hlásila RuntimeError „invalid overlay". `remove_overlay` má preto **stráž
+`stale_overlay?`**: overlay zneplatnený SketchUpom alebo zatvorený dokument (`Model#valid?` false) sa **neodstraňuje** — referencie už zahodil `disable!`. Platný
+overlay v živom dokumente sa odstraňuje ako doteraz a **jeho chyba ide ďalej do `Engine.log_error`**; výnimka samotného `valid?` sa za „zneplatnený" nepovažuje.
+**Vedome NIE plošný `rescue` bez logu ani porovnávanie textu výnimky** (zamlčal by skutočné chyby živého dokumentu). Postup `disable!`/`on_model_changed`/`restore!` sa
+nemenil (zmena toku = audit); spoločný základ prekrytí je F-03 (po V1). `hover_edge.rb` výnimku `remove` zahadzuje ticho a H3b ho nemenil. Testy:
+`tests/pure/test_h3b_overlay_novy_subor.rb`, in-SketchUp sekcia `run_h3b` (zneplatnenie vyrobené odstránením overlayu mimo modulu — File/New by vymenil dokument runnera).
 
 ### hover_edge.rb
 

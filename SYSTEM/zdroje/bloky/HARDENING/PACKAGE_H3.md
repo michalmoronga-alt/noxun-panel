@@ -236,6 +236,12 @@ Spoločné: čísla s desatinnou čiarkou (existujúce `num`, `budFmtEur`, `Hard
   výnimka tohto čítania = zatvorený dokument → tichý návrat). Rovnaká úprava v **`DirectionCheck`, `EdgeCheck`, `GrainCheck`** (S24); `HoverEdge` bez zmeny.
   Poradie a volania `attach/detach_observer`, `on_model_changed`, `restore!`, `enable!` sa **nemenia** (inak audit, §5).
 - **R-A06-3 (zákaz):** žiadne plošné `rescue` bez logu, žiadne porovnávanie textu výnimky („invalid overlay") ako jediný rozlišovač.
+- **Výsledok sondy R-A06-0 (H3b, 1.10.2026, SketchUp 2026, kópia ENGINEtests.skp, slučka `-RubyStartup`):** po `Sketchup.file_new` je nový model **ten istý
+  Ruby objekt** (`equal?` true), `Model#valid?` ostáva **true** (b), `Overlay#valid?` všetkých troch overlayov je **false** (c), `m_old.overlays` ani `to_a` nepadá
+  (overlay v ňom už nie je) (d), `remove_observer` vráti false bez výnimky (e). Pri samotnom `file_new` sa **nič nezapíše** — `on_model_changed` pre zhodný objekt
+  skončí skôr a modul drží zneplatnený overlay. Chyba (a) vznikne až **pri otvorení Štúdia**: `restore!` → `enable!` → `disable!` → `remove_overlay` →
+  `model.overlays.remove` = RuntimeError „invalid overlay" (`direction_check.rb:677`, `grain_check.rb:407`; `edge_check.rb:582` pri ďalšom kliku na hrany —
+  Štúdio hrany neobnovuje). Rozlišovač = **`Overlay#valid?`** (R-A06-2, variant „stráž v `remove_overlay`"); tok sa nemení, audit netreba.
 
 ## 7 · Testy a DoD
 
@@ -323,7 +329,8 @@ Otvor zákazku (alebo ukážkovú kuchyňu) a porovnaj s tým, čo si videl pred
    Uložiť bez zmeny — nič sa nezmení; Rozpočet má rovnaké sumy.
 6. **Sumy sa nezmenili:** Rozpočet SPOLU, suma ponuky a SPOLU nákupu kovania sú rovnaké ako pred aktualizáciou.
 7. **(H3b)** Zapni Smer otvárania (aj Zvýrazniť hrany), daj **Súbor → Nový**, otvor Štúdio, pozri **Okno → Ruby konzola**: žiadny riadok
-   „DirectionCheck.remove_overlay" (ani EdgeCheck/GrainCheck). Prepínače v novom súbore fungujú.
+   „DirectionCheck.remove_overlay" (ani EdgeCheck/GrainCheck). Prepínače v novom súbore fungujú — klikni aj **Zvýrazniť hrany** (Štúdio ich samo neobnovuje,
+   chyba hrán sa doteraz ukázala až pri tomto kliku) a skontroluj konzolu znova.
 
 ## 11 · Checklist uzáveru
 

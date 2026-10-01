@@ -21910,6 +21910,63 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # ===== H3b (A-06): ZNEPLATNENY OVERLAY PO NOVOM SUBORE =====================
+  # Sonda 1.10.2026: Windows File/New vycisti dokument AJ jeho prekrytia, ale
+  # Ruby objekt modelu ostava TEN ISTY (`equal?`, `valid?` true) — overlay
+  # modulu je zneplatneny a dalsie zapnutie (obnova pri otvoreni Studia,
+  # klik) ho odstranovalo cez `remove` -> „invalid overlay" v Ruby konzole.
+  # File/New sa tu NESPUSTA (vymenil by dokument runnera uprostred sady,
+  # PACKAGE_H3 §8) — zneplatnenie sa vyrobi tym, co File/New s overlayom
+  # urobi: odstrani ho z modelu MIMO modulu (odstraneny overlay je navzdy
+  # neplatny, lekcia D-104). Zivy dokument: vypnutie overlay odstrani ako doteraz.
+  def run_h3b(model)
+    mods = { 'DirectionCheck' => e::DirectionCheck, 'EdgeCheck' => e::EdgeCheck,
+             'GrainCheck' => e::GrainCheck }
+    unless mods.values.all? { |m| m.available?(model) }
+      info('H3b: SketchUp bez Overlay API — sekcia preskocena')
+      return
+    end
+    logs = []
+    orig = e.method(:log_error)
+    e.define_singleton_method(:log_error) do |ex, ctx = nil|
+      logs << "#{ctx}: #{ex.class}: #{ex.message}"
+      orig.call(ex, ctx)
+    end
+    mods.each do |name, mod|
+      mod.disable! if mod.instance_variable_get(:@overlay)
+      logs.clear
+      mod.enable!(model)
+      ov = mod.instance_variable_get(:@overlay)
+      ok("H3b #{name}: zapnutie zaregistrovalo overlay", !ov.nil? && model.overlays.to_a.include?(ov))
+      next unless ov
+
+      model.overlays.remove(ov) # to, co File/New urobi s prekrytiami dokumentu
+      ok("H3b #{name}: overlay odstraneny mimo modulu je zneplatneny a modul ho stale drzi (stav po File/New)",
+         ov.respond_to?(:valid?) && ov.valid? == false && mod.instance_variable_get(:@overlay).equal?(ov))
+      ok("H3b #{name}: modul nehlasi zapnute (overlay v modeli nie je)", mod.active?(model) == false)
+      # Obnova pri otvoreni Studia aj dalsi klik = enable! -> disable! -> remove_overlay.
+      st = mod.enable!(model)
+      ok("H3b #{name}: opatovne zapnutie NEZAPISALO chybu do logu #{logs.inspect}", logs.empty?)
+      ov2 = mod.instance_variable_get(:@overlay)
+      ok("H3b #{name}: kresba na dokumente funguje (novy overlay zaregistrovany, zapnute)",
+         st['active'] == true && !ov2.nil? && !ov2.equal?(ov) && model.overlays.to_a.include?(ov2))
+      mod.disable!
+      ok("H3b #{name}: vypnutie na ZIVOM dokumente overlay z modelu odstranilo, bez logu #{logs.inspect}",
+         !ov2.nil? && !model.overlays.to_a.include?(ov2) && mod.active?(model) == false && logs.empty?)
+    end
+  rescue StandardError => ex
+    log_line("FAIL: H3b vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  ensure
+    e.define_singleton_method(:log_error, orig) if orig
+    Array(mods && mods.values).each do |m|
+      begin
+        m.disable! if m.instance_variable_get(:@overlay)
+      rescue StandardError
+        nil
+      end
+    end
+  end
+
   # Vykon: postavi ~40 skriniek so 6 celami (≈250 dielcov) a zmeria ZAPNUTIE
   # (sken celej zakazky) + prvy prepocet payloadu. Cielom je < 300 ms; ked
   # sa cislo zhorsi, sken sa musi optimalizovat.
@@ -27901,6 +27958,7 @@ module NoxunSuRunner
     run_kovb2(model)          # KOV-B2: strom katalogu (`hw_tree`) nad sandboxom, zalozenie polozky s vyrobcom + zalozenie vyrobcu ZO STUDIA = BEZ kroku Spat, pin navrchu svojho listu, payload sekcie s popiskami a taxonomiou
     run_kovb3(model)          # KOV-B3: editor setu — zivy nahlad NIC nezapisuje (ani krok Spat), ulozenie setu bez kroku Spat, DVE OKNA nad tym istym setom = konflikt s hlaskou (nie tichy prepis) + vedoma obnova, legacy set „nezaradeny" a nakup nezmeneny, neaktivny sa uz nenuka
     run_kova2b(model)        # KOV-A2b: smer otvarania v modeli — lifecycle overlayu, symbol na spravnom kridle a prednej ploche, prestavba/Spat, dup-ID per instancia, vykon
+    run_h3b(model)           # H3b/A-06: overlay zneplatneny ako po File/New — opatovne zapnutie bez chyby v logu (smer otvarania, hrany, kresba), zivy dokument sa vypina ako doteraz
     run_tools1(model)        # NASTROJE-1 (T1a): Mower + Snaper v baliku enginu (kopia cez sev, rotacie/Z ako 1 krok Spat, odmietnutia bez operacie, bariera observera, Snaper a viditelnost)
     run_tools1b(model)       # NASTROJE-1 (T1b): boot migracia starych instalacii — docasny Plugins strom (styri ciele, marker per cesta, druhy beh = no-op) + dokaz, ze boot hook upratal ZIVU instalaciu
     run_kovc2b(model)        # KOV-C2b: zasuvky z receptu — dielce v modeli 1:1 s planom, JEDNA polozka vysuvu, prestavba (ina hlbka/vyska = ina NL/variant, ziadna duplicita, part_overrides prezijú), 1 krok Spat, kopia a sablona nesu pripnuty recept, plytka skrinka = ziadne dielce + RED + export zastaveny s PRAZDNYM priecinkom
