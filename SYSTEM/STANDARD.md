@@ -1781,7 +1781,7 @@ v §2.5, pri ABS seede v §7.5 a v [archiv/KRONIKA.md](archiv/KRONIKA.md) (Grep 
 |---|---|---|---|---|
 | config skrinky | `noxun_engine/core/cabinet_builder.rb` · `CabinetBuilder::CONFIG_SCHEMA` | **22** | nové pole, typ alebo hodnota configu, ktorej tichá strata v staršom plugine zmení výrobu (§2.5) | áno |
 | config dosky | `noxun_engine/core/board_builder.rb` · `BoardBuilder::BOARD_CONFIG_SCHEMA` | **2** | nové pole configu dosky, ktoré by starší plugin whitelistom zahodil | áno |
-| výrobný plán | `noxun_engine/core/build_plan.rb` · `BuildPlan::SCHEMA` | **7** | nová rola alebo pole dielca v pláne (§2.4) | áno |
+| výrobný plán | `noxun_engine/core/build_plan.rb` · `BuildPlan::SCHEMA` | **7** | nová rola (§2.4) alebo zmena významu či povinného poľa plánu (+ migrácia); **aditívne voliteľné pole schému nezvyšuje** (kontrakt v `build_plan.rb`) | áno |
 | kľúče dielcov | `noxun_engine/core/part_keys.rb` · `PartKeys::SCHEMA` | **1** | zmena tvaru `part_key` (identita dielca pre override a kovanie) | áno |
 | dictionary `NOXUN` | `noxun_engine/core/store.rb` · `Store::STD` | **1** | zmena štandardu entity (§2.1); kus z inej verzie = ORANGE `std_version` | áno |
 | dáta rozpočtu | `noxun_engine/core/budget_store.rb` · `BudgetStore::BUDGET_STD` | **3** | kľúč dát rozpočtu, ktorý by starší plugin ignoroval alebo orezal (marker zapíše prvá úprava rozpočtu) | áno |
