@@ -3300,7 +3300,8 @@ module Noxun
         n = st['wings'].to_i
         parts = ["#{n} #{direction_wing_plural(n)}"]
         parts << "#{st['unknown'].to_i} neurčených" if st['unknown'].to_i.positive?
-        parts << "#{st['legacy'].to_i} bez smeru (legacy)" if st['legacy'].to_i.positive?
+        # H4 · D-07: „legacy" je vyvojarsky zargon — zhodne so stitkom listy (studio.js).
+        parts << "#{st['legacy'].to_i} bez smeru (staršie čelá)" if st['legacy'].to_i.positive?
         "Smer otvárania zapnutý — #{parts.join(' · ')}."
       end
 

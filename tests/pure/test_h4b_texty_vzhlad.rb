@@ -183,7 +183,26 @@ end
 # vyhodi (je to kod, nie text); katalogove a logovacie texty sa neskenuju.
 module NxH4bRuby
   TRIG = /set_status\(|warn_item\(|err_item\(|ok_item\(|refresh_and_report\(|message_sk/.freeze
-  CAPS_OK = %w[ABS UNI VEPO NOXUN XLSX CSV DPH SPOLU MAX].freeze
+  CAPS_OK = %w[ABS UNI VEPO NOXUN XLSX CSV DPH SPOLU MAX DTDL MDF HDF RGB RRGGBB].freeze
+  # Codex #438 P2: hlasky predavane cez PREMENNU do `set_status(result, true)` —
+  # chybove n-tice `[false, '...']` (napr. `Materials.restore_pre_schema2!`)
+  # a priame `status.call('...')` zdielaneho jadra okien.
+  TUPLE = /\[false, (?:'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)")|status\.call\((?:'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)")/.freeze
+
+  def self.tuple_strings
+    out = []
+    Dir[File.join(NxH4b::ROOT, '**', '*.rb')].sort.each do |f|
+      File.readlines(f, encoding: 'UTF-8').each_with_index do |ln, i|
+        next if ln.strip.start_with?('#')
+
+        ln.scan(TUPLE).each do |m|
+          s = m.compact.first.to_s.gsub(/#\{[^}]*\}/, ' ')
+          out << ["#{f.sub("#{NxH4b::ROOT}/", '')}:#{i + 1}", s] if s =~ /\p{Ll}/
+        end
+      end
+    end
+    out
+  end
 
   def self.status_strings
     out = []
@@ -211,9 +230,13 @@ module NxH4bRuby
   end
 end
 
-NxTest.test('H4b (predrecenzia P3): stavove hlasky z Ruby bez zargonu a VELKYCH pismen') do
-  strs = NxH4bRuby.status_strings
-  NxTest.assert(strs.size > 200, "sken nasiel stavove hlasky (#{strs.size})")
+NxTest.test('H4b (predrecenzia P3, Codex #438): stavove hlasky z Ruby bez zargonu a VELKYCH pismen') do
+  tuples = NxH4bRuby.tuple_strings
+  NxTest.assert(tuples.size > 100, "sken nasiel chybove n-tice a status.call (#{tuples.size})")
+  NxTest.assert(tuples.any? { |_w, s| s.include?('Záloha katalógu pred migráciou je poškodená') },
+                'sken vidi aj navratove texty restore_pre_schema2!')
+  strs = NxH4bRuby.status_strings + tuples
+  NxTest.assert(strs.size > 300, "sken nasiel stavove hlasky (#{strs.size})")
   NxTest.assert(strs.any? { |_w, s| s.include?('vkladaná skrinka sadne na túto výšku') }, 'sken vidi aj viacriadkove hovory')
   strs.each do |where, s|
     NxTest.refute(s.match?(/\bghost\w*|\bseed\b|\blegacy\b|\bserver\w*/i), "#{where}: zargon v hlaske „#{s[0, 80]}“")
@@ -235,4 +258,43 @@ NxTest.test('H4b: Ruby zmeny su LEN zobrazovacie texty') do
                 'status po vrateni katalogu')
   NxTest.assert(NxH4b.src('ui/appliance_dialog.rb').include?("rec['seed'] == true ? 'z pluginu' : 'ručný'"),
                 'podtitul stromu spotrebicov bez „seed" (kluc `seed` v datach ostava)')
+end
+
+# Codex #438 P2: stavova hlaska po prepnuti „Smer otvárania" ide cestou
+# `do_direction_check` -> `status.call(direction_check_status(state))` do
+# zdielaneho jadra okien — tiez bez „legacy". Prepinac v modeli sa tu nespusta:
+# Overlay API, identita kliku a toggle su na cas testu nahradene.
+def h4b_with_stub(obj, name, impl)
+  had = obj.respond_to?(name)
+  orig = had ? obj.method(name) : nil
+  obj.define_singleton_method(name, &impl)
+  yield
+ensure
+  if had
+    obj.define_singleton_method(name, orig)
+  else
+    obj.singleton_class.send(:remove_method, name)
+  end
+end
+
+NxTest.test('H4b (Codex #438): hlaska Smeru otvarania cez status.call bez „legacy"') do
+  NxTest.skip!('zdielane jadro okien je len v headless sade') unless NxTest.headless?
+  unless defined?(Noxun::Engine::ProductionCore)
+    require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core')
+  end
+  e = Noxun::Engine
+  pc = e::ProductionCore
+  got = []
+  h4b_with_stub(e::DirectionCheck, :available?, ->(*_a) { true }) do
+    h4b_with_stub(pc, :identity_guard, ->(*_a, **_k) { true }) do
+      h4b_with_stub(e, :toggle_direction_check,
+                    ->(*_a) { { 'active' => true, 'wings' => 4, 'unknown' => 1, 'legacy' => 2 } }) do
+        pc.do_direction_check(nil, {}, generation: 1, status: ->(msg, _err = false) { got << msg },
+                                       repush: -> {}, direction_echo: -> {})
+      end
+    end
+  end
+  NxTest.assert_equal(1, got.size, "jedna stavova hlaska: #{got.inspect}")
+  NxTest.assert(got.first.to_s.include?('2 bez smeru (staršie čelá)'), got.first.to_s)
+  NxTest.refute(got.first.to_s.include?('legacy'), got.first.to_s)
 end

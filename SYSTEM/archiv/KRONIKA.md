@@ -29,7 +29,7 @@
   skupinách), mazanie ikonou `x` (sety, Pravidlá), „Zapísať vybrané" cez `aria-disabled` + dôvod (CS-11; stráž dvojitého zápisu ostáva). **D-09:** Nastavenia
   rozpočtu ikonou `sliders-horizontal` (Q2 → variant A), Pravidlá s kolesom; vedomá odchýlka od mockupu. **Testy:** nové `test_h4b_texty_vzhlad.js` (ponuka,
   klávesnica, Escape, výber cez existujúce potvrdenie, stráž dvojitého zápisu end-to-end, jedinečné ikony; 7 mutácií — všetky zhodí) a `.rb` guard (žargón
-  a kričanie v reťazcoch UI, verzia, glyfy, `disabled`, CSS, ikony, Ruby len texty); pripnuté texty v 13 sadách (len znenie); headless **4977 · 149 JS sád**
+  a kričanie v reťazcoch UI, verzia, glyfy, `disabled`, CSS, ikony, Ruby len texty); pripnuté texty v 13 sadách (len znenie); headless **4979 · 149 JS sád** (po predrecenzii a Codex kole 1)
   zelené + encoding guard; in-SU nie. **Vzhľad v CEF neoverený** (MCP SketchUpu nebežal; fotky `ui_foto.ps1 -Shoot` sú Chrome) — overí smoke bod 7.
   Predrecenzia povinná (nový ovládací prvok), výsledok v PR popise.
 

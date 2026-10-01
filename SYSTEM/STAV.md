@@ -28,7 +28,7 @@ v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a
 **Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin
 počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
 
-**Testy (H4b, PR #438):** **4977 headless · 149 JS sád** zelené + encoding guard; in-SU sa nespúšťal (JS/CSS a zobrazovacie texty; posledný beh H3b: 3284 PASS / 0 FAIL).
+**Testy (H4b, PR #438):** **4979 headless · 149 JS sád** zelené + encoding guard; in-SU sa nespúšťal (JS/CSS a zobrazovacie texty; posledný beh H3b: 3284 PASS / 0 FAIL).
 
 ## Robí sa
 
