@@ -27,7 +27,7 @@ v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a
 **Plugin beží len v SketchUpe 2026+** (0.17.10+; obe PC majú 2026). **Ochranu pred poškodeným súborom nastavení (H9) má len 0.17.7+, ochranu dvoch okien 0.17.8+ (pravidlá) a 0.17.9+ (rady) — aktualizovať obe PC a potom zavrieť všetky okná SketchUpu** (staré okno zapisuje bez ochrany).
 **Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
 
-**Testy (H12c, PR #?):** **5139 headless · 153 JS sád** zelené + encoding guard; in-SU sa nespúšťal (Ruby len komentáre — posledný beh **3366 / 0** na `ddb82b8c`, H12b).
+**Testy (H12c, PR #?):** **5139 headless · 153 JS sád** zelené + encoding guard; in-SU sa nespúšťal (spúšťače bez zmeny — posledný beh **3366 / 0** na `ddb82b8c`, H12b).
 
 ## Robí sa
 
