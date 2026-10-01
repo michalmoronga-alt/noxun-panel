@@ -12,7 +12,9 @@
 # API (Codex F5 — collector oddeleny od cisteho vypoctu):
 #   Bom.collect(model) -> {records:, hardware:, hardware_overrides:, manual_overrides:,
 #                          cabinet_sets:, cabinet_set_conflicts:, placements:, identities:,
-#                          hardware_issues:, warnings:, cabinets:, boards:}
+#                          hardware_issues:, warnings:, cabinets:, boards:, ...}
+#     (dalsie aditivne kluce — newer_configs, cut_issues, std_issues (H8) … —
+#     su opisane pri svojej premennej v `collect`; compute() ich ignoruje)
 #   Bom.compute(collected) -> {rows:, sheets:, edging:, hardware:, warnings:, summary:}
 # Headless testy krmia compute() zaznamami priamo (collect je tenky a vyzaduje SketchUp).
 #
@@ -66,6 +68,11 @@ module Noxun
         # kategoria `back_cut`) a vyrobna brana vsetkych styroch exportov
         # (`ProductionCore.cut_stop`). Zbiera sa v TOM ISTOM prechode.
         cut_issues = []
+        # H8 (R-13): kusy, ktorych znacka verzie standardu `std` nie je aktualna
+        # (chyba / starsia / novsia / poskodena). ADITIVNY kluc — `compute()` ho
+        # IGNORUJE, jediny citatel je `Validation.run` (ORANGE `std_version`,
+        # ZIADNA exportna brana). Jeden zaznam na top-level objekt (`std_issue`).
+        std_issues = []
         # KOV-H2: resolved cela per skrinka. Aditivny kluc — `compute()` ho
         # IGNORUJE. Sluzi VYHRADNE na LUDSKY popis vlastnika v rozklikanom
         # povode nakupneho riadku (`PartKeys.human_label` potrebuje `front_items`,
@@ -132,8 +139,8 @@ module Noxun
             # GHOST-D1: zaznam nesie DRUH — od dosky s vlastnym markerom
             # (`BoardBuilder::BOARD_CONFIG_SCHEMA`) uz `newer_configs` nie su
             # len skrinky.
-            note_newer_config(newer_configs, 'cabinet', *newer_address(inst, cid)) if
-              defined?(CabinetBuilder) && CabinetBuilder.newer_config?(ccfg)
+            cab_newer = defined?(CabinetBuilder) && CabinetBuilder.newer_config?(ccfg)
+            note_newer_config(newer_configs, 'cabinet', *newer_address(inst, cid)) if cab_newer
             Array(ccfg['hardware']).each { |h| hardware << h.merge('owner_id' => cid, 'owner_pid' => inst.persistent_id) }
             # KOV-H2: resolved cela pre popis vlastnika v povode nakupneho riadku.
             cabinet_fronts[cid] ||= (ccfg['front_items'].is_a?(Array) ? ccfg['front_items'] : [])
@@ -224,6 +231,10 @@ module Noxun
             br = back_rail_stale_issue(cid, inst.persistent_id, ccfg)
             cut_issues << br if br
             nested = {}
+            # H8 (R-13): kusy skrinky, ktorych znacka `std` sa cita — korpus
+            # + vyrobne dielce, ktore PRESLI filtrami nizsie (to, co ide do
+            # vystupov). Ziadny druhy prechod, len zoznam entit.
+            std_ents = [inst]
             inst.definition.entities.grep(Sketchup::ComponentInstance).each do |pi|
               next unless Store.kind(pi) == 'part'
               next unless Store.get(pi, 'manufactured') == true
@@ -235,9 +246,16 @@ module Noxun
                            role: Store.get(pi, 'role').to_s,
                            pid: pi.persistent_id)
               records << rec
+              std_ents << pi
               cut_issues.concat(cut_issues_for(pcfg, rec, owner_pid: inst.persistent_id, owner_cfg: ccfg))
               key = rec['part_key'].to_s
               nested[key] = rec unless key.empty? || nested.key?(key)
+            end
+            # R2.4: skrinka z NOVSEJ verzie configu uz ma RED `newer_config`
+            # (silnejsi, s branou) — druhy riadok o tom istom kuse by bol sum.
+            unless cab_newer
+              si = std_issue('cabinet', *newer_address(inst, cid), std_ents)
+              std_issues << si if si
             end
             collect_manual_overrides(manual_overrides, ccfg, cid, nested)
             # KOV-H1: ad-hoc polozky kovania. Zbieraju sa AZ TU, lebo potrebuju
@@ -260,8 +278,14 @@ module Noxun
             # filtrom manufactured — tomu poľu uz nemusime rozumiet a tiche
             # vynechanie budúceho vyrobneho pola je presne to, comu brana
             # kompatibility zabranuje. Vetva nizsie skladá LEN zname polia.
-            note_newer_config(newer_configs, 'board', *newer_address(inst, bid)) if
-              defined?(BoardBuilder) && BoardBuilder.newer_config?(bcfg)
+            brd_newer = defined?(BoardBuilder) && BoardBuilder.newer_config?(bcfg)
+            note_newer_config(newer_configs, 'board', *newer_address(inst, bid)) if brd_newer
+            # H8 (R-13): znacka `std` dosky — PRED filtrom manufactured (vzor
+            # `newer_configs`); pri RED `newer_config` sa nevydava (R2.4).
+            unless brd_newer
+              si = std_issue('board', *newer_address(inst, bid), [inst])
+              std_issues << si if si
+            end
             # S1-B1: doska je plnohodnotny vlastnik (drez, varna doska) — zbiera
             # sa PRED filtrom `manufactured`, lebo vazba na nom nezavisi
             # (docasne nevyrabana doska drez stale nesie).
@@ -297,6 +321,11 @@ module Noxun
             # D-143: SAMOSTATNY dielec — vlastnik (skrinka) ho neprestavi, takze
             # o nom hovori VYHRADNE jeho vlastny snapshot (znacka povodu).
             cut_issues.concat(cut_issues_for(pcfg, prec, owner_pid: nil, standalone: true))
+            # H8 (R-13): `id` = povodne `cabinet_id` (moze byt prazdne — nalez sa
+            # vtedy NESTRATI, adresu nesie `pid`; audit H8 A2).
+            si = std_issue('part', prec['owner_id'], nil, [inst],
+                           pid: entity_pid(inst), name: prec['name'])
+            std_issues << si if si
           end
         end
         # KOV-F1 (Codex #329 kolo 3 P1): stav PRAVIDIEL CELEHO PROJEKTU. Nalez
@@ -310,7 +339,7 @@ module Noxun
           placements: placements, identities: identities,
           hardware_issues: hardware_issues, newer_configs: newer_configs,
           hardware_manual: hardware_manual, cabinet_fronts: cabinet_fronts,
-          cut_issues: cut_issues,
+          cut_issues: cut_issues, std_issues: std_issues,
           appliance_slots: appliance_slots,
           appliances: appliance_records(appliances_doc, appliance_owners),
           warnings: warnings, cabinets: cabinets, boards: boards }
@@ -590,6 +619,43 @@ module Noxun
         return [s, pid] unless s.empty?
 
         ["bez ID (pid #{pid || '?'})", pid]
+      end
+
+      # --- H8 (R-13): znacka verzie standardu `std` ---------------------------
+
+      # Poradie zavaznosti stavov znacky (prvy = najzavaznejsi).
+      STD_STATE_ORDER = %w[newer invalid older legacy].freeze
+
+      # JEDEN zaznam `std_issues` pre top-level objekt, alebo nil, ked su vsetky
+      # jeho kusy (`ents` — objekty s `get_attribute`) aktualne.
+      #   { 'kind' => 'cabinet'|'board'|'part', 'id', 'owner_pid', 'pid', 'name',
+      #     'state' => najzavaznejsi stav (STD_STATE_ORDER), 'std' => najvyssia
+      #     celociselna znacka medzi newer/older kusmi (inak nil), 'count' =>
+      #     pocet kusov s problemom znacky, 'total' => ents.size,
+      #     'states' => { stav => pocet } (audit H8 A4 — veta pri zmiesanych) }
+      # Bez vynimky (`Store.read_std` ma rescue). CISTA voci modelu — headless
+      # testovatelna nad `NxTest::FakeEntity`.
+      def std_issue(kind, id, owner_pid, ents, pid: nil, name: nil, current: Store::STD)
+        list = Array(ents)
+        states = Hash.new(0)
+        top = nil
+        list.each do |e|
+          presence, raw = Store.read_std(e)
+          st = Store.std_state_of(presence, raw, current: current)
+          next if st == :current
+
+          states[st.to_s] += 1
+          top = raw if %i[newer older].include?(st) && (top.nil? || raw > top)
+        end
+        return nil if states.empty?
+
+        { 'kind' => kind.to_s, 'id' => id.to_s,
+          'owner_pid' => (owner_pid.is_a?(Integer) && owner_pid.positive? ? owner_pid : nil),
+          'pid' => (pid.is_a?(Integer) && pid.positive? ? pid : nil),
+          'name' => (name.nil? ? nil : name.to_s),
+          'state' => STD_STATE_ORDER.find { |s| states.key?(s) },
+          'std' => top, 'count' => states.values.sum, 'total' => list.size,
+          'states' => STD_STATE_ORDER.each_with_object({}) { |s, h| h[s] = states[s] if states.key?(s) } }
       end
 
       # `persistent_id` prezije save/reopen, `entityID` je fallback pre starsie

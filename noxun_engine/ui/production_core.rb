@@ -603,6 +603,15 @@ module Noxun
           return [ent.persistent_id] if ent
         end
 
+        # H8 (R-13): nalez „kus z inej verzie standardu" adresuje PRESNE ten kus —
+        # samostatny dielec podla `pid` (nie aj jeho vnorene dvojca so zhodnym
+        # `cabinet_id`), skrinku alebo dosku podla `owner_pid` (aj „bez ID").
+        # Fail-open: zmiznuty kus = dnesna vseobecna vetva.
+        if item['category'].to_s == Validation::CAT_STD_VERSION
+          ent = item['pid'] ? standalone_part_entity(model, item['pid']) : newer_config_entity(model, item['owner_pid'])
+          return [ent.persistent_id] if ent
+        end
+
         oid = item['owner_id'].to_s
         pkey = item['part_key'].to_s
         # KOV-A1 (Codex #280 P2-A): nalez, ktory nesie `owner_pid`, adresuje
