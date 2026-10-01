@@ -135,6 +135,10 @@
     // V0.6 E-b (tab Rozpocet): "⋯" dalsie udaje riadku (kod/URL/poznamka)
     // a "⬇" export suboru — nahradzaju glyfy z mocku (ziadne emoji v UI chrome).
     'more-horizontal': '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+    // H4 · D-09 (triedenie HARDENING): Nastavenia rozpoctu — Lucide
+    // `sliders-horizontal` (posuvniky = sadzby a prahy). Koleso `settings` ostava
+    // Pravidlam (zhoda s Inspectorom); `euro` ostava Rozpoctu.
+    'sliders-horizontal': '<path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/>',
     'download': '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>',
     // V0.6 D-90: uchytkovy profil na hornej hrane cela (vlastny symbol) —
     // lista profilu cez celu sirku + celo pod nou.

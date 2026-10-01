@@ -92,6 +92,17 @@
   .body { padding: 0 10px 10px; }
   .row { display: flex; align-items: center; margin: 5px 0; }
   .row label { flex: 0 0 128px; color: var(--nx-ink-label); }
+  /* H4 · D-08 (triedenie HARDENING): ZAKLADNY vzhlad rozbalovacky v OBOCH oknach.
+     Do tejto davky malo spolocne pravidlo len `.row select` — kazdy select mimo
+     riadku formulara (Podla vyrobcu, Kresba ciel, Vsetky kategorie, set noh,
+     ocakava) mal systemovy vzhlad prehliadaca. Holy elementovy selektor =
+     najnizsia specifickost: kazde existujuce pravidlo (`.row select`,
+     `.mdbar select`…) vyhrava. Vlastna sipka ZAMERNE nie (data URI s hex
+     farbou by obislo tokeny). */
+  select { font: inherit; font-size: 12px; padding: 4px 6px; border: 1px solid var(--nx-border-strong);
+           border-radius: 6px; background: var(--nx-surface); color: var(--nx-ink);
+           max-width: 100%; min-width: 0; }
+  select:disabled { background: var(--nx-surface-sunken); color: var(--nx-ink-soft); }
   .row input, .row select { flex: 1; padding: 4px 6px; border: 1px solid var(--nx-border-strong); border-radius: 6px; font-size: 13px; min-width: 0; }
   .row input.bad { border-color: var(--nx-danger-line); background: var(--nx-danger-bg-soft); }
   .row .unit { flex: 0 0 26px; text-align: right; color: var(--nx-ink-faint); font-size: 11px; padding-left: 4px; }
@@ -1747,7 +1758,9 @@
   .nx-inspector .legsrow.warn .legstxt { color: var(--nx-warnchip-fg); }
   .nx-inspector .legsrow .legssel { flex: 0 1 auto; min-width: 0; }
   .nx-inspector .legsrow .legssel:empty { display: none; }
-  .nx-inspector .legsrow .hwsetsel { max-width: 150px; font-size: 11px; }
+  /* H4 · D-08: pevnych 150 px vyber noh pretekal (dlhy nazov setu) — select sa
+     teraz zmesti do riadku a dlhy nazov oreze sam (cely je v ponuke). */
+  .nx-inspector .legsrow .hwsetsel { flex: 1 1 auto; min-width: 0; max-width: 100%; font-size: 11px; }
   /* ROH-B1 (mockup B1 / A1): RIADOK ROHOVEJ pod rozmermi — ta ista logika ako
      riadok noh (cez OBA stlpce mriezky, jeden riadok, bez nadpisu). Polia
      dverovej casti a CR su VSTUPY (zarovnane doprava, rozmer je cislo); CR
@@ -2273,6 +2286,9 @@
 .hwsset-head b { flex: 1 1 auto; font-size: 13px; }
 .hwsset-type { color: var(--nx-ink-muted); font-size: 11.5px; white-space: nowrap; }
 .hwsbtn { padding: 1px 8px; font-size: 11.5px; }
+/* H4 · D-08: mazacie tlacidla setov, pasiem a pravidiel nesu ikonu `x` (nie glyf) —
+   ikona ma velkost pisma tlacidla, aby riadok nezvysil. */
+.hwsbtn .ic, .mset-del .ic, .ghostbtn.bdel .ic { width: 12px; height: 12px; vertical-align: -1px; }
 .hwsset-members { margin-top: 3px; }
 .hwsset-m { font-size: 12px; color: var(--nx-ink-muted); padding: 1px 0; }
 /* Chipy klasifikacie: prve tri su OSI (typ · otvaranie · konstrukcia),

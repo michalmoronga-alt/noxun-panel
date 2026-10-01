@@ -918,7 +918,7 @@ module Noxun
             end
             if !sec['included'] && sec['subtotal'].to_f.positive?
               out << warn_item('budget|appliances|not_included', 'appliances', nil,
-                               "Spotrebiče (#{fmt(sec['subtotal'])} €) NIE SÚ v súčte — platia sa osobitne?")
+                               "Spotrebiče (#{fmt(sec['subtotal'])} €) nie sú v súčte — platia sa osobitne?")
             end
           when 'standard_rows'
             sec['rows'].each do |r|

@@ -446,7 +446,7 @@ module Noxun
         with_catalog_lock do
           backup = pre_schema2_backup_path
           unless File.exist?(backup)
-            return [false, 'Predmigračná záloha (materials.pre-schema-2.json) neexistuje.']
+            return [false, 'Záloha katalógu pred migráciou (materials.pre-schema-2.json) neexistuje — katalóg sa nedá vrátiť.']
           end
           bytes = File.binread(backup)
           data = begin
@@ -455,10 +455,10 @@ module Noxun
             nil
           end
           unless legacy_catalog_object?(data)
-            return [false, 'Predmigračná záloha nie je platný legacy katalóg — obnova sa nespustí.']
+            return [false, 'Záloha katalógu pred migráciou je poškodená (nemá tvar staršieho katalógu) — katalóg sa nevráti.']
           end
           unless write_migration_hold!
-            return [false, 'Zápis poistky migration_hold.json zlyhal — obnova sa nespustila (katalóg nezmenený).']
+            return [false, 'Zápis poistky migration_hold.json zlyhal — katalóg sa nevrátil (ostáva nezmenený).']
           end
           # GH #92 P1 (2. kolo): PORADIE = najprv VSETKY pripravne kroky (kopia
           # aktualneho primaru, karantena starej .bak, legacy .bak), primar sa
@@ -495,7 +495,7 @@ module Noxun
         end
       rescue StandardError => e
         Engine.log_error(e, 'Materials.restore_pre_schema2!') if defined?(Engine)
-        [false, "Obnova predmigračnej zálohy zlyhala: #{e.message}"]
+        [false, "Vrátenie katalógu pred migráciou zlyhalo: #{e.message}"]
       end
     end
   end

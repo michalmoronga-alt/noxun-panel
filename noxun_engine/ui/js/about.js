@@ -32,8 +32,8 @@
   // Texty skladá klient, server posiela čistý stav a čísla.
   function nxUpdaterText(u){
     var d = u || {};
-    var cur = d.current ? ('V' + d.current) : '—';
-    var av = d.available ? ('V' + d.available) : 'novšia verzia';
+    var cur = d.current ? ('v' + d.current) : '—';
+    var av = d.available ? ('v' + d.available) : 'novšia verzia';
     var dir = d.source_dir || '';
     if (d.enabled === false) return 'Aktualizátor nie je načítaný — reštartuj SketchUp.';
     if (d.locked) return 'Plugin je už aktualizovaný — reštartuj SketchUp.';
@@ -107,7 +107,7 @@
   // NEKRESLÍ vôbec.
   function nxAboutHtml(info, updater){
     var d = info || {};
-    var ver = d.version ? ('V' + nxAboutEsc(d.version)) : '…';
+    var ver = d.version ? ('v' + nxAboutEsc(d.version)) : '…';
     var dir = d.dir ? nxAboutEsc(d.dir) : '%APPDATA%\\NOXUN\\Engine';
     return '<div class="aboutrow">' +
       '<svg class="nx-logo aboutlogo" viewBox="0 0 100 100" aria-hidden="true"><use href="#i-logo"/></svg>' +

@@ -146,7 +146,10 @@ const STATE = {
 (function(){
   const bset = T.ssToolsHtml('bset', false);
   ok(/data-action="ss-save"/.test(bset), 'Nastavenia rozpočtu majú „Uložiť"');
-  ok(/data-action="ss-reload"/.test(bset), 'aj „Načítať nanovo"');
+  ok(/data-action="ss-reload"/.test(bset), 'aj „Obnoviť"');
+  // H4 · D-06: bezna obnova = „Obnoviť" + refresh-cw vsade (bolo „Načítať nanovo" + rotate-ccw).
+  ok(bset.indexOf('i-refresh-cw"/></svg> Obnoviť</button>') > -1 && bset.indexOf('Načítať nanovo') < 0,
+     'tlačidlo sa volá „Obnoviť" s ikonou refresh-cw (H4 · D-06)');
   eq(T.ssToolsHtml('sup', false), '', 'Dodávateľ / Demos je ČÍTANIE — prázdna lišta (D-78)');
   eq(T.ssToolsHtml('about', false), '', 'a „O plugine" tiež');
 })();
@@ -487,7 +490,7 @@ const STATE = {
   ok(ELS.sectools.innerHTML.indexOf('ss-save') < 0,
      'nad neznámym stavom sa NEUKLADÁ (patch proti nečitateľnej revízii)');
   ok(ELS.sectools.innerHTML.indexOf('ss-reload') > -1,
-     'ale „Načítať nanovo" OSTÁVA — jediná cesta von z prechodnej chyby disku');
+     'ale „Obnoviť" OSTÁVA — jediná cesta von z prechodnej chyby disku');
 
   // Ďalší úspešný push sekciu vráti do normálu.
   NX.setStudio({ settings: STATE });
@@ -504,7 +507,7 @@ const STATE = {
 
 (function(){
   const html = A.nxAboutHtml({ version: '9.9.9', dir: 'C:\\X\\Y' });
-  ok(html.indexOf('V9.9.9') > -1, 'verzia ide zo SERVERA (žiadny hardcode v HTML)');
+  ok(html.indexOf('v9.9.9') > -1, 'verzia ide zo SERVERA (žiadny hardcode v HTML)'); // H4 · D-07: malé „v"
   ok(html.indexOf('C:\\X\\Y') > -1, 'aj priečinok nastavení');
   ok(html.indexOf('id="cfgVersion"') > -1,
      'uzol verzie si drží meno z kolieska — je to TEN ISTÝ obsah');

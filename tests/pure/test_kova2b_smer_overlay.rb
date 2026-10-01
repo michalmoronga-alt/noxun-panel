@@ -535,7 +535,8 @@ NxTest.test('KOV-A2b: text listy sklada SERVER a priznava vsetky tri cisla') do
   on = pc.direction_check_status('active' => true, 'wings' => 5, 'unknown' => 2, 'legacy' => 3)
   NxTest.assert(on.include?('5 krídel'), on)
   NxTest.assert(on.include?('2 neurčených'), on)
-  NxTest.assert(on.include?('3 bez smeru (legacy)'), on)
+  NxTest.assert(on.include?('3 bez smeru (staršie čelá)'), on) # H4 · D-07: bolo „(legacy)"
+  NxTest.refute(on.include?('legacy'), 'bez zargonu v stavovej hlaske')
   clean = pc.direction_check_status('active' => true, 'wings' => 1, 'unknown' => 0, 'legacy' => 0)
   NxTest.assert(clean.include?('1 krídlo'), clean)
   NxTest.refute(clean.include?('neurčených'), 'ked netreba, o neurcenych sa nehovori')

@@ -706,7 +706,7 @@ module Noxun
           # Stara session konci PRED vznikom novej (druhe „Vlozit" = novy
           # snapshot); `GhostTool.start` to robi ako prvy krok.
           s = GhostTool.start(model, plan, hardware: hw, template_ref: tpl_ref, note: note, keep_point: keep_point)
-          return set_status('Ghost vkladanie sa nepodarilo spustiť — skús to znova.', true) if s.nil?
+          return set_status('Vkladanie sa nepodarilo spustiť — skús to znova.', true) if s.nil?
 
           # Poznamku preflightov (D-45 prevzata hrubka, materialove noty)
           # vypisuje AZ `ghost_after_commit` — pri stlaceni „Vlozit" sa este
@@ -832,7 +832,7 @@ module Noxun
         def handle_ghost_lock_z(payload)
           model = Sketchup.active_model
           data = parse(payload)
-          return if foreign_document?(data, model, 'Výška ghostu sa nezmenila')
+          return if foreign_document?(data, model, 'Výška vkladanej skrinky sa nezmenila')
 
           s = GhostTool.session
           return GhostTool.push_state(nil) unless s && s.active?
@@ -862,7 +862,7 @@ module Noxun
           rescue StandardError
             nil
           end
-          set_status("Zámok výšky #{GhostTool.fmt_mm(s.lock_plane_z)} mm — ghost sadne na túto výšku.")
+          set_status("Zámok výšky #{GhostTool.fmt_mm(s.lock_plane_z)} mm — vkladaná skrinka sadne na túto výšku.")
         end
 
         # GHOST: sprievodny zapis kovania zo sablony (H2/D-76). Bezi VNUTRI

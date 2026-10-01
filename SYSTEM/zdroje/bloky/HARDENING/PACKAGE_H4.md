@@ -162,6 +162,15 @@ súčet m² (už 2 desatinné) a stĺpec „Odhad platní" (orientačný rozsah 
 a množstvá `num()` → `nxfQty` (necelé kovanie v metroch sa neskryje); semafor Kontroly (celé počty) a tabuľka sadzieb `studio_settings.js` (vstupné polia)
 **bez zmeny**. Zámer, dáta ani čísla sa zladením nemenia.
 
+**Zladenie pri H4b (krok 0, implementátor, 1.10.2026, main `0794c56b` = v0.17.3 s H3a + H3b + H4a):** riadky slovníka R-B3 sa posunuli (napr. `studio.js:1289`
+→ `:1487`, `budget.js:671` → `:700`); H3a už prepísal „— počíta ich server." a „(PLAN, blok V1)" — **neprepisujú sa znova**; H3a nechal v novom titulku semaforu
+dovetok „(počíta server)" → odstránený (zámer D-07, smoke bod 11). **Doplnené mimo tabuľky** (rovnaký zámer, len zobrazenie): Ruby statusy Nastavení rozpočtu
+menovali „Načítať nanovo" (`supplier_settings_dialog.rb`) → „Obnoviť v lište sekcie"; podtitul stromu spotrebičov „seed" (`appliance_dialog.rb`) → „z pluginu";
+status „Výška ghostu sa nezmenila" (`actions_cabinet.rb`) → „vkladanej skrinky"; „Sadzby žijú v ⚙ Nastaveniach" (ikona sa mení D-09) → „v Nastaveniach rozpočtu";
+legenda „sadzby per režim" (`studio_settings.js`) → „podľa režimu"; „Obnoviť predmigračnú zálohu" v banneri aj veta read-only banneru → „Vrátiť katalóg pred
+migráciou…". Ruby diff je preto **5 súborov, len zobrazovacie reťazce** (kľúč tagu `zony` aj kľúč `seed` v dátach bez zmeny). Fotky okien: `ui_foto.ps1 -Shoot` (brief),
+nie `-Record` — popisok tagu „Zóny (obrysy)" z Ruby fotka z nahrávky ešte neukáže.
+
 ---
 
 ## 6 · Požiadavky

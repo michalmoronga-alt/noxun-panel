@@ -155,12 +155,12 @@ const LIST10 = [UNI(1), UNI(2), UNI(3), UNI(4), UNI(5), UNI(6),
 
   eq(info(S.edgeCheckBarHtml(EDGE_OFF, false, GRAIN_OFF, DIR_OFF)), VYP, 'všetko vypnuté = veta o prázdnom modeli');
   const onlyDir = info(S.edgeCheckBarHtml(EDGE_OFF, false, GRAIN_OFF, DIR_ON));
-  eq(onlyDir, '<span class="dcinfo">0 krídel · 1 bez smeru (legacy)</span>', 'len smer otvárania: bez vety a bez úvodného „ · "');
+  eq(onlyDir, '<span class="dcinfo">0 krídel · 1 bez smeru (staršie čelá)</span>', 'len smer otvárania: bez vety a bez úvodného „ · "');
   no(onlyDir.indexOf('Vypnuté') >= 0, 'veta „Vypnuté" pri zapnutom smere otvárania nie je');
   eq(info(S.edgeCheckBarHtml(EDGE_OFF, false, GRAIN_ON, DIR_OFF)), '<span class="gcinfo">12 dielcov s kresbou</span>',
      'len kresba');
   eq(info(S.edgeCheckBarHtml(EDGE_ON, false, GRAIN_OFF, DIR_ON)),
-     '3 hrany bez olepu · <span class="dcinfo">0 krídel · 1 bez smeru (legacy)</span>', 'hrany + smer');
+     '3 hrany bez olepu · <span class="dcinfo">0 krídel · 1 bez smeru (staršie čelá)</span>', 'hrany + smer');
   eq(info(S.edgeCheckBarHtml(EDGE_ON, false)), '3 hrany bez olepu', 'len hrany (bez stavov kresby a smeru)');
   ok(S.edgeCheckBarHtml({ available: false }, false, GRAIN_ON, DIR_ON).indexOf('class="ecoff"') >= 0,
      'nedostupné = ecoff bez zmeny');

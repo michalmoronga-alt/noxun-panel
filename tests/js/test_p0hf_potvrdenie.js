@@ -74,7 +74,7 @@ function push(miss){
   const t1 = B.budConfirmText(1, 'xlsx');
   ok(t1.indexOf('1 riadok') > -1, 'sklonovanie 1: ' + t1);
   ok(t1.indexOf('rozpočtu') > -1, t1);
-  ok(t1.indexOf('PODHODNOTENÁ') > -1, t1);
+  ok(t1.indexOf('bude podhodnotená') > -1, t1);
   ok(t1.indexOf('ešte raz') > -1, 'hlaska MUSI ponuknut cestu von: ' + t1);
   const t5 = B.budConfirmText(5, 'cp');
   ok(t5.indexOf('5 riadkov') > -1, 'sklonovanie 5: ' + t5);

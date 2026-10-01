@@ -198,7 +198,7 @@
     h += '</div>';
     h += '<button type="button" class="wgoto" data-nx-usage="warn:studio"' +
       ' onclick="onWarnStudio(event)"' +
-      ' title="Otvorí ŠTÚDIO na sekcii KONTROLA — celý zoznam nálezov zákazky">' +
+      ' title="Otvorí Štúdio na sekcii Kontrola — celý zoznam nálezov zákazky">' +
       'Otvoriť v Štúdiu → Kontrola</button>';
     return h;
   }
@@ -298,7 +298,7 @@
       // aby ich prvy reset karty (clearSelected -> materializeInsertCard) aplikoval.
       NXInsert.setLocksFlat(data.insert_locks);
       if (data.version){
-        el('verline').textContent = 'V' + data.version; // verzia z Ruby (jediny zdroj)
+        el('verline').textContent = 'v' + data.version; // verzia z Ruby (jediny zdroj)
         // UI-B3 + ŠT-4a: obsah kolieska („O plugine") stavia ZDIELANY js/about.js —
         // ten isty, ktory kresli sekciu `about` Studia (kontrakt Š19: jeden obsah,
         // dva vstupy). Verzia aj priecinok nastaveni chodia zo SERVERA, ziadny
@@ -976,7 +976,7 @@
     var wn = el('infWeight'); if (wn) wn.title = wg.title;
     var live = !!(c && c.cabinet_id);
     [['infParts', 'Klik = označí výrobné dielce tejto skrinky v modeli'],
-     ['infArea', 'Klik = otvorí ŠTÚDIO → Kusovník, zužený na túto skrinku']].forEach(function(o){
+     ['infArea', 'Klik = otvorí Štúdio → Kusovník, zúžený na túto skrinku']].forEach(function(o){
       var n = el(o[0]); if (!n) return;
       n.setAttribute('aria-disabled', live ? 'false' : 'true');
       n.title = live ? o[1] : 'Označ skrinku v modeli';

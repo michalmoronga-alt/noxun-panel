@@ -106,7 +106,9 @@
     //     len az po tom nasom.
     //     Funkcia „je otvoreny?" (Inspector) alebo top-level priznak okna (Studio).
     var FLYOUT_FNS = ['warnPanelOpen', 'nxEdgeMenuOpen', 'nxTagMenuOpen'];
-    var FLYOUT_FLAGS = ['ecMenuOpen', 'vepoMenuOpen'];
+    // H4 · D-06: `mdMoreOpen` = ponuka „⋯" listy Materialov (vlastny Escape
+    // v proj_materials.js; polozka ponuku zatvori PRED otvorenim modalu).
+    var FLYOUT_FLAGS = ['ecMenuOpen', 'vepoMenuOpen', 'mdMoreOpen'];
     //
     // Combobox D-85 (`NXCombo`) je zamerne v triede (b): v ziadnom z tych
     // siestich modalov `select[data-nx-combo]` NIE JE (su to potvrdzovacie okna;

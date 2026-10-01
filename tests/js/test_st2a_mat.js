@@ -86,7 +86,8 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   ok(/value="halifax"/.test(h), 'hladanie si nesie dotaz — lista sa prekresluje pri kazdom pushi');
   ok(/id="mdGroupMode"/.test(h) && /value="man"[^>]*selected/.test(h),
      'zoskupenie dlazdic ostava a pamata si vybrany rezim');
-  ok(!/id="mdRestoreBtn"/.test(h), 'bez predmigracnej zalohy sa rollback NEUKAZUJE');
+  ok(!/id="mdMoreBtn"/.test(h) && !/mdRestoreOpen|data-mdmore/.test(h),
+     'bez predmigracnej zalohy sa rollback NEUKAZUJE (ani prazdne „⋯" — H4 · D-06)');
   ok(/<span class="spacer">/.test(h), 'lista ma rozrazac — nastroje idu doprava');
 })();
 
@@ -96,15 +97,19 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   const man = h.match(/<button[^>]*id="mdNewDecorBtn"[^>]*>/)[0];
   ok(/disabled/.test(add) && /disabled/.test(man),
      'nudzovy (read-only) katalog vypina OBE pridavacie cesty — server by ich aj tak odmietol');
-  ok(!/id="mdRestoreBtn"/.test(h),
-     'v nudzovom rezime nesie rollback BANNER — v liste by bol druhy raz');
+  ok(!/id="mdMoreBtn"/.test(h) && !/data-mdmore/.test(h),
+     'v nudzovom rezime nesie rollback BANNER — v liste by bol druhy raz (ani „⋯")');
   ok(/value="az"[^>]*selected/.test(h), 'rezim A–Z sa pamata');
 })();
 
 (function(){
   const h = M.matToolsHtml({ ro: false, q: '', mode: 'man', backup: true });
-  ok(/id="mdRestoreBtn"/.test(h),
-     'pri zdravom katalogu so zalohou je rollback dostupny aj bez banneru (GH #93 P2)');
+  // H4 · D-06: rollback je dostupny cez ponuku „⋯" (zatvorena = len spustac).
+  ok(/id="mdMoreBtn"/.test(h),
+     'pri zdravom katalogu so zalohou je rollback dostupny aj bez banneru (GH #93 P2) — cez „⋯"');
+  const ho = M.matToolsHtml({ ro: false, q: '', mode: 'man', backup: true, more: true });
+  ok(/data-mdmore="restore"/.test(ho) && /Vrátiť katalóg pred migráciou…/.test(ho),
+     'otvorena ponuka nesie polozku „Vrátiť katalóg pred migráciou…"');
 })();
 
 // ŠT-2b: lista uz nema dva rezimy — okno zaniklo, `section` z jej stavu vypadol.

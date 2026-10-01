@@ -137,7 +137,9 @@
       // „Nastavenia rozpočtu" (posledný satelit) zaniklo a v navigácii už
       // nie je ani jedno premostenie.
       { id: 'sup',    ic: 'truck', t: 'Dodávateľ / Demos' },
-      { id: 'bset',   ic: 'euro',  t: 'Nastavenia rozpočtu' },
+      // H4 · D-09: vlastna ikona (posuvniky) — s `euro` sa v zbalenej navigacii
+      // zlievala s Rozpoctom; koleso nesu Pravidla. Vedoma odchylka od mockupu.
+      { id: 'bset',   ic: 'sliders-horizontal', t: 'Nastavenia rozpočtu' },
       { id: 'about',  ic: 'info',  t: 'O plugine' }
     ] }
   ];
@@ -164,7 +166,7 @@
     rules: { t: 'Pravidlá',
              hint: 'ABS podľa roly dielca (spoločné, len na čítanie) · kovanie podľa rozmerov — platí pre tento projekt' },
     hw: { t: 'Kovanie',
-          hint: 'katalóg položiek a sety sú spoločné pre všetky zákazky · predvoľby setov projektu zatiaľ v okne' },
+          hint: 'katalóg položiek a sety sú spoločné pre všetky zákazky · predvoľby setov platia pre túto zákazku' },
     // S1-A2 (Š20): katalóg spotrebičov je vec POČÍTAČA (%APPDATA%), nie
     // zákazky — hint to hovorí hneď, rovnako ako pri materiáloch a kovaní.
     appl: { t: 'Spotrebiče',
@@ -179,7 +181,7 @@
            hint: 'aktívny dodávateľ a stav väzby na Demos · väzba sa nastavuje pri konkrétnom dekore' },
     bset: { t: 'Nastavenia rozpočtu',
             hint: 'sadzby, režimy a prahy · globálne pre všetky zákazky, do zákazky sa nemrazia' },
-    about: { t: 'O plugine', hint: 'to isté nájdeš v koliesku Inspectora — jeden obsah, dva vstupy' }
+    about: { t: 'O plugine', hint: 'to isté nájdeš v koliesku Inspectora' }
   };
 
   // ---------------------------------------------------------------- helpers
@@ -506,7 +508,7 @@
       chip('orange', c.orange || 0, orangeChipText(c.orange || 0, list),
            'Klik zúži zoznam na oranžové nálezy — druhý klik filter zruší.') +
       '<div class="schip s-green" title="Skrinky, ktoré v zozname nálezov nefigurujú — z celkového ' +
-      'počtu skriniek v modeli (počíta server).">' +
+      'počtu skriniek v modeli.">' +
       '<span class="dot"></span><span><span class="n">' + green[0] +
       '</span> <span class="t">' + esc(green[1]) + '</span></span></div></div>';
   }
@@ -634,7 +636,7 @@
     if (it.category === 'layout_settings'){
       return '<button type="button" class="goact" data-act="bset"' +
         ' title="Otvoriť Nastavenia rozpočtu (prerez, orez, prídavok dupláku)"' +
-        ' aria-label="Otvoriť Nastavenia rozpočtu">' + ico('settings') + '</button>';
+        ' aria-label="Otvoriť Nastavenia rozpočtu">' + ico('sliders-horizontal') + '</button>';
     }
     var h = '';
     // D-143 (KON-0): zastaraná skrinka s chrbtom v drážke — hromadná prestavba
@@ -823,7 +825,7 @@
     if (!n) return '';
     return '<div class="hwbanner hwbanner-stop">' + num(n) + '× zásuvka má postavené dielce, '
          + 'ale nákup k nej nenašiel kit. Dielce sú narezané na konkrétnu dĺžku výsuvu — bez kitu '
-         + 'sa nedajú vyrobiť, preto sú zastavené VŠETKY exporty vrátane VEPO. Nápravu menuje '
+         + 'sa nedajú vyrobiť, preto sú zastavené <b>všetky</b> exporty vrátane VEPO. Nápravu menuje '
          + 'sekcia Kontrola pri každom červenom riadku.</div>';
   }
 
@@ -1101,7 +1103,7 @@
     var w = ecNum(d.wings);
     var t = w + ' ' + directionWingPluralSk(w);
     if (ecNum(d.unknown)) t += ' · ' + ecNum(d.unknown) + ' neurčených';
-    if (ecNum(d.legacy)) t += ' · ' + ecNum(d.legacy) + ' bez smeru (legacy)';
+    if (ecNum(d.legacy)) t += ' · ' + ecNum(d.legacy) + ' bez smeru (staršie čelá)';
     return t;
   }
 
@@ -1484,7 +1486,7 @@
     if (studioSec === 'ctrl'){
       box.innerHTML = edgeCheckBarHtml(EDGE, ecMenuOpen, GRAIN, DIRECTION) +
         '<span class="spacer"></span>' +
-        '<span class="sechint">Zoradené podľa závažnosti — poradie určuje server.</span>' +
+        '<span class="sechint">Zoradené podľa závažnosti.</span>' +
         // Review #7: Kontrola bola JEDINA sekcia BEZ „Obnoviť" — a pritom je to
         // sekcia, kvoli ktorej sa clovek do okna vracia po oprave v Inspectore.
         // Prestavba skrinky sem sama nedorazi, takze zoznam nalezov mohol
@@ -1549,7 +1551,7 @@
       '<span class="prjlbl">Projekt</span><input id="prjInput" type="text" value="' + esc(v.project || '') +
       '" placeholder="' + esc(v.default_project || 'projekt') + '"></label>' +
       '<div class="searchbox">' + ico('search') +
-      '<input id="bomSearch" placeholder="Hľadať dielec / skrinku…" value="' + esc(s.q || '') + '"></div>' +
+      '<input id="bomSearch" placeholder="Hľadať…" title="Hľadať dielec alebo skrinku" aria-label="Hľadať dielec alebo skrinku" value="' + esc(s.q || '') + '"></div>' +
       '<span class="spacer"></span>' +
       vepoBtnHtml(v, s.vepo === true);
     if (s.view === 'parts'){
@@ -1733,6 +1735,7 @@
     var emeta = ST.edges_meta || {};
     var g = groupBom(ST.rows, ST.sheets, bomQ);
     var cols = activeCols(COLS);
+    var tcls = partsTableClass(cols);
     var h = '';
     if (!(ST.rows || []).length){
       return '<div class="muted">Žiadne výrobné dielce v modeli — vlož korpus alebo dosku.</div>';
@@ -1750,8 +1753,11 @@
           '<span class="gsub">' + (m.th == null ? '' : nxfMm(m.th) + ' mm') +
           (m.uni ? ' · <span class="wtagchip">UNI</span>' : '') + '</span>' +
           '<span class="gsum">' + num(grp.ks) + ' ks · <b>' + num(grp.m2, 2) + ' m²</b></span></button>' +
-        '<table class="bomtab"><thead><tr>' +
-          cols.map(function(c){ return '<th class="' + (c.num ? 'num' : '') + '">' + esc(c.t) + '</th>'; }).join('') +
+        // H4 · D-08: `parts` = pevne rozlozenie a spolocne sirky stlpcov (studio.html)
+        // — bez neho mala kazda skupina materialu vlastne sirky a stlpce „skakali".
+        // Trieda `c-<kluc>` nesie sirku na `th` AJ `td` (kontrakt Š2: stlpce su volitelne).
+        '<table class="' + tcls + '"><thead><tr>' +
+          cols.map(function(c){ return '<th class="' + colCls(c) + '">' + esc(c.t) + '</th>'; }).join('') +
           '<th class="acth"></th></tr></thead><tbody>';
       grp.rows.forEach(function(r){
         // Adresa riadku = jeho INDEX v serverovom poli `rows` (vzor okna
@@ -1760,12 +1766,12 @@
         h += '<tr class="bomrow" data-i="' + (ST.rows || []).indexOf(r) + '">' +
           cols.map(function(c){
             if (c.k === 'abs'){
-              return '<td class="absc" title="' + esc(absFull(r, emeta)) + '">' +
+              return '<td class="absc c-abs" title="' + esc(absFull(r, emeta)) + '">' +
                      esc(absCompact(r, emeta)) + '</td>';
             }
             var v = cellValue(r, c.k);
             var txt = c.num ? cellNumText(c.k, v) : (String(v == null ? '' : v) || '—');
-            return '<td class="' + (c.num ? 'num' : '') + '">' + esc(txt) + '</td>';
+            return '<td class="' + colCls(c) + '">' + esc(txt) + '</td>';
           }).join('') +
           '<td class="acth"><span class="rowact">' +
             '<button type="button" class="ract" data-act="eye" title="Označiť v modeli">' + ico('eye') + '</button>' +
@@ -1781,6 +1787,18 @@
     h += totalRow(g);
     h += '<div class="hint">Klik na riadok označí dielec v modeli. Ceruzka ho navyše otvorí v Inspectore.</div>';
     return h;
+  }
+
+  // H4 · D-08: trieda bunky/hlavicky stlpca Dielce — zarovnanie cisla + sirka.
+  function colCls(c){ return (c.num ? 'num ' : '') + 'c-' + c.k; }
+
+  // Predrecenzia P2: PEVNE rozlozenie len ked su zapnute iba stlpce, ktorym
+  // studio.html dava sirku (predvolene). Volitelne Smer dekoru a Rola by pri
+  // okne 1060 px zjedli stlpec Dielec na nulu — vtedy automaticke rozlozenie.
+  var PARTS_FIXED_COLS = ['name', 'cab', 'l', 'w', 'th', 'q', 'abs'];
+  function partsTableClass(cols){
+    var fixed = (cols || []).every(function(c){ return PARTS_FIXED_COLS.indexOf(c.k) > -1; });
+    return 'bomtab parts' + (fixed ? ' fixed' : '');
   }
 
   // H4 · D-04: zapis cisla v stlpci Dielce. Dlzka a sirka celé mm (= VEPO
@@ -2392,6 +2410,7 @@
       // Testy nastavuju stav cez `setBomState` (bomView/bomQ/menu) — inak by
       // museli sahat do modulovych premennych, ktore Node nevidi.
       bomToolsHtml: bomToolsHtml, vepoBtnHtml: vepoBtnHtml, vepoMenuHtml: vepoMenuHtml,
+      partsTableClass: partsTableClass, // predrecenzia P2 H4b
       // Jantarovy indikator neaktualnosti: JEDEN markup pre vsetkych 5 mist
       // (Kusovnik · Kontrola · Nakup tu, Rozpocet · Ponuka v budget.js —
       // ten si ho v Node testoch berie requirom TOHTO suboru).

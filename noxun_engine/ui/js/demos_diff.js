@@ -296,7 +296,23 @@
       });
     }
     var apply = mddId('mddApplyBtn');
-    if (apply) apply.disabled = !(m && m.complete && m.complete.ok && v.updates.length && !MD_RO);
+    mddSetApply(apply, (m && m.complete && m.complete.ok && v.updates.length && !MD_RO) ? null : MDD_APPLY_IDLE);
+  }
+
+  // H4 · D-08 (CS-11, triedenie HARDENING): „Zapísať vybrané" je nedostupné cez
+  // `aria-disabled` + DOVOD v title (UI_DIZAJN §1, vzor D-78) — nikdy HTML
+  // `disabled` (tlacidlo by stratilo fokus aj tooltip a nepovedalo by preco).
+  // Straz dvojiteho zapisu OSTAVA: klik pri `aria-disabled` NIC neodosle
+  // (`mddOnClick` aj samotne `mddApply`).
+  var MDD_APPLY_IDLE = 'Najprv načítaj a vyber zmeny';
+  var MDD_APPLY_BUSY = 'Zapisujem…';
+  function mddSetApply(btn, reason){
+    if (!btn) return;
+    btn.setAttribute('aria-disabled', reason ? 'true' : 'false');
+    btn.setAttribute('title', reason || 'Zapíše vybrané kódy a ceny do katalógu');
+  }
+  function mddApplyBlocked(btn){
+    return !!btn && btn.getAttribute('aria-disabled') === 'true';
   }
 
   function mddOpen(){
@@ -327,6 +343,7 @@
   }
 
   function mddApply(){
+    if (mddApplyBlocked(mddId('mddApplyBtn'))) return;
     var v = mddBuildView(MDD_STATE);
     var checks = [];
     document.querySelectorAll('#mddBody .mddrow').forEach(function(row){
@@ -340,8 +357,8 @@
     });
     var accepts = mddAccepts(v, checks, MD_CATALOG);
     if (!accepts.length) return;
-    var btn = mddId('mddApplyBtn');
-    if (btn) btn.disabled = true; // pocas zapisu; vysledok pride cez done/fail
+    // pocas zapisu nedostupne; vysledok pride cez done/fail
+    mddSetApply(mddId('mddApplyBtn'), MDD_APPLY_BUSY);
     if (window.sketchup && sketchup.demos_apply)
       sketchup.demos_apply(JSON.stringify({ accepts: accepts, catalog_rev: MD_REV,
                                             catalog_schema: MD_CLIENT_SCHEMA }));
@@ -362,8 +379,7 @@
   // konflikte zneplatnil navrhy (baseline z casu lookupu) — dalsi zapis
   // vyzaduje novy lookup, hlaska to hovori.
   function mddFail(r){
-    var apply = mddId('mddApplyBtn');
-    if (apply) apply.disabled = false;
+    mddSetApply(mddId('mddApplyBtn'), null);
     var status = mddId('mddStatus');
     if (status && r && r.msg) status.textContent = r.msg;
     if (r && r.id){
@@ -381,14 +397,19 @@
   };
 
   // Delegovane ovladanie modalu — ziadne inline handlery s datami (BLOCKER 6).
+  function mddOnClick(t){
+    if (!t) return;
+    var action = t.getAttribute('data-action');
+    if (action === 'mdd-apply'){
+      if (mddApplyBlocked(t)) return; // H4 · CS-11: nedostupne = nic neodosle
+      mddApply();
+    }
+    else if (action === 'mdd-cancel') mddCancel();
+    else if (action === 'manual') mddManualSend(t.getAttribute('data-mdd-key') || '');
+  }
   if (typeof document !== 'undefined' && document.addEventListener){
     document.addEventListener('click', function(ev){
-      var t = ev.target && ev.target.closest ? ev.target.closest('[data-action]') : null;
-      if (!t) return;
-      var action = t.getAttribute('data-action');
-      if (action === 'mdd-apply') mddApply();
-      else if (action === 'mdd-cancel') mddCancel();
-      else if (action === 'manual') mddManualSend(t.getAttribute('data-mdd-key') || '');
+      mddOnClick(ev.target && ev.target.closest ? ev.target.closest('[data-action]') : null);
     });
   }
 
@@ -397,5 +418,9 @@
     module.exports = { mddNewModel: mddNewModel, mddApplyEvent: mddApplyEvent,
       mddOffers: mddOffers, mddBuildView: mddBuildView, mddRowRevOf: mddRowRevOf,
       mddAccepts: mddAccepts, mddStatusLabel: mddStatusLabel, mddFmtPrice: mddFmtPrice,
-      mddAttentionText: mddAttentionText };
+      mddAttentionText: mddAttentionText,
+      // H4 · D-08 (CS-11): straz „Zapísať vybrané" bez HTML `disabled`.
+      mddSetApply: mddSetApply, mddApplyBlocked: mddApplyBlocked, mddOnClick: mddOnClick,
+      // Stav modalu len pre test straze dvojiteho zapisu (vzor `setStForTest`).
+      mddSetStateForTest: function(s){ MDD_STATE = s; } };
   }

@@ -335,7 +335,7 @@
       ro.style.display = MD_RO ? 'flex' : 'none';
       if (rt && MD_RO){
         rt.textContent = 'Katalóg je len na čítanie — ' + (MD_RO_REASON || 'neznámy dôvod') +
-          ' Zmeny sú vypnuté; obnov predmigračnú zálohu alebo oprav súbor a reštartuj SketchUp.';
+          ' Zmeny sú vypnuté; vráť katalóg pred migráciou alebo oprav súbor a reštartuj SketchUp.';
       }
     }
     var eb = mdEl('mdEdgeBanner'), et = mdEl('mdEdgeBannerText');
@@ -359,7 +359,8 @@
     if (db) db.disabled = MD_RO;
     // GH #93 P2 (10. kolo): rollback aj pri zdravej SCHEMA 2 (zaloha existuje);
     // v read-only stave ho nesie nudzovy banner, tu by bol duplicitny.
-    var rb = mdEl('mdRestoreBtn');
+    // H4 · D-06: rollback zije v ponuke „⋯" (obal `mdMoreWrap`).
+    var rb = mdEl('mdMoreWrap');
     if (rb) rb.style.display = (MD_SCHEMA2 && !MD_RO && MD_HAS_BACKUP) ? '' : 'none';
   }
   // Cista funkcia (Node test): text banneru so slovenskym sklonovanim.
@@ -3065,7 +3066,7 @@
     var warn = null, block = null;
     if (p.used_count > 0){
       warn = 'Používa sa v modeli (' + p.used_count + '×: ' + (p.used || []).join(', ') +
-        (p.used_count > (p.used || []).length ? '…' : '') + ') — server mazanie odmietne.';
+        (p.used_count > (p.used || []).length ? '…' : '') + ') — plugin mazanie nedovolí.';
     }
     if (p.protected) block = 'Systémová predvoľba nových projektov — nedá sa zmazať.';
     else if (p.duplak_deps && p.duplak_deps.length) block = 'Na dosku sa odkazuje duplák ' + p.duplak_deps.join(', ') + ' — najprv zmaž duplák.';
@@ -3857,6 +3858,9 @@
     matCloseModals();
   }
   function matCloseModals(){
+    // H4 · D-06: ponuka „⋯" patri sekcii — po odchode sa neprekresluje (okno
+    // kresli hned celu novu sekciu), len zhasne.
+    mdMoreOpen = false;
     mdAppearanceInvalidate();
     mdUniClose();
     mdDeleteClose();
@@ -3895,20 +3899,12 @@
       ' title="Pridať materiál ručne (bez Demosu)" onclick="mdCreateOpen()">' +
       '<svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Pridať ručne</button>' +
       '<div class="searchbox"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>' +
-      '<input id="mdSearch" type="text" placeholder="Hľadať dekor, výrobcu alebo kód"' +
+      '<input id="mdSearch" type="text" placeholder="Hľadať…" title="Hľadať dekor, výrobcu alebo kód" aria-label="Hľadať dekor, výrobcu alebo kód"' +
       ' value="' + mdEsc(s.q || '') + '" oninput="mdSearchInput()"></div>' +
       '<select id="mdGroupMode" onchange="mdRenderLists()" title="Zoskupenie dlaždíc">' +
       '<option value="man"' + (s.mode === 'az' ? '' : ' selected') + '>Podľa výrobcu</option>' +
       '<option value="az"' + (s.mode === 'az' ? ' selected' : '') + '>A–Z</option></select>' +
       '<span class="spacer"></span>';
-    // GH #93 P2 (10. kolo): rollback sa ukazuje LEN so SCHEMA 2 a existujucou
-    // predmigracnou zalohou; v nudzovom rezime ho nesie banner nad zoznamom.
-    if (s.backup && !s.ro){
-      h += '<button type="button" class="ghostbtn" id="mdRestoreBtn"' +
-        ' title="Vráti katalóg do stavu pred migráciou (jednorazovo preskočí ďalšiu migráciu)"' +
-        ' onclick="mdRestoreOpen()"><svg class="ic" aria-hidden="true"><use href="#i-info"/></svg>' +
-        ' Obnoviť zálohu</button>';
-    }
     // Jantarove „Obnoviť" je ZDIELANY markup celeho okna (`studio.js`) — sekcia
     // ho nesmie kreslit druhykrat (vzor `budRefreshBtnHtml` v budget.js).
     // V prehliadaci je to globalna funkcia, v Node testoch pride requirom.
@@ -3919,14 +3915,114 @@
       h += refresh(s.stale === true,
                    'Prepočítať počty „Použité v projekte" z aktuálneho modelu');
     }
+    // GH #93 P2 (10. kolo): rollback sa ukazuje LEN so SCHEMA 2 a existujucou
+    // predmigracnou zalohou; v nudzovom rezime ho nesie banner nad zoznamom.
+    // H4 · D-06 (triedenie HARDENING, Q1 variant A): nudzova akcia uz nestoji
+    // VEDLA bezneho „Obnoviť" (pomylili sa) — je v ponuke „⋯" ZA nim. Bez
+    // polozky sa „⋯" nekresli vobec (D-78: ziadny prazdny spustac).
+    if (s.backup && !s.ro) h += mdMoreHtml(s.more === true);
     return h;
+  }
+
+  // H4 · D-06: ponuka „⋯" listy Materialov — CISTA funkcia (Node test).
+  // Ponuka je OVERLAY pod spustacom (UI_DIZAJN §1 — nikdy novy riadok listy),
+  // kresli sa len otvorena. Polozka vola TEN ISTY potvrdzovaci modal ako
+  // dnesne tlacidlo (`mdRestoreOpen` -> `restore_pre_schema2`) — novy zapis
+  // nevznika, len cesta k nemu.
+  function mdMoreHtml(open){
+    return '<span class="mdmore" id="mdMoreWrap">' +
+      '<button type="button" class="ghostbtn mdmorebtn" id="mdMoreBtn" data-mdmore="toggle"' +
+      ' aria-haspopup="menu" aria-expanded="' + (open ? 'true' : 'false') + '"' +
+      ' aria-controls="mdMoreMenu" aria-label="Ďalšie akcie katalógu" title="Ďalšie akcie katalógu">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-more-horizontal"/></svg></button>' +
+      (open
+        ? '<div class="mdmoremenu" id="mdMoreMenu" role="menu" aria-label="Ďalšie akcie katalógu">' +
+          '<button type="button" role="menuitem" class="mdmoreitem" id="mdRestoreItem" data-mdmore="restore"' +
+          ' title="Vráti katalóg do stavu pred migráciou (jednorazovo preskočí ďalšiu migráciu)">' +
+          '<svg class="ic" aria-hidden="true"><use href="#i-rotate-ccw"/></svg>' +
+          ' Vrátiť katalóg pred migráciou…</button></div>'
+        : '') +
+      '</span>';
+  }
+
+  // Otvorenost ponuky je CISTO klientska (nikam sa neuklada, vzor `vepoMenuOpen`
+  // v studio.js). Premenna je ZAMERNE globalna: Escape retaz `nx_esc.js` ju
+  // cita ako priznak otvoreneho flyoutu (FLYOUT_FLAGS) a kym je ponuka hore,
+  // Escape neposle dalej nikomu inemu — jedno stlacenie = jedna vrstva.
+  var mdMoreOpen = false;
+  function mdMoreRender(){
+    var stale = (typeof staleFlag !== 'undefined') && staleFlag === true;
+    matRenderTools(stale);
+  }
+  function mdMoreToggle(){
+    // Druhy klik na „⋯" = zatvorenie (bez prekreslenia, fokus ostava na „⋯").
+    if (mdMoreOpen){ mdMoreClose(true); return; }
+    mdMoreOpen = true;
+    mdMoreRender();
+    // Klavesnica: otvorenie presunie fokus na prvu polozku (vzor menu tlacidla),
+    // inak by Enter na „⋯" nechal pouzivatela pred ponukou, ktoru nevidi citac.
+    var it = mdEl('mdRestoreItem');
+    if (it){ try { it.focus(); } catch (e) {} }
+  }
+  // `focusBtn`: po Escape fokus patri spat na spustac (inak skonci v prazdne).
+  // Predrecenzia P3: zatvorenie lištu NEPREKRESLUJE (innerHTML by zhodil fokus
+  // z pola, do ktoreho pouzivatel prave klikol — napr. hladanie v tej istej
+  // liste). Len odstrani uzol ponuky a prepne aria-expanded; dalsi push kresli
+  // listu uz so zatvorenou ponukou (stav ide z `mdMoreOpen`).
+  function mdMoreClose(focusBtn){
+    if (!mdMoreOpen) return;
+    mdMoreOpen = false;
+    var menu = mdEl('mdMoreMenu');
+    if (menu && menu.parentNode) menu.parentNode.removeChild(menu);
+    var mb = mdEl('mdMoreBtn');
+    if (mb) mb.setAttribute('aria-expanded', 'false');
+    if (focusBtn){
+      var b = mdEl('mdMoreBtn');
+      if (b){ try { b.focus(); } catch (e) {} }
+    }
+  }
+  // Vyber polozky: NAJPRV zavriet ponuku, potom modal — ponuka a modal nikdy
+  // nie su hore naraz (Escape by inak nevedel, ktoru vrstvu zavriet ako prvu).
+  function mdMoreRestore(){
+    mdMoreClose(false);
+    mdRestoreOpen();
+  }
+  // Klik: spustac prepina, polozka vola akciu, klik MIMO obalu ponuku zavrie.
+  // Escape: zavrie LEN ponuku a udalost spotrebuje (po nej uz nic nezavrie dalsiu
+  // vrstvu). Sipky medzi polozkami nie su treba — polozka je jedna; Tab ponuku
+  // zavrie, aby neostala visiet za fokusom.
+  function mdMoreOnClick(t){
+    if (!t || !t.closest) return false;
+    var a = t.closest('[data-mdmore]');
+    if (a){
+      if (a.getAttribute('data-mdmore') === 'restore') mdMoreRestore();
+      else mdMoreToggle();
+      return true;
+    }
+    if (mdMoreOpen && !t.closest('#mdMoreWrap')) mdMoreClose(false);
+    return false;
+  }
+  function mdMoreOnKey(ev){
+    if (!mdMoreOpen || !ev) return false;
+    if (ev.key === 'Escape'){
+      mdMoreClose(true);
+      if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+      if (ev.preventDefault) ev.preventDefault();
+      return true;
+    }
+    if (ev.key === 'Tab'){ mdMoreClose(false); return false; }
+    return false;
+  }
+  if (typeof document !== 'undefined' && document.addEventListener){
+    document.addEventListener('click', function(ev){ mdMoreOnClick(ev.target); });
+    document.addEventListener('keydown', function(ev){ mdMoreOnKey(ev); });
   }
 
   // `stale` podava `studio.js` — jantarovy priznak je stav OKNA a ma jedinu
   // autoritu (`staleFlag`), sekcia si ho neodvodzuje.
   function matToolsState(stale){
     return { ro: MD_RO, q: MD_Q, mode: mdGroupMode(),
-             backup: MD_SCHEMA2 && MD_HAS_BACKUP, stale: stale === true };
+             backup: MD_SCHEMA2 && MD_HAS_BACKUP, stale: stale === true, more: mdMoreOpen };
   }
   function matRenderTools(stale){
     var box = mdEl('sectools');
@@ -4101,6 +4197,10 @@
       // nedal overit nicim nez klikanim. V prehliadaci ho `studio.js` vola ako
       // globalnu funkciu, nie cez export.
       matToolsHtml: matToolsHtml, matRenderBody: matRenderBody,
+      // H4 · D-06 — ponuka „⋯" (tests/js/test_h4b_texty_vzhlad.js): cista
+      // funkcia + obsluha kliku a klavesnice (potrebuju stav sekcie).
+      mdMoreHtml: mdMoreHtml, mdMoreOnClick: mdMoreOnClick, mdMoreOnKey: mdMoreOnKey,
+      mdMoreState: function(){ return mdMoreOpen; },
       // ŠT-2b — odchod zo sekcie zavrie modaly a zrusi bezaci Demos fetch
       matOnLeaveSection: matOnLeaveSection,
       // ŠT-2d — „Kde sa používa" + deep-link z karty dielca

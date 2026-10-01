@@ -314,7 +314,7 @@ NxTest.test('2A-4a restore: poskodena/nelegacy zaloha = [false, dovod] bez zasah
       File.binwrite(A4MAT.pre_schema2_backup_path, zly)
       ok, err = A4MAT.restore_pre_schema2!
       NxTest.refute(ok, "zaloha '#{zly[0, 12]}' nie je legacy katalog")
-      NxTest.assert(err.include?('nie je platný legacy'), err)
+      NxTest.assert(err.include?('je poškodená (nemá tvar staršieho katalógu)'), err) # H4b: bez žargónu „legacy“
       NxTest.assert_equal(a4_schema2_bytes, File.binread(A4MAT.path), 'primar bez zasahu')
       NxTest.refute(A4MAT.migration_hold?, 'hold flag sa nezapisal')
       NxTest.assert_equal([], Dir[File.join(A4MAT.dir, 'materials.rolledback-*.json')],

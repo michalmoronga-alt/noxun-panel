@@ -6,13 +6,11 @@
 
 ## Stav
 
-**v0.17.3 · 1.10.2026 — blok 9 HARDENING, dávka H4a** (PR #437): Štúdio píše čísla **všade rovnako** — čiarka, celé kusy bez „,00", peniaze s €, jednotky malým („4 platne × 17,00 €", „37,26 bm")
-a **nič neskrýva** (hrúbka 18,6 nie „19", bm 70,94 nie „70,9"); peňažné polia „68,00 €"; Kusovník „0,8 dookola". **Hodnoty, XLSX, CSV a VEPO bez zmeny.**
-Pod tým **H3b** (v0.17.2, PR #436): bez falošnej chyby „invalid overlay" v Ruby konzole po **Súbor → Nový**. Pod tým **H3a** (v0.17.1, PR #435): Štúdio bez zavádzajúcich údajov (Kusovník, ponuka, Kontrola, Nákup, sadzby) — **čísla, CSV, XLSX a VEPO bez zmeny**.
-Pod tým **BLOK CENY UZAVRETÝ** (v0.17.0, 30.9.; štart #425, PR #426–#429; **smoke PASS 30.9.**, PR #431). Doska a ABS páska **bez Demosu** majú **jeden odkaz na produkt** a **ručné overenie ceny** v Štúdiu → Materiály aj v Rozpočte (doska za platňu s prepočtom
-na €/m², sklo bez formátu za m², ABS za bm; „Potvrdiť cenu k dnešku" nedotknutú cenu nezmení ani o cent; zmena overených polí overenie zruší; Demos má prednosť;
-D-148). Rozpočet ukazuje vek ručných cien („ručne 18.9." / „neoverená") a počíta ich medzi **„N cien na kontrolu"**; **materiál bez formátu — sklo aj bežná
-doska (C14) — sa počíta podľa skutočných m² dielcov** bez odpadu (UNI a duplák bez väzby na odhade platní; porez a montáž bez zmeny, Q1).
+**v0.17.4 · 1.10.2026 — blok 9 HARDENING, dávka H4b** (PR #438): **texty a vzhľad** — núdzové „Vrátiť katalóg pred migráciou…" už nestojí vedľa „Obnoviť" (ponuka „⋯" v Materiáloch), „Obnoviť" znamená všade to isté, iný význam je „Vrátiť…";
+texty bez „ghost/seed/legacy/server" a bez kričania, verzia „v0.17.x"; jednotné rozbaľovačky, krátke „Hľadať…", stĺpce Kusovníka pod sebou, mazanie ikonou ×, Nastavenia rozpočtu s ikonou posuvníkov. **Dáta, čísla, XLSX, CSV a VEPO bez zmeny.**
+Pod tým **H4a** (v0.17.3, PR #437): čísla v Štúdiu všade rovnako, nič sa neskrýva. Pod tým **H3b** (v0.17.2, PR #436): bez falošnej chyby „invalid overlay" v Ruby konzole po **Súbor → Nový**. Pod tým **H3a** (v0.17.1, PR #435): Štúdio bez zavádzajúcich údajov (Kusovník, ponuka, Kontrola, Nákup, sadzby) — **čísla, CSV, XLSX a VEPO bez zmeny**.
+Pod tým **BLOK CENY UZAVRETÝ** (v0.17.0, 30.9.; štart #425, PR #426–#429; **smoke PASS 30.9.**, PR #431): doska a ABS páska **bez Demosu** majú **odkaz na produkt** a **ručné overenie ceny** (Materiály aj Rozpočet; D-148), Rozpočet ukazuje vek ručných cien
+a **„N cien na kontrolu"**; **materiál bez formátu — sklo aj bežná doska (C14) — sa počíta podľa skutočných m² dielcov** bez odpadu (porez a montáž bez zmeny, Q1).
 Pod tým **blok 2 · KONTROLA + VÝROBA** (v0.16.0, smoke **PASS 29.9.**), **blok 8 · K3 ROHOVÁ** (v0.15.0, smoke PASS 28.9.), **blok 7 · K1+K2** (v0.14.0). Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 so **štrnástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · **Nárezový plán** · Materiály · Kovanie · Spotrebiče · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine. Neaktívna položka navigácie už nie je žiadna.
 
@@ -30,20 +28,21 @@ v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a
 **Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin
 počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
 
-**Testy (H4a, PR #437):** **4969 headless · 148 JS sád** zelené + encoding guard; in-SU sa nespúšťal (len JS/CSS; posledný beh H3b: 3284 PASS / 0 FAIL).
+**Testy (H4b, PR #438):** **4979 headless · 149 JS sád** zelené + encoding guard; in-SU sa nespúšťal (JS/CSS a zobrazovacie texty; posledný beh H3b: 3284 PASS / 0 FAIL).
 
 ## Robí sa
 
 **Blok 9 · HARDENING PO V1** (štart 1.10.2026, PR #432): krížový audit V1 sedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**;
 17 dávok **H1…H17** sekvenčne podľa tabuľky v [PLAN.md](PLAN.md), **bez zmeny výrobných a cenových čísel**; priečinok bloku [zdroje/bloky/HARDENING/](zdroje/bloky/HARDENING/).
-Hotové **H1** PR #433 · **H2** (fotenie okien) PR #434 · **H3a** (zavádzajúce údaje v okne) PR #435 · **H3b** (falošná chyba v Ruby konzole po novom súbore) PR #436 · **H4a** (zápis čísel) PR #437; nasleduje **H4b**.
+Hotové **H1** PR #433 · **H2** (fotenie okien) PR #434 · **H3a** (zavádzajúce údaje v okne) PR #435 · **H3b** (falošná chyba v Ruby konzole po novom súbore) PR #436 · **H4a** (zápis čísel) PR #437 · **H4b** (texty a vzhľad) PR #438; nasleduje **H5**.
+**H4b — Michalove otázky Q1/Q2 bez odpovede, platí predvolená vratná voľba:** vrátenie katalógu v ponuke „⋯" Materiálov (nie v O plugine) a ikona posuvníkov pre Nastavenia rozpočtu.
 **H6 a H7 čakajú na schválený mockup** (R-38 v H7 potvrdí Michal) · **Q1** (porez a montáž pri skle) bez odpovede · pri prvej rohovej v dielni overiť záves Sensys · **na smoke čakajú** D-132 (#367), D-133 (#368), D-134 (#369).
 
 ## Ďalší krok
 
-Pokračovať blokom 9 v poradí tabuľky: **H4b** → H5; medzitým mockupy **H6** a **H7** na schválenie Michalom. Potom **R-13 → R-37
+Pokračovať blokom 9 v poradí tabuľky: **H5**; medzitým mockupy **H6** a **H7** na schválenie Michalom. Potom **R-13 → R-37
 → R-35** ako **H8–H10** (**R-13 rozhodnuté 29.9.: čítať** — ORANGE „dielec z inej verzie štandardu") a refaktory H11–H17; uzáver bloku = minor verzia + smoke
-(smoke H3a + H3b: 7 bodov v [PACKAGE_H3.md](zdroje/bloky/HARDENING/PACKAGE_H3.md) §10; H4a: body 1–4 v [PACKAGE_H4.md](zdroje/bloky/HARDENING/PACKAGE_H4.md) §10). Ak druhé PC ešte nemá 0.17.0, aktualizovať (Kompatibilita vyššie). **Test na reálnej zákazke po V1.**
+(smoke H3a + H3b: 7 bodov v [PACKAGE_H3.md](zdroje/bloky/HARDENING/PACKAGE_H3.md) §10; H4a + H4b: body 1–11 v [PACKAGE_H4.md](zdroje/bloky/HARDENING/PACKAGE_H4.md) §10; vzhľad rozbaľovačiek a výberu nôh v SketchUpe overí smoke bod 7). Ak druhé PC ešte nemá 0.17.0, aktualizovať (Kompatibilita vyššie). **Test na reálnej zákazke po V1.**
 
 ## Posledné uzávery
 

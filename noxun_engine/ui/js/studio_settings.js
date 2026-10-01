@@ -28,7 +28,7 @@
   // a cudziu zmenu (druhá inštancia, ručný zásah do súboru) by rozpísaný
   // formulár TICHO PREPÍSAL. Presne to má zámok chytiť, takže sa posiela
   // revízia PRIPNUTÁ pri fokuse poľa; uvoľní ju odpoveď servera (`SS.saved()`
-  // — potvrdenie, odmietnutie aj „Načítať nanovo") a KAŽDÉ prekreslenie tela
+  // — potvrdenie, odmietnutie aj „Obnoviť") a KAŽDÉ prekreslenie tela
   // z čerstvého stavu nad nerozpísaným formulárom (`ssRenderBody`, dlh 1b-A).
   var SS_BASE_REV = null;
   // Posledný payload NEDORAZIL (server ho nevedel zostaviť — chyba disku,
@@ -303,17 +303,17 @@
     box.appendChild(ssMk('div', 'sshead', 'dodávateľ: ' + (SS_STATE.supplier.name || '—') +
       ' · globálne pre všetky zákazky · v' + SS_STATE.version));
     ssRenderRates(ssFieldset(box, 'Sadzby služieb',
-      'Automatické služby — množstvo počíta engine z dát zákazky (bm olepu, počet platní, kusy ' +
+      'Automatické služby — množstvo sa počíta z dát zákazky (bm olepu, počet platní, kusy ' +
       'duplákov, m² montáže). Stĺpce € nízky · €€ štandard · €€€ vysoký sú sadzby pre cenový režim zákazky; ' +
       'v prázdnej bunke platí základ — ukazuje ho sivé číslo. Sivé číslo ukazuje uložený základ — ' +
       'po zmene Základu sa obnoví až po Uložiť.'));
-    ssRenderRows(ssFieldset(box, 'Štandardné riadky — sadzby per režim',
+    ssRenderRows(ssFieldset(box, 'Štandardné riadky — sadzby podľa režimu',
       'Fixné koncové položky ponuky. Násobok (koeficient veľkosti zákazky) sa nastavuje priamo ' +
       'v riadku rozpočtu — tu žije len sadzba.'));
     ssRenderScalars(ssFieldset(box, 'Výpočet a upozornenia', null));
     box.appendChild(ssMk('div', 'sshint',
       'Režim je sada predvolieb, nie zámok — v zákazke sa dá každý riadok prepísať a ručný prepis ' +
-      'prežije zmenu režimu. Prah cenovej ponuky je len NÁVRH: každú položku vieš v sekcii Rozpočet ' +
+      'prežije zmenu režimu. Prah cenovej ponuky je len návrh: každú položku vieš v sekcii Rozpočet ' +
       'prepnúť medzi „samostatne v ponuke" a „v zostave".'));
   }
 
@@ -351,7 +351,7 @@
     ssRow(fs, 'Aktívny dodávateľ', SS_STATE.supplier.name || '—');
     ssRow(fs, 'Súbor nastavení', SS_STATE.path || '—');
     fs.appendChild(ssMk('div', 'sshint',
-      'Sadzby a prahy tohto dodávateľa sú GLOBÁLNE (platia pre všetky zákazky) a upravujú sa ' +
+      'Sadzby a prahy tohto dodávateľa sú globálne (platia pre všetky zákazky) a upravujú sa ' +
       'v sekcii Nastavenia rozpočtu. Do zákazky sa nemrazia — rozpočet je pohyblivý obraz cien.'));
     box.appendChild(fs);
 
@@ -359,10 +359,10 @@
     fd.appendChild(ssMk('legend', null, 'Väzba na Demos'));
     fd.appendChild(ssMk('div', 'sshint',
       'Demos je verejný cenník — plugin sa neprihlasuje a nemá cenové pásmo ani sadzbu DPH ' +
-      '(firma je neplatca, katalógové ceny sú konečné). Väzba je vlastnosť KONKRÉTNEHO dekoru ' +
+      '(firma je neplatca, katalógové ceny sú konečné). Väzba je vlastnosť konkrétneho dekoru ' +
       'alebo kovania (odkaz + dátum overenia ceny), preto sa nastavuje pri ňom, nie tu.'));
     ssRow(fd, 'Odstup dotazov', (d.crawl_delay_s ? (ssNumText(d.crawl_delay_s) + ' s') : '—') +
-      ' · pevné (slušné správanie voči serveru, nedá sa skrátiť)');
+      ' · pevné (ohľaduplnosť k webu Demos, nedá sa skrátiť)');
     ssRow(fd, 'Cena je stará od', (d.stale_days == null ? '—' : (String(d.stale_days) + ' dní')) +
       ' · mení sa v Nastaveniach rozpočtu');
     var bar = ssMk('div', 'ssbar');
@@ -392,7 +392,7 @@
     }
     box.appendChild(ssMk('div', 'sshint',
       'Obsah „O plugine" nájdeš aj v koliesku Inspectora — je to jeden obsah s dvoma vstupmi. ' +
-      'Aktualizácia je LEN tu: zatvára obe okná a prepisuje súbory pluginu, preto do ' +
+      'Aktualizácia je len tu: zatvára obe okná a prepisuje súbory pluginu, preto do ' +
       'rozklikávacieho panela nepatrí. Po aktualizácii vždy reštartuj SketchUp.'));
   }
 
@@ -554,9 +554,9 @@
     }
     window.NXModal.open({
       title: 'Aktualizovať Noxun Engine',
-      sub: 'Nasadiť ' + (u.available ? ('V' + u.available) : 'novú verziu') + ' z „' + u.source_dir + '"?',
-      note: 'Pred výmenou súborov sa ZATVORIA OBE OKNÁ pluginu (Inspector aj Štúdio) — inak ich ' +
-            'SketchUp drží otvorené a priečinok sa nedá premenovať. Po dokončení REŠTARTUJ ' +
+      sub: 'Nasadiť ' + (u.available ? ('v' + u.available) : 'novú verziu') + ' z „' + u.source_dir + '"?',
+      note: 'Pred výmenou súborov sa zatvoria obe okná pluginu (Inspector aj Štúdio) — inak ich ' +
+            'SketchUp drží otvorené a priečinok sa nedá premenovať. Po dokončení reštartuj ' +
             'SketchUp; výsledok sa ukáže v okne SketchUpu, nie tu.',
       okLabel: 'Aktualizovať',
       fields: [],
@@ -614,7 +614,7 @@
     if (SS_FAILED){
       box.innerHTML = '<div class="err ssfail">Nastavenia sa nepodarilo načítať ' +
         '(chyba pri čítaní súboru). Hodnoty by nemuseli platiť, preto sa nezobrazujú — ' +
-        'skús <b>Načítať nanovo</b> v lište sekcie.</div>';
+        'skús <b>Obnoviť</b> v lište sekcie.</div>';
       return;
     }
     if (!SS_STATE){ box.innerHTML = '<div class="muted">Načítavam…</div>'; return; }
@@ -648,7 +648,7 @@
   // prázdna lišta je poctivejšia než tlačidlá, ktoré nič nerobia (D-78).
   // `failed` = posledný payload nedorazil. Lišta vtedy NESMIE ponúkať
   // „Uložiť" (patch proti revízii, ktorú sa práve nedá prečítať), ale MUSÍ
-  // nechať „Načítať nanovo" — je to jediná cesta, ako sa z prechodnej chyby
+  // nechať „Obnoviť" (H4 · D-06: bolo „Načítať nanovo") — je to jediná cesta, ako sa z prechodnej chyby
   // disku zotaviť bez zatvorenia Štúdia, a hláška v tele na ňu odkazuje
   // (review #227 kolo 2).
   // `blocked` (NP-2) = dôvod, prečo sa do súboru nedá zapisovať (novší plugin,
@@ -660,7 +660,7 @@
       return '<span class="spacer"></span>' +
         '<button type="button" class="ghostbtn" data-action="ss-reload"' +
         ' title="Skúsi znova načítať súbor nastavení">' +
-        '<svg class="ic" aria-hidden="true"><use href="#i-rotate-ccw"/></svg> Načítať nanovo</button>';
+        '<svg class="ic" aria-hidden="true"><use href="#i-refresh-cw"/></svg> Obnoviť</button>';
     }
     var save = blocked
       ? '<button type="button" class="primary" data-action="ss-save" aria-disabled="true" title="' +
@@ -668,7 +668,7 @@
       : '<button type="button" class="primary" data-action="ss-save">';
     return '<button type="button" class="ghostbtn" data-action="ss-reload"' +
       ' title="Zahodí neuložené zmeny a načíta súbor nanovo">' +
-      '<svg class="ic" aria-hidden="true"><use href="#i-rotate-ccw"/></svg> Načítať nanovo</button>' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-refresh-cw"/></svg> Obnoviť</button>' +
       '<span class="spacer"></span>' + save +
       '<svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Uložiť</button>';
   }

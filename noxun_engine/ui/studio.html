@@ -5,7 +5,7 @@
      to isté zdieľané jadro `ProductionCore`).
      Vizuálna referencia: SYSTEM/zdroje/ui20/mockup_studio.html -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.17.3">
+<link rel="stylesheet" href="css/panel.css?v=0.17.4">
 <style>
   /* Štýly sú ZÁMERNE inline v studio.html (rovnaký dôvod, aký mala production.html):
      panel.css je zdieľaný s Inspectorom a rozloženie tohto okna doňho nepatrí.
@@ -137,11 +137,19 @@
   .sectools .primary[aria-disabled="true"]:hover { background: var(--nx-surface-sunken);
                                                    color: var(--nx-ink-faint);
                                                    border-color: var(--nx-border); cursor: default; }
+  /* H4 · D-08 (CS-11): „Zapísať vybrané" v Aktualizovať z Demosu — rovnaký vzhľad
+     nedostupnej primárnej akcie (aria-disabled + dôvod v title, nikdy HTML disabled). */
+  .nxmodal .btnrow .primary[aria-disabled="true"],
+  .nxmodal .btnrow .primary[aria-disabled="true"]:hover { background: var(--nx-surface-sunken);
+                                                         color: var(--nx-ink-faint);
+                                                         border-color: var(--nx-border); cursor: default; }
   .secscroll { flex: 1; overflow: auto; padding: 10px 12px 20px; }
 
   /* Review #9: 150 px (bolo 180) — lišta Kusovníka nesie od SMOKE dávky o jeden
      prvok viac (Projekt) a pri NX_FIT_MIN 1060 px sa musí zmestiť do JEDNÉHO
-     riadku; pod 150 px už hint „Hľadať dielec / skrinku…" nie je čitateľný. */
+     riadku; pod 150 px už hint nie je čitateľný. H4 · D-08: všetky polia
+     hľadania majú krátky hint „Hľadať…" (dlhý sa orezával) — rozsah hovorí
+     `title` a `aria-label`. */
   .searchbox { display: flex; align-items: center; gap: 6px; border: 1px solid var(--nx-border-strong);
                border-radius: 6px; padding: 4px 8px; background: var(--nx-surface); min-width: 150px; }
   .searchbox input { border: 0; outline: 0; font: inherit; font-size: 12px; flex: 1;
@@ -187,6 +195,21 @@
   /* Review #4: hlavička okna — TEN ISTÝ vzor ako `.colmenu .mgrp` (aj mockup). */
   .vepomenu .mgrp { font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
                     color: var(--nx-ink-faint); padding: 3px 6px; }
+
+  /* H4 · D-06 (triedenie HARDENING): ponuka „⋯" lišty Materiálov — núdzové
+     vrátenie katalógu už nestojí vedľa bežného „Obnoviť". Ten istý jazyk ako
+     `.vepomenu` (overlay pod spúšťačom, nikdy ďalší riadok lišty). */
+  .mdmore { position: relative; display: inline-flex; }
+  .sectools .mdmorebtn { padding: 6px 8px; }
+  .mdmoremenu { position: absolute; top: calc(100% + 4px); right: 0; z-index: 60;
+                min-width: 248px; background: var(--nx-surface); border: 1px solid var(--nx-border);
+                border-radius: 6px; box-shadow: 0 6px 18px var(--nx-modal-shadow); padding: 4px; }
+  .mdmoremenu .mdmoreitem { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+                            padding: 6px 8px; background: transparent; color: var(--nx-ink);
+                            font-weight: 600; font-size: 12px; }
+  .mdmoremenu .mdmoreitem .ic { width: 14px; height: 14px; color: var(--nx-ink-muted); }
+  .mdmoremenu .mdmoreitem:hover, .mdmoremenu .mdmoreitem:focus-visible {
+    background: var(--nx-select-bg-soft); outline: none; }
 
   /* ---------- pohľady sekcie (Š4) ---------- */
   .bomviews { display: flex; border: 1px solid var(--nx-border-strong); border-radius: 6px;
@@ -247,6 +270,27 @@
   .bomtab tbody tr:hover { background: var(--nx-select-bg-soft); }
   .bomtab tbody tr:hover .rowact { opacity: 1; }
   td.absc { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--nx-ink-muted); cursor: help; }
+  /* H4 · D-08 (triedenie HARDENING): tabuľka Dielce má PEVNÉ rozloženie a spoločné
+     šírky stĺpcov — dovtedy si každá skupina materiálu rátala šírky z vlastného
+     obsahu a stĺpce Dĺžka/Šírka/Hr./ks „skákali" medzi skupinami. Šírky nesie
+     trieda `c-<kľúč>` (th aj td); Dielec dostane zvyšok. Textové bunky sa
+     ZALAMUJÚ — nič sa neoreže (ani dlhý zoznam skriniek, ani ABS). Pohľady
+     Platne a ABS (jedna tabuľka) sa nemenia.
+     Predrecenzia P2: pevné rozloženie platí LEN pri predvolených stĺpcoch
+     (trieda `fixed`, kreslí ju `partsTable`). So zapnutými voliteľnými
+     stĺpcami (Smer dekoru, Rola) by pri okne 1060 px (tabuľka ~826 px) súčet
+     pevných šírok zjedol stĺpec Dielec na nulu — vtedy tabuľka zostane pri
+     automatickom rozložení. Pri predvolených stĺpcoch má Dielec pri 826 px
+     aspoň 160 px (stráži test_h4b_texty_vzhlad.js). */
+  .bomtab.parts.fixed { table-layout: fixed; }
+  .bomtab.parts.fixed .c-l, .bomtab.parts.fixed .c-w { width: 64px; }
+  .bomtab.parts.fixed .c-th { width: 52px; }
+  .bomtab.parts.fixed .c-q { width: 44px; }
+  .bomtab.parts.fixed .c-abs { width: 190px; }
+  .bomtab.parts.fixed .c-cab { width: 22%; }
+  /* Zalamovanie len pri pevnom rozložení: v automatickom by `anywhere` znížilo
+     minimálnu šírku textu na jedno písmeno a stĺpec Dielec by sa zas zúžil. */
+  .bomtab.parts.fixed td { white-space: normal; overflow-wrap: anywhere; }
   .estfb { color: var(--nx-warn-fg); }
   .cellsw { display: inline-block; width: 13px; height: 13px; border-radius: 3px;
             border: 1px solid var(--nx-border-strong); vertical-align: -2px; margin-right: 7px; }
@@ -897,11 +941,11 @@
   <!-- 2A-4b (audit B2): potvrdenie obnovy predmigračnej zálohy (NIE UI.messagebox). -->
   <div id="mdRestoreModal" class="nxmodal" style="display:none">
     <div class="nxmodal-card">
-      <div class="nxmodal-title">Obnoviť predmigračnú zálohu</div>
+      <div class="nxmodal-title">Vrátiť katalóg pred migráciou</div>
       <div class="hint">Aktuálny katalóg sa odloží bokom (materials.rolledback-…) a nasadí sa záloha <b>materials.pre-schema-2.json</b> z času pred migráciou. Nič sa nemaže.</div>
       <div class="nxmodal-warn">Pri najbližšom štarte SketchUpu sa migrácia jednorazovo preskočí — katalóg ostane v pôvodnom formáte na opravu. Ďalší štart už migruje normálne.</div>
       <div class="btnrow">
-        <button class="primary" onclick="mdRestoreConfirm()">Obnoviť</button>
+        <button class="primary" onclick="mdRestoreConfirm()">Vrátiť katalóg</button>
         <button class="ghostbtn" onclick="mdRestoreClose()">Zrušiť</button>
       </div>
     </div>
@@ -928,7 +972,7 @@
       <div class="hint" id="mddStatus">…</div>
       <div id="mddBody" class="mddbody"></div>
       <div class="btnrow">
-        <button class="primary" id="mddApplyBtn" data-action="mdd-apply" disabled>Zapísať vybrané</button>
+        <button class="primary" id="mddApplyBtn" data-action="mdd-apply" aria-disabled="true" title="Najprv načítaj a vyber zmeny">Zapísať vybrané</button>
         <button class="ghostbtn" data-action="mdd-cancel">Zavrieť</button>
       </div>
     </div>
@@ -1048,7 +1092,7 @@
   <div id="mdRoBanner" class="mdbanner mdbanner-ro" style="display:none">
     <svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>
     <span id="mdRoText">…</span>
-    <button class="ghostbtn" id="mdRoRestoreBtn" onclick="mdRestoreOpen()">Obnoviť predmigračnú zálohu</button>
+    <button class="ghostbtn" id="mdRoRestoreBtn" onclick="mdRestoreOpen()">Vrátiť katalóg pred migráciou…</button>
   </div>
   <!-- 2A-4b (audit O2): pásky bez štruktúry a bez universal — picker ich nevyberie. -->
   <div id="mdEdgeBanner" class="mdbanner" style="display:none">
@@ -1248,40 +1292,40 @@
   </defs>
 </svg>
 
-<script src="js/errors.js?v=0.17.3"></script>
+<script src="js/errors.js?v=0.17.4"></script>
 <!-- D-51/D-77: minimálna OBSAHOVÁ veľkosť okna pri otvorení (js/win_fit.js).
      Navigácia 208 px + tabuľka Kusovníka so 7 stĺpcami a stĺpcom akcií — v užšom
      okne končí pravá časť riadku mimo. Trojica NX_FIT_MIN → width/height →
      min_width/min_height je v docs/UI_DIZAJN.md (tabuľka D-51). -->
 <script>window.NX_FIT_MIN = { w: 1060, h: 640 };</script>
-<script src="js/win_fit.js?v=0.17.3"></script>
+<script src="js/win_fit.js?v=0.17.4"></script>
 <!-- Sprite ikon (žiadne emoji v ovládacích prvkoch). Musí byť PRED studio.js —
      navigácia aj hover akcie riadkov používajú <use href="#i-…">. -->
-<script src="js/icons.js?v=0.17.3"></script>
+<script src="js/icons.js?v=0.17.4"></script>
 <!-- R-23.1: JEDEN dokumentový Escape handler s prioritným zoznamom vrstiev
      (ten istý súbor načítava aj panel.html). Musí byť PRED nx_modal.js
      aj studio.js — jeho listener má bežať ako PRVÝ, aby vedel udalosť
      spotrebovať skôr, než ju dostane handler okna. Kostre D-15, rozbaľovacím
      nastaveniam a `budPrModal` sa vyhýba sám (zoznam FOREIGN). -->
-<script src="js/nx_esc.js?v=0.17.3"></script>
+<script src="js/nx_esc.js?v=0.17.4"></script>
 <!-- ŠT-1b: ZDIELANE 3-stavove nastavenie kontroly hran. TEN ISTY subor nacitava
      aj Inspector (rohovy trojuholnik pri ABS kontrole v raile) — jeden markup,
      jeden stav. Musi byt PRED studio.js (lista sekcie Kontrola ho vola pri
      renderi). ŠT-1c PR B3: okno Vyroba zaniklo — prepinace su TU. -->
-<script src="js/edge_menu.js?v=0.17.3"></script>
+<script src="js/edge_menu.js?v=0.17.4"></script>
 <!-- ŠT-1c PR B2 (D-15): ZDIELANA kostra modalov („pridávačiek"). Musí byť PRED
      studio.js aj budget.js — Escape handler Štúdia sa pýta `NXModal.isOpen()`
      a rozpočet ním otvára svoje pridávačky. Ďalšie inštancie (D-69 editor
      materiálu, položka/set kovania) sa naň napoja bez kopírovania. -->
-<script src="js/nx_modal.js?v=0.17.3"></script>
-<script src="js/studio.js?v=0.17.3"></script>
+<script src="js/nx_modal.js?v=0.17.4"></script>
+<script src="js/studio.js?v=0.17.4"></script>
 <!-- ŠT-1c PR B1: sekcia ROZPOČET (Š12–Š13). MUSÍ byť AŽ ZA studio.js — číta
      jeho globálny payload `ST` a hlavne OBALUJE `NX.setStudio` (uvoľnenie
      frontu zápisov po príchode čerstvej generácie). studio.js pritom NX
      PRIRAĎUJE celý (`window.NX = {…}`), takže v opačnom poradí by obal aj
      `NX.budgetResult`/`NX.priceRefresh` prepísal a rozpočet by po prvom zápise
      zamrzol. Poradie stráži guard test (tests/pure/test_st1c_rozpocet.rb). -->
-<script src="js/budget.js?v=0.17.3"></script>
+<script src="js/budget.js?v=0.17.4"></script>
 <!-- ŠT-2a/2b: sekcia MATERIÁLY. Okno „Materiály projektu" ZANIKLO, takže tento
      súbor beží už len TU; príznak nižšie ostáva ako explicitné prihlásenie sa
      do režimu sekcie (a ako poistka Node testov, ktoré ho nenastavujú).
@@ -1295,14 +1339,14 @@
      handlerov; `demos_add.js` nesie modal „Pridať z Demosu". Oba používajú
      výhradne vlastné prefixy (`mdd*` / `nxda*`), takže v okne so studio.js
      a budget.js nič neprepisujú (stráži guard test). -->
-<script src="js/demos_diff.js?v=0.17.3"></script>
-<script src="js/demos_add.js?v=0.17.3"></script>
+<script src="js/demos_diff.js?v=0.17.4"></script>
+<script src="js/demos_add.js?v=0.17.4"></script>
 <!-- PICKER-1: vyhľadávač materiálov (`nx_combo`) je TEN ISTÝ komponent ako
      v Inspectore — predvoľby projektu v sekcii Materiály ho používajú tiež.
      Musí byť PRED proj_materials.js, ktorý ho pri renderi volá. -->
-<script src="js/nx_combo.js?v=0.17.3"></script>
-<script src="js/proj_materials.js?v=0.17.3"></script>
-<script src="js/md_appearance.js?v=0.17.3"></script>
+<script src="js/nx_combo.js?v=0.17.4"></script>
+<script src="js/proj_materials.js?v=0.17.4"></script>
+<script src="js/md_appearance.js?v=0.17.4"></script>
 <!-- ŠT-3a-1/3a-2: sekcia KOVANIE (Š16). Okno „Katalóg kovania" ZANIKLO, takže
      oba súbory bežia už len TU; príznak nižšie ostáva ako čitateľné prihlásenie
      sa do režimu sekcie (a ako marker poradia skriptov pre guard test).
@@ -1313,35 +1357,35 @@
      projektu" volajú jeho funkcie. Poradie stráži guard test
      (tests/pure/test_st3a_hw.rb). -->
 <script>window.NX_HW_SECTION = true;</script>
-<script src="js/hw_sets.js?v=0.17.3"></script>
-<script src="js/hw_catalog.js?v=0.17.3"></script>
+<script src="js/hw_sets.js?v=0.17.4"></script>
+<script src="js/hw_catalog.js?v=0.17.4"></script>
 <!-- S1-A2: sekcia SPOTREBIČE (`appl`). MUSÍ byť AŽ ZA studio.js — obaľuje jeho
      `NX.setStudio` (rovnaký dôvod ako rozpočet, materiály a kovanie) a lištu/telo
      sekcie kreslí cez `apRenderTools`/`apRenderBody`, ktoré studio.js volá cez
      `typeof`. Prijímače `NX.applTree`/`NX.applCard`/`NX.applResult` pridáva DO
      `window.NX` (studio.js ho priraďuje CELÝ), takže v opačnom poradí by zmizli.
      Poradie stráži guard test (tests/pure/test_s1a2_sekcia.rb). -->
-<script src="js/appliances.js?v=0.17.3"></script>
+<script src="js/appliances.js?v=0.17.4"></script>
 <!-- ŠT-3b-1: sekcia PRAVIDLÁ (Š17). Okno „Pravidlá kovania" ZANIKLO, takže
      tento súbor beží už len TU. MUSÍ byť AŽ ZA studio.js (obaľuje jeho
      `NX.setStudio` — rovnaký dôvod ako rozpočet, materiály a kovanie)
      a lištu/telo sekcie kreslí cez `rulesRenderTools`/`rulesRenderBody`,
      ktoré studio.js volá cez `typeof`. Poradie stráži guard test
      (tests/pure/test_st3b_rules.rb). -->
-<script src="js/rules.js?v=0.17.3"></script>
+<script src="js/rules.js?v=0.17.4"></script>
 <!-- ŠT-3c-1: sekcia Šablóny (Š18). Načítava sa AŽ ZA studio.js — obaľuje
      jeho NX.setStudio, rovnako ako všetky predošlé sekcie. -->
-<script src="js/templates.js?v=0.17.3"></script>
+<script src="js/templates.js?v=0.17.4"></script>
 <!-- ŠT-4a: „O plugine" je JEDEN OBSAH, DVA VSTUPY (kontrakt Š19) — ten istý
      `js/about.js` načítava aj panel.html. Musí byť PRED studio_settings.js,
      ktorý ho volá pri kreslení sekcie `about`. -->
-<script src="js/about.js?v=0.17.3"></script>
+<script src="js/about.js?v=0.17.4"></script>
 <!-- ŠT-4a: sekcie Nastavenia (`sup` · `bset` · `about`, Š19) — obsah
      zaniknutého okna „Nastavenia rozpočtu" (POSLEDNÝ satelit). Načítava sa AŽ
      ZA studio.js: obaľuje jeho NX.setStudio, rovnako ako všetky predošlé sekcie. -->
-<script src="js/studio_settings.js?v=0.17.3"></script>
+<script src="js/studio_settings.js?v=0.17.4"></script>
 <!-- NP-3: sekcia NÁREZOVÝ PLÁN (`cut`, mockup A + B). Načítava sa AŽ ZA
      studio.js — ten volá jej lištu a telo cez `typeof npRenderTools /
      npRenderBody` a ona číta jeho `ST`, `refreshBtnHtml` a `rgbHex`.
      `NX.setStudio` NEOBAĽUJE (nemá rozpísaný formulár ani lazy kanál). -->
-<script src="js/sheet_layout.js?v=0.17.3"></script>
+<script src="js/sheet_layout.js?v=0.17.4"></script>

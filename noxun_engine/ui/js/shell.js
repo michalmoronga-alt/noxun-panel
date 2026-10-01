@@ -381,7 +381,7 @@
       if (!available){
         tip = 'Kontrola kresby — vyžaduje SketchUp 2023 alebo novší';
       } else if (on){
-        tip = 'Kontrola smeru kresby je ZAPNUTÁ';
+        tip = 'Kontrola smeru kresby je zapnutá';
         if (s.parts != null) tip += ' — ' + s.parts + ' ' + grainPartWord(s.parts) + ' s kresbou';
         if (s.skipped) tip += ' · ' + s.skipped + ' bez kresby (materiál bez smeru)';
       } else {
@@ -409,10 +409,10 @@
       if (!available){
         tip = 'Smer otvárania — vyžaduje SketchUp 2023 alebo novší';
       } else if (on){
-        tip = 'Smer otvárania čiel je ZAPNUTÝ';
+        tip = 'Smer otvárania čiel je zapnutý';
         if (s.wings != null) tip += ' — ' + s.wings + ' ' + directionWingWord(s.wings);
         if (s.unknown) tip += ' · ' + s.unknown + ' neurčených';
-        if (s.legacy) tip += ' · ' + s.legacy + ' bez smeru (legacy)';
+        if (s.legacy) tip += ' · ' + s.legacy + ' bez smeru (staršie čelá)';
       } else {
         tip = 'Smer otvárania čiel v modeli (zapnúť/vypnúť)';
       }
@@ -863,7 +863,7 @@
       tip.textContent = 'ABS kontrola hrán — vyžaduje SketchUp 2023 alebo novší';
     } else if (on){
       var miss = (s.counts && s.counts.missing != null) ? s.counts.missing : null;
-      tip.textContent = 'ABS kontrola hrán je ZAPNUTÁ' +
+      tip.textContent = 'ABS kontrola hrán je zapnutá' +
         (miss != null ? ' — ' + miss + ' hrán chýba podľa pravidla' : '');
     } else {
       tip.textContent = 'ABS kontrola hrán — zvýrazní olep v modeli';

@@ -443,7 +443,7 @@ NxTest.test('P0-HF-01: riadok bez ceny je POTVRDITELNY dovod, nie tvrdy blok (ST
   c = NxP0::PC.export_confirmations(budget: NxP0.budget(miss: 3))
   NxTest.assert_equal(1, c.length, c.inspect)
   NxTest.assert(c.first.include?('3 riadkov'), c.first)
-  NxTest.assert(c.first.include?('PODHODNOTENÁ'), c.first)
+  NxTest.assert(c.first.include?('suma je podhodnotená'), c.first) # H4b: bez VEĽKÝCH písmen
 end
 
 NxTest.test('P0-HF-01: zaporna „Nábytková zostava" a nesulad s rozpoctom su TVRDE dovody') do

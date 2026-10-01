@@ -112,7 +112,7 @@ function dir(extra){
   const mixed = P.directionCheckText(dir({ wings: 3, unknown: 2, legacy: 4 }));
   ok(mixed.indexOf('3 krídla') >= 0, 'sklonovanie 2-4');
   ok(mixed.indexOf('2 neurčených') >= 0, 'neurcene sa priznaju');
-  ok(mixed.indexOf('4 bez smeru (legacy)') >= 0, 'legacy cela sa priznaju (nie su to nalezy)');
+  ok(mixed.indexOf('4 bez smeru (staršie čelá)') >= 0, 'legacy cela sa priznaju (nie su to nalezy)');
 
   eq(P.directionWingPluralSk(1), 'krídlo', '1');
   eq(P.directionWingPluralSk(2), 'krídla', '2');
@@ -149,13 +149,13 @@ function dir(extra){
   const on = NXShell.directionRail(dir());
   eq(on.on, true, 'zapnuty stav prisvieti ikonu raily');
   eq(on.available, true, 'dostupnost je zo servera');
-  ok(on.tip.indexOf('ZAPNUTÝ') >= 0, 'bublina povie, ze je prepinac zapnuty');
+  ok(on.tip.indexOf('je zapnutý') >= 0, 'bublina povie, ze je prepinac zapnuty');
   ok(on.tip.indexOf('12 krídel') >= 0, 'a nesie ZIVE cislo zo servera');
 
   const mixed = NXShell.directionRail(dir({ wings: 3, unknown: 2, legacy: 4 }));
   ok(mixed.tip.indexOf('3 krídla') >= 0, 'sklonovanie 2-4 je zhodne so Studiom');
   ok(mixed.tip.indexOf('2 neurčených') >= 0, 'neurcene sa priznaju aj v raile');
-  ok(mixed.tip.indexOf('4 bez smeru (legacy)') >= 0, 'legacy tiez');
+  ok(mixed.tip.indexOf('4 bez smeru (staršie čelá)') >= 0, 'legacy tiez');
 
   const off = NXShell.directionRail(dir({ active: false, wings: null }));
   eq(off.on, false, 'vypnuty stav nesvieti');

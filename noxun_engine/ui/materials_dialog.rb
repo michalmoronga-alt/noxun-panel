@@ -424,7 +424,7 @@ module Noxun
           # dostat aj panel a otvorene okno Studio (rovnako ako bezna mutacia),
           # inak by drzali predrollbackovy SCHEMA 2 obsah.
           after_catalog_change
-          set_status('Katalóg obnovený z predmigračnej zálohy. Pri najbližšom štarte SketchUpu sa migrácia jednorazovo preskočí.')
+          set_status('Katalóg vrátený do stavu pred migráciou. Pri najbližšom štarte SketchUpu sa migrácia jednorazovo preskočí.')
         end
 
         def set_status(msg, error = false)

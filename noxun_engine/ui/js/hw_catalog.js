@@ -506,7 +506,7 @@
   // „keep" nad zivym uzlom netreba.
   function mdhRenderEnums(){
     var line = hwEl('hwline');
-    if (line) line.textContent = 'V' + MDH_VERSION + ' · položiek: ' + Object.keys(MDH_ITEMS).length;
+    if (line) line.textContent = 'v' + MDH_VERSION + ' · položiek: ' + Object.keys(MDH_ITEMS).length;
   }
 
   function mdhApplyItems(data){
@@ -1808,7 +1808,7 @@
         (s.ro ? ' disabled' : '') + ' title="Pridať položku (z Demosu alebo ručne)">' +
         ico('plus') + ' Nová položka</button>' +
         '<div class="searchbox">' + ico('search') +
-        '<input id="hwSearch" type="text" placeholder="Hľadať kód, názov, dodávateľa"' +
+        '<input id="hwSearch" type="text" placeholder="Hľadať…" title="Hľadať kód, názov alebo dodávateľa" aria-label="Hľadať kód, názov alebo dodávateľa"' +
         ' value="' + hwEsc(s.q || '') + '"></div>' +
         '<select id="hwCategory" title="Kategória">' + hwCatOptions(s) + '</select>' +
         '<label class="hwinactive" title="Ukáž aj položky vyradené z ponuky">' +

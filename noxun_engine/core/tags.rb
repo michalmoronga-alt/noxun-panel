@@ -44,7 +44,7 @@ module Noxun
         { 'key' => 'vnutro',  'label' => 'Vnútro' },
         { 'key' => 'kovanie', 'label' => 'Kovanie' },
         { 'key' => 'dosky',   'label' => 'Dosky' },
-        { 'key' => 'zony',    'label' => 'Zóny (ghost)' }
+        { 'key' => 'zony',    'label' => 'Zóny (obrysy)' }
       ].freeze
 
       KEYS = ROWS.map { |r| r['key'] }.freeze

@@ -485,7 +485,7 @@ module Noxun
         def summary_line(rec)
           dims = rec['dims'].is_a?(Hash) ? rec['dims'] : {}
           parts = [summary_dims(rec['category'].to_s, dims)].reject { |s| s.to_s.empty? }
-          parts << (rec['seed'] == true ? 'seed' : 'ručný')
+          parts << (rec['seed'] == true ? 'z pluginu' : 'ručný')
           parts << 'vyradený' if ApplianceCatalog.deleted?(rec)
           parts.join(' · ')
         end

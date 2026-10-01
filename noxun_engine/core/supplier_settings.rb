@@ -351,7 +351,7 @@ module Noxun
       def unreadable_reason
         'Súbor nastavení dodávateľa sa nedá čítať (prístup odmietnutý, súbor drží iný program alebo chyba ' \
           'disku) — zobrazujú sa predvolené hodnoty a počíta s nimi rozpočet aj Kontrola; zápisy sú vypnuté. ' \
-          "Skontroluj súbor #{path} a klikni na Načítať nanovo."
+          "Skontroluj súbor #{path} a klikni na Obnoviť v lište sekcie Nastavenia rozpočtu."
       end
 
       # Verzia suboru na disku (pre vetu brany); chyba citania = „novsia".

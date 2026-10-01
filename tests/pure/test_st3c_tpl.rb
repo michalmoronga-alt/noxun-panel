@@ -207,7 +207,8 @@ end
 
 NxTest.test('ŠT-3c-1 (N32): potvrdenie doskovej hovori, ze sa uz NIKDY nevrati') do
   js = ST3C_TPL_JS[/function tplDeleteNote\(kind\)\{.*?\n  \}/m].to_s
-  NxTest.assert(js.include?('NIKDY'), 'markerovy seed doskove sablony NEDOPLNA')
+  # H4 · D-07: zdoraznenie bez VELKYCH pismen — veta ostava, len malymi.
+  NxTest.assert(js.include?('už nikdy nevráti'), 'markerovy seed doskove sablony NEDOPLNA')
   NxTest.assert(js.include?('neobnovujú'), 'a povie sa to recou pouzivatela')
 end
 
