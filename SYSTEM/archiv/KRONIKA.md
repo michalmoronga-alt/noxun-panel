@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H12a · register typov skrinky + jadro (1.10.2026, PR #?, v0.17.11, blok 9 · HARDENING PO V1, triedenie C-01; package
+- **H12a · register typov skrinky + jadro (1.10.2026, PR #446, v0.17.11, blok 9 · HARDENING PO V1, triedenie C-01; package
   [PACKAGE_H12.md](../zdroje/bloky/HARDENING/PACKAGE_H12.md) — §15 audit návrhu 0 BLOCKER · 6 FIX [AUDIT_H12_raw.md](../zdroje/bloky/HARDENING/AUDIT_H12_raw.md);
   rez H12a → H12b panel Ruby → H12c JS → H12d mená rolí).**
   Typ skrinky sa dodnes rozhodoval ~75 vetvami podľa mena (`== 'upper'`, `when 'dishwasher'`) v 17 súboroch; nový modul `core/cabinet_types.rb`
