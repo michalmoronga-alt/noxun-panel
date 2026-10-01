@@ -367,17 +367,53 @@ NxTest.test('docs: UI_DIZAJN.md nema historicke znacky mimo sekcie Historia') do
 end
 
 # CN-09 bod 5: veta „inventar je uplny" klamala, lebo ikony pribudali bez riadku v §4.
-# Teraz je to kontrola: kazdy kluc spritu icons.js stoji v §4 ako `kluc` (aj s popisom, kde sa kresli).
-NxTest.test('docs: inventar ikon UI_DIZAJN §4 obsahuje kazdy kluc spritu icons.js') do
-  icons = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'icons.js'), encoding: 'UTF-8')
-              .scan(/^    '([a-z0-9-]+)':/).flatten.uniq
-  NxTest.assert(icons.length > 50, "nenasiel som kluce spritu (#{icons.length}) — zmenil sa tvar icons.js?")
-  doc = File.read(File.join(NxTest::ROOT, NX_UI_DIZAJN), encoding: 'UTF-8')
+# Teraz je to kontrola: KAZDY symbol, ktory sprite vygeneruje (`<symbol id="i-…">`), stoji v §4
+# ako `kluc`. Symboly vznikaju dvoma cestami (Codex #440 P2): sluckou nad objektom `LUCIDE`
+# (dynamicke `'<symbol id="i-' + id`) a samostatnymi literalmi (`LOGO` = `<symbol id="i-logo"`).
+# Guard berie obe; dynamicka cesta mimo slucky LUCIDE (druha mapa symbolov) je pad — inak by
+# jej symboly presli bez kontroly.
+def nx_sprite_symbol_ids(src)
+  lucide = src[/var LUCIDE = \{(.*?)\n  \};/m, 1].to_s.scan(/^    '([a-z0-9-]+)':/).flatten
+  literal = src.scan(/<symbol id="i-([a-z0-9-]+)"/).flatten
+  dynamic = src.scan(/'<symbol id="i-' \+/).length
+  [(lucide + literal).uniq, dynamic]
+end
+
+def nx_icon_inventory_missing(ids, doc)
   sec4 = doc[/^## 4\. Ikony.*?(?=^## 5\.)/m].to_s
-  NxTest.assert(!sec4.empty?, 'UI_DIZAJN.md nema sekciu ## 4. Ikony pred ## 5.')
-  missing = icons.reject { |i| sec4.include?("`#{i}`") }
+  return nil if sec4.empty?
+
+  ids.reject { |i| sec4.include?("`#{i}`") }
+end
+
+NxTest.test('docs: inventar ikon UI_DIZAJN §4 obsahuje kazdy symbol spritu icons.js') do
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'icons.js'), encoding: 'UTF-8')
+  ids, dynamic = nx_sprite_symbol_ids(src)
+  NxTest.assert(ids.length > 50, "nenasiel som symboly spritu (#{ids.length}) — zmenil sa tvar icons.js?")
+  NxTest.assert(ids.include?('logo'), 'samostatne generovany symbol `logo` (LOGO) guard nevidi')
+  NxTest.assert_equal(1, dynamic,
+                      'icons.js sklada <symbol id="i-…"> dynamicky inde nez v slucke nad LUCIDE — rozsir nx_sprite_symbol_ids')
+  missing = nx_icon_inventory_missing(ids, File.read(File.join(NxTest::ROOT, NX_UI_DIZAJN), encoding: 'UTF-8'))
+  NxTest.assert(!missing.nil?, 'UI_DIZAJN.md nema sekciu ## 4. Ikony pred ## 5.')
   NxTest.assert(missing.empty?,
                 "Ikony zo spritu bez riadku v inventari UI_DIZAJN §4: #{missing.join(' · ')} — dopln ich s popisom, kde sa kreslia")
+end
+
+# Negativne pripady nad syntetickym spritom: samostatny literal (vzor LOGO) aj kluc LUCIDE
+# musia byt videne a chybajuci riadok v §4 musi byt nahlaseny.
+NxTest.test('docs: guard inventara ikon vidi samostatne symboly a hlasi chybajuci riadok') do
+  src = "  var LUCIDE = {\n    'aa': '<path/>',\n    'bb-c': '<path/>'\n  };\n" \
+        "  var LOGO = '<symbol id=\"i-logo\" viewBox=\"0 0 1 1\">' + '</symbol>';\n" \
+        "  var X = '<symbol id=\"i-extra\">';\n  s += '<symbol id=\"i-' + id + '\">';\n"
+  ids, dynamic = nx_sprite_symbol_ids(src)
+  NxTest.assert_equal(%w[aa bb-c logo extra], ids)
+  NxTest.assert_equal(1, dynamic)
+  doc = "## 4. Ikony\n`aa` · `bb-c` · `extra`\n## 5. Vzory\n`logo`\n"
+  NxTest.assert_equal(['logo'], nx_icon_inventory_missing(ids, doc), 'logo mimo §4 musi chybat')
+  NxTest.assert_equal([], nx_icon_inventory_missing(ids, doc.sub('`extra`', '`extra` · `logo`')))
+  NxTest.assert(nx_icon_inventory_missing(ids, "## 5. Vzory\n").nil?, 'chybajuca §4 musi byt nahlasena')
+  _, dyn2 = nx_sprite_symbol_ids(src + "  t += '<symbol id=\"i-' + k;\n")
+  NxTest.assert_equal(2, dyn2, 'druha dynamicka cesta musi byt zachytena')
 end
 
 # Mapa nesmie zaostat za kodom. Zmienka v proze NESTACI — genericke meno (napr.
