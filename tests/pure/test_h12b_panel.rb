@@ -117,6 +117,26 @@ if NxTest.headless?
     end
   end
 
+  NxTest.test('H12b R2.5: preflight ciel — rozsahy z limits typu (slot 300–1200 / 500–1200, inak 200–3000)') do
+    pan = NxH12b::E::Panel
+    gaps = { 'gap' => 3.0, 'gap_top' => 3.0, 'gap_bottom' => 3.0, 'gap_left' => 3.0, 'gap_right' => 3.0 }
+    fronts = gaps.merge('items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'auto', 'wings' => '1' }])
+    msg = 'Rozmery skrinky sú mimo povoleného rozsahu.'
+    pf = lambda do |t, w, h|
+      res = pan.send(:front_preflight_result, { 'type' => t, 'width' => w, 'height' => h, 'floor_height' => 100.0,
+                                                'dw_front_bottom' => 100.0, 'fronts' => fronts }, nil)
+      Array(res['errors']).map { |e| e['message'] }.include?(msg)
+    end
+    NxTest.assert(pf.call('dishwasher', 1250.0, 820.0), 'slot sirka nad 1200 = mimo rozsahu')
+    NxTest.assert(pf.call('dishwasher', 250.0, 820.0), 'slot sirka pod 300 = mimo rozsahu')
+    NxTest.assert(pf.call('dishwasher', 600.0, 1300.0), 'slot vyska linky nad 1200 = mimo rozsahu')
+    NxTest.refute(pf.call('dishwasher', 600.0, 820.0), 'slot 600 x 820 v rozsahu')
+    %w[lower upper corner_blind tall].each do |t|
+      NxTest.refute(pf.call(t, 1250.0, 1300.0), "#{t}: korpusovy rozsah 200–3000")
+      NxTest.assert(pf.call(t, 3100.0, 720.0), "#{t}: nad 3000 = mimo rozsahu")
+    end
+  end
+
   # --- R2.6 · aditivne kluce payloadu -------------------------------------------
 
   NxTest.test('H12b R2.6: NX.init nesie cabinet_types = client_payload = fixtura; predvolby z DEFAULTS_BY_TYPE') do

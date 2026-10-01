@@ -540,8 +540,8 @@ Testy: `tests/js/test_uic2_zony.js`, `tests/pure/test_uic2_zony.rb`, in-SU `run_
 Handlery `split_zone` · `set_zone_shelves` · `clean_zone` · `set_zone_field` · `select_zone` idú cez spoločný vstup **`zone_ctx`**, ktorý **prísne** overí
 dokument (`model_guid`), skrinku (`cabinet_id`) a **formát celého `zone_id`** (ID zón sa medzi dokumentmi opakujú).
 - **`Panel.zone_path` vracia pri poškodenom ID `nil`, nie koreň** (inak by „Vyčistiť zónu" zmazalo celé vnútro).
-- **Rohová delenie nepozná:** `split_refusal` pri `corner_blind` vráti `Construction::CORNER_ZONES_MSG` (obe osi) ešte pred kontrolou listu; police ostávajú;
-  invariant drží aj `Construction.validate!`.
+- **Rohová delenie nepozná:** `split_refusal` pri type s vnútrom `zones: shelves_only` (register `CabinetTypes`, dnes rohová; H12b) vráti
+  `Construction::CORNER_ZONES_MSG` (obe osi) ešte pred kontrolou listu; police ostávajú; invariant drží aj `Construction.validate!`.
 - **`apply_zone_mod` vetví návratovú hodnotu mutácie:** `false` = strom sa nezmenil ⇒ chybový status a **žiadny rebuild**; úspech sa hlási až po úspešnej
   mutácii. Presnú príčinu skladá `split_refusal` („zóna je už delená…", „strom má najviac 3 úrovne").
 - `handle_set_zone_field` pred zápisom volá `ZoneTree.validate_cuts` so **svetlým priestorom zóny z plánu** (`zone_clear_span` — cesta buildera; zlyhanie plánu =
@@ -986,6 +986,10 @@ projekcie** uloženého configu a plánu — žiadny zápis. Kontrakt vkladacej 
   a modelom in-SU `run_rohb2`) → `parts` `{role, x0, x1, z0, z1, title}` (blenda, výstuha, CR 1, CR 2; výstuha závesov sa nekreslí), `dims`, `fits`/`need`
   (`corner_fit_width`), `door_w` (otvor − okraje z `Fronts.resolve_layout`), `stats` (`count`/`area`). Iný typ aj chyba = `nil`.
 - **`slot_payload`, `cabinet_stats`, `legs_summary`, `appliance_rows`, `preview.appliances[]`** — odseky „Kontext Korpus", „Náhľad" a „Riadok Spotrebič".
+  Od H12b: `slot_payload` len pri type bez korpusu (`!CabinetTypes.carcass?`), druh riadkov spotrebiča = `appliance_owner` typu, `template_config_from` polia
+  rohovej pri `corner?` a komín/zapustenie/lišty pri `carcass?`.
+- **`template_list`** (vkladacia karta, `push_init`, `push_templates`; Štúdio cez `tile_row`) — od H12b každý záznam **korpusovej** šablóny nesie aditívny
+  **`type_word`** (`template_type_word(rec)` = `word` z registra, neznámy/prázdny/chýbajúci typ „dolná"; doska kľúč nemá). JS ho do H12c nečíta.
 - **`front_drawer`** (`front_drawer_payload`, len čelá, ktoré `Recipes.classified?` pozná ako zásuvku; do `front_slots` sa nezlučuje): položka výsuvu
   `source: 'recipe'` → `state: 'ok'` + `text` a `detail` (`Recipes.explain_stored(params, axes:)` z uložených parametrov a pripnutého receptu; nečitateľný recept =
   prázdny zoznam) · `drawer_conflicts` čela → `conflict` s vetou stavby · `config_schema < DRAWER_ACTIVATION_SCHEMA` → `stale` · inak `pending`; `sync` sa viaže na
@@ -1039,8 +1043,10 @@ Doména panela: observery výberu a transakcií, kamera a serverové cesty zmeny
 Doména panela: **všetky pushe Ruby → JS** (`push_init`, `push_selected`, `push_templates`, `push_materials`, `push_part_card`, `push_hardware_sets`, `set_status`)
 + identita dokumentu (`model_guid`) a malé echo kanály prepínačov raily (`push_edge_check`, `push_grain_check`, `push_tags`). Zásada: **echo push nesmie prekresliť
 rozpísaný formulár** — katalógové a stavové zmeny majú vlastné úzke kanály. `push_selected` nesie aj `push_tags(tags_state(model))` (Späť/Znova, prepnutie dokumentu,
-zmena výberu). `push_init` posiela predvoľby typov (`defaults` → JS `DEFAULTS`: `CabinetBuilder::LOWER_DEFAULTS` / `UPPER_DEFAULTS` /
-`DISHWASHER_DEFAULTS` a `corner_insert_defaults(model)` pre rohovú).
+zmena výberu). `push_init` posiela predvoľby typov (`defaults` → JS `DEFAULTS`) cez **`init_defaults(model)`** = `CabinetBuilder::DEFAULTS_BY_TYPE` v poradí
+`IDS` (tie isté objekty ako `*_DEFAULTS`), typ s rohovou zostavou cez `corner_insert_defaults(model)` (+ `corner_th2`) — H12b, JSON bajtovo ako predtým (golden
+`panel.json`). **Od H12b nesie aj `cabinet_types`** = `CabinetTypes.client_payload` (register typov pre klienta, zmluva `tests/fixtures/h12_cabinet_types.json`);
+aditívny kľúč — JS ho do H12c nečíta.
 
 **Deep-link kanály Kontroly** sú dva a len na čítanie: `push_focus_front(front_id)` otvorí kartu čela, `push_focus_hardware(target)` prisvieti riadok v Kovaní
 (adresa `owner_part_key` + `generic_type` + `rule_id` + `orphan`); server si nič nepamätá; zatvorený Inspector ani neúplná adresa nedostanú nič.
@@ -1074,7 +1080,8 @@ vyhlásenie v configu) a `set_appliance_mount` (výška osadenia chladničky —
 **`set_appliance_owner`** — priradenie modelu z riadku „Spotrebič" alebo odpojenie (skrinka, slot umývačky, doska). Súbor **nezapisuje**: deleguje na
 `ApplianceBinding.apply!` (`move` / `unbind`) — jediný transakčný vstup väzby (položka rozpočtu + `appliance_refs[]` vlastníka + prestavba = **jedna operácia, jeden
 krok Späť**). **Cieľ väzby skladá server z výberu, nie z payloadu:** klient posiela `item_id` a echo `cabinet_id` / `board_id`; druh (`cabinet` vs `slot`), ID aj
-`persistent_id` sa čítajú z označenej entity. Dokument overuje `foreign_document?` nahlas, nezhodné echo vráti „Výber sa medzitým zmenil" a obnoví kartu. Po úspechu
+`persistent_id` sa čítajú z označenej entity (druh = vlastnosť typu `appliance_owner` z registra `CabinetTypes` — H12b; tá istá vlastnosť odmieta montáž
+pri slote a určuje druh očakávaní). Dokument overuje `foreign_document?` nahlas, nezhodné echo vráti „Výber sa medzitým zmenil" a obnoví kartu. Po úspechu
 `push_selected`; otvorené Štúdio sa dozvie cez transakčný observer (zožltne „Obnoviť").
 
 **`set_appliance_expects`** = **config-only zápis vo vlastnej operácii, jeden krok Späť, bez prestavby.** Payload: `expects[]` (úplný nový zoznam), echo
@@ -1130,6 +1137,11 @@ ghostu (`handle_ghost_corner_side`) a hromadná prestavba zastaraných chrbtov (
 `rebuild_many` = jedna operácia, výber skriniek až po `ScaleWatch.flush_pending!`). Materiálové preflighty (D-45: telo → chrbát → remap ABS) a zámky vkladacej karty:
 odseky „Kontext Korpus" a „Vkladacia karta". **Poradie guardov: identita dokumentu PRVÁ**, až potom echo `cabinet_id`.
 
+- **Typ cez register `CabinetTypes` (H12b, [construction.md](construction.md), odsek `cabinet_types.rb`):** „slot" = typ bez korpusu (`!carcass?` — preflight:
+  sokel 0, `slot_preflight_opening`, kanonizácia riadku slotu; `slot_params?` bez tela a chrbta; typ zo šablóny sa prevezme), rozsahy preflightu = `limits` typu
+  (inak 200–3000), „rohová" = `corner?` (zdroj preflightu, šablóna, prepínač strany), čelá = `fronts` (`slot_fixed` → `slot_fronts_refusal`, `corner_one_door` →
+  `corner_fronts_refusal`), zmena typu = identita surová a zámok `type_locked` aspoň jedného (`corner_change_refusal`). `TEMPLATE_TYPE_WORDS` je odvodené z `word`
+  (poradie `IDS`). Výsledky bajtovo ako pred H12b (golden `panel.json`, matica H12a).
 - **Kópia** (`handle_insert_copy`) prenáša overenú zdrojovú skrinku samostatným `appearance_source:` do buildera (zachová živé materiály a ABS, vlastná identita
   a definícia); vzhľadový zdroj sa nikdy nepridáva do params/configu ani payloadu. Ruší bežiacu ghost session hneď na začiatku.
 - **Rohová na serveri:** `PARAM_KEYS` pozná `corner_side`/`corner_door_w`/`corner_cr1`/`corner_cr2`; JS posiela dverovú časť a CR len pri rohovej (`only`
@@ -1147,7 +1159,7 @@ odseky „Kontext Korpus" a „Vkladacia karta". **Poradie guardov: identita dok
   orezaná `CabinetBuilder.norm_corner_mm`) a živá šírka. Odpoveď nesie `opening` (cez `opening_json`, zapísaný hneď po výpočte — nesie ho aj odmietnutie), pri
   rohovej **`corner_ctx` `{th2, t}`** (`corner_preflight_ctx`; pri vkladaní hrúbka tak, ako ju upraví vklad) a **`corner_preview`** (len keď je `opening`
   a `corner_ctx`; vstup `corner_preview_params`, živý strop `CORNER_PREVIEW_LIVE_KEYS`). Pri vkladaní berie `corner_preflight_src` stranu a dverovú časť z payloadu.
-  `TEMPLATE_TYPE_WORDS` pozná „rohová".
+  `TEMPLATE_TYPE_WORDS` (z registra) pozná „rohová".
 - **`handle_ghost_corner_side`** (callback `ghost_corner_side`): dokument → živá session rohovej v tomto dokumente → `handle_insert(payload, keep_point: true)`
   (tá istá cesta ako „Vložiť") → keď nová session nevznikla, stará sa zruší. Nič nezapisuje.
 
@@ -1242,8 +1254,10 @@ rady, zmenu zadaj znova." (rozpis sa stratí) · `:stale_client` červené „Ok
 
 Doména panela: šablóny a ručné odfotenie náhľadu (`Panel.capture_preview_for`). Kontrakt: odsek „Vkladacia karta" a [model-a-identita.md](model-a-identita.md)
 (`template_previews.rb`). Žije tu aj **`handle_tag_visible`** — jediný handler viditeľnosti NOXUN tagov pre oba ovládače (okno tagov v raile, checkbox ghost zón).
-- **Typ šablóny rohovej a slotu je zamknutý:** `apply_template_type!` pri `corner_blind` aj `dishwasher` vráti skôr; `template_config_from` (payloads) zapisuje pri
-  rohovej výslovne všetky štyri polia rohovej.
+- **Typ šablóny rohovej a slotu je zamknutý:** `apply_template_type!` pri type `template_type: locked` (register `CabinetTypes` — slot aj rohová) vráti skôr;
+  prepnúť sa dá len medzi `TEMPLATE_SWITCH_TYPES` (= `ids_where(:template_type, 'switchable')`, dolná a horná), veta „Uložená ako …" z `word.upcase`
+  (`TEMPLATE_TYPE_LABELS`); chýbajúci typ = `FALLBACK`, `''` ostáva (H12b, matica H12a golden). Druh vlastníka očakávaní (`apply_template_expects!`) =
+  `appliance_owner` typu. `template_config_from` (payloads) zapisuje pri rohovej výslovne všetky štyri polia rohovej.
 - **Mini-modal uloženia** (`#tplModal`): checkbox „Uložiť aj kovanie (sety a ručné položky)" — default zapnutý, pamäť `localStorage['noxun.tpl.with_hardware']`;
   `saveTemplateAs` posiela boolean `with_hardware` (chýbajúci = zapnuté), `handle_save_template_as` ho po guardoch posunie do `template_config_from`
   a `template_save_hardware_note`. Vypnuté = bez setov, definícií a ručných položiek; poškodený zdroj pri zapnutej voľbe = konštrukcia bez kovania s jasnou hláškou.
@@ -1911,6 +1925,11 @@ v `scale_observer` (sekciu obslúži plný push Štúdia; `rules_payload` dostan
   `rules_problems` → **`global_precheck`** (pri „aj ako globálnu" alebo projekte, ktorý preberá globál; konflikt = nič sa nezapíše, žiadna operácia, žiadne echo,
   `RD.setGlobalRev`) → prestavba → globál cez `HardwareRules.save_library!` vyhodnotený `case`-om (H-RACE). `push_global` pošle `RD.setRules` + `RD.setGlobalRev`
   v jednom skripte (`global_rev_script`, guard na starý DOM). Okno nevolá `HardwareRules.write(` (guard test). Detail: [hardware.md](hardware.md).
+- **Veta rozsahu pravidla viazaného na typ skrinky (H12b, R2.6):** `rules_payload` nesie aditívny kľúč **`type_scope`** = `{ rule_id => veta }` (`type_scope_map`)
+  — „na hornú skrinku" / „na spodnú skrinku", keď filter `applies_to.cabinet_type` pravidla s rolou `cabinet` obsahuje **práve jeden** z typov
+  `TYPE_SCOPE_PHRASES` (zrkadlo dnešného `rdRoleDesc` v `rules.js`; inak kľúč pravidlo nemá a klient pokračuje ďalšími filtrami). Vety sú akuzatív so slovom
+  „spodnú" (terminológia F3), preto nie sú v registri typov. `rules.js` kľúč do H12c nečíta; `push_global` (Načítať globálne) ho neposiela — pravidlo z globálu,
+  ktoré projekt nemá, dostane vetu až s ďalším plným pushom.
 - **`ui/js/rules.js`** je prefixovaný `rd*`/`RD_*` (globály `el`/`esc` by kolidovali so `studio.js`); prijímače `RD.init`/`RD.setRules`/`RD.setStatus` si mená ponechali.
 
 Plné znenie: archív, „rules_dialog.rb".
@@ -1925,8 +1944,8 @@ tpl_capture · tpl_rename · tpl_preview`). **JS:** `ui/js/templates.js` (`TPL.i
 `TPL.init`, ktoré kreslí len pri `studioActiveSection() === 'tpl'`, vlastného PNG kanála a refreshu `apply` = plný push `bump: true` vs. zmena knižnice = echo
 `push_library_echo` bez zdvihu): [model-a-identita.md](model-a-identita.md), odseky `templates.rb` a `template_previews.rb`.
 
-- Dlaždica nesie odvodené kľúče zo servera (`tile_row`): `{name, preview_rev, config, hardware, appliance_expects, construction, vent_note}` — poradie stráži
-  `test_st3c_tpl.rb`; `TILE_CONFIG_KEYS` je orezaný (typ a tri rozmery). `templates.js` kreslí pri názve ikonu `wrench` s `aria-label` a súhrnom v `title` (aj
+- Dlaždica nesie odvodené kľúče zo servera (`tile_row`): `{name, preview_rev, config, hardware, appliance_expects, construction, vent_note}` + pri korpusovej
+  šablóne **`type_word`** (slovo typu zo servera, H12b; doska kľúč nemá; `templates.js` ho do H12c nečíta) — poradie stráži `test_st3c_tpl.rb`; `TILE_CONFIG_KEYS` je orezaný (typ a tri rozmery). `templates.js` kreslí pri názve ikonu `wrench` s `aria-label` a súhrnom v `title` (aj
   upozornenie na neprenosné zámky), riadok konštrukcie `.stplmeta.stplkon` len pri neprázdnom súhrne a vetu o vetraní do `title`. Nič z toho sa do
   `templates.json` nezapisuje. Popisky kategórií spotrebičov skladá server.
 - Vstupy: menu „Šablóny" → `StudioDialog.show(open_section: 'tpl')`, správa šablón vo vkladacej karte → `openStudio('tpl')`.
@@ -1940,10 +1959,14 @@ guard (`KINDS = cabinet | board`); apply a odfotenie len pre `cabinet`.
 - **`handle_apply` odmietne šablónu z novšej verzie:** kontroluje sa **RAW config uloženého záznamu** (`CabinetBuilder.newer_config?`) pred merge aj `rebuild_many`;
   hláška z jediného zdroja `CabinetBuilder.newer_config_message`. Tú istú kontrolu má vklad zo šablóny (`Panel.newer_template_refusal`) a „Vložiť kópiu" / „Uložiť ako
   šablónu". Detail: [construction.md](construction.md), odsek `cabinet_builder.rb`.
-- **Šablóna na rohovú skrinku:** `corner_template_apply_refusal(cab_cfg, tpl_cfg)` (čistá) odmietne šablónu inej strany aj šablónu s porušeným invariantom čiel;
-  `merge_template` — chýbajúci kľúč rohovej v šablóne = zachovaj hodnotu cieľa.
+- **Typový guard použitia šablóny (H12b, audit H12 A2):** čistá `template_type_refusal(cab_cfg, tpl_cfg)` porovnáva **identitu** (`template_type_id`: chýbajúci
+  typ = `CabinetTypes::FALLBACK`, `''` aj neznámy typ ostávajú surové — šablóna s `type: ''` sa na dolnú nepoužije a naopak, ako vždy); slovo typu vo vete je
+  oddelená **normalizácia** (`CabinetTypes.prop … :word`, neznámy aj prázdny = „dolná"). **Nie** `id_or_default` (to by `''` zlialo s dolnou). Obojsmerná
+  matica: `test_h12b_panel.rb` + golden `panel.json`.
+- **Šablóna na rohovú skrinku:** `corner_template_apply_refusal(cab_cfg, tpl_cfg)` (čistá, `CabinetTypes.corner?` oboch) odmietne šablónu inej strany aj šablónu
+  s porušeným invariantom čiel; `merge_template` — chýbajúci kľúč rohovej v šablóne = zachovaj hodnotu cieľa.
 - **`tile_row`** skladá odvodené kľúče dlaždice z tých istých funkcií ako Inspector (`TemplateStore.hardware_tile_summary`, `construction_summary` z účinných hodnôt,
-  `ventilation_note`); celé definície setov do Štúdia nechodia.
+  `ventilation_note`, slovo typu `Panel.template_type_word` — H12b); celé definície setov do Štúdia nechodia.
 - Odfotenie: `tpl_capture` → `TemplatesDialog.handle_capture` → `Panel.capture_preview_for(kind, name)` (z práve jednej označenej skrinky, dáta šablóny sa nemenia).
 
 Plné znenie: archív, „templates_dialog.rb".
