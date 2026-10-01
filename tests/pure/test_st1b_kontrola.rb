@@ -24,6 +24,7 @@ require_relative '../helper' unless defined?(NxTest)
 # Headless: ui/*.rb nie su v require zozname helpera (UI vrstva).
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core') if NxTest.headless?
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog') if NxTest.headless?
+require_relative 'test_h14a_register' unless defined?(NxH14Reg)
 
 S1B_STUDIO_RB = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog.rb'),
                           encoding: 'UTF-8')
@@ -43,14 +44,15 @@ S1B_STUDIO_HTML = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studi
 
 NxTest.test('ŠT-1b: sekcia `ctrl` je v RUBY whiteliste a JS je jeho ZRKADLO') do
   rb = Noxun::Engine::StudioDialog::SECTIONS
-  js = S1B_STUDIO_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
-  shell = S1B_SHELL_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
+  # H14a: JS strana = register `js/studio_sections.js` (kontrakt vo fixture,
+  # zhodu overuje tests/js/test_h14a_register.js); studio.js aj shell.js z neho citaju.
+  js = NxH14Reg.ids
   # ŠT-1c PR A pribudla sekcia `buy` (Nakup kovania), PR B1 sekcia `budget`
   # (Rozpocet) — zoznam musi sediet vo VSETKYCH TROCH suboroch.
   NxTest.assert_equal(%w[bom ctrl buy budget offer cut mat hw appl rules tpl sup bset about], rb,
                       'v Studiu ziju sekcie Kusovník, Kontrola, Nákup, Rozpočet, Ponuka, Materiály, Kovanie, Pravidlá a Šablóny')
   NxTest.assert_equal(rb, js, 'zoznam v studio.js sa nesmie rozist s Ruby autoritou')
-  NxTest.assert_equal(rb, shell, 'ani zrkadlo v paneli (shell.js)')
+  NxTest.assert_equal([], NxH14Reg.mirror_problems, 'ani zrkadlo v paneli (shell.js) — oba citaju register')
 end
 
 NxTest.test('ŠT-1b: tab `control` okna Vyroba (a s ŠT-1c cele okno) je PREC') do

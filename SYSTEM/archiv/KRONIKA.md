@@ -17,6 +17,24 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H14a · register sekcií Štúdia a zoznamy z registra (1.10.2026, PR #450, v0.17.14, blok 9 · HARDENING PO V1, triedenie C-02 časť 1 — CX-05;
+  package [PACKAGE_H14.md](../zdroje/bloky/HARDENING/PACKAGE_H14.md) + audit [AUDIT_H14_raw.md](../zdroje/bloky/HARDENING/AUDIT_H14_raw.md), §15 A2 A4 A5).**
+  Sekcia Štúdia sa prihlasovala na 13 miestach v 4 súboroch (zoznam 3×, `NAV`, `SEC_META`, `REFRESH_STATUS`, `SS_SECTIONS`, dve cesty prechodu, kotvy).
+  Nový modul `ui/js/studio_sections.js` (`NXStudioSections`: `ids` · `has` · `get` · `groups` · `inModule` · `fn` · `REFRESH_DEFAULT`, riadky zmrazené)
+  je jediný zoznam na klientovi; Ruby `StudioDialog::SECTIONS` ostáva serverovým whitelistom (D1) a paritu (aj poradie) stráži **nezávislá fixtúra**
+  `tests/fixtures/h14_studio_sections.json` vytvorená zo starého kódu v 1. commite. Zanikli `STUDIO_SECTIONS` (studio.js aj shell.js), `NAV`, `SEC_META`,
+  `REFRESH_STATUS`, `SS_SECTIONS`; badge Kontroly je `ctrl` (číta `ST.counts` ako predtým `true`). Tag registra v `studio.html` pred `studio.js`,
+  v `panel.html` pred `shell.js`. **T0 golden v 1. commite pred zásahom** (`h14_harness.js`: vm v poradí HTML, počítadlo zápisov `innerHTML`, zachytené
+  listenery, záznamový `localStorage` a `sketchup`, špehy 24 háčikov + 3 kotiev so stavom v okamihu volania): G1–G10 (navigácia, dispatch, prechody
+  14×14 oboma cestami + dokumentová matica, kotvy, hláška „Obnoviť", filter Inspectora, Nastavenia, návrat do rozpracovanej sekcie, pamäť počítača,
+  klik na navigáciu) + T0b (`push_state` headless: poradie kľúčov a bajty bez `version`/`gen`) — **fixtúry sa po zásahu nezmenili**. Nové
+  `test_h14a_register.js` (register = fixtúra, API, `fn` v čase volania, R1.5) a `test_h14a_register.rb` (R4.1–R4.4, guardy R5 a/b/e; `NxH14Reg`).
+  **T4:** 21 sád čítalo zoznamy textom zdroja → register/fixtúra (zrkadlá → `NxH14Reg.ids` + `mirror_problems`, položky `NAV` → riadok kontraktu,
+  `SEC_META` → `head`, `REFRESH_STATUS` → `refresh`); 8 `vm` sád dostalo register do zoznamu súborov. **Mutácie (21, všetky zhodené):** M1–M12, M14–M17,
+  M20–M23; M13, M18, M19 patria H14b. Mapa [rozsirovacie-body.md](../../docs/architecture/rozsirovacie-body.md) §4 prepísaná na register
+  (H13 guard `NX_H13_REQUIRED`: `SEC_META` → `NXStudioSections`). STAV pred dávkou: v0.17.13, H12c hotová, ďalší krok H12d/H11a/H6/H7, potom H14–H17.
+  Testy: **5157 headless · 155 JS sád** zelené + encoding guard; in-SU netreba (Ruby len komentár a verzia).
+
 - **H13 · mapa rozširovacích bodov + jedna tabuľka verzií dát (1.10.2026, PR #449, dokumentácia + guard testy, plugin bez zmeny, blok 9 · HARDENING PO V1,
   triedenie B-06 · B-07; krížový audit CN-02, CN-03, CN-04; brief [BRIEF_H13.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H13.md)).**
   Zoznam miest pre nový typ skrinky žil len v archíve rohovej (s číslami riadkov k v0.14.0) a v package H12, čísla schém v piatich dokumentoch.

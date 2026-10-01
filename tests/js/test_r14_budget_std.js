@@ -53,7 +53,7 @@ sandbox.window = sandbox;
 vm.createContext(sandbox);
 
 // PORADIE JE SUCASTOU KONTRAKTU — presne tak, ako ich nacitava studio.html.
-['studio.js', 'budget.js'].forEach(function(f){
+['studio_sections.js', 'studio.js', 'budget.js'].forEach(function(f){
   vm.runInContext(fs.readFileSync(path.join(JS_DIR, f), 'utf8'), sandbox, { filename: f });
 });
 

@@ -334,23 +334,17 @@
     // su sekciami Studia, takze jediny deep-link je ten nizsie — na SEKCIU.
 
     // ===== ST-1a: deep-link do okna STUDIO ==================================
-    // Sekcie Studia. Zoznam je ZRKADLO `StudioDialog::SECTIONS` — autoritou je
-    // RUBY, tento mirror len zabrani, aby z panela vyletela hodnota, ktora
-    // sekciu nepomenuva. ST-1a priniesla Kusovnik, ŠT-1b Kontrolu, ŠT-1c PR A
-    // Nakup kovania (`buy`), ŠT-1c PR B1 Rozpocet (`budget`), ŠT-1c PR B2
-    // Cenovu ponuku (`offer`).
-    // ŠT-2a: + `mat` (Materialy su ziva sekcia Studia; okno zanikne v ŠT-2b).
-    // ŠT-3a-1: + `hw` (Kovanie je živá sekcia; okno Katalóg kovania zanikne
-    // v ŠT-3a-2).
-    // ŠT-4a: + `sup`/`bset`/`about` (Nastavenia) — posledné premostenia sa
-    // stali sekciami a satelit zanikol.
-    // S1-A2: + `appl` (Spotrebiče — katalóg modelov tohto počítača).
-    // NP-3: + `cut` (Nárezový plán — posledná neaktívna položka ožila).
-    var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget', 'offer', 'cut', 'mat', 'hw', 'appl', 'rules', 'tpl',
-                           'sup', 'bset', 'about'];
+    // Sekcie Studia pozna register `js/studio_sections.js` (H14a; nacitava sa
+    // v panel.html PRED tymto suborom) — autoritou whitelistu je RUBY
+    // (`StudioDialog::SECTIONS`), register len zabrani, aby z panela vyletela
+    // hodnota, ktora sekciu nepomenuva. Je staticky, takze filter funguje hned
+    // (necaka na `NX.init`). Vlastny zoznam sekcii tu nie je.
+    var SECREG = (typeof module !== 'undefined' && module.exports)
+      ? require('./studio_sections.js')                                 // Node testy
+      : (typeof window !== 'undefined' ? window.NXStudioSections : null);
     function studioSection(s){
       var v = String(s == null ? '' : s);
-      return STUDIO_SECTIONS.indexOf(v) >= 0 ? v : null;
+      return SECREG.has(v) ? v : null;
     }
     // `anchor` predvyplni hladanie sekcie (N13 posiela ID skrinky). Bez sekcie
     // kotva nema kam sadnut, preto ide von LEN spolu s nou.
@@ -424,7 +418,6 @@
       warnRows: warnRows,
       studioSection: studioSection,
       studioOpenLink: studioOpenLink,
-      STUDIO_SECTIONS: STUDIO_SECTIONS,
       CONTEXTS: CONTEXTS,
       state: state,
       normCtx: normCtx,

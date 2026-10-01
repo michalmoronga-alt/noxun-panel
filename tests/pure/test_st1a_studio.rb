@@ -20,6 +20,7 @@ require_relative '../helper' unless defined?(NxTest)
 # tu ziadne SketchUp API nie je — vsetko je vnutri metod.
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core') if NxTest.headless?
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog') if NxTest.headless?
+require_relative 'test_h14a_register' unless defined?(NxH14Reg)
 
 ST1B_STUDIO_RB = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog.rb'),
                            encoding: 'UTF-8')
@@ -40,7 +41,10 @@ ST1B_STUDIO_HTML = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'stud
 
 NxTest.test('ST-1a: SECTIONS je whitelist v RUBY a JS je jeho ZRKADLO') do
   rb = ST1B_STUDIO_RB[/SECTIONS = %w\[([a-z ]+)\]/, 1].to_s.split
-  js = ST1B_STUDIO_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
+  # H14a: JS strana je register `js/studio_sections.js`; jeho zhodu s fixturou
+  # kontraktu overuje tests/js/test_h14a_register.js (bez regexu nad zdrojom).
+  js = NxH14Reg.ids
+  NxTest.refute(ST1B_STUDIO_JS.include?('var STUDIO_SECTIONS'), 'studio.js uz nedrzi vlastne zrkadlo zoznamu')
   # ŠT-1b pridala sekciu Kontrola (`ctrl`) — dovtedy premostenie do okna Vyroba.
   # ŠT-1c PR A pridala Nakup kovania (`buy`) — presun tabu Kovanie 1:1 (Š7).
   # ŠT-1c PR B1 pridala Rozpocet (`budget`) — POSLEDNY tab okna Vyroba.
@@ -945,8 +949,9 @@ NxTest.test('SMOKE 22.8. (1A–1D): LISTA Kusovnika a rohove nastavenie VEPO —
   NxTest.assert(ctrl.include?('refreshBtnHtml(staleFlag,'), 'lista Kontroly ma „Obnoviť"')
   NxTest.assert(ctrl.include?('Prepočítať kontrolu z aktuálneho modelu'),
                 'a tooltip hovori o KONTROLE')
-  NxTest.assert(ST1B_STUDIO_JS.include?("ctrl: 'Prepočítavam kontrolu…'"),
-                'aj priebezna hlaska je per sekciu')
+  # H14a: hlaska je v riadku registra (`refresh`), studio.js ju cita pri kliku.
+  NxTest.assert_equal('Prepočítavam kontrolu…', NxH14Reg.row('ctrl')['refresh'],
+                      'aj priebezna hlaska je per sekciu')
   NxTest.assert_equal(1, ST1B_STUDIO_JS.scan(/t\.closest\('#refreshBtn'\)/).length,
                       'vsetky sekcie idu JEDNYM handlerom (ziadna druha serverova cesta)')
   NxTest.assert(mockup.include?('Kontrola prepočítaná z modelu'), 'mockup Kontroly to drzi tiez')
@@ -990,7 +995,8 @@ NxTest.test('SMOKE 22.8.: „Obnoviť" hlasku VZDY zhodi — nikdy vecne „Prep
   # Klient si pred volanim nastavi „Prepočítavam…" (per sekciu) a sam o vysledku
   # nema ako vediet — prepocet bezi na SERVERI. Kym hlasku nikto nezhadzoval,
   # visela v okne aj po dobehnutom prepocte a vyzeralo to ako zamrznute okno.
-  NxTest.assert(ST1B_STUDIO_JS.include?("var REFRESH_STATUS = {"),
+  # H14a: hlaska per sekciu je `refresh` riadku registra, inak REFRESH_DEFAULT.
+  NxTest.assert(ST1B_STUDIO_JS.include?('NX.setStatus((r && r.refresh) || SECREG.REFRESH_DEFAULT, false);'),
                 'klient hlasku „Prepočítavam…" naozaj nastavuje (per sekciu)')
   NxTest.assert(ST1B_STUDIO_RB.include?("cb(dlg, 'refresh_bom')  { |_p| do_refresh_bom }"),
                 'callback uz nevola holy push_state — ma vlastnu cestu s hlaskou')
@@ -1053,20 +1059,21 @@ NxTest.test('ŠT-4a: PREMOSTENIA ZANIKLI CELE — niet uz kam premostovat') do
   # PRECO zaniklo), takze sa hlada FUNKCIA a jej export, nie retazec.
   NxTest.refute(ST1B_STUDIO_JS.include?('function navBridgeIds('), 'aj jeho zrkadlo `navBridgeIds`')
   NxTest.refute(ST1B_STUDIO_JS.include?('navBridgeIds:'), 'a jeho export do testov')
-  nav = ST1B_STUDIO_JS[/var NAV = \[.*?\n  \];/m].to_s
-  NxTest.refute(nav.include?('bridge:'),
+  # H14a: polozky navigacie = riadky registra (kontrakt vo fixture).
+  NxTest.refute(NxH14Reg.rows.any? { |r| r.key?('bridge') },
                 'ZIADNA polozka navigacie uz nie je premostenie — kazda je sekcia (alebo ma dovod)')
   NxTest.refute(ST1B_STUDIO_JS.include?('nbridge'),
                 'a zmizla aj sipka ↗, ktora premostenie oznacovala')
 end
 
 NxTest.test('NP-3: v navigacii Studia nie je ZIADNA neaktivna polozka (Narezovy plan ozil)') do
-  nav = ST1B_STUDIO_JS[/var NAV = \[.*?\n  \];/m].to_s
-  NxTest.assert(!nav.empty?, 'navigacia sa nasla')
-  NxTest.assert_equal(0, nav.scan(/disabled:/).length,
+  # H14a: navigacia = riadky registra (kontrakt vo fixture).
+  rows = NxH14Reg.rows
+  NxTest.assert(!rows.empty?, 'navigacia sa nasla')
+  NxTest.assert_equal(0, rows.count { |r| r.key?('disabled') },
                       'posledna neaktivna polozka (Nárezový plán, „fáza 2") ozila v NP-3')
-  NxTest.refute(nav.include?('fáza 2'), 'dovod „fáza 2" z navigacie zmizol')
-  NxTest.assert(nav.include?("id: 'cut'"), 'polozka ostava s id `cut` (Codex C13)')
+  NxTest.refute(rows.any? { |r| r.values.join(' ').include?('fáza 2') }, 'dovod „fáza 2" z navigacie zmizol')
+  NxTest.assert(NxH14Reg.ids.include?('cut'), 'polozka ostava s id `cut` (Codex C13)')
 end
 
 # --- 6) okno Vyroba ZANIKLO --------------------------------------------------

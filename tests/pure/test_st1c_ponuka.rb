@@ -17,6 +17,7 @@
 #      po nom tenky preklik) a jej export sa presunul do listy sekcie `offer`.
 #   5. Poradie skriptov: `nx_modal.js` PRED `studio.js` aj `budget.js`.
 require_relative '../helper' unless defined?(NxTest)
+require_relative 'test_h14a_register' unless defined?(NxH14Reg) # H14a: kontrakt sekcii Studia
 
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core') if NxTest.headless?
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog') if NxTest.headless?
@@ -42,25 +43,27 @@ S1C2_PANEL_CSS = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'css', 
 
 NxTest.test('ŠT-1c B2: `offer` je SEKCIA Studia — zrkadla whitelistu sedia vo VSETKYCH TROCH') do
   rb = Noxun::Engine::StudioDialog::SECTIONS
-  js = S1C2_STUDIO_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
-  shell = S1C2_SHELL_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
+  # H14a: JS strana = register `js/studio_sections.js` (kontrakt vo fixture,
+  # zhodu overuje tests/js/test_h14a_register.js); studio.js aj shell.js z neho citaju.
+  js = NxH14Reg.ids
   NxTest.assert_equal(%w[bom ctrl buy budget offer cut mat hw appl rules tpl sup bset about], rb, 'Ruby je autorita zoznamu')
   NxTest.assert_equal(rb, js, 'studio.js je jeho zrkadlo')
-  NxTest.assert_equal(rb, shell, 'a shell.js (panel) tiez')
+  NxTest.assert_equal([], NxH14Reg.mirror_problems, 'a shell.js (panel) tiez — oba citaju register')
 end
 
 NxTest.test('ŠT-1c B2: navigacia vedie na ZIVU sekciu — klientsky `goto` zanikol') do
-  nav = S1C2_STUDIO_JS[/var NAV = \[.*?\n  \];/m].to_s
-  NxTest.refute(nav.empty?, 'navigacia sa nasla')
-  NxTest.assert(nav.include?("{ id: 'offer',  ic: 'file-text',       t: 'Cenová ponuka' }"),
+  # H14a: polozky navigacie = riadky registra (kontrakt vo fixture).
+  offer = NxH14Reg.row('offer')
+  NxTest.refute(offer.nil?, 'navigacia sa nasla')
+  NxTest.assert(offer['ic'] == 'file-text' && offer['t'] == 'Cenová ponuka' && !offer.key?('bridge'),
                 'polozka je ZIVA sekcia (ziadny `goto`, ziadne premostenie)')
-  NxTest.refute(nav.include?('goto:'), 'preklik do CASTI inej sekcie uz v navigacii nie je')
+  NxTest.refute(NxH14Reg.rows.any? { |r| r.key?('goto') }, 'preklik do CASTI inej sekcie uz v navigacii nie je')
   NxTest.refute(S1C2_STUDIO_JS.include?('it.goto'),
                 'a ani jeho vetva v `onNav` (mrtvy kod by prezil davku)')
-  NxTest.assert(S1C2_STUDIO_JS.include?("offer: { t: 'Cenová ponuka',"),
+  NxTest.assert(offer['head'].to_s.start_with?('zákaznícky pohľad'),
                 'sekcia ma vlastnu hlavicku a hint')
-  NxTest.assert(S1C2_STUDIO_JS.include?("offer: 'Prepočítavam cenovú ponuku…'"),
-                'a vlastny text pri Obnovit (inak by hlasila kusovnik)')
+  NxTest.assert_equal('Prepočítavam cenovú ponuku…', offer['refresh'],
+                      'a vlastny text pri Obnovit (inak by hlasila kusovnik) — `refresh` v registri')
 end
 
 # --- 2) presun, nie kopia ----------------------------------------------------

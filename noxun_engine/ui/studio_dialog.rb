@@ -39,9 +39,11 @@ module Noxun
       # ZAVAZNY whitelist sekcii Studia. ŠT-1a priniesla Kusovnik, ŠT-1b
       # KONTROLU (`ctrl`), ŠT-1c PR A NAKUP KOVANIA (`buy`), ŠT-1c PR B1
       # ROZPOCET (`budget`), PR B2 CENOVU PONUKU (`offer`) a ŠT-2a MATERIALY
-      # (`mat` — prva ziva polozka skupiny KATALOGY). JS zrkadla
-      # (`studio.js`, `NXShell.STUDIO_SECTIONS`) su pohodlie, nie ochrana
-      # (zhodu strazi guard test): autoritou je VZDY Ruby.
+      # (`mat` — prva ziva polozka skupiny KATALOGY). Autoritou whitelistu je
+      # VZDY Ruby. Prezentaciu sekcie (skupina, ikona, nazov, napovedy, hlaska
+      # „Obnoviť") drzi JS register `ui/js/studio_sections.js` v TOM ISTOM
+      # poradi (H14a) — paritu (aj poradie) strazi nezavisla fixtura
+      # `tests/fixtures/h14_studio_sections.json`, nie regex nad zdrojom.
       # ŠT-3a-1 pridala KOVANIE (`hw` — druha ziva polozka skupiny KATALOGY).
       # ŠT-3b-1 pridala PRAVIDLÁ (`rules` — tretia ziva polozka skupiny KATALOGY).
       # ŠT-3c-1 pridala ŠABLÓNY (`tpl`), ŠT-4a NASTAVENIA (`sup` · `bset` ·
@@ -72,7 +74,7 @@ module Noxun
       # (od NP-3 aj Narezovy plan — neaktivna polozka uz neexistuje).
       # Predtym postupne zanikli: `mat` (ŠT-2a/2b) · `hw` (ŠT-3a) · `rules`
       # (ŠT-3b-1) · `tpl` (ŠT-3c-1) · `PRODUCTION_BRIDGES` (ŠT-1c PR B3).
-      # Klientska strana (`bridge:` v NAV, `bridgeTo`, `.nbridge`, callback
+      # Klientska strana (`bridge:` v polozke navigacie, `bridgeTo`, `.nbridge`, callback
       # `studio_bridge`) zanikla V TEJ ISTEJ davke — most bez oboch koncov by
       # bol mrtvy kod, ktory prezije prve „to sa este zide".
 

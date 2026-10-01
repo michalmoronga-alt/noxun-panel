@@ -156,7 +156,7 @@ end
 # pasca zavesov a skutocne miesta vykreslenia sekcie Studia (review #449).
 NX_H13_REQUIRED = {
   '## 1 · Nový typ skrinky' => %w[zavesenie-hornej-skrinky CabinetTypes::REGISTRY NX_H13_HANG_EXCEPTIONS],
-  '## 4 · Nová sekcia Štúdia' => %w[StudioDialog::SECTIONS SEC_META renderHead renderTools renderBody ssRenderBody]
+  '## 4 · Nová sekcia Štúdia' => %w[StudioDialog::SECTIONS NXStudioSections renderHead renderTools renderBody ssRenderBody]
 }.freeze
 
 def nx_h13_required_missing(rows)
@@ -236,7 +236,7 @@ NxTest.test('H13 B-06: Modul::CLEN plati len v rozsahu modulu; hole meno v subor
   NxTest.assert_equal([], nx_h13_map_problems(nx_h13_map_rows(doc + ['| `x/t.rb` | `TemplateStore::STD` · `TemplateUsage` | a |']), reader))
   NxTest.refute(nx_h13_map_problems(nx_h13_map_rows(doc + ['| `x/g.rb` | `TemplateStore::STD` | a |']), reader).empty?)
   NxTest.refute(nx_h13_map_problems(nx_h13_map_rows(doc + ['| `x/t.rb` | `STD` | a |']), reader).empty?, 'hole STD v subore s 2 modulmi preslo')
-  rows = [['## 4 · Nová sekcia Štúdia', 'x', %w[StudioDialog::SECTIONS SEC_META renderHead renderTools ssRenderBody]]]
+  rows = [['## 4 · Nová sekcia Štúdia', 'x', %w[StudioDialog::SECTIONS NXStudioSections renderHead renderTools ssRenderBody]]]
   NxTest.assert(nx_h13_required_missing(rows).include?('## 4 · Nová sekcia Štúdia: chyba `renderBody`'), 'chybajuci renderBody presiel')
 end
 

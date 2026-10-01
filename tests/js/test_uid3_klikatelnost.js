@@ -97,8 +97,12 @@ eq(typeof NXShell.studioLink, 'undefined', 'aj skladanie payloadu deep-linku na 
 
 // --- 3) ST-1a: deep-link do okna STUDIO -------------------------------------
 
-eq(NXShell.STUDIO_SECTIONS, ['bom', 'ctrl', 'buy', 'budget', 'offer', 'cut', 'mat', 'hw', 'appl', 'rules', 'tpl', 'sup', 'bset', 'about'],
-   'zoznam sekcii je ZRKADLO StudioDialog::SECTIONS');
+// H14a: vlastne zrkadlo zoznamu v shell.js zaniklo — filter cita register
+// `studio_sections.js` (jeho zhodu so StudioDialog::SECTIONS strazi fixtura h14).
+eq(typeof NXShell.STUDIO_SECTIONS, 'undefined', 'zrkadlo zoznamu sekcii v shell.js zaniklo (register)');
+const SECTIONS_14 = ['bom', 'ctrl', 'buy', 'budget', 'offer', 'cut', 'mat', 'hw', 'appl', 'rules', 'tpl', 'sup', 'bset', 'about'];
+eq(SECTIONS_14.map(NXShell.studioSection), SECTIONS_14,
+   'filter pusti presne sekcie StudioDialog::SECTIONS (vsetkych 14)');
 eq(NXShell.studioSection('bom'), 'bom', 'platna sekcia prejde');
 eq(NXShell.studioSection('ctrl'), 'ctrl', 'ŠT-1b: Kontrola je ZIVA sekcia Studia (uz nie premostenie)');
 eq(NXShell.studioSection('buy'), 'buy', 'ŠT-1c: Nákup kovania je ZIVA sekcia Studia (uz nie premostenie)');

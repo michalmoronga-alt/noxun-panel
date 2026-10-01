@@ -943,7 +943,7 @@ D-25 (`usage.js`) počíta klik v **capture** fáze, inak by mu overlaye vypadli
 - **Oko v riadku** ide existujúcou cestou `nx_select_hw_owner` s `origin: 'warn'` (`SELECT_OWNER_NOUNS`; neznámy pôvod = `hardware`) a s flush handshake.
 
 **Deep-link do Štúdia:** `openStudio(section, anchor)` → `NXShell.studioOpenLink(...)` → `open_studio` → `Panel.studio_link_of` → `StudioDialog.show(open_section:,
-anchor:)`. Panel posiela **iba meno**, autoritou whitelistu je Ruby (`StudioDialog::SECTIONS` ↔ zrkadlo `NXShell.STUDIO_SECTIONS`, guard test). Cieľ sa odloží
+anchor:)`. Panel posiela **iba meno**, autoritou whitelistu je Ruby (`StudioDialog::SECTIONS`); `NXShell.studioSection` filtruje registrom `NXStudioSections`. Cieľ sa odloží
 (`@pending_section`/`@pending_anchor`) a **jednorazovo ho spotrebuje najbližší `push_state`** (polia `open_section`/`anchor` v `NX.setStudio`); kotva cestuje len so
 sekciou; bez deep-linku (rail, toolbar) je `nil` a sekcia sa nemení. Cesty: warnpanel → „Otvoriť v Štúdiu → Kontrola" (`openStudio('ctrl')`) · „Materiál"
 v info stĺpci → `bom` s kotvou ID skrinky · preklik na dekor → `mat` s `material_id`.
@@ -1285,7 +1285,9 @@ Okno je `UI::HtmlDialog` (`STYLE_DIALOG`); obsah `1060 × 640` ⇒ `width/height
 z Inspectora (`StudioDialog.show(open_section:, anchor:)`).
 
 **Navigácia a sekcie:**
-- O sekcii rozhoduje **uzavretý whitelist v Ruby**, klient posiela iba kľúč. Prepnutie sekcie z kódu má jedno miesto `studioGoSection(id)` (globál na `window`).
+- O sekcii rozhoduje **uzavretý whitelist v Ruby**, klient posiela iba kľúč. Poradie, skupiny, ikony, názvy, nápovedy, badge a hlášku „Obnoviť" berú navigácia,
+  hlavička aj filter z **registra `NXStudioSections`** (odsek `ui/js/studio_sections.js` nižšie) — vlastný zoznam sekcií nedrží žiadny iný súbor. Prepnutie sekcie
+  z kódu je `studioGoSection(id)` (globál na `window`); deep-link v `NX.setStudio` volá tie isté háčiky vlastnou kópiou (jednu cestu prinesie H14b).
   Neaktívna položka navigácie dnes nie je; vetva `disabled` (`aria-disabled` s dôvodom) ostáva poistkou. Ikony položiek sú **jedinečné** (Nastavenia rozpočtu
   `sliders-horizontal` — vedomá odchýlka od mockupu, ten istý symbol nesie tlačidlo „Nastavenia" v Rozpočte a akcia nálezu Kontroly `layout_settings`; Pravidlá
   `settings`; Kovanie `hammer` ako rail Inspectora). Zbalená navigácia `nx_studio_nav` v `localStorage`.
@@ -1322,7 +1324,7 @@ a kontroluje len živú inštanciu okna — leave hook Rozpočtu neexistuje.
 `budRefreshBtnHtml`). Jantárový stav: odsek `StudioModelWatch`.
 
 **Deep-link** — kontraktové meno `NX.studioOpen(section, anchor)`, reálna funkcia panela `openStudio(section, anchor)` (`ui/js/actions.js`) → `open_studio` →
-`StudioDialog::SECTIONS` (JS zrkadlo `NXShell.STUDIO_SECTIONS`, guard test). Sekcia sa odloží do `@pending_section` a **jednorazovo ju spotrebuje najbližší
+`StudioDialog::SECTIONS` (klient filtruje registrom `NXStudioSections`). Sekcia sa odloží do `@pending_section` a **jednorazovo ju spotrebuje najbližší
 `push_state`**; `anchor` sa spotrebuje so sekciou (Kusovník: predvyplní hľadanie; Materiály: otvorí detail dekoru).
 
 **Zápis čísel a jednotiek celého okna** žije v `studio.js` — blok `nxf*` (`nxfMoney`, `nxfMoneyIn`, `nxfQty`, `nxfUnit`, `nxfQtyUnit`, `nxfMm`, `nxfDim`, `nxfDec`;
@@ -1339,6 +1341,31 @@ listeneri** s `ecMenu`/`vepoMenu` a až za modalovou brankou `nxModalOpen`.
 
 Testy okna: `tests/pure/test_st1a_studio.rb`, `tests/js/test_st1a_studio.js`, in-SU `run_st1a`. Plné znenie (vrátane zaniknutých premostení a okien): archív,
 „studio_dialog.rb + ui/studio.html + ui/js/studio.js — okno ŠTÚDIO (ŠT-1a)".
+
+### ui/js/studio_sections.js — register sekcií Štúdia
+
+**Čo to je:** jediný zoznam sekcií okna Štúdio na klientovi (`window.NXStudioSections`, v Node `module.exports`) — čisté API bez DOM a bez závislostí, riadky
+aj skupiny zmrazené. **Autorita whitelistu ostáva Ruby** `StudioDialog::SECTIONS`; register je prezentácia v tom istom poradí. Zhodu (aj poradie) stráži
+nezávislá fixtúra `tests/fixtures/h14_studio_sections.json` (vznikla zo starého kódu, nikdy ju nevyrába generátor z registra): JS test ju porovná s registrom,
+Ruby test so `SECTIONS` — žiadny regex nad zdrojom druhej strany.
+
+**Riadok:** `id` · `grp` (`job` ZÁKAZKA, `catalogs` KATALÓGY, `settings` NASTAVENIA) · `ic` (ikona spritu, každá iná) · `t` (názov v navigácii = nadpis) ·
+`hint` (len doplnok tooltipu navigácie, dnes `cut`) · `badge` (`ctrl` = semafor zákazky `ST.counts`, `appl` = `ST.appl.job.counts`) · `head` (nápoveda
+hlavičky) · `refresh` (hláška počas „Obnoviť"; bez nej `REFRESH_DEFAULT` „Prepočítavam kusovník…" — Šablóny vedome, Q1 H14) · `module` (súbor, ktorý sekciu
+kreslí) · `data` (kľúč payloadu `NX.setStudio`; guard overí, že ho `push_state` skladá — skladanie payloadu ostáva v Ruby explicitné).
+
+**API:** `ids()` · `has(id)` (len reťazec zo zoznamu — nie `null`, číslo ani `'__proto__'`) · `get(id)` (riadok alebo `null`) · `groups()` (`[{ grp, t, items }]`)
+· `inModule(file)` · `fn(meno)` (globálna funkcia **v čase volania**, len vlastná vlastnosť globálu — `let`/`const` ani zdedené meno nenájde; pre háčiky H14b)
+· `REFRESH_DEFAULT`. Zoznamy sú vždy nové polia a konzumenti si ich pýtajú **až pri použití** (poučenie H12) — pri načítaní si berú len referenciu na objekt.
+
+**Kto číta:** `studio.js` (`renderNav`, `renderHead`, `navItem`, `navCounts` cez `badge`, `requestRefresh`, whitelist `studioGoSection` aj deep-linku),
+`shell.js` (`NXShell.studioSection` — filter „Otvoriť v Štúdiu", funguje hneď, nečaká na `NX.init`), `studio_settings.js` (`ssActive` =
+`inModule('studio_settings.js')`). **Poradie načítania:** `studio.html` za `icons.js` a **pred** `studio.js`, `panel.html` **pred** `shell.js`; inde sa nenačítava
+(guard). Keby chýbal, skripty sa načítajú a chyba sa prejaví až pri prvom použití (zachytí ju `errors.js`).
+
+**Ako pridať sekciu:** kontrolný zoznam [rozsirovacie-body.md](rozsirovacie-body.md) §4. Testy: `tests/js/test_h14a_register.js` (register = fixtúra, API),
+`tests/pure/test_h14a_register.rb` (parita R4, guardy R5: zoznam sekcií mimo registra, neznáme id vo volaní, poradie skriptov), golden
+`tests/js/test_h14_golden.js` + `tests/pure/test_h14_studio_sekcie.rb` (navigácia, prechody, kotvy, hlášky a payload bez zmeny).
 
 ### StudioModelWatch — indikátor neaktuálnosti okna („Obnoviť" zožltne)
 

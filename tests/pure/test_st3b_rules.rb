@@ -17,6 +17,7 @@
 #   5. Zanik okna musi byt UPLNY — kym existuje HTML, polozka menu alebo
 #      panelove tlacidlo, ziju nad jednymi pravidlami dve UI s roznym stavom.
 require_relative '../helper' unless defined?(NxTest)
+require_relative 'test_h14a_register' unless defined?(NxH14Reg) # H14a: kontrakt sekcii Studia
 
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core') if NxTest.headless?
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog') if NxTest.headless?
@@ -44,11 +45,12 @@ ST3B_RULES_JS_CODE = ST3B_RULES_JS.lines.reject { |l| l.strip.start_with?('//') 
 
 NxTest.test('ŠT-3b-1: `rules` je ZIVA sekcia vo VSETKYCH TROCH zrkadlach') do
   rb = Noxun::Engine::StudioDialog::SECTIONS
-  js = ST3B_STUDIO_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
-  shell = ST3B_SHELL_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
+  # H14a: JS strana = register `js/studio_sections.js` (kontrakt vo fixture,
+  # zhodu overuje tests/js/test_h14a_register.js); studio.js aj shell.js z neho citaju.
+  js = NxH14Reg.ids
   NxTest.assert(rb.include?('rules'), 'Ruby je autorita zoznamu sekcii')
   NxTest.assert_equal(rb, js, 'studio.js je jeho zrkadlo')
-  NxTest.assert_equal(rb, shell, 'a shell.js (deep-link `openStudio`) tiez')
+  NxTest.assert_equal([], NxH14Reg.mirror_problems, 'a shell.js (deep-link `openStudio`) tiez — cita register')
 end
 
 NxTest.test('ŠT-3b-1: okno Pravidla kovania ZANIKLO — a s nim VSETKY jeho vstupy') do
@@ -63,11 +65,11 @@ NxTest.test('ŠT-3b-1: okno Pravidla kovania ZANIKLO — a s nim VSETKY jeho vst
                 'jeden kluc nesmie byt zaroven sekcia aj premostenie')
   # ŠT-4a: cela tabulka hlasok premosteni ZANIKLA s poslednym satelitom.
   NxTest.refute(st.const_defined?(:BRIDGE_STATUS), 'a nesmie existovat ani tabulka hlasok premosteni')
-  nav = ST3B_STUDIO_JS[/var NAV = \[.*?\n  \];/m].to_s
-  item = nav[/\{ id: 'rules'.*?\},/m].to_s
+  # H14a: polozka navigacie = riadok registra (kontrakt vo fixture).
+  item = NxH14Reg.row('rules') || {}
   NxTest.assert(!item.empty?, 'polozka navigacie sa nasla')
-  NxTest.refute(item.include?('bridge:'), 'polozka Pravidlá uz nie je premostenie')
-  NxTest.refute(item.include?('disabled:'), 'a nie je ani neaktivna')
+  NxTest.refute(item.key?('bridge'), 'polozka Pravidlá uz nie je premostenie')
+  NxTest.refute(item.key?('disabled'), 'a nie je ani neaktivna')
 
   main = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'main.rb'), encoding: 'UTF-8')
   NxTest.assert(main.include?("menu.add_item('Pravidlá kovania') { StudioDialog.show(open_section: 'rules') }"),
@@ -298,7 +300,8 @@ NxTest.test('ŠT-3b-2a (F8): hint sekcie uz NEPOSIELA nikoho do neexistujuceho o
   # Do 3b-2a tu stal riadok „zatiaľ ich spravuje okno „Pravidlá ABS"" — take
   # okno NIKDY neexistovalo. Hint musi hovorit PRAVDU: editor pravidiel ABS
   # nie je, menia sa hrany konkretneho dielca v Inspectore (D-78 duchom).
-  meta = ST3B_STUDIO_JS[/rules: \{ t: 'Pravidlá',.*?\},/m].to_s
+  # H14a: hlavicka sekcie = `head` riadku registra (SEC_META zaniklo).
+  meta = NxH14Reg.row('rules')['head'].to_s
   NxTest.assert(meta.include?('ABS podľa roly'), 'hlavicka sekcie menuje OBE skupiny')
   NxTest.refute(meta.include?('ŠT-3b-2'), 'a uz nesluby, ze ABS „pribudne" — je tam')
   body = ST3B_STUDIO_HTML[/<template id="rulesBodyTpl">.*?<\/template>/m].to_s

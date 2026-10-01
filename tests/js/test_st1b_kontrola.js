@@ -128,9 +128,10 @@ const COUNTS = { red: 2, orange: 2, total: 4, cabinets: 20, clean: 17 };
   // Navigacna polozka Kontrola musi mat priznak badge, inak by cisla nemal kto
   // vykreslit; a NESMIE byt premostenim (obsah je uz tu).
   const it = S.navItem('ctrl');
-  ok(it && it.badge === true, 'polozka Kontrola nesie zive pocty');
+  ok(it && it.badge === 'ctrl', 'polozka Kontrola nesie zive pocty (badge `ctrl` = semafor zakazky)');
   no(it.bridge, 'a uz NIE JE premostenim do okna Vyroba');
-  ok(S.STUDIO_SECTIONS.indexOf('ctrl') >= 0, 'je to ZIVA sekcia tohto okna');
+  ok(require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'studio_sections.js')).has('ctrl'),
+     'je to ZIVA sekcia tohto okna (register)');
 })();
 
 // --- 5) lista sekcie: prepinace a ich payload --------------------------------

@@ -111,23 +111,27 @@ XLSX a CSV kusovníka dnes **neexistujú** (UI20_KONTRAKT Š5) — stĺpec sa do
 
 ## 4 · Nová sekcia Štúdia
 
-Autorita zoznamu sekcií je Ruby whitelist; JS má zrkadlá (zjednotí ich dávka H14). Samotné id v zoznamoch sekciu len sprístupní na
-výber — **vykreslí ju až vlastná vetva**: bez riadku `SEC_META` ukáže hlavička „—" a bez vetvy v `renderBody` spadne telo do tabuliek
-Kusovníka. Sekcia skupiny Nastavenia ide navyše cez pevné vetvy `sup`/`bset`/`about` v `renderTools` aj `renderBody` (a vlastné vetvy
-v `studio_settings.js`). Nová sekcia potrebuje ikonu v inventári UI_DIZAJN §4, fotku v `scripts/ui_foto/shots.json` a `?v=` = VERSION
-pri novom skripte.
+Sekcia sa na klientovi prihlasuje **jedným riadkom registra** `NXStudioSections` (`ui/js/studio_sections.js`): z neho berú navigácia
+(skupina, ikona, názov, tooltip, badge), hlavička (názov a nápoveda), hláška „Obnoviť", filter deep-linku Inspectora aj zoznam sekcií
+Nastavení. **Autoritou whitelistu je Ruby** `StudioDialog::SECTIONS`; zhodu (aj poradie) stráži nezávislá fixtúra kontraktu, ktorú
+porovnáva JS aj Ruby test. Postup: (1) riadok registra, (2) id v `StudioDialog::SECTIONS` na tom istom mieste poradia, (3) riadok
+fixtúry, (4) JS modul sekcie + `<script>` v `studio.html` za `studio.js`, (5) kľúč payloadu v `StudioDialog.push_state` (+ `*_actions`,
+prípadne `on_ui_closed`), (6) fotka, (7) nová ikona v `icons.js` a v inventári UI_DIZAJN §4. **Vykreslí ju až vlastná vetva** (do dávky
+H14b): bez vetvy v `renderTools`/`renderBody` spadne telo do tabuliek Kusovníka; skupina Nastavenia má navyše vlastné vetvy
+v `studio_settings.js`. **Čo ťa zastaví:** guardy `test_h14a_register.rb` (zoznam sekcií mimo registra, neznáme id vo volaní, parita
+s fixtúrou, fotky, ikony, kľúč `data` v pushi, poradie skriptov) a golden `test_h14_golden.js`.
 
 | Súbor | Mená | Čo tam urobiť |
 |---|---|---|
-| `noxun_engine/ui/studio_dialog.rb` | `StudioDialog::SECTIONS` · `StudioDialog.push_state` | id sekcie (autorita) a jej dáta v pushi okna |
-| `noxun_engine/ui/js/studio.js` | `STUDIO_SECTIONS` · `NAV` · `studioGoSection` | zrkadlo zoznamu, položka navigácie (skupina, ikona, text) |
-| `noxun_engine/ui/js/studio.js` | `SEC_META` · `renderHead` · `renderTools` · `renderBody` | nadpis a nápoveda sekcie, vetva lišty a vetva tela (renderer sekcie, napr. `budRenderBody`, `ssRenderBody`) |
-| `noxun_engine/ui/js/shell.js` | `STUDIO_SECTIONS` | druhé zrkadlo (otváranie sekcie z Inspectora) |
-| `noxun_engine/ui/js/studio_settings.js` | `SS_SECTIONS` · `ssRenderBody` · `ssRenderTools` · `ssToolsHtml` | len sekcia skupiny Nastavenia: zoznam a vetvy tela a lišty (`sec === 'bset'` …) |
+| `noxun_engine/ui/js/studio_sections.js` | `NXStudioSections` · `REFRESH_DEFAULT` · `inModule` | riadok sekcie: `id`, `grp`, `ic`, `t`, `head`, prípadne `hint`, `badge`, `refresh`; `module` (kto kreslí) a `data` (kľúč payloadu) |
+| `noxun_engine/ui/studio_dialog.rb` | `StudioDialog::SECTIONS` · `StudioDialog.push_state` | id sekcie (serverový whitelist, poradie) a jej dáta v pushi okna |
+| `tests/fixtures/h14_studio_sections.json` | `sections` · `module` · `data` | riadok kontraktu (most Ruby ↔ JS; píše sa ručne, nikdy generátorom z registra) |
+| `noxun_engine/ui/js/studio.js` | `renderHead` · `renderTools` · `renderBody` · `studioGoSection` | hlavička je z registra; vetva lišty a tela sekcie (renderer napr. `budRenderBody`) — do H14b |
+| `noxun_engine/ui/js/studio_settings.js` | `ssRenderBody` · `ssRenderTools` · `ssToolsHtml` | len skupina Nastavenia: vetvy tela a lišty (`sec === 'bset'` …) |
 | `noxun_engine/ui/production_core.rb` | `ROUTE_SECTIONS` | len ak nález Kontroly vedie do sekcie |
-| `noxun_engine/ui/studio.html` | `studio.js` | nový skript sekcie s `?v=` |
-| `scripts/ui_foto/shots.json` | `studio_bom` | fotka sekcie pre UI PR |
-| `tests/pure/test_st4a_nastavenia.rb` | `STUDIO_SECTIONS` · `StudioDialog::SECTIONS` | JS zrkadlá = Ruby autorita |
+| `noxun_engine/ui/studio.html` | `studio_sections.js` · `studio.js` | nový skript sekcie s `?v=` za `studio.js` |
+| `scripts/ui_foto/shots.json` | `studio_bom` | fotka sekcie pre UI PR (popis = „Štúdio · " + názov z registra) |
+| `tests/pure/test_h14a_register.rb` | `NxH14Reg` · `H14a R4.1` · `H14a R5 a` | parita s fixtúrou a guardy proti zoznamu sekcií mimo registra |
 | `tests/pure/test_ui_foto.rb` | `StudioDialog::SECTIONS` | fotky = všetky sekcie |
 
 ## 5 · Nové pravidlo kovania viazané na typ skrinky

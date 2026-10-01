@@ -59,10 +59,14 @@
   var STALE_TIP = 'V modeli nastali zmeny od posledného prepočtu — čísla môžu byť neaktuálne. ' +
                   'Platí pre akúkoľvek zmenu v dokumente, aj mimo skriniek.';
 
-  // ZRKADLO `StudioDialog::SECTIONS` — autoritou whitelistu je RUBY, tento
-  // zoznam len zabrani, aby z okna vyletela hodnota, ktora sekciu nepomenuva.
-  var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget', 'offer', 'cut', 'mat', 'hw', 'appl', 'rules', 'tpl',
-                         'sup', 'bset', 'about'];
+  // H14a: sekcie okna (id, poradie, skupina, ikona, názov, nápovedy, hláška
+  // „Obnoviť") žijú v registri `js/studio_sections.js` — jedinom zozname na
+  // klientovi. Autoritou whitelistu je RUBY (`StudioDialog::SECTIONS`); register
+  // len zabráni, aby z okna vyletela hodnota, ktorá sekciu nepomenúva. Zoznamy
+  // sa z neho pýtajú až pri použití (nikdy pri načítaní tohto súboru).
+  var SECREG = (typeof module !== 'undefined' && module.exports)
+    ? require('./studio_sections.js')                                   // Node testy
+    : (typeof window !== 'undefined' ? window.NXStudioSections : null);
 
   // ŠT-1b (Š10): 3-stavove nastavenie kontroly hran je ZDIELANY komponent —
   // TEN ISTY markup kresli rail Inspectora (rohovy trojuholnik pri ABS ikone)
@@ -86,104 +90,6 @@
     { k: 'grain', t: 'Smer dekoru',  on: false },
     { k: 'role',  t: 'Rola',         on: false }
   ];
-
-  // Navigacia. Od NP-3 je KAZDA polozka SEKCIA (posledna neaktivna — Narezovy
-  // plan — ozila). Vetva `disabled` (vzor D-78: dovod v tooltipe) v kresleni
-  // ostava pre buducu polozku, ktora by prisla skor nez jej obsah.
-  var NAV = [
-    { grp: 'ZÁKAZKA', items: [
-      { id: 'bom',    ic: 'list',            t: 'Kusovník' },
-      // Š11: pri Kontrole visia ZIVE pocty RED/ORANGE z posledneho pushu.
-      { id: 'ctrl',   ic: 'clipboard-check', t: 'Kontrola', badge: true },
-      // ŠT-1c PR A (Š7): Nákup kovania je od tejto dávky SEKCIA — presun tabu
-      // Kovanie zo zaniknutého okna Výroba 1:1, bez redizajnu (ten príde s blokom KOVANIE).
-      { id: 'buy',    ic: 'cart',            t: 'Nákup kovania' },
-      // ŠT-1c PR B1 (Š12): Rozpočet je od tejto dávky SEKCIA — inline edit
-      // dát rozpočtu v modeli (1 zmena = 1 krok Späť). Do modelu zapisujú aj
-      // Materiály, Kovanie, Pravidlá a Šablóny (docs/UI_DIZAJN.md §5.16).
-      { id: 'budget', ic: 'euro',            t: 'Rozpočet' },
-      // ŠT-1c PR B2 (Š14–Š15): Cenová ponuka je od tejto dávky VLASTNÁ sekcia
-      // — zákaznícka projekcia toho istého rozpočtu (suma sa nikdy nelíši).
-      { id: 'offer',  ic: 'file-text',       t: 'Cenová ponuka' },
-      // NP-3 (blok 2, mockup A): Nárezový plán je SEKCIA — koľko platní stačí
-      // pri jednoduchom rozložení v pásoch (horná hranica). Kreslí ho
-      // `js/sheet_layout.js` (načítava sa AŽ ZA týmto súborom).
-      { id: 'cut',    ic: 'scissors',        t: 'Nárezový plán',
-        hint: 'koľko platní stačí pri tomto rozložení (horná hranica)' }
-    ] },
-    { grp: 'KATALÓGY', items: [
-      // ŠT-2a: Materiály sú SEKCIA — prvá živá položka skupiny KATALÓGY.
-      // ŠT-2b: okno „Materiály projektu" ZANIKLO — sekcia vie všetko vrátane
-      // Demos tokov a „Nahradiť UNI…", takže niet kam premosťovať.
-      { id: 'mat',    ic: 'layers',   t: 'Materiály' },
-      // ŠT-3a-1: Kovanie je SEKCIA (Š16 — pohľady Položky · Sety). Okno
-      // „Katalóg kovania" ešte žije kvôli trom modelovým zápisom (predvoľby
-      // setov projektu) — otvára ho premostenie Z VNÚTRA sekcie, nie
-      // navigácia. Ikona = hammer (kontrakt „Ikony navigácie").
-      { id: 'hw',     ic: 'hammer',   t: 'Kovanie' },
-      // S1-A2: Spotrebiče sú SEKCIA (13. položka, katalóg modelov tohto PC).
-      // S1-B2: badge = koľko riadkov pohľadu „V zákazke" treba vybaviť
-      // (nevybraný model, zaniknutý vlastník, nález Kontroly). Číslo skladá
-      // SERVER v `appl.job.counts` — klient si zo zoznamu nič nepočíta, presne
-      // ako pri Kontrole.
-      { id: 'appl',   ic: 'appliance', t: 'Spotrebiče', badge: 'appl' },
-      // ŠT-3b-1: Pravidlá sú SEKCIA (Š17). Okno „Pravidlá kovania" zaniklo;
-      // skupina „ABS podľa roly" pribudne v ŠT-3b-2.
-      { id: 'rules',  ic: 'settings', t: 'Pravidlá' },
-      // ŠT-3c-1: Šablóny sú SEKCIA (Š18) — okno „Šablóny" zaniklo.
-      { id: 'tpl',    ic: 'star',     t: 'Šablóny' }
-    ] },
-    { grp: 'NASTAVENIA', items: [
-      // ŠT-4a (Š19): posledné tri premostenia sa stali SEKCIAMI — okno
-      // „Nastavenia rozpočtu" (posledný satelit) zaniklo a v navigácii už
-      // nie je ani jedno premostenie.
-      { id: 'sup',    ic: 'truck', t: 'Dodávateľ / Demos' },
-      // H4 · D-09: vlastna ikona (posuvniky) — s `euro` sa v zbalenej navigacii
-      // zlievala s Rozpoctom; koleso nesu Pravidla. Vedoma odchylka od mockupu.
-      { id: 'bset',   ic: 'sliders-horizontal', t: 'Nastavenia rozpočtu' },
-      { id: 'about',  ic: 'info',  t: 'O plugine' }
-    ] }
-  ];
-
-  var SEC_META = {
-    bom: { t: 'Kusovník', hint: 'skupiny podľa materiálu · pohľady Dielce / Platne / ABS · živý zoznam' },
-    ctrl: { t: 'Kontrola', hint: 'semafor filtruje zoznam · klik na nález ho označí v modeli · prepínače hrán a kresby' },
-    buy: { t: 'Nákup kovania', hint: 'nákupný zoznam zo setov · nekompletné položky jantárovo · CSV pre objednávku' },
-    budget: { t: 'Rozpočet',
-              hint: 'rozpočet zákazky · ceny kovania sú spoločné pre všetky zákazky' },
-    offer: { t: 'Cenová ponuka',
-             hint: 'zákaznícky pohľad na ten istý rozpočet · rečou zákazníka, bez interných kódov' },
-    // NP-3 (mockup A): hint = sechint mockupu (plán je podklad, reže VEPO).
-    cut: { t: 'Nárezový plán',
-           hint: 'koľko platní stačí pri tomto rozložení · podklad pre objednávku — reže VEPO' },
-    // ŠT-2a: hint nesie to, co v okne Materialy stal podtitul (`#mdline`) —
-    // co sekcia spravuje a co je v nej GLOBALNE (katalog) vs projektove.
-    mat: { t: 'Materiály',
-           hint: 'katalóg dekorov je spoločný pre všetky zákazky · predvoľby projektu platia pre túto' },
-    // ŠT-3a-1 (Š16): presun okna Katalóg kovania 1:1 — redizajn a D-15
-    // pridávačky prídu s blokom KOVANIE.
-    // ŠT-3b-1 (Š17): zatiaľ LEN skupina „Kovanie podľa rozmerov" — hint to
-    // priznáva, aby prázdne miesto po ABS skupine nevyzeralo ako chyba.
-    rules: { t: 'Pravidlá',
-             hint: 'ABS podľa roly dielca (spoločné, len na čítanie) · kovanie podľa rozmerov — platí pre tento projekt' },
-    hw: { t: 'Kovanie',
-          hint: 'katalóg položiek a sety sú spoločné pre všetky zákazky · predvoľby setov platia pre túto zákazku' },
-    // S1-A2 (Š20): katalóg spotrebičov je vec POČÍTAČA (%APPDATA%), nie
-    // zákazky — hint to hovorí hneď, rovnako ako pri materiáloch a kovaní.
-    appl: { t: 'Spotrebiče',
-            hint: 'katalóg modelov je tohto počítača · rozmery z listov výrobcov · bez cien (tie patria Rozpočtu)' },
-    // ŠT-3c-1 (Š18): knižnica je spoločná pre všetky zákazky; NOVÚ šablónu
-    // ukladáš v Inspectore (má po ruke označenú skrinku), tu ich spravuješ.
-    tpl: { t: 'Šablóny',
-           hint: 'knižnica je spoločná pre všetky zákazky · novú uložíš v Inspectore z označenej skrinky' },
-    // ŠT-4a (Š19). Hinty hovoria to, čo bolo v podtitule zaniknutého okna:
-    // čo je GLOBÁLNE (platí pre všetky zákazky) a čo sa mení inde.
-    sup: { t: 'Dodávateľ / Demos',
-           hint: 'aktívny dodávateľ a stav väzby na Demos · väzba sa nastavuje pri konkrétnom dekore' },
-    bset: { t: 'Nastavenia rozpočtu',
-            hint: 'sadzby, režimy a prahy · globálne pre všetky zákazky, do zákazky sa nemrazia' },
-    about: { t: 'O plugine', hint: 'to isté nájdeš v koliesku Inspectora' }
-  };
 
   // ---------------------------------------------------------------- helpers
   function el(id){ return (typeof document === 'undefined') ? null : document.getElementById(id); }
@@ -663,8 +569,9 @@
 
   // Š11: živé počty pri navigačnej položke Kontrola. Čísla sú zo `counts`
   // KAŽDÉHO pushu — čistá zákazka badge nekreslí vôbec.
-  // Ktoré čísla visia pri položke navigácie. `true` = semafor celej zákazky
-  // (Kontrola), `'appl'` = počty pohľadu „V zákazke" (S1-B2). Oboje skladá
+  // Ktoré čísla visia pri položke navigácie (`badge` riadku registra). `'appl'`
+  // = počty pohľadu „V zákazke" (S1-B2), inak (`'ctrl'`) semafor celej zákazky
+  // (Kontrola). Oboje skladá
   // SERVER — klient sa len rozhodne, ktorý hotový blok prečíta.
   function navCounts(badge){
     if (badge === 'appl') return (ST && ST.appl && ST.appl.job) ? ST.appl.job.counts : null;
@@ -1223,7 +1130,7 @@
       var mdl = el('stModel');
       if (mdl) mdl.textContent = ST ? ('zákazka: ' + ST.model_title + ' · v' + ST.version) : '…';
       // Deep-link sekcie sa posiela PRAVE RAZ; kotva s nou.
-      if (ST && ST.open_section && STUDIO_SECTIONS.indexOf(ST.open_section) >= 0){
+      if (ST && ST.open_section && SECREG.has(ST.open_section)){
         if (studioSec !== ST.open_section && typeof hwProductContextChanged === 'function'){
           hwProductContextChanged(ST.open_section, ST.model_guid || '');
         }
@@ -1373,12 +1280,15 @@
     renderBody();
   }
 
+  // Navigácia = skupiny a položky registra (`js/studio_sections.js`) v jeho
+  // poradí. Od NP-3 je každá položka SEKCIA; vetva `disabled` (vzor D-78:
+  // dôvod v tooltipe) ostáva pre budúcu položku, ktorá by prišla skôr než jej obsah.
   function renderNav(){
     var box = el('snav');
     if (!box) return;
     var h = '';
-    NAV.forEach(function(g){
-      h += '<div class="sgrp">' + esc(g.grp) + '</div>';
+    SECREG.groups().forEach(function(g){
+      h += '<div class="sgrp">' + esc(g.t) + '</div>';
       g.items.forEach(function(it){
         var on = (it.id === studioSec && !it.disabled);
         // ŠT-4a: vetva premostenia zanikla — tooltip je buď dôvod neaktivity,
@@ -1404,7 +1314,9 @@
   function renderHead(){
     var box = el('sechead');
     if (!box) return;
-    var m = SEC_META[studioSec] || { t: '—', hint: '' };
+    // Nadpis = názov sekcie z registra, nápoveda = jeho `head` (neznáma sekcia „—").
+    var r = SECREG.get(studioSec);
+    var m = r ? { t: r.t, hint: r.head } : { t: '—', hint: '' };
     box.innerHTML = '<h2>' + esc(m.t) + '</h2><span class="sechint">' + esc(m.hint) + '</span>' +
       '<span class="secmodel" id="stModel">' + (ST ? esc('zákazka: ' + ST.model_title + ' · v' + ST.version) : '…') + '</span>';
   }
@@ -1974,28 +1886,13 @@
 
   // Jeden push prináša VŠETKY sekcie, takže sa prepočíta všetko — status ale
   // hovorí o tom, na čo sa používateľ práve pozerá (inak by po kliku v Nákupe
-  // hlásil kusovník a vyzeralo by to ako zlé tlačidlo).
-  var REFRESH_STATUS = { ctrl: 'Prepočítavam kontrolu…',
-                         buy: 'Prepočítavam nákupný zoznam…', budget: 'Prepočítavam rozpočet…',
-                         offer: 'Prepočítavam cenovú ponuku…',
-                         // NP-3: plán sa prepočíta z toho istého zberu ako rozpočet.
-                         cut: 'Prepočítavam nárezový plán…',
-                         // ŠT-2a: v Materiáloch sa z modelu prepočítava JEDINÉ —
-                         // koľko dielcov ktorý dekor používa (katalóg je globálny
-                         // a chodí echom). Hláška to musí povedať presne, inak
-                         // vyzerá, že sa prepočítava katalóg.
-                         mat: 'Prepočítavam použitie dekorov v projekte…',
-                         // ŠT-3b-1: v Pravidlách sa z modelu číta len počet skriniek,
-                         // ktoré uloženie prestavá (a či projekt už má vlastné pravidlá).
-                         rules: 'Načítavam pravidlá z aktuálneho modelu…',
-                         // ŠT-3a-1: v Kovaní sa z modelu neprepočítava nič —
-                         // „Obnoviť" si pýta čerstvý KATALÓG a sety z disku
-                         // (mohlo ich zmeniť žijúce okno Katalóg kovania).
-                         hw: 'Načítavam čerstvý katalóg kovania a sety…' };
-
+  // hlásil kusovník a vyzeralo by to ako zlé tlačidlo). Hláška sekcie je
+  // v registri (`refresh`), napr. Materiály hovoria presne, že sa prepočítava
+  // len použitie dekorov (katalóg je globálny a chodí echom).
   function requestRefresh(){
     if (!window.sketchup || !sketchup.refresh_bom) return;
-    NX.setStatus(REFRESH_STATUS[studioSec] || 'Prepočítavam kusovník…', false);
+    var r = SECREG.get(studioSec);
+    NX.setStatus((r && r.refresh) || SECREG.REFRESH_DEFAULT, false);
     sketchup.refresh_bom('');
   }
 
@@ -2153,13 +2050,8 @@
       (!!window.MDAppearance && window.MDAppearance.isOpen() === true));
   }
 
-  function navItem(id){
-    var found = null;
-    NAV.forEach(function(g){
-      g.items.forEach(function(it){ if (it.id === id) found = it; });
-    });
-    return found;
-  }
+  // Položka navigácie = riadok registra (`id`, `ic`, `t`, `hint`, `badge`…) alebo null.
+  function navItem(id){ return SECREG.get(id); }
 
   function onNav(id){
     var it = navItem(id);
@@ -2177,7 +2069,7 @@
   // Musí byť globálna — volá ju aj js/budget.js, ktorý sa načítava za týmto
   // súborom a vlastný stav sekcií nemá.
   function studioGoSection(id){
-    if (STUDIO_SECTIONS.indexOf(id) < 0) return;
+    if (!SECREG.has(id)) return;
     if (id !== studioSec && typeof hwProductContextChanged === 'function'){
       hwProductContextChanged(id, ST ? (ST.model_guid || '') : '');
     }
@@ -2400,7 +2292,7 @@
   // bez DOM.
   if (typeof module !== 'undefined' && module.exports){
     module.exports = {
-      STUDIO_SECTIONS: STUDIO_SECTIONS, COLS: COLS, NAV: NAV,
+      COLS: COLS,
       normText: normText, rowText: rowText, rowHit: rowHit, groupBom: groupBom,
       sheetRows: sheetRows,
       activeCols: activeCols, cellValue: cellValue, grainLabel: grainLabel,

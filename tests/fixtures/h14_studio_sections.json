@@ -1,0 +1,162 @@
+{
+  "_doc": [
+    "H14 · kontrakt registra sekcii Studia (NXStudioSections) — NEZAVISLA fixtura.",
+    "Vznikla v 1. commite H14a ZO STAREHO KODU (studio.js: NAV, SEC_META, REFRESH_STATUS pred zasahom) + rucne doplnene `module` a `data`.",
+    "Nikdy ju nevyraba generator z testovaneho registra a test ju nezapisuje. Most Ruby<->JS: StudioDialog::SECTIONS == ids (aj poradie).",
+    "Kluce riadka: id · grp · ic (ikona) · t (nazov = nadpis) · hint (len tooltip navigacie) · badge (zdroj poctov) · head (napoveda hlavicky) · refresh (hlaska Obnovit) · module (subor, ktory sekciu kresli) · data (kluc payloadu NX.setStudio)."
+  ],
+  "groups": [
+    {
+      "grp": "job",
+      "t": "ZÁKAZKA"
+    },
+    {
+      "grp": "catalogs",
+      "t": "KATALÓGY"
+    },
+    {
+      "grp": "settings",
+      "t": "NASTAVENIA"
+    }
+  ],
+  "refresh_default": "Prepočítavam kusovník…",
+  "sections": [
+    {
+      "id": "bom",
+      "grp": "job",
+      "ic": "list",
+      "t": "Kusovník",
+      "head": "skupiny podľa materiálu · pohľady Dielce / Platne / ABS · živý zoznam",
+      "module": "studio.js",
+      "data": "rows"
+    },
+    {
+      "id": "ctrl",
+      "grp": "job",
+      "ic": "clipboard-check",
+      "t": "Kontrola",
+      "badge": "ctrl",
+      "head": "semafor filtruje zoznam · klik na nález ho označí v modeli · prepínače hrán a kresby",
+      "refresh": "Prepočítavam kontrolu…",
+      "module": "studio.js",
+      "data": "control"
+    },
+    {
+      "id": "buy",
+      "grp": "job",
+      "ic": "cart",
+      "t": "Nákup kovania",
+      "head": "nákupný zoznam zo setov · nekompletné položky jantárovo · CSV pre objednávku",
+      "refresh": "Prepočítavam nákupný zoznam…",
+      "module": "studio.js",
+      "data": "hardware_sets"
+    },
+    {
+      "id": "budget",
+      "grp": "job",
+      "ic": "euro",
+      "t": "Rozpočet",
+      "head": "rozpočet zákazky · ceny kovania sú spoločné pre všetky zákazky",
+      "refresh": "Prepočítavam rozpočet…",
+      "module": "budget.js",
+      "data": "budget"
+    },
+    {
+      "id": "offer",
+      "grp": "job",
+      "ic": "file-text",
+      "t": "Cenová ponuka",
+      "head": "zákaznícky pohľad na ten istý rozpočet · rečou zákazníka, bez interných kódov",
+      "refresh": "Prepočítavam cenovú ponuku…",
+      "module": "budget.js",
+      "data": "budget"
+    },
+    {
+      "id": "cut",
+      "grp": "job",
+      "ic": "scissors",
+      "t": "Nárezový plán",
+      "hint": "koľko platní stačí pri tomto rozložení (horná hranica)",
+      "head": "koľko platní stačí pri tomto rozložení · podklad pre objednávku — reže VEPO",
+      "refresh": "Prepočítavam nárezový plán…",
+      "module": "sheet_layout.js",
+      "data": "sheet_layout"
+    },
+    {
+      "id": "mat",
+      "grp": "catalogs",
+      "ic": "layers",
+      "t": "Materiály",
+      "head": "katalóg dekorov je spoločný pre všetky zákazky · predvoľby projektu platia pre túto",
+      "refresh": "Prepočítavam použitie dekorov v projekte…",
+      "module": "proj_materials.js",
+      "data": "mat"
+    },
+    {
+      "id": "hw",
+      "grp": "catalogs",
+      "ic": "hammer",
+      "t": "Kovanie",
+      "head": "katalóg položiek a sety sú spoločné pre všetky zákazky · predvoľby setov platia pre túto zákazku",
+      "refresh": "Načítavam čerstvý katalóg kovania a sety…",
+      "module": "hw_catalog.js",
+      "data": "hw"
+    },
+    {
+      "id": "appl",
+      "grp": "catalogs",
+      "ic": "appliance",
+      "t": "Spotrebiče",
+      "badge": "appl",
+      "head": "katalóg modelov je tohto počítača · rozmery z listov výrobcov · bez cien (tie patria Rozpočtu)",
+      "module": "appliances.js",
+      "data": "appl"
+    },
+    {
+      "id": "rules",
+      "grp": "catalogs",
+      "ic": "settings",
+      "t": "Pravidlá",
+      "head": "ABS podľa roly dielca (spoločné, len na čítanie) · kovanie podľa rozmerov — platí pre tento projekt",
+      "refresh": "Načítavam pravidlá z aktuálneho modelu…",
+      "module": "rules.js",
+      "data": "rules"
+    },
+    {
+      "id": "tpl",
+      "grp": "catalogs",
+      "ic": "star",
+      "t": "Šablóny",
+      "head": "knižnica je spoločná pre všetky zákazky · novú uložíš v Inspectore z označenej skrinky",
+      "module": "templates.js",
+      "data": "tpl"
+    },
+    {
+      "id": "sup",
+      "grp": "settings",
+      "ic": "truck",
+      "t": "Dodávateľ / Demos",
+      "head": "aktívny dodávateľ a stav väzby na Demos · väzba sa nastavuje pri konkrétnom dekore",
+      "module": "studio_settings.js",
+      "data": "settings"
+    },
+    {
+      "id": "bset",
+      "grp": "settings",
+      "ic": "sliders-horizontal",
+      "t": "Nastavenia rozpočtu",
+      "head": "sadzby, režimy a prahy · globálne pre všetky zákazky, do zákazky sa nemrazia",
+      "module": "studio_settings.js",
+      "data": "settings"
+    },
+    {
+      "id": "about",
+      "grp": "settings",
+      "ic": "info",
+      "t": "O plugine",
+      "head": "to isté nájdeš v koliesku Inspectora",
+      "module": "studio_settings.js",
+      "data": "settings"
+    }
+  ]
+}

@@ -22,6 +22,7 @@
 #   5. Katalogovy zapis NESMIE zdvihnut generaciu okna. Inak by oprava ceny
 #      kovania zneplatnila rozkliknuty riadok Kusovnika a rozrobeny export.
 require_relative '../helper' unless defined?(NxTest)
+require_relative 'test_h14a_register' unless defined?(NxH14Reg) # H14a: kontrakt sekcii Studia
 
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core') if NxTest.headless?
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog') if NxTest.headless?
@@ -57,11 +58,12 @@ ST3A_HW_JS_CODE  = ST3A_HW_JS.lines.reject { |l| l.strip.start_with?('//') }.joi
 
 NxTest.test('ŠT-3a-1: `hw` je ZIVA sekcia vo VSETKYCH TROCH zrkadlach') do
   rb = Noxun::Engine::StudioDialog::SECTIONS
-  js = ST3A_STUDIO_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
-  shell = ST3A_SHELL_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
+  # H14a: JS strana = register `js/studio_sections.js` (kontrakt vo fixture,
+  # zhodu overuje tests/js/test_h14a_register.js); studio.js aj shell.js z neho citaju.
+  js = NxH14Reg.ids
   NxTest.assert(rb.include?('hw'), 'Ruby je autorita zoznamu sekcii')
   NxTest.assert_equal(rb, js, 'studio.js je jeho zrkadlo')
-  NxTest.assert_equal(rb, shell, 'a shell.js (deep-link `openStudio` z panela) tiez')
+  NxTest.assert_equal([], NxH14Reg.mirror_problems, 'a shell.js (deep-link `openStudio` z panela) tiez — cita register')
 end
 
 NxTest.test('ŠT-3a-1: premostenie navigacie `hw` ZANIKLO, ale OKNO zije dalej') do
@@ -70,12 +72,12 @@ NxTest.test('ŠT-3a-1: premostenie navigacie `hw` ZANIKLO, ale OKNO zije dalej')
                 'jeden kluc nesmie byt zaroven sekcia aj premostenie navigacie')
   # ŠT-4a: cela tabulka hlasok premosteni ZANIKLA s poslednym satelitom.
   NxTest.refute(st.const_defined?(:BRIDGE_STATUS), 'a nesmie existovat ani tabulka hlasok premosteni')
-  nav = ST3A_STUDIO_JS[/var NAV = \[.*?\n  \];/m].to_s
-  item = nav[/\{ id: 'hw'.*?\},/m].to_s
+  # H14a: polozka navigacie = riadok registra (kontrakt vo fixture).
+  item = NxH14Reg.row('hw') || {}
   NxTest.assert(!item.empty?, 'polozka navigacie sa nasla')
-  NxTest.refute(item.include?('bridge:'), 'polozka Kovanie uz nie je premostenie')
-  NxTest.refute(item.include?('disabled:'), 'a nie je ani neaktivna')
-  NxTest.assert(item.include?("ic: 'hammer'"),
+  NxTest.refute(item.key?('bridge'), 'polozka Kovanie uz nie je premostenie')
+  NxTest.refute(item.key?('disabled'), 'a nie je ani neaktivna')
+  NxTest.assert(item['ic'] == 'hammer',
                 'ikona = hammer, ta ista ako rail Inspectora (kontrakt „Ikony navigácie")')
 end
 

@@ -387,7 +387,7 @@ const LIST10 = [UNI(1), UNI(2), UNI(3), UNI(4), UNI(5), UNI(6),
   };
   sb.window = sb;
   vm.createContext(sb);
-  ['nx_modal.js', 'studio.js', 'budget.js'].forEach(function(f){
+  ['nx_modal.js', 'studio_sections.js', 'studio.js', 'budget.js'].forEach(function(f){
     vm.runInContext(fs.readFileSync(path.join(JS, f), 'utf8'), sb, { filename: f });
   });
   const PAYLOAD = {

@@ -18,6 +18,7 @@
 #      Vyrobu a Inspector, takze lista sekcie Kontrola v Studiu drzala po
 #      prepocte cache stare pocty.
 require_relative '../helper' unless defined?(NxTest)
+require_relative 'test_h14a_register' unless defined?(NxH14Reg) # H14a: kontrakt sekcii Studia
 
 # Headless: ui/*.rb nie su v require zozname helpera (UI vrstva).
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core') if NxTest.headless?
@@ -49,10 +50,11 @@ NxTest.test('ŠT-1c: `buy` je SEKCIA Studia — a premostenie do okna Vyroba zan
   NxTest.refute(st.const_defined?(:BRIDGE_STATUS), 'a s nimi aj cela tabulka hlasok')
   # Navigacia okna: polozka `buy` uz NESMIE mat `bridge` (sipka + tooltip
   # „zatiaľ v okne Výroba") — inak by tvrdila, ze obsah je inde.
-  nav = S1C_STUDIO_JS[/var NAV = \[.*?\n  \];/m].to_s
-  NxTest.assert(nav.include?("{ id: 'buy',    ic: 'cart',            t: 'Nákup kovania' }"),
+  # H14a: polozka navigacie aj hlavicka = riadok registra (kontrakt vo fixture).
+  buy = NxH14Reg.row('buy')
+  NxTest.assert(buy && buy['ic'] == 'cart' && buy['t'] == 'Nákup kovania' && !buy.key?('bridge'),
                 'polozka navigacie je ZIVA sekcia, nie premostenie')
-  NxTest.assert(S1C_STUDIO_JS.include?('buy: { t: \'Nákup kovania\''),
+  NxTest.assert(buy['head'].to_s.start_with?('nákupný zoznam zo setov'),
                 'sekcia ma vlastnu hlavicku a hint')
 end
 
@@ -109,8 +111,8 @@ NxTest.test('ŠT-1c (review P3): sekcia Nakup ma vlastnu cestu k cerstvym cislam
                 'takze bez neho by sa objednavalo zo starych poctov')
   NxTest.assert(S1C_STUDIO_JS.include?("t.closest('#refreshBtn')"),
                 'tlacidlo ma handler (ten isty ako v Kusovniku)')
-  NxTest.assert(S1C_STUDIO_JS.include?("buy: 'Prepočítavam nákupný zoznam…'"),
-                'status hovori o TEJ sekcii, na ktoru sa pouzivatel pozera')
+  NxTest.assert_equal('Prepočítavam nákupný zoznam…', NxH14Reg.row('buy')['refresh'],
+                      'status hovori o TEJ sekcii, na ktoru sa pouzivatel pozera (H14a: `refresh` v registri)')
 end
 
 # --- 2) obohatenie generiky zije v ZDIELANOM jadre (audit #3) -----------------

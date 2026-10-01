@@ -21,6 +21,7 @@
 #   5. Okno Vyroba stratilo POSLEDNY tab: prazdna skrupina, ktora POVIE, kam sa
 #      obsah presunul (prazdna plocha bez vysvetlenia vyzera ako chyba).
 require_relative '../helper' unless defined?(NxTest)
+require_relative 'test_h14a_register' unless defined?(NxH14Reg) # H14a: kontrakt sekcii Studia
 
 # Headless: ui/*.rb nie su v require zozname helpera (UI vrstva).
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core') if NxTest.headless?
@@ -53,11 +54,12 @@ NxTest.test('ŠT-1c B1: `budget` je SEKCIA Studia — premostenia do okna Vyroba
   # ŠT-4a: `BRIDGE_STATUS` uz NEEXISTUJE — posledny satelit zanikol, takze
   # niet kam premostovat (dokaz je v test_st1a_studio.rb).
   NxTest.refute(st.const_defined?(:BRIDGE_STATUS), 'a s nim aj cela tabulka hlasok premosteni')
-  nav = S1CB_STUDIO_JS[/var NAV = \[.*?\n  \];/m].to_s
-  NxTest.refute(nav.empty?, 'navigacia sa nasla')
-  NxTest.assert(nav.include?("{ id: 'budget', ic: 'euro',            t: 'Rozpočet' }"),
+  # H14a: polozka navigacie aj hlavicka = riadok registra (kontrakt vo fixture).
+  bud = NxH14Reg.row('budget')
+  NxTest.refute(bud.nil?, 'navigacia sa nasla')
+  NxTest.assert(bud['ic'] == 'euro' && bud['t'] == 'Rozpočet' && !bud.key?('bridge'),
                 'polozka navigacie je ZIVA sekcia, nie premostenie')
-  NxTest.assert(S1CB_STUDIO_JS.include?("budget: { t: 'Rozpočet',"),
+  NxTest.assert(bud['head'].to_s.start_with?('rozpočet zákazky'),
                 'sekcia ma vlastnu hlavicku a hint')
   # ŠT-1c PR B2: Cenova ponuka uz ma VLASTNU sekciu — jej kontrakt strazi
   # `tests/pure/test_st1c_ponuka.rb`; tu staci, ze uz nikam nepremostuje.
@@ -69,12 +71,12 @@ end
 
 NxTest.test('ŠT-1c B1: zrkadla whitelistu sekcii sedia vo VSETKYCH TROCH suboroch') do
   rb = Noxun::Engine::StudioDialog::SECTIONS
-  js = S1CB_STUDIO_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
-  shell = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'shell.js'), encoding: 'UTF-8')
-  shell_list = shell[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
+  # H14a: JS strana = register `js/studio_sections.js` (kontrakt vo fixture,
+  # zhodu overuje tests/js/test_h14a_register.js); studio.js aj shell.js z neho citaju.
+  js = NxH14Reg.ids
   NxTest.assert_equal(%w[bom ctrl buy budget offer cut mat hw appl rules tpl sup bset about], rb, 'Ruby je autorita zoznamu')
   NxTest.assert_equal(rb, js, 'studio.js je jeho zrkadlo')
-  NxTest.assert_equal(rb, shell_list, 'a shell.js (panel) tiez')
+  NxTest.assert_equal([], NxH14Reg.mirror_problems, 'a shell.js (panel) tiez — oba citaju register')
 end
 
 # --- 2) GENERACNY KONTRAKT (audit #1) ----------------------------------------

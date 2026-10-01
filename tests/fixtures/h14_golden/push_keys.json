@@ -1,0 +1,1346 @@
+{
+  "sections": [
+    "bom",
+    "ctrl",
+    "buy",
+    "budget",
+    "offer",
+    "cut",
+    "mat",
+    "hw",
+    "appl",
+    "rules",
+    "tpl",
+    "sup",
+    "bset",
+    "about"
+  ],
+  "consume": {
+    "\"bom\"": [
+      "bom",
+      null
+    ],
+    "\"ctrl\"": [
+      "ctrl",
+      null
+    ],
+    "\"buy\"": [
+      "buy",
+      null
+    ],
+    "\"budget\"": [
+      "budget",
+      null
+    ],
+    "\"offer\"": [
+      "offer",
+      null
+    ],
+    "\"cut\"": [
+      "cut",
+      null
+    ],
+    "\"mat\"": [
+      "mat",
+      null
+    ],
+    "\"hw\"": [
+      "hw",
+      null
+    ],
+    "\"appl\"": [
+      "appl",
+      null
+    ],
+    "\"rules\"": [
+      "rules",
+      null
+    ],
+    "\"tpl\"": [
+      "tpl",
+      null
+    ],
+    "\"sup\"": [
+      "sup",
+      null
+    ],
+    "\"bset\"": [
+      "bset",
+      null
+    ],
+    "\"about\"": [
+      "about",
+      null
+    ],
+    "\"xyz\"": [
+      null,
+      null
+    ],
+    "\"\"": [
+      null,
+      null
+    ],
+    "\"BOM\"": [
+      null,
+      null
+    ],
+    "\" bom\"": [
+      null,
+      null
+    ],
+    "nil": [
+      null,
+      null
+    ],
+    ":bom": [
+      "bom",
+      null
+    ]
+  },
+  "keys": [
+    "version",
+    "gen",
+    "model_title",
+    "model_guid",
+    "rows",
+    "sheets",
+    "edging",
+    "hardware",
+    "hardware_sets",
+    "summary",
+    "sheet_estimate",
+    "totals",
+    "materials_meta",
+    "edges_meta",
+    "vepo",
+    "control",
+    "counts",
+    "budget",
+    "sheet_layout",
+    "edge_check",
+    "grain_check",
+    "direction_check",
+    "mat",
+    "hw",
+    "appl",
+    "rules",
+    "tpl",
+    "settings",
+    "open_section",
+    "anchor"
+  ],
+  "payload": {
+    "model_title": "GOLDEN",
+    "model_guid": "G1",
+    "rows": [
+      {
+        "key": [
+          7200,
+          5600,
+          180,
+          "H18",
+          [
+            "",
+            "",
+            "",
+            ""
+          ],
+          "none",
+          null
+        ],
+        "length": 720.0,
+        "width": 560.0,
+        "thickness": 18.0,
+        "material_id": "H18",
+        "edges": {
+          "L1": null,
+          "L2": null,
+          "W1": null,
+          "W2": null
+        },
+        "grain_direction": "none",
+        "quantity": 1,
+        "names": [
+          "Bok"
+        ],
+        "free_names": [
+
+        ],
+        "kde": [
+          {
+            "owner_id": "CAB-001",
+            "quantity": 1
+          }
+        ],
+        "refs": [
+          {
+            "pid": 100,
+            "owner_id": "CAB-001"
+          }
+        ],
+        "role_label": "side"
+      },
+      {
+        "key": [
+          5640,
+          5600,
+          180,
+          "H18",
+          [
+            "",
+            "",
+            "",
+            ""
+          ],
+          "none",
+          null
+        ],
+        "length": 564.0,
+        "width": 560.0,
+        "thickness": 18.0,
+        "material_id": "H18",
+        "edges": {
+          "L1": null,
+          "L2": null,
+          "W1": null,
+          "W2": null
+        },
+        "grain_direction": "none",
+        "quantity": 1,
+        "names": [
+          "Dno"
+        ],
+        "free_names": [
+
+        ],
+        "kde": [
+          {
+            "owner_id": "CAB-002",
+            "quantity": 1
+          }
+        ],
+        "refs": [
+          {
+            "pid": 102,
+            "owner_id": "CAB-002"
+          }
+        ],
+        "role_label": "Dno"
+      },
+      {
+        "key": [
+          5600,
+          5300,
+          180,
+          "W18",
+          [
+            "",
+            "",
+            "",
+            ""
+          ],
+          "none",
+          null
+        ],
+        "length": 560.0,
+        "width": 530.0,
+        "thickness": 18.0,
+        "material_id": "W18",
+        "edges": {
+          "L1": null,
+          "L2": null,
+          "W1": null,
+          "W2": null
+        },
+        "grain_direction": "none",
+        "quantity": 1,
+        "names": [
+          "Polica"
+        ],
+        "free_names": [
+
+        ],
+        "kde": [
+          {
+            "owner_id": "CAB-001",
+            "quantity": 1
+          }
+        ],
+        "refs": [
+          {
+            "pid": 101,
+            "owner_id": "CAB-001"
+          }
+        ],
+        "role_label": "Polica"
+      }
+    ],
+    "sheets": [
+      {
+        "material_id": "H18",
+        "m2": 0.719,
+        "quantity": 2
+      },
+      {
+        "material_id": "W18",
+        "m2": 0.297,
+        "quantity": 1
+      }
+    ],
+    "edging": [
+
+    ],
+    "hardware": [
+
+    ],
+    "hardware_sets": {
+      "rows": [
+
+      ],
+      "unmapped": [
+
+      ]
+    },
+    "summary": {
+      "cabinets": 0,
+      "boards": 0,
+      "records": 3,
+      "rows": 3,
+      "quantity": 3,
+      "m2_total": 1.016,
+      "bm_total": 0,
+      "hardware_quantity": 0
+    },
+    "sheet_estimate": [
+      {
+        "material_id": "H18",
+        "m2": 0.719,
+        "m2_exact": 0.71904,
+        "quantity": 2,
+        "sheet_size": [
+          2800.0,
+          2070.0
+        ],
+        "sheet_m2": 5.796,
+        "count_min": 0.2,
+        "count_max": 0.2,
+        "fallback": false
+      },
+      {
+        "material_id": "W18",
+        "m2": 0.297,
+        "m2_exact": 0.2968,
+        "quantity": 1,
+        "sheet_size": [
+          2800.0,
+          2070.0
+        ],
+        "sheet_m2": 5.796,
+        "count_min": 0.1,
+        "count_max": 0.1,
+        "fallback": false
+      }
+    ],
+    "totals": {
+      "parts": 3,
+      "rows": 3,
+      "m2": 1.016,
+      "bm": 0.0,
+      "materials": 2,
+      "edges": 0,
+      "plates_min": 0.3,
+      "plates_max": 0.3
+    },
+    "materials_meta": {
+      "H18": {
+        "label": "H1181",
+        "color": [
+          124,
+          90,
+          58
+        ],
+        "th": 18.0,
+        "uni": false
+      },
+      "W18": {
+        "label": "W1000",
+        "color": null,
+        "th": 18.0,
+        "uni": false
+      }
+    },
+    "edges_meta": {
+    },
+    "vepo": {
+      "project": "GOLDEN",
+      "default_project": "GOLDEN",
+      "merge_18_36": true
+    },
+    "control": [
+      {
+        "severity": "orange",
+        "category": "budget",
+        "owner_id": null,
+        "part_key": null,
+        "hw_key": null,
+        "message_sk": "Štandardné riadky: 1 riadok bez ceny — medzisúčet je neúplný.",
+        "stable_key": "budget|section:standard_rows|incomplete",
+        "budget_section": "standard_rows",
+        "budget_row_key": null
+      },
+      {
+        "severity": "orange",
+        "category": "budget",
+        "owner_id": null,
+        "part_key": null,
+        "hw_key": null,
+        "message_sk": "Riadok „Vizualizácia + návrh“ nemá zadané m² — suma sa nedá vypočítať.",
+        "stable_key": "budget|std:vizualizacia|missing_m2",
+        "budget_section": "standard_rows",
+        "budget_row_key": "std:vizualizacia"
+      }
+    ],
+    "counts": {
+      "red": 0,
+      "orange": 2,
+      "total": 2,
+      "cabinets": 0,
+      "clean": 0
+    },
+    "budget": {
+      "mode": "standard",
+      "mode_label": "Štandard",
+      "currency": "EUR",
+      "vat_divisor": 1.23,
+      "sections": [
+        {
+          "key": "materials",
+          "name": "Materiál",
+          "rows": [
+            {
+              "key": "material:H18",
+              "nazov": "H1181 DTDL 18 mm",
+              "kod": null,
+              "dodavatel": null,
+              "mj": "PLATŇA",
+              "mnozstvo": 1,
+              "cena_mj": 211.55,
+              "spolu": 211.55,
+              "spolu_auto": 211.55,
+              "poznamka": "0,72 m² · formát 2800×2070 mm · plán: 1 platňa (horná hranica)",
+              "zdroj": "auto",
+              "cp_skupina": "zostava",
+              "price_missing": false,
+              "material_id": "H18",
+              "m2": 0.719,
+              "price_per_m2": 36.5,
+              "estimated": false,
+              "product_link": false,
+              "price_check": {
+                "kind": "sheet",
+                "id": "H18",
+                "label": "H1181 DTDL 18 mm",
+                "manual_check": true,
+                "state": "manual",
+                "checked_at": null,
+                "age_days": null,
+                "price_check_method": null,
+                "demos_url": null,
+                "product_link": false,
+                "price_missing": false
+              }
+            },
+            {
+              "key": "material:W18",
+              "nazov": "W1000 DTDL 18 mm",
+              "kod": null,
+              "dodavatel": null,
+              "mj": "PLATŇA",
+              "mnozstvo": 1,
+              "cena_mj": 155.91,
+              "spolu": 155.91,
+              "spolu_auto": 155.91,
+              "poznamka": "0,3 m² · formát 2800×2070 mm · plán: 1 platňa (horná hranica)",
+              "zdroj": "auto",
+              "cp_skupina": "zostava",
+              "price_missing": false,
+              "material_id": "W18",
+              "m2": 0.297,
+              "price_per_m2": 26.9,
+              "estimated": false,
+              "product_link": false,
+              "price_check": {
+                "kind": "sheet",
+                "id": "W18",
+                "label": "W1000 DTDL 18 mm",
+                "manual_check": true,
+                "state": "manual",
+                "checked_at": null,
+                "age_days": null,
+                "price_check_method": null,
+                "demos_url": null,
+                "product_link": false,
+                "price_missing": false
+              }
+            }
+          ],
+          "subtotal": 367.46,
+          "unknown_count": 0,
+          "complete": true,
+          "counts_in_total": true
+        },
+        {
+          "key": "abs",
+          "name": "ABS hrany",
+          "rows": [
+
+          ],
+          "subtotal": 0,
+          "unknown_count": 0,
+          "complete": true,
+          "counts_in_total": true
+        },
+        {
+          "key": "hardware",
+          "name": "Kovanie",
+          "rows": [
+
+          ],
+          "subtotal": 0,
+          "unknown_count": 0,
+          "complete": true,
+          "counts_in_total": true
+        },
+        {
+          "key": "services",
+          "name": "Služby",
+          "rows": [
+            {
+              "key": "service:olep",
+              "nazov": "Olepovanie ABS hrán",
+              "kod": null,
+              "dodavatel": null,
+              "mj": "BM",
+              "mnozstvo": 0,
+              "cena_mj": 0.9,
+              "spolu": 0.0,
+              "spolu_auto": 0.0,
+              "poznamka": "bm vrátane rezervy",
+              "zdroj": "auto",
+              "cp_skupina": "zostava",
+              "price_missing": false
+            },
+            {
+              "key": "service:porez",
+              "nazov": "Porez platní",
+              "kod": null,
+              "dodavatel": null,
+              "mj": "PLATŇA",
+              "mnozstvo": 2,
+              "cena_mj": 17.0,
+              "spolu": 34.0,
+              "spolu_auto": 34.0,
+              "poznamka": null,
+              "zdroj": "auto",
+              "cp_skupina": "zostava",
+              "price_missing": false
+            },
+            {
+              "key": "service:duplaky",
+              "nazov": "Lepenie duplákov",
+              "kod": null,
+              "dodavatel": null,
+              "mj": "KS",
+              "mnozstvo": 0,
+              "cena_mj": 50.0,
+              "spolu": 0.0,
+              "spolu_auto": 0.0,
+              "poznamka": null,
+              "zdroj": "auto",
+              "cp_skupina": "zostava",
+              "price_missing": false
+            },
+            {
+              "key": "service:pd_opracovanie",
+              "nazov": "Opracovanie pracovnej dosky",
+              "kod": null,
+              "dodavatel": null,
+              "mj": "FIX",
+              "mnozstvo": 0,
+              "cena_mj": 100.0,
+              "spolu": 0.0,
+              "spolu_auto": 0.0,
+              "poznamka": "zákazka neobsahuje pracovnú dosku",
+              "zdroj": "auto",
+              "cp_skupina": "zostava",
+              "price_missing": false
+            },
+            {
+              "key": "service:montaz",
+              "nazov": "Montáž",
+              "kod": null,
+              "dodavatel": null,
+              "mj": "M2",
+              "mnozstvo": 11.6,
+              "cena_mj": 15.0,
+              "spolu": 174.0,
+              "spolu_auto": 174.0,
+              "poznamka": "2 platní × 5,8 m²",
+              "zdroj": "auto",
+              "cp_skupina": "zostava",
+              "price_missing": false
+            }
+          ],
+          "subtotal": 208.0,
+          "unknown_count": 0,
+          "complete": true,
+          "counts_in_total": true
+        },
+        {
+          "key": "standard_rows",
+          "name": "Štandardné riadky",
+          "rows": [
+            {
+              "key": "std:doprava_zakaznik",
+              "nazov": "Doprava k zákazníkovi",
+              "kod": null,
+              "dodavatel": null,
+              "mj": "FIX",
+              "mnozstvo": 1.0,
+              "cena_mj": 60.0,
+              "spolu": 60.0,
+              "spolu_auto": 60.0,
+              "poznamka": null,
+              "zdroj": "auto",
+              "cp_skupina": "zostava",
+              "price_missing": false,
+              "kind": "fixed",
+              "multiplier": 1.0,
+              "rate": 60.0
+            },
+            {
+              "key": "std:doprava_vseobecna",
+              "nazov": "Doprava všeobecná",
+              "kod": null,
+              "dodavatel": null,
+              "mj": "FIX",
+              "mnozstvo": 1.0,
+              "cena_mj": 100.0,
+              "spolu": 100.0,
+              "spolu_auto": 100.0,
+              "poznamka": null,
+              "zdroj": "auto",
+              "cp_skupina": "zostava",
+              "price_missing": false,
+              "kind": "fixed",
+              "multiplier": 1.0,
+              "rate": 100.0
+            },
+            {
+              "key": "std:balne",
+              "nazov": "Balné",
+              "kod": null,
+              "dodavatel": null,
+              "mj": "FIX",
+              "mnozstvo": 1.0,
+              "cena_mj": 100.0,
+              "spolu": 100.0,
+              "spolu_auto": 100.0,
+              "poznamka": null,
+              "zdroj": "auto",
+              "cp_skupina": "zostava",
+              "price_missing": false,
+              "kind": "fixed",
+              "multiplier": 1.0,
+              "rate": 100.0
+            },
+            {
+              "key": "std:ostatne",
+              "nazov": "Ostatné náklady",
+              "kod": null,
+              "dodavatel": null,
+              "mj": "FIX",
+              "mnozstvo": 1.0,
+              "cena_mj": 100.0,
+              "spolu": 100.0,
+              "spolu_auto": 100.0,
+              "poznamka": null,
+              "zdroj": "auto",
+              "cp_skupina": "zostava",
+              "price_missing": false,
+              "kind": "fixed",
+              "multiplier": 1.0,
+              "rate": 100.0
+            },
+            {
+              "key": "std:material_montaz",
+              "nazov": "Materiál na montáž",
+              "kod": null,
+              "dodavatel": null,
+              "mj": "FIX",
+              "mnozstvo": 1.0,
+              "cena_mj": 100.0,
+              "spolu": 100.0,
+              "spolu_auto": 100.0,
+              "poznamka": null,
+              "zdroj": "auto",
+              "cp_skupina": "zostava",
+              "price_missing": false,
+              "kind": "fixed",
+              "multiplier": 1.0,
+              "rate": 100.0
+            },
+            {
+              "key": "std:vizualizacia",
+              "nazov": "Vizualizácia + návrh",
+              "kod": null,
+              "dodavatel": null,
+              "mj": "M2",
+              "mnozstvo": null,
+              "cena_mj": 15.0,
+              "spolu": null,
+              "spolu_auto": null,
+              "poznamka": "chýbajú m² z meračky",
+              "zdroj": "auto",
+              "cp_skupina": "zostava",
+              "price_missing": true,
+              "kind": "per_m2",
+              "multiplier": 1.0,
+              "rate": 15.0,
+              "missing_m2": true
+            },
+            {
+              "key": "std:odvody",
+              "nazov": "Odvody",
+              "kod": null,
+              "dodavatel": null,
+              "mj": "FIX",
+              "mnozstvo": 1.0,
+              "cena_mj": 100.0,
+              "spolu": 100.0,
+              "spolu_auto": 100.0,
+              "poznamka": null,
+              "zdroj": "auto",
+              "cp_skupina": "zostava",
+              "price_missing": false,
+              "kind": "fixed",
+              "multiplier": 1.0,
+              "rate": 100.0
+            },
+            {
+              "key": "std:zameranie",
+              "nazov": "Zameranie",
+              "kod": null,
+              "dodavatel": null,
+              "mj": "FIX",
+              "mnozstvo": 1.0,
+              "cena_mj": 100.0,
+              "spolu": 100.0,
+              "spolu_auto": 100.0,
+              "poznamka": null,
+              "zdroj": "auto",
+              "cp_skupina": "zostava",
+              "price_missing": false,
+              "kind": "fixed",
+              "multiplier": 1.0,
+              "rate": 100.0
+            }
+          ],
+          "subtotal": 660.0,
+          "unknown_count": 1,
+          "complete": false,
+          "counts_in_total": true
+        },
+        {
+          "key": "custom",
+          "name": "Vlastné položky",
+          "rows": [
+
+          ],
+          "subtotal": 0,
+          "unknown_count": 0,
+          "complete": true,
+          "counts_in_total": true
+        },
+        {
+          "key": "appliances",
+          "name": "Spotrebiče a vybavenie",
+          "rows": [
+
+          ],
+          "subtotal": 0,
+          "unknown_count": 0,
+          "complete": true,
+          "counts_in_total": false,
+          "included": false
+        },
+        {
+          "key": "rounding",
+          "name": "Zaokrúhlenie ponuky",
+          "rows": [
+            {
+              "key": "rounding",
+              "nazov": "Zaokrúhlenie ponuky",
+              "kod": null,
+              "dodavatel": null,
+              "mj": "FIX",
+              "mnozstvo": 1,
+              "cena_mj": 0.54,
+              "spolu": 0.54,
+              "spolu_auto": 0.54,
+              "poznamka": "na 1 € nahor",
+              "zdroj": "auto",
+              "cp_skupina": "zostava",
+              "price_missing": false
+            }
+          ],
+          "subtotal": 0.54,
+          "unknown_count": 0,
+          "complete": true,
+          "counts_in_total": true
+        }
+      ],
+      "totals": {
+        "raw_total": 1235.46,
+        "rounding": 0.54,
+        "rounding_step": 1.0,
+        "total": 1236.0,
+        "total_novat": 1004.88,
+        "unknown_count": 1,
+        "unknown_count_in_total": 1,
+        "complete": false,
+        "appliances_included": false,
+        "appliances_subtotal": 0.0,
+        "subtotals": {
+          "materials": 367.46,
+          "abs": 0,
+          "hardware": 0,
+          "services": 208.0,
+          "standard_rows": 660.0,
+          "custom": 0,
+          "appliances": 0,
+          "rounding": 0.54
+        }
+      },
+      "stale": {
+        "stale_days": 30,
+        "items": [
+          {
+            "kind": "sheet",
+            "id": "H18",
+            "label": "H1181 DTDL 18 mm",
+            "manual_check": true,
+            "state": "manual",
+            "checked_at": null,
+            "age_days": null,
+            "price_check_method": null,
+            "demos_url": null,
+            "product_link": false,
+            "price_missing": false
+          },
+          {
+            "kind": "sheet",
+            "id": "W18",
+            "label": "W1000 DTDL 18 mm",
+            "manual_check": true,
+            "state": "manual",
+            "checked_at": null,
+            "age_days": null,
+            "price_check_method": null,
+            "demos_url": null,
+            "product_link": false,
+            "price_missing": false
+          }
+        ],
+        "counts": {
+          "stale": 0,
+          "unverified": 0,
+          "manual": 2,
+          "fresh": 0,
+          "manual_hardware": 0,
+          "manual_materials": 2,
+          "manual_pending": 2,
+          "attention": 2
+        }
+      },
+      "settings": {
+        "supplier_id": "default",
+        "supplier_name": "Noxun",
+        "rounding_step": 1.0,
+        "abs_reserve_pct": 10.0,
+        "stale_days": 30,
+        "montaz_m2_per_plate": 5.8,
+        "cp_highlight_threshold": 150.0
+      },
+      "viz_m2": null,
+      "appliances_included": false,
+      "plan_prices": false,
+      "appliance_types": [
+        {
+          "code": "fridge",
+          "label": "Chladnička"
+        },
+        {
+          "code": "oven",
+          "label": "Rúra"
+        },
+        {
+          "code": "microwave",
+          "label": "Mikrovlnka"
+        },
+        {
+          "code": "dishwasher",
+          "label": "Umývačka"
+        },
+        {
+          "code": "hob",
+          "label": "Varná doska"
+        },
+        {
+          "code": "sink",
+          "label": "Drez"
+        },
+        {
+          "code": "hood",
+          "label": "Digestor"
+        },
+        {
+          "code": "other",
+          "label": "Iné"
+        }
+      ],
+      "budget_std": {
+        "state": "legacy",
+        "blocked": false,
+        "reason": ""
+      },
+      "budget_check": [
+        {
+          "severity": "orange",
+          "category": "budget",
+          "stable_key": "budget|std:vizualizacia|missing_m2",
+          "section": "standard_rows",
+          "row_key": "std:vizualizacia",
+          "message": "Riadok „Vizualizácia + návrh“ nemá zadané m² — suma sa nedá vypočítať."
+        },
+        {
+          "severity": "orange",
+          "category": "budget",
+          "stable_key": "budget|section:standard_rows|incomplete",
+          "section": "standard_rows",
+          "row_key": null,
+          "message": "Štandardné riadky: 1 riadok bez ceny — medzisúčet je neúplný."
+        }
+      ],
+      "cp_preview": {
+        "rows": [
+          {
+            "key": "cp:assembly",
+            "polozka": "Nábytková zostava – plošný a doplnkový materiál",
+            "cena": 134.54,
+            "mnozstvo": 1,
+            "mj": "set",
+            "kind": "assembly"
+          },
+          {
+            "key": "cp:item:material:H18",
+            "polozka": "H1181 DTDL 18 mm",
+            "cena": 211.55,
+            "mnozstvo": 1,
+            "mj": "set",
+            "kind": "item",
+            "source_key": "material:H18",
+            "suggested": true
+          },
+          {
+            "key": "cp:item:material:W18",
+            "polozka": "W1000 DTDL 18 mm",
+            "cena": 155.91,
+            "mnozstvo": 1,
+            "mj": "set",
+            "kind": "item",
+            "source_key": "material:W18",
+            "suggested": true
+          },
+          {
+            "key": "cp:zameranie",
+            "polozka": "Zameranie",
+            "cena": 0.0,
+            "mnozstvo": 1,
+            "mj": "set",
+            "kind": "fixed"
+          },
+          {
+            "key": "cp:vizualizacie",
+            "polozka": "Vizualizácie a príprava dokumentácie",
+            "cena": 0.0,
+            "mnozstvo": 1,
+            "mj": "set",
+            "kind": "fixed"
+          },
+          {
+            "key": "cp:montaz",
+            "polozka": "Montáž a výroba",
+            "cena": 174.0,
+            "mnozstvo": 1,
+            "mj": "set",
+            "kind": "fixed"
+          },
+          {
+            "key": "cp:rezia",
+            "polozka": "Prípravné a prevádzkové náklady a kompletačné položky",
+            "cena": 400.0,
+            "mnozstvo": 1,
+            "mj": "set",
+            "kind": "fixed"
+          },
+          {
+            "key": "cp:doprava",
+            "polozka": "Doprava",
+            "cena": 160.0,
+            "mnozstvo": 1,
+            "mj": "závoz",
+            "kind": "fixed"
+          }
+        ],
+        "total": 1236.0,
+        "total_label": "SPOLU",
+        "budget_total": 1236.0,
+        "diff": 0.0,
+        "consistent": true,
+        "assembly": 134.54,
+        "assembly_negative": false,
+        "unknown_count": 1,
+        "complete": false,
+        "threshold": 150.0,
+        "candidates": [
+          {
+            "source_key": "material:H18",
+            "section": "materials",
+            "label": "H1181 DTDL 18 mm",
+            "amount": 211.55,
+            "mnozstvo": 1,
+            "mj": "set",
+            "state": "samostatne",
+            "suggested": true,
+            "overridden": false
+          },
+          {
+            "source_key": "material:W18",
+            "section": "materials",
+            "label": "W1000 DTDL 18 mm",
+            "amount": 155.91,
+            "mnozstvo": 1,
+            "mj": "set",
+            "state": "samostatne",
+            "suggested": true,
+            "overridden": false
+          }
+        ],
+        "separate_count": 2,
+        "rezia_text": "Táto položka zahŕňa všetky nevyhnutné náklady súvisiace s realizáciou interiéru, vrátane prípravných prác, spotrebného a pomocného materiálu, logistiky, konzultácií, poradenstva, administratívnych prác a ostatných prevádzkových výdavkov potrebných na zabezpečenie kvalitnej a bezproblémovej realizácie projektu."
+      },
+      "appliance_owners": {
+        "matrix": {
+          "fridge": [
+            "cabinet"
+          ],
+          "oven": [
+            "cabinet"
+          ],
+          "microwave": [
+            "cabinet"
+          ],
+          "dishwasher": [
+            "slot"
+          ],
+          "hob": [
+            "board"
+          ],
+          "sink": [
+            "board"
+          ],
+          "hood": [
+
+          ],
+          "other": [
+
+          ]
+        },
+        "options": {
+          "cabinet": [
+
+          ],
+          "slot": [
+
+          ],
+          "board": [
+
+          ]
+        },
+        "job_label": "len zákazka (bez väzby)"
+      }
+    },
+    "sheet_layout": {
+      "ok": true,
+      "params": {
+        "kerf": 5.0,
+        "trim": 10.0,
+        "dup_allowance": 10.0
+      },
+      "source": "file",
+      "unreliable": false,
+      "blocked": null,
+      "without_material": {
+        "rows": 0,
+        "pieces": 0,
+        "items": [
+
+        ]
+      },
+      "materials": [
+        {
+          "id": "H18",
+          "label": "H1181",
+          "manufacturer": "Egger",
+          "th": 18.0,
+          "rgb": [
+            124,
+            90,
+            58
+          ],
+          "grain": "length",
+          "size": [
+            2800.0,
+            2070.0
+          ],
+          "usable": [
+            2780.0,
+            2050.0
+          ],
+          "trim": 10.0,
+          "no_trim": false,
+          "fallback": false,
+          "uni": false,
+          "orient": false,
+          "incomplete": false,
+          "upper_bound": true,
+          "invalid_params": false,
+          "blocked": null,
+          "sheets": 1,
+          "util": 12.4,
+          "phrase": {
+            "pre": "",
+            "n": "1 platňa",
+            "post": "(horná hranica)",
+            "cls": "",
+            "text": "1 platňa (horná hranica)"
+          },
+          "est": [
+            0.2,
+            0.2
+          ],
+          "est_budget": 1,
+          "budget_qty": 1,
+          "budget_src": null,
+          "rows": [
+            {
+              "k": [
+                5640,
+                5600,
+                180,
+                "H18",
+                [
+                  "",
+                  "",
+                  "",
+                  ""
+                ],
+                "none",
+                null
+              ],
+              "n": "Dno",
+              "s": "Dno",
+              "o": "CAB-002",
+              "l": 564.0,
+              "w": 560.0,
+              "c": 1,
+              "d": false,
+              "m": 1,
+              "q": 1,
+              "fl": 564.0,
+              "fw": 560.0
+            },
+            {
+              "k": [
+                7200,
+                5600,
+                180,
+                "H18",
+                [
+                  "",
+                  "",
+                  "",
+                  ""
+                ],
+                "none",
+                null
+              ],
+              "n": "Bok",
+              "s": "Bok",
+              "o": "CAB-001",
+              "l": 720.0,
+              "w": 560.0,
+              "c": 1,
+              "d": false,
+              "m": 1,
+              "q": 1,
+              "fl": 720.0,
+              "fw": 560.0
+            }
+          ],
+          "plates": [
+            {
+              "u": 12.4,
+              "p": [
+                [
+                  1,
+                  0.0,
+                  0.0
+                ],
+                [
+                  0,
+                  725.0,
+                  0.0
+                ]
+              ],
+              "o": [
+                0.0,
+                565.0,
+                2780.0,
+                1485.0
+              ]
+            }
+          ],
+          "unplaced": [
+
+          ],
+          "rejected": [
+
+          ],
+          "conflicts": [
+
+          ]
+        },
+        {
+          "id": "W18",
+          "label": "W1000",
+          "manufacturer": "",
+          "th": 18.0,
+          "rgb": null,
+          "grain": "none",
+          "size": [
+            2800.0,
+            2070.0
+          ],
+          "usable": [
+            2780.0,
+            2050.0
+          ],
+          "trim": 10.0,
+          "no_trim": false,
+          "fallback": false,
+          "uni": false,
+          "orient": false,
+          "incomplete": false,
+          "upper_bound": true,
+          "invalid_params": false,
+          "blocked": null,
+          "sheets": 1,
+          "util": 5.1,
+          "phrase": {
+            "pre": "",
+            "n": "1 platňa",
+            "post": "(horná hranica)",
+            "cls": "",
+            "text": "1 platňa (horná hranica)"
+          },
+          "est": [
+            0.1,
+            0.1
+          ],
+          "est_budget": 1,
+          "budget_qty": 1,
+          "budget_src": null,
+          "rows": [
+            {
+              "k": [
+                5600,
+                5300,
+                180,
+                "W18",
+                [
+                  "",
+                  "",
+                  "",
+                  ""
+                ],
+                "none",
+                null
+              ],
+              "n": "Polica",
+              "s": "Polica",
+              "o": "CAB-001",
+              "l": 560.0,
+              "w": 530.0,
+              "c": 1,
+              "d": false,
+              "m": 1,
+              "q": 1,
+              "fl": 560.0,
+              "fw": 530.0
+            }
+          ],
+          "plates": [
+            {
+              "u": 5.1,
+              "p": [
+                [
+                  0,
+                  0.0,
+                  0.0
+                ]
+              ],
+              "o": [
+                0.0,
+                535.0,
+                2780.0,
+                1515.0
+              ]
+            }
+          ],
+          "unplaced": [
+
+          ],
+          "rejected": [
+
+          ],
+          "conflicts": [
+
+          ]
+        }
+      ]
+    },
+    "edge_check": null,
+    "grain_check": null,
+    "direction_check": null,
+    "mat": null,
+    "hw": null,
+    "appl": null,
+    "rules": null,
+    "tpl": null,
+    "settings": null,
+    "open_section": null,
+    "anchor": null
+  }
+}

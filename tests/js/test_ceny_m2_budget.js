@@ -37,6 +37,7 @@ bctx.window = bctx;
 vm.createContext(bctx);
 // H4 · D-04: PORADIE ako v studio.html — `studio.js` (formátovač `nxf*`) PRED
 // `budget.js`; bez neho by sa kreslil núdzový zápis (kódy MJ bez prekladu).
+vm.runInContext(fs.readFileSync(path.join(JS, 'studio_sections.js'), 'utf8'), bctx);
 vm.runInContext(fs.readFileSync(path.join(JS, 'studio.js'), 'utf8'), bctx);
 vm.runInContext(fs.readFileSync(path.join(JS, 'budget.js'), 'utf8'), bctx);
 const B = bctx;
