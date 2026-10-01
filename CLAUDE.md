@@ -59,9 +59,9 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa
   kovanie alebo ceny**. **Hranice s príkladmi (od 1.10.2026):**
   - výrobná/cenová **áno:** zmena vzorca, rozmeru, počtu, hrany; zmena zoskupenia riadkov kusovníka (`row_key`) alebo obsahu či stĺpcov exportu (VEPO,
     CSV/XLSX kusovníka, nákup, ponuka); zmena ceny, sadzby alebo **čísla, podľa ktorého sa v okne objednáva či cenotvorí** (množstvo, počet platní, cena
-    položky) — aj keď sa výpočet nemení a mení sa len to, čo okno ukazuje;
-  - výrobná/cenová **nie:** nový **čítací** stĺpec alebo popis v okne bez zmeny `row_key`, zoskupenia a exportov (precedens `rows_with_roles`); preklad
-    nadpisov a popiskov bez zmeny čísel a CSV; farba, ikona, rozloženie;
+    položky) — aj keď sa výpočet nemení a mení sa len to, čo okno ukazuje, a **aj v novom čítacom stĺpci**;
+  - výrobná/cenová **nie:** nový **popisný** čítací stĺpec alebo popis v okne, ktorého hodnoty sa nepoužívajú na výrobu, objednávanie ani cenu, bez
+    zmeny `row_key`, zoskupenia a exportov (precedens `rows_with_roles`); preklad nadpisov a popiskov bez zmeny čísel a CSV; farba, ikona, rozloženie;
   - **nový ovládací prvok v UI** (hranica predrecenzie nižšie) **áno:** nové tlačidlo, prepínač, pole, rozbaľovačka alebo položka menu, ktorá niečo
     **spúšťa alebo zapisuje** (model, súbor, nastavenia, katalóg); **nie:** ďalšia voľba v existujúcom zozname s rovnakým správaním ako susedné (napr.
     ďalší stĺpec v menu „Stĺpce"), presun existujúceho tlačidla alebo jeho zmena na ikonu bez zmeny akcie.
