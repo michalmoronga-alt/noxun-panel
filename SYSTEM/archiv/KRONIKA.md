@@ -34,7 +34,7 @@
   `test_roha2_vkladanie`, `test_s1e0_min_vyska`, `test_st3c_tpl` ×2, `test_uib3_rady`). **Mutácie 13/13 zabité** (B1–B13, zoznam v `test_h12b_panel.rb`;
   B12 — rozsah slotu — zachytil až nový test rozsahov preflightu). In-SU `run_h12b`: apply šírky na 4 typoch, šablóna rovnakého/iného typu, zámok typu šablóny
   slotu a rohovej, `type_word` v knižnici, strana rohovej, ghost hornej Z 1400 — každá 1 krok Späť. **Testy:** 5131 headless · 151 JS sád · encoding guard;
-  in-SU **3366 / 0** na `778a37eb` (golden `run_h12` bajtovo rovnaký); po ňom len testy a dokumentácia. Predrecenzia povinná (výrobná, audit-povinná).
+  in-SU **3366 / 0** na `778a37eb` aj po predrecenzii na `ddb82b8c` (golden `run_h12` bajtovo rovnaký). Predrecenzia: 0× P1/P2, 5× P3 opravené v `ddb82b8c` (`type_scope` aj v „Načítať globálne", guard porovnania s ID-konštantami registra, dôvod odmietnutí v `run_h12b`, zoznam mutácií, fotky A6 v PR).
   STAV pred dávkou: v0.17.11 · H12a hotová · Robí sa H6/H7 (mockupy), H11a · Ďalší krok H12b, H12c, H12d.
 
 - **H12a · register typov skrinky + jadro (1.10.2026, PR #446, v0.17.11, blok 9 · HARDENING PO V1, triedenie C-01; package
