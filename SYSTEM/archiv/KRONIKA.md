@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H4b · texty a vzhľad (1.10.2026, PR #?, v0.17.4, blok 9 · HARDENING PO V1, položky triedenia HARDENING D-06 · D-07 · D-08 · D-09 — nie D-čísla
+- **H4b · texty a vzhľad (1.10.2026, PR #438, v0.17.4, blok 9 · HARDENING PO V1, položky triedenia HARDENING D-06 · D-07 · D-08 · D-09 — nie D-čísla
   DOGFOODINGU; package [PACKAGE_H4.md](../zdroje/bloky/HARDENING/PACKAGE_H4.md) časť H4b, zladenie §5.1).** **D-06:** núdzové „Obnoviť zálohu" stálo v lište
   Materiálov hneď vedľa bežného „Obnoviť" — teraz je to položka **„Vrátiť katalóg pred migráciou…" v ponuke „⋯"** za „Obnoviť" (Q1 bez odpovede → predvolený
   variant A); „⋯" sa bez zálohy nekreslí, ponuka je overlay, Escape zavrie len ju (`mdMoreOpen` v `nx_esc.js` FLYOUT_FLAGS), výber otvorí ten istý modal
