@@ -34,13 +34,13 @@ počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení,
 
 **Blok 9 · HARDENING PO V1** (štart 1.10.2026, PR #432): krížový audit V1 sedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**;
 17 dávok **H1…H17** sekvenčne podľa tabuľky v [PLAN.md](PLAN.md), **bez zmeny výrobných a cenových čísel**; priečinok bloku [zdroje/bloky/HARDENING/](zdroje/bloky/HARDENING/).
-Hotové **H1** PR #433 · **H2** (fotenie okien) PR #434 · **H3a** (zavádzajúce údaje v okne) PR #435 · **H3b** (falošná chyba v Ruby konzole po novom súbore) PR #436 · **H4a** (zápis čísel) PR #437 · **H4b** (texty a vzhľad) PR #438; nasleduje **H5**.
+Hotové **H1** PR #433 · **H2** (fotenie okien) PR #434 · **H3a** (zavádzajúce údaje v okne) PR #435 · **H3b** (falošná chyba v Ruby konzole po novom súbore) PR #436 · **H4a** (zápis čísel) PR #437 · **H4b** (texty a vzhľad) PR #438 · **H5a** (mapa okien bez histórie, strážca rastu dokumentov) PR #?; nasleduje **H5b**.
 **H4b — Michalove otázky Q1/Q2 bez odpovede, platí predvolená vratná voľba:** vrátenie katalógu v ponuke „⋯" Materiálov (nie v O plugine) a ikona posuvníkov pre Nastavenia rozpočtu.
 **H6 a H7 čakajú na schválený mockup** (R-38 v H7 potvrdí Michal) · **Q1** (porez a montáž pri skle) bez odpovede · pri prvej rohovej v dielni overiť záves Sensys · **na smoke čakajú** D-132 (#367), D-133 (#368), D-134 (#369).
 
 ## Ďalší krok
 
-Pokračovať blokom 9 v poradí tabuľky: **H5**; medzitým mockupy **H6** a **H7** na schválenie Michalom. Potom **R-13 → R-37
+Pokračovať blokom 9 v poradí tabuľky: **H5b** (UI_DIZAJN — norma oddelená od denníka, zastarané vety); medzitým mockupy **H6** a **H7** na schválenie Michalom. Potom **R-13 → R-37
 → R-35** ako **H8–H10** (**R-13 rozhodnuté 29.9.: čítať** — ORANGE „dielec z inej verzie štandardu") a refaktory H11–H17; uzáver bloku = minor verzia + smoke
 (smoke H3a + H3b: 7 bodov v [PACKAGE_H3.md](zdroje/bloky/HARDENING/PACKAGE_H3.md) §10; H4a + H4b: body 1–11 v [PACKAGE_H4.md](zdroje/bloky/HARDENING/PACKAGE_H4.md) §10; vzhľad rozbaľovačiek a výberu nôh v SketchUpe overí smoke bod 7). Ak druhé PC ešte nemá 0.17.0, aktualizovať (Kompatibilita vyššie). **Test na reálnej zákazke po V1.**
 
