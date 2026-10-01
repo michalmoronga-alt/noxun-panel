@@ -303,6 +303,35 @@
     ? require('./studio.js')          // Node testy — TEN ISTY helper
     : null;
 
+  // H4 · D-04 (triedenie HARDENING): zápis množstiev, jednotiek a peňažných
+  // polí = formátovač okna Štúdio (`nxf*` v studio.js — v okne globál súboru
+  // načítaného PRED týmto, v Node require). Bez neho (parse chyba studio.js,
+  // izolovaný test) núdzový zápis: kódy MJ bez prekladu, čísla s čiarkou
+  // a NIČ sa neskryje — okno nespadne (vzor `budRefreshBtnHtml`). Kódy MJ
+  // v payloade aj XLSX ostávajú.
+  function budNxf(name){
+    if (typeof window !== 'undefined' && window && typeof window[name] === 'function') return window[name];
+    return (BUD_STUDIO && typeof BUD_STUDIO[name] === 'function') ? BUD_STUDIO[name] : null;
+  }
+  function budQty(v, mj){
+    var f = budNxf('nxfQty');
+    if (f) return f(v, mj);
+    if (mj === 'BM' || mj === 'M2') return budFmtNum(v, 2);
+    return budNumText(v) || '—';
+  }
+  function budUnit(mj, n){
+    var f = budNxf('nxfUnit');
+    if (f) return f(mj, n);
+    return mj === 'M2' ? 'm²' : String(mj == null ? '' : mj);
+  }
+  // Hodnota PEŇAŽNÉHO poľa („68,00") — `budParse` ju prečíta späť na to isté číslo.
+  function budMoneyIn(v){
+    var f = budNxf('nxfMoneyIn');
+    return f ? f(v) : budNumText(v);
+  }
+  // Tlmené „€" za peňažným poľom (bez nového riadku).
+  var BUD_EUR_AFTER = ' <span class="bfnt">€</span>';
+
   function budStaleFlag(){
     return (typeof staleFlag === 'undefined') ? false : staleFlag === true;
   }
@@ -810,8 +839,8 @@
     var perM2 = (!area && r.price_per_m2 != null)
       ? ' <span class="bfnt">(' + bEsc(budFmtEur(budDisplay(r.price_per_m2, BUD_VAT, d))) + '/m²)</span>' : '';
     return '<tr' + budRowClass(r) + '><td>' + budMatLinkHtml(r, 'sheet') + bEsc(r.nazov) + budNoteHtml(r) + '</td>' +
-      '<td class="bnum">' + budQtyTagHtml(r) + bEsc(budFmtNum(r.mnozstvo, area ? 2 : 0)) + '</td>' +
-      '<td class="bnum">' + bEsc(area ? 'm²' : r.mj) + '</td>' +
+      '<td class="bnum">' + budQtyTagHtml(r) + bEsc(budQty(r.mnozstvo, area ? 'M2' : r.mj)) + '</td>' +
+      '<td class="bnum">' + bEsc(budUnit(area ? 'M2' : r.mj)) + '</td>' +
       '<td class="bnum">' + (r.price_missing ? '<span class="bmisslbl">chýba cena</span>'
         : bEsc(budSub(r.cena_mj, d)) + perM2) + '</td>' +
       '<td class="bnum">' + fresh + '</td>' +
@@ -846,8 +875,8 @@
 
   function budSimpleRow(r, b, d){
     return '<tr' + budRowClass(r) + '><td>' + budMatLinkHtml(r, 'edge') + bEsc(r.nazov) + budNoteHtml(r) + '</td>' +
-      '<td class="bnum">' + bEsc(budFmtNum(r.mnozstvo, 1)) + '</td>' +
-      '<td class="bnum">' + bEsc(r.mj) + '</td>' +
+      '<td class="bnum">' + bEsc(budQty(r.mnozstvo, 'BM')) + '</td>' +
+      '<td class="bnum">' + bEsc(budUnit(r.mj)) + '</td>' +
       budPriceCell(r, d) +
       '<td class="bnum">' + budMatFreshHtml(r, r.abs_id, 'edge', b) + '</td>' +
       '<td class="bnum">' + bEsc(budSub(r.spolu, d)) + '</td></tr>';
@@ -856,8 +885,8 @@
   function budHardwareRow(r, d){
     return '<tr' + budRowClass(r) + '><td class="bmut">' + budHardwareLink(r) + bEsc(r.kod) + '</td>' +
       '<td>' + bEsc(r.nazov) + budNoteHtml(r) + '</td>' +
-      '<td class="bnum">' + bEsc(budFmtNum(r.mnozstvo, 0)) + '</td>' +
-      '<td class="bnum">' + bEsc(r.mj) + '</td>' +
+      '<td class="bnum">' + bEsc(budQty(r.mnozstvo, r.mj)) + '</td>' +
+      '<td class="bnum">' + bEsc(budUnit(r.mj)) + '</td>' +
       (r.price_check ? '<td class="bnum">' +
         (r.price_missing ? '<span class="bmisslbl">chýba cena</span>' : bEsc(budSub(r.cena_mj, d))) +
         budManualCheckHtml(r.kod, r.nazov, r.price_check, true) + '</td>' : budPriceCell(r, d)) +
@@ -905,13 +934,15 @@
     }
     return '<td class="bnum">' + auto +
       '<input class="bedit" type="text" data-bud="override" data-key="' + bEsc(r.key) + '"' +
-      ' data-bkey="ov:' + bEsc(r.key) + '" value="' + bEsc(budNumText(r.spolu)) + '"' +
+      ' data-bkey="ov:' + bEsc(r.key) + '" value="' + bEsc(budMoneyIn(r.spolu)) + '"' +
       ' title="Ručný prepis sumy — prázdne pole vráti automatický výpočet" aria-label="Suma riadku">' +
+      BUD_EUR_AFTER +
       (over ? ' <svg class="ic bpen" aria-hidden="true"><use href="#i-pencil"/></svg>' : '') + '</td>';
   }
 
   function budServiceRow(r, d){
-    var calc = budFmtNum(r.mnozstvo, 2) + ' ' + bEsc(r.mj) + ' × ' +
+    // H4 · D-04: „37,26 bm × 1,10 €", „4 platne × 17,00 €", „0 paušálov × …".
+    var calc = bEsc(budQty(r.mnozstvo, r.mj) + ' ' + budUnit(r.mj, r.mnozstvo)) + ' × ' +
                bEsc(budSub(r.cena_mj, d)) + (r.poznamka ? ' <span class="bfnt">· ' + bEsc(r.poznamka) + '</span>' : '');
     return '<tr' + budRowClass(r) + '><td>' + bEsc(r.nazov) + '</td>' +
       '<td class="bnum bmut">' + calc + '</td>' + budOverrideCell(r, d) + '</tr>';
@@ -960,9 +991,9 @@
       '<td class="bnum"><input class="bedit bshort" type="text" data-bud="custom_field" data-field="pocet"' +
       ' data-id="' + bEsc(r.id) + '" data-bkey="c:pocet:' + bEsc(r.id) + '" value="' + bEsc(budNumText(r.mnozstvo)) + '"' +
       ' aria-label="Počet"></td>' +
-      '<td class="bnum"><input class="bedit bshort" type="text" data-bud="custom_field" data-field="cena"' +
-      ' data-id="' + bEsc(r.id) + '" data-bkey="c:cena:' + bEsc(r.id) + '" value="' + bEsc(budNumText(r.cena_mj)) + '"' +
-      ' placeholder="0,00" aria-label="Cena"></td>' +
+      '<td class="bnum"><input class="bedit bshort bmoney" type="text" data-bud="custom_field" data-field="cena"' +
+      ' data-id="' + bEsc(r.id) + '" data-bkey="c:cena:' + bEsc(r.id) + '" value="' + bEsc(budMoneyIn(r.cena_mj)) + '"' +
+      ' placeholder="0,00" aria-label="Cena">' + BUD_EUR_AFTER + '</td>' +
       budActionsCell('custom', r) +
       '<td class="bnum">' + bEsc(budSub(r.spolu, d)) + '</td></tr>';
   }
@@ -1028,9 +1059,9 @@
       '<span class="bfnt"> · ' + bEsc(budApplOwnerText(r)) + '</span>' + flag + '</td>' +
       '<td><input class="bedit" type="text"' + base + ' data-field="dodavatel" data-bkey="a:dod:' + bEsc(r.id) + '"' +
       ' value="' + bEsc(r.dodavatel || '') + '" placeholder="Dodávateľ" aria-label="Dodávateľ"></td>' +
-      '<td class="bnum"><input class="bedit bshort" type="text"' + base + ' data-field="cena"' +
-      ' data-bkey="a:cena:' + bEsc(r.id) + '" value="' + bEsc(budNumText(r.cena_mj)) + '" placeholder="0,00"' +
-      ' aria-label="Cena"></td>' +
+      '<td class="bnum"><input class="bedit bshort bmoney" type="text"' + base + ' data-field="cena"' +
+      ' data-bkey="a:cena:' + bEsc(r.id) + '" value="' + bEsc(budMoneyIn(r.cena_mj)) + '" placeholder="0,00"' +
+      ' aria-label="Cena">' + BUD_EUR_AFTER + '</td>' +
       budActionsCell('appliance', r) +
       '<td class="bnum">' + bEsc(budSub(r.spolu, d)) + '</td></tr>';
   }
@@ -1437,7 +1468,7 @@
       '<th>V ponuke</th></tr></thead><tbody>';
     rows.forEach(function(r){
       h += '<tr class="' + (r.kind === 'assembly' ? 'bcpasm' : '') + '"><td>' + bEsc(r.polozka) + '</td>' +
-        '<td class="bnum">' + bEsc(budFmtNum(r.mnozstvo, 0)) + '</td>' +
+        '<td class="bnum">' + bEsc(budQty(r.mnozstvo, 'KS')) + '</td>' +
         '<td class="bnum">' + bEsc(r.mj) + '</td>' +
         '<td class="bnum">' + budCpAmountHtml(r, d) + '</td>' +
         '<td>' + budCpSepHtml(r.source_key, true) + '</td></tr>';
@@ -1805,7 +1836,7 @@
              placeholder: 'nepovinné' },
            // `cena_mj` nesie ULOZENU cenu aj pri „dodáva zákazník" (priznak
            // nuluje len medzisucet, nikdy zapis) — presne ako bunka tabulky.
-           { key: 'cena', label: 'Cena', value: budNumText(r.cena_mj),
+           { key: 'cena', label: 'Cena', value: budMoneyIn(r.cena_mj),
              placeholder: '0,00', cls: 'mshort' }]
         : [];
       return head.concat([

@@ -126,8 +126,8 @@ const CAT = {
   const lines = M.mdUniSummaryLines(s);
   ok(lines[0].indexOf('Korpus, Chrbát') >= 0, 'predvolby v prvom riadku');
   ok(lines.some(l => l.indexOf('Skrinky: 3') >= 0), 'sucet skriniek');
-  ok(lines.some(l => l.indexOf('prevezme hrúbku 18.6 mm') >= 0), 'adopcia hrubky');
-  ok(lines.some(l => l.indexOf('BRD-001 (12→18.6 mm)') >= 0), 'doska so zmenou hrubky');
+  ok(lines.some(l => l.indexOf('prevezme hrúbku 18,6 mm') >= 0), 'adopcia hrubky');
+  ok(lines.some(l => l.indexOf('BRD-001 (12→18,6 mm)') >= 0), 'doska so zmenou hrubky');
   ok(lines.some(l => l.indexOf('BRD-002') >= 0 && l.indexOf('BRD-002 (') < 0),
      'doska bez zmeny hrubky bez zatvorky');
   ok(lines.some(l => l.indexOf('ABS hrany sa prevedú') >= 0), 'ABS remap riadok');

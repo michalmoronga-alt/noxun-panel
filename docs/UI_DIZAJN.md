@@ -243,6 +243,28 @@ druhý počítač). Pravidlá sú úzke zámerne:
 - Základ: 13 px. Labely 12–13 px, hinty 10,5 px, ID v hlavičke 14 px (700).
 - Nadpisy sekcií (`summary`, `legend`): 12 px, 600.
 
+### Zápis čísel a jednotiek (H4 · D-04, triedenie HARDENING)
+
+Okno Štúdio píše čísla **všade rovnako** cez JEDEN formátovač `nxf*` v `ui/js/studio.js` (sekcie ho volajú ako globál, v Node
+requirom). Pravidlá:
+
+- **Nikdy neskryť hodnotu.** Zaokrúhlenie len tam, kde ho robí aj výstup (dĺžka/šírka dielca na celé mm = VEPO). Hrúbka 18,6 je
+  „18,6", nie „19"; bm 70,94 je „70,94", nie „70,9"; 2,4 balenia nie je „2".
+- **Desatinná čiarka** všade, kde číslo čítajú ľudia. Bodka len vo vstupných poliach, ktoré si ju samy pýtajú (Materiály, Pravidlá).
+- **MJ v dátach = kód, v okne = text.** Payload, XLSX a poznámky servera nesú kódy (`PLATŇA`, `BM`, `M2`, `FIX`…); preklad je
+  výhradne v JS (`nxfUnit`). Cenová ponuka má vlastný slovník v Ruby.
+- **Oddeľovač tisícov len pri peniazoch** (nezalomiteľná medzera); rozmery bez medzier ako vo výkresoch a VEPO.
+
+| Funkcia | Použitie | Zápis |
+|---|---|---|
+| `nxfMoney(v)` | sumy, ceny za MJ | „1 323,10 €", „0,00 €", mínus „−" (U+2212), null → „—" (dvojča `budFmtEur`) |
+| `nxfMoneyIn(v)` | hodnota peňažného poľa | „68,00", „40,987" — bez tisícov a €, mínus ASCII (prečíta ju `budParse`); € ide tlmene ZA pole |
+| `nxfQty(v, mj)` | množstvo podľa kódu MJ | kusové (`KS PLATŇA SET PÁR BAL FIX`) celé bez desatinných, necelé max 2; merné (`BM M2`) vždy 2; neznámy kód max 3 |
+| `nxfUnit(mj, n)` | text jednotky | ks · bm · m² · set · pár · bal · platňa/platne/platní · paušál/paušály/paušálov |
+| `nxfMm(v)` | hrúbky, mm v texte | max 2 desatinné bez koncových núl (zrkadlo `mmLabel` a `Materials.fmt_mm`) |
+| `nxfDim(v)` | dĺžka a šírka dielca | celé mm, polovica nahor (= VEPO) |
+| `nxfDec(v, max)` | ostatné čísla v texte (kg, %) | max `max` desatinných bez koncových núl |
+
 ---
 
 ## 4. Ikony

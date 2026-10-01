@@ -191,6 +191,104 @@
   function num(v, dec){
     return (v == null || isNaN(v)) ? '—' : Number(v).toFixed(dec == null ? 0 : dec).replace('.', ',');
   }
+
+  // ============ ZÁPIS ČÍSEL A JEDNOTIEK (H4 · D-04, triedenie HARDENING) ============
+  // JEDEN formátovač okna Štúdio. Mení sa LEN ZÁPIS (desatinná čiarka, celé kusy
+  // bez „,00", peniaze s € a dvomi desatinnými, jednotky malým) — hodnota nikdy:
+  // nič sa neskryje zaokrúhlením (hrúbka 18,6 nie je „19", bm 70,94 nie je „70,9").
+  // Funkcie sú GLOBÁLNE (sekcie sa načítavajú ZA týmto súborom, vzor
+  // `refreshBtnHtml`); v Node ich dostanú requirom (`module.exports`).
+  // Payload, XLSX, CSV ani VEPO sa NEMENIA — kódy MJ (`PLATŇA`, `BM`…) ostávajú
+  // v dátach, do textu ich prekladá až `nxfUnit`. Pravidlá: docs/UI_DIZAJN.md
+  // („Zápis čísel a jednotiek").
+  var NXF_COUNT_MJ = { 'KS': 1, 'PLATŇA': 1, 'SET': 1, 'PÁR': 1, 'BAL': 1, 'FIX': 1 };
+  var NXF_MEASURE_MJ = { 'BM': 1, 'M2': 1 };
+  var NXF_UNIT = { 'KS': 'ks', 'BM': 'bm', 'M2': 'm²', 'SET': 'set', 'PÁR': 'pár', 'BAL': 'bal' };
+
+  function nxfBlank(v){ return v === null || v === undefined || v === '' || isNaN(v); }
+
+  // Max `max` desatinných BEZ koncových núl, čiarka, bez oddeľovača tisícov.
+  // Mínus U+2212 (typografický; polia ho nedostanú — tie majú `nxfMoneyIn`).
+  function nxfTrim(v, max){
+    var f = Number(v);
+    var p = Math.pow(10, max);
+    var r = Math.round(Math.abs(f) * p) / p;
+    var s = r.toFixed(max);
+    if (max > 0) s = s.replace(/0+$/, '').replace(/\.$/, '');
+    return (f < 0 && r !== 0 ? '−' : '') + s.replace('.', ',');
+  }
+
+  // Peniaze — DVOJČA `budFmtEur` (budget.js musí fungovať aj bez tohto súboru);
+  // zhodu stráži test na 200 hodnotách (tests/js/test_h4a_format.js, T2).
+  function nxfMoney(v){
+    if (nxfBlank(v)) return '—';
+    var f = Math.round(Number(v) * 100) / 100;
+    var neg = f < 0;
+    var parts = Math.abs(f).toFixed(2).split('.');
+    // Oddeľovač tisícov = NEZALOMITEĽNÁ medzera — LEN pri peniazoch.
+    // Escape sekvencia, nie neviditeľný znak v zdrojáku (vzor `budFmtEur`).
+    var whole = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
+    return (neg ? '−' : '') + whole + ',' + parts[1] + ' €';
+  }
+
+  // Hodnota PEŇAŽNÉHO POĽA: čiarka, bez tisícov a bez €, 2–3 desatinné (presnosť
+  // `budNumText`), mínus ASCII — `budParse` ju prečíta späť na to isté číslo.
+  function nxfMoneyIn(v){
+    if (nxfBlank(v)) return '';
+    var r3 = Math.round(Number(v) * 1000) / 1000;
+    var s = (Math.round(r3 * 100) / 100 === r3) ? r3.toFixed(2) : r3.toFixed(3);
+    if (/^-0\.0+$/.test(s)) s = s.slice(1);
+    return s.replace('.', ',');
+  }
+
+  // Množstvo podľa KÓDU MJ: kusové celé bez desatinných, necelé max 2 (nikdy
+  // nezaokrúhli na celé); merné (bm, m²) vždy 2; neznámy kód max 3.
+  function nxfQty(v, mj){
+    if (nxfBlank(v)) return '—';
+    var k = String(mj == null ? '' : mj).toUpperCase();
+    if (NXF_MEASURE_MJ[k]){
+      var f = Math.round(Number(v) * 100) / 100;
+      return (f < 0 ? '−' : '') + Math.abs(f).toFixed(2).replace('.', ',');
+    }
+    return nxfTrim(v, NXF_COUNT_MJ[k] ? 2 : 3);
+  }
+
+  // Text jednotky z KÓDU MJ. Pri `PLATŇA` a `FIX` so skloňovaním podľa `n`
+  // (bez `n` = tvar do stĺpca MJ). Neznámy kód sa vypíše bez zmeny.
+  function nxfUnit(mj, n){
+    var k = String(mj == null ? '' : mj).toUpperCase();
+    if (NXF_UNIT[k]) return NXF_UNIT[k];
+    if (k !== 'PLATŇA' && k !== 'FIX') return String(mj == null ? '' : mj);
+    var forms = k === 'PLATŇA' ? ['platňa', 'platne', 'platní'] : ['paušál', 'paušály', 'paušálov'];
+    if (nxfBlank(n)) return forms[0];
+    var x = Math.abs(Number(n));
+    if (x !== Math.floor(x)) return forms[1];
+    if (x === 1) return forms[0];
+    return (x >= 2 && x <= 4) ? forms[1] : forms[2];
+  }
+
+  function nxfQtyUnit(v, mj){ return nxfQty(v, mj) + ' ' + nxfUnit(mj, v); }
+
+  // Jednotka KATALÓGU kovania (`ks`, `m`, `par`…) → kód MJ — ZRKADLO
+  // `Budget::HW_UNIT_LABELS` (core/budget.rb), aby Nákup kovania písal jednotku
+  // rovnako ako Rozpočet („bm", „pár"). Neznáma jednotka → null (vypíše sa surovo).
+  var NXF_HW_UNIT = { 'ks': 'KS', 'set': 'SET', 'sada': 'SET', 'par': 'PÁR', 'pár': 'PÁR',
+                      'bal': 'BAL', 'balenie': 'BAL', 'm': 'BM', 'bm': 'BM' };
+  function nxfHwUnitCode(u){
+    var k = String(u == null ? '' : u).trim().toLowerCase();
+    return Object.prototype.hasOwnProperty.call(NXF_HW_UNIT, k) ? NXF_HW_UNIT[k] : null;
+  }
+
+  // Milimetre (hrúbky, mm v texte): max 2 desatinné bez koncových núl — zrkadlo
+  // Inspectora `mmLabel` a Ruby `Materials.fmt_mm`.
+  function nxfMm(v){ return nxfBlank(v) ? '—' : nxfTrim(v, 2); }
+
+  // Dĺžka a šírka dielca: celé mm, polovica nahor (= VEPO `rounded_dims`), bez
+  // oddeľovača tisícov (zhoda s výkresmi a VEPO).
+  function nxfDim(v){ return nxfBlank(v) ? '—' : String(Math.round(Number(v))); }
+
+  // Ostatné čísla v texte (kg, %): max `max` desatinných bez koncových núl.
+  function nxfDec(v, max){ return nxfBlank(v) ? '—' : nxfTrim(v, max == null ? 2 : max); }
   function ico(n){ return '<svg class="ic" aria-hidden="true"><use href="#i-' + n + '"/></svg>'; }
 
   // JEDINY markup tlacidla „Obnoviť" v celom okne. Pouzivaju ho VSETKY sekcie:
@@ -321,15 +419,32 @@
   // dielca v Inspectore, ktora ju zaroven kresli.
   var EDGE_CODES = ['L1', 'L2', 'W1', 'W2'];
 
-  // Hrubka pasky do kompaktneho zapisu: „1", „2", „0,8" (bez zbytocnej nuly).
+  // Hrubka pasky do kompaktneho zapisu: „1", „2", „0,8", „0,45" (bez zbytocnej
+  // nuly). H4 · D-04: cez `nxfMm` — 0,45 uz nie je „0,5".
   function edgeThShort(th){
     if (th == null || isNaN(th)) return '';
-    var v = Number(th);
-    return (Math.round(v * 10) % 10 === 0) ? String(Math.round(v)) : v.toFixed(1).replace('.', ',');
+    return nxfMm(th);
+  }
+
+  // H4 · D-11 (triedenie HARDENING): dielec olepeny DOOKOLA jednou paskou
+  // („0,8 dookola") — LEN ked vsetky styri kody nesu TU ISTU pasku (rovnake ID)
+  // a jej hrubka je znama. Dve rozne pasky rovnakej hrubky su plny kompakt
+  // (bunka by inak zatajila, ze ide o dve pasky). Titulok (`absFull`) ostava
+  // plny L1–W2 s menom pasky; data riadku, VEPO ani CSV sa nemenia.
+  function absAround(e, meta){
+    var first = e[EDGE_CODES[0]];
+    if (!first) return '';
+    for (var i = 1; i < EDGE_CODES.length; i++){
+      if (e[EDGE_CODES[i]] !== first) return '';
+    }
+    var th = edgeThShort(((meta || {})[first] || {}).th);
+    return th ? th + ' dookola' : '';
   }
 
   function absCompact(row, meta){
     var e = (row || {}).edges || {};
+    var around = absAround(e, meta);
+    if (around) return around;
     var out = [];
     EDGE_CODES.forEach(function(code){
       var id = e[code];
@@ -574,7 +689,8 @@
   // obohatená v ProductionCore) — JS len renderuje.
 
   // V0.6 D1b: cena — nil/undefined = „nezadaná" (—), NIKDY 0 (audit N11).
-  function price(v){ return (v == null || isNaN(v)) ? '—' : num(v, 2) + ' €'; }
+  // H4 · D-04: ten isty zapis ako Rozpocet (tisice, mínus U+2212).
+  function price(v){ return nxfMoney(v); }
 
   // D-93: drobné znamienko „ručne prepísané" pri počte. Text skladá VÝHRADNE
   // server (HardwareSets.manual_note / Bom.manual_note) — JS ho len vypíše;
@@ -744,7 +860,7 @@
              + ' data-src-key="' + esc(key) + '"'
              + ' title="' + esc(key ? SRC_TIP_PART : SRC_TIP_CAB) + '">' + txt + '</button>';
       }).join(' &nbsp;·&nbsp; ');
-      return '<div class="hwsrcg">' + head + ' · <b>' + num(g.quantity) + ' ks</b>: ' + items + '</div>';
+      return '<div class="hwsrcg">' + head + ' · <b>' + nxfQty(g.quantity, 'KS') + ' ks</b>: ' + items + '</div>';
     }).join('');
     return '<tr class="hwsrc"><td colspan="6"><b>Pôvod:</b>' + body + '</td></tr>';
   }
@@ -780,14 +896,15 @@
           // payload riadky preusporiada a index by otvoril cudzí riadok.
           var rk = hwRowKey(r);
           var open = buyOpen[rk] === true;
+          var hwu = nxfHwUnitCode(r.unit);   // H4 · D-04: MJ ako v Rozpočte
           var cls = 'hwbuyrow' + (r.missing ? ' hwmiss' : '') + (open ? ' on' : '');
           h += '<tr class="' + cls + '" data-buy="' + esc(rk) + '"'
              + ' title="Klik ukáže pôvod — z ktorých skriniek, setov a ručných položiek riadok vznikol">'
              + '<td>' + esc(r.code || '—') + '</td>'
              + '<td>' + esc(r.missing ? 'nie je v katalógu kovania' : (r.name_sk || ''))
              + (man ? ' <span class="hwchip">ručná</span>' : '') + '</td>'
-             + '<td><b>' + num(r.quantity) + '</b>' + hwManualMark(r.manual_note) + '</td>'
-             + '<td>' + esc(r.unit || '—') + '</td>'
+             + '<td><b>' + nxfQty(r.quantity, hwu || r.unit) + '</b>' + hwManualMark(r.manual_note) + '</td>'
+             + '<td>' + esc(hwu ? nxfUnit(hwu) : (r.unit || '—')) + '</td>'
              + '<td>' + price(r.price_eur_vat) + '</td><td>' + price(r.subtotal_eur_vat) + '</td></tr>';
           if (open) h += hwSourcesHtml(r);
         });
@@ -822,7 +939,7 @@
           h += '<tr class="hwmiss' + (hwRowStops(u) ? ' hwstop' : '') + '">'
              + '<td>' + esc(u.label || u.generic_type) + '</td>'
              + '<td title="' + esc(hwMissWhereTitle(u)) + '">' + esc(hwMissWhere(u)) + '</td>'
-             + '<td>' + num(u.quantity) + '</td><td>' + esc(reason) + '</td></tr>';
+             + '<td>' + nxfQty(u.quantity, 'KS') + '</td><td>' + esc(reason) + '</td></tr>';
         });
         h += '</tbody></table>';
       }
@@ -860,7 +977,7 @@
       // riadok kovania Inspectora/Katalogu — na `<tr>` by `display: flex`
       // rozhodil stlpce pod hlavickou (guard tests/pure/test_tr_flex_kolizia.rb).
       h += '<tr class="hwgen" data-i="' + i + '"><td>' + esc(g.label || g.generic_type) + '</td><td>' + params + '</td>' +
-           '<td><b>' + num(g.quantity) + '</b></td><td>' + kde + '</td></tr>';
+           '<td><b>' + nxfQty(g.quantity, 'KS') + '</b></td><td>' + kde + '</td></tr>';
     });
     h += '</tbody></table>';
     return h;
@@ -1630,7 +1747,7 @@
           '<span class="chev"></span>' +
           (hex ? '<span class="sw" style="background:' + hex + '"></span>' : '<span class="sw"></span>') +
           '<span class="gname">' + esc(m.label || grp.id) + '</span>' +
-          '<span class="gsub">' + (m.th == null ? '' : num(m.th) + ' mm') +
+          '<span class="gsub">' + (m.th == null ? '' : nxfMm(m.th) + ' mm') +
           (m.uni ? ' · <span class="wtagchip">UNI</span>' : '') + '</span>' +
           '<span class="gsum">' + num(grp.ks) + ' ks · <b>' + num(grp.m2, 2) + ' m²</b></span></button>' +
         '<table class="bomtab"><thead><tr>' +
@@ -1647,7 +1764,7 @@
                      esc(absCompact(r, emeta)) + '</td>';
             }
             var v = cellValue(r, c.k);
-            var txt = c.num ? num(v) : (String(v == null ? '' : v) || '—');
+            var txt = c.num ? cellNumText(c.k, v) : (String(v == null ? '' : v) || '—');
             return '<td class="' + (c.num ? 'num' : '') + '">' + esc(txt) + '</td>';
           }).join('') +
           '<td class="acth"><span class="rowact">' +
@@ -1664,6 +1781,15 @@
     h += totalRow(g);
     h += '<div class="hint">Klik na riadok označí dielec v modeli. Ceruzka ho navyše otvorí v Inspectore.</div>';
     return h;
+  }
+
+  // H4 · D-04: zapis cisla v stlpci Dielce. Dlzka a sirka celé mm (= VEPO
+  // `rounded_dims`), hrubka SKUTOCNA (18,6 — nie „19"; obchodnu 18 nesie VEPO),
+  // kusy celé bez desatinnych.
+  function cellNumText(key, v){
+    if (key === 'th') return nxfMm(v);
+    if (key === 'q') return nxfQty(v, 'KS');
+    return nxfDim(v);
   }
 
   // Sucty su SERVEROVE cisla (`totals`) — JS ich len vypise. Pri filtri sa
@@ -1688,7 +1814,7 @@
       : 'Spolu <b>' + num(t.parts) + ' dielcov</b> · <b>' + num(t.m2, 2) + ' m²</b> · ' +
         num(t.materials) + ' materiálov';
     return '<div class="totrow"><span>' + left + '</span><span class="spacer"></span>' +
-      '<span class="tmuted">ABS spolu ' + num(t.bm, 1) + ' bm · platne na objednávku: </span>' +
+      '<span class="tmuted">ABS spolu ' + nxfQty(t.bm, 'BM') + ' bm · platne na objednávku: </span>' +
       cutLinkHtml() + '</div>';
   }
 
@@ -1743,7 +1869,7 @@
       var e = s.est;
       var hex = rgbHex(m.color);
       var fb = e && e.fallback;
-      var fmt = e ? (num(e.sheet_size[0]) + ' × ' + num(e.sheet_size[1])) : '—';
+      var fmt = e ? (nxfDim(e.sheet_size[0]) + ' × ' + nxfDim(e.sheet_size[1])) : '—';
       var pl = e ? (num(e.count_min, 1) + ' – ' + num(e.count_max, 1)) : '—';
       // M-B1 (audit F7): UNI = materiál neurčený — počet platní je len
       // orientačný (formát je pracovný default), NIE nákupné číslo.
@@ -1762,7 +1888,7 @@
           esc(m.label || s.mid) +
           (e && e.uni === true ? ' <span class="wtagchip">UNI</span>' : '') +
           (s.purchaseOnly ? ' <span class="muted">(nákup pre dupláky)</span>' : '') + '</td>' +
-        '<td class="num">' + (m.th == null ? '—' : num(m.th) + ' mm') + '</td>' +
+        '<td class="num">' + (m.th == null ? '—' : nxfMm(m.th) + ' mm') + '</td>' +
         '<td' + (fb ? ' class="estfb" title="Materiál nemá formát v katalógu — použitý 2800×2070"' : '') +
           '>' + esc(fmt) + '</td>' +
         '<td class="num">' + (s.quantity == null ? '—' : num(s.quantity)) + '</td>' +
@@ -1801,14 +1927,14 @@
         '<td>' + (hex ? '<span class="cellsw" style="background:' + hex + '"></span>' : '') +
           esc(m.label || e.abs_id) + '</td>' +
         '<td>' + esc(m.decor || '—') + '</td>' +
-        '<td class="num">' + (m.th == null ? '—' : num(m.th, 1) + ' mm') + '</td>' +
+        '<td class="num">' + (m.th == null ? '—' : nxfMm(m.th) + ' mm') + '</td>' +
         '<td class="num">' + num(e.edges) + '</td>' +
-        '<td class="num"><b>' + num(e.bm, 1) + '</b></td></tr>';
+        '<td class="num"><b>' + nxfQty(e.bm, 'BM') + '</b></td></tr>';
     });
     h += '</tbody></table>';
     if (!list.length) h += '<div class="muted" style="padding:14px 4px">Filtru nezodpovedá žiadna páska.</div>';
     var t = ST.totals || {};
-    h += '<div class="totrow" style="margin-top:10px"><span>Spolu <b>' + num(t.bm, 1) +
+    h += '<div class="totrow" style="margin-top:10px"><span>Spolu <b>' + nxfQty(t.bm, 'BM') +
       ' bm</b> · ' + num(t.edges) + ' pások</span><span class="spacer"></span>' +
       '<span class="tmuted">spotreba bez rezervy</span></div>' +
       // VEDOMA ODCHYLKA ST-1a (drzi dalej): stlpce „bm s rezervou" a „€/bm" tu
@@ -2270,6 +2396,15 @@
       // (Kusovnik · Kontrola · Nakup tu, Rozpocet · Ponuka v budget.js —
       // ten si ho v Node testoch berie requirom TOHTO suboru).
       refreshBtnHtml: refreshBtnHtml, STALE_TIP: STALE_TIP,
+      // H4 · D-04 (tests/js/test_h4a_format.js): formátovač okna — sekcie
+      // (budget.js, proj_materials.js, hw_catalog.js, demos_diff.js, rules.js)
+      // si ho v Node berú requirom TOHTO súboru.
+      nxfMoney: nxfMoney, nxfMoneyIn: nxfMoneyIn, nxfQty: nxfQty, nxfUnit: nxfUnit,
+      nxfQtyUnit: nxfQtyUnit, nxfMm: nxfMm, nxfDim: nxfDim, nxfDec: nxfDec, nxfHwUnitCode: nxfHwUnitCode,
+      // render pohľadov Kusovníka nad fixtúrou (stav ide cez `setStForTest`)
+      partsTable: partsTable, sheetsTable: sheetsTable, absTable: absTable,
+      cellNumText: cellNumText,
+      setStForTest: function(s){ ST = s || null; },
       // ŠT-3c-1: aktivna sekcia — sekcne subory podla nej rozhoduju, ci smu
       // pisat do ZDIELANEHO `#secbody` (viz `TPL.init`).
       studioActiveSection: studioActiveSection,

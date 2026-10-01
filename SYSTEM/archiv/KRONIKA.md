@@ -17,6 +17,21 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H4a · jednotný zápis čísel a jednotiek + ABS „dookola" (1.10.2026, PR #437, v0.17.3, blok 9 · HARDENING PO V1, položky triedenia HARDENING D-04
+  a D-11 — nie D-čísla DOGFOODINGU; package [PACKAGE_H4.md](../zdroje/bloky/HARDENING/PACKAGE_H4.md) časť H4a).** Okno Štúdio malo 9 vlastných formátovačov,
+  dva s desatinnou bodkou, a niektoré hodnotu skrývali (hrúbka 18,6 ako „19", bm 70,94 ako „70,9", 2,4 balenia ako „2", MJ „PLATŇA"/„FIX" surovo). Teraz
+  **jeden formátovač `nxf*` v `studio.js`** (`nxfMoney` = dvojča `budFmtEur`, `nxfMoneyIn` pre peňažné polia, `nxfQty`/`nxfUnit` podľa kódu MJ so skloňovaním
+  platní a paušálov, `nxfMm`, `nxfDim`, `nxfDec`) nasadený v Rozpočte (Materiál, ABS, Kovanie, Služby „37,26 bm × 1,10 €", peňažné polia „68,00" + tlmené €,
+  množstvo ponuky), Kusovníku (hrúbka skutočná, ABS hrúbka a bm na 2 desatinné aj v súčtovom riadku, ktorý nechal H3a), Nákupe kovania (ceny, necelé množstvá),
+  Materiáloch (štítky „DTDL 18,6", „23/0,8", formáty, vety), cenách katalógu kovania a Demosu a súhrnoch Pravidiel (mm, kg). **D-11:** `absCompact` → „0,8 dookola"
+  len pri štyroch hranách s tou istou páskou (rovnaké ID); titulok ostáva plný. **Krok 0** (zladenie s H3a) zapísaný v package §5.1. Sekcie bez `studio.js`
+  (izolovaný test, parse chyba) kreslia núdzový zápis s čiarkou, nič neskryjú. **Charakterizácia:** diff vetvy nesiaha na Ruby (`core`, `ui/*.rb`, `ui/panel`
+  prázdne), zlaté a exportné sady (np4/ceny-m2/kova/kovh golden, XLSX rozpočtu, CP export, VEPO, CSV nákupu) zelené bez zmeny fixtúr. **Testy:** nová
+  `test_h4a_format.js` (tabuľka vstup → výstup, `nxfMoney ≡ budFmtEur` na 200 hodnotách, `nxfMm ≡ mmLabel`, okružná cesta poľa, render Rozpočtu a Kusovníka,
+  žiadna desatinná bodka vo viditeľnom texte, D-11; 7 mutácií — kusové na celé, tisíce v rozmere, „dookola" podľa hrúbky, € či „−" v poli, MJ surovo, hrúbka na
+  celé — každú zhodí); pripnuté texty s bodkou → čiarka v 6 sadách, `test_ceny_m2_budget.js` načíta `studio.js` pred `budget.js` (poradie okna) a čaká „platňa";
+  headless **4969 · 148 JS sád** zelené + encoding guard; in-SU nie (len JS/CSS). Fotky okien pred/po (`ui_foto.ps1 -Shoot`). Predrecenzia povinná (výrobná/cenová — zobrazenie), výsledok v PR popise.
+
 - **H3b · falošná chyba v Ruby konzole po novom súbore (1.10.2026, PR #436, v0.17.2, blok 9 · HARDENING PO V1, položka A-06; package
   [PACKAGE_H3.md](../zdroje/bloky/HARDENING/PACKAGE_H3.md) §6.6).** **Sonda R-A06-0** (SketchUp 2026, kópia ENGINEtests.skp, slučka `-RubyStartup`): Windows
   **Súbor → Nový** vyčistí dokument aj jeho prekrytia, ale **Ruby objekt modelu ostáva ten istý** (`equal?` a `Model#valid?` true) — `on_model_changed` overlay

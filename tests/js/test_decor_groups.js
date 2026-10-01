@@ -57,7 +57,7 @@ eq(sirota.edges.length, 1, 'sirota ma pasku');
 eq(sheetChipLabel({ type: 'DTDL', thickness: 18.0 }), 'DTDL 18', 'sheet chip');
 eq(sheetChipLabel({ type: 'DTDL', thickness: 38.0 }), 'DTDL 38', 'sheet chip PD');
 eq(edgeChipLabel({ width: 22.0, thickness: 1.0 }), '22/1', 'edge chip sirkovy');
-eq(edgeChipLabel({ width: 22.5, thickness: 2.0 }), '22.5/2', 'edge chip desatinny');
+eq(edgeChipLabel({ width: 22.5, thickness: 2.0 }), '22,5/2', 'edge chip desatinny (H4 · D-04: ciarka)');
 eq(edgeChipLabel({ thickness: 1.0 }), '1 mm', 'edge chip legacy bez sirky');
 
 console.log(JSON.stringify({ passed: n, failed: 0 }));

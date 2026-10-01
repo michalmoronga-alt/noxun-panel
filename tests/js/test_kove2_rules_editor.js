@@ -90,7 +90,7 @@ ok(box().querySelector('.rlift'), 'E1: pravidlo výklopov má EDITOR, nie vetu')
 const sum = md.textOf(box().querySelector('.rgsum'));
 ok(sum.indexOf('HK 2 triedy') >= 0, 'E1: súhrn menuje tabuľku tried: ' + sum);
 ok(sum.indexOf('2 + 2 ramená') >= 0, 'E1: aj mechanizmy a ramená HL: ' + sum);
-ok(sum.indexOf('tyč od 1100 mm') >= 0 && sum.indexOf('rezerva 0.5 kg') >= 0,
+ok(sum.indexOf('tyč od 1100 mm') >= 0 && sum.indexOf('rezerva 0,5 kg') >= 0,
    'E1: aj skaláre: ' + sum);
 eq(box().querySelectorAll('.lcls').length, 2, 'E1: riadok na každú triedu HK');
 eq(box().querySelectorAll('.lmech').length, 2, 'E1: aj na každý mechanizmus HL');

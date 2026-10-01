@@ -31,9 +31,13 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
 const JS = path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js');
 
 // --- budget.js v izolovanom kontexte (vzor test_ceny_kov_budget_manual.js) ----
-const bctx = { console: console, document: DOC, setTimeout: setTimeout, clearTimeout: clearTimeout };
+const bctx = { console: console, document: DOC, setTimeout: setTimeout, clearTimeout: clearTimeout,
+               localStorage: { getItem(){ return null; }, setItem(){} } };
 bctx.window = bctx;
 vm.createContext(bctx);
+// H4 · D-04: PORADIE ako v studio.html — `studio.js` (formátovač `nxf*`) PRED
+// `budget.js`; bez neho by sa kreslil núdzový zápis (kódy MJ bez prekladu).
+vm.runInContext(fs.readFileSync(path.join(JS, 'studio.js'), 'utf8'), bctx);
 vm.runInContext(fs.readFileSync(path.join(JS, 'budget.js'), 'utf8'), bctx);
 const B = bctx;
 
@@ -103,7 +107,9 @@ const PC_FRESH = { kind: 'sheet', id: 'S25', label: 'H1180 DTDL 25 mm', manual_c
   const plate = Object.assign({}, area, { mj: 'PLATŇA', mnozstvo: 1, cena_mj: 180.84, spolu: 180.84, qty_basis: undefined,
                                           price_per_m2: 31.2, demos_link: true, product_link: undefined, price_check: undefined });
   const hp = B.budMaterialRow(plate, budget, 1.23);
-  ok(hp.includes('<td class="bnum">1</td>') && hp.includes('>PLATŇA<') && hp.includes('(31,20 €/m²)'), 'platna ako doteraz');
+  // H4 · D-04: MJ v okne malým („platňa"), kód `PLATŇA` ostáva v dátach a XLSX.
+  ok(hp.includes('<td class="bnum">1</td>') && hp.includes('>platňa<') && !hp.includes('>PLATŇA<') &&
+     hp.includes('(31,20 €/m²)'), 'platna: MJ malym, mnozstvo a cena ako doteraz');
   ok(hp.includes('data-src="demos"') && hp.includes('<span class="bfnt">—</span>'), 'Demos: ikona a dnesna bunka');
   const abs = B.budSimpleRow({ abs_id: 'E43', nazov: 'ABS H1180', mj: 'BM', mnozstvo: 8.8, cena_mj: 0.39, spolu: 3.43,
                                product_link: true, price_check: { kind: 'edge', id: 'E43', state: 'stale', age_days: 45 } }, budget, 1.23);
