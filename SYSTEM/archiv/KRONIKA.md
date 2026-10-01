@@ -17,6 +17,20 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H3b · falošná chyba v Ruby konzole po novom súbore (1.10.2026, PR #?, v0.17.2, blok 9 · HARDENING PO V1, položka A-06; package
+  [PACKAGE_H3.md](../zdroje/bloky/HARDENING/PACKAGE_H3.md) §6.6).** **Sonda R-A06-0** (SketchUp 2026, kópia ENGINEtests.skp, slučka `-RubyStartup`): Windows
+  **Súbor → Nový** vyčistí dokument aj jeho prekrytia, ale **Ruby objekt modelu ostáva ten istý** (`equal?` a `Model#valid?` true) — `on_model_changed` overlay
+  pre zhodný objekt nevypne a modul drží overlay so `Overlay#valid?` false. Chyba sa preto nezapíše pri `file_new`, ale až **pri otvorení Štúdia** (`restore!` →
+  `enable!` → `disable!` → `remove_overlay` → RuntimeError „invalid overlay" pre Smer otvárania a Smer kresby; pri hranách až pri ďalšom kliku, Štúdio ich
+  neobnovuje). **Oprava = stráž `stale_overlay?` v `remove_overlay`** troch modulov (`direction_check`, `edge_check`, `grain_check`): overlay zneplatnený
+  SketchUpom alebo zatvorený dokument sa len zabudne; platný overlay v živom dokumente sa odstraňuje ako doteraz a jeho chyba ide do logu (aj výnimka samotného
+  `valid?`). Bez plošného `rescue` a bez porovnávania textu výnimky (R-A06-3); postup `disable!`/`on_model_changed`/`restore!` nezmenený → audit netreba
+  (hranica §5), `hover_edge` bez zmeny. **Testy:** nový `test_h3b_overlay_novy_subor.rb` (3 moduly × 7 scenárov + zdrojový guard; 8 mutácií — stráž preč v každom
+  module, stráž aj na živý dokument, plošný rescue, len `Model#valid?`, bez `Model#valid?`, zhltnutá výnimka `valid?` — každú zhodí aspoň jeden test);
+  headless **4969 · 147 JS sád** zelené + encoding guard; **in-SU 3284 PASS / 0 FAIL** (hlava `3caae5e4`, `-CloseWhenDone`) s novou sekciou `run_h3b` (zneplatnenie vyrobené odstránením overlayu mimo modulu,
+  File/New by vymenil dokument runnera — §8) + overenie tou istou sondou po oprave: pred opravou 2 záznamy „invalid overlay" pri otvorení Štúdia + 1 pri vypnutí hrán, po oprave **0**, Smer otvárania a kresba sa v novom súbore obnovili. Architektúra: odseky `direction_check.rb` (spoločný odsek o stráži),
+  `edge_check.rb`, `grain_check.rb` v `construction.md`; výsledok sondy zapísaný do package §6.6, smoke bod 7 doplnený o klik na hrany.
+
 - **H3a · zavádzajúce údaje v okne Štúdia (1.10.2026, PR #435, v0.17.1, blok 9 · HARDENING PO V1, položky A-01 · A-02 · A-03 · A-04 · A-07 z triedenia;
   package [PACKAGE_H3.md](../zdroje/bloky/HARDENING/PACKAGE_H3.md), rez H3a → H3b potvrdil orchestrátor).** Mení sa LEN to, čo okno ukazuje — čísla, CSV
   kovania, XLSX ponuky, VEPO a Rozpočet ostali (zlaté testy `np4_golden`, `kovh_golden`, `np1_vepo`, `kova_golden`, `ceny_m2_golden` bez pregenerovania;
