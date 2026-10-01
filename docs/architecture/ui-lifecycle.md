@@ -3885,7 +3885,7 @@ neexistujú; **vedomá odchýlka od wireframu mockupu**, ktorý kreslí cenové 
 okne push chodil len pri otvorení a po uložení, v Štúdiu chodí pri každej zmene modelu, takže pôvodné „init = reset formulára" by ticho zahodilo rozpísané sadzby; (2) telo sa
 **neprekresľuje, kým používateľ píše** do jeho poľa; (3) kreslí sa LEN do práve otvorenej sekcie (`#secbody`/`#sectools` sú zdieľané uzly — lekcia review #225 P1); (4) **`settings:
 nil` je SIGNÁL, nie „nič nové"** (review #227 P2): keď server payload nevie zostaviť (chyba disku), sekcia prejde do chybového stavu, formulár skryje a povie to — formulár, ktorý
-vyzerá aktuálne a aktuálny nie je, je horší než hláška; nad neznámym stavom sa navyše nedá **uložiť**, ale **„Načítať nanovo" v lište OSTÁVA** (review #227 kolo 2) — je to jediná
+vyzerá aktuálne a aktuálny nie je, je horší než hláška; nad neznámym stavom sa navyše nedá **uložiť**, ale **„Obnoviť" v lište OSTÁVA** (do H4b „Načítať nanovo") (review #227 kolo 2) — je to jediná
 cesta, ako sa z prechodnej chyby disku zotaviť bez zatvorenia Štúdia, a hláška v tele na ňu odkazuje menom.
 
 Rozlišuje sa PRÍTOMNOSŤ kľúča `settings`, nie pravdivosť hodnoty.

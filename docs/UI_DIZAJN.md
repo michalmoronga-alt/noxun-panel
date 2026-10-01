@@ -1361,7 +1361,7 @@ hrán). Pravidlá vzoru:
 ### 5.13 Viditeľnosť tagov modelu v raile (D-27, v0.8.13)
 
 Rýchle „zobraz/skry" SketchUp **tagov modelu** priamo z panela — Čelá · Chrbát ·
-Korpus · Vnútro · Kovanie · Dosky · Zóny (ghost) — aby sa nemuselo preklikávať
+Korpus · Vnútro · Kovanie · Dosky · Zóny (obrysy; do H4b „Zóny (ghost)") — aby sa nemuselo preklikávať
 do natívneho okna Tags. **Nie sú to chipy vrstiev náhľadu z UI-B2** (§5.2): tie
 prepínajú, čo panel *kreslí*, toto mení, čo je vidieť *v modeli*.
 
