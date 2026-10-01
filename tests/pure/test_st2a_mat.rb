@@ -19,6 +19,7 @@
 #      Priznak musi vzniknut aj zaniknut na spravnych miestach, inak na nom
 #      ŠT-2b postavi odlozenu poziadavku, ktora sa bude tvarit ziva v mrtvom okne.
 require_relative '../helper' unless defined?(NxTest)
+require_relative 'test_h14a_register' unless defined?(NxH14Reg) # H14a: kontrakt sekcii Studia
 
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core') if NxTest.headless?
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog') if NxTest.headless?
@@ -50,11 +51,12 @@ ST2A_MAT_JS_CODE = ST2A_MAT_JS.lines.reject { |l| l.strip.start_with?('//') }.jo
 
 NxTest.test('ŠT-2a: `mat` je ZIVA sekcia vo VSETKYCH TROCH zrkadlach') do
   rb = Noxun::Engine::StudioDialog::SECTIONS
-  js = ST2A_STUDIO_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
-  shell = ST2A_SHELL_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
+  # H14a: JS strana = register `js/studio_sections.js` (kontrakt vo fixture,
+  # zhodu overuje tests/js/test_h14a_register.js); studio.js aj shell.js z neho citaju.
+  js = NxH14Reg.ids
   NxTest.assert(rb.include?('mat'), 'Ruby je autorita zoznamu sekcii')
   NxTest.assert_equal(rb, js, 'studio.js je jeho zrkadlo')
-  NxTest.assert_equal(rb, shell, 'a shell.js (deep-link z panela) tiez')
+  NxTest.assert_equal([], NxH14Reg.mirror_problems, 'a shell.js (deep-link z panela) tiez — cita register')
 end
 
 NxTest.test('ŠT-2a: premostenie `mat` ZANIKLO — navigacia uz neotvara satelit') do
@@ -63,11 +65,11 @@ NxTest.test('ŠT-2a: premostenie `mat` ZANIKLO — navigacia uz neotvara satelit
                 'jeden kluc nesmie byt zaroven sekcia aj premostenie')
   # ŠT-4a: obe tabulky premosteni zanikli s POSLEDNYM satelitom.
   NxTest.refute(st.const_defined?(:BRIDGE_STATUS), 'a nesmie existovat ani tabulka hlasok')
-  nav = ST2A_STUDIO_JS[/var NAV = \[.*?\n  \];/m].to_s
-  mat_item = nav[/\{ id: 'mat'.*?\},/m].to_s
+  # H14a: polozka navigacie = riadok registra (kontrakt vo fixture).
+  mat_item = NxH14Reg.row('mat') || {}
   NxTest.assert(!mat_item.empty?, 'polozka navigacie sa nasla')
-  NxTest.refute(mat_item.include?('bridge:'), 'polozka Materiály uz nie je premostenie')
-  NxTest.refute(mat_item.include?('disabled:'), 'a nie je ani neaktivna')
+  NxTest.refute(mat_item.key?('bridge'), 'polozka Materiály uz nie je premostenie')
+  NxTest.refute(mat_item.key?('disabled'), 'a nie je ani neaktivna')
 end
 
 NxTest.test('ŠT-2b: okno Materialy ZANIKLO — a s nim VSETKY jeho vstupy') do

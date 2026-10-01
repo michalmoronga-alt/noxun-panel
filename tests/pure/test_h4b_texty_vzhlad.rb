@@ -17,6 +17,7 @@
 #   6. Zakladny `select` v panel.css a pevne rozlozenie tabulky Dielce (D-08).
 #   7. Ruby zmeny su LEN zobrazovacie texty (popisok tagu, statusy).
 require_relative '../helper' unless defined?(NxTest)
+require_relative 'test_h14a_register' unless defined?(NxH14Reg) # H14a: kontrakt sekcii Studia
 
 module NxH4b
   ROOT = File.join(NxTest::ROOT, 'noxun_engine')
@@ -164,12 +165,12 @@ NxTest.test('H4b · D-08: zakladny select, kratke hladanie, pevne stlpce Kusovni
 end
 
 NxTest.test('H4b · D-09: ikony navigacie jedinecne, sliders-horizontal v spritu aj v inventari') do
-  js = NxH4b.src('ui/js/studio.js')
-  nav = js[/var NAV = \[.*?\n  \];/m].to_s
-  ics = nav.scan(/ic: '([^']+)'/).flatten
+  # H14a: polozky navigacie = riadky registra `js/studio_sections.js` (kontrakt
+  # vo fixture; uplnu kontrolu ikon robi tests/pure/test_h14a_register.rb R4.3).
+  ics = NxH14Reg.rows.map { |r| r['ic'] }
   NxTest.assert(ics.size >= 14, "NAV ma vsetky polozky (#{ics.size})")
   NxTest.assert_equal([], ics.select { |i| ics.count(i) > 1 }.uniq, 'ziadne dve polozky navigacie s rovnakou ikonou')
-  NxTest.assert(nav.include?("{ id: 'bset',   ic: 'sliders-horizontal'"), 'Nastavenia rozpoctu = posuvniky')
+  NxTest.assert_equal('sliders-horizontal', NxH14Reg.row('bset')['ic'], 'Nastavenia rozpoctu = posuvniky')
   NxTest.assert(NxH4b.src('ui/js/icons.js').include?("'sliders-horizontal':"), 'symbol je v spritu')
   doc = File.read(File.join(NxTest::ROOT, 'docs', 'UI_DIZAJN.md'), encoding: 'UTF-8')
   sec4 = doc[/^## 4\. Ikony.*?(?=^## 5\.)/m].to_s

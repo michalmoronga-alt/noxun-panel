@@ -17,6 +17,7 @@
 #   5. „O plugine" je JEDEN OBSAH s DVOMA VSTUPMI (kontrakt Š19) — dve kopie
 #      markupu by sa pri prvej uprave rozisli.
 require_relative '../helper' unless defined?(NxTest)
+require_relative 'test_h14a_register' unless defined?(NxH14Reg) # H14a: kontrakt sekcii Studia
 
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog') if NxTest.headless?
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'supplier_settings_dialog') if NxTest.headless?
@@ -236,12 +237,13 @@ NxTest.test('ŠT-4a: cache-bust, poradie skriptov a zrkadla sekcii') do
                 'sekcia sa nacitava AZ ZA studio.js — obaluje jeho NX.setStudio')
   rb = Noxun::Engine::StudioDialog::SECTIONS
   %w[sup bset about].each { |k| NxTest.assert(rb.include?(k), "Ruby whitelist pozna sekciu `#{k}`") }
-  js = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'studio.js'), encoding: 'UTF-8')
-  shell = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'shell.js'), encoding: 'UTF-8')
-  [js, shell].each do |src|
-    list = src[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
-    NxTest.assert_equal(rb, list, 'JS zrkadlo sa nesmie rozist s Ruby autoritou')
-  end
+  # H14a: JS strana = register `js/studio_sections.js` (kontrakt vo fixture,
+  # zhodu overuje tests/js/test_h14a_register.js); studio.js, shell.js aj
+  # studio_settings.js z neho citaju (sekcie Nastaveni = `inModule`).
+  NxTest.assert_equal(rb, NxH14Reg.ids, 'JS zrkadlo sa nesmie rozist s Ruby autoritou')
+  NxTest.assert_equal([], NxH14Reg.mirror_problems, 'ziadny subor nedrzi vlastny zoznam sekcii')
+  NxTest.assert_equal(%w[sup bset about], NxH14Reg.rows.select { |r| r['module'] == 'studio_settings.js' }.map { |r| r['id'] },
+                      'sekcie Nastaveni kresli studio_settings.js')
 end
 
 NxTest.test('ŠT-4a: `sup` NESLUBUJE nastavenia, ktore neexistuju') do

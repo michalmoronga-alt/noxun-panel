@@ -137,7 +137,7 @@ const ctx = {
 };
 ctx.window = ctx;
 vm.createContext(ctx);
-['studio.js', 'budget.js'].forEach(function(f){
+['studio_sections.js', 'studio.js', 'budget.js'].forEach(function(f){
   vm.runInContext(fs.readFileSync(path.join(JS, f), 'utf8'), ctx, { filename: f });
 });
 const budgetPayload = { stale: { items: [] } };

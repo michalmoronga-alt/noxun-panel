@@ -36,9 +36,12 @@
   // ale aktuálny nie je, je horší než hláška (review #227 P2).
   var SS_FAILED = false;
 
-  // Sekcie, ktoré tento súbor kreslí. Autoritou zoznamu je Ruby
-  // (`StudioDialog::SECTIONS`) — tu je len to, čo patrí NASTAVENIAM.
-  var SS_SECTIONS = ['sup', 'bset', 'about'];
+  // Sekcie, ktoré tento súbor kreslí, pozná register `js/studio_sections.js`
+  // (H14a, riadky s `module: 'studio_settings.js'`). Autoritou whitelistu je
+  // Ruby (`StudioDialog::SECTIONS`); zoznam sa pýta až pri použití.
+  var SS_REG = (typeof module !== 'undefined' && module.exports)
+    ? require('./studio_sections.js')
+    : (typeof window !== 'undefined' ? window.NXStudioSections : null);
 
   function ssEl(id){ return (typeof document === 'undefined') ? null : document.getElementById(id); }
 
@@ -49,7 +52,7 @@
     var sec = null;
     if (typeof studioActiveSection === 'function') sec = studioActiveSection();
     else if (SS_STUDIO && typeof SS_STUDIO.studioActiveSection === 'function') sec = SS_STUDIO.studioActiveSection();
-    return (sec && SS_SECTIONS.indexOf(sec) >= 0) ? sec : null;
+    return (sec && SS_REG.inModule('studio_settings.js').indexOf(sec) >= 0) ? sec : null;
   }
 
   var SS_STUDIO = (typeof module !== 'undefined' && module.exports) ? require('./studio.js') : null;
@@ -973,5 +976,5 @@
                        updDirty: function(){ return UPD_DIRTY; },
                        updSent: function(){ return UPD_SENT; },
                        updReq: function(){ return UPD_REQ; },
-                       SS_SECTIONS: SS_SECTIONS, SS: SS };
+                       SS: SS };
   }

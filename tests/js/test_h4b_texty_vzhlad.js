@@ -234,13 +234,15 @@ M.mdSetCatalog({ catalog_schema: 2, pre_schema2_backup: true, catalog: { sheets:
 // ============ 4) D-09: ikony navigácie sú jedinečné ===========================
 
 (function(){
+  // H14a: položky navigácie sú riadky registra `studio_sections.js`.
+  const R = require(path.join(JS, 'studio_sections.js'));
   const ics = [];
-  S.NAV.forEach(function(g){ g.items.forEach(function(it){ ics.push(it.ic); }); });
+  R.groups().forEach(function(g){ g.items.forEach(function(it){ ics.push(it.ic); }); });
   const dup = ics.filter(function(ic, i){ return ics.indexOf(ic) !== i; });
   eq(dup, [], 'žiadne dve položky navigácie nemajú rovnakú ikonu (zbalená navigácia)');
-  const bset = [].concat.apply([], S.NAV.map(function(g){ return g.items; })).find(function(it){ return it.id === 'bset'; });
+  const bset = R.get('bset');
   eq(bset.ic, 'sliders-horizontal', 'Nastavenia rozpočtu = posuvníky (Q2 variant A)');
-  const rules = [].concat.apply([], S.NAV.map(function(g){ return g.items; })).find(function(it){ return it.id === 'rules'; });
+  const rules = R.get('rules');
   eq(rules.ic, 'settings', 'Pravidlá si nechávajú koleso (zhoda s Inspectorom)');
   const icons = fs.readFileSync(path.join(JS, 'icons.js'), 'utf8');
   ics.forEach(function(ic){

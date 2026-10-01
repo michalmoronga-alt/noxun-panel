@@ -22,6 +22,7 @@
 #   6. `UI.messagebox` v callbacku sekcie NIKDY — nativny modal blokuje cely
 #      kanal HtmlDialogu a Studio by zamrzlo.
 require_relative '../helper' unless defined?(NxTest)
+require_relative 'test_h14a_register' unless defined?(NxH14Reg) # H14a: kontrakt sekcii Studia
 
 require File.join(NxTest::ROOT, 'noxun_engine', 'core', 'appliance_catalog') if NxTest.headless?
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog') if NxTest.headless?
@@ -53,29 +54,32 @@ S1A2_AC = Noxun::Engine::ApplianceCatalog
 
 NxTest.test('S1-A2: `appl` je ZIVA sekcia vo VSETKYCH TROCH zrkadlach') do
   rb = Noxun::Engine::StudioDialog::SECTIONS
-  js = S1A2_STUDIO_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
-  shell = S1A2_SHELL_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
+  # H14a: JS strana = register `js/studio_sections.js` (kontrakt vo fixture,
+  # zhodu overuje tests/js/test_h14a_register.js); studio.js aj shell.js z neho citaju.
+  js = NxH14Reg.ids
   NxTest.assert(rb.include?('appl'), 'Ruby je autorita zoznamu sekcii')
   NxTest.assert_equal(rb, js, 'studio.js je jeho zrkadlo')
-  NxTest.assert_equal(rb, shell, 'a shell.js (deep-link `openStudio`) tiez')
+  NxTest.assert_equal([], NxH14Reg.mirror_problems, 'a shell.js (deep-link `openStudio`) tiez — cita register')
 end
 
 NxTest.test('S1-A2: sekcia stoji v skupine KATALÓGY medzi Kovanim a Pravidlami') do
   rb = Noxun::Engine::StudioDialog::SECTIONS
   NxTest.assert_equal(rb.index('hw') + 1, rb.index('appl'), 'hned za `hw`')
   NxTest.assert_equal(rb.index('appl') + 1, rb.index('rules'), 'a hned pred `rules`')
-  nav = S1A2_STUDIO_JS[/var NAV = \[.*?\n  \];/m].to_s
-  item = nav[/\{ id: 'appl'.*?\},/m].to_s
+  # H14a: polozka navigacie = riadok registra (kontrakt vo fixture).
+  item = NxH14Reg.row('appl') || {}
   NxTest.assert(!item.empty?, 'polozka navigacie sa nasla')
-  NxTest.assert(item.include?("ic: 'appliance'"), 'ikona = appliance')
-  NxTest.refute(item.include?('disabled:'), 'polozka nie je neaktivna — sekcia zije')
+  NxTest.assert_equal('catalogs', item['grp'], 'polozka je v skupine KATALÓGY')
+  NxTest.assert(item['ic'] == 'appliance', 'ikona = appliance')
+  NxTest.refute(item.key?('disabled'), 'polozka nie je neaktivna — sekcia zije')
   # S1-B2: badge UZ JE — pocty „nevybrany / bez vlastnika / nalez" sklada
   # SERVER v `appl.job.counts` (v A2 este nebolo co ratat).
-  NxTest.assert(item.include?("badge: 'appl'"), 'badge navigacie berie cisla z pohladu V zakazke')
+  NxTest.assert(item['badge'] == 'appl', 'badge navigacie berie cisla z pohladu V zakazke')
 end
 
 NxTest.test('S1-A2: sekcia ma hlavicku (SEC_META) a vlastnu vetvu listy aj tela') do
-  meta = S1A2_STUDIO_JS[/appl: \{ t: 'Spotrebiče',.*?\},/m].to_s
+  # H14a: hlavicka sekcie = `head` riadku registra (SEC_META zaniklo).
+  meta = NxH14Reg.row('appl')['head'].to_s
   NxTest.assert(meta.include?('tohto počítača'), 'hint hovori, ze katalog je vec POCITACA')
   NxTest.assert(S1A2_STUDIO_JS.include?("if (studioSec === 'appl'){"),
                 'lista aj telo maju vlastnu vetvu')

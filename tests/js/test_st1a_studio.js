@@ -28,6 +28,8 @@ global.document = {
   getElementById: function(id){ return ELS[id] || null; }
 };
 const S = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'studio.js'));
+// H14a: zoznam sekcii a polozky navigacie su v registri (studio.js ho pouziva).
+const R = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'studio_sections.js'));
 
 let n = 0;
 function eq(actual, expected, msg){
@@ -42,7 +44,8 @@ function ok(cond, msg){ n++; assert.ok(cond, msg); }
 // okna Vyroba. Zoznam je ZRKADLO `StudioDialog::SECTIONS`.
 // ŠT-2a: pribudla sekcia Materiály (`mat`) — prva ziva polozka skupiny KATALÓGY.
 // ŠT-3a-1: a Kovanie (`hw`) — druha.
-eq(S.STUDIO_SECTIONS, ['bom', 'ctrl', 'buy', 'budget', 'offer', 'cut', 'mat', 'hw', 'appl', 'rules', 'tpl', 'sup', 'bset', 'about'],
+eq(typeof S.STUDIO_SECTIONS, 'undefined', 'H14a: vlastne zrkadlo zoznamu v studio.js zaniklo (register)');
+eq(R.ids(), ['bom', 'ctrl', 'buy', 'budget', 'offer', 'cut', 'mat', 'hw', 'appl', 'rules', 'tpl', 'sup', 'bset', 'about'],
    'v Studiu ziju sekcie Kusovník, Kontrola, Nákup kovania, Rozpočet, Cenová ponuka, Materiály, Kovanie, Pravidlá a Šablóny');
 
 // --- 2) hladanie bez diakritiky (Š6) ----------------------------------------
@@ -168,7 +171,7 @@ eq(S.rgbHex([300, -5, 12]), '#ff000c', 'hodnoty mimo rozsahu sa orezu, nie zahod
 // zanikol, takze niet kam premostovat. `navBridgeIds` uz neexistuje a ZIADNA
 // polozka navigacie nema `bridge:`.
 ok(typeof S.navBridgeIds === 'undefined', 'zrkadlo whitelistu premosteni ZANIKLO');
-S.NAV.forEach(function(g){
+R.groups().forEach(function(g){
   g.items.forEach(function(it){
     ok(!it.bridge, `polozka „${it.t}" uz nie je premostenie (satelity zanikli vsetky)`);
   });
@@ -203,10 +206,10 @@ ok(BUY_ITEM && !BUY_ITEM.bridge && !BUY_ITEM.disabled, 'Nákup kovania je ZIVA s
 // NP-3: Nárezový plán OŽIL — v navigácii už nie je ŽIADNA neaktívna položka.
 const CUT = S.navItem('cut');
 ok(CUT && !CUT.disabled && !CUT.bridge, 'Nárezový plán je ZIVA sekcia tohto okna (NP-3)');
-ok(S.STUDIO_SECTIONS.indexOf('cut') >= 0, 'a je v zrkadle whitelistu sekcii');
+ok(R.has('cut'), 'a je v registri sekcii (= whitelist)');
 eq(CUT.ic, 'scissors', 'ikona noznic ostava (mockup A1)');
 ok(/horná hranica/.test(CUT.hint || ''), 'tooltip povie, co sekcia robi');
-S.NAV.forEach(function(g){
+R.groups().forEach(function(g){
   g.items.forEach(function(it){ ok(!it.disabled, `polozka „${it.t}" nie je neaktivna — ziadna uz nie je`); });
 });
 
@@ -215,9 +218,9 @@ ok(BOM_ITEM && !BOM_ITEM.bridge && !BOM_ITEM.disabled, 'Kusovník je ZIVA sekcia
 
 // Kazda polozka navigacie je bud sekcia, alebo premostenie, alebo ma dovod.
 // Polozka bez jedneho z troch by bola tichy mrtvy klik.
-S.NAV.forEach(function(g){
+R.groups().forEach(function(g){
   g.items.forEach(function(it){
-    ok(S.STUDIO_SECTIONS.indexOf(it.id) >= 0 || it.bridge || it.disabled,
+    ok(R.has(it.id) || it.bridge || it.disabled,
        `polozka navigacie „${it.t}" musi byt sekcia, premostenie alebo mat dovod`);
     ok(!!it.ic, `polozka „${it.t}" ma ikonu (zbalena navigacia ukazuje LEN ikony)`);
   });
@@ -456,7 +459,7 @@ ok(S.vepoMenuHtml(VEPO, true).indexOf('<div class="mgrp">Nastavenie VEPO exportu
   eq(sent[sent.length - 1], 'refresh', 'review #7: a tlacidlo vola ZDIELANU serverovu cestu');
   ok(sent.length === before + 1, 'jedno kliknutie = jedna ziadost');
   eq(ELS.status.textContent, 'Prepočítavam kontrolu…',
-     'review #7: a hlaska hovori o kontrole (REFRESH_STATUS.ctrl)');
+     'review #7: a hlaska hovori o kontrole (`refresh` riadku ctrl v registri)');
 })();
 
 console.log(`test_st1a_studio: ${n} kontrol OK`);

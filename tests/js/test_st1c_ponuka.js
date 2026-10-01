@@ -121,7 +121,7 @@ sandbox.window = sandbox;
 vm.createContext(sandbox);
 
 // PORADIE JE SUCASTOU TESTU — presne ako ich nacitava studio.html.
-['nx_modal.js', 'studio.js', 'budget.js'].forEach(function(f){
+['nx_modal.js', 'studio_sections.js', 'studio.js', 'budget.js'].forEach(function(f){
   vm.runInContext(fs.readFileSync(path.join(JS_DIR, f), 'utf8'), sandbox, { filename: f });
 });
 

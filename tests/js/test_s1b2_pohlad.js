@@ -494,10 +494,11 @@ R.renderApplianceRows([EXPECTED], { kind: 'cabinet', id: 'CAB-3' }, 'applRows');
   } catch (e) { /* render nad DOM stubom nie je predmetom tohto testu */ }
   eq(S.navCounts('appl'), { red: 0, orange: 5, total: 5 }, 'badge sekcie je z `appl.job.counts`');
   eq(S.navCounts(true), { red: 1, orange: 2 }, 'Kontrola má ďalej svoje vlastné');
+  // H14a: badge Kontroly je v registri `ctrl` — tá istá vetva ako `true`.
+  eq(S.navCounts(S.navItem('ctrl').badge), { red: 1, orange: 2 }, 'badge Kontroly z registra číta semafor zákazky');
   ok(S.navBadgeHtml(S.navCounts('appl')).indexOf('5') > 0, 'a vykreslí sa');
-  ok(S.NAV.some(function(g){
-    return g.items.some(function(it){ return it.id === 'appl' && it.badge === 'appl'; });
-  }), 'položka navigácie si pýta PRÁVE tieto počty');
+  // H14a: položka navigácie = riadok registra (`navItem`).
+  ok(S.navItem('appl') && S.navItem('appl').badge === 'appl', 'položka navigácie si pýta PRÁVE tieto počty');
 }
 
 // --- MUTÁCIE (čo test naozaj chytí) -----------------------------------------

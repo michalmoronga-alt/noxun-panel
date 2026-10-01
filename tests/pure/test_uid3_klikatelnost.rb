@@ -17,6 +17,7 @@
 #      Kusovnika, „Hrúbka" v karte dielca nikam viest nema — a teda ani netvrdi,
 #      ze vedie.
 require_relative '../helper' unless defined?(NxTest)
+require_relative 'test_h14a_register' unless defined?(NxH14Reg) # H14a: kontrakt sekcii Studia
 
 UID3_PANEL_HTML = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel.html'), encoding: 'UTF-8')
 UID3_CSS        = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'css', 'panel.css'), encoding: 'UTF-8')
@@ -250,10 +251,13 @@ NxTest.test('ST-1a: deep-link do Studia ma whitelist sekcii v RUBY a JS je jeho 
   studio_rb = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog.rb'),
                         encoding: 'UTF-8')
   rb = studio_rb[/SECTIONS = %w\[([a-z ]+)\]/, 1].to_s.split
-  js = UID3_SHELL_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
+  # H14a: shell.js filtruje registrom `js/studio_sections.js` (kontrakt vo fixture,
+  # zhodu overuje tests/js/test_h14a_register.js) — vlastne zrkadlo zaniklo.
+  js = NxH14Reg.ids
   NxTest.assert_equal(%w[bom ctrl buy budget offer cut mat hw appl rules tpl sup bset about], rb,
                       'v Studiu ziju sekcie Kusovník, Kontrola, Nákup, Rozpočet, Ponuka, Materiály, Kovanie, Pravidlá a Šablóny')
   NxTest.assert_equal(rb, js, 'JS mirror sa nesmie rozist s Ruby autoritou')
+  NxTest.assert_equal([], NxH14Reg.mirror_problems, 'shell.js nedrzi vlastny zoznam, filtruje registrom')
   NxTest.assert(UID3_PANEL_RB.include?("cb(dlg, 'open_studio')"),
                 'panel ma vlastny callback na otvorenie Studia')
   NxTest.assert(UID3_RESOLV_RB.include?('def studio_link_of'),

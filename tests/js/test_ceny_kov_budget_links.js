@@ -19,7 +19,7 @@ const ctx = {
 };
 ctx.window = ctx;
 vm.createContext(ctx);
-for (const file of ['studio.js', 'budget.js']){
+for (const file of ['studio_sections.js', 'studio.js', 'budget.js']){
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../../noxun_engine/ui/js', file), 'utf8'), ctx,
     { filename: file });
 }

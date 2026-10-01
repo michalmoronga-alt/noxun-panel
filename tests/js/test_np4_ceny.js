@@ -52,7 +52,7 @@ const sandbox = {
 };
 sandbox.window = sandbox;
 vm.createContext(sandbox);
-['studio.js', 'budget.js'].forEach(function(f){
+['studio_sections.js', 'studio.js', 'budget.js'].forEach(function(f){
   vm.runInContext(fs.readFileSync(path.join(JS_DIR, f), 'utf8'), sandbox, { filename: f });
 });
 const STATUS = [];
