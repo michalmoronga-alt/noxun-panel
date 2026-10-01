@@ -34,7 +34,7 @@ počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení,
 
 **Blok 9 · HARDENING PO V1** (štart 1.10.2026, PR #432): krížový audit V1 sedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**;
 17 dávok **H1…H17** sekvenčne podľa tabuľky v [PLAN.md](PLAN.md), **bez zmeny výrobných a cenových čísel**; priečinok bloku [zdroje/bloky/HARDENING/](zdroje/bloky/HARDENING/).
-Hotové **H1** PR #433 · **H2** (fotenie okien) PR #434 · **H3a** (zavádzajúce údaje v okne) PR #435 · **H3b** (falošná chyba v Ruby konzole po novom súbore) PR #436 · **H4a** (zápis čísel) PR #437 · **H4b** (texty a vzhľad) PR #438 · **H5a** (mapa okien bez histórie, strážca rastu dokumentov) PR #?; nasleduje **H5b**.
+Hotové **H1** PR #433 · **H2** (fotenie okien) PR #434 · **H3a** (zavádzajúce údaje v okne) PR #435 · **H3b** (falošná chyba v Ruby konzole po novom súbore) PR #436 · **H4a** (zápis čísel) PR #437 · **H4b** (texty a vzhľad) PR #438 · **H5a** (mapa okien bez histórie, strážca rastu dokumentov) PR #439; nasleduje **H5b**.
 **H4b — Michalove otázky Q1/Q2 bez odpovede, platí predvolená vratná voľba:** vrátenie katalógu v ponuke „⋯" Materiálov (nie v O plugine) a ikona posuvníkov pre Nastavenia rozpočtu.
 **H6 a H7 čakajú na schválený mockup** (R-38 v H7 potvrdí Michal) · **Q1** (porez a montáž pri skle) bez odpovede · pri prvej rohovej v dielni overiť záves Sensys · **na smoke čakajú** D-132 (#367), D-133 (#368), D-134 (#369).
 
