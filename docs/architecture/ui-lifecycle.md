@@ -3764,7 +3764,7 @@ uvoľní ho `SS.saved()` (potvrdenie, odmietnutie, reload) — **a tiež prekres
 nič rozpísané, obsah sa prekreslí z čerstvého stavu, takže držať starú revíziu by znamenalo **falošný konflikt** nad hodnotami, ktoré používateľ vidí — a zahodenú prácu
 (`SS.saved()` rozpis pri odmietnutí zahadzuje). Kontrakt kola 2 tým ostáva nedotknutý: **pod kurzorom je obsah zmrazený a pin sa drží**, takže cudziu zmenu nemožno ticho prepísať.
 
-**Uvoľňuje sa v `ssRenderBody`, nie v `ssApplyState`** (oprava dlhu 1b-A, PLAN blok 1b odrážka A): pin patrí k OBSAHU NA OBRAZOVKE, a ten sa prekresľuje aj **bez nového pushu** —
+**Uvoľňuje sa v `ssRenderBody`, nie v `ssApplyState`** (oprava dlhu 1b-A, blok 1b odrážka A — dnes v archíve `SYSTEM/archiv/ROADMAP_hotove_etapy.md`): pin patrí k OBSAHU NA OBRAZOVKE, a ten sa prekresľuje aj **bez nového pushu** —
 odchod zo sekcie a návrat cez `studioGoSection` → `render` → `renderBody`. Kým kontrola žila v ceste pushu, prežil zastaraný pin práve túto cestu (fokus nezmeneného poľa → cudzia
 zmena a push, prekreslenie potlačené → odchod a návrat) a sekcia potom ukazovala čerstvé hodnoty, ale ukladala proti starej revízii: **falošný konflikt a stratená editácia**.
 Miesto uvoľnenia je **jedno jediné** — riadok tesne pred `box.innerHTML = ''`, teda za strážou `ssTyping()`; podmienka je preto len `!ssDirty()`. Je to zámerné: posun uvoľnenia
@@ -4093,7 +4093,7 @@ zostavy, Čelá rohovej, skrytie delenia zón, „Šírku dverí", súhrn strany
 
 ### Trvalé UI pravidlo (Michal 20.7.2026): VERTIKÁLNY priestor panela je vzácny
 
-pred každým novým tlačidlom/poľom/riadkom POVINNE zvážiť umiestnenie do existujúceho radu, rohu náhľadu, ikony či kontextu; rast do výšky len v krajných prípadoch.
+Plné znenie a autorita: [../UI_DIZAJN.md](../UI_DIZAJN.md) §1 Princípy (tu len odkaz).
 
 ### usage_stats.rb
 

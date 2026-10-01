@@ -17,8 +17,8 @@ poistka proti kompresii kontextu.
 | Dávka | Predrecenzia |
 |---|---|
 | audit-povinná (kontrakt, schéma, migrácia, observer/undo lifecycle, nový modul — tá istá trieda ako `codex-audit`) | **povinná** |
-| výrobná alebo cenová (jediná definícia v CLAUDE.md: mení rozmery alebo počty dielov, hrany, kusovník, VEPO, nákupné zoznamy, kovanie alebo ceny) | **povinná** |
-| bežná dávka nad 300 zmenených riadkov kódu pluginu (bez testov a dokumentácie) alebo s novým ovládacím prvkom v UI | **povinná** (hranica N18, 26.9.2026) |
+| výrobná alebo cenová (jediná definícia v CLAUDE.md: mení rozmery alebo počty dielov, hrany, kusovník, VEPO, nákupné zoznamy, kovanie alebo ceny; príklady hraníc tamtiež) | **povinná** |
+| bežná dávka nad 300 zmenených riadkov kódu pluginu (bez testov a dokumentácie) alebo s novým ovládacím prvkom v UI (príklady hraníc v CLAUDE.md) | **povinná** (hranica N18, 26.9.2026) |
 | iný kód s novou UI interakciou (klávesnica, fokus, prepnutie dokumentu, prekreslenie) | odporúčaná |
 | docs-only, len zmena verzie | nie |
 
