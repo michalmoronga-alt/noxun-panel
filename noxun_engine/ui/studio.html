@@ -275,16 +275,22 @@
      obsahu a stĺpce Dĺžka/Šírka/Hr./ks „skákali" medzi skupinami. Šírky nesie
      trieda `c-<kľúč>` (th aj td); Dielec dostane zvyšok. Textové bunky sa
      ZALAMUJÚ — nič sa neoreže (ani dlhý zoznam skriniek, ani ABS). Pohľady
-     Platne a ABS (jedna tabuľka) sa nemenia. */
-  .bomtab.parts { table-layout: fixed; }
-  .bomtab.parts .c-l, .bomtab.parts .c-w { width: 64px; }
-  .bomtab.parts .c-th { width: 52px; }
-  .bomtab.parts .c-q { width: 44px; }
-  .bomtab.parts .c-abs { width: 190px; }
-  .bomtab.parts .c-grain { width: 96px; }
-  .bomtab.parts .c-role { width: 120px; }
-  .bomtab.parts .c-cab { width: 28%; }
-  .bomtab.parts td { white-space: normal; overflow-wrap: anywhere; }
+     Platne a ABS (jedna tabuľka) sa nemenia.
+     Predrecenzia P2: pevné rozloženie platí LEN pri predvolených stĺpcoch
+     (trieda `fixed`, kreslí ju `partsTable`). So zapnutými voliteľnými
+     stĺpcami (Smer dekoru, Rola) by pri okne 1060 px (tabuľka ~826 px) súčet
+     pevných šírok zjedol stĺpec Dielec na nulu — vtedy tabuľka zostane pri
+     automatickom rozložení. Pri predvolených stĺpcoch má Dielec pri 826 px
+     aspoň 160 px (stráži test_h4b_texty_vzhlad.js). */
+  .bomtab.parts.fixed { table-layout: fixed; }
+  .bomtab.parts.fixed .c-l, .bomtab.parts.fixed .c-w { width: 64px; }
+  .bomtab.parts.fixed .c-th { width: 52px; }
+  .bomtab.parts.fixed .c-q { width: 44px; }
+  .bomtab.parts.fixed .c-abs { width: 190px; }
+  .bomtab.parts.fixed .c-cab { width: 22%; }
+  /* Zalamovanie len pri pevnom rozložení: v automatickom by `anywhere` znížilo
+     minimálnu šírku textu na jedno písmeno a stĺpec Dielec by sa zas zúžil. */
+  .bomtab.parts.fixed td { white-space: normal; overflow-wrap: anywhere; }
   .estfb { color: var(--nx-warn-fg); }
   .cellsw { display: inline-block; width: 13px; height: 13px; border-radius: 3px;
             border: 1px solid var(--nx-border-strong); vertical-align: -2px; margin-right: 7px; }

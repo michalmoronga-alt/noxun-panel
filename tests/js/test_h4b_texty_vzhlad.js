@@ -231,4 +231,40 @@ M.mdSetCatalog({ catalog_schema: 2, pre_schema2_backup: true, catalog: { sheets:
      'tlačidlo „Nastavenia" v lište Rozpočtu má tú istú ikonu ako navigácia');
 })();
 
+// ============ 5) D-08 / predrecenzia P2: stĺpce Kusovníka pri úzkom okne =====
+// Pevné rozloženie (`fixed`) LEN pri stĺpcoch, ktorým studio.html dáva šírku.
+// Pri najmenšom okne (NX_FIT_MIN 1060 px − navigácia a okraje ≈ 826 px tabuľky)
+// musí stĺpcu Dielec ostať aspoň 160 px — inak sa názvy lámu po písmenách.
+
+(function(){
+  const cols = function(keys){ return S.COLS.filter(function(c){ return keys.indexOf(c.k) > -1; }); };
+  const def = S.COLS.filter(function(c){ return c.on; });
+  eq(S.partsTableClass(def), 'bomtab parts fixed', 'predvolené stĺpce = pevné rozloženie');
+  eq(S.partsTableClass(cols(['name', 'cab', 'l', 'w', 'th', 'q', 'abs', 'grain'])), 'bomtab parts',
+     'so Smerom dekoru = automatické rozloženie (Dielec sa nezje)');
+  eq(S.partsTableClass(cols(['name', 'cab', 'l', 'w', 'th', 'q', 'abs', 'role'])), 'bomtab parts', 'tak isto s Rolou');
+  eq(S.partsTableClass(cols(['name', 'l', 'w', 'th', 'q'])), 'bomtab parts fixed', 'menej stĺpcov = stále pevné');
+
+  const html = fs.readFileSync(path.join(UI, 'studio.html'), 'utf8');
+  const px = {}; let cabPct = null;
+  html.replace(/\.bomtab\.parts\.fixed ([^{]+)\{ width: (\d+)(px|%); \}/g, function(_m, sel, n, unit){
+    sel.split(',').forEach(function(s){
+      const k = (s.match(/\.c-([a-z]+)/) || [])[1];
+      if (!k) return;
+      if (unit === '%') { if (k === 'cab') cabPct = Number(n); } else px[k] = Number(n);
+    });
+    return _m;
+  });
+  ok(cabPct !== null && px.l && px.w && px.th && px.q && px.abs, 'CSS šírky stĺpcov sa dajú prečítať');
+  ok(/\.bomtab th\.acth, \.bomtab td\.acth \{ width: 56px;/.test(html), 'stĺpec akcií 56 px');
+  const table = 826;
+  const used = def.filter(function(c){ return c.k !== 'name' && c.k !== 'cab'; })
+    .reduce(function(a, c){ return a + px[c.k]; }, 0) + 56;
+  const dielec = table - used - table * cabPct / 100;
+  ok(dielec >= 160, 'pri 1060 px okne má Dielec ' + Math.round(dielec) + ' px (≥ 160)');
+  ok(!/\.bomtab\.parts \{ table-layout/.test(html), 'pevné rozloženie nie je bezpodmienečné');
+  ok(/\.bomtab\.parts\.fixed td \{ white-space: normal; overflow-wrap: anywhere; \}/.test(html),
+     'zalamovanie „anywhere" len pri pevnom rozložení (v automatickom by zúžilo Dielec)');
+})();
+
 console.log('test_h4b_texty_vzhlad: ' + n + ' asercii OK');

@@ -1735,6 +1735,7 @@
     var emeta = ST.edges_meta || {};
     var g = groupBom(ST.rows, ST.sheets, bomQ);
     var cols = activeCols(COLS);
+    var tcls = partsTableClass(cols);
     var h = '';
     if (!(ST.rows || []).length){
       return '<div class="muted">Žiadne výrobné dielce v modeli — vlož korpus alebo dosku.</div>';
@@ -1755,7 +1756,7 @@
         // H4 · D-08: `parts` = pevne rozlozenie a spolocne sirky stlpcov (studio.html)
         // — bez neho mala kazda skupina materialu vlastne sirky a stlpce „skakali".
         // Trieda `c-<kluc>` nesie sirku na `th` AJ `td` (kontrakt Š2: stlpce su volitelne).
-        '<table class="bomtab parts"><thead><tr>' +
+        '<table class="' + tcls + '"><thead><tr>' +
           cols.map(function(c){ return '<th class="' + colCls(c) + '">' + esc(c.t) + '</th>'; }).join('') +
           '<th class="acth"></th></tr></thead><tbody>';
       grp.rows.forEach(function(r){
@@ -1790,6 +1791,15 @@
 
   // H4 · D-08: trieda bunky/hlavicky stlpca Dielce — zarovnanie cisla + sirka.
   function colCls(c){ return (c.num ? 'num ' : '') + 'c-' + c.k; }
+
+  // Predrecenzia P2: PEVNE rozlozenie len ked su zapnute iba stlpce, ktorym
+  // studio.html dava sirku (predvolene). Volitelne Smer dekoru a Rola by pri
+  // okne 1060 px zjedli stlpec Dielec na nulu — vtedy automaticke rozlozenie.
+  var PARTS_FIXED_COLS = ['name', 'cab', 'l', 'w', 'th', 'q', 'abs'];
+  function partsTableClass(cols){
+    var fixed = (cols || []).every(function(c){ return PARTS_FIXED_COLS.indexOf(c.k) > -1; });
+    return 'bomtab parts' + (fixed ? ' fixed' : '');
+  }
 
   // H4 · D-04: zapis cisla v stlpci Dielce. Dlzka a sirka celé mm (= VEPO
   // `rounded_dims`), hrubka SKUTOCNA (18,6 — nie „19"; obchodnu 18 nesie VEPO),
@@ -2400,6 +2410,7 @@
       // Testy nastavuju stav cez `setBomState` (bomView/bomQ/menu) — inak by
       // museli sahat do modulovych premennych, ktore Node nevidi.
       bomToolsHtml: bomToolsHtml, vepoBtnHtml: vepoBtnHtml, vepoMenuHtml: vepoMenuHtml,
+      partsTableClass: partsTableClass, // predrecenzia P2 H4b
       // Jantarovy indikator neaktualnosti: JEDEN markup pre vsetkych 5 mist
       // (Kusovnik · Kontrola · Nakup tu, Rozpocet · Ponuka v budget.js —
       // ten si ho v Node testoch berie requirom TOHTO suboru).

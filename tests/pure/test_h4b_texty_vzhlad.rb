@@ -154,11 +154,12 @@ NxTest.test('H4b · D-08: zakladny select, kratke hladanie, pevne stlpce Kusovni
   end
   NxTest.assert(NxH4b.src('ui/js/appliances.js').include?('id="apJobQ" placeholder="Hľadať…"'), 'apJobQ: kratky hint')
   st = NxH4b.src('ui/studio.html')
-  NxTest.assert(st.include?('.bomtab.parts { table-layout: fixed; }'), 'tabulka Dielce ma pevne rozlozenie')
-  NxTest.assert(st.include?('.bomtab.parts td { white-space: normal; overflow-wrap: anywhere; }'),
-                'textove bunky sa zalamuju — nic sa neoreze')
+  NxTest.assert(st.include?('.bomtab.parts.fixed { table-layout: fixed; }'), 'tabulka Dielce ma pevne rozlozenie (pri predvolenych stlpcoch)')
+  NxTest.assert(st.include?('.bomtab.parts.fixed td { white-space: normal; overflow-wrap: anywhere; }'),
+                'textove bunky sa pri pevnom rozlozeni zalamuju — nic sa neoreze')
+  NxTest.refute(st.include?('.bomtab.parts { table-layout'), 'predrecenzia P2: pevne rozlozenie NIE bezpodmienecne')
   js = NxH4b.src('ui/js/studio.js')
-  NxTest.assert(js.include?("'c-' + c.k") && js.include?('<table class="bomtab parts">'),
+  NxTest.assert(js.include?("'c-' + c.k") && js.include?("'bomtab parts' + (fixed ? ' fixed' : '')"),
                 'partsTable nesie triedu stlpca c-<kluc> a tabulka triedu parts')
 end
 
