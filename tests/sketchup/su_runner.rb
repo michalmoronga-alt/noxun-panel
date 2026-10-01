@@ -22358,6 +22358,133 @@ module NoxunSuRunner
     end
   end
 
+  # ===== H12 (C-01): GOLDEN VYSTUPOV STYROCH TYPOV ================================
+  # Package H12 §8 + §15 A3/A4. Sest skriniek (dolna s dvierkami a policou,
+  # dolna 800 so zasuvkou a soklom, horna, slot 60, rohova vlavo, rohova vpravo
+  # 500/100) a ich VYSTUPY: dielce v modeli, config bez `engine_version`,
+  # riadky kusovnika, VEPO CSV aj LOG (pevny projekt, cas a verzia; riadok
+  # `Verzia:` sa vynima), expanzia nakupu + `purchase_csv` (objednavkovy vystup),
+  # popisky kovania, rozpocet (sucty a sekcie) a Kontrola (pocty a nalezy).
+  # Chyba `tests/fixtures/h12_golden/insu.json` => CAPTURE (zapise ju — smie sa
+  # to stat LEN na nezmenenom kode, prvy commit H12a); inak POROVNANIE
+  # retazcom. Headless `test_h12_golden.rb` strazi, ze fixtura existuje.
+  H12_GOLDEN = File.expand_path(File.join(__dir__, '..', 'fixtures', 'h12_golden', 'insu.json'))
+  H12_VOLATILE = /pid|refs|persistent|entity_?id|stale|link|checked|date|time|\Anow\z|\Aage/i
+
+  def h12_scrub(obj)
+    case obj
+    when Hash
+      obj.each_with_object({}) do |(k, v), out|
+        next if k.to_s.match?(H12_VOLATILE)
+
+        out[k.to_s] = h12_scrub(v)
+      end
+    when Array then obj.map { |v| h12_scrub(v) }
+    when Float then obj.round(4)
+    when Symbol then obj.to_s
+    else obj
+    end
+  end
+
+  def h12_door(wings = '1')
+    { 'items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'auto', 'wings' => wings }] }
+  end
+
+  def h12_cabinets
+    [
+      { 'type' => 'lower', 'shelves' => 1, 'fronts' => h12_door },
+      { 'type' => 'lower', 'width' => 800.0, 'plinth_mode' => 'front',
+        'fronts' => { 'items' => [
+          { 'id' => 'F1', 'type' => 'drawer_front', 'mode' => 'fixed', 'height' => 140.0, 'locked' => true },
+          { 'id' => 'F2', 'type' => 'door', 'mode' => 'auto', 'wings' => '2' }
+        ] } },
+      { 'type' => 'upper', 'fronts' => h12_door },
+      { 'type' => 'dishwasher' },
+      { 'type' => 'corner_blind' },
+      { 'type' => 'corner_blind', 'corner_side' => 'right', 'corner_door_w' => 500.0, 'corner_cr1' => 100.0 }
+    ]
+  end
+
+  def h12_parts(inst)
+    inst.definition.entities.grep(Sketchup::ComponentInstance)
+        .select { |i| e::Store.kind(i) == 'part' }
+        .map do |pi|
+          o = pi.transformation.origin
+          b = pi.definition.bounds
+          { 'part_key' => e::Store.get(pi, 'part_key').to_s, 'role' => e::Store.get(pi, 'role').to_s,
+            'definition' => pi.definition.name, 'material' => pi.material ? pi.material.name : nil,
+            'origin' => [mm(o.x), mm(o.y), mm(o.z)], 'size' => [mm(b.width), mm(b.height), mm(b.depth)],
+            'config' => e::Store.config(pi) }
+        end
+        .sort_by { |h| h['part_key'] }
+  end
+
+  def h12_capture(model)
+    core = e::ProductionCore
+    cabs = h12_cabinets.map do |params|
+      inst = e::CabinetBuilder.build(model, params)
+      raise "vlozenie #{params['type']} zlyhalo" unless inst
+
+      cfg = e::Store.config(inst) || {}
+      cfg.delete('engine_version')
+      o = inst.transformation.origin
+      { 'cabinet_id' => e::Store.get(inst, 'cabinet_id').to_s, 'origin' => [mm(o.x), mm(o.y), mm(o.z)],
+        'config' => cfg, 'parts' => h12_parts(inst) }
+    end
+    collected = core.fresh_collect(model)
+    bom = e::Bom.compute(collected)
+    smap = core.sheets_map
+    hw_exp = core.hardware_expansion(model, collected)
+    budget = core.budget_payload(model, bom, collected, nil, hw_exp, smap)
+    control = core.control_payload(collected, hardware_expansion: hw_exp, budget: budget, sheets: smap)
+    vepo = e::VepoExport.build(bom[:rows], project: 'H12 GOLDEN', materials: core.vepo_materials,
+                                           edge_thicknesses: core.vepo_edge_thicknesses, validation: control,
+                                           edge_decors: core.vepo_edge_decors, sheet_decors: core.vepo_sheet_decors,
+                                           version: 'H12', generated_at: '2026-10-01 00:00',
+                                           merge_18_36: core.merge_18_36)
+    log = vepo['log_text'].to_s.lines.reject { |l| l.start_with?('Verzia:') }.join
+    h12_scrub(
+      'cabinets' => cabs,
+      'bom' => bom[:rows],
+      'vepo_csv' => Array(vepo['groups']).map { |g| [g['filename'].to_s, g['csv'].to_s] },
+      'vepo_errors' => vepo['errors'],
+      'vepo_log' => log,
+      'expansion' => { 'rows' => hw_exp && hw_exp['rows'], 'unmapped' => hw_exp && hw_exp['unmapped'] },
+      'purchase_csv' => hw_exp && e::HardwareSets.purchase_csv(hw_exp, project: 'H12 GOLDEN', generated_at: 'FIX'),
+      'hardware_labeled' => core.hardware_labeled(bom),
+      'budget' => budget.is_a?(Hash) ? { 'totals' => budget['totals'], 'sections' => budget['sections'] } : nil,
+      'control' => { 'counts' => control['counts'], 'items' => control['items'] }
+    )
+  end
+
+  def run_h12(model)
+    cleanup(model)
+    got = h12_capture(model)
+    text = JSON.pretty_generate(got) + "\n"
+    rows = Array(got.dig('expansion', 'rows')).length
+    ok("H12: nakup ma neprazdnu expanziu setov (#{rows} riadkov, A3)", rows.positive?)
+    ok("H12: VEPO ma skupiny CSV (#{Array(got['vepo_csv']).length})", Array(got['vepo_csv']).any?)
+    if File.exist?(H12_GOLDEN)
+      want = File.read(H12_GOLDEN, encoding: 'UTF-8').gsub("\r\n", "\n") # checkout s autocrlf
+      same = want == text
+      unless same
+        File.write(File.join(File.dirname(OUT), 'h12_insu_got.json'), text)
+        w = JSON.parse(want)
+        diff = (w.keys | got.keys).reject { |k| w[k] == got[k] }
+        info("H12: rozdiel v klucoch #{diff.join(', ')} — cerstvy odtlacok v h12_insu_got.json vedla vysledku")
+      end
+      ok('H12: VEPO, kusovnik, nakup, rozpocet, Kontrola a dielce 6 skriniek BAJTOVO ako golden (insu.json)', same)
+    else
+      File.write(H12_GOLDEN, text)
+      info("H12: CAPTURE — golden zapisany do #{H12_GOLDEN} (#{text.bytesize} B); musi to byt NEZMENENY kod")
+      ok('H12: capture golden (prvy beh na nezmenenom kode)', File.exist?(H12_GOLDEN))
+    end
+    cleanup(model)
+  rescue StandardError => ex
+    log_line("FAIL: run_h12: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
   # ===== H11b (F-02): MINIMUM SKETCHUP 2026 =====================================
   # Sonda P2 z PACKAGE_H11 (B5) + N6: na ZIVOM SketchUpe 2026 sa zapise verzia,
   # overi sa vyklad ciselneho `version_number` (major = cislo / 100_000_000) proti
@@ -28348,6 +28475,7 @@ module NoxunSuRunner
     # 4x FAIL select-cez-kluc bez realnej regresie). Cerstva instancia ma nil.
     # ŠT-1c PR B3: okno Vyroba zaniklo — generacny token ma uz len Studio.
     e::StudioDialog.instance_variable_set(:@generation, 0) if defined?(e::StudioDialog)
+    run_h12(model)           # H12/C-01: golden vystupov 4 typov (VEPO bez riadku Verzia:, kusovnik, nakup + purchase_csv, rozpocet, Kontrola, dielce) — PRVY, pred zasahmi inych scenarov do katalogov
     run_sync(model)
     run_sync_back(model)     # davka Chrbat: D-37 hlbka, D-31 none, D-38 pevny 18
     run_sync_rails(model)    # H3/D-80: vnutro pod vystuhami (odsadenie, upright, chrbat, odmietnutie)

@@ -123,6 +123,7 @@ unless NxTest::IN_SKETCHUP
     core/doc_key
     core/part_keys
     core/build_plan
+    core/cabinet_types
     core/part_faces
     core/json_file_store
     core/dim_series

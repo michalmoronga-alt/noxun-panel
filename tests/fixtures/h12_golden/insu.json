@@ -1,0 +1,6072 @@
+{
+  "cabinets": [
+    {
+      "cabinet_id": "CAB-001",
+      "origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "config": {
+        "config_schema": 22,
+        "rules_seed_version": 7,
+        "part_key_schema": 1,
+        "plan_schema": 7,
+        "warnings": [
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Bok lavy“: hrany L1 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/side:left",
+            "data": {
+              "edges": [
+                "L1"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Bok pravy“: hrany L1 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/side:right",
+            "data": {
+              "edges": [
+                "L1"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Dno“: hrany L1 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/bottom",
+            "data": {
+              "edges": [
+                "L1"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Vrch“: hrany L1 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/top",
+            "data": {
+              "edges": [
+                "L1"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Polica 1“: hrany L1 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "zone:Z1/shelf:1",
+            "data": {
+              "edges": [
+                "L1"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Dvierka 1“: hrany L1, L2, W1, W2 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "front:F1/wing:single",
+            "data": {
+              "edges": [
+                "L1",
+                "L2",
+                "W1",
+                "W2"
+              ]
+            }
+          }
+        ],
+        "hardware": [
+          {
+            "owner_part_key": null,
+            "generic_type": "leg",
+            "quantity": 4,
+            "rule_id": "nohy-zakladne",
+            "variant_id": null,
+            "production_class": "counted",
+            "manufactured": true,
+            "params": {
+              "height": 100.0
+            },
+            "source": "rule",
+            "rule_quantity": 4
+          },
+          {
+            "owner_part_key": null,
+            "generic_type": "plinth_clip",
+            "quantity": 1,
+            "rule_id": "prichyt-sokla",
+            "variant_id": null,
+            "production_class": "counted",
+            "manufactured": true,
+            "params": {
+            },
+            "source": "rule",
+            "rule_quantity": 1
+          },
+          {
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "quantity": 2,
+            "rule_id": "zavesy-podla-vysky",
+            "variant_id": null,
+            "production_class": "counted",
+            "manufactured": true,
+            "params": {
+              "use_type": "door",
+              "opening_mode": "classic"
+            },
+            "source": "rule",
+            "rule_quantity": 2
+          },
+          {
+            "owner_part_key": "zone:Z1/shelf:1",
+            "generic_type": "shelf_pin",
+            "quantity": 4,
+            "rule_id": "podperky-policove",
+            "variant_id": null,
+            "production_class": "counted",
+            "manufactured": true,
+            "params": {
+            },
+            "source": "rule",
+            "rule_quantity": 4
+          }
+        ],
+        "drawer_conflicts": [
+
+        ],
+        "hardware_conflicts": [
+
+        ],
+        "type": "lower",
+        "name": null,
+        "construction_preset": "noxun-lower-18",
+        "mode": "parametric",
+        "width": 600.0,
+        "height": 720.0,
+        "depth": 510.0,
+        "thickness": 18.0,
+        "floor_height": 100.0,
+        "bottom_mode": "under_sides",
+        "top_mode": "full",
+        "back_mode": "overlay",
+        "back_thickness": 3.0,
+        "plinth_mode": "none",
+        "plinth_recess": 40.0,
+        "rail_depth": 100.0,
+        "rails_orientation": "flat",
+        "rails_top_offset": 0.0,
+        "sides": {
+          "thickness": 18.0,
+          "construction": "sides_wrap"
+        },
+        "bottom": {
+          "mode": "under_sides",
+          "thickness": 18.0
+        },
+        "top": {
+          "mode": "full",
+          "thickness": 18.0,
+          "rail_depth": 100.0,
+          "orientation": "flat",
+          "top_offset": 0.0
+        },
+        "back": {
+          "mode": "overlay",
+          "thickness": 3.0
+        },
+        "support": {
+          "type": "legs",
+          "height": 100.0
+        },
+        "material_id": null,
+        "front_material_id": null,
+        "back_material_id": null,
+        "drawer_material_id": null,
+        "part_overrides": {
+        },
+        "hardware_overrides": [
+
+        ],
+        "hardware_sets": {
+        },
+        "hardware_manual": [
+
+        ],
+        "available_width": 564.0,
+        "available_height": 584.0,
+        "available_depth": 507.0,
+        "front_plane": 0.0,
+        "wings": 1,
+        "zone_tree": {
+          "id": "Z1",
+          "generation": 0,
+          "split": null,
+          "shelves": 1,
+          "children": [
+
+          ]
+        },
+        "zones": [
+          {
+            "id": "CAB-001-Z1",
+            "stable_id": "Z1",
+            "parent": null,
+            "label": "Celé vnútro",
+            "position": [
+              18.0,
+              0.0,
+              118.0
+            ],
+            "width": 564.0,
+            "height": 584.0,
+            "depth": 507.0,
+            "split": null,
+            "shelves": 1,
+            "leaf": true
+          }
+        ],
+        "fronts": {
+          "split_axis": "height",
+          "gap": 3.0,
+          "gap_top": 2.0,
+          "gap_bottom": 2.0,
+          "gap_left": 2.0,
+          "gap_right": 2.0,
+          "edge_limit_off": false,
+          "items": [
+            {
+              "id": "F1",
+              "type": "door",
+              "mode": "auto",
+              "height": null,
+              "locked": false,
+              "wings": "1",
+              "profile": "none"
+            }
+          ]
+        },
+        "front_items": [
+          {
+            "id": "F1",
+            "type": "door",
+            "mode": "auto",
+            "height": 616.0,
+            "locked": false,
+            "wings": "1",
+            "wings_n": 1,
+            "profile": "none",
+            "z": 102.0
+          }
+        ]
+      },
+      "parts": [
+        {
+          "part_key": "cabinet/back",
+          "role": "back",
+          "definition": "NOXUN CAB-001 BACK",
+          "material": "HDF_WHITE_3",
+          "origin": [
+            0.0,
+            507.0,
+            100.0
+          ],
+          "size": [
+            600.0,
+            3.0,
+            620.0
+          ],
+          "config": {
+            "length": 600.0,
+            "width": 620.0,
+            "thickness": 3.0,
+            "quantity": 1,
+            "material_id": "HDF_WHITE_3",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            },
+            "back_mode": "overlay"
+          }
+        },
+        {
+          "part_key": "cabinet/bottom",
+          "role": "bottom",
+          "definition": "NOXUN CAB-001 BOTTOM",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            0.0,
+            0.0,
+            100.0
+          ],
+          "size": [
+            600.0,
+            507.0,
+            18.0
+          ],
+          "config": {
+            "length": 600.0,
+            "width": 507.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/side:left",
+          "role": "side_left",
+          "definition": "NOXUN CAB-001 SIDE-L",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            0.0,
+            0.0,
+            118.0
+          ],
+          "size": [
+            18.0,
+            507.0,
+            602.0
+          ],
+          "config": {
+            "length": 602.0,
+            "width": 507.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/side:right",
+          "role": "side_right",
+          "definition": "NOXUN CAB-001 SIDE-R",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            582.0,
+            0.0,
+            118.0
+          ],
+          "size": [
+            18.0,
+            507.0,
+            602.0
+          ],
+          "config": {
+            "length": 602.0,
+            "width": 507.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/top",
+          "role": "top",
+          "definition": "NOXUN CAB-001 TOP",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            18.0,
+            0.0,
+            702.0
+          ],
+          "size": [
+            564.0,
+            507.0,
+            18.0
+          ],
+          "config": {
+            "length": 564.0,
+            "width": 507.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "front:F1/wing:single",
+          "role": "front_door",
+          "definition": "NOXUN CAB-001 DOOR-1",
+          "material": "W1000_DTDL_18",
+          "origin": [
+            2.0,
+            -18.0,
+            102.0
+          ],
+          "size": [
+            596.0,
+            18.0,
+            616.0
+          ],
+          "config": {
+            "length": 616.0,
+            "width": 596.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "W1000_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "zone:Z1/shelf:1",
+          "role": "shelf",
+          "definition": "NOXUN CAB-001 SHELF-1-1",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            18.0,
+            20.0,
+            401.0
+          ],
+          "size": [
+            564.0,
+            487.0,
+            18.0
+          ],
+          "config": {
+            "length": 564.0,
+            "width": 487.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "cabinet_id": "CAB-002",
+      "origin": [
+        650.0,
+        0.0,
+        0.0
+      ],
+      "config": {
+        "config_schema": 22,
+        "rules_seed_version": 7,
+        "part_key_schema": 1,
+        "plan_schema": 7,
+        "warnings": [
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Bok lavy“: hrany L1 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/side:left",
+            "data": {
+              "edges": [
+                "L1"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Bok pravy“: hrany L1 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/side:right",
+            "data": {
+              "edges": [
+                "L1"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Dno“: hrany L1 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/bottom",
+            "data": {
+              "edges": [
+                "L1"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Vrch“: hrany L1 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/top",
+            "data": {
+              "edges": [
+                "L1"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Zasuvkove celo 1“: hrany L1, L2, W1, W2 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "front:F1/panel",
+            "data": {
+              "edges": [
+                "L1",
+                "L2",
+                "W1",
+                "W2"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Dvierka 2 lave“: hrany L1, L2, W1, W2 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "front:F2/wing:left",
+            "data": {
+              "edges": [
+                "L1",
+                "L2",
+                "W1",
+                "W2"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Dvierka 2 prave“: hrany L1, L2, W1, W2 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "front:F2/wing:right",
+            "data": {
+              "edges": [
+                "L1",
+                "L2",
+                "W1",
+                "W2"
+              ]
+            }
+          }
+        ],
+        "hardware": [
+          {
+            "owner_part_key": null,
+            "generic_type": "leg",
+            "quantity": 4,
+            "rule_id": "nohy-zakladne",
+            "variant_id": null,
+            "production_class": "counted",
+            "manufactured": true,
+            "params": {
+              "height": 100.0
+            },
+            "source": "rule",
+            "rule_quantity": 4
+          },
+          {
+            "owner_part_key": "front:F2/wing:left",
+            "generic_type": "hinge",
+            "quantity": 2,
+            "rule_id": "zavesy-podla-vysky",
+            "variant_id": null,
+            "production_class": "counted",
+            "manufactured": true,
+            "params": {
+              "use_type": "door",
+              "opening_mode": "classic"
+            },
+            "source": "rule",
+            "rule_quantity": 2
+          },
+          {
+            "owner_part_key": "front:F2/wing:right",
+            "generic_type": "hinge",
+            "quantity": 2,
+            "rule_id": "zavesy-podla-vysky",
+            "variant_id": null,
+            "production_class": "counted",
+            "manufactured": true,
+            "params": {
+              "use_type": "door",
+              "opening_mode": "classic"
+            },
+            "source": "rule",
+            "rule_quantity": 2
+          },
+          {
+            "owner_part_key": "front:F1/panel",
+            "generic_type": "slide",
+            "quantity": 1,
+            "rule_id": "vysuvy-nl-podla-hlbky",
+            "variant_id": null,
+            "production_class": "counted",
+            "manufactured": true,
+            "params": {
+              "nominal_length": 470.0,
+              "front_height": 140.0
+            },
+            "source": "rule",
+            "rule_quantity": 1
+          }
+        ],
+        "drawer_conflicts": [
+
+        ],
+        "hardware_conflicts": [
+
+        ],
+        "type": "lower",
+        "name": null,
+        "construction_preset": "noxun-lower-18",
+        "mode": "parametric",
+        "width": 800.0,
+        "height": 720.0,
+        "depth": 510.0,
+        "thickness": 18.0,
+        "floor_height": 100.0,
+        "bottom_mode": "under_sides",
+        "top_mode": "full",
+        "back_mode": "overlay",
+        "back_thickness": 3.0,
+        "plinth_mode": "front",
+        "plinth_recess": 40.0,
+        "rail_depth": 100.0,
+        "rails_orientation": "flat",
+        "rails_top_offset": 0.0,
+        "sides": {
+          "thickness": 18.0,
+          "construction": "sides_wrap"
+        },
+        "bottom": {
+          "mode": "under_sides",
+          "thickness": 18.0
+        },
+        "top": {
+          "mode": "full",
+          "thickness": 18.0,
+          "rail_depth": 100.0,
+          "orientation": "flat",
+          "top_offset": 0.0
+        },
+        "back": {
+          "mode": "overlay",
+          "thickness": 3.0
+        },
+        "support": {
+          "type": "plinth",
+          "height": 100.0,
+          "recess": 40.0
+        },
+        "material_id": null,
+        "front_material_id": null,
+        "back_material_id": null,
+        "drawer_material_id": null,
+        "part_overrides": {
+        },
+        "hardware_overrides": [
+
+        ],
+        "hardware_sets": {
+        },
+        "hardware_manual": [
+
+        ],
+        "available_width": 764.0,
+        "available_height": 584.0,
+        "available_depth": 507.0,
+        "front_plane": 0.0,
+        "wings": 2,
+        "zone_tree": {
+          "id": "Z1",
+          "generation": 0,
+          "split": null,
+          "shelves": 0,
+          "children": [
+
+          ]
+        },
+        "zones": [
+          {
+            "id": "CAB-002-Z1",
+            "stable_id": "Z1",
+            "parent": null,
+            "label": "Celé vnútro",
+            "position": [
+              18.0,
+              0.0,
+              118.0
+            ],
+            "width": 764.0,
+            "height": 584.0,
+            "depth": 507.0,
+            "split": null,
+            "shelves": 0,
+            "leaf": true
+          }
+        ],
+        "fronts": {
+          "split_axis": "height",
+          "gap": 3.0,
+          "gap_top": 2.0,
+          "gap_bottom": 2.0,
+          "gap_left": 2.0,
+          "gap_right": 2.0,
+          "edge_limit_off": false,
+          "items": [
+            {
+              "id": "F1",
+              "type": "drawer_front",
+              "mode": "fixed",
+              "height": 140.0,
+              "locked": true,
+              "wings": 1,
+              "profile": "none"
+            },
+            {
+              "id": "F2",
+              "type": "door",
+              "mode": "auto",
+              "height": null,
+              "locked": false,
+              "wings": "2",
+              "profile": "none"
+            }
+          ]
+        },
+        "front_items": [
+          {
+            "id": "F1",
+            "type": "drawer_front",
+            "mode": "fixed",
+            "height": 140.0,
+            "locked": true,
+            "wings": 1,
+            "wings_n": 1,
+            "profile": "none",
+            "z": 102.0
+          },
+          {
+            "id": "F2",
+            "type": "door",
+            "mode": "auto",
+            "height": 473.0,
+            "locked": false,
+            "wings": "2",
+            "wings_n": 2,
+            "profile": "none",
+            "z": 245.0
+          }
+        ]
+      },
+      "parts": [
+        {
+          "part_key": "cabinet/back",
+          "role": "back",
+          "definition": "NOXUN CAB-002 BACK",
+          "material": "HDF_WHITE_3",
+          "origin": [
+            0.0,
+            507.0,
+            100.0
+          ],
+          "size": [
+            800.0,
+            3.0,
+            620.0
+          ],
+          "config": {
+            "length": 800.0,
+            "width": 620.0,
+            "thickness": 3.0,
+            "quantity": 1,
+            "material_id": "HDF_WHITE_3",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            },
+            "back_mode": "overlay"
+          }
+        },
+        {
+          "part_key": "cabinet/bottom",
+          "role": "bottom",
+          "definition": "NOXUN CAB-002 BOTTOM",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            0.0,
+            0.0,
+            100.0
+          ],
+          "size": [
+            800.0,
+            507.0,
+            18.0
+          ],
+          "config": {
+            "length": 800.0,
+            "width": 507.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/plinth:front",
+          "role": "plinth",
+          "definition": "NOXUN CAB-002 PLINTH",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            0.0,
+            40.0,
+            0.0
+          ],
+          "size": [
+            800.0,
+            18.0,
+            100.0
+          ],
+          "config": {
+            "length": 800.0,
+            "width": 100.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/side:left",
+          "role": "side_left",
+          "definition": "NOXUN CAB-002 SIDE-L",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            0.0,
+            0.0,
+            118.0
+          ],
+          "size": [
+            18.0,
+            507.0,
+            602.0
+          ],
+          "config": {
+            "length": 602.0,
+            "width": 507.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/side:right",
+          "role": "side_right",
+          "definition": "NOXUN CAB-002 SIDE-R",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            782.0,
+            0.0,
+            118.0
+          ],
+          "size": [
+            18.0,
+            507.0,
+            602.0
+          ],
+          "config": {
+            "length": 602.0,
+            "width": 507.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/top",
+          "role": "top",
+          "definition": "NOXUN CAB-002 TOP",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            18.0,
+            0.0,
+            702.0
+          ],
+          "size": [
+            764.0,
+            507.0,
+            18.0
+          ],
+          "config": {
+            "length": 764.0,
+            "width": 507.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "front:F1/panel",
+          "role": "drawer_front",
+          "definition": "NOXUN CAB-002 DRW-1",
+          "material": "W1000_DTDL_18",
+          "origin": [
+            2.0,
+            -18.0,
+            102.0
+          ],
+          "size": [
+            796.0,
+            18.0,
+            140.0
+          ],
+          "config": {
+            "length": 140.0,
+            "width": 796.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "W1000_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "front:F2/wing:left",
+          "role": "front_door",
+          "definition": "NOXUN CAB-002 DOOR-2-L",
+          "material": "W1000_DTDL_18",
+          "origin": [
+            2.0,
+            -18.0,
+            245.0
+          ],
+          "size": [
+            396.5,
+            18.0,
+            473.0
+          ],
+          "config": {
+            "length": 473.0,
+            "width": 396.5,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "W1000_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "front:F2/wing:right",
+          "role": "front_door",
+          "definition": "NOXUN CAB-002 DOOR-2-R",
+          "material": "W1000_DTDL_18",
+          "origin": [
+            401.5,
+            -18.0,
+            245.0
+          ],
+          "size": [
+            396.5,
+            18.0,
+            473.0
+          ],
+          "config": {
+            "length": 473.0,
+            "width": 396.5,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "W1000_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "cabinet_id": "CAB-003",
+      "origin": [
+        1500.0,
+        0.0,
+        1400.0
+      ],
+      "config": {
+        "config_schema": 22,
+        "rules_seed_version": 7,
+        "part_key_schema": 1,
+        "plan_schema": 7,
+        "warnings": [
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Bok lavy“: hrany L1 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/side:left",
+            "data": {
+              "edges": [
+                "L1"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Bok pravy“: hrany L1 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/side:right",
+            "data": {
+              "edges": [
+                "L1"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Dno“: hrany L1 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/bottom",
+            "data": {
+              "edges": [
+                "L1"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Vrch“: hrany L1 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/top",
+            "data": {
+              "edges": [
+                "L1"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Dvierka 1“: hrany L1, L2, W1, W2 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "front:F1/wing:single",
+            "data": {
+              "edges": [
+                "L1",
+                "L2",
+                "W1",
+                "W2"
+              ]
+            }
+          }
+        ],
+        "hardware": [
+          {
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "quantity": 2,
+            "rule_id": "zavesy-podla-vysky",
+            "variant_id": null,
+            "production_class": "counted",
+            "manufactured": true,
+            "params": {
+              "use_type": "door",
+              "opening_mode": "classic"
+            },
+            "source": "rule",
+            "rule_quantity": 2
+          },
+          {
+            "owner_part_key": null,
+            "generic_type": "wall_hanger",
+            "quantity": 2,
+            "rule_id": "zavesenie-hornej-skrinky",
+            "variant_id": null,
+            "production_class": "counted",
+            "manufactured": true,
+            "params": {
+            },
+            "source": "rule",
+            "rule_quantity": 2
+          }
+        ],
+        "drawer_conflicts": [
+
+        ],
+        "hardware_conflicts": [
+
+        ],
+        "type": "upper",
+        "name": null,
+        "construction_preset": "noxun-upper-18",
+        "mode": "parametric",
+        "width": 600.0,
+        "height": 720.0,
+        "depth": 320.0,
+        "thickness": 18.0,
+        "floor_height": 0.0,
+        "bottom_mode": "between_sides",
+        "top_mode": "full",
+        "back_mode": "groove",
+        "back_thickness": 3.0,
+        "plinth_mode": "none",
+        "plinth_recess": 40.0,
+        "rail_depth": 100.0,
+        "rails_orientation": "flat",
+        "rails_top_offset": 0.0,
+        "sides": {
+          "thickness": 18.0,
+          "construction": "sides_wrap"
+        },
+        "bottom": {
+          "mode": "between_sides",
+          "thickness": 18.0
+        },
+        "top": {
+          "mode": "full",
+          "thickness": 18.0,
+          "rail_depth": 100.0,
+          "orientation": "flat",
+          "top_offset": 0.0
+        },
+        "back": {
+          "mode": "groove",
+          "thickness": 3.0
+        },
+        "support": {
+          "type": "none",
+          "height": 0.0
+        },
+        "material_id": null,
+        "front_material_id": null,
+        "back_material_id": null,
+        "drawer_material_id": null,
+        "part_overrides": {
+        },
+        "hardware_overrides": [
+
+        ],
+        "hardware_sets": {
+        },
+        "hardware_manual": [
+
+        ],
+        "available_width": 564.0,
+        "available_height": 684.0,
+        "available_depth": 307.0,
+        "front_plane": 0.0,
+        "wings": 1,
+        "zone_tree": {
+          "id": "Z1",
+          "generation": 0,
+          "split": null,
+          "shelves": 0,
+          "children": [
+
+          ]
+        },
+        "zones": [
+          {
+            "id": "CAB-003-Z1",
+            "stable_id": "Z1",
+            "parent": null,
+            "label": "Celé vnútro",
+            "position": [
+              18.0,
+              0.0,
+              18.0
+            ],
+            "width": 564.0,
+            "height": 684.0,
+            "depth": 307.0,
+            "split": null,
+            "shelves": 0,
+            "leaf": true
+          }
+        ],
+        "fronts": {
+          "split_axis": "height",
+          "gap": 3.0,
+          "gap_top": 2.0,
+          "gap_bottom": 2.0,
+          "gap_left": 2.0,
+          "gap_right": 2.0,
+          "edge_limit_off": false,
+          "items": [
+            {
+              "id": "F1",
+              "type": "door",
+              "mode": "auto",
+              "height": null,
+              "locked": false,
+              "wings": "1",
+              "profile": "none"
+            }
+          ]
+        },
+        "front_items": [
+          {
+            "id": "F1",
+            "type": "door",
+            "mode": "auto",
+            "height": 716.0,
+            "locked": false,
+            "wings": "1",
+            "wings_n": 1,
+            "profile": "none",
+            "z": 2.0
+          }
+        ]
+      },
+      "parts": [
+        {
+          "part_key": "cabinet/back",
+          "role": "back",
+          "definition": "NOXUN CAB-003 BACK",
+          "material": "HDF_WHITE_3",
+          "origin": [
+            18.0,
+            307.0,
+            18.0
+          ],
+          "size": [
+            564.0,
+            3.0,
+            684.0
+          ],
+          "config": {
+            "length": 564.0,
+            "width": 684.0,
+            "thickness": 3.0,
+            "quantity": 1,
+            "material_id": "HDF_WHITE_3",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            },
+            "back_mode": "groove",
+            "cut_size": {
+              "length": 600.0,
+              "width": 720.0
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/bottom",
+          "role": "bottom",
+          "definition": "NOXUN CAB-003 BOTTOM",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            18.0,
+            0.0,
+            0.0
+          ],
+          "size": [
+            564.0,
+            320.0,
+            18.0
+          ],
+          "config": {
+            "length": 564.0,
+            "width": 320.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/side:left",
+          "role": "side_left",
+          "definition": "NOXUN CAB-003 SIDE-L",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "size": [
+            18.0,
+            320.0,
+            720.0
+          ],
+          "config": {
+            "length": 720.0,
+            "width": 320.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/side:right",
+          "role": "side_right",
+          "definition": "NOXUN CAB-003 SIDE-R",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            582.0,
+            0.0,
+            0.0
+          ],
+          "size": [
+            18.0,
+            320.0,
+            720.0
+          ],
+          "config": {
+            "length": 720.0,
+            "width": 320.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/top",
+          "role": "top",
+          "definition": "NOXUN CAB-003 TOP",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            18.0,
+            0.0,
+            702.0
+          ],
+          "size": [
+            564.0,
+            320.0,
+            18.0
+          ],
+          "config": {
+            "length": 564.0,
+            "width": 320.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "front:F1/wing:single",
+          "role": "front_door",
+          "definition": "NOXUN CAB-003 DOOR-1",
+          "material": "W1000_DTDL_18",
+          "origin": [
+            2.0,
+            -18.0,
+            2.0
+          ],
+          "size": [
+            596.0,
+            18.0,
+            716.0
+          ],
+          "config": {
+            "length": 716.0,
+            "width": 596.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "W1000_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "cabinet_id": "CAB-004",
+      "origin": [
+        2150.0,
+        0.0,
+        0.0
+      ],
+      "config": {
+        "config_schema": 22,
+        "rules_seed_version": 7,
+        "part_key_schema": 1,
+        "plan_schema": 7,
+        "warnings": [
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Dv myčka“: hrany L1, L2, W1, W2 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "front:F1/blind",
+            "data": {
+              "edges": [
+                "L1",
+                "L2",
+                "W1",
+                "W2"
+              ]
+            }
+          }
+        ],
+        "hardware": [
+
+        ],
+        "drawer_conflicts": [
+
+        ],
+        "hardware_conflicts": [
+
+        ],
+        "type": "dishwasher",
+        "name": null,
+        "construction_preset": "noxun-dishwasher",
+        "mode": "parametric",
+        "width": 600.0,
+        "height": 880.0,
+        "depth": 560.0,
+        "thickness": 18.0,
+        "floor_height": 0.0,
+        "bottom_mode": "under_sides",
+        "top_mode": "full",
+        "back_mode": "none",
+        "back_thickness": 3.0,
+        "plinth_mode": "none",
+        "plinth_recess": 40.0,
+        "rail_depth": 100.0,
+        "rails_orientation": "flat",
+        "rails_top_offset": 0.0,
+        "sides": {
+          "thickness": 18.0,
+          "construction": "sides_wrap"
+        },
+        "bottom": {
+          "mode": "under_sides",
+          "thickness": 18.0
+        },
+        "top": {
+          "mode": "full",
+          "thickness": 18.0,
+          "rail_depth": 100.0,
+          "orientation": "flat",
+          "top_offset": 0.0
+        },
+        "back": {
+          "mode": "none",
+          "thickness": 3.0
+        },
+        "support": {
+          "type": "none",
+          "height": 0.0
+        },
+        "material_id": null,
+        "front_material_id": null,
+        "back_material_id": null,
+        "drawer_material_id": null,
+        "part_overrides": {
+        },
+        "hardware_overrides": [
+
+        ],
+        "hardware_sets": {
+        },
+        "hardware_manual": [
+
+        ],
+        "available_width": 600.0,
+        "available_height": 880.0,
+        "available_depth": 560.0,
+        "front_plane": 0.0,
+        "wings": 0,
+        "zone_tree": {
+          "id": "Z1",
+          "generation": 0,
+          "split": null,
+          "shelves": 0,
+          "children": [
+
+          ]
+        },
+        "zones": [
+
+        ],
+        "fronts": {
+          "split_axis": "height",
+          "gap": 0.0,
+          "gap_top": 2.0,
+          "gap_bottom": 0.0,
+          "gap_left": 2.0,
+          "gap_right": 2.0,
+          "edge_limit_off": false,
+          "items": [
+            {
+              "id": "F1",
+              "type": "blind",
+              "mode": "fixed",
+              "height": 778.0,
+              "locked": true,
+              "wings": 1,
+              "profile": "none"
+            }
+          ]
+        },
+        "front_items": [
+          {
+            "id": "F1",
+            "type": "blind",
+            "mode": "fixed",
+            "height": 778.0,
+            "locked": true,
+            "wings": 1,
+            "wings_n": 1,
+            "profile": "none",
+            "z": 100.0,
+            "label": "dv myčka"
+          }
+        ],
+        "dw_class": 600,
+        "dw_body_height": 820.0,
+        "dw_front_bottom": 100.0,
+        "dw_front_height": 778.0
+      },
+      "parts": [
+        {
+          "part_key": "front:F1/blind",
+          "role": "false_front",
+          "definition": "NOXUN CAB-004 BLIND-1",
+          "material": "W1000_DTDL_18",
+          "origin": [
+            2.0,
+            -18.0,
+            100.0
+          ],
+          "size": [
+            596.0,
+            18.0,
+            778.0
+          ],
+          "config": {
+            "length": 778.0,
+            "width": 596.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "W1000_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "cabinet_id": "CAB-005",
+      "origin": [
+        2800.0,
+        0.0,
+        0.0
+      ],
+      "config": {
+        "config_schema": 22,
+        "rules_seed_version": 7,
+        "part_key_schema": 1,
+        "plan_schema": 7,
+        "warnings": [
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Bok lavy“: hrany L1 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/side:left",
+            "data": {
+              "edges": [
+                "L1"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Bok pravy“: hrany L1 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/side:right",
+            "data": {
+              "edges": [
+                "L1"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Dno“: hrany L1 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/bottom",
+            "data": {
+              "edges": [
+                "L1"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Vrch“: hrany L1 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/top",
+            "data": {
+              "edges": [
+                "L1"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Vystuha zavesov“: hrany L2 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/hinge_rail",
+            "data": {
+              "edges": [
+                "L2"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „CR lista 1“: hrany L1, L2, W1, W2 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/cr:1",
+            "data": {
+              "edges": [
+                "L1",
+                "L2",
+                "W1",
+                "W2"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „CR lista 2“: hrany L1, L2, W1, W2 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/cr:2",
+            "data": {
+              "edges": [
+                "L1",
+                "L2",
+                "W1",
+                "W2"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Vystuha rohova“: hrany L1, W1, W2 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/corner_rail",
+            "data": {
+              "edges": [
+                "L1",
+                "W1",
+                "W2"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Dvierka 1“: hrany L1, L2, W1, W2 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "front:F1/wing:single",
+            "data": {
+              "edges": [
+                "L1",
+                "L2",
+                "W1",
+                "W2"
+              ]
+            }
+          }
+        ],
+        "hardware": [
+          {
+            "owner_part_key": null,
+            "generic_type": "leg",
+            "quantity": 6,
+            "rule_id": "nohy-zakladne",
+            "variant_id": null,
+            "production_class": "counted",
+            "manufactured": true,
+            "params": {
+              "height": 100.0
+            },
+            "source": "rule",
+            "rule_quantity": 6
+          },
+          {
+            "owner_part_key": null,
+            "generic_type": "plinth_clip",
+            "quantity": 2,
+            "rule_id": "prichyt-sokla",
+            "variant_id": null,
+            "production_class": "counted",
+            "manufactured": true,
+            "params": {
+            },
+            "source": "rule",
+            "rule_quantity": 2
+          },
+          {
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "quantity": 2,
+            "rule_id": "zavesy-podla-vysky",
+            "variant_id": null,
+            "production_class": "counted",
+            "manufactured": true,
+            "params": {
+              "use_type": "door",
+              "opening_mode": "classic"
+            },
+            "source": "rule",
+            "rule_quantity": 2
+          }
+        ],
+        "drawer_conflicts": [
+
+        ],
+        "hardware_conflicts": [
+
+        ],
+        "type": "corner_blind",
+        "name": null,
+        "construction_preset": "noxun-corner-blind",
+        "mode": "parametric",
+        "width": 1100.0,
+        "height": 720.0,
+        "depth": 510.0,
+        "thickness": 18.0,
+        "floor_height": 100.0,
+        "bottom_mode": "under_sides",
+        "top_mode": "full",
+        "back_mode": "overlay",
+        "back_thickness": 3.0,
+        "plinth_mode": "none",
+        "plinth_recess": 40.0,
+        "rail_depth": 100.0,
+        "rails_orientation": "flat",
+        "rails_top_offset": 0.0,
+        "sides": {
+          "thickness": 18.0,
+          "construction": "sides_wrap"
+        },
+        "bottom": {
+          "mode": "under_sides",
+          "thickness": 18.0
+        },
+        "top": {
+          "mode": "full",
+          "thickness": 18.0,
+          "rail_depth": 100.0,
+          "orientation": "flat",
+          "top_offset": 0.0
+        },
+        "back": {
+          "mode": "overlay",
+          "thickness": 3.0
+        },
+        "support": {
+          "type": "legs",
+          "height": 100.0
+        },
+        "material_id": null,
+        "front_material_id": null,
+        "back_material_id": null,
+        "drawer_material_id": null,
+        "part_overrides": {
+        },
+        "hardware_overrides": [
+
+        ],
+        "hardware_sets": {
+        },
+        "hardware_manual": [
+
+        ],
+        "available_width": 1064.0,
+        "available_height": 584.0,
+        "available_depth": 507.0,
+        "front_plane": 0.0,
+        "wings": 1,
+        "zone_tree": {
+          "id": "Z1",
+          "generation": 0,
+          "split": null,
+          "shelves": 0,
+          "children": [
+
+          ]
+        },
+        "zones": [
+          {
+            "id": "CAB-005-Z1",
+            "stable_id": "Z1",
+            "parent": null,
+            "label": "Celé vnútro",
+            "position": [
+              18.0,
+              0.0,
+              118.0
+            ],
+            "width": 1064.0,
+            "height": 584.0,
+            "depth": 507.0,
+            "split": null,
+            "shelves": 0,
+            "leaf": true
+          }
+        ],
+        "fronts": {
+          "split_axis": "height",
+          "gap": 3.0,
+          "gap_top": 2.0,
+          "gap_bottom": 2.0,
+          "gap_left": 2.0,
+          "gap_right": 2.0,
+          "edge_limit_off": false,
+          "items": [
+            {
+              "id": "F1",
+              "type": "door",
+              "mode": "auto",
+              "height": null,
+              "locked": false,
+              "wings": "1",
+              "profile": "none",
+              "direction": "right"
+            }
+          ]
+        },
+        "front_items": [
+          {
+            "id": "F1",
+            "type": "door",
+            "mode": "auto",
+            "height": 616.0,
+            "locked": false,
+            "wings": "1",
+            "wings_n": 1,
+            "profile": "none",
+            "z": 102.0,
+            "direction": "right"
+          }
+        ],
+        "corner_side": "left",
+        "corner_door_w": 450.0,
+        "corner_cr1": 80.0,
+        "corner_cr2": 80.0
+      },
+      "parts": [
+        {
+          "part_key": "cabinet/back",
+          "role": "back",
+          "definition": "NOXUN CAB-005 BACK",
+          "material": "HDF_WHITE_3",
+          "origin": [
+            0.0,
+            507.0,
+            100.0
+          ],
+          "size": [
+            1100.0,
+            3.0,
+            620.0
+          ],
+          "config": {
+            "length": 1100.0,
+            "width": 620.0,
+            "thickness": 3.0,
+            "quantity": 1,
+            "material_id": "HDF_WHITE_3",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            },
+            "back_mode": "overlay"
+          }
+        },
+        {
+          "part_key": "cabinet/bottom",
+          "role": "bottom",
+          "definition": "NOXUN CAB-005 BOTTOM",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            0.0,
+            0.0,
+            100.0
+          ],
+          "size": [
+            1100.0,
+            507.0,
+            18.0
+          ],
+          "config": {
+            "length": 1100.0,
+            "width": 507.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/corner_panel",
+          "role": "corner_blind_panel",
+          "definition": "NOXUN CAB-005 CORNER-PANEL",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            450.0,
+            0.0,
+            118.0
+          ],
+          "size": [
+            632.0,
+            18.0,
+            584.0
+          ],
+          "config": {
+            "length": 584.0,
+            "width": 632.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/corner_rail",
+          "role": "corner_rail",
+          "definition": "NOXUN CAB-005 CORNER-RAIL",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            548.0,
+            -98.0,
+            100.0
+          ],
+          "size": [
+            18.0,
+            98.0,
+            620.0
+          ],
+          "config": {
+            "length": 620.0,
+            "width": 98.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/cr:1",
+          "role": "cr_front",
+          "definition": "NOXUN CAB-005 CR-1",
+          "material": "W1000_DTDL_18",
+          "origin": [
+            452.0,
+            -18.0,
+            102.0
+          ],
+          "size": [
+            78.0,
+            18.0,
+            616.0
+          ],
+          "config": {
+            "length": 616.0,
+            "width": 78.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "W1000_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/cr:2",
+          "role": "cr_side",
+          "definition": "NOXUN CAB-005 CR-2",
+          "material": "W1000_DTDL_18",
+          "origin": [
+            530.0,
+            -96.0,
+            102.0
+          ],
+          "size": [
+            18.0,
+            96.0,
+            616.0
+          ],
+          "config": {
+            "length": 616.0,
+            "width": 96.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "W1000_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/hinge_rail",
+          "role": "hinge_rail",
+          "definition": "NOXUN CAB-005 HINGE-RAIL",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            432.0,
+            0.0,
+            118.0
+          ],
+          "size": [
+            18.0,
+            80.0,
+            584.0
+          ],
+          "config": {
+            "length": 584.0,
+            "width": 80.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/side:left",
+          "role": "side_left",
+          "definition": "NOXUN CAB-005 SIDE-L",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            0.0,
+            0.0,
+            118.0
+          ],
+          "size": [
+            18.0,
+            507.0,
+            602.0
+          ],
+          "config": {
+            "length": 602.0,
+            "width": 507.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/side:right",
+          "role": "side_right",
+          "definition": "NOXUN CAB-005 SIDE-R",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            1082.0,
+            0.0,
+            118.0
+          ],
+          "size": [
+            18.0,
+            507.0,
+            602.0
+          ],
+          "config": {
+            "length": 602.0,
+            "width": 507.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/top",
+          "role": "top",
+          "definition": "NOXUN CAB-005 TOP",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            18.0,
+            0.0,
+            702.0
+          ],
+          "size": [
+            1064.0,
+            507.0,
+            18.0
+          ],
+          "config": {
+            "length": 1064.0,
+            "width": 507.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "front:F1/wing:single",
+          "role": "front_door",
+          "definition": "NOXUN CAB-005 DOOR-1",
+          "material": "W1000_DTDL_18",
+          "origin": [
+            2.0,
+            -18.0,
+            102.0
+          ],
+          "size": [
+            446.0,
+            18.0,
+            616.0
+          ],
+          "config": {
+            "length": 616.0,
+            "width": 446.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "W1000_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "cabinet_id": "CAB-006",
+      "origin": [
+        3950.0,
+        0.0,
+        0.0
+      ],
+      "config": {
+        "config_schema": 22,
+        "rules_seed_version": 7,
+        "part_key_schema": 1,
+        "plan_schema": 7,
+        "warnings": [
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Bok lavy“: hrany L1 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/side:left",
+            "data": {
+              "edges": [
+                "L1"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Bok pravy“: hrany L1 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/side:right",
+            "data": {
+              "edges": [
+                "L1"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Dno“: hrany L1 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/bottom",
+            "data": {
+              "edges": [
+                "L1"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Vrch“: hrany L1 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/top",
+            "data": {
+              "edges": [
+                "L1"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Vystuha zavesov“: hrany L2 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/hinge_rail",
+            "data": {
+              "edges": [
+                "L2"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „CR lista 1“: hrany L1, L2, W1, W2 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/cr:1",
+            "data": {
+              "edges": [
+                "L1",
+                "L2",
+                "W1",
+                "W2"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „CR lista 2“: hrany L1, L2, W1, W2 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/cr:2",
+            "data": {
+              "edges": [
+                "L1",
+                "L2",
+                "W1",
+                "W2"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Vystuha rohova“: hrany L1, W1, W2 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "cabinet/corner_rail",
+            "data": {
+              "edges": [
+                "L1",
+                "W1",
+                "W2"
+              ]
+            }
+          },
+          {
+            "code": "abs_uni_material",
+            "severity": "warn",
+            "message": "Dielec „Dvierka 1“: hrany L1, L2, W1, W2 bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu).",
+            "part_key": "front:F1/wing:single",
+            "data": {
+              "edges": [
+                "L1",
+                "L2",
+                "W1",
+                "W2"
+              ]
+            }
+          }
+        ],
+        "hardware": [
+          {
+            "owner_part_key": null,
+            "generic_type": "leg",
+            "quantity": 6,
+            "rule_id": "nohy-zakladne",
+            "variant_id": null,
+            "production_class": "counted",
+            "manufactured": true,
+            "params": {
+              "height": 100.0
+            },
+            "source": "rule",
+            "rule_quantity": 6
+          },
+          {
+            "owner_part_key": null,
+            "generic_type": "plinth_clip",
+            "quantity": 2,
+            "rule_id": "prichyt-sokla",
+            "variant_id": null,
+            "production_class": "counted",
+            "manufactured": true,
+            "params": {
+            },
+            "source": "rule",
+            "rule_quantity": 2
+          },
+          {
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "quantity": 2,
+            "rule_id": "zavesy-podla-vysky",
+            "variant_id": null,
+            "production_class": "counted",
+            "manufactured": true,
+            "params": {
+              "use_type": "door",
+              "opening_mode": "classic"
+            },
+            "source": "rule",
+            "rule_quantity": 2
+          }
+        ],
+        "drawer_conflicts": [
+
+        ],
+        "hardware_conflicts": [
+
+        ],
+        "type": "corner_blind",
+        "name": null,
+        "construction_preset": "noxun-corner-blind",
+        "mode": "parametric",
+        "width": 1100.0,
+        "height": 720.0,
+        "depth": 510.0,
+        "thickness": 18.0,
+        "floor_height": 100.0,
+        "bottom_mode": "under_sides",
+        "top_mode": "full",
+        "back_mode": "overlay",
+        "back_thickness": 3.0,
+        "plinth_mode": "none",
+        "plinth_recess": 40.0,
+        "rail_depth": 100.0,
+        "rails_orientation": "flat",
+        "rails_top_offset": 0.0,
+        "sides": {
+          "thickness": 18.0,
+          "construction": "sides_wrap"
+        },
+        "bottom": {
+          "mode": "under_sides",
+          "thickness": 18.0
+        },
+        "top": {
+          "mode": "full",
+          "thickness": 18.0,
+          "rail_depth": 100.0,
+          "orientation": "flat",
+          "top_offset": 0.0
+        },
+        "back": {
+          "mode": "overlay",
+          "thickness": 3.0
+        },
+        "support": {
+          "type": "legs",
+          "height": 100.0
+        },
+        "material_id": null,
+        "front_material_id": null,
+        "back_material_id": null,
+        "drawer_material_id": null,
+        "part_overrides": {
+        },
+        "hardware_overrides": [
+
+        ],
+        "hardware_sets": {
+        },
+        "hardware_manual": [
+
+        ],
+        "available_width": 1064.0,
+        "available_height": 584.0,
+        "available_depth": 507.0,
+        "front_plane": 0.0,
+        "wings": 1,
+        "zone_tree": {
+          "id": "Z1",
+          "generation": 0,
+          "split": null,
+          "shelves": 0,
+          "children": [
+
+          ]
+        },
+        "zones": [
+          {
+            "id": "CAB-006-Z1",
+            "stable_id": "Z1",
+            "parent": null,
+            "label": "Celé vnútro",
+            "position": [
+              18.0,
+              0.0,
+              118.0
+            ],
+            "width": 1064.0,
+            "height": 584.0,
+            "depth": 507.0,
+            "split": null,
+            "shelves": 0,
+            "leaf": true
+          }
+        ],
+        "fronts": {
+          "split_axis": "height",
+          "gap": 3.0,
+          "gap_top": 2.0,
+          "gap_bottom": 2.0,
+          "gap_left": 2.0,
+          "gap_right": 2.0,
+          "edge_limit_off": false,
+          "items": [
+            {
+              "id": "F1",
+              "type": "door",
+              "mode": "auto",
+              "height": null,
+              "locked": false,
+              "wings": "1",
+              "profile": "none",
+              "direction": "left"
+            }
+          ]
+        },
+        "front_items": [
+          {
+            "id": "F1",
+            "type": "door",
+            "mode": "auto",
+            "height": 616.0,
+            "locked": false,
+            "wings": "1",
+            "wings_n": 1,
+            "profile": "none",
+            "z": 102.0,
+            "direction": "left"
+          }
+        ],
+        "corner_side": "right",
+        "corner_door_w": 500.0,
+        "corner_cr1": 100.0,
+        "corner_cr2": 80.0
+      },
+      "parts": [
+        {
+          "part_key": "cabinet/back",
+          "role": "back",
+          "definition": "NOXUN CAB-006 BACK",
+          "material": "HDF_WHITE_3",
+          "origin": [
+            0.0,
+            507.0,
+            100.0
+          ],
+          "size": [
+            1100.0,
+            3.0,
+            620.0
+          ],
+          "config": {
+            "length": 1100.0,
+            "width": 620.0,
+            "thickness": 3.0,
+            "quantity": 1,
+            "material_id": "HDF_WHITE_3",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            },
+            "back_mode": "overlay"
+          }
+        },
+        {
+          "part_key": "cabinet/bottom",
+          "role": "bottom",
+          "definition": "NOXUN CAB-006 BOTTOM",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            0.0,
+            0.0,
+            100.0
+          ],
+          "size": [
+            1100.0,
+            507.0,
+            18.0
+          ],
+          "config": {
+            "length": 1100.0,
+            "width": 507.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/corner_panel",
+          "role": "corner_blind_panel",
+          "definition": "NOXUN CAB-006 CORNER-PANEL",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            18.0,
+            0.0,
+            118.0
+          ],
+          "size": [
+            582.0,
+            18.0,
+            584.0
+          ],
+          "config": {
+            "length": 584.0,
+            "width": 582.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/corner_rail",
+          "role": "corner_rail",
+          "definition": "NOXUN CAB-006 CORNER-RAIL",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            464.0,
+            -98.0,
+            100.0
+          ],
+          "size": [
+            18.0,
+            98.0,
+            620.0
+          ],
+          "config": {
+            "length": 620.0,
+            "width": 98.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/cr:1",
+          "role": "cr_front",
+          "definition": "NOXUN CAB-006 CR-1",
+          "material": "W1000_DTDL_18",
+          "origin": [
+            500.0,
+            -18.0,
+            102.0
+          ],
+          "size": [
+            98.0,
+            18.0,
+            616.0
+          ],
+          "config": {
+            "length": 616.0,
+            "width": 98.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "W1000_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/cr:2",
+          "role": "cr_side",
+          "definition": "NOXUN CAB-006 CR-2",
+          "material": "W1000_DTDL_18",
+          "origin": [
+            482.0,
+            -96.0,
+            102.0
+          ],
+          "size": [
+            18.0,
+            96.0,
+            616.0
+          ],
+          "config": {
+            "length": 616.0,
+            "width": 96.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "W1000_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/hinge_rail",
+          "role": "hinge_rail",
+          "definition": "NOXUN CAB-006 HINGE-RAIL",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            600.0,
+            0.0,
+            118.0
+          ],
+          "size": [
+            18.0,
+            80.0,
+            584.0
+          ],
+          "config": {
+            "length": 584.0,
+            "width": 80.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/side:left",
+          "role": "side_left",
+          "definition": "NOXUN CAB-006 SIDE-L",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            0.0,
+            0.0,
+            118.0
+          ],
+          "size": [
+            18.0,
+            507.0,
+            602.0
+          ],
+          "config": {
+            "length": 602.0,
+            "width": 507.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/side:right",
+          "role": "side_right",
+          "definition": "NOXUN CAB-006 SIDE-R",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            1082.0,
+            0.0,
+            118.0
+          ],
+          "size": [
+            18.0,
+            507.0,
+            602.0
+          ],
+          "config": {
+            "length": 602.0,
+            "width": 507.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "cabinet/top",
+          "role": "top",
+          "definition": "NOXUN CAB-006 TOP",
+          "material": "K009_PW_DTDL_18",
+          "origin": [
+            18.0,
+            0.0,
+            702.0
+          ],
+          "size": [
+            1064.0,
+            507.0,
+            18.0
+          ],
+          "config": {
+            "length": 1064.0,
+            "width": 507.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "K009_PW_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        },
+        {
+          "part_key": "front:F1/wing:single",
+          "role": "front_door",
+          "definition": "NOXUN CAB-006 DOOR-1",
+          "material": "W1000_DTDL_18",
+          "origin": [
+            602.0,
+            -18.0,
+            102.0
+          ],
+          "size": [
+            496.0,
+            18.0,
+            616.0
+          ],
+          "config": {
+            "length": 616.0,
+            "width": 496.0,
+            "thickness": 18.0,
+            "quantity": 1,
+            "material_id": "W1000_DTDL_18",
+            "grain_direction": "none",
+            "edges": {
+              "L1": null,
+              "L2": null,
+              "W1": null,
+              "W2": null
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "bom": [
+    {
+      "key": [
+        11000,
+        6200,
+        30,
+        "HDF_WHITE_3",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 1100.0,
+      "width": 620.0,
+      "thickness": 3.0,
+      "material_id": "HDF_WHITE_3",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 2,
+      "names": [
+        "Chrbat"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-005",
+          "quantity": 1
+        },
+        {
+          "owner_id": "CAB-006",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "key": [
+        8000,
+        6200,
+        30,
+        "HDF_WHITE_3",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 800.0,
+      "width": 620.0,
+      "thickness": 3.0,
+      "material_id": "HDF_WHITE_3",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 1,
+      "names": [
+        "Chrbat"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-002",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "key": [
+        6000,
+        7200,
+        30,
+        "HDF_WHITE_3",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 600.0,
+      "width": 720.0,
+      "thickness": 3.0,
+      "material_id": "HDF_WHITE_3",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 1,
+      "names": [
+        "Chrbat"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-003",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "key": [
+        6000,
+        6200,
+        30,
+        "HDF_WHITE_3",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 600.0,
+      "width": 620.0,
+      "thickness": 3.0,
+      "material_id": "HDF_WHITE_3",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 1,
+      "names": [
+        "Chrbat"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-001",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "key": [
+        11000,
+        5070,
+        180,
+        "K009_PW_DTDL_18",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 1100.0,
+      "width": 507.0,
+      "thickness": 18.0,
+      "material_id": "K009_PW_DTDL_18",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 2,
+      "names": [
+        "Dno"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-005",
+          "quantity": 1
+        },
+        {
+          "owner_id": "CAB-006",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "key": [
+        10640,
+        5070,
+        180,
+        "K009_PW_DTDL_18",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 1064.0,
+      "width": 507.0,
+      "thickness": 18.0,
+      "material_id": "K009_PW_DTDL_18",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 2,
+      "names": [
+        "Vrch"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-005",
+          "quantity": 1
+        },
+        {
+          "owner_id": "CAB-006",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "key": [
+        8000,
+        5070,
+        180,
+        "K009_PW_DTDL_18",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 800.0,
+      "width": 507.0,
+      "thickness": 18.0,
+      "material_id": "K009_PW_DTDL_18",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 1,
+      "names": [
+        "Dno"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-002",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "key": [
+        8000,
+        1000,
+        180,
+        "K009_PW_DTDL_18",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 800.0,
+      "width": 100.0,
+      "thickness": 18.0,
+      "material_id": "K009_PW_DTDL_18",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 1,
+      "names": [
+        "Sokel predny"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-002",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "key": [
+        7640,
+        5070,
+        180,
+        "K009_PW_DTDL_18",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 764.0,
+      "width": 507.0,
+      "thickness": 18.0,
+      "material_id": "K009_PW_DTDL_18",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 1,
+      "names": [
+        "Vrch"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-002",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "key": [
+        7200,
+        3200,
+        180,
+        "K009_PW_DTDL_18",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 720.0,
+      "width": 320.0,
+      "thickness": 18.0,
+      "material_id": "K009_PW_DTDL_18",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 2,
+      "names": [
+        "Bok lavy",
+        "Bok pravy"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-003",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "key": [
+        6200,
+        980,
+        180,
+        "K009_PW_DTDL_18",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 620.0,
+      "width": 98.0,
+      "thickness": 18.0,
+      "material_id": "K009_PW_DTDL_18",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 2,
+      "names": [
+        "Vystuha rohova"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-005",
+          "quantity": 1
+        },
+        {
+          "owner_id": "CAB-006",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "key": [
+        6020,
+        5070,
+        180,
+        "K009_PW_DTDL_18",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 602.0,
+      "width": 507.0,
+      "thickness": 18.0,
+      "material_id": "K009_PW_DTDL_18",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 8,
+      "names": [
+        "Bok lavy",
+        "Bok pravy"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-001",
+          "quantity": 2
+        },
+        {
+          "owner_id": "CAB-002",
+          "quantity": 2
+        },
+        {
+          "owner_id": "CAB-005",
+          "quantity": 2
+        },
+        {
+          "owner_id": "CAB-006",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "key": [
+        6000,
+        5070,
+        180,
+        "K009_PW_DTDL_18",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 600.0,
+      "width": 507.0,
+      "thickness": 18.0,
+      "material_id": "K009_PW_DTDL_18",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 1,
+      "names": [
+        "Dno"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-001",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "key": [
+        5840,
+        6320,
+        180,
+        "K009_PW_DTDL_18",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 584.0,
+      "width": 632.0,
+      "thickness": 18.0,
+      "material_id": "K009_PW_DTDL_18",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 1,
+      "names": [
+        "Blenda rohova"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-005",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "key": [
+        5840,
+        5820,
+        180,
+        "K009_PW_DTDL_18",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 584.0,
+      "width": 582.0,
+      "thickness": 18.0,
+      "material_id": "K009_PW_DTDL_18",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 1,
+      "names": [
+        "Blenda rohova"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-006",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "key": [
+        5840,
+        800,
+        180,
+        "K009_PW_DTDL_18",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 584.0,
+      "width": 80.0,
+      "thickness": 18.0,
+      "material_id": "K009_PW_DTDL_18",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 2,
+      "names": [
+        "Vystuha zavesov"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-005",
+          "quantity": 1
+        },
+        {
+          "owner_id": "CAB-006",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "key": [
+        5640,
+        5070,
+        180,
+        "K009_PW_DTDL_18",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 564.0,
+      "width": 507.0,
+      "thickness": 18.0,
+      "material_id": "K009_PW_DTDL_18",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 1,
+      "names": [
+        "Vrch"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-001",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "key": [
+        5640,
+        4870,
+        180,
+        "K009_PW_DTDL_18",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 564.0,
+      "width": 487.0,
+      "thickness": 18.0,
+      "material_id": "K009_PW_DTDL_18",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 1,
+      "names": [
+        "Polica 1"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-001",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "key": [
+        5640,
+        3200,
+        180,
+        "K009_PW_DTDL_18",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 564.0,
+      "width": 320.0,
+      "thickness": 18.0,
+      "material_id": "K009_PW_DTDL_18",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 2,
+      "names": [
+        "Dno",
+        "Vrch"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-003",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "key": [
+        7780,
+        5960,
+        180,
+        "W1000_DTDL_18",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 778.0,
+      "width": 596.0,
+      "thickness": 18.0,
+      "material_id": "W1000_DTDL_18",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 1,
+      "names": [
+        "Dv myčka"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-004",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "key": [
+        7160,
+        5960,
+        180,
+        "W1000_DTDL_18",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 716.0,
+      "width": 596.0,
+      "thickness": 18.0,
+      "material_id": "W1000_DTDL_18",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 1,
+      "names": [
+        "Dvierka 1"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-003",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "key": [
+        6160,
+        5960,
+        180,
+        "W1000_DTDL_18",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 616.0,
+      "width": 596.0,
+      "thickness": 18.0,
+      "material_id": "W1000_DTDL_18",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 1,
+      "names": [
+        "Dvierka 1"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-001",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "key": [
+        6160,
+        4960,
+        180,
+        "W1000_DTDL_18",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 616.0,
+      "width": 496.0,
+      "thickness": 18.0,
+      "material_id": "W1000_DTDL_18",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 1,
+      "names": [
+        "Dvierka 1"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-006",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "key": [
+        6160,
+        4460,
+        180,
+        "W1000_DTDL_18",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 616.0,
+      "width": 446.0,
+      "thickness": 18.0,
+      "material_id": "W1000_DTDL_18",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 1,
+      "names": [
+        "Dvierka 1"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-005",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "key": [
+        6160,
+        980,
+        180,
+        "W1000_DTDL_18",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 616.0,
+      "width": 98.0,
+      "thickness": 18.0,
+      "material_id": "W1000_DTDL_18",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 1,
+      "names": [
+        "CR lista 1"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-006",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "key": [
+        6160,
+        960,
+        180,
+        "W1000_DTDL_18",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 616.0,
+      "width": 96.0,
+      "thickness": 18.0,
+      "material_id": "W1000_DTDL_18",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 2,
+      "names": [
+        "CR lista 2"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-005",
+          "quantity": 1
+        },
+        {
+          "owner_id": "CAB-006",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "key": [
+        6160,
+        780,
+        180,
+        "W1000_DTDL_18",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 616.0,
+      "width": 78.0,
+      "thickness": 18.0,
+      "material_id": "W1000_DTDL_18",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 1,
+      "names": [
+        "CR lista 1"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-005",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "key": [
+        4730,
+        3965,
+        180,
+        "W1000_DTDL_18",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 473.0,
+      "width": 396.5,
+      "thickness": 18.0,
+      "material_id": "W1000_DTDL_18",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 2,
+      "names": [
+        "Dvierka 2 lave",
+        "Dvierka 2 prave"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-002",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "key": [
+        1400,
+        7960,
+        180,
+        "W1000_DTDL_18",
+        [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "none",
+        null
+      ],
+      "length": 140.0,
+      "width": 796.0,
+      "thickness": 18.0,
+      "material_id": "W1000_DTDL_18",
+      "edges": {
+        "L1": null,
+        "L2": null,
+        "W1": null,
+        "W2": null
+      },
+      "grain_direction": "none",
+      "quantity": 1,
+      "names": [
+        "Zasuvkove celo 1"
+      ],
+      "free_names": [
+
+      ],
+      "kde": [
+        {
+          "owner_id": "CAB-002",
+          "quantity": 1
+        }
+      ]
+    }
+  ],
+  "vepo_csv": [
+    [
+      "h12_golden_celo_uni_dtdl_18_36.csv",
+      "\"Dv myčka s4\";\"778\";\"\";\"596\";\"\";\"18\";\"1\";\"Čelo UNI DTDL\";\"\"\r\n\"Dv1 s3\";\"716\";\"\";\"596\";\"\";\"18\";\"1\";\"Čelo UNI DTDL\";\"\"\r\n\"Dv1 s1\";\"616\";\"\";\"596\";\"\";\"18\";\"1\";\"Čelo UNI DTDL\";\"\"\r\n\"Dv1 s6\";\"616\";\"\";\"496\";\"\";\"18\";\"1\";\"Čelo UNI DTDL\";\"\"\r\n\"Dv1 s5\";\"616\";\"\";\"446\";\"\";\"18\";\"1\";\"Čelo UNI DTDL\";\"\"\r\n\"CR 1 s6\";\"616\";\"\";\"98\";\"\";\"18\";\"1\";\"Čelo UNI DTDL\";\"\"\r\n\"CR 2 s5 s6\";\"616\";\"\";\"96\";\"\";\"18\";\"2\";\"Čelo UNI DTDL\";\"\"\r\n\"CR 1 s5\";\"616\";\"\";\"78\";\"\";\"18\";\"1\";\"Čelo UNI DTDL\";\"\"\r\n\"Dv2 LP s2\";\"473\";\"\";\"397\";\"\";\"18\";\"2\";\"Čelo UNI DTDL\";\"\"\r\n\"Zas celo 1 s2\";\"140\";\"\";\"796\";\"\";\"18\";\"1\";\"Čelo UNI DTDL\";\"\"\r\n"
+    ],
+    [
+      "h12_golden_hdf_uni_dtdl_3.csv",
+      "\"Chrbat s5 s6\";\"1100\";\"\";\"620\";\"\";\"3\";\"2\";\"HDF UNI DTDL\";\"\"\r\n\"Chrbat s2\";\"800\";\"\";\"620\";\"\";\"3\";\"1\";\"HDF UNI DTDL\";\"\"\r\n\"Chrbat s3\";\"600\";\"\";\"720\";\"\";\"3\";\"1\";\"HDF UNI DTDL\";\"\"\r\n\"Chrbat s1\";\"600\";\"\";\"620\";\"\";\"3\";\"1\";\"HDF UNI DTDL\";\"\"\r\n"
+    ],
+    [
+      "h12_golden_korpus_uni_dtdl_18_36.csv",
+      "\"Dno s5 s6\";\"1100\";\"\";\"507\";\"\";\"18\";\"2\";\"Korpus UNI DTDL\";\"\"\r\n\"Vrch s5 s6\";\"1064\";\"\";\"507\";\"\";\"18\";\"2\";\"Korpus UNI DTDL\";\"\"\r\n\"Dno s2\";\"800\";\"\";\"507\";\"\";\"18\";\"1\";\"Korpus UNI DTDL\";\"\"\r\n\"Sokel s2\";\"800\";\"\";\"100\";\"\";\"18\";\"1\";\"Korpus UNI DTDL\";\"\"\r\n\"Vrch s2\";\"764\";\"\";\"507\";\"\";\"18\";\"1\";\"Korpus UNI DTDL\";\"\"\r\n\"Bok LP s3\";\"720\";\"\";\"320\";\"\";\"18\";\"2\";\"Korpus UNI DTDL\";\"\"\r\n\"Vyst roh s5 s6\";\"620\";\"\";\"98\";\"\";\"18\";\"2\";\"Korpus UNI DTDL\";\"\"\r\n\"Bok LP s1 s2 s5 s6\";\"602\";\"\";\"507\";\"\";\"18\";\"8\";\"Korpus UNI DTDL\";\"\"\r\n\"Dno s1\";\"600\";\"\";\"507\";\"\";\"18\";\"1\";\"Korpus UNI DTDL\";\"\"\r\n\"Blenda roh s5\";\"584\";\"\";\"632\";\"\";\"18\";\"1\";\"Korpus UNI DTDL\";\"\"\r\n\"Blenda roh s6\";\"584\";\"\";\"582\";\"\";\"18\";\"1\";\"Korpus UNI DTDL\";\"\"\r\n\"Vyst zav s5 s6\";\"584\";\"\";\"80\";\"\";\"18\";\"2\";\"Korpus UNI DTDL\";\"\"\r\n\"Vrch s1\";\"564\";\"\";\"507\";\"\";\"18\";\"1\";\"Korpus UNI DTDL\";\"\"\r\n\"Polica 1 s1\";\"564\";\"\";\"487\";\"\";\"18\";\"1\";\"Korpus UNI DTDL\";\"\"\r\n\"Dno/Vrch s3\";\"564\";\"\";\"320\";\"\";\"18\";\"2\";\"Korpus UNI DTDL\";\"\"\r\n"
+    ]
+  ],
+  "vepo_errors": [
+
+  ],
+  "vepo_log": "Noxun Engine — VEPO export LOG\r\nProjekt: H12 GOLDEN (h12_golden)\r\nDátum:   2026-10-01 00:00\r\n------------------------------------------------------------\r\nSkupiny exportu (3):\r\n  - h12_golden_celo_uni_dtdl_18_36.csv (10 riadkov, 12 ks) [W1000_DTDL_18]\r\n  - h12_golden_hdf_uni_dtdl_3.csv (4 riadkov, 5 ks) [HDF_WHITE_3]\r\n  - h12_golden_korpus_uni_dtdl_18_36.csv (15 riadkov, 28 ks) [K009_PW_DTDL_18]\r\n------------------------------------------------------------\r\nRiadky vyradené z CSV (0):\r\n------------------------------------------------------------\r\nSkrátené názvy (0):\r\n  (žiadne)\r\n------------------------------------------------------------\r\nPoznámky pre VEPO (0 riadkov):\r\n  (žiadne — všetky pásky v dekore dosky)\r\n------------------------------------------------------------\r\nKONTROLA — 0 kritických (RED), 49 na kontrolu (ORANGE):\r\n  [ORANGE] Materiál: 3 riadky bez ceny — medzisúčet je neúplný.\r\n  [ORANGE] Štandardné riadky: 1 riadok bez ceny — medzisúčet je neúplný.\r\n  [ORANGE] Riadok „Vizualizácia + návrh“ nemá zadané m² — suma sa nedá vypočítať.\r\n  [ORANGE] Dielec „Chrbat“ (CAB-001) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Dno“ (CAB-001) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Bok lavy“ (CAB-001) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Bok pravy“ (CAB-001) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Vrch“ (CAB-001) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Dvierka 1“ (CAB-001) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Polica 1“ (CAB-001) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Chrbat“ (CAB-002) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Dno“ (CAB-002) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Sokel predny“ (CAB-002) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Bok lavy“ (CAB-002) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Bok pravy“ (CAB-002) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Vrch“ (CAB-002) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Zasuvkove celo 1“ (CAB-002) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Dvierka 2 lave“ (CAB-002) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Dvierka 2 prave“ (CAB-002) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Chrbat“ (CAB-003) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Dno“ (CAB-003) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Bok lavy“ (CAB-003) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Bok pravy“ (CAB-003) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Vrch“ (CAB-003) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Dvierka 1“ (CAB-003) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Slot umývačky CAB-004 očakáva umývačku, ale priradený spotrebič nemá — priraď ho v riadku Spotrebič alebo očakávanie zruš.\r\n  [ORANGE] Dielec „Dv myčka“ (CAB-004) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Chrbat“ (CAB-005) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Dno“ (CAB-005) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Blenda rohova“ (CAB-005) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Vystuha rohova“ (CAB-005) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „CR lista 1“ (CAB-005) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „CR lista 2“ (CAB-005) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Vystuha zavesov“ (CAB-005) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Bok lavy“ (CAB-005) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Bok pravy“ (CAB-005) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Vrch“ (CAB-005) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Dvierka 1“ (CAB-005) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Chrbat“ (CAB-006) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Dno“ (CAB-006) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Blenda rohova“ (CAB-006) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Vystuha rohova“ (CAB-006) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „CR lista 1“ (CAB-006) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „CR lista 2“ (CAB-006) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Vystuha zavesov“ (CAB-006) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Bok lavy“ (CAB-006) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Bok pravy“ (CAB-006) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Vrch“ (CAB-006) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  [ORANGE] Dielec „Dvierka 1“ (CAB-006) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).\r\n  Pozn.: RED je varovanie, export sa neblokuje.\r\n",
+  "expansion": {
+    "rows": [
+      {
+        "code": "104717",
+        "quantity": 12,
+        "sources": [
+          {
+            "cabinet_id": "CAB-001",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2,
+            "owner_label": "F1 · dvierka"
+          },
+          {
+            "cabinet_id": "CAB-002",
+            "owner_part_key": "front:F2/wing:left",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2,
+            "owner_label": "F2 · dvierka ľavé"
+          },
+          {
+            "cabinet_id": "CAB-002",
+            "owner_part_key": "front:F2/wing:right",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2,
+            "owner_label": "F2 · dvierka pravé"
+          },
+          {
+            "cabinet_id": "CAB-003",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2,
+            "owner_label": "F1 · dvierka"
+          },
+          {
+            "cabinet_id": "CAB-005",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2,
+            "owner_label": "F1 · dvierka"
+          },
+          {
+            "cabinet_id": "CAB-006",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2,
+            "owner_label": "F1 · dvierka"
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "HETTICH 9071205 Sensys záves naložený 110° TH skrutka SiSy",
+        "category": "ZAVESY",
+        "unit": "ks",
+        "price_eur_vat": 4.18,
+        "manual_note": null,
+        "subtotal_eur_vat": 50.16
+      },
+      {
+        "code": "105408",
+        "quantity": 12,
+        "sources": [
+          {
+            "cabinet_id": "CAB-001",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2,
+            "owner_label": "F1 · dvierka"
+          },
+          {
+            "cabinet_id": "CAB-002",
+            "owner_part_key": "front:F2/wing:left",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2,
+            "owner_label": "F2 · dvierka ľavé"
+          },
+          {
+            "cabinet_id": "CAB-002",
+            "owner_part_key": "front:F2/wing:right",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2,
+            "owner_label": "F2 · dvierka pravé"
+          },
+          {
+            "cabinet_id": "CAB-003",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2,
+            "owner_label": "F1 · dvierka"
+          },
+          {
+            "cabinet_id": "CAB-005",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2,
+            "owner_label": "F1 · dvierka"
+          },
+          {
+            "cabinet_id": "CAB-006",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2,
+            "owner_label": "F1 · dvierka"
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "HETTICH 9088251 Sensys krytka pre misku TH",
+        "category": "ZAVESY",
+        "unit": "ks",
+        "price_eur_vat": 0.25,
+        "manual_note": null,
+        "subtotal_eur_vat": 3.0
+      },
+      {
+        "code": "105425",
+        "quantity": 12,
+        "sources": [
+          {
+            "cabinet_id": "CAB-001",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2,
+            "owner_label": "F1 · dvierka"
+          },
+          {
+            "cabinet_id": "CAB-002",
+            "owner_part_key": "front:F2/wing:left",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2,
+            "owner_label": "F2 · dvierka ľavé"
+          },
+          {
+            "cabinet_id": "CAB-002",
+            "owner_part_key": "front:F2/wing:right",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2,
+            "owner_label": "F2 · dvierka pravé"
+          },
+          {
+            "cabinet_id": "CAB-003",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2,
+            "owner_label": "F1 · dvierka"
+          },
+          {
+            "cabinet_id": "CAB-005",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2,
+            "owner_label": "F1 · dvierka"
+          },
+          {
+            "cabinet_id": "CAB-006",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2,
+            "owner_label": "F1 · dvierka"
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "HETTICH 9088250 Sensys krytka ramienka logo Hettich",
+        "category": "ZAVESY",
+        "unit": "ks",
+        "price_eur_vat": 0.19,
+        "manual_note": null,
+        "subtotal_eur_vat": 2.28
+      },
+      {
+        "code": "106412",
+        "quantity": 12,
+        "sources": [
+          {
+            "cabinet_id": "CAB-001",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2,
+            "owner_label": "F1 · dvierka"
+          },
+          {
+            "cabinet_id": "CAB-002",
+            "owner_part_key": "front:F2/wing:left",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2,
+            "owner_label": "F2 · dvierka ľavé"
+          },
+          {
+            "cabinet_id": "CAB-002",
+            "owner_part_key": "front:F2/wing:right",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2,
+            "owner_label": "F2 · dvierka pravé"
+          },
+          {
+            "cabinet_id": "CAB-003",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2,
+            "owner_label": "F1 · dvierka"
+          },
+          {
+            "cabinet_id": "CAB-005",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2,
+            "owner_label": "F1 · dvierka"
+          },
+          {
+            "cabinet_id": "CAB-006",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2,
+            "owner_label": "F1 · dvierka"
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "HETTICH 9071656 Sensys montážna podložka krížová D1,5 excenter hmoždinka",
+        "category": "ZAVESY",
+        "unit": "ks",
+        "price_eur_vat": 0.97,
+        "manual_note": null,
+        "subtotal_eur_vat": 11.64
+      },
+      {
+        "code": "357696",
+        "quantity": 1,
+        "sources": [
+          {
+            "cabinet_id": "CAB-002",
+            "owner_part_key": "front:F1/panel",
+            "generic_type": "slide",
+            "rule_id": "vysuvy-nl-podla-hlbky",
+            "set_id": "vysuv-atira-biela-h70",
+            "quantity": 1,
+            "owner_label": "F1 · zásuvkové čelo"
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "K-HETTICH Atira zásuvka 70, 470mm/30kg, biela, SiSy",
+        "category": "VYSUVY",
+        "unit": "set",
+        "price_eur_vat": 42.89,
+        "manual_note": null,
+        "subtotal_eur_vat": 42.89
+      },
+      {
+        "code": "9078",
+        "quantity": 20,
+        "sources": [
+          {
+            "cabinet_id": "CAB-001",
+            "owner_part_key": null,
+            "generic_type": "leg",
+            "rule_id": "nohy-zakladne",
+            "set_id": "nohy-podla-sokla",
+            "quantity": 4,
+            "owner_label": null
+          },
+          {
+            "cabinet_id": "CAB-002",
+            "owner_part_key": null,
+            "generic_type": "leg",
+            "rule_id": "nohy-zakladne",
+            "set_id": "nohy-podla-sokla",
+            "quantity": 4,
+            "owner_label": null
+          },
+          {
+            "cabinet_id": "CAB-005",
+            "owner_part_key": null,
+            "generic_type": "leg",
+            "rule_id": "nohy-zakladne",
+            "set_id": "nohy-podla-sokla",
+            "quantity": 6,
+            "owner_label": null
+          },
+          {
+            "cabinet_id": "CAB-006",
+            "owner_part_key": null,
+            "generic_type": "leg",
+            "rule_id": "nohy-zakladne",
+            "set_id": "nohy-podla-sokla",
+            "quantity": 6,
+            "owner_label": null
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "Häfele 637.76.353 noha AXILO H100",
+        "category": "NOHY",
+        "unit": "ks",
+        "price_eur_vat": 0.72,
+        "manual_note": null,
+        "subtotal_eur_vat": 14.4
+      },
+      {
+        "code": "9079",
+        "quantity": 20,
+        "sources": [
+          {
+            "cabinet_id": "CAB-001",
+            "owner_part_key": null,
+            "generic_type": "leg",
+            "rule_id": "nohy-zakladne",
+            "set_id": "nohy-podla-sokla",
+            "quantity": 4,
+            "owner_label": null
+          },
+          {
+            "cabinet_id": "CAB-002",
+            "owner_part_key": null,
+            "generic_type": "leg",
+            "rule_id": "nohy-zakladne",
+            "set_id": "nohy-podla-sokla",
+            "quantity": 4,
+            "owner_label": null
+          },
+          {
+            "cabinet_id": "CAB-005",
+            "owner_part_key": null,
+            "generic_type": "leg",
+            "rule_id": "nohy-zakladne",
+            "set_id": "nohy-podla-sokla",
+            "quantity": 6,
+            "owner_label": null
+          },
+          {
+            "cabinet_id": "CAB-006",
+            "owner_part_key": null,
+            "generic_type": "leg",
+            "rule_id": "nohy-zakladne",
+            "set_id": "nohy-podla-sokla",
+            "quantity": 6,
+            "owner_label": null
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna",
+        "category": "NOHY",
+        "unit": "ks",
+        "price_eur_vat": 0.5,
+        "manual_note": null,
+        "subtotal_eur_vat": 10.0
+      },
+      {
+        "code": "950",
+        "quantity": 5,
+        "sources": [
+          {
+            "cabinet_id": "CAB-001",
+            "owner_part_key": null,
+            "generic_type": "plinth_clip",
+            "rule_id": "prichyt-sokla",
+            "set_id": "prichyt-sokla-axilo",
+            "quantity": 1,
+            "owner_label": null
+          },
+          {
+            "cabinet_id": "CAB-005",
+            "owner_part_key": null,
+            "generic_type": "plinth_clip",
+            "rule_id": "prichyt-sokla",
+            "set_id": "prichyt-sokla-axilo",
+            "quantity": 2,
+            "owner_label": null
+          },
+          {
+            "cabinet_id": "CAB-006",
+            "owner_part_key": null,
+            "generic_type": "plinth_clip",
+            "rule_id": "prichyt-sokla",
+            "set_id": "prichyt-sokla-axilo",
+            "quantity": 2,
+            "owner_label": null
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)",
+        "category": "NOHY",
+        "unit": "ks",
+        "price_eur_vat": 0.35,
+        "manual_note": null,
+        "subtotal_eur_vat": 1.75
+      },
+      {
+        "code": "306125",
+        "quantity": 4,
+        "sources": [
+          {
+            "cabinet_id": "CAB-001",
+            "owner_part_key": "zone:Z1/shelf:1",
+            "generic_type": "shelf_pin",
+            "rule_id": "podperky-policove",
+            "set_id": "podperky-police",
+            "quantity": 4,
+            "owner_label": "Polica 1"
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "STRONG Podpera Policová s návlekom 7/5mm zinok biely",
+        "category": "SPOJOVACI_MATERIAL",
+        "unit": "ks",
+        "price_eur_vat": 0.04,
+        "manual_note": null,
+        "subtotal_eur_vat": 0.16
+      },
+      {
+        "code": "93240",
+        "quantity": 2,
+        "sources": [
+          {
+            "cabinet_id": "CAB-003",
+            "owner_part_key": null,
+            "generic_type": "wall_hanger",
+            "rule_id": "zavesenie-hornej-skrinky",
+            "set_id": "zavesenie-bystrica",
+            "quantity": 2,
+            "owner_label": null
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "STRONG Bystrica závesné kovanie biela",
+        "category": "SPOJOVACI_MATERIAL",
+        "unit": "ks",
+        "price_eur_vat": 0.37,
+        "manual_note": null,
+        "subtotal_eur_vat": 0.74
+      }
+    ],
+    "unmapped": [
+
+    ]
+  },
+  "purchase_csv": "\"NOXUN kovanie — nákupný zoznam\";\"H12 GOLDEN\";\"FIX\"\r\n\"kategória\";\"kód\";\"názov\";\"počet\";\"MJ\";\"cena € s DPH\";\"medzisúčet € s DPH\"\r\n\"ZAVESY\";\"104717\";\"HETTICH 9071205 Sensys záves naložený 110° TH skrutka SiSy\";\"12\";\"ks\";\"4,18\";\"50,16\"\r\n\"ZAVESY\";\"105408\";\"HETTICH 9088251 Sensys krytka pre misku TH\";\"12\";\"ks\";\"0,25\";\"3,00\"\r\n\"ZAVESY\";\"105425\";\"HETTICH 9088250 Sensys krytka ramienka logo Hettich\";\"12\";\"ks\";\"0,19\";\"2,28\"\r\n\"ZAVESY\";\"106412\";\"HETTICH 9071656 Sensys montážna podložka krížová D1,5 excenter hmoždinka\";\"12\";\"ks\";\"0,97\";\"11,64\"\r\n\"VYSUVY\";\"357696\";\"K-HETTICH Atira zásuvka 70, 470mm/30kg, biela, SiSy\";\"1\";\"set\";\"42,89\";\"42,89\"\r\n\"NOHY\";\"9078\";\"Häfele 637.76.353 noha AXILO H100\";\"20\";\"ks\";\"0,72\";\"14,40\"\r\n\"NOHY\";\"9079\";\"Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna\";\"20\";\"ks\";\"0,50\";\"10,00\"\r\n\"NOHY\";\"950\";\"Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)\";\"5\";\"ks\";\"0,35\";\"1,75\"\r\n\"SPOJOVACI_MATERIAL\";\"306125\";\"STRONG Podpera Policová s návlekom 7/5mm zinok biely\";\"4\";\"ks\";\"0,04\";\"0,16\"\r\n\"SPOJOVACI_MATERIAL\";\"93240\";\"STRONG Bystrica závesné kovanie biela\";\"2\";\"ks\";\"0,37\";\"0,74\"\r\n\"SPOLU (len známe ceny)\";\"\";\"\";\"100\";\"\";\"\";\"137,02\"\r\n",
+  "hardware_labeled": [
+    {
+      "key": [
+        "hinge",
+        "",
+        "opening_mode=classic|use_type=door"
+      ],
+      "generic_type": "hinge",
+      "variant_id": null,
+      "params": {
+        "use_type": "door",
+        "opening_mode": "classic"
+      },
+      "quantity": 12,
+      "breakdown": [
+        {
+          "owner_id": "CAB-001",
+          "rule_id": "zavesy-podla-vysky",
+          "source": "rule",
+          "quantity": 2,
+          "owner_part_key": "front:F1/wing:single"
+        },
+        {
+          "owner_id": "CAB-002",
+          "rule_id": "zavesy-podla-vysky",
+          "source": "rule",
+          "quantity": 2,
+          "owner_part_key": "front:F2/wing:left"
+        },
+        {
+          "owner_id": "CAB-002",
+          "rule_id": "zavesy-podla-vysky",
+          "source": "rule",
+          "quantity": 2,
+          "owner_part_key": "front:F2/wing:right"
+        },
+        {
+          "owner_id": "CAB-003",
+          "rule_id": "zavesy-podla-vysky",
+          "source": "rule",
+          "quantity": 2,
+          "owner_part_key": "front:F1/wing:single"
+        },
+        {
+          "owner_id": "CAB-005",
+          "rule_id": "zavesy-podla-vysky",
+          "source": "rule",
+          "quantity": 2,
+          "owner_part_key": "front:F1/wing:single"
+        },
+        {
+          "owner_id": "CAB-006",
+          "rule_id": "zavesy-podla-vysky",
+          "source": "rule",
+          "quantity": 2,
+          "owner_part_key": "front:F1/wing:single"
+        }
+      ],
+      "label": "Závesy",
+      "params_label": null,
+      "params_text": "dvierka · klasické otváranie",
+      "where": [
+        {
+          "owner_id": "CAB-001",
+          "quantity": 2,
+          "manual": false,
+          "manual_note": null
+        },
+        {
+          "owner_id": "CAB-002",
+          "quantity": 4,
+          "manual": false,
+          "manual_note": null
+        },
+        {
+          "owner_id": "CAB-003",
+          "quantity": 2,
+          "manual": false,
+          "manual_note": null
+        },
+        {
+          "owner_id": "CAB-005",
+          "quantity": 2,
+          "manual": false,
+          "manual_note": null
+        },
+        {
+          "owner_id": "CAB-006",
+          "quantity": 2,
+          "manual": false,
+          "manual_note": null
+        }
+      ]
+    },
+    {
+      "key": [
+        "leg",
+        "",
+        "height=100.0"
+      ],
+      "generic_type": "leg",
+      "variant_id": null,
+      "params": {
+        "height": 100.0
+      },
+      "quantity": 20,
+      "breakdown": [
+        {
+          "owner_id": "CAB-001",
+          "rule_id": "nohy-zakladne",
+          "source": "rule",
+          "quantity": 4,
+          "owner_part_key": null
+        },
+        {
+          "owner_id": "CAB-002",
+          "rule_id": "nohy-zakladne",
+          "source": "rule",
+          "quantity": 4,
+          "owner_part_key": null
+        },
+        {
+          "owner_id": "CAB-005",
+          "rule_id": "nohy-zakladne",
+          "source": "rule",
+          "quantity": 6,
+          "owner_part_key": null
+        },
+        {
+          "owner_id": "CAB-006",
+          "rule_id": "nohy-zakladne",
+          "source": "rule",
+          "quantity": 6,
+          "owner_part_key": null
+        }
+      ],
+      "label": "Nohy",
+      "params_label": null,
+      "params_text": "výška sokla 100 mm",
+      "where": [
+        {
+          "owner_id": "CAB-001",
+          "quantity": 4,
+          "manual": false,
+          "manual_note": null
+        },
+        {
+          "owner_id": "CAB-002",
+          "quantity": 4,
+          "manual": false,
+          "manual_note": null
+        },
+        {
+          "owner_id": "CAB-005",
+          "quantity": 6,
+          "manual": false,
+          "manual_note": null
+        },
+        {
+          "owner_id": "CAB-006",
+          "quantity": 6,
+          "manual": false,
+          "manual_note": null
+        }
+      ]
+    },
+    {
+      "key": [
+        "plinth_clip",
+        "",
+        ""
+      ],
+      "generic_type": "plinth_clip",
+      "variant_id": null,
+      "params": {
+      },
+      "quantity": 5,
+      "breakdown": [
+        {
+          "owner_id": "CAB-001",
+          "rule_id": "prichyt-sokla",
+          "source": "rule",
+          "quantity": 1,
+          "owner_part_key": null
+        },
+        {
+          "owner_id": "CAB-005",
+          "rule_id": "prichyt-sokla",
+          "source": "rule",
+          "quantity": 2,
+          "owner_part_key": null
+        },
+        {
+          "owner_id": "CAB-006",
+          "rule_id": "prichyt-sokla",
+          "source": "rule",
+          "quantity": 2,
+          "owner_part_key": null
+        }
+      ],
+      "label": "Príchyt sokla",
+      "params_label": null,
+      "params_text": null,
+      "where": [
+        {
+          "owner_id": "CAB-001",
+          "quantity": 1,
+          "manual": false,
+          "manual_note": null
+        },
+        {
+          "owner_id": "CAB-005",
+          "quantity": 2,
+          "manual": false,
+          "manual_note": null
+        },
+        {
+          "owner_id": "CAB-006",
+          "quantity": 2,
+          "manual": false,
+          "manual_note": null
+        }
+      ]
+    },
+    {
+      "key": [
+        "shelf_pin",
+        "",
+        ""
+      ],
+      "generic_type": "shelf_pin",
+      "variant_id": null,
+      "params": {
+      },
+      "quantity": 4,
+      "breakdown": [
+        {
+          "owner_id": "CAB-001",
+          "rule_id": "podperky-policove",
+          "source": "rule",
+          "quantity": 4,
+          "owner_part_key": "zone:Z1/shelf:1"
+        }
+      ],
+      "label": "Podperky",
+      "params_label": null,
+      "params_text": null,
+      "where": [
+        {
+          "owner_id": "CAB-001",
+          "quantity": 4,
+          "manual": false,
+          "manual_note": null
+        }
+      ]
+    },
+    {
+      "key": [
+        "slide",
+        "",
+        "front_height=140.0|nominal_length=470.0"
+      ],
+      "generic_type": "slide",
+      "variant_id": null,
+      "params": {
+        "nominal_length": 470.0,
+        "front_height": 140.0
+      },
+      "quantity": 1,
+      "breakdown": [
+        {
+          "owner_id": "CAB-002",
+          "rule_id": "vysuvy-nl-podla-hlbky",
+          "source": "rule",
+          "quantity": 1,
+          "owner_part_key": "front:F1/panel"
+        }
+      ],
+      "label": "Výsuv",
+      "params_label": null,
+      "params_text": "NL 470 mm · výška čela 140 mm",
+      "where": [
+        {
+          "owner_id": "CAB-002",
+          "quantity": 1,
+          "manual": false,
+          "manual_note": null
+        }
+      ]
+    },
+    {
+      "key": [
+        "wall_hanger",
+        "",
+        ""
+      ],
+      "generic_type": "wall_hanger",
+      "variant_id": null,
+      "params": {
+      },
+      "quantity": 2,
+      "breakdown": [
+        {
+          "owner_id": "CAB-003",
+          "rule_id": "zavesenie-hornej-skrinky",
+          "source": "rule",
+          "quantity": 2,
+          "owner_part_key": null
+        }
+      ],
+      "label": "Zavesenie na stenu",
+      "params_label": null,
+      "params_text": null,
+      "where": [
+        {
+          "owner_id": "CAB-003",
+          "quantity": 2,
+          "manual": false,
+          "manual_note": null
+        }
+      ]
+    }
+  ],
+  "budget": {
+    "totals": {
+      "raw_total": 1213.02,
+      "rounding": 0.98,
+      "rounding_step": 1.0,
+      "total": 1214.0,
+      "total_novat": 986.99,
+      "unknown_count": 4,
+      "unknown_count_in_total": 4,
+      "complete": false,
+      "appliances_included": false,
+      "appliances_subtotal": 0.0,
+      "subtotals": {
+        "materials": 0.0,
+        "abs": 0,
+        "hardware": 137.02,
+        "services": 416.0,
+        "standard_rows": 660.0,
+        "custom": 0,
+        "appliances": 0,
+        "rounding": 0.98
+      }
+    },
+    "sections": [
+      {
+        "key": "materials",
+        "name": "Materiál",
+        "rows": [
+          {
+            "key": "material:HDF_WHITE_3",
+            "nazov": "HDF UNI DTDL 3 mm",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "PLATŇA",
+            "mnozstvo": 1,
+            "cena_mj": null,
+            "spolu": null,
+            "spolu_auto": null,
+            "poznamka": "2,66 m² · formát 2800×2070 mm · materiál neurčený (UNI) — počet platní je orientačný · plán: orientačne 1 platňa pri formáte 2800 × 2070",
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": true,
+            "material_id": "HDF_WHITE_3",
+            "m2": 2.664,
+            "price_per_m2": null,
+            "estimated": false,
+            "uni": true
+          },
+          {
+            "key": "material:K009_PW_DTDL_18",
+            "nazov": "Korpus UNI DTDL 18 mm",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "PLATŇA",
+            "mnozstvo": 2,
+            "cena_mj": null,
+            "spolu": null,
+            "spolu_auto": null,
+            "poznamka": "8,12 m² · formát 2800×2070 mm · materiál neurčený (UNI) — počet platní je orientačný · plán: orientačne 2 platne pri formáte 2800 × 2070",
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": true,
+            "material_id": "K009_PW_DTDL_18",
+            "m2": 8.119,
+            "price_per_m2": null,
+            "estimated": false,
+            "uni": true
+          },
+          {
+            "key": "material:W1000_DTDL_18",
+            "nazov": "Čelo UNI DTDL 18 mm",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "PLATŇA",
+            "mnozstvo": 1,
+            "cena_mj": null,
+            "spolu": null,
+            "spolu_auto": null,
+            "poznamka": "2,55 m² · formát 2800×2070 mm · materiál neurčený (UNI) — počet platní je orientačný · plán: orientačne 1 platňa pri formáte 2800 × 2070",
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": true,
+            "material_id": "W1000_DTDL_18",
+            "m2": 2.551,
+            "price_per_m2": null,
+            "estimated": false,
+            "uni": true
+          }
+        ],
+        "subtotal": 0.0,
+        "unknown_count": 3,
+        "complete": false,
+        "counts_in_total": true
+      },
+      {
+        "key": "abs",
+        "name": "ABS hrany",
+        "rows": [
+
+        ],
+        "subtotal": 0,
+        "unknown_count": 0,
+        "complete": true,
+        "counts_in_total": true
+      },
+      {
+        "key": "hardware",
+        "name": "Kovanie",
+        "rows": [
+          {
+            "key": "hw:104717",
+            "nazov": "HETTICH 9071205 Sensys záves naložený 110° TH skrutka SiSy",
+            "kod": "104717",
+            "dodavatel": "Demos",
+            "mj": "KS",
+            "mnozstvo": 12,
+            "cena_mj": 4.18,
+            "spolu": 50.16,
+            "spolu_auto": 50.16,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "category": "ZAVESY"
+          },
+          {
+            "key": "hw:105408",
+            "nazov": "HETTICH 9088251 Sensys krytka pre misku TH",
+            "kod": "105408",
+            "dodavatel": "Demos",
+            "mj": "KS",
+            "mnozstvo": 12,
+            "cena_mj": 0.25,
+            "spolu": 3.0,
+            "spolu_auto": 3.0,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "category": "ZAVESY"
+          },
+          {
+            "key": "hw:105425",
+            "nazov": "HETTICH 9088250 Sensys krytka ramienka logo Hettich",
+            "kod": "105425",
+            "dodavatel": "Demos",
+            "mj": "KS",
+            "mnozstvo": 12,
+            "cena_mj": 0.19,
+            "spolu": 2.28,
+            "spolu_auto": 2.28,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "category": "ZAVESY"
+          },
+          {
+            "key": "hw:106412",
+            "nazov": "HETTICH 9071656 Sensys montážna podložka krížová D1,5 excenter hmoždinka",
+            "kod": "106412",
+            "dodavatel": "Demos",
+            "mj": "KS",
+            "mnozstvo": 12,
+            "cena_mj": 0.97,
+            "spolu": 11.64,
+            "spolu_auto": 11.64,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "category": "ZAVESY"
+          },
+          {
+            "key": "hw:357696",
+            "nazov": "K-HETTICH Atira zásuvka 70, 470mm/30kg, biela, SiSy",
+            "kod": "357696",
+            "dodavatel": "Demos",
+            "mj": "SET",
+            "mnozstvo": 1,
+            "cena_mj": 42.89,
+            "spolu": 42.89,
+            "spolu_auto": 42.89,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "category": "VYSUVY"
+          },
+          {
+            "key": "hw:9078",
+            "nazov": "Häfele 637.76.353 noha AXILO H100",
+            "kod": "9078",
+            "dodavatel": "Quatro LM",
+            "mj": "KS",
+            "mnozstvo": 20,
+            "cena_mj": 0.72,
+            "spolu": 14.4,
+            "spolu_auto": 14.4,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "category": "NOHY",
+            "price_check": {
+              "kind": "hardware",
+              "id": "9078",
+              "label": "Häfele 637.76.353 noha AXILO H100",
+              "manual_check": true,
+              "state": "manual",
+              "price_check_method": null,
+              "demos_url": null
+            }
+          },
+          {
+            "key": "hw:9079",
+            "nazov": "Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna",
+            "kod": "9079",
+            "dodavatel": "Quatro LM",
+            "mj": "KS",
+            "mnozstvo": 20,
+            "cena_mj": 0.5,
+            "spolu": 10.0,
+            "spolu_auto": 10.0,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "category": "NOHY",
+            "price_check": {
+              "kind": "hardware",
+              "id": "9079",
+              "label": "Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna",
+              "manual_check": true,
+              "state": "manual",
+              "price_check_method": null,
+              "demos_url": null
+            }
+          },
+          {
+            "key": "hw:950",
+            "nazov": "Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)",
+            "kod": "950",
+            "dodavatel": "Quatro LM",
+            "mj": "KS",
+            "mnozstvo": 5,
+            "cena_mj": 0.35,
+            "spolu": 1.75,
+            "spolu_auto": 1.75,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "category": "NOHY",
+            "price_check": {
+              "kind": "hardware",
+              "id": "950",
+              "label": "Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)",
+              "manual_check": true,
+              "state": "manual",
+              "price_check_method": null,
+              "demos_url": null
+            }
+          },
+          {
+            "key": "hw:306125",
+            "nazov": "STRONG Podpera Policová s návlekom 7/5mm zinok biely",
+            "kod": "306125",
+            "dodavatel": "Demos",
+            "mj": "KS",
+            "mnozstvo": 4,
+            "cena_mj": 0.04,
+            "spolu": 0.16,
+            "spolu_auto": 0.16,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "category": "SPOJOVACI_MATERIAL"
+          },
+          {
+            "key": "hw:93240",
+            "nazov": "STRONG Bystrica závesné kovanie biela",
+            "kod": "93240",
+            "dodavatel": "Demos",
+            "mj": "KS",
+            "mnozstvo": 2,
+            "cena_mj": 0.37,
+            "spolu": 0.74,
+            "spolu_auto": 0.74,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "category": "SPOJOVACI_MATERIAL"
+          }
+        ],
+        "subtotal": 137.02,
+        "unknown_count": 0,
+        "complete": true,
+        "counts_in_total": true
+      },
+      {
+        "key": "services",
+        "name": "Služby",
+        "rows": [
+          {
+            "key": "service:olep",
+            "nazov": "Olepovanie ABS hrán",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "BM",
+            "mnozstvo": 0,
+            "cena_mj": 0.9,
+            "spolu": 0.0,
+            "spolu_auto": 0.0,
+            "poznamka": "bm vrátane rezervy",
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false
+          },
+          {
+            "key": "service:porez",
+            "nazov": "Porez platní",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "PLATŇA",
+            "mnozstvo": 4,
+            "cena_mj": 17.0,
+            "spolu": 68.0,
+            "spolu_auto": 68.0,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false
+          },
+          {
+            "key": "service:duplaky",
+            "nazov": "Lepenie duplákov",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "KS",
+            "mnozstvo": 0,
+            "cena_mj": 50.0,
+            "spolu": 0.0,
+            "spolu_auto": 0.0,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false
+          },
+          {
+            "key": "service:pd_opracovanie",
+            "nazov": "Opracovanie pracovnej dosky",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "FIX",
+            "mnozstvo": 0,
+            "cena_mj": 100.0,
+            "spolu": 0.0,
+            "spolu_auto": 0.0,
+            "poznamka": "zákazka neobsahuje pracovnú dosku",
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false
+          },
+          {
+            "key": "service:montaz",
+            "nazov": "Montáž",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "M2",
+            "mnozstvo": 23.2,
+            "cena_mj": 15.0,
+            "spolu": 348.0,
+            "spolu_auto": 348.0,
+            "poznamka": "4 platní × 5,8 m²",
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false
+          }
+        ],
+        "subtotal": 416.0,
+        "unknown_count": 0,
+        "complete": true,
+        "counts_in_total": true
+      },
+      {
+        "key": "standard_rows",
+        "name": "Štandardné riadky",
+        "rows": [
+          {
+            "key": "std:doprava_zakaznik",
+            "nazov": "Doprava k zákazníkovi",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "FIX",
+            "mnozstvo": 1.0,
+            "cena_mj": 60.0,
+            "spolu": 60.0,
+            "spolu_auto": 60.0,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "kind": "fixed",
+            "multiplier": 1.0,
+            "rate": 60.0
+          },
+          {
+            "key": "std:doprava_vseobecna",
+            "nazov": "Doprava všeobecná",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "FIX",
+            "mnozstvo": 1.0,
+            "cena_mj": 100.0,
+            "spolu": 100.0,
+            "spolu_auto": 100.0,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "kind": "fixed",
+            "multiplier": 1.0,
+            "rate": 100.0
+          },
+          {
+            "key": "std:balne",
+            "nazov": "Balné",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "FIX",
+            "mnozstvo": 1.0,
+            "cena_mj": 100.0,
+            "spolu": 100.0,
+            "spolu_auto": 100.0,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "kind": "fixed",
+            "multiplier": 1.0,
+            "rate": 100.0
+          },
+          {
+            "key": "std:ostatne",
+            "nazov": "Ostatné náklady",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "FIX",
+            "mnozstvo": 1.0,
+            "cena_mj": 100.0,
+            "spolu": 100.0,
+            "spolu_auto": 100.0,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "kind": "fixed",
+            "multiplier": 1.0,
+            "rate": 100.0
+          },
+          {
+            "key": "std:material_montaz",
+            "nazov": "Materiál na montáž",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "FIX",
+            "mnozstvo": 1.0,
+            "cena_mj": 100.0,
+            "spolu": 100.0,
+            "spolu_auto": 100.0,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "kind": "fixed",
+            "multiplier": 1.0,
+            "rate": 100.0
+          },
+          {
+            "key": "std:vizualizacia",
+            "nazov": "Vizualizácia + návrh",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "M2",
+            "mnozstvo": null,
+            "cena_mj": 15.0,
+            "spolu": null,
+            "spolu_auto": null,
+            "poznamka": "chýbajú m² z meračky",
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": true,
+            "kind": "per_m2",
+            "multiplier": 1.0,
+            "rate": 15.0,
+            "missing_m2": true
+          },
+          {
+            "key": "std:odvody",
+            "nazov": "Odvody",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "FIX",
+            "mnozstvo": 1.0,
+            "cena_mj": 100.0,
+            "spolu": 100.0,
+            "spolu_auto": 100.0,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "kind": "fixed",
+            "multiplier": 1.0,
+            "rate": 100.0
+          },
+          {
+            "key": "std:zameranie",
+            "nazov": "Zameranie",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "FIX",
+            "mnozstvo": 1.0,
+            "cena_mj": 100.0,
+            "spolu": 100.0,
+            "spolu_auto": 100.0,
+            "poznamka": null,
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false,
+            "kind": "fixed",
+            "multiplier": 1.0,
+            "rate": 100.0
+          }
+        ],
+        "subtotal": 660.0,
+        "unknown_count": 1,
+        "complete": false,
+        "counts_in_total": true
+      },
+      {
+        "key": "custom",
+        "name": "Vlastné položky",
+        "rows": [
+
+        ],
+        "subtotal": 0,
+        "unknown_count": 0,
+        "complete": true,
+        "counts_in_total": true
+      },
+      {
+        "key": "appliances",
+        "name": "Spotrebiče a vybavenie",
+        "rows": [
+
+        ],
+        "subtotal": 0,
+        "unknown_count": 0,
+        "complete": true,
+        "counts_in_total": false,
+        "included": false
+      },
+      {
+        "key": "rounding",
+        "name": "Zaokrúhlenie ponuky",
+        "rows": [
+          {
+            "key": "rounding",
+            "nazov": "Zaokrúhlenie ponuky",
+            "kod": null,
+            "dodavatel": null,
+            "mj": "FIX",
+            "mnozstvo": 1,
+            "cena_mj": 0.98,
+            "spolu": 0.98,
+            "spolu_auto": 0.98,
+            "poznamka": "na 1 € nahor",
+            "zdroj": "auto",
+            "cp_skupina": "zostava",
+            "price_missing": false
+          }
+        ],
+        "subtotal": 0.98,
+        "unknown_count": 0,
+        "complete": true,
+        "counts_in_total": true
+      }
+    ]
+  },
+  "control": {
+    "counts": {
+      "red": 0,
+      "orange": 49,
+      "total": 49,
+      "cabinets": 6,
+      "clean": 0
+    },
+    "items": [
+      {
+        "severity": "orange",
+        "category": "budget",
+        "owner_id": null,
+        "part_key": null,
+        "hw_key": null,
+        "message_sk": "Materiál: 3 riadky bez ceny — medzisúčet je neúplný.",
+        "stable_key": "budget|section:materials|incomplete",
+        "budget_section": "materials",
+        "budget_row_key": null
+      },
+      {
+        "severity": "orange",
+        "category": "budget",
+        "owner_id": null,
+        "part_key": null,
+        "hw_key": null,
+        "message_sk": "Štandardné riadky: 1 riadok bez ceny — medzisúčet je neúplný.",
+        "stable_key": "budget|section:standard_rows|incomplete",
+        "budget_section": "standard_rows",
+        "budget_row_key": null
+      },
+      {
+        "severity": "orange",
+        "category": "budget",
+        "owner_id": null,
+        "part_key": null,
+        "hw_key": null,
+        "message_sk": "Riadok „Vizualizácia + návrh“ nemá zadané m² — suma sa nedá vypočítať.",
+        "stable_key": "budget|std:vizualizacia|missing_m2",
+        "budget_section": "standard_rows",
+        "budget_row_key": "std:vizualizacia"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-001",
+        "part_key": "cabinet/back",
+        "hw_key": null,
+        "message_sk": "Dielec „Chrbat“ (CAB-001) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-001|cabinet/back",
+        "uni_id": "HDF_WHITE_3"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-001",
+        "part_key": "cabinet/bottom",
+        "hw_key": null,
+        "message_sk": "Dielec „Dno“ (CAB-001) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-001|cabinet/bottom",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-001",
+        "part_key": "cabinet/side:left",
+        "hw_key": null,
+        "message_sk": "Dielec „Bok lavy“ (CAB-001) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-001|cabinet/side:left",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-001",
+        "part_key": "cabinet/side:right",
+        "hw_key": null,
+        "message_sk": "Dielec „Bok pravy“ (CAB-001) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-001|cabinet/side:right",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-001",
+        "part_key": "cabinet/top",
+        "hw_key": null,
+        "message_sk": "Dielec „Vrch“ (CAB-001) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-001|cabinet/top",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-001",
+        "part_key": "front:F1/wing:single",
+        "hw_key": null,
+        "message_sk": "Dielec „Dvierka 1“ (CAB-001) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-001|front:F1/wing:single",
+        "uni_id": "W1000_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-001",
+        "part_key": "zone:Z1/shelf:1",
+        "hw_key": null,
+        "message_sk": "Dielec „Polica 1“ (CAB-001) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-001|zone:Z1/shelf:1",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-002",
+        "part_key": "cabinet/back",
+        "hw_key": null,
+        "message_sk": "Dielec „Chrbat“ (CAB-002) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-002|cabinet/back",
+        "uni_id": "HDF_WHITE_3"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-002",
+        "part_key": "cabinet/bottom",
+        "hw_key": null,
+        "message_sk": "Dielec „Dno“ (CAB-002) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-002|cabinet/bottom",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-002",
+        "part_key": "cabinet/plinth:front",
+        "hw_key": null,
+        "message_sk": "Dielec „Sokel predny“ (CAB-002) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-002|cabinet/plinth:front",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-002",
+        "part_key": "cabinet/side:left",
+        "hw_key": null,
+        "message_sk": "Dielec „Bok lavy“ (CAB-002) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-002|cabinet/side:left",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-002",
+        "part_key": "cabinet/side:right",
+        "hw_key": null,
+        "message_sk": "Dielec „Bok pravy“ (CAB-002) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-002|cabinet/side:right",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-002",
+        "part_key": "cabinet/top",
+        "hw_key": null,
+        "message_sk": "Dielec „Vrch“ (CAB-002) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-002|cabinet/top",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-002",
+        "part_key": "front:F1/panel",
+        "hw_key": null,
+        "message_sk": "Dielec „Zasuvkove celo 1“ (CAB-002) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-002|front:F1/panel",
+        "uni_id": "W1000_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-002",
+        "part_key": "front:F2/wing:left",
+        "hw_key": null,
+        "message_sk": "Dielec „Dvierka 2 lave“ (CAB-002) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-002|front:F2/wing:left",
+        "uni_id": "W1000_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-002",
+        "part_key": "front:F2/wing:right",
+        "hw_key": null,
+        "message_sk": "Dielec „Dvierka 2 prave“ (CAB-002) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-002|front:F2/wing:right",
+        "uni_id": "W1000_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-003",
+        "part_key": "cabinet/back",
+        "hw_key": null,
+        "message_sk": "Dielec „Chrbat“ (CAB-003) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-003|cabinet/back",
+        "uni_id": "HDF_WHITE_3"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-003",
+        "part_key": "cabinet/bottom",
+        "hw_key": null,
+        "message_sk": "Dielec „Dno“ (CAB-003) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-003|cabinet/bottom",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-003",
+        "part_key": "cabinet/side:left",
+        "hw_key": null,
+        "message_sk": "Dielec „Bok lavy“ (CAB-003) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-003|cabinet/side:left",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-003",
+        "part_key": "cabinet/side:right",
+        "hw_key": null,
+        "message_sk": "Dielec „Bok pravy“ (CAB-003) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-003|cabinet/side:right",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-003",
+        "part_key": "cabinet/top",
+        "hw_key": null,
+        "message_sk": "Dielec „Vrch“ (CAB-003) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-003|cabinet/top",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-003",
+        "part_key": "front:F1/wing:single",
+        "hw_key": null,
+        "message_sk": "Dielec „Dvierka 1“ (CAB-003) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-003|front:F1/wing:single",
+        "uni_id": "W1000_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "appliance",
+        "owner_id": "CAB-004",
+        "part_key": null,
+        "hw_key": null,
+        "message_sk": "Slot umývačky CAB-004 očakáva umývačku, ale priradený spotrebič nemá — priraď ho v riadku Spotrebič alebo očakávanie zruš.",
+        "data": {
+          "route": "appl"
+        },
+        "stable_key": "appliance|CAB-004|missing|dishwasher"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-004",
+        "part_key": "front:F1/blind",
+        "hw_key": null,
+        "message_sk": "Dielec „Dv myčka“ (CAB-004) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-004|front:F1/blind",
+        "uni_id": "W1000_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-005",
+        "part_key": "cabinet/back",
+        "hw_key": null,
+        "message_sk": "Dielec „Chrbat“ (CAB-005) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-005|cabinet/back",
+        "uni_id": "HDF_WHITE_3"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-005",
+        "part_key": "cabinet/bottom",
+        "hw_key": null,
+        "message_sk": "Dielec „Dno“ (CAB-005) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-005|cabinet/bottom",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-005",
+        "part_key": "cabinet/corner_panel",
+        "hw_key": null,
+        "message_sk": "Dielec „Blenda rohova“ (CAB-005) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-005|cabinet/corner_panel",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-005",
+        "part_key": "cabinet/corner_rail",
+        "hw_key": null,
+        "message_sk": "Dielec „Vystuha rohova“ (CAB-005) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-005|cabinet/corner_rail",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-005",
+        "part_key": "cabinet/cr:1",
+        "hw_key": null,
+        "message_sk": "Dielec „CR lista 1“ (CAB-005) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-005|cabinet/cr:1",
+        "uni_id": "W1000_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-005",
+        "part_key": "cabinet/cr:2",
+        "hw_key": null,
+        "message_sk": "Dielec „CR lista 2“ (CAB-005) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-005|cabinet/cr:2",
+        "uni_id": "W1000_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-005",
+        "part_key": "cabinet/hinge_rail",
+        "hw_key": null,
+        "message_sk": "Dielec „Vystuha zavesov“ (CAB-005) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-005|cabinet/hinge_rail",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-005",
+        "part_key": "cabinet/side:left",
+        "hw_key": null,
+        "message_sk": "Dielec „Bok lavy“ (CAB-005) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-005|cabinet/side:left",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-005",
+        "part_key": "cabinet/side:right",
+        "hw_key": null,
+        "message_sk": "Dielec „Bok pravy“ (CAB-005) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-005|cabinet/side:right",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-005",
+        "part_key": "cabinet/top",
+        "hw_key": null,
+        "message_sk": "Dielec „Vrch“ (CAB-005) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-005|cabinet/top",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-005",
+        "part_key": "front:F1/wing:single",
+        "hw_key": null,
+        "message_sk": "Dielec „Dvierka 1“ (CAB-005) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-005|front:F1/wing:single",
+        "uni_id": "W1000_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-006",
+        "part_key": "cabinet/back",
+        "hw_key": null,
+        "message_sk": "Dielec „Chrbat“ (CAB-006) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-006|cabinet/back",
+        "uni_id": "HDF_WHITE_3"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-006",
+        "part_key": "cabinet/bottom",
+        "hw_key": null,
+        "message_sk": "Dielec „Dno“ (CAB-006) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-006|cabinet/bottom",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-006",
+        "part_key": "cabinet/corner_panel",
+        "hw_key": null,
+        "message_sk": "Dielec „Blenda rohova“ (CAB-006) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-006|cabinet/corner_panel",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-006",
+        "part_key": "cabinet/corner_rail",
+        "hw_key": null,
+        "message_sk": "Dielec „Vystuha rohova“ (CAB-006) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-006|cabinet/corner_rail",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-006",
+        "part_key": "cabinet/cr:1",
+        "hw_key": null,
+        "message_sk": "Dielec „CR lista 1“ (CAB-006) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-006|cabinet/cr:1",
+        "uni_id": "W1000_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-006",
+        "part_key": "cabinet/cr:2",
+        "hw_key": null,
+        "message_sk": "Dielec „CR lista 2“ (CAB-006) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-006|cabinet/cr:2",
+        "uni_id": "W1000_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-006",
+        "part_key": "cabinet/hinge_rail",
+        "hw_key": null,
+        "message_sk": "Dielec „Vystuha zavesov“ (CAB-006) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-006|cabinet/hinge_rail",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-006",
+        "part_key": "cabinet/side:left",
+        "hw_key": null,
+        "message_sk": "Dielec „Bok lavy“ (CAB-006) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-006|cabinet/side:left",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-006",
+        "part_key": "cabinet/side:right",
+        "hw_key": null,
+        "message_sk": "Dielec „Bok pravy“ (CAB-006) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-006|cabinet/side:right",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-006",
+        "part_key": "cabinet/top",
+        "hw_key": null,
+        "message_sk": "Dielec „Vrch“ (CAB-006) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-006|cabinet/top",
+        "uni_id": "K009_PW_DTDL_18"
+      },
+      {
+        "severity": "orange",
+        "category": "uni_material",
+        "owner_id": "CAB-006",
+        "part_key": "front:F1/wing:single",
+        "hw_key": null,
+        "message_sk": "Dielec „Dvierka 1“ (CAB-006) — materiál UNI (neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).",
+        "stable_key": "uni_material|CAB-006|front:F1/wing:single",
+        "uni_id": "W1000_DTDL_18"
+      }
+    ]
+  }
+}

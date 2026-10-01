@@ -175,7 +175,7 @@ module Noxun
         cfg = config.is_a?(Hash) ? config : {}
         raw = cfg['appliance_expects'].is_a?(Array) ? cfg['appliance_expects'] : []
         codes = raw.map { |c| c.to_s.strip }.reject(&:empty?)
-        codes = ApplianceBinding::SLOT_EXPECTS.dup if cfg['type'].to_s == 'dishwasher'
+        codes = ApplianceBinding::SLOT_EXPECTS.dup if CabinetTypes.prop(cfg['type'], :appliance_owner) == 'slot'
         codes = ApplianceCatalog::CATEGORIES.select { |c| codes.include?(c) } # kanonicke poradie
         labels = codes.map { |c| ApplianceCatalog.category_label_acc(c) }
         { 'has' => !codes.empty?, 'codes' => codes,
@@ -199,7 +199,7 @@ module Noxun
       def construction_summary(config)
         cfg = config.is_a?(Hash) ? config : {}
         parts = []
-        unless cfg['type'].to_s == 'dishwasher'
+        if CabinetTypes.carcass?(cfg['type'])
           x = CabinetBuilder.norm_setback(cfg['back_setback'])
           y = CabinetBuilder.norm_setback(cfg['top_front_setback'])
           parts << "komín vzadu #{Construction.fmt_mm(x)}" if x.positive?

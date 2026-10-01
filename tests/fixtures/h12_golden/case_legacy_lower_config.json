@@ -1,0 +1,654 @@
+{
+  "params": {
+    "type": "lower",
+    "width": 600.0,
+    "height": 720.0,
+    "depth": 510.0,
+    "thickness": 18.0,
+    "floor_height": 100.0,
+    "bottom_mode": "between_sides",
+    "top_mode": "full",
+    "back_mode": "overlay",
+    "back_thickness": 3.0,
+    "plinth_mode": "front",
+    "plinth_recess": 50.0,
+    "rail_depth": 100.0,
+    "rails_orientation": "flat",
+    "rails_top_offset": 0.0,
+    "back_setback": 0.0,
+    "top_front_setback": 0.0,
+    "back_rail_height": 100.0,
+    "zone_tree": {
+      "id": "Z1",
+      "generation": 0,
+      "split": null,
+      "shelves": 0,
+      "children": [
+
+      ]
+    },
+    "fronts": {
+      "split_axis": "height",
+      "gap": 3.0,
+      "gap_top": 2.0,
+      "gap_bottom": 2.0,
+      "gap_left": 2.0,
+      "gap_right": 2.0,
+      "edge_limit_off": false,
+      "items": [
+
+      ]
+    },
+    "material_id": null,
+    "front_material_id": null,
+    "back_material_id": null,
+    "drawer_material_id": null,
+    "part_key_schema": 1,
+    "part_overrides": {
+    },
+    "hardware_overrides": [
+
+    ],
+    "hardware_sets": {
+    },
+    "hardware_manual": [
+
+    ],
+    "name": null
+  },
+  "normalize": {
+    "type": "lower",
+    "width": 600.0,
+    "height": 720.0,
+    "depth": 510.0,
+    "thickness": 18.0,
+    "floor_height": 100.0,
+    "bottom_mode": "between_sides",
+    "top_mode": "full",
+    "back_mode": "overlay",
+    "back_thickness": 3.0,
+    "plinth_mode": "front",
+    "plinth_recess": 50.0,
+    "rail_depth": 100.0,
+    "rails_orientation": "flat",
+    "rails_top_offset": 0.0,
+    "back_setback": 0.0,
+    "top_front_setback": 0.0,
+    "back_rail_height": 100.0,
+    "zone_tree": {
+      "id": "Z1",
+      "generation": 0,
+      "split": null,
+      "shelves": 0,
+      "children": [
+
+      ]
+    },
+    "fronts": {
+      "split_axis": "height",
+      "gap": 3.0,
+      "gap_top": 2.0,
+      "gap_bottom": 2.0,
+      "gap_left": 2.0,
+      "gap_right": 2.0,
+      "edge_limit_off": false,
+      "items": [
+
+      ]
+    },
+    "material_id": null,
+    "front_material_id": null,
+    "back_material_id": null,
+    "drawer_material_id": null,
+    "part_overrides": {
+    },
+    "hardware_overrides": [
+
+    ],
+    "hardware_sets": {
+    },
+    "hardware_manual": [
+
+    ],
+    "part_key_schema": 1,
+    "appliance_refs": null,
+    "appliance_expects": null,
+    "name": null
+  },
+  "plan": {
+    "schema": 7,
+    "parts": [
+      {
+        "suffix": "SIDE-L",
+        "part_key": "cabinet/side:left",
+        "role": "side_left",
+        "name": "Bok lavy",
+        "material": "korpus",
+        "box": [
+          18.0,
+          507.0,
+          720.0
+        ],
+        "origin": [
+          0,
+          0,
+          0.0
+        ],
+        "prod": {
+          "length": 720.0,
+          "width": 507.0,
+          "thickness": 18.0
+        },
+        "axes": {
+          "length": 2,
+          "width": 1,
+          "thickness": 0
+        }
+      },
+      {
+        "suffix": "SIDE-R",
+        "part_key": "cabinet/side:right",
+        "role": "side_right",
+        "name": "Bok pravy",
+        "material": "korpus",
+        "box": [
+          18.0,
+          507.0,
+          720.0
+        ],
+        "origin": [
+          582.0,
+          0,
+          0.0
+        ],
+        "prod": {
+          "length": 720.0,
+          "width": 507.0,
+          "thickness": 18.0
+        },
+        "axes": {
+          "length": 2,
+          "width": 1,
+          "thickness": 0
+        }
+      },
+      {
+        "suffix": "BOTTOM",
+        "part_key": "cabinet/bottom",
+        "role": "bottom",
+        "name": "Dno",
+        "material": "korpus",
+        "box": [
+          564.0,
+          507.0,
+          18.0
+        ],
+        "origin": [
+          18.0,
+          0,
+          100.0
+        ],
+        "prod": {
+          "length": 564.0,
+          "width": 507.0,
+          "thickness": 18.0
+        },
+        "axes": {
+          "length": 0,
+          "width": 1,
+          "thickness": 2
+        }
+      },
+      {
+        "suffix": "TOP",
+        "part_key": "cabinet/top",
+        "role": "top",
+        "name": "Vrch",
+        "material": "korpus",
+        "box": [
+          564.0,
+          507.0,
+          18.0
+        ],
+        "origin": [
+          18.0,
+          0,
+          702.0
+        ],
+        "prod": {
+          "length": 564.0,
+          "width": 507.0,
+          "thickness": 18.0
+        },
+        "axes": {
+          "length": 0,
+          "width": 1,
+          "thickness": 2
+        }
+      },
+      {
+        "suffix": "BACK",
+        "part_key": "cabinet/back",
+        "role": "back",
+        "name": "Chrbat",
+        "material": "korpus",
+        "box": [
+          600.0,
+          3.0,
+          620.0
+        ],
+        "origin": [
+          0,
+          507.0,
+          100.0
+        ],
+        "prod": {
+          "length": 600.0,
+          "width": 620.0,
+          "thickness": 3.0
+        },
+        "axes": {
+          "length": 0,
+          "width": 2,
+          "thickness": 1
+        },
+        "back_mode": "overlay"
+      },
+      {
+        "suffix": "PLINTH",
+        "part_key": "cabinet/plinth:front",
+        "role": "plinth",
+        "name": "Sokel predny",
+        "material": "korpus",
+        "box": [
+          564.0,
+          18.0,
+          100.0
+        ],
+        "origin": [
+          18.0,
+          50.0,
+          0
+        ],
+        "prod": {
+          "length": 564.0,
+          "width": 100.0,
+          "thickness": 18.0
+        },
+        "axes": {
+          "length": 0,
+          "width": 2,
+          "thickness": 1
+        }
+      }
+    ],
+    "hardware": [
+      {
+        "owner_part_key": null,
+        "generic_type": "leg",
+        "quantity": 4,
+        "rule_id": "nohy-zakladne",
+        "variant_id": null,
+        "production_class": "counted",
+        "manufactured": true,
+        "params": {
+          "height": 100.0
+        },
+        "source": "rule",
+        "rule_quantity": 4
+      }
+    ],
+    "warnings": [
+
+    ],
+    "zones": [
+      {
+        "id": "CAB-001-Z1",
+        "stable_id": "Z1",
+        "parent": null,
+        "label": "Celé vnútro",
+        "position": [
+          18.0,
+          0.0,
+          118.0
+        ],
+        "width": 564.0,
+        "height": 584.0,
+        "depth": 507.0,
+        "split": null,
+        "shelves": 0,
+        "leaf": true
+      }
+    ],
+    "zone_tree": {
+      "id": "Z1",
+      "generation": 0,
+      "split": null,
+      "shelves": 0,
+      "children": [
+
+      ]
+    },
+    "front_items": [
+
+    ],
+    "available": {
+      "width": 564.0,
+      "height": 584.0,
+      "depth": 507.0
+    },
+    "wings": 0,
+    "interior": {
+      "z_lo": 118.0,
+      "z_hi": 702.0,
+      "avail_h": 584.0,
+      "back_front_y": 507.0,
+      "back_thickness": 3.0
+    },
+    "references": [
+
+    ],
+    "zone_bounds": {
+      "CAB-001-Z1": {
+        "x0": 18.0,
+        "x1": 582.0,
+        "y0": 0.0,
+        "y1": 507.0,
+        "z0": 118.0,
+        "z1": 702.0
+      }
+    },
+    "front_bounds": {
+    },
+    "drawer_conflicts": [
+
+    ],
+    "drawer_writes": [
+
+    ],
+    "drawer_override_writes": [
+
+    ],
+    "hardware_conflicts": [
+
+    ]
+  },
+  "config": {
+    "config_schema": 22,
+    "rules_seed_version": 7,
+    "part_key_schema": 1,
+    "plan_schema": 7,
+    "warnings": [
+
+    ],
+    "hardware": [
+      {
+        "owner_part_key": null,
+        "generic_type": "leg",
+        "quantity": 4,
+        "rule_id": "nohy-zakladne",
+        "variant_id": null,
+        "production_class": "counted",
+        "manufactured": true,
+        "params": {
+          "height": 100.0
+        },
+        "source": "rule",
+        "rule_quantity": 4
+      }
+    ],
+    "drawer_conflicts": [
+
+    ],
+    "hardware_conflicts": [
+
+    ],
+    "type": "lower",
+    "name": null,
+    "construction_preset": "noxun-lower-18",
+    "mode": "parametric",
+    "width": 600.0,
+    "height": 720.0,
+    "depth": 510.0,
+    "thickness": 18.0,
+    "floor_height": 100.0,
+    "bottom_mode": "between_sides",
+    "top_mode": "full",
+    "back_mode": "overlay",
+    "back_thickness": 3.0,
+    "plinth_mode": "front",
+    "plinth_recess": 50.0,
+    "rail_depth": 100.0,
+    "rails_orientation": "flat",
+    "rails_top_offset": 0.0,
+    "sides": {
+      "thickness": 18.0,
+      "construction": "sides_wrap"
+    },
+    "bottom": {
+      "mode": "between_sides",
+      "thickness": 18.0
+    },
+    "top": {
+      "mode": "full",
+      "thickness": 18.0,
+      "rail_depth": 100.0,
+      "orientation": "flat",
+      "top_offset": 0.0
+    },
+    "back": {
+      "mode": "overlay",
+      "thickness": 3.0
+    },
+    "support": {
+      "type": "plinth",
+      "height": 100.0,
+      "recess": 50.0
+    },
+    "material_id": null,
+    "front_material_id": null,
+    "back_material_id": null,
+    "drawer_material_id": null,
+    "part_overrides": {
+    },
+    "hardware_overrides": [
+
+    ],
+    "hardware_sets": {
+    },
+    "hardware_manual": [
+
+    ],
+    "available_width": 564.0,
+    "available_height": 584.0,
+    "available_depth": 507.0,
+    "front_plane": 0.0,
+    "wings": 0,
+    "zone_tree": {
+      "id": "Z1",
+      "generation": 0,
+      "split": null,
+      "shelves": 0,
+      "children": [
+
+      ]
+    },
+    "zones": [
+      {
+        "id": "CAB-001-Z1",
+        "stable_id": "Z1",
+        "parent": null,
+        "label": "Celé vnútro",
+        "position": [
+          18.0,
+          0.0,
+          118.0
+        ],
+        "width": 564.0,
+        "height": 584.0,
+        "depth": 507.0,
+        "split": null,
+        "shelves": 0,
+        "leaf": true
+      }
+    ],
+    "fronts": {
+      "split_axis": "height",
+      "gap": 3.0,
+      "gap_top": 2.0,
+      "gap_bottom": 2.0,
+      "gap_left": 2.0,
+      "gap_right": 2.0,
+      "edge_limit_off": false,
+      "items": [
+
+      ]
+    },
+    "front_items": [
+
+    ]
+  },
+  "config_roundtrip": {
+    "type": "lower",
+    "width": 600.0,
+    "height": 720.0,
+    "depth": 510.0,
+    "thickness": 18.0,
+    "floor_height": 100.0,
+    "bottom_mode": "between_sides",
+    "top_mode": "full",
+    "back_mode": "overlay",
+    "back_thickness": 3.0,
+    "plinth_mode": "front",
+    "plinth_recess": 50.0,
+    "rail_depth": 100.0,
+    "rails_orientation": "flat",
+    "rails_top_offset": 0.0,
+    "back_setback": 0.0,
+    "top_front_setback": 0.0,
+    "back_rail_height": 100.0,
+    "zone_tree": {
+      "id": "Z1",
+      "generation": 0,
+      "split": null,
+      "shelves": 0,
+      "children": [
+
+      ]
+    },
+    "fronts": {
+      "split_axis": "height",
+      "gap": 3.0,
+      "gap_top": 2.0,
+      "gap_bottom": 2.0,
+      "gap_left": 2.0,
+      "gap_right": 2.0,
+      "edge_limit_off": false,
+      "items": [
+
+      ]
+    },
+    "material_id": null,
+    "front_material_id": null,
+    "back_material_id": null,
+    "drawer_material_id": null,
+    "part_overrides": {
+    },
+    "hardware_overrides": [
+
+    ],
+    "hardware_sets": {
+    },
+    "hardware_manual": [
+
+    ],
+    "part_key_schema": 1,
+    "appliance_refs": null,
+    "appliance_expects": null,
+    "name": null
+  },
+  "support_type": "plinth",
+  "hw_ctx": {
+    "width": 600.0,
+    "height": 720.0,
+    "depth": 510.0,
+    "floor_height": 100.0,
+    "kh": 620.0,
+    "kb": 600.0,
+    "support": "plinth",
+    "cabinet_type": "lower"
+  },
+  "front_opening": {
+    "x0": 0.0,
+    "w": 600.0,
+    "z0": 100.0,
+    "h": 620.0
+  },
+  "min_valid": {
+    "height": 147.0,
+    "depth": 150.0,
+    "width": 200.0
+  },
+  "names": {
+    "default": "Spodná skrinka 600",
+    "display": "Spodná skrinka 600",
+    "template_id": "base-lower-18",
+    "preset": "noxun-lower-18"
+  },
+  "home_z": 0.0,
+  "appliance_context": {
+    "interior": {
+      "width": 564.0,
+      "height": 584.0,
+      "depth": 507.0
+    },
+    "z_lo": 118.0,
+    "gap": 3.0,
+    "single_zone": true,
+    "fronts_pair": {
+      "applicable": false,
+      "reason": "delenie sa netýka: skrinka nemá čelá"
+    }
+  },
+  "owner_kind": "cabinet",
+  "slot_record": null,
+  "entity_kind": "cabinet",
+  "tpl_expects": {
+    "has": false,
+    "codes": [
+
+    ],
+    "text": ""
+  },
+  "tpl_construction": {
+    "has": false,
+    "text": ""
+  },
+  "direction_blind": "cross",
+  "scale": {
+    "min": {
+      "width": 200.0,
+      "height": 80.0,
+      "depth": 150.0
+    },
+    "depth": [
+      150.0,
+      null
+    ],
+    "height": 147.0,
+    "corner_width": [
+      300.0,
+      null
+    ]
+  },
+  "ghost": {
+    "type_key": "lower",
+    "corner": false,
+    "lock_z": 0.0,
+    "memory_lock_z": {
+      "lower": 0.0
+    }
+  },
+  "corner_thicknesses": {
+  }
+}

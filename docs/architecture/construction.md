@@ -10,9 +10,51 @@ Plánovač, buildery, strom zón, modulové výpočty (police, čelá), kontrakt
 
 ## Plánovanie a stavba
 
+### cabinet_types.rb
+
+**Register typov skrinky (H12a, v0.17.11, C-01) — `Noxun::Engine::CabinetTypes`.** JEDINÉ miesto, ktoré vie, aké typy skrinky existujú a aké majú
+**vlastnosti**; jadro (`cabinet_builder`, `construction`, `scale_observer`, `appliance_binding`, `appliance_checks`, `bom`, `direction_check`, `templates`,
+`ghost_tool`) sa pýta **vlastnosti, nie mena typu** — pravidlo „**jedna vlastnosť na miesto**", nová podmienka dáva presne tú istú množinu typov ako stará
+(matica 7 vstupov `lower upper dishwasher corner_blind tall nil ''` v `test_h12a_register.rb` a golden `test_h12_golden.rb`). Čistý modul bez IO a SketchUpu;
+načíta sa hneď za `build_plan` — **pred** `construction` (`CORNER_TYPE`), `scale_observer` (`MIN_BY_TYPE`) a `cabinet_builder` (`TYPES`, `CORNER_TYPE`,
+`UPPER_HANG_Z`, `DW_*_RANGE`), ktoré z neho berú aliasy už pri načítaní (guard poradia v `main.rb`; `hardware_rules` register nepoužíva).
+
+- **`REGISTRY`** (zmrazený `id => props`, poradie `IDS` = `lower upper dishwasher corner_blind`), kľúče každého typu (`KEYS`, invariant T1): `id` · `label`
+  (Dolná/Horná/Umývačka/Rohová) · `word` (= `label` malým, slovo do viet) · `auto_name` (`Spodná skrinka %{w}`, `Horná skrinka %{w}`, `Umývačka %{dw} (slot)`,
+  `Rohová skrinka %{w}`; `%{w}` = zaokrúhlená šírka, `%{dw}` = trieda slotu) · `auto_name_typed` (auto názov platí len pri tomto type — dnes len rohová,
+  vzor `CORNER_AUTO_NAME_RE`) · `preset` · `template_id` · `builder` (`carcass` | `appliance_slot` — typ bez korpusu) · `hang_z` (výška vloženia mm, `> 0` =
+  **visí**, horná 1400) · `on_floor` (**stojí na podlahe** — nohy/sokel podľa configu; horná a slot nie) · `limits` (vlastné rozsahy `{width, height}`, dnes len
+  slot 300–1200 / 500–1200) · `appliance_owner` (`cabinet` | `slot`) · `fronts` (`free` | `slot_fixed` | `corner_one_door`) · `front_opening` (`full` | `slot` |
+  `corner_door`) · `zones` (`tree` | `none` | `shelves_only`) + `zones_reason` · `template_type` (`switchable` | `locked`) + `template_lock {title, tip}` ·
+  `type_locked` (typ sa nemení žiadnou cestou — rohová) · `assembly` (`corner_blind` | nil) · `ui_order` (poradie tlačidiel v HTML). **Dve podlahové vlastnosti
+  zámerne:** „len horná" (`hang_z`: výška vloženia, starý V0.1 sokel `legacy_plinth`, seed závesov) a „horná alebo slot" (`on_floor`: `normalize`, `support_type`)
+  sú dnes dve rôzne množiny — jedna vlastnosť by v okrajovom prípade zmenila slot.
+- **API (čisté):** `known?(t)` · `norm(t)` (známy → sám; neznámy, nil aj `''` → `FALLBACK = 'lower'`; prijme String/Symbol/nil) · `id_or_default(t)` (nil/`''` →
+  `FALLBACK`, **neznámy ostáva** — kľúč pamäte ghostu; **nenahrádza** porovnanie identity šablón, kde `''` ostáva `''` — audit H12 A2) · `get` · `prop` ·
+  `hangs?` · `on_floor?` · `carcass?` · `corner?` (`assembly`) · `ids_where(key, value)` · `client_payload`.
+- **Neznámy typ** (aj z novšieho pluginu) = **profil dolnej** cez `norm` (dnešné správanie; config z novšej verzie stopne dopredný guard `newer_config?` skôr).
+  **Miesta identity** si nechávajú surový reťazec: vstup pravidiel kovania `cabinet_hw_ctx['cabinet_type']`, porovnanie typu šablóny a skrinky (panel, H12b),
+  kľúč pamäte zamknutej výšky ghostu.
+- **`client_payload`** = kontrakt pre JS (H12b ho pošle v `NX.init`, H12c z neho číta): pole hashov v poradí `IDS`, **kľúče ako stringy s menami `KEYS`**,
+  hodnoty len JSON typy (`limits` → `{"width": [..], "height": [..]}`, `template_lock` → `{"title", "tip"}`); zmluva = `tests/fixtures/h12_cabinet_types.json`.
+- **Čo register NIE JE:** predvoľby (`*_DEFAULTS` → `CabinetBuilder::DEFAULTS_BY_TYPE`), polia typu (`DW_KEYS`, `CORNER_KEYS` → `EXTRA_KEYS_BY_TYPE`),
+  `PARAM_KEYS` a kód typov (`appliance_slot_plan`, `corner_parts`, `slot_fronts!`, `corner_fronts!`…) ostávajú v builderi — register hovorí **ktorá** vetva, nie **ako**.
+  Aliasy pre testy a cudzí kód: `CabinetBuilder::TYPES` (= `IDS`), `CabinetBuilder::CORNER_TYPE` a `Construction::CORNER_TYPE` (= `CORNER`, do H12a dve kópie),
+  `CabinetBuilder::UPPER_HANG_Z`, `DW_WIDTH_RANGE`/`DW_HEIGHT_RANGE`, `ScaleWatch::MIN_BY_TYPE` (odvodené z `limits`).
+- **Guardy (`test_h12a_register.rb`):** v `core/` a `modules/` **žiadne nové vetvenie podľa mena typu** (`== 'upper'`, `when 'dishwasher'`, `%w[…upper…]`,
+  `|| 'lower'`, `CORNER_TYPE` mimo aliasov — allowlist podľa obsahu riadka s dôvodom: kategórie spotrebičov, seed závesov, mapy predvolieb; panel `ui/` pribudne
+  v H12b) · `DEFAULTS_BY_TYPE` = `IDS` · **CN-03** (visiace typy = `cabinet_type` seedu závesov, [hardware.md](hardware.md)) · poradie načítania. **Nový typ** =
+  riadok `REGISTRY` + `DEFAULTS_BY_TYPE` (+ `EXTRA_KEYS_BY_TYPE`, `PARAM_KEYS`) + kód buildera + HTML tlačidlo a `option` + seed šablóny + pri `hang_z > 0` seed
+  závesov a `SEED_VERSION` + bump `CONFIG_SCHEMA` (mapa rozširovacích bodov: H13).
+
 ### construction.rb
 
 plánovač cfg→BuildPlan (kovanie sa vyhodnocuje po vyradení degenerovaných dielcov; `support_type`).
+
+**H12a (v0.17.11) — typ cez register [`CabinetTypes`](#cabinet_typesrb).** Vetvu slotu vyberá `builder` (`build_plan` → `appliance_slot_plan` pri `!carcass?`;
+rovnako `setback_value`, `back_rails?`, `min_valid_height`/`min_valid_depth`), otvor čiel `front_opening` (`slot`; rohová ďalej cez `corner?`), podporu
+`support_type` (`none` pri `!on_floor?` alebo `floor_height <= 0`); `corner?(cfg)` deleguje na `CabinetTypes.corner?` (symbol aj string kľúč). `CORNER_TYPE` je
+alias registra. **`cabinet_hw_ctx['cabinet_type']` ostáva SUROVÝ identifikátor** (pravidlá kovania porovnávajú identitu — pasca CN-03, [hardware.md](hardware.md)).
 
 **D-143 (KON-0, v0.13.1) — chrbát nesie ZNAČKU PÔVODU a chrbát v drážke ROZMER DO NÁREZU.** `back_part` dáva každému deskriptoru chrbta aditívny kľúč
 `back_mode` (`overlay`/`inset`/`groove`) a chrbtu **v drážke** navyše `cut_size: {length: w, width: h − s}` — plný rozmer skrinky od spodku dna po vrch v **tých
@@ -239,7 +281,13 @@ Chyba UV mapovania sa neprehltne; existujúca operácia zruší celý vklad/pres
 stále používať cudzí dielec alebo odpojená skrinka; následný rebuild ju nesmie vyčistiť. Obsadené meno dostane novú definíciu, bez premenovania cudzej
 alebo vyhľadávania náhrad podľa podobného mena. Čistenie nepoužívaných definícií sa nezavádza.
 
-**ROH-A1 · K3 (v0.14.1, `CONFIG_SCHEMA` 22) — TYP `corner_blind`.** `TYPES` = `lower upper dishwasher corner_blind` (JS zrkadlá `CAB_TYPES`/`INSERT_TYPES`),
+**H12a (v0.17.11) — vetvy podľa typu idú cez register [`CabinetTypes`](#cabinet_typesrb):** `construction_preset_for`, `template_id_for`, `default_name`
+(`auto_name`), `auto_name?` (`auto_name_typed`) a `home_z` (`hang_z`) čítajú register; `defaults_for` = `DEFAULTS_BY_TYPE[norm(t)]`; `normalize` vetví `slot =
+!carcass?`, šírku/výšku slotu klampuje `limits`, `floor_height`/`plinth_mode` vynúti pri `!on_floor?`, rohovú pri `corner?`; `cabinet_config` zapisuje polia typu
+z `EXTRA_KEYS_BY_TYPE.fetch(type, [])` (poradie kľúčov bez zmeny) a komín/lišty pri `carcass?`; `legacy_plinth` = `hangs?`; `config_to_params` nechýbajúci typ
+dopĺňa `CabinetTypes::FALLBACK`. **Bajty plánu, configu a výstupov sa nemenia** (golden `test_h12_golden.rb` + in-SU `run_h12`).
+
+**ROH-A1 · K3 (v0.14.1, `CONFIG_SCHEMA` 22) — TYP `corner_blind`.** `TYPES` = `lower upper dishwasher corner_blind` (od H12a alias registra; JS zrkadlá `CAB_TYPES`/`INSERT_TYPES`),
 `CORNER_DEFAULTS` = `LOWER_DEFAULTS` + šírka 1100 + informatívny jeden riadok dvierok + polia rohovej. **Polia `CORNER_KEYS`** (`corner_side`, `corner_door_w`,
 `corner_cr1`, `corner_cr2`) idú jedným zoznamom cez `normalize` (`norm_corner`: strana enum `CORNER_SIDES`, rozmery **prísne** cez `SETBACK_NUM_RE` — nečíslo /
 nekonečno = predvoľba poľa — a klamp `CORNER_RANGES` 250–800 / 50–250), `cabinet_config` (**len pri rohovej, vždy všetky štyri**), `config_to_params` (18 volaní —
@@ -537,7 +585,9 @@ meria `async S6`).
 
 **SLOT UMÝVAČKY (S1-E, typ `dishwasher`) — štvrtá vetva buildera vedľa dolnej, hornej a dosky.** Slot **nie je korpus**: nemá boky, dno, strop, chrbát ani zóny.
 Vyrába **jediný dielec — ČELO** (cez modul čiel ako jeden pevný item typu `blind`, teda rola `false_front`) a **telo spotrebiča kreslí ako REFERENCIU**, nie ako dielec.
-`TYPES` je **jediný zoznam typov** (`lower upper dishwasher corner_blind`; rohová viď ROH-A1 vyššie) a JS ho zrkadlí v `core.js` (`CAB_TYPES`) aj v `insert_state.js` (`INSERT_TYPES` + `board`); zhodu stráži guard test.
+Zoznam typov je od H12a **register `CabinetTypes`** (odsek [cabinet_types.rb](#cabinet_typesrb); `TYPES` = alias `IDS`, `lower upper dishwasher corner_blind`)
+a JS ho zatiaľ zrkadlí v `core.js` (`CAB_TYPES`) aj v `insert_state.js` (`INSERT_TYPES` + `board`; zo servera ich naplní H12c); zhodu stráži guard test.
+Vetvy slotu sa pýtajú vlastností (`carcass?`, `limits`, `appliance_owner`, `fronts`, `front_opening`), nie mena `dishwasher`.
 
 **Polia slotu** (`DW_KEYS`, uzavretý whitelist uložených polí): `dw_class` (600 | 450), `dw_body_height`, `dw_front_bottom` = spodná hrana **čela** od podlahy,
 `dw_front_height`. **D-139: vstupmi sú len trieda, telo a sokel (`DW_INPUT_KEYS`)** — `dw_front_height` je **ODVODENÉ** (`dw_front_eval`: výška linky − sokel −
@@ -785,7 +835,7 @@ nedokáže overiť, či Windows Alt do Toolu naozaj **doručí** a či sa pritom
 **Michalovmu smoke checklistu** (`SYSTEM/PLAN.md`, sekcia GHOST, bod 2); zapísaný fallback pri zlyhaní je **TAB** (Scope OUT dávky, cyklovanie kotiev je preto jedna volateľná
 metóda `PlacementSession#cycle_anchor!`).
 **ROH-B2 (O12) — kláves D = strana dverí rohovej** (`CORNER_SIDE_KEY` = kód 68). Vlastníme ho **len** pri ghoste rohovej pri umiestňovaní (`corner_side_key?` —
-`PlacementSession#corner?` = typ zmrazeného plánu `corner_blind`); pri inej skrinke, doske aj kreslení ide D SketchUpu nedotknutý. Prečo D: ←/→, ↑/↓, Alt, Esc
+`PlacementSession#corner?` = `CabinetTypes.corner?` typu zmrazeného plánu; kľúč pamäte výšky `@type_key` = `id_or_default`, surový typ — H12a); pri inej skrinke, doske aj kreslení ide D SketchUpu nedotknutý. Prečo D: ←/→, ↑/↓, Alt, Esc
 a Shift sú obsadené, TAB je zapísaný fallback kotiev; D nemá v SketchUpe predvolenú skratku (in-SU `run_rohb2` to overí nad `Sketchup.get_shortcuts` Michalovho
 PC) a meracie pole je pri umiestňovaní vypnuté, takže písmeno do neho nevtečie. Nástroj **nič nezrkadlí sám** — `GhostTool.request_corner_side` len ohlási
 panelu stranu, ktorú ghost nesie (`Panel.ghost_corner_side_key` → `NX.ghostCornerSide`); stranu prepne vkladacia karta tou istou funkciou ako prepínač v riadku
@@ -1191,7 +1241,8 @@ Súbor, v ktorom žijú triedy prekrytí (`Sketchup::Overlay`) — celý je pod 
 
 ### scale_observer.rb
 
-**S1-E: TYPOVÉ MINIMÁ.** `MIN_BY_TYPE` drží spodné hranice pre typy, ktoré sa neriadia korpusovými (dnes `dishwasher`: šírka 300, výška 500) — sú to **tie isté čísla**
+**S1-E: TYPOVÉ MINIMÁ.** `MIN_BY_TYPE` drží spodné hranice pre typy, ktoré sa neriadia korpusovými (dnes `dishwasher`: šírka 300, výška 500; od H12a **odvodené** z `limits` registra `CabinetTypes`, hĺbka = `MIN['depth']`;
+vetvy slotu v `clamp_height`/`clamp_depth` pri `!carcass?`) — sú to **tie isté čísla**
 ako spodné hranice `CabinetBuilder::DW_WIDTH_RANGE` / `DW_HEIGHT_RANGE` (jedna hranica na oboch miestach, BLOCKER E1; guard test `test_s1e_slot.rb`). `clamp_min`
 aj `clamp_height` sa pýtajú `min_for(key, type)`, takže typové minimum má prednosť pred korpusovým. **D-139:** výšku linky slotu viaže odvodené čelo, preto
 `clamp_height` pri slote odbočí na **`clamp_slot_height`** — hranice `CabinetBuilder.slot_height_bounds(params)` (prienik `DW_HEIGHT_RANGE` a sokel + medzera + 300 …

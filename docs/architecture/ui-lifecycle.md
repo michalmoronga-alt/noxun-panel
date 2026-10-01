@@ -2109,7 +2109,8 @@ Položky nesú `dflt` (riedky config).
 **JS registre typu skrinky** (pri novom type sa menia všetky): `core.js` `CAB_TYPES` (bez typu by `setType` skrinku sklopil na dolnú) a `NX_TYPE_LABEL` ·
 `insert_state.js` `INSERT_TYPES`, `templateType`/`templatesForType` · `templates.js` `TPL_TYPE_WORDS` · `part_card.js` `roleLabel` a `isFront` · `rules.js`
 `rdRoleDesc` · `form.js` `TYPE_LIMITS`, `applyVisibility`, `TPL_TYPE_LOCK` · `hardware.js` `LEGS_INSERT_TYPES` · `sync.rb` `DEFAULTS.<typ>` · `NX_CTX_LOCK` (`shell.js`).
-Typy dnes: `lower` · `upper` · `dishwasher` · `corner_blind` (Ruby `CabinetBuilder::TYPES`, [construction.md](construction.md)).
+Typy dnes: `lower` · `upper` · `dishwasher` · `corner_blind` (Ruby register `CabinetTypes` od H12a — `CabinetBuilder::TYPES` je jeho alias, [construction.md](construction.md#cabinet_typesrb);
+JS zoznamy z neho naplní H12c).
 
 ### Trvalé UI pravidlo (Michal 20.7.2026): VERTIKÁLNY priestor panela je vzácny
 
