@@ -44,7 +44,7 @@ predrecenzia, in-SU) sa určí pri package podľa CLAUDE.md; stĺpec je predpokl
 | ✅ H5 · dokumentácia okien a UI dizajnu (aktuálny stav oddelený od histórie, strážca rastu, zastarané vety) — **H5a PR #439** (mapa okien `ui-lifecycle.md` 551 → 253 kB, história do archívu, strop veľkosti mapy) · **H5b PR #440** (UI_DIZAJN = norma bez denníka, deväť zastaraných viet opravených, strážca veľkosti, značiek a inventára ikon) | B-02 · B-03 · B-05 | dokumentácia |
 | H6 · priestor v Inspectore (nápovedy, pás, spodné tlačidlá, kóty náhľadu, súhrny sektorov) | D-01 · D-02 · D-05 | kód UI · mockup |
 | H7 · názov zákazky na jednom mieste + nastavenia exportu v jadre — **pred presunom ochrana R-38** (poškodený súbor nastavení exportu sa nesmie ticho prepísať zálohou; výsledok zápisu sa ukáže; R-38 = návrh — potvrdí Michal s mockupom H7) | A-05 · C-07 · R-38 | kód · mockup · audit |
-| H8 · dielec z inej verzie štandardu (ORANGE) | R-13 | kód · audit |
+| ✅ H8 · dielec z inej verzie štandardu (ORANGE `std_version` v Kontrole, čísla bez zmeny) — package [PACKAGE_H8.md](zdroje/bloky/HARDENING/PACKAGE_H8.md) — **PR #441** | R-13 | kód · audit · in-SU |
 | H9 · ochrana nastavení dodávateľa pred seedom | R-37 | kód · audit |
 | H10 · dve okná SketchUpu neprepíšu pravidlá kovania a rady | R-35 | kód · audit |
 | H11 · SketchUp 2026.2 (ukončenie bez pádu, načítanie súborov) + minimum SketchUp 2026 | F-01 · F-02 | kód · audit · in-SU |
@@ -82,6 +82,9 @@ predrecenzia, in-SU) sa určí pri package podľa CLAUDE.md; stĺpec je predpokl
   koreň `H:\Môj disk\NoxunENGINE data`, odhad 3 PR; patrí k nej aj zdieľanie `.skm`. Rozhodnutia
   [zdroje/next_sessions/V1_DEBATA_2026-09-06_LUCIA_KNIZNICE.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_LUCIA_KNIZNICE.md), mechanizmus `zdroje/next_sessions/SYNC_KNIZNICE_NAVRH_2026-09-06.md`
   (PR #323); plné znenie v [DOGFOODING.md](DOGFOODING.md); príprava = blok 9 · H16 (C-04 súpis knižníc); dovtedy katalógy ručne. Updater D-52 je hotový (v0.9.14).
+- **F3 z H8 · guard značky `std`** (audit H8 A5, 1.10.2026) — keď kus nesie **novšiu** značku `std`, odmietnuť jeho prestavbu **aj pridelenie nového ID kópii**
+  (`BoardBuilder.dedup_copies` a dedup skrinky dnes značku ticho prepíšu na aktuálnu a ORANGE nález zanikne bez kontroly kusa); potrebné až pri prvom zvýšení `Store::STD`
+  (vzor R-12 pre `config_schema`). Package [PACKAGE_H8.md](zdroje/bloky/HARDENING/PACKAGE_H8.md) §14.
 - **Runner testov v SketchUpe po teste sám vráti pôvodnú verziu pluginu** (workflow N4, 26.9.2026) — `scripts\run_su_tests.ps1` dnes nechá nasadenú
   rozpracovanú vetvu; dovtedy platí pravidlo „po každom mergi nainštalovať main" (CLAUDE.md, Verzia a uzáver).
 - **D-147 · Nárezový plán: menšie dielce nad seba v páse** (Michal 29.9.2026, smoke bloku 2) — vnárať menšie dielce do voľného miesta pásu nad nižším dielcom (plán býva niekedy o platňu opatrnejší, než musí); plné znenie v [DOGFOODING.md](DOGFOODING.md).

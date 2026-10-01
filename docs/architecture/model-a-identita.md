@@ -113,9 +113,16 @@ a reprodukcie recyklácie cez skutočný `PanelAppObserver#onOpenModel` (vzor sc
 
 ### store.rb
 
-prístup k `NOXUN` dictionary.
+prístup k `NOXUN` dictionary (`write`, `get`, `config`, `kind`).
 
-**Verzia kontraktu configu `config_schema` je dnes `21`** (KON-B · K2 — chrbát z líšt `back_mode 'rails'` a výška líšt `back_rail_height`; 20 = KON-A komín a zapustenie).
+**Značka verzie štandardu `std` (H8, R-13).** `Store::STD = 1` píše 9 miest v builderoch (skrinka, dielec, nohy, referencia, úchytkový profil, doska, dedup
+kópie skrinky aj dosky, zóna) — vždy aktuálnu hodnotu; `write` preskakuje `nil`, takže kľúč nikdy nezmizne. **Číta ju jedine Kontrola:** `read_std(entity)`
+→ `[:missing | :present | :error, raw]` cez sentinel `STD_MISSING` (vzor `BudgetStore`; `get` „chýba" od uloženého `nil` nerozlíši), s `rescue` (výnimka pri
+čítaní nesmie zhodiť `Bom.collect`). Čistá `std_state_of(presence, raw, current: STD)` → `:current` · `:legacy` (chýba) · `:older` · `:newer` · `:invalid`
+(čokoľvek iné než `Integer >= 1`, aj `:error`; žiadne `.to_i`). `std_state(entity)` je ich zloženie. Agregáciu na kus robí `Bom.std_issue`
+([outputs.md](outputs.md), odsek `bom.rb`); význam stavov STANDARD §2.1 „Čítanie `std`".
+
+**Verzia kontraktu configu `config_schema` je dnes `22`** (ROH-A1 · K3 — rohová skrinka; 21 = KON-B · K2 chrbát z líšt `back_mode 'rails'` a výška líšt `back_rail_height`; 20 = KON-A komín a zapustenie).
 Aktivačné konštanty sa pri bumpe nehýbu: `DRAWER_ACTIVATION_SCHEMA` 5 · `HINGE_ACTIVATION_SCHEMA` 9 · `LIFT_ACTIVATION_SCHEMA` 11 · `BACK_CUT_ACTIVATION_SCHEMA` 19 ·
 `BACK_RAIL_ACTIVATION_SCHEMA` 20. Zápis markera, dopredný guard aj celá **história čísel** žijú v odseku `cabinet_builder.rb` ([construction.md](construction.md))
 a v komentári `HISTORIA` pri konštante — tu je len ukazovateľ, aby sa aktuálne číslo dalo nájsť od dát.

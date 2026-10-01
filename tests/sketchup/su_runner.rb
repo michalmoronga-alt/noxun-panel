@@ -8856,6 +8856,209 @@ module NoxunSuRunner
     [mm(o.x), mm(o.y), mm(o.z)]
   end
 
+  # --- H8 (R-13): znacka verzie standardu `std` v Kontrole --------------------
+  # Krok 1 (`run_h8_saved`) bezi v `run` PRED cistym stolom (`cleanup`) nad
+  # PRAVE OTVORENOU kopiou ENGINEtests.skp — uloženy a znovu otvoreny model je
+  # jediny dokaz, ze typ znacky po save/reopen ostava Integer a Kontrola nedava
+  # falosne poplachy. Prazdna vzorka = NEOVERENE (nie PASS). Kroky 2–4
+  # (`run_h8`) menia znacku LEN v operacii, ktora sa zrusi (`abort_operation`).
+
+  # Co presne zber kontroluje (zrkadlo filtrov `Bom.collect`): top-level skrinky,
+  # dosky, vnorene vyrobne dielce `sheet` a samostatne vyrobne dielce.
+  def h8_coverage(model)
+    cov = { cabinets: 0, boards: 0, nested: 0, standalone: 0 }
+    vals = Hash.new(0)
+    note = lambda do |ent|
+      presence, raw = e::Store.read_std(ent)
+      vals[presence == :present ? "#{raw.inspect}:#{raw.class}" : presence.to_s] += 1
+    end
+    vyrobny = ->(ent) { e::Store.get(ent, 'manufactured') == true && e::Store.get(ent, 'production_class').to_s == 'sheet' }
+    model.entities.grep(Sketchup::ComponentInstance).each do |inst|
+      case e::Store.kind(inst)
+      when 'cabinet'
+        cov[:cabinets] += 1
+        note.call(inst)
+        inst.definition.entities.grep(Sketchup::ComponentInstance).each do |pi|
+          next unless e::Store.kind(pi) == 'part' && vyrobny.call(pi)
+
+          cov[:nested] += 1
+          note.call(pi)
+        end
+      when 'board'
+        cov[:boards] += 1
+        note.call(inst)
+      when 'part'
+        next unless vyrobny.call(inst)
+
+        cov[:standalone] += 1
+        note.call(inst)
+      end
+    end
+    [cov, vals]
+  end
+
+  def run_h8_saved(model)
+    cov, vals = h8_coverage(model)
+    info("H8 krok 1: pokrytie ulozeneho modelu '#{File.basename(model.path.to_s)}' — skrinky #{cov[:cabinets]}, " \
+         "dosky #{cov[:boards]}, vnorene vyrobne dielce #{cov[:nested]}, samostatne dielce #{cov[:standalone]}; " \
+         "znacky #{vals.sort.to_h.inspect}")
+    issues = Array(e::ProductionCore.fresh_collect(model)[:std_issues])
+    if cov.values.sum.zero?
+      info('H8 krok 1: NEOVERENE — ulozeny model nema ziadny kontrolovany kus (prazdna vzorka nie je PASS)')
+      return
+    end
+
+    ok("H8 krok 1: ulozeny a znovu otvoreny model NEDAVA ziadny nalez znacky std (#{issues.length} zaznamov: " \
+       "#{issues.first(3).map { |i| [i['kind'], i['id'], i['state']] }.inspect})", issues.empty?)
+    ok("H8 krok 1: vsetky znacky po save/reopen su Integer 1 (#{vals.keys.inspect})", vals.keys == ['1:Integer'])
+  rescue StandardError => ex
+    log_line("FAIL: H8 krok 1 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
+  H8_CAB = { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0 }.freeze
+
+  # Zmena znacky v ZRUSENEJ operacii: blok dostane hotovy zber a model sa po
+  # nom vrati presne do povodneho stavu (`abort_operation`, ziadny krok Spat).
+  def h8_probe(model, label)
+    out = nil
+    e::ScaleWatch.guard do
+      model.start_operation("SU-TEST H8 #{label}", true)
+      begin
+        out = yield
+      ensure
+        model.abort_operation
+      end
+    end
+    out
+  end
+
+  def h8_rows(model)
+    e::Bom.compute(e::Bom.collect(model))[:rows].map { |r| r.reject { |k, _| k == 'refs' } }
+  end
+
+  def h8_items(col)
+    Array(e::ProductionCore.control_payload(col)['items']).select { |i| i['category'] == e::Validation::CAT_STD_VERSION }
+  end
+
+  # Krok 1b: VSETKY druhy kusov (skrinka, vnorene dielce, doska, samostatny
+  # dielec) cez skutocny subor — `save_copy` + `definitions.load` (vzor KON-0 h)
+  # a SKUTOCNY `Bom.collect` nad nacitanymi entitami. Doplna krok 1, ktoremu
+  # ulozeny ENGINEtests.skp moze niektory druh kusu nedat (napr. dosku).
+  def h8_saved_roundtrip(model, cab)
+    det = d134_detach(model, cab)
+    path = File.join(File.dirname(OUT), 'ENGINEtests_h8_saved.skp')
+    ok('H8 krok 1b: SKP save_copy', model.save_copy(path))
+    loaded = model.definitions.load(path)
+    view = Object.new
+    view.define_singleton_method(:entities) { loaded.entities }
+    view.define_singleton_method(:method_missing) { |name, *args, &blk| model.send(name, *args, &blk) }
+    view.define_singleton_method(:respond_to_missing?) { |name, priv = false| model.respond_to?(name, priv) }
+    cov, vals = h8_coverage(view)
+    issues = Array(e::Bom.collect(view)[:std_issues])
+    info("H8 krok 1b: pokrytie nacitaneho suboru — skrinky #{cov[:cabinets]}, dosky #{cov[:boards]}, " \
+         "vnorene vyrobne dielce #{cov[:nested]}, samostatne dielce #{cov[:standalone]}; znacky #{vals.sort.to_h.inspect}")
+    ok('H8 krok 1b: nacitany subor ma VSETKY druhy kusov (skrinka, vnorene dielce, doska, samostatny dielec)',
+       cov.values.all?(&:positive?))
+    ok("H8 krok 1b: po save/load su vsetky znacky Integer 1 a zber nehlasi nic (#{issues.length})",
+       vals.keys == ['1:Integer'] && issues.empty?)
+    if det&.valid?
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST H8 upratanie 1b', true)
+        det.erase!
+        model.commit_operation
+      end
+    end
+  rescue StandardError => ex
+    log_line("FAIL: H8 krok 1b vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
+  def run_h8(model)
+    cleanup(model)
+    cab = e::CabinetBuilder.build(model, H8_CAB.dup)
+    board = e::BoardBuilder.build(model, { 'material_id' => 'K009_PW_DTDL_18', 'length' => 700.0, 'width' => 400.0 })
+    return ok('H8: fixtura (skrinka + doska)', false) unless cab && board
+
+    cid = e::Store.get(cab, 'cabinet_id').to_s
+    base = e::Bom.collect(model)
+    rows0 = h8_rows(model)
+    ok("H8: cerstvo postavena skrinka a doska nemaju nalez znacky (#{Array(base[:std_issues]).length})",
+       base[:std_issues] == [])
+    parts = cab.definition.entities.grep(Sketchup::ComponentInstance).select do |pi|
+      e::Store.kind(pi) == 'part' && e::Store.get(pi, 'manufactured') == true &&
+        e::Store.get(pi, 'production_class').to_s == 'sheet'
+    end
+    ok("H8: skrinka ma vyrobne dielce (#{parts.length})", parts.length >= 3)
+    h8_saved_roundtrip(model, cab)
+
+    # 2) vnoreny dielec so znackou 2 -> JEDEN zaznam `newer` pre skrinku; Spat nic.
+    r2 = h8_probe(model, 'std 2') do
+      parts.first.set_attribute(e::Store::DICT, 'std', 2)
+      col = e::Bom.collect(model)
+      items = h8_items(col)
+      { iss: col[:std_issues], rows: h8_rows(model), items: items,
+        pids: items.first ? e::ProductionCore.pids_for_problem(model, items.first) : nil }
+    end
+    iss = Array(r2[:iss])
+    ok("H8 krok 2: dielec so znackou 2 = jeden zaznam newer pre skrinku #{cid} (#{iss.inspect[0, 200]})",
+       iss.length == 1 && iss[0]['kind'] == 'cabinet' && iss[0]['id'] == cid && iss[0]['state'] == 'newer' &&
+       iss[0]['count'] == 1 && iss[0]['total'] == parts.length + 1 && iss[0]['std'] == 2)
+    ok('H8 krok 2: kusovnik pri inej znacke BAJTOVO rovnaky', r2[:rows] == rows0)
+    it = r2[:items].first
+    ok("H8 krok 4: Kontrola ma ORANGE std_version (#{it && it['message_sk']})",
+       r2[:items].length == 1 && it['severity'] == 'orange' && it['owner_id'] == cid &&
+       it['message_sk'].include?('je z novšej verzie štandardu Noxun (značka 2, tento plugin pozná 1)'))
+    ok("H8 krok 4: klik na nalez oznaci skrinku (#{r2[:pids].inspect})", r2[:pids] == [cab.persistent_id])
+    after2 = e::Bom.collect(model)[:std_issues]
+    ok("H8 krok 2: po zruseni operacie znova ziadny nalez (#{after2.length}), znacka #{e::Store.get(parts.first, 'std').inspect}",
+       after2 == [] && e::Store.get(parts.first, 'std') == 1)
+
+    # 3) doska BEZ znacky -> `legacy`; Spat nic.
+    r3 = h8_probe(model, 'doska bez std') do
+      board.delete_attribute(e::Store::DICT, 'std')
+      col = e::Bom.collect(model)
+      items = h8_items(col)
+      { iss: col[:std_issues], rows: h8_rows(model), items: items,
+        pids: items.first ? e::ProductionCore.pids_for_problem(model, items.first) : nil }
+    end
+    iss3 = Array(r3[:iss])
+    ok("H8 krok 3: doska bez znacky = legacy (#{iss3.inspect[0, 200]})",
+       iss3.length == 1 && iss3[0]['kind'] == 'board' && iss3[0]['state'] == 'legacy' &&
+       iss3[0]['owner_pid'] == board.persistent_id)
+    ok('H8 krok 3: kusovnik bez zmeny', r3[:rows] == rows0)
+    ok("H8 krok 4: klik na nalez dosky oznaci tu dosku (#{r3[:pids].inspect})", r3[:pids] == [board.persistent_id])
+    ok('H8 krok 3: po zruseni operacie doska znacku zase ma a nalez zmizol',
+       e::Store.get(board, 'std') == 1 && e::Bom.collect(model)[:std_issues] == [])
+
+    # Samostatny dielec (kopia vnoreneho na koreni) so znackou 2 -> klik len na neho.
+    det = d134_detach(model, cab)
+    if det
+      r5 = h8_probe(model, 'samostatny dielec std 2') do
+        det.set_attribute(e::Store::DICT, 'std', 2)
+        col = e::Bom.collect(model)
+        items = h8_items(col)
+        { iss: col[:std_issues], items: items,
+          pids: items.first ? e::ProductionCore.pids_for_problem(model, items.first) : nil }
+      end
+      iss5 = Array(r5[:iss])
+      ok("H8: samostatny dielec so znackou 2 = zaznam part s PID (#{iss5.inspect[0, 200]})",
+         iss5.length == 1 && iss5[0]['kind'] == 'part' && iss5[0]['pid'] == det.persistent_id &&
+         iss5[0]['id'] == cid)
+      ok("H8: klik oznaci PRESNE samostatny dielec, nie skrinku (#{r5[:pids].inspect})",
+         r5[:pids] == [det.persistent_id])
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST H8 upratanie', true)
+        det.erase! if det.valid?
+        model.commit_operation
+      end
+    else
+      ok('H8: fixtura samostatneho dielca', false)
+    end
+    cleanup(model)
+  rescue StandardError => ex
+    log_line("FAIL: H8 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
   # --- DOCKEY (1d/R-02b, review #267 P1-1 + delty P2-N1/P2-GLM/P2-1) --------
   # Identita dokumentu v REALNOM SketchUpe — to, co headless sada nad stubom
   # dokazat nevie:
@@ -27875,6 +28078,9 @@ module NoxunSuRunner
       return
     end
     log_line("INFO: verzia pluginu #{Noxun::Engine::VERSION}, model '#{File.basename(model.path.to_s)}'")
+    # H8 (audit A3): znacka `std` nad ULOZENYM modelom — MUSI bezat PRED cistym
+    # stolom, inak by kontrolovala prazdny model a presla naprazdno.
+    run_h8_saved(model)
     cleanup(model) # cisty stol (zvysky z predoslych behov)
     normalize_tags(model) # D-27: a definovana viditelnost tagov dielcov
     # Opakovany beh v TOM ISTOM okne (MCP replay): predosly beh mohol cez
@@ -27905,6 +28111,7 @@ module NoxunSuRunner
     run_r03(model)           # R-03: sev prepare_insert/commit_insert — ciste pripravenie, vlastny rigidny transform, odmietnutia, edit kontext
     run_r12(model)           # 1d/R-12: dopredny guard configu — marker, odmietnuta prestavba bez mutacie a bez kroku Spat, kopia/sablony, citanie dalej bezi
     run_r14(model)           # 1d/R-14: verzia formatu dat rozpoctu — marker v TEJ ISTEJ operacii (1x Spat vrati oboje), odmietnutie novsej zakazky bez zapisu a bez kroku Spat, citanie a priznak v payloade
+    run_h8(model)            # H8/R-13: znacka verzie standardu — dielec so std 2 / doska bez std / samostatny dielec = jeden ORANGE na kus, klik presne na neho, kusovnik bajtovo rovnaky, zrusena operacia nic nenecha
     run_dockey(model)        # 1d/R-02b: identita dokumentu — `valid?` probe, rotacia pri onOpenModel nad RECYKLOVANYM objektom, onActivateModel nerotuje, fail-closed
     run_ghost(model)         # GHOST V1-04: vkladanie na klik — 0 mutacii pred klikom, zamok/free vyska, rotacia a kotvy, degenerovany luc, undo/prepnutie/druhe „Vlozit", sablona a peciatka
     run_d123(model)          # D-123: skrinka s nohami/soklom stoji na ploche aj bez zamku Z

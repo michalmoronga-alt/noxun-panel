@@ -17,6 +17,21 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H8 · kus z inej verzie štandardu (1.10.2026, PR #441, v0.17.6, blok 9 · HARDENING PO V1, register R-13; package
+  [PACKAGE_H8.md](../zdroje/bloky/HARDENING/PACKAGE_H8.md), audit návrhu 0 BLOCKER · 4 FIX · 3 NOTE [AUDIT_H8_raw.md](../zdroje/bloky/HARDENING/AUDIT_H8_raw.md)).**
+  Značka verzie štandardu `NOXUN/std` sa od v0.1.0 píše na 9 miestach, ale nikde nečítala (STANDARD §0 sľuboval „označí na revíziu"). Teraz: `Store.read_std`/`std_state_of`
+  (5 stavov aktuálny · chýba · starší · novší · neplatný; prísne len `Integer >= 1`, sentinel, výnimka pri čítaní = neplatný bez pádu zberu) → `Bom.collect` aditívny kľúč
+  **`std_issues`** v tom istom prechode (jeden záznam na skrinku = korpus + výrobné dielce, dosku pred filtrom `manufactured`, samostatný dielec aj bez `cabinet_id`; RED
+  `newer_config` má prednosť) → **ORANGE `std_version`** v Kontrole (veta podľa stavu, pri zmiešaných stavoch rozpis „1 z novšej verzie, 2 bez značky", rada podľa
+  najzávažnejšieho; bez exportnej brány, bez tlačidla — Q1/Q2 bez odpovede, platí návrh) → klik označí presne ten kus (`pids_for_problem`: `pid` / `owner_pid`).
+  Kusovník, VEPO, nákup, rozpočet ani ponuka sa nemenia. STANDARD §0, §2.1 (odsek „Čítanie `std`" s priznaným limitom dedup kópie), §10; F3 (guard novšej značky pri
+  prestavbe aj dedup) do zásobníka Po V1. **Krok 0:** H3a zmenila len zobrazenie semaforu (`counts` a zelené číslo bez zmeny) → R3.5 platí. **Audit A1** splnený
+  **headless** — skutočný `Bom.collect` nad fake modelom (stub `Bom::Sketchup` len na čas zberu): rôzne značky menia **len** `std_issues`, všetky ostatné kľúče hlboko
+  zhodné, `Bom.compute` aj VEPO CSV bajtovo rovnaké. **Testy:** 5004 headless · 149 JS sád + encoding guard; nová `test_h8_std_citanie.rb` (15 testov); **mutácie 17/17
+  zabité** (M5, M7, M12 a M16 „`next` pred `records <<`" padajú na výsledku zberu). **In-SU (DoD brána, audit A3):** krok 1 pred `cleanup` nad uloženým ENGINEtests.skp —
+  4 skrinky + 45 vnorených výrobných dielcov, všetky značky `Integer 1`, 0 nálezov; krok 1b (doska a samostatný dielec cez `save_copy` + `definitions.load`): 1 skrinka, 1 doska, 5 vnorených, 1 samostatný dielec, všetko `Integer 1`, 0 nálezov;
+  kroky 2–4 (dielec so značkou 2, doska bez značky, samostatný dielec — jeden ORANGE, klik na kus, kusovník bajtovo rovnaký, zrušená operácia nič nenechá) PASS;
+  celý beh **3302 PASS / 0 FAIL** na hlave `d4e87870` (prvý beh bez kroku 1b 3299 / 0 na `38675bda`). STAV pred dávkou: v0.17.5 · H5 hotová · Robí sa H6/H7 (mockupy) · Ďalší krok H6/H7, potom H8–H10.
 - **H5b · UI_DIZAJN ako norma + zastarané vety (1.10.2026, PR #440, v0.17.5 — dokumentácia a komentáre v kóde pluginu, bez zmeny správania; blok 9 · HARDENING PO V1, položky
   triedenia B-05 a zvyšok B-03, krížový audit CS-06, CN-08, CN-09; brief [BRIEF_H5.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H5.md)) — dávka H5 hotová.**
   `docs/UI_DIZAJN.md` miešal normu s denníkom dávok (21 riadkov s historickými značkami — verzie, `PR B1`, `review #249`, zaniknuté okná a premostenia).

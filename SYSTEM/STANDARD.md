@@ -17,7 +17,12 @@ Tento štandard je ten kontrakt. Všetky moduly nového systému (generátor kor
 
 **Čo je záväzné.** Sekcie 1–11 sú kontrakt: dátový model, identita, jednotky, hierarchia, výrobné triedy. Kto ich poruší, rozbije interoperabilitu modulov. Sekcia 12 „Otvorené body" sú veci zámerne nechané na prototyp/V1 — tie sa NErozhodujú od stola, overia sa v SketchUpe cez SkAgent na reálnych dielcoch.
 
-**Verzia štandardu na komponente.** Každá NOXUN entita nesie `NOXUN/std` = číslo verzie štandardu (v1 = `1`). Keď sa štandard posunie, migračný skript pozná podľa `std`, čo treba dopočítať alebo prepísať. Bez tohto poľa je entita „predštandardová" a systém ju označí na revíziu.
+**Verzia štandardu na komponente.** Každá NOXUN entita nesie `NOXUN/std` = číslo verzie štandardu (v1 = `1`) — verziu **kontraktu dictionary**
+(ktoré kľúče a v akom tvare). Verziu **obsahu configu** nesie samostatne `config_schema` (skrinka `CabinetBuilder::CONFIG_SCHEMA`, doska
+`BoardBuilder::BOARD_CONFIG_SCHEMA`); migrácie a dopredné guardy sa dnes riadia ňou, nie `std`. Bez poľa `std`, so značkou inej verzie alebo
+s poškodenou značkou systém kus **označí na revíziu** = ORANGE nález `std_version` v Kontrole (od H8, čítanie podľa 2.1); nič sa neprepočítava,
+neopravuje ani neblokuje. **Budúce zvýšenie `Store::STD`** musí v tej istej dávke rozhodnúť o starších kusoch — migrácia, alebo vedomé prijatie
+ORANGE nálezov `older` na starých zákazkách, kým sa neprestavia.
 
 ```json
 { "std": 1 }
@@ -84,6 +89,16 @@ Základný layout (ploché kľúče, čítané často):
 | `name` | String | ľudský názov dielca („Bok ľavý") — kusovník a VEPO čítajú názov odtiaľto, nie z `config` |
 | `role_key` | String | kompatibilitný alias `part_key` — buildery korpusu ho zapisujú s rovnakou hodnotou (doska ho nepíše), čítacia cesta ho berie ako fallback pre staršie modely a jeho meno nesie aj legacy UI protokol; kanonická identita je `part_key` |
 | `config` | JSON string | celá konfigurácia entity (rozmery, konštrukcia, zóny, hrany, materiál…) |
+
+**Čítanie `std` (H8, R-13).** Zapisuje sa vždy aktuálna hodnota (`Store::STD`, dnes `1`); číta ju **jedine Kontrola** cez `Store.std_state`. Stavy:
+**aktuálny** (`Integer` = `STD`, bez nálezu) · **chýba** (`legacy` — kľúč nie je; na modeloch Engine nevzniká, zápis je v každom builderi od v0.1.0) ·
+**starší** (`older`, `Integer` 1…`STD`−1 — dnes nedosiahnuteľné) · **novší** (`newer`, `Integer` > `STD` — kus z novšieho pluginu, napr. iné PC) ·
+**neplatný** (`invalid` — čokoľvek iné než `Integer >= 1`: `0`, záporné, `1.0`, `"1"`, uložené `nil`, výnimka pri čítaní; žiadne `.to_i`).
+Kontrolujú sa **skrinky, dosky** (aj nevyrábané) a **výrobné dielce `sheet`** — vnorené v skrinke aj samostatné; zóny, proxy kovania, referencie a nevýrobné
+dielce nie (nejdú do výstupov). Nález je **jeden ORANGE riadok na top-level objekt** (skrinka s počtom kusov a rozpisom stavov, najzávažnejší
+newer > invalid > older > legacy určuje radu), nikdy na každý dielec. Keď má skrinka či doska RED `newer_config` (novší `config_schema`), ORANGE `std_version`
+sa pre ňu nevydá — RED hovorí viac a blokuje. **Priznaný limit:** prestavba kusa a pridelenie nového ID kópii dosky (`BoardBuilder.dedup_copies`) zapíšu
+aktuálnu značku, takže nález zanikne bez toho, aby sa kus skontroloval (guard „novšia značka = odmietnuť prestavbu aj dedup" je v zásobníku, F3).
 
 **`kind: reference` = REFERENČNÁ GEOMETRIA DOMÉNY** (S1-E). Je to vec, ktorú **kupuje zákazník** a my ju v modeli len ukazujeme, aby bolo vidno, čo kam príde —
 dnes **telo spotrebiča** (`role: appliance_body`, slot umývačky; telo chladničky pribudne v S1-F). Vždy nesie `manufactured: false` a `production_class: 'reference'`
@@ -1559,6 +1574,7 @@ Pred odovzdaním systém kontroluje minimálne (GPT debata sekcia 32):
 - nekompatibilné kovanie; nedostatočná hĺbka pre výsuv
 - príliš veľké/malé čelo
 - komponent bez výrobného zaradenia; group s výrobným materiálom; výrobný diel bez materiálu
+- kus s inou, chýbajúcou alebo poškodenou značkou verzie štandardu `std` (ORANGE `std_version`, bez brány — čítanie v 2.1)
 
 **„Nezmestí sa na platňu" (RED `oversize`, od NP-2).** Dielec sa porovnáva s **použiteľnou plochou** platne: formát mínus **orez okraja**
 na každej hrane — bežné platne (DTD, MDF, HDF, iné) áno, **pracovná doska, kompakt a zástena bez orezu** (hrany sú hotové). **Duplák** sa

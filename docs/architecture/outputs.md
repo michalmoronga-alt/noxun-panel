@@ -161,6 +161,15 @@ ju len prevezme; `stable_key` = `back_cut|kód|owner_id|part_key|pid` (dva samos
 (klik označí skrinku) a nesie aditívny **`fix: 'rebuild_stale'`** — riadok Kontroly v Štúdiu pri ňom ponúkne „Prestaviť zastarané skrinky" ([ui-lifecycle.md](ui-lifecycle.md)).
 Chýbajúci kľúč = kontrola sa preskočí (vzor `placements:`).
 
+**H8 (R-13) — kategória `std_version` (ORANGE, bez brány, bez tlačidla).** `check_std_issues(collected[:std_issues], items)` hneď za `check_newer_configs`; chýbajúci
+kľúč = preskok. Riadok `std_version_item`: `owner_id` = ID (pri samostatnom dielci bez `cabinet_id` adresa „bez ID (pid N)"), `owner_pid` pri skrinke a doske, `pid`
+pri samostatnom dielci, `part_key nil`, `stable_key` = `std_version|druh|owner_id|pid` (dve kópie so zhodným ID = dva riadky). Záznam bez ID aj bez PID sa preskočí.
+Veta (`std_version_message`) — jeden stav: „Skrinka CAB-004 (3 z 14 kusov): nemá značku verzie štandardu Noxun — … <rada> Nákup ani výroba sa tým nezastavujú."
+(rozsah len pri skrinke s viac kusmi); viac stavov: „Skrinka CAB-004 — značka verzie štandardu Noxun nesedí pri 3 z 14 kusov (1 z novšej verzie, 2 bez značky). …";
+rada podľa najzávažnejšieho stavu (newer: „aktualizuj plugin", inak „prestavba … značku doplní", pri samostatnom dielci „skontroluj ho ručne"). Ide do Kontroly,
+statusu exportu (`control_suffix`) a sekcie KONTROLA vo VEPO LOGu; **žiadna exportná brána** ho nečíta. Zelené číslo semaforu sa počíta podľa ID (existujúci limit
+`counts` — dve kópie so zhodným ID ubrajú jednu skrinku), samostatný dielec vyradí svoju pôvodnú skrinku (vzor `back_cut`).
+
 ### production_core.rb — zdieľané čisté jadro výstupov zákazky (ŠT-1a PR A)
 
 `do_select` rešpektuje `flush_blocked` po kontrole generácie okna. Nedokončený návrh v Inspectore oznámi cez status pôvodného Štúdia a model ani výber pri tom nečíta/neprepíše.
@@ -174,7 +183,9 @@ Sú tam: **VEPO rodina** (`vepo_settings`/`save_vepo_settings` nad `%APPDATA%\NO
 `vepo_base_label`, `vepo_disambiguate`/`vepo_disambiguate_variants`, `vepo_group_key`, `vepo_edge_thicknesses`, od v0.9.22 aj `vepo_edge_decors`/`vepo_sheet_decors` pre poznámku
 o odlišnej ABS — D-112, detail v odseku `vepo_export.rb`; `default_project_name`), **mapy katalógov** pre `Validation.run`
 (`sheets_map` → `{}` pri chybe, `edges_map` → **`nil`** pri chybe, lebo prázdna mapa by falošne označila každú olepenú hranu), identita dokumentu `model_guid` a **výberové
-resolvery** klik→entita (`pids_for_problem` vrátane fallbacku na vlastníka pri nepostavenom dielci, `pids_for_duplicate` pre D-103, `refs_for` — od ŠT-2d aj vetvy
+resolvery** klik→entita (`pids_for_problem` vrátane fallbacku na vlastníka pri nepostavenom dielci a vlastných vetiev pred všeobecnou: `newer_config` podľa
+`owner_pid`, `back_cut` podľa `pid`, **od H8 `std_version`** — samostatný dielec podľa `pid` [`standalone_part_entity`, nie aj skrinka s tým `cabinet_id`],
+skrinka či doska podľa `owner_pid` [`newer_config_entity`], zmiznutý kus = fail-open na všeobecnú vetvu; `pids_for_duplicate` pre D-103, `refs_for` — od ŠT-2d aj vetvy
 `material_key`/`abs_key` s nepovinným `owner_id`, ktoré hľadajú dielce podľa **efektívneho materiálu z BOM** pre „Kde sa používa"; detail v odseku sekcie MATERIÁLY; **od ŠT-3b-2a
 `pids_for_override`** — oko pri jantárovom riadku sekcie Pravidlá adresuje dvojicou **(owner_id, part_key)** a **znovupoužíva telo `pids_for_problem`** [prázdny kľúč = celý
 korpus]; vetva `rule_ref` v `do_select` je vlastná zámerne — override v kusovníku vlastný riadok mať nemusí, napr. vypnuté kovanie; od ŠT-3b-2b beží **bez `fresh_collect`** — hľadá
@@ -740,6 +751,16 @@ riadok by vždy skončil hláškou „zoznam sa medzitým zmenil". Resolver má 
 Čitatelia: `ProductionCore.export_blockers(newer:)` — hlási „Skrinka CAB-001, Doska BRD-002" (`newer_ids_text`, ten istý strop „tri + a ďalšie N") a **zastaví VEPO, nákupný CSV,
 rozpočet aj ponuku** — a `Validation` (RED `newer_config`, hláška menuje **úplný** zoznam dotknutých výstupov vrátane kusovníka, ktorý je nad takým objektom neúplný, aj keď sa
 ďalej zobrazuje). `compute()` kľúč ignoruje.
+
+**`std_issues` (H8, R-13) — značka verzie štandardu.** Aditívny kľúč, ktorý `compute()` ignoruje a číta ho **jedine** `Validation.run` (ORANGE `std_version`, žiadna
+brána). Skladá ho čistá **`Bom.std_issue(kind, id, owner_pid, ents, pid:, name:, current:)`** — `nil`, keď sú všetky `ents` v stave `:current` (`Store.std_state`),
+inak **jeden záznam na top-level objekt** `{kind, id, owner_pid, pid, name, state, std, count, total, states}`: `state` = najzávažnejší stav (`STD_STATE_ORDER`
+newer > invalid > older > legacy), `std` = najvyššia celočíselná značka medzi newer/older kusmi, `count` = kusy s problémom značky, `total` = počet kontrolovaných
+kusov, `states` = rozpis `{stav => počet}` (veta pri zmiešaných stavoch, audit H8 A4). Zber v **tom istom prechode**: **skrinka** = korpus + vnorené dielce, ktoré
+prešli existujúcimi filtrami (`kind part`, `manufactured`, `sheet` — `std_ents << pi` hneď za `records << rec`), adresa `newer_address(inst, cid)`; **doska**
+pred filtrom `manufactured` (vzor `newer_configs`); **samostatný dielec** za filtrami, `id` = pôvodné `cabinet_id` (môže byť prázdne — adresu nesie `pid`,
+audit H8 A2), `name`. Pri `newer_config?` skrinky či dosky (`cab_newer`/`brd_newer`) sa `std_issue` nevolá — RED `newer_config` má prednosť. Headless test
+spúšťa **skutočný `collect`** nad fake modelom (`tests/pure/test_h8_std_citanie.rb`, stub `Bom::Sketchup` len na čas zberu) a overuje, že sa mení **len** `std_issues`.
 
 **S1-E — aditívny kľúč `appliance_slots`.** Pre každý slot umývačky (`ccfg['type'] == 'dishwasher'`) zbiera `appliance_slot_record` v **tom istom prechode**
 z už načítaného `ccfg` záznam `{owner_id, owner_pid, width, height, dw_class, dw_body_height, body_width, class_label}` — žiadny druhý sken modelu (vzor

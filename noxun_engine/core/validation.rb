@@ -156,6 +156,12 @@ module Noxun
       # CELO — a jeho vyroba na tele nezavisi. Je to upozornenie pre cloveka
       # („takto sa to nezmesti"), nie chyba vyrobnych dat.
       CAT_APPLIANCE   = 'appliance'
+      # ORANGE — H8 (R-13): kus nesie INU (alebo ziadnu ci poskodenu) znacku
+      # verzie standardu Noxun `std`, nez pozna tento plugin. ZIADNA exportna
+      # brana a ziadne tlacidlo opravy (rozhodnutie 29.9., variant S): kusovnik,
+      # VEPO, nakup ani ceny sa nemenia — Kontrola len prizna, ze kus treba
+      # skontrolovat. Cita aditivny `collected[:std_issues]` (`Bom.std_issue`).
+      CAT_STD_VERSION = 'std_version'
 
       # Druh top-level kusu, ktory MA KOVANIE. Zdielana konstanta preto, ze
       # „skrinka vs. doska" nie je kozmetika textu: len pri skrinke zliatie
@@ -257,6 +263,8 @@ module Noxun
         check_hardware_issues(collected[:hardware_issues], items,
                               collected[:hardware_overrides])
         check_newer_configs(collected[:newer_configs], items)
+        # H8 (R-13): chybajuci kluc = kontrola sa preskoci (vzor `placements:`).
+        check_std_issues(collected[:std_issues], items)
         check_cut_issues(collected[:cut_issues], items)
         check_hardware_manual(collected[:hardware_manual], items)
         # S1-E: udaje slotu chodia TOU ISTOU cestou ako vsetko ostatne —
@@ -1121,6 +1129,111 @@ module Noxun
                                      'cenová ponuka); aktualizuj plugin.',
                      'stable_key' => "#{CAT_NEWER_CFG}|#{id}" }
         end
+      end
+
+      # --- H8 (R-13): kus z inej verzie standardu Noxun ------------------------
+      #
+      # Aditivny kluc zberu `std_issues` (`Bom.std_issue` — jeden zaznam na
+      # top-level skrinku, dosku alebo samostatny dielec); nil / chybajuci =
+      # kontrola sa preskoci (vzor `placements:`). ORANGE bez brany: Kontrola,
+      # status exportu a sekcia KONTROLA vo VEPO LOGu — nic viac.
+      # `stable_key` nesie PID (vzor `back_cut`): dve kopie so zhodnym ID su
+      # dva riadky. Zaznam bez ID aj bez PID nema adresu, preskoci sa.
+      STD_STATE_PHRASE = { 'newer' => 'z novšej verzie', 'invalid' => 's poškodenou značkou',
+                           'older' => 'zo staršej verzie', 'legacy' => 'bez značky' }.freeze
+
+      def check_std_issues(issues, items)
+        Array(issues).each do |iss|
+          next unless iss.is_a?(Hash)
+
+          it = std_version_item(iss)
+          items << it if it
+        end
+      end
+
+      def std_version_item(iss)
+        kind = iss['kind'].to_s
+        kind = KIND_CABINET unless %w[cabinet board part].include?(kind)
+        part = kind == 'part'
+        id = iss['id'].to_s.strip
+        pid = std_pid(iss['pid'])
+        opid = std_pid(iss['owner_pid'])
+        addr_pid = part ? pid : opid
+        return nil if id.empty? && addr_pid.nil?
+
+        # Audit H8 A2: samostatny dielec bez povodneho `cabinet_id` sa NESTRATI —
+        # adresu nesie PID; veta potom netvrdi neznamu prislusnost ku skrinke.
+        oid = id.empty? ? "bez ID (pid #{addr_pid})" : id
+        msg = std_version_message(iss, kind, oid, owner_known: !id.empty?)
+        { 'severity' => ORANGE, 'category' => CAT_STD_VERSION,
+          'owner_id' => oid, 'owner_pid' => (part ? nil : opid), 'pid' => (part ? pid : nil),
+          'part_key' => nil, 'hw_key' => nil, 'message_sk' => msg,
+          'stable_key' => [CAT_STD_VERSION, kind, oid, addr_pid.to_s].join('|') }
+      end
+
+      def std_pid(v)
+        v.is_a?(Integer) && v.positive? ? v : nil
+      end
+
+      # Veta nalezu (server je jedina autorita, JS ju len zobrazi):
+      #   jeden stav:   „<Subjekt>[ (N z M kusov)]: <veta stavu> <rada> Nákup ani …"
+      #   viac stavov:  „<Subjekt> — značka … nesedí pri N z M kusov (rozpis). <rada> …"
+      # Rada sa riadi NAJZAVAZNEJSIM stavom (audit H8 A4).
+      def std_version_message(iss, kind, oid, owner_known:)
+        order = defined?(Bom) ? Bom::STD_STATE_ORDER : %w[newer invalid older legacy]
+        raw_states = iss['states'].is_a?(Hash) ? iss['states'] : {}
+        states = order.each_with_object({}) do |s, h|
+          n = raw_states[s]
+          h[s] = n if n.is_a?(Integer) && n.positive?
+        end
+        state = order.include?(iss['state'].to_s) ? iss['state'].to_s : (states.keys.first || 'invalid')
+        count = iss['count'].is_a?(Integer) ? iss['count'] : states.values.sum
+        total = iss['total'].is_a?(Integer) ? iss['total'] : 0
+        subject = std_subject(kind, oid, iss['name'].to_s.strip, owner_known)
+        tail = "#{std_advice(kind, state)} Nákup ani výroba sa tým nezastavujú."
+        if states.length > 1
+          split = states.map { |s, n| "#{n} #{STD_STATE_PHRASE[s]}" }.join(', ')
+          return "#{subject} — značka verzie štandardu Noxun nesedí pri #{count} z #{total} kusov " \
+                 "(#{split}). #{tail}"
+        end
+
+        scope = kind == KIND_CABINET && total > 1 ? " (#{count} z #{total} kusov)" : ''
+        "#{subject}#{scope}: #{std_state_sentence(state, iss['std'])} #{tail}"
+      end
+
+      def std_subject(kind, oid, name, owner_known)
+        case kind
+        when 'board' then "Doska #{oid}"
+        when 'part'
+          base = name.empty? ? 'Samostatný dielec' : "Samostatný dielec „#{name}“"
+          if owner_known then "#{base} (zo skrinky #{oid})"
+          elsif name.empty? then "#{base} #{oid}"
+          else base
+          end
+        else "Skrinka #{oid}"
+        end
+      end
+
+      def std_state_sentence(state, std)
+        cur = Store::STD
+        mark = std.is_a?(Integer) ? "značka #{std}, " : ''
+        case state
+        when 'newer' then "je z novšej verzie štandardu Noxun (#{mark}tento plugin pozná #{cur})."
+        when 'older' then "je zo staršej verzie štandardu Noxun (#{mark}aktuálna #{cur})."
+        when 'legacy'
+          'nemá značku verzie štandardu Noxun — kus vznikol mimo tohto pluginu alebo bol ručne upravený.'
+        else 'má poškodenú značku verzie štandardu Noxun.'
+        end
+      end
+
+      def std_advice(kind, state)
+        part = kind == 'part'
+        if state == 'newer'
+          return part ? 'Plugin ho číta podľa svojej verzie — aktualizuj plugin, kým s ním budeš ďalej pracovať.'
+                      : 'Plugin ju číta podľa svojej verzie — aktualizuj plugin, kým s ňou budeš ďalej pracovať.'
+        end
+        part ? 'Skontroluj ho ručne — prestavba ho nezasiahne.'
+             : 'Skontroluj rozmery a materiál; prestavba (zmeň a vráť rozmer v Inspectore) značku doplní.'
       end
 
       # --- D-143 (KON-0): chrbat v drazke / rozmer do narezu -----------------
