@@ -26,14 +26,18 @@
   predvoľby a polia, kód buildera, statické HTML, seed šablóny, vety `TYPE_SCOPE_PHRASES`, `OWNER_MATRIX`, seed kovania a slovo „Spodná" v auto názve.
   **Pasca závesov CN-03** je v scenári 1 ako výslovné upozornenie; guard (T3c z `test_h12a_register.rb` presunutý a rozšírený) vyžaduje, aby každý
   visiaci typ registra bol v `cabinet_type` pravidla `zavesenie-hornej-skrinky` alebo vo výnimkách s dôvodom a aby pravidlo neplatilo na typ, ktorý
-  nevisí. **STANDARD §13** = jediná tabuľka verzií dát (32 aktuálnych + 13 pevných prahov a značiek obsahu; stĺpec „Schéma" podľa CLAUDE.md, seed
+  nevisí. **STANDARD §13** = jediná tabuľka verzií dát (32 aktuálnych, 13 pevných prahov a značiek obsahu a 16 nemenných krokov histórie schém katalógov; stĺpec „Schéma" podľa CLAUDE.md, seed
   = výrobná dávka); STAV „Kompatibilita", §2.5, mapa a odseky `cabinet_types`/`hardware_rules` na ňu len odkazujú, história ostáva v komentároch
   `HISTORIA`, §2.5, §7.5 a tu. Nový `tests/pure/test_h13_rozsirovacie_body.rb`: každý riadok mapy = existujúci súbor a mená v ňom, hodnoty §13 =
   konštanty v kóde, **každá** číselná konštanta verzie v `noxun_engine/` je v tabuľke (kroky `SCHEMA_*` modulu so `SCHEMA_CURRENT` sú výnimka —
   `SCHEMA_CURRENT` musí ukazovať na najvyšší krok), pasca závesov; všetky tri guardy majú negatívne testy a mutácie nad kópiou reálnych dát (schéma 23
   bez tabuľky, nová konštanta, krok materiálov bez `SCHEMA_CURRENT`, premenovaný register v mape aj v kóde, visiaci typ bez seedu) padajú.
   CLAUDE.md sa nemení (odkaz na §13 doplní orchestrátor alebo Michal). H12d musí prepísať riadky mien rolí v scenári 2 (inak guard mapy padne).
-  Testy: **5146 headless · 153 JS sád** zelené + encoding guard; in-SU netreba (plugin bez zmeny).
+  **Review PR #449 kolo 1 (5× P2, opravy pôvodným implementátorom):** `Modul::ČLEN` v mape sa overuje ako **deklarácia v tele svojho modulu**
+  (`TemplateStore::STD` vs `TemplateUsage::STD`; holé meno v súbore s viacerými modulmi = chyba) · BuildPlan `SCHEMA` len pri novej role alebo
+  zmene významu či povinného poľa (aditívne voliteľné pole bez bumpu, kontrakt `build_plan.rb`) · scenár sekcie Štúdia s `SEC_META`, `renderHead`,
+  `renderTools`, `renderBody` a vetvami Nastavení · STAV „Kompatibilita" bez čísel schém + guard · kroky `SCHEMA_*` presnými hodnotami (§13.3).
+  Testy: **5148 headless · 153 JS sád** zelené + encoding guard; in-SU netreba (plugin bez zmeny).
 
 - **H12c · JS Inspectora a Štúdia číta typy skriniek zo servera (1.10.2026, PR #448, v0.17.13, blok 9 · HARDENING PO V1, triedenie C-01; package
   [PACKAGE_H12.md](../zdroje/bloky/HARDENING/PACKAGE_H12.md) časť H12c, §15 A1 a A6).**
