@@ -63,7 +63,9 @@ a [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md) — **len Gre
   (záznam každej dávky), [ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md) (plné
   texty hotových blokov a etáp), [DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md)
   (index + plné texty vyriešených D-čísel), [UI_LIFECYCLE_historia_do_v0.17.md](archiv/UI_LIFECYCLE_historia_do_v0.17.md)
-  (plné znenie mapy okien `docs/architecture/ui-lifecycle.md` s priebehom dávok do v0.17.4), staršie analýzy a vízie. V archíve sa
+  (plné znenie mapy okien `docs/architecture/ui-lifecycle.md` s priebehom dávok do v0.17.4),
+  [UI_DIZAJN_dennik_do_v0.17.md](archiv/UI_DIZAJN_dennik_do_v0.17.md) (plné znenie `docs/UI_DIZAJN.md` s denníkom dávok do v0.17.4),
+  staršie analýzy a vízie. V archíve sa
   **existujúce záznamy neprepisujú** — pribúdať však pribúda priebežne, presne ako káže
   checklist uzáveru v CLAUDE.md: záznam dávky navrch KRONIKY, vyriešené D-číslo navrch
   indexu v DOGFOODING_vyriesene.md, hotový blok plným textom do ROADMAP_hotove_etapy.md

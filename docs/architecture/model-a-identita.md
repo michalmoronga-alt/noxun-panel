@@ -151,16 +151,20 @@ parser inde by sa časom rozišiel; jediný čitateľ je zatiaľ deep-link „kl
 **ZÁVÄZNÝ kontrakt plánu** (SCHEMA 7 — posledný bump ROH-A1 · K3: päť rolí rohovej zostavy; MIN_DIM, validátor, `warnings[]`, hardware string-keyed s GENERIC_TYPES/limitmi/referenčnou integritou ownera). Geometria, kusovník aj VEPO
 čítajú TEN ISTÝ plán.
 
-**`SCHEMA` 6 → 7 (ROH-A1 · K3, v0.14.1): ROHOVÁ ZOSTAVA.** `ROLES` dostali `corner_blind_panel` · `hinge_rail` · `corner_rail` (korpus) a `cr_front` · `cr_side`
-(čelový materiál). Precedens schém 4 a 6: plán, ktorý môže niesť rolu neznámu staršiemu pluginu, už nie je plánom schémy 6. Kľúče `cabinet/corner_panel`,
-`cabinet/hinge_rail`, `cabinet/corner_rail`, `cabinet/cr:1`, `cabinet/cr:2` prijíma existujúce `cabinet/` pravidlo (`PartKeys::SCHEMA` sa nebumpuje); CR 2 a rohová
-výstuha majú **záporný origin Y** (pred korpusom), čo `validate_part!` pripúšťa. Kompatibilitu typu drží `CONFIG_SCHEMA` 22 ([construction.md](construction.md)).
+**História čísla `SCHEMA`** (vzostupne; aktuálna hodnota je v prvej vete odseku — zdroj pravdy `BuildPlan::SCHEMA` v `build_plan.rb`):
 
 **`GENERIC_TYPES` + `lift` a `SCHEMA` 2 → 3 (KOV-B1, v0.9.19).** Slovník typov kovania dostal `lift` (výklopy a sklopy) — presunuté z KOV-E podľa auditu #17 BLOCKER 2, lebo
 kanonická mapa `use_type → generic_type` v `hardware_sets.rb` ho potrebuje UŽ TERAZ (inak sa výklopový set nedá uložiť). PRAVIDLÁ ani seed mapovanie k nemu zatiaľ NIE SÚ — tie
 prinesie KOV-E; slovník je tu preto, aby už nebol potrebný ďalší bump kontraktu. Rozšírenie je pre STARŠÍ plugin neznámy typ, ktorý jeho `guard_unknown_hardware!` odmietne, takže
 plán, ktorý ho môže niesť, už nie je plánom schémy 2 — odtiaľ bump. Slovenský názov („Výklop / sklop") žije v troch mapách naraz (`HardwareRules.label_for`,
 `Validation::HW_LABELS`, `ui/js/rules.js`) a paritu stráži guard, ktorý iteruje `GENERIC_TYPES` — nie opísaný zoznam.
+
+**`SCHEMA` 3 → 4 (KOV-C2b, v0.9.31): DIELCE ZÁSUVIEK.** `ROLES` dostali `drawer_bottom` · `drawer_back` · `box_side` · `drawer_inner_front` (zhodné s `Recipes::ROLE_*`
+aj `CabinetBuilder::DRAWER_ROLES` — väzbu drží guard test), materiálový signál dielca pozná **`:drawer`** (4. kanál) a `HW_SOURCES` má **`recipe`**. Položka výsuvu z receptu
+smie navyše niesť voliteľné **`locked: true`** — a to VÝHRADNE pri `source: 'recipe'` a len keď existuje platný NL zámok (Astra #19 N11: inak by každá zásuvka hlásila „ručne
+prepísané"). Plán má aditívny kľúč **`drawer_conflicts`** (fail-closed dôvody; validuje `validate_drawer_conflicts!` proti registru `Recipes::DRAWER_BLOCKERS`) a dva
+zápisové kanály pre builder — `drawer_writes` a `drawer_override_writes`. Rozšírenie je pre STARŠÍ plugin neznáma rola aj neznámy `source`, takže plán, ktorý ich môže niesť,
+už nie je plánom schémy 3 — odtiaľ bump.
 
 **`GENERIC_TYPES` + `plinth_clip` a `SCHEMA` 4 → 5 (KOV-G1a, v0.9.58).** Slovník typov kovania dostal **`plinth_clip`** — príchyt soklovej lišty (Häfele AXILO 637.38.054,
 rozhodnutie Michal 9.9.2026: drží samostatnú soklovú lištu na nohách, 1 ks na začaté 4 nohy). PRAVIDLO k nemu prinesie až **KOV-G1b**; tu je slovník, seed set
@@ -170,16 +174,14 @@ troch mapách naraz (`HardwareRules.label_for`, `Validation::HW_LABELS`, `ui/js/
 **`CONFIG_SCHEMA` sa NEBUMPUJE** — bez pravidla položka `plinth_clip` nevzniká, do configu skrinky sa teda nemá ako dostať; downgrade knižnice a snapshotu zastavia existujúce
 brány (`normalize_sets` set neznámeho typu zahodí a detektor straty to prizná).
 
-**`SCHEMA` 3 → 4 (KOV-C2b, v0.9.31): DIELCE ZÁSUVIEK.** `ROLES` dostali `drawer_bottom` · `drawer_back` · `box_side` · `drawer_inner_front` (zhodné s `Recipes::ROLE_*`
-aj `CabinetBuilder::DRAWER_ROLES` — väzbu drží guard test), materiálový signál dielca pozná **`:drawer`** (4. kanál) a `HW_SOURCES` má **`recipe`**. Položka výsuvu z receptu
-smie navyše niesť voliteľné **`locked: true`** — a to VÝHRADNE pri `source: 'recipe'` a len keď existuje platný NL zámok (Astra #19 N11: inak by každá zásuvka hlásila „ručne
-prepísané"). Plán má aditívny kľúč **`drawer_conflicts`** (fail-closed dôvody; validuje `validate_drawer_conflicts!` proti registru `Recipes::DRAWER_BLOCKERS`) a dva
-zápisové kanály pre builder — `drawer_writes` a `drawer_override_writes`. Rozšírenie je pre STARŠÍ plugin neznáma rola aj neznámy `source`, takže plán, ktorý ich môže niesť,
-už nie je plánom schémy 3 — odtiaľ bump.
-
 **`SCHEMA` 5 → 6 (KON-B · K2, v0.13.3): LIŠTY CHRBTA.** `ROLES` dostali `back_rail_top` · `back_rail_bottom` (kľúče `cabinet/back_rail:top|bottom`, `PartKeys.valid?`
 ich prijíma existujúcim `cabinet/` pravidlom — `PartKeys::SCHEMA` sa nebumpuje). Precedens schémy 4: plán, ktorý môže niesť rolu neznámu staršiemu pluginu, už nie je
 plánom schémy 5. **`BACK_MODES`** (značka pôvodu dielca s rolou `back`) sa **nerozširuje** — lišty ju nenesú; `rails` je hodnota configu, nie značka dielca.
+
+**`SCHEMA` 6 → 7 (ROH-A1 · K3, v0.14.1): ROHOVÁ ZOSTAVA.** `ROLES` dostali `corner_blind_panel` · `hinge_rail` · `corner_rail` (korpus) a `cr_front` · `cr_side`
+(čelový materiál). Precedens schém 4 a 6: plán, ktorý môže niesť rolu neznámu staršiemu pluginu, už nie je plánom schémy 6. Kľúče `cabinet/corner_panel`,
+`cabinet/hinge_rail`, `cabinet/corner_rail`, `cabinet/cr:1`, `cabinet/cr:2` prijíma existujúce `cabinet/` pravidlo (`PartKeys::SCHEMA` sa nebumpuje); CR 2 a rohová
+výstuha majú **záporný origin Y** (pred korpusom), čo `validate_part!` pripúšťa. Kompatibilitu typu drží `CONFIG_SCHEMA` 22 ([construction.md](construction.md)).
 
 **KOV-F1 (v0.9.48): aditívny kľúč plánu `hardware_conflicts`.** `[{owner_part_key, code, message}]` — dôvody, pre ktoré je VYDANÁ položka kovania
 nesprávna (dnes `door_height_out_of_table`: dvierka vyššie než tabuľka závesov). Validuje `BuildPlan.validate_hardware_conflicts!` proti uzavretému
@@ -194,8 +196,8 @@ je v [construction.md](construction.md).
 smie ju niesť len rola `back` (`validate_back_mode!`). `cut_size: {length, width}` je **rozmer do nárezu** v osiach `prod`; prítomné pole musí byť úplné, konečné,
 kladné a **≥ geometrii** (`validate_cut_size!`, tolerancia `CUT_TOL` 0,01 mm) — `box` = `prod` ostáva geometria. Oba kľúče builder prenesie do **výrobného snapshotu
 na entite** (`config.back_mode`, `config.cut_size`; `cut_size` len neolepenému dielcu) a výstupy čítajú rozmer do nárezu výhradne cez `Bom.cut_dims`
-([outputs.md](outputs.md)). Aditívne voliteľné pole → `SCHEMA` ostáva **5** (precedens `references`, `hardware_conflicts`); kompatibilitu so starším pluginom drží
-`CONFIG_SCHEMA` 19 ([construction.md](construction.md)).
+([outputs.md](outputs.md)). Aditívne voliteľné pole → `SCHEMA` sa **nebumpla** (vtedy 5; precedens `references`, `hardware_conflicts`); kompatibilitu so starším
+pluginom drží `CONFIG_SCHEMA` (od D-143 schéma 19, [construction.md](construction.md)).
 
 **`hardware_set_key_type` pozná prefix `class:`** (triedny kľúč mapovania setov, [hardware.md](hardware.md)): vracia z neho prvý segment, takže `class:lift|classic` prestavbu
 neblokuje a `class:sliding|classic` z novšej verzie áno. `parse_hardware_set_key` pre triedny kľúč vracia `nil` — nie je to výber podľa typu ani podľa dielca.
@@ -205,7 +207,7 @@ renderer dielcov (`CabinetBuilder.add_part`) zapisuje na entitu `kind: 'part'`, 
 Deskriptor (symbolové kľúče, mm Float): `ref_key` (unikátny v pláne) · `role` z `REFERENCE_ROLES` · `kind: 'reference'` ·
 `box` [3 × Float > 0] · `origin` [3 × Float] · `production_class: 'reference'` · `manufactured: false` · `source` z `REFERENCE_SOURCES`
 (`generic` | `catalog`) · `label` (ľudský popis do modelu a diagnostiky) · voliteľné `dw_class`, `item_id`, `bands`. Validuje ho `validate_references!`, volané
-z `validate!` len keď kľúč existuje. `SCHEMA` ostáva **5**: plán sa **neperzistuje**
+z `validate!` len keď kľúč existuje. `SCHEMA` sa **nebumpla** (vtedy 5): plán sa **neperzistuje**
 (do configu ide cez `merge_final` len menovitý zoznam kľúčov), takže kompatibilitu vyjadruje `CabinetBuilder::CONFIG_SCHEMA`, nie schéma plánu.
 Kreslí ho `CabinetBuilder.render_references` (viď [construction.md](construction.md)).
 

@@ -354,7 +354,8 @@ debate nad `mockup_ui20.html`.
   šírka 470 + kontextové riadky. Audit DOBROVOĽNE áno (veľký zásah do panel.js, nech Codex
   hľadá diery v lifecycle). In-SU smoke.
 - UI-B2 (M) Náhľad: kontextové projekcie s kótami + pvbar (chipy vrstiev D-27 + Olep + kamera N7).
-- UI-B3 (M) Korpus obsah: Základné 2-stĺpce + info (server dopočty; hmotnosť zatiaľ „—" do fázy 3)
+- UI-B3 (M) Korpus obsah: Základné 2-stĺpce + info (server dopočty; hmotnosť vtedy „—" do fázy 3 — *dnes: od KOV-W
+  ukazuje riadok Hmotnosť kg, viď docs/UI_DIZAJN.md §5.3*)
   + rozmerové rady N6 (config v %APPDATA%) + ikony skupín + šablóna-modal + typ badge + koliesko
   kontext (téma UI prepínač · rady editor · o plugine).
 

@@ -18,7 +18,7 @@ plánovač cfg→BuildPlan (kovanie sa vyhodnocuje po vyradení degenerovaných 
 `back_mode` (`overlay`/`inset`/`groove`) a chrbtu **v drážke** navyše `cut_size: {length: w, width: h − s}` — plný rozmer skrinky od spodku dna po vrch v **tých
 istých osiach ako `prod`** (`length` = X, `width` = Z; horná 600 × 720 → do nárezu **600 × 720**). `box` = `prod` = geometria sa **nemenia** — model ukazuje chrbát
 v drážke 564 × 684 a rovnosť `box`/`prod` stráži `PartFaces`/`AppearanceMapping`. Rozhodnutie Michala 26.9.2026: presne by bolo +9 mm na stranu s drážkou (POJMY),
-pre V1 ide do nárezu plný rozmer a dielňa ho zreže. Prítomné pole validuje `BuildPlan.validate_cut_size!` (konečné, kladné, ≥ geometrii); BuildPlan `SCHEMA` ostáva 5.
+pre V1 ide do nárezu plný rozmer a dielňa ho zreže. Prítomné pole validuje `BuildPlan.validate_cut_size!` (konečné, kladné, ≥ geometrii); BuildPlan `SCHEMA` sa nebumpla (vtedy 5).
 
 **KON-A · K1 (v0.13.2) — KOMÍN VZADU A ZAPUSTENIE STROPU; hĺbka dielcov má DVOCH pomocníkov.** `back_setback(cfg)` (X) a `top_front_setback(cfg)` (Y) čítajú
 konečné číslo > 0 orezané na `SETBACK_MAX` (300), inak 0 (slot vždy 0) — neplatná hodnota nikdy nezhodí stavbu. **`back_stop(cfg)` = zadný doraz `R`** dna, stropu,
@@ -537,7 +537,7 @@ meria `async S6`).
 
 **SLOT UMÝVAČKY (S1-E, typ `dishwasher`) — štvrtá vetva buildera vedľa dolnej, hornej a dosky.** Slot **nie je korpus**: nemá boky, dno, strop, chrbát ani zóny.
 Vyrába **jediný dielec — ČELO** (cez modul čiel ako jeden pevný item typu `blind`, teda rola `false_front`) a **telo spotrebiča kreslí ako REFERENCIU**, nie ako dielec.
-`TYPES` je **jediný zoznam typov** (`lower upper dishwasher`) a JS ho zrkadlí v `core.js` (`CAB_TYPES`) aj v `insert_state.js` (`INSERT_TYPES` + `board`); zhodu stráži guard test.
+`TYPES` je **jediný zoznam typov** (`lower upper dishwasher corner_blind`; rohová viď ROH-A1 vyššie) a JS ho zrkadlí v `core.js` (`CAB_TYPES`) aj v `insert_state.js` (`INSERT_TYPES` + `board`); zhodu stráži guard test.
 
 **Polia slotu** (`DW_KEYS`, uzavretý whitelist uložených polí): `dw_class` (600 | 450), `dw_body_height`, `dw_front_bottom` = spodná hrana **čela** od podlahy,
 `dw_front_height`. **D-139: vstupmi sú len trieda, telo a sokel (`DW_INPUT_KEYS`)** — `dw_front_height` je **ODVODENÉ** (`dw_front_eval`: výška linky − sokel −
@@ -968,7 +968,7 @@ police v zónach: rovnomerné rozloženie v svetlej výške (`n` políc ⇒ `n+1
 
 ČELÁ-A (D-119, v0.10.6): `gap_left`/`gap_right` sú samostatné okraje celej skrinky. Normalizácia pre každú chýbajúcu stranu preberá legacy `gap_sides` (inak 2 mm),
 prítomná nula vyhráva; nový zápis starý kľúč vynecháva. Otvor je `width − gap_left − gap_right`, prvý panel začína na `gap_left`. Každá strana má vlastnú kontrolu
-konečného čísla a limitu ±100/±2000. Korpusové kotvy a krok kópie sa nemenia. `CONFIG_SCHEMA` 12 chráni asymetriu pred starším pluginom; BuildPlan ostáva 5.
+konečného čísla a limitu ±100/±2000. Korpusové kotvy a krok kópie sa nemenia. `CONFIG_SCHEMA` 12 chráni asymetriu pred starším pluginom; BuildPlan `SCHEMA` sa nebumpla (vtedy 5).
 
 čelá fixed/auto s lockmi, „bez čela", krídla 1–4. **D-120:** `profile_edge` top/bottom/free na dvierkach, top/bottom/left/right na ostatných paneloch.
 Chýbajúca hrana znamená legacy top, prítomná neplatná hrana odmietne zápis. `free` vyrieši `profile_edges` z `direction_slots`: oproti pántom, dvojkrídlo v strede;

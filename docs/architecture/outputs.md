@@ -635,7 +635,9 @@ Zber modelu a agregácia riadkov kusovníka (`Bom.collect`, `Bom.compute`, `Bom.
 platný `cut_size` snapshotu (Hash, konečné kladné čísla ≥ geometrii − `BuildPlan::CUT_TOL`) = **rozmer do nárezu** a záznam navyše nesie `geo_length`/`geo_width` + `cut_size: true`;
 chýbajúce pole = geometria (overlay, staré zákazky); poškodené = geometria + `cut_invalid`. Tým jediným krokom idú do nárezu **kusovník (agregácia aj stĺpce), kontrola
 formátu platne, VEPO, plocha pre rozpočet a ponuku** (`SheetEstimate` číta riadky BOM) — a `cut_size` sa uplatní **pred** otočením podľa dekoru (`VepoExport.oriented`).
-Tú istú `cut_dims` volá plocha skrinky v Inspectore (`Panel.cabinet_stats`) a karta dielca; **hmotnosť ostáva z geometrie** (`weight_totals` dostáva surové snapshoty).
+Tú istú `cut_dims` volá plocha skrinky v Inspectore (`Panel.cabinet_stats`) a karta dielca; **hmotnosť ostáva z geometrie** (`weight_totals` dostáva surové snapshoty — odrezok sa neváži).
+Je to čítanie **po stavbe** (rozmery hotového dielca zo snapshotu, nie rozmer do nárezu). V **pláne** pred materializáciou ide hrúbka do hmotnosti z katalógového
+záznamu, nie z deskriptora ([materials.md](materials.md), KOV-W) — obe vety platia, každá v inom kroku.
 Zber popri tom skladá aditívny kľúč **`cut_issues`** (`compute()` ho ignoruje): `cut_issues_for(cfg, rec, standalone:)` na každom výrobnom zázname (vnorenom, doske aj
 samostatnom dielci) a `back_stale_issue` na skrinke. Kódy a register brány `CUT_BLOCKERS` (poradie = poradie viet): `cut_size_invalid` · `back_groove_edged` (značka
 `groove` + účinná hrana ABS) · `back_groove_incomplete` (značka `groove`, bez ABS, bez `cut_size`) · `back_groove_stale` (skrinka `groove` pod
