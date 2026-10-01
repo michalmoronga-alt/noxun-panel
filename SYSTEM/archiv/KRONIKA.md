@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H12b · panel Ruby z registra typov + payload pre klienta (1.10.2026, PR #?, v0.17.12, blok 9 · HARDENING PO V1, triedenie C-01; package
+- **H12b · panel Ruby z registra typov + payload pre klienta (1.10.2026, PR #447, v0.17.12, blok 9 · HARDENING PO V1, triedenie C-01; package
   [PACKAGE_H12.md](../zdroje/bloky/HARDENING/PACKAGE_H12.md) časť H12b, §15 A2 a A6).**
   Panel Ruby (`ui/panel/actions_cabinet`, `actions_templates`, `actions_zones`, `actions_appliance`, `payloads`, `sync`) a `templates_dialog.rb` sa už nepýtajú
   mena typu (`== 'dishwasher'`, `== CORNER_TYPE`, `%w[lower upper]`), ale vlastností registra `CabinetTypes`: slot = `!carcass?` (preflight, telo/chrbát,
