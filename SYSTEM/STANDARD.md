@@ -1764,8 +1764,8 @@ K týmto sa systém dostane, až keď jadro (štandard → referenčný korpus �
 
 **JEDINÉ miesto s aktuálnymi číslami verzií dát** — ostatné dokumenty (STAV „Kompatibilita", odseky modulov) na túto sekciu len odkazujú.
 Tabuľky stráži `tests/pure/test_h13_rozsirovacie_body.rb`: hodnota v stĺpci **Hodnota** sa musí rovnať konštante v kóde a **každá** číselná
-konštanta verzie v `noxun_engine/` (meno obsahuje `SCHEMA`, `STD`, `SEED` alebo `VERSION`) musí byť v niektorej tabuľke. Výnimka: kroky
-histórie `SCHEMA_*` v module, ktorý má `SCHEMA_CURRENT` (katalóg materiálov a kovania) — test overí, že `SCHEMA_CURRENT` ukazuje na najvyšší krok.
+konštanta verzie v `noxun_engine/` (meno obsahuje `SCHEMA`, `STD`, `SEED` alebo `VERSION`) musí byť v niektorej tabuľke — aj nemenné kroky
+histórie `SCHEMA_*` katalógov (§13.3; test navyše overí, že sú v module jedinečné a `SCHEMA_CURRENT` ukazuje na najvyšší).
 
 **Zmena schémy (CLAUDE.md, audit návrhu):** každé zvýšenie `CONFIG_SCHEMA`, BuildPlan `SCHEMA` alebo akéhokoľvek `STD` — v tabuľke stĺpec
 „Schéma" = **áno**. Seed (`SEED_VERSION`, `SEED_SET_VERSION`) schéma nie je, ale mení predvolené kovanie, ABS alebo ceny, takže taká dávka
@@ -1838,6 +1838,31 @@ nový tvar = nová konštanta a riadok v `STD_SUPPORTED`.
 | sety — výškový variant | `noxun_engine/core/hardware_sets.rb` · `HardwareSets::STD_HEIGHT_VARIANT` | **4** | set s výškovým variantom |
 | sety — preskočenie kódu | `noxun_engine/core/hardware_sets.rb` · `HardwareSets::STD_SKIP_CODE` | **5** | člen so sentinelom „bez kódu" |
 | sety — výklopové tvary | `noxun_engine/core/hardware_sets.rb` · `HardwareSets::STD_LIFT_FORMS` | **6** | tvary členov výklopu (najvyšší marker setov) |
+
+### 13.3 Kroky histórie schém katalógov (nemenné)
+
+Katalóg materiálov a kovania značí schému **lazy podľa obsahu** a kód sa vetví porovnaním s krokom (`schema >= SCHEMA_GROUPS` …) — zmena
+hodnoty kroku by existujúci katalóg prečítala zlou cestou. Kroky sú preto **nemenné**: nový krok = nová konštanta s ďalším číslom
+a `SCHEMA_CURRENT` na ňu (test: hodnoty presne podľa tabuľky, v module žiadne dve rovnaké, `SCHEMA_CURRENT` = najvyšší krok).
+
+| Čo | Kde | Hodnota | Význam |
+|---|---|---|---|
+| materiály — legacy | `noxun_engine/core/materials.rb` · `Materials::SCHEMA_LEGACY` | **1** | skupina = presný text dekoru |
+| materiály — skupiny | `noxun_engine/core/materials.rb` · `Materials::SCHEMA_GROUPS` | **2** | skupinová identita (`group_id`, štruktúra povrchu) |
+| materiály — duplák | `noxun_engine/core/materials.rb` · `Materials::SCHEMA_DUPLAK` | **3** | duplák — variant zdvojený zo zdroja (`source_material_id`) |
+| materiály — zástena | `noxun_engine/core/materials.rb` · `Materials::SCHEMA_ZASTENA` | **4** | zástena — obojstranný dekor (`back_decor`) |
+| materiály — Demos | `noxun_engine/core/materials.rb` · `Materials::SCHEMA_DEMOS` | **5** | cenová väzba Demosu (`demos_url`, `price_checked_at`) |
+| materiály — obrázok | `noxun_engine/core/materials.rb` · `Materials::SCHEMA_IMAGE` | **6** | obrázok dekoru (`image_url`) |
+| materiály — UNI | `noxun_engine/core/materials.rb` · `Materials::SCHEMA_UNI` | **7** | UNI pracovné materiály (`uni`, `uni_role`) |
+| materiály — hrana PD | `noxun_engine/core/materials.rb` · `Materials::SCHEMA_PD_EDGE` | **8** | hranová úprava pracovnej dosky (`pd_edge_subtype`) |
+| materiály — dekor dodávateľa | `noxun_engine/core/materials.rb` · `Materials::SCHEMA_SUPPLIER_DECOR` | **9** | dekor u dodávateľa (`supplier_decor`) |
+| materiály — vzhľad | `noxun_engine/core/materials.rb` · `Materials::SCHEMA_APPEARANCE` | **10** | spoločný vzhľad dosiek a ABS |
+| materiály — odkaz na produkt | `noxun_engine/core/materials.rb` · `Materials::SCHEMA_PRODUCT_URL` | **11** | odkaz na produkt (`product_url`) |
+| materiály — ručné overenie ceny | `noxun_engine/core/materials.rb` · `Materials::SCHEMA_MANUAL_CHECK` | **12** | ručné overenie ceny (`price_check_method`) |
+| kovanie — základ | `noxun_engine/core/hardware_catalog.rb` · `HardwareCatalog::SCHEMA_BASE` | **1** | katalóg bez výrobcov |
+| kovanie — výrobca a rad | `noxun_engine/core/hardware_catalog.rb` · `HardwareCatalog::SCHEMA_CLASSIFIED` | **2** | `manufacturer` / `series` z taxonómie |
+| kovanie — odkaz na produkt | `noxun_engine/core/hardware_catalog.rb` · `HardwareCatalog::SCHEMA_PRODUCT_URL` | **3** | odkaz na produkt |
+| kovanie — ručné overenie ceny | `noxun_engine/core/hardware_catalog.rb` · `HardwareCatalog::SCHEMA_MANUAL_CHECK` | **4** | ručné overenie ceny |
 
 **Mimo tabuliek (nie sú číselné verzie dát):** verzia pluginu `VERSION` (pravidlá v CLAUDE.md, v configu ako `engine_version`), prah podľa verzie
 pluginu `CabinetBuilder::FRONT_VALIDATION_VERSION` a textové identifikátory formátu `HardwareCatalog::STD` / `HardwareTaxonomy::STD`. Config

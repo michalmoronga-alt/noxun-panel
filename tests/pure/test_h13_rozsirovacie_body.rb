@@ -110,7 +110,21 @@ def nx_h13_name_in?(name, src)
   scope = nx_h13_scope(src, segs[-2])
   return src.include?(name) if scope.nil?
 
-  nx_h13_word?(segs[-1], scope)
+  nx_h13_declared?(segs[-1], scope)
+end
+
+# V tele modulu musi byt clen DEKLAROVANY, nie len pouzity (pouzitie `STD`
+# v metode by inak zakrylo zmazanu konstantu): KONSTANTA = `KONST =`, vnoreny
+# modul/trieda = `module X`/`class X`, metoda = `def [self.]meno`.
+def nx_h13_declared?(member, scope)
+  m = Regexp.escape(member)
+  if member.match?(/\A[A-Z][A-Z0-9_]*\z/)
+    scope.match?(/^\s*#{m}\s*=/)
+  elsif member.match?(/\A[A-Z]/)
+    scope.match?(/^\s*(?:module|class)\s+#{m}\b/)
+  else
+    scope.match?(/\bdef\s+(?:self\.)?#{m}(?![\w?!])/)
+  end
 end
 
 # Problemy mapy: cesta neexistuje, riadok bez mien, meno v subore nie je,
@@ -209,6 +223,8 @@ NxTest.test('H13 B-06: Modul::CLEN plati len v rozsahu modulu; hole meno v subor
   gone = two.sub("      STD = 7\n", '')
   NxTest.refute(nx_h13_name_in?('TemplateStore::STD', gone), 'zmazane TemplateStore::STD preslo vdaka TemplateUsage::STD')
   NxTest.refute(nx_h13_name_in?('TemplateUsage.migrate!', two), 'metoda ineho modulu presla')
+  used = two.sub("      STD = 7\n", '').sub('def migrate!; end', "def migrate!; { 'std' => STD }; end")
+  NxTest.refute(nx_h13_name_in?('TemplateStore::STD', used), 'pouzitie STD v metode zakrylo zmazanu konstantu')
   NxTest.assert(nx_h13_name_in?('BuildPlan::ROLES', 'x = e::BuildPlan::ROLES'), 'nedeklarovany modul = doslovny odkaz')
   NxTest.refute(nx_h13_name_in?('BuildPlan::ROLES', 'BuildPlan; ROLES'), 'nedeklarovany modul po castiach nestaci')
   reader = ->(p) { { 'x/t.rb' => two, 'x/g.rb' => gone }[p] }
@@ -333,16 +349,15 @@ def nx_h13_version_rows(section)
   [rows, errs]
 end
 
-# Hodnota konstanty `Modul::KONST` v zdroji: prvy zapis `KONST =` za riadkom
-# `module <posledny segment modulu>`; odkaz na inu konstantu sa dohlada v tom
-# istom module (napr. SCHEMA_CURRENT = SCHEMA_MANUAL_CHECK).
+# Hodnota konstanty `Modul::KONST` v zdroji: prvy zapis `KONST =` v TELE
+# modulu (`nx_h13_scope` — nie v inom module toho isteho suboru); odkaz na
+# inu konstantu sa dohlada v tom istom module (SCHEMA_CURRENT = SCHEMA_X).
 def nx_h13_const_value(src, qualified, depth = 0)
   *mods, name = qualified.split('::')
-  lines = src.lines
-  start = mods.empty? ? 0 : lines.index { |l| l.match?(/\A\s*module #{Regexp.escape(mods.last)}\b/) }
-  return nil if start.nil? || depth > 3
+  body = mods.empty? ? src : nx_h13_scope(src, mods.last)
+  return nil if body.nil? || depth > 3
 
-  lines[start..].each do |l|
+  body.lines.each do |l|
     m = l.match(NX_H13_CONST_LINE)
     next unless m && m[1] == name
 
@@ -372,8 +387,10 @@ def nx_h13_version_consts(files)
   end
 end
 
-# Problemy tabulky: hodnota nesedi, konstanta v kode chyba v tabulke, krok
-# historie mimo SCHEMA_CURRENT. `files` = { cesta => zdroj }.
+# Problemy tabulky: hodnota nesedi, konstanta v kode chyba v tabulke (aj krok
+# historie `SCHEMA_*` — su nemenne a tabulka drzi ich presnu hodnotu, review
+# #449), dva rovnake kroky v module, SCHEMA_CURRENT nie na najvyssom kroku.
+# `files` = { cesta => zdroj }.
 def nx_h13_version_problems(section, files, not_versions = NX_H13_NOT_VERSIONS)
   rows, problems = nx_h13_version_rows(section)
   rows.each do |path, const, value|
@@ -391,9 +408,6 @@ def nx_h13_version_problems(section, files, not_versions = NX_H13_NOT_VERSIONS)
   inventory.each do |path, consts|
     with_current = consts.select { |_, n| n == 'SCHEMA_CURRENT' }.map(&:first)
     consts.each do |mod, name|
-      if name.start_with?('SCHEMA_') && name != 'SCHEMA_CURRENT' && with_current.include?(mod)
-        next
-      end
       next if listed.include?([path, "#{mod}::#{name}"]) || not_versions.key?("#{mod}::#{name}")
 
       problems << "§13: konstanta #{mod}::#{name} (#{path}) nie je v tabulke"
@@ -403,6 +417,8 @@ def nx_h13_version_problems(section, files, not_versions = NX_H13_NOT_VERSIONS)
                     .map { |_, n| nx_h13_const_value(files[path], "#{mod}::#{n}") }
       cur = nx_h13_const_value(files[path], "#{mod}::SCHEMA_CURRENT")
       problems << "§13: #{mod}::SCHEMA_CURRENT = #{cur}, najvyssi krok #{steps.max}" if steps.any? && cur != steps.max
+      dup = steps.group_by(&:itself).select { |_, v| v.length > 1 }.keys
+      problems << "§13: #{mod} ma dva kroky SCHEMA_* s hodnotou #{dup.join(', ')} (kroky su nemenne a jedinecne)" if dup.any?
     end
   end
   problems
@@ -437,8 +453,18 @@ NxTest.test('H13 B-07: guard tabulky verzii chyti staru hodnotu, chybajucu konst
   files = { 'x/foo.rb' => src }
   sec = "## 13. Verzie\n\n| Čo | Kde | Hodnota | Kedy |\n|---|---|---|---|\n" \
         "| a | `x/foo.rb` · `Foo::STD` | **2** | k |\n| b | `x/foo.rb` · `Foo::SCHEMA_CURRENT` | **2** | k |\n" \
-        "| c | `x/foo.rb` · `Bar::STD` | **5** | k |\n| d | `x/foo.rb` · `Bar::SEED_VERSION` | **3** | k |\n"
+        "| c | `x/foo.rb` · `Bar::STD` | **5** | k |\n| d | `x/foo.rb` · `Bar::SEED_VERSION` | **3** | k |\n" \
+        "| e | `x/foo.rb` · `Foo::SCHEMA_A` | **1** | k |\n| f | `x/foo.rb` · `Foo::SCHEMA_B` | **2** | k |\n"
   NxTest.assert_equal([], nx_h13_version_problems(sec, files, {}), 'falosny poplach')
+  # Review #449 P2: kroky historie su nemenne — zmena hodnoty, chybajuci riadok aj duplicita padaju.
+  moved = { 'x/foo.rb' => src.sub('SCHEMA_A = 1', 'SCHEMA_A = 2') }
+  NxTest.assert(nx_h13_version_problems(sec, moved, {}).any? { |p| p.include?('Foo::SCHEMA_A = 2 v kode') }, 'zmeneny krok presiel')
+  NxTest.assert(nx_h13_version_problems(sec.sub('**1** | k |', '**2** | k |'), moved, {}).any? { |p| p.include?('dva kroky') },
+                'duplicitny krok presiel aj s prepisanou tabulkou')
+  NxTest.refute(nx_h13_version_problems(sec.sub(/^\| e .*\n/, ''), files, {}).empty?, 'krok bez riadku presiel')
+  NxTest.assert_equal(5, nx_h13_const_value("module Foo\n  STD = 5\nend\nmodule Bar\n  STD = 7\nend\n", 'Foo::STD'))
+  NxTest.assert_equal(nil, nx_h13_const_value("module Foo\n  X = 1\nend\nmodule Bar\n  STD = 7\nend\n", 'Foo::STD'),
+                    'konstanta ineho modulu nesmie zastupit chybajucu')
   NxTest.assert_equal(5, nx_h13_const_value(src, 'Bar::STD'), 'STD v druhom module tej istej suboru')
   NxTest.assert_equal(2, nx_h13_const_value(src, 'Foo::SCHEMA_CURRENT'), 'odkaz na krok')
   NxTest.refute(nx_h13_version_problems(sec.sub('| **3** |', '| **2** |'), files, {}).empty?, 'stara hodnota presla')
