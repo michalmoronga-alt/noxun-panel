@@ -25,13 +25,14 @@
   kresba, Sokel/Nohy = `!onFloor`, slot = `!carcass`, rohová = `corner`, čelá = `fronts`, otvor = `front_opening`, „Delenie zóny" = `zones: shelves_only`,
   rail Zóny = `zones: none` + `zones_reason`, zámok typu šablóny = `template_lock`, očakávania = `appliance_owner`, rozsahy = `limits`; `CONSTRUCTION_FIELDS`
   `onlyIf:'corner'`. **A1:** nič odvodené sa neskladá pri načítaní skriptu (`NXInsert.insertTypes()` pri volaní), pred registrom platí neutrálny profil = dolná.
-  Štúdio: dlaždica šablóny = `type_word`, veta rozsahu pravidla = mapa `type_scope` (`RD_TYPE_SCOPE`; plní ju len naplnenie formulára a `RD.setTypeScope`,
-  lacné echo nie). HTML statické (D5) + guard. Ruby len komentáre. **Prvý commit = JS golden pred zásahom** (`5d607a9d`, `tests/js/test_h12_golden.js` +
+  Štúdio: dlaždica šablóny = `type_word`, veta rozsahu pravidla = `type_scope` ako **pole po riadkoch** pravidiel (predrecenzia P3: nie podľa `rule_id`;
+  `RD_TYPE_SCOPE` plní len naplnenie formulára a `RD.setTypeScope`, lacné echo nie). HTML statické (D5) + guard. Ruby len komentáre. **Prvý commit = JS golden pred zásahom** (`5d607a9d`, `tests/js/test_h12_golden.js` +
   `h12_golden/js.json`: 7 vstupov × vkladacia karta, označená skrinka cez `NX.loadSelected`, čisté funkcie a Štúdio; skripty v jednom `vm` kontexte v poradí
   HTML — `h12_harness.js`) — po refaktore **bajtovo rovnaký**. Nové: `test_h12c_typy.js` (register, A1 načítanie pred registrom, M15, matica dvoch
   podlahových množín), `test_h12c_js.rb` (guard T3a na `ui/js` s allowlistom, T3d HTML = register, parita `type_scope.json`), `nx_types_fixture.js`.
   T4 prepis 9 Ruby testov (5 súborov) a 17 JS sád zo zdroja na paritu s registrom. **Mutácie 14/14 zabité** (C1–C14 v `test_h12c_js.rb`). **Testy:** 5139 headless · 153 JS sád
-  · encoding guard; in-SU nebežal (Ruby spúšťače bez zmeny). Fotky A6 `-Shoot` 19/19 OK. Predrecenzia povinná (výrobná + audit).
+  · encoding guard; in-SU nebežal (Ruby spúšťače bez zmeny). Fotky A6 19/19 OK (po oprave tvaru `type_scope` nová nahrávka `-Record`). Predrecenzia (povinná — výrobná + audit): 0× P1/P2,
+  3× P3 (guard aj mapy s kľúčom v úvodzovkách a šablónového reťazca, `type_scope` po riadkoch, veta o identite v dokumentácii) — opravené pred PR.
   STAV pred dávkou: v0.17.12 · H12b hotová · Robí sa H6/H7 (mockupy), H11a · Ďalší krok H12c, H12d.
 
 - **H12b · panel Ruby z registra typov + payload pre klienta (1.10.2026, PR #447, v0.17.12, blok 9 · HARDENING PO V1, triedenie C-01; package

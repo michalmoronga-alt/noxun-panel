@@ -1930,14 +1930,15 @@ v `scale_observer` (sekciu obslúži plný push Štúdia; `rules_payload` dostan
   `rules_problems` → **`global_precheck`** (pri „aj ako globálnu" alebo projekte, ktorý preberá globál; konflikt = nič sa nezapíše, žiadna operácia, žiadne echo,
   `RD.setGlobalRev`) → prestavba → globál cez `HardwareRules.save_library!` vyhodnotený `case`-om (H-RACE). `push_global` pošle `RD.setRules` + `RD.setGlobalRev`
   v jednom skripte (`global_rev_script`, guard na starý DOM). Okno nevolá `HardwareRules.write(` (guard test). Detail: [hardware.md](hardware.md).
-- **Veta rozsahu pravidla viazaného na typ skrinky (H12b, R2.6):** `rules_payload` nesie aditívny kľúč **`type_scope`** = `{ rule_id => veta }` (`type_scope_map`)
-  — „na hornú skrinku" / „na spodnú skrinku", keď filter `applies_to.cabinet_type` pravidla s rolou `cabinet` obsahuje **práve jeden** z typov
-  `TYPE_SCOPE_PHRASES` (doslovne pôvodný `rdRoleDesc`; inak kľúč pravidlo nemá a klient pokračuje ďalšími filtrami). Vety sú akuzatív so slovom
-  „spodnú" (terminológia F3), preto nie sú v registri typov. `push_global` (Načítať globálne) pošle v tom istom skripte tú istú mapu nad **globálnymi**
-  pravidlami (`type_scope_script` → `RD.setTypeScope`, guard pre DOM bez prijímača). **Klient (H12c):** `rdRoleDesc(r, scope)` vetu typu len zobrazí z mapy
-  `RD_TYPE_SCOPE` (kľúč `rule_id`), sám typ neprekladá; mapu nasadí **len naplnenie formulára** (`rdSetState` — `RD.init`, `setSection(force)`, zmena pravidiel
-  na modeli) a `RD.setTypeScope` (prepíše len popisy riadkov `.rid`, rozpísané hodnoty ostanú); lacné echo nad tými istými pravidlami (`rdSetExtra`) ju
-  **neprepíše** — formulár môže práve ukazovať načítaný globál.
+- **Veta rozsahu pravidla viazaného na typ skrinky (H12b, R2.6):** `rules_payload` nesie kľúč **`type_scope`** = **pole po riadkoch `rules`** (veta | `nil`,
+  `type_scope_list`; H12c, predrecenzia P3 — nie mapa podľa `rule_id`, ktoré môže byť duplicitné alebo chýbať) — „na hornú skrinku" / „na spodnú skrinku",
+  keď filter `applies_to.cabinet_type` pravidla s rolou `cabinet` obsahuje **práve jeden** z typov `TYPE_SCOPE_PHRASES` (doslovne pôvodný `rdRoleDesc`; inak
+  `nil` a klient pokračuje ďalšími filtrami). Vety sú akuzatív so slovom „spodnú" (terminológia F3), preto nie sú v registri typov. `push_global` (Načítať
+  globálne) pošle v tom istom skripte to isté pole nad **globálnymi** pravidlami v poradí `RD.setRules` (`type_scope_script` → `RD.setTypeScope`, guard pre DOM
+  bez prijímača). **Klient (H12c):** riadok `i` dostane vetu z pozície `i` (`rdRuleDesc(i)` = `rdRoleDesc(r, rdScopeAt(i))`), sám typ neprekladá; poradie
+  riadkov formulár drží (`rdCollectRules` ide po `.rrule` v poradí vykreslenia). Pole `RD_TYPE_SCOPE` nasadí **len naplnenie formulára** (`rdSetState` —
+  `RD.init`, `setSection(force)`, zmena pravidiel na modeli) a `RD.setTypeScope` (prepíše len popisy riadkov `.rid`, rozpísané hodnoty ostanú); lacné echo nad
+  tými istými pravidlami (`rdSetExtra`) ho **neprepíše** — formulár môže práve ukazovať načítaný globál.
 - **`ui/js/rules.js`** je prefixovaný `rd*`/`RD_*` (globály `el`/`esc` by kolidovali so `studio.js`); prijímače `RD.init`/`RD.setRules`/`RD.setStatus` si mená ponechali.
 
 Plné znenie: archív, „rules_dialog.rb".
@@ -2146,7 +2147,8 @@ slot nie) · `corner` (rohová zostava). **Jedna vlastnosť na miesto, presná m
 `fronts`, otvor čiel = `front_opening`, „Delenie zóny" = `zones: shelves_only`, rail Zóny = `zones: none` (+ `zones_reason`), zámok typu šablóny = `template_type`
 + `template_lock`, očakávania šablóny = `appliance_owner`, rozsahy = `limits`. **A1 (audit H12):** skripty Inspectora bežia pred `sketchup.ready()`, preto
 **žiadny odvodený zoznam sa neskladá pri načítaní** (`NXInsert.insertTypes()` sa pýta pri volaní); pred doručením registra platí **neutrálny profil = dolná**
-(žiadne bliknutie zlého UI). Neznámy surový typ z payloadu (`loadSelected`) sa číta ako dolná; identita (`NXShell.cabType`, `templateType` porovnanie) ostáva.
+(žiadne bliknutie zlého UI). Neznámy surový typ z payloadu (`loadSelected`) sa číta ako dolná; surový ostáva len `NXShell.cabType` (rail sa pýta cez `NXTypes`). Filter šablón
+vkladacej karty (`templateType`/`templatesForType`) porovnáva **normalizované** typy (`NXTypes.norm` — neznámy a chýbajúci = dolná), rovnako ako predtým.
 Výnimky guardu `test_h12c_js.rb` (allowlist s dôvodom): bootstrap `DEFAULTS` pred `NX.init`, `FALLBACK` a hodnota zostavy v registri. Štúdio register nemá —
 slovo typu šablóny (`type_word`) a vetu rozsahu pravidla (`type_scope`) skladá server. HTML (tlačidlá typu, `<select>` modalu) ostáva **statické** (D5) a guard
 ho porovná s registrom (`label`, `ui_order`). Mimo registra typu: `part_card.js` `roleLabel`/`isFront` (mená a vlastnosti rolí — H12d/H13), `rdRoleDesc` roly.

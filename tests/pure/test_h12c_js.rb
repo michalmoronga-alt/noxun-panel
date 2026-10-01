@@ -10,7 +10,8 @@
 #   * HTML ostava STATICKE (rozhodnutie D5) — tlacidla typu a `<select>`
 #     modalu sablony sa porovnavaju s registrom (`label`, `ui_order`);
 #   * vety rozsahu pravidiel (`type_scope`) a slovo typu sablony (`type_word`)
-#     sklada server — fixtura `type_scope.json` (vstup JS golden) = Ruby mapa.
+#     sklada server — fixtura `type_scope.json` (vstup JS golden) = Ruby pole
+#     po riadkoch (`type_scope_list`).
 #
 # Spravanie pred/po (bajtovo) strazi JS golden `tests/js/test_h12_golden.js`;
 # register, A1 a matica su v `tests/js/test_h12c_typy.js`.
@@ -45,11 +46,13 @@ module NxH12c
   end
 
   NAME = '(?:lower|upper|dishwasher|corner_blind)'
-  Q = %q{['"]}
+  # Retazec v JS: '…', "…" aj sablonovy `…` (predrecenzia P3).
+  Q = %q{['"`]}
   # Formy vetvenia podla MENA typu v JS (porovnanie oboma smermi, `case`,
   # `indexOf`/`includes`, zoznam v poli, predvolba `||` aj ternarna, mapa
-  # s klucom typu a pristup `.corner_blind`).
+  # s klucom typu — holym aj v uvodzovkach — a pristup `.corner_blind`/`['upper']`).
   BRANCH_RES = [
+    /[{,]\s*#{Q}#{NAME}#{Q}\s*:/,
     /(?:===?|!==?)\s*#{Q}#{NAME}#{Q}/,
     /#{Q}#{NAME}#{Q}\s*(?:===?|!==?)/,
     /\bcase\s+#{Q}#{NAME}#{Q}/,
@@ -121,7 +124,14 @@ NxTest.test('H12c T3a: guard chyti kazdu formu vetvenia podla mena v JS a nehlas
     "var t = c.type || 'lower';",
     "var t = has ? getType() : 'lower';",
     "var L = { lower: 'Dolná', upper: 'Horná' };",
-    'var d = DEFAULTS.corner_blind || {};'
+    'var d = DEFAULTS.corner_blind || {};',
+    # predrecenzia P3: mapa s klucom v uvodzovkach a sablonovy retazec
+    "var L = { 'upper': 'Horná' };",
+    'var L = { "dishwasher": 1, "lower": 2 };',
+    'var L = {a: 1, "corner_blind": 3};',
+    'if (t === `upper`) return 0;',
+    'var CAB = [`lower`, `upper`];',
+    'var d = DEFAULTS[`dishwasher`];'
   ]
   caught.each { |l| NxTest.assert(NxH12c.branch?(l), "guard nechytil: #{l}") }
   clean = [
@@ -132,7 +142,10 @@ NxTest.test('H12c T3a: guard chyti kazdu formu vetvenia podla mena v JS a nehlas
     "{ id:'corner_door_w', kind:'num', dflt:450, onlyIf:'corner' },",
     "var t = c.type || NXTypes.FALLBACK;",
     "type: 'lower',  // bootstrap",
-    "label = 'Horná skrinka';"
+    "label = 'Horná skrinka';",
+    "var o = { 'type': t, 'upper_hang': 1 };",
+    'var s = `Typ ${NXTypes.label(t)}`;',
+    "var k = { lowerBound: 1 };"
   ]
   clean.each { |l| NxTest.refute(NxH12c.branch?(l), "falosny poplach: #{l}") }
 end
@@ -192,12 +205,14 @@ end
 
 # --- R3.4 · Studio: vety zo servera ----------------------------------------------
 
-NxTest.test('H12c R3.4: fixtura type_scope.json (vstup JS golden) = mapa servera type_scope_map') do
+NxTest.test('H12c R3.4: fixtura type_scope.json (vstup JS golden) = pole servera type_scope_list') do
   fx = JSON.parse(File.read(File.join(NxTest::ROOT, 'tests', 'fixtures', 'h12_golden', 'type_scope.json'), encoding: 'UTF-8'))
-  NxTest.assert_equal(fx['type_scope'], NxH12c::E::RulesDialog.type_scope_map(fx['rules']),
+  NxTest.assert_equal(fx['type_scope'], NxH12c::E::RulesDialog.type_scope_list(fx['rules']),
                       'JS golden dostava presne to, co server posiela')
   rules = NxH12c.src('noxun_engine', 'ui', 'js', 'rules.js')
-  NxTest.assert(rules.include?('RD_TYPE_SCOPE = rdScopeMap(d.type_scope);'), 'plny push nasadi mapu (rdSetState)')
+  NxTest.assert(rules.include?('RD_TYPE_SCOPE = rdScopeList(d.type_scope);'), 'plny push nasadi pole (rdSetState)')
+  NxTest.assert(rules.include?('rdRoleDesc(r, rdScopeAt(i))'), 'riadok formulara berie vetu na svojej pozicii')
+  NxTest.refute(rules.match?(/r\.rule_id\b[^\n]*RD_TYPE_SCOPE|RD_TYPE_SCOPE[^\n]*rule_id/), 'vety sa nekluccuju podla rule_id')
   extra = rules[/function rdSetExtra\(d\)\{(.*?)\n  \}/m, 1].to_s
   NxTest.refute(extra.include?('type_scope'), 'lacne echo (rdSetExtra) mapu neprepisuje')
   tpl = NxH12c.src('noxun_engine', 'ui', 'js', 'templates.js')

@@ -12,7 +12,7 @@
 //   M15 `NX.init` nasadi register PRED oznacenim (`loadSelected`),
 //   T2  matica miest, kde sa dve „podlahove" mnoziny lisia (len horna vs
 //       horna alebo slot) — nad poliami, ktore golden drzi na nule,
-//   R3.4 Studio: veta rozsahu pravidla z mapy servera (plny push, „Načítať
+//   R3.4 Studio: veta rozsahu pravidla z pola servera PO RIADKOCH (plny push, „Načítať
 //       globálne", lacne echo ju neprepise), slovo typu dlazdice zo servera.
 'use strict';
 const assert = require('node:assert');
@@ -161,22 +161,27 @@ function initData(extra){
 // ============ R3.4) STUDIO: vety a slova zo servera ===========================
 {
   const c = H.load({ page: 'studio.html' }).ctx;
+  // Predrecenzia P3: dva riadky s ROVNAKYM `rule_id` (a jeden bez id) — veta
+  // ide PODLA POZICIE riadku, nie podla id.
   const rules = [{ rule_id: 'a', applies_to: { role: 'cabinet', cabinet_type: ['upper'] } },
-                 { rule_id: 'b', applies_to: { role: 'cabinet', cabinet_type: ['lower'] } }];
-  c.RD.init({ rules: rules, type_scope: { a: 'na hornú skrinku' } });
-  eq(rules.map(r => c.rdRoleDesc(r)), ['na hornú skrinku', 'na každú skrinku'], 'veta len z mapy servera');
-  // „Načítať globálne": server posle mapu nad globalnymi pravidlami.
-  c.RD.setTypeScope({ a: 'na hornú skrinku', b: 'na spodnú skrinku' });
-  eq(rules.map(r => c.rdRoleDesc(r)), ['na hornú skrinku', 'na spodnú skrinku'], 'setTypeScope prepise mapu');
-  // Lacne echo s pravidlami, ktorymi bol formular naplneny, mapu NEPREPISE
+                 { rule_id: 'a', applies_to: { role: 'cabinet', cabinet_type: ['lower'] } },
+                 { applies_to: { role: 'cabinet', cabinet_type: ['upper'] } }];
+  const desc = () => rules.map((_r, i) => c.rdRuleDesc(i));
+  c.RD.init({ rules: rules, type_scope: ['na hornú skrinku', null, 'na hornú skrinku'] });
+  eq(desc(), ['na hornú skrinku', 'na každú skrinku', 'na hornú skrinku'], 'veta len z pola servera, po riadkoch');
+  // „Načítať globálne": server posle pole nad globalnymi pravidlami.
+  c.RD.setTypeScope(['na hornú skrinku', 'na spodnú skrinku', null]);
+  eq(desc(), ['na hornú skrinku', 'na spodnú skrinku', 'na každú skrinku'],
+     'setTypeScope prepise pole; rovnake rule_id nezmiesa vety');
+  // Lacne echo s pravidlami, ktorymi bol formular naplneny, pole NEPREPISE
   // (formular moze ukazovat global, ktory este neplati).
-  c.RD.setSection({ rules: rules, type_scope: { a: 'na hornú skrinku' } });
-  eq(c.rdRoleDesc(rules[1]), 'na spodnú skrinku', 'echo nad tymi istymi pravidlami vetu globalu nezhodi');
-  // Plne naplnenie formulara (force) mapu nahradi.
-  c.RD.setSection({ rules: rules, type_scope: {} }, true);
-  eq(c.rdRoleDesc(rules[0]), 'na každú skrinku', 'force = mapa noveho naplnenia');
-  c.RD.init({ rules: rules, type_scope: 'zle' });
-  eq(c.rdRoleDesc(rules[0]), 'na každú skrinku', 'zly tvar mapy = ziadna veta (nie vynimka)');
+  c.RD.setSection({ rules: rules, type_scope: ['na hornú skrinku', null, null] });
+  eq(c.rdRuleDesc(1), 'na spodnú skrinku', 'echo nad tymi istymi pravidlami vetu globalu nezhodi');
+  // Plne naplnenie formulara (force) pole nahradi.
+  c.RD.setSection({ rules: rules, type_scope: [] }, true);
+  eq(c.rdRuleDesc(0), 'na každú skrinku', 'force = pole noveho naplnenia');
+  c.RD.init({ rules: rules, type_scope: { 0: 'zle' } });
+  eq(c.rdRuleDesc(0), 'na každú skrinku', 'zly tvar (nie pole) = ziadna veta (nie vynimka)');
   // Dlazdica sablony: slovo typu zo servera, okno ho neprekladá.
   const meta = tp => (c.tplTileHtml(tp, 'cabinet', 0).match(/class="stplmeta">([^<]*)</) || [])[1];
   eq(meta({ name: 'X', kind: 'cabinet', config: { type: 'upper' }, type_word: 'horná' }), 'horná', 'type_word zo servera');

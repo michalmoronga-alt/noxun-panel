@@ -14,10 +14,11 @@
   { "rule_id": "polica", "applies_to": { "role": "shelf" } },
   { "rule_id": "zavesenie-hornej-skrinky", "applies_to": { "role": "cabinet", "cabinet_type": ["upper"] } }
  ],
- "type_scope": {
-  "horna": "na hornú skrinku",
-  "dolna": "na spodnú skrinku",
-  "horna-a-slot": "na hornú skrinku",
-  "zavesenie-hornej-skrinky": "na hornú skrinku"
- }
+ "type_scope": [
+  "na hornú skrinku",
+  "na spodnú skrinku",
+  "na hornú skrinku",
+  null, null, null, null, null, null, null, null, null,
+  "na hornú skrinku"
+ ]
 }

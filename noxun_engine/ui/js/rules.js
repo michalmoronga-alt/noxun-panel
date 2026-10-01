@@ -37,12 +37,16 @@
   // (vzor `rdSrcLine`). Formulara pravidiel kovania sa nedotykaju.
   var RD_ABS = null;
   var RD_OVR = null;
-  // H12c: VETA ROZSAHU pravidiel viazanych na typ skrinky `{ rule_id => veta }`
-  // („na hornú skrinku") — sklada ju server (`type_scope`, RulesDialog). Patri
-  // pravidlam, ktorymi bol formular NAPLNENY (`rdSetState`), a „Načítať
-  // globálne" posiela svoju (`RD.setTypeScope`). Okno ziadnu mapu typov nema.
-  var RD_TYPE_SCOPE = {};
-  function rdScopeMap(m){ return (m && typeof m === 'object' && !Array.isArray(m)) ? m : {}; }
+  // H12c: VETA ROZSAHU pravidiel viazanych na typ skrinky („na hornú skrinku")
+  // — sklada ju server (`type_scope`, RulesDialog) ako POLE PO RIADKOCH
+  // `RD_RULES` (veta | null; predrecenzia P3: nie podla `rule_id`, ktore moze
+  // byt duplicitne alebo chybat). Poradie riadkov formular drzi (`rdCollectRules`
+  // ide po `.rrule` v poradi vykreslenia). Patri pravidlam, ktorymi bol
+  // formular NAPLNENY (`rdSetState`), „Načítať globálne" posiela svoje
+  // (`RD.setTypeScope`). Okno ziadnu mapu typov nema.
+  var RD_TYPE_SCOPE = [];
+  function rdScopeList(m){ return Array.isArray(m) ? m : []; }
+  function rdScopeAt(i){ var v = RD_TYPE_SCOPE[i]; return (typeof v === 'string' && v) ? v : null; }
   // Review #220 P1: „formular je vykresleny a jeho hodnoty ziju v DOM".
   // Kym plati, prekreslit ho smie UZ LEN zmena pravidiel NA MODELI — nie
   // pripojenie tela pri navrate do sekcie. Rucne hodnoty (`.rqty`, `.bmax`,
@@ -292,17 +296,16 @@
   }
   if (typeof window !== 'undefined') window.rdWidthHint = rdWidthHint;
 
-  // `scope` = mapa viet rozsahu podla typu (predvolene `RD_TYPE_SCOPE` zo servera).
-  function rdRoleDesc(r, scope){
+  // `typePhrase` = veta rozsahu podla typu PRE TENTO RIADOK zo servera
+  // (`rdScopeAt(i)`), alebo nic — ciste (Node test).
+  function rdRoleDesc(r, typePhrase){
     // GH #126 P2: popis podla SKUTOCNYCH filtrov pravidla — cabinet pravidlo
     // moze cielit podla podopretia (nohy) ALEBO typu korpusu (Bystrica).
     var ap = (r.applies_to || {}); var role = ap.role || '';
     if (role === 'cabinet'){
-      // H12c: veta podla TYPU skrinky prichadza hotova zo servera (kluc =
-      // `rule_id` ako ho server cita); pravidlo bez nej pokracuje dalej.
-      var sc = rdScopeMap(scope === undefined ? RD_TYPE_SCOPE : scope);
-      var rid = String(r.rule_id == null ? '' : r.rule_id);
-      if (Object.prototype.hasOwnProperty.call(sc, rid) && sc[rid]) return String(sc[rid]);
+      // H12c: veta podla TYPU skrinky prichadza hotova zo servera; pravidlo
+      // bez nej pokracuje dalsimi filtrami.
+      if (typeof typePhrase === 'string' && typePhrase) return typePhrase;
       // KOV-G1b: prah výšky sokla (príchyt sokla existuje až od 55 mm) —
       // bez neho by dve pravidlá na skrinku na nohách vyzerali rovnako.
       var fmin = ap.floor_height_min;
@@ -361,11 +364,12 @@
     setGlobalRev: function(rev){
       if (typeof rev === 'string' && rev !== '') RD_GLOBAL_REV = rev;
     },
-    // H12c: „Načítať globálne" — vety rozsahu pre PRAVE nacitany global (ta
-    // ista mapa ako `type_scope` plneho pushu). Prepise len popisy riadkov,
+    // H12c: „Načítať globálne" — vety rozsahu pre PRAVE nacitany global (to
+    // iste pole po riadkoch ako `type_scope` plneho pushu, v poradi
+    // `RD.setRules` z toho isteho skriptu). Prepise len popisy riadkov,
     // rozpisane hodnoty formulara sa nedotkne.
-    setTypeScope: function(map){
-      RD_TYPE_SCOPE = rdScopeMap(map);
+    setTypeScope: function(list){
+      RD_TYPE_SCOPE = rdScopeList(list);
       rdRefreshRoleDesc();
     },
     setStatus: function(msg, err){
@@ -415,18 +419,23 @@
     }
     // H12c: vety rozsahu patria pravidlam, ktorymi sa formular PRAVE naplnil
     // (nie `rdSetExtra` — lacne echo nad globalom vo formulari by ich prepisalo).
-    RD_TYPE_SCOPE = rdScopeMap(d.type_scope);
+    RD_TYPE_SCOPE = rdScopeList(d.type_scope);
     rdSetExtra(d);
   }
-  // Popisy riadkov pravidiel po novej mape viet (bez prekreslenia formulara).
+  // Popis riadku `i` formulara (veta typu z pola servera na tej istej pozicii).
+  function rdRuleDesc(i){
+    var r = RD_RULES[i];
+    return r ? rdRoleDesc(r, rdScopeAt(i)) : '';
+  }
+  // Popisy riadkov pravidiel po novom poli viet (bez prekreslenia formulara).
   function rdRefreshRoleDesc(){
     var box = rdEl('rulesBox');
     if (!box || !box.querySelectorAll) return;
     var rows = box.querySelectorAll('.rrule');
     for (var i = 0; i < rows.length; i++){
-      var r = RD_RULES[parseInt(rows[i].getAttribute('data-i'), 10)];
+      var idx = parseInt(rows[i].getAttribute('data-i'), 10);
       var span = rows[i].querySelector ? rows[i].querySelector('.rid') : null;
-      if (r && span) span.textContent = rdRoleDesc(r);
+      if (RD_RULES[idx] && span) span.textContent = rdRuleDesc(idx);
     }
   }
 
@@ -717,7 +726,7 @@
     RD_RULES.forEach(function(r, i){
       html += '<div class="rrule" data-i="'+i+'">';
       html += '<div class="rhead"><label><input type="checkbox" class="ren" '+(r.enabled!==false?'checked':'')+'> '
-            + '<b>'+rdEsc(rdRuleTitle(r))+'</b></label> <span class="rid">'+rdEsc(rdRoleDesc(r))+'</span></div>';
+            + '<b>'+rdEsc(rdRuleTitle(r))+'</b></label> <span class="rid">'+rdEsc(rdRoleDesc(r, rdScopeAt(i)))+'</span></div>';
       if (r.kind === 'fixed'){
         html += '<div class="rrow"><label>Počet</label><input class="rqty rnum" type="number" min="1" max="999" step="1" value="'+rdEsc(r.quantity!=null?r.quantity:1)+'"><span class="unit">ks</span></div>';
       } else if (r.kind === 'bands'){
@@ -1469,7 +1478,7 @@
                        // H10a/R-35: pin revízie globálu (getter — test BLOCKER 1).
                        rdGlobalRev: rdGlobalRev,
                        // H12c: prijimace viet rozsahu (plny push aj „Načítať globálne").
-                       RD: RD, rdTypeScope: function(){ return RD_TYPE_SCOPE; } };
+                       RD: RD, rdRuleDesc: rdRuleDesc, rdTypeScope: function(){ return RD_TYPE_SCOPE; } };
   }
   // ŠT-3b-1: `sketchup.ready('')` tu ZANIKLO. V okne „Pravidlá kovania" bol
   // tento subor POSLEDNY a jeho `ready` znamenal „HTML je nacitane"; okno

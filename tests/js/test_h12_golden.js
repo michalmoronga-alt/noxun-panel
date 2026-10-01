@@ -205,7 +205,11 @@ function pureCase(t){
 function studio(){
   const c = H.load({ page: 'studio.html' }).ctx;
   c.RD.init({ rules: JSON.parse(JSON.stringify(SCOPE.rules)), type_scope: JSON.parse(JSON.stringify(SCOPE.type_scope)) });
-  const rules = SCOPE.rules.map(function(r){ return [r.rule_id, c.rdRoleDesc(r)]; });
+  // Popis riadku tak, ako ho kresli formular (stary kod: `rdRoleDesc(r)`;
+  // od H12c veta typu z pola `type_scope` na pozicii riadku — `rdRuleDesc(i)`).
+  const rules = SCOPE.rules.map(function(r, i){
+    return [r.rule_id, typeof c.rdRuleDesc === 'function' ? c.rdRuleDesc(i) : c.rdRoleDesc(r)];
+  });
   const tiles = INPUTS.map(function(t){
     const cfg = t === null ? {} : { type: t };
     const html = c.tplTileHtml({ name: 'S', kind: 'cabinet', config: cfg, type_word: serverWord(t) }, 'cabinet', 0);
