@@ -168,7 +168,7 @@ ok(md.textOf(box).indexOf('novšej verzie') < 0,
    'L2: kind, ktorý TÁTO verzia pozná, sa netvári ako z budúcnosti: ' + hint);
 ok(hint.indexOf('HK 2 triedy') >= 0 && hint.indexOf('1 rameno') >= 0,
    'L2: súhrn menuje tabuľky: ' + hint);
-ok(hint.indexOf('0.5 kg') >= 0 && hint.indexOf('1100 mm') >= 0,
+ok(hint.indexOf('0,5 kg') >= 0 && hint.indexOf('1100 mm') >= 0,
    'L2: aj rezervu na úchytku a prah druhej tyče: ' + hint);
 eq(box.querySelectorAll('.rbands').length, 0, 'L2: pásma závesov výklop nemá');
 eq(md.textOf(box.querySelector('.rid')), 'na každý výklop',

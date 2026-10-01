@@ -74,9 +74,15 @@
 
   // --- ciste funkcie (Node testy) -----------------------------------------
 
+  // H4 · D-04 (triedenie HARDENING): cena = formátovač okna Štúdio `nxfMoney`
+  // (studio.js, načítaný skôr; v Node require) — „12,50 €" ako v Rozpočte.
+  // Bez neho (izolovaný test) aspoň čiarka namiesto bodky.
   function mdhFmtPrice(v){
+    var f = (typeof window !== 'undefined' && window && typeof window.nxfMoney === 'function') ? window.nxfMoney
+      : (HW_STUDIO && typeof HW_STUDIO.nxfMoney === 'function' ? HW_STUDIO.nxfMoney : null);
+    if (f) return f(v);
     return (v === null || v === undefined) ? '—'
-      : (Math.round(Number(v) * 100) / 100).toFixed(2) + ' €';
+      : (Math.round(Number(v) * 100) / 100).toFixed(2).replace('.', ',') + ' €';
   }
   // ISO8601 -> "overené 1.8.2026"; prazdne/zle -> null (nezobrazovat).
   function mdhCheckedLabel(iso){

@@ -129,7 +129,7 @@ eq(mddRowRevOf(CAT, 'sheet', 'NEEXISTUJE'), '', 'neznamy zaznam = prazdny rev (s
 ok(mddStatusLabel('miss').length > 0 && mddStatusLabel('skipped_duplak').indexOf('dupl') >= 0,
    'SK popisy stavov');
 eq(mddStatusLabel('nieco-nove'), 'nieco-nove', 'neznamy stav sa ukaze doslovne');
-eq(mddFmtPrice(18.994), '18.99 €', 'cena na 2 desatiny');
+eq(mddFmtPrice(18.994), '18,99 €', 'cena na 2 desatiny, ciarka (H4 · D-04)');
 eq(mddFmtPrice(null), '—', 'nil cena = pomlcka');
 ok(mddNewModel(7).session === 7 && mddNewModel(7).order.length === 0, 'cisty model');
 

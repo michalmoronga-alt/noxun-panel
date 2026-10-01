@@ -92,6 +92,16 @@
   function rdCount(n, one, few, many){
     return n + ' ' + (n === 1 ? one : (n >= 2 && n <= 4 ? few : many));
   }
+  // H4 · D-04 (triedenie HARDENING): ZOBRAZENÉ čísla v súhrnoch a vetách
+  // (mm, kg) = formátovač okna Štúdio (`nxfMm`, `nxfDec` v studio.js, načítaný
+  // skôr; v Node require) — „rezerva 0,5 kg", nie „0.5". Bez neho (izolovaný
+  // test) aspoň čiarka namiesto bodky. Hodnoty polí sa nemenia.
+  function rdFmt(name, v, a){
+    var f = (typeof window !== 'undefined' && window && typeof window[name] === 'function') ? window[name]
+      : (RD_STUDIO && typeof RD_STUDIO[name] === 'function' ? RD_STUDIO[name] : null);
+    return f ? f(v, a) : String(v).replace('.', ',');
+  }
+  function rdMm(v){ return rdFmt('nxfMm', v); }
   function rdLiftSummary(r){
     var cls = rdArr(r && r.classes).length;
     var mech = rdArr(r && r.mechanisms).length;
@@ -100,8 +110,8 @@
     var rod = (r && typeof r.rod_double_from_kb_mm === 'number') ? r.rod_double_from_kb_mm : null;
     var parts = ['HK ' + rdCount(cls, 'trieda', 'triedy', 'tried'),
                  'HL ' + mech + ' + ' + rdCount(arms, 'rameno', 'ramená', 'ramien')];
-    if (rod !== null) parts.push('tyč od ' + rod + ' mm');
-    if (kg !== null) parts.push('rezerva ' + kg + ' kg');
+    if (rod !== null) parts.push('tyč od ' + rdMm(rod) + ' mm');
+    if (kg !== null) parts.push('rezerva ' + rdFmt('nxfDec', kg, 2) + ' kg');
     return parts.join(' · ');
   }
   if (typeof window !== 'undefined') window.rdLiftSummary = rdLiftSummary;
@@ -277,9 +287,9 @@
       // bez neho by dve pravidlá na skrinku na nohách vyzerali rovnako.
       var fmin = ap.floor_height_min;
       if (typeof fmin === 'number' && isFinite(fmin) && fmin > 0){
-        // Číslo sa vypisuje tak, ako ho posiela server (vzor `rdLiftSummary`
-        // — „tyč od 1100 mm“): 55.0 je v JS „55“, žiadny vlastný formátovač.
-        return 'na skrinku na nohách so soklom od ' + fmin + ' mm';
+        // Číslo zo servera cez formátovač okna (H4 · D-04, `rdMm`): 55.0 je
+        // „55", 55.5 je „55,5" (vzor `rdLiftSummary` — „tyč od 1100 mm“).
+        return 'na skrinku na nohách so soklom od ' + rdMm(fmin) + ' mm';
       }
       if ((ap.support || []).length) return 'na skrinku s podstavcom';
       return 'na každú skrinku';
@@ -557,8 +567,8 @@
   function rdGuardSummary(r){
     var out = [];
     var wp = r && r.width_plus;
-    if (wp && wp.over != null && wp.add != null) out.push('+' + wp.add + ' nad ' + wp.over + ' mm');
-    if (r && r.width_warn_over != null) out.push('varovanie nad ' + r.width_warn_over + ' mm');
+    if (wp && wp.over != null && wp.add != null) out.push('+' + rdMm(wp.add) + ' nad ' + rdMm(wp.over) + ' mm');
+    if (r && r.width_warn_over != null) out.push('varovanie nad ' + rdMm(r.width_warn_over) + ' mm');
     // Pozor na `.length` nad NE-poľom: reťazec ho má tiež a lišta by hlásila
     // „3 hmotnostné pásma" nad tvarom, ktorý žiadne pásmo nemá.
     var wb = rdArr(r && r.weight_bands);
@@ -1127,7 +1137,7 @@
     var reach = null;
     for (var i = 0; i < sorted.length; i++){
       if (reach !== null && sorted[i].kh_min > reach){
-        return name + ': medzi pásmami ramien je medzera pri výške ' + reach
+        return name + ': medzi pásmami ramien je medzera pri výške ' + rdMm(reach)
              + ' mm — výklop tej výšky by nedostal žiadne ramená.';
       }
       var top = sorted[i].kh_max;

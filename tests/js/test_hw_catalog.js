@@ -17,11 +17,11 @@ function eq(actual, expected, msg){
 function ok(cond, msg){ n++; assert.ok(cond, msg); }
 
 // --- mdhFmtPrice -------------------------------------------------------------
-eq(mdhFmtPrice(4.18), '4.18 €', 'cena na 2 desatiny');
-eq(mdhFmtPrice(4.1849), '4.18 €', 'zaokruhlenie');
+eq(mdhFmtPrice(4.18), '4,18 €', 'cena na 2 desatiny');
+eq(mdhFmtPrice(4.1849), '4,18 €', 'zaokruhlenie');
 eq(mdhFmtPrice(null), '—', 'nil = pomlcka (nezadana != 0)');
 eq(mdhFmtPrice(undefined), '—', 'undefined = pomlcka');
-eq(mdhFmtPrice(0), '0.00 €', 'nula je legalna cena');
+eq(mdhFmtPrice(0), '0,00 €', 'nula je legalna cena');
 
 // --- mdhCheckedLabel ---------------------------------------------------------
 eq(mdhCheckedLabel('2026-08-01T00:12:33Z'), 'overené 1.8.2026', 'ISO -> SK datum');

@@ -187,16 +187,26 @@
       return g;
     });
   }
+  // `fmtNum` = hodnota VSTUPNÉHO poľa (bodka, plná presnosť) — polia sa nemenia.
   function fmtNum(v){ var f = parseFloat(v); return (f === Math.round(f)) ? String(Math.round(f)) : String(f); }
-  function sheetChipLabel(s){ return (s.type ? s.type + ' ' : '') + fmtNum(s.thickness); }
+  // H4 · D-04 (triedenie HARDENING): ZOBRAZENÉ mm (štítky hrúbok, formáty,
+  // vety) = formátovač okna Štúdio `nxfMm` (studio.js, načítaný skôr; v Node
+  // require) — čiarka, max 2 desatinné („DTDL 18,6", „23/0,8"). Bez neho
+  // (izolovaný test) aspoň čiarka namiesto bodky.
+  function mdMm(v){
+    var f = (typeof window !== 'undefined' && window && typeof window.nxfMm === 'function') ? window.nxfMm
+      : (MAT_STUDIO && typeof MAT_STUDIO.nxfMm === 'function' ? MAT_STUDIO.nxfMm : null);
+    return f ? f(parseFloat(v)) : fmtNum(v).replace('.', ',');
+  }
+  function sheetChipLabel(s){ return (s.type ? s.type + ' ' : '') + mdMm(s.thickness); }
   function edgeChipLabel(a){
-    return (a.width === null || a.width === undefined) ? fmtNum(a.thickness) + ' mm' : fmtNum(a.width) + '/' + fmtNum(a.thickness);
+    return (a.width === null || a.width === undefined) ? mdMm(a.thickness) + ' mm' : mdMm(a.width) + '/' + mdMm(a.thickness);
   }
   // 2A-4b: riadok dosky v detaile = typ · hrubka · format (format ako druhy
   // riadok bunky — stlpec rozmeru ostava uzky).
   function sheetDimLabel(s){
     var ss = s.sheet_size;
-    var fmt = (ss && ss.length === 2) ? fmtNum(ss[0]) + '×' + fmtNum(ss[1]) : '';
+    var fmt = (ss && ss.length === 2) ? mdMm(ss[0]) + '×' + mdMm(ss[1]) : '';
     // 2B-2: rub zasteny do sub riadku ("4100×640 · rub K552 RT") — obchodna
     // identita produktu musi byt v detaile citatelna.
     if (s.back_decor){
@@ -880,7 +890,7 @@
     if (!MD_SCHEMA2 || MD_RO) return '';
     var t = String(s.type || '').toUpperCase();
     if (t !== 'DTDL' && t !== 'MDF') return '';
-    return '<button class="mduni" title="Vytvoriť duplák (' + fmtNum(s.thickness * 2) + ' mm lepené z 2× tejto dosky)"' +
+    return '<button class="mduni" title="Vytvoriť duplák (' + mdMm(s.thickness * 2) + ' mm lepené z 2× tejto dosky)"' +
       ' aria-label="Vytvoriť duplák" onclick="mdCreateDuplak(\'' + mdEsc(s.material_id) + '\')">' +
       '<svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg></button>';
   }
@@ -1748,7 +1758,7 @@
   // Formát platne „2800 × 2070" (alebo '').
   function mdManualFmt(item){
     var sz = item && item.sheet_size;
-    return sz && sz.length === 2 ? fmtNum(sz[0]) + ' × ' + fmtNum(sz[1]) : '';
+    return sz && sz.length === 2 ? mdMm(sz[0]) + ' × ' + mdMm(sz[1]) : '';
   }
   // Text pola pre rezim PRESNE zo servera (R20b — prepnutie bez pisania
   // cenu nemeni; nikdy spatny prepocet zobrazeneho textu).
@@ -1902,15 +1912,15 @@
     if (!item) return '';
     var head = kind === 'edge'
       ? 'ABS ' + String(item.decor || '') + ' ' + edgeChipLabel(item).replace(/\./g, ',')
-      : String(item.decor || '') + ' ' + String(item.type || '') + ' ' + fmtNum(item.thickness) + ' mm';
+      : String(item.decor || '') + ' ' + String(item.type || '') + ' ' + mdMm(item.thickness) + ' mm';
     return head + (item.decor_name ? ' · ' + item.decor_name : '');
   }
   // „Položka" (text, udaje sa tu nemenia — na to je ceruzka).
   function mdManualInfo(kind, item){
     var code = 'kód ' + (item && item.code ? item.code : '—');
     if (kind === 'edge'){
-      var th = String(fmtNum(item.thickness)).replace('.', ',');
-      var w = (item.width === null || item.width === undefined) ? '' : fmtNum(item.width) + ' × ';
+      var th = mdMm(item.thickness);
+      var w = (item.width === null || item.width === undefined) ? '' : mdMm(item.width) + ' × ';
       return 'ABS ' + w + th + ' mm · ' + code;
     }
     var pd = (item && item.price_display) || {};
@@ -3113,14 +3123,14 @@
     if (s.project && s.project.length) lines.push('Predvoľby projektu: ' + s.project.join(', ') + ' → ' + s.target_label);
     if (cabsN){
       var t = 'Skrinky: ' + cabsN + ' sa prepočíta';
-      if (s.adopting_n) t += ', ' + s.adopting_n + ' prevezme hrúbku ' + fmtNum(s.target_th) + ' mm';
+      if (s.adopting_n) t += ', ' + s.adopting_n + ' prevezme hrúbku ' + mdMm(s.target_th) + ' mm';
       lines.push(t);
     }
     (s.th_changes || []).forEach(function(t){ lines.push('Zmena hrúbky ' + t.change + ' mm: ' + t.n + '×'); });
     if (s.overrides_n) lines.push('Dielce s vlastným UNI materiálom: ' + s.overrides_n + '×');
     if (s.boards && s.boards.length){
       lines.push('Dosky: ' + s.boards.map(function(b){
-        return b.bid + (b.from !== b.to ? ' (' + fmtNum(b.from) + '→' + fmtNum(b.to) + ' mm)' : '');
+        return b.bid + (b.from !== b.to ? ' (' + mdMm(b.from) + '→' + mdMm(b.to) + ' mm)' : '');
       }).join(', '));
     }
     var abs = s.abs || {};

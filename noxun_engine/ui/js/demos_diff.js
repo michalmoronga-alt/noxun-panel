@@ -150,8 +150,17 @@
     return mddStatusLabel(p ? p.status : '');
   }
 
+  // H4 · D-04 (triedenie HARDENING): cena = formátovač okna Štúdio `nxfMoney`
+  // (studio.js, načítaný skôr; v Node require) — „18,99 €" ako v Rozpočte.
+  // Bez neho (izolovaný test) aspoň čiarka namiesto bodky.
+  var MDD_STUDIO = (typeof module !== 'undefined' && module.exports)
+    ? require('./studio.js')
+    : null;
   function mddFmtPrice(v){
-    return v == null ? '—' : (Math.round(Number(v) * 100) / 100).toFixed(2) + ' €';
+    var f = (typeof window !== 'undefined' && window && typeof window.nxfMoney === 'function') ? window.nxfMoney
+      : (MDD_STUDIO && typeof MDD_STUDIO.nxfMoney === 'function' ? MDD_STUDIO.nxfMoney : null);
+    if (f) return f(v);
+    return v == null ? '—' : (Math.round(Number(v) * 100) / 100).toFixed(2).replace('.', ',') + ' €';
   }
 
   // ===== DOM cast (CEF only) ================================================
