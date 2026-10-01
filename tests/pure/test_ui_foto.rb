@@ -240,6 +240,37 @@ NxTest.test('ui_foto: -Shoot bez -Rec vyberie len USPESNU nahravku; -Only filtru
   NxTest.assert(ok_at && ok_at > ps.index("VYSLEDOK NAHRAVKY: $failed FAIL").to_i, 'marker uspechu az po validacii FAIL riadkov')
 end
 
+NxTest.test('ui_foto: verdikt fotky — OK len po ustaleni bez chyb, inak CHYBA / BEZ REPORTU') do
+  exe = nx_uifoto_pwsh
+  NxTest.skip!('pwsh/powershell nie je k dispozicii') unless exe
+  require 'open3'
+  lib = File.join(NxUiFotoTest::TOOL, 'lib.ps1')
+  cases = {
+    'SETTLED' => "$true ([pscustomobject]@{ stage='settled'; errors=@() })",
+    'LATEOK' => "$true ([pscustomobject]@{ stage='late'; errors=@() })",
+    'LATEERR' => "$true ([pscustomobject]@{ stage='late'; errors=@('JS chyba: neskora') })",
+    'REPLAY' => "$true ([pscustomobject]@{ stage='replay'; errors=@() })",
+    'NOREP' => '$true $null',
+    'NOPNG' => '$false $null',
+    'NOPNGSETTLED' => "$false ([pscustomobject]@{ stage='settled'; errors=@() })"
+  }
+  script = ". '#{lib}'; " + cases.map do |k, args|
+    "$v = Get-NxShotStatus #{args}; Write-Output ('#{k}=' + $v.status + '|' + (@($v.errors) -join ';'))"
+  end.join('; ')
+  out, err, st = Open3.capture3(exe, '-NoProfile', '-Command', script)
+  NxTest.assert(st.success?, "pwsh: #{err}")
+  got = out.lines.map(&:strip).reject(&:empty?).to_h { |l| l.split('=', 2) }
+  NxTest.assert_equal('ok|', got['SETTLED'], 'ustalene bez chyb = OK')
+  NxTest.assert_equal('ok|', got['LATEOK'], 'stav late bez chyb = OK')
+  NxTest.assert_equal('err|JS chyba: neskora', got['LATEERR'], 'neskora chyba = CHYBA')
+  NxTest.assert(got['REPLAY'].to_s.start_with?('err|prehravac nedobehol do ustalenia'), "len replay = CHYBA (#{got['REPLAY']})")
+  NxTest.assert_equal('none|', got['NOREP'], 'bez reportu = BEZ REPORTU')
+  NxTest.assert_equal('err|Chrome nevytvoril fotku.', got['NOPNG'], 'bez fotky = CHYBA')
+  NxTest.assert_equal('err|Chrome nevytvoril fotku.', got['NOPNGSETTLED'], 'bez fotky aj s reportom = CHYBA')
+  ps = File.binread(File.join(NxUiFotoTest::ROOT, 'scripts', 'ui_foto.ps1'))
+  NxTest.assert(ps.include?('$verdict = Get-NxShotStatus $ok $rep'), 'ui_foto.ps1 pouziva Get-NxShotStatus')
+end
+
 NxTest.test('ui_foto: vystup -Shoot ma unikatny priecinok aj pre subezne behy (PID)') do
   ps = File.binread(File.join(NxUiFotoTest::ROOT, 'scripts', 'ui_foto.ps1'))
   NxTest.assert(ps.include?("('shots_{0}_{1}' -f $stamp, $PID)"), 'shots_<cas>_<PID>')

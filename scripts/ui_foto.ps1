@@ -5,7 +5,10 @@
 # Fotky idu do %TEMP% (report orchestratorovi -> Michal), NIKDY do gitu.
 #
 # Rezimy:
-#   -Shoot (predvoleny)  vezme NAJNOVSIU nahravku (alebo -Rec <priecinok>), skopiruje
+#   -Shoot (predvoleny)  vezme NAJNOVSIU USPESNU nahravku (so znackou NAHRAVKA_OK.txt,
+#                        zapisuje ju -Record az po kontrole vysledku) alebo -Rec <priecinok>
+#                        (aj starsia nahravka bez znacky). Ked ziadna uspesna nie je (napr.
+#                        prvy beh po zavedeni znacky), zacni -Record. Skopiruje
 #                        AKTUALNE noxun_engine/ui z tohto checkoutu do docasnej stranky,
 #                        vlozi prehravac scripts/ui_foto/nx_stub.js (len do kopie, nikdy
 #                        do repa), spusti lokalny server (python, len 127.0.0.1) a headless
@@ -48,7 +51,7 @@ $tool = Join-Path $PSScriptRoot 'ui_foto'
 $fotoRoot = Join-Path $env:TEMP 'noxun_ui_foto'
 New-Item -ItemType Directory -Force -Path $fotoRoot | Out-Null
 $utf8 = New-Object System.Text.UTF8Encoding($false)
-. (Join-Path $tool 'lib.ps1')  # Find-NxLatestRec, Select-NxShots, Set-NxRecOk
+. (Join-Path $tool 'lib.ps1')  # Find-NxLatestRec, Select-NxShots, Set-NxRecOk, Get-NxShotStatus
 # Fotka sa robi na konci virtualneho casu Chrome; prehravac posiela finalny report po
 # SETTLE_MS (6000 ms, nx_stub.js) od prehrania - rozpocet musi byt s rezervou dlhsi.
 $NxVirtualBudgetMs = 9500
@@ -402,19 +405,9 @@ function Invoke-NxShoot([string]$recDir) {
       $repPath = Join-Path $reports ($s.id + '.json')
       $rep = $null
       if (Test-Path $repPath) { try { $rep = Read-NxJson $repPath } catch {} }
-      $errs = @()
-      $status = 'ok'
-      if (-not $ok) { $status = 'err'; $errs += 'Chrome nevytvoril fotku.' }
-      if (-not $rep) { if ($status -eq 'ok') { $status = 'none' } }
-      else {
-        if (@($rep.errors).Count -gt 0) { $status = 'err'; $errs += @($rep.errors | ForEach-Object { [string]$_ }) }
-        # Report sa posiela aj po ustaleni (SETTLE_MS v nx_stub.js) a pri kazdej neskorej
-        # chybe. Ked prisiel LEN stav po prehrani, stranka nedobehla do ustalenia pred
-        # fotkou - jej obsah (a pripadne neskore chyby) nie je overeny (Codex #434 P2).
-        if (@('settled', 'late') -notcontains [string]$rep.stage) {
-          $status = 'err'; $errs += ('prehravac nedobehol do ustalenia pred fotkou (stav: ' + [string]$rep.stage + ')')
-        }
-      }
+      $verdict = Get-NxShotStatus $ok $rep
+      $status = $verdict.status
+      $errs = @($verdict.errors)
       $long = $null
       if ($ok -and $rep -and ([int]$rep.height -gt ($h + 24))) {
         $lh = [Math]::Min([int]$rep.height + 16, 12000)

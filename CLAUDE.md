@@ -194,7 +194,8 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa
 - **Fotenie okien (UI dávky, od 1.10.2026):** `powershell -NoProfile -File scripts\ui_foto.ps1` nafotí Inspector (bez výberu + kontexty Korpus,
   Zóny, Čelá, Kovanie) a všetkých 14 sekcií Štúdia z **nahrávky reálnych dát pluginu** prehranej v aktuálnom UI checkoutu (headless Chrome,
   aj pri zamknutej obrazovke) + verzie na celú výšku + kontaktný hárok `index.html`. **Každá UI dávka:** po zmene JS/CSS/HTML `-Shoot`
-  (predvolený, nad poslednou nahrávkou); po zmene **tvaru dát z Ruby** (payload okna) `-Record` — nová nahrávka v SketchUpe overenou
+  (predvolený, nad poslednou **úspešnou** nahrávkou — so značkou `NAHRAVKA_OK.txt`; staršie nahrávky bez značky len cez `-Rec <priečinok>`;
+  keď úspešná nahrávka ešte nie je, napr. prvý beh po mergi H2, začni `-Record`); po zmene **tvaru dát z Ruby** (payload okna) `-Record` — nová nahrávka v SketchUpe overenou
   slučkou runnera nad kópiou ENGINEtests.skp, zdieľa jeho zámok (`exit 2` = iný beh beží), inštancia sa zavrie sama — a hneď fotí.
   `-Only studio_cut,panel_cela` = podmnožina. Fotky idú do `%TEMP%\noxun_ui_foto\shots_<čas>_<PID>\` → **report orchestrátorovi → Michal; do gitu
   nie**. **Hranice:** statický stav (bez modálov, hoveru a rozbalených ponúk), Chrome nie CEF (písmo a rozbaľovačky sa môžu líšiť), svetlá

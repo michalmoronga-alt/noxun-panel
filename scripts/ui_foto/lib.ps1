@@ -35,3 +35,23 @@ function Select-NxShots($shots, [string]$only) {
   }
   return $sel
 }
+
+# Verdikt jednej fotky pre harok: ok | err | none (bez reportu) + zoznam chyb.
+# $rep = report prehravaca (nx_stub.js). Report sa posiela po prehrani (`replay`), po
+# ustaleni (`settled`) a pri kazdej neskorej chybe (`late`); ked prisiel LEN `replay`,
+# stranka pred fotkou nedobehla do ustalenia - obsah ani neskore chyby nie su overene
+# (Codex #434 P2), takze karta je CHYBA, nie OK.
+function Get-NxShotStatus([bool]$pngOk, $rep) {
+  $errs = @()
+  $status = 'ok'
+  if (-not $pngOk) { $status = 'err'; $errs += 'Chrome nevytvoril fotku.' }
+  if (-not $rep) {
+    if ($status -eq 'ok') { $status = 'none' }
+  } else {
+    if (@($rep.errors).Count -gt 0) { $status = 'err'; $errs += @($rep.errors | ForEach-Object { [string]$_ }) }
+    if (@('settled', 'late') -notcontains [string]$rep.stage) {
+      $status = 'err'; $errs += ('prehravac nedobehol do ustalenia pred fotkou (stav: ' + [string]$rep.stage + ')')
+    }
+  }
+  return @{ status = $status; errors = @($errs) }
+}
