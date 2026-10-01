@@ -48,9 +48,10 @@ načíta sa hneď za `build_plan` — **pred** `construction` (`CORNER_TYPE`), `
   `CabinetBuilder::UPPER_HANG_Z`, `DW_WIDTH_RANGE`/`DW_HEIGHT_RANGE`, `ScaleWatch::MIN_BY_TYPE` (odvodené z `limits`).
 - **Guardy (`test_h12a_register.rb`; JS `test_h12c_js.rb`):** v `core/`, `modules/`, od H12b aj `ui/` (`.rb`) a od H12c aj `ui/js/*.js` **žiadne nové vetvenie podľa mena typu**
   (`== 'upper'`, `when 'dishwasher'`, `%w[…upper…]`, `|| 'lower'`, `CORNER_TYPE` mimo aliasov — allowlist podľa obsahu riadka s dôvodom: kategórie
-  spotrebičov, seed závesov, mapy predvolieb, vety rozsahu pravidiel `RulesDialog::TYPE_SCOPE_PHRASES`) · `DEFAULTS_BY_TYPE` = `IDS` · **CN-03** (visiace typy = `cabinet_type` seedu závesov, [hardware.md](hardware.md)) · poradie načítania. **Nový typ** =
-  riadok `REGISTRY` + `DEFAULTS_BY_TYPE` (+ `EXTRA_KEYS_BY_TYPE`, `PARAM_KEYS`) + kód buildera + HTML tlačidlo a `option` + seed šablóny + pri `hang_z > 0` seed
-  závesov a `SEED_VERSION` + bump `CONFIG_SCHEMA` (mapa rozširovacích bodov: H13).
+  spotrebičov, seed závesov, mapy predvolieb, vety rozsahu pravidiel `RulesDialog::TYPE_SCOPE_PHRASES`) · `DEFAULTS_BY_TYPE` = `IDS` · poradie načítania;
+  **CN-03** (visiace typy = `cabinet_type` seedu závesov, [hardware.md](hardware.md)) stráži `test_h13_rozsirovacie_body.rb`. **Nový typ** = riadok `REGISTRY`,
+  predvoľby a polia, kód buildera, HTML, seed šablóny, pri `hang_z > 0` seed závesov a bump `CONFIG_SCHEMA` — úplný zoznam miest:
+  [rozsirovacie-body.md](rozsirovacie-body.md) (scenár 1).
 
 ### construction.rb
 

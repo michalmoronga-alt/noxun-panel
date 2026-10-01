@@ -15,10 +15,11 @@ reprodukovateľný z .skp; globál `%APPDATA%` len default nových projektov + s
 
 **Pravidlo viazané na typ skrinky — pasca CN-03 (H12a, v0.17.11).** Jediné seed pravidlo s filtrom typu je `zavesenie-hornej-skrinky` (`applies_to.cabinet_type
 = ['upper']`, 2× „Bystrica"); kontext nesie **surový** identifikátor `cabinet_hw_ctx['cabinet_type']`. Nový **visiaci** typ (`hang_z > 0` v registri
-[`CabinetTypes`](construction.md#cabinet_typesrb)) by bez úpravy seedu ostal **bez závesov** — guard `test_h12a_register.rb` (T3c) preto vyžaduje, aby visiace typy
-registra = `cabinet_type` tohto seed pravidla a aby každý `cabinet_type` v seede bol známy typ; pri novom visiacom type: doplniť id do seedu, zvýšiť `SEED_VERSION`
-a overiť „Doplniť nové predvolené". **Používateľom upravené pravidlá a projektové snapshoty guard nepokrýva** (filter vlastnosťou namiesto typu = zmena schémy
-pravidiel, F6 po V1; plná mapa rozširovacích bodov H13).
+[`CabinetTypes`](construction.md#cabinet_typesrb)) by bez úpravy seedu ostal **bez závesov** — guard `test_h13_rozsirovacie_body.rb` preto vyžaduje, aby každý
+visiaci typ registra bol v `cabinet_type` tohto seed pravidla (alebo vo výnimkách s dôvodom), aby pravidlo neplatilo na typ, ktorý nevisí, a aby každý `cabinet_type`
+v seede bol známy typ; pri novom visiacom type: doplniť id do seedu, zvýšiť `SEED_VERSION` a overiť „Doplniť nové predvolené". **Používateľom upravené pravidlá
+a projektové snapshoty guard nepokrýva** (filter vlastnosťou namiesto typu = zmena schémy pravidiel, F6 po V1). Postup pre nový typ a nové pravidlo viazané
+na typ: [rozsirovacie-body.md](rozsirovacie-body.md) (scenáre 1 a 5).
 
 **D-120 (v0.10.7, SEED_VERSION 7):** `part_flag_length` používa `FrontProfiles.cut_length` — vodorovný profil má rez po šírke, zvislý po výške; neplatná anotácia nedá
 odhadnutú dĺžku. Tri nové pravidlá pokrývajú flap/up, flap/down a false_front, pôvodné rule_id dvierok/zásuviek držia. Vlastné zapnuté profilové pravidlo potlačí seed

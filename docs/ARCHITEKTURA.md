@@ -28,6 +28,7 @@ Reťaz: `noxun_engine.rb` (loader, autorita VERSION; **minimum SketchUp 2026** �
 | [architecture/appliances.md](architecture/appliances.md) | katalóg spotrebičov (per PC), prílohy, snapshot modelu pre zákazku |
 | [architecture/outputs.md](architecture/outputs.md) | kontrolný semafor, zdieľané jadro výstupov zákazky (kusovník, VEPO, nákup, rozpočet, ceny, exporty) |
 | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) | Inspector (kostra, kontexty, karty), Štúdio (okno a sekcie), zdieľané JS komponenty, lifecycle okien |
+| [architecture/rozsirovacie-body.md](architecture/rozsirovacie-body.md) | **kde sa plugin rozširuje** — miesta pre nový typ skrinky (vrátane pasce závesov), novú rolu dielca, stĺpec Kusovníka, sekciu Štúdia a pravidlo kovania viazané na typ; verzie dát v [../SYSTEM/STANDARD.md](../SYSTEM/STANDARD.md) §13 |
 
 Ďalej v `docs/`: pravidlá SketchUp kódu [SKETCHUP_PRAVIDLA.md](SKETCHUP_PRAVIDLA.md) ·
 DC pasce [DC_PRAVIDLA.md](DC_PRAVIDLA.md) · UI dizajn [UI_DIZAJN.md](UI_DIZAJN.md).

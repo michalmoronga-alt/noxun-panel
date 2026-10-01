@@ -9,7 +9,8 @@
 #   * neznamy typ = profil dolnej (`norm`), miesta IDENTITY drzia surovy
 #     retazec (`id_or_default`, vstup pravidiel `cabinet_type`);
 #   * `client_payload` je kontrakt pre JS = `tests/fixtures/h12_cabinet_types.json`;
-#   * pasca CN-03: visiace typy registra = typy seed pravidla zavesov.
+#   * pasca CN-03 (visiace typy registra = typy seed pravidla zavesov) od H13
+#     v `test_h13_rozsirovacie_body.rb`.
 #
 # Vysledky (cisla, plan, config, VEPO) strazi golden `test_h12_golden.rb`
 # + in-SU `run_h12` — tu je kontrakt registra a guardy proti navratu
@@ -273,21 +274,8 @@ NxTest.test('H12a T3b: DEFAULTS_BY_TYPE = IDS a EXTRA_KEYS_BY_TYPE su podmnozina
   NxTest.assert_equal(cb::CORNER_KEYS, cb::EXTRA_KEYS_BY_TYPE['corner_blind'])
 end
 
-NxTest.test('H12a T3c (CN-03): visiace typy registra = cabinet_type seed pravidla zavesov') do
-  rules = Noxun::Engine::HardwareRules::SEED_RULES
-  hang = rules.find { |r| r['rule_id'] == 'zavesenie-hornej-skrinky' }
-  NxTest.assert(hang, 'seed pravidlo zavesov chyba')
-  hanging = NxH12a::CT::IDS.select { |id| NxH12a::CT.hangs?(id) }
-  NxTest.assert_equal(hanging, Array(hang.dig('applies_to', 'cabinet_type')),
-                      'novy VISIACI typ (hang_z > 0) bez zavesov: dopln jeho id do `applies_to.cabinet_type` ' \
-                      'seed pravidla `zavesenie-hornej-skrinky`, zvys HardwareRules::SEED_VERSION a over ' \
-                      '„Doplniť nové predvoľby" (hardware.md, odsek hardware_rules)')
-  rules.each do |r|
-    Array((r['applies_to'] || {})['cabinet_type']).each do |t|
-      NxTest.assert(NxH12a::CT.known?(t), "seed pravidlo #{r['rule_id']} filtruje neznamy typ #{t}")
-    end
-  end
-end
+# T3c (pasca zavesov CN-03) zije od H13 v `test_h13_rozsirovacie_body.rb`
+# (rovnaka kontrola + zoznam vynimiek s dovodom a negativne testy).
 
 NxTest.test('H12a T3e: main.rb nacita register za build_plan a PRED construction/hardware_rules/builderom') do
   main = NxH12a.src('noxun_engine', 'main.rb')
