@@ -27,7 +27,7 @@ v0.15.4 zapíše 3 — potom v0.15.3 a starší zákazku v Rozpočte needituje a
 **Ochranu pred poškodeným súborom nastavení (H9) má len 0.17.7+, ochranu dvoch okien (H10a) len 0.17.8+ — aktualizovať obe PC a po aktualizácii zavrieť všetky okná SketchUpu** (staré okno zapisuje bez revízie; formát súborov sa nemení). **Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin
 počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
 
-**Testy (H10a, PR #?):** **5063 headless · 150 JS sád** zelené + encoding guard; in-SU (brána) **3324 / 0** na hlave `c830688a` (scenár `run_h10a` v izolovanom sandboxe).
+**Testy (H10a, PR #?):** **5065 headless · 150 JS sád** zelené + encoding guard; in-SU (brána) **3324 / 0** na hlave `c830688a` (scenár `run_h10a` v izolovanom sandboxe).
 
 ## Robí sa
 

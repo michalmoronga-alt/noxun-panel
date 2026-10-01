@@ -29,8 +29,8 @@
   vyhodnotený `case` (H-RACE — FIX 4). Klient: pin `RD_GLOBAL_REV` sa posúva **len** pri prvom naplnení, pri zdroji `global` a na `RD.setGlobalRev` (BLOCKER 1).
   **Q1 bez odpovede** → vratná voľba z package (konflikt = neuloží sa nič, ani projekt). Prevádzková podmienka: po aktualizácii zavrieť všetky okná SketchUpu na PC.
   Kód pluginu +315 / −35 riadkov s komentármi (bez `?v=`). **Charakterizácia** C1 (commit `9cbac8b4`, zelená na main): jedno okno = bajtovo rovnaký súbor, aj cez
-  `save_library!`; golden kovania bez pregenerovania. **Testy:** 5063 headless · 150 JS sád + encoding guard; nové `test_h10a_globalne_pravidla.rb` (23 testov)
-  a `test_h10a_pin.js` (23 kontrol); `test_st3b_rules.rb` a R-37 T15 prevzaté na `baseline_state`/`global_rev`; **mutácie 14/14 zabité** (M1–M14 package).
+  `save_library!`; golden kovania bez pregenerovania. **Testy:** 5065 headless · 150 JS sád + encoding guard; nové `test_h10a_globalne_pravidla.rb` (25 testov)
+  a `test_h10a_pin.js` (23 kontrol); `test_st3b_rules.rb` a R-37 T15 prevzaté na `baseline_state`/`global_rev`; **mutácie 16/16 zabité** (M1–M14 package + M15/M16 po predrecenzii). **Predrecenzia:** 0× P1, 1× P2 (chýbajúci test vetvy `:blocked` po prestavbe), 1× P3 (test pinu pri Načítať globálne) — doplnené testami, logika bez nálezov.
   **In-SU (brána):** 3324 / 0 na hlave `c830688a` — `run_h10a` v izolovanom sandboxe (H-PRE bez kroku Späť, vedomé prepísanie, H-RACE + jeden Späť vráti snapshot aj
   kovanie, živé pravidlá bajtovo nedotknuté). STAV pred dávkou: v0.17.7 · H9 hotová · Robí sa H6/H7 (mockupy), nasleduje H10 · Ďalší krok H10.
 - **H9 · súbor nastavení zlého tvaru = poškodený (1.10.2026, PR #442, v0.17.7, blok 9 · HARDENING PO V1, register R-37; package

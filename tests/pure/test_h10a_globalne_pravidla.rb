@@ -788,6 +788,63 @@ NxTest.test('H10a T-A4: :unreadable a :write_failed po prestavbe — pin bez zme
   end
 end
 
+NxTest.test('H10a T-A4: brana az POD zamkom po prestavbe (:blocked) — veta brany, globál nedotknuty, pin bez zmeny') do
+  NxTest.skip!('okno Pravidla headless') unless NxTest.headless? && !Object.const_defined?(:Sketchup)
+  r = NxH10a
+  s = NxH10aSave
+  r.with_lib do
+    r::HR.write(r::HR::SEED_RULES)
+    model = s.model
+    s.with_dialog(model) do |log|
+      pay = s::RD.rules_payload(model)
+      orig = r::HR.method(:save_library!)
+      reason = nil
+      before = nil
+      r::HR.define_singleton_method(:save_library!) do |rules, rev|
+        # Predkontrola prebehla nad zdravym suborom; medzi nou a zamkom sa
+        # subor poskodil (degradovany: poskodeny primar + platna zaloha).
+        NxH10a.make_degraded
+        reason = r::HR.write_gate.last
+        before = NxH10a.files
+        orig.call(rules, rev)
+      end
+      begin
+        form = r.toggled('leg', pay['rules'])
+        rec = s.save(model, pay, form, also_global: true)
+      ensure
+        r::HR.define_singleton_method(:save_library!, orig)
+      end
+      NxTest.assert(reason.to_s.include?('poškodené'), "brana pod zamkom (#{reason})")
+      NxTest.assert_equal(["Pravidlá uložené do projektu — #{reason} — prestavaných 0 skriniek.", false],
+                          s.last_status(rec), 'veta brany, nie konflikt ani „zápis zlyhal"')
+      NxTest.assert_equal(before, r.files, 'globalny primar aj .bak nedotknute')
+      NxTest.assert_equal(r::HR.normalize_rules(form), s.snapshot(model), 'projekt ulozeny')
+      NxTest.assert_equal([], s.global_revs(rec), 'pin bez zmeny, prepis sa neponuka')
+      NxTest.assert_equal(1, log[:after])
+    end
+  end
+end
+
+NxTest.test('H10a T-A2: „Načítať globálne" posle pravidla AJ revíziu globalu (pin)') do
+  NxTest.skip!('okno Pravidla headless') unless NxTest.headless? && !Object.const_defined?(:Sketchup)
+  r = NxH10a
+  s = NxH10aSave
+  r.with_lib do
+    r::HR.write(r.toggled('hinge'))
+    model = s.model
+    s.with_dialog(model) do |_log|
+      rec = []
+      s::RD.dispatch('load_global', '', ->(x) { rec << x.to_s })
+      line = rec.find { |x| x.start_with?('RD.setRules(') }
+      NxTest.assert(line, 'formular dostal globál')
+      NxTest.assert_equal([r::HR.library_check[:rev]], s.global_revs(rec), 'pin = revizia nacitaneho globalu')
+      NxTest.assert(line.index('RD.setRules(') < line.index('RD.setGlobalRev('), 'v jednom skripte, za pravidlami')
+      NxTest.assert(line.include?('if (window.RD && RD.setGlobalRev)'), 'guard pre DOM bez prijimaca')
+      NxTest.assert_equal([], model.ops, 'nacitanie nic nezapisuje do modelu')
+    end
+  end
+end
+
 # =============================================================================
 # A5 · strukturalne guardy zdroja
 # =============================================================================
