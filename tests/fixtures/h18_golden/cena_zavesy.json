@@ -1,0 +1,594 @@
+{
+  "expansion": {
+    "rows": [
+      {
+        "code": "104717",
+        "quantity": 4,
+        "sources": [
+          {
+            "cabinet_id": "CAB-B",
+            "owner_part_key": "front:F1/wing:left",
+            "generic_type": "hinge",
+            "rule_id": "h18-fixture",
+            "set_id": "zaves-klasik",
+            "quantity": 2
+          },
+          {
+            "cabinet_id": "CAB-C",
+            "owner_part_key": "front:F2/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "h18-fixture",
+            "set_id": "zaves-klasik",
+            "quantity": 2
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "HETTICH 9071205 Sensys záves naložený 110° TH skrutka SiSy",
+        "category": "ZAVESY",
+        "unit": "ks",
+        "price_eur_vat": 4.18,
+        "manual_note": null,
+        "subtotal_eur_vat": 16.72
+      },
+      {
+        "code": "105408",
+        "quantity": 8,
+        "sources": [
+          {
+            "cabinet_id": "CAB-A",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "h18-fixture",
+            "set_id": "zaves-p2o",
+            "quantity": 2
+          },
+          {
+            "cabinet_id": "CAB-B",
+            "owner_part_key": "front:F1/wing:left",
+            "generic_type": "hinge",
+            "rule_id": "h18-fixture",
+            "set_id": "zaves-klasik",
+            "quantity": 2
+          },
+          {
+            "cabinet_id": "CAB-C",
+            "owner_part_key": "front:F2/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "h18-fixture",
+            "set_id": "zaves-klasik",
+            "quantity": 2
+          },
+          {
+            "cabinet_id": "CAB-D",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "h18-fixture",
+            "set_id": "zaves-p2o",
+            "quantity": 2
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "HETTICH 9088251 Sensys krytka pre misku TH",
+        "category": "ZAVESY",
+        "unit": "ks",
+        "price_eur_vat": 0.25,
+        "manual_note": null,
+        "subtotal_eur_vat": 2.0
+      },
+      {
+        "code": "105425",
+        "quantity": 8,
+        "sources": [
+          {
+            "cabinet_id": "CAB-A",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "h18-fixture",
+            "set_id": "zaves-p2o",
+            "quantity": 2
+          },
+          {
+            "cabinet_id": "CAB-B",
+            "owner_part_key": "front:F1/wing:left",
+            "generic_type": "hinge",
+            "rule_id": "h18-fixture",
+            "set_id": "zaves-klasik",
+            "quantity": 2
+          },
+          {
+            "cabinet_id": "CAB-C",
+            "owner_part_key": "front:F2/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "h18-fixture",
+            "set_id": "zaves-klasik",
+            "quantity": 2
+          },
+          {
+            "cabinet_id": "CAB-D",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "h18-fixture",
+            "set_id": "zaves-p2o",
+            "quantity": 2
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "HETTICH 9088250 Sensys krytka ramienka logo Hettich",
+        "category": "ZAVESY",
+        "unit": "ks",
+        "price_eur_vat": 0.19,
+        "manual_note": null,
+        "subtotal_eur_vat": 1.52
+      },
+      {
+        "code": "106412",
+        "quantity": 8,
+        "sources": [
+          {
+            "cabinet_id": "CAB-A",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "h18-fixture",
+            "set_id": "zaves-p2o",
+            "quantity": 2
+          },
+          {
+            "cabinet_id": "CAB-B",
+            "owner_part_key": "front:F1/wing:left",
+            "generic_type": "hinge",
+            "rule_id": "h18-fixture",
+            "set_id": "zaves-klasik",
+            "quantity": 2
+          },
+          {
+            "cabinet_id": "CAB-C",
+            "owner_part_key": "front:F2/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "h18-fixture",
+            "set_id": "zaves-klasik",
+            "quantity": 2
+          },
+          {
+            "cabinet_id": "CAB-D",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "h18-fixture",
+            "set_id": "zaves-p2o",
+            "quantity": 2
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "HETTICH 9071656 Sensys montážna podložka krížová D1,5 excenter hmoždinka",
+        "category": "ZAVESY",
+        "unit": "ks",
+        "price_eur_vat": 0.97,
+        "manual_note": null,
+        "subtotal_eur_vat": 7.76
+      },
+      {
+        "code": "245723",
+        "quantity": 4,
+        "sources": [
+          {
+            "cabinet_id": "CAB-A",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "h18-fixture",
+            "set_id": "zaves-p2o",
+            "quantity": 2
+          },
+          {
+            "cabinet_id": "CAB-D",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "h18-fixture",
+            "set_id": "zaves-p2o",
+            "quantity": 2
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "HETTICH 9071313 Sensys záves naložený 110° TH skrutka PTO",
+        "category": "ZAVESY",
+        "unit": "ks",
+        "price_eur_vat": 3.52,
+        "manual_note": null,
+        "subtotal_eur_vat": 14.08
+      },
+      {
+        "code": "250831",
+        "quantity": 2,
+        "sources": [
+          {
+            "cabinet_id": "CAB-A",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "h18-fixture",
+            "set_id": "zaves-p2o",
+            "quantity": 1
+          },
+          {
+            "cabinet_id": "CAB-D",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "h18-fixture",
+            "set_id": "zaves-p2o",
+            "quantity": 1
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "BLUM 956A1004 Tip-on pre závesy,76mm,magnet,komplet,biela",
+        "category": "ZAVESY",
+        "unit": "ks",
+        "price_eur_vat": 6.93,
+        "manual_note": null,
+        "subtotal_eur_vat": 13.86
+      },
+      {
+        "code": "X1",
+        "quantity": 2,
+        "sources": [
+          {
+            "cabinet_id": "CAB-E",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "h18-fixture",
+            "set_id": "moj-zaves",
+            "quantity": 2
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": true,
+        "name_sk": null,
+        "category": null,
+        "unit": null,
+        "price_eur_vat": null,
+        "manual_note": null,
+        "subtotal_eur_vat": null
+      }
+    ],
+    "unmapped": [
+      {
+        "cabinet_id": "CAB-B",
+        "owner_part_key": "front:F1/wing:right",
+        "generic_type": "hinge",
+        "rule_id": "h18-fixture",
+        "quantity": 2,
+        "set_id": "zaves-p2o",
+        "reason": "hinge_set_mismatch",
+        "nominal_length": null,
+        "params_label": null,
+        "detail": "opening_mode"
+      },
+      {
+        "cabinet_id": "CAB-C",
+        "owner_part_key": "front:F1/wing:single",
+        "generic_type": "hinge",
+        "rule_id": "h18-fixture",
+        "quantity": 2,
+        "set_id": "zaves-klasik",
+        "reason": "hinge_set_mismatch",
+        "nominal_length": null,
+        "params_label": null,
+        "detail": "opening_mode"
+      }
+    ],
+    "notes": [
+      {
+        "code": "hinge_set_unclassified",
+        "set_id": "moj-zaves",
+        "set_name": "Môj záves (nezaradený)",
+        "cabinet_id": "CAB-E",
+        "owner_part_key": "front:F1/wing:single",
+        "generic_type": "hinge",
+        "rule_id": "h18-fixture"
+      }
+    ],
+    "summary": {
+      "rows": 7,
+      "quantity": 36,
+      "total_eur_vat": 55.94,
+      "unknown_prices": 1,
+      "unmapped": 2
+    }
+  },
+  "csv": "\"NOXUN kovanie — nákupný zoznam\";\"H18 GOLDEN\";\"2026-10-02\"\r\n\"kategória\";\"kód\";\"názov\";\"počet\";\"MJ\";\"cena € s DPH\";\"medzisúčet € s DPH\"\r\n\"ZAVESY\";\"104717\";\"HETTICH 9071205 Sensys záves naložený 110° TH skrutka SiSy\";\"4\";\"ks\";\"4,18\";\"16,72\"\r\n\"ZAVESY\";\"105408\";\"HETTICH 9088251 Sensys krytka pre misku TH\";\"8\";\"ks\";\"0,25\";\"2,00\"\r\n\"ZAVESY\";\"105425\";\"HETTICH 9088250 Sensys krytka ramienka logo Hettich\";\"8\";\"ks\";\"0,19\";\"1,52\"\r\n\"ZAVESY\";\"106412\";\"HETTICH 9071656 Sensys montážna podložka krížová D1,5 excenter hmoždinka\";\"8\";\"ks\";\"0,97\";\"7,76\"\r\n\"ZAVESY\";\"245723\";\"HETTICH 9071313 Sensys záves naložený 110° TH skrutka PTO\";\"4\";\"ks\";\"3,52\";\"14,08\"\r\n\"ZAVESY\";\"250831\";\"BLUM 956A1004 Tip-on pre závesy,76mm,magnet,komplet,biela\";\"2\";\"ks\";\"6,93\";\"13,86\"\r\n\"MIMO KATALÓGU\";\"X1\";\"\";\"2\";\"\";\"\";\"\"\r\n\"SPOLU (len známe ceny)\";\"\";\"\";\"36\";\"\";\"\";\"55,94\"\r\n\r\n\"NEMAPOVANÉ (bez kódov — nenacenené)\";\"dôvod\";\"kde\";\"počet\";\"rozmer\";\"\";\"\"\r\n\"hinge\";\"set „zaves-p2o“ nesedí s čelom (iný spôsob otvárania) — vyber správny set alebo Pravidlá → Doplniť nové predvoľby\";\"CAB-B front:F1/wing:right\";\"2\";\"\";\"\";\"\"\r\n\"hinge\";\"set „zaves-klasik“ nesedí s čelom (iný spôsob otvárania) — vyber správny set alebo Pravidlá → Doplniť nové predvoľby\";\"CAB-C front:F1/wing:single\";\"2\";\"\";\"\";\"\"\r\n",
+  "hardware": [
+    {
+      "key": "hardware",
+      "name": "Kovanie",
+      "rows": [
+        {
+          "key": "hw:104717",
+          "nazov": "HETTICH 9071205 Sensys záves naložený 110° TH skrutka SiSy",
+          "kod": "104717",
+          "dodavatel": "Demos",
+          "mj": "KS",
+          "mnozstvo": 4,
+          "cena_mj": 4.18,
+          "spolu": 16.72,
+          "spolu_auto": 16.72,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "ZAVESY",
+          "product_link": true
+        },
+        {
+          "key": "hw:105408",
+          "nazov": "HETTICH 9088251 Sensys krytka pre misku TH",
+          "kod": "105408",
+          "dodavatel": "Demos",
+          "mj": "KS",
+          "mnozstvo": 8,
+          "cena_mj": 0.25,
+          "spolu": 2.0,
+          "spolu_auto": 2.0,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "ZAVESY",
+          "product_link": true
+        },
+        {
+          "key": "hw:105425",
+          "nazov": "HETTICH 9088250 Sensys krytka ramienka logo Hettich",
+          "kod": "105425",
+          "dodavatel": "Demos",
+          "mj": "KS",
+          "mnozstvo": 8,
+          "cena_mj": 0.19,
+          "spolu": 1.52,
+          "spolu_auto": 1.52,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "ZAVESY",
+          "product_link": true
+        },
+        {
+          "key": "hw:106412",
+          "nazov": "HETTICH 9071656 Sensys montážna podložka krížová D1,5 excenter hmoždinka",
+          "kod": "106412",
+          "dodavatel": "Demos",
+          "mj": "KS",
+          "mnozstvo": 8,
+          "cena_mj": 0.97,
+          "spolu": 7.76,
+          "spolu_auto": 7.76,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "ZAVESY",
+          "product_link": true
+        },
+        {
+          "key": "hw:245723",
+          "nazov": "HETTICH 9071313 Sensys záves naložený 110° TH skrutka PTO",
+          "kod": "245723",
+          "dodavatel": "Demos",
+          "mj": "KS",
+          "mnozstvo": 4,
+          "cena_mj": 3.52,
+          "spolu": 14.08,
+          "spolu_auto": 14.08,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "ZAVESY",
+          "product_link": true
+        },
+        {
+          "key": "hw:250831",
+          "nazov": "BLUM 956A1004 Tip-on pre závesy,76mm,magnet,komplet,biela",
+          "kod": "250831",
+          "dodavatel": "Demos",
+          "mj": "KS",
+          "mnozstvo": 2,
+          "cena_mj": 6.93,
+          "spolu": 13.86,
+          "spolu_auto": 13.86,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "ZAVESY",
+          "product_link": true
+        },
+        {
+          "key": "hw:x1",
+          "nazov": "X1",
+          "kod": "X1",
+          "dodavatel": null,
+          "mj": "KS",
+          "mnozstvo": 2,
+          "cena_mj": null,
+          "spolu": null,
+          "spolu_auto": null,
+          "poznamka": "kód nie je v katalógu kovania",
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": true,
+          "category": null
+        }
+      ],
+      "subtotal": 55.94,
+      "unknown_count": 1,
+      "complete": false,
+      "counts_in_total": true
+    }
+  ],
+  "totals": {
+    "raw_total": 715.94,
+    "rounding": 0.06,
+    "rounding_step": 1.0,
+    "total": 716.0,
+    "total_novat": 582.11,
+    "unknown_count": 2,
+    "unknown_count_in_total": 2,
+    "complete": false,
+    "appliances_included": false,
+    "appliances_subtotal": 0.0,
+    "subtotals": {
+      "materials": 0,
+      "abs": 0,
+      "hardware": 55.94,
+      "services": 0.0,
+      "standard_rows": 660.0,
+      "custom": 0,
+      "appliances": 0,
+      "rounding": 0.06
+    }
+  },
+  "cp_rows": {
+    "rows": [
+      {
+        "key": "cp:assembly",
+        "polozka": "Nábytková zostava – plošný a doplnkový materiál",
+        "cena": 156.0,
+        "mnozstvo": 1,
+        "mj": "set",
+        "kind": "assembly"
+      },
+      {
+        "key": "cp:zameranie",
+        "polozka": "Zameranie",
+        "cena": 0.0,
+        "mnozstvo": 1,
+        "mj": "set",
+        "kind": "fixed"
+      },
+      {
+        "key": "cp:vizualizacie",
+        "polozka": "Vizualizácie a príprava dokumentácie",
+        "cena": 0.0,
+        "mnozstvo": 1,
+        "mj": "set",
+        "kind": "fixed"
+      },
+      {
+        "key": "cp:rezia",
+        "polozka": "Prípravné a prevádzkové náklady a kompletačné položky",
+        "cena": 400.0,
+        "mnozstvo": 1,
+        "mj": "set",
+        "kind": "fixed"
+      },
+      {
+        "key": "cp:doprava",
+        "polozka": "Doprava",
+        "cena": 160.0,
+        "mnozstvo": 1,
+        "mj": "závoz",
+        "kind": "fixed"
+      }
+    ],
+    "total": 716.0,
+    "total_label": "SPOLU",
+    "budget_total": 716.0,
+    "diff": 0.0,
+    "consistent": true,
+    "assembly": 156.0,
+    "assembly_negative": false,
+    "unknown_count": 2,
+    "complete": false,
+    "threshold": 150.0,
+    "candidates": [
+      {
+        "source_key": "hw:104717",
+        "section": "hardware",
+        "label": "HETTICH Sensys záves naložený 110° TH skrutka SiSy",
+        "amount": 16.72,
+        "mnozstvo": 4,
+        "mj": "ks",
+        "state": "zostava",
+        "suggested": false,
+        "overridden": false
+      },
+      {
+        "source_key": "hw:245723",
+        "section": "hardware",
+        "label": "HETTICH Sensys záves naložený 110° TH skrutka PTO",
+        "amount": 14.08,
+        "mnozstvo": 4,
+        "mj": "ks",
+        "state": "zostava",
+        "suggested": false,
+        "overridden": false
+      },
+      {
+        "source_key": "hw:250831",
+        "section": "hardware",
+        "label": "BLUM 956A1004 Tip-on pre závesy,76mm,magnet,komplet,biela",
+        "amount": 13.86,
+        "mnozstvo": 2,
+        "mj": "ks",
+        "state": "zostava",
+        "suggested": false,
+        "overridden": false
+      },
+      {
+        "source_key": "hw:106412",
+        "section": "hardware",
+        "label": "HETTICH Sensys montážna podložka krížová D1,5 excenter hmoždinka",
+        "amount": 7.76,
+        "mnozstvo": 8,
+        "mj": "ks",
+        "state": "zostava",
+        "suggested": false,
+        "overridden": false
+      },
+      {
+        "source_key": "hw:105408",
+        "section": "hardware",
+        "label": "HETTICH Sensys krytka pre misku TH",
+        "amount": 2.0,
+        "mnozstvo": 8,
+        "mj": "ks",
+        "state": "zostava",
+        "suggested": false,
+        "overridden": false
+      },
+      {
+        "source_key": "hw:105425",
+        "section": "hardware",
+        "label": "HETTICH Sensys krytka ramienka logo Hettich",
+        "amount": 1.52,
+        "mnozstvo": 8,
+        "mj": "ks",
+        "state": "zostava",
+        "suggested": false,
+        "overridden": false
+      }
+    ],
+    "separate_count": 0,
+    "rezia_text": "Táto položka zahŕňa všetky nevyhnutné náklady súvisiace s realizáciou interiéru, vrátane prípravných prác, spotrebného a pomocného materiálu, logistiky, konzultácií, poradenstva, administratívnych prác a ostatných prevádzkových výdavkov potrebných na zabezpečenie kvalitnej a bezproblémovej realizácie projektu."
+  },
+  "specification": {
+    "categories": [
+      {
+        "key": "zavesy",
+        "name": "ZÁVESY",
+        "items": [
+          "BLUM 956A1004 Tip-on pre závesy,76mm,magnet,komplet,biela",
+          "HETTICH Sensys krytka pre misku TH",
+          "HETTICH Sensys krytka ramienka logo Hettich",
+          "HETTICH Sensys montážna podložka krížová D1,5 excenter hmoždinka",
+          "HETTICH Sensys záves naložený 110° TH skrutka PTO",
+          "HETTICH Sensys záves naložený 110° TH skrutka SiSy"
+        ]
+      }
+    ],
+    "item_count": 6
+  }
+}
