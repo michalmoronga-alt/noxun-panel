@@ -28230,14 +28230,16 @@ module NoxunSuRunner
       e::Panel.handle_insert(pg(model, GHOST_PARAMS.dup))
       state[:h11a_tool2] = ghost_tool
       ok('H11a Q5: novy ghost sa zavesil', !state[:h11a_tool2].nil? && state[:h11a_tool2].attached? && !ghost_session.nil?)
-      e::Panel.hide
     end]
+    # Nove okno sa zatvara az po nacitani (vzor D-52b) — zatvorenie v tom istom
+    # ticku, v ktorom vzniklo, CEF `set_on_closed` nespolahlivo nedorucil.
+    steps << [SETTLE, lambda { e::Panel.hide }]
     steps << [SETTLE, lambda do
       t2 = state[:h11a_tool2]
-      ok('H11a Q5: novy ghost sa rucnym zatvorenim zrusil normalne (Vyber, ziadna session)',
+      ok("H11a Q5: novy ghost sa rucnym zatvorenim zrusil normalne (Vyber, ziadna session; #{model.tools.active_tool_name})",
          !t2.nil? && !t2.attached? && ghost_session.nil? && h11a_selection_tool?(model))
-      ok('H11a Q5: posledne zatvorenie islo normalnou cestou',
-         h11a_trace.last(4).include?('hook:inspector:normal'))
+      ok("H11a Q5: posledne zatvorenie islo normalnou cestou (#{h11a_trace.last(4).inspect})",
+         e::Panel.dialog_closed? && h11a_trace.last(4).include?('hook:inspector:normal'))
       h11a_teardown(model)
     end]
 
@@ -28257,11 +28259,11 @@ module NoxunSuRunner
       ok("H11a Q5b: nove Studio ma vlastny observer, Inspector odpojeny (#{h11a_observers(model).inspect})",
          h11a_observers(model) == %i[nil model])
       ok('H11a Q5b: otvorenie Studia potvrdilo beh (priznak dole)', !h11a_lc.quitting?)
-      e::StudioDialog.hide
     end]
+    steps << [SETTLE, lambda { e::StudioDialog.hide }]
     steps << [SETTLE, lambda do
-      ok('H11a Q5b: Studio sa zatvorilo normalnou cestou', e::StudioDialog.dialog_closed? &&
-         h11a_trace.last(4).include?('hook:studio:normal'))
+      ok("H11a Q5b: Studio sa zatvorilo normalnou cestou (#{h11a_trace.last(4).inspect})",
+         e::StudioDialog.dialog_closed? && h11a_trace.last(4).include?('hook:studio:normal'))
       h11a_teardown(model)
     end]
 

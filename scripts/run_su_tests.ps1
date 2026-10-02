@@ -35,7 +35,19 @@
 # relacii a izolovat sa nepodarila (File/New vs. save, okna, overlay ani
 # nastroje to nie su). Skript exit kod instancie vypise (aj hex), ale verdikt
 # testov sa nim NEMENI - ten je hotovy skor.
-param([switch]$CloseWhenDone)
+#
+# -QuitProbe (H11a, F-01, package H11 §A6): namiesto celej sady nacita kratky
+# tests/sketchup/su_quit_probe.rb (Inspector + Studio otvorene, ghost na kurzore,
+# stopa AppLifecycle do quit_trace.txt cez vopred otvoreny handle, ulozenie
+# run-kopie, Sketchup.quit). Zdiela zamok, sentinel aj run_* priecinok; proces
+# sa ukonci SAM (prepinac -CloseWhenDone sa ignoruje). Verdikt az PO zaniku
+# procesu (max 120 s, nikdy nezabija): PASS = exit kod 0 · presne 1x on_quit ·
+# ziadny pop:executed po on_quit · kazdy hook po on_quit = quitting · ziadny
+# hook:*:normal medzi probe:saved a on_quit. FAIL = cokolvek ine VRATANE
+# 0xC0000374. Vypise `QUIT-TEST: PASS|FAIL` + stopu, exit 0/1. S -QuitMenu sonda
+# ukonci SketchUp cestou pouzivatela Subor > Koniec (send_action 57665; poistka
+# Sketchup.quit po 8 s) namiesto Sketchup.quit.
+param([switch]$CloseWhenDone, [switch]$QuitProbe, [switch]$QuitMenu)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
 $su = 'C:\Program Files\SketchUp\SketchUp 2026\SketchUp\SketchUp.exe'
@@ -165,7 +177,10 @@ try {
   function ConvertTo-RubySq([string]$s) {
     return ($s -replace '\\', '/') -replace "'", "\'"
   }
-  $runner = ConvertTo-RubySq (Join-Path $repo 'tests\sketchup\su_runner.rb')
+  $runnerFile = 'su_runner.rb'
+  if ($QuitProbe) { $runnerFile = 'su_quit_probe.rb' }
+  $runner = ConvertTo-RubySq (Join-Path $repo ('tests\sketchup\' + $runnerFile))
+  $quitTrace = Join-Path $work 'quit_trace.txt'
   $outRb = ConvertTo-RubySq $out
   $appdataRb = ConvertTo-RubySq $appdata
   $boot = Join-Path $work 'boot.rb'
@@ -177,6 +192,8 @@ try {
   $bootHead = @'
 ENV['APPDATA'] = '__NOXUN_APPDATA__'
 ENV['NOXUN_SU_OUT'] = '__NOXUN_OUT__'
+ENV['NOXUN_QUIT_TRACE'] = '__NOXUN_QUIT_TRACE__'
+ENV['NOXUN_QUIT_VIA'] = '__NOXUN_QUIT_VIA__'
 '@
   # -CloseWhenDone: samozatvorenie bezi VNUTRI SketchUpu (Ruby timer), nie zo
   # skriptu - skript by musel proces zabit a to je zakazane. Timer sa instaluje
@@ -297,9 +314,15 @@ rescue ScriptError, StandardError => ex
 end
 '@
   $bootText = $bootHead + "`n"
-  if ($CloseWhenDone) { $bootText += $closeBlock + "`n" }
+  # -QuitProbe sa ukoncuje sam (Sketchup.quit v sonde) — samozatvaraci blok by
+  # s nim pretekal o to iste ukoncenie.
+  if ($CloseWhenDone -and -not $QuitProbe) { $bootText += $closeBlock + "`n" }
   $bootText += $bootLoad + "`n"
   $bootText = $bootText.Replace('__NOXUN_APPDATA__', $appdataRb).Replace('__NOXUN_OUT__', $outRb)
+  $bootText = $bootText.Replace('__NOXUN_QUIT_TRACE__', (ConvertTo-RubySq $quitTrace))
+  $quitVia = 'quit'
+  if ($QuitMenu) { $quitVia = 'menu' }
+  $bootText = $bootText.Replace('__NOXUN_QUIT_VIA__', $quitVia)
   $bootText = $bootText.Replace('__NOXUN_RUNNER__', $runner).Replace('__NOXUN_CLOSE_LOG__', (ConvertTo-RubySq $closeLog))
   $bootText = $bootText -replace "`r`n", "`n"
   [System.IO.File]::WriteAllText($boot, $bootText, (New-Object System.Text.UTF8Encoding($false)))
@@ -330,6 +353,49 @@ end
     Remove-Item $sentinel -Force -ErrorAction SilentlyContinue -Confirm:$false
     Write-Host ''
     Get-Content $out -Encoding UTF8 | Write-Host
+    if ($QuitProbe) {
+      # QUIT TEST (H11a §A6): verdikt AZ PO zaniku procesu — exit kod je jeho sucast.
+      $quitWaitS = 120
+      Write-Host ('QUIT-TEST: cakam na zanik procesu SketchUpu (PID ' + $suProc.Id + ', max ' + $quitWaitS + ' s)...')
+      $why = New-Object System.Collections.Generic.List[string]
+      if ($suProc.WaitForExit($quitWaitS * 1000)) {
+        $suExit = $suProc.ExitCode
+        Write-Host ('QUIT-TEST: exit kod ' + $suExit + ' (0x' + ('{0:X8}' -f $suExit) + ')')
+        if ($suExit -ne 0) { $why.Add('exit kod ' + $suExit + ' (0x' + ('{0:X8}' -f $suExit) + ') - ma byt 0') }
+      } else {
+        $why.Add('proces nezanikol do ' + $quitWaitS + ' s - skript ho NEZABIJA, zavri ho rucne')
+      }
+      $probeFails = (Select-String -Path $out -Pattern '^FAIL:' | Measure-Object).Count
+      if ($probeFails -gt 0) { $why.Add('priprava sondy: ' + $probeFails + ' FAIL') }
+      $trace = @()
+      if (Test-Path $quitTrace) { $trace = @(Get-Content $quitTrace -Encoding UTF8 | Where-Object { $_ -ne '' }) }
+      $iSaved = [Array]::IndexOf($trace, 'probe:saved')
+      $iQuit = [Array]::IndexOf($trace, 'on_quit')
+      $quits = @($trace | Where-Object { $_ -eq 'on_quit' }).Count
+      if ($iSaved -lt 0) { $why.Add('v stope chyba probe:saved (sonda sa nepripravila)') }
+      if ($quits -ne 1) { $why.Add('on_quit ' + $quits + 'x - ma byt presne 1x') }
+      if ($iQuit -ge 0) {
+        for ($i = $iQuit + 1; $i -lt $trace.Count; $i++) {
+          $ev = $trace[$i]
+          if ($ev -eq 'pop:executed') { $why.Add('pop:executed PO on_quit (riadok ' + ($i + 1) + ')') }
+          if ($ev -like 'hook:*' -and $ev -notlike '*:quitting') { $why.Add($ev + ' PO on_quit nema rezim quitting') }
+        }
+        if ($iSaved -ge 0) {
+          for ($i = $iSaved + 1; $i -lt $iQuit; $i++) {
+            if ($trace[$i] -like 'hook:*:normal') { $why.Add($trace[$i] + ' medzi ulozenim a on_quit (poradie B)') }
+          }
+        }
+      }
+      Write-Host ('QUIT-TEST stopa (' + $quitTrace + '):')
+      $trace | ForEach-Object { Write-Host ('  ' + $_) }
+      if ($why.Count -eq 0) {
+        Write-Host 'QUIT-TEST: PASS'
+        $exitCode = 0
+      } else {
+        Write-Host 'QUIT-TEST: FAIL'
+        $why | ForEach-Object { Write-Host ('  - ' + $_) }
+      }
+    } else {
     # SKIP alebo nula PASS = zlyhanie (Codex review PR #20): beh bez testov nesmie byt zeleny.
     $failed = (Select-String -Path $out -Pattern '^FAIL:' | Measure-Object).Count
     $skipped = (Select-String -Path $out -Pattern '^SKIP:' | Measure-Object).Count
@@ -357,6 +423,7 @@ end
       }
       if (Test-Path $closeLog) { Get-Content $closeLog -Encoding UTF8 | ForEach-Object { Write-Host ('  close.log: ' + $_) } }
       else { Write-Host ('  close.log chyba (' + $closeLog + ') - boot.rb sa k zatvaraniu nedostal.') }
+    }
     }
   } else {
     Write-Host 'TIMEOUT po 8 min.'

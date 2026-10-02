@@ -279,7 +279,7 @@ end
 
 NxTest.test('H12a T3e: main.rb nacita register za build_plan a PRED construction/hardware_rules/builderom') do
   main = NxH12a.src('noxun_engine', 'main.rb')
-  at = ->(rel) { main.index("Sketchup.require 'noxun_engine/core/#{rel}'") }
+  at = ->(rel) { main.index("AppLifecycle.require_part 'noxun_engine/core/#{rel}'") }
   reg = at.call('cabinet_types')
   NxTest.assert(reg, 'main.rb nenacitava core/cabinet_types')
   NxTest.assert(at.call('build_plan') < reg, 'register az za build_plan')

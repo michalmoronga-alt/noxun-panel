@@ -1089,10 +1089,10 @@ end
 
 NxTest.test('H7a T-A9: nacitanie — main.rb aj helper poznaju modul (po materials/doc_key, pred production_core)') do
   main = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'main.rb'), encoding: 'UTF-8')
-  i_es = main.index("Sketchup.require 'noxun_engine/core/export_settings'")
-  i_mat = main.index("Sketchup.require 'noxun_engine/core/materials'")
-  i_dk = main.index("Sketchup.require 'noxun_engine/core/doc_key'")
-  i_pc = main.index("Sketchup.require 'noxun_engine/ui/production_core'")
+  i_es = main.index("AppLifecycle.require_part 'noxun_engine/core/export_settings'")
+  i_mat = main.index("AppLifecycle.require_part 'noxun_engine/core/materials'")
+  i_dk = main.index("AppLifecycle.require_part 'noxun_engine/core/doc_key'")
+  i_pc = main.index("AppLifecycle.require_part 'noxun_engine/ui/production_core'")
   NxTest.assert(i_es && i_mat && i_dk && i_pc && i_mat < i_es && i_dk < i_es && i_es < i_pc, 'poradie v main.rb')
   helper = File.read(File.join(NxTest::ROOT, 'tests', 'helper.rb'), encoding: 'UTF-8')
   NxTest.assert(helper.include?('core/export_settings'), 'helper ho nacita headless')

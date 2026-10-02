@@ -91,6 +91,10 @@ module Noxun
         def ensure_dialog
           return @dialog if @dialog
 
+          # H11a: otvorenie NOVEHO okna pri ukoncovani nepride — ak bol priznak
+          # hore, SketchUp bezi dalej a odlozene upratanie sa dokonci HNED
+          # (este pred novym oknom a jeho observermi).
+          AppLifecycle.confirm_running!('otvorený Inspector', sync: true)
           @dialog = UI::HtmlDialog.new(
             dialog_title: 'Noxun Engine',
             preferences_key: DLG_KEY,
@@ -111,15 +115,31 @@ module Noxun
           @dialog.set_file(File.join(Engine.plugin_dir, 'ui', 'panel.html'))
           register_callbacks(@dialog) # pred show!
           @dialog.set_on_closed do
-            detach_observer
-            # D-89a: zvyraznenie hrany zije len s otvorenou kartou — po zatvoreni
-            # panela sa overlay odpoji, aby v modeli neostala visiet ploska.
-            HoverEdge.release if defined?(HoverEdge)
-            # GHOST (V1-04): ghost visiaci na kurzore patri vkladacej karte —
-            # so zatvorenym Inspectorom nema kto vklad dokoncit ani zrusit.
-            # Cancel = 0 mutacii modelu, 0 krokov Spat.
-            GhostTool.cancel_session('zatvorený Inspector') if defined?(GhostTool)
-            @dialog = nil
+            if AppLifecycle.quitting?
+              # H11a (F-01): tento hook bezi aj pri UKONCENI aplikacie a v 2026.2
+              # `pop_tool` z neho konci padom (#1117). Pri ohlasenom
+              # ukoncovani preto ZIADNE SketchUp API: ghost sa zneplatni len
+              # v Ruby (klik uz necommitne) a upratanie sa odlozi — dokonci sa,
+              # ak sa ukaze, ze SketchUp bezi dalej (okno, klik/Esc v nastroji).
+              AppLifecycle.trace('hook:inspector:quitting')
+              orphan = defined?(GhostTool) ? GhostTool.invalidate_session!('zatvorený Inspector') : nil
+              AppLifecycle.defer_until_running('Inspector') do
+                detach_observer if @dialog.nil? # znovu otvoreny panel uz ma vlastne observery
+                HoverEdge.release if defined?(HoverEdge)
+                GhostTool.pop_tool(orphan) if orphan # viazane na INSTANCIU, nie na vrch stacku
+              end
+            else
+              AppLifecycle.trace('hook:inspector:normal')
+              detach_observer
+              # D-89a: zvyraznenie hrany zije len s otvorenou kartou — po zatvoreni
+              # panela sa overlay odpoji, aby v modeli neostala visiet ploska.
+              HoverEdge.release if defined?(HoverEdge)
+              # GHOST (V1-04): ghost visiaci na kurzore patri vkladacej karte —
+              # so zatvorenym Inspectorom nema kto vklad dokoncit ani zrusit.
+              # Cancel = 0 mutacii modelu, 0 krokov Spat.
+              GhostTool.cancel_session('zatvorený Inspector') if defined?(GhostTool)
+            end
+            @dialog = nil # VZDY — bariera aktualizatora (`dialog_closed?`) sa nemeni
           end
           attach_observer
           @dialog
@@ -355,17 +375,22 @@ module Noxun
 end
 
 # Casti panela - reopenuju module Panel (poradie nie je vyznamove; handlery sa volaju az runtime).
-Sketchup.require 'noxun_engine/ui/panel/actions_cabinet'
-Sketchup.require 'noxun_engine/ui/panel/actions_zones'
-Sketchup.require 'noxun_engine/ui/panel/actions_templates'
-Sketchup.require 'noxun_engine/ui/panel/actions_materials'
-Sketchup.require 'noxun_engine/ui/panel/actions_parts'
-Sketchup.require 'noxun_engine/ui/panel/actions_hardware'
-Sketchup.require 'noxun_engine/ui/panel/actions_board' # V0.4.7c samostatna doska
-Sketchup.require 'noxun_engine/ui/panel/actions_appliance' # S1-B2 riadok „Spotrebic"
-Sketchup.require 'noxun_engine/ui/panel/actions_usage' # D-25 merac pouzivania panela
-Sketchup.require 'noxun_engine/ui/panel/actions_settings' # UI-B3 koliesko: tema UI + rozmerove rady
-Sketchup.require 'noxun_engine/ui/panel/sync'
-Sketchup.require 'noxun_engine/ui/panel/resolvers'
-Sketchup.require 'noxun_engine/ui/panel/payloads'
-Sketchup.require 'noxun_engine/ui/panel/selection'
+# H11a: `AppLifecycle.require_part` — chyba casti sa zapise a plugin sa v init nespusti (main.rb).
+module Noxun
+  module Engine
+    AppLifecycle.require_part 'noxun_engine/ui/panel/actions_cabinet'
+    AppLifecycle.require_part 'noxun_engine/ui/panel/actions_zones'
+    AppLifecycle.require_part 'noxun_engine/ui/panel/actions_templates'
+    AppLifecycle.require_part 'noxun_engine/ui/panel/actions_materials'
+    AppLifecycle.require_part 'noxun_engine/ui/panel/actions_parts'
+    AppLifecycle.require_part 'noxun_engine/ui/panel/actions_hardware'
+    AppLifecycle.require_part 'noxun_engine/ui/panel/actions_board' # V0.4.7c samostatna doska
+    AppLifecycle.require_part 'noxun_engine/ui/panel/actions_appliance' # S1-B2 riadok „Spotrebic"
+    AppLifecycle.require_part 'noxun_engine/ui/panel/actions_usage' # D-25 merac pouzivania panela
+    AppLifecycle.require_part 'noxun_engine/ui/panel/actions_settings' # UI-B3 koliesko: tema UI + rozmerove rady
+    AppLifecycle.require_part 'noxun_engine/ui/panel/sync'
+    AppLifecycle.require_part 'noxun_engine/ui/panel/resolvers'
+    AppLifecycle.require_part 'noxun_engine/ui/panel/payloads'
+    AppLifecycle.require_part 'noxun_engine/ui/panel/selection'
+  end
+end

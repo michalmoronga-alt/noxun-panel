@@ -1212,7 +1212,7 @@ NxTest.test('ST-1a: toolbar aj rail vedu do ŠTÚDIA; Výroba zmizla aj z Extens
   rail = panel_html[/<button[^>]*id="railStudio".*?<\/button>/m].to_s
   NxTest.assert(rail.include?('onclick="openStudio()"'),
                 'rail „Štúdio" otvara Studio, nie okno Vyroba')
-  NxTest.assert(ST1B_MAIN_RB.include?("Sketchup.require 'noxun_engine/ui/studio_dialog'"),
+  NxTest.assert(ST1B_MAIN_RB.include?("AppLifecycle.require_part 'noxun_engine/ui/studio_dialog'"),
                 'loader okno nacitava')
 end
 

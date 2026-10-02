@@ -801,7 +801,7 @@ end
 NxTest.test('S1-B2: whitelist panela pozna `set_appliance_owner`') do
   src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel.rb'), encoding: 'UTF-8')
   NxTest.assert(src.include?("cb(dlg, 'set_appliance_owner')"), 'callback je registrovany')
-  NxTest.assert(src.include?("Sketchup.require 'noxun_engine/ui/panel/actions_appliance'"),
+  NxTest.assert(src.include?("AppLifecycle.require_part 'noxun_engine/ui/panel/actions_appliance'"),
                 'a subor sa nacitava')
 end
 
