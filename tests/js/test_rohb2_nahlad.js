@@ -123,6 +123,13 @@ function render(ctx, type, mode, fields, cp, opening, items, hw){
   ctx.renderPreview();
   return ctx.__svg.innerHTML;
 }
+// H6c: koty su v PX (11 px na obrazovke) - riadky kot sa overuju RELATIVNE: text kot,
+// jeho poloha (x v mm sceny, y) a mierka s = 11 / font-size (px na mm kresby).
+function dimText(svg, label){
+  const re = new RegExp('<text x="([-\\d.]+)" y="([-\\d.]+)" font-size="([-\\d.]+)"[^>]*>' + label + '</text>');
+  const m = re.exec(svg);
+  return m ? { x: parseFloat(m[1]), y: parseFloat(m[2]), fs: parseFloat(m[3]), s: 11 / parseFloat(m[3]) } : null;
+}
 // Dielce zostavy v mm SCENY (pad 14): role -> [x, sirka, atributy skupiny + telo].
 function corner(svg){
   const out = {};
@@ -147,19 +154,22 @@ function corner(svg){
   ok(s.indexOf('<title>Slepá časť — blenda korpusová 632 × 584 (materiál korpusu)</title>') >= 0, 'bublina = text servera');
   ok(/<g pointer-events="none"><g class="fgrp" data-front-id="F1">/.test(s), 'Korpus kreslí aj DVERE (O12), bez interakcie');
   ok(/<rect x="16" y="[-\d.]+" width="446" height="616" fill="#e0f2f4"/.test(s), 'dvere 2…448 (otvor + okraje)');
-  // Koty: 450 a 80 tesne pod skrinkou (z −26), sirka o riadok nizsie (z −62).
-  // ry(z) = 14 + (720 − z) → −26: 760, text 751 · −62: 796, text 787.
-  ok(/<text x="239" y="751"[^>]*>450<\/text>/.test(s), 'kóta dverovej časti 450 (stred 0…450) pod skrinkou');
-  ok(/<text x="504" y="751"[^>]*>80<\/text>/.test(s), 'kóta CR 1 = 80 (450…530)');
-  ok(/<text x="564" y="787"[^>]*>Š 1100 mm<\/text>/.test(s), 'šírka o riadok nižšie');
-  ok(!/y="751"[^>]*>Š 1100 mm/.test(s), 'šírka už nie je na mieste kôt rohovej');
+  // Koty: 450 a 80 tesne pod skrinkou (18 px), sirka o riadok (18 px) nizsie - bez „mm" (O11).
+  const k450 = dimText(s, '450'), k80 = dimText(s, '80'), kW = dimText(s, 'Š 1100');
+  ok(k450 && k80 && kW, 'všetky tri kóty existujú (šírka bez „mm")');
+  ok(k450.x === 239 && k450.y === k80.y, 'kóta dverovej časti 450 (stred 0…450) pod skrinkou');
+  eq(k80.x, 504, 'kóta CR 1 = 80 (450…530)');
+  eq(kW.x, 564, 'šírka je vystredená pod celou skrinkou');
+  ok(Math.abs((kW.y - k450.y) - 18 / k450.s) < 0.01, 'šírka o riadok (18 px) nižšie než kóty rohovej');
+  ok(Math.abs(k450.fs * k450.s - 11) < 0.01, 'kóty majú 11 px na obrazovke');
+  ok(!/ mm<\/text>/.test(s), 'v kótach nie je „mm"');
 
   // --- Dvere vpravo: zrkadlo zo servera ---
   s = render(ctx, 'corner_blind', 'cab', {}, CP_R, { x0: 650, w: 450, z0: 100, h: 620 });
   c = corner(s);
   eq([c.corner_blind_panel.x, c.corner_blind_panel.w, c.cr_front.x, c.cr_side.x, c.corner_rail.x], [18, 632, 570, 552, 534],
      'dvere vpravo: celá zostava zrkadlená (súradnice servera)');
-  ok(/<text x="889" y="751"[^>]*>450<\/text>/.test(s) && /<text x="624" y="751"[^>]*>80<\/text>/.test(s), 'kóty zrkadlené (650…1100, 570…650)');
+  ok(dimText(s, '450').x === 889 && dimText(s, '80').x === 624 && dimText(s, '450').y === dimText(s, '80').y, 'kóty zrkadlené (650…1100, 570…650)');
   ok(/<rect x="666" y="[-\d.]+" width="446" height="616" fill="#e0f2f4"/.test(s), 'dvere vpravo 652…1098');
 
   // --- Nezmestena zostava cervenou ---
@@ -184,7 +194,7 @@ function corner(svg){
   // --- Vkladanie: so zostavou, zhasnute cela = vnutro bez nej ---
   s = render(ctx, 'corner_blind', 'insert', {}, CP_L, undefined, null);
   eq(Object.keys(corner(s)).length, 4, 'vkladanie kreslí rohovú tak, ako sa vloží (A6)');
-  ok(/y="751"[^>]*>450</.test(s) && /y="787"[^>]*>Š 1100 mm/.test(s), 'vkladanie: tie isté kóty');
+  ok(dimText(s, '450') && dimText(s, 'Š 1100') && dimText(s, 'Š 1100').y > dimText(s, '450').y, 'vkladanie: tie isté kóty (šírka pod kótami rohovej)');
   get(ctx, "NXLayers.toggle('insert', 'cela', { zony: true, cela: true })");
   eq(Object.keys(corner(render(ctx, 'corner_blind', 'insert', {}, CP_L, undefined, null))).length, 0,
      'zhasnuté čelá odkryjú vnútro — zostava (blenda pred vnútrom) nie');
@@ -193,7 +203,7 @@ function corner(svg){
   // --- Bez kresby servera: ziadna zostava, dnesne koty ---
   s = render(ctx, 'corner_blind', 'cab', {}, null);
   eq(Object.keys(corner(s)).length, 0, 'bez kresby servera sa zostava nekreslí (nič sa nehádá)');
-  ok(/y="751"[^>]*>Š 1100 mm/.test(s), 'a šírka ostáva na svojom mieste');
+  ok(dimText(s, 'Š 1100') && !dimText(s, '450'), 'a šírka je na prvom rade (pod skrinkou, bez kôt rohovej)');
 
   // --- PARITA: ostatne typy su pixel po pixeli rovnake (kresba v globali aj bez) ---
   const LOW = [{ id: 'F1', type: 'drawer_front', mode: 'fixed', z: 102, height: 180, wings_n: 1, profile: 'none' },

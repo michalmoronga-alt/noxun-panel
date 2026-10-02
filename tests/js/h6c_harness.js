@@ -112,7 +112,7 @@ function makeCtx(){
   const byId = { preview: svg };
   const ctx = { console, setTimeout, clearTimeout, window: {}, JSON, Math };
   ctx.document = { getElementById: id => byId[id] || null, querySelectorAll: () => [], querySelector: () => null,
-                   addEventListener(){}, body: { appendChild(){}, setAttribute(){} }, createElement: () => fakeEl() };
+                   addEventListener(){}, removeEventListener(){}, body: { appendChild(){}, setAttribute(){} }, createElement: () => fakeEl() };
   ctx.el = id => byId[id] || null;
   vm.createContext(ctx);
   ['core.js', 'preview.js'].forEach(f => {

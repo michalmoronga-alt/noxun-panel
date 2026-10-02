@@ -61,8 +61,6 @@
   var PV_PART_FILL = '#e5d8b8', PV_PART_STROKE = '#c9b784';
   var PV_DANGER = '#e53935';        // --nx-danger-line
   var PV_DANGER_BG = '#fdecea';     // --nx-err-bg
-  // Koty rohovej: dverova cast a CR 1 tesne pod skrinkou, sirka pod nimi.
-  var PV_CORNER_DIM_Z = -26, PV_CORNER_WIDTH_Z = -62;
   var dragState = null;
   // ===== D-08 / UI-B1: kontext prepina nahlad AJ viditelne skupiny (CSS cez
   // data-view-ctx na <body>). Rezimove taby v hlavicke nahradil RAIL — stavovy
@@ -143,36 +141,96 @@
     });
     return e;
   }
-  // Scena = korpus ∪ cela (fit ukaze aj presahy — Codex F3). Bez presahov je
-  // vysledok identicky s povodnym {0,0,W+2p,H+2p}, drag prepocty sa nemenia.
-  // D-08: v rezime 'cab' scenu rozsiruje rezerva na koty (dole a vpravo, Codex F5).
-  // UI-B2: kazda projekcia si berie prave tolko miesta, kolko jej koty
-  // potrebuju — inak by kota skoncila mimo okna a pouzivatel by ju nenasiel.
-  var DIM_EXT = 70; // mm sceny pre kotovacie ciary a texty
-  // Rezerva NAD kotou hlbky: odsadenie ciary (14) + znacka (7) + text (9) + vzduch.
-  var DIM_TOP = 34;
-  // Odsadenie kotovacej ciary hlbky od skosenej hornej plochy (zdielane so
-  // scenou — inak by sa rezerva a kresba rozisli).
-  var DIM_DEPTH_OFF = 14;
+  // ===== H6c (D-02, O10 A / O11 A): KOTY V PIXELOCH ============================
+  // Kresba (viewBox) ostava v mm modelu — tahanie priecky, vyber zony a klik na
+  // znacku kovania sa nemenia. Kazdy TEXT a kazda CIARA kot ma ale stalu velkost
+  // NA OBRAZOVKE: font = DIM_FONT_PX / s (s = px na mm prave kreslenej kresby,
+  // `pvS`), ciara 1 px (`non-scaling-stroke`). Rezerva okraja na koty je v px
+  // (`nxDimScene`), nie v mm — inak by kota pri vysokej skrinke vysla mimo okna.
+  var DIM_FONT_PX = 11;      // koty, popisy cel, zon, pasiem
+  var DIM_GAP_FONT_PX = 10;  // cisla medzier medzi celami
+  var DIM_TICK_PX = 4;       // pol-dlzka koncovej ciarky
+  var DIM_OFF_PX = 18;       // vodorovna kota pod najnizsim prvkom kresby
+  var DIM_OFF_V_PX = 20;     // zvisla kota vedla obrysu
+  var DIM_TXT_PX = 5;        // text NAD vodorovnou ciarou
+  var DIM_TXT_V_PX = 9;      // stred textu vedla zvislej ciary
+  var DIM_ROW_PX = 18;       // druhy rad kot (rohova: sirka pod dverovou castou)
+  var DIM_DEPTH_OFF_PX = 12; // kota hlbky nad skosenim
+  var PV_PAD_PX = 6;         // vzduch okolo kresby
+  var DIM_CHAR_W = 0.56;     // odhad sirky znaku: 0,56 · font (parita s mockupom, D10)
+  var PV_REF_RECT = { w: 404, h: 323 }; // nahlad pri okne 850 px (D8) — ked #preview nema rozmer
+  var pvS = 1;               // px na mm AKTUALNEJ kresby (nastavuje applyViewBox)
+  var pvBaseZ = 0;           // najnizsi kresleny bod projekcie (mm) — pod nim visia vodorovne koty
+  var pvLastRect = null;     // posledny REALNY rozmer #preview, s ktorym sa kreslilo
+  function pvU(px){ return px / (pvS > 0 ? pvS : 1); }
+  function pvN(v){ return Math.round(v * 100) / 100; }
+  function pvN3(v){ return Math.round(v * 1000) / 1000; }
+  function pvTextW(txt, fontPx){ return DIM_CHAR_W * fontPx * String(txt).length; }
+  // Kolko px ma kota dlzky `lenPx`: prvy popis zo zoznamu (dlhy -> kratky), ktory
+  // sa zmesti (s rezervou 4 px); '' = nezmesti sa ziadny. Ciste (Node testy).
+  function pvFitLabel(lenPx, labels, fontPx){
+    var list = Array.isArray(labels) ? labels : [labels];
+    for (var i = 0; i < list.length; i++){
+      if (pvTextW(list[i], fontPx || DIM_FONT_PX) <= lenPx - 4) return String(list[i]);
+    }
+    return '';
+  }
+  // Popis cela v troch stupnoch (dlhy -> „F1 · 760" -> „F1") podla sirky panelu
+  // v px; panel nizsi ako 12 px popis nema (''). Ciste (Node testy).
+  function pvFrontLabel(labels, widthPx, heightPx){
+    if (!(heightPx >= 12)) return '';
+    return pvFitLabel(widthPx, labels, DIM_FONT_PX) || String(labels[labels.length - 1]);
+  }
+  // Rozmer #preview v px; bez rozmeru (zbaleny sektor, skryty panel, Node) sa
+  // kresli na referencii 404 x 323 a `real` je false.
+  function pvRect(){
+    var svg = (typeof el === 'function') ? el('preview') : null;
+    if (svg && typeof svg.getBoundingClientRect === 'function'){
+      var b = svg.getBoundingClientRect();
+      if (b && b.width >= 50 && b.height >= 50) return { w: b.width, h: b.height, real: true };
+    }
+    return { w: PV_REF_RECT.w, h: PV_REF_RECT.h, real: false };
+  }
+  // Ciste (Node testy): scena z OBSAHU v mm (`content` = {minX, maxX, minZ, maxZ})
+  // a okrajov v px (`margins` = {l, r, t, b}) pre okno `rect` = {w, h} px. Mierka
+  // `s` je najvacsia, pri ktorej sa obsah AJ okraje zmestia; scena = obsah
+  // rozsireny o (okraj + vzduch) / s na kazdej strane, takze pri `meet` ma
+  // vysledny viewBox presne mierku `s`. Neplatny vstup scenu nezrusi (s = 0,05).
+  function nxDimScene(content, margins, rect){
+    var c = content || {}, m = margins || {};
+    var minX = nxNumOr(c.minX, 0), minZ = nxNumOr(c.minZ, 0);
+    var cw = Math.max(1, nxNumOr(c.maxX, 1) - minX), ch = Math.max(1, nxNumOr(c.maxZ, 1) - minZ);
+    var rw = (rect && rect.w > 0) ? rect.w : PV_REF_RECT.w, rh = (rect && rect.h > 0) ? rect.h : PV_REF_RECT.h;
+    var l = Math.max(0, nxNumOr(m.l, 0)), r = Math.max(0, nxNumOr(m.r, 0));
+    var t = Math.max(0, nxNumOr(m.t, 0)), b = Math.max(0, nxNumOr(m.b, 0));
+    var P = PV_PAD_PX;
+    var s = Math.min((rw - 2 * P - l - r) / cw, (rh - 2 * P - t - b) / ch);
+    if (!isFinite(s) || s <= 0) s = 0.05;
+    return { x0: minX - (l + P) / s, x1: minX + cw + (r + P) / s,
+             z0: minZ - (b + P) / s, z1: minZ + ch + (t + P) / s,
+             w: cw + (l + r + 2 * P) / s, h: ch + (t + b + 2 * P) / s, s: s };
+  }
   // Naznak hlbky v korpusovej projekcii (skosena horna plocha, vzor mockupu).
   // Nie je to mierka hlbky — je to citatelny NAZNAK; presnu hodnotu nesie kota.
   function pvDepthSkew(){
     var D = numv('depth') || 0;
     return D > 0 ? Math.min(Math.max(D * 0.18, 24), 130) : 0;
   }
-  // Kde LEZI kota hlbky a kam az musi siahat scena, aby ju fit neorezal.
-  // Obe hodnoty su TU, aby sa rezerva a kresba nemohli rozist (Codex #169 P2).
-  // Ciste (Node testy).
-  function pvDepthDimZ(H, sk){ return H + sk + DIM_DEPTH_OFF; }
-  function pvSceneTopZ(H, sk){ return sk > 0 ? (H + sk + DIM_TOP) : H; }
-  // UI-C1b: scena vkladanej DOSKY je samotna doska (dlzka x sirka) + rezerva na
+  // Okraje (px) korpusovej projekcie a vkladania: vlavo koty sokla/tela, vpravo
+  // vyska, dole sirka (rohova: o rad nizsie), hore kota hlbky nad skosenim
+  // (ciara 12 + text 5 + vyska pisma 11 + vzduch). Ciste (Node testy).
+  function pvCabMargins(sk, corner){
+    return { l: 46, r: 40, t: sk > 0 ? 30 : 8, b: 28 + (corner ? DIM_ROW_PX : 0) };
+  }
+  // UI-C1b: scena vkladanej DOSKY je samotna doska (dlzka x sirka) + okraj na
   // koty. Vlastna funkcia — korpusove polia (#width/#height) v tomto rezime nic
-  // neznamenaju. Ciste (Node testy): rozmery dnu, obdlznik sceny von.
-  // Vlavo a hore staci obycajny padding, vpravo (kota sirky) a dole (kota dlzky)
-  // musi ostat miesto na ciaru aj text — inak by ich fit orezal.
-  function pvBoardScene(L, Wd){
+  // neznamenaju. Ciste (Node testy): rozmery dnu, obdlznik sceny von (v suradniciach
+  // SVG: x vodorovne, y zhora nadol, dlzka vodorovne). Vpravo (kota sirky) a dole
+  // (kota dlzky) musi ostat miesto na ciaru aj text — inak by ich fit orezal.
+  function pvBoardScene(L, Wd, rect){
     var l = Math.max(1, nxNumOr(L, 0)), w = Math.max(1, nxNumOr(Wd, 0));
-    return { x: -PV_PAD, y: -PV_PAD, w: l + PV_PAD + DIM_EXT, h: w + PV_PAD + DIM_EXT };
+    var sc = nxDimScene({ minX: 0, maxX: l, minZ: 0, maxZ: w }, { l: 0, r: 40, t: 0, b: 28 }, rect);
+    return { x: sc.x0, y: w - sc.z1, w: sc.w, h: sc.h, s: sc.s, baseZ: 0 };
   }
   // Rozsah DRAFT ciel vkladanej sablony v mm modelu (Codex #175 P2). Zrkadlo
   // `frontsExtent`, ale nad draftom — vo vkladani `frontItems` neexistuje.
@@ -239,70 +297,98 @@
     return e;
   }
 
+  // H6c (R1): scena = OBSAH v mm (korpus ∪ cela ∪ referencie) + okraje na koty
+  // v PX (`nxDimScene`) pre aktualny rozmer #preview (`pvRect`). Vracia viewBox
+  // v suradniciach SVG (rx = PV_PAD + x, ry = PV_PAD + H − z) a `baseZ` — najnizsi
+  // kresleny bod (D11: vodorovna kota visi pod nim, nie na pevnom −26 mm).
   function sceneSize(){
-    if (pvInsertBoard()) return pvBoardScene(numv('ib_length'), numv('ib_width'));
+    var rect = pvRect();
+    if (pvInsertBoard()) return pvBoardScene(numv('ib_length'), numv('ib_width'), rect);
     var W = numv('width')||600, H = numv('height')||720;
     var solid = (previewMode === 'cab' || previewMode === 'hw');
     var e = solid ? null : frontsExtent();
     var minX = e ? e.minX : 0, maxX = e ? e.maxX : W;
     var minZ = e ? e.minZ : 0, maxZ = e ? e.maxZ : H;
+    var mg = { l: 0, r: 0, t: 0, b: 0 };
+    function union(x){
+      if (!x) return;
+      minX = Math.min(minX, x.minX); maxX = Math.max(maxX, x.maxX);
+      minZ = Math.min(minZ, x.minZ); maxZ = Math.max(maxZ, x.maxZ);
+    }
+    // Rohova zostava (`cr_front` moze siahat pod korpus) patri do obsahu vsade, kde sa kresli.
+    var ce = pvCornerExtent();
     if (previewMode === 'cab' || previewMode === 'insert'){
       // D-11: vlavo koty sokla/tela, vpravo vyska, dole sirka, hore naznak hlbky
       // (UI-C1b: vkladanie kresli sablonu tym istym celnym rezom + kotami)
       var sk = pvDepthSkew();
-      minX = -DIM_EXT; maxX = W + DIM_EXT + sk; minZ = -DIM_EXT;
-      // Codex #169 P2: nad skosenim este LEZI KOTA hlbky — scene musi patrit aj
-      // jej ciara, znacky a text, inak ju fit orezal.
-      maxZ = pvSceneTopZ(H, sk);
+      minX = 0; maxX = W + sk; minZ = 0; maxZ = H + sk;
+      mg = pvCabMargins(sk, !!ce);
+      union(ce);
       // Codex #175 P2: vo VKLADANI sa cela naozaj kreslia, a s odomknutym limitom
-      // presahov (D-22) mozu sablonove cela vytrcat MIMO obrys korpusu. Rezerva
-      // na koty ich nemusi pokryt, preto sa scena roztiahne o ich skutocny rozsah
-      // (frontsExtent cita `frontItems`, ktore su tu null — pasca FIX 11).
-      var ie = insertFrontsExtent();
-      if (ie){
-        minX = Math.min(minX, ie.minX); maxX = Math.max(maxX, ie.maxX);
-        minZ = Math.min(minZ, ie.minZ); maxZ = Math.max(maxZ, ie.maxZ);
-      }
+      // presahov (D-22) mozu sablonove cela vytrcat MIMO obrys korpusu — scena sa
+      // roztiahne o ich skutocny rozsah (frontsExtent cita `frontItems`, ktore su
+      // tu null — pasca FIX 11).
+      union(insertFrontsExtent());
       // S1-E: celo slotu SMIE presahovat vysku linky — scena mu musi nechat
-      // miesto, inak by fit odrezal jeho hornu hranu (a s nou popis presahu).
+      // miesto, inak by fit odrezal jeho hornu hranu.
       var sl = pvSlot();
-      if (sl) maxZ = Math.max(maxZ, sl.fb + sl.fh + DIM_TOP);
+      if (sl) maxZ = Math.max(maxZ, sl.fb + sl.fh);
     } else if (previewMode === 'fronts'){
-      maxX = Math.max(maxX, W) + DIM_EXT; // koty vysok riadkov vpravo
-      minX = Math.min(minX, 0) - 34;      // cisla medzier pri lavom okraji
-      minZ = Math.min(minZ, 0) - 46;      // kota celkovej sirky dole
+      union(ce);
+      mg = { l: 34, r: 40, t: 8, b: 28 }; // cisla medzier vlavo, koty vysok vpravo, sirka dole
     } else if (previewMode === 'zones'){
-      minZ = Math.min(minZ, 0) - 46;      // koty sirok zon pod korpusom
+      // koty sirok zon pod korpusom — len ked je co porovnavat (1 < stlpcov <= 8)
+      var sp = [];
+      try { sp = nxZoneSpans(computeZones()); } catch (ex) { sp = []; }
+      if (sp.length > 1 && sp.length <= 8) mg.b = 28;
     } else if (previewMode === 'hw'){
-      // H6b (O9): suhrn kovania je v liste sektora, nie v kresbe — rezerva dole je
-      // len to, co sa KRESLI: nohy pod korpusom (pri sokli stoja v sokli, rezerva 0).
+      // H6b (O9): suhrn kovania je v liste sektora, nie v kresbe — okraj dole je
+      // len to, co sa KRESLI: nohy pod korpusom (pri sokli stoja v sokli, okraj 0).
       minZ = Math.min(minZ, nxHwLowestZ(hwItems, nxCabFloorHeight()));
       // Cela (ghost vrstva) a rohova zostava mozu siahat mimo korpus (okraj dole −20,
-      // `cr_front`) — rezerva −96 mm ich kedysi kryla, teraz ich rozsah patri do sceny.
-      var he = [frontsExtent(), pvCornerExtent()];
-      he.forEach(function(x){
-        if (!x) return;
-        minX = Math.min(minX, x.minX); maxX = Math.max(maxX, x.maxX);
-        minZ = Math.min(minZ, x.minZ); maxZ = Math.max(maxZ, x.maxZ);
-      });
+      // `cr_front`) — ich rozsah patri do sceny.
+      union(frontsExtent()); union(ce);
     }
     // PR #381 (P2): telo slotu sa do sceny priklada v KAZDOM kontexte —
     // od opravy projekcii ho vidno aj v Celach a v Kovani. S1-F: box niky sa
     // kresli LEN v kontexte Korpus, takze sa aj do sceny priklada len tam
     // (inak by Cela a Kovanie mali prazdny okraj po neviditelnom boxe).
-    var sx = nxRefExtent(pvSlot(), pvApplianceRefs(), W);
-    if (sx){
-      minX = Math.min(minX, sx.minX); maxX = Math.max(maxX, sx.maxX);
-      minZ = Math.min(minZ, sx.minZ); maxZ = Math.max(maxZ, sx.maxZ);
-    }
-    return { x: minX, y: H - maxZ,
-             w: (maxX - minX) + 2*PV_PAD, h: (maxZ - minZ) + 2*PV_PAD };
+    union(nxRefExtent(pvSlot(), pvApplianceRefs(), W));
+    var sc = nxDimScene({ minX: minX, maxX: maxX, minZ: minZ, maxZ: maxZ }, mg, rect);
+    return { x: PV_PAD + sc.x0, y: PV_PAD + H - sc.z1, w: sc.w, h: sc.h, s: sc.s, baseZ: minZ };
   }
   function fitPreview(){ pvUserView = false; pvView = null; renderPreview(); }
+  // Nastavi viewBox (fit alebo pohlad pouzivatela) A mierku kresby `pvS` — tu sa
+  // ROZHODUJE, kolko mm je 11 px (R1.4): mierka sa berie z AKTUALNEHO viewBoxu,
+  // takze po zoome je ina nez pri fite.
   function applyViewBox(svg){
     var base = sceneSize();
     if (!pvUserView || !pvView) pvView = { x: base.x, y: base.y, w: base.w, h: base.h };
+    var rect = pvRect();
+    var s = Math.min(rect.w / pvView.w, rect.h / pvView.h);
+    pvS = (isFinite(s) && s > 0) ? s : 1;
+    pvBaseZ = base.baseZ;
+    pvLastRect = rect.real ? { w: rect.w, h: rect.h } : null;
     svg.setAttribute('viewBox', pvView.x + ' ' + pvView.y + ' ' + pvView.w + ' ' + pvView.h);
+  }
+  // R6: prekreslenie kot po zoome a po zmene velkosti okna — najviac raz za snimku
+  // (rAF; bez neho setTimeout 16). Pocas tahania priecky sa nenaplanuje (tahanie
+  // si kresli samo). Hover zvyraznenie po prekresleni zanikne (dnesne spravanie).
+  var pvRenderPending = false;
+  function pvScheduleRender(){
+    if (pvRenderPending || dragState) return;
+    pvRenderPending = true;
+    var run = function(){ pvRenderPending = false; if (!dragState) renderPreview(); };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);
+    else setTimeout(run, 16);
+  }
+  // Zmena velkosti #preview (okno, rozbalenie sektora): prekresli len ked sa sirka
+  // alebo vyska zmenila o >= 1 px a obe su >= 50 (zbaleny sektor = 0 → ignoruje sa).
+  function pvOnResize(w, h){
+    if (!(w >= 50 && h >= 50)) return false;
+    if (pvLastRect && Math.abs(w - pvLastRect.w) < 1 && Math.abs(h - pvLastRect.h) < 1) return false;
+    pvScheduleRender();
+    return true;
   }
   // Mapovanie px<->mm pri preserveAspectRatio meet (letterbox offsety).
   function viewMapping(rect){
@@ -500,13 +586,13 @@
     });
   }
   // Koty dverovej casti a CR 1 (rozsahy zo servera, zrkadlene pri dverach
-  // vpravo) tesne pod skrinkou — sirka skrinky ide o riadok nizsie.
+  // vpravo) tesne pod skrinkou (18 px) — sirka skrinky ide o DIM_ROW_PX nizsie.
   function drawCornerDims(S, rx, ry, cp){
     ((cp && cp.dims) || []).forEach(function(d){
       if (!d) return;
       var x0 = nxNumOr(d.x0, NaN), x1 = nxNumOr(d.x1, NaN);
       if (isNaN(x0) || isNaN(x1) || !(x1 > x0)) return;
-      pvDimH(S, rx, ry, x0, x1, PV_CORNER_DIM_Z, String(d.label == null ? '' : d.label), 18);
+      pvDimH(S, rx, ry, x0, x1, pvBaseZ, DIM_OFF_PX, [String(d.label == null ? '' : d.label)]);
     });
   }
 
@@ -727,29 +813,48 @@
              olep: !!partCard };
   }
 
-  // ---- decentne koty (vzor mockupu dimH/dimV — tenka ciara, tlmeny text) ----
-  function pvDimH(S, rx, ry, x1, x2, z, label, size){
-    var f = size || 20;
-    S.push('<g stroke="'+PV_DIM+'" stroke-width="1.4" fill="none" pointer-events="none">' +
-      '<path d="M'+rx(x1)+' '+(ry(z)-7)+'V'+(ry(z)+7)+'M'+rx(x2)+' '+(ry(z)-7)+'V'+(ry(z)+7)+'"/>' +
-      '<path d="M'+rx(x1)+' '+ry(z)+'H'+rx(x2)+'"/></g>' +
-      '<text x="'+rx((x1+x2)/2)+'" y="'+(ry(z)-9)+'" font-size="'+f+'" fill="'+PV_DIM+
+  // ---- decentne koty v PX (H6c; vzor mockupu dimH/dimV — tenka ciara, tlmeny text) ----
+  // Suradnice `x1, x2, z` su v mm modelu (kotovany prvok), odsadenie `dyPx`/`dxPx`,
+  // znacky a pismo v PIXELOCH obrazovky (prevod `/ pvS` robi `pvU`). `labels` = dlhy
+  // popis -> kratky (len cislo); vodorovna kota ostane vzdy s textom NAD ciarou
+  // (D9), zvisla ho pri tesnom useku napise cislom VEDLA kota (R3).
+  var PV_DIM_LINE = ' stroke-width="1" vector-effect="non-scaling-stroke"';
+  function pvDimH(S, rx, ry, x1, x2, z, dyPx, labels, fontPx){
+    var f = fontPx || DIM_FONT_PX, list = Array.isArray(labels) ? labels : [labels];
+    var label = pvFitLabel(Math.abs(x2 - x1) * pvS, list, f) || list[list.length - 1];
+    var y = ry(z) + pvU(dyPx), tk = pvU(DIM_TICK_PX), xa = rx(x1), xb = rx(x2);
+    S.push('<g stroke="'+PV_DIM+'" stroke-width="1" vector-effect="non-scaling-stroke" fill="none" pointer-events="none">' +
+      '<path'+PV_DIM_LINE+' d="M'+pvN3(xa)+' '+pvN3(y-tk)+'V'+pvN3(y+tk)+'M'+pvN3(xb)+' '+pvN3(y-tk)+'V'+pvN3(y+tk)+'"/>' +
+      '<path'+PV_DIM_LINE+' d="M'+pvN3(xa)+' '+pvN3(y)+'H'+pvN3(xb)+'"/></g>' +
+      '<text x="'+pvN3(rx((x1+x2)/2))+'" y="'+pvN3(y-pvU(DIM_TXT_PX))+'" font-size="'+pvN3(pvU(f))+'" fill="'+PV_DIM+
       '" text-anchor="middle" pointer-events="none">'+esc(label)+'</text>');
   }
-  function pvDimV(S, rx, ry, x, z1, z2, label, size){
-    var f = size || 20, ym = ry((z1+z2)/2);
-    S.push('<g stroke="'+PV_DIM+'" stroke-width="1.4" fill="none" pointer-events="none">' +
-      '<path d="M'+(rx(x)-7)+' '+ry(z1)+'H'+(rx(x)+7)+'M'+(rx(x)-7)+' '+ry(z2)+'H'+(rx(x)+7)+'"/>' +
-      '<path d="M'+rx(x)+' '+ry(z1)+'V'+ry(z2)+'"/></g>' +
-      '<text x="'+(rx(x)+10)+'" y="'+ym+'" font-size="'+f+'" fill="'+PV_DIM+
-      '" text-anchor="middle" dominant-baseline="middle" pointer-events="none" transform="rotate(-90 '+
-      (rx(x)+10)+' '+ym+')">'+esc(label)+'</text>');
+  function pvDimV(S, rx, ry, x, dxPx, z1, z2, labels, fontPx){
+    var f = fontPx || DIM_FONT_PX, list = Array.isArray(labels) ? labels : [labels];
+    var xl = rx(x) + pvU(dxPx), tk = pvU(DIM_TICK_PX), ya = ry(z1), yb = ry(z2), ym = ry((z1+z2)/2);
+    var g = '<g stroke="'+PV_DIM+'" stroke-width="1" vector-effect="non-scaling-stroke" fill="none" pointer-events="none">' +
+      '<path'+PV_DIM_LINE+' d="M'+pvN3(xl-tk)+' '+pvN3(ya)+'H'+pvN3(xl+tk)+'M'+pvN3(xl-tk)+' '+pvN3(yb)+'H'+pvN3(xl+tk)+'"/>' +
+      '<path'+PV_DIM_LINE+' d="M'+pvN3(xl)+' '+pvN3(ya)+'V'+pvN3(yb)+'"/></g>';
+    var label = pvFitLabel(Math.abs(z2 - z1) * pvS, list, f);
+    if (label){
+      var xt = xl + pvU(DIM_TXT_V_PX);
+      S.push(g + '<text x="'+pvN3(xt)+'" y="'+pvN3(ym)+'" font-size="'+pvN3(pvU(f))+'" fill="'+PV_DIM+
+        '" text-anchor="middle" dominant-baseline="middle" pointer-events="none" transform="rotate(-90 '+
+        pvN3(xt)+' '+pvN3(ym)+')">'+esc(label)+'</text>');
+    } else {
+      // usek je prilis kratky aj na cislo: cislo VODOROVNE vedla kota (vlavo od lavych, vpravo od pravych)
+      var left = dxPx < 0;
+      S.push(g + '<text x="'+pvN3(xl + (left ? -1 : 1) * pvU(4))+'" y="'+pvN3(ym)+'" font-size="'+pvN3(pvU(f))+'" fill="'+PV_DIM+
+        '" text-anchor="'+(left ? 'end' : 'start')+'" dominant-baseline="middle" pointer-events="none">'+
+        esc(list[list.length - 1])+'</text>');
+    }
   }
-  // `fill` je volitelny (N26: medzery pri editacii svietia jantarovo) — bez
-  // neho plati tlmena kotova farba.
-  function pvText(S, x, y, txt, size, anchor, fill){
-    S.push('<text x="'+x+'" y="'+y+'" font-size="'+(size||18)+'" fill="'+(fill||PV_DIM)+
-      '" text-anchor="'+(anchor||'middle')+'" pointer-events="none">'+esc(txt)+'</text>');
+  // Popis v px: `x`, `y` v suradniciach kresby, `fontPx` na obrazovke. `fill` je
+  // volitelny (N26: medzery pri editacii svietia jantarovo) — bez neho plati
+  // tlmena kotova farba. `extra` = dalsie SVG atributy (napr. dominant-baseline).
+  function pvText(S, x, y, txt, fontPx, anchor, fill, extra){
+    S.push('<text x="'+pvN3(x)+'" y="'+pvN3(y)+'" font-size="'+pvN3(pvU(fontPx || DIM_FONT_PX))+'" fill="'+(fill||PV_DIM)+
+      '" text-anchor="'+(anchor||'middle')+'"'+(extra ? ' '+extra : '')+' pointer-events="none">'+esc(txt)+'</text>');
   }
 
   // ---- spolocny podklad: obrys korpusu + schematicke dielce ----------------
@@ -822,10 +927,10 @@
     // D-139: pasmo „výplň hore" ZANIKLO — celo siaha po linku mínus medzeru
     // hore; vyplň nad umyvackou je samostatny nizky korpus a slot sa nastavi
     // po jej spodok. Kota vysky cela ukaze odvodene cislo.
-    if (sl.fh > 0) pvDimV(S, rx, ry, g.gapLeft + 26, sl.fb, ftop, String(Math.round(sl.fh)));
-    pvDimH(S, rx, ry, 0, W, -26, String(Math.round(W)));
-    pvDimV(S, rx, ry, W + 26, 0, H, String(Math.round(H)));
-    if (sl.fb > 0) pvDimV(S, rx, ry, -26, 0, sl.fb, String(Math.round(sl.fb)));
+    if (sl.fh > 0) pvDimV(S, rx, ry, g.gapLeft, DIM_OFF_V_PX, sl.fb, ftop, [String(Math.round(sl.fh))]);
+    pvDimH(S, rx, ry, 0, W, pvBaseZ, DIM_OFF_PX, [String(Math.round(W))]);
+    pvDimV(S, rx, ry, W, DIM_OFF_V_PX, 0, H, [String(Math.round(H))]);
+    if (sl.fb > 0) pvDimV(S, rx, ry, 0, -DIM_OFF_V_PX, 0, sl.fb, [String(Math.round(sl.fb))]);
   }
 
   // ---- S1-F: BOX NIKY + PASMA DVERI + PASMO PRIPUSTNEJ HRANY --------------
@@ -854,9 +959,11 @@
           S.push('<line x1="' + rx(x) + '" y1="' + ry(z0) + '" x2="' + rx(x + w) +
                  '" y2="' + ry(z0) + '" stroke="' + col + '" stroke-width="1.5"/>');
         }
-        if (z1 - z0 > 34){
-          pvText(S, rx(x + w / 2), ry(z0 + (z1 - z0) / 2) + 7,
-                 String(Math.round(nxNumOr(bd.size, z1 - z0))), 20, 'middle', col);
+        // H6c: cislo pasma (11 px) sa napise, len ked sa pasmo zmesti na vysku pisma —
+        // pri zoome sa dokresli (R6).
+        if ((z1 - z0) * pvS >= DIM_FONT_PX){
+          pvText(S, rx(x + w / 2), ry(z0 + (z1 - z0) / 2),
+                 String(Math.round(nxNumOr(bd.size, z1 - z0))), DIM_FONT_PX, 'middle', col, 'dominant-baseline="middle"');
         }
       });
       drawApplianceSplit(S, rx, ry, a, x, w);
@@ -877,10 +984,11 @@
              (PV_APPL_GUTTER - 4) + '" height="' + (hi - lo) + '" fill="' + PV_SLOT_FILL +
              '" fill-opacity=".55" stroke="' + PV_SLOT_FILL + '" stroke-width="1"/>');
       if (sp.lo_mm != null && sp.hi_mm != null){
-        pvText(S, rx(x - PV_APPL_GUTTER - 4), ry(hi) - 4,
-               String(Math.round(sp.hi_mm)), 18, 'end', PV_SLOT_FILL);
-        pvText(S, rx(x - PV_APPL_GUTTER - 4), ry(lo) + 16,
-               String(Math.round(sp.lo_mm)), 18, 'end', PV_SLOT_FILL);
+        // Konce pasma hrany (11 px) VLAVO od jantaroveho pasma: horny tesne nad nim, dolny pod nim.
+        pvText(S, rx(x - PV_APPL_GUTTER) - pvU(4), ry(hi) - pvU(3),
+               String(Math.round(sp.hi_mm)), DIM_FONT_PX, 'end', PV_SLOT_FILL);
+        pvText(S, rx(x - PV_APPL_GUTTER) - pvU(4), ry(lo) + pvU(DIM_FONT_PX + 2),
+               String(Math.round(sp.lo_mm)), DIM_FONT_PX, 'end', PV_SLOT_FILL);
       }
     }
     var e = nxNumOr(sp.edge, NaN);
@@ -889,7 +997,9 @@
     S.push('<line x1="' + rx(x - PV_APPL_GUTTER) + '" y1="' + ry(e) + '" x2="' + rx(x + w) +
            '" y2="' + ry(e) + '" stroke="' + ecol + '" stroke-width="2.5"/>');
     if (sp.edge_mm != null){
-      pvText(S, rx(x + w) + 6, ry(e) + 6, 'hrana ' + Math.round(sp.edge_mm), 18, 'start', ecol);
+      // Cislo hrany nad ciarou, zarovnane k pravemu okraju boxu DOVNUTRA — 11 px text
+      // „hrana 695" (~55 px) by zvonka siahol cez kotu vysky.
+      pvText(S, rx(x + w) - pvU(4), ry(e) - pvU(4), 'hrana ' + Math.round(sp.edge_mm), DIM_FONT_PX, 'end', ecol);
     }
   }
 
@@ -994,8 +1104,11 @@
         S.push('<rect class="zrect" data-zid="'+z.id+'" x="'+rx(z.x)+'" y="'+ry(z.z+z.h)+'" width="'+z.w+'" height="'+z.h+'" fill="'+col+'" fill-opacity="'+(active?0.55:0.32)+'" stroke="'+(active?PV_SELECT:col)+'" stroke-width="'+(active?4:1.5)+'" style="cursor:pointer"/>');
         // police (tenke ciary)
         if (z.shelves>0){ for (var s=1;s<=z.shelves;s++){ var zs = z.z + z.h*s/(z.shelves+1); S.push('<line x1="'+rx(z.x)+'" y1="'+ry(zs)+'" x2="'+rx(z.x+z.w)+'" y2="'+ry(zs)+'" stroke="#8d6e63" stroke-width="2"/>'); } }
-        // rozmer text
-        if (z.w>60 && z.h>30) S.push('<text x="'+rx(z.x+z.w/2)+'" y="'+ry(z.z+z.h/2)+'" font-size="'+Math.min(22,z.w/5)+'" fill="#37474f" text-anchor="middle" dominant-baseline="middle" pointer-events="none">'+Math.round(z.w)+'×'+Math.round(z.h)+'</text>');
+        // rozmer zony (11 px) — len ked sa zmesti: sirka textu <= sirka zony − 4 px a vyska zony >= 13 px (R3)
+        var zlab = Math.round(z.w)+'×'+Math.round(z.h);
+        if (z.w * pvS - 4 >= pvTextW(zlab, DIM_FONT_PX) && z.h * pvS >= 13){
+          pvText(S, rx(z.x+z.w/2), ry(z.z+z.h/2), zlab, DIM_FONT_PX, 'middle', '#37474f', 'dominant-baseline="middle"');
+        }
       } else if (z.split){
         // priecky (hrube ciary), tahatelne
         drawDividers(z, S, rx, ry, g.t, g.fh, g.topNone, g.H);
@@ -1004,7 +1117,7 @@
     // UI-B2: koty sirok zon pod korpusom — len ked je co porovnavat
     var spans = nxZoneSpans(zones);
     if (spans.length > 1 && spans.length <= 8){
-      spans.forEach(function(sp){ pvDimH(S, rx, ry, sp.x, sp.x + sp.w, -26, String(Math.round(sp.w)), 18); });
+      spans.forEach(function(sp){ pvDimH(S, rx, ry, sp.x, sp.x + sp.w, pvBaseZ, DIM_OFF_PX, [String(Math.round(sp.w))]); });
     }
   }
 
@@ -1047,7 +1160,7 @@
     if (g.frontsPending) return;
     if (!items || !items.length){
       // odhad z formulara (bez presnych vysok) — len info
-      S.push('<text x="'+rx(W/2)+'" y="'+ry(H/2)+'" font-size="20" fill="#90a4ae" text-anchor="middle">Čelá: nastav v sekcii Čelá</text>');
+      pvText(S, rx(W/2), ry(H/2), 'Čelá: nastav v sekcii Čelá', DIM_FONT_PX, 'middle', '#90a4ae');
       return;
     }
     // D-07: okraje/medzera z poli (0 je platna hodnota — NIE || default);
@@ -1065,7 +1178,8 @@
         // D-18: pásmo Bez čela = čiarkovaný obrys bez výplne (otvorená nika v rade).
         // D-23: aj none pás je súčasťou skupiny — klik vedie na jeho riadok v zozname.
         S.push('<rect x="'+rx(gs)+'" y="'+ry(z+h)+'" width="'+ow+'" height="'+h+'" fill="none" stroke="#90a4ae" stroke-width="1.5" stroke-dasharray="7 5"/>');
-        S.push('<text x="'+rx(fxc)+'" y="'+ry(z+h/2)+'" font-size="18" fill="#90a4ae" text-anchor="middle" dominant-baseline="middle">'+fnum+' · bez čela '+Math.round(h)+'</text>');
+        var nlab = pvFrontLabel([fnum + ' · bez čela ' + Math.round(h), fnum + ' · ' + Math.round(h), fnum], ow * pvS, h * pvS);
+        if (nlab) S.push('<text x="'+pvN3(rx(fxc))+'" y="'+pvN3(ry(z+h/2))+'" font-size="'+pvN3(pvU(DIM_FONT_PX))+'" fill="#90a4ae" text-anchor="middle" dominant-baseline="middle">'+esc(nlab)+'</text>');
         S.push('</g>');
         return;
       }
@@ -1100,7 +1214,11 @@
       // cislo ostava vyskou RIADKU — presne to, co je v zozname ciel.
       // D-115 HALO: text dostane obrys farbou VYPLNE panelu (`col`, PV_* zrkadlo
       // tokenu), inak by ho X zasuvky/blendy preskrtlo. Ziadna nova farba.
-      S.push('<text x="'+rx(fxc)+'" y="'+ry(panelZ+(ph > 0 ? ph : h)/2)+'" font-size="18" fill="'+PV_SELECT_ACCENT+'" paint-order="stroke" stroke="'+col+'" stroke-width="4" text-anchor="middle" dominant-baseline="middle">'+fnum+' · '+frontTypeDesc(it.type)+' '+Math.round(h)+'</text>');
+      // H6c (R3): popis v 3 stupnoch — „F1 · zásuvka 760" → „F1 · 760" → „F1" podľa
+      // sirky panelu v px; pri vyske panelu < 12 px popis nie je. HALO 2,75 px.
+      var plab = pvFrontLabel([fnum+' · '+frontTypeDesc(it.type)+' '+Math.round(h), fnum+' · '+Math.round(h), fnum],
+                              ow * pvS, (ph > 0 ? ph : h) * pvS);
+      if (plab) S.push('<text x="'+pvN3(rx(fxc))+'" y="'+pvN3(ry(panelZ+(ph > 0 ? ph : h)/2))+'" font-size="'+pvN3(pvU(DIM_FONT_PX))+'" fill="'+PV_SELECT_ACCENT+'" paint-order="stroke" stroke="'+col+'" stroke-width="'+pvN3(pvU(2.75))+'" text-anchor="middle" dominant-baseline="middle">'+esc(plab)+'</text>');
       S.push('</g>');
     });
   }
@@ -1174,17 +1292,19 @@
   function renderCabOutline(S, rx, ry, W, H, fh, corner){
     var D = numv('depth') || 0, sk = pvDepthSkew();
     if (corner) drawCornerDims(S, rx, ry, corner);
-    pvDimH(S, rx, ry, 0, W, corner ? PV_CORNER_WIDTH_Z : -26, 'Š ' + Math.round(W) + ' mm', 22);
-    pvDimV(S, rx, ry, W + 26, 0, H, 'V ' + Math.round(H), 22);
+    // H6c (O11 A): bez „mm"; dlhy popis sa pri tesnom useku skrati na cislo (R3).
+    pvDimH(S, rx, ry, 0, W, pvBaseZ, corner ? DIM_OFF_PX + DIM_ROW_PX : DIM_OFF_PX,
+           ['Š ' + Math.round(W), String(Math.round(W))]);
+    pvDimV(S, rx, ry, W, DIM_OFF_V_PX, 0, H, ['V ' + Math.round(H), String(Math.round(H))]);
     // D-11: vlavo koty sokla (0..fh) a tela (fh..H) — len ked sokel existuje
     if (fh > 0){
-      pvDimV(S, rx, ry, -26, 0, fh, 'sokel ' + Math.round(fh), 18);
-      pvDimV(S, rx, ry, -26, fh, H, 'telo ' + Math.round(H - fh), 18);
+      pvDimV(S, rx, ry, 0, -DIM_OFF_V_PX, 0, fh, ['sokel ' + Math.round(fh), String(Math.round(fh))]);
+      pvDimV(S, rx, ry, 0, -DIM_OFF_V_PX, fh, H, ['telo ' + Math.round(H - fh), String(Math.round(H - fh))]);
     }
-    // hlbka: kota na skosenej hornej ploche (naznak) — inak aspon text
-    if (D > 0){
-      if (sk > 0) pvDimH(S, rx, ry, W, W + sk, pvDepthDimZ(H, sk), 'H ' + Math.round(D), 18);
-      else pvText(S, rx(W/2), ry(H/2), 'hĺbka ' + Math.round(D) + ' mm', 20);
+    // hlbka: kota na skosenej hornej ploche (naznak). Pri D > 0 je skosenie vzdy
+    // >= 24 mm (`pvDepthSkew`), takze nahradna vetva „hĺbka … mm" bola mrtva (S24).
+    if (D > 0 && sk > 0){
+      pvDimH(S, rx, ry, W, W + sk, H + sk, -DIM_DEPTH_OFF_PX, ['H ' + Math.round(D), String(Math.round(D))]);
     }
   }
 
@@ -1250,7 +1370,7 @@
     // ROH-A2: medzery, pasy aj kota sirky patria CELNEMU OTVORU (rohova:
     // dverova cast) — ostatne typy fx0 = 0, fw = W, teda dnesne cisla.
     var fx0 = nxNumOr(g.fx0, 0), fw = nxNumOr(g.fw, g.W);
-    var xr = Math.max(g.W, fx0 + fw - gr) + 26;
+    var xr = Math.max(g.W, fx0 + fw - gr);
     // N26: pasy medzier sa kreslia PRED kotami, aby cisla ostali navrchu.
     var hot = pvGapsHot();
     if (hot){
@@ -1261,14 +1381,41 @@
                '" fill="' + PV_GAP_FILL + '" stroke="' + PV_GAP_LINE + '" stroke-width="1.2"/>');
       });
     }
+    // H6c (R3): cisla medzier (10 px) zarovnane doprava 6 px vlavo od otvoru, BEZ
+    // PREKRYVU — zoradene zdola nahor, rozostup >= 11 px (vzor mockupu); tesne
+    // medzery sa rozotlacia nahor (a od horneho okraja spat), nepretnu sa.
+    var gapDims = [];
     dims.forEach(function(d){
-      if (d.kind === 'front') pvDimV(S, rx, ry, xr, d.z1, d.z2, String(Math.round(d.size)), 18);
-      else pvText(S, rx(fx0 - 14), ry((d.z1 + d.z2)/2), String(Math.round(d.size)), 15, 'end',
-                  hot ? PV_GAP_TEXT : null);
+      if (d.kind === 'front') pvDimV(S, rx, ry, xr, DIM_OFF_V_PX, d.z1, d.z2, [String(Math.round(d.size))]);
+      else gapDims.push(d);
     });
-    pvDimH(S, rx, ry, fx0 + gl, fx0 + fw - gr, -26, String(Math.round(fw - gl - gr)), 18);
+    var gapY = nxSpreadLabels(gapDims.map(function(d){ return ry((d.z1 + d.z2)/2); }), pvU(11),
+                              pvView ? pvView.y + pvU(PV_PAD_PX + 6) : -Infinity);
+    gapDims.forEach(function(d, i){
+      pvText(S, rx(fx0) - pvU(6), gapY[i], String(Math.round(d.size)), DIM_GAP_FONT_PX, 'end',
+             hot ? PV_GAP_TEXT : null, 'dominant-baseline="middle"');
+    });
+    // D11: kota sirky visi pod NAJNIZSIM kreslenym prvkom (aj pod presahom cela dole).
+    pvDimH(S, rx, ry, fx0 + gl, fx0 + fw - gr, pvBaseZ, DIM_OFF_PX, [String(Math.round(fw - gl - gr))]);
   }
 
+  // Ciste (Node testy): rozotlacenie popiskov v jednom stlpci. `ys` = suradnice
+  // y (px kresby rastu NADOL) zoradene ZDOLA NAHOR (klesajuce y); kazdy dalsi je
+  // aspon o `step` vyssie nez predosly; ked rad siaha nad `minY`, posunie sa spat
+  // nadol (poradie a rozostup ostavaju). Nemeni vstup.
+  function nxSpreadLabels(ys, step, minY){
+    var out = ys.slice(), i;
+    for (i = 1; i < out.length; i++){
+      if (out[i] > out[i - 1] - step) out[i] = out[i - 1] - step;
+    }
+    if (out.length && out[out.length - 1] < minY){
+      out[out.length - 1] = minY;
+      for (i = out.length - 2; i >= 0; i--){
+        if (out[i] < out[i + 1] + step) out[i] = out[i + 1] + step;
+      }
+    }
+    return out;
+  }
   // Ciste (Node testy): rozklad radu ciel na kotovatelne useky.
   // items = front_items ([{ z, height }]), g = { H, fh }
   // -> [{ kind:'front'|'gap', z1, z2, size, id }]
@@ -1565,16 +1712,14 @@
       S.push('<path d="' + d + '" stroke="' + PV_DIM + '" stroke-width="' +
              Math.max(2, Math.round(Math.min(L, Wd) / 90)) + '" fill="none" pointer-events="none"/>');
     } else {
-      pvText(S, L / 2, ry(Wd / 2), 'bez smeru dekoru', pvBoardFont(L, Wd));
+      pvText(S, L / 2, ry(Wd / 2), 'bez smeru dekoru', DIM_FONT_PX, 'middle', null, 'dominant-baseline="middle"');
     }
-    // Popisky su v mm SCENY — velkost sa odvija od VACSIEHO rozmeru, inak by
-    // kota na 2600 mm doske bola necitatelne drobna a na 300 mm obria.
-    pvDimH(S, rx, ry, 0, L, -26, String(Math.round(L)), pvBoardFont(L, Wd));
-    pvDimV(S, rx, ry, L + 26, 0, Wd, String(Math.round(Wd)), pvBoardFont(L, Wd));
+    // H6c: popisky maju stalych 11 px na obrazovke (kedysi pismo v mm odvodene od
+    // vacsieho rozmeru dosky) — rovnako velke pri doske 300 aj 2600 mm.
+    pvDimH(S, rx, ry, 0, L, pvBaseZ, DIM_OFF_PX, [String(Math.round(L))]);
+    pvDimV(S, rx, ry, L, DIM_OFF_V_PX, 0, Wd, [String(Math.round(Wd))]);
     svg.innerHTML = S.join('');
   }
-  // Velkost pisma projekcie dosky (mm sceny). Ciste (Node testy).
-  function pvBoardFont(L, Wd){ return Math.max(16, Math.round(Math.max(L, Wd) / 30)); }
   // Ciste (Node testy): tri sipky smeru dekoru v mm sceny dosky.
   // 'length' = po dlzke (vodorovne), 'width' = po sirke (zvisle), inak ziadne.
   function nxGrainArrows(L, Wd, grain){
@@ -1784,7 +1929,18 @@
                  w: nw, h: pvView.h * ratio };
       pvUserView = true;
       svg.setAttribute('viewBox', pvView.x + ' ' + pvView.y + ' ' + pvView.w + ' ' + pvView.h);
+      // H6c (R6): zoom meni mierku, takze koty (stalych 11 px) sa musia prekreslit
+      // — najviac raz za snimku. Posun (pan) mierku nemeni, tam sa neprekresluje.
+      pvScheduleRender();
     }, { passive: false });
+    // H6c (R6): zmena velkosti #preview (okno, rozbalenie sektora) — koty sa prekreslia
+    // pre novu mierku. Bez ResizeObserver (Node) sa nic neregistruje.
+    if (typeof ResizeObserver === 'function'){
+      new ResizeObserver(function(){
+        var b = svg.getBoundingClientRect();
+        pvOnResize(b.width, b.height);
+      }).observe(svg);
+    }
     previewBound = true;
   }
 
@@ -1992,8 +2148,15 @@
     module.exports = { NXLayers: NXLayers, cabTabPreview: cabTabPreview,
                        nxHwMarks: nxHwMarks, nxHwSummary: nxHwSummary, nxSlideGeom: nxSlideGeom,
                        nxLegGeom: nxLegGeom, nxHwLowestZ: nxHwLowestZ,
-                       nxFrontDims: nxFrontDims, nxZoneSpans: nxZoneSpans,
-                       pvDepthDimZ: pvDepthDimZ, pvSceneTopZ: pvSceneTopZ,
+                       nxFrontDims: nxFrontDims, nxZoneSpans: nxZoneSpans, nxSpreadLabels: nxSpreadLabels,
+                       // H6c (tests/js/test_h6c_koty.js): kóty v px — čistá scéna, výber popisu,
+                       // plánovač prekreslenia, okraje a konštanty px modelu
+                       nxDimScene: nxDimScene, pvFitLabel: pvFitLabel, pvFrontLabel: pvFrontLabel,
+                       pvCabMargins: pvCabMargins, pvOnResize: pvOnResize, pvScheduleRender: pvScheduleRender,
+                       sceneSize: sceneSize, setupPreviewDelegation: setupPreviewDelegation,
+                       DIM_FONT_PX: DIM_FONT_PX, DIM_GAP_FONT_PX: DIM_GAP_FONT_PX, DIM_OFF_PX: DIM_OFF_PX,
+                       DIM_OFF_V_PX: DIM_OFF_V_PX, DIM_TXT_PX: DIM_TXT_PX, DIM_ROW_PX: DIM_ROW_PX,
+                       DIM_DEPTH_OFF_PX: DIM_DEPTH_OFF_PX, PV_PAD_PX: PV_PAD_PX,
                        // UI-C1b: draft ciel, odhad navrhu a doskova projekcia
                        nxFrontsResolve: nxFrontsResolve, nxDraftStats: nxDraftStats,
                        nxGrainArrows: nxGrainArrows, pvBoardScene: pvBoardScene,
