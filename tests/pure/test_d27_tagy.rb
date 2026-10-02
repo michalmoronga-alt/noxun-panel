@@ -9,8 +9,9 @@
 #      LEN tagy, ktore v modeli su (D-78),
 #   3) ZAPIS bezi v JEDNEJ operacii s ABORT vetvou (viditelnost tagu je zapis
 #      do .skp — na rozdiel od overlayov D-103/D-104/D-105),
-#   4) JEDEN ZDROJ STAVU, DVA OVLADACE: okno tagov v raile aj checkbox ghost
-#      zon idu cez `Engine.set_tag_visible`; `Zones` uz vlastnu cestu nema,
+#   4) JEDEN ZDROJ STAVU, JEDEN OVLADAC (od H6a): okno tagov v raile ide cez
+#      `Engine.set_tag_visible` (checkbox obrysov zon pod nahladom zanikol);
+#      `Zones` uz vlastnu cestu nema,
 #   5) SERVEROVE GUARDY panela: identita dokumentu + whitelist + vyslovny
 #      boolean; odmietnutie NEZAPISUJE a obnovi stav,
 #   6) stav chodi s KAZDYM pushom vyberu (Spat/Znova, prepnutie dokumentu),
@@ -157,14 +158,21 @@ NxTest.test('D-27: Zones uz vlastnu zapisovaciu cestu NEMA') do
   NxTest.assert_equal(1, zones_code.scan(/\.visible\s*=[^=]/).length)
 end
 
-NxTest.test('D-27: checkbox ghost zon ide TOU ISTOU cestou ako okno tagov') do
+NxTest.test('D-27 + H6a: obrysy zon prepina JEDEN ovladac - okno tagov v raile') do
   NxTest.refute(D27_PANEL.include?("cb(dlg, 'toggle_zones')"),
                 'stary callback bez identity dokumentu ZANIKOL')
   NxTest.refute(D27_ACT.include?('def handle_toggle_zones'), 'a jeho handler tiez')
-  NxTest.assert(D27_ACTJS.include?('sketchup.nx_tag_visible'), 'checkbox posiela novy callback')
-  NxTest.assert(D27_ACTJS =~ /function toggleZones\(\).*?'zony'/m, 'a posiela kluc `zony`')
-  NxTest.assert(D27_ACTJS =~ /function toggleZones\(\).*?model_guid/m,
-                'checkbox musi niest identitu dokumentu')
+  # H6a (O8): druhy ovladac (checkbox pod nahladom) zanikol - ani HTML, ani JS, ani CSS ho nema.
+  NxTest.refute(D27_HTML.include?('zonesChk'), 'v panel.html nie je checkbox obrysov zon')
+  NxTest.refute(D27_HTML.include?('toggleZones'), 'a nevola toggleZones')
+  NxTest.refute(D27_HTML.include?('class="zoneline"'), 'ani jeho riadok `.zoneline`')
+  NxTest.refute(D27_CSS.include?('.zoneline'), 'CSS `.zoneline` zaniklo')
+  NxTest.refute(D27_ACTJS.include?('toggleZones'), 'actions.js uz toggleZones nema')
+  NxTest.refute(D27_SHELL.include?('zonesChk'), 'shell.js uz checkbox nenasadzuje')
+  # Zdielana serverova cesta ostava a rail ponuka kluc `zony`.
+  NxTest.assert(D27_PANEL.include?("cb(dlg, 'nx_tag_visible')"), 'callback okna tagov ostava')
+  NxTest.assert(D27_MENU.include?('togglePayload'), 'okno tagov posiela prepnutie s identitou dokumentu')
+  NxTest.assert(D27::KEYS.include?('zony'), 'whitelist servera ma kluc `zony` (riadok okna tagov)')
 end
 
 # --- 5) serverove guardy panela ----------------------------------------------
@@ -288,8 +296,9 @@ NxTest.test('D-27: panel si ZIADNY vlastny stav tagov nedrzi (server je autorita
   NxTest.assert(code.include?('nxTagState = st'), 'drzi sa LEN posledny stav zo servera')
   fn = code[/function nxApplyTags\(st\)\{?.*?\n  \}/m].to_s
   NxTest.refute(fn.include?('localStorage'), 'viditelnost tagu patri modelu, nie prehliadacu')
-  NxTest.assert(fn.include?("el('zonesChk')"),
-                'ten isty stav nasadzuje aj checkbox ghost zon (jeden zdroj, dva ovladace)')
+  NxTest.assert(fn.include?("el('railTagy')"),
+                'stav nasadzuje ikona raily (jeden zdroj, jeden ovladac po H6a)')
+  NxTest.refute(fn.include?("el('zonesChk')"), 'checkbox obrysov zon zanikol')
 end
 
 # --- 8) overlay nekresli nad skrytym tagom -----------------------------------

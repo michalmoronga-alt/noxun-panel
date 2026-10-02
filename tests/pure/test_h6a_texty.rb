@@ -17,9 +17,12 @@ def h6a_read(rel)
   File.read(File.join(H6A_UI, rel), encoding: 'UTF-8')
 end
 
-# Normalizacia na porovnanie: bez tagov, bez entit, jedna medzera, male pismena.
-def h6a_norm(s)
-  CGI.unescapeHTML(s.to_s.gsub(/<[^>]*>/, ' ')).gsub(/\s+/, ' ').strip.downcase
+# Normalizacia na porovnanie: bez entit, jedna medzera, male pismena. Tagy sa
+# odstranuju LEN z HTML (v JS by `<`…`>` z kodu zozrali retazce).
+def h6a_norm(s, html: false)
+  s = s.to_s
+  s = s.gsub(/<[^>]*>/, ' ') if html
+  CGI.unescapeHTML(s).gsub(/\s+/, ' ').strip.downcase
 end
 
 # Zdrojovy JS: spojenie retazcov `' + '` je pre porovnanie JEDEN retazec.
@@ -32,10 +35,13 @@ end
 # Cely korpus, v ktorom sa veta smie nachadzat (HTML + JS panela a Studia + server textov).
 def h6a_corpus
   @h6a_corpus ||= begin
-    parts = [h6a_read('panel.html')]
-    Dir.glob(File.join(H6A_UI, 'js', '*.js')).sort.each { |f| parts << h6a_js(File.join('js', File.basename(f))) }
-    parts << h6a_read(File.join('panel', 'payloads.rb'))
-    h6a_norm(parts.join("\n"))
+    html = h6a_read('panel.html')
+    # Texty bublin ziju v ATRIBUTE `data-tip` - pred odstranenim tagov sa vytiahnu.
+    tips = html.scan(/data-tip="([^"]*)"/m).flatten.map { |t| h6a_norm(t) }
+    parts = [h6a_norm(html, html: true)] + tips
+    Dir.glob(File.join(H6A_UI, 'js', '*.js')).sort.each { |f| parts << h6a_norm(h6a_js(File.join('js', File.basename(f)))) }
+    parts << h6a_norm(h6a_read(File.join('panel', 'payloads.rb')))
+    parts.join("\n")
   end
 end
 
@@ -43,10 +49,10 @@ end
 def h6a_visible_corpus
   @h6a_visible ||= begin
     html = h6a_read('panel.html').gsub(/data-tip="[^"]*"/m, '')
-    parts = [html]
-    %w[materials.js rules.js form.js core.js].each { |f| parts << h6a_js(File.join('js', f)) }
-    parts << h6a_read(File.join('panel', 'payloads.rb'))
-    h6a_norm(parts.join("\n"))
+    parts = [h6a_norm(html, html: true)]
+    %w[materials.js rules.js form.js core.js].each { |f| parts << h6a_norm(h6a_js(File.join('js', f))) }
+    parts << h6a_norm(h6a_read(File.join('panel', 'payloads.rb')))
+    parts.join("\n")
   end
 end
 

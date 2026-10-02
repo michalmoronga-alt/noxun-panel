@@ -547,7 +547,6 @@
   .inslock.on { background: var(--nx-warn-bg-soft); border-color: var(--nx-warn); }
   /* Nahlad (fit ⛶ presunuty do overlaya nahladu — D-29; rezimove taby su v sticky hlavicke) */
   #preview { width: 100%; border: 1px solid var(--nx-border); border-radius: 6px; background: var(--nx-surface-preview); display: block; touch-action: none; }
-  .pvhint { font-size: 10px; color: var(--nx-ink-faint); text-align: center; margin: 3px 0 4px; }
   /* ===== Zony (UI-C2) =====================================================
      Strom so STROMOVYMI SPOJNICAMI: vnorenie kresli vlastny kontajner `.zkids`
      s lavou linkou a vodorovnym „zubom" pri kazdom uzle. Odsadenie paddingom
@@ -599,12 +598,12 @@
   .fldrow input { flex: 1; padding: 3px 5px; border: 1px solid var(--nx-border-strong); border-radius: 6px; min-width: 0; }
   .fldrow .lockbtn { flex: 0 0 30px; cursor: pointer; text-align: center; border: 1px solid var(--nx-border); border-radius: 6px; background: var(--nx-surface-sunken); padding: 3px 0; display: inline-flex; align-items: center; justify-content: center; }
   .fldrow .lockbtn.on { background: var(--nx-warn-bg-soft); border-color: var(--nx-warn); }
-  .zoneline { display: flex; align-items: center; margin: 8px 0 2px; }
-  .zoneline input { margin-right: 7px; width: 15px; height: 15px; }
-  .zoneline label { color: var(--nx-ink-label); }
   #status { font-size: 11px; padding: 7px 9px; border-radius: 6px; background: var(--nx-surface-sunken); color: var(--nx-ink-label); border: 1px solid var(--nx-border); min-height: 16px; line-height: 1.35; margin-top: 8px; }
   #status.err { background: var(--nx-err-bg); color: var(--nx-err-fg); border-color: var(--nx-err-border); }
   #status.ok  { background: var(--nx-ok-bg); color: var(--nx-ok-fg); border-color: var(--nx-ok-border); }
+  /* H6a (O2 A): stavova veta Inspectora je bez spravy SKRYTA (NX.setStatus nastavi
+     `hidden`); `display` pravidlo by atribut prebilo (pasca D-137), preto poistka. */
+  .nx-inspector #status[hidden] { display: none; }
   /* H10b: stavova veta ulozenia radov PRIAMO v modale kolieska (modal prekryva
      #status panela). Vzhlad ako #status; prazdna je `hidden` (nezabera riadok). */
   #serStatus { font-size: 11px; padding: 7px 9px; border-radius: 6px; background: var(--nx-surface-sunken); color: var(--nx-ink-label); border: 1px solid var(--nx-border); line-height: 1.35; margin-top: 8px; }
@@ -1170,7 +1169,6 @@
   .pvtool:hover { background: var(--nx-surface-sunken); }
   .pvtool[aria-disabled="true"] { color: var(--nx-ink-faint); cursor: not-allowed; }
   .pvtool .ic { width: 16px; height: 16px; }
-  .zoneline { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--nx-ink-muted); margin-top: 4px; }
   /* paticka v normalnom toku (A12: #verline PRESUNUTY sem, nie fixed, nie duplikat) */
   .nxfoot { margin: 10px 0 0; padding-top: 8px; border-top: 1px solid var(--nx-border-soft);
             font-size: 11px; color: var(--nx-ink-faint); text-align: center; }
@@ -1183,11 +1181,13 @@
   .crumb b { color: var(--nx-ink); }
   .crumb .backlink { color: var(--nx-select); cursor: pointer; text-decoration: underline; }
   /* rezimy Inspectora (body class z bridge.js) */
-  .insertmore { display: none; }
-  body.mode-cab .insertmore { display: block; }
-  /* D-14: ulozit ako sablonu — rovnake pravidlo ako insertmore (len oznaceny korpus) */
-  .savetpl { display: none; }
-  body.mode-cab .savetpl { display: block; }
+  /* H6a (O1 B): „Vlozit kopiu" (B3) a „Ulozit sablonu" (D-14) stoja dole vedla seba
+     v JEDNOM rade, rovnako siroke, a len pri oznacenej skrinke (vkladanie, dielec
+     a doska ich nemaju). Rovnake akcie ako predtym, dva riadky -> jeden. */
+  .nx-inspector .cabacts { display: none; gap: 6px; margin-top: 4px; }
+  .nx-inspector body.mode-cab .cabacts { display: flex; }
+  .nx-inspector .cabacts .ghostbtn { flex: 1 1 0; min-width: 0; display: inline-flex; align-items: center;
+            justify-content: center; gap: 5px; padding: 8px 6px; font-size: 12px; white-space: nowrap; }
   /* D-14/D-15: genericky in-panel modal pre "pridavacie" akcie */
   .nxmodal { position: fixed; inset: 0; background: var(--nx-scrim); z-index: 60;
              display: flex; align-items: center; justify-content: center; }
@@ -1509,15 +1509,17 @@
   .nx-inspector body.mode-board .pvbox { display: none; }
   #boardSvg { width: 100%; max-height: 200px; border: 1px solid var(--nx-border); border-radius: 6px;
               background: var(--nx-surface); margin: 4px 0 6px; }
-  /* Zaskrtnutie "zony ghost" patri ku kontextu Zony. */
-  .nx-inspector body:not([data-view-ctx="zony"]) .zoneline { display: none; }
-
   /* --- S2: vkladacia karta vs. rozmery ----------------------------------- */
   .nx-inspector body.mode-cab #insertCard { display: none; }
   /* Vkladaci prepinac: data-insert-kind atribut na <body> (PREZIJE setUiMode
      className prepis — Codex audit c, blocker G). */
   .nx-inspector body:not([data-insert-kind="board"]) #insertBoardForm { display: none; }
   .nx-inspector body[data-insert-kind="board"].mode-insert #basicCard { display: none; }
+  /* H6a (O4): pri oznacenej skrinke nadpis „Rozmery" nad polami odpada (list sektora
+     „Zakladne" uz hovori, co je vnutri); vo vkladani ostava. */
+  .nx-inspector body.mode-cab #basicCard > legend { display: none; }
+  /* H6a (mockup bod 7): „?" materialov skrinky je v liste sektora len pri oznacenej skrinke. */
+  .nx-inspector body:not(.mode-cab) #s3Help { display: none; }
   /* UI-C1b: vo vkladani KORPUSU nesie informacny stlpec ODHAD zo sablony —
      „Vnút. hĺbka" a „Hmotnosť" tam mockup nema (vertikalny priestor). */
   .nx-inspector body.mode-insert #infIntDepth,
@@ -2203,18 +2205,6 @@
   #preview g.hwmk.hov path:not(.hwhit) { stroke: var(--nx-select-strong); }
   .frow.hov { background: var(--nx-select-bg-hover); border-radius: 6px; }
   .frow.hov .fnum { color: var(--nx-select-accent); font-weight: 600; }
-  /* D-23: hint pod nahladom podla aktivneho kontextu (data-view-ctx, UI-B1) —
-     klik na celo sa ukazuje LEN v kontexte Cela; zonovy hint LEN v Zonach. */
-  .pvhint .ph-fronts { display: none; }
-  body[data-view-ctx="cela"] .pvhint .ph-fronts { display: inline; }
-  body[data-view-ctx="cela"] .pvhint .ph-zones,
-  body[data-view-ctx="kovanie"] .pvhint .ph-zones,
-  body[data-view-ctx="korpus"] .pvhint .ph-zones { display: none; }
-  /* GH P3: oznaceny DIELEC ma nahlad NUTENE zonovy (bridge previewMode='zones',
-     data-view-ctx sa vedome NEMENI) — hint musi nasledovat realny
-     nahlad, nie kontext. Za kontextovymi pravidlami = vyhrava pri rovnakej specificite. */
-  body.mode-part .pvhint .ph-zones { display: inline; }
-  body.mode-part .pvhint .ph-fronts { display: none; }
   /* ===== V0.6 M-A2: modal "Pridat z Demosu" (nxda*) + dlazdice s fotkou +
      potvrdenie mazania. Farby VYHRADNE cez tokeny --nx-* (UI_DIZAJN). */
   .nxdabody { overflow-y: auto; flex: 1; min-height: 120px; max-height: 62vh; margin: 6px 0; }

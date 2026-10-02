@@ -1276,7 +1276,8 @@
     marks.forEach(function(m){ S.push(hwMarkSvg(m, rx, ry, false)); });
     var sum = nxHwSummary(hwItems);
     pvText(S, rx(g.W/2), ry(-44), sum || 'Skrinka zatiaľ nemá kovanie', 19);
-    if (marks.length) pvText(S, rx(g.W/2), ry(-70), 'klik na značku = označí vlastníka v modeli · pozície sú orientačné', 15);
+    // H6a (O5): veta „klik na značku…" je od teraz v „?" pod náhľadom
+    // (NXShell.pvHelpText, kontext Kovanie) — z kresby zmizla.
   }
 
   // Ciste (Node testy): odvodenie znaciek z payloadu kovania.

@@ -15,8 +15,11 @@
     setVal('cab_front', c.front_material_id || '');
     setVal('cab_front_c', c.front_material_id || ''); // UI-C3: zrkadlo v zozname ciel
     setVal('cab_back', c.back_material_id || '');
-    el('cabMatHint').textContent = on ? 'Materiály tejto skrinky — prázdne = dediť z projektu.'
-                                      : 'Označ skrinku pre nastavenie jej materiálov.';
+    // H6a: pomocna veta o dedeni je „?" v liste sektora (#s3Help); s vyberom
+    // ostava riadok skryty, bez vyberu hovori STAVOVA veta (hidden=false).
+    var mh = el('cabMatHint');
+    mh.textContent = 'Označ skrinku pre nastavenie jej materiálov.';
+    mh.hidden = on;
     // D-85: zmena `value`/`disabled` nevystreli ziadnu udalost — trigger comboboxu
     // treba obnovit vyslovne (inak by ukazoval material predoslej skrinky).
     nxComboSync();
@@ -30,7 +33,9 @@
     // skryty. Ta ista hodnota, dva vstupne body; drzat ich v synchro MUSI
     // KAZDA cesta, ktora sa dotkne `cab_front`.
     ['cab_body','cab_front','cab_front_c','cab_back'].forEach(function(id){ var e=el(id); if(e){ e.value=''; e.disabled=true; } });
-    el('cabMatHint').textContent = 'Označ skrinku pre nastavenie jej materiálov.';
+    var mh = el('cabMatHint');
+    mh.textContent = 'Označ skrinku pre nastavenie jej materiálov.';
+    mh.hidden = false;
     nxComboSync();
     if (typeof updateCabfrontMeta === 'function') updateCabfrontMeta(); // D-130b: bez skrinky je meta prazdna
   }

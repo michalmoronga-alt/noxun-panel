@@ -74,7 +74,7 @@ NxTest.test('H4b · D-07: UI texty bez vyvojarskeho zargonu (ghost, seed, legacy
   # Kontrola, ze extrakcia nieco nasla (inak by guard predstieral pokrytie).
   all = NxH4b.ui_texts
   NxTest.assert(all['ui/js/studio.js'].include?('Zoradené podľa závažnosti.'), 'extrakcia JS retazcov funguje')
-  NxTest.assert(all['ui/panel.html'].include?('Zobraziť obrysy zón v modeli'), 'extrakcia HTML funguje')
+  NxTest.assert(all['ui/panel.html'].include?('Uložiť šablónu'), 'extrakcia HTML funguje')
   NxTest.assert(all['core/tags.rb'].include?('Zóny (obrysy)'), 'popisok tagu zon v raile: „Zóny (obrysy)"')
 end
 

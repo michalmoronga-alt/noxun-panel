@@ -896,7 +896,15 @@
       if (typeof nxInsertDraftResume === 'function') nxInsertDraftResume();
       refreshZoneUI(); renderPreview();
     },
-    setStatus: function(msg, err){ var e = el('status'); e.textContent = msg; e.className = err ? 'err' : 'ok'; },
+    // H6a (O2 A): stavova veta sa ukaze LEN so spravou — prazdny text ju skryje
+    // (`NX.setStatus('')` v hardware.js; „Pripravene." zaniklo). Trieda ok/err
+    // ostava; skryta veta nezabera ani riadok.
+    setStatus: function(msg, err){
+      var e = el('status');
+      e.textContent = msg;
+      e.className = err ? 'err' : 'ok';
+      e.hidden = String(msg == null ? '' : msg).trim() === '';
+    },
     // UI-B3: maly push nastaveni pocitaca po zmene v koliesku (rady/tema).
     // Meni LEN ponuky a stav prepinaca — ZIADNY render karty, rozpisany
     // formular sa nesmie dotknut (vzor NX.setUsedIds).
