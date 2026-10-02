@@ -343,7 +343,9 @@ NxTest.test('1b-6a: prepis nazvu PO ulozeni zmaze aj zaznam spred ulozenia') do
     core.save_project_name(m, 'Prve meno')
     m.path = 'C:/Zakazky/Prepis.skp'
     m.guid = 'GUID-PREPIS-2'
-    NxTest.assert_equal('Druhe meno', core.save_project_name(m, 'Druhe meno'))
+    # H7a: zapis vracia [status, reason]; platny nazov cita volajuci.
+    NxTest.assert_equal([:ok, ''], core.save_project_name(m, 'Druhe meno'))
+    NxTest.assert_equal('Druhe meno', core.project_name(m))
     map = core.project_names
     NxTest.assert_equal('Druhe meno', map['c:/zakazky/prepis.skp'], 'zaznam sadol na cestu')
     NxTest.refute(map.key?('guid:GUID-PREPIS'), 'kluc spred ulozenia zanikol')
@@ -408,7 +410,10 @@ NxTest.test('1b-6c: KAZDY zapisovatel suboru berie zamok a cita NANOVO') do
   door = ST1B_CORE_RB[/def update_vepo_settings.*?\n      end\n/m].to_s
   NxTest.assert(door.include?('Materials.with_catalog_lock'),
                 'zapisove dvere berú medziprocesovy zamok')
-  NxTest.assert(door.include?('JsonFileStore.reload!'),
+  # H7a: cerstve citanie (`reload!` primaru aj zalohy) robi zapisova brana,
+  # ktoru dvere volaju pod zamkom PRED striktnym citanim.
+  gate = ST1B_CORE_RB[/def write_gate.*?\n      end\n/m].to_s
+  NxTest.assert(door.include?('write_gate') && gate.include?('JsonFileStore.reload!'),
                 'a citaju subor NANOVO — sekundova cache by zapis druhej instancie skryla')
   NxTest.assert(door.include?('rescue StandardError'),
                 'cela zamknuta uprava je v rescue — zlyhanie .lock nesmie uniknut ako vynimka')
@@ -424,13 +429,13 @@ NxTest.test('1b-6c: mapu nazvov cez save_vepo_settings zapisat NEDA (obchadzka z
   key = 'c:/zakazky/obchadzka.skp'
   begin
     core.update_project_names { |map| map.merge(key => 'Zakazka v subore') }
-    NxTest.refute(core.save_vepo_settings(core::PROJECT_NAMES_KEY => {}),
-                  'zapis mapy tadeto je odmietnuty')
+    NxTest.assert_equal(:failed, core.save_vepo_settings(core::PROJECT_NAMES_KEY => {}).first,
+                        'zapis mapy tadeto je odmietnuty')
     # Review #248: symbolovy kluc by guard obisiel a JSON by z neho spravil ten
     # isty retazec — pri parsovani vyhra druhy vyskyt a odtlacok mapy prepise
     # cerstvu mapu napriek zamku.
-    NxTest.refute(core.save_vepo_settings(:project_names => {}),
-                  'ani v symbolovej podobe')
+    NxTest.assert_equal(:failed, core.save_vepo_settings(:project_names => {}).first,
+                        'ani v symbolovej podobe')
     NxTest.assert_equal('Zakazka v subore', core.project_names[key],
                         'a mapa v subore ostala nedotknuta')
   ensure
@@ -456,7 +461,7 @@ NxTest.test('1b-6c: zapis last_dir NEZMAZE nazov, ktory medzitym zapisala druha 
       ST1B_OTHER_INSTANCE.call(key, 'Druha instancia')
       orig.call(&blk)
     end
-    NxTest.assert(core.save_vepo_settings('last_dir' => 'C:/Export'), 'nas zapis presiel')
+    NxTest.assert_equal([:ok, ''], core.save_vepo_settings('last_dir' => 'C:/Export'), 'nas zapis presiel')
   ensure
     mats.define_singleton_method(:with_catalog_lock, orig)
   end
@@ -483,7 +488,8 @@ NxTest.test('1b-6c: prepinac 18/36 nezmaze zaznam druhej instancie') do
       ST1B_OTHER_INSTANCE.call(key, 'Druha instancia')
       orig.call(&blk)
     end
-    NxTest.refute(core.save_merge_18_36(false), 'prepinac sa zapisal')
+    NxTest.assert_equal([:ok, ''], core.save_merge_18_36(false), 'prepinac sa zapisal')
+    NxTest.refute(core.merge_18_36, 'a plati vypnuty')
   ensure
     mats.define_singleton_method(:with_catalog_lock, orig)
   end
@@ -579,8 +585,8 @@ NxTest.test('1b-6c: zlyhanie zamku je len FALSE — a export dostane spravny naz
     mats.define_singleton_method(:with_catalog_lock) do |&_blk|
       raise Errno::EACCES, 'materials.lock (test)'
     end
-    NxTest.refute(core.save_vepo_settings('last_dir' => 'C:/Nezapise'),
-                  'zapis pri nedostupnom zamku vracia FALSE, nevyhadzuje')
+    NxTest.assert_equal(:failed, core.save_vepo_settings('last_dir' => 'C:/Nezapise').first,
+                        'zapis pri nedostupnom zamku vracia :failed, nevyhadzuje')
     NxTest.assert_equal('Zakazka bez zamku', core.project_name(m),
                         'citanie aj tak dava spravny nazov (fallback spred zamku)')
   ensure
@@ -613,12 +619,14 @@ NxTest.test('1b-6c: NEPRECITATELNY subor nastavenia NEPREPISE (audit #1)') do
     begin
       store.define_singleton_method(:read) { |*_a, **_k| raise IOError, 'poskodeny subor (test)' }
       store.define_singleton_method(:write) { |*a| writes += 1; orig_write.call(*a) }
-      NxTest.refute(core.save_vepo_settings('last_dir' => 'C:/Export'),
-                    'zapis nad neprecitatelnym suborom sa NEUDEJE')
-      # Nie-Hash obsah (platny JSON, zly tvar) je rovnaka pasca.
+      # H7a: I/O chyba citania = :failed (o zdravi suboru nehovori nic).
+      NxTest.assert_equal(:failed, core.save_vepo_settings('last_dir' => 'C:/Export').first,
+                          'zapis nad neprecitatelnym suborom sa NEUDEJE')
+      # Nie-Hash obsah (platny JSON, zly tvar) je rovnaka pasca — H7a ju hlasi
+      # ako :unreadable (bez dobrej zalohy sa neda pokracovat).
       store.define_singleton_method(:read) { |*_a, **_k| [] }
-      NxTest.refute(core.save_vepo_settings('last_dir' => 'C:/Export'),
-                    'ani nad obsahom, ktory nie je objekt')
+      NxTest.assert_equal(:unreadable, core.save_vepo_settings('last_dir' => 'C:/Export').first,
+                          'ani nad obsahom, ktory nie je objekt')
       NxTest.assert_equal(0, writes, 'do suboru sa nezapisalo NIC')
     ensure
       store.define_singleton_method(:read, orig_read)
@@ -693,8 +701,9 @@ NxTest.test('ST-1a: neulozeny model ma VLASTNY kluc sedenia a zastupny nazov') d
   begin
     # Kluc sedenia existuje, takze pomenovat sa da UZ PRED prvym ulozenim —
     # presne scenar 1b-6a (do R-02b to slo len vdaka guid; teraz vdaka tokenu).
-    NxTest.assert_equal('ine meno', core.save_project_name(empty, 'ine meno'),
+    NxTest.assert_equal([:ok, ''], core.save_project_name(empty, 'ine meno'),
                         'zapis pod kluc sedenia sa udeje')
+    NxTest.assert_equal('ine meno', core.project_name(empty))
   ensure
     core.save_project_name(empty, '') # zaznam sedenia nesmie ostat v sandboxe
   end

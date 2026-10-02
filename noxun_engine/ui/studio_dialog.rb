@@ -646,11 +646,13 @@ module Noxun
 
           msg = []
           if data.key?('project')
-            name = ProductionCore.save_project_name(model, data['project'])
+            ProductionCore.save_project_name(model, data['project'])
+            name = ProductionCore.project_name(model)
             msg << "Názov projektu: #{name}"
           end
           if data.key?('merge')
-            merge = ProductionCore.save_merge_18_36(data['merge'] == true)
+            ProductionCore.save_merge_18_36(data['merge'] == true)
+            merge = ProductionCore.merge_18_36
             msg << "18+36 spolu: #{merge ? 'zapnuté' : 'vypnuté'}"
           end
           return set_status('Nič sa nezmenilo.', true) if msg.empty?
