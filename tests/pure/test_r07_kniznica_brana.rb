@@ -560,7 +560,12 @@ NxTest.test('R-07 (P2-3): panel dáva ROVNAKÝ dôvod ako súpis (žiadne „pri
   # (vzor `test_r08_zamky.rb`): overidy sa pri blokovanej kniznici NULUJU
   # a dovod sa posiela dalej.
   body = r.method_src('ui/panel/payloads.rb', 'decorate_hardware_purchase')
-  NxTest.assert(body.include?('library_read_only?') && body.include?('blocked ? {} :'),
+  blocked_helper = r.method_src('ui/panel/payloads.rb', 'hw_purchase_blocked?')
+  override_helper = r.method_src('ui/panel/payloads.rb', 'hw_purchase_overrides')
+  NxTest.assert(body.include?('blocked = hw_purchase_blocked?(status)') &&
+                body.include?('hw_purchase_overrides(cfg, status)') &&
+                blocked_helper.include?('status == :missing && HardwareSets.library_read_only?') &&
+                override_helper.include?('hw_purchase_blocked?(status) ? {} :'),
                 'panel pri read-only kniznici override skrinky NEUPLATNI')
   ip = r.method_src('ui/panel/payloads.rb', 'item_purchase')
   NxTest.assert(ip.include?('library_incompatible'),

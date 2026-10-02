@@ -7,6 +7,14 @@
 > **Postrehy Michala sa píšu HNEĎ**, hocikedy a na hociktorú tému — zaradenie robí agent (plné pravidlo: [PLAN.md](PLAN.md), sekcia „Pravidlo pre postrehy").
 > **Kde je zvyšok:** história zápisníka (priebežné stavy, 2A migračná mapa, hardening a sedenia V0.5, priebeh seedu, zodpovedané otázky) → [archiv/DOGFOODING_historia.md](archiv/DOGFOODING_historia.md) · odpočet merača D-25 → [zdroje/MERAC_D25_odpocet_2026-08.md](zdroje/MERAC_D25_odpocet_2026-08.md) · história dávok → [archiv/KRONIKA.md](archiv/KRONIKA.md).
 
+## HARDENING PO V1
+
+- **D-150 · Výber setu pri krídle klasifikovaných dvierok sa neuloží** (sonda a audit H18, 2.10.2026) — Inspector hlási uloženie,
+  ale zápis skladá odmietnutý `class:hinge|…@krídlo`; prestavba ho zahodí a odstráni aj starší platný `hinge@krídlo`.
+  **Nákup sa môže zmeniť napriek úspešnej hláške.** Správny smer je existujúci `hinge@krídlo` so zachovanou validáciou triedy;
+  povoliť iba parser nestačí (resolver owner triedny záves nečíta). *Otvorené: návrh [H18b-1](zdroje/bloky/HARDENING/PACKAGE_H18b.md),
+  výrobná/cenová dávka, predrecenzia a in-SU brána; **implementácia čaká na Michalovu odpoveď Q2**. H18 mení iba zobrazenie.*
+
 ## KONTROLA + VÝROBA
 
 *(Skupina je prázdna a **blok 2 je uzavretý vo v0.16.0 (29.9.2026)** — D-94, D-112, D-113, D-121 a D-122 majú plné texty v
@@ -28,6 +36,13 @@ Smoke bloku 2 **PASS 29.9.2026** (bez chýb); nové postrehy k týmto funkciám 
 
 ## Po V1 — zásobník
 
+- **D-151 · Výber setu pri klasifikovanom výklope bez systému sa nikdy nepoužije** (sonda H18b, 3.10.2026) — zápis na skrinke
+  aj pri čele hlási úspech, resolver ho zastaví ako `lift_system_missing` ešte pred mapovaním; export už dnes stojí na RED.
+  Návrh: zápis odmietnuť vetou „čelo nemá systém výklopu (HK top / HL top)". *Zásobník; mimo H18/H18b-1.*
+- **D-152 · Mŕtvy výber dielca po návrate čela alebo krídla ožije** (H18 F4, sonda H18b, 3.10.2026) — `typ@dielec` vrátane
+  `hinge@krídlo` po zmene počtu krídiel či typu čela ostáva v configu; `prune_missing_owners` čistí iba triedne kľúče.
+  Nákup ho bez položky nečíta a hlavička H18 ho neráta, pri návrate položky začne platiť. *Zásobník; čistenie existujúcej zákazky
+  potrebuje vlastnú dávku a golden. D-153 ostáva iba podmienený návrh pri H18b-2 v [package](zdroje/bloky/HARDENING/PACKAGE_H18b.md) §14.*
 - **D-147 · Nárezový plán: menšie dielce sa neukladajú nad seba v páse** (Michal 29.9.2026, smoke bloku 2) — pásové rozloženie dá do pásu dielce len
   vedľa seba; nad nižším dielcom ostáva voľné miesto (vidno ho ako zvyšok), hoci by sa tam zmestil ďalší menší dielec. Plán je preto opatrnejší (niekedy
   o platňu viac), než by musel. Doladiť heuristiku (vnáranie menších dielcov do voľného miesta pásu) po V1. *Stav: zásobník — Michal: „doladíme po V1".*

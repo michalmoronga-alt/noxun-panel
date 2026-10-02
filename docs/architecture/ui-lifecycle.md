@@ -733,8 +733,9 @@ Medzery v projekcii Čelá sa podfarbia jantárovo pri **kurzore v poli schémy*
 
 **Čo robí:** kovanie označenej skrinky — položky z pravidiel podľa vlastníka, ručne pridané položky, sety a pravidlá. Tri skupiny v **záväznom poradí**:
 **Položky z pravidiel** (`hwitems`) · **Sety** (`hwsets`) · **Pravidlá** (`hwrules`). Kostra je statická, JS píše obsah kontajnerov `#hwRows`, `#hwSetRows`
-a riadok Nôh `#legsRow` (Základné) — `refreshHardwareSets` obnovuje selecty vo **všetkých troch**. **Meta skupín (H6b):** `#hwItemsMeta` („6 ks", pri ručných „· 2 ručne"; `hwItemsMetaText`) a `#hwSetsMeta` („podľa projektu" / „1 vlastný" …; `hwSetsMetaText` — skrinkový
-výber `override_set_id`/`override_selector`, výbery pri čelách: legacy vlastníci z `owner_overrides` + klasifikovaní z `compat.owners`, každý vlastník raz; skrinka pri jednej triede `compat.cab`, inak kľúč typu — pri zmiešanej skrinke (`compat.cab` null) len ak má typ položku mimo `compat.owners`, `hwHasLegacyItem`) plní `hwMetaApply` na konci
+a riadok Nôh `#legsRow` (Základné) — `refreshHardwareSets` obnovuje selecty vo **všetkých troch**. **Meta skupín (H6b/H18):** `#hwItemsMeta`
+(„6 ks", pri ručných „· 2 ručne"; `hwItemsMetaText`) a `#hwSetsMeta` („podľa projektu" / „1 vlastný" …; `hwSetsMetaText` = súčet serverových
+`own_count`, počtu rôznych víťazných vlastných kľúčov; mŕtvy či zatienený výber a typ bez položky sa nerátajú) plní `hwMetaApply` na konci
 `renderHardware`, v `refreshHardwareSets` a `refreshHardwareManual`; skupina Pravidlá meta nemá. Dáta: `cabinet_payload` (`config.hardware`, `purchase`,
 `compat`, `hardware_manual_view`, `front_drawer` …); zápis existujúcimi akciami `set_hardware_override` / `set_hardware_set` (`actions_hardware.rb`) a `apply_all`.
 Detail domény: [hardware.md](hardware.md).
@@ -1070,15 +1071,19 @@ projekcie** uloženého configu a plánu — žiadny zápis. Kontrakt vkladacej 
   chránenom seed pravidle (`HardwareRules.protected_lift_item?`), `ručne` pri `source: 'manual'`, inak žiadny; čísla, ktoré na položke nie sú, sa nedopočítavajú;
   KH a KB tým istým vzorcom ako kontext pravidiel. Expanzia raz (`item_expansion` → `buy_lines`); záznam s `reason == lift_set_incomplete` → `state: 'incomplete'`
   s vetou `Validation.lift_incomplete_sentence` (tá istá ako Kontrola). Nesie ho aj ľahký push.
-- **`hardware_set_options` a owner výbery:** typ z kľúča a „výber na úrovni vlastníka" cez jediné autority `HardwareSets.mapping_key_type` a `owner_scoped_key?`.
-  **Emituje sa len kľúč, ktorý resolver pre ten dielec naozaj číta** (owner triedny kľúč aktívnej triedy z `active_class_by_owner`, legacy `typ@owner` len pri
-  neklasifikovanej položke); poškodená hodnota príznakom `invalid`.
-- **`compat`** (ponuka pre klasifikovanú položku; `nil` = plochý zoznam setov): `cab` a `owners[owner_part_key]` s `class_key` · `class_label` · `scope_label` ·
-  `none_label` (odkiaľ hodnota prichádza bez vlastného výberu) · `options` (`HardwareSets.class_set_options`, len kompatibilné a aktívne) · `current` · `stored`
-  + `value_text` (uložená hodnota mimo ponuky — `disabled`). **`cab` len pri jednej nenulovej triede** v skrinke; **`cab: null` je výrok** (zmiešaná skrinka → riadok
-  skrinky sa nekreslí, rozhoduje `hwCabRowOff`; `hwCabOptionList` vráti `null`, Sety typ vynechajú s vetou „set sa vyberá pri konkrétnom čele", živý refresh riadok
-  odstráni `hwDropSetRow`). Kľúč sa v paneli neskladá — JS pošle `set_id` alebo `value` akciou `set_hardware_set` a kľúč zloží
-  `HardwareSets.apply_cabinet_override`; neznáme ID sa neodosiela. Testy `tests/pure/test_kovd1b_ui.rb`, `tests/js/test_kovd1b_ui.js`.
+- **`hardware_set_options` a owner výbery:** typ z kľúča a rozsah vlastníka cez `HardwareSets.mapping_key_type` a `owner_scoped_key?`.
+  `own_count` = rôzne víťazné vlastné kľúče z `item_mapping_source` nad položkami daného typu. `owner_overrides` prenáša plochých vlastníkov;
+  pri klasifikovaných dvierkach skutočný `hinge@krídlo` číta `compat.owners`, pri ostatných klasifikovaných položkách owner triedny kľúč.
+  Poškodený plochý výber nesie `invalid` a text „neplatný výber (uložený výber)"; poškodený skrinkový výber aj `override_label` a `owner_default_label`.
+  **Uložené vs. účinné overridy (H18):** pri chýbajúcom snapshote a nekompatibilnej knižnici sú účinné `{}` (`hw_purchase_blocked?` / `hw_purchase_overrides`,
+  zdieľané s `decorate_hardware_purchase` a `drawer_buy_ctx`). Hlavička a dedenie z účinných; uložená hodnota zostáva viditeľná. Stav `:invalid` ako predtým.
+- **`compat`** (`nil` = plochý zoznam): `cab` a `owners[owner_part_key]` s `class_key` · `class_label` · `scope_label` · `none_label` · `options`
+  (`HardwareSets.class_set_options`, kompatibilné a aktívne) · `current` · `stored` + `value_text` (uložená hodnota mimo ponuky — `disabled`).
+  `none_label` cez `hardware_source_none_label`: sonda bez vlastného kľúča, pri skrinke aj bez vlastníka; zdroj `cab_class` = „skrinky", `cab` =
+  „staršieho výberu skrinky", projektové úrovne a žiadny zdroj = „projektu". `current` je ID celej voľby (aj selektora), nie výsledný set z pásma.
+  **`cab` len pri jednej nenulovej triede**; zmiešaná skrinka `cab: null` → riadok skrinky sa nekreslí (`hwCabRowOff`, `hwDropSetRow`), Sety odkážu na čelo.
+  JS iba kreslí, posiela pôvodné `set_id` / `value`; kľúč skladá `HardwareSets.apply_cabinet_override`. H18 jeho zápis nemení (D-150 čaká na Q2).
+  Testy `test_kovd1b_ui` a `test_h18_sety_pravda` (Ruby + JS).
 
 Plné znenie: archív, „payloads.rb".
 
@@ -1255,6 +1260,8 @@ Auto-apply hlási nezhodu dokumentu **nahlas** (na rozdiel od tichého echa výb
 Doména panela: ručné zásahy do kovania (`handle_set_hardware_override` — zápis po poliach s merge záznamu identity) a výber setu na skrinke či dielci
 (`handle_set_hardware_set`). Pravidlá a sety: [hardware.md](hardware.md); UI: „Kontext Kovanie". Obe cesty overujú dokument **pred** `cabinet_id` a zápis beží ako
 jeden rebuild = jeden krok Späť.
+Po zrušení výberu `hw_set_status_msg` neutrálne hlási „výber zrušený"; dedenie vysvetľuje riadok setu. Telo `handle_set_hardware_set` zostáva
+v H18 nezmenené (zdrojový guard), vrátane existujúceho problému zápisu pri klasifikovanom krídle (D-150).
 
 - **`OVERRIDE_FIELDS`** (`quantity` · `disabled` · `nominal_length` · `height_variant` · `box_height`) sa **musí zhodovať** s `CabinetBuilder::OVERRIDE_CONTENT_KEYS`
   (guard test).

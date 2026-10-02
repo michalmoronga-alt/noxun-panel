@@ -1316,7 +1316,7 @@ module Noxun
         # KOV-D1a: hodnotou moze byt aj vyber podla parametra (viac setov).
         def hw_set_status_msg(gt, owner, value, set_defs)
           who = "#{HardwareRules.label_for(gt)}#{owner ? " pre dielec #{owner}" : ''}"
-          return "#{who}: platí #{owner ? 'výber skrinky/projektu' : 'predvoľba projektu'}." if value.nil?
+          return "#{who}: výber zrušený." if value.nil?
           if value.is_a?(Hash)
             n = Array(value['bands']).length
             return "#{who}: #{HardwareSets.param_by(value['param'])} (#{n} #{n == 1 ? 'pásmo' : 'pásma'})."

@@ -122,11 +122,14 @@ module NxH18
 
   def context(c)
     # Vsetky podvrhnutia sa obnovia aj po chybe; globalny test state nesmie uniknut.
-    methods = [[P, :hardware_read_state], [HS, :load], [HS, :library_read_only?]]
+    # Decorator cita katalog sam. V plnej sade uz mohol iny test zanechat
+    # docasny katalog, preto explicitne pripneme POVODNY seed a vratime metodu.
+    methods = [[P, :hardware_read_state], [HS, :load], [HS, :library_read_only?], [E::HardwareCatalog, :items]]
     originals = methods.to_h { |mod, name| [[mod, name], mod.method(name)] }
     P.define_singleton_method(:hardware_read_state) { [c['status'] == 'blocked' ? :missing : :ok, c['state']] }
     HS.define_singleton_method(:load) { { 'sets' => c['state']['sets'].values, 'mapping' => c['state']['mapping'] } }
     HS.define_singleton_method(:library_read_only?) { c['status'] == 'blocked' }
+    E::HardwareCatalog.define_singleton_method(:items) { NxH18.copy(E::HardwareCatalog::SEED_ITEMS) }
     yield
   ensure
     originals&.each { |(mod, name), method| mod.define_singleton_method(name, method) }
@@ -215,7 +218,7 @@ module NxH18
              door('classic', 'front:F2/wing:single').merge('owner_id' => 'CAB-C'),
              door('tipon', 'front:F1/wing:single').merge('owner_id' => 'CAB-D'),
              door('tipon', 'front:F1/wing:single').merge('owner_id' => 'CAB-E')]
-    # B: iny nezaradeny set na kridle rozlisi prehodenie owner a cab (M23).
+    # B: nekompatibilny klasicky set na Tip-On kridle rozlisi owner a cab (M23).
     ov = { 'CAB-A' => { 'hinge' => 'zaves-p2o' },
            'CAB-B' => { 'hinge' => 'zaves-p2o', 'hinge@front:F1/wing:left' => 'zaves-klasik' },
            'CAB-C' => { 'hinge' => 'zaves-klasik' }, 'CAB-E' => { 'hinge' => 'moj-zaves' } }

@@ -432,6 +432,7 @@
     if (sc) return hwCompatOptionList(sc);
     var ov = hwOwnerOverride(entry, owner);
     return hwSetOptionList(entry, (ov && ov.set_id) || '', '(podľa skrinky/projektu)',
+                           (ov && ov.invalid) ? (ov.label || 'neplatný výber') :
                            (ov && ov.selector) ? (ov.label || 'podľa parametra') : null);
   }
   // KOV-D1b (Codex #310 kolo 1 P2-3): server ZÁMERNE pošle `compat.cab = null`,
@@ -844,55 +845,20 @@
     if (m > 0) out.push(m + ' ručne');
     return out.join(' · ');
   }
-  // Ma skrinka polozku typu `entry.generic_type`, ktoru triedny vyber nepokryva (bez klasifikacie
-  // alebo bez vlastnika)? Len taka polozka cita kluc typu. Ciste (Node testy).
-  function hwHasLegacyItem(entry, items){
-    var owners = (entry.compat && entry.compat.owners) || {};
-    return (items || []).some(function(it){
-      if (!it || it.generic_type !== entry.generic_type) return false;
-      var ow = String(it.owner_part_key || '');
-      return !ow || !Object.prototype.hasOwnProperty.call(owners, ow);
-    });
-  }
-  // Sety: kolko vlastnych vyberov setu ma skrinka — vyber na CELEJ skrinke
-  // (typ s `override_set_id` alebo `override_selector`; pri klasifikovanej zasuvke
-  // vyber v `compat.cab`) a vybery pri JEDNOTLIVYCH cielach (`owner_overrides` pre
-  // legacy vlastnikov + `compat.owners` pre klasifikovanych, kazdy vlastnik raz).
-  // Poskodeny zapis (`invalid`) je tiez
-  // zapis v configu, takze sa rata. Nic vlastne = „podľa projektu"; prazdna
-  // ponuka (skrinka nema kovanie so setom) = bez meta.
-  function hwSetsMetaText(setOptions, items){
+  // H18: ucinne vlastne vybery pocita server tym istym resolverom ako nakup.
+  function hwSetsMetaText(setOptions){
     var list = (setOptions || []).filter(function(o){ return !!o; });
     if (!list.length) return '';
-    function picked(sc){ return !!(sc && (sc.current || sc.stored)); }
-    var n = 0;
-    list.forEach(function(o){
-      var c = o.compat;
-      // Skrinka: pri klasifikovanej skrinke (jedna trieda, `compat.cab`) plati triedny vyber.
-      // Bez klasifikacie plati kluc typu (`override_*`). Pri zmiesanej skrinke (`compat.cab`
-      // = null) plati kluc typu LEN ked ma skrinka polozku tohto typu mimo `compat.owners`
-      // (legacy); inak ho resolver necita, riadok skrinky v skupine Sety sa nekresli
-      // (`hwCabRowOff`) a hlavicka nesmie tvrdit „vlastny" vyber, ktory nic nerobi.
-      if (c && c.cab) { if (picked(c.cab)) n++; }
-      else if ((o.override_set_id || o.override_selector) && (!c || hwHasLegacyItem(o, items))) n++;
-      // Cela: server posiela klasifikovanych vlastnikov v `compat.owners` A legacy vlastnikov
-      // v `owner_overrides` (jeden typ ich moze mat naraz) — spocitaju sa raz za vlastnika.
-      var owners = c && c.owners ? c.owners : {};
-      var legacy = o.owner_overrides || {};
-      var seen = {};
-      Object.keys(owners).forEach(function(k){
-        seen[k] = true;
-        if (picked(owners[k]) || legacy[k]) n++;
-      });
-      Object.keys(legacy).forEach(function(k){ if (!seen[k]) n++; });
-    });
+    var n = list.reduce(function(sum, entry){
+      return sum + (typeof entry.own_count === 'number' && isFinite(entry.own_count) ? entry.own_count : 0);
+    }, 0);
     return n > 0 ? (n + ' ' + hwPlural(n, 'vlastný', 'vlastné', 'vlastných')) : 'podľa projektu';
   }
   function hwMetaApply(items){
     var a = el('hwItemsMeta'), b = el('hwSetsMeta');
     var manual = (typeof hwManualView !== 'undefined') ? hwManualView : [];
     if (a) a.textContent = hwItemsMetaText(items, manual);
-    if (b) b.textContent = (items == null) ? '' : hwSetsMetaText(HW_SET_OPTIONS, items);
+    if (b) b.textContent = (items == null) ? '' : hwSetsMetaText(HW_SET_OPTIONS);
   }
 
   // items: config.hardware (pole) alebo null (nic neoznacene); overrides: hardware_overrides;

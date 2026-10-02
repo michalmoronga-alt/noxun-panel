@@ -1161,7 +1161,7 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Hw`).
   pod skupinou.
 - **Skupiny Kovania nesú meta v hlavičke:** Položky `6 ks` (súčet počtov z pravidiel;
   pri ručne pridaných aj `· 2 ručne`), Sety `podľa projektu` alebo `1 vlastný /
-  2–4 vlastné / 5+ vlastných` (vlastný výber setu na skrinke aj pri čelách);
+  2–4 vlastné / 5+ vlastných` (počet skutočne použitých vlastných výberov zo servera);
   Pravidlá meta nemajú. Lišta sektora Kovanie nesie súhrn typov (`Nohy 4× · Výsuv
   1× · …`), ktorý z kresby zmizol.
 
