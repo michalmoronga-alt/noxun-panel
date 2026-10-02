@@ -17,6 +17,23 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H12d · mená rolí na jednom mieste (2.10.2026, PR #452, v0.17.16, blok 9 · HARDENING PO V1, triedenie C-05 — GR-04; package
+  [PACKAGE_H12.md](../zdroje/bloky/HARDENING/PACKAGE_H12.md) R0.6, R4, §15 A3 A5 A6; brief [BRIEF_H12d.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H12d.md)).**
+  Karta dielca mala vlastnú JS mapu `roleLabel`, ktorá sa od stĺpca Rola v Kusovníku líšila v 9 rolách („Vrch" vs „Strop", „Priečka zvislá", „Zásuvkové
+  čelo", surové `drawer_bottom` a `free_panel`); `outputs.md` pritom tvrdil, že je zhodná (F1). Teraz **`PartKeys::ROLE_LABELS` + `role_label`** je jediná
+  tabuľka (doslovne bývalá `ProductionCore::ROLE_LABELS`; tá je alias a delegácia), `ZONE_PART_LABELS`/`DRAWER_PART_LABELS` sú z nej odvodené (bajtovo),
+  `Panel::BOARD_ROLE_LABELS` zanikla, **`part_card_payload` nesie `role_label`** a karta (`pcRoleText` = `pc.role_label || pc.role`) aj položka raily
+  (`nxTempLabel` — `sel` v režime `part` je vždy payload karty, overené: jediný volajúci `setUiMode('part', c.part_card)`) ho len vypíšu. **Q1 platí návrh**
+  (Michal neodpovedal): viditeľná zmena len v karte dielca. Výrobné mená, `Recipes.role_label`, `rdRoleDesc`, `corner_preview_title`, VEPO skratky bez zmeny.
+  **1. commit = charakterizácia na nezmenenom kóde:** golden `test_h12d_roles_golden.rb` (`roles.json`: Kusovník, `rows_with_roles`, prehľad ABS, `human_label`,
+  karta dosky) a dokumentačný JS odtlačok `roles_js.json` (hlavička karty, modal „Použiť na podobné…", raila) — oba bez regenerácie; golden H12a–c nedotknuté.
+  Nové `test_h12d_mena_roli.rb` (pokrytie rolí, alias, odvodenie, payload, guard T3f) a `test_h12d_mena_roli.js` (zmenilo sa presne 9 rolí, ostatné bajtovo).
+  **T4:** `test_roha1_rohova.js`, `test_kova1_cela.rb`, `test_konb_listy.rb` — asserty na JS mapu → meno zo servera + karta číta `role_label`. Mapa
+  `rozsirovacie-body.md` scenár 2 na nový stav. Nástroj fotiek: nová fotka **„Inspector · karta dielca"** (`panel_dielec`, nahrávka označí dielec skrinky).
+  **Mutácie (8, všetky zhodené):** M16 JS mapa späť · rola bez mena · výrobné meno „Vrch" → „Strop" (golden H12a) · vlastná kópia v `ProductionCore` · payload
+  bez `role_label` · `DRAWER_PART_LABELS` bez malého písmena · `nxTempLabel` ignoruje `role_label` · karta ignoruje `role_label`. STAV pred dávkou: v0.17.15,
+  H14b hotová, ďalší krok H12d. Testy: **5167 headless · 157 JS sád** zelené + encoding guard; in-SU netreba (žiadny builder, observer, undo ani zápis).
+
 - **H14b · jedna cesta prepnutia sekcie, kotvy a kreslenie sekcie z registra (1.10.2026, PR #451, v0.17.15, blok 9 · HARDENING PO V1, triedenie C-02
   časť 2 — CX-04 + GR-06 klient; package [PACKAGE_H14.md](../zdroje/bloky/HARDENING/PACKAGE_H14.md) §15 A1 A3).**
   Klik v navigácii a deep-link prepínali sekciu dvoma kópiami tých istých háčikov a `renderTools`/`renderBody` mali po 11 vetiev podľa id. Teraz

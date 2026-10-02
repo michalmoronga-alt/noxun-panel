@@ -1,6 +1,6 @@
 # Noxun Engine - FOTENIE OKIEN pre UI davky (D-10, blok 9 HARDENING, davka H2).
 # Nastroj pre agentov, plugin sa nim nemeni. Jednym prikazom nafoti Inspector
-# (bez vyberu + kontexty Korpus/Zony/Cela/Kovanie) a VSETKY sekcie Studia
+# (bez vyberu + kontexty Korpus/Zony/Cela/Kovanie + karta dielca) a VSETKY sekcie Studia
 # z realnych dat pluginu - bez interaktivneho SketchUpu, aj pri zamknutej obrazovke.
 # Fotky idu do %TEMP% (report orchestratorovi -> Michal), NIKDY do gitu.
 #

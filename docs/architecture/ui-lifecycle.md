@@ -813,6 +813,11 @@ Plné znenie: archív, „Riadok „Spotrebič" v Inspectore".
 hrany · **rad akcií dole** („Označiť v modeli", „Použiť na podobné…"). Dáta: `part_card` payload (`Panel.part_grain_payload`, `part_cut_payload`, hrany D-102),
 zápis `set_part_material` / `set_part_edge` / `set_part_edges_all` / `set_part_grain` (`actions_parts.rb`).
 
+- **Meno roly skladá server** (H12d): payload nesie `role_label` (`PartKeys.role_label` — rovnaké slovo ako stĺpec Rola v Kusovníku); hlavička karty
+  (`#pcName`, `#pcName2`), veta modalu „Použiť na podobné…" a položka raily (`nxTempLabel` v `bridge.js` — v režime `part` je `sel` vždy payload karty)
+  ho len vypíšu cez `pcRoleText` (`pc.role_label || pc.role`). JS mapu mien rolí nemá (guard T3f v `tests/pure/test_h12d_mena_roli.rb`); payload bez kľúča
+  ukáže surovú rolu. `pc.role` ostáva pre vlastnosti roly (`isFront`, hrany).
+
 - **Rozmery dielca sú VÝSTUP** — informačné riadky `.inforow` v mriežke `.basicgrid`/`.infocol` (nikdy polia). **„Do nárezu"** pod Hrúbkou len pri platnom
   `cut_size` (napr. chrbát v drážke): Dĺžka/Šírka ostávajú rozmer modelu, texty skladá server (`Panel.part_cut_payload`: `cut_text`, `cut_title`, `model_title`).
 - **Preklik na dekor** (`#pcMatLink`/`#bcMatLink`, `.matlink`, v existujúcom riadku): `nxDecorLinkState` → `openStudio('mat', material_id)` (funkcia v `part_card.js`,
@@ -926,7 +931,7 @@ Testy: `tests/js/test_insert_state.js`, `tests/js/test_uic1b_vkladanie.js`, `tes
 Karta Doska pri označenej samostatnej doske: rozmery, materiál a hrany, orientácia. Všetky zápisy nesú echo `board_id` a idú cez guard dokumentu (odsek
 `actions_board.rb`). **Orientácia** (`#boardOriRow`, `data-bc-ori`; `syncOrientationSegments`) → `set_board_orientation` → `Panel.handle_set_board_orientation`:
 odmietne neznámu požadovanú aj uloženú hodnotu, rovnaká hodnota = no-op, inak jedna prestavba s deltou transformácie = jeden krok Späť +
-`ScaleWatch.remember_transform`; pred odoslaním `flushBoardEditsNow`. Payload `Panel.board_payload` nesie `orientation` + `orientation_label`; neznámu hodnotu
+`ScaleWatch.remember_transform`; pred odoslaním `flushBoardEditsNow`. Payload `Panel.board_payload` nesie `orientation` + `orientation_label` a meno roly `role_label` (`PartKeys.role_label`, H12d — JS ho neprekladá); neznámu hodnotu
 nepreklasifikuje (žiadny segment nesvieti).
 
 ### Klikateľnosť a deep-linky (UI-D3, ui/js/bridge.js + shell.js + boot.js + ui/studio_dialog.rb)
@@ -2193,7 +2198,7 @@ slot nie) · `corner` (rohová zostava). **Jedna vlastnosť na miesto, presná m
 vkladacej karty (`templateType`/`templatesForType`) porovnáva **normalizované** typy (`NXTypes.norm` — neznámy a chýbajúci = dolná), rovnako ako predtým.
 Výnimky guardu `test_h12c_js.rb` (allowlist s dôvodom): bootstrap `DEFAULTS` pred `NX.init`, `FALLBACK` a hodnota zostavy v registri. Štúdio register nemá —
 slovo typu šablóny (`type_word`) a vetu rozsahu pravidla (`type_scope`) skladá server. HTML (tlačidlá typu, `<select>` modalu) ostáva **statické** (D5) a guard
-ho porovná s registrom (`label`, `ui_order`). Mimo registra typu: `part_card.js` `roleLabel`/`isFront` (mená a vlastnosti rolí — H12d/H13), `rdRoleDesc` roly.
+ho porovná s registrom (`label`, `ui_order`). Mimo registra typu: `part_card.js` `isFront` (vlastnosť roly — H13 mapa) a `rdRoleDesc` roly; mená rolí karta dostane zo servera (`role_label`, H12d).
 Sady: golden `test_h12_golden.js` (správanie pred/po bajtovo), `test_h12c_typy.js` (register, A1, M15, matica), Node sady plnia register z fixtúry
 (`tests/js/nx_types_fixture.js`). Typy dnes: `lower` · `upper` · `dishwasher` · `corner_blind`.
 

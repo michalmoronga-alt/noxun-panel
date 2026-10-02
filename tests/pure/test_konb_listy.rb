@@ -429,8 +429,11 @@ NxTest.test('KON-B: ABS seed, labely, strany 2D karty, osi zo snapshotu, tag, na
   NxTest.assert_equal(['Lišta chrbta horná', 'Lišta chrbta dolná'],
                       [pc.role_label('back_rail_top'), pc.role_label('back_rail_bottom')])
   js = NxKonB.src('noxun_engine', 'ui', 'js', 'part_card.js')
-  NxTest.assert(js.include?("back_rail_top:'Lišta chrbta horná'") && js.include?("back_rail_bottom:'Lišta chrbta dolná'"),
-                'karta dielca pozna nazvy roli')
+  # H12d (T4): karta dielca vypise `role_label` zo servera (jedina tabulka
+  # `PartKeys::ROLE_LABELS` — ta ista, z ktorej cita Kusovnik vyssie).
+  NxTest.assert_equal(['Lišta chrbta horná', 'Lišta chrbta dolná'],
+                      [Noxun::Engine::PartKeys.role_label('back_rail_top'), Noxun::Engine::PartKeys.role_label('back_rail_bottom')])
+  NxTest.assert(js.include?('pc.role_label || pc.role'), 'karta dielca pozna nazvy roli (zo servera)')
   NxTest.assert_equal('body', NxKonB::CN.material_channel('back_rail_bottom', :korpus), 'material z korpusu')
   pl = NxKonB.plan('back_mode' => 'rails')
   %w[cabinet/back_rail:bottom cabinet/back_rail:top].each do |key|

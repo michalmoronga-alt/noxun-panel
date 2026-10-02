@@ -7,9 +7,6 @@ module Noxun
     module Panel
       class << self
         # --- payload korpusu -------------------------------------------------
-        # Slovenske labely roli dosky (jediny zdroj — JS ich NEduplikuje, Codex audit c).
-        BOARD_ROLE_LABELS = { 'free_panel' => 'Voľná doska' }.freeze
-
         # Karta samostatnej dosky (V0.4.7c). Zdroj = ploche atributy + config na
         # instancii (autoritativny vyrobny zaznam, standard 8.3). edge_labels/sides
         # z AbsRules — jeden zdroj pravdy ako pri karte dielca.
@@ -20,7 +17,9 @@ module Noxun
             'board_id' => Store.get(inst, 'id'),
             'name' => cfg['name'] || Store.get(inst, 'name'),
             'role' => role,
-            'role_label' => BOARD_ROLE_LABELS[role] || role,
+            # H12d: meno roly z JEDINEJ tabulky (`PartKeys::ROLE_LABELS`) — JS ho
+            # neduplikuje (Codex audit c).
+            'role_label' => PartKeys.role_label(role),
             'length' => cfg['length'], 'width' => cfg['width'], 'thickness' => cfg['thickness'],
             'material_id' => cfg['material_id'],
             # V0.6 M-B1: UNI doska ma hrubku editovatelnu v karte (JS odomkne pole).
@@ -3016,6 +3015,10 @@ module Noxun
           ov = ((params['part_overrides'] || {})[rk] || {})
           {
             'role_key' => rk, 'role' => role, 'name' => Store.get(part, 'name'),
+            # H12d (C-05): zobrazovacie meno roly ako v stlpci Rola Kusovnika —
+            # karta dielca (hlavicka, modal „Použiť na podobné…", polozka raily)
+            # ho len vypise, vlastnu mapu mien nema.
+            'role_label' => PartKeys.role_label(role),
             'length' => cfg['length'], 'width' => cfg['width'], 'thickness' => cfg['thickness'],
             # K1 / D-108: smer dekoru je od v0.7.23 VSTUP. Tu je EFEKTIVNY smer
             # zo snapshotu dielca (standard 8.3) — ten isty udaj, z ktoreho pocita

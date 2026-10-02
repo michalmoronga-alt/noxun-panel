@@ -33,9 +33,12 @@
     if (typeof nxShellApply === 'function') nxShellApply();
   }
   // Popis docasnej polozky raily — meno dielca/dosky, alebo rola dielca.
+  // H12d: v rezime `part` je `sel` VZDY payload karty dielca (jediny volajuci
+  // `setUiMode('part', c.part_card)`), takze meno roly nesie server
+  // (`role_label` = stlpec Rola v Kusovniku); bez kluca ostava surova rola.
   function nxTempLabel(mode, sel){
     if (!sel) return '';
-    if (mode === 'part') return sel.name || (typeof roleLabel === 'function' ? roleLabel(sel.role) : '');
+    if (mode === 'part') return sel.name || sel.role_label || sel.role || '';
     if (mode === 'board') return sel.name || '';
     return '';
   }

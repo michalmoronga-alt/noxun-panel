@@ -14,6 +14,7 @@
 #      — kazdy skript Inspectora/Studia ide surovymi bajtmi do NNNN_<panel|studio>.js
 #      (File.binwrite, NIE to_json: to_json pokazilo diakritiku), znacky
 #      NNNN_mark_<nazov>.txt pred kazdym krokom: panel_open, panel_select_cab1,
+#      panel_select_part (karta dielca), panel_leave_part,
 #      studio_<sekcia> pre KAZDU sekciu StudioDialog::SECTIONS, end,
 #   5. index.json (zoznam suborov) + meta.json, vysledok do NOXUN_UIFOTO_RESULT
 #      s koncovym markerom; potom ulozi RUN-KOPIU modelu a ukonci SketchUp sam
@@ -98,7 +99,9 @@ module NoxunUiFoto
         [1.0, -> { step_build }],
         [1.0, -> { step_model_image }],
         [7.0, -> { step_panel_open }],
-        [5.0, -> { step_select }]
+        [5.0, -> { step_select }],
+        [5.0, -> { step_select_part }],
+        [3.0, -> { step_leave_part }]
       ]
       sections.each_with_index do |s, i|
         steps << [i.zero? ? FIRST_STUDIO_WAIT : STEP_WAIT, -> { step_section(s) }]
@@ -263,6 +266,50 @@ module NoxunUiFoto
       model.selection.add(@cab1) if @cab1 && @cab1.valid?
       bad('panel_select_cab1: ziadna skrinka na vyber') unless @cab1
       nil
+    end
+
+    # H12d: karta dielca (meno roly skladá server). Vnoreny dielec ide do vyberu
+    # len v edit kontexte skrinky (`active_path`, vzor in-SU runnera); prednost
+    # maju roly, ktorych meno H12d zjednotilo s Kusovnikom.
+    PART_ROLES = %w[drawer_front top divider_v divider_h drawer_bottom].freeze
+
+    def step_select_part
+      model = Sketchup.active_model
+      mark('panel_select_part')
+      part = pick_part(@cab1)
+      unless part
+        bad('panel_select_part: skrinka nema dielec na vyber')
+        return nil
+      end
+
+      model.selection.clear
+      model.active_path = [@cab1]
+      model.selection.add(part)
+      info("karta dielca: rola #{e::Store.get(part, 'role')}")
+      nil
+    end
+
+    # Zatvori edit kontext pred Studiom (vlastna znacka — skripty Inspectora po
+    # odznaceni nepatria do fotky karty dielca).
+    def step_leave_part
+      model = Sketchup.active_model
+      mark('panel_leave_part')
+      model.selection.clear
+      model.active_path = nil
+      nil
+    end
+
+    def pick_part(cab)
+      return nil unless cab && cab.valid?
+
+      parts = cab.definition.entities.to_a.select do |i|
+        (i.is_a?(Sketchup::ComponentInstance) || i.is_a?(Sketchup::Group)) && i.valid? && e::Store.kind(i) == 'part'
+      end
+      PART_ROLES.each do |r|
+        hit = parts.find { |p| e::Store.get(p, 'role').to_s == r }
+        return hit if hit
+      end
+      parts.first
     end
 
     def step_section(section)

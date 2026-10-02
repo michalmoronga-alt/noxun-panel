@@ -1876,38 +1876,13 @@ module Noxun
       # kusovnik AJ VEPO — to sa kvoli jednemu volitelnemu stlpcu nerobi.
       #
       # Slovensky text sklada SERVER (jedna autorita nazvov, JS ziadny preklad
-      # enumu nema — vzor `HardwareRules.label_for`).
-      ROLE_LABELS = {
-        'side_left' => 'Bok ľavý', 'side_right' => 'Bok pravý',
-        'top' => 'Strop', 'bottom' => 'Dno', 'back' => 'Chrbát',
-        'shelf' => 'Polica', 'divider_v' => 'Zvislá priečka', 'divider_h' => 'Vodorovná priečka',
-        'rail_front' => 'Výstuha predná', 'rail_back' => 'Výstuha zadná',
-        'plinth' => 'Sokel', 'front_door' => 'Dvierka', 'drawer_front' => 'Čelo zásuvky',
-        'free_panel' => 'Voľná doska',
-        # KOV-A1 (Codex #280 P2-B): rola `flap` je SPOLOCNA pre vyklop AJ sklop,
-        # takze jej nazov musi byt NEUTRALNY — „Výklop" by v kusovniku aj v karte
-        # dielca klamal pri kazdom sklope. Konkretny text (vyklop vs. sklop) vie
-        # povedat len TYP cela, nie rola: `PartKeys.flap_label` (rovnaky neutralny
-        # tvar bez zhody) a od KOV-A2 karta cela s piktogramami.
-        'flap' => 'Výklop/sklop', 'false_front' => 'Blenda',
-        # KOV-C2a: roly dielcov zasuviek. V pláne ich este NIC neemituje
-        # (to je C2b) — nazvy tu su UZ TERAZ, lebo prehlad ABS pravidiel
-        # (Pravidlá -> ABS) cita roly zo seedu a bez nich by ukazal holé
-        # identifikatory `drawer_bottom`.
-        'drawer_bottom' => 'Dno zásuvky', 'drawer_back' => 'Chrbát zásuvky',
-        'box_side' => 'Bok boxu', 'drawer_inner_front' => 'Vnútorné čelo zásuvky',
-        # KON-B · K2: listy chrbta (spolocny nazov dielca „Lista chrbta", rola
-        # rozlisuje hornu a dolnu — stlpec Rola „Lišta chrbta horná · … dolná").
-        'back_rail_top' => 'Lišta chrbta horná', 'back_rail_bottom' => 'Lišta chrbta dolná',
-        # ROH-A1 · K3: rohova zostava (nazvy dielcov z buildera su ASCII,
-        # stlpec Rola je s diakritikou).
-        'corner_blind_panel' => 'Blenda korpusová', 'hinge_rail' => 'Výstuha závesov',
-        'corner_rail' => 'Rohová výstuha', 'cr_front' => 'CR lišta 1', 'cr_side' => 'CR lišta 2'
-      }.freeze
+      # enumu nema — vzor `HardwareRules.label_for`). H12d (C-05): tabulka
+      # zije v `PartKeys::ROLE_LABELS` (core — cita ju aj karta dielca a dosky);
+      # tu je alias a delegacia, konzumenti Kusovnika sa nemenia.
+      ROLE_LABELS = PartKeys::ROLE_LABELS
 
       def role_label(role)
-        r = role.to_s
-        ROLE_LABELS[r] || (r.empty? ? '' : r)
+        PartKeys.role_label(role)
       end
 
       def row_roles(collected)

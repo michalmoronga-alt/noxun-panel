@@ -1,0 +1,467 @@
+{
+  "side_left": {
+    "js_role_label": "Bok ľavý",
+    "bez_nazvu": {
+      "pcName": "<b>Bok ľavý</b> · Bok ľavý",
+      "pcName2": "Bok ľavý",
+      "simWhat": "Olep hrán dielca <b>Bok ľavý</b> (Bok ľavý).",
+      "temp": "Bok ľavý"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · Bok ľavý",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (Bok ľavý).",
+      "temp": "Bok lavy"
+    }
+  },
+  "side_right": {
+    "js_role_label": "Bok pravý",
+    "bez_nazvu": {
+      "pcName": "<b>Bok pravý</b> · Bok pravý",
+      "pcName2": "Bok pravý",
+      "simWhat": "Olep hrán dielca <b>Bok pravý</b> (Bok pravý).",
+      "temp": "Bok pravý"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · Bok pravý",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (Bok pravý).",
+      "temp": "Bok lavy"
+    }
+  },
+  "bottom": {
+    "js_role_label": "Dno",
+    "bez_nazvu": {
+      "pcName": "<b>Dno</b> · Dno",
+      "pcName2": "Dno",
+      "simWhat": "Olep hrán dielca <b>Dno</b> (Dno).",
+      "temp": "Dno"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · Dno",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (Dno).",
+      "temp": "Bok lavy"
+    }
+  },
+  "top": {
+    "js_role_label": "Vrch",
+    "bez_nazvu": {
+      "pcName": "<b>Vrch</b> · Vrch",
+      "pcName2": "Vrch",
+      "simWhat": "Olep hrán dielca <b>Vrch</b> (Vrch).",
+      "temp": "Vrch"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · Vrch",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (Vrch).",
+      "temp": "Bok lavy"
+    }
+  },
+  "back": {
+    "js_role_label": "Chrbát",
+    "bez_nazvu": {
+      "pcName": "<b>Chrbát</b> · Chrbát",
+      "pcName2": "Chrbát",
+      "simWhat": "Olep hrán dielca <b>Chrbát</b> (Chrbát).",
+      "temp": "Chrbát"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · Chrbát",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (Chrbát).",
+      "temp": "Bok lavy"
+    }
+  },
+  "shelf": {
+    "js_role_label": "Polica",
+    "bez_nazvu": {
+      "pcName": "<b>Polica</b> · Polica",
+      "pcName2": "Polica",
+      "simWhat": "Olep hrán dielca <b>Polica</b> (Polica).",
+      "temp": "Polica"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · Polica",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (Polica).",
+      "temp": "Bok lavy"
+    }
+  },
+  "divider_v": {
+    "js_role_label": "Priečka zvislá",
+    "bez_nazvu": {
+      "pcName": "<b>Priečka zvislá</b> · Priečka zvislá",
+      "pcName2": "Priečka zvislá",
+      "simWhat": "Olep hrán dielca <b>Priečka zvislá</b> (Priečka zvislá).",
+      "temp": "Priečka zvislá"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · Priečka zvislá",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (Priečka zvislá).",
+      "temp": "Bok lavy"
+    }
+  },
+  "divider_h": {
+    "js_role_label": "Priečka vodorovná",
+    "bez_nazvu": {
+      "pcName": "<b>Priečka vodorovná</b> · Priečka vodorovná",
+      "pcName2": "Priečka vodorovná",
+      "simWhat": "Olep hrán dielca <b>Priečka vodorovná</b> (Priečka vodorovná).",
+      "temp": "Priečka vodorovná"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · Priečka vodorovná",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (Priečka vodorovná).",
+      "temp": "Bok lavy"
+    }
+  },
+  "front_door": {
+    "js_role_label": "Dvierka",
+    "bez_nazvu": {
+      "pcName": "<b>Dvierka</b> · Dvierka",
+      "pcName2": "Dvierka",
+      "simWhat": "Olep hrán dielca <b>Dvierka</b> (Dvierka).",
+      "temp": "Dvierka"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · Dvierka",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (Dvierka).",
+      "temp": "Bok lavy"
+    }
+  },
+  "drawer_front": {
+    "js_role_label": "Zásuvkové čelo",
+    "bez_nazvu": {
+      "pcName": "<b>Zásuvkové čelo</b> · Zásuvkové čelo",
+      "pcName2": "Zásuvkové čelo",
+      "simWhat": "Olep hrán dielca <b>Zásuvkové čelo</b> (Zásuvkové čelo).",
+      "temp": "Zásuvkové čelo"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · Zásuvkové čelo",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (Zásuvkové čelo).",
+      "temp": "Bok lavy"
+    }
+  },
+  "flap": {
+    "js_role_label": "Výklop/sklop",
+    "bez_nazvu": {
+      "pcName": "<b>Výklop/sklop</b> · Výklop/sklop",
+      "pcName2": "Výklop/sklop",
+      "simWhat": "Olep hrán dielca <b>Výklop/sklop</b> (Výklop/sklop).",
+      "temp": "Výklop/sklop"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · Výklop/sklop",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (Výklop/sklop).",
+      "temp": "Bok lavy"
+    }
+  },
+  "cover_panel": {
+    "js_role_label": "cover_panel",
+    "bez_nazvu": {
+      "pcName": "<b>cover_panel</b> · cover_panel",
+      "pcName2": "cover_panel",
+      "simWhat": "Olep hrán dielca <b>cover_panel</b> (cover_panel).",
+      "temp": "cover_panel"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · cover_panel",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (cover_panel).",
+      "temp": "Bok lavy"
+    }
+  },
+  "false_front": {
+    "js_role_label": "Blenda",
+    "bez_nazvu": {
+      "pcName": "<b>Blenda</b> · Blenda",
+      "pcName2": "Blenda",
+      "simWhat": "Olep hrán dielca <b>Blenda</b> (Blenda).",
+      "temp": "Blenda"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · Blenda",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (Blenda).",
+      "temp": "Bok lavy"
+    }
+  },
+  "rail_front": {
+    "js_role_label": "Výstuha predná",
+    "bez_nazvu": {
+      "pcName": "<b>Výstuha predná</b> · Výstuha predná",
+      "pcName2": "Výstuha predná",
+      "simWhat": "Olep hrán dielca <b>Výstuha predná</b> (Výstuha predná).",
+      "temp": "Výstuha predná"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · Výstuha predná",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (Výstuha predná).",
+      "temp": "Bok lavy"
+    }
+  },
+  "rail_back": {
+    "js_role_label": "Výstuha zadná",
+    "bez_nazvu": {
+      "pcName": "<b>Výstuha zadná</b> · Výstuha zadná",
+      "pcName2": "Výstuha zadná",
+      "simWhat": "Olep hrán dielca <b>Výstuha zadná</b> (Výstuha zadná).",
+      "temp": "Výstuha zadná"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · Výstuha zadná",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (Výstuha zadná).",
+      "temp": "Bok lavy"
+    }
+  },
+  "plinth": {
+    "js_role_label": "Sokel",
+    "bez_nazvu": {
+      "pcName": "<b>Sokel</b> · Sokel",
+      "pcName2": "Sokel",
+      "simWhat": "Olep hrán dielca <b>Sokel</b> (Sokel).",
+      "temp": "Sokel"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · Sokel",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (Sokel).",
+      "temp": "Bok lavy"
+    }
+  },
+  "gola_profile": {
+    "js_role_label": "gola_profile",
+    "bez_nazvu": {
+      "pcName": "<b>gola_profile</b> · gola_profile",
+      "pcName2": "gola_profile",
+      "simWhat": "Olep hrán dielca <b>gola_profile</b> (gola_profile).",
+      "temp": "gola_profile"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · gola_profile",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (gola_profile).",
+      "temp": "Bok lavy"
+    }
+  },
+  "free_panel": {
+    "js_role_label": "free_panel",
+    "bez_nazvu": {
+      "pcName": "<b>free_panel</b> · free_panel",
+      "pcName2": "free_panel",
+      "simWhat": "Olep hrán dielca <b>free_panel</b> (free_panel).",
+      "temp": "free_panel"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · free_panel",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (free_panel).",
+      "temp": "Bok lavy"
+    }
+  },
+  "drawer_bottom": {
+    "js_role_label": "drawer_bottom",
+    "bez_nazvu": {
+      "pcName": "<b>drawer_bottom</b> · drawer_bottom",
+      "pcName2": "drawer_bottom",
+      "simWhat": "Olep hrán dielca <b>drawer_bottom</b> (drawer_bottom).",
+      "temp": "drawer_bottom"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · drawer_bottom",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (drawer_bottom).",
+      "temp": "Bok lavy"
+    }
+  },
+  "drawer_back": {
+    "js_role_label": "drawer_back",
+    "bez_nazvu": {
+      "pcName": "<b>drawer_back</b> · drawer_back",
+      "pcName2": "drawer_back",
+      "simWhat": "Olep hrán dielca <b>drawer_back</b> (drawer_back).",
+      "temp": "drawer_back"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · drawer_back",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (drawer_back).",
+      "temp": "Bok lavy"
+    }
+  },
+  "box_side": {
+    "js_role_label": "box_side",
+    "bez_nazvu": {
+      "pcName": "<b>box_side</b> · box_side",
+      "pcName2": "box_side",
+      "simWhat": "Olep hrán dielca <b>box_side</b> (box_side).",
+      "temp": "box_side"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · box_side",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (box_side).",
+      "temp": "Bok lavy"
+    }
+  },
+  "drawer_inner_front": {
+    "js_role_label": "drawer_inner_front",
+    "bez_nazvu": {
+      "pcName": "<b>drawer_inner_front</b> · drawer_inner_front",
+      "pcName2": "drawer_inner_front",
+      "simWhat": "Olep hrán dielca <b>drawer_inner_front</b> (drawer_inner_front).",
+      "temp": "drawer_inner_front"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · drawer_inner_front",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (drawer_inner_front).",
+      "temp": "Bok lavy"
+    }
+  },
+  "back_rail_top": {
+    "js_role_label": "Lišta chrbta horná",
+    "bez_nazvu": {
+      "pcName": "<b>Lišta chrbta horná</b> · Lišta chrbta horná",
+      "pcName2": "Lišta chrbta horná",
+      "simWhat": "Olep hrán dielca <b>Lišta chrbta horná</b> (Lišta chrbta horná).",
+      "temp": "Lišta chrbta horná"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · Lišta chrbta horná",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (Lišta chrbta horná).",
+      "temp": "Bok lavy"
+    }
+  },
+  "back_rail_bottom": {
+    "js_role_label": "Lišta chrbta dolná",
+    "bez_nazvu": {
+      "pcName": "<b>Lišta chrbta dolná</b> · Lišta chrbta dolná",
+      "pcName2": "Lišta chrbta dolná",
+      "simWhat": "Olep hrán dielca <b>Lišta chrbta dolná</b> (Lišta chrbta dolná).",
+      "temp": "Lišta chrbta dolná"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · Lišta chrbta dolná",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (Lišta chrbta dolná).",
+      "temp": "Bok lavy"
+    }
+  },
+  "corner_blind_panel": {
+    "js_role_label": "Blenda korpusová",
+    "bez_nazvu": {
+      "pcName": "<b>Blenda korpusová</b> · Blenda korpusová",
+      "pcName2": "Blenda korpusová",
+      "simWhat": "Olep hrán dielca <b>Blenda korpusová</b> (Blenda korpusová).",
+      "temp": "Blenda korpusová"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · Blenda korpusová",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (Blenda korpusová).",
+      "temp": "Bok lavy"
+    }
+  },
+  "hinge_rail": {
+    "js_role_label": "Výstuha závesov",
+    "bez_nazvu": {
+      "pcName": "<b>Výstuha závesov</b> · Výstuha závesov",
+      "pcName2": "Výstuha závesov",
+      "simWhat": "Olep hrán dielca <b>Výstuha závesov</b> (Výstuha závesov).",
+      "temp": "Výstuha závesov"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · Výstuha závesov",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (Výstuha závesov).",
+      "temp": "Bok lavy"
+    }
+  },
+  "corner_rail": {
+    "js_role_label": "Rohová výstuha",
+    "bez_nazvu": {
+      "pcName": "<b>Rohová výstuha</b> · Rohová výstuha",
+      "pcName2": "Rohová výstuha",
+      "simWhat": "Olep hrán dielca <b>Rohová výstuha</b> (Rohová výstuha).",
+      "temp": "Rohová výstuha"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · Rohová výstuha",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (Rohová výstuha).",
+      "temp": "Bok lavy"
+    }
+  },
+  "cr_front": {
+    "js_role_label": "CR lišta 1",
+    "bez_nazvu": {
+      "pcName": "<b>CR lišta 1</b> · CR lišta 1",
+      "pcName2": "CR lišta 1",
+      "simWhat": "Olep hrán dielca <b>CR lišta 1</b> (CR lišta 1).",
+      "temp": "CR lišta 1"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · CR lišta 1",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (CR lišta 1).",
+      "temp": "Bok lavy"
+    }
+  },
+  "cr_side": {
+    "js_role_label": "CR lišta 2",
+    "bez_nazvu": {
+      "pcName": "<b>CR lišta 2</b> · CR lišta 2",
+      "pcName2": "CR lišta 2",
+      "simWhat": "Olep hrán dielca <b>CR lišta 2</b> (CR lišta 2).",
+      "temp": "CR lišta 2"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · CR lišta 2",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (CR lišta 2).",
+      "temp": "Bok lavy"
+    }
+  },
+  "neznama_rola": {
+    "js_role_label": "neznama_rola",
+    "bez_nazvu": {
+      "pcName": "<b>neznama_rola</b> · neznama_rola",
+      "pcName2": "neznama_rola",
+      "simWhat": "Olep hrán dielca <b>neznama_rola</b> (neznama_rola).",
+      "temp": "neznama_rola"
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · neznama_rola",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> (neznama_rola).",
+      "temp": "Bok lavy"
+    }
+  },
+  "('')": {
+    "js_role_label": "",
+    "bez_nazvu": {
+      "pcName": "<b></b> · ",
+      "pcName2": "",
+      "simWhat": "Olep hrán dielca <b></b> ().",
+      "temp": ""
+    },
+    "s_nazvom": {
+      "pcName": "<b>Bok lavy</b> · ",
+      "pcName2": "Bok lavy",
+      "simWhat": "Olep hrán dielca <b>Bok lavy</b> ().",
+      "temp": "Bok lavy"
+    }
+  }
+}

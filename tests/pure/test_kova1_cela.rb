@@ -554,8 +554,12 @@ module NxTest
     pc = NxKovA1.src('ui/js/part_card.js')
     assert(pc.include?("pc.role === 'flap'") && pc.include?("pc.role === 'false_front'"),
            'part_card.js: isFront musi poznat nove roly (inak by 19 mm material bol disabled)')
-    assert(pc.include?("flap:'Výklop/sklop'") && pc.include?("false_front:'Blenda'"),
-           'part_card.js: nazvy roli (flap NEUTRALNE — spolocna rola vyklopu aj sklopu)')
+    # H12d (T4): karta dielca vlastnu mapu mien nema — meno roly (flap NEUTRALNE)
+    # posiela server v `role_label` z jedinej tabulky `PartKeys::ROLE_LABELS`.
+    assert_equal('Výklop/sklop', E::PartKeys.role_label('flap'))
+    assert_equal('Blenda', E::PartKeys.role_label('false_front'))
+    assert(pc.include?('pc.role_label || pc.role'),
+           'part_card.js: nazov roly zo servera (flap NEUTRALNE — spolocna rola vyklopu aj sklopu)')
   end
 
   # ========================= 7) CONFIG_SCHEMA ===============================

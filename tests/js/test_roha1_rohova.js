@@ -100,9 +100,13 @@ ok(ids.indexOf('corner_side') < 0, 'CONSTRUCTION_FIELDS nema stranu (prepinac, n
 // ============ 4) karta dielca a pravidla ======================================
 const pc = mkCtx();
 load(pc, 'part_card.js');
+// H12d (T4): meno roly sklada SERVER (`PartKeys::ROLE_LABELS` -> `role_label`
+// v payloade karty; Ruby golden `roles.json`), karta ho len vypise.
+const ROLES_GOLDEN = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests', 'fixtures', 'h12_golden', 'roles.json'), 'utf8'));
 [['corner_blind_panel', 'Blenda korpusová'], ['hinge_rail', 'Výstuha závesov'], ['corner_rail', 'Rohová výstuha'],
  ['cr_front', 'CR lišta 1'], ['cr_side', 'CR lišta 2']].forEach(function(p){
-  eq(pc.roleLabel(p[0]), p[1], `roleLabel ${p[0]}`);
+  eq(ROLES_GOLDEN.role_label[p[0]], p[1], `server role_label ${p[0]}`);
+  eq(pc.pcRoleText({ role: p[0], role_label: ROLES_GOLDEN.role_label[p[0]] }), p[1], `karta vypise role_label ${p[0]}`);
 });
 const pcSrc = fs.readFileSync(path.join(JS, 'part_card.js'), 'utf8');
 ok(pcSrc.indexOf("pc.role === 'cr_front' || pc.role === 'cr_side'") >= 0,

@@ -118,14 +118,58 @@ module Noxun
         k
       end
 
-      ZONE_PART_LABELS = { 'shelf' => 'Polica', 'divider_v' => 'Zvislá priečka',
-                           'divider_h' => 'Vodorovná priečka' }.freeze
+      # H12d (C-05): JEDINA tabulka ZOBRAZOVACICH mien roli dielcov. Autoritou
+      # je stlpec Rola v Kusovniku — `ProductionCore::ROLE_LABELS`/`role_label`
+      # su od H12d alias a delegacia sem; karta dielca dostane hotovy text
+      # v payloade (`role_label`), JS ziadnu vlastnu mapu nema. VYROBNE nazvy
+      # dielcov (ASCII, kusovnik a VEPO) su INY udaj a ziju v builderoch.
+      # Rezervovane roly (`cover_panel`, `gola_profile`) plan nevydava a meno
+      # nemaju — vypisu sa surovo, rovnako ako rola z novsieho pluginu.
+      ROLE_LABELS = {
+        'side_left' => 'Bok ľavý', 'side_right' => 'Bok pravý',
+        'top' => 'Strop', 'bottom' => 'Dno', 'back' => 'Chrbát',
+        'shelf' => 'Polica', 'divider_v' => 'Zvislá priečka', 'divider_h' => 'Vodorovná priečka',
+        'rail_front' => 'Výstuha predná', 'rail_back' => 'Výstuha zadná',
+        'plinth' => 'Sokel', 'front_door' => 'Dvierka', 'drawer_front' => 'Čelo zásuvky',
+        'free_panel' => 'Voľná doska',
+        # KOV-A1 (Codex #280 P2-B): rola `flap` je SPOLOCNA pre vyklop AJ sklop,
+        # takze jej nazov musi byt NEUTRALNY — „Výklop" by v kusovniku aj v karte
+        # dielca klamal pri kazdom sklope. Konkretny text (vyklop vs. sklop) vie
+        # povedat len TYP cela, nie rola: `PartKeys.flap_label` (rovnaky neutralny
+        # tvar bez zhody) a od KOV-A2 karta cela s piktogramami.
+        'flap' => 'Výklop/sklop', 'false_front' => 'Blenda',
+        # KOV-C2a: roly dielcov zasuviek (prehlad ABS cita roly zo seedu — bez
+        # nazvov by ukazal holé identifikatory `drawer_bottom`; od KOV-C2b ich
+        # plan aj emituje).
+        'drawer_bottom' => 'Dno zásuvky', 'drawer_back' => 'Chrbát zásuvky',
+        'box_side' => 'Bok boxu', 'drawer_inner_front' => 'Vnútorné čelo zásuvky',
+        # KON-B · K2: listy chrbta (spolocny nazov dielca „Lista chrbta", rola
+        # rozlisuje hornu a dolnu — stlpec Rola „Lišta chrbta horná · … dolná").
+        'back_rail_top' => 'Lišta chrbta horná', 'back_rail_bottom' => 'Lišta chrbta dolná',
+        # ROH-A1 · K3: rohova zostava (nazvy dielcov z buildera su ASCII,
+        # stlpec Rola je s diakritikou).
+        'corner_blind_panel' => 'Blenda korpusová', 'hinge_rail' => 'Výstuha závesov',
+        'corner_rail' => 'Rohová výstuha', 'cr_front' => 'CR lišta 1', 'cr_side' => 'CR lišta 2'
+      }.freeze
 
-      # KOV-C2b: ludske nazvy vyrabanych dielcov zasuvky (rovnake slova ako
-      # `Recipes.role_label`, len zo strany identity dielca).
-      DRAWER_PART_LABELS = { 'drawer_bottom' => 'dno zásuvky',
-                             'drawer_back' => 'chrbát zásuvky',
-                             'drawer_inner_front' => 'vnútorné čelo zásuvky' }.freeze
+      # Zobrazovacie meno roly; rola bez mena sa vypise surovo (nova rola sa
+      # nestrati), prazdna nevymysla text.
+      def role_label(role)
+        r = role.to_s
+        ROLE_LABELS[r] || (r.empty? ? '' : r)
+      end
+
+      # Mena dielcov zony v `human_label` (Kovanie, Kontrola) — ODVODENE z tabulky
+      # mien roli (H12d), nie druha kopia.
+      ZONE_PART_LABELS = %w[shelf divider_v divider_h].to_h { |r| [r, ROLE_LABELS.fetch(r)] }.freeze
+
+      # KOV-C2b: ludske nazvy vyrabanych dielcov zasuvky — v `human_label` stoja
+      # za cislom cela („F2 · dno zásuvky"), preto s MALYM prvym pismenom; od H12d
+      # odvodene z `ROLE_LABELS` (bajtovo rovnake slova).
+      DRAWER_PART_LABELS = %w[drawer_bottom drawer_back drawer_inner_front].to_h do |r|
+        label = ROLE_LABELS.fetch(r)
+        [r, (label[0].downcase + label[1..]).freeze]
+      end.freeze
 
       # KOV-A2b: ID CELA z kluca dielca (`front:F2/wing:single` -> „F2"), inak
       # nil. Pouziva ju deep-link „klik na RED nález otvorí kartu čela" — kluc

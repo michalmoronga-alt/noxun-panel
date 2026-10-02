@@ -1,18 +1,9 @@
   // ===================== V0.3 KARTA DIELCA (ABS editor) =====================
-  function roleLabel(role){
-    var m = { side_left:'Bok ľavý', side_right:'Bok pravý', bottom:'Dno', top:'Vrch', back:'Chrbát',
-      shelf:'Polica', divider_v:'Priečka zvislá', divider_h:'Priečka vodorovná', front_door:'Dvierka',
-      drawer_front:'Zásuvkové čelo', plinth:'Sokel', rail_front:'Výstuha predná', rail_back:'Výstuha zadná',
-      // KOV-A1: rola `flap` je SPOLOČNÁ pre výklop aj sklop, preto neutrálny
-      // názov — „Výklop" by pri každom sklope klamal. Konkrétny text povie až
-      // typ čela (server: PartKeys.flap_label; karta čela príde v KOV-A2).
-      flap:'Výklop/sklop', false_front:'Blenda',
-      // KON-B · K2: listy chrbta (zrkadlo `ProductionCore::ROLE_LABELS`).
-      back_rail_top:'Lišta chrbta horná', back_rail_bottom:'Lišta chrbta dolná',
-      // ROH-A1: rohová zostava (zrkadlo `ProductionCore::ROLE_LABELS`).
-      corner_blind_panel:'Blenda korpusová', hinge_rail:'Výstuha závesov', corner_rail:'Rohová výstuha',
-      cr_front:'CR lišta 1', cr_side:'CR lišta 2' };
-    return m[role] || role;
+  // H12d (C-05): meno roly skladá SERVER (`role_label` v payloade karty =
+  // stĺpec Rola v Kusovníku, `PartKeys::ROLE_LABELS`). Karta vlastnú mapu mien
+  // nemá; rola bez mena (alebo payload bez kľúča) sa vypíše surovo.
+  function pcRoleText(pc){
+    return (pc && (pc.role_label || pc.role)) || '';
   }
   function sheetLabelOf(id){
     for (var i=0; i<MATERIALS.sheets.length; i++){
@@ -30,8 +21,8 @@
     box.style.display='';
     // V0.4.5 D1: omrvinka "‹ CAB-003 › Bok lavy" — klik na CAB = spat na skrinku
     if (el('pcCab')) el('pcCab').textContent = pc.cabinet_id || '?';
-    if (el('pcName2')) el('pcName2').textContent = pc.name || roleLabel(pc.role);
-    el('pcName').innerHTML = '<b>'+esc(pc.name || roleLabel(pc.role))+'</b> · '+esc(roleLabel(pc.role));
+    if (el('pcName2')) el('pcName2').textContent = pc.name || pcRoleText(pc);
+    el('pcName').innerHTML = '<b>'+esc(pc.name || pcRoleText(pc))+'</b> · '+esc(pcRoleText(pc));
     // UI-D1: „Zakladne hore" — rozmery a smer dekoru ako INFORMACNE riadky.
     renderPartBasic(pc);
     // UI-D1: otvoreny modal „Použiť na podobné…" patri KONKRETNEMU dielcu —
@@ -593,7 +584,7 @@
     simCount = null;
     simSkipped = '';
     el('simWhat').innerHTML = 'Olep hrán dielca <b>' +
-      esc(partCard.name || roleLabel(partCard.role)) + '</b> (' + esc(roleLabel(partCard.role)) + ').';
+      esc(partCard.name || pcRoleText(partCard)) + '</b> (' + esc(pcRoleText(partCard)) + ').';
     applySimScopeButtons();
     applySimCountView();
     applySimSkippedView();

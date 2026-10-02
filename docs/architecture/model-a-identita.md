@@ -129,7 +129,7 @@ a v komentári `HISTORIA` pri konštante — tu je len ukazovateľ, aby sa aktu�
 
 ### part_keys.rb
 
-stabilná identita dielcov + `valid?` (aj `board/` prefix).
+stabilná identita dielcov + `valid?` (aj `board/` prefix) + **zobrazovacie mená rolí** (H12d).
 
 **`migrate_overrides` kľúče neexistujúcich dielcov ZACHOVÁVA** (zmena konštrukcie nesmie zahodiť ručné nastavenia, kým sa dielec môže vrátiť) — dôsledok: zoznamy ručných zásahov
 musia mŕtve kľúče **odfiltrovať jointom s reálnymi dielcami** (`Bom.collect_manual_overrides`, ŠT-3b-2a), nie ich zobraziť.
@@ -152,6 +152,14 @@ premapuje, kde treba). Kľúče CR sú deterministické, preto sa hrúbky čelov
 
 **KOV-A2b — `front_id(key)`:** čistý parser, ktorý z kľúča dielca vytiahne ID čela (`front:F2/wing:single` → `F2`), inak `nil`. Formát kľúča je kontrakt tohto modulu, takže druhý
 parser inde by sa časom rozišiel; jediný čitateľ je zatiaľ deep-link „klik na RED nález otvorí kartu čela" (`ProductionCore.do_select` → `Panel.push_focus_front`).
+
+**H12d — mená rolí na jednom mieste (C-05):** `ROLE_LABELS` je **jediná tabuľka zobrazovacích mien rolí** (s diakritikou; autorita = stĺpec Rola v Kusovníku)
+a `role_label(role)` vráti meno, pri role bez mena surovú rolu (nová rola sa nestratí), pri prázdnej `''`. Žije tu (core, načíta sa pred `build_plan`), lebo ju
+čítajú Kusovník (`ProductionCore::ROLE_LABELS`/`role_label` = alias a delegácia), prehľad ABS (`RulesDialog.abs_role_label`) aj payloady karty dielca a dosky
+(`role_label` v `Panel.part_card_payload` a `board_payload`; JS vlastnú mapu nemá). `ZONE_PART_LABELS` a `DRAWER_PART_LABELS` (mená v `human_label` pre Kovanie
+a Kontrolu) sú z nej **odvodené** (zásuvka s malým prvým písmenom — stojí za číslom čela). **Výrobné názvy dielcov** (ASCII, kusovník a VEPO) sú iný údaj a žijú
+v builderoch; iný gramatický tvar do viet hlášok má `Recipes.role_label`. Rezervované roly `cover_panel`, `gola_profile` meno nemajú. Stráži
+`tests/pure/test_h12d_mena_roli.rb` (pokrytie rolí, alias, odvodenie, payload, guard T3f) a golden `test_h12d_roles_golden.rb` (`tests/fixtures/h12_golden/roles.json`).
 
 ### build_plan.rb
 

@@ -1,0 +1,206 @@
+{
+  "roles": [
+    "side_left",
+    "side_right",
+    "bottom",
+    "top",
+    "back",
+    "shelf",
+    "divider_v",
+    "divider_h",
+    "front_door",
+    "drawer_front",
+    "flap",
+    "cover_panel",
+    "false_front",
+    "rail_front",
+    "rail_back",
+    "plinth",
+    "gola_profile",
+    "free_panel",
+    "drawer_bottom",
+    "drawer_back",
+    "box_side",
+    "drawer_inner_front",
+    "back_rail_top",
+    "back_rail_bottom",
+    "corner_blind_panel",
+    "hinge_rail",
+    "corner_rail",
+    "cr_front",
+    "cr_side",
+    "neznama_rola",
+    ""
+  ],
+  "role_label": {
+    "side_left": "Bok ľavý",
+    "side_right": "Bok pravý",
+    "bottom": "Dno",
+    "top": "Strop",
+    "back": "Chrbát",
+    "shelf": "Polica",
+    "divider_v": "Zvislá priečka",
+    "divider_h": "Vodorovná priečka",
+    "front_door": "Dvierka",
+    "drawer_front": "Čelo zásuvky",
+    "flap": "Výklop/sklop",
+    "cover_panel": "cover_panel",
+    "false_front": "Blenda",
+    "rail_front": "Výstuha predná",
+    "rail_back": "Výstuha zadná",
+    "plinth": "Sokel",
+    "gola_profile": "gola_profile",
+    "free_panel": "Voľná doska",
+    "drawer_bottom": "Dno zásuvky",
+    "drawer_back": "Chrbát zásuvky",
+    "box_side": "Bok boxu",
+    "drawer_inner_front": "Vnútorné čelo zásuvky",
+    "back_rail_top": "Lišta chrbta horná",
+    "back_rail_bottom": "Lišta chrbta dolná",
+    "corner_blind_panel": "Blenda korpusová",
+    "hinge_rail": "Výstuha závesov",
+    "corner_rail": "Rohová výstuha",
+    "cr_front": "CR lišta 1",
+    "cr_side": "CR lišta 2",
+    "neznama_rola": "neznama_rola",
+    "": "",
+    "(nil)": "",
+    "(symbol shelf)": "Polica"
+  },
+  "rows_with_roles": [
+    {
+      "names": [
+        "Celo"
+      ],
+      "role_label": "Čelo zásuvky"
+    },
+    {
+      "names": [
+        "Bok"
+      ],
+      "role_label": "Bok ľavý · Bok pravý"
+    },
+    {
+      "names": [
+        "Priecka"
+      ],
+      "role_label": "Zvislá priečka"
+    },
+    {
+      "names": [
+        "Doska"
+      ],
+      "role_label": "Strop · Dno"
+    },
+    {
+      "names": [
+        "Priecka"
+      ],
+      "role_label": "Vodorovná priečka"
+    },
+    {
+      "names": [
+        "Dno zasuvky"
+      ],
+      "role_label": "Dno zásuvky"
+    },
+    {
+      "names": [
+        "Chrbat zasuvky"
+      ],
+      "role_label": "Chrbát zásuvky"
+    },
+    {
+      "names": [
+        "Vnutorne celo"
+      ],
+      "role_label": "Vnútorné čelo zásuvky"
+    },
+    {
+      "names": [
+        "Bok boxu"
+      ],
+      "role_label": "Bok boxu"
+    },
+    {
+      "names": [
+        "Bez roly"
+      ],
+      "role_label": null
+    },
+    {
+      "names": [
+        "Nieco"
+      ],
+      "role_label": "neznama_rola"
+    },
+    {
+      "names": [
+        "Doska"
+      ],
+      "role_label": "Voľná doska"
+    }
+  ],
+  "abs_role_label": {
+    "side_left": "Bok ľavý",
+    "side_right": "Bok pravý",
+    "bottom": "Dno",
+    "top": "Strop",
+    "back": "Chrbát",
+    "shelf": "Polica",
+    "divider_v": "Zvislá priečka",
+    "divider_h": "Vodorovná priečka",
+    "front_door": "Dvierka",
+    "drawer_front": "Čelo zásuvky",
+    "flap": "Výklop/sklop",
+    "cover_panel": "cover_panel",
+    "false_front": "Blenda",
+    "rail_front": "Výstuha predná",
+    "rail_back": "Výstuha zadná",
+    "plinth": "Sokel",
+    "gola_profile": "gola_profile",
+    "free_panel": "Voľná doska",
+    "drawer_bottom": "Dno zásuvky",
+    "drawer_back": "Chrbát zásuvky",
+    "box_side": "Bok boxu",
+    "drawer_inner_front": "Vnútorné čelo zásuvky",
+    "back_rail_top": "Lišta chrbta horná",
+    "back_rail_bottom": "Lišta chrbta dolná",
+    "corner_blind_panel": "Blenda korpusová",
+    "hinge_rail": "Výstuha závesov",
+    "corner_rail": "Rohová výstuha",
+    "cr_front": "CR lišta 1",
+    "cr_side": "CR lišta 2",
+    "neznama_rola": "neznama_rola",
+    "": ""
+  },
+  "human_label": {
+    "zone:Z1/shelf:1": "Polica 1",
+    "zone:Z1/divider_v:2": "Zvislá priečka 2",
+    "zone:Z1/divider_h:3": "Vodorovná priečka 3",
+    "front:F2/drawer_bottom": "F2 · dno zásuvky",
+    "front:F2/drawer_back": "F2 · chrbát zásuvky",
+    "front:F2/drawer_inner_front": "F2 · vnútorné čelo zásuvky",
+    "front:F2/box_side:left": "F2 · bok boxu ľavý",
+    "front:F2/box_side:right": "F2 · bok boxu pravý",
+    "front:F2/panel": "F2 · zásuvkové čelo",
+    "cabinet/side_left": "cabinet/side_left",
+    "cabinet/corner_panel": "cabinet/corner_panel",
+    "board/main": "board/main"
+  },
+  "zone_part_labels": {
+    "shelf": "Polica",
+    "divider_v": "Zvislá priečka",
+    "divider_h": "Vodorovná priečka"
+  },
+  "drawer_part_labels": {
+    "drawer_bottom": "dno zásuvky",
+    "drawer_back": "chrbát zásuvky",
+    "drawer_inner_front": "vnútorné čelo zásuvky"
+  },
+  "board_role_label": {
+    "free_panel": "Voľná doska",
+    "": "",
+    "neznama_rola": "neznama_rola"
+  }
+}
