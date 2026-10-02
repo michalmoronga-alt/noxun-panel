@@ -997,7 +997,7 @@ anchor:)`. Panel posiela **iba meno**, autoritou whitelistu je Ruby (`StudioDial
 sekciou; bez deep-linku (rail, toolbar) je `nil` a sekcia sa nemení. Cesty: warnpanel → „Otvoriť v Štúdiu → Kontrola" (`openStudio('ctrl')`) · „Materiál"
 v info stĺpci → `bom` s kotvou ID skrinky · preklik na dekor → `mat` s `material_id`.
 
-**Názov projektu** sa edituje na jedinom mieste — v lište Kusovníka v Štúdiu; JS ho neposiela do žiadneho exportu (autorita `ProductionCore.project_name`).
+**Názov projektu** sa edituje na jedinom mieste — v lište Kusovníka v Štúdiu; JS ho neposiela do žiadneho exportu (autorita `ExportSettings.project_name`, od H7a v jadre).
 
 Testy: `tests/pure/test_uid3_klikatelnost.rb`, `tests/pure/test_st1a_studio.rb`, `tests/js/test_uid3_klikatelnost.js`, `tests/js/test_st1a_studio.js`, in-SU `run_st1a`.
 
@@ -1459,7 +1459,8 @@ stĺpce: `UI20_KONTRAKT.md` Š2. **JS:** `studio.js` — `partsTable` / `sheetsT
 - **Lišta** = čistá funkcia `bomToolsHtml(vepo, st)` (stav argumentom): `[Dielce · Platne · ABS] · [Projekt] · [hľadanie] · ⟶ · [VEPO export ▸roh] · [Stĺpce] ·
   [Obnoviť]`. **Pole „Projekt"** (`.prjbox .prjlbl`) je jediné editovateľné miesto názvu projektu; zápis `studio_set_vepo_opts` → `%APPDATA%` a **cielené echo**
   `push_vepo_bar` → `NX.setVepoBar` (nedvíha generáciu — inak by klik hneď po editácii názvu spadol na „Dáta okna sa medzitým zmenili"); hodnotu inputu nasadí len
-  keď v ňom používateľ nepíše; stav checkboxu sa nasadzuje pri **každom** pushi. Exporty názov z JS neberú (autorita `ProductionCore.project_name`).
+  keď v ňom používateľ nepíše; stav checkboxu sa nasadzuje pri **každom** pushi. Exporty názov z JS neberú (autorita `ExportSettings.project_name`). Od H7a zápis vracia výsledok:
+  zlyhanie (poškodený súbor nastavení, zámok) okno povie červeno s dôvodom a echo `setVepoBar` ukáže uloženú pravdu (odsek `export_settings.rb` v outputs.md).
 - **Rohové nastavenie VEPO** (`.cornerzone` v pravom dolnom rohu tlačidla, `.vepofly`): jediný prepínač **„18+36 spolu"**; otvorenosť čisto klientska
   (`vepoMenuOpen`); hodnotu nasadzuje echo `NX.setVepoBar` aj do otvoreného okna.
 - **Stĺpce:** voliteľné stĺpce v `localStorage` `nx_bom_cols`, zbalené skupiny `nx_bom_groups` (len zobrazovacie veci počítača). Tabuľka Dielce má triedu `parts`,

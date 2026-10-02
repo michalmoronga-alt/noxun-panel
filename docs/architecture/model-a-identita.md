@@ -47,7 +47,7 @@ materiál naozaj drží. Rovnako `RulesDialog.cabinets(model)` — počet „skr
 `DocKey.invalidate(model)` volajú `PanelAppObserver#onNewModel`/`#onOpenModel` **aj** `ScaleWatch::EngineAppObserver` (prvý garantuje poradie voči pushu do panela, druhý je
 nainštalovaný vždy a kryje Štúdio a dialógy bez Inspectora; že rotujú dvaja, nevadí — udalosť je **ohraničená Ruby tickom**, takže vyrobí najviac jeden token, viac nižšie).
 Volajú ho cez **`Engine.on_document_replaced`** (žije v `core/doc_key.rb`, aby ho vedela spustiť aj headless sada) — jedno miesto so **zoznamom pamätí viazaných na objekt
-modelu**: identita `DocKey` a most názvu zákazky `SESSION_KEY_BRIDGE` (`outputs.md`). Obe stáli na tej istej falzifikovanej premise, preto majú spoločný cleanup a **každá ďalšia
+modelu**: identita `DocKey` a most názvu zákazky `SESSION_KEY_BRIDGE` (`ExportSettings`, `outputs.md`). Obe stáli na tej istej falzifikovanej premise, preto majú spoločný cleanup a **každá ďalšia
 taká pamäť doň musí pribudnúť — okrem tých, ktoré upratuje vlastná zdokumentovaná cesta** (`GhostTool` session sa ruší priamo v observeroch kvôli vlastnej hláške a poradiu voči
 nástrojovému stacku; `ScaleWatch` cache transformácií čistí `forget_detached_models`, viď priznaná hranica tam).
 **`onActivateModel` NEROTUJE** (macOS prepnutie medzi už otvorenými dokumentmi) a **uloženie, prvé uloženie ani Save As identitu NEMENIA**. Je to JEDINÝ
@@ -85,7 +85,7 @@ dokument;** rotácia by vrátila presne pôvodný bug R-02 (rozpísaná úprava 
 otvorené okno, takže niet komu identitu prekrížiť. (3) Registry drží SILNÚ referenciu + `equal?` (recyklácia `object_id` po GC) a **živý
 dokument sa NIKDY nevyhadzuje** (BLOCKER 2 — vytlačený živý by po návrate dostal nový token a klient by zahodil drafty); upratuje sa len `valid? == false` záznam. (4) Chyba/ne-model
 = `''` — **fail-closed obojsmerne**: odmieta sa aj prázdny kľúč SERVERA (BLOCKER 1, `'' == ''` by pustilo zápis bez identity). (5) Token je náhodný (unikátny naprieč sedeniami),
-lebo `ProductionCore#project_session_key` persistuje `guid:<hodnota>` do `vepo_settings.json` — deterministický čítač by po reštarte kolidoval.
+lebo `ExportSettings#project_session_key` (od H7a; predtým `ProductionCore`) persistuje `guid:<hodnota>` do `vepo_settings.json` — deterministický čítač by po reštarte kolidoval.
 
 **`DocKey.foreign?(claimed, model, tolerate_blank_client: false)` je JEDINÝ porovnávač identity** (review #267 P3-2) — cezeň idú VŠETKY guardy: `Panel.foreign_document?`, zóny,
 tagy, karty dielca a dosky, šablóny, Štúdio, Pravidlá, Materiály aj okno katalógu kovania. **Fail-closed na strane servera platí bez výnimky**: keď sa identita aktívneho dokumentu
@@ -250,7 +250,7 @@ Spoločná perzistencia malých JSON katalógov v `%APPDATA%\NOXUN\Engine` (mate
   `read(path, fallback: false)` (H9) číta súbor **bez** ďalšej zálohy (vlastný kľúč cache) — tak sa číta `.bak`, aby sa nikdy nepoužila `.bak.bak`.
 - **`.bak` recovery:** `read_primary_or_backup` pri poškodenom primári prečíta zálohu, takže panel sa neotvorí prázdny.
 - **Očakávaný tvar (H9/R-37, opt-in):** súbor, ktorý sa parsuje, ale nemá tvar volajúceho (`[]`, `{}`, `null`, zlý typ kontajnera), je **poškodený** — rovnaká trieda ako
-  nečitateľný JSON. Predikát dodáva volajúci (`doc_shape_ok?` v `supplier_settings`, `abs_rules`, `hardware_rules`; H7 prevezme pre `vepo_settings`). Primitíva:
+  nečitateľný JSON. Predikát dodáva volajúci (`doc_shape_ok?` v `supplier_settings`, `abs_rules`, `hardware_rules` a od H7a `export_settings` pre `vepo_settings.json`). Primitíva:
   `read_valid(path, shape:)` = primár dobrého tvaru → inak `.bak` dobrého tvaru (čítaná `fallback: false`) → inak **`InvalidShape < JSON::ParserError`** (volajúci ho berie ako
   poškodený obsah bez zálohy: zapisovateľný fallback); nezapisuje ani neloguje. `shape_ok?` je **jediné** miesto, kde sa predikát volá: akúkoľvek jeho výnimku (aj `ParserError`,
   `ENOENT`) zabalí do **`ShapeCheckError < StandardError`** — o súbore nehovorí nič, preto nie je `ParserError` ani `SystemCallError` a volajúci ho nesmie zameniť za poškodený

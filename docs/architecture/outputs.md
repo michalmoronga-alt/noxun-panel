@@ -179,9 +179,9 @@ kusovník, súpisy platní/ABS a VEPO export sa sťahovali z okna Výroba do nov
 
 **Od ŠT-1c PR B3, keď okno Výroba zaniklo, je jadro JEDINOU implementáciou** — Štúdio aj rail Inspectora ho volajú priamo.
 
-Sú tam: **VEPO rodina** (`vepo_settings`/`save_vepo_settings` nad `%APPDATA%\NOXUN\Engine\vepo_settings.json`, `vepo_materials` s celou kaskádou rozlíšenia labelov,
+Sú tam: **VEPO rodina** (`vepo_materials` s celou kaskádou rozlíšenia labelov,
 `vepo_base_label`, `vepo_disambiguate`/`vepo_disambiguate_variants`, `vepo_group_key`, `vepo_edge_thicknesses`, od v0.9.22 aj `vepo_edge_decors`/`vepo_sheet_decors` pre poznámku
-o odlišnej ABS — D-112, detail v odseku `vepo_export.rb`; `default_project_name`), **mapy katalógov** pre `Validation.run`
+o odlišnej ABS — D-112, detail v odseku `vepo_export.rb`; nastavenia exportu `vepo_settings.json` sú od H7a v odseku `export_settings.rb`), **mapy katalógov** pre `Validation.run`
 (`sheets_map` → `{}` pri chybe, `edges_map` → **`nil`** pri chybe, lebo prázdna mapa by falošne označila každú olepenú hranu), identita dokumentu `model_guid` a **výberové
 resolvery** klik→entita (`pids_for_problem` vrátane fallbacku na vlastníka pri nepostavenom dielci a vlastných vetiev pred všeobecnou: `newer_config` podľa
 `owner_pid`, `back_cut` podľa `pid`, **od H8 `std_version`** — samostatný dielec podľa `pid` [`standalone_part_entity`, nie aj skrinka s tým `cabinet_id`],
@@ -459,52 +459,10 @@ PRED** vetvou karty čela: pri kovaní je cieľom riadok, nie karta. `hw_focus_t
 o tom, kam nález vedie, by sa rozišla). `select_target_item` dostal štvrtý voliteľný argument: pri adrese Kovania vyberá **vlastníka (korpus)** z rovnakého dôvodu ako pri čele —
 sekcia Kovanie žije len nad označenou skrinkou. Nález bez adresy sa správa presne ako pred D4.
 
-**`project_names` (ŠT-1a, audit #1):** názov projektu je od tejto dávky **serverový údaj** — mapa v `vepo_settings.json` (nastavenie POČÍTAČA, žiadny zápis do modelu, žiadny krok
-Späť).
-
-**Kľúčom je NORMALIZOVANÁ CESTA súboru, nie `model.guid`** — SketchUp guid **mení po každom uložení** modelu, takže na guid kľúči by sa názov po Ctrl+S ticho stratil a v súbore by
-rástli mŕtve záznamy (nález review P1). Normalizácia je `\`→`/` + `downcase` (Windows nerozlišuje ani veľkosť písmen, ani smer lomítka).
-
-**Neuložený model cestu nemá** a dostane náhradný kľúč `guid:<guid>`, ktorý platí len v rámci sedenia; čítanie naň padá ako na záložku (pomenoval som Untitled a potom ho uložil) a
-**prvý zápis s platnou cestou ho zmigruje** — záznam sadne na cestu a guid kľúč sa zmaže.
-
-**Ctrl+S ale mení cestu AJ guid NARAZ (1b-6a):** po prvom uložení sa záznam pod *starým* guid kľúčom z modelu už nedá nájsť — záložka hľadala `guid:<nový guid>` a našla prázdno,
-takže názov zadaný pred prvým uložením sa ticho stratil a všetky štyri exporty sa pomenovali podľa `.skp` súboru namiesto zákazky (výrobná P2). Most drží **pamäť procesu**
-`SESSION_KEY_BRIDGE` (`object_id` modelu → posledný kľúč sedenia, pod ktorým sa názov zapísal), overená **identitou objektu** (`equal?`, čisté porovnanie referencií).
-
-> **`equal?` samo o sebe NESTAČÍ (1d/R-02b, review delty #267 P2-GLM).** Pôvodné zdôvodnenie „cudzí dokument názov zdediť nemôže, Windows pri File > New/Open model zničí
-> a vytvorí nový" je **nepravdivé** — Windows drží jeden dokument na proces a `Sketchup::Model` objekt smie **recyklovať** (auditované pri GHOST vkladaní, review #268 P2-2).
-> Na recyklovanom objekte vráti `equal?` true aj pre práve založený cudzí dokument, takže nový Untitled zdedil kľúč sedenia — a s ním **názov zákazky** predošlého dokumentu,
-> ktorý by ticho odišiel do VEPO/CSV/XLSX. Most preto zahadzuje **`Engine.on_document_replaced`** (volajú ho oba AppObservery z `onNewModel`/`onOpenModel`, nikdy
-> z `onActivateModel`, nikdy pri uložení) ešte **pred** notifikáciou okien; `equal?` tu ostáva ako druhá poistka proti recyklácii `object_id` po GC. Je to **ten istý koreň**
-> ako pri identite dokumentu (`DocKey`), preto majú obe pamäte **jeden spoločný zoznam cleanupov** — každá ďalšia pamäť viazaná na objekt modelu doň musí pribudnúť.
-
-Prvé čítanie po uložení záznam **adoptuje a hneď zmigruje na cestu**
-(`adopt_session_name`) a most sa spotrebuje; **bez migrácie** by názov žil len do konca sedenia a po reštarte by sa stratil aj tak. Kľúče sedenia sa spotrebujú pri prvom čítaní s
-platnou cestou **vždy** — aj keď cesta už svoj názov má: ten **má prednosť** a rozpísaný názov ho neprepíše, ale musí zaniknúť, inak by sa o pár minút vynoril pri „Uložiť ako" na
-čerstvej ceste (review #243 P2-2). Most sa zahadzuje **až po úspešnom zápise** — `save_vepo_settings` vracia `true`/`false` a pri zamknutom súbore či plnom disku ostáva most nažive,
-takže sa migrácia zopakuje hneď, ako zápis prejde (review #243 P2-1). Zápisová cesta upratuje to isté
-(`save_project_name` maže VŠETKY kľúče sedenia zákazky, nielen ten podľa aktuálneho guid). Most **nie je zakázaný okenný stav**: nie je to stav okna ani medzivýsledok výpočtu, ale
-údaj o dokumente, ktorý sa z modelu po uložení prečítať nedá — obe okná z neho čítajú to isté a nemajú si ho ako prepísať; je to konštanta (nie `@ivar`) aj kvôli guard testu, ktorý
-tu inštančné premenné nepripúšťa, a je zhora ohraničená (`SESSION_BRIDGE_MAX`). Prázdna hodnota **aj hodnota zhodná s defaultom zmaže záznam**, takže sa pomenovanie vráti
-na názov `.skp` a premenovanie súboru sa v okne prejaví samo. Číta ho **všetky štyri exporty** (VEPO, CSV kovania, XLSX rozpočtu, XLSX cenovej ponuky) — z DOM sa `project`
-**prestal posielať**, inak by dve okná mali dve pravdy a tá istá zákazka by sa v dvoch výstupoch volala inak. `merge_18_36` ostáva globálny a číta sa rovnakou cestou.
-
-**Zápis `vepo_settings.json` má JEDNY dvere (1b-6c):** súbor je nastavenie POČÍTAČA so **šiestimi zapisovateľmi** — `save_merge_18_36`, štyri zápisy `last_dir` (VEPO, CSV kovania,
-XLSX rozpočtu, XLSX cenovej ponuky) a mapa `project_names` — a menil sa read-modify-write **bez medziprocesového zámku**. Dve inštancie SketchUpu zdieľajú jeden `%APPDATA%`, takže
-zápis jednej vedel zmazať zákazku pomenovanú v druhej; `JsonFileStore` rieši **atomicitu** (tmp+rename, `.bak`), **nie súbeh** — a jeho sekundová cache navyše skryje čerstvý zápis
-suseda. Každý zápis preto ide cez **`update_vepo_settings`**: `Materials.with_catalog_lock` (jeden sidecar `.lock` nad tým istým priečinkom, reentrantný — detail v
-[materials.md](materials.md)) + čítanie súboru **nanovo vnútri zámku** (`JsonFileStore.reload!`); blok dostane čerstvé nastavenia a vráti hash na zlúčenie, `nil` = netreba
-zapisovať. **Čítania sa nezamykajú** (hot push panela by zámok platil zbytočne), ale **štyri exporty si na začiatku vypýtajú čerstvý súbor** (`refresh_vepo_settings`) — hotový
-CSV/XLSX sa už ďalším čítaním nezahojí. Zámok sa cez export **zámerne nedrží**: cesta otvára modálny `savepanel` a druhá inštancia by čakala, kým používateľ klikne.
-
-**Štyri pravidlá tých dverí, každé zaplatené nálezom auditu:** *(1)* zápisová cesta číta **strikto** (`vepo_settings_for_write`) — lenivé `{}` z neprečítateľného súboru by sa
-zlúčilo s novými `attrs` a zmazalo `project_names`, `merge_18_36` aj `last_dir`; chýbajúci súbor je legitímne prázdno, existujúci a nečitateľný (alebo nie-Hash) **zastaví zápis**.
-*(2)* Celá zamknutá úprava je v `rescue` — aj zlyhanie `.lock` je len zalogovaný `false` (kontext logu nesie **fázu** lock/read/block/write), nikdy výnimka do okna či exportu.
-*(3)* Mapu názvov cez `save_vepo_settings` **zapísať nejde** (odovzdaný odtlačok by čerstvú mapu prepísal celú) — na to je `update_project_names`, ktoré blok kŕmi čerstvou mapou;
-stráži to guard test. *(4)* Názov sa počíta **aj pred zámkom**: keď sa `.lock` nedá vziať, blok pod ním nikdy nebeží, a bez tohto fallbacku by všetky štyri exporty dostali meno
-`.skp` súboru namiesto zákazky. Keď blok **bežal**, `project_name` vracia **čerstvú** hodnotu spod zámku (`effective_project_name` nad čerstvou mapou) — inak by sa export
-pomenoval podľa `.skp` napriek tomu, že súbor už drží správny názov (review #243, kolo 3).
+**Nastavenia exportu (názov zákazky, 18 + 36, posledný priečinok) žijú od H7a v jadre** — odsek [`export_settings.rb`](#export_settingsrb). Jadro ich len volá: štyri exporty
+čítajú `ExportSettings.refresh` → `project_name` / `merge_18_36` / `last_dir` a po zápise súboru `save_last_dir` (výsledok **zámerne ignorujú** — zlyhaný posledný priečinok nemá
+zastaviť hotový export, dôvod je v logu); **`pending_name_note(model)`** (text exportu, preto ostal tu) pripojí na koniec záverečnej vety všetkých štyroch exportov upozornenie,
+keď názov zákazky čaká na prenos k súboru (`ExportSettings.name_pending?`, farba statusu sa nemení).
 
 **`materials_meta`/`edges_meta` (audit #4)** sú kontrakt skupín Kusovníka: per `material_id` (resp. `abs_id`) label, katalógová farba ako **pole `[r,g,b]`** (nie CSS reťazec —
 prevod robí klient, ktorý farbu kreslí), hrúbka a príznak UNI; materiál mimo katalógu sa pomenuje **svojím ID** a farbu nedostane (radšej žiadna vzorka než náhodná).
@@ -1105,7 +1063,103 @@ z disku, I/O chyby vyletia ako neúspešný zápis) je v [model-a-identita.md](m
 
 ### export_settings.rb
 
-Nastavenia exportu (`vepo_settings.json`: názov zákazky, 18 + 36, posledný priečinok) — H7a presun z `ui/production_core.rb` do jadra (`Noxun::Engine::ExportSettings`).
+**Nastavenia exportu v jadre (H7a, C-07, R-38).** `Noxun::Engine::ExportSettings` (`core/export_settings.rb`, `module_function`) je jediná autorita súboru
+`%APPDATA%\NOXUN\Engine\vepo_settings.json` — nastavenia POČÍTAČA, nie zákazky: mapa názvov zákaziek `project_names`, prepínač „18 + 36 spolu" (`merge_18_36`, `!= false`
+= zapnuté) a posledný priečinok exportu (`last_dir`, surová hodnota). Do H7a žil v `ui/production_core.rb`; okno Štúdia (payload a echo `vepo`, `do_set_vepo_opts`) aj štyri
+exporty ho volajú **priamo**, `ProductionCore` nemá žiadne delegáty (dve mená jednej veci by stuby testov strážili starú cestu). Meno súboru, kľúče, kľúč záznamu (cesta / `guid:<DocKey
+token>` — `doc_token` je presne `ProductionCore.model_guid`), strop 120 znakov, prenos pri prvom uložení a predvolené `projekt` (`DEFAULT_PROJECT_NAME`) sa presunom nezmenili
+(golden `tests/fixtures/h7_golden/` — mená a nadpisy exportov, bajty súboru aj `.bak` po každom kroku, štyri exporty end-to-end). Načíta sa za `core/materials`/`doc_key`,
+pred `ui/production_core`; pri načítaní na súbor nesiaha. Verejné: `path` · `read` · `refresh` · `write_gate` · `update` · `save` · `written?` · `project_names` ·
+`update_project_names` · `project_key` · `project_name` · `default_project_name` · `save_project_name` · `name_pending?` · `merge_18_36` · `save_merge_18_36` · `last_dir` ·
+`save_last_dir` · rodina kľúča sedenia (`normalize_project_path`, `project_session_key`, `session_key?`, `remember_/forget_/remembered_session_key`, `session_keys_for`).
+
+**Ochrana R-38 (rodina H9/R-37 — `HardwareRules.write_gate`, `JsonFileStore.degraded?`, `preserve_valid_backup`).** Predikát tvaru `doc_shape_ok?` posudzuje **len kontajnery**:
+objekt, neprázdny (`{}` plugin nikdy nezapísal — od V0.5 C je každý zápis zlúčenie s neprázdnymi `attrs`), `project_names` ak je, tak objekt; hodnoty (napr. `merge_18_36: "nie"`)
+posudzuje dnešná normalizácia (mimo R-38). Matica:
+
+| Stav súboru | Čítanie (`read`) | Zápis (názov, 18 + 36, posledný priečinok, prenos názvu) | `.bak` |
+|---|---|---|---|
+| zdravý | súbor | `:ok` / `:unchanged` | ako dnes |
+| chýba primár, `.bak` dobrá | záloha | `:ok` — **obnova** | ako dnes |
+| nečitateľný alebo zlý tvar (`[]`, `null`, `"x"`, `42`, `{}`, `project_names` nie objekt) + dobrá `.bak` | **záloha** (aj 18 + 36 a posledný priečinok) | **`:blocked`** + `DEGRADED_REASON` | **nedotknutá** |
+| nečitateľný / nie-objekt **bez** dobrej `.bak` | predvolené | **`:unreadable`** + `UNREADABLE_REASON` (dnes ticho) | ako dnes |
+| objekt so zlým `project_names` alebo `{}` **bez** dobrej `.bak` | ako dnes (mapa `{}`, ostatné kľúče zo súboru) | `:ok` — samooprava | dostane zlý primár |
+| zámok, brána, čítanie, blok zlyhá | — | `:failed` + `FAILED_REASON` | nedotknutá |
+| zlyhá samotný zápis (finálne premenovanie) | — | `:failed` | primár nezmenený, `.bak` už môže byť kópia doterajšieho primára (R-11) |
+
+`read` = `JsonFileStore.read_valid(path, shape:)`; pri `InvalidShape` (bez dobrej zálohy) dnešná cesta `JsonFileStore.read` (nečitateľný primár → `.bak`, nie-objekt → `{}`),
+nikdy nevyhodí. **`write_gate → [state, reason]`** (`:ok` | `:degraded`) zhodí cache primára **aj zálohy** (`….bak|nofallback` plní `read_valid` — bez toho by echo po odmietnutom
+zápise do 1 s čítalo starú zálohu) a pýta sa `JsonFileStore.degraded?(path, shape:)` nad diskom; výnimky nechytá (volajúci = `:failed`), nezapisuje, neloguje.
+**`update { |fresh| attrs | nil } → [status, reason]`** je jediné `JsonFileStore.write(` v module, poradie **zámok → brána → strikné čítanie (`read_for_write`) → blok → zápis
+s predikátom tvaru** (tretí parameter POZIČNE — pasca Ruby 3, H9) je záväzné; `ParserError`/`NotObject` vo fáze čítania = `:unreadable`, I/O (EACCES) = `:failed`. Odmietnutie
+zaloguje jeden riadok „export settings: zapis odmietnuty — <dôvod>" **len pri zmene** (`LAST_BLOCK`; úspech ho nuluje). **`written?(status)`** (`:ok`/`:unchanged`) je jediný
+prevod na „zápis prebehol" — pole je v Ruby vždy pravdivé, volajúci rozhoduje `case`/`==`/`written?` (guard T-A9). Primitívum `JsonFileStore` sa nezmenilo.
+
+**Náprava = premenovať, nie zmazať.** Dôvody v oknách radia poškodený `vepo_settings.json` **premenovať** (napr. na `vepo_settings.poskodeny.json` — plugin číta len presnú
+cestu, súbor ostane na ručnú obnovu); plugin potom pokračuje zo zálohy. Strata je **spravidla presne posledná zmena** pred poškodením (`.bak` je o jeden zápis za primárom);
+keď cez poškodený súbor medzitým zapisoval starší plugin bez brány, záloha môže byť staršia — veta to hovorí podmienene. **Starší plugin** (druhé PC, druhé okno) bránu nemá:
+po aktualizácii zavrieť všetky okná SketchUpu na oboch PC (vzor H9, H10).
+
+**Čakajúci názov (§15 A1) a obmedzenie pokusov prenosu.** Keď je súbor poškodený práve pri prvom uložení zákazky pomenovanej pred uložením, prenos z kľúča sedenia na cestu
+brána odmietne: názov platí z mostu `SESSION_KEY_BRIDGE` a zo zálohy **len do zatvorenia SketchUpu** — `name_pending?(model)` (čistá: kľúč je cesta, pod cestou názov nie je,
+pod niektorým kľúčom sedenia áno) a `ProductionCore.pending_name_note` to povedia vetou po štyroch exportoch (stav hlavičky prinesie H7b). Most sa zahadzuje **len** pri
+`written?`; po oprave (premenovaní) súboru sa prenos zopakuje sám. Aby sa neopakoval pri **každom** čítaní (zámok + nový fallback log `JsonFileStore` pri každom parsovaní
+poškodeného primára), pamätá si `ADOPT_RETRY` (kľúč `[cesta, zmrazená kópia aliasov]`, strop 32, bez odkazu na model) **obsahový podpis** súborov v čase odmietnutia —
+SHA1 bajtov primára a `.bak` (nie mtime + veľkosť: oprava rovnakej dĺžky s vráteným časom by sa nerozpoznala). Ďalší pokus až po zmene obsahu; `refresh` pamäť **nemaže**
+(§17 C3). Zapamätá sa len odmietnutie podľa obsahu (`:blocked`, `:unreadable`) — prechodná chyba (`:failed`, zámok, disk) sa skúša hneď pri ďalšom čítaní ako doteraz.
+
+**Hlásenie v okne Štúdia (`StudioDialog#do_set_vepo_opts`).** Jadro vracia dôvod (texty dôvodov sú konštanty modulu), okno skladá vetu cez `case`: úspech zeleno („Názov zákazky:
+<názov> · platí pre VEPO, kovanie, rozpočet aj ponuku", „18 + 36 spolu: zapnuté|vypnuté · platí pre VEPO export"), `:blocked`/`:unreadable` **červeno** s dôvodom, inak
+červeno „… sa nepodarilo uložiť — skús znova"; vety spojené „. ", červená, keď ktorákoľvek zlyhala; echo `push_vepo_bar` ide **vždy** (pole a checkbox ukážu uloženú pravdu, nie
+napísaný text), úspech generáciu nedvíha. Zastarané okno s napísaným názvom povie „… názov zákazky sa neuložil, zadaj ho znova". Poškodený súbor sa **inde nehlási** (Q1 —
+hlavička ukazuje názov, pod ktorým exporty naozaj odídu). Testy: `tests/pure/test_h7a_export_settings.rb` (matica, predikát, brána, fázy, most, dve inštancie, cache zálohy,
+počet pokusov a logov, čakajúci názov, okno, guardy presunu), `tests/pure/test_h7a_golden.rb` (T0).
+
+**`project_names` (ŠT-1a, audit #1):** názov zákazky je od tejto dávky **serverový údaj** — mapa v `vepo_settings.json` (nastavenie POČÍTAČA, žiadny zápis do modelu, žiadny krok
+Späť).
+
+**Kľúčom je NORMALIZOVANÁ CESTA súboru, nie `model.guid`** — SketchUp guid **mení po každom uložení** modelu, takže na guid kľúči by sa názov po Ctrl+S ticho stratil a v súbore by
+rástli mŕtve záznamy (nález review P1). Normalizácia je `\`→`/` + `downcase` (Windows nerozlišuje ani veľkosť písmen, ani smer lomítka).
+
+**Neuložený model cestu nemá** a dostane náhradný kľúč `guid:<guid>`, ktorý platí len v rámci sedenia; čítanie naň padá ako na záložku (pomenoval som Untitled a potom ho uložil) a
+**prvý zápis s platnou cestou ho zmigruje** — záznam sadne na cestu a guid kľúč sa zmaže.
+
+**Ctrl+S ale mení cestu AJ guid NARAZ (1b-6a):** po prvom uložení sa záznam pod *starým* guid kľúčom z modelu už nedá nájsť — záložka hľadala `guid:<nový guid>` a našla prázdno,
+takže názov zadaný pred prvým uložením sa ticho stratil a všetky štyri exporty sa pomenovali podľa `.skp` súboru namiesto zákazky (výrobná P2). Most drží **pamäť procesu**
+`SESSION_KEY_BRIDGE` (`object_id` modelu → posledný kľúč sedenia, pod ktorým sa názov zapísal), overená **identitou objektu** (`equal?`, čisté porovnanie referencií).
+
+> **`equal?` samo o sebe NESTAČÍ (1d/R-02b, review delty #267 P2-GLM).** Pôvodné zdôvodnenie „cudzí dokument názov zdediť nemôže, Windows pri File > New/Open model zničí
+> a vytvorí nový" je **nepravdivé** — Windows drží jeden dokument na proces a `Sketchup::Model` objekt smie **recyklovať** (auditované pri GHOST vkladaní, review #268 P2-2).
+> Na recyklovanom objekte vráti `equal?` true aj pre práve založený cudzí dokument, takže nový Untitled zdedil kľúč sedenia — a s ním **názov zákazky** predošlého dokumentu,
+> ktorý by ticho odišiel do VEPO/CSV/XLSX. Most preto zahadzuje **`Engine.on_document_replaced`** (volajú ho oba AppObservery z `onNewModel`/`onOpenModel`, nikdy
+> z `onActivateModel`, nikdy pri uložení) ešte **pred** notifikáciou okien; `equal?` tu ostáva ako druhá poistka proti recyklácii `object_id` po GC. Je to **ten istý koreň**
+> ako pri identite dokumentu (`DocKey`), preto majú obe pamäte **jeden spoločný zoznam cleanupov** — každá ďalšia pamäť viazaná na objekt modelu doň musí pribudnúť.
+
+Prvé čítanie po uložení záznam **adoptuje a hneď zmigruje na cestu**
+(`adopt_session_name`) a most sa spotrebuje; **bez migrácie** by názov žil len do konca sedenia a po reštarte by sa stratil aj tak. Kľúče sedenia sa spotrebujú pri prvom čítaní s
+platnou cestou **vždy** — aj keď cesta už svoj názov má: ten **má prednosť** a rozpísaný názov ho neprepíše, ale musí zaniknúť, inak by sa o pár minút vynoril pri „Uložiť ako" na
+čerstvej ceste (review #243 P2-2). Most sa zahadzuje **až po úspešnom zápise** — `update_project_names` vracia `[status, reason]` (H7a; predtým `true`/`false`) a pri zamknutom súbore či plnom disku ostáva most nažive,
+takže sa migrácia zopakuje hneď, ako zápis prejde (review #243 P2-1). Zápisová cesta upratuje to isté
+(`save_project_name` maže VŠETKY kľúče sedenia zákazky, nielen ten podľa aktuálneho guid). Most **nie je zakázaný okenný stav**: nie je to stav okna ani medzivýsledok výpočtu, ale
+údaj o dokumente, ktorý sa z modelu po uložení prečítať nedá — obe okná z neho čítajú to isté a nemajú si ho ako prepísať; je to konštanta (nie `@ivar`) a je zhora ohraničená (`SESSION_BRIDGE_MAX`). Prázdna hodnota **aj hodnota zhodná s defaultom zmaže záznam**, takže sa pomenovanie vráti
+na názov `.skp` a premenovanie súboru sa v okne prejaví samo. Čítajú ho **všetky štyri exporty** (VEPO, CSV kovania, XLSX rozpočtu, XLSX cenovej ponuky) — z DOM sa `project`
+**prestal posielať**, inak by dve okná mali dve pravdy a tá istá zákazka by sa v dvoch výstupoch volala inak. `merge_18_36` ostáva globálny a číta sa rovnakou cestou.
+
+**Zápis `vepo_settings.json` má JEDNY dvere (1b-6c):** súbor je nastavenie POČÍTAČA so **šiestimi zapisovateľmi** — `save_merge_18_36`, štyri zápisy `last_dir` (`save_last_dir`) (VEPO, CSV kovania,
+XLSX rozpočtu, XLSX cenovej ponuky) a mapa `project_names` — a menil sa read-modify-write **bez medziprocesového zámku**. Dve inštancie SketchUpu zdieľajú jeden `%APPDATA%`, takže
+zápis jednej vedel zmazať zákazku pomenovanú v druhej; `JsonFileStore` rieši **atomicitu** (tmp+rename, `.bak`), **nie súbeh** — a jeho sekundová cache navyše skryje čerstvý zápis
+suseda. Každý zápis preto ide cez **`update`**: `Materials.with_catalog_lock` (jeden sidecar `.lock` nad tým istým priečinkom, reentrantný — detail v
+[materials.md](materials.md)) + čítanie súboru **nanovo vnútri zámku** (`JsonFileStore.reload!`); blok dostane čerstvé nastavenia a vráti hash na zlúčenie, `nil` = netreba
+zapisovať. **Čítania sa nezamykajú** (hot push panela by zámok platil zbytočne), ale **štyri exporty si na začiatku vypýtajú čerstvý súbor** (`refresh`) — hotový
+CSV/XLSX sa už ďalším čítaním nezahojí. Zámok sa cez export **zámerne nedrží**: cesta otvára modálny `savepanel` a druhá inštancia by čakala, kým používateľ klikne.
+
+**Štyri pravidlá tých dverí, každé zaplatené nálezom auditu:** *(1)* zápisová cesta číta **strikto** (`read_for_write`) — lenivé `{}` z neprečítateľného súboru by sa
+zlúčilo s novými `attrs` a zmazalo `project_names`, `merge_18_36` aj `last_dir`; chýbajúci súbor je legitímne prázdno, existujúci a nečitateľný (alebo nie-Hash) **zastaví zápis**.
+*(2)* Celá zamknutá úprava je v `rescue` — aj zlyhanie `.lock` je len zalogovaný `[:failed, FAILED_REASON]` (kontext logu `ExportSettings.update(<fáza>)` nesie **fázu** lock/gate/read/block/write), nikdy výnimka do okna či exportu.
+*(3)* Mapu názvov cez `save` **zapísať nejde** (`[:failed, …]` + log) (odovzdaný odtlačok by čerstvú mapu prepísal celú) — na to je `update_project_names`, ktoré blok kŕmi čerstvou mapou;
+stráži to guard test. *(4)* Názov sa počíta **aj pred zámkom**: keď sa `.lock` nedá vziať, blok pod ním nikdy nebeží, a bez tohto fallbacku by všetky štyri exporty dostali meno
+`.skp` súboru namiesto zákazky. Keď blok **bežal**, `project_name` vracia **čerstvú** hodnotu spod zámku (`effective_project_name` nad čerstvou mapou) — inak by sa export
+pomenoval podľa `.skp` napriek tomu, že súbor už drží správny názov (review #243, kolo 3).
 
 ### vepo_export.rb
 

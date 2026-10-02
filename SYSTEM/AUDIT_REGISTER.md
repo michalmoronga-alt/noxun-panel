@@ -27,7 +27,7 @@ V1 rozsahu. Hlásená strata neuložených hodnôt, hygiena, texty, refaktor a v
 | R-37 | ✅ dávkou H9 (PR #442, v0.17.7) | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** | S | ~~súbor nastavení zlého tvaru sa ticho nahradí predvolenými a zničí dobrú zálohu~~ — záloha, inak predvolené (dodávateľ s bannerom; ABS a kovanie len log — Q1) a bez zápisu; rozsah v sekcii R-37 |
 | R-35 | ✅ dávkami H10a (PR #443, v0.17.8 — pravidlá kovania) a H10b (PR #444, v0.17.9 — rozmerové rady) | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** (tichá strata pri dvoch oknách SketchUpu; po R-37) | S/M | ~~zmena pravidiel kovania a radov pri dvoch oknách ticho zanikne~~ — pravidlá: hláška, nič sa neprepíše; rady: rôzne sa zlúčia, ten istý = hláška |
 | R-13 | ✅ dávkou H8 (PR #441, v0.17.6) | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** (čítať — rozhodnuté 29.9.; prvá v poradí) | S | ~~dielec z inej verzie štandardu Kontrola neoznačí~~ — Kontrola ho hlási ORANGE `std_version` |
-| R-38 | platí | hraničné (len pri poškodenom súbore; stratí názvy zákaziek a prepínač zlúčenia 18/36 vo VEPO exporte — mení pomenovanie a členenie výstupu, nie rozmery, počty ani ceny) | S | poškodený súbor VEPO nastavení (názvy zákaziek, zlúčenie 18/36) sa môže ticho prepísať staršou zálohou — **zaradenie: blok 9 · H7** (návrh orchestrátora 1.10.2026 — potvrdí Michal s mockupom H7) |
+| R-38 | ✅ dávkou H7a (PR #?, v0.17.20) | hraničné (len pri poškodenom súbore; mení pomenovanie a členenie VEPO, nie rozmery, počty ani ceny) | S | ~~poškodený súbor VEPO nastavení sa môže ticho prepísať staršou zálohou~~ — záloha a zápisy vypnuté, výsledok zápisu v okne; rozsah v sekcii R-38 |
 | R-18 | platí | po V1 (hlásená strata neuložených hodnôt — ⋯ editor sa zavrie ako uložený, zlyhaný zápis ohlási červený status) | S | pri súbehu úpravy bunky a ⋯ editora v Rozpočte sa rozpísané hodnoty môžu stratiť |
 | R-16 | platí | hraničné (XLSX má kód a dodávateľa) | M | dva rovnaké dekory od dvoch výrobcov majú v rozpočte rovnaký názov riadku |
 | R-25 | čiastočne (PR #350) | po V1 | S | pri vybranej doske s chybným rozmerom klik na riadok Štúdia rozpísanú zmenu zahodí |
@@ -114,7 +114,7 @@ sa parsuje, ale nemá očakávaný tvar (predikát nad kontajnermi), je **poško
 Kontrola ORANGE), **ABS a kovanie len záznamom v logu** (v UI ani Kontrole nič — otvorená otázka Q1); prvé vedomé uloženie súbor opraví; dobrá
 záloha sa nikdy neprepíše (`JsonFileStore` predikát tvaru, `read_valid`, `InvalidShape`/`ShapeCheckError`, pozičný `write(path, payload, shape)`). Globálne pravidlá
 kovania majú jedinú zápisovú bránu `HardwareRules.write_gate` (autorita pre H10). NP-4 brána auto-zápisu platí pre všetkých 8 skalárov. **Nechránené (zvyšky):**
-`dim_series` (pri načítaní nezapisuje, ale uloženie radov nad súborom zlého tvaru zálohu zničí — rady sú len ponuka), `vepo_settings.json` (R-38 → H7),
+`dim_series` (pri načítaní nezapisuje, ale uloženie radov nad súborom zlého tvaru zálohu zničí — rady sú len ponuka), ~~`vepo_settings.json` (R-38 → H7)~~ (✅ H7a),
 hodnotové poškodenie sadzby (`porez: "abc"` → seed-merge doplní predvolenú a zapíše), chýbajúca dopredná brána `std` v `abs_rules`, Kontrola pri čítaní
 zo zálohy nehlási a **ABS a kovanie bez dobrej zálohy ticho počítajú s predvolenými pravidlami (len log)** — Q1, predvoľba „nie". Package a audity: `SYSTEM/zdroje/bloky/HARDENING/PACKAGE_H9.md`.
 
@@ -170,7 +170,7 @@ beží pred `XlsxWriter.write_book` (spresnenie GLM 30.8.) — OSTÁVA: HLÁSIŤ
 `production_core.rb` (log nevzniká; známy dlh Docs cleanup C). [E:R-12 korigované #250]
 **Návrh:** hlásenie pred vznikom súboru, nezastavovať; opraviť komentár. **S.**
 
-### R-38 · P3 · ui · `ui/production_core.rb` — `vepo_settings.json` (`update_vepo_settings` · `save_project_name` · `save_merge_18_36`)
+### R-38 · P3 · ui → core · `ui/production_core.rb` → od H7a `core/export_settings.rb` — `vepo_settings.json` (`update` · `save_project_name` · `save_merge_18_36`)
 Z Codex auditu dávky 1d/R-11, nález B3 (vedome MIMO rozsahu R-11). Šiesty globálny JSON store priečinka nemá ani jedno z toho, čo
 ostatných päť: **dôvod zlyhania zápisu sa nesurfaceuje nikde** (`update_vepo_settings` vráti `false`, `save_project_name` výsledok
 zahodí, `save_merge_18_36` ho ignoruje) a **chýba mu aj degraded guard** z R-11 — poškodený primár s platnou `.bak` teda stále vie
@@ -179,6 +179,15 @@ prepísať novšie nastavenia obsahom odvodeným od staršej zálohy. Zámok (1b
 tri cesty musia najprv začať výsledok zápisu vôbec čítať a mať kam ho povedať. Pôvodne navrhnutá ako samostatná dávka. **Odhad: S.**
 **Zaradenie (1.10.2026, návrh orchestrátora — potvrdí Michal s mockupom H7):** blok 9 · HARDENING, dávka **H7** — ochrana ide pred presun nastavení
 exportu do jadra (C-07); po presune dávka H7 aktualizuje cestu súboru v tomto zázname.
+**✅ dávkou H7a (PR #?, v0.17.20, blok 9 · HARDENING PO V1)** — cesta: **`core/export_settings.rb`** (`Noxun::Engine::ExportSettings`, presun z
+`ui/production_core.rb` bez delegátov). **Chránené:** súbor, ktorý je nečitateľný alebo nemá očakávaný tvar (predikát nad kontajnermi: objekt, neprázdny,
+`project_names` objekt), sa pri **dobrej zálohe** číta **zo zálohy** (názvy zákaziek, 18 + 36 aj posledný priečinok) a **zápisy sú vypnuté** (`write_gate` pod
+zámkom nad diskom, `[:blocked, dôvod]`; záloha sa nikdy neprepíše — zápis nesie predikát tvaru); každý zápis vracia `[status, reason]` a okno Štúdia
+zlyhanie povie **červeno** s dôvodom a návodom (premenovať poškodený súbor, nie zmazať), echo ukáže uloženú pravdu. Bez dobrej zálohy ostáva dnešné
+správanie, nové je len povedať `:unreadable`. Názov zákazky, ktorý pri prvom uložení čaká na prenos k poškodenému súboru, ohlási veta po štyroch exportoch
+(stav hlavičky H7b). **Neplatí / mimo:** hodnotové poškodenie (`merge_18_36: "nie"` = zapnuté — normalizácia ticho), banner alebo nález Kontroly pri
+čítaní zo zálohy (Q1 — predvoľba „nie"), samooprava nečitateľného súboru bez zálohy (stojí ako dnes, len sa to povie), starší plugin na druhom PC bránu
+nemá (aktualizovať obe PC a zavrieť všetky okná). Package a audity: `SYSTEM/zdroje/bloky/HARDENING/PACKAGE_H7.md`, `AUDIT_H7_*raw.md`.
 
 ## Os UI VZORY a drobné dlhy
 
