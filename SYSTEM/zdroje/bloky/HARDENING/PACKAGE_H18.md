@@ -480,5 +480,12 @@ M5/M7/M14/M18 → T3 nad **čerstvým mutovaným Ruby payloadom v `_dev/`** prot
 M10/M15/M17 → JS T3. M6 zhodí payload už nepovoleným zdrojom `owner` (KeyError slovníka), zachytené v Ruby T0.
 Predzmenové JSON ani `payload_po.json` sa počas mutácií nemenia.
 
-**Kontroly:** 5331 headless / 0 FAIL, 162 JS sád / 0 FAIL. **Fotky:** natívna nahrávka ešte čaká na voľný SU slot.
+**Kontroly:** 5331 headless / 0 FAIL, 162 JS sád / 0 FAIL, encoding guard PASS; dotknuté H18 8/0 a H6b 202 OK.
+**T7 fotky:** `ui_foto -Record -Only panel_kovanie` PASS nad kódovou hlavou `f204a536db115df5228859d27416d0eaee14c669`.
+Nahrávka v `C:\Users\PC\AppData\Local\Temp\noxun_ui_foto\rec_0.17.26_20261003_012532` — 70 zachytených súborov, own_count v 16 pushoch.
+Fotky `C:\Users\PC\AppData\Local\Temp\noxun_ui_foto\shots_20261003_012732_114460\05_panel_kovanie.png`, `00_model.png`, `index.html` (0 problémov).
+Ilustračná baseline: main UI 0.17.25 + úspešný payload 0.17.21, `shots_20261003_010825_102944/05_panel_kovanie.png`; nedokazuje pôvodný payload 0.17.25.
+Obe fotky vizuálne skontrolované; zdravé seed dáta zostávajú rovnaké, scenáre starého výberu dokazuje matica a smoke §10.
+Vlastný SketchUp PID112260 sa sám zavrel (exit 0), lock/sentinel odstránil runner; pôvodný ENGINEtests aj 85 živých NOXUN súborov byte/hash rovnaké.
+Po nahrávke INSTALL z čistého root mainu `2640f47b`: nainštalovaný **0.17.25**, všetkých 181 súborov zhodných s mainom; SU slot vrátený orchestrátorovi.
 Predrecenzia a GH review sú následné brány; smoke §10 po mergi a inštalácii overí Michal.

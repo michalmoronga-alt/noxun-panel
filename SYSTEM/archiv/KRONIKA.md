@@ -24,7 +24,7 @@
   pravdivá prvá voľba aj tooltip, skutočný kľúč krídla, priznané poškodenie a blocked stav. `explain` nesúlad dvierok rovnaký ako Nákup a Kontrola;
   zrušenie neutrálne „výber zrušený". **Expanzia + CSV nákupu, rozpočet a ponuka klasifikovaných závesov bajtovo nezmenené**; výsledok resolvera celej matice
   zachovaný (jediné vymenované textové opravy `explain`). Zápisová akcia bez zmeny, pripnutá zdrojovým guardom; in-SU nie je brána.
-  **Kontroly:** 5331 headless / 0 FAIL, 162 JS sád / 0 FAIL; M1–M23 zhodené (vrátane cenovej M23), stromy po mutáciách obnovené; natívna nahrávka ešte čaká na voľný SU slot.
+  **Kontroly:** 5331 headless / 0 FAIL, 162 JS sád / 0 FAIL; M1–M23 zhodené (vrátane cenovej M23), stromy po mutáciách obnovené; encoding PASS; ui_foto -Record PASS nad f204a536, PID112260 sa sám zavrel (exit 0); main 0.17.25 obnovený.
   Architektúra prepísaná na mieste, patch a všetky cache značky 0.17.26. D-149 archivované, **D-150 otvorené a H18b čaká na odpoveď Q2**;
   D-151/D-152 v zásobníku, D-153 ostáva podmienený návrh. Package [H18](../zdroje/bloky/HARDENING/PACKAGE_H18.md) §15, surový audit a brief prenesené do repa.
 
