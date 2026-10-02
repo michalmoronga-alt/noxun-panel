@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.17.17 · 2.10.2026 — blok 9 HARDENING; dávka H6a hotová** (PR #?): **Inspector má viac miesta** — pomocné vety sú v „?" (pod náhľadom, v hlavičkách skupín Zón a Kovania, pri materiáloch, spotrebiči a v Pravidlách kovania),
+**v0.17.17 · 2.10.2026 — blok 9 HARDENING; dávka H6a hotová** (PR #453): **Inspector má viac miesta** — pomocné vety sú v „?" (pod náhľadom, v hlavičkách skupín Zón a Kovania, pri materiáloch, spotrebiči a v Pravidlách kovania),
 „Vložiť kópiu" a „Uložiť šablónu" stoja v jednom riadku, „Pripravené." zmizlo (stavová veta sa ukáže len so správou), obrysy zón prepína len rail — **čísla a exporty bez zmeny**. Pod tým **H12d** (v0.17.16, PR #452): karta dielca volá roly ako Kusovník · **H14b/H14a** (v0.17.15/v0.17.14, PR #451/#450): sekcie Štúdia na jednom mieste
 · **H13** (PR #449): mapa rozširovacích bodov · **H12a–c** (v0.17.11–13, PR #446–#448): typy skriniek na jednom mieste · **H11b** (v0.17.10, PR #445): minimum SketchUp 2026 · **H10b/H10a** (v0.17.9/v0.17.8, PR #444/#443): dve okná SketchUpu sa neprebíjajú · **H9** (v0.17.7, PR #442): poškodený súbor nastavení nezničí zálohu · **H8** (v0.17.6, PR #441): kus z inej verzie = oranžový riadok
 · **H5/H4b/H4a** (v0.17.3–v0.17.5, PR #437–#440): mapa okien, texty, vzhľad, čísla v Štúdiu všade rovnako · **H3a/H3b** (v0.17.1–v0.17.2, PR #435–#436): bez zavádzajúcich údajov a falošnej chyby po **Súbor → Nový** — **čísla a exporty bez zmeny**.
@@ -26,12 +26,12 @@ ani nevyexportuje** (rohovú skrinku by sklopil na dolnú). **Rozpočet:** po pr
 **Plugin beží len v SketchUpe 2026+** (0.17.10+; obe PC majú 2026). **Ochranu pred poškodeným súborom nastavení (H9) má len 0.17.7+, ochranu dvoch okien 0.17.8+ (pravidlá) a 0.17.9+ (rady) — aktualizovať obe PC a potom zavrieť všetky okná SketchUpu** (staré okno zapisuje bez ochrany).
 **Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
 
-**Testy (H6a, PR #?):** **5180 headless · 158 JS sád** zelené + encoding guard; in-SU sa nespúšťal (Ruby spúšťače bez zmeny — posledný beh **3366 / 0** na `ddb82b8c`, H12b).
+**Testy (H6a, PR #453):** **5180 headless · 158 JS sád** zelené + encoding guard; in-SU sa nespúšťal (Ruby spúšťače bez zmeny — posledný beh **3366 / 0** na `ddb82b8c`, H12b).
 
 ## Robí sa
 
 **Blok 9 · HARDENING PO V1** (štart 1.10.2026, PR #432): krížový audit V1 sedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**; 17 dávok **H1…H17** sekvenčne podľa tabuľky v [PLAN.md](PLAN.md), **bez zmeny výrobných a cenových čísel**; priečinok bloku [zdroje/bloky/HARDENING/](zdroje/bloky/HARDENING/).
-Hotové **H1–H5** (PR #433–#440), **H6a** (nápovedy, spodok panela, stavová veta — PR #?), **H8–H10b** (R-13, R-37, R-35 — PR #441–#444), **H11b** (PR #445), **H12a–d** (PR #446–#448, #452), **H13** (PR #449) a **H14a/H14b** (PR #450, #451); **H6b/H6c** (lišty sektorov a súhrny, kóty náhľadu) a **H7** majú schválený mockup, idú po sebe; **H11a** čaká na Q1, **H11c** na 2026.2.
+Hotové **H1–H5** (PR #433–#440), **H6a** (nápovedy, spodok panela, stavová veta — PR #453), **H8–H10b** (R-13, R-37, R-35 — PR #441–#444), **H11b** (PR #445), **H12a–d** (PR #446–#448, #452), **H13** (PR #449) a **H14a/H14b** (PR #450, #451); **H6b/H6c** (lišty sektorov a súhrny, kóty náhľadu) a **H7** majú schválený mockup, idú po sebe; **H11a** čaká na Q1, **H11c** na 2026.2.
 **Otázky bez odpovede, platí návrh:** H12 Q1 (karta dielca ako Kusovník — zavedené v H12d) · H11 Q2 (starší SketchUp = nenačíta sa, jedna hláška) · H11 Q1 (chyba súboru = vypnúť plugin, H11a) · H11 Q3 (kedy 2026.2) · H10b Q2 (rôzne rady sa zlúčia bez hlášky, ten istý rad = hláška) · H10a Q1 (cudzí globál = neuloží sa nič)
 · H9 Q1/Q2 (pri čítaní zo zálohy bez nálezu v Kontrole, bez tlačidla „Obnoviť zo zálohy") · H8 Q1/Q2 (veta o značke verzie, bez tlačidla) · H4b Q1/Q2 (vrátenie katalógu v ponuke „⋯" Materiálov, ikona posuvníkov pre Nastavenia rozpočtu).
 **H7: R-38 áno** (Michal 2.10.) · **Q1** (porez a montáž pri skle) bez odpovede · pri prvej rohovej v dielni overiť záves Sensys · **na smoke čakajú** D-132 (#367), D-133 (#368), D-134 (#369).

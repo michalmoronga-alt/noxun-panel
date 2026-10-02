@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H6a · nápovedy, spodok panela a stavová veta (2.10.2026, PR #?, v0.17.17, blok 9 · HARDENING PO V1, triedenie D-01 — CU-04, CU-11, GR-22, CS-10; package
+- **H6a · nápovedy, spodok panela a stavová veta (2.10.2026, PR #453, v0.17.17, blok 9 · HARDENING PO V1, triedenie D-01 — CU-04, CU-11, GR-22, CS-10; package
   [PACKAGE_H6.md](../zdroje/bloky/HARDENING/PACKAGE_H6.md) §6 „H6a" + §15; mockup [MOCKUP_H6_INSPECTOR.html](../zdroje/bloky/HARDENING/MOCKUP_H6_INSPECTOR.html);
   rozhodnutia Michala 2.10. v [ROZHODNUTIA_MICHALA_2026-10-01.md](../zdroje/bloky/HARDENING/ROZHODNUTIA_MICHALA_2026-10-01.md); brief
   [BRIEF_H6.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H6.md)).** Prvá z troch častí H6 (H6a nápovedy a spodok → H6b lišty a súhrny → H6c kóty). Pomocné vety, ktoré
