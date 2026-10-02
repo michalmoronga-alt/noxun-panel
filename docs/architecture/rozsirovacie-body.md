@@ -2,8 +2,8 @@
 
 > **Časť mapy modulov Noxun Engine.** Rozcestník a kľúčové invarianty sú
 > v [../ARCHITEKTURA.md](../ARCHITEKTURA.md).
-> **Čo to je:** kontrolný zoznam miest pre päť najčastejších rozšírení — nový typ skrinky, nová rola dielca, nový stĺpec Kusovníka,
-> nová sekcia Štúdia a nové pravidlo kovania viazané na typ. Detail každého miesta je v odseku jeho modulu (Grep `^### <súbor>`).
+> **Čo to je:** kontrolný zoznam miest pre šesť najčastejších rozšírení — nový typ skrinky, nová rola dielca, nový stĺpec Kusovníka,
+> nová sekcia Štúdia, nové pravidlo kovania viazané na typ a nový set alebo systém kovania. Detail každého miesta je v odseku jeho modulu (Grep `^### <súbor>`).
 > **Ako sa číta:** tabuľky menujú **súbor a mená** (konštanta, modul, funkcia) — nikdy čísla riadkov. Riadok tabuľky, ktorý začína
 > cestou v spätných apostrofoch, stráži `tests/pure/test_h13_rozsirovacie_body.rb`: súbor musí existovať a každé meno z druhého
 > stĺpca v ňom musí byť. Meno `Modul::ČLEN` alebo `Modul.metóda` sa hľadá **v rozsahu toho modulu** (súbor, ktorý modul nedeklaruje,
@@ -151,7 +151,7 @@ mení formát pravidiel (`HardwareRules::STD`, dopredná brána — audit). Prav
 | `noxun_engine/core/hardware_rules.rb` | `SEED_RULES` · `SEED_VERSION` · `STD` · `merge_seed` · `floor_height_ok?` · `evaluate` · `LEGACY_SEED_SHAPES` | seed pravidlo, filter, migrácia seedu (nedotknuté nahradiť, upravené nechať) |
 | `noxun_engine/core/construction.rb` | `cabinet_hw_ctx` | kľúče kontextu skrinky (typ, podpora, výška sokla) |
 | `noxun_engine/core/hardware_sets_seed.rb` | `HardwareSets::SEED_SETS` · `HardwareSets::LEGACY_SEED_SHAPES` · `HardwareSets::SEED_VERSION` · `HardwareSets::MAPPING_ADDITIONS` | set (generický typ → kódy katalógu) pre novú položku — dáta, starý tvar a verzia seedu v jednom súbore |
-| `noxun_engine/core/hardware_catalog.rb` | `SEED_SET_VERSION` | nové kódy v katalógu kovania |
+| `noxun_engine/core/hardware_catalog_seed.rb` | `HardwareCatalog::SEED_ROWS` · `HardwareCatalog::SEED_SET_VERSION` | nové kódy v katalógu kovania — manifest, zoznam kódov patchu a verzia seedu v jednom súbore |
 | `noxun_engine/ui/rules_dialog.rb` | `TYPE_SCOPE_PHRASES` · `type_scope_list` | veta rozsahu pravidla v sekcii Pravidlá (server) |
 | `noxun_engine/ui/js/rules.js` | `rdRoleDesc` | zobrazenie vety (typ sem prichádza hotovou vetou zo servera) |
 | `tests/pure/test_h12b_panel.rb` | `type_scope` | veta rozsahu pravidla viazaného na typ |
@@ -160,7 +160,25 @@ mení formát pravidiel (`HardwareRules::STD`, dopredná brána — audit). Prav
 Pravidlo s typom **sa týka aj pasce v scenári 1**: keď nové pravidlo platí na „všetky visiace" typy, guard závesov je vzor, ako ho
 strážiť (množina typov z vlastnosti registra = filter pravidla).
 
+## 6 · Nový set alebo systém kovania
+
+Predvolené kovanie je od H15 v **dátových súboroch `*_seed.rb`** (len literály). **Nový set** = riadky v dátach + verzia seedu + vedomá regenerácia
+goldenu `tests/fixtures/h15_golden/generate.rb` zdôvodnená v PR; kód setu musí byť v manifeste katalógu. Dávka je **výrobná/cenová**. **Nový systém**
+(napr. Antaro) dnes navyše vyžaduje slovníky v kóde (posledné štyri riadky; zjednotenie **C-08, Po V1**):
+
+| Súbor | Mená | Čo tam urobiť |
+|---|---|---|
+| `noxun_engine/core/hardware_sets_seed.rb` | `HardwareSets::SEED_SETS` · `HardwareSets::MAPPING_ADDITIONS` · `HardwareSets::LEGACY_SEED_SHAPES` · `HardwareSets::SEED_VERSION` | set, triedna predvoľba, starý tvar, verzia |
+| `noxun_engine/core/hardware_catalog_seed.rb` | `HardwareCatalog::SEED_ROWS` · `HardwareCatalog::SEED_SET_VERSION` | riadok manifestu pre nový kód + zoznam kódov patchu |
+| `noxun_engine/core/hardware_catalog.rb` | `HardwareCatalog.apply_seed_patches!` | krok patchu pre novú verziu (vzor v4: len doplniť chýbajúce) |
+| `noxun_engine/core/hardware_taxonomy_seed.rb` | `HardwareTaxonomy::SEED_MANUFACTURERS` · `HardwareTaxonomy::SEED_SERIES` · `HardwareTaxonomy::SEED_VERSION` | nový výrobca alebo rada |
+| `noxun_engine/data/recipes/RELEASED.json` | `atira_sisy_v1` · `quadro_v6_sisy_v1` | register receptov (nový systém = nový recept + riadok) |
+| `noxun_engine/core/hardware_sets.rb` | `HardwareSets::SYSTEM_IDENTITY` · `HardwareSets::DRAWER_HEIGHT_VARIANTS` | identita systému a výšky, ktoré overuje expanzia |
+| `noxun_engine/core/drawer_recipes.rb` | `Recipes::SYSTEMS` · `Recipes::CONSTRUCTION_TO_SYSTEM` | systém receptu (`metal` → `atira` napevno) |
+| `noxun_engine/modules/fronts.rb` | `Fronts::DRAWER_SYSTEMS` | systém zásuvky na čele |
+| `noxun_engine/core/validation.rb` | `Validation::SYSTEM_LABELS_SK` | menovka systému v hláške „chýba kit" |
+
 ## História
 
 Kapitola vznikla dávkou H13 bloku 9 · HARDENING (krížový audit V1, B-06/CN-02, CN-03) ako náhrada súpisu, ktorý žil len v archíve
-rohovej skrinky (`SYSTEM/archiv/bloky/ROHOVA/FAKTY_Z_KODU_2026-09-27.md` §1.2 a §2.6, s číslami riadkov k v0.14.0) a v package H12 §0.
+rohovej skrinky (`SYSTEM/archiv/bloky/ROHOVA/FAKTY_Z_KODU_2026-09-27.md` §1.2 a §2.6, s číslami riadkov k v0.14.0) a v package H12 §0. Scenár 6: H15b.

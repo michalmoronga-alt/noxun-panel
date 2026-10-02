@@ -43,7 +43,7 @@ module Noxun
     module HardwareTaxonomy
       STD            = 'noxun-hardware-taxonomy'
       SCHEMA_CURRENT = 1
-      SEED_VERSION   = 3
+      # H15b: SEED_VERSION je v hardware_taxonomy_seed.rb.
       FILE           = 'hardware_taxonomy.json'
 
       # Whitelisty klucov (KONTRAKT — vzor HardwareSets::SET_KEYS): kluc mimo
@@ -56,26 +56,7 @@ module Noxun
       # v chipoch a stromoch, kde by 5000 znakov rozbilo layout).
       MAX_NAME = 60
 
-      # SEED (v1). Zdroj: SYSTEM/zdroje/SEED_KATALOG_2026-07.md + debata 2.8.2026.
-      # Doplna sa LEN to, co v subore CHYBA — pouzivatelske mena sa nikdy
-      # neprepisuju a nic sa nemaze.
-      # v2 (D-118, 7.9.2026): Tulip (uchytky a vesiaky, 6 seed poloziek) a rada
-      # StrongBox (5 poloziek) — bez nich by ich katalogovy riadok nemal
-      # vyrobcu a strom katalogu by ich zhodil pod „— bez vyrobcu".
-      # v3 (KOV-G1a, 9.9.2026): vyrobca **Häfele** a rada **AXILO** presunuta
-      # pod neho. AXILO je Häfele program, nie Hettich — seed v1 to mal ZLE
-      # a od tejto davky ma set nôh aj devat katalogovych riadkov spravneho
-      # vyrobcu. Presun existujucich suborov robi `migrate_axilo_owner!` nizsie.
-      SEED_MANUFACTURERS = ['Hettich', 'Blum', 'Grass', 'Strong', 'Häfele',
-                            'Tulip', 'Ostatné'].freeze
-      SEED_SERIES = [
-        ['Sensys', 'Hettich'], ['InnoTech Atira', 'Hettich'], ['Quadro', 'Hettich'],
-        ['AvanTech YOU', 'Hettich'], ['AXILO', 'Häfele'],
-        ['CLIP top', 'Blum'], ['AVENTOS', 'Blum'], ['TANDEMBOX', 'Blum'],
-        ['LEGRABOX', 'Blum'], ['MERIVOBOX', 'Blum'], ['TIP-ON', 'Blum'],
-        ['Nova Pro', 'Grass'], ['Tiomos', 'Grass'],
-        ['StrongMax', 'Strong'], ['StrongBox', 'Strong']
-      ].freeze
+      # H15b: SEED_MANUFACTURERS a SEED_SERIES (+ historia v1..v3) su v hardware_taxonomy_seed.rb.
 
       # KOV-G1a: JEDNORAZOVA MIGRACIA VLASTNIKA RADY (seed v2 -> v3).
       # `merge_seed` vie iba DOPĹŇAŤ chybajuce mena, takze uz zapisana rada

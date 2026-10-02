@@ -33,7 +33,8 @@ NX_H13_SCENARIOS = [
   '## 2 · Nová rola dielca',
   '## 3 · Nový stĺpec Kusovníka',
   '## 4 · Nová sekcia Štúdia',
-  '## 5 · Nové pravidlo kovania viazané na typ skrinky'
+  '## 5 · Nové pravidlo kovania viazané na typ skrinky',
+  '## 6 · Nový set alebo systém kovania'
 ].freeze
 
 # CN-03: seed pravidla, ktore vydavaju ZAVESY na stenu, a vynimky (id typu =>
@@ -156,7 +157,9 @@ end
 # pasca zavesov a skutocne miesta vykreslenia sekcie Studia (review #449).
 NX_H13_REQUIRED = {
   '## 1 · Nový typ skrinky' => %w[zavesenie-hornej-skrinky CabinetTypes::REGISTRY NX_H13_HANG_EXCEPTIONS],
-  '## 4 · Nová sekcia Štúdia' => %w[StudioDialog::SECTIONS NXStudioSections renderHead renderTools renderBody ssRenderBody]
+  '## 4 · Nová sekcia Štúdia' => %w[StudioDialog::SECTIONS NXStudioSections renderHead renderTools renderBody ssRenderBody],
+  # H15b (D7): datove subory kovania a slovnik systemov, ktory ostal v kode (C-08).
+  '## 6 · Nový set alebo systém kovania' => %w[HardwareSets::SEED_SETS HardwareSets::SYSTEM_IDENTITY HardwareCatalog::SEED_ROWS]
 }.freeze
 
 def nx_h13_required_missing(rows)
@@ -173,7 +176,7 @@ def nx_h13_repo_reader
   end
 end
 
-NxTest.test('H13 B-06: mapa rozsirovacich bodov ma vsetkych 5 scenarov a v kazdom strazene riadky') do
+NxTest.test('H13 B-06: mapa rozsirovacich bodov ma vsetkych 6 scenarov a v kazdom strazene riadky') do
   lines = nx_h13_src(NX_H13_MAP).lines.map(&:rstrip)
   heads = lines.select { |l| l.start_with?('## ') }
   missing = NX_H13_SCENARIOS.reject { |h| heads.include?(h) }
