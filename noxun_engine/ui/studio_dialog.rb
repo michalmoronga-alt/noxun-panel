@@ -1369,9 +1369,6 @@ module Noxun
         def ensure_dialog
           return @dialog if @dialog
 
-          # H11a: otvorenie NOVEHO okna pri ukoncovani nepride — odlozene
-          # upratanie sa dokonci este pred novym oknom a jeho observerom.
-          AppLifecycle.confirm_running!('otvorené Štúdio', sync: true)
           @dialog = UI::HtmlDialog.new(
             dialog_title: 'Noxun Engine — Štúdio',
             preferences_key: DLG_KEY,
@@ -1403,16 +1400,7 @@ module Noxun
           # Bez vynulovania by dalsie otvorenie ozivilo referenciu na mrtve
           # okno a kazdy push by tichol na vynimke (audit #14).
           @dialog.set_on_closed do
-            if AppLifecycle.quitting?
-              # H11a (F-01): hook bezi aj pri ukonceni aplikacie (v 2026.2
-              # SketchUp API z neho pada, #1117) — odvesenie observera (SketchUp API) sa odlozi; ostatne
-              # resety nizsie su cisty Ruby a bezia vzdy.
-              AppLifecycle.trace('hook:studio:quitting')
-              AppLifecycle.defer_until_running('Štúdio') { detach_stale_observer if @dialog.nil? }
-            else
-              AppLifecycle.trace('hook:studio:normal')
-              detach_stale_observer
-            end
+            detach_stale_observer
             @ready = false
             @mat_full_pending = true # dalsie otvorenie zacina bez katalogu
             @hw_full_pending = true  # ŠT-3a-1: to iste pre katalog kovania

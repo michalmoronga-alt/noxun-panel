@@ -225,25 +225,6 @@ module Noxun
           false
         end
 
-        # H11a (F-01): zneplatnenie session CISTYM Ruby — pre `set_on_closed`
-        # pri ohlasenom ukoncovani SketchUpu (hook bezi aj pri ukonceni a v 2026.2
-        # z neho SketchUp API pada, #1117). Ziadny
-        # `view`, timer, `push_state` ani pop. Po nom `live_session` nastroja
-        # = nil, takze klik uz NIC nevlozi. Vracia sirotsky nastroj (alebo nil)
-        # — jeho pop sa odklada na potvrdeny beh SketchUpu.
-        def invalidate_session!(reason = nil)
-          s = @session
-          if s
-            s.cancel!(reason)
-            @session = nil if s.terminal? || s.committing?
-          end
-          t = @active_tool
-          t && t.attached? ? t : nil
-        rescue StandardError => e
-          Engine.log_error(e, 'GhostTool.invalidate_session!')
-          nil
-        end
-
         # Session skoncila uspesnym commitom — uvolni slot (nastroj konci
         # samostatne, po dokonceni klikovej cesty).
         def release_session(s)
@@ -375,16 +356,8 @@ module Noxun
         # s `deactivate`. `active_tool_id` sa na rozhodovanie NEPOUZIVA:
         # nemapuje sa spolahlivo na instanciu; „som navrchu" si drzime sami
         # z `activate` / `suspend` / `resume` / `deactivate`.
-        # H11a (F-01): pri ohlasenom ukoncovani SketchUpu sa pop NEROBI (pad
-        # #1117 v 2026.2) — odlozi sa na potvrdeny beh a nastroj ostava pripojeny.
         def pop_tool(tool)
           return false unless tool && tool.attached?
-
-          if AppLifecycle.quitting?
-            AppLifecycle.trace('pop:deferred')
-            AppLifecycle.defer_until_running('ghost pop') { pop_tool(tool) }
-            return false
-          end
 
           unless tool.on_top?
             tool.request_finish!
@@ -394,7 +367,6 @@ module Noxun
           model = tool.model_ref || Sketchup.active_model
           @active_tool = nil if @active_tool.equal?(tool)
           tool.detach!
-          AppLifecycle.trace('pop:executed')
           model.tools.pop_tool
           true
         rescue StandardError => e
@@ -2004,9 +1976,6 @@ module Noxun
         # reason 0 = Esc · 1 = OPATOVNY vyber toho isteho nastroja · 2 = Undo
         # pocas nastroja. Vo vsetkych troch: session konci, undo sa NEBLOKUJE.
         def onCancel(reason, view)
-          # H11a: Esc pri ukoncovani nepride — SketchUp bezi dalej, odlozene
-          # upratanie (vratane popu sirotskeho nastroja) pojde cez timer.
-          AppLifecycle.confirm_running!('Esc v nástroji', sync: false) if reason.to_i.zero? && AppLifecycle.quitting?
           guarded('onCancel') do
             # GHOST-D2: Esc / Undo / opatovny vyber = koniec CELEJ session
             # (0 krokov Spat, bez peciatky) a zamok inferencie sa uvolni.
@@ -2086,9 +2055,6 @@ module Noxun
         end
 
         def onLButtonDown(_flags, x, y, view)
-          # H11a: klik pri ukoncovani nepride — SketchUp bezi dalej. Zneplatnena
-          # session (`live_session` = nil) klik aj tak nepusti do commitu.
-          AppLifecycle.confirm_running!('klik v nástroji', sync: false) if AppLifecycle.quitting?
           guarded('onLButtonDown') do
             s = live_session
             next unless s && s.active?

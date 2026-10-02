@@ -38,7 +38,7 @@
 #
 # -QuitProbe (H11a, F-01, package H11 §A6): namiesto celej sady nacita kratky
 # tests/sketchup/su_quit_probe.rb (Inspector + Studio otvorene, ghost na kurzore,
-# stopa AppLifecycle do quit_trace.txt cez vopred otvoreny handle, ulozenie
+# stopa sondy do quit_trace.txt cez vopred otvoreny handle, ulozenie
 # run-kopie, Sketchup.quit). Zdiela zamok, sentinel aj run_* priecinok; proces
 # sa ukonci SAM (prepinac -CloseWhenDone sa ignoruje). Verdikt az PO zaniku
 # procesu (max 120 s, nikdy nezabija): PASS = exit kod 0 · presne 1x on_quit ·

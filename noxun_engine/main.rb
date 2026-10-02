@@ -594,15 +594,14 @@ end
 module Noxun
   module Engine
     # H11a: init (migracie, menu, toolbar, observery) bezi LEN nad CELYM pluginom
-    # a so zaregistrovanym quit observerom (`install!` je PRVY krok) — inak
-    # JEDNA hlaska a plugin ostava v tomto okne SketchUpu vypnuty (obnova =
-    # restart SketchUpu; rucny reload sa nepodporuje). Rozhodnutie plati na
+    # — inak JEDNA hlaska a plugin ostava v tomto okne SketchUpu vypnuty (obnova
+    # = restart SketchUpu; rucny reload sa nepodporuje). Rozhodnutie plati na
     # cely proces (memo) — opakovane nacitanie `main.rb` ho nezmeni.
     def self.init_allowed?
       return false unless lifecycle_ready?
       return @init_allowed unless @init_allowed.nil?
 
-      @init_allowed = !AppLifecycle.failed? && AppLifecycle.install!
+      @init_allowed = !AppLifecycle.failed?
       AppLifecycle.announce_failures! unless @init_allowed
       @init_allowed
     end

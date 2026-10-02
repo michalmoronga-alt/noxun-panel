@@ -11,13 +11,12 @@
 #      stromom so stub subormi a stub `sketchup.rb`: chyba casti = vsetky
 #      casti skusene, 1 hlaska, init NEbezi; vsetko ok = init bezi a 0 hlasok;
 #      chybajuci / pokazeny / nedokonceny bootstrap = 1 hlaska o zakladnom
-#      subore a 0 casti; neprijaty quit observer = hlaska a init NEbezi.
+#      subore a 0 casti.
 #   T6 staticky: zoznam 91 + 14 casti a poradie = zmrazena kopia z mainu
 #      b2427ef1, kazda cesta existuje, ziadne `Sketchup.require 'noxun_engine/`
-#      ani `.rbe`/`.rbs`.
+#      ani `.rbe`/`.rbs`; `reset_for_tests!` plugin nevola.
 #
 # MUTACIE (vysledok v PR davky H11a):
-#   M9  init bezi pri `install!` false        -> T5g
 #   M10 `require_part` chyta len StandardError -> T4 (SyntaxError/LoadError)
 #   M11 init bezi pri chybach                  -> T5a/T5b
 #   M12 bootstrap bez vlastnej vetvy           -> T5d/T5e
@@ -103,7 +102,6 @@ module NxH11aLoad
   STUB_SKETCHUP = <<~'RUBY'
     $nx_msgs = []
     $nx_menu = 0
-    $nx_obs = []
     def file_loaded?(_f)
       false
     end
@@ -112,18 +110,6 @@ module NxH11aLoad
       nil
     end
     module Sketchup
-      class AppObserver; end
-      def self.add_observer(obs)
-        return false if ENV['NX_ADD_OBSERVER'] == 'false'
-
-        $nx_obs << obs
-        true
-      end
-
-      def self.remove_observer(_obs)
-        true
-      end
-
       def self.status_text=(_t); end
     end
     module UI
@@ -196,10 +182,9 @@ module NxH11aLoad
         end
         fails = defined?(Noxun::Engine::AppLifecycle) && Noxun::Engine::AppLifecycle.respond_to?(:failures) ? Noxun::Engine::AppLifecycle.failures : nil
         puts 'NX_JSON=' + JSON.generate('parts' => $nx_parts, 'msgs' => $nx_msgs, 'menu' => $nx_menu,
-                                        'obs' => $nx_obs.length, 'failures' => fails)
+                                        'failures' => fails)
       RUBY
-      env = { 'NX_ADD_OBSERVER' => (mode == :observer_false ? 'false' : 'true') }
-      out = IO.popen(env, [RbConfig.ruby, script], err: %i[child out], &:read).to_s.force_encoding(Encoding::UTF_8)
+      out = IO.popen([RbConfig.ruby, script], err: %i[child out], &:read).to_s.force_encoding(Encoding::UTF_8)
       json = out[/^NX_JSON=(.*)$/, 1]
       res = json ? JSON.parse(json) : {}
       res.merge('raw' => out, 'init' => out.include?('boot_cutover'), 'raised' => out[/^NX_RAISED=(.*)$/, 1])
@@ -266,7 +251,7 @@ NxTest.test('H11a T4: announce_failures! — 2x volanie = 1 hlaska s prvou cesto
   NxTest.skip!('meni stav nacitania — len headless') unless NxTest.headless?
   lc = NxH11aLoad.lc
   begin
-    lc.reset_for_tests!(boot: true)
+    lc.reset_for_tests!
     NxH11aLoad.with_messagebox do |msgs|
       NxTest.refute(lc.announce_failures!, 'bez chyb ziadna hlaska')
       dir = Dir.mktmpdir('nx-h11a-t4c-')
@@ -290,7 +275,7 @@ NxTest.test('H11a T4: announce_failures! — 2x volanie = 1 hlaska s prvou cesto
                     m.include?('vypnutý'), "text hlasky: #{m}")
     end
   ensure
-    lc.reset_for_tests!(boot: true)
+    lc.reset_for_tests!
   end
 end
 
@@ -309,7 +294,6 @@ NxTest.test('H11a T5a: chyba casti (raise) — vsetky casti skusene, 1 hlaska, i
   NxTest.assert(r['msgs'].first.to_s.include?('noxun_engine/core/abs_rules.rb'), r['msgs'].first.to_s)
   NxTest.refute(r['init'], "init nesmie bezat: #{r['raw']}")
   NxTest.assert_equal(0, r['menu'], 'UI.menu nevolane')
-  NxTest.assert_equal(0, r['obs'], 'pri chybe sa observer ani neregistruje')
 end
 
 NxTest.test('H11a T5b: syntax chyba casti — ostatne casti nacitane, 1 hlaska, init NEbezi') do
@@ -323,7 +307,7 @@ NxTest.test('H11a T5b: syntax chyba casti — ostatne casti nacitane, 1 hlaska, 
   NxTest.assert_equal(0, r['menu'])
 end
 
-NxTest.test('H11a T5c: vsetko ok — init bezi, 0 hlasok, observer zaregistrovany 1x') do
+NxTest.test('H11a T5c: vsetko ok — init bezi, 0 hlasok') do
   nx_h11a_t5_skip!
   r = NxH11aLoad.boot(:ok)
   NxTest.assert(r['raised'].nil?, "main.rb nesmie vyhodit: #{r['raised']}")
@@ -331,7 +315,6 @@ NxTest.test('H11a T5c: vsetko ok — init bezi, 0 hlasok, observer zaregistrovan
   NxTest.assert_equal([], r['msgs'])
   NxTest.assert(r['init'], "init MUSI bezat: #{r['raw']}")
   NxTest.assert_equal(1, r['menu'], 'menu sa vytvorilo')
-  NxTest.assert_equal(1, r['obs'], 'quit observer zaregistrovany raz')
 end
 
 { 'd' => :bootstrap_missing, 'e' => :bootstrap_syntax, 'f' => :bootstrap_no_sentinel }.each do |k, mode|
@@ -345,16 +328,6 @@ end
     NxTest.refute(r['init'], 'init nesmie bezat')
     NxTest.assert_equal(0, r['menu'])
   end
-end
-
-NxTest.test('H11a T5g: quit observer neprijaty (add_observer false) — hlaska, init NEbezi') do
-  nx_h11a_t5_skip!
-  r = NxH11aLoad.boot(:observer_false)
-  NxTest.assert_equal(NxH11aLoad::MAIN_PARTS, r['parts'], 'casti sa nacitali vsetky')
-  NxTest.assert_equal(1, r['msgs'].length, "jedna hlaska: #{r['msgs'].inspect}")
-  NxTest.assert(r['msgs'].first.to_s.include?('quit observer'), r['msgs'].first.to_s)
-  NxTest.refute(r['init'], 'init nesmie bezat')
-  NxTest.assert_equal(0, r['menu'])
 end
 
 # --- T6: staticky zoznam --------------------------------------------------------
@@ -395,4 +368,22 @@ NxTest.test('H11a T6: bootstrap ide PRED zoznamom a ma vlastnu chybovu vetvu bez
   code = life.lines.map { |l| l.sub(/#.*$/, '') }.join
   NxTest.refute(code =~ /^\s*(require|load)\s+['"]|require_relative|Sketchup\.require/,
                 'bootstrap nesmie nacitavat ine subory pluginu')
+end
+
+NxTest.test('H11a T6: reset_for_tests! v plugine nikto nevola (len definicia)') do
+  hits = Dir[File.join(NxTest::ROOT, 'noxun_engine', '**', '*.rb')].flat_map do |f|
+    File.binread(f).force_encoding(Encoding::UTF_8).lines.each_with_index.select do |l, _i|
+      l.sub(/#.*$/, '').include?('reset_for_tests!')
+    end.map { |_l, i| "#{File.basename(f)}:#{i + 1}" }
+  end
+  NxTest.assert_equal(1, hits.length, "len definicia: #{hits.inspect}")
+  NxTest.assert(hits.first.start_with?('app_lifecycle.rb'), hits.inspect)
+end
+
+NxTest.test('H11a T6: app_lifecycle je dnes LEN nacitanie (ukoncovanie = H11c, poradie B na 26.0)') do
+  life = NxH11aLoad.src('noxun_engine', 'core', 'app_lifecycle.rb')
+  code = life.lines.map { |l| l.sub(/#.*$/, '') }.join
+  %w[onQuit AppObserver add_observer quitting? start_timer].each do |bad|
+    NxTest.refute(code.include?(bad), "#{bad} patri do H11c (Z1 s vlastnym auditom), nie do H11a")
+  end
 end

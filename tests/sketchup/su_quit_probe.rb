@@ -1,18 +1,21 @@
 # frozen_string_literal: true
-# Noxun Engine — QUIT TEST (H11a, F-01, package H11 §A6). Spusta ho
-# `scripts\run_su_tests.ps1 -QuitProbe` namiesto celej sady (su_runner.rb):
+# Noxun Engine — QUIT TEST (H11a, F-01, package H11 §A6; nastroj pre H11c).
+# Spusta ho `scripts\run_su_tests.ps1 -QuitProbe [-QuitMenu]` namiesto celej
+# sady (su_runner.rb):
 #
 #   kopia ENGINEtests.skp -> Inspector + Studio otvorene -> ghost visi na kurzore
-#   -> `AppLifecycle.trace_sink` = zapis do `quit_trace.txt` cez VOPRED otvoreny
-#   handle (priznana testovacia vynimka D3 — produkcia sink nema, ziadne IO pri
-#   ukoncovani) -> ulozenie run-kopie -> `Sketchup.quit`.
+#   -> stopa do `quit_trace.txt` cez VOPRED otvoreny handle -> ulozenie run-kopie
+#   -> `Sketchup.quit` (s -QuitMenu Subor > Koniec, `send_action` 57665).
 #
-# Pocas ukoncovania sa zapisuju LEN udalosti `AppLifecycle.trace` (Ruby stav):
-# `on_quit`, `hook:<okno>:<normal|quitting>`, `pop:<executed|deferred>`,
-# `deferred:*`, `running:*`. Verdikt robi PowerShell PO zaniku procesu
-# (exit kod 0, presne 1x on_quit, ziadny pop:executed po on_quit, kazdy hook
-# po on_quit = quitting, ziadny hook:*:normal medzi `probe:saved` a on_quit).
-# Na SketchUpe 26.0 sa hooky pri ukonceni nevolaju (S8) — prazdne miesto je OK.
+# Instrumentacia zije VYHRADNE v tejto sonde (plugin ziadnu stopu nema): vlastny
+# `AppObserver#onQuit` -> `on_quit`; obal `Panel.detach_observer` ->
+# `hook:inspector:normal` a `StudioDialog.detach_stale_observer` ->
+# `hook:studio:normal` (prvy krok hookov `set_on_closed`); obal
+# `GhostTool.pop_tool` -> `pop:executed`. IO pocas ukoncovania je priznana
+# testovacia vynimka (D3). Verdikt robi PowerShell PO zaniku procesu (exit kod 0,
+# presne 1x on_quit, ziadny pop:executed po on_quit, ziadny hook pred on_quit
+# po `probe:saved`). Na 26.0.429 (H11a) hooky oboch okien prisli PRED on_quit
+# (poradie B) cez `Sketchup.quit` aj Subor > Koniec — exit 0, ale FAIL.
 #
 # BEZPECNOST: bezi VYHRADNE nad kopiou ENGINEtests*.skp (inak nic nerobi a NEukonci).
 
@@ -21,6 +24,35 @@ module NoxunQuitProbe
   TRACE = ENV['NOXUN_QUIT_TRACE'].to_s
   MARKER = '=== KONIEC SUBORU ==='
   GHOST_PARAMS = { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0 }.freeze
+
+  # Vlastny observer sondy — LEN zapis udalosti (handle je otvoreny vopred).
+  class QuitWatch < Sketchup::AppObserver
+    def onQuit # rubocop:disable Naming/MethodName — SketchUp API
+      NoxunQuitProbe.trace('on_quit')
+    end
+  end
+
+  module PanelHook
+    def detach_observer(*args, &blk)
+      NoxunQuitProbe.trace('hook:inspector:normal')
+      super
+    end
+  end
+
+  module StudioHook
+    def detach_stale_observer(*args, &blk)
+      NoxunQuitProbe.trace('hook:studio:normal')
+      super
+    end
+  end
+
+  module PopHook
+    def pop_tool(*args, &blk)
+      r = super
+      NoxunQuitProbe.trace('pop:executed') if r
+      r
+    end
+  end
 
   module_function
 
@@ -39,6 +71,14 @@ module NoxunQuitProbe
     line(MARKER)
   end
 
+  # Zapis cez vopred otvoreny handle; kazda chyba je izolovana.
+  def trace(ev)
+    fh = @fh
+    fh.write("#{ev}\n") if fh && @armed
+  rescue StandardError
+    nil
+  end
+
   def guard_model?(model)
     base = model ? model.path.to_s.tr('\\', '/').downcase.split('/').last.to_s : ''
     base.start_with?('enginetests')
@@ -46,8 +86,8 @@ module NoxunQuitProbe
 
   def start
     File.write(OUT, "MARKER START #{Time.now} (su_quit_probe)\n")
-    unless defined?(Noxun::Engine::AppLifecycle) && e::AppLifecycle.respond_to?(:trace_sink=)
-      return finish('FAIL: quit probe: plugin nema AppLifecycle (H11a) — test nebezal')
+    unless defined?(Noxun::Engine::Panel) && defined?(Noxun::Engine::GhostTool)
+      return finish('FAIL: quit probe: plugin nie je nacitany — test nebezal')
     end
 
     model = Sketchup.active_model
@@ -74,21 +114,23 @@ module NoxunQuitProbe
     ready = e::Panel.dialog_alive? && e::StudioDialog.dialog_alive? &&
             !e::GhostTool.session.nil? && !e::GhostTool.active_tool.nil? && e::GhostTool.active_tool.attached?
     line("#{ready ? 'PASS' : 'FAIL'}: quit probe: Inspector + Studio otvorene a ghost visi na kurzore")
-    line("#{e::AppLifecycle.observer_installed? ? 'PASS' : 'FAIL'}: quit probe: quit observer zaregistrovany")
-    # D3: handle sa otvara TERAZ (pred ukoncenim), nie v sinku.
-    fh = File.open(TRACE, 'a')
-    fh.sync = true
-    @fh = fh
-    e::AppLifecycle.trace_sink = lambda do |ev|
-      fh.write("#{ev}\n")
-    end
-    e::AppLifecycle.trace(ready ? 'probe:ready' : 'probe:not_ready')
+    # D3: handle sa otvara TERAZ (pred ukoncenim), nie pri zapise.
+    @fh = File.open(TRACE, 'a')
+    @fh.sync = true
+    @armed = true
+    e::Panel.singleton_class.prepend(PanelHook)
+    e::StudioDialog.singleton_class.prepend(StudioHook)
+    e::GhostTool.singleton_class.prepend(PopHook)
+    @watch = QuitWatch.new
+    observed = Sketchup.add_observer(@watch) ? true : false
+    line("#{observed ? 'PASS' : 'FAIL'}: quit probe: observer sondy (onQuit) zaregistrovany")
+    trace(ready ? 'probe:ready' : 'probe:not_ready')
     saved = model.save ? true : false
     unless saved && !model.modified?
       stub = File.join(File.dirname(OUT), 'closing_stub.skp')
       saved = model.save(stub) ? true : false
     end
-    e::AppLifecycle.trace(saved ? 'probe:saved' : 'probe:save_failed')
+    trace(saved ? 'probe:saved' : 'probe:save_failed')
     line("#{saved ? 'PASS' : 'FAIL'}: quit probe: run-kopia ulozena (Sketchup.quit sa nebude pytat)")
     UI.start_timer(1.0, false) { quit_now }
   rescue StandardError => ex
@@ -100,12 +142,12 @@ module NoxunQuitProbe
   # `Sketchup.quit` (instancia nesmie ostat visiet). Inak priamo `Sketchup.quit`.
   def quit_now
     via_menu = ENV['NOXUN_QUIT_VIA'].to_s == 'menu'
-    e::AppLifecycle.trace(via_menu ? 'probe:quit_menu' : 'probe:quit')
+    trace(via_menu ? 'probe:quit_menu' : 'probe:quit')
     finish("INFO: quit probe: #{via_menu ? 'Subor > Koniec (send_action 57665)' : 'Sketchup.quit'} — " \
            'verdikt robi run_su_tests.ps1 po zaniku procesu')
     if via_menu
       UI.start_timer(8.0, false) do
-        e::AppLifecycle.trace('probe:fallback_quit')
+        trace('probe:fallback_quit')
         Sketchup.quit
       end
       Sketchup.send_action(57_665)
