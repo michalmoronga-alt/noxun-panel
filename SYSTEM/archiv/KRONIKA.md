@@ -17,6 +17,27 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H6c · kóty náhľadu (2.10.2026, PR #455, v0.17.19, blok 9 · HARDENING PO V1, triedenie D-02; package
+  [PACKAGE_H6.md](../zdroje/bloky/HARDENING/PACKAGE_H6.md) §6 „H6c" + §15; mockup [MOCKUP_H6_INSPECTOR.html](../zdroje/bloky/HARDENING/MOCKUP_H6_INSPECTOR.html) časť E;
+  rozhodnutia Michala 2.10. O10 A, O11 A; brief [BRIEF_H6.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H6.md)).** Tretia z troch častí H6. **Kóty a popisy v náhľade majú stálu veľkosť
+  na obrazovke:** 11 px (čísla medzier Čiel 10 px), čiara 1 px (`non-scaling-stroke`), **bez „mm"** („Š 800", „V 864", „H 520", „sokel 100", „telo 764") — pri spodnej 800 × 864
+  doteraz 6,5 px, pri vysokej 600 × 2100 3 px, pri malej skrinke nafúknuté na ~15 px. `viewBox` ostáva v **mm** (ťahanie priečky, výber zóny a klik na značku kovania bez zmeny),
+  mierka `pvS` (px na mm práve kreslenej kresby) sa berie z aktuálneho `viewBox`, takže 11 px platí aj po zoome; rezerva okraja na kóty (`DIM_EXT` 70 mm, `DIM_TOP`, `DIM_DEPTH_OFF`,
+  `PV_CORNER_*`) zanikla — scénu skladá čistá `nxDimScene(obsah v mm, okraje v px, rect)` (korpus l 46 · r 40 · t 30 · b 28 (+18 rohová), čelá 34/40/8/28, zóny b 28, kovanie 0, doska r 40 · b 28;
+  `rect` z `getBoundingClientRect`, pod 50 px referencia 404 × 323; `meet` dá `viewBox` presne mierku `s`, neplatný vstup 0,05). Vodorovné kóty visia 18 px pod **najnižším kresleným
+  prvkom** (aj pod presahom čela dole, D11), zvislé 20 px vedľa obrysu, hĺbka 12 px nad skosením, rohová šírka o riadok (18 px) nižšie. **Zmestenie (R3):** čistá `pvFitLabel` (odhad šírky
+  `0,56 · font · znaky`, rezerva 4 px) — zvislá kóta dlhý popis → číslo → **číslo vodorovne vedľa kóty**, vodorovná dlhý → krátky nad čiarou; popis čela v troch stupňoch („F1 · zásuvka 760"
+  → „F1 · 760" → „F1", pri paneli < 12 px nič); čísla medzier bez prekryvu (`nxSpreadLabels`, rozostup ≥ 11 px); popis zóny „764×646" a číslo pásma chladničky len keď sa zmestia.
+  Ostatné texty náhľadu v jednom modeli: slot umývačky, chladnička (S1-F; „hrana NNN" zarovnané dovnútra boxu, aby nesiahalo cez kótu výšky), „Čelá: nastav v sekcii Čelá", „bez smeru dekoru",
+  kóty vkladanej dosky (`pvBoardFont` zanikol). Mŕtva vetva „hĺbka … mm" (pri D > 0 je skosenie vždy ≥ 24 mm) zrušená. **Prekreslenie (R6):** Ctrl+koliesko → `pvScheduleRender()` (najviac
+  raz za snímku, `requestAnimationFrame`, fallback `setTimeout` 16; počas ťahania priečky nič), `ResizeObserver` na `#preview` → `pvOnResize` (zmena ≥ 1 px, obe strany ≥ 50 px), posun pohľadu bez
+  prekreslenia. Testy: golden popisov kót nad starým kódom (`tests/fixtures/h6c_koty/`, 14 prípadov) a `tests/js/test_h6c_koty.js` (T0–T6: golden, `nxDimScene`, nič sa neoreže pre 14 prípadov × 4 okná
+  a po zoome, skracovanie, bez „mm", prekreslenie, interakcia v mm); prepísané asserty v `test_rohb2_nahlad.js`, `test_uib2_nahlad.js`, `test_uic1b_vkladanie.js`, `test_h6b_suhrny.js`.
+  **Dáta, payloady, Ruby logika, výroba a ceny bez zmeny** (Ruby len verzia; in-SU nespúšťané). Dokumentácia: UI_DIZAJN §3 a §5.2, ui-lifecycle „Náhľad".
+  **Predrecenzia (opravené pred PR):** čísla medzier Čiel sa po priblížení nestiahnu k okraju výrezu (horný okraj rozotláčania je okraj scény); popisky pásma hrany chladničky
+  idú v jednom stĺpci dovnútra boxu (nepretnú sa s kótou tela), číslo pásma ustúpi, ak by sa s nimi pretlo; obsah scény počíta so zapnutými vrstvami Čelá (presah dole) a Kovanie (nohy)
+  v Korpuse, Zónach aj Čelách; výnimky T0 zúžené na pásma 40 a 71; nový test, že sa žiadne dva texty kót neprekrývajú. Golden prípadu `fronts_presah` regenerovaný nad starým kódom
+  (oprava nereálnych, prekrývajúcich sa čiel v dátach prípadu, nie zmena správania).
 - **H6b · lišty sektorov a súhrny (2.10.2026, PR #454, v0.17.18, blok 9 · HARDENING PO V1, triedenie D-01 pás + D-05; package
   [PACKAGE_H6.md](../zdroje/bloky/HARDENING/PACKAGE_H6.md) §6 „H6b" + §15; mockup [MOCKUP_H6_INSPECTOR.html](../zdroje/bloky/HARDENING/MOCKUP_H6_INSPECTOR.html) časti B–D, F;
   rozhodnutia Michala 2.10. O6, O7, O9, O12; brief [BRIEF_H6.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H6.md)).** Druhá z troch častí H6. **Pás „Skrinka … upravíš

@@ -430,7 +430,10 @@ function load(ctx, file){
   ctx.getInsertKind = () => 'cabinet';
   ctx.selectedCabId = 'CAB-1';
   ctx.currentZoneTree = null;
-  const PAD = vm.runInContext('PV_PAD', ctx);
+  // H6c: scena v px modeli - viewBox = OBSAH (mm) + 2 x 6 px vzduchu / s (Kovanie nema ziadne okraje na koty).
+  // Vyska obsahu = vyska viewBoxu minus vzduch; mierka s = meet na referencii 404 x 323 (Node bez rozmeru).
+  const contentH = vb => vb[3] - 12 / Math.min(404 / vb[2], 323 / vb[3]);
+  const near = (a, b, msg) => { n++; assert.ok(Math.abs(a - b) < 0.01, msg + ': cakam ' + b + ', dostal ' + a); };
   function render(fh, items){
     vm.runInContext('pvUserView = false; pvView = null; frontDraft = null;', ctx);
     ctx.setType('lower');
@@ -451,14 +454,14 @@ function load(ctx, file){
   // Sokel 100: nohy stoja v sokli (z >= 0) - rezerva dole 0, scena = vyska skrinky + 2 PAD.
   let r = render(100, [LEG, SLIDE]);
   NOTXT(r, 'sokel');
-  eq(r.vb[3], 864 + 2 * PAD, 'T6: sokel > 0 - scena nema rezervu dole (bola 96 mm)');
+  near(contentH(r.vb), 864, 'T6: sokel > 0 - scena nema rezervu dole (bola 96 mm)');
   // Bez sokla visia nohy POD korpusom (70 mm) - rezerva len na ne.
   r = render(0, [LEG]);
   NOTXT(r, 'bez sokla');
-  eq(r.vb[3], 864 + 70 + 2 * PAD, 'T6: sokel = 0 - rezerva len na nohy (70 mm)');
+  near(contentH(r.vb), 864 + 70, 'T6: sokel = 0 - rezerva len na nohy (70 mm)');
   // Bez nohy ziadna rezerva ani pri sokli 0.
   r = render(0, [SLIDE]);
-  eq(r.vb[3], 864 + 2 * PAD, 'T6: bez noh - ziadna rezerva dole');
+  near(contentH(r.vb), 864, 'T6: bez noh - ziadna rezerva dole');
   r = render(100, []);
   NOTXT(r, 'prazdne kovanie');
   ok(r.html.indexOf('<text') < 0 || r.html.indexOf('hrana') < 0, 'T6: prazdne kovanie - ziadne texty v kresbe');
@@ -474,7 +477,7 @@ function load(ctx, file){
     vm.runInContext("previewMode = 'hw'", ctx);
     ctx.renderPreview();
     const vb2 = svg.getAttribute('viewBox').split(/\s+/).map(parseFloat);
-    ok(vb2[1] + vb2[3] >= 720 + 20 + PAD, 'T6 (P3-3): cela presahujuce dole −20 je v scene Kovania (spodok viewBoxu ' + (vb2[1] + vb2[3]) + ')');
+    ok(vb2[1] + vb2[3] >= 720 + 20 + 14, 'T6 (P3-3): cela presahujuce dole −20 je v scene Kovania (spodok viewBoxu ' + (vb2[1] + vb2[3]) + ')');
     // Rohova: dielec zostavy siaha pod korpus.
     ctx.setType('corner_blind');
     ctx.cornerPreview = { parts: [{ role: 'cr_front', x0: 650, x1: 1100, z0: -60, z1: 700 }], dims: [], fits: true };
@@ -484,7 +487,7 @@ function load(ctx, file){
     vm.runInContext('pvUserView = false; pvView = null;', ctx);
     ctx.renderPreview();
     const vb3 = svg.getAttribute('viewBox').split(/\s+/).map(parseFloat);
-    ok(vb3[1] + vb3[3] >= 862 + 60 + PAD, 'T6 (P3-3): cr_front rohovej je v scene Kovania (spodok viewBoxu ' + (vb3[1] + vb3[3]) + ')');
+    ok(vb3[1] + vb3[3] >= 862 + 60 + 14, 'T6 (P3-3): cr_front rohovej je v scene Kovania (spodok viewBoxu ' + (vb3[1] + vb3[3]) + ')');
     ctx.cornerPreview = null;
   }
   // Ciste jadro rezervy.

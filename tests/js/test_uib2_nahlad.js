@@ -230,14 +230,15 @@ const withTop = PV.nxFrontDims([{ id: 'F1', z: 100, height: 500 }], GEOM);
 deq(withTop.map(d => d.kind), ['front', 'gap'], 'zvysok pod stropom je medzera');
 
 // Kota hlbky lezi NAD naznakom skosenia — scena jej musi nechat miesto na
-// ciaru, znacky aj text, inak ju fit oreze (Codex #169 P2).
-[ { H: 720, sk: 100.8 }, { H: 2000, sk: 24 }, { H: 400, sk: 130 } ].forEach(c => {
-  const dimZ = PV.pvDepthDimZ(c.H, c.sk);
-  const top = PV.pvSceneTopZ(c.H, c.sk);
-  ok(dimZ > c.H + c.sk, `kota hlbky lezi nad skosenim (H=${c.H})`);
-  ok(top >= dimZ + 16, `scena nechava miesto na kotu hlbky aj jej text (H=${c.H}): top=${top}, kota=${dimZ}`);
+// ciaru, znacky aj text, inak ju fit oreze (Codex #169 P2). H6c: okraj hore je
+// v PX (ciara 12 px nad skosenim + text 5 px nad ciarou + vyska pisma 11 px), nie v mm.
+[ 100.8, 24, 130 ].forEach(sk => {
+  const mg = PV.pvCabMargins(sk, false);
+  ok(mg.t >= PV.DIM_DEPTH_OFF_PX + PV.DIM_TXT_PX + PV.DIM_FONT_PX,
+     `okraj hore nechava miesto na kotu hlbky aj jej text (skosenie ${sk}): t=${mg.t}`);
 });
-eq(PV.pvSceneTopZ(720, 0), 720, 'bez hlbky (bez skosenia) sa scena nad korpus nerozsiruje');
+ok(PV.pvCabMargins(0, false).t < PV.pvCabMargins(100.8, false).t, 'bez hlbky (bez skosenia) sa nad korpus tolko miesta nerezervuje');
+ok(PV.pvCabMargins(50, true).b === PV.pvCabMargins(50, false).b + PV.DIM_ROW_PX, 'rohova: sirka o riadok nizsie = okraj dole o jeden rad viac');
 
 // Koty sirok zon: distinct stlpce, zoradene zlava.
 deq(PV.nxZoneSpans([

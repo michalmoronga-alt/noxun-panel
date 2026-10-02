@@ -269,6 +269,8 @@ druhý počítač). Pravidlá sú úzke zámerne:
 - Rodina: `"Segoe UI", Tahoma, sans-serif`.
 - Základ: 13 px. Labely 12–13 px, hinty 10,5 px, ID v hlavičke 14 px (700).
 - Nadpisy sekcií (`summary`, `legend`): 12 px, 600.
+- **Kóty a popisy v náhľade (H6c):** **11 px** na obrazovke (čísla medzier Čiel 10 px), stále rovnako pri malej aj vysokej skrinke
+  a pri zoome; čiara kót 1 px. Podrobnosti §5.2.
 
 ### Zápis čísel a jednotiek (H4 · D-04, triedenie HARDENING)
 
@@ -533,18 +535,32 @@ Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`projSvg`)
 
 | Kontext | Projekcia |
 |---|---|
-| **Korpus** | čelný rez s kótami: šírka dole · výška vpravo · sokel a telo vľavo · hĺbka kótou na náznaku skosenia hornej plochy |
-| **Zóny** | zónová schéma (klikateľné zóny, ťahateľné priečky) + kóty šírok stĺpcov |
-| **Čelá** | predný pohľad čiel + kóty výšok riadkov vpravo, medzery pri ľavom okraji, celková šírka dole |
+| **Korpus** | čelný rez s kótami: šírka dole (pod najnižším prvkom) · výška vpravo · sokel a telo vľavo · hĺbka kótou nad náznakom skosenia hornej plochy |
+| **Zóny** | zónová schéma (klikateľné zóny, ťahateľné priečky) + kóty šírok stĺpcov pod korpusom; popis zóny „764×646" len keď sa zmestí |
+| **Čelá** | predný pohľad čiel + kóty výšok riadkov vpravo, medzery pri ľavom okraji, celková šírka dole (pod presahom čela, ak nejaký je) |
 | **Kovanie** | korpus s **pozíciami kovania**: záves = krúžok s krížikom na závesovej hrane · **výsuv = koľajnica „L" pri OBOCH bokoch + telo šuflíka** (nižšie) · nohy = obdĺžniky dole; **súhrn všetkých položiek je v lište sektora Kovanie**, nie v kresbe (tá je bez textov a väčšia) |
 | **Dielec** | hrany s ABS farbami (`#partSvg`) |
 
 Zásady kreslenia:
 
-- **Kóty sú decentné:** tenká čiara (1,4), tlmená farba `--nx-ink-faint`,
-  hodnota bez jednotky (jednotka len tam, kde je to prvý údaj). Kreslené farby
-  sú **zrkadlom tokenov** — SVG atribúty nevedia `var()` (rovnaký vzor ako
-  ostatné farby náhľadu).
+- **Kóty sú decentné a čitateľné (H6c · D-02):** tenká čiara **1 px**
+  (`non-scaling-stroke`), tlmená farba `--nx-ink-faint`, **bez jednotky vôbec**
+  („Š 800", „V 864", „H 520", „sokel 100", „telo 764" — v plugine je všetko mm).
+  Písmo kót a popisov (čela, zóny, pásma chladničky, doska) má **11 px na
+  obrazovke** (čísla medzier Čiel 10 px) — nezávisle od veľkosti skrinky aj od
+  zoomu. Kresba ostáva v mm modelu (ťahanie priečky, výber zóny a klik na značku
+  fungujú ako predtým); stálu veľkosť dáva mierka `pvS` = px na mm práve
+  kreslenej kresby, z ktorej sa `px / pvS` prevádzajú písmo, odsadenia (kóta
+  18 px pod najnižším prvkom, zvislá 20 px vedľa obrysu, hĺbka 12 px nad
+  skosením, rohová o riadok 18 px nižšie) aj okraje scény (`nxDimScene`: korpus
+  l 46 · r 40 · t 30 · b 28, čelá l 34 · r 40 · t 8 · b 28, zóny b 28, kovanie
+  0). **Keď sa popis nezmestí, skráti sa:** „V 864" → „864" → číslo
+  **vodorovne vedľa kóty**; „F1 · zásuvka 760" → „F1 · 760" → „F1" (panel nižší
+  ako 12 px popis nemá); čísla medzier sa neprekrývajú (rozostup ≥ 11 px). Žiadne dva texty kót sa neprekrývajú. Scéna počíta aj so zapnutými vrstvami
+  (Čelá s presahom dole, Kovanie s nohami pod korpusom), takže kóta šírky vždy visí pod nimi.
+  Zoom (Ctrl+koliesko) a zmena veľkosti náhľadu **kóty prekreslia** (najviac raz
+  za snímku; posun pohľadu nie). Kreslené farby sú **zrkadlom tokenov** — SVG
+  atribúty nevedia `var()` (rovnaký vzor ako ostatné farby náhľadu).
 - **Náhľad nikdy nepočíta dáta.** Kreslí sa výhradne z payloadov, ktoré panel
   už má (rozmery formulára, `front_items`, `config.hardware`, strom zón).
   Odvodené hodnoty (pozícia značky, medzera medzi čelami) žijú v JS ako čisté

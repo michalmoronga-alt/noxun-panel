@@ -125,11 +125,14 @@ eq(ah.every(function(a){ return a.x2 > a.x1; }), true, 'sipka ukazuje v smere ra
 eq(ah.map(function(a){ return a.y1; }), [150, 300, 450], 'sipky su rozlozene naprieč doskou');
 const av = pv.nxGrainArrows(2600, 600, 'width');
 eq(av.every(function(a){ return a.x1 === a.x2 && a.y2 > a.y1; }), true, 'po sirke = zvisle sipky');
-// Scena musi niest kotu vpravo aj dole — inak by ju fit orezal.
+// Scena musi niest kotu vpravo aj dole — inak by ju fit orezal. H6c: rezerva je v PX
+// (kota vpravo 20 px + text 9 px + pol pisma, kota dole 18 px + znacka), nie v mm.
 const sc = pv.pvBoardScene(2600, 600);
-eq(sc.x < 0 && sc.y < 0, true, 'scena ma padding vlavo a hore');
-eq(sc.x + sc.w > 2600 + 26, true, 'vpravo je miesto na kotu sirky');
-eq(sc.y + sc.h > 600 + 26, true, 'dole je miesto na kotu dlzky');
+const scS = Math.min(404 / sc.w, 323 / sc.h); // px na mm pri meet na referencii 404 x 323
+eq(Math.abs(scS - sc.s) < 1e-9, true, 'viewBox ma presne mierku s (meet)');
+eq(sc.x < 0 && sc.y < 0, true, 'scena ma vzduch vlavo a hore');
+eq((sc.x + sc.w - 2600) * scS >= 20 + 9 + 6, true, 'vpravo je miesto na kotu sirky (ciara 20 px + text)');
+eq((sc.y + sc.h - 600) * scS >= 18 + 4, true, 'dole je miesto na kotu dlzky (ciara 18 px + znacka)');
 eq(pv.pvBoardScene(0, 0).w > 0, true, 'nulove rozmery scenu nezrusia');
 
 // ============ 4) VRSTVY NAHLADU V REZIME 'insert' ===========================
