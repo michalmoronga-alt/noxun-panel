@@ -68,8 +68,8 @@ ich je päť (štyri typy + Doska), šiesty typ potrebuje rozhodnutie o rozlože
 ## 2 · Nová rola dielca
 
 Rola je **vlastnosť dielca v pláne** (`BuildPlan::ROLES`) a zoznamy jej vlastností sú dnes rozdelené po moduloch (ktorá rola je čelo,
-ktorá stojí, ktorá je zásuvka, ako sa volá). Výrobný názov dielca (ASCII, ide do kusovníka a VEPO) je **iný** údaj než zobrazovacie meno
-roly. Verzie: BuildPlan `SCHEMA` (nová rola v pláne), `CONFIG_SCHEMA` (ak ju nesie nové pole configu), ABS `SEED_VERSION` (predvolené
+ktorá stojí, ktorá je zásuvka); **zobrazovacie meno** má od H12d jedno miesto (`PartKeys::ROLE_LABELS`). Výrobný názov dielca (ASCII, ide
+do kusovníka a VEPO) je **iný** údaj než zobrazovacie meno roly. Verzie: BuildPlan `SCHEMA` (nová rola v pláne), `CONFIG_SCHEMA` (ak ju nesie nové pole configu), ABS `SEED_VERSION` (predvolené
 hrany novej roly — inak sa na existujúcich PC postaví **bez pásky**). Dávka je výrobná (mení kusovník a VEPO).
 
 | Súbor | Mená | Čo tam urobiť |
@@ -83,12 +83,12 @@ hrany novej roly — inak sa na existujúcich PC postaví **bez pásky**). Dávk
 | `noxun_engine/core/hardware_rules.rb` | `FRONT_ROLES` | ktoré čelá nesú kovanie |
 | `noxun_engine/core/cp_export.rb` | `CpExport::FRONT_ROLES` | cenová ponuka — čo je čelo |
 | `noxun_engine/core/vepo_export.rb` | `VepoExport::SHORT_NAMES` · `NAME_PAIRS` | skratka výrobného názvu pre VEPO (kľúč = presný reťazec buildera) |
-| `noxun_engine/core/part_keys.rb` | `ZONE_PART_LABELS` · `DRAWER_PART_LABELS` | mená dielcov zóny a zásuvky v Kovaní a Kontrole |
-| `noxun_engine/ui/production_core.rb` | `ROLE_LABELS` · `role_label` | zobrazovacie meno (stĺpec Rola v Kusovníku — autorita mien) |
+| `noxun_engine/core/part_keys.rb` | `ROLE_LABELS` · `role_label` · `ZONE_PART_LABELS` · `DRAWER_PART_LABELS` | **jediné zobrazovacie meno roly** (stĺpec Rola v Kusovníku, karta dielca aj dosky, prehľad ABS); mená dielcov zóny a zásuvky v Kovaní a Kontrole sú z neho odvodené. Nová rola bez mena zhodí `tests/pure/test_h12d_mena_roli.rb` |
+| `noxun_engine/ui/production_core.rb` | `ROLE_LABELS` · `role_label` | len alias a delegácia na `PartKeys` (Kusovník, Štúdio) — meno sa sem nepíše |
 | `noxun_engine/core/drawer_recipes.rb` | `Recipes.role_label` | iný gramatický tvar do viet hlášok zásuviek |
 | `noxun_engine/ui/rules_dialog.rb` | `ABS_ROLE_ORDER` | poradie rolí v prehľade ABS sekcie Pravidlá |
-| `noxun_engine/ui/panel/payloads.rb` | `BOARD_ROLE_LABELS` · `MANUAL_OWNER_PREFIXES` · `CORNER_PREVIEW_ROLES` | karta dosky, ručné zásahy, kresba rohovej |
-| `noxun_engine/ui/js/part_card.js` | `roleLabel` · `isFront` | JS kópia mien a „je čelo" v karte dielca (mená zjednotí H12d) |
+| `noxun_engine/ui/panel/payloads.rb` | `part_card_payload` · `board_payload` · `MANUAL_OWNER_PREFIXES` · `CORNER_PREVIEW_ROLES` | `role_label` v payloade karty dielca a dosky (hotový text pre JS), ručné zásahy, kresba rohovej |
+| `noxun_engine/ui/js/part_card.js` | `pcRoleText` · `isFront` | karta vypíše `role_label` zo servera (vlastnú mapu mien nemá — guard T3f); „je čelo" je JS kópia vlastnosti roly |
 | `noxun_engine/ui/js/rules.js` | `rdRoleDesc` | veta rozsahu pravidla kovania podľa roly |
 | `tests/pure/test_roha1_rohova.rb` | `BuildPlan::ROLES` · `EDGE_LABELS` · `ROLE_AXES` · `role_label` | vzor testu pre nové roly (každá rola vo všetkých zoznamoch) |
 
