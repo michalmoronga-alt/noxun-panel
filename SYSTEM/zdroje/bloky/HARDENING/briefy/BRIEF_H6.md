@@ -1,5 +1,7 @@
 # Brief — dávka H6 · priestor v Inspectore (D-01, D-02, D-05) — blok 9 HARDENING
 
+> Kópia zadania zo scratchpadu (2.10.2026); autorita = súbory v priečinku bloku.
+
 Orchestrátor ti povie, ktorú časť robíš (**H6a**, **H6b** alebo **H6c**). Každá časť = samostatný PR z **čerstvého `origin/main`** (po mergi predchodcu).
 
 | Časť | Vetva | Obsah (package §6) | Predrecenzia |
@@ -9,11 +11,11 @@ Orchestrátor ti povie, ktorú časť robíš (**H6a**, **H6b** alebo **H6c**). 
 | **H6c** · kóty náhľadu | `feat/h6c-koty-nahladu` | O10, O11 (+ ďalšie texty v mm z §0) | povinná |
 
 ## Zdroj (autorita v tomto poradí)
-1. `C:\Users\PC\AppData\Local\Temp\claude\C--APP-DEV-RUBY-ENGINE\bec8118a-40cf-4c0b-9a3e-af1bf4f85fdf\scratchpad\HARDENING\PACKAGE_H6.md` — **§15 (potvrdenie
+1. [PACKAGE_H6.md](../PACKAGE_H6.md) — **§15 (potvrdenie
    orchestrátora) má prednosť**, potom §6 požiadavky tvojej časti, §7 testy, §11 uzáver. Sonda §0 je z mainu `108c808c` — medzitým mohli zmergovať iné dávky
    (H12d mení `part_card.js`/payload karty dielca) → **krok 0: over čísla riadkov a mená proti aktuálnemu mainu**; rozdiel meniaci zámer → STOP a otázka.
-2. Rozhodnutia Michala `…\scratchpad\HARDENING\ROZHODNUTIA_H6_H7_2026-10-02.md` (O1 a O3 sú **odchýlky od mockupu**).
-3. Mockup `…\scratchpad\HARDENING\MOCKUP_H6_INSPECTOR.html` — vizuálny cieľ; kde sa líši od rozhodnutí, platia rozhodnutia.
+2. Rozhodnutia Michala sekcia „Mockupy H6 a H7" v [ROZHODNUTIA_MICHALA_2026-10-01.md](../ROZHODNUTIA_MICHALA_2026-10-01.md) (O1 a O3 sú **odchýlky od mockupu**).
+3. Mockup [MOCKUP_H6_INSPECTOR.html](../MOCKUP_H6_INSPECTOR.html) — vizuálny cieľ; kde sa líši od rozhodnutí, platia rozhodnutia.
 
 ## Len H6a navyše (prenesenie do repa)
 - Package `PACKAGE_H6.md` → `SYSTEM/zdroje/bloky/HARDENING/PACKAGE_H6.md`; tento brief → `SYSTEM/zdroje/bloky/HARDENING/briefy/BRIEF_H6.md`.
