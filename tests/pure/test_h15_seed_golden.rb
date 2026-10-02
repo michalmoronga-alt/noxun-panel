@@ -30,6 +30,11 @@
 #      materialmi (§15 A1 — bez nich sa hmotnost cela nedopocita a vyklop
 #      vyda len prislusenstvo). Surovy CSV, JSON `expand`, sekcia `hardware`
 #      rozpoctu.
+#   G7b (predrecenzia H15a, P3) to iste pre Tip-On zasuvku (K-sada + PTOs
+#      modul), Tip-On dvierka (zaves P2O + TipOn) a skrinku so soklom 18 mm
+#      (klzak 17–20, platnicka vedome bez kodu). Fixtura `g7b_nakup.json`
+#      vznikla generatorom `generate.rb g7b` nad stromom MAINU `d69f3e55`
+#      (pred H15a, `git archive`) — teda tiez nad nezmenenym kodom.
 #
 # §15 A1: golden NESMIE pripnut neuplny nakup. `NxH15Golden.purchase_problems`
 # overi (generator PRED zapisom, test potom stale): v riadkoch je mechanizmus
@@ -64,7 +69,7 @@ module NxH15Golden
   # Fixtury: JSON dokumenty (porovnanie cez prvu odlisnu cestu) a SUROVE subory
   # cerstvej instalacie (porovnanie po riadkoch).
   JSON_FIXTURES = %w[g1_konstanty g2_kniznica g3_upgrade_sety g4_upgrade_katalog
-                     g5_projekt g6_flap g7_nakup].freeze
+                     g5_projekt g6_flap g7_nakup g7b_nakup].freeze
   RAW_FIXTURES = {
     'g2_hardware_sets.json' => :sets, 'g2_hardware_catalog.json' => :catalog,
     'g2_hardware_taxonomy.json' => :taxonomy
@@ -113,13 +118,31 @@ module NxH15Golden
     'vyklop_hl' => lift_case('hl_top')
   }.freeze
 
-  # §15 A1: co MUSI byt v nakupe danej konfiguracie — { konfiguracia => [set
-  # (regex), [povinne cleny podla stitku]] }. Stitky su NEZAVISLY zapis (nie
-  # odvodene zo seedu): presne tieto cleny drzia zasuvku a vyklop.
+  # G7b (predrecenzia H15a): Tip-On zasuvka, Tip-On dvierka a sokel 17–20 mm.
+  G7B_CASES = {
+    'zasuvka_atira_tipon' => { 'width' => 900.0, 'height' => 720.0, 'depth' => 500.0,
+                               'fronts' => { 'items' => [
+                                 { 'type' => 'drawer_front', 'mode' => 'fixed', 'height' => 175.0,
+                                   'opening_mode' => 'tipon', 'drawer' => { 'construction' => 'metal' } }
+                               ] } },
+    'dvierka_tipon' => NxKovaGolden.base('fronts' => NxKovaGolden.items(
+      NxKovaGolden.door('wings' => '2', 'opening_mode' => 'tipon')
+    )),
+    'sokel_18' => NxKovaGolden.base('floor_height' => 18.0,
+                                    'fronts' => NxKovaGolden.items(NxKovaGolden.door('wings' => '1')))
+  }.freeze
+
+  # §15 A1: co MUSI byt v nakupe danej konfiguracie — { konfiguracia =>
+  # [genericke typy poloziek, set (regex), [povinne cleny podla stitku]] }.
+  # Stitky su NEZAVISLY zapis (nie odvodene zo seedu): presne tieto cleny drzia
+  # zasuvku, vyklop, Tip-On dvierka a nohu.
   REQUIRED_MEMBERS = {
-    'zasuvka_atira' => [/\Aatira-biela-h\d+-sisy\z/, ['K-sada']],
-    'vyklop_hk' => [/\Avyklop-hk-klasik\z/, ['mechanizmus HK top']],
-    'vyklop_hl' => [/\Avyklop-hl-klasik\z/, ['mechanizmus HL top', 'ramená HL top', 'stabilizačná tyč']]
+    'zasuvka_atira' => [%w[slide], /\Aatira-biela-h\d+-sisy\z/, ['K-sada']],
+    'vyklop_hk' => [%w[lift], /\Avyklop-hk-klasik\z/, ['mechanizmus HK top']],
+    'vyklop_hl' => [%w[lift], /\Avyklop-hl-klasik\z/, ['mechanizmus HL top', 'ramená HL top', 'stabilizačná tyč']],
+    'zasuvka_atira_tipon' => [%w[slide], /\Aatira-biela-h\d+-p2o\z/, ['K-sada', 'PTOs mechanizmus']],
+    'dvierka_tipon' => [%w[hinge], /\Azaves-p2o\z/, ['záves P2O', 'TipOn na dvierka']],
+    'sokel_18' => [%w[leg], /\Anohy-podla-sokla\z/, ['noha']]
   }.freeze
 
   # Minimalny model so slovnikom atributov (vzor `NxD118b::Model`).
@@ -466,7 +489,7 @@ module NxH15Golden
       cat = HC.items
       state = { 'mapping' => lib['mapping'], 'sets' => lib['sets'].to_h { |s| [s['set_id'], s] } }
       rules = HR.normalize_rules(HR::SEED_RULES)
-      g7_cases.to_h do |name, params|
+      g7_cases.merge(G7B_CASES).to_h do |name, params|
         plan = E::Construction.build_plan(E::CabinetBuilder.normalize(params), 'CAB-1',
                                           hardware_rules: rules, materials: MATERIALS)
         exp = HS.expand(plan[:hardware], state, catalog: cat)
@@ -479,10 +502,18 @@ module NxH15Golden
     end
   end
 
-  def g7
-    purchases.transform_values do |p|
+  def purchase_doc(names)
+    purchases.slice(*names).transform_values do |p|
       { 'purchase_csv' => p['csv'], 'expand' => p['exp'], 'budget_hardware' => p['budget'] }
     end
+  end
+
+  def g7
+    purchase_doc(g7_cases.keys)
+  end
+
+  def g7b
+    purchase_doc(G7B_CASES.keys)
   end
 
   # §15 A1: zoznam problemov nakupu (prazdny = golden sa smie zapisat).
@@ -509,11 +540,11 @@ module NxH15Golden
     want = REQUIRED_MEMBERS[name]
     return [] unless want
 
-    set_re, labels = want
+    types, set_re, labels = want
     plan = purchase['plan']
     codes = purchase['exp']['rows'].to_h { |r| [r['code'], r['quantity']] }
-    items = plan[:hardware].select { |h| %w[slide lift].include?(h['generic_type']) }
-    return ["#{name}: plan nema polozku vysuvu/vyklopu"] if items.empty?
+    items = plan[:hardware].select { |h| types.include?(h['generic_type']) }
+    return ["#{name}: plan nema polozku #{types.inspect}"] if items.empty?
 
     items.flat_map do |item|
       ex = HS.explain(item, purchase['state'], catalog: purchase['catalog'])
@@ -545,6 +576,7 @@ module NxH15Golden
     when 'g5_projekt' then g5
     when 'g6_flap' then g6
     when 'g7_nakup' then g7
+    when 'g7b_nakup' then g7b
     else raise ArgumentError, "neznama fixtura #{name}"
     end
   end
@@ -627,6 +659,8 @@ NxTest.test('H15 T0 G7 (§15 A1): nakup je UPLNY — mechanizmus/kit, ramena, ty
   NxTest.skip!('sandbox %APPDATA% len headless') unless NxTest.headless?
   probs = NxH15Golden.purchase_problems
   NxTest.assert(probs.empty?, "golden nakupu by pripol neuplny nakup: #{probs.first(5).inspect}")
+  NxTest.assert_equal(NxH15Golden::G7B_CASES.keys.sort, JSON.parse(NxH15Golden.golden_text('g7b_nakup.json')).keys.sort,
+                      'zoznam konfiguracii G7b = zoznam vo fixture')
   NxTest.assert_equal(NxH15Golden.g7_cases.keys.sort, JSON.parse(NxH15Golden.golden_text('g7_nakup.json')).keys.sort,
                       'zoznam konfiguracii G7 = zoznam vo fixture')
 end

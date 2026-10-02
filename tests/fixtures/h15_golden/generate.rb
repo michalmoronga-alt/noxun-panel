@@ -3,7 +3,8 @@
 #
 # Spusta sa RUCNE a LEN nad NEZMENENYM kodom (prvy commit H15a) — test ho
 # nevola, inak by charakterizacia „dokazovala" samu seba:
-#   C:/Ruby32-x64/bin/ruby.exe tests/fixtures/h15_golden/generate.rb
+#   C:/Ruby32-x64/bin/ruby.exe tests/fixtures/h15_golden/generate.rb       # G1–G7 (1. commit H15a)
+#   C:/Ruby32-x64/bin/ruby.exe tests/fixtures/h15_golden/generate.rb g7b   # LEN G7b (nad mainom d69f3e55)
 #
 # Prepisuje `*.json` v tomto priecinku. V H15a ani H15b sa NESPUSTA — rozdiel
 # po presune dat je NALEZ. Regenerovat sa smie IBA pri VEDOMEJ zmene seedu
@@ -27,6 +28,13 @@ module NxH15GoldenGen
       exit 1
     end
     FileUtils.mkdir_p(g::DIR)
+    # `g7b`: LEN fixtura G7b (predrecenzia H15a) — spusta sa nad stromom mainu
+    # pred H15a (`git archive d69f3e55`), ostatne fixtury sa nedotknu.
+    if ARGV.include?('g7b')
+      File.binwrite(g.fixture_path('g7b_nakup.json'), g.pretty(g.document('g7b_nakup')))
+      puts "OK: g7b_nakup.json v #{g::DIR}"
+      return
+    end
     g::JSON_FIXTURES.each do |name|
       File.binwrite(g.fixture_path("#{name}.json"), g.pretty(g.document(name)))
     end

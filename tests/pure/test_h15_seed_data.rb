@@ -10,7 +10,9 @@
 #      `def`, volanie (`map`), cudzia konstanta (`SKIP_CODE`) ani `A::B`;
 #   b) presunute konstanty su v plugine deklarovane PRAVE RAZ — vo svojom
 #      seed subore;
-#   c) logicky subor nedeklaruje `SEED_*` ani `LEGACY_SEED_*` (okrem allowlistu
+#   c) logicky subor nedeklaruje datove mena — `SEED_*`, `LEGACY_SEED_*`,
+#      `MAPPING_ADDITIONS*`, `MAPPING_MIGRATIONS*`, `DEFAULT_SETS*`,
+#      `DEFAULT_MAPPING*` ani ziadnu z presunutych konstant (okrem allowlistu
 #      s dovodom — v H15a prazdny);
 #   d) v `main.rb` aj `tests/helper.rb` je seed subor PRAVE RAZ a TESNE PRED
 #      svojim logickym suborom; subor existuje;
@@ -151,10 +153,16 @@ module NxH15Data
     out
   end
 
-  # c) `SEED_*` / `LEGACY_SEED_*` deklarovane v logike mimo allowlistu.
-  def logic_seed_decls(text, mod, allow = {})
+  # c) Datove mena, ktore v logike nemaju co hladat (predrecenzia H15a P3:
+  # presunute `MAPPING_*` prefix `SEED_` nemaju). `MAPPING_NONE*` logiky (sentinel
+  # mapovania) vzor zamerne nechyti.
+  DATA_NAME_RE = /\A(LEGACY_)?SEED_|\AMAPPING_(ADDITIONS|MIGRATIONS)|\ADEFAULT_(SETS|MAPPING)/.freeze
+
+  # c) datove mena (vzor + presunute konstanty) deklarovane v logike mimo allowlistu.
+  def logic_seed_decls(text, mod, allow = {}, moved = [])
+    names = moved.map(&:to_s)
     cdecls(text, mod).map(&:first).map(&:to_s)
-                     .select { |n| n =~ /\A(LEGACY_)?SEED_/ }
+                     .select { |n| n =~ DATA_NAME_RE || names.include?(n) }
                      .reject { |n| allow.key?(n) }
   end
 
@@ -203,7 +211,7 @@ NxH15Data::SEED_MODULES.each do |logic, (mod, moved, _allow)|
 end
 
 # ============================================================================
-# b) + c) presunute konstanty prave raz; logika bez SEED_*
+# b) + c) presunute konstanty prave raz; logika bez datovych mien
 # ============================================================================
 
 NxH15Data::SEED_MODULES.each do |logic, (mod, moved, allow)|
@@ -216,10 +224,10 @@ NxH15Data::SEED_MODULES.each do |logic, (mod, moved, allow)|
     end
   end
 
-  NxTest.test("H15 R5 c: #{logic}.rb nedeklaruje SEED_* ani LEGACY_SEED_* (allowlist #{allow.keys.inspect})") do
+  NxTest.test("H15 R5 c: #{logic}.rb nedeklaruje datove mena (SEED_*, MAPPING_ADDITIONS…, presunute; allowlist #{allow.keys.inspect})") do
     NxTest.skip!('bez RubyVM::AbstractSyntaxTree') unless NxH15Data.ast?
     allow.each_value { |why| NxTest.refute(why.to_s.strip.empty?, 'vynimka allowlistu bez dovodu') }
-    bad = NxH15Data.logic_seed_decls(NxH15Data.src(NxH15Data.core(logic)), mod, allow)
+    bad = NxH15Data.logic_seed_decls(NxH15Data.src(NxH15Data.core(logic)), mod, allow, moved)
     NxTest.assert(bad.empty?, "#{logic}.rb: seed data patria do #{logic}_seed.rb — #{bad.inspect}")
   end
 end
@@ -290,7 +298,7 @@ NxTest.test('H15 R5 a (negativne): straz chyti def, volanie, cudziu konstantu, A
   NxTest.refute(mods2 == %w[Noxun Engine HardwareSets], 'druhy modul v seed subore sa musi prejavit')
 end
 
-NxTest.test('H15 R5 c (negativne): novy SEED_X = v logike zhodi straz; konstanta vo vnorenej triede nie') do
+NxTest.test('H15 R5 c (negativne): SEED_X, MAPPING_ADDITIONS_V9, DEFAULT_SETS aj presunute meno v logike zhodia straz') do
   NxTest.skip!('bez RubyVM::AbstractSyntaxTree') unless NxH15Data.ast?
   logic = <<~RUBY
     module Noxun
@@ -299,6 +307,13 @@ NxTest.test('H15 R5 c (negativne): novy SEED_X = v logike zhodi straz; konstanta
           SKIP_CODE = 'none'
           SEED_X = [1].freeze
           LEGACY_SEED_Y = {}.freeze
+          MAPPING_NONE = { '__none__' => true }.freeze
+          MAPPING_ADDITIONS_V9 = { 'class:x' => 'y' }.freeze
+          MAPPING_MIGRATIONS = {}.freeze
+          DEFAULT_SETS = [{ 'set_id' => 'x' }].freeze
+          DEFAULT_MAPPING = {}.freeze
+          SETS_LIKE_TABLE = [].freeze
+          SETS_TABLE = [].freeze
           class Ine
             SEED_Z = 1
           end
@@ -306,9 +321,14 @@ NxTest.test('H15 R5 c (negativne): novy SEED_X = v logike zhodi straz; konstanta
       end
     end
   RUBY
-  NxTest.assert_equal(%w[SEED_X LEGACY_SEED_Y], NxH15Data.logic_seed_decls(logic, 'HardwareSets'))
-  NxTest.assert_equal(%w[LEGACY_SEED_Y],
+  base = %w[SEED_X LEGACY_SEED_Y MAPPING_ADDITIONS_V9 MAPPING_MIGRATIONS DEFAULT_SETS DEFAULT_MAPPING]
+  NxTest.assert_equal(base, NxH15Data.logic_seed_decls(logic, 'HardwareSets'),
+                      'MAPPING_NONE (sentinel logiky) a SETS_LIKE_TABLE/SETS_TABLE bez datoveho mena vzor nechyti')
+  NxTest.assert_equal(base - %w[SEED_X],
                       NxH15Data.logic_seed_decls(logic, 'HardwareSets', 'SEED_X' => 'odvodene pri nacitani'))
+  NxTest.assert_equal(base + %w[SETS_TABLE],
+                      NxH15Data.logic_seed_decls(logic, 'HardwareSets', {}, %w[SETS_TABLE]),
+                      'presunute meno v logike zhodi straz aj bez datoveho prefixu')
 end
 
 NxTest.test('H15 R5 d (negativne): seed za logikou, dvakrat alebo chybajuci = nalez') do
