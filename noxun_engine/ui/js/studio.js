@@ -46,6 +46,20 @@
   // CISTO klientska (nikam sa neuklada), hodnota checkboxu je zo servera.
   var vepoMenuOpen = false;
 
+  // H7b (mockup H7 O1 A): NÁZOV ZÁKAZKY v hlavičke Štúdia — editor na mieste
+  // (vzor premenovania skrinky `bridge.js startCabRename`). Stav OKNA:
+  // otvorený editor, dokument z času otvorenia (R-02) a stráž dvojitého
+  // odoslania (Enter + blur).
+  var jobEditOpen = false;
+  var jobEditGuid = '';
+  var jobSending = false;
+  // Audit H7 §16 B2 / §17 C1: čo používateľ VIDÍ (názov v hlavičke, „18 + 36"
+  // v rohovom nastavení VEPO). Ide s KAŽDÝM zo štyroch exportov ako `expect`
+  // a server export spustí len pri zhode s uloženou pravdou. Nastavuje ho
+  // payload a echo (pravda zo servera), commit editora (optimisticky odoslaný
+  // text) a zmena prepínača — NIKDY sa nečíta z DOM.
+  var VEPO_EXPECT = { project: '', merge: true };
+
   // SMOKE 22.8. (schvalene): NEAKTUALNOST okna. Studio cisla neprepocitava samo
   // — kym sa nestlaci „Obnoviť", visia v nom cisla z posledneho prepoctu. Server
   // (StudioModelWatch) posle `NX.markStale()`, ked sa v modeli OD TOHO PREPOCTU
@@ -1108,7 +1122,12 @@
       // Kľúčom je teraz identita riadku, takže prežije push aj preusporiadanie
       // a maže sa LEN pri zmene dokumentu (vzor `ctrlUniOpen` vyššie).
       if (!ST || !data || ST.model_guid !== data.model_guid) buyOpen = {};
+      // H7b (R-B5): rozpísaný názov zákazky patrí DOKUMENTU, v ktorom sa editor
+      // otvoril — push iného dokumentu ho zahodí BEZ odoslania (vzor
+      // `dropCabRename`); push toho istého ho nechá (hodnota, fokus, kurzor).
+      if (jobEditOpen && (!data || (data.model_guid || '') !== jobEditGuid)) dropJobEdit();
       ST = data || null;
+      jobSyncExpect();
       // D-143: plný push = server dokončil (alebo odmietol) prestavbu — tlačidlo
       // „Prestaviť zastarané skrinky" sa odomkne.
       ctrlRebuildBusy = false;
@@ -1126,8 +1145,6 @@
       EDGE = (ST && ST.edge_check) ? ST.edge_check : null;
       GRAIN = (ST && ST.grain_check) ? ST.grain_check : null;
       DIRECTION = (ST && ST.direction_check) ? ST.direction_check : null;
-      var mdl = el('stModel');
-      if (mdl) mdl.textContent = ST ? ('zákazka: ' + ST.model_title + ' · v' + ST.version) : '…';
       // Deep-link sekcie sa posiela PRÁVE RAZ; kotva s ňou. Prepnutie ide TOU
       // ISTOU cestou ako klik v navigácii (`studioSwitchSection`: kontext
       // dokumentu, zhasnutie menu, odchod zo starej a vstup do novej sekcie) —
@@ -1144,19 +1161,18 @@
       e.textContent = msg;
       e.className = err ? 'err' : 'ok';
     },
-    // Maly echo push LISTY (nazov projektu + merge) po zapise nastavenia.
-    // ZAMERNE neprekresluje celu listu: pouzivatel moze mat kurzor v poli
-    // Projekt a re-render by mu ho vzal pod rukami. Hodnota inputu sa preto
-    // nasadzuje LEN ked v nom prave nepise.
+    // Malé echo názvu zákazky a „18 + 36" po zápise nastavenia alebo po
+    // exporte (H7b R-B6, R-B9). ZÁMERNE neprekresľuje lištu: používateľ môže
+    // mať kurzor v hľadaní Kusovníka alebo otvorené rohové nastavenie VEPO.
+    // Hlavička sa prekreslí len vtedy, keď v nej práve nepíše (editor sa
+    // nikdy neprepíše); bodky a tooltipy štyroch exportov sa obnovia na mieste.
     setVepoBar: function(state){
       if (!ST) return;
       ST.vepo = state || ST.vepo;
       var v = ST.vepo || {};
-      var inp = el('prjInput');
-      if (inp && (typeof document === 'undefined' || document.activeElement !== inp)){
-        inp.value = v.project || '';
-      }
-      if (inp) inp.placeholder = v.default_project || 'projekt';
+      jobSyncExpect();
+      if (!jobEditOpen) renderHead();
+      jobRefreshExports();
       // SMOKE 1A: checkbox uz nie je v liste, ale v rohovom nastaveni VEPO.
       // V DOM je VZDY (okno sa len skryva triedou), takze echo prepise jeho
       // stav aj vtedy, ked ho ma pouzivatel prave otvoreny — a otvorene okno
@@ -1243,8 +1259,223 @@
     // Nadpis = názov sekcie z registra, nápoveda = jeho `head` (neznáma sekcia „—").
     var r = SECREG.get(studioSec);
     var m = r ? { t: r.t, hint: r.head } : { t: '—', hint: '' };
+    // H7b (R-B5): otvorený editor názvu sa NIKDY neprepíše (hodnota, fokus,
+    // kurzor) — prekreslí sa len nadpis a nápoveda sekcie.
+    if (jobEditOpen && box.querySelector){
+      var h2 = box.querySelector('h2');
+      if (h2) h2.textContent = m.t;
+      var hint = box.querySelector('.sechint');
+      if (hint) hint.textContent = m.hint;
+      return;
+    }
     box.innerHTML = '<h2>' + esc(m.t) + '</h2><span class="sechint">' + esc(m.hint) + '</span>' +
-      '<span class="secmodel" id="stModel">' + (ST ? esc('zákazka: ' + ST.model_title + ' · v' + ST.version) : '…') + '</span>';
+      (ST ? jobHeadHtml(ST.vepo, ST.version, VEPO_EXPECT.project)
+          : '<span class="jobhd"><span class="jobver">…</span></span>');
+  }
+
+  // ------------------------------------------- H7b: názov zákazky (hlavička)
+  //
+  // Mockup H7 (PLATÍ 2.10.2026): „Zákazka: <názov> ✎" v hlavičke KAŽDEJ
+  // sekcie, klik = pole na mieste (O1 A); pole PROJEKT v lište Kusovníka
+  // zaniklo (O2). Tri podoby podľa zdroja, ktorý skladá SERVER (`vepo.source`):
+  // zadaný (tučne) · podľa súboru (sivý dovetok) · predvolený „projekt"
+  // (jantárová bodka, kurzíva, „zadaj názov"). Q2 (predvolené áno, čaká na
+  // potvrdenie Michala): čakajúci názov (`vepo.pending`) = ako zadaný + bodka
+  // + „neuložené k súboru", tooltip = serverová veta `vepo.notice`.
+
+  // Orez + strop 120 znakov — zobrazenie optimisticky odoslaného textu (server
+  // normalizuje rovnako a echo ho aj tak prepíše svojou pravdou).
+  function jobClean(raw){
+    return String(raw == null ? '' : raw).trim().slice(0, 120).trim();
+  }
+
+  function jobSource(v){
+    var s = v && v.source;
+    return (s === 'file' || s === 'default') ? s : 'set';
+  }
+
+  // Názov, ktorý hlavička ukazuje: `shown` = odoslaný text (optimisticky),
+  // inak názov zo servera. Prázdny = predvolený názov.
+  function jobView(vepo, shown){
+    var v = vepo || {};
+    var server = String(v.project == null ? '' : v.project);
+    var name = (shown == null) ? server : (jobClean(shown) || String(v.default_project || 'projekt'));
+    if (name === server) return { name: name, src: jobSource(v), pending: v.pending === true };
+    // Krátka chvíľa medzi commitom a echom: text rovný predvolenému sa neuloží
+    // (zápis záznam zmaže), takže platí predvolený zdroj.
+    var dflt = (name === String(v.default_project || 'projekt'));
+    return { name: name, src: dflt ? (v.file ? 'file' : 'default') : 'set', pending: false };
+  }
+
+  function jobTip(v, src, version){
+    var ver = ' · v' + String(version == null ? '' : version);
+    if (src === 'default'){
+      return 'Exporty sa teraz pomenujú „projekt" — model ešte nie je uložený. Klikni a zadaj názov zákazky.';
+    }
+    if (src === 'file'){
+      return 'Názov sa berie z mena súboru ' + String(v.file || '') + '.skp. Klikni a zadaj vlastný — ' +
+        'súbor sa nepremenuje.' + ver;
+    }
+    return 'Názov zákazky pre VEPO, kovanie, rozpočet aj ponuku. ' +
+      (v.file ? 'Súbor: ' + String(v.file) + '.skp. Prázdne pole vráti meno súboru.'
+              : 'Model ešte nie je uložený — názov sa pri prvom uložení prenesie na súbor. Prázdne pole vráti „projekt".') +
+      ver;
+  }
+
+  // Pravá časť hlavičky — čistá funkcia (stav argumentom, testuje ju
+  // tests/js/test_h7b_hlavicka.js).
+  function jobHeadHtml(vepo, version, shown){
+    var v = vepo || {};
+    var j = jobView(v, shown);
+    var tip = j.pending ? String(v.notice || '') : jobTip(v, j.src, version);
+    var dot = (j.src === 'default' || j.pending);
+    var h = '<span class="jobhd"><span class="joblbl">Zákazka</span>' +
+      '<button type="button" class="jobname src-' + j.src + '" id="jobName" title="' + esc(tip) + '"' +
+      ' aria-label="' + esc('Upraviť názov zákazky — ' + j.name) + '">' +
+      (dot ? '<i class="jdot" aria-hidden="true"></i>' : '') +
+      '<span class="jobtext">' + esc(j.name) + '</span>' + ico('pencil') + '</button>';
+    if (j.pending) h += '<span class="jobsrc warn">neuložené k súboru</span>';
+    else if (j.src === 'file') h += '<span class="jobsrc">podľa súboru</span>';
+    else if (j.src === 'default') h += '<span class="jobsrc warn">zadaj názov</span>';
+    return h + '<span class="jobver">· v' + esc(version) + '</span></span>';
+  }
+
+  // `VEPO_EXPECT` = pravda zo servera (payload aj echo).
+  function jobSyncExpect(){
+    var v = (ST && ST.vepo) || {};
+    VEPO_EXPECT = { project: String(v.project == null ? '' : v.project), merge: v.merge_18_36 !== false };
+  }
+
+  // Kópia pre exportné volanie (`expect`). Globál súboru — číta ho aj
+  // `js/budget.js` (XLSX rozpočtu a ponuky).
+  function nxVepoExpect(){
+    return { project: String(VEPO_EXPECT.project == null ? '' : VEPO_EXPECT.project),
+             merge: VEPO_EXPECT.merge !== false };
+  }
+
+  function startJobEdit(){
+    if (!ST || jobEditOpen || typeof document === 'undefined') return;
+    var btn = el('jobName');
+    var hd = btn ? btn.parentNode : null;
+    if (!hd || !hd.replaceChild) return;
+    jobEditOpen = true;
+    jobEditGuid = ST.model_guid || ''; // R-02: dokument z času OTVORENIA editora
+    jobSending = false;
+    var inp = document.createElement('input');
+    inp.type = 'text';
+    inp.id = 'jobEdit';
+    inp.className = 'jobinp';
+    inp.value = jobView(ST.vepo, VEPO_EXPECT.project).name;
+    inp.maxLength = 120;
+    inp.setAttribute('maxlength', '120');
+    inp.title = 'Enter uloží, Escape zruší, prázdne pole vráti automatický názov';
+    inp.setAttribute('title', inp.title);
+    inp.setAttribute('aria-label', 'Názov zákazky');
+    inp.onkeydown = function(ev){
+      if (ev.key === 'Enter'){ ev.preventDefault(); commitJobEdit(); }
+      else if (ev.key === 'Escape'){
+        // Escape patrí LEN editoru — dokumentová reťaz (`nx_esc.js`, menu VEPO)
+        // nesmie zavrieť ďalšiu vrstvu.
+        ev.preventDefault();
+        if (ev.stopPropagation) ev.stopPropagation();
+        cancelJobEdit();
+      }
+    };
+    inp.onblur = function(){ commitJobEdit(); };
+    hd.replaceChild(inp, btn);
+    // Dovetok zdroja („podľa súboru", „zadaj názov") k písaniu nepatrí.
+    var tails = hd.querySelectorAll ? hd.querySelectorAll('.jobsrc') : [];
+    for (var i = 0; i < tails.length; i++){
+      if (tails[i].parentNode) tails[i].parentNode.removeChild(tails[i]);
+    }
+    inp.focus();
+    if (inp.select) inp.select();
+  }
+
+  // Enter alebo blur. Editor sa zatvára HNEĎ a hlavička optimisticky ukáže
+  // odoslaný text (ten ide aj do `expect`); autorita je echo `setVepoBar`
+  // (pri zlyhaní zápisu pôvodný názov — O8). Nezmenený text nič neposiela.
+  function commitJobEdit(){
+    if (!jobEditOpen || jobSending) return;
+    jobSending = true; // blur po Enter/odstránení poľa nesmie poslať druhý zápis
+    var inp = el('jobEdit');
+    var raw = inp ? String(inp.value == null ? '' : inp.value) : null;
+    var guid = jobEditGuid;
+    jobEditOpen = false;
+    jobEditGuid = '';
+    if (raw !== null && ST && guid === (ST.model_guid || '') &&
+        raw.trim() !== jobView(ST.vepo, VEPO_EXPECT.project).name){
+      VEPO_EXPECT.project = raw;
+      sendVepoOpts({ project: raw }, guid);
+    }
+    renderHead();
+  }
+
+  function cancelJobEdit(){
+    if (!jobEditOpen) return;
+    dropJobEdit();
+    renderHead();
+  }
+
+  // Zahodí editor BEZ odoslania (Escape, push iného dokumentu).
+  function dropJobEdit(){
+    jobSending = true;
+    jobEditOpen = false;
+    jobEditGuid = '';
+  }
+
+  // H7b (R-B8, O3/O4/O7): bodka a tooltip štyroch exportov. Meno priečinka
+  // a súborov skladá SERVER tými istými funkciami ako export
+  // (`vepo.export_names`) — klient si zo slugu nič neodvodzuje. Bodka svieti
+  // LEN pri predvolenom „projekt" (pri čakajúcom názve nie — exporty sa teraz
+  // pomenujú správne, varovanie nesie veta po exporte).
+  var JOB_EXPORTS = {
+    vepo: { base: 'Exportuje prírezy (po odpočte ABS) do VEPO CSV — vyberieš priečinok',
+            key: 'vepo_dir', pre: 'Vytvorí v ňom priečinok ', post: '\\', sel: '#vepoBtn' },
+    hw: { base: 'CSV nákupného zoznamu — počíta sa z čerstvého modelu',
+          key: 'hw_csv', pre: 'Súbor ', post: '', sel: '#hwCsvBtn' },
+    budget: { base: 'Interný rozpočet v presnom formáte tvojich hárkov',
+              key: 'budget_xlsx', pre: 'Súbor ', post: '', sel: '[data-bud="xlsx"]' },
+    offer: { base: 'Zákaznícky dokument: cenová tabuľka + špecifikácia (bez interných pojmov a kódov)',
+             key: 'offer_xlsx', pre: 'Súbor ', post: '', sel: '[data-bud="cp"]' }
+  };
+
+  function nxJobExport(kind, vepo){
+    var d = JOB_EXPORTS[kind];
+    if (!d) return { dot: false, tip: '' };
+    var v = (vepo !== undefined) ? (vepo || {}) : ((ST && ST.vepo) || {});
+    var names = v.export_names || {};
+    var nm = names[d.key];
+    var tip = d.base;
+    if (typeof nm === 'string' && nm !== '') tip += '. ' + d.pre + nm + d.post;
+    var dot = jobSource(v) === 'default' && v.pending !== true;
+    if (dot) tip += ' · názov zákazky zadáš hore v hlavičke';
+    return { dot: dot, tip: tip };
+  }
+
+  function jobDotHtml(on){
+    return on ? '<i class="xdot" aria-hidden="true"></i>' : '';
+  }
+
+  // Echo: bodky a tooltipy na MIESTE (bez prekreslenia lišty — fokus
+  // v hľadaní a otvorené rohové nastavenie VEPO ostanú).
+  function jobRefreshExports(){
+    if (typeof document === 'undefined' || !document.querySelector) return;
+    Object.keys(JOB_EXPORTS).forEach(function(kind){
+      var btn = document.querySelector(JOB_EXPORTS[kind].sel);
+      if (!btn || !btn.setAttribute) return;
+      var info = nxJobExport(kind);
+      btn.setAttribute('title', info.tip);
+      var dot = btn.querySelector ? btn.querySelector('.xdot') : null;
+      if (info.dot && !dot && document.createElement){
+        var i = document.createElement('i');
+        i.setAttribute('class', 'xdot');
+        i.setAttribute('aria-hidden', 'true');
+        btn.appendChild(i);
+      } else if (!info.dot && dot && dot.parentNode){
+        dot.parentNode.removeChild(dot);
+      }
+    });
   }
 
   // Lista sekcie: primarna akcia vlavo, exporty vedla nej, hladanie a stlpce
@@ -1294,9 +1525,11 @@
   function buyRenderTools(){
     var box = el('sectools');
     if (!box) return;
+    // H7b (R-B8): tooltip povie meno súboru, bodka svieti pri „projekt".
+    var job = nxJobExport('hw');
     box.innerHTML = '<button type="button" class="ghostbtn" id="hwCsvBtn"' +
-      ' title="CSV nákupného zoznamu — počíta sa z čerstvého modelu">' +
-      ico('download') + ' CSV kovania</button>' +
+      ' title="' + esc(job.tip) + '">' +
+      ico('download') + ' CSV kovania' + jobDotHtml(job.dot) + '</button>' +
       refreshBtnHtml(staleFlag, 'Prepočítať nákupný zoznam z aktuálneho modelu') +
       '<span class="spacer"></span>' +
       '<span class="sechint">Klik na riadok generiky označí vlastníka v modeli.</span>';
@@ -1305,16 +1538,16 @@
   // LISTA sekcie KUSOVNIK — cista funkcia (testuje ju tests/js/test_st1a_studio.js).
   //
   // SMOKE 22.8. (1B/1C/1D), poradie schvalene Michalom: vlavo „co pozeram"
-  // (pohlady · Projekt · hladanie), vpravo „co s tym robim" (VEPO · Stlpce ·
-  // Obnoviť). Konkretne zmeny oproti ŠT-1a:
+  // (pohlady · hladanie), vpravo „co s tym robim" (VEPO · Stlpce ·
+  // Obnoviť). H7b (mockup H7 O2): pole „Projekt" ZANIKLO — nazov zakazky sa
+  // upravuje na JEDINOM mieste, v hlavicke Studia (`jobHeadHtml`).
+  // Konkretne zmeny oproti ŠT-1a:
   //   * XLSX a CSV placeholdery su PREC. D-78 („neexistujuci export je
   //     viditelny a priznany") plati na sluby, ktore prichadzaju hned —
   //     tieto dva viseli neaktivne cez cely blok ŠT-1 a v smoke teste
   //     pusobili ako rozbite tlacidla. Vratia sa s REALNYM exportom.
   //   * checkbox „18+36 spolu" sa z listy odstahoval do ROHOVEHO NASTAVENIA
   //     tlacidla VEPO (patri k exportu, nie k pohladu na kusovnik).
-  //   * „Projekt" dostal stitok a ram — je to VSTUP, ktory pomenuva zakazku
-  //     pre vsetky exporty, takze nesmie vyzerat ako popisok medzi tlacidlami.
   //
   // Stav lišty chodí ARGUMENTOM (`st` = pohľad · hľadanie · otvorené menu),
   // nie z modulových premenných: rovnaký vzor ako zdieľaný `edge_menu.js`
@@ -1330,10 +1563,6 @@
       vw('parts', 'Dielce', 'Výrobné dielce po materiáloch') +
       vw('sheets', 'Platne', 'Súpis platní — odvodený z kusovníka') +
       vw('abs', 'ABS', 'Súpis ABS pások — odvodený z kusovníka') + '</div>' +
-      '<label class="prjbox" title="Názov zákazky — pomenuje priečinok a súbory VEPO exportu,' +
-      ' titulok rozpočtu aj cenovej ponuky. Platí pre všetky exporty.">' +
-      '<span class="prjlbl">Projekt</span><input id="prjInput" type="text" value="' + esc(v.project || '') +
-      '" placeholder="' + esc(v.default_project || 'projekt') + '"></label>' +
       '<div class="searchbox">' + ico('search') +
       '<input id="bomSearch" placeholder="Hľadať…" title="Hľadať dielec alebo skrinku" aria-label="Hľadať dielec alebo skrinku" value="' + esc(s.q || '') + '"></div>' +
       '<span class="spacer"></span>' +
@@ -1365,10 +1594,12 @@
   // Inspectora aj s listou Kontroly; OBSAH okna je vlastny (jeden checkbox),
   // preto NIE zdielany edge_menu.js — ten kresli 3-stavovu kontrolu hran.
   function vepoBtnHtml(v, open){
+    // H7b (R-B8): tooltip povie meno priečinka, bodka svieti pri „projekt".
+    var job = nxJobExport('vepo', v);
     return '<span class="vepofly">' +
       '<button type="button" class="primary" id="vepoBtn"' +
-      ' title="Exportuje prírezy (po odpočte ABS) do VEPO CSV — vyberieš priečinok">' +
-      ico('download') + ' VEPO export</button>' +
+      ' title="' + esc(job.tip) + '">' +
+      ico('download') + ' VEPO export' + jobDotHtml(job.dot) + '</button>' +
       '<button type="button" id="vepoMore" class="cornerzone" data-vepo="menu"' +
       ' aria-expanded="' + (open ? 'true' : 'false') + '" aria-haspopup="true"' +
       ' aria-label="Nastavenie VEPO exportu"' +
@@ -1728,7 +1959,9 @@
   function vepoExport(){
     if (!ST || !window.sketchup || !sketchup.vepo_export) return;
     NX.setStatus('Exportujem VEPO…', false);
-    sketchup.vepo_export(JSON.stringify({ gen: ST.gen }));
+    // H7b (§16 B2, §17 C1): `expect` = názov a „18 + 36", ktoré používateľ
+    // vidí; server export spustí len pri zhode s uloženou pravdou.
+    sketchup.vepo_export(JSON.stringify({ gen: ST.gen, expect: nxVepoExpect() }));
   }
 
   // ŠT-1c PR A: CSV nákupného zoznamu kovania. Názov projektu sa NEPOSIELA —
@@ -1738,7 +1971,7 @@
   function hwCsvExport(){
     if (!ST || !window.sketchup || !sketchup.hw_csv_export) return;
     NX.setStatus('Exportujem nákupný zoznam…', false);
-    sketchup.hw_csv_export(JSON.stringify({ gen: ST.gen }));
+    sketchup.hw_csv_export(JSON.stringify({ gen: ST.gen, expect: nxVepoExpect() }));
   }
 
   // Klik na riadok generiky = OZNAC VLASTNIKA v modeli. Posiela sa KLUC
@@ -1766,11 +1999,13 @@
     }));
   }
 
-  // Nazov projektu aj merge zapisuje SERVER (audit #1) — okno posiela iba
-  // hodnotu a svoju identitu; po zapise pride cerstvy payload OBOM oknam.
-  function sendVepoOpts(attrs){
+  // Nazov zakazky aj merge zapisuje SERVER (audit #1) — okno posiela iba
+  // hodnotu a svoju identitu; po zapise pride echo `NX.setVepoBar`.
+  // `guid` = dokument ZACHYTENY pri otvoreni editora nazvu (R-02); bez neho
+  // dnesny dokument (prepinac 18 + 36).
+  function sendVepoOpts(attrs, guid){
     if (!ST || !window.sketchup || !sketchup.studio_set_vepo_opts) return;
-    var p = { gen: ST.gen, model_guid: ST.model_guid || '' };
+    var p = { gen: ST.gen, model_guid: (guid != null) ? guid : (ST.model_guid || '') };
     if (attrs.project !== undefined) p.project = attrs.project;
     if (attrs.merge !== undefined) p.merge = attrs.merge;
     sketchup.studio_set_vepo_opts(JSON.stringify(p));
@@ -2053,6 +2288,8 @@
       // SMOKE 1A: roh je SAMOSTATNE tlacidlo NAD telom exportu — klik nan sa
       // teda k hlavnej akcii vobec nedostane (`#vepoBtn` ho neobsahuje).
       if (t.closest('[data-vepo]')){ vepoMenuToggle(); return; }
+      // H7b: klik (aj Enter/medzerník — je to <button>) na názov zákazky.
+      if (t.closest('#jobName')){ startJobEdit(); return; }
       if (t.closest('#vepoBtn')){ vepoExport(); return; }
       if (t.closest('#hwCsvBtn')){ hwCsvExport(); return; }
       if (t.closest('#refreshBtn')){ requestRefresh(); return; }
@@ -2115,8 +2352,12 @@
         }
         return;
       }
-      if (t.id === 'mergeChk'){ sendVepoOpts({ merge: !!t.checked }); return; }
-      if (t.id === 'prjInput'){ sendVepoOpts({ project: t.value }); }
+      if (t.id === 'mergeChk'){
+        // H7b: export hneď po prepnutí očakáva NOVÚ hodnotu (echo ju potvrdí
+        // alebo pri zlyhaní zápisu vráti uloženú).
+        VEPO_EXPECT.merge = !!t.checked;
+        sendVepoOpts({ merge: !!t.checked });
+      }
     });
 
     document.addEventListener('input', function(ev){
@@ -2127,7 +2368,6 @@
     });
 
     document.addEventListener('keydown', function(ev){
-      if (ev.key === 'Enter' && ev.target && ev.target.id === 'prjInput') ev.target.blur();
       // Š10 (audit #6): nastavenie zatvára klik mimo AJ Escape — vzor
       // warnpanelu a railu Inspectora. Fokus patrí späť na rohové tlačidlo,
       // inak by po Escape skončil v prázdne.
@@ -2178,6 +2418,11 @@
       // Testy nastavuju stav cez `setBomState` (bomView/bomQ/menu) — inak by
       // museli sahat do modulovych premennych, ktore Node nevidi.
       bomToolsHtml: bomToolsHtml, vepoBtnHtml: vepoBtnHtml, vepoMenuHtml: vepoMenuHtml,
+      // H7b (tests/js/test_h7b_hlavicka.js): názov zákazky v hlavičke, bodky
+      // a tooltipy štyroch exportov, `expect` exportov.
+      jobHeadHtml: jobHeadHtml, jobView: jobView, nxJobExport: nxJobExport, nxVepoExpect: nxVepoExpect,
+      JOB_EXPORTS: JOB_EXPORTS, buyRenderTools: buyRenderTools,
+      jobEditState: function(){ return { open: jobEditOpen, guid: jobEditGuid, sending: jobSending }; },
       partsTableClass: partsTableClass, // predrecenzia P2 H4b
       // Jantarovy indikator neaktualnosti: JEDEN markup pre vsetkych 5 mist
       // (Kusovnik · Kontrola · Nakup tu, Rozpocet · Ponuka v budget.js —

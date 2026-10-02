@@ -234,7 +234,7 @@ module NxR14
     calls = []
     with_stubs(base_stubs(export_budget(std))) do
       with_ui(File.join(dir, file_name), calls) do
-        PC.send(method, :model, { 'gen' => 1 }, generation: 1,
+        PC.send(method, :model, { 'gen' => 1, 'expect' => NxTest.export_expect(:model) }, generation: 1,
                                                 status: ->(m, e = false) { msg = m; err = e },
                                                 repush: -> {})
       end

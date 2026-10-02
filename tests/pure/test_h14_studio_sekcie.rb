@@ -141,9 +141,17 @@ module NxH14Push
     sd.instance_variable_set(:@pending_section, prev)
   end
 
+  # H7b (R-B11): `vepo` dostal na koniec nove kluce (zdroj nazvu, meno suboru,
+  # mena exportov, cakajuci nazov) — fixtura sa NEREGENERUJE: porovnaju sa
+  # 3 povodne kluce v povodnom poradi, nove pripina `test_h7b_nazov_zakazky.rb`.
+  VEPO_T0_KEYS = %w[project default_project merge_18_36].freeze
+
   def snapshot
     data = push
     payload = data.reject { |k, _v| %w[version gen].include?(k) }
+    if payload['vepo'].is_a?(Hash)
+      payload = payload.merge('vepo' => payload['vepo'].select { |k, _v| VEPO_T0_KEYS.include?(k) })
+    end
     { 'sections' => E::StudioDialog::SECTIONS, 'consume' => consume_matrix, 'keys' => data.keys,
       'payload' => payload }
   end

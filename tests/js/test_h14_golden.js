@@ -35,9 +35,21 @@ const fresh = H.golden();
 const names = fs.readdirSync(H.GOLDEN_DIR).filter(function(f){ return /^g\d+_[a-z_]+\.json$/.test(f); })
   .map(function(f){ return f.replace(/\.json$/, ''); }).sort();
 assert.deepStrictEqual(names, Object.keys(fresh).sort(), 'golden subory = skupiny G1–G10');
+// H7b (R-B11): fixtury sa NEREGENERUJU — styri ohranicene fragmenty (hlavicka,
+// pole Projekt, title + bodka #vepoBtn a #hwCsvBtn) sa normalizuju na OBOCH
+// stranach a pocet nahradeni je PRESNY (inak by normalizacia skryla viac).
+const ZERO = { HLAVICKA: 0, PRJBOX: 0, VEPO: 0, CSV: 0 };
 names.forEach(function(name){
-  const want = JSON.parse(fs.readFileSync(path.join(H.GOLDEN_DIR, name + '.json'), 'utf8'));
-  const got = JSON.parse(H.serialize(fresh[name]));
+  const w = H.normalizeH7(JSON.parse(fs.readFileSync(path.join(H.GOLDEN_DIR, name + '.json'), 'utf8')), 'old');
+  const g = H.normalizeH7(JSON.parse(H.serialize(fresh[name])), 'new');
+  const exp = Object.assign({}, ZERO, H.H7_COUNTS[name] || {});
+  n++;
+  assert.deepStrictEqual(w.counts, exp, name + ': fixtura — presny pocet normalizovanych fragmentov H7b');
+  n++;
+  assert.deepStrictEqual(g.counts, Object.assign({}, exp, { PRJBOX: 0 }),
+                         name + ': dnesny kod — presny pocet fragmentov H7b (pole Projekt zaniklo)');
+  const want = w.value;
+  const got = g.value;
   assert.deepStrictEqual(Object.keys(got), Object.keys(want), name + ': rovnake pripady v rovnakom poradi');
   Object.keys(want).forEach(function(k){
     n++;

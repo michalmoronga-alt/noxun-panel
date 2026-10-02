@@ -92,7 +92,11 @@ function calls(L){ return L.LOG.map(function(c){ return c.split(' @')[0]; }); }
      [].concat.apply([], R.inModule('studio.js').map(function(id){ return hookNames(R.get(id)); })).sort(),
      'OWN_HOOKS = presne haciky sekcii, ktore kresli studio.js');
 
-  const golden = JSON.parse(fs.readFileSync(path.join(H.GOLDEN_DIR, 'g2_dispatch.json'), 'utf8')).own;
+  // H7b (R-B11): fixtura G2 sa neregeneruje — obe strany idu cez TU ISTU
+  // normalizaciu styroch fragmentov H7b ako golden (`H.normalizeH7`).
+  const golden = H.normalizeH7(JSON.parse(fs.readFileSync(path.join(H.GOLDEN_DIR, 'g2_dispatch.json'), 'utf8')).own,
+                               'old').value;
+  const normNew = function(v){ return H.normalizeH7(v, 'new').value; };
   const view = function(v){
     const t = { getAttribute: function(k){ return k === 'data-view' ? v : null; } };
     t.closest = function(sel){ return sel === '[data-view]' ? t : null; };
@@ -105,7 +109,7 @@ function calls(L){ return L.LOG.map(function(c){ return c.split(' @')[0]; }); }
     global.window.studioGoSection('bom');
     const got = { tools: ELS.sectools.innerHTML, body: ELS.secbody.innerHTML };
     ok(got.tools.length > 0 && got.body.length > 0, `T8 bom:${v}: lista aj telo NIE SU prazdne`);
-    eq(got, golden['bom:' + v], `T8 bom:${v}: Kusovnik v Node = Kusovnik v okne (golden G2)`);
+    eq(normNew(got), golden['bom:' + v], `T8 bom:${v}: Kusovnik v Node = Kusovnik v okne (golden G2)`);
   });
   view('parts');
   ['ctrl', 'buy'].forEach(function(id){
@@ -113,7 +117,7 @@ function calls(L){ return L.LOG.map(function(c){ return c.split(' @')[0]; }); }
     global.window.studioGoSection(id);
     const got = { tools: ELS.sectools.innerHTML, body: ELS.secbody.innerHTML };
     ok(got.tools.length > 0 && got.body.length > 0, `T8 ${id}: lista aj telo NIE SU prazdne`);
-    eq(got, golden[id], `T8 ${id}: sekcia v Node = sekcia v okne (golden G2)`);
+    eq(normNew(got), golden[id], `T8 ${id}: sekcia v Node = sekcia v okne (golden G2)`);
   });
   delete global.window; delete global.document; delete global.NX;
 })();

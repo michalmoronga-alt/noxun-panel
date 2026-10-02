@@ -718,13 +718,14 @@ end
 NxTest.test('ST-1a: VSETKY STYRI exporty citaju nazov zo SERVERA — z DOM uz nechodi') do
   # Presne toto bol BLOCKER #1: dokial nazov posielal DOM, dve okna mali dve
   # pravdy a ta ista zakazka sa v dvoch vystupoch volala inak.
-  NxTest.assert(ST1B_CORE_RB.include?('project: ExportSettings.project_name(model)'),
+  # H7b: VEPO cita nazov do premennej (ide aj do vety po exporte R-B3).
+  NxTest.assert(ST1B_CORE_RB.include?('project: project,'),
                 'VEPO export cita nazov v Ruby')
   # ŠT-1c PR A: telo CSV kovania sa prestahovalo do jadra; PR B1 tam presunula
   # aj oba XLSX exporty. VSETKY STYRI teda citaju nazov v ZDIELANOM jadre —
   # dve kopie by sa casom rozisli.
-  NxTest.assert_equal(3, ST1B_CORE_RB.scan(/project = ExportSettings\.project_name\(model\)/).length,
-                      'CSV kovania, XLSX rozpoctu aj XLSX cenovej ponuky citaju nazov v jadre')
+  NxTest.assert_equal(4, ST1B_CORE_RB.scan(/project = ExportSettings\.project_name\(model\)/).length,
+                      'VEPO, CSV kovania, XLSX rozpoctu aj XLSX cenovej ponuky citaju nazov v jadre')
   # Komentare (ktore o zaniknutej ceste hovoria) sa vynechavaju — hlada sa KOD.
   strip = ->(src) { src.lines.map { |l| l.sub(/#.*$/, '') }.join }
   NxTest.refute(strip.call(ST1B_CORE_RB).include?("data['project']"),
@@ -733,8 +734,12 @@ NxTest.test('ST-1a: VSETKY STYRI exporty citaju nazov zo SERVERA — z DOM uz ne
     NxTest.refute(src.match?(/project:\s*\(/),
                   "#{name} uz nesmie posielat `project:` z DOM (server je autorita)")
   end
-  NxTest.assert(ST1B_STUDIO_HTML.include?('id="secbody"') && ST1B_STUDIO_JS.include?("id=\"prjInput\""),
-                'editovatelny input zije v liste Kusovnika v Studiu')
+  # H7b (mockup H7 O1 A, O2): nazov sa upravuje na JEDINOM mieste — v hlavicke
+  # Studia (`#jobName` -> pole na mieste `#jobEdit`); pole v liste Kusovnika zaniklo.
+  NxTest.assert(ST1B_STUDIO_HTML.include?('id="sechead"') && ST1B_STUDIO_JS.include?('id="jobName"') &&
+                ST1B_STUDIO_JS.include?("inp.id = 'jobEdit';"),
+                'editovatelny nazov zije v hlavicke Studia')
+  NxTest.refute(ST1B_STUDIO_JS.include?('prjInput'), 'pole Projekt v liste Kusovnika zaniklo')
 end
 
 NxTest.test('ST-1a: merge 18+36 je GLOBALNE nastavenie a chodi v KAZDOM pushi (audit #16)') do
@@ -742,7 +747,9 @@ NxTest.test('ST-1a: merge 18+36 je GLOBALNE nastavenie a chodi v KAZDOM pushi (a
                 'default je zapnute')
   NxTest.assert(ST1B_CORE_RB.include?('merge = ExportSettings.merge_18_36'),
                 'export cita merge zo SERVERA, nie z checkboxu')
-  NxTest.assert(ST1B_STUDIO_RB.include?('merge_18_36: ExportSettings.merge_18_36'),
+  # H7b (R-B1): payload aj echo sklada JEDNA funkcia jadra (`vepo_payload`).
+  NxTest.assert(ST1B_STUDIO_RB.include?('vepo: ProductionCore.vepo_payload(model)') &&
+                ST1B_CORE_RB.include?("'merge_18_36' => es.merge_18_36"),
                 'stav checkboxu je v KAZDOM pushi Studia — cita sa zo SERVERA')
   # SMOKE 22.8.: checkbox sa z listy prestahoval do ROHOVEHO nastavenia VEPO
   # (`vepoMenuHtml`) — pravidlo „hodnota je z payloadu" plati bezo zmeny.
@@ -884,8 +891,9 @@ NxTest.test('ST-1a (review P2): zapis nastaveni NEZDVIHA generaciu (inak by prvy
   NxTest.refute(echo.include?('@generation'), 'echo sa generacie NEDOTYKA')
   NxTest.assert(echo.include?('NX.setVepoBar'), 'a meni LEN obsah listy')
   NxTest.assert(ST1B_STUDIO_JS.include?('setVepoBar: function(state)'), 'klient echo pozna')
-  NxTest.assert(ST1B_STUDIO_JS.include?('document.activeElement !== inp'),
-                'hodnota inputu sa nenasadzuje, kym v nom pouzivatel pise')
+  # H7b (R-B6): echo hlavicku neprekresli, kym v nej pouzivatel pise.
+  NxTest.assert(ST1B_STUDIO_JS.include?('if (!jobEditOpen) renderHead();'),
+                'hodnota editora nazvu sa neprepise, kym v nom pouzivatel pise')
 end
 
 NxTest.test('ST-1a (review P2): sekcia ma RUCNY refresh (prestavba z Inspectora sem sama nedorazi)') do
@@ -982,11 +990,14 @@ NxTest.test('SMOKE 22.8. (1A–1D): LISTA Kusovnika a rohove nastavenie VEPO —
   NxTest.assert(ST1B_STUDIO_JS.include?('if (ST && studioSwitchSection(ST.open_section,'),
                 'a deep-link zo servera tiez')
 
-  # 1D: „Projekt" je VSTUP so stitkom, nie popisok medzi tlacidlami.
-  NxTest.assert(ST1B_STUDIO_JS.include?('<span class="prjlbl">Projekt</span>'),
-                'pole ma viditelny stitok')
-  NxTest.assert(ST1B_STUDIO_HTML.include?('.prjbox .prjlbl'), 'a stitok ma svoj styl')
-  NxTest.assert(mockup.include?('prjbox'), 'mockup pole Projekt tiez ukazuje')
+  # 1D -> H7b (mockup H7 O2): pole „Projekt" ZANIKLO vo VSETKYCH TROCH miestach
+  # (kod · kontrakt Š5 · mockup) — nazov zakazky sa upravuje v hlavicke Studia.
+  NxTest.refute(ST1B_STUDIO_JS.include?('prjlbl') || ST1B_STUDIO_JS.include?('prjbox'),
+                'kod: pole Projekt v liste nie je')
+  NxTest.refute(ST1B_STUDIO_HTML.include?('.prjbox'), 'a jeho styl v okne neostal mrtvy')
+  NxTest.refute(mockup.include?('prjbox'), 'mockup pole Projekt v liste uz nekresli')
+  NxTest.assert(mockup.include?('jobhd'), 'mockup ukazuje nazov zakazky v hlavicke')
+  NxTest.assert(kontrakt.include?('Revízia H7'), 'kontrakt Š5 nesie reviziu H7')
 end
 
 NxTest.test('SMOKE 22.8.: „Prepočítať ceny" prizna stare ceny (projekcia payloadu)') do

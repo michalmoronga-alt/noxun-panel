@@ -505,6 +505,61 @@ function g10(){
   return out;
 }
 
+// ------------------------------------------------- H7b (R-B11, audit §15 A4)
+// Fixtury G1–G10 sa NEREGENERUJU. H7b zmenilo presne STYRI ohranicene
+// fragmenty — normalizuju sa na OBOCH stranach a pocet nahradeni sa overi
+// (normalizacia nesmie potichu skryt nic ine; bajty mimo nich ostavaju):
+//   HLAVICKA — `secmodel`/`stModel` (pred H7b) ↔ `jobhd` (nazov zakazky),
+//   PRJBOX   — pole „Projekt" v liste Kusovnika (H7b zaniklo → prazdno),
+//   VEPO     — `title` + jantarova bodka tlacidla `#vepoBtn`,
+//   CSV      — `title` + jantarova bodka tlacidla `#hwCsvBtn`.
+// Tlacidla Rozpoctu a Ponuky v goldenoch nie su (kreslia ich spehy).
+const H7_FRAGMENTS = [
+  { key: 'HLAVICKA', re: /<span class="secmodel" id="stModel">[^<]*<\/span>/g, rep: '«HLAVICKA»', side: 'old' },
+  { key: 'HLAVICKA', re: /<span class="jobhd">[\s\S]*?<span class="jobver">[^<]*<\/span><\/span>/g, rep: '«HLAVICKA»', side: 'new' },
+  { key: 'PRJBOX', re: /<label class="prjbox"[^>]*>[\s\S]*?<\/label>/g, rep: '', side: 'old' },
+  { key: 'VEPO', re: /(<button type="button" class="primary" id="vepoBtn") title="[^"]*">([\s\S]*?)(?:<i class="xdot" aria-hidden="true"><\/i>)?<\/button>/g,
+    rep: '$1 «VEPO»>$2</button>', side: 'both' },
+  { key: 'CSV', re: /(<button type="button" class="ghostbtn" id="hwCsvBtn") title="[^"]*">([\s\S]*?)(?:<i class="xdot" aria-hidden="true"><\/i>)?<\/button>/g,
+    rep: '$1 «CSV»>$2</button>', side: 'both' }
+];
+// Presne pocty nahradeni (sonda package H7 §15 A4) po skupinach goldenu.
+const H7_COUNTS = {
+  g1_nav: { HLAVICKA: 15 },
+  g2_dispatch: { PRJBOX: 4, VEPO: 4, CSV: 1 },
+  g4_anchors: { PRJBOX: 2, VEPO: 2 },
+  g8_return: { PRJBOX: 2, VEPO: 2 }
+};
+
+// -> { value: normalizovana hlboka kopia, counts: { HLAVICKA, PRJBOX, VEPO, CSV } }
+// `side`: 'old' = fixtura (stary markup), 'new' = dnesny kod.
+function normalizeH7(value, side){
+  const counts = { HLAVICKA: 0, PRJBOX: 0, VEPO: 0, CSV: 0 };
+  function str(s){
+    let out = s;
+    H7_FRAGMENTS.forEach(function(f){
+      if (f.side !== 'both' && f.side !== side) return;
+      out = out.replace(f.re, function(){
+        counts[f.key] += 1;
+        const m = arguments;
+        return f.rep.replace(/\$(\d)/g, function(_x, d){ return m[Number(d)] == null ? '' : m[Number(d)]; });
+      });
+    });
+    return out;
+  }
+  function walk(v){
+    if (typeof v === 'string') return str(v);
+    if (Array.isArray(v)) return v.map(walk);
+    if (v && typeof v === 'object'){
+      const o = {};
+      Object.keys(v).forEach(function(k){ o[k] = walk(v[k]); });
+      return o;
+    }
+    return v;
+  }
+  return { value: walk(value), counts: counts };
+}
+
 // Zapis fixtury: kazdy kluc prvej urovne na vlastnom riadku, hodnota kompaktne
 // (citatelny diff, polovicna velkost oproti odsadenemu JSON).
 function serialize(obj){
@@ -522,6 +577,7 @@ function golden(){
 
 module.exports = { load: load, install: install, missingHooks: missingHooks, ready: ready, payload: payload,
                    golden: golden, serialize: serialize, contract: contract, ids: ids, target: target, fire: fire, rd: rd, wr: wr,
+                   normalizeH7: normalizeH7, H7_COUNTS: H7_COUNTS,
                    resetCounters: resetCounters, writes: writes, goQuiet: goQuiet,
                    HOOKS: HOOKS, ANCHORS: ANCHORS, ROOT: ROOT, UI: UI, GOLDEN_DIR: GOLDEN_DIR,
                    FIXTURE_SECTIONS: FIXTURE_SECTIONS };

@@ -189,7 +189,7 @@ NxTest.test('ŠT-1c (audit #15): CSV kovania dostal GENERACNY GUARD — vedoma z
   NxTest.assert(note.include?('fresh_collect'),
                 'aj to, co je poistkou proti zastaranym poctom (cerstvy zber)')
   # Klient posiela `gen` — bez neho by guard odmietol KAZDY export.
-  NxTest.assert(S1C_STUDIO_JS.include?('sketchup.hw_csv_export(JSON.stringify({ gen: ST.gen }))'),
+  NxTest.assert(S1C_STUDIO_JS.include?('sketchup.hw_csv_export(JSON.stringify({ gen: ST.gen, expect: nxVepoExpect() }))'),
                 'lista sekcie posiela generaciu okna')
 end
 

@@ -688,7 +688,7 @@ module NxH7A
     Dir.mktmpdir('nx-h7a-exp-') do |dir|
       NxH7G.with_stubs(PC, NxH7G.collect_stubs(col)) do
         NxH7G.with_ui(dir, []) do
-          PC.send(method, mdl, { 'gen' => 1 }, generation: 1,
+          PC.send(method, mdl, { 'gen' => 1, 'expect' => NxTest.export_expect(mdl) }, generation: 1,
                                                status: ->(t, e = false) { msg = t; err = e }, repush: -> {})
         end
       end

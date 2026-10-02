@@ -168,6 +168,85 @@ module Noxun
           'inak sa po zatvorení SketchUpu stratí'
       end
 
+      # --- H7b: mena exportov, veta po exporte a payload hlavicky -------------
+      #
+      # Meno CSV kovania — PRESNE vyraz, ktorym ho `do_hw_csv` pomenuje (jedine
+      # miesto; tooltip okna ho cita cez `export_file_names`).
+      def hw_csv_file_name(project)
+        "kovanie_#{VepoExport.project_slug(project)}.csv"
+      end
+
+      # Mena styroch exportov pre tooltip okna (R-B2, O7). Sklada ich VYHRADNE
+      # tymi istymi funkciami ako export — tooltip nikdy neklame a klient si
+      # zo slugu nic neodvodzuje. Datum XLSX je z casu pushu (po polnoci do
+      # dalsieho pushu nesedi den; export sa pomenuje spravne — echo po
+      # exporte ho obnovi).
+      def export_file_names(project, now = Time.now)
+        { 'vepo_dir' => VepoExport.project_slug(project),
+          'hw_csv' => hw_csv_file_name(project),
+          'budget_xlsx' => BudgetXlsx.file_name(project, now),
+          'offer_xlsx' => CpXlsx.file_name(project, now) }
+      end
+
+      # Veta na koniec zaverecneho statusu, ked sa export pomenoval predvolenym
+      # „projekt" (R-B3, O4). Farbu statusu nemeni a nic neblokuje; s vetou
+      # cakajuceho nazvu (`pending_name_note`) sa vylucuje (ta plati len pre
+      # ulozeny model, tato len pre neulozeny).
+      def default_name_note(model, project)
+        return '' unless ExportSettings.name_source(model, project) == 'default'
+
+        " · pomenované predvoleným názvom „#{ExportSettings::DEFAULT_PROJECT_NAME}\" — " \
+          'názov zákazky zadáš v hlavičke Štúdia'
+      rescue StandardError
+        '' # veta po HOTOVOM zapise nikdy nezhodi export
+      end
+
+      # Tooltip hlavicky pri cakajucom nazve (§15 A1, Q2) — sklada server.
+      def pending_name_notice(model, project)
+        return '' unless ExportSettings.name_pending?(model)
+
+        "Názov zákazky „#{project}\" platí len do zatvorenia SketchUpu — nastavenia exportu sú poškodené " \
+          "(súbor #{ExportSettings.path}). Premenuj ho (napr. na vepo_settings.poskodeny.json) — plugin potom " \
+          'pokračuje zo zálohy (spravidla sa stratí len posledná zmena; ak súbor medzitým zapisovala staršia ' \
+          'verzia pluginu, záloha môže byť staršia) a názov sa k súboru uloží sám; inak sa po zatvorení ' \
+          'stratí a exporty sa pomenujú podľa súboru.'
+      end
+
+      # Payload `vepo` okna Studia — JEDNA funkcia pre plny push aj echo
+      # (`push_vepo_bar`). Prve tri kluce v dnesnom poradi a tvare (golden H14),
+      # za nimi H7b: zdroj nazvu, meno suboru, mena exportov, cakajuci nazov
+      # a jeho vysvetlenie. `project` ide UZ NORMALIZOVANY (§17 C2) — presne to,
+      # co klient vrati v `expect.project`. Klient nic neodvodzuje.
+      def vepo_payload(model)
+        es = ExportSettings
+        project = es.project_name(model)
+        default = es.default_project_name(model)
+        { 'project' => es.normalize_project_name(model, project),
+          'default_project' => default,
+          'merge_18_36' => es.merge_18_36,
+          'source' => es.name_source(model, project),
+          'file' => model_file_title(model),
+          'export_names' => export_file_names(project, Time.now),
+          'pending' => es.name_pending?(model),
+          'notice' => pending_name_notice(model, project) }
+      end
+
+      # Meno ulozeneho suboru bez pripony pre tooltip hlavicky; neulozeny = ''.
+      def model_file_title(model)
+        return '' unless model.respond_to?(:path) && !model.path.to_s.empty?
+
+        t = model.respond_to?(:title) ? model.title.to_s : ''
+        t.empty? ? File.basename(model.path.to_s, '.*') : t
+      end
+
+      # Audit H7 §16 B2 / §17 C1: brana `expect` v styroch exportoch — po
+      # branach generacie a `flush_blocked` a po `ExportSettings.refresh`, PRED
+      # zberom a vyberom suboru. nil = pokracuj; inak veta (export sa nespusti,
+      # echo hlavicky posle okno po navrate).
+      def export_expect_stop(model, data, merge: false)
+        ExportSettings.expect_mismatch(model, data['expect'], merge: merge)
+      end
+
       # --- Mapy katalogov + identita modelu --------------------------------
 
       # Stabilna identita modelu — zrkadlo MaterialsDialog.model_guid (oneskoreny
@@ -1609,6 +1688,10 @@ module Noxun
         end
 
         ExportSettings.refresh # 1b-6c: nazov aj 18/36 z CERSTVEHO suboru
+        # H7b (§16 B2, §17 C1): okno musi vidiet to, co plati — nazov AJ 18 + 36
+        # (len VEPO ich oba pouziva). Nesulad / stary klient = export sa nespusti.
+        expect_stop = export_expect_stop(model, data, merge: true)
+        return status.call(expect_stop, true) if expect_stop
 
         # Nalez 5: JEDEN cerstvy RAW zber -> nad nim compute AJ kontrola;
         # validaciu EXPLICITNE odovzdame do build (prefix statusu + sekcia
@@ -1654,9 +1737,10 @@ module Noxun
                                              sheets: smap)
         # audit #1: nazov projektu aj merge su SERVEROVE — z DOM uz nechodia.
         merge = ExportSettings.merge_18_36
+        project = ExportSettings.project_name(model)
         result = VepoExport.build(
           bom[:rows],
-          project: ExportSettings.project_name(model),
+          project: project,
           materials: vepo_materials,
           edge_thicknesses: vepo_edge_thicknesses,
           validation: control,
@@ -1678,7 +1762,8 @@ module Noxun
         ctrl = control_suffix(control)
         ExportSettings.save_last_dir(dir)
         # H7a (§15 A1): nazov caka na prenos k suboru -> veta na konci statusu.
-        pending = pending_name_note(model)
+        # H7b (R-B3): export pomenovany predvolenym „projekt" -> veta (vylucuju sa).
+        pending = "#{pending_name_note(model)}#{default_name_note(model, project)}"
         if result['groups'].empty?
           return status.call("Export nevytvoril žiadny CSV — #{result['errors'].length} chybných riadkov. " \
                              "Dôvody v LOGu: #{target}#{ctrl}#{pending}", true)
@@ -1718,6 +1803,9 @@ module Noxun
         end
 
         ExportSettings.refresh # 1b-6c: nazov zakazky z CERSTVEHO suboru
+        # H7b (§16 B2, §17 C1): nazov, ktory okno ukazuje, musi platit.
+        expect_stop = export_expect_stop(model, data)
+        return status.call(expect_stop, true) if expect_stop
         collected = fresh_collect(model)
         # KOV-H1 / review #283 P2-B: brana NOVSEJ SCHEMY musi padnut HNED po
         # zbere — pred expanziou aj pred „niet co exportovat". Skrinka z novsej
@@ -1751,7 +1839,7 @@ module Noxun
         # audit #1: nazov projektu je SERVEROVA autorita (jeden nazov pre
         # VSETKY styri exporty) — z DOM uz nechodi.
         project = ExportSettings.project_name(model)
-        fname = "kovanie_#{VepoExport.project_slug(project)}.csv"
+        fname = hw_csv_file_name(project)
         target = UI.savepanel('Uložiť nákupný zoznam kovania', ExportSettings.last_dir, fname)
         return status.call('Export zrušený.') if target.nil? || target.to_s.empty?
 
@@ -1764,7 +1852,7 @@ module Noxun
         dup = dup_id_suffix(warn_dups)
         status.call("Nákupný zoznam: #{n} položiek" \
                     "#{un.positive? ? " + #{un} nemapovaných (v CSV aj KONTROLE)" : ''} → #{target}#{dup}" \
-                    "#{pending_name_note(model)}",
+                    "#{pending_name_note(model)}#{default_name_note(model, project)}",
                     un.positive? || !dup.empty?)
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_hw_csv')
@@ -3186,6 +3274,9 @@ module Noxun
         end
 
         ExportSettings.refresh # 1b-6c: nazov zakazky z CERSTVEHO suboru
+        # H7b (§16 B2, §17 C1): nazov, ktory okno ukazuje, musi platit.
+        expect_stop = export_expect_stop(model, data)
+        return status.call(expect_stop, true) if expect_stop
         collected = fresh_collect(model)
         # KOV-H1 / review #283 P2-B: brana novsej schemy PRED vsetkym ostatnym —
         # aj pred „rozpocet sa nepodarilo zostavit" a pred `budget_std_block`,
@@ -3246,7 +3337,7 @@ module Noxun
         # exportoval (repush PRED statusom — push by status inak prekryl).
         repush.call if budget['plan_prices'] == true
         status.call("Rozpočet uložený: #{fmt_eur(totals['total'])} → #{target}#{warn}#{dup}" \
-                    "#{plan_export_note(budget)}#{pending_name_note(model)}",
+                    "#{plan_export_note(budget)}#{pending_name_note(model)}#{default_name_note(model, project)}",
                     !warn.empty? || !dup.empty?)
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_budget_xlsx')
@@ -3271,6 +3362,9 @@ module Noxun
         end
 
         ExportSettings.refresh # 1b-6c: nazov zakazky z CERSTVEHO suboru
+        # H7b (§16 B2, §17 C1): nazov, ktory okno ukazuje, musi platit.
+        expect_stop = export_expect_stop(model, data)
+        return status.call(expect_stop, true) if expect_stop
         collected = fresh_collect(model)
         # KOV-H1 / review #283 P2-B: TA ISTA brana ako pri rozpocte — najprv.
         newer_stop = newer_config_stop(collected)
@@ -3332,7 +3426,7 @@ module Noxun
         # (len Michalovi, nie zakaznikovi) a okno sa obnovi z exportovaneho stavu.
         repush.call if budget['plan_prices'] == true
         status.call("#{cp_status(cp, spec, target, warnings)}#{plan_export_note(budget)}" \
-                    "#{pending_name_note(model)}", !warnings.empty?)
+                    "#{pending_name_note(model)}#{default_name_note(model, project)}", !warnings.empty?)
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_cp_xlsx')
         status.call("Export cenovej ponuky zlyhal: #{e.message}", true)

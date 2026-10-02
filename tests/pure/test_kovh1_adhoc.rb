@@ -202,7 +202,7 @@ module NxKovh1
     Dir.mktmpdir('nx-kovh1-') do |dir|
       with_stubs(stubs) do
         with_ui(File.join(dir, file_name), calls) do
-          PC.send(method, :model, { 'gen' => 1 }, generation: 1,
+          PC.send(method, :model, { 'gen' => 1, 'expect' => NxTest.export_expect(:model) }, generation: 1,
                                   status: ->(m, e = false) { msg = m; err = e },
                                   repush: -> {})
         end

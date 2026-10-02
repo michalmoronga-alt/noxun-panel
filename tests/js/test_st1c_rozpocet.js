@@ -167,6 +167,7 @@ const bomTools = els.sectools.innerHTML;
 ok(bomTools.indexOf('id="vepoMore"') > -1, 'VEPO export ma rohove nastavenie');
 ok(bomTools.indexOf('id="mergeChk"') > -1, 'a checkbox „18+36 spolu" zije v nom');
 ok(bomTools.indexOf('aria-disabled') === -1, 'neaktivne XLSX/CSV placeholdery su prec');
-ok(bomTools.indexOf('class="prjlbl"') > -1, 'pole Projekt ma viditelny stitok');
+ok(bomTools.indexOf('prjbox') === -1, 'H7b (O2): pole Projekt z listy zaniklo');
+ok(els.sechead.innerHTML.indexOf('id="jobName"') > -1, 'H7b (O1): nazov zakazky je v hlavicke sekcie');
 
 console.log('test_st1c_rozpocet.js: ' + n + ' OK');

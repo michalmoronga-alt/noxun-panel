@@ -457,6 +457,12 @@ poradie presunov satelitov schválené (nižšie) · deep-linky `NX.studioOpen` 
   (schválené 22.8.): `[Dielce · Platne · ABS] · [Projekt] · [hľadanie] · ⟶ · [VEPO export ▸] ·
   [Stĺpce] · [Obnoviť]` — vľavo „čo pozerám", vpravo „čo s tým robím". **Pole „Projekt" má viditeľný
   štítok a vlastný rám**: je to jediný vstup v lište a pomenúva zákazku pre všetky exporty.
+  **Revízia H7 (2.10.2026, mockup `SYSTEM/zdroje/bloky/HARDENING/MOCKUP_H7_NAZOV_ZAKAZKY.html`, O1 A · O2):**
+  pole „Projekt" z lišty **zaniklo** — názov zákazky sa upravuje na jedinom mieste, **v hlavičke Štúdia**
+  („Zákazka: <názov> ✎" v každej sekcii, klik = pole na mieste). Lišta teraz: `[Dielce · Platne · ABS] ·
+  [hľadanie] · ⟶ · [VEPO export ▸] · [Stĺpce] · [Obnoviť]`. Kým by sa exporty pomenovali predvoleným
+  „projekt", nesie jantárovú bodku hlavička aj štyri exporty (VEPO, CSV kovania, XLSX rozpočtu, cenová
+  ponuka); tooltip exportu povie presné meno priečinka/súboru (skladá ho plugin).
 - **Š6** živé hľadanie (bez diakritiky, hľadá dielec/skrinku/poznámku, prázdne skupiny sa skryjú,
   súčtový riadok ukáže počítadlo filtra).
 

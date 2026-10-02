@@ -213,15 +213,24 @@ module Noxun
       # SAMOOPRAVA objektu bez dobrej zalohy (matica R-A2, D3; review #456 P2):
       # neplatny kontajner `project_names` (pole, retazec, null …) nemoze niest
       # ziadny platny nazov zakazky (mapa je len objekt), takze ho kazdy uspesny
-      # zapis — aj skalarny (18 + 36, posledny priecinok) — nahradi prazdnou
-      # mapou a zaloguje to. Platna mapa sa nikdy nemeni. Vysledok `update` tak
-      # vzdy spĺňa `doc_shape_ok?` (inak by `:ok` hlasilo opravu, ktora nenastala).
+      # zapis nahradi prazdnou mapou a zaloguje to. Skalarny zapis (18 + 36,
+      # posledny priecinok) ho opravi TU; zapis MAPY (nazov, prenos nazvu) ho
+      # opravi uz v `update_project_names` (blok dostane prazdnu mapu a vrati
+      # platnu), takze sem dorazi dokument dobreho tvaru — log rovnakej vety
+      # ide preto odtial (`log_repair`). Platna mapa sa nikdy nemeni. Vysledok
+      # `update` tak vzdy spĺňa `doc_shape_ok?` (inak by `:ok` hlasilo opravu,
+      # ktora nenastala).
       def self_repair(doc)
         return doc unless doc.is_a?(Hash) && doc.key?(PROJECT_NAMES_KEY) && !doc[PROJECT_NAMES_KEY].is_a?(Hash)
 
-        Engine.log("export settings: neplatny #{PROJECT_NAMES_KEY} (#{doc[PROJECT_NAMES_KEY].class}) " \
-                   'nahradeny prazdnou mapou — samooprava suboru bez zalohy')
+        log_repair(doc[PROJECT_NAMES_KEY])
         doc.merge(PROJECT_NAMES_KEY => {})
+      end
+
+      # Jedna veta logu samoopravy pre obe cesty (skalarny zapis aj zapis mapy).
+      def log_repair(bad)
+        Engine.log("export settings: neplatny #{PROJECT_NAMES_KEY} (#{bad.class}) " \
+                   'nahradeny prazdnou mapou — samooprava suboru bez zalohy')
       end
 
       # Odmietnutie podla obsahu, volitelne s podpisom suborov (volat POD zamkom).
@@ -353,8 +362,12 @@ module Noxun
       def update_project_names(sign: false)
         update(sign: sign) do |settings|
           names = settings[PROJECT_NAMES_KEY]
+          # Samooprava neplatneho kontajnera (matica R-A2) — log len ked blok
+          # naozaj nieco zapise (`nil` = ziadny zapis, ziadna oprava).
+          bad = settings.key?(PROJECT_NAMES_KEY) && !names.is_a?(Hash)
           names = names.is_a?(Hash) ? names.dup : {}
           fresh = yield(names)
+          log_repair(settings[PROJECT_NAMES_KEY]) if bad && !fresh.nil?
           fresh.nil? ? nil : { PROJECT_NAMES_KEY => fresh }
         end
       end
@@ -608,7 +621,7 @@ module Noxun
         key = project_key(model)
         return [:failed, FAILED_REASON] if key.empty?
 
-        s = name.to_s.strip[0, PROJECT_NAME_MAX].to_s.strip
+        s = clean_project_name(name)
         stored = !(s.empty? || s == default_project_name(model))
         aliases = session_keys_for(model)
         # Cita a zapisuje POD ZAMKOM nad CERSTVOU mapou (1b-6c) — inak by zapis
@@ -642,6 +655,76 @@ module Noxun
       # sa zahadzoval a okno hlasilo zeleno aj zlyhanie).
       def save_merge_18_36(value)
         save('merge_18_36' => (value == true))
+      end
+
+      # --- H7b: jedna normalizacia nazvu, zdroj nazvu a kontrola `expect` ----
+      #
+      # Orez + strop 120 znakov — PRESNE to, co sa uklada (`save_project_name`).
+      def clean_project_name(name)
+        name.to_s.strip[0, PROJECT_NAME_MAX].to_s.strip
+      end
+
+      # Audit H7 §17 C2: JEDINA normalizacia nazvu pre porovnanie aj pre okno.
+      # Prazdne = predvoleny nazov (meno suboru, inak „projekt") — to iste
+      # pravidlo, akym `project_name` cita a `save_project_name` maze zaznam.
+      # Payload okna posiela nazov UZ normalizovany a export porovnava obe
+      # strany touto funkciou, takze rucne zapisany zaznam dlhsi ako 120 znakov
+      # nevyrobi trvaly falosny nesulad. (Meno suboru exportu sa nemeni — ide
+      # z `project_name`, parita H7a.)
+      def normalize_project_name(model, name)
+        s = clean_project_name(name)
+        s.empty? ? default_project_name(model) : s
+      end
+
+      # Odkial je nazov, pod ktorym exporty odidu (R-B1, cista funkcia):
+      # 'set' = zadany pouzivatelom · 'file' = meno ulozeneho suboru ·
+      # 'default' = „projekt" (neulozeny model bez nazvu). Ulozeny nazov sa
+      # predvolenemu nikdy nerovna (zapis taky zaznam zmaze), takze rovnost
+      # s predvolenym znamena „nazov nie je zadany".
+      def name_source(model, name)
+        return 'set' unless name.to_s == default_project_name(model)
+
+        (model.respond_to?(:path) ? model.path.to_s : '').empty? ? 'default' : 'file'
+      rescue StandardError
+        'set' # neznamy zdroj = bez bodky a bez vety (nic sa neblokuje)
+      end
+
+      # Audit H7 §16 B2 a §17 C1: kazde exportne volanie okna nesie
+      # `expect {project, merge}` = co pouzivatel VIDI (hlavicka, prepinac).
+      # Export sa spusti LEN ked sa to zhoduje s ulozenou pravdou — zlyhany
+      # zapis nazvu (zamok, poskodeny subor) tak nikdy nevyrobi subor pod
+      # starym nazvom. Bezstavove: nic necaka, nesulad = veta a klik znova.
+      # Chybajuci alebo neplatny `expect` (stary klient) = FAIL-CLOSED.
+      # 18 + 36 sa porovnava len vo VEPO (`merge: true`) — inde vystup nemeni
+      # a zlyhany zapis prepinaca nesmie blokovat XLSX ani CSV.
+      # -> nil (zhoda) alebo veta pre stavovy riadok.
+      EXPECT_STALE = 'Okno je zastarané — zatvor a otvor Štúdio a klikni znova.'
+      EXPECT_FAILED = 'Export sa nespustil — nastavenia exportu sa nepodarilo overiť, skús znova.'
+
+      def expect_valid?(expect)
+        expect.is_a?(Hash) && expect['project'].is_a?(String) && [true, false].include?(expect['merge'])
+      end
+
+      def expect_mismatch(model, expect, merge: false)
+        return EXPECT_STALE unless expect_valid?(expect)
+
+        out = []
+        stored = normalize_project_name(model, project_name(model))
+        if normalize_project_name(model, expect['project']) != stored
+          out << "Názov zákazky sa neuložil (platí „#{stored}\") — export sa nespustil, " \
+                 'skontroluj názov a klikni znova.'
+        end
+        if merge
+          now = merge_18_36
+          if expect['merge'] != now
+            out << "Nastavenie 18 + 36 sa neuložilo (platí: #{now ? 'zapnuté' : 'vypnuté'}) — " \
+                   'export sa nespustil, skontroluj nastavenie a klikni znova.'
+          end
+        end
+        out.empty? ? nil : out.join(' ')
+      rescue StandardError => e
+        Engine.log_error(e, 'ExportSettings.expect_mismatch')
+        EXPECT_FAILED
       end
     end
   end

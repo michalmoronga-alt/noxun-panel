@@ -165,7 +165,7 @@ module NxKon0
     calls = []
     with_stubs(stubs(col)) do
       with_ui(File.join(dir, 'out.file'), calls) do
-        PC.send(method, :model, { 'gen' => 1 }, generation: 1,
+        PC.send(method, :model, { 'gen' => 1, 'expect' => NxTest.export_expect(:model) }, generation: 1,
                                                 status: ->(m, e = false) { msg = m; err = e },
                                                 repush: -> {})
       end

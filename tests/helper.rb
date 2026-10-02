@@ -340,3 +340,16 @@ module NxTest
     end
   end
 end
+
+# --- H7b (audit H7 §17 C1): `expect` exportneho volania --------------------
+# Styri exporty Studia (VEPO, CSV kovania, XLSX rozpoctu, XLSX ponuky) od H7b
+# POVINNE nesu `expect` = nazov zakazky a „18 + 36", ktore okno ukazuje; bez
+# neho ich server odmietne (fail-closed). Testy exportov ho skladaju zo servera
+# — presne to, co by po pushi ukazovala hlavicka okna. Volat AZ pod stubmi
+# nazvu (`project_name`), ktore si test nastavil.
+module NxTest
+  def self.export_expect(model)
+    es = Noxun::Engine::ExportSettings
+    { 'project' => es.project_name(model).to_s, 'merge' => es.merge_18_36 }
+  end
+end

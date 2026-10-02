@@ -186,7 +186,8 @@ module NxNp4
     events = []
     with_stubs(export_stubs(bud)) do
       with_ui(File.join(dir, 'np4.xlsx')) do
-        PC.send(method, :model, { 'gen' => 1, 'confirm_unpriced' => PC.unpriced_count(bud) }, generation: 1,
+        PC.send(method, :model, { 'gen' => 1, 'confirm_unpriced' => PC.unpriced_count(bud),
+                                  'expect' => NxTest.export_expect(:model) }, generation: 1,
                                                 status: lambda { |m, _e = false|
                                                   msg = m
                                                   events << :status
