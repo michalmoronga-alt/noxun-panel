@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H7b · názov zákazky v hlavičke Štúdia + povinný `expect` pri štyroch exportoch (2.10.2026, PR #?, v0.17.21, blok 9 · HARDENING PO V1, triedenie A-05; package
+- **H7b · názov zákazky v hlavičke Štúdia + povinný `expect` pri štyroch exportoch (2.10.2026, PR #457, v0.17.21, blok 9 · HARDENING PO V1, triedenie A-05; package
   [PACKAGE_H7.md](../zdroje/bloky/HARDENING/PACKAGE_H7.md) §6 R-B1–R-B12 + §15–§17 (§17 C1/C2 má prednosť); mockup
   [MOCKUP_H7_NAZOV_ZAKAZKY.html](../zdroje/bloky/HARDENING/MOCKUP_H7_NAZOV_ZAKAZKY.html) PLATÍ, O1–O9; brief [BRIEF_H7.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H7.md)).**
   Druhá časť H7, **nový ovládací prvok v UI** (predrecenzia povinná), **nie výrobná/cenová** — mená aj bajty exportov bez zmeny (golden H7a T0a/T0c zelený bez regenerácie,
