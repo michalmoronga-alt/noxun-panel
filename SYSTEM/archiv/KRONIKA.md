@@ -42,8 +42,12 @@
   názov sa toleruje** (export pod skutočným menom, stav „ · Zákazka: Klinika (podľa súboru)"), zadaný názov na ktorejkoľvek strane + iné meno = odmietnutie
   **neutrálnou vetou** „Okno ukazovalo „X", platí „Y"…" (slepá kontrola opráv: DELTA OK + 1× P3 — veta bez príčiny, doladené), 18 + 36 pri VEPO prísne; bez observera uloženia; brána `ExportSettings.expect_check`. (P2) testy
   `rescue` vetiev (výnimka pri overovaní = `EXPECT_FAILED` pred výberom súboru vo všetkých 4, `name_source`, `default_name_note`, `model_file_title`). (P3) VEPO
-  použije názov a 18 + 36 **overené v bráne** pred výberom priečinka (dve inštancie SketchUpu). **5246 headless · 161 JS sád** zelené + encoding guard;
-  **mutácie B1–B27 + P1–P10 (39) zabité**; in-SU **3369 / 0** na `8cbc5732` (potom len STAV/KRONIKA) — `su_runner` posiela `expect` (so `source`) a overuje fail-closed CSV kovania bez `expect`
+  použije názov a 18 + 36 **overené v bráne** pred výberom priečinka (dve inštancie SketchUpu).
+  **Codex kolo 1 (3× P2) — opravené (`c060416d`):** (1) názov sa normalizuje **raz** a tá istá hodnota ide do hlavičky, tooltipov aj všetkých 4 exportov — **vedomá zmena
+  hraničného prípadu:** názov nad 120 znakov (meno `.skp` alebo ručný záznam) sa v menách exportov oreže na 120 ako v okne (dlhé meno mohlo aj prekročiť limit cesty);
+  pri bežných menách bajtovo bez zmeny (golden H7a bez regenerácie) · (2) CSV kovania, XLSX rozpočtu a ponuky použijú názov **overený v bráne** (ako VEPO) · (3) editor si
+  pamätá text pri otvorení — blur/Enter **nedotknutého** poľa po pushi alebo echu nič nezapíše (inak by vrátil starší názov). **5248 headless · 161 JS sád** zelené
+  + encoding guard; **mutácie B1–B27 + P1–P10 + R1–R3 (45) zabité**; in-SU **3369 / 0** na `c060416d` (potom len STAV/KRONIKA) — `su_runner` posiela `expect` (so `source`) a overuje fail-closed CSV kovania bez `expect`
   s echom hlavičky. STAV pred dávkou: v0.17.20 (H7a), Ďalší krok „H7b". **Poradie callbackov** (blur editora pred klikom na export) NEOVERENÉ v SketchUpe —
   návrh od neho nezávisí (pri obrátenom poradí export odmietne a stačí klik znova).
 
