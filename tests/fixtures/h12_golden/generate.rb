@@ -5,6 +5,7 @@
 # inak by charakterizacia „dokazovala" samu seba:
 #   C:/Ruby32-x64/bin/ruby.exe tests/fixtures/h12_golden/generate.rb         # H12a: case_*.json + matrix.json
 #   C:/Ruby32-x64/bin/ruby.exe tests/fixtures/h12_golden/generate.rb panel   # H12b: LEN panel.json
+#   C:/Ruby32-x64/bin/ruby.exe tests/fixtures/h12_golden/generate.rb roles   # H12d: LEN roles.json
 #
 # Bez argumentu prepisuje `case_*.json` a `matrix.json` (prvy commit H12a);
 # s argumentom `panel` LEN `panel.json` (prvy commit H12b — fixtury H12a sa
@@ -14,6 +15,7 @@
 require_relative '../../helper'
 require_relative '../../pure/test_h12_golden' unless defined?(NxH12Golden)
 require_relative '../../pure/test_h12b_golden' unless defined?(NxH12bGolden)
+require_relative '../../pure/test_h12d_roles_golden' unless defined?(NxH12dGolden)
 
 module NxH12GoldenGen
   module_function
@@ -30,8 +32,16 @@ module NxH12GoldenGen
     File.write(NxH12bGolden::PATH, NxH12bGolden.pretty(NxH12bGolden.snapshot))
     puts "OK: panel golden v #{NxH12bGolden::PATH}"
   end
+
+  def run_roles
+    File.write(NxH12dGolden::PATH, NxH12dGolden.pretty(NxH12dGolden.snapshot))
+    puts "OK: golden mien roli v #{NxH12dGolden::PATH}"
+  end
 end
 
 if $PROGRAM_NAME == __FILE__
-  ARGV.include?('panel') ? NxH12GoldenGen.run_panel : NxH12GoldenGen.run
+  if ARGV.include?('panel') then NxH12GoldenGen.run_panel
+  elsif ARGV.include?('roles') then NxH12GoldenGen.run_roles
+  else NxH12GoldenGen.run
+  end
 end
