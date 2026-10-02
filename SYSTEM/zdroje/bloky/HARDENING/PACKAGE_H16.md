@@ -154,6 +154,10 @@ kóde · (2) register + `main.rb`/helper + T1, T2b, T4–T7, T9–T11 (zelené e
   #10, rady a aktualizácie aj s `.bak`, 3 prepínače, `template_usage.json`); ostatné (S6) len existencia; plus mapa **súbor → držaný zámok** (T2b). Po zavedení registra bežec vráti aj cesty resolverov bez override (T11) a s override (T2).
 - **R0.2** Test `tests/pure/test_h16_kniznice.rb` s T0 zelený na starom kóde v 1. commite; fixtúra sa v dávke **neregeneruje** (zmena = nález → STOP).
 - **R0.3** Platí len headless (`NxTest.skip! … unless NxTest.headless?` — v SketchUpe `RbConfig.ruby` nie je samostatný interpreter, vzor `test_d52a_updater.rb:77`).
+- **R0.4 · Spresnenie po P1 PR #461 (3.10.2026):** JSON gem od 2.8 mení formát prázdnych kontajnerov. Pôvodný `first_use.json` ostáva bezo zmeny;
+  druhý **celý** manifest `first_use_compact.json` je zachytený na pre-H16 kóde (`fe7f5405`, T0 harness `c9c4c512`), dvoma behmi pôvodného generátora.
+  Bežec vráti presný výsledok malej sondy `pretty_generate`; iba tá vyberie manifest. Neznámy formát = chyba, žiadne miešanie povolených SHA po súboroch,
+  žiadna normalizácia obsahu ani poradia. Pôvod, reprodukcia a identity zdrojov: `tests/fixtures/h16_golden/README.md`.
 
 ### R1 · Register `Noxun::Engine::LibraryRegistry` (`core/library_registry.rb`)
 

@@ -5,8 +5,9 @@
 #
 #   T0  golden prveho behu — bezec `tests/h16_first_use.rb` v SAMOSTATNOM procese
 #       (cerstvy sandbox + pamat modulov; package §15 A5), DVA behy = opakovatelnost;
-#       fixtura `tests/fixtures/h16_golden/first_use.json` vznikla na kode PRED
-#       zasahom a v davke sa NEREGENERUJE (rozdiel = nalez)
+#       fixtury `tests/fixtures/h16_golden/first_use*.json` vznikli na kode PRED
+#       zasahom (povod v README); original sa NEREGENERUJE (rozdiel = nalez).
+#       CELY variant vybera sonda JSON generatora v bezci, stale sa porovnavaju SHA bajtov
 #   T1  tvar registra (kluce, mnoziny, zamok <-> rezim, prilohy, verzie, zmrazenie, API)
 #   T2  parita ciest pod `Materials.test_dir_override` (v bezci); T11 bez override
 #   T2b zamok DRZANY pri zapise kazdeho suboru prveho behu = `lock` riadku
@@ -28,6 +29,14 @@ module NxH16
   R = Noxun::Engine::LibraryRegistry
   RUNNER = File.join(NxTest::ROOT, 'tests', 'h16_first_use.rb')
   GOLDEN = File.join(NxTest::ROOT, 'tests', 'fixtures', 'h16_golden', 'first_use.json')
+  # JSON 2.8 zmenil len format prazdnych kontajnerov. Variant sa nevybera
+  # podla zhody suborov ani len podla cisla gemu — neznamy format = STOP.
+  LEGACY_JSON_FORMAT = "{\n  \"object\": {\n  },\n  \"array\": [\n\n  ]\n}".freeze
+  COMPACT_JSON_FORMAT = "{\n  \"object\": {},\n  \"array\": []\n}".freeze
+  GOLDENS = {
+    LEGACY_JSON_FORMAT => GOLDEN,
+    COMPACT_JSON_FORMAT => File.join(File.dirname(GOLDEN), 'first_use_compact.json')
+  }.freeze
   DOC = File.join('docs', 'architecture', 'kniznice.md')
   STANDARD = File.join('SYSTEM', 'STANDARD.md')
 
@@ -117,8 +126,12 @@ module NxH16
     @runs ||= [run_once, run_once]
   end
 
-  def golden
-    @golden ||= JSON.parse(File.read(GOLDEN, encoding: 'UTF-8'))
+  def golden(json_format = LEGACY_JSON_FORMAT)
+    path = GOLDENS[json_format]
+    raise ArgumentError, "neznamy format JSON generatora #{json_format.inspect} — treba variant overeny na pre-H16 kode" unless path
+
+    @goldens ||= {}
+    @goldens[json_format] ||= JSON.parse(File.read(path, encoding: 'UTF-8'))
   end
 
   def golden_problems(run, gold)
@@ -546,10 +559,11 @@ NxTest.test('H16 T0: golden prveho behu — dva behy v samostatnych procesoch = 
   NxTest.skip!('bezec potrebuje samostatny Ruby interpreter (len headless)') unless NxTest.headless?
   a, b = NxH16.runs
   [a, b].each_with_index do |run, i|
-    probs = NxH16.golden_problems(run, NxH16.golden)
+    probs = NxH16.golden_problems(run, NxH16.golden(run['json_format']))
     NxTest.assert(probs.empty?, "beh #{i + 1}: #{probs.join(' · ')} — golden sa v H16 NEREGENERUJE (nalez)")
   end
   NxTest.assert_equal(a['files'], b['files'], 'dva behy vyrobili inu mnozinu suborov')
+  NxTest.assert_equal(a['json_format'], b['json_format'], 'dva behy maju iny JSON generator')
   NxTest.assert(NxH16.golden['files'].length >= 25, 'golden ma podozrivo malo suborov')
 end
 
@@ -560,6 +574,30 @@ NxTest.test('H16 T0: negativ — iny subor, iny obsah alebo iny zamok golden zho
   NxTest.refute(NxH16.golden_problems(ok.merge('files' => %w[a.json b.lock presets.json]), gold).empty?)
   NxTest.refute(NxH16.golden_problems(ok.merge('sha' => { 'a.json' => 'y' }), gold).empty?)
   NxTest.refute(NxH16.golden_problems(ok.merge('locks_at_write' => { 'a.json' => [''] }), gold).empty?)
+end
+
+NxTest.test('H16 T0: JSON profil vybera cely pre-H16 variant; cudzi profil ani SHA druheho variantu neprejde') do
+  legacy = NxH16.golden(NxH16::LEGACY_JSON_FORMAT)
+  compact = NxH16.golden(NxH16::COMPACT_JSON_FORMAT)
+  NxTest.assert_equal(legacy['files'], compact['files'])
+  NxTest.assert_equal(legacy['locks_at_write'], compact['locks_at_write'])
+  NxTest.assert_equal(legacy['sha'].keys, compact['sha'].keys)
+  changed = legacy['sha'].keys.select { |f| legacy['sha'][f] != compact['sha'][f] }
+  NxTest.assert_equal(%w[abs_rules.json materials.json templates.json], changed)
+  [[NxH16::LEGACY_JSON_FORMAT, legacy, compact], [NxH16::COMPACT_JSON_FORMAT, compact, legacy]].each do |format, gold, other|
+    NxTest.assert(NxH16.golden_problems(gold, NxH16.golden(format)).empty?)
+    NxTest.assert_equal(3, NxH16.golden_problems(other, NxH16.golden(format)).length, 'cely cudzi variant musi padnut')
+    changed.each do |f|
+      mixed = gold.merge('sha' => gold['sha'].merge(f => other['sha'][f]))
+      NxTest.refute(NxH16.golden_problems(mixed, NxH16.golden(format)).empty?, "cudzi SHA pre #{f}")
+    end
+    gold['sha'].each_key do |f|
+      bad = gold.merge('sha' => gold['sha'].merge(f => '0' * 64))
+      NxTest.refute(NxH16.golden_problems(bad, NxH16.golden(format)).empty?, "poskodeny SHA pre #{f}")
+    end
+  end
+  NxTest.assert_raise('neznamy format JSON generatora') { NxH16.golden('neznamy') }
+  NxTest.assert_raise('neznamy format JSON generatora') { NxH16.golden(nil) }
 end
 
 # --- T1 ---------------------------------------------------------------------------------

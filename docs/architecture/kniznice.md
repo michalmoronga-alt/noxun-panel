@@ -41,7 +41,8 @@
 - **API:** `root` (= `Materials.dir`) · `entries` · `keys` · `get(key)` (String alebo Symbol, neznámy = `nil`) · `shared` · `path(key)`
   (absolútna cesta bez lomky na konci, glob = `nil`). Nič nečíta z disku.
 - **Guardy** (`tests/pure/test_h16_kniznice.rb`): golden prvého behu v samostatnom procese (`tests/h16_first_use.rb`, súbory, obsah,
-  zámky) · tvar registra · parita ciest s override aj bez neho · zámok držaný pri zápise = `lock` · jediný koreň · literály mien
+  zámky; celý pre-H16 variant podľa presnej sondy JSON generátora, stále SHA pôvodných bajtov — pôvod v
+  [golden README](../../tests/fixtures/h16_golden/README.md), neznámy formát = chyba) · tvar registra · parita ciest s override aj bez neho · zámok držaný pri zápise = `lock` · jediný koreň · literály mien
   úložísk · zapisovatelia a **počet zápisových miest na súbor** (`WRITE_SITES`) · žiadny neznámy súbor po prvom behu a triedenie mien
   (finálne / technické / dočasné / neznáme — D-48 prenáša len finálne) · verzie ↔ STANDARD §13.1 · táto stránka ↔ register ·
   kľúče `localStorage` a zákaz inej perzistencie okna · pripnutá zdieľaná množina.

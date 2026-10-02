@@ -17,7 +17,10 @@
 # `LibraryRegistry`, vrati aj cesty jeho resolverov a zamkov bez override
 # (T11) a s `Materials.test_dir_override` (T2).
 #
-# Vystup: jeden riadok `NXH16_JSON=<json>` na stdout. Nikdy nesiaha na zivy
+# Vystup: jeden riadok `NXH16_JSON=<json>` na stdout, aj s malou sondou
+# `JSON.pretty_generate` — od JSON 2.8 sa prazdne objekty/polia formatuju inak.
+# Sonda vybera pre-H16 golden variant; bajty suborov sa NENORMALIZUJU.
+# Nikdy nesiaha na zivy
 # `%APPDATA%` — helper ho headless presmeruje do TEMP (inak beh odmietne).
 require 'json'
 require 'digest'
@@ -111,7 +114,7 @@ module NxH16WriteSpy
 end
 Noxun::Engine::JsonFileStore.singleton_class.prepend(NxH16WriteSpy)
 
-out = {}
+out = { 'json_format' => JSON.pretty_generate({ 'object' => {}, 'array' => [] }) }
 reg = defined?(Noxun::Engine::LibraryRegistry) ? Noxun::Engine::LibraryRegistry : nil
 if reg
   specs = reg::ENTRIES.map { |r| r['resolver'] }.compact + reg::LOCKS.values
