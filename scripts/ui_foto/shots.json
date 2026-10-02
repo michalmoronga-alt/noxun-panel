@@ -10,6 +10,7 @@
     { "id": "panel_zony", "kind": "panel", "upto": "panel_select_cab1", "ctx": "zony", "label": "Inspector · Zóny" },
     { "id": "panel_cela", "kind": "panel", "upto": "panel_select_cab1", "ctx": "cela", "label": "Inspector · Čelá" },
     { "id": "panel_kovanie", "kind": "panel", "upto": "panel_select_cab1", "ctx": "kovanie", "label": "Inspector · Kovanie" },
+    { "id": "panel_dielec", "kind": "panel", "upto": "panel_select_part", "label": "Inspector · karta dielca" },
     { "id": "studio_bom", "kind": "studio", "upto": "studio_bom", "label": "Štúdio · Kusovník" },
     { "id": "studio_ctrl", "kind": "studio", "upto": "studio_ctrl", "label": "Štúdio · Kontrola" },
     { "id": "studio_buy", "kind": "studio", "upto": "studio_buy", "label": "Štúdio · Nákup kovania" },

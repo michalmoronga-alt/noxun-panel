@@ -536,7 +536,7 @@ karta kreslila pásku na opačnú stranu, než hovorí pravidlo aj label. `drawe
 sa časom rozišli a 2D karta by kreslila pásku na inú hranu, než akú vidno zafarbenú v modeli a než akú zvýrazní Kontrola olepov. Pravidlá (seed 4) sa tým **nemenia** — L1 = 1,0 mm
 platí ďalej, mení sa len to, KTORÚ plochu kvádra kód L1 pomenúva. Bump verzie je nutný z rovnakého dôvodu ako pri
 `flap`/`false_front` — bez neho by `merge_seed_roles` roly na existujúcich inštaláciách nikdy nedoplnil a zásuvka by sa postavila BEZ olepu. Roly sú aj v
-`RulesDialog::ABS_ROLE_ORDER` (na konci, za čelami) a v `ProductionCore::ROLE_LABELS` („Dno zásuvky", „Chrbát zásuvky", „Bok boxu", „Vnútorné čelo zásuvky") — prehľad ABS
+`RulesDialog::ABS_ROLE_ORDER` (na konci, za čelami) a v `PartKeys::ROLE_LABELS` („Dno zásuvky", „Chrbát zásuvky", „Bok boxu", „Vnútorné čelo zásuvky") — prehľad ABS
 pravidiel ich číta zo seedu, takže bez názvov by ukázal holé identifikátory. Dielce samotné ešte **nikto neemituje** (to je C2b).
 
 **KON-B · K2 — `SEED_VERSION` 4 → 5: lišty chrbta** (`back_rail_top`, `back_rail_bottom`, chrbát „Z líšt"). Obe majú **L1 1,0 mm** — páska na jednej dlhej hrane
