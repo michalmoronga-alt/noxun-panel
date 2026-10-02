@@ -563,6 +563,22 @@ NxTest.test('H7a T-A10: syntakticky poskodeny primar — 100x project_name = naj
   end
 end
 
+NxTest.test('H7a T-A10: log odmietnutia LEN pri zmene stavu (opakovany zapis = jeden riadok, oprava stav zhodi)') do
+  NxTest.skip!('vyzaduje headless sandbox') unless NxTest.headless?
+  NxH7A.with_sandbox do
+    NxH7A.degraded!
+    NxH7A.with_log do |logs|
+      5.times { NxH7A.save_last_dir('D:/X') }
+      NxTest.assert_equal(1, NxH7A.count_logs(logs)[:note], 'pat odmietnuti = jeden riadok')
+      File.rename(NxH7A.path, "#{NxH7A.path}.poskodeny")
+      NxTest.assert_equal(:ok, NxH7A.save_last_dir('D:/Y').first, 'obnova')
+      NxH7A.write_raw(NxH7A.path, '[]')
+      NxH7A.save_last_dir('D:/Z')
+      NxTest.assert_equal(2, NxH7A.count_logs(logs)[:note], 'po uspechu nove odmietnutie znova zaloguje')
+    end
+  end
+end
+
 NxTest.test('H7a T-A10: variant zly tvar [] — rovnake obmedzenie pokusov') do
   NxTest.skip!('vyzaduje headless sandbox') unless NxTest.headless?
   NxH7A.with_sandbox do
