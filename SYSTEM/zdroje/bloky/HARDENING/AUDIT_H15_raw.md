@@ -1,0 +1,12 @@
+1. **FIX-IN-H15a — G7 môže pripnúť nekompletný nákup ako správny golden.**  
+   [PACKAGE_H15.md:124](</C:/APP DEV/RUBY/ENGINE/_dev/audit_h15/PACKAGE_H15.md:124>) vyžaduje triedne mapovanie a neprázdnu expanziu. To nestačí: vlastná sonda HK bez hmotnosti čela vydala príslušenstvo `13781`, `347834`, ale **žiadny mechanizmus**, spolu s `lift_class_missing` a `lift_set_incomplete`. Obe uvedené podmienky pritom splnila. Bez materiálového vstupu sa hmotnosť nedopočíta — [construction.rb:835](</C:/APP DEV/RUBY/ENGINE/noxun_engine/core/construction.rb:835>); odkazovaný test preto odovzdáva aj `materials: MAT` — [test_kove1b_pravidlo.rb:233](</C:/APP DEV/RUBY/ENGINE/tests/pure/test_kove1b_pravidlo.rb:233>).  
+   **Doplniť pred generovaním T0:** explicitné materiály, očakávaný mechanizmus/kit v riadkoch, pri HL aj ramená a požadované tyče; žiadne blokujúce konflikty, nemapované ani chýbajúce katalógové položky. Rovnaké podmienky ponechať v teste.
+
+2. **FIX-IN-H15b — Allowlist R5c dovolí vrátiť produktové dáta do logiky.**  
+   [PACKAGE_H15.md:159](</C:/APP DEV/RUBY/ENGINE/_dev/audit_h15/PACKAGE_H15.md:159>) povoľuje `SEED_ITEMS`, `SEED_ITEMS_V2` a `SEED_PRODUCT_LINKS` podľa mena, ale nevyžaduje kontrolu ich odvodenia. Napríklad nahradenie výpočtu [hardware_catalog.rb:1816](</C:/APP DEV/RUBY/ENGINE/noxun_engine/core/hardware_catalog.rb:1816>) ekvivalentným literálom ponechá golden nezmenený a splní popísané guardy, hoci ceny a produkty budú opäť v mechanike.  
+   **Doplniť:** kontrolu, že tieto tri výnimky zostávajú odvodené z príslušných seed konštánt, a negatívny test ich nahradenia literálom. Ide o dieru ochrany C-03, nie o preukázanú chybu dnešného nákupu.
+
+3. **NOTE — Samotný presun je obhájiteľný; BLOCKER som nenašiel.**  
+   Na čistom `main` **`108c808c`** vlastná simulácia presunu iba v pamäti zachovala **120 konštánt** vrátane poradia a rekurzívneho zmrazenia, výsledky merge starých aj upravených setov a **7 existujúcich nákupných goldenov vrátane surového CSV**. Merge používa obsahové porovnanie — [hardware_sets.rb:2061](</C:/APP DEV/RUBY/ENGINE/noxun_engine/core/hardware_sets.rb:2061>). Zachovaný namespace, navrhnuté načítanie, updater/recovery a presun ciest v §13 nevykazujú ďalšiu konkrétnu regresiu. Trieda **audit áno / výrobná-cenová áno / in-SU odporúčaný** je primeraná. Celú sadu, diskové upgrade scenáre ani SketchUp som nespúšťal; súbory zostali nezmenené.
+
+
