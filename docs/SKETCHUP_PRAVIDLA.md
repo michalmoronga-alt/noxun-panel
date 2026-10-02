@@ -6,7 +6,10 @@ Destilát z „Výskumná správa pre kódera SketchUp pluginov" (deep research,
 
 - **Jeden top-level namespace** na plugin: `module Noxun::<Plugin>`. Žiadne globálne premenné, žiadne monkey-patchovanie SketchUp API. Všetky extensiony zdieľajú jeden Ruby proces — kolízia mien rozbije cudzí plugin.
 - **Loader (root `.rb`) robí len registráciu** `SketchupExtension` — žiadna logika. Logika v rovnomennom podpriečinku. Umožňuje disable/enable bez načítania kódu.
-- **`Sketchup.require`** namiesto `require_relative` (funguje aj so šifrovanými `.rbe`).
+- **Súbory pluginu (Noxun Engine) výhradne cez `AppLifecycle.require_part 'noxun_engine/…'`** — Ruby `require` s absolútnou cestou, rovnaká semantika na
+  SketchUpe 2026.0 aj 2026.2 (`Sketchup.require` chyby do 2026.1 prehltne, od 2026.2 ich prepustí). Chyba súboru = jedna hláška, plugin v tom okne vypnutý,
+  obnova **reštartom SketchUpu**. Plugin sa **nešifruje** (`.rbe`/`.rbs` Ruby `require` nenačíta; guard test). Prvý súbor (`core/app_lifecycle.rb`) načíta
+  bootstrap v `main.rb` s vlastnou chybovou vetvou. Ostatné pluginy rodiny Noxun: `Sketchup.require` namiesto `require_relative`.
 - Po inštalácii **nezapisovať do priečinka pluginu** — užívateľské dáta do `%APPDATA%` (u nás `%APPDATA%\NOXUN\<Plugin>\`).
 
 ## Geometria
@@ -28,6 +31,10 @@ Destilát z „Výskumná správa pre kódera SketchUp pluginov" (deep research,
 
 ## HtmlDialog
 
+- **`set_on_closed` beží aj pri UKONČENÍ aplikácie** (v 2026.2 pád `pop_tool` z hooku, api-issue-tracker #1117; na 26.0.429 zmerané **pred** `onQuit`, teda príznak
+  ho pri ukončení nezachytí — uzáver F-01 až overením na 2026.2, H11c). Pri `AppLifecycle.quitting?` (príznak
+  z `AppObserver#onQuit`) hook **nevolá žiadne SketchUp API** (observery, prekrytia, nástroje, pohľad, timery) — len zneplatní stav v Ruby a SketchUp upratanie
+  odloží cez `AppLifecycle.defer_until_running`. `@dialog = nil` a čisté Ruby resety bežia vždy. `onQuit` mení len Ruby stav.
 - **Referenciu na dialóg držať** v modulovej/inštančnej premennej — inak ho GC zavrie „záhadne".
 - Unikátny `preferences_key`; **callbacky (`add_action_callback`) registrovať pred `show`**.
 - **Ruby → JS výhradne cez `to_json`** (`dialog.execute_script("app.update(#{data.to_json})")`), nikdy interpoláciou stringu.
