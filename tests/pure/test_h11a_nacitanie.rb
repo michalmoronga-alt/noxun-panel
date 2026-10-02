@@ -57,8 +57,21 @@ module NxH11aLoad
     actions_board actions_appliance actions_usage actions_settings sync resolvers payloads selection
   ].map { |p| "noxun_engine/ui/panel/#{p}" }.freeze
   PART_RE = /AppLifecycle\.require_part '([^']+)'/.freeze
+  # Povolene holé require v main.rb/panel.rb: stdlib a JEDINE nacitanie bootstrapu.
+  ALLOWED_REQUIRES = ["require 'sketchup.rb'", "require 'json'", 'require LIFECYCLE_FILE'].freeze
 
   module_function
+
+  # Riadky kodu (bez komentarov), ktore nacitavaju subor inak nez cez
+  # `AppLifecycle.require_part` alebo povoleny bootstrap/stdlib require.
+  def loader_offenders(text)
+    text.lines.map { |l| l.sub(/#.*$/, '').strip }.reject(&:empty?).select do |code|
+      next true if code =~ /Sketchup\.require\b|\brequire_relative\b/
+      next false unless code =~ /(?<![.\w])(require|load)\b/
+
+      !ALLOWED_REQUIRES.include?(code)
+    end
+  end
 
   def lc
     Noxun::Engine::AppLifecycle
@@ -345,11 +358,32 @@ NxTest.test('H11a T6: kazda cast existuje; ziadne Sketchup.require stromu ani .r
     NxTest.assert(File.file?(File.join(NxTest::ROOT, "#{part}.rb")), "chyba subor #{part}.rb")
   end
   offenders = Dir[File.join(NxTest::ROOT, 'noxun_engine', '**', '*.rb')].select do |f|
-    File.binread(f).force_encoding(Encoding::UTF_8).lines.any? { |l| l.sub(/#.*$/, '').include?("Sketchup.require 'noxun_engine/") }
+    File.binread(f).force_encoding(Encoding::UTF_8).lines.any? { |l| l.sub(/#.*$/, '') =~ /Sketchup\.require\b/ }
   end
-  NxTest.assert(offenders.empty?, "Sketchup.require stromu: #{offenders.inspect}")
+  NxTest.assert(offenders.empty?, "Sketchup.require v plugine: #{offenders.inspect}")
+  %w[main.rb ui/panel.rb].each do |rel|
+    bad = NxH11aLoad.loader_offenders(NxH11aLoad.src('noxun_engine', *rel.split('/')))
+    NxTest.assert(bad.empty?, "#{rel}: nacitanie mimo require_part/bootstrapu: #{bad.inspect}")
+  end
   enc = Dir[File.join(NxTest::ROOT, 'noxun_engine', '**', '*.{rbe,rbs}')]
   NxTest.assert(enc.empty?, "plugin sa nesifruje — Ruby require .rbe/.rbs nenacita: #{enc.inspect}")
+end
+
+NxTest.test('H11a T6: straz nacitania chyti aj dvojite uvodzovky, File.join, load a Sketchup.require') do
+  ok_src = "require 'json'\n    def self.bootstrap_lifecycle!\n      require LIFECYCLE_FILE\n    end\n" \
+           "      AppLifecycle.require_part 'noxun_engine/core/units' # require 'x' v komentari\n"
+  NxTest.assert_equal([], NxH11aLoad.loader_offenders(ok_src), 'json + bootstrap + require_part + komentar = povolene')
+  [
+    %(Sketchup.require "noxun_engine/core/units"\n),
+    %(Sketchup.require 'noxun_engine/core/units'\n),
+    %(Sketchup.require(File.join(PLUGIN_DIR, 'core', 'units'))\n),
+    %(require "noxun_engine/core/units"\n),
+    %(require File.join(PLUGIN_DIR, 'core', 'units')\n),
+    %(load File.join(PLUGIN_DIR, 'core', 'units.rb')\n),
+    %(require_relative 'core/units'\n)
+  ].each do |bad|
+    NxTest.assert_equal(1, NxH11aLoad.loader_offenders(bad).length, "straz musi chytit: #{bad.strip}")
+  end
 end
 
 NxTest.test('H11a T6: bootstrap ide PRED zoznamom a ma vlastnu chybovu vetvu bez AppLifecycle') do
@@ -358,6 +392,8 @@ NxTest.test('H11a T6: bootstrap ide PRED zoznamom a ma vlastnu chybovu vetvu bez
   NxTest.refute(boot.empty?, 'bootstrap_lifecycle! chyba')
   NxTest.assert(boot.include?('rescue StandardError, ScriptError'), 'vlastna chybova vetva (aj ScriptError)')
   NxTest.assert(boot.include?('LOADED'), 'kontrola sentinelu')
+  NxTest.assert_equal(1, main.scan('require LIFECYCLE_FILE').length, 'bootstrap sa nacitava PRAVE RAZ')
+  NxTest.assert(boot.include?('require LIFECYCLE_FILE'), 'jedine hole require suboru pluginu je v bootstrap_lifecycle!')
   failed = main[/def self\.bootstrap_failed!.*?\n    end\n/m].to_s
   NxTest.refute(failed.include?('AppLifecycle'), 'chybova vetva nesmie zavisiet od AppLifecycle')
   NxTest.assert(main.index('if bootstrap_lifecycle!') < main.index("AppLifecycle.require_part 'noxun_engine/core/units'"),

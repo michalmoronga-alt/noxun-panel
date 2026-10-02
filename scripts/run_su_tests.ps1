@@ -40,11 +40,12 @@
 # tests/sketchup/su_quit_probe.rb (Inspector + Studio otvorene, ghost na kurzore,
 # stopa sondy do quit_trace.txt cez vopred otvoreny handle, ulozenie
 # run-kopie, Sketchup.quit). Zdiela zamok, sentinel aj run_* priecinok; proces
-# sa ukonci SAM (prepinac -CloseWhenDone sa ignoruje). Verdikt az PO zaniku
-# procesu (max 120 s, nikdy nezabija): PASS = exit kod 0 · presne 1x on_quit ·
-# ziadny pop:executed po on_quit · kazdy hook po on_quit = quitting · ziadny
-# hook:*:normal medzi probe:saved a on_quit. FAIL = cokolvek ine VRATANE
-# 0xC0000374. Vypise `QUIT-TEST: PASS|FAIL` + stopu, exit 0/1. S -QuitMenu sonda
+# sa ukonci SAM (prepinac -CloseWhenDone sa ignoruje). Po H11a je to ZAZNAM,
+# nie brana (kriteria H11a-1 zanikli s vratenim ukoncovania; PASS/FAIL pre
+# zalozny navrh Z1 prepise H11c): az PO zaniku procesu (max 120 s, nikdy
+# nezabija) vypise `QUIT-TEST: ZAZNAM`, exit kod, poradie (A = on_quit pred
+# hookmi okien, B = hooky pred on_quit) a stopu. Exit 0 len pri exit kode
+# SketchUpu 0, presne 1x on_quit a pripravenej sonde; inak 1 (0xC0000374 = 1). S -QuitMenu sonda
 # ukonci SketchUp cestou pouzivatela Subor > Koniec (send_action 57665; poistka
 # Sketchup.quit po 8 s) namiesto Sketchup.quit.
 param([switch]$CloseWhenDone, [switch]$QuitProbe, [switch]$QuitMenu)
@@ -354,16 +355,17 @@ end
     Write-Host ''
     Get-Content $out -Encoding UTF8 | Write-Host
     if ($QuitProbe) {
-      # QUIT TEST (H11a §A6): verdikt AZ PO zaniku procesu — exit kod je jeho sucast.
+      # QUIT TEST (H11a, nastroj pre H11c): ZAZNAM po zaniku procesu — exit kod a poradie.
       $quitWaitS = 120
       Write-Host ('QUIT-TEST: cakam na zanik procesu SketchUpu (PID ' + $suProc.Id + ', max ' + $quitWaitS + ' s)...')
       $why = New-Object System.Collections.Generic.List[string]
+      $exitText = 'proces nezanikol do ' + $quitWaitS + ' s (skript ho NEZABIJA, zavri ho rucne)'
       if ($suProc.WaitForExit($quitWaitS * 1000)) {
         $suExit = $suProc.ExitCode
-        Write-Host ('QUIT-TEST: exit kod ' + $suExit + ' (0x' + ('{0:X8}' -f $suExit) + ')')
-        if ($suExit -ne 0) { $why.Add('exit kod ' + $suExit + ' (0x' + ('{0:X8}' -f $suExit) + ') - ma byt 0') }
+        $exitText = [string]$suExit + ' (0x' + ('{0:X8}' -f $suExit) + ')'
+        if ($suExit -ne 0) { $why.Add('exit kod ' + $exitText) }
       } else {
-        $why.Add('proces nezanikol do ' + $quitWaitS + ' s - skript ho NEZABIJA, zavri ho rucne')
+        $why.Add($exitText)
       }
       $probeFails = (Select-String -Path $out -Pattern '^FAIL:' | Measure-Object).Count
       if ($probeFails -gt 0) { $why.Add('priprava sondy: ' + $probeFails + ' FAIL') }
@@ -374,25 +376,24 @@ end
       $quits = @($trace | Where-Object { $_ -eq 'on_quit' }).Count
       if ($iSaved -lt 0) { $why.Add('v stope chyba probe:saved (sonda sa nepripravila)') }
       if ($quits -ne 1) { $why.Add('on_quit ' + $quits + 'x - ma byt presne 1x') }
-      if ($iQuit -ge 0) {
-        for ($i = $iQuit + 1; $i -lt $trace.Count; $i++) {
-          $ev = $trace[$i]
-          if ($ev -eq 'pop:executed') { $why.Add('pop:executed PO on_quit (riadok ' + ($i + 1) + ')') }
-          if ($ev -like 'hook:*' -and $ev -notlike '*:quitting') { $why.Add($ev + ' PO on_quit nema rezim quitting') }
-        }
-        if ($iSaved -ge 0) {
-          for ($i = $iSaved + 1; $i -lt $iQuit; $i++) {
-            if ($trace[$i] -like 'hook:*:normal') { $why.Add($trace[$i] + ' medzi ulozenim a on_quit (poradie B)') }
-          }
-        }
+      $order = 'neurcene'
+      if ($iQuit -ge 0 -and $iSaved -ge 0) {
+        $hooksBefore = 0
+        for ($i = $iSaved + 1; $i -lt $iQuit; $i++) { if ($trace[$i] -like 'hook:*') { $hooksBefore++ } }
+        $order = 'A (on_quit pred hookmi okien)'
+        if ($hooksBefore -gt 0) { $order = 'B (' + $hooksBefore + ' hook(y) okien pred on_quit)' }
       }
+      $popsBefore = 0
+      if ($iQuit -ge 0) { for ($i = 0; $i -lt $iQuit; $i++) { if ($trace[$i] -eq 'pop:executed') { $popsBefore++ } } }
+      Write-Host 'QUIT-TEST: ZAZNAM (nie brana — kriteria pre Z1 prepise H11c)'
+      Write-Host ('  exit kod SketchUpu: ' + $exitText)
+      Write-Host ('  poradie: ' + $order + ' · on_quit ' + $quits + 'x · pop:executed pred on_quit ' + $popsBefore + 'x')
       Write-Host ('QUIT-TEST stopa (' + $quitTrace + '):')
       $trace | ForEach-Object { Write-Host ('  ' + $_) }
       if ($why.Count -eq 0) {
-        Write-Host 'QUIT-TEST: PASS'
         $exitCode = 0
       } else {
-        Write-Host 'QUIT-TEST: FAIL'
+        Write-Host 'QUIT-TEST: zaznam neuplny alebo SketchUp neskoncil cisto:'
         $why | ForEach-Object { Write-Host ('  - ' + $_) }
       }
     } else {

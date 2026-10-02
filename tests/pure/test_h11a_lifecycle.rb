@@ -1,11 +1,12 @@
 # frozen_string_literal: true
-# Testy H11a (F-01, cast „ukoncovanie"): PRIPRAVA NA SKETCHUP 2026.2.
+# Testy H11a (F-01): CHARAKTERIZACIA T0a RUCNEHO ZATVORENIA INSPECTORA — podklad
+# pre H11c (zalozny navrh Z1); samotne ukoncovanie SketchUpu H11a neriesi.
 #
 # CO SA DOKAZUJE:
 #   T0a charakterizacia DNESNEJ cesty zatvorenia Inspectora (`cancel_session`)
 #       — synchronne `view.invalidate` (+ `lock_inference` pri kresleni),
 #       `UI.start_timer(0)` a v timeri PRAVE JEDEN `tools.pop_tool`.
-#       Bezi pred zasahom aj po nom (ruchne zatvorenie sa nezmenilo).
+#       Bezi pred zasahom aj po nom (rucne zatvorenie sa nezmenilo).
 require_relative '../helper' unless defined?(NxTest)
 
 module NxH11a

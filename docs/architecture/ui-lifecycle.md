@@ -2199,8 +2199,8 @@ príprava → **`abort_prepared!`** (uprace len vlastný staging). `apply!` = ob
   a bez registrácie. Zdroj verzie je číselné `Sketchup.version_number` (major = číslo / 100 000 000), reťazec `Sketchup.version` je záloha a krížová kontrola;
   **neznáma alebo rozporná verzia = fail-open** (plugin sa načíta, riadok v konzole). Inštalátor má to isté minimum (`$MinSketchupYear`, `-ResolveOnly` = len výpis cieľa). Porovnanie generácie beží
   aj na `:idle` (cudzí proces mohol aktualizáciu medzitým dokončiť a upratať), ale blokuje **len dokázaný nesúlad** — keď sa verzia stromu zistiť nedá (chýbajúci
-  alebo nečitateľný `main.rb`), plugin sa načíta normálne a chýbajúci či poškodený súbor ohlási obal načítania (`AppLifecycle.require_part`,
-  jedna hláška, plugin v tom okne vypnutý — odsek `app_lifecycle.rb`). Zámok sa berie pri každom boote.
+  alebo nečitateľný `main.rb`), plugin sa načíta normálne a chybu samotného `main.rb` ohlási SketchUp pri jeho načítaní (`Sketchup.require` extensionu);
+  chyby vnútorných súborov načítaných z validného `main.rb` hlási obal `AppLifecycle.require_part` (odsek `app_lifecycle.rb`). Zámok sa berie pri každom boote.
 
 **UI vrstva — sekcia „O plugine"** (server `supplier_settings_dialog.rb`, klient `about.js` + `studio_settings.js`):
 - **Kontrola verzie je explicitná akcia** (nie súčasť payloadu): spúšťa ju vstup do sekcie (klik aj deep-link → `studioSwitchSection` → háčik `enter` riadka `about` = `ssOnAboutEnter()`) a uloženie
@@ -2254,7 +2254,8 @@ Riešenie je **záložný návrh Z1** v dávke **H11c** (hook nástroj nepopne, 
 **Quit test** (`scripts\run_su_tests.ps1 -QuitProbe`, s `-QuitMenu` cesta Súbor > Koniec cez `send_action` 57665 → `tests/sketchup/su_quit_probe.rb`):
 kópia ENGINEtests.skp, Inspector + Štúdio + ghost, **inštrumentácia žije len v sonde** (vlastný `AppObserver#onQuit`, obaly `Panel.detach_observer`,
 `StudioDialog.detach_stale_observer`, `GhostTool.pop_tool`), stopa cez vopred otvorený handle do `quit_trace.txt`, uloženie run-kópie, ukončenie; verdikt **až po
-zániku procesu**: exit kód 0 · presne 1× `on_quit` · žiadny `pop:executed` po `on_quit` · žiadny hook medzi `probe:saved` a `on_quit`; 0xC0000374 = FAIL.
+zániku procesu** = **záznam, nie brána**: skript vypíše `QUIT-TEST: ZAZNAM` so stopou, exit kódom a poradím (`A` = `on_quit` pred hookmi okien, `B` =
+hooky pred `on_quit`); exit 0 len pri ukončení s kódom 0 a presne 1× `on_quit`, inak 1 (0xC0000374 = 1). Kritériá PASS/FAIL pre záložný návrh Z1 **prepíše H11c**.
 In-SU: `run_h11a` (P1 brána načítania, Q7) a `run_h11a_async` (Q1 ručné zatvorenie) v `su_runner.rb`.
 
 ### Satelitné okná

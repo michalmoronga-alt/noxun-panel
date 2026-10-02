@@ -12,10 +12,10 @@
 # `hook:inspector:normal` a `StudioDialog.detach_stale_observer` ->
 # `hook:studio:normal` (prvy krok hookov `set_on_closed`); obal
 # `GhostTool.pop_tool` -> `pop:executed`. IO pocas ukoncovania je priznana
-# testovacia vynimka (D3). Verdikt robi PowerShell PO zaniku procesu (exit kod 0,
-# presne 1x on_quit, ziadny pop:executed po on_quit, ziadny hook pred on_quit
-# po `probe:saved`). Na 26.0.429 (H11a) hooky oboch okien prisli PRED on_quit
-# (poradie B) cez `Sketchup.quit` aj Subor > Koniec — exit 0, ale FAIL.
+# testovacia vynimka (D3). PowerShell PO zaniku procesu vypise ZAZNAM (exit kod,
+# poradie A/B, stopa) — nie branu; kriteria PASS/FAIL pre Z1 prepise H11c.
+# Na 26.0.429 (H11a) hooky oboch okien prisli PRED on_quit (poradie B) cez
+# `Sketchup.quit` aj Subor > Koniec, exit 0.
 #
 # BEZPECNOST: bezi VYHRADNE nad kopiou ENGINEtests*.skp (inak nic nerobi a NEukonci).
 

@@ -28,9 +28,9 @@
   package §17): quit test na 26.0 — `Sketchup.quit` aj Súbor > Koniec (`send_action` 57665): stopa `hook:studio` · `hook:inspector` (pri `Sketchup.quit` niekedy aj `pop:executed` z timera) · **až potom** `on_quit`, exit kód **0** — SketchUp zatvára okná **pred** `onQuit` (poradie B), takže príznak z `onQuit` by pri ukončení nič nezachytil.
   Pád #1117 na 2026.2 rieši **H11c = záložný návrh Z1 + vlastný audit** (AUDIT_REGISTER **R-42**, F-01 otvorené). Ostáva nástroj quit testu
   (`scripts\run_su_tests.ps1 -QuitProbe [-QuitMenu]`, `tests/sketchup/su_quit_probe.rb` s vlastnou inštrumentáciou; na finálnom kóde oba režimy znova poradie B, exit 0). **In-SU 3387 / 0** na `b8f3e6e4` (P1, Q7, Q1
-  ručné zatvorenie); T0b pred zásahom `790d74ff` 3380 / 0. Testy: **5263 headless** (`test_h11a_nacitanie.rb` T4–T6 so subprocesom skutočného `main.rb`,
+  ručné zatvorenie); T0b pred zásahom `790d74ff` 3380 / 0. Testy: **5264 headless** (`test_h11a_nacitanie.rb` T4–T6 so subprocesom skutočného `main.rb`,
   `test_h11a_lifecycle.rb` T0a charakterizácia ručného zatvorenia; 9 textových testov len prefix `require_part`) · **161 JS sád** · encoding guard; mutácie
-  načítania M10–M13 zabité. Dokumentácia: odsek `app_lifecycle.rb` (ui-lifecycle.md, so zmeraným poradím B), updater, `SKETCHUP_PRAVIDLA.md`, router `ARCHITEKTURA.md`.
+  načítania M10–M13 a M15 zabité; predrecenzia 0× P1/P2, 4× P3 opravené (veta updatera o `main.rb`, quit test = záznam bez brány — kritériá pre Z1 prepíše H11c, prísnejšia stráž načítania, hlavička testu). Dokumentácia: odsek `app_lifecycle.rb` (ui-lifecycle.md, so zmeraným poradím B), updater, `SKETCHUP_PRAVIDLA.md`, router `ARCHITEKTURA.md`.
 - **H7b · názov zákazky v hlavičke Štúdia + povinný `expect` pri štyroch exportoch (2.10.2026, PR #457, v0.17.21, blok 9 · HARDENING PO V1, triedenie A-05; package
   [PACKAGE_H7.md](../zdroje/bloky/HARDENING/PACKAGE_H7.md) §6 R-B1–R-B12 + §15–§17 (§17 C1/C2 má prednosť); mockup
   [MOCKUP_H7_NAZOV_ZAKAZKY.html](../zdroje/bloky/HARDENING/MOCKUP_H7_NAZOV_ZAKAZKY.html) PLATÍ, O1–O9; brief [BRIEF_H7.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H7.md)).**

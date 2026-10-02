@@ -364,3 +364,6 @@ nedosiahol. Brána P1 (Ruby `require` s absolútnou cestou) **PASS**; surové `S
 - **H11c = záložný návrh Z1 + vlastný audit** (keď bude SketchUp 2026.2, Michal dá vedieť): hook nástroj nikdy nepopne, len zneplatní session; ghost sa ukončí sám
   pri najbližšom používateľskom vstupe (vzor `finish_self_soon`) — mení dnešné správanie, preto audit a mockup správania; poradie B je **potvrdené už na 26.0**.
   F-01 ostáva otvorené (AUDIT_REGISTER R-42).
+- **Quit test je po H11a len záznam:** `run_su_tests.ps1 -QuitProbe [-QuitMenu]` vypíše `QUIT-TEST: ZAZNAM` (stopa, exit kód, poradie A/B) a vráti 0 len pri
+  exit kóde 0 a presne 1× `on_quit`. Pôvodné kritériá §A6 (režim `quitting`, žiadny `hook:*:normal` pred `on_quit`) patrili k vrátenému H11a-1 — **kritériá PASS/FAIL
+  pre Z1 prepíše H11c** (napr. exit 0 na 2026.2 + žiadny `pop:executed` medzi hookmi a `on_quit`).
