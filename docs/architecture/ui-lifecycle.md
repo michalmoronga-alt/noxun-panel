@@ -2315,7 +2315,8 @@ Plné znenie a autorita: [../UI_DIZAJN.md](../UI_DIZAJN.md) §1 Princípy (tu le
 identifikátory prvkov a počty** (žiadne hodnoty polí ani názvy projektov) do `%APPDATA%\NOXUN\Engine\usage_stats.json` (`JsonFileStore`, `.bak`; SCHEMA 1:
 `first_seen`, `last_seen`, `counts`). `record(counts)` nikdy nevyhadzuje; `merge` sčíta dávky a zachová neznáme polia, súbor s novšou schémou sa neprepisuje;
 `sanitize_counts` ticho zahodí vadné hodnoty; read-modify-write chráni `flock` na **sidecar** zámku (dve inštancie SketchUpu). Klient `ui/js/usage.js` počíta
-kliky v capture fáze a posiela dávku `usage_flush` (handler `actions_usage.rb`).
+kliky v capture fáze a posiela dávku `usage_flush` (handler `actions_usage.rb`). Koreň `UsageStats.dir` = `Materials.dir` (jediný koreň; súpis
+[kniznice.md](kniznice.md)).
 
 ## História
 

@@ -29,7 +29,8 @@ Reťaz: `noxun_engine.rb` (loader, autorita VERSION; **minimum SketchUp 2026** �
 | [architecture/appliances.md](architecture/appliances.md) | katalóg spotrebičov (per PC), prílohy, snapshot modelu pre zákazku |
 | [architecture/outputs.md](architecture/outputs.md) | kontrolný semafor, zdieľané jadro výstupov zákazky (kusovník, VEPO, nákup, rozpočet, ceny, exporty) |
 | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) | Inspector (kostra, kontexty, karty), Štúdio (okno a sekcie), zdieľané JS komponenty, lifecycle okien |
-| [architecture/rozsirovacie-body.md](architecture/rozsirovacie-body.md) | **kde sa plugin rozširuje** — miesta pre nový typ skrinky (vrátane pasce závesov), novú rolu dielca, stĺpec Kusovníka, sekciu Štúdia a pravidlo kovania viazané na typ; verzie dát v [../SYSTEM/STANDARD.md](../SYSTEM/STANDARD.md) §13 |
+| [architecture/rozsirovacie-body.md](architecture/rozsirovacie-body.md) | **kde sa plugin rozširuje** — miesta pre nový typ skrinky (vrátane pasce závesov), novú rolu dielca, stĺpec Kusovníka, sekciu Štúdia, pravidlo kovania viazané na typ, set kovania a nové úložisko na počítači; verzie dát v [../SYSTEM/STANDARD.md](../SYSTEM/STANDARD.md) §13 |
+| [architecture/kniznice.md](architecture/kniznice.md) | **súpis knižníc a úložísk na počítači** — čo plugin ukladá mimo zákazky, čo sa pri zdieľaní medzi PC (D-48) prenáša a čo ostáva tomuto PC, zámky, prílohy, verzie a zapisovatelia |
 
 Ďalej v `docs/`: pravidlá SketchUp kódu [SKETCHUP_PRAVIDLA.md](SKETCHUP_PRAVIDLA.md) ·
 DC pasce [DC_PRAVIDLA.md](DC_PRAVIDLA.md) · UI dizajn [UI_DIZAJN.md](UI_DIZAJN.md).
@@ -41,6 +42,7 @@ DC pasce [DC_PRAVIDLA.md](DC_PRAVIDLA.md) · UI dizajn [UI_DIZAJN.md](UI_DIZAJN.
 | `units` · `ids` · `store` · `part_keys` · `build_plan` · `doc_key` | [architecture/model-a-identita.md](architecture/model-a-identita.md) |
 | `json_file_store` · `dim_series` · `debug` | [architecture/model-a-identita.md](architecture/model-a-identita.md) |
 | `templates` · `template_usage` · `template_previews` | [architecture/model-a-identita.md](architecture/model-a-identita.md) |
+| `library_registry` (súpis knižníc a úložísk mimo zákazky — zdieľanie medzi PC, zámky, prílohy, verzie; podklad D-48) | [architecture/kniznice.md](architecture/kniznice.md) |
 | `cabinet_types` (register typov skrinky a ich vlastností — H12a) | [architecture/construction.md](architecture/construction.md) |
 | `construction` · `cabinet_builder` · `board_builder` · `placement` · `zones` · `zone_tree` · `tags` | [architecture/construction.md](architecture/construction.md) |
 | `ghost_tool` (GHOST vkladanie na klik — SketchUp `Tool` + placement session) | [architecture/construction.md](architecture/construction.md) |

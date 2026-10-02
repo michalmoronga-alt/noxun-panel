@@ -499,6 +499,7 @@ module Noxun
       AppLifecycle.require_part 'noxun_engine/core/json_file_store' # cache + bezpecny atomicky zapis JSON katalogov
       AppLifecycle.require_part 'noxun_engine/core/dim_series'  # UI-B3 (N6): rozmerove rady panela (%APPDATA%, nastavenie pocitaca)
       AppLifecycle.require_part 'noxun_engine/core/materials'   # V0.3 materialovy katalog (pred abs_rules)
+      AppLifecycle.require_part 'noxun_engine/core/library_registry' # H16: supis kniznic a ulozisk mimo modelu (ciste data; koren = Materials.dir pri volani)
       AppLifecycle.require_part 'noxun_engine/core/materials_appearance' # MR-1A: kontrakt a publikacia spolocneho vzhladu
       AppLifecycle.require_part 'noxun_engine/core/materials_native_appearance' # MR-1B1: overeny nativny kontajner, bez zapojenia builderov
       AppLifecycle.require_part 'noxun_engine/core/materials_build_appearance' # MR-1B2: povodny vzhlad pri prestavbe a kopii

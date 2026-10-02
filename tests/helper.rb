@@ -129,6 +129,7 @@ unless NxTest::IN_SKETCHUP
     core/json_file_store
     core/dim_series
     core/materials
+    core/library_registry
     core/materials_appearance
     core/materials_native_appearance
     core/materials_build_appearance

@@ -237,7 +237,7 @@ položku zákazky** — `ref_key` je `ref:appliance_niche:<item_id>` a skrinka s
 
 ### json_file_store.rb
 
-Spoločná perzistencia malých JSON katalógov v `%APPDATA%\NOXUN\Engine` (materiály, šablóny, sety a pravidlá kovania, ABS, rozmerové rady, nastavenia dodávateľa). Modul rieši
+Spoločná perzistencia malých JSON súborov v `%APPDATA%\NOXUN\Engine` (ktoré to sú, ich zámky a zdieľanie medzi PC: súpis [kniznice.md](kniznice.md)). Modul rieši
 **atomicitu**, nie súbeh — medziprocesový zámok je nad ním (`Materials.with_catalog_lock`, sidecar `materials.lock`, 1d/R-08).
 
 - **Zápis** ide `tmp → fsync → `.bak` → rename`: nikdy neexistuje okno, v ktorom by bol cieľový súbor neúplný. `preserve_valid_backup` odloží PREDCHÁDZAJÚCI obsah do `.bak`, ale
@@ -306,6 +306,8 @@ panel vezme z **`DimSeries.write_block_reason`** a ukáže ho namiesto všeobecn
 ### templates.rb
 
 (UI od ŠT-3c-1 = **sekcia `tpl` Štúdia**, okno „Šablóny" ZANIKLO) — knižnica šablón (`%APPDATA%\NOXUN\Engine\templates.json` + `.bak`, zápis cez `JsonFileStore`).
+Koreň `TemplateStore.dir` = `Materials.dir` (jediný koreň, vzor `AbsRules.dir`; súpis [kniznice.md](kniznice.md)); od neho idú `TemplateUsage`, `TemplatePreviews` a ich zámky, takže
+`Materials.test_dir_override` presmeruje aj šablóny.
 
 **KOV-I — súhrn uloženého kovania:** čistá `TemplateStore.hardware_summary(config)` vracia `{has, sets: [{generic_type, label, set_name}], manual_count}`.
 Prítomnosť znamená neprázdnu mapu `hardware_sets` alebo neprázdne pole `hardware_manual`; samotné definície bez mapovania odznak nevytvoria. Názvy sa čítajú
