@@ -355,8 +355,8 @@ a atribúty na `<body>`; `innerHTML` re-render kostry je zakázaný (listenery, 
 - **Viditeľnosť tagov** (`railTagy` v obale `.railmenu`, nie `.railfly`): celé tlačidlo otvára okno so zoznamom NOXUN tagov (`#railTagsMenu`, čistý modul
   `ui/js/tag_menu.js`). Zápis `nx_tag_visible` → `Panel.handle_tag_visible` (prísny guard, whitelist `Tags::KEYS`, výslovný boolean) → `Engine.set_tag_visible` →
   `Tags.set_visible` (**jedna operácia = jeden krok Späť**) → `broadcast_tags`. Stav pull v `push_init` (`tags`) a push pri každom `push_selected`; `LayersObserver`
-  sa nepridáva (zmena v natívnom okne Tags sa prejaví pri ďalšom pushi). Checkbox „Zobraziť zóny (ghost)" (`#zonesChk`) je **druhý ovládač toho istého tagu**
-  (kľúč `zony`, `nxApplyTags`). Testy `tests/pure/test_d27_tagy.rb`, `tests/js/test_d27_tagy.js`, in-SU `run_d27`; modul `tags.rb` v [construction.md](construction.md).
+  sa nepridáva (zmena v natívnom okne Tags sa prejaví pri ďalšom pushi). Obrysy zón (kľúč `zony`) prepína **jediný ovládač — toto okno** (`nxApplyTags` nasadzuje ikonu raily);
+  checkbox pod náhľadom zanikol (H6a). Testy `tests/pure/test_d27_tagy.rb`, `tests/js/test_d27_tagy.js`, in-SU `run_d27`; modul `tags.rb` v [construction.md](construction.md).
 - **Koliesko** otvára modal `#cfgModal` (Vzhľad = téma · Rozmerové rady = editor `DimSeries` · O plugine = logo + verzia) — zámerne nie piaty kontext (nastavenia
   počítača nepatria do stavového stroja a musia ísť aj bez výberu). Rady chodia v `push_init` (`ui_settings`) a malým pushom `NX.setUiSettings` (mení len
   ponuky a stav prepínača). **Téma v tomto payloade nie je a nesmie pribudnúť** (`nxSyncThemeButtons` len presvieti tlačidlá). **Dve okná (H10b/R-35):** editor
@@ -377,6 +377,13 @@ a atribúty na `<body>`; `innerHTML` re-render kostry je zakázaný (listenery, 
 - Akcie **z náhľadu** najprv rozbalia cestu k cieľu (`nxRevealTarget`).
 - Scroll je dokumentový (rail `position: fixed`, hlavička sticky, warnpanel je overlay v hlavičke). CSS kostry je scopnuté pod `.nx-inspector` na `<html>`.
   Pätička s verziou z Ruby. Testy: `tests/js/test_uib1_kostra.js`, `tests/pure/test_uib1_kostra.rb`, in-SU `run_uib1`.
+- **Spodok panela a pomocné texty (H6a):** akcie „Vložiť kópiu" a „Uložiť šablónu" sú dve `ghostbtn` v jednom `.cabacts` (viditeľné len `body.mode-cab`;
+  akcie `insertCopySelected()` / `openSaveTemplateModal()` bez zmeny). **`#status`** je `hidden` bez správy: `NX.setStatus(msg, err)` (`bridge.js`) nastaví
+  `textContent`, triedu `ok`/`err` a `hidden = (msg prázdna po trim)`; `NX.setStatus('')` (`hardware.js`) vetu schová, „Pripravené." nie je; Štúdio má vlastný
+  `#status`. Legenda „Rozmery" (`#basicCard > legend`) je skrytá pri `mode-cab`. **„?" pod náhľadom** je statický `#pvHelp` v `.pvbar` (pred `#pvCam`); `data-tip`
+  mu nasadzuje `nxShellApply` z čistej `NXShell.pvHelpText(mode, ctx)` (Zóny a dielec = zónová veta, Čelá, Kovanie, inak len gestá). **„?" v hlavičkách** skupín
+  Štruktúra zón, Položky, Sety, Pravidlá (`.ghdr` + `.gtools` + `.nxtip r`, klik cez `nxTipStop` skupinu nezbalí) a `#s3Help` v lište Materiálov (len `mode-cab`,
+  súrodenec `#s3Meta`). Testy `tests/pure/test_h6a_html.rb`, `test_h6a_texty.rb` (inventár viet `tests/fixtures/h6_texty.json`), `tests/js/test_h6a_napovedy.js`.
 
 ### D-08 kontexty
 
@@ -510,7 +517,7 @@ orientačná. Všetky vrstvy berú geometriu z **jedného** `pvGeom()`; `sceneSi
 
 **Spodný pás** (`.pvbar`, `renderPvBar`): **chipy vrstiev** Zóny·Čelá·Kovanie·Olep — chip kontextu je základ, ostatné sa prisvietia ako ghost (tlmené,
 `pointer-events: none`); Olep mimo kontextu Dielec a chip bez dát sú `aria-disabled` s vysvetlením. Stav per kontext v `NXLayers`, nová identita ho resetuje.
-Vpravo **kamera** a **fit**. Kamera = čisté čítanie: `nx_camera_focus` → `Panel.handle_camera_focus` (`view.camera.set` čelne + `view.zoom(entity)`; žiadny
+Vpravo **„?"** (`#pvHelp`, gestá podľa režimu a kontextu — `NXShell.pvHelpText`; pod náhľadom už nie je riadok `.pvhint` ani checkbox obrysov zón), **kamera** a **fit**. Kamera = čisté čítanie: `nx_camera_focus` → `Panel.handle_camera_focus` (`view.camera.set` čelne + `view.zoom(entity)`; žiadny
 `start_operation`, výber sa nemení; prísny guard `model_guid` + `cabinet_id`). Chipy prepínajú vrstvy náhľadu, nie tagy modelu.
 
 **Ťahanie priečky:** `pointerdown` + **pointer capture**, koniec na `pointerup`/`pointercancel`/strate fokusu cez jediné `endDivListeners`. **Magnet** 1/4 · 1/2 ·
@@ -774,6 +781,8 @@ Testy kontextu: `tests/js/test_uic4_kovanie.js`, `tests/pure/test_uic4_kovanie.r
 
 **Čo robí:** v Základných skrinky (a v karte dosky `#boardApplRows` — varná doska, drez) ukáže **jeden riadok cez oba stĺpce na každý viazaný spotrebič**, riadok
 „očakáva" pre nesplnené očakávanie (`appliance_expects[]`, slot umývačky vždy) a **posledný riadok voľby „očakáva"**. Vzor riadku Nôh — žiadny sektor ani nadpis.
+Veta riadku voľby: pri prázdnom zozname je pomocná („bez spotrebiča — nastav „očakáva"…") a `aprRowHtml` ju kreslí ako „?" za výberom (`.nxtip inl r`); pri neprázdnom
+zozname je to stav („očakáva rúru") a ostáva viditeľný `.aptxt` pod riadkom (H6a; text aj payload zo servera bez zmeny).
 Blok sa skrýva len pri kuse mimo matice vlastníkov a pri slote (ten voľbu nemá); skrinka a doska majú riadok voľby aj bez očakávaní (inak by sa očakávanie bez
 šablóny nedalo zapnúť). Zápisy: `actions_appliance.rb` ([actions_appliance.rb](#actions_appliancerb)).
 
@@ -1949,7 +1958,8 @@ pushi** (malý JSON, bez západky). **JS:** `ui/js/rules.js` (`rdApplyState`, `r
   serverovou `HardwareRules.label_for` (guard test). Pravidlo sa nemaže.
 - **Editor door guardov** pravidla `bands` (`rdGuardHtml`, zbalený `<details>` so súhrnom `rdGuardSummary`, otvorenosť `RD_GUARD_OPEN` podľa `rule_id`): `width_plus
   {over, add}` · `width_warn_over` · `weight_bands [{max, quantity}]` · `finite`; kreslí sa pri `kind: 'bands'` s výstupom `hinge` a pri každom `bands`, ktoré guard
-  už nesie. `RD_GUARD_KEYS` = zrkadlo `HardwareRules::DOOR_GUARD_KEYS` (guard test).
+  už nesie. `RD_GUARD_KEYS` = zrkadlo `HardwareRules::DOOR_GUARD_KEYS` (guard test). Pomocná veta bloku („Platí pre dvierka…", `RD_GUARD_HELP`) je „?"
+  (`.studio .nxtip`) v `<summary>` za súhrnom; klik naň blok nezbalí.
 - **Tvar zo snapshotu nesmie zhodiť sekciu:** `weight_bands`, `bands` aj `series` prechádzajú bránou `rdArr`; zlý tvar = prázdna tabuľka s jantárovým hintom (`.rgbad`)
   a v lište „neplatný tvar" (`rdWeightBroken`); opraví ho uloženie. Pri zbalení bloku `rdGuardToggle` → `rdGuardRefresh` prevezme formulár zberom `rdSyncFromForm`
   a prepíše len text `.rgsum` (bez `rdRender`).

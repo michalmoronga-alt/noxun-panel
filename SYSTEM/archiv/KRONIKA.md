@@ -17,6 +17,23 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H6a · nápovedy, spodok panela a stavová veta (2.10.2026, PR #?, v0.17.17, blok 9 · HARDENING PO V1, triedenie D-01 — CU-04, CU-11, GR-22, CS-10; package
+  [PACKAGE_H6.md](../zdroje/bloky/HARDENING/PACKAGE_H6.md) §6 „H6a" + §15; mockup [MOCKUP_H6_INSPECTOR.html](../zdroje/bloky/HARDENING/MOCKUP_H6_INSPECTOR.html);
+  rozhodnutia Michala 2.10. v [ROZHODNUTIA_MICHALA_2026-10-01.md](../zdroje/bloky/HARDENING/ROZHODNUTIA_MICHALA_2026-10-01.md); brief
+  [BRIEF_H6.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H6.md)).** Prvá z troch častí H6 (H6a nápovedy a spodok → H6b lišty a súhrny → H6c kóty). Pomocné vety, ktoré
+  trvalo zaberali riadky, sú „?" (stavové vety ostali viditeľné): jedno **„?" vedľa kamery pod náhľadom** (text podľa režimu a kontextu — čistá `NXShell.pvHelpText`:
+  Zóny a označený dielec = klik na zónu a ťahanie priečky, Čelá = klik na čelo, Kovanie = klik na značku, inak len zoom a posun), „?" v hlavičkách **Štruktúra zón ·
+  Položky z pravidiel · Sety · Pravidlá**, v lište **Materiály** (len pri označenej skrinke), v riadku **Spotrebič** (pri prázdnom očakávaní; „očakáva rúru" ostáva ako
+  stav) a v Štúdiu → Pravidlá pri bloku **Kontroly dvierok** (O13/CS-10). Riadok `.pvhint` a veta „klik na značku…" v kresbe Kovania zanikli. **O1 B** (odchýlka od
+  mockupu): „Vložiť kópiu" a „Uložiť šablónu" ostali dole, ale **vedľa seba v jednom riadku** (`.cabacts`, skrátený text, rovnaké akcie); **O2 A:** `#status` je
+  `hidden`, kým nenesie správu (`NX.setStatus`), „Pripravené." zmizlo (Štúdio ho má ďalej, F5); **O3 B:** pätka s verziou ostala; **O4:** nadpis „Rozmery" pri označenej
+  skrinke preč; **O8:** checkbox „Zobraziť obrysy zón v modeli" a `toggleZones` zanikli — tag `Noxun/Zóny` prepína **jediný ovládač, okno tagov v raile** (server bez
+  zmeny). **Dáta, payloady, Ruby logika, výroba a ceny bez zmeny** (Ruby len komentár a verzia; in-SU nespúšťané). **1. commit = R0:** `tests/fixtures/h6_texty.json` +
+  `test_h6a_texty.rb` (každá pomocná veta je dosiahnutelná, stavové ostávajú viditeľné) — zelený na starom aj novom kóde. Nové `test_h6a_html.rb`, `test_h6a_napovedy.js`;
+  prepísané `test_d27_tagy.rb`/`.js` (jeden ovládač) a kanárik v `test_h4b_texty_vzhlad.rb`. Namerané (`ui_foto -Shoot`, výška obsahu pred → po): bez výberu 1418 → 1358 px,
+  Korpus 1338 → 1190, Zóny 1021 → < 850, dielec 1190 → 1116; Čelá a Kovanie nemajú „long" fotku (obsah ≤ 850 px pred aj po; v Kovaní po zásahu pribudlo ≈ 80 px voľného miesta pod pätkou). Nahradený text STAV: v0.17.16 H12d (karta dielca volá
+  roly ako Kusovník; Kusovník, VEPO, nákup a rozpočet bez zmeny).
+
 - **H12d · mená rolí na jednom mieste (2.10.2026, PR #452, v0.17.16, blok 9 · HARDENING PO V1, triedenie C-05 — GR-04; package
   [PACKAGE_H12.md](../zdroje/bloky/HARDENING/PACKAGE_H12.md) R0.6, R4, §15 A3 A5 A6; brief [BRIEF_H12d.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H12d.md)).**
   Karta dielca mala vlastnú JS mapu `roleLabel`, ktorá sa od stĺpca Rola v Kusovníku líšila v 9 rolách („Vrch" vs „Strop", „Priečka zvislá", „Zásuvkové

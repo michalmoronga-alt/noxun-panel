@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="sk" data-nx-theme="noxun">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Noxun Engine — mockup H7 · názov zákazky na jednom mieste</title>
+<!--
+  Blok 9 HARDENING PO V1 · dávka H7 · položky A-05 (UI) + C-07 (len poznámka, bez UI).
+  Stav: NÁVRH — čaká na schválenie Michalom (1.10.2026). Body O1–O9 = „návrh — potvrdí Michal".
+  Dôkazy: SYSTEM/zdroje/bloky/HARDENING/CROSS_AUDIT_A5_CLAUDE_STOLAR_UX.md (CU-07),
+          CROSS_AUDIT_A2_GROK.md (GR-20, doplnok k R-38), SYSTEM/AUDIT_REGISTER.md (R-38).
+  Fakty z kódu (main 4da1c3b5, v0.17.0):
+    ui/production_core.rb — vepo_settings :21-133, default_project_name :268-271, project_names :293-519, exporty :1979 · :2072 · :3544 · :3635
+    ui/studio_dialog.rb   — do_set_vepo_opts :630-656, push_vepo_bar :662-670, model_title :1633, payload vepo :1659-1661
+    ui/js/studio.js       — hlavička renderHead :1203-1209 + :1022-1023, lišta Kusovníka bomToolsHtml :1338-1356, setVepoBar :1117-1133
+    ui/studio.html        — .sechead :51-55, .prjbox :154-164
+    core/vepo_export.rb   — project_slug :175, mená CSV :288, priečinok :323, LOG :340, :767
+    core/xlsx_writer.rb   — BudgetXlsx.title :390, file_name :402 · core/cp_export.rb — CpXlsx.title :616, file_name :627
+    core/hardware_sets.rb — purchase_csv, 1. riadok :2471
+  Vzhľad = Štúdio v0.17.0 (snímky _dev/v1audit_shots/studio_01_bom.png, studio_03_buy, studio_04_budget, studio_05_offer, studio_06_cut).
+  Tokeny --nx-* = kópia :root z ui/css/panel.css + prepisy témy Lucia. --mk-* = LEN anotácie mockupu.
+  Forma stránky = SYSTEM/archiv/bloky/CENY/MOCKUP_CENY_2026-09-30.html.
+-->
+<style>
+  :root{
+    --nx-bg:#f4f5f7; --nx-surface:#fff; --nx-surface-sunken:#eceff1; --nx-surface-readonly:#f4f6f8;
+    --nx-surface-th:#f5f7f8; --nx-part-bg:#f2fafb;
+    --nx-ink:#263238; --nx-ink-title:#1b3a4b; --nx-ink-strong:#37474f; --nx-ink-label:#455a64;
+    --nx-ink-muted:#607d8b; --nx-ink-soft:#78909c; --nx-ink-faint:#90a4ae;
+    --nx-border:#cfd8dc; --nx-border-strong:#b0bec5; --nx-border-soft:#eceff1;
+    --nx-action:#2e7d32; --nx-action-hover:#1b5e20; --nx-on-accent:#fff;
+    --nx-select:#107787; --nx-select-strong:#0B5661; --nx-select-accent:#0e6b7a;
+    --nx-select-bg:#e0f2f4; --nx-select-bg-soft:#f0f9fa; --nx-select-bg-hover:#d6eef1; --nx-part-border:#7fc4cf;
+    --nx-ok-bg:#e8f5e9; --nx-ok-fg:#1b5e20; --nx-ok-border:#c8e6c9;
+    --nx-err-bg:#fdecea; --nx-err-fg:#b71c1c; --nx-err-border:#f5c6cb;
+    --nx-warn:#ffb74d; --nx-warn-bg:#fff8ef; --nx-warn-bg-soft:#fff3e0; --nx-warn-fg:#e65100;
+    --nx-warnchip-fg:#b26a00; --nx-warnchip-border:#ffcc80;
+    --nx-warnrow-fg:#7a5000; --nx-warnrow-border:#ffe0b2; --nx-wbadge-fg:#4e2e00;
+    --nx-ghost-hover:#e0e4e7;
+    /* LEN anotácie mockupu (nie sú to tokeny pluginu) */
+    --mk-page:#e6e9ec; --mk-bar:#2b3a42; --mk-bar-ink:#dfe7ec; --mk-bar-sub:#8ea3ae;
+    --mk-win-border:#b6c0c6; --mk-win-head:#dfe4e7; --mk-win-dot:#bcc6cc; --mk-shadow:rgba(20,30,45,.16);
+    --mk-bg:#fffdf3; --mk-border:#d8cfa8; --mk-ink:#6b5d1f; --mk-ink-strong:#5b4f18;
+    --mk-pin:#f6d860; --mk-pin-border:#c9a83a; --mk-pin-ink:#4a3f10; --mk-row:#fffbe6;
+    --mk-dpin:#cfd8dc; --mk-dpin-ink:#37474f;
+    /* DÁTA: vzorky dekorov z katalógu */
+    --mat-f206:#3a3a3a;
+  }
+  :root[data-nx-theme="lucia"]{
+    --nx-select:#c2185b; --nx-select-strong:#880e4f; --nx-select-accent:#ad1457; --nx-select-bg:#fce4ec;
+    --nx-select-bg-soft:#fdf1f5; --nx-select-bg-hover:#fce4ec; --nx-part-border:#f48fb1; --nx-part-bg:#fff5f9;
+  }
+  *{box-sizing:border-box}
+  html{overflow-x:clip}
+  html,body{margin:0}
+  body{font-family:"Segoe UI",Tahoma,sans-serif;font-size:13px;color:var(--nx-ink);background:var(--mk-page);padding:0 0 70px}
+  button,input{font-family:inherit;font-size:inherit}
+  .ic{width:15px;height:15px;flex:0 0 auto;vertical-align:middle;fill:none;stroke:currentColor;
+      stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+  code,.code{font-family:Consolas,"Cascadia Mono",monospace;font-size:11.5px}
+
+  /* ===== stránka mockupu ===== */
+  .mockbar{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;padding:8px 16px;background:var(--mk-bar);color:var(--mk-bar-ink)}
+  .mockbar .mb-title{font-weight:600;font-size:13px}
+  .mockbar .mb-ver{font-size:11px;color:var(--mk-bar-sub)}
+  .mockbar .mb-sp{flex:1}
+  .mockbar .mb-ctl{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--mk-bar-sub)}
+  .mockbar .mb-ctl button{font-size:11px;padding:2px 9px;border-radius:6px;border:1px solid var(--mk-bar-sub);background:transparent;
+                          color:var(--mk-bar-ink);cursor:pointer}
+  .mockbar .mb-ctl button.on{background:var(--mk-bar-ink);color:var(--mk-bar)}
+  .mockbar label{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--mk-bar-ink);cursor:pointer}
+  .notestrip{display:flex;align-items:flex-start;gap:8px;padding:6px 16px;font-size:11.5px;line-height:1.45;
+             background:var(--nx-warn-bg-soft);color:var(--nx-warnchip-fg);border-bottom:1px solid var(--nx-warnchip-border)}
+  .notestrip .ic{margin-top:1px}
+  .page{max-width:1180px;margin:0 auto;padding:0 16px}
+  .pending{margin:14px 0 0;padding:10px 14px;border:2px dashed var(--nx-warn);border-radius:8px;
+           background:var(--nx-warn-bg);color:var(--nx-warnrow-fg);font-weight:600;font-size:14px;line-height:1.45}
+  .card{margin:16px 0 0;background:var(--nx-surface);border:1px solid var(--nx-border);border-radius:8px;padding:12px 16px;line-height:1.5}
+  .card h1{font-size:17px;margin:0 0 6px;color:var(--nx-ink-title)}
+  .card h3{font-size:13.5px;margin:0 0 4px;color:var(--nx-ink-title)}
+  .card p{margin:6px 0}
+  .card ul,.card ol{margin:6px 0 0;padding-left:20px}
+  .card li{margin:3px 0}
+  .stat{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:1px 8px;border-radius:9px;
+        background:var(--nx-warn-bg-soft);color:var(--nx-warnchip-fg);border:1px solid var(--nx-warnchip-border);vertical-align:2px;margin-left:6px}
+  .meta{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 12px;margin:8px 0 4px;font-size:12.5px}
+  .meta b{color:var(--nx-ink-strong)}
+  .keep{border-left:4px solid var(--nx-ok-fg)}
+  .keep h3{color:var(--nx-ok-fg)}
+  .facts{border-left:4px solid var(--nx-ink-faint)}
+  .risk{border-left:4px solid var(--nx-warn)}
+  .src{font-size:11.5px;color:var(--nx-ink-soft)}
+  .legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:8px;font-size:11.5px;color:var(--nx-ink-muted)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .sh{margin:34px 0 0;display:flex;align-items:baseline;gap:6px 10px;flex-wrap:wrap}
+  .sh h2{margin:0;font-size:16px;color:var(--nx-ink-title)}
+  .sh .shl{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:22px;padding:0 7px;border-radius:6px;
+           background:var(--mk-bar);color:var(--nx-on-accent);font-size:12px;font-weight:700}
+  .sh .shsub{flex-basis:100%;font-size:12px;color:var(--nx-ink-muted);line-height:1.45}
+  .cmpl{display:flex;align-items:center;gap:8px;margin:14px 0 6px;font-size:12px;color:var(--nx-ink-muted);flex-wrap:wrap}
+  .tagd,.tagn{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.06em;padding:2px 9px;border-radius:9px}
+  .tagd{background:var(--nx-surface-sunken);color:var(--nx-ink-label);border:1px solid var(--nx-border-strong)}
+  .tagn{background:var(--nx-select-bg);color:var(--nx-select);border:1px solid var(--nx-part-border)}
+  .win{background:var(--nx-surface);border:1px solid var(--mk-win-border);border-radius:9px;box-shadow:0 10px 30px var(--mk-shadow);overflow:hidden;max-width:1060px}
+  .winhead{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--mk-win-head);border-bottom:1px solid var(--nx-border);
+           font-size:12px;font-weight:600;color:var(--nx-ink-strong)}
+  .winhead .wdots{display:flex;gap:4px}
+  .winhead .wdots i{width:9px;height:9px;border-radius:50%;background:var(--mk-win-dot);display:block}
+  .winhead .wsub{font-weight:400;color:var(--nx-ink-muted)}
+  .winhead .wsize{margin-left:auto;font-weight:400;font-size:11px;color:var(--nx-ink-faint);white-space:nowrap}
+  .mocknote{background:var(--mk-bg);border:1px dashed var(--mk-border);border-radius:8px;padding:10px 13px;font-size:12.5px;
+            color:var(--mk-ink);line-height:1.55;margin:10px 0 0;max-width:1060px}
+  .mocknote b{color:var(--mk-ink-strong)}
+  .mocknote h4{margin:0 0 4px;font-size:12.5px;color:var(--mk-ink-strong)}
+  .mocknote ol{margin:4px 0 0;padding-left:0;list-style:none}
+  .mocknote li{margin:6px 0;padding-left:34px;position:relative}
+  .npin{position:absolute;left:0;top:1px;min-width:28px;height:16px;padding:0 4px;border-radius:8px;background:var(--mk-pin);
+        color:var(--mk-pin-ink);border:1px solid var(--mk-pin-border);font:700 9.5px/14px "Segoe UI",sans-serif;text-align:center}
+  .npin.d{background:var(--mk-dpin);color:var(--mk-dpin-ink);border-color:var(--nx-border-strong)}
+  .pkg{display:block;margin-top:2px;font-size:10.5px;color:var(--nx-ink-soft);font-family:Consolas,"Cascadia Mono",monospace;word-break:break-word}
+  .mpin,.dpin{display:inline-block;min-width:18px;height:16px;padding:0 4px;border-radius:8px;font:700 9px/14px "Segoe UI",sans-serif;
+        text-align:center;letter-spacing:0;text-transform:none;vertical-align:1px;box-shadow:0 1px 2px rgba(0,0,0,.16);font-style:normal;margin:0 4px;flex:0 0 auto}
+  .mpin{background:var(--mk-pin);color:var(--mk-pin-ink);border:1px solid var(--mk-pin-border)}
+  .dpin{background:var(--mk-dpin);color:var(--mk-dpin-ink);border:1px solid var(--nx-border-strong)}
+  .oref{display:inline-block;height:16px;padding:0 6px;border-radius:8px;background:var(--nx-warn-bg-soft);color:var(--nx-warnchip-fg);
+        border:1px solid var(--nx-warnchip-border);font:700 9px/14px "Segoe UI",sans-serif;white-space:nowrap;vertical-align:1px;
+        text-decoration:none;margin:0 2px}
+  .oref:hover{background:var(--nx-warn-bg);border-color:var(--nx-warn)}
+  body.nopins .mpin, body.nopins .dpin{display:none}
+  .tipline{margin:6px 0 0;font-size:11.5px;color:var(--nx-ink-muted);max-width:1060px;line-height:1.45}
+  .tipline .tl{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--nx-ink-faint);
+               border:1px solid var(--nx-border);border-radius:6px;padding:0 5px;margin-right:6px;background:var(--nx-surface)}
+
+  /* ===== prepínače ukážky (LEN mockup) ===== */
+  .mkswitch{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:10px 0 0;font-size:11.5px;color:var(--mk-ink)}
+  .mkswitch .mkl{font-weight:600;color:var(--mk-ink-strong);margin-right:2px}
+  .mkswitch button{font-size:11.5px;padding:3px 10px;border-radius:6px;border:1px dashed var(--mk-border);background:var(--mk-bg);
+                   color:var(--mk-ink-strong);cursor:pointer}
+  .mkswitch button.on{background:var(--mk-pin);border-style:solid;border-color:var(--mk-pin-border);color:var(--mk-pin-ink);font-weight:600}
+
+  /* ===== tabuľky stránky ===== */
+  .tscroll{overflow-x:auto;margin-top:8px}
+  table.mt{border-collapse:collapse;width:100%;font-size:12px;background:var(--nx-surface)}
+  table.mt th{background:var(--nx-surface-th);text-align:left;font-weight:600;color:var(--nx-ink-label);padding:6px 8px;border-bottom:1px solid var(--nx-border);
+              font-size:11.5px;white-space:nowrap}
+  table.mt td{padding:6px 8px;border-bottom:1px solid var(--nx-border-soft);vertical-align:top;line-height:1.45}
+  table.mt td.cd{font-family:Consolas,"Cascadia Mono",monospace;font-size:10.5px;color:var(--nx-ink-soft);word-break:break-word;min-width:150px}
+  table.mt td.ex{font-family:Consolas,"Cascadia Mono",monospace;font-size:11.5px;color:var(--nx-ink-strong);overflow-wrap:anywhere;min-width:170px}
+  table.mt tr.no td{color:var(--nx-ink-soft)}
+  table.mt tr.sub td{background:var(--nx-bg);font-weight:700;color:var(--nx-ink-strong);font-size:11.5px}
+  table.mt .ex.def{color:var(--nx-warnchip-fg)}
+  .ob td:first-child{white-space:nowrap}
+  .ob tr:target td{background:var(--nx-warn-bg)}
+  .rec{background:var(--nx-ok-bg);border:1px solid var(--nx-ok-border);border-radius:6px;padding:2px 6px;display:block}
+  .nvr{display:inline-block;font-size:10px;font-weight:700;padding:0 7px;border-radius:9px;background:var(--nx-warn-bg-soft);color:var(--nx-warnchip-fg);
+       border:1px solid var(--nx-warnchip-border);white-space:nowrap;margin-top:3px}
+  .ans{min-width:90px;border-bottom:1px dashed var(--nx-border-strong);display:inline-block;height:16px}
+
+  /* ===== časová os (sekcia E) ===== */
+  .tl{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-top:10px}
+  .tlc{background:var(--nx-surface);border:1px solid var(--nx-border);border-radius:8px;padding:9px 11px;font-size:12px;line-height:1.45}
+  .tlc .tln{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--mk-bar);
+            color:var(--nx-on-accent);font-size:11px;font-weight:700;margin-right:6px}
+  .tlc .tlh{font-weight:700;color:var(--nx-ink-title)}
+  .tlc .tlf{font-size:11px;color:var(--nx-ink-soft);margin:2px 0 6px}
+  .tlc .tlbox{border:1px solid var(--nx-border);border-radius:6px;background:var(--nx-bg);padding:6px 8px;margin:4px 0 6px;overflow:hidden}
+  .tlc .today{font-size:11px;color:var(--nx-ink-muted);margin-top:4px}
+
+  /* =====================================================================
+     ŠTÚDIO — zrkadlo ui/studio.html + panel.css (scope .stu)
+     ===================================================================== */
+  .stu{font-size:13px;color:var(--nx-ink);background:var(--nx-bg);display:flex;min-height:0}
+  .stu button{border:0;border-radius:6px;cursor:pointer;font:inherit;font-size:12px;font-weight:600}
+  .stu .snav{flex:0 0 208px;background:var(--nx-bg);border-right:1px solid var(--nx-border);padding:8px 6px}
+  .stu .sgrp{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--nx-ink-faint);padding:2px 8px 3px}
+  .stu .navitem{display:flex;width:100%;align-items:center;gap:8px;padding:6px 8px;margin:1px 0;background:none;font-size:12.5px;
+                font-weight:400;color:var(--nx-ink-strong);text-align:left}
+  .stu .navitem .ic{color:var(--nx-ink-muted)}
+  .stu .navitem.on{background:var(--nx-select-bg);color:var(--nx-select);font-weight:600;box-shadow:inset 3px 0 0 var(--nx-select)}
+  .stu .navitem.on .ic{color:var(--nx-select)}
+  .stu .navitem span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .stu .nbadge{flex:0 0 auto;font-size:10.5px;font-weight:700;background:var(--nx-warn-bg-soft);color:var(--nx-wbadge-fg);
+               border:1px solid var(--nx-warnchip-border);border-radius:9px;padding:0 6px;line-height:15px}
+  .stu .navmore{font-size:11px;color:var(--nx-ink-faint);padding:6px 8px}
+  .stu .sbody{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--nx-surface)}
+  .stu .sechead{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--nx-border);background:var(--nx-bg);min-height:37px}
+  .stu .sechead h2{font-size:14px;margin:0;color:var(--nx-ink-title);font-weight:700;white-space:nowrap}
+  .stu .sechint{font-size:11px;color:var(--nx-ink-soft);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto}
+  .stu .secmodel{margin-left:auto;font-size:11px;color:var(--nx-ink-faint);white-space:nowrap}
+  /* NÁVRH: názov zákazky v hlavičke (vzor `.idbar .cname` z panel.css — premenovanie skrinky) */
+  .stu .jobhd{margin-left:auto;display:inline-flex;align-items:center;gap:6px;min-width:0;flex:0 1 auto;font-size:11px;white-space:nowrap}
+  .stu .joblbl{font-size:11px;color:var(--nx-ink-faint)}
+  .stu .jobname{display:inline-flex;align-items:center;gap:4px;padding:1px 4px;margin:0 -4px 0 0;background:none;min-width:0;max-width:300px;
+                font-size:12.5px;font-weight:700;color:var(--nx-ink-strong);border-radius:6px}
+  .stu .jobname:hover,.stu .jobname:focus{color:var(--nx-select);background:var(--nx-select-bg-soft);outline:0}
+  .stu .jobname .jobtext{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .stu .jobname .ic{width:12px;height:12px;color:var(--nx-ink-faint)}
+  .stu .jobname:hover .ic,.stu .jobname:focus .ic{color:var(--nx-select)}
+  .stu .jobname.src-file{font-weight:600}
+  .stu .jobname.src-default .jobtext{font-style:italic;font-weight:600;color:var(--nx-warnchip-fg)}
+  .stu .jobsrc{font-size:11px;color:var(--nx-ink-faint)}
+  .stu .jobsrc.warn{display:inline-block;font-size:10.5px;font-weight:600;padding:0 7px;border-radius:9px;line-height:16px;
+                    background:var(--nx-warn-bg);border:1px solid var(--nx-warnchip-border);color:var(--nx-warn-fg)}
+  .stu .jobver{font-size:11px;color:var(--nx-ink-faint)}
+  .stu .jdot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--nx-warn);box-shadow:0 0 0 1px var(--nx-warn-fg);flex:0 0 8px}
+  .stu .jobinp{font:inherit;font-size:12.5px;font-weight:600;padding:2px 6px;width:230px;max-width:100%;border:1px solid var(--nx-select);
+               border-radius:6px;background:var(--nx-surface);color:var(--nx-ink);outline:0}
+  /* variant B — stále pole (vzor .prjbox) */
+  .stu .jobbox{display:inline-flex;align-items:center;gap:6px;padding:2px 6px 2px 9px;border:1px solid var(--nx-border-strong);border-radius:6px;
+               background:var(--nx-surface-sunken)}
+  .stu .jobbox.is-def{border-color:var(--nx-warnchip-border);background:var(--nx-warn-bg)}
+  .stu .jobbox input{font:inherit;font-size:12px;font-weight:600;padding:3px 7px;width:170px;border:1px solid var(--nx-border-strong);border-radius:6px;
+                     background:var(--nx-surface);color:var(--nx-ink-strong)}
+  .stu .jobbox input::placeholder{font-style:italic;color:var(--nx-ink-faint);font-weight:400}
+  .stu .jobbox input:focus{outline:0;border-color:var(--nx-select)}
+  .stu .jobbox .joblbl{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+
+  .stu .sectools{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--nx-border-soft);flex-wrap:wrap}
+  .stu .spacer{flex:1}
+  .stu .primary{position:relative;display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:var(--nx-action);color:var(--nx-on-accent)}
+  .stu .ghostbtn{position:relative;display:inline-flex;align-items:center;gap:5px;padding:6px 10px;background:var(--nx-surface-sunken);
+                 color:var(--nx-ink-strong);border:1px solid var(--nx-border)}
+  .stu .bomviews{display:inline-flex;border:1px solid var(--nx-border-strong);border-radius:6px;overflow:hidden}
+  .stu .bomviews button{border-radius:0;background:var(--nx-surface);color:var(--nx-ink-label);padding:5px 11px;font-weight:400}
+  .stu .bomviews button+button{border-left:1px solid var(--nx-border-soft)}
+  .stu .bomviews button.on{background:var(--nx-select-bg);color:var(--nx-select);font-weight:600}
+  .stu .prjbox{position:relative;display:inline-flex;align-items:center;gap:6px;padding:2px 6px 2px 9px;border:1px solid var(--nx-border-strong);border-radius:6px;
+               background:var(--nx-surface-sunken);color:var(--nx-ink-label)}
+  .stu .pinabs{position:absolute;top:-10px;left:-10px;margin:0;z-index:1}
+  .stu .prjbox .prjlbl{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--nx-ink-faint)}
+  .stu .prjbox input{font:inherit;font-size:12px;font-weight:600;padding:4px 8px;width:120px;border:1px solid var(--nx-border-strong);border-radius:6px;
+                     background:var(--nx-surface);color:var(--nx-ink-strong)}
+  .stu .prjbox input:focus{outline:0;border-color:var(--nx-select)}
+  .stu .searchbox{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--nx-border-strong);border-radius:6px;
+                  background:var(--nx-surface);color:var(--nx-ink-faint);font-size:12px;width:150px;overflow:hidden;white-space:nowrap}
+  .stu .joblink{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;background:none;border:1px dashed var(--nx-border-strong);
+                color:var(--nx-ink-muted);font-weight:400;font-size:11.5px;max-width:200px}
+  .stu .joblink b{color:var(--nx-ink-strong);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .stu .vepofly{position:relative;display:inline-flex}
+  .stu .vepofly .primary{padding-right:16px}
+  .stu .vepofly .corner{position:absolute;right:3px;bottom:3px;width:0;height:0;border-left:6px solid transparent;border-bottom:6px solid rgba(255,255,255,.85)}
+  /* NÁVRH: jantárová bodka na exporte, kým je názov predvolený */
+  .stu .xdot{position:absolute;top:-4px;right:-4px;width:11px;height:11px;border-radius:50%;background:var(--nx-warn);
+             border:2px solid var(--nx-surface);box-shadow:0 0 0 1px var(--nx-warn-fg)}
+  .stu .sechint2{font-size:11px;color:var(--nx-ink-soft)}
+  .stu .bseg{display:inline-flex;border:1px solid var(--nx-border-strong);border-radius:6px;overflow:hidden}
+  .stu .bseg button{border-radius:0;background:var(--nx-surface);color:var(--nx-ink-label);padding:5px 10px;font-weight:400;font-size:11.5px}
+  .stu .bseg button.on{background:var(--nx-select);color:var(--nx-on-accent);font-weight:600}
+  .stu .grp{margin:8px 12px 0;border:1px solid var(--nx-border);border-radius:8px;overflow:hidden;opacity:.55}
+  .stu .grph{display:flex;align-items:center;gap:8px;padding:7px 10px;font-weight:700;font-size:12.5px;color:var(--nx-ink-strong);border-bottom:1px solid var(--nx-border-soft)}
+  .stu .grph .sw{width:13px;height:13px;border-radius:3px;background:var(--mat-f206)}
+  .stu .grph small{font-weight:400;color:var(--nx-ink-soft)}
+  .stu .grph .gsum{margin-left:auto;font-weight:400;font-size:11.5px;color:var(--nx-ink-muted)}
+  .stu .grow{display:flex;gap:12px;padding:6px 10px;font-size:12px;border-bottom:1px solid var(--nx-border-soft)}
+  .stu .grow span:first-child{flex:1}
+  .stu .sbar{padding:5px 10px;font-size:11.5px;border-top:1px solid var(--nx-border);background:var(--nx-surface-sunken);color:var(--nx-ink-muted)}
+  .stu .sbar.ok{background:var(--nx-ok-bg);color:var(--nx-ok-fg);border-top-color:var(--nx-ok-border)}
+  .stu .sbar.err{background:var(--nx-err-bg);color:var(--nx-err-fg);border-top-color:var(--nx-err-border)}
+  .stu .mkhl{background:var(--mk-row);outline:1px dashed var(--mk-border);outline-offset:2px;border-radius:6px}
+  body.nopins .stu .mkhl{background:none;outline:none}
+  /* sekcia C — mini lišty exportov */
+  .xgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:12px;margin-top:10px}
+  .xcard{background:var(--nx-surface);border:1px solid var(--mk-win-border);border-radius:9px;overflow:hidden;box-shadow:0 6px 18px var(--mk-shadow)}
+  .xcard .stu{display:block}
+  .xcard .xcap{padding:7px 11px 9px;font-size:11.5px;line-height:1.45;color:var(--nx-ink-muted);border-top:1px solid var(--nx-border-soft);background:var(--nx-surface)}
+  .xcard .xcap .tl{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--nx-ink-faint);
+                   border:1px solid var(--nx-border);border-radius:6px;padding:0 5px;margin-right:4px}
+  .xcard .xcap code{color:var(--nx-ink-strong);overflow-wrap:anywhere}
+  #varTable .jobhd, .tl .jobhd{margin-left:0}
+  .tl .jobhd{flex-wrap:wrap;row-gap:3px;white-space:normal}
+  .tl .jobname{max-width:100%}
+  .tl .jobver{display:none}
+  .xcard .xcap .st{display:block;margin-top:4px;padding:3px 7px;border-radius:6px;background:var(--nx-ok-bg);color:var(--nx-ok-fg);border:1px solid var(--nx-ok-border)}
+
+  @media (max-width:760px){
+    .page{padding:0 12px}
+    .stu .snav{display:none}
+    .stu .sechead{flex-wrap:wrap;row-gap:4px}
+    .stu .sechint{order:3;flex-basis:100%}
+    .stu .jobname{max-width:190px}
+    .stu .jobinp{width:190px}
+    .xgrid{grid-template-columns:1fr}
+    .meta{grid-template-columns:1fr}
+    .mocknote li{padding-left:34px}
+  }
+</style>
+</head>
+<body>
+
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <!-- sprite = výrez z ui/js/icons.js (Lucide 24×24, stroke 2) -->
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></symbol>
+    <symbol id="i-clipboard-check" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></symbol>
+    <symbol id="i-cart" viewBox="0 0 24 24"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></symbol>
+    <symbol id="i-euro" viewBox="0 0 24 24"><path d="M4 10h12"/><path d="M4 14h9"/><path d="M19 6a7.7 7.7 0 0 0-5.2-2A7.9 7.9 0 0 0 6 12c0 4.4 3.5 8 7.8 8 2 0 3.8-.8 5.2-2"/></symbol>
+    <symbol id="i-file-text" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v5h5"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol>
+    <symbol id="i-scissors" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-refresh-cw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-columns-3" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/></symbol>
+  </defs>
+</svg>
+
+<div class="mockbar">
+  <span class="mb-title">Noxun Engine — mockup H7 · názov zákazky na jednom mieste</span>
+  <span class="mb-ver">blok 9 HARDENING · A-05 (+ C-07 len poznámka) · 1.10.2026 · NÁVRH · klikateľné</span>
+  <span class="mb-sp"></span>
+  <span class="mb-ctl">téma okna: <button type="button" data-theme="noxun" class="on">NOXUN</button><button type="button" data-theme="lucia">Lucia</button></span>
+  <label><input type="checkbox" id="pinTog" checked> štítky</label>
+</div>
+<div class="notestrip">
+  <svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>
+  <span>Mockup, nie živý plugin. Prepínačom nad oknami zvolíš situáciu (nový model · uložený bez názvu · s názvom). V okne <b>Návrh</b> klikni na názov v hlavičke a prepíš ho (Enter uloží, Esc zruší, prázdne pole vráti automatický názov). V okne <b>Dnes</b> môžeš písať do poľa PROJEKT — obe okná ukazujú <b>tú istú uloženú hodnotu</b>. Tabuľka v sekcii D sa prepočíta. Jantárové štítky <b>O…</b> = otvorené body „návrh — potvrdí Michal".</span>
+</div>
+
+<main class="page">
+
+<div class="pending" role="note">NÁVRH — čaká na schválenie Michalom. Body O1–O9 potrebujú tvoju odpoveď pred písaním package H7 (súhrn na konci stránky).</div>
+
+<section class="card" aria-labelledby="introH">
+  <h1 id="introH">Názov zákazky na jednom mieste <span class="stat">návrh · 1.10.2026</span></h1>
+  <div class="plati" style="margin:10px 0 14px;padding:9px 12px;border:1px solid var(--nx-warn);background:var(--nx-warn-bg-soft);border-radius:6px;font-size:13px;line-height:1.5;color:var(--nx-ink)"><b>PLATÍ (2.10.2026)</b> — mockup je schválený Michalom: <b>všetko podľa odporúčania</b> (O1–O9) a <b>R-38 v H7: áno</b>. Záväzné sú <a href="ROZHODNUTIA_MICHALA_2026-10-01.md">rozhodnutia v sekcii „Mockupy H6 a H7 — odpovede Michala (2.10.2026)"</a>.</div>
+  <div class="meta">
+    <b>Dávka</b><span>H7 · blok 9 HARDENING PO V1 · „názov zákazky na jednom mieste + nastavenia exportu v jadre"</span>
+    <b>Položky</b><span><b>A-05</b> Názov zákazky je schovaný v Kusovníku (CU-07 · GR-20) — rieši tento mockup · <b>C-07</b> Nastavenia exportu do jadra (k R-38) — úprava kódu bez UI, len <a href="#secF">poznámka v sekcii F</a></span>
+    <b>Stav</b><span>NÁVRH — čaká na schválenie Michalom</span>
+    <b>Dôkazy</b><span class="src">CROSS_AUDIT_A5_CLAUDE_STOLAR_UX.md (CU-07) · CROSS_AUDIT_A2_GROK.md (GR-20, doplnok k R-38) · AUDIT_REGISTER.md (R-38) · snímky studio_01_bom, 03_buy, 04_budget, 05_offer, 06_cut</span>
+  </div>
+  <h3 style="margin-top:10px">V skratke — čo sa zmení pre teba</h3>
+  <ol>
+    <li><b>Názov zákazky je hore v hlavičke Štúdia</b>, v každej sekcii — tam, kde dnes stojí „zákazka: Bez názvu" (to je meno súboru, nie zákazky). Klik na názov = úprava na mieste. Žiadny nový riadok.</li>
+    <li><b>Kým by sa exporty pomenovali „projekt", svieti jantárová bodka</b> v hlavičke aj na štyroch exportných tlačidlách. Tooltip povie presné meno priečinka alebo súboru.</li>
+    <li><b>Pole PROJEKT z lišty Kusovníka zmizne</b> — jedno miesto na úpravu (<a class="oref" href="#O2">O2</a>).</li>
+    <li><b>Uložená hodnota je tá istá</b> — rovnaký súbor, rovnaký kľúč. Nič sa nemigruje a exporty sa pri rovnakom texte volajú presne ako dnes.</li>
+  </ol>
+  <div class="legend">
+    <span><i class="dpin" style="margin:0">D1</i> problém dnešného okna</span>
+    <span><i class="mpin" style="margin:0">A1</i> zmena oproti dnešnému pluginu</span>
+    <span><a class="oref" href="#O1" style="margin:0">O1</a> otvorený bod — návrh, potvrdí Michal</span>
+  </div>
+</section>
+
+<section class="card facts" aria-labelledby="factsH">
+  <h3 id="factsH">Ako to funguje dnes (fakty z kódu v0.17.0)</h3>
+  <ul>
+    <li><b>Dva rôzne „názvy" na obrazovke.</b> Hlavička Štúdia ukazuje <b>meno súboru</b> (pri neuloženom modeli „Bez názvu"). Všetky štyri exporty — VEPO, CSV kovania, XLSX rozpočtu, XLSX cenovej ponuky — sa ale pomenujú podľa poľa <b>PROJEKT</b> v lište Kusovníka. Kto do Kusovníka nezájde, názov nevidí.</li>
+    <li><b>Názov má tri podoby:</b> <b>zadaný</b> (napísal si ho) · <b>podľa súboru</b> (uložený model bez zadaného názvu — berie sa meno .skp súboru a sleduje jeho premenovanie) · <b>predvolený „projekt"</b> (nový, ešte neuložený model).</li>
+    <li><b>Pole PROJEKT ukazuje automatický názov ako vyplnenú hodnotu</b> — „projekt" vyzerá, akoby si ho zadal (GR-20).</li>
+    <li><b>Kde je uložený:</b> v nastaveniach <b>tohto počítača</b> (<code>%APPDATA%\NOXUN\Engine\vepo_settings.json</code>), nie v .skp. Kľúčom je cesta k súboru. Nový model má dočasný kľúč a pri prvom uložení sa názov prenesie na súbor (funguje od dávky 1b-6a).</li>
+    <li><b>Prázdne pole</b> alebo text rovnaký ako automatický názov = zadaný názov sa zmaže a platí automatický. Najviac 120 znakov. Do .skp sa nezapisuje nič, zmena nerobí krok Späť.</li>
+  </ul>
+</section>
+
+<section class="card risk" aria-labelledby="riskH">
+  <h3 id="riskH">Prečo na tom záleží (príklad z dielne)</h3>
+  <p>Dve nové zákazky, obe zatiaľ neuložené, obe teda „projekt". VEPO export si pamätá posledný priečinok, takže druhá zákazka ponúkne ten istý. Druhý export potom <b>nahradí priečinok <code>projekt\</code> prvej zákazky</b> — export vymieňa celý priečinok naraz, ak v ňom sú len jeho súbory (<span class="code">core/vepo_export.rb:323</span>). A zákazník dostane XLSX s nadpisom <b>„CENOVÁ PONUKA projekt - AKT. 1.10.2026"</b>.</p>
+</section>
+
+<section class="card keep" aria-labelledby="keepH">
+  <h3 id="keepH">Čo sa NEMENÍ</h3>
+  <ul>
+    <li>Uložená hodnota, jej miesto aj kľúč (<code>project_names</code> v <code>vepo_settings.json</code>, kľúč = cesta k .skp, pri novom modeli dočasný kľúč). <b>Nič sa nemigruje.</b></li>
+    <li>Automatický názov: meno súboru bez .skp, pri neuloženom modeli slovo „projekt". Toto slovo ostáva, lebo jeho zmena by premenovala súbory (GR-20).</li>
+    <li>Mená priečinkov, súborov a nadpisov všetkých exportov pri rovnakom texte názvu — bajtovo rovnaké.</li>
+    <li>Výpočty, kusovník, ceny, VEPO obsah. Do modelu sa nezapisuje nič.</li>
+  </ul>
+</section>
+
+<!-- ============================ A · HLAVIČKA + LIŠTA KUSOVNÍKA ============================ -->
+<div class="sh" id="secA"><span class="shl">A</span><h2>Hlavička Štúdia a lišta Kusovníka</h2>
+  <span class="shsub">Okno Štúdia, sekcia Kusovník (výrez: hlavička, lišta, začiatok tabuľky). Na úzkej obrazovke je navigácia skrytá a popis sekcie sa zalomí pod nadpis — v SketchUpe je hlavička jeden riadok.</span></div>
+
+<div class="mkswitch" data-stbox="1"></div>
+<div class="mkswitch" id="varBox"></div>
+
+<div class="cmpl"><span class="tagd">DNES</span> v0.17.0 — názov zákazky len v lište Kusovníka</div>
+<div class="win" id="winDnes">
+  <div class="winhead"><span class="wdots"><i></i><i></i><i></i></span> Štúdio <span class="wsub">· Kusovník</span><span class="wsize">výrez · šírka 1060 px</span></div>
+  <div class="stu">
+    <nav class="snav" data-nav="1"></nav>
+    <div class="sbody">
+      <div class="sechead" data-part="head"></div>
+      <div class="sectools" data-part="tools"></div>
+      <div data-part="body"></div>
+      <div class="sbar" data-part="bar">Pripravené.</div>
+    </div>
+  </div>
+</div>
+<div class="mocknote">
+  <ol>
+    <li><span class="npin d">D1</span><b>Hlavička ukazuje meno súboru</b> („Bez názvu" pri novom modeli) — nie názov, pod ktorým odídu exporty. Pri zadanom názve vidíš naraz dva rôzne názvy (prepni „Uložený, názov zadaný").<span class="pkg">ui/studio_dialog.rb:1633 (model_title) · ui/js/studio.js:1022-1023, :1203-1209</span></li>
+    <li><span class="npin d">D2</span><b>Skutočný názov je pole PROJEKT</b> — len v Kusovníku. Automatický názov v ňom stojí ako vyplnený text, takže „projekt" vyzerá zadaný (GR-20).<span class="pkg">ui/js/studio.js:1349-1352 (value = project, placeholder = default_project)</span></li>
+    <li><span class="npin d">D3</span><b>Rozpočet, Cenová ponuka a Nákup kovania pole nemajú</b>, hoci ich exporty sa podľa neho pomenujú. Po zmene napíše stavový riadok „Názov projektu: … Platí pre všetky exporty."<span class="pkg">ui/studio_dialog.rb:645-655</span></li>
+  </ol>
+</div>
+
+<div class="cmpl"><span class="tagn">NÁVRH</span> názov zákazky v hlavičke, jantár kým je predvolený</div>
+<div class="win" id="winNavrh">
+  <div class="winhead"><span class="wdots"><i></i><i></i><i></i></span> Štúdio <span class="wsub">· Kusovník</span><span class="wsize">výrez · šírka 1060 px</span></div>
+  <div class="stu">
+    <nav class="snav" data-nav="1"></nav>
+    <div class="sbody">
+      <div class="sechead" data-part="head"></div>
+      <div class="sectools" data-part="tools"></div>
+      <div data-part="body"></div>
+      <div class="sbar" data-part="bar">Pripravené.</div>
+    </div>
+  </div>
+</div>
+<p class="tipline" id="tipNow"></p>
+<div class="mocknote">
+  <ol>
+    <li><span class="npin">A1</span><b>„Zákazka: &lt;názov&gt;" v hlavičke</b> — na mieste dnešného „zákazka: &lt;súbor&gt;", v <b>každej</b> sekcii Štúdia (aj v Katalógoch a Nastaveniach, ako dnes). Klik na názov alebo ceruzku = pole priamo na mieste; Enter alebo klik mimo uloží, Esc zruší, prázdne pole vráti automatický názov — ten istý vzor ako premenovanie skrinky v Inspectore. <b>Výška hlavičky sa nemení.</b> <a class="oref" href="#O1">O1</a><span class="pkg">ui/js/studio.js renderHead :1203-1209 + NX.setStudio :1022-1023 · ui/studio.html .sechead :51-55 · vzor ui/js/bridge.js :63-127 (startCabRename) a panel.css :1112-1120 (.cname)</span></li>
+    <li><span class="npin">A2</span><b>Tri podoby názvu:</b> zadaný (tučne) · podľa súboru (sivý dovetok „podľa súboru", bez bodky) · predvolený „projekt" (jantárová bodka, kurzíva a „zadaj názov"). Súbor a verzia pluginu sú v tooltipe, verzia ostáva aj sivou vpravo. <a class="oref" href="#O3">O3</a><span class="pkg">payload vepo: ui/studio_dialog.rb:1659-1661 + echo push_vepo_bar :662-670 — doplniť zdroj názvu (zadaný · súbor · predvolený), skladá server</span></li>
+    <li><span class="npin">A3</span><b>Pole PROJEKT v lište zmizlo</b> — lišta sa skráti o ~190 px, pri úzkom okne sa menej láme. <a class="oref" href="#O2">O2</a><span class="pkg">ui/js/studio.js bomToolsHtml :1338-1356, udalosti :2113, :2124 · ui/studio.html .prjbox :154-164</span></li>
+    <li><span class="npin">A4</span><b>Jantárová bodka na „VEPO export"</b>, kým je názov predvolený — rovnako na ďalších troch exportoch (sekcia C). Tooltip povie meno priečinka. <a class="oref" href="#O4">O4</a> <a class="oref" href="#O7">O7</a><span class="pkg">ui/js/studio.js vepoBtnHtml :1383</span></li>
+    <li><span class="npin">A5</span><b>Stavový riadok po zmene:</b> „Názov zákazky: … · platí pre VEPO, kovanie, rozpočet aj ponuku". Keď sa zápis nepodarí, červeno a hlavička ostane na pôvodnom názve. <a class="oref" href="#O8">O8</a> <a class="oref" href="#O9">O9</a><span class="pkg">ui/studio_dialog.rb:645-655 · ui/production_core.rb save_project_name :493-519</span></li>
+  </ol>
+</div>
+
+<!-- ============================ B · VARIANTY ÚPRAVY ============================ -->
+<div class="sh" id="secB"><span class="shl">B</span><h2>Ako vyzerá názov v hlavičke — všetky stavy</h2>
+  <span class="shsub">Pravá časť hlavičky vo variante A (text s ceruzkou) a vo variante B (stále viditeľné pole). Alternatíva C — názov v navigácii pod „ZÁKAZKA" — sa nekreslí: pri zbalenej navigácii (len ikony) by zmizol. <a class="oref" href="#O1">O1</a></span></div>
+<div class="tscroll">
+  <table class="mt" id="varTable">
+    <thead><tr><th>Stav</th><th>Variant A — text s ceruzkou (odporúčaný)</th><th>Variant B — stále pole</th><th>Tooltip</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+<div class="mocknote">
+  <b>Prečo A:</b> názov sa mení zriedka (raz na zákazku), no vidieť ho treba stále. Pole s rámom v hlavičke každej sekcie — aj Materiálov či Pravidiel — pôsobí ako formulár a ťahá oko. Variant B má jednu výhodu: automatický názov ukáže <b>sivou nápovedou</b> v prázdnom poli (presne návrh GR-20). Variant A to rieši kurzívou a dovetkom.
+</div>
+
+<!-- ============================ C · EXPORTY ============================ -->
+<div class="sh" id="secC"><span class="shl">C</span><h2>Štyri exporty — bodka a meno súboru v tooltipe</h2>
+  <span class="shsub">Lišty sekcií Kusovník, Nákup kovania, Rozpočet a Cenová ponuka v návrhu. Riadok „tooltip" ukazuje, čo povie prechod myšou (na mobile ho vidíš rovno). Meno skladá server tými istými funkciami ako export, takže tooltip neklame. Nárezový plán nemá export ani názov nepoužíva. <a class="oref" href="#O3">O3</a> <a class="oref" href="#O4">O4</a> <a class="oref" href="#O7">O7</a></span></div>
+<div class="mkswitch" data-stbox="1"></div>
+<div class="xgrid" id="expBox"></div>
+<div class="mocknote">
+  <ol>
+    <li><span class="npin">C1</span><b>Bodka svieti len pri „projekt"</b> (nový neuložený model bez zadaného názvu). Pri názve podľa súboru bodka nie je — súbor si pomenoval ty, keď si ho ukladal. <a class="oref" href="#O3">O3</a></li>
+    <li><span class="npin">C2</span><b>Export sa neblokuje.</b> Po exporte s predvoleným názvom pribudne na koniec stavového riadku jedna veta (zelený ostáva zelený). <a class="oref" href="#O4">O4</a><span class="pkg">stavy exportov: ui/production_core.rb :2006 (VEPO) · :2083 (CSV kovania) · :3564 (rozpočet) · cp_status :3688 (ponuka)</span></li>
+    <li><span class="npin">C3</span><b>Tooltip s menom</b> doplní dnešný text tlačidla (ten ostáva). <a class="oref" href="#O7">O7</a><span class="pkg">mená: VepoExport.project_slug core/vepo_export.rb:175 · BudgetXlsx.file_name core/xlsx_writer.rb:402 · CpXlsx.file_name core/cp_export.rb:627 · „kovanie_…csv" ui/production_core.rb:2072 · tlačidlá: studio.js :1383 (VEPO), :1304 (CSV), budget.js :460 (XLSX), :1298 (ponuka)</span></li>
+  </ol>
+</div>
+
+<!-- ============================ D · KDE SA NÁZOV POUŽIJE ============================ -->
+<div class="sh" id="secD"><span class="shl">D</span><h2>Kde sa názov zákazky použije</h2>
+  <span class="shsub">Všetky miesta v kóde v0.17.0. Stĺpec „Príklad" sa prepočíta podľa zvolenej situácie a názvu, ktorý napíšeš v sekcii A (dátum exportu 1.10.2026). Rovnaký text = rovnaké mená ako dnes.</span></div>
+<div class="mkswitch" data-stbox="1"></div>
+<div class="tscroll">
+  <table class="mt" id="whereTable">
+    <thead><tr><th>Výstup</th><th>Čo nesie názov</th><th>Príklad teraz</th><th>Kód (súbor:riadok)</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+<div class="mocknote">
+  <b>Fakt pre zjednotenie:</b> všetky štyri exporty čítajú názov z <b>jedného</b> miesta na serveri (<code>ProductionCore.project_name</code>) — v exportoch sa nič nerozchádza. Rozchádza sa len <b>zobrazenie</b>: hlavička Štúdia a karta „Projekt" v Kovaní ukazujú meno súboru. Návrh zjednocuje hlavičku (A1); karta kovania hovorí o sadách uložených <i>v modeli</i>, preto tam meno súboru sedí a ostáva. Rôzne tvary v menách súborov (VEPO a CSV kovania bez diakritiky a malými písmenami, XLSX s diakritikou) sú zámer dnešných exportov a nemenia sa.
+</div>
+
+<!-- ============================ E · NEULOŽENÝ MODEL A VÝNIMKY ============================ -->
+<div class="sh" id="secE"><span class="shl">E</span><h2>Nový model, prvé uloženie a výnimky</h2>
+  <span class="shsub">Päť krokov jednej zákazky a čo v každom ukáže hlavička (variant A). Kroky 1–3 fungujú už dnes, návrh ich len ukáže. Kroky 4–5 sú dnešné obmedzenie úložiska — návrh ich poctivo priznáva, nerieši. <a class="oref" href="#O5">O5</a> <a class="oref" href="#O6">O6</a></span></div>
+<div class="tl" id="tl"></div>
+<div class="mocknote">
+  <ol>
+    <li><span class="npin">E1</span><b>Neuložený model:</b> názov sa dá zadať hneď — uloží sa pod dočasným kľúčom a pri prvom Ctrl+S sa prenesie na súbor. Hlavička počas toho neukazuje „Bez názvu", ale to, pod čím odídu exporty. <span class="pkg">ui/production_core.rb project_key :403-406, adopt_session_name :442-471</span></li>
+    <li><span class="npin">E2</span><b>Predvyplnenie z mena súboru pri prvom otvorení — nie.</b> Uložený model meno súboru už dnes dostane automaticky a to sleduje premenovanie súboru. Zápisom by názov zamrzol a v nastaveniach by pribúdali záznamy bez tvojho vedomia. <a class="oref" href="#O5">O5</a></li>
+    <li><span class="npin">E3</span><b>Názov patrí počítaču, nie súboru.</b> „Uložiť ako", premenovanie či presun súboru a otvorenie u Lucie → podľa súboru. V H7 sa úložisko nemení; trvalé riešenie (názov uložený priamo v .skp) patrí k položke <b>G-02 Karta zákazky</b> v zásobníku PO V1. <a class="oref" href="#O6">O6</a></li>
+  </ol>
+</div>
+
+<!-- ============================ F · C-07 POZNÁMKA ============================ -->
+<div class="sh" id="secF"><span class="shl">F</span><h2>C-07 · Nastavenia exportu v jadre — poznámka (bez UI)</h2>
+  <span class="shsub">Úprava kódu v tej istej dávke. Z tvojho pohľadu sa nemení nič: ten istý súbor, tie isté kľúče, rovnaké správanie.</span></div>
+<section class="card facts" style="margin-top:10px">
+  <h3>Čo je dnes kde</h3>
+  <p><b>Súbor:</b> <code>%APPDATA%\NOXUN\Engine\vepo_settings.json</code> (+ záloha <code>.bak</code>). Obsahuje tri veci, ktoré zdieľajú všetky štyri exporty: <b><code>project_names</code></b> (mapa: cesta .skp alebo dočasný kľúč nového modelu → názov zákazky), <b><code>merge_18_36</code></b> (18 + 36 mm do jedného VEPO súboru, predvolene zapnuté) a <b><code>last_dir</code></b> (posledný priečinok exportu).</p>
+  <div class="tscroll">
+    <table class="mt">
+      <thead><tr><th>Čo</th><th>Kde sa číta / zapisuje dnes</th></tr></thead>
+      <tbody>
+        <tr><td>Čítanie nastavení (pri chybe prázdne, okno nikdy nespadne)</td><td class="cd">ui/production_core.rb:33-40 vepo_settings</td></tr>
+        <tr><td>Prísne čítanie pred zápisom · jediné dvere zápisu (zámok, čítanie nanovo) · zápis bez mapy názvov · čerstvé čítanie pred exportom</td><td class="cd">ui/production_core.rb:49-56 · :80-97 update_vepo_settings · :108-119 save_vepo_settings · :128-133 refresh_vepo_settings</td></tr>
+        <tr><td>Názov zákazky: automatický, kľúče, prenos z nového modelu, zápis</td><td class="cd">ui/production_core.rb:267-519 (default_project_name :268, project_name :414, save_project_name :493)</td></tr>
+        <tr><td>18 + 36 spolu</td><td class="cd">ui/production_core.rb:523-529</td></tr>
+        <tr><td>Okno Štúdia — zápis názvu a 18 + 36, čítanie do lišty</td><td class="cd">ui/studio_dialog.rb:630-656 do_set_vepo_opts · :662-670 push_vepo_bar · :1659-1661 payload vepo</td></tr>
+        <tr><td>Exporty — názov + posledný priečinok</td><td class="cd">ui/production_core.rb VEPO :1963-1999 · CSV kovania :2071-2079 · rozpočet :3544-3554 · ponuka :3635-3643</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><b>C-07:</b> celé úložisko je dnes vo vrstve okien (<code>ui/production_core.rb</code>), hoci je to nastavenie počítača pre exporty. Presunie sa do jadra (<code>core/</code>, meno modulu určí package) <b>bez zmeny tvaru JSON, mena súboru a kľúčov</b>; okno aj exporty ho budú volať odtiaľ. Nový modul = audit návrhu je povinný (CLAUDE.md).</p>
+  <p><b>Súvis s R-38:</b> tento súbor jediný zo šiestich nemá ochranu pri poškodenej hlavnej kópii a zlyhaný zápis nehlási — dnes okno po zlyhanom zápise napíše zeleno „Názov projektu: &lt;starý názov&gt;". Hlásenie zlyhania pri názve je <a class="oref" href="#O8">O8</a>; ochrana súboru pri poškodení sa rozhodne v package C-07.</p>
+</section>
+
+<!-- ============================ G · O-BODY ============================ -->
+<div class="sh" id="secG"><span class="shl">G</span><h2>Súhrn otvorených bodov O1–O9</h2>
+  <span class="shsub">Každý bod je <b>návrh — potvrdí Michal</b>. Zelené = odporúčanie. Stačí odpovedať „O1–O9 podľa návrhu" alebo napísať odchýlky.</span></div>
+<div class="tscroll">
+  <table class="mt ob">
+    <thead><tr><th>Bod</th><th>Otázka</th><th>Odporúčanie</th><th>Alternatívy</th><th>Dotknuté (pre package)</th></tr></thead>
+    <tbody>
+      <tr id="O1"><td><b>O1</b><br><span class="nvr">návrh — potvrdí Michal</span></td><td>Ako sa názov v hlavičke upravuje?</td>
+        <td><span class="rec"><b>A</b> — text s ceruzkou, klik = pole na mieste (vzor premenovania skrinky). V hlavičke každej sekcie, ako dnes „zákazka: …".</span></td>
+        <td>B — stále viditeľné pole s rámom · C — v navigácii pod „ZÁKAZKA" (pri zbalenej navigácii zmizne)</td>
+        <td class="cd">studio.js :1203-1209, :1022-1023, :1117-1133 · studio.html :51-55</td></tr>
+      <tr id="O2"><td><b>O2</b><br><span class="nvr">návrh — potvrdí Michal</span></td><td>Čo s poľom PROJEKT v lište Kusovníka?</td>
+        <td><span class="rec"><b>Zmizne</b> — jedno miesto na úpravu, užšia lišta.</span></td>
+        <td>B — namiesto poľa text „Zákazka: …" ako odkaz do hlavičky · C — ostane ako druhé pole (dve miesta = dnešný problém)</td>
+        <td class="cd">studio.js :1338-1356, :2113, :2124 · studio.html :154-164 · testy test_st1a_studio.js:297, test_st1a_studio.rb:720, :966-967</td></tr>
+      <tr id="O3"><td><b>O3</b><br><span class="nvr">návrh — potvrdí Michal</span></td><td>Kedy svieti jantárová bodka?</td>
+        <td><span class="rec"><b>Len pri „projekt"</b> (nový neuložený model bez zadaného názvu). Pri názve podľa súboru sivý dovetok „podľa súboru", bez bodky.</span></td>
+        <td>Bodka aj pri názve podľa súboru — potom by sa musel dať názov súboru „potvrdiť", no text rovnaký ako automatický sa dnes neukladá → zmena správania úložiska, mimo H7</td>
+        <td class="cd">payload vepo studio_dialog.rb:1659-1661, :664-666 (+ zdroj názvu)</td></tr>
+      <tr id="O4"><td><b>O4</b><br><span class="nvr">návrh — potvrdí Michal</span></td><td>Čo pri exporte s predvoleným názvom?</td>
+        <td><span class="rec">Bodka + tooltip s menom + <b>jedna veta v stavovom riadku po exporte</b>. Neblokuje, farbu stavu nemení.</span></td>
+        <td>A — len bodka a tooltip · C — potvrdzovacie okno pred exportom (klik navyše pri každom novom modeli)</td>
+        <td class="cd">production_core.rb :2006, :2083, :3564, :3688</td></tr>
+      <tr id="O5"><td><b>O5</b><br><span class="nvr">návrh — potvrdí Michal</span></td><td>Uložiť meno súboru ako názov zákazky pri prvom otvorení?</td>
+        <td><span class="rec"><b>Nie.</b> Meno súboru sa už dnes použije automaticky a sleduje premenovanie; zápis by menil dáta bez tvojho vedomia.</span></td>
+        <td>Áno — zapísať pri prvom otvorení (neodporúčam)</td>
+        <td class="cd">— (nič sa nerobí)</td></tr>
+      <tr id="O6"><td><b>O6</b><br><span class="nvr">návrh — potvrdí Michal</span></td><td>Názov patrí počítaču, nie súboru (Lucia ho nevidí, „Uložiť ako" ho stratí). Riešiť v H7?</td>
+        <td><span class="rec"><b>V H7 nie</b> — len poctivé „podľa súboru" v hlavičke. Trvalé riešenie (názov v .skp) zapísať k G-02 Karta zákazky (PO V1).</span></td>
+        <td>Preniesť názov pri „Uložiť ako" už v H7 — nové správanie zápisu, audit návrhu</td>
+        <td class="cd">production_core.rb project_key :403-406, project_name :414-426</td></tr>
+      <tr id="O7"><td><b>O7</b><br><span class="nvr">návrh — potvrdí Michal</span></td><td>Ukázať presné meno priečinka/súboru v tooltipe exportu?</td>
+        <td><span class="rec"><b>Áno</b> — meno skladá server tými istými funkciami ako export (GR-20: „tlačidlo VEPO povie, ako sa priečinok bude volať").</span></td>
+        <td>Len všeobecná veta „pomenuje sa podľa názvu zákazky"</td>
+        <td class="cd">vepo_export.rb:175 · xlsx_writer.rb:402 · cp_export.rb:627 · production_core.rb:2072</td></tr>
+      <tr id="O8"><td><b>O8</b><br><span class="nvr">návrh — potvrdí Michal</span></td><td>Zlyhaný zápis názvu (zamknutý súbor, plný disk) dnes okno neprizná. Hlásiť v H7?</td>
+        <td><span class="rec"><b>Áno</b> — hlavička ostane na pôvodnom názve, stavový riadok červeno „Názov zákazky sa nepodarilo uložiť — skús znova". Ochrana súboru pri poškodení podľa package C-07 / R-38.</span></td>
+        <td>Nechať celé na R-38 po V1</td>
+        <td class="cd">production_core.rb save_project_name :493-519 (výsledok zápisu sa zahadzuje) · studio_dialog.rb:645-655</td></tr>
+      <tr id="O9"><td><b>O9</b><br><span class="nvr">návrh — potvrdí Michal</span></td><td>Slovo „projekt" → „zákazka" v texte okna?</td>
+        <td><span class="rec"><b>Áno</b> — štítok „Zákazka", stav „Názov zákazky: …", tooltipy. Predvolené slovo „projekt" v menách súborov ostáva.</span></td>
+        <td>Nechať „Projekt"</td>
+        <td class="cd">studio_dialog.rb:647, :655 · studio.js :1349-1351</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ============================ H · PRE PACKAGE ============================ -->
+<section class="card facts" style="margin-top:24px" aria-labelledby="pkgH">
+  <h3 id="pkgH">Pre package H7 (fakty, malým písmom)</h3>
+  <ul class="src" style="font-size:11.5px">
+    <li><b>Úložisko:</b> <code>%APPDATA%\NOXUN\Engine\vepo_settings.json</code> (<code>Materials.dir</code>, core/materials.rb:233-237) · kľúč mapy <code>project_names</code> (production_core.rb:293) · kľúč záznamu = normalizovaná cesta .skp (malé písmená, <code>/</code>; :344-346), nový model <code>guid:&lt;DocKey token&gt;</code> (:354-357) · strop 120 znakov (:294) · predvolená hodnota <code>default_project_name</code> = meno súboru bez prípony, inak <code>'projekt'</code> (:268-271) · prázdne alebo rovnaké ako predvolené = záznam sa zmaže (:497-509).</li>
+    <li><b>Zápis z okna:</b> existujúci callback <code>studio_set_vepo_opts</code> → <code>StudioDialog#do_set_vepo_opts</code> (studio_dialog.rb:630-656, brána generácie + DocKey ostáva). Pozor: pri zastaranej generácii server zápis odmietne („Okno sa medzitým prepočítalo…") a napísaný názov sa stratí — tak ako dnes v Kusovníku; package zváži. Echo <code>push_vepo_bar</code> (:662-670) → <code>NX.setVepoBar</code> (studio.js:1117-1133) dnes prepisuje <code>#prjInput</code> a <code>#mergeChk</code>; po H7 hlavičku (ak sa v nej práve nepíše) a <code>#mergeChk</code>.</li>
+    <li><b>Payload</b> <code>vepo</code> (studio_dialog.rb:1659-1661 a echo :664-666) doplní zdroj názvu (zadaný · súbor · predvolený) a náhľad mien exportov — skladá server, klient nič neodvodzuje (vzor audit #16 ŠT-1a). Súbor pre tooltip hlavičky: <code>model_title</code> (:1633).</li>
+    <li><b>Dokumentácia:</b> UI_DIZAJN.md:1438-1440 (veta „názov projektu: input v Štúdiu → Kusovník") prepísať · docs/architecture/ui-lifecycle.md (sekcia Kusovník, :1847) · outputs.md :451-495 (project_names) · C-07: outputs.md odsek production_core :164-201 + nový odsek modulu jadra a riadok v docs/ARCHITEKTURA.md.</li>
+    <li><b>Testy:</b> dnešné viazané na pole — test_st1a_studio.js:297 (poradie lišty), test_st1a_studio.rb:720, :966-967 · nové: tri stavy hlavičky, bodka len pri predvolenom, tooltip = serverový text, echo neprepíše rozpísaný názov.</li>
+    <li><b>Trieda dávky (predpoklad):</b> nový ovládač v UI → predrecenzia povinná · C-07 nový modul jadra → audit návrhu povinný · zápis ide do nastavení počítača, nie do modelu, buildery ani undo sa nemenia → in-SU brána sa nespúšťa (určí package) · zmena JS/CSS → bump verzie a všetky <code>?v=</code>.</li>
+    <li><b>Mimo H7 (zistené pri prieskume):</b> „Kovanie → Projekt" ukazuje „Model: &lt;súbor&gt;" (hardware_catalog_dialog.rb:549, hw_sets.js:1808) — ostáva, hovorí o sadách v modeli. Nárezový plán názov nepoužíva (nemá export).</li>
+  </ul>
+</section>
+
+</main>
+
+<script>
+(function(){
+  'use strict';
+  var FILE = 'Kuchyna_Novak';
+  var VER = 'v0.17.0';
+  var S = { saved:false, file:FILE, stored:'', hv:'A', kv:'A', editing:false, barD:null, barN:null };
+  var PRESETS = [
+    { id:'s1', t:'Nový neuložený model', st:{ saved:false, file:FILE, stored:'' } },
+    { id:'s2', t:'Uložený, názov nezadaný', st:{ saved:true, file:FILE, stored:'' } },
+    { id:'s3', t:'Uložený, názov zadaný', st:{ saved:true, file:FILE, stored:'Kuchyňa Novák' } }
+  ];
+
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function ico(n){ return '<svg class="ic" aria-hidden="true"><use href="#i-' + n + '"/></svg>'; }
+  function pin(t){ return '<i class="mpin">' + t + '</i>'; }
+  function dpin(t){ return '<i class="dpin">' + t + '</i>'; }
+
+  // --- model názvu (zrkadlo ProductionCore: default_project_name / project_name / save_project_name) ---
+  function defName(st){ return st.saved ? st.file : 'projekt'; }
+  function eff(st){ return st.stored || defName(st); }
+  function src(st){ return st.stored ? 'stored' : (st.saved ? 'file' : 'default'); }
+  // VepoExport.slug / project_slug
+  function slug(v){
+    var s = String(v);
+    try { s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch(e) {}
+    return s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  }
+  function pslug(v){
+    var s = slug(v);
+    if (!s) return 'projekt';
+    return /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/.test(s) ? 'projekt_' + s : s;
+  }
+  function safe(t){ return t.replace(/[\\\/:*?"<>|]/g, '-').replace(/\s+/g, ' ').trim(); }
+  function names(st){
+    var n = eff(st), p = pslug(n);
+    return {
+      name:n, slug:p,
+      vepoDir: p + '\\',
+      vepoCsv: p + '_w1100_st30_alpska_biela_dtdl_18_36.csv',
+      vepoLog: p + '_export.log',
+      logLine: 'Projekt: ' + n + ' (' + p + ')',
+      hwCsv: 'kovanie_' + p + '.csv',
+      hwRow: '"NOXUN kovanie — nákupný zoznam";"' + n + '";"2026-10-01 14:05"',
+      budFile: safe('Rozpocet ' + n + ' - AKT 1.10. 2026') + '.xlsx',
+      budTitle: 'Rozpočet ' + n + ' - AKT. 1.10. 2026',
+      cpFile: safe('Cenova ponuka ' + n + ' - 1.10.2026') + '.xlsx',
+      cpTitle: 'CENOVÁ PONUKA ' + n + ' - AKT. 1.10.2026'
+    };
+  }
+  function tipText(st){
+    var sc = src(st);
+    if (sc === 'default') return 'Exporty sa teraz pomenujú „projekt" — model ešte nie je uložený. Klikni a zadaj názov zákazky.';
+    if (sc === 'file') return 'Názov sa berie z mena súboru ' + st.file + '.skp. Klikni a zadaj vlastný — súbor sa nepremenuje. · ' + VER;
+    return 'Názov zákazky pre VEPO, kovanie, rozpočet aj ponuku. ' +
+      (st.saved ? 'Súbor: ' + st.file + '.skp. Prázdne pole vráti meno súboru.' : 'Model ešte nie je uložený — názov sa pri prvom uložení prenesie na súbor. Prázdne pole vráti „projekt".') + ' · ' + VER;
+  }
+
+  // --- hlavička: NÁVRH, variant A / B ---
+  function jobCtl(st, variant, live, pins){
+    var sc = src(st), n = eff(st), tip = tipText(st);
+    var h = '<span class="jobhd' + (pins ? ' mkhl' : '') + '">';
+    if (pins) h += pin('A1');
+    if (variant === 'B'){
+      h += '<label class="jobbox' + (sc === 'default' ? ' is-def' : '') + '" title="' + esc(tip) + '">' +
+        (sc === 'default' ? '<i class="jdot"></i>' : '') + '<span class="joblbl">Zákazka</span>' +
+        '<input type="text" maxlength="120"' + (live ? ' data-job="inp"' : ' tabindex="-1"') +
+        ' value="' + esc(sc === 'stored' ? n : '') + '" placeholder="' + esc(n) + '" aria-label="Názov zákazky"></label>';
+      if (sc === 'file') h += '<span class="jobsrc">podľa súboru</span>';
+      if (sc === 'default') h += '<span class="jobsrc warn">zadaj názov</span>';
+    } else if (live && S.editing){
+      h += '<span class="joblbl">Zákazka</span><input type="text" class="jobinp" id="jobEdit" maxlength="120" value="' + esc(n) + '"' +
+        ' title="Enter uloží, Escape zruší, prázdne pole vráti automatický názov" aria-label="Názov zákazky">';
+    } else {
+      h += '<span class="joblbl">Zákazka</span>' +
+        '<button type="button" class="jobname src-' + sc + '"' + (live ? ' data-job="edit"' : ' tabindex="-1"') +
+        ' title="' + esc(tip) + '" aria-label="Upraviť názov zákazky — ' + esc(n) + '">' +
+        (sc === 'default' ? '<i class="jdot"></i>' : '') + '<span class="jobtext">' + esc(n) + '</span>' + ico('pencil') + '</button>';
+      if (sc === 'file') h += '<span class="jobsrc">podľa súboru</span>';
+      if (sc === 'default') h += '<span class="jobsrc warn">zadaj názov</span>';
+    }
+    if (pins && sc !== 'stored') h += pin('A2');
+    h += '<span class="jobver">· ' + VER + '</span></span>';
+    return h;
+  }
+
+  var HINT = 'skupiny podľa materiálu · pohľady Dielce / Platne / ABS · živý zoznam';
+  function headDnes(st){
+    var title = st.saved ? st.file : 'Bez názvu';
+    return '<h2>Kusovník</h2><span class="sechint">' + esc(HINT) + '</span>' +
+      '<span class="secmodel">zákazka: ' + esc(title) + ' · ' + VER + '</span>' + dpin('D1');
+  }
+  function headNavrh(st){
+    return '<h2>Kusovník</h2><span class="sechint">' + esc(HINT) + '</span>' + jobCtl(st, S.hv, true, true);
+  }
+  function vepoBtn(dot, pins){
+    return '<span class="vepofly"><button type="button" class="primary" tabindex="-1">' + ico('download') + ' VEPO export' +
+      (dot ? '<i class="xdot" aria-hidden="true"></i>' : '') + '</button><i class="corner"></i></span>' + (pins && dot ? pin('A4') : '');
+  }
+  function views(){
+    return '<span class="bomviews"><button type="button" class="on" tabindex="-1">Dielce</button><button type="button" tabindex="-1">Platne</button><button type="button" tabindex="-1">ABS</button></span>';
+  }
+  function tail(){
+    return '<button type="button" class="ghostbtn" tabindex="-1">' + ico('columns-3') + ' Stĺpce ' + ico('chevron-down') + '</button>' +
+      '<button type="button" class="ghostbtn" tabindex="-1">' + ico('refresh-cw') + ' Obnoviť</button>';
+  }
+  function search(){ return '<span class="searchbox">' + ico('search') + ' Hľadať dielec / skrinku…</span>'; }
+  function toolsDnes(st){
+    return views() + '<label class="prjbox" title="Názov zákazky — pomenuje priečinok a súbory VEPO exportu, titulok rozpočtu aj cenovej ponuky. Platí pre všetky exporty.">' +
+      '<i class="dpin pinabs">D2</i><span class="prjlbl">Projekt</span><input type="text" data-dnes="prj" maxlength="120" value="' + esc(eff(st)) + '" placeholder="' + esc(defName(st)) + '"></label>' +
+      search() + '<span class="spacer"></span>' + vepoBtn(false, false) + tail();
+  }
+  function toolsNavrh(st){
+    var h = views();
+    if (S.kv === 'B'){
+      h += '<button type="button" class="joblink" data-job="focus" title="Názov zákazky sa upravuje v hlavičke">Zákazka: <b>' + esc(eff(st)) + '</b></button>';
+    } else {
+      h += pin('A3');
+    }
+    return h + search() + '<span class="spacer"></span>' + vepoBtn(src(st) === 'default', true) + tail();
+  }
+  function bodyRows(){
+    return '<div class="grp"><div class="grph"><span class="sw"></span>F206 ST9 Pietra Grigia čierna <small>18 mm</small><span class="gsum">6 ks · 1,95 m²</span></div>' +
+      '<div class="grow"><span>Dv myčka</span><span>CAB-002 ×1</span><span>778</span><span>596</span></div>' +
+      '<div class="grow"><span>Zasuvkove celo 1</span><span>CAB-001 ×1</span><span>760</span><span>796</span></div></div><div style="height:8px"></div>';
+  }
+  function navHtml(){
+    var it = [['list','Kusovník',1],['clipboard-check','Kontrola',0,'10'],['cart','Nákup kovania'],['euro','Rozpočet'],['file-text','Cenová ponuka'],['scissors','Nárezový plán']];
+    var h = '<div class="sgrp">Zákazka</div>';
+    it.forEach(function(x){
+      h += '<button type="button" class="navitem' + (x[2] ? ' on' : '') + '" tabindex="-1">' + ico(x[0]) + '<span>' + x[1] + '</span>' +
+        (x[3] ? '<b class="nbadge">' + x[3] + '</b>' : '') + '</button>';
+    });
+    return h + '<div class="navmore">Katalógy · Nastavenia …</div>';
+  }
+  function bar(el, b){
+    el.className = 'sbar' + (b && b.cls ? ' ' + b.cls : '');
+    el.textContent = b ? b.t : 'Pripravené.';
+  }
+
+  // --- sekcia B: tabuľka stavov ---
+  function renderVarTable(){
+    var rows = [
+      { t:'Predvolený „projekt"', d:'nový neuložený model', st:{ saved:false, file:FILE, stored:'' } },
+      { t:'Podľa súboru', d:'uložený Kuchyna_Novak.skp, názov nezadaný', st:{ saved:true, file:FILE, stored:'' } },
+      { t:'Zadaný', d:'uložený, názov „Kuchyňa Novák"', st:{ saved:true, file:FILE, stored:'Kuchyňa Novák' } }
+    ];
+    var h = '';
+    rows.forEach(function(r){
+      h += '<tr><td><b>' + esc(r.t) + '</b><br><span class="src">' + esc(r.d) + '</span></td>' +
+        '<td><div class="stu" style="background:none;display:block"><div class="sechead" style="border:0;background:none;padding:4px 0">' + jobCtl(r.st, 'A', false, false) + '</div></div></td>' +
+        '<td><div class="stu" style="background:none;display:block"><div class="sechead" style="border:0;background:none;padding:4px 0">' + jobCtl(r.st, 'B', false, false) + '</div></div></td>' +
+        '<td style="font-size:11.5px;color:var(--nx-ink-muted);min-width:200px">' + esc(tipText(r.st)) + '</td></tr>';
+    });
+    h += '<tr><td><b>Úprava</b><br><span class="src">klik na názov / ceruzku</span></td>' +
+      '<td><div class="stu" style="background:none;display:block"><div class="sechead" style="border:0;background:none;padding:4px 0"><span class="jobhd"><span class="joblbl">Zákazka</span>' +
+      '<input type="text" class="jobinp" tabindex="-1" value="Kuchyňa Novák"><span class="jobver">· ' + VER + '</span></span></div></div></td>' +
+      '<td><span class="src">pole je stále — píše sa rovno doň</span></td>' +
+      '<td style="font-size:11.5px;color:var(--nx-ink-muted)">Enter uloží, Escape zruší, prázdne pole vráti automatický názov</td></tr>';
+    $('varTable').querySelector('tbody').innerHTML = h;
+  }
+
+  // --- sekcia C: mini lišty exportov ---
+  function xcard(title, tools, tip, status){
+    return '<div class="xcard"><div class="stu"><div class="sbody"><div class="sechead"><h2>' + esc(title) + '</h2>' + jobCtl(S, S.hv, false, false) + '</div>' +
+      '<div class="sectools">' + tools + '</div></div></div>' +
+      '<div class="xcap"><span class="tl">tooltip</span>' + tip + (status ? '<span class="st">' + status + '</span>' : '') + '</div></div>';
+  }
+  function renderExports(){
+    var n = names(S), dflt = src(S) === 'default';
+    var dot = dflt ? '<i class="xdot" aria-hidden="true"></i>' : '';
+    var more = dflt ? ' · <b>názov zákazky zadáš hore v hlavičke</b>' : '';
+    var tail2 = dflt ? ' · pomenované predvoleným názvom „projekt" — názov zákazky zadáš v hlavičke' : '';
+    var h = '';
+    h += xcard('Kusovník',
+      views() + '<span class="spacer"></span>' + vepoBtn(dflt, false),
+      'Exportuje prírezy (po odpočte ABS) do VEPO CSV — vyberieš priečinok. Vytvorí v ňom priečinok <code>' + esc(n.vepoDir) + '</code>' + more,
+      dflt ? 'po exporte: VEPO export hotový: 5 súborov, 38 riadkov (52 ks) → D:\\Zakazky\\' + esc(n.slug) + esc(tail2) : '');
+    h += xcard('Nákup kovania',
+      '<button type="button" class="ghostbtn" tabindex="-1">' + ico('download') + ' CSV kovania' + dot + '</button>' +
+      '<button type="button" class="ghostbtn" tabindex="-1">' + ico('refresh-cw') + ' Obnoviť</button>',
+      'CSV nákupného zoznamu — počíta sa z čerstvého modelu. Súbor <code>' + esc(n.hwCsv) + '</code>' + more,
+      dflt ? 'po exporte: Nákupný zoznam: 9 položiek → D:\\Zakazky\\' + esc(n.hwCsv) + esc(tail2) : '');
+    h += xcard('Rozpočet',
+      '<span class="bseg"><button type="button" class="on" tabindex="-1">s DPH</button><button type="button" tabindex="-1">bez DPH</button></span>' +
+      '<span class="spacer"></span><button type="button" class="primary" tabindex="-1">' + ico('download') + ' XLSX rozpočet' + dot + '</button>' +
+      '<button type="button" class="ghostbtn" tabindex="-1">' + ico('settings') + ' Nastavenia</button>',
+      'Interný rozpočet v presnom formáte tvojich hárkov. Súbor <code>' + esc(n.budFile) + '</code>' + more,
+      dflt ? 'po exporte: Rozpočet uložený: 1 902,00 € → D:\\Zakazky\\' + esc(n.budFile) + esc(tail2) : '');
+    h += xcard('Cenová ponuka',
+      '<button type="button" class="primary" tabindex="-1">' + ico('download') + ' Cenová ponuka (zákazník)' + dot + '</button>' +
+      '<button type="button" class="ghostbtn" tabindex="-1">' + ico('refresh-cw') + ' Obnoviť</button>',
+      'Zákaznícky dokument: cenová tabuľka + špecifikácia. Súbor <code>' + esc(n.cpFile) + '</code>, nadpis <code>' + esc(n.cpTitle) + '</code>' + more,
+      dflt ? 'po exporte: Cenová ponuka uložená: 1 902,00 € · 9 riadkov · špecifikácia 14 položiek → D:\\Zakazky\\' + esc(n.cpFile) + esc(tail2) : '');
+    $('expBox').innerHTML = h;
+  }
+
+  // --- sekcia D: kde sa názov použije ---
+  function renderWhere(){
+    var n = names(S), cls = src(S) === 'default' ? ' def' : '';
+    var R = [
+      ['sub','Exporty — všetky čítajú ProductionCore.project_name(model) (ui/production_core.rb:414)'],
+      ['VEPO export','Názov priečinka (celý sa pri novom exporte vymení)', n.vepoDir, 'core/vepo_export.rb:323 · slug :175-179 · volá ui/production_core.rb:1979'],
+      ['VEPO export','Mená CSV súborov (začiatok)', n.vepoCsv, 'core/vepo_export.rb:288'],
+      ['VEPO export','LOG — meno súboru a riadok „Projekt:"', n.vepoLog + '  ·  ' + n.logLine, 'core/vepo_export.rb:340, :767'],
+      ['CSV kovania','Meno súboru', n.hwCsv, 'ui/production_core.rb:2071-2073'],
+      ['CSV kovania','1. riadok súboru', n.hwRow, 'core/hardware_sets.rb:2471'],
+      ['XLSX rozpočet','Meno súboru (ponuka okna Uložiť)', n.budFile, 'core/xlsx_writer.rb:402-407 · volá ui/production_core.rb:3544-3547'],
+      ['XLSX rozpočet','Nadpis hárku', n.budTitle, 'core/xlsx_writer.rb:383, :390-394'],
+      ['XLSX cenová ponuka','Meno súboru (ponuka okna Uložiť)', n.cpFile, 'core/cp_export.rb:627-632 · volá ui/production_core.rb:3635-3638'],
+      ['XLSX cenová ponuka','Nadpis oboch hárkov (cenník aj špecifikácia) — vidí zákazník', n.cpTitle, 'core/cp_export.rb:579, :601, :616-620'],
+      ['sub','Okno Štúdia'],
+      ['Kusovník — lišta','Pole PROJEKT (dnes jediné miesto úpravy) → v návrhu zmizne (O2)', n.name, 'ui/js/studio.js:1349-1352 · zápis ui/studio_dialog.rb:645-648'],
+      ['Stavový riadok','Po zmene názvu', 'Názov projektu: ' + n.name + '. Platí pre všetky exporty.', 'ui/studio_dialog.rb:647, :655'],
+      ['sub','Kde sa dnes ukazuje meno SÚBORU, nie zákazky'],
+      ['Hlavička Štúdia','„zákazka: …" — v návrhu tu bude názov zákazky (A1)', 'zákazka: ' + (S.saved ? S.file : 'Bez názvu'), 'ui/studio_dialog.rb:1633 · ui/js/studio.js:1022-1023, :1208', 'no'],
+      ['Kovanie → Projekt','„Model: …" — sady uložené v modeli, ostáva', 'Model: ' + (S.saved ? S.file : 'Bez názvu'), 'ui/hardware_catalog_dialog.rb:549 · ui/js/hw_sets.js:1808', 'no'],
+      ['Nárezový plán','Názov nepoužíva (nemá export)', '—', '—', 'no']
+    ];
+    var h = '';
+    R.forEach(function(r){
+      if (r[0] === 'sub'){ h += '<tr class="sub"><td colspan="4">' + esc(r[1]) + '</td></tr>'; return; }
+      h += '<tr' + (r[4] === 'no' ? ' class="no"' : '') + '><td><b>' + esc(r[0]) + '</b></td><td>' + esc(r[1]) + '</td>' +
+        '<td class="ex' + (r[4] === 'no' ? '' : cls) + '">' + esc(r[2]) + '</td><td class="cd">' + esc(r[3]) + '</td></tr>';
+    });
+    $('whereTable').querySelector('tbody').innerHTML = h;
+  }
+
+  // --- sekcia E: časová os ---
+  function renderTimeline(){
+    var steps = [
+      { h:'Nový model', f:'SketchUp → Súbor → Nový', st:{ saved:false, file:FILE, stored:'' },
+        c:'Exporty by sa pomenovali „projekt". Hlavička to povie hneď — bodka a „zadaj názov".', today:'Dnes: hlavička „Bez názvu", pole PROJEKT „projekt" len v Kusovníku.' },
+      { h:'Zadáš názov', f:'klik na názov → „Kuchyňa Novák" → Enter', st:{ saved:false, file:FILE, stored:'Kuchyňa Novák' },
+        c:'Uloží sa na tomto PC pod dočasným kľúčom nového modelu. Jantár zhasne.', today:'Dnes rovnako (len cez pole v Kusovníku).' },
+      { h:'Prvé uloženie', f:'Ctrl+S → Kuchyna_Novak.skp', st:{ saved:true, file:FILE, stored:'Kuchyňa Novák' },
+        c:'Názov ostane — prenesie sa na súbor.', today:'Funguje už dnes (dávka 1b-6a).' },
+      { h:'Uložiť ako…', f:'→ Kuchyna_Novak_v2.skp', st:{ saved:true, file:'Kuchyna_Novak_v2', stored:'' },
+        c:'Nový súbor = nový kľúč. Zadaný názov ostal pri pôvodnom súbore; hlavička prizná „podľa súboru". O6', today:'Dnes rovnako, len to nie je vidieť.' },
+      { h:'Ten istý súbor u Lucie', f:'iný počítač, Kuchyna_Novak.skp', st:{ saved:true, file:FILE, stored:'' },
+        c:'Názov je uložený na počítači, nie v súbore — Lucia vidí meno súboru. O6', today:'Dnes rovnako, len to nie je vidieť.' }
+    ];
+    var h = '';
+    steps.forEach(function(s, i){
+      h += '<div class="tlc"><div><span class="tln">' + (i + 1) + '</span><span class="tlh">' + esc(s.h) + '</span></div>' +
+        '<div class="tlf">' + esc(s.f) + '</div>' +
+        '<div class="tlbox stu" style="display:block"><div class="sechead" style="border:0;background:none;padding:0;min-height:0">' + jobCtl(s.st, 'A', false, false) + '</div></div>' +
+        '<div>' + esc(s.c).replace(/O6$/, '<a class="oref" href="#O6">O6</a>') + '</div><div class="today">' + esc(s.today) + '</div></div>';
+    });
+    $('tl').innerHTML = h;
+  }
+
+  // --- prepínače ---
+  function presetOn(p){ return p.st.saved === S.saved && p.st.file === S.file && p.st.stored === S.stored; }
+  function renderSwitches(){
+    var boxes = document.querySelectorAll('[data-stbox]');
+    var h = '<span class="mkl">Situácia:</span>';
+    PRESETS.forEach(function(p){
+      h += '<button type="button" data-st="' + p.id + '"' + (presetOn(p) ? ' class="on"' : '') + '>' + esc(p.t) + '</button>';
+    });
+    h += '<span>· teraz: <b>' + esc(eff(S)) + '</b> (' + ({ stored:'zadaný', file:'podľa súboru', 'default':'predvolený' })[src(S)] + ')</span>';
+    Array.prototype.forEach.call(boxes, function(b){ b.innerHTML = h; });
+    $('varBox').innerHTML = '<span class="mkl">Hlavička:</span>' +
+      '<button type="button" data-hv="A"' + (S.hv === 'A' ? ' class="on"' : '') + '>A · text s ceruzkou</button>' +
+      '<button type="button" data-hv="B"' + (S.hv === 'B' ? ' class="on"' : '') + '>B · stále pole</button>' +
+      '<span class="mkl" style="margin-left:10px">Pole v Kusovníku:</span>' +
+      '<button type="button" data-kv="A"' + (S.kv === 'A' ? ' class="on"' : '') + '>zmizne</button>' +
+      '<button type="button" data-kv="B"' + (S.kv === 'B' ? ' class="on"' : '') + '>ostane ako text</button>' +
+      ' <a class="oref" href="#O1">O1</a><a class="oref" href="#O2">O2</a>';
+  }
+
+  function renderWins(){
+    var wd = $('winDnes'), wn = $('winNavrh');
+    Array.prototype.forEach.call(document.querySelectorAll('[data-nav]'), function(n){ n.innerHTML = navHtml(); });
+    var dd = wd.querySelector('[data-part="tools"] input[data-dnes]');
+    var keepD = dd && document.activeElement === dd;
+    wd.querySelector('[data-part="head"]').innerHTML = headDnes(S);
+    if (!keepD) wd.querySelector('[data-part="tools"]').innerHTML = toolsDnes(S);
+    wd.querySelector('[data-part="body"]').innerHTML = bodyRows();
+    bar(wd.querySelector('[data-part="bar"]'), S.barD);
+    wn.querySelector('[data-part="head"]').innerHTML = headNavrh(S);
+    wn.querySelector('[data-part="tools"]').innerHTML = toolsNavrh(S);
+    wn.querySelector('[data-part="body"]').innerHTML = bodyRows();
+    bar(wn.querySelector('[data-part="bar"]'), S.barN);
+    $('tipNow').innerHTML = '<span class="tl">tooltip názvu</span>' + esc(tipText(S));
+  }
+
+  function render(){
+    renderSwitches(); renderWins(); renderExports(); renderWhere();
+  }
+
+  // --- zápis (zrkadlo save_project_name: orez, strop 120, prázdne/rovnaké = zmaž) ---
+  function commit(v, from){
+    var s = String(v == null ? '' : v).trim().slice(0, 120).trim();
+    S.stored = (s === '' || s === defName(S)) ? '' : s;
+    var shown = eff(S);
+    S.barD = { cls:'ok', t:'Názov projektu: ' + shown + '. Platí pre všetky exporty.' };
+    S.barN = { cls:'ok', t:'Názov zákazky: ' + shown + ' · platí pre VEPO, kovanie, rozpočet aj ponuku.' };
+    S.editing = false;
+    render();
+  }
+
+  var committing = false;
+  document.addEventListener('click', function(ev){
+    var t = ev.target.closest ? ev.target.closest('button, a') : null;
+    if (!t) return;
+    if (t.hasAttribute('data-st')){
+      var p = PRESETS.filter(function(x){ return x.id === t.getAttribute('data-st'); })[0];
+      if (p){ S.saved = p.st.saved; S.file = p.st.file; S.stored = p.st.stored; S.editing = false; S.barD = S.barN = null; render(); }
+      return;
+    }
+    if (t.hasAttribute('data-hv')){ S.hv = t.getAttribute('data-hv'); S.editing = false; render(); return; }
+    if (t.hasAttribute('data-kv')){ S.kv = t.getAttribute('data-kv'); render(); return; }
+    if (t.hasAttribute('data-theme')){
+      document.documentElement.setAttribute('data-nx-theme', t.getAttribute('data-theme'));
+      Array.prototype.forEach.call(document.querySelectorAll('[data-theme]'), function(b){ b.classList.toggle('on', b === t); });
+      return;
+    }
+    if (t.getAttribute('data-job') === 'edit'){
+      S.editing = true; renderWins();
+      var inp = $('jobEdit'); if (inp){ inp.focus(); inp.select(); }
+      return;
+    }
+    if (t.getAttribute('data-job') === 'focus'){
+      if (S.hv === 'A'){ S.editing = true; renderWins(); var i2 = $('jobEdit'); if (i2){ i2.focus(); i2.select(); } }
+      else { var i3 = $('winNavrh').querySelector('input[data-job="inp"]'); if (i3) i3.focus(); }
+      return;
+    }
+  });
+  document.addEventListener('keydown', function(ev){
+    var t = ev.target;
+    if (t && t.id === 'jobEdit'){
+      if (ev.key === 'Enter'){ ev.preventDefault(); committing = true; commit(t.value, 'A'); committing = false; }
+      else if (ev.key === 'Escape'){ ev.preventDefault(); committing = true; S.editing = false; renderWins(); committing = false; }
+      return;
+    }
+    if (t && (t.getAttribute('data-job') === 'inp' || t.getAttribute('data-dnes') === 'prj') && ev.key === 'Enter'){ ev.preventDefault(); t.blur(); }
+  });
+  document.addEventListener('focusout', function(ev){
+    var t = ev.target;
+    if (t && t.id === 'jobEdit' && S.editing && !committing){ commit(t.value, 'A'); }
+  });
+  document.addEventListener('change', function(ev){
+    var t = ev.target;
+    if (t && t.getAttribute && t.getAttribute('data-dnes') === 'prj'){ commit(t.value, 'D'); return; }
+    if (t && t.getAttribute && t.getAttribute('data-job') === 'inp'){ commit(t.value, 'B'); return; }
+    if (t && t.id === 'pinTog'){ document.body.classList.toggle('nopins', !t.checked); }
+  });
+
+  renderVarTable();
+  renderTimeline();
+  render();
+})();
+</script>
+</body>
+</html>
