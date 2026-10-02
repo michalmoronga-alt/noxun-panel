@@ -67,7 +67,9 @@ Smoke bloku 2 **PASS 29.9.2026** (bez chýb); nové postrehy k týmto funkciám 
   Jednotný zdroj = **firemný Google Disk** (sú tam všetky firemné veci). Dotýka sa: katalóg materiálov, šablóny korpusov, pravidlá kovania (dnes všetko v lokálnom %APPDATA%).
 *Stav: po V1 — **rozhodnuté 6.9.2026: PRVÁ funkcia po uzávere V1** v tvare Odoslať / Aktualizovať naraz pre všetky katalógy (aj nastavenia rozpočtu a dodávateľa, prílohy
 spotrebičov, náhľady šablón), verzie per katalóg, konflikt ručne (výber verzie), štart len oznámi, koreň `H:\Môj disk\NoxunENGINE data`; odhad 3 PR — checkpoint
-`zdroje/next_sessions/V1_DEBATA_2026-09-06_LUCIA_KNIZNICE.md`. Dovtedy export/import ručne.*
+`zdroje/next_sessions/V1_DEBATA_2026-09-06_LUCIA_KNIZNICE.md`. Dovtedy export/import ručne. **Príprava hotová (H16, 2.10.2026):** súpis
+[../docs/architecture/kniznice.md](../docs/architecture/kniznice.md) (register `LibraryRegistry` v kóde) nahrádza záväzný zoznam store-ov §1 návrhu SYNC; rozmerové rady
+a „18 + 36" ostávajú každému PC (Michal 2.10.); fakty pre D-48 v jeho časti 5.*
 - **DOCX/PDF generátor cenovej ponuky + rodina dokumentov** *(od 26.8. MIMO V1 — vyčlenené z odkladov dávky E)* — plný generátor ponuky do DOCX/PDF so šablónou a vizualizáciami (dnes XLSX) ·
   rodina dokumentov okolo ponuky (ponuka 3D vizualizácií, preberací protokol). *Predpoklad: neutrálny model ponuky (XLSX/DOCX/PDF ako renderery tých istých dát — audit kolo 0, P2).*
 - **D-107 · Izolácia objektu pred fotením náhľadu šablóny** (Michal 20.8., smoke test) — náhľad šablóny je dnes **kontextová fotografia** aktuálneho pohľadu dorámovaná na skrinku (UI-D2), takže do nej

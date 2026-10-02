@@ -2,8 +2,8 @@
 
 > **Časť mapy modulov Noxun Engine.** Rozcestník a kľúčové invarianty sú
 > v [../ARCHITEKTURA.md](../ARCHITEKTURA.md).
-> **Čo to je:** kontrolný zoznam miest pre šesť najčastejších rozšírení — nový typ skrinky, nová rola dielca, nový stĺpec Kusovníka,
-> nová sekcia Štúdia, nové pravidlo kovania viazané na typ a nový set alebo systém kovania. Detail každého miesta je v odseku jeho modulu (Grep `^### <súbor>`).
+> **Čo to je:** kontrolný zoznam miest pre sedem najčastejších rozšírení — nový typ skrinky, nová rola dielca, nový stĺpec Kusovníka,
+> nová sekcia Štúdia, nové pravidlo kovania viazané na typ, nový set alebo systém kovania a nové úložisko na počítači. Detail každého miesta je v odseku jeho modulu (Grep `^### <súbor>`).
 > **Ako sa číta:** tabuľky menujú **súbor a mená** (konštanta, modul, funkcia) — nikdy čísla riadkov. Riadok tabuľky, ktorý začína
 > cestou v spätných apostrofoch, stráži `tests/pure/test_h13_rozsirovacie_body.rb`: súbor musí existovať a každé meno z druhého
 > stĺpca v ňom musí byť. Meno `Modul::ČLEN` alebo `Modul.metóda` sa hľadá **v rozsahu toho modulu** (súbor, ktorý modul nedeklaruje,
@@ -178,7 +178,21 @@ goldenu `tests/fixtures/h15_golden/generate.rb` zdôvodnená v PR; kód setu mus
 | `noxun_engine/modules/fronts.rb` | `Fronts::DRAWER_SYSTEMS` | systém zásuvky na čele |
 | `noxun_engine/core/validation.rb` | `Validation::SYSTEM_LABELS_SK` | menovka systému v hláške „chýba kit" |
 
+## 7 · Nové úložisko na počítači
+
+Nový súbor alebo priečinok mimo zákazky (knižnica, nastavenie, cache, značka). **Zdieľanie medzi PC (`sync`) rozhoduje Michal**; nový
+modul a formát súboru = dávka **audit-povinná**. Súpis: [kniznice.md](kniznice.md).
+
+| Súbor | Mená | Čo tam urobiť |
+|---|---|---|
+| `noxun_engine/core/library_registry.rb` | `LibraryRegistry::ENTRIES` · `LibraryRegistry::LOCKS` · `LibraryRegistry::OUTSIDE` | riadok: `sync`, zámok a jeho režim, verzia, prílohy, zapisovatelia |
+| `noxun_engine/core/materials.rb` | `Materials.dir` · `Materials.with_catalog_lock` | cesta cez jediný koreň (vlastný `%APPDATA%` guard nepustí), zámok |
+| `noxun_engine/core/json_file_store.rb` | `JsonFileStore.write` · `JsonFileStore.degraded?` | atomický zápis s `.bak`, brána poškodeného súboru |
+| `tests/pure/test_h16_kniznice.rb` | `NxH16::WRITE_SITES` | počet zápisových miest v súbore zapisovateľa (+ verzia do STANDARD §13.1) |
+| `tests/h16_first_use.rb` | `UsageStats.record` | krok prvého behu, ak súbor vzniká bez okna |
+| `docs/architecture/kniznice.md` | `LibraryRegistry` · `WRITE_SITES` | riadok súpisu (časť 2 alebo 3) |
+
 ## História
 
 Kapitola vznikla dávkou H13 bloku 9 · HARDENING (krížový audit V1, B-06/CN-02, CN-03) ako náhrada súpisu, ktorý žil len v archíve
-rohovej skrinky (`SYSTEM/archiv/bloky/ROHOVA/FAKTY_Z_KODU_2026-09-27.md` §1.2 a §2.6, s číslami riadkov k v0.14.0) a v package H12 §0. Scenár 6: H15b.
+rohovej skrinky (`SYSTEM/archiv/bloky/ROHOVA/FAKTY_Z_KODU_2026-09-27.md` §1.2 a §2.6, s číslami riadkov k v0.14.0) a v package H12 §0. Scenár 6: H15b. Scenár 7: H16.

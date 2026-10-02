@@ -54,7 +54,7 @@ predrecenzia, in-SU) sa určí pri package podľa CLAUDE.md; stĺpec je predpokl
 | ✅ H13 · mapa rozširovacích bodov (vrátane pravidiel viazaných na typ) + tabuľka verzií dát — [rozsirovacie-body.md](../docs/architecture/rozsirovacie-body.md) a [STANDARD §13](STANDARD.md) — **PR #449** | B-06 · B-07 | dokumentácia + guard testy (po H12) |
 | H14 · sekcie Štúdia na jednom mieste — package [PACKAGE_H14.md](zdroje/bloky/HARDENING/PACKAGE_H14.md), rez: **✅ H14a · register sekcií + zoznamy z registra (bez viditeľnej zmeny) — PR #450** · **✅ H14b · jedna cesta prepnutia, kotvy a kreslenie sekcie z registra (bez viditeľnej zmeny; Q1 „Obnoviť" v Šablónach čaká) — PR #451** | C-02 | kód · audit · predrecenzia |
 | ✅ H15 · dáta kovania oddelené od mechaniky setov — package [PACKAGE_H15.md](zdroje/bloky/HARDENING/PACKAGE_H15.md), rez: **✅ H15a · seed dáta setov v `core/hardware_sets_seed.rb` + golden T0 troch modulov (výstupy bez zmeny) — PR #459** · **✅ H15b · katalóg a taxonómia v `*_seed.rb` + scenár 6 mapy — PR #460** | C-03 | kód · audit · výrobná · predrecenzia |
-| H16 · súpis knižníc (príprava D-48) | C-04 | kód · audit |
+| ✅ H16 · súpis knižníc (príprava D-48) — register `LibraryRegistry` + [kniznice.md](../docs/architecture/kniznice.md), jediný koreň (bez viditeľnej zmeny) — package [PACKAGE_H16.md](zdroje/bloky/HARDENING/PACKAGE_H16.md) — **PR #?** | C-04 | kód · audit |
 | H17 · spoločná príprava exportov (prvý rez R-15) | C-06 | kód · audit · výrobná |
 | H18 · Inspector ukáže skutočne použitý set závesov (výroba bez zmeny) — zdroj: slepé recenzie PR #454, rozhodnutie Michala 3A (2.10.2026) | — | kód · package |
 
@@ -86,7 +86,7 @@ predrecenzia, in-SU) sa určí pri package podľa CLAUDE.md; stĺpec je predpokl
 - **D-48 · Zdieľaná knižnica pre 2 PC (Michal + Lucia)** (mimo V1 od 26.8.2026) — **prvá funkcia po V1** (rozhodnuté 6.9.2026) v tvare Odoslať / Aktualizovať s verziami per katalóg, konflikt ručne,
   koreň `H:\Môj disk\NoxunENGINE data`, odhad 3 PR; patrí k nej aj zdieľanie `.skm`. Rozhodnutia
   [zdroje/next_sessions/V1_DEBATA_2026-09-06_LUCIA_KNIZNICE.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_LUCIA_KNIZNICE.md), mechanizmus `zdroje/next_sessions/SYNC_KNIZNICE_NAVRH_2026-09-06.md`
-  (PR #323); plné znenie v [DOGFOODING.md](DOGFOODING.md); príprava = blok 9 · H16 (C-04 súpis knižníc); dovtedy katalógy ručne. Updater D-52 je hotový (v0.9.14).
+  (PR #323); plné znenie v [DOGFOODING.md](DOGFOODING.md); príprava = blok 9 · H16 ✅ (PR #?, súpis [kniznice.md](../docs/architecture/kniznice.md)); dovtedy katalógy ručne. Updater D-52 je hotový (v0.9.14).
 - **F3 z H8 · guard značky `std`** (audit H8 A5, 1.10.2026) — keď kus nesie **novšiu** značku `std`, odmietnuť jeho prestavbu **aj pridelenie nového ID kópii**
   (`BoardBuilder.dedup_copies` a dedup skrinky dnes značku ticho prepíšu na aktuálnu a ORANGE nález zanikne bez kontroly kusa); potrebné až pri prvom zvýšení `Store::STD`
   (vzor R-12 pre `config_schema`). Package [PACKAGE_H8.md](zdroje/bloky/HARDENING/PACKAGE_H8.md) §14.
