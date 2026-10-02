@@ -73,7 +73,8 @@ NxTest.test('H12d R4.2: ZONE_PART_LABELS a DRAWER_PART_LABELS su odvodene, BOARD
   src = NxH12d.src('core/part_keys.rb')
   NxTest.assert_equal(1, src.scan("'dno zásuvky'").length + src.scan("'Dno zásuvky'").length,
                       'meno dna zasuvky je v part_keys.rb raz (tabulka), nie kopia v odvodenej mape')
-  NxTest.refute(NxH12d::E::Panel.const_defined?(:BOARD_ROLE_LABELS), 'Panel::BOARD_ROLE_LABELS zanikla')
+  NxTest.refute(NxH12d::E::Panel.singleton_class.const_defined?(:BOARD_ROLE_LABELS, false),
+                'Panel::BOARD_ROLE_LABELS zanikla (konstanta zila v `class << self` — na singletone)')
   NxTest.refute(NxH12d.src('ui/panel/payloads.rb').include?('BOARD_ROLE_LABELS'), 'ziadna zmienka v payloads.rb')
 end
 
