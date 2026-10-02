@@ -1,0 +1,199 @@
+{
+  "_poznamka": "H6b R0 (blok 9 HARDENING): golden vystupov STARYCH cistych funkcii metaDims (NXShell.sectorMeta(...).s2), metaMaterials (.s3) a nxHwSummary (preview.js) nad 9 stavmi. H6b ich nemeni - lista S1 a S4 Kovania ich len znovu pouzije. Fixturu NEGENERUJE novy kod (vyrobena jednorazovo nad mainom 0.17.17).",
+  "states": [
+    {
+      "id": "spodna_800x864x520_sokel100",
+      "dims": {
+        "w": 800,
+        "h": 864,
+        "d": 520,
+        "plinth": 100
+      },
+      "materials": [],
+      "hw": [
+        {
+          "label": "Nohy",
+          "generic_type": "leg",
+          "quantity": 4
+        },
+        {
+          "label": "Výsuv",
+          "generic_type": "slide",
+          "quantity": 1
+        },
+        {
+          "label": "Príchyt sokla",
+          "generic_type": "plinth_clip",
+          "quantity": 1
+        }
+      ],
+      "s2": "800 × 864 × 520 · sokel 100",
+      "s3": "",
+      "hw_summary": "Nohy 4× · Výsuv 1× · Príchyt sokla 1×"
+    },
+    {
+      "id": "horna_800x720x320",
+      "dims": {
+        "w": 800,
+        "h": 720,
+        "d": 320,
+        "plinth": 100,
+        "plinth_visible": false
+      },
+      "materials": [],
+      "hw": [
+        {
+          "label": "Záves",
+          "generic_type": "hinge",
+          "quantity": 4
+        },
+        {
+          "label": "Záves",
+          "generic_type": "hinge",
+          "quantity": 2
+        },
+        {
+          "label": "Podperka police",
+          "generic_type": "shelf_pin",
+          "quantity": 8
+        }
+      ],
+      "s2": "800 × 720 × 320",
+      "s3": "",
+      "hw_summary": "Záves 6× · Podperka police 8×"
+    },
+    {
+      "id": "vysoka_600x2100x560",
+      "dims": {
+        "w": 600,
+        "h": 2100,
+        "d": 560,
+        "plinth": 100
+      },
+      "materials": [],
+      "hw": [
+        {
+          "label": "Nohy",
+          "generic_type": "leg",
+          "quantity": 4
+        },
+        {
+          "label": "Záves",
+          "generic_type": "hinge",
+          "quantity": 6
+        }
+      ],
+      "s2": "600 × 2100 × 560 · sokel 100",
+      "s3": "",
+      "hw_summary": "Nohy 4× · Záves 6×"
+    },
+    {
+      "id": "rohova_vlavo_450",
+      "dims": {
+        "w": 1100,
+        "h": 864,
+        "d": 520,
+        "plinth": 100,
+        "corner": {
+          "side": "left",
+          "door": 450
+        }
+      },
+      "materials": [],
+      "hw": [
+        {
+          "label": "Záves",
+          "generic_type": "hinge",
+          "quantity": 2
+        }
+      ],
+      "s2": "1100 × 864 × 520 · sokel 100 · dvere vľavo 450",
+      "s3": "",
+      "hw_summary": "Záves 2×"
+    },
+    {
+      "id": "rohova_vpravo_bez_cisla",
+      "dims": {
+        "w": 1100,
+        "h": 864,
+        "d": 520,
+        "plinth": 100,
+        "corner": {
+          "side": "right"
+        }
+      },
+      "materials": [],
+      "hw": [],
+      "s2": "1100 × 864 × 520 · sokel 100 · dvere vpravo",
+      "s3": "",
+      "hw_summary": ""
+    },
+    {
+      "id": "umyvacka_sokel60",
+      "dims": {
+        "w": 600,
+        "h": 820,
+        "d": 560,
+        "plinth": 60,
+        "plinth_visible": false
+      },
+      "materials": [],
+      "hw": [
+        {
+          "label": "Záves",
+          "generic_type": "hinge",
+          "quantity": 2
+        }
+      ],
+      "s2": "600 × 820 × 560",
+      "s3": "",
+      "hw_summary": "Záves 2×"
+    },
+    {
+      "id": "neuplne_rozmery",
+      "dims": {
+        "w": 800,
+        "h": 864
+      },
+      "materials": [],
+      "hw": [
+        {
+          "label": "Nohy",
+          "generic_type": "leg",
+          "quantity": "x"
+        }
+      ],
+      "s2": "",
+      "s3": "",
+      "hw_summary": "Nohy 0×"
+    },
+    {
+      "id": "material_dedeny",
+      "dims": {
+        "w": 900,
+        "h": 720,
+        "d": 560,
+        "plinth": 100
+      },
+      "materials": [
+        "",
+        "",
+        ""
+      ],
+      "hw": [],
+      "s2": "900 × 720 × 560 · sokel 100",
+      "s3": "dedí z projektu",
+      "hw_summary": ""
+    },
+    {
+      "id": "prazdne_kovanie",
+      "dims": {},
+      "materials": [],
+      "hw": [],
+      "s2": "",
+      "s3": "",
+      "hw_summary": ""
+    }
+  ],
+  "hw_summary_null": ""
+}
