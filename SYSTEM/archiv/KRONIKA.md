@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H11a · načítanie súborov pluginu s jednou hláškou + nástroj quit testu (2.10.2026, PR #?, v0.17.22, blok 9 · HARDENING PO V1, triedenie F-01; package
+- **H11a · načítanie súborov pluginu s jednou hláškou + nástroj quit testu (2.10.2026, PR #458, v0.17.22, blok 9 · HARDENING PO V1, triedenie F-01; package
   [PACKAGE_H11.md](../zdroje/bloky/HARDENING/PACKAGE_H11.md) časť II + §15/§16 a **§17 (rozhodnutie orchestrátora)**; brief [BRIEF_H11.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H11.md);
   Q1 Michal 2.10.: chyba súboru = celý plugin vypnutý).** Audit-povinná (nový modul), predrecenzia povinná, nie výrobná/cenová. **Nový modul `core/app_lifecycle.rb`**
   (čistý Ruby, prvý súbor pluginu): bootstrap v `main.rb` s vlastnou chybovou vetvou a sentinelom `LOADED`, 91 súborov `main.rb` + 14 častí `panel.rb` cez
