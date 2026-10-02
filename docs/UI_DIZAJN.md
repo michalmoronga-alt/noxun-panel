@@ -325,7 +325,7 @@ Ostatný set: `maximize` (fit), `alert`, `lock` / `lock-open`, `eye` / `eye-off`
 `copy`, `factory` (hlavička skupiny podľa výrobcu v Materiáloch), `settings`, `star`, `rotate-ccw` („Vrátiť…", §1), `x`, `plus`,
 `check`, `chevron-right` (disclosure), `chevron-down` (rozbalenie — rozmerový
 rad, combobox, ponuka stĺpcov), `link`, `search`, `arrow-left`, `arrow-right`
-(preklik „Otvoriť v Kovaní" z karty čela), `trash`, `help-circle` (tooltip `.nxtip`, §5.7),
+(preklik „Otvoriť v Kovaní" z karty čela; odkaz s rozmermi skrinky v lište Náhľadu → Korpus), `trash`, `help-circle` (tooltip `.nxtip`, §5.7),
 `pencil`, `box` (tab Korpus), `layout-grid` (tab Zóny), `columns-2` (tab Čelá),
 `layers` (Materiály), `globe` (universal ABS), `info` (banner),
 `refresh-cw` („Obnoviť" všade, §1; aj Aktualizovať z Demosu — detail dekoru),
@@ -472,26 +472,36 @@ sektoroch**. Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html
 - **Sektory:** `S1 Náhľad · S2 Základné · S3 Materiály · S4 Nastavenia`. Sú to
   `<details>` — zbalenie si pamätá `localStorage`, takže **prežije prekreslenie
   aj zatvorenie panela**. Lišta sektora je tmavšia než telo a nesie vpravo
-  **meta súhrn** toho, čo je vnútri: S1 názov kreslenej projekcie · S2
+  **meta súhrn** toho, čo je vnútri: S1 názov kreslenej projekcie (mimo
+  Korpusu ho nahrádza **odkaz s rozmermi**, nižšie) · S2
   `900 × 720 × 560 · sokel 100` · S3 popisy materiálov (prázdny slot = dedenie
-  sa vynechá, všetko dedené povie „dedí z projektu") · S4 otvorená skupina
-  menom, inak `4 skupiny · všetko zbalené`. Súhrn je vidno **rovnako zbalený aj
-  rozbalený** — zbalený sektor povie, čo skrýva, rozbalený drží ten istý údaj na
-  očnom mieste. Text sa skladá **až pri kreslení** zo živého stavu panela
-  (`NXShell.sectorMeta`); nikdy sa necachuje ako hotový reťazec a nikdy nelomí
-  riadok (ellipsis).
+  sa vynechá, všetko dedené povie „dedí z projektu") · S4 **vždy súhrn obsahu**
+  kontextu: Korpus `strop 2 výstuhy · boky na dne · chrbát v drážke`, Zóny
+  `2 zóny · 3 police` (listy stromu a ich police; prázdna jediná zóna povie
+  „prázdna"), Čelá `1 čelo · F206 ST9 · medzera 3 · okraje 2` (bez čiel „bez
+  čiel"), Kovanie `Nohy 4× · Výsuv 1× · Príchyt sokla 1×` (ručne pridané položky
+  `· 2 ručne`; „bez kovania" len keď nie sú ani pravidlá, ani ručné). **Otvorená skupina súhrn nemení** — jej názov je vidno hneď pod
+  lištou. Slot umývačky nemá korpusové skupiny, jeho Korpus je bez súhrnu.
+  Súhrn je vidno **rovnako zbalený aj rozbalený** — zbalený sektor povie, čo
+  skrýva, rozbalený drží ten istý údaj na očnom mieste. Text sa skladá **až pri
+  kreslení** zo živého stavu panela (`NXShell.sectorMeta` nad obsahom, ktorý
+  zbiera `nxMetaContent`); nikdy sa necachuje ako hotový reťazec a nikdy nelomí
+  riadok (ellipsis); celý súhrn nesie `title` lišty.
 - **S2 a S3 patria kontextu Korpus** (+ Materiály pri vkladaní). V kontextoch
-  **Zóny · Čelá · Kovanie** sa skrývajú a namiesto nich stojí **tenký kontextový
-  riadok** `#ctxNote` so súhrnom skrinky a preklikom späť („Skrinka 900 × 720 ×
-  560 · K2738 MO — rozmery a materiály **upravíš v Korpuse**"). Dôvod je
-  vertikálny priestor: inak by každý kontext začínal tromi cudzími sektormi a
-  jeho vlastný obsah by ležal pod zlomom. **Jediná autorita pravidla je čistá
-  funkcia `NXShell.sectorVis(mode, ctx)`** — CSS pravidlá nad `#secBasic` /
-  `#secMat` sú jej **zrkadlom** (zhodu stráži `tests/pure/test_uib1_kostra.rb`,
-  maticu `tests/js/test_uib1_kostra.js`). Riadok si viditeľnosť nesie inline
-  (vzor `renderPartCard`), text do neho píše `bridge.js` z payloadu skrinky —
-  **žiadne nové dáta a žiadny `innerHTML`** (kostra je statická, A4). Pri
-  **dielci a doske** sa S2/S3 aj riadok skrývajú (majú vlastnú kartu v S4).
+  **Zóny · Čelá · Kovanie** sa skrývajú a namiesto nich stojí v **lište Náhľadu
+  odkaz s rozmermi skrinky** (`#s1Link`: `800 × 864 × 520 · sokel 100 →`, tá
+  istá funkcia ako lišta Základné, ikona `arrow-right`). Klik otvorí kontext
+  Korpus (zastaví natívny toggle `<summary>`, takže sektor nezbalí), bublina
+  ukáže **materiál korpusu** (`aria-label` začína viditeľným textom rozmerov; aktuálny popis z katalógu — premenovanie dekoru
+  ju zmení). Pás „Skrinka … upravíš v Korpuse" zanikol. Dôvod je vertikálny
+  priestor: inak by každý kontext začínal tromi cudzími sektormi a jeho vlastný
+  obsah by ležal pod zlomom. **Jediná autorita pravidla je čistá funkcia
+  `NXShell.sectorVis(mode, ctx)`** (`basic`, `mat`, `link`) — CSS pravidlá nad
+  `#secBasic` / `#secMat` sú jej **zrkadlom** (zhodu stráži
+  `tests/pure/test_uib1_kostra.rb`, maticu `tests/js/test_uib1_kostra.js`).
+  Odkaz je statický prvok (A4, žiadny `innerHTML`): JS píše len text, `title`
+  a `hidden`. Pri **dielci a doske** sa S2/S3 aj odkaz skrývajú (majú vlastnú
+  kartu v S4).
 - **Spodok panela (pri označenej skrinke):** dve akcie **„Vložiť kópiu"** a
   **„Uložiť šablónu"** stoja **vedľa seba v jednom riadku** (`.cabacts`, rovnako
   široké; v hlavičke žiadne ikony akcií) · **stavová veta `#status`** stojí na
@@ -526,7 +536,7 @@ Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`projSvg`)
 | **Korpus** | čelný rez s kótami: šírka dole · výška vpravo · sokel a telo vľavo · hĺbka kótou na náznaku skosenia hornej plochy |
 | **Zóny** | zónová schéma (klikateľné zóny, ťahateľné priečky) + kóty šírok stĺpcov |
 | **Čelá** | predný pohľad čiel + kóty výšok riadkov vpravo, medzery pri ľavom okraji, celková šírka dole |
-| **Kovanie** | korpus s **pozíciami kovania**: záves = krúžok s krížikom na závesovej hrane · **výsuv = koľajnica „L" pri OBOCH bokoch + telo šuflíka** (nižšie) · nohy = obdĺžniky dole; pod projekciou súhrn všetkých položiek |
+| **Kovanie** | korpus s **pozíciami kovania**: záves = krúžok s krížikom na závesovej hrane · **výsuv = koľajnica „L" pri OBOCH bokoch + telo šuflíka** (nižšie) · nohy = obdĺžniky dole; **súhrn všetkých položiek je v lište sektora Kovanie**, nie v kresbe (tá je bez textov a väčšia) |
 | **Dielec** | hrany s ABS farbami (`#partSvg`) |
 
 Zásady kreslenia:
@@ -924,7 +934,13 @@ staršia `mockup_inspector_c.html` (`s4Fronts`) pre zvyšok kontextu.
   všetko, čo platí **naraz pre všetky čelá** — to je kritérium pre budúce
   ovládače. Zámok limitu presahov a „Predvolené" sú **ikony v hlavičke** (stav
   nesie ikona + `title` + jantárová farba, nie text v tele) a meta hlavičky
-  povie stav aj pri **zbalenej** skupine.
+  povie stav aj pri **zbalenej** skupine. Meta „Spoločné pre skrinku" je
+  čitateľná bez legendy: `F206 ST9 · medzera 3 · okraje 2` — dekor ako **prvé dve
+  slová časti pred „ · "** (kód dekoru; celý názov je v bubline), okraje ako spoločná hodnota
+  a výnimky `okraje 2 · dole -20` (zhoda počtu → vyhrá prvá strana v poradí
+  hore, dole, vľavo, vpravo; keď je každá hodnota iná, vypíšu sa všetky strany
+  menom). Čísla sú ako v poli (`-20`, `2,5`); slot umývačky medzeru a okraj
+  dole nemá, preto ich v meta niet.
 - **RIADOK JE MRIEŽKA, nie rad (D-130a).** `22px minmax(0,1fr) 112px 22px`,
   riadky: názov · súhrn · karta. Flex rad držal riadok pohromade, ale poloha
   poľa výšky závisela od toho, **čo v riadku práve bolo** (chip AUTO, „mm",
@@ -1127,6 +1143,11 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Hw`).
   skupiny ostáva priamym textom `<summary>`): Položky z pravidiel, Sety, Pravidlá
   (aj Štruktúra zón v kontexte Zóny). Text je čistý (`data-tip`), bez `.hint`
   pod skupinou.
+- **Skupiny Kovania nesú meta v hlavičke:** Položky `6 ks` (súčet počtov z pravidiel;
+  pri ručne pridaných aj `· 2 ručne`), Sety `podľa projektu` alebo `1 vlastný /
+  2–4 vlastné / 5+ vlastných` (vlastný výber setu na skrinke aj pri čelách);
+  Pravidlá meta nemajú. Lišta sektora Kovanie nesie súhrn typov (`Nohy 4× · Výsuv
+  1× · …`), ktorý z kresby zmizol.
 
 - **Položky sú zoskupené podľa VLASTNÍKA, nie podľa typu** (`.hwbox`): „Skrinka" ·
   box každého čela · spoločný box „Vnútro skrinky". Je to **iba iné zobrazenie

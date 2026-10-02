@@ -368,12 +368,22 @@ a atribúty na `<body>`; `innerHTML` re-render kostry je zakázaný (listenery, 
 
 **Sektory:**
 - `<details data-key="s1…s4">`, zbalenie v `localStorage`. Viditeľnosť S2/S3 rozhoduje čistá **`NXShell.sectorVis(mode, ctx)`** — Základné a Materiály patria
-  kontextu **Korpus** (+ vkladanie); v Zónach/Čelách/Kovaní ich nahrádza riadok **`#ctxNote`** (`NXShell.ctxNoteText`, preklik na Korpus). CSS nad
-  `#secBasic`/`#secMat` je **zrkadlom** tejto funkcie (guard `tests/pure/test_uib1_kostra.rb` + matica `tests/js/test_uib1_kostra.js`).
+  kontextu **Korpus** (+ vkladanie); v Zónach/Čelách/Kovaní ich nahrádza **odkaz `#s1Link` v lište Náhľadu** (H6b: rozmery skrinky, klik = Korpus; vráti ho
+  `sectorVis().link`). CSS nad `#secBasic`/`#secMat` je **zrkadlom** tejto funkcie (guard `tests/pure/test_uib1_kostra.rb` + matica `tests/js/test_uib1_kostra.js`).
+- **Odkaz `#s1Link` (H6b, O6):** statický `<button hidden data-nx-usage="ctx:korpus" onclick="nxS1Link(event)">` v `<summary>` S1 s textom `#s1LinkTxt` (elipsa) a ikonou
+  `arrow-right`. `nxSectorMetaApply` ho ukáže len pri `mode = cab` a kontexte Zóny/Čelá/Kovanie (`sectorMeta().s1link` = `metaDims(dims)`, **tá istá funkcia a polia
+  ako lišta Základné**; nekompletné rozmery → bez odkazu), zároveň skryje `#s1Meta` (názov projekcie). `nxS1Link` = `nxTipStop` (klik nezbalí sektor) +
+  `setViewContext('korpus')`. Bublina (`title` aj `aria-label`) = `NXShell.s1LinkTitle(material)` — „Materiál korpusu: … — klik otvorí kontext Korpus"; popis dekoru
+  si `bridge.js` drží ako **dáta** (`s1LinkSrc.material_id`) a prekladá až v `renderS1Link` (volá ho `setS1Link` pri pushi skrinky aj `NX.setMaterials`, takže
+  premenovanie dekoru zmení bublinu). Poistka `.nx-inspector .sect > .secthead [hidden] { display: none; }` (pasca D-137).
 - Skupiny S4 nesú `data-s4="<kontext>"` a sú v rámci kontextu **exkluzívne** (`NXShell.exclusiveClose`, kľúč `nxsec_s4.<ctx>.<key>`), výnimka `data-s4-solo`.
 - **Lišta sektora nesie META súhrn** (`NXShell.sectorMeta`, čítaný živo z panela cez `nxSectorMetaApply` — žiadna cache textu, žiadne nové serverové dáta);
-  obnovuje ho `nxShellApply`, jeden delegovaný `input`/`change` listener a `toggle` v `bindDetails`. **Názov skupiny S4 berie `NXShell.groupTitle` len
-  z priamych textových uzlov `<summary>`** — pravidlo pre nové hlavičky: názov musí ostať priamym textom, nie v elemente.
+  obnovuje ho `nxShellApply`, `refreshHardwareManual`, jeden delegovaný `input`/`change` listener (`NX_META_FIELDS` vrátane `top_mode`, `bottom_mode`, `back_mode` a polí medzier `fr_gap*`)
+  a programové cesty, ktoré menia obsah: `renderZoneTree` (aj prázdny strom), `renderHardware` (blok `finally`), `updateFrontMeta`, `updateCabfrontMeta`.
+  **S4 je vždy SÚHRN OBSAHU kontextu** (H6b, O12; otvorená skupina ho nemení, názov skupiny sa už nezbiera): `nxMetaContent(mode, ctx)` zbiera len živý stav aktuálneho
+  kontextu — Korpus hodnoty selectov `top_mode`/`bottom_mode`/`back_mode` (slot umývačky `!NXTypes.carcass` = bez súhrnu), Zóny listy z `computeZones()` (bez 4. úrovne
+  `deep`) a ich police, Čelá `nxFrontCounts()` + `nxCabfrontText()`, Kovanie `hwItems` + `nxHwSummary` + počet ručných položiek (`hwManualView`). Skladajú ho čisté funkcie `metaKorpus`/`metaZones`/
+  `metaFronts`/`metaHardware` v `shell.js` cez `sectorMeta` (Node testy `tests/js/test_h6b_suhrny.js`); formát v UI_DIZAJN §5.1.
 - Akcie **z náhľadu** najprv rozbalia cestu k cieľu (`nxRevealTarget`).
 - Scroll je dokumentový (rail `position: fixed`, hlavička sticky, warnpanel je overlay v hlavičke). CSS kostry je scopnuté pod `.nx-inspector` na `<html>`.
   Pätička s verziou z Ruby. Testy: `tests/js/test_uib1_kostra.js`, `tests/pure/test_uib1_kostra.rb`, in-SU `run_uib1`.
@@ -481,12 +491,13 @@ Plné znenie: archív, „Obsah Korpusu — Základné v dvoch stĺpcoch + kolie
 
 **Čo robí:** sektor S1 — každý kontext kreslí **svoj** pohľad (výmena, nie vrstvenie): **Korpus** čelný rez s kótami (Š dole, V vpravo, sokel/telo vľavo,
 hĺbka kótou na náznaku skosenia) · **Zóny** zónová schéma + kóty šírok stĺpcov · **Čelá** predný pohľad + kóty výšok riadkov a medzier · **Kovanie** projekcia
-s pozíciami (záves = krúžok s krížikom na závesovej hrane · výsuv = koľajnica „L" pri OBOCH bokoch + telo šuflíka · nohy = obdĺžniky v pásme sokla) + súhrn
-položiek · **Dielec** hrany s ABS (`#partSvg`) · **vkladanie** projekcia `insert`. Zoom/pan/fit, výška rastie s oknom, debounce prekreslenia 500 ms.
+s pozíciami (záves = krúžok s krížikom na závesovej hrane · výsuv = koľajnica „L" pri OBOCH bokoch + telo šuflíka · nohy = obdĺžniky v pásme sokla; **bez textov** —
+súhrn položiek je v lište sektora Kovanie, H6b) · **Dielec** hrany s ABS (`#partSvg`) · **vkladanie** projekcia `insert`. Zoom/pan/fit, výška rastie s oknom, debounce prekreslenia 500 ms.
 
 **Žiadne nové dáta:** kreslí sa výhradne z payloadov panela — rozmery formulára, `front_items`, `config.hardware` (`hwItems` z toho istého pushu), strom zón;
 odvodenie robia čisté funkcie `nxHwMarks` / `nxSlideGeom` / `nxHwSummary` / `nxFrontDims` / `nxZoneSpans`. **Kovanie sa nečíta z geometrie** a značka je
-orientačná. Všetky vrstvy berú geometriu z **jedného** `pvGeom()`; `sceneSize` rezervuje miesto pre kóty každej projekcie.
+orientačná. Všetky vrstvy berú geometriu z **jedného** `pvGeom()`; `sceneSize` rezervuje miesto pre kóty každej projekcie (Kovanie len pre to, čo kreslí: čelá s presahom a dielce rohovej zostavy (`frontsExtent`, `pvCornerExtent`), nohy pod korpusom
+`nxHwLowestZ(hwItems, fh)` — pri sokli > 0 rezerva dole 0, bez sokla 70 mm; geometria nohy `nxLegGeom`).
 
 - **Výsuv:** geometria `nxSlideGeom` (pätka dovnútra, telo za pätkami, pomer z výšky čela); **anker = vnútorné líca bokov `x = t … W−t`** (výsuv drží bok, nie
   čelo; `2t ≥ W` padá na celý korpus); vetva `slide_rail` v `hwMarkSvg` má priehľadnú hit-oblasť `.hwhit` (hover CSS ju vynecháva).
@@ -564,8 +575,9 @@ dokument (`model_guid`), skrinku (`cabinet_id`) a **formát celého `zone_id`** 
 `.gapdiag`). Dáta: `cabinet_payload` (`front_items`, `front_slots`, `front_drawer`, `front_lift`, `front_opening`), zápis `collectFronts` → `apply_all` (jeden krok
 Späť) po čítacom preflighte `front_preflight` (nižšie).
 
-**Hlavičky skupín:** `#frontMeta` („3 čelá · 1 bez smeru"; počet z DOM, „bez smeru" výhradne zo `front_slots`) + akcia **„všetkým"**; `#cabfrontMeta` (dekor ·
-medzera · štyri okraje, `cabfrontMetaText`), zámok limitu presahov `#edgeLimitLock` (stav v ikone `lock`/`lock-open`, `title`, `aria-pressed`, `amber`) a ikona
+**Hlavičky skupín:** `#frontMeta` („3 čelá · 1 bez smeru"; počet z DOM, „bez smeru" výhradne zo `front_slots`; text `frontCountText(n, unset)` z `core.js`, ten istý ide
+do lišty sektora, počty `nxFrontCounts`) + akcia **„všetkým"**; `#cabfrontMeta` (`cabfrontMetaText(decor, gaps, {slot})`, H6b O7: „F206 ST9 · medzera 3 · okraje 2 ·
+dole -20" — dekor = prvé dve slová časti pred „ · ", celý názov v `title`, okraje spoločná hodnota + výnimky, slot bez medzery a okraja dole; text skladá `nxCabfrontText`), zámok limitu presahov `#edgeLimitLock` (stav v ikone `lock`/`lock-open`, `title`, `aria-pressed`, `amber`) a ikona
 „Predvolené" `#frontGapsReset`. **Každé tlačidlo v `<summary>` musí `preventDefault()` aj `stopPropagation()`** (`nxTipStop`), inak klik skupinu zbalí.
 
 **Materiál čiel** má v tomto kontexte druhý ovládač `cab_front_c` (sektor Materiály patrí Korpusu) — tá istá hodnota, synchro drží každá cesta, ktorá siaha na
@@ -700,7 +712,9 @@ Medzery v projekcii Čelá sa podfarbia jantárovo pri **kurzore v poli schémy*
 
 **Čo robí:** kovanie označenej skrinky — položky z pravidiel podľa vlastníka, ručne pridané položky, sety a pravidlá. Tri skupiny v **záväznom poradí**:
 **Položky z pravidiel** (`hwitems`) · **Sety** (`hwsets`) · **Pravidlá** (`hwrules`). Kostra je statická, JS píše obsah kontajnerov `#hwRows`, `#hwSetRows`
-a riadok Nôh `#legsRow` (Základné) — `refreshHardwareSets` obnovuje selecty vo **všetkých troch**. Dáta: `cabinet_payload` (`config.hardware`, `purchase`,
+a riadok Nôh `#legsRow` (Základné) — `refreshHardwareSets` obnovuje selecty vo **všetkých troch**. **Meta skupín (H6b):** `#hwItemsMeta` („6 ks", pri ručných „· 2 ručne"; `hwItemsMetaText`) a `#hwSetsMeta` („podľa projektu" / „1 vlastný" …; `hwSetsMetaText` — skrinkový
+výber `override_set_id`/`override_selector`, výbery pri čelách: legacy vlastníci z `owner_overrides` + klasifikovaní z `compat.owners`, každý vlastník raz; skrinka pri jednej triede `compat.cab`, inak kľúč typu — pri zmiešanej skrinke (`compat.cab` null) len ak má typ položku mimo `compat.owners`, `hwHasLegacyItem`) plní `hwMetaApply` na konci
+`renderHardware`, v `refreshHardwareSets` a `refreshHardwareManual`; skupina Pravidlá meta nemá. Dáta: `cabinet_payload` (`config.hardware`, `purchase`,
 `compat`, `hardware_manual_view`, `front_drawer` …); zápis existujúcimi akciami `set_hardware_override` / `set_hardware_set` (`actions_hardware.rb`) a `apply_all`.
 Detail domény: [hardware.md](hardware.md).
 

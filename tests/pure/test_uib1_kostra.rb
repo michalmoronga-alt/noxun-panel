@@ -164,16 +164,21 @@ NxTest.test('UI-B: lista kazdeho sektora ma ZIVY meta suhrn') do
   # Meta je len ZOBRAZENIE — obnova visi na udalostiach, nie na zapisovej ceste.
   NxTest.assert(UIB1_SHELL_CODE.include?('nxSectorMetaApply()'),
                 'meta sa musi obnovovat (nxSectorMetaApply)')
-  # Codex #173 P2: `data-s4-solo` je vynate z EXKLUZIVITY, NIE zo zberu udajov.
-  # Kontext Zony ma jedine dieta S4 a je to prave solo strom — jeho preskocenie
-  # znamena trvalo prazdnu listu sektora.
-  zber = UIB1_SHELL_CODE[/function nxMetaGroups\(\).*?\n  \}/m].to_s
-  NxTest.refute(zber.empty?, 'shell.js musi mat zber skupin pre meta (nxMetaGroups)')
-  NxTest.refute(zber.include?('data-s4-solo'),
-                'meta nesmie solo skupinu preskocit — vynimka patri len exkluzivite')
+  # H6b (O12): S4 je SUHRN OBSAHU kontextu zo zivych dat — nazov otvorenej skupiny
+  # sa uz nezbiera (nxMetaGroups zanikla) a strom zon (`data-s4-solo`) sa cita z
+  # `computeZones`, takze kontext Zony nikdy nezostane bez suhrnu (Codex #173 P2).
+  NxTest.assert(UIB1_SHELL_CODE.include?('function nxMetaContent('),
+                'shell.js musi mat zber obsahu kontextu pre meta (nxMetaContent)')
+  NxTest.refute(UIB1_SHELL_CODE.include?('nxMetaGroups'),
+                'nazov otvorenej skupiny sa do meta uz nezbiera (O12)')
+  zber = UIB1_SHELL_CODE[/function nxMetaContent\(.*?\n  \}/m].to_s
+  NxTest.refute(zber.empty?, 'nxMetaContent sa nenasla — guard by tichol')
+  NxTest.assert(zber.include?('computeZones()'), 'suhrn Zon sa pocita zo stromu zon (computeZones)')
+  NxTest.refute(zber.include?('data-s4'), 'zber obsahu nehlada skupiny v DOM podla data-s4')
+  NxTest.refute(zber.include?('.open'), 'otvorena skupina suhrn nemeni')
 end
 
-NxTest.test('UI-B: PROGRAMOVE zmeny karty obnovia meta (Codex #173 P2)') do
+NxTest.test('UI-B: PROGRAMOVE zmeny karty obnovia meta (Codex #173 P2, H6b R6)') do
   # Delegovany input/change listener zachyti len RUCNE zmeny. Cesty, ktore
   # prepisu polia alebo popisy zvnutra kodu, musia meta obnovit vyslovne.
   { 'js/form.js' => 'materializeInsertCard (sablona a typ prepisu rozmery)',
@@ -181,6 +186,27 @@ NxTest.test('UI-B: PROGRAMOVE zmeny karty obnovia meta (Codex #173 P2)') do
     'js/bridge.js' => 'NX.setMaterials (premenovanie dekoru meni popis)' }.each do |file, why|
     src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', file), encoding: 'UTF-8')
     NxTest.assert(src.include?('nxSectorMetaApply()'), "#{file}: #{why} — meta ostane stara")
+  end
+  # H6b R6: suhrny obsah (strom zon, kovanie, cela, spolocne nastavenia) sa meni
+  # aj programovo — kazda cesta, ktora ho prekresluje, obnovi aj listu sektora.
+  ui = ->(f) { uib1_no_comments(File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', f), encoding: 'UTF-8'), :js) }
+  actions = ui.call('actions.js')
+  NxTest.assert(actions[/function renderZoneTree\(.*?\n  \}/m].to_s.scan('nxZoneMetaRefresh()').length >= 2,
+                'renderZoneTree obnovi listu Zon na OBOCH vystupoch (aj prazdny strom)')
+  NxTest.assert(actions.include?("function nxZoneMetaRefresh(){ if (typeof nxSectorMetaApply === 'function') nxSectorMetaApply(); }"),
+                'hook stromu zon vola nxSectorMetaApply')
+  hw = ui.call('hardware.js')
+  NxTest.assert(hw[/function renderHardware\(.*?\n  \}/m].to_s.include?('nxSectorMetaApply()'),
+                'renderHardware obnovi listu Kovania (aj pri skorom navrate — finally)')
+  form = ui.call('form.js')
+  NxTest.assert(form[/function updateFrontMeta\(.*?\n  \}/m].to_s.include?('nxSectorMetaApply()'),
+                'updateFrontMeta obnovi listu Čiel')
+  NxTest.assert(form[/function updateCabfrontMeta\(.*?\n  \}/m].to_s.include?('nxSectorMetaApply()'),
+                'updateCabfrontMeta obnovi listu Čiel (spolocne nastavenia)')
+  # Pole, ktorych ZIVA zmena hybe suhrnom, musia byt v zozname delegovaneho listenera.
+  fields = UIB1_SHELL_CODE[/var NX_META_FIELDS = \[(.*?)\];/m, 1].to_s
+  %w[top_mode bottom_mode back_mode fr_gap fr_gap_top fr_gap_bottom fr_gap_left fr_gap_right].each do |f|
+    NxTest.assert(fields.include?("'#{f}'"), "NX_META_FIELDS chyba #{f} — suhrn by po pisani zostal stary")
   end
 end
 
@@ -239,10 +265,10 @@ NxTest.test('UI-B1: pravidla kostry visia pod korenovou triedou .nx-inspector') 
   end
 end
 
-NxTest.test('UI-B1: S2/S3 patria kontextu Korpus, inde je kontextovy riadok') do
+NxTest.test('UI-B1: S2/S3 patria kontextu Korpus, inde je odkaz v liste Nahladu') do
   # Kontrakt UI 2.0 (sekcia Kostra): Zakladne a Materialy su vlastnosti SKRINKY
   # a ziju v kontexte Korpus (+ Materialy pri vkladani); Zony/Cela/Kovanie
-  # dostanu namiesto nich tenky riadok s preklikom. UI-B1 dala do CSS mapu len
+  # dostanu namiesto nich odkaz v liste Nahladu (H6b). UI-B1 dala do CSS mapu len
   # pre REZIM VYBERU a tuto cast ticho vynechala — guard to uz nedovoli.
   NxTest.assert(UIB1_CSS.include?('body.mode-cab:not([data-view-ctx="korpus"]) #secBasic'),
                 'CSS musi mimo Korpusu skryvat sektor Zakladne')
@@ -251,13 +277,27 @@ NxTest.test('UI-B1: S2/S3 patria kontextu Korpus, inde je kontextovy riadok') do
   # Rezimove skryvanie (dielec/doska maju vlastnu kartu) ostava v platnosti.
   NxTest.assert(UIB1_CSS.include?('body.mode-part #secBasic'), 'dielec: S2 sa stale skryva')
   NxTest.assert(UIB1_CSS.include?('body.mode-board #secMat'), 'doska: S3 sa stale skryva')
-  # Riadok je STATICKY prvok kostry s preklikom cez rovnaky guard ako rail.
-  NxTest.assert(UIB1_HTML.include?('id="ctxNote"'), 'kontextovy riadok chyba v kostre')
-  NxTest.assert(UIB1_HTML.include?('id="ctxNoteSum"'), 'riadok musi mat miesto na suhrn skrinky')
-  link = UIB1_HTML_CODE[/<[a-z]+ [^>]*id="ctxNoteLink"[^>]*>/].to_s
-  NxTest.assert(link.start_with?('<button'), 'preklik na Korpus musi byt <button> (klavesnica)')
-  NxTest.assert(link.include?("setViewContext('korpus')"),
-                'preklik ide cez guard setViewContext, nie priamou zmenou DOM')
+  # H6b (O6): pas #ctxNote zanikol — mimo Korpusu stoji v liste Nahladu STATICKY
+  # odkaz s rozmermi (klik = Korpus). Preklik ide cez rovnaky guard ako rail
+  # (setViewContext) a zastavi natívny toggle <summary> (inak by zbalil sektor).
+  NxTest.refute(UIB1_HTML_CODE.include?('ctxNote'), 'panel.html: pas #ctxNote zanikol')
+  NxTest.refute(UIB1_CSS_CODE.include?('ctxnote') || UIB1_CSS_CODE.include?('ctxlink'),
+                'panel.css: pravidla pasu zanikli')
+  summary = UIB1_HTML_CODE[/<summary class="secthead"><span class="sn">Náhľad<\/span>.*?<\/summary>/m].to_s
+  NxTest.refute(summary.empty?, 'lista sektora Nahlad sa nenasla')
+  link = summary[/<button [^>]*id="s1Link"[^>]*>/].to_s
+  NxTest.assert(link.start_with?('<button type="button"'), 'preklik na Korpus musi byt <button> (klavesnica)')
+  NxTest.assert(link.include?('data-nx-usage="ctx:korpus"'), 'merac ctx:korpus ostava (kontinuita statistiky)')
+  NxTest.assert(link.include?('onclick="nxS1Link(event)"'), 'odkaz ide cez nxS1Link (stop + guard)')
+  NxTest.assert(link.include?(' hidden'), 'odkaz je v HTML skryty (ukaze ho JS mimo Korpusu)')
+  NxTest.assert(summary.include?('id="s1LinkTxt"'), 'odkaz ma miesto na text s elipsou')
+  NxTest.assert(summary.include?('#i-arrow-right'), 'odkaz nesie ikonu arrow-right')
+  nx_link = UIB1_SHELL_CODE[/function nxS1Link\(.*?\n  \}/m].to_s
+  NxTest.assert(nx_link.include?('nxTipStop(ev)') && nx_link.include?("setViewContext('korpus')"),
+                'nxS1Link = nxTipStop + setViewContext(korpus) (ten isty guard ako rail)')
+  # A4: kostra sa neprekresluje — JS pise len text, title a hidden.
+  NxTest.assert(UIB1_CSS.include?('.nx-inspector .sect > .secthead [hidden] { display: none; }'),
+                'poistka pasce D-137: `display` pravidlo odkazu by prebilo `hidden`')
   # Pravidlo zije v JS ako CISTA funkcia — CSS je jej zrkadlo, nie druhy zdroj.
   NxTest.assert(UIB1_SHELL_CODE.include?('function sectorVis('),
                 'shell.js musi mat viditelnost sektorov ako cistu funkciu')
@@ -265,18 +305,19 @@ NxTest.test('UI-B1: S2/S3 patria kontextu Korpus, inde je kontextovy riadok') do
                 'sectorVis sa exportuje (inak ju Node matica neotestuje)')
 end
 
-NxTest.test('UI-B1: kontextovy riadok drzi DATA, nie hotovy text (zivy katalog)') do
+NxTest.test('UI-B1: bublina odkazu drzi DATA, nie hotovy text (zivy katalog)') do
   # Codex #171 P2: premenovanie dekoru v okne Materialy chodi cez NX.setMaterials
-  # (bez loadSelected). Keby si riadok cachoval hotovy popis, ukazoval by stary
-  # nazov az do dalsieho vyberu — preto drzi material_id a preklada az pri
+  # (bez loadSelected). Keby si odkaz cachoval hotovy popis, ukazoval by stary
+  # nazov az do dalsieho vyberu — preto bridge drzi material_id a preklada az pri
   # kresleni, a setMaterials ho musi prekreslit.
   bridge = uib1_no_comments(UIB1_BRIDGE, :js)
   NxTest.assert(bridge.include?('material_id: p.material_id'),
-                'setCtxNote musi ulozit ID materialu, nie prelozeny popis')
+                'setS1Link musi ulozit ID materialu, nie prelozeny popis')
   set_mat = bridge[/setMaterials: function\(data\)\{?.*?\n    \},/m].to_s
   NxTest.refute(set_mat.empty?, 'setMaterials sa nenasiel — guard by tichol')
-  NxTest.assert(set_mat.include?('renderCtxNote()'),
-                'zivy refresh katalogu musi prekreslit aj kontextovy riadok')
+  NxTest.assert(set_mat.include?('renderS1Link()'),
+                'zivy refresh katalogu musi prekreslit aj bublinu odkazu')
+  NxTest.refute(bridge.include?('CtxNote'), 'bridge.js: ziadny zvysok pasu #ctxNote')
 end
 
 NxTest.test('UI-B1: sektor S4 prepina skupiny cez data-view-ctx (nie cez re-render)') do

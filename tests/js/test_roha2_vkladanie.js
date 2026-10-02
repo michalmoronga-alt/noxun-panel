@@ -389,7 +389,7 @@ function formBridgeCtx(){
    'setType', 'syncTemplateTiles', 'writeConstruction', 'buildFrontHwBadges', 'closeFrontCard', 'renderFronts',
    'applyInsertLockValues', 'renderInsertLocks', 'applyVisibility', 'refreshMaterialFilters', 'validateFields',
    'updateAvailable', 'refreshZoneUI', 'nxSectorMetaApply', 'nxSetModelGuid', 'cancelBoardEdits',
-   'renderBoardCard', 'setSelected', 'setCabInfo', 'setCtxNote', 'setIdbar', 'setUiMode',
+   'renderBoardCard', 'setSelected', 'setCabInfo', 'setIdbar', 'setUiMode',
    'invalidateFrontPlaceholders', 'fitPreview', 'renderPartCard', 'renderHardware', 'clearCabinetMaterials']
     .forEach(k => { ctx[k] = () => {}; });
   ctx.renderPreview = () => { ctx.__renders++; };

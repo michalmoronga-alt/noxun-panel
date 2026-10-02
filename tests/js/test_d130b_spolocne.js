@@ -33,20 +33,55 @@ const JS = path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js');
 const C = require(path.join(JS, 'core.js'));
 
 // ============ A) META HLAVICKY = CISTA FUNKCIA ==============================
+// H6b (O7): „F206 ST9 · medzera 3 · okraje 2 · dole -20" — dekor = prve dve slova
+// (celý názov nesie `title`), okraje = spolocna hodnota + vynimky v poradi
+// hore/dole/vlavo/vpravo.
+const G = (gap, top, bottom, left, right) => ({ gap, top, bottom, left, right });
 
-eq(C.cabfrontMetaText('Dub Halifax', { gap: 3, top: 2, bottom: 2, left: 0, right: 0 }),
-   'Dub Halifax · 3 · 2/2/0/0', 'A: dekor · medzera · styri okraje');
-eq(C.cabfrontMetaText('', { gap: 3, top: 2, bottom: 2, left: 2, right: 2 }),
-   '3 · 2/2/2/2', 'A: bez dekoru zacina riadok rovno medzerou (ziadna prazdna bodka)');
+eq(C.cabfrontMetaText('F206 ST9 Pietra Grigia čierna · DTDL 18 mm', G(3, 2, 2, 2, 2)),
+   'F206 ST9 · medzera 3 · okraje 2', 'A (O7): dekor = prve dve slova, vsetky okraje rovnake');
+eq(C.cabfrontMetaText('Dub Halifax', G(3, 2, 2, 0, 0)),
+   'Dub Halifax · medzera 3 · okraje 2 · vľavo 0 · vpravo 0',
+   'A (O7): 2 : 2 — zaklad je PRVA hodnota v poradi hore, dole, vlavo, vpravo (M6)');
+eq(C.cabfrontMetaText('Dub', G(3, 2, -20, 2, 2)),
+   'Dub · medzera 3 · okraje 2 · dole -20', 'A (O7): jedna vynimka');
+eq(C.cabfrontMetaText('Dub', G(3, 2, 2, 2, 5)),
+   'Dub · medzera 3 · okraje 2 · vpravo 5', 'A (O7): vynimka na poslednej strane');
+eq(C.cabfrontMetaText('Dub', G(3, 3, 2, 2, 2)),
+   'Dub · medzera 3 · okraje 2 · hore 3', 'A (O7): vynimka hore, zaklad je najcastejsia hodnota (nie prva)');
+eq(C.cabfrontMetaText('Dub', G(3, 2, -20, 0, 1)),
+   'Dub · medzera 3 · hore 2 · dole -20 · vľavo 0 · vpravo 1',
+   'A (O7): kazda hodnota ina — vsetky strany menom');
+eq(C.cabfrontMetaText('Dub', G(2.5, 2.5, 2.5, 2.5, 2.5)),
+   'Dub · medzera 2,5 · okraje 2,5', 'A (O7): desatinna ciarka ako v poli');
+eq(C.cabfrontMetaText('', G(3, 2, 2, 2, 2)),
+   'medzera 3 · okraje 2', 'A (O7): bez dekoru zacina riadok rovno medzerou (ziadna prazdna bodka)');
+eq(C.cabfrontMetaText('Dub', G(3, 2, 2, 2, 2)),
+   'Dub · medzera 3 · okraje 2', 'A (O7): dekor z jedneho slova');
 eq(C.cabfrontMetaText('Dub Halifax', null), '',
    'A: bez oznacenej skrinky je meta PRAZDNA (cisla by patrili minulemu vyberu)');
-eq(C.cabfrontMetaText('H1180 ST37 Dub Halifax prírodný · 18', { gap: 3, top: 2, bottom: 2, left: 2, right: 2 }),
-   'H1180 ST37 Du… · 3 · 2/2/2/2', 'A: dlhy dekor sa skrati elipsou (hlavicka je uzka)');
+eq(C.cabfrontMetaText('Dub Halifax', null, { slot: true }), '', 'A: slot bez skrinky tiez prazdna');
+// Slot umyvacky: polia „medzera" a „dole" su skryte (server ich drzi na 0) — v meta nie su.
+eq(C.cabfrontMetaText('Dub', G(0, 2, 0, 2, 2), { slot: true }),
+   'Dub · okraje 2', 'A (D6): slot — bez medzery a bez okraja dole');
+eq(C.cabfrontMetaText('Dub', G(0, 2, 0, 2, 5), { slot: true }),
+   'Dub · okraje 2 · vpravo 5', 'A (D6): slot — vynimka vpravo');
+eq(C.cabfrontMetaText('H1180 ST37 Dub Halifax prírodný · 18', G(3, 2, 2, 2, 2)),
+   'H1180 ST37 · medzera 3 · okraje 2', 'A (M7): ziadna elipsa — prve dve slova');
 eq(C.cabfrontDecorShort('Dub 18'), 'Dub 18', 'A: kratky nazov ostava cely');
+// P3-2: popis polozky je „<dekor> <struktura> <nazov> · <TYP> <hrubka> mm" - dekor je cast PRED „ · ".
+eq(C.cabfrontDecorShort('K009 · DTDL 18 mm'), 'K009', 'A (P3-2): dekor bez struktury a nazvu');
+eq(C.cabfrontMetaText('K009 · DTDL 18 mm', G(3, 2, 2, 2, 2)), 'K009 · medzera 3 · okraje 2',
+   'A (P3-2): ziadne „K009 · · medzera"');
+eq(C.cabfrontDecorShort('K009 Dub Halifax prírodný · DTDL 18 mm'), 'K009 Dub', 'A (P3-2): dve slova pred „ · "');
+eq(C.cabfrontDecorShort(' · DTDL 18 mm'), '', 'A (P3-2): popis bez dekoru = ziadny dekor');
+eq(C.cabfrontDecorShort('  F206   ST9   Pietra '), 'F206 ST9', 'A: biele znaky sa zlucia');
 eq(C.cabfrontDecorShort('   '), '', 'A: prazdny nazov = ziadny dekor');
-// Zaporny okraj (presah) aj desatinna medzera musia byt v meta citatelne.
-eq(C.cabfrontMetaText('Dub', { gap: 2.5, top: -20, bottom: 2, left: 0, right: 0 }),
-   'Dub · 2,5 · -20/2/0/0', 'A: presah je zaporne cislo, desatinna ciarka ostava');
+eq(C.cabfrontDecorShort(null), '', 'A: null = ziadny dekor');
+eq(C.frontCountText(1, 0), '1 čelo', 'A: 1 čelo');
+eq(C.frontCountText(3, 1), '3 čelá · 1 bez smeru', 'A: 3 čelá, jedno bez smeru');
+eq(C.frontCountText(5, 0), '5 čiel', 'A: 5 čiel');
+eq(C.frontCountText(0, 0), 'bez čiel', 'A (D6): bez čiel');
 
 // ============ B) DOM: hlavicka, zamok, reset ================================
 //
@@ -185,18 +220,26 @@ eq(applyCalls - before, 1, 'C: reset = PRESNE jeden apply');
 // --- C2) META hlavicky z HODNOT --------------------------------------------
 global.selectedCabId = 'CAB-001';
 FM.updateCabfrontMeta();
-eq(metaNode.textContent, '3 · 2/2/2/2', 'C2: bez zvoleneho dekoru len cisla');
+eq(metaNode.textContent, 'medzera 3 · okraje 2', 'C2: bez zvoleneho dekoru len medzera a okraje');
+ok(!metaNode.hasAttribute('title'), 'C2: bez dekoru nie je ani bublina');
 matSel.value = 'D2';
 FM.updateCabfrontMeta();
-eq(metaNode.textContent, 'Dub 18 · 3 · 2/2/2/2', 'C2: dekor sa cita z TEXTU vybranej option');
+eq(metaNode.textContent, 'Dub 18 · medzera 3 · okraje 2', 'C2: dekor sa cita z TEXTU vybranej option');
+eq(metaNode.getAttribute('title'), 'Dub 18', 'C2 (O7): bublina = cely nazov dekoru');
 matSel.value = 'D1';
 global.el('fr_gap_left').value = '-20';
 FM.updateCabfrontMeta();
-eq(metaNode.textContent, 'H1180 ST37 Du… · 3 · 2/2/-20/2', 'C2: dlhy dekor s elipsou + presah');
+eq(metaNode.textContent, 'H1180 ST37 · medzera 3 · okraje 2 · vľavo -20', 'C2: dekor = kod + vynimka okraja');
+eq(metaNode.getAttribute('title'), 'H1180 ST37 Dub Halifax prírodný · 18',
+   'C2 (O7): `title` nesie CELY nazov dekoru (v texte su len dve slova)');
+eq(FM.nxCabfrontText(), 'H1180 ST37 · medzera 3 · okraje 2 · vľavo -20',
+   'C2: list sektora Čelá berie TEN ISTY text (jeden zdroj)');
 global.selectedCabId = null;
 FM.updateCabfrontMeta();
 eq(metaNode.textContent, '', 'C2: bez oznacenej skrinky je meta prazdna');
+ok(!metaNode.hasAttribute('title'), 'C2: a bez skrinky nie je ani bublina');
 global.el('fr_gap_left').value = '2';
+matSel.value = '';
 
 // --- D) N26: FOKUS / HOVER, NIE OTVORENA SKUPINA (M1) -----------------------
 eq(PV.pvGapsHot(), false, 'D: v pokoji medzery nesvietia');

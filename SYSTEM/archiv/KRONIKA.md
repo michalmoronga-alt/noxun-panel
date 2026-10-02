@@ -17,6 +17,28 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H6b · lišty sektorov a súhrny (2.10.2026, PR #454, v0.17.18, blok 9 · HARDENING PO V1, triedenie D-01 pás + D-05; package
+  [PACKAGE_H6.md](../zdroje/bloky/HARDENING/PACKAGE_H6.md) §6 „H6b" + §15; mockup [MOCKUP_H6_INSPECTOR.html](../zdroje/bloky/HARDENING/MOCKUP_H6_INSPECTOR.html) časti B–D, F;
+  rozhodnutia Michala 2.10. O6, O7, O9, O12; brief [BRIEF_H6.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H6.md)).** Druhá z troch častí H6. **Pás „Skrinka … upravíš
+  v Korpuse" (`#ctxNote`) zanikol:** mimo Korpusu je v lište sektora Náhľad **odkaz s rozmermi skrinky** (`#s1Link`, „800 × 864 × 520 · sokel 100 →", tá istá funkcia
+  `metaDims` ako lišta Základné, rohová aj „dvere vľavo 450"), klik otvorí Korpus a sektor nezbalí (`nxS1Link` = `nxTipStop` + `setViewContext`), bublina povie materiál
+  korpusu (`NXShell.s1LinkTitle`; popis sa prekladá až pri kreslení, takže premenovanie dekoru ju zmení). `sectorVis` vracia `{ basic, mat, link }`. **Lišta sektora
+  Nastavenia je vždy súhrn obsahu (O12)** a otvorená skupina ho nemení: Korpus „strop 2 výstuhy · boky na dne · chrbát v drážke" (zo selectov; slot umývačky bez súhrnu),
+  Zóny „2 zóny · 3 police" (listy stromu bez 4. úrovne, jediná prázdna „1 zóna · prázdna"), Čelá „1 čelo · F206 ST9 · medzera 3 · okraje 2" (bez čiel „bez čiel"),
+  Kovanie „Nohy 4× · Výsuv 1× · Príchyt sokla 1×" (ten istý `nxHwSummary`; bez kovania „bez kovania"); `metaGroups`, `nxMetaGroups` a `groupTitle` zanikli (názov skupiny sa
+  už nezbiera). **„Spoločné pre skrinku" (O7):** `F206 ST9 · medzera 3 · okraje 2 · dole -20` — dekor = prvé dve slová (celý názov v `title`, `CABFRONT_DECOR_MAX` zanikol),
+  okraje spoločná hodnota + výnimky v poradí hore, dole, vľavo, vpravo (zhoda počtu → prvá v poradí; keď je každá hodnota iná, všetky menom), čísla ako v poli; slot bez
+  medzery a okraja dole; `frontCountText(n, unset)` je spoločný pre meta skupiny aj lištu. **Skupiny Kovania nesú meta:** Položky „6 ks · 2 ručne", Sety „podľa projektu" /
+  „1 vlastný" (skrinkový výber, výbery pri čelách, pri klasifikovaných zásuvkách `compat`). **Kresba Kovania bez textov (O9):** súhrn aj náhradná veta zmizli a scéna nemá
+  rezervu −96 mm (nohy pod korpusom len bez sokla — `nxHwLowestZ`), kresba je väčšia. Živá obnova: `nxSectorMetaApply` volajú `renderZoneTree`, `renderHardware`,
+  `updateFrontMeta`, `updateCabfrontMeta`; `NX_META_FIELDS` + 8 polí. **Dáta, payloady, Ruby logika, výroba a ceny bez zmeny** (Ruby len verzia; in-SU nespúšťané).
+  **1. commit = R0:** golden `tests/fixtures/h6b_suhrny.json` (`metaDims`, `metaMaterials`, `nxHwSummary` nad 9 stavmi) — zelený na starom aj novom kóde. Nový
+  `tests/js/test_h6b_suhrny.js`; prepísané `test_uib1_kostra.js`/`.rb`, `test_uib_meta.js`, `test_d130b_spolocne.js` (1:1 náhrady). Namerané (`ui_foto -Shoot`): Zóny, Čelá
+  a Kovanie sú o ≈ 52 px kratšie (pás preč); Korpus, bez výberu a dielec bez zmeny výšky (1190 / 1358 / 1116 px). Nahradený text STAV: v0.17.17 H6a (pomocné vety v „?",
+  tlačidlá v jednom riadku, stavová veta len so správou, obrysy zón len v raile); staré dávky H3–H5, H8–H10, H11b, H12a–c a H13 sa v STAV zlúčili do jedného
+  riadka (limit 80 riadkov / 12 kB) — plné znenia sú v tejto KRONIKE. **Predrecenzia:** súhrn lišty Kovanie počíta aj ručné položky („· N ručne"), dekor v súhrne „Spoločné
+  pre skrinku" sa reže pred „ · " (žiadne „K009 · ·"), scéna Kovania zahŕňa čelá s presahom dole a dielce rohovej zostavy, `aria-label` odkazu začína viditeľným textom.
+
 - **H6a · nápovedy, spodok panela a stavová veta (2.10.2026, PR #453, v0.17.17, blok 9 · HARDENING PO V1, triedenie D-01 — CU-04, CU-11, GR-22, CS-10; package
   [PACKAGE_H6.md](../zdroje/bloky/HARDENING/PACKAGE_H6.md) §6 „H6a" + §15; mockup [MOCKUP_H6_INSPECTOR.html](../zdroje/bloky/HARDENING/MOCKUP_H6_INSPECTOR.html);
   rozhodnutia Michala 2.10. v [ROZHODNUTIA_MICHALA_2026-10-01.md](../zdroje/bloky/HARDENING/ROZHODNUTIA_MICHALA_2026-10-01.md); brief

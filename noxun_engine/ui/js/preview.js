@@ -114,6 +114,22 @@
   }
   // D-07: rozsah ciel v modelovych mm (presahy mozu ist mimo obrys korpusu).
   // ROH-A2: bocne okraje sa merajú od OTVORU (pri ostatnych typoch 0…W).
+  // Rozsah dielcov rohovej zostavy (server posiela x0/x1/z0/z1 v mm) pre scenu —
+  // `cr_front` moze siahat pod korpus. Ciste (Node testy). Bez zostavy null.
+  function pvCornerExtent(){
+    var cp = (typeof pvCornerPreview === 'function') ? pvCornerPreview() : null;
+    if (!cp) return null;
+    var e = null;
+    cp.parts.forEach(function(p){
+      if (!p) return;
+      var x0 = nxNumOr(p.x0, NaN), x1 = nxNumOr(p.x1, NaN), z0 = nxNumOr(p.z0, NaN), z1 = nxNumOr(p.z1, NaN);
+      if (isNaN(x0) || isNaN(x1) || isNaN(z0) || isNaN(z1)) return;
+      if (!e) e = { minX: x0, maxX: x1, minZ: z0, maxZ: z1 };
+      e.minX = Math.min(e.minX, x0); e.maxX = Math.max(e.maxX, x1);
+      e.minZ = Math.min(e.minZ, z0); e.maxZ = Math.max(e.maxZ, z1);
+    });
+    return e;
+  }
   function frontsExtent(){
     var items = frontItems; if (!items || !items.length) return null;
     var W = numv('width')||600, H = numv('height')||720;
@@ -258,7 +274,17 @@
     } else if (previewMode === 'zones'){
       minZ = Math.min(minZ, 0) - 46;      // koty sirok zon pod korpusom
     } else if (previewMode === 'hw'){
-      minZ = Math.min(minZ, 0) - 96;      // nohy pod korpusom + suhrn kovania
+      // H6b (O9): suhrn kovania je v liste sektora, nie v kresbe — rezerva dole je
+      // len to, co sa KRESLI: nohy pod korpusom (pri sokli stoja v sokli, rezerva 0).
+      minZ = Math.min(minZ, nxHwLowestZ(hwItems, nxCabFloorHeight()));
+      // Cela (ghost vrstva) a rohova zostava mozu siahat mimo korpus (okraj dole −20,
+      // `cr_front`) — rezerva −96 mm ich kedysi kryla, teraz ich rozsah patri do sceny.
+      var he = [frontsExtent(), pvCornerExtent()];
+      he.forEach(function(x){
+        if (!x) return;
+        minX = Math.min(minX, x.minX); maxX = Math.max(maxX, x.maxX);
+        minZ = Math.min(minZ, x.minZ); maxZ = Math.max(maxZ, x.maxZ);
+      });
     }
     // PR #381 (P2): telo slotu sa do sceny priklada v KAZDOM kontexte —
     // od opravy projekcii ho vidno aj v Celach a v Kovani. S1-F: box niky sa
@@ -1274,10 +1300,28 @@
     if (NXLayers.stateOf('hw', 'zony', pvAvail()) !== 'on') drawZonesGhost(S, rx, ry, g);
     var marks = nxHwMarks(hwItems, g);
     marks.forEach(function(m){ S.push(hwMarkSvg(m, rx, ry, false)); });
-    var sum = nxHwSummary(hwItems);
-    pvText(S, rx(g.W/2), ry(-44), sum || 'Skrinka zatiaľ nemá kovanie', 19);
-    // H6a (O5): veta „klik na značku…" je od teraz v „?" pod náhľadom
-    // (NXShell.pvHelpText, kontext Kovanie) — z kresby zmizla.
+    // H6a (O5): veta „klik na značku…" je v „?" pod náhľadom (NXShell.pvHelpText,
+    // kontext Kovanie). H6b (O9): súhrn položiek („Nohy 4× · Výsuv 1× · …") je
+    // v lište sektora Kovanie (`nxHwSummary` číta `nxMetaContent`, shell.js) —
+    // z kresby zmizol spolu s náhradnou vetou „Skrinka zatiaľ nemá kovanie"
+    // (ju hovorí lišta: „bez kovania"); kresba je väčšia.
+  }
+
+  // Geometria nohy v kresbe Kovania (mm sceny): pri sokli (fh > 0) stoji v sokli
+  // (0…min(fh, 90)), bez sokla visi POD korpusom (−70…0). Jedno miesto pre znacky
+  // aj rezervu sceny.
+  function nxLegGeom(fh){
+    var lh = fh > 0 ? Math.min(fh, 90) : 70;
+    return { lw: 42, lh: lh, z0: fh > 0 ? 0 : -lh };
+  }
+  // Najnizsi kresleny bod znaciek kovania (z, mm; najviac 0) — rezerva sceny pod
+  // korpusom. Ciste (Node testy).
+  function nxHwLowestZ(items, fh){
+    var low = 0;
+    (items || []).forEach(function(it){
+      if (it && it.generic_type === 'leg') low = Math.min(low, nxLegGeom(fh).z0);
+    });
+    return low;
   }
 
   // Ciste (Node testy): odvodenie znaciek z payloadu kovania.
@@ -1285,7 +1329,7 @@
   // g:     { W, H, fh, gapSides, gap, fronts: [{ id, z, height, type, wings_n }] }
   // ->     [{ kind:'hinge'|'slide'|'leg', x, z, w, h, r, owner, title }]
   // Typy bez kresitelnej pozicie (podperky, spojky, uchytky) znacku nedostanu —
-  // su v suhrne pod projekciou, aby o nich pouzivatel vedel.
+  // su v suhrne v liste sektora Kovanie, aby o nich pouzivatel vedel.
   function nxHwMarks(items, g){
     var out = [];
     if (!items || !items.length) return out;
@@ -1321,8 +1365,8 @@
       var title = (it.label || it.generic_type || '') +
                   (it.owner_label ? ' · ' + it.owner_label : '') + ' · ' + qty + '×';
       if (it.generic_type === 'leg'){
-        var n = Math.min(qty, 8), lw = 42, lh = fh > 0 ? Math.min(fh, 90) : 70;
-        var z0 = fh > 0 ? 0 : -lh, ins = 60, span = W - 2*ins - lw;
+        var n = Math.min(qty, 8), lg = nxLegGeom(fh), lw = lg.lw, lh = lg.lh;
+        var z0 = lg.z0, ins = 60, span = W - 2*ins - lw;
         for (var i = 0; i < n; i++){
           var lx = (n === 1 || span <= 0) ? (W - lw)/2 : (ins + span * i / (n - 1));
           out.push({ kind: 'leg', x: lx, z: z0, w: lw, h: lh, owner: owner, title: title });
@@ -1419,8 +1463,9 @@
     return { z: z, foot: foot, legH: bodyH, xL: x0, xR: x1, bx: bx, bw: bw, bodyH: bodyH };
   }
 
-  // Ciste (Node testy): suhrn pod projekciou — VSETKY typy vratane tych bez
-  // znacky (poctivo: „podperky 8×" musia byt vidiet, aj ked sa nekreslia).
+  // Ciste (Node testy): suhrn kovania v liste sektora Kovanie (H6b; do kresby uz
+  // nejde) — VSETKY typy vratane tych bez znacky (poctivo: „podperky 8×" musia
+  // byt vidiet, aj ked sa nekreslia).
   function nxHwSummary(items){
     var order = [], sums = {};
     (items || []).forEach(function(it){
@@ -1946,6 +1991,7 @@
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { NXLayers: NXLayers, cabTabPreview: cabTabPreview,
                        nxHwMarks: nxHwMarks, nxHwSummary: nxHwSummary, nxSlideGeom: nxSlideGeom,
+                       nxLegGeom: nxLegGeom, nxHwLowestZ: nxHwLowestZ,
                        nxFrontDims: nxFrontDims, nxZoneSpans: nxZoneSpans,
                        pvDepthDimZ: pvDepthDimZ, pvSceneTopZ: pvSceneTopZ,
                        // UI-C1b: draft ciel, odhad navrhu a doskova projekcia

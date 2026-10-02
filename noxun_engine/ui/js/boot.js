@@ -37,12 +37,10 @@
         var v = localStorage.getItem(NXShell.secKey(d.dataset.key, d.getAttribute('data-s4')));
         if (v !== null) d.open = (v === '1');
       } catch(e){}
-      // Meta lista sektora S4 ukazuje OTVORENU skupinu (alebo pocet zbalenych),
-      // takze kazde rozbalenie/zbalenie ju musi obnovit. `toggle` nebublinkuje —
-      // delegovany listener v shell.js ho nezachyti, patri sem.
+      // Meta lista sektora S4 je SUHRN OBSAHU kontextu a otvorena skupina ho
+      // nemeni (H6b, O12) — rozbalenie/zbalenie ju preto neobnovuje.
       d.addEventListener('toggle', function(){
         nxSecExclusive(d); nxSecWrite(d);
-        if (typeof nxSectorMetaApply === 'function') nxSectorMetaApply();
       });
     });
     // Po obnove z localStorage moze byt otvorenych viac surodencov naraz
