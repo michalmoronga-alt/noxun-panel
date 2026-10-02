@@ -648,7 +648,7 @@ u knižnice setov (R-07/R-08/R-11) a katalógu (GH #99).
   na to nestačí: rada v súbore už je, takže by pod Hettichom ostala navždy — a set nôh aj deväť nových katalógových riadkov nesú dvojicu Häfele/AXILO, ktorá by v takej
   taxonómii NEEXISTOVALA (`create_item` aj `save_set!` by ich odmietli vetou „rada nepatrí výrobcovi"). Presun preto beží **vnútri `merge_seed`, PRED dopĺňaním rád** (po ňom
   by ho add-if-absent krok preskočil) a dotkne sa **LEN záznamu, ktorý je PRESNE starý seed tvar**: meno doslovne `AXILO` **a** vlastník ekvivalentný `Hettich` (vzor
-  `LEGACY_SEED_SHAPES` v `hardware_sets.rb`). Premenovaná („AXILO plus") alebo inak naviazaná rada = **ruky preč** + info log. Nový vlastník sa berie z **UŽ ULOŽENÉHO** zápisu
+  `LEGACY_SEED_SHAPES` setov, dáta v `hardware_sets_seed.rb`). Premenovaná („AXILO plus") alebo inak naviazaná rada = **ruky preč** + info log. Nový vlastník sa berie z **UŽ ULOŽENÉHO** zápisu
   výrobcu (keď má používateľ „HÄFELE", rada zapísaná naším „Häfele" by v selectoch rád zmizla — JS filtruje presným reťazcom, Codex #320 kolo 2 P2); keď výrobca ešte
   neexistuje, doplní sa v tom istom kroku. Jednorazovosť stráži `seed_version` (2 → **3**), takže návrat rady pod Hettich sa už nikdy neprepíše.
 - **`series_owner(rada)` — KOMU RADA V ŽIVEJ TAXONÓMII PATRÍ** (Codex #337 N2/N3). Migrácie (katalógová oprava dvojice Hettich+AXILO, klasifikácia seed setov) sa musia pýtať
@@ -664,10 +664,32 @@ u knižnice setov (R-07/R-08/R-11) a katalógu (GH #99).
 Zápis do taxonómie je zápis do globálneho súboru, takže v SketchUpe **nerobí krok Späť**. Testy: `tests/pure/test_kovb1_taxonomia.rb` (vrátane REÁLNEHO dvojprocesového `flock`)
 a in-SketchUp sekcia `run_kovb1`.
 
+### hardware_sets_seed.rb
+
+**Seed dáta setov kovania (H15a, blok 9 HARDENING, C-03) — LEN literály, žiadna logika.** Žije tu predvolené kovanie, ktoré dostane čerstvá inštalácia
+a ktoré seed-merge dopĺňa do existujúcich knižníc: `SEED_VERSION` s komentárom histórie v2..v8, `SEED_SETS` (29 setov), `SEED_MAPPING` (legacy kľúče podľa
+generického typu), `LEGACY_SEED_SHAPES` (predošlé seed tvary pre „nedotknutý nahradím, upravený nechám"), `MAPPING_MIGRATIONS` a `MAPPING_ADDITIONS`
+(add-if-absent predvoľby, aj triedne kľúče). Modul je ten istý `HardwareSets` — mená konštánt sa nezmenili, mechanika v `hardware_sets.rb` ich číta ako doteraz.
+
+- **Poradie načítania:** súbor ide **tesne PRED** `hardware_sets.rb` (`main.rb` cez `AppLifecycle.require_part` aj `tests/helper.rb`), lebo z dát sa pri
+  načítaní logiky odvodzuje `CLASS_MAPPING_KEYS`. Dáta preto **nesmú odkazovať na konštanty logiky** — bunka „vedome bez kódu" je literál `'none'`
+  (= `HardwareSets::SKIP_CODE`, ten istý zmrazený reťazec).
+- **Len literály (guard `tests/pure/test_h15_seed_data.rb`, AST):** deklarácie konštánt s reťazcom, číslom, `nil/true/false`, poľom, hashom a `%w[]`,
+  `.freeze` a odkaz na konštantu deklarovanú vyššie v tom istom súbore; žiadne `def`, volania ani cudzie konštanty. Guard drží aj to, že presunuté konštanty
+  sú v plugine deklarované práve raz (tu), že `hardware_sets.rb` nedeklaruje žiadne `SEED_*` ani `LEGACY_SEED_*` a že súbor otvára len svoj modul.
+- **Ako sa seed mení:** zmena setu tu + `SEED_VERSION` + starý tvar zmeneného setu do `LEGACY_SEED_SHAPES` v tom istom súbore (bez bumpu sa zmena do
+  existujúcich inštalácií nedostane — [STANDARD §13](../../SYSTEM/STANDARD.md)) + **vedomá regenerácia goldenu** `tests/fixtures/h15_golden/generate.rb`
+  zdôvodnená v PR. Golden T0 (`tests/pure/test_h15_seed_golden.rb`) pripína konštanty, čerstvú inštaláciu, upgrade knižnice, katalógu a taxonómie, projektové
+  predvoľby aj nákup a rozpočet end-to-end — tichá zmena dát pri úprave súboru ho zhodí.
+- `frozen_string_literal: true` je povinný (reťazce dát sú zmrazené ako predtým); zmrazený je obal každej konštanty, vnútorné polia a hashe nie (tak to bolo
+  aj v `hardware_sets.rb` a nikto ich nemení).
+
 ### hardware_sets.rb
 
 Sety kovania (mapovacie pravidlo generický typ → kódy katalógu) + projektový snapshot predvolieb na modeli; nadväzujúce zmienky sú v odsekoch `hardware_rules.rb`
-a `hardware_catalog.rb` a v [ui-lifecycle.md](ui-lifecycle.md) (sekcia `hw` Štúdia).
+a `hardware_catalog.rb` a v [ui-lifecycle.md](ui-lifecycle.md) (sekcia `hw` Štúdia). **Seed dáta setov** (`SEED_VERSION`, `SEED_SETS`, `SEED_MAPPING`,
+`LEGACY_SEED_SHAPES`, `MAPPING_MIGRATIONS`, `MAPPING_ADDITIONS`) sú od H15a v `hardware_sets_seed.rb` (odsek vyššie); tu ostáva mechanika a odvodeniny
+(`CLASS_MAPPING_KEYS`, `SKIP_CODE`). História seedu nižšie ostáva platná.
 
 **H2/D-76 + KOV-I — šablóna voliteľne nesie kovanie.** „Uložiť aj kovanie“ je predvolene zapnuté: do šablóny idú prenosné mapovania, zmrazené definície
 (`template_set_defs`, snapshot projektu pred globálom) a ručné položky `hardware_manual`. Vypnutá voľba vynechá všetky tri kľúče aj kontrolu zdroja setov.

@@ -157,6 +157,7 @@ unless NxTest::IN_SKETCHUP
     core/hardware_catalog
     core/appliance_catalog
     core/hardware_taxonomy
+    core/hardware_sets_seed
     core/hardware_sets
     core/drawer_recipes
     modules/shelves

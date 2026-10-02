@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.17.22' unless defined?(VERSION)
+    VERSION = '0.17.23' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -527,6 +527,7 @@ module Noxun
       AppLifecycle.require_part 'noxun_engine/core/hardware_catalog' # V0.6 C-1: katalog kovania (po materials/demos — pouziva slug, normalize_price, Demos.fetch)
       AppLifecycle.require_part 'noxun_engine/core/appliance_catalog' # S1-A1: katalog spotrebicov (po hardware_catalog — per-PC JSON vedla neho, pouziva Materials.dir a JsonFileStore)
       AppLifecycle.require_part 'noxun_engine/core/hardware_taxonomy' # KOV-B1: vyrobcovia a rady kovania (po hardware_catalog, pred hardware_sets — obe ju pouzivaju)
+      AppLifecycle.require_part 'noxun_engine/core/hardware_sets_seed' # H15a: seed data setov (len literaly; PRED hardware_sets)
       AppLifecycle.require_part 'noxun_engine/core/hardware_sets' # V0.6 D1: sety kovania (po build_plan/hardware_catalog — GENERIC_TYPES, CATEGORIES; pred validation/ui)
       AppLifecycle.require_part 'noxun_engine/core/drawer_recipes' # KOV-C1: nemenne recepty zasuviek (ciste jadro, data pack v data/recipes)
       AppLifecycle.require_part 'noxun_engine/modules/shelves'
