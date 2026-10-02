@@ -544,9 +544,9 @@ end
 
 NxTest.test('DocKey: loader aj headless harness nacitavaju doc_key pred pouzivatelmi') do
   main_src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'main.rb'), encoding: 'UTF-8')
-  at_key = main_src.index("Sketchup.require 'noxun_engine/core/doc_key'")
+  at_key = main_src.index("AppLifecycle.require_part 'noxun_engine/core/doc_key'")
   NxTest.assert(!at_key.nil?, 'main.rb nacitava core/doc_key')
-  at_first_user = main_src.index("Sketchup.require 'noxun_engine/core/materials_replace_uni'")
+  at_first_user = main_src.index("AppLifecycle.require_part 'noxun_engine/core/materials_replace_uni'")
   NxTest.assert(!at_first_user.nil? && at_key < at_first_user,
                 'doc_key sa nacitava PRED prvym pouzivatelom (materials_replace_uni)')
 end

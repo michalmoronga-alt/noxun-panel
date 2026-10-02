@@ -81,8 +81,8 @@ NxTest.test('ST-1a: ProductionCore nedrzi ziadny okenny stav (@dialog/@generatio
 end
 
 NxTest.test('ST-1a: loader nacitava production_core PRED oknom, ktore ho vola') do
-  core_at = ST1A_MAIN_SRC.index("Sketchup.require 'noxun_engine/ui/production_core'")
-  dlg_at  = ST1A_MAIN_SRC.index("Sketchup.require 'noxun_engine/ui/studio_dialog'")
+  core_at = ST1A_MAIN_SRC.index("AppLifecycle.require_part 'noxun_engine/ui/production_core'")
+  dlg_at  = ST1A_MAIN_SRC.index("AppLifecycle.require_part 'noxun_engine/ui/studio_dialog'")
   NxTest.assert(!core_at.nil?, 'main.rb nenacitava noxun_engine/ui/production_core')
   NxTest.assert(!dlg_at.nil?, 'main.rb nenacitava noxun_engine/ui/studio_dialog')
   NxTest.assert(core_at < dlg_at,

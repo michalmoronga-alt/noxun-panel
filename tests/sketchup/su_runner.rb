@@ -27929,6 +27929,191 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # =========================================================================
+  # H11a (F-01) — NACITANIE SUBOROV PLUGINU S JEDNOU HLASKOU.
+  #
+  # Synchronna cast (`run_h11a`): Q7 (plugin nacitany cely) a Q8 = P1 — BRANA
+  # obalu nacitania: Ruby `require` s absolutnou cestou ma v SketchUpe tu istu
+  # semantiku ako headless (S12): ok -> true, znova -> false, chyba = zaznam
+  # spravnej triedy, nic nevyhodi. Vsetko nad TEMP sandboxom (`noxun_h11_*`),
+  # NIKDY nad Plugins. Asynchronna cast (`run_h11a_async`) = Q1: rucne
+  # zatvorenie oboch okien s ghostom a zvyraznenou hranou (charakterizacia pre
+  # H11c — ukoncovanie SketchUpu rozhodne zalozny navrh Z1 s vlastnym auditom).
+  # =========================================================================
+
+  H11A_PROBE = 'SU-TEST H11a sonda undo stacku'
+
+  def h11a_ready?
+    defined?(e::AppLifecycle) && e::AppLifecycle.respond_to?(:require_part)
+  end
+
+  def h11a_lc
+    e::AppLifecycle
+  end
+
+  # Surova semantika Ruby `require` v SketchUpe (S12).
+  def h11a_write_probe_files(dir, suffix)
+    File.write(File.join(dir, "ok#{suffix}.rb"),
+               "$nx_h11a_ok = ($nx_h11a_ok || 0) + 1\n")
+    File.write(File.join(dir, "raise#{suffix}.rb"), "raise 'H11a P1 sonda: chyba pri nacitani'\n")
+    File.write(File.join(dir, "syntax#{suffix}.rb"), "def nx_h11a_broken(\n")
+  end
+
+  def run_h11a(model)
+    _ = model
+    dir = Dir.mktmpdir('noxun_h11_')
+    begin
+      # --- S12 surovo (Kernel#require s absolutnou cestou) ------------------
+      h11a_write_probe_files(dir, '_k')
+      res = {}
+      %w[ok_k ok_k raise_k syntax_k missing_k].each_with_index do |n, i|
+        key = "#{i}_#{n}"
+        begin
+          res[key] = [:ret, require(File.join(dir, n))]
+        rescue StandardError, ScriptError => ex
+          res[key] = [:raised, ex.class]
+        end
+      end
+      info("H11a S12 surovo v SketchUpe #{Sketchup.version}: #{res.inspect}")
+      ok('H11a S12: Ruby require — ok = true, znova = false (v $LOADED_FEATURES)',
+         res['0_ok_k'] == [:ret, true] && res['1_ok_k'] == [:ret, false])
+      ok('H11a S12: Ruby require — raise prepusti RuntimeError',
+         res['2_raise_k'] == [:raised, RuntimeError])
+      ok('H11a S12: Ruby require — syntax chyba prepusti SyntaxError',
+         res['3_syntax_k'] == [:raised, SyntaxError])
+      ok('H11a S12: Ruby require — chybajuci subor prepusti LoadError',
+         res['4_missing_k'] == [:raised, LoadError])
+      ok_key = $LOADED_FEATURES.find { |f| f.end_with?('/ok_k.rb') }
+      info("H11a N5: kluc $LOADED_FEATURES pre sondu = #{ok_key.inspect}")
+      units = $LOADED_FEATURES.find { |f| f.end_with?('noxun_engine/core/units.rb') }
+      info("H11a N5: kluc $LOADED_FEATURES pre noxun_engine/core/units.rb = #{units.inspect}")
+
+      # --- surove Sketchup.require (len dokumentacia do PR, nie brana) ------
+      h11a_write_probe_files(dir, '_s')
+      raw = {}
+      %w[ok_s ok_s raise_s syntax_s missing_s].each_with_index do |n, i|
+        key = "#{i}_#{n}"
+        begin
+          raw[key] = [:ret, Sketchup.require(File.join(dir, n))]
+        rescue StandardError, ScriptError => ex
+          raw[key] = [:raised, ex.class]
+        end
+      end
+      info("H11a P1 (dokumentacia): Sketchup.require v SketchUpe #{Sketchup.version}: #{raw.inspect}")
+
+      unless h11a_ready?
+        info('H11a: AppLifecycle v plugine nie je (charakterizacny beh) — P1 a Q7 sa nespustia')
+        return
+      end
+
+      # --- Q8 = P1: AppLifecycle.require_part (BRANA nacitania) -------------
+      lc = h11a_lc
+      h11a_write_probe_files(dir, '_p')
+      before = lc.failures.dup
+      rec = []
+      p1 = %w[ok_p ok_p raise_p syntax_p missing_p].map do |n|
+        begin
+          [n, lc.require_part(n, record: rec, root: dir)]
+        rescue Exception => ex # rubocop:disable Lint/RescueException — brana: NIC nesmie prejst
+          [n, [:raised, ex.class]]
+        end
+      end
+      info("H11a P1: require_part #{p1.inspect} · zaznamy #{rec.map { |r| [r['path'], r['class']] }.inspect}")
+      ok('H11a P1: require_part — ok = true, znova = false (uspech oboch)',
+         p1[0][1] == true && p1[1][1] == false)
+      ok('H11a P1: require_part nic nevyhodil (raise/syntax/chybajuci = nil)',
+         p1[2][1].nil? && p1[3][1].nil? && p1[4][1].nil?)
+      ok('H11a P1: zaznamy spravnej triedy (RuntimeError, SyntaxError, LoadError)',
+         rec.map { |r| r['class'] } == %w[RuntimeError SyntaxError LoadError] &&
+         rec.map { |r| r['path'] } == %w[raise_p syntax_p missing_p])
+      ok('H11a P1: vlastny zoznam `record:` nezaspinil globalny zoznam chyb',
+         lc.failures == before)
+      ok('H11a P1: zaznam nesie spravu a najviac 6 riadkov backtrace',
+         rec.all? { |r| !r['message'].to_s.empty? && Array(r['backtrace']).length <= 6 })
+
+      # --- Q7: plugin je nacitany cely ------------------------------------
+      ok("H11a Q7: plugin sa nacital CELY (chyby: #{lc.failures.inspect})", lc.failures.empty? && !lc.failed?)
+      ok('H11a Q7: init prebehol (brana init_allowed? pustila)', e.init_allowed? == true)
+      parts = $LOADED_FEATURES.count { |f| f.include?('/noxun_engine/') && f.end_with?('.rb') }
+      info("H11a Q7: suborov pluginu v $LOADED_FEATURES = #{parts}")
+    ensure
+      FileUtils.rm_rf(dir)
+    end
+  rescue StandardError => ex
+    log_line("FAIL: run_h11a vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
+  # Vychodisko Q1: Inspector + Studio otvorene, oznacena doska so zvyraznenou
+  # hranou L1, sonda undo stacku a ghost visiaci na kurzore.
+  def h11a_setup!(model, state)
+    cleanup(model)
+    ghost_teardown!(model)
+    e::HoverEdge.release
+    e.reset_restart_latch! # latch by okna otvorit nedovolil
+    e::Panel.show
+    e::StudioDialog.show
+    b = e::BoardBuilder.build(model, { 'material_id' => 'K009_PW_DTDL_18',
+                                       'length' => 400.0, 'width' => 300.0 })
+    e::Panel.select_only(model, b)
+    state[:h11a_hover] = e::HoverEdge.show(model, 'L1')
+    state[:h11a_hover] = e::HoverEdge.ensure_overlay(model) unless state[:h11a_hover]
+    state[:h11a_ov] = e::HoverEdge.instance_variable_get(:@overlay)
+    char_push_stack_probe(model, H11A_PROBE)
+    e::Panel.handle_insert(pg(model, GHOST_PARAMS.dup))
+    state[:h11a_tool] = ghost_tool
+    state[:h11a_cabs] = cabinets(model).length
+  end
+
+  def h11a_overlay_gone?(model, state)
+    ov = state[:h11a_ov]
+    e::HoverEdge.instance_variable_get(:@overlay).nil? && (ov.nil? || !model.overlays.to_a.include?(ov))
+  end
+
+  def h11a_selection_tool?(model)
+    model.tools.active_tool_name.to_s == 'SelectionTool' || model.tools.active_tool_id == 21_022
+  end
+
+  def h11a_observers(model)
+    [e::Panel.instance_variable_get(:@observer_model), e::StudioDialog.instance_variable_get(:@observer_model)]
+      .map { |m| m.equal?(model) ? :model : (m.nil? ? :nil : :ine) }
+  end
+
+  def h11a_teardown(model)
+    ghost_teardown!(model)
+    e::HoverEdge.release
+    cleanup(model)
+  rescue StandardError => ex
+    info("H11a teardown: #{ex.class}: #{ex.message}")
+  end
+
+  def run_h11a_async(model, state, steps)
+    # --- Q1 rucne zatvorenie oboch okien = dnesne spravanie (charakterizacia) --
+    steps << [0.5, lambda do
+      h11a_setup!(model, state)
+    end]
+    steps << [SETTLE, lambda do
+      ok('H11a Q1: vychodisko — obe okna otvorene, ghost visi, hrana zvyraznena',
+         e::Panel.dialog_alive? && e::StudioDialog.dialog_alive? &&
+         !state[:h11a_tool].nil? && state[:h11a_tool].attached? && !ghost_session.nil? && !state[:h11a_ov].nil?)
+      e::Panel.hide
+      e::StudioDialog.hide
+    end]
+    steps << [SETTLE, lambda do
+      ok('H11a Q1: rucne zatvorenie — obe okna dobehli `set_on_closed`',
+         e::Panel.dialog_closed? && e::StudioDialog.dialog_closed?)
+      ok('H11a Q1: rucne zatvorenie — ghost session zrusena', ghost_session.nil?)
+      t = state[:h11a_tool]
+      ok("H11a Q1: ghost sa popol, aktivny je Vyber (#{model.tools.active_tool_name})",
+         !t.nil? && !t.attached? && h11a_selection_tool?(model) && ghost_tool.nil?)
+      ok('H11a Q1: zvyraznenie hrany zmizlo z modelu', h11a_overlay_gone?(model, state))
+      ok("H11a Q1: observery zatvorenych okien su odpojene (#{h11a_observers(model).inspect})",
+         h11a_observers(model) == %i[nil nil])
+      ok('H11a Q1: ziadna nova skrinka, sonda undo stacku je stale navrchu',
+         cabinets(model).length == state[:h11a_cabs] && char_stack_probe(model) == H11A_PROBE)
+      h11a_teardown(model)
+    end]
+  end
+
   def run_async(model, done)
     state = {}
     steps = []
@@ -28564,6 +28749,10 @@ module NoxunSuRunner
     # nestretol s fake oknom sekcie STALE.
     run_d52b_async(model, state, steps)
 
+    # H11a (F-01): rucne zatvorenie oboch okien s ghostom (Q1, charakterizacia
+    # pre H11c). `set_on_closed` je v CEF asynchronny, preto retaz krokov.
+    run_h11a_async(model, state, steps)
+
     # NASTROJE-1 (T1a): nastroj spusteny DO debounce okna po rotacii aj po nativnom
     # Move ? bariera musi observer dotiahnut do pokoja EST PRED vlastnou operaciou.
     run_tools1_async(model, state, steps)
@@ -28746,6 +28935,7 @@ module NoxunSuRunner
     run_kova2b(model)        # KOV-A2b: smer otvarania v modeli — lifecycle overlayu, symbol na spravnom kridle a prednej ploche, prestavba/Spat, dup-ID per instancia, vykon
     run_h3b(model)           # H3b/A-06: overlay zneplatneny ako po File/New — opatovne zapnutie bez chyby v logu (smer otvarania, hrany, kresba), zivy dokument sa vypina ako doteraz
     run_h11b(model)          # H11b/F-02: verzia SketchUpu (version_number vs. retazec), kontrola minima pusti 2026, styri prekrytia bez verzijnych poistiek (overlay_id + enabled?, zapnutie/opatovne zapnutie/vypnutie)
+    run_h11a(model)          # H11a/F-01: Q8 = P1 brana obalu nacitania (Ruby require s absolutnou cestou nad TEMP sandboxom: ok/znova/raise/syntax/chybajuci) + surove Sketchup.require do PR, Q7 plugin nacitany cely a init prebehol
     run_tools1(model)        # NASTROJE-1 (T1a): Mower + Snaper v baliku enginu (kopia cez sev, rotacie/Z ako 1 krok Spat, odmietnutia bez operacie, bariera observera, Snaper a viditelnost)
     run_tools1b(model)       # NASTROJE-1 (T1b): boot migracia starych instalacii — docasny Plugins strom (styri ciele, marker per cesta, druhy beh = no-op) + dokaz, ze boot hook upratal ZIVU instalaciu
     run_kovc2b(model)        # KOV-C2b: zasuvky z receptu — dielce v modeli 1:1 s planom, JEDNA polozka vysuvu, prestavba (ina hlbka/vyska = ina NL/variant, ziadna duplicita, part_overrides prezijú), 1 krok Spat, kopia a sablona nesu pripnuty recept, plytka skrinka = ziadne dielce + RED + export zastaveny s PRAZDNYM priecinkom

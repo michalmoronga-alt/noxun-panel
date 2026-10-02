@@ -6,7 +6,10 @@ Destilát z „Výskumná správa pre kódera SketchUp pluginov" (deep research,
 
 - **Jeden top-level namespace** na plugin: `module Noxun::<Plugin>`. Žiadne globálne premenné, žiadne monkey-patchovanie SketchUp API. Všetky extensiony zdieľajú jeden Ruby proces — kolízia mien rozbije cudzí plugin.
 - **Loader (root `.rb`) robí len registráciu** `SketchupExtension` — žiadna logika. Logika v rovnomennom podpriečinku. Umožňuje disable/enable bez načítania kódu.
-- **`Sketchup.require`** namiesto `require_relative` (funguje aj so šifrovanými `.rbe`).
+- **Súbory pluginu (Noxun Engine) výhradne cez `AppLifecycle.require_part 'noxun_engine/…'`** — Ruby `require` s absolútnou cestou, rovnaká semantika na
+  SketchUpe 2026.0 aj 2026.2 (`Sketchup.require` chyby do 2026.1 prehltne, od 2026.2 ich prepustí). Chyba súboru = jedna hláška, plugin v tom okne vypnutý,
+  obnova **reštartom SketchUpu**. Plugin sa **nešifruje** (`.rbe`/`.rbs` Ruby `require` nenačíta; guard test). Prvý súbor (`core/app_lifecycle.rb`) načíta
+  bootstrap v `main.rb` s vlastnou chybovou vetvou. Ostatné pluginy rodiny Noxun: `Sketchup.require` namiesto `require_relative`.
 - Po inštalácii **nezapisovať do priečinka pluginu** — užívateľské dáta do `%APPDATA%` (u nás `%APPDATA%\NOXUN\<Plugin>\`).
 
 ## Geometria
@@ -28,6 +31,8 @@ Destilát z „Výskumná správa pre kódera SketchUp pluginov" (deep research,
 
 ## HtmlDialog
 
+- **`set_on_closed` beží aj pri UKONČENÍ aplikácie** a na 26.0.429 príde **pred** `AppObserver#onQuit` (quit test H11a); v 2026.2 `pop_tool` z hooku
+  padá (api-issue-tracker #1117). Riešenie (záložný návrh Z1) je dávka H11c — do hooku zatiaľ nepridávať nové volania SketchUp API.
 - **Referenciu na dialóg držať** v modulovej/inštančnej premennej — inak ho GC zavrie „záhadne".
 - Unikátny `preferences_key`; **callbacky (`add_action_callback`) registrovať pred `show`**.
 - **Ruby → JS výhradne cez `to_json`** (`dialog.execute_script("app.update(#{data.to_json})")`), nikdy interpoláciou stringu.

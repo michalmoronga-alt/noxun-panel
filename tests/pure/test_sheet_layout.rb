@@ -633,7 +633,7 @@ end
 
 NxTest.test('NP-1: loader nacitava sheet_layout po vepo_export/sheet_estimate/validation a pred budget') do
   src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'main.rb'), encoding: 'UTF-8')
-  at = ->(m) { src.index("Sketchup.require 'noxun_engine/core/#{m}'") }
+  at = ->(m) { src.index("AppLifecycle.require_part 'noxun_engine/core/#{m}'") }
   NxTest.assert(!at.call('sheet_layout').nil?, 'main.rb nenacitava core/sheet_layout')
   %w[materials vepo_export sheet_estimate validation].each do |dep|
     NxTest.assert(at.call(dep) < at.call('sheet_layout'), "#{dep} sa musi nacitat PRED sheet_layout")

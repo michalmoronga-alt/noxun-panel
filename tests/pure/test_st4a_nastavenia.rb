@@ -63,7 +63,7 @@ NxTest.test('ŠT-4a: okno „Nastavenia rozpočtu" ZANIKLO — a bol to POSLEDNY
   # a premenovanie by rozbilo kazdy `defined?` guard aj kazdy odkaz.
   NxTest.assert(defined?(Noxun::Engine::SupplierSettingsDialog),
                 'serverovy modul zije dalej (NEPREMENUVA sa)')
-  NxTest.assert(ST4A_MAIN_RB.include?("Sketchup.require 'noxun_engine/ui/supplier_settings_dialog'"),
+  NxTest.assert(ST4A_MAIN_RB.include?("AppLifecycle.require_part 'noxun_engine/ui/supplier_settings_dialog'"),
                 'a loader ho nacitava')
 end
 

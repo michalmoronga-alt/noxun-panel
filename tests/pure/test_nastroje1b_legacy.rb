@@ -432,7 +432,7 @@ NxTest.test('T1b: main.rb spusta migraciu PRED registraciou toolbaru') do
   NxTest.assert(toolbar_at && tools_at, 'main.rb nema registraciu toolbarov')
   NxTest.assert(cleanup_at < toolbar_at && cleanup_at < tools_at,
                 'migracia bezi AZ PO registracii toolbaru — legacy by sa upratalo o boot neskor')
-  NxTest.assert(src.include?("Sketchup.require 'noxun_engine/tools/legacy_cleanup'"),
+  NxTest.assert(src.include?("AppLifecycle.require_part 'noxun_engine/tools/legacy_cleanup'"),
                 'main.rb nenacitava tools/legacy_cleanup')
 end
 

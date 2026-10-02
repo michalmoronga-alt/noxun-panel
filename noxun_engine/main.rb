@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.17.21' unless defined?(VERSION)
+    VERSION = '0.17.22' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -441,114 +441,172 @@ module Noxun
       tb.restore
       @toolbar = tb
     end
+
+    # --- H11a: BOOTSTRAP zivotneho cyklu (F-01) -------------------------------
+    # `core/app_lifecycle.rb` nacita vsetky ostatne subory pluginu — preto ide
+    # PRVY a ma VLASTNU chybovu vetvu (bez neho niet koho sa spytat na chyby).
+    # Ruby `require` s absolutnou cestou (ta ista semantika na 2026.0 aj
+    # 2026.2) + sentinel `LOADED` (posledny riadok suboru = vykonal sa cely).
+    # Chyba = JEDNA hlaska a zvysok `main.rb` sa nevykona. Syntax chyba
+    # samotneho `main.rb` ostava v rezii SketchUpu.
+    LIFECYCLE_FILE = File.join(PLUGIN_DIR, 'core', 'app_lifecycle.rb')
+    BOOTSTRAP_MESSAGE = 'Noxun Engine sa nenačítal — chýba alebo je poškodený základný súbor pluginu ' \
+                        '(core/app_lifecycle.rb). Reštartuj SketchUp; ak to nepomôže, nainštaluj plugin znova.'
+
+    def self.bootstrap_lifecycle!
+      require LIFECYCLE_FILE
+      @lifecycle_ready = defined?(AppLifecycle) && AppLifecycle.const_defined?(:LOADED, false) &&
+                         AppLifecycle::LOADED == true
+      bootstrap_failed!('sentinel LOADED chyba — subor sa nevykonal cely') unless @lifecycle_ready
+      @lifecycle_ready
+    rescue StandardError, ScriptError => e
+      bootstrap_failed!("#{e.class}: #{e.message}")
+    end
+
+    def self.lifecycle_ready?
+      @lifecycle_ready == true
+    end
+
+    def self.bootstrap_failed!(detail)
+      @lifecycle_ready = false
+      log("CHYBA základného súboru core/app_lifecycle.rb: #{detail}")
+      unless @bootstrap_announced
+        @bootstrap_announced = true
+        ::UI.messagebox(BOOTSTRAP_MESSAGE) if defined?(::UI) && ::UI.respond_to?(:messagebox)
+      end
+      false
+    rescue StandardError
+      false
+    end
   end
 end
 
-# Vnutorne subory — Sketchup.require (funguje aj so sifrovanymi .rbe).
+# Vnutorne subory — `AppLifecycle.require_part` (H11a): Ruby `require` s absolutnou
+# cestou, chyba suboru sa zapise a nacitanie pokracuje (diagnostika celeho rozsahu);
+# init nizsie sa potom NESPUSTI a ukaze sa JEDNA hlaska. Plugin sa nesifruje (.rbe).
 # Poradie: pure moduly (shelves/fronts/zone_tree) pred construction; templates po builderi.
-Sketchup.require 'noxun_engine/core/units'
-Sketchup.require 'noxun_engine/core/doc_key' # 1d/R-02b: stabilna identita dokumentu (pred vsetkymi identity guardmi)
-Sketchup.require 'noxun_engine/core/ids'
-Sketchup.require 'noxun_engine/core/store'
-Sketchup.require 'noxun_engine/core/part_keys' # stabilna identita dielcov pre override a buduce vystupy
-Sketchup.require 'noxun_engine/core/build_plan' # zavazny kontrakt planu (validator, warnings, hardware)
-Sketchup.require 'noxun_engine/core/cabinet_types' # H12a: register typov skrinky (pred construction, scale_observer a cabinet_builder — pri nacitani z neho beru CORNER_TYPE, MIN_BY_TYPE, TYPES a dalsie aliasy)
-Sketchup.require 'noxun_engine/core/part_faces' # D-88: kontrakt hrana -> plocha kvadra (pred vsetkymi tvorcami deskriptorov)
-Sketchup.require 'noxun_engine/core/json_file_store' # cache + bezpecny atomicky zapis JSON katalogov
-Sketchup.require 'noxun_engine/core/dim_series'  # UI-B3 (N6): rozmerove rady panela (%APPDATA%, nastavenie pocitaca)
-Sketchup.require 'noxun_engine/core/materials'   # V0.3 materialovy katalog (pred abs_rules)
-Sketchup.require 'noxun_engine/core/materials_appearance' # MR-1A: kontrakt a publikacia spolocneho vzhladu
-Sketchup.require 'noxun_engine/core/materials_native_appearance' # MR-1B1: overeny nativny kontajner, bez zapojenia builderov
-Sketchup.require 'noxun_engine/core/materials_build_appearance' # MR-1B2: povodny vzhlad pri prestavbe a kopii
-Sketchup.require 'noxun_engine/core/appearance_mapping' # MR-3A: lokalne UV oboch stran a ABS
-Sketchup.require 'noxun_engine/core/materials_apply_appearance' # MR-3B: atomicky vzhlad fyzickych vyskytov
-Sketchup.require 'noxun_engine/core/updater'     # D-52a: jadro aktualizatora pluginu (po materials — pouziva with_catalog_lock)
-Sketchup.require 'noxun_engine/core/materials_catalog' # V0.5.1 split: CRUD/validacia/scan/patch/seed
-Sketchup.require 'noxun_engine/core/materials_decor'    # V0.5.1 split: D-41 dekor = kluc skupiny + batch
-Sketchup.require 'noxun_engine/core/materials_abs'      # V0.5.1 split: ABS podla dekoru (picker, remap)
-Sketchup.require 'noxun_engine/core/materials_project'  # V0.5.1 split: projektove defaulty + usage
-Sketchup.require 'noxun_engine/core/materials_migration' # 2A-2: dormantna migracia na SCHEMA 2 (standard 7.1)
-Sketchup.require 'noxun_engine/core/materials_health'   # 2A-4a: stav katalogu (read-only rezim), obnova z .bak, rollback
-Sketchup.require 'noxun_engine/core/demos/client'        # V0.6-B: async siet (allowlist, robots, throttle)
-Sketchup.require 'noxun_engine/core/demos/sitemap_cache' # V0.6-B: cache produktovych URL (48k, refresh na pokyn)
-Sketchup.require 'noxun_engine/core/demos/slug_matcher'  # V0.6-B: identita zaznamu -> produktova URL
-Sketchup.require 'noxun_engine/core/demos/product_parser' # V0.6-B: HTML -> kod/ceny/parametre/rodina
-Sketchup.require 'noxun_engine/core/demos/lookup'        # V0.6 B-2a: orchestrator lookupu (po materials — pouziva duplak?/identity_norm)
-Sketchup.require 'noxun_engine/core/demos/name_search'   # V0.6 M-A: offline nazvove hladanie v sitemap cache
-Sketchup.require 'noxun_engine/core/demos/image_cache'   # V0.6 M-A: lokalna cache obrazkov dekorov (BLOCKER 1 — ziadne remote img v CEF)
-Sketchup.require 'noxun_engine/core/demos/family'        # V0.6 M-A: rodina dekoru zo stranky + orchestrator zalozenia
-Sketchup.require 'noxun_engine/core/materials_demos_create' # V0.6 M-A: atomicke zalozenie skupiny z Demosu (1 lock, 1 zapis)
-Sketchup.require 'noxun_engine/core/materials_replace_uni'  # V0.6 M-B2: „Nahradit UNI…" (scan+klasifikacia+odtlacok planu)
-Sketchup.require 'noxun_engine/core/abs_rules'   # V0.3 ABS pravidla (pouziva Materials)
-Sketchup.require 'noxun_engine/core/front_profiles' # D-90 uchytkove profily ciel (pred fronts/hardware_rules)
-Sketchup.require 'noxun_engine/core/hardware_rules' # V0.4 pravidla kovania (pred construction)
-Sketchup.require 'noxun_engine/core/hardware_catalog' # V0.6 C-1: katalog kovania (po materials/demos — pouziva slug, normalize_price, Demos.fetch)
-Sketchup.require 'noxun_engine/core/appliance_catalog' # S1-A1: katalog spotrebicov (po hardware_catalog — per-PC JSON vedla neho, pouziva Materials.dir a JsonFileStore)
-Sketchup.require 'noxun_engine/core/hardware_taxonomy' # KOV-B1: vyrobcovia a rady kovania (po hardware_catalog, pred hardware_sets — obe ju pouzivaju)
-Sketchup.require 'noxun_engine/core/hardware_sets' # V0.6 D1: sety kovania (po build_plan/hardware_catalog — GENERIC_TYPES, CATEGORIES; pred validation/ui)
-Sketchup.require 'noxun_engine/core/drawer_recipes' # KOV-C1: nemenne recepty zasuviek (ciste jadro, data pack v data/recipes)
-Sketchup.require 'noxun_engine/modules/shelves'
-Sketchup.require 'noxun_engine/modules/fronts'
-Sketchup.require 'noxun_engine/core/zone_tree'
-Sketchup.require 'noxun_engine/core/zones'
-Sketchup.require 'noxun_engine/core/construction'
-Sketchup.require 'noxun_engine/core/scale_observer'
-Sketchup.require 'noxun_engine/core/placement'      # V0.4.7b umiestnovanie (top-level cabinet+board)
-Sketchup.require 'noxun_engine/core/cabinet_builder'
-Sketchup.require 'noxun_engine/core/board_builder' # V0.4.7 samostatna doska
-Sketchup.require 'noxun_engine/core/ghost_tool'    # V1-04 GHOST vkladanie na klik (po cabinet_builder — pouziva sev R-03)
-Sketchup.require 'noxun_engine/core/tags'          # D-27 viditelnost tagov modelu (po builderoch — cita ich konstanty mien)
-Sketchup.require 'noxun_engine/core/templates'
-Sketchup.require 'noxun_engine/core/template_previews' # UI-D2: PNG nahlady sablon (subor vedla templates.json)
-Sketchup.require 'noxun_engine/core/appliance_checks' # S1-F: verdikt niky a delenia ciel (po construction+fronts — cita interior_dims, front_opening a GAP_DEFAULT; pred bom/validation/panel)
-Sketchup.require 'noxun_engine/core/bom'           # V0.5 A kusovnik/supisy zo snapshotov
-Sketchup.require 'noxun_engine/core/usage_stats'   # D-25 merac pouzivania panela (lokalne pocitadla)
-Sketchup.require 'noxun_engine/core/vepo_export'   # V0.5 C VEPO CSV export (prirezy z BOM)
-Sketchup.require 'noxun_engine/core/sheet_estimate' # D-19 orientacny odhad platni
-Sketchup.require 'noxun_engine/core/debug'         # read-only diagnostika stavu (bugcatch cez MCP)
-Sketchup.require 'noxun_engine/core/validation'    # V0.5 D kontrolny semafor vyroby (RED/ORANGE)
-Sketchup.require 'noxun_engine/core/sheet_layout'  # NP-1 narezovy plan — jadro vypoctu (po vepo_export/sheet_estimate/validation, pred budget)
-Sketchup.require 'noxun_engine/core/edge_check'     # D-104 kontrola hran (po validation — zdiela jeho definicie UNI/nelepitelnych)
-Sketchup.require 'noxun_engine/core/hover_edge'     # D-89a hrana pod kurzorom (pred edge_overlay — ten definuje jej Overlay triedu)
-Sketchup.require 'noxun_engine/core/grain_check'    # K2/D-87 smer kresby (po edge_check — zdiela jeho prechod modelom; pred edge_overlay)
-Sketchup.require 'noxun_engine/core/direction_check' # KOV-A2b smer otvarania (po grain_check — zdiela jeho vzory; pred edge_overlay)
-Sketchup.require 'noxun_engine/core/edge_overlay'   # D-104 Sketchup::Overlay + ModelObserver (SU 2023+, guardovane) + D-89a HoverEdgeOverlay + K2 GrainOverlay + KOV-A2b DirectionOverlay
-Sketchup.require 'noxun_engine/core/supplier_settings' # V0.6 E-a: sadzby/rezimy/standardne riadky rozpoctu (globál)
-Sketchup.require 'noxun_engine/core/export_settings' # H7a: nastavenia exportu (nazov zakazky, 18 + 36, posledny priecinok; po materials/doc_key, pred ui/production_core)
-Sketchup.require 'noxun_engine/core/budget_store'  # V0.6 E-a: data rozpoctu v zakazke (po store + supplier_settings)
-Sketchup.require 'noxun_engine/core/appliance_binding' # S1-B1: vazba spotrebica na zakazku (po budget_store + cabinet_builder/board_builder + appliance_catalog)
-Sketchup.require 'noxun_engine/core/budget'        # V0.6 E-a: vypocet rozpoctu (po bom/sheet_estimate/budget_store + appliance_binding — ponuka vlastnikov)
-Sketchup.require 'noxun_engine/core/xlsx_writer'   # V0.6 E-b: pravy .xlsx bez gemov + Luciin harok rozpoctu
-Sketchup.require 'noxun_engine/core/cp_export'     # V0.6 E-b2: cenova ponuka (view nad rozpoctom) + zakaznicky xlsx
-Sketchup.require 'noxun_engine/core/price_refresh' # V0.6 E-c: hromadne obnovenie cien z Demosu (po demos/lookup + hardware_catalog)
-# ŠT-1c PR B3: `ui/production_dialog.rb` (okno Vyroba) ZANIKOL — cely jeho
-# obsah zije v okne Studio. Zdielane ciste jadro `production_core` ostava:
-# je to autorita exportov, mutacii rozpoctu, prepinacov a textov (Studio aj
-# rail Inspectora ho citaju). Nacita sa PRED oknom Studio, ktore ho vola.
-Sketchup.require 'noxun_engine/ui/production_core'   # ST-1a: zdielane ciste jadro vystupov — PRED oknom Studio
-Sketchup.require 'noxun_engine/ui/studio_dialog'     # ST-1a okno Studio (skelet + Kusovnik)
-Sketchup.require 'noxun_engine/ui/panel'
-Sketchup.require 'noxun_engine/ui/rules_dialog'     # V0.4 editor pravidiel kovania
-Sketchup.require 'noxun_engine/ui/materials_dialog' # V0.4.5 D2 projektove predvolby materialov
-Sketchup.require 'noxun_engine/ui/materials_appearance_dialog' # MR-2B session spolocneho vzhladu
-Sketchup.require 'noxun_engine/ui/hardware_catalog_dialog' # V0.6 C-2: okno Katalog kovania
-Sketchup.require 'noxun_engine/ui/appliance_dialog' # S1-A2: serverova autorita sekcie SPOTREBICE (bez okna)
-Sketchup.require 'noxun_engine/ui/supplier_settings_dialog' # ŠT-4a: serverova autorita sekcii Nastavenia (okno zaniklo)
-Sketchup.require 'noxun_engine/ui/templates_dialog' # V0.4.5 D2 sprava sablon
-# NASTROJE-1: nastroje Mower + Snaper v balíku enginu. Ciste jadra prve (headless
-# sada nacitava LEN ich), potom spolocna vrstva s registratorom a az nakoniec
-# moduly nastrojov — `tools.rb` sam pri nacitani nic neregistruje (legacy Mower
-# staval toolbar pri kazdom `load`), registraciu spusta init blok nizsie.
-Sketchup.require 'noxun_engine/tools/mower_calc'  # ciste jadro: posun, nazov kopie, vyber cesty
-Sketchup.require 'noxun_engine/tools/snap_calc'   # ciste jadro: AABB sweep a verdikty prisunutia
-Sketchup.require 'noxun_engine/tools/legacy_cleanup' # T1b: ciste jadro boot migracie starych instalacii (po core/updater — pouziva normalize_path)
-Sketchup.require 'noxun_engine/tools/tools'       # spolocna vrstva + JEDINY registrator toolbaru/menu
-Sketchup.require 'noxun_engine/tools/mower'       # rotacie, Z, kopia (po cabinet_builder — pouziva sev vkladu)
-Sketchup.require 'noxun_engine/tools/snaper'      # prisunutie na doraz (po tags — cita folder_hidden?)
+module Noxun
+  module Engine
+    if bootstrap_lifecycle!
+      AppLifecycle.require_part 'noxun_engine/core/units'
+      AppLifecycle.require_part 'noxun_engine/core/doc_key' # 1d/R-02b: stabilna identita dokumentu (pred vsetkymi identity guardmi)
+      AppLifecycle.require_part 'noxun_engine/core/ids'
+      AppLifecycle.require_part 'noxun_engine/core/store'
+      AppLifecycle.require_part 'noxun_engine/core/part_keys' # stabilna identita dielcov pre override a buduce vystupy
+      AppLifecycle.require_part 'noxun_engine/core/build_plan' # zavazny kontrakt planu (validator, warnings, hardware)
+      AppLifecycle.require_part 'noxun_engine/core/cabinet_types' # H12a: register typov skrinky (pred construction, scale_observer a cabinet_builder — pri nacitani z neho beru CORNER_TYPE, MIN_BY_TYPE, TYPES a dalsie aliasy)
+      AppLifecycle.require_part 'noxun_engine/core/part_faces' # D-88: kontrakt hrana -> plocha kvadra (pred vsetkymi tvorcami deskriptorov)
+      AppLifecycle.require_part 'noxun_engine/core/json_file_store' # cache + bezpecny atomicky zapis JSON katalogov
+      AppLifecycle.require_part 'noxun_engine/core/dim_series'  # UI-B3 (N6): rozmerove rady panela (%APPDATA%, nastavenie pocitaca)
+      AppLifecycle.require_part 'noxun_engine/core/materials'   # V0.3 materialovy katalog (pred abs_rules)
+      AppLifecycle.require_part 'noxun_engine/core/materials_appearance' # MR-1A: kontrakt a publikacia spolocneho vzhladu
+      AppLifecycle.require_part 'noxun_engine/core/materials_native_appearance' # MR-1B1: overeny nativny kontajner, bez zapojenia builderov
+      AppLifecycle.require_part 'noxun_engine/core/materials_build_appearance' # MR-1B2: povodny vzhlad pri prestavbe a kopii
+      AppLifecycle.require_part 'noxun_engine/core/appearance_mapping' # MR-3A: lokalne UV oboch stran a ABS
+      AppLifecycle.require_part 'noxun_engine/core/materials_apply_appearance' # MR-3B: atomicky vzhlad fyzickych vyskytov
+      AppLifecycle.require_part 'noxun_engine/core/updater'     # D-52a: jadro aktualizatora pluginu (po materials — pouziva with_catalog_lock)
+      AppLifecycle.require_part 'noxun_engine/core/materials_catalog' # V0.5.1 split: CRUD/validacia/scan/patch/seed
+      AppLifecycle.require_part 'noxun_engine/core/materials_decor'    # V0.5.1 split: D-41 dekor = kluc skupiny + batch
+      AppLifecycle.require_part 'noxun_engine/core/materials_abs'      # V0.5.1 split: ABS podla dekoru (picker, remap)
+      AppLifecycle.require_part 'noxun_engine/core/materials_project'  # V0.5.1 split: projektove defaulty + usage
+      AppLifecycle.require_part 'noxun_engine/core/materials_migration' # 2A-2: dormantna migracia na SCHEMA 2 (standard 7.1)
+      AppLifecycle.require_part 'noxun_engine/core/materials_health'   # 2A-4a: stav katalogu (read-only rezim), obnova z .bak, rollback
+      AppLifecycle.require_part 'noxun_engine/core/demos/client'        # V0.6-B: async siet (allowlist, robots, throttle)
+      AppLifecycle.require_part 'noxun_engine/core/demos/sitemap_cache' # V0.6-B: cache produktovych URL (48k, refresh na pokyn)
+      AppLifecycle.require_part 'noxun_engine/core/demos/slug_matcher'  # V0.6-B: identita zaznamu -> produktova URL
+      AppLifecycle.require_part 'noxun_engine/core/demos/product_parser' # V0.6-B: HTML -> kod/ceny/parametre/rodina
+      AppLifecycle.require_part 'noxun_engine/core/demos/lookup'        # V0.6 B-2a: orchestrator lookupu (po materials — pouziva duplak?/identity_norm)
+      AppLifecycle.require_part 'noxun_engine/core/demos/name_search'   # V0.6 M-A: offline nazvove hladanie v sitemap cache
+      AppLifecycle.require_part 'noxun_engine/core/demos/image_cache'   # V0.6 M-A: lokalna cache obrazkov dekorov (BLOCKER 1 — ziadne remote img v CEF)
+      AppLifecycle.require_part 'noxun_engine/core/demos/family'        # V0.6 M-A: rodina dekoru zo stranky + orchestrator zalozenia
+      AppLifecycle.require_part 'noxun_engine/core/materials_demos_create' # V0.6 M-A: atomicke zalozenie skupiny z Demosu (1 lock, 1 zapis)
+      AppLifecycle.require_part 'noxun_engine/core/materials_replace_uni'  # V0.6 M-B2: „Nahradit UNI…" (scan+klasifikacia+odtlacok planu)
+      AppLifecycle.require_part 'noxun_engine/core/abs_rules'   # V0.3 ABS pravidla (pouziva Materials)
+      AppLifecycle.require_part 'noxun_engine/core/front_profiles' # D-90 uchytkove profily ciel (pred fronts/hardware_rules)
+      AppLifecycle.require_part 'noxun_engine/core/hardware_rules' # V0.4 pravidla kovania (pred construction)
+      AppLifecycle.require_part 'noxun_engine/core/hardware_catalog' # V0.6 C-1: katalog kovania (po materials/demos — pouziva slug, normalize_price, Demos.fetch)
+      AppLifecycle.require_part 'noxun_engine/core/appliance_catalog' # S1-A1: katalog spotrebicov (po hardware_catalog — per-PC JSON vedla neho, pouziva Materials.dir a JsonFileStore)
+      AppLifecycle.require_part 'noxun_engine/core/hardware_taxonomy' # KOV-B1: vyrobcovia a rady kovania (po hardware_catalog, pred hardware_sets — obe ju pouzivaju)
+      AppLifecycle.require_part 'noxun_engine/core/hardware_sets' # V0.6 D1: sety kovania (po build_plan/hardware_catalog — GENERIC_TYPES, CATEGORIES; pred validation/ui)
+      AppLifecycle.require_part 'noxun_engine/core/drawer_recipes' # KOV-C1: nemenne recepty zasuviek (ciste jadro, data pack v data/recipes)
+      AppLifecycle.require_part 'noxun_engine/modules/shelves'
+      AppLifecycle.require_part 'noxun_engine/modules/fronts'
+      AppLifecycle.require_part 'noxun_engine/core/zone_tree'
+      AppLifecycle.require_part 'noxun_engine/core/zones'
+      AppLifecycle.require_part 'noxun_engine/core/construction'
+      AppLifecycle.require_part 'noxun_engine/core/scale_observer'
+      AppLifecycle.require_part 'noxun_engine/core/placement'      # V0.4.7b umiestnovanie (top-level cabinet+board)
+      AppLifecycle.require_part 'noxun_engine/core/cabinet_builder'
+      AppLifecycle.require_part 'noxun_engine/core/board_builder' # V0.4.7 samostatna doska
+      AppLifecycle.require_part 'noxun_engine/core/ghost_tool'    # V1-04 GHOST vkladanie na klik (po cabinet_builder — pouziva sev R-03)
+      AppLifecycle.require_part 'noxun_engine/core/tags'          # D-27 viditelnost tagov modelu (po builderoch — cita ich konstanty mien)
+      AppLifecycle.require_part 'noxun_engine/core/templates'
+      AppLifecycle.require_part 'noxun_engine/core/template_previews' # UI-D2: PNG nahlady sablon (subor vedla templates.json)
+      AppLifecycle.require_part 'noxun_engine/core/appliance_checks' # S1-F: verdikt niky a delenia ciel (po construction+fronts — cita interior_dims, front_opening a GAP_DEFAULT; pred bom/validation/panel)
+      AppLifecycle.require_part 'noxun_engine/core/bom'           # V0.5 A kusovnik/supisy zo snapshotov
+      AppLifecycle.require_part 'noxun_engine/core/usage_stats'   # D-25 merac pouzivania panela (lokalne pocitadla)
+      AppLifecycle.require_part 'noxun_engine/core/vepo_export'   # V0.5 C VEPO CSV export (prirezy z BOM)
+      AppLifecycle.require_part 'noxun_engine/core/sheet_estimate' # D-19 orientacny odhad platni
+      AppLifecycle.require_part 'noxun_engine/core/debug'         # read-only diagnostika stavu (bugcatch cez MCP)
+      AppLifecycle.require_part 'noxun_engine/core/validation'    # V0.5 D kontrolny semafor vyroby (RED/ORANGE)
+      AppLifecycle.require_part 'noxun_engine/core/sheet_layout'  # NP-1 narezovy plan — jadro vypoctu (po vepo_export/sheet_estimate/validation, pred budget)
+      AppLifecycle.require_part 'noxun_engine/core/edge_check'     # D-104 kontrola hran (po validation — zdiela jeho definicie UNI/nelepitelnych)
+      AppLifecycle.require_part 'noxun_engine/core/hover_edge'     # D-89a hrana pod kurzorom (pred edge_overlay — ten definuje jej Overlay triedu)
+      AppLifecycle.require_part 'noxun_engine/core/grain_check'    # K2/D-87 smer kresby (po edge_check — zdiela jeho prechod modelom; pred edge_overlay)
+      AppLifecycle.require_part 'noxun_engine/core/direction_check' # KOV-A2b smer otvarania (po grain_check — zdiela jeho vzory; pred edge_overlay)
+      AppLifecycle.require_part 'noxun_engine/core/edge_overlay'   # D-104 Sketchup::Overlay + ModelObserver (SU 2023+, guardovane) + D-89a HoverEdgeOverlay + K2 GrainOverlay + KOV-A2b DirectionOverlay
+      AppLifecycle.require_part 'noxun_engine/core/supplier_settings' # V0.6 E-a: sadzby/rezimy/standardne riadky rozpoctu (globál)
+      AppLifecycle.require_part 'noxun_engine/core/export_settings' # H7a: nastavenia exportu (nazov zakazky, 18 + 36, posledny priecinok; po materials/doc_key, pred ui/production_core)
+      AppLifecycle.require_part 'noxun_engine/core/budget_store'  # V0.6 E-a: data rozpoctu v zakazke (po store + supplier_settings)
+      AppLifecycle.require_part 'noxun_engine/core/appliance_binding' # S1-B1: vazba spotrebica na zakazku (po budget_store + cabinet_builder/board_builder + appliance_catalog)
+      AppLifecycle.require_part 'noxun_engine/core/budget'        # V0.6 E-a: vypocet rozpoctu (po bom/sheet_estimate/budget_store + appliance_binding — ponuka vlastnikov)
+      AppLifecycle.require_part 'noxun_engine/core/xlsx_writer'   # V0.6 E-b: pravy .xlsx bez gemov + Luciin harok rozpoctu
+      AppLifecycle.require_part 'noxun_engine/core/cp_export'     # V0.6 E-b2: cenova ponuka (view nad rozpoctom) + zakaznicky xlsx
+      AppLifecycle.require_part 'noxun_engine/core/price_refresh' # V0.6 E-c: hromadne obnovenie cien z Demosu (po demos/lookup + hardware_catalog)
+      # ŠT-1c PR B3: `ui/production_dialog.rb` (okno Vyroba) ZANIKOL — cely jeho
+      # obsah zije v okne Studio. Zdielane ciste jadro `production_core` ostava:
+      # je to autorita exportov, mutacii rozpoctu, prepinacov a textov (Studio aj
+      # rail Inspectora ho citaju). Nacita sa PRED oknom Studio, ktore ho vola.
+      AppLifecycle.require_part 'noxun_engine/ui/production_core'   # ST-1a: zdielane ciste jadro vystupov — PRED oknom Studio
+      AppLifecycle.require_part 'noxun_engine/ui/studio_dialog'     # ST-1a okno Studio (skelet + Kusovnik)
+      AppLifecycle.require_part 'noxun_engine/ui/panel'
+      AppLifecycle.require_part 'noxun_engine/ui/rules_dialog'     # V0.4 editor pravidiel kovania
+      AppLifecycle.require_part 'noxun_engine/ui/materials_dialog' # V0.4.5 D2 projektove predvolby materialov
+      AppLifecycle.require_part 'noxun_engine/ui/materials_appearance_dialog' # MR-2B session spolocneho vzhladu
+      AppLifecycle.require_part 'noxun_engine/ui/hardware_catalog_dialog' # V0.6 C-2: okno Katalog kovania
+      AppLifecycle.require_part 'noxun_engine/ui/appliance_dialog' # S1-A2: serverova autorita sekcie SPOTREBICE (bez okna)
+      AppLifecycle.require_part 'noxun_engine/ui/supplier_settings_dialog' # ŠT-4a: serverova autorita sekcii Nastavenia (okno zaniklo)
+      AppLifecycle.require_part 'noxun_engine/ui/templates_dialog' # V0.4.5 D2 sprava sablon
+      # NASTROJE-1: nastroje Mower + Snaper v balíku enginu. Ciste jadra prve (headless
+      # sada nacitava LEN ich), potom spolocna vrstva s registratorom a az nakoniec
+      # moduly nastrojov — `tools.rb` sam pri nacitani nic neregistruje (legacy Mower
+      # staval toolbar pri kazdom `load`), registraciu spusta init blok nizsie.
+      AppLifecycle.require_part 'noxun_engine/tools/mower_calc'  # ciste jadro: posun, nazov kopie, vyber cesty
+      AppLifecycle.require_part 'noxun_engine/tools/snap_calc'   # ciste jadro: AABB sweep a verdikty prisunutia
+      AppLifecycle.require_part 'noxun_engine/tools/legacy_cleanup' # T1b: ciste jadro boot migracie starych instalacii (po core/updater — pouziva normalize_path)
+      AppLifecycle.require_part 'noxun_engine/tools/tools'       # spolocna vrstva + JEDINY registrator toolbaru/menu
+      AppLifecycle.require_part 'noxun_engine/tools/mower'       # rotacie, Z, kopia (po cabinet_builder — pouziva sev vkladu)
+      AppLifecycle.require_part 'noxun_engine/tools/snaper'      # prisunutie na doraz (po tags — cita folder_hidden?)
+    end
+  end
+end
 
 module Noxun
   module Engine
-    unless file_loaded?(__FILE__)
+    # H11a: init (migracie, menu, toolbar, observery) bezi LEN nad CELYM pluginom
+    # — inak JEDNA hlaska a plugin ostava v tomto okne SketchUpu vypnuty (obnova
+    # = restart SketchUpu; rucny reload sa nepodporuje). Rozhodnutie plati na
+    # cely proces (memo) — opakovane nacitanie `main.rb` ho nezmeni.
+    def self.init_allowed?
+      return false unless lifecycle_ready?
+      return @init_allowed unless @init_allowed.nil?
+
+      @init_allowed = !AppLifecycle.failed?
+      AppLifecycle.announce_failures! unless @init_allowed
+      @init_allowed
+    end
+
+    if !file_loaded?(__FILE__) && init_allowed?
       # 2A-4b (audit O4 + F11): jednorazovy boot cutover katalogu materialov na
       # SCHEMA 2 — VLASTNY chraneny blok MIMO hlavneho begin/rescue inicializacie
       # (zlyhanie migracie NESMIE zhodit menu/toolbar/observer). Ziadny

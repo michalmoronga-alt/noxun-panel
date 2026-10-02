@@ -355,17 +355,22 @@ module Noxun
 end
 
 # Casti panela - reopenuju module Panel (poradie nie je vyznamove; handlery sa volaju az runtime).
-Sketchup.require 'noxun_engine/ui/panel/actions_cabinet'
-Sketchup.require 'noxun_engine/ui/panel/actions_zones'
-Sketchup.require 'noxun_engine/ui/panel/actions_templates'
-Sketchup.require 'noxun_engine/ui/panel/actions_materials'
-Sketchup.require 'noxun_engine/ui/panel/actions_parts'
-Sketchup.require 'noxun_engine/ui/panel/actions_hardware'
-Sketchup.require 'noxun_engine/ui/panel/actions_board' # V0.4.7c samostatna doska
-Sketchup.require 'noxun_engine/ui/panel/actions_appliance' # S1-B2 riadok „Spotrebic"
-Sketchup.require 'noxun_engine/ui/panel/actions_usage' # D-25 merac pouzivania panela
-Sketchup.require 'noxun_engine/ui/panel/actions_settings' # UI-B3 koliesko: tema UI + rozmerove rady
-Sketchup.require 'noxun_engine/ui/panel/sync'
-Sketchup.require 'noxun_engine/ui/panel/resolvers'
-Sketchup.require 'noxun_engine/ui/panel/payloads'
-Sketchup.require 'noxun_engine/ui/panel/selection'
+# H11a: `AppLifecycle.require_part` — chyba casti sa zapise a plugin sa v init nespusti (main.rb).
+module Noxun
+  module Engine
+    AppLifecycle.require_part 'noxun_engine/ui/panel/actions_cabinet'
+    AppLifecycle.require_part 'noxun_engine/ui/panel/actions_zones'
+    AppLifecycle.require_part 'noxun_engine/ui/panel/actions_templates'
+    AppLifecycle.require_part 'noxun_engine/ui/panel/actions_materials'
+    AppLifecycle.require_part 'noxun_engine/ui/panel/actions_parts'
+    AppLifecycle.require_part 'noxun_engine/ui/panel/actions_hardware'
+    AppLifecycle.require_part 'noxun_engine/ui/panel/actions_board' # V0.4.7c samostatna doska
+    AppLifecycle.require_part 'noxun_engine/ui/panel/actions_appliance' # S1-B2 riadok „Spotrebic"
+    AppLifecycle.require_part 'noxun_engine/ui/panel/actions_usage' # D-25 merac pouzivania panela
+    AppLifecycle.require_part 'noxun_engine/ui/panel/actions_settings' # UI-B3 koliesko: tema UI + rozmerove rady
+    AppLifecycle.require_part 'noxun_engine/ui/panel/sync'
+    AppLifecycle.require_part 'noxun_engine/ui/panel/resolvers'
+    AppLifecycle.require_part 'noxun_engine/ui/panel/payloads'
+    AppLifecycle.require_part 'noxun_engine/ui/panel/selection'
+  end
+end

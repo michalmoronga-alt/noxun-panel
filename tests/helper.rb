@@ -119,6 +119,7 @@ end
 # V SketchUpe su uz nacitane pluginom — nenacitavame druhykrat.
 unless NxTest::IN_SKETCHUP
   %w[
+    core/app_lifecycle
     core/units
     core/doc_key
     core/part_keys
