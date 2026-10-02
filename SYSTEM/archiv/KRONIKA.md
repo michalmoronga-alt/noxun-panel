@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H15a · seed dáta setov kovania v samostatnom súbore (2.10.2026, PR #?, v0.17.23, blok 9 · HARDENING PO V1, triedenie C-03 = CX-03 · GR-07; package
+- **H15a · seed dáta setov kovania v samostatnom súbore (2.10.2026, PR #459, v0.17.23, blok 9 · HARDENING PO V1, triedenie C-03 = CX-03 · GR-07; package
   [PACKAGE_H15.md](../zdroje/bloky/HARDENING/PACKAGE_H15.md) — **§15 má prednosť** (A1 golden nákupu s explicitnými materiálmi), surový audit
   [AUDIT_H15_raw.md](../zdroje/bloky/HARDENING/AUDIT_H15_raw.md), brief [BRIEF_H15.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H15.md)).** Audit-povinná (nový modul)
   + výrobná/cenová (presúva sa zdroj nákupných kódov), predrecenzia povinná. **1. commit = golden T0 pre všetky tri moduly** (`tests/pure/test_h15_seed_golden.rb`,

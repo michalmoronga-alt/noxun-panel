@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.17.23 · 2.10.2026 — blok 9 HARDENING; dávka H15a hotová** (PR #?): **predvolené sety kovania sú v samostatnom dátovom súbore** (`core/hardware_sets_seed.rb`,
+**v0.17.23 · 2.10.2026 — blok 9 HARDENING; dávka H15a hotová** (PR #459): **predvolené sety kovania sú v samostatnom dátovom súbore** (`core/hardware_sets_seed.rb`,
 len hodnoty) — nový alebo opravený predvolený set = jeden súbor + verzia seedu; **pre používateľa sa nemení nič** (knižnica setov, nákup, rozpočet kovania aj ponuka
 Pravidiel bajtovo rovnaké — stráži golden). Katalóg a výrobcovia nasledujú v **H15b**. Pod tým **H11a** (v0.17.22, PR #458): chyba súboru pluginu = jedna hláška
 a plugin sa v okne vypne; pád #1117 na 2026.2 rieši **H11c** · **H7b** (v0.17.21, PR #457): názov zákazky v hlavičke Štúdia · **H7a** (v0.17.20, PR #456) · **H3–H6c, H8–H14b** (v0.17.1–v0.17.19, PR #435–#455): texty, nápovedy, kóty náhľadu, čísla v Štúdiu, poškodené súbory a dve okná bez straty dát, SketchUp 2026+, sekcie Štúdia na jednom mieste — **čísla a exporty bez zmeny**.
@@ -27,13 +27,13 @@ ani nevyexportuje** (rohovú skrinku by sklopil na dolnú). **Rozpočet:** po pr
 **Ochranu pred poškodeným súborom nastavení (H9) má len 0.17.7+, nastavení exportu (H7a) 0.17.20+, ochranu dvoch okien 0.17.8+ (pravidlá) a 0.17.9+ (rady) — aktualizovať obe PC a potom zavrieť všetky okná SketchUpu** (staré okno zapisuje bez ochrany).
 **Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
 
-**Testy (H15a, PR #?):** **5284 headless · 161 JS sád** zelené + encoding guard; in-SU **3387 / 0** na `0dc79fee`; mutácie M1–M17 + A1 zhodené.
+**Testy (H15a, PR #459):** **5284 headless · 161 JS sád** zelené + encoding guard; in-SU **3387 / 0** na `0dc79fee`; mutácie M1–M17 + A1 zhodené.
 
 ## Robí sa
 
 **Blok 9 · HARDENING PO V1** (štart 1.10.2026, PR #432): krížový audit V1 sedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**; 17 dávok **H1…H17** sekvenčne podľa tabuľky v [PLAN.md](PLAN.md), **bez zmeny výrobných a cenových čísel**; priečinok bloku [zdroje/bloky/HARDENING/](zdroje/bloky/HARDENING/).
 Hotové **H1–H5** (PR #433–#440), **H6a–H6c** (PR #453–#455), **H7a/H7b** (nastavenia exportu + R-38, názov zákazky v hlavičke — PR #456, #457), **H8–H10b** (R-13, R-37, R-35 — PR #441–#444), **H11b** (PR #445),
-**H12a–d** (PR #446–#448, #452), **H13** (PR #449), **H14a/H14b** (PR #450, #451); **H11a** (PR #458, len načítanie; ukončovanie vrátené — poradie B na 26.0), **H15a** (PR #?, seed setov), **H11c** = Z1 + audit, čaká, kým Michal nainštaluje 2026.2 na oboch PC; nová **H18** (závesy, 3A).
+**H12a–d** (PR #446–#448, #452), **H13** (PR #449), **H14a/H14b** (PR #450, #451); **H11a** (PR #458, len načítanie; ukončovanie vrátené — poradie B na 26.0), **H15a** (PR #459, seed setov), **H11c** = Z1 + audit, čaká, kým Michal nainštaluje 2026.2 na oboch PC; nová **H18** (závesy, 3A).
 **Otázky bez odpovede, platí návrh:** H12 Q1 (karta dielca ako Kusovník — zavedené v H12d) · H11 Q2 (starší SketchUp = nenačíta sa, jedna hláška) · H11 Q3 (kedy 2026.2) · H10b Q2 (rôzne rady sa zlúčia bez hlášky, ten istý rad = hláška) · H10a Q1 (cudzí globál = neuloží sa nič)
 · H9 Q1/Q2 (pri čítaní zo zálohy bez nálezu v Kontrole, bez tlačidla „Obnoviť zo zálohy") · H8 Q1/Q2 (veta o značke verzie, bez tlačidla) · H4b Q1/Q2 (vrátenie katalógu v ponuke „⋯" Materiálov, ikona posuvníkov pre Nastavenia rozpočtu).
 **H7: R-38 áno** (✅ H7a) · H7 Q1 (hlásiť poškodenie aj mimo zápisu — „nie") · H7 Q2 („neuložené k súboru" v hlavičke — **potvrdené** 2.10., H7b) · **Q1** (porez a montáž pri skle) bez odpovede · pri prvej rohovej v dielni overiť záves Sensys · **na smoke čakajú** D-132 (#367), D-133 (#368), D-134 (#369).
