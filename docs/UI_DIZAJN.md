@@ -486,7 +486,7 @@ sektoroch**. Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html
   skrýva, rozbalený drží ten istý údaj na očnom mieste. Text sa skladá **až pri
   kreslení** zo živého stavu panela (`NXShell.sectorMeta` nad obsahom, ktorý
   zbiera `nxMetaContent`); nikdy sa necachuje ako hotový reťazec a nikdy nelomí
-  riadok (ellipsis).
+  riadok (ellipsis); celý súhrn nesie `title` lišty.
 - **S2 a S3 patria kontextu Korpus** (+ Materiály pri vkladaní). V kontextoch
   **Zóny · Čelá · Kovanie** sa skrývajú a namiesto nich stojí v **lište Náhľadu
   odkaz s rozmermi skrinky** (`#s1Link`: `800 × 864 × 520 · sokel 100 →`, tá

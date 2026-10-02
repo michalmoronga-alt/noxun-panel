@@ -211,6 +211,18 @@ function PV_TITLE_OF(c){ return { zony: 'Zóny', cela: 'Čelá', kovanie: 'Kovan
      '2 vlastné', 'T4: Sety - compat: skrinka + ulozeny vyber pri cele, bez dvojitého rátania');
   eq(HW.hwSetsMetaText([E({ generic_type: 'slide', compat: { cab: null, owners: {} } })]), 'podľa projektu',
      'T4: Sety - compat bez vyberu');
+  // refreshHardwareManual (lahky push rucnych poloziek) obnovi meta skupiny AJ listu sektora.
+  {
+    const nodes = { hwItemsMeta: { textContent: '' }, hwSetsMeta: { textContent: '' } };
+    global.el = id => nodes[id] || null;
+    global.hwItems = [{ generic_type: 'leg', quantity: 4 }];
+    let applied = 0;
+    global.nxSectorMetaApply = () => { applied++; };
+    HW.refreshHardwareManual([{ id: 'a' }, { id: 'b' }]);
+    eq(nodes.hwItemsMeta.textContent, '4 ks · 2 ručne', 'T4: refreshHardwareManual - meta skupiny Polozky');
+    eq(applied, 1, 'T4 (P3): refreshHardwareManual obnovi aj listu sektora Kovanie');
+    delete global.nxSectorMetaApply; delete global.el; delete global.hwItems; delete global.hwManualView;
+  }
 }
 
 // ============ vm kontext pre DOM cesty (T5, T6) ================================
@@ -289,6 +301,8 @@ function load(ctx, file){
      '800 × 864 × 520 · sokel 100 — Materiál korpusu: K2738 MO — klik otvorí kontext Korpus',
      'T5 (P3-4): aria-label = viditelny text rozmerov + bublina (Label in Name)');
   eq(ids.s4Meta.textContent, '2 zóny · 3 police', 'T5: Zony - S4 suhrn (listy, police)');
+  eq(ids.s4Meta.getAttribute('title'), '2 zóny · 3 police', 'T5 (P3): lista nesie cely suhrn aj v `title`');
+  eq(ids.s2Meta.getAttribute('title'), '800 × 864 × 520 · sokel 100', 'T5 (P3): `title` aj na liste Zakladne');
   F.width = 900;
   ctx.nxSectorMetaApply();
   eq(ids.s1LinkTxt.textContent, '900 × 864 × 520 · sokel 100', 'T5: zmena sirky sa prejavi v odkaze hned');
@@ -311,6 +325,7 @@ function load(ctx, file){
   ctx.hwItems = null;
   ctx.nxSectorMetaApply();
   eq(ids.s4Meta.textContent, '', 'T5: Kovanie - nic neoznacene');
+  eq(ids.s4Meta.getAttribute('title'), null, 'T5 (P3): prazdny suhrn = ziadny `title`');
   // Cela: pocet + spolocne.
   sh.setCtx('cela');
   ctx.nxFrontCounts = () => ({ n: 2, unset: 1 });

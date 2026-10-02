@@ -706,7 +706,11 @@
     });
     [['s1Meta', m.s1], ['s2Meta', m.s2], ['s3Meta', m.s3], ['s4Meta', m.s4]].forEach(function(o){
       var n = el(o[0]);
-      if (n) n.textContent = o[1];
+      if (!n) return;
+      n.textContent = o[1];
+      // Dlhy suhrn orezava elipsa (napr. „· N ručne" na konci) — cely text nesie bublina.
+      if (o[1]) n.setAttribute('title', o[1]);
+      else if (n.removeAttribute) n.removeAttribute('title');
     });
     // Mimo Korpusu stoji v liste Nahladu odkaz s rozmermi MIESTO nazvu projekcie
     // (nazov uz hovori rail aj chip pod nahladom).
