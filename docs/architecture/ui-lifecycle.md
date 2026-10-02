@@ -513,8 +513,8 @@ kóty visia 18 px pod ním, aj pod presahom čela, D11). Kóty kreslia `pvDimH` 
 krátky vždy nad čiarou; popis čela `pvFrontLabel` v troch stupňoch („F1 · zásuvka 760" → „F1 · 760" → „F1", panel < 12 px popis nemá); čísla medzier Čiel
 `nxSpreadLabels` (rozostup ≥ 11 px, zhluk sa pri hornom okraji **scény** `pvSceneTop` — nie priblíženého výrezu — vráti nadol); popis zóny a číslo pásma chladničky sa nakreslia, len keď sa zmestia. **Rad susedných vodorovných kót**
 (stĺpce zón, dverová časť + CR 1 rohovej) kreslí `pvDimHRow`: popis, ktorý sa nezmestí do svojho úseku, sa nevnúti nad susedov — skúsi druhý pruh pod čiarou (len zóny) a keď je
-obsadený, vynechá sa (pri priblížení sa dokreslí); samostatná kóta (Š, H, doska) ostáva s textom vždy nad čiarou (`pvDimH`). **Doska:** obrys a šípky smeru dekoru majú hrúbku v px
-(`non-scaling-stroke`), hrot šípky je orezaný na rozstup šípok — obrys aj šípky sú celé vo `viewBox` aj pri doske 10 × 10 mm. **Prekreslenie:**
+obsadený, vynechá sa (pri priblížení sa dokreslí; vedomé obmedzenie pri extrémnych rozmeroch); aj popisy, čo sa zmestia, sa kontrolujú voči obsadenému miestu (úseky z rôznych radov zón sa prekrývajú); samostatná kóta (Š, H, doska) ostáva s textom vždy nad čiarou (`pvDimH`). **Doska:** obrys a šípky smeru dekoru majú hrúbku v px
+(`non-scaling-stroke`), hrot šípky je orezaný na rozstup šípok — obrys aj šípky sú celé vo `viewBox` aj pri doske 10 × 10 mm; text „bez smeru dekoru" sa pri doske užšej než text vynechá. **Prekreslenie:**
 Ctrl+koliesko po zmene `viewBox` volá `pvScheduleRender()` (najviac raz za snímku cez `requestAnimationFrame`, bez neho `setTimeout` 16; počas `dragState` nič),
 `ResizeObserver` na `#preview` volá `pvOnResize(w, h)` (prekreslí pri zmene ≥ 1 px a obe strany ≥ 50 px; bez `ResizeObserver` sa nič neregistruje); posun pohľadu (pan)
 mierku nemení, preto neprekresľuje. Testy `tests/js/test_h6c_koty.js` + golden `tests/fixtures/h6c_koty/`.

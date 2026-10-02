@@ -849,7 +849,9 @@
   // RAD susednych vodorovnych kot (stlpce zon, dverova cast + CR 1 rohovej): popis, ktory
   // sa NEZMESTI do svojho useku, sa nevnuti nad susedov — skusi druhy pruh POD ciarou
   // (`allowBelow`, len kde pod radom nie je dalsi rad) a ked je aj tam obsadeny, vynecha sa
-  // (pri priblizeni sa dokresli). Popisy, co sa zmestia, maju prednost. Ciste kreslenie do S.
+  // (pri priblizeni sa dokresli). Popisy, co sa zmestia do useku, maju prednost, ale aj tie sa
+  // kontroluju voci obsadenemu miestu (useky z roznych radov zon sa mozu prekryvat — jedna zona
+  // na celu sirku dole, tri stlpce hore). Ciste kreslenie do S.
   function pvDimHRow(S, rx, ry, spans, z, dyPx, allowBelow){
     var f = DIM_FONT_PX, y = ry(z) + pvU(dyPx), tk = pvU(DIM_TICK_PX);
     var items = spans.map(function(sp){
@@ -864,13 +866,8 @@
     function free(lane, r){
       return !placed[lane].some(function(q){ return r.a < q.b && r.b > q.a; });
     }
-    items.forEach(function(it){
-      if (!it.fit) return;
-      it.text = it.fit; placed[0].push(span(it, it.fit));
-    });
-    items.forEach(function(it){
-      if (it.fit) return;
-      var label = it.list[it.list.length - 1], r = span(it, label);
+    items.filter(function(it){ return it.fit; }).concat(items.filter(function(it){ return !it.fit; })).forEach(function(it){
+      var label = it.fit || it.list[it.list.length - 1], r = span(it, label);
       for (var lane = 0; lane <= (allowBelow ? 1 : 0); lane++){
         if (free(lane, r)){ it.text = label; it.lane = lane; placed[lane].push(r); break; }
       }
@@ -1805,7 +1802,10 @@
       S.push('<path d="' + d + '" stroke="' + PV_DIM + '" stroke-width="1.5" vector-effect="non-scaling-stroke"' +
              ' fill="none" pointer-events="none"/>');
     } else {
-      pvText(S, L / 2, ry(Wd / 2), 'bez smeru dekoru', DIM_FONT_PX, 'middle', null, 'dominant-baseline="middle"');
+      // text sa nezmesti do uzkej dosky (10 x 600 mm: ~98 px do 10 mm) - vtedy sa vynecha, nepreteka cez kotu sirky
+      if (pvFitLabel(L * pvS, ['bez smeru dekoru'], DIM_FONT_PX)){
+        pvText(S, L / 2, ry(Wd / 2), 'bez smeru dekoru', DIM_FONT_PX, 'middle', null, 'dominant-baseline="middle"');
+      }
     }
     // H6c: popisky maju stalych 11 px na obrazovke (kedysi pismo v mm odvodene od
     // vacsieho rozmeru dosky) — rovnako velke pri doske 300 aj 2600 mm.
@@ -1820,8 +1820,9 @@
     if (grain !== 'length' && grain !== 'width') return [];
     var horiz = (grain === 'length');
     var len = (horiz ? L : Wd) * 0.42;         // dlzka sipky
-    // ramienka hrotu: 6 mm .. 12 % dlzky, ale nikdy viac nez 90 % rozstupu sipiek a 45 % dlzky -
-    // inak by hrot na malej doske (10 mm) trcal za jej okraj (bezne dosky ostavaju bez zmeny)
+    // ramienka hrotu: 6 mm .. 12 % dlzky, ale nikdy viac nez 90 % rozstupu sipiek (stvrtina priecneho
+    // rozmeru) a 45 % dlzky - inak by hrot na malej doske (10 mm) trcal za jej okraj. Bezna doska
+    // 2600 x 600 ostava bez zmeny (131 mm); u uzkych dlhych dosiek sa hrot zmensi (2600 x 400: 131 -> 90 mm).
     var cross = horiz ? Wd : L;
     var head = Math.min(Math.max(6, len * 0.12), cross / 4 * 0.9, len * 0.45);
     var out = [];

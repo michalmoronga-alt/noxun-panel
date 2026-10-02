@@ -206,6 +206,10 @@ function checkCase(ctx, c, rect, label, opts){
       }
     }
   }));
+  // doska BEZ smeru dekoru: text sa nezmesti do uzkej dosky 10 x 600 (~98 px do 10 mm) -> vynecha sa; na 300 x 300 je
+  const nt = id => H.texts(H.renderCase(ctx, H.EXTRA_CASES.find(c => c.id === id), { w: 404, h: 323 })).some(t => t.text === 'bez smeru dekoru');
+  eq(nt('board_10x600_nograin'), false, 'T2c uzka doska bez smeru: „bez smeru dekoru" sa nevnuti cez kotu sirky');
+  eq(nt('board_300x300'), true, 'T2c doska 300 x 300 bez smeru: text je');
   // bezne dosky maju sipky ako doteraz (hrot 6 mm .. 12 % dlzky, nezmenene)
   const a = PV.nxGrainArrows(2600, 600, 'length')[0];
   near(a.x2 - a.hx1, Math.max(6, 2600 * 0.42 * 0.12), 1e-9, 'T2c hrot sipky bezneho dielu ostal');
@@ -320,6 +324,36 @@ function checkCase(ctx, c, rect, label, opts){
       pvView = { x: pvView.x, y: cy - pvView.h * k / 2, w: pvView.w * k, h: pvView.h * k }; pvUserView = true; })()`, ctx);
     check(H.renderCase(ctx, fr, r, { keepView: true }), 'T3d zoom ' + n + '×');
   });
+}
+
+// ---- T3e · rad vodorovnych kot (pvDimHRow): POZITIVNE - popisy sa nestratia, ak je kde (review PR #455) ----
+{
+  const ctx = H.makeCtx();
+  const r = { w: 404, h: 210 };
+  const lineOf = svg => parseFloat(/<path stroke-width="1" vector-effect="non-scaling-stroke" d="M[-\d.]+ ([-\d.]+)H/.exec(svg)[1]);
+  // zony 600 x 2100, 4 stlpce @404x210: vsetky styri popisy „128", dva v hornom pruhu a dva POD ciarou kot
+  const z4 = H.renderCase(ctx, H.EXTRA_CASES.find(c => c.id === 'zones_4_tall'), r);
+  const l4 = lineOf(z4);
+  const t128 = H.texts(z4).filter(t => t.text === '128');
+  eq(t128.length, 4, 'T3e zony 600x2100 @404x210: styri popisy „128" (ziadny sa nestratil)');
+  eq(t128.filter(t => parseFloat(t.attrs.y) < l4).length, 2, 'T3e dva popisy nad ciarou kot');
+  eq(t128.filter(t => parseFloat(t.attrs.y) > l4).length, 2, 'T3e a dva POD ciarou kot (druhy pruh)');
+  // vysoka rohova @404x210: uzky usek CR 1 „50" sa nezmesti a nema kam -> chyba; po priblizeni ×0,25 je spat
+  const ct = H.EXTRA_CASES.find(c => c.id === 'cab_corner_tall');
+  const c0 = H.texts(H.renderCase(ctx, ct, r)).map(t => t.text);
+  ok(c0.indexOf('250') >= 0 && c0.indexOf('50') < 0, 'T3e vysoka rohova @404x210: „250" je, „50" sa nezmesti a vynecha sa (nevnuti sa nad suseda)');
+  vm.runInContext(`(function(){ var k = 0.25, cx = pvView.x + pvView.w / 2, cy = pvView.y + pvView.h / 2;
+    pvView = { x: cx - pvView.w * k / 2, y: cy - pvView.h * k / 2, w: pvView.w * k, h: pvView.h * k }; pvUserView = true; })()`, ctx);
+  const c1 = H.texts(H.renderCase(ctx, ct, r, { keepView: true })).map(t => t.text);
+  ok(c1.indexOf('250') >= 0 && c1.indexOf('50') >= 0, 'T3e po priblizeni ×0,25 sa „50" vrati');
+  // useky z roznych radov zon: „564" (spodny rad) a stredne „176" (horny rad) maju ten isty stred - obe zostanu, jedna pod ciarou
+  const zo = H.renderCase(ctx, H.EXTRA_CASES.find(c => c.id === 'zones_overlap_rows'), { w: 404, h: 323 });
+  const lo = lineOf(zo);
+  const tz = H.texts(zo).filter(t => t.text === '564' || t.text === '176');
+  eq(tz.map(t => t.text).sort(), ['176', '176', '176', '564'], 'T3e prekryvajuce sa useky: vsetky styri popisy su');
+  const mid = tz.filter(t => Math.abs(parseFloat(t.attrs.x) - (14 + 300)) < 0.01);
+  eq(mid.length, 2, 'T3e a dva z nich (564 a stredne 176) maju rovnaky stred');
+  ok(mid.some(t => parseFloat(t.attrs.y) > lo) && mid.some(t => parseFloat(t.attrs.y) < lo), 'T3e jeden nad ciarou a jeden pod nou');
 }
 
 // ---- T3c · D11: dokreslene vrstvy su v obsahu sceny (predrecenzia P3) ----

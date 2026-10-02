@@ -120,12 +120,21 @@ const EXTRA_CASES = [
     zones: leafZones([{ w: 1, shelves: 4 }, { w: 1, shelves: 4 }, { w: 1, shelves: 4 }, { w: 1, shelves: 4 }], 600, 2100, 18, 100) },
   { id: 'zones_8_wide', mode: 'zones', type: 'lower', fields: { width: 800, height: 864, depth: 520 },
     zones: leafZones([1, 2, 3, 4, 5, 6, 7, 8].map(() => ({ w: 1 })), 800, 864, 18, 100) },
+  // spodny rad jedna zona na celu sirku (564), horny rad tri stlpce (176): stred „564" a stredneho „176" je na tom istom mieste
+  { id: 'zones_overlap_rows', mode: 'zones', type: 'lower', fields: { width: 600, height: 864, depth: 520 },
+    zones: [{ id: 'Z1', leaf: false, split: { axis: 'h', count: 2, sizes: [300, 400] }, x: 18, z: 118, w: 564, h: 728, shelves: 0 },
+            { id: 'Z1.1', leaf: true, x: 18, z: 118, w: 564, h: 300, shelves: 0 },
+            { id: 'Z1.2', leaf: false, split: { axis: 'v', count: 3, sizes: [176, 176, 176] }, x: 18, z: 436, w: 564, h: 410, shelves: 0 },
+            { id: 'Z1.2.1', leaf: true, x: 18, z: 436, w: 176, h: 410, shelves: 0 },
+            { id: 'Z1.2.2', leaf: true, x: 212, z: 436, w: 176, h: 410, shelves: 0 },
+            { id: 'Z1.2.3', leaf: true, x: 406, z: 436, w: 176, h: 410, shelves: 0 }] },
   { id: 'cab_corner_tall', mode: 'cab', type: 'corner_blind', fields: { width: 600, height: 2100, depth: 510 },
     cp: CP_TALL, opening: { x0: 0, w: 250, z0: 100, h: 2000 },
     items: [{ id: 'F1', type: 'door', mode: 'auto', z: 102, height: 1996, wings_n: 1, profile: 'none', direction: 'right' }] },
   { id: 'board_10x10', mode: 'insert', type: 'lower', board: true, fields: { ib_length: 10, ib_width: 10, ib_grain: 'length' } },
   { id: 'board_10x600', mode: 'insert', type: 'lower', board: true, fields: { ib_length: 10, ib_width: 600, ib_grain: 'width' } },
   { id: 'board_2600x10', mode: 'insert', type: 'lower', board: true, fields: { ib_length: 2600, ib_width: 10, ib_grain: 'length' } },
+  { id: 'board_10x600_nograin', mode: 'insert', type: 'lower', board: true, fields: { ib_length: 10, ib_width: 600, ib_grain: 'none' } },
   { id: 'board_300x300', mode: 'insert', type: 'lower', board: true, fields: { ib_length: 300, ib_width: 300, ib_grain: 'none' } },
   { id: 'board_2800x2070', mode: 'insert', type: 'lower', board: true, fields: { ib_length: 2800, ib_width: 2070, ib_grain: 'width' } }
 ];
