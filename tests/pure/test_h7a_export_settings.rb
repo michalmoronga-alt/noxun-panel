@@ -302,6 +302,33 @@ NxTest.test('H7a T-A1: objekt so zlym project_names alebo {} BEZ zalohy — ako 
   end
 end
 
+NxTest.test('H7a T-A1 (review #456 P2): skalarny zapis nad zlym project_names BEZ zalohy subor naozaj opravi') do
+  NxTest.skip!('vyzaduje headless sandbox') unless NxTest.headless?
+  ops = { 'save_merge_18_36' => -> { NxH7A::S.save_merge_18_36(false) },
+          'save_last_dir' => -> { NxH7A.save_last_dir('D:/Opravene') } }
+  ['{"project_names":[]}', '{"project_names":"x","merge_18_36":true}', '{"project_names":null}'].each do |bad|
+    ops.each do |name, op|
+      NxH7A.with_sandbox do
+        NxH7A.write_raw(NxH7A.path, bad)
+        NxH7A.with_log do |logs|
+          NxTest.assert_equal([:ok, ''], op.call, "#{bad} #{name}")
+          NxTest.assert(logs.any? { |l| l.include?('samooprava') }, "#{bad} #{name}: oprava je v logu")
+        end
+        doc = JSON.parse(File.binread(NxH7A.path))
+        NxTest.assert(NxH7A::S.doc_shape_ok?(doc), "#{bad} #{name}: po :ok subor splna tvar (#{doc.inspect})")
+        NxTest.assert_equal({}, doc['project_names'], "#{bad} #{name}: neplatny kontajner -> prazdna mapa")
+        NxTest.assert_equal(bad, File.binread("#{NxH7A.path}.bak"), "#{bad} #{name}: .bak = povodny primar (ako dnes)")
+      end
+    end
+  end
+  # platna mapa sa samoopravou nikdy nemeni
+  NxH7A.with_sandbox do
+    NxH7A.write_raw(NxH7A.path, NxH7A::PRIMARY)
+    NxH7A.save_last_dir('D:/X')
+    NxTest.assert_equal(NxH7A::PRIMARY['project_names'], NxH7A.read['project_names'])
+  end
+end
+
 # =============================================================================
 # T-A3 BRANA
 # =============================================================================
@@ -973,8 +1000,10 @@ NxTest.test('H7a T-A9: jedine dvere zapisu — zamok, brana, strikne citanie, za
   src = NxH7A.code(NxH7A::ES_RB)
   NxTest.assert_equal(1, src.scan('JsonFileStore.write(').length, 'v module JEDINY zapis suboru')
   upd = NxH7A.body(NxH7A::ES_RB, 'update')
-  NxTest.assert(upd.include?('JsonFileStore.write(path, fresh.merge(attrs), shape_check)'),
+  NxTest.assert(upd.include?('JsonFileStore.write(path, doc, shape_check)'),
                 'zapis v `update`, treti POZICNY argument = shape_check')
+  NxTest.assert(upd.include?('doc = self_repair(fresh.merge(attrs))') && upd.include?('unless doc_shape_ok?(doc)'),
+                'zapisuje sa LEN dokument, ktory po samooprave splna tvar (review #456 P2)')
   i_lock = upd.index('Materials.with_catalog_lock')
   i_gate = upd.index('write_gate')
   i_read = upd.index('read_for_write')

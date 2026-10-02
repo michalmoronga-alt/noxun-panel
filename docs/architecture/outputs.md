@@ -1083,7 +1083,7 @@ posudzuje dnešná normalizácia (mimo R-38). Matica:
 | chýba primár, `.bak` dobrá | záloha | `:ok` — **obnova** | ako dnes |
 | nečitateľný alebo zlý tvar (`[]`, `null`, `"x"`, `42`, `{}`, `project_names` nie objekt) + dobrá `.bak` | **záloha** (aj 18 + 36 a posledný priečinok) | **`:blocked`** + `DEGRADED_REASON` | **nedotknutá** |
 | nečitateľný / nie-objekt **bez** dobrej `.bak` | predvolené | **`:unreadable`** + `UNREADABLE_REASON` (dnes ticho) | ako dnes |
-| objekt so zlým `project_names` alebo `{}` **bez** dobrej `.bak` | ako dnes (mapa `{}`, ostatné kľúče zo súboru) | `:ok` — samooprava | dostane zlý primár |
+| objekt so zlým `project_names` alebo `{}` **bez** dobrej `.bak` | ako dnes (mapa `{}`, ostatné kľúče zo súboru) | `:ok` — samooprava **každým** zápisom (aj 18 + 36 a posledný priečinok: neplatný kontajner → `{}` s logom, review #456; zapíše sa len dokument, ktorý spĺňa tvar) | dostane zlý primár |
 | zámok, brána, čítanie, blok zlyhá | — | `:failed` + `FAILED_REASON` | nedotknutá |
 | zlyhá samotný zápis (finálne premenovanie) | — | `:failed` | primár nezmenený, `.bak` už môže byť kópia doterajšieho primára (R-11) |
 

@@ -199,12 +199,29 @@ module Noxun
           next note_block([:unchanged, '']) if attrs.nil?
 
           phase = 'write'
-          JsonFileStore.write(path, fresh.merge(attrs), shape_check)
+          doc = self_repair(fresh.merge(attrs))
+          raise ArgumentError, "#{FILE}: zluceny dokument nema tvar nastaveni" unless doc_shape_ok?(doc)
+
+          JsonFileStore.write(path, doc, shape_check)
           note_block([:ok, ''])
         end
       rescue StandardError => e
         Engine.log_error(e, "ExportSettings.update(#{phase})")
         [:failed, FAILED_REASON]
+      end
+
+      # SAMOOPRAVA objektu bez dobrej zalohy (matica R-A2, D3; review #456 P2):
+      # neplatny kontajner `project_names` (pole, retazec, null …) nemoze niest
+      # ziadny platny nazov zakazky (mapa je len objekt), takze ho kazdy uspesny
+      # zapis — aj skalarny (18 + 36, posledny priecinok) — nahradi prazdnou
+      # mapou a zaloguje to. Platna mapa sa nikdy nemeni. Vysledok `update` tak
+      # vzdy spĺňa `doc_shape_ok?` (inak by `:ok` hlasilo opravu, ktora nenastala).
+      def self_repair(doc)
+        return doc unless doc.is_a?(Hash) && doc.key?(PROJECT_NAMES_KEY) && !doc[PROJECT_NAMES_KEY].is_a?(Hash)
+
+        Engine.log("export settings: neplatny #{PROJECT_NAMES_KEY} (#{doc[PROJECT_NAMES_KEY].class}) " \
+                   'nahradeny prazdnou mapou — samooprava suboru bez zalohy')
+        doc.merge(PROJECT_NAMES_KEY => {})
       end
 
       # Odmietnutie podla obsahu, volitelne s podpisom suborov (volat POD zamkom).
