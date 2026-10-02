@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H12d · mená rolí na jednom mieste (2.10.2026, PR #?, v0.17.16, blok 9 · HARDENING PO V1, triedenie C-05 — GR-04; package
+- **H12d · mená rolí na jednom mieste (2.10.2026, PR #452, v0.17.16, blok 9 · HARDENING PO V1, triedenie C-05 — GR-04; package
   [PACKAGE_H12.md](../zdroje/bloky/HARDENING/PACKAGE_H12.md) R0.6, R4, §15 A3 A5 A6; brief [BRIEF_H12d.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H12d.md)).**
   Karta dielca mala vlastnú JS mapu `roleLabel`, ktorá sa od stĺpca Rola v Kusovníku líšila v 9 rolách („Vrch" vs „Strop", „Priečka zvislá", „Zásuvkové
   čelo", surové `drawer_bottom` a `free_panel`); `outputs.md` pritom tvrdil, že je zhodná (F1). Teraz **`PartKeys::ROLE_LABELS` + `role_label`** je jediná
