@@ -764,8 +764,7 @@ niečo iné, než používateľ vrátil.
 (`take_insert_hardware!`) · šablónový ref · pôvodný model · **stav `:active` → `:committing` → `:committed` | `:cancelled`** · `rotation_index` (0..3) · `anchor` · `z_mode` ·
 poslednú platnú polohu s príznakom `placeable`. **Terminálne stavy sú idempotentné** — druhý klik aj druhý cancel sú no-op, takže dvojklik nikdy nevyrobí dve skrinky.
 Identita dokumentu je **objekt `Sketchup::Model`, nie `guid`** (mení sa pri každom uložení — lekcia #261/#264), takže Ctrl+S ghost nezruší.
-**Všetky konce životného cyklu rušia starú session PRED čímkoľvek ďalším:** druhé „Vložiť" (nová session s čerstvým snapshotom) · zavretie Inspectora (`set_on_closed`;
-pri ohlásenom ukončovaní SketchUpu len zneplatnenie v Ruby — odsek nižšie) ·
+**Všetky konce životného cyklu rušia starú session PRED čímkoľvek ďalším:** druhé „Vložiť" (nová session s čerstvým snapshotom) · zavretie Inspectora (`set_on_closed`) ·
 **File > New / Open** · aktivácia iného dokumentu · `onCancel` 0/1/2 · `deactivate` · iný spôsob vloženia (`handle_insert_copy`, `handle_insert_board`).
 
 **Prepnutie dokumentu má DVE obrany a Windows drží tú prvú.** `GhostTool.on_document_replaced` (volá ho `PanelAppObserver#onNewModel`/`#onOpenModel` ešte pred prepnutím
@@ -775,14 +774,6 @@ identity by vrátilo „ten istý dokument" a session by prežila do cudzej zák
 Na `guid` sa spoľahnúť **nedá ani ako na kľúč, ani ako na doplnok identity**: mení ho každé uloženie, takže by Ctrl+S ghost zabil (package to zakazuje). Ghost môže existovať len
 s otvoreným Inspectorom a ten `PanelAppObserver` vždy pripája (`attach_observer` → `ensure_app_observer`), takže prvá obrana je vždy aktívna.
 Slot session sa uvoľňuje aj nad stavom `:committing` — commit prerušený výnimkou **mimo `StandardError`** by ho inak držal až do reštartu.
-
-**Ukončovanie SketchUpu (F-01, odsek `app_lifecycle.rb` v [ui-lifecycle.md](ui-lifecycle.md)).** Od SketchUpu 2026.2 beží `set_on_closed` Inspectora aj pri ukončení
-aplikácie a `pop_tool` z neho končí pádom. Hook preto pri `AppLifecycle.quitting?` volá **`GhostTool.invalidate_session!(reason)`** — čistý Ruby (`cancel!` + uvoľnenie
-slotu ako v `cancel_session`), **bez** `view`, timera, `push_state` a popu; vráti **sirotský nástroj** (`@active_tool`, ak je `attached?`). Potom `live_session` = nil, takže klik
-sirotského nástroja **nič nevloží**. **`pop_tool(tool)` má poistku:** pri `quitting?` stopa `pop:deferred`, pop sa odloží `defer_until_running('ghost pop')` a nástroj ostáva
-pripojený (aj timer `end_tool` po `onQuit`); inak stopa `pop:executed` tesne pred `model.tools.pop_tool`. **`onLButtonDown` a `onCancel(0)` (Esc)** ako prvý príkaz potvrdia
-beh (`confirm_running!(…, sync: false)` — pop až v timeri, z Tool callbacku sa volať nesmie); `onMouseMove`, `deactivate`, `resume` beh nepotvrdzujú. `cancel_session`,
-`end_tool` a `deactivate` sa nemenia.
 
 **ZÁVÄZNÁ tabuľka kotiev.** Predná rovina korpusu je **vždy lokálne Y = 0** (čelá majú záporné Y a do kotiev NEVSTUPUJÚ; plinth recess ani presah čela rovinu Y = 0 nemenia).
 **D-123:** spodné kotvy aj obálka patria **celej skrinke vrátane nôh/sokla**, preto začínajú na **lokálnom Z = 0** pri oboch typoch a oboch variantoch dna. `floor_height` je

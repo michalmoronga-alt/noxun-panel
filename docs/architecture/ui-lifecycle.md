@@ -221,8 +221,6 @@ nevystrelí selection event**. Lifecycle oboch je **atomický**: `attach_observe
 - Undo/Redo označia `history: true`; odložený refresh pred stavom výberu pošle `NX.historyRefresh(doc)`: zhodný dokument zruší rozpracovaný návrh, timer
   aj naviazanú akciu (oneskorený preflight/ack neobnoví hodnoty spred Undo). Abort vlastného apply značku nemá (jeho odmietací ack zachová novší edit).
   Detach odstráni aj značku histórie.
-- **Zatvorenie panela pri ohlásenom ukončovaní SketchUpu** (`AppLifecycle.quitting?`) observery hneď neodvesí — detach sa odloží a dokončí len po potvrdenom behu
-  a len keď medzitým nevzniklo nové okno (`detach_observer if @dialog.nil?`); nový panel potvrdí beh ešte pred `attach_observer` (odsek `app_lifecycle.rb`).
 
 ### SketchUp toolbar (UI-02, žije v main.rb — NIE je vlastný modul)
 
@@ -1464,8 +1462,7 @@ jeho funkcie globálmi) — chýbajúci vlastný háčik je **chyba programu** (
 - **Porovnanie epoch:** `push_state` si ukladá `@pushed_epoch = @epoch` **až na konci** (po `fresh_collect`, keď payload odišiel) — transakcie spustené samotným
   prepočtom (zápis rozpočtu s `bump: false`) sa tým pohltia. Flush posiela `NX.markStale()` len pri `@epoch > @pushed_epoch`, so živým oknom a **dvojitým guardom
   dokumentu** (`txn_model_ok?` v callbacku aj v timeri).
-- **Lifecycle = život okna:** attach v `ensure_dialog` (anti-double `remove → add`, vlastný rescue), detach v `set_on_closed` (pri ohlásenom ukončovaní
-  SketchUpu odložený — odsek `app_lifecycle.rb`), prevesenie a nulovanie epochy pri
+- **Lifecycle = život okna:** attach v `ensure_dialog` (anti-double `remove → add`, vlastný rescue), detach v `set_on_closed`, prevesenie a nulovanie epochy pri
   prepnutí dokumentu (`on_model_changed`) — epocha je per dokument. Žiadny `Engine` broadcast.
 - **Klient** drží `staleFlag` (stav okna); `NX.markStale()` prekreslí len lištu aktívnej sekcie, zhadzuje ho **výhradne plný payload** `setStudio` (echá nie).
   Jantár cez `--nx-warn*`. Signál znamená „možno neaktuálne" (aj posun cudzieho objektu ho vyvolá).
@@ -2231,57 +2228,34 @@ Plné znenie: archív, „updater.rb — …" a „UI vrstva — sekcia „O plu
 
 ### app_lifecycle.rb
 
-**Životný cyklus pluginu v procese SketchUpu (F-01) — čistý Ruby, prvý načítaný súbor pluginu.** Dve úlohy: (1) ukončovanie SketchUpu bez volania SketchUp API
-z hookov okien, (2) načítanie súborov pluginu s jednou hláškou. Pád pri ukončení na SketchUpe 2026.2 (#1117) **táto príprava neodstraňuje dokázateľne** — overí
-to až quit test a smoke na 2026.2 (riadok H11c v PLAN). **Zmerané na 26.0.429 (quit test, `Sketchup.quit` aj Súbor > Koniec):** hooky okien pri ukončení bežia
-a prídu **PRED** `onQuit` (poradie B) — príznak ich pri ukončení nezachytí a hooky idú normálnou vetvou (pri `Sketchup.quit` stihne aj pop z timera, pri
-Súbor > Koniec timer už nepríde); na 26.0 bez pádu (exit 0).
+**Životný cyklus pluginu v procese SketchUpu (F-01) — čistý Ruby, prvý načítaný súbor pluginu. Dnes len načítanie súborov s jednou hláškou**; ukončovanie
+SketchUpu (pád #1117 na 2026.2) tu zatiaľ nie je — rieši ho dávka H11c (záložný návrh Z1 s vlastným auditom, nižšie).
 - **Načítanie:** `main.rb` najprv **bootstrapom** načíta tento súbor (Ruby `require` s absolútnou cestou, vlastná chybová vetva `rescue StandardError, ScriptError`
-  + **sentinel** `AppLifecycle::LOADED` na poslednom riadku súboru = vykonal sa celý). Chyba bootstrapu = jedna hláška o základnom súbore (`Engine.BOOTSTRAP_MESSAGE`)
+  + **sentinel** `AppLifecycle::LOADED` na poslednom riadku súboru = vykonal sa celý). Chyba bootstrapu = jedna hláška o základnom súbore (`Engine::BOOTSTRAP_MESSAGE`)
   a zvyšok `main.rb` sa nevykoná. Potom **91 súborov `main.rb` a 14 častí `ui/panel.rb`** ide cez **`AppLifecycle.require_part 'noxun_engine/…'`** = Ruby `require`
   s absolútnou cestou `<Plugins>/<path>.rb` (rovnaká semantika na 2026.0 aj 2026.2; `Sketchup.require` chyby do 2026.1 prehltne a vráti `true`, od 2026.2 ich
   prepustí). Návrat `true` (načítaný) / `false` (už bol) / `nil` (chyba): záznam `{path, class, message, backtrace(6)}` do `failures` (alebo do `record:`), riadok
   v konzole, **nikdy nevyhodí** (`StandardError` + `ScriptError`; `Interrupt` prejde) a **pokračuje sa ďalším súborom** (diagnostika celého rozsahu). Plugin sa
   **nešifruje** (`.rbe`/`.rbs` Ruby `require` nenačíta; guard). Kontrakt platí pre súbory načítané z validného `main.rb` — syntax chyba samotného `main.rb` ostáva
   v réžii SketchUpu.
-- **Fail-closed init:** `Engine.init_allowed?` (memo na proces) pustí init (migrácie, menu, toolbar, observery) **len** keď `failures` je prázdne **a** prvý krok
-  `install!` (quit observer) uspel; inak **`announce_failures!`** = **jedna** hláška na proces („Noxun Engine sa nenačítal celý — chyba v súbore … (spolu N)…
-  Reštartuj SketchUp; ak to nepomôže, nainštaluj plugin znova.") a plugin je v tomto okne SketchUpu vypnutý (rozhodnutie Michala Q1). **Jediná podporovaná obnova
-  = reštart SketchUpu** (ručný reload by nechal `panel.rb` v require cache bez jeho častí). Nový súbor pluginu = riadok v `main.rb` **aj** v zmrazenom zozname
-  `tests/pure/test_h11a_nacitanie.rb` (T6).
-- **Quit observer:** `QuitObserver < Sketchup::AppObserver`, `onQuit` = **len Ruby stav** (`mark_quitting!` + `trace('on_quit')`, riadok konzoly „ukončovanie
-  SketchUpu (onQuit)"); žiadne SketchUp API, timer, okno ani súbor (guard T7). `install!(app:, observer:)` registruje **presne raz** na proces (už pridaný observer =
-  návrat bez novej registrácie; výmena observera najprv odpojí starý a keď `remove_observer` zlyhá, aktivácia sa zastaví); `add_observer` `false`/výnimka =
-  chyba štartu → init sa nespustí.
-- **Príznak a odklad:** `quitting?` · `mark_quitting!(source)` · `defer_until_running(label) { … }` (pri ukončovaní blok uloží, inak ho hneď vykoná) ·
-  `confirm_running!(reason, sync:)` — bez príznaku nerobí nič; s ním príznak zhodí a odložené bloky spustí (`sync: true` hneď — otvorenie nového okna;
-  `sync: false` cez `UI.start_timer(0)` — z Tool callbacku sa `pop_tool` volať nesmie); chyba bloku nezastaví ostatné. **Beh potvrdzujú len udalosti, ktoré pri
-  ukončovaní neprídu:** `ensure_dialog` **nového** okna Inspectora aj Štúdia (pred `HtmlDialog.new`) a `onLButtonDown` / `onCancel(0)` (Esc) ghost nástroja ako
-  prvý príkaz. `onMouseMove`, `deactivate`, `resume` beh nepotvrdzujú.
-- **Stopa:** `trace(event)` = posledných 50 udalostí v pamäti (`trace_events`): `on_quit`, `hook:<inspector|studio>:<normal|quitting>`, `pop:<executed|deferred>`,
-  `deferred:skip:<label>` (odložené), `deferred:run:<label>` (vykonané), `running:<reason>`. `trace_sink` je **len testovací hák** (quit test; v produkcii `nil`,
-  žiadne IO pri ukončovaní); jeho chyba je izolovaná. `reset_for_tests!(boot:)` volajú len testy (guard).
+- **Fail-closed init:** `Engine.init_allowed?` (memo na proces) pustí init (migrácie, menu, toolbar, observery) **len** keď `failures` je prázdne; inak
+  **`announce_failures!`** = **jedna** hláška na proces („Noxun Engine sa nenačítal celý — chyba v súbore … (spolu N)… Reštartuj SketchUp; ak to nepomôže,
+  nainštaluj plugin znova.") a plugin je v tomto okne SketchUpu vypnutý (rozhodnutie Michala Q1). **Jediná podporovaná obnova = reštart SketchUpu** (ručný reload
+  by nechal `panel.rb` v require cache bez jeho častí). Nový súbor pluginu = riadok v `main.rb` **aj** v zmrazenom zozname `tests/pure/test_h11a_nacitanie.rb` (T6).
+  `reset_for_tests!` volajú len testy (guard).
 
-#### Zatvorenie okna vs. ukončenie SketchUpu
+#### Zatvorenie okna vs. ukončenie SketchUpu (zmerané, rieši H11c)
 
-Hooky `set_on_closed` Inspectora (`panel.rb`) a Štúdia (`studio_dialog.rb`) majú dve vetvy. **Bez príznaku** = správanie spred F-01 (stopa `hook:<okno>:normal`).
-**Pri `quitting?`:** Inspector → `GhostTool.invalidate_session!` (čistý Ruby, klik sirotského nástroja už nič nevloží) + `defer_until_running('Inspector')`
-{ `detach_observer if @dialog.nil?` · `HoverEdge.release` · `GhostTool.pop_tool(orphan)` }; Štúdio → `defer_until_running('Štúdio') { detach_stale_observer if
-@dialog.nil? }`. Čisté resety Štúdia (`@ready`, `*_full_pending`, tri `on_ui_closed`) a **`@dialog = nil` bežia VŽDY** — bariéra aktualizátora (`dialog_closed?`)
-sa nemení. `GhostTool.pop_tool` pri `quitting?` pop **odloží** (`pop:deferred`), takže ani timer `end_tool` po `onQuit` nástroj nepopne.
+Hooky `set_on_closed` Inspectora (`panel.rb`) a Štúdia (`studio_dialog.rb`) sa pri ukončení SketchUpu **volajú** a na 26.0.429 prídu **PRED**
+`AppObserver#onQuit` (poradie B) — quit test H11a cez `Sketchup.quit` aj Súbor > Koniec: stopa `hook:studio` · `hook:inspector` (pri `Sketchup.quit` niekedy aj
+`pop:executed` z timera) · až potom `on_quit`, exit kód 0. Príznak z `onQuit` by preto hooky pri ukončení nezachytil; v 2026.2 `pop_tool` z hooku padá (#1117).
+Riešenie je **záložný návrh Z1** v dávke **H11c** (hook nástroj nepopne, ghost sa ukončí sám pri ďalšom vstupe) s vlastným auditom, keď bude SketchUp 2026.2.
 
-| Situácia | Inspector | Štúdio | Ghost |
-|---|---|---|---|
-| ručné zatvorenie | normálna vetva | normálna vetva | ukončí sa, aktívny Výber |
-| ukončenie 26.0.429 (zmerané) | normálna vetva — hooky prídu PRED `onQuit` (poradie B) | normálna vetva | `Sketchup.quit`: pop z timera pred `onQuit`; Súbor > Koniec: timer nepríde; bez pádu (exit 0) |
-| 2026.2, `onQuit` pred `on_close` | zneplatnenie v Ruby, upratanie odložené (nikdy nebeží) | odložené | žiadny pop |
-| 2026.2, `on_close` pred `onQuit` (na 26.0 zmerané, na 2026.2 **NEOVERENÉ**) | normálna vetva; pop v timeri sa odloží len ak timer príde po `onQuit` | normálna | **nevyriešené** → quit test (`hook:…:normal` pred `on_quit`) → záložný návrh Z1 v H11c |
-| `onQuit` bez skutočného ukončenia (**NEOVERENÉ**) | klik **necommitne**; klik / Esc / otvorenie okna potvrdí beh a dokončí upratanie | otvorenie okna dokončí | sirotský nástroj sa popne po potvrdení |
-
-**Quit test** (`scripts\run_su_tests.ps1 -QuitProbe` → `tests/sketchup/su_quit_probe.rb`): kópia ENGINEtests.skp, Inspector + Štúdio + ghost, stopa cez vopred
-otvorený handle do `quit_trace.txt`, uloženie run-kópie, `Sketchup.quit` (s `-QuitMenu` cesta Súbor > Koniec, `send_action` 57665); verdikt **až po zániku procesu**: exit kód 0 · presne 1× `on_quit` · žiadny
-`pop:executed` po `on_quit` · každý hook po `on_quit` = `quitting` · žiadny `hook:*:normal` medzi `probe:saved` a `on_quit`; 0xC0000374 = FAIL. In-SU scenáre
-Q1–Q8 (`run_h11a`, `run_h11a_async` v `su_runner.rb`).
+**Quit test** (`scripts\run_su_tests.ps1 -QuitProbe`, s `-QuitMenu` cesta Súbor > Koniec cez `send_action` 57665 → `tests/sketchup/su_quit_probe.rb`):
+kópia ENGINEtests.skp, Inspector + Štúdio + ghost, **inštrumentácia žije len v sonde** (vlastný `AppObserver#onQuit`, obaly `Panel.detach_observer`,
+`StudioDialog.detach_stale_observer`, `GhostTool.pop_tool`), stopa cez vopred otvorený handle do `quit_trace.txt`, uloženie run-kópie, ukončenie; verdikt **až po
+zániku procesu**: exit kód 0 · presne 1× `on_quit` · žiadny `pop:executed` po `on_quit` · žiadny hook medzi `probe:saved` a `on_quit`; 0xC0000374 = FAIL.
+In-SU: `run_h11a` (P1 brána načítania, Q7) a `run_h11a_async` (Q1 ručné zatvorenie) v `su_runner.rb`.
 
 ### Satelitné okná
 

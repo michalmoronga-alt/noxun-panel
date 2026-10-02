@@ -64,7 +64,7 @@ DC pasce [DC_PRAVIDLA.md](DC_PRAVIDLA.md) · UI dizajn [UI_DIZAJN.md](UI_DIZAJN.
 | `sheet_layout` (NP-1 nárezový plán: pásové rozloženie na platne per nákupný materiál + spoločná príprava obdĺžnika a „zmestí sa" pre Kontrolu; od NP-3 jediná veta o počte pre sekciu Štúdia a poznámku rozpočtu) | [architecture/outputs.md](architecture/outputs.md) |
 | `price_refresh` · `supplier_settings` · `export_settings` · `vepo_export` · `cp_export` · `xlsx_writer` | [architecture/outputs.md](architecture/outputs.md) |
 | `usage_stats` | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |
-| `app_lifecycle` (životný cyklus v procese SketchUpu: načítanie súborov s jednou hláškou, quit observer, hooky okien pri ukončovaní bez SketchUp API — F-01) | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |
+| `app_lifecycle` (životný cyklus v procese SketchUpu — dnes načítanie súborov pluginu s jednou hláškou a fail-closed initom; ukončovanie SketchUpu = H11c, F-01) | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |
 | `updater` (D-52a jadro — manifest, staging, swap, zámok/lease, restart latch; recovery žije v loaderi · D-52b UI — sekcia „O plugine": asynchrónny check s tokenom, bariéra zatvorenia okien, natívne hlášky) | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |
 
 ### Modules (`noxun_engine/modules/`)

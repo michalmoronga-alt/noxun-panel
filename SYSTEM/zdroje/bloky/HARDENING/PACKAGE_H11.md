@@ -347,3 +347,20 @@ Výsledok delty: pôvodné 1–4, 6–9 RESOLVED, 5 PARTIAL; nové **0 BLOCKER �
 plugin sa nenačíta, jedna hláška; vratné, nemení dáta). **H11a čaká na Michalovu odpoveď Q1** (pri chybe súboru vypnúť celý plugin — predvoľba podľa
 auditu NOTE 9) — ak neodpovie, H11a ide s predvoľbou, v PR označiť. Implementátor skopíruje package + `AUDIT_H11_raw.md` + `AUDIT_H11_delta_raw.md`
 do `SYSTEM/zdroje/bloky/HARDENING/`.
+
+---
+
+## 17 · Výsledok H11a na 26.0 — rozhodnutie orchestrátora (2.10.2026) · MÁ PREDNOSŤ PRED ČASŤOU II
+
+**Výsledok (SketchUp 26.0.429, quit test §A6 na implementácii H11a-1+2):** `Sketchup.quit` aj Súbor > Koniec (`send_action` 57665): stopa `hook:studio` · `hook:inspector` (pri `Sketchup.quit` niekedy aj `pop:executed` z timera) · **až potom** `on_quit`, exit kód **0**. SketchUp zatvára okná pluginu **pred** `AppObserver#onQuit`
+(**poradie B**) — predpoklad S8 („na 26.0 sa hooky pri ukončení nevolajú") neplatí a príznak z `onQuit` by hooky pri ukončení nezachytil; H11a-1 by teda cieľ
+nedosiahol. Brána P1 (Ruby `require` s absolútnou cestou) **PASS**; surové `Sketchup.require` na 26.0 pri raise aj syntax chybe vráti `true` (prehltne).
+
+**Rozhodnutie orchestrátora — variant (b):**
+- **H11a = len načítanie (H11a-2):** `core/app_lifecycle.rb` (`require_part`, `failures`, `announce_failures!`, sentinel `LOADED`), bootstrap v `main.rb`, 91 + 14
+  súborov cez `require_part`, fail-closed init `Engine.init_allowed?` (Q1 — celý plugin vypnutý, jedna hláška, obnova reštartom). Kód H11a-1 (príznak z
+  `onQuit`, `QuitObserver`, `install!`, stráže v hookoch okien, `invalidate_session!`, poistka `pop_tool`, potvrdenie behu) sa **nemerguje** — vrátený z vetvy.
+  Ostáva **testovací nástroj quit testu** (`run_su_tests.ps1 -QuitProbe [-QuitMenu]`, `tests/sketchup/su_quit_probe.rb` s vlastnou inštrumentáciou) pre H11c.
+- **H11c = záložný návrh Z1 + vlastný audit** (keď bude SketchUp 2026.2, Michal dá vedieť): hook nástroj nikdy nepopne, len zneplatní session; ghost sa ukončí sám
+  pri najbližšom používateľskom vstupe (vzor `finish_self_soon`) — mení dnešné správanie, preto audit a mockup správania; poradie B je **potvrdené už na 26.0**.
+  F-01 ostáva otvorené (AUDIT_REGISTER R-42).

@@ -34,11 +34,19 @@ V1 rozsahu. Hlásená strata neuložených hodnôt, hygiena, texty, refaktor a v
 | R-27 | čiastočne (hint o Rozpočte zanikol) | po V1 | S | texty v Pravidlách sú nepresné |
 | R-32 | čiastočne (5 prázdnych + 4 kostrové odseky) | po V1 | S | agent musí pri zásahu čítať kód |
 | R-39 | brána správne otvorená | — | S (docs) | smer dvierok dnes žiadny výstup nespotrebúva |
+| R-42 | platí (F-01; poradie B potvrdené na 26.0 — H11a) | blok 9 · H11c po aktualizácii na 2026.2 (Z1 + audit) | M | SketchUp 2026.2 môže pri ukončení s otvoreným Inspectorom spadnúť |
 | R-05 · R-09 · R-10 · R-15 · R-17 · R-19 (zvyšok) · R-20 · R-21 · R-22 · R-23 (2)+(3) · R-24 · R-26 · R-28 · R-29 · R-30 · R-31 · R-33 · R-36 · R-40 | platia | po V1 | S–L | bez výrobného/cenového rizika a bez tichej straty uložených dát — detail pri každej položke a v podklade |
 
 ## Os GHOST — observery · undo · vkladanie (blok 1d PRED blokom GHOST)
 
-*(Bez otvorenej položky — R-01 až R-04 sú v sekcii „Vyriešené" nižšie; zvyšok R-01+R-04 je R-36 v osi IDENTITA a proces.)*
+*(R-01 až R-04 sú v sekcii „Vyriešené" nižšie; zvyšok R-01+R-04 je R-36 v osi IDENTITA a proces.)*
+
+### R-42 · P2 · ui/core · `ui/panel.rb` + `ui/studio_dialog.rb` (`set_on_closed`) + `core/ghost_tool.rb` (`cancel_session` → `pop_tool`) — F-01 bloku 9 · HARDENING
+
+Pád SketchUpu 2026.2 pri ukončení s otvoreným Inspectorom (api-issue-tracker #1117: `pop_tool` z `set_on_closed`). **Quit test H11a na 26.0.429:** `Sketchup.quit` aj Súbor > Koniec (`send_action` 57665): stopa `hook:studio` · `hook:inspector` (pri `Sketchup.quit` niekedy aj `pop:executed` z timera) · **až potom** `on_quit`, exit kód **0** —
+hooky okien prídu **pred** `onQuit` (poradie B), takže ochrana príznakom z `onQuit` nezaberie. **Otvorené — potrebný záložný návrh Z1** (hook nástroj nepopne,
+ghost sa ukončí sám pri ďalšom vstupe) s vlastným auditom v dávke **H11c** po aktualizácii na 2026.2. Dávka H11a dodala len načítanie súborov s jednou hláškou
+a nástroj quit testu (`run_su_tests.ps1 -QuitProbe [-QuitMenu]`). Package: `SYSTEM/zdroje/bloky/HARDENING/PACKAGE_H11.md` §17.
 
 ## Os KOVANIE — dátový model setov (blok 1d PRED blokom KOVANIE)
 
