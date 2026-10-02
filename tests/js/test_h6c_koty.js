@@ -39,7 +39,7 @@ function variants(g){
   if ((m = /^(F\d+) · .*?(\d+)$/.exec(g))) { out.push(m[1] + ' · ' + m[2]); out.push(m[1]); }
   return out;
 }
-const OPTIONAL = { zones_4: /^\d+×\d+$/, cab_fridge: /^(40|629|71|1200)$/ };
+const OPTIONAL = { cab_fridge: /^(40|71)$/ }; // tenke pasma chladnicky (4,6 a 8 px) sa pri 404 x 323 nezmestia; popisy zon musia byt VSETKY
 {
   const ctx = H.makeCtx();
   H.CASES.forEach(c => {
@@ -164,6 +164,25 @@ function checkCase(ctx, c, rect, label, opts){
   eq(vm.runInContext('pvLastRect', ctx3), null, 'T2 kreslenie na referencii zabudne rozmer (po rozbalení sa musí prekresliť)');
 }
 
+// ---- T2b · texty sa navzajom neprekryvaju (vsetky pripady harnessu x 4 rozmery okna) ----
+{
+  const ctx = H.makeCtx();
+  // + uzsia nika chladnicky (box 350 mm): cislo pasma „71" by lezalo pod popiskami hrany
+  const narrowBox = { id: 'fridge_narrow', mode: 'cab', type: 'lower', fields: { width: 600, height: 2076, depth: 560 },
+    appl: [Object.assign({}, H.BEKO, { box: { x: 20, z: 118, w: 350, h: 1940 } })] };
+  H.CASES.concat([narrowBox]).forEach(c => RECTS.forEach(r => {
+    const ts = H.texts(H.renderCase(ctx, c, r)).filter(t => t.text !== '?');
+    const bx = ts.map(box);
+    for (let i = 0; i < ts.length; i++) for (let j = i + 1; j < ts.length; j++) {
+      const a = bx[i], b = bx[j];
+      const ox = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0), oy = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0);
+      const sc = Math.min(r.w / vbOf(ctx)[2], r.h / vbOf(ctx)[3]);
+      ok(!(ox * sc > 0.5 && oy * sc > 0.5),
+         `T2b ${c.id} ${r.w}x${r.h}: „${ts[i].text}" a „${ts[j].text}" sa prekryvaju (${(ox * sc).toFixed(1)} x ${(oy * sc).toFixed(1)} px)`);
+    }
+  }));
+}
+
 // ============ T3 · pvFitLabel · popis cela · medzery · popis zony ===========
 {
   eq(PV.pvFitLabel(100, ['V 864', '864'], 11), 'V 864', 'T3 dlhý popis sa zmestí');
@@ -228,6 +247,88 @@ function checkCase(ctx, c, rect, label, opts){
             { id: 'Z1.1', leaf: true, x: 18, z: 118, w: 30, h: 728, shelves: 0 }, { id: 'Z1.2', leaf: true, x: 66, z: 118, w: 716, h: 728, shelves: 0 }] };
   const zt = H.texts(H.renderCase(ctx, zn, { w: 404, h: 323 })).map(t => t.text);
   ok(zt.indexOf('716×728') >= 0 && zt.indexOf('30×728') < 0, 'T3 popis úzkej zóny sa nekreslí, široká ho má');
+}
+
+// ---- T3b · cisla medzier po priblizeni (predrecenzia P2): horny okraj je okraj SCENY, nie vyrezu ----
+{
+  const ctx = H.makeCtx();
+  const tall = H.CASES.find(c => c.id === 'fronts_tall');
+  const r = { w: 404, h: 323 };
+  H.renderCase(ctx, tall, r);
+  // priblizit spodok 5 krokov (×1/1,2 na krok)
+  vm.runInContext(`(function(){ var k = Math.pow(1 / 1.2, 5);
+    pvView = { x: pvView.x, y: pvView.y + pvView.h * (1 - k), w: pvView.w * k, h: pvView.h * k }; pvUserView = true; })()`, ctx);
+  const svg = H.renderCase(ctx, tall, r, { keepView: true });
+  const vb = vbOf(ctx), s = Math.min(r.w / vb[2], r.h / vb[3]);
+  const gaps = H.texts(svg).filter(t => Math.abs(parseFloat(t.attrs['font-size']) * s - 10) < 0.011);
+  // medzera medzi F1 a F2: stred z = 1503,5; musi lezat na svojom mieste, nie na okraji vyrezu
+  const g3 = gaps.find(t => t.text === '3');
+  near(parseFloat(g3.attrs.y), 14 + 2100 - 1503.5, 0.01, 'T3b medzera 3 ostane na svojej vyske (mimo vyrezu), nestiahne sa k okraju priblizeneho vyrezu');
+  const g2 = gaps.filter(t => t.text === '2').map(t => parseFloat(t.attrs.y));
+  ok(g2.some(y => Math.abs(y - (14 + 2100 - 101)) < 0.01), 'T3b spodna medzera 2 je na svojom mieste');
+}
+
+// ---- T3c · D11: dokreslene vrstvy su v obsahu sceny (predrecenzia P3) ----
+{
+  const r = { w: 404, h: 323 };
+  function layerOn(ctx, mode, key){
+    vm.runInContext(`NXLayers.reset(); NXLayers.toggle(${JSON.stringify(mode)}, ${JSON.stringify(key)}, pvAvail());`, ctx);
+  }
+  // spodny okraj druhych rozmerov sa meria v suradniciach kresby: ry(z) = 14 + H − z
+  function lowestWidthDim(svg, ctx, label){
+    const vb = vbOf(ctx), s = Math.min(r.w / vb[2], r.h / vb[3]);
+    const t = H.texts(svg).find(x => x.text === label && !/rotate/.test(x.attrs.transform || ''));
+    return { lineY: parseFloat(t.attrs.y) + 5 / s, vb: vb, s: s };
+  }
+  // 1) horna skrinka, cela s presahom −20, vrstva Cela zapnuta v Korpuse
+  {
+    const ctx = H.makeCtx();
+    const c = { id: 'upper_presah', mode: 'cab', type: 'upper', fields: { width: 800, height: 720, depth: 320, floor_height: 0 },
+      items: [{ id: 'F1', type: 'door', mode: 'fixed', z: -20, height: 740, wings_n: 1, profile: 'none' }] };
+    H.renderCase(ctx, c, r);
+    layerOn(ctx, 'cab', 'cela');
+    const svg = H.renderCase(ctx, c, r);
+    ok(/class="fgrp"/.test(svg) || /M\d/.test(svg), 'T3c-1 vrstva Cela sa v Korpuse kresli');
+    const d = lowestWidthDim(svg, ctx, 'Š 800') ;
+    const frontBottom = 14 + 720 + 20;
+    near((d.lineY - frontBottom) * d.s, 18, 0.05, 'T3c-1 kota sirky je 18 px pod presahom cela (−20)');
+    ok(d.vb[1] + d.vb[3] >= frontBottom + 6 / d.s - 0.01, 'T3c-1 presah cela nie je orezany');
+  }
+  // 2) Zony, sokel 0 + nohy, vrstva Kovanie
+  {
+    const ctx = H.makeCtx();
+    const base = H.CASES.find(c => c.id === 'zones_4');
+    const c = Object.assign({}, base, { id: 'zones_legs', fields: Object.assign({}, base.fields, { floor_height: 0 }),
+      hw: [{ owner_part_key: 'cabinet:leg', generic_type: 'leg', quantity: 4, label: 'Nohy' }] });
+    H.renderCase(ctx, c, r);
+    layerOn(ctx, 'zones', 'kovanie');
+    const svg = H.renderCase(ctx, c, r);
+    ok(/class="hwmk"|data-owner/.test(svg) || /stroke-opacity|opacity="0.75"/.test(svg), 'T3c-2 nohy (ghost Kovanie) sa v Zonach kreslia');
+    const d = lowestWidthDim(svg, ctx, '178');
+    const legBottom = 14 + 864 + 70;
+    ok(d.lineY >= legBottom - 0.01, 'T3c-2 kota sirky zony nejde cez nohy (visi pod nimi)');
+    near((d.lineY - legBottom) * d.s, 18, 0.05, 'T3c-2 a je 18 px pod nohami');
+    ok(d.vb[1] + d.vb[3] >= legBottom + 6 / d.s - 0.01, 'T3c-2 nohy nie su orezane');
+  }
+  // 3) mala skrinka 300 x 300, sokel 0 + nohy, vrstva Kovanie v Korpuse
+  {
+    const ctx = H.makeCtx();
+    const c = { id: 'small_legs', mode: 'cab', type: 'lower', fields: { width: 300, height: 300, depth: 300, floor_height: 0 },
+      hw: [{ owner_part_key: 'cabinet:leg', generic_type: 'leg', quantity: 4, label: 'Nohy' }] };
+    H.renderCase(ctx, c, r);
+    layerOn(ctx, 'cab', 'kovanie');
+    const svg = H.renderCase(ctx, c, r);
+    const d = lowestWidthDim(svg, ctx, 'Š 300');
+    const legBottom = 14 + 300 + 70;
+    near((d.lineY - legBottom) * d.s, 18, 0.05, 'T3c-3 kota sirky je 18 px pod nohami (−70 mm)');
+    ok(d.vb[1] + d.vb[3] >= legBottom + 6 / d.s - 0.01, 'T3c-3 nohy nie su orezane');
+    // bez zapnutej vrstvy sa nic nerezervuje
+    vm.runInContext('NXLayers.reset()', ctx);
+    const plain = H.renderCase(ctx, c, r);
+    const d0 = lowestWidthDim(plain, ctx, 'Š 300');
+    near((d0.lineY - (14 + 300)) * d0.s, 18, 0.05, 'T3c-3 bez vrstvy kota visi 18 px pod korpusom');
+  }
+  vm.runInContext('NXLayers.reset()', H.makeCtx());
 }
 
 // ============ T4 · bez „mm"; čiara kót 1 px ===================================

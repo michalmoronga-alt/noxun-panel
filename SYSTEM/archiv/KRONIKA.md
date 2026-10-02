@@ -34,6 +34,10 @@
   prekreslenia. Testy: golden popisov kót nad starým kódom (`tests/fixtures/h6c_koty/`, 14 prípadov) a `tests/js/test_h6c_koty.js` (T0–T6: golden, `nxDimScene`, nič sa neoreže pre 14 prípadov × 4 okná
   a po zoome, skracovanie, bez „mm", prekreslenie, interakcia v mm); prepísané asserty v `test_rohb2_nahlad.js`, `test_uib2_nahlad.js`, `test_uic1b_vkladanie.js`, `test_h6b_suhrny.js`.
   **Dáta, payloady, Ruby logika, výroba a ceny bez zmeny** (Ruby len verzia; in-SU nespúšťané). Dokumentácia: UI_DIZAJN §3 a §5.2, ui-lifecycle „Náhľad".
+  **Predrecenzia (opravené pred PR):** čísla medzier Čiel sa po priblížení nestiahnu k okraju výrezu (horný okraj rozotláčania je okraj scény); popisky pásma hrany chladničky
+  idú v jednom stĺpci dovnútra boxu (nepretnú sa s kótou tela), číslo pásma ustúpi, ak by sa s nimi pretlo; obsah scény počíta so zapnutými vrstvami Čelá (presah dole) a Kovanie (nohy)
+  v Korpuse, Zónach aj Čelách; výnimky T0 zúžené na pásma 40 a 71; nový test, že sa žiadne dva texty kót neprekrývajú. Golden prípadu `fronts_presah` regenerovaný nad starým kódom
+  (oprava nereálnych, prekrývajúcich sa čiel v dátach prípadu, nie zmena správania).
 - **H6b · lišty sektorov a súhrny (2.10.2026, PR #454, v0.17.18, blok 9 · HARDENING PO V1, triedenie D-01 pás + D-05; package
   [PACKAGE_H6.md](../zdroje/bloky/HARDENING/PACKAGE_H6.md) §6 „H6b" + §15; mockup [MOCKUP_H6_INSPECTOR.html](../zdroje/bloky/HARDENING/MOCKUP_H6_INSPECTOR.html) časti B–D, F;
   rozhodnutia Michala 2.10. O6, O7, O9, O12; brief [BRIEF_H6.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H6.md)).** Druhá z troch častí H6. **Pás „Skrinka … upravíš

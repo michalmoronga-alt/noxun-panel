@@ -556,7 +556,8 @@ Zásady kreslenia:
   l 46 · r 40 · t 30 · b 28, čelá l 34 · r 40 · t 8 · b 28, zóny b 28, kovanie
   0). **Keď sa popis nezmestí, skráti sa:** „V 864" → „864" → číslo
   **vodorovne vedľa kóty**; „F1 · zásuvka 760" → „F1 · 760" → „F1" (panel nižší
-  ako 12 px popis nemá); čísla medzier sa neprekrývajú (rozostup ≥ 11 px).
+  ako 12 px popis nemá); čísla medzier sa neprekrývajú (rozostup ≥ 11 px). Žiadne dva texty kót sa neprekrývajú. Scéna počíta aj so zapnutými vrstvami
+  (Čelá s presahom dole, Kovanie s nohami pod korpusom), takže kóta šírky vždy visí pod nimi.
   Zoom (Ctrl+koliesko) a zmena veľkosti náhľadu **kóty prekreslia** (najviac raz
   za snímku; posun pohľadu nie). Kreslené farby sú **zrkadlom tokenov** — SVG
   atribúty nevedia `var()` (rovnaký vzor ako ostatné farby náhľadu).

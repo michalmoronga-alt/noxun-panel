@@ -161,6 +161,7 @@
   var PV_REF_RECT = { w: 404, h: 323 }; // nahlad pri okne 850 px (D8) — ked #preview nema rozmer
   var pvS = 1;               // px na mm AKTUALNEJ kresby (nastavuje applyViewBox)
   var pvBaseZ = 0;           // najnizsi kresleny bod projekcie (mm) — pod nim visia vodorovne koty
+  var pvSceneTop = -Infinity; // horny okraj SCENY (suradnice kresby) — nie priblizeneho vyrezu
   var pvLastRect = null;     // posledny REALNY rozmer #preview, s ktorym sa kreslilo
   function pvU(px){ return px / (pvS > 0 ? pvS : 1); }
   function pvN(v){ return Math.round(v * 100) / 100; }
@@ -349,6 +350,16 @@
       // `cr_front`) — ich rozsah patri do sceny.
       union(frontsExtent()); union(ce);
     }
+    // D11: DOKRESLENE vrstvy (chip Cela / Kovanie, ghost) sa kreslia v Korpuse, Zonach
+    // aj Celach — ich rozsah (cela s presahom dole, nohy pod korpusom) patri do obsahu
+    // sceny, inak ich fit oreze a kota sirky ide cez ne. Vo vkladani su cela uz
+    // v `insertFrontsExtent`, v Kovani v bloku vyssie.
+    if (pvChipMode() !== 'part'){
+      NXLayers.ghosts(pvChipMode(), pvAvail()).forEach(function(k){
+        if (k === 'cela' && previewMode !== 'insert') union(frontsExtent());
+        else if (k === 'kovanie') minZ = Math.min(minZ, nxHwLowestZ(hwItems, nxCabFloorHeight()));
+      });
+    }
     // PR #381 (P2): telo slotu sa do sceny priklada v KAZDOM kontexte —
     // od opravy projekcii ho vidno aj v Celach a v Kovani. S1-F: box niky sa
     // kresli LEN v kontexte Korpus, takze sa aj do sceny priklada len tam
@@ -368,6 +379,7 @@
     var s = Math.min(rect.w / pvView.w, rect.h / pvView.h);
     pvS = (isFinite(s) && s > 0) ? s : 1;
     pvBaseZ = base.baseZ;
+    pvSceneTop = base.y;
     pvLastRect = rect.real ? { w: rect.w, h: rect.h } : null;
     svg.setAttribute('viewBox', pvView.x + ' ' + pvView.y + ' ' + pvView.w + ' ' + pvView.h);
   }
@@ -951,6 +963,7 @@
       S.push('<rect x="' + rx(x) + '" y="' + ry(z + h) + '" width="' + w + '" height="' + h +
              '" fill="' + col + '" fill-opacity=".08" stroke="' + col +
              '" stroke-width="2" stroke-dasharray="12 8"/>');
+      var sideLabels = pvApplLabels(ry, a, x, w);
       (a.bands || []).forEach(function(bd){
         if (!bd) return;
         var z0 = nxNumOr(bd.z0, 0), z1 = nxNumOr(bd.z1, 0);
@@ -961,13 +974,56 @@
         }
         // H6c: cislo pasma (11 px) sa napise, len ked sa pasmo zmesti na vysku pisma —
         // pri zoome sa dokresli (R6).
-        if ((z1 - z0) * pvS >= DIM_FONT_PX){
-          pvText(S, rx(x + w / 2), ry(z0 + (z1 - z0) / 2),
-                 String(Math.round(nxNumOr(bd.size, z1 - z0))), DIM_FONT_PX, 'middle', col, 'dominant-baseline="middle"');
+        // a nepretina sa s popiskami pasma hrany (stlpec vpravo dovnutra boxu).
+        var btxt = String(Math.round(nxNumOr(bd.size, z1 - z0)));
+        var by = ry(z0 + (z1 - z0) / 2), bx = rx(x + w / 2), bhw = pvU(pvTextW(btxt, DIM_FONT_PX) / 2);
+        var clashB = sideLabels.some(function(L){
+          var lx1 = rx(x + w) - pvU(4), lx0 = lx1 - pvU(pvTextW(L.text, DIM_FONT_PX));
+          return Math.abs(L.y - by) < pvU(DIM_FONT_PX) && lx0 < bx + bhw && lx1 > bx - bhw;
+        });
+        if ((z1 - z0) * pvS >= DIM_FONT_PX && !clashB){
+          pvText(S, bx, by, btxt, DIM_FONT_PX, 'middle', col, 'dominant-baseline="middle"');
         }
       });
       drawApplianceSplit(S, rx, ry, a, x, w);
     });
+  }
+
+  // Rozsah pasma hrany [lo, hi] (z, mm); jednostranny rozsah od/po hranu boxu.
+  function pvApplSplitRange(a){
+    var sp = a.split, b = a.box;
+    var lo = nxNumOr(sp.lo, NaN), hi = nxNumOr(sp.hi, NaN);
+    var z = nxNumOr(b.z, 0), h = nxNumOr(b.h, 0);
+    if (isNaN(lo)) lo = z;
+    if (isNaN(hi)) hi = z + h;
+    return { lo: lo, hi: hi };
+  }
+  // Popisky pasma hrany (konce pasma a „hrana NNN", 11 px) v JEDNOM stlpci vpravo
+  // DOVNUTRA boxu (vlavo je kota sokla/tela, vpravo kota vysky — zvonka by sa
+  // popisky pretli s kotami). Zoradene zdola nahor a rozotlacene (rozostup 12 px),
+  // `y` v suradniciach kresby. Ciste (Node testy).
+  function pvApplLabels(ry, a, x, w){
+    var sp = a.split;
+    if (!sp || !a.box) return [];
+    var rg = pvApplSplitRange(a), items = [];
+    // Popisok musi sediet DOVNUTRA boxu (inak by siahol cez kotu sokla/tela vlavo):
+    // „hrana 695" → „695" → nic, podla sirky boxu v px; pri zoome sa dokresli.
+    var room = nxNumOr(w, 0) * pvS - 4;
+    function put(z, labels, fill){
+      var t = pvFitLabel(room, labels, DIM_FONT_PX);
+      if (t) items.push({ z: z, text: t, fill: fill });
+    }
+    if (rg.hi - rg.lo > 0 && sp.lo_mm != null && sp.hi_mm != null){
+      put(rg.lo, [String(Math.round(sp.lo_mm))], PV_SLOT_FILL);
+      put(rg.hi, [String(Math.round(sp.hi_mm))], PV_SLOT_FILL);
+    }
+    var e = nxNumOr(sp.edge, NaN);
+    if (!isNaN(e) && sp.edge_mm != null){
+      put(e, ['hrana ' + Math.round(sp.edge_mm), String(Math.round(sp.edge_mm))], sp.state === 'clash' ? PV_SLOT_FILL : PV_SELECT_ACCENT);
+    }
+    items.sort(function(p, q){ return p.z - q.z; });
+    var ys = nxSpreadLabels(items.map(function(it){ return ry(it.z); }), pvU(DIM_FONT_PX + 1), pvSceneTop + pvU(PV_PAD_PX + 6));
+    return items.map(function(it, i){ return { text: it.text, fill: it.fill, y: ys[i] }; });
   }
 
   // Pasmo pripustnej hrany ciel (jantar) + ciara SUCASNEJ hrany. Jednostranny
@@ -975,32 +1031,21 @@
   function drawApplianceSplit(S, rx, ry, a, x, w){
     var sp = a.split;
     if (!sp) return;
-    var lo = nxNumOr(sp.lo, NaN), hi = nxNumOr(sp.hi, NaN);
-    var b = a.box, z = nxNumOr(b.z, 0), h = nxNumOr(b.h, 0);
-    if (isNaN(lo)) lo = z;
-    if (isNaN(hi)) hi = z + h;
+    var rg = pvApplSplitRange(a), lo = rg.lo, hi = rg.hi;
     if (hi - lo > 0){
       S.push('<rect x="' + rx(x - PV_APPL_GUTTER) + '" y="' + ry(hi) + '" width="' +
              (PV_APPL_GUTTER - 4) + '" height="' + (hi - lo) + '" fill="' + PV_SLOT_FILL +
              '" fill-opacity=".55" stroke="' + PV_SLOT_FILL + '" stroke-width="1"/>');
-      if (sp.lo_mm != null && sp.hi_mm != null){
-        // Konce pasma hrany (11 px) VLAVO od jantaroveho pasma: horny tesne nad nim, dolny pod nim.
-        pvText(S, rx(x - PV_APPL_GUTTER) - pvU(4), ry(hi) - pvU(3),
-               String(Math.round(sp.hi_mm)), DIM_FONT_PX, 'end', PV_SLOT_FILL);
-        pvText(S, rx(x - PV_APPL_GUTTER) - pvU(4), ry(lo) + pvU(DIM_FONT_PX + 2),
-               String(Math.round(sp.lo_mm)), DIM_FONT_PX, 'end', PV_SLOT_FILL);
-      }
     }
     var e = nxNumOr(sp.edge, NaN);
-    if (isNaN(e)) return;
-    var ecol = sp.state === 'clash' ? PV_SLOT_FILL : PV_SELECT_ACCENT;
-    S.push('<line x1="' + rx(x - PV_APPL_GUTTER) + '" y1="' + ry(e) + '" x2="' + rx(x + w) +
-           '" y2="' + ry(e) + '" stroke="' + ecol + '" stroke-width="2.5"/>');
-    if (sp.edge_mm != null){
-      // Cislo hrany nad ciarou, zarovnane k pravemu okraju boxu DOVNUTRA — 11 px text
-      // „hrana 695" (~55 px) by zvonka siahol cez kotu vysky.
-      pvText(S, rx(x + w) - pvU(4), ry(e) - pvU(4), 'hrana ' + Math.round(sp.edge_mm), DIM_FONT_PX, 'end', ecol);
+    if (!isNaN(e)){
+      var ecol = sp.state === 'clash' ? PV_SLOT_FILL : PV_SELECT_ACCENT;
+      S.push('<line x1="' + rx(x - PV_APPL_GUTTER) + '" y1="' + ry(e) + '" x2="' + rx(x + w) +
+             '" y2="' + ry(e) + '" stroke="' + ecol + '" stroke-width="2.5"/>');
     }
+    pvApplLabels(ry, a, x, w).forEach(function(L){
+      pvText(S, rx(x + w) - pvU(4), L.y, L.text, DIM_FONT_PX, 'end', L.fill, 'dominant-baseline="middle"');
+    });
   }
 
   function renderPreview(){
@@ -1390,7 +1435,7 @@
       else gapDims.push(d);
     });
     var gapY = nxSpreadLabels(gapDims.map(function(d){ return ry((d.z1 + d.z2)/2); }), pvU(11),
-                              pvView ? pvView.y + pvU(PV_PAD_PX + 6) : -Infinity);
+                              pvSceneTop + pvU(PV_PAD_PX + 6));
     gapDims.forEach(function(d, i){
       pvText(S, rx(fx0) - pvU(6), gapY[i], String(Math.round(d.size)), DIM_GAP_FONT_PX, 'end',
              hot ? PV_GAP_TEXT : null, 'dominant-baseline="middle"');
@@ -2148,7 +2193,7 @@
     module.exports = { NXLayers: NXLayers, cabTabPreview: cabTabPreview,
                        nxHwMarks: nxHwMarks, nxHwSummary: nxHwSummary, nxSlideGeom: nxSlideGeom,
                        nxLegGeom: nxLegGeom, nxHwLowestZ: nxHwLowestZ,
-                       nxFrontDims: nxFrontDims, nxZoneSpans: nxZoneSpans, nxSpreadLabels: nxSpreadLabels,
+                       nxFrontDims: nxFrontDims, nxZoneSpans: nxZoneSpans, nxSpreadLabels: nxSpreadLabels, pvApplLabels: pvApplLabels,
                        // H6c (tests/js/test_h6c_koty.js): kóty v px — čistá scéna, výber popisu,
                        // plánovač prekreslenia, okraje a konštanty px modelu
                        nxDimScene: nxDimScene, pvFitLabel: pvFitLabel, pvFrontLabel: pvFrontLabel,

@@ -501,7 +501,8 @@ orientačná. Všetky vrstvy berú geometriu z **jedného** `pvGeom()`.
 **Kóty v px (H6c · D-02):** `viewBox` ostáva v **mm** modelu (`rx = PV_PAD + x`, `PV_PAD` 14 mm; ťahanie priečky, výber zóny a klik na značku sa nezmenili), ale
 každý popis a čiara kót majú **stálu veľkosť na obrazovke**. `sceneSize()` zloží **obsah v mm** (korpus ∪ čelá s presahom ∪ rohová zostava `pvCornerExtent` ∪
 referencie `nxRefExtent`; Kovanie len čo kreslí: nohy pod korpusom `nxHwLowestZ`, pri sokli > 0 nič, bez sokla 70 mm; geometria nohy `nxLegGeom`) a **okraje v px**
-(`pvCabMargins`: korpus a vkladanie l 46 · r 40 · t 30 pri skosení (inak 8) · b 28, rohová b + `DIM_ROW_PX` 18 · čelá l 34 · r 40 · t 8 · b 28 · zóny b 28 len pri
+(obsah zahŕňa aj **zapnuté dokreslené vrstvy** — chip Čelá = `frontsExtent` s presahom, chip Kovanie = nohy `nxHwLowestZ` — v Korpuse, Zónach aj Čelách, aby ich fit neorezal a kóta šírky nešla cez ne;
+`pvCabMargins`: korpus a vkladanie l 46 · r 40 · t 30 pri skosení (inak 8) · b 28, rohová b + `DIM_ROW_PX` 18 · čelá l 34 · r 40 · t 8 · b 28 · zóny b 28 len pri
 1 < stĺpcoch ≤ 8 · Kovanie 0 · doska r 40 · b 28) čistou **`nxDimScene(content, margins, rect)`**: mierka `s` je najväčšia, pri ktorej sa zmestí obsah aj okraje + 6 px
 vzduchu (`PV_PAD_PX`), scéna je obsah rozšírený o `(okraj + vzduch) / s`, takže `meet` dá `viewBox` presne mierku `s` (neplatný vstup → `s` = 0,05). `rect` je rozmer
 `#preview` z `getBoundingClientRect` (`pvRect`); pod 50 px (zbalený sektor, skrytý panel, Node) sa kreslí na referencii **404 × 323** a `pvLastRect` sa zabudne.
@@ -510,7 +511,7 @@ kóty visia 18 px pod ním, aj pod presahom čela, D11). Kóty kreslia `pvDimH` 
 `DIM_GAP_FONT_PX` 10, čiara 1 px `non-scaling-stroke`, značky ±4 px, odsadenia `DIM_OFF_PX` 18 / `DIM_OFF_V_PX` 20 / hĺbka `DIM_DEPTH_OFF_PX` 12). Zmestenie popisu rieši čistá
 **`pvFitLabel(lenPx, labels, fontPx)`** (odhad šírky `0,56 · font · znaky`, rezerva 4 px): zvislá kóta dlhý → krátky → **číslo vodorovne vedľa kóty**, vodorovná dlhý →
 krátky vždy nad čiarou; popis čela `pvFrontLabel` v troch stupňoch („F1 · zásuvka 760" → „F1 · 760" → „F1", panel < 12 px popis nemá); čísla medzier Čiel
-`nxSpreadLabels` (rozostup ≥ 11 px, zhluk sa pri hornom okraji vráti nadol); popis zóny a číslo pásma chladničky sa nakreslia, len keď sa zmestia. **Prekreslenie:**
+`nxSpreadLabels` (rozostup ≥ 11 px, zhluk sa pri hornom okraji **scény** `pvSceneTop` — nie priblíženého výrezu — vráti nadol); popis zóny a číslo pásma chladničky sa nakreslia, len keď sa zmestia. **Prekreslenie:**
 Ctrl+koliesko po zmene `viewBox` volá `pvScheduleRender()` (najviac raz za snímku cez `requestAnimationFrame`, bez neho `setTimeout` 16; počas `dragState` nič),
 `ResizeObserver` na `#preview` volá `pvOnResize(w, h)` (prekreslí pri zmene ≥ 1 px a obe strany ≥ 50 px; bez `ResizeObserver` sa nič neregistruje); posun pohľadu (pan)
 mierku nemení, preto neprekresľuje. Testy `tests/js/test_h6c_koty.js` + golden `tests/fixtures/h6c_koty/`.
@@ -538,9 +539,9 @@ mierku nemení, preto neprekresľuje. Testy `tests/js/test_h6c_koty.js` + golden
   trčiace telo. Rozmery generického tela sú zrkadlom Ruby (`PV_DW_BODY`, `PV_DW_BASE_H`, `PV_DW_BASE_SIDE`; guard test).
 - **Kontrolná geometria chladničky** (`preview.appliances[]`, kolekcia adresovaná `item_id`): `{item_id, label, box{x,z,w,h}, bands[…], split{…} | nil, state}` v mm
   a súradniciach korpusu; geometria z `Construction.appliance_niche_references` (tá istá ako builder), verdikt z Kontroly. `drawApplianceRefs` len v Korpuse: box
-  prerušovane (teal, pri `clash` jantár), pásma dverí (číslo pásma 11 px, len keď sa pásmo zmestí na výšku písma), pásmo prípustnej hrany (konce vľavo od pásma, „hrana NNN"
-  nad čiarou zarovnané k pravému okraju boxu dovnútra); `na`/`unknown`/`unsatisfiable` pásmo nekreslí; model bez údajov o dverách má `bands`
-  prázdne. Scéna `nxRefExtent`. Globál `applPreview` plní `bridge.js`, chýbajúci kľúč = prázdne pole, odchod z výberu ho zahodí.
+  prerušovane (teal, pri `clash` jantár), pásma dverí (číslo pásma 11 px, len keď sa pásmo zmestí na výšku písma), pásmo prípustnej hrany (konce pásma a „hrana NNN" v jednom stĺpci vpravo **dovnútra boxu** — `pvApplLabels`:
+  rozotlačené, „hrana 695" → „695" → nič podľa šírky boxu v px; číslo pásma sa pri kolízii s nimi vynechá); `na`/`unknown`/`unsatisfiable` pásmo nekreslí;
+  model bez údajov o dverách má `bands` prázdne. Scéna `nxRefExtent`. Globál `applPreview` plní `bridge.js`, chýbajúci kľúč = prázdne pole, odchod z výberu ho zahodí.
 - **Značka kovania má `data-owner`** (`owner_part_key`): klik → `nxHwMarkPick` v `hardware.js` (označí vlastníka a dotiahne jeho box v Kovaní).
 
 **Spodný pás** (`.pvbar`, `renderPvBar`): **chipy vrstiev** Zóny·Čelá·Kovanie·Olep — chip kontextu je základ, ostatné sa prisvietia ako ghost (tlmené,

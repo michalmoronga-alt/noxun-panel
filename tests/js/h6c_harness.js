@@ -8,7 +8,7 @@ const vm = require('node:vm');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..', '..');
-const JS = path.join(ROOT, 'noxun_engine', 'ui', 'js');
+const JS = process.env.H6C_JS_DIR || path.join(ROOT, 'noxun_engine', 'ui', 'js'); // generator goldenu: H6C_JS_DIR = kopia STAREHO kodu
 const TYPES = require('./nx_types_fixture.js');
 
 function plain(v){ return (v && typeof v === 'object') ? JSON.parse(JSON.stringify(v)) : v; }
@@ -88,9 +88,9 @@ const CASES = [
     items: [{ id: 'F1', type: 'door', mode: 'fixed', z: 102, height: 1400, wings_n: 1, profile: 'none' },
             { id: 'F2', type: 'door', mode: 'auto', z: 1505, height: 593, wings_n: 1, profile: 'none' }] },
   { id: 'fronts_presah', mode: 'fronts', type: 'lower', fields: { width: 800, height: 864, depth: 520 },
-    items: [{ id: 'F1', type: 'drawer_front', mode: 'fixed', z: -20, height: 180, wings_n: 1, profile: 'none' },
-            { id: 'F2', type: 'door', mode: 'auto', z: 163, height: 699, wings_n: 2, profile: 'none' },
-            { id: 'F3', type: 'none', mode: 'fixed', z: 100, height: 60, wings_n: 1, profile: 'none' }] },
+    items: [{ id: 'F1', type: 'drawer_front', mode: 'fixed', z: -20, height: 120, wings_n: 1, profile: 'none' },
+            { id: 'F3', type: 'none', mode: 'fixed', z: 103, height: 60, wings_n: 1, profile: 'none' },
+            { id: 'F2', type: 'door', mode: 'auto', z: 166, height: 696, wings_n: 2, profile: 'none' }] },
   { id: 'zones_4', mode: 'zones', type: 'lower', fields: { width: 800, height: 864, depth: 520 },
     zones: leafZones([{ w: 1, shelves: 2 }, { w: 1, shelves: 1 }, { w: 1, shelves: 0 }, { w: 1, shelves: 3 }], 800, 864, 18, 100) },
   { id: 'hw_lower', mode: 'hw', type: 'lower', fields: { width: 800, height: 864, depth: 520 },
