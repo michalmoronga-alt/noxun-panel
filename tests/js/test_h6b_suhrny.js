@@ -223,8 +223,23 @@ function PV_TITLE_OF(c){ return { zony: 'Zóny', cela: 'Čelá', kovanie: 'Kovan
   eq(HW.hwSetsMetaText([E({ generic_type: 'slide', compat: { cab: null, owners: { 'front:F1': { current: null, stored: false } } },
                             owner_overrides: { 'front:F1': { invalid: true } } })]), '1 vlastný',
      'T4 (Codex P2): poskodeny zapis klasifikovaneho vlastnika sa rata raz');
-  eq(HW.hwSetsMetaText([E({ generic_type: 'slide', override_set_id: 'S9', compat: { cab: null, owners: {} } })]), '1 vlastný',
-     'T4 (Codex P2): zmiesana skrinka (cab = null) - platny je kluc typu');
+  // Zmiesana skrinka (cab = null): kluc typu plati LEN s polozkou mimo compat.owners (legacy).
+  const OW2 = { 'front:F1': { current: null, stored: false }, 'front:F2': { current: null, stored: false } };
+  const SL = (owner) => ({ generic_type: 'slide', owner_part_key: owner, quantity: 1 });
+  eq(HW.hwSetsMetaText([E({ generic_type: 'slide', override_set_id: 'S9', compat: { cab: null, owners: OW2 } })], [SL('front:F1'), SL('front:F2')]),
+     'podľa projektu', 'T4 (P2 delta): dve triedy zasuviek, ziadna legacy polozka - kluc typu nikto necita');
+  eq(HW.hwSetsMetaText([E({ generic_type: 'slide', override_set_id: 'S9', compat: { cab: null, owners: OW2 } })]),
+     'podľa projektu', 'T4 (P2 delta): bez zoznamu poloziek sa kluc typu nerata');
+  eq(HW.hwSetsMetaText([E({ generic_type: 'slide', override_set_id: 'S9', compat: { cab: null, owners: OW2 } })],
+                       [SL('front:F1'), SL('front:F2'), SL('front:F3')]),
+     '1 vlastný', 'T4 (P2 delta): zmiesana skrinka s legacy polozkou (F3 mimo compat.owners) - kluc typu plati');
+  eq(HW.hwSetsMetaText([E({ generic_type: 'slide', override_selector: { param: 'x' }, compat: { cab: null, owners: OW2 } })],
+                       [SL('front:F1'), SL('')]),
+     '1 vlastný', 'T4 (P2 delta): polozka bez vlastnika je legacy - kluc typu plati (selector)');
+  eq(HW.hwSetsMetaText([E({ generic_type: 'slide', override_set_id: 'S9', compat: { cab: null, owners: OW2 } })],
+                       [{ generic_type: 'hinge', owner_part_key: 'front:F3' }, SL('front:F1')]),
+     'podľa projektu', 'T4 (P2 delta): legacy polozka INEHO typu kluc typu slide nezapne');
+  eq(HW.hwSetsMetaText([E({ override_set_id: 'S9' })], []), '1 vlastný', 'T4: bez klasifikacie plati kluc typu aj bez zoznamu poloziek');
   eq(HW.hwSetsMetaText([E({ generic_type: 'slide', override_set_id: 'S9', compat: { cab: { current: null, stored: false }, owners: {} } })]),
      'podľa projektu', 'T4 (Codex P2): klasifikovana skrinka - dormantny kluc typu sa nerata');
   // refreshHardwareManual (lahky push rucnych poloziek) obnovi meta skupiny AJ listu sektora.
@@ -237,6 +252,16 @@ function PV_TITLE_OF(c){ return { zony: 'Zóny', cela: 'Čelá', kovanie: 'Kovan
     HW.refreshHardwareManual([{ id: 'a' }, { id: 'b' }]);
     eq(nodes.hwItemsMeta.textContent, '4 ks · 2 ručne', 'T4: refreshHardwareManual - meta skupiny Polozky');
     eq(applied, 1, 'T4 (P3): refreshHardwareManual obnovi aj listu sektora Kovanie');
+    // Hlavicka Sety dostane polozky z `hwItems` (kluc typu plati len s legacy polozkou) - cesta panela.
+    const OPT = [{ generic_type: 'slide', override_set_id: 'S9', owner_overrides: {},
+                   compat: { cab: null, owners: { 'front:F1': { current: null, stored: false }, 'front:F2': { current: null, stored: false } } } }];
+    const slideOf = o => ({ generic_type: 'slide', owner_part_key: o, quantity: 1 });
+    global.hwItems = [slideOf('front:F1'), slideOf('front:F2')];
+    HW.refreshHardwareSets(OPT);
+    eq(nodes.hwSetsMeta.textContent, 'podľa projektu', 'T4 (P2 delta): hlavicka Sety - dve triedy bez legacy polozky');
+    global.hwItems = [slideOf('front:F1'), slideOf('front:F2'), slideOf('front:F3')];
+    HW.refreshHardwareSets(OPT);
+    eq(nodes.hwSetsMeta.textContent, '1 vlastný', 'T4 (P2 delta): hlavicka Sety - s legacy polozkou plati kluc typu');
     delete global.nxSectorMetaApply; delete global.el; delete global.hwItems; delete global.hwManualView;
   }
 }

@@ -713,7 +713,7 @@ Medzery v projekcii Čelá sa podfarbia jantárovo pri **kurzore v poli schémy*
 **Čo robí:** kovanie označenej skrinky — položky z pravidiel podľa vlastníka, ručne pridané položky, sety a pravidlá. Tri skupiny v **záväznom poradí**:
 **Položky z pravidiel** (`hwitems`) · **Sety** (`hwsets`) · **Pravidlá** (`hwrules`). Kostra je statická, JS píše obsah kontajnerov `#hwRows`, `#hwSetRows`
 a riadok Nôh `#legsRow` (Základné) — `refreshHardwareSets` obnovuje selecty vo **všetkých troch**. **Meta skupín (H6b):** `#hwItemsMeta` („6 ks", pri ručných „· 2 ručne"; `hwItemsMetaText`) a `#hwSetsMeta` („podľa projektu" / „1 vlastný" …; `hwSetsMetaText` — skrinkový
-výber `override_set_id`/`override_selector`, výbery pri čelách: legacy vlastníci z `owner_overrides` + klasifikovaní z `compat.owners`, každý vlastník raz; skrinka pri jednej triede `compat.cab`, inak kľúč typu) plní `hwMetaApply` na konci
+výber `override_set_id`/`override_selector`, výbery pri čelách: legacy vlastníci z `owner_overrides` + klasifikovaní z `compat.owners`, každý vlastník raz; skrinka pri jednej triede `compat.cab`, inak kľúč typu — pri zmiešanej skrinke (`compat.cab` null) len ak má typ položku mimo `compat.owners`, `hwHasLegacyItem`) plní `hwMetaApply` na konci
 `renderHardware`, v `refreshHardwareSets` a `refreshHardwareManual`; skupina Pravidlá meta nemá. Dáta: `cabinet_payload` (`config.hardware`, `purchase`,
 `compat`, `hardware_manual_view`, `front_drawer` …); zápis existujúcimi akciami `set_hardware_override` / `set_hardware_set` (`actions_hardware.rb`) a `apply_all`.
 Detail domény: [hardware.md](hardware.md).
