@@ -630,11 +630,25 @@ module Noxun
         # zmenili". Kusovnik sa pritom nezmenil — zmenila sa LISTA. Ide preto
         # cielene echo (vzor `push_edge_check`), ktore prepise len jej obsah
         # a generaciu NECHA TAK.
+        #
+        # H7a / R-38: kazdy zapis vracia `[status, reason]` (`ExportSettings`)
+        # a okno ho povie PRAVDIVO — zlyhanie nikdy zeleno (O8): poskodeny
+        # subor (:blocked) alebo necitatelny (:unreadable) cerveno s dovodom,
+        # ina chyba (:failed) cerveno „skús znova". Echo `push_vepo_bar` ide
+        # VZDY, aj pri zlyhani — pole a checkbox ukazu ulozenu pravdu, nie
+        # napisany text. Rozhoduje sa `case`, nikdy pravdivostou (pole je v Ruby
+        # vzdy pravdive).
         def do_set_vepo_opts(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
           model = Sketchup.active_model
           unless data['gen'].to_i == @generation.to_i
             push_state if @dialog && @dialog.visible?
+            # H7a (D6): napisany nazov sa pri zastaranom okne NEULOZIL — povedat
+            # to vyslovne, inak by sa stratil potichu.
+            if data.key?('project')
+              return set_status('Okno sa medzitým prepočítalo — názov zákazky sa neuložil, zadaj ho znova.', true)
+            end
+
             return set_status('Okno sa medzitým prepočítalo — obnovené, skús znova.', true)
           end
           # Tolerantne ako `ProductionCore.do_budget`: prazdny udaj z klienta
@@ -645,20 +659,37 @@ module Noxun
           end
 
           msg = []
+          failed = false
           if data.key?('project')
-            ExportSettings.save_project_name(model, data['project'])
-            name = ExportSettings.project_name(model)
-            msg << "Názov projektu: #{name}"
+            status, why = ExportSettings.save_project_name(model, data['project'])
+            case status
+            when :ok, :unchanged
+              msg << "Názov zákazky: #{ExportSettings.project_name(model)} · platí pre VEPO, kovanie, rozpočet aj ponuku"
+            when :blocked, :unreadable
+              failed = true
+              msg << "Názov zákazky sa neuložil: #{why}"
+            else
+              failed = true
+              msg << 'Názov zákazky sa nepodarilo uložiť — skús znova'
+            end
           end
           if data.key?('merge')
-            ExportSettings.save_merge_18_36(data['merge'] == true)
-            merge = ExportSettings.merge_18_36
-            msg << "18+36 spolu: #{merge ? 'zapnuté' : 'vypnuté'}"
+            status, why = ExportSettings.save_merge_18_36(data['merge'] == true)
+            case status
+            when :ok, :unchanged
+              msg << "18 + 36 spolu: #{ExportSettings.merge_18_36 ? 'zapnuté' : 'vypnuté'} · platí pre VEPO export"
+            when :blocked, :unreadable
+              failed = true
+              msg << "Nastavenie 18 + 36 sa neuložilo: #{why}"
+            else
+              failed = true
+              msg << 'Nastavenie 18 + 36 sa nepodarilo uložiť — skús znova'
+            end
           end
           return set_status('Nič sa nezmenilo.', true) if msg.empty?
 
           push_vepo_bar(model)
-          set_status("#{msg.join(' · ')}. Platí pre všetky exporty.")
+          set_status("#{msg.join('. ')}.", failed)
         end
 
         # Maly echo push LISTY sekcie (nazov projektu + merge). Nezdviha

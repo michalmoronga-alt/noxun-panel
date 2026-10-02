@@ -668,6 +668,12 @@ NxTest.test('H7a T-A11: cakajuci nazov — plati v sedeni, 4 exporty pripoja vet
       NxTest.assert(msg.end_with?(note), "#{exp}: veta na konci statusu: #{msg}")
       NxTest.refute(err, "#{exp}: farba statusu bez zmeny")
     end
+    if NxTest.headless?
+      txt, red, bar = NxH7A.opts(m, 'project' => 'Iny nazov')
+      NxTest.assert(txt.start_with?('Názov zákazky sa neuložil: nastavenia exportu sú poškodené'), txt)
+      NxTest.assert_equal(true, red, 'premenovanie pri cakajucom nazve = cervene :blocked')
+      NxTest.assert_equal('Zakazka L', bar['project'])
+    end
     reopened = NxH7A::MODEL.new('C:/Zakazky/L.skp', 'REOPEN')
     NxTest.assert_equal('L', NxH7A::S.project_name(reopened), 'bez opravy sa po znovuotvoreni strati (priznane)')
     # oprava v povodnom okne
@@ -692,6 +698,157 @@ NxTest.test('H7a T-A11: zdravy subor — name_pending? nikdy true, exporty bez v
     NxTest.refute(NxH7A::S.name_pending?(NxH7A.model), 'bez nazvu')
     msg, = NxH7A.export_status(:do_hw_csv, m)
     NxTest.refute(msg.include?('pozor: názov zákazky'), msg)
+  end
+end
+
+# =============================================================================
+# T-A8 OKNO — `StudioDialog#do_set_vepo_opts` (R-A7, O8)
+# =============================================================================
+
+require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog') if NxTest.headless?
+
+module NxH7A
+  SD = E::StudioDialog
+  GEN = 7
+
+  module_function
+
+  # Okno bez SketchUpu: `js` zachytava skripty (status aj echo idu realnym
+  # `set_status`/`push_vepo_bar`), `push_state` sa len pocita.
+  def with_window(mdl)
+    scripts = []
+    pushes = []
+    sk = Module.new
+    sk.define_singleton_method(:active_model) { mdl }
+    Object.const_set(:Sketchup, sk)
+    prev_gen = SD.instance_variable_get(:@generation)
+    SD.instance_variable_set(:@generation, GEN)
+    sc = SD.singleton_class
+    sc.send(:alias_method, :h7a_orig_js, :js)
+    sc.send(:alias_method, :h7a_orig_push_state, :push_state)
+    sc.send(:define_method, :js) { |s| scripts << s; true }
+    sc.send(:define_method, :push_state) { |*_a, **_k| pushes << :push_state; true }
+    yield scripts, pushes
+  ensure
+    sc.send(:remove_method, :js)
+    sc.send(:remove_method, :push_state)
+    sc.send(:alias_method, :js, :h7a_orig_js)
+    sc.send(:alias_method, :push_state, :h7a_orig_push_state)
+    sc.send(:remove_method, :h7a_orig_js)
+    sc.send(:remove_method, :h7a_orig_push_state)
+    sc.send(:private, :js)
+    SD.instance_variable_set(:@generation, prev_gen)
+    Object.send(:remove_const, :Sketchup) if Object.const_defined?(:Sketchup, false)
+  end
+
+  # -> [text, cervene?, echo (Hash alebo nil), pocet push_state, generacia po]
+  def opts(mdl, data, gen = GEN)
+    out = nil
+    with_window(mdl) do |scripts, pushes|
+      SD.do_set_vepo_opts({ 'gen' => gen, 'model_guid' => PC.model_guid(mdl) }.merge(data))
+      st = scripts.reverse.find { |s| s.start_with?('NX.setStatus(') }.to_s
+      m = st.match(/\ANX\.setStatus\((.*), (true|false)\)\z/m)
+      bar = scripts.find { |s| s.include?('NX.setVepoBar(') }.to_s[/NX\.setVepoBar\((.*)\);\z/m, 1]
+      out = [m ? JSON.parse(m[1]) : nil, m ? m[2] == 'true' : nil, bar ? JSON.parse(bar) : nil,
+             pushes.length, SD.instance_variable_get(:@generation)]
+    end
+    out
+  end
+
+  def degraded!
+    write_raw(path, '[]')
+    write_raw("#{path}.bak", GOOD)
+  end
+end
+
+NxTest.test('H7a T-A8: okno — uspech zeleno, poskodeny subor / necitatelny / zlyhanie cerveno, echo VZDY') do
+  NxTest.skip!('vyzaduje headless sandbox') unless NxTest.headless?
+  NxH7A.with_sandbox do
+    m = NxH7A.model
+    NxH7A.write_raw(NxH7A.path, NxH7A::PRIMARY)
+    txt, red, bar, pushes, gen = NxH7A.opts(m, 'project' => 'Kuchyňa Novák')
+    NxTest.assert_equal('Názov zákazky: Kuchyňa Novák · platí pre VEPO, kovanie, rozpočet aj ponuku.', txt)
+    NxTest.assert_equal(false, red)
+    NxTest.assert_equal('Kuchyňa Novák', bar['project'], 'echo nesie ulozeny nazov')
+    NxTest.assert_equal([0, NxH7A::GEN], [pushes, gen], 'uspech nedviha generaciu ani plny prepocet')
+
+    NxH7A.degraded!
+    txt, red, bar = NxH7A.opts(m, 'project' => 'Napisany')
+    NxTest.assert_equal("Názov zákazky sa neuložil: #{format(NxH7A::S::DEGRADED_REASON, NxH7A.path)}.", txt)
+    NxTest.assert_equal(true, red, 'zlyhanie NIKDY zeleno')
+    NxTest.assert_equal('Zo zalohy', bar['project'], 'echo = ulozena pravda (zaloha), nie napisany text')
+
+    NxH7A.write_raw(NxH7A.path, NxH7A::UNREADABLE)
+    File.delete("#{NxH7A.path}.bak")
+    NxH7A::STORE.invalidate
+    txt, red, bar = NxH7A.opts(m, 'project' => 'Napisany')
+    NxTest.assert_equal("Názov zákazky sa neuložil: #{format(NxH7A::S::UNREADABLE_REASON, NxH7A.path)}.", txt)
+    NxTest.assert_equal(true, red)
+    NxTest.assert_equal('A', bar['project'], 'echo aj pri necitatelnom subore')
+
+    NxH7A.write_raw(NxH7A.path, NxH7A::PRIMARY)
+    NxH7A.with_lock_probe(raise_error: IOError.new('zamok (test)')) do
+      txt, red, bar = NxH7A.opts(m, 'project' => 'Napisany')
+    end
+    NxTest.assert_equal('Názov zákazky sa nepodarilo uložiť — skús znova.', txt)
+    NxTest.assert_equal(true, red)
+    NxTest.assert_equal('Primar', bar['project'])
+  end
+end
+
+NxTest.test('H7a T-A8: okno — 18 + 36 rovnako (uspech, poskodeny, zlyhanie) a spojenie dvoch viet') do
+  NxTest.skip!('vyzaduje headless sandbox') unless NxTest.headless?
+  NxH7A.with_sandbox do
+    m = NxH7A.model
+    NxH7A.write_raw(NxH7A.path, NxH7A::PRIMARY)
+    txt, red, bar = NxH7A.opts(m, 'merge' => true)
+    NxTest.assert_equal('18 + 36 spolu: zapnuté · platí pre VEPO export.', txt)
+    NxTest.assert_equal(false, red)
+    NxTest.assert_equal(true, bar['merge_18_36'])
+    txt, = NxH7A.opts(m, 'merge' => false)
+    NxTest.assert_equal('18 + 36 spolu: vypnuté · platí pre VEPO export.', txt)
+
+    NxH7A.degraded!
+    txt, red, bar = NxH7A.opts(m, 'merge' => true)
+    NxTest.assert_equal("Nastavenie 18 + 36 sa neuložilo: #{format(NxH7A::S::DEGRADED_REASON, NxH7A.path)}.", txt)
+    NxTest.assert_equal(true, red)
+    NxTest.assert_equal(false, bar['merge_18_36'], 'checkbox ukaze ulozenu pravdu (zaloha = vypnute)')
+
+    NxH7A.write_raw(NxH7A.path, NxH7A::PRIMARY)
+    NxH7A.with_lock_probe(raise_error: IOError.new('zamok (test)')) do
+      txt, red = NxH7A.opts(m, 'merge' => true)
+    end
+    NxTest.assert_equal('Nastavenie 18 + 36 sa nepodarilo uložiť — skús znova.', txt)
+    NxTest.assert_equal(true, red)
+
+    # dve vety naraz — cervena, ak ktorakolvek zlyhala
+    txt, red = NxH7A.opts(m, 'project' => 'Spolu', 'merge' => true)
+    NxTest.assert_equal('Názov zákazky: Spolu · platí pre VEPO, kovanie, rozpočet aj ponuku. ' \
+                        '18 + 36 spolu: zapnuté · platí pre VEPO export.', txt)
+    NxTest.assert_equal(false, red)
+    txt, red = NxH7A.opts(m, 'merge' => 'x')
+    NxTest.assert(txt.start_with?('18 + 36 spolu: vypnuté'), txt)
+    NxTest.assert_equal('Nič sa nezmenilo.', NxH7A.opts(m, {}).first)
+    _t, red = NxH7A.opts(m, {})
+    NxTest.assert_equal(true, red)
+  end
+end
+
+NxTest.test('H7a T-A8: zastarana generacia s nazvom — nova veta, nic sa nezapise, okno sa obnovi') do
+  NxTest.skip!('vyzaduje headless sandbox') unless NxTest.headless?
+  NxH7A.with_sandbox do
+    m = NxH7A.model
+    NxH7A.write_raw(NxH7A.path, NxH7A::PRIMARY)
+    before = NxH7A.snapshot
+    txt, red, bar, _pushes, gen = NxH7A.opts(m, { 'project' => 'Napisany' }, NxH7A::GEN - 1)
+    NxTest.assert_equal('Okno sa medzitým prepočítalo — názov zákazky sa neuložil, zadaj ho znova.', txt)
+    NxTest.assert_equal(true, red)
+    # plny prepocet ide len do ZIVEHO okna (headless `@dialog` nie je) — echo listy nie
+    NxTest.assert_equal(nil, bar, 'bez zapisu ziadne echo listy')
+    NxTest.assert_equal(NxH7A::GEN, gen)
+    NxTest.assert_equal(before, NxH7A.snapshot, 'nic sa nezapisalo')
+    txt, = NxH7A.opts(m, { 'merge' => true }, NxH7A::GEN - 1)
+    NxTest.assert_equal('Okno sa medzitým prepočítalo — obnovené, skús znova.', txt, 'bez nazvu dnesna veta')
   end
 end
 
