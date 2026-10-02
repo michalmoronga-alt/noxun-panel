@@ -724,8 +724,13 @@ NxTest.test('ST-1a: VSETKY STYRI exporty citaju nazov zo SERVERA — z DOM uz ne
   # ŠT-1c PR A: telo CSV kovania sa prestahovalo do jadra; PR B1 tam presunula
   # aj oba XLSX exporty. VSETKY STYRI teda citaju nazov v ZDIELANOM jadre —
   # dve kopie by sa casom rozisli.
-  NxTest.assert_equal(4, ST1B_CORE_RB.scan(/project = ExportSettings\.project_name\(model\)/).length,
-                      'VEPO, CSV kovania, XLSX rozpoctu aj XLSX cenovej ponuky citaju nazov v jadre')
+  NxTest.assert_equal(3, ST1B_CORE_RB.scan(/project = ExportSettings\.project_name\(model\)/).length,
+                      'CSV kovania, XLSX rozpoctu aj XLSX cenovej ponuky citaju nazov v jadre')
+  # Predrecenzia H7b P3: VEPO berie nazov OVERENY v brane `expect` (jadro,
+  # `ExportSettings.expect_check` -> `project_name`), nie znova po vybere priecinka.
+  NxTest.assert(ST1B_CORE_RB.include?('project = gate[:project]') &&
+                ST1B_SETTINGS_RB.include?('project = project_name(model)'),
+                'VEPO cita nazov v jadre (overeny v brane)')
   # Komentare (ktore o zaniknutej ceste hovoria) sa vynechavaju — hlada sa KOD.
   strip = ->(src) { src.lines.map { |l| l.sub(/#.*$/, '') }.join }
   NxTest.refute(strip.call(ST1B_CORE_RB).include?("data['project']"),
@@ -745,7 +750,8 @@ end
 NxTest.test('ST-1a: merge 18+36 je GLOBALNE nastavenie a chodi v KAZDOM pushi (audit #16)') do
   NxTest.assert(ST1B_SETTINGS_RB.include?("read['merge_18_36'] != false"),
                 'default je zapnute')
-  NxTest.assert(ST1B_CORE_RB.include?('merge = ExportSettings.merge_18_36'),
+  # Predrecenzia H7b P3: hodnota OVERENA v brane `expect` (server ju cita sam).
+  NxTest.assert(ST1B_CORE_RB.include?('merge = gate[:merge]') && ST1B_SETTINGS_RB.include?('now = merge_18_36'),
                 'export cita merge zo SERVERA, nie z checkboxu')
   # H7b (R-B1): payload aj echo sklada JEDNA funkcia jadra (`vepo_payload`).
   NxTest.assert(ST1B_STUDIO_RB.include?('vepo: ProductionCore.vepo_payload(model)') &&

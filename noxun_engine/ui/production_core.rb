@@ -241,10 +241,13 @@ module Noxun
 
       # Audit H7 §16 B2 / §17 C1: brana `expect` v styroch exportoch — po
       # branach generacie a `flush_blocked` a po `ExportSettings.refresh`, PRED
-      # zberom a vyberom suboru. nil = pokracuj; inak veta (export sa nespusti,
-      # echo hlavicky posle okno po navrate).
-      def export_expect_stop(model, data, merge: false)
-        ExportSettings.expect_mismatch(model, data['expect'], merge: merge)
+      # zberom a vyberom suboru. -> `ExportSettings.expect_check` Hash:
+      # `:stop` (veta = export sa nespusti, echo hlavicky posle okno po
+      # navrate), `:note` (automaticky nazov sa medzitym zmenil — veta na
+      # koniec statusu), `:project`/`:merge` = OVERENE hodnoty (VEPO ich pouzije
+      # aj po zatvoreni vyberu priecinka — predrecenzia H7b P3).
+      def export_expect_check(model, data, merge: false)
+        ExportSettings.expect_check(model, data['expect'], merge: merge)
       end
 
       # --- Mapy katalogov + identita modelu --------------------------------
@@ -1690,8 +1693,8 @@ module Noxun
         ExportSettings.refresh # 1b-6c: nazov aj 18/36 z CERSTVEHO suboru
         # H7b (§16 B2, §17 C1): okno musi vidiet to, co plati — nazov AJ 18 + 36
         # (len VEPO ich oba pouziva). Nesulad / stary klient = export sa nespusti.
-        expect_stop = export_expect_stop(model, data, merge: true)
-        return status.call(expect_stop, true) if expect_stop
+        gate = export_expect_check(model, data, merge: true)
+        return status.call(gate[:stop], true) if gate[:stop]
 
         # Nalez 5: JEDEN cerstvy RAW zber -> nad nim compute AJ kontrola;
         # validaciu EXPLICITNE odovzdame do build (prefix statusu + sekcia
@@ -1736,8 +1739,11 @@ module Noxun
                                                                     nil, hw_exp, smap),
                                              sheets: smap)
         # audit #1: nazov projektu aj merge su SERVEROVE — z DOM uz nechodia.
-        merge = ExportSettings.merge_18_36
-        project = ExportSettings.project_name(model)
+        # Predrecenzia H7b P3: hodnoty OVERENE v brane `expect` (pred vyberom
+        # priecinka) — druha instancia SketchUpu ich pocas modalneho vyberu
+        # mohla zmenit a VEPO by odislo s inym 18 + 36, nez okno ukazovalo.
+        merge = gate[:merge]
+        project = gate[:project]
         result = VepoExport.build(
           bom[:rows],
           project: project,
@@ -1763,7 +1769,7 @@ module Noxun
         ExportSettings.save_last_dir(dir)
         # H7a (§15 A1): nazov caka na prenos k suboru -> veta na konci statusu.
         # H7b (R-B3): export pomenovany predvolenym „projekt" -> veta (vylucuju sa).
-        pending = "#{pending_name_note(model)}#{default_name_note(model, project)}"
+        pending = "#{pending_name_note(model)}#{default_name_note(model, project)}#{gate[:note]}"
         if result['groups'].empty?
           return status.call("Export nevytvoril žiadny CSV — #{result['errors'].length} chybných riadkov. " \
                              "Dôvody v LOGu: #{target}#{ctrl}#{pending}", true)
@@ -1804,8 +1810,8 @@ module Noxun
 
         ExportSettings.refresh # 1b-6c: nazov zakazky z CERSTVEHO suboru
         # H7b (§16 B2, §17 C1): nazov, ktory okno ukazuje, musi platit.
-        expect_stop = export_expect_stop(model, data)
-        return status.call(expect_stop, true) if expect_stop
+        gate = export_expect_check(model, data)
+        return status.call(gate[:stop], true) if gate[:stop]
         collected = fresh_collect(model)
         # KOV-H1 / review #283 P2-B: brana NOVSEJ SCHEMY musi padnut HNED po
         # zbere — pred expanziou aj pred „niet co exportovat". Skrinka z novsej
@@ -1852,7 +1858,7 @@ module Noxun
         dup = dup_id_suffix(warn_dups)
         status.call("Nákupný zoznam: #{n} položiek" \
                     "#{un.positive? ? " + #{un} nemapovaných (v CSV aj KONTROLE)" : ''} → #{target}#{dup}" \
-                    "#{pending_name_note(model)}#{default_name_note(model, project)}",
+                    "#{pending_name_note(model)}#{default_name_note(model, project)}#{gate[:note]}",
                     un.positive? || !dup.empty?)
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_hw_csv')
@@ -3275,8 +3281,8 @@ module Noxun
 
         ExportSettings.refresh # 1b-6c: nazov zakazky z CERSTVEHO suboru
         # H7b (§16 B2, §17 C1): nazov, ktory okno ukazuje, musi platit.
-        expect_stop = export_expect_stop(model, data)
-        return status.call(expect_stop, true) if expect_stop
+        gate = export_expect_check(model, data)
+        return status.call(gate[:stop], true) if gate[:stop]
         collected = fresh_collect(model)
         # KOV-H1 / review #283 P2-B: brana novsej schemy PRED vsetkym ostatnym —
         # aj pred „rozpocet sa nepodarilo zostavit" a pred `budget_std_block`,
@@ -3337,7 +3343,8 @@ module Noxun
         # exportoval (repush PRED statusom — push by status inak prekryl).
         repush.call if budget['plan_prices'] == true
         status.call("Rozpočet uložený: #{fmt_eur(totals['total'])} → #{target}#{warn}#{dup}" \
-                    "#{plan_export_note(budget)}#{pending_name_note(model)}#{default_name_note(model, project)}",
+                    "#{plan_export_note(budget)}#{pending_name_note(model)}#{default_name_note(model, project)}" \
+                    "#{gate[:note]}",
                     !warn.empty? || !dup.empty?)
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_budget_xlsx')
@@ -3363,8 +3370,8 @@ module Noxun
 
         ExportSettings.refresh # 1b-6c: nazov zakazky z CERSTVEHO suboru
         # H7b (§16 B2, §17 C1): nazov, ktory okno ukazuje, musi platit.
-        expect_stop = export_expect_stop(model, data)
-        return status.call(expect_stop, true) if expect_stop
+        gate = export_expect_check(model, data)
+        return status.call(gate[:stop], true) if gate[:stop]
         collected = fresh_collect(model)
         # KOV-H1 / review #283 P2-B: TA ISTA brana ako pri rozpocte — najprv.
         newer_stop = newer_config_stop(collected)
@@ -3426,7 +3433,8 @@ module Noxun
         # (len Michalovi, nie zakaznikovi) a okno sa obnovi z exportovaneho stavu.
         repush.call if budget['plan_prices'] == true
         status.call("#{cp_status(cp, spec, target, warnings)}#{plan_export_note(budget)}" \
-                    "#{pending_name_note(model)}#{default_name_note(model, project)}", !warnings.empty?)
+                    "#{pending_name_note(model)}#{default_name_note(model, project)}#{gate[:note]}",
+                    !warnings.empty?)
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_cp_xlsx')
         status.call("Export cenovej ponuky zlyhal: #{e.message}", true)

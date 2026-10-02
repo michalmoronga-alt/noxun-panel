@@ -1348,9 +1348,13 @@
 
   // Kópia pre exportné volanie (`expect`). Globál súboru — číta ho aj
   // `js/budget.js` (XLSX rozpočtu a ponuky).
+  // `source` = zdroj názvu, ktorý hlavička PRÁVE ukazuje (`set`/`file`/
+  // `default`; spresnenie §17 C1): automatický → automatický názov server
+  // toleruje (napr. model sa medzitým uložil), zadaný nie.
   function nxVepoExpect(){
-    return { project: String(VEPO_EXPECT.project == null ? '' : VEPO_EXPECT.project),
-             merge: VEPO_EXPECT.merge !== false };
+    var project = String(VEPO_EXPECT.project == null ? '' : VEPO_EXPECT.project);
+    return { project: project, merge: VEPO_EXPECT.merge !== false,
+             source: jobView((ST && ST.vepo) || {}, project).src };
   }
 
   function startJobEdit(){

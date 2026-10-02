@@ -378,14 +378,14 @@ function exportCall(name){
     MD.userClick(q(c[1]));
     const names = SENT.map(function(s){ return s[0]; });
     eq(names, ['studio_set_vepo_opts', c[2]], 'T-B11 ' + c[2] + ': najprv zapis nazvu, potom export');
-    eq(exportCall(c[2]).expect, { project: 'Nové meno', merge: true },
+    eq(exportCall(c[2]).expect, { project: 'Nové meno', merge: true, source: 'set' },
        'T-B11 ' + c[2] + ': export nesie `expect` = napisany text a 18 + 36');
     // Echo zlyhania (zapis sa nepodaril — server vrati povodny nazov).
     W.NX.setVepoBar(clone(V.set));
     if (c[0] === 'budget') $('sectools').innerHTML = W.budToolsHtml(budgetPayload(0));
     if (c[0] === 'offer') $('sectools').innerHTML = W.budOfferToolsHtml();
     MD.userClick(q(c[1]));
-    eq(exportCall(c[2]).expect, { project: 'Kuchyňa Novák', merge: true },
+    eq(exportCall(c[2]).expect, { project: 'Kuchyňa Novák', merge: true, source: 'set' },
        'T-B11 ' + c[2] + ': po echu zlyhania `expect` = ulozeny nazov');
   });
 });
@@ -401,7 +401,7 @@ test('T-B11 18+36', function(){
   go('buy');
   ok($('mergeChk') === null, 'T-B11: v Nakupe #mergeChk v DOM nie je');
   MD.userClick($('hwCsvBtn'));
-  eq(exportCall('hw_csv_export').expect, { project: 'Kuchyňa Novák', merge: false },
+  eq(exportCall('hw_csv_export').expect, { project: 'Kuchyňa Novák', merge: false, source: 'set' },
      'T-B11: `expect.merge` z klientskej premennej (nie z DOM)');
 });
 
@@ -412,7 +412,7 @@ test('T-B11 P0-HF', function(){
   MD.userClick(q('[data-bud="xlsx"]'));
   eq(sent('budget_xlsx').length, 0, 'T-B11 P0-HF: neozbrojeny 1. klik nic neposle (len ozbroji)');
   MD.userClick(q('[data-bud="xlsx"]'));
-  eq(exportCall('budget_xlsx'), { gen: 1, confirm_unpriced: 2, expect: { project: 'Kuchyňa Novák', merge: true } },
+  eq(exportCall('budget_xlsx'), { gen: 1, confirm_unpriced: 2, expect: { project: 'Kuchyňa Novák', merge: true, source: 'set' } },
      'T-B11 P0-HF: 2. klik posle potvrdenie AJ `expect`');
   // Server export pre nesulad odmietol a poslal echo — ozbrojenie sa NERUSI
   // (cisla sa nezmenili), dalsi klik posle `expect` znova.
@@ -420,7 +420,27 @@ test('T-B11 P0-HF', function(){
   eq(W.budArmed('xlsx'), 2, 'T-B11 P0-HF: echo ozbrojenie nezrusi');
   MD.userClick(q('[data-bud="xlsx"]'));
   eq(sent('budget_xlsx').length, 2, 'T-B11 P0-HF: ozbrojeny klik ide hned');
-  eq(exportCall('budget_xlsx').expect, { project: 'Kuchyňa Novák', merge: true }, 'T-B11 P0-HF: znova s `expect`');
+  eq(exportCall('budget_xlsx').expect, { project: 'Kuchyňa Novák', merge: true, source: 'set' }, 'T-B11 P0-HF: znova s `expect`');
+});
+
+// Spresnenie §17 C1 (predrecenzia H7b P2): `expect.source` = zdroj, ktory
+// hlavicka PRAVE ukazuje — server podla neho toleruje automaticky → automaticky.
+test('T-B11 source', function(){
+  [['dflt', 'default', 'projekt'], ['file', 'file', 'Kuchyna_Novak'], ['set', 'set', 'Kuchyňa Novák'],
+   ['pending', 'set', 'Zákazka A']].forEach(function(c){
+    push(V[c[0]]);
+    eq(W.nxVepoExpect().source, c[1], 'T-B11 source ' + c[0] + ': zdroj podla hlavicky');
+    eq(W.nxVepoExpect().project, c[2], 'T-B11 source ' + c[0] + ': nazov');
+  });
+  push(V.dflt);
+  go('bom');
+  const inp = openEditor();
+  inp.value = 'Nová zákazka';
+  MD.userKey(inp, 'Enter');
+  eq(clone(W.nxVepoExpect()), { project: 'Nová zákazka', merge: true, source: 'set' },
+     'T-B11 source: po commite editora (optimisticky) = zadany');
+  W.NX.setVepoBar(clone(V.dflt)); // echo zlyhania
+  eq(W.nxVepoExpect().source, 'default', 'T-B11 source: po echu zlyhania = pravda zo servera');
 });
 
 // Relay panela (VEPO, CSV, XLSX) preposiela payload okna CELY — `expect` sa

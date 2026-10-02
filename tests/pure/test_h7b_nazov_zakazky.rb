@@ -44,7 +44,7 @@ module NxH7B
   # Ten isty `expect`, aky by po pushi poslalo okno (payload `vepo`).
   def window_expect(mdl)
     v = PC.vepo_payload(mdl)
-    { 'project' => v['project'], 'merge' => v['merge_18_36'] }
+    { 'project' => v['project'], 'merge' => v['merge_18_36'], 'source' => v['source'] }
   end
 
   # Jeden export nad sandboxom (nazov a nastavenia SKUTOCNE, zber stubnuty).
@@ -238,19 +238,19 @@ NxTest.test('H7b T-B11: zlyhany zapis nazvu — export s `expect` sa ODMIETNE pr
     end
     NxTest.assert_equal(:failed, st.first, 'zapis nazvu zlyhal (zamok)')
     NxH7B::EXPORTS.each do |exp|
-      r = NxH7B.run(exp, m, 'expect' => { 'project' => 'Nový', 'merge' => true })
+      r = NxH7B.run(exp, m, 'expect' => { 'project' => 'Nový', 'merge' => true, 'source' => 'set' })
       NxTest.assert(r[:pickers].empty?, "#{exp}: vyber suboru sa NEOTVORIL")
       NxTest.assert(r[:files].empty?, "#{exp}: ziadny subor")
       NxTest.assert_equal(0, r[:collects], "#{exp}: odmietnutie PRED zberom modelu")
       NxTest.assert(r[:err], "#{exp}: cerveno")
-      NxTest.assert_equal('Názov zákazky sa neuložil (platí „Stary") — export sa nespustil, skontroluj názov a klikni znova.',
+      NxTest.assert_equal('Názov zákazky sa medzitým zmenil — platí „Stary". Export sa nespustil, skontroluj názov a klikni znova.',
                           r[:msg], exp.to_s)
     end
     # zapis uspeje -> export prejde a mena = to, co skladac (a golden T0c) hovori
     NxTest.assert_equal([:ok, ''], NxH7B::S.save_project_name(m, 'Nový'))
     names = NxH7B::PC.export_file_names('Nový', NxH7G::NOW)
     NxH7B::EXPORTS.each do |exp|
-      r = NxH7B.run(exp, m, 'expect' => { 'project' => 'Nový', 'merge' => true })
+      r = NxH7B.run(exp, m, 'expect' => { 'project' => 'Nový', 'merge' => true, 'source' => 'set' })
       NxTest.refute(r[:err], "#{exp}: po uspesnom zapise zeleno (#{r[:msg]})")
       case exp
       when :do_export then NxTest.assert_equal([names['vepo_dir']], r[:files], 'VEPO priecinok')
@@ -270,10 +270,10 @@ NxTest.test('H7b T-B11: prekrizene — nazov ulozeny + 18 + 36 nie: VEPO odmietn
     NxH7A.with_lock_probe(raise_error: Errno::EACCES.new('lock')) do
       NxTest.assert_equal(:failed, NxH7B::S.save_merge_18_36(false).first, '18 + 36 sa nezapisalo')
     end
-    exp_data = { 'expect' => { 'project' => 'Kríž', 'merge' => false } }
+    exp_data = { 'expect' => { 'project' => 'Kríž', 'merge' => false, 'source' => 'set' } }
     r = NxH7B.run(:do_export, m, exp_data)
     NxTest.assert(r[:pickers].empty? && r[:err], 'VEPO: 18 + 36 nesedi -> odmietnuty pred vyberom priecinka')
-    NxTest.assert_equal('Nastavenie 18 + 36 sa neuložilo (platí: zapnuté) — export sa nespustil, skontroluj nastavenie a klikni znova.',
+    NxTest.assert_equal('Nastavenie 18 + 36 sa medzitým zmenilo — platí: zapnuté. Export sa nespustil, skontroluj nastavenie a klikni znova.',
                         r[:msg])
     %i[do_hw_csv do_budget_xlsx do_cp_xlsx].each do |exp|
       r = NxH7B.run(exp, m, exp_data)
@@ -288,9 +288,9 @@ NxTest.test('H7b T-B11: prekrizene — nazov ulozeny + 18 + 36 nie: VEPO odmietn
       NxTest.assert_equal(:failed, NxH7B::S.save_project_name(m, 'Neulozeny').first)
     end
     NxH7B::EXPORTS.each do |exp|
-      r = NxH7B.run(exp, m, 'expect' => { 'project' => 'Neulozeny', 'merge' => false })
+      r = NxH7B.run(exp, m, 'expect' => { 'project' => 'Neulozeny', 'merge' => false, 'source' => 'set' })
       NxTest.assert(r[:pickers].empty? && r[:err], "#{exp}: nazov nesedi -> odmietnuty")
-      NxTest.assert(r[:msg].start_with?('Názov zákazky sa neuložil (platí „Kriz2")'), "#{exp}: #{r[:msg]}")
+      NxTest.assert(r[:msg].start_with?('Názov zákazky sa medzitým zmenil — platí „Kriz2".'), "#{exp}: #{r[:msg]}")
     end
   end
 end
@@ -301,12 +301,12 @@ NxTest.test('H7b T-B11: obratene poradie (export pred zapisom) — odmietnutie, 
     m = NxH7B.saved('C:/Zakazky/Poradie.skp', 'S-POR')
     NxH7B::S.save_project_name(m, 'Staré')
     NxH7B::EXPORTS.each do |exp|
-      r = NxH7B.run(exp, m, 'expect' => { 'project' => 'Nové', 'merge' => true })
+      r = NxH7B.run(exp, m, 'expect' => { 'project' => 'Nové', 'merge' => true, 'source' => 'set' })
       NxTest.assert(r[:err] && r[:pickers].empty?, "#{exp}: export pred zapisom odmietnuty")
     end
     NxH7B::S.save_project_name(m, 'Nové')
     NxH7B::EXPORTS.each do |exp|
-      r = NxH7B.run(exp, m, 'expect' => { 'project' => 'Nové', 'merge' => true })
+      r = NxH7B.run(exp, m, 'expect' => { 'project' => 'Nové', 'merge' => true, 'source' => 'set' })
       NxTest.refute(r[:err], "#{exp}: klik znova po zapise prejde (#{r[:msg]})")
     end
   end
@@ -321,7 +321,9 @@ NxTest.test('H7b T-B11 (§17 C1): BEZ `expect` alebo s neplatnym tvarom = odmiet
            { 'expect' => { 'project' => 5, 'merge' => true } },
            { 'expect' => { 'project' => 'Stary' } },
            { 'expect' => { 'project' => 'Stary', 'merge' => 'true' } },
-           { 'expect' => { project: 'Stary', merge: true } }]
+           { 'expect' => { project: 'Stary', merge: true } },
+           { 'expect' => { 'project' => 'Stary', 'merge' => true } }, # bez `source` (spresnenie C1)
+           { 'expect' => { 'project' => 'Stary', 'merge' => true, 'source' => 'iny' } }]
     NxH7B::EXPORTS.each do |exp|
       bad.each do |data|
         r = NxH7B.run(exp, m, data)
@@ -329,7 +331,7 @@ NxTest.test('H7b T-B11 (§17 C1): BEZ `expect` alebo s neplatnym tvarom = odmiet
         NxTest.assert(r[:err] && r[:pickers].empty? && r[:files].empty?, "#{exp} #{data.inspect}: nic nevzniklo")
         NxTest.assert_equal(0, r[:collects], "#{exp} #{data.inspect}: PRED zberom")
       end
-      ok = NxH7B.run(exp, m, 'expect' => { 'project' => 'Stary', 'merge' => true })
+      ok = NxH7B.run(exp, m, 'expect' => { 'project' => 'Stary', 'merge' => true, 'source' => 'file' })
       NxTest.refute(ok[:err], "#{exp}: platny `expect` prejde (#{ok[:msg]})")
     end
   end
@@ -350,8 +352,17 @@ NxTest.test('H7b T-B11 (§17 C2): rucny zaznam > 120 znakov — export s `expect
     end
     # aj prazdny/medzerovy text = predvoleny nazov (to iste pravidlo ako pri zapise)
     m2 = NxH7B.saved('C:/Zakazky/Pr.skp', 'S-PR')
-    r = NxH7B.run(:do_hw_csv, m2, 'expect' => { 'project' => '   ', 'merge' => true })
+    r = NxH7B.run(:do_hw_csv, m2, 'expect' => { 'project' => '   ', 'merge' => true, 'source' => 'file' })
     NxTest.refute(r[:err], "prazdny expect = predvoleny nazov suboru (#{r[:msg]})")
+    # ZADANY nazov (tolerancia automatickych mien sa ho netyka): medzery okolo
+    # a text nad 120 znakov sa normalizuju ROVNAKO ako pri zapise.
+    NxH7B::S.save_project_name(m2, 'Moja zákazka')
+    r = NxH7B.run(:do_hw_csv, m2, 'expect' => { 'project' => '  Moja zákazka  ', 'merge' => true, 'source' => 'set' })
+    NxTest.refute(r[:err], "zadany nazov s medzerami = ten isty nazov (#{r[:msg]})")
+    long = 'L' * 125
+    NxH7B::S.save_project_name(m2, long)
+    r = NxH7B.run(:do_hw_csv, m2, 'expect' => { 'project' => long, 'merge' => true, 'source' => 'set' })
+    NxTest.refute(r[:err], "zadany nazov > 120 znakov = orezany rovnako ako pri zapise (#{r[:msg]})")
   end
 end
 
@@ -376,13 +387,13 @@ NxTest.test('H7b T-B11: poradie v tele 4 exportov — refresh → expect → zbe
     i_gen = body.index("data['gen'].to_i == generation.to_i")
     i_flush = body.index("data['flush_blocked']")
     i_ref = body.index('ExportSettings.refresh')
-    i_exp = body.index('export_expect_stop(model, data')
+    i_exp = body.index('export_expect_check(model, data')
     i_col = body.index('fresh_collect(model)')
     i_ui = body.index('UI.savepanel') || body.index('UI.select_directory')
     NxTest.assert([i_gen, i_flush, i_ref, i_exp, i_col, i_ui].none?(&:nil?), "#{exp}: vsetky kroky su v tele")
     NxTest.assert(i_gen < i_flush && i_flush < i_ref && i_ref < i_exp && i_exp < i_col && i_col < i_ui,
                   "#{exp}: poradie generacia → flush → refresh → expect → zber → vyber suboru")
-    NxTest.assert_equal(exp == :do_export, body.include?('export_expect_stop(model, data, merge: true)'),
+    NxTest.assert_equal(exp == :do_export, body.include?('export_expect_check(model, data, merge: true)'),
                         "#{exp}: 18 + 36 sa porovnava len vo VEPO")
   end
 end
@@ -485,6 +496,147 @@ NxTest.test('H7b (P3 z H7a): zly `project_names` BEZ zalohy — zapis NAZVU kont
     NxH7A.with_log do |logs|
       NxH7B::S.save_project_name(NxH7A.model, 'A')
       NxTest.refute(logs.any? { |l| l.include?('samooprava') }, 'platna mapa = ziadna samooprava')
+    end
+  end
+end
+
+# =============================================================================
+# PREDRECENZIA H7b — spresnenie §17 C1 (automaticky -> automaticky), vetvy
+# `rescue` a overene hodnoty VEPO
+# =============================================================================
+
+NxTest.test('H7b P2 (spresnenie C1): novy model -> Ctrl+S -> export na PRVY klik prejde pod menom suboru') do
+  NxTest.skip!('vyzaduje headless sandbox') unless NxTest.headless?
+  NxH7A.with_sandbox do
+    NxH7B::EXPORTS.each do |exp|
+      m = NxH7B.unsaved("U-NEW-#{exp}")
+      seen = NxH7B.window_expect(m) # okno ukazuje „projekt" (predvoleny)
+      NxTest.assert_equal({ 'project' => 'projekt', 'merge' => true, 'source' => 'default' }, seen)
+      m.path = 'C:/Zakazky/Klinika.skp' # ulozenie — okno sa nepushuje
+      r = NxH7B.run(exp, m, 'expect' => seen)
+      NxTest.refute(r[:err], "#{exp}: automaticky -> automaticky sa toleruje (#{r[:msg]})")
+      NxTest.assert(r[:msg].end_with?(' · Zákazka: Klinika (podľa súboru)'), "#{exp}: stav povie skutocne meno: #{r[:msg]}")
+      names = NxH7B::PC.export_file_names('Klinika', NxH7G::NOW)
+      got = exp == :do_export ? r[:files].first : r[:pickers].first['name']
+      want = { do_export: names['vepo_dir'], do_hw_csv: names['hw_csv'], do_budget_xlsx: names['budget_xlsx'],
+               do_cp_xlsx: names['offer_xlsx'] }[exp]
+      NxTest.assert_equal(want, got, "#{exp}: subor sa vola podla skutocneho mena")
+    end
+  end
+end
+
+NxTest.test('H7b P2 (spresnenie C1): Save As s automatickym menom prejde; bez zmeny mena bez vety') do
+  NxTest.skip!('vyzaduje headless sandbox') unless NxTest.headless?
+  NxH7A.with_sandbox do
+    m = NxH7B.saved('C:/Zakazky/Prva.skp', 'S-SAVEAS')
+    seen = NxH7B.window_expect(m)
+    NxTest.assert_equal('file', seen['source'])
+    r = NxH7B.run(:do_hw_csv, m, 'expect' => seen)
+    NxTest.refute(r[:err] || r[:msg].include?('Zákazka:'), "bez zmeny ziadna veta: #{r[:msg]}")
+    m.path = 'C:/Zakazky/Druha.skp'
+    r = NxH7B.run(:do_hw_csv, m, 'expect' => seen)
+    NxTest.refute(r[:err], "Save As prejde: #{r[:msg]}")
+    NxTest.assert(r[:msg].end_with?(' · Zákazka: Druha (podľa súboru)'), r[:msg])
+    NxTest.assert_equal('kovanie_druha.csv', r[:pickers].first['name'])
+  end
+end
+
+NxTest.test('H7b P2 (spresnenie C1): ZADANY nazov na ktorejkolvek strane + ine meno = odmietnutie neutralnou vetou') do
+  NxTest.skip!('vyzaduje headless sandbox') unless NxTest.headless?
+  NxH7A.with_sandbox do
+    # okno ukazovalo zadany nazov, druhe okno ho zmenilo
+    m = NxH7B.saved('C:/Zakazky/Z1.skp', 'S-Z1')
+    NxH7B::S.save_project_name(m, 'Moja')
+    seen = NxH7B.window_expect(m)
+    NxH7B::S.save_project_name(m, 'Iná')
+    # okno ukazovalo meno suboru, druhe okno medzitym zadalo nazov
+    f = NxH7B.saved('C:/Zakazky/Z2.skp', 'S-Z2')
+    seen_f = NxH7B.window_expect(f)
+    NxH7B::S.save_project_name(f, 'Zadany inde')
+    NxH7B::EXPORTS.each do |exp|
+      r = NxH7B.run(exp, m, 'expect' => seen)
+      NxTest.assert(r[:err] && r[:pickers].empty?, "#{exp}: set -> set odmietnuty")
+      NxTest.assert_equal('Názov zákazky sa medzitým zmenil — platí „Iná". Export sa nespustil, skontroluj názov a klikni znova.',
+                          r[:msg], exp.to_s)
+      r = NxH7B.run(exp, f, 'expect' => seen_f)
+      NxTest.assert(r[:err] && r[:pickers].empty?, "#{exp}: file -> set odmietnuty")
+      NxTest.refute(r[:msg].include?('neuložil'), "#{exp}: veta je neutralna (nic nezlyhalo)")
+    end
+    # set (okno) -> automaticky (druhe okno nazov zmazalo)
+    NxH7B::S.save_project_name(m, '')
+    r = NxH7B.run(:do_cp_xlsx, m, 'expect' => seen)
+    NxTest.assert(r[:err] && r[:msg].start_with?('Názov zákazky sa medzitým zmenil — platí „Z1".'), r[:msg])
+  end
+end
+
+NxTest.test('H7b P2: vynimka pri overovani `expect` = export sa NESPUSTI (fail-closed) vo vsetkych 4') do
+  NxTest.skip!('vyzaduje headless sandbox') unless NxTest.headless?
+  NxH7A.with_sandbox do
+    m = NxH7B.saved
+    seen = NxH7B.window_expect(m)
+    NxH7G.with_stubs(NxH7B::S, project_name: ->(*_a) { raise IOError, 'test' }) do
+      NxH7B::EXPORTS.each do |exp|
+        r = NxH7B.run(exp, m, 'expect' => seen)
+        NxTest.assert_equal(NxH7B::S::EXPECT_FAILED, r[:msg], exp.to_s)
+        NxTest.assert(r[:err] && r[:pickers].empty? && r[:files].empty?, "#{exp}: nic nevzniklo")
+        NxTest.assert_equal(0, r[:collects], "#{exp}: PRED zberom")
+      end
+    end
+  end
+end
+
+NxTest.test('H7b P2: name_source pri chybe = set, default_name_note pri chybe = prazdna, model_file_title fallback') do
+  bad = Object.new
+  def bad.path
+    raise IOError, 'test'
+  end
+  NxTest.assert_equal('set', NxH7B::S.name_source(bad, 'x'), 'neznamy zdroj = bez bodky a bez vety')
+  NxH7G.with_stubs(NxH7B::S, name_source: ->(*_a) { raise IOError, 'test' }) do
+    NxTest.assert_equal('', NxH7B::PC.default_name_note(NxH7B.unsaved, 'projekt'), 'veta po zapise nikdy nezhodi export')
+  end
+  titled = Struct.new(:path, :title).new('C:/Z/Subor.skp', 'Titul')
+  NxTest.assert_equal('Titul', NxH7B::PC.model_file_title(titled), 'meno z `title`')
+  NxTest.assert_equal('Kúpeľňa Horná', NxH7B::PC.model_file_title(NxH7B.saved), 'bez `title` = meno suboru bez pripony')
+  NxTest.assert_equal('Subor', NxH7B::PC.model_file_title(Struct.new(:path, :title).new('C:/Z/Subor.skp', '')),
+                      'prazdny `title` = meno suboru')
+  NxTest.assert_equal('', NxH7B::PC.model_file_title(NxH7B.unsaved), 'neulozeny = prazdne')
+  NxTest.assert_equal('', NxH7B::PC.model_file_title(Object.new), 'bez `path` = prazdne')
+end
+
+NxTest.test('H7b P3: VEPO pouzije nazov a 18 + 36 OVERENE pred vyberom priecinka (druha instancia pocas vyberu)') do
+  NxTest.skip!('vyzaduje headless sandbox') unless NxTest.headless?
+  NxH7A.with_sandbox do
+    m = NxH7B.saved('C:/Zakazky/Overene.skp', 'S-P3')
+    NxH7B::S.save_project_name(m, 'Overené')
+    seen = NxH7B.window_expect(m)
+    NxTest.assert_equal(true, seen['merge'])
+    col = NxH7G.collected([NxH7G.record(1, 18.0), NxH7G.record(2, 36.0)])
+    msg = nil
+    err = nil
+    Dir.mktmpdir('nx-h7b-p3-') do |dir|
+      ui = Module.new
+      ui.define_singleton_method(:select_directory) do |**_kw|
+        # druha instancia SketchUpu zapise POCAS modalneho vyberu priecinka
+        NxH7B::S.save_project_name(m, 'Iný názov')
+        NxH7B::S.save_merge_18_36(false)
+        dir
+      end
+      Object.const_set(:UI, ui)
+      begin
+        NxH7G.with_stubs(NxH7B::PC, NxH7G.collect_stubs(col)) do
+          NxH7G.with_now do
+            NxH7B::PC.do_export(m, { 'gen' => 1, 'expect' => seen }, generation: 1,
+                                status: ->(t, e = false) { msg = t; err = e }, repush: -> {})
+          end
+        end
+      ensure
+        Object.send(:remove_const, :UI) if Object.const_defined?(:UI, false)
+      end
+      NxTest.refute(err, msg.to_s)
+      NxTest.assert_equal(['overene'], Dir.children(dir).sort, 'priecinok = overeny nazov, nie zmena pocas vyberu')
+      files = Dir.children(File.join(dir, 'overene')).select { |f| f.end_with?('.csv') }
+      NxTest.assert_equal(1, files.length, "18 a 36 SPOLU (overene zapnute), nie zvlast: #{files.inspect}")
+      NxTest.assert(files.first.end_with?('_18_36.csv'), files.first)
     end
   end
 end

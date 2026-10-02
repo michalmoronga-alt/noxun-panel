@@ -1411,9 +1411,9 @@ bodku a tooltip štyroch exportov — lišta sa neprekresľuje (fokus v hľadan�
 (aj pri zlyhaní — O8) a **po každom exporte** (obaly `do_export`/`do_hw_csv`/`do_budget_xlsx`/`do_cp_xlsx` v `ensure`, aj pri odmietnutí); generáciu nedvíha.
 **Štyri exporty** (VEPO, CSV kovania, XLSX rozpočtu, cenová ponuka): bodka `.xdot` a tooltip z jednej funkcie `nxJobExport(kind)` (`JOB_EXPORTS`, aj pre `budget.js`
 cez `budJob`) — dnešný text + meno priečinka/súboru zo **servera** (`vepo.export_names`, klient nič neodvodzuje); bodka **len pri `default`** (pri čakajúcom nie).
-**`expect` (audit H7 §16 B2, §17 C1):** každé zo štyroch exportných volaní nesie `expect: nxVepoExpect()` = `{ project, merge }` z klientskej premennej
-`VEPO_EXPECT` (nastaví ju payload/echo, commit editora a zmena `#mergeChk` — nikdy DOM); server export bez zhody **nespustí** (odsek `production_core.rb`
-v outputs.md). Klik na export z otvoreného editora = mousedown → blur (zápis) → click (export s napísaným textom); poradie callbackov SketchUpu nie je oficiálne
+**`expect` (audit H7 §16 B2, §17 C1):** každé zo štyroch exportných volaní nesie `expect: nxVepoExpect()` = `{ project, merge, source }` z klientskej premennej
+`VEPO_EXPECT` (nastaví ju payload/echo, commit editora a zmena `#mergeChk` — nikdy DOM; `source` = zdroj, ktorý hlavička práve ukazuje); server export bez zhody
+**nespustí**, automatický → automatický názov (napr. model sa medzitým uložil) toleruje (odsek `production_core.rb` v outputs.md). Klik na export z otvoreného editora = mousedown → blur (zápis) → click (export s napísaným textom); poradie callbackov SketchUpu nie je oficiálne
 zdokumentované ani overené sondou — pri obrátenom poradí server export odmietne a stačí klik znova (súbor pod neuloženým názvom nevznikne). Testy
 `tests/js/test_h7b_hlavicka.js` (verný režim `minidom.faithful(true)`), `tests/pure/test_h7b_nazov_zakazky.rb`.
 

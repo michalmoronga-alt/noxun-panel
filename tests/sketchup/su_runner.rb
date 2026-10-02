@@ -140,7 +140,9 @@ module NoxunSuRunner
   # zakazky a „18 + 36", ktore okno ukazuje — runner ho posiela presne tak,
   # ako by ho poslalo okno po pushi (inak by ich server odmietol fail-closed).
   def h7b_expect(model)
-    { 'project' => e::ExportSettings.project_name(model).to_s, 'merge' => e::ExportSettings.merge_18_36 }
+    es = e::ExportSettings
+    project = es.project_name(model).to_s
+    { 'project' => project, 'merge' => es.merge_18_36, 'source' => es.name_source(model, project) }
   end
 
   # R-02: zapisove handlery panela vyzaduju identitu DOKUMENTU (`model_guid`) —

@@ -690,41 +690,66 @@ module Noxun
       end
 
       # Audit H7 §16 B2 a §17 C1: kazde exportne volanie okna nesie
-      # `expect {project, merge}` = co pouzivatel VIDI (hlavicka, prepinac).
-      # Export sa spusti LEN ked sa to zhoduje s ulozenou pravdou — zlyhany
-      # zapis nazvu (zamok, poskodeny subor) tak nikdy nevyrobi subor pod
-      # starym nazvom. Bezstavove: nic necaka, nesulad = veta a klik znova.
+      # `expect {project, merge, source}` = co pouzivatel VIDI (hlavicka a jej
+      # zdroj, prepinac). Export sa spusti LEN ked sa to zhoduje s ulozenou
+      # pravdou — zlyhany zapis nazvu (zamok, poskodeny subor) ani zmena
+      # z druheho okna tak nikdy nevyrobi subor pod inym nazvom, nez okno
+      # ukazovalo. Bezstavove: nic necaka, nesulad = veta a klik znova.
       # Chybajuci alebo neplatny `expect` (stary klient) = FAIL-CLOSED.
-      # 18 + 36 sa porovnava len vo VEPO (`merge: true`) — inde vystup nemeni
-      # a zlyhany zapis prepinaca nesmie blokovat XLSX ani CSV.
-      # -> nil (zhoda) alebo veta pre stavovy riadok.
+      #
+      # Spresnenie §17 C1 (predrecenzia H7b P2): AUTOMATICKY -> AUTOMATICKY
+      # nazov sa toleruje. Ked okno ukazovalo automaticky nazov („projekt"
+      # alebo meno suboru) a plati opat automaticky (najcastejsie: novy model
+      # sa medzitym ULOZIL — Ctrl+S nepushuje okno), pouzivatel nic nezadal
+      # a niet co stratit: export prebehne pod skutocnym menom a stav to
+      # povie (`note`). Ked je na ktorejkolvek strane ZADANY nazov ('set')
+      # a mena sa lisia -> odmietnutie neutralnou pravdivou vetou.
+      # 18 + 36 sa porovnava len vo VEPO (`merge: true`), vzdy prisne — inde
+      # vystup nemeni a zlyhany zapis prepinaca nesmie blokovat XLSX ani CSV.
+      #
+      # -> { stop: nil | veta, note: '' | veta na koniec statusu,
+      #      project: overeny nazov (pre export), merge: overene 18 + 36 }
       EXPECT_STALE = 'Okno je zastarané — zatvor a otvor Štúdio a klikni znova.'
       EXPECT_FAILED = 'Export sa nespustil — nastavenia exportu sa nepodarilo overiť, skús znova.'
+      SOURCES = %w[set file default].freeze
+      AUTO_SOURCES = %w[file default].freeze
 
       def expect_valid?(expect)
-        expect.is_a?(Hash) && expect['project'].is_a?(String) && [true, false].include?(expect['merge'])
+        expect.is_a?(Hash) && expect['project'].is_a?(String) && [true, false].include?(expect['merge']) &&
+          SOURCES.include?(expect['source'])
       end
 
-      def expect_mismatch(model, expect, merge: false)
-        return EXPECT_STALE unless expect_valid?(expect)
+      def expect_check(model, expect, merge: false)
+        return { stop: EXPECT_STALE, note: '', project: nil, merge: nil } unless expect_valid?(expect)
 
+        project = project_name(model)
+        now = merge_18_36
+        stored = normalize_project_name(model, project)
+        source = name_source(model, project)
         out = []
-        stored = normalize_project_name(model, project_name(model))
+        note = ''
         if normalize_project_name(model, expect['project']) != stored
-          out << "Názov zákazky sa neuložil (platí „#{stored}\") — export sa nespustil, " \
-                 'skontroluj názov a klikni znova.'
-        end
-        if merge
-          now = merge_18_36
-          if expect['merge'] != now
-            out << "Nastavenie 18 + 36 sa neuložilo (platí: #{now ? 'zapnuté' : 'vypnuté'}) — " \
-                   'export sa nespustil, skontroluj nastavenie a klikni znova.'
+          if AUTO_SOURCES.include?(expect['source']) && AUTO_SOURCES.include?(source)
+            # predvoleny „projekt" povie veta `default_name_note` exportu
+            note = source == 'file' ? " · Zákazka: #{stored} (podľa súboru)" : ''
+          else
+            out << "Názov zákazky sa medzitým zmenil — platí „#{stored}\". Export sa nespustil, " \
+                   'skontroluj názov a klikni znova.'
           end
         end
-        out.empty? ? nil : out.join(' ')
+        if merge && expect['merge'] != now
+          out << "Nastavenie 18 + 36 sa medzitým zmenilo — platí: #{now ? 'zapnuté' : 'vypnuté'}. " \
+                 'Export sa nespustil, skontroluj nastavenie a klikni znova.'
+        end
+        { stop: out.empty? ? nil : out.join(' '), note: note, project: project, merge: now }
       rescue StandardError => e
-        Engine.log_error(e, 'ExportSettings.expect_mismatch')
-        EXPECT_FAILED
+        Engine.log_error(e, 'ExportSettings.expect_check')
+        { stop: EXPECT_FAILED, note: '', project: nil, merge: nil }
+      end
+
+      # Len veta zastavenia (nil = export smie pokracovat).
+      def expect_mismatch(model, expect, merge: false)
+        expect_check(model, expect, merge: merge)[:stop]
       end
     end
   end

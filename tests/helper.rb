@@ -350,6 +350,7 @@ end
 module NxTest
   def self.export_expect(model)
     es = Noxun::Engine::ExportSettings
-    { 'project' => es.project_name(model).to_s, 'merge' => es.merge_18_36 }
+    project = es.project_name(model).to_s
+    { 'project' => project, 'merge' => es.merge_18_36, 'source' => es.name_source(model, project) }
   end
 end

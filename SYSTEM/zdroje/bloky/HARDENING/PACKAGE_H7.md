@@ -555,6 +555,18 @@ konceptu §16 → **audit uzavretý** (ďalší delta audit sa nespúšťa; over
 - **NOTE 5–7:** poradie callbackov nie je potrebné pre bezpečnosť (len pre export na prvý klik) — v PR uviesť ako NEOVERENÉ v SketchUpe; Save As/dve zákazky bez
   trvalého bloku; SHA1 náklad primeraný.
 
+### 17.1 Odchýlky H7b (predrecenzia H7b, rozhodnutie orchestrátora 2.10.2026) — spresnenie §17 C1
+
+- **`expect` nesie aj `source`** (zdroj názvu, ktorý hlavička ukazovala: `set`/`file`/`default`); bez neho alebo s neplatným = fail-closed ako doteraz.
+- **Automatický → automatický sa toleruje:** ak očakávaný aj skutočný zdroj ∈ {`default`, `file`} a mená sa líšia (najbežnejšie: nový model → Ctrl+S → export —
+  uloženie okno nepushuje), používateľ nič nezadal a niet čo stratiť → export prebehne pod skutočným menom, stav pripojí „ · Zákazka: <meno> (podľa súboru)"
+  a echo hlavičky sa urobí. **Observer uloženia sa nepridáva** (observer lifecycle = audit).
+- **Zadaný názov na ktorejkoľvek strane + iné meno = odmietnutie neutrálnou pravdivou vetou** „Názov zákazky sa medzitým zmenil — platí „…". Export sa nespustil,
+  skontroluj názov a klikni znova." (veta „sa neuložil" ostáva len pri skutočne zlyhanom zápise — hlási ju zápis v okne). 18 + 36 pri VEPO ostáva prísne
+  (veta „Nastavenie 18 + 36 sa medzitým zmenilo — platí: …").
+- **Výnimka pri overovaní = `EXPECT_FAILED`** (export sa nespustí) — pokryté testom a mutáciou.
+- **VEPO používa názov a 18 + 36 overené v bráne** (pred výberom priečinka), nie znova prečítané po ňom (P3 — dve inštancie SketchUpu).
+
 **Potvrdenie orchestrátora k §12 (2.10.2026):** D1 áno (`ExportSettings`, bez delegátov) · D2 áno · D3 áno (bez dobrej zálohy dnešné správanie + povedať) · D4 áno ·
 D5 áno (upravené §15/§16) · D6 nahradené §16/§17 (expect) · D7 áno · D8 áno · D9 áno · D10 áno. **Rez H7a → H7b**, každá samostatný PR z čerstvého mainu.
 **Trieda:** H7a = audit-povinná + **výrobná/cenová** (predrecenzia povinná, **in-SU 1 beh = podmienka mergu**); H7b = nový ovládací prvok (predrecenzia povinná),

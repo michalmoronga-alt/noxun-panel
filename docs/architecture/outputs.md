@@ -472,11 +472,15 @@ funkciami exportov (`VepoExport.project_slug`, **`hw_csv_file_name`** — jedin�
 `CpXlsx.file_name`); dátum XLSX je z času pushu (po polnoci do ďalšieho pushu nesedí deň, export sa pomenuje správne; echo po exporte ho obnoví). Mená a bajty exportov
 sa nemenia (golden H7a T0a/T0c bez regenerácie). **`default_name_note(model, project)`** — veta „ · pomenované predvoleným názvom „projekt" — názov zákazky zadáš
 v hlavičke Štúdia" na konci záverečnej vety štyroch exportov, keď sa súbor pomenoval predvoleným „projekt" (farba ani tok sa nemenia; s `pending_name_note` sa
-vylučuje; výnimku prehltne — nikdy nezhodí hotový export). **Brána `expect` (§16 B2, §17 C1):** `export_expect_stop(model, data, merge:)` →
-`ExportSettings.expect_mismatch` beží v každom zo štyroch exportov **po** bránach generácie a `flush_blocked` a po `ExportSettings.refresh`, **pred** zberom modelu a
-výberom súboru; nesúlad názvu (alebo 18 + 36 — **len VEPO**, `merge: true`) alebo chýbajúci či neplatný `expect` = červená veta a export sa **nespustí**
-(fail-closed; žiadny čakací stav ani automatické pokračovanie). Volajúci mimo okien Štúdia v kóde pluginu nie sú (výnimka C1 sa nepoužila); testy a `su_runner`
-posielajú `expect` ako okno (`NxTest.export_expect`, `h7b_expect`).
+vylučuje; výnimku prehltne — nikdy nezhodí hotový export). **Brána `expect` (§16 B2, §17 C1 + spresnenie H7b):** `export_expect_check(model, data, merge:)` →
+`ExportSettings.expect_check` beží v každom zo štyroch exportov **po** bránach generácie a `flush_blocked` a po `ExportSettings.refresh`, **pred** zberom modelu a
+výberom súboru. `expect` = `{ project, merge, source }` (`source` = zdroj názvu, ktorý hlavička ukazovala). Nesúlad názvu, keď je na **niektorej** strane zadaný
+názov (`set`), alebo nesúlad 18 + 36 (**len VEPO**, `merge: true`, vždy prísne) = neutrálna červená veta („Názov zákazky sa medzitým zmenil — platí „…". Export sa
+nespustil…") a export sa **nespustí**; chýbajúci či neplatný `expect` (aj bez `source`) a výnimka pri overovaní = **fail-closed**. **Automatický → automatický**
+(okno ukazovalo „projekt" alebo meno súboru a platí opäť automatický názov — typicky nový model sa medzitým uložil, Ctrl+S okno nepushuje) sa **toleruje**: export
+prebehne pod skutočným menom a stav to povie („ · Zákazka: Klinika (podľa súboru)", `:note`). Brána vracia aj **overené** `:project`/`:merge` — VEPO ich použije
+aj po zatvorení výberu priečinka (druhá inštancia SketchUpu ich počas výberu nezmení). Žiadny čakací stav ani automatické pokračovanie. Volajúci mimo okien
+Štúdia v kóde pluginu nie sú (výnimka C1 sa nepoužila); testy a `su_runner` posielajú `expect` ako okno (`NxTest.export_expect`, `h7b_expect`).
 
 **`materials_meta`/`edges_meta` (audit #4)** sú kontrakt skupín Kusovníka: per `material_id` (resp. `abs_id`) label, katalógová farba ako **pole `[r,g,b]`** (nie CSS reťazec —
 prevod robí klient, ktorý farbu kreslí), hrúbka a príznak UNI; materiál mimo katalógu sa pomenuje **svojím ID** a farbu nedostane (radšej žiadna vzorka než náhodná).
@@ -1087,8 +1091,9 @@ pred `ui/production_core`; pri načítaní na súbor nesiaha. Verejné: `path` �
 `update_project_names` · `project_key` · `project_name` · `default_project_name` · `save_project_name` · `name_pending?` · `merge_18_36` · `save_merge_18_36` · `last_dir` ·
 `save_last_dir` · rodina kľúča sedenia (`normalize_project_path`, `project_session_key`, `session_key?`, `remember_/forget_/remembered_session_key`, `session_keys_for`)
 · H7b: `clean_project_name` / **`normalize_project_name`** (jediná normalizácia názvu: orez, strop 120, prázdne = predvolený — používa ju zápis aj porovnanie) ·
-`name_source` · **`expect_mismatch(model, expect, merge:)`** (`nil` alebo veta; neplatný tvar `EXPECT_STALE` „Okno je zastarané — zatvor a otvor Štúdio a klikni
-znova.", výnimka `EXPECT_FAILED`; obe strany porovnania idú cez `normalize_project_name`, takže ručný záznam dlhší ako 120 znakov nevyrobí trvalý falošný nesúlad).
+`name_source` · **`expect_check(model, expect, merge:)`** → `{ stop:, note:, project:, merge: }` (neplatný tvar `EXPECT_STALE` „Okno je zastarané — zatvor a otvor
+Štúdio a klikni znova.", výnimka `EXPECT_FAILED`; tolerancia automatický → automatický, `AUTO_SOURCES`; obe strany porovnania idú cez `normalize_project_name`,
+takže ručný záznam dlhší ako 120 znakov nevyrobí trvalý falošný nesúlad) · `expect_mismatch` (len `:stop`).
 
 **Ochrana R-38 (rodina H9/R-37 — `HardwareRules.write_gate`, `JsonFileStore.degraded?`, `preserve_valid_backup`).** Predikát tvaru `doc_shape_ok?` posudzuje **len kontajnery**:
 objekt, neprázdny (`{}` plugin nikdy nezapísal — od V0.5 C je každý zápis zlúčenie s neprázdnymi `attrs`), `project_names` ak je, tak objekt; hodnoty (napr. `merge_18_36: "nie"`)
