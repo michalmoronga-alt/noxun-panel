@@ -43,18 +43,28 @@ module NxH16
   DIR_CONST_RE = /\b(?:DIR_NAME|ATTACH_ROOT|TMP_NAME|LEASES_DIR)\s*=\s*['"]([^'"]+)['"]/.freeze
   JOIN_RE = /File\.join\(\s*(?:dir|Materials\.dir|TemplateStore\.dir)\s*,\s*['"]([\w.\-]+)['"]/.freeze
   STAMP_RE = /timestamped_free_path\(\s*['"]([^'"]+)['"]/.freeze
-  WRITE_RE = /JsonFileStore\.write\(|File\.(?:binwrite|write|rename|delete)\(|File\.open\([^)]*(?:'w|'a|"w|"a|File::CREAT)|FileUtils\.(?:mkdir_p|cp|mv|rm_f|rm_rf|copy)|deploy_bytes\(|\.save_as\(|write_image\(|write_thumbnail\(/.freeze
+  # Zapisove PRIMITIVA Ruby: zapis, vytvorenie, presun, kopia, mazanie suboru ci priecinka.
+  WRITE_PRIM = /JsonFileStore\.write\(|\b(?:File|IO)\.(?:binwrite|write|rename|delete|unlink|copy_stream)\(|\bFile\.(?:open|new)\([^)]*(?:'[wa]|"[wa]|File::CREAT)|\bDir\.mkdir\(|\bFileUtils\.(?:mkdir_p|mkdir|cp|cp_r|mv|move|rm|rm_f|rm_r|rm_rf|copy|copy_file|touch|remove_entry|remove_entry_secure|remove_file|remove_dir|ln_s|install)\b|\.save_as\(|write_image\(|write_thumbnail\(/.freeze
+  # Zapisovi POMOCNICI pluginu, ktori dostanu CIELOVU CESTU v parametri — ich volanie je
+  # zapisove miesto v subore volania (novy cielovy priecinok cez existujuceho pomocnika
+  # zmeni pocet). Novy taky pomocnik = doplnit sem (test overi, ze kazdy je v plugine definovany).
+  WRITE_HELPERS = %w[deploy_bytes stage_attachment discard_file stage_then_rename write_temp copy_file! try_rename
+                     rm_quiet write_book].freeze
+  HELPER_RE = /(?:\A|[^\w.]|\b[A-Z]\w*\.)(?:#{WRITE_HELPERS.map { |h| Regexp.escape(h) }.join('|')})\(/.freeze
+  WRITE_RE = Regexp.union(WRITE_PRIM, HELPER_RE).freeze
   FNM = File::FNM_PATHNAME | File::FNM_EXTGLOB | File::FNM_DOTMATCH
 
-  # R6.2b (§15 A1): POCET riadkov so zapisovym primitivom v kazdom Ruby subore
-  # pluginu a CO tie zapisy pisu. Nie je to parser — refaktor, ktory pocet
-  # zachova, test nehybe; nove miesto zapisu (aj dynamicke meno v uz znamom
-  # subore alebo zapis cez pomocnika) pocet zmeni a test ho zastavi.
+  # R6.2b (§15 A1): POCET riadkov so zapisovym primitivom alebo volanim znameho
+  # zapisoveho pomocnika (WRITE_HELPERS) v kazdom Ruby subore pluginu a CO tie
+  # zapisy pisu. Nie je to parser — refaktor, ktory pocet zachova, test nehybe;
+  # nove miesto zapisu (aj dynamicke meno v uz znamom subore alebo novy ciel cez
+  # znameho pomocnika) pocet zmeni a test ho zastavi. Novy pomocnik s cestou
+  # v parametri sa doplni do WRITE_HELPERS.
   WRITE_SITES = {
-    'noxun_engine.rb' => [15, 'instalacia: recovery aktualizacie v Plugins (lease, zamok, swap stromu)'],
+    'noxun_engine.rb' => [28, 'instalacia: recovery aktualizacie v Plugins (lease, zamok, swap stromu, rm_quiet)'],
     'noxun_engine/main.rb' => [1, 'ui_theme.json'],
     'noxun_engine/core/abs_rules.rb' => [1, 'abs_rules.json'],
-    'noxun_engine/core/appliance_catalog.rb' => [10, 'appliances.json, zamok, prilohy appliances/ a ich staging'],
+    'noxun_engine/core/appliance_catalog.rb' => [14, 'appliances.json, zamok, prilohy appliances/ a ich staging (stage_attachment, discard_file)'],
     'noxun_engine/core/demos/client.rb' => [2, 'demos_throttle.lock'],
     'noxun_engine/core/demos/image_cache.rb' => [4, 'textures/ (obrazok cez docasne meno)'],
     'noxun_engine/core/demos/sitemap_cache.rb' => [1, 'demos_sitemap.json'],
@@ -67,23 +77,23 @@ module NxH16
     'noxun_engine/core/hardware_rules.rb' => [1, 'hardware_rules.json'],
     'noxun_engine/core/hardware_sets.rb' => [1, 'hardware_sets.json'],
     'noxun_engine/core/hardware_taxonomy.rb' => [1, 'hardware_taxonomy.json'],
-    'noxun_engine/core/json_file_store.rb' => [6, 'primitivum: atomicky zapis a .bak za volajuceho'],
+    'noxun_engine/core/json_file_store.rb' => [9, 'primitivum: atomicky zapis a .bak za volajuceho (write_temp)'],
     'noxun_engine/core/materials.rb' => [7, 'materials.json, materials.lock, materials.pre-schema-2.json'],
     'noxun_engine/core/materials_appearance.rb' => [3, 'appearances/ (publikacia staging -> <uuid>.skm)'],
     'noxun_engine/core/materials_catalog.rb' => [2, 'uni_seed.done a drawer_uni_seed.done'],
     'noxun_engine/core/materials_health.rb' => [14, 'obnova/rollback materials.json, migration_hold.json, forenzne kopie, uni_seed.done'],
     'noxun_engine/core/materials_native_appearance.rb' => [1, 'appearances/ staging (.skm)'],
     'noxun_engine/core/supplier_settings.rb' => [1, 'supplier_settings.json'],
-    'noxun_engine/core/template_previews.rb' => [12, 'template_previews/ (capture v tmp/, .png.new, upratanie)'],
+    'noxun_engine/core/template_previews.rb' => [14, 'template_previews/ (capture v tmp/, .png.new cez stage_then_rename, upratanie)'],
     'noxun_engine/core/templates.rb' => [6, 'templates.json, template_usage.json a ich zamky'],
-    'noxun_engine/core/updater.rb' => [25, 'updater_settings.json + instalacia v Plugins (staging, swap, lease)'],
+    'noxun_engine/core/updater.rb' => [31, 'updater_settings.json + instalacia v Plugins (staging, swap, lease, copy_file!, try_rename)'],
     'noxun_engine/core/usage_stats.rb' => [3, 'usage_stats.json a jeho zamok'],
     'noxun_engine/core/vepo_export.rb' => [8, 'export: priecinok VEPO, ktory vybral pouzivatel'],
-    'noxun_engine/core/xlsx_writer.rb' => [1, 'export: subor XLSX, ktory vybral pouzivatel'],
+    'noxun_engine/core/xlsx_writer.rb' => [3, 'export: subor XLSX, ktory vybral pouzivatel (write_book)'],
     'noxun_engine/tools/legacy_cleanup.rb' => [2, 'legacy_cleanup.json + mazanie starych pluginov v Plugins'],
     'noxun_engine/ui/appliance_dialog.rb' => [1, 'temp: miniatura prilohy'],
     'noxun_engine/ui/materials_appearance_dialog.rb' => [1, 'temp: nahlad vzhladu v Dir.mktmpdir'],
-    'noxun_engine/ui/production_core.rb' => [1, 'export: CSV, ktore vybral pouzivatel']
+    'noxun_engine/ui/production_core.rb' => [2, 'export: CSV a XLSX (XlsxWriter.write_book), ktore vybral pouzivatel']
   }.freeze
 
   KIND_SK = { 'library' => 'knižnica', 'attachments' => 'prílohy', 'setting' => 'nastavenie',
@@ -224,14 +234,45 @@ module NxH16
 
   # --- T3: jediny koren -------------------------------------------------------------
 
+  # Kazde citanie premennej APPDATA (ENV['…'], ENV["…"], ENV.fetch) v kode pluginu.
+  APPDATA_RE = /\bENV\s*(?:\[\s*['"]APPDATA['"]\s*\]|\.fetch\(\s*['"]APPDATA['"])/.freeze
+
+  # Rozsahy metod (riadky) a ich tela: [[meno, od, do, telo], ...].
+  def method_ranges(src)
+    lines = src.lines
+    out = []
+    lines.each_with_index do |l, i|
+      m = l.match(/\A([ \t]*)def (?:self\.)?([a-z_]\w*[?!=]?)/)
+      next unless m
+
+      stop = ((i + 1)...lines.length).find { |j| lines[j].match?(/\A#{m[1]}end\b/) }
+      next if stop.nil?
+
+      out << [m[2], i + 1, stop + 1, lines[(i + 1)...stop].join]
+    end
+    out
+  end
+
+  # Jediny koren: %APPDATA% smie citat LEN `Materials.dir` a zalozna vetva metody,
+  # ktora NAJPRV deleguje na `Materials.dir` (vzor `AbsRules.dir`) — v akejkolvek
+  # metode a v akomkolvek zapise; citanie mimo metody (konstanta) je chyba.
   def root_problems(sources)
     probs = []
     sources.each do |rel, src|
-      src.scan(/^([ \t]*)def (?:self\.)?(\w*dir)\b[^\n]*\n(.*?)^\1end\b/m).each do |_ind, name, body|
-        next unless body.include?("ENV['APPDATA']")
-        next if rel == 'noxun_engine/core/materials.rb' && name == 'dir'
+      ranges = method_ranges(src)
+      code_lines(src).each do |code, no|
+        next unless code.match?(APPDATA_RE)
 
-        probs << "#{rel} #{name}: koren si pocita z %APPDATA% sam — deleguj na Materials.dir (vzor AbsRules.dir)" unless body.include?('Materials.dir')
+        inner = ranges.select { |_n, a, b, _| a < no && no < b }.min_by { |_n, a, b, _| b - a }
+        if inner.nil?
+          probs << "#{rel}:#{no}: %APPDATA% mimo metody — koren ber z Materials.dir"
+          next
+        end
+        name, _a, _b, body = inner
+        next if rel == 'noxun_engine/core/materials.rb' && name == 'dir'
+        next if body.match?(/\breturn Materials\.dir\b/)
+
+        probs << "#{rel}:#{no} #{name}: koren si pocita z %APPDATA% sam — deleguj na Materials.dir (vzor AbsRules.dir)"
       end
     end
     probs
@@ -383,29 +424,45 @@ module NxH16
 
   # --- T9: pamat okien -----------------------------------------------------------------
 
-  LS_KEY_RES = [/localStorage\.(?:get|set|remove)Item\(\s*'([^']+)'/, /\bls(?:Get|Set)\(\s*'([^']+)'/,
-                /\b\w*_KEY\s*=\s*'([^']+)'/].freeze
+  # Literal v ', " alebo ` (sablona JS) — skupina 2 = obsah.
+  Q = %q{(['"`])((?:(?!\1).){1,120}?)\1}
+  LS_KEY_RES = [/localStorage\.(?:get|set|remove)Item\(\s*#{Q}/, /\bls(?:Get|Set)\(\s*#{Q}/,
+                /\b\w*_KEY\s*=\s*#{Q}/].freeze
   FORBIDDEN_RE = /\bsessionStorage\b|\bindexedDB\b|document\.cookie|\bopenDatabase\b|caches\.open|navigator\.storage/.freeze
+  # Supis sam menuje localStorage v datach — nie je pouzivatelom pamate okna.
+  MEMORY_SKIP = %w[noxun_engine/core/library_registry.rb].freeze
 
-  def js_code(src)
-    src.lines.reject { |l| l.strip.start_with?('//', '*', '/*') }.map { |l| l.sub(%r{\s//\s.*\z}, '') }.join
+  # Kod bez komentarov podla typu: JS (//, /* */), HTML (<!-- --> + inline JS), Ruby (#).
+  def web_code(rel, src)
+    return code_lines(src).map(&:first).join if rel.end_with?('.rb')
+
+    s = rel.end_with?('.html') ? src.gsub(/<!--.*?-->/m, '') : src
+    s = s.gsub(%r{/\*.*?\*/}m, '')
+    s.lines.reject { |l| l.strip.start_with?('//') }.map { |l| l.sub(%r{\s//\s.*\z}, '') }.join
   end
 
-  # js = { rel => text } pre ui/js/*.js; web = { rel => text } pre ui/**/*.{js,html}
-  def js_memory_problems(js, web, outside = R::OUTSIDE)
+  def literals(text)
+    text.scan(Regexp.new(Q)).map(&:last)
+  end
+
+  # sources = { rel => text } — ui/**/*.{js,html} a Ruby pluginu (aj HTML skladane v Ruby).
+  def js_memory_problems(sources, outside = R::OUTSIDE)
     mem = outside.find { |g| g['key'] == 'ui_memory' }
     probs = []
     users = []
-    js.each do |rel, src|
-      code = js_code(src)
+    sources.each do |rel, src|
+      next if MEMORY_SKIP.include?(rel)
+
+      code = web_code(rel, src)
+      probs << "#{rel}: nova perzistencia okna (#{code[FORBIDDEN_RE]}) — zarad ju do supisu" if code.match?(FORBIDDEN_RE)
       next unless code.include?('localStorage') || code.match?(/\bsecKey\b.*\{/)
 
       users << rel if code.include?('localStorage')
-      keys = LS_KEY_RES.flat_map { |re| code.scan(re).flatten }
-      code.scan(/RECENT_KEYS\s*=\s*\{([^}]*)\}/).flatten.each { |b| keys.concat(b.scan(/'([^']+)'/).flatten) }
+      keys = LS_KEY_RES.flat_map { |re| code.scan(re).map(&:last) }
+      code.scan(/RECENT_KEYS\s*=\s*\{([^}]*)\}/).flatten.each { |b| keys.concat(literals(b)) }
       # secKey sklada kluc z prefixu a casti ('nxsec_s4.' + ctx + '.' + key) — prefixy su literaly s pismenom.
       code.scan(/function secKey\([^)]*\)\s*\{(.*?)\n\s*\}/m).flatten.each do |b|
-        keys.concat(b.scan(/'([^']+)'/).flatten.grep(/\A[a-z]/i))
+        keys.concat(literals(b).grep(/\A[a-z]/i))
       end
       keys.uniq.each do |k|
         next if mem['names'].any? { |n| File.fnmatch(n, k) }
@@ -415,19 +472,15 @@ module NxH16
     end
     (users - mem['writers']).each { |f| probs << "#{f} pouziva localStorage, ale nie je v writers ui_memory" }
     (mem['writers'] - users).each { |f| probs << "#{f} je v writers ui_memory, ale localStorage nepouziva" }
-    web.each do |rel, src|
-      src.each_line.with_index(1) do |l, no|
-        probs << "#{rel}:#{no}: nova perzistencia okna (#{l[FORBIDDEN_RE]}) — zarad ju do supisu" if l.match?(FORBIDDEN_RE)
-      end
-    end
     probs
   end
 
-  def ui_sources(glob)
-    Dir.glob(File.join(NxTest::ROOT, 'noxun_engine', 'ui', glob)).sort.to_h do |p|
+  def memory_sources
+    web = Dir.glob(File.join(NxTest::ROOT, 'noxun_engine', 'ui', '**', '*.{js,html}')).sort.to_h do |p|
       rel = p.sub("#{NxTest::ROOT}/", '')
       [rel, read(rel)]
     end
+    web.merge(plugin_sources)
   end
 
   # --- T1: zmrazenie ------------------------------------------------------------------
@@ -582,20 +635,20 @@ end
 
 # --- T3 -------------------------------------------------------------------------------------
 
-NxTest.test('H16 T3: jediny koren — ziadna metoda *dir nepocita %APPDATA% sama (okrem Materials.dir)') do
+NxTest.test('H16 T3: jediny koren — %APPDATA% cita len Materials.dir a zalozne vetvy delegujuce na neho') do
   probs = NxH16.root_problems(NxH16.plugin_sources)
   NxTest.assert(probs.empty?, probs.join("\n"))
 end
 
-NxTest.test('H16 T3: negativ — nova metoda *_dir s vlastnym ENV zhodi guard') do
-  bad = { 'noxun_engine/core/novy.rb' => "module X\n  def self.presets_dir\n    File.join(ENV['APPDATA'], 'NOXUN')\n  end\nend\n" }
-  ok = { 'noxun_engine/core/novy.rb' => "module X\n  def dir\n    return Materials.dir if defined?(Materials)\n    " \
-                                        "File.join(ENV['APPDATA'], 'NOXUN')\n  end\nend\n" }
-  NxTest.refute(NxH16.root_problems(bad).empty?)
-  NxTest.assert(NxH16.root_problems(ok).empty?)
+NxTest.test('H16 T3: negativy — vlastny ENV v *_dir, ENV["APPDATA"], ENV.fetch v inej metode, konstanta') do
+  wrap = ->(body) { { 'noxun_engine/core/novy.rb' => "module X\n#{body}end\n" } }
+  NxTest.refute(NxH16.root_problems(wrap.call("  def self.presets_dir\n    File.join(ENV['APPDATA'], 'NOXUN')\n  end\n")).empty?)
+  NxTest.refute(NxH16.root_problems(wrap.call("  def root_path\n    File.join(ENV[\"APPDATA\"], 'NOXUN')\n  end\n")).empty?)
+  NxTest.refute(NxH16.root_problems(wrap.call("  def base\n    ENV.fetch('APPDATA', '.')\n  end\n")).empty?)
+  NxTest.refute(NxH16.root_problems(wrap.call("  ROOT = ENV['APPDATA'].to_s\n")).empty?)
+  ok = "  def dir\n    return Materials.dir if defined?(Materials)\n\n    File.join(ENV['APPDATA'], 'NOXUN')\n  end\n"
+  NxTest.assert(NxH16.root_problems(wrap.call(ok)).empty?, 'zalozna vetva za Materials.dir je povolena')
 end
-
-# --- T4 -------------------------------------------------------------------------------------
 
 NxTest.test('H16 T4: kazdy literal mena uloziska v plugine je v supise') do
   lits = NxH16.storage_literals(NxH16.plugin_sources)
@@ -645,6 +698,26 @@ NxTest.test('H16 T5b: negativy — druhy zapis v znamom subore, pomocnik deploy_
   NxTest.assert(NxH16.write_site_problems(helper).any? { |p| p.start_with?("#{cat}: 3 ") })
   less = src.merge(dim => src[dim].gsub('JsonFileStore.write(', 'JsonFileStore.nic('))
   NxTest.assert(NxH16.write_site_problems(less).any? { |p| p.include?(dim) })
+end
+
+NxTest.test('H16 T5b: negativy — novy ciel cez znameho pomocnika a dalsie zapisove primitiva') do
+  src = NxH16.plugin_sources
+  app = 'noxun_engine/core/appliance_catalog.rb'
+  thumbs = src.merge(app => "#{src[app]}\nstage_attachment(src, File.join(dir, THUMBS_DIR), att_id, file)\n")
+  NxTest.assert(NxH16.write_site_problems(thumbs).any? { |p| p.start_with?("#{app}: 15 ") }, 'pomocnik s novym cielom')
+  ["IO.binwrite(p, x)", "IO.copy_stream(a, b)", "File.new(p, 'w')", "Dir.mkdir(p)", "FileUtils.touch(p)", 'FileUtils.rm(p)',
+   'FileUtils.move(a, b)', 'File.unlink(p)', 'File.delete(p)', 'Materials.deploy_bytes(p, b)'].each do |line|
+    NxTest.assert(line.match?(NxH16::WRITE_RE), "zapis nechyteny: #{line}")
+  end
+  ['File.read(p)', "File.open(p, 'rb')", 'stats.copy_file(x)', 'obj.rm(p)', 'File.exist?(p)'].each do |line|
+    NxTest.refute(line.match?(NxH16::WRITE_RE), "citanie hlasene ako zapis: #{line}")
+  end
+end
+
+NxTest.test('H16 T5b: kazdy zapisovy pomocnik z WRITE_HELPERS je v plugine definovany') do
+  all = NxH16.plugin_sources.values.join
+  missing = NxH16::WRITE_HELPERS.reject { |h| all.match?(/\bdef (?:self\.)?#{Regexp.escape(h)}[(\s]/) }
+  NxTest.assert(missing.empty?, "pomocnik premenovany alebo zruseny: #{missing.join(', ')} — uprav WRITE_HELPERS")
 end
 
 # --- T6 / T6b -----------------------------------------------------------------------------------
@@ -714,17 +787,27 @@ end
 
 # --- T9 ---------------------------------------------------------------------------------------------
 
-NxTest.test('H16 T9: kluce localStorage su v OUTSIDE ui_memory a ina perzistencia okna nie je') do
-  probs = NxH16.js_memory_problems(NxH16.ui_sources(File.join('js', '*.js')), NxH16.ui_sources('**/*.{js,html}'))
+NxTest.test('H16 T9: kluce localStorage (JS, HTML, Ruby) su v OUTSIDE ui_memory a ina perzistencia okna nie je') do
+  probs = NxH16.js_memory_problems(NxH16.memory_sources)
   NxTest.assert(probs.empty?, probs.join("\n"))
 end
 
-NxTest.test('H16 T9: negativy — novy kluc lsSet, sessionStorage, indexedDB') do
-  js = NxH16.ui_sources(File.join('js', '*.js'))
+NxTest.test('H16 T9: negativy — lsSet, dvojite uvodzovky, sablona, inline HTML, Ruby, sessionStorage, indexedDB') do
+  src = NxH16.memory_sources
   st = 'noxun_engine/ui/js/studio.js'
-  NxTest.refute(NxH16.js_memory_problems(js.merge(st => "#{js[st]}\nlsSet('nx_foo', 1);\n"), {}).empty?)
-  NxTest.refute(NxH16.js_memory_problems(js, { st => "sessionStorage.setItem('nx_x', 1);\n" }).empty?)
-  NxTest.refute(NxH16.js_memory_problems(js, { st => "indexedDB.open('nx');\n" }).empty?)
+  bo = 'noxun_engine/ui/js/boot.js'
+  [[st, "lsSet('nx_foo', 1);"], [st, "localStorage.setItem(\"nx_foo\", '1');"], [st, 'localStorage.getItem(`nx_foo`);'],
+   [st, "sessionStorage.setItem('nx_x', 1);"], [st, "indexedDB.open('nx');"]].each do |rel, line|
+    NxTest.refute(NxH16.js_memory_problems(src.merge(rel => "#{src[rel]}\n#{line}\n")).empty?, "nezachytene: #{line}")
+  end
+  html = 'noxun_engine/ui/panel.html'
+  NxTest.refute(NxH16.js_memory_problems(src.merge(html => "#{src[html]}\n<script>localStorage.setItem('nx_foo','1')</script>\n")).empty?,
+                'inline skript v HTML')
+  rb = 'noxun_engine/tools/mower.rb'
+  NxTest.refute(NxH16.js_memory_problems(src.merge(rb => "#{src[rb]}\nHTML = \"<script>localStorage.setItem('nx_foo','1')</script>\"\n")).empty?,
+                'HTML skladane v Ruby')
+  NxTest.refute(NxH16.js_memory_problems(src.merge(bo => '')).empty?, 'zapisovatel v supise bez localStorage')
+  NxTest.assert(NxH16.js_memory_problems(src.merge(st => "#{src[st]}\n// sessionStorage len v komentari\n")).empty?, 'komentar')
 end
 
 # --- T10 --------------------------------------------------------------------------------------------

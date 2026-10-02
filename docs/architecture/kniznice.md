@@ -14,7 +14,9 @@
 ## 1 · Pravidlá
 
 - **Jediný koreň:** všetko leží v `%APPDATA%\NOXUN\Engine` a každý modul sa naň pýta cez `Materials.dir` (aj šablóny a štatistika).
-  Testy celý koreň presmerujú jedným `Materials.test_dir_override`; vlastný výpočet koreňa z `%APPDATA%` guard nepustí.
+  Testy koreň presmerujú `Materials.test_dir_override`; výnimka je katalóg spotrebičov — jeho vlastný `ApplianceCatalog.test_dir_override`
+  (len testy) má prednosť a `appliances.json` aj `appliances/` presunie inam. Čítanie `%APPDATA%` mimo `Materials.dir` (okrem záložnej
+  vetvy metódy, ktorá najprv deleguje na `Materials.dir`) guard nepustí.
 - **„Zdieľa sa" (áno)** = D-48 Odoslať / Aktualizovať súbor prenesie na druhý počítač — **knižnice a ich prílohy** (materiály, ABS,
   kovanie, šablóny, dodávateľ, spotrebiče). **Len tento PC (nie)** = cesty, značky, osobné nastavenia, cache a zálohy.
   **Zmena zdieľania je rozhodnutie Michala** (test pripína zdieľanú množinu).
