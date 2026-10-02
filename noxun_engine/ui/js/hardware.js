@@ -1884,6 +1884,7 @@
   function refreshHardwareManual(view){
     hwManualView = Array.isArray(view) ? view : [];
     hwMetaApply((typeof hwItems !== 'undefined') ? hwItems : null); // „· m ručne" v hlavicke Poloziek
+    if (typeof nxSectorMetaApply === 'function') nxSectorMetaApply(); // aj v liste sektora Kovanie
     var block = el('hwManBlock');
     if (!block) return false;                        // sekcia nie je vykreslena
     block.innerHTML = hwManualInnerHtml();

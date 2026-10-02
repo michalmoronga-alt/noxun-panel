@@ -114,6 +114,22 @@
   }
   // D-07: rozsah ciel v modelovych mm (presahy mozu ist mimo obrys korpusu).
   // ROH-A2: bocne okraje sa merajú od OTVORU (pri ostatnych typoch 0…W).
+  // Rozsah dielcov rohovej zostavy (server posiela x0/x1/z0/z1 v mm) pre scenu —
+  // `cr_front` moze siahat pod korpus. Ciste (Node testy). Bez zostavy null.
+  function pvCornerExtent(){
+    var cp = (typeof pvCornerPreview === 'function') ? pvCornerPreview() : null;
+    if (!cp) return null;
+    var e = null;
+    cp.parts.forEach(function(p){
+      if (!p) return;
+      var x0 = nxNumOr(p.x0, NaN), x1 = nxNumOr(p.x1, NaN), z0 = nxNumOr(p.z0, NaN), z1 = nxNumOr(p.z1, NaN);
+      if (isNaN(x0) || isNaN(x1) || isNaN(z0) || isNaN(z1)) return;
+      if (!e) e = { minX: x0, maxX: x1, minZ: z0, maxZ: z1 };
+      e.minX = Math.min(e.minX, x0); e.maxX = Math.max(e.maxX, x1);
+      e.minZ = Math.min(e.minZ, z0); e.maxZ = Math.max(e.maxZ, z1);
+    });
+    return e;
+  }
   function frontsExtent(){
     var items = frontItems; if (!items || !items.length) return null;
     var W = numv('width')||600, H = numv('height')||720;
@@ -261,6 +277,14 @@
       // H6b (O9): suhrn kovania je v liste sektora, nie v kresbe — rezerva dole je
       // len to, co sa KRESLI: nohy pod korpusom (pri sokli stoja v sokli, rezerva 0).
       minZ = Math.min(minZ, nxHwLowestZ(hwItems, nxCabFloorHeight()));
+      // Cela (ghost vrstva) a rohova zostava mozu siahat mimo korpus (okraj dole −20,
+      // `cr_front`) — rezerva −96 mm ich kedysi kryla, teraz ich rozsah patri do sceny.
+      var he = [frontsExtent(), pvCornerExtent()];
+      he.forEach(function(x){
+        if (!x) return;
+        minX = Math.min(minX, x.minX); maxX = Math.max(maxX, x.maxX);
+        minZ = Math.min(minZ, x.minZ); maxZ = Math.max(maxZ, x.maxZ);
+      });
     }
     // PR #381 (P2): telo slotu sa do sceny priklada v KAZDOM kontexte —
     // od opravy projekcii ho vidno aj v Celach a v Kovani. S1-F: box niky sa

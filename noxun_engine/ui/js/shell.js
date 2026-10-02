@@ -132,7 +132,7 @@
 
     // Bublina odkazu v liste Nahladu (H6b, O6): povie MATERIAL korpusu — ten je
     // v Korpuse, v liste ostavaju len rozmery. Cista funkcia; popis dekoru
-    // prichadza uz prelozeny z AKTUALNEHO katalogu (bridge.js renderCtxNote).
+    // prichadza uz prelozeny z AKTUALNEHO katalogu (bridge.js renderS1Link).
     // Bez materialu ostane len vyzva (nic sa nevymysla).
     function s1LinkTitle(material){
       var m = String(material == null ? '' : material).trim();
@@ -262,10 +262,17 @@
     }
     // Kovanie: ten isty `nxHwSummary`, aky kreslil nahlad. `items === null` =
     // nic neoznacene (''), prazdne pole = skrinka kovanie nema.
+    // Rucne pridane polozky (`h.manual` = ich pocet) su tiez kovanie skrinky: suhrn
+    // z pravidiel + „· N ručne" (zhodne s metou skupiny Polozky, D14); len rucne →
+    // „N ručne"; „bez kovania" az ked su prazdne OBE.
     function metaHardware(h){
       if (!h || h.items == null) return '';
-      if (!h.items.length) return 'bez kovania';
-      return String(h.summary == null ? '' : h.summary);
+      var m = parseInt(h.manual, 10) || 0;
+      var out = [];
+      if (h.items.length && h.summary) out.push(String(h.summary));
+      if (m > 0) out.push(m + ' ručne');
+      if (out.length) return out.join(' · ');
+      return (!h.items.length) ? 'bez kovania' : '';
     }
     function metaContent(mode, ctx, content){
       if (mode !== 'cab') return ''; // dielec/doska maju vlastnu kartu; vkladanie S4 nema
@@ -598,8 +605,11 @@
     var b = el('s1Link');
     if (!b) return;
     var t = NXShell.s1LinkTitle(nxS1LinkMaterial);
+    var txt = el('s1LinkTxt');
+    var vis = txt ? String(txt.textContent || '').trim() : '';
     b.setAttribute('title', t);
-    b.setAttribute('aria-label', t);
+    // Label in Name: aria-label zacina viditelnym textom (rozmery), inak by ho citacka nepovedala.
+    b.setAttribute('aria-label', vis ? (vis + ' — ' + t) : t);
   }
   // Klik v <summary> by sektor zbalil — rovnaky stop ako „?" a ikony skupin.
   function nxS1Link(ev){
@@ -675,7 +685,8 @@
     } else if (ctx === 'kovanie'){
       var items = (typeof hwItems !== 'undefined') ? hwItems : null;
       out.hw = { items: items,
-                 summary: (items && typeof nxHwSummary === 'function') ? nxHwSummary(items) : '' };
+                 summary: (items && typeof nxHwSummary === 'function') ? nxHwSummary(items) : '',
+                 manual: (items && typeof hwManualView !== 'undefined' && Array.isArray(hwManualView)) ? hwManualView.length : 0 };
     } else {
       out.korpus = {
         carcass: !(typeof getType === 'function' && typeof NXTypes !== 'undefined') || NXTypes.carcass(getType()),

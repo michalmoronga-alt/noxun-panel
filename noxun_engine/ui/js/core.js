@@ -633,6 +633,9 @@
   // drzi na 0), takze v meta nie su.
   function cabfrontDecorShort(name){
     var s = String(name == null ? '' : name).replace(/\s+/g, ' ').trim();
+    // Popis polozky je „<dekor> <struktura> <nazov> · <TYP> <hrubka> mm" — dekor je
+    // cast PRED prvym „ · "; dekor bez struktury a nazvu („K009 · DTDL 18 mm") dava „K009".
+    s = s.split(/(?:^|\s)·(?:\s|$)/)[0].trim();
     if (!s) return '';
     return s.split(' ').slice(0, 2).join(' ');
   }

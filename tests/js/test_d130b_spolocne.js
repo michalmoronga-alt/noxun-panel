@@ -69,6 +69,12 @@ eq(C.cabfrontMetaText('Dub', G(0, 2, 0, 2, 5), { slot: true }),
 eq(C.cabfrontMetaText('H1180 ST37 Dub Halifax prírodný · 18', G(3, 2, 2, 2, 2)),
    'H1180 ST37 · medzera 3 · okraje 2', 'A (M7): ziadna elipsa — prve dve slova');
 eq(C.cabfrontDecorShort('Dub 18'), 'Dub 18', 'A: kratky nazov ostava cely');
+// P3-2: popis polozky je „<dekor> <struktura> <nazov> · <TYP> <hrubka> mm" - dekor je cast PRED „ · ".
+eq(C.cabfrontDecorShort('K009 · DTDL 18 mm'), 'K009', 'A (P3-2): dekor bez struktury a nazvu');
+eq(C.cabfrontMetaText('K009 · DTDL 18 mm', G(3, 2, 2, 2, 2)), 'K009 · medzera 3 · okraje 2',
+   'A (P3-2): ziadne „K009 · · medzera"');
+eq(C.cabfrontDecorShort('K009 Dub Halifax prírodný · DTDL 18 mm'), 'K009 Dub', 'A (P3-2): dve slova pred „ · "');
+eq(C.cabfrontDecorShort(' · DTDL 18 mm'), '', 'A (P3-2): popis bez dekoru = ziadny dekor');
 eq(C.cabfrontDecorShort('  F206   ST9   Pietra '), 'F206 ST9', 'A: biele znaky sa zlucia');
 eq(C.cabfrontDecorShort('   '), '', 'A: prazdny nazov = ziadny dekor');
 eq(C.cabfrontDecorShort(null), '', 'A: null = ziadny dekor');

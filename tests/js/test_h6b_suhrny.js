@@ -153,6 +153,16 @@ function PV_TITLE_OF(c){ return { zony: 'Zóny', cela: 'Čelá', kovanie: 'Kovan
   eq(hw(null), '', 'T2: Kovanie - nic neoznacene');
   eq(hw([]), 'bez kovania', 'T2 (D6): Kovanie - prazdne pole');
   eq(meta({ mode: 'cab', ctx: 'kovanie' }).s4, '', 'T2: Kovanie - chybajuci obsah');
+  // Rucne pridane polozky (hwManualView) su tiez kovanie (P2): „· N ručne", len rucne „N ručne",
+  // „bez kovania" az ked su prazdne OBE (zhodne s metou skupiny Polozky, D14).
+  const hwm = (items, manual) => meta({ mode: 'cab', ctx: 'kovanie',
+    content: { hw: { items: items, summary: PV.nxHwSummary(items), manual: manual } } }).s4;
+  eq(hwm(HW3, 2), 'Nohy 4× · Výsuv 1× · Príchyt sokla 1× · 2 ručne', 'T2 (P2): pravidla + rucne');
+  eq(hwm([], 1), '1 ručne', 'T2 (P2): len rucna polozka - nie „bez kovania"');
+  eq(hwm([], 0), 'bez kovania', 'T2 (P2): prazdne obe = „bez kovania"');
+  eq(hwm(HW3, 0), 'Nohy 4× · Výsuv 1× · Príchyt sokla 1×', 'T2 (P2): bez rucnych bez zmeny');
+  eq(hwm(null, 3), '', 'T2 (P2): nic neoznacene');
+  eq(hwm([], undefined), 'bez kovania', 'T2: chybajuci pocet rucnych = 0');
 
   // Otvorena skupina suhrn NEMENI (O12) - ani zbalena, ani rozbalena.
   const c1 = { korpus: { top: 'full', bottom: 'under_sides', back: 'groove' } };
@@ -275,7 +285,9 @@ function load(ctx, file){
   eq(ids.s1LinkTxt.textContent, '800 × 864 × 520 · sokel 100', 'T5: Zony - text odkazu = rozmery zo ZIVYCH poli');
   eq(ids.s1Meta.hidden, true, 'T5: Zony - nazov projekcie sa schova (odkaz ho nahradi)');
   eq(ids.s1Link.getAttribute('title'), 'Materiál korpusu: K2738 MO — klik otvorí kontext Korpus', 'T5: bublina nesie material');
-  eq(ids.s1Link.getAttribute('aria-label'), ids.s1Link.getAttribute('title'), 'T5: aria-label = bublina');
+  eq(ids.s1Link.getAttribute('aria-label'),
+     '800 × 864 × 520 · sokel 100 — Materiál korpusu: K2738 MO — klik otvorí kontext Korpus',
+     'T5 (P3-4): aria-label = viditelny text rozmerov + bublina (Label in Name)');
   eq(ids.s4Meta.textContent, '2 zóny · 3 police', 'T5: Zony - S4 suhrn (listy, police)');
   F.width = 900;
   ctx.nxSectorMetaApply();
@@ -288,6 +300,14 @@ function load(ctx, file){
   ctx.hwItems = [];
   ctx.nxSectorMetaApply();
   eq(ids.s4Meta.textContent, 'bez kovania', 'T5: Kovanie - prazdne kovanie');
+  ctx.hwItems = [];
+  ctx.hwManualView = [{ id: 'm1' }];
+  ctx.nxSectorMetaApply();
+  eq(ids.s4Meta.textContent, '1 ručne', 'T5 (P2): Kovanie - len rucna polozka');
+  ctx.hwItems = [{ label: 'Nohy', generic_type: 'leg', quantity: 4 }];
+  ctx.nxSectorMetaApply();
+  eq(ids.s4Meta.textContent, 'Nohy 4× · 1 ručne', 'T5 (P2): Kovanie - pravidla + rucna');
+  ctx.hwManualView = [];
   ctx.hwItems = null;
   ctx.nxSectorMetaApply();
   eq(ids.s4Meta.textContent, '', 'T5: Kovanie - nic neoznacene');
@@ -386,6 +406,31 @@ function load(ctx, file){
   r = render(100, []);
   NOTXT(r, 'prazdne kovanie');
   ok(r.html.indexOf('<text') < 0 || r.html.indexOf('hrana') < 0, 'T6: prazdne kovanie - ziadne texty v kresbe');
+  // P3-3: cela s okrajom dole −20 (horna skrinka bez sokla, ghost Čelá) a `cr_front` rohovej
+  // nesmu byt v scene Kovania orezane (rezerva −96 mm uz nie je).
+  {
+    const FR = [{ id: 'F1', type: 'door', mode: 'auto', z: -20, height: 700, wings_n: 1, profile: 'none' }];
+    vm.runInContext('pvUserView = false; pvView = null; frontDraft = null;', ctx);
+    ctx.setType('upper');
+    ctx.__fields = { width: 800, height: 720, depth: 320, thickness: 18, floor_height: 0, fr_gap_left: 2, fr_gap_right: 2,
+                     fr_gap: 3, fr_gap_top: 2, top_mode: 'full', back_mode: 'overlay' };
+    ctx.frontOpening = null; ctx.frontItems = FR; ctx.frontSlots = {}; ctx.hwItems = [SLIDE];
+    vm.runInContext("previewMode = 'hw'", ctx);
+    ctx.renderPreview();
+    const vb2 = svg.getAttribute('viewBox').split(/\s+/).map(parseFloat);
+    ok(vb2[1] + vb2[3] >= 720 + 20 + PAD, 'T6 (P3-3): cela presahujuce dole −20 je v scene Kovania (spodok viewBoxu ' + (vb2[1] + vb2[3]) + ')');
+    // Rohova: dielec zostavy siaha pod korpus.
+    ctx.setType('corner_blind');
+    ctx.cornerPreview = { parts: [{ role: 'cr_front', x0: 650, x1: 1100, z0: -60, z1: 700 }], dims: [], fits: true };
+    ctx.__fields = { width: 1100, height: 862, depth: 510, thickness: 18, floor_height: 0, fr_gap_left: 2, fr_gap_right: 2,
+                     fr_gap: 3, fr_gap_top: 2, top_mode: 'full', back_mode: 'overlay' };
+    ctx.frontOpening = { x0: 650, w: 450 }; ctx.frontItems = []; ctx.hwItems = [];
+    vm.runInContext('pvUserView = false; pvView = null;', ctx);
+    ctx.renderPreview();
+    const vb3 = svg.getAttribute('viewBox').split(/\s+/).map(parseFloat);
+    ok(vb3[1] + vb3[3] >= 862 + 60 + PAD, 'T6 (P3-3): cr_front rohovej je v scene Kovania (spodok viewBoxu ' + (vb3[1] + vb3[3]) + ')');
+    ctx.cornerPreview = null;
+  }
   // Ciste jadro rezervy.
   eq(PV.nxHwLowestZ([LEG], 0), -70, 'T6: nxHwLowestZ - nohy bez sokla');
   eq(PV.nxHwLowestZ([LEG], 100), 0, 'T6: nxHwLowestZ - nohy v sokli');
