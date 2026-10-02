@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H6c · kóty náhľadu (2.10.2026, PR #?, v0.17.19, blok 9 · HARDENING PO V1, triedenie D-02; package
+- **H6c · kóty náhľadu (2.10.2026, PR #455, v0.17.19, blok 9 · HARDENING PO V1, triedenie D-02; package
   [PACKAGE_H6.md](../zdroje/bloky/HARDENING/PACKAGE_H6.md) §6 „H6c" + §15; mockup [MOCKUP_H6_INSPECTOR.html](../zdroje/bloky/HARDENING/MOCKUP_H6_INSPECTOR.html) časť E;
   rozhodnutia Michala 2.10. O10 A, O11 A; brief [BRIEF_H6.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H6.md)).** Tretia z troch častí H6. **Kóty a popisy v náhľade majú stálu veľkosť
   na obrazovke:** 11 px (čísla medzier Čiel 10 px), čiara 1 px (`non-scaling-stroke`), **bez „mm"** („Š 800", „V 864", „H 520", „sokel 100", „telo 764") — pri spodnej 800 × 864
