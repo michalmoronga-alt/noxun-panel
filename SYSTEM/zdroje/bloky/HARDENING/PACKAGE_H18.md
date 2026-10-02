@@ -485,7 +485,10 @@ Predzmenové JSON ani `payload_po.json` sa počas mutácií nemenia.
 Nahrávka v `C:\Users\PC\AppData\Local\Temp\noxun_ui_foto\rec_0.17.26_20261003_012532` — 70 zachytených súborov, own_count v 16 pushoch.
 Fotky `C:\Users\PC\AppData\Local\Temp\noxun_ui_foto\shots_20261003_012732_114460\05_panel_kovanie.png`, `00_model.png`, `index.html` (0 problémov).
 Ilustračná baseline: main UI 0.17.25 + úspešný payload 0.17.21, `shots_20261003_010825_102944/05_panel_kovanie.png`; nedokazuje pôvodný payload 0.17.25.
-Obe fotky vizuálne skontrolované; zdravé seed dáta zostávajú rovnaké, scenáre starého výberu dokazuje matica a smoke §10.
+Obe fotky vizuálne skontrolované; render zdravých seed dát je bez poškodenia. Nahrávka má iba dva Inspector payloady (`0015_panel.js`, `0021_panel.js`),
+oba pre spodnú skrinku 800 so zásuvkou, bez závesových položiek a `none_label`; Sety sú na snímke zbalené. Závesy v Studio pushoch patria projektovému
+súpisu/katalógu, nie novému rozsahu Inspectora. Fotka preto **nedokazuje nové označenia závesov ani precedence**; tie dokazuje headless matica a
+vizuálne ich ešte musí overiť Michal v smoke §10 po mergi/inštalácii. Z tejto nahrávky sa rozbalená autentická závesová scéna nedá získať.
 Vlastný SketchUp PID112260 sa sám zavrel (exit 0), lock/sentinel odstránil runner; pôvodný ENGINEtests aj 85 živých NOXUN súborov byte/hash rovnaké.
 Po nahrávke INSTALL z čistého root mainu `2640f47b`: nainštalovaný **0.17.25**, všetkých 181 súborov zhodných s mainom; SU slot vrátený orchestrátorovi.
 Predrecenzia a GH review sú následné brány; smoke §10 po mergi a inštalácii overí Michal.
