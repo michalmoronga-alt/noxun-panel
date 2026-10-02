@@ -3,9 +3,8 @@
 # s prvkami Inspectora (podklad pre buduci rezim Jednoduchy/Rozsireny).
 # Uklada VYLUCNE identifikatory prvkov a pocty — ziadne hodnoty poli, ziadne
 # nazvy projektov/suborov. Subor: %APPDATA%\NOXUN\Engine\usage_stats.json
-# (zapis cez JsonFileStore — atomicky tmp+rename, .bak zaloha; testovaci
-# sandbox funguje cez ENV['APPDATA'] presmerovane v tests/helper.rb, rovnaky
-# vzor ako TemplateStore).
+# (zapis cez JsonFileStore — atomicky tmp+rename, .bak zaloha; koren =
+# `Materials.dir` (R-08, H16), testy cez ENV sandbox aj test_dir_override).
 #
 # Struktura suboru (SCHEMA 1):
 #   { "schema": 1, "first_seen": "YYYY-MM-DD", "last_seen": "YYYY-MM-DD",
@@ -31,6 +30,8 @@ module Noxun
       module_function
 
       def dir
+        return Materials.dir if defined?(Materials) && Materials.respond_to?(:dir)
+
         base = ENV['APPDATA'] || Dir.tmpdir
         File.join(base, 'NOXUN', 'Engine')
       end

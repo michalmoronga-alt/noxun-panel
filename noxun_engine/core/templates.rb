@@ -78,7 +78,12 @@ module Noxun
 
       module_function
 
+      # H16 (C-04): jediny koren — TA ISTA cesta, akou ju pocita Materials
+      # (+ test_dir_override), vzor R-08 (`AbsRules.dir`). Produkcia sa nemeni;
+      # od nej zavisia TemplateUsage, TemplatePreviews a ich zamky.
       def dir
+        return Materials.dir if defined?(Materials) && Materials.respond_to?(:dir)
+
         base = ENV['APPDATA'] || Dir.tmpdir
         File.join(base, 'NOXUN', 'Engine')
       end

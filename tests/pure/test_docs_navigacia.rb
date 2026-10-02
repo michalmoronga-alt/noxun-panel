@@ -45,7 +45,7 @@ NX_NEXT_SESSIONS_STATUS = '> Stav: KONCEPT'
 NX_ARCH_ROUTER_MAX_LINES = 200
 NX_ARCH_FILES = %w[
   model-a-identita.md construction.md materials.md
-  hardware.md appliances.md outputs.md ui-lifecycle.md rozsirovacie-body.md
+  hardware.md appliances.md outputs.md ui-lifecycle.md rozsirovacie-body.md kniznice.md
 ].freeze
 # Dlhy riadok = necitatelny diff (jeden odsek = jeden riadok bola presne choroba,
 # ktoru tato davka liecila). Plati na router aj na mapu; SYSTEM/ je mimo rozsah.
@@ -69,13 +69,17 @@ NX_ARCH_MAX_BYTES = {
   'model-a-identita.md' => 90 * 1024,
   'appliances.md' => 62 * 1024,
   # Davka H13 (B-06): mapa rozsirovacich bodov ma ~15 kB — strop ~1,3x (kontrolny
-  # zoznam miest, nie historia; rastie len s novym scenarom).
-  'rozsirovacie-body.md' => 20 * 1024
+  # zoznam miest, nie historia; rastie len s novym scenarom). H16 (scenar 7) ho
+  # dotiahol k stropu — novy strop ~1,3x velkosti po H16.
+  'rozsirovacie-body.md' => 28 * 1024,
+  # Davka H16 (C-04): supis kniznic a ulozisk (~14 kB) — strop ~1,4x; rastie len
+  # s novym ulozistom (riadok tabulky), nie historiou.
+  'kniznice.md' => 20 * 1024
 }.freeze
 # Historicke znacky smu v upratanych suboroch mapy stat LEN vo vyhradenej sekcii
 # „## História" na konci suboru (zaniknute okna, odkaz do archivu). Ostatne subory
 # mapy este upratane nie su — pribudnu sem, ked ich niektora davka uprace.
-NX_ARCH_HISTORY_FILES = %w[ui-lifecycle.md rozsirovacie-body.md].freeze
+NX_ARCH_HISTORY_FILES = %w[ui-lifecycle.md rozsirovacie-body.md kniznice.md].freeze
 NX_ARCH_HISTORY_HEADING = '## História'
 
 # Davka H5b (blok 9 · HARDENING, 1.10.2026, krizovy audit V1 B-05/B-03, CS-06, CN-08/CN-09):

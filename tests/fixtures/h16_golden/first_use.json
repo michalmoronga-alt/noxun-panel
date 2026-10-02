@@ -1,0 +1,108 @@
+{
+  "files": [
+    "abs_rules.json",
+    "appliances.json",
+    "appliances.json.lock",
+    "dim_series.json",
+    "dim_series.json.bak",
+    "direction_check.json",
+    "drawer_uni_seed.done",
+    "edge_check.json",
+    "grain_check.json",
+    "hardware_catalog.json",
+    "hardware_catalog.lock",
+    "hardware_rules.json",
+    "hardware_sets.json",
+    "hardware_taxonomy.json",
+    "legacy_cleanup.json",
+    "materials.json",
+    "materials.lock",
+    "supplier_settings.json",
+    "template_usage.json",
+    "template_usage.json.lock",
+    "templates.json",
+    "templates.json.lock",
+    "uni_seed.done",
+    "updater_settings.json",
+    "updater_settings.json.bak",
+    "usage_stats.json",
+    "usage_stats.json.lock"
+  ],
+  "sha": {
+    "abs_rules.json": "b6291307a5388497490e7ee723b74819a5cf3914a0239f4935c8a19810b1440c",
+    "dim_series.json": "f430726dabd0f07297016bb1387cd7b658d73e30d9ad4ac47b55958eb83e5d88",
+    "dim_series.json.bak": "f430726dabd0f07297016bb1387cd7b658d73e30d9ad4ac47b55958eb83e5d88",
+    "direction_check.json": "f71a4b5a05c9b7f782cb010f0a667df620e8ebcfcb10ca4cfc4f30ea9bdf2824",
+    "edge_check.json": "43f73043fd9dad0a68eb0f59bacd326698873d626c250bfbf7f840a24b363a5f",
+    "grain_check.json": "f71a4b5a05c9b7f782cb010f0a667df620e8ebcfcb10ca4cfc4f30ea9bdf2824",
+    "hardware_catalog.json": "c8d0beca686ae83b6e6908c312de9b570b269297ddae7673a6abeeb224cd93bc",
+    "hardware_rules.json": "ae29a590fcb7f646ceefbdf7cdcb782c5163f2c3e25df2ef4d4900402ed8618e",
+    "hardware_sets.json": "b1eb5674b5c80200d76c655e4a2f0c72ab62d250e9e3c7326556324f0d6b00e0",
+    "hardware_taxonomy.json": "0461e823b8c478bd0f0adda950d6ec5c385b63f39f27709d72fd8b8fce02161e",
+    "materials.json": "4985e20ec6565796b95d53c27bba297ac52f8b79c5ed7b12e0140f736638f999",
+    "supplier_settings.json": "0123fd5f567f237a2838d10926899cc4c108c257403d184573b76facc664679c",
+    "template_usage.json": "71e883eb5b7f30846e2806e68afadd52547d25e40933d4ce90c2a1f4fbf441ee",
+    "templates.json": "cb5a131e62a9d39554acd6ef158a2b8dae79fd1b2be39bf4ada65eb26a40b670",
+    "updater_settings.json": "9e837030e8e5fb45932283d3af55e2b50defc57733c964900ec9c5c55b2453e7",
+    "updater_settings.json.bak": "c5e730ec59f42ed31356115bdf58e29a75cd9d9522e5dd847d83916a4ccdb09a"
+  },
+  "locks_at_write": {
+    "abs_rules.json": [
+      "materials.lock"
+    ],
+    "appliances.json": [
+      "appliances.json.lock"
+    ],
+    "dim_series.json": [
+      "materials.lock"
+    ],
+    "direction_check.json": [
+      ""
+    ],
+    "drawer_uni_seed.done": [
+      "materials.lock"
+    ],
+    "edge_check.json": [
+      ""
+    ],
+    "grain_check.json": [
+      ""
+    ],
+    "hardware_catalog.json": [
+      "hardware_catalog.lock"
+    ],
+    "hardware_rules.json": [
+      "materials.lock"
+    ],
+    "hardware_sets.json": [
+      "materials.lock"
+    ],
+    "hardware_taxonomy.json": [
+      "materials.lock"
+    ],
+    "legacy_cleanup.json": [
+      "materials.lock"
+    ],
+    "materials.json": [
+      "materials.lock"
+    ],
+    "supplier_settings.json": [
+      "materials.lock"
+    ],
+    "template_usage.json": [
+      "template_usage.json.lock"
+    ],
+    "templates.json": [
+      "templates.json.lock"
+    ],
+    "uni_seed.done": [
+      "materials.lock"
+    ],
+    "updater_settings.json": [
+      "materials.lock"
+    ],
+    "usage_stats.json": [
+      "usage_stats.json.lock"
+    ]
+  }
+}

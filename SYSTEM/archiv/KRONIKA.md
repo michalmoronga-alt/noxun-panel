@@ -17,6 +17,27 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H16 · súpis knižníc a úložísk na počítači — príprava D-48 (2.10.2026, PR #461, v0.17.25, blok 9 · HARDENING PO V1, triedenie C-04 = GR-03 · CX k D-48;
+  package [PACKAGE_H16.md](../zdroje/bloky/HARDENING/PACKAGE_H16.md) — **§15 a potvrdenie orchestrátora majú prednosť**, brief [BRIEF_H16.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H16.md)).**
+  Audit-povinná (nový modul), nie výrobná/cenová, predrecenzia povinná. **Bez viditeľnej zmeny** — golden prvého behu (T0, 1. commit na starom kóde) nedotknutý.
+  **Register** `core/library_registry.rb` (čisté dáta, hlboko zmrazené): 30 riadkov koreňa `%APPDATA%\NOXUN\Engine` (12 zdieľaných pri D-48 = 9 knižníc + 3 priečinky
+  príloh, 18 len pre tento PC) s druhom, zámkom a jeho režimom (`module caller mixed self none`), verziami zo STANDARD §13.1, prílohami, vzormi finálnych
+  a dočasných mien a zapisovateľmi; 6 zámkov, 8 skupín mimo koreňa (aj `dev_tools` — cudzí súbor nástroja agentov). **Rozhodnutia Michala 2.10. (4A, 5A):**
+  rozmerové rady aj „18 + 36" = každý PC svoje. **Jediný koreň (R2):** `TemplateStore.dir` a `UsageStats.dir` delegujú na `Materials.dir` (vzor R-08) —
+  šablóny, ich náhľady, použitie, štatistika a ich zámky odteraz nasledujú `Materials.test_dir_override`; produkčné cesty bez zmeny (T11).
+  **Guardy** (`tests/pure/test_h16_kniznice.rb`, 27 testov): bežec prvého behu v samostatnom procese (`tests/h16_first_use.rb`, dva behy: 27 súborov, SHA 16
+  deterministických, zámok držaný pri každom z 19 zápisov) · tvar a zmrazenie · parita ciest s override aj bez · väzba zámku · jediný koreň · literály ·
+  zapisovatelia + **počet zápisových miest na súbor** (33 súborov) · triedenie mien (finálne / technické / dočasné / neznáme) · verzie ↔ §13.1 · `kniznice.md` ↔
+  register · `localStorage` a zákaz inej perzistencie okna · pripnutá zdieľaná množina. **Docs:** nový súbor mapy `docs/architecture/kniznice.md` (strop 20 kB,
+  upratané — história len na konci), router, veta v STANDARD §13.1, scenár 7 „Nové úložisko na počítači" v mape (strop mapy 20 → 28 kB), odseky
+  `json_file_store.rb`, `templates.rb`, `usage_stats.rb`, D-48 „príprava hotová" v DOGFOODING a PLAN; zmrazený zoznam H11a 94 → 95.
+  **Odchýlky:** kľúč riadka `vepo_settings.json` je `export_settings` (guard H7a T-A9 nepustí slovo `vepo_settings` mimo `export_settings.rb`) · `classify`
+  vracia aj `:technical` (`.bak`, zámky) · commity 2–4 package zlúčené (negatívny dôkaz R2 = mutácia M5). **Mutácie** M1–M23 všetky zhodené (M23 = cudzí override
+  spotrebičov v bežci → T0, T2, T2b). **Predrecenzia** 0/0/4 P3 opravené: počet zápisových miest chytí aj ďalšie primitíva (`IO.binwrite`,
+  `IO.copy_stream`, `File.new`, `Dir.mkdir`, `FileUtils.touch/rm/move`, `File.unlink`) a volania známych zápisových pomocníkov s cestou (`WRITE_HELPERS`) ·
+  `localStorage` aj v dvojitých úvodzovkách, šablónach, inline `<script>` v HTML a v Ruby · `%APPDATA%` v akejkoľvek metóde a zápise (okrem záložnej vetvy za
+  `Materials.dir`) · veta `kniznice.md` o výnimke `ApplianceCatalog.test_dir_override`. Testy: **5322 headless · 161 JS** + encoding guard; in-SU **3387 / 0** (odporúčaný beh, `-CloseWhenDone`).
+  Nahradený stav v STAV: „H15 hotová; ďalej H16–H18".
 - **H15b · seed dáta katalógu a taxonómie kovania v samostatných súboroch (2.10.2026, PR #460, v0.17.24, blok 9 · HARDENING PO V1, triedenie C-03 = CX-03;
   package [PACKAGE_H15.md](../zdroje/bloky/HARDENING/PACKAGE_H15.md) — **§15 A2 má prednosť**, brief [BRIEF_H15.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H15.md)).**
   Audit-povinná (dva nové moduly) + výrobná/cenová (presúva sa zdroj nákupných kódov a seed cien), predrecenzia povinná, in-SU netreba (§8). **Presun 1:1:**

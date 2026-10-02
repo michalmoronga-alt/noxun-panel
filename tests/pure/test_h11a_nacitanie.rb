@@ -12,7 +12,7 @@
 #      casti skusene, 1 hlaska, init NEbezi; vsetko ok = init bezi a 0 hlasok;
 #      chybajuci / pokazeny / nedokonceny bootstrap = 1 hlaska o zakladnom
 #      subore a 0 casti.
-#   T6 staticky: zoznam 94 + 14 casti a poradie = zmrazena kopia z mainu
+#   T6 staticky: zoznam 95 + 14 casti a poradie = zmrazena kopia z mainu
 #      b2427ef1, kazda cesta existuje, ziadne `Sketchup.require 'noxun_engine/`
 #      ani `.rbe`/`.rbs`; `reset_for_tests!` plugin nevola.
 #
@@ -32,11 +32,11 @@ module NxH11aLoad
   # Zmrazeny zoznam casti `main.rb` a `ui/panel.rb` (poradie!) z mainu b2427ef1
   # (v0.17.21) + H15a `core/hardware_sets_seed` (tesne pred `core/hardware_sets`)
   # + H15b `core/hardware_catalog_seed` a `core/hardware_taxonomy_seed` (kazdy tesne
-  # pred svojim logickym suborom).
+  # pred svojim logickym suborom) + H16 `core/library_registry` (tesne za `core/materials`).
   # Novy subor pluginu = vedome doplnenie TU aj v `main.rb`.
   MAIN_PARTS = %w[
     core/units core/doc_key core/ids core/store core/part_keys core/build_plan core/cabinet_types
-    core/part_faces core/json_file_store core/dim_series core/materials core/materials_appearance
+    core/part_faces core/json_file_store core/dim_series core/materials core/library_registry core/materials_appearance
     core/materials_native_appearance core/materials_build_appearance core/appearance_mapping
     core/materials_apply_appearance core/updater core/materials_catalog core/materials_decor
     core/materials_abs core/materials_project core/materials_migration core/materials_health
@@ -349,10 +349,10 @@ end
 
 # --- T6: staticky zoznam --------------------------------------------------------
 
-NxTest.test('H11a T6: zoznam casti main.rb (94) a panel.rb (14) = zmrazena kopia, poradie sedi') do
+NxTest.test('H11a T6: zoznam casti main.rb (95) a panel.rb (14) = zmrazena kopia, poradie sedi') do
   main = NxH11aLoad.src('noxun_engine', 'main.rb')
   panel = NxH11aLoad.src('noxun_engine', 'ui', 'panel.rb')
-  NxTest.assert_equal(94, NxH11aLoad::MAIN_PARTS.length)
+  NxTest.assert_equal(95, NxH11aLoad::MAIN_PARTS.length)
   NxTest.assert_equal(NxH11aLoad::MAIN_PARTS, main.scan(NxH11aLoad::PART_RE).flatten)
   NxTest.assert_equal(NxH11aLoad::PANEL_PARTS, panel.scan(NxH11aLoad::PART_RE).flatten)
 end

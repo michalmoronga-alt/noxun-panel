@@ -1791,6 +1791,8 @@ v §2.5, pri ABS seede v §7.5 a v [archiv/KRONIKA.md](archiv/KRONIKA.md) (Grep 
 
 **Súbory na počítači (`%APPDATA%\NOXUN\Engine\`):**
 
+Ktoré súbory sa zdieľajú medzi PC, ich zámky a prílohy: súpis [../docs/architecture/kniznice.md](../docs/architecture/kniznice.md) (autorita `LibraryRegistry`).
+
 | Čo | Kde | Hodnota | Kedy zvýšiť | Schéma |
 |---|---|---|---|---|
 | knižnica šablón | `noxun_engine/core/templates.rb` · `TemplateStore::STD` | **7** | nový tvar záznamu alebo seed šablóny pre existujúce knižnice (migrácia `migrate!` cez `old_std < N`) | áno |
