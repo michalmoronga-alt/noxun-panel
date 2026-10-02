@@ -846,8 +846,9 @@
   }
   // Sety: kolko vlastnych vyberov setu ma skrinka — vyber na CELEJ skrinke
   // (typ s `override_set_id` alebo `override_selector`; pri klasifikovanej zasuvke
-  // vyber v `compat.cab`) a vybery pri JEDNOTLIVYCH cielach (`owner_overrides`,
-  // pri klasifikovanych `compat.owners`). Poskodeny zapis (`invalid`) je tiez
+  // vyber v `compat.cab`) a vybery pri JEDNOTLIVYCH cielach (`owner_overrides` pre
+  // legacy vlastnikov + `compat.owners` pre klasifikovanych, kazdy vlastnik raz).
+  // Poskodeny zapis (`invalid`) je tiez
   // zapis v configu, takze sa rata. Nic vlastne = „podľa projektu"; prazdna
   // ponuka (skrinka nema kovanie so setom) = bez meta.
   function hwSetsMetaText(setOptions){
@@ -856,14 +857,21 @@
     function picked(sc){ return !!(sc && (sc.current || sc.stored)); }
     var n = 0;
     list.forEach(function(o){
-      if (o.compat){
-        if (picked(o.compat.cab)) n++;
-        var ow = o.compat.owners || {};
-        Object.keys(ow).forEach(function(k){ if (picked(ow[k])) n++; });
-      } else {
-        if (o.override_set_id || o.override_selector) n++;
-        n += Object.keys(o.owner_overrides || {}).length;
-      }
+      var c = o.compat;
+      // Skrinka: pri klasifikovanej skrinke (jedna trieda, `compat.cab`) plati triedny vyber;
+      // inak (neklasifikovana alebo zmiesana skrinka) plati kluc typu (`override_*`).
+      if (c && c.cab) { if (picked(c.cab)) n++; }
+      else if (o.override_set_id || o.override_selector) n++;
+      // Cela: server posiela klasifikovanych vlastnikov v `compat.owners` A legacy vlastnikov
+      // v `owner_overrides` (jeden typ ich moze mat naraz) — spocitaju sa raz za vlastnika.
+      var owners = c && c.owners ? c.owners : {};
+      var legacy = o.owner_overrides || {};
+      var seen = {};
+      Object.keys(owners).forEach(function(k){
+        seen[k] = true;
+        if (picked(owners[k]) || legacy[k]) n++;
+      });
+      Object.keys(legacy).forEach(function(k){ if (!seen[k]) n++; });
     });
     return n > 0 ? (n + ' ' + hwPlural(n, 'vlastný', 'vlastné', 'vlastných')) : 'podľa projektu';
   }

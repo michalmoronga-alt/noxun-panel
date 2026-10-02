@@ -211,6 +211,22 @@ function PV_TITLE_OF(c){ return { zony: 'Zóny', cela: 'Čelá', kovanie: 'Kovan
      '2 vlastné', 'T4: Sety - compat: skrinka + ulozeny vyber pri cele, bez dvojitého rátania');
   eq(HW.hwSetsMetaText([E({ generic_type: 'slide', compat: { cab: null, owners: {} } })]), 'podľa projektu',
      'T4: Sety - compat bez vyberu');
+  // Codex kolo 1 P2: jeden typ ma klasifikovanych AJ legacy vlastnikov - `compat.owners` nesie
+  // len klasifikovanych, `owner_overrides` aj legacy; kazdy vlastnik sa rata raz.
+  const mixed = E({ generic_type: 'slide',
+    compat: { cab: null, owners: { 'front:F1': { current: 'c1', stored: false }, 'front:F2': { current: null, stored: false } } },
+    owner_overrides: { 'front:F1': { set_id: 'c1' }, 'front:F3': { set_id: 'legacy1' } } });
+  eq(HW.hwSetsMetaText([mixed]), '2 vlastné', 'T4 (Codex P2): klasifikovane F1 + legacy F3, F1 sa nerata dvakrat');
+  eq(HW.hwSetsMetaText([E({ generic_type: 'slide', compat: { cab: null, owners: { 'front:F1': { current: null, stored: false } } },
+                            owner_overrides: { 'front:F3': { set_id: 'legacy1' } } })]), '1 vlastný',
+     'T4 (Codex P2): len legacy vlastnik s vlastnym setom nie je „podľa projektu"');
+  eq(HW.hwSetsMetaText([E({ generic_type: 'slide', compat: { cab: null, owners: { 'front:F1': { current: null, stored: false } } },
+                            owner_overrides: { 'front:F1': { invalid: true } } })]), '1 vlastný',
+     'T4 (Codex P2): poskodeny zapis klasifikovaneho vlastnika sa rata raz');
+  eq(HW.hwSetsMetaText([E({ generic_type: 'slide', override_set_id: 'S9', compat: { cab: null, owners: {} } })]), '1 vlastný',
+     'T4 (Codex P2): zmiesana skrinka (cab = null) - platny je kluc typu');
+  eq(HW.hwSetsMetaText([E({ generic_type: 'slide', override_set_id: 'S9', compat: { cab: { current: null, stored: false }, owners: {} } })]),
+     'podľa projektu', 'T4 (Codex P2): klasifikovana skrinka - dormantny kluc typu sa nerata');
   // refreshHardwareManual (lahky push rucnych poloziek) obnovi meta skupiny AJ listu sektora.
   {
     const nodes = { hwItemsMeta: { textContent: '' }, hwSetsMeta: { textContent: '' } };
