@@ -480,6 +480,28 @@ kde hláška tvrdí opak. Od 1b-3 je čítacia cesta čistá, takže ostáva len
 commit — prvé Ctrl+Z vracia reset, presne ako status sľubuje. `Panel.push_selected` si dedup naďalej **vyžiada** u observera (`request_dedup`) a ten ho urobí **transparentne**, takže
 samostatný vrchol undo stacku z neho nevznikne.
 
+### hardware_catalog_seed.rb
+
+**Seed dáta katalógu kovania (H15b, blok 9 HARDENING, C-03) — LEN literály, žiadna logika.** Žije tu predvolený produktový manifest, ktorý dostane čerstvá
+inštalácia, a zoznamy, ktorými patche dopĺňajú existujúce katalógy: `SEED_SET_VERSION` s komentárom histórie v2..v5, `SEED_ROWS` (146 riadkov,
+`[kód, názov, kategória, MJ, cena|nil, poznámka|nil, výrobca|nil, rada|nil, demos_url|nil, dodávateľ|nil]`) so sprievodnými zoznamami
+`SEED_PRICE_CHECKED_AT`, `SEED_PRICE_CHECKED_AT_V4`, `SEED_INACTIVE`, `SEED_AVENTOS_V4`, `SEED_PRODUCT_CODES`, v2 tvar manifestu `SEED_ROWS_V2` (60 riadkov, len
+pre patch v3) a zoznamy patchov `SEED_PATCH_V2_ADD`, `LEGACY_SEED_93240`, `SEED_PATCH_V3_ADD`, `SEED_PATCH_V4_ADD` (= `SEED_AVENTOS_V4`), `SEED_PATCH_V5_ADD`,
+`SEED_PATCH_V5_CLASSIFY`. Modul je ten istý `HardwareCatalog` — mená konštánt sa nezmenili, mechanika v `hardware_catalog.rb` ich číta ako doteraz.
+
+- **Poradie načítania:** súbor ide **tesne PRED** `hardware_catalog.rb` (`main.rb` cez `AppLifecycle.require_part` aj `tests/helper.rb`), lebo logika pri
+  načítaní z dát odvodzuje `SEED_PRODUCT_LINKS`, `SEED_ITEMS` a `SEED_ITEMS_V2`. Dáta nesmú odkazovať na konštanty logiky.
+- **Len literály (guard `tests/pure/test_h15_seed_data.rb`, AST)** — rovnaké pravidlá ako [`hardware_sets_seed.rb`](#hardware_sets_seedrb). Navyše (§15 A2
+  package H15): výnimky, ktoré smie `hardware_catalog.rb` deklarovať so `SEED_` menom, sú **len odvodeniny** (`SEED_ITEMS`, `SEED_ITEMS_V2`,
+  `SEED_PRODUCT_LINKS` — každá deklarovaná práve raz; výraz musí čítať svoju seed konštantu, smie čítať len seed konštanty, nevolá metódy bez príjemcu
+  a nesmie mať literál produktu: reťazec len meno poľa položky alebo jedna z dvoch formátových hodnôt s dôvodom v stráži (predvolený dodávateľ `'Demos'`,
+  oddeľovač `' · '`), celé číslo len ako index `row[n]`, desatinné vôbec) a **kontrakt** `SEED_MATCH_FIELDS` (len mená polí, práve raz). Ekvivalentný
+  literál namiesto odvodenia guard zhodí, aj keď by golden ostal rovnaký.
+- **Ako sa seed mení:** riadok manifestu tu + `SEED_SET_VERSION` + patch existujúceho katalógu v `hardware_catalog.rb` (jeho zoznam kódov patrí sem) +
+  **vedomá regenerácia goldenu** `tests/fixtures/h15_golden/generate.rb` zdôvodnená v PR (bez bumpu sa zmena do existujúcich inštalácií nedostane —
+  [STANDARD §13](../../SYSTEM/STANDARD.md)). Golden T0 pripína konštanty, čerstvú inštaláciu, upgrade katalógu v1..v5 aj nákup a rozpočet end-to-end.
+- `frozen_string_literal: true` je povinný; zmrazený je obal každej konštanty (vnútorné polia nie — tak to bolo aj predtým).
+
 ### hardware_catalog.rb
 
 katalóg kovania (V0.6 dávka C): položky s kódmi a cenami s DPH, serverové vyhľadávanie (JS len renderuje vrátené poradie), `row_rev` guard riadku, **„no silent caps" (TEST-1)** —
@@ -567,6 +589,10 @@ Tri veci, ktoré k tomu patria:
   zámku** — taxonómia má vlastný sidecar (`materials.lock`) a vnoriť ho do katalógového by vyrobilo PORADIE zámkov, teda presne to riziko, kvôli ktorému majú katalógy jeden
   spoločný sidecar. Stráži to zdrojový guard v `tests/pure/test_hardware_catalog.rb`.
 
+**Kde sú seed dáta (H15b):** manifest `SEED_ROWS` s jeho sprievodnými zoznamami, v2 tvar `SEED_ROWS_V2`, zoznamy patchov v2..v5 a `SEED_SET_VERSION` žijú
+v [`hardware_catalog_seed.rb`](#hardware_catalog_seedrb); tu ostáva mechanika (`seed!`, `apply_seed_patches!`, patche), odvodeniny `SEED_ITEMS`, `SEED_ITEMS_V2`,
+`SEED_PRODUCT_LINKS` a kontrakt porovnania `SEED_MATCH_FIELDS`. História seedu nižšie platí bez zmeny.
+
 **SEED v3 — dáta z Démosu (D-118, v0.9.43).** Manifest `SEED_ROWS` má odteraz **deväť polí**
 (`[kód, názov, kategória, MJ, cena|nil, poznámka|nil, výrobca|nil, rada|nil, demos_url|nil]`) a **114 riadkov**: pôvodných 60 z D1 + **54 kódov, ktoré používajú seed sety
 zásuviek** (vrátane PTOs modulov `352908`/`352909` a opravenej antracitovej K-sady `357889`). Každý riadok je overený proti PRODUKTOVEJ STRÁNKE demos-trade.sk (7.9.2026):
@@ -619,6 +645,14 @@ nechá, ale seed riadok `367823` sa vtedy resolvne na „Häfele BEZ rady" — a
 NEEXISTUJE. Krok 3 preto beží **len keď taxonómia naozaj hovorí „AXILO patrí Häfele"**, a zapisuje jej ULOŽENÝ zápis mena (JS filtruje presným reťazcom); pri cudzej väzbe
 alebo pri ešte nezaloženej taxonómii sa nevykoná vôbec.
 
+### hardware_taxonomy_seed.rb
+
+**Seed dáta taxonómie kovania (H15b, blok 9 HARDENING, C-03) — LEN literály.** `SEED_VERSION` (3), `SEED_MANUFACTURERS` a `SEED_SERIES` s komentárom
+histórie v1..v3 (Tulip, StrongBox, Häfele a AXILO pod ním). Modul je ten istý `HardwareTaxonomy`; mechanika (`merge_seed`, `migrate_axilo_owner!`) aj
+parametre jednorazovej migrácie vlastníka rady (`AXILO_SERIES`, `AXILO_LEGACY_OWNER`, `AXILO_OWNER`) ostávajú v `hardware_taxonomy.rb`. Načítava sa **tesne
+PRED** `hardware_taxonomy.rb` (`main.rb` aj `tests/helper.rb`); pravidlá „len literály" a stráž sú tie isté ako pri
+[`hardware_sets_seed.rb`](#hardware_sets_seedrb). Zmena seedu = výrobca alebo rada tu + `SEED_VERSION` + vedomá regenerácia goldenu T0.
+
 ### hardware_taxonomy.rb
 
 **Jediný zoznam prípustných výrobcov a rád kovania (KOV-B1, v0.9.19; audit #17 BLOCKER 4).** Set aj položka katalógu nesú `manufacturer`/`series` ako reťazec — keby si ho každý
@@ -639,7 +673,8 @@ u knižnice setov (R-07/R-08/R-11) a katalógu (GH #99).
   (vzor pôvodného zápisu pravidiel kovania, ktorý H10a nahradil revíziou obsahu) sa tu vedome nezavádza: dve otvorené okná by si ju prebili.
 - **Zápis:** `with_catalog_lock` → `JsonFileStore.reload!` → **znovu posúdená brána nad čerstvým dokumentom** → prípadná revízia (`load_with_revision` dáva obsah aj odtlačok
   z JEDNÉHO stavu súboru) → atomický zápis. Do súboru zapisuje **jediné miesto** (`write`); zlyhaný `flock` je IOError a končí ako `:write_failed`, nikdy ako tichý úspech.
-- **Seed (`SEED_VERSION` 3, KOV-G1a):** Hettich · Blum · Grass · Strong · **Häfele** · **Tulip** · Ostatné a ich rady (Sensys, InnoTech Atira, Quadro, AvanTech YOU; **AXILO
+- **Seed (`SEED_VERSION` 3, KOV-G1a; dáta `SEED_VERSION`, `SEED_MANUFACTURERS`, `SEED_SERIES` od H15b v [`hardware_taxonomy_seed.rb`](#hardware_taxonomy_seedrb),
+  parametre migrácie `AXILO_*` ostávajú tu):** Hettich · Blum · Grass · Strong · **Häfele** · **Tulip** · Ostatné a ich rady (Sensys, InnoTech Atira, Quadro, AvanTech YOU; **AXILO
   pod Häfele**; CLIP top, AVENTOS,
   TANDEMBOX, LEGRABOX, MERIVOBOX, TIP-ON; Nova Pro, Tiomos; StrongMax, **StrongBox**). Tulip a StrongBox pribudli s katalógovým seedom v3 — bez nich by šesť úchytiek/vešiakov
   a päť StrongBoxov nemalo výrobcu a strom katalógu by ich zhodil pod „— bez výrobcu". Merge dopĺňa LEN chýbajúce mená, nikdy neprepisuje a nad read-only ani degradovaným

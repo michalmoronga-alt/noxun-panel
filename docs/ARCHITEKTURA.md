@@ -55,7 +55,7 @@ DC pasce [DC_PRAVIDLA.md](DC_PRAVIDLA.md) · UI dizajn [UI_DIZAJN.md](UI_DIZAJN.
 | `materials_apply_appearance` (aplikovanie vzhľadu na podporované výskyty a izolácia zdieľaných definícií) | [architecture/materials.md](architecture/materials.md) |
 | `materials_migration` · `materials_health` · `abs_rules` | [architecture/materials.md](architecture/materials.md) |
 | `demos/` (`client` · `slug_matcher` · `name_search` · `product_parser` · `family` · `lookup` · `sitemap_cache` · `image_cache`) | [architecture/materials.md](architecture/materials.md) |
-| `hardware_rules` · `hardware_catalog` · `hardware_taxonomy` · `hardware_sets` · `hardware_sets_seed` (seed dáta setov, len literály) | [architecture/hardware.md](architecture/hardware.md) |
+| `hardware_rules` · `hardware_catalog` · `hardware_taxonomy` · `hardware_sets` · `hardware_catalog_seed` · `hardware_taxonomy_seed` · `hardware_sets_seed` (seed dáta katalógu, taxonómie a setov — len literály) | [architecture/hardware.md](architecture/hardware.md) |
 | `drawer_recipes` (nemenné recepty zásuviek + dátový pack `data/recipes/`) | [architecture/hardware.md](architecture/hardware.md) |
 | `appliance_catalog` (per-PC katalóg spotrebičov: rozmery z listov, prílohy, tombstone, snapshot pre zákazku) | [architecture/appliances.md](architecture/appliances.md) |
 | `appliance_binding` (jediný transakčný vstup pre spotrebič v zákazke: položka + `appliance_refs[]` oboch vlastníkov + prestavba v JEDNEJ operácii) | [architecture/appliances.md](architecture/appliances.md) |

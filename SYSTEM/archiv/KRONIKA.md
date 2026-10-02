@@ -17,6 +17,22 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H15b · seed dáta katalógu a taxonómie kovania v samostatných súboroch (2.10.2026, PR #460, v0.17.24, blok 9 · HARDENING PO V1, triedenie C-03 = CX-03;
+  package [PACKAGE_H15.md](../zdroje/bloky/HARDENING/PACKAGE_H15.md) — **§15 A2 má prednosť**, brief [BRIEF_H15.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H15.md)).**
+  Audit-povinná (dva nové moduly) + výrobná/cenová (presúva sa zdroj nákupných kódov a seed cien), predrecenzia povinná, in-SU netreba (§8). **Presun 1:1:**
+  `SEED_SET_VERSION` + história, manifest `SEED_ROWS` (146 riadkov) so sprievodnými zoznamami, v2 tvar `SEED_ROWS_V2` a zoznamy patchov v2..v5 doslovne do
+  `core/hardware_catalog_seed.rb`; `SEED_VERSION`, `SEED_MANUFACTURERS`, `SEED_SERIES` do `core/hardware_taxonomy_seed.rb`; oba tesne pred svojou logikou
+  (`main.rb` cez `AppLifecycle.require_part` aj helper; zmrazený zoznam H11a 92 → 94). Odvodeniny `SEED_ITEMS`, `SEED_ITEMS_V2`, `SEED_PRODUCT_LINKS`, kontrakt
+  `SEED_MATCH_FIELDS` a `AXILO_*` ostali v logike; žiadna zmena v dátach ani v metódach (T5 `--color-moved`: 830 riadkov presunutých, v logike 9 ukazovateľov,
+  1 riadok `SEED_VERSION   = 3` git neoznačí ako presun — krátky blok pod prahom detekcie). **Guard R5** rozšírený na 3 moduly + **c2 (§15 A2):** allowlist
+  katalógu = len odvodeniny (musia čítať svoju seed konštantu, smú čítať len seed konštanty, reťazec len meno poľa položky, celé číslo len index `row[n]`) a kontrakt
+  mien polí; negatívne testy nad syntetickým zdrojom. Docs: odseky `hardware_catalog_seed.rb`, `hardware_taxonomy_seed.rb` + vety v logických odsekoch, router,
+  STANDARD §13.1 (2 cesty), mapa — scenár 5 s kvalifikovanými menami a **nový scenár 6 „Nový set alebo systém kovania"** (D7; slovníky systémov v kóde = C-08)
+  s povinnými menami v `test_h13`. **Mutácie** A2 (ekvivalentný literál `SEED_ITEMS` — golden zelený, guard c2 zhodí), M9 (main aj helper), M11, M13, M14, M15
+  (len G1 — čerstvý súbor taxonómie poradie rád nedrží), M16 zhodené. **Predrecenzia** 0/0/3 P3 opravené: c2 chytí druhú deklaráciu odvodeniny či kontraktu
+  a volanie metódy bez príjemcu (literál schovaný v pomocnej `def`), text v `hardware.md` menuje aj formátové hodnoty `'Demos'` a `' · '`.
+  Testy: **5295 headless · 161 JS** + encoding guard; golden T0 bez regenerácie zelený.
+  Nahradený stav v STAV: „H15a hotová, katalóg a výrobcovia nasledujú v H15b".
 - **H15a · seed dáta setov kovania v samostatnom súbore (2.10.2026, PR #459, v0.17.23, blok 9 · HARDENING PO V1, triedenie C-03 = CX-03 · GR-07; package
   [PACKAGE_H15.md](../zdroje/bloky/HARDENING/PACKAGE_H15.md) — **§15 má prednosť** (A1 golden nákupu s explicitnými materiálmi), surový audit
   [AUDIT_H15_raw.md](../zdroje/bloky/HARDENING/AUDIT_H15_raw.md), brief [BRIEF_H15.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H15.md)).** Audit-povinná (nový modul)

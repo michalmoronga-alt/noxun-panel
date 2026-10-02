@@ -1802,9 +1802,9 @@ v §2.5, pri ABS seede v §7.5 a v [archiv/KRONIKA.md](archiv/KRONIKA.md) (Grep 
 | pravidlá kovania — formát | `noxun_engine/core/hardware_rules.rb` · `HardwareRules::STD` | **3** | nový `kind` alebo kľúč filtra, ktorý by starší plugin uplatnil zle (dopredná brána) | áno |
 | pravidlá kovania — seed | `noxun_engine/core/hardware_rules.rb` · `HardwareRules::SEED_VERSION` | **7** | nové alebo zmenené seed pravidlo — aj nový visiaci typ skrinky (pasca CN-03) | nie (seed) |
 | katalóg kovania — schéma | `noxun_engine/core/hardware_catalog.rb` · `HardwareCatalog::SCHEMA_CURRENT` | **4** | nové pole položky (marker lazy podľa obsahu, vzor materiálov) | áno |
-| katalóg kovania — seed | `noxun_engine/core/hardware_catalog.rb` · `HardwareCatalog::SEED_SET_VERSION` | **6** | nové alebo opravené seed kódy (patch len nedotknutých riadkov) | nie (seed) |
+| katalóg kovania — seed | `noxun_engine/core/hardware_catalog_seed.rb` · `HardwareCatalog::SEED_SET_VERSION` | **6** | nové alebo opravené seed kódy (patch len nedotknutých riadkov; zoznam kódov patchu v tom istom súbore) | nie (seed) |
 | taxonómia kovania — schéma | `noxun_engine/core/hardware_taxonomy.rb` · `HardwareTaxonomy::SCHEMA_CURRENT` | **1** | formát výrobcov a radov | áno |
-| taxonómia kovania — seed | `noxun_engine/core/hardware_taxonomy.rb` · `HardwareTaxonomy::SEED_VERSION` | **3** | nový výrobca alebo rad v seede | nie (seed) |
+| taxonómia kovania — seed | `noxun_engine/core/hardware_taxonomy_seed.rb` · `HardwareTaxonomy::SEED_VERSION` | **3** | nový výrobca alebo rad v seede | nie (seed) |
 | sety kovania — formát | `noxun_engine/core/hardware_sets.rb` · `HardwareSets::STD` | **1** | základ; nový tvar setu dostane vlastný marker podľa obsahu (§13.2) | áno |
 | sety kovania — seed | `noxun_engine/core/hardware_sets_seed.rb` · `HardwareSets::SEED_VERSION` | **8** | nový alebo zmenený seed set (starý tvar do `LEGACY_SEED_SHAPES` v tom istom súbore) | nie (seed) |
 | katalóg spotrebičov — formát | `noxun_engine/core/appliance_catalog.rb` · `ApplianceCatalog::STD` | **1** | formát `appliances.json` | áno |

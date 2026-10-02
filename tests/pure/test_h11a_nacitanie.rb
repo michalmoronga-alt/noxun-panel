@@ -12,7 +12,7 @@
 #      casti skusene, 1 hlaska, init NEbezi; vsetko ok = init bezi a 0 hlasok;
 #      chybajuci / pokazeny / nedokonceny bootstrap = 1 hlaska o zakladnom
 #      subore a 0 casti.
-#   T6 staticky: zoznam 92 + 14 casti a poradie = zmrazena kopia z mainu
+#   T6 staticky: zoznam 94 + 14 casti a poradie = zmrazena kopia z mainu
 #      b2427ef1, kazda cesta existuje, ziadne `Sketchup.require 'noxun_engine/`
 #      ani `.rbe`/`.rbs`; `reset_for_tests!` plugin nevola.
 #
@@ -30,7 +30,9 @@ require 'json'
 
 module NxH11aLoad
   # Zmrazeny zoznam casti `main.rb` a `ui/panel.rb` (poradie!) z mainu b2427ef1
-  # (v0.17.21) + H15a `core/hardware_sets_seed` (tesne pred `core/hardware_sets`).
+  # (v0.17.21) + H15a `core/hardware_sets_seed` (tesne pred `core/hardware_sets`)
+  # + H15b `core/hardware_catalog_seed` a `core/hardware_taxonomy_seed` (kazdy tesne
+  # pred svojim logickym suborom).
   # Novy subor pluginu = vedome doplnenie TU aj v `main.rb`.
   MAIN_PARTS = %w[
     core/units core/doc_key core/ids core/store core/part_keys core/build_plan core/cabinet_types
@@ -41,7 +43,8 @@ module NxH11aLoad
     core/demos/client core/demos/sitemap_cache core/demos/slug_matcher core/demos/product_parser
     core/demos/lookup core/demos/name_search core/demos/image_cache core/demos/family
     core/materials_demos_create core/materials_replace_uni core/abs_rules core/front_profiles
-    core/hardware_rules core/hardware_catalog core/appliance_catalog core/hardware_taxonomy
+    core/hardware_rules core/hardware_catalog_seed core/hardware_catalog core/appliance_catalog
+    core/hardware_taxonomy_seed core/hardware_taxonomy
     core/hardware_sets_seed core/hardware_sets core/drawer_recipes modules/shelves modules/fronts core/zone_tree core/zones
     core/construction core/scale_observer core/placement core/cabinet_builder core/board_builder
     core/ghost_tool core/tags core/templates core/template_previews core/appliance_checks core/bom
@@ -346,10 +349,10 @@ end
 
 # --- T6: staticky zoznam --------------------------------------------------------
 
-NxTest.test('H11a T6: zoznam casti main.rb (92) a panel.rb (14) = zmrazena kopia, poradie sedi') do
+NxTest.test('H11a T6: zoznam casti main.rb (94) a panel.rb (14) = zmrazena kopia, poradie sedi') do
   main = NxH11aLoad.src('noxun_engine', 'main.rb')
   panel = NxH11aLoad.src('noxun_engine', 'ui', 'panel.rb')
-  NxTest.assert_equal(92, NxH11aLoad::MAIN_PARTS.length)
+  NxTest.assert_equal(94, NxH11aLoad::MAIN_PARTS.length)
   NxTest.assert_equal(NxH11aLoad::MAIN_PARTS, main.scan(NxH11aLoad::PART_RE).flatten)
   NxTest.assert_equal(NxH11aLoad::PANEL_PARTS, panel.scan(NxH11aLoad::PART_RE).flatten)
 end

@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 # H15 (blok 9 HARDENING, C-03) — GUARD „DATA KOVANIA NIE SU V LOGIKE" (package
-# H15, R5). H15a: sety (`core/hardware_sets_seed.rb`); H15b ho rozsiri o katalog
-# a taxonomiu (tabulka `SEED_MODULES`).
+# H15, R5). H15a: sety (`core/hardware_sets_seed.rb`); H15b: katalog
+# (`core/hardware_catalog_seed.rb`) a taxonomia (`core/hardware_taxonomy_seed.rb`)
+# — tabulka `SEED_MODULES`.
 #
 # CO PLATI:
 #   a) datovy subor = LEN literaly (AST): deklaracie konstant s retazcom,
@@ -13,7 +14,15 @@
 #   c) logicky subor nedeklaruje datove mena — `SEED_*`, `LEGACY_SEED_*`,
 #      `MAPPING_ADDITIONS*`, `MAPPING_MIGRATIONS*`, `DEFAULT_SETS*`,
 #      `DEFAULT_MAPPING*` ani ziadnu z presunutych konstant (okrem allowlistu
-#      s dovodom — v H15a prazdny);
+#      s dovodom — len katalog: tri odvodeniny a kontrakt porovnania patchu);
+#   c2) (§15 A2) allowlist nesmie vratit produktove data do logiky:
+#      odvodenina (`SEED_ITEMS`, `SEED_ITEMS_V2`, `SEED_PRODUCT_LINKS`) MUSI
+#      odkazovat na svoju seed konstantu, smie odkazovat len na seed konstanty
+#      a ine odvodeniny a nesmie obsahovat literal produktu — retazec len meno
+#      pola polozky (alebo predvoleny dodavatel / oddelovac s dovodom), cele
+#      cislo len ako index `row[n]`, desatinne cislo vobec, ziadne volanie
+#      metody bez prijemcu (`px(code)`) a deklaracia PRAVE RAZ; kontrakt
+#      `SEED_MATCH_FIELDS` = len zoznam mien poli, tiez prave raz;
 #   d) v `main.rb` aj `tests/helper.rb` je seed subor PRAVE RAZ a TESNE PRED
 #      svojim logickym suborom; subor existuje;
 #   e) seed subor otvara len svoj modul (`Noxun` › `Engine` › modul).
@@ -29,8 +38,34 @@ module NxH15Data
     'hardware_sets' => ['HardwareSets',
                         %w[SEED_VERSION SEED_SETS SEED_MAPPING LEGACY_SEED_SHAPES MAPPING_MIGRATIONS
                            MAPPING_ADDITIONS],
-                        {}]
+                        {}],
+    'hardware_catalog' => ['HardwareCatalog',
+                           %w[SEED_SET_VERSION SEED_ROWS SEED_PRICE_CHECKED_AT SEED_PRICE_CHECKED_AT_V4
+                              SEED_INACTIVE SEED_AVENTOS_V4 SEED_PRODUCT_CODES SEED_ROWS_V2 SEED_PATCH_V2_ADD
+                              LEGACY_SEED_93240 SEED_PATCH_V3_ADD SEED_PATCH_V4_ADD SEED_PATCH_V5_ADD
+                              SEED_PATCH_V5_CLASSIFY],
+                           { 'SEED_PRODUCT_LINKS' => 'odvodene pri nacitani zo SEED_ROWS (poznamka a odkaz produktu)',
+                             'SEED_ITEMS' => 'odvodene pri nacitani zo SEED_ROWS (zaznamy poloziek)',
+                             'SEED_ITEMS_V2' => 'odvodene pri nacitani zo SEED_ROWS_V2 (v2 tvar pre patch v3)',
+                             'SEED_MATCH_FIELDS' => 'kontrakt porovnania patchu v3 (mena poli, nie data)' }],
+    'hardware_taxonomy' => ['HardwareTaxonomy', %w[SEED_VERSION SEED_MANUFACTURERS SEED_SERIES], {}]
   }.freeze
+
+  # c2) §15 A2: KAZDA vynimka allowlistu je bud odvodenina (+ seed konstanty,
+  # z ktorych MUSI vychadzat), alebo kontrakt mien poli. Vynimka, ktora nie
+  # je ani jedno, guard zhodi — allowlist sa nesmie stat zadnymi dverami.
+  DERIVED = {
+    'hardware_catalog' => { 'SEED_PRODUCT_LINKS' => %w[SEED_ROWS SEED_PRODUCT_CODES],
+                            'SEED_ITEMS' => %w[SEED_ROWS],
+                            'SEED_ITEMS_V2' => %w[SEED_ROWS_V2] }
+  }.freeze
+  FIELD_CONTRACTS = { 'hardware_catalog' => %w[SEED_MATCH_FIELDS] }.freeze
+  # Mena poli zaznamu polozky katalogu (`normalize_item`) — jedine retazce,
+  # ktore odvodenina smie mat, okrem `FORMAT_STRINGS` s dovodom.
+  FIELD_KEYS = %w[item_code name_sk category unit supplier price_eur_vat notes manufacturer series
+                  demos_url product_url price_checked_at active].freeze
+  FORMAT_STRINGS = { 'Demos' => 'predvoleny dodavatel riadku s nil v manifeste',
+                     ' · ' => 'oddelovac odkazu produktu v poznamke riadku' }.freeze
 
   # Uzly, ktore smie mat datovy subor (Ruby 3.2; 3.3+ pridava INTEGER/FLOAT/STR
   # varianty literalov).
@@ -166,6 +201,135 @@ module NxH15Data
                      .reject { |n| allow.key?(n) }
   end
 
+  # c2) Vynimky allowlistu, ktore nie su ani odvodeninou, ani kontraktom mien poli.
+  def unclassified(logic, allow)
+    allow.keys - DERIVED.fetch(logic, {}).keys - FIELD_CONTRACTS.fetch(logic, [])
+  end
+
+  # c2) Hodnota (AST uzol) PRVEJ deklaracie `name` priamo v tele modulu `mod`; nil = chyba.
+  def cdecl_value(text, mod, name)
+    cdecl_values(text, mod, name).first
+  end
+
+  # c2) Hodnoty VSETKYCH deklaracii `name` priamo v tele modulu `mod`
+  # (predrecenzia H15b P3: druha deklaracia s literalom nesmie prejst).
+  def cdecl_values(text, mod, name)
+    found = []
+    walk = lambda do |node, inside|
+      return unless node.is_a?(RubyVM::AbstractSyntaxTree::Node)
+
+      case node.type
+      when :MODULE, :CLASS
+        cpath = node.children[0]
+        nm = cpath.is_a?(RubyVM::AbstractSyntaxTree::Node) ? cpath.children.last.to_s : ''
+        node.children[1..].each { |c| walk.call(c, node.type == :MODULE && nm == mod) }
+        return
+      when :CDECL
+        found << node.children[1] if inside && node.children[0] == name.to_sym
+      when :DEFN, :DEFS
+        return
+      end
+      node.children.each { |c| walk.call(c, inside) }
+    end
+    walk.call(RubyVM::AbstractSyntaxTree.parse(text), false)
+    found
+  end
+
+  # Retazec literalu (Ruby 3.2 s `frozen_string_literal` = LIT, inak STR); nil = nie je retazec.
+  def str_of(node)
+    v = node.children[0]
+    %i[LIT STR].include?(node.type) && v.is_a?(String) ? v : nil
+  end
+
+  # Identita uzla podla pozicie (`children` vracia zakazdym nove objekty).
+  def pos(node)
+    [node.type, node.first_lineno, node.first_column, node.last_lineno, node.last_column]
+  end
+
+  def num_node?(node)
+    v = node.children[0]
+    %i[INTEGER FLOAT].include?(node.type) || (node.type == :LIT && v.is_a?(Numeric))
+  end
+
+  # c2) Odvodenina `name` v logike: -> problemy. `sources` = seed konstanty,
+  # na ktore MUSI odkazovat; `seed_names` = co seed subor deklaruje;
+  # `derived_names` = ine odvodeniny toho isteho modulu.
+  def derived_problems(text, mod, name, sources, seed_names, derived_names)
+    values = cdecl_values(text, mod, name)
+    return ["#{name}: v logike chyba deklaracia (odvodenina allowlistu)"] if values.empty?
+    return ["#{name}: v logike #{values.length} deklaracie (odvodenina smie byt prave raz)"] if values.length > 1
+
+    value = values.first
+    probs = []
+    refs = []
+    index_ok = {}
+    allowed_strings = FIELD_KEYS + FORMAT_STRINGS.keys
+    walk = lambda do |node|
+      return unless node.is_a?(RubyVM::AbstractSyntaxTree::Node)
+
+      line = node.first_lineno
+      if node.type == :CALL && node.children[1] == :[] && node.children[2].is_a?(RubyVM::AbstractSyntaxTree::Node)
+        args = node.children[2].children.compact
+        index_ok[pos(args[0])] = true if args.length == 1 && num_node?(args[0]) && args[0].children[0].is_a?(Integer)
+      end
+      case node.type
+      when :CONST
+        cn = node.children[0].to_s
+        refs << cn
+        unless seed_names.include?(cn) || derived_names.include?(cn)
+          probs << "#{name} (riadok #{line}): odkaz na `#{cn}` — odvodenina smie citat len seed konstanty"
+        end
+      when :COLON2, :COLON3
+        probs << "#{name} (riadok #{line}): kvalifikovany odkaz na konstantu"
+      when :FCALL, :VCALL
+        # predrecenzia H15b P3: volanie metody modulu (`px(code)`) by mohlo
+        # vratit literal produktu z pomocnej `def` — odvodenina ziadne nema.
+        probs << "#{name} (riadok #{line}): volanie metody `#{node.children[0]}` bez prijemcu (odvodenina smie len transformovat seed)"
+      when :DSTR, :DSYM, :XSTR, :DXSTR, :DREGX
+        probs << "#{name} (riadok #{line}): skladany literal #{node.type}"
+      else
+        s = str_of(node)
+        if s
+          probs << "#{name} (riadok #{line}): literal #{s.inspect} (produktove data patria do seedu)" unless allowed_strings.include?(s)
+        elsif num_node?(node)
+          v = node.children[0]
+          unless v.is_a?(Integer) && index_ok[pos(node)]
+            probs << "#{name} (riadok #{line}): cislo #{v.inspect} mimo indexu `row[n]` (produktove data patria do seedu)"
+          end
+        elsif node.type == :LIT
+          probs << "#{name} (riadok #{line}): literal #{node.children[0].class}"
+        end
+      end
+      node.children.each { |c| walk.call(c) }
+    end
+    walk.call(value)
+    (sources - refs).each { |src| probs << "#{name}: neodkazuje na seed konstantu `#{src}` — nie je odvodenina" }
+    probs.uniq
+  end
+
+  # c2) Kontrakt `name` = len zoznam mien poli zaznamu (`%w[]` + `.freeze`).
+  def contract_problems(text, mod, name)
+    values = cdecl_values(text, mod, name)
+    return ["#{name}: v logike chyba deklaracia (kontrakt allowlistu)"] if values.empty?
+    return ["#{name}: v logike #{values.length} deklaracie (kontrakt smie byt prave raz)"] if values.length > 1
+
+    value = values.first
+    probs = []
+    walk = lambda do |node|
+      return unless node.is_a?(RubyVM::AbstractSyntaxTree::Node)
+
+      if node.type == :CALL
+        probs << "#{name}: volanie `#{node.children[1]}`" unless node.children[1] == :freeze && node.children[2].nil?
+      elsif !%i[LIST ZLIST].include?(node.type)
+        s = str_of(node)
+        probs << "#{name}: #{s ? s.inspect : node.type} nie je meno pola polozky" unless s && FIELD_KEYS.include?(s)
+      end
+      node.children.each { |c| walk.call(c) }
+    end
+    walk.call(value)
+    probs.uniq
+  end
+
   # d) poradie: seed tesne pred logikou, kazdy prave raz.
   def order_problems(parts, pairs)
     pairs.flat_map do |seed, logic|
@@ -229,6 +393,22 @@ NxH15Data::SEED_MODULES.each do |logic, (mod, moved, allow)|
     allow.each_value { |why| NxTest.refute(why.to_s.strip.empty?, 'vynimka allowlistu bez dovodu') }
     bad = NxH15Data.logic_seed_decls(NxH15Data.src(NxH15Data.core(logic)), mod, allow, moved)
     NxTest.assert(bad.empty?, "#{logic}.rb: seed data patria do #{logic}_seed.rb — #{bad.inspect}")
+  end
+
+  NxTest.test("H15 R5 c2 (§15 A2): allowlist #{logic}.rb = len odvodeniny zo seedu a kontrakt mien poli") do
+    NxTest.skip!('bez RubyVM::AbstractSyntaxTree') unless NxH15Data.ast?
+    derived = NxH15Data::DERIVED.fetch(logic, {})
+    contracts = NxH15Data::FIELD_CONTRACTS.fetch(logic, [])
+    NxTest.assert_equal([], NxH15Data.unclassified(logic, allow),
+                        'kazda vynimka allowlistu je odvodenina so zdrojom alebo kontrakt mien poli')
+    NxTest.assert_equal([], (derived.keys + contracts) - allow.keys, 'DERIVED/FIELD_CONTRACTS mimo allowlistu')
+    text = NxH15Data.src(NxH15Data.core(logic))
+    seed_names = moved.map(&:to_s)
+    probs = derived.flat_map do |name, sources|
+      NxH15Data.derived_problems(text, mod, name, sources, seed_names, derived.keys)
+    end
+    probs += contracts.flat_map { |name| NxH15Data.contract_problems(text, mod, name) }
+    NxTest.assert(probs.empty?, "#{logic}.rb: #{probs.first(6).inspect}")
   end
 end
 
@@ -329,6 +509,109 @@ NxTest.test('H15 R5 c (negativne): SEED_X, MAPPING_ADDITIONS_V9, DEFAULT_SETS aj
   NxTest.assert_equal(base + %w[SETS_TABLE],
                       NxH15Data.logic_seed_decls(logic, 'HardwareSets', {}, %w[SETS_TABLE]),
                       'presunute meno v logike zhodi straz aj bez datoveho prefixu')
+end
+
+module NxH15Data
+  # Synteticka logika katalogu: odvodeniny v tvare ako v `hardware_catalog.rb`.
+  SYN_CAT = <<~RUBY
+    # frozen_string_literal: true
+    module Noxun
+      module Engine
+        module HardwareCatalog
+          SEED_PRODUCT_LINKS = SEED_ROWS.each_with_object({}) do |row, links|
+            next unless SEED_PRODUCT_CODES.include?(row[0])
+            links[row[0]] = { 'notes' => row[5], 'product_url' => row[5].split(' · ').last }
+          end.freeze
+          SEED_ITEMS = SEED_ROWS.map do |code, name, price, sup|
+            item = { 'item_code' => code, 'name_sk' => name, 'supplier' => sup || 'Demos' }
+            item['price_eur_vat'] = price unless price.nil?
+            item['active'] = false if SEED_INACTIVE.include?(code)
+            item['product_url'] = SEED_PRODUCT_LINKS[code]['product_url'] if SEED_PRODUCT_LINKS.key?(code)
+            item
+          end.freeze
+          SEED_MATCH_FIELDS = %w[name_sk category unit price_eur_vat notes supplier].freeze
+          class Ine
+            SEED_X = [{ 'item_code' => '1' }].freeze
+          end
+        end
+      end
+    end
+  RUBY
+  SYN_SEED_NAMES = %w[SEED_ROWS SEED_PRODUCT_CODES SEED_INACTIVE].freeze
+  SYN_DERIVED = %w[SEED_PRODUCT_LINKS SEED_ITEMS].freeze
+
+  module_function
+
+  def syn_items(text)
+    derived_problems(text, 'HardwareCatalog', 'SEED_ITEMS', %w[SEED_ROWS], SYN_SEED_NAMES, SYN_DERIVED)
+  end
+end
+
+NxTest.test('H15 R5 c2 (negativne, §15 A2): literal produktu namiesto odvodenia zhodi straz') do
+  NxTest.skip!('bez RubyVM::AbstractSyntaxTree') unless NxH15Data.ast?
+  d = NxH15Data
+  syn = d::SYN_CAT
+  NxTest.assert_equal([], d.syn_items(syn), 'syntetická odvodenina = bez nálezu')
+  NxTest.assert_equal([], d.derived_problems(syn, 'HardwareCatalog', 'SEED_PRODUCT_LINKS',
+                                             %w[SEED_ROWS SEED_PRODUCT_CODES], d::SYN_SEED_NAMES, d::SYN_DERIVED))
+  NxTest.assert_equal([], d.contract_problems(syn, 'HardwareCatalog', 'SEED_MATCH_FIELDS'))
+  items_re = /^      SEED_ITEMS = SEED_ROWS\.map do .*?^      end\.freeze\n/m
+  NxTest.assert(syn.match?(items_re), 'syntetický zdroj má odvodeninu SEED_ITEMS')
+  {
+    # ekvivalentny literal (pole hashov s kodom a cenou) — golden by sa nezmenil
+    'pole hashov s kodom a cenou' =>
+      "      SEED_ITEMS = [{ 'item_code' => '104717', 'name_sk' => 'Záves', 'supplier' => 'Demos', " \
+      "'price_eur_vat' => 4.18 }].freeze\n",
+    'odvodenie + prilepeny literal' =>
+      "      SEED_ITEMS = (SEED_ROWS.map { |c| { 'item_code' => c } } + [{ 'item_code' => '999999' }]).freeze\n",
+    'cena ako cele cislo' =>
+      "      SEED_ITEMS = SEED_ROWS.map { |c| { 'item_code' => c, 'price_eur_vat' => 4 } }.freeze\n",
+    'zly zdroj' => "      SEED_ITEMS = SEED_INACTIVE.map { |c| { 'item_code' => c } }.freeze\n",
+    'cudzia tabulka v logike' => "      SEED_ITEMS = SEED_ROWS.map { |c| PRICE_TABLE[c] }.freeze\n",
+    'kvalifikovany odkaz' => "      SEED_ITEMS = SEED_ROWS.map { |c| HardwareSets::SEED_SETS[c] }.freeze\n",
+    'interpolacia' => "      SEED_ITEMS = SEED_ROWS.map { |c| \"x\#{c}\" }.freeze\n"
+  }.each do |what, body|
+    NxTest.refute(d.syn_items(syn.sub(items_re, body)).empty?, "straz musi chytit: #{what}")
+  end
+  NxTest.refute(d.syn_items(syn.sub(items_re, '')).empty?, 'chybajuca odvodenina = nalez')
+  # predrecenzia H15b P3: druha deklaracia s literalom (Ruby len varuje) = nalez
+  second = "      SEED_ITEMS = [{ 'item_code' => '104717', 'price_eur_vat' => 4.18 }].freeze\n"
+  anchor = "      class Ine\n"
+  NxTest.assert(syn.include?(anchor), 'syntetický zdroj má kotvu `class Ine`')
+  probs = d.syn_items(syn.sub(anchor, second + anchor))
+  NxTest.assert(probs.any? { |p| p.include?('2 deklaracie') }, "druha deklaracia odvodeniny musi zhodit straz: #{probs.inspect}")
+  NxTest.refute(d.contract_problems(syn.sub(anchor, "      SEED_MATCH_FIELDS = %w[name_sk].freeze\n#{anchor}"),
+                                    'HardwareCatalog', 'SEED_MATCH_FIELDS').empty?,
+                'druha deklaracia kontraktu = nalez')
+  # predrecenzia H15b P3: literal produktu schovany v pomocnej `def` modulu
+  helper_def = "      def self.px(c)\n        { 'item_code' => c, 'price_eur_vat' => 4.18 }\n      end\n"
+  {
+    'FCALL px(code)' => "      SEED_ITEMS = SEED_ROWS.map { |code| px(code) }.freeze\n",
+    'VCALL ceny' => "      SEED_ITEMS = SEED_ROWS.map { |code| { 'item_code' => code }.merge(ceny) }.freeze\n"
+  }.each do |what, body|
+    src = syn.sub(items_re, body).sub(anchor, helper_def + anchor)
+    NxTest.assert(src.include?('def self.px'), 'pomocna def je v zdroji')
+    probs = d.syn_items(src)
+    NxTest.assert(probs.any? { |p| p.include?('bez prijemcu') }, "straz musi chytit volanie bez prijemcu: #{what} — #{probs.inspect}")
+  end
+  NxTest.refute(d.contract_problems(syn.sub("price_eur_vat notes supplier].freeze", "price_eur_vat notes 104717].freeze"),
+                                    'HardwareCatalog', 'SEED_MATCH_FIELDS').empty?,
+                'kontrakt mien poli s kodom produktu = nalez')
+  NxTest.refute(d.contract_problems(syn.sub('%w[name_sk category unit price_eur_vat notes supplier].freeze',
+                                            "SEED_ROWS.map(&:first).freeze"),
+                                    'HardwareCatalog', 'SEED_MATCH_FIELDS').empty?,
+                'kontrakt ako odvodenie = nalez')
+  # deklaracia vo vnorenej triede (nie v tele modulu) sa za odvodeninu nepocita
+  NxTest.assert_equal(nil, d.cdecl_value(d::SYN_CAT, 'HardwareCatalog', 'SEED_X'))
+end
+
+NxTest.test('H15 R5 c2 (negativne): vynimka allowlistu bez odvodenia ci kontraktu = nalez') do
+  d = NxH15Data
+  allow = d::SEED_MODULES['hardware_catalog'][2]
+  NxTest.assert_equal([], d.unclassified('hardware_catalog', allow))
+  NxTest.assert_equal(['SEED_PRICES'],
+                      d.unclassified('hardware_catalog', allow.merge('SEED_PRICES' => 'ceny pre rozpocet')))
+  NxTest.assert_equal(['SEED_X'], d.unclassified('hardware_taxonomy', { 'SEED_X' => 'dovod' }))
 end
 
 NxTest.test('H15 R5 d (negativne): seed za logikou, dvakrat alebo chybajuci = nalez') do
