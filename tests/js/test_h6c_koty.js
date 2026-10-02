@@ -131,7 +131,7 @@ function checkCase(ctx, c, rect, label, opts){
 }
 {
   const ctx = H.makeCtx();
-  H.CASES.forEach(c => RECTS.forEach(r => {
+  H.CASES.concat(H.EXTRA_CASES).forEach(c => RECTS.forEach(r => {
     const out = checkCase(ctx, c, r, `T2 ${c.id} ${r.w}x${r.h}`);
     near(vm.runInContext('pvS', ctx), out.s, 1e-9, `T2 ${c.id}: pvS = mierka viewBoxu`);
   }));
@@ -170,7 +170,7 @@ function checkCase(ctx, c, rect, label, opts){
   // + uzsia nika chladnicky (box 350 mm): cislo pasma „71" by lezalo pod popiskami hrany
   const narrowBox = { id: 'fridge_narrow', mode: 'cab', type: 'lower', fields: { width: 600, height: 2076, depth: 560 },
     appl: [Object.assign({}, H.BEKO, { box: { x: 20, z: 118, w: 350, h: 1940 } })] };
-  H.CASES.concat([narrowBox]).forEach(c => RECTS.forEach(r => {
+  H.CASES.concat(H.EXTRA_CASES, [narrowBox]).forEach(c => RECTS.forEach(r => {
     const ts = H.texts(H.renderCase(ctx, c, r)).filter(t => t.text !== '?');
     const bx = ts.map(box);
     for (let i = 0; i < ts.length; i++) for (let j = i + 1; j < ts.length; j++) {
@@ -181,6 +181,34 @@ function checkCase(ctx, c, rect, label, opts){
          `T2b ${c.id} ${r.w}x${r.h}: „${ts[i].text}" a „${ts[j].text}" sa prekryvaju (${(ox * sc).toFixed(1)} x ${(oy * sc).toFixed(1)} px)`);
     }
   }));
+}
+
+// ---- T2c · doska: obrys a sipky su CELE vo viewBoxe aj pri najmensich/najdlhsich rozmeroch (Codex #455 P2) ----
+{
+  const ctx = H.makeCtx();
+  H.EXTRA_CASES.filter(c => c.board).forEach(c => RECTS.forEach(r => {
+    const svg = H.renderCase(ctx, c, r);
+    const vb = vbOf(ctx), s = Math.min(r.w / vb[2], r.h / vb[3]);
+    const L = c.fields.ib_length, Wd = c.fields.ib_width;
+    const m = /<rect x="0" y="0" width="([-\d.]+)" height="([-\d.]+)"[^>]*stroke-width="([-\d.]+)" vector-effect="non-scaling-stroke"\/>/.exec(svg);
+    ok(m, `T2c ${c.id}: obrys dosky ma hrubku v px (non-scaling-stroke)`);
+    const half = parseFloat(m[3]) / 2 / s; // pol hrubky ciary v mm sceny
+    ok(0 - half >= vb[0] && L + half <= vb[0] + vb[2] && 0 - half >= vb[1] && Wd + half <= vb[1] + vb[3],
+       `T2c ${c.id} ${r.w}x${r.h}: obrys dosky (vratane ciary) je cely vo viewBoxe ${JSON.stringify(vb)}`);
+    // sipky smeru dekoru: vsetky body v obryse dosky (nesmu trcat von)
+    const pd = /<path d="([^"]+)" stroke="#90a4ae" stroke-width="1.5"/.exec(svg);
+    if (c.fields.ib_grain !== 'none') {
+      ok(pd, `T2c ${c.id}: sipky su kreslene`);
+      const nums = pd[1].match(/-?[\d.]+/g).map(parseFloat);
+      for (let i = 0; i < nums.length; i += 2) {
+        ok(nums[i] >= -1e-9 && nums[i] <= L + 1e-9 && nums[i + 1] >= -1e-9 && nums[i + 1] <= Wd + 1e-9,
+           `T2c ${c.id}: bod sipky (${nums[i]}, ${nums[i + 1]}) lezi mimo dosky ${L} x ${Wd}`);
+      }
+    }
+  }));
+  // bezne dosky maju sipky ako doteraz (hrot 6 mm .. 12 % dlzky, nezmenene)
+  const a = PV.nxGrainArrows(2600, 600, 'length')[0];
+  near(a.x2 - a.hx1, Math.max(6, 2600 * 0.42 * 0.12), 1e-9, 'T2c hrot sipky bezneho dielu ostal');
 }
 
 // ============ T3 · pvFitLabel · popis cela · medzery · popis zony ===========

@@ -166,6 +166,8 @@
   function pvU(px){ return px / (pvS > 0 ? pvS : 1); }
   function pvN(v){ return Math.round(v * 100) / 100; }
   function pvN3(v){ return Math.round(v * 1000) / 1000; }
+  // velkost pisma: 5 platnych cifier (pri doske 10 mm je 1 px = 0,02 mm, 3 desatiny by pismo skreslili)
+  function pvFs(v){ return +v.toPrecision(5); }
   function pvTextW(txt, fontPx){ return DIM_CHAR_W * fontPx * String(txt).length; }
   // Kolko px ma kota dlzky `lenPx`: prvy popis zo zoznamu (dlhy -> kratky), ktory
   // sa zmesti (s rezervou 4 px); '' = nezmesti sa ziadny. Ciste (Node testy).
@@ -600,12 +602,15 @@
   // Koty dverovej casti a CR 1 (rozsahy zo servera, zrkadlene pri dverach
   // vpravo) tesne pod skrinkou (18 px) — sirka skrinky ide o DIM_ROW_PX nizsie.
   function drawCornerDims(S, rx, ry, cp){
+    var spans = [];
     ((cp && cp.dims) || []).forEach(function(d){
       if (!d) return;
       var x0 = nxNumOr(d.x0, NaN), x1 = nxNumOr(d.x1, NaN);
       if (isNaN(x0) || isNaN(x1) || !(x1 > x0)) return;
-      pvDimH(S, rx, ry, x0, x1, pvBaseZ, DIM_OFF_PX, [String(d.label == null ? '' : d.label)]);
+      spans.push({ x1: x0, x2: x1, labels: [String(d.label == null ? '' : d.label)] });
     });
+    // pod radom je rad s celkovou sirkou, preto druhy pruh pod ciarou nie je k dispozicii
+    pvDimHRow(S, rx, ry, spans, pvBaseZ, DIM_OFF_PX, false);
   }
 
   // S1-E: výška sokla KORPUSU. Horná skrinka ju nemá a slot umývačky tiež nie
@@ -838,8 +843,47 @@
     S.push('<g stroke="'+PV_DIM+'" stroke-width="1" vector-effect="non-scaling-stroke" fill="none" pointer-events="none">' +
       '<path'+PV_DIM_LINE+' d="M'+pvN3(xa)+' '+pvN3(y-tk)+'V'+pvN3(y+tk)+'M'+pvN3(xb)+' '+pvN3(y-tk)+'V'+pvN3(y+tk)+'"/>' +
       '<path'+PV_DIM_LINE+' d="M'+pvN3(xa)+' '+pvN3(y)+'H'+pvN3(xb)+'"/></g>' +
-      '<text x="'+pvN3(rx((x1+x2)/2))+'" y="'+pvN3(y-pvU(DIM_TXT_PX))+'" font-size="'+pvN3(pvU(f))+'" fill="'+PV_DIM+
+      '<text x="'+pvN3(rx((x1+x2)/2))+'" y="'+pvN3(y-pvU(DIM_TXT_PX))+'" font-size="'+pvFs(pvU(f))+'" fill="'+PV_DIM+
       '" text-anchor="middle" pointer-events="none">'+esc(label)+'</text>');
+  }
+  // RAD susednych vodorovnych kot (stlpce zon, dverova cast + CR 1 rohovej): popis, ktory
+  // sa NEZMESTI do svojho useku, sa nevnuti nad susedov — skusi druhy pruh POD ciarou
+  // (`allowBelow`, len kde pod radom nie je dalsi rad) a ked je aj tam obsadeny, vynecha sa
+  // (pri priblizeni sa dokresli). Popisy, co sa zmestia, maju prednost. Ciste kreslenie do S.
+  function pvDimHRow(S, rx, ry, spans, z, dyPx, allowBelow){
+    var f = DIM_FONT_PX, y = ry(z) + pvU(dyPx), tk = pvU(DIM_TICK_PX);
+    var items = spans.map(function(sp){
+      var list = Array.isArray(sp.labels) ? sp.labels : [sp.labels];
+      return { sp: sp, list: list, fit: pvFitLabel(Math.abs(sp.x2 - sp.x1) * pvS, list, f), text: null, lane: 0 };
+    });
+    var placed = [[], []];
+    function span(it, label){
+      var cx = rx((it.sp.x1 + it.sp.x2) / 2) * pvS, w = pvTextW(label, f);
+      return { a: cx - w / 2 - 1, b: cx + w / 2 + 1 };
+    }
+    function free(lane, r){
+      return !placed[lane].some(function(q){ return r.a < q.b && r.b > q.a; });
+    }
+    items.forEach(function(it){
+      if (!it.fit) return;
+      it.text = it.fit; placed[0].push(span(it, it.fit));
+    });
+    items.forEach(function(it){
+      if (it.fit) return;
+      var label = it.list[it.list.length - 1], r = span(it, label);
+      for (var lane = 0; lane <= (allowBelow ? 1 : 0); lane++){
+        if (free(lane, r)){ it.text = label; it.lane = lane; placed[lane].push(r); break; }
+      }
+    });
+    items.forEach(function(it){
+      var xa = rx(it.sp.x1), xb = rx(it.sp.x2);
+      S.push('<g stroke="'+PV_DIM+'" stroke-width="1" vector-effect="non-scaling-stroke" fill="none" pointer-events="none">' +
+        '<path'+PV_DIM_LINE+' d="M'+pvN3(xa)+' '+pvN3(y-tk)+'V'+pvN3(y+tk)+'M'+pvN3(xb)+' '+pvN3(y-tk)+'V'+pvN3(y+tk)+'"/>' +
+        '<path'+PV_DIM_LINE+' d="M'+pvN3(xa)+' '+pvN3(y)+'H'+pvN3(xb)+'"/></g>');
+      if (it.text === null) return;
+      S.push('<text x="'+pvN3(rx((it.sp.x1 + it.sp.x2) / 2))+'" y="'+pvN3(it.lane ? y + pvU(DIM_TXT_PX + 8) : y - pvU(DIM_TXT_PX))+
+        '" font-size="'+pvFs(pvU(f))+'" fill="'+PV_DIM+'" text-anchor="middle" pointer-events="none">'+esc(it.text)+'</text>');
+    });
   }
   function pvDimV(S, rx, ry, x, dxPx, z1, z2, labels, fontPx){
     var f = fontPx || DIM_FONT_PX, list = Array.isArray(labels) ? labels : [labels];
@@ -850,13 +894,13 @@
     var label = pvFitLabel(Math.abs(z2 - z1) * pvS, list, f);
     if (label){
       var xt = xl + pvU(DIM_TXT_V_PX);
-      S.push(g + '<text x="'+pvN3(xt)+'" y="'+pvN3(ym)+'" font-size="'+pvN3(pvU(f))+'" fill="'+PV_DIM+
+      S.push(g + '<text x="'+pvN3(xt)+'" y="'+pvN3(ym)+'" font-size="'+pvFs(pvU(f))+'" fill="'+PV_DIM+
         '" text-anchor="middle" dominant-baseline="middle" pointer-events="none" transform="rotate(-90 '+
         pvN3(xt)+' '+pvN3(ym)+')">'+esc(label)+'</text>');
     } else {
       // usek je prilis kratky aj na cislo: cislo VODOROVNE vedla kota (vlavo od lavych, vpravo od pravych)
       var left = dxPx < 0;
-      S.push(g + '<text x="'+pvN3(xl + (left ? -1 : 1) * pvU(4))+'" y="'+pvN3(ym)+'" font-size="'+pvN3(pvU(f))+'" fill="'+PV_DIM+
+      S.push(g + '<text x="'+pvN3(xl + (left ? -1 : 1) * pvU(4))+'" y="'+pvN3(ym)+'" font-size="'+pvFs(pvU(f))+'" fill="'+PV_DIM+
         '" text-anchor="'+(left ? 'end' : 'start')+'" dominant-baseline="middle" pointer-events="none">'+
         esc(list[list.length - 1])+'</text>');
     }
@@ -865,7 +909,7 @@
   // volitelny (N26: medzery pri editacii svietia jantarovo) — bez neho plati
   // tlmena kotova farba. `extra` = dalsie SVG atributy (napr. dominant-baseline).
   function pvText(S, x, y, txt, fontPx, anchor, fill, extra){
-    S.push('<text x="'+pvN3(x)+'" y="'+pvN3(y)+'" font-size="'+pvN3(pvU(fontPx || DIM_FONT_PX))+'" fill="'+(fill||PV_DIM)+
+    S.push('<text x="'+pvN3(x)+'" y="'+pvN3(y)+'" font-size="'+pvFs(pvU(fontPx || DIM_FONT_PX))+'" fill="'+(fill||PV_DIM)+
       '" text-anchor="'+(anchor||'middle')+'"'+(extra ? ' '+extra : '')+' pointer-events="none">'+esc(txt)+'</text>');
   }
 
@@ -1165,7 +1209,8 @@
     // UI-B2: koty sirok zon pod korpusom — len ked je co porovnavat
     var spans = nxZoneSpans(zones);
     if (spans.length > 1 && spans.length <= 8){
-      spans.forEach(function(sp){ pvDimH(S, rx, ry, sp.x, sp.x + sp.w, pvBaseZ, DIM_OFF_PX, [String(Math.round(sp.w))]); });
+      pvDimHRow(S, rx, ry, spans.map(function(sp){ return { x1: sp.x, x2: sp.x + sp.w, labels: [String(Math.round(sp.w))] }; }),
+                pvBaseZ, DIM_OFF_PX, true);
     }
   }
 
@@ -1227,7 +1272,7 @@
         // D-23: aj none pás je súčasťou skupiny — klik vedie na jeho riadok v zozname.
         S.push('<rect x="'+rx(gs)+'" y="'+ry(z+h)+'" width="'+ow+'" height="'+h+'" fill="none" stroke="#90a4ae" stroke-width="1.5" stroke-dasharray="7 5"/>');
         var nlab = pvFrontLabel([fnum + ' · bez čela ' + Math.round(h), fnum + ' · ' + Math.round(h), fnum], ow * pvS, h * pvS);
-        if (nlab) S.push('<text x="'+pvN3(rx(fxc))+'" y="'+pvN3(ry(z+h/2))+'" font-size="'+pvN3(pvU(DIM_FONT_PX))+'" fill="#90a4ae" text-anchor="middle" dominant-baseline="middle">'+esc(nlab)+'</text>');
+        if (nlab) S.push('<text x="'+pvN3(rx(fxc))+'" y="'+pvN3(ry(z+h/2))+'" font-size="'+pvFs(pvU(DIM_FONT_PX))+'" fill="#90a4ae" text-anchor="middle" dominant-baseline="middle">'+esc(nlab)+'</text>');
         S.push('</g>');
         return;
       }
@@ -1266,7 +1311,7 @@
       // sirky panelu v px; pri vyske panelu < 12 px popis nie je. HALO 2,75 px.
       var plab = pvFrontLabel([fnum+' · '+frontTypeDesc(it.type)+' '+Math.round(h), fnum+' · '+Math.round(h), fnum],
                               ow * pvS, (ph > 0 ? ph : h) * pvS);
-      if (plab) S.push('<text x="'+pvN3(rx(fxc))+'" y="'+pvN3(ry(panelZ+(ph > 0 ? ph : h)/2))+'" font-size="'+pvN3(pvU(DIM_FONT_PX))+'" fill="'+PV_SELECT_ACCENT+'" paint-order="stroke" stroke="'+col+'" stroke-width="'+pvN3(pvU(2.75))+'" text-anchor="middle" dominant-baseline="middle">'+esc(plab)+'</text>');
+      if (plab) S.push('<text x="'+pvN3(rx(fxc))+'" y="'+pvN3(ry(panelZ+(ph > 0 ? ph : h)/2))+'" font-size="'+pvFs(pvU(DIM_FONT_PX))+'" fill="'+PV_SELECT_ACCENT+'" paint-order="stroke" stroke="'+col+'" stroke-width="'+pvFs(pvU(2.75))+'" text-anchor="middle" dominant-baseline="middle">'+esc(plab)+'</text>');
       S.push('</g>');
     });
   }
@@ -1743,13 +1788,13 @@
     function rx(x){ return x; }
     function ry(y){ return Wd - y; } // model (x,y) -> svg (flip Y): dlzka vodorovne
     // Vypln = farba zvoleneho DEKORU z katalogu (vzor mockupu); ked ju katalog
-    // nema, ostava neutralna vyberova. Hrubka ciary sa skaluje so scenou —
-    // pevne 2 mm su na 2600 mm doske neviditelne.
+    // nema, ostava neutralna vyberova. H6c (Codex #455 P2): obrys aj sipky maju hrubku
+    // v PX (`non-scaling-stroke`) - cislo v mm by pri doske 10 x 10 mm (LIMITS) bolo
+    // ~56 px siroke a trcalo by cez okraj sceny (okraj ma len 6 px vzduchu).
     var mc = (typeof nxComboColorOf === 'function') ? nxComboColorOf('decor', val('ib_material')) : '';
-    var sw = Math.max(2, Math.round(Math.max(L, Wd) / 300));
     S.push('<rect x="0" y="0" width="' + L + '" height="' + Wd + '" fill="' + (mc || PV_FRONT_DOOR) +
            '" fill-opacity="' + (mc ? '.8' : '.55') + '" stroke="' + PV_FRONT_STROKE +
-           '" stroke-width="' + sw + '"/>');
+           '" stroke-width="1.5" vector-effect="non-scaling-stroke"/>');
     var arrows = nxGrainArrows(L, Wd, grain);
     if (arrows.length){
       var d = arrows.map(function(a){
@@ -1757,8 +1802,8 @@
                'M' + a.hx1 + ' ' + ry(a.hy1) + 'L' + a.x2 + ' ' + ry(a.y2) +
                'L' + a.hx2 + ' ' + ry(a.hy2);
       }).join(' ');
-      S.push('<path d="' + d + '" stroke="' + PV_DIM + '" stroke-width="' +
-             Math.max(2, Math.round(Math.min(L, Wd) / 90)) + '" fill="none" pointer-events="none"/>');
+      S.push('<path d="' + d + '" stroke="' + PV_DIM + '" stroke-width="1.5" vector-effect="non-scaling-stroke"' +
+             ' fill="none" pointer-events="none"/>');
     } else {
       pvText(S, L / 2, ry(Wd / 2), 'bez smeru dekoru', DIM_FONT_PX, 'middle', null, 'dominant-baseline="middle"');
     }
@@ -1775,7 +1820,10 @@
     if (grain !== 'length' && grain !== 'width') return [];
     var horiz = (grain === 'length');
     var len = (horiz ? L : Wd) * 0.42;         // dlzka sipky
-    var head = Math.max(6, len * 0.12);        // ramienka hrotu
+    // ramienka hrotu: 6 mm .. 12 % dlzky, ale nikdy viac nez 90 % rozstupu sipiek a 45 % dlzky -
+    // inak by hrot na malej doske (10 mm) trcal za jej okraj (bezne dosky ostavaju bez zmeny)
+    var cross = horiz ? Wd : L;
+    var head = Math.min(Math.max(6, len * 0.12), cross / 4 * 0.9, len * 0.45);
     var out = [];
     for (var i = 1; i <= 3; i++){
       var off = (horiz ? Wd : L) * i / 4;      // rozlozenie naprieč doskou

@@ -107,6 +107,29 @@ const CASES = [
   { id: 'cab_fridge', mode: 'cab', type: 'lower', fields: { width: 600, height: 2076, depth: 560 }, appl: [BEKO] }
 ];
 
+// Dalsie pripady (NIE su v goldene - ide o rozlozenia z review PR #455): tesne susedne kóty
+// pri malom okne, vysoka rohova s uzkou dverovou castou a CR 1, platne male/dlhe dosky.
+const CP_TALL = { side: 'left', fits: true, need: 584, door_w: 246,
+  parts: [{ role: 'corner_blind_panel', x0: 250, x1: 582, z0: 118, z1: 2082, title: 'b' },
+          { role: 'corner_rail', x0: 348, x1: 366, z0: 100, z1: 2100, title: 'v' },
+          { role: 'cr_front', x0: 252, x1: 300, z0: 102, z1: 2098, title: 'c1' },
+          { role: 'cr_side', x0: 300, x1: 318, z0: 102, z1: 2098, title: 'c2' }],
+  dims: [{ x0: 0, x1: 250, label: '250' }, { x0: 250, x1: 300, label: '50' }], stats: { count: 5, area: 0.584 } };
+const EXTRA_CASES = [
+  { id: 'zones_4_tall', mode: 'zones', type: 'lower', fields: { width: 600, height: 2100, depth: 560 },
+    zones: leafZones([{ w: 1, shelves: 4 }, { w: 1, shelves: 4 }, { w: 1, shelves: 4 }, { w: 1, shelves: 4 }], 600, 2100, 18, 100) },
+  { id: 'zones_8_wide', mode: 'zones', type: 'lower', fields: { width: 800, height: 864, depth: 520 },
+    zones: leafZones([1, 2, 3, 4, 5, 6, 7, 8].map(() => ({ w: 1 })), 800, 864, 18, 100) },
+  { id: 'cab_corner_tall', mode: 'cab', type: 'corner_blind', fields: { width: 600, height: 2100, depth: 510 },
+    cp: CP_TALL, opening: { x0: 0, w: 250, z0: 100, h: 2000 },
+    items: [{ id: 'F1', type: 'door', mode: 'auto', z: 102, height: 1996, wings_n: 1, profile: 'none', direction: 'right' }] },
+  { id: 'board_10x10', mode: 'insert', type: 'lower', board: true, fields: { ib_length: 10, ib_width: 10, ib_grain: 'length' } },
+  { id: 'board_10x600', mode: 'insert', type: 'lower', board: true, fields: { ib_length: 10, ib_width: 600, ib_grain: 'width' } },
+  { id: 'board_2600x10', mode: 'insert', type: 'lower', board: true, fields: { ib_length: 2600, ib_width: 10, ib_grain: 'length' } },
+  { id: 'board_300x300', mode: 'insert', type: 'lower', board: true, fields: { ib_length: 300, ib_width: 300, ib_grain: 'none' } },
+  { id: 'board_2800x2070', mode: 'insert', type: 'lower', board: true, fields: { ib_length: 2800, ib_width: 2070, ib_grain: 'width' } }
+];
+
 function makeCtx(){
   const svg = fakeEl();
   const byId = { preview: svg };
@@ -175,4 +198,4 @@ function texts(svg){
   return out;
 }
 
-module.exports = { makeCtx, renderCase, texts, CASES, CP_L, CP_R, BEKO, fakeEl, plain, ROOT, JS };
+module.exports = { makeCtx, renderCase, texts, CASES, EXTRA_CASES, CP_L, CP_R, BEKO, fakeEl, plain, ROOT, JS };
