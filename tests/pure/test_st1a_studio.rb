@@ -368,7 +368,7 @@ NxTest.test('ST-1a: nazov projektu je nastavenie POCITACA — nikdy sa nezapisuj
   # pod kapotou vola zapisove dvere — cielom je stale %APPDATA%, nie .skp.
   NxTest.assert(body.include?('update_project_names'),
                 'zapisuje sa cez zamknutu upravu mapy nazvov, nie do modelu')
-  door = ST1B_SETTINGS_RB[/def update\n.*?\n      end\n/m].to_s
+  door = ST1B_SETTINGS_RB[/def update\b.*?\n      end\n/m].to_s
   NxTest.assert(door.include?('JsonFileStore.write(path'),
                 'zapisuje sa do %APPDATA% (vepo_settings.json), nie do .skp')
   NxTest.refute(body.include?('start_operation'), 'ziadna operacia = ziadny krok Spat')
@@ -410,7 +410,7 @@ NxTest.test('1b-6c: KAZDY zapisovatel suboru berie zamok a cita NANOVO') do
   # Statiky guard: keby si `save_merge_18_36` alebo niektory zapis `last_dir`
   # sahal na `JsonFileStore.write` sam, zamok by chranil len mapu nazvov a
   # subeh by zmigrovany nazov aj tak stratil (kolo 3 #243).
-  door = ST1B_SETTINGS_RB[/def update\n.*?\n      end\n/m].to_s
+  door = ST1B_SETTINGS_RB[/def update\b.*?\n      end\n/m].to_s
   NxTest.assert(door.include?('Materials.with_catalog_lock'),
                 'zapisove dvere berú medziprocesovy zamok')
   # H7a: cerstve citanie (`reload!` primaru aj zalohy) robi zapisova brana,
@@ -676,7 +676,7 @@ NxTest.test('1b-6c: zamok blokuje DRUHY PROCES (nie len monkeypatch)') do
     deadline = Time.now + 15
     sleep 0.05 until File.exist?(ready) || Time.now > deadline
     NxTest.assert(File.exist?(ready), 'druhy proces zamok drzi')
-    NxTest.assert(core.save('last_dir' => 'C:/Po-zamku'), 'nas zapis presiel')
+    NxTest.assert_equal([:ok, ''], core.save('last_dir' => 'C:/Po-zamku'), 'nas zapis presiel')
   ensure
     Process.waitpid(pid)
     FileUtils.rm_f(ready)

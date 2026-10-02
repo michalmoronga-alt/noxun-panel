@@ -45,9 +45,11 @@ module Noxun
                         '(oprav súbor %s alebo ho premenuj, napr. na vepo_settings.poskodeny.json — ' \
                         'plugin potom pokračuje zo zálohy; spravidla sa stratí len posledná zmena, ' \
                         'ak súbor medzitým zapisovala staršia verzia pluginu, záloha môže byť staršia)'
-      UNREADABLE_REASON = 'súbor nastavení exportu sa nedá prečítať (oprav súbor %s alebo ho premenuj ' \
-                          'aj s jeho .bak — plugin potom začne s predvolenými nastaveniami a bez ' \
-                          'uložených názvov zákaziek)'
+      # `%s` = subor, ktory sa naozaj neda precitat: primar, a ked primar
+      # chyba, jeho `.bak` (predrecenzia H7a P3).
+      UNREADABLE_REASON = 'súbor nastavení exportu sa nedá prečítať (oprav súbor %s alebo ho premenuj; ' \
+                          'ak je poškodená aj záloha .bak, premenuj aj ju — plugin potom začne ' \
+                          's predvolenými nastaveniami a bez uložených názvov zákaziek)'
       FAILED_REASON = 'zápis sa nepodaril (súbor je zamknutý alebo disk nedostupný)'
 
       # Obsah suboru nie je objekt (dnesna sprava; `IOError` = I/O chyba
@@ -173,18 +175,24 @@ module Noxun
       #   :failed     — zamok, I/O, blok alebo samotny zapis zlyhal.
       # Zapis nesie predikat tvaru (POZICNE — pasca Ruby 3, H9): zly primar
       # sa nikdy neotoci do dobrej `.bak`.
-      def update
+      #
+      # `sign: true` (len prenos nazvu, `adopt_session_name`): pri odmietnuti
+      # podla OBSAHU (:blocked/:unreadable) prida tretiu polozku — obsahovy
+      # podpis suborov spocitany este POD zamkom (predrecenzia H7a P3: po
+      # uvolneni zamku by ho mohol posunut zapis druhej instancie a pamat
+      # pokusov by zablokovala aj stav, ktory sa uz zmenil).
+      def update(sign: false)
         phase = 'lock'
         Materials.with_catalog_lock do
           phase = 'gate'
           state, why = write_gate
-          next note_block([:blocked, why]) unless state == :ok
+          next rejected(note_block([:blocked, why]), sign) unless state == :ok
 
           phase = 'read'
           fresh = begin
             read_for_write
           rescue JSON::ParserError, NotObject
-            next note_block([:unreadable, format(UNREADABLE_REASON, path)])
+            next rejected(note_block([:unreadable, format(UNREADABLE_REASON, unreadable_file)]), sign)
           end
           phase = 'block'
           attrs = yield(fresh)
@@ -197,6 +205,17 @@ module Noxun
       rescue StandardError => e
         Engine.log_error(e, "ExportSettings.update(#{phase})")
         [:failed, FAILED_REASON]
+      end
+
+      # Odmietnutie podla obsahu, volitelne s podpisom suborov (volat POD zamkom).
+      def rejected(result, sign)
+        sign ? result + [adopt_signature] : result
+      end
+
+      # Ktory subor sa naozaj neda precitat: primar; ked chyba, jeho `.bak`.
+      def unreadable_file
+        file = path
+        File.exist?(file) ? file : "#{file}.bak"
       end
 
       # Zapis nezavislych klucov (`last_dir`, `merge_18_36`) — hodnota nezavisi
@@ -314,8 +333,8 @@ module Noxun
       # sa mapa menila nad odtlackom a zapis jednej instancie by zmazal zakazku
       # pomenovanu v druhej. Vracia `[status, reason]` (H7a) — pri inom nez
       # zapisanom vysledku (`written?`) si volajuci MUSI nechat most na dalsi pokus.
-      def update_project_names
-        update do |settings|
+      def update_project_names(sign: false)
+        update(sign: sign) do |settings|
           names = settings[PROJECT_NAMES_KEY]
           names = names.is_a?(Hash) ? names.dup : {}
           fresh = yield(names)
@@ -452,12 +471,12 @@ module Noxun
         # subor) sa prenos neopakuje, kym sa OBSAH suborov nezmeni — inak by
         # kazde citanie bralo zamok a kazde nove parsovanie poskodeneho primaru
         # pridalo riadok fallback logu `JsonFileStore`.
-        retry_key = [key, aliases.dup.sort.freeze].freeze
+        retry_key = adopt_retry_key(key, aliases)
         sig = ADOPT_RETRY[retry_key]
         return(name.empty? ? nil : name) if sig && sig == adopt_signature
 
         fresh = nil
-        status, = update_project_names do |names|
+        status, _why, sig_now = update_project_names(sign: true) do |names|
           stale = aliases.select { |k| names.key?(k) }
           # Rozhodnutie (ktory kluc sedenia nesie nazov, ci ma cesta prednost)
           # patri DOVNUTRA zamku — nad zastaranym odtlackom by mohlo prepisat
@@ -470,7 +489,7 @@ module Noxun
           names
         end
         name = fresh unless fresh.nil?
-        note_adopt_attempt(retry_key, status)
+        note_adopt_attempt(retry_key, status, sig_now)
         # Most sa zahadzuje LEN po zapisanom vysledku (review #243 P2-1, H7a).
         forget_session_key(model) if written?(status)
         name.empty? ? nil : name
@@ -484,13 +503,21 @@ module Noxun
       # vratenym casom by sa inak nerozpoznala, sonda H7d L4). Zapamata sa LEN
       # odmietnutie podla OBSAHU (`:blocked`, `:unreadable`); prechodna chyba
       # (`:failed` — zamok, disk) sa skusa hned pri dalsom citani ako doteraz.
+      # Podpis sa pocita POD zamkom (`update(sign: true)`). Zaznam zanikne
+      # pri uspesnom prenose alebo vytlaceni stropom — `forget_session_key`
+      # ho nemaze (kluc nenesie model; pri vymene dokumentu nova zakazka ma
+      # iny kluc sedenia, takze stary zaznam sa jej netyka).
       ADOPT_RETRY = {}
       ADOPT_RETRY_MAX = 32
 
-      def note_adopt_attempt(retry_key, status)
-        if %i[blocked unreadable].include?(status)
+      def adopt_retry_key(key, aliases)
+        [key, aliases.dup.sort.freeze].freeze
+      end
+
+      def note_adopt_attempt(retry_key, status, signature = nil)
+        if %i[blocked unreadable].include?(status) && signature
           ADOPT_RETRY.delete(retry_key)
-          ADOPT_RETRY[retry_key] = adopt_signature
+          ADOPT_RETRY[retry_key] = signature
           ADOPT_RETRY.shift while ADOPT_RETRY.length > ADOPT_RETRY_MAX
         else
           ADOPT_RETRY.delete(retry_key)
@@ -518,14 +545,23 @@ module Noxun
       # subor pri prvom ulozeni): nazov plati LEN do zatvorenia SketchUpu
       # (most v pamati). Cista funkcia, nezapisuje. Pyta sa ju az kod, ktory
       # uz zavolal `project_name` (ten prenos skusil).
+      #
+      # Predrecenzia H7a P3: pravdive LEN ked posledny pokus odmietol OBSAH
+      # suboru (zaznam v `ADOPT_RETRY`). Prechodne zlyhanie pri ZDRAVOM subore
+      # (zamok, plny disk = `:failed`) nie je poskodenie — veta „premenuj
+      # poskodeny subor" by navadzala premenovat zdravy subor; prenos sa tam
+      # zopakuje pri dalsom citani sam.
       def name_pending?(model)
         key = project_key(model)
         return false if key.empty? || session_key?(key)
 
+        aliases = session_keys_for(model)
+        return false unless ADOPT_RETRY.key?(adopt_retry_key(key, aliases))
+
         map = project_names
         return false unless map[key].to_s.strip.empty?
 
-        session_keys_for(model).any? { |k| !map[k].to_s.strip.empty? }
+        aliases.any? { |k| !map[k].to_s.strip.empty? }
       rescue StandardError
         false
       end

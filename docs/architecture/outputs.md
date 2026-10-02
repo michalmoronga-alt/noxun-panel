@@ -1102,11 +1102,14 @@ po aktualizácii zavrieť všetky okná SketchUpu na oboch PC (vzor H9, H10).
 
 **Čakajúci názov (§15 A1) a obmedzenie pokusov prenosu.** Keď je súbor poškodený práve pri prvom uložení zákazky pomenovanej pred uložením, prenos z kľúča sedenia na cestu
 brána odmietne: názov platí z mostu `SESSION_KEY_BRIDGE` a zo zálohy **len do zatvorenia SketchUpu** — `name_pending?(model)` (čistá: kľúč je cesta, pod cestou názov nie je,
-pod niektorým kľúčom sedenia áno) a `ProductionCore.pending_name_note` to povedia vetou po štyroch exportoch (stav hlavičky prinesie H7b). Most sa zahadzuje **len** pri
+pod niektorým kľúčom sedenia áno **a posledný pokus odmietol obsah súboru** — záznam v `ADOPT_RETRY`; prechodné `:failed` nad zdravým súborom vetu o poškodení nevyvolá)
+a `ProductionCore.pending_name_note` to povedia vetou po štyroch exportoch (stav hlavičky prinesie H7b). Most sa zahadzuje **len** pri
 `written?`; po oprave (premenovaní) súboru sa prenos zopakuje sám. Aby sa neopakoval pri **každom** čítaní (zámok + nový fallback log `JsonFileStore` pri každom parsovaní
 poškodeného primára), pamätá si `ADOPT_RETRY` (kľúč `[cesta, zmrazená kópia aliasov]`, strop 32, bez odkazu na model) **obsahový podpis** súborov v čase odmietnutia —
 SHA1 bajtov primára a `.bak` (nie mtime + veľkosť: oprava rovnakej dĺžky s vráteným časom by sa nerozpoznala). Ďalší pokus až po zmene obsahu; `refresh` pamäť **nemaže**
-(§17 C3). Zapamätá sa len odmietnutie podľa obsahu (`:blocked`, `:unreadable`) — prechodná chyba (`:failed`, zámok, disk) sa skúša hneď pri ďalšom čítaní ako doteraz.
+(§17 C3). Podpis sa počíta **pod zámkom** (`update(sign: true)` ho pri odmietnutí pridá ako tretiu položku výsledku), nie po jeho uvoľnení. Zapamätá sa len odmietnutie
+podľa obsahu (`:blocked`, `:unreadable`) — prechodná chyba (`:failed`, zámok, disk) sa skúša hneď pri ďalšom čítaní ako doteraz. `forget_session_key` záznam nemaže (kľúč
+nenesie model; zaniká úspešným prenosom alebo stropom). `UNREADABLE_REASON` menuje súbor, ktorý sa naozaj nedá prečítať (pri chýbajúcom primári jeho `.bak`).
 
 **Hlásenie v okne Štúdia (`StudioDialog#do_set_vepo_opts`).** Jadro vracia dôvod (texty dôvodov sú konštanty modulu), okno skladá vetu cez `case`: úspech zeleno („Názov zákazky:
 <názov> · platí pre VEPO, kovanie, rozpočet aj ponuku", „18 + 36 spolu: zapnuté|vypnuté · platí pre VEPO export"), `:blocked`/`:unreadable` **červeno** s dôvodom, inak

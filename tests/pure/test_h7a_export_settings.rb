@@ -717,6 +717,48 @@ NxTest.test('H7a T-A11: zdravy subor — name_pending? nikdy true, exporty bez v
   end
 end
 
+NxTest.test('H7a T-A11 (predrecenzia P3): ZDRAVY subor + prechodne zlyhanie prenosu (:failed) — ziadna veta o poskodeni') do
+  NxTest.skip!('vyzaduje headless sandbox') unless NxTest.headless?
+  NxH7A.with_sandbox do
+    m = NxH7A.named_unsaved('Zakazka F')
+    m.path = 'C:/Zakazky/F.skp'
+    NxH7A.with_lock_probe(raise_error: Errno::EACCES.new('materials.lock (test)')) do
+      NxTest.assert_equal('Zakazka F', NxH7A::S.project_name(m), 'nazov plati z fallbacku')
+      NxTest.refute(NxH7A::S.name_pending?(m), 'zamok/disk nie je poskodeny subor')
+      NxTest.assert_equal('', NxH7A::PC.pending_name_note(m), 'ziadne „premenuj poškodený súbor" nad zdravym suborom')
+    end
+    NxTest.assert(NxH7A::S::ADOPT_RETRY.empty?, ':failed sa do pamate pokusov nezapisuje')
+    NxTest.assert_equal('Zakazka F', NxH7A::S.project_name(m), 'po uvolneni zamku prenos prebehne sam')
+    NxTest.assert_equal('Zakazka F', NxH7A.read['project_names']['c:/zakazky/f.skp'])
+  end
+end
+
+NxTest.test('H7a T-A10 (predrecenzia P3): podpis odmietnuteho prenosu sa pocita POD zamkom') do
+  NxTest.skip!('vyzaduje headless sandbox') unless NxTest.headless?
+  NxH7A.with_sandbox do
+    m = NxH7A.pending_setup('{"x":')
+    mat = NxH7A::MAT
+    NxH7G.with_stubs(NxH7A::S, adopt_signature: ->(*_a) { ['PODPIS', mat.instance_variable_get(:@catalog_lock_depth).to_i.positive?] }) do
+      NxH7A::S.project_name(m)
+    end
+    vals = NxH7A::S::ADOPT_RETRY.values
+    NxTest.assert_equal([['PODPIS', true]], vals, 'ulozeny podpis vznikol pod zamkom')
+  end
+end
+
+NxTest.test('H7a T-A1 (predrecenzia P3): chyba primar a necitatelna je .bak — dovod menuje .bak') do
+  NxTest.skip!('vyzaduje headless sandbox') unless NxTest.headless?
+  NxH7A.with_sandbox do
+    NxH7A.write_raw("#{NxH7A.path}.bak", NxH7A::UNREADABLE)
+    status, why = NxH7A.save_last_dir('D:/X')
+    NxTest.assert_equal(:unreadable, status)
+    NxTest.assert_equal(format(NxH7A::S::UNREADABLE_REASON, "#{NxH7A.path}.bak"), why)
+    NxH7A.write_raw(NxH7A.path, NxH7A::UNREADABLE)
+    _s, why2 = NxH7A.save_last_dir('D:/X')
+    NxTest.assert_equal(format(NxH7A::S::UNREADABLE_REASON, NxH7A.path), why2, 'necitatelny primar = primar')
+  end
+end
+
 # =============================================================================
 # T-A8 OKNO — `StudioDialog#do_set_vepo_opts` (R-A7, O8)
 # =============================================================================
@@ -940,7 +982,7 @@ NxTest.test('H7a T-A9: jedine dvere zapisu — zamok, brana, strikne citanie, za
   NxTest.assert(i_lock && i_gate && i_read && i_write && i_lock < i_gate && i_gate < i_read && i_read < i_write,
                 'poradie zamok -> brana -> citanie -> zapis')
   NxTest.assert(NxH7A.body(NxH7A::ES_RB, 'save').include?('update { attrs }'), 'save ide cez update')
-  NxTest.assert(NxH7A.body(NxH7A::ES_RB, 'update_project_names').include?('update do |settings|'),
+  NxTest.assert(NxH7A.body(NxH7A::ES_RB, 'update_project_names').include?('update(sign: sign) do |settings|'),
                 'mapa nazvov ide cez update')
   NxTest.assert(NxH7A.body(NxH7A::ES_RB, 'read').include?('JsonFileStore.read_valid('), 'read cita s tvarom')
   gate = NxH7A.body(NxH7A::ES_RB, 'write_gate')
@@ -958,6 +1000,23 @@ NxTest.test('H7a T-A9: vysledok zapisu sa NIKDY nerozhoduje pravdivostou (ui/ a 
     end.map { |l, i| "#{File.basename(f)}:#{i + 1}: #{l.strip}" }
   end
   NxTest.assert(hits.empty?, "pravdivost nad [status, reason]: #{hits.join(' | ')}")
+end
+
+NxTest.test('H7a T-A9: ani TESTY nerozhoduju vysledok zapisu pravdivostou (assert/refute nad [status, reason])') do
+  # Predrecenzia H7a P3: `NxTest.assert(core.save(...))` je vzdy pravdive — test by
+  # zlyhany zapis nikdy nezachytil. Sady, ktore modul pouzivaju, porovnavaju status.
+  writers = 'save_project_name|save_merge_18_36|save_last_dir|save_vepo_settings|save|update|update_project_names'
+  bad = /\b(?:assert|refute)\(\s*[\w:]+\.(?:#{writers})\b/
+  files = Dir[File.join(NxTest::ROOT, 'tests', '**', '*.rb')].select do |f|
+    src = File.read(f, encoding: 'UTF-8')
+    src.include?('ExportSettings') || src.include?('NxH7A')
+  end
+  NxTest.assert(files.length >= 5, "sady s nastaveniami exportu sa nasli (#{files.length})")
+  hits = files.flat_map do |f|
+    NxH7A.code(File.read(f, encoding: 'UTF-8')).lines.each_with_index.select { |l, _i| l.match?(bad) }
+         .map { |l, i| "#{File.basename(f)}:#{i + 1}: #{l.strip}" }
+  end
+  NxTest.assert(hits.empty?, "assert/refute nad [status, reason]: #{hits.join(' | ')}")
 end
 
 NxTest.test('H7a T-A9: kluc sedenia sa presunom nezmenil — doc_token == ProductionCore.model_guid') do
