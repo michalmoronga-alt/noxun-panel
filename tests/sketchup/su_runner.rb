@@ -9372,12 +9372,12 @@ module NoxunSuRunner
     #    modelu. Po vymene dokumentu sa NESMIE pamatat, inak by novy Untitled
     #    zdedil nazov zakazky a odniesol si ho do VEPO/CSV/XLSX.
     e.end_document_event # cisty tick, inak by sa cleanup preskocil
-    e::ProductionCore.remember_session_key(model, "guid:#{e::Panel.model_guid(model)}")
+    e::ExportSettings.remember_session_key(model, "guid:#{e::Panel.model_guid(model)}")
     ok('DOCKEY 8: vychodisko — most si kluc sedenia pamata',
-       !e::ProductionCore.remembered_session_key(model).to_s.empty?)
+       !e::ExportSettings.remembered_session_key(model).to_s.empty?)
     e.on_document_replaced(model)
     ok('DOCKEY 8: vymena dokumentu most ZAHODILA (novy Untitled nezdedi nazov)',
-       e::ProductionCore.remembered_session_key(model).to_s.empty?)
+       e::ExportSettings.remembered_session_key(model).to_s.empty?)
     cleanup(model)
   end
 
@@ -15619,19 +15619,21 @@ module NoxunSuRunner
 
     # --- 5) nazov projektu je SERVEROVY (audit #1) ---------------------------
     # Review P1: kluc je CESTA suboru, nie `model.guid` — guid sa meni pri
-    # kazdom ulozeni a nazov by sa po Ctrl+S ticho stratil.
-    key = core.project_key(model)
+    # kazdom ulozeni a nazov by sa po Ctrl+S ticho stratil. H7a: nastavenia
+    # exportu ziju v `ExportSettings`, zapis vracia [status, reason].
+    es = e::ExportSettings
+    key = es.project_key(model)
     if key.empty?
       info('ST-1a: model nema cestu ani guid — zapis nazvu projektu sa preskocil.')
     else
       ok('ST-1a: kluc nazvu projektu je CESTA suboru, nie prchavy guid',
-         !key.start_with?('guid:') && key == core.normalize_project_path(model.path))
-      original = core.project_names[key]
+         !key.start_with?('guid:') && key == es.normalize_project_path(model.path))
+      original = es.project_names[key]
       begin
-        saved = core.save_project_name(model, 'SU TEST PROJEKT')
-        ok('ST-1a: nazov projektu sa ULOZIL na serveri', saved == 'SU TEST PROJEKT')
+        status, = es.save_project_name(model, 'SU TEST PROJEKT')
+        ok('ST-1a: nazov projektu sa ULOZIL na serveri (H7a: stav :ok)', status == :ok)
         ok('ST-1a: a cita ho ta ista cesta, akou ho citaju exporty',
-           core.project_name(model) == 'SU TEST PROJEKT')
+           es.project_name(model) == 'SU TEST PROJEKT')
         ok('ST-1a: zapis nazvu NEMENI model (nastavenie pocitaca, nie zakazky)',
            model.entities.length == before_ents)
 
@@ -15644,16 +15646,16 @@ module NoxunSuRunner
         )
         ok('ST-1a: zapis z listy Studia NEZDVIHOL generaciu (review P2)',
            e::StudioDialog.instance_variable_get(:@generation).to_i == gen_opts)
-        ok('ST-1a: a nazov sa naozaj zapisal', core.project_name(model) == 'SU TEST PROJEKT 2')
+        ok('ST-1a: a nazov sa naozaj zapisal', es.project_name(model) == 'SU TEST PROJEKT 2')
         ok('ST-1a: zapis z listy model nezmenil', model.entities.length == before_ents)
 
-        core.save_project_name(model, '')
+        es.save_project_name(model, '')
         ok('ST-1a: vymazany nazov padne spat na nazov suboru zakazky',
-           core.project_name(model) == core.default_project_name(model))
+           es.project_name(model) == es.default_project_name(model))
       ensure
         # Testovaci zaznam po sebe upratame — je to realny %APPDATA% subor.
         # Mapa sa meni VYHRADNE cez zamknute dvere (1b-6c).
-        core.update_project_names do |map|
+        es.update_project_names do |map|
           if original.nil?
             map.delete(key)
           else
@@ -16035,7 +16037,7 @@ module NoxunSuRunner
     ok('SMOKE: prepocet model NEZMENIL', model.entities.length == before_ents)
 
     # Rohove nastavenie: zapis ide EXISTUJUCOU cestou `studio_set_vepo_opts`.
-    was = core.merge_18_36
+    was = e::ExportSettings.merge_18_36
     guid = core.model_guid(model)
     begin
       echo = st1c_capture(e::StudioDialog) do
@@ -16043,7 +16045,7 @@ module NoxunSuRunner
                                            'merge' => !was }.to_json)
       end
       ok("SMOKE: „18 + 36 spolu\" z rohoveho nastavenia sa ULOZIL (#{was} -> #{!was})",
-         core.merge_18_36 == !was)
+         e::ExportSettings.merge_18_36 == !was)
       ok('SMOKE: a okno dostalo CIELENE echo listy (nie plny prepocet)',
          echo.any? { |s| s.include?('NX.setVepoBar(') } &&
          echo.none? { |s| s.include?('NX.setStudio(') })
@@ -16058,7 +16060,7 @@ module NoxunSuRunner
       e::StudioDialog.do_set_vepo_opts({ 'gen' => st1c_gen, 'model_guid' => guid,
                                          'merge' => was }.to_json)
     end
-    ok('SMOKE: povodna hodnota nastavenia je vratena', core.merge_18_36 == was)
+    ok('SMOKE: povodna hodnota nastavenia je vratena', e::ExportSettings.merge_18_36 == was)
     ok('SMOKE: zapis nastavenia model NEZMENIL', model.entities.length == before_ents)
 
     # Gen guard VEPO exportu — NEZMENENY (prekopala sa lista, nie export).
@@ -22441,7 +22443,7 @@ module NoxunSuRunner
                                            edge_thicknesses: core.vepo_edge_thicknesses, validation: control,
                                            edge_decors: core.vepo_edge_decors, sheet_decors: core.vepo_sheet_decors,
                                            version: 'H12', generated_at: '2026-10-01 00:00',
-                                           merge_18_36: core.merge_18_36)
+                                           merge_18_36: e::ExportSettings.merge_18_36)
     log = vepo['log_text'].to_s.lines.reject { |l| l.start_with?('Verzia:') }.join
     h12_scrub(
       'cabinets' => cabs,

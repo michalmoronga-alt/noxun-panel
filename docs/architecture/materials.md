@@ -497,7 +497,7 @@ zakázaný; párová stránka sa s ním nezhoduje).
 ktorého `rename` by zámok stratil; `test_dir_override` presmeruje aj zámok, takže izolované testy nesúťažia so živým katalógom. Je **reentrantný** (hĺbkový počítadlo): druhý
 `flock` toho istého súboru cez ďalší handle by sa v JEDNOM procese zablokoval sám o seba, a mutátory držia zámok cez `load + write_unlocked`. **Od 1b-6c sa nezískaný zámok
 neprehliada** — `flock` vracia `false`, keď ho filesystem nepodporuje, a tichým pokračovaním by kritická sekcia bežala BEZ zámku; namiesto toho letí `IOError` a volajúci sa
-rozhodne (zápis nastavení ho preloží na `false`, viď `production_core` v [outputs.md](outputs.md)). Ten istý zámok používa aj zápis **`vepo_settings.json`** — je to ten istý
+rozhodne (zápis nastavení exportu ho od H7a preloží na `[:failed, dôvod]`, viď `export_settings` v [outputs.md](outputs.md)). Ten istý zámok používa aj zápis **`vepo_settings.json`** — je to ten istý
 priečinok a **jeden širší zámok** nevyrobí poradie dvoch zámkov ani riziko zaseknutia; kritické sekcie sú v ms a **nikdy sa cez ne nedrží modálne okno**.
 
 ### materials_migration.rb

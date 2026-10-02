@@ -1,0 +1,275 @@
+{
+  "zadany_nazov": [
+    {
+      "export": "do_export",
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": null,
+          "name": null
+        }
+      ],
+      "error": false,
+      "ok": true,
+      "last_dir": "<DIR>",
+      "vepo_dirs": [
+        {
+          "dir": "kuchyna_novak",
+          "files": [
+            "kuchyna_novak_export.log",
+            "kuchyna_novak_k009_pw_dtdl_18_36.csv"
+          ]
+        }
+      ]
+    },
+    {
+      "export": "do_hw_csv",
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "<DIR>",
+          "name": "kovanie_kuchyna_novak.csv"
+        }
+      ],
+      "error": false,
+      "ok": true,
+      "last_dir": "<DIR>"
+    },
+    {
+      "export": "do_budget_xlsx",
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "<DIR>",
+          "name": "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx"
+        }
+      ],
+      "error": false,
+      "ok": true,
+      "last_dir": "<DIR>"
+    },
+    {
+      "export": "do_cp_xlsx",
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "<DIR>",
+          "name": "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx"
+        }
+      ],
+      "error": false,
+      "ok": true,
+      "last_dir": "<DIR>",
+      "files_in_dir": [
+        "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx",
+        "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx",
+        "kovanie_kuchyna_novak.csv"
+      ]
+    }
+  ],
+  "zadany_nazov_bez_18_36": [
+    {
+      "export": "do_export",
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": null,
+          "name": null
+        }
+      ],
+      "error": false,
+      "ok": true,
+      "last_dir": "<DIR>",
+      "vepo_dirs": [
+        {
+          "dir": "kuchyna_novak",
+          "files": [
+            "kuchyna_novak_export.log",
+            "kuchyna_novak_k009_pw_dtdl_18.csv",
+            "kuchyna_novak_k009_pw_dtdl_36.csv"
+          ]
+        }
+      ]
+    },
+    {
+      "export": "do_hw_csv",
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "<DIR>",
+          "name": "kovanie_kuchyna_novak.csv"
+        }
+      ],
+      "error": false,
+      "ok": true,
+      "last_dir": "<DIR>"
+    },
+    {
+      "export": "do_budget_xlsx",
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "<DIR>",
+          "name": "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx"
+        }
+      ],
+      "error": false,
+      "ok": true,
+      "last_dir": "<DIR>"
+    },
+    {
+      "export": "do_cp_xlsx",
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "<DIR>",
+          "name": "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx"
+        }
+      ],
+      "error": false,
+      "ok": true,
+      "last_dir": "<DIR>",
+      "files_in_dir": [
+        "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx",
+        "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx",
+        "kovanie_kuchyna_novak.csv"
+      ]
+    }
+  ],
+  "ulozeny_bez_nazvu": [
+    {
+      "export": "do_export",
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": null,
+          "name": null
+        }
+      ],
+      "error": false,
+      "ok": true,
+      "last_dir": "<DIR>",
+      "vepo_dirs": [
+        {
+          "dir": "kupelna_horna",
+          "files": [
+            "kupelna_horna_export.log",
+            "kupelna_horna_k009_pw_dtdl_18_36.csv"
+          ]
+        }
+      ]
+    },
+    {
+      "export": "do_hw_csv",
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "<DIR>",
+          "name": "kovanie_kupelna_horna.csv"
+        }
+      ],
+      "error": false,
+      "ok": true,
+      "last_dir": "<DIR>"
+    },
+    {
+      "export": "do_budget_xlsx",
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "<DIR>",
+          "name": "Rozpocet Kúpeľňa Horná - AKT 1.10. 2026.xlsx"
+        }
+      ],
+      "error": false,
+      "ok": true,
+      "last_dir": "<DIR>"
+    },
+    {
+      "export": "do_cp_xlsx",
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "<DIR>",
+          "name": "Cenova ponuka Kúpeľňa Horná - 1.10.2026.xlsx"
+        }
+      ],
+      "error": false,
+      "ok": true,
+      "last_dir": "<DIR>",
+      "files_in_dir": [
+        "Cenova ponuka Kúpeľňa Horná - 1.10.2026.xlsx",
+        "Rozpocet Kúpeľňa Horná - AKT 1.10. 2026.xlsx",
+        "kovanie_kupelna_horna.csv"
+      ]
+    }
+  ],
+  "neulozeny": [
+    {
+      "export": "do_export",
+      "pickers": [
+        {
+          "picker": "select_directory",
+          "start": null,
+          "name": null
+        }
+      ],
+      "error": false,
+      "ok": true,
+      "last_dir": "<DIR>",
+      "vepo_dirs": [
+        {
+          "dir": "projekt",
+          "files": [
+            "projekt_export.log",
+            "projekt_k009_pw_dtdl_18_36.csv"
+          ]
+        }
+      ]
+    },
+    {
+      "export": "do_hw_csv",
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "<DIR>",
+          "name": "kovanie_projekt.csv"
+        }
+      ],
+      "error": false,
+      "ok": true,
+      "last_dir": "<DIR>"
+    },
+    {
+      "export": "do_budget_xlsx",
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "<DIR>",
+          "name": "Rozpocet projekt - AKT 1.10. 2026.xlsx"
+        }
+      ],
+      "error": false,
+      "ok": true,
+      "last_dir": "<DIR>"
+    },
+    {
+      "export": "do_cp_xlsx",
+      "pickers": [
+        {
+          "picker": "savepanel",
+          "start": "<DIR>",
+          "name": "Cenova ponuka projekt - 1.10.2026.xlsx"
+        }
+      ],
+      "error": false,
+      "ok": true,
+      "last_dir": "<DIR>",
+      "files_in_dir": [
+        "Cenova ponuka projekt - 1.10.2026.xlsx",
+        "Rozpocet projekt - AKT 1.10. 2026.xlsx",
+        "kovanie_projekt.csv"
+      ]
+    }
+  ]
+}

@@ -195,7 +195,8 @@ NxTest.test('DocKey: vymena dokumentu je JEDNA udalost s JEDNYM zoznamom cleanup
   body = src[/def document_cleanups\(model\).*?\n      end\n/m].to_s
   NxTest.refute(body.empty?, 'zoznam cleanupov existuje')
   NxTest.assert(body.include?('DocKey.invalidate'), 'rotuje identitu dokumentu')
-  NxTest.assert(body.include?('ProductionCore.forget_session_key'),
+  # H7a: most nazvu zakazky zije v `ExportSettings` (presun z ProductionCore).
+  NxTest.assert(body.include?('ExportSettings.forget_session_key'),
                 'zahadzuje most nazvu zakazky (inak novy Untitled zdedi cudzi nazov)')
   NxTest.assert(body.scan(/rescue StandardError/).length >= 2,
                 'kazdy cleanup je osetreny zvlast — zlyhanie jedneho nesmie zastavit ostatne')

@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.17.19' unless defined?(VERSION)
+    VERSION = '0.17.20' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -514,6 +514,7 @@ Sketchup.require 'noxun_engine/core/grain_check'    # K2/D-87 smer kresby (po ed
 Sketchup.require 'noxun_engine/core/direction_check' # KOV-A2b smer otvarania (po grain_check — zdiela jeho vzory; pred edge_overlay)
 Sketchup.require 'noxun_engine/core/edge_overlay'   # D-104 Sketchup::Overlay + ModelObserver (SU 2023+, guardovane) + D-89a HoverEdgeOverlay + K2 GrainOverlay + KOV-A2b DirectionOverlay
 Sketchup.require 'noxun_engine/core/supplier_settings' # V0.6 E-a: sadzby/rezimy/standardne riadky rozpoctu (globál)
+Sketchup.require 'noxun_engine/core/export_settings' # H7a: nastavenia exportu (nazov zakazky, 18 + 36, posledny priecinok; po materials/doc_key, pred ui/production_core)
 Sketchup.require 'noxun_engine/core/budget_store'  # V0.6 E-a: data rozpoctu v zakazke (po store + supplier_settings)
 Sketchup.require 'noxun_engine/core/appliance_binding' # S1-B1: vazba spotrebica na zakazku (po budget_store + cabinet_builder/board_builder + appliance_catalog)
 Sketchup.require 'noxun_engine/core/budget'        # V0.6 E-a: vypocet rozpoctu (po bom/sheet_estimate/budget_store + appliance_binding — ponuka vlastnikov)

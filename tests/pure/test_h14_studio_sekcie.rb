@@ -104,8 +104,9 @@ module NxH14Push
                  settings_payload: ->(*_a) { nil } }
     stubs_pc = { fresh_collect: ->(*_a) { col }, sheets_map: ->(*_a) { SHEETS },
                  edges_map: ->(*_a) { {} }, hardware_expansion: ->(*_a) { { 'rows' => [], 'unmapped' => [] } },
-                 hardware_catalog_items: ->(*_a) { nil }, model_guid: ->(*_a) { 'G1' },
-                 project_name: ->(*_a) { 'GOLDEN' }, default_project_name: ->(*_a) { 'GOLDEN' },
+                 hardware_catalog_items: ->(*_a) { nil }, model_guid: ->(*_a) { 'G1' } }
+    # H7a: nastavenia exportu ziju v `ExportSettings` (payload `vepo` bez zmeny).
+    stubs_es = { project_name: ->(*_a) { 'GOLDEN' }, default_project_name: ->(*_a) { 'GOLDEN' },
                  merge_18_36: ->(*_a) { true } }
     checks = [E.const_defined?(:EdgeCheck) ? E::EdgeCheck : nil, E.const_defined?(:GrainCheck) ? E::GrainCheck : nil,
               E.const_defined?(:DirectionCheck) ? E::DirectionCheck : nil].compact
@@ -113,7 +114,9 @@ module NxH14Push
       with_stubs(Time, now: -> { NOW }) do
         with_stubs(sd, stubs_sd) do
           with_stubs(pc, stubs_pc) do
-            with_checks(checks) { sd.send(:push_state) }
+            with_stubs(E::ExportSettings, stubs_es) do
+              with_checks(checks) { sd.send(:push_state) }
+            end
           end
         end
       end

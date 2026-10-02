@@ -1,0 +1,66 @@
+[
+  {
+    "step": "nazov ulozeneho modelu",
+    "primary": "{\n  \"project_names\": {\n    \"c:/zakazky/kuchyna_novak.skp\": \"Kuchyňa Novák\"\n  }\n}",
+    "bak": null,
+    "name_m1": "Kuchyňa Novák",
+    "name_m2": "projekt",
+    "merge_18_36": true
+  },
+  {
+    "step": "nazov neulozeneho modelu (kluc sedenia)",
+    "primary": "{\n  \"project_names\": {\n    \"c:/zakazky/kuchyna_novak.skp\": \"Kuchyňa Novák\",\n    \"guid:nxdoc-T0B-2\": \"Nová zákazka 2\"\n  }\n}",
+    "bak": "{\n  \"project_names\": {\n    \"c:/zakazky/kuchyna_novak.skp\": \"Kuchyňa Novák\"\n  }\n}",
+    "name_m1": "Kuchyňa Novák",
+    "name_m2": "Nová zákazka 2",
+    "merge_18_36": true
+  },
+  {
+    "step": "prve ulozenie + citanie (prenos na cestu)",
+    "primary": "{\n  \"project_names\": {\n    \"c:/zakazky/kuchyna_novak.skp\": \"Kuchyňa Novák\",\n    \"c:/zakazky/nova.skp\": \"Nová zákazka 2\"\n  }\n}",
+    "bak": "{\n  \"project_names\": {\n    \"c:/zakazky/kuchyna_novak.skp\": \"Kuchyňa Novák\",\n    \"guid:nxdoc-T0B-2\": \"Nová zákazka 2\"\n  }\n}",
+    "name_m1": "Kuchyňa Novák",
+    "name_m2": "Nová zákazka 2",
+    "merge_18_36": true
+  },
+  {
+    "step": "18 + 36 vypnute",
+    "primary": "{\n  \"project_names\": {\n    \"c:/zakazky/kuchyna_novak.skp\": \"Kuchyňa Novák\",\n    \"c:/zakazky/nova.skp\": \"Nová zákazka 2\"\n  },\n  \"merge_18_36\": false\n}",
+    "bak": "{\n  \"project_names\": {\n    \"c:/zakazky/kuchyna_novak.skp\": \"Kuchyňa Novák\",\n    \"c:/zakazky/nova.skp\": \"Nová zákazka 2\"\n  }\n}",
+    "name_m1": "Kuchyňa Novák",
+    "name_m2": "Nová zákazka 2",
+    "merge_18_36": false
+  },
+  {
+    "step": "posledny priecinok",
+    "primary": "{\n  \"project_names\": {\n    \"c:/zakazky/kuchyna_novak.skp\": \"Kuchyňa Novák\",\n    \"c:/zakazky/nova.skp\": \"Nová zákazka 2\"\n  },\n  \"merge_18_36\": false,\n  \"last_dir\": \"D:/Export/VEPO\"\n}",
+    "bak": "{\n  \"project_names\": {\n    \"c:/zakazky/kuchyna_novak.skp\": \"Kuchyňa Novák\",\n    \"c:/zakazky/nova.skp\": \"Nová zákazka 2\"\n  },\n  \"merge_18_36\": false\n}",
+    "name_m1": "Kuchyňa Novák",
+    "name_m2": "Nová zákazka 2",
+    "merge_18_36": false
+  },
+  {
+    "step": "zmazanie nazvu",
+    "primary": "{\n  \"project_names\": {\n    \"c:/zakazky/nova.skp\": \"Nová zákazka 2\"\n  },\n  \"merge_18_36\": false,\n  \"last_dir\": \"D:/Export/VEPO\"\n}",
+    "bak": "{\n  \"project_names\": {\n    \"c:/zakazky/kuchyna_novak.skp\": \"Kuchyňa Novák\",\n    \"c:/zakazky/nova.skp\": \"Nová zákazka 2\"\n  },\n  \"merge_18_36\": false,\n  \"last_dir\": \"D:/Export/VEPO\"\n}",
+    "name_m1": "Kuchyna_Novak",
+    "name_m2": "Nová zákazka 2",
+    "merge_18_36": false
+  },
+  {
+    "step": "130 znakov (strop 120)",
+    "primary": "{\n  \"project_names\": {\n    \"c:/zakazky/nova.skp\": \"Nová zákazka 2\",\n    \"c:/zakazky/kuchyna_novak.skp\": \"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\"\n  },\n  \"merge_18_36\": false,\n  \"last_dir\": \"D:/Export/VEPO\"\n}",
+    "bak": "{\n  \"project_names\": {\n    \"c:/zakazky/nova.skp\": \"Nová zákazka 2\"\n  },\n  \"merge_18_36\": false,\n  \"last_dir\": \"D:/Export/VEPO\"\n}",
+    "name_m1": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+    "name_m2": "Nová zákazka 2",
+    "merge_18_36": false
+  },
+  {
+    "step": "zapis druhej instancie medzi nasim citanim a zapisom",
+    "primary": "{\n  \"project_names\": {\n    \"c:/zakazky/nova.skp\": \"Nová zákazka 2\",\n    \"c:/zakazky/kuchyna_novak.skp\": \"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\",\n    \"c:/zakazky/druha.skp\": \"Druhá inštancia\",\n    \"c:/zakazky/treti.skp\": \"Tretia\"\n  },\n  \"merge_18_36\": false,\n  \"last_dir\": \"D:/Export/VEPO\"\n}",
+    "bak": "{\n  \"project_names\": {\n    \"c:/zakazky/nova.skp\": \"Nová zákazka 2\",\n    \"c:/zakazky/kuchyna_novak.skp\": \"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\",\n    \"c:/zakazky/druha.skp\": \"Druhá inštancia\"\n  },\n  \"merge_18_36\": false,\n  \"last_dir\": \"D:/Export/VEPO\"\n}",
+    "name_m1": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+    "name_m2": "Nová zákazka 2",
+    "merge_18_36": false
+  }
+]

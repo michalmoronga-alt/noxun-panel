@@ -581,18 +581,21 @@ module NxNp3Push
                  settings_payload: ->(*_a) { nil } }
     stubs_pc = { fresh_collect: ->(*_a) { col }, sheets_map: ->(*_a) { NxNp3::SHEETS },
                  edges_map: ->(*_a) { {} }, hardware_expansion: ->(*_a) { { 'rows' => [], 'unmapped' => [] } },
-                 hardware_catalog_items: ->(*_a) { nil }, model_guid: ->(*_a) { 'g' },
-                 project_name: ->(*_a) { 'SYNT' }, default_project_name: ->(*_a) { 'SYNT' },
+                 hardware_catalog_items: ->(*_a) { nil }, model_guid: ->(*_a) { 'g' } }
+    # H7a: nastavenia exportu ziju v `ExportSettings`.
+    stubs_es = { project_name: ->(*_a) { 'SYNT' }, default_project_name: ->(*_a) { 'SYNT' },
                  merge_18_36: ->(*_a) { true } }
     checks = [e.const_defined?(:EdgeCheck) ? e::EdgeCheck : nil, e.const_defined?(:GrainCheck) ? e::GrainCheck : nil,
               e.const_defined?(:DirectionCheck) ? e::DirectionCheck : nil].compact
     ms = nil
     NxNp3.with_stubs(sd, stubs_sd) do
       NxNp3.with_stubs(pc, stubs_pc) do
-        with_checks(checks) do
-          t0 = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-          sd.send(:push_state)
-          ms = (Process.clock_gettime(Process::CLOCK_MONOTONIC) - t0) * 1000.0
+        NxNp3.with_stubs(e::ExportSettings, stubs_es) do
+          with_checks(checks) do
+            t0 = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+            sd.send(:push_state)
+            ms = (Process.clock_gettime(Process::CLOCK_MONOTONIC) - t0) * 1000.0
+          end
         end
       end
     end

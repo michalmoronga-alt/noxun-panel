@@ -22,11 +22,14 @@ ST1A_CORE_SRC = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'product
                           encoding: 'UTF-8')
 ST1A_MAIN_SRC = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'main.rb'), encoding: 'UTF-8')
 
-# Presne to, co dávka ST-1a PR A presunula do jadra.
+# Presne to, co dávka ST-1a PR A presunula do jadra. H7a: nastavenia exportu
+# (`vepo_settings`, `save_vepo_settings`, `default_project_name`) odisli DALEJ
+# do `core/export_settings.rb` (ExportSettings.read/save/default_project_name)
+# — ich strazi `test_h7a_export_settings.rb` (T-A9).
 ST1A_MOVED = %i[
-  vepo_settings save_vepo_settings vepo_materials vepo_base_label
+  vepo_materials vepo_base_label
   vepo_disambiguate_variants vepo_disambiguate vepo_group_key
-  vepo_edge_thicknesses default_project_name
+  vepo_edge_thicknesses
   sheets_map edges_map model_guid
   pids_for_problem pids_for_duplicate refs_for
 ].freeze
@@ -43,17 +46,13 @@ end
 NxTest.test('ST-1a: telo presunutych metod zije v Core (a nikde inde druhykrat)') do
   # Podpisy tiel, ktore sa presunuli. Ked sa niektory objavi v okne, mame dve
   # kopie toho isteho vypoctu — presne to, comu dávka predchadza.
+  # H7a: nastavenia exportu (citanie, zapisove dvere, default nazvu) maju
+  # vlastny modul — ich odtlacky strazi `test_h7a_export_settings.rb` (T-A9).
   fingerprints = {
-    'vepo_settings' => 'JsonFileStore.available?(path)',
-    # 1b-6c: zapis prebral `update_vepo_settings` (zamok + cerstve citanie);
-    # `save_vepo_settings` je jeho tenky obal pre nezavisle kluce.
-    'save_vepo_settings' => 'update_vepo_settings { attrs }',
-    'update_vepo_settings' => 'JsonFileStore.write(vepo_settings_path,',
     'vepo_materials' => 'labeled = Materials.sheets.map',
     'vepo_base_label' => "s['back_decor']",
     'vepo_disambiguate' => 'groups_per = labeled.group_by',
     'vepo_edge_thicknesses' => 'Materials.edges.each_with_object',
-    'default_project_name' => "File.basename(p, '.*')",
     'sheets_map' => 'Materials.sheets.each_with_object',
     # 1d/R-02b: identitu dava DocKey (Model#guid sa meni pri kazdom ulozeni).
     'model_guid' => 'DocKey.key(model)',

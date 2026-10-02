@@ -17,6 +17,31 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H7a · nastavenia exportu v jadre + ochrana R-38 (2.10.2026, PR #456, v0.17.20, blok 9 · HARDENING PO V1, triedenie A-05 · C-07 · R-38; package
+  [PACKAGE_H7.md](../zdroje/bloky/HARDENING/PACKAGE_H7.md) §6 R0, R-A1–R-A9 + §15–§17; surové audity `AUDIT_H7_raw.md`, `AUDIT_H7_delta_raw.md`, `AUDIT_H7_delta2_raw.md`;
+  brief [BRIEF_H7.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H7.md)).** Prvá z dvoch častí H7, **výrobná/cenová dávka** (rozsah zmeny len pri poškodenom súbore: pri zlom tvare
+  + dobrej zálohe sa názov zákazky **aj „18 + 36"** berú zo zálohy — dnes `{}` → meno `.skp` a zlúčenie 18/36 proti nastaveniu v zálohe). **Poradie commitov:** (1) golden nad starým
+  kódom (`tests/fixtures/h7_golden/` — T0a mená a nadpisy 4 exportov pre 11 názvov, T0b bajty `vepo_settings.json` aj `.bak` po 8 krokoch vrátane zápisu druhej inštancie, T0c štyri exporty
+  end-to-end bez stubu názvu a nastavení, 4 scenáre) → (2) ochrana na mieste v `ui/production_core.rb` → (3) čistý presun do **`core/export_settings.rb`** (`Noxun::Engine::ExportSettings`,
+  bez delegátov; mená bez `vepo_`: `read`/`read_for_write`/`update`/`save`/`refresh`/`path`, nové `last_dir`/`save_last_dir`, `doc_token` = presne `ProductionCore.model_guid`, `DEFAULT_PROJECT_NAME`)
+  → (4) hlásenia v okne → (5) docs. **Ochrana:** predikát `doc_shape_ok?` (objekt, neprázdny, `project_names` objekt), `read` cez `read_valid` (bez dobrej zálohy dnešná cesta),
+  `write_gate` (reload primára **aj** `.bak`, `degraded?` s tvarom) pod zámkom pred strikným čítaním, zápis s pozičným predikátom (dobrá záloha sa nezničí), výsledok **`[status, reason]`**
+  (`:ok`/`:unchanged`/`:blocked`/`:unreadable`/`:failed`, `written?`), log odmietnutia raz za zmenu (`LAST_BLOCK` — konštanta, nie `@ivar`, kvôli guardu bezstavovosti jadra).
+  **Čakajúci názov (§15 A1):** `name_pending?` + `ProductionCore.pending_name_note` na konci záverečnej vety 4 exportov; **`ADOPT_RETRY`** — obsahový podpis SHA1 primára a `.bak`,
+  kľúč `[cesta, zmrazené aliasy]`, strop 32, `refresh` ho **nemaže** (§17 C3); pamätá sa **len odmietnutie podľa obsahu** (`:blocked`/`:unreadable`) — prechodné `:failed` (zámok, disk)
+  sa skúša hneď ako doteraz (inak by testy 1b-6a „migrácia sa zopakuje hneď, ako zápis prejde" neprešli 1:1; vedomé spresnenie package R-A5). **Okno:** `do_set_vepo_opts` cez `case` —
+  zelené „Názov zákazky: … · platí pre VEPO, kovanie, rozpočet aj ponuku" / „18 + 36 spolu: … · platí pre VEPO export", červené s dôvodom (návod **premenovať**, nie zmazať; strata
+  podmienene „spravidla len posledná zmena", §17 C4) alebo „skús znova"; echo vždy; zastarané okno s napísaným názvom to povie. **Testy:** nová sada `test_h7a_export_settings.rb`
+  (T-A1 matica so 7 zlými tvarmi s aj bez zálohy, T-A2–T-A11 vrátane okna a guardov presunu) + `test_h7a_golden.rb` (T0, bez regenerácie); prepojené stuby exportov
+  (`kon0`, `kovh1`, `np4`, `p0hf`, `r14`, `h14`, `np3` — cieľový modul sa určí raz), `st1a_studio`, `st1a_core`, `doc_key`, `su_runner`. **5222 headless · 160 JS sád** zelené + encoding guard;
+  **mutácie M1–M33 zabité** (M23 v znení §17 C3, M25 I/O pri čítaní ≠ `:unreadable`, M26 zlyhanie 18 + 36 zeleno, M27–M30 z predrecenzie, M31–M33 z review); **in-SU 3366 / 0 na `1525bac6`**
+  (po ňom len dokumentácia). **Codex kolo 1 (1× P2) — opravené:** skalárny zápis nad objektom so zlým `project_names` bez zálohy vracal `:ok`, ale zlý kontajner nechal v súbore;
+  `update` ho teraz nahradí prázdnou mapou (log; platná mapa nedotknutá) a zapíše len dokument, ktorý spĺňa tvar. **Predrecenzia 0× P1/P2, 4× P3 — opravené:** veta „premenuj poškodený súbor" po exportoch len keď prenos odmietol obsah súboru (nie pri
+  prechodnom `:failed` nad zdravým súborom); podpis pamäte pokusov sa počíta pod zámkom (`update(sign: true)`); dôvod nečitateľnosti menuje `.bak`, keď primár chýba; testy
+  ani guard T-A9 (rozšírený na `tests/`) nerozhodujú `[status, reason]` pravdivosťou; `forget_session_key` pamäť pokusov vedome nemaže (odchýlka od R-A5, kľúč nenesie model).
+  STAV pred dávkou: v0.17.19 (H6c kóty náhľadu), Ďalší krok „H7 (názov zákazky)". **Mimo H7a:** UI hlavička, pole PROJEKT, bodky a `expect` = H7b; hodnotové poškodenie, banner pri čítaní
+  zo zálohy (Q1 „nie"), `last_dir` zlého typu v troch exportoch (N1 → H17).
+
 - **H6c · kóty náhľadu (2.10.2026, PR #455, v0.17.19, blok 9 · HARDENING PO V1, triedenie D-02; package
   [PACKAGE_H6.md](../zdroje/bloky/HARDENING/PACKAGE_H6.md) §6 „H6c" + §15; mockup [MOCKUP_H6_INSPECTOR.html](../zdroje/bloky/HARDENING/MOCKUP_H6_INSPECTOR.html) časť E;
   rozhodnutia Michala 2.10. O10 A, O11 A; brief [BRIEF_H6.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H6.md)).** Tretia z troch častí H6. **Kóty a popisy v náhľade majú stálu veľkosť

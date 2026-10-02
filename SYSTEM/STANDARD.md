@@ -1738,7 +1738,10 @@ Sadzby služieb, cenové režimy, štandardné koncové riadky a **skaláre výp
   a zápisy sú vypnuté (banner „poškodené — číta sa záloha"), bez nej platia predvolené hodnoty **s priznaním** (banner, Kontrola)
   a súbor opraví až vedomé uloženie; posledná dobrá záloha sa nikdy neprepíše. **Zdravý súbor sa nemení.** To isté platí pre globálne
   pravidlá ABS hrán a kovania (§6, §7 — pravidlá zo zálohy, zápis odmietnutý; bez zálohy predvolené bez zápisu, **priznané len záznamom
-  v logu** — upozornenie v Kontrole je otvorená otázka).
+  v logu** — upozornenie v Kontrole je otvorená otázka) a od H7a/R-38 aj pre **nastavenia exportu** `vepo_settings.json` (názvy zákaziek,
+  „18 + 36 spolu", posledný priečinok — [`core/export_settings.rb`](../noxun_engine/core/export_settings.rb)): nečitateľný súbor alebo súbor
+  zlého tvaru s dobrou zálohou sa číta **zo zálohy** a zápisy sú vypnuté; každé uloženie z okna Štúdia povie výsledok (zlyhanie červeno
+  s dôvodom a návodom „premenuj poškodený súbor, nie zmaž"); bez dobrej zálohy ostáva dnešné správanie (zápis zastavený, teraz s hlásením).
 - **Priznaný limit:** verzie **pred NP-2 (v0.15.1 a staršie)** bránu nemajú — keď na tom istom `%APPDATA%` (dve verzie SketchUpu, downgrade)
   uložia nastavenia, nové polia zahodia a verziu 2 nechajú; novší plugin potom doplní predvolené 5 / 10 / 10 mm bez varovania.
 
