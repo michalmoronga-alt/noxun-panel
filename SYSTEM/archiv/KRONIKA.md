@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H16 · súpis knižníc a úložísk na počítači — príprava D-48 (2.10.2026, PR #?, v0.17.25, blok 9 · HARDENING PO V1, triedenie C-04 = GR-03 · CX k D-48;
+- **H16 · súpis knižníc a úložísk na počítači — príprava D-48 (2.10.2026, PR #461, v0.17.25, blok 9 · HARDENING PO V1, triedenie C-04 = GR-03 · CX k D-48;
   package [PACKAGE_H16.md](../zdroje/bloky/HARDENING/PACKAGE_H16.md) — **§15 a potvrdenie orchestrátora majú prednosť**, brief [BRIEF_H16.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H16.md)).**
   Audit-povinná (nový modul), nie výrobná/cenová, predrecenzia povinná. **Bez viditeľnej zmeny** — golden prvého behu (T0, 1. commit na starom kóde) nedotknutý.
   **Register** `core/library_registry.rb` (čisté dáta, hlboko zmrazené): 30 riadkov koreňa `%APPDATA%\NOXUN\Engine` (12 zdieľaných pri D-48 = 9 knižníc + 3 priečinky

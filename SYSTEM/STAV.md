@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.17.25 · 2.10.2026 — blok 9 HARDENING; dávka H16 hotová** (PR #?): **súpis všetkého, čo plugin ukladá mimo zákazky** ([kniznice.md](../docs/architecture/kniznice.md),
+**v0.17.25 · 2.10.2026 — blok 9 HARDENING; dávka H16 hotová** (PR #461): **súpis všetkého, čo plugin ukladá mimo zákazky** ([kniznice.md](../docs/architecture/kniznice.md),
 register `LibraryRegistry`) — čo sa pri D-48 zdieľa (knižnice a prílohy) a čo ostáva každému PC (rady a „18 + 36" podľa Michala 2.10.); všetko v jednom koreni; **pre používateľa sa nemení nič** (golden).
 Pod tým **H15a/H15b** (PR #459, #460): kovanie v súboroch `core/*_seed.rb` · **H11a** (PR #458): chyba súboru = jedna hláška; pád #1117 na 2026.2 rieši **H11c** · **H7a/H7b** (PR #456, #457): názov zákazky v hlavičke Štúdia · **H3–H6c, H8–H14b** (PR #435–#455): texty, nápovedy, čísla v Štúdiu, poškodené súbory a dve okná bez straty dát, SketchUp 2026+ — **čísla a exporty bez zmeny**.
 Pod tým **BLOK CENY UZAVRETÝ** (v0.17.0, PR #425–#431, **smoke PASS 30.9.**): odkaz na produkt a ručné overenie ceny dosky a ABS bez Demosu (D-148), vek ručných cien v Rozpočte, **materiál bez formátu (sklo aj doska, C14) podľa skutočných m² dielcov**.
@@ -25,13 +25,13 @@ ani nevyexportuje** (rohovú skrinku by sklopil na dolnú). **Rozpočet:** po pr
 **Ochranu pred poškodeným súborom nastavení (H9) má len 0.17.7+, nastavení exportu (H7a) 0.17.20+, ochranu dvoch okien 0.17.8+ (pravidlá) a 0.17.9+ (rady) — aktualizovať obe PC a potom zavrieť všetky okná SketchUpu** (staré okno zapisuje bez ochrany).
 **Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
 
-**Testy (H16, PR #?):** **5322 headless · 161 JS sád** zelené + encoding guard; in-SU 3387 / 0 (odporúčaný beh — jediný koreň mení cieľ KOV-B1/KOV-I); mutácie M1–M23 zhodené.
+**Testy (H16, PR #461):** **5322 headless · 161 JS sád** zelené + encoding guard; in-SU 3387 / 0 (odporúčaný beh — jediný koreň mení cieľ KOV-B1/KOV-I); mutácie M1–M23 zhodené.
 
 ## Robí sa
 
 **Blok 9 · HARDENING PO V1** (štart 1.10.2026, PR #432): krížový audit V1 sedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**; 17 dávok **H1…H17** sekvenčne podľa tabuľky v [PLAN.md](PLAN.md), **bez zmeny výrobných a cenových čísel**; priečinok bloku [zdroje/bloky/HARDENING/](zdroje/bloky/HARDENING/).
 Hotové **H1–H5** (PR #433–#440), **H6a–H6c** (PR #453–#455), **H7a/H7b** (nastavenia exportu + R-38, názov zákazky v hlavičke — PR #456, #457), **H8–H10b** (R-13, R-37, R-35 — PR #441–#444), **H11b** (PR #445),
-**H12a–d** (PR #446–#448, #452), **H13** (PR #449), **H14a/H14b** (PR #450, #451); **H11a** (PR #458, len načítanie; ukončovanie vrátené — poradie B na 26.0), **H15a/H15b** (PR #459, #460, seed dáta kovania), **H16** (PR #?, súpis knižníc), **H11c** = Z1 + audit, čaká, kým Michal nainštaluje 2026.2 na oboch PC; nová **H18** (závesy, 3A).
+**H12a–d** (PR #446–#448, #452), **H13** (PR #449), **H14a/H14b** (PR #450, #451); **H11a** (PR #458, len načítanie; ukončovanie vrátené — poradie B na 26.0), **H15a/H15b** (PR #459, #460, seed dáta kovania), **H16** (PR #461, súpis knižníc), **H11c** = Z1 + audit, čaká, kým Michal nainštaluje 2026.2 na oboch PC; nová **H18** (závesy, 3A).
 **Otázky bez odpovede, platí návrh:** H12 Q1 (karta dielca ako Kusovník — zavedené v H12d) · H11 Q2 (starší SketchUp = nenačíta sa, jedna hláška) · H11 Q3 (kedy 2026.2) · H10b Q2 (rôzne rady sa zlúčia bez hlášky, ten istý rad = hláška) · H10a Q1 (cudzí globál = neuloží sa nič)
 · H9 Q1/Q2 (pri čítaní zo zálohy bez nálezu v Kontrole, bez tlačidla „Obnoviť zo zálohy") · H8 Q1/Q2 (veta o značke verzie, bez tlačidla) · H4b Q1/Q2 (vrátenie katalógu v ponuke „⋯" Materiálov, ikona posuvníkov pre Nastavenia rozpočtu).
 **H7: R-38 áno** (✅ H7a) · H7 Q1 (hlásiť poškodenie aj mimo zápisu — „nie") · H7 Q2 („neuložené k súboru" v hlavičke — **potvrdené** 2.10., H7b) · **Q1** (porez a montáž pri skle) bez odpovede · pri prvej rohovej v dielni overiť záves Sensys · **na smoke čakajú** D-132 (#367), D-133 (#368), D-134 (#369).
