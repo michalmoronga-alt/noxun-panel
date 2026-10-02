@@ -493,9 +493,10 @@ pre patch v3) a zoznamy patchov `SEED_PATCH_V2_ADD`, `LEGACY_SEED_93240`, `SEED_
   načítaní z dát odvodzuje `SEED_PRODUCT_LINKS`, `SEED_ITEMS` a `SEED_ITEMS_V2`. Dáta nesmú odkazovať na konštanty logiky.
 - **Len literály (guard `tests/pure/test_h15_seed_data.rb`, AST)** — rovnaké pravidlá ako [`hardware_sets_seed.rb`](#hardware_sets_seedrb). Navyše (§15 A2
   package H15): výnimky, ktoré smie `hardware_catalog.rb` deklarovať so `SEED_` menom, sú **len odvodeniny** (`SEED_ITEMS`, `SEED_ITEMS_V2`,
-  `SEED_PRODUCT_LINKS` — výraz musí čítať svoju seed konštantu, smie čítať len seed konštanty a nesmie mať literál produktu: reťazec len meno poľa položky,
-  celé číslo len ako index `row[n]`, desatinné vôbec) a **kontrakt** `SEED_MATCH_FIELDS` (len mená polí). Ekvivalentný literál namiesto odvodenia guard
-  zhodí, aj keď by golden ostal rovnaký.
+  `SEED_PRODUCT_LINKS` — každá deklarovaná práve raz; výraz musí čítať svoju seed konštantu, smie čítať len seed konštanty, nevolá metódy bez príjemcu
+  a nesmie mať literál produktu: reťazec len meno poľa položky alebo jedna z dvoch formátových hodnôt s dôvodom v stráži (predvolený dodávateľ `'Demos'`,
+  oddeľovač `' · '`), celé číslo len ako index `row[n]`, desatinné vôbec) a **kontrakt** `SEED_MATCH_FIELDS` (len mená polí, práve raz). Ekvivalentný
+  literál namiesto odvodenia guard zhodí, aj keď by golden ostal rovnaký.
 - **Ako sa seed mení:** riadok manifestu tu + `SEED_SET_VERSION` + patch existujúceho katalógu v `hardware_catalog.rb` (jeho zoznam kódov patrí sem) +
   **vedomá regenerácia goldenu** `tests/fixtures/h15_golden/generate.rb` zdôvodnená v PR (bez bumpu sa zmena do existujúcich inštalácií nedostane —
   [STANDARD §13](../../SYSTEM/STANDARD.md)). Golden T0 pripína konštanty, čerstvú inštaláciu, upgrade katalógu v1..v5 aj nákup a rozpočet end-to-end.

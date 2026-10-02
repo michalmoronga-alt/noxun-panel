@@ -29,7 +29,9 @@
   mien polí; negatívne testy nad syntetickým zdrojom. Docs: odseky `hardware_catalog_seed.rb`, `hardware_taxonomy_seed.rb` + vety v logických odsekoch, router,
   STANDARD §13.1 (2 cesty), mapa — scenár 5 s kvalifikovanými menami a **nový scenár 6 „Nový set alebo systém kovania"** (D7; slovníky systémov v kóde = C-08)
   s povinnými menami v `test_h13`. **Mutácie** A2 (ekvivalentný literál `SEED_ITEMS` — golden zelený, guard c2 zhodí), M9 (main aj helper), M11, M13, M14, M15
-  (len G1 — čerstvý súbor taxonómie poradie rád nedrží), M16 zhodené. Testy: **5295 headless · 161 JS** + encoding guard; golden T0 bez regenerácie zelený.
+  (len G1 — čerstvý súbor taxonómie poradie rád nedrží), M16 zhodené. **Predrecenzia** 0/0/3 P3 opravené: c2 chytí druhú deklaráciu odvodeniny či kontraktu
+  a volanie metódy bez príjemcu (literál schovaný v pomocnej `def`), text v `hardware.md` menuje aj formátové hodnoty `'Demos'` a `' · '`.
+  Testy: **5295 headless · 161 JS** + encoding guard; golden T0 bez regenerácie zelený.
   Nahradený stav v STAV: „H15a hotová, katalóg a výrobcovia nasledujú v H15b".
 - **H15a · seed dáta setov kovania v samostatnom súbore (2.10.2026, PR #459, v0.17.23, blok 9 · HARDENING PO V1, triedenie C-03 = CX-03 · GR-07; package
   [PACKAGE_H15.md](../zdroje/bloky/HARDENING/PACKAGE_H15.md) — **§15 má prednosť** (A1 golden nákupu s explicitnými materiálmi), surový audit
