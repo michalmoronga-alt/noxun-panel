@@ -1481,8 +1481,8 @@
   /* --- VIDITELNOST S2/S3 PODLA KONTEXTU RAILY (kontrakt UI 2.0, Kostra) ---
      Zakladne a Materialy su vlastnosti SKRINKY a patria kontextu KORPUS
      (+ Materialy pri vkladani). V Zonach/Celach/Kovani by tri cudzie sektory
-     odtlacili vlastny obsah kontextu pod zlom — namiesto nich stoji tenky
-     #ctxNote s preklikom spat na Korpus. UI-B1 tuto cast mapy [A3] nedotiahla
+     odtlacili vlastny obsah kontextu pod zlom — namiesto nich stoji v liste Nahladu
+     odkaz `#s1Link` s preklikom spat na Korpus. UI-B1 tuto cast mapy [A3] nedotiahla
      (riesila len rezim vyberu), preto pribuda az teraz; strazi to guard test
      tests/pure/test_uib1_kostra.rb + JS matica tests/js/test_uib1_kostra.js. */
   .nx-inspector body.mode-cab:not([data-view-ctx="korpus"]) #secBasic,

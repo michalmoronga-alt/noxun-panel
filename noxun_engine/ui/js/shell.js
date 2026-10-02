@@ -113,7 +113,7 @@
 
     function setLabel(t){ state.label = String(t == null ? '' : t); }
 
-    // --- viditelnost sektorov S2/S3 + kontextovy riadok (kontrakt UI 2.0) -----
+    // --- viditelnost sektorov S2/S3 + odkaz v liste Nahladu (kontrakt UI 2.0) --
     // JEDINA autorita pravidla. Zakladne a Materialy su vlastnosti SKRINKY:
     //   * dielec / doska  — nezobrazuju sa vobec (maju vlastnu kartu v S4),
     //   * vkladanie       — zobrazuju sa (vkladacia karta + material dosky),

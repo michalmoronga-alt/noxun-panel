@@ -35,7 +35,7 @@ NxTest.test('H6a T1: skupiny Struktura zon / Polozky / Sety / Pravidla bez `.hin
     summary = g[/<summary.*?<\/summary>/m].to_s
     NxTest.assert(summary.include?('class="ghdr"'), "#{title}: hlavicka je `.ghdr`")
     NxTest.assert(summary =~ /\A<summary class="ghdr"><svg[^>]*><use [^>]*\/><\/svg>#{Regexp.escape(title)}<span class="gtools">/,
-                  "#{title}: nazov ostava PRIAMYM textom <summary> (groupTitle)")
+                  "#{title}: nazov ostava PRIAMYM textom <summary>")
     NxTest.assert(summary.include?('class="nxtip r"'), "#{title}: hlavicka nesie otaznik (nxtip)")
   end
 end

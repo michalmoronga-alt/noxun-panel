@@ -265,10 +265,10 @@ NxTest.test('UI-B1: pravidla kostry visia pod korenovou triedou .nx-inspector') 
   end
 end
 
-NxTest.test('UI-B1: S2/S3 patria kontextu Korpus, inde je kontextovy riadok') do
+NxTest.test('UI-B1: S2/S3 patria kontextu Korpus, inde je odkaz v liste Nahladu') do
   # Kontrakt UI 2.0 (sekcia Kostra): Zakladne a Materialy su vlastnosti SKRINKY
   # a ziju v kontexte Korpus (+ Materialy pri vkladani); Zony/Cela/Kovanie
-  # dostanu namiesto nich tenky riadok s preklikom. UI-B1 dala do CSS mapu len
+  # dostanu namiesto nich odkaz v liste Nahladu (H6b). UI-B1 dala do CSS mapu len
   # pre REZIM VYBERU a tuto cast ticho vynechala — guard to uz nedovoli.
   NxTest.assert(UIB1_CSS.include?('body.mode-cab:not([data-view-ctx="korpus"]) #secBasic'),
                 'CSS musi mimo Korpusu skryvat sektor Zakladne')

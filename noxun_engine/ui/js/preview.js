@@ -1305,7 +1305,7 @@
   // g:     { W, H, fh, gapSides, gap, fronts: [{ id, z, height, type, wings_n }] }
   // ->     [{ kind:'hinge'|'slide'|'leg', x, z, w, h, r, owner, title }]
   // Typy bez kresitelnej pozicie (podperky, spojky, uchytky) znacku nedostanu —
-  // su v suhrne pod projekciou, aby o nich pouzivatel vedel.
+  // su v suhrne v liste sektora Kovanie, aby o nich pouzivatel vedel.
   function nxHwMarks(items, g){
     var out = [];
     if (!items || !items.length) return out;
