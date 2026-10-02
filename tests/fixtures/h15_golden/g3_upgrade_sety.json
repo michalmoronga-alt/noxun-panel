@@ -1,0 +1,882 @@
+{
+  "v1_stare_tvary": {
+    "state": "ok",
+    "zapisane": true,
+    "seed_version": 8,
+    "std": 6,
+    "file_sha256": "a1d0f4e7adbdd9030ede57284d3be6339328666706f5df9f0498ba87c526a53b",
+    "set_ids": [
+      "zaves-klasik",
+      "zaves-p2o",
+      "nohy-klzak-17",
+      "vysuv-atira-biela-h70",
+      "nohy-podla-sokla",
+      "prichyt-sokla-axilo",
+      "nohy-axilo-150",
+      "atira-biela-h70-sisy",
+      "atira-biela-h144-sisy",
+      "atira-biela-h176-sisy",
+      "atira-biela-h70-p2o",
+      "atira-biela-h144-p2o",
+      "atira-biela-h176-p2o",
+      "atira-antracit-h70-sisy",
+      "atira-antracit-h144-sisy",
+      "atira-antracit-h176-sisy",
+      "atira-antracit-h70-p2o",
+      "atira-antracit-h144-p2o",
+      "atira-antracit-h176-p2o",
+      "vysuv-quadro-v6-sisy",
+      "vysuv-quadro-v6-p2o",
+      "zavesenie-bystrica",
+      "podperky-police",
+      "vyklop-hk-klasik",
+      "vyklop-hk-klasik-tmavy",
+      "vyklop-hk-tipon",
+      "vyklop-hk-tipon-tmavy",
+      "vyklop-hl-klasik",
+      "vyklop-hl-klasik-tmavy"
+    ],
+    "mapping": {
+      "hinge": "zaves-klasik",
+      "leg": "nohy-podla-sokla",
+      "slide": "vysuv-atira-biela-h70",
+      "class:slide|classic|metal": {
+        "param": "height_variant",
+        "bands": [
+          {
+            "min": 70.0,
+            "max": 70.0,
+            "set_id": "atira-biela-h70-sisy"
+          },
+          {
+            "min": 144.0,
+            "max": 144.0,
+            "set_id": "atira-biela-h144-sisy"
+          },
+          {
+            "min": 176.0,
+            "max": 176.0,
+            "set_id": "atira-biela-h176-sisy"
+          }
+        ]
+      },
+      "class:slide|tipon|metal": {
+        "param": "height_variant",
+        "bands": [
+          {
+            "min": 70.0,
+            "max": 70.0,
+            "set_id": "atira-biela-h70-p2o"
+          },
+          {
+            "min": 144.0,
+            "max": 144.0,
+            "set_id": "atira-biela-h144-p2o"
+          },
+          {
+            "min": 176.0,
+            "max": 176.0,
+            "set_id": "atira-biela-h176-p2o"
+          }
+        ]
+      },
+      "class:slide|classic|wood": "vysuv-quadro-v6-sisy",
+      "class:slide|tipon|wood": "vysuv-quadro-v6-p2o",
+      "class:hinge|classic": "zaves-klasik",
+      "class:hinge|tipon": "zaves-p2o",
+      "class:lift|classic|hk_top": "vyklop-hk-klasik",
+      "class:lift|tipon|hk_top": "vyklop-hk-tipon",
+      "class:lift|classic|hl_top": "vyklop-hl-klasik",
+      "plinth_clip": "prichyt-sokla-axilo"
+    },
+    "odlisne_od_seedu": {
+    }
+  },
+  "v4_pred_d118b": {
+    "state": "ok",
+    "zapisane": true,
+    "seed_version": 8,
+    "std": 6,
+    "file_sha256": "d84f54a75d771724fd0faf1461d1d896ad974889ceb9f08137ff53737b4d0ab5",
+    "set_ids": [
+      "atira-antracit-h70-sisy",
+      "atira-biela-h70-p2o",
+      "vysuv-atira-biela-h70",
+      "zaves-klasik",
+      "zaves-p2o",
+      "nohy-podla-sokla",
+      "prichyt-sokla-axilo",
+      "nohy-klzak-17",
+      "nohy-axilo-150",
+      "atira-biela-h70-sisy",
+      "atira-biela-h144-sisy",
+      "atira-biela-h176-sisy",
+      "atira-biela-h144-p2o",
+      "atira-biela-h176-p2o",
+      "atira-antracit-h144-sisy",
+      "atira-antracit-h176-sisy",
+      "atira-antracit-h70-p2o",
+      "atira-antracit-h144-p2o",
+      "atira-antracit-h176-p2o",
+      "vysuv-quadro-v6-sisy",
+      "vysuv-quadro-v6-p2o",
+      "zavesenie-bystrica",
+      "podperky-police",
+      "vyklop-hk-klasik",
+      "vyklop-hk-klasik-tmavy",
+      "vyklop-hk-tipon",
+      "vyklop-hk-tipon-tmavy",
+      "vyklop-hl-klasik",
+      "vyklop-hl-klasik-tmavy"
+    ],
+    "mapping": {
+      "slide": "vysuv-atira-biela-h70",
+      "class:slide|classic|metal": {
+        "param": "height_variant",
+        "bands": [
+          {
+            "min": 70.0,
+            "max": 70.0,
+            "set_id": "atira-biela-h70-sisy"
+          },
+          {
+            "min": 144.0,
+            "max": 144.0,
+            "set_id": "atira-biela-h144-sisy"
+          },
+          {
+            "min": 176.0,
+            "max": 176.0,
+            "set_id": "atira-biela-h176-sisy"
+          }
+        ]
+      },
+      "class:slide|tipon|metal": {
+        "param": "height_variant",
+        "bands": [
+          {
+            "min": 70.0,
+            "max": 70.0,
+            "set_id": "atira-biela-h70-p2o"
+          },
+          {
+            "min": 144.0,
+            "max": 144.0,
+            "set_id": "atira-biela-h144-p2o"
+          },
+          {
+            "min": 176.0,
+            "max": 176.0,
+            "set_id": "atira-biela-h176-p2o"
+          }
+        ]
+      },
+      "class:slide|classic|wood": "vysuv-quadro-v6-sisy",
+      "class:slide|tipon|wood": "vysuv-quadro-v6-p2o",
+      "class:hinge|classic": "zaves-klasik",
+      "class:hinge|tipon": "zaves-p2o",
+      "class:lift|classic|hk_top": "vyklop-hk-klasik",
+      "class:lift|tipon|hk_top": "vyklop-hk-tipon",
+      "class:lift|classic|hl_top": "vyklop-hl-klasik",
+      "plinth_clip": "prichyt-sokla-axilo"
+    },
+    "odlisne_od_seedu": {
+    }
+  },
+  "v7_nohy_nedotknute": {
+    "state": "ok",
+    "zapisane": true,
+    "seed_version": 8,
+    "std": 6,
+    "file_sha256": "fac833fd972e3a27a42ab936a6d25011686b5866d01dac0b6d5010f82dcb5a7b",
+    "set_ids": [
+      "zaves-klasik",
+      "zaves-p2o",
+      "nohy-klzak-17",
+      "nohy-axilo-150",
+      "vysuv-atira-biela-h70",
+      "atira-biela-h70-sisy",
+      "atira-biela-h144-sisy",
+      "atira-biela-h176-sisy",
+      "atira-biela-h70-p2o",
+      "atira-biela-h144-p2o",
+      "atira-biela-h176-p2o",
+      "atira-antracit-h70-sisy",
+      "atira-antracit-h144-sisy",
+      "atira-antracit-h176-sisy",
+      "atira-antracit-h70-p2o",
+      "atira-antracit-h144-p2o",
+      "atira-antracit-h176-p2o",
+      "vysuv-quadro-v6-sisy",
+      "vysuv-quadro-v6-p2o",
+      "zavesenie-bystrica",
+      "podperky-police",
+      "vyklop-hk-klasik",
+      "vyklop-hk-klasik-tmavy",
+      "vyklop-hk-tipon",
+      "vyklop-hk-tipon-tmavy",
+      "vyklop-hl-klasik",
+      "vyklop-hl-klasik-tmavy",
+      "nohy-podla-sokla",
+      "prichyt-sokla-axilo"
+    ],
+    "mapping": {
+      "hinge": "zaves-klasik",
+      "leg": "nohy-podla-sokla",
+      "slide": "vysuv-atira-biela-h70",
+      "wall_hanger": "zavesenie-bystrica",
+      "shelf_pin": "podperky-police",
+      "class:slide|classic|metal": {
+        "param": "height_variant",
+        "bands": [
+          {
+            "min": 70.0,
+            "max": 70.0,
+            "set_id": "atira-biela-h70-sisy"
+          },
+          {
+            "min": 144.0,
+            "max": 144.0,
+            "set_id": "atira-biela-h144-sisy"
+          },
+          {
+            "min": 176.0,
+            "max": 176.0,
+            "set_id": "atira-biela-h176-sisy"
+          }
+        ]
+      },
+      "class:slide|tipon|metal": {
+        "param": "height_variant",
+        "bands": [
+          {
+            "min": 70.0,
+            "max": 70.0,
+            "set_id": "atira-biela-h70-p2o"
+          },
+          {
+            "min": 144.0,
+            "max": 144.0,
+            "set_id": "atira-biela-h144-p2o"
+          },
+          {
+            "min": 176.0,
+            "max": 176.0,
+            "set_id": "atira-biela-h176-p2o"
+          }
+        ]
+      },
+      "class:slide|classic|wood": "vysuv-quadro-v6-sisy",
+      "class:slide|tipon|wood": "vysuv-quadro-v6-p2o",
+      "class:hinge|classic": "zaves-klasik",
+      "class:hinge|tipon": "zaves-p2o",
+      "class:lift|classic|hk_top": "vyklop-hk-klasik",
+      "class:lift|tipon|hk_top": "vyklop-hk-tipon",
+      "class:lift|classic|hl_top": "vyklop-hl-klasik",
+      "plinth_clip": "prichyt-sokla-axilo"
+    },
+    "odlisne_od_seedu": {
+    }
+  },
+  "v7_nohy_premenovane": {
+    "state": "ok",
+    "zapisane": true,
+    "seed_version": 8,
+    "std": 6,
+    "file_sha256": "7adc1a0e91270722209e72c3daa88b09d5f8d01261ab6b9b2d29ac984804d43d",
+    "set_ids": [
+      "zaves-klasik",
+      "zaves-p2o",
+      "nohy-klzak-17",
+      "nohy-axilo-150",
+      "vysuv-atira-biela-h70",
+      "atira-biela-h70-sisy",
+      "atira-biela-h144-sisy",
+      "atira-biela-h176-sisy",
+      "atira-biela-h70-p2o",
+      "atira-biela-h144-p2o",
+      "atira-biela-h176-p2o",
+      "atira-antracit-h70-sisy",
+      "atira-antracit-h144-sisy",
+      "atira-antracit-h176-sisy",
+      "atira-antracit-h70-p2o",
+      "atira-antracit-h144-p2o",
+      "atira-antracit-h176-p2o",
+      "vysuv-quadro-v6-sisy",
+      "vysuv-quadro-v6-p2o",
+      "zavesenie-bystrica",
+      "podperky-police",
+      "vyklop-hk-klasik",
+      "vyklop-hk-klasik-tmavy",
+      "vyklop-hk-tipon",
+      "vyklop-hk-tipon-tmavy",
+      "vyklop-hl-klasik",
+      "vyklop-hl-klasik-tmavy",
+      "nohy-podla-sokla",
+      "prichyt-sokla-axilo"
+    ],
+    "mapping": {
+      "hinge": "zaves-klasik",
+      "leg": "nohy-podla-sokla",
+      "slide": "vysuv-atira-biela-h70",
+      "wall_hanger": "zavesenie-bystrica",
+      "shelf_pin": "podperky-police",
+      "class:slide|classic|metal": {
+        "param": "height_variant",
+        "bands": [
+          {
+            "min": 70.0,
+            "max": 70.0,
+            "set_id": "atira-biela-h70-sisy"
+          },
+          {
+            "min": 144.0,
+            "max": 144.0,
+            "set_id": "atira-biela-h144-sisy"
+          },
+          {
+            "min": 176.0,
+            "max": 176.0,
+            "set_id": "atira-biela-h176-sisy"
+          }
+        ]
+      },
+      "class:slide|tipon|metal": {
+        "param": "height_variant",
+        "bands": [
+          {
+            "min": 70.0,
+            "max": 70.0,
+            "set_id": "atira-biela-h70-p2o"
+          },
+          {
+            "min": 144.0,
+            "max": 144.0,
+            "set_id": "atira-biela-h144-p2o"
+          },
+          {
+            "min": 176.0,
+            "max": 176.0,
+            "set_id": "atira-biela-h176-p2o"
+          }
+        ]
+      },
+      "class:slide|classic|wood": "vysuv-quadro-v6-sisy",
+      "class:slide|tipon|wood": "vysuv-quadro-v6-p2o",
+      "class:hinge|classic": "zaves-klasik",
+      "class:hinge|tipon": "zaves-p2o",
+      "class:lift|classic|hk_top": "vyklop-hk-klasik",
+      "class:lift|tipon|hk_top": "vyklop-hk-tipon",
+      "class:lift|classic|hl_top": "vyklop-hl-klasik",
+      "plinth_clip": "prichyt-sokla-axilo"
+    },
+    "odlisne_od_seedu": {
+      "nohy-podla-sokla": {
+        "set_id": "nohy-podla-sokla",
+        "name": "Moje nohy",
+        "generic_type": "leg",
+        "members": [
+          {
+            "per": "unit",
+            "qty": 1,
+            "label": "noha",
+            "param_bands": {
+              "param": "height",
+              "bands": [
+                {
+                  "min": 17.0,
+                  "max": 21.0,
+                  "code": "82744"
+                },
+                {
+                  "min": 140.0,
+                  "max": 160.0,
+                  "code": "367823"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "v7_migracia_leg": {
+    "state": "ok",
+    "zapisane": true,
+    "seed_version": 8,
+    "std": 6,
+    "file_sha256": "b1eb5674b5c80200d76c655e4a2f0c72ab62d250e9e3c7326556324f0d6b00e0",
+    "set_ids": [
+      "zaves-klasik",
+      "zaves-p2o",
+      "nohy-podla-sokla",
+      "prichyt-sokla-axilo",
+      "nohy-klzak-17",
+      "nohy-axilo-150",
+      "vysuv-atira-biela-h70",
+      "atira-biela-h70-sisy",
+      "atira-biela-h144-sisy",
+      "atira-biela-h176-sisy",
+      "atira-biela-h70-p2o",
+      "atira-biela-h144-p2o",
+      "atira-biela-h176-p2o",
+      "atira-antracit-h70-sisy",
+      "atira-antracit-h144-sisy",
+      "atira-antracit-h176-sisy",
+      "atira-antracit-h70-p2o",
+      "atira-antracit-h144-p2o",
+      "atira-antracit-h176-p2o",
+      "vysuv-quadro-v6-sisy",
+      "vysuv-quadro-v6-p2o",
+      "zavesenie-bystrica",
+      "podperky-police",
+      "vyklop-hk-klasik",
+      "vyklop-hk-klasik-tmavy",
+      "vyklop-hk-tipon",
+      "vyklop-hk-tipon-tmavy",
+      "vyklop-hl-klasik",
+      "vyklop-hl-klasik-tmavy"
+    ],
+    "mapping": {
+      "hinge": "zaves-klasik",
+      "leg": "nohy-podla-sokla",
+      "slide": "vysuv-atira-biela-h70",
+      "wall_hanger": "zavesenie-bystrica",
+      "shelf_pin": "podperky-police",
+      "plinth_clip": "prichyt-sokla-axilo",
+      "class:slide|classic|metal": {
+        "param": "height_variant",
+        "bands": [
+          {
+            "min": 70.0,
+            "max": 70.0,
+            "set_id": "atira-biela-h70-sisy"
+          },
+          {
+            "min": 144.0,
+            "max": 144.0,
+            "set_id": "atira-biela-h144-sisy"
+          },
+          {
+            "min": 176.0,
+            "max": 176.0,
+            "set_id": "atira-biela-h176-sisy"
+          }
+        ]
+      },
+      "class:slide|tipon|metal": {
+        "param": "height_variant",
+        "bands": [
+          {
+            "min": 70.0,
+            "max": 70.0,
+            "set_id": "atira-biela-h70-p2o"
+          },
+          {
+            "min": 144.0,
+            "max": 144.0,
+            "set_id": "atira-biela-h144-p2o"
+          },
+          {
+            "min": 176.0,
+            "max": 176.0,
+            "set_id": "atira-biela-h176-p2o"
+          }
+        ]
+      },
+      "class:slide|classic|wood": "vysuv-quadro-v6-sisy",
+      "class:slide|tipon|wood": "vysuv-quadro-v6-p2o",
+      "class:hinge|classic": "zaves-klasik",
+      "class:hinge|tipon": "zaves-p2o",
+      "class:lift|classic|hk_top": "vyklop-hk-klasik",
+      "class:lift|tipon|hk_top": "vyklop-hk-tipon",
+      "class:lift|classic|hl_top": "vyklop-hl-klasik"
+    },
+    "odlisne_od_seedu": {
+    }
+  },
+  "v7_kolizia_prichyt": {
+    "state": "ok",
+    "zapisane": true,
+    "seed_version": 8,
+    "std": 6,
+    "file_sha256": "48132cc4df812e466bddb57fa7280e08d1fa17bff990c3f2b5d56dc51b455d4c",
+    "set_ids": [
+      "zaves-klasik",
+      "zaves-p2o",
+      "nohy-podla-sokla",
+      "nohy-klzak-17",
+      "nohy-axilo-150",
+      "vysuv-atira-biela-h70",
+      "atira-biela-h70-sisy",
+      "atira-biela-h144-sisy",
+      "atira-biela-h176-sisy",
+      "atira-biela-h70-p2o",
+      "atira-biela-h144-p2o",
+      "atira-biela-h176-p2o",
+      "atira-antracit-h70-sisy",
+      "atira-antracit-h144-sisy",
+      "atira-antracit-h176-sisy",
+      "atira-antracit-h70-p2o",
+      "atira-antracit-h144-p2o",
+      "atira-antracit-h176-p2o",
+      "vysuv-quadro-v6-sisy",
+      "vysuv-quadro-v6-p2o",
+      "zavesenie-bystrica",
+      "podperky-police",
+      "vyklop-hk-klasik",
+      "vyklop-hk-klasik-tmavy",
+      "vyklop-hk-tipon",
+      "vyklop-hk-tipon-tmavy",
+      "vyklop-hl-klasik",
+      "vyklop-hl-klasik-tmavy",
+      "prichyt-sokla-axilo"
+    ],
+    "mapping": {
+      "hinge": "zaves-klasik",
+      "leg": "nohy-podla-sokla",
+      "slide": "vysuv-atira-biela-h70",
+      "wall_hanger": "zavesenie-bystrica",
+      "shelf_pin": "podperky-police",
+      "class:slide|classic|metal": {
+        "param": "height_variant",
+        "bands": [
+          {
+            "min": 70.0,
+            "max": 70.0,
+            "set_id": "atira-biela-h70-sisy"
+          },
+          {
+            "min": 144.0,
+            "max": 144.0,
+            "set_id": "atira-biela-h144-sisy"
+          },
+          {
+            "min": 176.0,
+            "max": 176.0,
+            "set_id": "atira-biela-h176-sisy"
+          }
+        ]
+      },
+      "class:slide|tipon|metal": {
+        "param": "height_variant",
+        "bands": [
+          {
+            "min": 70.0,
+            "max": 70.0,
+            "set_id": "atira-biela-h70-p2o"
+          },
+          {
+            "min": 144.0,
+            "max": 144.0,
+            "set_id": "atira-biela-h144-p2o"
+          },
+          {
+            "min": 176.0,
+            "max": 176.0,
+            "set_id": "atira-biela-h176-p2o"
+          }
+        ]
+      },
+      "class:slide|classic|wood": "vysuv-quadro-v6-sisy",
+      "class:slide|tipon|wood": "vysuv-quadro-v6-p2o",
+      "class:hinge|classic": "zaves-klasik",
+      "class:hinge|tipon": "zaves-p2o",
+      "class:lift|classic|hk_top": "vyklop-hk-klasik",
+      "class:lift|tipon|hk_top": "vyklop-hk-tipon",
+      "class:lift|classic|hl_top": "vyklop-hl-klasik"
+    },
+    "odlisne_od_seedu": {
+      "prichyt-sokla-axilo": {
+        "set_id": "prichyt-sokla-axilo",
+        "name": "Môj záves",
+        "generic_type": "hinge",
+        "members": [
+          {
+            "per": "unit",
+            "qty": 1,
+            "code": "777001"
+          }
+        ]
+      }
+    }
+  },
+  "v7_vlastna_trieda": {
+    "state": "ok",
+    "zapisane": true,
+    "seed_version": 8,
+    "std": 6,
+    "file_sha256": "47329f628823b2bb769f29faa8f8025246e00eb75feab2b54d9effbc0728ad6e",
+    "set_ids": [
+      "zaves-klasik",
+      "zaves-p2o",
+      "nohy-podla-sokla",
+      "prichyt-sokla-axilo",
+      "nohy-klzak-17",
+      "nohy-axilo-150",
+      "vysuv-atira-biela-h70",
+      "atira-biela-h70-sisy",
+      "atira-biela-h144-sisy",
+      "atira-biela-h176-sisy",
+      "atira-biela-h70-p2o",
+      "atira-biela-h144-p2o",
+      "atira-biela-h176-p2o",
+      "atira-antracit-h70-sisy",
+      "atira-antracit-h144-sisy",
+      "atira-antracit-h176-sisy",
+      "atira-antracit-h70-p2o",
+      "atira-antracit-h144-p2o",
+      "atira-antracit-h176-p2o",
+      "vysuv-quadro-v6-sisy",
+      "vysuv-quadro-v6-p2o",
+      "zavesenie-bystrica",
+      "podperky-police",
+      "vyklop-hk-klasik",
+      "vyklop-hk-klasik-tmavy",
+      "vyklop-hk-tipon",
+      "vyklop-hk-tipon-tmavy",
+      "vyklop-hl-klasik",
+      "vyklop-hl-klasik-tmavy"
+    ],
+    "mapping": {
+      "hinge": "zaves-klasik",
+      "leg": "nohy-podla-sokla",
+      "slide": "vysuv-atira-biela-h70",
+      "wall_hanger": "zavesenie-bystrica",
+      "shelf_pin": "podperky-police",
+      "plinth_clip": "prichyt-sokla-axilo",
+      "class:slide|classic|metal": "atira-antracit-h70-sisy",
+      "class:slide|tipon|metal": {
+        "param": "height_variant",
+        "bands": [
+          {
+            "min": 70.0,
+            "max": 70.0,
+            "set_id": "atira-biela-h70-p2o"
+          },
+          {
+            "min": 144.0,
+            "max": 144.0,
+            "set_id": "atira-biela-h144-p2o"
+          },
+          {
+            "min": 176.0,
+            "max": 176.0,
+            "set_id": "atira-biela-h176-p2o"
+          }
+        ]
+      },
+      "class:slide|classic|wood": "vysuv-quadro-v6-sisy",
+      "class:slide|tipon|wood": "vysuv-quadro-v6-p2o",
+      "class:hinge|classic": "zaves-klasik",
+      "class:hinge|tipon": "zaves-p2o",
+      "class:lift|classic|hk_top": "vyklop-hk-klasik",
+      "class:lift|tipon|hk_top": "vyklop-hk-tipon",
+      "class:lift|classic|hl_top": "vyklop-hl-klasik"
+    },
+    "odlisne_od_seedu": {
+    }
+  },
+  "v7_konflikt_taxonomie": {
+    "state": "ok",
+    "zapisane": true,
+    "seed_version": 8,
+    "std": 6,
+    "file_sha256": "5f58f133120b397aa5927a681de07fae89948bf51137e18435b1194cc91d0ae9",
+    "set_ids": [
+      "zaves-klasik",
+      "zaves-p2o",
+      "nohy-klzak-17",
+      "nohy-axilo-150",
+      "vysuv-atira-biela-h70",
+      "atira-biela-h70-sisy",
+      "atira-biela-h144-sisy",
+      "atira-biela-h176-sisy",
+      "atira-biela-h70-p2o",
+      "atira-biela-h144-p2o",
+      "atira-biela-h176-p2o",
+      "atira-antracit-h70-sisy",
+      "atira-antracit-h144-sisy",
+      "atira-antracit-h176-sisy",
+      "atira-antracit-h70-p2o",
+      "atira-antracit-h144-p2o",
+      "atira-antracit-h176-p2o",
+      "vysuv-quadro-v6-sisy",
+      "vysuv-quadro-v6-p2o",
+      "zavesenie-bystrica",
+      "podperky-police",
+      "vyklop-hk-klasik",
+      "vyklop-hk-klasik-tmavy",
+      "vyklop-hk-tipon",
+      "vyklop-hk-tipon-tmavy",
+      "vyklop-hl-klasik",
+      "vyklop-hl-klasik-tmavy",
+      "nohy-podla-sokla",
+      "prichyt-sokla-axilo"
+    ],
+    "mapping": {
+      "hinge": "zaves-klasik",
+      "slide": "vysuv-atira-biela-h70",
+      "wall_hanger": "zavesenie-bystrica",
+      "shelf_pin": "podperky-police",
+      "class:slide|classic|metal": {
+        "param": "height_variant",
+        "bands": [
+          {
+            "min": 70.0,
+            "max": 70.0,
+            "set_id": "atira-biela-h70-sisy"
+          },
+          {
+            "min": 144.0,
+            "max": 144.0,
+            "set_id": "atira-biela-h144-sisy"
+          },
+          {
+            "min": 176.0,
+            "max": 176.0,
+            "set_id": "atira-biela-h176-sisy"
+          }
+        ]
+      },
+      "class:slide|tipon|metal": {
+        "param": "height_variant",
+        "bands": [
+          {
+            "min": 70.0,
+            "max": 70.0,
+            "set_id": "atira-biela-h70-p2o"
+          },
+          {
+            "min": 144.0,
+            "max": 144.0,
+            "set_id": "atira-biela-h144-p2o"
+          },
+          {
+            "min": 176.0,
+            "max": 176.0,
+            "set_id": "atira-biela-h176-p2o"
+          }
+        ]
+      },
+      "class:slide|classic|wood": "vysuv-quadro-v6-sisy",
+      "class:slide|tipon|wood": "vysuv-quadro-v6-p2o",
+      "class:hinge|classic": "zaves-klasik",
+      "class:hinge|tipon": "zaves-p2o",
+      "class:lift|classic|hk_top": "vyklop-hk-klasik",
+      "class:lift|tipon|hk_top": "vyklop-hk-tipon",
+      "class:lift|classic|hl_top": "vyklop-hl-klasik",
+      "plinth_clip": "prichyt-sokla-axilo"
+    },
+    "odlisne_od_seedu": {
+      "prichyt-sokla-axilo": {
+        "set_id": "prichyt-sokla-axilo",
+        "name": "Príchyt sokla AXILO",
+        "generic_type": "plinth_clip",
+        "members": [
+          {
+            "per": "unit",
+            "qty": 1,
+            "label": "príchyt sokla",
+            "code": "950"
+          }
+        ]
+      }
+    }
+  },
+  "v8_aktualna": {
+    "state": "ok",
+    "zapisane": false,
+    "seed_version": 8,
+    "std": 6,
+    "file_sha256": "b1eb5674b5c80200d76c655e4a2f0c72ab62d250e9e3c7326556324f0d6b00e0",
+    "set_ids": [
+      "zaves-klasik",
+      "zaves-p2o",
+      "nohy-podla-sokla",
+      "prichyt-sokla-axilo",
+      "nohy-klzak-17",
+      "nohy-axilo-150",
+      "vysuv-atira-biela-h70",
+      "atira-biela-h70-sisy",
+      "atira-biela-h144-sisy",
+      "atira-biela-h176-sisy",
+      "atira-biela-h70-p2o",
+      "atira-biela-h144-p2o",
+      "atira-biela-h176-p2o",
+      "atira-antracit-h70-sisy",
+      "atira-antracit-h144-sisy",
+      "atira-antracit-h176-sisy",
+      "atira-antracit-h70-p2o",
+      "atira-antracit-h144-p2o",
+      "atira-antracit-h176-p2o",
+      "vysuv-quadro-v6-sisy",
+      "vysuv-quadro-v6-p2o",
+      "zavesenie-bystrica",
+      "podperky-police",
+      "vyklop-hk-klasik",
+      "vyklop-hk-klasik-tmavy",
+      "vyklop-hk-tipon",
+      "vyklop-hk-tipon-tmavy",
+      "vyklop-hl-klasik",
+      "vyklop-hl-klasik-tmavy"
+    ],
+    "mapping": {
+      "hinge": "zaves-klasik",
+      "leg": "nohy-podla-sokla",
+      "slide": "vysuv-atira-biela-h70",
+      "wall_hanger": "zavesenie-bystrica",
+      "shelf_pin": "podperky-police",
+      "plinth_clip": "prichyt-sokla-axilo",
+      "class:slide|classic|metal": {
+        "param": "height_variant",
+        "bands": [
+          {
+            "min": 70.0,
+            "max": 70.0,
+            "set_id": "atira-biela-h70-sisy"
+          },
+          {
+            "min": 144.0,
+            "max": 144.0,
+            "set_id": "atira-biela-h144-sisy"
+          },
+          {
+            "min": 176.0,
+            "max": 176.0,
+            "set_id": "atira-biela-h176-sisy"
+          }
+        ]
+      },
+      "class:slide|tipon|metal": {
+        "param": "height_variant",
+        "bands": [
+          {
+            "min": 70.0,
+            "max": 70.0,
+            "set_id": "atira-biela-h70-p2o"
+          },
+          {
+            "min": 144.0,
+            "max": 144.0,
+            "set_id": "atira-biela-h144-p2o"
+          },
+          {
+            "min": 176.0,
+            "max": 176.0,
+            "set_id": "atira-biela-h176-p2o"
+          }
+        ]
+      },
+      "class:slide|classic|wood": "vysuv-quadro-v6-sisy",
+      "class:slide|tipon|wood": "vysuv-quadro-v6-p2o",
+      "class:hinge|classic": "zaves-klasik",
+      "class:hinge|tipon": "zaves-p2o",
+      "class:lift|classic|hk_top": "vyklop-hk-klasik",
+      "class:lift|tipon|hk_top": "vyklop-hk-tipon",
+      "class:lift|classic|hl_top": "vyklop-hl-klasik"
+    },
+    "odlisne_od_seedu": {
+    }
+  }
+}

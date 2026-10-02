@@ -1,0 +1,2203 @@
+{
+  "door_2wings": {
+    "purchase_csv": "\"NOXUN kovanie — nákupný zoznam\";\"H15\";\"2026-10-01\"\r\n\"kategória\";\"kód\";\"názov\";\"počet\";\"MJ\";\"cena € s DPH\";\"medzisúčet € s DPH\"\r\n\"ZAVESY\";\"104717\";\"HETTICH 9071205 Sensys záves naložený 110° TH skrutka SiSy\";\"4\";\"ks\";\"4,18\";\"16,72\"\r\n\"ZAVESY\";\"105408\";\"HETTICH 9088251 Sensys krytka pre misku TH\";\"4\";\"ks\";\"0,25\";\"1,00\"\r\n\"ZAVESY\";\"105425\";\"HETTICH 9088250 Sensys krytka ramienka logo Hettich\";\"4\";\"ks\";\"0,19\";\"0,76\"\r\n\"ZAVESY\";\"106412\";\"HETTICH 9071656 Sensys montážna podložka krížová D1,5 excenter hmoždinka\";\"4\";\"ks\";\"0,97\";\"3,88\"\r\n\"NOHY\";\"9078\";\"Häfele 637.76.353 noha AXILO H100\";\"4\";\"ks\";\"0,72\";\"2,88\"\r\n\"NOHY\";\"9079\";\"Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna\";\"4\";\"ks\";\"0,50\";\"2,00\"\r\n\"NOHY\";\"950\";\"Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)\";\"1\";\"ks\";\"0,35\";\"0,35\"\r\n\"SPOLU (len známe ceny)\";\"\";\"\";\"25\";\"\";\"\";\"27,59\"\r\n",
+    "expand": {
+      "rows": [
+        {
+          "code": "104717",
+          "quantity": 4,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/wing:left",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            },
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/wing:right",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "HETTICH 9071205 Sensys záves naložený 110° TH skrutka SiSy",
+          "category": "ZAVESY",
+          "unit": "ks",
+          "price_eur_vat": 4.18,
+          "manual_note": null,
+          "subtotal_eur_vat": 16.72
+        },
+        {
+          "code": "105408",
+          "quantity": 4,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/wing:left",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            },
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/wing:right",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "HETTICH 9088251 Sensys krytka pre misku TH",
+          "category": "ZAVESY",
+          "unit": "ks",
+          "price_eur_vat": 0.25,
+          "manual_note": null,
+          "subtotal_eur_vat": 1.0
+        },
+        {
+          "code": "105425",
+          "quantity": 4,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/wing:left",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            },
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/wing:right",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "HETTICH 9088250 Sensys krytka ramienka logo Hettich",
+          "category": "ZAVESY",
+          "unit": "ks",
+          "price_eur_vat": 0.19,
+          "manual_note": null,
+          "subtotal_eur_vat": 0.76
+        },
+        {
+          "code": "106412",
+          "quantity": 4,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/wing:left",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            },
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/wing:right",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "HETTICH 9071656 Sensys montážna podložka krížová D1,5 excenter hmoždinka",
+          "category": "ZAVESY",
+          "unit": "ks",
+          "price_eur_vat": 0.97,
+          "manual_note": null,
+          "subtotal_eur_vat": 3.88
+        },
+        {
+          "code": "9078",
+          "quantity": 4,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": null,
+              "generic_type": "leg",
+              "rule_id": "nohy-zakladne",
+              "set_id": "nohy-podla-sokla",
+              "quantity": 4
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "Häfele 637.76.353 noha AXILO H100",
+          "category": "NOHY",
+          "unit": "ks",
+          "price_eur_vat": 0.72,
+          "manual_note": null,
+          "subtotal_eur_vat": 2.88
+        },
+        {
+          "code": "9079",
+          "quantity": 4,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": null,
+              "generic_type": "leg",
+              "rule_id": "nohy-zakladne",
+              "set_id": "nohy-podla-sokla",
+              "quantity": 4
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna",
+          "category": "NOHY",
+          "unit": "ks",
+          "price_eur_vat": 0.5,
+          "manual_note": null,
+          "subtotal_eur_vat": 2.0
+        },
+        {
+          "code": "950",
+          "quantity": 1,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": null,
+              "generic_type": "plinth_clip",
+              "rule_id": "prichyt-sokla",
+              "set_id": "prichyt-sokla-axilo",
+              "quantity": 1
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)",
+          "category": "NOHY",
+          "unit": "ks",
+          "price_eur_vat": 0.35,
+          "manual_note": null,
+          "subtotal_eur_vat": 0.35
+        }
+      ],
+      "unmapped": [
+
+      ],
+      "notes": [
+
+      ],
+      "summary": {
+        "rows": 7,
+        "quantity": 25,
+        "total_eur_vat": 27.59,
+        "unknown_prices": 0,
+        "unmapped": 0
+      }
+    },
+    "budget_hardware": {
+      "key": "hardware",
+      "name": "Kovanie",
+      "rows": [
+        {
+          "key": "hw:104717",
+          "nazov": "HETTICH 9071205 Sensys záves naložený 110° TH skrutka SiSy",
+          "kod": "104717",
+          "dodavatel": "Demos",
+          "mj": "KS",
+          "mnozstvo": 4,
+          "cena_mj": 4.18,
+          "spolu": 16.72,
+          "spolu_auto": 16.72,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "ZAVESY",
+          "product_link": true
+        },
+        {
+          "key": "hw:105408",
+          "nazov": "HETTICH 9088251 Sensys krytka pre misku TH",
+          "kod": "105408",
+          "dodavatel": "Demos",
+          "mj": "KS",
+          "mnozstvo": 4,
+          "cena_mj": 0.25,
+          "spolu": 1.0,
+          "spolu_auto": 1.0,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "ZAVESY",
+          "product_link": true
+        },
+        {
+          "key": "hw:105425",
+          "nazov": "HETTICH 9088250 Sensys krytka ramienka logo Hettich",
+          "kod": "105425",
+          "dodavatel": "Demos",
+          "mj": "KS",
+          "mnozstvo": 4,
+          "cena_mj": 0.19,
+          "spolu": 0.76,
+          "spolu_auto": 0.76,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "ZAVESY",
+          "product_link": true
+        },
+        {
+          "key": "hw:106412",
+          "nazov": "HETTICH 9071656 Sensys montážna podložka krížová D1,5 excenter hmoždinka",
+          "kod": "106412",
+          "dodavatel": "Demos",
+          "mj": "KS",
+          "mnozstvo": 4,
+          "cena_mj": 0.97,
+          "spolu": 3.88,
+          "spolu_auto": 3.88,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "ZAVESY",
+          "product_link": true
+        },
+        {
+          "key": "hw:9078",
+          "nazov": "Häfele 637.76.353 noha AXILO H100",
+          "kod": "9078",
+          "dodavatel": "Quatro LM",
+          "mj": "KS",
+          "mnozstvo": 4,
+          "cena_mj": 0.72,
+          "spolu": 2.88,
+          "spolu_auto": 2.88,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "NOHY",
+          "product_link": true,
+          "price_check": {
+            "kind": "hardware",
+            "id": "9078",
+            "label": "Häfele 637.76.353 noha AXILO H100",
+            "manual_check": true,
+            "state": "manual",
+            "checked_at": null,
+            "age_days": null,
+            "price_check_method": null,
+            "demos_url": null,
+            "product_link": true
+          }
+        },
+        {
+          "key": "hw:9079",
+          "nazov": "Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna",
+          "kod": "9079",
+          "dodavatel": "Quatro LM",
+          "mj": "KS",
+          "mnozstvo": 4,
+          "cena_mj": 0.5,
+          "spolu": 2.0,
+          "spolu_auto": 2.0,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "NOHY",
+          "product_link": true,
+          "price_check": {
+            "kind": "hardware",
+            "id": "9079",
+            "label": "Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna",
+            "manual_check": true,
+            "state": "manual",
+            "checked_at": null,
+            "age_days": null,
+            "price_check_method": null,
+            "demos_url": null,
+            "product_link": true
+          }
+        },
+        {
+          "key": "hw:950",
+          "nazov": "Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)",
+          "kod": "950",
+          "dodavatel": "Quatro LM",
+          "mj": "KS",
+          "mnozstvo": 1,
+          "cena_mj": 0.35,
+          "spolu": 0.35,
+          "spolu_auto": 0.35,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "NOHY",
+          "product_link": true,
+          "price_check": {
+            "kind": "hardware",
+            "id": "950",
+            "label": "Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)",
+            "manual_check": true,
+            "state": "manual",
+            "checked_at": null,
+            "age_days": null,
+            "price_check_method": null,
+            "demos_url": null,
+            "product_link": true
+          }
+        }
+      ],
+      "subtotal": 27.59,
+      "unknown_count": 0,
+      "complete": true,
+      "counts_in_total": true
+    }
+  },
+  "drawer_fixed_locked": {
+    "purchase_csv": "\"NOXUN kovanie — nákupný zoznam\";\"H15\";\"2026-10-01\"\r\n\"kategória\";\"kód\";\"názov\";\"počet\";\"MJ\";\"cena € s DPH\";\"medzisúčet € s DPH\"\r\n\"VYSUVY\";\"357696\";\"K-HETTICH Atira zásuvka 70, 470mm/30kg, biela, SiSy\";\"1\";\"set\";\"42,89\";\"42,89\"\r\n\"NOHY\";\"9078\";\"Häfele 637.76.353 noha AXILO H100\";\"4\";\"ks\";\"0,72\";\"2,88\"\r\n\"NOHY\";\"9079\";\"Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna\";\"4\";\"ks\";\"0,50\";\"2,00\"\r\n\"NOHY\";\"950\";\"Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)\";\"1\";\"ks\";\"0,35\";\"0,35\"\r\n\"SPOLU (len známe ceny)\";\"\";\"\";\"10\";\"\";\"\";\"48,12\"\r\n",
+    "expand": {
+      "rows": [
+        {
+          "code": "357696",
+          "quantity": 1,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/panel",
+              "generic_type": "slide",
+              "rule_id": "vysuvy-nl-podla-hlbky",
+              "set_id": "vysuv-atira-biela-h70",
+              "quantity": 1
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "K-HETTICH Atira zásuvka 70, 470mm/30kg, biela, SiSy",
+          "category": "VYSUVY",
+          "unit": "set",
+          "price_eur_vat": 42.89,
+          "manual_note": null,
+          "subtotal_eur_vat": 42.89
+        },
+        {
+          "code": "9078",
+          "quantity": 4,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": null,
+              "generic_type": "leg",
+              "rule_id": "nohy-zakladne",
+              "set_id": "nohy-podla-sokla",
+              "quantity": 4
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "Häfele 637.76.353 noha AXILO H100",
+          "category": "NOHY",
+          "unit": "ks",
+          "price_eur_vat": 0.72,
+          "manual_note": null,
+          "subtotal_eur_vat": 2.88
+        },
+        {
+          "code": "9079",
+          "quantity": 4,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": null,
+              "generic_type": "leg",
+              "rule_id": "nohy-zakladne",
+              "set_id": "nohy-podla-sokla",
+              "quantity": 4
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna",
+          "category": "NOHY",
+          "unit": "ks",
+          "price_eur_vat": 0.5,
+          "manual_note": null,
+          "subtotal_eur_vat": 2.0
+        },
+        {
+          "code": "950",
+          "quantity": 1,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": null,
+              "generic_type": "plinth_clip",
+              "rule_id": "prichyt-sokla",
+              "set_id": "prichyt-sokla-axilo",
+              "quantity": 1
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)",
+          "category": "NOHY",
+          "unit": "ks",
+          "price_eur_vat": 0.35,
+          "manual_note": null,
+          "subtotal_eur_vat": 0.35
+        }
+      ],
+      "unmapped": [
+
+      ],
+      "notes": [
+
+      ],
+      "summary": {
+        "rows": 4,
+        "quantity": 10,
+        "total_eur_vat": 48.12,
+        "unknown_prices": 0,
+        "unmapped": 0
+      }
+    },
+    "budget_hardware": {
+      "key": "hardware",
+      "name": "Kovanie",
+      "rows": [
+        {
+          "key": "hw:357696",
+          "nazov": "K-HETTICH Atira zásuvka 70, 470mm/30kg, biela, SiSy",
+          "kod": "357696",
+          "dodavatel": "Demos",
+          "mj": "SET",
+          "mnozstvo": 1,
+          "cena_mj": 42.89,
+          "spolu": 42.89,
+          "spolu_auto": 42.89,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "VYSUVY",
+          "product_link": true
+        },
+        {
+          "key": "hw:9078",
+          "nazov": "Häfele 637.76.353 noha AXILO H100",
+          "kod": "9078",
+          "dodavatel": "Quatro LM",
+          "mj": "KS",
+          "mnozstvo": 4,
+          "cena_mj": 0.72,
+          "spolu": 2.88,
+          "spolu_auto": 2.88,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "NOHY",
+          "product_link": true,
+          "price_check": {
+            "kind": "hardware",
+            "id": "9078",
+            "label": "Häfele 637.76.353 noha AXILO H100",
+            "manual_check": true,
+            "state": "manual",
+            "checked_at": null,
+            "age_days": null,
+            "price_check_method": null,
+            "demos_url": null,
+            "product_link": true
+          }
+        },
+        {
+          "key": "hw:9079",
+          "nazov": "Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna",
+          "kod": "9079",
+          "dodavatel": "Quatro LM",
+          "mj": "KS",
+          "mnozstvo": 4,
+          "cena_mj": 0.5,
+          "spolu": 2.0,
+          "spolu_auto": 2.0,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "NOHY",
+          "product_link": true,
+          "price_check": {
+            "kind": "hardware",
+            "id": "9079",
+            "label": "Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna",
+            "manual_check": true,
+            "state": "manual",
+            "checked_at": null,
+            "age_days": null,
+            "price_check_method": null,
+            "demos_url": null,
+            "product_link": true
+          }
+        },
+        {
+          "key": "hw:950",
+          "nazov": "Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)",
+          "kod": "950",
+          "dodavatel": "Quatro LM",
+          "mj": "KS",
+          "mnozstvo": 1,
+          "cena_mj": 0.35,
+          "spolu": 0.35,
+          "spolu_auto": 0.35,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "NOHY",
+          "product_link": true,
+          "price_check": {
+            "kind": "hardware",
+            "id": "950",
+            "label": "Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)",
+            "manual_check": true,
+            "state": "manual",
+            "checked_at": null,
+            "age_days": null,
+            "price_check_method": null,
+            "demos_url": null,
+            "product_link": true
+          }
+        }
+      ],
+      "subtotal": 48.12,
+      "unknown_count": 0,
+      "complete": true,
+      "counts_in_total": true
+    }
+  },
+  "upper_cabinet": {
+    "purchase_csv": "\"NOXUN kovanie — nákupný zoznam\";\"H15\";\"2026-10-01\"\r\n\"kategória\";\"kód\";\"názov\";\"počet\";\"MJ\";\"cena € s DPH\";\"medzisúčet € s DPH\"\r\n\"ZAVESY\";\"104717\";\"HETTICH 9071205 Sensys záves naložený 110° TH skrutka SiSy\";\"4\";\"ks\";\"4,18\";\"16,72\"\r\n\"ZAVESY\";\"105408\";\"HETTICH 9088251 Sensys krytka pre misku TH\";\"4\";\"ks\";\"0,25\";\"1,00\"\r\n\"ZAVESY\";\"105425\";\"HETTICH 9088250 Sensys krytka ramienka logo Hettich\";\"4\";\"ks\";\"0,19\";\"0,76\"\r\n\"ZAVESY\";\"106412\";\"HETTICH 9071656 Sensys montážna podložka krížová D1,5 excenter hmoždinka\";\"4\";\"ks\";\"0,97\";\"3,88\"\r\n\"SPOJOVACI_MATERIAL\";\"93240\";\"STRONG Bystrica závesné kovanie biela\";\"2\";\"ks\";\"0,37\";\"0,74\"\r\n\"SPOLU (len známe ceny)\";\"\";\"\";\"18\";\"\";\"\";\"23,10\"\r\n",
+    "expand": {
+      "rows": [
+        {
+          "code": "104717",
+          "quantity": 4,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/wing:left",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            },
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/wing:right",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "HETTICH 9071205 Sensys záves naložený 110° TH skrutka SiSy",
+          "category": "ZAVESY",
+          "unit": "ks",
+          "price_eur_vat": 4.18,
+          "manual_note": null,
+          "subtotal_eur_vat": 16.72
+        },
+        {
+          "code": "105408",
+          "quantity": 4,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/wing:left",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            },
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/wing:right",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "HETTICH 9088251 Sensys krytka pre misku TH",
+          "category": "ZAVESY",
+          "unit": "ks",
+          "price_eur_vat": 0.25,
+          "manual_note": null,
+          "subtotal_eur_vat": 1.0
+        },
+        {
+          "code": "105425",
+          "quantity": 4,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/wing:left",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            },
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/wing:right",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "HETTICH 9088250 Sensys krytka ramienka logo Hettich",
+          "category": "ZAVESY",
+          "unit": "ks",
+          "price_eur_vat": 0.19,
+          "manual_note": null,
+          "subtotal_eur_vat": 0.76
+        },
+        {
+          "code": "106412",
+          "quantity": 4,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/wing:left",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            },
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/wing:right",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "HETTICH 9071656 Sensys montážna podložka krížová D1,5 excenter hmoždinka",
+          "category": "ZAVESY",
+          "unit": "ks",
+          "price_eur_vat": 0.97,
+          "manual_note": null,
+          "subtotal_eur_vat": 3.88
+        },
+        {
+          "code": "93240",
+          "quantity": 2,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": null,
+              "generic_type": "wall_hanger",
+              "rule_id": "zavesenie-hornej-skrinky",
+              "set_id": "zavesenie-bystrica",
+              "quantity": 2
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "STRONG Bystrica závesné kovanie biela",
+          "category": "SPOJOVACI_MATERIAL",
+          "unit": "ks",
+          "price_eur_vat": 0.37,
+          "manual_note": null,
+          "subtotal_eur_vat": 0.74
+        }
+      ],
+      "unmapped": [
+
+      ],
+      "notes": [
+
+      ],
+      "summary": {
+        "rows": 5,
+        "quantity": 18,
+        "total_eur_vat": 23.1,
+        "unknown_prices": 0,
+        "unmapped": 0
+      }
+    },
+    "budget_hardware": {
+      "key": "hardware",
+      "name": "Kovanie",
+      "rows": [
+        {
+          "key": "hw:104717",
+          "nazov": "HETTICH 9071205 Sensys záves naložený 110° TH skrutka SiSy",
+          "kod": "104717",
+          "dodavatel": "Demos",
+          "mj": "KS",
+          "mnozstvo": 4,
+          "cena_mj": 4.18,
+          "spolu": 16.72,
+          "spolu_auto": 16.72,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "ZAVESY",
+          "product_link": true
+        },
+        {
+          "key": "hw:105408",
+          "nazov": "HETTICH 9088251 Sensys krytka pre misku TH",
+          "kod": "105408",
+          "dodavatel": "Demos",
+          "mj": "KS",
+          "mnozstvo": 4,
+          "cena_mj": 0.25,
+          "spolu": 1.0,
+          "spolu_auto": 1.0,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "ZAVESY",
+          "product_link": true
+        },
+        {
+          "key": "hw:105425",
+          "nazov": "HETTICH 9088250 Sensys krytka ramienka logo Hettich",
+          "kod": "105425",
+          "dodavatel": "Demos",
+          "mj": "KS",
+          "mnozstvo": 4,
+          "cena_mj": 0.19,
+          "spolu": 0.76,
+          "spolu_auto": 0.76,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "ZAVESY",
+          "product_link": true
+        },
+        {
+          "key": "hw:106412",
+          "nazov": "HETTICH 9071656 Sensys montážna podložka krížová D1,5 excenter hmoždinka",
+          "kod": "106412",
+          "dodavatel": "Demos",
+          "mj": "KS",
+          "mnozstvo": 4,
+          "cena_mj": 0.97,
+          "spolu": 3.88,
+          "spolu_auto": 3.88,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "ZAVESY",
+          "product_link": true
+        },
+        {
+          "key": "hw:93240",
+          "nazov": "STRONG Bystrica závesné kovanie biela",
+          "kod": "93240",
+          "dodavatel": "Demos",
+          "mj": "KS",
+          "mnozstvo": 2,
+          "cena_mj": 0.37,
+          "spolu": 0.74,
+          "spolu_auto": 0.74,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "SPOJOVACI_MATERIAL",
+          "product_link": true
+        }
+      ],
+      "subtotal": 23.1,
+      "unknown_count": 0,
+      "complete": true,
+      "counts_in_total": true
+    }
+  },
+  "auto_w599": {
+    "purchase_csv": "\"NOXUN kovanie — nákupný zoznam\";\"H15\";\"2026-10-01\"\r\n\"kategória\";\"kód\";\"názov\";\"počet\";\"MJ\";\"cena € s DPH\";\"medzisúčet € s DPH\"\r\n\"ZAVESY\";\"104717\";\"HETTICH 9071205 Sensys záves naložený 110° TH skrutka SiSy\";\"2\";\"ks\";\"4,18\";\"8,36\"\r\n\"ZAVESY\";\"105408\";\"HETTICH 9088251 Sensys krytka pre misku TH\";\"2\";\"ks\";\"0,25\";\"0,50\"\r\n\"ZAVESY\";\"105425\";\"HETTICH 9088250 Sensys krytka ramienka logo Hettich\";\"2\";\"ks\";\"0,19\";\"0,38\"\r\n\"ZAVESY\";\"106412\";\"HETTICH 9071656 Sensys montážna podložka krížová D1,5 excenter hmoždinka\";\"2\";\"ks\";\"0,97\";\"1,94\"\r\n\"NOHY\";\"9078\";\"Häfele 637.76.353 noha AXILO H100\";\"4\";\"ks\";\"0,72\";\"2,88\"\r\n\"NOHY\";\"9079\";\"Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna\";\"4\";\"ks\";\"0,50\";\"2,00\"\r\n\"NOHY\";\"950\";\"Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)\";\"1\";\"ks\";\"0,35\";\"0,35\"\r\n\"SPOLU (len známe ceny)\";\"\";\"\";\"17\";\"\";\"\";\"16,41\"\r\n",
+    "expand": {
+      "rows": [
+        {
+          "code": "104717",
+          "quantity": 2,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/wing:single",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "HETTICH 9071205 Sensys záves naložený 110° TH skrutka SiSy",
+          "category": "ZAVESY",
+          "unit": "ks",
+          "price_eur_vat": 4.18,
+          "manual_note": null,
+          "subtotal_eur_vat": 8.36
+        },
+        {
+          "code": "105408",
+          "quantity": 2,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/wing:single",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "HETTICH 9088251 Sensys krytka pre misku TH",
+          "category": "ZAVESY",
+          "unit": "ks",
+          "price_eur_vat": 0.25,
+          "manual_note": null,
+          "subtotal_eur_vat": 0.5
+        },
+        {
+          "code": "105425",
+          "quantity": 2,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/wing:single",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "HETTICH 9088250 Sensys krytka ramienka logo Hettich",
+          "category": "ZAVESY",
+          "unit": "ks",
+          "price_eur_vat": 0.19,
+          "manual_note": null,
+          "subtotal_eur_vat": 0.38
+        },
+        {
+          "code": "106412",
+          "quantity": 2,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/wing:single",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "HETTICH 9071656 Sensys montážna podložka krížová D1,5 excenter hmoždinka",
+          "category": "ZAVESY",
+          "unit": "ks",
+          "price_eur_vat": 0.97,
+          "manual_note": null,
+          "subtotal_eur_vat": 1.94
+        },
+        {
+          "code": "9078",
+          "quantity": 4,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": null,
+              "generic_type": "leg",
+              "rule_id": "nohy-zakladne",
+              "set_id": "nohy-podla-sokla",
+              "quantity": 4
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "Häfele 637.76.353 noha AXILO H100",
+          "category": "NOHY",
+          "unit": "ks",
+          "price_eur_vat": 0.72,
+          "manual_note": null,
+          "subtotal_eur_vat": 2.88
+        },
+        {
+          "code": "9079",
+          "quantity": 4,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": null,
+              "generic_type": "leg",
+              "rule_id": "nohy-zakladne",
+              "set_id": "nohy-podla-sokla",
+              "quantity": 4
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna",
+          "category": "NOHY",
+          "unit": "ks",
+          "price_eur_vat": 0.5,
+          "manual_note": null,
+          "subtotal_eur_vat": 2.0
+        },
+        {
+          "code": "950",
+          "quantity": 1,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": null,
+              "generic_type": "plinth_clip",
+              "rule_id": "prichyt-sokla",
+              "set_id": "prichyt-sokla-axilo",
+              "quantity": 1
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)",
+          "category": "NOHY",
+          "unit": "ks",
+          "price_eur_vat": 0.35,
+          "manual_note": null,
+          "subtotal_eur_vat": 0.35
+        }
+      ],
+      "unmapped": [
+
+      ],
+      "notes": [
+
+      ],
+      "summary": {
+        "rows": 7,
+        "quantity": 17,
+        "total_eur_vat": 16.41,
+        "unknown_prices": 0,
+        "unmapped": 0
+      }
+    },
+    "budget_hardware": {
+      "key": "hardware",
+      "name": "Kovanie",
+      "rows": [
+        {
+          "key": "hw:104717",
+          "nazov": "HETTICH 9071205 Sensys záves naložený 110° TH skrutka SiSy",
+          "kod": "104717",
+          "dodavatel": "Demos",
+          "mj": "KS",
+          "mnozstvo": 2,
+          "cena_mj": 4.18,
+          "spolu": 8.36,
+          "spolu_auto": 8.36,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "ZAVESY",
+          "product_link": true
+        },
+        {
+          "key": "hw:105408",
+          "nazov": "HETTICH 9088251 Sensys krytka pre misku TH",
+          "kod": "105408",
+          "dodavatel": "Demos",
+          "mj": "KS",
+          "mnozstvo": 2,
+          "cena_mj": 0.25,
+          "spolu": 0.5,
+          "spolu_auto": 0.5,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "ZAVESY",
+          "product_link": true
+        },
+        {
+          "key": "hw:105425",
+          "nazov": "HETTICH 9088250 Sensys krytka ramienka logo Hettich",
+          "kod": "105425",
+          "dodavatel": "Demos",
+          "mj": "KS",
+          "mnozstvo": 2,
+          "cena_mj": 0.19,
+          "spolu": 0.38,
+          "spolu_auto": 0.38,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "ZAVESY",
+          "product_link": true
+        },
+        {
+          "key": "hw:106412",
+          "nazov": "HETTICH 9071656 Sensys montážna podložka krížová D1,5 excenter hmoždinka",
+          "kod": "106412",
+          "dodavatel": "Demos",
+          "mj": "KS",
+          "mnozstvo": 2,
+          "cena_mj": 0.97,
+          "spolu": 1.94,
+          "spolu_auto": 1.94,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "ZAVESY",
+          "product_link": true
+        },
+        {
+          "key": "hw:9078",
+          "nazov": "Häfele 637.76.353 noha AXILO H100",
+          "kod": "9078",
+          "dodavatel": "Quatro LM",
+          "mj": "KS",
+          "mnozstvo": 4,
+          "cena_mj": 0.72,
+          "spolu": 2.88,
+          "spolu_auto": 2.88,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "NOHY",
+          "product_link": true,
+          "price_check": {
+            "kind": "hardware",
+            "id": "9078",
+            "label": "Häfele 637.76.353 noha AXILO H100",
+            "manual_check": true,
+            "state": "manual",
+            "checked_at": null,
+            "age_days": null,
+            "price_check_method": null,
+            "demos_url": null,
+            "product_link": true
+          }
+        },
+        {
+          "key": "hw:9079",
+          "nazov": "Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna",
+          "kod": "9079",
+          "dodavatel": "Quatro LM",
+          "mj": "KS",
+          "mnozstvo": 4,
+          "cena_mj": 0.5,
+          "spolu": 2.0,
+          "spolu_auto": 2.0,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "NOHY",
+          "product_link": true,
+          "price_check": {
+            "kind": "hardware",
+            "id": "9079",
+            "label": "Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna",
+            "manual_check": true,
+            "state": "manual",
+            "checked_at": null,
+            "age_days": null,
+            "price_check_method": null,
+            "demos_url": null,
+            "product_link": true
+          }
+        },
+        {
+          "key": "hw:950",
+          "nazov": "Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)",
+          "kod": "950",
+          "dodavatel": "Quatro LM",
+          "mj": "KS",
+          "mnozstvo": 1,
+          "cena_mj": 0.35,
+          "spolu": 0.35,
+          "spolu_auto": 0.35,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "NOHY",
+          "product_link": true,
+          "price_check": {
+            "kind": "hardware",
+            "id": "950",
+            "label": "Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)",
+            "manual_check": true,
+            "state": "manual",
+            "checked_at": null,
+            "age_days": null,
+            "price_check_method": null,
+            "demos_url": null,
+            "product_link": true
+          }
+        }
+      ],
+      "subtotal": 16.41,
+      "unknown_count": 0,
+      "complete": true,
+      "counts_in_total": true
+    }
+  },
+  "mix_fixed_auto": {
+    "purchase_csv": "\"NOXUN kovanie — nákupný zoznam\";\"H15\";\"2026-10-01\"\r\n\"kategória\";\"kód\";\"názov\";\"počet\";\"MJ\";\"cena € s DPH\";\"medzisúčet € s DPH\"\r\n\"ZAVESY\";\"104717\";\"HETTICH 9071205 Sensys záves naložený 110° TH skrutka SiSy\";\"4\";\"ks\";\"4,18\";\"16,72\"\r\n\"ZAVESY\";\"105408\";\"HETTICH 9088251 Sensys krytka pre misku TH\";\"4\";\"ks\";\"0,25\";\"1,00\"\r\n\"ZAVESY\";\"105425\";\"HETTICH 9088250 Sensys krytka ramienka logo Hettich\";\"4\";\"ks\";\"0,19\";\"0,76\"\r\n\"ZAVESY\";\"106412\";\"HETTICH 9071656 Sensys montážna podložka krížová D1,5 excenter hmoždinka\";\"4\";\"ks\";\"0,97\";\"3,88\"\r\n\"VYSUVY\";\"357696\";\"K-HETTICH Atira zásuvka 70, 470mm/30kg, biela, SiSy\";\"2\";\"set\";\"42,89\";\"85,78\"\r\n\"NOHY\";\"9078\";\"Häfele 637.76.353 noha AXILO H100\";\"4\";\"ks\";\"0,72\";\"2,88\"\r\n\"NOHY\";\"9079\";\"Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna\";\"4\";\"ks\";\"0,50\";\"2,00\"\r\n\"NOHY\";\"950\";\"Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)\";\"1\";\"ks\";\"0,35\";\"0,35\"\r\n\"SPOLU (len známe ceny)\";\"\";\"\";\"27\";\"\";\"\";\"113,37\"\r\n",
+    "expand": {
+      "rows": [
+        {
+          "code": "104717",
+          "quantity": 4,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F3/wing:left",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            },
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F3/wing:right",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "HETTICH 9071205 Sensys záves naložený 110° TH skrutka SiSy",
+          "category": "ZAVESY",
+          "unit": "ks",
+          "price_eur_vat": 4.18,
+          "manual_note": null,
+          "subtotal_eur_vat": 16.72
+        },
+        {
+          "code": "105408",
+          "quantity": 4,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F3/wing:left",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            },
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F3/wing:right",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "HETTICH 9088251 Sensys krytka pre misku TH",
+          "category": "ZAVESY",
+          "unit": "ks",
+          "price_eur_vat": 0.25,
+          "manual_note": null,
+          "subtotal_eur_vat": 1.0
+        },
+        {
+          "code": "105425",
+          "quantity": 4,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F3/wing:left",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            },
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F3/wing:right",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "HETTICH 9088250 Sensys krytka ramienka logo Hettich",
+          "category": "ZAVESY",
+          "unit": "ks",
+          "price_eur_vat": 0.19,
+          "manual_note": null,
+          "subtotal_eur_vat": 0.76
+        },
+        {
+          "code": "106412",
+          "quantity": 4,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F3/wing:left",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            },
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F3/wing:right",
+              "generic_type": "hinge",
+              "rule_id": "zavesy-podla-vysky",
+              "set_id": "zaves-klasik",
+              "quantity": 2
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "HETTICH 9071656 Sensys montážna podložka krížová D1,5 excenter hmoždinka",
+          "category": "ZAVESY",
+          "unit": "ks",
+          "price_eur_vat": 0.97,
+          "manual_note": null,
+          "subtotal_eur_vat": 3.88
+        },
+        {
+          "code": "357696",
+          "quantity": 2,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/panel",
+              "generic_type": "slide",
+              "rule_id": "vysuvy-nl-podla-hlbky",
+              "set_id": "vysuv-atira-biela-h70",
+              "quantity": 1
+            },
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F2/panel",
+              "generic_type": "slide",
+              "rule_id": "vysuvy-nl-podla-hlbky",
+              "set_id": "vysuv-atira-biela-h70",
+              "quantity": 1
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "K-HETTICH Atira zásuvka 70, 470mm/30kg, biela, SiSy",
+          "category": "VYSUVY",
+          "unit": "set",
+          "price_eur_vat": 42.89,
+          "manual_note": null,
+          "subtotal_eur_vat": 85.78
+        },
+        {
+          "code": "9078",
+          "quantity": 4,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": null,
+              "generic_type": "leg",
+              "rule_id": "nohy-zakladne",
+              "set_id": "nohy-podla-sokla",
+              "quantity": 4
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "Häfele 637.76.353 noha AXILO H100",
+          "category": "NOHY",
+          "unit": "ks",
+          "price_eur_vat": 0.72,
+          "manual_note": null,
+          "subtotal_eur_vat": 2.88
+        },
+        {
+          "code": "9079",
+          "quantity": 4,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": null,
+              "generic_type": "leg",
+              "rule_id": "nohy-zakladne",
+              "set_id": "nohy-podla-sokla",
+              "quantity": 4
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna",
+          "category": "NOHY",
+          "unit": "ks",
+          "price_eur_vat": 0.5,
+          "manual_note": null,
+          "subtotal_eur_vat": 2.0
+        },
+        {
+          "code": "950",
+          "quantity": 1,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": null,
+              "generic_type": "plinth_clip",
+              "rule_id": "prichyt-sokla",
+              "set_id": "prichyt-sokla-axilo",
+              "quantity": 1
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)",
+          "category": "NOHY",
+          "unit": "ks",
+          "price_eur_vat": 0.35,
+          "manual_note": null,
+          "subtotal_eur_vat": 0.35
+        }
+      ],
+      "unmapped": [
+
+      ],
+      "notes": [
+
+      ],
+      "summary": {
+        "rows": 8,
+        "quantity": 27,
+        "total_eur_vat": 113.37,
+        "unknown_prices": 0,
+        "unmapped": 0
+      }
+    },
+    "budget_hardware": {
+      "key": "hardware",
+      "name": "Kovanie",
+      "rows": [
+        {
+          "key": "hw:104717",
+          "nazov": "HETTICH 9071205 Sensys záves naložený 110° TH skrutka SiSy",
+          "kod": "104717",
+          "dodavatel": "Demos",
+          "mj": "KS",
+          "mnozstvo": 4,
+          "cena_mj": 4.18,
+          "spolu": 16.72,
+          "spolu_auto": 16.72,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "ZAVESY",
+          "product_link": true
+        },
+        {
+          "key": "hw:105408",
+          "nazov": "HETTICH 9088251 Sensys krytka pre misku TH",
+          "kod": "105408",
+          "dodavatel": "Demos",
+          "mj": "KS",
+          "mnozstvo": 4,
+          "cena_mj": 0.25,
+          "spolu": 1.0,
+          "spolu_auto": 1.0,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "ZAVESY",
+          "product_link": true
+        },
+        {
+          "key": "hw:105425",
+          "nazov": "HETTICH 9088250 Sensys krytka ramienka logo Hettich",
+          "kod": "105425",
+          "dodavatel": "Demos",
+          "mj": "KS",
+          "mnozstvo": 4,
+          "cena_mj": 0.19,
+          "spolu": 0.76,
+          "spolu_auto": 0.76,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "ZAVESY",
+          "product_link": true
+        },
+        {
+          "key": "hw:106412",
+          "nazov": "HETTICH 9071656 Sensys montážna podložka krížová D1,5 excenter hmoždinka",
+          "kod": "106412",
+          "dodavatel": "Demos",
+          "mj": "KS",
+          "mnozstvo": 4,
+          "cena_mj": 0.97,
+          "spolu": 3.88,
+          "spolu_auto": 3.88,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "ZAVESY",
+          "product_link": true
+        },
+        {
+          "key": "hw:357696",
+          "nazov": "K-HETTICH Atira zásuvka 70, 470mm/30kg, biela, SiSy",
+          "kod": "357696",
+          "dodavatel": "Demos",
+          "mj": "SET",
+          "mnozstvo": 2,
+          "cena_mj": 42.89,
+          "spolu": 85.78,
+          "spolu_auto": 85.78,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "VYSUVY",
+          "product_link": true
+        },
+        {
+          "key": "hw:9078",
+          "nazov": "Häfele 637.76.353 noha AXILO H100",
+          "kod": "9078",
+          "dodavatel": "Quatro LM",
+          "mj": "KS",
+          "mnozstvo": 4,
+          "cena_mj": 0.72,
+          "spolu": 2.88,
+          "spolu_auto": 2.88,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "NOHY",
+          "product_link": true,
+          "price_check": {
+            "kind": "hardware",
+            "id": "9078",
+            "label": "Häfele 637.76.353 noha AXILO H100",
+            "manual_check": true,
+            "state": "manual",
+            "checked_at": null,
+            "age_days": null,
+            "price_check_method": null,
+            "demos_url": null,
+            "product_link": true
+          }
+        },
+        {
+          "key": "hw:9079",
+          "nazov": "Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna",
+          "kod": "9079",
+          "dodavatel": "Quatro LM",
+          "mj": "KS",
+          "mnozstvo": 4,
+          "cena_mj": 0.5,
+          "spolu": 2.0,
+          "spolu_auto": 2.0,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "NOHY",
+          "product_link": true,
+          "price_check": {
+            "kind": "hardware",
+            "id": "9079",
+            "label": "Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna",
+            "manual_check": true,
+            "state": "manual",
+            "checked_at": null,
+            "age_days": null,
+            "price_check_method": null,
+            "demos_url": null,
+            "product_link": true
+          }
+        },
+        {
+          "key": "hw:950",
+          "nazov": "Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)",
+          "kod": "950",
+          "dodavatel": "Quatro LM",
+          "mj": "KS",
+          "mnozstvo": 1,
+          "cena_mj": 0.35,
+          "spolu": 0.35,
+          "spolu_auto": 0.35,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "NOHY",
+          "product_link": true,
+          "price_check": {
+            "kind": "hardware",
+            "id": "950",
+            "label": "Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)",
+            "manual_check": true,
+            "state": "manual",
+            "checked_at": null,
+            "age_days": null,
+            "price_check_method": null,
+            "demos_url": null,
+            "product_link": true
+          }
+        }
+      ],
+      "subtotal": 113.37,
+      "unknown_count": 0,
+      "complete": true,
+      "counts_in_total": true
+    }
+  },
+  "zasuvka_atira": {
+    "purchase_csv": "\"NOXUN kovanie — nákupný zoznam\";\"H15\";\"2026-10-01\"\r\n\"kategória\";\"kód\";\"názov\";\"počet\";\"MJ\";\"cena € s DPH\";\"medzisúčet € s DPH\"\r\n\"VYSUVY\";\"357696\";\"K-HETTICH Atira zásuvka 70, 470mm/30kg, biela, SiSy\";\"1\";\"set\";\"42,89\";\"42,89\"\r\n\"NOHY\";\"9078\";\"Häfele 637.76.353 noha AXILO H100\";\"4\";\"ks\";\"0,72\";\"2,88\"\r\n\"NOHY\";\"9079\";\"Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna\";\"4\";\"ks\";\"0,50\";\"2,00\"\r\n\"NOHY\";\"950\";\"Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)\";\"1\";\"ks\";\"0,35\";\"0,35\"\r\n\"SPOLU (len známe ceny)\";\"\";\"\";\"10\";\"\";\"\";\"48,12\"\r\n",
+    "expand": {
+      "rows": [
+        {
+          "code": "357696",
+          "quantity": 1,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/panel",
+              "generic_type": "slide",
+              "rule_id": "recipe:atira_sisy_v1",
+              "set_id": "atira-biela-h70-sisy",
+              "quantity": 1
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "K-HETTICH Atira zásuvka 70, 470mm/30kg, biela, SiSy",
+          "category": "VYSUVY",
+          "unit": "set",
+          "price_eur_vat": 42.89,
+          "manual_note": null,
+          "subtotal_eur_vat": 42.89
+        },
+        {
+          "code": "9078",
+          "quantity": 4,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": null,
+              "generic_type": "leg",
+              "rule_id": "nohy-zakladne",
+              "set_id": "nohy-podla-sokla",
+              "quantity": 4
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "Häfele 637.76.353 noha AXILO H100",
+          "category": "NOHY",
+          "unit": "ks",
+          "price_eur_vat": 0.72,
+          "manual_note": null,
+          "subtotal_eur_vat": 2.88
+        },
+        {
+          "code": "9079",
+          "quantity": 4,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": null,
+              "generic_type": "leg",
+              "rule_id": "nohy-zakladne",
+              "set_id": "nohy-podla-sokla",
+              "quantity": 4
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna",
+          "category": "NOHY",
+          "unit": "ks",
+          "price_eur_vat": 0.5,
+          "manual_note": null,
+          "subtotal_eur_vat": 2.0
+        },
+        {
+          "code": "950",
+          "quantity": 1,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": null,
+              "generic_type": "plinth_clip",
+              "rule_id": "prichyt-sokla",
+              "set_id": "prichyt-sokla-axilo",
+              "quantity": 1
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)",
+          "category": "NOHY",
+          "unit": "ks",
+          "price_eur_vat": 0.35,
+          "manual_note": null,
+          "subtotal_eur_vat": 0.35
+        }
+      ],
+      "unmapped": [
+
+      ],
+      "notes": [
+
+      ],
+      "summary": {
+        "rows": 4,
+        "quantity": 10,
+        "total_eur_vat": 48.12,
+        "unknown_prices": 0,
+        "unmapped": 0
+      }
+    },
+    "budget_hardware": {
+      "key": "hardware",
+      "name": "Kovanie",
+      "rows": [
+        {
+          "key": "hw:357696",
+          "nazov": "K-HETTICH Atira zásuvka 70, 470mm/30kg, biela, SiSy",
+          "kod": "357696",
+          "dodavatel": "Demos",
+          "mj": "SET",
+          "mnozstvo": 1,
+          "cena_mj": 42.89,
+          "spolu": 42.89,
+          "spolu_auto": 42.89,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "VYSUVY",
+          "product_link": true
+        },
+        {
+          "key": "hw:9078",
+          "nazov": "Häfele 637.76.353 noha AXILO H100",
+          "kod": "9078",
+          "dodavatel": "Quatro LM",
+          "mj": "KS",
+          "mnozstvo": 4,
+          "cena_mj": 0.72,
+          "spolu": 2.88,
+          "spolu_auto": 2.88,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "NOHY",
+          "product_link": true,
+          "price_check": {
+            "kind": "hardware",
+            "id": "9078",
+            "label": "Häfele 637.76.353 noha AXILO H100",
+            "manual_check": true,
+            "state": "manual",
+            "checked_at": null,
+            "age_days": null,
+            "price_check_method": null,
+            "demos_url": null,
+            "product_link": true
+          }
+        },
+        {
+          "key": "hw:9079",
+          "nazov": "Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna",
+          "kod": "9079",
+          "dodavatel": "Quatro LM",
+          "mj": "KS",
+          "mnozstvo": 4,
+          "cena_mj": 0.5,
+          "spolu": 2.0,
+          "spolu_auto": 2.0,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "NOHY",
+          "product_link": true,
+          "price_check": {
+            "kind": "hardware",
+            "id": "9079",
+            "label": "Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna",
+            "manual_check": true,
+            "state": "manual",
+            "checked_at": null,
+            "age_days": null,
+            "price_check_method": null,
+            "demos_url": null,
+            "product_link": true
+          }
+        },
+        {
+          "key": "hw:950",
+          "nazov": "Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)",
+          "kod": "950",
+          "dodavatel": "Quatro LM",
+          "mj": "KS",
+          "mnozstvo": 1,
+          "cena_mj": 0.35,
+          "spolu": 0.35,
+          "spolu_auto": 0.35,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "NOHY",
+          "product_link": true,
+          "price_check": {
+            "kind": "hardware",
+            "id": "950",
+            "label": "Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)",
+            "manual_check": true,
+            "state": "manual",
+            "checked_at": null,
+            "age_days": null,
+            "price_check_method": null,
+            "demos_url": null,
+            "product_link": true
+          }
+        }
+      ],
+      "subtotal": 48.12,
+      "unknown_count": 0,
+      "complete": true,
+      "counts_in_total": true
+    }
+  },
+  "vyklop_hk": {
+    "purchase_csv": "\"NOXUN kovanie — nákupný zoznam\";\"H15\";\"2026-10-01\"\r\n\"kategória\";\"kód\";\"názov\";\"počet\";\"MJ\";\"cena € s DPH\";\"medzisúčet € s DPH\"\r\n\"VYKLOPY\";\"13781\";\"BLUM 20S4200 Aventos HK/HS/HL Top čelný príchyt\";\"1\";\"par\";\"4,40\";\"4,40\"\r\n\"VYKLOPY\";\"347810\";\"BLUM 22K2300 Aventos HK Top výklop slabý\";\"1\";\"set\";\"71,45\";\"71,45\"\r\n\"VYKLOPY\";\"347834\";\"BLUM 22K8000 Aventos HK Top krytky bez S-D, biela\";\"1\";\"set\";\"11,26\";\"11,26\"\r\n\"SPOLU (len známe ceny)\";\"\";\"\";\"3\";\"\";\"\";\"87,11\"\r\n",
+    "expand": {
+      "rows": [
+        {
+          "code": "13781",
+          "quantity": 1,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/flap",
+              "generic_type": "lift",
+              "rule_id": "vyklopy-aventos",
+              "set_id": "vyklop-hk-klasik",
+              "quantity": 1
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "BLUM 20S4200 Aventos HK/HS/HL Top čelný príchyt",
+          "category": "VYKLOPY",
+          "unit": "par",
+          "price_eur_vat": 4.4,
+          "manual_note": null,
+          "subtotal_eur_vat": 4.4
+        },
+        {
+          "code": "347810",
+          "quantity": 1,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/flap",
+              "generic_type": "lift",
+              "rule_id": "vyklopy-aventos",
+              "set_id": "vyklop-hk-klasik",
+              "quantity": 1
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "BLUM 22K2300 Aventos HK Top výklop slabý",
+          "category": "VYKLOPY",
+          "unit": "set",
+          "price_eur_vat": 71.45,
+          "manual_note": null,
+          "subtotal_eur_vat": 71.45
+        },
+        {
+          "code": "347834",
+          "quantity": 1,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/flap",
+              "generic_type": "lift",
+              "rule_id": "vyklopy-aventos",
+              "set_id": "vyklop-hk-klasik",
+              "quantity": 1
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "BLUM 22K8000 Aventos HK Top krytky bez S-D, biela",
+          "category": "VYKLOPY",
+          "unit": "set",
+          "price_eur_vat": 11.26,
+          "manual_note": null,
+          "subtotal_eur_vat": 11.26
+        }
+      ],
+      "unmapped": [
+
+      ],
+      "notes": [
+
+      ],
+      "summary": {
+        "rows": 3,
+        "quantity": 3,
+        "total_eur_vat": 87.11,
+        "unknown_prices": 0,
+        "unmapped": 0
+      }
+    },
+    "budget_hardware": {
+      "key": "hardware",
+      "name": "Kovanie",
+      "rows": [
+        {
+          "key": "hw:13781",
+          "nazov": "BLUM 20S4200 Aventos HK/HS/HL Top čelný príchyt",
+          "kod": "13781",
+          "dodavatel": "Demos",
+          "mj": "PÁR",
+          "mnozstvo": 1,
+          "cena_mj": 4.4,
+          "spolu": 4.4,
+          "spolu_auto": 4.4,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "VYKLOPY",
+          "product_link": true
+        },
+        {
+          "key": "hw:347810",
+          "nazov": "BLUM 22K2300 Aventos HK Top výklop slabý",
+          "kod": "347810",
+          "dodavatel": "Demos",
+          "mj": "SET",
+          "mnozstvo": 1,
+          "cena_mj": 71.45,
+          "spolu": 71.45,
+          "spolu_auto": 71.45,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "VYKLOPY",
+          "product_link": true
+        },
+        {
+          "key": "hw:347834",
+          "nazov": "BLUM 22K8000 Aventos HK Top krytky bez S-D, biela",
+          "kod": "347834",
+          "dodavatel": "Demos",
+          "mj": "SET",
+          "mnozstvo": 1,
+          "cena_mj": 11.26,
+          "spolu": 11.26,
+          "spolu_auto": 11.26,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "VYKLOPY",
+          "product_link": true
+        }
+      ],
+      "subtotal": 87.11,
+      "unknown_count": 0,
+      "complete": true,
+      "counts_in_total": true
+    }
+  },
+  "vyklop_hl": {
+    "purchase_csv": "\"NOXUN kovanie — nákupný zoznam\";\"H15\";\"2026-10-01\"\r\n\"kategória\";\"kód\";\"názov\";\"počet\";\"MJ\";\"cena € s DPH\";\"medzisúčet € s DPH\"\r\n\"VYKLOPY\";\"13781\";\"BLUM 20S4200 Aventos HK/HS/HL Top čelný príchyt\";\"1\";\"par\";\"4,40\";\"4,40\"\r\n\"VYKLOPY\";\"507343\";\"BLUM 22.8000 Aventos HF/HL/HS Top krytky bez S-D, biela\";\"1\";\"set\";\"12,73\";\"12,73\"\r\n\"VYKLOPY\";\"507352\";\"BLUM 22L2500 Aventos HL Top výklop silný, skrutky\";\"1\";\"set\";\"86,81\";\"86,81\"\r\n\"VYKLOPY\";\"507357\";\"BLUM 22L3800 Aventos HL Top ramená - 390-540mm\";\"1\";\"set\";\"59,84\";\"59,84\"\r\n\"VYKLOPY\";\"507365\";\"BLUM 22Q1076U Aventos HL Top stabilizačná tyč (1076 mm)\";\"1\";\"ks\";\"15,59\";\"15,59\"\r\n\"SPOLU (len známe ceny)\";\"\";\"\";\"5\";\"\";\"\";\"179,37\"\r\n",
+    "expand": {
+      "rows": [
+        {
+          "code": "13781",
+          "quantity": 1,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/flap",
+              "generic_type": "lift",
+              "rule_id": "vyklopy-aventos",
+              "set_id": "vyklop-hl-klasik",
+              "quantity": 1
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "BLUM 20S4200 Aventos HK/HS/HL Top čelný príchyt",
+          "category": "VYKLOPY",
+          "unit": "par",
+          "price_eur_vat": 4.4,
+          "manual_note": null,
+          "subtotal_eur_vat": 4.4
+        },
+        {
+          "code": "507343",
+          "quantity": 1,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/flap",
+              "generic_type": "lift",
+              "rule_id": "vyklopy-aventos",
+              "set_id": "vyklop-hl-klasik",
+              "quantity": 1
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "BLUM 22.8000 Aventos HF/HL/HS Top krytky bez S-D, biela",
+          "category": "VYKLOPY",
+          "unit": "set",
+          "price_eur_vat": 12.73,
+          "manual_note": null,
+          "subtotal_eur_vat": 12.73
+        },
+        {
+          "code": "507352",
+          "quantity": 1,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/flap",
+              "generic_type": "lift",
+              "rule_id": "vyklopy-aventos",
+              "set_id": "vyklop-hl-klasik",
+              "quantity": 1
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "BLUM 22L2500 Aventos HL Top výklop silný, skrutky",
+          "category": "VYKLOPY",
+          "unit": "set",
+          "price_eur_vat": 86.81,
+          "manual_note": null,
+          "subtotal_eur_vat": 86.81
+        },
+        {
+          "code": "507357",
+          "quantity": 1,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/flap",
+              "generic_type": "lift",
+              "rule_id": "vyklopy-aventos",
+              "set_id": "vyklop-hl-klasik",
+              "quantity": 1
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "BLUM 22L3800 Aventos HL Top ramená - 390-540mm",
+          "category": "VYKLOPY",
+          "unit": "set",
+          "price_eur_vat": 59.84,
+          "manual_note": null,
+          "subtotal_eur_vat": 59.84
+        },
+        {
+          "code": "507365",
+          "quantity": 1,
+          "sources": [
+            {
+              "cabinet_id": "",
+              "owner_part_key": "front:F1/flap",
+              "generic_type": "lift",
+              "rule_id": "vyklopy-aventos",
+              "set_id": "vyklop-hl-klasik",
+              "quantity": 1
+            }
+          ],
+          "manual_quantity": 0,
+          "missing": false,
+          "name_sk": "BLUM 22Q1076U Aventos HL Top stabilizačná tyč (1076 mm)",
+          "category": "VYKLOPY",
+          "unit": "ks",
+          "price_eur_vat": 15.59,
+          "manual_note": null,
+          "subtotal_eur_vat": 15.59
+        }
+      ],
+      "unmapped": [
+
+      ],
+      "notes": [
+
+      ],
+      "summary": {
+        "rows": 5,
+        "quantity": 5,
+        "total_eur_vat": 179.37,
+        "unknown_prices": 0,
+        "unmapped": 0
+      }
+    },
+    "budget_hardware": {
+      "key": "hardware",
+      "name": "Kovanie",
+      "rows": [
+        {
+          "key": "hw:13781",
+          "nazov": "BLUM 20S4200 Aventos HK/HS/HL Top čelný príchyt",
+          "kod": "13781",
+          "dodavatel": "Demos",
+          "mj": "PÁR",
+          "mnozstvo": 1,
+          "cena_mj": 4.4,
+          "spolu": 4.4,
+          "spolu_auto": 4.4,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "VYKLOPY",
+          "product_link": true
+        },
+        {
+          "key": "hw:507343",
+          "nazov": "BLUM 22.8000 Aventos HF/HL/HS Top krytky bez S-D, biela",
+          "kod": "507343",
+          "dodavatel": "Demos",
+          "mj": "SET",
+          "mnozstvo": 1,
+          "cena_mj": 12.73,
+          "spolu": 12.73,
+          "spolu_auto": 12.73,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "VYKLOPY",
+          "product_link": true
+        },
+        {
+          "key": "hw:507352",
+          "nazov": "BLUM 22L2500 Aventos HL Top výklop silný, skrutky",
+          "kod": "507352",
+          "dodavatel": "Demos",
+          "mj": "SET",
+          "mnozstvo": 1,
+          "cena_mj": 86.81,
+          "spolu": 86.81,
+          "spolu_auto": 86.81,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "VYKLOPY",
+          "product_link": true
+        },
+        {
+          "key": "hw:507357",
+          "nazov": "BLUM 22L3800 Aventos HL Top ramená - 390-540mm",
+          "kod": "507357",
+          "dodavatel": "Demos",
+          "mj": "SET",
+          "mnozstvo": 1,
+          "cena_mj": 59.84,
+          "spolu": 59.84,
+          "spolu_auto": 59.84,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "VYKLOPY",
+          "product_link": true
+        },
+        {
+          "key": "hw:507365",
+          "nazov": "BLUM 22Q1076U Aventos HL Top stabilizačná tyč (1076 mm)",
+          "kod": "507365",
+          "dodavatel": "Demos",
+          "mj": "KS",
+          "mnozstvo": 1,
+          "cena_mj": 15.59,
+          "spolu": 15.59,
+          "spolu_auto": 15.59,
+          "poznamka": null,
+          "zdroj": "auto",
+          "cp_skupina": "zostava",
+          "price_missing": false,
+          "category": "VYKLOPY",
+          "product_link": true
+        }
+      ],
+      "subtotal": 179.37,
+      "unknown_count": 0,
+      "complete": true,
+      "counts_in_total": true
+    }
+  }
+}

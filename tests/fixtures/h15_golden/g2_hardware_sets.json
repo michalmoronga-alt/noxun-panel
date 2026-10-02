@@ -1,0 +1,985 @@
+{
+  "std": 6,
+  "seed_version": 8,
+  "sets": [
+    {
+      "set_id": "zaves-klasik",
+      "name": "Záves KLASIK (Sensys 110° SiSy)",
+      "generic_type": "hinge",
+      "use_type": "door",
+      "opening_mode": "classic",
+      "manufacturer": "Hettich",
+      "series": "Sensys",
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "záves",
+          "code": "104717"
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "platnička",
+          "code": "106412"
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "krytka misky",
+          "code": "105408"
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "krytka ramienka",
+          "code": "105425"
+        }
+      ]
+    },
+    {
+      "set_id": "zaves-p2o",
+      "name": "Záves P2O + TipOn (bez tlmenia)",
+      "generic_type": "hinge",
+      "use_type": "door",
+      "opening_mode": "tipon",
+      "manufacturer": "Hettich",
+      "series": "Sensys",
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "záves P2O",
+          "code": "245723"
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "platnička",
+          "code": "106412"
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "krytka misky",
+          "code": "105408"
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "krytka ramienka",
+          "code": "105425"
+        },
+        {
+          "per": "owner",
+          "qty": 1,
+          "label": "TipOn na dvierka",
+          "code": "250831"
+        }
+      ]
+    },
+    {
+      "set_id": "nohy-podla-sokla",
+      "name": "Nohy podľa výšky sokla",
+      "generic_type": "leg",
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "noha",
+          "param_bands": {
+            "param": "height",
+            "bands": [
+              {
+                "min": 17.0,
+                "max": 20.0,
+                "code": "272212"
+              },
+              {
+                "min": 55.0,
+                "max": 90.0,
+                "code": "9069"
+              },
+              {
+                "min": 91.0,
+                "max": 115.0,
+                "code": "9078"
+              },
+              {
+                "min": 116.0,
+                "max": 140.0,
+                "code": "9077"
+              },
+              {
+                "min": 141.0,
+                "max": 170.0,
+                "code": "9076"
+              },
+              {
+                "min": 171.0,
+                "max": 190.0,
+                "code": "9027"
+              },
+              {
+                "min": 191.0,
+                "max": 220.0,
+                "code": "9075"
+              }
+            ]
+          }
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "platnička",
+          "param_bands": {
+            "param": "height",
+            "bands": [
+              {
+                "min": 17.0,
+                "max": 20.0,
+                "code": "none"
+              },
+              {
+                "min": 55.0,
+                "max": 220.0,
+                "code": "9079"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "set_id": "prichyt-sokla-axilo",
+      "name": "Príchyt sokla AXILO",
+      "generic_type": "plinth_clip",
+      "use_type": "other",
+      "opening_mode": "other",
+      "manufacturer": "Häfele",
+      "series": "AXILO",
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "príchyt sokla",
+          "code": "950"
+        }
+      ]
+    },
+    {
+      "set_id": "nohy-klzak-17",
+      "name": "Klzák s rektifikáciou 17 mm",
+      "generic_type": "leg",
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "code": "82744"
+        }
+      ]
+    },
+    {
+      "set_id": "nohy-axilo-150",
+      "name": "Noha AXILO 150 mm",
+      "generic_type": "leg",
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "code": "367823"
+        }
+      ]
+    },
+    {
+      "set_id": "vysuv-atira-biela-h70",
+      "name": "Výsuv (staré zákazky)",
+      "generic_type": "slide",
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "K-sada",
+          "code_by_nl": {
+            "420": "357695",
+            "470": "357696"
+          }
+        }
+      ]
+    },
+    {
+      "set_id": "atira-biela-h70-sisy",
+      "name": "Atira biela H70 — klasické",
+      "generic_type": "slide",
+      "use_type": "drawer",
+      "opening_mode": "classic",
+      "drawer_construction": "metal",
+      "manufacturer": "Hettich",
+      "series": "InnoTech Atira",
+      "height_variant": 70,
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "K-sada",
+          "code_by_nl": {
+            "350": "357694",
+            "420": "357695",
+            "470": "357696",
+            "520": "357697"
+          }
+        }
+      ]
+    },
+    {
+      "set_id": "atira-biela-h144-sisy",
+      "name": "Atira biela H144 — klasické",
+      "generic_type": "slide",
+      "use_type": "drawer",
+      "opening_mode": "classic",
+      "drawer_construction": "metal",
+      "manufacturer": "Hettich",
+      "series": "InnoTech Atira",
+      "height_variant": 144,
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "K-sada",
+          "code_by_nl": {
+            "350": "357734",
+            "420": "357735",
+            "470": "357736"
+          }
+        }
+      ]
+    },
+    {
+      "set_id": "atira-biela-h176-sisy",
+      "name": "Atira biela H176 — klasické",
+      "generic_type": "slide",
+      "use_type": "drawer",
+      "opening_mode": "classic",
+      "drawer_construction": "metal",
+      "manufacturer": "Hettich",
+      "series": "InnoTech Atira",
+      "height_variant": 176,
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "K-sada",
+          "code_by_nl": {
+            "350": "357773",
+            "420": "357774",
+            "470": "357775",
+            "520": "357777",
+            "620": "357783"
+          }
+        }
+      ]
+    },
+    {
+      "set_id": "atira-biela-h70-p2o",
+      "name": "Atira biela H70 — Tip-On",
+      "generic_type": "slide",
+      "use_type": "drawer",
+      "opening_mode": "tipon",
+      "drawer_construction": "metal",
+      "manufacturer": "Hettich",
+      "series": "InnoTech Atira",
+      "height_variant": 70,
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "K-sada",
+          "code_by_nl": {
+            "350": "357722",
+            "420": "357723",
+            "470": "357724",
+            "520": "357725",
+            "620": "357716"
+          }
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "PTOs mechanizmus",
+          "code_by_nl": {
+            "350": "352908",
+            "420": "352908",
+            "470": "352908",
+            "520": "352908",
+            "620": "none"
+          }
+        }
+      ]
+    },
+    {
+      "set_id": "atira-biela-h144-p2o",
+      "name": "Atira biela H144 — Tip-On",
+      "generic_type": "slide",
+      "use_type": "drawer",
+      "opening_mode": "tipon",
+      "drawer_construction": "metal",
+      "manufacturer": "Hettich",
+      "series": "InnoTech Atira",
+      "height_variant": 144,
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "K-sada",
+          "code_by_nl": {
+            "350": "357761",
+            "420": "357762",
+            "470": "357763",
+            "520": "357764",
+            "620": "357755"
+          }
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "PTOs mechanizmus",
+          "code_by_nl": {
+            "350": "352908",
+            "420": "352908",
+            "470": "352908",
+            "520": "352908",
+            "620": "none"
+          }
+        }
+      ]
+    },
+    {
+      "set_id": "atira-biela-h176-p2o",
+      "name": "Atira biela H176 — Tip-On",
+      "generic_type": "slide",
+      "use_type": "drawer",
+      "opening_mode": "tipon",
+      "drawer_construction": "metal",
+      "manufacturer": "Hettich",
+      "series": "InnoTech Atira",
+      "height_variant": 176,
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "K-sada",
+          "code_by_nl": {
+            "350": "357801",
+            "420": "357802",
+            "470": "357803",
+            "520": "357812",
+            "620": "357795"
+          }
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "PTOs mechanizmus",
+          "code_by_nl": {
+            "350": "352908",
+            "420": "352908",
+            "470": "352908",
+            "520": "352909",
+            "620": "none"
+          }
+        }
+      ]
+    },
+    {
+      "set_id": "atira-antracit-h70-sisy",
+      "name": "Atira antracit H70 — klasické",
+      "generic_type": "slide",
+      "use_type": "drawer",
+      "opening_mode": "classic",
+      "drawer_construction": "metal",
+      "manufacturer": "Hettich",
+      "series": "InnoTech Atira",
+      "height_variant": 70,
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "K-sada",
+          "code_by_nl": {
+            "350": "357887",
+            "420": "357888",
+            "470": "357889",
+            "520": "357890"
+          }
+        }
+      ]
+    },
+    {
+      "set_id": "atira-antracit-h144-sisy",
+      "name": "Atira antracit H144 — klasické",
+      "generic_type": "slide",
+      "use_type": "drawer",
+      "opening_mode": "classic",
+      "drawer_construction": "metal",
+      "manufacturer": "Hettich",
+      "series": "InnoTech Atira",
+      "height_variant": 144,
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "K-sada",
+          "code_by_nl": {
+            "350": "357926",
+            "420": "357927",
+            "470": "357928"
+          }
+        }
+      ]
+    },
+    {
+      "set_id": "atira-antracit-h176-sisy",
+      "name": "Atira antracit H176 — klasické",
+      "generic_type": "slide",
+      "use_type": "drawer",
+      "opening_mode": "classic",
+      "drawer_construction": "metal",
+      "manufacturer": "Hettich",
+      "series": "InnoTech Atira",
+      "height_variant": 176,
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "K-sada",
+          "code_by_nl": {
+            "420": "357969",
+            "470": "357970"
+          }
+        }
+      ]
+    },
+    {
+      "set_id": "atira-antracit-h70-p2o",
+      "name": "Atira antracit H70 — Tip-On",
+      "generic_type": "slide",
+      "use_type": "drawer",
+      "opening_mode": "tipon",
+      "drawer_construction": "metal",
+      "manufacturer": "Hettich",
+      "series": "InnoTech Atira",
+      "height_variant": 70,
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "K-sada",
+          "code_by_nl": {
+            "350": "357914",
+            "420": "357915",
+            "470": "357916",
+            "520": "357917"
+          }
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "PTOs mechanizmus",
+          "code_by_nl": {
+            "350": "352908",
+            "420": "352908",
+            "470": "352908",
+            "520": "352908"
+          }
+        }
+      ]
+    },
+    {
+      "set_id": "atira-antracit-h144-p2o",
+      "name": "Atira antracit H144 — Tip-On",
+      "generic_type": "slide",
+      "use_type": "drawer",
+      "opening_mode": "tipon",
+      "drawer_construction": "metal",
+      "manufacturer": "Hettich",
+      "series": "InnoTech Atira",
+      "height_variant": 144,
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "K-sada",
+          "code_by_nl": {
+            "350": "357955",
+            "420": "357956",
+            "470": "357957",
+            "520": "357958"
+          }
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "PTOs mechanizmus",
+          "code_by_nl": {
+            "350": "352908",
+            "420": "352908",
+            "470": "352908",
+            "520": "352908"
+          }
+        }
+      ]
+    },
+    {
+      "set_id": "atira-antracit-h176-p2o",
+      "name": "Atira antracit H176 — Tip-On",
+      "generic_type": "slide",
+      "use_type": "drawer",
+      "opening_mode": "tipon",
+      "drawer_construction": "metal",
+      "manufacturer": "Hettich",
+      "series": "InnoTech Atira",
+      "height_variant": 176,
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "K-sada",
+          "code_by_nl": {
+            "350": "357996",
+            "420": "357997",
+            "470": "357998",
+            "520": "357999"
+          }
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "PTOs mechanizmus",
+          "code_by_nl": {
+            "350": "352908",
+            "420": "352908",
+            "470": "352908",
+            "520": "352908"
+          }
+        }
+      ]
+    },
+    {
+      "set_id": "vysuv-quadro-v6-sisy",
+      "name": "Quadro V6 EB23 — klasické",
+      "generic_type": "slide",
+      "use_type": "drawer",
+      "opening_mode": "classic",
+      "drawer_construction": "wood",
+      "manufacturer": "Hettich",
+      "series": "Quadro",
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "K-sada",
+          "code_by_nl": {
+            "350": "317640",
+            "400": "317641",
+            "450": "317642",
+            "500": "317643",
+            "550": "367919"
+          }
+        }
+      ]
+    },
+    {
+      "set_id": "vysuv-quadro-v6-p2o",
+      "name": "Quadro V6 EB23 — Tip-On",
+      "generic_type": "slide",
+      "use_type": "drawer",
+      "opening_mode": "tipon",
+      "drawer_construction": "wood",
+      "manufacturer": "Hettich",
+      "series": "Quadro",
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "K-sada",
+          "code_by_nl": {
+            "350": "343031",
+            "400": "343033",
+            "450": "317644"
+          }
+        }
+      ]
+    },
+    {
+      "set_id": "zavesenie-bystrica",
+      "name": "Zavesenie na stenu „Bystrica\"",
+      "generic_type": "wall_hanger",
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "code": "93240"
+        }
+      ]
+    },
+    {
+      "set_id": "podperky-police",
+      "name": "Podperka policová 7/5",
+      "generic_type": "shelf_pin",
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "code": "306125"
+        }
+      ]
+    },
+    {
+      "set_id": "vyklop-hk-klasik",
+      "name": "Výklop HK top — klasik (biela)",
+      "generic_type": "lift",
+      "use_type": "lift",
+      "opening_mode": "classic",
+      "lift_system": "hk_top",
+      "manufacturer": "Blum",
+      "series": "AVENTOS",
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "mechanizmus HK top",
+          "code_by_param": {
+            "param": "lift_class",
+            "codes": {
+              "22K2300": "347810",
+              "22K2500": "347811",
+              "22K2700": "347812",
+              "22K2900": "347813"
+            }
+          }
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "čelný príchyt (pár)",
+          "code": "13781"
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "krytky biele",
+          "code": "347834"
+        }
+      ]
+    },
+    {
+      "set_id": "vyklop-hk-klasik-tmavy",
+      "name": "Výklop HK top — klasik (tmavá)",
+      "generic_type": "lift",
+      "use_type": "lift",
+      "opening_mode": "classic",
+      "lift_system": "hk_top",
+      "manufacturer": "Blum",
+      "series": "AVENTOS",
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "mechanizmus HK top",
+          "code_by_param": {
+            "param": "lift_class",
+            "codes": {
+              "22K2300": "347810",
+              "22K2500": "347811",
+              "22K2700": "347812",
+              "22K2900": "347813"
+            }
+          }
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "čelný príchyt (pár)",
+          "code": "13781"
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "krytky tmavo šedé",
+          "code": "347835"
+        }
+      ]
+    },
+    {
+      "set_id": "vyklop-hk-tipon",
+      "name": "Výklop HK top — Tip-On (biela)",
+      "generic_type": "lift",
+      "use_type": "lift",
+      "opening_mode": "tipon",
+      "lift_system": "hk_top",
+      "manufacturer": "Blum",
+      "series": "AVENTOS",
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "mechanizmus HK top Tip-On",
+          "code_by_param": {
+            "param": "lift_class",
+            "codes": {
+              "22K2300": "347814",
+              "22K2500": "347826",
+              "22K2700": "347827",
+              "22K2900": "347828"
+            }
+          }
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "čelný príchyt (pár)",
+          "code": "13781"
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "krytky biele",
+          "code": "347834"
+        },
+        {
+          "per": "owner",
+          "qty": 1,
+          "label": "Tip-On jednotka 76 mm",
+          "code": "250831"
+        }
+      ]
+    },
+    {
+      "set_id": "vyklop-hk-tipon-tmavy",
+      "name": "Výklop HK top — Tip-On (tmavá)",
+      "generic_type": "lift",
+      "use_type": "lift",
+      "opening_mode": "tipon",
+      "lift_system": "hk_top",
+      "manufacturer": "Blum",
+      "series": "AVENTOS",
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "mechanizmus HK top Tip-On",
+          "code_by_param": {
+            "param": "lift_class",
+            "codes": {
+              "22K2300": "347814",
+              "22K2500": "347826",
+              "22K2700": "347827",
+              "22K2900": "347828"
+            }
+          }
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "čelný príchyt (pár)",
+          "code": "13781"
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "krytky tmavo šedé",
+          "code": "347835"
+        },
+        {
+          "per": "owner",
+          "qty": 1,
+          "label": "Tip-On jednotka 76 mm čierna",
+          "code": "497007"
+        }
+      ]
+    },
+    {
+      "set_id": "vyklop-hl-klasik",
+      "name": "Výklop HL top — klasik (biela)",
+      "generic_type": "lift",
+      "use_type": "lift",
+      "opening_mode": "classic",
+      "lift_system": "hl_top",
+      "manufacturer": "Blum",
+      "series": "AVENTOS",
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "mechanizmus HL top",
+          "code_by_param": {
+            "param": "lift_class",
+            "codes": {
+              "22L2200": "507351",
+              "22L2500": "507352"
+            }
+          }
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "ramená HL top",
+          "code_by_param": {
+            "param": "arm_class",
+            "codes": {
+              "22L3200": "507355",
+              "22L3500": "507356",
+              "22L3800": "507357",
+              "22L3900": "507358"
+            }
+          }
+        },
+        {
+          "per": "owner",
+          "qty": 1,
+          "label": "stabilizačná tyč",
+          "quantity_from": "rod_count",
+          "code": "507365"
+        },
+        {
+          "per": "owner",
+          "qty": 1,
+          "label": "predlžovací diel tyče",
+          "quantity_from": "rod_extension",
+          "code": "507366"
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "čelný príchyt (pár)",
+          "code": "13781"
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "krytky biele",
+          "code": "507343"
+        }
+      ]
+    },
+    {
+      "set_id": "vyklop-hl-klasik-tmavy",
+      "name": "Výklop HL top — klasik (tmavá)",
+      "generic_type": "lift",
+      "use_type": "lift",
+      "opening_mode": "classic",
+      "lift_system": "hl_top",
+      "manufacturer": "Blum",
+      "series": "AVENTOS",
+      "members": [
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "mechanizmus HL top",
+          "code_by_param": {
+            "param": "lift_class",
+            "codes": {
+              "22L2200": "507351",
+              "22L2500": "507352"
+            }
+          }
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "ramená HL top",
+          "code_by_param": {
+            "param": "arm_class",
+            "codes": {
+              "22L3200": "507355",
+              "22L3500": "507356",
+              "22L3800": "507357",
+              "22L3900": "507358"
+            }
+          }
+        },
+        {
+          "per": "owner",
+          "qty": 1,
+          "label": "stabilizačná tyč",
+          "quantity_from": "rod_count",
+          "code": "507365"
+        },
+        {
+          "per": "owner",
+          "qty": 1,
+          "label": "predlžovací diel tyče",
+          "quantity_from": "rod_extension",
+          "code": "507366"
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "čelný príchyt (pár)",
+          "code": "13781"
+        },
+        {
+          "per": "unit",
+          "qty": 1,
+          "label": "krytky tmavo šedé",
+          "code": "507345"
+        }
+      ]
+    }
+  ],
+  "mapping": {
+    "hinge": "zaves-klasik",
+    "leg": "nohy-podla-sokla",
+    "slide": "vysuv-atira-biela-h70",
+    "wall_hanger": "zavesenie-bystrica",
+    "shelf_pin": "podperky-police",
+    "plinth_clip": "prichyt-sokla-axilo",
+    "class:slide|classic|metal": {
+      "param": "height_variant",
+      "bands": [
+        {
+          "min": 70.0,
+          "max": 70.0,
+          "set_id": "atira-biela-h70-sisy"
+        },
+        {
+          "min": 144.0,
+          "max": 144.0,
+          "set_id": "atira-biela-h144-sisy"
+        },
+        {
+          "min": 176.0,
+          "max": 176.0,
+          "set_id": "atira-biela-h176-sisy"
+        }
+      ]
+    },
+    "class:slide|tipon|metal": {
+      "param": "height_variant",
+      "bands": [
+        {
+          "min": 70.0,
+          "max": 70.0,
+          "set_id": "atira-biela-h70-p2o"
+        },
+        {
+          "min": 144.0,
+          "max": 144.0,
+          "set_id": "atira-biela-h144-p2o"
+        },
+        {
+          "min": 176.0,
+          "max": 176.0,
+          "set_id": "atira-biela-h176-p2o"
+        }
+      ]
+    },
+    "class:slide|classic|wood": "vysuv-quadro-v6-sisy",
+    "class:slide|tipon|wood": "vysuv-quadro-v6-p2o",
+    "class:hinge|classic": "zaves-klasik",
+    "class:hinge|tipon": "zaves-p2o",
+    "class:lift|classic|hk_top": "vyklop-hk-klasik",
+    "class:lift|tipon|hk_top": "vyklop-hk-tipon",
+    "class:lift|classic|hl_top": "vyklop-hl-klasik"
+  }
+}
