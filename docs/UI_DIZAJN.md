@@ -73,7 +73,8 @@ odkazujú na ne kód, testy a CLAUDE.md.
   warnpanel, `.miniopts` rozmerových radov, nastavenie zvýraznenia hrán):
   vertikálny priestor sa nesmie meniť tým, že si niečo otvoríš.
 - **Pomocný text = tooltip, stavová veta ostáva viditeľná** (D-130a). Vysvetlenie
-  „ako to funguje" nesmie trvale zaberať riadok — ide do `.nxtip` (§5.7).
+  „ako to funguje" nesmie trvale zaberať riadok — ide do `.nxtip` (§5.7); platí to
+  aj pre nápovedy gest náhľadu a skupín (v Štúdiu `.studio .nxtip`).
   **Stavová veta je niečo iné:** červený dôvod, jantárové odporúčanie, „bez
   klasifikácie" či návrhová hláška D-120 hovoria o TOMTO čele TERAZ a musia byť
   vidieť bez hľadania. `.hint` sa v novom UI **nepridáva**.
@@ -491,6 +492,16 @@ sektoroch**. Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html
   (vzor `renderPartCard`), text do neho píše `bridge.js` z payloadu skrinky —
   **žiadne nové dáta a žiadny `innerHTML`** (kostra je statická, A4). Pri
   **dielci a doske** sa S2/S3 aj riadok skrývajú (majú vlastnú kartu v S4).
+- **Spodok panela (pri označenej skrinke):** dve akcie **„Vložiť kópiu"** a
+  **„Uložiť šablónu"** stoja **vedľa seba v jednom riadku** (`.cabacts`, rovnako
+  široké; v hlavičke žiadne ikony akcií) · **stavová veta `#status`** stojí na
+  konci panela a je **skrytá, kým nenesie správu** (`NX.setStatus` pri prázdnom
+  texte nastaví `hidden`; zelená `ok`, červená `err`; „Pripravené." nie je) ·
+  pätka „Noxun Engine v…" ostáva. Pri označenej skrinke nie je nad poľami nadpis
+  „Rozmery" (list sektora „Základné" už povie obsah); vo vkladaní ostáva.
+  **Pomocné vety skupín** (Štruktúra zón, Položky z pravidiel, Sety, Pravidlá)
+  a vysvetlenie materiálov sú „?" v hlavičke (`.nxtip r`, klik skupinu
+  nezbalí — `nxTipStop`); stavové vety ostávajú viditeľné.
 - **Skupiny v S4 sú EXKLUZÍVNE** v rámci jedného kontextu: otvorenie jednej
   zavrie ostatné (aj ich zatvorenie sa uloží). Sektory samotné sú **nezávislé**.
   Výnimka `data-s4-solo` (Štruktúra zón) do exkluzivity nepatrí.
@@ -579,9 +590,15 @@ Zásady kreslenia:
 - **Olep** vie náhľad ukázať len pri označenom **dielci** (hranové dáta nesie
   výhradne `part_card`) — inde je chip **neaktívny s vysvetlením**, nie ticho
   mŕtvy. Rovnako je neaktívny každý chip, ktorý nemá čo kresliť.
-- **Vpravo nástroje:** **kamera** (zarovná pohľad SketchUpu na označenú skrinku
-  — čelný pohľad + doramovanie) a **fit** (reset zoomu). Náhľad má **jedno miesto
-  ovládania** a plocha SVG ostáva čistá pre pan/zoom/ťah priečky.
+- **Vpravo nástroje:** **„?"** (`#pvHelp`) s gestami náhľadu, **kamera** (zarovná
+  pohľad SketchUpu na označenú skrinku — čelný pohľad + doramovanie) a **fit**
+  (reset zoomu). Náhľad má **jedno miesto ovládania** a plocha SVG ostáva čistá
+  pre pan/zoom/ťah priečky. **Text „?" podľa režimu a kontextu** skladá čistá
+  `NXShell.pvHelpText`: Zóny a označený dielec (zónový náhľad) = klik na zónu,
+  ťahanie priečky (magnet 1/4 · 1/2 · 3/4, Alt ho vypne); Čelá = klik na čelo;
+  Kovanie = klik na značku označí vlastníka, pozície sú orientačné; Korpus,
+  vkladanie a doska = len zoom a posun pohľadu. Pod náhľadom už nie je riadok
+  s gestami ani checkbox obrysov zón (tag `Noxun/Zóny` prepína okno tagov v raile).
 - **Stav chipov je per kontext** a žije v pamäti okna: **nová identita výberu ho
   resetuje**, echo push ho nemení (tá istá zásada ako `viewContext` z UI-B1).
 - Chipy sú `<button>` s `aria-disabled` (nie HTML `disabled`) — ostávajú
@@ -597,6 +614,8 @@ Sektor **Základné** je rozdelený na **vstupy vľavo a dopočítané údaje vp
 (`.basicgrid`). Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html`
 (`basicgrid` / `rowc` / `dwrap` / `miniopts` / `infocol`).
 
+- **Legenda „Rozmery"** nad poľami je len vo vkladaní; pri označenej skrinke je
+  skrytá (CSS `body.mode-cab #basicCard > legend`).
 - **Vľavo kompaktné rozmery** (`.rowc`): Šírka · Výška · Hĺbka · Sokel · Hrúbka,
   každý s ikonou zo spritu. Pole je úzke a hodnota zarovnaná doprava —
   rozmer je číslo, nie veta (UX-03).
@@ -1104,6 +1123,11 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Part`,
 
 Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Hw`).
 
+- **Nápovedy skupín sú „?" v hlavičke** (`.ghdr` + `.gtools` + `.nxtip r`, názov
+  skupiny ostáva priamym textom `<summary>`): Položky z pravidiel, Sety, Pravidlá
+  (aj Štruktúra zón v kontexte Zóny). Text je čistý (`data-tip`), bez `.hint`
+  pod skupinou.
+
 - **Položky sú zoskupené podľa VLASTNÍKA, nie podľa typu** (`.hwbox`): „Skrinka" ·
   box každého čela · spoločný box „Vnútro skrinky". Je to **iba iné zobrazenie
   tých istých dát** — identita položky, zápisové cesty aj nákupný riadok D-92
@@ -1444,10 +1468,9 @@ prepínajú, čo panel *kreslí*, toto mení, čo je vidieť *v modeli*.
   neviditeľný, keď je skrytý jeho priečinok — riadok vtedy nesie jantárovú
   poznámku „priečinok skrytý". Priečinok sa **nikdy nezapína automaticky**
   (môže obsahovať cudzie tagy).
-- **Jeden stav, dva ovládače.** Checkbox „Zobraziť obrysy zón v modeli"
-  hovorí o tom istom tagu (`Noxun/Zóny`), preto ide **tou istou serverovou
-  cestou** a nasadzuje ho **ten istý push** — panel si nedrží vlastnú kópiu ani
-  jedného (vzor „materiál čiel v dvoch ovládačoch", §5.7).
+- **Jeden stav, jeden ovládač.** Obrysy zón v modeli (tag `Noxun/Zóny`) prepína
+  **len** okno tagov v raile (riadok „Zóny (obrysy)"); druhý ovládač pod
+  náhľadom zanikol. Nasadzuje ho server cez push — panel si nedrží vlastnú kópiu.
 - **Je to zápis do modelu, nie overlay.** Na rozdiel od ABS kontroly a kontroly
   kresby (kreslia NAD modelom, žiadny krok Späť — D-103/D-104/D-105) sa
   viditeľnosť tagu **ukladá do .skp**: jeden klik = **jeden krok Späť**. Klik,

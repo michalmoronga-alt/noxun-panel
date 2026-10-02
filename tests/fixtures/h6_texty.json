@@ -1,0 +1,24 @@
+{
+  "_poznamka": "H6a (blok 9 HARDENING): doslovne pomocne vety Inspectora, ktore sa presuvaju do „?\". Invariant: ZIADNY udaj nezmizne - kazda veta je dosiahnutelna (v texte riadku, v data-tip alebo v retazci cistej funkcie napovede). Pomocny text = help; stavove vety (status) ostavaju viditelne. Fixturu NEGENERUJE novy kod. Polozky su rozdelene na dve casti, ktore existovali uz pred H6a (ikona v starej vete sa v H6a nahradzuje slovami, D15).",
+  "help": [
+    { "id": "pv_zony",    "text": "Klik na zónu = výber (police, delenie) · ťahaj priečku = posun (magnet 1/4 · 1/2 · 3/4, Alt ho vypne)" },
+    { "id": "pv_cela",    "text": "Klik na čelo = jeho riadok v zozname" },
+    { "id": "pv_gesta",   "text": "Ctrl+koliesko = zoom · ťahaj plochu = posun pohľadu" },
+    { "id": "pv_znacka",  "text": "Klik na značku = označí vlastníka v modeli · pozície sú orientačné" },
+    { "id": "zony_strom", "text": "Klik na zónu (tu alebo v náhľade) ju vyberie — delenie a police sa potom týkajú jej. Strom má najviac 3 úrovne." },
+    { "id": "polozky_1",  "text": "Položky sú zoskupené podľa vlastníka — skrinka a každé čelo má svoj box. Klik na hlavičku boxu označí vlastníka v modeli (panel ostáva v Kovaní). Počty určujú pravidlá; zmena počtu je ručný zásah pre túto skrinku a" },
+    { "id": "polozky_2",  "text": "vráti pravidlo." },
+    { "id": "sety",       "text": "Set nesie pásmo (dĺžky, nosnosti) — z neho vie Nákup vybrať správny kód. Vlastný set jedného čela sa vyberá priamo v jeho boxe medzi položkami." },
+    { "id": "pravidla",   "text": "Počty určujú pravidlá projektu (nohy podľa podstavca, závesy podľa výšky, výsuv podľa hĺbky). Katalóg drží kódy a ceny, z ktorých sa skladá nákup." },
+    { "id": "materialy",  "text": "Materiály tejto skrinky — prázdne = dediť z projektu." },
+    { "id": "spotrebic",  "text": "bez spotrebiča — nastav „očakáva\", ak sem spotrebič patrí" },
+    { "id": "cs10",       "text": "Platí pre dvierka. Hmotnostné pásma iba upozorňujú — počet závesov riadi tabuľka výšok. Prázdne pole = kontrola je vypnutá." }
+  ],
+  "status": [
+    { "id": "mat_bez_vyberu",    "text": "Označ skrinku pre nastavenie jej materiálov." },
+    { "id": "spotrebic_ocakava", "text": "očakáva" },
+    { "id": "rgbad",             "text": "Hmotnostné pásma sú v uložených dátach v nesprávnom tvare" },
+    { "id": "back_note",         "text": "(nepoužije sa — chrbát z líšt je z korpusu)" },
+    { "id": "front_draft",       "text": "Zásuvka bez klasifikácie" }
+  ]
+}

@@ -479,17 +479,8 @@
     if (window.sketchup && sketchup.insert_copy)
       sketchup.insert_copy(nxDocPayload({ cabinet_id: selectedCabId }));
   }
-  // D-27: ghost zony su TAG ako kazdy iny (`Noxun/Zóny`) — checkbox preto ide
-  // TOU ISTOU cestou ako okno tagov v raile. Stary callback `toggle_zones`
-  // posielal holy retazec "true"/"false" BEZ identity dokumentu, takze
-  // oneskoreny klik vedel prepnut tag v cudzom modeli; teraz nesie model_guid
-  // a striktny boolean (o zapise rozhoduje server).
-  function toggleZones(){
-    if (!(window.sketchup && sketchup.nx_tag_visible && window.NXTagMenu)) return;
-    var on = el('zonesChk').checked === true;
-    sketchup.nx_tag_visible(JSON.stringify(
-      NXTagMenu.togglePayload({ model_guid: nxModelGuid }, 'zony', on)));
-  }
+  // H6a (O8): obrysy zon v modeli (tag `Noxun/Zóny`) prepina uz len okno tagov v raile
+  // (`nx_tag_visible`, kluc `zony`) — druhy ovladac (checkbox pod nahladom) zanikol.
 
   // ===== UI-B3 (N13): klikatelny informacny stlpec Zakladnych ================
   // „Všetko informačné je klikateľné a vedie tam, kam ukazuje." Klik na pocet

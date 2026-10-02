@@ -942,7 +942,7 @@ top-level umiestňovanie — **od S1-E cez `CabinetBuilder.envelope`**, takže p
 ghost boxy (predvolene VYPNUTÉ, klik na zóny cez 2D náhľad; ghost skupiny žijú PRIAMO v `model.entities`, takže holý počet entít modelu sa zónovou zmenou legitímne mení).
 
 **Vlastný `set_visible` tu od D-27 (v0.8.13) NIE JE** — viditeľnosť tagu `Noxun/Zóny` prepína spoločná cesta `Tags.set_visible` (nižšie), tá istá, akou sa prepínajú ostatné NOXUN
-tagy. Dva ovládače nad jedným tagom (checkbox „Zobraziť zóny (ghost) v modeli" v sektore Náhľad a okno tagov v raile) tak nemajú ani dva stavy, ani dve undo semantiky. `visible?`
+tagy. Tag prepína jediný ovládač — okno tagov v raile (checkbox pod náhľadom zanikol v H6a) — takže nemá ani dva stavy, ani dve undo semantiky. `visible?`
 ostáva (číta `TAG` aj legacy `OLD_TAG`) a `migrate_tag` beží ďalej pri stavbe ghostov.
 
 ### tags.rb

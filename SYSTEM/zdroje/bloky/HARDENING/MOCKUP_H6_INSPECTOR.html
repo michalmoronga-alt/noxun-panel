@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup H6 · Inspector</title>
+<!--
+  Blok 9 HARDENING · dávka H6 „priestor v Inspectore" — položky D-01, D-02, D-05 (Michal: „Teraz").
+  Zdroj nálezov: SYSTEM/zdroje/bloky/HARDENING/CROSS_AUDIT_A5_CLAUDE_STOLAR_UX.md (CU-02, CU-04, CU-10, CU-11),
+                 CROSS_AUDIT_A2_GROK.md (GR-22), CROSS_AUDIT_A3_CODEX_SOL.md (CS-10); ROZHODNUTIA_MICHALA_2026-10-01.md (D-01/D-02/D-05).
+  Obrazovky „Dnes" = prekreslené _dev/v1audit_shots/inspector_*.png (plugin v0.17.0, okno 486 × 850 px) + CSS/HTML pluginu:
+    ui/panel.html (kostra), ui/css/panel.css (:root tokeny, .sect, .pvbar, .ctxnote, #status, .nxfoot, .nxtip),
+    ui/js/preview.js (kóty: pvDimH/pvDimV/pvText, renderCabOutline, sceneSize, viewMapping), ui/js/shell.js (sectorMeta).
+  Náhľady v mockupe kreslí ten istý výpočet mierky ako plugin (viewBox v mm + „meet" do 404 × 323 px); „Návrh" má písmo v px.
+  Tokeny --nx-* = kópia :root z panel.css. --mk-* = LEN anotácie mockupu. Farby dekorov sú vzorky (dáta), nie UI tokeny.
+  Čísla sú ukážkové (CAB-001 Spodná skrinka 800 z test modelu). Mockup nemení správanie ani dáta — len rozloženie, texty a písmo kót.
+-->
+<style>
+  :root{
+    --nx-bg:#f4f5f7; --nx-surface:#fff; --nx-surface-sunken:#eceff1; --nx-surface-readonly:#f4f6f8;
+    --nx-surface-preview:#fafcff; --nx-surface-th:#f5f7f8; --nx-part-bg:#f2fafb;
+    --nx-ink:#263238; --nx-ink-title:#1b3a4b; --nx-ink-strong:#37474f; --nx-ink-label:#455a64;
+    --nx-ink-muted:#607d8b; --nx-ink-soft:#78909c; --nx-ink-faint:#90a4ae;
+    --nx-border:#cfd8dc; --nx-border-strong:#b0bec5; --nx-border-soft:#eceff1;
+    --nx-action:#2e7d32; --nx-on-accent:#fff;
+    --nx-select:#107787; --nx-select-strong:#0B5661; --nx-select-accent:#0e6b7a;
+    --nx-select-bg:#e0f2f4; --nx-select-bg-soft:#f0f9fa; --nx-select-bg-hover:#d6eef1; --nx-part-border:#7fc4cf;
+    --nx-ok-bg:#e8f5e9; --nx-ok-fg:#1b5e20; --nx-ok-border:#c8e6c9;
+    --nx-err-bg:#fdecea; --nx-err-fg:#b71c1c; --nx-err-border:#f5c6cb;
+    --nx-danger:#c62828;
+    --nx-warn:#ffb74d; --nx-warn-bg:#fff8ef; --nx-warn-bg-soft:#fff3e0; --nx-warn-fg:#e65100;
+    --nx-warnchip-fg:#b26a00; --nx-warnchip-border:#ffcc80; --nx-warnrow-fg:#7a5000;
+    --nx-ghost-hover:#e0e4e7; --nx-logo:#78909c; --nx-modal-shadow:rgba(0,0,0,.25);
+    /* LEN anotácie mockupu (nie sú to tokeny pluginu) */
+    --mk-page:#e6e9ec; --mk-bar:#2b3a42; --mk-bar-ink:#dfe7ec; --mk-bar-sub:#8ea3ae;
+    --mk-win-border:#b6c0c6; --mk-win-head:#dfe4e7; --mk-win-dot:#bcc6cc; --mk-shadow:rgba(20,30,45,.16);
+    --mk-pin:#f6d860; --mk-pin-border:#c9a83a; --mk-pin-ink:#4a3f10;
+    --mk-gone:#d84343; --mk-gone-bg:#fff1f1; --mk-fold:#c0392b; --mk-row:#fffbe6;
+    /* DÁTA: vzorky dekorov (materiál, nie UI) */
+    --mat-w1100:#f6f5f0; --mat-f206:#3b3b3d;
+  }
+  *{box-sizing:border-box}
+  html{overflow-x:clip}
+  html,body{margin:0}
+  body{font-family:"Segoe UI",Tahoma,sans-serif;font-size:13px;color:var(--nx-ink);background:var(--mk-page);padding:0 0 70px}
+  button{font-family:inherit}
+  .ic{width:15px;height:15px;flex:0 0 auto;vertical-align:middle;fill:none;stroke:currentColor;
+      stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+  code{font-family:Consolas,"Cascadia Mono",monospace;font-size:11.5px;background:var(--nx-surface-sunken);padding:0 4px;border-radius:3px;word-break:break-word}
+  .nw{white-space:nowrap}
+
+  /* ===== stránka mockupu ===== */
+  .mockbar{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;padding:8px 16px;background:var(--mk-bar);color:var(--mk-bar-ink)}
+  .mockbar .mb-title{font-weight:600;font-size:13px}
+  .mockbar .mb-ver{font-size:11px;color:var(--mk-bar-sub)}
+  .mockbar .mb-sp{flex:1}
+  .mockbar label{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--mk-bar-ink);cursor:pointer}
+  .notestrip{display:flex;align-items:flex-start;gap:8px;padding:6px 16px;font-size:11.5px;line-height:1.45;
+             background:var(--nx-warn-bg-soft);color:var(--nx-warnchip-fg);border-bottom:1px solid var(--nx-warnchip-border)}
+  .notestrip .ic{margin-top:1px}
+  .page{max-width:1180px;margin:0 auto;padding:0 16px}
+  .pending{margin:14px auto 0;padding:10px 14px;border:2px dashed var(--nx-warn);border-radius:8px;
+           background:var(--nx-warn-bg);color:var(--nx-warnrow-fg);font-weight:600;font-size:14px;line-height:1.45}
+  .card{margin:16px 0 0;background:var(--nx-surface);border:1px solid var(--nx-border);border-radius:8px;padding:12px 16px;line-height:1.5}
+  .card h1{font-size:17px;margin:0 0 6px;color:var(--nx-ink-title)}
+  .card h3{font-size:13.5px;margin:12px 0 4px;color:var(--nx-ink-title)}
+  .card p{margin:6px 0}
+  .card ul{margin:6px 0 0;padding-left:18px}
+  .card li{margin:3px 0}
+  .stat{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:1px 8px;border-radius:9px;
+        background:var(--nx-warn-bg-soft);color:var(--nx-warnchip-fg);border:1px solid var(--nx-warnchip-border);vertical-align:2px;margin-left:6px}
+  .meta-dl{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:8px 0 4px;font-size:12.5px}
+  .meta-dl dt{color:var(--nx-ink-muted)} .meta-dl dd{margin:0;color:var(--nx-ink-strong)}
+  .src{font-size:11.5px;color:var(--nx-ink-soft)}
+  .legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:8px;font-size:11.5px;color:var(--nx-ink-muted)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .lg-new{display:inline-block;width:26px;height:12px;outline:2px solid var(--mk-pin-border);border-radius:4px}
+  .lg-gone{display:inline-block;width:26px;height:12px;outline:2px dashed var(--mk-gone);border-radius:4px}
+  .lg-o{display:inline-block;width:26px;height:12px;outline:2px dashed var(--nx-warn);border-radius:4px}
+  .lg-fold{display:inline-block;width:26px;border-top:2px dashed var(--mk-fold)}
+
+  .sh{margin:34px 0 0;display:flex;align-items:baseline;gap:6px 10px;flex-wrap:wrap}
+  .sh h2{margin:0;font-size:16px;color:var(--nx-ink-title)}
+  .sh .shl{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:22px;padding:0 7px;border-radius:6px;
+           background:var(--mk-bar);color:var(--nx-on-accent);font-size:12px;font-weight:700}
+  .sh .shsub{flex-basis:100%;font-size:12.5px;color:var(--nx-ink-muted);line-height:1.5}
+
+  /* tabuľky */
+  .tbl{width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0 2px;background:var(--nx-surface)}
+  .tbl th{background:var(--nx-surface-th);text-align:left;font-weight:600;color:var(--nx-ink-strong);padding:6px 8px;border-bottom:1px solid var(--nx-border)}
+  .tbl td{padding:6px 8px;border-bottom:1px solid var(--nx-border-soft);vertical-align:top}
+  .tbl td.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .tbl tr.sum td{font-weight:700;background:var(--mk-row)}
+  .tbl .old{color:var(--nx-ink-soft)}
+  .tbl .newt{color:var(--nx-select-strong);font-weight:600}
+  .tbl .bad{color:var(--mk-gone);font-weight:700}
+  .tbl .good{color:var(--nx-ok-fg);font-weight:700}
+  .tbl .ans{min-width:120px;background:repeating-linear-gradient(0deg,transparent 0 21px,var(--nx-border-soft) 21px 22px)}
+  @media (max-width:700px){
+    .tbl.stack thead{display:none}
+    .tbl.stack, .tbl.stack tbody, .tbl.stack tr, .tbl.stack td{display:block;width:100%}
+    .tbl.stack tr{border:1px solid var(--nx-border);border-radius:8px;margin:0 0 10px;padding:4px 0;background:var(--nx-surface)}
+    .tbl.stack td{border:0;padding:3px 10px}
+    .tbl.stack td::before{content:attr(data-h);display:block;font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--nx-ink-soft)}
+    .tbl.stack td.num{text-align:left}
+    .tbl.stack .ans{min-height:44px}
+  }
+
+  /* dvojica Dnes / Návrh */
+  .pair{display:grid;grid-template-columns:minmax(0,1fr);gap:22px;margin-top:14px}
+  @media (min-width:1040px){.pair{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  .col{min-width:0;display:flex;flex-direction:column;align-items:center}
+  .colhead{display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;width:100%;max-width:488px;margin:0 0 6px}
+  .colhead .ct{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 9px;border-radius:9px}
+  .colhead .ct.dnes{background:var(--nx-surface-sunken);color:var(--nx-ink-muted);border:1px solid var(--nx-border)}
+  .colhead .ct.navrh{background:var(--nx-select);color:#fff}
+  .colhead .cs{font-size:11.5px;color:var(--nx-ink-muted)}
+  .colhead .save{margin-left:auto;font-size:12px;font-weight:700;color:var(--nx-ok-fg);background:var(--nx-ok-bg);border:1px solid var(--nx-ok-border);padding:1px 9px;border-radius:9px}
+  .colhead .mkbtn{font-size:11px;padding:2px 9px;border-radius:6px;border:1px solid var(--nx-border-strong);background:var(--nx-surface);color:var(--nx-ink-strong);cursor:pointer}
+  .fitbox{width:100%;display:flex;justify-content:center}
+  .win{width:488px;flex:0 0 auto;border:1px solid var(--mk-win-border);border-radius:8px;overflow:hidden;background:var(--nx-bg);box-shadow:0 6px 20px var(--mk-shadow)}
+  .winhead{display:flex;align-items:center;gap:8px;height:24px;padding:0 10px;background:var(--mk-win-head);font-size:11px;color:var(--nx-ink-muted);border-bottom:1px solid var(--mk-win-border)}
+  .winhead .wd{display:inline-flex;gap:4px}.winhead .wd i{width:8px;height:8px;border-radius:50%;background:var(--mk-win-dot)}
+  .winhead .wsize{margin-left:auto}
+
+  /* zoznam zmien pod dvojicou */
+  .chglist{margin:14px 0 0;background:var(--nx-surface);border:1px solid var(--nx-border);border-radius:8px;padding:10px 14px}
+  .chglist h4{margin:0 0 6px;font-size:12.5px;color:var(--nx-ink-title)}
+  .chglist ol{list-style:none;margin:0;padding:0}
+  .chglist li{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:2px 8px;align-items:baseline;padding:5px 0;border-top:1px solid var(--nx-border-soft);font-size:12.5px;line-height:1.45}
+  .chglist li:first-child{border-top:0}
+  .chglist .px{font-weight:700;color:var(--nx-ok-fg);white-space:nowrap;font-variant-numeric:tabular-nums}
+  .chglist .px.zero{color:var(--nx-ink-soft);font-weight:600}
+  .chglist .fn{grid-column:2 / -1;font-size:11px;color:var(--nx-ink-soft)}
+  .chglist .fn code{font-size:10.5px}
+  .chglist li.tot{font-weight:700;background:var(--mk-row)}
+  .pinl{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;
+        background:var(--mk-pin);border:1px solid var(--mk-pin-border);color:var(--mk-pin-ink);font-size:10px;font-weight:700;font-style:normal}
+
+  /* otvorené body */
+  .obox{border:1.5px dashed var(--nx-warn);background:var(--nx-warn-bg);border-radius:8px;padding:9px 12px 10px;margin:12px 0 0;line-height:1.5}
+  .obox:target{box-shadow:0 0 0 3px var(--nx-warn)}
+  .obox .ohead{display:flex;align-items:baseline;gap:4px 8px;flex-wrap:wrap;margin:0 0 4px}
+  .obox .otagi{display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:9px;background:var(--nx-warn-bg-soft);
+               color:var(--nx-warnchip-fg);border:1px solid var(--nx-warnchip-border)}
+  .obox .ohead b{font-size:13px;color:var(--nx-ink-title)}
+  .obox dl{display:grid;grid-template-columns:96px minmax(0,1fr);gap:4px 10px;margin:4px 0 0;font-size:12.5px}
+  .obox dt{color:var(--nx-warnrow-fg);font-weight:700}
+  .obox dt.rec{color:var(--nx-ok-fg)}
+  .obox dd{margin:0}
+  .obox .orec{margin-top:6px;font-size:12.5px}
+  .obox .where{font-size:11px;color:var(--nx-ink-soft);margin-top:5px}
+  @media (max-width:520px){.obox dl{grid-template-columns:minmax(0,1fr)} .obox dd{margin-bottom:4px}}
+
+  /* porovnanie náhľadov (časť E) */
+  .ectl{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin:12px 0 0;padding:8px 12px;background:var(--nx-surface);border:1px solid var(--nx-border);border-radius:8px;font-size:12px}
+  .segline{display:inline-flex;flex-wrap:wrap;border:1px solid var(--nx-border-strong);border-radius:6px;overflow:hidden}
+  .segline button{border:0;border-right:1px solid var(--nx-border);background:var(--nx-surface);padding:4px 10px;font-size:11.5px;color:var(--nx-ink-strong);cursor:pointer}
+  .segline button:last-child{border-right:0}
+  .segline button.on{background:var(--nx-select-bg);color:var(--nx-select-strong);font-weight:600}
+  .rng{display:inline-flex;align-items:center;gap:6px;color:var(--nx-ink-muted)}
+  .rng input{width:160px}
+  .pvcmp{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;margin-top:10px}
+  @media (min-width:900px){.pvcmp{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  .pvcell{min-width:0;background:var(--nx-surface);border:1px solid var(--nx-border);border-radius:8px;padding:8px 10px}
+  .pvcell .pvct{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:12px;color:var(--nx-ink-strong);font-weight:600}
+  .pvcell .pvframe{max-width:406px;margin:0 auto}
+  .pvcell .pvframe svg{display:block;width:100%;height:auto;border:1px solid var(--nx-border);border-radius:6px;background:var(--nx-surface-preview)}
+  .pvread{margin-top:6px;font-size:12px;text-align:center}
+  .pvread b.bad{color:var(--mk-gone)} .pvread b.good{color:var(--nx-ok-fg)}
+
+  /* ===== PANEL — zrkadlo panel.css (scoped pod .insp) ===== */
+  .insp{position:relative;display:flex;width:486px;min-height:850px;background:var(--nx-bg);color:var(--nx-ink);font-size:13px;line-height:normal;text-align:left}
+  .insp.short{min-height:0}
+  .insp button{cursor:default}
+  .insp .crail{flex:0 0 44px;width:44px;border-right:1px solid var(--nx-border);padding:6px 0;display:flex;flex-direction:column;align-items:center;gap:4px;background:var(--nx-bg)}
+  .insp .railbtn{position:relative;width:34px;height:32px;padding:0;border:1px solid transparent;border-radius:6px;background:none;color:var(--nx-ink-muted);
+                 display:inline-flex;align-items:center;justify-content:center}
+  .insp .railbtn .ic{width:17px;height:17px}
+  .insp .railbtn.on{background:var(--nx-select-bg);color:var(--nx-select);border-color:var(--nx-select);box-shadow:inset 2px 0 0 var(--nx-select)}
+  .insp .railbtn.fn .ic{color:var(--nx-ink-faint)}
+  .insp .railbtn.fn.on .ic{color:var(--nx-select)}
+  .insp .railfly{position:relative;display:inline-flex}
+  .insp .railfly .railbtn::after{content:'';position:absolute;right:3px;bottom:3px;width:0;height:0;border-left:6px solid transparent;border-bottom:6px solid var(--nx-ink-faint)}
+  .insp .raildiv{width:24px;height:1px;background:var(--nx-border);margin:4px 0;flex:0 0 auto}
+  .insp .railgap{flex:1 1 auto}
+  .insp .rpin{position:relative;display:inline-flex}
+  .insp .pcont{flex:1 1 auto;min-width:0;padding:0 10px 10px}
+  .insp .nxhdr{position:relative;display:flex;align-items:center;gap:8px;margin:0 -10px 8px;padding:8px 10px;min-height:40px;background:var(--nx-bg);border-bottom:1px solid var(--nx-border)}
+  .insp .nx-logo{width:24px;height:24px;flex:0 0 auto;color:var(--nx-logo)}
+  .insp .idbar{display:flex;align-items:baseline;gap:8px;min-width:0;flex:1 1 auto}
+  .insp .cid{flex:0 0 auto;font-weight:700;font-size:14px;color:var(--nx-select)}
+  .insp .cname{flex:0 1 auto;min-width:0;display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--nx-ink-strong);white-space:nowrap;overflow:hidden}
+  .insp .cname .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .insp .cname .ic{width:12px;height:12px;color:var(--nx-ink-faint)}
+  .insp .typbadge{flex:0 0 auto;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:1px 7px;border-radius:9px;
+                  background:var(--nx-surface-sunken);color:var(--nx-ink-muted);border:1px solid var(--nx-border-soft)}
+  .insp .warnchip{margin-left:auto;flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--nx-warnchip-fg);
+                  background:var(--nx-warn-bg-soft);border:1px solid var(--nx-warnchip-border);border-radius:99px;padding:1px 8px}
+  .insp .warnchip .ic{width:13px;height:13px}
+  .insp .hdrtools{position:relative;flex:0 0 auto;display:inline-flex;gap:3px}
+  .insp .hdrbtn{width:26px;height:24px;padding:0;display:inline-flex;align-items:center;justify-content:center;background:var(--nx-surface);
+                color:var(--nx-ink-strong);border:1px solid var(--nx-border);border-radius:6px;position:relative}
+  .insp .hdrbtn .ic{width:15px;height:15px}
+  .insp .sect{position:relative;border:1px solid var(--nx-border);border-radius:6px;background:var(--nx-surface);margin:0 0 8px}
+  .insp .secthead{position:relative;display:flex;align-items:center;gap:7px;min-height:28px;padding:6px 9px;background:var(--nx-surface-sunken);
+                  border-radius:6px 6px 0 0;border-bottom:1px solid var(--nx-border-soft)}
+  .insp .secthead .chev{width:12px;height:12px;color:var(--nx-ink-muted)}
+  .insp .sn{flex:0 0 auto;font-weight:600;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--nx-ink-muted)}
+  .insp .meta{margin-left:auto;min-width:0;padding-left:8px;font-size:11px;color:var(--nx-ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .insp .metalink{margin-left:auto;min-width:0;display:inline-flex;align-items:center;gap:3px;padding:0 0 0 8px;border:0;background:none;
+                  font:inherit;font-size:11px;color:var(--nx-select);white-space:nowrap;overflow:hidden}
+  .insp .metalink span{overflow:hidden;text-overflow:ellipsis;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+  .insp .metalink .ic{width:11px;height:11px}
+  .insp .sectbody{padding:7px 9px 9px}
+  .insp .pvbox{position:relative;padding-top:1px}
+  .insp .pvsvg{display:block;width:100%;height:323px;border:1px solid var(--nx-border);border-radius:6px;background:var(--nx-surface-preview)}
+  .insp .pvskip{display:flex;align-items:center;justify-content:center;height:44px;border:1px dashed var(--nx-border-strong);border-radius:6px;
+                background:var(--nx-surface-preview);font-size:11px;color:var(--nx-ink-faint);font-style:italic}
+  .insp .pvbar{position:relative;display:flex;align-items:center;gap:4px;margin-top:4px}
+  .insp .pvchips{display:flex;align-items:center;gap:3px;min-width:0;overflow:hidden}
+  .insp .lchip{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;font-size:10.5px;font-weight:600;background:var(--nx-surface);color:var(--nx-ink-muted);
+               border:1px solid var(--nx-border);border-radius:99px;white-space:nowrap}
+  .insp .lchip .ic{width:12px;height:12px}
+  .insp .lchip.base{background:var(--nx-select);border-color:var(--nx-select);color:var(--nx-surface)}
+  .insp .lchip.off{color:var(--nx-ink-faint);border-style:dashed}
+  .insp .pvsp{flex:1}
+  .insp .pvtool{width:26px;height:24px;padding:0;display:inline-flex;align-items:center;justify-content:center;background:var(--nx-surface);
+                color:var(--nx-ink-strong);border:1px solid var(--nx-border);border-radius:6px}
+  .insp .pvtool .ic{width:16px;height:16px}
+  .insp .pvhint{position:relative;font-size:10px;color:var(--nx-ink-faint);text-align:center;margin:3px 0 4px;line-height:1.3}
+  .insp .zoneline{position:relative;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--nx-ink-muted);margin-top:4px}
+  .insp .zoneline .cb{width:15px;height:15px;border:1px solid var(--nx-border-strong);border-radius:3px;background:#fff}
+  .insp .nxtip{position:relative;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:20px;height:20px;padding:0;border:0;
+               border-radius:50%;background:none;color:var(--nx-ink-faint);cursor:help}
+  .insp .nxtip .ic{width:14px;height:14px}
+  .insp .nxtip.inl{width:16px;height:16px}.insp .nxtip.inl .ic{width:12px;height:12px}
+  .insp .nxtip:hover,.insp .nxtip:focus{color:var(--nx-select);outline:none}
+  .insp .nxtip::after{content:attr(data-tip);display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:30;width:250px;padding:7px 9px;border-radius:6px;
+               background:var(--nx-ink);color:#fff;font-size:11px;font-weight:400;line-height:1.45;white-space:normal;text-align:left;letter-spacing:0;text-transform:none;
+               box-shadow:0 6px 18px var(--nx-modal-shadow)}
+  .insp .nxtip.l::after{right:auto;left:0}
+  .insp .nxtip:hover::after,.insp .nxtip:focus::after{display:block}
+  .insp .ctxnote{position:relative;background:var(--nx-part-bg);border:1px solid var(--nx-part-border);border-radius:6px;padding:6px 8px;font-size:11px;color:var(--nx-ink-muted);margin:0 0 8px;line-height:1.45}
+  .insp .ctxnote b{color:var(--nx-ink-strong);font-weight:600}
+  .insp .ctxnote u{color:var(--nx-select)}
+  .insp .legendz{position:relative;font-weight:600;font-size:12px;color:var(--nx-ink-strong);margin:1px 0 6px}
+  .insp .basicgrid{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:12px}
+  .insp .rowc{display:flex;align-items:center;gap:5px;height:26px;margin-bottom:5px}
+  .insp .rowc label{display:inline-flex;align-items:center;gap:6px;width:66px;color:var(--nx-ink-label);font-size:13px}
+  .insp .rowc label .ic{width:14px;height:14px;color:var(--nx-ink-soft)}
+  .insp .inp{display:inline-block;width:50px;height:26px;border:1px solid var(--nx-border-strong);border-radius:6px;text-align:right;padding:0 6px;font-size:13px;line-height:24px;background:#fff}
+  .insp .pbtn{display:inline-flex;align-items:center;justify-content:center;width:16px;height:26px;border:1px solid var(--nx-border);border-radius:6px;color:var(--nx-ink-faint);background:var(--nx-surface)}
+  .insp .pbtn .ic{width:11px;height:11px}
+  .insp .unit{color:var(--nx-ink-faint);font-size:11px;padding-left:2px}
+  .insp .infocol{border-left:1px solid var(--nx-border-soft);padding-left:12px;font-size:11px;color:var(--nx-ink-muted)}
+  .insp .infocol div{display:flex;justify-content:space-between;gap:6px;height:16px}
+  .insp .infocol b{font-weight:400;color:var(--nx-ink)}
+  .insp .infocol .lk{color:var(--nx-ink-strong);font-weight:600}
+  .insp .legsrow{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--nx-ink-soft);padding:6px 0 0;margin-top:4px;border-top:1px solid var(--nx-border-soft);white-space:nowrap;overflow:hidden}
+  .insp .legsrow .ic{width:12px;height:12px;color:var(--nx-ink-faint)}
+  .insp .legsrow b{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;color:var(--nx-ink-strong);font-weight:600}
+  .insp .minisel{flex:0 0 auto;display:inline-flex;align-items:center;gap:3px;height:18px;padding:0 4px;border:1px solid var(--nx-ink-muted);border-radius:3px;
+                 font-size:10.5px;color:var(--nx-ink);background:#fff;max-width:150px;overflow:hidden;white-space:nowrap}
+  .insp .minisel .ic{width:10px;height:10px}
+  .insp .aprows{margin-top:4px;padding-top:3px;border-top:1px solid var(--nx-border-soft)}
+  .insp .aprow{position:relative;display:flex;align-items:center;gap:6px;font-size:10.8px;color:var(--nx-ink-soft);min-height:20px}
+  .insp .aprow .ic{width:12px;height:12px;color:var(--nx-ink-faint)}
+  .insp .aprow .apsp{flex:1}
+  .insp .aptxt{position:relative;padding-left:18px;font-size:10.8px;color:var(--nx-ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .insp .hint{position:relative;font-size:10.5px;color:var(--nx-ink-faint);margin:2px 0 6px;line-height:1.4}
+  .insp .matrow{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .insp .matrow label{width:70px;flex:0 0 auto;font-size:12px;color:var(--nx-ink-label)}
+  .insp .combo{flex:1 1 auto;min-width:0;height:26px;border:1px solid var(--nx-border-strong);border-radius:6px;display:flex;align-items:center;gap:6px;padding:0 8px;font-size:12px;background:#fff}
+  .insp .combo .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .insp .combo .ic{width:12px;height:12px;color:var(--nx-ink-faint)}
+  .insp .sw{width:14px;height:12px;flex:0 0 auto;border:1px solid var(--nx-border);border-radius:2px}
+  .insp .ghostbtn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:7px 8px;border:1px solid var(--nx-border);border-radius:6px;
+                  background:var(--nx-surface-sunken);color:var(--nx-ink-strong);font-size:12px;font-weight:600}
+  .insp .ghostbtn.wide{margin-top:4px;padding:8px;font-size:13px}
+  .insp .grp{position:relative;display:flex;align-items:center;gap:6px;min-height:34px;padding:7px 10px;margin:0 0 8px;border:1px solid var(--nx-border);border-radius:6px;
+             background:#fff;font-weight:600;font-size:12px;color:var(--nx-ink-strong)}
+  .insp .grp:last-child{margin-bottom:0}
+  .insp .grp .gch{width:12px;height:12px;color:var(--nx-ink-muted)}
+  .insp .grp .gic{width:13px;height:13px;color:var(--nx-ink-faint)}
+  .insp .grp.open .gic{color:var(--nx-select)}
+  .insp .grp .gtools{margin-left:auto;display:inline-flex;align-items:center;gap:3px;min-width:0}
+  .insp .grp .gmeta{min-width:0;font-weight:400;font-size:11px;color:var(--nx-ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-right:4px;font-variant-numeric:tabular-nums}
+  .insp .ibtn{display:inline-flex;align-items:center;justify-content:center;gap:3px;height:20px;min-width:20px;padding:0 3px;border:0;background:none;color:var(--nx-ink-muted);font-size:11px;font-weight:600}
+  .insp .ibtn .ic{width:13px;height:13px}
+  .insp .grpbox{position:relative;border:1px solid var(--nx-border);border-radius:6px;background:#fff;margin:0 0 8px}
+  .insp .grpbox .grp{border:0;margin:0}
+  .insp .grpbox .gbody{padding:0 10px 10px}
+  .insp .ztree{display:flex;align-items:center;gap:6px;padding:4px 8px;border-left:3px solid var(--nx-select);border-radius:6px;background:var(--nx-select-bg);font-size:12px}
+  .insp .ztree b{color:var(--nx-ink)} .insp .ztree span{color:var(--nx-ink-soft);font-size:11px}
+  .insp .botblk{position:relative}
+  .insp .status{position:relative;font-size:11px;padding:7px 9px;border-radius:6px;background:var(--nx-surface-sunken);color:var(--nx-ink-label);border:1px solid var(--nx-border);
+                min-height:16px;line-height:1.35;margin-top:8px}
+  .insp .nxfoot{position:relative;margin:10px 0 0;padding-top:8px;border-top:1px solid var(--nx-border-soft);font-size:11px;color:var(--nx-ink-faint);text-align:center}
+  .insp .fstatus{position:absolute;left:54px;right:10px;top:806px;z-index:8;display:flex;align-items:center;gap:8px;font-size:11px;padding:7px 9px;border-radius:6px;
+                 background:var(--nx-err-bg);color:var(--nx-err-fg);border:1px solid var(--nx-err-border);box-shadow:0 4px 14px var(--nx-modal-shadow);line-height:1.35}
+  .insp .fstatus[hidden]{display:none}
+  .insp .fstatus .ic{width:14px;height:14px}
+  .insp .fstatus .fx{margin-left:auto;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border:0;background:none;color:var(--nx-err-fg);padding:0}
+  .insp .fold{position:absolute;left:0;right:0;top:850px;bottom:0;border-top:2px dashed var(--mk-fold);pointer-events:none;z-index:7;
+              background:repeating-linear-gradient(135deg,rgba(38,50,56,.07) 0 6px,transparent 6px 12px)}
+  .insp .fold span{position:absolute;right:6px;top:-19px;font-size:10px;font-weight:600;background:var(--mk-fold);color:#fff;padding:1px 7px;border-radius:9px;white-space:nowrap}
+
+  /* anotácie */
+  .gone{position:relative;outline:2px dashed var(--mk-gone);outline-offset:1px;border-radius:6px;background-color:var(--mk-gone-bg)}
+  .new{position:relative;outline:2px solid var(--mk-pin-border);outline-offset:1px;border-radius:6px}
+  .pin{position:absolute;top:-8px;right:-7px;z-index:9;display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;
+       background:var(--mk-pin);border:1px solid var(--mk-pin-border);color:var(--mk-pin-ink);font-size:10px;font-weight:700;font-style:normal;line-height:1;pointer-events:none}
+  .pin.x{background:var(--mk-gone);border-color:var(--mk-gone);color:#fff}
+  .pin.lft{right:auto;left:-7px}
+  body.nopins .gone{outline:none;background-color:transparent}
+  body.nopins .new{outline:none}
+  body.nopins .pin, body.nopins .fold{display:none}
+</style>
+</head>
+<body>
+
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-maximize" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 11 7 11 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.53 13.53 0 0 0 1 12s4 7 11 7a9.74 9.74 0 0 0 5.39-1.61"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="m2 2 20 20"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></symbol>
+    <symbol id="i-rotate-ccw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></symbol>
+    <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></symbol>
+    <symbol id="i-layout-grid" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></symbol>
+    <symbol id="i-columns-2" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/></symbol>
+    <symbol id="i-rows-3" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+    <symbol id="i-help-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></symbol>
+    <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+    <symbol id="i-profile" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="5" rx="1.5"/><path d="M6 8v13h12V8"/></symbol>
+    <symbol id="i-cabinet" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="15" rx="1"/><path d="M12 3v15"/><path d="M6 21v-3"/><path d="M18 21v-3"/><path d="M9.5 10h.01"/><path d="M14.5 10h.01"/></symbol>
+    <symbol id="i-front" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="1"/><rect x="8" y="7" width="8" height="2" rx="1"/></symbol>
+    <symbol id="i-hammer" viewBox="0 0 24 24"><path d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5"/></symbol>
+    <symbol id="i-shell" viewBox="0 0 24 24"><path d="M14 11a2 2 0 1 1-4 0 4 4 0 0 1 8 0 6 6 0 0 1-12 0 8 8 0 0 1 16 0 10 10 0 1 1-20 0 11.93 11.93 0 0 1 2.42-7.22 2 2 0 1 1 3.16 2.44"/></symbol>
+    <symbol id="i-slab" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="1.5"/><path d="M2 10h20"/></symbol>
+    <symbol id="i-grain" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="1.5"/><path d="M6 9.5h12"/><path d="M6 12h12"/><path d="M6 14.5h12"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></symbol>
+    <symbol id="i-appliance" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M5 10h14"/><path d="M15 5v2"/><path d="M15 13v3"/></symbol>
+    <symbol id="i-arr-h" viewBox="0 0 24 24"><path d="M8 8 4 12l4 4"/><path d="m16 8 4 4-4 4"/><path d="M4 12h16"/></symbol>
+    <symbol id="i-arr-v" viewBox="0 0 24 24"><path d="m8 8 4-4 4 4"/><path d="m8 16 4 4 4-4"/><path d="M12 4v16"/></symbol>
+    <symbol id="i-arr-d" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="M6 11v7h7"/><path d="M18 13V6h-7"/></symbol>
+    <symbol id="i-plinth" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="13" rx="2"/><rect x="6" y="19" width="12" height="3" rx="1" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-p-top" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4"/><path d="M5 8v12"/><path d="M19 8v12"/></symbol>
+    <symbol id="i-p-bottom" viewBox="0 0 24 24"><rect x="3" y="16" width="18" height="4"/><path d="M5 4v12"/><path d="M19 4v12"/></symbol>
+    <symbol id="i-p-back" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/><path d="m4 20 16-16"/></symbol>
+    <symbol id="i-direction" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1.5"/><path d="m9 8 5 4-5 4" stroke-dasharray="3 2"/></symbol>
+    <symbol id="i-logo" viewBox="7071.5 11779.5 6054 6054"><g fill="currentColor" stroke="none">
+      <g transform="translate(6842.5 56)"><path d="M4814 14749c0,521 0,1041 0,1561 -145,0 -291,0 -436,0 0,-517 0,-1035 0,-1552l436 -9zm0 3c-12,-788 -622,-1561 -1566,-1556 -944,6 -1549,792 -1550,1556l0 100 0 1458 433 0 0 -1474 0 -84c21,-630 497,-1124 1124,-1136 577,-12 1127,493 1123,1146l436 -10z"/></g>
+      <g transform="translate(3466.5 59.5)"><path d="M8203 14742c0,-9 0,-7 -1,-16 -25,-784 -637,-1547 -1578,-1542 -951,6 -1562,787 -1563,1558l437 -1c21,-635 501,-1121 1133,-1134 569,-11 1113,476 1132,1114 0,14 0,5 0,19l440 2zm-3142 -1c12,794 627,1574 1579,1569 951,-5 1562,-798 1563,-1568l-437 0c-21,634 -501,1132 -1133,1145 -568,12 -1112,-473 -1134,-1107 0,-16 -2,-23 -2,-39l-436 0z"/></g>
+      <g transform="rotate(45 10098.5 14806.5) translate(222 0)"><polygon points="7673,12911 8290,12911 9876,14498 11463,12911 12080,12911 10185,14806 12080,16702 11464,16702 9876,15114 8289,16702 7673,16702 9568,14806"/></g>
+      <g transform="translate(-3489.5 -25)"><path d="M12030 14746c0,-520 0,-868 0,-1388 145,0 290,0 436,0 0,517 0,863 0,1380l-436 8zm0 -2c12,787 622,1561 1565,1555 944,-5 1550,-791 1551,-1555l0 -100 0 -1286 -433 0 0 1302 0 84c-21,630 -497,1123 -1124,1136 -577,12 -1128,-493 -1123,-1146l-436 10z"/></g>
+      <g transform="translate(-6842.5 61)"><path d="M18499 14744c0,520 0,1040 0,1561 -145,0 -291,0 -436,0 0,-518 0,-1035 0,-1553l436 -8zm0 2c-12,-787 -622,-1560 -1566,-1555 -943,5 -1549,791 -1550,1555l0 100 0 1459 433 0 0 -1475 0 -84c21,-629 497,-1123 1124,-1136 577,-12 1127,494 1123,1146l436 -10z"/></g>
+    </g></symbol>
+  </defs>
+</svg>
+
+<div class="mockbar">
+  <span class="mb-title">Noxun Engine — mockup H6 · priestor v Inspectore</span>
+  <span class="mb-ver">blok 9 HARDENING · D-01 · D-02 · D-05 · 1.10.2026 · plugin v0.17.0</span>
+  <span class="mb-sp"></span>
+  <label><input type="checkbox" id="pinTog" checked> štítky a rámčeky</label>
+</div>
+<div class="notestrip">
+  <svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>
+  <span>Mockup, nie živý plugin. Okná „Dnes" sú prekreslené podľa screenshotov v0.17.0 (okno 486 × 850 px), náhľady skriniek kreslí ten istý výpočet mierky ako plugin. <b>Červený prerušovaný rámček = zmizne</b>, <b>žltý rámček = nové miesto</b>, číslo = riadok v zozname zmien pod oknami. <b>Oranžový rámček „návrh — potvrdí Michal (O…)" = tu rozhoduješ ty</b> (všetky body spolu v časti H). Na mobile sú okná zmenšené — px v texte platia pre skutočný panel. „?" v návrhu sa dá chytiť (myš alebo ťuk) a ukáže bublinu.</span>
+</div>
+
+<main class="page">
+
+
+<section class="card" aria-labelledby="introH">
+  <h1 id="introH">Inspector — viac miesta, čitateľné kóty, zbalené sekcie povedia obsah <span class="stat">platí · 2.10.2026</span></h1>
+  <div class="plati" style="margin:10px 0 14px;padding:9px 12px;border:1px solid var(--nx-warn);background:var(--nx-warn-bg-soft);border-radius:6px;font-size:13px;line-height:1.5;color:var(--nx-ink)"><b>PLATÍ (2.10.2026)</b> — mockup je schválený Michalom s odchýlkami; záväzné sú <a href="ROZHODNUTIA_MICHALA_2026-10-01.md">rozhodnutia v sekcii „Mockupy H6 a H7 — odpovede Michala (2.10.2026)"</a>. Kde sa mockup líši, platia rozhodnutia: <b>O1</b> — „Vložiť kópiu" a „Uložiť šablónu" ostávajú DOLE na dnešnom mieste, ale vedľa seba v jednom riadku (text „Uložiť šablónu", žiadne ikony v hlavičke) · <b>O2 A</b> — stavová veta ostáva na konci panela a ukáže sa len so správou („Pripravené." zmizne), žiadny pás pri spodku okna · <b>O3 B</b> — pätka s verziou ostáva. O4–O13 podľa odporúčania mockupu (A).</div>
+  <dl class="meta-dl">
+    <dt>Dátum</dt><dd>1.10.2026</dd>
+    <dt>Dávka</dt><dd>H6 · priestor v Inspectore (blok 9 HARDENING)</dd>
+    <dt>Položky</dt><dd><b>D-01</b> uvoľniť ~200 px výšky · <b>D-02</b> čitateľné kóty v náhľade · <b>D-05</b> zbalená sekcia povie, čo skrýva</dd>
+    <dt>Z auditu</dt><dd>CU-02, CU-04, CU-10, CU-11 (Claude · stolár + UX), GR-22 (Grok), CS-10 (Codex)</dd>
+    <dt>Stav</dt><dd><b>PLATÍ — schválené Michalom 2.10.2026 (pozri rozhodnutia)</b></dd>
+  </dl>
+  <h3>Čo sa zmení z pohľadu stolára</h3>
+  <ul>
+    <li><b>Viac práce na jednej obrazovke.</b> V každom kontexte zmizne 210–290 px textov a tlačidiel, ktoré sa opakujú stále dokola. Kontext Čelá sa zmestí na obrazovku celý, v Korpuse uvidíš bez scrollovania aj Materiály.</li>
+    <li><b>Kóty v náhľade sa dajú prečítať.</b> Dnes majú 3–8 px podľa veľkosti skrinky, návrh je vždy 11 px — pri spodnej aj pri vysokej skrinke.</li>
+    <li><b>Zbalená sekcia povie, čo v nej je.</b> Namiesto „3 skupiny · všetko zbalené" uvidíš „strop 2 výstuhy · boky na dne · chrbát v drážke".</li>
+    <li><b>Nič sa nepočíta inak a žiadny údaj nezmizne.</b> Menia sa len rozloženie, texty a písmo kót. Kde ostane každý presunutý údaj, ukazuje časť G.</li>
+  </ul>
+  <table class="tbl stack" aria-label="Uvoľnené px podľa kontextu">
+    <thead><tr><th>Kontext</th><th>Čo zmizne alebo sa presunie</th><th>Uvoľní (odhad)</th><th>Efekt v okne 850 px</th></tr></thead>
+    <tbody>
+      <tr><td data-h="Kontext"><b>Korpus</b></td><td data-h="Čo zmizne">nápoveda gest 20 · nadpis „Rozmery" 22 · veta „bez spotrebiča…" 17 · veta o dedení materiálov 21 · spodný blok (2 tlačidlá, „Pripravené.", verzia) 155</td><td data-h="Uvoľní" class="num">≈ 235 px</td><td data-h="Efekt">Materiály sa posunú o ~60 px vyššie, spodok panela o ~235 px.</td></tr>
+      <tr><td data-h="Kontext"><b>Čelá</b></td><td data-h="Čo zmizne">nápoveda 20 · pás „Skrinka … upravíš v Korpuse" 50 · spodný blok 155</td><td data-h="Uvoľní" class="num">≈ 225 px</td><td data-h="Efekt">Celý kontext sa zmestí na obrazovku s rezervou ~240 px (miesto pre rozbalenú skupinu).</td></tr>
+      <tr><td data-h="Kontext"><b>Zóny</b></td><td data-h="Čo zmizne">nápoveda 2 riadky 30 · „Zobraziť zóny (ghost)" 22 · pás 50 · nápoveda stromu 33 · spodný blok 155</td><td data-h="Uvoľní" class="num">≈ 290 px</td><td data-h="Efekt">Delenie zóny a Police sa dostanú nad zlom okna.</td></tr>
+      <tr><td data-h="Kontext"><b>Kovanie</b></td><td data-h="Čo zmizne">nápoveda 20 · pás 50 · spodný blok 155 · pri otvorenej skupine ešte 30–55 px nápovedy</td><td data-h="Uvoľní" class="num">≈ 225 px (+30–55)</td><td data-h="Efekt">Položky kovania začnú o ~70 px vyššie.</td></tr>
+      <tr><td data-h="Kontext"><b>Bez výberu</b> (vkladanie)</td><td data-h="Čo zmizne">nápoveda gest 20 · „Pripravené." 40 · verzia 33 (tlačidlá kópie a šablóny tu dnes nie sú)</td><td data-h="Uvoľní" class="num">≈ 93 px</td><td data-h="Efekt">Viac dlaždíc šablón bez scrollovania.</td></tr>
+    </tbody>
+  </table>
+  <p class="src">Odhady px sú z CSS pluginu a zo screenshotov <code>_dev/v1audit_shots/inspector_*.png</code> (napr. spodný blok v Čelách: od konca sektora na y&nbsp;681 po koniec pätky na y&nbsp;~840 = ~155 px; audit CU-11 odhadol ~110 px). Presné čísla zmeria dávka H6 na živom paneli.</p>
+  <div class="legend">
+    <span><span class="lg-gone"></span> zmizne (Dnes)</span>
+    <span><span class="lg-new"></span> nové miesto (Návrh)</span>
+    <span><span class="lg-o"></span> návrh — potvrdí Michal (O…)</span>
+    <span><span class="lg-fold"></span> spodok okna 850 px — nižšie treba scrollovať</span>
+  </div>
+</section>
+
+<!-- ============================ A · KORPUS ============================ -->
+<div class="sh" id="secA"><span class="shl">A</span><h2>Kontext Korpus</h2>
+  <span class="shsub">Spodná skrinka 800 × 864 × 520, sokel 100 (CAB-001 z testovacieho modelu). Vľavo dnešný panel, vpravo návrh. Čiarkovaná červená čiara = spodok okna 850 px; čo je pod ňou, dnes vidíš až po scrollovaní.</span></div>
+<div class="pair">
+  <div class="col">
+    <div class="colhead"><span class="ct dnes">Dnes</span><span class="cs">v0.17.0 · okno 486 × 850</span></div>
+    <div class="fitbox"><div class="win"><div class="winhead"><span class="wd"><i></i><i></i><i></i></span>Noxun Inspector — Korpus<span class="wsize">486 px</span></div>
+      <div class="insp">
+        <nav class="crail" data-ctx="korpus"></nav>
+        <div class="pcont">
+          <header class="nxhdr"><svg class="nx-logo" aria-hidden="true"><use href="#i-logo"/></svg>
+            <div class="idbar"><span class="cid">CAB-001</span><span class="cname"><span class="t">Spodná skrinka 800</span><svg class="ic"><use href="#i-pencil"/></svg></span><span class="typbadge">Dolná</span></div></header>
+          <section class="sect"><div class="secthead"><svg class="ic chev"><use href="#i-chevron-down"/></svg><span class="sn">Náhľad</span><span class="meta">Čelný rez + kóty</span></div>
+            <div class="sectbody"><div class="pvbox new"><i class="pin">9</i><svg class="pvsvg" data-pv="cab" data-mode="dnes" data-w="800" data-h="864" data-d="520" data-fh="100" viewBox="0 0 404 323" preserveAspectRatio="xMidYMid meet"></svg></div>
+              <div class="pvbar"><span class="pvchips"><span class="lchip"><svg class="ic"><use href="#i-eye-off"/></svg>Zóny</span><span class="lchip"><svg class="ic"><use href="#i-eye-off"/></svg>Čelá</span><span class="lchip"><svg class="ic"><use href="#i-eye-off"/></svg>Kovanie</span><span class="lchip off"><svg class="ic"><use href="#i-eye-off"/></svg>Olep</span></span><span class="pvsp"></span><span class="pvtool"><svg class="ic"><use href="#i-camera"/></svg></span><span class="pvtool"><svg class="ic"><use href="#i-maximize"/></svg></span></div>
+              <div class="pvhint gone"><i class="pin x">4</i>Ctrl+koliesko = zoom · ťahaj plochu = posun pohľadu</div>
+            </div></section>
+          <section class="sect"><div class="secthead"><svg class="ic chev"><use href="#i-chevron-down"/></svg><span class="sn">Základné</span><span class="meta">800 × 864 × 520 · sokel 100</span></div>
+            <div class="sectbody">
+              <div class="legendz gone"><i class="pin x">5</i>Rozmery</div>
+              <div class="basicgrid">
+                <div>
+                  <div class="rowc"><label><svg class="ic"><use href="#i-arr-h"/></svg>Šírka</label><span class="inp">800</span><span class="pbtn"><svg class="ic"><use href="#i-chevron-down"/></svg></span><span class="unit">mm</span></div>
+                  <div class="rowc"><label><svg class="ic"><use href="#i-arr-v"/></svg>Výška</label><span class="inp">864</span><span class="pbtn"><svg class="ic"><use href="#i-chevron-down"/></svg></span><span class="unit">mm</span></div>
+                  <div class="rowc"><label><svg class="ic"><use href="#i-arr-d"/></svg>Hĺbka</label><span class="inp">520</span><span class="pbtn"><svg class="ic"><use href="#i-chevron-down"/></svg></span><span class="unit">mm</span></div>
+                  <div class="rowc"><label><svg class="ic"><use href="#i-plinth"/></svg>Sokel</label><span class="inp">100</span><span class="pbtn"><svg class="ic"><use href="#i-chevron-down"/></svg></span><span class="unit">mm</span></div>
+                  <div class="rowc"><label><svg class="ic"><use href="#i-slab"/></svg>Hrúbka</label><span class="inp">18</span><span class="unit">mm</span></div>
+                </div>
+                <div class="infocol">
+                  <div><span>Vnút. šírka</span><b>764</b></div><div><span>Vnút. hĺbka</span><b>517</b></div><div><span>Úložná výška</span><b>646</b></div>
+                  <div><span class="lk">Dielcov</span><b>7</b></div><div><span class="lk">Materiál</span><b>2,55 m²</b></div><div><span>Hmotnosť</span><b>≈ 25,4 kg</b></div>
+                </div>
+              </div>
+              <div class="legsrow"><svg class="ic"><use href="#i-plinth"/></svg><span>Nohy</span><b>4× noha AXILO H100 + platnička · 1× príchyt sokla AXILO</b><span class="minisel">podľa projektu — Nohy p…<svg class="ic"><use href="#i-chevron-down"/></svg></span></div>
+              <div class="aprows"><div class="aprow"><svg class="ic"><use href="#i-appliance"/></svg><span>Spotrebič</span><span class="apsp"></span><span class="minisel">očakáva: —<svg class="ic"><use href="#i-chevron-down"/></svg></span></div>
+                <div class="aptxt gone"><i class="pin x">6</i>bez spotrebiča — nastav „očakáva“, ak sem spotrebič patrí</div></div>
+            </div></section>
+          <section class="sect"><div class="secthead"><svg class="ic chev"><use href="#i-chevron-down"/></svg><span class="sn">Materiály</span><span class="meta">W1100 ST30 Alpská biela · DTDL 18 mm · F206 ST9 Pietra Grigia čierna · DTDL 18 mm</span></div>
+            <div class="sectbody">
+              <div class="hint gone"><i class="pin x">7</i>Materiály tejto skrinky — prázdne = dediť z projektu.</div>
+              <div class="matrow"><label>Korpus</label><span class="combo"><span class="sw" style="background:var(--mat-w1100)"></span><span class="t">W1100 ST30 Alpská biela · DTDL 18 mm</span><svg class="ic"><use href="#i-chevron-down"/></svg></span></div>
+              <div class="matrow"><label>Čelá</label><span class="combo"><span class="sw" style="background:var(--mat-f206)"></span><span class="t">F206 ST9 Pietra Grigia čierna · DTDL 18 mm</span><svg class="ic"><use href="#i-chevron-down"/></svg></span></div>
+              <div class="matrow"><label>Chrbát</label><span class="combo"><span class="t">(dediť z projektu)</span><svg class="ic"><use href="#i-chevron-down"/></svg></span></div>
+              <button class="ghostbtn" tabindex="-1"><svg class="ic"><use href="#i-layers"/></svg>Materiály projektu…</button>
+            </div></section>
+          <section class="sect"><div class="secthead new"><i class="pin">8</i><svg class="ic chev"><use href="#i-chevron-down"/></svg><span class="sn">Nastavenia</span><span class="meta">3 skupiny · všetko zbalené</span></div>
+            <div class="sectbody">
+              <div class="grp"><svg class="ic gch"><use href="#i-chevron-right"/></svg><svg class="ic gic"><use href="#i-p-top"/></svg>Strop</div>
+              <div class="grp"><svg class="ic gch"><use href="#i-chevron-right"/></svg><svg class="ic gic"><use href="#i-p-bottom"/></svg>Dno &amp; podstavec</div>
+              <div class="grp"><svg class="ic gch"><use href="#i-chevron-right"/></svg><svg class="ic gic"><use href="#i-p-back"/></svg>Chrbát</div>
+            </div></section>
+          <div class="botblk gone"><i class="pin x">1</i>
+            <button class="ghostbtn wide" tabindex="-1"><svg class="ic"><use href="#i-copy"/></svg>Vložiť kópiu</button>
+            <button class="ghostbtn wide" tabindex="-1"><svg class="ic"><use href="#i-star"/></svg>Uložiť ako šablónu do knižnice</button></div>
+          <div class="status gone"><i class="pin x">2</i>Pripravené.</div>
+          <footer class="nxfoot gone"><i class="pin x">3</i>Noxun Engine V0.17.0</footer>
+        </div>
+        <div class="fold"><span>spodok okna 850 px — nižšie treba scrollovať</span></div>
+      </div></div></div>
+  </div>
+  <div class="col">
+    <div class="colhead"><span class="ct navrh">Návrh</span><button type="button" class="mkbtn" id="fstatBtn">ukáž chybovú správu (O2 · B)</button><span class="save">uvoľní ≈ 235 px</span></div>
+    <div class="fitbox"><div class="win"><div class="winhead"><span class="wd"><i></i><i></i><i></i></span>Noxun Inspector — Korpus<span class="wsize">486 px</span></div>
+      <div class="insp">
+        <nav class="crail" data-ctx="korpus" data-pin-cfg="3"></nav>
+        <div class="pcont">
+          <header class="nxhdr"><svg class="nx-logo" aria-hidden="true"><use href="#i-logo"/></svg>
+            <div class="idbar"><span class="cid">CAB-001</span><span class="cname"><span class="t">Spodná skrinka 800</span><svg class="ic"><use href="#i-pencil"/></svg></span><span class="typbadge">Dolná</span></div>
+            <span class="hdrtools new"><i class="pin">1</i>
+              <button class="hdrbtn nxtipb" tabindex="0" title="Vložiť kópiu — presná kópia označenej skrinky vrátane materiálov, úprav dielcov (ABS) a kovania" aria-label="Vložiť kópiu"><svg class="ic"><use href="#i-copy"/></svg></button>
+              <button class="hdrbtn" tabindex="0" title="Uložiť ako šablónu do knižnice…" aria-label="Uložiť ako šablónu do knižnice"><svg class="ic"><use href="#i-star"/></svg></button></span></header>
+          <section class="sect"><div class="secthead"><svg class="ic chev"><use href="#i-chevron-down"/></svg><span class="sn">Náhľad</span><span class="meta">Čelný rez + kóty</span></div>
+            <div class="sectbody"><div class="pvbox new"><i class="pin">9</i><svg class="pvsvg" data-pv="cab" data-mode="navrh" data-w="800" data-h="864" data-d="520" data-fh="100" viewBox="0 0 404 323" preserveAspectRatio="xMidYMid meet"></svg></div>
+              <div class="pvbar"><span class="pvchips"><span class="lchip"><svg class="ic"><use href="#i-eye-off"/></svg>Zóny</span><span class="lchip"><svg class="ic"><use href="#i-eye-off"/></svg>Čelá</span><span class="lchip"><svg class="ic"><use href="#i-eye-off"/></svg>Kovanie</span><span class="lchip off"><svg class="ic"><use href="#i-eye-off"/></svg>Olep</span></span><span class="pvsp"></span>
+                <span class="new" style="display:inline-flex;border-radius:50%"><i class="pin">4</i><button type="button" class="nxtip" aria-label="Pomoc" data-tip="Ctrl+koliesko = zoom · ťahaj plochu = posun pohľadu · tlačidlo vpravo vráti celý pohľad."><svg class="ic"><use href="#i-help-circle"/></svg></button></span>
+                <span class="pvtool"><svg class="ic"><use href="#i-camera"/></svg></span><span class="pvtool"><svg class="ic"><use href="#i-maximize"/></svg></span></div>
+            </div></section>
+          <section class="sect"><div class="secthead"><svg class="ic chev"><use href="#i-chevron-down"/></svg><span class="sn">Základné</span><span class="meta">800 × 864 × 520 · sokel 100</span></div>
+            <div class="sectbody">
+              <div class="basicgrid">
+                <div>
+                  <div class="rowc"><label><svg class="ic"><use href="#i-arr-h"/></svg>Šírka</label><span class="inp">800</span><span class="pbtn"><svg class="ic"><use href="#i-chevron-down"/></svg></span><span class="unit">mm</span></div>
+                  <div class="rowc"><label><svg class="ic"><use href="#i-arr-v"/></svg>Výška</label><span class="inp">864</span><span class="pbtn"><svg class="ic"><use href="#i-chevron-down"/></svg></span><span class="unit">mm</span></div>
+                  <div class="rowc"><label><svg class="ic"><use href="#i-arr-d"/></svg>Hĺbka</label><span class="inp">520</span><span class="pbtn"><svg class="ic"><use href="#i-chevron-down"/></svg></span><span class="unit">mm</span></div>
+                  <div class="rowc"><label><svg class="ic"><use href="#i-plinth"/></svg>Sokel</label><span class="inp">100</span><span class="pbtn"><svg class="ic"><use href="#i-chevron-down"/></svg></span><span class="unit">mm</span></div>
+                  <div class="rowc"><label><svg class="ic"><use href="#i-slab"/></svg>Hrúbka</label><span class="inp">18</span><span class="unit">mm</span></div>
+                </div>
+                <div class="infocol">
+                  <div><span>Vnút. šírka</span><b>764</b></div><div><span>Vnút. hĺbka</span><b>517</b></div><div><span>Úložná výška</span><b>646</b></div>
+                  <div><span class="lk">Dielcov</span><b>7</b></div><div><span class="lk">Materiál</span><b>2,55 m²</b></div><div><span>Hmotnosť</span><b>≈ 25,4 kg</b></div>
+                </div>
+              </div>
+              <div class="legsrow"><svg class="ic"><use href="#i-plinth"/></svg><span>Nohy</span><b>4× noha AXILO H100 + platnička · 1× príchyt sokla AXILO</b><span class="minisel">podľa projektu — Nohy p…<svg class="ic"><use href="#i-chevron-down"/></svg></span></div>
+              <div class="aprows"><div class="aprow new"><i class="pin">6</i><svg class="ic"><use href="#i-appliance"/></svg><span>Spotrebič</span><span class="apsp"></span><span class="minisel">očakáva: —<svg class="ic"><use href="#i-chevron-down"/></svg></span><button type="button" class="nxtip inl" aria-label="Pomoc" data-tip="bez spotrebiča — nastav „očakáva“, ak sem spotrebič patrí"><svg class="ic"><use href="#i-help-circle"/></svg></button></div></div>
+            </div></section>
+          <section class="sect"><div class="secthead new"><i class="pin">7</i><svg class="ic chev"><use href="#i-chevron-down"/></svg><span class="sn">Materiály</span><span class="meta">W1100 ST30 Alpská biela · DTDL 18 mm · F206 ST9 Pietra Grigia čierna · DTDL 18 mm</span><button type="button" class="nxtip inl" aria-label="Pomoc" data-tip="Materiály tejto skrinky — prázdne = dediť z projektu."><svg class="ic"><use href="#i-help-circle"/></svg></button></div>
+            <div class="sectbody">
+              <div class="matrow"><label>Korpus</label><span class="combo"><span class="sw" style="background:var(--mat-w1100)"></span><span class="t">W1100 ST30 Alpská biela · DTDL 18 mm</span><svg class="ic"><use href="#i-chevron-down"/></svg></span></div>
+              <div class="matrow"><label>Čelá</label><span class="combo"><span class="sw" style="background:var(--mat-f206)"></span><span class="t">F206 ST9 Pietra Grigia čierna · DTDL 18 mm</span><svg class="ic"><use href="#i-chevron-down"/></svg></span></div>
+              <div class="matrow"><label>Chrbát</label><span class="combo"><span class="t">(dediť z projektu)</span><svg class="ic"><use href="#i-chevron-down"/></svg></span></div>
+              <button class="ghostbtn" tabindex="-1"><svg class="ic"><use href="#i-layers"/></svg>Materiály projektu…</button>
+            </div></section>
+          <section class="sect"><div class="secthead new"><i class="pin">8</i><svg class="ic chev"><use href="#i-chevron-down"/></svg><span class="sn">Nastavenia</span><span class="meta">strop 2 výstuhy · boky na dne · chrbát v drážke</span></div>
+            <div class="sectbody">
+              <div class="grp"><svg class="ic gch"><use href="#i-chevron-right"/></svg><svg class="ic gic"><use href="#i-p-top"/></svg>Strop</div>
+              <div class="grp"><svg class="ic gch"><use href="#i-chevron-right"/></svg><svg class="ic gic"><use href="#i-p-bottom"/></svg>Dno &amp; podstavec</div>
+              <div class="grp"><svg class="ic gch"><use href="#i-chevron-right"/></svg><svg class="ic gic"><use href="#i-p-back"/></svg>Chrbát</div>
+            </div></section>
+        </div>
+        <div class="fstatus" id="fstat" hidden><svg class="ic"><use href="#i-alert"/></svg><span>Skontroluj červené polia — kópia by nezachytila rozpísanú úpravu.</span><button type="button" class="fx" aria-label="Zavrieť správu" id="fstatX"><svg class="ic"><use href="#i-x"/></svg></button><i class="pin">2</i></div>
+        <div class="fold"><span>spodok okna 850 px</span></div>
+      </div></div></div>
+  </div>
+</div>
+
+<div class="chglist">
+  <h4>Zmeny v Korpuse (čísla = štítky v oknách)</h4>
+  <ol>
+    <li><i class="pinl">1</i><span><b>„Vložiť kópiu" a „Uložiť ako šablónu do knižnice"</b> → dve ikony v hlavičke vedľa názvu skrinky (tie isté ikony a tá istá akcia; bublina povie celý názov). Len pri označenej skrinke, ako dnes. <a href="#O1">O1</a></span><span class="px">≈ 78 px</span>
+      <span class="fn"><code>ui/panel.html:914</code>, <code>:916</code> · viditeľnosť <code>ui/css/panel.css:1168–1172</code> · hlavička <code>ui/panel.html:84–96</code></span></li>
+    <li><i class="pinl">2</i><span><b>„Pripravené."</b> → nič, kým nie je čo hlásiť. Správa (najmä chyba) sa ukáže pásom pri spodku okna — skús tlačidlo nad oknom. <a href="#O2">O2</a></span><span class="px">≈ 40 px</span>
+      <span class="fn"><code>ui/panel.html:1063</code> · <code>ui/js/bridge.js:891</code> (NX.setStatus) · <code>ui/css/panel.css:592–594</code></span></li>
+    <li><i class="pinl">3</i><span><b>Pätka „Noxun Engine V0.17.0"</b> → preč; verzia ostáva v koliesku (štítok 3 v raile) → O plugine a v Štúdiu → O plugine. <a href="#O3">O3</a></span><span class="px">≈ 33 px</span>
+      <span class="fn"><code>ui/panel.html:1068</code> · <code>ui/js/bridge.js:301</code></span></li>
+    <li><i class="pinl">4</i><span><b>Nápoveda „Ctrl+koliesko = zoom…"</b> → „?" v spodnom páse náhľadu vedľa kamery. <a href="#O5">O5</a></span><span class="px">≈ 20 px</span>
+      <span class="fn"><code>ui/panel.html:120</code> (.pvhint) · <code>ui/css/panel.css:537</code>, <code>:2188–2196</code></span></li>
+    <li><i class="pinl">5</i><span><b>Nadpis „Rozmery"</b> → preč pri označenej skrinke (lišta „Základné" a ikony pri poliach hovoria to isté). <a href="#O4">O4</a></span><span class="px">≈ 22 px</span>
+      <span class="fn"><code>ui/panel.html:262</code></span></li>
+    <li><i class="pinl">6</i><span><b>Veta „bez spotrebiča — nastav „očakáva"…"</b> → „?" v riadku Spotrebič. Keď skrinka niečo očakáva („očakáva rúru"), veta ostáva viditeľná — to je stav, nie nápoveda.</span><span class="px">≈ 17 px</span>
+      <span class="fn"><code>ui/panel/payloads.rb:313–315</code> (text zo servera) · <code>ui/js/appliance_row.js:81–90</code></span></li>
+    <li><i class="pinl">7</i><span><b>Veta „Materiály tejto skrinky — prázdne = dediť z projektu."</b> → „?" v lište Materiály (voľba „(dediť z projektu)" v poli to hovorí tiež). Pri vkladaní ostáva stavová veta „Označ skrinku pre nastavenie…".</span><span class="px">≈ 21 px</span>
+      <span class="fn"><code>ui/panel.html:395</code> · <code>ui/js/materials.js:18</code>, <code>:33</code></span></li>
+    <li><i class="pinl">8</i><span><b>Lišta Nastavenia</b>: „3 skupiny · všetko zbalené" → „strop 2 výstuhy · boky na dne · chrbát v drážke" (D-05, časť F). <a href="#O12">O12</a></span><span class="px zero">0 px</span>
+      <span class="fn"><code>ui/js/shell.js:214–224</code> (metaGroups)</span></li>
+    <li><i class="pinl">9</i><span><b>Kóty v náhľade</b> 11 px namiesto ~6 px, bez „mm" (D-02, časť E). <a href="#O10">O10</a> · <a href="#O11">O11</a></span><span class="px zero">0 px</span>
+      <span class="fn"><code>ui/js/preview.js:1150–1160</code></span></li>
+    <li class="tot"><span></span><span>Spolu v Korpuse</span><span class="px">≈ 235 px</span></li>
+  </ol>
+</div>
+
+<div class="card" style="margin-top:12px">
+  <h3 style="margin-top:0">Zmestí sa hlavička aj pri dlhom názve a upozorneniach?</h3>
+  <p style="font-size:12.5px">Áno — názov sa skráti tromi bodkami (celý je v bublinke a v premenovaní ceruzkou), ikony, typ a upozornenia ostanú celé. Tak isto sa správa hlavička dnes.</p>
+  <div class="fitbox"><div class="win"><div class="insp short"><nav class="crail" style="padding:0;min-height:40px"></nav><div class="pcont" style="padding-bottom:0">
+    <header class="nxhdr" style="margin-bottom:0;border-bottom:0"><svg class="nx-logo" aria-hidden="true"><use href="#i-logo"/></svg>
+      <div class="idbar"><span class="cid">CAB-014</span><span class="cname"><span class="t">Drezová skrinka s košom na odpad 900</span><svg class="ic"><use href="#i-pencil"/></svg></span><span class="typbadge">Dolná</span><span class="warnchip"><svg class="ic"><use href="#i-alert"/></svg>2</span></div>
+      <span class="hdrtools"><button class="hdrbtn" tabindex="-1"><svg class="ic"><use href="#i-copy"/></svg></button><button class="hdrbtn" tabindex="-1"><svg class="ic"><use href="#i-star"/></svg></button></span></header>
+  </div></div></div></div>
+</div>
+
+<div class="obox" id="O1"><div class="ohead"><span class="otagi">návrh — potvrdí Michal (O1)</span><b>Kam s „Vložiť kópiu" a „Uložiť ako šablónu"</b></div>
+  <dl><dt class="rec">A · odporúčam</dt><dd>Dve ikony v hlavičke vedľa názvu skrinky (kópia, hviezdička — tie isté ako dnes). Vidno ich vždy, aj keď si odscrolloval dole; bublina povie celý názov akcie. Len pri označenej skrinke.</dd>
+      <dt>B</dt><dd>Ostanú dole, ale v jednom riadku ako dve polovičné tlačidlá. Uvoľní len ~39 px a stále treba scrollovať.</dd></dl>
+  <div class="orec"><b>Odporúčanie:</b> A — nezaberú ani jeden riadok a sú stále po ruke.</div>
+  <div class="where">Akcia sa nemení (<code>insertCopySelected</code> <code>ui/js/actions.js:468</code> s kontrolou červených polí, <code>openSaveTemplateModal</code> <code>ui/js/form.js:1765</code>) — mení sa len miesto tlačidla.</div></div>
+
+<div class="obox" id="O2"><div class="ohead"><span class="otagi">návrh — potvrdí Michal (O2)</span><b>Stavová veta („Pripravené." a hlásenia)</b></div>
+  <dl><dt>A</dt><dd>Ostáva na konci panela, ale ukáže sa len vtedy, keď nesie správu. Chyba po kliku hore (napr. kópia pri červenom poli) ostane dole mimo obrazovky — ako dnes.</dd>
+      <dt class="rec">B · odporúčam</dt><dd>Keď príde správa, ukáže sa tenký pás pri spodnom okraji okna, nad obsahom (nič neposunie). Zelená správa zmizne sama po 4 s, červená ostane, kým ju nezavrieš krížikom alebo nepríde ďalšia.</dd></dl>
+  <div class="orec"><b>Odporúčanie:</b> B — chybu uvidíš vždy, aj keď si pri hlavičke. Je to jediný bod, ktorý mení, <i>kedy</i> sa správa ukáže; texty správ ostávajú rovnaké.</div>
+  <div class="where">Správy posiela Ruby (<code>ui/panel/sync.rb:615–617</code> set_status) aj JS (<code>ui/js/actions.js</code>, napr. :473) — všetky idú cez jedno <code>NX.setStatus</code> (<code>ui/js/bridge.js:891</code>), takže zmena je na jednom mieste.</div></div>
+
+<div class="obox" id="O3"><div class="ohead"><span class="otagi">návrh — potvrdí Michal (O3)</span><b>Verzia pluginu v pätke</b></div>
+  <dl><dt class="rec">A · odporúčam</dt><dd>Pätku zrušiť. Verzia ostáva v koliesku → O plugine a v Štúdiu → O plugine (tam je aj kontrola aktualizácie).</dd>
+      <dt>B</dt><dd>Pätku nechať (≈ 33 px na konci každého kontextu).</dd></dl>
+  <div class="orec"><b>Odporúčanie:</b> A — verziu hľadáš raz za čas, nie pri každej skrinke.</div></div>
+
+<div class="obox" id="O4"><div class="ohead"><span class="otagi">návrh — potvrdí Michal (O4)</span><b>Nadpis „Rozmery" v Základných</b></div>
+  <dl><dt class="rec">A · odporúčam</dt><dd>Pri označenej skrinke preč (≈ 22 px). Pri vkladaní nového objektu ostáva — tam oddeľuje dlaždice šablón od rozmerov.</dd>
+      <dt>B</dt><dd>Nechať všade.</dd></dl>
+  <div class="orec"><b>Odporúčanie:</b> A — lišta „Základné", ikony a „mm" pri poliach hovoria to isté.</div></div>
+
+<div class="obox" id="O5"><div class="ohead"><span class="otagi">návrh — potvrdí Michal (O5)</span><b>Kam s nápovedami pod náhľadom a v skupinách</b></div>
+  <dl><dt class="rec">A · odporúčam</dt><dd>Jeden „?" v spodnom páse náhľadu vedľa kamery; bublina povie gestá a to, čo robí klik v danom kontexte (zóna, čelo, značka kovania). Nápovedy skupín (strom zón, Kovanie) idú do „?" v hlavičke skupiny — presne ako už dnes v Čelách. Stavové vety (červené, jantárové, „očakáva rúru") ostávajú viditeľné.</dd>
+      <dt>B</dt><dd>Gestá napísať do lišty sektora Náhľad (návrh GR-22). Na šírke 486 px sa nezmestia a zabrali by miesto rozmerom skrinky z O6.</dd></dl>
+  <div class="orec"><b>Odporúčanie:</b> A — to isté pravidlo, aké už platí („pomocný text = bublina", UI_DIZAJN §1).</div>
+  <div class="where">Hinty: <code>ui/panel.html:120</code>, <code>:395</code>, <code>:574–575</code>, <code>:761–764</code>, <code>:776–777</code>, <code>:785–786</code>; komponent „?" <code>ui/css/panel.css:271–300</code> (.nxtip).</div></div>
+
+<!-- ============================ B · ČELÁ ============================ -->
+<div class="sh" id="secB"><span class="shl">B</span><h2>Kontext Čelá</h2>
+  <span class="shsub">Tá istá skrinka, jedno zásuvkové čelo F1 760. Dnes sa kontext zmestí tesne a spodok zaberajú tlačidlá a pätka; v návrhu ostane pod obsahom ~240 px voľného miesta na rozbalenú skupinu.</span></div>
+<div class="pair">
+  <div class="col">
+    <div class="colhead"><span class="ct dnes">Dnes</span><span class="cs">v0.17.0 · okno 486 × 850</span></div>
+    <div class="fitbox"><div class="win"><div class="winhead"><span class="wd"><i></i><i></i><i></i></span>Noxun Inspector — Čelá<span class="wsize">486 px</span></div>
+      <div class="insp">
+        <nav class="crail" data-ctx="cela"></nav>
+        <div class="pcont">
+          <header class="nxhdr"><svg class="nx-logo" aria-hidden="true"><use href="#i-logo"/></svg>
+            <div class="idbar"><span class="cid">CAB-001</span><span class="cname"><span class="t">Spodná skrinka 800</span><svg class="ic"><use href="#i-pencil"/></svg></span><span class="typbadge">Dolná</span></div></header>
+          <section class="sect"><div class="secthead"><svg class="ic chev"><use href="#i-chevron-down"/></svg><span class="sn">Náhľad</span><span class="meta">Čelá</span></div>
+            <div class="sectbody"><div class="pvbox new"><i class="pin">6</i><svg class="pvsvg" data-pv="fronts" data-mode="dnes" data-w="800" data-h="864" data-fh="100" data-fr="c800" viewBox="0 0 404 323" preserveAspectRatio="xMidYMid meet"></svg></div>
+              <div class="pvbar"><span class="pvchips"><span class="lchip"><svg class="ic"><use href="#i-eye-off"/></svg>Zóny</span><span class="lchip base"><svg class="ic"><use href="#i-eye"/></svg>Čelá</span><span class="lchip"><svg class="ic"><use href="#i-eye-off"/></svg>Kovanie</span><span class="lchip off"><svg class="ic"><use href="#i-eye-off"/></svg>Olep</span></span><span class="pvsp"></span><span class="pvtool"><svg class="ic"><use href="#i-camera"/></svg></span><span class="pvtool"><svg class="ic"><use href="#i-maximize"/></svg></span></div>
+              <div class="pvhint gone"><i class="pin x">2</i>Klik na čelo = jeho riadok v zozname · Ctrl+koliesko = zoom · ťahaj plochu = posun pohľadu</div>
+            </div></section>
+          <div class="ctxnote gone"><i class="pin x">1</i>Skrinka <b>800 × 864 × 520 · W1100 ST30 Alpská biela · DTDL 18 mm</b> — rozmery a materiály <u>upravíš v Korpuse</u></div>
+          <section class="sect"><div class="secthead new"><i class="pin">4</i><svg class="ic chev"><use href="#i-chevron-down"/></svg><span class="sn">Čelá</span><span class="meta">2 skupiny · všetko zbalené</span></div>
+            <div class="sectbody">
+              <div class="grp"><svg class="ic gch"><use href="#i-chevron-right"/></svg><svg class="ic gic"><use href="#i-front"/></svg>Čelá<span class="gtools"><span class="gmeta">1 čelo</span><span class="ibtn"><svg class="ic"><use href="#i-profile"/></svg>všetkým</span><span class="nxtip inl"><svg class="ic"><use href="#i-help-circle"/></svg></span></span></div>
+              <div class="grp new"><i class="pin">5</i><svg class="ic gch"><use href="#i-chevron-right"/></svg><svg class="ic gic"><use href="#i-cabinet"/></svg>Spoločné pre skrinku<span class="gtools"><span class="gmeta">F206 ST9 Piet… · 3 · 2/2/2/2</span><span class="ibtn"><svg class="ic"><use href="#i-lock"/></svg></span><span class="ibtn"><svg class="ic"><use href="#i-rotate-ccw"/></svg></span><span class="nxtip inl"><svg class="ic"><use href="#i-help-circle"/></svg></span></span></div>
+            </div></section>
+          <div class="botblk gone"><i class="pin x">3</i>
+            <button class="ghostbtn wide" tabindex="-1"><svg class="ic"><use href="#i-copy"/></svg>Vložiť kópiu</button>
+            <button class="ghostbtn wide" tabindex="-1"><svg class="ic"><use href="#i-star"/></svg>Uložiť ako šablónu do knižnice</button>
+            <div class="status">Pripravené.</div>
+            <footer class="nxfoot">Noxun Engine V0.17.0</footer></div>
+        </div>
+        <div class="fold"><span>spodok okna 850 px</span></div>
+      </div></div></div>
+  </div>
+  <div class="col">
+    <div class="colhead"><span class="ct navrh">Návrh</span><span class="save">uvoľní ≈ 225 px</span></div>
+    <div class="fitbox"><div class="win"><div class="winhead"><span class="wd"><i></i><i></i><i></i></span>Noxun Inspector — Čelá<span class="wsize">486 px</span></div>
+      <div class="insp">
+        <nav class="crail" data-ctx="cela"></nav>
+        <div class="pcont">
+          <header class="nxhdr"><svg class="nx-logo" aria-hidden="true"><use href="#i-logo"/></svg>
+            <div class="idbar"><span class="cid">CAB-001</span><span class="cname"><span class="t">Spodná skrinka 800</span><svg class="ic"><use href="#i-pencil"/></svg></span><span class="typbadge">Dolná</span></div>
+            <span class="hdrtools new"><i class="pin">3</i><button class="hdrbtn" tabindex="-1" title="Vložiť kópiu"><svg class="ic"><use href="#i-copy"/></svg></button><button class="hdrbtn" tabindex="-1" title="Uložiť ako šablónu do knižnice…"><svg class="ic"><use href="#i-star"/></svg></button></span></header>
+          <section class="sect"><div class="secthead new"><i class="pin">1</i><svg class="ic chev"><use href="#i-chevron-down"/></svg><span class="sn">Náhľad</span>
+              <button type="button" class="metalink" title="Korpus: W1100 ST30 Alpská biela · DTDL 18 mm — klik otvorí Korpus"><span>800 × 864 × 520 · sokel 100</span><svg class="ic"><use href="#i-arrow-right"/></svg></button></div>
+            <div class="sectbody"><div class="pvbox new"><i class="pin">6</i><svg class="pvsvg" data-pv="fronts" data-mode="navrh" data-w="800" data-h="864" data-fh="100" data-fr="c800" viewBox="0 0 404 323" preserveAspectRatio="xMidYMid meet"></svg></div>
+              <div class="pvbar"><span class="pvchips"><span class="lchip"><svg class="ic"><use href="#i-eye-off"/></svg>Zóny</span><span class="lchip base"><svg class="ic"><use href="#i-eye"/></svg>Čelá</span><span class="lchip"><svg class="ic"><use href="#i-eye-off"/></svg>Kovanie</span><span class="lchip off"><svg class="ic"><use href="#i-eye-off"/></svg>Olep</span></span><span class="pvsp"></span>
+                <span class="new" style="display:inline-flex;border-radius:50%"><i class="pin">2</i><button type="button" class="nxtip" aria-label="Pomoc" data-tip="Klik na čelo = jeho riadok v zozname · Ctrl+koliesko = zoom · ťahaj plochu = posun pohľadu."><svg class="ic"><use href="#i-help-circle"/></svg></button></span>
+                <span class="pvtool"><svg class="ic"><use href="#i-camera"/></svg></span><span class="pvtool"><svg class="ic"><use href="#i-maximize"/></svg></span></div>
+            </div></section>
+          <section class="sect"><div class="secthead new"><i class="pin">4</i><svg class="ic chev"><use href="#i-chevron-down"/></svg><span class="sn">Čelá</span><span class="meta">1 čelo · F206 ST9 · medzera 3 · okraje 2</span></div>
+            <div class="sectbody">
+              <div class="grp"><svg class="ic gch"><use href="#i-chevron-right"/></svg><svg class="ic gic"><use href="#i-front"/></svg>Čelá<span class="gtools"><span class="gmeta">1 čelo</span><span class="ibtn"><svg class="ic"><use href="#i-profile"/></svg>všetkým</span><span class="nxtip inl"><svg class="ic"><use href="#i-help-circle"/></svg></span></span></div>
+              <div class="grp new"><i class="pin">5</i><svg class="ic gch"><use href="#i-chevron-right"/></svg><svg class="ic gic"><use href="#i-cabinet"/></svg>Spoločné pre skrinku<span class="gtools"><span class="gmeta" title="F206 ST9 Pietra Grigia čierna · DTDL 18 mm">F206 ST9 · medzera 3 · okraje 2</span><span class="ibtn"><svg class="ic"><use href="#i-lock"/></svg></span><span class="ibtn"><svg class="ic"><use href="#i-rotate-ccw"/></svg></span><span class="nxtip inl"><svg class="ic"><use href="#i-help-circle"/></svg></span></span></div>
+            </div></section>
+        </div>
+        <div class="fold"><span>spodok okna 850 px</span></div>
+      </div></div></div>
+  </div>
+</div>
+
+<div class="chglist">
+  <h4>Zmeny v Čelách</h4>
+  <ol>
+    <li><i class="pinl">1</i><span><b>Pás „Skrinka 800 × 864 × 520 · W1100… — upravíš v Korpuse"</b> → rozmery v lište Náhľadu „800 × 864 × 520 · sokel 100 →"; klik otvorí Korpus (ako dnes odkaz v páse), bublina ukáže materiál korpusu. <a href="#O6">O6</a></span><span class="px">≈ 50 px</span>
+      <span class="fn"><code>ui/panel.html:457</code> (#ctxNote, <code>setViewContext('korpus')</code>) · <code>ui/js/shell.js:125</code> (sectorVis), <code>:138</code> (ctxNoteText), <code>:157</code> (PV_TITLE) · CSS <code>ui/css/panel.css:1477–1485</code></span></li>
+    <li><i class="pinl">2</i><span><b>Nápoveda „Klik na čelo = … · Ctrl+koliesko…"</b> → „?" v páse náhľadu. <a href="#O5">O5</a></span><span class="px">≈ 20 px</span></li>
+    <li><i class="pinl">3</i><span><b>Spodný blok</b> (kópia, šablóna, „Pripravené.", verzia) → ikony v hlavičke / správa len keď je / verzia v koliesku. <a href="#O1">O1</a>–<a href="#O3">O3</a></span><span class="px">≈ 155 px</span></li>
+    <li><i class="pinl">4</i><span><b>Lišta sektora Čelá</b>: „2 skupiny · všetko zbalené" → „1 čelo · F206 ST9 · medzera 3 · okraje 2". <a href="#O12">O12</a></span><span class="px zero">0 px</span></li>
+    <li><i class="pinl">5</i><span><b>Súhrn „Spoločné pre skrinku"</b>: „F206 ST9 Piet… · 3 · 2/2/2/2" → „F206 ST9 · medzera 3 · okraje 2" (celý dekor v bublinke). <a href="#O7">O7</a></span><span class="px zero">0 px</span>
+      <span class="fn"><code>ui/js/core.js:583–598</code> (cabfrontMetaText)</span></li>
+    <li><i class="pinl">6</i><span><b>Popis čela a kóty</b> 11 px (dnes 6 px): „F1 · zásuvka 760", „760", „796", medzery „2". Časť E.</span><span class="px zero">0 px</span>
+      <span class="fn"><code>ui/js/preview.js:1076</code>, <code>:1238–1242</code></span></li>
+    <li class="tot"><span></span><span>Spolu v Čelách</span><span class="px">≈ 225 px</span></li>
+  </ol>
+</div>
+
+<div class="obox" id="O6"><div class="ohead"><span class="otagi">návrh — potvrdí Michal (O6)</span><b>Kam s rozmermi skrinky, keď zmizne pás „…upravíš v Korpuse"</b></div>
+  <dl><dt class="rec">A · odporúčam</dt><dd>Do lišty sektora Náhľad v Zónach, Čelách a Kovaní: „800 × 864 × 520 · sokel 100 →". Klik otvorí Korpus, bublina ukáže aj materiál korpusu. Uvoľní ~50 px.</dd>
+      <dt>B</dt><dd>Do hlavičky vedľa „DOLNÁ". Pri dlhom názve a upozorneniach by sa názov skrinky skrátil na pár písmen.</dd>
+      <dt>C</dt><dd>Pás nechať, ale na jeden riadok bez materiálu. Uvoľní len ~22 px.</dd></dl>
+  <div class="orec"><b>Odporúčanie:</b> A — rozmery ostanú na očiach a klik vedie tam, kde sa menia.</div>
+  <div class="where"><b>Fakt z kódu:</b> dnes klik na rozmery v lište Základné (<code>ui/panel.html:182</code>, #s2Meta) len zbalí/rozbalí sektor — do Korpusu vedie jedine odkaz „upravíš v Korpuse" v páse. Lišta Náhľadu dnes píše len názov pohľadu („Zóny", „Čelá", „Kovanie — pozície"), ktorý už hovorí rail aj plný čip pod náhľadom.</div></div>
+
+<div class="obox" id="O7"><div class="ohead"><span class="otagi">návrh — potvrdí Michal (O7)</span><b>Súhrn „Spoločné pre skrinku"</b></div>
+  <dl><dt class="rec">A · odporúčam</dt><dd>„F206 ST9 · medzera 3 · okraje 2". Dekor skrátený na prvé dve slová (kód), celý názov v bublinke. Keď sa okraje líšia, vypíše sa spoločná hodnota a výnimka: „okraje 2 · dole −20".</dd>
+      <dt>B</dt><dd>„F206 ST9 · medzera 3 · okraje 2/−20/2/2" (poradie hore/dole/vľavo/vpravo) — kratšie, ale treba si pamätať poradie.</dd></dl>
+  <div class="orec"><b>Odporúčanie:</b> A — prečítaš to bez legendy.</div></div>
+
+<!-- ============================ C · ZÓNY ============================ -->
+<div class="sh" id="secC"><span class="shl">C</span><h2>Kontext Zóny <span style="font-size:12px;font-weight:400;color:var(--nx-ink-muted)">(hlavička a súhrny; náhľad je skrátený)</span></h2>
+  <span class="shsub">Zóny majú najviac pomocného textu: dvojriadkovú nápovedu, riadok s prepínačom ghostu, pás a nápovedu pod stromom.</span></div>
+<div class="pair">
+  <div class="col">
+    <div class="colhead"><span class="ct dnes">Dnes</span><span class="cs">v0.17.0</span></div>
+    <div class="fitbox"><div class="win"><div class="winhead"><span class="wd"><i></i><i></i><i></i></span>Noxun Inspector — Zóny<span class="wsize">486 px</span></div>
+      <div class="insp short">
+        <nav class="crail" data-ctx="zony"></nav>
+        <div class="pcont">
+          <header class="nxhdr"><svg class="nx-logo" aria-hidden="true"><use href="#i-logo"/></svg>
+            <div class="idbar"><span class="cid">CAB-001</span><span class="cname"><span class="t">Spodná skrinka 800</span><svg class="ic"><use href="#i-pencil"/></svg></span><span class="typbadge">Dolná</span></div></header>
+          <section class="sect"><div class="secthead"><svg class="ic chev"><use href="#i-chevron-down"/></svg><span class="sn">Náhľad</span><span class="meta">Zóny</span></div>
+            <div class="sectbody"><div class="pvskip">náhľad 323 px — rozloženie bez zmeny (kóty: časť E)</div>
+              <div class="pvbar"><span class="pvchips"><span class="lchip base"><svg class="ic"><use href="#i-eye"/></svg>Zóny</span><span class="lchip"><svg class="ic"><use href="#i-eye-off"/></svg>Čelá</span><span class="lchip"><svg class="ic"><use href="#i-eye-off"/></svg>Kovanie</span><span class="lchip off"><svg class="ic"><use href="#i-eye-off"/></svg>Olep</span></span><span class="pvsp"></span><span class="pvtool"><svg class="ic"><use href="#i-camera"/></svg></span><span class="pvtool"><svg class="ic"><use href="#i-maximize"/></svg></span></div>
+              <div class="pvhint gone"><i class="pin x">1</i>Klik na zónu = výber (police, delenie) · ťahaj priečku = posun (magnet 1/4 · 1/2 · 3/4, Alt ho vypne) · Ctrl+koliesko = zoom · ťahaj plochu = posun pohľadu</div>
+              <div class="zoneline gone"><i class="pin x">2</i><span class="cb"></span>Zobraziť zóny (ghost) v modeli</div>
+            </div></section>
+          <div class="ctxnote gone"><i class="pin x">3</i>Skrinka <b>800 × 864 × 520 · W1100 ST30 Alpská biela · DTDL 18 mm</b> — rozmery a materiály <u>upravíš v Korpuse</u></div>
+          <section class="sect"><div class="secthead new"><i class="pin">5</i><svg class="ic chev"><use href="#i-chevron-down"/></svg><span class="sn">Zóny</span><span class="meta">Štruktúra zón</span></div>
+            <div class="sectbody">
+              <div class="grpbox"><div class="grp open"><svg class="ic gch"><use href="#i-chevron-down"/></svg><svg class="ic gic"><use href="#i-layout-grid"/></svg>Štruktúra zón</div>
+                <div class="gbody"><div class="ztree"><b>Celé vnútro</b><span>764 × 646 prázdna</span></div>
+                  <div class="hint gone" style="margin:6px 0 0"><i class="pin x">4</i>Klik na zónu (tu alebo v náhľade) ju vyberie — delenie a police sa potom týkajú jej. Strom má najviac 3 úrovne.</div></div></div>
+              <div class="grp"><svg class="ic gch"><use href="#i-chevron-right"/></svg><svg class="ic gic"><use href="#i-columns-2"/></svg>Delenie zóny</div>
+              <div class="grp"><svg class="ic gch"><use href="#i-chevron-right"/></svg><svg class="ic gic"><use href="#i-rows-3"/></svg>Police</div>
+              <div class="grp"><svg class="ic gch"><use href="#i-chevron-right"/></svg><svg class="ic gic"><use href="#i-box"/></svg>Vnútro</div>
+            </div></section>
+          <div class="botblk gone"><i class="pin x">6</i>
+            <button class="ghostbtn wide" tabindex="-1"><svg class="ic"><use href="#i-copy"/></svg>Vložiť kópiu</button>
+            <button class="ghostbtn wide" tabindex="-1"><svg class="ic"><use href="#i-star"/></svg>Uložiť ako šablónu do knižnice</button>
+            <div class="status">Pripravené.</div>
+            <footer class="nxfoot">Noxun Engine V0.17.0</footer></div>
+        </div>
+      </div></div></div>
+  </div>
+  <div class="col">
+    <div class="colhead"><span class="ct navrh">Návrh</span><span class="save">uvoľní ≈ 290 px</span></div>
+    <div class="fitbox"><div class="win"><div class="winhead"><span class="wd"><i></i><i></i><i></i></span>Noxun Inspector — Zóny<span class="wsize">486 px</span></div>
+      <div class="insp short">
+        <nav class="crail" data-ctx="zony" data-pin-eye="2"></nav>
+        <div class="pcont">
+          <header class="nxhdr"><svg class="nx-logo" aria-hidden="true"><use href="#i-logo"/></svg>
+            <div class="idbar"><span class="cid">CAB-001</span><span class="cname"><span class="t">Spodná skrinka 800</span><svg class="ic"><use href="#i-pencil"/></svg></span><span class="typbadge">Dolná</span></div>
+            <span class="hdrtools new"><i class="pin">6</i><button class="hdrbtn" tabindex="-1"><svg class="ic"><use href="#i-copy"/></svg></button><button class="hdrbtn" tabindex="-1"><svg class="ic"><use href="#i-star"/></svg></button></span></header>
+          <section class="sect"><div class="secthead new"><i class="pin">3</i><svg class="ic chev"><use href="#i-chevron-down"/></svg><span class="sn">Náhľad</span>
+              <button type="button" class="metalink" title="Korpus: W1100 ST30 Alpská biela · DTDL 18 mm — klik otvorí Korpus"><span>800 × 864 × 520 · sokel 100</span><svg class="ic"><use href="#i-arrow-right"/></svg></button></div>
+            <div class="sectbody"><div class="pvskip">náhľad 323 px — rozloženie bez zmeny</div>
+              <div class="pvbar"><span class="pvchips"><span class="lchip base"><svg class="ic"><use href="#i-eye"/></svg>Zóny</span><span class="lchip"><svg class="ic"><use href="#i-eye-off"/></svg>Čelá</span><span class="lchip"><svg class="ic"><use href="#i-eye-off"/></svg>Kovanie</span><span class="lchip off"><svg class="ic"><use href="#i-eye-off"/></svg>Olep</span></span><span class="pvsp"></span>
+                <span class="new" style="display:inline-flex;border-radius:50%"><i class="pin">1</i><button type="button" class="nxtip" aria-label="Pomoc" data-tip="Klik na zónu = výber (police, delenie) · ťahaj priečku = posun (magnet 1/4 · 1/2 · 3/4, Alt ho vypne) · Ctrl+koliesko = zoom · ťahaj plochu = posun pohľadu."><svg class="ic"><use href="#i-help-circle"/></svg></button></span>
+                <span class="pvtool"><svg class="ic"><use href="#i-camera"/></svg></span><span class="pvtool"><svg class="ic"><use href="#i-maximize"/></svg></span></div>
+            </div></section>
+          <section class="sect"><div class="secthead new"><i class="pin">5</i><svg class="ic chev"><use href="#i-chevron-down"/></svg><span class="sn">Zóny</span><span class="meta">1 zóna · prázdna</span></div>
+            <div class="sectbody">
+              <div class="grpbox new"><i class="pin">4</i><div class="grp open"><svg class="ic gch"><use href="#i-chevron-down"/></svg><svg class="ic gic"><use href="#i-layout-grid"/></svg>Štruktúra zón<span class="gtools"><button type="button" class="nxtip inl" aria-label="Pomoc" data-tip="Klik na zónu (tu alebo v náhľade) ju vyberie — delenie a police sa potom týkajú jej. Strom má najviac 3 úrovne."><svg class="ic"><use href="#i-help-circle"/></svg></button></span></div>
+                <div class="gbody"><div class="ztree"><b>Celé vnútro</b><span>764 × 646 prázdna</span></div></div></div>
+              <div class="grp"><svg class="ic gch"><use href="#i-chevron-right"/></svg><svg class="ic gic"><use href="#i-columns-2"/></svg>Delenie zóny</div>
+              <div class="grp"><svg class="ic gch"><use href="#i-chevron-right"/></svg><svg class="ic gic"><use href="#i-rows-3"/></svg>Police</div>
+              <div class="grp"><svg class="ic gch"><use href="#i-chevron-right"/></svg><svg class="ic gic"><use href="#i-box"/></svg>Vnútro</div>
+            </div></section>
+        </div>
+      </div></div></div>
+  </div>
+</div>
+
+<div class="chglist">
+  <h4>Zmeny v Zónach</h4>
+  <ol>
+    <li><i class="pinl">1</i><span><b>Dvojriadková nápoveda</b> (klik na zónu, ťahanie priečky, magnet, zoom) → „?" v páse náhľadu. <a href="#O5">O5</a></span><span class="px">≈ 30 px</span></li>
+    <li><i class="pinl">2</i><span><b>„Zobraziť zóny (ghost) v modeli"</b> → riadok preč; ten istý prepínač je v raile pod okom „Viditeľnosť tagov" → „Zóny (ghost)" (štítok 2 v raile). <a href="#O8">O8</a></span><span class="px">≈ 22 px</span>
+      <span class="fn"><code>ui/panel.html:121–127</code> · <code>core/tags.rb:47</code> (kľúč <code>zony</code> = „Zóny (ghost)")</span></li>
+    <li><i class="pinl">3</i><span><b>Pás „Skrinka … upravíš v Korpuse"</b> → rozmery v lište Náhľadu. <a href="#O6">O6</a></span><span class="px">≈ 50 px</span></li>
+    <li><i class="pinl">4</i><span><b>Nápoveda pod stromom</b> → „?" v hlavičke skupiny Štruktúra zón. <a href="#O5">O5</a></span><span class="px">≈ 33 px</span>
+      <span class="fn"><code>ui/panel.html:574–575</code></span></li>
+    <li><i class="pinl">5</i><span><b>Lišta sektora Zóny</b>: „Štruktúra zón" → „1 zóna · prázdna" (pri delení napr. „4 zóny · 3 police"). <a href="#O12">O12</a></span><span class="px zero">0 px</span></li>
+    <li><i class="pinl">6</i><span><b>Spodný blok</b> → ikony v hlavičke / preč. <a href="#O1">O1</a>–<a href="#O3">O3</a></span><span class="px">≈ 155 px</span></li>
+    <li class="tot"><span></span><span>Spolu v Zónach</span><span class="px">≈ 290 px</span></li>
+  </ol>
+</div>
+
+<div class="obox" id="O8"><div class="ohead"><span class="otagi">návrh — potvrdí Michal (O8)</span><b>Prepínač „Zobraziť zóny (ghost) v modeli"</b></div>
+  <dl><dt class="rec">A · odporúčam</dt><dd>Riadok preč. Ten istý prepínač (ten istý tag Noxun/Zóny a ten istý stav) je v raile pod okom „Viditeľnosť tagov" → „Zóny (ghost)". Nič sa nestratí, je len o klik ďalej.</dd>
+      <dt>B</dt><dd>Malá ikona v spodnom páse náhľadu, len v kontexte Zóny — druhé tlačidlo na to isté.</dd></dl>
+  <div class="orec"><b>Odporúčanie:</b> A — jedna vec, jedno miesto; oko v raile už ukazuje, keď je niečo skryté.</div>
+  <div class="where">Testy, ktoré dnešný riadok držia: <code>tests/pure/test_d27_tagy.rb:291</code>, <code>tests/js/test_usage.js:118</code>.</div></div>
+
+<!-- ============================ D · KOVANIE ============================ -->
+<div class="sh" id="secD"><span class="shl">D</span><h2>Kontext Kovanie <span style="font-size:12px;font-weight:400;color:var(--nx-ink-muted)">(hlavička a súhrny)</span></h2>
+  <span class="shsub">Skupiny sú zbalené. Keď dnes otvoríš Položky, Sety alebo Pravidlá, pribudne ešte 2–4 riadky stálej nápovedy (30–55 px).</span></div>
+<div class="pair">
+  <div class="col">
+    <div class="colhead"><span class="ct dnes">Dnes</span><span class="cs">v0.17.0</span></div>
+    <div class="fitbox"><div class="win"><div class="winhead"><span class="wd"><i></i><i></i><i></i></span>Noxun Inspector — Kovanie<span class="wsize">486 px</span></div>
+      <div class="insp short">
+        <nav class="crail" data-ctx="kovanie"></nav>
+        <div class="pcont">
+          <header class="nxhdr"><svg class="nx-logo" aria-hidden="true"><use href="#i-logo"/></svg>
+            <div class="idbar"><span class="cid">CAB-001</span><span class="cname"><span class="t">Spodná skrinka 800</span><svg class="ic"><use href="#i-pencil"/></svg></span><span class="typbadge">Dolná</span></div></header>
+          <section class="sect"><div class="secthead"><svg class="ic chev"><use href="#i-chevron-down"/></svg><span class="sn">Náhľad</span><span class="meta">Kovanie — pozície</span></div>
+            <div class="sectbody"><div class="pvskip">náhľad 323 px — súhrn kovania je dnes vnútri kresby (pozri nižšie)</div>
+              <div class="pvbar"><span class="pvchips"><span class="lchip"><svg class="ic"><use href="#i-eye-off"/></svg>Zóny</span><span class="lchip"><svg class="ic"><use href="#i-eye-off"/></svg>Čelá</span><span class="lchip base"><svg class="ic"><use href="#i-eye"/></svg>Kovanie</span><span class="lchip off"><svg class="ic"><use href="#i-eye-off"/></svg>Olep</span></span><span class="pvsp"></span><span class="pvtool"><svg class="ic"><use href="#i-camera"/></svg></span><span class="pvtool"><svg class="ic"><use href="#i-maximize"/></svg></span></div>
+              <div class="pvhint gone"><i class="pin x">1</i>Ctrl+koliesko = zoom · ťahaj plochu = posun pohľadu</div>
+            </div></section>
+          <div class="ctxnote gone"><i class="pin x">2</i>Skrinka <b>800 × 864 × 520 · W1100 ST30 Alpská biela · DTDL 18 mm</b> — rozmery a materiály <u>upravíš v Korpuse</u></div>
+          <section class="sect"><div class="secthead new"><i class="pin">4</i><svg class="ic chev"><use href="#i-chevron-down"/></svg><span class="sn">Kovanie</span><span class="meta">3 skupiny · všetko zbalené</span></div>
+            <div class="sectbody">
+              <div class="grp"><svg class="ic gch"><use href="#i-chevron-right"/></svg><svg class="ic gic"><use href="#i-hammer"/></svg>Položky z pravidiel</div>
+              <div class="grp"><svg class="ic gch"><use href="#i-chevron-right"/></svg><svg class="ic gic"><use href="#i-layers"/></svg>Sety</div>
+              <div class="grp"><svg class="ic gch"><use href="#i-chevron-right"/></svg><svg class="ic gic"><use href="#i-settings"/></svg>Pravidlá</div>
+            </div></section>
+          <div class="botblk gone"><i class="pin x">3</i>
+            <button class="ghostbtn wide" tabindex="-1"><svg class="ic"><use href="#i-copy"/></svg>Vložiť kópiu</button>
+            <button class="ghostbtn wide" tabindex="-1"><svg class="ic"><use href="#i-star"/></svg>Uložiť ako šablónu do knižnice</button>
+            <div class="status">Pripravené.</div>
+            <footer class="nxfoot">Noxun Engine V0.17.0</footer></div>
+        </div>
+      </div></div></div>
+  </div>
+  <div class="col">
+    <div class="colhead"><span class="ct navrh">Návrh</span><span class="save">uvoľní ≈ 225 px</span></div>
+    <div class="fitbox"><div class="win"><div class="winhead"><span class="wd"><i></i><i></i><i></i></span>Noxun Inspector — Kovanie<span class="wsize">486 px</span></div>
+      <div class="insp short">
+        <nav class="crail" data-ctx="kovanie"></nav>
+        <div class="pcont">
+          <header class="nxhdr"><svg class="nx-logo" aria-hidden="true"><use href="#i-logo"/></svg>
+            <div class="idbar"><span class="cid">CAB-001</span><span class="cname"><span class="t">Spodná skrinka 800</span><svg class="ic"><use href="#i-pencil"/></svg></span><span class="typbadge">Dolná</span></div>
+            <span class="hdrtools new"><i class="pin">3</i><button class="hdrbtn" tabindex="-1"><svg class="ic"><use href="#i-copy"/></svg></button><button class="hdrbtn" tabindex="-1"><svg class="ic"><use href="#i-star"/></svg></button></span></header>
+          <section class="sect"><div class="secthead new"><i class="pin">2</i><svg class="ic chev"><use href="#i-chevron-down"/></svg><span class="sn">Náhľad</span>
+              <button type="button" class="metalink" title="Korpus: W1100 ST30 Alpská biela · DTDL 18 mm — klik otvorí Korpus"><span>800 × 864 × 520 · sokel 100</span><svg class="ic"><use href="#i-arrow-right"/></svg></button></div>
+            <div class="sectbody"><div class="pvskip">náhľad 323 px — kresba bez textov, väčšia (pozri nižšie)</div>
+              <div class="pvbar"><span class="pvchips"><span class="lchip"><svg class="ic"><use href="#i-eye-off"/></svg>Zóny</span><span class="lchip"><svg class="ic"><use href="#i-eye-off"/></svg>Čelá</span><span class="lchip base"><svg class="ic"><use href="#i-eye"/></svg>Kovanie</span><span class="lchip off"><svg class="ic"><use href="#i-eye-off"/></svg>Olep</span></span><span class="pvsp"></span>
+                <span class="new" style="display:inline-flex;border-radius:50%"><i class="pin">1</i><button type="button" class="nxtip" aria-label="Pomoc" data-tip="Klik na značku = označí vlastníka v modeli · pozície sú orientačné · Ctrl+koliesko = zoom · ťahaj plochu = posun pohľadu."><svg class="ic"><use href="#i-help-circle"/></svg></button></span>
+                <span class="pvtool"><svg class="ic"><use href="#i-camera"/></svg></span><span class="pvtool"><svg class="ic"><use href="#i-maximize"/></svg></span></div>
+            </div></section>
+          <section class="sect"><div class="secthead new"><i class="pin">4</i><svg class="ic chev"><use href="#i-chevron-down"/></svg><span class="sn">Kovanie</span><span class="meta">Nohy 4× · Výsuv 1× · Príchyt sokla 1×</span></div>
+            <div class="sectbody">
+              <div class="grp new"><i class="pin">5</i><svg class="ic gch"><use href="#i-chevron-right"/></svg><svg class="ic gic"><use href="#i-hammer"/></svg>Položky z pravidiel<span class="gtools"><span class="gmeta">6 ks</span><button type="button" class="nxtip inl" aria-label="Pomoc" data-tip="Položky sú zoskupené podľa vlastníka — skrinka a každé čelo má svoj box. Klik na hlavičku boxu označí vlastníka v modeli. Počty určujú pravidlá; zmena počtu je ručný zásah pre túto skrinku a šípka späť vráti pravidlo."><svg class="ic"><use href="#i-help-circle"/></svg></button></span></div>
+              <div class="grp"><svg class="ic gch"><use href="#i-chevron-right"/></svg><svg class="ic gic"><use href="#i-layers"/></svg>Sety<span class="gtools"><span class="gmeta">podľa projektu</span><button type="button" class="nxtip inl" aria-label="Pomoc" data-tip="Set nesie pásmo (dĺžky, nosnosti) — z neho vie Nákup vybrať správny kód. Vlastný set jedného čela sa vyberá priamo v jeho boxe medzi položkami."><svg class="ic"><use href="#i-help-circle"/></svg></button></span></div>
+              <div class="grp"><svg class="ic gch"><use href="#i-chevron-right"/></svg><svg class="ic gic"><use href="#i-settings"/></svg>Pravidlá<span class="gtools"><button type="button" class="nxtip inl" aria-label="Pomoc" data-tip="Počty určujú pravidlá projektu (nohy podľa podstavca, závesy podľa výšky, výsuv podľa hĺbky). Katalóg drží kódy a ceny, z ktorých sa skladá nákup."><svg class="ic"><use href="#i-help-circle"/></svg></button></span></div>
+            </div></section>
+        </div>
+      </div></div></div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:14px">
+  <h3 style="margin-top:0">Kresba kovania — súhrn dnes vnútri kresby, v návrhu v lište</h3>
+  <div class="pvcmp">
+    <div class="pvcell"><div class="pvct"><span class="colhead" style="margin:0;width:auto"><span class="ct dnes">Dnes</span></span>text pod skrinkou, písmo v mm modelu</div>
+      <div class="pvframe"><svg data-pv="hw" data-mode="dnes" data-w="800" data-h="864" data-fh="100" data-read="hwR1" viewBox="0 0 404 323"></svg></div><div class="pvread" id="hwR1"></div></div>
+    <div class="pvcell"><div class="pvct"><span class="colhead" style="margin:0;width:auto"><span class="ct navrh">Návrh · O9 A</span></span>bez textov, kresba sa zväčší</div>
+      <div class="pvframe"><svg data-pv="hw" data-mode="navrh" data-w="800" data-h="864" data-fh="100" data-read="hwR2" viewBox="0 0 404 323"></svg></div><div class="pvread" id="hwR2"></div></div>
+  </div>
+</div>
+
+<div class="chglist">
+  <h4>Zmeny v Kovaní</h4>
+  <ol>
+    <li><i class="pinl">1</i><span><b>Nápoveda gest</b> + veta „klik na značku = označí vlastníka · pozície sú orientačné" (dnes drobným písmom v kresbe) → „?" v páse. <a href="#O5">O5</a></span><span class="px">≈ 20 px</span></li>
+    <li><i class="pinl">2</i><span><b>Pás „Skrinka … upravíš v Korpuse"</b> → rozmery v lište Náhľadu. <a href="#O6">O6</a></span><span class="px">≈ 50 px</span></li>
+    <li><i class="pinl">3</i><span><b>Spodný blok</b> → ikony v hlavičke / preč. <a href="#O1">O1</a>–<a href="#O3">O3</a></span><span class="px">≈ 155 px</span></li>
+    <li><i class="pinl">4</i><span><b>Lišta sektora Kovanie</b>: „3 skupiny · všetko zbalené" → „Nohy 4× · Výsuv 1× · Príchyt sokla 1×" (ten istý súhrn, aký dnes kreslí náhľad). <a href="#O9">O9</a> · <a href="#O12">O12</a></span><span class="px zero">0 px</span>
+      <span class="fn"><code>ui/js/preview.js:1277–1278</code>, <code>:1422</code> (nxHwSummary)</span></li>
+    <li><i class="pinl">5</i><span><b>Nápovedy troch skupín</b> → „?" v hlavičke skupiny; skupiny dostanú súhrn („6 ks", „podľa projektu" / „1 vlastný"). <a href="#O5">O5</a></span><span class="px">+30–55 px pri otvorenej skupine</span>
+      <span class="fn"><code>ui/panel.html:761–764</code>, <code>:776–777</code>, <code>:785–786</code></span></li>
+    <li class="tot"><span></span><span>Spolu v Kovaní</span><span class="px">≈ 225 px</span></li>
+  </ol>
+</div>
+
+<div class="obox" id="O9"><div class="ohead"><span class="otagi">návrh — potvrdí Michal (O9)</span><b>Súhrn kovania v kresbe („Nohy 4× · Výsuv 1× · Príchyt sokla 1×")</b></div>
+  <dl><dt class="rec">A · odporúčam</dt><dd>Súhrn do lišty sektora Kovanie (čitateľne, aj keď je zbalený), vetu „klik na značku…" do „?". Z kresby preč — skrinka v náhľade sa zväčší, lebo pod sebou nepotrebuje miesto na text.</dd>
+      <dt>B</dt><dd>Nechať súhrn v kresbe, len čitateľným písmom 11 px.</dd></dl>
+  <div class="orec"><b>Odporúčanie:</b> A — ten istý údaj na čitateľnom mieste a väčšia kresba.</div>
+  <div class="where">Rezerva pod kresbou 96 mm: <code>ui/js/preview.js:268</code> (sceneSize, vetva <code>hw</code>).</div></div>
+
+<!-- ============================ E · KÓTY (D-02) ============================ -->
+<div class="sh" id="secE"><span class="shl">E</span><h2>Kóty v náhľade — čitateľné pri každej skrinke (D-02)</h2>
+  <span class="shsub">Dnes má písmo kót veľkosť v milimetroch modelu (22 a 18 mm), takže sa zmenšuje s veľkosťou skrinky. Návrh: písmo má stálu veľkosť na obrazovke. Prepni typ skrinky alebo posuň výšku — obe kresby sa prepočítajú tým istým výpočtom mierky ako v plugine (náhľad 404 × 323 px pri okne 850 px).</span></div>
+<div class="ectl">
+  <span class="segline" id="ePresets">
+    <button type="button" data-p="low" class="on">Spodná 800 × 864</button>
+    <button type="button" data-p="up">Horná 800 × 720</button>
+    <button type="button" data-p="tall">Vysoká 600 × 2100</button>
+  </span>
+  <label class="rng">výška <input type="range" id="eH" min="300" max="2400" step="10" value="864"> <b id="eHv">864</b> mm</label>
+</div>
+<div class="pvcmp">
+  <div class="pvcell"><div class="pvct"><span class="colhead" style="margin:0;width:auto"><span class="ct dnes">Dnes</span></span>Korpus · písmo v mm modelu</div>
+    <div class="pvframe"><svg id="eDnes" viewBox="0 0 404 323"></svg></div><div class="pvread" id="eDnesR"></div></div>
+  <div class="pvcell"><div class="pvct"><span class="colhead" style="margin:0;width:auto"><span class="ct navrh">Návrh</span></span>Korpus · 11 px, bez „mm"</div>
+    <div class="pvframe"><svg id="eNavrh" viewBox="0 0 404 323"></svg></div><div class="pvread" id="eNavrhR"></div></div>
+</div>
+<div class="pvcmp">
+  <div class="pvcell"><div class="pvct"><span class="colhead" style="margin:0;width:auto"><span class="ct dnes">Dnes</span></span>Čelá · vysoká 600 × 2100, dvierka 1400 + 593</div>
+    <div class="pvframe"><svg data-pv="fronts" data-mode="dnes" data-w="600" data-h="2100" data-fh="100" data-fr="tall" data-read="fR1" viewBox="0 0 404 323"></svg></div><div class="pvread" id="fR1"></div></div>
+  <div class="pvcell"><div class="pvct"><span class="colhead" style="margin:0;width:auto"><span class="ct navrh">Návrh</span></span>Čelá · vysoká — dlhý popis sa skráti na „F2 · 593"</div>
+    <div class="pvframe"><svg data-pv="fronts" data-mode="navrh" data-w="600" data-h="2100" data-fh="100" data-fr="tall" data-read="fR2" viewBox="0 0 404 323"></svg></div><div class="pvread" id="fR2"></div></div>
+</div>
+
+<table class="tbl stack" aria-label="Veľkosť písma v náhľade dnes a v návrhu">
+  <thead><tr><th>Text v náhľade</th><th>Dnes (mm modelu)</th><th>Spodná 800 × 864</th><th>Vysoká 600 × 2100</th><th>Návrh</th><th>Kde v kóde</th></tr></thead>
+  <tbody>
+    <tr><td data-h="Text">Korpus: „Š 800 mm", „V 864"</td><td data-h="Dnes" class="num">22</td><td data-h="Spodná" class="num bad">6,5 px</td><td data-h="Vysoká" class="num bad">3,0 px</td><td data-h="Návrh" class="num good">11 px</td><td data-h="Kde"><code>preview.js:1150–1151</code></td></tr>
+    <tr><td data-h="Text">Korpus: „sokel 100", „telo 764", „H 520"</td><td data-h="Dnes" class="num">18</td><td data-h="Spodná" class="num bad">5,3 px</td><td data-h="Vysoká" class="num bad">2,5 px</td><td data-h="Návrh" class="num good">11 px</td><td data-h="Kde"><code>preview.js:1154–1159</code></td></tr>
+    <tr><td data-h="Text">Čelá: „F1 · zásuvka 760", kóty výšok a šírky</td><td data-h="Dnes" class="num">18</td><td data-h="Spodná" class="num bad">6,2 px</td><td data-h="Vysoká" class="num bad">2,7 px</td><td data-h="Návrh" class="num good">11 px</td><td data-h="Kde"><code>preview.js:1041</code>, <code>:1076</code>, <code>:1238–1242</code></td></tr>
+    <tr><td data-h="Text">Čelá: čísla medzier „2", „3"</td><td data-h="Dnes" class="num">15</td><td data-h="Spodná" class="num bad">5,2 px</td><td data-h="Vysoká" class="num bad">2,2 px</td><td data-h="Návrh" class="num good">10 px</td><td data-h="Kde"><code>preview.js:1239</code></td></tr>
+    <tr><td data-h="Text">Zóny: „764×646"</td><td data-h="Dnes" class="num">min(22; šírka/5)</td><td data-h="Spodná" class="num bad">7,6 px</td><td data-h="Vysoká" class="num bad">3,3 px</td><td data-h="Návrh" class="num good">11 px</td><td data-h="Kde"><code>preview.js:971</code>, <code>:980</code></td></tr>
+    <tr><td data-h="Text">Kovanie: súhrn pod skrinkou / veta o značkách</td><td data-h="Dnes" class="num">19 / 15</td><td data-h="Spodná" class="num bad">6,2 / 4,9 px</td><td data-h="Vysoká" class="num bad">2,8 / 2,2 px</td><td data-h="Návrh" class="num good">v lište 11 px (O9)</td><td data-h="Kde"><code>preview.js:1277–1278</code></td></tr>
+    <tr><td data-h="Text">Doska (vkladanie): kóty a „bez smeru dekoru"</td><td data-h="Dnes" class="num">max(16; dĺžka/30)</td><td data-h="Spodná" class="num">—</td><td data-h="Vysoká" class="num">—</td><td data-h="Návrh" class="num good">11 px</td><td data-h="Kde"><code>preview.js:1521–1530</code></td></tr>
+  </tbody>
+</table>
+<p class="src">Hodnoty pri okne 850 px (náhľad má 38 % výšky okna, 210–640 px — <code>ui/css/panel.css:1131</code>). Väčšie okno dnes písmo trochu zväčší, malá skrinka (napr. 300 × 300) ho naopak nafúkne na ~15 px. Návrh je vždy rovnaký.</p>
+
+<div class="obox" id="O10"><div class="ohead"><span class="otagi">návrh — potvrdí Michal (O10)</span><b>Veľkosť písma kót a čo spraví zoom (Ctrl+koliesko)</b></div>
+  <dl><dt class="rec">A · odporúčam</dt><dd>11 px (čísla medzier 10 px), vždy rovnako na obrazovke — pri malej aj vysokej skrinke a aj pri priblížení, ako kóty v SketchUpe. Čiara kóty 1 px (dnes ~0,4 px). Keď sa popis do krátkej kóty nezmestí („sokel 100" pri vysokej skrinke), ostane len číslo; keď ani to, číslo sa napíše vedľa kóty.</dd>
+      <dt>B</dt><dd>11 px pri „Prispôsobiť pohľad"; priblíženie písmo zväčší spolu s kresbou (ako lupa). Pri veľkom priblížení budú čísla obrovské a budú sa prekrývať s čiarami.</dd></dl>
+  <div class="orec"><b>Odporúčanie:</b> A — čísla sú čitateľné pri každom pohľade.</div>
+  <div class="where">Dnes zoom a posun menia len výrez kresby (<code>ui/js/preview.js:1724–1740</code>, <code>:1753–1760</code>) a kresba sa neprekreslí — variant A potrebuje prekresliť kóty po zoome. Rezerva okraja na kóty je dnes v mm (<code>DIM_EXT = 70</code>, <code>preview.js:134</code>; <code>DIM_TOP = 34</code>, <code>:136</code>) — pri písme v px musí byť v px, inak by kóty pri vysokej skrinke vyšli mimo náhľadu.</div></div>
+
+<div class="obox" id="O11"><div class="ohead"><span class="otagi">návrh — potvrdí Michal (O11)</span><b>Jednotky pri kótach</b></div>
+  <dl><dt class="rec">A · odporúčam</dt><dd>Bez „mm" všade: „Š 800 · V 864 · H 520 · sokel 100". V plugine je všetko v mm a polia to majú napísané.</dd>
+      <dt>B</dt><dd>„mm" všade: „Š 800 mm · V 864 mm · H 520 mm · sokel 100 mm". Dlhšie texty sa horšie zmestia do krátkych kót.</dd></dl>
+  <div class="orec"><b>Odporúčanie:</b> A — kratšie a jednotné.</div>
+  <div class="where">Dnes „mm" len pri šírke (<code>preview.js:1150</code>) a pri „hĺbka … mm", keď chýba skosenie (<code>:1160</code>). Pravidlo „jednotka len pri prvom údaji" v UI_DIZAJN §5.2 (riadok 616–617) sa prepíše.</div></div>
+
+<!-- ============================ F · SÚHRNY (D-05) ============================ -->
+<div class="sh" id="secF"><span class="shl">F</span><h2>Zbalená sekcia povie, čo skrýva (D-05)</h2>
+  <span class="shsub">Súhrn sa skladá z údajov, ktoré panel už má, a až pri kreslení (nič sa neukladá, nič sa nepočíta inak). Dlhý súhrn sa oreže tromi bodkami a celý je v bublinke.</span></div>
+<table class="tbl stack" aria-label="Súhrny v lištách dnes a v návrhu">
+  <thead><tr><th>Kde</th><th>Dnes</th><th>Návrh (príklad)</th><th>Z čoho (panel to už má)</th></tr></thead>
+  <tbody>
+    <tr><td data-h="Kde">Korpus · lišta Nastavenia</td><td data-h="Dnes" class="old">3 skupiny · všetko zbalené</td><td data-h="Návrh" class="newt">strop 2 výstuhy · boky na dne · chrbát v drážke</td><td data-h="Z čoho">zvolené voľby Strop / Dno / Chrbát (tie isté polia ako v skupinách); slová: plný strop · strop 2 výstuhy · bez stropu · boky na dne · dno medzi bokmi · chrbát naložený / vložený / v drážke / z líšt · bez chrbta</td></tr>
+    <tr><td data-h="Kde">Čelá · lišta sektora</td><td data-h="Dnes" class="old">2 skupiny · všetko zbalené</td><td data-h="Návrh" class="newt">1 čelo · F206 ST9 · medzera 3 · okraje 2</td><td data-h="Z čoho">počet čiel (a „1 bez smeru", ak je) + súhrn Spoločné</td></tr>
+    <tr><td data-h="Kde">Čelá · skupina Spoločné pre skrinku</td><td data-h="Dnes" class="old">F206 ST9 Piet… · 3 · 2/2/2/2</td><td data-h="Návrh" class="newt">F206 ST9 · medzera 3 · okraje 2</td><td data-h="Z čoho">dekor čiel, medzera, štyri okraje (O7)</td></tr>
+    <tr><td data-h="Kde">— keď sa okraje líšia</td><td data-h="Dnes" class="old">F206 ST9 Piet… · 3 · 2/−20/2/2</td><td data-h="Návrh" class="newt">F206 ST9 · medzera 3 · okraje 2 · dole −20</td><td data-h="Z čoho">to isté</td></tr>
+    <tr><td data-h="Kde">Zóny · lišta sektora</td><td data-h="Dnes" class="old">Štruktúra zón</td><td data-h="Návrh" class="newt">1 zóna · prázdna — pri delení „4 zóny · 3 police"</td><td data-h="Z čoho">strom zón, ktorý panel kreslí</td></tr>
+    <tr><td data-h="Kde">Kovanie · lišta sektora</td><td data-h="Dnes" class="old">3 skupiny · všetko zbalené</td><td data-h="Návrh" class="newt">Nohy 4× · Výsuv 1× · Príchyt sokla 1×</td><td data-h="Z čoho">ten istý súhrn, aký dnes kreslí náhľad pod skrinkou (O9)</td></tr>
+    <tr><td data-h="Kde">Kovanie · skupina Položky z pravidiel</td><td data-h="Dnes" class="old">—</td><td data-h="Návrh" class="newt">6 ks</td><td data-h="Z čoho">súčet počtov položiek</td></tr>
+    <tr><td data-h="Kde">Kovanie · skupina Sety</td><td data-h="Dnes" class="old">—</td><td data-h="Návrh" class="newt">podľa projektu · alebo „1 vlastný"</td><td data-h="Z čoho">voľba setu pri skrinke (projekt / vlastný)</td></tr>
+    <tr><td data-h="Kde">Náhľad · lišta v Zónach, Čelách, Kovaní</td><td data-h="Dnes" class="old">Zóny · Čelá · Kovanie — pozície</td><td data-h="Návrh" class="newt">800 × 864 × 520 · sokel 100 →</td><td data-h="Z čoho">tie isté rozmery ako lišta Základné (O6)</td></tr>
+  </tbody>
+</table>
+
+<div class="obox" id="O12"><div class="ohead"><span class="otagi">návrh — potvrdí Michal (O12)</span><b>Čo ukáže lišta sektora, keď je v ňom otvorená skupina</b></div>
+  <dl><dt class="rec">A · odporúčam</dt><dd>Vždy súhrn obsahu — zbalený aj rozbalený sektor ukazuje to isté (tak znie pravidlo „zbalený sektor povie, čo skrýva").</dd>
+      <dt>B</dt><dd>Ako dnes: pri otvorenej skupine jej názov, súhrn len keď je všetko zbalené.</dd></dl>
+  <div class="orec"><b>Odporúčanie:</b> A — názov otvorenej skupiny je vidno hneď pod lištou, súhrn je nová informácia.</div>
+  <div class="where"><code>ui/js/shell.js:214–224</code> (metaGroups), <code>:622</code> (nxMetaGroups) · test <code>tests/js/test_uib_meta.js:79–88</code> · UI_DIZAJN §5.1 riadky 567–570.</div></div>
+
+<div class="obox" id="O13"><div class="ohead"><span class="otagi">návrh — potvrdí Michal (O13)</span><b>Rozsah: stála nápoveda v Štúdiu → Pravidlá kovania (CS-10)</b></div>
+  <p style="margin:2px 0 4px;font-size:12.5px">D-01 má medzi zdrojmi aj nález CS-10. Ten nie je v Inspectore, ale v Štúdiu: pri pravidle závesov stojí stála veta „Platí pre dvierka. Hmotnostné pásma iba upozorňujú — počet závesov riadi tabuľka výšok. Prázdne pole = kontrola je vypnutá." Je to ten istý vzor — vysvetlenie patrí do „?", viditeľná ostáva len červená veta o pokazených dátach.</p>
+  <dl><dt class="rec">A · odporúčam</dt><dd>Zahrnúť do H6 — jedna veta do „?", rovnaký komponent, žiadne riziko.</dd>
+      <dt>B</dt><dd>Nechať na neskoršiu dávku so Štúdiom (H6 ostane čisto Inspector).</dd></dl>
+  <div class="orec"><b>Odporúčanie:</b> A — malé, rovnaké pravidlo, zbytočne by čakalo.</div>
+  <div class="where"><code>ui/js/rules.js:606–614</code> (stavová veta <code>.hint.rgbad</code> ostáva, pomocná <code>.hint</code> ide do „?").</div></div>
+
+<!-- ============================ G · KDE OSTANE INFORMÁCIA ============================ -->
+<div class="sh" id="secG"><span class="shl">G</span><h2>Žiadny údaj nezmizne — kde ostane</h2>
+  <span class="shsub">Všetko, čo návrh odoberie z obrazovky, má iné miesto. Stavové vety (červený dôvod, jantárové odporúčanie, „očakáva rúru", chyba pri kópii) ostávajú viditeľné.</span></div>
+<table class="tbl stack" aria-label="Kde ostane presunutý údaj">
+  <thead><tr><th>Čo zmizne z obrazovky</th><th>Kde to ostane</th></tr></thead>
+  <tbody>
+    <tr><td data-h="Zmizne">Pás „Skrinka 800 × 864 × 520 · W1100 ST30… — upravíš v Korpuse"</td><td data-h="Ostane"><b>Rozmery:</b> lišta Náhľadu v Zónach, Čelách a Kovaní (klik = Korpus) a lišta Základné v Korpuse. <b>Materiál korpusu:</b> Korpus → Materiály (lišta aj pole) a bublina na rozmeroch. <b>Materiál čiel:</b> Čelá → Spoločné pre skrinku.</td></tr>
+    <tr><td data-h="Zmizne">„Ctrl+koliesko = zoom · ťahaj plochu…" a vety o klikaní v náhľade</td><td data-h="Ostane">„?" v spodnom páse náhľadu, text podľa kontextu</td></tr>
+    <tr><td data-h="Zmizne">„Zobraziť zóny (ghost) v modeli"</td><td data-h="Ostane">rail → oko „Viditeľnosť tagov" → „Zóny (ghost)" — ten istý prepínač a stav</td></tr>
+    <tr><td data-h="Zmizne">Nápoveda stromu zón, nápovedy troch skupín Kovania</td><td data-h="Ostane">„?" v hlavičke danej skupiny</td></tr>
+    <tr><td data-h="Zmizne">„Materiály tejto skrinky — prázdne = dediť z projektu."</td><td data-h="Ostane">„?" v lište Materiály; voľba „(dediť z projektu)" v poli</td></tr>
+    <tr><td data-h="Zmizne">„bez spotrebiča — nastav „očakáva"…"</td><td data-h="Ostane">„?" v riadku Spotrebič (keď skrinka niečo očakáva, veta ostáva)</td></tr>
+    <tr><td data-h="Zmizne">Tlačidlá „Vložiť kópiu" a „Uložiť ako šablónu do knižnice"</td><td data-h="Ostane">ikony v hlavičke — viditeľné vždy, aj po odscrollovaní</td></tr>
+    <tr><td data-h="Zmizne">„Pripravené."</td><td data-h="Ostane">nič — prázdny stav nič nehovorí; skutočné správy sa ukážu (O2)</td></tr>
+    <tr><td data-h="Zmizne">„Noxun Engine V0.17.0"</td><td data-h="Ostane">koliesko → O plugine; Štúdio → O plugine</td></tr>
+    <tr><td data-h="Zmizne">Súhrn kovania a veta o značkách v kresbe</td><td data-h="Ostane">lišta sektora Kovanie; „?" v páse (O9)</td></tr>
+    <tr><td data-h="Zmizne">Nadpis „Rozmery" (pri označenej skrinke)</td><td data-h="Ostane">lišta „Základné", ikony a „mm" pri poliach; pri vkladaní ostáva (O4)</td></tr>
+  </tbody>
+</table>
+
+<!-- ============================ H · OTVORENÉ BODY ============================ -->
+<div class="sh" id="secH"><span class="shl">H</span><h2>Otvorené body — tu odpovedáš</h2>
+  <span class="shsub">Stačí napísať napr. „O1 A, O2 B, … podľa návrhu" alebo len „všetko podľa odporúčania". Každý bod má vyššie svoj rámček s variantmi.</span></div>
+<table class="tbl stack" aria-label="Súhrn otvorených bodov">
+  <thead><tr><th>Bod</th><th>Otázka</th><th>Odporúčanie</th><th>Odpoveď Michala</th></tr></thead>
+  <tbody>
+    <tr><td data-h="Bod"><a href="#O1"><b>O1</b></a></td><td data-h="Otázka">Kam s „Vložiť kópiu" a „Uložiť ako šablónu"? (A ikony v hlavičke · B polovičné tlačidlá dole)</td><td data-h="Odporúčanie"><b>A</b> — nezaberú riadok, sú stále po ruke</td><td data-h="Odpoveď" class="ans"></td></tr>
+    <tr><td data-h="Bod"><a href="#O2"><b>O2</b></a></td><td data-h="Otázka">Stavová veta: A len so správou na konci panela · B pás pri spodku okna, zelená zmizne po 4 s, červená ostane do ×</td><td data-h="Odporúčanie"><b>B</b> — chybu uvidíš vždy</td><td data-h="Odpoveď" class="ans"></td></tr>
+    <tr><td data-h="Bod"><a href="#O3"><b>O3</b></a></td><td data-h="Otázka">Pätka s verziou: A zrušiť (verzia v koliesku → O plugine) · B nechať</td><td data-h="Odporúčanie"><b>A</b></td><td data-h="Odpoveď" class="ans"></td></tr>
+    <tr><td data-h="Bod"><a href="#O4"><b>O4</b></a></td><td data-h="Otázka">Nadpis „Rozmery" pri označenej skrinke: A preč · B nechať</td><td data-h="Odporúčanie"><b>A</b> (pri vkladaní ostáva)</td><td data-h="Odpoveď" class="ans"></td></tr>
+    <tr><td data-h="Bod"><a href="#O5"><b>O5</b></a></td><td data-h="Otázka">Nápovedy: A jeden „?" v páse náhľadu + „?" v hlavičkách skupín · B gestá do lišty Náhľadu</td><td data-h="Odporúčanie"><b>A</b></td><td data-h="Odpoveď" class="ans"></td></tr>
+    <tr><td data-h="Bod"><a href="#O6"><b>O6</b></a></td><td data-h="Otázka">Rozmery skrinky mimo Korpusu: A lišta Náhľadu (klik = Korpus) · B hlavička · C pás na 1 riadok</td><td data-h="Odporúčanie"><b>A</b></td><td data-h="Odpoveď" class="ans"></td></tr>
+    <tr><td data-h="Bod"><a href="#O7"><b>O7</b></a></td><td data-h="Otázka">Súhrn Spoločné: A „F206 ST9 · medzera 3 · okraje 2 · dole −20" · B „okraje 2/−20/2/2"</td><td data-h="Odporúčanie"><b>A</b></td><td data-h="Odpoveď" class="ans"></td></tr>
+    <tr><td data-h="Bod"><a href="#O8"><b>O8</b></a></td><td data-h="Otázka">„Zobraziť zóny (ghost)": A preč, ostáva v raile pod okom · B ikona v páse náhľadu</td><td data-h="Odporúčanie"><b>A</b></td><td data-h="Odpoveď" class="ans"></td></tr>
+    <tr><td data-h="Bod"><a href="#O9"><b>O9</b></a></td><td data-h="Otázka">Súhrn kovania: A do lišty Kovanie, z kresby preč · B nechať v kresbe čitateľne</td><td data-h="Odporúčanie"><b>A</b></td><td data-h="Odpoveď" class="ans"></td></tr>
+    <tr><td data-h="Bod"><a href="#O10"><b>O10</b></a></td><td data-h="Otázka">Písmo kót: A 11 px stále, aj pri zoome · B 11 px pri fite, zoom zväčšuje ako lupa</td><td data-h="Odporúčanie"><b>A</b></td><td data-h="Odpoveď" class="ans"></td></tr>
+    <tr><td data-h="Bod"><a href="#O11"><b>O11</b></a></td><td data-h="Otázka">Jednotky pri kótach: A bez „mm" všade · B „mm" všade</td><td data-h="Odporúčanie"><b>A</b></td><td data-h="Odpoveď" class="ans"></td></tr>
+    <tr><td data-h="Bod"><a href="#O12"><b>O12</b></a></td><td data-h="Otázka">Lišta sektora pri otvorenej skupine: A vždy súhrn · B názov otvorenej skupiny</td><td data-h="Odporúčanie"><b>A</b></td><td data-h="Odpoveď" class="ans"></td></tr>
+    <tr><td data-h="Bod"><a href="#O13"><b>O13</b></a></td><td data-h="Otázka">Nápoveda v Štúdiu → Pravidlá kovania (CS-10): A zahrnúť do H6 · B neskôr</td><td data-h="Odporúčanie"><b>A</b></td><td data-h="Odpoveď" class="ans"></td></tr>
+  </tbody>
+</table>
+
+<!-- ============================ I · PRE PACKAGE ============================ -->
+<div class="sh" id="secI"><span class="shl">I</span><h2>Pre package dávky H6 — fakty z kódu</h2>
+  <span class="shsub">Technické odkazy pre neskoršie zadanie (plugin v0.17.0, main @ 4da1c3b5). Michal ich čítať nemusí.</span></div>
+<section class="card" style="font-size:12.5px">
+  <ul>
+    <li><b>Pás #ctxNote:</b> <code>ui/panel.html:457</code> (odkaz <code>setViewContext('korpus')</code>); text <code>ui/js/shell.js:138</code> (ctxNoteText), viditeľnosť <code>:125</code> (sectorVis → <code>note</code>), plnenie <code>:551–565</code>; CSS <code>ui/css/panel.css:1477–1485</code>. Testy: <code>tests/pure/test_uib1_kostra.rb:255–257</code>, <code>tests/js/test_uib1_kostra.js:175–182</code>. UI_DIZAJN §5.1 (riadky 575–586) opisuje pás — prepísať.</li>
+    <li><b>Lišty sektorov:</b> S1 názov pohľadu <code>ui/js/shell.js:157</code> (PV_TITLE) a metaTitle; S2 rozmery metaDims <code>:180–195</code> (klik dnes len zbalí sektor — <code>ui/panel.html:182</code>); S4 metaGroups „… · všetko zbalené" <code>:214–224</code>; nxMetaGroups <code>:622</code>; kreslenie <code>nxSectorMetaApply</code> <code>:634</code>. Klikateľný údaj v <code>&lt;summary&gt;</code> potrebuje <code>preventDefault</code> + <code>stopPropagation</code> (vzor <code>nxTipStop</code>, <code>ui/panel.html:659–661</code>). Test <code>tests/js/test_uib_meta.js:79–88</code>.</li>
+    <li><b>Kópia a šablóna:</b> <code>ui/panel.html:914</code>, <code>:916</code>; viditeľnosť len <code>body.mode-cab</code> <code>ui/css/panel.css:1168–1172</code>. Hlavičku <code>#idbar</code> prepisuje <code>setIdbar</code> cez innerHTML (<code>ui/js/bridge.js:130–179</code>) — ikony patria ako statickí súrodenci <code>#idbar</code> do <code>.nxhdr-id</code> (<code>ui/panel.html:85–88</code>), nie do setIdbar. Akcie bez zmeny: <code>insertCopySelected</code> <code>ui/js/actions.js:468</code> (kontrola červených polí :473), <code>openSaveTemplateModal</code> <code>ui/js/form.js:1765</code>. In-SU testy volajú akciu „Vložiť kópiu" (napr. <code>tests/sketchup/su_runner.rb:5286</code>) — presun tlačidla ich nemení, package posúdi bránu.</li>
+    <li><b>Status a pätka:</b> <code>ui/panel.html:1063</code>, <code>:1068</code>; <code>NX.setStatus</code> <code>ui/js/bridge.js:891</code>, <code>#verline</code> <code>:301</code>; Ruby <code>ui/panel/sync.rb:615–617</code>; CSS <code>ui/css/panel.css:592–594</code>, <code>:1157</code>. Verzia ostáva v <code>#cfgAbout</code> (<code>ui/js/about.js:104–110</code>). Pás pri spodku okna = overlay (pravidlo UI_DIZAJN §1 „rozbaľovacie okno je overlay").</li>
+    <li><b>Nápovedy:</b> <code>.pvhint</code> <code>ui/panel.html:120</code> + CSS <code>ui/css/panel.css:537</code>, <code>:2188–2196</code>; ghost zón <code>ui/panel.html:121–127</code>, CSS <code>:1155</code>, <code>:1495</code> (testy <code>tests/pure/test_d27_tagy.rb:291</code>, <code>tests/js/test_usage.js:118</code>); hinty <code>ui/panel.html:262</code> (Rozmery), <code>:395</code> (+ <code>ui/js/materials.js:18</code>, <code>:33</code>), <code>:574–575</code>, <code>:761–764</code>, <code>:776–777</code>, <code>:785–786</code>; spotrebič <code>ui/panel/payloads.rb:313–315</code> + <code>ui/js/appliance_row.js:81–90</code>. Komponent <code>.nxtip</code> <code>ui/css/panel.css:271–300</code>. Princíp UI_DIZAJN §1 riadky 48–52; audit CS-10 (Pravidlá kovania <code>ui/js/rules.js:606–614</code>) je ten istý vzor v Štúdiu — rozsah rozhodne O13.</li>
+    <li><b>Kóty (D-02):</b> pvDimH/pvDimV/pvText <code>ui/js/preview.js:704–726</code> (predvolené 20/18 mm, odsadenie 9–10 mm, čiara 1,4 mm); Korpus <code>:1150–1160</code>; čelá <code>:1041</code>, <code>:1076</code>, <code>:1238–1242</code>; zóny <code>:971</code>, <code>:980</code>; kovanie <code>:1277–1278</code>; doska <code>:1521–1530</code> (pvBoardFont); rohová <code>:482</code>; scéna <code>sceneSize</code> <code>:225–273</code>, <code>DIM_EXT</code> <code>:134</code>, <code>DIM_TOP</code> <code>:136</code>, <code>PV_PAD</code> <code>:2</code>; mierka <code>viewMapping</code> <code>:281</code>; zoom/posun menia len viewBox <code>:1724–1740</code>, <code>:1753–1760</code>. Výška náhľadu <code>ui/css/panel.css:1131</code>. Test: <code>tests/js/test_s1f_preview.js</code> a ďalšie JS sady náhľadu. UI_DIZAJN §5.2 riadky 616–619 (kóty decentné, jednotka len pri prvom údaji) a §3 typografia — prepísať.</li>
+    <li><b>Súhrny (D-05):</b> „Spoločné" <code>ui/js/core.js:583–598</code> (cabfrontMetaText, test <code>tests/js/test_d130b_spolocne.js:37–43</code>); počet čiel <code>ui/js/form.js:3087</code> (updateFrontMeta); súhrn kovania <code>ui/js/preview.js:1422</code> (nxHwSummary); voľby korpusu <code>ui/panel.html:477–481</code>, <code>:506–509</code>, <code>:532–538</code>; sety (projekt/vlastný) <code>ui/js/hardware.js:447–455</code>.</li>
+    <li><b>Uzáver:</b> zmena css/js ⇒ bump patch + všetky <code>?v=</code> v <code>ui/*.html</code>. Dávka pridáva/presúva ovládacie prvky v UI (ikony v hlavičke, „?") ⇒ podľa CLAUDE.md povinná predrecenzia. Dáta, výroba ani ceny sa nemenia.</li>
+  </ul>
+</section>
+
+</main>
+
+<script>
+(function(){
+  'use strict';
+  /* ---------- rail ---------- */
+  function railBtn(ic, on, cls){
+    return '<button type="button" tabindex="-1" class="railbtn' + (cls ? ' ' + cls : '') + (on ? ' on' : '') + '"><svg class="ic"><use href="#i-' + ic + '"/></svg></button>';
+  }
+  function pinWrap(html, n){ return n ? '<span class="rpin new">' + html + '<i class="pin">' + n + '</i></span>' : html; }
+  document.querySelectorAll('nav.crail[data-ctx]').forEach(function(n){
+    var c = n.getAttribute('data-ctx');
+    n.innerHTML = railBtn('cabinet', c === 'korpus') + railBtn('layout-grid', c === 'zony') + railBtn('front', c === 'cela') + railBtn('hammer', c === 'kovanie') +
+      '<div class="raildiv"></div><span class="railfly">' + railBtn('shell', false, 'fn') + '</span>' + railBtn('grain', false, 'fn') +
+      railBtn('direction', true, 'fn') + pinWrap(railBtn('eye-off', true, 'fn'), n.getAttribute('data-pin-eye')) +
+      '<span class="railgap"></span><div class="raildiv"></div>' + pinWrap(railBtn('settings'), n.getAttribute('data-pin-cfg')) + railBtn('layers');
+  });
+
+  /* ---------- náhľady ---------- */
+  var BW = 404, BH = 323;
+  var C = { dim:'#90a4ae', part:'#e5d8b8', partS:'#c9b784', outline:'#90a4ae', ghost:'#f4f5f7', ghostS:'#cfd8dc',
+            sel:'#107787', selAcc:'#0e6b7a', drawer:'#bfe3e8', door:'#e0f2f4', frS:'#7fc4cf', zone:'#42a5f5', zink:'#37474f' };
+  var FR = {
+    c800: [{ n:'F1', type:'drawer', z:102, h:760 }],
+    tall: [{ n:'F1', type:'door', z:102, h:1400 }, { n:'F2', type:'door', z:1505, h:593 }]
+  };
+  function esc(t){ return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+  function r2(v){ return Math.round(v * 100) / 100; }
+  function tw(t, f){ return String(t).length * 0.56 * f; }
+  function fmt(v){ return (Math.round(v * 10) / 10).toFixed(1).replace('.', ','); }
+  function rect(S, x, y, w, h, fill, stroke, sw, extra){
+    S.push('<rect x="' + r2(x) + '" y="' + r2(y) + '" width="' + r2(Math.max(w, 0)) + '" height="' + r2(Math.max(h, 0)) + '" fill="' + fill +
+           '" stroke="' + stroke + '" stroke-width="' + r2(sw) + '"' + (extra || '') + '/>');
+  }
+  function text(S, x, y, t, f, anchor, fill, halo, base){
+    S.push('<text x="' + r2(x) + '" y="' + r2(y) + '" font-size="' + r2(f) + '" font-family="Segoe UI, Tahoma, sans-serif" fill="' + (fill || C.dim) +
+           '" text-anchor="' + (anchor || 'middle') + '"' + (base ? ' dominant-baseline="' + base + '"' : '') +
+           (halo ? ' paint-order="stroke" stroke="' + halo + '" stroke-width="' + r2(Math.max(f * 0.25, 1)) + '"' : '') + '>' + esc(t) + '</text>');
+  }
+  function vtext(S, x, ym, t, f){
+    S.push('<text x="' + r2(x) + '" y="' + r2(ym) + '" font-size="' + r2(f) + '" font-family="Segoe UI, Tahoma, sans-serif" fill="' + C.dim +
+           '" text-anchor="middle" dominant-baseline="middle" transform="rotate(-90 ' + r2(x) + ' ' + r2(ym) + ')">' + esc(t) + '</text>');
+  }
+  function dimH(S, x1, x2, y, lab, f, tick, off, sw){
+    S.push('<path d="M' + r2(x1) + ' ' + r2(y - tick) + 'V' + r2(y + tick) + 'M' + r2(x2) + ' ' + r2(y - tick) + 'V' + r2(y + tick) +
+           'M' + r2(x1) + ' ' + r2(y) + 'H' + r2(x2) + '" stroke="' + C.dim + '" stroke-width="' + r2(sw) + '" fill="none"/>');
+    if (lab) text(S, (x1 + x2) / 2, y - off, lab, f);
+  }
+  function dimVline(S, x, y1, y2, tick, sw){
+    S.push('<path d="M' + r2(x - tick) + ' ' + r2(y1) + 'H' + r2(x + tick) + 'M' + r2(x - tick) + ' ' + r2(y2) + 'H' + r2(x + tick) +
+           'M' + r2(x) + ' ' + r2(y1) + 'V' + r2(y2) + '" stroke="' + C.dim + '" stroke-width="' + r2(sw) + '" fill="none"/>');
+  }
+  function dimV(S, x, y1, y2, lab, f, tick, off, sw){ dimVline(S, x, y1, y2, tick, sw); vtext(S, x + off, (y1 + y2) / 2, lab, f); }
+  // Návrh: kóta sa „zmestí" — dlhý popis → len číslo → číslo vedľa kóty
+  function dimVfit(S, x, y1, y2, labLong, labShort, f, side){
+    dimVline(S, x, y1, y2, 4, 1);
+    var len = Math.abs(y2 - y1), ym = (y1 + y2) / 2;
+    if (tw(labLong, f) <= len - 4) return vtext(S, x + 9, ym, labLong, f);
+    if (tw(labShort, f) <= len - 4) return vtext(S, x + 9, ym, labShort, f);
+    if (side === 'left') text(S, x - 4, ym, labShort, f, 'end', null, null, 'middle');
+    else text(S, x + 4, ym, labShort, f, 'start', null, null, 'middle');
+  }
+  function skewOf(D){ return D > 0 ? Math.min(Math.max(D * 0.18, 24), 130) : 0; }
+
+  function carcass(S, m, g){
+    var X = m.X, Y = m.Y, s = m.s, W = g.W, H = g.H, t = 18, fh = g.fh, sk = g.sk || 0, lw = Math.max(s, 0.6);
+    if (sk > 0){
+      S.push('<polygon points="' + [[X(0), Y(H)], [X(W), Y(H)], [X(W + sk), Y(H + sk)], [X(sk), Y(H + sk)]].map(function(p){ return r2(p[0]) + ',' + r2(p[1]); }).join(' ') +
+             '" fill="' + C.ghost + '" stroke="' + C.ghostS + '" stroke-width="' + r2(lw) + '"/>');
+    }
+    rect(S, X(0), Y(H), W * s, H * s, '#fff', C.outline, Math.max(2 * s, 0.75));
+    rect(S, X(0), Y(H), t * s, H * s, C.part, C.partS, lw);
+    rect(S, X(W - t), Y(H), t * s, H * s, C.part, C.partS, lw);
+    rect(S, X(0), Y(fh + t), W * s, t * s, C.part, C.partS, lw);
+    if (g.rails !== false) rect(S, X(t), Y(H), (W - 2 * t) * s, 100 * s, C.part, C.partS, lw);
+    else rect(S, X(t), Y(H), (W - 2 * t) * s, t * s, C.part, C.partS, lw);
+    if (fh > 0) rect(S, X(0), Y(fh), W * s, fh * s, C.ghost, C.ghostS, lw, ' stroke-dasharray="' + r2(Math.max(4 * s, 2)) + ' ' + r2(Math.max(3 * s, 1.5)) + '"');
+  }
+  function mapMm(vb, H){
+    var s = Math.min(BW / vb.w, BH / vb.h), ox = (BW - vb.w * s) / 2, oy = (BH - vb.h * s) / 2;
+    return { s: s, X: function(x){ return ox + (x - vb.x) * s; }, Y: function(z){ return oy + ((H - z) - vb.y) * s; } };
+  }
+  function mapPx(cw, ch, L, R, T, B){
+    var P = 6, s = Math.min((BW - 2 * P - L - R) / cw, (BH - 2 * P - T - B) / ch);
+    var ox = (BW - (L + cw * s + R)) / 2 + L, oy = (BH - (T + ch * s + B)) / 2 + T;
+    return { s: s, X: function(x){ return ox + x * s; }, Y: function(z){ return oy + (ch - z) * s; } };
+  }
+
+  /* Korpus — čelný rez s kótami */
+  function cabDnes(S, g){
+    var sk = g.sk, maxZ = sk > 0 ? g.H + sk + 34 : g.H;
+    var vb = { x: -70 - 14, y: g.H - maxZ - 14, w: (g.W + 70 + sk) + 70 + 28, h: maxZ + 70 + 28 };
+    var m = mapMm(vb, g.H), s = m.s;
+    carcass(S, m, g);
+    dimH(S, m.X(0), m.X(g.W), m.Y(-26), 'Š ' + g.W + ' mm', 22 * s, 7 * s, 9 * s, 1.4 * s);
+    dimV(S, m.X(g.W + 26), m.Y(0), m.Y(g.H), 'V ' + g.H, 22 * s, 7 * s, 10 * s, 1.4 * s);
+    if (g.fh > 0){
+      dimV(S, m.X(-26), m.Y(0), m.Y(g.fh), 'sokel ' + g.fh, 18 * s, 7 * s, 10 * s, 1.4 * s);
+      dimV(S, m.X(-26), m.Y(g.fh), m.Y(g.H), 'telo ' + (g.H - g.fh), 18 * s, 7 * s, 10 * s, 1.4 * s);
+    }
+    if (g.D > 0 && sk > 0) dimH(S, m.X(g.W), m.X(g.W + sk), m.Y(g.H + sk + 14), 'H ' + g.D, 18 * s, 7 * s, 9 * s, 1.4 * s);
+    return 'Dnes: Š a V <b class="bad">' + fmt(22 * s) + ' px</b> · sokel, telo, H <b class="bad">' + fmt(18 * s) + ' px</b>';
+  }
+  function cabNavrh(S, g){
+    var F = 11, sk = g.sk;
+    var m = mapPx(g.W + sk, g.H + sk, 46, 40, 30, 28);
+    carcass(S, m, g);
+    dimH(S, m.X(0), m.X(g.W), m.Y(0) + 18, 'Š ' + g.W, F, 4, 5, 1);
+    dimVfit(S, m.X(g.W) + 20, m.Y(0), m.Y(g.H), 'V ' + g.H, String(g.H), F, 'right');
+    if (g.fh > 0){
+      dimVfit(S, m.X(0) - 20, m.Y(0), m.Y(g.fh), 'sokel ' + g.fh, String(g.fh), F, 'left');
+      dimVfit(S, m.X(0) - 20, m.Y(g.fh), m.Y(g.H), 'telo ' + (g.H - g.fh), String(g.H - g.fh), F, 'left');
+    }
+    if (g.D > 0 && sk > 0) dimH(S, m.X(g.W), m.X(g.W + sk), m.Y(g.H + sk) - 12, 'H ' + g.D, F, 4, 5, 1);
+    return 'Návrh: všetky kóty <b class="good">11 px</b>';
+  }
+
+  /* Čelá — predný pohľad */
+  function frontGaps(fr, fh, H){
+    var out = [], prev = fh;
+    fr.slice().sort(function(a, b){ return a.z - b.z; }).forEach(function(it){
+      if (it.z - prev >= 0.5) out.push({ z1: prev, z2: it.z, size: it.z - prev });
+      prev = it.z + it.h;
+    });
+    if (H - prev >= 0.5) out.push({ z1: prev, z2: H, size: H - prev });
+    return out;
+  }
+  function drawFronts(S, m, g, fr, F, mode){
+    var X = m.X, Y = m.Y, s = m.s, gl = 2, gr = 2;
+    fr.forEach(function(it){
+      var col = it.type === 'drawer' ? C.drawer : C.door;
+      var x0 = X(gl), x1 = X(g.W - gr), yt = Y(it.z + it.h), yb = Y(it.z), ym = (yt + yb) / 2;
+      rect(S, x0, yt, x1 - x0, yb - yt, col, C.frS, Math.max(1.5 * s, 0.75));
+      var sw = r2(Math.max(3 * s, 0.9)), da = r2(Math.max(11 * s, 3)) + ' ' + r2(Math.max(8 * s, 2));
+      var d = it.type === 'drawer' ? ('M' + r2(x0) + ' ' + r2(yt) + 'L' + r2(x1) + ' ' + r2(yb) + 'M' + r2(x1) + ' ' + r2(yt) + 'L' + r2(x0) + ' ' + r2(yb))
+                                   : ('M' + r2(x1) + ' ' + r2(yt) + 'L' + r2(x0) + ' ' + r2(ym) + 'L' + r2(x1) + ' ' + r2(yb));
+      S.push('<path d="' + d + '" stroke="' + C.sel + '" stroke-width="' + sw + '" stroke-dasharray="' + da + '" fill="none" stroke-linecap="round"/>');
+      var desc = it.type === 'drawer' ? 'zásuvka' : 'dvierka';
+      var lab = it.n + ' · ' + desc + ' ' + it.h;
+      if (mode === 'navrh'){
+        var room = (x1 - x0) - 8;
+        if (tw(lab, F) > room) lab = it.n + ' · ' + it.h;
+        if (tw(lab, F) > room) lab = it.n;
+      }
+      text(S, (x0 + x1) / 2, ym, lab, F, 'middle', C.selAcc, col, 'middle');
+    });
+  }
+  function frontsDnes(S, g){
+    var fr = FR[g.fr], gl = 2, gr = 2, minZf = 0, maxT = g.H;
+    fr.forEach(function(it){ minZf = Math.min(minZf, it.z); maxT = Math.max(maxT, it.z + it.h); });
+    var minX = Math.min(0, gl) - 34, maxX = Math.max(g.W, g.W - gr) + 70, minZ = minZf - 46, maxZ = maxT;
+    var vb = { x: minX - 14, y: g.H - maxZ - 14, w: maxX - minX + 28, h: maxZ - minZ + 28 };
+    var m = mapMm(vb, g.H), s = m.s;
+    carcass(S, m, { W: g.W, H: g.H, fh: g.fh, sk: 0, rails: true });
+    drawFronts(S, m, g, fr, 18 * s, 'dnes');
+    fr.forEach(function(it){ dimV(S, m.X(g.W + 26), m.Y(it.z), m.Y(it.z + it.h), String(it.h), 18 * s, 7 * s, 10 * s, 1.4 * s); });
+    frontGaps(fr, g.fh, g.H).forEach(function(gp){ text(S, m.X(-14), m.Y((gp.z1 + gp.z2) / 2), String(gp.size), 15 * s, 'end'); });
+    dimH(S, m.X(gl), m.X(g.W - gr), m.Y(-26), String(g.W - gl - gr), 18 * s, 7 * s, 9 * s, 1.4 * s);
+    return 'Dnes: popis čela a kóty <b class="bad">' + fmt(18 * s) + ' px</b> · medzery <b class="bad">' + fmt(15 * s) + ' px</b>';
+  }
+  function frontsNavrh(S, g){
+    var fr = FR[g.fr], gl = 2, gr = 2;
+    var m = mapPx(g.W, g.H, 34, 40, 8, 28);
+    carcass(S, m, { W: g.W, H: g.H, fh: g.fh, sk: 0, rails: true });
+    drawFronts(S, m, g, fr, 11, 'navrh');
+    fr.forEach(function(it){ dimVfit(S, m.X(g.W) + 20, m.Y(it.z), m.Y(it.z + it.h), String(it.h), String(it.h), 11, 'right'); });
+    var last = -99;
+    frontGaps(fr, g.fh, g.H).forEach(function(gp){
+      var y = m.Y((gp.z1 + gp.z2) / 2);
+      if (Math.abs(y - last) < 11) y = last + (y > last ? 11 : -11);
+      text(S, m.X(0) - 6, y, String(gp.size), 10, 'end', null, null, 'middle'); last = y;
+    });
+    dimH(S, m.X(gl), m.X(g.W - gr), m.Y(0) + 18, String(g.W - gl - gr), 11, 4, 5, 1);
+    return 'Návrh: popis a kóty <b class="good">11 px</b> · medzery <b class="good">10 px</b>';
+  }
+
+  /* Kovanie — pozície (zjednodušene) */
+  function hwMarks(S, m, g){
+    var X = m.X, Y = m.Y, s = m.s, t = 18, lw = Math.max(1.5 * s, 0.75);
+    var bz = 300, bh = 440, foot = 40;
+    S.push('<path d="M' + r2(X(t)) + ' ' + r2(Y(bz + bh)) + 'V' + r2(Y(bz)) + 'H' + r2(X(t + foot)) + 'M' + r2(X(g.W - t)) + ' ' + r2(Y(bz + bh)) + 'V' + r2(Y(bz)) + 'H' + r2(X(g.W - t - foot)) +
+           '" stroke="' + C.sel + '" stroke-width="' + r2(Math.max(3 * s, 1)) + '" fill="none"/>');
+    rect(S, X(t + foot + 2), Y(bz + bh * 0.95), (g.W - 2 * (t + foot + 2)) * s, bh * 0.9 * s, C.door, C.sel, lw);
+    [40, 280, 480, 720].forEach(function(x){ rect(S, X(x), Y(g.fh - 6), 40 * s, (g.fh - 12) * s, C.door, C.sel, lw); });
+  }
+  function hwDnes(S, g){
+    var vb = { x: -14, y: -14, w: g.W + 28, h: g.H + 96 + 28 };
+    var m = mapMm(vb, g.H), s = m.s;
+    carcass(S, m, { W: g.W, H: g.H, fh: g.fh, sk: 0, rails: true });
+    hwMarks(S, m, g);
+    text(S, m.X(g.W / 2), m.Y(-44), 'Nohy 4× · Výsuv 1× · Príchyt sokla 1×', 19 * s);
+    text(S, m.X(g.W / 2), m.Y(-70), 'klik na značku = označí vlastníka v modeli · pozície sú orientačné', 15 * s);
+    return 'Dnes: súhrn <b class="bad">' + fmt(19 * s) + ' px</b> · veta <b class="bad">' + fmt(15 * s) + ' px</b> · skrinka ' + Math.round(g.H * s) + ' px vysoká';
+  }
+  function hwNavrh(S, g){
+    var m = mapPx(g.W, g.H, 6, 6, 6, 6);
+    carcass(S, m, { W: g.W, H: g.H, fh: g.fh, sk: 0, rails: true });
+    hwMarks(S, m, g);
+    return 'Návrh: bez textov · skrinka <b class="good">' + Math.round(g.H * m.s) + ' px</b> vysoká · súhrn je v lište sektora';
+  }
+
+  function cfgOf(el){
+    var d = el.dataset, D = +(d.d || 0);
+    return { kind: d.pv, mode: d.mode, W: +d.w, H: +d.h, D: D, fh: +(d.fh || 0), sk: skewOf(D), rails: d.rails !== '0', fr: d.fr || 'c800' };
+  }
+  function draw(svg, g){
+    var S = [], read = '';
+    if (g.kind === 'cab') read = g.mode === 'dnes' ? cabDnes(S, g) : cabNavrh(S, g);
+    else if (g.kind === 'fronts') read = g.mode === 'dnes' ? frontsDnes(S, g) : frontsNavrh(S, g);
+    else if (g.kind === 'hw') read = g.mode === 'dnes' ? hwDnes(S, g) : hwNavrh(S, g);
+    svg.setAttribute('viewBox', '0 0 ' + BW + ' ' + BH);
+    svg.innerHTML = S.join('');
+    return read;
+  }
+  document.querySelectorAll('svg[data-pv]').forEach(function(svg){
+    var read = draw(svg, cfgOf(svg));
+    var id = svg.getAttribute('data-read');
+    if (id && document.getElementById(id)) document.getElementById(id).innerHTML = read;
+  });
+
+  /* časť E — interaktívne porovnanie */
+  var PRE = { low: { W: 800, H: 864, D: 520, fh: 100, rails: true }, up: { W: 800, H: 720, D: 350, fh: 0, rails: false }, tall: { W: 600, H: 2100, D: 560, fh: 100, rails: true } };
+  var cur = { W: 800, H: 864, D: 520, fh: 100, rails: true };
+  var eH = document.getElementById('eH'), eHv = document.getElementById('eHv');
+  function redrawE(){
+    var base = { kind: 'cab', W: cur.W, H: cur.H, D: cur.D, fh: cur.fh, sk: skewOf(cur.D), rails: cur.rails };
+    document.getElementById('eDnesR').innerHTML = draw(document.getElementById('eDnes'), Object.assign({ mode: 'dnes' }, base));
+    document.getElementById('eNavrhR').innerHTML = draw(document.getElementById('eNavrh'), Object.assign({ mode: 'navrh' }, base));
+    eHv.textContent = cur.H;
+  }
+  document.querySelectorAll('#ePresets button').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('#ePresets button').forEach(function(x){ x.classList.toggle('on', x === b); });
+      cur = Object.assign({}, PRE[b.getAttribute('data-p')]);
+      eH.value = cur.H; redrawE();
+    });
+  });
+  eH.addEventListener('input', function(){ cur.H = +eH.value; if (cur.fh >= cur.H - 100) cur.fh = 0; redrawE(); });
+  redrawE();
+
+  /* stavová správa (O2 · B) */
+  var fs = document.getElementById('fstat'), fb = document.getElementById('fstatBtn'), fx = document.getElementById('fstatX');
+  if (fb && fs) fb.addEventListener('click', function(){ fs.hidden = !fs.hidden; });
+  if (fx && fs) fx.addEventListener('click', function(){ fs.hidden = true; });
+
+  /* štítky */
+  var pt = document.getElementById('pinTog');
+  if (pt) pt.addEventListener('change', function(){ document.body.classList.toggle('nopins', !pt.checked); });
+
+  /* okná 486 px zmenšiť na úzkej obrazovke */
+  function fit(){
+    document.querySelectorAll('.fitbox').forEach(function(b){
+      var w = b.querySelector('.win'); if (!w) return;
+      w.style.zoom = '';
+      var k = Math.min(1, b.clientWidth / w.offsetWidth);
+      if (k < 1) w.style.zoom = k.toFixed(3);
+    });
+  }
+  window.addEventListener('resize', fit);
+  fit();
+})();
+</script>
+</body>
+</html>

@@ -84,10 +84,18 @@
       // ÚPLNY aktuálny zoznam ide do DOM (nie len do pamäte): riadok sa
       // prekresľuje celou kartou, takže jediné miesto, kde stav naozaj žije,
       // je posledný payload servera.
+      // H6a (D4): bez ocakavania je veta servera („bez spotrebica — nastav ...")
+      // POMOCNY text -> „?" za vyberom; s ocakavanim („ocakava rúru") je to
+      // STAV a ostava viditelny pod riadkom. Payload ani server sa nemenia.
+      var empty = (r.expects || []).length === 0;
+      var tip = empty
+        ? '<button type="button" class="nxtip inl r" aria-label="Pomoc" data-tip="' + aprEsc(r.text) +
+          '" onclick="nxTipStop(event)">' + aprIco('help-circle') + '</button>'
+        : '';
       return '<div class="aprow expects" data-apr-row="expects" data-apr-expects="' +
         aprEsc((r.expects || []).join(',')) + '">' + aprIco('appliance') +
-        '<span class="aplbl">Spotrebič</span><span class="apsel">' + aprExpectsHtml(r) +
-        '</span><span class="aptxt soft">' + aprEsc(r.text) + '</span></div>';
+        '<span class="aplbl">Spotrebič</span><span class="apsel">' + aprExpectsHtml(r) + tip +
+        '</span>' + (empty ? '' : '<span class="aptxt soft">' + aprEsc(r.text) + '</span>') + '</div>';
     }
     var bound = r.state === 'bound';
     var tone = String(r.tone || '');

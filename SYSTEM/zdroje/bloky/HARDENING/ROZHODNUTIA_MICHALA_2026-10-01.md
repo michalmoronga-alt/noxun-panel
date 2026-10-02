@@ -158,3 +158,35 @@ dôvodom je **jeho rozhodnutie pri triedení 1.10.2026**; orchestrátor dôvody 
 - **Mockup schvaľuje Michal** pred packages dávok H6 (priestor v Inspectore) a H7 (názov zákazky); mockupy sa pripravia počas H1–H5.
 - **H7 doplnená o R-38** (orchestrátor po review PR #432): presun nastavení exportu do jadra (C-07) ide až s ochranou poškodeného súboru nastavení
   pred tichým prepisom zo zálohy — inak by presun zachoval cestu k strate názvov zákaziek. Michal to potvrdí spolu s mockupom H7.
+
+## Mockupy H6 a H7 — odpovede Michala (2.10.2026 ~02:15, chat)
+
+**H6 · priestor v Inspectore (`MOCKUP_H6_INSPECTOR.html`, O1–O13) — platí:**
+
+| Bod | Odpoveď | Čo to znamená |
+|---|---|---|
+| O1 | **odchýlka od návrhu** | „Vložiť kópiu" a „Uložiť šablónu" **ostávajú na dnešnom mieste dole**, ale **vedľa seba v jednom riadku** (dve tlačidlá). Text „Uložiť ako šablónu do knižnice" sa **skráti na „Uložiť šablónu"**. Žiadne ikony v hlavičke. |
+| O2 | **A** | Stavová veta ostáva na konci panela, ukáže sa len vtedy, keď nesie správu („Pripravené." zmizne). Žiadny pás pri spodku okna. |
+| O3 | **B** | Pätka s verziou („Noxun Engine V…") **ostáva**. |
+| O4 | A | Nadpis „Rozmery" pri označenej skrinke preč; pri vkladaní ostáva. |
+| O5 | A | Jeden „?" v spodnom páse náhľadu + „?" v hlavičkách skupín; stavové vety ostávajú viditeľné. |
+| O6 | A | Rozmery skrinky do lišty sektora Náhľad v Zónach/Čelách/Kovaní („800 × 864 × 520 · sokel 100 →"), klik = Korpus, bublina s materiálom; pás „…upravíš v Korpuse" preč. |
+| O7 | A | „F206 ST9 · medzera 3 · okraje 2 · dole −20". |
+| O8 | A | Riadok „Zobraziť zóny (ghost) v modeli" preč; ostáva v raile pod okom. |
+| O9 | A | Súhrn kovania do lišty sektora Kovanie, z kresby preč (kresba sa zväčší). |
+| O10 | A | Kóty 11 px stále (medzery 10 px), aj pri zoome; prekreslenie kót po zoome. |
+| O11 | A | Bez „mm" pri kótach všade. |
+| O12 | A | Lišta sektora vždy súhrn obsahu (aj pri otvorenej skupine). |
+| O13 | A | Stála nápoveda v Štúdiu → Pravidlá kovania (CS-10) do „?" v rámci H6. |
+
+Dôsledok O1 B + O2 A + O3 B: spodný blok (tlačidlá v jednom riadku, správa len keď je, pätka) ostáva — úspora na kontext je menšia ako v mockupe (spodný blok namiesto ≈ 155 px uvoľní ≈ 40 + 39 px = rádovo ≈ 80 px). Ostatné úspory (O4–O9) platia.
+
+**H7 · názov zákazky na jednom mieste (`MOCKUP_H7_NAZOV_ZAKAZKY.html`, O1–O9) — platí: všetko podľa odporúčania.**
+O1 A (text s ceruzkou v hlavičke Štúdia, klik = pole na mieste) · O2 pole PROJEKT v lište Kusovníka zmizne · O3 jantárová bodka len pri „projekt" ·
+O4 bodka + tooltip + jedna veta po exporte, neblokuje · O5 meno súboru sa pri otvorení neukladá · O6 „Uložiť ako"/Lucia → riešenie v G-02 po V1 ·
+O7 tooltip s presným menom priečinka/súboru (skladá server) · O8 zlyhaný zápis názvu nahlásiť červeno, hlavička ostane na pôvodnom · O9 „projekt" → „zákazka" v textoch okna.
+**R-38 v H7: áno** (odporúčanie zo zhrnutia 1.10. — „všetko podľa odporúčania"; ochrana súboru nastavení exportu pri poškodení, rozhodne package C-07).
+
+**Otázky zo zhrnutia 1.10. bez odpovede — platí predvolené (vratné, nemení výrobné čísla):**
+Q1 H11a pri chybe súboru vypnúť celý plugin · Q2 SketchUp 2026.2 — H11c ostáva otvorené · Q3 H12d názvy v karte dielca podľa Kusovníka · Q4 H9 ABS/kovanie
+bez zálohy — otvorené (bez zmeny) · Q5 „dolná" · Q11 H14 text nechať · Q12 H15 predvolené pravidlá kovania nepresúvať (zásobník Po V1).

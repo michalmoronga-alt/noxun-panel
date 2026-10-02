@@ -12,7 +12,7 @@
      Vsetky nove CSS pravidla kostry visia pod nou, aby panel.css ostal
      bezpecne zdielatelny so satelitnymi oknami. -->
 <script>document.documentElement.className = 'nx-inspector';</script>
-<link rel="stylesheet" href="css/panel.css?v=0.17.16">
+<link rel="stylesheet" href="css/panel.css?v=0.17.17">
 
 <!-- ===== RAIL (A9: staticke ID pre merac D-25) =============================
      Kontexty su platne LEN nad oznacenym korpusom — pri dielci/doske/vkladani
@@ -112,18 +112,14 @@
       <div class="pvbar">
         <div class="pvchips" id="pvChips"></div>
         <span class="pvsp"></span>
+        <!-- H6a (O5): JEDNO „?" pre gestá náhľadu — text podľa režimu a kontextu
+             skladá čistá `NXShell.pvHelpText` (nxShellApply ho nasadí cez
+             setAttribute). Statický text je záloha pre prvé vykreslenie. -->
+        <button type="button" id="pvHelp" class="nxtip r" aria-label="Pomoc k náhľadu"
+          data-tip="Ctrl+koliesko = zoom · ťahaj plochu = posun pohľadu"
+          onclick="nxTipStop(event)"><svg class="ic" aria-hidden="true"><use href="#i-help-circle"/></svg></button>
         <button type="button" id="pvCam" class="pvtool" data-nx-usage="pv:kamera" onclick="onPvCamera()" title="Pohľad na skrinku — zarovná kameru v SketchUpe (čelný pohľad)" aria-label="Pohľad na skrinku — zarovná kameru v SketchUpe"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg></button>
         <button type="button" id="pvFit" class="pvtool" data-nx-usage="pv:fit" onclick="fitPreview()" title="Prispôsobiť pohľad (reset zoomu)" aria-label="Prispôsobiť pohľad (reset zoomu)"><svg class="ic" aria-hidden="true"><use href="#i-maximize"/></svg></button>
-      </div>
-      <!-- D-23: hint podla aktivneho kontextu (CSS cez data-view-ctx na <body>) —
-           v kontexte Cela pribudol klik na celo, zonova cast sa mimo Zon skryva -->
-      <div class="pvhint"><span class="ph-zones">Klik na zónu = výber (police, delenie) · ťahaj priečku = posun (magnet 1/4 · 1/2 · 3/4, Alt ho vypne) · </span><span class="ph-fronts">Klik na čelo = jeho riadok v zozname · </span>Ctrl+koliesko = zoom · ťahaj plochu = posun pohľadu</div>
-      <div class="zoneline">
-        <!-- D-27: TEN ISTY tag (`Noxun/Zóny`), aky ponuka okno tagov v raile —
-             preto aj TA ISTA serverova cesta (`nx_tag_visible`, kluc `zony`)
-             a ten isty stav; panel si tu ziadnu kopiu nedrzi. -->
-        <input id="zonesChk" type="checkbox" onchange="toggleZones()">
-        <label for="zonesChk">Zobraziť obrysy zón v modeli</label>
       </div>
     </fieldset>
     <!-- A3: nahlady dielca a dosky patria do S1 (karty s poliami su v S4).
@@ -387,12 +383,14 @@
      smer dekoru vkladanej dosky (A3 — cab_* selecty su bez vyberu disabled,
      preto sa vo vkladani vobec neukazuju). -->
 <details class="sect" id="secMat" data-key="s3" open>
-  <summary class="secthead"><span class="sn">Materiály</span><span class="meta" id="s3Meta"></span></summary>
+  <summary class="secthead"><span class="sn">Materiály</span><span class="meta" id="s3Meta"></span><button type="button" class="nxtip r" id="s3Help" aria-label="Pomoc" data-tip="Materiály tejto skrinky — prázdne = dediť z projektu." onclick="nxTipStop(event)"><svg class="ic" aria-hidden="true"><use href="#i-help-circle"/></svg></button></summary>
   <div class="sectbody">
     <!-- MATERIALY (V0.3): materialy TEJTO skrinky. Projektove predvolby = okno
          Materialy projektu (V0.4.5 D2 — sprava mimo Inspectora, vzor SYSTEM/07). -->
     <div id="cabMatBlock">
-      <div class="hint" id="cabMatHint">Materiály tejto skrinky — prázdne = dediť z projektu. Označ skrinku pre nastavenie.</div>
+      <!-- H6a (O5/mockup bod 7): pomocna veta o dedeni je „?" v liste sektora (#s3Help);
+           tu ostava LEN stavova veta bez vyberu (s vyberom je skryta). -->
+      <div class="hint" id="cabMatHint">Označ skrinku pre nastavenie jej materiálov.</div>
       <div class="matrow"><label>Korpus</label><select id="cab_body" data-nx-combo="decor" data-nx-combo-ctx="body" onchange="onCabinetMaterial('body', this.value)"></select></div>
       <div class="matrow"><label>Čelá</label><select id="cab_front" data-nx-combo="decor" data-nx-combo-ctx="front" onchange="onCabinetMaterial('front', this.value)"></select></div>
       <div class="matrow"><label>Chrbát</label><select id="cab_back" data-nx-combo="decor" data-nx-combo-ctx="back" onchange="onCabinetMaterial('back', this.value)"></select></div>
@@ -568,11 +566,9 @@
          Kostra je STATICKA (A4): JS pise len obsah #zoneTree / #zoneFields
          a triedy/disabled na uz existujucich uzloch. -->
     <details data-key="zones" data-s4="zony" data-s4-solo="1" open>
-      <summary><svg class="ic gic" aria-hidden="true"><use href="#i-layout-grid"/></svg>Štruktúra zón</summary>
+      <summary class="ghdr"><svg class="ic gic" aria-hidden="true"><use href="#i-layout-grid"/></svg>Štruktúra zón<span class="gtools"><button type="button" class="nxtip r" aria-label="Pomoc" data-tip="Klik na zónu (tu alebo v náhľade) ju vyberie — delenie a police sa potom týkajú jej. Strom má najviac 3 úrovne." onclick="nxTipStop(event)"><svg class="ic" aria-hidden="true"><use href="#i-help-circle"/></svg></button></span></summary>
       <div class="body">
         <div id="zoneTree"><div class="muted">Žiadny označený korpus.</div></div>
-        <div class="hint">Klik na zónu (tu alebo v náhľade) ju vyberie — delenie a police
-          sa potom týkajú jej. Strom má najviac 3 úrovne.</div>
       </div>
     </details>
 
@@ -756,12 +752,8 @@
          Tri skupiny v zavaznom poradi: Polozky z pravidiel · Sety · Pravidla.
          Kostra je STATICKA (A4) — JS pise LEN obsah #hwRows a #hwSetRows. -->
     <details data-key="hwitems" data-s4="kovanie">
-      <summary><svg class="ic gic" aria-hidden="true"><use href="#i-hammer"/></svg>Položky z pravidiel</summary>
+      <summary class="ghdr"><svg class="ic gic" aria-hidden="true"><use href="#i-hammer"/></svg>Položky z pravidiel<span class="gtools"><button type="button" class="nxtip r" aria-label="Pomoc" data-tip="Položky sú zoskupené podľa vlastníka — skrinka a každé čelo má svoj box. Klik na hlavičku boxu označí vlastníka v modeli (panel ostáva v Kovaní). Počty určujú pravidlá; zmena počtu je ručný zásah pre túto skrinku a tlačidlo so šípkou späť vráti pravidlo." onclick="nxTipStop(event)"><svg class="ic" aria-hidden="true"><use href="#i-help-circle"/></svg></button></span></summary>
       <div class="body">
-        <div class="hint">Položky sú zoskupené podľa <b>vlastníka</b> — skrinka a každé čelo má svoj box.
-          Klik na hlavičku boxu <b>označí vlastníka v modeli</b> (panel ostáva v Kovaní).
-          Počty určujú pravidlá; zmena počtu je ručný zásah pre túto skrinku a
-          <svg class="ic ic-inline" aria-hidden="true"><use href="#i-rotate-ccw"/></svg> vráti pravidlo.</div>
         <div id="hwRows"><div class="muted">Označ skrinku v modeli.</div></div>
       </div>
     </details>
@@ -770,20 +762,16 @@
          Obsah sa nemeni (V0.6 D1b), len sa odstahoval z konca zoznamu poloziek
          do vlastnej skupiny, aby sa boxy vlastnikov nemiesali so setmi. -->
     <details data-key="hwsets" data-s4="kovanie">
-      <summary><svg class="ic gic" aria-hidden="true"><use href="#i-layers"/></svg>Sety</summary>
+      <summary class="ghdr"><svg class="ic gic" aria-hidden="true"><use href="#i-layers"/></svg>Sety<span class="gtools"><button type="button" class="nxtip r" aria-label="Pomoc" data-tip="Set nesie pásmo (dĺžky, nosnosti) — z neho vie Nákup vybrať správny kód. Vlastný set jedného čela sa vyberá priamo v jeho boxe medzi položkami." onclick="nxTipStop(event)"><svg class="ic" aria-hidden="true"><use href="#i-help-circle"/></svg></button></span></summary>
       <div class="body">
         <div id="hwSetRows"><div class="muted">Označ skrinku v modeli.</div></div>
-        <div class="hint">Set nesie pásmo (dĺžky, nosnosti) — z neho vie Nákup vybrať správny kód.
-          Vlastný set jedného čela sa vyberá priamo v jeho boxe medzi položkami.</div>
       </div>
     </details>
 
     <!-- PRAVIDLA — vstupne body do satelitnych okien (ziadny zasah do modelu). -->
     <details data-key="hwrules" data-s4="kovanie">
-      <summary><svg class="ic gic" aria-hidden="true"><use href="#i-settings"/></svg>Pravidlá</summary>
+      <summary class="ghdr"><svg class="ic gic" aria-hidden="true"><use href="#i-settings"/></svg>Pravidlá<span class="gtools"><button type="button" class="nxtip r" aria-label="Pomoc" data-tip="Počty určujú pravidlá projektu (nohy podľa podstavca, závesy podľa výšky, výsuv podľa hĺbky). Katalóg drží kódy a ceny, z ktorých sa skladá nákup." onclick="nxTipStop(event)"><svg class="ic" aria-hidden="true"><use href="#i-help-circle"/></svg></button></span></summary>
       <div class="body">
-        <div class="hint">Počty určujú pravidlá projektu (nohy podľa podstavca, závesy podľa výšky,
-          výsuv podľa hĺbky). Katalóg drží kódy a ceny, z ktorých sa skladá nákup.</div>
         <div class="btnrow">
           <button class="ghostbtn" onclick="openStudio('rules')"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg> Pravidlá kovania…</button>
           <!-- D-91: katalog kovania — po zruseni satelitnych tlacidiel v hlavicke
@@ -910,10 +898,14 @@
 </details>
 
 <!-- pri oznacenom korpuse: PRESNA serverova kopia oznacenej skrinky (B3) — config
-     z modelu, nie z formulara: nesie aj materialy, upravy dielcov a kovania, nazov -->
-<button class="ghostbtn wide insertmore" onclick="insertCopySelected()" title="Vloží presnú kópiu označenej skrinky — vrátane materiálov, úprav dielcov (ABS) a kovania"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg> Vložiť kópiu</button>
-<!-- D-14: ulozenie oznaceneho korpusu do kniznice sablon (in-panel modal — vzor D-15) -->
-<button class="ghostbtn wide savetpl" onclick="openSaveTemplateModal()"><svg class="ic" aria-hidden="true"><use href="#i-star"/></svg> Uložiť ako šablónu do knižnice</button>
+     z modelu, nie z formulara: nesie aj materialy, upravy dielcov a kovania, nazov.
+     H6a (O1 B): obe akcie stoja DOLE vedla seba v jednom riadku (`.cabacts`, len
+     pri oznacenej skrinke) — akcie ostali tie iste, zmenilo sa len rozlozenie. -->
+<div class="cabacts">
+  <button class="ghostbtn" id="insertCopyBtn" onclick="insertCopySelected()" title="Vloží presnú kópiu označenej skrinky — vrátane materiálov, úprav dielcov (ABS) a kovania"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg> Vložiť kópiu</button>
+  <!-- D-14: ulozenie oznaceneho korpusu do kniznice sablon (in-panel modal — vzor D-15) -->
+  <button class="ghostbtn" id="saveTplBtn" onclick="openSaveTemplateModal()" title="Uloží označenú skrinku ako šablónu do knižnice"><svg class="ic" aria-hidden="true"><use href="#i-star"/></svg> Uložiť šablónu</button>
+</div>
 
 <div id="tplModal" class="nxmodal" style="display:none">
   <div class="nxmodal-card">
@@ -1061,7 +1053,9 @@
   </div>
 </div>
 
-<div id="status">Pripravené.</div>
+<!-- H6a (O2 A): stavova veta stoji na konci panela, ale ukaze sa LEN so spravou
+     (NX.setStatus ju pri prazdnom texte skryje); „Pripravene." zaniklo. -->
+<div id="status" hidden></div>
 
 <!-- D-29 A12/A2: paticka v normalnom toku (NIE fixed). #verline je PRESUNUTY sem
      (jediny vyskyt — bridge.js NX.init pise 'v'+Engine::VERSION); cache-bust priponu
@@ -1077,60 +1071,60 @@
      musi existovat pred prvym renderom aj pred ready), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.17.16"></script>
+<script src="js/errors.js?v=0.17.17"></script>
 <!-- D-77 / A7: minimalna OBSAHOVA velkost okna pri otvoreni. UI-B1 stanovil
      jednu pravdu sirky Inspectora — 470 px OBSAHU (rail 44 + karta). Vyska 810
      pokryva nahlad + dva rozbalene sektory. Dorovnava sa oboma smermi, raz pri
      nacitani a nikdy nad plochu obrazovky (js/win_fit.js). -->
 <script>window.NX_FIT_MIN = { w: 470, h: 810 };</script>
-<script src="js/win_fit.js?v=0.17.16"></script>
-<script src="js/icons.js?v=0.17.16"></script>
+<script src="js/win_fit.js?v=0.17.17"></script>
+<script src="js/icons.js?v=0.17.17"></script>
 <!-- R-23.1: JEDEN dokumentový Escape handler s prioritným zoznamom vrstiev
      (ten istý súbor načítava aj studio.html). Musí byť PRED skriptami, ktoré
      modály otvárajú — jeho listener má bežať ako PRVÝ, aby vedel udalosť
      spotrebovať skôr, než ju dostane handler okna. -->
-<script src="js/nx_esc.js?v=0.17.16"></script>
+<script src="js/nx_esc.js?v=0.17.17"></script>
 <!-- KOV-H2: zdieľaná kostra modalov D-15 (ten istý súbor načítava aj
      studio.html). Musí byť ZA nx_esc.js (reťaz Escape má bežať prvá) a PRED
      core.js/hardware.js — modal ručnej položky kovania ju volá menom. -->
-<script src="js/nx_modal.js?v=0.17.16"></script>
+<script src="js/nx_modal.js?v=0.17.17"></script>
 <!-- ŠT-4a: zdieľaný obsah „O plugine" (rovnaký súbor načítava aj studio.html). -->
-<script src="js/about.js?v=0.17.16"></script>
+<script src="js/about.js?v=0.17.17"></script>
 <!-- D-85 (UI-03): zdielany combobox. Musi byt PRED core/part/board — tie ho pri
      renderi kariet volaju (NXCombo.scan). Sam na nikom nezavisi (ikony si berie
      defenzivne cez NXIcons, ak sprite existuje). -->
-<script src="js/nx_combo.js?v=0.17.16"></script>
+<script src="js/nx_combo.js?v=0.17.17"></script>
 <!-- v0.7.28: ZDIELANE 3-stavove nastavenie kontroly hran (rohovy trojuholnik pri
      ABS kontrole v raile). TEN ISTY subor nacitava aj okno Studio — jeden markup,
      jeden stav. Musi byt PRED shell.js (rohove okno kresli NXEdgeMenu). -->
-<script src="js/edge_menu.js?v=0.17.16"></script>
-<script src="js/tag_menu.js?v=0.17.16"></script>
-<script src="js/core.js?v=0.17.16"></script>
-<script src="js/expr.js?v=0.17.16"></script>
-<script src="js/insert_state.js?v=0.17.16"></script>
-<script src="js/form.js?v=0.17.16"></script>
-<script src="js/zone_tree.js?v=0.17.16"></script>
-<script src="js/preview.js?v=0.17.16"></script>
+<script src="js/edge_menu.js?v=0.17.17"></script>
+<script src="js/tag_menu.js?v=0.17.17"></script>
+<script src="js/core.js?v=0.17.17"></script>
+<script src="js/expr.js?v=0.17.17"></script>
+<script src="js/insert_state.js?v=0.17.17"></script>
+<script src="js/form.js?v=0.17.17"></script>
+<script src="js/zone_tree.js?v=0.17.17"></script>
+<script src="js/preview.js?v=0.17.17"></script>
 <!-- H14a: register sekcii Studia — filter deep-linku „Otvoriť v Štúdiu" v shell.js
      z neho cita zname sekcie. MUSI byt PRED shell.js. -->
-<script src="js/studio_sections.js?v=0.17.16"></script>
+<script src="js/studio_sections.js?v=0.17.17"></script>
 <!-- UI-B1: kostra Inspectora — stavovy stroj vyber x kontext, rail, sektory. -->
-<script src="js/shell.js?v=0.17.16"></script>
-<script src="js/actions.js?v=0.17.16"></script>
+<script src="js/shell.js?v=0.17.17"></script>
+<script src="js/actions.js?v=0.17.17"></script>
 <!-- GHOST-FB4: Ghost pasik vkladacej karty. Musi byt PRED bridge.js
      (NX.setGhost vola nxGhostApply); sam na nikom nezavisi. -->
-<script src="js/ghost_bar.js?v=0.17.16"></script>
+<script src="js/ghost_bar.js?v=0.17.17"></script>
 <!-- UI-B3: nastavenia Inspectora (koliesko) + rozmerove rady N6. Musi byt PRED
      bridge.js (NX.setUiSettings volá nxApplyUiSettings) a za core.js (el/esc). -->
-<script src="js/settings.js?v=0.17.16"></script>
-<script src="js/bridge.js?v=0.17.16"></script>
-<script src="js/materials.js?v=0.17.16"></script>
-<script src="js/part_card.js?v=0.17.16"></script>
-<script src="js/board_card.js?v=0.17.16"></script>
-<script src="js/hardware.js?v=0.17.16"></script>
+<script src="js/settings.js?v=0.17.17"></script>
+<script src="js/bridge.js?v=0.17.17"></script>
+<script src="js/materials.js?v=0.17.17"></script>
+<script src="js/part_card.js?v=0.17.17"></script>
+<script src="js/board_card.js?v=0.17.17"></script>
+<script src="js/hardware.js?v=0.17.17"></script>
 <!-- S1-B2: riadok „Spotrebič" v Základných aj v karte dosky. Vlastný súbor
      (nie hardware.js) zámerne: s kovaním nemá nič spoločné a payload mu
      chodí vlastným kľúčom (`appliance_rows`). -->
-<script src="js/appliance_row.js?v=0.17.16"></script>
-<script src="js/usage.js?v=0.17.16"></script>
-<script src="js/boot.js?v=0.17.16"></script>
+<script src="js/appliance_row.js?v=0.17.17"></script>
+<script src="js/usage.js?v=0.17.17"></script>
+<script src="js/boot.js?v=0.17.17"></script>

@@ -8,8 +8,8 @@
 //   2) rozhodovanie o ikone raily je cista funkcia (svieti, ked nieco nevidno),
 //   3) payload do Ruby je identita + kluc + STRIKTNY boolean,
 //   4) skryty PRIECINOK tagov sa prizna (tag je zapnuty, vidiet ho aj tak nie),
-//   5) panel si ziadny vlastny stav nedrzi a checkbox ghost zon ide TOU ISTOU
-//      cestou (jeden zdroj, dva ovladace),
+//   5) panel si ziadny vlastny stav nedrzi (od H6a je jediny ovladac tagu zon
+//      okno tagov v raile; checkbox pod nahladom zanikol),
 //   6) texty ani kluce sa neopisuju do shell.js.
 'use strict';
 const assert = require('node:assert');
@@ -161,8 +161,9 @@ function state(rows, hidden){
      'a otvorenie rohu ABS recipročne zhasne okno tagov');
 
   const actions = fs.readFileSync(path.join(ROOT, 'noxun_engine', 'ui', 'js', 'actions.js'), 'utf8');
-  ok(actions.indexOf('sketchup.nx_tag_visible') >= 0,
-     'checkbox ghost zon ide TOU ISTOU cestou ako okno tagov');
+  // H6a (O8): checkbox obrysov zon zanikol - jediny ovladac tagu `zony` je okno tagov v raile.
+  no(actions.indexOf('sketchup.nx_tag_visible') >= 0 || actions.indexOf('toggleZones') >= 0,
+     'actions.js uz druhy ovladac tagu zon nema (checkbox zanikol)');
   no(actions.indexOf('sketchup.toggle_zones') >= 0,
      'stary callback bez identity dokumentu zanikol');
 

@@ -147,6 +147,26 @@
       return out.length ? out.join(' · ') : '—';
     }
 
+    // --- „?" pod nahladom: gesta podla toho, co sa v nahlade DA robit (H6a, O5) ---
+    // Nahrada staleho riadku `.pvhint`. JEDEN zdroj textu (cista funkcia, Node
+    // test): zonova veta len tam, kde nahlad kresli zony a priecky (kontext Zony
+    // a DIELEC — jeho nahlad je zonovy), veta o celach len v Celach, veta o znackach
+    // len v Kovani; vkladanie, doska a Korpus maju samotne gesta zoomu a posunu.
+    var PV_HELP_ZONY = 'Klik na zónu = výber (police, delenie) · ťahaj priečku = posun (magnet 1/4 · 1/2 · 3/4, Alt ho vypne)';
+    var PV_HELP_CELA = 'Klik na čelo = jeho riadok v zozname';
+    var PV_HELP_ZNACKA = 'Klik na značku = označí vlastníka v modeli · pozície sú orientačné';
+    var PV_HELP_GESTA = 'Ctrl+koliesko = zoom · ťahaj plochu = posun pohľadu';
+    function pvHelpText(mode, ctx){
+      var m = (mode === undefined ? state.mode : mode);
+      var c = normCtx(ctx === undefined ? state.ctx : ctx);
+      var lead = '';
+      if (m === 'part') lead = PV_HELP_ZONY;
+      else if (m === 'cab' && c === 'zony') lead = PV_HELP_ZONY;
+      else if (m === 'cab' && c === 'cela') lead = PV_HELP_CELA;
+      else if (m === 'cab' && c === 'kovanie') lead = PV_HELP_ZNACKA;
+      return lead ? (lead + ' · ' + PV_HELP_GESTA) : PV_HELP_GESTA;
+    }
+
     // --- meta suhrny v listach sektorov (kontrakt UI 2.0) --------------------
     // Lista kazdeho sektora nesie vpravo jednoriadkovy SUHRN toho, co je vnutri
     // (mockup `sect(key, name, meta, …)`). Vidno ho ROVNAKO zbaleny aj rozbaleny
@@ -434,6 +454,7 @@
       setLabel: setLabel,
       sectorVis: sectorVis,
       ctxNoteText: ctxNoteText,
+      pvHelpText: pvHelpText,
       sectorMeta: sectorMeta,
       grainRail: grainRail,
       grainPartWord: grainPartWord,
@@ -530,6 +551,9 @@
     }
     var s4 = el('s4Name');
     if (s4) s4.textContent = nxS4Title(mode, ctx);
+    // „?" pod nahladom: text gest podla rezimu a kontextu (cista NXShell.pvHelpText).
+    var pvh = el('pvHelp');
+    if (pvh) pvh.setAttribute('data-tip', NXShell.pvHelpText(mode, ctx));
     nxCtxNoteApply();
     nxSectorMetaApply(); // meta suhrny listy sektorov (rezim aj kontext ich menia)
   }
@@ -999,9 +1023,8 @@
       NXTagMenu.togglePayload({ model_guid: nxModelGuid }, key, value)));
   }
 
-  // Nasadenie serveroveho stavu. JEDEN stav, DVA ovladace: ikona raily s oknom
-  // a checkbox „Zobraziť zóny (ghost) v modeli" (kluc `zony`) — panel nema
-  // vlastnu kopiu ani jedneho.
+  // Nasadenie serveroveho stavu. JEDEN stav, JEDEN ovladac: ikona raily s oknom
+  // tagov (obrysy zon su v nom riadok `zony`, H6a O8) — panel nema vlastnu kopiu.
   function nxApplyTags(st){
     nxTagState = st || null;
     var s = window.NXTagMenu ? NXTagMenu.railState(st) : null;
@@ -1014,13 +1037,6 @@
     }
     // Otvorene okno drzi ZIVY stav — prekresli ho.
     if (nxTagMenuOpen()) nxRenderTagMenu(true);
-    var chk = el('zonesChk');
-    if (chk){
-      var row = null;
-      var rows = (st && st.rows) || [];
-      for (var i = 0; i < rows.length; i++){ if (rows[i] && rows[i].key === 'zony') row = rows[i]; }
-      chk.checked = !!(row && row.visible === true);
-    }
   }
 
   // K2/D-87: to iste pre KONTROLU KRESBY. Rozhodovanie je v CISTEJ funkcii

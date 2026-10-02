@@ -645,13 +645,23 @@
     return (typeof v === 'number' && isFinite(v)) ? String(v) : '';
   }
 
+  // H6a (O13/CS-10): veta, ktorá bola pod blokom `.hint`, je teraz bublina „?"
+  // v hlavičke bloku. Text sa nemení.
+  var RD_GUARD_HELP = 'Platí pre dvierka. Hmotnostné pásma iba upozorňujú — počet závesov riadi tabuľka ' +
+    'výšok. Prázdne pole = kontrola je vypnutá.';
+  function rdHelpIco(){ return '<svg class="ic" aria-hidden="true"><use href="#i-help-circle"/></svg>'; }
+
   // HTML editora. ČISTÁ funkcia (Node test) — stav otvorenia chodí z modulu.
   function rdGuardHtml(r, i){
     var wp = (r && r.width_plus && typeof r.width_plus === 'object') ? r.width_plus : {};
     var open = RD_GUARD_OPEN[rdGuardKey(r, i)] === true;
     var h = '<details class="rgrd" data-rid="' + rdEsc(rdGuardKey(r, i)) + '"' + (open ? ' open' : '') +
       ' ontoggle="rdGuardToggle(this)">' +
-      '<summary>Kontroly dvierok <span class="rgsum">' + rdEsc(rdGuardSummary(r)) + '</span></summary>' +
+      // H6a (O13/CS-10): pomocna veta bloku je „?" v hlavicke (vzor `ssTip`, `.studio .nxtip`);
+      // klik na nu blok NEZBALI (preventDefault + stopPropagation ako pri tooltipoch Inspectora).
+      '<summary>Kontroly dvierok <span class="rgsum">' + rdEsc(rdGuardSummary(r)) + '</span>' +
+      '<button type="button" class="nxtip" aria-label="Pomoc" data-tip="' + rdEsc(RD_GUARD_HELP) +
+      '" onclick="event.preventDefault();event.stopPropagation()">' + rdHelpIco() + '</button></summary>' +
       '<div class="rgbody">' +
       '<div class="rrow"><label>Šírka nad</label>' +
       '<input class="rgover rnum" type="number" min="1" step="1" value="' + rdEsc(rdNumAttr(wp.over)) + '">' +
@@ -681,8 +691,7 @@
           'preto je tabuľka prázdna. Uložením sa pokazený údaj z pravidla odstráni; ' +
           'pásma potom môžeš zadať nanovo.</div>'
         : '') +
-      '<div class="hint">Platí pre dvierka. Hmotnostné pásma iba upozorňujú — počet závesov riadi tabuľka ' +
-      'výšok. Prázdne pole = kontrola je vypnutá.</div></div></details>';
+      '</div></details>';
   }
 
   // Codex #330 kolo 1 (P2): ZBALENIE bloku je okamih, keď formulár zmizne
