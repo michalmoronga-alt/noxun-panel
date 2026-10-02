@@ -35,7 +35,9 @@
   **1. commit = R0:** golden `tests/fixtures/h6b_suhrny.json` (`metaDims`, `metaMaterials`, `nxHwSummary` nad 9 stavmi) — zelený na starom aj novom kóde. Nový
   `tests/js/test_h6b_suhrny.js`; prepísané `test_uib1_kostra.js`/`.rb`, `test_uib_meta.js`, `test_d130b_spolocne.js` (1:1 náhrady). Namerané (`ui_foto -Shoot`): Zóny, Čelá
   a Kovanie sú o ≈ 52 px kratšie (pás preč); Korpus, bez výberu a dielec bez zmeny výšky (1190 / 1358 / 1116 px). Nahradený text STAV: v0.17.17 H6a (pomocné vety v „?",
-  tlačidlá v jednom riadku, stavová veta len so správou, obrysy zón len v raile).
+  tlačidlá v jednom riadku, stavová veta len so správou, obrysy zón len v raile); staré dávky H3–H5, H8–H10, H11b, H12a–d, H13 a H14a/b sa v STAV zlúčili do jedného
+  riadka (limit 80 riadkov / 12 kB) — plné znenia sú v tejto KRONIKE. **Predrecenzia:** súhrn lišty Kovanie počíta aj ručné položky („· N ručne"), dekor v súhrne „Spoločné
+  pre skrinku" sa reže pred „ · " (žiadne „K009 · ·"), scéna Kovania zahŕňa čelá s presahom dole a dielce rohovej zostavy, `aria-label` odkazu začína viditeľným textom.
 
 - **H6a · nápovedy, spodok panela a stavová veta (2.10.2026, PR #453, v0.17.17, blok 9 · HARDENING PO V1, triedenie D-01 — CU-04, CU-11, GR-22, CS-10; package
   [PACKAGE_H6.md](../zdroje/bloky/HARDENING/PACKAGE_H6.md) §6 „H6a" + §15; mockup [MOCKUP_H6_INSPECTOR.html](../zdroje/bloky/HARDENING/MOCKUP_H6_INSPECTOR.html);

@@ -378,11 +378,11 @@ a atribúty na `<body>`; `innerHTML` re-render kostry je zakázaný (listenery, 
   premenovanie dekoru zmení bublinu). Poistka `.nx-inspector .sect > .secthead [hidden] { display: none; }` (pasca D-137).
 - Skupiny S4 nesú `data-s4="<kontext>"` a sú v rámci kontextu **exkluzívne** (`NXShell.exclusiveClose`, kľúč `nxsec_s4.<ctx>.<key>`), výnimka `data-s4-solo`.
 - **Lišta sektora nesie META súhrn** (`NXShell.sectorMeta`, čítaný živo z panela cez `nxSectorMetaApply` — žiadna cache textu, žiadne nové serverové dáta);
-  obnovuje ho `nxShellApply`, jeden delegovaný `input`/`change` listener (`NX_META_FIELDS` vrátane `top_mode`, `bottom_mode`, `back_mode` a polí medzier `fr_gap*`)
+  obnovuje ho `nxShellApply`, `refreshHardwareManual`, jeden delegovaný `input`/`change` listener (`NX_META_FIELDS` vrátane `top_mode`, `bottom_mode`, `back_mode` a polí medzier `fr_gap*`)
   a programové cesty, ktoré menia obsah: `renderZoneTree` (aj prázdny strom), `renderHardware` (blok `finally`), `updateFrontMeta`, `updateCabfrontMeta`.
   **S4 je vždy SÚHRN OBSAHU kontextu** (H6b, O12; otvorená skupina ho nemení, názov skupiny sa už nezbiera): `nxMetaContent(mode, ctx)` zbiera len živý stav aktuálneho
   kontextu — Korpus hodnoty selectov `top_mode`/`bottom_mode`/`back_mode` (slot umývačky `!NXTypes.carcass` = bez súhrnu), Zóny listy z `computeZones()` (bez 4. úrovne
-  `deep`) a ich police, Čelá `nxFrontCounts()` + `nxCabfrontText()`, Kovanie `hwItems` + `nxHwSummary`. Skladajú ho čisté funkcie `metaKorpus`/`metaZones`/
+  `deep`) a ich police, Čelá `nxFrontCounts()` + `nxCabfrontText()`, Kovanie `hwItems` + `nxHwSummary` + počet ručných položiek (`hwManualView`). Skladajú ho čisté funkcie `metaKorpus`/`metaZones`/
   `metaFronts`/`metaHardware` v `shell.js` cez `sectorMeta` (Node testy `tests/js/test_h6b_suhrny.js`); formát v UI_DIZAJN §5.1.
 - Akcie **z náhľadu** najprv rozbalia cestu k cieľu (`nxRevealTarget`).
 - Scroll je dokumentový (rail `position: fixed`, hlavička sticky, warnpanel je overlay v hlavičke). CSS kostry je scopnuté pod `.nx-inspector` na `<html>`.
@@ -496,7 +496,7 @@ súhrn položiek je v lište sektora Kovanie, H6b) · **Dielec** hrany s ABS (`#
 
 **Žiadne nové dáta:** kreslí sa výhradne z payloadov panela — rozmery formulára, `front_items`, `config.hardware` (`hwItems` z toho istého pushu), strom zón;
 odvodenie robia čisté funkcie `nxHwMarks` / `nxSlideGeom` / `nxHwSummary` / `nxFrontDims` / `nxZoneSpans`. **Kovanie sa nečíta z geometrie** a značka je
-orientačná. Všetky vrstvy berú geometriu z **jedného** `pvGeom()`; `sceneSize` rezervuje miesto pre kóty každej projekcie (Kovanie len pre to, čo kreslí: nohy pod korpusom
+orientačná. Všetky vrstvy berú geometriu z **jedného** `pvGeom()`; `sceneSize` rezervuje miesto pre kóty každej projekcie (Kovanie len pre to, čo kreslí: čelá s presahom a dielce rohovej zostavy (`frontsExtent`, `pvCornerExtent`), nohy pod korpusom
 `nxHwLowestZ(hwItems, fh)` — pri sokli > 0 rezerva dole 0, bez sokla 70 mm; geometria nohy `nxLegGeom`).
 
 - **Výsuv:** geometria `nxSlideGeom` (pätka dovnútra, telo za pätkami, pomer z výšky čela); **anker = vnútorné líca bokov `x = t … W−t`** (výsuv drží bok, nie
@@ -577,7 +577,7 @@ Späť) po čítacom preflighte `front_preflight` (nižšie).
 
 **Hlavičky skupín:** `#frontMeta` („3 čelá · 1 bez smeru"; počet z DOM, „bez smeru" výhradne zo `front_slots`; text `frontCountText(n, unset)` z `core.js`, ten istý ide
 do lišty sektora, počty `nxFrontCounts`) + akcia **„všetkým"**; `#cabfrontMeta` (`cabfrontMetaText(decor, gaps, {slot})`, H6b O7: „F206 ST9 · medzera 3 · okraje 2 ·
-dole -20" — dekor = prvé dve slová, celý názov v `title`, okraje spoločná hodnota + výnimky, slot bez medzery a okraja dole; text skladá `nxCabfrontText`), zámok limitu presahov `#edgeLimitLock` (stav v ikone `lock`/`lock-open`, `title`, `aria-pressed`, `amber`) a ikona
+dole -20" — dekor = prvé dve slová časti pred „ · ", celý názov v `title`, okraje spoločná hodnota + výnimky, slot bez medzery a okraja dole; text skladá `nxCabfrontText`), zámok limitu presahov `#edgeLimitLock` (stav v ikone `lock`/`lock-open`, `title`, `aria-pressed`, `amber`) a ikona
 „Predvolené" `#frontGapsReset`. **Každé tlačidlo v `<summary>` musí `preventDefault()` aj `stopPropagation()`** (`nxTipStop`), inak klik skupinu zbalí.
 
 **Materiál čiel** má v tomto kontexte druhý ovládač `cab_front_c` (sektor Materiály patrí Korpusu) — tá istá hodnota, synchro drží každá cesta, ktorá siaha na

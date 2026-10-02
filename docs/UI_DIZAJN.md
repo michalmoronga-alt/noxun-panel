@@ -479,8 +479,8 @@ sektoroch**. Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html
   kontextu: Korpus `strop 2 výstuhy · boky na dne · chrbát v drážke`, Zóny
   `2 zóny · 3 police` (listy stromu a ich police; prázdna jediná zóna povie
   „prázdna"), Čelá `1 čelo · F206 ST9 · medzera 3 · okraje 2` (bez čiel „bez
-  čiel"), Kovanie `Nohy 4× · Výsuv 1× · Príchyt sokla 1×` (bez kovania „bez
-  kovania"). **Otvorená skupina súhrn nemení** — jej názov je vidno hneď pod
+  čiel"), Kovanie `Nohy 4× · Výsuv 1× · Príchyt sokla 1×` (ručne pridané položky
+  `· 2 ručne`; „bez kovania" len keď nie sú ani pravidlá, ani ručné). **Otvorená skupina súhrn nemení** — jej názov je vidno hneď pod
   lištou. Slot umývačky nemá korpusové skupiny, jeho Korpus je bez súhrnu.
   Súhrn je vidno **rovnako zbalený aj rozbalený** — zbalený sektor povie, čo
   skrýva, rozbalený drží ten istý údaj na očnom mieste. Text sa skladá **až pri
@@ -492,7 +492,7 @@ sektoroch**. Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html
   odkaz s rozmermi skrinky** (`#s1Link`: `800 × 864 × 520 · sokel 100 →`, tá
   istá funkcia ako lišta Základné, ikona `arrow-right`). Klik otvorí kontext
   Korpus (zastaví natívny toggle `<summary>`, takže sektor nezbalí), bublina
-  ukáže **materiál korpusu** (aktuálny popis z katalógu — premenovanie dekoru
+  ukáže **materiál korpusu** (`aria-label` začína viditeľným textom rozmerov; aktuálny popis z katalógu — premenovanie dekoru
   ju zmení). Pás „Skrinka … upravíš v Korpuse" zanikol. Dôvod je vertikálny
   priestor: inak by každý kontext začínal tromi cudzími sektormi a jeho vlastný
   obsah by ležal pod zlomom. **Jediná autorita pravidla je čistá funkcia
@@ -936,7 +936,7 @@ staršia `mockup_inspector_c.html` (`s4Fronts`) pre zvyšok kontextu.
   nesie ikona + `title` + jantárová farba, nie text v tele) a meta hlavičky
   povie stav aj pri **zbalenej** skupine. Meta „Spoločné pre skrinku" je
   čitateľná bez legendy: `F206 ST9 · medzera 3 · okraje 2` — dekor ako **prvé dve
-  slová** názvu (celý názov je v bubline), okraje ako spoločná hodnota
+  slová časti pred „ · "** (kód dekoru; celý názov je v bubline), okraje ako spoločná hodnota
   a výnimky `okraje 2 · dole -20` (zhoda počtu → vyhrá prvá strana v poradí
   hore, dole, vľavo, vpravo; keď je každá hodnota iná, vypíšu sa všetky strany
   menom). Čísla sú ako v poli (`-20`, `2,5`); slot umývačky medzeru a okraj
