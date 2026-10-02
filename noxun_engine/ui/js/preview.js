@@ -288,7 +288,7 @@
       if (!a || !a.box) return;
       var b = a.box, x0 = nxNumOr(b.x, 0), z0 = nxNumOr(b.z, 0);
       var x1 = x0 + nxNumOr(b.w, 0), z1 = z0 + nxNumOr(b.h, 0);
-      // Pasmo hrany a jeho popisky lezia VLAVO od boxu.
+      // Jantarove pasmo hrany lezi VLAVO od boxu (popisky pasma idu dovnutra boxu, `pvApplLabels`).
       var gx = (a.split ? x0 - PV_APPL_GUTTER : x0);
       var n = { minX: Math.min(0, gx), maxX: Math.max(W, x1),
                 minZ: Math.min(0, z0), maxZ: z1 };
@@ -1009,9 +1009,11 @@
     // Popisok musi sediet DOVNUTRA boxu (inak by siahol cez kotu sokla/tela vlavo):
     // „hrana 695" → „695" → nic, podla sirky boxu v px; pri zoome sa dokresli.
     var room = nxNumOr(w, 0) * pvS - 4;
-    function put(z, labels, fill){
+    // `lift` = posun popisku v px NAHORU od jeho ciary: ciara hrany (2,5 mm, neskaluje sa) by
+    // inak prestrtla cislo vycentrovane na nej.
+    function put(z, labels, fill, lift){
       var t = pvFitLabel(room, labels, DIM_FONT_PX);
-      if (t) items.push({ z: z, text: t, fill: fill });
+      if (t) items.push({ z: z, text: t, fill: fill, lift: lift || 0 });
     }
     if (rg.hi - rg.lo > 0 && sp.lo_mm != null && sp.hi_mm != null){
       put(rg.lo, [String(Math.round(sp.lo_mm))], PV_SLOT_FILL);
@@ -1019,10 +1021,11 @@
     }
     var e = nxNumOr(sp.edge, NaN);
     if (!isNaN(e) && sp.edge_mm != null){
-      put(e, ['hrana ' + Math.round(sp.edge_mm), String(Math.round(sp.edge_mm))], sp.state === 'clash' ? PV_SLOT_FILL : PV_SELECT_ACCENT);
+      put(e, ['hrana ' + Math.round(sp.edge_mm), String(Math.round(sp.edge_mm))], sp.state === 'clash' ? PV_SLOT_FILL : PV_SELECT_ACCENT,
+          DIM_FONT_PX / 2 + 3);
     }
     items.sort(function(p, q){ return p.z - q.z; });
-    var ys = nxSpreadLabels(items.map(function(it){ return ry(it.z); }), pvU(DIM_FONT_PX + 1), pvSceneTop + pvU(PV_PAD_PX + 6));
+    var ys = nxSpreadLabels(items.map(function(it){ return ry(it.z) - pvU(it.lift); }), pvU(DIM_FONT_PX + 1), pvSceneTop + pvU(PV_PAD_PX + 6));
     return items.map(function(it, i){ return { text: it.text, fill: it.fill, y: ys[i] }; });
   }
 

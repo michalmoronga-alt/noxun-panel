@@ -268,6 +268,32 @@ function checkCase(ctx, c, rect, label, opts){
   ok(g2.some(y => Math.abs(y - (14 + 2100 - 101)) < 0.01), 'T3b spodna medzera 2 je na svojom mieste');
 }
 
+// ---- T3d · ciara sucasnej hrany chladnicky neprestrtne cislo hrany (fit aj zoom) ----
+{
+  const ctx = H.makeCtx();
+  const fr = H.CASES.find(c => c.id === 'cab_fridge');
+  const r = { w: 404, h: 323 };
+  function check(svg, label){
+    const vb = vbOf(ctx), s = Math.min(r.w / vb[2], r.h / vb[3]);
+    const edge = /<line x1="[-\d.]+" y1="([-\d.]+)" x2="[-\d.]+" y2="[-\d.]+" stroke="#0e6b7a" stroke-width="2.5"\/>/.exec(svg);
+    ok(edge, label + ': ciara hrany existuje');
+    const lineY = parseFloat(edge[1]);
+    const t = H.texts(svg).find(x => /^(hrana )?695$/.test(x.text));
+    ok(t, label + ': cislo hrany existuje');
+    const b = box(t);
+    ok(b.y1 <= lineY - 1.25 + 1e-6 || b.y0 >= lineY + 1.25 - 1e-6, `${label}: ciara hrany (y ${lineY}) nepretina cislo ${JSON.stringify(b)}`);
+    ok(b.y1 <= lineY, label + ': cislo hrany lezi NAD ciarou');
+  }
+  check(H.renderCase(ctx, fr, r), 'T3d fit');
+  [4, 6, 8].forEach(n => {
+    H.renderCase(ctx, fr, r);
+    // priblizenie n krokov okolo hrany 813 (y = 14 + 2076 − 813)
+    vm.runInContext(`(function(){ var k = Math.pow(1 / 1.2, ${n}), cy = 14 + 2076 - 813;
+      pvView = { x: pvView.x, y: cy - pvView.h * k / 2, w: pvView.w * k, h: pvView.h * k }; pvUserView = true; })()`, ctx);
+    check(H.renderCase(ctx, fr, r, { keepView: true }), 'T3d zoom ' + n + '×');
+  });
+}
+
 // ---- T3c · D11: dokreslene vrstvy su v obsahu sceny (predrecenzia P3) ----
 {
   const r = { w: 404, h: 323 };
@@ -288,11 +314,13 @@ function checkCase(ctx, c, rect, label, opts){
     H.renderCase(ctx, c, r);
     layerOn(ctx, 'cab', 'cela');
     const svg = H.renderCase(ctx, c, r);
-    ok(/class="fgrp"/.test(svg) || /M\d/.test(svg), 'T3c-1 vrstva Cela sa v Korpuse kresli');
+    ok(svg.indexOf('stroke-dasharray="9 6"') >= 0, 'T3c-1 vrstva Cela (ghost obrys cela) sa v Korpuse naozaj kresli');
     const d = lowestWidthDim(svg, ctx, 'Š 800') ;
     const frontBottom = 14 + 720 + 20;
     near((d.lineY - frontBottom) * d.s, 18, 0.05, 'T3c-1 kota sirky je 18 px pod presahom cela (−20)');
     ok(d.vb[1] + d.vb[3] >= frontBottom + 6 / d.s - 0.01, 'T3c-1 presah cela nie je orezany');
+    vm.runInContext('NXLayers.reset()', ctx);
+    ok(H.renderCase(ctx, c, r).indexOf('stroke-dasharray="9 6"') < 0, 'T3c-1 bez zapnutej vrstvy ghost obrys cela nie je');
   }
   // 2) Zony, sokel 0 + nohy, vrstva Kovanie
   {
@@ -303,7 +331,7 @@ function checkCase(ctx, c, rect, label, opts){
     H.renderCase(ctx, c, r);
     layerOn(ctx, 'zones', 'kovanie');
     const svg = H.renderCase(ctx, c, r);
-    ok(/class="hwmk"|data-owner/.test(svg) || /stroke-opacity|opacity="0.75"/.test(svg), 'T3c-2 nohy (ghost Kovanie) sa v Zonach kreslia');
+    ok(svg.indexOf('<g pointer-events="none" opacity="0.75">') >= 0 && svg.indexOf('#b0bec5') >= 0, 'T3c-2 nohy (ghost Kovanie, tlmena znacka) sa v Zonach naozaj kreslia');
     const d = lowestWidthDim(svg, ctx, '178');
     const legBottom = 14 + 864 + 70;
     ok(d.lineY >= legBottom - 0.01, 'T3c-2 kota sirky zony nejde cez nohy (visi pod nimi)');
