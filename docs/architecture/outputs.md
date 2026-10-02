@@ -464,6 +464,20 @@ sekcia Kovanie žije len nad označenou skrinkou. Nález bez adresy sa správa p
 zastaviť hotový export, dôvod je v logu); **`pending_name_note(model)`** (text exportu, preto ostal tu) pripojí na koniec záverečnej vety všetkých štyroch exportov upozornenie,
 keď názov zákazky čaká na prenos k súboru (`ExportSettings.name_pending?`, farba statusu sa nemení).
 
+**Názov zákazky v okne a `expect` (H7b).** **`vepo_payload(model)`** je JEDNA funkcia pre payload `vepo` plného pushu Štúdia aj echo `push_vepo_bar`: prvé tri kľúče
+v pôvodnom poradí a tvare (`project` — už **normalizovaný** `ExportSettings.normalize_project_name`, §17 C2 · `default_project` · `merge_18_36`), za nimi `source`
+(`ExportSettings.name_source`: `set`/`file`/`default`), `file` (`model_file_title` — meno uloženého súboru bez prípony, neuložený `''`), `export_names`, `pending`
+(`name_pending?`) a `notice` (`pending_name_notice` — veta tooltipu hlavičky, `''` mimo stavu). **`export_file_names(project, now)`** skladá mená pre tooltip výhradne
+funkciami exportov (`VepoExport.project_slug`, **`hw_csv_file_name`** — jediné miesto mena CSV kovania, volá ho aj `do_hw_csv` —, `BudgetXlsx.file_name`,
+`CpXlsx.file_name`); dátum XLSX je z času pushu (po polnoci do ďalšieho pushu nesedí deň, export sa pomenuje správne; echo po exporte ho obnoví). Mená a bajty exportov
+sa nemenia (golden H7a T0a/T0c bez regenerácie). **`default_name_note(model, project)`** — veta „ · pomenované predvoleným názvom „projekt" — názov zákazky zadáš
+v hlavičke Štúdia" na konci záverečnej vety štyroch exportov, keď sa súbor pomenoval predvoleným „projekt" (farba ani tok sa nemenia; s `pending_name_note` sa
+vylučuje; výnimku prehltne — nikdy nezhodí hotový export). **Brána `expect` (§16 B2, §17 C1):** `export_expect_stop(model, data, merge:)` →
+`ExportSettings.expect_mismatch` beží v každom zo štyroch exportov **po** bránach generácie a `flush_blocked` a po `ExportSettings.refresh`, **pred** zberom modelu a
+výberom súboru; nesúlad názvu (alebo 18 + 36 — **len VEPO**, `merge: true`) alebo chýbajúci či neplatný `expect` = červená veta a export sa **nespustí**
+(fail-closed; žiadny čakací stav ani automatické pokračovanie). Volajúci mimo okien Štúdia v kóde pluginu nie sú (výnimka C1 sa nepoužila); testy a `su_runner`
+posielajú `expect` ako okno (`NxTest.export_expect`, `h7b_expect`).
+
 **`materials_meta`/`edges_meta` (audit #4)** sú kontrakt skupín Kusovníka: per `material_id` (resp. `abs_id`) label, katalógová farba ako **pole `[r,g,b]`** (nie CSS reťazec —
 prevod robí klient, ktorý farbu kreslí), hrúbka a príznak UNI; materiál mimo katalógu sa pomenuje **svojím ID** a farbu nedostane (radšej žiadna vzorka než náhodná).
 
@@ -1071,7 +1085,10 @@ token>` — `doc_token` je presne `ProductionCore.model_guid`), strop 120 znakov
 (golden `tests/fixtures/h7_golden/` — mená a nadpisy exportov, bajty súboru aj `.bak` po každom kroku, štyri exporty end-to-end). Načíta sa za `core/materials`/`doc_key`,
 pred `ui/production_core`; pri načítaní na súbor nesiaha. Verejné: `path` · `read` · `refresh` · `write_gate` · `update` · `save` · `written?` · `project_names` ·
 `update_project_names` · `project_key` · `project_name` · `default_project_name` · `save_project_name` · `name_pending?` · `merge_18_36` · `save_merge_18_36` · `last_dir` ·
-`save_last_dir` · rodina kľúča sedenia (`normalize_project_path`, `project_session_key`, `session_key?`, `remember_/forget_/remembered_session_key`, `session_keys_for`).
+`save_last_dir` · rodina kľúča sedenia (`normalize_project_path`, `project_session_key`, `session_key?`, `remember_/forget_/remembered_session_key`, `session_keys_for`)
+· H7b: `clean_project_name` / **`normalize_project_name`** (jediná normalizácia názvu: orez, strop 120, prázdne = predvolený — používa ju zápis aj porovnanie) ·
+`name_source` · **`expect_mismatch(model, expect, merge:)`** (`nil` alebo veta; neplatný tvar `EXPECT_STALE` „Okno je zastarané — zatvor a otvor Štúdio a klikni
+znova.", výnimka `EXPECT_FAILED`; obe strany porovnania idú cez `normalize_project_name`, takže ručný záznam dlhší ako 120 znakov nevyrobí trvalý falošný nesúlad).
 
 **Ochrana R-38 (rodina H9/R-37 — `HardwareRules.write_gate`, `JsonFileStore.degraded?`, `preserve_valid_backup`).** Predikát tvaru `doc_shape_ok?` posudzuje **len kontajnery**:
 objekt, neprázdny (`{}` plugin nikdy nezapísal — od V0.5 C je každý zápis zlúčenie s neprázdnymi `attrs`), `project_names` ak je, tak objekt; hodnoty (napr. `merge_18_36: "nie"`)
@@ -1083,7 +1100,7 @@ posudzuje dnešná normalizácia (mimo R-38). Matica:
 | chýba primár, `.bak` dobrá | záloha | `:ok` — **obnova** | ako dnes |
 | nečitateľný alebo zlý tvar (`[]`, `null`, `"x"`, `42`, `{}`, `project_names` nie objekt) + dobrá `.bak` | **záloha** (aj 18 + 36 a posledný priečinok) | **`:blocked`** + `DEGRADED_REASON` | **nedotknutá** |
 | nečitateľný / nie-objekt **bez** dobrej `.bak` | predvolené | **`:unreadable`** + `UNREADABLE_REASON` (dnes ticho) | ako dnes |
-| objekt so zlým `project_names` alebo `{}` **bez** dobrej `.bak` | ako dnes (mapa `{}`, ostatné kľúče zo súboru) | `:ok` — samooprava **každým** zápisom (aj 18 + 36 a posledný priečinok: neplatný kontajner → `{}` s logom, review #456; zapíše sa len dokument, ktorý spĺňa tvar) | dostane zlý primár |
+| objekt so zlým `project_names` alebo `{}` **bez** dobrej `.bak` | ako dnes (mapa `{}`, ostatné kľúče zo súboru) | `:ok` — samooprava **každým** zápisom (skalárny zápis — 18 + 36, posledný priečinok — v `self_repair`, zápis názvu v `update_project_names`; obe cesty jednou vetou logu `log_repair`; zapíše sa len dokument, ktorý spĺňa tvar) | dostane zlý primár |
 | zámok, brána, čítanie, blok zlyhá | — | `:failed` + `FAILED_REASON` | nedotknutá |
 | zlyhá samotný zápis (finálne premenovanie) | — | `:failed` | primár nezmenený, `.bak` už môže byť kópia doterajšieho primára (R-11) |
 
@@ -1103,7 +1120,7 @@ po aktualizácii zavrieť všetky okná SketchUpu na oboch PC (vzor H9, H10).
 **Čakajúci názov (§15 A1) a obmedzenie pokusov prenosu.** Keď je súbor poškodený práve pri prvom uložení zákazky pomenovanej pred uložením, prenos z kľúča sedenia na cestu
 brána odmietne: názov platí z mostu `SESSION_KEY_BRIDGE` a zo zálohy **len do zatvorenia SketchUpu** — `name_pending?(model)` (čistá: kľúč je cesta, pod cestou názov nie je,
 pod niektorým kľúčom sedenia áno **a posledný pokus odmietol obsah súboru** — záznam v `ADOPT_RETRY`; prechodné `:failed` nad zdravým súborom vetu o poškodení nevyvolá)
-a `ProductionCore.pending_name_note` to povedia vetou po štyroch exportoch (stav hlavičky prinesie H7b). Most sa zahadzuje **len** pri
+a `ProductionCore.pending_name_note` to povedia vetou po štyroch exportoch; hlavička Štúdia ukáže bodku a „neuložené k súboru" (payload `vepo.pending`/`notice`). Most sa zahadzuje **len** pri
 `written?`; po oprave (premenovaní) súboru sa prenos zopakuje sám. Aby sa neopakoval pri **každom** čítaní (zámok + nový fallback log `JsonFileStore` pri každom parsovaní
 poškodeného primára), pamätá si `ADOPT_RETRY` (kľúč `[cesta, zmrazená kópia aliasov]`, strop 32, bez odkazu na model) **obsahový podpis** súborov v čase odmietnutia —
 SHA1 bajtov primára a `.bak` (nie mtime + veľkosť: oprava rovnakej dĺžky s vráteným časom by sa nerozpoznala). Ďalší pokus až po zmene obsahu; `refresh` pamäť **nemaže**

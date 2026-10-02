@@ -187,6 +187,10 @@ O4 bodka + tooltip + jedna veta po exporte, neblokuje · O5 meno súboru sa pri 
 O7 tooltip s presným menom priečinka/súboru (skladá server) · O8 zlyhaný zápis názvu nahlásiť červeno, hlavička ostane na pôvodnom · O9 „projekt" → „zákazka" v textoch okna.
 **R-38 v H7: áno** (odporúčanie zo zhrnutia 1.10. — „všetko podľa odporúčania"; ochrana súboru nastavení exportu pri poškodení, rozhodne package C-07).
 
+**H7 Q2 (package H7 §13, nový stav po schválení mockupu) — PREDVOLENÉ, čaká na potvrdenie Michala:** stav hlavičky „neuložené k súboru" s jantárovou bodkou pri
+čakajúcom názve (poškodený súbor nastavení pri prvom uložení zákazky) — **áno**, implementované v H7b; zapísané aj v mockupe H7 (rámček PLATÍ). Vratné; pri „nie"
+ostane len veta po exporte (H7a).
+
 **Otázky zo zhrnutia 1.10. bez odpovede — platí predvolené (vratné, nemení výrobné čísla):**
 Q1 H11a pri chybe súboru vypnúť celý plugin · Q2 SketchUp 2026.2 — H11c ostáva otvorené · Q3 H12d názvy v karte dielca podľa Kusovníka · Q4 H9 ABS/kovanie
 bez zálohy — otvorené (bez zmeny) · Q5 „dolná" · Q11 H14 text nechať · Q12 H15 predvolené pravidlá kovania nepresúvať (zásobník Po V1).

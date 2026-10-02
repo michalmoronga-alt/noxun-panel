@@ -997,7 +997,8 @@ anchor:)`. Panel posiela **iba meno**, autoritou whitelistu je Ruby (`StudioDial
 sekciou; bez deep-linku (rail, toolbar) je `nil` a sekcia sa nemení. Cesty: warnpanel → „Otvoriť v Štúdiu → Kontrola" (`openStudio('ctrl')`) · „Materiál"
 v info stĺpci → `bom` s kotvou ID skrinky · preklik na dekor → `mat` s `material_id`.
 
-**Názov projektu** sa edituje na jedinom mieste — v lište Kusovníka v Štúdiu; JS ho neposiela do žiadneho exportu (autorita `ExportSettings.project_name`, od H7a v jadre).
+**Názov zákazky** sa edituje na jedinom mieste — v hlavičke Štúdia (odsek okna ŠTÚDIO, „Hlavička — názov zákazky"); JS ho do exportu neposiela ako názov, len ako
+kontrolu `expect` (autorita `ExportSettings.project_name`, od H7a v jadre).
 
 Testy: `tests/pure/test_uid3_klikatelnost.rb`, `tests/pure/test_st1a_studio.rb`, `tests/js/test_uid3_klikatelnost.js`, `tests/js/test_st1a_studio.js`, in-SU `run_st1a`.
 
@@ -1395,6 +1396,27 @@ v komentároch; správanie `tests/js/test_h4b_texty_vzhlad.js`. **Hľadanie** (K
 **Rohové nastavenie tlačidiel** (zóna `.cornerzone` zdieľaná s railom Inspectora a lištou Kontroly, obsah okna vlastný): zatvára klik mimo a Escape — **v jednom
 listeneri** s `ecMenu`/`vepoMenu` a až za modalovou brankou `nxModalOpen`.
 
+**Hlavička — názov zákazky (H7b, mockup `SYSTEM/zdroje/bloky/HARDENING/MOCKUP_H7_NAZOV_ZAKAZKY.html`, O1–O9):** pravá časť hlavičky KAŽDEJ sekcie je
+`jobHeadHtml(vepo, verzia, zobrazený)` (`studio.js`, čistá funkcia) — „Zákazka" · `<button id="jobName" class="jobname src-<zdroj>">` s ceruzkou · dovetok · „· v<verzia>"
+(zanikol `#stModel` „zákazka: <súbor>"). Zdroj skladá **server** (`vepo.source`): `set` zadaný (tučne) · `file` podľa súboru (sivé „podľa súboru") · `default` predvolený
+„projekt" (jantárová `.jdot`, kurzíva, „zadaj názov"); **čakajúci názov** (`vepo.pending`, poškodený súbor nastavení pri prvom uložení — Q2 predvolené áno, čaká na
+potvrdenie Michala) = ako zadaný + bodka + „neuložené k súboru", tooltip = serverová `vepo.notice`. Tooltipy ostatných podôb skladá JS z `vepo.source`/`vepo.file`
+a verzie. **Editor na mieste** (vzor `bridge.js` `startCabRename`): klik/Enter/medzerník na `#jobName` → `<input id="jobEdit" class="jobinp" maxlength="120">` (fokus,
+označený text, dovetok preč), **zachytí `ST.model_guid`** (R-02). Enter alebo blur → editor sa **hneď zavrie**, hlavička **optimisticky** ukáže odoslaný text a
+`sendVepoOpts({ project }, zachytený guid)` (jediná cesta zápisu `studio_set_vepo_opts`); nezmenený text (po orezaní) nič neposiela; stráž `jobSending` = Enter + blur
+jeden zápis. Escape na poli (`onkeydown` s `preventDefault` + `stopPropagation`) zruší bez zápisu — dokumentová reťaz (`nx_esc.js`, menu VEPO) ho nedostane.
+**Plný push počas písania:** ten istý dokument → `renderHead` editor **neprepíše** (len nadpis a nápoveda sekcie); iný dokument → editor zmizne bez odoslania
+(`dropJobEdit`). **Echo** `push_vepo_bar` → `NX.setVepoBar`: obnoví `ST.vepo` a `VEPO_EXPECT`, hlavičku (ak sa v nej nepíše) a **na mieste** (`jobRefreshExports`)
+bodku a tooltip štyroch exportov — lišta sa neprekresľuje (fokus v hľadaní a otvorené menu VEPO ostanú); `#mergeChk` ako doteraz. Echo ide po zápise názvu či 18 + 36
+(aj pri zlyhaní — O8) a **po každom exporte** (obaly `do_export`/`do_hw_csv`/`do_budget_xlsx`/`do_cp_xlsx` v `ensure`, aj pri odmietnutí); generáciu nedvíha.
+**Štyri exporty** (VEPO, CSV kovania, XLSX rozpočtu, cenová ponuka): bodka `.xdot` a tooltip z jednej funkcie `nxJobExport(kind)` (`JOB_EXPORTS`, aj pre `budget.js`
+cez `budJob`) — dnešný text + meno priečinka/súboru zo **servera** (`vepo.export_names`, klient nič neodvodzuje); bodka **len pri `default`** (pri čakajúcom nie).
+**`expect` (audit H7 §16 B2, §17 C1):** každé zo štyroch exportných volaní nesie `expect: nxVepoExpect()` = `{ project, merge }` z klientskej premennej
+`VEPO_EXPECT` (nastaví ju payload/echo, commit editora a zmena `#mergeChk` — nikdy DOM); server export bez zhody **nespustí** (odsek `production_core.rb`
+v outputs.md). Klik na export z otvoreného editora = mousedown → blur (zápis) → click (export s napísaným textom); poradie callbackov SketchUpu nie je oficiálne
+zdokumentované ani overené sondou — pri obrátenom poradí server export odmietne a stačí klik znova (súbor pod neuloženým názvom nevznikne). Testy
+`tests/js/test_h7b_hlavicka.js` (verný režim `minidom.faithful(true)`), `tests/pure/test_h7b_nazov_zakazky.rb`.
+
 Testy okna: `tests/pure/test_st1a_studio.rb`, `tests/js/test_st1a_studio.js`, in-SU `run_st1a`. Plné znenie (vrátane zaniknutých premostení a okien): archív,
 „studio_dialog.rb + ui/studio.html + ui/js/studio.js — okno ŠTÚDIO (ŠT-1a)".
 
@@ -1450,17 +1472,18 @@ jeho funkcie globálmi) — chýbajúci vlastný háčik je **chyba programu** (
 ### Sekcia KUSOVNÍK v Štúdiu (Š1–Š6)
 
 **Čo robí:** zoznam všetkých výrobných dielcov zákazky v troch pohľadoch **Dielce · Platne · ABS**, hľadanie (aj zúženie na skrinku z Inspectora), voliteľné
-stĺpce, klik na riadok označí dielce v modeli, VEPO export a názov projektu. **Dáta:** `push_state` posiela kľúče kusovníka na najvyššej
+stĺpce, klik na riadok označí dielce v modeli, VEPO export (názov zákazky je v hlavičke okna). **Dáta:** `push_state` posiela kľúče kusovníka na najvyššej
 úrovni payloadu (`studio_dialog.rb`, zber `Bom` + `ProductionCore`): `rows` (`ProductionCore.rows_with_roles`; každý riadok nesie pole `refs` na entity
 v modeli), `sheets`, `edging` (pohľad ABS), `summary`, `sheet_estimate`, `totals`, `materials_meta`, `edges_meta`, `vepo`; klient ich drží v `ST` (`ST.rows` …) — kontrakt výstupov a VEPO: [outputs.md](outputs.md), [../../SYSTEM/VEPO_KONTRAKT.md](../../SYSTEM/VEPO_KONTRAKT.md);
 stĺpce: `UI20_KONTRAKT.md` Š2. **JS:** `studio.js` — `partsTable` / `sheetsTable` / `absTable`, `COLS` + `cellValue` + `activeCols`, `bomToolsHtml(vepo, st)`,
 `vepoBtnHtml`/`vepoMenuHtml`, `cutLinkHtml`, `absCompact`/`absFull`.
 
-- **Lišta** = čistá funkcia `bomToolsHtml(vepo, st)` (stav argumentom): `[Dielce · Platne · ABS] · [Projekt] · [hľadanie] · ⟶ · [VEPO export ▸roh] · [Stĺpce] ·
-  [Obnoviť]`. **Pole „Projekt"** (`.prjbox .prjlbl`) je jediné editovateľné miesto názvu projektu; zápis `studio_set_vepo_opts` → `%APPDATA%` a **cielené echo**
-  `push_vepo_bar` → `NX.setVepoBar` (nedvíha generáciu — inak by klik hneď po editácii názvu spadol na „Dáta okna sa medzitým zmenili"); hodnotu inputu nasadí len
-  keď v ňom používateľ nepíše; stav checkboxu sa nasadzuje pri **každom** pushi. Exporty názov z JS neberú (autorita `ExportSettings.project_name`). Od H7a zápis vracia výsledok:
-  zlyhanie (poškodený súbor nastavení, zámok) okno povie červeno s dôvodom a echo `setVepoBar` ukáže uloženú pravdu (odsek `export_settings.rb` v outputs.md).
+- **Lišta** = čistá funkcia `bomToolsHtml(vepo, st)` (stav argumentom): `[Dielce · Platne · ABS] · [hľadanie] · ⟶ · [VEPO export ▸roh] · [Stĺpce] · [Obnoviť]`.
+  Pole „Projekt" zaniklo (H7b, O2) — názov zákazky sa upravuje v hlavičke okna; zápis `studio_set_vepo_opts` → `%APPDATA%` a **cielené echo** `push_vepo_bar` →
+  `NX.setVepoBar` (nedvíha generáciu — inak by klik hneď po editácii názvu spadol na „Dáta okna sa medzitým zmenili"); stav checkboxu sa nasadzuje pri **každom** pushi.
+  Exporty názov z JS neberú (autorita `ExportSettings.project_name`), posielajú len kontrolu `expect`. Od H7a zápis vracia výsledok: zlyhanie (poškodený súbor
+  nastavení, zámok) okno povie červeno s dôvodom a echo `setVepoBar` ukáže uloženú pravdu (odsek `export_settings.rb` v outputs.md). Tlačidlo VEPO nesie bodku
+  a tooltip s menom priečinka (odsek okna ŠTÚDIO).
 - **Rohové nastavenie VEPO** (`.cornerzone` v pravom dolnom rohu tlačidla, `.vepofly`): jediný prepínač **„18+36 spolu"**; otvorenosť čisto klientska
   (`vepoMenuOpen`); hodnotu nasadzuje echo `NX.setVepoBar` aj do otvoreného okna.
 - **Stĺpce:** voliteľné stĺpce v `localStorage` `nx_bom_cols`, zbalené skupiny `nx_bom_groups` (len zobrazovacie veci počítača). Tabuľka Dielce má triedu `parts`,
@@ -1528,7 +1551,8 @@ Testy: `tests/pure/test_st1b_kontrola.rb`, `tests/js/test_st1b_kontrola.js` (+ `
 ### Sekcia NÁKUP KOVANIA v Štúdiu (Š7)
 
 **Čo robí:** nákupný zoznam kovania zákazky zo setov (kategórie ako medzihlavičky, riadok mimo katalógu jantárovo, súčet „len známe ceny" s počtom nezadaných),
-zoznam **„Bez kódov"** a **generika podľa pravidiel** s klikom na vlastníka; CSV export a „Obnoviť" v lište. **Dáta:** payload `hardware` a `hardware_sets`
+zoznam **„Bez kódov"** a **generika podľa pravidiel** s klikom na vlastníka; CSV export (bodka a tooltip s menom súboru, `expect` — odsek okna ŠTÚDIO) a „Obnoviť"
+v lište. **Dáta:** payload `hardware` a `hardware_sets`
 z `ProductionCore` (expanzia setov [hardware.md](hardware.md), výstupy [outputs.md](outputs.md)). **JS:** `studio.js` — `buySection`, `price`, `hwManualMark`,
 `hwSourceGroups`, `hwStopOwners`/`hwStopCount`, `hwMissWhere`/`hwMissWhereTitle`; CSS `.hwsec`/`.hwbanner`/`.hwcat`/`.hwmiss`/`.hwsum` v `studio.html` (tokeny).
 
@@ -1561,7 +1585,7 @@ in-SU `run_st1c` a `run_d94`. Plné znenie: archív, „Sekcia NÁKUP KOVANIA v 
 ### Sekcia ROZPOČET v Štúdiu (Š12–Š13)
 
 **Čo robí:** rozpočet zákazky po sekciách (Materiál, ABS, Kovanie, Služby, Spotrebiče, vlastné položky…), režim *€ · €€ · €€€*, DPH, prepočet cien, ručné overenie cien
-dosiek a ABS, spotrebiče s vlastníkom, XLSX rozpočtu. **Jediná sekcia, ktorá cez rozpočet zapisuje do modelu** (1 zmena = 1 krok Späť). **Dáta:** payload `budget`
+dosiek a ABS, spotrebiče s vlastníkom, XLSX rozpočtu (bodka a tooltip s menom súboru cez `budJob`, `expect` cez `budExpect` — odsek okna ŠTÚDIO). **Jediná sekcia, ktorá cez rozpočet zapisuje do modelu** (1 zmena = 1 krok Späť). **Dáta:** payload `budget`
 z `ProductionCore` / `Budget` ([outputs.md](outputs.md)); mutácie `budget_mutate` → `StudioDialog.do_budget` → `ProductionCore.do_budget`. **JS:** `ui/js/budget.js`
 (prefix `bud*`/`BUD_*`, načítava sa **až za `studio.js`** — `studio.js` priraďuje celé `window.NX`; guard test).
 
@@ -1633,7 +1657,7 @@ kanál.
 - **Ponuka sa needituje** — chýbajúca cena sa dopĺňa v Rozpočte (jantárový guard „Suma ponuky je podhodnotená…" s preklikom). Celý varovný pás `budWarnChips(b)` je
   aj tu (tie isté čísla; ciele: staré ceny a spotrebiče → Rozpočet, upozornenia → Kontrola).
 - Zoznam „Zlúčené v zostave" je v `BUD_OPEN` pod `cp_merged` (otvorený prežije prekreslenie). Prepínač DPH sa nezdvojuje; riadok zaokrúhlenia je jedno serverové číslo
-  v oboch sekciách. Lišta: „Cenová ponuka (zákazník)" + „Obnoviť". Platí aj banner a vypnutie pri nekompatibilných dátach (odsek Rozpočet).
+  v oboch sekciách. Lišta: „Cenová ponuka (zákazník)" (bodka, tooltip s menom súboru a `expect` ako XLSX rozpočtu) + „Obnoviť". Platí aj banner a vypnutie pri nekompatibilných dátach (odsek Rozpočet).
 
 Testy: `tests/pure/test_st1c_ponuka.rb`, `tests/js/test_st1c_ponuka.js`, in-SU `run_st1c` (`st1c_offer`).
 

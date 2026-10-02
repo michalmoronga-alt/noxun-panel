@@ -1593,8 +1593,17 @@ v `HtmlDialog.new` sú **vonkajšie** — obsah + rámik okna (Windows ≈ 16 px
   `aria-disabled` teda **nie je** náhrada za chýbajúcu funkciu, ale za
   **funkciu, ktorá je na ceste**.
 - **Výstup sa nikdy netvári ako vstup.** Údaj, ktorý sa edituje inde, je
-  v ostatných miestach TEXT (názov projektu: input v Štúdiu → Kusovník,
-  text v lište Kusovníka v Štúdiu).
+  v ostatných miestach TEXT. Názov zákazky je v hlavičke Štúdia **text
+  s ceruzkou** (vzor premenovania skrinky) — klik otvorí pole na mieste
+  (Enter alebo klik mimo uloží, Escape zruší, prázdne pole vráti automatický
+  názov); inde (tooltip exportu) je len text.
+- **Názov zákazky má tri podoby** (hlavička Štúdia): zadaný (tučne) · podľa
+  súboru (sivý dovetok „podľa súboru", bez bodky) · predvolený „projekt"
+  (jantárová bodka `.jdot`, kurzíva, dovetok „zadaj názov"). Kým by sa exporty
+  pomenovali „projekt", nesú jantárovú bodku `.xdot` aj štyri exporty (VEPO,
+  CSV kovania, XLSX rozpočtu, cenová ponuka); tooltip exportu povie presné
+  meno priečinka/súboru. Bodka neblokuje — po exporte pribudne jedna veta.
+  Výška hlavičky sa nemení (jeden riadok, dlhý názov výpustka).
 - **Voľba zobrazenia je vec POČÍTAČA, nie zákazky.** Voliteľné stĺpce,
   zbalené skupiny a zbalená navigácia žijú v `localStorage` (nikdy v `.skp`
   a nikdy v `%APPDATA%` — nie je to nastavenie pluginu, len tohto okna).
