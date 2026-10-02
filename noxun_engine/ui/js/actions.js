@@ -279,6 +279,10 @@
     else { refreshZoneUI(); nxDraftChanged(); }
   }
 
+  // H6b: lista sektora Zony nesie suhrn stromu ("2 zóny · 3 police") — obnovi sa pri
+  // kazdom prekresleni stromu (aj pri programovej zmene, Spat a serverovom pushi).
+  function nxZoneMetaRefresh(){ if (typeof nxSectorMetaApply === 'function') nxSectorMetaApply(); }
+
   // --- strom zon so STROMOVYMI SPOJNICAMI (kontrakt UI 2.0) ------------------
   // Vnorenie sa stavia z ciest (zoznam z computeZones je pre-order DFS): kazda
   // uroven dostane vlastny kontajner `.zkids`, ktoremu spojnice kresli CSS.
@@ -290,7 +294,7 @@
   function renderZoneTree(zones){
     var c = el('zoneTree'); if (!c) return;
     c.innerHTML = '';
-    if (!zones || !zones.length){ c.innerHTML = '<div class="muted">Žiadny označený korpus.</div>'; return; }
+    if (!zones || !zones.length){ c.innerHTML = '<div class="muted">Žiadny označený korpus.</div>'; nxZoneMetaRefresh(); return; }
     var boxes = [c];
     zones.forEach(function(z){
       var depth = z.path.length - 1;
@@ -312,6 +316,7 @@
       host.appendChild(kids);
       boxes[depth + 1] = kids;
     });
+    nxZoneMetaRefresh();
   }
   function shelfWord(n){ return n === 1 ? 'polica' : (n < 5 ? 'police' : 'políc'); }
 

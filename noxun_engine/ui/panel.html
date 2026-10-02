@@ -12,7 +12,7 @@
      Vsetky nove CSS pravidla kostry visia pod nou, aby panel.css ostal
      bezpecne zdielatelny so satelitnymi oknami. -->
 <script>document.documentElement.className = 'nx-inspector';</script>
-<link rel="stylesheet" href="css/panel.css?v=0.17.17">
+<link rel="stylesheet" href="css/panel.css?v=0.17.18">
 
 <!-- ===== RAIL (A9: staticke ID pre merac D-25) =============================
      Kontexty su platne LEN nad oznacenym korpusom — pri dielci/doske/vkladani
@@ -99,7 +99,10 @@
      Sektory su <details data-key="s…"> — rozbalenie si pamata bindDetails
      (localStorage), takze PREZIJE echo push aj zmenu vyberu (A5). -->
 <details class="sect" id="secPreview" data-key="s1" open>
-  <summary class="secthead"><span class="sn">Náhľad</span><span class="meta" id="s1Meta"></span></summary>
+  <!-- H6b (O6): mimo Korpusu stoji v liste MIESTO nazvu projekcie odkaz s rozmermi skrinky
+       (klik = kontext Korpus, bublina = material korpusu). STATICKY prvok (A4): JS pise len
+       text, title a hidden. `nxS1Link` zastavi klik, inak by <summary> sektor zbalil. -->
+  <summary class="secthead"><span class="sn">Náhľad</span><span class="meta" id="s1Meta"></span><button type="button" class="metalink" id="s1Link" hidden data-nx-usage="ctx:korpus" onclick="nxS1Link(event)"><span id="s1LinkTxt"></span><svg class="ic" aria-hidden="true"><use href="#i-arrow-right"/></svg></button></summary>
   <div class="sectbody">
     <!-- NAHLAD: fixne okno + zoom/pan. UI-B2: pod SVG je tenky PEVNY PAS —
          vlavo chipy vrstiev (obsah kresli renderPvBar), vpravo nastroje
@@ -444,16 +447,6 @@
   </div>
 </details>
 
-<!-- ===== KONTEXTOVY RIADOK (kontrakt UI 2.0, sekcia Kostra) ================
-     S2 Zakladne a S3 Materialy su vlastnosti SKRINKY a patria kontextu KORPUS
-     (+ Materialy pri vkladani). V kontextoch Zony/Cela/Kovanie sa skryvaju a
-     namiesto nich stoji TENKY riadok so suhrnom a preklikom spat na Korpus —
-     inak by kazdy kontext zacinal tromi cudzimi sektormi a vlastny obsah by
-     bol az pod nimi (vertikalny priestor panela je vzacny).
-     Kostra je STATICKA (A4): JS pise LEN text suhrnu a display (vzor
-     partCard/boardCard), NIKDY innerHTML. -->
-<div class="ctxnote" id="ctxNote" style="display:none">Skrinka <b id="ctxNoteSum">—</b> — rozmery a materiály <button type="button" class="ctxlink" id="ctxNoteLink" data-nx-usage="ctx:korpus" onclick="setViewContext('korpus')">upravíš v Korpuse</button></div>
-
 <!-- ===== S4 · NASTAVENIA ===================================================
      Obsah sektora urcuje KONTEXT raily (data-view-ctx na <body>): skupiny su
      oznacene data-s4="<kontext>". Skupiny v ramci jedneho kontextu su
@@ -752,7 +745,7 @@
          Tri skupiny v zavaznom poradi: Polozky z pravidiel · Sety · Pravidla.
          Kostra je STATICKA (A4) — JS pise LEN obsah #hwRows a #hwSetRows. -->
     <details data-key="hwitems" data-s4="kovanie">
-      <summary class="ghdr"><svg class="ic gic" aria-hidden="true"><use href="#i-hammer"/></svg>Položky z pravidiel<span class="gtools"><button type="button" class="nxtip r" aria-label="Pomoc" data-tip="Položky sú zoskupené podľa vlastníka — skrinka a každé čelo má svoj box. Klik na hlavičku boxu označí vlastníka v modeli (panel ostáva v Kovaní). Počty určujú pravidlá; zmena počtu je ručný zásah pre túto skrinku a tlačidlo so šípkou späť vráti pravidlo." onclick="nxTipStop(event)"><svg class="ic" aria-hidden="true"><use href="#i-help-circle"/></svg></button></span></summary>
+      <summary class="ghdr"><svg class="ic gic" aria-hidden="true"><use href="#i-hammer"/></svg>Položky z pravidiel<span class="gtools"><span class="meta" id="hwItemsMeta"></span><button type="button" class="nxtip r" aria-label="Pomoc" data-tip="Položky sú zoskupené podľa vlastníka — skrinka a každé čelo má svoj box. Klik na hlavičku boxu označí vlastníka v modeli (panel ostáva v Kovaní). Počty určujú pravidlá; zmena počtu je ručný zásah pre túto skrinku a tlačidlo so šípkou späť vráti pravidlo." onclick="nxTipStop(event)"><svg class="ic" aria-hidden="true"><use href="#i-help-circle"/></svg></button></span></summary>
       <div class="body">
         <div id="hwRows"><div class="muted">Označ skrinku v modeli.</div></div>
       </div>
@@ -762,7 +755,7 @@
          Obsah sa nemeni (V0.6 D1b), len sa odstahoval z konca zoznamu poloziek
          do vlastnej skupiny, aby sa boxy vlastnikov nemiesali so setmi. -->
     <details data-key="hwsets" data-s4="kovanie">
-      <summary class="ghdr"><svg class="ic gic" aria-hidden="true"><use href="#i-layers"/></svg>Sety<span class="gtools"><button type="button" class="nxtip r" aria-label="Pomoc" data-tip="Set nesie pásmo (dĺžky, nosnosti) — z neho vie Nákup vybrať správny kód. Vlastný set jedného čela sa vyberá priamo v jeho boxe medzi položkami." onclick="nxTipStop(event)"><svg class="ic" aria-hidden="true"><use href="#i-help-circle"/></svg></button></span></summary>
+      <summary class="ghdr"><svg class="ic gic" aria-hidden="true"><use href="#i-layers"/></svg>Sety<span class="gtools"><span class="meta" id="hwSetsMeta"></span><button type="button" class="nxtip r" aria-label="Pomoc" data-tip="Set nesie pásmo (dĺžky, nosnosti) — z neho vie Nákup vybrať správny kód. Vlastný set jedného čela sa vyberá priamo v jeho boxe medzi položkami." onclick="nxTipStop(event)"><svg class="ic" aria-hidden="true"><use href="#i-help-circle"/></svg></button></span></summary>
       <div class="body">
         <div id="hwSetRows"><div class="muted">Označ skrinku v modeli.</div></div>
       </div>
@@ -1071,60 +1064,60 @@
      musi existovat pred prvym renderom aj pred ready), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.17.17"></script>
+<script src="js/errors.js?v=0.17.18"></script>
 <!-- D-77 / A7: minimalna OBSAHOVA velkost okna pri otvoreni. UI-B1 stanovil
      jednu pravdu sirky Inspectora — 470 px OBSAHU (rail 44 + karta). Vyska 810
      pokryva nahlad + dva rozbalene sektory. Dorovnava sa oboma smermi, raz pri
      nacitani a nikdy nad plochu obrazovky (js/win_fit.js). -->
 <script>window.NX_FIT_MIN = { w: 470, h: 810 };</script>
-<script src="js/win_fit.js?v=0.17.17"></script>
-<script src="js/icons.js?v=0.17.17"></script>
+<script src="js/win_fit.js?v=0.17.18"></script>
+<script src="js/icons.js?v=0.17.18"></script>
 <!-- R-23.1: JEDEN dokumentový Escape handler s prioritným zoznamom vrstiev
      (ten istý súbor načítava aj studio.html). Musí byť PRED skriptami, ktoré
      modály otvárajú — jeho listener má bežať ako PRVÝ, aby vedel udalosť
      spotrebovať skôr, než ju dostane handler okna. -->
-<script src="js/nx_esc.js?v=0.17.17"></script>
+<script src="js/nx_esc.js?v=0.17.18"></script>
 <!-- KOV-H2: zdieľaná kostra modalov D-15 (ten istý súbor načítava aj
      studio.html). Musí byť ZA nx_esc.js (reťaz Escape má bežať prvá) a PRED
      core.js/hardware.js — modal ručnej položky kovania ju volá menom. -->
-<script src="js/nx_modal.js?v=0.17.17"></script>
+<script src="js/nx_modal.js?v=0.17.18"></script>
 <!-- ŠT-4a: zdieľaný obsah „O plugine" (rovnaký súbor načítava aj studio.html). -->
-<script src="js/about.js?v=0.17.17"></script>
+<script src="js/about.js?v=0.17.18"></script>
 <!-- D-85 (UI-03): zdielany combobox. Musi byt PRED core/part/board — tie ho pri
      renderi kariet volaju (NXCombo.scan). Sam na nikom nezavisi (ikony si berie
      defenzivne cez NXIcons, ak sprite existuje). -->
-<script src="js/nx_combo.js?v=0.17.17"></script>
+<script src="js/nx_combo.js?v=0.17.18"></script>
 <!-- v0.7.28: ZDIELANE 3-stavove nastavenie kontroly hran (rohovy trojuholnik pri
      ABS kontrole v raile). TEN ISTY subor nacitava aj okno Studio — jeden markup,
      jeden stav. Musi byt PRED shell.js (rohove okno kresli NXEdgeMenu). -->
-<script src="js/edge_menu.js?v=0.17.17"></script>
-<script src="js/tag_menu.js?v=0.17.17"></script>
-<script src="js/core.js?v=0.17.17"></script>
-<script src="js/expr.js?v=0.17.17"></script>
-<script src="js/insert_state.js?v=0.17.17"></script>
-<script src="js/form.js?v=0.17.17"></script>
-<script src="js/zone_tree.js?v=0.17.17"></script>
-<script src="js/preview.js?v=0.17.17"></script>
+<script src="js/edge_menu.js?v=0.17.18"></script>
+<script src="js/tag_menu.js?v=0.17.18"></script>
+<script src="js/core.js?v=0.17.18"></script>
+<script src="js/expr.js?v=0.17.18"></script>
+<script src="js/insert_state.js?v=0.17.18"></script>
+<script src="js/form.js?v=0.17.18"></script>
+<script src="js/zone_tree.js?v=0.17.18"></script>
+<script src="js/preview.js?v=0.17.18"></script>
 <!-- H14a: register sekcii Studia — filter deep-linku „Otvoriť v Štúdiu" v shell.js
      z neho cita zname sekcie. MUSI byt PRED shell.js. -->
-<script src="js/studio_sections.js?v=0.17.17"></script>
+<script src="js/studio_sections.js?v=0.17.18"></script>
 <!-- UI-B1: kostra Inspectora — stavovy stroj vyber x kontext, rail, sektory. -->
-<script src="js/shell.js?v=0.17.17"></script>
-<script src="js/actions.js?v=0.17.17"></script>
+<script src="js/shell.js?v=0.17.18"></script>
+<script src="js/actions.js?v=0.17.18"></script>
 <!-- GHOST-FB4: Ghost pasik vkladacej karty. Musi byt PRED bridge.js
      (NX.setGhost vola nxGhostApply); sam na nikom nezavisi. -->
-<script src="js/ghost_bar.js?v=0.17.17"></script>
+<script src="js/ghost_bar.js?v=0.17.18"></script>
 <!-- UI-B3: nastavenia Inspectora (koliesko) + rozmerove rady N6. Musi byt PRED
      bridge.js (NX.setUiSettings volá nxApplyUiSettings) a za core.js (el/esc). -->
-<script src="js/settings.js?v=0.17.17"></script>
-<script src="js/bridge.js?v=0.17.17"></script>
-<script src="js/materials.js?v=0.17.17"></script>
-<script src="js/part_card.js?v=0.17.17"></script>
-<script src="js/board_card.js?v=0.17.17"></script>
-<script src="js/hardware.js?v=0.17.17"></script>
+<script src="js/settings.js?v=0.17.18"></script>
+<script src="js/bridge.js?v=0.17.18"></script>
+<script src="js/materials.js?v=0.17.18"></script>
+<script src="js/part_card.js?v=0.17.18"></script>
+<script src="js/board_card.js?v=0.17.18"></script>
+<script src="js/hardware.js?v=0.17.18"></script>
 <!-- S1-B2: riadok „Spotrebič" v Základných aj v karte dosky. Vlastný súbor
      (nie hardware.js) zámerne: s kovaním nemá nič spoločné a payload mu
      chodí vlastným kľúčom (`appliance_rows`). -->
-<script src="js/appliance_row.js?v=0.17.17"></script>
-<script src="js/usage.js?v=0.17.17"></script>
-<script src="js/boot.js?v=0.17.17"></script>
+<script src="js/appliance_row.js?v=0.17.18"></script>
+<script src="js/usage.js?v=0.17.18"></script>
+<script src="js/boot.js?v=0.17.18"></script>

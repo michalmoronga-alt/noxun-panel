@@ -507,6 +507,8 @@
         sel.title = owner ? hwOwnerTitle(entry, owner) : hwCabTitle(entry);
       }
     });
+    // Meta skupiny Sety pocita ten isty zoznam ponuky — obnov ju spolu s nim.
+    hwMetaApply((typeof hwItems !== 'undefined') ? hwItems : null);
   }
   // D-92: zivy refresh SEKUNDARNYCH riadkov (nakup) bez prekreslenia poloziek —
   // rozpisany pocet, fokus aj vyber setu ostavaju. Parovanie cez identitu
@@ -820,6 +822,58 @@
     return { pins: pins, offs: pinOffs, rest: rest, restOffs: restOffs };
   }
 
+  // ---- H6b: META v hlavickach skupin Polozky a Sety -------------------------
+  // Zbalena skupina povie, co skryva (pravidlo „zbaleny sektor povie, co
+  // skryva"). Ciste funkcie nad ZIVYM payloadom (Node testy) — ziadny cachovany
+  // retazec; plni ich `hwMetaApply` po kazdom prekresleni kovania.
+  function hwPlural(n, one, few, many){ return n === 1 ? one : (n >= 2 && n <= 4 ? few : many); }
+  // Polozky: „6 ks" (sucet poctov zo zoznamu pravidiel; nulove a neciselne
+  // mnozstva sa nerataju) + „· 2 ručne" pri rucne pridanych (D-93, ine data).
+  // Bez skrinky (`items == null`) a bez udaja je meta prazdna.
+  function hwItemsMetaText(items, manualView){
+    if (items == null) return '';
+    var total = 0;
+    (items || []).forEach(function(it){
+      if (!it) return;
+      var q = parseInt(it.quantity, 10);
+      total += (isFinite(q) && q > 0) ? q : 0;
+    });
+    var m = Array.isArray(manualView) ? manualView.length : 0;
+    var out = [];
+    if (total > 0) out.push(total + ' ks');
+    if (m > 0) out.push(m + ' ručne');
+    return out.join(' · ');
+  }
+  // Sety: kolko vlastnych vyberov setu ma skrinka — vyber na CELEJ skrinke
+  // (typ s `override_set_id` alebo `override_selector`; pri klasifikovanej zasuvke
+  // vyber v `compat.cab`) a vybery pri JEDNOTLIVYCH cielach (`owner_overrides`,
+  // pri klasifikovanych `compat.owners`). Poskodeny zapis (`invalid`) je tiez
+  // zapis v configu, takze sa rata. Nic vlastne = „podľa projektu"; prazdna
+  // ponuka (skrinka nema kovanie so setom) = bez meta.
+  function hwSetsMetaText(setOptions){
+    var list = (setOptions || []).filter(function(o){ return !!o; });
+    if (!list.length) return '';
+    function picked(sc){ return !!(sc && (sc.current || sc.stored)); }
+    var n = 0;
+    list.forEach(function(o){
+      if (o.compat){
+        if (picked(o.compat.cab)) n++;
+        var ow = o.compat.owners || {};
+        Object.keys(ow).forEach(function(k){ if (picked(ow[k])) n++; });
+      } else {
+        if (o.override_set_id || o.override_selector) n++;
+        n += Object.keys(o.owner_overrides || {}).length;
+      }
+    });
+    return n > 0 ? (n + ' ' + hwPlural(n, 'vlastný', 'vlastné', 'vlastných')) : 'podľa projektu';
+  }
+  function hwMetaApply(items){
+    var a = el('hwItemsMeta'), b = el('hwSetsMeta');
+    var manual = (typeof hwManualView !== 'undefined') ? hwManualView : [];
+    if (a) a.textContent = hwItemsMetaText(items, manual);
+    if (b) b.textContent = (items == null) ? '' : hwSetsMetaText(HW_SET_OPTIONS);
+  }
+
   // items: config.hardware (pole) alebo null (nic neoznacene); overrides: hardware_overrides;
   // setOptions (D1b): ponuka setu per typ (server payloads.hardware_set_options);
   // cabId (GH #127 P2): identita RENDROVANEJ skrinky — cestuje s payloadom.
@@ -831,6 +885,15 @@
     // boxu, ktory uz neexistuje.
     hwClearHover();
     HW_SET_OPTIONS = setOptions || [];
+    // Meta skupin a lista sektora Kovanie sa obnovia na KONCI (aj pri skorom
+    // navrate) — `hwItems` a `hwManualView` nastavil push uz pred volanim.
+    try { renderHardwareBody(box, setBox, items, overrides, setOptions, cabId); }
+    finally {
+      hwMetaApply(items);
+      if (typeof nxSectorMetaApply === 'function') nxSectorMetaApply();
+    }
+  }
+  function renderHardwareBody(box, setBox, items, overrides, setOptions, cabId){
     if (items === null){
       box.innerHTML = '<div class="muted">Označ skrinku v modeli — kovanie sa počíta na vloženej skrinke.</div>';
       if (setBox) setBox.innerHTML = '<div class="muted">Označ skrinku v modeli.</div>';
@@ -1820,6 +1883,7 @@
   // vyber setu sa nedotknu (vzor `refreshHardwarePurchase`).
   function refreshHardwareManual(view){
     hwManualView = Array.isArray(view) ? view : [];
+    hwMetaApply((typeof hwItems !== 'undefined') ? hwItems : null); // „· m ručne" v hlavicke Poloziek
     var block = el('hwManBlock');
     if (!block) return false;                        // sekcia nie je vykreslena
     block.innerHTML = hwManualInnerHtml();
@@ -2586,5 +2650,7 @@
       legsGenState: function(){ return legsGen; },
       // Zivy refresh ponuky setov a zapis vyberu — riadok Noh ich zdiela
       // s kontextom Kovanie (ziadny vlastny kanal).
-      refreshHardwareSets: refreshHardwareSets, onHwSet: onHwSet, hwSetEntry: hwSetEntry };
+      refreshHardwareSets: refreshHardwareSets, onHwSet: onHwSet, hwSetEntry: hwSetEntry,
+      // H6b: meta skupin Polozky a Sety (tests/js/test_h6b_suhrny.js).
+      hwItemsMetaText: hwItemsMetaText, hwSetsMetaText: hwSetsMetaText, hwMetaApply: hwMetaApply };
   }

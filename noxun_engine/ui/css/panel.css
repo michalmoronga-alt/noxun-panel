@@ -1488,19 +1488,20 @@
   .nx-inspector body.mode-cab:not([data-view-ctx="korpus"]) #secBasic,
   .nx-inspector body.mode-cab:not([data-view-ctx="korpus"]) #secMat { display: none; }
 
-  /* Kontextovy riadok. Viditelnost riadi JS (NXShell.sectorVis -> inline
-     display, vzor partCard/boardCard); CSS je POISTKA pre rezimy, v ktorych
-     riadok nesmie byt nikdy — dielec a doska maju vlastnu kartu, vkladanie
-     nema o com informovat. */
-  .nx-inspector .ctxnote { background: var(--nx-part-bg); border: 1px solid var(--nx-part-border);
-            border-radius: 6px; padding: 6px 8px; font-size: 11px; color: var(--nx-ink-muted);
-            margin: 0 0 8px; }
-  .nx-inspector .ctxnote b { color: var(--nx-ink-strong); font-weight: 600; }
-  .nx-inspector .ctxlink { padding: 0; border: 0; background: none; font: inherit; cursor: pointer;
-            color: var(--nx-select); text-decoration: underline; }
-  .nx-inspector .ctxlink:hover { color: var(--nx-select-strong); }
-  .nx-inspector body.mode-insert #ctxNote, .nx-inspector body.mode-part #ctxNote,
-  .nx-inspector body.mode-board #ctxNote { display: none; }
+  /* H6b (O6): ODKAZ NA KORPUS v liste Nahladu — nahrada pasu "Skrinka … upravis v
+     Korpuse". Mimo Korpusu (Zony/Cela/Kovanie) stoji v liste MIESTO nazvu projekcie
+     a nesie rozmery skrinky; klik otvori Korpus, bublina povie material. Viditelnost
+     riadi JS (hidden); poistka nizsie, lebo `display` pravidlo by prebilo `hidden`
+     (pasca D-137). Farba = vyberova rodina (teal), text s elipsou, ikona mimo elipsy. */
+  .nx-inspector .sect > .secthead .metalink { display: inline-flex; align-items: center; gap: 3px;
+            margin-left: auto; min-width: 0; padding: 0 2px; border: 0; border-radius: 6px;
+            background: none; font: inherit; font-size: 11px; color: var(--nx-select); cursor: pointer; }
+  .nx-inspector .sect > .secthead .metalink > span { min-width: 0; overflow: hidden;
+            text-overflow: ellipsis; white-space: nowrap; }
+  .nx-inspector .sect > .secthead .metalink .ic { flex: 0 0 auto; width: 12px; height: 12px; }
+  .nx-inspector .sect > .secthead .metalink:hover { text-decoration: underline; color: var(--nx-select-strong); }
+  .nx-inspector .sect > .secthead .metalink:focus-visible { outline: 2px solid var(--nx-select); outline-offset: 1px; }
+  .nx-inspector .sect > .secthead [hidden] { display: none; }
 
   /* --- S1: ktory nahlad sa kresli --------------------------------------- */
   .nx-inspector #partSvg, .nx-inspector #boardSvg { display: none; }

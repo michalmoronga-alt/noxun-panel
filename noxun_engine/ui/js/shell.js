@@ -118,33 +118,26 @@
     //   * dielec / doska  — nezobrazuju sa vobec (maju vlastnu kartu v S4),
     //   * vkladanie       — zobrazuju sa (vkladacia karta + material dosky),
     //   * oznaceny korpus — LEN v kontexte Korpus; v Zonach/Celach/Kovani ich
-    //     nahradi tenky kontextovy riadok s preklikom spat na Korpus.
+    //     nahradi ODKAZ v liste Nahladu (`link`: rozmery skrinky, klik = Korpus).
     // CSS (pravidla nad #secBasic/#secMat) je ZRKADLOM tejto funkcie — zhodu
     // strazi tests/pure/test_uib1_kostra.rb, maticu tests/js/test_uib1_kostra.js.
     function sectorVis(mode, ctx){
       var m = (mode === undefined ? state.mode : mode);
-      if (m === 'part' || m === 'board') return { basic: false, mat: false, note: false };
+      if (m === 'part' || m === 'board') return { basic: false, mat: false, link: false };
       var cab = (m === 'cab');
       // Mimo oznaceneho korpusu je zobrazeny kontext vzdy Korpus (effectiveCtx).
       var korpus = !cab || normCtx(ctx === undefined ? state.ctx : ctx) === 'korpus';
-      return { basic: korpus, mat: korpus, note: cab && !korpus };
+      return { basic: korpus, mat: korpus, link: cab && !korpus };
     }
 
-    // Suhrn skrinky do kontextoveho riadku: „900 × 720 × 560 · K2738 MO".
-    // Cista funkcia — cisla aj popis materialu prichadzaju z payloadu, panel
-    // nic nedopocitava. Chybajuci udaj sa VYNECHA (radsej kratsi riadok nez
-    // vymyslene cislo); ked nie je nic, ostane pomlcka (vzor nxCabInfo).
-    function ctxNoteText(dims, material){
-      var d = dims || {};
-      var out = [];
-      var mm = ['w', 'h', 'd'].map(function(k){
-        var n = parseFloat(d[k]);
-        return (isNaN(n) || n <= 0) ? null : String(Math.round(n));
-      });
-      if (mm[0] && mm[1] && mm[2]) out.push(mm.join(' × '));
+    // Bublina odkazu v liste Nahladu (H6b, O6): povie MATERIAL korpusu — ten je
+    // v Korpuse, v liste ostavaju len rozmery. Cista funkcia; popis dekoru
+    // prichadza uz prelozeny z AKTUALNEHO katalogu (bridge.js renderCtxNote).
+    // Bez materialu ostane len vyzva (nic sa nevymysla).
+    function s1LinkTitle(material){
       var m = String(material == null ? '' : material).trim();
-      if (m) out.push(m);
-      return out.length ? out.join(' · ') : '—';
+      return m ? ('Materiál korpusu: ' + m + ' — klik otvorí kontext Korpus')
+               : 'Klik otvorí kontext Korpus';
     }
 
     // --- „?" pod nahladom: gesta podla toho, co sa v nahlade DA robit (H6a, O5) ---
@@ -227,17 +220,69 @@
       return src.length ? 'dedí z projektu' : '';
     }
 
-    // S4 — otvorena skupina menom, inak pocet zbalenych. Slovenska mnozina:
-    // 1 skupina · 2–4 skupiny · 5+ skupín. Meta NIKDY neopakuje nazov sektora
-    // (kontext Cela ma jedinu skupinu „Čelá" — „ČELÁ Čelá" je sum, nie udaj).
-    function metaGroups(groups, sectorName){
-      var g = groups || {};
-      var open = String(g.open == null ? '' : g.open).trim();
-      if (open) return (open === String(sectorName == null ? '' : sectorName).trim()) ? '' : open;
-      var n = parseInt(g.count, 10);
-      if (isNaN(n) || n <= 0) return '';
-      var w = (n === 1) ? 'skupina' : (n < 5 ? 'skupiny' : 'skupín');
-      return n + ' ' + w + ' · všetko zbalené';
+    // S4 — SUHRN OBSAHU kontextu (H6b, O12): zbaleny aj rozbaleny sektor ukazuje
+    // to iste a otvorena skupina ho NEMENI (jej nazov je vidno hned pod listou).
+    // Skladanie je cista funkcia nad zivym stavom, ktory zbiera DOM obal
+    // (`nxMetaContent`) — nic sa necachuje. Slova sa berú z hodnot selectov;
+    // neznama hodnota (novsi plugin) cast VYNECHA, nic sa nehada.
+    var META_TOP = { full: 'plný strop', two_rails: 'strop 2 výstuhy', none: 'bez stropu' };
+    var META_BOTTOM = { under_sides: 'boky na dne', between_sides: 'dno medzi bokmi' };
+    var META_BACK = { overlay: 'chrbát naložený', inset: 'chrbát vložený', groove: 'chrbát v drážke',
+                      rails: 'chrbát z líšt', none: 'bez chrbta' };
+    function metaWord(map, key){
+      return Object.prototype.hasOwnProperty.call(map, key) ? map[key] : '';
+    }
+    // Slovenska mnozina: 1 · 2–4 · 5+ (zhodne s `shelfWord` v actions.js).
+    function skPlural(n, one, few, many){ return n === 1 ? one : (n >= 2 && n <= 4 ? few : many); }
+
+    // Korpus: „strop 2 výstuhy · boky na dne · chrbát v drážke". Typ bez korpusu
+    // (slot umyvacky) tieto skupiny nema — meta je prazdna (D6).
+    function metaKorpus(c){
+      if (!c || c.carcass === false) return '';
+      return [metaWord(META_TOP, c.top), metaWord(META_BOTTOM, c.bottom), metaWord(META_BACK, c.back)]
+        .filter(function(s){ return !!s; }).join(' · ');
+    }
+    // Zony: pocet LISTOV (bez 4. urovne `deep`, ktoru strom len zachovava) a sucet
+    // ich polic: „1 zóna · prázdna" / „2 zóny · 3 police".
+    function metaZones(zones){
+      var leaves = (zones || []).filter(function(z){ return z && z.leaf && !z.deep; });
+      var n = leaves.length;
+      if (!n) return '';
+      var shelves = leaves.reduce(function(a, z){ return a + Math.max(0, parseInt(z.shelves, 10) || 0); }, 0);
+      var head = n + ' ' + skPlural(n, 'zóna', 'zóny', 'zón');
+      if (shelves > 0) return head + ' · ' + shelves + ' ' + skPlural(shelves, 'polica', 'police', 'políc');
+      return n === 1 ? head + ' · prázdna' : head;
+    }
+    // Cela: „1 čelo · F206 ST9 · medzera 3 · okraje 2". Texty sklada core.js
+    // (`frontCountText`, `cabfrontMetaText`) — tu sa len spoja. Bez ciel len „bez čiel".
+    function metaFronts(f){
+      if (!f) return '';
+      if (!(parseInt(f.count, 10) > 0)) return 'bez čiel';
+      return [f.count_text, f.common_text].filter(function(s){ return !!s; }).join(' · ');
+    }
+    // Kovanie: ten isty `nxHwSummary`, aky kreslil nahlad. `items === null` =
+    // nic neoznacene (''), prazdne pole = skrinka kovanie nema.
+    function metaHardware(h){
+      if (!h || h.items == null) return '';
+      if (!h.items.length) return 'bez kovania';
+      return String(h.summary == null ? '' : h.summary);
+    }
+    function metaContent(mode, ctx, content){
+      if (mode !== 'cab') return ''; // dielec/doska maju vlastnu kartu; vkladanie S4 nema
+      var c = content || {};
+      switch (normCtx(ctx)){
+        case 'zony':    return metaZones(c.zones);
+        case 'cela':    return metaFronts(c.fronts);
+        case 'kovanie': return metaHardware(c.hw);
+        default:        return metaKorpus(c.korpus);
+      }
+    }
+
+    // Odkaz v liste Nahladu (O6): rozmery skrinky (ta ista metaDims ako S2) mimo
+    // Korpusu; v Korpuse a inych rezimoch '' (lista nesie nazov projekcie).
+    function metaS1Link(mode, ctx, dims){
+      if (mode !== 'cab' || normCtx(ctx) === 'korpus') return '';
+      return metaDims(dims);
     }
 
     // Vstup je STAV, nie hotove texty — volajuci posiela cisla a ID prelozene
@@ -248,9 +293,10 @@
       var mode = (x.mode === undefined) ? state.mode : x.mode;
       return {
         s1: metaTitle(mode, x.ctx, x.insert_kind),
+        s1link: metaS1Link(mode, x.ctx, x.dims),
         s2: metaDims(x.dims),
         s3: metaMaterials(x.materials),
-        s4: metaGroups(x.groups, x.s4_name)
+        s4: metaContent(mode, x.ctx, x.content)
       };
     }
 
@@ -266,28 +312,6 @@
     // nezatvaraju a `solo` skupiny (strom zon) su z exkluzivity vynate — ani
     // ich nikto nezatvara, ani ony nikoho.
     // items = [{ key, s4, solo, open }]
-    // D-130b: NAZOV SKUPINY z jej `<summary>` — LEN priame textove uzly.
-    // `textContent` by pribral aj `.gtools` (meta a akcie v hlavicke), takze
-    // lista sektora by ukazovala „Čelá 3 čelá · 1 bez smeru všetkým".
-    // Element (ikona `<svg>`, `<span class="meta">`, tlacidla) sa preskoci;
-    // skupina bez `.gtools` da presne ten isty text ako predtym.
-    // Pracuje nad `childNodes` (prehliadac) aj nad `children` mini-DOM sady —
-    // v oboch su textove uzly v zozname deti, lisi sa len meno vlastnosti.
-    function groupTitle(summary){
-      if (!summary) return '';
-      var kids = summary.childNodes || summary.children || [];
-      var out = '', i, n;
-      for (i = 0; i < kids.length; i++){
-        n = kids[i];
-        if (!n) continue;
-        // nodeType 3 = TEXT_NODE (prehliadac); mini-DOM znaci textovy uzol menom.
-        if (n.nodeType === 3 || n.tagName === '#text'){
-          out += (n.nodeValue != null) ? n.nodeValue : (n.text || '');
-        }
-      }
-      return out.replace(/\s+/g, ' ').trim();
-    }
-
     function exclusiveClose(items, openedKey){
       items = items || [];
       var opened = null, i;
@@ -434,7 +458,7 @@
 
     return {
       secKey: secKey,
-      exclusiveClose: exclusiveClose, groupTitle: groupTitle,
+      exclusiveClose: exclusiveClose,
       warnRows: warnRows,
       studioSection: studioSection,
       studioOpenLink: studioOpenLink,
@@ -453,7 +477,7 @@
       identityGuid: identityGuid,
       setLabel: setLabel,
       sectorVis: sectorVis,
-      ctxNoteText: ctxNoteText,
+      s1LinkTitle: s1LinkTitle,
       pvHelpText: pvHelpText,
       sectorMeta: sectorMeta,
       grainRail: grainRail,
@@ -554,30 +578,33 @@
     // „?" pod nahladom: text gest podla rezimu a kontextu (cista NXShell.pvHelpText).
     var pvh = el('pvHelp');
     if (pvh) pvh.setAttribute('data-tip', NXShell.pvHelpText(mode, ctx));
-    nxCtxNoteApply();
     nxSectorMetaApply(); // meta suhrny listy sektorov (rezim aj kontext ich menia)
   }
 
-  // ===== DOM: kontextovy riadok (nahrada S2/S3 mimo Korpusu) =================
-  // Suhrn skrinky si panel drzi TU — kontext sa prepina bez serveroveho pushu,
-  // takze text musi prezit prepnutie. Plni ho bridge pri kazdom pushi skrinky
-  // (nxSetCtxNote), viditelnost rozhoduje NXShell.sectorVis.
-  var nxCtxNoteSum = '—';
+  // ===== DOM: odkaz na Korpus v liste Nahladu (nahrada pasu `#ctxNote`) =======
+  // Mimo Korpusu stoji v liste S1 miesto nazvu projekcie ODKAZ s rozmermi
+  // skrinky (statický <button id="s1Link"> v HTML — A4: kostra sa neprekresluje,
+  // JS pise len text, `title` a `hidden`). Text zlozi nxSectorMetaApply z tych
+  // istych poli ako lista Zakladne; bublina nesie MATERIAL korpusu. Popis
+  // materialu si panel drzi TU (kontext sa prepina bez serveroveho pushu) —
+  // plni ho bridge pri kazdom pushi skrinky a pri zmene katalogu.
+  var nxS1LinkMaterial = '';
 
-  function nxSetCtxNote(dims, material){
-    nxCtxNoteSum = NXShell.ctxNoteText(dims, material);
-    nxCtxNoteApply();
+  function nxSetS1LinkTitle(material){
+    nxS1LinkMaterial = String(material == null ? '' : material);
+    nxS1LinkApplyTitle();
   }
-
-  // Viditelnost riadku riadi JS (inline display — vzor renderPartCard /
-  // renderBoardCard); CSS je len poistka pre rezimy, kde riadok nesmie byt.
-  function nxCtxNoteApply(){
-    var n = el('ctxNote');
-    if (!n) return;
-    var vis = NXShell.sectorVis();
-    var sum = el('ctxNoteSum');
-    if (sum) sum.textContent = nxCtxNoteSum;
-    n.style.display = vis.note ? '' : 'none';
+  function nxS1LinkApplyTitle(){
+    var b = el('s1Link');
+    if (!b) return;
+    var t = NXShell.s1LinkTitle(nxS1LinkMaterial);
+    b.setAttribute('title', t);
+    b.setAttribute('aria-label', t);
+  }
+  // Klik v <summary> by sektor zbalil — rovnaky stop ako „?" a ikony skupin.
+  function nxS1Link(ev){
+    if (typeof nxTipStop === 'function') nxTipStop(ev);
+    setViewContext('korpus');
   }
 
   // ===== DOM: meta suhrny v listach sektorov =================================
@@ -621,44 +648,63 @@
     }
     return [lbl('cab_body'), lbl('cab_front'), lbl('cab_back')];
   }
-  // Skupiny S4 patria KONTEXTU (data-s4). Nazov otvorenej skupiny sa cita z jej
-  // <summary> — slovenske nazvy tak ziju len v HTML (ikona je SVG, textContent
-  // ju neberie).
-  //
-  // D-130b: `textContent` uz NESTACI. Hlavicky skupin nesu od D-130a `.gtools`
-  // (meta + akcie), takze cely text hlavicky je „Čelá 3 čelá · 1 bez smeru
-  // všetkým" a „Spoločné pre skrinku dub Halifax · 3 · 2/2/0/0" — lista sektora
-  // potrebuje LEN nazov. Beru sa preto iba PRIAME TEXTOVE uzly `<summary>`:
-  // ikona je `<svg>` (element), meta aj tlacidla su `<span>`/`<button>`, takze
-  // vypadnu samy a skupiny bez `.gtools` davaju presne to, co davali doteraz.
-  // Biele znaky z odriadkovania v HTML sa zlucia (nazov je na vlastnom riadku).
-  // Codex #173 P2: `data-s4-solo` (strom zon) je vynaty z EXKLUZIVITY, NIE zo
-  // zberu udajov — je to plnohodnotna skupina sektora. Ked sa preskakoval, mal
-  // kontext Zony (jedine dieta S4 je prave solo strom) meta trvalo prazdne.
-  function nxMetaGroups(){
-    var mode = NXShell.mode();
-    if (mode === 'part' || mode === 'board') return { open: '', count: 0 };
-    var nodes = document.querySelectorAll('#secSet details[data-s4="' + NXShell.effectiveCtx() + '"]');
-    var count = nodes.length, open = '', i, s;
-    for (i = 0; i < nodes.length; i++){
-      if (!nodes[i].open || open) continue;
-      s = nodes[i].querySelector('summary');
-      open = NXShell.groupTitle(s);
+  // S4 — ZIVY STAV obsahu kontextu (O12): hodnoty selectov Korpusu, listy stromu
+  // zon, pocet ciel + spolocne nastavenia, polozky kovania. Zbiera sa LEN to,
+  // co aktualny kontext potrebuje (pocitat zony v Celach by bola zbytocna praca
+  // pri kazdom stlaceni klavesu). Slova a suhrny skladaju ciste funkcie v
+  // NXShell (metaKorpus/metaZones/metaFronts/metaHardware) a core.js/preview.js
+  // — otvorena skupina suhrn NEMENI, takze sa uz nezbiera ani jej nazov.
+  function nxMetaContent(mode, ctx){
+    var out = {};
+    if (mode !== 'cab') return out;
+    var v = function(id){ var n = el(id); return n ? n.value : ''; };
+    if (ctx === 'zony'){
+      if (typeof computeZones === 'function'){
+        var max = (typeof NXZ !== 'undefined' && NXZ.MAX_LEVELS) ? NXZ.MAX_LEVELS : 3;
+        out.zones = computeZones().map(function(z){
+          return { leaf: z.leaf, shelves: z.shelves, deep: z.path.length > max };
+        });
+      }
+    } else if (ctx === 'cela'){
+      var fc = (typeof nxFrontCounts === 'function') ? nxFrontCounts() : { n: 0, unset: 0 };
+      out.fronts = {
+        count: fc.n,
+        count_text: (typeof frontCountText === 'function') ? frontCountText(fc.n, fc.unset) : '',
+        common_text: (typeof nxCabfrontText === 'function') ? nxCabfrontText() : ''
+      };
+    } else if (ctx === 'kovanie'){
+      var items = (typeof hwItems !== 'undefined') ? hwItems : null;
+      out.hw = { items: items,
+                 summary: (items && typeof nxHwSummary === 'function') ? nxHwSummary(items) : '' };
+    } else {
+      out.korpus = {
+        carcass: !(typeof getType === 'function' && typeof NXTypes !== 'undefined') || NXTypes.carcass(getType()),
+        top: v('top_mode'), bottom: v('bottom_mode'), back: v('back_mode')
+      };
     }
-    return { open: open, count: count };
+    return out;
   }
   function nxSectorMetaApply(){
     if (!document.body) return;
     var mode = NXShell.mode(), ctx = NXShell.effectiveCtx();
+    var dims = nxMetaDims();
     var m = NXShell.sectorMeta({
       mode: mode, ctx: ctx, insert_kind: nxMetaInsertKind(),
-      dims: nxMetaDims(), materials: nxMetaMaterials(),
-      groups: nxMetaGroups(), s4_name: nxS4Title(mode, ctx)
+      dims: dims, materials: nxMetaMaterials(),
+      content: nxMetaContent(mode, ctx)
     });
     [['s1Meta', m.s1], ['s2Meta', m.s2], ['s3Meta', m.s3], ['s4Meta', m.s4]].forEach(function(o){
       var n = el(o[0]);
       if (n) n.textContent = o[1];
     });
+    // Mimo Korpusu stoji v liste Nahladu odkaz s rozmermi MIESTO nazvu projekcie
+    // (nazov uz hovori rail aj chip pod nahladom).
+    var on = !!m.s1link;
+    var link = el('s1Link'), lt = el('s1LinkTxt'), s1 = el('s1Meta');
+    if (lt) lt.textContent = m.s1link;
+    if (link) link.hidden = !on;
+    if (s1) s1.hidden = on;
+    if (on) nxS1LinkApplyTitle();
   }
   // ZIVA obnova pri praci pouzivatela: pisanie do rozmerov a zmena materialu.
   // JEDEN delegovany listener namiesto zasahov do form.js/materials.js — meta je
@@ -666,7 +712,9 @@
   // rezimu aj serverovy push pokryva nxShellApply, otvorenie skupiny boot.js.
   var NX_META_FIELDS = ['width', 'height', 'depth', 'floor_height', 'corner_door_w',
                         'ib_length', 'ib_width', 'ib_thickness',
-                        'cab_body', 'cab_front', 'cab_front_c', 'cab_back', 'ib_material'];
+                        'cab_body', 'cab_front', 'cab_front_c', 'cab_back', 'ib_material',
+                        'top_mode', 'bottom_mode', 'back_mode',
+                        'fr_gap', 'fr_gap_top', 'fr_gap_bottom', 'fr_gap_left', 'fr_gap_right'];
   if (typeof document !== 'undefined'){
     var nxMetaWatch = function(ev){
       var t = ev.target;

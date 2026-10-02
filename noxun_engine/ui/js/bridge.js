@@ -543,8 +543,8 @@
       if (typeof partCard !== 'undefined' && partCard) renderPartCard(partCard);
       if (typeof boardCard !== 'undefined' && boardCard) renderBoardCard(boardCard);
       // Codex #171 P2: premenovanie dekoru v sekcii Materialy chodi TOUTO cestou
-      // (bez loadSelected) — kontextovy riadok si preto popis prelozi znova.
-      renderCtxNote();
+      // (bez loadSelected) — bublina odkazu si preto popis prelozi znova.
+      renderS1Link();
       // Codex #173 P2: z rovnakeho dovodu aj meta lista sektora Materialy —
       // je to PROGRAMOVA zmena popisu, ziadne `change` sa nevystreli.
       if (typeof nxSectorMetaApply === 'function') nxSectorMetaApply();
@@ -754,10 +754,10 @@
       setCabinetMaterials(c); // V0.3 korpusove material selecty (prazdne = dedi)
       renderTemplateTiles(true);
       setIdbar(c);
-      // Kontextovy riadok (nahrada S2/S3 v Zonach/Celach/Kovani) — PRED
-      // setUiMode, aby nxShellApply uz pisal cerstvy suhrn. Ziadne nove data:
-      // rozmery su z payloadu, popis materialu z katalogu, ktory panel uz ma.
-      setCtxNote(c);
+      // Bublina odkazu na Korpus v liste Nahladu (nahrada S2/S3 v Zonach/Celach/
+      // Kovani) — PRED setUiMode, aby nxShellApply uz pisal cerstvy odkaz.
+      // Ziadne nove data: popis materialu je z katalogu, ktory panel uz ma.
+      setS1Link(c);
       // part_card je vnoreny payload — identitu dokumentu nesie obalka.
       if (c.part_card) c.part_card.model_guid = c.model_guid;
       setUiMode(c.part_card ? 'part' : 'cab', c.part_card ? c.part_card : c);
@@ -827,7 +827,7 @@
       invalidateFrontPlaceholders(); // D-23: bez resolved dat ziadne ≈ odhady
       buildFrontHwBadges([]);
       setCabInfo(null); // UI-B3: kontext dosky — korpusove dopocty neplatia
-      setCtxNote(null); // ani suhrn skrinky (doska ma vlastnu kartu)
+      setS1Link(null); // ani bublina odkazu na Korpus (doska ma vlastnu kartu)
       renderPartCard(null);
       renderHardware(null, []);
       // KOV-G2 (D-111): doska nohy nema — riadok zmizne aj s pamatou vstupov.
@@ -865,7 +865,7 @@
       closeFrontCard(); // KOV-A2a: odchod z korpusu = karta cela zaniká
       buildFrontHwBadges([]); // Codex PR #30: badge patria oznacenej skrinke — bez nej ziadne
       setCabInfo(null);       // UI-B3: bez skrinky niet dielcov ani plochy
-      setCtxNote(null);       // ani suhrn skrinky do kontextoveho riadku
+      setS1Link(null);       // ani bublina odkazu na Korpus
       setIdbar(null);
       // UI-C1b (N9/N10): vkladanie ma VLASTNU projekciu — sablona tak, ako bude
       // vlozena (korpus s celami), pri doske obdlznik so smerom dekoru. Kontexty
@@ -954,31 +954,28 @@
   // (core.js) z payloadu skrinky; bez oznacenej skrinky su pomlcky a klikatelne
   // riadky su neaktivne — `aria-disabled`, NIE HTML `disabled` (vzor D-78:
   // tlacidlo ostava fokusovatelne a nesie vysvetlenie).
-  // Suhrn skrinky do kontextoveho riadku. Vstupy si drzime ako DATA (rozmery
-  // + ID materialu), NIE ako hotovy text: popis dekoru sa da premenovat v okne
+  // Bublina odkazu na Korpus v liste Nahladu (H6b). Vstupy si drzime ako DATA
+  // (ID materialu), NIE ako hotovy text: popis dekoru sa da premenovat v okne
   // Materialy a ten push (`NX.setMaterials`) kartu skrinky neposiela — cachovany
   // retazec by ukazoval stary nazov az do dalsieho vyberu (Codex #171 P2).
-  var ctxNoteSrc = null;
+  var s1LinkSrc = null;
 
-  function setCtxNote(c){
+  function setS1Link(c){
     var p = c || {};
-    ctxNoteSrc = p.cabinet_id
-      ? { w: p.width, h: p.height, d: p.depth, material_id: p.material_id || '' }
-      : null;
-    renderCtxNote();
+    s1LinkSrc = p.cabinet_id ? { material_id: p.material_id || '' } : null;
+    renderS1Link();
   }
 
   // Preklad ID -> popis dekoru sa robi AZ TU, z aktualneho katalogu. Prazdny
   // material_id znamena „dedi z projektu" — povedz to nahlas, nepis meno
-  // cudzieho dekoru. Text sklada cista funkcia NXShell.ctxNoteText.
-  function renderCtxNote(){
-    if (typeof nxSetCtxNote !== 'function') return;
-    if (!ctxNoteSrc){ nxSetCtxNote(null, ''); return; }
-    var s = ctxNoteSrc;
-    var mat = s.material_id
-      ? (typeof sheetLabelOf === 'function' ? sheetLabelOf(s.material_id) : '')
-      : 'dekor dedí z projektu';
-    nxSetCtxNote({ w: s.w, h: s.h, d: s.d }, mat);
+  // cudzieho dekoru. Titulok odkazu sklada cista funkcia NXShell.s1LinkTitle.
+  function renderS1Link(){
+    if (typeof nxSetS1LinkTitle !== 'function') return;
+    if (!s1LinkSrc){ nxSetS1LinkTitle(''); return; }
+    var mat = s1LinkSrc.material_id
+      ? (typeof sheetLabelOf === 'function' ? sheetLabelOf(s1LinkSrc.material_id) : '')
+      : 'dedí z projektu';
+    nxSetS1LinkTitle(mat);
   }
 
   function setCabInfo(c){

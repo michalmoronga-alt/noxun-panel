@@ -8,8 +8,7 @@
 //   2) S2 = trojica rozmerov (nedelitelna) + sokel len tam, kde vobec je,
 //   3) S3 = popisy materialov; prazdny slot = dedenie, ziadny slot = ziadne
 //      meta (dielec/doska maju vlastnu kartu),
-//   4) S4 = otvorena skupina menom, inak pocet zbalenych so SPRAVNOU
-//      slovenskou mnozinou,
+//   4) S4 = SUHRN OBSAHU kontextu (H6b, O12) — otvorena skupina ho nemeni,
 //   5) skladanie je CISTA funkcia — bez DOM, bez cachovaneho textu.
 //
 // shell.js exportuje ciste jadro (NXShell); DOM cast sa v Node nikdy nevola.
@@ -69,30 +68,28 @@ eq(meta({ mode: 'cab' }).s3, '', 'ziadne sloty = ziadne meta');
 eq(meta({ mode: 'cab', materials: ['  ', null] }).s3, 'dedí z projektu', 'biele znaky su prazdny slot');
 
 // ------------------------------------------------------------------- S4 ------
-eq(meta({ mode: 'cab', groups: { open: 'Strop', count: 4 } }).s4, 'Strop', 'otvorena skupina menom');
-// Kontext Cela ma jedinu skupinu s rovnakym menom ako sektor — „ČELÁ Čelá" je
-// sum, nie udaj; meta nazov sektora NIKDY neopakuje.
-eq(meta({ mode: 'cab', ctx: 'cela', groups: { open: 'Čelá', count: 1 }, s4_name: 'Čelá' }).s4,
-  '', 'meta neopakuje nazov sektora');
-eq(meta({ mode: 'cab', groups: { open: 'Strop', count: 4 }, s4_name: 'Nastavenia' }).s4,
-  'Strop', 'ina skupina nazov sektora neopakuje');
-eq(meta({ mode: 'cab', groups: { open: '', count: 4 } }).s4, '4 skupiny · všetko zbalené', '2–4 skupiny');
-eq(meta({ mode: 'cab', groups: { open: '', count: 1 } }).s4, '1 skupina · všetko zbalené', 'jedna skupina');
-eq(meta({ mode: 'cab', groups: { open: '', count: 5 } }).s4, '5 skupín · všetko zbalené', '5+ skupín');
-eq(meta({ mode: 'cab', groups: { open: '', count: 0 } }).s4, '', 'kontext bez skupin = ziadne meta');
-// Codex #173 P2: kontext Zony ma jedinu skupinu a je to `data-s4-solo` strom.
-// Solo je vynate z EXKLUZIVITY, nie zo zberu udajov — meta ho musi vidiet.
-eq(meta({ mode: 'cab', ctx: 'zony', groups: { open: 'Štruktúra zón', count: 1 }, s4_name: 'Zóny' }).s4,
-  'Štruktúra zón', 'solo skupina (strom zon) ma v meta svoje meno');
-eq(meta({ mode: 'cab', ctx: 'zony', groups: { open: '', count: 1 }, s4_name: 'Zóny' }).s4,
-  '1 skupina · všetko zbalené', 'zbalena solo skupina sa pocita');
-eq(meta({ mode: 'part', groups: { open: '', count: 0 } }).s4, '', 'dielec: karta, nie skupiny');
-eq(meta({ mode: 'cab' }).s4, '', 'chybajuce skupiny = ziadne meta');
+// H6b (O12): lista S4 je vzdy SUHRN OBSAHU kontextu — zbaleny aj rozbaleny sektor
+// ukazuje to iste a otvorena skupina ho NEMENI. Podrobne scenare (Korpus 3 x 2 x 5
+// kombinacii, Zony, Cela, Kovanie, okrajove pripady) su v test_h6b_suhrny.js; tu
+// ostava nadstavba nad starym kontraktom „meta nie je nazov skupiny".
+eq(meta({ mode: 'cab', content: { korpus: { top: 'two_rails', bottom: 'under_sides', back: 'groove' } } }).s4,
+  'strop 2 výstuhy · boky na dne · chrbát v drážke', 'S4: Korpus = suhrn konstrukcie');
+eq(meta({ mode: 'cab' }).s4, '', 'chybajuci obsah = ziadne meta');
+eq(meta({ mode: 'part', content: { korpus: { top: 'full', bottom: 'under_sides', back: 'groove' } } }).s4, '',
+  'S4: dielec ma kartu, nie skupiny');
+eq(meta({ mode: 'board', content: { korpus: { top: 'full', bottom: 'under_sides', back: 'groove' } } }).s4, '',
+  'S4: doska ma kartu, nie skupiny');
+eq(meta({ mode: 'insert', content: { korpus: { top: 'full', bottom: 'under_sides', back: 'groove' } } }).s4, '',
+  'S4: vkladanie ma vlastnu kartu (sektor Nastavenia je v nom skryty)');
+// Stary vstup `groups` (otvorena skupina) uz nic nerobi — meta ho ignoruje.
+eq(meta({ mode: 'cab', groups: { open: 'Strop', count: 4 } }).s4, '',
+  'S4 (M3): otvorena skupina meta NEMENI (a ziadne „4 skupiny · vsetko zbalene")');
 
 // ----------------------------------------------------------- cistota funkcie --
 // Vstup sa NEMENI a rovnaky vstup da rovnaky vystup (skladanie nesmie mat pamat).
 const vstup = { mode: 'cab', ctx: 'korpus', dims: { w: 900, h: 720, d: 560, plinth: 100 },
-                materials: ['K2738 MO', '', ''], groups: { open: '', count: 4 } };
+                materials: ['K2738 MO', '', ''],
+                content: { korpus: { top: 'full', bottom: 'between_sides', back: 'overlay' } } };
 const kopia = JSON.parse(JSON.stringify(vstup));
 const prvy = meta(vstup);
 const druhy = meta(vstup);
@@ -100,64 +97,25 @@ n++;
 assert.deepStrictEqual(prvy, druhy, 'to iste zadanie musi dat to iste meta');
 n++;
 assert.deepStrictEqual(vstup, kopia, 'sectorMeta nesmie siahnut na vstup');
-// Vysledok su presne styri texty — kostra ma styri sektory.
+// Vysledok su texty pre styri sektory + odkaz v liste Nahladu (H6b).
 n++;
-assert.deepStrictEqual(Object.keys(prvy).sort(), ['s1', 's2', 's3', 's4'], 'meta pre styri sektory');
+assert.deepStrictEqual(Object.keys(prvy).sort(), ['s1', 's1link', 's2', 's3', 's4'],
+  'meta pre styri sektory a odkaz na Korpus');
 
 // Bez rezimu sa berie stav modulu (rovnaky vzor ako sectorVis) — po track('cab')
 // je to kontext Korpus.
 NXShell.track('cab', NXShell.identityOf('cab', { cabinet_id: 'CAB-001', model_guid: 'g' }));
 eq(meta({ dims: { w: 900, h: 720, d: 560 } }).s1, 'Čelný rez + kóty', 'bez rezimu plati stav modulu');
 
-// ------------------------------------------------- S4: NAZOV SKUPINY --------
-// D-130b: hlavicky skupin nesu od D-130a `.gtools` (meta + akcie), takze
-// `textContent` cele hlavicky uz NIE JE nazov skupiny — lista sektora by
-// ukazovala „Čelá 3 čelá · 1 bez smeru všetkým". `groupTitle` berie LEN priame
-// textove uzly `<summary>`; skupiny bez `.gtools` musia dat to iste, co davali
-// predtym (inak by oprava potichu premenovala pol panela).
-const { mkEl, DOC } = require(path.join(__dirname, 'minidom.js'));
-function summaryOf(html){
-  const s = mkEl('summary');
-  s.innerHTML = html;
-  DOC.body.appendChild(s);
-  return s;
-}
-// Skupina S DOPLNKAMI v hlavicke (Čelá, D-130a).
-eq(NXShell.groupTitle(summaryOf(
-  '<svg class="ic gic"><use href="#i-front"/></svg>Čelá\n  ' +
-  '<span class="gtools"><span class="meta" id="frontMeta">3 čelá · 1 bez smeru</span>' +
-  '<button type="button" class="ibtn wide" id="frontBulkBtn">všetkým</button>' +
-  '<button type="button" class="nxtip r"><svg class="ic"><use href="#i-help-circle"/></svg></button>' +
-  '</span>')), 'Čelá', 'S4: meta ani akcie hlavicky NIE SU sucastou nazvu skupiny');
-// Skupina „Spoločné pre skrinku" (D-130b) — meta je dlha a menila by sa pri
-// kazdej zmene dekoru/medzier, takze v liste sektora nema co robit.
-eq(NXShell.groupTitle(summaryOf(
-  '<svg class="ic gic"><use href="#i-cabinet"/></svg>Spoločné pre skrinku\n  ' +
-  '<span class="gtools"><span class="meta" id="cabfrontMeta">H1180 ST37 Du… · 3 · 2/2/0/0</span>' +
-  '<button type="button" class="ibtn" id="edgeLimitLock"><svg class="ic"><use href="#i-lock"/></svg></button>' +
-  '<button type="button" class="ibtn" id="frontGapsReset"><svg class="ic"><use href="#i-rotate-ccw"/></svg></button>' +
-  '</span>')), 'Spoločné pre skrinku', 'S4: to iste pre skupinu so schemou medzier');
-// Skupiny BEZ `.gtools` — presne tie isté nazvy ako pred opravou.
-eq(NXShell.groupTitle(summaryOf('<svg class="ic gic"><use href="#i-p-bottom"/></svg>Dno &amp; podstavec')),
-  'Dno & podstavec', 'S4: bezna skupina s ikonou ostava nedotknuta (aj s entitou)');
-eq(NXShell.groupTitle(summaryOf('<svg class="ic gic"><use href="#i-rows-3"/></svg>Police')),
-  'Police', 'S4: bezna skupina');
-eq(NXShell.groupTitle(summaryOf('Pokročilé')), 'Pokročilé', 'S4: skupina bez ikony');
-// Hranicne vstupy: ziadna hlavicka a hlavicka bez textu nesmu spadnut.
-eq(NXShell.groupTitle(null), '', 'S4: chybajuca hlavicka = prazdny nazov');
-eq(NXShell.groupTitle(summaryOf('<span class="meta">len meta</span>')), '',
-  'S4: hlavicka bez vlastneho textu nema nazov (radsej prazdno nez cudzi text)');
-// A DOM cesta ju naozaj pouziva — `nxSectorMetaApply` sa v Node nevola, takze
-// bez tejto kontroly by sa dal `nxMetaGroups` ticho vratit na `textContent`.
+// ------------------------------------------------- S4: DOM cesta -------------
+// `nxSectorMetaApply` sa v Node nevola, takze zdrojove kontroly strazia, ze sa
+// k nazvu otvorenej skupiny (`textContent` <summary>) nikdy nevrati.
 (function(){
   const src = require('node:fs')
     .readFileSync(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'shell.js'), 'utf8');
-  const fn = src.match(/function nxMetaGroups\(\)[\s\S]*?\n  \}/);
-  n++; assert.ok(fn, 'S4: `nxMetaGroups` sa v shell.js nasla');
-  n++; assert.ok(fn[0].indexOf('NXShell.groupTitle(s)') >= 0,
-    'S4: `nxMetaGroups` berie nazov cez `groupTitle`');
-  n++; assert.ok(fn[0].indexOf('textContent') < 0,
-    'S4: a NEcita `textContent` hlavicky (pribral by meta aj akcie)');
+  n++; assert.ok(src.indexOf('function nxMetaContent(') >= 0, 'S4: `nxMetaContent` sa v shell.js nasla');
+  n++; assert.ok(src.indexOf('function nxMetaGroups(') < 0, 'S4: `nxMetaGroups` zanikla (O12)');
+  n++; assert.ok(src.indexOf('groupTitle') < 0, 'S4: nazov skupiny sa uz nezbiera');
 })();
 
 console.log(`OK test_uib_meta.js — ${n} kontrol`);

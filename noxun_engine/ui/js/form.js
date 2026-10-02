@@ -107,17 +107,32 @@
   // D-130b: `resetFrontGaps` je tiez ikona v hlavicke (ten isty stop-guard).
   // PREDVOLBY SA NEMENIA — 3 / 2 / 2 / 2 / 2 je stav, ktory server normalizuje.
   function resetFrontGaps(ev){ nxTipStop(ev); setNum('fr_gap', 3); setNum('fr_gap_top', 2); setNum('fr_gap_bottom', 2); setNum('fr_gap_left', 2); setNum('fr_gap_right', 2); onField(); }
-  // Meta hlavicky `cabfront`: dekor · medzera · styri okraje. Text sklada
-  // CISTA funkcia v core.js; tu sa len zbieraju hodnoty z DOM.
+  // Meta hlavicky `cabfront`: dekor · medzera · okraje. Text sklada CISTA
+  // funkcia v core.js; tu sa len zbieraju hodnoty z DOM. Ten isty text ide aj
+  // do listy sektora Čelá (`nxMetaContent` v shell.js) — jeden zdroj.
   // Bez oznacenej skrinky je meta prazdna (`cabfrontMetaText(null)`).
-  function updateCabfrontMeta(){
-    var node = el('cabfrontMeta'); if (!node) return;
-    if (typeof cabfrontMetaText !== 'function') return;
+  function nxCabfrontText(){
+    if (typeof cabfrontMetaText !== 'function') return '';
     var picked = (typeof selectedCabId !== 'undefined') && selectedCabId;
     var gaps = picked ? { gap: frontGapVal('fr_gap', 3.0), top: frontGapVal('fr_gap_top', 2.0),
                                  bottom: frontGapVal('fr_gap_bottom', 2.0), left: frontGapVal('fr_gap_left', 2.0),
                                  right: frontGapVal('fr_gap_right', 2.0) } : null;
-    node.textContent = cabfrontMetaText(cabfrontDecorName(), gaps);
+    // Slot umyvacky nema medzeru ani okraj dole (polia su skryte, server ich drzi na 0).
+    var slot = (typeof NXTypes !== 'undefined' && typeof cabTypeNow === 'function') ? !NXTypes.carcass(cabTypeNow()) : false;
+    return cabfrontMetaText(cabfrontDecorName(), gaps, { slot: slot });
+  }
+  function updateCabfrontMeta(){
+    var node = el('cabfrontMeta'); if (!node) return;
+    if (typeof cabfrontMetaText !== 'function') return;
+    node.textContent = nxCabfrontText();
+    // Cely nazov dekoru je v bubline (v texte su len prve dve slova); bez dekoru
+    // bublina zmizne.
+    var name = String(cabfrontDecorName() || '').replace(/\s+/g, ' ').trim();
+    if (name && node.textContent) node.setAttribute('title', name);
+    else if (node.removeAttribute) node.removeAttribute('title');
+    else node.setAttribute('title', '');
+    // List sektora Čelá nesie ten istý suhrn — obnovi sa spolu s metou skupiny.
+    if (typeof nxSectorMetaApply === 'function') nxSectorMetaApply();
   }
   // Nazov dekoru berieme z TEXTU vybranej option uz existujuceho selectu
   // `cab_front_c` — ziadny druhy zdroj pravdy, ziadny novy dotaz na server.
@@ -3102,8 +3117,8 @@
   // D-130a R1: META v hlavicke skupiny („3 čelá · 1 bez smeru"). Pocet ciel
   // cita z DOM, „bez smeru" VYHRADNE zo servera (`front_slots`) — bez slotov
   // ostane len pocet a nic sa neodvodzuje.
-  function updateFrontMeta(){
-    var node = el('frontMeta'); if (!node) return;
+  // H6b: pocty cita aj list sektora Čelá (`nxMetaContent`) — jedna cesta.
+  function nxFrontCounts(){
     var wrap = el('frontRows');
     var rows = wrap ? wrap.querySelectorAll('.frow') : [];
     var n = rows.length, unset = 0;
@@ -3111,8 +3126,16 @@
       var entry = frontSlotsOf(rows[i].dataset.frontId);
       if (entry && frontDirBadge(entry.slots)) unset++;
     }
-    var word = (n === 1) ? 'čelo' : (n < 5 ? 'čelá' : 'čiel');
-    node.textContent = n ? (n + ' ' + word + (unset ? ' · ' + unset + ' bez smeru' : '')) : '';
+    return { n: n, unset: unset };
+  }
+  function updateFrontMeta(){
+    var node = el('frontMeta');
+    if (node){
+      var c = nxFrontCounts();
+      node.textContent = c.n ? frontCountText(c.n, c.unset) : '';
+    }
+    // List sektora Čelá nesie pocet ciel — obnovi sa spolu s metou skupiny.
+    if (typeof nxSectorMetaApply === 'function') nxSectorMetaApply();
   }
   // Klik na naviazane kovanie: prepni kontext na Kovanie a dotiahni do pohladu
   // BOX VLASTNIKA tohto cela. Ziadny zapis — je to navigacia (N13: klikatelne
@@ -3239,7 +3262,8 @@
                        // hlavicky kresli panel z ciseho textu core.js.
                        toggleEdgeLimit: toggleEdgeLimit, setEdgeLimitOff: setEdgeLimitOff,
                        resetFrontGaps: resetFrontGaps, updateCabfrontMeta: updateCabfrontMeta,
-                       cabfrontDecorName: cabfrontDecorName,
+                       cabfrontDecorName: cabfrontDecorName, nxCabfrontText: nxCabfrontText,
+                       nxFrontCounts: nxFrontCounts,
                        // S1-E: hranice per TYP a viditelnost riadkov slotu.
                        // `limitFor` je CISTE jadro (zrkadlo Ruby rozsahov),
                        // `applyVisibility` a `nxSlotFrontsLock` sa overuju nad

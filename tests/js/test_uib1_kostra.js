@@ -131,57 +131,60 @@ NXShell.track('insert', NXShell.identityOf('insert', null));
 eq(NXShell.identityId(), '', 'vkladanie nema co poslat');
 eq(NXShell.identityGuid(), '', 'ani dokument');
 
-// --------------------- viditelnost S2/S3 + kontextovy riadok (fix 18.8.) -----
+// --------------------- viditelnost S2/S3 + odkaz v liste Nahladu (fix 18.8., H6b) -----
 // PRECO to matica nechytila doteraz: testovala VYHRADNE stavovy stroj (rezim,
 // identita, echo/nova, kluce zbaleni) — o tom, CO sa pri danom stave zobrazi,
 // nevedela nic. Viditelnost sektorov zila len v CSS a UI-B1 do nej dala mapu
 // pre REZIM VYBERU (part/board/insert), nie pre KONTEXT raily; kontrakt „S2/S3
-// patria Korpusu + tenky kontextovy riadok inde" tak vypadol ticho a ziadny
+// patria Korpusu + odkaz na Korpus inde" tak vypadol ticho a ziadny
 // test o nom nevedel. Odteraz je pravidlo CISTA funkcia NXShell.sectorVis
 // (CSS je jej zrkadlo — zhodu strazi tests/pure/test_uib1_kostra.rb).
 function vis(mode, ctx){ return NXShell.sectorVis(mode, ctx); }
 
-// Oznaceny korpus: Korpus ukazuje sektory, ostatne kontexty kontextovy riadok.
-deq(vis('cab', 'korpus'), { basic: true, mat: true, note: false },
-  'Korpus: Zakladne aj Materialy su na mieste, riadok netreba');
+// Oznaceny korpus: Korpus ukazuje sektory, ostatne kontexty odkaz (`link`) v liste Nahladu.
+deq(vis('cab', 'korpus'), { basic: true, mat: true, link: false },
+  'Korpus: Zakladne aj Materialy su na mieste, odkaz netreba');
 ['zony', 'cela', 'kovanie'].forEach(function(c){
-  deq(vis('cab', c), { basic: false, mat: false, note: true },
-    'kontext ' + c + ': S2/S3 skryte, namiesto nich kontextovy riadok');
+  deq(vis('cab', c), { basic: false, mat: false, link: true },
+    'kontext ' + c + ': S2/S3 skryte, namiesto nich odkaz v liste Nahladu');
 });
 // Neznamy kontext padne na Korpus (rovnaky fallback ako normCtx).
-deq(vis('cab', 'nezmysel'), { basic: true, mat: true, note: false },
+deq(vis('cab', 'nezmysel'), { basic: true, mat: true, link: false },
   'neznamy kontext sa sprava ako Korpus');
 
-// NEZMENENE: dielec a doska maju vlastnu kartu — sektory ani riadok nemaju co
+// NEZMENENE: dielec a doska maju vlastnu kartu — sektory ani odkaz nemaju co
 // robit; vkladanie ukazuje vkladaciu kartu aj materialy (Codex #168 P2).
 ['part', 'board'].forEach(function(m){
-  deq(vis(m, 'korpus'), { basic: false, mat: false, note: false },
-    m + ': ziadne korpusove sektory ani riadok');
-  deq(vis(m, 'kovanie'), { basic: false, mat: false, note: false },
+  deq(vis(m, 'korpus'), { basic: false, mat: false, link: false },
+    m + ': ziadne korpusove sektory ani odkaz');
+  deq(vis(m, 'kovanie'), { basic: false, mat: false, link: false },
     m + ': kontext sa na to nesmie pytat (rail je aj tak neaktivny)');
 });
-deq(vis('insert', 'korpus'), { basic: true, mat: true, note: false },
+deq(vis('insert', 'korpus'), { basic: true, mat: true, link: false },
   'vkladanie: vkladacia karta aj materialy ostavaju');
-deq(vis('insert', 'cela'), { basic: true, mat: true, note: false },
+deq(vis('insert', 'cela'), { basic: true, mat: true, link: false },
   'vkladanie: kontext je neplatny, sektory drzia (effectiveCtx je Korpus)');
 
 // Bez argumentov cita ZIVY stav — presne tak ju vola nxShellApply.
 reset();
 NXShell.track('cab', 'cab:CAB-007');
-deq(vis(), { basic: true, mat: true, note: false }, 'zivy stav: novy vyber startuje na Korpuse');
+deq(vis(), { basic: true, mat: true, link: false }, 'zivy stav: novy vyber startuje na Korpuse');
 NXShell.setCtx('cela');
-deq(vis(), { basic: false, mat: false, note: true }, 'zivy stav: po prepnuti na Cela');
+deq(vis(), { basic: false, mat: false, link: true }, 'zivy stav: po prepnuti na Cela');
 
-// ------------------------------------------- text kontextoveho riadku -------
-// Rozmery aj popis materialu prichadzaju z payloadu — panel nic nedopocitava.
-eq(NXShell.ctxNoteText({ w: 900, h: 720, d: 560 }, 'K2738 MO'), '900 × 720 × 560 · K2738 MO',
-  'suhrn skrinky: rozmery + dekor');
-eq(NXShell.ctxNoteText({ w: 900.4, h: 719.6, d: 560 }, ''), '900 × 720 × 560',
-  'rozmery su cele mm; bez materialu ostanu same');
-eq(NXShell.ctxNoteText({ w: 900, h: 0, d: 560 }, 'K2738 MO'), 'K2738 MO',
-  'nekompletne rozmery sa VYNECHAJU (radsej nic nez vymyslene cislo)');
-eq(NXShell.ctxNoteText(null, ''), '—', 'bez dat ostane pomlcka');
-eq(NXShell.ctxNoteText({ w: 'x', h: 'y', d: 'z' }, '  '), '—', 'nezmysly sa nezobrazia');
+// ------------------------------------------- bublina odkazu v liste Nahladu ----
+// H6b (O6): rozmery stoja v liste (metaDims), BUBLINA nesie material korpusu.
+// Popis dekoru prichadza z AKTUALNEHO katalogu uz prelozeny — funkcia ho len vlozi.
+eq(NXShell.s1LinkTitle('K2738 MO'), 'Materiál korpusu: K2738 MO — klik otvorí kontext Korpus',
+  'bublina: material korpusu + vyzva');
+eq(NXShell.s1LinkTitle('dedí z projektu'), 'Materiál korpusu: dedí z projektu — klik otvorí kontext Korpus',
+  'bublina: dedeny material sa povie nahlas');
+eq(NXShell.s1LinkTitle(''), 'Klik otvorí kontext Korpus', 'bez materialu ostane len vyzva (nic sa nevymysla)');
+eq(NXShell.s1LinkTitle(null), 'Klik otvorí kontext Korpus', 'null = bez materialu');
+eq(NXShell.s1LinkTitle('  W1100 ST30  '), 'Materiál korpusu: W1100 ST30 — klik otvorí kontext Korpus',
+  'biele znaky okolo popisu sa orezu');
+assert.strictEqual(NXShell.ctxNoteText, undefined, 'pas #ctxNote zanikol — ctxNoteText uz neexistuje');
+n++;
 
 // --------------------------------------------- kluce zbalenia (A5) ----------
 eq(NXShell.secKey('s1', null), 'nxsec_s1', 'sektor ma vlastny nezavisly kluc');

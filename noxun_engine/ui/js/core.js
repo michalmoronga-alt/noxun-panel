@@ -615,30 +615,57 @@
   // R6-b: tab Kovanie ma KAZDY FYZICKY TYP vratane BLENDY — blenda
   // s uchytkovym profilom kovanie dostava (pravidlo `uchytkovy-profil-blenda`).
   // Chyba LEN pri `none`: otvorena nika nie je dielec, takze nema vlastnika.
-  // --- D-130b: meta hlavicky skupiny „Spoločné pre skrinku" -----------------
-  // JEDEN riadok, ktory povie stav aj pri ZBALENEJ skupine: dekor ciel ·
-  // medzera medzi celami · styri okraje (hore/dole/vlavo/vpravo).
+  // --- D-130b / H6b (O7): meta hlavicky skupiny „Spoločné pre skrinku" -------
+  // JEDEN riadok, ktory povie stav aj pri ZBALENEJ skupine, citatelne bez
+  // legendy: „F206 ST9 · medzera 3 · okraje 2" alebo „… · okraje 2 · dole -20".
   // CISTA funkcia — `form.js` ju len kresli do `#cabfrontMeta`.
   // `g == null` = nie je oznacena skrinka: meta je PRAZDNA (cisla bez skrinky
   // by klamali — patrili by poslednemu vyberu).
   // Dekor je volitelny: neoznaceny/nezvoleny material vypadne a riadok zacne
-  // rovno medzerou (radsej kratsi riadok nez prazdna bodka navrch).
-  var CABFRONT_DECOR_MAX = 14;
+  // rovno medzerou (radsej kratsi riadok nez prazdna bodka navrch). Dekor sa
+  // ukaze ako PRVE DVE SLOVA nazvu (kod, napr. „F206 ST9") — cely nazov nesie
+  // `title` hlavicky (form.js), ziadna elipsa.
+  // Okraje (hore/dole/vlavo/vpravo): vsetky rovnake = „okraje 2"; inak najcastejsia
+  // hodnota ako zaklad (pri rovnosti prva v poradi) a za nou vynimky v tom istom
+  // poradi „okraje 2 · dole -20"; ked je kazda hodnota ina, vypisu sa vsetky
+  // strany menom. Cisla ako v poli (`mmLabel`: „2,5", „-20").
+  // `opts.slot` = slot umyvacky: polia „medzera" a „dole" su skryte (server ich
+  // drzi na 0), takze v meta nie su.
   function cabfrontDecorShort(name){
-    var s = String(name == null ? '' : name).trim();
+    var s = String(name == null ? '' : name).replace(/\s+/g, ' ').trim();
     if (!s) return '';
-    // Elipsa je ZNAK, nie tri bodky — hlavicka je uzka a tri bodky by ju
-    // predlzili presne tam, kde setrime.
-    return (s.length > CABFRONT_DECOR_MAX) ? (s.slice(0, CABFRONT_DECOR_MAX - 1) + '…') : s;
+    return s.split(' ').slice(0, 2).join(' ');
   }
-  function cabfrontMetaText(decor, g){
-    if (!g) return '';
+  var CABFRONT_SIDES = [['top', 'hore'], ['bottom', 'dole'], ['left', 'vľavo'], ['right', 'vpravo']];
+  function cabfrontEdgesText(g, slot){
     function num(v){ var t = mmLabel(v); return t === '' ? '?' : t; }
+    var sides = CABFRONT_SIDES.filter(function(s){ return !(slot && s[0] === 'bottom'); })
+      .map(function(s){ return { name: s[1], v: num(g[s[0]]) }; });
+    var counts = {}, base = null, best = 0;
+    sides.forEach(function(s){ counts[s.v] = (counts[s.v] || 0) + 1; });
+    sides.forEach(function(s){ if (counts[s.v] > best){ best = counts[s.v]; base = s.v; } }); // zhoda: prva v poradi
+    if (best === sides.length) return 'okraje ' + base;
+    if (best === 1) return sides.map(function(s){ return s.name + ' ' + s.v; }).join(' · ');
+    var out = ['okraje ' + base];
+    sides.forEach(function(s){ if (s.v !== base) out.push(s.name + ' ' + s.v); });
+    return out.join(' · ');
+  }
+  function cabfrontMetaText(decor, g, opts){
+    if (!g) return '';
+    var slot = !!(opts && opts.slot);
     var out = [], d = cabfrontDecorShort(decor);
     if (d) out.push(d);
-    out.push(num(g.gap));
-    out.push([num(g.top), num(g.bottom), num(g.left), num(g.right)].join('/'));
+    if (!slot){ var t = mmLabel(g.gap); out.push('medzera ' + (t === '' ? '?' : t)); }
+    out.push(cabfrontEdgesText(g, slot));
     return out.join(' · ');
+  }
+  // H6b (O12): „1 čelo" / „3 čelá · 1 bez smeru" — texty meta skupiny Čelá aj
+  // sektora Čelá (jedna funkcia, jedno slovosledne pravidlo). Bez ciel „bez čiel".
+  function frontCountText(n, unset){
+    var c = parseInt(n, 10) || 0, u = parseInt(unset, 10) || 0;
+    if (c <= 0) return 'bez čiel';
+    var word = (c === 1) ? 'čelo' : (c < 5 ? 'čelá' : 'čiel');
+    return c + ' ' + word + (u ? ' · ' + u + ' bez smeru' : '');
   }
 
   var FRONT_TAB_CELO = 'celo';
@@ -2030,6 +2057,7 @@
       // D-130b (tests/js/test_d130b_spolocne.js): meta hlavicky skupiny
       // „Spoločné pre skrinku" — cisty text z dekoru a piatich hodnot.
       cabfrontMetaText: cabfrontMetaText, cabfrontDecorShort: cabfrontDecorShort,
+      frontCountText: frontCountText,
       FRONT_WINGS_OPTIONS: FRONT_WINGS_OPTIONS,
       // KOV-C2c (tests/js/test_kovc2c_karta.js): riadky zasuvky v karte cela.
       frontDrawerRows: frontDrawerRows, frontDrawerAxesRow: frontDrawerAxesRow,
