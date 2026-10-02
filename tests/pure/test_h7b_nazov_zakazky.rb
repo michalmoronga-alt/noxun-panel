@@ -243,7 +243,7 @@ NxTest.test('H7b T-B11: zlyhany zapis nazvu — export s `expect` sa ODMIETNE pr
       NxTest.assert(r[:files].empty?, "#{exp}: ziadny subor")
       NxTest.assert_equal(0, r[:collects], "#{exp}: odmietnutie PRED zberom modelu")
       NxTest.assert(r[:err], "#{exp}: cerveno")
-      NxTest.assert_equal('Názov zákazky sa medzitým zmenil — platí „Stary". Export sa nespustil, skontroluj názov a klikni znova.',
+      NxTest.assert_equal('Okno ukazovalo „Nový", platí „Stary". Export sa nespustil, skontroluj názov a klikni znova.',
                           r[:msg], exp.to_s)
     end
     # zapis uspeje -> export prejde a mena = to, co skladac (a golden T0c) hovori
@@ -273,7 +273,7 @@ NxTest.test('H7b T-B11: prekrizene — nazov ulozeny + 18 + 36 nie: VEPO odmietn
     exp_data = { 'expect' => { 'project' => 'Kríž', 'merge' => false, 'source' => 'set' } }
     r = NxH7B.run(:do_export, m, exp_data)
     NxTest.assert(r[:pickers].empty? && r[:err], 'VEPO: 18 + 36 nesedi -> odmietnuty pred vyberom priecinka')
-    NxTest.assert_equal('Nastavenie 18 + 36 sa medzitým zmenilo — platí: zapnuté. Export sa nespustil, skontroluj nastavenie a klikni znova.',
+    NxTest.assert_equal('Okno ukazovalo 18 + 36: vypnuté, platí: zapnuté. Export sa nespustil, skontroluj nastavenie a klikni znova.',
                         r[:msg])
     %i[do_hw_csv do_budget_xlsx do_cp_xlsx].each do |exp|
       r = NxH7B.run(exp, m, exp_data)
@@ -290,7 +290,7 @@ NxTest.test('H7b T-B11: prekrizene — nazov ulozeny + 18 + 36 nie: VEPO odmietn
     NxH7B::EXPORTS.each do |exp|
       r = NxH7B.run(exp, m, 'expect' => { 'project' => 'Neulozeny', 'merge' => false, 'source' => 'set' })
       NxTest.assert(r[:pickers].empty? && r[:err], "#{exp}: nazov nesedi -> odmietnuty")
-      NxTest.assert(r[:msg].start_with?('Názov zákazky sa medzitým zmenil — platí „Kriz2".'), "#{exp}: #{r[:msg]}")
+      NxTest.assert(r[:msg].start_with?('Okno ukazovalo „Neulozeny", platí „Kriz2".'), "#{exp}: #{r[:msg]}")
     end
   end
 end
@@ -556,16 +556,17 @@ NxTest.test('H7b P2 (spresnenie C1): ZADANY nazov na ktorejkolvek strane + ine m
     NxH7B::EXPORTS.each do |exp|
       r = NxH7B.run(exp, m, 'expect' => seen)
       NxTest.assert(r[:err] && r[:pickers].empty?, "#{exp}: set -> set odmietnuty")
-      NxTest.assert_equal('Názov zákazky sa medzitým zmenil — platí „Iná". Export sa nespustil, skontroluj názov a klikni znova.',
+      NxTest.assert_equal('Okno ukazovalo „Moja", platí „Iná". Export sa nespustil, skontroluj názov a klikni znova.',
                           r[:msg], exp.to_s)
       r = NxH7B.run(exp, f, 'expect' => seen_f)
       NxTest.assert(r[:err] && r[:pickers].empty?, "#{exp}: file -> set odmietnuty")
-      NxTest.refute(r[:msg].include?('neuložil'), "#{exp}: veta je neutralna (nic nezlyhalo)")
+      NxTest.refute(r[:msg].include?('neuložil') || r[:msg].include?('medzitým'),
+                    "#{exp}: veta hovori len fakt (co okno ukazovalo, co plati), nie preco")
     end
     # set (okno) -> automaticky (druhe okno nazov zmazalo)
     NxH7B::S.save_project_name(m, '')
     r = NxH7B.run(:do_cp_xlsx, m, 'expect' => seen)
-    NxTest.assert(r[:err] && r[:msg].start_with?('Názov zákazky sa medzitým zmenil — platí „Z1".'), r[:msg])
+    NxTest.assert(r[:err] && r[:msg].start_with?('Okno ukazovalo „Moja", platí „Z1".'), r[:msg])
   end
 end
 

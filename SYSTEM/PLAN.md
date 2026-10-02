@@ -56,6 +56,7 @@ predrecenzia, in-SU) sa určí pri package podľa CLAUDE.md; stĺpec je predpokl
 | H15 · dáta kovania oddelené od mechaniky setov | C-03 | kód · audit · výrobná |
 | H16 · súpis knižníc (príprava D-48) | C-04 | kód · audit |
 | H17 · spoločná príprava exportov (prvý rez R-15) | C-06 | kód · audit · výrobná |
+| H18 · Inspector ukáže skutočne použitý set závesov (výroba bez zmeny) — zdroj: slepé recenzie PR #454, rozhodnutie Michala 3A (2.10.2026) | — | kód · package |
 
 ### 3 · STABILITA
 
@@ -77,6 +78,8 @@ predrecenzia, in-SU) sa určí pri package podľa CLAUDE.md; stĺpec je predpokl
   D-03 skratky cez menu, E-03 rad skriniek naraz, E-05/G-04 prehľad skriniek v Kusovníku, E-07 hmotnosť a logistika zákazky, E-08 Kusovník po stene, E-10 skok
   z dielca na platňu, E-11 rozpracované zákazky, E-12 zákaznícky názov položky, E-13 odhad hodín dielne, G-06 poznámka ku skrinke, G-07 pravý klik na skrinku,
   G-08 štetec dekoru.
+- **Z odpovedí Michala 2.10.2026 večer** ([rozhodnutia bloku 9](zdroje/bloky/HARDENING/ROZHODNUTIA_MICHALA_2026-10-01.md)): **6A** zjednotiť „Spodná / Dolná"
+  v názvoch typu skrinky · **8B** súbory ABS pravidiel a kovania bez dobrej zálohy — dnes len log, hlásenie v okne po V1.
 - **Akceptačný test V1 na kompletnej reálnej zákazke** (Michal 29.–30.9.2026, rozhodnutia CENY C10/C13) — po V1; pôvodne riadok „V1.0 zostavy" bloku 4 (archív).
 - **Otvorené R-čísla registra auditu 1c** — autorita a verdikty: [AUDIT_REGISTER.md](AUDIT_REGISTER.md), sekcia „Stav po previerke 29.9.2026". R-13, R-37 a R-35 uzavrel blok 9
   (H8–H10, ✅), R-38 dávka H7a (✅), prvý rez R-15 v H17; ostatné platné položky sú po V1 (R-05 = D-109 nižšie). Pravidlo pre dávky z registra: **Pravidlá plánovania dávok** nižšie.

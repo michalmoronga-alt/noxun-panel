@@ -40,7 +40,7 @@
   **Predrecenzia 2× P2 + 1× P3 — opravené (`8cbc5732`):** (P2) najbežnejší postup nový model → Ctrl+S → export by skončil červeným odmietnutím, hoci nič nezlyhalo
   (uloženie okno nepushuje) — **spresnenie §17 C1** (package §17.1 „Odchýlky H7b", rozhodnutie orchestrátora): `expect` nesie aj `source`, **automatický → automatický
   názov sa toleruje** (export pod skutočným menom, stav „ · Zákazka: Klinika (podľa súboru)"), zadaný názov na ktorejkoľvek strane + iné meno = odmietnutie
-  **neutrálnou vetou** „Názov zákazky sa medzitým zmenil…", 18 + 36 pri VEPO prísne; bez observera uloženia; brána `ExportSettings.expect_check`. (P2) testy
+  **neutrálnou vetou** „Okno ukazovalo „X", platí „Y"…" (slepá kontrola opráv: DELTA OK + 1× P3 — veta bez príčiny, doladené), 18 + 36 pri VEPO prísne; bez observera uloženia; brána `ExportSettings.expect_check`. (P2) testy
   `rescue` vetiev (výnimka pri overovaní = `EXPECT_FAILED` pred výberom súboru vo všetkých 4, `name_source`, `default_name_note`, `model_file_title`). (P3) VEPO
   použije názov a 18 + 36 **overené v bráne** pred výberom priečinka (dve inštancie SketchUpu). **5246 headless · 161 JS sád** zelené + encoding guard;
   **mutácie B1–B27 + P1–P10 (39) zabité**; in-SU **3369 / 0** na `8cbc5732` (potom len STAV/KRONIKA) — `su_runner` posiela `expect` (so `source`) a overuje fail-closed CSV kovania bez `expect`

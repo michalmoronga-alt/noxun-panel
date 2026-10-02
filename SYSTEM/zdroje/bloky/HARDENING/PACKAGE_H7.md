@@ -561,9 +561,9 @@ konceptu §16 → **audit uzavretý** (ďalší delta audit sa nespúšťa; over
 - **Automatický → automatický sa toleruje:** ak očakávaný aj skutočný zdroj ∈ {`default`, `file`} a mená sa líšia (najbežnejšie: nový model → Ctrl+S → export —
   uloženie okno nepushuje), používateľ nič nezadal a niet čo stratiť → export prebehne pod skutočným menom, stav pripojí „ · Zákazka: <meno> (podľa súboru)"
   a echo hlavičky sa urobí. **Observer uloženia sa nepridáva** (observer lifecycle = audit).
-- **Zadaný názov na ktorejkoľvek strane + iné meno = odmietnutie neutrálnou pravdivou vetou** „Názov zákazky sa medzitým zmenil — platí „…". Export sa nespustil,
-  skontroluj názov a klikni znova." (veta „sa neuložil" ostáva len pri skutočne zlyhanom zápise — hlási ju zápis v okne). 18 + 36 pri VEPO ostáva prísne
-  (veta „Nastavenie 18 + 36 sa medzitým zmenilo — platí: …").
+- **Zadaný názov na ktorejkoľvek strane + iné meno = odmietnutie neutrálnou pravdivou vetou** „Okno ukazovalo „X", platí „Y". Export sa nespustil,
+  skontroluj názov a klikni znova." — hovorí len fakt, nie príčinu (rozdiel môže byť zlyhaný zápis, ktorý okno už hlási červeno, aj zmena z druhého okna;
+  slepá kontrola opráv P3). 18 + 36 pri VEPO ostáva prísne (veta „Okno ukazovalo 18 + 36: …, platí: …. Export sa nespustil…").
 - **Výnimka pri overovaní = `EXPECT_FAILED`** (export sa nespustí) — pokryté testom a mutáciou.
 - **VEPO používa názov a 18 + 36 overené v bráne** (pred výberom priečinka), nie znova prečítané po ňom (P3 — dve inštancie SketchUpu).
 

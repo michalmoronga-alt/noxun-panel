@@ -475,8 +475,8 @@ v hlavičke Štúdia" na konci záverečnej vety štyroch exportov, keď sa súb
 vylučuje; výnimku prehltne — nikdy nezhodí hotový export). **Brána `expect` (§16 B2, §17 C1 + spresnenie H7b):** `export_expect_check(model, data, merge:)` →
 `ExportSettings.expect_check` beží v každom zo štyroch exportov **po** bránach generácie a `flush_blocked` a po `ExportSettings.refresh`, **pred** zberom modelu a
 výberom súboru. `expect` = `{ project, merge, source }` (`source` = zdroj názvu, ktorý hlavička ukazovala). Nesúlad názvu, keď je na **niektorej** strane zadaný
-názov (`set`), alebo nesúlad 18 + 36 (**len VEPO**, `merge: true`, vždy prísne) = neutrálna červená veta („Názov zákazky sa medzitým zmenil — platí „…". Export sa
-nespustil…") a export sa **nespustí**; chýbajúci či neplatný `expect` (aj bez `source`) a výnimka pri overovaní = **fail-closed**. **Automatický → automatický**
+názov (`set`), alebo nesúlad 18 + 36 (**len VEPO**, `merge: true`, vždy prísne) = neutrálna červená veta, ktorá hovorí len fakt („Okno ukazovalo „X", platí „Y". Export sa
+nespustil…"; pri 18 + 36 „Okno ukazovalo 18 + 36: …, platí: …") a export sa **nespustí**; chýbajúci či neplatný `expect` (aj bez `source`) a výnimka pri overovaní = **fail-closed**. **Automatický → automatický**
 (okno ukazovalo „projekt" alebo meno súboru a platí opäť automatický názov — typicky nový model sa medzitým uložil, Ctrl+S okno nepushuje) sa **toleruje**: export
 prebehne pod skutočným menom a stav to povie („ · Zákazka: Klinika (podľa súboru)", `:note`). Brána vracia aj **overené** `:project`/`:merge` — VEPO ich použije
 aj po zatvorení výberu priečinka (druhá inštancia SketchUpu ich počas výberu nezmení). Žiadny čakací stav ani automatické pokračovanie. Volajúci mimo okien

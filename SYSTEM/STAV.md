@@ -33,14 +33,14 @@ ani nevyexportuje** (rohovú skrinku by sklopil na dolnú). **Rozpočet:** po pr
 
 **Blok 9 · HARDENING PO V1** (štart 1.10.2026, PR #432): krížový audit V1 sedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**; 17 dávok **H1…H17** sekvenčne podľa tabuľky v [PLAN.md](PLAN.md), **bez zmeny výrobných a cenových čísel**; priečinok bloku [zdroje/bloky/HARDENING/](zdroje/bloky/HARDENING/).
 Hotové **H1–H5** (PR #433–#440), **H6a–H6c** (PR #453–#455), **H7a/H7b** (nastavenia exportu + R-38, názov zákazky v hlavičke — PR #456, #?), **H8–H10b** (R-13, R-37, R-35 — PR #441–#444), **H11b** (PR #445),
-**H12a–d** (PR #446–#448, #452), **H13** (PR #449), **H14a/H14b** (PR #450, #451); **H11a** čaká na Q1, **H11c** na 2026.2.
-**Otázky bez odpovede, platí návrh:** H12 Q1 (karta dielca ako Kusovník — zavedené v H12d) · H11 Q2 (starší SketchUp = nenačíta sa, jedna hláška) · H11 Q1 (chyba súboru = vypnúť plugin, H11a) · H11 Q3 (kedy 2026.2) · H10b Q2 (rôzne rady sa zlúčia bez hlášky, ten istý rad = hláška) · H10a Q1 (cudzí globál = neuloží sa nič)
+**H12a–d** (PR #446–#448, #452), **H13** (PR #449), **H14a/H14b** (PR #450, #451); **H11a** (Q1 potvrdené 2.10.: pri chybe súboru vypnúť plugin), **H11c** čaká, kým Michal nainštaluje 2026.2 na oboch PC; nová **H18** (závesy, 3A).
+**Otázky bez odpovede, platí návrh:** H12 Q1 (karta dielca ako Kusovník — zavedené v H12d) · H11 Q2 (starší SketchUp = nenačíta sa, jedna hláška) · H11 Q3 (kedy 2026.2) · H10b Q2 (rôzne rady sa zlúčia bez hlášky, ten istý rad = hláška) · H10a Q1 (cudzí globál = neuloží sa nič)
 · H9 Q1/Q2 (pri čítaní zo zálohy bez nálezu v Kontrole, bez tlačidla „Obnoviť zo zálohy") · H8 Q1/Q2 (veta o značke verzie, bez tlačidla) · H4b Q1/Q2 (vrátenie katalógu v ponuke „⋯" Materiálov, ikona posuvníkov pre Nastavenia rozpočtu).
-**H7: R-38 áno** (✅ H7a) · H7 Q1 (hlásiť poškodenie aj mimo zápisu — „nie") · H7 Q2 („neuložené k súboru" v hlavičke — zavedené v H7b s predvoľbou „áno", čaká na potvrdenie) · **Q1** (porez a montáž pri skle) bez odpovede · pri prvej rohovej v dielni overiť záves Sensys · **na smoke čakajú** D-132 (#367), D-133 (#368), D-134 (#369).
+**H7: R-38 áno** (✅ H7a) · H7 Q1 (hlásiť poškodenie aj mimo zápisu — „nie") · H7 Q2 („neuložené k súboru" v hlavičke — **potvrdené** 2.10., H7b) · **Q1** (porez a montáž pri skle) bez odpovede · pri prvej rohovej v dielni overiť záves Sensys · **na smoke čakajú** D-132 (#367), D-133 (#368), D-134 (#369).
 
 ## Ďalší krok
 
-Pokračovať blokom 9 (H14 Q1 „Obnoviť" v Šablónach čaká na Michala): **H11a** (príprava na 2026.2); potom H15–H17; uzáver bloku = minor verzia + smoke
+Pokračovať blokom 9 (H14 Q1 „Obnoviť" v Šablónach čaká na Michala): **H11a** (príprava na 2026.2); potom H15–H18 (porovnávacie exporty z reálnej zákazky pošle Michal pred H17); uzáver bloku = minor verzia + smoke
 (smoke H7: 6 bodov v [PACKAGE_H7.md](zdroje/bloky/HARDENING/PACKAGE_H7.md) §10, bod 5 voliteľne; bod 3 overí aj klik na export hneď po prepísaní názvu;
 smoke H6a + H6b + H6c: 9 + 6 + 5 bodov v [PACKAGE_H6.md](zdroje/bloky/HARDENING/PACKAGE_H6.md) §10 — Inspector na testovacom modeli; smoke H3a + H3b: 7 bodov v [PACKAGE_H3.md](zdroje/bloky/HARDENING/PACKAGE_H3.md) §10; H4a + H4b: body 1–11 v [PACKAGE_H4.md](zdroje/bloky/HARDENING/PACKAGE_H4.md) §10; vzhľad rozbaľovačiek a výberu nôh v SketchUpe overí smoke bod 7;
 H8: 4 body v [PACKAGE_H8.md](zdroje/bloky/HARDENING/PACKAGE_H8.md) §10 — reálna zákazka bez nového riadku a s rovnakými číslami; H9: 5 bodov v [PACKAGE_H9.md](zdroje/bloky/HARDENING/PACKAGE_H9.md) §10 — rovnaké čísla rozpočtu, hrán a nákupu, ochrana naživo voliteľne;

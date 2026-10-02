@@ -703,7 +703,8 @@ module Noxun
       # sa medzitym ULOZIL — Ctrl+S nepushuje okno), pouzivatel nic nezadal
       # a niet co stratit: export prebehne pod skutocnym menom a stav to
       # povie (`note`). Ked je na ktorejkolvek strane ZADANY nazov ('set')
-      # a mena sa lisia -> odmietnutie neutralnou pravdivou vetou.
+      # a mena sa lisia -> odmietnutie neutralnou pravdivou vetou („Okno
+      # ukazovalo …, plati …").
       # 18 + 36 sa porovnava len vo VEPO (`merge: true`), vzdy prisne — inde
       # vystup nemeni a zlyhany zapis prepinaca nesmie blokovat XLSX ani CSV.
       #
@@ -728,18 +729,22 @@ module Noxun
         source = name_source(model, project)
         out = []
         note = ''
-        if normalize_project_name(model, expect['project']) != stored
+        # Veta odmietnutia hovori LEN fakt (co okno ukazovalo a co plati) — nie
+        # preco: rozdiel moze byt zlyhany zapis (ten povie cerveno uz okno) aj
+        # zmena z druheho okna (slepa kontrola oprav H7b P3).
+        shown = normalize_project_name(model, expect['project'])
+        if shown != stored
           if AUTO_SOURCES.include?(expect['source']) && AUTO_SOURCES.include?(source)
             # predvoleny „projekt" povie veta `default_name_note` exportu
             note = source == 'file' ? " · Zákazka: #{stored} (podľa súboru)" : ''
           else
-            out << "Názov zákazky sa medzitým zmenil — platí „#{stored}\". Export sa nespustil, " \
+            out << "Okno ukazovalo „#{shown}\", platí „#{stored}\". Export sa nespustil, " \
                    'skontroluj názov a klikni znova.'
           end
         end
         if merge && expect['merge'] != now
-          out << "Nastavenie 18 + 36 sa medzitým zmenilo — platí: #{now ? 'zapnuté' : 'vypnuté'}. " \
-                 'Export sa nespustil, skontroluj nastavenie a klikni znova.'
+          out << "Okno ukazovalo 18 + 36: #{expect['merge'] ? 'zapnuté' : 'vypnuté'}, " \
+                 "platí: #{now ? 'zapnuté' : 'vypnuté'}. Export sa nespustil, skontroluj nastavenie a klikni znova."
         end
         { stop: out.empty? ? nil : out.join(' '), note: note, project: project, merge: now }
       rescue StandardError => e
