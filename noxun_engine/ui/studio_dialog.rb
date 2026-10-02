@@ -390,10 +390,15 @@ module Noxun
           end
         end
 
+        # H7b (R-B9, D7): po KAZDOM exporte (aj odmietnutom — `expect`, brany,
+        # zrusenie) ide echo hlavicky `push_vepo_bar`: nazov, bodky a tooltipy
+        # sa zladia s cerstvym suborom nastaveni. Generacia sa nemeni.
         def do_export(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
           ProductionCore.do_export(Sketchup.active_model, data, generation: @generation,
                                                                 status: status_proc, repush: repush_proc)
+        ensure
+          push_vepo_bar
         end
 
         # ŠT-1c PR A (Š7): CSV nakupneho zoznamu kovania z listy sekcie Nakup.
@@ -403,6 +408,8 @@ module Noxun
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
           ProductionCore.do_hw_csv(Sketchup.active_model, data, generation: @generation,
                                                                 status: status_proc, repush: repush_proc)
+        ensure
+          push_vepo_bar
         end
 
         # --- ŠT-1c PR B1: sekcia ROZPOCET -----------------------------------
@@ -437,6 +444,8 @@ module Noxun
           ProductionCore.do_budget_xlsx(Sketchup.active_model, data, generation: @generation,
                                                                      status: status_proc,
                                                                      repush: repush_proc)
+        ensure
+          push_vepo_bar # H7b (R-B9)
         end
 
         # Zakaznicka cenova ponuka (XLSX) — od ŠT-1c PR B2 export SEKCIE
@@ -446,6 +455,8 @@ module Noxun
           ProductionCore.do_cp_xlsx(Sketchup.active_model, data, generation: @generation,
                                                                  status: status_proc,
                                                                  repush: repush_proc)
+        ensure
+          push_vepo_bar # H7b (R-B9)
         end
 
         # --- ŠT-1b: sekcia KONTROLA -----------------------------------------
@@ -692,14 +703,13 @@ module Noxun
           set_status("#{msg.join('. ')}.", failed)
         end
 
-        # Maly echo push LISTY sekcie (nazov projektu + merge). Nezdviha
+        # Maly echo push nazvu zakazky a 18 + 36 (hlavicka Studia, bodky
+        # a tooltipy styroch exportov, rohove nastavenie VEPO). Nezdviha
         # generaciu a neprepocitava kusovnik — je to zobrazovacia synchronizacia
-        # toho, co uz je zapisane.
+        # toho, co uz je zapisane. Tvar = payload `vepo` (`vepo_payload`).
         def push_vepo_bar(model = nil)
           m = model || Sketchup.active_model
-          st = { 'project' => ExportSettings.project_name(m),
-                 'default_project' => ExportSettings.default_project_name(m),
-                 'merge_18_36' => ExportSettings.merge_18_36 }
+          st = ProductionCore.vepo_payload(m)
           js("if (window.NX && NX.setVepoBar) NX.setVepoBar(#{st.to_json});")
         rescue StandardError => e
           Engine.log_error(e, 'StudioDialog.push_vepo_bar')
@@ -1694,9 +1704,10 @@ module Noxun
             edges_meta: ProductionCore.edges_meta(bom),
             # audit #1 + #16: nazov projektu aj merge chodia v KAZDOM pushi,
             # takze sa lista nikdy nerozide s tym, co plati pre exporty.
-            vepo: { project: ExportSettings.project_name(model),
-                    default_project: ExportSettings.default_project_name(model),
-                    merge_18_36: ExportSettings.merge_18_36 },
+            # H7b (R-B1): JEDNA funkcia skladá payload aj echo `push_vepo_bar`
+            # — prvé tri kľúče bez zmeny, za nimi zdroj názvu, meno súboru, mená
+            # štyroch exportov a čakajúci názov (hlavička Štúdia, bodky, tooltipy).
+            vepo: ProductionCore.vepo_payload(model),
             # ŠT-1b, sekcia KONTROLA (Š8–Š11). `counts` nesie aj ZELENE cislo
             # („skriniek bez nálezu") — JS si zo zoznamu NIC neprepocitava, ani
             # badge navigacie. Filter chipov je cisto zobrazovacia vec klienta.

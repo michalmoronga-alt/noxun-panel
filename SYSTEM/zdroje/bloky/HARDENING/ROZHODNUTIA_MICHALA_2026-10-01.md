@@ -187,6 +187,20 @@ O4 bodka + tooltip + jedna veta po exporte, neblokuje · O5 meno súboru sa pri 
 O7 tooltip s presným menom priečinka/súboru (skladá server) · O8 zlyhaný zápis názvu nahlásiť červeno, hlavička ostane na pôvodnom · O9 „projekt" → „zákazka" v textoch okna.
 **R-38 v H7: áno** (odporúčanie zo zhrnutia 1.10. — „všetko podľa odporúčania"; ochrana súboru nastavení exportu pri poškodení, rozhodne package C-07).
 
+**H7 Q2 (package H7 §13, nový stav po schválení mockupu) — POTVRDENÉ Michalom 2.10.2026 večer (nižšie):** stav hlavičky „neuložené k súboru" s jantárovou bodkou pri
+čakajúcom názve (poškodený súbor nastavení pri prvom uložení zákazky) — **áno**, implementované v H7b; zapísané aj v mockupe H7 (rámček PLATÍ).
+
 **Otázky zo zhrnutia 1.10. bez odpovede — platí predvolené (vratné, nemení výrobné čísla):**
 Q1 H11a pri chybe súboru vypnúť celý plugin · Q2 SketchUp 2026.2 — H11c ostáva otvorené · Q3 H12d názvy v karte dielca podľa Kusovníka · Q4 H9 ABS/kovanie
 bez zálohy — otvorené (bez zmeny) · Q5 „dolná" · Q11 H14 text nechať · Q12 H15 predvolené pravidlá kovania nepresúvať (zásobník Po V1).
+
+### Odpovede 2.10.2026 večer (chat, prenesené orchestrátorom)
+
+- **Q2 H7** (hlavička „neuložené k súboru" s jantárovou bodkou) — **potvrdené: áno** (H7b).
+- **Porovnávacie exporty z reálnej zákazky** pošle Michal **pred H17**.
+- **Závesy (3A):** nová dávka **H18** — Inspector (Sety) ukáže **skutočne použitý set závesov**; **výroba sa nemení** (zdroj: slepé recenzie PR #454).
+- **Rozmerové rady (4A):** každý PC svoje. · **18 + 36 (5A):** každý PC svoje.
+- **„Spodná / Dolná" (6A):** zásobník Po V1.
+- **H11a (7A):** pri chybe súboru pluginu **vypnúť celý plugin**.
+- **ABS a kovanie bez zálohy (8B):** len log → zásobník Po V1.
+- **SketchUp 2026.2:** Michal ho nainštaluje na oboch PC a dá vedieť — **H11c čaká**.

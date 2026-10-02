@@ -136,6 +136,15 @@ module NoxunSuRunner
     e::Units.to_mm(len)
   end
 
+  # H7b (audit H7 §17 C1): styri exporty Studia POVINNE nesu `expect` = nazov
+  # zakazky a „18 + 36", ktore okno ukazuje — runner ho posiela presne tak,
+  # ako by ho poslalo okno po pushi (inak by ich server odmietol fail-closed).
+  def h7b_expect(model)
+    es = e::ExportSettings
+    project = es.project_name(model).to_s
+    { 'project' => project, 'merge' => es.merge_18_36, 'source' => es.name_source(model, project) }
+  end
+
   # R-02: zapisove handlery panela vyzaduju identitu DOKUMENTU (`model_guid`) —
   # runner ju musi poslat presne tak, ako ju posiela panel (nxDocPayload).
   # JEDNO miesto, nech sa scenare nemusia starat o tvar payloadu.
@@ -16499,7 +16508,7 @@ module NoxunSuRunner
 
         before_calls = calls[0]
         scripts = st1c_capture(e::StudioDialog) do
-          e::StudioDialog.do_cp_xlsx({ 'gen' => st1c_gen }.to_json)
+          e::StudioDialog.do_cp_xlsx({ 'gen' => st1c_gen, 'expect' => h7b_expect(model) }.to_json)
         end
         ok('ŠT-1c B2 (P0-HF): čerstvá generácia BEZ potvrdenia končí na cenovej bráne — dialóg sa NEOTVORÍ',
            calls[0] == before_calls && scripts.any? { |s| s.include?('Export sa zastavil') })
@@ -16507,7 +16516,8 @@ module NoxunSuRunner
         # Zastavenie okno OBNOVILO (repush zdvihol generaciu) — druhy pokus ide
         # s CERSTVOU generaciou a potvrdenym poctom, presne ako druhy klik v UI.
         scripts = st1c_capture(e::StudioDialog) do
-          e::StudioDialog.do_cp_xlsx({ 'gen' => st1c_gen, 'confirm_unpriced' => miss }.to_json)
+          e::StudioDialog.do_cp_xlsx({ 'gen' => st1c_gen, 'confirm_unpriced' => miss,
+                                      'expect' => h7b_expect(model) }.to_json)
         end
         ok('ŠT-1c B2: s ČERSTVOU generáciou (a potvrdenou cenovou bránou) dobehne až k výberu súboru ' \
            '(guard nie je natvrdo zavretý)',
@@ -16617,11 +16627,25 @@ module NoxunSuRunner
          scripts.any? { |s| s.include?('Dáta okna sa medzitým zmenili') })
       ok('ŠT-1c: odmietnuty export model NEZMENIL', model.entities.length == before_ents)
 
+      # H7b (audit H7 §17 C1): cerstva generacia, ale BEZ `expect` (stary
+      # klient) — export sa NESPUSTI pred dialogom a okno to povie (fail-closed);
+      # echo hlavicky (`NX.setVepoBar`) ide aj po odmietnuti (R-B9).
+      before_calls = calls[0]
+      scripts = st1c_capture(e::StudioDialog) do
+        e::StudioDialog.do_hw_csv({ 'gen' => stgen.call }.to_json)
+      end
+      ok('H7b: CSV kovania BEZ `expect` NEOTVORI dialog na ulozenie (fail-closed)',
+         calls[0] == before_calls)
+      ok('H7b: a okno povie, ze je zastarane',
+         scripts.any? { |s| s.include?('Okno je zastarané') })
+      ok('H7b: po odmietnutom exporte ide echo hlavicky (NX.setVepoBar)',
+         scripts.any? { |s| s.include?('NX.setVepoBar(') })
+
       # S CERSTVOU generaciou uz cesta dobehne az k vyberu suboru (a tam
       # „pouzivatel" zrusi) — dokaz, ze guard nie je natvrdo zavrety.
       before_calls = calls[0]
       scripts = st1c_capture(e::StudioDialog) do
-        e::StudioDialog.do_hw_csv({ 'gen' => stgen.call }.to_json)
+        e::StudioDialog.do_hw_csv({ 'gen' => stgen.call, 'expect' => h7b_expect(model) }.to_json)
       end
       ok('ŠT-1c: s CERSTVOU generaciou export dobehne az k vyberu suboru',
          calls[0] == before_calls + 1)
@@ -27758,7 +27782,7 @@ module NoxunSuRunner
       picked = false
       kovc2b_stub_savepanel!(File.join(dir, 'kovanie.csv')) { picked = true }
       begin
-        e::ProductionCore.do_hw_csv(model, { 'gen' => 1 }, generation: 1,
+        e::ProductionCore.do_hw_csv(model, { 'gen' => 1, 'expect' => h7b_expect(model) }, generation: 1,
                                     status: ->(msg, *_r) { status = msg },
                                     repush: -> {})
       rescue StandardError => ex

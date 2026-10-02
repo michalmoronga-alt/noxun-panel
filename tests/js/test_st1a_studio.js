@@ -300,8 +300,9 @@ ok(BAR.indexOf('aria-disabled') < 0, '1B: v liste Kusovnika neostalo ZIADNE mrtv
 // „CSV" v tooltipe VEPO exportu je nazov FORMATU, nie druhe tlacidlo.
 ok(/title="Exportuje prírezy[^"]*VEPO CSV/.test(BAR), 'VEPO export ostal a stale hovori, co robi');
 
-// 1C+1D poradie: vlavo „co pozeram", vpravo „co s tym robim".
-const ORDER = ['class="bomviews"', 'class="prjbox"', 'class="searchbox"', 'class="spacer"',
+// 1C poradie: vlavo „co pozeram", vpravo „co s tym robim". H7b (mockup H7 O2):
+// pole „Projekt" z listy ZANIKLO — nazov zakazky je v hlavicke Studia.
+const ORDER = ['class="bomviews"', 'class="searchbox"', 'class="spacer"',
                'id="vepoBtn"', 'id="colBtn"', 'id="refreshBtn"'];
 let last = -1;
 ORDER.forEach(function(mark){
@@ -310,12 +311,8 @@ ORDER.forEach(function(mark){
   last = at;
 });
 
-ok(BAR.indexOf('<span class="prjlbl">Projekt</span>') > -1,
-   '1D: pole Projekt ma VIDITELNY stitok (nie len placeholder)');
-ok(BAR.indexOf('value="Kuchyňa Novák"') > -1, '1D: a nesie hodnotu zo SERVERA');
-ok(BAR.indexOf('placeholder="projekt"') > -1, 'default projektu ostava placeholderom');
-ok(/title="Názov zákazky[^"]*exporty/.test(BAR),
-   '1D: tooltip povie, ze nazov plati pre VSETKY exporty');
+ok(BAR.indexOf('prjbox') < 0 && BAR.indexOf('prjInput') < 0 && BAR.indexOf('Projekt') < 0,
+   'H7b (O2): pole Projekt v liste Kusovnika nie je — jedno miesto upravy je hlavicka');
 
 // Segment pohladov aj stlpce reaguju na stav, ktory pride ARGUMENTOM.
 const ABS_BAR = S.bomToolsHtml(VEPO, { view: 'abs', q: 'polica', cols: false, vepo: false });

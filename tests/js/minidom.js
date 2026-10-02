@@ -12,6 +12,22 @@
 // repeater (pridanie/odobranie riadku nad realnymi uzlami) overit nedal.
 const VOID = { input: 1, br: 1, img: 1, hr: 1, meta: 1, link: 1, use: 1 };
 
+// H7b (audit H7 §15 A6, §16 B8): VERNY REZIM fokusu a udalosti — OPT-IN
+// (`faithful(true)`), ostatne sady sa nemenia. Zapina: `parentNode` a
+// `replaceChild`, `select()`, handlery `on<typ>` v `dispatch`, `focus()`, ktory
+// na predoslom prvku vystreli `blur` (ako prehliadac), a pomocnikov `userClick`
+// (mousedown → presun fokusu → click) a `userKey`. Kazdy test ho vypina vo
+// `finally` cez `reset()` — rezim nesmie pretiect do dalsieho testu.
+let FAITHFUL = false;
+const FOCUSABLE = { BUTTON: 1, INPUT: 1, SELECT: 1, TEXTAREA: 1, A: 1 };
+
+// `blur` nebubluje — handler `onblur` a poslucháči LEN toho prvku.
+function fireLocal(el, type){
+  const ev = { type: type, target: el, preventDefault(){}, stopPropagation(){} };
+  if (typeof el['on' + type] === 'function') el['on' + type](ev);
+  ((el._listeners && el._listeners[type]) || []).slice().forEach(function(fn){ fn(ev); });
+}
+
 function unesc(s){
   return String(s).replace(/&quot;/g, '"').replace(/&gt;/g, '>')
                   .replace(/&lt;/g, '<').replace(/&amp;/g, '&');
@@ -62,9 +78,40 @@ function mkEl(tag){
       return c;
     },
     remove(){ if (this.parent) this.parent.removeChild(this); },
+    // H7b: verny rezim (inak `undefined` ako doteraz — sady bez neho sa nemenia).
+    // Priradenie (`el.select = function(){}` v starsich sadach) ma prednost.
+    get parentNode(){ return ('_parentNode' in this) ? this._parentNode : (FAITHFUL ? this.parent : undefined); },
+    set parentNode(v){ this._parentNode = v; },
+    get replaceChild(){
+      if (this._replaceChild) return this._replaceChild;
+      if (!FAITHFUL) return undefined;
+      return function(c, old){
+        const i = this.children.indexOf(old);
+        if (i < 0) throw new Error('minidom.replaceChild: uzol nie je potomok');
+        c.parent = this;
+        old.parent = null;
+        this.children.splice(i, 1, c);
+        return old;
+      };
+    },
+    set replaceChild(f){ this._replaceChild = f; },
+    get select(){
+      if (this._select) return this._select;
+      if (!FAITHFUL) return undefined;
+      return function(){ this._selected = true; };
+    },
+    set select(f){ this._select = f; },
     addEventListener(type, fn){ (this._listeners[type] || (this._listeners[type] = [])).push(fn); },
-    focus(){ DOC.activeElement = this; },
-    blur(){ if (DOC.activeElement === this) DOC.activeElement = null; },
+    focus(){
+      const prev = DOC.activeElement;
+      DOC.activeElement = this;
+      if (FAITHFUL && prev && prev !== this) fireLocal(prev, 'blur');
+    },
+    blur(){
+      if (DOC.activeElement !== this) return;
+      DOC.activeElement = null;
+      if (FAITHFUL) fireLocal(this, 'blur');
+    },
     scrollIntoView(){},
     setSelectionRange(){},
     cloneNode(){ return mkEl(this.tagName); },
@@ -279,6 +326,11 @@ function dispatch(target, type, extra){
   }, extra || {});
   let cur = target;
   while (cur){
+    // H7b verny rezim: handler `on<typ>` (napr. `inp.onkeydown`) bezi ako v prehliadaci.
+    if (FAITHFUL && typeof cur['on' + type] === 'function'){
+      cur['on' + type](ev);
+      if (ev._immediate || ev._stopped) return ev;
+    }
     const list = (cur._listeners && cur._listeners[type]) ? cur._listeners[type].slice() : [];
     for (let i = 0; i < list.length; i++){
       list[i](ev);
@@ -301,5 +353,27 @@ function fireScroll(target){
   });
 }
 
+// --- H7b: verny rezim (opt-in) ---------------------------------------------
+function faithful(on){ FAITHFUL = !!on; return FAITHFUL; }
+function isFaithful(){ return FAITHFUL; }
+// Navrat do predvoleneho stavu — KAZDY test verneho rezimu ho vola vo `finally`.
+function reset(){ FAITHFUL = false; DOC.activeElement = null; }
+
+// Klik pouzivatela: mousedown → presun fokusu (blur predosleho) → click.
+// Neaktivovatelny prvok fokus len zhodi (ako klik do prazdna).
+function userClick(el){
+  if (!FAITHFUL) throw new Error('minidom.userClick: zapni faithful(true)');
+  dispatch(el, 'mousedown');
+  if (FOCUSABLE[el.tagName]) el.focus();
+  else if (DOC.activeElement && DOC.activeElement.blur) DOC.activeElement.blur();
+  return dispatch(el, 'click');
+}
+
+function userKey(el, key){
+  if (!FAITHFUL) throw new Error('minidom.userKey: zapni faithful(true)');
+  return dispatch(el, 'keydown', { key: key });
+}
+
 module.exports = { mkEl: mkEl, DOC: DOC, dispatch: dispatch, fireScroll: fireScroll,
-                   qsa: qsa, textOf: textOf };
+                   qsa: qsa, textOf: textOf,
+                   faithful: faithful, isFaithful: isFaithful, reset: reset, userClick: userClick, userKey: userKey };

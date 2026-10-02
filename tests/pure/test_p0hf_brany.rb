@@ -184,7 +184,7 @@ module NxP0
     target = File.join(dir, file_name)
     with_stubs(stubs) do
       with_ui(target, calls) do
-        PC.send(method, :model, { 'gen' => 1 }.merge(data), generation: 1,
+        PC.send(method, :model, { 'gen' => 1, 'expect' => NxTest.export_expect(:model) }.merge(data), generation: 1,
                                                             status: ->(m, e = false) { msg = m; err = e },
                                                             repush: -> { repushes << :repush })
       end
@@ -738,7 +738,7 @@ if NxTest.headless?
       begin
         NxP0.with_stubs(stubs) do
           NxP0.with_ui(dir, calls) do
-            NxP0::PC.do_export(:model, { 'gen' => 1 }, generation: 1,
+            NxP0::PC.do_export(:model, { 'gen' => 1, 'expect' => NxTest.export_expect(:model) }, generation: 1,
                                                        status: ->(m, e = false) { msg = m; err = e },
                                                        repush: -> {})
           end

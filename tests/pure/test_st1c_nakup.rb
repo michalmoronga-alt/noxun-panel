@@ -174,7 +174,8 @@ NxTest.test('ŠT-1c (audit #15): CSV kovania dostal GENERACNY GUARD — vedoma z
                 'odmietnutie nie je tiche — okno sa obnovi')
   NxTest.assert(body.include?("data['flush_blocked']"),
                 'a cervene pole panela export zastavi (flush guard ostal)')
-  NxTest.assert(body.include?('project_name(model)'),
+  # H7b / review #457: nazov ide zo servera cez branu `expect` (`gate[:project]`).
+  NxTest.assert(body.include?('project = gate[:project]') && !body.include?("data['project']"),
                 'nazov projektu je SERVEROVA autorita (z DOM nechodi)')
   NxTest.assert(body.include?('fresh_collect(model)'),
                 'zoznam sa pocita z CERSTVEHO modelu, nie z payloadu okna')
@@ -189,7 +190,7 @@ NxTest.test('ŠT-1c (audit #15): CSV kovania dostal GENERACNY GUARD — vedoma z
   NxTest.assert(note.include?('fresh_collect'),
                 'aj to, co je poistkou proti zastaranym poctom (cerstvy zber)')
   # Klient posiela `gen` — bez neho by guard odmietol KAZDY export.
-  NxTest.assert(S1C_STUDIO_JS.include?('sketchup.hw_csv_export(JSON.stringify({ gen: ST.gen }))'),
+  NxTest.assert(S1C_STUDIO_JS.include?('sketchup.hw_csv_export(JSON.stringify({ gen: ST.gen, expect: nxVepoExpect() }))'),
                 'lista sekcie posiela generaciu okna')
 end
 

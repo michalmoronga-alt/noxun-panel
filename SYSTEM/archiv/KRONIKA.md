@@ -17,6 +17,40 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H7b · názov zákazky v hlavičke Štúdia + povinný `expect` pri štyroch exportoch (2.10.2026, PR #457, v0.17.21, blok 9 · HARDENING PO V1, triedenie A-05; package
+  [PACKAGE_H7.md](../zdroje/bloky/HARDENING/PACKAGE_H7.md) §6 R-B1–R-B12 + §15–§17 (§17 C1/C2 má prednosť); mockup
+  [MOCKUP_H7_NAZOV_ZAKAZKY.html](../zdroje/bloky/HARDENING/MOCKUP_H7_NAZOV_ZAKAZKY.html) PLATÍ, O1–O9; brief [BRIEF_H7.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H7.md)).**
+  Druhá časť H7, **nový ovládací prvok v UI** (predrecenzia povinná), **nie výrobná/cenová** — mená aj bajty exportov bez zmeny (golden H7a T0a/T0c zelený bez regenerácie,
+  `export_file_names` = fixtúra mien pre 11 názvov). **Hlavička Štúdia** v každej sekcii: „Zákazka: <názov> ✎" (`jobHeadHtml`), tri podoby zo servera (`vepo.source`:
+  zadaný · podľa súboru · predvolený „projekt" s jantárovou bodkou), `#stModel` zanikol; **editor na mieste** (Enter/blur uloží so zachyteným dokumentom, Escape zruší
+  bez šírenia do dokumentovej reťaze, nezmenený text nič neposiela, push iného dokumentu editor zahodí, push toho istého ho nechá). **Pole PROJEKT v lište Kusovníka
+  zaniklo** (O2; pravidlo troch miest: kód, `UI20_KONTRAKT.md` Š5 revízia H7, `mockup_studio.html`). **Štyri exporty:** bodka pri „projekt" a tooltip s presným menom
+  priečinka/súboru zo servera (`vepo.export_names`, `nxJobExport` aj pre `budget.js`); veta „pomenované predvoleným názvom „projekt"…" po exporte (`default_name_note`,
+  farba bez zmeny); echo hlavičky po každom exporte (`push_vepo_bar` v `ensure` obalov `StudioDialog`). **`expect` POVINNÝ (§17 C1):** VEPO (aj cez relay panela), CSV kovania,
+  XLSX rozpočtu a ponuky nesú `{project, merge}` z klientskej `VEPO_EXPECT`; server po `refresh` a pred zberom a výberom súboru porovná **jednou normalizáciou na oboch stranách**
+  (`ExportSettings.normalize_project_name`, §17 C2; 18 + 36 len VEPO) — nesúlad, chýbajúci alebo neplatný `expect` = červená veta, export sa nespustí. Volajúci mimo okien
+  v kóde pluginu nie je (výnimka C1 nepoužitá); testy a `su_runner` posielajú `expect`. **Q2 („neuložené k súboru" s jantárovou bodkou pri čakajúcom názve)** implementované
+  s predvoľbou **áno**, zapísané do mockupu a rozhodnutí ako „predvolené, čaká na potvrdenie Michala". Payload `vepo` = 3 pôvodné kľúče + `source`, `file`, `export_names`,
+  `pending`, `notice` (jedna funkcia `ProductionCore.vepo_payload`). **Goldeny H14 sa neregenerovali** — normalizácia štyroch fragmentov (hlavička, pole Projekt, `title` + bodka
+  `#vepoBtn` a `#hwCsvBtn`) s presným počtom (g1 15 · g2 4/4/1 · g4 2/2 · g8 2/2), `push_keys` porovnáva 3 pôvodné kľúče. **P3 z H7a:** samooprava zlého `project_names`
+  pri zápise názvu sa loguje tou istou vetou (`log_repair`), komentár `self_repair` je pravdivý; hlavička `test_h7a_export_settings.rb` pomenúva mutácie M1–M33.
+  **Testy:** nové `tests/js/test_h7b_hlavicka.js` (T-B1–T-B6, T-B11, T-B12 nad verným režimom `minidom.faithful(true)` — `parentNode`, `replaceChild`, `select`, `on<typ>`,
+  `focus` → `blur`, `userClick`, `userKey`, `reset`) a `tests/pure/test_h7b_nazov_zakazky.rb` (T-B7–T-B9, T-B11, T-B12, P3); prepísané viazané testy (`st1a_studio` rb/js,
+  `st1c_nakup`, `st1c_rozpocet`, `h14_golden`, `h14b_prepnutie`, `h14_studio_sekcie`, stuby exportov `kon0`, `kovh1`, `np4`, `p0hf`, `r14`, `h7a_*`).
+  **Predrecenzia 2× P2 + 1× P3 — opravené (`8cbc5732`):** (P2) najbežnejší postup nový model → Ctrl+S → export by skončil červeným odmietnutím, hoci nič nezlyhalo
+  (uloženie okno nepushuje) — **spresnenie §17 C1** (package §17.1 „Odchýlky H7b", rozhodnutie orchestrátora): `expect` nesie aj `source`, **automatický → automatický
+  názov sa toleruje** (export pod skutočným menom, stav „ · Zákazka: Klinika (podľa súboru)"), zadaný názov na ktorejkoľvek strane + iné meno = odmietnutie
+  **neutrálnou vetou** „Okno ukazovalo „X", platí „Y"…" (slepá kontrola opráv: DELTA OK + 1× P3 — veta bez príčiny, doladené), 18 + 36 pri VEPO prísne; bez observera uloženia; brána `ExportSettings.expect_check`. (P2) testy
+  `rescue` vetiev (výnimka pri overovaní = `EXPECT_FAILED` pred výberom súboru vo všetkých 4, `name_source`, `default_name_note`, `model_file_title`). (P3) VEPO
+  použije názov a 18 + 36 **overené v bráne** pred výberom priečinka (dve inštancie SketchUpu).
+  **Codex kolo 1 (3× P2) — opravené (`c060416d`):** (1) názov sa normalizuje **raz** a tá istá hodnota ide do hlavičky, tooltipov aj všetkých 4 exportov — **vedomá zmena
+  hraničného prípadu:** názov nad 120 znakov (meno `.skp` alebo ručný záznam) sa v menách exportov oreže na 120 ako v okne (dlhé meno mohlo aj prekročiť limit cesty);
+  pri bežných menách bajtovo bez zmeny (golden H7a bez regenerácie) · (2) CSV kovania, XLSX rozpočtu a ponuky použijú názov **overený v bráne** (ako VEPO) · (3) editor si
+  pamätá text pri otvorení — blur/Enter **nedotknutého** poľa po pushi alebo echu nič nezapíše (inak by vrátil starší názov). **5248 headless · 161 JS sád** zelené
+  + encoding guard; **mutácie B1–B27 + P1–P10 + R1–R3 (45) zabité**; in-SU **3369 / 0** na `c060416d` (potom len STAV/KRONIKA) — `su_runner` posiela `expect` (so `source`) a overuje fail-closed CSV kovania bez `expect`
+  s echom hlavičky. STAV pred dávkou: v0.17.20 (H7a), Ďalší krok „H7b". **Poradie callbackov** (blur editora pred klikom na export) NEOVERENÉ v SketchUpe —
+  návrh od neho nezávisí (pri obrátenom poradí export odmietne a stačí klik znova).
+
 - **H7a · nastavenia exportu v jadre + ochrana R-38 (2.10.2026, PR #456, v0.17.20, blok 9 · HARDENING PO V1, triedenie A-05 · C-07 · R-38; package
   [PACKAGE_H7.md](../zdroje/bloky/HARDENING/PACKAGE_H7.md) §6 R0, R-A1–R-A9 + §15–§17; surové audity `AUDIT_H7_raw.md`, `AUDIT_H7_delta_raw.md`, `AUDIT_H7_delta2_raw.md`;
   brief [BRIEF_H7.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H7.md)).** Prvá z dvoch častí H7, **výrobná/cenová dávka** (rozsah zmeny len pri poškodenom súbore: pri zlom tvare

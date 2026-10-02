@@ -43,7 +43,7 @@ predrecenzia, in-SU) sa určí pri package podľa CLAUDE.md; stĺpec je predpokl
 | ✅ H4b · texty a vzhľad (Obnoviť vs. vrátenie katalógu, žargón a VEĽKÉ písmená, rozbaľovačky, hľadanie, stĺpce Kusovníka, ikony mazania, ikona Nastavení rozpočtu) — package [PACKAGE_H4.md](zdroje/bloky/HARDENING/PACKAGE_H4.md) — **PR #438** (Q1/Q2 predvolená vratná voľba) | D-06 · D-07 · D-08 · D-09 | kód UI · nový ovládací prvok · predrecenzia |
 | ✅ H5 · dokumentácia okien a UI dizajnu (aktuálny stav oddelený od histórie, strážca rastu, zastarané vety) — **H5a PR #439** (mapa okien `ui-lifecycle.md` 551 → 253 kB, história do archívu, strop veľkosti mapy) · **H5b PR #440** (UI_DIZAJN = norma bez denníka, deväť zastaraných viet opravených, strážca veľkosti, značiek a inventára ikon) | B-02 · B-03 · B-05 | dokumentácia |
 | ✅ H6 · priestor v Inspectore — mockup schválený 2.10., package [PACKAGE_H6.md](zdroje/bloky/HARDENING/PACKAGE_H6.md), rez: **✅ H6a · nápovedy do „?", spodok panela, stavová veta — PR #453** · **✅ H6b · lišty sektorov a súhrny — PR #454** · **✅ H6c · kóty náhľadu (11 px stále, bez „mm") — PR #455** | D-01 · D-02 · D-05 | kód UI · mockup |
-| H7 · názov zákazky na jednom mieste + nastavenia exportu v jadre — package [PACKAGE_H7.md](zdroje/bloky/HARDENING/PACKAGE_H7.md), rez: **✅ H7a · nastavenia exportu v jadre + ochrana R-38 — PR #456** · H7b · názov zákazky v hlavičke Štúdia | A-05 · C-07 · R-38 | kód · mockup · audit · výrobná (H7a) |
+| H7 · názov zákazky na jednom mieste + nastavenia exportu v jadre — package [PACKAGE_H7.md](zdroje/bloky/HARDENING/PACKAGE_H7.md), rez: **✅ H7a · nastavenia exportu v jadre + ochrana R-38 — PR #456** · **✅ H7b · názov zákazky v hlavičke Štúdia + povinný `expect` pri 4 exportoch — PR #457** | A-05 · C-07 · R-38 | kód · mockup · audit · výrobná (H7a) |
 | ✅ H8 · dielec z inej verzie štandardu (ORANGE `std_version` v Kontrole, čísla bez zmeny) — package [PACKAGE_H8.md](zdroje/bloky/HARDENING/PACKAGE_H8.md) — **PR #441** | R-13 | kód · audit · in-SU |
 | ✅ H9 · ochrana nastavení dodávateľa, pravidiel ABS a kovania pred seedom (súbor zlého tvaru = poškodený; zdravý bez zmeny) — package [PACKAGE_H9.md](zdroje/bloky/HARDENING/PACKAGE_H9.md) — **PR #442** | R-37 | kód · audit |
 | H10 · dve okná SketchUpu neprepíšu pravidlá kovania a rady — package [PACKAGE_H10.md](zdroje/bloky/HARDENING/PACKAGE_H10.md), rez: **✅ H10a · pravidlá kovania (revízia obsahu, predkontrola, pin globálu; Q1 predvolená vratná voľba) — PR #443** · **✅ H10b · rozmerové rady (po kľúčoch s pôvodnou hodnotou kľúča; Q2 predvolená vratná voľba) — PR #444** | R-35 | kód · audit · in-SU (H10a) |
@@ -56,6 +56,7 @@ predrecenzia, in-SU) sa určí pri package podľa CLAUDE.md; stĺpec je predpokl
 | H15 · dáta kovania oddelené od mechaniky setov | C-03 | kód · audit · výrobná |
 | H16 · súpis knižníc (príprava D-48) | C-04 | kód · audit |
 | H17 · spoločná príprava exportov (prvý rez R-15) | C-06 | kód · audit · výrobná |
+| H18 · Inspector ukáže skutočne použitý set závesov (výroba bez zmeny) — zdroj: slepé recenzie PR #454, rozhodnutie Michala 3A (2.10.2026) | — | kód · package |
 
 ### 3 · STABILITA
 
@@ -77,6 +78,8 @@ predrecenzia, in-SU) sa určí pri package podľa CLAUDE.md; stĺpec je predpokl
   D-03 skratky cez menu, E-03 rad skriniek naraz, E-05/G-04 prehľad skriniek v Kusovníku, E-07 hmotnosť a logistika zákazky, E-08 Kusovník po stene, E-10 skok
   z dielca na platňu, E-11 rozpracované zákazky, E-12 zákaznícky názov položky, E-13 odhad hodín dielne, G-06 poznámka ku skrinke, G-07 pravý klik na skrinku,
   G-08 štetec dekoru.
+- **Z odpovedí Michala 2.10.2026 večer** ([rozhodnutia bloku 9](zdroje/bloky/HARDENING/ROZHODNUTIA_MICHALA_2026-10-01.md)): **6A** zjednotiť „Spodná / Dolná"
+  v názvoch typu skrinky · **8B** súbory ABS pravidiel a kovania bez dobrej zálohy — dnes len log, hlásenie v okne po V1.
 - **Akceptačný test V1 na kompletnej reálnej zákazke** (Michal 29.–30.9.2026, rozhodnutia CENY C10/C13) — po V1; pôvodne riadok „V1.0 zostavy" bloku 4 (archív).
 - **Otvorené R-čísla registra auditu 1c** — autorita a verdikty: [AUDIT_REGISTER.md](AUDIT_REGISTER.md), sekcia „Stav po previerke 29.9.2026". R-13, R-37 a R-35 uzavrel blok 9
   (H8–H10, ✅), R-38 dávka H7a (✅), prvý rez R-15 v H17; ostatné platné položky sú po V1 (R-05 = D-109 nižšie). Pravidlo pre dávky z registra: **Pravidlá plánovania dávok** nižšie.

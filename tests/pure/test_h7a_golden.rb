@@ -306,7 +306,8 @@ module NxH7G
     with_stubs(PC, collect_stubs(col)) do
       with_ui(dir, seen) do
         with_now do
-          PC.send(method, model, { 'gen' => 1 }, generation: 1,
+          # H7b (§17 C1): okno posiela `expect` = to, co ukazuje hlavicka (fixtura sa nemeni).
+          PC.send(method, model, { 'gen' => 1, 'expect' => NxTest.export_expect(model) }, generation: 1,
                                                  status: ->(m, e = false) { msg = m; err = e },
                                                  repush: -> {})
         end

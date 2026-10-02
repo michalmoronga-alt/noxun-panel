@@ -19,8 +19,28 @@
 #   a prenos nazvu · T-A6 dve instancie · T-A7/T-A7b `refresh` a cache zalohy ·
 #   T-A10 pocet pokusov prenosu a logov · T-A11 cakajuci nazov (+ veta po
 #   4 exportoch). Okno (T-A8) a guardy (T-A9) su na konci sady.
-# Mutacie M1–M24 (package §7, §15–§17) zabija tato sada spolu s T0
-# (`test_h7a_golden.rb`) a prepojenymi testami `test_st1a_studio.rb`.
+# Mutacie M1–M33 (KRONIKA H7a, PR #456) zabija tato sada spolu s T0
+# (`test_h7a_golden.rb`) a prepojenymi testami `test_st1a_studio.rb`:
+#   package §7:  M1 `update` bez `write_gate` · M2 brana bez tvaru · M3 zapis
+#     bez `shape_check` · M4–M6 predikat bez `is_a?(Hash)` / bez `project_names`
+#     / bez `!empty?` · M7 `read` bez `read_valid` · M8 `read` bez fallbacku pri
+#     `InvalidShape` · M9 okno rozhoduje pravdivostou · M10 echo len pri uspechu ·
+#     M11 `refresh` bez `.bak` · M12 adopt zahodi most pri `:blocked` · M13
+#     `:unreadable` -> `:failed` · M14 `save` pusti `project_names` · M15 log vzdy ·
+#     M16 `doc_token` bez `rescue`
+#   §15–§17:     M17 brana bez invalidacie `.bak` · M18 adopt bez `ADOPT_RETRY` ·
+#     M19 `ADOPT_RETRY` sa nezmaze po zmene podpisu · M20 `name_pending?` vzdy
+#     false · M21 export bez `pending_name_note` · M22 podpis cez `file_signature` ·
+#     M23 (v zneni §17 C3) `refresh` maze `ADOPT_RETRY` · M24 kluc retry drzi
+#     povodne pole aliasov
+#   implementacia: M25 I/O chyba pri citani = `:unreadable` (ma byt `:failed`) ·
+#     M26 zlyhanie 18 + 36 zeleno
+#   predrecenzia: M27 veta „premenuj poškodený súbor" aj pri prechodnom `:failed` ·
+#     M28 podpis pamate pokusov az po uvolneni zamku · M29 dovod necitatelnosti
+#     nemenuje `.bak` pri chybajucom primari · M30 test/guard rozhoduje
+#     `[status, reason]` pravdivostou
+#   review #456: M31 bez samoopravy aj bez validacie dokumentu · M32 len validacia
+#     (bez samoopravy) · M33 samooprava aj nad PLATNOU mapou
 require_relative '../helper' unless defined?(NxTest)
 require 'fileutils'
 require 'tmpdir'
@@ -688,7 +708,7 @@ module NxH7A
     Dir.mktmpdir('nx-h7a-exp-') do |dir|
       NxH7G.with_stubs(PC, NxH7G.collect_stubs(col)) do
         NxH7G.with_ui(dir, []) do
-          PC.send(method, mdl, { 'gen' => 1 }, generation: 1,
+          PC.send(method, mdl, { 'gen' => 1, 'expect' => NxTest.export_expect(mdl) }, generation: 1,
                                                status: ->(t, e = false) { msg = t; err = e }, repush: -> {})
         end
       end

@@ -332,6 +332,27 @@
   // Tlmené „€" za peňažným poľom (bez nového riadku).
   var BUD_EUR_AFTER = ' <span class="bfnt">€</span>';
 
+  // H7b (R-B8, O3/O4/O7): bodka a tooltip exportu s menom súboru — z TOHO
+  // ISTÉHO pomocníka ako VEPO a CSV kovania (`nxJobExport` v studio.js; meno
+  // skladá server). Bez neho (parse chyba studio.js) dnešný tooltip bez bodky.
+  var BUD_TIP_XLSX = 'Interný rozpočet v presnom formáte tvojich hárkov';
+  var BUD_TIP_CP = 'Zákaznícky dokument: cenová tabuľka + špecifikácia (bez interných pojmov a kódov)';
+  function budJob(kind, fallbackTip){
+    var f = budNxf('nxJobExport');
+    var r = f ? f(kind) : null;
+    return (r && typeof r.tip === 'string') ? r : { dot: false, tip: fallbackTip };
+  }
+  function budJobDot(job){
+    return (job && job.dot) ? '<i class="xdot" aria-hidden="true"></i>' : '';
+  }
+  // Audit H7 §16 B2 / §17 C1: `expect` exportu (názov a „18 + 36", ktoré okno
+  // ukazuje). Bez pomocníka sa nepošle nič — server export odmietne
+  // (fail-closed), nikdy nepomenuje súbor naslepo.
+  function budExpect(){
+    var f = budNxf('nxVepoExpect');
+    return f ? f() : undefined;
+  }
+
   function budStaleFlag(){
     return (typeof staleFlag === 'undefined') ? false : staleFlag === true;
   }
@@ -487,8 +508,9 @@
       // tým zároveň schudla o najdlhší popisok (review PR #198 #4: pri šírke
       // okna 1060 px sa lámala do druhého riadku).
       '<button type="button" class="primary" data-bud="xlsx" data-bkey="xlsx"' +
-      ' title="Interný rozpočet v presnom formáte tvojich hárkov">' +
-      '<svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> XLSX rozpočet</button>' +
+      ' title="' + bEsc(budJob('budget', BUD_TIP_XLSX).tip) + '">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> XLSX rozpočet' +
+      budJobDot(budJob('budget', BUD_TIP_XLSX)) + '</button>' +
       '<button type="button" class="ghostbtn" data-bud="settings" data-bkey="settings"' +
       ' title="Sadzby, režimy a prahy — globálne nastavenie, platí pre každú zákazku">' +
       '<svg class="ic" aria-hidden="true"><use href="#i-sliders-horizontal"/></svg> Nastavenia</button>';
@@ -1326,9 +1348,11 @@
     // („Cenová ponuka (zákazník)") — je to to isté tlačidlo, len sa presťahovalo
     // k dokumentu, ktorý vyrába; premenovať ho by znamenalo, že si používateľ
     // hľadá nový ovládač namiesto známeho.
+    var job = budJob('offer', BUD_TIP_CP);
     return '<button type="button" class="primary" data-bud="cp" data-bkey="cp"' +
-      ' title="Zákaznícky dokument: cenová tabuľka + špecifikácia (bez interných pojmov a kódov)">' +
-      '<svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> Cenová ponuka (zákazník)</button>' +
+      ' title="' + bEsc(job.tip) + '">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> Cenová ponuka (zákazník)' +
+      budJobDot(job) + '</button>' +
       // Prestavba skrinky z Inspectora sem sama nedorazí — bez „Obnoviť" by sa
       // dala poslať zákazníkovi ponuka zo starých rozmerov (rovnaký dôvod ako
       // v lište Kusovníka, Nákupu aj Rozpočtu; handler aj markup su zdielane).
@@ -1536,7 +1560,7 @@
     NX.setStatus('Pripravujem cenovú ponuku…', false);
     // ST-1a (audit #1): nazov projektu je SERVEROVY udaj — z DOM sa uz
     // neposiela (input zije v liste Kusovnika v okne Studio).
-    sketchup.cp_xlsx(JSON.stringify({ gen: st.gen, confirm_unpriced: budArmed('cp') }));
+    sketchup.cp_xlsx(JSON.stringify({ gen: st.gen, confirm_unpriced: budArmed('cp'), expect: budExpect() }));
   }
 
   // --- E-c: PREPOČÍTAŤ CENY ------------------------------------------------
@@ -2195,7 +2219,7 @@
     if (budNeedsConfirm('xlsx', st)) return;
     NX.setStatus('Pripravujem XLSX rozpočet…', false);
     // ST-1a (audit #1): nazov projektu cita SERVER — z DOM uz nechodi.
-    sketchup.budget_xlsx(JSON.stringify({ gen: st.gen, confirm_unpriced: budArmed('xlsx') }));
+    sketchup.budget_xlsx(JSON.stringify({ gen: st.gen, confirm_unpriced: budArmed('xlsx'), expect: budExpect() }));
   }
 
   // --- P0-HF: DVOJKROKOVÝ EXPORT PRI RIADKOCH BEZ CENY ----------------------
