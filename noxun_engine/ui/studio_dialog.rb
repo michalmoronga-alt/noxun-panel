@@ -646,13 +646,13 @@ module Noxun
 
           msg = []
           if data.key?('project')
-            ProductionCore.save_project_name(model, data['project'])
-            name = ProductionCore.project_name(model)
+            ExportSettings.save_project_name(model, data['project'])
+            name = ExportSettings.project_name(model)
             msg << "Názov projektu: #{name}"
           end
           if data.key?('merge')
-            ProductionCore.save_merge_18_36(data['merge'] == true)
-            merge = ProductionCore.merge_18_36
+            ExportSettings.save_merge_18_36(data['merge'] == true)
+            merge = ExportSettings.merge_18_36
             msg << "18+36 spolu: #{merge ? 'zapnuté' : 'vypnuté'}"
           end
           return set_status('Nič sa nezmenilo.', true) if msg.empty?
@@ -666,9 +666,9 @@ module Noxun
         # toho, co uz je zapisane.
         def push_vepo_bar(model = nil)
           m = model || Sketchup.active_model
-          st = { 'project' => ProductionCore.project_name(m),
-                 'default_project' => ProductionCore.default_project_name(m),
-                 'merge_18_36' => ProductionCore.merge_18_36 }
+          st = { 'project' => ExportSettings.project_name(m),
+                 'default_project' => ExportSettings.default_project_name(m),
+                 'merge_18_36' => ExportSettings.merge_18_36 }
           js("if (window.NX && NX.setVepoBar) NX.setVepoBar(#{st.to_json});")
         rescue StandardError => e
           Engine.log_error(e, 'StudioDialog.push_vepo_bar')
@@ -1663,9 +1663,9 @@ module Noxun
             edges_meta: ProductionCore.edges_meta(bom),
             # audit #1 + #16: nazov projektu aj merge chodia v KAZDOM pushi,
             # takze sa lista nikdy nerozide s tym, co plati pre exporty.
-            vepo: { project: ProductionCore.project_name(model),
-                    default_project: ProductionCore.default_project_name(model),
-                    merge_18_36: ProductionCore.merge_18_36 },
+            vepo: { project: ExportSettings.project_name(model),
+                    default_project: ExportSettings.default_project_name(model),
+                    merge_18_36: ExportSettings.merge_18_36 },
             # ŠT-1b, sekcia KONTROLA (Š8–Š11). `counts` nesie aj ZELENE cislo
             # („skriniek bez nálezu") — JS si zo zoznamu NIC neprepocitava, ani
             # badge navigacie. Filter chipov je cisto zobrazovacia vec klienta.

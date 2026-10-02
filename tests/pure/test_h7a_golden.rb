@@ -51,23 +51,24 @@ module NxH7G
   module_function
 
   # --- API nastaveni exportu ----------------------------------------------
-  # JEDINE miesto sady, ktore pozna modul nastaveni. Presun H7a (commit 3)
-  # prepoji LEN tieto riadky — odtlacky a kroky sa nemenia.
+  # JEDINE miesto sady, ktore pozna modul nastaveni. Presun H7a z
+  # ProductionCore do ExportSettings prepojil LEN tieto riadky — odtlacky
+  # a kroky sa nemenili (fixtura vznikla nad ProductionCore na maine).
   def api
-    PC
+    E::ExportSettings
   end
 
   def settings_path
-    PC.vepo_settings_path
+    E::ExportSettings.path
   end
 
   def save_last_dir(dir)
-    PC.save_vepo_settings('last_dir' => dir)
+    E::ExportSettings.save_last_dir(dir)
   end
 
   # Surova hodnota posledneho priecinka (presne ako ju vidia exporty).
   def last_dir_raw
-    PC.vepo_settings['last_dir']
+    E::ExportSettings.last_dir
   end
 
   # --- sandbox ---------------------------------------------------------------

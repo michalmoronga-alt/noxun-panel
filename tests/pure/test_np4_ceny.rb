@@ -138,18 +138,26 @@ module NxNp4
   end
 
   # --- stubbing exportov (vzor test_r14_budget_std.rb) ---------------------
+  # H7a: nastavenia exportu (refresh, last_dir, save_last_dir, project_name,
+  # merge_18_36) ziju v `ExportSettings` — stub ide na modul, ktory metodu ma.
+  def stub_sc(name)
+    (PC.respond_to?(name) ? PC : Noxun::Engine::ExportSettings).singleton_class
+  end
+
   def with_stubs(overrides)
     names = overrides.keys
+    # cielovy modul sa urci RAZ (po `remove_method` by ho `respond_to?` nenasiel)
+    scs = names.to_h { |name| [name, stub_sc(name)] }
     names.each do |name|
-      SC.send(:alias_method, :"np4_orig_#{name}", name)
-      SC.send(:define_method, name, &overrides[name])
+      scs[name].send(:alias_method, :"np4_orig_#{name}", name)
+      scs[name].send(:define_method, name, &overrides[name])
     end
     yield
   ensure
     names.each do |name|
-      SC.send(:remove_method, name)
-      SC.send(:alias_method, name, :"np4_orig_#{name}")
-      SC.send(:remove_method, :"np4_orig_#{name}")
+      scs[name].send(:remove_method, name)
+      scs[name].send(:alias_method, name, :"np4_orig_#{name}")
+      scs[name].send(:remove_method, :"np4_orig_#{name}")
     end
   end
 
@@ -165,8 +173,8 @@ module NxNp4
   def export_stubs(bud)
     col = { records: [], hardware: [], hardware_overrides: [], cabinet_sets: {},
             cabinet_set_conflicts: {}, placements: [], warnings: [], identities: [] }
-    { refresh_vepo_settings: ->(*_a) {}, vepo_settings: ->(*_a) { {} },
-      save_vepo_settings: ->(*_a) { true }, project_name: ->(*_a) { 'NP4' },
+    { refresh: ->(*_a) {}, last_dir: ->(*_a) { nil },
+      save_last_dir: ->(*_a) { [:ok, ''] }, project_name: ->(*_a) { 'NP4' },
       fresh_collect: ->(*_a) { col }, sheets_map: ->(*_a) { G::SHEETS },
       hardware_expansion: ->(*_a) { { 'rows' => [], 'unmapped' => [] } },
       budget_payload: ->(*_a) { bud } }

@@ -183,6 +183,7 @@ unless NxTest::IN_SKETCHUP
     core/direction_check
     core/hover_edge
     core/supplier_settings
+    core/export_settings
     core/budget_store
     core/appliance_binding
     core/budget

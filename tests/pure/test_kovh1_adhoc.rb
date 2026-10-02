@@ -132,18 +132,26 @@ module NxKovh1
   PC = E::ProductionCore
   SC = PC.singleton_class
 
+  # H7a: nastavenia exportu (refresh, last_dir, save_last_dir, project_name,
+  # merge_18_36) ziju v `ExportSettings` — stub ide na modul, ktory metodu ma.
+  def stub_sc(name)
+    (PC.respond_to?(name) ? PC : Noxun::Engine::ExportSettings).singleton_class
+  end
+
   def with_stubs(overrides)
     names = overrides.keys
+    # cielovy modul sa urci RAZ (po `remove_method` by ho `respond_to?` nenasiel)
+    scs = names.to_h { |name| [name, stub_sc(name)] }
     names.each do |name|
-      SC.send(:alias_method, :"kovh1_orig_#{name}", name)
-      SC.send(:define_method, name, &overrides[name])
+      scs[name].send(:alias_method, :"kovh1_orig_#{name}", name)
+      scs[name].send(:define_method, name, &overrides[name])
     end
     yield
   ensure
     names.each do |name|
-      SC.send(:remove_method, name)
-      SC.send(:alias_method, name, :"kovh1_orig_#{name}")
-      SC.send(:remove_method, :"kovh1_orig_#{name}")
+      scs[name].send(:remove_method, name)
+      scs[name].send(:alias_method, name, :"kovh1_orig_#{name}")
+      scs[name].send(:remove_method, :"kovh1_orig_#{name}")
     end
   end
 
@@ -178,8 +186,8 @@ module NxKovh1
     budget = { 'totals' => { 'total' => 100.0, 'unknown_count_in_total' => 0 },
                'cp_preview' => { 'total' => 100.0, 'rows' => [], 'assembly' => 10.0,
                                  'assembly_negative' => false, 'consistent' => true, 'diff' => 0.0 } }
-    { refresh_vepo_settings: ->(*_a) {}, vepo_settings: ->(*_a) { {} },
-      save_vepo_settings: ->(*_a) { true }, project_name: ->(*_a) { 'Test' },
+    { refresh: ->(*_a) {}, last_dir: ->(*_a) { nil },
+      save_last_dir: ->(*_a) { [:ok, ''] }, project_name: ->(*_a) { 'Test' },
       fresh_collect: ->(*_a) { collected }, sheets_map: ->(*_a) { {} },
       hardware_expansion: ->(*_a) { exp }, budget_payload: ->(*_a) { budget } }
   end

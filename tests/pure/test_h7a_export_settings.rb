@@ -33,8 +33,9 @@ module NxH7A
   PC    = E::ProductionCore
   STORE = E::JsonFileStore
   MAT   = E::Materials
-  # Modul nastaveni exportu. Presun H7a (commit 3) prepoji LEN blok „API".
-  S     = E::ProductionCore
+  # Modul nastaveni exportu. Presun H7a z ProductionCore prepojil LEN tuto
+  # konstantu a blok „API" (testy ochrany vznikli nad starym miestom).
+  S     = E::ExportSettings
 
   GOOD = { 'project_names' => { 'c:/z/a.skp' => 'Zo zalohy' }, 'merge_18_36' => false,
            'last_dir' => 'D:/Zaloha' }.freeze
@@ -49,31 +50,31 @@ module NxH7A
   # --- API (jedine miesto, ktore pozna modul) -----------------------------
 
   def path
-    S.vepo_settings_path
+    S.path
   end
 
   def read
-    S.vepo_settings
+    S.read
   end
 
   def save(attrs)
-    S.save_vepo_settings(attrs)
+    S.save(attrs)
   end
 
   def update(&blk)
-    S.update_vepo_settings(&blk)
+    S.update(&blk)
   end
 
   def refresh
-    S.refresh_vepo_settings
+    S.refresh
   end
 
   def save_last_dir(dir)
-    S.save_vepo_settings('last_dir' => dir)
+    S.save_last_dir(dir)
   end
 
   def last_dir
-    read['last_dir']
+    S.last_dir
   end
 
   # --- sandbox ------------------------------------------------------------------
@@ -692,4 +693,129 @@ NxTest.test('H7a T-A11: zdravy subor — name_pending? nikdy true, exporty bez v
     msg, = NxH7A.export_status(:do_hw_csv, m)
     NxTest.refute(msg.include?('pozor: názov zákazky'), msg)
   end
+end
+
+# =============================================================================
+# T-A9 GUARDY (presun bez delegatov, jedine dvere, ziadna pravdivost)
+# =============================================================================
+
+module NxH7A
+  ES_RB = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'export_settings.rb'), encoding: 'UTF-8')
+  MOVED = %i[vepo_settings_path vepo_settings vepo_settings_for_write update_vepo_settings save_vepo_settings
+             refresh_vepo_settings project_names update_project_names normalize_project_path
+             project_session_key session_key? remember_session_key forget_session_key remembered_session_key
+             session_keys_for project_key project_name adopt_session_name effective_project_name
+             default_project_name save_project_name merge_18_36 save_merge_18_36 name_pending?
+             write_gate doc_shape_ok? shape_check note_block written?].freeze
+  MOVED_CONSTS = %i[VEPO_SETTINGS_FILE PROJECT_NAMES_KEY PROJECT_NAME_MAX SESSION_KEY_PREFIX
+                    SESSION_KEY_BRIDGE SESSION_BRIDGE_MAX ADOPT_RETRY LAST_BLOCK DEGRADED_REASON
+                    UNREADABLE_REASON FAILED_REASON NotObject].freeze
+
+  module_function
+
+  def code(src)
+    src.lines.map { |l| l.sub(/#.*$/, '') }.join
+  end
+
+  def body(src, name)
+    src[/def #{Regexp.escape(name)}\b.*?\n      end\n/m].to_s
+  end
+
+  def plugin_rb_files
+    Dir[File.join(NxTest::ROOT, 'noxun_engine', '{core,ui}', '**', '*.rb')]
+  end
+end
+
+NxTest.test('H7a T-A9: ProductionCore po presune NEMA nastavenia exportu (ziadne delegaty ani konstanty)') do
+  pc = NxH7A::PC
+  left = NxH7A::MOVED.select { |m| pc.respond_to?(m) }
+  NxTest.assert(left.empty?, "ProductionCore stale odpoveda na: #{left.join(', ')}")
+  consts = NxH7A::MOVED_CONSTS.select { |c| pc.const_defined?(c, false) }
+  NxTest.assert(consts.empty?, "ProductionCore stale ma konstanty: #{consts.join(', ')}")
+  NxTest.assert(pc.respond_to?(:model_guid), 'model_guid ostava v ProductionCore')
+  NxTest.assert(pc.respond_to?(:pending_name_note), 'veta po exporte je text exportu (ProductionCore)')
+  es = NxH7A::S
+  %i[path doc_shape_ok? shape_check read refresh write_gate update save written? project_names
+     update_project_names normalize_project_path project_session_key session_key? remember_session_key
+     forget_session_key remembered_session_key session_keys_for project_key effective_project_name
+     default_project_name project_name save_project_name merge_18_36 save_merge_18_36 last_dir save_last_dir
+     name_pending?].each { |m| NxTest.assert(es.respond_to?(m), "ExportSettings.#{m}") }
+  NxTest.assert_equal('vepo_settings.json', es::FILE, 'meno suboru bez zmeny')
+  NxTest.assert_equal('projekt', es::DEFAULT_PROJECT_NAME)
+  NxTest.assert_equal(120, es::PROJECT_NAME_MAX)
+  NxTest.assert_equal('guid:', es::SESSION_KEY_PREFIX)
+end
+
+NxTest.test('H7a T-A9: mimo export_settings.rb nikto necita vepo_settings ani VEPO_SETTINGS_FILE') do
+  bad = NxH7A.plugin_rb_files.reject { |f| f.end_with?('export_settings.rb') }.select do |f|
+    src = NxH7A.code(File.read(f, encoding: 'UTF-8'))
+    src.match?(/\bvepo_settings\b(?!\.json|\.poskodeny)/) || src.include?('VEPO_SETTINGS_FILE')
+  end
+  NxTest.assert(bad.empty?, "druha cesta k suboru nastaveni: #{bad.map { |f| File.basename(f) }.join(', ')}")
+end
+
+NxTest.test('H7a T-A9: jedine dvere zapisu — zamok, brana, strikne citanie, zapis s predikatom tvaru') do
+  src = NxH7A.code(NxH7A::ES_RB)
+  NxTest.assert_equal(1, src.scan('JsonFileStore.write(').length, 'v module JEDINY zapis suboru')
+  upd = NxH7A.body(NxH7A::ES_RB, 'update')
+  NxTest.assert(upd.include?('JsonFileStore.write(path, fresh.merge(attrs), shape_check)'),
+                'zapis v `update`, treti POZICNY argument = shape_check')
+  i_lock = upd.index('Materials.with_catalog_lock')
+  i_gate = upd.index('write_gate')
+  i_read = upd.index('read_for_write')
+  i_write = upd.index('JsonFileStore.write(')
+  NxTest.assert(i_lock && i_gate && i_read && i_write && i_lock < i_gate && i_gate < i_read && i_read < i_write,
+                'poradie zamok -> brana -> citanie -> zapis')
+  NxTest.assert(NxH7A.body(NxH7A::ES_RB, 'save').include?('update { attrs }'), 'save ide cez update')
+  NxTest.assert(NxH7A.body(NxH7A::ES_RB, 'update_project_names').include?('update do |settings|'),
+                'mapa nazvov ide cez update')
+  NxTest.assert(NxH7A.body(NxH7A::ES_RB, 'read').include?('JsonFileStore.read_valid('), 'read cita s tvarom')
+  gate = NxH7A.body(NxH7A::ES_RB, 'write_gate')
+  NxTest.assert(gate.include?('JsonFileStore.reload!("#{file}.bak")'), 'brana zhodi aj cache zalohy')
+  NxTest.assert(gate.include?('JsonFileStore.degraded?(file, shape: shape_check)'), 'brana s tvarom')
+end
+
+NxTest.test('H7a T-A9: vysledok zapisu sa NIKDY nerozhoduje pravdivostou (ui/ a core/)') do
+  writers = 'save_project_name|save_merge_18_36|save_last_dir|save|update|update_project_names'
+  pre = /(?:\bif|\bunless|&&|\|\||!)\s*\(?\s*ExportSettings\.(?:#{writers})\b/
+  post = /ExportSettings\.(?:#{writers})\b(?:\([^()\n]*\))?\s*(?:\?|&&|\|\|)/
+  hits = NxH7A.plugin_rb_files.flat_map do |f|
+    NxH7A.code(File.read(f, encoding: 'UTF-8')).lines.each_with_index.select do |l, _i|
+      l.match?(pre) || l.match?(post)
+    end.map { |l, i| "#{File.basename(f)}:#{i + 1}: #{l.strip}" }
+  end
+  NxTest.assert(hits.empty?, "pravdivost nad [status, reason]: #{hits.join(' | ')}")
+end
+
+NxTest.test('H7a T-A9: kluc sedenia sa presunom nezmenil — doc_token == ProductionCore.model_guid') do
+  m = NxH7A::MODEL.new('', 'TOKEN')
+  NxTest.assert_equal(NxH7A::PC.model_guid(m), NxH7A::S.doc_token(m))
+  NxTest.assert_equal("guid:#{NxH7A::PC.model_guid(m)}", NxH7A::S.project_session_key(m))
+  NxTest.assert_equal('', NxH7A::S.doc_token(nil))
+  tok = NxH7A.body(NxH7A::ES_RB, 'doc_token')
+  NxTest.assert(tok.include?('DocKey.key(model)') && tok.include?('rescue StandardError'), 'doc_token = model_guid')
+  dk = Noxun::Engine::DocKey.singleton_class
+  dk.send(:alias_method, :h7a_orig_key, :key)
+  begin
+    dk.send(:define_method, :key) { |_m| raise 'identita (test)' }
+    NxTest.assert_equal('', NxH7A::S.project_session_key(m), 'chyba identity = prazdny kluc, nie vynimka')
+  ensure
+    dk.send(:remove_method, :key)
+    dk.send(:alias_method, :key, :h7a_orig_key)
+    dk.send(:remove_method, :h7a_orig_key)
+  end
+end
+
+NxTest.test('H7a T-A9: nacitanie — main.rb aj helper poznaju modul (po materials/doc_key, pred production_core)') do
+  main = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'main.rb'), encoding: 'UTF-8')
+  i_es = main.index("Sketchup.require 'noxun_engine/core/export_settings'")
+  i_mat = main.index("Sketchup.require 'noxun_engine/core/materials'")
+  i_dk = main.index("Sketchup.require 'noxun_engine/core/doc_key'")
+  i_pc = main.index("Sketchup.require 'noxun_engine/ui/production_core'")
+  NxTest.assert(i_es && i_mat && i_dk && i_pc && i_mat < i_es && i_dk < i_es && i_es < i_pc, 'poradie v main.rb')
+  helper = File.read(File.join(NxTest::ROOT, 'tests', 'helper.rb'), encoding: 'UTF-8')
+  NxTest.assert(helper.include?('core/export_settings'), 'helper ho nacita headless')
+  dk = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'doc_key.rb'), encoding: 'UTF-8')
+  NxTest.assert(dk.include?('ExportSettings.forget_session_key(model) if defined?(ExportSettings)'),
+                'vymena dokumentu zahadzuje most v ExportSettings')
 end

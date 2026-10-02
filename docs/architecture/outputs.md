@@ -1103,6 +1103,10 @@ odvodeným od STARŠEJ zálohy — a sadzby sú **cenové** dáta. `write` má p
 („súbor je poškodený — číta sa záloha, zápisy sú vypnuté, oprav alebo zmaž `<cesta>`") namiesto „nastavenia sa nepodarilo uložiť". Kontrakt `JsonFileStore.degraded?` (číta priamo
 z disku, I/O chyby vyletia ako neúspešný zápis) je v [model-a-identita.md](model-a-identita.md). Testy: `tests/pure/test_r11_degradovana_zaloha.rb`.
 
+### export_settings.rb
+
+Nastavenia exportu (`vepo_settings.json`: názov zákazky, 18 + 36, posledný priečinok) — H7a presun z `ui/production_core.rb` do jadra (`Noxun::Engine::ExportSettings`).
+
 ### vepo_export.rb
 
 **ROH-A1 · K3 — skratky rohovej zostavy (potvrdil Michal 28.9.: mockup O6, rozhodnutie R10 bloku ROHOVÁ):** `SHORT_NAMES` dostali presné názvy z buildera (`Construction::CORNER_NAMES`) —

@@ -1732,7 +1732,7 @@
   }
 
   // ŠT-1c PR A: CSV nákupného zoznamu kovania. Názov projektu sa NEPOSIELA —
-  // číta ho SERVER (`ProductionCore.project_name`), aby všetky exporty
+  // číta ho SERVER (`ExportSettings.project_name`), aby všetky exporty
   // pomenovali zákazku rovnako. Od tejto dávky nesie aj `gen` (audit #15):
   // nákupný dokument nesmie vzniknúť z okna so zastaranými dátami.
   function hwCsvExport(){

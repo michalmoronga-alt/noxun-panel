@@ -5,7 +5,7 @@
 # guardy (Panel.foreign_document?, zony, tagy, Studio, Rules baseline, okno
 # kovania) aj JS zrkadlo (nxModelGuid) stali na Sketchup::Model#guid — lenze
 # SketchUp guid MENI pri KAZDOM ulozeni (dokumentovane pri PROJECT_NAMES_KEY
-# v production_core.rb a v AUDIT_REGISTER R-04). Ctrl+S do ~400 ms po uprave
+# v export_settings.rb a v AUDIT_REGISTER R-04). Ctrl+S do ~400 ms po uprave
 # pola panela tak vyzeral ako prepnutie dokumentu: debounced edit sa zahodil
 # a nxDropDocState zmazal rozpisany stav. Tento modul je JEDINY zdroj hodnoty
 # `model_guid` v payloadoch — meno pola na drote ostava (kontrakt R-02 sa
@@ -72,7 +72,7 @@
 # nevadi: panel po starte SketchUpu aj tak zacina cerstvym NX.init.
 #
 # Registry drzi SILNU referenciu na model (presny vzor SESSION_KEY_BRIDGE,
-# production_core.rb): `equal?` odzbrojuje recyklaciu object_id po GC — je to
+# export_settings.rb): `equal?` odzbrojuje recyklaciu object_id po GC — je to
 # DRUHA poistka pod udalostnou rotaciou, nie hlavny mechanizmus. Ziadny strop
 # na ZIVE dokumenty (Codex audit R-02b, BLOCKER 2: vytlaceny zivy dokument by
 # po navrate dostal novy token a nxSetModelGuid by zahodil drafty).
@@ -174,7 +174,7 @@ module Noxun
           log_error(e, 'on_document_replaced/DocKey') if respond_to?(:log_error)
         end
         begin
-          ProductionCore.forget_session_key(model) if defined?(ProductionCore)
+          ExportSettings.forget_session_key(model) if defined?(ExportSettings)
         rescue StandardError => e
           log_error(e, 'on_document_replaced/SESSION_KEY_BRIDGE') if respond_to?(:log_error)
         end
@@ -326,7 +326,7 @@ module Noxun
           false
         end
 
-        # Globalne unikatny aj NAPRIEC sedeniami: ProductionCore persistuje
+        # Globalne unikatny aj NAPRIEC sedeniami: ExportSettings persistuje
         # `guid:<hodnota>` kluce neulozenych zakaziek do vepo_settings.json
         # (project_names) - deterministicky citac by po restarte kolidoval
         # a nazov cudzieho neulozeneho projektu by sa objavil na dnesnom.
