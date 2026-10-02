@@ -17,6 +17,25 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H11a · príprava na SketchUp 2026.2: načítanie súborov s jednou hláškou + okná pri ukončovaní bez SketchUp API (2.10.2026, PR #?, v0.17.22, blok 9 · HARDENING
+  PO V1, triedenie F-01; package [PACKAGE_H11.md](../zdroje/bloky/HARDENING/PACKAGE_H11.md) časť II + §15/§16; brief [BRIEF_H11.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H11.md);
+  Q1 Michal 2.10.: chyba súboru = celý plugin vypnutý).** Audit-povinná (observer lifecycle, nový modul), predrecenzia povinná, nie výrobná/cenová. **Nový modul
+  `core/app_lifecycle.rb`** (čistý Ruby, prvý súbor pluginu): **načítanie** — bootstrap v `main.rb` s vlastnou chybovou vetvou a sentinelom `LOADED`, 91 súborov
+  `main.rb` + 14 častí `panel.rb` cez `AppLifecycle.require_part` (Ruby `require` s absolútnou cestou, záznam chyby, pokračuje sa), `Engine.init_allowed?` pustí init
+  len nad celým pluginom so zaregistrovaným quit observerom, inak **jedna hláška** a plugin vypnutý (obnova reštartom); **ukončovanie** — `QuitObserver#onQuit` len
+  Ruby príznak + stopa, `install!` presne raz (D1), hooky Inspectora a Štúdia pri `quitting?` len zneplatnia stav (`GhostTool.invalidate_session!`) a SketchUp
+  upratanie odložia, `@dialog = nil` vždy, `GhostTool.pop_tool` pri `quitting?` pop odloží, beh potvrdí nové okno (hneď) a klik/Esc v nástroji (timer).
+  **Brána P1 PASS** (SketchUp 26.0.429): Ruby `require` aj `require_part` = ok `true` → znova `false`, raise/syntax/chýbajúci = záznam RuntimeError/SyntaxError/LoadError,
+  nič nevyhodí; surové `Sketchup.require` na 26.0 vráti pri raise aj syntax chybe `true` (prehltne), pri chýbajúcom `false`; kľúč `$LOADED_FEATURES` = absolútna cesta
+  `…/Plugins/noxun_engine/core/units.rb` (N5; aktualizácia aj tak vyžaduje reštart = nový proces). **In-SU 3442 / 0** na `bf467e86` (Q1–Q6, Q7, Q8 = P1; T0b Q1 na mieste
+  pred zásahom `790d74ff` 3380 / 0). **Quit test na 26.0 FAIL — poradie B:** `Sketchup.quit` (`-QuitProbe`) aj Súbor > Koniec (`-QuitMenu`, `send_action` 57665) → exit kód **0**,
+  ale stopa `hook:studio:normal` · `hook:inspector:normal` · (pri `Sketchup.quit` aj `pop:executed` z timera; pri Súbor > Koniec timer už nepríde) · **až potom** `on_quit` — SketchUp zatvára okná pluginu **pred** `onQuit`, teda príznak hooky pri
+  ukončení nezachytí (predpoklad S8 „na 26.0 sa hooky nevolajú" neplatí). Na 26.0 to nepadá; či 2026.2 padne, ukáže H11c — pri poradí B package počíta so záložným
+  návrhom Z1 (hook nástroj nepopne, ukončí sa sám pri ďalšom vstupe). **Rozhodnutie o H11a čaká na orchestrátora/Michala.** Testy: **5279 headless** (+31:
+  `test_h11a_lifecycle.rb` T0a–T3/T7, `test_h11a_nacitanie.rb` T4–T6 so subprocesom skutočného `main.rb`; 9 textových testov len prefix `require_part`) · **161 JS sád**
+  · encoding guard; **mutácie M1–M14 všetky zabité**. Quit test: `scripts\run_su_tests.ps1 -QuitProbe [-QuitMenu]` + `tests/sketchup/su_quit_probe.rb`.
+  Dokumentácia: nový odsek `app_lifecycle.rb` (ui-lifecycle.md, s maticou „Zatvorenie okna vs. ukončenie SketchUpu" a zmeraným poradím B), odseky `ghost_tool.rb`,
+  Observery panela, StudioModelWatch, updater (chýbajúci súbor ohlási obal), `SKETCHUP_PRAVIDLA.md`, router `ARCHITEKTURA.md`.
 - **H7b · názov zákazky v hlavičke Štúdia + povinný `expect` pri štyroch exportoch (2.10.2026, PR #457, v0.17.21, blok 9 · HARDENING PO V1, triedenie A-05; package
   [PACKAGE_H7.md](../zdroje/bloky/HARDENING/PACKAGE_H7.md) §6 R-B1–R-B12 + §15–§17 (§17 C1/C2 má prednosť); mockup
   [MOCKUP_H7_NAZOV_ZAKAZKY.html](../zdroje/bloky/HARDENING/MOCKUP_H7_NAZOV_ZAKAZKY.html) PLATÍ, O1–O9; brief [BRIEF_H7.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H7.md)).**
