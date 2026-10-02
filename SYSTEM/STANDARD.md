@@ -1806,7 +1806,7 @@ v §2.5, pri ABS seede v §7.5 a v [archiv/KRONIKA.md](archiv/KRONIKA.md) (Grep 
 | taxonómia kovania — schéma | `noxun_engine/core/hardware_taxonomy.rb` · `HardwareTaxonomy::SCHEMA_CURRENT` | **1** | formát výrobcov a radov | áno |
 | taxonómia kovania — seed | `noxun_engine/core/hardware_taxonomy.rb` · `HardwareTaxonomy::SEED_VERSION` | **3** | nový výrobca alebo rad v seede | nie (seed) |
 | sety kovania — formát | `noxun_engine/core/hardware_sets.rb` · `HardwareSets::STD` | **1** | základ; nový tvar setu dostane vlastný marker podľa obsahu (§13.2) | áno |
-| sety kovania — seed | `noxun_engine/core/hardware_sets.rb` · `HardwareSets::SEED_VERSION` | **8** | nový alebo zmenený seed set (starý tvar do `LEGACY_SEED_SHAPES`) | nie (seed) |
+| sety kovania — seed | `noxun_engine/core/hardware_sets_seed.rb` · `HardwareSets::SEED_VERSION` | **8** | nový alebo zmenený seed set (starý tvar do `LEGACY_SEED_SHAPES` v tom istom súbore) | nie (seed) |
 | katalóg spotrebičov — formát | `noxun_engine/core/appliance_catalog.rb` · `ApplianceCatalog::STD` | **1** | formát `appliances.json` | áno |
 | katalóg spotrebičov — seed | `noxun_engine/core/appliance_catalog.rb` · `ApplianceCatalog::SEED_VERSION` | **1** | nové seed spotrebiče | nie (seed) |
 | nastavenia dodávateľa — formát | `noxun_engine/core/supplier_settings.rb` · `SupplierSettings::STD` | **2** | nový skalár alebo kľúč, ktorý by starší plugin pri uložení zahodil (§11.5) | áno |

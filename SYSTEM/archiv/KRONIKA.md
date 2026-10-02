@@ -17,6 +17,22 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H15a · seed dáta setov kovania v samostatnom súbore (2.10.2026, PR #459, v0.17.23, blok 9 · HARDENING PO V1, triedenie C-03 = CX-03 · GR-07; package
+  [PACKAGE_H15.md](../zdroje/bloky/HARDENING/PACKAGE_H15.md) — **§15 má prednosť** (A1 golden nákupu s explicitnými materiálmi), surový audit
+  [AUDIT_H15_raw.md](../zdroje/bloky/HARDENING/AUDIT_H15_raw.md), brief [BRIEF_H15.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H15.md)).** Audit-povinná (nový modul)
+  + výrobná/cenová (presúva sa zdroj nákupných kódov), predrecenzia povinná. **1. commit = golden T0 pre všetky tri moduly** (`tests/pure/test_h15_seed_golden.rb`,
+  ručný generátor a fixtúry `tests/fixtures/h15_golden/`): G1 konštanty (zmrazenie, poradie, SHA-256 `Marshal` a JSON), G2 čerstvá inštalácia plným textom troch
+  súborov, G3 upgrade knižnice setov (v1, v4, v7 nohy nedotknuté/premenované, migrácia `leg`, kolízia príchytu, vlastná triedna hodnota, konflikt taxonómie, v8),
+  G4 upgrade katalógu (v1, v2 s úpravami, v4, v5) a taxonómie, G5 „Doplniť nové predvoľby" + ponuka Pravidiel, G6 `flap_set_codes`, G7 nákup + rozpočet end-to-end
+  (5 KOVA prípadov + zásuvka Atira z receptu + výklop HK a HL, explicitné materiály). **§15 A1:** generátor aj test overia úplný nákup (K-sada; HK mechanizmus;
+  HL mechanizmus + ramená + tyče v počte `rod_count`; žiadny konflikt, nemapovaná položka ani riadok mimo katalógu) — HK bez materiálov generátor odmietne zapísať.
+  **Presun 1:1:** `SEED_VERSION` + história v2..v8, `SEED_SETS`, `SEED_MAPPING`, `LEGACY_SEED_SHAPES`, `MAPPING_MIGRATIONS`, `MAPPING_ADDITIONS` doslovne do
+  `core/hardware_sets_seed.rb` (načítaný tesne pred `hardware_sets.rb` cez `AppLifecycle.require_part` a v helperi; zmrazený zoznam H11a 91 → 92); jediná zmena
+  v dátach `SKIP_CODE` → `'none'`; v logike len 3 riadky ukazovateľov (T5 `--color-moved`: 625 riadkov presunutých, 1 zmenený, hlavička a obal modulu).
+  **Guard R5** (`tests/pure/test_h15_seed_data.rb`, AST): len literály, presunuté konštanty práve raz, logika bez `SEED_*`, poradie načítania, len vlastný modul +
+  negatívne testy. Docs: odsek `hardware_sets_seed.rb`, veta v `hardware_sets.rb` a taxonómii (F5), router, STANDARD §13.1, mapa scenár 5 s kvalifikovanými menami.
+  **Mutácie** M1–M10, M12, M14–M17 a A1 (HK bez materiálov) zhodené (M3 `17.0` → `17` chytí G1 aj `seed_library`). **Predrecenzia** 0/0/2 P3 opravené: guard R5 c chytí aj `MAPPING_ADDITIONS*`/`MAPPING_MIGRATIONS*`/`DEFAULT_SETS*` a presunuté mená; nový golden **G7b** (Tip-On zásuvka, Tip-On dvierka, sokel 18 mm — kódy 272212, 352908, 250831, 245723) vygenerovaný nad stromom mainu `d69f3e55`. Testy: **5284 headless · 161 JS** + encoding
+  guard; golden T0 bez regenerácie zelený; in-SU **3387 / 0** na `0dc79fee` (neskôr len dokumentácia). Package a audit skopírované do priečinka bloku.
 - **H11a · načítanie súborov pluginu s jednou hláškou + nástroj quit testu (2.10.2026, PR #458, v0.17.22, blok 9 · HARDENING PO V1, triedenie F-01; package
   [PACKAGE_H11.md](../zdroje/bloky/HARDENING/PACKAGE_H11.md) časť II + §15/§16 a **§17 (rozhodnutie orchestrátora)**; brief [BRIEF_H11.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H11.md);
   Q1 Michal 2.10.: chyba súboru = celý plugin vypnutý).** Audit-povinná (nový modul), predrecenzia povinná, nie výrobná/cenová. **Nový modul `core/app_lifecycle.rb`**

@@ -1,0 +1,90 @@
+{
+  "std": "noxun-hardware-taxonomy",
+  "schema": 1,
+  "seed_version": 3,
+  "manufacturers": [
+    {
+      "name": "Blum"
+    },
+    {
+      "name": "Grass"
+    },
+    {
+      "name": "Häfele"
+    },
+    {
+      "name": "Hettich"
+    },
+    {
+      "name": "Ostatné"
+    },
+    {
+      "name": "Strong"
+    },
+    {
+      "name": "Tulip"
+    }
+  ],
+  "series": [
+    {
+      "name": "AvanTech YOU",
+      "manufacturer": "Hettich"
+    },
+    {
+      "name": "AVENTOS",
+      "manufacturer": "Blum"
+    },
+    {
+      "name": "AXILO",
+      "manufacturer": "Häfele"
+    },
+    {
+      "name": "CLIP top",
+      "manufacturer": "Blum"
+    },
+    {
+      "name": "InnoTech Atira",
+      "manufacturer": "Hettich"
+    },
+    {
+      "name": "LEGRABOX",
+      "manufacturer": "Blum"
+    },
+    {
+      "name": "MERIVOBOX",
+      "manufacturer": "Blum"
+    },
+    {
+      "name": "Nova Pro",
+      "manufacturer": "Grass"
+    },
+    {
+      "name": "Quadro",
+      "manufacturer": "Hettich"
+    },
+    {
+      "name": "Sensys",
+      "manufacturer": "Hettich"
+    },
+    {
+      "name": "StrongBox",
+      "manufacturer": "Strong"
+    },
+    {
+      "name": "StrongMax",
+      "manufacturer": "Strong"
+    },
+    {
+      "name": "TANDEMBOX",
+      "manufacturer": "Blum"
+    },
+    {
+      "name": "Tiomos",
+      "manufacturer": "Grass"
+    },
+    {
+      "name": "TIP-ON",
+      "manufacturer": "Blum"
+    }
+  ]
+}

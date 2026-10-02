@@ -150,7 +150,7 @@ mení formát pravidiel (`HardwareRules::STD`, dopredná brána — audit). Prav
 |---|---|---|
 | `noxun_engine/core/hardware_rules.rb` | `SEED_RULES` · `SEED_VERSION` · `STD` · `merge_seed` · `floor_height_ok?` · `evaluate` · `LEGACY_SEED_SHAPES` | seed pravidlo, filter, migrácia seedu (nedotknuté nahradiť, upravené nechať) |
 | `noxun_engine/core/construction.rb` | `cabinet_hw_ctx` | kľúče kontextu skrinky (typ, podpora, výška sokla) |
-| `noxun_engine/core/hardware_sets.rb` | `SEED_VERSION` · `LEGACY_SEED_SHAPES` | set (generický typ → kódy katalógu) pre novú položku |
+| `noxun_engine/core/hardware_sets_seed.rb` | `HardwareSets::SEED_SETS` · `HardwareSets::LEGACY_SEED_SHAPES` · `HardwareSets::SEED_VERSION` · `HardwareSets::MAPPING_ADDITIONS` | set (generický typ → kódy katalógu) pre novú položku — dáta, starý tvar a verzia seedu v jednom súbore |
 | `noxun_engine/core/hardware_catalog.rb` | `SEED_SET_VERSION` | nové kódy v katalógu kovania |
 | `noxun_engine/ui/rules_dialog.rb` | `TYPE_SCOPE_PHRASES` · `type_scope_list` | veta rozsahu pravidla v sekcii Pravidlá (server) |
 | `noxun_engine/ui/js/rules.js` | `rdRoleDesc` | zobrazenie vety (typ sem prichádza hotovou vetou zo servera) |
