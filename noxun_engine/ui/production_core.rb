@@ -216,17 +216,20 @@ module Noxun
       # (`push_vepo_bar`). Prve tri kluce v dnesnom poradi a tvare (golden H14),
       # za nimi H7b: zdroj nazvu, meno suboru, mena exportov, cakajuci nazov
       # a jeho vysvetlenie. `project` ide UZ NORMALIZOVANY (§17 C2) — presne to,
-      # co klient vrati v `expect.project`. Klient nic neodvodzuje.
+      # co klient vrati v `expect.project`. Klient nic neodvodzuje. Review #457
+      # P2: mena exportov (tooltip) sa skladaju z TEJ ISTEJ normalizovanej
+      # hodnoty, akou ich exporty naozaj pomenuju (`expect_check` -> `:project`).
       def vepo_payload(model)
         es = ExportSettings
         project = es.project_name(model)
+        name = es.normalize_project_name(model, project)
         default = es.default_project_name(model)
-        { 'project' => es.normalize_project_name(model, project),
+        { 'project' => name,
           'default_project' => default,
           'merge_18_36' => es.merge_18_36,
           'source' => es.name_source(model, project),
           'file' => model_file_title(model),
-          'export_names' => export_file_names(project, Time.now),
+          'export_names' => export_file_names(name, Time.now),
           'pending' => es.name_pending?(model),
           'notice' => pending_name_notice(model, project) }
       end
@@ -1844,7 +1847,9 @@ module Noxun
 
         # audit #1: nazov projektu je SERVEROVA autorita (jeden nazov pre
         # VSETKY styri exporty) — z DOM uz nechodi.
-        project = ExportSettings.project_name(model)
+        # Review #457 P2: nazov OVERENY v brane `expect` (ako VEPO) — druha
+        # instancia ho po brane (pocas zberu) zmenit nemoze.
+        project = gate[:project]
         fname = hw_csv_file_name(project)
         target = UI.savepanel('Uložiť nákupný zoznam kovania', ExportSettings.last_dir, fname)
         return status.call('Export zrušený.') if target.nil? || target.to_s.empty?
@@ -3322,7 +3327,7 @@ module Noxun
           return stop_for_confirmation(unpriced, status: status, repush: repush)
         end
 
-        project = ExportSettings.project_name(model) # audit #1: server je autorita nazvu
+        project = gate[:project] # audit #1 + review #457: nazov overeny v brane `expect`
         now = Time.now
         target = UI.savepanel('Uložiť rozpočet (XLSX)', ExportSettings.last_dir,
                               BudgetXlsx.file_name(project, now))
@@ -3417,7 +3422,7 @@ module Noxun
           return stop_for_confirmation(unpriced, status: status, repush: repush)
         end
 
-        project = ExportSettings.project_name(model) # audit #1: server je autorita nazvu
+        project = gate[:project] # audit #1 + review #457: nazov overeny v brane `expect`
         now = Time.now
         target = UI.savepanel('Uložiť cenovú ponuku (XLSX)', ExportSettings.last_dir,
                               CpXlsx.file_name(project, now))

@@ -478,8 +478,9 @@ výberom súboru. `expect` = `{ project, merge, source }` (`source` = zdroj náz
 názov (`set`), alebo nesúlad 18 + 36 (**len VEPO**, `merge: true`, vždy prísne) = neutrálna červená veta, ktorá hovorí len fakt („Okno ukazovalo „X", platí „Y". Export sa
 nespustil…"; pri 18 + 36 „Okno ukazovalo 18 + 36: …, platí: …") a export sa **nespustí**; chýbajúci či neplatný `expect` (aj bez `source`) a výnimka pri overovaní = **fail-closed**. **Automatický → automatický**
 (okno ukazovalo „projekt" alebo meno súboru a platí opäť automatický názov — typicky nový model sa medzitým uložil, Ctrl+S okno nepushuje) sa **toleruje**: export
-prebehne pod skutočným menom a stav to povie („ · Zákazka: Klinika (podľa súboru)", `:note`). Brána vracia aj **overené** `:project`/`:merge` — VEPO ich použije
-aj po zatvorení výberu priečinka (druhá inštancia SketchUpu ich počas výberu nezmení). Žiadny čakací stav ani automatické pokračovanie. Volajúci mimo okien
+prebehne pod skutočným menom a stav to povie („ · Zákazka: Klinika (podľa súboru)", `:note`). Brána vracia aj **overené** `:project` (normalizovaný — **ten istý** názov
+ukazuje hlavička, tooltip aj pomenuje všetky 4 exporty; pri názve do 120 znakov bajtovo bez zmeny, nad 120 znakov orezaný — vedomá zmena hraničného prípadu, review
+#457) a `:merge` — všetky štyri exporty ich použijú aj po zbere a výbere súboru (druhá inštancia SketchUpu ich medzitým nezmení). Žiadny čakací stav ani automatické pokračovanie. Volajúci mimo okien
 Štúdia v kóde pluginu nie sú (výnimka C1 sa nepoužila); testy a `su_runner` posielajú `expect` ako okno (`NxTest.export_expect`, `h7b_expect`).
 
 **`materials_meta`/`edges_meta` (audit #4)** sú kontrakt skupín Kusovníka: per `material_id` (resp. `abs_id`) label, katalógová farba ako **pole `[r,g,b]`** (nie CSS reťazec —

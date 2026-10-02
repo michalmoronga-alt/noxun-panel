@@ -328,6 +328,30 @@ test('T-B3', function(){
   eq(sent('studio_set_vepo_opts').length, 0, 'T-B3: push ani echo nic neodoslali');
 });
 
+// Review #457 P2: push alebo echo pocas otvoreneho editora zmeni pravdu servera
+// — blur NEDOTKNUTEHO pola nesmie zapisat spat starsi nazov.
+test('T-B3 nedotknute pole', function(){
+  push(V.set);
+  go('bom');
+  let inp = openEditor();
+  push(Object.assign(clone(V.set), { project: 'Iné meno z druhého okna' })); // ten isty dokument
+  ok($('jobEdit') === inp, 'T-B3: editor pri pushi toho isteho dokumentu ostal');
+  MD.userClick($('status')); // blur bez upravy
+  eq(sent('studio_set_vepo_opts').length, 0, 'T-B3: blur nedotknuteho pola po pushi nic nezapise');
+  ok($('sechead').innerHTML.indexOf('<span class="jobtext">Iné meno z druhého okna</span>') > -1,
+     'T-B3: hlavicka ukazuje aktualnu pravdu servera');
+  inp = openEditor();
+  W.NX.setVepoBar(Object.assign(clone(V.set), { project: 'Tretie meno' }));
+  MD.userKey(inp, 'Enter');
+  eq(sent('studio_set_vepo_opts').length, 0, 'T-B3: Enter nedotknuteho pola po echu nic nezapise');
+  inp = openEditor();
+  inp.value = 'Moja úprava';
+  push(Object.assign(clone(V.set), { project: 'Štvrté meno' }));
+  MD.userKey(inp, 'Enter');
+  eq(sent('studio_set_vepo_opts').map(function(s){ return s[1].project; }), ['Moja úprava'],
+     'T-B3: upravene pole sa odosle aj po pushi (zamer pouzivatela)');
+});
+
 // ================================================================== T-B4
 test('T-B4', function(){
   push(V.set);

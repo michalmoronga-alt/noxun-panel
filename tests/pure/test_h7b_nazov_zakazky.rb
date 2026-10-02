@@ -641,3 +641,71 @@ NxTest.test('H7b P3: VEPO pouzije nazov a 18 + 36 OVERENE pred vyberom priecinka
     end
   end
 end
+
+# =============================================================================
+# REVIEW #457 (Codex kolo 1) — jeden normalizovany nazov pre okno aj exporty,
+# nazov overeny v brane vo vsetkych 4 exportoch
+# =============================================================================
+
+NxTest.test('H7b review #457: nazov nad 120 znakov — hlavicka, tooltip aj 4 exporty pouziju TEN ISTY orezany nazov') do
+  NxTest.skip!('vyzaduje headless sandbox') unless NxTest.headless?
+  NxH7A.with_sandbox do
+    long = "#{'D' * 125}  "
+    NxH7A.write_raw(NxH7A.path, { 'project_names' => { 'c:/z/a.skp' => long }, 'merge_18_36' => true })
+    m = NxH7A.model
+    cut = 'D' * 120
+    v = NxH7G.with_now { NxH7B::PC.vepo_payload(m) }
+    NxTest.assert_equal(cut, v['project'], 'hlavicka')
+    NxTest.assert_equal(NxH7B::PC.export_file_names(cut, NxH7G::NOW), v['export_names'],
+                        'tooltip = mena z orezaneho nazvu (nie z 125 znakov)')
+    seen = NxH7B.window_expect(m)
+    { do_hw_csv: 'hw_csv', do_budget_xlsx: 'budget_xlsx', do_cp_xlsx: 'offer_xlsx' }.each do |exp, key|
+      r = NxH7B.run(exp, m, 'expect' => seen)
+      NxTest.refute(r[:err], "#{exp}: #{r[:msg]}")
+      NxTest.assert_equal(v['export_names'][key], r[:pickers].first['name'], "#{exp}: subor = meno z tooltipu")
+    end
+    # VEPO: nazov, s ktorym sa stavia vystup (priecinok by v docasnom adresari
+    # prekrocil limit cesty — zachyti sa vstup `build`).
+    got = nil
+    NxH7G.with_stubs(NxH7B::E::VepoExport, build: lambda { |_rows, **kw|
+      got = kw[:project]
+      { 'groups' => [], 'errors' => [] }
+    }) do
+      NxH7B.run(:do_export, m, 'expect' => seen)
+    end
+    NxTest.assert_equal(cut, got, 'VEPO stavia vystup s orezanym nazvom')
+  end
+end
+
+NxTest.test('H7b review #457: CSV kovania, XLSX rozpoctu a ponuky pouziju nazov OVERENY v brane (druha instancia ho zmeni po brane)') do
+  NxTest.skip!('vyzaduje headless sandbox') unless NxTest.headless?
+  NxH7A.with_sandbox do
+    m = NxH7B.saved('C:/Zakazky/Brana.skp', 'S-GATE')
+    NxH7B::S.save_project_name(m, 'Overený')
+    seen = NxH7B.window_expect(m)
+    names = NxH7B::PC.export_file_names('Overený', NxH7G::NOW)
+    { do_hw_csv: 'hw_csv', do_budget_xlsx: 'budget_xlsx', do_cp_xlsx: 'offer_xlsx' }.each do |exp, key|
+      NxH7B::S.save_project_name(m, 'Overený')
+      col = NxH7G.collected([])
+      seen_ui = []
+      msg = nil
+      Dir.mktmpdir('nx-h7b-gate-') do |dir|
+        # „druha instancia" zapise iny nazov AZ PO brane — pocas zberu modelu
+        stubs = NxH7G.collect_stubs(col).merge(fresh_collect: lambda { |*_a|
+          NxH7B::S.save_project_name(m, 'Zmenený po bráne')
+          NxH7B::S.refresh
+          col
+        })
+        NxH7G.with_stubs(NxH7B::PC, stubs) do
+          NxH7G.with_ui(dir, seen_ui) do
+            NxH7G.with_now do
+              NxH7B::PC.send(exp, m, { 'gen' => 1, 'expect' => seen }, generation: 1,
+                                                                      status: ->(t, _e = false) { msg = t }, repush: -> {})
+            end
+          end
+        end
+      end
+      NxTest.assert_equal(names[key], seen_ui.first && seen_ui.first['name'], "#{exp}: subor pod overenym nazvom (#{msg})")
+    end
+  end
+end

@@ -724,13 +724,14 @@ NxTest.test('ST-1a: VSETKY STYRI exporty citaju nazov zo SERVERA — z DOM uz ne
   # ŠT-1c PR A: telo CSV kovania sa prestahovalo do jadra; PR B1 tam presunula
   # aj oba XLSX exporty. VSETKY STYRI teda citaju nazov v ZDIELANOM jadre —
   # dve kopie by sa casom rozisli.
-  NxTest.assert_equal(3, ST1B_CORE_RB.scan(/project = ExportSettings\.project_name\(model\)/).length,
-                      'CSV kovania, XLSX rozpoctu aj XLSX cenovej ponuky citaju nazov v jadre')
-  # Predrecenzia H7b P3: VEPO berie nazov OVERENY v brane `expect` (jadro,
-  # `ExportSettings.expect_check` -> `project_name`), nie znova po vybere priecinka.
-  NxTest.assert(ST1B_CORE_RB.include?('project = gate[:project]') &&
-                ST1B_SETTINGS_RB.include?('project = project_name(model)'),
-                'VEPO cita nazov v jadre (overeny v brane)')
+  # Predrecenzia H7b P3 + review #457: VSETKY STYRI berú nazov OVERENY v brane
+  # `expect` (jadro, `ExportSettings.expect_check` -> `project_name`), nie znova
+  # po brane — a ziadny export si ho necita vlastnou cestou.
+  NxTest.assert_equal(0, ST1B_CORE_RB.scan(/project = ExportSettings\.project_name\(model\)/).length,
+                      'ziadny export necita nazov mimo brany')
+  NxTest.assert_equal(4, ST1B_CORE_RB.scan(/project = gate\[:project\]/).length,
+                      'VEPO, CSV kovania, XLSX rozpoctu aj XLSX cenovej ponuky citaju nazov v jadre (overeny v brane)')
+  NxTest.assert(ST1B_SETTINGS_RB.include?('project = project_name(model)'), 'brana cita nazov v jadre')
   # Komentare (ktore o zaniknutej ceste hovoria) sa vynechavaju — hlada sa KOD.
   strip = ->(src) { src.lines.map { |l| l.sub(/#.*$/, '') }.join }
   NxTest.refute(strip.call(ST1B_CORE_RB).include?("data['project']"),

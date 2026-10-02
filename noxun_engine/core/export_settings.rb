@@ -669,8 +669,9 @@ module Noxun
       # pravidlo, akym `project_name` cita a `save_project_name` maze zaznam.
       # Payload okna posiela nazov UZ normalizovany a export porovnava obe
       # strany touto funkciou, takze rucne zapisany zaznam dlhsi ako 120 znakov
-      # nevyrobi trvaly falosny nesulad. (Meno suboru exportu sa nemeni — ide
-      # z `project_name`, parita H7a.)
+      # nevyrobi trvaly falosny nesulad. Review #457: TA ISTA normalizovana
+      # hodnota pomenuje aj exporty (`expect_check` -> `:project`) — pri nazve
+      # do 120 znakov bajtovo bez zmeny (golden H7a), nad 120 orezany ako v okne.
       def normalize_project_name(model, name)
         s = clean_project_name(name)
         s.empty? ? default_project_name(model) : s
@@ -746,7 +747,11 @@ module Noxun
           out << "Okno ukazovalo 18 + 36: #{expect['merge'] ? 'zapnuté' : 'vypnuté'}, " \
                  "platí: #{now ? 'zapnuté' : 'vypnuté'}. Export sa nespustil, skontroluj nastavenie a klikni znova."
         end
-        { stop: out.empty? ? nil : out.join(' '), note: note, project: project, merge: now }
+        # `:project` = NORMALIZOVANY nazov (review #457 P2): exporty sa pomenuju
+        # presne tak, ako ukazuje hlavicka a tooltip — pri bezne dlhych menach
+        # bajtovo bez zmeny, nad 120 znakov orezane (inak by meno nesedelo s
+        # oknom a mohlo prekrocit limit suborovej cesty).
+        { stop: out.empty? ? nil : out.join(' '), note: note, project: stored, merge: now }
       rescue StandardError => e
         Engine.log_error(e, 'ExportSettings.expect_check')
         { stop: EXPECT_FAILED, note: '', project: nil, merge: nil }

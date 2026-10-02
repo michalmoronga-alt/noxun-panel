@@ -53,6 +53,10 @@
   var jobEditOpen = false;
   var jobEditGuid = '';
   var jobSending = false;
+  // Review #457 P2: text pola v okamihu otvorenia — nedotknuté pole sa
+  // nikdy neodošle (push/echo počas písania mohol medzitým zmeniť pravdu
+  // servera a blur by inak zapísal späť starší názov).
+  var jobEditStart = null;
   // Audit H7 §16 B2 / §17 C1: čo používateľ VIDÍ (názov v hlavičke, „18 + 36"
   // v rohovom nastavení VEPO). Ide s KAŽDÝM zo štyroch exportov ako `expect`
   // a server export spustí len pri zhode s uloženou pravdou. Nastavuje ho
@@ -1370,6 +1374,7 @@
     inp.id = 'jobEdit';
     inp.className = 'jobinp';
     inp.value = jobView(ST.vepo, VEPO_EXPECT.project).name;
+    jobEditStart = inp.value;
     inp.maxLength = 120;
     inp.setAttribute('maxlength', '120');
     inp.title = 'Enter uloží, Escape zruší, prázdne pole vráti automatický názov';
@@ -1408,7 +1413,7 @@
     jobEditOpen = false;
     jobEditGuid = '';
     if (raw !== null && ST && guid === (ST.model_guid || '') &&
-        raw.trim() !== jobView(ST.vepo, VEPO_EXPECT.project).name){
+        raw !== jobEditStart && raw.trim() !== jobView(ST.vepo, VEPO_EXPECT.project).name){
       VEPO_EXPECT.project = raw;
       sendVepoOpts({ project: raw }, guid);
     }
