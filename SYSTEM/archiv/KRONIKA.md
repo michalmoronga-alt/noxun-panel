@@ -36,9 +36,16 @@
   pri zápise názvu sa loguje tou istou vetou (`log_repair`), komentár `self_repair` je pravdivý; hlavička `test_h7a_export_settings.rb` pomenúva mutácie M1–M33.
   **Testy:** nové `tests/js/test_h7b_hlavicka.js` (T-B1–T-B6, T-B11, T-B12 nad verným režimom `minidom.faithful(true)` — `parentNode`, `replaceChild`, `select`, `on<typ>`,
   `focus` → `blur`, `userClick`, `userKey`, `reset`) a `tests/pure/test_h7b_nazov_zakazky.rb` (T-B7–T-B9, T-B11, T-B12, P3); prepísané viazané testy (`st1a_studio` rb/js,
-  `st1c_nakup`, `st1c_rozpocet`, `h14_golden`, `h14b_prepnutie`, `h14_studio_sekcie`, stuby exportov `kon0`, `kovh1`, `np4`, `p0hf`, `r14`, `h7a_*`). **5240 headless · 161 JS sád**
-  zelené + encoding guard; **mutácie B1–B27 (29) zabité**; in-SU **3369 / 0** na `1fa9398c` (Ruby kód od `2ee9c1bc` bez zmeny; potom len STAV/KRONIKA/PLAN) — `su_runner` posiela `expect` a overuje fail-closed CSV kovania bez `expect` s echom hlavičky. STAV pred dávkou: v0.17.20 (H7a), Ďalší krok „H7b". **Poradie callbackov** (blur editora pred
-  klikom na export) NEOVERENÉ v SketchUpe — návrh od neho nezávisí (pri obrátenom poradí export odmietne a stačí klik znova).
+  `st1c_nakup`, `st1c_rozpocet`, `h14_golden`, `h14b_prepnutie`, `h14_studio_sekcie`, stuby exportov `kon0`, `kovh1`, `np4`, `p0hf`, `r14`, `h7a_*`).
+  **Predrecenzia 2× P2 + 1× P3 — opravené (`8cbc5732`):** (P2) najbežnejší postup nový model → Ctrl+S → export by skončil červeným odmietnutím, hoci nič nezlyhalo
+  (uloženie okno nepushuje) — **spresnenie §17 C1** (package §17.1 „Odchýlky H7b", rozhodnutie orchestrátora): `expect` nesie aj `source`, **automatický → automatický
+  názov sa toleruje** (export pod skutočným menom, stav „ · Zákazka: Klinika (podľa súboru)"), zadaný názov na ktorejkoľvek strane + iné meno = odmietnutie
+  **neutrálnou vetou** „Názov zákazky sa medzitým zmenil…", 18 + 36 pri VEPO prísne; bez observera uloženia; brána `ExportSettings.expect_check`. (P2) testy
+  `rescue` vetiev (výnimka pri overovaní = `EXPECT_FAILED` pred výberom súboru vo všetkých 4, `name_source`, `default_name_note`, `model_file_title`). (P3) VEPO
+  použije názov a 18 + 36 **overené v bráne** pred výberom priečinka (dve inštancie SketchUpu). **5246 headless · 161 JS sád** zelené + encoding guard;
+  **mutácie B1–B27 + P1–P10 (39) zabité**; in-SU **3369 / 0** na `8cbc5732` (potom len STAV/KRONIKA) — `su_runner` posiela `expect` (so `source`) a overuje fail-closed CSV kovania bez `expect`
+  s echom hlavičky. STAV pred dávkou: v0.17.20 (H7a), Ďalší krok „H7b". **Poradie callbackov** (blur editora pred klikom na export) NEOVERENÉ v SketchUpe —
+  návrh od neho nezávisí (pri obrátenom poradí export odmietne a stačí klik znova).
 
 - **H7a · nastavenia exportu v jadre + ochrana R-38 (2.10.2026, PR #456, v0.17.20, blok 9 · HARDENING PO V1, triedenie A-05 · C-07 · R-38; package
   [PACKAGE_H7.md](../zdroje/bloky/HARDENING/PACKAGE_H7.md) §6 R0, R-A1–R-A9 + §15–§17; surové audity `AUDIT_H7_raw.md`, `AUDIT_H7_delta_raw.md`, `AUDIT_H7_delta2_raw.md`;

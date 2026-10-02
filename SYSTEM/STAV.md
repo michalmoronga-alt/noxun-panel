@@ -27,7 +27,7 @@ ani nevyexportuje** (rohovú skrinku by sklopil na dolnú). **Rozpočet:** po pr
 **Ochranu pred poškodeným súborom nastavení (H9) má len 0.17.7+, nastavení exportu (H7a) 0.17.20+, ochranu dvoch okien 0.17.8+ (pravidlá) a 0.17.9+ (rady) — aktualizovať obe PC a potom zavrieť všetky okná SketchUpu** (staré okno zapisuje bez ochrany).
 **Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
 
-**Testy (H7b, PR #?):** **5240 headless · 161 JS sád** zelené + encoding guard; in-SU **3369 / 0** na `1fa9398c` (potom len docs).
+**Testy (H7b, PR #?):** **5246 headless · 161 JS sád** zelené + encoding guard; in-SU **3369 / 0** na `8cbc5732` (potom len STAV/KRONIKA).
 
 ## Robí sa
 
