@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H6b · lišty sektorov a súhrny (2.10.2026, PR #?, v0.17.18, blok 9 · HARDENING PO V1, triedenie D-01 pás + D-05; package
+- **H6b · lišty sektorov a súhrny (2.10.2026, PR #454, v0.17.18, blok 9 · HARDENING PO V1, triedenie D-01 pás + D-05; package
   [PACKAGE_H6.md](../zdroje/bloky/HARDENING/PACKAGE_H6.md) §6 „H6b" + §15; mockup [MOCKUP_H6_INSPECTOR.html](../zdroje/bloky/HARDENING/MOCKUP_H6_INSPECTOR.html) časti B–D, F;
   rozhodnutia Michala 2.10. O6, O7, O9, O12; brief [BRIEF_H6.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H6.md)).** Druhá z troch častí H6. **Pás „Skrinka … upravíš
   v Korpuse" (`#ctxNote`) zanikol:** mimo Korpusu je v lište sektora Náhľad **odkaz s rozmermi skrinky** (`#s1Link`, „800 × 864 × 520 · sokel 100 →", tá istá funkcia
