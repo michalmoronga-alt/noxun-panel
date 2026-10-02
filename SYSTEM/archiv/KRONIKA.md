@@ -33,9 +33,10 @@
   zelené „Názov zákazky: … · platí pre VEPO, kovanie, rozpočet aj ponuku" / „18 + 36 spolu: … · platí pre VEPO export", červené s dôvodom (návod **premenovať**, nie zmazať; strata
   podmienene „spravidla len posledná zmena", §17 C4) alebo „skús znova"; echo vždy; zastarané okno s napísaným názvom to povie. **Testy:** nová sada `test_h7a_export_settings.rb`
   (T-A1 matica so 7 zlými tvarmi s aj bez zálohy, T-A2–T-A11 vrátane okna a guardov presunu) + `test_h7a_golden.rb` (T0, bez regenerácie); prepojené stuby exportov
-  (`kon0`, `kovh1`, `np4`, `p0hf`, `r14`, `h14`, `np3` — cieľový modul sa určí raz), `st1a_studio`, `st1a_core`, `doc_key`, `su_runner`. **5221 headless · 160 JS sád** zelené + encoding guard;
-  **mutácie M1–M30 zabité** (M23 v znení §17 C3, M25 I/O pri čítaní ≠ `:unreadable`, M26 zlyhanie 18 + 36 zeleno, M27–M30 z predrecenzie); **in-SU 3366 / 0 na `793447f0`**
-  (po ňom len dokumentácia). **Predrecenzia 0× P1/P2, 4× P3 — opravené:** veta „premenuj poškodený súbor" po exportoch len keď prenos odmietol obsah súboru (nie pri
+  (`kon0`, `kovh1`, `np4`, `p0hf`, `r14`, `h14`, `np3` — cieľový modul sa určí raz), `st1a_studio`, `st1a_core`, `doc_key`, `su_runner`. **5222 headless · 160 JS sád** zelené + encoding guard;
+  **mutácie M1–M33 zabité** (M23 v znení §17 C3, M25 I/O pri čítaní ≠ `:unreadable`, M26 zlyhanie 18 + 36 zeleno, M27–M30 z predrecenzie, M31–M33 z review); **in-SU 3366 / 0 na `1525bac6`**
+  (po ňom len dokumentácia). **Codex kolo 1 (1× P2) — opravené:** skalárny zápis nad objektom so zlým `project_names` bez zálohy vracal `:ok`, ale zlý kontajner nechal v súbore;
+  `update` ho teraz nahradí prázdnou mapou (log; platná mapa nedotknutá) a zapíše len dokument, ktorý spĺňa tvar. **Predrecenzia 0× P1/P2, 4× P3 — opravené:** veta „premenuj poškodený súbor" po exportoch len keď prenos odmietol obsah súboru (nie pri
   prechodnom `:failed` nad zdravým súborom); podpis pamäte pokusov sa počíta pod zámkom (`update(sign: true)`); dôvod nečitateľnosti menuje `.bak`, keď primár chýba; testy
   ani guard T-A9 (rozšírený na `tests/`) nerozhodujú `[status, reason]` pravdivosťou; `forget_session_key` pamäť pokusov vedome nemaže (odchýlka od R-A5, kľúč nenesie model).
   STAV pred dávkou: v0.17.19 (H6c kóty náhľadu), Ďalší krok „H7 (názov zákazky)". **Mimo H7a:** UI hlavička, pole PROJEKT, bodky a `expect` = H7b; hodnotové poškodenie, banner pri čítaní
