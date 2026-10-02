@@ -1,0 +1,189 @@
+{
+  "Kuchyňa Novák": {
+    "project_slug": "kuchyna_novak",
+    "vepo_dir": "kuchyna_novak",
+    "csv_filenames": [
+      "kuchyna_novak_k009_pw_dtdl_18_36.csv"
+    ],
+    "log_head": [
+      "Noxun Engine — VEPO export LOG",
+      "Projekt: Kuchyňa Novák (kuchyna_novak)"
+    ],
+    "hw_csv": "kovanie_kuchyna_novak.csv",
+    "hw_csv_head": "\"NOXUN kovanie — nákupný zoznam\";\"Kuchyňa Novák\";\"2026-10-01 14:05\"",
+    "budget_xlsx": "Rozpocet Kuchyňa Novák - AKT 1.10. 2026.xlsx",
+    "budget_title": "Rozpočet Kuchyňa Novák - AKT. 1.10. 2026",
+    "offer_xlsx": "Cenova ponuka Kuchyňa Novák - 1.10.2026.xlsx",
+    "offer_title": "CENOVÁ PONUKA Kuchyňa Novák - AKT. 1.10.2026"
+  },
+  "projekt": {
+    "project_slug": "projekt",
+    "vepo_dir": "projekt",
+    "csv_filenames": [
+      "projekt_k009_pw_dtdl_18_36.csv"
+    ],
+    "log_head": [
+      "Noxun Engine — VEPO export LOG",
+      "Projekt: projekt (projekt)"
+    ],
+    "hw_csv": "kovanie_projekt.csv",
+    "hw_csv_head": "\"NOXUN kovanie — nákupný zoznam\";\"projekt\";\"2026-10-01 14:05\"",
+    "budget_xlsx": "Rozpocet projekt - AKT 1.10. 2026.xlsx",
+    "budget_title": "Rozpočet projekt - AKT. 1.10. 2026",
+    "offer_xlsx": "Cenova ponuka projekt - 1.10.2026.xlsx",
+    "offer_title": "CENOVÁ PONUKA projekt - AKT. 1.10.2026"
+  },
+  "Kuchyna_Novak": {
+    "project_slug": "kuchyna_novak",
+    "vepo_dir": "kuchyna_novak",
+    "csv_filenames": [
+      "kuchyna_novak_k009_pw_dtdl_18_36.csv"
+    ],
+    "log_head": [
+      "Noxun Engine — VEPO export LOG",
+      "Projekt: Kuchyna_Novak (kuchyna_novak)"
+    ],
+    "hw_csv": "kovanie_kuchyna_novak.csv",
+    "hw_csv_head": "\"NOXUN kovanie — nákupný zoznam\";\"Kuchyna_Novak\";\"2026-10-01 14:05\"",
+    "budget_xlsx": "Rozpocet Kuchyna_Novak - AKT 1.10. 2026.xlsx",
+    "budget_title": "Rozpočet Kuchyna_Novak - AKT. 1.10. 2026",
+    "offer_xlsx": "Cenova ponuka Kuchyna_Novak - 1.10.2026.xlsx",
+    "offer_title": "CENOVÁ PONUKA Kuchyna_Novak - AKT. 1.10.2026"
+  },
+  "con": {
+    "project_slug": "projekt_con",
+    "vepo_dir": "projekt_con",
+    "csv_filenames": [
+      "projekt_con_k009_pw_dtdl_18_36.csv"
+    ],
+    "log_head": [
+      "Noxun Engine — VEPO export LOG",
+      "Projekt: con (projekt_con)"
+    ],
+    "hw_csv": "kovanie_projekt_con.csv",
+    "hw_csv_head": "\"NOXUN kovanie — nákupný zoznam\";\"con\";\"2026-10-01 14:05\"",
+    "budget_xlsx": "Rozpocet con - AKT 1.10. 2026.xlsx",
+    "budget_title": "Rozpočet con - AKT. 1.10. 2026",
+    "offer_xlsx": "Cenova ponuka con - 1.10.2026.xlsx",
+    "offer_title": "CENOVÁ PONUKA con - AKT. 1.10.2026"
+  },
+  "COM1": {
+    "project_slug": "projekt_com1",
+    "vepo_dir": "projekt_com1",
+    "csv_filenames": [
+      "projekt_com1_k009_pw_dtdl_18_36.csv"
+    ],
+    "log_head": [
+      "Noxun Engine — VEPO export LOG",
+      "Projekt: COM1 (projekt_com1)"
+    ],
+    "hw_csv": "kovanie_projekt_com1.csv",
+    "hw_csv_head": "\"NOXUN kovanie — nákupný zoznam\";\"COM1\";\"2026-10-01 14:05\"",
+    "budget_xlsx": "Rozpocet COM1 - AKT 1.10. 2026.xlsx",
+    "budget_title": "Rozpočet COM1 - AKT. 1.10. 2026",
+    "offer_xlsx": "Cenova ponuka COM1 - 1.10.2026.xlsx",
+    "offer_title": "CENOVÁ PONUKA COM1 - AKT. 1.10.2026"
+  },
+  "": {
+    "project_slug": "projekt",
+    "vepo_dir": "projekt",
+    "csv_filenames": [
+      "projekt_k009_pw_dtdl_18_36.csv"
+    ],
+    "log_head": [
+      "Noxun Engine — VEPO export LOG",
+      "Projekt:  (projekt)"
+    ],
+    "hw_csv": "kovanie_projekt.csv",
+    "hw_csv_head": "\"NOXUN kovanie — nákupný zoznam\";\"\";\"2026-10-01 14:05\"",
+    "budget_xlsx": "Rozpocet zakazka - AKT 1.10. 2026.xlsx",
+    "budget_title": "Rozpočet zákazka - AKT. 1.10. 2026",
+    "offer_xlsx": "Cenova ponuka zakazka - 1.10.2026.xlsx",
+    "offer_title": "CENOVÁ PONUKA zákazka - AKT. 1.10.2026"
+  },
+  "   ": {
+    "project_slug": "projekt",
+    "vepo_dir": "projekt",
+    "csv_filenames": [
+      "projekt_k009_pw_dtdl_18_36.csv"
+    ],
+    "log_head": [
+      "Noxun Engine — VEPO export LOG",
+      "Projekt:     (projekt)"
+    ],
+    "hw_csv": "kovanie_projekt.csv",
+    "hw_csv_head": "\"NOXUN kovanie — nákupný zoznam\";\"   \";\"2026-10-01 14:05\"",
+    "budget_xlsx": "Rozpocet zakazka - AKT 1.10. 2026.xlsx",
+    "budget_title": "Rozpočet zákazka - AKT. 1.10. 2026",
+    "offer_xlsx": "Cenova ponuka zakazka - 1.10.2026.xlsx",
+    "offer_title": "CENOVÁ PONUKA zákazka - AKT. 1.10.2026"
+  },
+  "a/b:c*?\"<>|": {
+    "project_slug": "a_b_c",
+    "vepo_dir": "a_b_c",
+    "csv_filenames": [
+      "a_b_c_k009_pw_dtdl_18_36.csv"
+    ],
+    "log_head": [
+      "Noxun Engine — VEPO export LOG",
+      "Projekt: a/b:c*?\"<>| (a_b_c)"
+    ],
+    "hw_csv": "kovanie_a_b_c.csv",
+    "hw_csv_head": "\"NOXUN kovanie — nákupný zoznam\";\"a/b:c*?\"\"<>|\";\"2026-10-01 14:05\"",
+    "budget_xlsx": "Rozpocet a-b-c------ - AKT 1.10. 2026.xlsx",
+    "budget_title": "Rozpočet a/b:c*?\"<>| - AKT. 1.10. 2026",
+    "offer_xlsx": "Cenova ponuka a-b-c------ - 1.10.2026.xlsx",
+    "offer_title": "CENOVÁ PONUKA a/b:c*?\"<>| - AKT. 1.10.2026"
+  },
+  "Žltá skriňa – 2. NP": {
+    "project_slug": "zlta_skrina_2_np",
+    "vepo_dir": "zlta_skrina_2_np",
+    "csv_filenames": [
+      "zlta_skrina_2_np_k009_pw_dtdl_18_36.csv"
+    ],
+    "log_head": [
+      "Noxun Engine — VEPO export LOG",
+      "Projekt: Žltá skriňa – 2. NP (zlta_skrina_2_np)"
+    ],
+    "hw_csv": "kovanie_zlta_skrina_2_np.csv",
+    "hw_csv_head": "\"NOXUN kovanie — nákupný zoznam\";\"Žltá skriňa – 2. NP\";\"2026-10-01 14:05\"",
+    "budget_xlsx": "Rozpocet Žltá skriňa – 2. NP - AKT 1.10. 2026.xlsx",
+    "budget_title": "Rozpočet Žltá skriňa – 2. NP - AKT. 1.10. 2026",
+    "offer_xlsx": "Cenova ponuka Žltá skriňa – 2. NP - 1.10.2026.xlsx",
+    "offer_title": "CENOVÁ PONUKA Žltá skriňa – 2. NP - AKT. 1.10.2026"
+  },
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA": {
+    "project_slug": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "vepo_dir": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "csv_filenames": [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_k009_pw_dtdl_18_36.csv"
+    ],
+    "log_head": [
+      "Noxun Engine — VEPO export LOG",
+      "Projekt: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA (aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)"
+    ],
+    "hw_csv": "kovanie_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.csv",
+    "hw_csv_head": "\"NOXUN kovanie — nákupný zoznam\";\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\";\"2026-10-01 14:05\"",
+    "budget_xlsx": "Rozpocet AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA - AKT 1.10. 2026.xlsx",
+    "budget_title": "Rozpočet AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA - AKT. 1.10. 2026",
+    "offer_xlsx": "Cenova ponuka AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA - 1.10.2026.xlsx",
+    "offer_title": "CENOVÁ PONUKA AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA - AKT. 1.10.2026"
+  },
+  "Ťažká \"zákazka\"": {
+    "project_slug": "tazka_zakazka",
+    "vepo_dir": "tazka_zakazka",
+    "csv_filenames": [
+      "tazka_zakazka_k009_pw_dtdl_18_36.csv"
+    ],
+    "log_head": [
+      "Noxun Engine — VEPO export LOG",
+      "Projekt: Ťažká \"zákazka\" (tazka_zakazka)"
+    ],
+    "hw_csv": "kovanie_tazka_zakazka.csv",
+    "hw_csv_head": "\"NOXUN kovanie — nákupný zoznam\";\"Ťažká \"\"zákazka\"\"\";\"2026-10-01 14:05\"",
+    "budget_xlsx": "Rozpocet Ťažká -zákazka- - AKT 1.10. 2026.xlsx",
+    "budget_title": "Rozpočet Ťažká \"zákazka\" - AKT. 1.10. 2026",
+    "offer_xlsx": "Cenova ponuka Ťažká -zákazka- - 1.10.2026.xlsx",
+    "offer_title": "CENOVÁ PONUKA Ťažká \"zákazka\" - AKT. 1.10.2026"
+  }
+}
