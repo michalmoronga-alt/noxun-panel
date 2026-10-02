@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H7a · nastavenia exportu v jadre + ochrana R-38 (2.10.2026, PR #?, v0.17.20, blok 9 · HARDENING PO V1, triedenie A-05 · C-07 · R-38; package
+- **H7a · nastavenia exportu v jadre + ochrana R-38 (2.10.2026, PR #456, v0.17.20, blok 9 · HARDENING PO V1, triedenie A-05 · C-07 · R-38; package
   [PACKAGE_H7.md](../zdroje/bloky/HARDENING/PACKAGE_H7.md) §6 R0, R-A1–R-A9 + §15–§17; surové audity `AUDIT_H7_raw.md`, `AUDIT_H7_delta_raw.md`, `AUDIT_H7_delta2_raw.md`;
   brief [BRIEF_H7.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H7.md)).** Prvá z dvoch častí H7, **výrobná/cenová dávka** (rozsah zmeny len pri poškodenom súbore: pri zlom tvare
   + dobrej zálohe sa názov zákazky **aj „18 + 36"** berú zo zálohy — dnes `{}` → meno `.skp` a zlúčenie 18/36 proti nastaveniu v zálohe). **Poradie commitov:** (1) golden nad starým

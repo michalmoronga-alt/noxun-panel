@@ -27,7 +27,7 @@ V1 rozsahu. Hlásená strata neuložených hodnôt, hygiena, texty, refaktor a v
 | R-37 | ✅ dávkou H9 (PR #442, v0.17.7) | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** | S | ~~súbor nastavení zlého tvaru sa ticho nahradí predvolenými a zničí dobrú zálohu~~ — záloha, inak predvolené (dodávateľ s bannerom; ABS a kovanie len log — Q1) a bez zápisu; rozsah v sekcii R-37 |
 | R-35 | ✅ dávkami H10a (PR #443, v0.17.8 — pravidlá kovania) a H10b (PR #444, v0.17.9 — rozmerové rady) | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** (tichá strata pri dvoch oknách SketchUpu; po R-37) | S/M | ~~zmena pravidiel kovania a radov pri dvoch oknách ticho zanikne~~ — pravidlá: hláška, nič sa neprepíše; rady: rôzne sa zlúčia, ten istý = hláška |
 | R-13 | ✅ dávkou H8 (PR #441, v0.17.6) | ~~pred V1~~ → **PO V1 — Michal 30.9.2026 ráno** (čítať — rozhodnuté 29.9.; prvá v poradí) | S | ~~dielec z inej verzie štandardu Kontrola neoznačí~~ — Kontrola ho hlási ORANGE `std_version` |
-| R-38 | ✅ dávkou H7a (PR #?, v0.17.20) | hraničné (len pri poškodenom súbore; mení pomenovanie a členenie VEPO, nie rozmery, počty ani ceny) | S | ~~poškodený súbor VEPO nastavení sa môže ticho prepísať staršou zálohou~~ — záloha a zápisy vypnuté, výsledok zápisu v okne; rozsah v sekcii R-38 |
+| R-38 | ✅ dávkou H7a (PR #456, v0.17.20) | hraničné (len pri poškodenom súbore; mení pomenovanie a členenie VEPO, nie rozmery, počty ani ceny) | S | ~~poškodený súbor VEPO nastavení sa môže ticho prepísať staršou zálohou~~ — záloha a zápisy vypnuté, výsledok zápisu v okne; rozsah v sekcii R-38 |
 | R-18 | platí | po V1 (hlásená strata neuložených hodnôt — ⋯ editor sa zavrie ako uložený, zlyhaný zápis ohlási červený status) | S | pri súbehu úpravy bunky a ⋯ editora v Rozpočte sa rozpísané hodnoty môžu stratiť |
 | R-16 | platí | hraničné (XLSX má kód a dodávateľa) | M | dva rovnaké dekory od dvoch výrobcov majú v rozpočte rovnaký názov riadku |
 | R-25 | čiastočne (PR #350) | po V1 | S | pri vybranej doske s chybným rozmerom klik na riadok Štúdia rozpísanú zmenu zahodí |
@@ -179,7 +179,7 @@ prepísať novšie nastavenia obsahom odvodeným od staršej zálohy. Zámok (1b
 tri cesty musia najprv začať výsledok zápisu vôbec čítať a mať kam ho povedať. Pôvodne navrhnutá ako samostatná dávka. **Odhad: S.**
 **Zaradenie (1.10.2026, návrh orchestrátora — potvrdí Michal s mockupom H7):** blok 9 · HARDENING, dávka **H7** — ochrana ide pred presun nastavení
 exportu do jadra (C-07); po presune dávka H7 aktualizuje cestu súboru v tomto zázname.
-**✅ dávkou H7a (PR #?, v0.17.20, blok 9 · HARDENING PO V1)** — cesta: **`core/export_settings.rb`** (`Noxun::Engine::ExportSettings`, presun z
+**✅ dávkou H7a (PR #456, v0.17.20, blok 9 · HARDENING PO V1)** — cesta: **`core/export_settings.rb`** (`Noxun::Engine::ExportSettings`, presun z
 `ui/production_core.rb` bez delegátov). **Chránené:** súbor, ktorý je nečitateľný alebo nemá očakávaný tvar (predikát nad kontajnermi: objekt, neprázdny,
 `project_names` objekt), sa pri **dobrej zálohe** číta **zo zálohy** (názvy zákaziek, 18 + 36 aj posledný priečinok) a **zápisy sú vypnuté** (`write_gate` pod
 zámkom nad diskom, `[:blocked, dôvod]`; záloha sa nikdy neprepíše — zápis nesie predikát tvaru); každý zápis vracia `[status, reason]` a okno Štúdia
