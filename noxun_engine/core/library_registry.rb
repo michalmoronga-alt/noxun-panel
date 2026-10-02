@@ -60,6 +60,7 @@ module Noxun
       }.freeze
 
       CORE = 'noxun_engine/core/'
+      private_constant :CORE
 
       def self.deep_freeze(obj)
         case obj
@@ -68,6 +69,7 @@ module Noxun
         end
         obj.freeze
       end
+      private_class_method :deep_freeze
 
       # Zostavi riadok; `.tmp-*` atomickeho zapisu doplni pri `bak` sam.
       def self.row(key, file, kind, sync, resolver: nil, lock: nil, lock_mode: 'none', versions: [], bak: false,

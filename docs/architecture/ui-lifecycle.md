@@ -2232,7 +2232,7 @@ Plné znenie: archív, „updater.rb — …" a „UI vrstva — sekcia „O plu
 SketchUpu (pád #1117 na 2026.2) tu zatiaľ nie je — rieši ho dávka H11c (záložný návrh Z1 s vlastným auditom, nižšie).
 - **Načítanie:** `main.rb` najprv **bootstrapom** načíta tento súbor (Ruby `require` s absolútnou cestou, vlastná chybová vetva `rescue StandardError, ScriptError`
   + **sentinel** `AppLifecycle::LOADED` na poslednom riadku súboru = vykonal sa celý). Chyba bootstrapu = jedna hláška o základnom súbore (`Engine::BOOTSTRAP_MESSAGE`)
-  a zvyšok `main.rb` sa nevykoná. Potom **91 súborov `main.rb` a 14 častí `ui/panel.rb`** ide cez **`AppLifecycle.require_part 'noxun_engine/…'`** = Ruby `require`
+  a zvyšok `main.rb` sa nevykoná. Potom **95 súborov `main.rb` a 14 častí `ui/panel.rb`** ide cez **`AppLifecycle.require_part 'noxun_engine/…'`** = Ruby `require`
   s absolútnou cestou `<Plugins>/<path>.rb` (rovnaká semantika na 2026.0 aj 2026.2; `Sketchup.require` chyby do 2026.1 prehltne a vráti `true`, od 2026.2 ich
   prepustí). Návrat `true` (načítaný) / `false` (už bol) / `nil` (chyba): záznam `{path, class, message, backtrace(6)}` do `failures` (alebo do `record:`), riadok
   v konzole, **nikdy nevyhodí** (`StandardError` + `ScriptError`; `Interrupt` prejde) a **pokračuje sa ďalším súborom** (diagnostika celého rozsahu). Plugin sa
