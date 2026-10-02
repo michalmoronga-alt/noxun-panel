@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H15b · seed dáta katalógu a taxonómie kovania v samostatných súboroch (2.10.2026, PR #?, v0.17.24, blok 9 · HARDENING PO V1, triedenie C-03 = CX-03;
+- **H15b · seed dáta katalógu a taxonómie kovania v samostatných súboroch (2.10.2026, PR #460, v0.17.24, blok 9 · HARDENING PO V1, triedenie C-03 = CX-03;
   package [PACKAGE_H15.md](../zdroje/bloky/HARDENING/PACKAGE_H15.md) — **§15 A2 má prednosť**, brief [BRIEF_H15.md](../zdroje/bloky/HARDENING/briefy/BRIEF_H15.md)).**
   Audit-povinná (dva nové moduly) + výrobná/cenová (presúva sa zdroj nákupných kódov a seed cien), predrecenzia povinná, in-SU netreba (§8). **Presun 1:1:**
   `SEED_SET_VERSION` + história, manifest `SEED_ROWS` (146 riadkov) so sprievodnými zoznamami, v2 tvar `SEED_ROWS_V2` a zoznamy patchov v2..v5 doslovne do
