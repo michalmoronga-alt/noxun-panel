@@ -1,7 +1,6 @@
 {
   "HardwareSets::SEED_VERSION": {
     "class": "Integer",
-    "size": 4,
     "frozen": true,
     "inner_frozen": null,
     "unfrozen_strings": 0,
@@ -154,7 +153,6 @@
   },
   "HardwareCatalog::SEED_SET_VERSION": {
     "class": "Integer",
-    "size": 4,
     "frozen": true,
     "inner_frozen": null,
     "unfrozen_strings": 0,
@@ -903,7 +901,6 @@
   },
   "HardwareTaxonomy::SEED_VERSION": {
     "class": "Integer",
-    "size": 4,
     "frozen": true,
     "inner_frozen": null,
     "unfrozen_strings": 0,

@@ -243,10 +243,14 @@ module NxH15Golden
             when Array then obj.first
             when Hash then obj.values.first
             end
-    { 'class' => obj.class.name, 'size' => (obj.respond_to?(:size) && !obj.is_a?(String) ? obj.size : nil),
-      'frozen' => obj.frozen?, 'inner_frozen' => (inner.nil? ? nil : inner.frozen?),
-      'unfrozen_strings' => unfrozen_strings(obj), 'order' => identity_order(obj),
-      'sha256_marshal' => sha(Marshal.dump(obj)), 'sha256_json' => sha(JSON.generate(obj)) }
+    rep = { 'class' => obj.class.name, 'size' => (obj.respond_to?(:size) && !obj.is_a?(String) ? obj.size : nil),
+            'frozen' => obj.frozen?, 'inner_frozen' => (inner.nil? ? nil : inner.frozen?),
+            'unfrozen_strings' => unfrozen_strings(obj), 'order' => identity_order(obj),
+            'sha256_marshal' => sha(Marshal.dump(obj)), 'sha256_json' => sha(JSON.generate(obj)) }
+    # `Integer#size` = bajty strojoveho slova (Windows 4, Linux CI 8) — platformovo
+    # zavisle, nie vlastnost dat; hodnotu cisla pripinaju oba SHA.
+    rep.delete('size') if obj.is_a?(Numeric)
+    rep
   end
 
   def g1
