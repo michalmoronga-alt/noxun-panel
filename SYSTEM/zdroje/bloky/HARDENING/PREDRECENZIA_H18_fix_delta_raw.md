@@ -1,0 +1,6 @@
+1. **P2 — `noxun_engine/ui/panel/payloads.rb:2333` a `noxun_engine/ui/js/hardware.js:450` — uložený skrinkový výber zostáva neviditeľný pri zmiešaných klasifikovaných dvierkach.**  
+   **Spúšťač:** `Dmix/ov1/seed/blocked`: nekompatibilná knižnica bez snapshotu, uložené `hardware_sets['hinge'] = 'moj-zaves'` a dvierka Tip-On aj klasické. Payload nesie `blocked: true`, `override_value_text: "moj-zaves (chýba)"`, `own_count: 0` a nákup správne hlási blokovanie, ale `class_compat_payload` ponechá `compat.cab: nil`. `hwCabRowOff` preto odstráni skrinkový riadok a oba owner selecty ukážu iba účinné „podľa projektu — bez setu“. Uložená hodnota sa nikde nezobrazí. Rovnaké zlyhanie má `Dmixleg/ov1/seed/blocked`. Test ho míňa, pretože `tests/pure/test_h18_sety_pravda.rb:100` kontroluje skrinkový rozsah iba pri neprázdnom `compat.cab`.  
+   **Dopad:** používateľ nevie, že starší skrinkový výber ostal uložený a po obnovení kompatibility sa môže znovu uplatniť.  
+   **Minimálna oprava:** pri `blocked + compat.cab == nil` zobraziť v skupine Sety samostatný neaktívny skrinkový riadok s `override_value_text`; nesmie sprístupniť zápis, ktorý zmiešaná klasifikácia odmieta. Doplniť Ruby aj JS regresiu pre `Dmix` a `Dmixleg`.
+
+VERDIKT: TREBA OPRAVIŤ

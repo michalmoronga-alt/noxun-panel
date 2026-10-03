@@ -1,4 +1,4 @@
-"""H18 T8: rucny reprodukovatelny beh M1-M29, vzdy obnovi presne povodne bajty.
+"""H18 T8: rucny reprodukovatelny beh M1-M34, vzdy obnovi presne povodne bajty.
 
 Spustenie z repa: python tests/fixtures/h18_golden/mutations.py
 Vysledky su iba v gitignored _dev/h18_takeover/mutations.json.
@@ -82,6 +82,11 @@ MUTATIONS = [
     ('M27', JS, "if (entry && entry.blocked){\n      return hwSetOptionList(entry, '', entry.owner_default_label", "if (false){\n      return hwSetOptionList(entry, '', entry.owner_default_label", 'js'),
     ('M28', PAY, 'effective = hw_purchase_overrides(cfg, status, overrides)\n          blocked = hw_purchase_blocked?(status)', 'effective = hw_purchase_overrides(cfg, status, overrides)\n          blocked = status != :ok', 'js-fresh-payload'),
     ('M29', PAY, "out[owner]['value_text'] = HardwareSets.mapping_value_text(val, defs) if blocked", "out[owner]['value_text'] = HardwareSets.mapping_value_text(val, defs) if false", 'js-fresh-payload'),
+    ('M30', JS, 'return o && o.blocked && hwCabRowOff(o) && o.override_value_text;', 'return false;', 'js'),
+    ('M31', JS, 'storedBox.innerHTML = storedHtml;', 'storedBox.innerHTML = storedBox.innerHTML;', 'js'),
+    ('M32', JS, "' <span class=\"hwown\">' + esc(stored)", "' <span class=\"hwown\">' + stored", 'js'),
+    ('M33', JS, 'storedBox.innerHTML = storedHtml;', 'if (storedHtml) storedBox.innerHTML = storedHtml;', 'js'),
+    ('M34', JS, "if (empty) empty.hidden = !!storedHtml || !!(setBox && setBox.querySelector('select.hwsetsel'));", 'if (empty) empty.hidden = true;', 'js'),
 ]
 
 def write_verified(path, data):

@@ -529,3 +529,32 @@ Vlastný SketchUp PID123448 a launcher PID113940 skončili exitom 0 (oficiálny 
 INSTALL z čistého root main `2640f47b`: installed **0.17.25**, všetkých **181** súborov zhodných s pôvodným main manifestom; **85** live súborov a
 pôvodný model SHA `fdace66f4fc4b6ac9d8b0f5c1b7f7e680c2d065f121a7ceb3241864f5a1c9ead` nezmenené. SU slot výslovne vrátený orchestrátorovi.
 Nová slepá delta a GH review sú ďalšie brány; smoke §10 a H18b Q2 stále čakajú.
+
+## 18 · Oprava P2 slepej delty (Codex, 3.10.2026) — aktuálny doplnok §17
+
+Slepá delta kódovej hlavy `0e9e9d47`: **0 P1 / 1 P2, TREBA OPRAVIŤ**.
+[Surový výsledok](PREDRECENZIA_H18_fix_delta_raw.md) prenesený byte-for-byte; SHA256
+`f2409523c558f8cfc03de9a384d46c3457d6a35bcb76d0b7c74a7cd32b0a91a1`.
+`Dmix/ov1/seed/blocked` a `Dmixleg/ov1/seed/blocked` už niesli správny `override_value_text`, ale `compat.cab: null` ho schovalo.
+
+**Oprava oproti `ba4431aa`: iba JS zobrazenie.** Pri `blocked + compat.cab == null + override_value_text` kreslí `hwStoredCabRowsHtml`
+samostatný neaktívny skrinkový text v Setoch: „skrinka: … (uložený výber) — nepoužíva sa“, s plným textom v `title` a existujúcim orezením názvu.
+Žiadny select, input, tlačidlo ani handler; zmiešaný skrinkový zápis zostáva nedostupný. Platí aj pre zmiešaný výsuv v pôvodnej matici A4.
+`refreshHardwareSets` vymení iba tento obsah; zmena názvu, odstránenie výberu a odblokovanie nenechajú starý text. Existujúce owner selecty,
+účinné dedenie, nákup aj meta sa nemenia; rozpísaný počet a fokus ostávajú. `hwSetRowsEmpty` sa obnoví, keď nezostane text ani skrinkový select.
+**Ruby a tvar payloadu, writer handler, kompatibilita, resolver, config a nákup bez diffu** voči `ba4431aa`; verzia tej istej dávky ostáva 0.17.26.
+
+**T11 Ruby:** explicitne Dmix/Dmixleg: `compat.cab` null, uložený generic cab text, účinné `{}`, `own_count`, oba dedičné owner rozsahy a normal stav.
+**Nezávislý Z8:** mini-DOM spustí skutočný `renderHardware`, nie jeho kópiu ani nový helper; očakávaný zmiešaný rozsah a uložená hodnota sú zo statického
+`blocked_pred.json`, bez rozhodovania podľa aktuálneho `compat.cab`. Na presnom starom JS z `ba4431aa` **54 chýb → po oprave 0**, vrátane oboch nálezových ID.
+Kontroluje viditeľný uložený text, celý tooltip a nulový počet zápisových ovládačov v Setoch; normal aj blocked bez uloženého výberu nemajú nový riadok.
+**T12 JS:** Dmix/Dmixleg pri ľahkom pushi: nový text vrátane HTML znakov iba ako text, oba owner selecty na účinnom dedení, odblokovanie, opätovné blokovanie,
+odstránenie uloženého výberu; zachovaný uzol počtu, hodnota a fokus. Pôvodné R0 aj všetky PO JSON sa nemenia, `fixed_payload` bez ďalšieho uvoľnenia.
+**M1–M34 všetky zhodené:** M1–M29 zachované; M30 chýbajúci riadok, M31 neobnovený text, M32 neescapovaný text, M33 neodstránený text,
+M34 neobnovený pôvodný popis. Po mutáciách presná byte/hash obnova štyroch zdrojov.
+**Kontroly:** 5333 Ruby / 0 FAIL / 0 SKIP, 162 samostatných JS sád / 0 FAIL, H18 Ruby 10/0, encoding PASS.
+
+**T7:** Ruby payload byte-identical → stačí štandardný `ui_foto -Shoot -Only panel_kovanie` nad úspešným Recordom §17
+`rec_0.17.26_20261003_022507`; nový Record, deploy ani SketchUp sa nespúšťa. Shoot nasleduje po commitnutí a plných kontrolách.
+Limit nahrávky §17 zostáva: Inspector je CAB-001 so zásuvkou, bez závesov a blocked; nové zmiešané označenie dokazuje headless oracle, vizuálny smoke čaká na Michala.
+Čerstvá slepá delta `ba4431aa..fixHEAD` a GH review čakajú pred PR; smoke §10 a H18b Q2 bez zmeny.

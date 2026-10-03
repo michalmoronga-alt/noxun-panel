@@ -118,6 +118,26 @@ NxTest.test('H18 T10: blocked ulozeny cab/owner, classified/legacy, string/selec
   end
 end
 
+NxTest.test('H18 T11: Dmix a Dmixleg nesu ulozeny-neucinny text bez zapisoveho cab rozsahu') do
+  NxTest.skip!('headless fixture context') unless NxTest.headless?
+  truth = NxH18.fixture('blocked_pred')
+  NxH18.cases.select { |c| c['id'].match?(/\A(?:Dmix|Dmixleg)\//) }.each do |c|
+    oracle = truth.fetch(c['id'])
+    entry = NxH18.payload(c).first
+    NxTest.assert_equal(nil, entry.fetch('compat').fetch('cab'), c['id'] + ' zmiesana trieda nema zapisovy cab rozsah')
+    NxTest.assert_equal(oracle['own_keys'].length, entry['own_count'], c['id'] + ' iba ucinne vybery')
+    if c['status'] == 'blocked'
+      NxTest.assert_equal(oracle['flat_cab_text'], entry['override_value_text'], c['id'] + ' text ulozeneho generic cab')
+      NxTest.assert_equal({}, NxH18.effective(c), c['id'] + ' ulozene neplati v nakupe')
+      entry['compat']['owners'].each do |owner, scope|
+        NxTest.assert_equal(oracle['owners'].fetch(owner)['none_label'], scope['none_label'], c['id'] + ' effective dedenie ownera')
+      end
+    else
+      NxTest.assert(!entry.key?('override_value_text') && !entry.key?('blocked'), c['id'] + ' odblokovany payload nema novy stav')
+    end
+  end
+end
+
 NxTest.test('H18 T0: resolver, nakup a povolene polia payloadu bajtovo == PRED') do
   NxTest.skip!('headless fixture context') unless NxTest.headless?
   expected = NxH18.fixture('resolver')

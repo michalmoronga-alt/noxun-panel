@@ -11,7 +11,7 @@ const blocked = read('blocked_pred'), sources = read('source_pred');
 Object.keys(blocked).filter(id => id.startsWith('P2/')).forEach(id => { sources[id] = blocked[id]; });
 const before = read('zhoda_pred'), after = disagreements(payload, sources, blocked);
 assert(before.length > 0, 'PRED musi zachytit skutocny nalez');
-assert.deepEqual(after, [], 'T3 Z1-Z6: skutocne vykreslenie == nezavisly oracle stareho resolvera');
+assert.deepEqual(after, [], 'T3 Z1-Z8: skutocne vykreslenie == nezavisly oracle stareho resolvera');
 // Normal, missing-unblocked a invalid NESMU dostat novy ulozeny-neucinny
 // stav. Nezavisle pripinanie zdraveho stringu, selectora a invalid markeru.
 Object.keys(blocked).filter(id => id.startsWith('P2/') && blocked[id].status !== 'blocked').forEach(id => {
@@ -40,4 +40,48 @@ Object.keys(blocked).filter(id => id.startsWith('P2/') && blocked[id].status !==
 assert.equal(HW.hwSetsMetaText([{ own_count: '2' }, { own_count: NaN }, { own_count: Infinity }]), 'podľa projektu');
 assert.equal(HW.hwSetsMetaText([{ own_count: 1 }, { own_count: 2 }]), '3 vlastné');
 assert.equal(HW.hwSetsMetaText([{ own_count: 5 }]), '5 vlastných');
-console.log('H18 T3: ' + Object.keys(sources).length + ' pripadov, rozchody ' + before.length + ' -> ' + after.length + '; Z1-Z7 + tooltipy OK');
+// T12: skutocny lahky refresh; okrem textu zostava rozpisany riadok/fokus.
+const { panel } = require(path.join(dir, 'mixed_display.js'));
+const ui = panel();
+try {
+  ['Dmix', 'Dmixleg'].forEach(kind => {
+    const id = kind + '/ov1/seed/blocked', original = payload[id];
+    const items = Object.keys(blocked[id].owners).map(owner => ({ generic_type: 'hinge', owner_part_key: owner,
+      owner_label: owner.includes('F1') ? 'F1 · dvierka' : 'F2 · dvierka', quantity: 2, rule_id: 'h18-fixture' }));
+    ui.ctx.renderHardware(items, [], original, 'CAB-1');
+    const draft = ui.items.querySelector('input.hwqty');
+    draft.value = '7';
+    draft.focus();
+    const edited = JSON.parse(JSON.stringify(original));
+    edited[0].override_value_text = '<img src=x> & "zmenený výber"';
+    ui.ctx.refreshHardwareSets(edited);
+    const row = ui.sets.querySelector('.hwstoredsetrow');
+    assert(row, kind + ' ulozeny riadok zostal viditelny');
+    assert.equal(ui.textOf(row), 'Závesy skrinka: <img src=x> & "zmenený výber" (uložený výber) — nepoužíva sa', kind + ' aktualny serverovy text');
+    assert.equal(row.querySelectorAll('img,select,input,button').length, 0, kind + ' len escapovany text bez ovladaca');
+    assert.equal(ui.items.querySelector('input.hwqty'), draft, kind + ' povodny item DOM');
+    assert.equal(draft.value, '7', kind + ' rozpisany pocet ostal');
+    assert.equal(ui.ctx.document.activeElement, draft, kind + ' fokus zostal');
+    const owners = ui.items.querySelectorAll('select.hwsetsel');
+    assert.equal(owners.length, 2, kind + ' oba existujuce owner selecty');
+    owners.forEach(sel => {
+      const selected = sel.querySelectorAll('option').filter(o => o.hasAttribute('selected'));
+      assert.equal(selected.length, 1, kind + ' owner ma jednu vybranu volbu');
+      assert.equal(selected[0].value, '', kind + ' ucinne dedenie ownera');
+      assert.equal(ui.textOf(selected[0]), 'podľa projektu — bez setu', kind + ' bez ulozeneho cab vo vlastnikovi');
+    });
+    ui.ctx.refreshHardwareSets(payload[kind + '/ov1/seed/ok']);
+    assert.equal(ui.sets.querySelectorAll('.hwstoredsetrow').length, 0, kind + ' odblokovanie odstrani neucinny text');
+    assert.equal(ui.byId('hwSetRowsEmpty').hidden, false, kind + ' znovu viditelny existujuci popis zmiesanej skrinky');
+    ui.ctx.refreshHardwareSets(original);
+    assert.equal(ui.sets.querySelectorAll('.hwstoredsetrow').length, 1, kind + ' nove blokovanie zobrazi ulozeny text');
+    ui.ctx.refreshHardwareSets(payload[kind + '/ov0/seed/blocked']);
+    assert.equal(ui.sets.querySelectorAll('.hwstoredsetrow').length, 0, kind + ' odstraneny vyber nezostane visiet');
+    assert.equal(ui.byId('hwSetRowsEmpty').hidden, false, kind + ' bez ulozeneho vyberu ma popis');
+    assert.equal(ui.sets.querySelectorAll('select,input,button').length, 0, kind + ' refresh neprida zapis');
+    assert.equal(ui.items.querySelector('input.hwqty'), draft, kind + ' zachovany DOM po celom cykle');
+    assert.equal(draft.value, '7', kind + ' rozpisany pocet po celom cykle');
+    assert.equal(ui.ctx.document.activeElement, draft, kind + ' fokus po celom cykle');
+  });
+} finally { ui.dispose(); }
+console.log('H18 T3/T12: ' + Object.keys(sources).length + ' pripadov, rozchody ' + before.length + ' -> ' + after.length + '; Z1-Z8 + zmiesany refresh OK');

@@ -82,6 +82,7 @@ function disagreements(payloads, sources, blockedSources){
       }
     });
   });
+  if (blockedSources) failures.push(...require('./mixed_display.js').disagreements(payloads, blockedSources));
   return failures;
 }
 module.exports = { disagreements };

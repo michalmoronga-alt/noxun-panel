@@ -741,7 +741,8 @@ a riadok Nôh `#legsRow` (Základné) — `refreshHardwareSets` obnovuje selecty
 Detail domény: [hardware.md](hardware.md).
 
 **Ľahký push `NX.setHardwareSets`** (zmena setov, mapovania alebo katalógu v Štúdiu — `HardwareCatalogDialog.push_items` → `Panel.push_hardware_sets`) obnoví ponuky
-setov, nákupné riadky (`refreshHardwarePurchase`), **ručné položky** (`manual_view` → `refreshHardwareManual`, len vlastný blok; `plan_parts_by_key` sa volá len
+setov aj popisné uložené-neúčinné riadky zmiešanej skrinky (`hwStoredCabRows`, bez selectu; výmena textu aj odstránenie po odblokovaní),
+nákupné riadky (`refreshHardwarePurchase`), **ručné položky** (`manual_view` → `refreshHardwareManual`, len vlastný blok; `plan_parts_by_key` sa volá len
 keď ad-hoc položky sú), **`front_drawer`** (`refreshFrontDrawer` vymení záznam a prekreslí len otvorenú kartu; záznam nesie `axes` a `lock` —
 `Panel.front_drawer_refresh`; plán sa stavia len pri klasifikovanej zásuvke) a **`legs_summary`** (`renderLegsRow` až za `refreshHardwareSets`). Chýbajúci kľúč sa
 ničoho nedotkne; `{}` = „skrinka zásuvky nemá". Žiadny plný push, žiadny krok Späť.
@@ -1085,7 +1086,10 @@ projekcie** uloženého configu a plánu — žiadny zápis. Kontrakt vkladacej 
   „staršieho výberu skrinky", projektové úrovne a žiadny zdroj = „projektu". `current` je ID celej voľby (aj selektora), nie výsledný set z pásma.
   Pri `blocked` má uložený výber `current: null`, `stored: true`; skrinkový rozsah číta uloženého víťaza `cab_class`/`cab` cez existujúci resolver
   nad sondou bez vlastníka, vrátane staršieho `hinge`. `none_label` naďalej vychádza z účinných `{}`.
-  **`cab` len pri jednej nenulovej triede**; zmiešaná skrinka `cab: null` → riadok skrinky sa nekreslí (`hwCabRowOff`, `hwDropSetRow`), Sety odkážu na čelo.
+  **`cab` len pri jednej nenulovej triede**; zmiešaná skrinka `cab: null` → skrinkový ovládač sa nekreslí (`hwCabRowOff`, `hwDropSetRow`).
+  Pri `blocked` a `override_value_text` kreslí `hwStoredCabRowsHtml` v Setoch iba neaktívny text „skrinka: … (uložený výber) — nepoužíva sa“,
+  plný text v `title`. `hwSetRowsEmpty` je počas tohto zobrazenia skrytý; ľahký refresh ho po odstránení textu znovu ukáže, ak nie je skrinkový select.
+  Owner selecty a ich účinné dedenie sa tým nemenia, zmiešaný skrinkový zápis zostáva nedostupný.
   JS iba kreslí, posiela pôvodné `set_id` / `value`; kľúč skladá `HardwareSets.apply_cabinet_override`. H18 jeho zápis nemení (D-150 čaká na Q2).
   Testy `test_kovd1b_ui` a `test_h18_sety_pravda` (Ruby + JS).
 

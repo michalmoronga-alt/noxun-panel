@@ -443,15 +443,27 @@
   // KOV-D1b (Codex #310 kolo 1 P2-3): server ZÁMERNE pošle `compat.cab = null`,
   // keď má skrinka klasifikované zásuvky VIACERÝCH tried (alebo klasifikovanú
   // vedľa legacy) — jeden kľúč by platil len na časť položiek a
-  // `apply_cabinet_override` taký zápis odmieta. Riadok skrinky sa vtedy
-  // NEKRESLÍ vôbec; inak by sa vykreslil plochý zoznam setov, z ktorého by
+  // `apply_cabinet_override` taký zápis odmieta. Ovladac skrinky sa vtedy
+  // nekresli; inak by sa vykreslil plochý zoznam setov, z ktorého by
   // KAŽDÁ voľba skončila hláškou. Rozlišuje sa **neprítomný** `compat`
   // (legacy/neklasifikovaná skrinka → pôvodná cesta) od prítomného s `cab: null`.
   function hwCabRowOff(entry){
     return !!(entry && entry.compat) && !entry.compat.cab;
   }
+  // Zmiesana skrinka nema zapisovy cab rozsah. Pri blokovani ale ponecha
+  // viditelny ulozeny generic vyber — iba text, nikdy select ani akciu.
+  function hwStoredCabRowsHtml(entries){
+    return (entries || []).filter(function(o){
+      return o && o.blocked && hwCabRowOff(o) && o.override_value_text;
+    }).map(function(o){
+      var stored = 'skrinka: ' + o.override_value_text + ' (uložený výber) — nepoužíva sa';
+      return '<div class="hwrow hwsetrow hwstoredsetrow"><span class="hwname" title="'
+           + esc(o.label + ' ' + stored) + '">' + esc(o.label)
+           + ' <span class="hwown">' + esc(stored) + '</span></span></div>';
+    }).join('');
+  }
   // Ponuka pre riadok SKRINKY (override projektovej predvolby).
-  // -> null = riadok sa nemá kresliť vôbec (zmiešaná skrinka)
+  // -> null = zapisujuci ovladac sa nekresli (zmiesana skrinka)
   function hwCabOptionList(entry){
     if (hwCabRowOff(entry)) return null;
     var sc = hwCompatScope(entry, null);
@@ -517,6 +529,15 @@
         sel.title = owner ? hwOwnerTitle(entry, owner) : hwCabTitle(entry);
       }
     });
+    // Ulozene-neucinne texty sa pri lahkom pushi vymenia cele; zmiznu po
+    // odblokovani/odstraneni vyberu. Item riadky ani ich fokus sa nemenia.
+    var storedBox = el('hwStoredCabRows');
+    if (storedBox){
+      var storedHtml = hwStoredCabRowsHtml(HW_SET_OPTIONS);
+      storedBox.innerHTML = storedHtml;
+      var empty = el('hwSetRowsEmpty'), setBox = el('hwSetRows');
+      if (empty) empty.hidden = !!storedHtml || !!(setBox && setBox.querySelector('select.hwsetsel'));
+    }
     // Meta skupiny Sety pocita ten isty zoznam ponuky — obnov ju spolu s nim.
     hwMetaApply((typeof hwItems !== 'undefined') ? hwItems : null);
   }
@@ -913,9 +934,9 @@
     // skrinka naozaj ma) — inak by sa prvy novy set typu neobjavil hned, ale
     // az po novom vybere (zivy push obnovuje EXISTUJUCE selecty).
     if (!setBox) return;
-    // KOV-D1b: typ, ktorého skrinkový výber je nepoužiteľný (zmiešané triedy
-    // zásuviek), sa v skupine Sety NEKRESLÍ — set sa vtedy vyberá pri
-    // konkrétnom čele a ovládač na skrinke by len ponúkal chybu.
+    // KOV-D1b: typ, ktoreho skrinkovy vyber je nepouzitelny pri zmiesanych triedach,
+    // sa neovlada na skrinke — set sa vybera pri konkretnom cele. Ulozeny
+    // generic vyber pri blocked je len popisny riadok bez ovladaca.
     var all = (setOptions || []).filter(function(o){ return !!o; });
     var perFront = all.length > 0 && all.every(hwCabRowOff);
     var sets = all.filter(function(o){ return !hwCabRowOff(o); }).map(function(o){
@@ -924,9 +945,11 @@
            + hwSetSelectHtml(hwCabOptionList(o), o.generic_type, '', cabId, hwCabTitle(o))
            + '</div>';
     }).join('');
-    setBox.innerHTML = sets || (perFront
-      ? '<div class="muted">Zásuvky tejto skrinky sú rôznych druhov — set sa vyberá pri konkrétnom čele.</div>'
-      : '<div class="muted">Táto skrinka nemá kovanie, pre ktoré by sa dal vybrať set.</div>');
+    var stored = hwStoredCabRowsHtml(all);
+    setBox.innerHTML = sets + '<div id="hwSetRowsEmpty" class="muted"' + (sets || stored ? ' hidden' : '') + '>'
+      + (perFront ? 'Zásuvky tejto skrinky sú rôznych druhov — set sa vyberá pri konkrétnom čele.'
+                  : 'Táto skrinka nemá kovanie, pre ktoré by sa dal vybrať set.') + '</div>'
+      + '<div id="hwStoredCabRows">' + stored + '</div>';
   }
 
   // ---- UI-C4: klik na hlavicku boxu = OZNAC VLASTNIKA V MODELI -------------

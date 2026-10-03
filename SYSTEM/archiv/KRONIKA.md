@@ -17,6 +17,12 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H18 · oprava P2 slepej delty (3.10.2026, PR #?, v0.17.26).** Zmiešané triedy pri nekompatibilnej knižnici zobrazia uložený skrinkový set ako
+  neaktívny text „uložený výber — nepoužíva sa“. Žiadny nový ovládač; Ruby, payload, writer, resolver, nákup a všetky JSON bez zmeny voči `ba4431aa`.
+  Ľahký refresh text aktualizuje aj odstráni, zachová rozpísaný počet a fokus. Nezávislý Z8 nad skutočným renderom: `ba4431aa` **54 chýb → fix 0**;
+  oba Dmix/Dmixleg prípady reprodukované. **5333 Ruby/0 FAIL/0 SKIP, 162 JS sád/0 FAIL, M1–M34 zhodené, encoding PASS**.
+  Raw výsledok bez prepísania v HARDENING; `-Shoot` a nová slepá delta pred PR nasledujú. [PACKAGE_H18 §18](../zdroje/bloky/HARDENING/PACKAGE_H18.md).
+
 - **H18 · nový T7 Record po oprave predrecenzie (3.10.2026 02:25, v0.17.26).** Čistý kódový HEAD `0e9e9d47`: štandardný ui_foto -Record PASS,
   70 reálnych pushov, zdravý render zásuvkovej CAB-001 so zbalenými Setmi; závesový/blocked vizuálny smoke zostáva otvorený. Stará fotka `f204a536` je historická.
   Vlastný SketchUp PID123448 aj launcher PID113940 exit 0; bez zostávajúcej inštancie či locku. Main `2640f47b`/0.17.25 obnovený, 181 installed súborov,
