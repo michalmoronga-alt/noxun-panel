@@ -17,6 +17,13 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H18 · predrecenzia uzavretá (3.10.2026, PR #?, v0.17.26).** Čerstvá slepá delta `ba4431aa..29a2f6f2`: **0 P1/P2/P3, OPRAVA OK**;
+  pôvodné 2 P2 aj následná 1 P2 opravené. Recenzent v izolovanom archíve: **5332 Ruby/0 FAIL/1 SKIP** (chýba `.git`), 162 JS sád PASS,
+  H18 10 PASS + 1402 prípadov bez rozchodov, samostatný encoding PASS. Aktuálny plný clean-git beh implementátora ostáva **5333/0/0**.
+  Raw výsledok prenesený verbatim; root overil následný doc-only delta `29a2f6f2..b70836ba` aj vlastný JS beh 1402 PASS.
+  Kód, goldeny a verzia bez ďalšej zmeny. Kvótová brána pred PR: Codex weekly 83 % zostáva; GH/CI spracuje root, native hinge/mixed smoke a H18b Q2 čakajú.
+  [PACKAGE_H18 §19](../zdroje/bloky/HARDENING/PACKAGE_H18.md).
+
 - **H18 · oprava P2 slepej delty (3.10.2026, PR #?, v0.17.26).** Zmiešané triedy pri nekompatibilnej knižnici zobrazia uložený skrinkový set ako
   neaktívny text „uložený výber — nepoužíva sa“. Žiadny nový ovládač; Ruby, payload, writer, resolver, nákup a všetky JSON bez zmeny voči `ba4431aa`.
   Ľahký refresh text aktualizuje aj odstráni, zachová rozpísaný počet a fokus. Nezávislý Z8 nad skutočným renderom: `ba4431aa` **54 chýb → fix 0**;

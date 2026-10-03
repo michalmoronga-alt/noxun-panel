@@ -24,13 +24,13 @@ ani nevyexportuje** (rohovú skrinku by sklopil na dolnú). **Rozpočet:** po pr
 **Ochranu pred poškodeným súborom nastavení (H9) má len 0.17.7+, nastavení exportu (H7a) 0.17.20+, ochranu dvoch okien 0.17.8+ (pravidlá) a 0.17.9+ (rady) — aktualizovať obe PC a potom zavrieť všetky okná SketchUpu** (staré okno zapisuje bez ochrany).
 **Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
 
-**Testy (H18, PR #?):** 5333 headless/0 FAIL, 162 JS sád/0 FAIL; R0 nezmenené, M1–M34 zhodené; encoding + Record/Shoot PASS. Aj P2 zmiešanej skrinky opravená; delta review a smoke čakajú.
+**Testy (H18, PR #?):** git 5333 Ruby/0 FAIL/0 SKIP, 162 JS PASS, M1–M34 zhodené; R0 nezmenené, encoding a Record/Shoot PASS. Slepá delta 0 P1/P2/P3; archív 5332/0/1 SKIP (bez .git). GH review a native smoke čakajú.
 
 ## Robí sa
 
 **Blok 9 · HARDENING PO V1** (štart 1.10.2026, PR #432): krížový audit V1 sedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**; 17 dávok **H1…H17** sekvenčne podľa tabuľky v [PLAN.md](PLAN.md), **bez zmeny výrobných a cenových čísel**; priečinok bloku [zdroje/bloky/HARDENING/](zdroje/bloky/HARDENING/).
 Hotové **H1–H5** (PR #433–#440), **H6a–H6c** (PR #453–#455), **H7a/H7b** (nastavenia exportu + R-38, názov zákazky v hlavičke — PR #456, #457), **H8–H10b** (R-13, R-37, R-35 — PR #441–#444), **H11b** (PR #445),
-**H12a–d** (PR #446–#448, #452), **H13** (PR #449), **H14a/H14b** (PR #450, #451); **H11a** (PR #458, len načítanie; ukončovanie vrátené — poradie B na 26.0), **H15a/H15b** (PR #459, #460, seed dáta kovania), **H16** (PR #461, súpis knižníc), **H11c** = Z1 + audit, čaká, kým Michal nainštaluje 2026.2 na oboch PC; **H18** (závesy, 3A, PR #?).
+**H12a–d** (PR #446–#448, #452), **H13** (PR #449), **H14a/H14b** (PR #450, #451); **H11a** (PR #458, len načítanie; ukončovanie vrátené — poradie B na 26.0), **H15a/H15b** (PR #459, #460, seed dáta kovania), **H16** (PR #461, súpis knižníc), **H11c** = Z1 + audit, čaká, kým Michal nainštaluje 2026.2 na oboch PC; **H18** (závesy, 3A, PR #?; predrecenzia čistá).
 **H18b (D-150) čaká na Michalovu odpoveď Q2**; Q1 predvolené A (starý výber sa nemaže).
 **Otázky bez odpovede, platí návrh:** H12 Q1 (karta dielca ako Kusovník — zavedené v H12d) · H11 Q2 (starší SketchUp = nenačíta sa, jedna hláška) · H11 Q3 (kedy 2026.2) · H10b Q2 (rôzne rady sa zlúčia bez hlášky, ten istý rad = hláška) · H10a Q1 (cudzí globál = neuloží sa nič)
 · H9 Q1/Q2 (pri čítaní zo zálohy bez nálezu v Kontrole, bez tlačidla „Obnoviť zo zálohy") · H8 Q1/Q2 (veta o značke verzie, bez tlačidla) · H4b Q1/Q2 (vrátenie katalógu v ponuke „⋯" Materiálov, ikona posuvníkov pre Nastavenia rozpočtu).
@@ -38,7 +38,7 @@ Hotové **H1–H5** (PR #433–#440), **H6a–H6c** (PR #453–#455), **H7a/H7b*
 
 ## Ďalší krok
 
-Dokončiť review H18; ďalej H17 (H14 Q1 „Obnoviť" čaká na Michala, H11c po 2026.2, H18b až po odpovedi Q2) (porovnávacie exporty z reálnej zákazky pošle Michal pred H17); uzáver bloku = minor verzia + smoke
+Dokončiť GH review a CI H18; ďalej H17 (H14 Q1 „Obnoviť" čaká na Michala, H11c po 2026.2, H18b až po odpovedi Q2) (porovnávacie exporty z reálnej zákazky pošle Michal pred H17); uzáver bloku = minor verzia + smoke
 (smoke H7: 6 bodov v [PACKAGE_H7.md](zdroje/bloky/HARDENING/PACKAGE_H7.md) §10, bod 5 voliteľne; bod 3 overí aj klik na export hneď po prepísaní názvu;
 smoke H6a + H6b + H6c: 9 + 6 + 5 bodov v [PACKAGE_H6.md](zdroje/bloky/HARDENING/PACKAGE_H6.md) §10 — Inspector na testovacom modeli; smoke H3a + H3b: 7 bodov v [PACKAGE_H3.md](zdroje/bloky/HARDENING/PACKAGE_H3.md) §10; H4a + H4b: body 1–11 v [PACKAGE_H4.md](zdroje/bloky/HARDENING/PACKAGE_H4.md) §10; vzhľad rozbaľovačiek a výberu nôh v SketchUpe overí smoke bod 7;
 H8: 4 body v [PACKAGE_H8.md](zdroje/bloky/HARDENING/PACKAGE_H8.md) §10 — reálna zákazka bez nového riadku a s rovnakými číslami; H9: 5 bodov v [PACKAGE_H9.md](zdroje/bloky/HARDENING/PACKAGE_H9.md) §10 — rovnaké čísla rozpočtu, hrán a nákupu, ochrana naživo voliteľne;

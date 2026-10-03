@@ -561,3 +561,21 @@ Fotka `C:\Users\PC\AppData\Local\Temp\noxun_ui_foto\shots_20261003_030654_124956
 Vizuálne skontrolovaná: zdravý render a footer 0.17.26. Nahrávka §17 naďalej overuje nezmenený finálny Ruby payload; posledná zmena je iba JS.
 Limit nahrávky §17 zostáva: Inspector je CAB-001 so zásuvkou, bez závesov a blocked; nové zmiešané označenie dokazuje headless oracle, vizuálny smoke čaká na Michala.
 Pred PR čaká čerstvá slepá delta `ba4431aa..fixHEAD`; následné GH review, smoke §10 a H18b Q2 bez zmeny.
+
+## 19 · Predrecenzia uzavretá (Codex, 3.10.2026) — aktuálny výsledok
+
+**H18, PR #?:** čerstvá nezávislá slepá delta `ba4431aa9f0e859f6bec05058dc55c0deef75e12..29a2f6f2d06da72ae2eb9cbd56322d909f27e99e`
+vrátila **0 P1/P2/P3; VERDIKT OPRAVA OK**. [Surový výsledok](PREDRECENZIA_H18_mixed_delta_raw.md) prenesený verbatim.
+Pôvodné 2 P2 (§17) aj ďalšia 1 P2 (§18) opravené; koncept 3A bez zmeny. Po kódovej hlave nasledujú len docs-only commity.
+Root osobitne overil `29a2f6f2..b70836ba` ako doc-only a vlastný H18 JS beh **1402 prípadov PASS**.
+
+**Dôkazy recenzenta v izolovaných archívoch:** H18 Ruby 10 PASS, H18 JS 1402 prípadov/0 rozchodov, všetkých 162 JS sád PASS;
+plná Ruby **5332 PASS/0 FAIL/1 SKIP**, pretože archív nemá `.git`; samostatný encoding guard PASS.
+Skip je iba dôsledok archive-only prostredia. **Aktuálny plný clean-git beh implementátora (§18) ostáva 5333 PASS/0 FAIL/0 SKIP**;
+nie je nahradený archívnym behom. Pôvodný JS v regresii recenzenta zachytil 54 chýbajúcich riadkov.
+
+**Rozsah po verdikte:** iba dokumentácia a zachovanie raw výsledku; žiadne zmeny kódu, predzmenových ani PO JSON, verzie, nákupu, configu či writer handlera.
+Kvótová brána `usage -Gate codex` pred vytvorením PR prešla: Codex weekly použitých 17 %, **83 % zostáva**, exit 0; PR nebude draft.
+Prvé GH kolo je automatické; review/CI a merge riadi root. Číslo PR sa doplní samostatným number-only commitom.
+**Native hinge/mixed vizuálny smoke stále ČAKÁ:** úspešný Record/Shoot dokazuje transport a zdravý CAB-001 so zásuvkou, bez autentickej hinge/blocked scény.
+H18b zápisy a nákup (D-150) zostávajú mimo H18; **Q2 čaká na Michala**, nič z H18b sa neimplementovalo.
