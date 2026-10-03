@@ -17,6 +17,11 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H18 · nový T7 Record po oprave predrecenzie (3.10.2026 02:25, v0.17.26).** Čistý kódový HEAD `0e9e9d47`: štandardný ui_foto -Record PASS,
+  70 reálnych pushov, zdravý render zásuvkovej CAB-001 so zbalenými Setmi; závesový/blocked vizuálny smoke zostáva otvorený. Stará fotka `f204a536` je historická.
+  Vlastný SketchUp PID123448 aj launcher PID113940 exit 0; bez zostávajúcej inštancie či locku. Main `2640f47b`/0.17.25 obnovený, 181 installed súborov,
+  85 live súborov a pôvodný model SHA zhodné; SU slot vrátený. Presné cesty a limity [PACKAGE_H18 §17](../zdroje/bloky/HARDENING/PACKAGE_H18.md#17--oprava-predrecenzie-codex-3102026--aktuálne-dôkazy-majú-prednosť-pred-16).
+
 - **H18 · oprava predrecenzie (3.10.2026, PR #?, v0.17.26).** Predrecenzia `54f55246`: 0 P1 / 2 P2, raw výsledok zachovaný.
   Pri blocked knižnici sa uložený starší cab výber závesov nestratí; plochý cab/owner je disabled „(uložený výber)“, dedenie z effective mapy.
   Koncept 3A, writer, resolver a nákup nezmenené. Pôvodných päť R0 JSON bez diffu; samostatný oracle zo starej reťaze a 160 regresií v štyroch stavoch.

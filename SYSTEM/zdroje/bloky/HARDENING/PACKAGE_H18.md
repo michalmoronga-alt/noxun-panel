@@ -519,7 +519,13 @@ Všetkých päť pôvodných R0 JSON ostáva bez diffu od `76ba4035`; PO fixture
 M27 plochý owner disabled, M28 iba skutočný blocked stav (aj nové missing/invalid regresie), M29 uložený owner text. Všetky zachytené.
 **Kontroly:** 5332 Ruby / 0 FAIL / 0 SKIP; 162 samostatných JS sád / 0 FAIL; H18 Ruby 9/0; encoding PASS.
 
-**T7 nový Record čaká na SU slot orchestrátora.** Nahrávka §16 nad `f204a536` neoveruje opravený tvar payloadu.
-Pred finálnym pushom musí vzniknúť nový `ui_foto -Record` z opravenej kódovej hlavy; evidovať jeho HEAD, priečinky, ukončenie procesu a obnovu mainu.
-Stará fotka zásuvkovej skrinky zostáva iba historický render, nie dôkaz nových závesových fieldov. Vizuálny smoke §10 stále čaká na Michala.
-Nová slepá delta a GH review sú ďalšie brány; H18b čaká na Q2.
+**T7 nový Record PASS** z čistého kódového HEAD `0e9e9d47ad98f8e67dfd786fc2c43cbe4992cd62`, `ui_foto -Record -Only panel_kovanie`, 3.10.2026 02:25.
+Nahrávka `C:\Users\PC\AppData\Local\Temp\noxun_ui_foto\rec_0.17.26_20261003_022507`: 70 súborov, panel 24 / studio 27, úspešný marker.
+Nová fotka `C:\Users\PC\AppData\Local\Temp\noxun_ui_foto\shots_20261003_022709_113940\05_panel_kovanie.png`, aj `00_model.png` a `index.html`.
+Vizuálne bez poškodenia, footer 0.17.26; opäť CAB-001 so zásuvkou a zbalenými Setmi. Dva Inspector payloady bez závesov a bez blocked stavu.
+**Limit:** tento nový Record overuje načítanie opravenej hlavy, reálny transport a zdravý render. Nedokazuje nové závesové ani blocked označenia;
+tie dokazuje nezávislá headless matica a vizuálne ich ešte overí Michal v smoke §10. Stará nahrávka §16 nad `f204a536` je iba historický dôkaz.
+Vlastný SketchUp PID123448 a launcher PID113940 skončili exitom 0 (oficiálny runner); nezostal SketchUp, deploy.lock ani sentinel.
+INSTALL z čistého root main `2640f47b`: installed **0.17.25**, všetkých **181** súborov zhodných s pôvodným main manifestom; **85** live súborov a
+pôvodný model SHA `fdace66f4fc4b6ac9d8b0f5c1b7f7e680c2d065f121a7ceb3241864f5a1c9ead` nezmenené. SU slot výslovne vrátený orchestrátorovi.
+Nová slepá delta a GH review sú ďalšie brány; smoke §10 a H18b Q2 stále čakajú.
