@@ -3556,10 +3556,9 @@ module Noxun
         # bezne `add_row` a cena vyjde JEDNA).
         expand_manual(manual_items, rows, lookup)
         Array(hardware_items).each do |it|
-          next unless it.is_a?(Hash)
+          next unless expandable_hardware_item?(it)
           gt  = it['generic_type'].to_s
           qty = it['quantity'].to_i
-          next if gt.empty? || qty < 1
           sid, reason, info = resolve_set_id(gt, it, overrides, mapping)
           if sid.nil?
             reason = no_set_reason if reason == 'no_set'
@@ -3580,23 +3579,17 @@ module Noxun
           # zakazku pustil von, preto RED brana (`hinge_set_mismatch`). Tato
           # vetva je SKORSIA nez `set_incompatible_info`, takze bez povysenia
           # prave tu by sa k RED nikdy nedoslo.
-          if set['generic_type'].to_s != gt
-            unmapped << if door_item?(it)
-                          unmapped_entry(it, sid, HINGE_SET_MISMATCH,
-                                         { 'detail' => 'generic_type' })
-                        else
-                          unmapped_entry(it, sid, 'set_type_mismatch')
-                        end
+          type_problem = set_type_problem(it, set, sid)
+          if type_problem
+            unmapped << type_problem
             next
           end
           # KOV-C2a: klasifikacia setu vs. klasifikacia polozky (otvaranie,
           # konstrukcia, system, vyska). Netyka sa poloziek bez klasifikacie —
           # tie tuto vetvu nikdy neprejdu.
-          bad = set_incompatible_info(it, set)
-          if bad
-            # KOV-F1: dovod si nesie sama kontrola — zaves ma vlastny RED kod
-            # (`hinge_set_mismatch`), zasuvka ostava na ORANGE `set_incompatible`.
-            unmapped << unmapped_entry(it, sid, bad['reason'] || 'set_incompatible', bad)
+          class_problem = set_class_problem(it, set, sid)
+          if class_problem
+            unmapped << class_problem
             next
           end
           # KOV-F1: zaves na LEGACY (nezaradenom) sete sa NAKUPI ako doteraz,
@@ -3658,7 +3651,7 @@ module Noxun
         # `set_incompatible_info`) videli `nil` triedny kluc a pustili ju na
         # genericky `lift`, teda na set, o ktorom nikto nedokaze, ze k systemu
         # cela patri. Legacy vyklop (bez `params.use_type`) sa tym NEMENI.
-        return [nil, LIFT_SYSTEM_MISSING, {}] if ck.nil? && lift_item?(it)
+        return [nil, LIFT_SYSTEM_MISSING, {}] if mapping_skipped?(it, ck)
 
         value = resolve_mapping_value(generic_type, it, cabinet_overrides, mapping)
         # KOV-C2a: klasifikovana polozka BEZ triedneho mapovania nie je „typ bez
@@ -3764,7 +3757,15 @@ module Noxun
           value['bands'].is_a?(Array)
       end
 
+      # H18: zdroj je vysledok TEJ ISTEJ retaze, nie druha kopia v UI.
+      MAPPING_SOURCE_LEVELS = %w[owner owner_class cab_class cab project_class project].freeze
+      MAPPING_OWN_LEVELS = %w[owner owner_class cab_class cab].freeze
+
       def resolve_mapping_value(generic_type, it, cabinet_overrides, mapping)
+        resolve_mapping_source(generic_type, it, cabinet_overrides, mapping).first
+      end
+
+      def resolve_mapping_source(generic_type, it, cabinet_overrides, mapping)
         # KOV-C2a/KOV-D1a: klasifikovana polozka ma VLASTNU, TROJUROVNOVU
         # precedenciu — OWNER triedny override skrinky -> triedny override
         # skrinky -> projektovy snapshot. Nizsia uroven sa berie LEN vtedy, ked
@@ -3795,19 +3796,19 @@ module Noxun
             opk = it['owner_part_key'].to_s
             unless opk.empty?
               v = ov["#{generic_type}@#{opk}"]
-              return v if present_mapping_value?(v)
+              return [v, 'owner', "#{generic_type}@#{opk}"] if present_mapping_value?(v)
             end
             v = ov[ck]
-            return v if present_mapping_value?(v)
+            return [v, 'cab_class', ck] if present_mapping_value?(v)
 
             v = ov[generic_type]
-            return v if present_mapping_value?(v)
+            return [v, 'cab', generic_type] if present_mapping_value?(v)
           end
           v = mapping[ck]
-          return v if present_mapping_value?(v)
+          return [v, 'project_class', ck] if present_mapping_value?(v)
 
           v = mapping[generic_type]
-          return present_mapping_value?(v) ? v : nil
+          return present_mapping_value?(v) ? [v, 'project', generic_type] : [nil, nil, nil]
         end
         if ck
           ov = cabinet_overrides[it['owner_id'].to_s]
@@ -3815,13 +3816,13 @@ module Noxun
             opk = it['owner_part_key'].to_s
             unless opk.empty?
               v = ov["#{ck}@#{opk}"]
-              return v if present_mapping_value?(v)
+              return [v, 'owner_class', "#{ck}@#{opk}"] if present_mapping_value?(v)
             end
             v = ov[ck]
-            return v if present_mapping_value?(v)
+            return [v, 'cab_class', ck] if present_mapping_value?(v)
           end
           v = mapping[ck]
-          return present_mapping_value?(v) ? v : nil
+          return present_mapping_value?(v) ? [v, 'project_class', ck] : [nil, nil, nil]
         end
 
         ov = cabinet_overrides[it['owner_id'].to_s]
@@ -3829,13 +3830,13 @@ module Noxun
           opk = it['owner_part_key'].to_s
           unless opk.empty?
             v = ov["#{generic_type}@#{opk}"]
-            return v if present_mapping_value?(v)
+            return [v, 'owner', "#{generic_type}@#{opk}"] if present_mapping_value?(v)
           end
           v = ov[generic_type]
-          return v if present_mapping_value?(v)
+          return [v, 'cab', generic_type] if present_mapping_value?(v)
         end
         v = mapping[generic_type]
-        present_mapping_value?(v) ? v : nil
+        present_mapping_value?(v) ? [v, 'project', generic_type] : [nil, nil, nil]
       end
 
       # KOV-D1a (Codex #308 kolo 2 P1): kluc JE pritomny, len jeho hodnota sa
@@ -4774,6 +4775,48 @@ module Noxun
       # no_set_reason: ako v `expand` — volajuci ho posiela, ked je pricina
       # „bez mapovania" INA a konkretnejsia (R-07: `library_incompatible`).
       # Panel a supis musia dat TEN ISTY dovod (review P2-3).
+      # H18: item_mapping_source a explain maju rovnaky normalizovany kontext.
+      def item_mapping_context(item, overrides)
+        [item.merge('owner_id' => EXPLAIN_OWNER),
+         { EXPLAIN_OWNER => normalize_mapping(overrides.is_a?(Hash) ? overrides : {},
+                                               nil, allow_owner: true) }]
+      end
+
+      def expandable_hardware_item?(item)
+        item.is_a?(Hash) && !item['generic_type'].to_s.empty? && item['quantity'].to_i >= 1
+      end
+
+      def mapping_skipped?(item, class_key)
+        class_key.nil? && lift_item?(item)
+      end
+
+      # Zdroj pre ULOZENU polozku skrinky (owner_id dodava citaci obal).
+      def item_mapping_source(item, mapping, overrides)
+        return [nil, nil, nil] unless expandable_hardware_item?(item)
+
+        it, ovr = item_mapping_context(item, overrides)
+        gt = it['generic_type'].to_s
+        return [nil, nil, nil] if mapping_skipped?(it, class_key_for(it, gt))
+
+        resolve_mapping_source(gt, it, ovr, mapping)
+      end
+
+      # R2.6: dve vetvy nesuladu zdieľane s nakupom; expanzia bez zmeny.
+      def set_type_problem(item, set, sid)
+        return nil if set['generic_type'].to_s == item['generic_type'].to_s
+
+        if door_item?(item)
+          unmapped_entry(item, sid, HINGE_SET_MISMATCH, { 'detail' => 'generic_type' })
+        else
+          unmapped_entry(item, sid, 'set_type_mismatch')
+        end
+      end
+
+      def set_class_problem(item, set, sid)
+        bad = set_incompatible_info(item, set)
+        bad ? unmapped_entry(item, sid, bad['reason'] || 'set_incompatible', bad) : nil
+      end
+
       def explain(item, state, overrides: {}, catalog: nil, lookup: nil,
                   no_set_reason: 'no_set')
         out = { 'set_id' => nil, 'set_name' => nil, 'members' => [], 'problems' => [],
@@ -4784,9 +4827,7 @@ module Noxun
 
         mapping = state.is_a?(Hash) && state['mapping'].is_a?(Hash) ? state['mapping'] : {}
         sets    = state.is_a?(Hash) && state['sets'].is_a?(Hash) ? state['sets'] : {}
-        it = item.merge('owner_id' => EXPLAIN_OWNER)
-        ovr = { EXPLAIN_OWNER => normalize_mapping(overrides.is_a?(Hash) ? overrides : {},
-                                                   nil, allow_owner: true) }
+        it, ovr = item_mapping_context(item, overrides)
 
         sid, reason, info = resolve_set_id(gt, it, ovr, mapping)
         if sid.nil?
@@ -4801,15 +4842,16 @@ module Noxun
           return out
         end
         out['set_name'] = set['name']
-        if set['generic_type'].to_s != gt
-          explain_problem(out, unmapped_entry(it, sid, 'set_type_mismatch'))
+        type_problem = set_type_problem(it, set, sid)
+        if type_problem
+          explain_problem(out, type_problem)
           return out
         end
         # KOV-C2a: TA ISTA kontrola ako v `expand` — panel a supis sa nesmu
         # rozist (inak by panel rozpisal kody kitu, ktory v nakupe nevznikne).
-        bad = set_incompatible_info(it, set)
-        if bad
-          explain_problem(out, unmapped_entry(it, sid, 'set_incompatible', bad))
+        class_problem = set_class_problem(it, set, sid)
+        if class_problem
+          explain_problem(out, class_problem)
           return out
         end
         # R-06 (brana 1d): TA ISTA brana ako v expand — panel a supis sa nesmu

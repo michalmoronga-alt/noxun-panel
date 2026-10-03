@@ -1002,6 +1002,11 @@ P2O set bez tlmenia + piest), takže pribudlo päť vecí:
   `hinge`** → triedny kľúč projektu → **legacy `hinge`**. Dva rozdiely oproti zásuvke sú vecné: vlastný set NA SKRINKE nikdy ticho nespadne na projektový
   default (Codex #327 kolo 2), a na konci reťaze stojí legacy `hinge` — bez neho by KAŽDÁ existujúca zákazka po prestavbe stratila závesy (položky sú
   odteraz klasifikované, ale snapshot triedny kľúč ešte nemá). Prázdny výsledok preto pri závese znamená dnešné `no_set`, nie `class_unmapped`.
+  **H18 (v0.17.26):** tú istú reťaz nesie `resolve_mapping_source` → `[raw_value, level, key]`; `resolve_mapping_value` vracia jej prvý prvok.
+  Zmrazené `MAPPING_SOURCE_LEVELS` = `owner owner_class cab_class cab project_class project`, vlastné `MAPPING_OWN_LEVELS` = prvé štyri.
+  `item_mapping_source` zdieľa normalizovaný `EXPLAIN_OWNER` kontext s `explain` a filter položiek s `expand` (Hash, neprázdny typ, počet ≥ 1).
+  `mapping_skipped?` zdieľaný s `resolve_set_id` odstaví klasifikovaný výklop bez systému pred čítaním mapy. `expand` a `explain` zdieľajú obe
+  vetvy nesúladu (`set_type_problem`, `set_class_problem`): pri dvierkach `hinge_set_mismatch`, inde doterajší dôvod; expanzia bez zmeny.
 - **Sentinel `MAPPING_NONE = { 'none' => true }` = „vedome bez setu".** Je to **samostatný kontrakt**, nie členská bunka `code_by_nl` (`SKIP_CODE` — zhoda
   reťazca je náhoda). Zmazať kľúč nestačí: pri reťazovej precedencii by chýbajúci kľúč znamenal „padni nižšie", teda presný opak voľby. **Je to HASH, nie
   reťazec (Codex #329 kolo 1):** `set_id` je ľubovoľný neprázdny reťazec, takže vlastný set s ID `none` (aj `NONE`) sú platné dáta — reťazcový sentinel by

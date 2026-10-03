@@ -717,7 +717,7 @@ NxTest.test('KOV-D1a (Codex #308 kolo 2 P2): karta ukaze LEN kluc AKTIVNEJ tried
 
   # Poskodena hodnota sa PRIZNA — nie prazdny select.
   bad = c::HWS.normalize_mapping({ c::OWNK => '' }, nil, allow_owner: true)
-  NxTest.assert_equal({ 'invalid' => true },
+  NxTest.assert_equal({ 'invalid' => true, 'label' => 'neplatný výber (uložený výber)' },
                       panel.owner_set_overrides(bad, 'slide', [c.atira_item])[c::OWNER])
 end
 

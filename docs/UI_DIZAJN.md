@@ -1161,10 +1161,13 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Hw`).
   pod skupinou.
 - **Skupiny Kovania nesú meta v hlavičke:** Položky `6 ks` (súčet počtov z pravidiel;
   pri ručne pridaných aj `· 2 ručne`), Sety `podľa projektu` alebo `1 vlastný /
-  2–4 vlastné / 5+ vlastných` (vlastný výber setu na skrinke aj pri čelách);
+  2–4 vlastné / 5+ vlastných` (počet skutočne použitých vlastných výberov zo servera);
   Pravidlá meta nemajú. Lišta sektora Kovanie nesie súhrn typov (`Nohy 4× · Výsuv
   1× · …`), ktorý z kresby zmizol.
 
+- **Uložený-neúčinný skrinkový set pri zmiešaných triedach** je len textový riadok v Setoch;
+  jasne píše „uložený výber — nepoužíva sa“, plný názov nesie `title`. Nedostáva pole ani select.
+  Po obnovení knižnice alebo odstránení výberu zmizne aj cez ľahké obnovenie panela.
 - **Položky sú zoskupené podľa VLASTNÍKA, nie podľa typu** (`.hwbox`): „Skrinka" ·
   box každého čela · spoločný box „Vnútro skrinky". Je to **iba iné zobrazenie
   tých istých dát** — identita položky, zápisové cesty aj nákupný riadok D-92

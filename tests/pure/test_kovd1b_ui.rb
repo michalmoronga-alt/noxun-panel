@@ -434,7 +434,9 @@ NxTest.test('KOV-D1b (P2-1): detail hovorí to isté čo Nákup aj pri nepoužit
   #     ktora by musela prist prave z tej nepouzitelnej kniznice).
   ctx = c.src('noxun_engine', 'ui', 'panel',
               'payloads.rb')[/def drawer_buy_ctx.*?\n        end\n/m].to_s
-  NxTest.assert(ctx.include?('status == :missing && HardwareSets.library_read_only?'),
+  blocked_helper = c.src('noxun_engine', 'ui', 'panel', 'payloads.rb')[/def hw_purchase_blocked\?.*?\n        end\n/m].to_s
+  NxTest.assert(ctx.include?('hw_purchase_blocked?(status)') &&
+                blocked_helper.include?('status == :missing && HardwareSets.library_read_only?'),
                 'ta ista podmienka ako v `decorate_hardware_purchase`')
   NxTest.assert(ctx.include?('(blocked ? {} : cabinet_set_overrides(cfg))'),
                 'override skrinky sa pri nepouzitelnej kniznici NEUPLATNI')
