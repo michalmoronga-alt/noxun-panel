@@ -554,7 +554,10 @@ odstránenie uloženého výberu; zachovaný uzol počtu, hodnota a fokus. Pôvo
 M34 neobnovený pôvodný popis. Po mutáciách presná byte/hash obnova štyroch zdrojov.
 **Kontroly:** 5333 Ruby / 0 FAIL / 0 SKIP, 162 samostatných JS sád / 0 FAIL, H18 Ruby 10/0, encoding PASS.
 
-**T7:** Ruby payload byte-identical → stačí štandardný `ui_foto -Shoot -Only panel_kovanie` nad úspešným Recordom §17
-`rec_0.17.26_20261003_022507`; nový Record, deploy ani SketchUp sa nespúšťa. Shoot nasleduje po commitnutí a plných kontrolách.
+**T7 Shoot PASS** z čistého kódového HEAD `29a2f6f2d06da72ae2eb9cbd56322d909f27e99e`, 3.10.2026 03:06, exit 0, 0 problémov.
+Ruby payload byte-identical → štandardný `ui_foto -Shoot -Only panel_kovanie` nad úspešným Recordom §17
+`rec_0.17.26_20261003_022507`; žiadny nový Record, deploy, SketchUp ani zásah do shared lock/sentinel.
+Fotka `C:\Users\PC\AppData\Local\Temp\noxun_ui_foto\shots_20261003_030654_124956\05_panel_kovanie.png`, aj `00_model.png` a `index.html`.
+Vizuálne skontrolovaná: zdravý render a footer 0.17.26. Nahrávka §17 naďalej overuje nezmenený finálny Ruby payload; posledná zmena je iba JS.
 Limit nahrávky §17 zostáva: Inspector je CAB-001 so zásuvkou, bez závesov a blocked; nové zmiešané označenie dokazuje headless oracle, vizuálny smoke čaká na Michala.
-Čerstvá slepá delta `ba4431aa..fixHEAD` a GH review čakajú pred PR; smoke §10 a H18b Q2 bez zmeny.
+Pred PR čaká čerstvá slepá delta `ba4431aa..fixHEAD`; následné GH review, smoke §10 a H18b Q2 bez zmeny.

@@ -21,7 +21,9 @@
   neaktívny text „uložený výber — nepoužíva sa“. Žiadny nový ovládač; Ruby, payload, writer, resolver, nákup a všetky JSON bez zmeny voči `ba4431aa`.
   Ľahký refresh text aktualizuje aj odstráni, zachová rozpísaný počet a fokus. Nezávislý Z8 nad skutočným renderom: `ba4431aa` **54 chýb → fix 0**;
   oba Dmix/Dmixleg prípady reprodukované. **5333 Ruby/0 FAIL/0 SKIP, 162 JS sád/0 FAIL, M1–M34 zhodené, encoding PASS**.
-  Raw výsledok bez prepísania v HARDENING; `-Shoot` a nová slepá delta pred PR nasledujú. [PACKAGE_H18 §18](../zdroje/bloky/HARDENING/PACKAGE_H18.md).
+  Raw výsledok bez prepísania v HARDENING; `-Shoot` z čistého `29a2f6f2` PASS/exit 0 nad Recordom `0e9e9d47`, bez SU/deploy, 0 problémov.
+  Fotka `shots_20261003_030654_124956/05_panel_kovanie.png` je zdravý CAB-001 so zásuvkou; nové zmiešané označenie vizuálne nedokazuje.
+  Nová slepá delta pred PR čaká. [PACKAGE_H18 §18](../zdroje/bloky/HARDENING/PACKAGE_H18.md).
 
 - **H18 · nový T7 Record po oprave predrecenzie (3.10.2026 02:25, v0.17.26).** Čistý kódový HEAD `0e9e9d47`: štandardný ui_foto -Record PASS,
   70 reálnych pushov, zdravý render zásuvkovej CAB-001 so zbalenými Setmi; závesový/blocked vizuálny smoke zostáva otvorený. Stará fotka `f204a536` je historická.
