@@ -1076,11 +1076,15 @@ projekcie** uloženého configu a plánu — žiadny zápis. Kontrakt vkladacej 
   pri klasifikovaných dvierkach skutočný `hinge@krídlo` číta `compat.owners`, pri ostatných klasifikovaných položkách owner triedny kľúč.
   Poškodený plochý výber nesie `invalid` a text „neplatný výber (uložený výber)"; poškodený skrinkový výber aj `override_label` a `owner_default_label`.
   **Uložené vs. účinné overridy (H18):** pri chýbajúcom snapshote a nekompatibilnej knižnici sú účinné `{}` (`hw_purchase_blocked?` / `hw_purchase_overrides`,
-  zdieľané s `decorate_hardware_purchase` a `drawer_buy_ctx`). Hlavička a dedenie z účinných; uložená hodnota zostáva viditeľná. Stav `:invalid` ako predtým.
+  zdieľané s `decorate_hardware_purchase` a `drawer_buy_ctx`). Hlavička a dedenie z účinných; uložená hodnota zostáva viditeľná.
+  Iba tento stav nesie `blocked: true`, `override_value_text` (ak je plochý skrinkový výber) a `owner_overrides[owner].value_text`; ploché selecty
+  zobrazia uloženú hodnotu ako zablokované `__stored__`, prvú voľbu a tooltip z účinného dedenia. Stav `:invalid` a `:missing` s kompatibilnou knižnicou ako predtým.
 - **`compat`** (`nil` = plochý zoznam): `cab` a `owners[owner_part_key]` s `class_key` · `class_label` · `scope_label` · `none_label` · `options`
   (`HardwareSets.class_set_options`, kompatibilné a aktívne) · `current` · `stored` + `value_text` (uložená hodnota mimo ponuky — `disabled`).
   `none_label` cez `hardware_source_none_label`: sonda bez vlastného kľúča, pri skrinke aj bez vlastníka; zdroj `cab_class` = „skrinky", `cab` =
   „staršieho výberu skrinky", projektové úrovne a žiadny zdroj = „projektu". `current` je ID celej voľby (aj selektora), nie výsledný set z pásma.
+  Pri `blocked` má uložený výber `current: null`, `stored: true`; skrinkový rozsah číta uloženého víťaza `cab_class`/`cab` cez existujúci resolver
+  nad sondou bez vlastníka, vrátane staršieho `hinge`. `none_label` naďalej vychádza z účinných `{}`.
   **`cab` len pri jednej nenulovej triede**; zmiešaná skrinka `cab: null` → riadok skrinky sa nekreslí (`hwCabRowOff`, `hwDropSetRow`), Sety odkážu na čelo.
   JS iba kreslí, posiela pôvodné `set_id` / `value`; kľúč skladá `HardwareSets.apply_cabinet_override`. H18 jeho zápis nemení (D-150 čaká na Q2).
   Testy `test_kovd1b_ui` a `test_h18_sety_pravda` (Ruby + JS).

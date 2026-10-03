@@ -374,22 +374,23 @@
   // sety daneho typu. current = zapisany set_id ('' = dedi), paramLabel = text,
   // ked je zapisany vyber PODLA PARAMETRA (selector — panel ho needituje).
   // -> [{ value, text, selected, disabled }]
-  function hwSetOptionList(entry, current, defaultText, paramLabel){
-    var out = [{ value: '', text: defaultText, selected: !current && !paramLabel, disabled: false }];
-    if (paramLabel){
-      out.push({ value: HW_SET_PARAM, text: paramLabel, selected: true, disabled: true });
+  function hwSetOptionList(entry, current, defaultText, paramLabel, storedText){
+    var shown = storedText || paramLabel;
+    var out = [{ value: '', text: defaultText, selected: !current && !shown, disabled: false }];
+    if (shown){
+      out.push({ value: storedText ? HW_SET_STORED : HW_SET_PARAM, text: shown, selected: true, disabled: true });
     }
     var opts = (entry && entry.options) || [];
     var found = false;
     opts.forEach(function(s){
       if (s.set_id === current) found = true;
       out.push({ value: s.set_id, text: s.name,
-                 selected: !paramLabel && s.set_id === current, disabled: false });
+                 selected: !shown && s.set_id === current, disabled: false });
     });
     // Set, ktory uz nie je v ponuke (zmazany z kniznice), je v modeli STALE
     // zapisany — musi ostat viditelny, inak by select klamal.
     if (current && !found){
-      out.push({ value: current, text: current + ' (chýba)', selected: !paramLabel, disabled: false });
+      out.push({ value: current, text: current + ' (chýba)', selected: !shown, disabled: false });
     }
     return out;
   }
@@ -431,6 +432,10 @@
     var sc = hwCompatScope(entry, owner);
     if (sc) return hwCompatOptionList(sc);
     var ov = hwOwnerOverride(entry, owner);
+    if (entry && entry.blocked){
+      return hwSetOptionList(entry, '', entry.owner_default_label || 'podľa projektu', null,
+                             ov ? ov.value_text + ' (uložený výber)' : null);
+    }
     return hwSetOptionList(entry, (ov && ov.set_id) || '', '(podľa skrinky/projektu)',
                            (ov && ov.invalid) ? (ov.label || 'neplatný výber') :
                            (ov && ov.selector) ? (ov.label || 'podľa parametra') : null);
@@ -451,6 +456,10 @@
     if (hwCabRowOff(entry)) return null;
     var sc = hwCompatScope(entry, null);
     if (sc) return hwCompatOptionList(sc);
+    if (entry && entry.blocked){
+      return hwSetOptionList(entry, '', entry.project_label || 'podľa projektu', null,
+                             entry.override_value_text ? entry.override_value_text + ' (uložený výber)' : null);
+    }
     return hwSetOptionList(entry, (entry && entry.override_set_id) || '',
                            (entry && entry.project_label) || 'podľa projektu',
                            (entry && entry.override_selector) ? (entry.override_label || 'podľa parametra') : null);

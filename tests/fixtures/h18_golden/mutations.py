@@ -1,4 +1,4 @@
-"""H18 T8: rucny reprodukovatelny beh M1-M23, vzdy obnovi presne povodne bajty.
+"""H18 T8: rucny reprodukovatelny beh M1-M29, vzdy obnovi presne povodne bajty.
 
 Spustenie z repa: python tests/fixtures/h18_golden/mutations.py
 Vysledky su iba v gitignored _dev/h18_takeover/mutations.json.
@@ -76,6 +76,12 @@ MUTATIONS = [
               v = ov["#{generic_type}@#{opk}"]
               return [v, 'owner', "#{generic_type}@#{opk}"] if present_mapping_value?(v)
             end""", 'klasifikovane zavesy expand'),
+    ('M24', PAY, "%w[cab_class cab].include?(level) ? raw : nil", 'overrides[class_key]', 'js-fresh-payload'),
+    ('M25', JS, "if (entry && entry.blocked){\n      return hwSetOptionList(entry, '', entry.project_label", "if (false){\n      return hwSetOptionList(entry, '', entry.project_label", 'js'),
+    ('M26', PAY, 'owner_default_label(effective[gt], proj_val, opts, proj_name)', 'owner_default_label(ov_val, proj_val, opts, proj_name)', 'js-fresh-payload'),
+    ('M27', JS, "if (entry && entry.blocked){\n      return hwSetOptionList(entry, '', entry.owner_default_label", "if (false){\n      return hwSetOptionList(entry, '', entry.owner_default_label", 'js'),
+    ('M28', PAY, 'effective = hw_purchase_overrides(cfg, status, overrides)\n          blocked = hw_purchase_blocked?(status)', 'effective = hw_purchase_overrides(cfg, status, overrides)\n          blocked = status != :ok', 'js-fresh-payload'),
+    ('M29', PAY, "out[owner]['value_text'] = HardwareSets.mapping_value_text(val, defs) if blocked", "out[owner]['value_text'] = HardwareSets.mapping_value_text(val, defs) if false", 'js-fresh-payload'),
 ]
 
 def write_verified(path, data):
@@ -125,8 +131,8 @@ def main():
             write_verified(path, mutated.encode('utf-8'))
             if target == 'js-fresh-payload':
                 payload = ROOT / '_dev/h18_takeover/mutated_payload.json'
-                code = "File.write(ARGV.first, NxH18.matrix_json(NxH18.cases.to_h { |c| [c['id'], NxH18.payload(c)] }))"
-                generated = subprocess.run([RUBY, '-r', './tests/fixtures/h18_golden/cases', '-e', code, str(payload)],
+                code = "File.write(ARGV.first, NxH18.matrix_json((NxH18.cases + NxH18Blocked.cases).to_h { |c| [c['id'], NxH18.payload(c)] }))"
+                generated = subprocess.run([RUBY, '-r', './tests/fixtures/h18_golden/blocked_cases', '-e', code, str(payload)],
                                            cwd=ROOT, capture_output=True, encoding='utf-8', timeout=90)
                 if generated.returncode != 0:
                     raise RuntimeError(f'{name}: generator zlyhal: {generated.stderr}')

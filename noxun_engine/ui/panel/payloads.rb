@@ -2243,6 +2243,8 @@ module Noxun
           # globalom pre referencovane set_id — audit BLOCKER 4).
           overrides = cabinet_set_overrides(cfg)
           effective = hw_purchase_overrides(cfg, status, overrides)
+          blocked = hw_purchase_blocked?(status)
+          defs = compat_defs(globals, snap_sets)
           refs = HardwareSets.referenced_set_ids(proj_map, 'cab' => overrides)
           types = Array(hardware).filter_map { |h| h.is_a?(Hash) ? h['generic_type'].to_s : nil }
                                  .reject(&:empty?).uniq
@@ -2279,16 +2281,23 @@ module Noxun
                                     end),
               # H1b (D-81): vybery na urovni VLASTNIKA (kluc "gt@owner_part_key")
               # — panel ich vykresli priamo v riadku kovania toho dielca.
-              'owner_overrides' => owner_set_overrides(overrides, gt, hardware),
-              'owner_default_label' => owner_default_label(ov_val, proj_val, opts, proj_name),
+              'owner_overrides' => owner_set_overrides(overrides, gt, hardware, blocked: blocked, defs: defs),
+              'owner_default_label' => owner_default_label(effective[gt], proj_val, opts, proj_name),
               # KOV-D1b: ponuka pre KLASIFIKOVANE polozky (zasuvky) — triedny
               # kluc, len kompatibilne moznosti. `nil` = typ klasifikovanu
               # polozku nema a karta kresli povodny plochy zoznam setov.
               'compat' => class_compat_payload(gt, hardware, overrides, proj_map,
-                                               globals, snap_sets, refs, effective_overrides: effective),
+                                               globals, snap_sets, refs, effective_overrides: effective, blocked: blocked),
               'status' => status.to_s,
               'options' => opts.map { |s| { 'set_id' => s['set_id'], 'name' => s['name'] } }
-            }
+            }.tap do |entry|
+              # Ulozeny vyber ostava viditelny, ale pri R-07 blocked sa nepouzije.
+              # JS tento stav iba kresli; pravidlo kniznice neopakuje.
+              if blocked
+                entry['blocked'] = true
+                entry['override_value_text'] = HardwareSets.mapping_value_text(ov_val, defs) unless ov_val.nil?
+              end
+            end
           end
         end
 
@@ -2307,7 +2316,7 @@ module Noxun
         # sklada `HardwareSets.apply_cabinet_override` (D1a), nie panel.
         # -> { 'cab' => scope, 'owners' => { owner => scope } } | nil
         def class_compat_payload(gt, hardware, overrides, proj_map, globals, snap_sets, refs,
-                                 effective_overrides: overrides)
+                                 effective_overrides: overrides, blocked: false)
           active = active_class_by_owner(hardware, gt)
           classes = active.values.uniq
           return nil if classes.compact.empty?
@@ -2325,7 +2334,7 @@ module Noxun
             item = Array(hardware).find { |h| h.is_a?(Hash) && h['generic_type'].to_s == gt && HardwareSets.class_key_for(h, gt) == classes.first }
             out['cab'] = compat_scope(classes.first, nil, overrides, proj_map,
                                       globals, snap_sets, refs, defs, item: item,
-                                      effective_overrides: effective_overrides)
+                                      effective_overrides: effective_overrides, blocked: blocked)
           end
           active.each do |owner, ck|
             next if ck.nil?
@@ -2333,7 +2342,7 @@ module Noxun
             item = Array(hardware).find { |h| h.is_a?(Hash) && h['generic_type'].to_s == gt && h['owner_part_key'].to_s == owner && HardwareSets.class_key_for(h, gt) == ck }
             out['owners'][owner] = compat_scope(ck, owner, overrides, proj_map,
                                                 globals, snap_sets, refs, defs, item: item,
-                                                effective_overrides: effective_overrides)
+                                                effective_overrides: effective_overrides, blocked: blocked)
           end
           out
         end
@@ -2353,16 +2362,21 @@ module Noxun
         #   stored     — ulozena hodnota, ktora v ponuke NIE JE (neaktivny set,
         #                set z novsej verzie): zobrazi sa, vybrat sa nedá (F10)
         def compat_scope(class_key, owner, overrides, proj_map, globals, snap_sets, refs, defs,
-                         item: nil, effective_overrides: overrides)
+                         item: nil, effective_overrides: overrides, blocked: false)
           value = if owner && item
                     raw, level, = HardwareSets.item_mapping_source(item, proj_map, overrides)
                     %w[owner owner_class].include?(level) ? raw : nil
+                  elsif blocked && item
+                    # Uchovame aj starsi cab vyber, ktory triedny kluc nema.
+                    # Owner do rozsahu SKRINKY nepatri; vitaza vyberie resolver.
+                    raw, level, = HardwareSets.item_mapping_source(item.merge('owner_part_key' => ''), proj_map, overrides)
+                    %w[cab_class cab].include?(level) ? raw : nil
                   else
                     overrides[owner ? "#{class_key}@#{owner}" : class_key]
                   end
           opts = HardwareSets.class_set_options(class_key, globals, snap_sets, refs)
           cur = HardwareSets.mapping_option_id(value)
-          known = !cur.nil? && opts.any? { |o| o['id'] == cur }
+          known = !blocked && !cur.nil? && opts.any? { |o| o['id'] == cur }
           { 'class_key' => class_key,
             'class_label' => HardwareSets.class_key_label(class_key),
             'scope_label' => (owner ? 'Set pre toto čelo' : 'Set pre túto skrinku'),
@@ -2436,7 +2450,7 @@ module Noxun
         # položky, a legacy `typ@owner` len tam, kde položka klasifikáciu nemá.
         # Bez toho by po zmene otvárania/konštrukcie karta ukazovala DORMANTNÝ
         # výber starej triedy ako vybraný a mazanie by cielilo na iný kľúč.
-        def owner_set_overrides(overrides, gt, hardware)
+        def owner_set_overrides(overrides, gt, hardware, blocked: false, defs: {})
           active = active_class_by_owner(hardware, gt)
           out = {}
           overrides.each do |key, val|
@@ -2461,6 +2475,7 @@ module Noxun
               else
                 { 'set_id' => val.to_s }
               end
+            out[owner]['value_text'] = HardwareSets.mapping_value_text(val, defs) if blocked
           end
           out
         end

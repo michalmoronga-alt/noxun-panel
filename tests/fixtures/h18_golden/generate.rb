@@ -2,10 +2,12 @@
 # Rucny generator. Predzmenove odtlacky smie vytvorit LEN na pripnutom maine;
 # po implementacii prepise iba payload_po.json (--after), nikdy stare goldeny.
 require_relative 'cases'
+require_relative 'blocked_cases' if ARGV == ['--after']
 
 if ARGV == ['--after']
   abort 'predzmenove goldeny chybaju' unless File.file?(File.join(__dir__, 'source_pred.json'))
   File.write(File.join(__dir__, 'payload_po.json'), NxH18.matrix_json(NxH18.cases.to_h { |c| [c['id'], NxH18.payload(c)] }))
+  File.write(File.join(__dir__, 'blocked_payload_po.json'), NxH18.matrix_json(NxH18Blocked.cases.to_h { |c| [c['id'], NxH18.payload(c)] }))
 else
   abort 'ocakavane --after alebo ziadny argument' unless ARGV.empty?
   abort 'generator PRED smie bezat len nad starym kodom' if NxH18::HS.respond_to?(:resolve_mapping_source)

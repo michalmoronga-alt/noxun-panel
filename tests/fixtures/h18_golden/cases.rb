@@ -126,9 +126,15 @@ module NxH18
     # docasny katalog, preto explicitne pripneme POVODNY seed a vratime metodu.
     methods = [[P, :hardware_read_state], [HS, :load], [HS, :library_read_only?], [E::HardwareCatalog, :items]]
     originals = methods.to_h { |mod, name| [[mod, name], mod.method(name)] }
-    P.define_singleton_method(:hardware_read_state) { [c['status'] == 'blocked' ? :missing : :ok, c['state']] }
+    P.define_singleton_method(:hardware_read_state) do
+      [case c['status']
+       when 'blocked', 'missing' then :missing
+       when 'invalid' then :invalid
+       else :ok
+       end, c['state']]
+    end
     HS.define_singleton_method(:load) { { 'sets' => c['state']['sets'].values, 'mapping' => c['state']['mapping'] } }
-    HS.define_singleton_method(:library_read_only?) { c['status'] == 'blocked' }
+    HS.define_singleton_method(:library_read_only?) { c['status'] == 'blocked' || c['library_read_only'] == true }
     E::HardwareCatalog.define_singleton_method(:items) { NxH18.copy(E::HardwareCatalog::SEED_ITEMS) }
     yield
   ensure

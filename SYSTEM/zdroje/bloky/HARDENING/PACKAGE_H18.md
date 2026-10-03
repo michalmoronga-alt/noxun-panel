@@ -492,3 +492,34 @@ vizuálne ich ešte musí overiť Michal v smoke §10 po mergi/inštalácii. Z t
 Vlastný SketchUp PID112260 sa sám zavrel (exit 0), lock/sentinel odstránil runner; pôvodný ENGINEtests aj 85 živých NOXUN súborov byte/hash rovnaké.
 Po nahrávke INSTALL z čistého root mainu `2640f47b`: nainštalovaný **0.17.25**, všetkých 181 súborov zhodných s mainom; SU slot vrátený orchestrátorovi.
 Predrecenzia a GH review sú následné brány; smoke §10 po mergi a inštalácii overí Michal.
+
+## 17 · Oprava predrecenzie (Codex, 3.10.2026) — aktuálne dôkazy majú prednosť pred §16
+
+Predrecenzia BASE `2640f47b` → HEAD `54f55246`: **0 P1 / 2 P2, TREBA OPRAVIŤ**.
+[Surový výsledok](PREDRECENZIA_H18_raw.md) prenesený bez prepísania; oba nálezy root nezávisle reprodukoval.
+Koncept zostáva 3A, display-only; žiadna zmena resolvera, nákupu, exportu, configu ani tela writer handlera.
+
+- **P2-1:** pri `blocked` číta `compat.cab` uloženého víťaza `cab_class`/`cab` existujúcim `item_mapping_source` nad sondou bez ownera.
+  Aj generický `hinge` zostáva viditeľný ako disabled „(uložený výber)“; `current` je null. `none_label` a `own_count` ostávajú z účinných `{}`.
+- **P2-2:** iba `blocked` nesie serverový príznak `blocked: true` a uložené texty `override_value_text` / `owner_overrides[owner].value_text`.
+  Plochý cab aj owner kreslia vybranú disabled voľbu `__stored__`, pričom dedičná prvá voľba aj tooltip vychádzajú z účinných overrideov.
+  Normal, missing s kompatibilnou knižnicou a invalid snapshot tento nový stav nedostanú; ich správanie zostáva pôvodné.
+
+**Nezávislá regresia T10/Z7:** pôvodná reťaz `resolve_mapping_value` z main `2640f47b` je staticky pripnutá v `old_resolver.rb` (SHA256 kontrola),
+bez volania nového source helpera. `blocked_pred.json` oddeľuje uloženú mapu od účinného víťaza; pri plochom riadku dokazuje aj uložený-neúčinný
+výber výklopu bez systému. **160 nových prípadov**: classified/legacy × cab/class/owner/kombinácie × string, kompatibilný string, selector, invalid,
+sentinel × normal/missing-unblocked/invalid/blocked. Známy kompatibilný string má explicitný očakávaný current, nie odhad z aktuálnych options.
+Spolu **1402 prípadov / 1846 položiek**; Z1 kontroluje skutočne vybranú hodnotu a disabled stav, Z7 plochý uložený výber, prvú voľbu a tooltip.
+Posilnený oracle nad pôvodnou H18 hlavou `2d2c1b34` zachytí **894 rozchodov → po oprave 0** (pôvodná matica 1242 prípadov).
+
+**T0 povolený delta rozsah PO:** len blocked nové polia vyššie, `owner_default_label` a už povolené hinge `compat.current/stored/value_text`.
+`fixed_payload` ignoruje iba tieto konkrétne polia v blocked stave; T10 ich samostatne pripína na nezávislú pravdu. Žiadne ostatné polia neboli uvoľnené.
+Všetkých päť pôvodných R0 JSON ostáva bez diffu od `76ba4035`; PO fixture zmenená len týmto doloženým display rozsahom.
+**Mutácie M1–M29:** pôvodné M1–M23 zachované; M24 cab generic uložený víťaz, M25 plochý cab disabled, M26 effective dedenie,
+M27 plochý owner disabled, M28 iba skutočný blocked stav (aj nové missing/invalid regresie), M29 uložený owner text. Všetky zachytené.
+**Kontroly:** 5332 Ruby / 0 FAIL / 0 SKIP; 162 samostatných JS sád / 0 FAIL; H18 Ruby 9/0; encoding PASS.
+
+**T7 nový Record čaká na SU slot orchestrátora.** Nahrávka §16 nad `f204a536` neoveruje opravený tvar payloadu.
+Pred finálnym pushom musí vzniknúť nový `ui_foto -Record` z opravenej kódovej hlavy; evidovať jeho HEAD, priečinky, ukončenie procesu a obnovu mainu.
+Stará fotka zásuvkovej skrinky zostáva iba historický render, nie dôkaz nových závesových fieldov. Vizuálny smoke §10 stále čaká na Michala.
+Nová slepá delta a GH review sú ďalšie brány; H18b čaká na Q2.

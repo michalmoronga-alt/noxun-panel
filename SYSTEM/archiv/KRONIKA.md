@@ -17,6 +17,11 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H18 · oprava predrecenzie (3.10.2026, PR #?, v0.17.26).** Predrecenzia `54f55246`: 0 P1 / 2 P2, raw výsledok zachovaný.
+  Pri blocked knižnici sa uložený starší cab výber závesov nestratí; plochý cab/owner je disabled „(uložený výber)“, dedenie z effective mapy.
+  Koncept 3A, writer, resolver a nákup nezmenené. Pôvodných päť R0 JSON bez diffu; samostatný oracle zo starej reťaze a 160 regresií v štyroch stavoch.
+  **5332 Ruby/0 FAIL, 162 JS sád/0 FAIL, M1–M29 zhodené, encoding PASS**; nový Record a slepá delta čakajú. Dôkazy [PACKAGE_H18 §17](../zdroje/bloky/HARDENING/PACKAGE_H18.md#17--oprava-predrecenzie-codex-3102026--aktuálne-dôkazy-majú-prednosť-pred-16).
+
 - **H18 · pravdivý výber závesov v Inspectore (3.10.2026, PR #?, v0.17.26, blok 9 HARDENING, D-149; rozhodnutie Michala 3A).**
   Audit-povinná + výrobná/cenová (konzervatívne, len zobrazenie); audit návrhu uzavretý 2.10. (0 BLOCKER, 5 FIX, 3 NOTE), predrecenzia pred PR.
   Prvý commit `76ba4035` na starom kóde mainu `2640f47b`: resolver, payload, nezávislý oracle zdroja, cenový golden a matica zobrazenia.

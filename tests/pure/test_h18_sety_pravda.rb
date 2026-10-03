@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 # H18 T0/T1/T2/T5/T9: oracle a goldeny boli pripnute PRED zasahom (76ba4035).
 require_relative '../fixtures/h18_golden/cases'
+require_relative '../fixtures/h18_golden/blocked_cases'
 require 'digest'
 
 module NxH18Checks
@@ -48,7 +49,71 @@ module NxH18Checks
           scope.delete('none_label')
         end
       end
+      # P2 predrecenzie: LEN blocked dostal explicitne ulozene-neucinne
+      # texty a dedenie z effective mapy. T10 kontroluje kazde nove pole aj
+      # zmeneny owner_default_label proti nezavislej starej retazi.
+      if blocked
+        entry.delete('blocked')
+        entry.delete('override_value_text')
+        entry.delete('owner_default_label')
+        entry['owner_overrides'].each_value { |ov| ov.delete('value_text') }
+      end
       entry
+    end
+  end
+end
+
+NxTest.test('H18 T10: blocked ulozeny cab/owner, classified/legacy, string/selector/invalid aj unblocked stavy') do
+  NxTest.skip!('headless fixture context') unless NxTest.headless?
+  expected = NxH18.fixture('blocked_pred')
+  after = NxH18.fixture('blocked_payload_po')
+  # Predzmenova retaz je pripnuta bajtovo, nezavisi od noveho helpera.
+  path = File.join(NxH18::DIR, 'old_resolver.rb')
+  chain = File.read(path).gsub("\r\n", "\n")[/^  def resolve_mapping_value\b.*?^  end\n/m]
+  restored = chain.lines.map { |line| line == "\n" ? line : '    ' + line }.join
+  NxTest.assert_equal('ad8ebb4f2cfbfcdb8ac97371c2547e59550e84bbb5790e7156c91014427ebd67', Digest::SHA256.hexdigest(restored))
+  NxTest.assert(!chain.include?('resolve_mapping_source') && !chain.include?('item_mapping_source'))
+  (NxH18.cases + NxH18Blocked.cases).each do |c|
+    truth = expected.fetch(c['id'])
+    NxTest.assert_equal(truth, NxH18Blocked.truth(c), c['id'] + ' stary oracle immutable')
+    entry = NxH18.payload(c).find { |e| e['generic_type'] == c['gt'] }
+    next unless entry
+
+    blocked = c['status'] == 'blocked'
+    NxTest.assert_equal(blocked, entry.fetch('blocked', false), c['id'] + ' brana iba blocked')
+    NxTest.assert_equal(truth['own_keys'].length, entry['own_count'], c['id'] + ' effective count')
+    if blocked
+      NxTest.assert_equal(truth['flat_none_label'], entry['owner_default_label'], c['id'] + ' effective owner dedenie')
+      NxTest.assert_equal(truth['flat_cab_text'], entry['override_value_text'], c['id'] + ' ulozena cab hodnota')
+      truth['owners'].each do |owner, scope|
+        next if scope['class_key'] || scope['flat_raw'].nil?
+
+        NxTest.assert_equal(scope['flat_text'], entry['owner_overrides'].fetch(owner)['value_text'], c['id'] + ' ulozena owner hodnota')
+      end
+    else
+      NxTest.assert(!entry.key?('blocked') && !entry.key?('override_value_text'), c['id'] + ' ziadny novy flat stav')
+      NxTest.assert(entry['owner_overrides'].values.none? { |ov| ov.key?('value_text') }, c['id'] + ' ziadny novy owner stav')
+    end
+    compat = entry['compat']
+    if compat
+      scopes = compat['owners'].map { |owner, sc| [sc, truth['owners'].fetch(owner), true] }
+      scopes << [compat['cab'], truth.fetch('cab'), false] if compat['cab']
+      scopes.each do |scope, oracle, owner|
+        raw = if owner
+                saved = oracle['stored_winner']
+                %w[owner owner_class].include?(saved[1]) ? saved[0] : nil
+              else oracle['stored_value']
+              end
+        id = NxH18::HS.mapping_option_id(raw)
+        known = !blocked && id && scope['options'].any? { |o| o['id'] == id }
+        NxTest.assert_equal(known ? id : nil, scope['current'], c['id'] + ' current')
+        NxTest.assert_equal(!raw.nil? && !known, scope['stored'], c['id'] + ' stored')
+        NxTest.assert_equal(NxH18::HS.mapping_value_text(raw, c['state']['sets']), scope['value_text'], c['id'] + ' stored text')
+        NxTest.assert_equal(oracle['none_label'], scope['none_label'], c['id'] + ' effective inherited')
+      end
+    end
+    if c['id'].start_with?('P2/')
+      NxTest.assert_equal(after.fetch(c['id']), NxH18.payload(c), c['id'] + ' post aktualnost')
     end
   end
 end
