@@ -6,7 +6,7 @@
 
 ## Stav
 
-**v0.17.26 · 3.10.2026 — blok 9 HARDENING; H18 implementovaná, PR #?**: Inspector závesov ukáže skutočne použitý výber zo skrinky či krídla,
+**v0.17.26 · 3.10.2026 — blok 9 HARDENING; H18 implementovaná, PR #462**: Inspector závesov ukáže skutočne použitý výber zo skrinky či krídla,
 hlavička Sety ráta iba účinné výbery; „podľa staršieho výberu skrinky — Môj záves" už nesľubuje projekt. **Nákup a ceny bez zmeny** (predzmenové goldeny).
 Pod tým **H16** (PR #461): súpis [kniznice.md](../docs/architecture/kniznice.md), register `LibraryRegistry`; rozmerové rady a „18 + 36" ostávajú každému PC.
 Pod tým **H15a/H15b** (PR #459, #460): kovanie v súboroch `core/*_seed.rb` · **H11a** (PR #458): chyba súboru = jedna hláška; pád #1117 na 2026.2 rieši **H11c** · **H7a/H7b** (PR #456, #457): názov zákazky v hlavičke Štúdia · **H3–H6c, H8–H14b** (PR #435–#455): texty, nápovedy, čísla v Štúdiu, poškodené súbory a dve okná bez straty dát, SketchUp 2026+ — **čísla a exporty bez zmeny**.
@@ -24,13 +24,13 @@ ani nevyexportuje** (rohovú skrinku by sklopil na dolnú). **Rozpočet:** po pr
 **Ochranu pred poškodeným súborom nastavení (H9) má len 0.17.7+, nastavení exportu (H7a) 0.17.20+, ochranu dvoch okien 0.17.8+ (pravidlá) a 0.17.9+ (rady) — aktualizovať obe PC a potom zavrieť všetky okná SketchUpu** (staré okno zapisuje bez ochrany).
 **Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
 
-**Testy (H18, PR #?):** git 5333 Ruby/0 FAIL/0 SKIP, 162 JS PASS, M1–M34 zhodené; R0 nezmenené, encoding a Record/Shoot PASS. Slepá delta 0 P1/P2/P3; archív 5332/0/1 SKIP (bez .git). GH review a native smoke čakajú.
+**Testy (H18, PR #462):** git 5333 Ruby/0 FAIL/0 SKIP, 162 JS PASS, M1–M34 zhodené; R0 nezmenené, encoding a Record/Shoot PASS. Slepá delta 0 P1/P2/P3; archív 5332/0/1 SKIP (bez .git). GH review a native smoke čakajú.
 
 ## Robí sa
 
 **Blok 9 · HARDENING PO V1** (štart 1.10.2026, PR #432): krížový audit V1 sedmimi audítormi → Michalovo triedenie **35 Teraz · 29 Po V1 · 11 vyradených**; 17 dávok **H1…H17** sekvenčne podľa tabuľky v [PLAN.md](PLAN.md), **bez zmeny výrobných a cenových čísel**; priečinok bloku [zdroje/bloky/HARDENING/](zdroje/bloky/HARDENING/).
 Hotové **H1–H5** (PR #433–#440), **H6a–H6c** (PR #453–#455), **H7a/H7b** (nastavenia exportu + R-38, názov zákazky v hlavičke — PR #456, #457), **H8–H10b** (R-13, R-37, R-35 — PR #441–#444), **H11b** (PR #445),
-**H12a–d** (PR #446–#448, #452), **H13** (PR #449), **H14a/H14b** (PR #450, #451); **H11a** (PR #458, len načítanie; ukončovanie vrátené — poradie B na 26.0), **H15a/H15b** (PR #459, #460, seed dáta kovania), **H16** (PR #461, súpis knižníc), **H11c** = Z1 + audit, čaká, kým Michal nainštaluje 2026.2 na oboch PC; **H18** (závesy, 3A, PR #?; predrecenzia čistá).
+**H12a–d** (PR #446–#448, #452), **H13** (PR #449), **H14a/H14b** (PR #450, #451); **H11a** (PR #458, len načítanie; ukončovanie vrátené — poradie B na 26.0), **H15a/H15b** (PR #459, #460, seed dáta kovania), **H16** (PR #461, súpis knižníc), **H11c** = Z1 + audit, čaká, kým Michal nainštaluje 2026.2 na oboch PC; **H18** (závesy, 3A, PR #462; predrecenzia čistá).
 **H18b (D-150) čaká na Michalovu odpoveď Q2**; Q1 predvolené A (starý výber sa nemaže).
 **Otázky bez odpovede, platí návrh:** H12 Q1 (karta dielca ako Kusovník — zavedené v H12d) · H11 Q2 (starší SketchUp = nenačíta sa, jedna hláška) · H11 Q3 (kedy 2026.2) · H10b Q2 (rôzne rady sa zlúčia bez hlášky, ten istý rad = hláška) · H10a Q1 (cudzí globál = neuloží sa nič)
 · H9 Q1/Q2 (pri čítaní zo zálohy bez nálezu v Kontrole, bez tlačidla „Obnoviť zo zálohy") · H8 Q1/Q2 (veta o značke verzie, bez tlačidla) · H4b Q1/Q2 (vrátenie katalógu v ponuke „⋯" Materiálov, ikona posuvníkov pre Nastavenia rozpočtu).

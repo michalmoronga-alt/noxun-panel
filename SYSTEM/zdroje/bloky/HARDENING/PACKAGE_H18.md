@@ -564,7 +564,7 @@ Pred PR čaká čerstvá slepá delta `ba4431aa..fixHEAD`; následné GH review,
 
 ## 19 · Predrecenzia uzavretá (Codex, 3.10.2026) — aktuálny výsledok
 
-**H18, PR #?:** čerstvá nezávislá slepá delta `ba4431aa9f0e859f6bec05058dc55c0deef75e12..29a2f6f2d06da72ae2eb9cbd56322d909f27e99e`
+**H18, PR #462:** čerstvá nezávislá slepá delta `ba4431aa9f0e859f6bec05058dc55c0deef75e12..29a2f6f2d06da72ae2eb9cbd56322d909f27e99e`
 vrátila **0 P1/P2/P3; VERDIKT OPRAVA OK**. [Surový výsledok](PREDRECENZIA_H18_mixed_delta_raw.md) prenesený verbatim.
 Pôvodné 2 P2 (§17) aj ďalšia 1 P2 (§18) opravené; koncept 3A bez zmeny. Po kódovej hlave nasledujú len docs-only commity.
 Root osobitne overil `29a2f6f2..b70836ba` ako doc-only a vlastný H18 JS beh **1402 prípadov PASS**.

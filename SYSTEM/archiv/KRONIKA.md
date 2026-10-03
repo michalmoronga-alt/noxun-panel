@@ -17,14 +17,14 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H18 · predrecenzia uzavretá (3.10.2026, PR #?, v0.17.26).** Čerstvá slepá delta `ba4431aa..29a2f6f2`: **0 P1/P2/P3, OPRAVA OK**;
+- **H18 · predrecenzia uzavretá (3.10.2026, PR #462, v0.17.26).** Čerstvá slepá delta `ba4431aa..29a2f6f2`: **0 P1/P2/P3, OPRAVA OK**;
   pôvodné 2 P2 aj následná 1 P2 opravené. Recenzent v izolovanom archíve: **5332 Ruby/0 FAIL/1 SKIP** (chýba `.git`), 162 JS sád PASS,
   H18 10 PASS + 1402 prípadov bez rozchodov, samostatný encoding PASS. Aktuálny plný clean-git beh implementátora ostáva **5333/0/0**.
   Raw výsledok prenesený verbatim; root overil následný doc-only delta `29a2f6f2..b70836ba` aj vlastný JS beh 1402 PASS.
   Kód, goldeny a verzia bez ďalšej zmeny. Kvótová brána pred PR: Codex weekly 83 % zostáva; GH/CI spracuje root, native hinge/mixed smoke a H18b Q2 čakajú.
   [PACKAGE_H18 §19](../zdroje/bloky/HARDENING/PACKAGE_H18.md).
 
-- **H18 · oprava P2 slepej delty (3.10.2026, PR #?, v0.17.26).** Zmiešané triedy pri nekompatibilnej knižnici zobrazia uložený skrinkový set ako
+- **H18 · oprava P2 slepej delty (3.10.2026, PR #462, v0.17.26).** Zmiešané triedy pri nekompatibilnej knižnici zobrazia uložený skrinkový set ako
   neaktívny text „uložený výber — nepoužíva sa“. Žiadny nový ovládač; Ruby, payload, writer, resolver, nákup a všetky JSON bez zmeny voči `ba4431aa`.
   Ľahký refresh text aktualizuje aj odstráni, zachová rozpísaný počet a fokus. Nezávislý Z8 nad skutočným renderom: `ba4431aa` **54 chýb → fix 0**;
   oba Dmix/Dmixleg prípady reprodukované. **5333 Ruby/0 FAIL/0 SKIP, 162 JS sád/0 FAIL, M1–M34 zhodené, encoding PASS**.
@@ -37,12 +37,12 @@
   Vlastný SketchUp PID123448 aj launcher PID113940 exit 0; bez zostávajúcej inštancie či locku. Main `2640f47b`/0.17.25 obnovený, 181 installed súborov,
   85 live súborov a pôvodný model SHA zhodné; SU slot vrátený. Presné cesty a limity [PACKAGE_H18 §17](../zdroje/bloky/HARDENING/PACKAGE_H18.md#17--oprava-predrecenzie-codex-3102026--aktuálne-dôkazy-majú-prednosť-pred-16).
 
-- **H18 · oprava predrecenzie (3.10.2026, PR #?, v0.17.26).** Predrecenzia `54f55246`: 0 P1 / 2 P2, raw výsledok zachovaný.
+- **H18 · oprava predrecenzie (3.10.2026, PR #462, v0.17.26).** Predrecenzia `54f55246`: 0 P1 / 2 P2, raw výsledok zachovaný.
   Pri blocked knižnici sa uložený starší cab výber závesov nestratí; plochý cab/owner je disabled „(uložený výber)“, dedenie z effective mapy.
   Koncept 3A, writer, resolver a nákup nezmenené. Pôvodných päť R0 JSON bez diffu; samostatný oracle zo starej reťaze a 160 regresií v štyroch stavoch.
   **5332 Ruby/0 FAIL, 162 JS sád/0 FAIL, M1–M29 zhodené, encoding PASS**; nový Record a slepá delta čakajú. Dôkazy [PACKAGE_H18 §17](../zdroje/bloky/HARDENING/PACKAGE_H18.md#17--oprava-predrecenzie-codex-3102026--aktuálne-dôkazy-majú-prednosť-pred-16).
 
-- **H18 · pravdivý výber závesov v Inspectore (3.10.2026, PR #?, v0.17.26, blok 9 HARDENING, D-149; rozhodnutie Michala 3A).**
+- **H18 · pravdivý výber závesov v Inspectore (3.10.2026, PR #462, v0.17.26, blok 9 HARDENING, D-149; rozhodnutie Michala 3A).**
   Audit-povinná + výrobná/cenová (konzervatívne, len zobrazenie); audit návrhu uzavretý 2.10. (0 BLOCKER, 5 FIX, 3 NOTE), predrecenzia pred PR.
   Prvý commit `76ba4035` na starom kóde mainu `2640f47b`: resolver, payload, nezávislý oracle zdroja, cenový golden a matica zobrazenia.
   **1 242 prípadov / 1 686 položiek, 1 979 rozdielov → 0.** Reťaz výberu má jednu autoritu s hodnotou, zdrojom a kľúčom; serverové `own_count`,
