@@ -1090,7 +1090,7 @@ projekcie** uloženého configu a plánu — žiadny zápis. Kontrakt vkladacej 
   Pri `blocked` a `override_value_text` kreslí `hwStoredCabRowsHtml` v Setoch iba neaktívny text „skrinka: … (uložený výber) — nepoužíva sa“,
   plný text v `title`. `hwSetRowsEmpty` je počas tohto zobrazenia skrytý; ľahký refresh ho po odstránení textu znovu ukáže, ak nie je skrinkový select.
   Owner selecty a ich účinné dedenie sa tým nemenia, zmiešaný skrinkový zápis zostáva nedostupný.
-  JS iba kreslí, posiela pôvodné `set_id` / `value`; kľúč skladá `HardwareSets.apply_cabinet_override`. H18 jeho zápis nemení (D-150 čaká na Q2).
+  JS iba kreslí, posiela pôvodné `set_id` / `value`; kľúč skladá `HardwareSets.apply_cabinet_override`: pri závese krídla dvierok aj sklopu `hinge@<krídlo>`.
   Testy `test_kovd1b_ui` a `test_h18_sety_pravda` (Ruby + JS).
 
 Plné znenie: archív, „payloads.rb".
@@ -1269,7 +1269,7 @@ Doména panela: ručné zásahy do kovania (`handle_set_hardware_override` — z
 (`handle_set_hardware_set`). Pravidlá a sety: [hardware.md](hardware.md); UI: „Kontext Kovanie". Obe cesty overujú dokument **pred** `cabinet_id` a zápis beží ako
 jeden rebuild = jeden krok Späť.
 Po zrušení výberu `hw_set_status_msg` neutrálne hlási „výber zrušený"; dedenie vysvetľuje riadok setu. Telo `handle_set_hardware_set` zostáva
-v H18 nezmenené (zdrojový guard), vrátane existujúceho problému zápisu pri klasifikovanom krídle (D-150).
+nezmenené (zdrojový guard); `apply_cabinet_override` pri klasifikovanom závese s vlastníkom zapisuje `hinge@<krídlo>` so zachovanou validáciou triedy.
 
 - **`OVERRIDE_FIELDS`** (`quantity` · `disabled` · `nominal_length` · `height_variant` · `box_height`) sa **musí zhodovať** s `CabinetBuilder::OVERRIDE_CONTENT_KEYS`
   (guard test).

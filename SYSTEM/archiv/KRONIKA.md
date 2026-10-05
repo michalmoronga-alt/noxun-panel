@@ -17,6 +17,13 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H18b-1 · implementácia vo vetve (5.10.2026, v0.17.27, výrobná/cenová dávka).** Michal schválil Q2 „H18B opraviť“; Q1 A/Q3 A ostávajú, H18b-2 sa nerobí.
+  Štart main `c6bba0b9` (H18 v0.17.26, PR #462), R0 commit `4a815dee` pred editom pluginu: 2816 zápisov a nákup reálnych skriniek R1–R8.
+  Klasifikovaný záves krídla zapisuje `hinge@<krídlo>` a tento kľúč neodstraňuje ako stale; validácia ostáva, F10 číta skutočne uložený výber.
+  Resolver, handler, parser a normalizácia bez zmeny vykonateľného tela; H18 goldeny bez regenerácie. D-151/D-152 sú zásobník.
+  Plná Ruby sada 5340/0/0 (cielená 7/0/0), všetkých 163 JS sád PASS, M1–M10 zhodené; súbory po mutáciách obnovené bajtovo. In-SU, predrecenzia a PR ešte čakajú.
+  Predchádzajúci STAV: H18 zobrazuje účinný set a ráta vlastné výbery; git 5333 Ruby/0/0, 162 JS, M1–M34; archív 5332/0/1 bez .git.
+
 - **H18 · predrecenzia uzavretá (3.10.2026, PR #462, v0.17.26).** Čerstvá slepá delta `ba4431aa..29a2f6f2`: **0 P1/P2/P3, OPRAVA OK**;
   pôvodné 2 P2 aj následná 1 P2 opravené. Recenzent v izolovanom archíve: **5332 Ruby/0 FAIL/1 SKIP** (chýba `.git`), 162 JS sád PASS,
   H18 10 PASS + 1402 prípadov bez rozchodov, samostatný encoding PASS. Aktuálny plný clean-git beh implementátora ostáva **5333/0/0**.

@@ -1,9 +1,9 @@
-> **Prenesený návrh, bez autorizácie implementácie (3.10.2026).** Posledné potvrdenie orchestrátora má prednosť pred staršími
-> predvolenými vetami: **H18b-1 čaká na Michalovu odpoveď Q2**, H18b-2 len pri Q1 B. H18 nepridáva zápis ani nemení nákup.
+> **Autorizácia Michala (5.10.2026): „H18B opraviť“; „pokračovať“.** Q2 = oprava H18b-1, implementácia schválená.
+> Q1 A a Q3 A ostávajú; H18b-2 sa nerobí. D-151/D-152 sú mimo scope. Povinná predrecenzia a in-SU brána ostávajú.
 
 # PACKAGE H18b · Výber setu závesov pri krídle dvierok naozaj platí (D-150) — blok 9 HARDENING
 
-> **Autorita:** Michal — otázka **Q2** z PACKAGE_H18 §13 bez odpovede → platí predvolené **A**: „opraviť samostatnou dávkou H18b hneď po H18, aby výber pri
+> **Autorita:** Michal — otázka **Q2** z PACKAGE_H18 §13 výslovne schválená **5.10.2026**: „opraviť samostatnou dávkou H18b hneď po H18, aby výber pri
 > krídle naozaj platil (výrobná dávka, test v SketchUpe)". **Q1** (voľba „podľa projektu" v riadku skrinky zmaže aj starý výber) bez odpovede → predvolené **A**
 > (nič sa nemaže); variant **B** je **voliteľná časť H18b-2** s vlastným rozhodnutím Michala (§13). Nález: PACKAGE_H18 §14 F1 / **D-150**, sonda H18 S13,
 > audit H18 **NOTE 7** („zápis `hinge@<wing>` so zachovanou klasifikačnou validáciou je správny smer; povoliť `class:hinge|…@wing` v parseri nestačí").
@@ -203,7 +203,7 @@ prestavba, starší výber krídla, odmietnutie bez kroku Späť, kópia).
 - **T1 · nákup reálnych skriniek** R1–R8: očakávanie skladá **nezmenený** `expand` nad mapou „východisková − `hinge@<v>` + `hinge@<v>` ⇒ hodnota"; scenáre bez
   výberu pri krídle (R3, R6, R8, stav „pred") bajtovo == `nakup_pred.json`.
 - **T2 · invariant „zápis sa prečíta":** 11 druhov × rozsah: zápis značky (bez `known_sets`) → `norm_hardware_sets` (bez čiel aj s reálnymi čelami tam, kde
-  existujú) → `resolve_mapping_value` vráti značku. **Jediná vymenovaná výnimka: výklop bez systému** (assert „mŕtvy" výslovne, komentár D-151 — keď ho niekto opraví,
+  existujú) → `resolve_mapping_value` vráti značku. **Výklop bez systému:** raw resolver značku číta, ale spotrebiteľ `resolve_set_id` vracia `[nil, 'lift_system_missing', {}]` (D-151 — keď ho niekto opraví,
   test sa zmení vedome).
 - **T3 · validácia:** Tip-On krídlo + KLASIK → `:invalid` s vetou „nesedí klasifikácii čela (iný spôsob otvárania)"; set iného typu → `:invalid`; **neaktívny** set
   novo pri krídle → `:invalid`; **neaktívny uložený** výber krídla znovu uložiť → `:ok` (F10 výnimka teraz platí aj pre krídlo — vymenovaná zmena správania);
@@ -348,4 +348,12 @@ hlava. Číslo PR: `PR #?` → samostatný commit.
 
 **Potvrdenie orchestrátora (3.10.2026 ~00:20):** D1 áno (`hinge@<krídlo>` — kľúč, ktorý resolver číta prvý, žiadny nový triedny kľúč) · **D4 áno — H18b-1 bez auditu
 návrhu** (kľúč je v kontrakte od H1a, resolver ho číta od KOV-F1; nemení sa schéma, undo ani migrácia) · D5 áno. Trieda H18b-1: výrobná/cenová, **in-SU brána**,
-predrecenzia povinná. **Implementácia H18b-1 ČAKÁ na Michalovu odpoveď Q2** (mení, čo sa objedná). H18b-2 len pri Q1 B, samostatný PR + audit. Q3 predvolené A.
+predrecenzia povinná. **Historický WAIT bol zrušený Michalovým schválením Q2 5.10.2026** (mení, čo sa objedná). H18b-2 len pri Q1 B, samostatný PR + audit. Q3 predvolené A.
+
+
+## 15 · Implementácia H18b-1 (5.10.2026)
+
+- Michal výslovne autorizoval opravu Q2; Q1 A/Q3 A ostávajú, H18b-2 sa nerobí. D-151/D-152 bez opravy.
+- Štart `c6bba0b96d96efc63b0f90c9083e77b66bd98d52` (v0.17.26), vetva `fix/h18b-wing-selection`. R0 baseline `4a815dee` vznikol pred produkčnou editáciou; 2816 kombinácií, 8 scenárov z `Construction.build_plan` s explicitným `owner_id`. PRED fixtúry ~174 kB; H18 goldeny sa neregenerujú.
+- T2 upresnené proti živému zdroju: `resolve_mapping_value` číta aj raw značku výklopu bez systému; skutočný spotrebiteľ `resolve_set_id` skončí `[nil, lift_system_missing, {}]`. Test pripína obe správania, D-151 sa nemení.
+- Lokálna cielená sada T0–T6: 7 PASS/0 FAIL/0 SKIP; JS3 scenáre PASS, všetkých 163 JS sád PASS. M1–M10 zhodené; po každom behu súbory obnovené bajtovo. Plná Ruby sada 5340 PASS/0 FAIL/0 SKIP, encoding a docs guard PASS; predrecenzia a in-SU sa doplnia pred PR.

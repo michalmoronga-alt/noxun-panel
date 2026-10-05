@@ -204,3 +204,8 @@ bez zálohy — otvorené (bez zmeny) · Q5 „dolná" · Q11 H14 text nechať �
 - **H11a (7A):** pri chybe súboru pluginu **vypnúť celý plugin**.
 - **ABS a kovanie bez zálohy (8B):** len log → zásobník Po V1.
 - **SketchUp 2026.2:** Michal ho nainštaluje na oboch PC a dá vedieť — **H11c čaká**.
+
+
+### Odpoveď 5.10.2026 — H18b
+
+Michal: **„H18B opraviť“**, **„pokračovať“** — výslovné schválenie Q2 opravy H18b-1 (D-150). Q1 A a Q3 A ostávajú; H18b-2 ani D-151/D-152 sa neimplementujú. Výrobná/cenová dávka, predrecenzia a in-SU ostávajú brány. Voľba implementačných subagentov 6.1 SOL platí pre toto sedenie; globálna tabuľka rolí sa nemení.

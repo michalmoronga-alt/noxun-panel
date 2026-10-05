@@ -1,0 +1,428 @@
+{
+  "R1": {
+    "owner": "front:F1/wing:single",
+    "value": "blum-tipon",
+    "payload": [
+      {
+        "generic_type": "leg",
+        "own_count": 0,
+        "label": "Nohy",
+        "project_set_id": "nohy-podla-sokla",
+        "project_set_name": "Nohy podľa výšky sokla",
+        "project_selector": null,
+        "project_label": "podľa projektu — Nohy podľa výšky sokla",
+        "override_set_id": null,
+        "override_selector": null,
+        "override_label": null,
+        "owner_overrides": {
+        },
+        "owner_default_label": "podľa projektu — Nohy podľa výšky sokla",
+        "compat": null,
+        "status": "ok",
+        "options": [
+          {
+            "set_id": "nohy-klzak-17",
+            "name": "Klzák s rektifikáciou 17 mm"
+          },
+          {
+            "set_id": "nohy-axilo-150",
+            "name": "Noha AXILO 150 mm"
+          },
+          {
+            "set_id": "nohy-podla-sokla",
+            "name": "Nohy podľa výšky sokla"
+          }
+        ]
+      },
+      {
+        "generic_type": "plinth_clip",
+        "own_count": 0,
+        "label": "Príchyt sokla",
+        "project_set_id": "prichyt-sokla-axilo",
+        "project_set_name": "Príchyt sokla AXILO",
+        "project_selector": null,
+        "project_label": "podľa projektu — Príchyt sokla AXILO",
+        "override_set_id": null,
+        "override_selector": null,
+        "override_label": null,
+        "owner_overrides": {
+        },
+        "owner_default_label": "podľa projektu — Príchyt sokla AXILO",
+        "compat": null,
+        "status": "ok",
+        "options": [
+          {
+            "set_id": "prichyt-sokla-axilo",
+            "name": "Príchyt sokla AXILO"
+          }
+        ]
+      },
+      {
+        "generic_type": "hinge",
+        "own_count": 1,
+        "label": "Závesy",
+        "project_set_id": "zaves-klasik",
+        "project_set_name": "Záves KLASIK (Sensys 110° SiSy)",
+        "project_selector": null,
+        "project_label": "podľa projektu — Záves KLASIK (Sensys 110° SiSy)",
+        "override_set_id": null,
+        "override_selector": null,
+        "override_label": null,
+        "owner_overrides": {
+        },
+        "owner_default_label": "podľa projektu — Záves KLASIK (Sensys 110° SiSy)",
+        "compat": {
+          "cab": {
+            "class_key": "class:hinge|tipon",
+            "class_label": "Závesy · Tip-On",
+            "scope_label": "Set pre túto skrinku",
+            "none_label": "podľa projektu — Záves P2O + TipOn (bez tlmenia)",
+            "options": [
+              {
+                "id": "set:blum-tipon",
+                "label": "Blum Tip-On záves",
+                "set_id": "blum-tipon"
+              },
+              {
+                "id": "set:zaves-p2o",
+                "label": "Záves P2O + TipOn (bez tlmenia)",
+                "set_id": "zaves-p2o"
+              }
+            ],
+            "current": null,
+            "stored": false,
+            "value_text": "bez setu"
+          },
+          "owners": {
+            "front:F1/wing:single": {
+              "class_key": "class:hinge|tipon",
+              "class_label": "Závesy · Tip-On",
+              "scope_label": "Set pre toto čelo",
+              "none_label": "podľa projektu — Záves P2O + TipOn (bez tlmenia)",
+              "options": [
+                {
+                  "id": "set:blum-tipon",
+                  "label": "Blum Tip-On záves",
+                  "set_id": "blum-tipon"
+                },
+                {
+                  "id": "set:zaves-p2o",
+                  "label": "Záves P2O + TipOn (bez tlmenia)",
+                  "set_id": "zaves-p2o"
+                }
+              ],
+              "current": "set:blum-tipon",
+              "stored": false,
+              "value_text": "Blum Tip-On záves"
+            }
+          }
+        },
+        "status": "ok",
+        "options": [
+          {
+            "set_id": "blum-tipon",
+            "name": "Blum Tip-On záves"
+          },
+          {
+            "set_id": "moj-zaves",
+            "name": "Môj záves"
+          },
+          {
+            "set_id": "zaves-klasik",
+            "name": "Záves KLASIK (Sensys 110° SiSy)"
+          },
+          {
+            "set_id": "zaves-p2o",
+            "name": "Záves P2O + TipOn (bez tlmenia)"
+          }
+        ]
+      }
+    ]
+  },
+  "R2": {
+    "owner": "front:F1/wing:single",
+    "value": "blum-tipon",
+    "payload": [
+      {
+        "generic_type": "leg",
+        "own_count": 0,
+        "label": "Nohy",
+        "project_set_id": "nohy-podla-sokla",
+        "project_set_name": "Nohy podľa výšky sokla",
+        "project_selector": null,
+        "project_label": "podľa projektu — Nohy podľa výšky sokla",
+        "override_set_id": null,
+        "override_selector": null,
+        "override_label": null,
+        "owner_overrides": {
+        },
+        "owner_default_label": "podľa projektu — Nohy podľa výšky sokla",
+        "compat": null,
+        "status": "ok",
+        "options": [
+          {
+            "set_id": "nohy-klzak-17",
+            "name": "Klzák s rektifikáciou 17 mm"
+          },
+          {
+            "set_id": "nohy-axilo-150",
+            "name": "Noha AXILO 150 mm"
+          },
+          {
+            "set_id": "nohy-podla-sokla",
+            "name": "Nohy podľa výšky sokla"
+          }
+        ]
+      },
+      {
+        "generic_type": "plinth_clip",
+        "own_count": 0,
+        "label": "Príchyt sokla",
+        "project_set_id": "prichyt-sokla-axilo",
+        "project_set_name": "Príchyt sokla AXILO",
+        "project_selector": null,
+        "project_label": "podľa projektu — Príchyt sokla AXILO",
+        "override_set_id": null,
+        "override_selector": null,
+        "override_label": null,
+        "owner_overrides": {
+        },
+        "owner_default_label": "podľa projektu — Príchyt sokla AXILO",
+        "compat": null,
+        "status": "ok",
+        "options": [
+          {
+            "set_id": "prichyt-sokla-axilo",
+            "name": "Príchyt sokla AXILO"
+          }
+        ]
+      },
+      {
+        "generic_type": "hinge",
+        "own_count": 1,
+        "label": "Závesy",
+        "project_set_id": "zaves-klasik",
+        "project_set_name": "Záves KLASIK (Sensys 110° SiSy)",
+        "project_selector": null,
+        "project_label": "podľa projektu — Záves KLASIK (Sensys 110° SiSy)",
+        "override_set_id": null,
+        "override_selector": null,
+        "override_label": null,
+        "owner_overrides": {
+        },
+        "owner_default_label": "podľa projektu — Záves KLASIK (Sensys 110° SiSy)",
+        "compat": {
+          "cab": {
+            "class_key": "class:hinge|tipon",
+            "class_label": "Závesy · Tip-On",
+            "scope_label": "Set pre túto skrinku",
+            "none_label": "podľa projektu — Záves P2O + TipOn (bez tlmenia)",
+            "options": [
+              {
+                "id": "set:blum-tipon",
+                "label": "Blum Tip-On záves",
+                "set_id": "blum-tipon"
+              },
+              {
+                "id": "set:zaves-p2o",
+                "label": "Záves P2O + TipOn (bez tlmenia)",
+                "set_id": "zaves-p2o"
+              }
+            ],
+            "current": null,
+            "stored": false,
+            "value_text": "bez setu"
+          },
+          "owners": {
+            "front:F1/wing:single": {
+              "class_key": "class:hinge|tipon",
+              "class_label": "Závesy · Tip-On",
+              "scope_label": "Set pre toto čelo",
+              "none_label": "podľa projektu — Záves P2O + TipOn (bez tlmenia)",
+              "options": [
+                {
+                  "id": "set:blum-tipon",
+                  "label": "Blum Tip-On záves",
+                  "set_id": "blum-tipon"
+                },
+                {
+                  "id": "set:zaves-p2o",
+                  "label": "Záves P2O + TipOn (bez tlmenia)",
+                  "set_id": "zaves-p2o"
+                }
+              ],
+              "current": "set:blum-tipon",
+              "stored": false,
+              "value_text": "Blum Tip-On záves"
+            }
+          }
+        },
+        "status": "ok",
+        "options": [
+          {
+            "set_id": "blum-tipon",
+            "name": "Blum Tip-On záves"
+          },
+          {
+            "set_id": "moj-zaves",
+            "name": "Môj záves"
+          },
+          {
+            "set_id": "zaves-klasik",
+            "name": "Záves KLASIK (Sensys 110° SiSy)"
+          },
+          {
+            "set_id": "zaves-p2o",
+            "name": "Záves P2O + TipOn (bez tlmenia)"
+          }
+        ]
+      }
+    ]
+  },
+  "R4": {
+    "owner": "front:F1/wing:left",
+    "value": "zaves-klasik",
+    "payload": [
+      {
+        "generic_type": "leg",
+        "own_count": 0,
+        "label": "Nohy",
+        "project_set_id": "nohy-podla-sokla",
+        "project_set_name": "Nohy podľa výšky sokla",
+        "project_selector": null,
+        "project_label": "podľa projektu — Nohy podľa výšky sokla",
+        "override_set_id": null,
+        "override_selector": null,
+        "override_label": null,
+        "owner_overrides": {
+        },
+        "owner_default_label": "podľa projektu — Nohy podľa výšky sokla",
+        "compat": null,
+        "status": "ok",
+        "options": [
+          {
+            "set_id": "nohy-klzak-17",
+            "name": "Klzák s rektifikáciou 17 mm"
+          },
+          {
+            "set_id": "nohy-axilo-150",
+            "name": "Noha AXILO 150 mm"
+          },
+          {
+            "set_id": "nohy-podla-sokla",
+            "name": "Nohy podľa výšky sokla"
+          }
+        ]
+      },
+      {
+        "generic_type": "plinth_clip",
+        "own_count": 0,
+        "label": "Príchyt sokla",
+        "project_set_id": "prichyt-sokla-axilo",
+        "project_set_name": "Príchyt sokla AXILO",
+        "project_selector": null,
+        "project_label": "podľa projektu — Príchyt sokla AXILO",
+        "override_set_id": null,
+        "override_selector": null,
+        "override_label": null,
+        "owner_overrides": {
+        },
+        "owner_default_label": "podľa projektu — Príchyt sokla AXILO",
+        "compat": null,
+        "status": "ok",
+        "options": [
+          {
+            "set_id": "prichyt-sokla-axilo",
+            "name": "Príchyt sokla AXILO"
+          }
+        ]
+      },
+      {
+        "generic_type": "hinge",
+        "own_count": 2,
+        "label": "Závesy",
+        "project_set_id": "zaves-klasik",
+        "project_set_name": "Záves KLASIK (Sensys 110° SiSy)",
+        "project_selector": null,
+        "project_label": "podľa projektu — Záves KLASIK (Sensys 110° SiSy)",
+        "override_set_id": "moj-zaves",
+        "override_selector": null,
+        "override_label": null,
+        "owner_overrides": {
+        },
+        "owner_default_label": "podľa skrinky — Môj záves",
+        "compat": {
+          "cab": {
+            "class_key": "class:hinge|classic",
+            "class_label": "Závesy · Klasické",
+            "scope_label": "Set pre túto skrinku",
+            "none_label": "podľa staršieho výberu skrinky — Môj záves",
+            "options": [
+              {
+                "id": "set:zaves-klasik",
+                "label": "Záves KLASIK (Sensys 110° SiSy)",
+                "set_id": "zaves-klasik"
+              }
+            ],
+            "current": null,
+            "stored": false,
+            "value_text": "bez setu"
+          },
+          "owners": {
+            "front:F1/wing:left": {
+              "class_key": "class:hinge|classic",
+              "class_label": "Závesy · Klasické",
+              "scope_label": "Set pre toto čelo",
+              "none_label": "podľa staršieho výberu skrinky — Môj záves",
+              "options": [
+                {
+                  "id": "set:zaves-klasik",
+                  "label": "Záves KLASIK (Sensys 110° SiSy)",
+                  "set_id": "zaves-klasik"
+                }
+              ],
+              "current": "set:zaves-klasik",
+              "stored": false,
+              "value_text": "Záves KLASIK (Sensys 110° SiSy)"
+            },
+            "front:F1/wing:right": {
+              "class_key": "class:hinge|classic",
+              "class_label": "Závesy · Klasické",
+              "scope_label": "Set pre toto čelo",
+              "none_label": "podľa staršieho výberu skrinky — Môj záves",
+              "options": [
+                {
+                  "id": "set:zaves-klasik",
+                  "label": "Záves KLASIK (Sensys 110° SiSy)",
+                  "set_id": "zaves-klasik"
+                }
+              ],
+              "current": null,
+              "stored": false,
+              "value_text": "bez setu"
+            }
+          }
+        },
+        "status": "ok",
+        "options": [
+          {
+            "set_id": "blum-tipon",
+            "name": "Blum Tip-On záves"
+          },
+          {
+            "set_id": "moj-zaves",
+            "name": "Môj záves"
+          },
+          {
+            "set_id": "zaves-klasik",
+            "name": "Záves KLASIK (Sensys 110° SiSy)"
+          },
+          {
+            "set_id": "zaves-p2o",
+            "name": "Záves P2O + TipOn (bez tlmenia)"
+          }
+        ]
+      }
+    ]
+  }
+}

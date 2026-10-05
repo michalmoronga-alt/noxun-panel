@@ -868,6 +868,8 @@ ktorý tá trieda nikdy nemá, a resolver by ho nikdy neprečítal. Platia štyr
 - **Triedny kľúč (bez ownera) prijímajú aj `set_global_mapping!`/`set_project_mapping!`** — mení sa vždy JEDEN kľúč, ostatné mapovania ostávajú a definície všetkých setov
   selektora sa zmrazia do snapshotu v tom istom zápise.
 
+**Záves (dvierka aj sklop) owner triedny kľúč nemá** — výber pre jedno krídlo je `hinge@<part_key>`, prvý stupeň precedencie závesu; zápis ho validuje proti klasifikácii krídla rovnako ako triedny zápis.
+
 **NEAKTÍVNY SET (KOV-D1a).** `active: false` znamená „už sa NEDÁ NOVO vybrať" — na všetkých zapisovacích cestách (globál, projekt, override skrinky) a **bez ohľadu na to, či
 je položka klasifikovaná**. **Už uložená hodnota sa zobrazuje a zachováva** a expanzia je na príznak naďalej slepá, takže deaktivácia setu **nemení nákup existujúcej
 zákazky**. Neplatná aktuálna hodnota ostáva s chybou — nikdy sa nenahradí prvou kompatibilnou.

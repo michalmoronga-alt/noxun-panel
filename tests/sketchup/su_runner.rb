@@ -26189,6 +26189,7 @@ module NoxunSuRunner
       kovf_out_of_table(model, markers)
       kovf_stale(model)
       kovf_cabinet_set(model)
+      kovf_wing_set(model)
     ensure
       r03_clear_markers(model, markers)
       sets.delete_set!(KOVF_ALT_SET, revision: sets.revision)
@@ -26452,6 +26453,113 @@ module NoxunSuRunner
     ok('KOV-F vlastny set: ziadny nesulad klasifikacie (set je na dvierka, klasicky)',
        kovf_ctrl(model).none? { |i| i['category'] == e::Validation::CAT_HW_MISMATCH })
     cleanup(model)
+  end
+
+  # H18b-1 D-150: realna akcia kridla musi zapisat to, co nakup precita.
+  def kovf_wing_set(model)
+    cleanup(model)
+    markers = []
+    rec = []
+    install_js_recorder(rec)
+    begin
+      inst = kovf_build(model, 800.0, 900.0, 'wings' => '2')
+      return ok('H18b: vlozenie dvoch kridiel', false) unless inst
+
+      cid = e::Store.get(inst, 'cabinet_id')
+      owner = 'front:F1/wing:left'
+      key = "hinge@#{owner}"
+      model.selection.clear
+      model.selection.add(inst)
+      action = lambda do |value|
+        e::Panel.handle_set_hardware_set(pg(model, 'generic_type' => 'hinge',
+                                           'set_id' => value, 'owner_part_key' => owner, 'cabinet_id' => cid))
+      end
+      read_map = -> { (e::Store.config(inst) || {})['hardware_sets'] || {} }
+      e::Panel.handle_set_hardware_set(pg(model, 'generic_type' => 'hinge',
+                                         'set_id' => KOVF_ALT_SET, 'cabinet_id' => cid))
+      qty = kovf_hinges(inst).find { |h| h['owner_part_key'] == owner }['quantity']
+      expected = { '104717' => qty, KOVF_ALT_CODE => qty }
+      marker = r03_marker(model, markers)
+      rec.clear
+      action.call('zaves-klasik')
+      ok('H18b: zapis kridla aj skrinky ostali v configu',
+         read_map.call == { 'class:hinge|classic' => KOVF_ALT_SET, key => 'zaves-klasik' })
+      ok("H18b: nakup ma rozne zavesy na lavom a pravom (#{kovf_codes(model).inspect})", kovf_codes(model) == expected)
+      ok('H18b: hlaska menuje naozaj ulozeny set',
+         rec.any? { |s| s.include?('NX.setStatus') && s.include?('Záves KLASIK') } && read_map.call[key] == 'zaves-klasik')
+      cfg = e::Store.config(inst)
+      payload = e::Panel.hardware_set_options(cfg, cfg['hardware']).find { |entry| entry['generic_type'] == 'hinge' }
+      ok('H18b: Inspector ukazuje vybrany set kridla', payload['compat']['owners'][owner]['current'] == 'set:zaves-klasik')
+
+      Sketchup.undo
+      ok('H18b Spat: naraz mapa aj nakup, presne jeden krok',
+         !read_map.call.key?(key) && kovf_codes(model) == { KOVF_ALT_CODE => qty * 2 } && marker.valid?)
+      if Sketchup.respond_to?(:redo)
+        Sketchup.redo
+        ok('H18b Redo: mapa aj nakup su obnovene', read_map.call[key] == 'zaves-klasik' && kovf_codes(model) == expected)
+      else
+        info('H18b: Sketchup.redo nedostupne — vetva netestovana')
+        action.call('zaves-klasik')
+      end
+      e::CabinetBuilder.rebuild(model, inst, e::CabinetBuilder.config_to_params(e::Store.config(inst)).merge('depth' => 560.0))
+      ok('H18b: vyber kridla prezije prestavbu a Kontrola nema nesulad',
+         read_map.call[key] == 'zaves-klasik' && kovf_codes(model) == expected &&
+         kovf_ctrl(model).none? { |i| i['category'] == e::Validation::CAT_HW_MISMATCH })
+
+      model.selection.clear
+      model.selection.add(inst)
+      e::Panel.handle_insert_copy(pg(model, 'cabinet_id' => cid))
+      copied = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' && i != inst }
+      ok('H18b: Vlozit kopiu nesie aj volbu kridla aj nakup',
+         copied && (e::Store.config(copied)['hardware_sets'] || {})[key] == 'zaves-klasik' &&
+         kovf_codes(model) == expected.transform_values { |q| q * 2 })
+      if copied
+        model.start_operation('H18b cleanup kopie', true)
+        copied.erase!
+        model.commit_operation
+      end
+      model.selection.clear
+      model.selection.add(inst)
+      action.call(KOVF_ALT_SET)
+      ok('H18b: starsi vyber kridla sa nahradi a kluc ostane',
+         read_map.call[key] == KOVF_ALT_SET && kovf_codes(model) == { KOVF_ALT_CODE => qty * 2 })
+      rec.clear
+      action.call('')
+      ok('H18b: zrusenie maze len vyber kridla a nakup dedi skrinku',
+         read_map.call == { 'class:hinge|classic' => KOVF_ALT_SET } && kovf_codes(model) == { KOVF_ALT_CODE => qty * 2 } &&
+         rec.any? { |s| s.include?('NX.setStatus') && s.include?('výber zrušený') })
+      r03_clear_markers(model, markers)
+      cleanup(model)
+
+      inst = kovf_build(model, 800.0, 500.0, 'opening_mode' => 'tipon', 'wings' => '1')
+      return ok('H18b: vlozenie Tip-On kridla', false) unless inst
+
+      cid = e::Store.get(inst, 'cabinet_id')
+      owner = 'front:F1/wing:single'
+      key = "hinge@#{owner}"
+      model.selection.clear
+      model.selection.add(inst)
+      before_cfg = e::Store.config(inst).to_json
+      before_codes = kovf_codes(model)
+      marker = r03_marker(model, markers)
+      rec.clear
+      action.call('zaves-klasik')
+      ok('H18b: nekompatibilny Tip-On vyber nema zapis ani zmenu nakupu',
+         e::Store.config(inst).to_json == before_cfg && kovf_codes(model) == before_codes &&
+         rec.any? { |s| s.include?('NX.setStatus') && s.include?('nesedí klasifikácii čela') })
+      Sketchup.undo
+      ok('H18b: odmietnutie nevytvorilo krok Spat', !marker.valid?)
+      rec.clear
+      action.call('zaves-p2o')
+      ok('H18b: platny Tip-On vyber sa zapise, nakupi a pravdivo ohlasi',
+         read_map.call[key] == 'zaves-p2o' && kovf_codes(model).key?('245723') &&
+         e::ProductionCore.hardware_expansion(model, e::Bom.collect(model))['rows'].any? { |r| r['code'] == '250831' && r['quantity'] == 1 } &&
+         rec.any? { |s| s.include?('NX.setStatus') && s.include?('Záves P2O') })
+    ensure
+      remove_js_recorder
+      r03_clear_markers(model, markers)
+      cleanup(model)
+    end
   end
 
   # ============================================================================
@@ -28948,7 +29056,7 @@ module NoxunSuRunner
     run_kovd4(model)         # KOV-D4: PAMAT pri prechode na dvierka — prechod zasuvka -> dvierka -> zasuvka ide TOU ISTOU cestou ako panel (klient serverove polia neposiela): pripnuty recept aj zamok NL prezije, dormantny zamok NEMA chipy osi, po navrate sa zamok znovu VALIDUJE stavbou (dlzka, geometria aj nakupny kit); zmena otvarania pripne INY recept a stary zamok ostava dormantny (dlzka je z automatu, riadok nesvieti ako aktivny), navrat na classic ho zase aktivuje
     run_kovd5(model)         # KOV-D5: ABS farbenie dielcov zasuviek — chrbat Atiry ma pasku na HORNEJ ploske (dolna aj velke plochy cisté), dno ziadnu; Quadro bok boxu aj vnutorne celo tiez HORE; Kontrola olepov zvyrazni TU ISTU ploskou (aj pri starom modeli, kde osi pochadzaju z ROLY); Spat aj Redo mapovanie nemenia a prestavba starej zakazky farbu doplni
     run_kovw(model)          # KOV-W: hmotnost dielcov v ZIVOM retazci katalog -> skrinka -> snapshoty -> Inspector -> Kontrola: pri znamej hustote sedi sucet zo snapshotov s planom (±0,05 kg) a nic sa neuklada do modelu; typ BEZ hustoty (nie UNI) da tazsi odhad, PRESNE JEDEN build warning na skrinku a ORANGE v Kontrole; UNI dielec odhad zachova, ale hmotnostny nalez sa v Kontrole POTLACI (hlasi sa len „materiál neurčený"); Spat vracia hmotnost spolu s materialom
-    run_kovf(model)          # KOV-F1: zavesy podla NOXUN tabulky — pocty z REALNEJ sirky kridla (1250 -> 3, 850 -> 3, kridlo 800 x 700 -> 2+1), varovanie sirky nad 800 mm v Kontrole, Tip-On celo dostane P2O set + PRESNE JEDEN piest na kridlo (klasicke celo klasicky set), dvierka nad tabulkou vydaju polozku 7 ks + RED „mimo tabuľky" so zastavenym nakupom/rozpoctom/ponukou (VEPO bezi dalej), rucny zamok poctu RED zhasne v JEDNOM kroku Spat (aj Redo), skrinka ULOZENA PRED tabulkou (schema 8) dostane RED „prestav ju" so zastavenymi 3 vystupmi a prestavba ho zhasne, vlastny set skrinky prezije prestavbu
+    run_kovf(model)          # KOV-F1: zavesy podla NOXUN tabulky — pocty z REALNEJ sirky kridla (1250 -> 3, 850 -> 3, kridlo 800 x 700 -> 2+1), varovanie sirky nad 800 mm v Kontrole, Tip-On celo dostane P2O set + PRESNE JEDEN piest na kridlo (klasicke celo klasicky set), dvierka nad tabulkou vydaju polozku 7 ks + RED „mimo tabuľky" so zastavenym nakupom/rozpoctom/ponukou (VEPO bezi dalej), rucny zamok poctu RED zhasne v JEDNOM kroku Spat (aj Redo), skrinka ULOZENA PRED tabulkou (schema 8) dostane RED „prestav ju" so zastavenymi 3 vystupmi a prestavba ho zhasne, vlastny set skrinky prezije prestavbu, vyber pri kridle plati (H18b: zapis, nakup, Spat/Redo, prestavba, kopia, odmietnutie)
     run_kove(model)          # KOV-E1b: vyklopy a sklopy — skrinka 600 x 400 x 320 s vyklopom da 22K2300 + kompletny set (mechanizmus, prichyt, krytky), prestavba na HL top pri vyske 600 da 22L2500 + 22L3800 + JEDNU tyc (KH je z KORPUSU, nie z cela), siroka skrinka 1200 dve tyce + predlzenie, Spat/Redo vratia stav NARAZ, reopen (prestavba z ULOZENEHO configu) system vyklopu nestrati, sklop dostane ZAVESY (nikdy vyklopovy mechanizmus), skrinka zo schemy 10 bez vyklopu = RED „Doplniť nové predvoľby" so zastavenymi 3 vystupmi (VEPO bezi) a prestavba ho zhasne; prestavba so STARYM snapshotom pravidiel (seed 4) RED NEZHASNE (zhasne az doplnenie predvolieb + prestavba) a vyklop s RUCNYM kovanim RED nedostane, prestavba mu automat NEVYDA (ORANGE) a v nakupe je mechanizmus prave raz
     run_kovg(model)          # KOV-G1b: nohy 4/6 podla SIRKY + prichyt sokla — „Doplniť nové predvoľby" prepise stare pravidlo noh (`fixed 4`) na pasma podla sirky a doplni `prichyt-sokla`; skrinka 600 so soklom 100 da 4 nohy + 1 prichyt (nakup 4x 9078 + 4x 9079 + 1x 950), zmena sirky na 1200 da 6 + 2 a je to JEDEN krok Spat; sokel 17 mm (klzak) da nohy BEZ platnicky a BEZ prichytu, sokel 40 mm (vedome nepokryta zona) vyda nohy s ORANGE „doplň pásmo" a bez kodu, sokel VPREDU dostane nohy, ale nikdy prichyt; rucny zamok 8 noh prichyt NEZMENI (prichyt je zo SIRKY, O3) a Kontrola to prizna ORANGE `plinth_clip_check` — po zruseni zamku zhasne; RUCNY prichyt 950 vedla automatu sa v nakupe zlepi na 2 ks a stavba k tomu prilozi ORANGE `plinth_clip_manual_duplicate` (automat sa NEPOTLACA)
     run_d118b(model)         # D-118b: PTOs modul a vedome prazdna bunka v ZIVOM retazci kniznica -> predvolby projektu -> vlozena Tip-On zasuvka -> nakup: pri NL 470 pribudne modul 352908 (1 ks, nazov z katalogu), pri NL 620 (kit typu PTO) modul VEDOME nepribudne a NEVZNIKNE ziadna oranzova; snapshot nesie std 6 (od KOV-E1a) a config schemu 8
