@@ -103,7 +103,12 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa
   kvót z CodexBar CLI. **Codex weekly zostatok < 10 %** → GH kolo ani audit sa automaticky nespúšťa a **PR sa otvorí ako draft** (Codex
   ho nerecenzuje); ďalej podľa triedy: **bežná dávka** → **náhradná brána** (slepý recenzent + interná delta), PR to prizná · **audit-povinná,
   výrobná/cenová dávka alebo P0/P1** → rozhodne Michal (keď neodpovie: tabuľka v sekcii Autonómne bloky).
-- **Claude session nad 80 % → nový implementačný subagent sa nespúšťa**, počká sa na reset session. Plánovanie blokov rešpektuje okná resetu.
+- **Claude session nad 80 % → nový implementačný subagent sa nespúšťa**: reset **do 60 min** → čaká sa; reset neskôr → **bežná dávka**
+  smie ísť na **náhradného implementátora** (tabuľka Náhradníci vo [SYSTEM/WORKFLOW.md](SYSTEM/WORKFLOW.md) § 2), ostatné čakajú na reset.
+  Plánovanie blokov rešpektuje okná resetu.
+- **Počkať, nie náhradník (od 6.10.2026):** keď má primárny agent roly reset **do 60 min** a úloha neblokuje ďalšiu prácu, **čaká sa**
+  (orchestrátor medzitým robí nezávislú dávku). Audit-povinné a výrobné/cenové dávky čakajú vždy. Inak náhradník len podľa tabuľky
+  Náhradníci — **najprv schopnosť, až potom kvóta**.
 
 ## Autonómne bloky (od 12.8.2026, revízie 26.9. a 27.9.2026)
 
