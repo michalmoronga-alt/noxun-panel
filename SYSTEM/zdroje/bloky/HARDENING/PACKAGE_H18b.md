@@ -365,4 +365,7 @@ predrecenzia povinná. **Historický WAIT bol zrušený Michalovým schválením
 
 - **Finálny in-SU po uvoľnení loginu (6.10.2026): 3400 PASS/0 FAIL, runner exit 0.** Štandardný `scripts/run_su_tests.ps1 -CloseWhenDone` nad čistým `337f96011c3b791b9dfd334111c2f4c994d0850d`, run `run_20261006_023518_96292`, vlastná kópia `ENGINEtests_run_96292.skp`, plugin 0.17.27.
   Všetkých 13 H18b scenárov PASS vrátane handlera/Inspectora/nákupu, jedného kroku Späť/Znova, prestavby/kópie, náhrady/zrušenia a odmietnutia nekompatibilného setu bez undo kroku. Marker 02:39:05, uloženie run-kópie true, prirodzený koniec vlastného PID 17040 po `Sketchup.quit` 02:39:09; známy teardown `0xC0000374` až po výsledku. Po behu iba dokumentácia; predchádzajúce záznamy zachované.
-- **Draft PR #463**: natívna brána splnená; draft čaká na root a GH review/CI. Slepá zdrojová predrecenzia `746a4d69` má 0 P1/P2/P3. Kvótová brána pred otvorením: weekly 32 % zostáva, PASS. Žiadny merge.
+- **PR #463 ready**: natívna brána splnená; slepá zdrojová predrecenzia `746a4d69` má 0 P1/P2/P3. Kvótová brána pred otvorením: weekly 32 % zostáva, PASS.
+  Prvé GH kolo nad `714ffc93` našlo jedinú P1 v uzávere D-150: otvorený zápisník stále tvrdil čakanie na predrecenziu/native a archív nemal plný text ani index.
+  Dokumentačná oprava presúva celé pôvodné znenie s príčinou, riešením, PR a native dôkazom do [archívu](../../../archiv/DOGFOODING_vyriesene.md), dopĺňa index a zosúlaďuje PLAN/STAV.
+  Produkčný kód, testy, verzie a nasadenie bez zmeny. Slepú docs deltu a nové plné GH kolo/CI na opravenej hlave koordinuje root; žiadny merge. D-151/D-152 ostávajú zásobník, H18b-2 sa nerobí.

@@ -9,12 +9,6 @@
 
 ## HARDENING PO V1
 
-- **D-150 · Výber setu pri krídle klasifikovaných dvierok sa neuloží** (sonda a audit H18, 2.10.2026) — Inspector hlási uloženie,
-  ale zápis skladá odmietnutý `class:hinge|…@krídlo`; prestavba ho zahodí a odstráni aj starší platný `hinge@krídlo`.
-  **Nákup sa môže zmeniť napriek úspešnej hláške.** Správny smer je existujúci `hinge@krídlo` so zachovanou validáciou triedy;
-  povoliť iba parser nestačí (resolver owner triedny záves nečíta). *Otvorené: návrh [H18b-1](zdroje/bloky/HARDENING/PACKAGE_H18b.md),
-  výrobná/cenová dávka, predrecenzia a in-SU brána; **Q2 schválené Michalom 5.10.2026; oprava vo vetve, predrecenzia a in-SU čakajú**. H18 mení iba zobrazenie.*
-
 - **D-151 · Výklop bez systému prijme neúčinný výber setu** — zápis na skrinke aj čele hlási úspech, ale `resolve_set_id` zastaví nákup na `lift_system_missing`; raw resolver hodnotu číta. Zásobník, mimo H18b-1.
 - **D-152 · Výber dielca po zmene čela zostáva a po návrate ožije** — legacy `typ@dielec` nečistí `prune_missing_owners`; zahŕňa `hinge@krídlo`. Zásobník, mimo H18b-1; oprava by menila config pri prestavbe.
 

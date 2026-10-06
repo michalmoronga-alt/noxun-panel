@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-150** — Výber setu krídla dvierok/sklopu sa uloží, prežije prestavbu a platí v Inspectore aj nákupe; validácia ostáva — 6.10.2026, H18b-1, PR #463, v0.17.27 (ready; nové GH kolo/CI čaká)
 - **D-149** — Inspector závesov ukazuje skutočný zdroj výberu skrinky/krídla a hlavička počíta iba účinné vlastné výbery; nákup a ceny bez zmeny — 3.10.2026, H18, PR #462, v0.17.26
 - **V1-03 zvyšok — ceny materiálov/ABS (CENY-M1a/M1b/M2)** (bez D-čísla) — doska a ABS bez Demosu majú jeden odkaz na produkt, ručné overenie ceny v Štúdiu → Materiály aj z Rozpočtu (vek „ručne 18.9." / „na kontrolu", čip „N cien na kontrolu"); materiál bez formátu (sklo aj doska) sa v Rozpočte počíta podľa m² — 30.9.2026, PR #426 + #427 + #428, v0.16.1–v0.16.3
 - **D-148** — Formulár ceruzky pri Demos položke ruší dátum overenia pri zmene ceny, kódu, dodávateľa alebo formátu (ako bunka a editor „Upraviť…"); ručne prepísaná Demos cena už neostáva „overená" a „Prepočítať ceny" ju overí znova — 30.9.2026, PR #427, v0.16.2
@@ -134,6 +135,31 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-150 — Výber setu krídla sa uloží a platí v nákupe, opravené 6.10.2026
+
+**Pôvodné plné znenie (historický stav pred uzáverom):**
+
+- **D-150 · Výber setu pri krídle klasifikovaných dvierok sa neuloží** (sonda a audit H18, 2.10.2026) — Inspector hlási uloženie,
+  ale zápis skladá odmietnutý `class:hinge|…@krídlo`; prestavba ho zahodí a odstráni aj starší platný `hinge@krídlo`.
+  **Nákup sa môže zmeniť napriek úspešnej hláške.** Správny smer je existujúci `hinge@krídlo` so zachovanou validáciou triedy;
+  povoliť iba parser nestačí (resolver owner triedny záves nečíta). *Otvorené: návrh [H18b-1](../zdroje/bloky/HARDENING/PACKAGE_H18b.md),
+  výrobná/cenová dávka, predrecenzia a in-SU brána; **Q2 schválené Michalom 5.10.2026; oprava vo vetve, predrecenzia a in-SU čakajú**. H18 mení iba zobrazenie.*
+
+**Riešenie (H18b-1, PR #463, v0.17.27):** pri klasifikovaných dvierkach aj sklope writer zapisuje existujúci `hinge@<vlastník>`
+a neodstráni ho ako zastaraný kľúč. Resolver, parser, normalizácia a panelový handler ostávajú bez zmeny vykonateľného tela;
+klasifikačná, typová a F10 validácia ostáva. Nový výber nahradí starší výber toho krídla, zrušenie ho odstráni; prestavba aj kópia
+ho zachovajú, Inspector ukazuje skutočne použitý set a nákup expanduje celý set vrátane príslušenstva. Jeden krok Späť/Znova
+funguje cez existujúci handler. Nová schéma ani migrácia nevznikla; existujúce zákazky bez nového výberu pri krídle sú bajtovo rovnaké.
+
+**Overenie:** predzmenový baseline `4a815dee` (2816 kombinácií, 8 scenárov skutočných plánov), H18 goldeny bez regenerácie;
+5340 Ruby PASS/0 FAIL/0 SKIP, 163 JS sád PASS, M1–M10 zhodené. Slepá zdrojová predrecenzia `746a4d69`: 0 P1/P2/P3, SOURCE ONLY.
+Finálny in-SU nad `337f96011c3b791b9dfd334111c2f4c994d0850d`, run `run_20261006_023518_96292`: **3400 PASS/0 FAIL**, runner exit 0,
+všetkých 13 H18b scenárov PASS. Po tomto behu sa mení iba dokumentácia. Predchádzajúci FAIL a startup TIMEOUT sú v package §15.
+
+**Stav PR:** ready; prvé GH kolo našlo P1 v chýbajúcom uzávere D-150. Tento presun dopĺňa plný text aj index; nové plné GH kolo
+a CI na opravenej hlave ostávajú bránami pred merge. **D-151/D-152 ostávajú zásobník, Q1 A/Q3 A platia; H18b-2 sa nerobí.**
+Zdroj a smoke: [PACKAGE_H18b.md](../zdroje/bloky/HARDENING/PACKAGE_H18b.md), §10 a §15.
 
 ### D-149 — Inspector závesov ukazuje skutočne použitý výber, vyriešené 3.10.2026
 

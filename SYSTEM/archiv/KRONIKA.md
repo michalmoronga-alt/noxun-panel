@@ -17,6 +17,11 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H18b-1 · P1 uzáveru D-150 (6.10.2026, PR #463 ready, v0.17.27).** Prvé GH kolo nad `714ffc93` našlo jedinú P1: D-150 ostalo otvorené a predrecenzia/native boli v zápisníku zastarané.
+  Plné pôvodné znenie, príčina, riešenie, PR a finálny native dôkaz presunuté do `DOGFOODING_vyriesene.md`, doplnený riadok navrch indexu. PLAN/STAV/package zosúladené s ready PR a native PASS; staré záznamy nižšie ostávajú historické.
+  Produkčný kód, testy, verzie aj nasadenie bez zmeny; po native `337f9601`/`run_20261006_023518_96292` (3400 PASS/0 FAIL) iba docs. D-151/D-152 zásobník, Q1 A/Q3 A platia, H18b-2 sa nerobí.
+  Predchádzajúci STAV hlásil draft PR #463 a GH/CI čakanie; aktuálne PR ready, P1 docs opravená. Slepá delta a nové plné GH kolo/CI na opravenej hlave ešte čakajú; žiadny merge.
+
 - **H18b-1 · natívna brána PASS (6.10.2026, v0.17.27, draft PR #463).** Po Michalovom potvrdení funkčného SketchUpu štandardný runner nad `337f96011c3b791b9dfd334111c2f4c994d0850d`, run `run_20261006_023518_96292`: **3400 PASS/0 FAIL**, exit 0.
   Všetkých 13 H18b scenárov PASS: skutočný handler, Inspector, celý nákupný set, jeden krok Späť/Znova, prestavba, kópia, náhrada/zrušenie a kompatibilita. Testovacia kópia uložená; vlastná inštancia sama skončila (známy teardown `0xC0000374` až po výsledku).
   Prvý FAIL aj druhý startup TIMEOUT zachované; po úspešnom behu sa mení iba dokumentácia. Zdrojová predrecenzia 0 P1/P2/P3 ostáva; draft čaká na GH review/CI a root, žiadny merge.
