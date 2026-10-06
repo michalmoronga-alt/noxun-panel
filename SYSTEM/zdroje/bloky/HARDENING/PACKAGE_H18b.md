@@ -356,9 +356,11 @@ predrecenzia povinná. **Historický WAIT bol zrušený Michalovým schválením
 - Michal výslovne autorizoval opravu Q2; Q1 A/Q3 A ostávajú, H18b-2 sa nerobí. D-151/D-152 bez opravy.
 - Štart `c6bba0b96d96efc63b0f90c9083e77b66bd98d52` (v0.17.26), vetva `fix/h18b-wing-selection`. R0 baseline `4a815dee` vznikol pred produkčnou editáciou; 2816 kombinácií, 8 scenárov z `Construction.build_plan` s explicitným `owner_id`. PRED fixtúry ~174 kB; H18 goldeny sa neregenerujú.
 - T2 upresnené proti živému zdroju: `resolve_mapping_value` číta aj raw značku výklopu bez systému; skutočný spotrebiteľ `resolve_set_id` skončí `[nil, lift_system_missing, {}]`. Test pripína obe správania, D-151 sa nemení.
-- Lokálna cielená sada T0–T6: 7 PASS/0 FAIL/0 SKIP; JS3 scenáre PASS, všetkých 163 JS sád PASS. M1–M10 zhodené; po každom behu súbory obnovené bajtovo. Plná Ruby sada 5340 PASS/0 FAIL/0 SKIP, encoding a docs guard PASS; predrecenzia a in-SU sa doplnia pred PR.
+- Lokálna cielená sada T0–T6: 7 PASS/0 FAIL/0 SKIP; JS3 scenáre PASS, všetkých 163 JS sád PASS. M1–M10 zhodené; po každom behu súbory obnovené bajtovo. Plná Ruby sada 5340 PASS/0 FAIL/0 SKIP, encoding a docs guard PASS; zdrojová predrecenzia 0 P1/P2/P3 nad `746a4d69` (6.10., SOURCE ONLY). Finálny in-SU čaká.
 - **In-SU prvý beh (`bccee9d1`, 5.10.2026): 3396 PASS / 4 FAIL.** Všetky štyri FAIL boli presným nákupným oracle novej sady: očakávanie vynechalo platničku a obe krytky setu KLASIK.
   Skutočný nákup bol `104717`, `106412`, `105408`, `105425` po 2 ks + `NX-TEST-ZAVES` 2 ks. Seed potvrdzuje všetky štyri členy; testová oprava `746a4d69` pripína celý set aj po Redo/prestavbe/kópii, produkčný writer bez zmeny. Cielená sada po oprave 7/0/0 a JS3 PASS.
 - **Druhý natívny štart (`746a4d69`, 6.10.2026): testy nezačali, vyžaduje sa prihlásenie SketchUpu.** Michal potvrdil, že okno Welcome otvoril on a rieši login.
   Pôvodný launch PID zanikol pred bootom (bez `su_result.txt` aj `close.log`); runner prirodzene skončil po 8 minútach TIMEOUT, exit 1. Žiadny kill/reštart ani zásah do Michalovho okna.
   **In-SU brána ostáva NEOVERENÁ** do skutočného PASS po vyriešení prihlásenia; prvý FAIL aj startup záznam sa zachovávajú oddelene.
+
+- **Draft PR #?**: dôvodom je čakajúca finálna in-SU brána a prihlásenie SketchUpu. Slepá zdrojová predrecenzia `746a4d69` má 0 P1/P2/P3; GH review sa spustí až po native PASS a prepnutí na ready. Kvótová brána pred otvorením: weekly 32 % zostáva, PASS. Žiadny merge.
