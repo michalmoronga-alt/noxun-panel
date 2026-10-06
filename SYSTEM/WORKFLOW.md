@@ -166,14 +166,16 @@ flowchart TD
   MA["Rozhodne Michal, či audit aj pod prahom<br/>kým neodpovie, dávka čaká"]:::michal
   AU["Audit návrhu: audítor audit-povinných<br/>BLOCKER opraviť v návrhu"]:::ext
   QS{"Claude session<br/>nad 80 %?"}:::gate
-  WT["Reset do 60 min: počkať<br/>neskôr: bežná dávka → náhradný implementátor<br/>(časť 2), ostatné čakajú"]:::orch
+  WT["Reset do 60 min, alebo dávka nie je bežná:<br/>počkať na reset session"]:::orch
+  QR{"Bežná dávka a reset<br/>neskôr ako o 60 min?"}:::gate
+  IMN["Náhradný implementátor (časť 2)<br/>predrecenzia vždy slepý recenzent Claude"]:::sub
   IM["Implementácia<br/>subagent vo worktree"]:::sub
   VV["Verzia: patch 2×<br/>+ všetky ?v= v HTML"]:::sub
   T1["Testy: headless<br/>+ každá JS sada zvlášť"]:::auto
   Q2{"Buildery, observery, undo a operácie,<br/>geometria, zápis panela do modelu?"}:::gate
   SU["Test v SketchUpe = brána mergu<br/>runner -CloseWhenDone · znova len pri zmene<br/>Ruby spúšťača po poslednom behu"]:::auto
   DOC["Docs v tej istej dávke: architektúra na mieste,<br/>D-čísla do archívu, STAV, KRONIKA, v PLAN riadok s ✅<br/>číslo PR zatiaľ PR #?"]:::sub
-  Q3{"Audit-povinná, výrobná/cenová,<br/>nad 300 riadkov alebo nový prvok UI?"}:::gate
+  Q3{"Audit-povinná, výrobná/cenová,<br/>nad 300 riadkov, nový prvok UI<br/>alebo náhradný implementátor?"}:::gate
   PRE["Implementátor po pushi stojí, PR neotvára<br/>predrecenziu spustí orchestrátor: slepý recenzent<br/>P1/P2 opraví implementátor, PR až na pokyn"]:::sub
   QK{"Codex weekly<br/>zostatok pod 10 %?"}:::gate
   PR["gh pr create<br/>implementátor"]:::sub
@@ -193,8 +195,11 @@ flowchart TD
   MA -->|"povolí"| AU
   AU --> QS
   Q1 -->|"nie"| QS
-  QS -->|"áno"| WT
+  QS -->|"áno"| QR
+  QR -->|"nie"| WT
   WT --> QS
+  QR -->|"áno"| IMN
+  IMN --> VV
   QS -->|"nie"| IM
   IM --> VV
   VV --> T1
@@ -327,7 +332,7 @@ Všetko, čo musí platiť, aby práca pokračovala. „Kto" = kto bránu uzatv�
 | testy zelené | vždy headless + každá JS sada zvlášť | CI + orchestrátor | CLAUDE.md · Testovanie |
 | test v SketchUpe zelený | buildery, observery, undo a operácie, geometria, akcie panela zapisujúce do modelu; na finálnej hlave znova len pri zmene Ruby spúšťača po poslednom behu (PR uvedie hlavu behu) | runner → orchestrátor | CLAUDE.md · Testovanie |
 | docs a verzia na mieste | kódová dávka: celý checklist; dokumentačné PR: KRONIKA + pri zmene stavu bloku, smoke alebo poradia prác aktualizuje faktický stav v STAV „Stav" (bez verzie a čísel testov) a prepíše „Robí sa" a „Ďalší krok" | orchestrátor + guard testy | CLAUDE.md · Verzia a uzáver dávky |
-| predrecenzia bez P1/P2 | audit-povinné a výrobné/cenové dávky; bežná dávka nad 300 riadkov kódu pluginu alebo s novým prvkom UI | slepý recenzent → orchestrátor | skill `predrecenzia` |
+| predrecenzia bez P1/P2 | audit-povinné a výrobné/cenové dávky; bežná dávka nad 300 riadkov kódu pluginu alebo s novým prvkom UI; každá dávka náhradného implementátora (časť 2) | slepý recenzent → orchestrátor | skill `predrecenzia` |
 | review kolo uzavreté | pred mergom, pre aktuálnu hlavu vetvy | review PR alebo náhradná brána → orchestrátor | skill `codex-po-pr` |
 | CI zelené | pred mergom, na aktuálnej hlave | GitHub Actions | skill `codex-po-pr` |
 | pravidlo 3 kôl | keď nálezy vráti aj 3. GH kolo | orchestrátor | CLAUDE.md · Git workflow · skill `codex-po-pr` |
