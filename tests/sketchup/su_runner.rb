@@ -26478,7 +26478,10 @@ module NoxunSuRunner
       e::Panel.handle_set_hardware_set(pg(model, 'generic_type' => 'hinge',
                                          'set_id' => KOVF_ALT_SET, 'cabinet_id' => cid))
       qty = kovf_hinges(inst).find { |h| h['owner_part_key'] == owner }['quantity']
-      expected = { '104717' => qty, KOVF_ALT_CODE => qty }
+      # KLASIK obsahuje aj platnicku a obe krytky, kazdu 1 ks na zaves.
+      # Nakupna funkcia kovf_codes vracia VSETKY produkty setu, nie len zaves.
+      # Presna mapa strazi aj pocet prislusenstva (SEED_SETS zaves-klasik).
+      expected = { '104717' => qty, '106412' => qty, '105408' => qty, '105425' => qty, KOVF_ALT_CODE => qty }
       marker = r03_marker(model, markers)
       rec.clear
       action.call('zaves-klasik')

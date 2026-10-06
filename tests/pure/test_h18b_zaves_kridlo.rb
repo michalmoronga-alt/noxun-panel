@@ -44,6 +44,9 @@ NxTest.test('H18b T1: nakup a mapa realnych skriniek R1-R8 proti PRED') do
   end
   r4 = NxH18b.scenario(NxH18b.scenarios.find { |c| c['id'] == 'R4' })['after']['rows']
   NxTest.assert_equal(4, r4.find { |r| r['code'] == '104717' }['quantity'])
+  %w[106412 105408 105425].each do |code|
+    NxTest.assert_equal(4, r4.find { |r| r['code'] == code }['quantity'], 'KLASIK nakup obsahuje aj komplet prislusenstva')
+  end
   NxTest.assert_equal(4, r4.find { |r| r['code'] == 'X1' }['quantity'])
 end
 
