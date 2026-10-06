@@ -1,6 +1,6 @@
 ---
 name: predrecenzia
-description: Slepá predrecenzia diffu vetvy PRED `gh pr create` — nezávislý slepý recenzent (subagent bez kontextu orchestrátora) hľadá chyby skôr, než ich nájde GitHub Codex. Povinná pri dávkach audit-povinných (kontrakt, schéma, migrácia, observer/undo lifecycle, nový modul), výrobných/cenových a pri bežnej dávke nad 300 zmenených riadkov kódu pluginu (bez testov a dokumentácie) alebo s novým ovládacím prvkom v UI. Vráti číslované nálezy P1/P2/P3 a verdikt; P1/P2 sa opravia pred otvorením PR.
+description: Slepá predrecenzia diffu vetvy PRED `gh pr create` — nezávislý slepý recenzent (subagent bez kontextu orchestrátora) hľadá chyby skôr, než ich nájde GitHub Codex. Povinná pri dávkach audit-povinných (kontrakt, schéma, migrácia, observer/undo lifecycle, nový modul), výrobných/cenových a pri bežnej dávke nad 300 zmenených riadkov kódu pluginu (bez testov a dokumentácie) alebo s novým ovládacím prvkom v UI, a pri každej dávke náhradného implementátora (Codex). Vráti číslované nálezy P1/P2/P3 a verdikt; P1/P2 sa opravia pred otvorením PR.
 ---
 
 # Slepá predrecenzia pred PR

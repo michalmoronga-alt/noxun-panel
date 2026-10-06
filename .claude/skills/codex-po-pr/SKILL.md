@@ -11,7 +11,7 @@ GitHub Codex review (rola **review PR** v tabuľke Obsadenie rolí, `SYSTEM/WORK
 
 0. **Pred `gh pr create`:**
    - **Predrecenzia** (skill `predrecenzia`, **povinná**) prebehla pri dávke **audit-povinnej**, **výrobnej/cenovej** (definícia v CLAUDE.md) a pri **bežnej
-     dávke nad 300 zmenených riadkov kódu pluginu** (bez testov a dokumentácie) **alebo s novým ovládacím prvkom v UI** — jej P1/P2 sú opravené a PR popis
+     dávke nad 300 zmenených riadkov kódu pluginu** (bez testov a dokumentácie) **alebo s novým ovládacím prvkom v UI** a pri **každej dávke náhradného implementátora** (tabuľka Náhradníci v `SYSTEM/WORKFLOW.md` § 2) — jej P1/P2 sú opravené a PR popis
      má sekciu „Predrecenzia". Pri docs-only sa nerobí.
    - **Číslo PR** je všade, kde ho dávka píše (PLAN, KRONIKA, STAV, `DOGFOODING_vyriesene`), zatiaľ `PR #?` — doplní ho samostatný commit hneď
      po `gh pr create` (krok 1).

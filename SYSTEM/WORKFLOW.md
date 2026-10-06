@@ -168,7 +168,7 @@ flowchart TD
   QS{"Claude session<br/>nad 80 %?"}:::gate
   WT["Reset do 60 min, alebo dávka nie je bežná:<br/>počkať na reset session"]:::orch
   QR{"Bežná dávka a reset<br/>neskôr ako o 60 min?"}:::gate
-  IMN["Náhradný implementátor (časť 2)<br/>predrecenzia vždy slepý recenzent Claude"]:::sub
+  IMN["Náhradný implementátor (časť 2)<br/>predrecenzia vždy slepý recenzent Claude"]:::ext
   IM["Implementácia<br/>subagent vo worktree"]:::sub
   VV["Verzia: patch 2×<br/>+ všetky ?v= v HTML"]:::sub
   T1["Testy: headless<br/>+ každá JS sada zvlášť"]:::auto
@@ -328,7 +328,7 @@ Všetko, čo musí platiť, aby práca pokračovala. „Kto" = kto bránu uzatv�
 | mockup schválený | pred packages, pri blokoch s UI; každý bod „návrh — potvrdí Michal" zodpovedaný | Michal | CLAUDE.md · Git workflow (poradie bloku, otvorené body mockupu) |
 | audit návrhu dávky bez BLOCKER | dávka mení dátový kontrakt, schému (každé zvýšenie `CONFIG_SCHEMA`, BuildPlan `SCHEMA` alebo STD), migráciu, observer/undo alebo pridáva modul; pred ním sonda na kóde | audítor → orchestrátor | skill `codex-audit` |
 | kvóta | štart okna; pred auditom, implementačným subagentom, predrecenziou, `gh pr create` a `@codex review` | skript `usage` → orchestrátor | CLAUDE.md · Kvóty a štart okna · skill `usage` |
-| počkať, nie náhradník | primárny agent roly má reset do 60 min a úloha neblokuje ďalšiu prácu → čaká sa (orchestrátor medzitým robí nezávislú dávku); audit-povinné a výrobné/cenové dávky čakajú vždy; inak náhradník podľa časti 2 | orchestrátor | CLAUDE.md · Kvóty a štart okna · časť 2 Náhradníci |
+| počkať, nie náhradník | primárny agent roly má reset do 60 min a úloha neblokuje ďalšiu prácu → čaká sa (orchestrátor medzitým robí nezávislú dávku); audit-povinné a výrobné/cenové dávky čakajú vždy; implementátor pri resete do 60 min čaká aj pri blokujúcej dávke (hranica 2 v časti 7); inak náhradník podľa časti 2 | orchestrátor | CLAUDE.md · Kvóty a štart okna · časť 2 Náhradníci |
 | testy zelené | vždy headless + každá JS sada zvlášť | CI + orchestrátor | CLAUDE.md · Testovanie |
 | test v SketchUpe zelený | buildery, observery, undo a operácie, geometria, akcie panela zapisujúce do modelu; na finálnej hlave znova len pri zmene Ruby spúšťača po poslednom behu (PR uvedie hlavu behu) | runner → orchestrátor | CLAUDE.md · Testovanie |
 | docs a verzia na mieste | kódová dávka: celý checklist; dokumentačné PR: KRONIKA + pri zmene stavu bloku, smoke alebo poradia prác aktualizuje faktický stav v STAV „Stav" (bez verzie a čísel testov) a prepíše „Robí sa" a „Ďalší krok" | orchestrátor + guard testy | CLAUDE.md · Verzia a uzáver dávky |
@@ -343,7 +343,7 @@ Všetko, čo musí platiť, aby práca pokračovala. „Kto" = kto bránu uzatv�
 
 | # | Hranica | Pravidlo | Kde |
 |---|---|---|---|
-| 1 | predrecenzia pri bežnej dávke | nad 300 zmenených riadkov kódu pluginu (bez testov a dokumentácie) alebo nový ovládací prvok v UI (príklady hraníc v CLAUDE.md) | CLAUDE.md · skill `predrecenzia` |
+| 1 | predrecenzia pri bežnej dávke | nad 300 zmenených riadkov kódu pluginu (bez testov a dokumentácie) alebo nový ovládací prvok v UI (príklady hraníc v CLAUDE.md); dávka náhradného implementátora vždy (časť 2) | CLAUDE.md · skill `predrecenzia` |
 | 2 | kvóta pred implementačným subagentom | Claude session nad 80 % → nový implementačný subagent sa nespúšťa: reset do 60 min → čaká sa; reset neskôr → bežná dávka smie ísť na náhradného implementátora (časť 2), ostatné čakajú | CLAUDE.md · skill `usage` |
 | 3 | výrobná/cenová dávka | mení rozmery alebo počty dielov, hrany, kusovník, VEPO, nákupné zoznamy, kovanie alebo ceny (jediná definícia; príklady hraníc tamtiež) | CLAUDE.md · Git workflow |
 | 4 | `-CloseWhenDone` | agent ho používa vždy; bez neho len Michalovo ručné spustenie | CLAUDE.md · Testovanie |
