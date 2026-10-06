@@ -20,7 +20,7 @@
 - **Roly: náhradníci, čakanie, kontrola modelu, Grok shadow (7.10.2026, PR #464, docs).** Zápis rozhodnutí, ktoré Michal schválil 6.10.2026 (návrh routera v `noxun-mods`, otázky 1–4).
   WORKFLOW § 2: tabuľka Náhradníci (najprv schopnosť, až potom kvóta; Codex `gpt-6.1-sol` smie zastúpiť implementátora len pri bežných dávkach, predrecenziu vtedy robí vždy slepý recenzent Claude), veta o kontrole modelu cez mod `usage-bar` a nový riadok Grok `grok-4.7` ako implementátor skúšobne (shadow, nikdy sa nemerguje); § 10 pravidlá shadow behov.
   CLAUDE.md Kvóty + WORKFLOW § 6/§ 7 + skill `usage`: reset primárneho agenta do 60 min → čaká sa; Claude nad 80 % s resetom neskôr → bežná dávka smie ísť na náhradného implementátora, ostatné čakajú.
-  Existujúce obsadenie rolí bez zmeny; podnet `gpt-6.1-sol` pre bežný audit a deltu ostáva otvorený pre Michala. Kód pluginu, verzia ani STAV bez zmeny; headless 5340/0.
+  Michal 7.10. na podnet z registra prepol bežný audit a deltu z `gpt-5.6-sol` na `gpt-6.1-sol`; ostatné obsadenie bez zmeny. Kód pluginu, verzia ani STAV bez zmeny; headless 5340/0.
 
 - **H18b-1 · P1 uzáveru D-150 (6.10.2026, PR #463 ready, v0.17.27).** Prvé GH kolo nad `714ffc93` našlo jedinú P1: D-150 ostalo otvorené a predrecenzia/native boli v zápisníku zastarané.
   Plné pôvodné znenie, príčina, riešenie, PR a finálny native dôkaz presunuté do `DOGFOODING_vyriesene.md`, doplnený riadok navrch indexu. PLAN/STAV/package zosúladené s ready PR a native PASS; staré záznamy nižšie ostávajú historické.
