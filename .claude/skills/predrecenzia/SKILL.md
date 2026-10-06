@@ -1,6 +1,6 @@
 ---
 name: predrecenzia
-description: Slepá predrecenzia diffu vetvy PRED `gh pr create` — nezávislý slepý recenzent (subagent bez kontextu orchestrátora) hľadá chyby skôr, než ich nájde GitHub Codex. Povinná pri dávkach audit-povinných (kontrakt, schéma, migrácia, observer/undo lifecycle, nový modul), výrobných/cenových a pri bežnej dávke nad 300 zmenených riadkov kódu pluginu (bez testov a dokumentácie) alebo s novým ovládacím prvkom v UI. Vráti číslované nálezy P1/P2/P3 a verdikt; P1/P2 sa opravia pred otvorením PR.
+description: Slepá predrecenzia diffu vetvy PRED `gh pr create` — nezávislý slepý recenzent (subagent bez kontextu orchestrátora) hľadá chyby skôr, než ich nájde GitHub Codex. Povinná pri dávkach audit-povinných (kontrakt, schéma, migrácia, observer/undo lifecycle, nový modul), výrobných/cenových a pri bežnej dávke nad 300 zmenených riadkov kódu pluginu (bez testov a dokumentácie) alebo s novým ovládacím prvkom v UI, a pri každej dávke náhradného implementátora (Codex). Vráti číslované nálezy P1/P2/P3 a verdikt; P1/P2 sa opravia pred otvorením PR.
 ---
 
 # Slepá predrecenzia pred PR
@@ -19,6 +19,7 @@ poistka proti kompresii kontextu.
 | audit-povinná (kontrakt, schéma, migrácia, observer/undo lifecycle, nový modul — tá istá trieda ako `codex-audit`) | **povinná** |
 | výrobná alebo cenová (jediná definícia v CLAUDE.md: mení rozmery alebo počty dielov, hrany, kusovník, VEPO, nákupné zoznamy, kovanie alebo ceny; príklady hraníc tamtiež) | **povinná** |
 | bežná dávka nad 300 zmenených riadkov kódu pluginu (bez testov a dokumentácie) alebo s novým ovládacím prvkom v UI (príklady hraníc v CLAUDE.md) | **povinná** (hranica N18, 26.9.2026) |
+| dávka náhradného implementátora (Codex; tabuľka Náhradníci v `SYSTEM/WORKFLOW.md` § 2) | **povinná**, vždy slepý recenzent Claude — Codex nesmie byť jediný, kto kontroluje kód Codexu (6.10.2026) |
 | iný kód s novou UI interakciou (klávesnica, fokus, prepnutie dokumentu, prekreslenie) | odporúčaná |
 | docs-only, len zmena verzie | nie |
 

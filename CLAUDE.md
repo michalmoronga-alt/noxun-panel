@@ -74,7 +74,7 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa
   zápisu do modelu a výsledok zapíše do package — postup: skill `codex-audit`, krok 0.
 - **Slepá predrecenzia PRED PR (skill `predrecenzia`):** **povinná** pri dávke **audit-povinnej** (tá istá trieda ako `codex-audit`),
   **výrobnej/cenovej** a **aj pri bežnej dávke nad 300 zmenených riadkov kódu pluginu** (bez testov a dokumentácie) **alebo s novým
-  ovládacím prvkom v UI** (príklady hraníc pri definícii výrobnej/cenovej dávky vyššie); pri docs-only nie. Slepý recenzent dostane len zadanie a `git diff main...HEAD`; jeho P1/P2 sa opravia ešte
+  ovládacím prvkom v UI** (príklady hraníc pri definícii výrobnej/cenovej dávky vyššie) **a pri každej dávke náhradného implementátora** (tabuľka Náhradníci vo WORKFLOW § 2); pri docs-only nie. Slepý recenzent dostane len zadanie a `git diff main...HEAD`; jeho P1/P2 sa opravia ešte
   pred PR a výsledok ide do PR popisu (sekcia „Predrecenzia"). Nenahrádza `codex-audit` ani `codex-po-pr`.
 - **Rešerš a krížový audit (poradie podľa praxe):** pri bloku **debata s Michalom → koncept → outside-in rešerš + krížový audit bloku
   RAZ, pred packages** (rešeršéri a audítor s rovnakým zadaním) → reconcile orchestrátora (nálezy ALREADY EXISTS / SIMPLER NATIVE PATH
@@ -103,7 +103,13 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Súbor nad ~50 kB sa
   kvót z CodexBar CLI. **Codex weekly zostatok < 10 %** → GH kolo ani audit sa automaticky nespúšťa a **PR sa otvorí ako draft** (Codex
   ho nerecenzuje); ďalej podľa triedy: **bežná dávka** → **náhradná brána** (slepý recenzent + interná delta), PR to prizná · **audit-povinná,
   výrobná/cenová dávka alebo P0/P1** → rozhodne Michal (keď neodpovie: tabuľka v sekcii Autonómne bloky).
-- **Claude session nad 80 % → nový implementačný subagent sa nespúšťa**, počká sa na reset session. Plánovanie blokov rešpektuje okná resetu.
+- **Claude session nad 80 % → nový implementačný subagent sa nespúšťa**: reset **do 60 min** → čaká sa; reset neskôr → **bežná dávka**
+  smie ísť na **náhradného implementátora** (tabuľka Náhradníci vo [SYSTEM/WORKFLOW.md](SYSTEM/WORKFLOW.md) § 2), ostatné čakajú na reset.
+  Plánovanie blokov rešpektuje okná resetu.
+- **Počkať, nie náhradník (od 6.10.2026):** keď má primárny agent roly reset **do 60 min** a úloha neblokuje ďalšiu prácu, **čaká sa**
+  (orchestrátor medzitým robí nezávislú dávku). Audit-povinné a výrobné/cenové dávky čakajú vždy. Inak náhradník len podľa tabuľky
+  Náhradníci — **najprv schopnosť, až potom kvóta**. Pre implementátora platí riadok o Claude session nad 80 % vyššie (reset do 60 min
+  → čaká sa aj pri blokujúcej dávke; orchestrátor medzitým robí prácu bez implementačného subagenta).
 
 ## Autonómne bloky (od 12.8.2026, revízie 26.9. a 27.9.2026)
 
