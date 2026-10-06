@@ -24,7 +24,7 @@ ani nevyexportuje** (rohovú skrinku by sklopil na dolnú). **Rozpočet:** po pr
 **Ochranu pred poškodeným súborom nastavení (H9) má len 0.17.7+, nastavení exportu (H7a) 0.17.20+, ochranu dvoch okien 0.17.8+ (pravidlá) a 0.17.9+ (rady) — aktualizovať obe PC a potom zavrieť všetky okná SketchUpu** (staré okno zapisuje bez ochrany).
 **Aktualizuj plugin na oboch PC (Michal aj Lucia) na 0.17.0 pred prvým uložením odkazu, ručným overením ceny alebo porovnávaním a posielaním ponúk — starší plugin počíta sklo aj dosku bez formátu po starom** (`BUDGET_STD` blok CENY nemení, takže starší plugin nevaruje).
 
-**Testy (H18b-1):** plná sada 5340 Ruby/0 FAIL/0 SKIP, všetkých 163 JS sád PASS, M1–M10 zhodené; encoding a docs guard PASS. Predrecenzia, in-SU a smoke čakajú.
+**Testy (H18b-1):** 5340 Ruby/0/0, 163 JS PASS, M1–M10 zhodené; encoding/docs PASS. In-SU 3396/4 FAIL (oracle opravený); nový štart blokuje login. Finálne brány čakajú.
 
 ## Robí sa
 
