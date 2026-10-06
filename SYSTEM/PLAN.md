@@ -56,9 +56,11 @@ predrecenzia, in-SU) sa určí pri package podľa CLAUDE.md; stĺpec je predpokl
 | ✅ H15 · dáta kovania oddelené od mechaniky setov — package [PACKAGE_H15.md](zdroje/bloky/HARDENING/PACKAGE_H15.md), rez: **✅ H15a · seed dáta setov v `core/hardware_sets_seed.rb` + golden T0 troch modulov (výstupy bez zmeny) — PR #459** · **✅ H15b · katalóg a taxonómia v `*_seed.rb` + scenár 6 mapy — PR #460** | C-03 | kód · audit · výrobná · predrecenzia |
 | ✅ H16 · súpis knižníc (príprava D-48) — register `LibraryRegistry` + [kniznice.md](../docs/architecture/kniznice.md), jediný koreň (bez viditeľnej zmeny) — package [PACKAGE_H16.md](zdroje/bloky/HARDENING/PACKAGE_H16.md) — **PR #461** | C-04 | kód · audit |
 | H17 · spoločná príprava exportov (prvý rez R-15) | C-06 | kód · audit · výrobná |
-| ✅ H18 · Inspector ukáže skutočne použitý set závesov (D-149, rozhodnutie Michala 3A); nákup a ceny bez zmeny — [package](zdroje/bloky/HARDENING/PACKAGE_H18.md), **PR #462**; H18b (D-150) čaká na odpoveď Q2 | — | kód · audit · výrobná/cenová (zobrazenie) · predrecenzia |
+| ✅ H18 · Inspector ukáže skutočne použitý set závesov (D-149, rozhodnutie Michala 3A); nákup a ceny bez zmeny — [package](zdroje/bloky/HARDENING/PACKAGE_H18.md), **PR #462** | — | kód · audit · výrobná/cenová (zobrazenie) · predrecenzia |
 
-**Otvorené po H18:** D-150 (zápis pri krídle) → návrh H18b-1, čaká na Michalovu odpoveď Q2; D-151 (výklop bez systému) a D-152 (oživenie mŕtveho výberu) → zásobník.
+| ✅ H18b-1 · voľba setu krídla platí (D-150 v archíve), v0.17.27 — [package](zdroje/bloky/HARDENING/PACKAGE_H18b.md); predrecenzia 0 P1/P2/P3, in-SU 3400 PASS nad `337f9601`; PR #463 ready, po P1 docs oprava; nové GH kolo/CI čaká | — | kód · výrobná/cenová · predrecenzia · in-SU |
+
+**Otvorené po H18:** D-151 (výklop bez systému) a D-152 (oživenie mŕtveho výberu) → zásobník. D-150 opravené H18b-1, plný text a index v [archíve](archiv/DOGFOODING_vyriesene.md); GH kolo/CI PR #463 pred merge čaká.
 
 ### 3 · STABILITA
 

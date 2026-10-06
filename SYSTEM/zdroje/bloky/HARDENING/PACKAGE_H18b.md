@@ -1,9 +1,9 @@
-> **Prenesený návrh, bez autorizácie implementácie (3.10.2026).** Posledné potvrdenie orchestrátora má prednosť pred staršími
-> predvolenými vetami: **H18b-1 čaká na Michalovu odpoveď Q2**, H18b-2 len pri Q1 B. H18 nepridáva zápis ani nemení nákup.
+> **Autorizácia Michala (5.10.2026): „H18B opraviť“; „pokračovať“.** Q2 = oprava H18b-1, implementácia schválená.
+> Q1 A a Q3 A ostávajú; H18b-2 sa nerobí. D-151/D-152 sú mimo scope. Povinná predrecenzia a in-SU brána ostávajú.
 
 # PACKAGE H18b · Výber setu závesov pri krídle dvierok naozaj platí (D-150) — blok 9 HARDENING
 
-> **Autorita:** Michal — otázka **Q2** z PACKAGE_H18 §13 bez odpovede → platí predvolené **A**: „opraviť samostatnou dávkou H18b hneď po H18, aby výber pri
+> **Autorita:** Michal — otázka **Q2** z PACKAGE_H18 §13 výslovne schválená **5.10.2026**: „opraviť samostatnou dávkou H18b hneď po H18, aby výber pri
 > krídle naozaj platil (výrobná dávka, test v SketchUpe)". **Q1** (voľba „podľa projektu" v riadku skrinky zmaže aj starý výber) bez odpovede → predvolené **A**
 > (nič sa nemaže); variant **B** je **voliteľná časť H18b-2** s vlastným rozhodnutím Michala (§13). Nález: PACKAGE_H18 §14 F1 / **D-150**, sonda H18 S13,
 > audit H18 **NOTE 7** („zápis `hinge@<wing>` so zachovanou klasifikačnou validáciou je správny smer; povoliť `class:hinge|…@wing` v parseri nestačí").
@@ -203,7 +203,7 @@ prestavba, starší výber krídla, odmietnutie bez kroku Späť, kópia).
 - **T1 · nákup reálnych skriniek** R1–R8: očakávanie skladá **nezmenený** `expand` nad mapou „východisková − `hinge@<v>` + `hinge@<v>` ⇒ hodnota"; scenáre bez
   výberu pri krídle (R3, R6, R8, stav „pred") bajtovo == `nakup_pred.json`.
 - **T2 · invariant „zápis sa prečíta":** 11 druhov × rozsah: zápis značky (bez `known_sets`) → `norm_hardware_sets` (bez čiel aj s reálnymi čelami tam, kde
-  existujú) → `resolve_mapping_value` vráti značku. **Jediná vymenovaná výnimka: výklop bez systému** (assert „mŕtvy" výslovne, komentár D-151 — keď ho niekto opraví,
+  existujú) → `resolve_mapping_value` vráti značku. **Výklop bez systému:** raw resolver značku číta, ale spotrebiteľ `resolve_set_id` vracia `[nil, 'lift_system_missing', {}]` (D-151 — keď ho niekto opraví,
   test sa zmení vedome).
 - **T3 · validácia:** Tip-On krídlo + KLASIK → `:invalid` s vetou „nesedí klasifikácii čela (iný spôsob otvárania)"; set iného typu → `:invalid`; **neaktívny** set
   novo pri krídle → `:invalid`; **neaktívny uložený** výber krídla znovu uložiť → `:ok` (F10 výnimka teraz platí aj pre krídlo — vymenovaná zmena správania);
@@ -348,4 +348,24 @@ hlava. Číslo PR: `PR #?` → samostatný commit.
 
 **Potvrdenie orchestrátora (3.10.2026 ~00:20):** D1 áno (`hinge@<krídlo>` — kľúč, ktorý resolver číta prvý, žiadny nový triedny kľúč) · **D4 áno — H18b-1 bez auditu
 návrhu** (kľúč je v kontrakte od H1a, resolver ho číta od KOV-F1; nemení sa schéma, undo ani migrácia) · D5 áno. Trieda H18b-1: výrobná/cenová, **in-SU brána**,
-predrecenzia povinná. **Implementácia H18b-1 ČAKÁ na Michalovu odpoveď Q2** (mení, čo sa objedná). H18b-2 len pri Q1 B, samostatný PR + audit. Q3 predvolené A.
+predrecenzia povinná. **Historický WAIT bol zrušený Michalovým schválením Q2 5.10.2026** (mení, čo sa objedná). H18b-2 len pri Q1 B, samostatný PR + audit. Q3 predvolené A.
+
+
+## 15 · Implementácia H18b-1 (5.10.2026)
+
+- Michal výslovne autorizoval opravu Q2; Q1 A/Q3 A ostávajú, H18b-2 sa nerobí. D-151/D-152 bez opravy.
+- Štart `c6bba0b96d96efc63b0f90c9083e77b66bd98d52` (v0.17.26), vetva `fix/h18b-wing-selection`. R0 baseline `4a815dee` vznikol pred produkčnou editáciou; 2816 kombinácií, 8 scenárov z `Construction.build_plan` s explicitným `owner_id`. PRED fixtúry ~174 kB; H18 goldeny sa neregenerujú.
+- T2 upresnené proti živému zdroju: `resolve_mapping_value` číta aj raw značku výklopu bez systému; skutočný spotrebiteľ `resolve_set_id` skončí `[nil, lift_system_missing, {}]`. Test pripína obe správania, D-151 sa nemení.
+- Lokálna cielená sada T0–T6: 7 PASS/0 FAIL/0 SKIP; JS3 scenáre PASS, všetkých 163 JS sád PASS. M1–M10 zhodené; po každom behu súbory obnovené bajtovo. Plná Ruby sada 5340 PASS/0 FAIL/0 SKIP, encoding a docs guard PASS; zdrojová predrecenzia 0 P1/P2/P3 nad `746a4d69` (6.10., SOURCE ONLY). Finálny in-SU 3400 PASS/0 FAIL nad `337f9601` (6.10.).
+- **In-SU prvý beh (`bccee9d1`, 5.10.2026): 3396 PASS / 4 FAIL.** Všetky štyri FAIL boli presným nákupným oracle novej sady: očakávanie vynechalo platničku a obe krytky setu KLASIK.
+  Skutočný nákup bol `104717`, `106412`, `105408`, `105425` po 2 ks + `NX-TEST-ZAVES` 2 ks. Seed potvrdzuje všetky štyri členy; testová oprava `746a4d69` pripína celý set aj po Redo/prestavbe/kópii, produkčný writer bez zmeny. Cielená sada po oprave 7/0/0 a JS3 PASS.
+- **Druhý natívny štart (`746a4d69`, 6.10.2026): testy nezačali, vyžaduje sa prihlásenie SketchUpu.** Michal potvrdil, že okno Welcome otvoril on a rieši login.
+  Pôvodný launch PID zanikol pred bootom (bez `su_result.txt` aj `close.log`); runner prirodzene skončil po 8 minútach TIMEOUT, exit 1. Žiadny kill/reštart ani zásah do Michalovho okna.
+  **Pri druhom štarte bola in-SU brána NEOVERENÁ**; prvý FAIL aj startup záznam sa zachovávajú oddelene.
+
+- **Finálny in-SU po uvoľnení loginu (6.10.2026): 3400 PASS/0 FAIL, runner exit 0.** Štandardný `scripts/run_su_tests.ps1 -CloseWhenDone` nad čistým `337f96011c3b791b9dfd334111c2f4c994d0850d`, run `run_20261006_023518_96292`, vlastná kópia `ENGINEtests_run_96292.skp`, plugin 0.17.27.
+  Všetkých 13 H18b scenárov PASS vrátane handlera/Inspectora/nákupu, jedného kroku Späť/Znova, prestavby/kópie, náhrady/zrušenia a odmietnutia nekompatibilného setu bez undo kroku. Marker 02:39:05, uloženie run-kópie true, prirodzený koniec vlastného PID 17040 po `Sketchup.quit` 02:39:09; známy teardown `0xC0000374` až po výsledku. Po behu iba dokumentácia; predchádzajúce záznamy zachované.
+- **PR #463 ready**: natívna brána splnená; slepá zdrojová predrecenzia `746a4d69` má 0 P1/P2/P3. Kvótová brána pred otvorením: weekly 32 % zostáva, PASS.
+  Prvé GH kolo nad `714ffc93` našlo jedinú P1 v uzávere D-150: otvorený zápisník stále tvrdil čakanie na predrecenziu/native a archív nemal plný text ani index.
+  Dokumentačná oprava presúva celé pôvodné znenie s príčinou, riešením, PR a native dôkazom do [archívu](../../../archiv/DOGFOODING_vyriesene.md), dopĺňa index a zosúlaďuje PLAN/STAV.
+  Produkčný kód, testy, verzie a nasadenie bez zmeny. Slepú docs deltu a nové plné GH kolo/CI na opravenej hlave koordinuje root; žiadny merge. D-151/D-152 ostávajú zásobník, H18b-2 sa nerobí.

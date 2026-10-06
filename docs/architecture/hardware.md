@@ -834,8 +834,9 @@ chceme), `BuildPlan.parse_hardware_set_key` vracia `nil` (preto sa kľúč mapov
 - **Precedencia pre receptovú položku je TROJÚROVŇOVÁ:** owner triedny → triedny (skrinka) → projektový snapshot. Na nižšiu úroveň sa ide **LEN pri NEPRÍTOMNOM kľúči**;
   prítomná hodnota, ktorá sa nedá rozložiť (chýbajúce pásmo, nekompatibilný set), končí ako `unmapped` s dôvodom → RED `drawer_kit_missing`. Na generický `slide`/`slide@owner`
   sa naďalej NIKDY nepadá.
-- **Zápis (`apply_cabinet_override`).** Pre KLASIFIKOVANÉ položky sa už nepíše generický `slide@owner` (resolver by ho neprečítal — tichý no-op), ale owner triedny kľúč;
-  kľúč zloží **`override_class_key`** a len vtedy, keď všetky položky tej identity nesú ROVNAKÚ klasifikáciu (zmiešaná skrinka ostáva na generickom kľúči). Hodnotou smie byť
+- **Zápis (`apply_cabinet_override`).** Klasifikovaný výsuv a výklop s vlastníkom píšu owner triedny kľúč; legacy `typ@owner` pritom odpratajú.
+  **Záves dvierok aj sklopu s vlastníkom píše `hinge@<krídlo>`**, prvý kľúč reťaze závesu; ten sa ako stale nemaže. `override_class_key` naďalej určí triedu
+  aj pre validáciu krídla; všetky položky identity musia niesť rovnakú klasifikáciu (zmiešaná skrinka sa odmietne). Hodnotou smie byť
   aj **selektor podľa `height_variant`** (Atira; Quadro pevný `set_id`) — akcia panela `handle_set_hardware_set` ho prijme v poli `value` a do snapshotu zmrazí KAŽDÝ
   referencovaný set. **Validácia beží PRED zápisom** (`classified_value_problem` / `band_set_problem`): každé pásmo sa overí proti klasifikácii cieľového čela (otváranie,
   konštrukcia, systém), výška setu musí patriť do pásma, ktoré ho vydáva, selektor musí mať pásmo pre AKTUÁLNU výšku a neaktívna definícia sa odmietne — forged payload sa do
@@ -996,8 +997,8 @@ P2O set bez tlmenia + piest), takže pribudlo päť vecí:
 - **Triedny kľúč `hinge` je DVOJSEGMENTOVÝ** (`class:hinge|<opening_mode>`, bez konštrukcie zásuvky). `class_set_match?` je jediné miesto, kde sa
   rozhoduje, či set patrí do ponuky triedy: pre `slide` platí doterajšie „musí mať systém a konštrukciu", pre `hinge` **„musí byť set na dvierka"** —
   požiadavka „vydaný systém zásuviek" by závesové sety z ponuky vyhodila úplne (Sol kolo 2 FIX 3). Tú istú vetvu má aj zápisová validácia
-  `class_key_value_problem`. **Per-krídlo triedny override je MIMO F1**: `owner_scoped_class_head?` ho v parseri odmieta a UI ho neponúka (owner triedny
-  kľúč ostáva výhradou zásuviek).
+  `class_key_value_problem`. **Owner triedny kľúč závesu neexistuje**: `owner_scoped_class_head?` ho v parseri odmieta. UI pri krídle vyberá cez
+  `hinge@<krídlo>` a zápis ho validuje proti klasifikácii krídla; owner triedne kľúče ostávajú pre výsuv a výklop.
 - **PRECEDENCIA závesu je PÄŤSTUPŇOVÁ**: override vlastníka (`hinge@front:F1/wing:left`) → **triedny override skrinky** → **generický override skrinky
   `hinge`** → triedny kľúč projektu → **legacy `hinge`**. Dva rozdiely oproti zásuvke sú vecné: vlastný set NA SKRINKE nikdy ticho nespadne na projektový
   default (Codex #327 kolo 2), a na konci reťaze stojí legacy `hinge` — bez neho by KAŽDÁ existujúca zákazka po prestavbe stratila závesy (položky sú

@@ -948,8 +948,8 @@ module Noxun
           unless allow_owner
             return [nil, 'triedny kľúč nemá výber na úrovni dielca — ten je len na skrinke']
           end
-          # KOV-F1: per-kridlo triedny vyber je MIMO davky — parser ho odmieta
-          # a UI ho neponuka. Owner triedny kluc maju LEN triedy z
+          # H18b (D-150): vyber zavesu pri kridle je `hinge@<kridlo>`,
+          # nie owner triedny kluc. Owner triedny kluc maju LEN triedy z
           # `CLASS_OWNER_PART`: zasuvka (`class:slide|…@front:F1/panel`)
           # a KOV-E1a vyklop (`class:lift|…@front:F1/flap`).
           part = owner_scoped_class_part(head)
@@ -3048,6 +3048,8 @@ module Noxun
       # TRIEDNY — a s ownerom OWNER TRIEDNY (`class:slide|classic|metal@front:F1/panel`).
       # Genericky kluc by pre taku polozku resolver NEPRECITAL (C2a) a zapis by
       # bol tichy no-op.
+      # H18b (D-150): klasifikovany zaves s vlastnikom pise `hinge@<kridlo>`;
+      # owner triedny kluc zavesu neexistuje. Triedna validacia ostava cela.
       # -> [:ok, new_map, referenced_set_ids] | [:invalid, message, nil]
       def apply_cabinet_override(cfg, generic_type, owner_part_key, value, known_sets: nil)
         gt = generic_type.to_s.strip
@@ -3072,12 +3074,15 @@ module Noxun
         ck, ck_err = override_class_key(items, gt, owner)
         return [:invalid, ck_err, nil] if ck_err
 
-        key = ck || (owner ? "#{gt}@#{owner}" : gt)
+        # H18b: kluc, ktory resolver cita ako prvy vo vetve zavesu
+        # `resolve_mapping_source` (KOV-F1, patstupnova precedencia).
+        door_owner = ck && owner && items.all? { |item| door_item?(item) }
+        key = door_owner ? "#{gt}@#{owner}" : (ck || (owner ? "#{gt}@#{owner}" : gt))
         # KOV-D1a (Codex #308 kolo 1 P2): pri KLASIFIKOVANOM owner vybere je
         # LEGACY kluc `typ@owner` uz mrtvy (resolver ho pre taku polozku necita).
         # Zapis aj zrusenie ho preto odpratu — inak by po upgrade skrinky ostal
         # v configu a karta cela by ho dalej ukazovala ako aktualnu volbu.
-        stale = ck && owner ? "#{gt}@#{owner}" : nil
+        stale = ck && owner && !door_owner ? "#{gt}@#{owner}" : nil
         if value.nil? || (value.is_a?(String) && value.strip.empty?)
           map.delete(key)
           map.delete(stale) if stale

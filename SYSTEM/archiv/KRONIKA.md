@@ -17,6 +17,25 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **H18b-1 · P1 uzáveru D-150 (6.10.2026, PR #463 ready, v0.17.27).** Prvé GH kolo nad `714ffc93` našlo jedinú P1: D-150 ostalo otvorené a predrecenzia/native boli v zápisníku zastarané.
+  Plné pôvodné znenie, príčina, riešenie, PR a finálny native dôkaz presunuté do `DOGFOODING_vyriesene.md`, doplnený riadok navrch indexu. PLAN/STAV/package zosúladené s ready PR a native PASS; staré záznamy nižšie ostávajú historické.
+  Produkčný kód, testy, verzie aj nasadenie bez zmeny; po native `337f9601`/`run_20261006_023518_96292` (3400 PASS/0 FAIL) iba docs. D-151/D-152 zásobník, Q1 A/Q3 A platia, H18b-2 sa nerobí.
+  Predchádzajúci STAV hlásil draft PR #463 a GH/CI čakanie; aktuálne PR ready, P1 docs opravená. Slepá delta a nové plné GH kolo/CI na opravenej hlave ešte čakajú; žiadny merge.
+
+- **H18b-1 · natívna brána PASS (6.10.2026, v0.17.27, draft PR #463).** Po Michalovom potvrdení funkčného SketchUpu štandardný runner nad `337f96011c3b791b9dfd334111c2f4c994d0850d`, run `run_20261006_023518_96292`: **3400 PASS/0 FAIL**, exit 0.
+  Všetkých 13 H18b scenárov PASS: skutočný handler, Inspector, celý nákupný set, jeden krok Späť/Znova, prestavba, kópia, náhrada/zrušenie a kompatibilita. Testovacia kópia uložená; vlastná inštancia sama skončila (známy teardown `0xC0000374` až po výsledku).
+  Prvý FAIL aj druhý startup TIMEOUT zachované; po úspešnom behu sa mení iba dokumentácia. Zdrojová predrecenzia 0 P1/P2/P3 ostáva; draft čaká na GH review/CI a root, žiadny merge.
+
+- **H18b-1 · implementácia vo vetve (5.10.2026, v0.17.27, draft PR #463, výrobná/cenová dávka).** Michal schválil Q2 „H18B opraviť“; Q1 A/Q3 A ostávajú, H18b-2 sa nerobí.
+  Štart main `c6bba0b9` (H18 v0.17.26, PR #462), R0 commit `4a815dee` pred editom pluginu: 2816 zápisov a nákup reálnych skriniek R1–R8.
+  Klasifikovaný záves krídla zapisuje `hinge@<krídlo>` a tento kľúč neodstraňuje ako stale; validácia ostáva, F10 číta skutočne uložený výber.
+  Resolver, handler, parser a normalizácia bez zmeny vykonateľného tela; H18 goldeny bez regenerácie. D-151/D-152 sú zásobník.
+  Plná Ruby sada 5340/0/0 (cielená 7/0/0), všetkých 163 JS sád PASS, M1–M10 zhodené; súbory po mutáciách obnovené bajtovo. Finálny in-SU čaká na prihlásenie SketchUpu; PR je draft.
+  Prvý in-SU nad `bccee9d1`: 3396 PASS/4 FAIL, presný nákupný test vynechal 3 členy príslušenstva KLASIK; `746a4d69` doplnil ich kódy a počty bez zmeny produkcie.
+  Druhý štart 6.10. nad `746a4d69` nedošiel k testom: prihlásenie SketchUpu rieši Michal, jeho Welcome okno ostáva nedotknuté. Runner skončil po 8 minútach TIMEOUT/exit 1. Native brána NEOVERENÁ, žiadny merge.
+  Čerstvá slepá zdrojová predrecenzia 6.10. nad `746a4d69`: 0 P1/P2/P3, PR OK — SOURCE ONLY; native runtime tým nie je kvalifikovaný.
+  Predchádzajúci STAV: H18 zobrazuje účinný set a ráta vlastné výbery; git 5333 Ruby/0/0, 162 JS, M1–M34; archív 5332/0/1 bez .git.
+
 - **H18 · predrecenzia uzavretá (3.10.2026, PR #462, v0.17.26).** Čerstvá slepá delta `ba4431aa..29a2f6f2`: **0 P1/P2/P3, OPRAVA OK**;
   pôvodné 2 P2 aj následná 1 P2 opravené. Recenzent v izolovanom archíve: **5332 Ruby/0 FAIL/1 SKIP** (chýba `.git`), 162 JS sád PASS,
   H18 10 PASS + 1402 prípadov bez rozchodov, samostatný encoding PASS. Aktuálny plný clean-git beh implementátora ostáva **5333/0/0**.
