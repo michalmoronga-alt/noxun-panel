@@ -363,4 +363,4 @@ predrecenzia povinná. **Historický WAIT bol zrušený Michalovým schválením
   Pôvodný launch PID zanikol pred bootom (bez `su_result.txt` aj `close.log`); runner prirodzene skončil po 8 minútach TIMEOUT, exit 1. Žiadny kill/reštart ani zásah do Michalovho okna.
   **In-SU brána ostáva NEOVERENÁ** do skutočného PASS po vyriešení prihlásenia; prvý FAIL aj startup záznam sa zachovávajú oddelene.
 
-- **Draft PR #?**: dôvodom je čakajúca finálna in-SU brána a prihlásenie SketchUpu. Slepá zdrojová predrecenzia `746a4d69` má 0 P1/P2/P3; GH review sa spustí až po native PASS a prepnutí na ready. Kvótová brána pred otvorením: weekly 32 % zostáva, PASS. Žiadny merge.
+- **Draft PR #463**: dôvodom je čakajúca finálna in-SU brána a prihlásenie SketchUpu. Slepá zdrojová predrecenzia `746a4d69` má 0 P1/P2/P3; GH review sa spustí až po native PASS a prepnutí na ready. Kvótová brána pred otvorením: weekly 32 % zostáva, PASS. Žiadny merge.

@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **H18b-1 · implementácia vo vetve (5.10.2026, v0.17.27, draft PR #?, výrobná/cenová dávka).** Michal schválil Q2 „H18B opraviť“; Q1 A/Q3 A ostávajú, H18b-2 sa nerobí.
+- **H18b-1 · implementácia vo vetve (5.10.2026, v0.17.27, draft PR #463, výrobná/cenová dávka).** Michal schválil Q2 „H18B opraviť“; Q1 A/Q3 A ostávajú, H18b-2 sa nerobí.
   Štart main `c6bba0b9` (H18 v0.17.26, PR #462), R0 commit `4a815dee` pred editom pluginu: 2816 zápisov a nákup reálnych skriniek R1–R8.
   Klasifikovaný záves krídla zapisuje `hinge@<krídlo>` a tento kľúč neodstraňuje ako stale; validácia ostáva, F10 číta skutočne uložený výber.
   Resolver, handler, parser a normalizácia bez zmeny vykonateľného tela; H18 goldeny bez regenerácie. D-151/D-152 sú zásobník.
@@ -1266,11 +1266,11 @@
   a `antigravity-outside-in` zladené; **SYSTEM/README, STAV a PLAN** — hlavičky a pravidlá. Guard dĺžky riadkov a odkazov stráži aj WORKFLOW.md; status riadok
   záznamu rozhodnutí dostal tvar, ktorý žiada guard konceptov. Pravidlo Z7 (ukazovateľ kontextu) je v CLAUDE.md z PR #392 (záznam nižšie). Mimo repa
   (orchestrátor): N15, N16; ďalej PR C (register agentov) a PR D (Grok plugin). **Review:** GH Codex kolo 1 = 5× P2 (pri Codex kvóte pod 10 % rozhoduje
-  trieda dávky · hranica 80 % len pre implementátora · `PR #?` doplnený samostatným commitom po `gh pr create` · kvótová brána aj pred auditom · `model:`
+  trieda dávky · hranica 80 % len pre implementátora · `PR #463` doplnený samostatným commitom po `gh pr create` · kvótová brána aj pred auditom · `model:`
   v tabuľke rolí) + Michalove spresnenia Q1–Q6 (predrecenzia nad 300 riadkov alebo s novým prvkom UI povinná · `gh pr ready` pri drafte spustí kolo, pri
   kvóte pod 10 % sa naň nečaká · debata a mockup v priečinku bloku, po uzávere fyzický presun s kontrolou odkazov, `zdroje/ui20/` ostáva · backlog N4
   v zásobníku PLAN); slepá delta opráv (1× P2 + 4× P3) doplnila opravu P0/P1 medzi prípady pre Michala, `gh pr ready` rozhoduje len o čakaní na kolo,
-  `PR #?` všade (aj STAV a DOGFOODING_vyriesene) s kontrolou orchestrátorom, poznámky k vetvám diagramov a dodatok §6 v zázname rozhodnutí — bez
+  `PR #463` všade (aj STAV a DOGFOODING_vyriesene) s kontrolou orchestrátorom, poznámky k vetvám diagramov a dodatok §6 v zázname rozhodnutí — bez
   nového GH kola.
 - **NÁSTROJ — oprava hooku kontroly kódovania po úprave súboru (26.9.2026, PR #394, hook Claude Code; verzia pluginu sa nemení).** Hook `post_edit_check.ps1`
   (od 24.7.) reálne nebežal: Claude Code spúšťa hooky na Windows cez Git Bash a ten z príkazu v dvojitých úvodzovkách zjedol `$d`/`$env:` → parse error PowerShellu

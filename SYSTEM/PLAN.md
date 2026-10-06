@@ -1,7 +1,7 @@
 # PLAN — čo sa ide robiť (bloky prác)
 
 > Roadmapa **bez histórie**: bloky v poradí, každý s cieľom a zaradenými položkami. Blok NEMÁ číslo verzie vopred — **dostane ho pri štarte** (minor bump = výhradne uzáver bloku).
-> **Evidencia (od 26.9.2026):** hotová dávka **ostáva v bloku ako riadok s ✅ a číslom PR** (pred `gh pr create` `PR #?`, číslo doplní samostatný commit hneď po vytvorení PR);
+> **Evidencia (od 26.9.2026):** hotová dávka **ostáva v bloku ako riadok s ✅ a číslom PR** (pred `gh pr create` `PR #463`, číslo doplní samostatný commit hneď po vytvorení PR);
 > odsek o nej ide do [archiv/KRONIKA.md](archiv/KRONIKA.md) a [STAV.md](STAV.md) sa prepíše pri zvýšení VERSION, pri dokumentačnom PR, ktoré mení stav bloku, smoke alebo poradie prác, sa v ňom aktualizuje faktický stav v „Stav" (verzia a čísla testov sa nemenia) a prepíšu „Robí sa" a „Ďalší krok".
 > Blok sa presúva plným textom do [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md) až s **uzáverom bloku** (fajka patrí do riadku, nikdy do nadpisu — stráži guard).
 > Plné znenie otvorených postrehov žije v [DOGFOODING.md](DOGFOODING.md) **v skupinách podľa týchto blokov** — tu je len číslo, názov a jedna veta; skupina „smoke po uzávere" je dočasná a zanikne s posledným nálezom.
@@ -58,7 +58,7 @@ predrecenzia, in-SU) sa určí pri package podľa CLAUDE.md; stĺpec je predpokl
 | H17 · spoločná príprava exportov (prvý rez R-15) | C-06 | kód · audit · výrobná |
 | ✅ H18 · Inspector ukáže skutočne použitý set závesov (D-149, rozhodnutie Michala 3A); nákup a ceny bez zmeny — [package](zdroje/bloky/HARDENING/PACKAGE_H18.md), **PR #462** | — | kód · audit · výrobná/cenová (zobrazenie) · predrecenzia |
 
-| H18b-1 · voľba setu krídla naozaj platí (D-150); Q2 schválené Michalom 5.10.2026, implementácia vo v0.17.27 — [package](zdroje/bloky/HARDENING/PACKAGE_H18b.md); slepá zdrojová predrecenzia 0 P1/P2/P3; finálny in-SU čaká na login; draft PR #? | — | kód · výrobná/cenová · predrecenzia · in-SU |
+| H18b-1 · voľba setu krídla naozaj platí (D-150); Q2 schválené Michalom 5.10.2026, implementácia vo v0.17.27 — [package](zdroje/bloky/HARDENING/PACKAGE_H18b.md); slepá zdrojová predrecenzia 0 P1/P2/P3; finálny in-SU čaká na login; draft PR #463 | — | kód · výrobná/cenová · predrecenzia · in-SU |
 
 **Otvorené po H18:** D-150 → H18b-1 (implementované, brány čakajú); D-151 (výklop bez systému) a D-152 (oživenie mŕtveho výberu) → zásobník.
 
