@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **Matica výberu agentov (7.10.2026, PR #?, docs).** Michal schválil 7.10. výber implementátora podľa triedy dávky. Fakt overený orchestrátorom: effort subagenta sa pri volaní Agent tool nedá nastaviť, len `effort:` v definícii typu (parameter `model:` prepíše model, effort nie; code.claude.com/docs/en/sub-agents) — typy agentov sú preto **profily** (model + effort).
+- **Matica výberu agentov (7.10.2026, PR #465, docs).** Michal schválil 7.10. výber implementátora podľa triedy dávky. Fakt overený orchestrátorom: effort subagenta sa pri volaní Agent tool nedá nastaviť, len `effort:` v definícii typu (parameter `model:` prepíše model, effort nie; code.claude.com/docs/en/sub-agents) — typy agentov sú preto **profily** (model + effort).
   Nové typy `implementator-lahky` (Sonnet `medium`, trieda Ľ) a `implementator-stredny` (Sonnet `high`, trieda S); `implementator` ostáva profil Ť (Opus `high`). WORKFLOW § 2: riadky profilov v Obsadení rolí a nová podsekcia **Matica výberu** (triedy, profily, postup výberu, eskalácia P1 → Opus, shadow len pri voľných limitoch, povýšenie po 5 behoch, návrhy orchestrátora na potvrdenie Michala, smer Claude/Codex/Grok); § 10 odsek o Grok shadow odkazuje na maticu.
   Parser modu `usage-bar` (`parseRoleModels`) overený spustením jeho funkcie nad WORKFLOW z main aj z vetvy: rovnaký výstup (Codex `gpt-6-astra`, `gpt-6.1-sol`; Grok `grok-4.7`), nové riadky ani podsekcia ho nerozbíjajú. Kód pluginu, verzia ani STAV bez zmeny.
 - **Roly: náhradníci, čakanie, kontrola modelu, Grok shadow (7.10.2026, PR #464, docs).** Zápis rozhodnutí, ktoré Michal schválil 6.10.2026 (návrh routera v `noxun-mods`, otázky 1–4).
